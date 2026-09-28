@@ -69,6 +69,9 @@ import { APP_CONNECTION_LOST_MESSAGE, APP_OPERATION_ERROR_MESSAGE, reportAppErro
 import { isComunicadoPending, isMockComunicados, loadDriverComunicados, type ComunicadoDestinatario } from "./lib/comunicados";
 import type { ComunicadosLoadStatus } from "./screens/ComunicadosScreen";
 import { clearMediaDraft, loadMediaDraft, saveMediaDraft, touchMediaDraft } from "./lib/mediaDraftStore";
+import { summarizeExpenseUploads, type ExpenseSubmission, type ExpenseUploadRow } from "./lib/expenseUploadState";
+import { resumeExpenseSubmission } from "./lib/expenseSubmission";
+import { usesAsyncExpenseUpload, expenseSubmissionStorageKey, ensureExpenseSubmissionRemote, loadExpenseUploadRowsRemote, transitionExpenseUploadRemote, dispatchExpenseUploadRemote, createExpenseUploadItem } from "./lib/dataverse";
 
 const EXCHANGE_ERROR_MESSAGES: Record<string, string> = {
   EXCHANGE_CONCURRENCY_CONFLICT: "A troca foi alterada por outra pessoa. Atualize a agenda e tente novamente.",
@@ -449,6 +452,57 @@ function App() {
   const [expenseReferenceError, setExpenseReferenceError] = useState("");
   const [receiptClienteOptions, setReceiptClienteOptions] = useState<string[]>([]);
   const [expensePhotos, setExpensePhotos] = useState<ExpensePhoto[]>([]);
+  const [expenseSubmission, setExpenseSubmission] = useState<ExpenseSubmission | null>(null);
+  const [expenseUploadRows, setExpenseUploadRows] = useState<ExpenseUploadRow[]>([]);
+  const [expenseUploadReady, setExpenseUploadReady] = useState(false);
+  const expenseSubmissionRef = useRef<ExpenseSubmission | null>(null);
+  const expenseSubmitBusyRef = useRef(false);
+  const expenseUploadSummary = expenseSubmission?.expenseConfirmed ? summarizeExpenseUploads(expenseSubmission.items, expenseUploadRows) : null;
+  const expenseUploadMessage = !expenseUploadSummary ? ""
+    : expenseUploadSummary.complete ? expenseSubmission?.items.length ? "Despesa e comprovantes registrados." : "Despesa registrada."
+    : expenseUploadSummary.pending ? `Despesa registrada; ${expenseUploadSummary.pending} comprovante(s) em processamento${expenseUploadSummary.failed ? `; ${expenseUploadSummary.failed} com falha confirmada` : ""}. Você pode sair e voltar para acompanhar.`
+    : `${expenseUploadSummary.sent} comprovante(s) enviado(s); ${expenseUploadSummary.failed} com falha confirmada.`;
+
+  useEffect(() => {
+    if (!remoteMode || !driverContext || !usesAsyncExpenseUpload()) return;
+    let active = true;
+    setExpenseUploadReady(false);
+    loadMediaDraft<ExpenseSubmission>(expenseSubmissionStorageKey(driverContext.id)).then(saved => {
+      if (!active) return;
+      expenseSubmissionRef.current = saved;
+      setExpenseSubmission(saved);
+      if (saved) {
+        setExpenseDraft(saved.draft);
+        setExpensePhotos(saved.items.map(item => ({ id: item.id, dataUrl: item.dataUrl, mediaType: item.mimeType.startsWith("video/") ? "video" : "foto" })));
+      }
+      setExpenseUploadReady(true);
+    }).catch(error => { if (active) setCriticalError(error instanceof Error ? error.message : "Falha ao restaurar envio de despesa."); });
+    return () => { active = false; };
+  }, [remoteMode, driverContext?.id]);
+
+  useEffect(() => {
+    if (!expenseSubmission || !remoteMode) return;
+    let active = true;
+    let busy = false;
+    let reportedFailure = false;
+    const refresh = async () => {
+      if (busy || document.visibilityState !== "visible") return;
+      busy = true;
+      try {
+        const rows = await loadExpenseUploadRowsRemote(expenseSubmission.expenseId);
+        if (active) setExpenseUploadRows(rows);
+        reportedFailure = false;
+      } catch (error) {
+        if (active && !reportedFailure) reportAppError(error, { severity: "warning", source: "app", action: "expenseUploadStatus", phase: "poll", screen: "gastos", detailId: expenseSubmission.expenseId });
+        reportedFailure = true;
+      } finally { busy = false; }
+    };
+    void refresh();
+    const timer = window.setInterval(() => { void refresh(); }, 5000);
+    const onVisible = () => { void refresh(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { active = false; window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
+  }, [expenseSubmission, remoteMode]);
   const [expensePhotoDraft, setExpensePhotoDraft] = useState("");
   const [expensePhotoPreviewUrl, setExpensePhotoPreviewUrl] = useState("");
   const [expensePhotoPosterUrl, setExpensePhotoPosterUrl] = useState("");
@@ -1588,7 +1642,81 @@ function App() {
     }
   };
 
+  const submitExpenseAsync = async (draft: ExpenseDraft) => {
+    if (expenseSubmitBusyRef.current || !expenseUploadReady) return;
+    expenseSubmitBusyRef.current = true;
+    try {
+      setRemoteOperation({ title: "Registrando gasto", message: "Preparando envio seguro.", phase: "loading" });
+      const driver = driverContext ?? await getDriverContext();
+      const key = expenseSubmissionStorageKey(driver.id);
+      let submission = expenseSubmissionRef.current;
+      if (submission?.expenseConfirmed && summarizeExpenseUploads(submission.items, expenseUploadRows).complete) {
+        await clearMediaDraft(key);
+        expenseSubmissionRef.current = null;
+        setExpenseSubmission(null);
+        setExpenseUploadRows([]);
+        setExpenseDraft({ ...EMPTY_EXPENSE_DRAFT });
+        revokePhotoPreviewUrls(expensePhotos);
+        setExpensePhotos([]);
+        setScreen("inicio");
+        setToast("Despesa e comprovantes registrados.");
+        return;
+      }
+      if (submission?.expenseConfirmed && expenseUploadSummary?.pending && submission.items.every(item => item.dispatchStarted && !item.previousAttemptId)) {
+        // An explicit user action may close an unclaimed attempt. A claimed run
+        // is protected by the server's row version and continues processing.
+        const current = await loadExpenseUploadRowsRemote(submission.expenseId);
+        for (const item of submission.items) {
+          if (current.some(row => row.cr40f_anexodespesaoperacionalid === item.id && row.new_uploadattemptid === item.attemptId && row.cr40f_status === 100000000)) {
+            await transitionExpenseUploadRemote({ action: "cancelUnclaimed", attachmentId: item.id, attemptId: item.attemptId });
+          }
+        }
+        setExpenseUploadRows(await loadExpenseUploadRowsRemote(submission.expenseId));
+        setToast("Status consultado. Somente tentativas ainda não iniciadas foram encerradas; as demais continuam em processamento.");
+        return;
+      }
+      if (!submission) {
+        await assertExpenseSchemaReadyRemote();
+        const photos = await Promise.all(expensePhotos.filter(hasMediaDraftContent).map(prepareMediaDraftForUpload));
+        const vehicleId = draft.veiculoId || getDriverCurrentVehicleId(driver);
+        const names = await loadExpenseLookupNavigationNamesRemote({ includeVeiculo: Boolean(vehicleId), includeReserva: false });
+        const payload = buildExpenseCreatePayload({
+          draft, photos, referenceData: expenseReferenceData, motoristaId: driver.id, veiculoId: vehicleId,
+          categoryEntitySet: DATAVERSE.categoriasDespesasOperacionais, paymentMethodEntitySet: DATAVERSE.formasPagamentoDespesas,
+          cityEntitySet: DATAVERSE.cidades, motoristaEntitySet: DATAVERSE.funcionarios, veiculoEntitySet: DATAVERSE.veiculos,
+          reservaEntitySet: DATAVERSE.geral, lookupNavigationNames: names
+        });
+        submission = {
+          expenseId: crypto.randomUUID(), expenseConfirmed: false, draft: { ...draft }, payload, motoristaId: driver.id,
+          items: photos.map((photo, index) => createExpenseUploadItem(photo.dataUrl, index + 1))
+        };
+        // Never send anything until the durable journal succeeds.
+        await saveMediaDraft(submission, key);
+        expenseSubmissionRef.current = submission;
+        setExpenseSubmission(submission);
+      }
+      const rows = await resumeExpenseSubmission(submission, {
+        save: async value => { await saveMediaDraft(value, key); setExpenseSubmission({ ...value }); },
+        ensure: ensureExpenseSubmissionRemote,
+        loadRows: loadExpenseUploadRowsRemote,
+        retry: (id, attempt, next) => transitionExpenseUploadRemote({ action: "retry", attachmentId: id, attemptId: attempt, nextAttemptId: next }),
+        dispatch: dispatchExpenseUploadRemote,
+        report: (error, attachmentId, attemptId) => reportAppError(error, { severity: "warning", source: "app", action: "expenseUpload", phase: "acceptanceUnknown", screen: "gastos", detailId: submission!.expenseId, payload: { attachmentId, attemptId } })
+      }, Boolean(expenseUploadSummary?.canRetry));
+      setExpenseUploadRows(rows);
+      const summary = summarizeExpenseUploads(submission.items, rows);
+      setToast(!submission.items.length ? "Despesa registrada." : summary.pending ? "Despesa registrada; comprovante em processamento." : summary.failed ? "Despesa registrada; há comprovantes com falha confirmada." : "Despesa e comprovantes registrados.");
+    } catch (error) {
+      reportAppError(error, { source: "app", action: "expenseUpload", phase: "prepare", screen: "gastos", detailId: expenseSubmissionRef.current?.expenseId });
+      setCriticalError(error instanceof Error ? error.message : "Falha ao preparar despesa. O envio foi preservado.");
+    } finally {
+      setRemoteOperation(null);
+      expenseSubmitBusyRef.current = false;
+    }
+  };
+
   const submitExpense = async (draft: ExpenseDraft) => {
+    if (usesAsyncExpenseUpload()) return submitExpenseAsync(draft);
     if (remoteOperation) return;
     if (!remoteMode) {
       setToast("Abra no Power Apps para registrar no Dataverse.");
@@ -2567,12 +2695,16 @@ function App() {
   if (screen === "gastos") {
     return show(
       <ExpenseScreen
+        uploadMessage={expenseUploadMessage}
+        formLocked={Boolean(expenseSubmission)}
+        submitLabel={expenseUploadSummary?.complete ? "CONCLUIR" : expenseUploadSummary?.canRetry ? "TENTAR COMPROVANTES NOVAMENTE" : expenseSubmission?.items.every(item => item.dispatchStarted && !item.previousAttemptId) ? "VERIFICAR ENVIO" : expenseSubmission ? "CONTINUAR ENVIO" : "REGISTRAR"}
+        submitDisabled={usesAsyncExpenseUpload() && !expenseUploadReady}
         draft={expenseDraft}
         photos={expensePhotos}
         referenceData={expenseReferenceData}
         referenceLoading={expenseReferenceLoading}
         referenceError={!remoteMode ? "Visualização local. Para gravar, abra o app publicado no Model-driven." : expenseReferenceError}
-        onDraftChange={setExpenseDraft}
+        onDraftChange={(draft) => { if (!expenseSubmission) setExpenseDraft(draft); }}
         onAddPhoto={openExpenseCamera}
         onPreviewPhoto={openExpensePreview}
         onBack={() => setScreen("inicio")}

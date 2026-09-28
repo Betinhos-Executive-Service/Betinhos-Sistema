@@ -24,17 +24,17 @@ function openDatabase(): Promise<IDBDatabase> {
   });
 }
 
-export async function loadMediaDraft<T>(): Promise<T | null> {
+export async function loadMediaDraft<T>(key = RECORD_KEY): Promise<T | null> {
   if (typeof indexedDB === "undefined") return null;
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, "readwrite");
     const store = transaction.objectStore(STORE_NAME);
-    const request = store.get(RECORD_KEY);
+    const request = store.get(key);
     request.onsuccess = () => {
       const record = request.result as StoredDraft<T> | undefined;
       if (!record || record.expiresAt <= Date.now()) {
-        if (record) store.delete(RECORD_KEY);
+        if (record) store.delete(key);
         resolve(null);
       } else resolve(record.payload);
     };
@@ -43,15 +43,18 @@ export async function loadMediaDraft<T>(): Promise<T | null> {
   });
 }
 
-export async function saveMediaDraft<T>(payload: T): Promise<void> {
-  if (typeof indexedDB === "undefined") return;
+export async function saveMediaDraft<T>(payload: T, key = RECORD_KEY): Promise<void> {
+  if (typeof indexedDB === "undefined") {
+    if (key !== RECORD_KEY) throw new Error("Armazenamento local indisponível. Nenhuma despesa foi enviada.");
+    return;
+  }
   const serializedSize = new Blob([JSON.stringify(payload)]).size;
   if (serializedSize > MAX_BYTES) throw new Error("[MEDIA_STORAGE_LIMIT] Rascunhos de mídia excederam 25 MB. Remova fotos antigas.");
   return queueWrite(async () => {
     const db = await openDatabase();
     await new Promise<void>((resolve, reject) => {
       const transaction = db.transaction(STORE_NAME, "readwrite");
-      transaction.objectStore(STORE_NAME).put({ key: RECORD_KEY, savedAt: Date.now(), expiresAt: Date.now() + EXPIRES_MS, payload } satisfies StoredDraft<T>);
+      transaction.objectStore(STORE_NAME).put({ key, savedAt: Date.now(), expiresAt: key === RECORD_KEY ? Date.now() + EXPIRES_MS : Number.MAX_SAFE_INTEGER, payload } satisfies StoredDraft<T>);
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error);
     });
@@ -78,13 +81,13 @@ export async function touchMediaDraft(): Promise<void> {
   });
 }
 
-export async function clearMediaDraft(): Promise<void> {
+export async function clearMediaDraft(key = RECORD_KEY): Promise<void> {
   if (typeof indexedDB === "undefined") return;
   return queueWrite(async () => {
     const db = await openDatabase();
     await new Promise<void>((resolve, reject) => {
       const transaction = db.transaction(STORE_NAME, "readwrite");
-      transaction.objectStore(STORE_NAME).delete(RECORD_KEY);
+      transaction.objectStore(STORE_NAME).delete(key);
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error);
     });
