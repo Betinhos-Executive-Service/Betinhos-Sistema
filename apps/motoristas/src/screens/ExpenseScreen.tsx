@@ -18,6 +18,10 @@ import {
 import type { MaintenanceRequestVehicleOption } from "../lib/dataverse";
 
 type ExpenseScreenProps = {
+  uploadMessage?: string;
+  formLocked?: boolean;
+  submitLabel?: string;
+  submitDisabled?: boolean;
   draft: ExpenseDraft;
   photos: ExpensePhoto[];
   referenceData: ExpenseReferenceData;
@@ -40,6 +44,10 @@ function focusInvalidField(element: HTMLElement | null) {
 }
 
 export function ExpenseScreen({
+  uploadMessage = "",
+  formLocked = false,
+  submitLabel = "REGISTRAR",
+  submitDisabled = false,
   draft,
   photos,
   referenceData,
@@ -115,7 +123,8 @@ export function ExpenseScreen({
   };
 
   const submit = () => {
-    if (isSubmitting) return;
+    if (isSubmitting || submitDisabled) return;
+    if (formLocked) { onSubmit(draft); return; }
     const nextErrors = validateExpenseDraft(draft, photos, referenceData);
     setErrors(nextErrors);
     if (nextErrors.categoriaId) return focusInvalidField(categoryRef.current);
@@ -145,7 +154,7 @@ export function ExpenseScreen({
       <section className="main-panel maintenance-request-main">
         <article className="finalize-card maintenance-request-card">
           <div className="finalize-scroll">
-            <div className="finalize-form maintenance maintenance-request-form expense-form">
+            <fieldset disabled={formLocked || isSubmitting} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }} className="finalize-form maintenance maintenance-request-form expense-form">
               {referenceLoading ? <div className="form-error-summary">Carregando regras de despesa.</div> : null}
               {!referenceLoading && referenceError ? <div className="form-error-summary">{referenceError}</div> : null}
               {!referenceLoading && !referenceError && (!categoriesReady || !paymentReady || !citiesReady) ? (
@@ -333,13 +342,15 @@ export function ExpenseScreen({
                   </div>
                 </div>
               </FormField>
-            </div>
+            </fieldset>
           </div>
+          {uploadMessage ? <p role="status" aria-live="polite">{uploadMessage}</p> : null}
           <ActionBar className="finalize-actions maintenance-actions">
             <ActionButton
               className="finalize-primary"
               variant="primary"
-              idleLabel="REGISTRAR"
+              idleLabel={submitLabel}
+              disabled={submitDisabled}
               loadingLabel="REGISTRANDO"
               successLabel="REGISTRADO"
               state={submitState}

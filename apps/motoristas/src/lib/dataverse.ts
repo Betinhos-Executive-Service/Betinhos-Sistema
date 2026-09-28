@@ -1,4 +1,5 @@
 import type { AgendaItem, DetailAction, DetailData, DetailField, MaintenancePhotoKind } from "../types";
+import { ATTACHMENT_STATUS, type ExpenseSubmission, type ExpenseUploadItem, type ExpenseUploadRow } from "./expenseUploadState.ts";
 
 import type { CollisionLookupNavigationNames, CollisionPhotoKind } from "./collisions";
 import {
@@ -225,6 +226,7 @@ const ENTITY_SET_TO_ENTITY_NAME: Record<string, string> = {
 };
 
 const FLOW_URLS = {
+  expenseAsync: "VITE_FLOW_DESPESA_ASYNC_URL",
   gerarVoucher: "VITE_FLOW_GERAR_VOUCHER_URL",
   salvarFotosManutencao: "VITE_FLOW_SALVAR_FOTOS_MANUTENCAO_URL",
   enviarReciboCliente: "VITE_FLOW_ENVIAR_RECIBO_CLIENTE_URL"
@@ -233,6 +235,7 @@ const FLOW_URLS = {
 const DEV_DATAVERSE_URL = "https://org23b93544.crm2.dynamics.com/";
 
 const FLOW_DATAVERSE_ENVIRONMENT_VARIABLES: Record<string, string | undefined> = {
+  [FLOW_URLS.expenseAsync]: "new_FlowURLDespesaAsync",
   [FLOW_URLS.gerarVoucher]: "new_FlowURLFlowGerarVoucherAppMotoristasv2",
   [FLOW_URLS.salvarFotosManutencao]: "new_FlowURLFlowSalvarArquivosOnedrive",
   [FLOW_URLS.enviarReciboCliente]: "new_FlowURLFlowEnviarReciboCliente"
@@ -1204,6 +1207,89 @@ async function uploadMaintenancePhoto(
     mimeType,
     metadata
   });
+}
+
+export function usesAsyncExpenseUpload() {
+  return hasDataverseRuntime() && `${getClientUrl()}/`.toLowerCase() === DEV_DATAVERSE_URL.toLowerCase();
+}
+
+export function expenseSubmissionStorageKey(motoristaId: string) {
+  return `expense-upload:${getClientUrl().toLowerCase()}:${cleanGuid(motoristaId)}`;
+}
+
+export function createExpenseUploadItem(dataUrl: string, order: number): ExpenseUploadItem {
+  const mimeType = getDataUrlMimeType(dataUrl);
+  const fileName = `comprovante-${order}.${getFileExtensionFromMimeType(mimeType)}`;
+  assertValidBase64Payload(dataUrlToBase64(dataUrl), { fileName, mimeType });
+  return { id: crypto.randomUUID(), attemptId: crypto.randomUUID(), dataUrl, mimeType, fileName, order, dispatchStarted: false };
+}
+
+async function expenseRequest(path: string, method = "GET", body?: Record<string, unknown>, headers: Record<string, string> = {}) {
+  const response = await fetch(`${getClientUrl()}/api/data/v9.2/${path}`, {
+    method,
+    headers: { Accept: "application/json", "Content-Type": "application/json", ...headers },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (response.status === 404 && method === "GET") return null;
+  const text = await response.text();
+  if (!response.ok) throw new Error(`Despesa: HTTP ${response.status}. ${text}`);
+  return text ? JSON.parse(text) : {};
+}
+
+async function ensureExpenseRecord(entitySet: string, id: string, payload: Record<string, unknown>) {
+  const path = `${entitySet}(${cleanGuid(id)})`;
+  if (await expenseRequest(path)) return;
+  try {
+    await expenseRequest(path, "PATCH", payload, { "If-None-Match": "*" });
+  } catch (error) {
+    // A lost create response is recoverable only after the exact ID is found.
+    if (!await expenseRequest(path)) throw error;
+  }
+}
+
+export async function ensureExpenseSubmissionRemote(submission: ExpenseSubmission) {
+  if (!usesAsyncExpenseUpload()) throw new Error("Envio assíncrono disponível somente no DEV.");
+  // Fail before creating any row when the deployment/permissions are incomplete.
+  await assertEntityHasAttributes(DATAVERSE.anexosDespesasOperacionais, "Anexos de despesas", ["new_uploadattemptid", "new_uploadrunid", "new_uploaderror", "cr40f_mimetype", "cr40f_driveitemid"]);
+  if (!await resolveFlowUrl(FLOW_URLS.expenseAsync)) throw new Error("Flow assíncrono de despesas não configurado.");
+  await ensureExpenseRecord(DATAVERSE.despesasOperacionais, submission.expenseId, {
+    ...submission.payload, new_uploadexpectedcount: submission.items.length
+  });
+  if (!submission.items.length) return;
+  const names = await loadExpenseAttachmentLookupNavigationNamesRemote();
+  for (const item of submission.items) {
+    await ensureExpenseRecord(DATAVERSE.anexosDespesasOperacionais, item.id, {
+      cr40f_nome: `Comprovante ${item.order} - ${String(submission.payload.cr40f_nome)}`.slice(0, 120),
+      cr40f_nomearquivo: item.fileName,
+      cr40f_ordem: item.order,
+      cr40f_mimetype: item.mimeType,
+      cr40f_tipo: 100000000,
+      cr40f_status: ATTACHMENT_STATUS.pending,
+      new_uploadattemptid: item.attemptId,
+      [`${names.despesa}@odata.bind`]: bind(DATAVERSE.despesasOperacionais, submission.expenseId),
+      [`${names.enviadoPor}@odata.bind`]: bind(DATAVERSE.funcionarios, submission.motoristaId)
+    });
+  }
+}
+
+export async function loadExpenseUploadRowsRemote(expenseId: string): Promise<ExpenseUploadRow[]> {
+  const result = await expenseRequest(`${DATAVERSE.anexosDespesasOperacionais}?$select=cr40f_anexodespesaoperacionalid,cr40f_status,new_uploadattemptid,new_uploaderror&$filter=_cr40f_despesa_value eq ${cleanGuid(expenseId)}`);
+  return result?.value ?? [];
+}
+
+export async function transitionExpenseUploadRemote(command: Record<string, unknown>): Promise<{ applied: boolean; status: number }> {
+  const result = await expenseRequest("new_ExpenseUploadTransition", "POST", { new_Command: JSON.stringify(command) });
+  return JSON.parse(result.new_Result);
+}
+
+export async function dispatchExpenseUploadRemote(item: ExpenseUploadItem) {
+  const url = await resolveFlowUrl(FLOW_URLS.expenseAsync);
+  if (!url) throw new Error("Flow assíncrono de despesas não configurado.");
+  const response = await fetch(url, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ attachmentId: item.id, attemptId: item.attemptId, conteudoBase64: dataUrlToBase64(item.dataUrl) })
+  });
+  if (response.status !== 202) throw new Error(`Aceitação do comprovante indefinida: HTTP ${response.status}. Consulte o status antes de reenviar.`);
 }
 
 export async function uploadExpenseInvoiceRemote({

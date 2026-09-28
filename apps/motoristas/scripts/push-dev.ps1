@@ -1,17 +1,25 @@
 param(
-  [switch] $DeviceCode
+  [switch] $DeviceCode,
+  [switch] $ExpenseUploadOnly
 )
 
 if ($PSVersionTable.PSEdition -eq "Core" -or $PSHOME -like "*codex-runtimes*") {
   $windowsPowerShell = Join-Path $env:WINDIR "System32\WindowsPowerShell\v1.0\powershell.exe"
   $arguments = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $PSCommandPath)
   if ($DeviceCode) { $arguments += "-DeviceCode" }
+  if ($ExpenseUploadOnly) { $arguments += "-ExpenseUploadOnly" }
   & $windowsPowerShell @arguments
   exit $LASTEXITCODE
 }
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+
+if ($ExpenseUploadOnly) {
+  $expensePwsh = (Get-Command pwsh -ErrorAction Stop).Source
+  & $expensePwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'push-expense-upload-dev.ps1')
+  exit $LASTEXITCODE
+}
 
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $workspaceParent = Split-Path $root -Parent
