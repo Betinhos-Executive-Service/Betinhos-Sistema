@@ -2,6 +2,15 @@
 @import './design-tokens.css';
 @import './components/button.css';
 
+/* Centabel Book: fonte de títulos da marca; na interface, só no título de página. */
+@font-face {
+  font-family: 'Centabel Book';
+  src: url('./fonts/centabel-book.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 *, *::before, *::after { box-sizing: border-box; }
 html, body { height: 100%; }
 body {
