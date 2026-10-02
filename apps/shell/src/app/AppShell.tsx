@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { ChevronDown, ExternalLink, Menu as MenuIcon, X } from 'lucide-react'
+import { ChevronDown, Download, ExternalLink, Menu as MenuIcon, X } from 'lucide-react'
 import { MENU, itemLabel, type MenuGroup, type MenuItem } from '../nav/menu'
 import { hrefFor } from '../nav/useHashRoute'
+import { useInstallPrompt } from './useInstallPrompt'
 
 type Props = {
   activeId: string
@@ -51,6 +52,7 @@ function NavGroup({ group, open, onToggle, activeId, entityLabels }: { group: Me
 export function AppShell({ activeId, activeGroupId, title, entityLabels, connection, children }: Props) {
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set(activeGroupId ? [activeGroupId] : []))
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const install = useInstallPrompt()
 
   // Ao navegar, o grupo do item ativo abre e a gaveta mobile fecha.
   useEffect(() => {
@@ -97,6 +99,12 @@ export function AppShell({ activeId, activeGroupId, title, entityLabels, connect
             <NavGroup key={group.id} group={group} open={openGroups.has(group.id)} onToggle={() => toggle(group.id)} activeId={activeId} entityLabels={entityLabels} />
           ))}
         </div>
+        {install ? (
+          <button type="button" className="nav-item nav-install" onClick={install}>
+            <Download size={20} aria-hidden="true" />
+            <span className="nav-item__label">Instalar app</span>
+          </button>
+        ) : null}
         <div className="app-shell__status" role="status">
           <span className="status-dot" data-ok={connection.ok} aria-hidden="true" />
           <span>{connection.text}</span>

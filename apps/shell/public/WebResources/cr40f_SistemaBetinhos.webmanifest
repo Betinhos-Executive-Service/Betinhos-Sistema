@@ -1,0 +1,17 @@
+{
+  "id": "/WebResources/cr40f_SistemaBetinhosLoader.html",
+  "name": "Sistema Betinhos",
+  "short_name": "Betinhos",
+  "description": "Operação, financeiro, frota e cadastros da Betinhos Executive Service.",
+  "lang": "pt-BR",
+  "start_url": "/WebResources/cr40f_SistemaBetinhosLoader.html",
+  "scope": "/WebResources/",
+  "display": "standalone",
+  "background_color": "#f0f0f0",
+  "theme_color": "#001a3d",
+  "icons": [
+    { "src": "/WebResources/cr40f_SistemaBetinhosIcon192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/WebResources/cr40f_SistemaBetinhosIcon512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/WebResources/cr40f_SistemaBetinhosIconMaskable512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
