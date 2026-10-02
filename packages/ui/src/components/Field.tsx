@@ -1,6 +1,6 @@
 import {
   createContext, forwardRef, useContext, useId,
-  type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes,
+  type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes,
 } from 'react'
 
 export type ControlSize = 'compact' | 'default' | 'touch'
@@ -27,7 +27,7 @@ export type FieldProps = {
   /** Desabilita o controle e esmaece o rótulo. */
   disabled?: boolean
   className?: string
-  /** Um controle: `Input`, `Select` ou `Textarea`. */
+  /** Um controle: `Input`, `Textarea` ou `Select`. */
   children: ReactNode
 }
 
@@ -60,7 +60,7 @@ export function Field({ label, hint, error, required = false, disabled = false, 
 type ControlStyle = { size?: ControlSize; invalid?: boolean }
 
 /** Atributos que o controle herda do `Field` em volta; o que for passado direto no controle tem prioridade. */
-function useControl(own: { id?: string; invalid?: boolean; required?: boolean; disabled?: boolean; describedBy?: string }) {
+export function useControl(own: { id?: string; invalid?: boolean; required?: boolean; disabled?: boolean; describedBy?: string }) {
   const field = useContext(FieldContext)
   const invalid = own.invalid ?? field?.invalid ?? false
   return {
@@ -75,7 +75,7 @@ function useControl(own: { id?: string; invalid?: boolean; required?: boolean; d
   }
 }
 
-function controlClassName(kind: string, size: ControlSize, invalid: boolean, className?: string) {
+export function controlClassName(kind: string, size: ControlSize, invalid: boolean, className?: string) {
   return ['bt-control', `bt-control--${kind}`, size !== 'default' && `bt-control--${size}`, invalid && 'bt-control--invalid', className].filter(Boolean).join(' ')
 }
 
@@ -97,30 +97,6 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
       {prefix != null ? <span className="bt-control__affix">{prefix}</span> : null}
       <input ref={ref} type={type} className="bt-control__input" {...control.attrs} {...rest} />
       {suffix != null ? <span className="bt-control__affix">{suffix}</span> : null}
-    </div>
-  )
-})
-
-export type SelectProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, 'size'> & ControlStyle & {
-  /** Primeira opção vazia, mostrada enquanto nada foi escolhido. */
-  placeholder?: string
-}
-
-/** Seleção nativa (teclado e leitor de tela do sistema). As opções vão em `<option>` filhos. */
-export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
-  { size = 'default', invalid, placeholder, className, id, required, disabled, 'aria-describedby': describedBy, children, ...rest },
-  ref,
-) {
-  const control = useControl({ id, invalid, required, disabled, describedBy })
-  return (
-    <div className={controlClassName('select', size, control.invalid, className)}>
-      <select ref={ref} className="bt-control__input" {...control.attrs} {...rest}>
-        {placeholder != null ? <option value="">{placeholder}</option> : null}
-        {children}
-      </select>
-      <svg className="bt-control__caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="m6 9 6 6 6-6" />
-      </svg>
     </div>
   )
 })

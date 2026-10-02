@@ -2,6 +2,7 @@
 @import './design-tokens.css';
 @import './components/button.css';
 @import './components/field.css';
+@import './components/select.css';
 
 /* Centabel Book: fonte de títulos da marca; na interface, só no título de página. */
 @font-face {
