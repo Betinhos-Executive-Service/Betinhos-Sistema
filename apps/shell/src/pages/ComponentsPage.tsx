@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Check, ChevronRight, Clock, Plus, TriangleAlert, X } from 'lucide-react'
-import { Button, Cluster, Field, Grid, Input, SearchBox, Select, Stack, StatusBadge, Textarea, filterOptions, type ButtonSize, type ButtonVariant, type ControlSize, type SelectOption, type StatusTone } from '@betinhos/ui'
+import { Alert, Button, Cluster, Field, Grid, Input, SearchBox, Select, Stack, StatusBadge, Textarea, ToastProvider, filterOptions, useToast, type AlertTone, type ButtonSize, type ButtonVariant, type ControlSize, type SelectOption, type StatusTone } from '@betinhos/ui'
 import { PageLayout } from '../app/PageLayout'
 
 const CLIENTES: SelectOption[] = ['Embraer', 'Tenaris', 'Kenvue', 'Johnson & Johnson'].map((label) => ({ value: label, label }))
@@ -25,7 +25,7 @@ const VARIANTS: ButtonVariant[] = ['primary', 'secondary', 'action', 'ghost', 'd
 const SIZES: ButtonSize[] = ['compact', 'default', 'touch']
 const CONTROLS = ['Input', 'Textarea'] as const
 /** Componentes do Design System que ainda não são React; entram aqui conforme forem revisados. */
-const PENDING = ['Alert', 'EmptyState', 'SegmentedControl', 'Surface', 'PageHeader', 'MetricCard', 'DateTile', 'Table']
+const PENDING = ['EmptyState', 'SegmentedControl', 'Surface', 'PageHeader', 'MetricCard', 'DateTile', 'Table']
 
 function Section({ name, summary, children }: { name: string; summary: string; children: ReactNode }) {
   return (
@@ -331,9 +331,56 @@ function StatusBadgeShowcase() {
   )
 }
 
+const ALERT_TONES: AlertTone[] = ['info', 'success', 'warning', 'danger']
+
+function AlertShowcase() {
+  const toast = useToast()
+  const [tone, setTone] = useState<AlertTone>('warning')
+  const [withTitle, setWithTitle] = useState(true)
+  const [dismissible, setDismissible] = useState(true)
+  const [withAction, setWithAction] = useState(false)
+  const [visible, setVisible] = useState(true)
+  const texts: Record<AlertTone, { title: string; text: string }> = {
+    info: { title: 'Opções sincronizadas com o Dataverse', text: 'Alterações valem para todos os usuários do módulo.' },
+    success: { title: 'Ocorrência registrada', text: 'O responsável recebe o aviso por e-mail.' },
+    warning: { title: 'Registros vinculados podem ser afetados', text: 'Confira o uso da opção antes de excluir.' },
+    danger: { title: 'Não foi possível salvar', text: 'Revise os campos destacados e tente de novo.' },
+  }
+
+  return (
+    <Section name="Alert" summary="Aviso na página (Alert) e aviso flutuante (Toast, via useToast), nos quatro tons de status.">
+      <div className="showcase__stage showcase__stage--form" style={{ maxWidth: 560 }}>
+        {visible ? (
+          <Alert
+            tone={tone}
+            title={withTitle ? texts[tone].title : undefined}
+            action={withAction ? <Button variant="secondary" size="compact" onClick={() => setVisible(false)}>Entendi</Button> : undefined}
+            onDismiss={dismissible ? () => setVisible(false) : undefined}
+          >
+            {texts[tone].text}
+          </Alert>
+        ) : <Button variant="ghost" onClick={() => setVisible(true)}>Mostrar de novo</Button>}
+      </div>
+      <Cluster gap="4">
+        <Choice label="tone" value={tone} options={ALERT_TONES} onChange={setTone} />
+        <Toggle label="title" value={withTitle} onChange={setWithTitle} />
+        <Toggle label="onDismiss" value={dismissible} onChange={setDismissible} />
+        <Toggle label="action" value={withAction} onChange={setWithAction} />
+      </Cluster>
+      <p className="showcase__label">Toast: dispare e veja no topo da tela</p>
+      <Cluster gap="3">
+        <Button variant="secondary" onClick={() => toast({ tone: 'success', message: 'Ocorrência registrada.' })}>Sucesso (some em 4 s)</Button>
+        <Button variant="secondary" onClick={() => toast({ tone: 'danger', message: 'Não foi possível salvar. Revise os campos destacados.' })}>Erro (fica até fechar)</Button>
+        <Button variant="secondary" onClick={() => toast({ tone: 'info', message: 'Lista atualizada.' })}>Informação</Button>
+      </Cluster>
+    </Section>
+  )
+}
+
 /** Vitrine dos componentes de `@betinhos/ui`, só no `pnpm dev`. */
 export function ComponentsPage() {
   return (
+    <ToastProvider>
     <PageLayout eyebrow="Design System" title="Componentes">
       <Stack gap="4">
         <ButtonShowcase />
@@ -341,6 +388,7 @@ export function ComponentsPage() {
         <SelectShowcase />
         <SearchBoxShowcase />
         <StatusBadgeShowcase />
+        <AlertShowcase />
         <Section name="Em revisão" summary="Ainda não são componentes React. Entram nesta página um a um, depois de revisados.">
           <ul className="showcase__pending">
             {PENDING.map((name) => <li key={name}>{name}</li>)}
@@ -348,5 +396,6 @@ export function ComponentsPage() {
         </Section>
       </Stack>
     </PageLayout>
+    </ToastProvider>
   )
 }
