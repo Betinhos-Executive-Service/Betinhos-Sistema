@@ -3,6 +3,7 @@ import { MonitorOff, PlugZap, SearchX } from 'lucide-react'
 import type { Host } from '../host'
 import { DEFAULT_ITEM, type MenuGroup, type MenuItem } from '../nav/menu'
 import { hrefFor } from '../nav/useHashRoute'
+import { ComponentsPage } from '../pages/ComponentsPage'
 import { EmptyState, PageLayout } from './PageLayout'
 
 type Props = { host: Host; group: MenuGroup | null; item: MenuItem | null; label: string }
@@ -54,6 +55,8 @@ export function RouteLayout({ host, group, item, label }: Props) {
       </PageLayout>
     )
   }
+
+  if (item.kind === 'page') return <ComponentsPage />
 
   if (host.mode === 'mock') {
     const target = item.kind === 'webresource' ? item.resource : item.kind === 'entity' ? item.entity : item.url
