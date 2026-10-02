@@ -1,5 +1,6 @@
 /* Tokens gerados (não editar) + base e primitives de layout compartilhados. */
 @import './design-tokens.css';
+@import './components/button.css';
 
 *, *::before, *::after { box-sizing: border-box; }
 html, body { height: 100%; }
