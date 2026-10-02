@@ -73,6 +73,7 @@
   --bt-font-size-20: 20px;
   --bt-font-size-26: 26px;
   --bt-font-size-34: 34px;
+  --bt-font-size-40: 40px;
 
   /* space */
   --bt-space-1: 4px;
@@ -108,7 +109,7 @@
 
   /* typography */
   --bt-typography-heading-page-font-family: var(--bt-font-family-display);
-  --bt-typography-heading-page-font-size: var(--bt-font-size-34);
+  --bt-typography-heading-page-font-size: var(--bt-font-size-40);
   --bt-typography-heading-page-font-weight: var(--bt-font-weight-regular);
   --bt-typography-heading-page-letter-spacing: 0px;
   --bt-typography-heading-page-line-height: 1.08;
@@ -189,6 +190,7 @@
   --bt-shadow-toast: 0px 12px 35px 0px rgba(0, 18, 45, 0.18);
 
   /* component */
+  --bt-heading-page-stroke-width: 0.5px;
   --bt-button-primary-background: var(--bt-color-brand);
   --bt-button-primary-background-hover: var(--bt-color-brand-hover);
   --bt-button-primary-foreground: var(--bt-color-white);
