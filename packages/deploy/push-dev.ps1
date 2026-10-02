@@ -83,22 +83,32 @@ if (Test-Path -LiteralPath $assetsDir) {
   }
 }
 
-if (-not (Get-Module -ListAvailable MSAL.PS)) { throw "Modulo MSAL.PS nao encontrado. Instale com: Install-Module MSAL.PS -Scope CurrentUser" }
-Import-Module MSAL.PS -ErrorAction Stop
-
 Write-Step "autenticacao em $environmentHost"
-$scope = "$environmentBaseUrl/user_impersonation"
-$clientApplication = New-MsalClientApplication -ClientId $clientIdGuid.ToString() -TenantId $TenantId -RedirectUri ([Uri] "http://localhost")
-Enable-MsalTokenCacheOnDisk -PublicClientApplication $clientApplication
-try { $tokenResult = Get-MsalToken -PublicClientApplication $clientApplication -Scopes $scope -Silent }
-catch {
-  if ($DeviceCode) { $tokenResult = Get-MsalToken -PublicClientApplication $clientApplication -Scopes $scope -DeviceCode }
-  else { $tokenResult = Get-MsalToken -PublicClientApplication $clientApplication -Scopes $scope -Interactive }
+$clientSecret = Get-Setting "DV_CLIENT_SECRET"
+if (-not [string]::IsNullOrWhiteSpace($clientSecret)) {
+  # CI: service principal (application user no ambiente), sem login interativo nem MSAL.PS.
+  $tenant = Get-Setting "DV_TENANT_ID"
+  if ([string]::IsNullOrWhiteSpace($tenant)) { throw "DV_TENANT_ID ausente. Obrigatorio quando DV_CLIENT_SECRET esta definido." }
+  $tokenBody = @{ grant_type = "client_credentials"; client_id = $clientIdGuid.ToString(); client_secret = $clientSecret; scope = "$environmentBaseUrl/.default" }
+  $accessToken = (Invoke-RestMethod -Method Post -Uri "https://login.microsoftonline.com/$tenant/oauth2/v2.0/token" -Body $tokenBody).access_token
 }
-if ([string]::IsNullOrWhiteSpace($tokenResult.AccessToken)) { throw "Falha ao obter token MSAL para $scope." }
+else {
+  if (-not (Get-Module -ListAvailable MSAL.PS)) { throw "Modulo MSAL.PS nao encontrado. Instale com: Install-Module MSAL.PS -Scope CurrentUser" }
+  Import-Module MSAL.PS -ErrorAction Stop
+  $scope = "$environmentBaseUrl/user_impersonation"
+  $clientApplication = New-MsalClientApplication -ClientId $clientIdGuid.ToString() -TenantId $TenantId -RedirectUri ([Uri] "http://localhost")
+  Enable-MsalTokenCacheOnDisk -PublicClientApplication $clientApplication
+  try { $tokenResult = Get-MsalToken -PublicClientApplication $clientApplication -Scopes $scope -Silent }
+  catch {
+    if ($DeviceCode) { $tokenResult = Get-MsalToken -PublicClientApplication $clientApplication -Scopes $scope -DeviceCode }
+    else { $tokenResult = Get-MsalToken -PublicClientApplication $clientApplication -Scopes $scope -Interactive }
+  }
+  $accessToken = $tokenResult.AccessToken
+}
+if ([string]::IsNullOrWhiteSpace($accessToken)) { throw "Falha ao obter token para $environmentHost." }
 
 $headers = @{
-  Authorization              = "Bearer $($tokenResult.AccessToken)"
+  Authorization              = "Bearer $accessToken"
   Accept                     = "application/json"
   "OData-MaxVersion"         = "4.0"
   "OData-Version"            = "4.0"

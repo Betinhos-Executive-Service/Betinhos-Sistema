@@ -1,0 +1,58 @@
+name: Sincronizar solução do DEV
+
+# Traz schema, flows, plugins e WebResources editados no DEV para o repo (pasta solution/),
+# em uma branch sync/* com PR para dev. Só leitura no DEV.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  SOLUTION: AppBetinhos
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Instala o Power Platform CLI
+        run: dotnet tool install --global Microsoft.PowerApps.CLI.Tool
+      - name: Exporta do DEV (não gerenciada e managed)
+        env:
+          DV_ENVIRONMENT_URL: ${{ vars.DV_ENVIRONMENT_URL }}
+          DV_TENANT_ID: ${{ vars.DV_TENANT_ID }}
+          DV_CLIENT_ID: ${{ vars.DV_CLIENT_ID }}
+          DV_CLIENT_SECRET: ${{ secrets.DV_CLIENT_SECRET }}
+        run: |
+          pac auth create --environment "$DV_ENVIRONMENT_URL" --tenant "$DV_TENANT_ID" --applicationId "$DV_CLIENT_ID" --clientSecret "$DV_CLIENT_SECRET"
+          mkdir -p out
+          pac solution export --name "$SOLUTION" --path "out/$SOLUTION.zip" --overwrite
+          pac solution export --name "$SOLUTION" --path "out/${SOLUTION}_managed.zip" --managed --overwrite
+      - name: Desempacota em solution/
+        run: pac solution unpack --zipfile "out/$SOLUTION.zip" --folder "solution/$SOLUTION" --packagetype Both --allowDelete true
+      - name: Remove valores atuais de variáveis de ambiente
+        # Valor atual pertence a cada ambiente; o do DEV não pode seguir para TEST/PROD.
+        run: find "solution/$SOLUTION" -name environmentvariablevalues.json -delete
+      - name: Varredura de segredos
+        run: node packages/deploy/scan-secrets.mjs solution
+      - name: Abre PR para dev
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git add solution
+          if git diff --cached --quiet; then echo "Sem mudanças no DEV." >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
+          branch="sync/dev-${{ github.run_number }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -m "Sincroniza a solução $SOLUTION a partir do DEV"
+          git push origin "$branch"
+          gh pr create --base dev --head "$branch" --title "Sincroniza a solução $SOLUTION a partir do DEV" --body "Exportação automática do DEV. Revise o diff de schema e flows antes do merge."
