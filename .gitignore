@@ -8,3 +8,4 @@ dist/
 .env.*
 *.log
 !.env.example
+out/
