@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { ChevronRight, Plus, X } from 'lucide-react'
-import { Button, Cluster, Field, Grid, Input, Select, Stack, Textarea, filterOptions, type ButtonSize, type ButtonVariant, type ControlSize, type SelectOption } from '@betinhos/ui'
+import { Button, Cluster, Field, Grid, Input, SearchBox, Select, Stack, Textarea, filterOptions, type ButtonSize, type ButtonVariant, type ControlSize, type SelectOption } from '@betinhos/ui'
 import { PageLayout } from '../app/PageLayout'
 
 const CLIENTES: SelectOption[] = ['Embraer', 'Tenaris', 'Kenvue', 'Johnson & Johnson'].map((label) => ({ value: label, label }))
@@ -25,7 +25,7 @@ const VARIANTS: ButtonVariant[] = ['primary', 'secondary', 'action', 'ghost', 'd
 const SIZES: ButtonSize[] = ['compact', 'default', 'touch']
 const CONTROLS = ['Input', 'Textarea'] as const
 /** Componentes do Design System que ainda não são React; entram aqui conforme forem revisados. */
-const PENDING = ['SearchBox', 'StatusBadge', 'Alert', 'EmptyState', 'SegmentedControl', 'Surface', 'PageHeader', 'MetricCard', 'DateTile', 'Table']
+const PENDING = ['StatusBadge', 'Alert', 'EmptyState', 'SegmentedControl', 'Surface', 'PageHeader', 'MetricCard', 'DateTile', 'Table']
 
 function Section({ name, summary, children }: { name: string; summary: string; children: ReactNode }) {
   return (
@@ -259,6 +259,35 @@ function SelectShowcase() {
   )
 }
 
+function SearchBoxShowcase() {
+  const [query, setQuery] = useState('')
+  const [searching, setSearching] = useState(false)
+  const [results, setResults] = useState<SelectOption[] | null>(null)
+  const [compact, setCompact] = useState('')
+
+  // Simula a busca no Dataverse: só roda depois da pausa de digitação.
+  const search = (text: string) => {
+    if (!text.trim()) { setResults(null); return }
+    setSearching(true)
+    setTimeout(() => { setResults(filterOptions([...MOTORISTAS, ...PESSOAS], text)); setSearching(false) }, 500)
+  }
+
+  return (
+    <Section name="SearchBox" summary="Busca de página: lupa, campo, limpar e espera de digitação antes de buscar.">
+      <Stack gap="3">
+        <SearchBox value={query} onChange={setQuery} onSearch={search} loading={searching} placeholder="Buscar por nome, cliente ou motorista" aria-label="Buscar pessoas" />
+        <p className="showcase__summary" role="status">
+          {searching ? 'Buscando…' : results === null ? 'Digite para buscar; a busca dispara 250 ms depois da última tecla. Esc limpa.' : results.length ? `${results.length} resultado(s): ${results.map((item) => item.label).join(', ')}` : 'Nenhum resultado encontrado para estes termos.'}
+        </p>
+        <p className="showcase__label">Compacto, para filtros</p>
+        <div style={{ maxWidth: 320 }}>
+          <SearchBox size="compact" value={compact} onChange={setCompact} placeholder="Filtrar lista" aria-label="Filtrar lista" />
+        </div>
+      </Stack>
+    </Section>
+  )
+}
+
 /** Vitrine dos componentes de `@betinhos/ui`, só no `pnpm dev`. */
 export function ComponentsPage() {
   return (
@@ -267,6 +296,7 @@ export function ComponentsPage() {
         <ButtonShowcase />
         <FieldShowcase />
         <SelectShowcase />
+        <SearchBoxShowcase />
         <Section name="Em revisão" summary="Ainda não são componentes React. Entram nesta página um a um, depois de revisados.">
           <ul className="showcase__pending">
             {PENDING.map((name) => <li key={name}>{name}</li>)}
