@@ -1,7 +1,10 @@
 .memsearch/
 .worktrees/
+.claude/
+*.tsbuildinfo
 node_modules/
 dist/
 .env
 .env.*
 *.log
+!.env.example

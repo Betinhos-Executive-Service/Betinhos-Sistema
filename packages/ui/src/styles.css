@@ -1,0 +1,34 @@
+/* Tokens gerados (não editar) + base e primitives de layout compartilhados. */
+@import './design-tokens.css';
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: var(--bt-font-family-sans);
+  font-size: var(--bt-font-size-13);
+  line-height: var(--bt-typography-body-default-line-height);
+  color: var(--bt-color-text-primary);
+  background-color: var(--bt-color-canvas);
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 0; border-color: var(--bt-focus-border); box-shadow: var(--bt-focus-ring); }
+
+.bt-stack { display: flex; flex-direction: column; gap: var(--bt-gap, var(--bt-space-3)); min-width: 0; }
+.bt-cluster { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-gap, var(--bt-space-2)); min-width: 0; }
+.bt-split { display: flex; align-items: center; justify-content: space-between; gap: var(--bt-gap, var(--bt-space-3)); min-width: 0; }
+.bt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(var(--bt-grid-min, 240px), 100%), 1fr)); gap: var(--bt-gap, var(--bt-space-3)); }
+
+/* Versão do build: sempre visível, sutil, sem capturar clique, foco ou toque. */
+.bt-build-badge {
+  position: fixed;
+  z-index: var(--bt-z-index-toast);
+  right: var(--bt-space-2);
+  bottom: calc(var(--bt-space-1) + env(safe-area-inset-bottom));
+  font-size: var(--bt-font-size-11);
+  font-weight: var(--bt-font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--bt-color-text-tertiary);
+  pointer-events: none;
+  user-select: none;
+}

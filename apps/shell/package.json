@@ -1,0 +1,29 @@
+{
+  "name": "@betinhos/shell",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 36472 --strictPort",
+    "typecheck": "tsc --noEmit",
+    "build": "node ../../packages/deploy/bump-version.mjs . && tsc --noEmit && vite build && node ../../packages/deploy/inline-webresource.mjs dist",
+    "wr": "pnpm build",
+    "test": "vitest run",
+    "push": "pnpm build && powershell.exe -NoProfile -ExecutionPolicy Bypass -File ../../packages/deploy/push-dev.ps1 -AppDir apps/shell -ResourceName cr40f_SistemaBetinhos.html -DisplayName \"Sistema Betinhos\" -LoaderName cr40f_SistemaBetinhosLoader.html -DeviceCode"
+  },
+  "dependencies": {
+    "@betinhos/dataverse": "workspace:*",
+    "@betinhos/ui": "workspace:*",
+    "lucide-react": "^1.47.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.1.0",
+    "vitest": "^3.2.0"
+  }
+}
