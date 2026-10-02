@@ -67,6 +67,17 @@ export function filterOptions(options: SelectOption[], query: string) {
   })
 }
 
+/** Agrupa opções seguidas com o mesmo `group`, preservando o índice global de cada uma (usado pelo teclado). */
+function groupRuns(options: SelectOption[]) {
+  const runs: { group?: string; options: { option: SelectOption; index: number }[] }[] = []
+  options.forEach((option, index) => {
+    const last = runs[runs.length - 1]
+    if (last && last.group === option.group) last.options.push({ option, index })
+    else runs.push({ group: option.group, options: [{ option, index }] })
+  })
+  return runs
+}
+
 /** Posiciona o painel colado ao controle; abre para cima quando falta espaço embaixo. */
 function placePanel(box: HTMLElement, panel: HTMLElement) {
   const rect = box.getBoundingClientRect()
@@ -270,12 +281,10 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
           <div className="bt-select-panel__list" id={listId} role="listbox" aria-multiselectable={props.multiple || undefined}>
             {loading ? <p className="bt-select-panel__status" role="status">{loadingText}</p> : null}
             {!loading && total === 0 ? <p className="bt-select-panel__status">{emptyText}</p> : null}
-            {!loading ? visible.map((option, index) => {
+            {!loading ? groupRuns(visible).map((run) => {
+              const rows = run.options.map(({ option, index }) => {
               const isSelected = selected.includes(option.value)
-              const header = option.group && option.group !== visible[index - 1]?.group
-                ? <div key={`group-${option.group}`} className="bt-select-group" role="presentation">{option.group}</div>
-                : null
-              return [header, (
+              return (
                 <div
                   key={option.value}
                   id={optionId(index)}
@@ -294,7 +303,19 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
                     {option.subtitle ? <span className="bt-select-option__subtitle">{option.subtitle}</span> : null}
                   </span>
                 </div>
-              )]
+              )
+              })
+              if (!run.group) return rows
+              const groupId = `${listId}-group-${run.options[0].index}`
+              return (
+                <div key={`group-${run.group}-${run.options[0].index}`} className="bt-select-group" role="group" aria-labelledby={groupId}>
+                  <div className="bt-select-group__title" id={groupId}>
+                    <span>{run.group}</span>
+                    <span className="bt-select-group__count">{run.options.length}</span>
+                  </div>
+                  {rows}
+                </div>
+              )
             }) : null}
             {canCreate ? (
               <div
