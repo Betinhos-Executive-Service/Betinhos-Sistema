@@ -5,6 +5,7 @@
 @import './components/select.css';
 @import './components/search-box.css';
 @import './components/status-badge.css';
+@import './components/alert.css';
 
 /* Centabel Book: fonte de títulos da marca; na interface, só no título de página. */
 @font-face {
