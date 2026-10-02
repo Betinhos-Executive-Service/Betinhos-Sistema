@@ -52,9 +52,6 @@
 .bt-control__affix + .bt-control__input { padding-left: var(--bt-space-2); }
 .bt-control__input:has(+ .bt-control__affix) { padding-right: var(--bt-space-2); }
 
-.bt-control--select .bt-control__input { appearance: none; padding-right: var(--bt-space-8); cursor: pointer; text-overflow: ellipsis; }
-.bt-control__caret { position: absolute; right: var(--bt-space-2-5); color: var(--bt-color-text-secondary); pointer-events: none; }
-
 .bt-control--textarea { align-items: stretch; }
 .bt-control--textarea .bt-control__input { min-height: 0; padding: var(--bt-space-2-5) var(--bt-space-3); line-height: 1.5; resize: vertical; }
 
@@ -64,7 +61,7 @@
 
 /* Em toque, o alvo padrão sobe para 44px. */
 @media (pointer: coarse) {
-  .bt-control--input:not(.bt-control--compact), .bt-control--select:not(.bt-control--compact) { min-height: var(--bt-control-height-touch); }
+  .bt-control--input:not(.bt-control--compact) { min-height: var(--bt-control-height-touch); }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,11 +1,29 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { ChevronRight, Plus, X } from 'lucide-react'
-import { Button, Cluster, Field, Grid, Input, Select, Stack, Textarea, type ButtonSize, type ButtonVariant, type ControlSize } from '@betinhos/ui'
+import { Button, Cluster, Field, Grid, Input, Select, Stack, Textarea, filterOptions, type ButtonSize, type ButtonVariant, type ControlSize, type SelectOption } from '@betinhos/ui'
 import { PageLayout } from '../app/PageLayout'
+
+const CLIENTES: SelectOption[] = ['Embraer', 'Tenaris', 'Kenvue', 'Johnson & Johnson'].map((label) => ({ value: label, label }))
+const VEICULOS: SelectOption[] = [
+  { value: 'v1', label: 'Corolla · ABC1D23', group: 'Sedan' },
+  { value: 'v2', label: 'Civic · EFG4H56', group: 'Sedan' },
+  { value: 'v3', label: 'SW4 · IJK7L89', group: 'SUV' },
+  { value: 'v4', label: 'Commander · MNO1P23', group: 'SUV' },
+  { value: 'v5', label: 'Sprinter · QRS4T56', group: 'Van' },
+]
+const STATUS: SelectOption[] = ['Aberto', 'Em andamento', 'Concluído', 'Cancelado'].map((label) => ({ value: label, label, disabled: label === 'Cancelado' }))
+const MOTORISTAS: SelectOption[] = ['André Luís', 'Bruno Araújo', 'Cláudio Ferraz', 'Érica Nunes', 'João Conceição', 'Márcio Sá', 'Patrícia Gusmão', 'Sérgio Antônio'].map((label) => ({ value: label, label }))
+const PESSOAS: SelectOption[] = [
+  { value: 'p1', label: 'Marina Lopes', subtitle: 'Embraer', search: 'mari' },
+  { value: 'p2', label: 'Carlos Prado', subtitle: 'Tenaris' },
+  { value: 'p3', label: 'Ana Ribeiro', subtitle: 'Kenvue' },
+  { value: 'p4', label: 'João Araújo', subtitle: 'Embraer' },
+  { value: 'p5', label: 'Renata Sá', subtitle: 'Johnson & Johnson' },
+]
 
 const VARIANTS: ButtonVariant[] = ['primary', 'secondary', 'action', 'ghost', 'danger']
 const SIZES: ButtonSize[] = ['compact', 'default', 'touch']
-const CONTROLS = ['Input', 'Select', 'Textarea'] as const
+const CONTROLS = ['Input', 'Textarea'] as const
 /** Componentes do Design System que ainda não são React; entram aqui conforme forem revisados. */
 const PENDING = ['SearchBox', 'StatusBadge', 'Alert', 'EmptyState', 'SegmentedControl', 'Surface', 'PageHeader', 'MetricCard', 'DateTile', 'Table']
 
@@ -132,7 +150,7 @@ function FieldShowcase() {
   }
 
   return (
-    <Section name="Field" summary="Rótulo, controle, ajuda e erro ligados por id. Controles: Input, Select e Textarea.">
+    <Section name="Field" summary="Rótulo, controle, ajuda e erro ligados por id. Controles: Input e Textarea.">
       <div className="showcase__stage showcase__stage--form">
         <Field
           label={label || 'Rótulo'}
@@ -142,13 +160,6 @@ function FieldShowcase() {
           disabled={disabled}
         >
           {control === 'Input' ? <Input size={size} placeholder="Ex.: Embraer" prefix={affix ? 'R$' : undefined} suffix={affix ? 'km' : undefined} /> : null}
-          {control === 'Select' ? (
-            <Select size={size} placeholder="Selecione" defaultValue="">
-              <option value="embraer">Embraer</option>
-              <option value="tenaris">Tenaris</option>
-              <option value="kenvue">Kenvue</option>
-            </Select>
-          ) : null}
           {control === 'Textarea' ? <Textarea placeholder="Descreva o que aconteceu" /> : null}
         </Field>
       </div>
@@ -173,12 +184,8 @@ function FieldShowcase() {
             <Field label="Título" required error={submitted && missing.titulo ? 'Informe um título para a ocorrência.' : undefined}>
               <Input value={form.titulo} onChange={update('titulo')} placeholder="Ex.: Atraso na apresentação" />
             </Field>
-            <Field label="Gravidade" required error={submitted && missing.gravidade ? 'Escolha a gravidade.' : undefined}>
-              <Select value={form.gravidade} onChange={update('gravidade')} placeholder="Selecione">
-                <option value="baixa">Baixa</option>
-                <option value="media">Média</option>
-                <option value="alta">Alta</option>
-              </Select>
+            <Field label="Cliente" required error={submitted && missing.gravidade ? 'Informe o cliente.' : undefined}>
+              <Input value={form.gravidade} onChange={update('gravidade')} placeholder="Ex.: Embraer" />
             </Field>
             <Field label="Valor do reembolso" hint="Opcional.">
               <Input value={form.valor} onChange={update('valor')} inputMode="decimal" prefix="R$" placeholder="0,00" />
@@ -197,6 +204,61 @@ function FieldShowcase() {
   )
 }
 
+function SelectShowcase() {
+  const [motorista, setMotorista] = useState<string | null>(null)
+  const [status, setStatus] = useState<string | null>('Aberto')
+  const [solicitante, setSolicitante] = useState<string | null>(null)
+  const [passageiros, setPassageiros] = useState<string[]>(['p1', 'p4'])
+  const [remoto, setRemoto] = useState<string | null>(null)
+  const [found, setFound] = useState<SelectOption[]>([])
+  const [loading, setLoading] = useState(false)
+  const [bloqueado] = useState<string | null>('Embraer')
+  const [veiculo, setVeiculo] = useState<string | null>(null)
+  const [centros, setCentros] = useState<SelectOption[]>(['Operação', 'Comercial', 'Frota'].map((label) => ({ value: label, label })))
+  const [centro, setCentro] = useState<string | null>(null)
+  const [compacto, setCompacto] = useState<string | null>(null)
+
+  // Simula a busca no Dataverse: responde depois de 600 ms, como o seletor de passageiros do Formulário Geral.
+  const search = (query: string) => {
+    setLoading(true)
+    setTimeout(() => { setFound(filterOptions(PESSOAS, query)); setLoading(false) }, 600)
+  }
+
+  return (
+    <Section name="Select" summary="Um componente, nove usos: com busca, sem busca, pessoa com subtítulo, múltiplo, busca remota, agrupado, criável, compacto e desabilitado.">
+      <Grid gap="4" min={240}>
+        <Field label="Motorista" hint="Com busca: ignora acento e caixa.">
+          <Select options={MOTORISTAS} value={motorista} onChange={setMotorista} />
+        </Field>
+        <Field label="Status" required hint="Sem busca; obrigatório não mostra o limpar.">
+          <Select options={STATUS} searchable={false} value={status} onChange={setStatus} />
+        </Field>
+        <Field label="Solicitante" hint="Opção com subtítulo; a busca também acha pelo cliente.">
+          <Select options={PESSOAS} placeholder="Selecionar solicitante" value={solicitante} onChange={setSolicitante} />
+        </Field>
+        <Field label="Passageiros" hint="Múltiplo: o painel fica aberto e o gatilho mostra +N.">
+          <Select multiple options={PESSOAS} placeholder="Selecione passageiros" value={passageiros} onChange={setPassageiros} />
+        </Field>
+        <Field label="Passageiro (busca remota)" hint="As opções chegam de fora, com estado de carregamento.">
+          <Select options={found} loading={loading} loadingText="Pesquisando passageiros…" emptyText="Nenhum passageiro encontrado." onSearchChange={search} placeholder="Selecionar passageiro" value={remoto} onChange={setRemoto} />
+        </Field>
+        <Field label="Veículo" hint="Opções agrupadas por categoria.">
+          <Select options={VEICULOS} value={veiculo} onChange={setVeiculo} />
+        </Field>
+        <Field label="Centro de custo" hint="Criável: digite um nome novo e escolha “Adicionar”.">
+          <Select options={centros} value={centro} onChange={setCentro} onCreate={(label) => { setCentros((list) => [...list, { value: label, label }]); setCentro(label) }} />
+        </Field>
+        <Field label="Tamanho compacto" hint="32px, para filtros e áreas densas.">
+          <Select size="compact" options={CLIENTES} value={compacto} onChange={setCompacto} />
+        </Field>
+        <Field label="Cliente" disabled hint="Desabilitado.">
+          <Select options={CLIENTES} value={bloqueado} onChange={() => {}} />
+        </Field>
+      </Grid>
+    </Section>
+  )
+}
+
 /** Vitrine dos componentes de `@betinhos/ui`, só no `pnpm dev`. */
 export function ComponentsPage() {
   return (
@@ -204,6 +266,7 @@ export function ComponentsPage() {
       <Stack gap="4">
         <ButtonShowcase />
         <FieldShowcase />
+        <SelectShowcase />
         <Section name="Em revisão" summary="Ainda não são componentes React. Entram nesta página um a um, depois de revisados.">
           <ul className="showcase__pending">
             {PENDING.map((name) => <li key={name}>{name}</li>)}
