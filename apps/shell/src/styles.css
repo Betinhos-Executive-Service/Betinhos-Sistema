@@ -125,7 +125,7 @@
 .page { max-width: var(--bt-layout-content-max); margin: 0 auto; padding: 22px 26px var(--bt-space-8); }
 .page__header { min-height: 72px; margin-bottom: var(--bt-space-3); }
 .page__eyebrow { margin: 0 0 var(--bt-space-1); font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); letter-spacing: 0.8px; text-transform: uppercase; color: var(--bt-color-text-secondary); }
-.page__title { margin: 0; font-size: clamp(25px, 3vw, var(--bt-font-size-34)); font-weight: var(--bt-font-weight-extrabold); letter-spacing: -0.035em; line-height: 1.08; color: var(--bt-color-brand); }
+.page__title { margin: 0; font-family: var(--bt-typography-heading-page-font-family); font-size: clamp(25px, 3vw, var(--bt-typography-heading-page-font-size)); font-weight: var(--bt-typography-heading-page-font-weight); letter-spacing: var(--bt-typography-heading-page-letter-spacing); line-height: var(--bt-typography-heading-page-line-height); color: var(--bt-color-brand); }
 
 .surface { background-color: var(--bt-surface-background); border: var(--bt-border-width-default) solid var(--bt-surface-border); border-radius: var(--bt-surface-radius); box-shadow: var(--bt-surface-shadow); }
 .empty-state { display: flex; flex-direction: column; align-items: flex-start; gap: var(--bt-space-2); padding: var(--bt-space-6) var(--bt-space-4); }
