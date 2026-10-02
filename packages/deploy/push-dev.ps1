@@ -62,13 +62,25 @@ $apiBaseUrl = "$environmentBaseUrl/api/data/v9.2"
 $resourcePath = Join-Path $appRoot "dist\webresource.html"
 if (-not (Test-Path -LiteralPath $resourcePath)) { throw "WebResource nao encontrado: $resourcePath. Rode o build antes." }
 
-$targets = @(@{ Name = $ResourceName; Display = $DisplayName; Path = $resourcePath })
+$targets = @(@{ Name = $ResourceName; Display = $DisplayName; Path = $resourcePath; Type = 1 })
 if ($LoaderName) {
   $template = [IO.File]::ReadAllText((Join-Path $PSScriptRoot "loader.template.html"), [Text.Encoding]::UTF8)
   $loaderPath = Join-Path $appRoot "dist\loader.html"
   $loaderHtml = $template.Replace("{{RESOURCE}}", $ResourceName).Replace("{{TITLE}}", $DisplayName)
   [IO.File]::WriteAllText($loaderPath, $loaderHtml, (New-Object Text.UTF8Encoding($false)))
-  $targets += @{ Name = $LoaderName; Display = "$DisplayName (carregador)"; Path = $loaderPath }
+  $targets += @{ Name = $LoaderName; Display = "$DisplayName (carregador)"; Path = $loaderPath; Type = 1 }
+}
+
+# Arquivos de apoio (icones, manifesto do app instalavel): o nome do arquivo e o nome do WebResource.
+# Tipos do Dataverse: 3 = Script (nao ha tipo JSON; o manifesto vai como Script), 5 = PNG, 10 = ICO, 11 = SVG.
+$assetTypes = @{ ".webmanifest" = 3; ".js" = 3; ".png" = 5; ".ico" = 10; ".svg" = 11 }
+$assetsDir = Join-Path $appRoot "dist\WebResources"
+if (Test-Path -LiteralPath $assetsDir) {
+  foreach ($asset in Get-ChildItem -LiteralPath $assetsDir -File) {
+    $extension = $asset.Extension.ToLowerInvariant()
+    if (-not $assetTypes.ContainsKey($extension)) { throw "Tipo de arquivo sem mapeamento de WebResource: $($asset.Name)" }
+    $targets += @{ Name = $asset.Name; Display = "$DisplayName - $($asset.BaseName)"; Path = $asset.FullName; Type = $assetTypes[$extension] }
+  }
 }
 
 if (-not (Get-Module -ListAvailable MSAL.PS)) { throw "Modulo MSAL.PS nao encontrado. Instale com: Install-Module MSAL.PS -Scope CurrentUser" }
@@ -100,7 +112,7 @@ if ($solutions.Count -ne 1) { throw "Solucao $solutionUniqueName nao encontrada 
 if ($solutions[0].ismanaged) { throw "Solucao $solutionUniqueName esta gerenciada neste ambiente. Deploy abortado." }
 $solutionId = $solutions[0].solutionid
 
-function Publish-WebResource([string] $Name, [string] $Display, [string] $Path) {
+function Publish-WebResource([string] $Name, [string] $Display, [string] $Path, [int] $Type) {
   $escapedName = Escape-OData $Name
   $lookupUri = "$apiBaseUrl/webresourceset?`$select=webresourceid,name,webresourcetype&`$filter=name eq '$escapedName'"
   $found = @((Invoke-RestMethod -Method Get -Uri $lookupUri -Headers $headers).value)
@@ -108,12 +120,12 @@ function Publish-WebResource([string] $Name, [string] $Display, [string] $Path) 
   $content = [Convert]::ToBase64String([IO.File]::ReadAllBytes($Path))
   if ($found.Count -eq 0) {
     Write-Step "criando $Name na solucao $solutionUniqueName"
-    $body = @{ name = $Name; displayname = $Display; webresourcetype = 1; content = $content; isenabledformobileclient = $true } | ConvertTo-Json -Depth 4
+    $body = @{ name = $Name; displayname = $Display; webresourcetype = $Type; content = $content; isenabledformobileclient = $true } | ConvertTo-Json -Depth 4
     Invoke-RestMethod -Method Post -Uri "$apiBaseUrl/webresourceset" -Headers $headers -ContentType "application/json; charset=utf-8" -Body $body | Out-Null
     $id = @((Invoke-RestMethod -Method Get -Uri $lookupUri -Headers $headers).value)[0].webresourceid
   }
   else {
-    if ($found[0].webresourcetype -ne 1) { throw "$Name ja existe, mas nao e HTML. Deploy abortado." }
+    if ($found[0].webresourcetype -ne $Type) { throw "$Name ja existe com outro tipo ($($found[0].webresourcetype)). Deploy abortado." }
     $id = $found[0].webresourceid
     Write-Step "atualizando $Name"
     $body = @{ displayname = $Display; content = $content; isenabledformobileclient = $true } | ConvertTo-Json -Depth 4
@@ -125,17 +137,17 @@ function Publish-WebResource([string] $Name, [string] $Display, [string] $Path) 
     $action = @{ ComponentId = $id; ComponentType = 61; SolutionUniqueName = $solutionUniqueName; AddRequiredComponents = $false } | ConvertTo-Json -Depth 4
     Invoke-RestMethod -Method Post -Uri "$apiBaseUrl/AddSolutionComponent" -Headers $headers -ContentType "application/json; charset=utf-8" -Body $action | Out-Null
   }
-  return @{ Id = $id; Name = $Name; Content = $content; ComponentUri = $componentUri }
+  return @{ Id = $id; Name = $Name; Type = $Type; Content = $content; ComponentUri = $componentUri }
 }
 
-$resources = @($targets | ForEach-Object { Publish-WebResource $_.Name $_.Display $_.Path })
+$resources = @($targets | ForEach-Object { Publish-WebResource $_.Name $_.Display $_.Path $_.Type })
 $publishXml = "<importexportxml><webresources>" + (($resources | ForEach-Object { "<webresource>$($_.Id)</webresource>" }) -join "") + "</webresources></importexportxml>"
 Write-Step "publicando WebResources"
 Invoke-RestMethod -Method Post -Uri "$apiBaseUrl/PublishXml" -Headers $headers -ContentType "application/json; charset=utf-8" -Body (@{ ParameterXml = $publishXml } | ConvertTo-Json) | Out-Null
 
 foreach ($r in $resources) {
   $published = Invoke-RestMethod -Method Get -Uri "$apiBaseUrl/webresourceset($($r.Id))?`$select=name,content,webresourcetype" -Headers $headers
-  if ($published.name -ne $r.Name -or $published.webresourcetype -ne 1 -or $published.content -ne $r.Content) { throw "Validacao pos-publicacao falhou em $($r.Name)." }
+  if ($published.name -ne $r.Name -or $published.webresourcetype -ne $r.Type -or $published.content -ne $r.Content) { throw "Validacao pos-publicacao falhou em $($r.Name)." }
   if (@((Invoke-RestMethod -Method Get -Uri $r.ComponentUri -Headers $headers).value).Count -eq 0) { throw "$($r.Name) nao esta na solucao $solutionUniqueName apos a publicacao." }
 }
 

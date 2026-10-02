@@ -1,5 +1,8 @@
 import { createClient, createMetadata, createXrmShim, getHostXrm, isLocalHost, type DataverseClient } from '@betinhos/dataverse'
 
+/** App model-driven que ainda atende as listas e formulários nativos. */
+const MODEL_DRIVEN_APP = 'cr40f_ModelDrivenBetinhos'
+
 export type Host =
   /** Aberto fora do Dataverse (pnpm dev): sem dados, só navegação. */
   | { mode: 'mock' }
@@ -12,6 +15,11 @@ export type Host =
       insideModelDriven: boolean
       appId: () => Promise<string | undefined>
     }
+
+async function lookupAppId(client: DataverseClient) {
+  const page = await client.request<{ value: { appmoduleid: string }[] }>(`appmodules?$select=appmoduleid&$filter=uniquename eq '${MODEL_DRIVEN_APP}'`)
+  return page.value[0]?.appmoduleid
+}
 
 export function createHost(): Host {
   if (isLocalHost()) return { mode: 'mock' }
@@ -32,7 +40,7 @@ export function createHost(): Host {
     metadata: createMetadata(client),
     insideModelDriven: Boolean(hostXrm),
     appId: () => (appId ??= Promise.resolve(hostXrm?.Utility?.getGlobalContext().getCurrentAppProperties?.())
-      .then((properties) => properties?.appId)
+      .then((properties) => properties?.appId ?? lookupAppId(client))
       .catch(() => undefined)),
   }
 }

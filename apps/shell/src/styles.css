@@ -28,7 +28,7 @@
   grid-template-columns: 1fr auto;
   grid-template-areas: "name close" "sub close";
   align-items: center;
-  padding: var(--bt-space-5) var(--bt-space-4) var(--bt-space-3);
+  padding: calc(var(--bt-space-5) + env(safe-area-inset-top)) var(--bt-space-4) var(--bt-space-3);
 }
 .app-shell__brand-name { grid-area: name; font-size: var(--bt-font-size-17); font-weight: var(--bt-font-weight-extrabold); letter-spacing: -0.3px; line-height: 1.29; }
 .app-shell__brand-sub { grid-area: sub; font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-bold); letter-spacing: 0.8px; text-transform: uppercase; color: var(--bt-color-text-tertiary); }
@@ -38,11 +38,12 @@
   display: flex;
   align-items: center;
   gap: var(--bt-space-2);
-  padding: var(--bt-space-3) var(--bt-space-4) var(--bt-space-6);
+  padding: var(--bt-space-3) var(--bt-space-4) calc(var(--bt-space-6) + env(safe-area-inset-bottom));
   font-size: var(--bt-font-size-12);
   font-weight: var(--bt-font-weight-semibold);
   color: var(--bt-color-text-tertiary);
 }
+.nav-install { width: calc(100% - 2 * var(--bt-space-2)); margin: 0 var(--bt-space-2); background-color: transparent; cursor: pointer; text-align: left; }
 .status-dot { flex: none; width: var(--bt-space-2); height: var(--bt-space-2); border-radius: var(--bt-radius-full); background-color: var(--bt-color-warning); }
 .status-dot[data-ok="true"] { background-color: var(--bt-color-success); }
 
@@ -147,7 +148,7 @@
     align-items: center;
     gap: var(--bt-space-3);
     min-height: 68px;
-    padding: var(--bt-space-2) var(--bt-space-3);
+    padding: calc(var(--bt-space-2) + env(safe-area-inset-top)) var(--bt-space-3) var(--bt-space-2);
     background-color: var(--bt-color-surface);
     border-bottom: var(--bt-border-width-default) solid var(--bt-color-border);
   }
