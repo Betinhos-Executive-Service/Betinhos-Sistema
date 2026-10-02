@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { ChevronRight, Plus, X } from 'lucide-react'
-import { Button, Cluster, Field, Grid, Input, SearchBox, Select, Stack, Textarea, filterOptions, type ButtonSize, type ButtonVariant, type ControlSize, type SelectOption } from '@betinhos/ui'
+import { Check, ChevronRight, Clock, Plus, TriangleAlert, X } from 'lucide-react'
+import { Button, Cluster, Field, Grid, Input, SearchBox, Select, Stack, StatusBadge, Textarea, filterOptions, type ButtonSize, type ButtonVariant, type ControlSize, type SelectOption, type StatusTone } from '@betinhos/ui'
 import { PageLayout } from '../app/PageLayout'
 
 const CLIENTES: SelectOption[] = ['Embraer', 'Tenaris', 'Kenvue', 'Johnson & Johnson'].map((label) => ({ value: label, label }))
@@ -25,7 +25,7 @@ const VARIANTS: ButtonVariant[] = ['primary', 'secondary', 'action', 'ghost', 'd
 const SIZES: ButtonSize[] = ['compact', 'default', 'touch']
 const CONTROLS = ['Input', 'Textarea'] as const
 /** Componentes do Design System que ainda não são React; entram aqui conforme forem revisados. */
-const PENDING = ['StatusBadge', 'Alert', 'EmptyState', 'SegmentedControl', 'Surface', 'PageHeader', 'MetricCard', 'DateTile', 'Table']
+const PENDING = ['Alert', 'EmptyState', 'SegmentedControl', 'Surface', 'PageHeader', 'MetricCard', 'DateTile', 'Table']
 
 function Section({ name, summary, children }: { name: string; summary: string; children: ReactNode }) {
   return (
@@ -288,6 +288,49 @@ function SearchBoxShowcase() {
   )
 }
 
+const TONES: StatusTone[] = ['neutral', 'info', 'success', 'warning', 'danger']
+
+function StatusBadgeShowcase() {
+  const [tone, setTone] = useState<StatusTone>('info')
+  const [label, setLabel] = useState('Em andamento')
+  const [dot, setDot] = useState(false)
+  const [icon, setIcon] = useState(false)
+  const icons: Record<StatusTone, ReactNode> = { neutral: null, info: <Clock />, success: <Check />, warning: <Clock />, danger: <TriangleAlert /> }
+
+  return (
+    <Section name="StatusBadge" summary="Pílula de status com cinco tons; cada tom é um par de tokens, texto forte sobre fundo suave.">
+      <div className="showcase__stage">
+        <StatusBadge tone={tone} dot={dot} icon={icon ? icons[tone] : undefined}>{label || 'Status'}</StatusBadge>
+      </div>
+      <Cluster gap="4">
+        <Choice label="tone" value={tone} options={TONES} onChange={setTone} />
+        <label className="showcase__control">
+          <span>children</span>
+          <input type="text" value={label} onChange={(event) => setLabel(event.target.value)} />
+        </label>
+        <Toggle label="dot" value={dot} onChange={setDot} />
+        <Toggle label="icon" value={icon} onChange={setIcon} />
+      </Cluster>
+      <p className="showcase__label">Os cinco estados do sistema</p>
+      <Cluster gap="2">
+        <StatusBadge>Rascunho</StatusBadge>
+        <StatusBadge tone="info">Aberto</StatusBadge>
+        <StatusBadge tone="success">Concluído</StatusBadge>
+        <StatusBadge tone="warning">Em análise</StatusBadge>
+        <StatusBadge tone="danger">Atrasado</StatusBadge>
+      </Cluster>
+      <p className="showcase__label">Com segundo sinal: ponto ou ícone</p>
+      <Cluster gap="2">
+        <StatusBadge tone="success" dot>Conectado</StatusBadge>
+        <StatusBadge tone="warning" dot>Pendente</StatusBadge>
+        <StatusBadge tone="danger" icon={<TriangleAlert />}>Atrasado</StatusBadge>
+        <StatusBadge tone="success" icon={<Check />}>Confirmado</StatusBadge>
+        <StatusBadge tone="info" icon={<Clock />}>Aguardando validação</StatusBadge>
+      </Cluster>
+    </Section>
+  )
+}
+
 /** Vitrine dos componentes de `@betinhos/ui`, só no `pnpm dev`. */
 export function ComponentsPage() {
   return (
@@ -297,6 +340,7 @@ export function ComponentsPage() {
         <FieldShowcase />
         <SelectShowcase />
         <SearchBoxShowcase />
+        <StatusBadgeShowcase />
         <Section name="Em revisão" summary="Ainda não são componentes React. Entram nesta página um a um, depois de revisados.">
           <ul className="showcase__pending">
             {PENDING.map((name) => <li key={name}>{name}</li>)}
