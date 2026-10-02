@@ -4,7 +4,7 @@
   "version": "0.0.2",
   "type": "module",
   "scripts": {
-    "dev": "vite --port 36472 --strictPort",
+    "dev": "node ../../packages/deploy/dev-restart.mjs 36472 .",
     "typecheck": "tsc --noEmit",
     "build": "node ../../packages/deploy/bump-version.mjs . && tsc --noEmit && vite build && node ../../packages/deploy/inline-webresource.mjs dist",
     "wr": "pnpm build",
