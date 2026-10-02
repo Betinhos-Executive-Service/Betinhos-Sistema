@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<style>body{margin:0;font:13px "Manrope","Segoe UI",sans-serif;color:#64748b;background:#f0f0f0}p{padding:24px}</style>
+</head>
+<body>
+<p id="msg">Carregando…</p>
+<script>
+// Carregador: o model-driven serve WebResources por uma URL com marcador de cache que nem sempre
+// muda após publicar. Este arquivo quase nunca muda; ele busca a tela real pela URL direta,
+// sem cache, para que cada publicação apareça na hora.
+(async function () {
+  try {
+    var response = await fetch('/WebResources/{{RESOURCE}}?v=' + Date.now(), { cache: 'no-store', credentials: 'same-origin' })
+    if (!response.ok) throw new Error('HTTP ' + response.status)
+    var html = await response.text()
+    document.open()
+    document.write(html)
+    document.close()
+  } catch (error) {
+    document.getElementById('msg').textContent = 'Não foi possível carregar {{TITLE}} (' + error.message + '). Recarregue a página.'
+  }
+})()
+</script>
+</body>
+</html>

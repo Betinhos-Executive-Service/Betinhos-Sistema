@@ -1,0 +1,15 @@
+{
+  "name": "betinhos-sistema",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.4.1",
+  "scripts": {
+    "dev": "pnpm --filter @betinhos/shell dev",
+    "build": "pnpm --filter @betinhos/shell build",
+    "wr": "pnpm --filter @betinhos/shell wr",
+    "push": "pnpm --filter @betinhos/shell push",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm --filter @betinhos/shell typecheck",
+    "tokens": "node packages/deploy/sync-tokens.mjs"
+  }
+}
