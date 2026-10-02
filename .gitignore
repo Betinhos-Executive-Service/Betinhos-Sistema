@@ -1,0 +1,7 @@
+.memsearch/
+.worktrees/
+node_modules/
+dist/
+.env
+.env.*
+*.log
