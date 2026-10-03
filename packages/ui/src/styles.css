@@ -15,6 +15,7 @@
 @import './components/table.css';
 @import './components/drawer.css';
 @import './components/upload.css';
+@import './components/app-shell.css';
 
 /* Centabel Book: fonte de títulos da marca; na interface, só no título de página. */
 @font-face {
