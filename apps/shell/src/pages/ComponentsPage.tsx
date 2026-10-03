@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { Check, ChevronRight, Clock, Plus, TriangleAlert, X } from 'lucide-react'
-import { Alert, Button, Cluster, Field, Grid, Input, SearchBox, Select, Stack, StatusBadge, Textarea, ToastProvider, filterOptions, useToast, type AlertTone, type ButtonSize, type ButtonVariant, type ControlSize, type SelectOption, type StatusTone } from '@betinhos/ui'
+import { Check, ChevronRight, Clock, Inbox, Plus, PlugZap, SearchX, TriangleAlert, X } from 'lucide-react'
+import { Alert, Button, Cluster, EmptyState, Field, Grid, Input, SearchBox, Select, Stack, StatusBadge, Textarea, ToastProvider, filterOptions, useToast, type AlertTone, type ButtonSize, type ButtonVariant, type ControlSize, type SelectOption, type StatusTone } from '@betinhos/ui'
 import { PageLayout } from '../app/PageLayout'
 
 const CLIENTES: SelectOption[] = ['Embraer', 'Tenaris', 'Kenvue', 'Johnson & Johnson'].map((label) => ({ value: label, label }))
@@ -25,7 +25,7 @@ const VARIANTS: ButtonVariant[] = ['primary', 'secondary', 'action', 'ghost', 'd
 const SIZES: ButtonSize[] = ['compact', 'default', 'touch']
 const CONTROLS = ['Input', 'Textarea'] as const
 /** Componentes do Design System que ainda não são React; entram aqui conforme forem revisados. */
-const PENDING = ['EmptyState', 'SegmentedControl', 'Surface', 'PageHeader', 'MetricCard', 'DateTile', 'Table']
+const PENDING = ['SegmentedControl', 'Surface', 'PageHeader', 'MetricCard', 'DateTile', 'Table']
 
 function Section({ name, summary, children }: { name: string; summary: string; children: ReactNode }) {
   return (
@@ -331,6 +331,33 @@ function StatusBadgeShowcase() {
   )
 }
 
+function EmptyStateShowcase() {
+  const [filtered, setFiltered] = useState(true)
+  return (
+    <Section name="EmptyState" summary="Estado vazio ou de erro: ícone, título, explicação curta e a ação que leva ao próximo passo.">
+      <Grid gap="4" min={300}>
+        <div className="surface">
+          {filtered
+            ? <EmptyState icon={<Inbox />} title="Nenhuma ocorrência encontrada para estes filtros." action={<Button variant="secondary" onClick={() => setFiltered(false)}>Limpar filtros</Button>}>Ajuste o período ou limpe os filtros para ver mais resultados.</EmptyState>
+            : <EmptyState icon={<Inbox />} title="Nenhuma ocorrência registrada ainda." action={<Button icon={<Plus size={16} />} onClick={() => setFiltered(true)}>Registrar ocorrência</Button>}>A primeira ocorrência aparece aqui assim que for registrada.</EmptyState>}
+        </div>
+        <div className="surface">
+          <EmptyState tone="danger" icon={<PlugZap />} title="Dataverse sem resposta." action={<Button variant="secondary">Tentar de novo</Button>}>Verifique a conexão e tente de novo. Se continuar, avise a TI.</EmptyState>
+        </div>
+      </Grid>
+      <p className="showcase__label">Alinhado à esquerda (páginas do shell) e compacto (blocos pequenos)</p>
+      <Grid gap="4" min={300}>
+        <div className="surface">
+          <EmptyState align="start" icon={<SearchX />} title="Este endereço não corresponde a nenhuma tela">Escolha uma tela no menu.</EmptyState>
+        </div>
+        <div className="surface">
+          <EmptyState compact icon={<Inbox />} title="Sem notas nesta ocorrência.">Adicione a primeira pelo botão acima.</EmptyState>
+        </div>
+      </Grid>
+    </Section>
+  )
+}
+
 const ALERT_TONES: AlertTone[] = ['info', 'success', 'warning', 'danger']
 
 function AlertShowcase() {
@@ -389,6 +416,7 @@ export function ComponentsPage() {
         <SearchBoxShowcase />
         <StatusBadgeShowcase />
         <AlertShowcase />
+        <EmptyStateShowcase />
         <Section name="Em revisão" summary="Ainda não são componentes React. Entram nesta página um a um, depois de revisados.">
           <ul className="showcase__pending">
             {PENDING.map((name) => <li key={name}>{name}</li>)}

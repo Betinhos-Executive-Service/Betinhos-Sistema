@@ -4,7 +4,8 @@ import type { Host } from '../host'
 import { DEFAULT_ITEM, type MenuGroup, type MenuItem } from '../nav/menu'
 import { hrefFor } from '../nav/useHashRoute'
 import { ComponentsPage } from '../pages/ComponentsPage'
-import { EmptyState, PageLayout } from './PageLayout'
+import { EmptyState, buttonClassName } from '@betinhos/ui'
+import { PageLayout } from './PageLayout'
 
 type Props = { host: Host; group: MenuGroup | null; item: MenuItem | null; label: string }
 
@@ -41,7 +42,7 @@ export function RouteLayout({ host, group, item, label }: Props) {
   if (!item) {
     return (
       <PageLayout title="Tela não encontrada">
-        <EmptyState icon={<SearchX size={36} />} title="Este endereço não corresponde a nenhuma tela" action={<a className="button button--primary" href={hrefFor(DEFAULT_ITEM.id)}>Ir para a Página Inicial</a>}>
+        <EmptyState className="surface" align="start" icon={<SearchX size={36} />} title="Este endereço não corresponde a nenhuma tela" action={<a className={buttonClassName({ variant: 'primary' })} href={hrefFor(DEFAULT_ITEM.id)}>Ir para a Página Inicial</a>}>
           Escolha uma tela no menu.
         </EmptyState>
       </PageLayout>
@@ -51,7 +52,7 @@ export function RouteLayout({ host, group, item, label }: Props) {
   if (item.kind === 'unavailable') {
     return (
       <PageLayout eyebrow={group?.label} title={label}>
-        <EmptyState icon={<MonitorOff size={36} />} title="Ainda não disponível no Sistema Betinhos">{item.reason}</EmptyState>
+        <EmptyState className="surface" align="start" icon={<MonitorOff size={36} />} title="Ainda não disponível no Sistema Betinhos">{item.reason}</EmptyState>
       </PageLayout>
     )
   }
@@ -62,7 +63,7 @@ export function RouteLayout({ host, group, item, label }: Props) {
     const target = item.kind === 'webresource' ? item.resource : item.kind === 'entity' ? item.entity : item.url
     return (
       <PageLayout eyebrow={group?.label} title={label}>
-        <EmptyState icon={<PlugZap size={36} />} title="Esta tela abre dentro do Dataverse">
+        <EmptyState className="surface" align="start" icon={<PlugZap size={36} />} title="Esta tela abre dentro do Dataverse">
           Fora do ambiente não há dados para mostrar. Publique com <code>pnpm push</code> e abra o Sistema Betinhos no Dataverse para ver <code>{target}</code>.
         </EmptyState>
       </PageLayout>
