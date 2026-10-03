@@ -1,7 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { Check, ChevronRight, CircleCheck, Clock, Inbox, Plus, PlugZap, SearchX, TriangleAlert, X } from 'lucide-react'
+import { Check, ChevronRight, CircleCheck, Clock, Copy, EllipsisVertical, Home, Inbox, LayoutDashboard, Pencil, Plus, PlugZap, SearchX, Trash2, TriangleAlert, Truck, X } from 'lucide-react'
 import {
-  Alert, Button, Cluster, DateTile, Drawer, EmptyState, Field, Grid, Input, MetricCard, PageHeader, SearchBox, SegmentedControl, Select, Stack, StatusBadge, Surface, Table, TableTitle, Textarea, ToastProvider, Upload,
+  Alert, Avatar, BottomNav, Breadcrumb, Button, Checkbox, ChoiceGroup, Cluster, DateTile, Dialog, Drawer, EmptyState, Field, Grid, Input, Menu, MetricCard, PageHeader, Pagination, Progress, Radio, SearchBox, SegmentedControl, Select, Skeleton, Spinner, Stack, StatusBadge, Surface, Switch, Table, TableTitle, Tabs, Textarea, ToastProvider, Tooltip, Upload,
   filterOptions, useToast, type AlertTone, type ButtonSize, type ButtonVariant, type ControlSize, type SelectOption, type StatusTone, type UploadFile,
 } from '@betinhos/ui'
 import { PageLayout } from '../app/PageLayout'
@@ -519,6 +519,106 @@ function UploadShowcase() {
   )
 }
 
+function ChoiceShowcase() {
+  const [notificar, setNotificar] = useState(true)
+  const [canais, setCanais] = useState<string[]>(['email'])
+  const [prioridade, setPrioridade] = useState('normal')
+  const toggle = (value: string) => setCanais((list) => (list.includes(value) ? list.filter((item) => item !== value) : [...list, value]))
+  return (
+    <Section name="Checkbox, Radio e Switch" summary="Escolhas: várias independentes (Checkbox), uma entre poucas (Radio) e ligar/desligar com efeito imediato (Switch).">
+      <Grid gap="4" min={240}>
+        <ChoiceGroup label="Avisar por" hint="Pode marcar mais de um." inline>
+          <Checkbox label="E-mail" checked={canais.includes('email')} onChange={() => toggle('email')} />
+          <Checkbox label="WhatsApp" checked={canais.includes('whats')} onChange={() => toggle('whats')} />
+          <Checkbox label="SMS" disabled />
+        </ChoiceGroup>
+        <ChoiceGroup label="Prioridade" error={prioridade === 'alta' ? 'Prioridade alta exige justificativa no campo Descrição.' : undefined}>
+          <Radio name="prio" label="Normal" value="normal" checked={prioridade === 'normal'} onChange={() => setPrioridade('normal')} />
+          <Radio name="prio" label="Alta" description="Avisa a coordenação na hora." value="alta" checked={prioridade === 'alta'} onChange={() => setPrioridade('alta')} />
+        </ChoiceGroup>
+        <Stack gap="2">
+          <Switch label="Notificar o cliente" description={notificar ? 'Ligado: o cliente recebe o resumo por e-mail.' : 'Desligado.'} checked={notificar} onChange={(event) => setNotificar(event.target.checked)} />
+          <Switch label="Modo de manutenção" disabled />
+        </Stack>
+      </Grid>
+    </Section>
+  )
+}
+
+function TabsShowcase() {
+  const [tab, setTab] = useState('detalhes')
+  return (
+    <Section name="Tabs" summary="Abas de uma mesma tela, com sublinhado azul; setas, Home e End trocam a aba.">
+      <Surface>
+        <Tabs aria-label="Seções da ocorrência" value={tab} onChange={setTab} tabs={[{ value: 'detalhes', label: 'Detalhes' }, { value: 'acoes', label: 'Plano de ações', badge: 3 }, { value: 'historico', label: 'Histórico' }, { value: 'anexos', label: 'Anexos', disabled: true }]}>
+          <p className="showcase__summary" style={{ margin: 0 }}>{tab === 'detalhes' ? 'Contexto, causa e solução da ocorrência.' : tab === 'acoes' ? 'Três ações corretivas, uma atrasada.' : 'Registro de alterações e notas.'}</p>
+        </Tabs>
+      </Surface>
+    </Section>
+  )
+}
+
+function DialogMenuShowcase() {
+  const toast = useToast()
+  const [confirm, setConfirm] = useState(false)
+  const [info, setInfo] = useState(false)
+  return (
+    <Section name="Dialog e Menu" summary="Dialog: decisão curta no centro (confirmar, excluir). Menu: ações do registro atrás de um botão ⋯.">
+      <Cluster gap="3">
+        <Button variant="danger" onClick={() => setConfirm(true)}>Excluir opção</Button>
+        <Button variant="secondary" onClick={() => setInfo(true)}>Aviso informativo</Button>
+        <Menu
+          trigger={(props) => <Button variant="secondary" icon={<EllipsisVertical size={16} />} aria-label="Mais ações" {...props} />}
+          actions={[
+            { id: 'editar', label: 'Editar', icon: <Pencil />, onSelect: () => toast({ message: 'Editar ocorrência.' }) },
+            { id: 'copiar', label: 'Duplicar', icon: <Copy />, onSelect: () => toast({ message: 'Ocorrência duplicada.' }) },
+            { id: 'excluir', label: 'Excluir', icon: <Trash2 />, tone: 'danger', onSelect: () => setConfirm(true) },
+          ]}
+        />
+      </Cluster>
+      <Dialog open={confirm} onClose={() => setConfirm(false)} tone="danger" title="Excluir esta opção?" actions={<><Button variant="secondary" onClick={() => setConfirm(false)}>Cancelar</Button><Button variant="danger" onClick={() => { setConfirm(false); toast({ tone: 'success', message: 'Opção excluída.' }) }}>Excluir</Button></>}>
+        Registros vinculados podem ser afetados. Esta ação não pode ser desfeita.
+      </Dialog>
+      <Dialog open={info} onClose={() => setInfo(false)} title="Opções sincronizadas com o Dataverse" actions={<Button onClick={() => setInfo(false)}>Entendi</Button>}>
+        Alterações feitas aqui valem para todos os usuários do módulo.
+      </Dialog>
+    </Section>
+  )
+}
+
+function MiscShowcase() {
+  const [page, setPage] = useState(1)
+  const [progress, setProgress] = useState(64)
+  return (
+    <Section name="Tooltip, Pagination, Skeleton, Spinner, Avatar, Breadcrumb e Progress" summary="Peças pequenas que completam as telas.">
+      <Grid gap="4" min={260}>
+        <Stack gap="3">
+          <p className="showcase__label">Tooltip e Spinner</p>
+          <Cluster gap="3">
+            <Tooltip text="Atualiza a lista com os dados do Dataverse"><Button variant="secondary" icon={<Clock size={16} />} aria-label="Atualizar" /></Tooltip>
+            <Spinner label="Carregando ocorrências" />
+            <Avatar name="Marina Lopes" size="sm" /><Avatar name="Carlos Prado" /><Avatar name="Ana Ribeiro" size="lg" />
+          </Cluster>
+          <p className="showcase__label">Breadcrumb</p>
+          <Breadcrumb items={[{ label: 'Operacional', href: '#/' }, { label: 'Ocorrências', href: '#/componentes' }, { label: 'OC-0412' }]} />
+        </Stack>
+        <Stack gap="3">
+          <p className="showcase__label">Skeleton</p>
+          <Cluster gap="3"><Skeleton shape="circle" /><Stack gap="2"><Skeleton width={180} /><Skeleton width={120} /></Stack></Cluster>
+          <Skeleton shape="rect" height={56} />
+          <p className="showcase__label">Progress</p>
+          <Progress label="Ações concluídas" value={progress} tone={progress >= 100 ? 'success' : 'info'} />
+          <Cluster gap="2"><Button size="compact" variant="secondary" onClick={() => setProgress((v) => Math.max(0, v - 16))}>−16</Button><Button size="compact" variant="secondary" onClick={() => setProgress((v) => Math.min(100, v + 16))}>+16</Button></Cluster>
+        </Stack>
+      </Grid>
+      <p className="showcase__label">Pagination</p>
+      <Pagination page={page} pageSize={20} total={128} noun="ocorrências" onChange={setPage} />
+      <p className="showcase__label">BottomNav: aparece só no celular (até 820px), com até 5 atalhos</p>
+      <BottomNav activeId="componentes" items={[{ id: 'inicio', label: 'Início', href: '#/cr40f_homebetinhos', icon: <Home /> }, { id: 'dashboard', label: 'Dashboard', href: '#/new_dashboard', icon: <LayoutDashboard /> }, { id: 'reservas', label: 'Reservas', href: '#/cr40f_reservadeveculos', icon: <Truck />, badge: 3 }, { id: 'componentes', label: 'Componentes', href: '#/componentes', icon: <Inbox /> }]} />
+    </Section>
+  )
+}
+
 const ALERT_TONES: AlertTone[] = ['info', 'success', 'warning', 'danger']
 
 function AlertShowcase() {
@@ -586,6 +686,10 @@ export function ComponentsPage() {
         <TableShowcase />
         <DrawerShowcase />
         <UploadShowcase />
+        <ChoiceShowcase />
+        <TabsShowcase />
+        <DialogMenuShowcase />
+        <MiscShowcase />
         {PENDING.length ? (
           <Section name="Em revisão" summary="Ainda não são componentes React. Entram nesta página um a um, depois de revisados.">
             <ul className="showcase__pending">
