@@ -13,15 +13,3 @@ export function PageLayout({ eyebrow, title, children }: { eyebrow?: string; tit
     </div>
   )
 }
-
-/** Estado vazio/explicativo: ícone, título, explicação curta e ação opcional. */
-export function EmptyState({ icon, title, children, action }: { icon: ReactNode; title: string; children: ReactNode; action?: ReactNode }) {
-  return (
-    <section className="surface empty-state">
-      <span className="empty-state__icon" aria-hidden="true">{icon}</span>
-      <h2 className="empty-state__title">{title}</h2>
-      <p className="empty-state__text">{children}</p>
-      {action}
-    </section>
-  )
-}
