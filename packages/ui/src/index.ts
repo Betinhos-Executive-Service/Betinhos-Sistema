@@ -2,6 +2,8 @@ export { Alert, ToastProvider, useToast, type AlertProps, type AlertTone, type T
 export { BuildBadge, formatBuild } from './BuildBadge'
 export { Button, buttonClassName, type ButtonProps, type ButtonSize, type ButtonVariant } from './components/Button'
 export { DateTile, dateTileParts, type DateTileProps } from './components/DateTile'
+export { Drawer, type DrawerProps } from './components/Drawer'
+export { Upload, acceptFiles, formatFileSize, type UploadFile, type UploadProps } from './components/Upload'
 export { EmptyState, type EmptyStateProps } from './components/EmptyState'
 export { MetricCard, type MetricCardProps, type MetricTone } from './components/MetricCard'
 export { PageHeader, type PageHeaderProps } from './components/PageHeader'

@@ -13,6 +13,8 @@
 @import './components/metric-card.css';
 @import './components/date-tile.css';
 @import './components/table.css';
+@import './components/drawer.css';
+@import './components/upload.css';
 
 /* Centabel Book: fonte de títulos da marca; na interface, só no título de página. */
 @font-face {
