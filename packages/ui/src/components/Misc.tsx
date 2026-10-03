@@ -41,8 +41,8 @@ export function Pagination({ page, pageSize, total, onChange, noun }: Pagination
 
 export type SkeletonProps = HTMLAttributes<HTMLSpanElement> & { width?: number | string; height?: number | string; shape?: 'text' | 'rect' | 'circle' }
 /** Marcação do formato final enquanto o conteúdo carrega; nunca para estado vazio. */
-export function Skeleton({ width = '100%', height, shape = 'text', className, style, ...rest }: SkeletonProps) {
-  return <span className={['bt-skeleton', `bt-skeleton--${shape}`, className].filter(Boolean).join(' ')} style={{ width, height, ...style }} aria-hidden="true" {...rest} />
+export function Skeleton({ width, height, shape = 'text', className, style, ...rest }: SkeletonProps) {
+  return <span className={['bt-skeleton', `bt-skeleton--${shape}`, className].filter(Boolean).join(' ')} style={{ width: width ?? (shape === 'circle' ? undefined : '100%'), height, ...style }} aria-hidden="true" {...rest} />
 }
 
 /** Indicador girando de 800ms com rótulo acessível; para ações locais, não para página inteira. */
