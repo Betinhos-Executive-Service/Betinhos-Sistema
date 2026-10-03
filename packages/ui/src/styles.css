@@ -7,6 +7,12 @@
 @import './components/status-badge.css';
 @import './components/alert.css';
 @import './components/empty-state.css';
+@import './components/segmented-control.css';
+@import './components/surface.css';
+@import './components/page-header.css';
+@import './components/metric-card.css';
+@import './components/date-tile.css';
+@import './components/table.css';
 
 /* Centabel Book: fonte de títulos da marca; na interface, só no título de página. */
 @font-face {
