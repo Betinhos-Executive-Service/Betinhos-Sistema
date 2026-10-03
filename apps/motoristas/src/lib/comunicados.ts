@@ -396,10 +396,13 @@ export async function executeComunicadoAction(operationName: string, parameters:
   let xrm: XrmApi | undefined;
   try { xrm = (window.parent as Window & { Xrm?: XrmApi }).Xrm; } catch { /* Parent may be cross-origin. */ }
   xrm ??= (window as Window & { Xrm?: XrmApi }).Xrm;
-  const execute = xrm?.WebApi?.online?.execute;
+  const online = xrm?.WebApi?.online;
+  // O Xrm depende do `this`; extrair o método solto quebra com "reading '_execute'".
+  const execute = online?.execute?.bind(online);
   if (!execute) throw new Error("Abra o web resource no Power Apps para registrar esta ação.");
   const parameterTypes = Object.fromEntries(Object.keys(parameters).map((key) => [key, {
-    typeName: key.endsWith("Id") ? "Edm.Guid" : "Edm.String",
+    // Com "Edm.Guid" o Xrm serializa a string como 'undefined'; o servidor converte o texto para Guid.
+    typeName: "Edm.String",
     structuralProperty: 1
   }]));
   const response = await execute({

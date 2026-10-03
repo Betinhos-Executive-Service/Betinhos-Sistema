@@ -1,6 +1,6 @@
 {
   "name": "app-motoristas-webresource",
-  "version": "2.1.686",
+  "version": "2.1.688",
   "private": true,
   "type": "module",
   "scripts": {
