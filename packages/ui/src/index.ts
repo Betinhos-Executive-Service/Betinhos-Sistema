@@ -1,7 +1,13 @@
 export { Alert, ToastProvider, useToast, type AlertProps, type AlertTone, type ToastOptions } from './components/Alert'
 export { BuildBadge, formatBuild } from './BuildBadge'
 export { Button, buttonClassName, type ButtonProps, type ButtonSize, type ButtonVariant } from './components/Button'
+export { DateTile, dateTileParts, type DateTileProps } from './components/DateTile'
 export { EmptyState, type EmptyStateProps } from './components/EmptyState'
+export { MetricCard, type MetricCardProps, type MetricTone } from './components/MetricCard'
+export { PageHeader, type PageHeaderProps } from './components/PageHeader'
+export { SegmentedControl, type SegmentedControlProps, type SegmentedOption } from './components/SegmentedControl'
+export { Surface, type SurfaceProps } from './components/Surface'
+export { Table, TableTitle, type TableColumn, type TableProps } from './components/Table'
 export {
   Field, Input, Textarea, fieldIds,
   type ControlSize, type FieldProps, type InputProps, type TextareaProps,

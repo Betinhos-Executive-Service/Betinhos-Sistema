@@ -1,6 +1,9 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { Check, ChevronRight, Clock, Inbox, Plus, PlugZap, SearchX, TriangleAlert, X } from 'lucide-react'
-import { Alert, Button, Cluster, EmptyState, Field, Grid, Input, SearchBox, Select, Stack, StatusBadge, Textarea, ToastProvider, filterOptions, useToast, type AlertTone, type ButtonSize, type ButtonVariant, type ControlSize, type SelectOption, type StatusTone } from '@betinhos/ui'
+import { Check, ChevronRight, CircleCheck, Clock, Inbox, Plus, PlugZap, SearchX, TriangleAlert, X } from 'lucide-react'
+import {
+  Alert, Button, Cluster, DateTile, EmptyState, Field, Grid, Input, MetricCard, PageHeader, SearchBox, SegmentedControl, Select, Stack, StatusBadge, Surface, Table, TableTitle, Textarea, ToastProvider,
+  filterOptions, useToast, type AlertTone, type ButtonSize, type ButtonVariant, type ControlSize, type SelectOption, type StatusTone,
+} from '@betinhos/ui'
 import { PageLayout } from '../app/PageLayout'
 
 const CLIENTES: SelectOption[] = ['Embraer', 'Tenaris', 'Kenvue', 'Johnson & Johnson'].map((label) => ({ value: label, label }))
@@ -25,7 +28,15 @@ const VARIANTS: ButtonVariant[] = ['primary', 'secondary', 'action', 'ghost', 'd
 const SIZES: ButtonSize[] = ['compact', 'default', 'touch']
 const CONTROLS = ['Input', 'Textarea'] as const
 /** Componentes do Design System que ainda não são React; entram aqui conforme forem revisados. */
-const PENDING = ['SegmentedControl', 'Surface', 'PageHeader', 'MetricCard', 'DateTile', 'Table']
+const PENDING: string[] = []
+
+type Ocorrencia = { id: string; titulo: string; local: string; cliente: string; responsavel: string; prazo: string; status: StatusTone; statusLabel: string; gravidade: 'success' | 'warning' | 'danger'; gravidadeLabel: string }
+const OCORRENCIAS: Ocorrencia[] = [
+  { id: 'OC-0412', titulo: 'Atraso na apresentação do motorista', local: 'Aeroporto de Guarulhos', cliente: 'Embraer', responsavel: 'Marina Lopes', prazo: '2026-09-28', status: 'danger', statusLabel: 'Atrasado', gravidade: 'danger', gravidadeLabel: 'Gravidade crítica' },
+  { id: 'OC-0409', titulo: 'Veículo diferente do confirmado', local: 'São José dos Campos', cliente: 'Johnson & Johnson', responsavel: 'Carlos Prado', prazo: '2026-10-06', status: 'info', statusLabel: 'Em andamento', gravidade: 'warning', gravidadeLabel: 'Gravidade média' },
+  { id: 'OC-0403', titulo: 'Voucher enviado sem telefone do passageiro', local: 'Congonhas', cliente: 'Tenaris', responsavel: 'Ana Ribeiro', prazo: '2026-10-12', status: 'success', statusLabel: 'Concluído', gravidade: 'success', gravidadeLabel: 'Gravidade baixa' },
+]
+const dataBR = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR')
 
 function Section({ name, summary, children }: { name: string; summary: string; children: ReactNode }) {
   return (
@@ -358,6 +369,118 @@ function EmptyStateShowcase() {
   )
 }
 
+function SegmentedShowcase() {
+  const [periodo, setPeriodo] = useState('semana')
+  const [modo, setModo] = useState('timeline')
+  return (
+    <Section name="SegmentedControl" summary="Seletor de opções mutuamente exclusivas (2 a 5), item ativo em navy; setas trocam a opção.">
+      <Cluster gap="4">
+        <SegmentedControl aria-label="Período" value={periodo} onChange={setPeriodo} options={[{ value: 'hoje', label: 'Hoje' }, { value: 'semana', label: 'Semana' }, { value: 'mes', label: 'Mês' }, { value: 'todas', label: 'Todas' }]} />
+        <SegmentedControl aria-label="Modo de exibição" size="compact" value={modo} onChange={setModo} options={[{ value: 'timeline', label: 'Linha do tempo' }, { value: 'motorista', label: 'Por motorista' }, { value: 'mapa', label: 'Mapa', disabled: true }]} />
+      </Cluster>
+      <p className="showcase__summary" role="status">Período: {periodo} · Modo: {modo}</p>
+      <div style={{ maxWidth: 420 }}>
+        <SegmentedControl aria-label="Período em largura total" fullWidth value={periodo} onChange={setPeriodo} options={[{ value: 'hoje', label: 'Hoje' }, { value: 'semana', label: 'Semana' }, { value: 'mes', label: 'Mês' }]} />
+      </div>
+    </Section>
+  )
+}
+
+function SurfaceShowcase() {
+  return (
+    <Section name="Surface" summary="O card base: branco, borda, raio de 12px e sombra baixa, com cabeçalho opcional.">
+      <Grid gap="4" min={280}>
+        <Surface eyebrow="Prioridade" title="Próximas ações" action={<Button variant="ghost" size="compact" iconEnd={<ChevronRight size={14} />}>Ver todas</Button>}>
+          <p className="showcase__summary" style={{ margin: 0 }}>Três ações vencem até sexta-feira. A mais antiga está atrasada há dois dias.</p>
+        </Surface>
+        <Surface compact title="Compacto">
+          <p className="showcase__summary" style={{ margin: 0 }}>Padding menor, para blocos densos.</p>
+        </Surface>
+        <Surface flush title="Sem padding (flush)">
+          <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+            {['Listas e tabelas encostam na borda', 'Cada item com seu próprio padding'].map((item) => <li key={item} style={{ padding: '10px 16px', borderTop: '1px solid var(--bt-color-border)', fontSize: 13 }}>{item}</li>)}
+          </ul>
+        </Surface>
+      </Grid>
+    </Section>
+  )
+}
+
+function PageHeaderShowcase() {
+  return (
+    <Section name="PageHeader" summary="Cabeçalho de página: eyebrow, título em Centabel Book, descrição e até duas ações.">
+      <div className="showcase__stage showcase__stage--form" style={{ maxWidth: 'none' }}>
+        <PageHeader eyebrow="Qualidade" title="Gestão de ocorrências" description="Registre, acompanhe e encerre as ocorrências da operação." actions={<><Button variant="secondary">Exportar lista</Button><Button icon={<Plus size={16} />}>Registrar ocorrência</Button></>} />
+      </div>
+    </Section>
+  )
+}
+
+function MetricCardShowcase() {
+  const [loading, setLoading] = useState(false)
+  return (
+    <Section name="MetricCard" summary="Card de KPI: ícone em fundo suave do tom, rótulo, valor em navy e linha de apoio.">
+      <Grid gap="3" min={200}>
+        <MetricCard tone="info" icon={<Inbox />} label="Ocorrências abertas" value="128" hint="Últimos 30 dias" loading={loading} />
+        <MetricCard tone="danger" icon={<TriangleAlert />} label="Ações atrasadas" value="7" hint="3 críticas" loading={loading} />
+        <MetricCard tone="warning" icon={<Clock />} label="Vencem esta semana" value="14" hint="Até 09/10/2026" loading={loading} />
+        <MetricCard tone="success" icon={<CircleCheck />} label="Concluídas" value="96" hint="75% do total" loading={loading} />
+      </Grid>
+      <Cluster gap="3"><Toggle label="loading" value={loading} onChange={setLoading} /></Cluster>
+    </Section>
+  )
+}
+
+function DateTileShowcase() {
+  return (
+    <Section name="DateTile" summary="Bloco de data em navy, dia grande e mês abaixo, para linhas de agenda; atrasado vira danger.">
+      <Cluster gap="4">
+        <DateTile date="2026-10-06" />
+        <DateTile date="2026-09-28" overdue />
+        <DateTile date="2026-10-12" size="compact" />
+        <DateTile date="2026-09-28" size="compact" overdue />
+      </Cluster>
+      <Surface compact>
+        <Cluster gap="3">
+          <DateTile date="2026-09-28" overdue />
+          <div style={{ display: 'grid', gap: 2, minWidth: 0 }}>
+            <Cluster gap="2"><span className="showcase__label">Ação corretiva</span><StatusBadge tone="danger">Atrasado</StatusBadge></Cluster>
+            <strong style={{ fontSize: 13 }}>Contato com o cliente sobre o atraso</strong>
+            <span className="showcase__summary" style={{ margin: 0 }}>Marina Lopes</span>
+          </div>
+        </Cluster>
+      </Surface>
+    </Section>
+  )
+}
+
+function TableShowcase() {
+  const toast = useToast()
+  const [loading, setLoading] = useState(false)
+  const [empty, setEmpty] = useState(false)
+  return (
+    <Section name="Table" summary="Lista operacional em linhas clicáveis, com cabeçalho off-white, barra de gravidade, carregamento, vazio e rodapé.">
+      <Table<Ocorrencia>
+        rows={empty ? [] : OCORRENCIAS}
+        rowKey={(row) => row.id}
+        loading={loading}
+        onRowClick={(row) => toast({ tone: 'info', message: `Abrir ${row.id}: ${row.titulo}` })}
+        severity={(row) => ({ tone: row.gravidade, label: row.gravidadeLabel })}
+        columns={[
+          { key: 'titulo', header: 'Ocorrência', width: 'minmax(240px, 1.6fr)', cell: (row) => <TableTitle title={row.titulo} meta={`${row.id} · ${row.local}`} /> },
+          { key: 'cliente', header: 'Cliente', width: 'minmax(120px, .8fr)', hideBelow: 'mobile', cell: (row) => row.cliente },
+          { key: 'responsavel', header: 'Responsável', width: 'minmax(120px, .8fr)', hideBelow: 'compact', cell: (row) => row.responsavel },
+          { key: 'prazo', header: 'Prazo', width: '100px', hideBelow: 'mobile', cell: (row) => <span style={row.status === 'danger' ? { color: 'var(--bt-color-danger)', fontWeight: 800 } : undefined}>{dataBR(row.prazo)}</span> },
+          { key: 'status', header: 'Status', width: '120px', align: 'end', cell: (row) => <StatusBadge tone={row.status}>{row.statusLabel}</StatusBadge> },
+        ]}
+        empty={<EmptyState icon={<Inbox />} title="Nenhuma ocorrência encontrada para estes filtros." action={<Button variant="secondary" onClick={() => setEmpty(false)}>Limpar filtros</Button>}>Ajuste o período ou limpe os filtros.</EmptyState>}
+        footer={<><span>1–3 de 128</span><Cluster gap="1"><Button variant="secondary" size="compact" disabled>Anterior</Button><Button variant="secondary" size="compact">Próxima</Button></Cluster></>}
+      />
+      <Cluster gap="3"><Toggle label="loading" value={loading} onChange={setLoading} /><Toggle label="vazio" value={empty} onChange={setEmpty} /></Cluster>
+    </Section>
+  )
+}
+
 const ALERT_TONES: AlertTone[] = ['info', 'success', 'warning', 'danger']
 
 function AlertShowcase() {
@@ -417,11 +540,19 @@ export function ComponentsPage() {
         <StatusBadgeShowcase />
         <AlertShowcase />
         <EmptyStateShowcase />
-        <Section name="Em revisão" summary="Ainda não são componentes React. Entram nesta página um a um, depois de revisados.">
-          <ul className="showcase__pending">
-            {PENDING.map((name) => <li key={name}>{name}</li>)}
-          </ul>
-        </Section>
+        <SegmentedShowcase />
+        <SurfaceShowcase />
+        <PageHeaderShowcase />
+        <MetricCardShowcase />
+        <DateTileShowcase />
+        <TableShowcase />
+        {PENDING.length ? (
+          <Section name="Em revisão" summary="Ainda não são componentes React. Entram nesta página um a um, depois de revisados.">
+            <ul className="showcase__pending">
+              {PENDING.map((name) => <li key={name}>{name}</li>)}
+            </ul>
+          </Section>
+        ) : null}
       </Stack>
     </PageLayout>
     </ToastProvider>
