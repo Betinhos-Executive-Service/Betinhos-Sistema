@@ -9,6 +9,8 @@ export type MenuItem =
   | { kind: 'external'; id: string; label: string; url: string }
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
+  /** Tela React do próprio shell. */
+  | { kind: 'page'; id: string; label: string; page: 'componentes' }
 
 export type MenuGroup = { id: string; label: string; items: MenuItem[] }
 
@@ -86,6 +88,10 @@ export const MENU: MenuGroup[] = [
       wr('Composição de Preço', 'new_TelaComposicaoPreco.html'),
     ],
   },
+  // Referência para quem desenvolve: só existe no `pnpm dev`, nunca no build publicado.
+  ...(import.meta.env.DEV
+    ? [{ id: 'design-system', label: 'Design System', items: [{ kind: 'page', id: 'componentes', label: 'Componentes', page: 'componentes' }] } satisfies MenuGroup]
+    : []),
 ]
 
 export const ALL_ITEMS = MENU.flatMap((group) => group.items)
