@@ -1,6 +1,7 @@
 export { Alert, ToastProvider, useToast, type AlertProps, type AlertTone, type ToastOptions } from './components/Alert'
 export { BuildBadge, formatBuild } from './BuildBadge'
 export { Button, buttonClassName, type ButtonProps, type ButtonSize, type ButtonVariant } from './components/Button'
+export { EmptyState, type EmptyStateProps } from './components/EmptyState'
 export {
   Field, Input, Textarea, fieldIds,
   type ControlSize, type FieldProps, type InputProps, type TextareaProps,

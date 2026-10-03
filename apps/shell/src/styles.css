@@ -128,11 +128,6 @@
 .page__title { margin: 0; font-family: var(--bt-typography-heading-page-font-family); font-size: clamp(28px, 3.4vw, var(--bt-typography-heading-page-font-size)); font-weight: var(--bt-typography-heading-page-font-weight); -webkit-text-stroke: var(--bt-heading-page-stroke-width) currentColor; letter-spacing: var(--bt-typography-heading-page-letter-spacing); line-height: var(--bt-typography-heading-page-line-height); color: var(--bt-color-brand); }
 
 .surface { background-color: var(--bt-surface-background); border: var(--bt-border-width-default) solid var(--bt-surface-border); border-radius: var(--bt-surface-radius); box-shadow: var(--bt-surface-shadow); }
-.empty-state { display: flex; flex-direction: column; align-items: flex-start; gap: var(--bt-space-2); padding: var(--bt-space-6) var(--bt-space-4); }
-.empty-state__icon { color: var(--bt-color-action); line-height: 0; }
-.empty-state__title { margin: 0; font-size: var(--bt-font-size-17); font-weight: var(--bt-font-weight-extrabold); line-height: 1.29; color: var(--bt-color-text-primary); }
-.empty-state__text { margin: 0 0 var(--bt-space-2); max-width: 65ch; font-size: var(--bt-font-size-14); color: var(--bt-color-slate-700); }
-.empty-state code { font-family: var(--bt-font-family-mono); font-size: var(--bt-font-size-12); padding: var(--bt-space-0-5) var(--bt-space-1-5); border-radius: var(--bt-radius-xs); background-color: var(--bt-color-surface-soft); overflow-wrap: anywhere; }
 
 /* Vitrine de componentes (só no pnpm dev) */
 .showcase { display: flex; flex-direction: column; gap: var(--bt-space-3-5); padding: var(--bt-space-4); }
