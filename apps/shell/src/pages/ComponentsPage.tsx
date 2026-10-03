@@ -1,8 +1,8 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Check, ChevronRight, CircleCheck, Clock, Inbox, Plus, PlugZap, SearchX, TriangleAlert, X } from 'lucide-react'
 import {
-  Alert, Button, Cluster, DateTile, EmptyState, Field, Grid, Input, MetricCard, PageHeader, SearchBox, SegmentedControl, Select, Stack, StatusBadge, Surface, Table, TableTitle, Textarea, ToastProvider,
-  filterOptions, useToast, type AlertTone, type ButtonSize, type ButtonVariant, type ControlSize, type SelectOption, type StatusTone,
+  Alert, Button, Cluster, DateTile, Drawer, EmptyState, Field, Grid, Input, MetricCard, PageHeader, SearchBox, SegmentedControl, Select, Stack, StatusBadge, Surface, Table, TableTitle, Textarea, ToastProvider, Upload,
+  filterOptions, useToast, type AlertTone, type ButtonSize, type ButtonVariant, type ControlSize, type SelectOption, type StatusTone, type UploadFile,
 } from '@betinhos/ui'
 import { PageLayout } from '../app/PageLayout'
 
@@ -481,6 +481,44 @@ function TableShowcase() {
   )
 }
 
+function DrawerShowcase() {
+  const toast = useToast()
+  const [open, setOpen] = useState(false)
+  const [wide, setWide] = useState(false)
+  const [titulo, setTitulo] = useState('')
+  const [files, setFiles] = useState<UploadFile[]>([])
+  return (
+    <Section name="Drawer" summary="Painel lateral modal pela direita: prende o foco, fecha por X, Esc e fundo; cabeçalho e rodapé fixos, conteúdo rola.">
+      <Cluster gap="3">
+        <Button onClick={() => setOpen(true)}>Abrir drawer</Button>
+        <Toggle label="wide (720px)" value={wide} onChange={setWide} />
+      </Cluster>
+      <Drawer open={open} onClose={() => setOpen(false)} eyebrow="Ocorrência" title="Registrar ocorrência" size={wide ? 'wide' : 'default'}
+        footer={<><Button variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button><Button onClick={() => { setOpen(false); toast({ tone: 'success', message: 'Ocorrência registrada.' }) }}>Registrar</Button></>}>
+        <Stack gap="3">
+          <Alert tone="info">Os campos com * são obrigatórios.</Alert>
+          <Field label="Título" required><Input value={titulo} onChange={(event) => setTitulo(event.target.value)} placeholder="Ex.: Atraso na apresentação" /></Field>
+          <Field label="Descrição"><Textarea rows={4} /></Field>
+          <Field label="Evidências" hint="PDF, JPG ou PNG até 10 MB, no máximo 5.">
+            <Upload files={files} onChange={setFiles} accept="image/*,.pdf" maxSize={10 * 1048576} maxFiles={5} label="Arraste as evidências ou escolha os arquivos" hint="PDF, JPG ou PNG até 10 MB" />
+          </Field>
+        </Stack>
+      </Drawer>
+    </Section>
+  )
+}
+
+function UploadShowcase() {
+  const [files, setFiles] = useState<UploadFile[]>([{ name: 'foto-painel.jpg', size: 348160, url: '#' }])
+  return (
+    <Section name="Upload" summary="Área de arrastar e soltar com lista dos arquivos, limites de tamanho e quantidade, e erro explicado.">
+      <div style={{ maxWidth: 560 }}>
+        <Upload files={files} onChange={setFiles} accept="image/*,.pdf" maxSize={2 * 1048576} maxFiles={3} label="Arraste as evidências ou escolha os arquivos" hint="PDF, JPG ou PNG até 2 MB, no máximo 3" />
+      </div>
+    </Section>
+  )
+}
+
 const ALERT_TONES: AlertTone[] = ['info', 'success', 'warning', 'danger']
 
 function AlertShowcase() {
@@ -546,6 +584,8 @@ export function ComponentsPage() {
         <MetricCardShowcase />
         <DateTileShowcase />
         <TableShowcase />
+        <DrawerShowcase />
+        <UploadShowcase />
         {PENDING.length ? (
           <Section name="Em revisão" summary="Ainda não são componentes React. Entram nesta página um a um, depois de revisados.">
             <ul className="showcase__pending">
