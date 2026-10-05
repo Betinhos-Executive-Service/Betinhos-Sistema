@@ -7,8 +7,8 @@
 }
 .bt-sheet[data-level='full'] { --bt-sheet-offset: 0px; }
 .bt-sheet::backdrop {
-  background-color: var(--bt-color-brand);
-  opacity: var(--bt-opacity-backdrop);
+  background-color: rgba(0, 26, 61, var(--bt-opacity-backdrop)); /* igual ao Drawer */
+  opacity: 1;
   transition: opacity var(--bt-duration-normal) var(--bt-ease-out);
 }
 @starting-style { .bt-sheet[open]::backdrop { opacity: 0; } }
@@ -17,7 +17,7 @@
 .bt-sheet__panel {
   position: absolute; inset: auto 0 0 0; height: var(--bt-sheet-height);
   display: flex; flex-direction: column;
-  background-color: var(--bt-color-surface-soft);
+  background-color: var(--bt-color-surface-neutral);
   border-radius: var(--bt-radius-xl) var(--bt-radius-xl) 0 0;
   box-shadow: var(--bt-shadow-toast);
   transform: translateY(var(--bt-sheet-offset));
