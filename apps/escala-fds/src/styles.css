@@ -1,0 +1,57 @@
+/* Escala de fim de semana: painel lateral (520px) aberto pela grade de Reservas. Valores só de tokens --bt-*. */
+
+html, body, #root { height: 100%; margin: 0; }
+body { background-color: var(--bt-color-canvas); font-family: var(--bt-font-family-sans); color: var(--bt-color-text-primary); }
+
+.escala { display: flex; flex-direction: column; height: 100%; max-width: 720px; margin: 0 auto; background-color: var(--bt-color-canvas); }
+
+.escala__head { display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-2); padding: var(--bt-space-3) var(--bt-space-4); background-color: var(--bt-color-surface); border-bottom: var(--bt-border-width-default) solid var(--bt-color-border); }
+.escala__week { display: flex; align-items: center; gap: var(--bt-space-2); }
+.escala__week-label { display: grid; min-width: 128px; text-align: center; }
+.escala__week-label strong { font-size: var(--bt-font-size-17); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); }
+.escala__eyebrow { font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); letter-spacing: .08em; text-transform: uppercase; color: var(--bt-color-text-secondary); }
+
+.escala > .bt-tabs { padding: 0 var(--bt-space-4); background-color: var(--bt-color-surface); }
+
+.escala__body { flex: 1; overflow-y: auto; padding: var(--bt-space-3) var(--bt-space-4) var(--bt-space-8); }
+.escala__skeleton { display: grid; gap: var(--bt-space-2); }
+.escala__tab { display: flex; flex-direction: column; gap: var(--bt-space-3); }
+
+.escala__day { display: grid; line-height: 1.2; text-transform: capitalize; }
+.escala__day small { font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-semibold); opacity: .85; text-transform: none; }
+.escala .bt-segmented--full .bt-segmented__item { min-height: 44px; }
+
+.escala__summary { margin: 0; font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }
+.escala__summary strong { color: var(--bt-color-text-primary); }
+.escala__summary-muted { color: var(--bt-color-warning); font-weight: var(--bt-font-weight-bold); }
+
+.escala__list { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
+.escala__row { display: grid; gap: var(--bt-space-2); padding: var(--bt-space-2-5) var(--bt-space-3); background-color: var(--bt-color-surface-neutral); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); }
+.escala__row.is-unavailable { background-color: var(--bt-color-warning-soft); }
+.escala__row-main { display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-2); flex-wrap: wrap; }
+.escala__row-extra { display: grid; grid-template-columns: 140px 1fr; gap: var(--bt-space-2); }
+.escala__name { font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-primary); }
+.escala__meta { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+
+.escala__absence { grid-template-columns: 1fr auto auto; align-items: center; }
+.escala__absence-main { display: grid; gap: var(--bt-space-0-5); min-width: 0; }
+
+.escala__form { display: grid; gap: var(--bt-space-3); padding: var(--bt-space-4); background-color: var(--bt-color-surface); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-lg); }
+.escala__form-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--bt-space-2); }
+.escala__form-actions { display: flex; justify-content: flex-end; gap: var(--bt-space-2); }
+
+.escala__table { width: 100%; border-collapse: collapse; background-color: var(--bt-color-surface); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-lg); overflow: hidden; font-size: var(--bt-font-size-13); }
+.escala__table thead th { height: 36px; padding: 0 var(--bt-space-3); background-color: var(--bt-color-surface-neutral); font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); text-transform: uppercase; letter-spacing: .08em; color: var(--bt-color-text-secondary); text-align: left; white-space: nowrap; }
+.escala__table thead th + th, .escala__table td { width: 92px; text-align: right; font-variant-numeric: tabular-nums; }
+.escala__table tbody th { display: flex; align-items: center; gap: var(--bt-space-2); flex-wrap: wrap; text-align: left; font-weight: inherit; }
+.escala__table tbody th, .escala__table td { padding: var(--bt-space-2-5) var(--bt-space-3); border-top: var(--bt-border-width-default) solid var(--bt-color-border); }
+.escala__table td { font-weight: var(--bt-font-weight-bold); }
+
+.escala__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-2); flex-wrap: wrap; padding: var(--bt-space-3) var(--bt-space-4); background-color: var(--bt-color-surface); border-top: var(--bt-border-width-default) solid var(--bt-color-border); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-secondary); }
+.escala__foot-actions { display: flex; gap: var(--bt-space-2); }
+
+.escala__mock { margin: 0; padding: var(--bt-space-1) var(--bt-space-4); font-size: var(--bt-font-size-11); color: var(--bt-color-text-secondary); }
+
+@media (max-width: 380px) {
+  .escala__row-extra, .escala__form-row { grid-template-columns: 1fr; }
+}
