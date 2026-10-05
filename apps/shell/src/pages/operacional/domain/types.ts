@@ -33,4 +33,6 @@ export type OperacionalData = {
   /** Por id de reserva, já em ordem de seleção. */
   passageiros: Record<string, PassageiroServico[]>
   queryMode: 'full' | 'safe'
+  /** Falhas parciais que não impedem a tela (listas de apoio indisponíveis). */
+  warnings: string[]
 }

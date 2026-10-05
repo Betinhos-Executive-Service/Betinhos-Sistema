@@ -80,8 +80,9 @@ export function createClient(clientUrl: string, fetchImpl: typeof fetch = (...ar
       if (!match) throw new DataverseError('Registro criado, mas o id não foi retornado.', response.status)
       return match[1].toLowerCase()
     },
+    // If-Match: * impede que o PATCH vire upsert e crie um registro quando o id não existe.
     async update(entitySet, id, data) {
-      await send(`${entitySet}(${cleanId(id)})`, { method: 'PATCH', body: JSON.stringify(data) })
+      await send(`${entitySet}(${cleanId(id)})`, { method: 'PATCH', headers: { 'If-Match': '*' }, body: JSON.stringify(data) })
     },
     async remove(entitySet, id) {
       await send(`${entitySet}(${cleanId(id)})`, { method: 'DELETE' })

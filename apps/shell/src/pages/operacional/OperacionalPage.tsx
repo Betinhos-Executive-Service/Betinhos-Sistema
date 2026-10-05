@@ -9,7 +9,7 @@ import type { Motorista, Reserva } from './domain/types'
 import { buildAttention, type AttentionItem } from './domain/alerts'
 import { groupByHour } from './domain/bands'
 import { freshnessLabel } from './domain/refresh'
-import { isCancelled, serviceState } from './domain/serviceState'
+import { isCancelled, normalizeStatus, serviceState } from './domain/serviceState'
 import { addDays, dateKey, formatHour } from './domain/time'
 import { telHref } from './domain/phone'
 import { useOperacional } from './useOperacional'
@@ -42,7 +42,7 @@ function Operacional({ host }: { host: Host }) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [statusOptions, setStatusOptions] = useState<ChoiceOption[]>([])
   const [busy, setBusy] = useState(false)
-  const [confirmCancel, setConfirmCancel] = useState<{ reservaId: string; codigo: string; option: ChoiceOption } | null>(null)
+  const [confirm, setConfirm] = useState<{ reservaId: string; codigo: string; kind: 'cancel' | 'motorista' | 'programar'; run: () => void } | null>(null)
   const [manualRefresh, setManualRefresh] = useState(false)
   const wide = useMedia('(min-width: 860px)')
   const landscape = useMedia('(orientation: landscape) and (max-height: 560px)')
@@ -68,14 +68,14 @@ function Operacional({ host }: { host: Host }) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
-      if (confirmCancel || (selectedId && !wide)) return
+      if (confirm || (selectedId && !wide)) return
       if ((event.target as HTMLElement).closest('input, textarea, select, [role="listbox"], [role="combobox"], [role="dialog"], [role="switch"], [contenteditable]')) return
       if (event.key === 'ArrowLeft') changeDay(addDays(dayKey, -1))
       if (event.key === 'ArrowRight') changeDay(addDays(dayKey, 1))
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId, wide, confirmCancel, dayKey, changeDay])
+  }, [selectedId, wide, confirm, dayKey, changeDay])
 
   const visible = useMemo(() => (motoristaId ? op.reservas.filter((r) => r.motoristaId === motoristaId) : op.reservas), [op.reservas, motoristaId])
   const attention = useMemo(() => buildAttention(visible, now), [visible, now])
@@ -92,7 +92,10 @@ function Operacional({ host }: { host: Host }) {
   const errorText = (prefix: string, reason: unknown) => [prefix, reason instanceof Error ? reason.message : '', 'Tente de novo.'].filter(Boolean).join(' ')
 
   async function changeStatus(target: { reservaId: string; codigo: string }, option: ChoiceOption, confirmed = false) {
-    if (isCancelled(option.label) && !confirmed) { setConfirmCancel({ ...target, option }); return }
+    if (!confirmed) {
+      const kind = isCancelled(option.label) ? 'cancel' : /programad/.test(normalizeStatus(option.label)) ? 'programar' : null
+      if (kind) { setConfirm({ ...target, kind, run: () => void changeStatus(target, option, true) }); return }
+    }
     setBusy(true)
     try {
       await op.mutate(target.reservaId, { statusValue: option.value, status: option.label }, () => source.setStatus(target.reservaId, option.value))
@@ -102,7 +105,12 @@ function Operacional({ host }: { host: Host }) {
     } finally { setBusy(false) }
   }
 
-  async function changeMotorista(target: { reservaId: string; codigo: string }, motorista: Motorista | null) {
+  async function changeMotorista(target: { reservaId: string; codigo: string }, motorista: Motorista | null, confirmed = false) {
+    const current = byId.get(target.reservaId)
+    if (!confirmed && current && /programad/.test(normalizeStatus(current.status))) {
+      setConfirm({ ...target, kind: 'motorista', run: () => void changeMotorista(target, motorista, true) })
+      return
+    }
     setBusy(true)
     try {
       await op.mutate(target.reservaId, { motoristaId: motorista?.id ?? null, motorista: motorista?.nome ?? '' }, () => source.setMotorista(target.reservaId, motorista?.id ?? null))
@@ -119,6 +127,13 @@ function Operacional({ host }: { host: Host }) {
     setSelectedId(item.reservaId) // atribuir e ver abrem o detalhe, onde ficam o seletor e o contexto
   }
 
+  const code = confirm?.codigo ?? ''
+  const confirmTexts = confirm?.kind === 'motorista'
+    ? { title: `Trocar o motorista do serviço #${code}?`, body: 'O motorista anterior e o novo recebem aviso por push e e-mail, e o veículo pode ser reatribuído automaticamente.', keep: 'Manter motorista', go: 'Trocar motorista' }
+    : confirm?.kind === 'programar'
+      ? { title: `Programar o serviço #${code}?`, body: 'O motorista recebe aviso por push e e-mail.', keep: 'Voltar', go: 'Programar serviço' }
+      : { title: `Cancelar o serviço #${code}?`, body: 'O motorista e o cliente podem já estar contando com este serviço.', keep: 'Manter serviço', go: 'Cancelar serviço' }
+
   const freshness = op.refreshFailed && op.lastUpdated
     ? `Não foi possível atualizar · última atualização ${formatHour(op.lastUpdated)}`
     : freshnessLabel(op.lastUpdated, now)
@@ -133,7 +148,7 @@ function Operacional({ host }: { host: Host }) {
   let body
   if (op.loading && !op.data) body = <AgendaSkeleton />
   else if (op.error) body = <Alert tone="danger" title="Não foi possível carregar os serviços" action={<Button variant="secondary" onClick={() => void op.refresh()}>Tentar de novo</Button>}>{op.error}</Alert>
-  else if (!op.reservas.length) body = <EmptyState align="start" icon={<CalendarX size={36} />} title="Nenhum serviço para este dia" action={dayKey !== today ? <Button onClick={() => setDayKey(today)}>Ir para hoje</Button> : undefined}>Use as setas para ver outro dia.</EmptyState>
+  else if (!op.reservas.length) body = <EmptyState align="start" icon={<CalendarX size={36} />} title="Nenhum serviço para este dia" action={dayKey !== today ? <Button onClick={() => changeDay(today)}>Ir para hoje</Button> : undefined}>Use as setas para ver outro dia.</EmptyState>
   else if (!visible.length) body = <EmptyState align="start" title="Nenhum serviço deste motorista neste dia" action={<Button variant="secondary" onClick={() => setMotoristaId(null)}>Limpar filtro</Button>} />
   else if (landscape) body = <LandscapeTable reservas={visible} now={now} passageiros={op.data?.passageiros ?? {}} onSelect={setSelectedId} />
   else body = (
@@ -150,6 +165,7 @@ function Operacional({ host }: { host: Host }) {
           freshness={freshness} freshnessWarning={op.refreshFailed} refreshing={manualRefresh && op.refreshing}
           onRefresh={() => { setManualRefresh(true); void op.refresh() }} total={visible.length}
           motoristas={motoristas} motoristaId={motoristaId} onMotorista={setMotoristaId} showConcluded={showConcluded} onShowConcluded={setShowConcluded} mock={source.mock} />
+        {op.data?.warnings.map((w) => <Alert key={w} tone="warning">{w}</Alert>)}
         {op.data?.queryMode === 'safe' ? <Alert tone="info">Alguns campos não estão disponíveis; mostrando a versão reduzida.</Alert> : null}
         <div className="op-split">
           <div>{body}</div>
@@ -164,12 +180,12 @@ function Operacional({ host }: { host: Host }) {
         </Sheet>
       ) : null}
 
-      <Dialog open={Boolean(confirmCancel)} onClose={() => setConfirmCancel(null)} tone="danger" title={`Cancelar o serviço #${confirmCancel?.codigo ?? ''}?`}
+      <Dialog open={Boolean(confirm)} onClose={() => setConfirm(null)} tone={confirm?.kind === 'cancel' ? 'danger' : undefined} title={confirmTexts.title}
         actions={<>
-          <Button variant="secondary" onClick={() => setConfirmCancel(null)}>Manter serviço</Button>
-          <Button variant="danger" onClick={() => { const pending = confirmCancel!; setConfirmCancel(null); void changeStatus(pending, pending.option, true) }}>Cancelar serviço</Button>
+          <Button variant="secondary" onClick={() => setConfirm(null)}>{confirmTexts.keep}</Button>
+          <Button variant={confirm?.kind === 'cancel' ? 'danger' : 'primary'} onClick={() => { const pending = confirm!; setConfirm(null); pending.run() }}>{confirmTexts.go}</Button>
         </>}>
-        O motorista e o cliente podem já estar contando com este serviço.
+        {confirmTexts.body}
       </Dialog>
     </PageLayout>
   )

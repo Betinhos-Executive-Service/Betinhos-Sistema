@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createClient } from '@betinhos/dataverse'
 import { SAFE_MODE_ERROR, loadOperacional, mapReserva, reservasPath } from './queries'
-import { motoristaPatch, statusPatch } from './mutations'
+import { motoristaPatch, motoristaRefPath, statusPatch } from './mutations'
 import { createMockData } from './mock'
 import { buildAttention } from '../domain/alerts'
 import { findConflicts } from '../domain/conflicts'
@@ -42,7 +42,27 @@ describe('consultas', () => {
     expect(data.queryMode).toBe('safe')
     expect(data.reservas).toHaveLength(1)
     expect(data.motoristas).toEqual([])
+    expect(data.warnings).toEqual(['Não foi possível carregar a lista de motoristas; mostrando os que aparecem nas reservas.'])
     expect(data.passageiros.a[0]).toMatchObject({ nome: 'Ana', ordem: 1 })
+  })
+})
+
+describe('permissão', () => {
+  it('relança 403 da lista de motoristas em vez de usar o fallback', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('cr40f_funcionarioses')) return json({ error: { message: 'sem acesso' } }, 403)
+      return json({ value: [] })
+    })
+    await expect(loadOperacional(createClient('https://org.example', fetchMock as typeof fetch), sets, '2026-10-05')).rejects.toMatchObject({ status: 403 })
+  })
+  it('avisa quando os passageiros falham por erro comum', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('cr40f_servicosporpassageiros')) return json({ error: { message: 'falhou' } }, 500)
+      if (url.includes('cr40f_funcionarioses')) return json({ value: [] })
+      return json({ value: [{ cr40f_reservadeveculosid: 'A', cr40f_dataehorriodesada: '2026-10-05T11:30:00Z' }] })
+    })
+    const data = await loadOperacional(createClient('https://org.example', fetchMock as typeof fetch), sets, '2026-10-05')
+    expect(data.warnings).toContain('Não foi possível carregar os passageiros vinculados.')
   })
 })
 
@@ -50,7 +70,7 @@ describe('mutações', () => {
   it('monta os payloads de PATCH', () => {
     expect(statusPatch(202410008)).toEqual({ cr40f_status: 202410008 })
     expect(motoristaPatch('cr40f_funcionarioses', '{ABC}')).toEqual({ 'cr40f_Motorista@odata.bind': '/cr40f_funcionarioses(abc)' })
-    expect(motoristaPatch('cr40f_funcionarioses', null)).toEqual({ 'cr40f_Motorista@odata.bind': null })
+    expect(motoristaRefPath('cr40f_reservadeveculoses', '{ABC}')).toBe('cr40f_reservadeveculoses(abc)/cr40f_Motorista/$ref')
   })
 })
 

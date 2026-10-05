@@ -3,7 +3,7 @@ import type { Host } from '../../../host'
 import type { OperacionalData } from '../domain/types'
 import { MOCK_STATUS, createMockData } from './mock'
 import { ENTITIES, loadOperacional, type EntitySets } from './queries'
-import { motoristaPatch, statusPatch } from './mutations'
+import { motoristaPatch, motoristaRefPath, statusPatch } from './mutations'
 
 /** Tudo que a tela precisa do mundo externo; dataverse em produção, memória no pnpm dev. */
 export type Source = {
@@ -62,7 +62,8 @@ export function createSource(host: Host): Source {
     setStatus: async (reservaId, value) => host.client.update((await entitySets()).reserva, reservaId, statusPatch(value)),
     setMotorista: async (reservaId, motoristaId) => {
       const s = await entitySets()
-      await host.client.update(s.reserva, reservaId, motoristaPatch(s.funcionario, motoristaId))
+      if (motoristaId === null) await host.client.request(motoristaRefPath(s.reserva, reservaId), { method: 'DELETE' })
+      else await host.client.update(s.reserva, reservaId, motoristaPatch(s.funcionario, motoristaId))
     },
     openReserva(reservaId) {
       // XrmHost.Navigation é Record<string, unknown>: o cast para openForm continua necessário.
