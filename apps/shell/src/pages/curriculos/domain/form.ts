@@ -37,7 +37,7 @@ const numberText = (value: number | null) => (value == null ? '' : String(value)
 
 export function toForm(c: Curriculo): CurriculoForm {
   return {
-    nome: c.nome, cpf: c.cpf, email: c.email, telefone: c.telefone, whatsapp: c.whatsapp, cidade: c.cidade, estado: c.estado,
+    nome: c.nome, cpf: c.cpf, email: c.email, telefone: c.telefone, whatsapp: c.whatsapp, cidade: c.cidade, estado: c.estado.toUpperCase(),
     cargo: c.cargo, experiencia: c.experiencia, ultimoCargo: c.ultimoCargo, ultimaEmpresa: c.ultimaEmpresa,
     pretensao: c.pretensao == null ? '' : String(c.pretensao).replace('.', ','),
     nota: numberText(c.nota), indicadoPor: c.indicadoPor, disponibilidade: numberText(c.disponibilidade), cnh: numberText(c.cnh),
@@ -45,10 +45,10 @@ export function toForm(c: Curriculo): CurriculoForm {
   }
 }
 
-/** "3500", "3500,5" ou "3500.50"; recusa separador de milhar. */
+/** "3500", "3500,5" ou "1500.125" (qualquer nº de casas, como o legado); recusa separador de milhar. O payload arredonda para 2 casas. */
 export function parseDecimal(raw: string): number | null {
   const text = raw.trim().replace(',', '.')
-  return /^\d+(\.\d{1,2})?$/.test(text) ? Number(text) : null
+  return /^\d+(\.\d+)?$/.test(text) ? Number(text) : null
 }
 
 export function validateForm(form: CurriculoForm): FormErrors {
@@ -57,7 +57,7 @@ export function validateForm(form: CurriculoForm): FormErrors {
   if (!has('nome')) errors.nome = 'Informe o nome completo.'
   if (has('cpf') && digits(form.cpf).length !== 11) errors.cpf = 'O CPF precisa ter 11 dígitos.'
   if (has('email') && !EMAIL.test(form.email.trim())) errors.email = 'Use um e-mail no formato nome@dominio.com.'
-  if (has('estado') && !/^[A-Z]{2}$/.test(form.estado.trim())) errors.estado = 'Use a sigla com 2 letras, ex.: SP.'
+  if (has('estado') && !/^[A-Za-z]{2}$/.test(form.estado.trim())) errors.estado = 'Use a sigla com 2 letras, ex.: SP.'
   if (!has('cargo')) errors.cargo = 'Informe o cargo de interesse.'
   if (has('pretensao') && parseDecimal(form.pretensao) == null) errors.pretensao = 'Use só números, ex.: 3500,00.'
   if (has('nota') && !(/^\d{1,2}$/.test(form.nota.trim()) && Number(form.nota) <= 10)) errors.nota = 'Use um número inteiro de 0 a 10.'
@@ -69,7 +69,11 @@ export function validateForm(form: CurriculoForm): FormErrors {
 function columnValue(key: FormKey, raw: string): string | number | null {
   const text = raw.trim()
   if (!text) return null
-  if (key === 'pretensao') return parseDecimal(text)
+  if (key === 'pretensao') {
+    const n = parseDecimal(text)
+    return n == null ? null : Math.round(n * 100) / 100
+  }
+  if (key === 'estado') return text.toUpperCase()
   if (key === 'nota' || CHOICES.includes(key)) return Number(text)
   return text
 }
@@ -91,7 +95,7 @@ export function changePayload(before: CurriculoForm, after: CurriculoForm): Row 
   return payload
 }
 
-export const isDirty = (before: CurriculoForm, after: CurriculoForm) => FORM_KEYS.some((key) => before[key] !== after[key])
+export const isDirty = (before: CurriculoForm, after: CurriculoForm) => FORM_KEYS.some((key) => before[key].trim() !== after[key].trim())
 
 /** Assinatura estável (chaves ordenadas) usada pela idempotência, igual ao legado. */
 export function payloadSignature(payload: Row) {

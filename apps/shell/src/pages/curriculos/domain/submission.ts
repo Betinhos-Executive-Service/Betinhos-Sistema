@@ -7,13 +7,14 @@ export const DRAFT_KEY = 'betinhos.curriculos.rascunho.v1'
 export const PENDING_KEY = 'betinhos.curriculos.pendente.v1'
 
 export type Pending = { recordId: string; signature: string; phase: 'record-created' | 'upload-completed'; fileName: string; webUrl?: string }
-export type Step = 'create' | 'upload' | 'link' | 'need-file'
+export type Step = 'create' | 'upload' | 'link' | 'need-file' | 'done'
 
 function remove(kv: KV, key: string) {
   try { kv.removeItem(key) } catch { /* armazenamento bloqueado */ }
 }
+/** false quando a escrita falha (cheio ou bloqueado), para a UI poder avisar. */
 function write(kv: KV, key: string, value: unknown) {
-  try { kv.setItem(key, JSON.stringify(value)) } catch { /* cheio ou bloqueado: segue sem persistir */ }
+  try { kv.setItem(key, JSON.stringify(value)); return true } catch { return false }
 }
 function readJson(kv: KV, key: string): unknown {
   try {
@@ -37,13 +38,14 @@ export function readPending(kv: KV): Pending | null {
   return pending
 }
 
-export const writePending = (kv: KV, pending: Pending) => write(kv, PENDING_KEY, pending)
+export const writePending = (kv: KV, pending: Pending): boolean => write(kv, PENDING_KEY, pending)
 export const clearPending = (kv: KV) => remove(kv, PENDING_KEY)
 
 /** Mesmas regras do legado (index.html:2215-2300): só retoma quando o payload é idêntico. */
 export function nextStep(pending: Pending | null, signature: string, hasFile: boolean): Step {
   if (!pending || pending.signature !== signature) return 'create'
   if (pending.phase === 'upload-completed' && pending.webUrl) return 'link'
+  if (!pending.fileName) return 'done'
   return hasFile ? 'upload' : 'need-file'
 }
 
@@ -54,6 +56,7 @@ export function readDraft(kv: KV, base: CurriculoForm): CurriculoForm | null {
   const draft = { ...base }
   let changed = false
   for (const key of FORM_KEYS) {
+    if (key === 'status') continue // o status vem sempre da base
     const field = (value as Record<string, unknown>)[key]
     if (typeof field === 'string' && field !== base[key]) { draft[key] = field; changed = true }
   }

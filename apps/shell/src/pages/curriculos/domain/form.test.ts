@@ -64,6 +64,23 @@ describe('formulário', () => {
     expect(isDirty(before, before)).toBe(false)
     expect(isDirty(before, after)).toBe(true)
   })
+  it('isDirty ignora diferença só de espaço, como o changePayload', () => {
+    const before = toForm(curriculo)
+    expect(isDirty(before, { ...before, cidade: 'São Paulo  ' })).toBe(false)
+    expect(isDirty(before, { ...before, cidade: 'Rio' })).toBe(true)
+  })
+  it('aceita UF em caixa baixa e grava em maiúsculas', () => {
+    const existing = makeCurriculo({ id: 'z', nome: 'Zé', cargo: 'Motorista', estado: 'sp' })
+    expect(toForm(existing).estado).toBe('SP')
+    expect(validateForm({ ...toForm(existing), estado: 'sp' })).toEqual({})
+    expect(createPayload({ ...toForm(existing), estado: 'sp' }).new_estado).toBe('SP')
+  })
+  it('aceita muitas casas decimais e arredonda a 2 no payload', () => {
+    expect(parseDecimal('1500.125')).toBe(1500.125)
+    const form = { ...toForm(curriculo), pretensao: '1500.125' }
+    expect(validateForm(form)).toEqual({})
+    expect(createPayload(form).new_pretensaosalarial).toBe(1500.13)
+  })
   it('assina o payload sem depender da ordem das chaves', () => {
     expect(payloadSignature({ b: 1, a: 'x' })).toBe(payloadSignature({ a: 'x', b: 1 }))
     expect(parseDecimal('12,5')).toBe(12.5)
