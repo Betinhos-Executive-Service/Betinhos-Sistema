@@ -16,6 +16,8 @@ export { Upload, acceptFiles, formatFileSize, type UploadFile, type UploadProps 
 export { EmptyState, type EmptyStateProps } from './components/EmptyState'
 export { MetricCard, type MetricCardProps, type MetricTone } from './components/MetricCard'
 export { PageHeader, type PageHeaderProps } from './components/PageHeader'
+export { PageToolbar, pageToolbarClassName, type PageToolbarProps, type PageToolbarVariant } from './components/PageToolbar'
+export { createShellHeaderStore, useShellHeader, type ShellHeaderEntry, type ShellHeaderStore } from './components/ShellHeader'
 export { SegmentedControl, type SegmentedControlProps, type SegmentedOption } from './components/SegmentedControl'
 export { Surface, type SurfaceProps } from './components/Surface'
 export { Table, TableTitle, type TableColumn, type TableProps } from './components/Table'
