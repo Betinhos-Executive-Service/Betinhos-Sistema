@@ -22,24 +22,36 @@ export function Sheet({ open, onClose, title, eyebrow, footer, expandLabel = 'Ve
   const panelRef = useRef<HTMLDivElement>(null)
   const drag = useRef<{ y: number; t: number; pointer: number } | null>(null)
   const [level, setLevel] = useState<SheetLevel>('half')
+  const closeTimer = useRef<number | undefined>(undefined)
   const [closing, setClosing] = useState(false)
+  const [notified, setNotified] = useState(false)
   const titleId = useId()
 
   useEffect(() => {
+    window.clearTimeout(closeTimer.current) // reabrir ou fechar pelo pai cancela o onClose atrasado
     const dialog = dialogRef.current
     if (!dialog) return
     if (open && !dialog.open) { setLevel('half'); setClosing(false); dialog.showModal() }
     if (!open && dialog.open) dialog.close()
   }, [open])
 
+  useEffect(() => () => window.clearTimeout(closeTimer.current), [])
+
+  // Se o pai não fechou dentro do onClose, o sheet volta e aceita fechar de novo.
+  useEffect(() => {
+    if (!notified) return
+    setNotified(false)
+    if (open) setClosing(false)
+  }, [notified, open])
+
   function requestClose() {
     if (closing) return
     setClosing(true)
-    window.setTimeout(onClose, EXIT_MS)
+    closeTimer.current = window.setTimeout(() => { onClose(); setNotified(true) }, EXIT_MS)
   }
 
   function onPointerDown(event: PointerEvent<HTMLElement>) {
-    if (drag.current || (event.target as HTMLElement).closest('button')) return // ignora segundo dedo e botões
+    if (!event.isPrimary || event.button !== 0 || drag.current || (event.target as HTMLElement).closest('button')) return // ignora segundo dedo e botões
     drag.current = { y: event.clientY, t: performance.now(), pointer: event.pointerId }
     event.currentTarget.setPointerCapture(event.pointerId)
     panelRef.current?.setAttribute('data-dragging', '')
@@ -49,6 +61,12 @@ export function Sheet({ open, onClose, title, eyebrow, footer, expandLabel = 'Ve
     if (!start || start.pointer !== event.pointerId || !panelRef.current) return
     // Transform direto no painel: não recalcula estilo dos filhos.
     panelRef.current.style.transform = `translateY(calc(var(--bt-sheet-offset) + ${dampen(event.clientY - start.y)}px))`
+  }
+  function onPointerCancel(event: PointerEvent<HTMLElement>) {
+    if (!drag.current || drag.current.pointer !== event.pointerId) return
+    drag.current = null
+    panelRef.current?.removeAttribute('data-dragging')
+    if (panelRef.current) panelRef.current.style.transform = ''
   }
   function onPointerUp(event: PointerEvent<HTMLElement>) {
     const start = drag.current
@@ -72,7 +90,7 @@ export function Sheet({ open, onClose, title, eyebrow, footer, expandLabel = 'Ve
       onClick={(event) => { if (event.target === event.currentTarget) requestClose() }}
     >
       <div ref={panelRef} className="bt-sheet__panel">
-        <header className="bt-sheet__head" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}>
+        <header className="bt-sheet__head" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel}>
           <span className="bt-sheet__handle" aria-hidden="true" />
           <div className="bt-sheet__heading">
             {eyebrow != null ? <span className="bt-sheet__eyebrow">{eyebrow}</span> : null}
