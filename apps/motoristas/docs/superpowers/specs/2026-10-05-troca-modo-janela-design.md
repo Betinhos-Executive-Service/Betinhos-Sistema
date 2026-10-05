@@ -18,7 +18,7 @@ Deixar explícito, no registro e no App Motoristas, se a troca tem **horário ma
 | Âncora do Entre serviços | **Posição na agenda, uma por motorista**: "depois da OS-A, antes da OS-B". Sem cálculo de horário de término (só 12% dos serviços têm retorno previsto: 161/1.289 em set/2026, PROD) |
 | Extremos | "Depois de" vazio = desde o início do dia; "antes de" vazio = até o fim do dia. Âncoras opcionais: motorista sem serviço no dia fica sem âncoras = livre o dia todo |
 | Janela gravada (técnica) | `inicio` = menor saída entre os "depois de" (ou 00:00 do dia); `fim` = maior saída entre os "antes de" (ou 23:59). Serve só ao `ExchangeConflictValidator`; não é exibida como horário |
-| Agenda muda | Serviço-âncora cancelado, reatribuído a outro motorista, ou ordem invertida (OS-B antes da OS-A) → alerta para a gestão; mudança de horário → recalcula a janela técnica |
+| Agenda muda | Alertas (âncora cancelada, reatribuída, ordem invertida) **calculados na exibição**, como "atrasada". A janela técnica é calculada só no registro/atualização pela API; não há recálculo automático (o guard de pré-validação só enxerga a requisição raiz, então um update de troca disparado por update de serviço seria indistinguível de edição direta). Atualizar a troca pela API recalcula |
 | Confirmação fora da janela | Horário marcado: fora de início–fim. Entre serviços: depois da saída da própria OS-B. Permitida com **motivo obrigatório**; marca alerta |
 | Local da troca | Campo opcional; app mostra se preenchido |
 | Conclusão | Inalterada: conclui quando os dois motoristas confirmam |
@@ -29,7 +29,7 @@ Deixar explícito, no registro e no App Motoristas, se a troca tem **horário ma
 - `new_mododajanela` — choice: Horário marcado 100000000 · Entre serviços 100000001. Opcional (vazio = Horário marcado).
 - `new_m1depoisde`, `new_m1antesde`, `new_m2depoisde`, `new_m2antesde` — lookups `cr40f_reservadeveculos` (âncoras por motorista), todas opcionais.
 - `new_localdatroca` — texto (200), opcional.
-- `new_alertajanela` — texto (500). Motivo do alerta atual; vazio = sem alerta.
+- `new_alertajanela` — texto (500). Gravado pela confirmação fora da janela; vazio = sem alerta.
 - `new_motivoforadajanelamotorista1` / `...motorista2` — texto multilinha.
 Incluir na solução AppBetinhos; publicar.
 
@@ -43,7 +43,8 @@ Incluir na solução AppBetinhos; publicar.
 - `ExchangeLifecycleCommandHandler`: cálculo da janela no registro/atualização; motivo fora da janela na confirmação.
 - `ExchangeMutationGuard`: bloquear raw update dos novos campos (só via API/plugin).
 - `ExchangeConflictValidator`: segue igual, usando a janela calculada.
-- `ServiceExchangeSynchronizer` (ou novo passo no update da reserva): quando `cr40f_dataehorriodesada`, status ou motorista de um serviço-âncora mudar, recalcular a janela técnica das trocas abertas que o apontam, ou gravar `new_alertajanela`.
+- `ExchangeAnchorLoader`: lê as âncoras (saída, motorista, cancelado) para validação nas APIs. Sem sincronização automática por update de serviço.
+- Parâmetro inteiro opcional omitido chega como 0 pela Web API: `new_ModoJanela = 0` é tratado como não informado.
 
 ## Telas
 - **Tela Funções Operacionais** (registro): seletor de modo (padrão Entre serviços para Troca); em Entre serviços, mostrar a agenda do dia de cada motorista e escolher a posição ("depois de / antes de") para cada um; em Horário marcado, início/fim como hoje. Campo local opcional. Lista/detalhe exibe selo, alerta e "atrasada".
@@ -62,6 +63,6 @@ Cálculo de lacunas livres; Entre serviços para Devolução/Retirada; notifica�
 
 ## Verificação
 - Testes unitários: janela técnica a partir das âncoras e extremos vazios; âncora inválida (outro motorista, outro dia, ordem invertida); fora da janela.
-- E2E em DEV estendendo `scripts/verify-exchange-lifecycle-*-e2e.ps1`: registrar Entre serviços, mudar horário de uma âncora e conferir recálculo, cancelar/reatribuir âncora e conferir alerta, confirmar fora da janela com e sem motivo.
+- E2E em DEV: `scripts/verify-exchange-window-mode-e2e.ps1` (update sem modo recalcula pelas âncoras, âncora de outro motorista, ordem invertida, âncora em horário marcado, edição direta bloqueada, volta para horário marcado). Confirmação fora da janela exige usuário mapeado como motorista: testar pelo App Motoristas.
 - App Motoristas e Tela Funções Operacionais testados no navegador autenticado em DEV.
 - PROD só após aprovação explícita.
