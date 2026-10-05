@@ -1,15 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Dialog, EmptyState, Sheet, Surface, ToastProvider, useToast } from '@betinhos/ui'
 import type { ChoiceOption } from '@betinhos/dataverse'
 import { CalendarX } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
 import { createSource } from './data/source'
-import type { Motorista } from './domain/types'
+import type { Motorista, Reserva } from './domain/types'
 import { buildAttention, type AttentionItem } from './domain/alerts'
 import { groupByHour } from './domain/bands'
 import { freshnessLabel } from './domain/refresh'
-import { isCancelled } from './domain/serviceState'
+import { isCancelled, serviceState } from './domain/serviceState'
 import { addDays, dateKey, formatHour } from './domain/time'
 import { telHref } from './domain/phone'
 import { useOperacional } from './useOperacional'
@@ -42,13 +42,24 @@ function Operacional({ host }: { host: Host }) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [statusOptions, setStatusOptions] = useState<ChoiceOption[]>([])
   const [busy, setBusy] = useState(false)
-  const [confirmCancel, setConfirmCancel] = useState<ChoiceOption | null>(null)
+  const [confirmCancel, setConfirmCancel] = useState<{ reservaId: string; codigo: string; option: ChoiceOption } | null>(null)
   const [manualRefresh, setManualRefresh] = useState(false)
   const wide = useMedia('(min-width: 860px)')
   const landscape = useMedia('(orientation: landscape) and (max-height: 560px)')
   const op = useOperacional(source, dayKey)
 
-  useEffect(() => { source.statusOptions().then(setStatusOptions).catch(() => setStatusOptions([])) }, [source])
+  const changeDay = useCallback((key: string) => { setDayKey(key); setSelectedId(null) }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    source.statusOptions().then((o) => { if (!cancelled) setStatusOptions(o) }).catch(() => {
+      if (cancelled) return
+      setStatusOptions([])
+      toast({ tone: 'warning', message: 'Não foi possível carregar as opções de status.' })
+    })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [source])
 
   // O ícone só gira quando a pessoa clicou em Atualizar; polling e pós-mutação só mudam o rótulo de frescor.
   useEffect(() => { if (!op.refreshing) setManualRefresh(false) }, [op.refreshing])
@@ -56,14 +67,15 @@ function Operacional({ host }: { host: Host }) {
   // Setas do teclado trocam o dia quando nada está aberto e o foco não está num campo.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (selectedId && !wide) return
-      if ((event.target as HTMLElement).closest('input, textarea, select, [role="listbox"], [contenteditable]')) return
-      if (event.key === 'ArrowLeft') setDayKey((k) => addDays(k, -1))
-      if (event.key === 'ArrowRight') setDayKey((k) => addDays(k, 1))
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+      if (confirmCancel || (selectedId && !wide)) return
+      if ((event.target as HTMLElement).closest('input, textarea, select, [role="listbox"], [role="combobox"], [role="dialog"], [role="switch"], [contenteditable]')) return
+      if (event.key === 'ArrowLeft') changeDay(addDays(dayKey, -1))
+      if (event.key === 'ArrowRight') changeDay(addDays(dayKey, 1))
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId, wide])
+  }, [selectedId, wide, confirmCancel, dayKey, changeDay])
 
   const visible = useMemo(() => (motoristaId ? op.reservas.filter((r) => r.motoristaId === motoristaId) : op.reservas), [op.reservas, motoristaId])
   const attention = useMemo(() => buildAttention(visible, now), [visible, now])
@@ -72,28 +84,31 @@ function Operacional({ host }: { host: Host }) {
   const motoristas = op.data?.motoristas ?? []
   const selected = selectedId ? byId.get(selectedId) ?? null : null
   // Desktop: painel sempre preenchido com o primeiro serviço, como no legado.
-  const detailed = selected ?? (wide && !landscape ? visible[0] ?? null : null)
+  const firstPending = useMemo(() => visible.find((r) => serviceState(r, now).kind !== 'concluded') ?? null, [visible, now])
+  const detailed = selected ?? (wide && !landscape ? firstPending : null)
+  const lastSelected = useRef<Reserva | null>(null)
+  if (selected) lastSelected.current = selected
+  const sheetReserva = selected ?? lastSelected.current
+  const errorText = (prefix: string, reason: unknown) => [prefix, reason instanceof Error ? reason.message : '', 'Tente de novo.'].filter(Boolean).join(' ')
 
-  async function changeStatus(option: ChoiceOption, confirmed = false) {
-    if (!detailed) return
-    if (isCancelled(option.label) && !confirmed) { setConfirmCancel(option); return }
+  async function changeStatus(target: { reservaId: string; codigo: string }, option: ChoiceOption, confirmed = false) {
+    if (isCancelled(option.label) && !confirmed) { setConfirmCancel({ ...target, option }); return }
     setBusy(true)
     try {
-      await op.mutate(detailed.id, { statusValue: option.value, status: option.label }, () => source.setStatus(detailed.id, option.value))
+      await op.mutate(target.reservaId, { statusValue: option.value, status: option.label }, () => source.setStatus(target.reservaId, option.value))
       toast({ tone: 'success', message: `Status alterado para ${option.label}.` })
     } catch (reason) {
-      toast({ tone: 'danger', message: `Não foi possível alterar o status. ${reason instanceof Error ? reason.message : ''} Tente de novo.` })
+      toast({ tone: 'danger', message: errorText('Não foi possível alterar o status.', reason) })
     } finally { setBusy(false) }
   }
 
-  async function changeMotorista(motorista: Motorista | null) {
-    if (!detailed) return
+  async function changeMotorista(target: { reservaId: string; codigo: string }, motorista: Motorista | null) {
     setBusy(true)
     try {
-      await op.mutate(detailed.id, { motoristaId: motorista?.id ?? null, motorista: motorista?.nome ?? '' }, () => source.setMotorista(detailed.id, motorista?.id ?? null))
-      toast({ tone: 'success', message: motorista ? `${motorista.nome} atribuído ao serviço #${detailed.codigo}.` : `Motorista removido do serviço #${detailed.codigo}.` })
+      await op.mutate(target.reservaId, { motoristaId: motorista?.id ?? null, motorista: motorista?.nome ?? '' }, () => source.setMotorista(target.reservaId, motorista?.id ?? null))
+      toast({ tone: 'success', message: motorista ? `${motorista.nome} atribuído ao serviço #${target.codigo}.` : `Motorista removido do serviço #${target.codigo}.` })
     } catch (reason) {
-      toast({ tone: 'danger', message: `Não foi possível trocar o motorista. ${reason instanceof Error ? reason.message : ''} Tente de novo.` })
+      toast({ tone: 'danger', message: errorText('Não foi possível trocar o motorista.', reason) })
     } finally { setBusy(false) }
   }
 
@@ -108,10 +123,12 @@ function Operacional({ host }: { host: Host }) {
     ? `Não foi possível atualizar · última atualização ${formatHour(op.lastUpdated)}`
     : freshnessLabel(op.lastUpdated, now)
 
-  const detail = detailed ? (
-    <ServiceDetail reserva={detailed} filhos={op.data?.passageiros[detailed.id] ?? []} motoristas={motoristas} reservas={op.reservas} now={now}
-      statusOptions={statusOptions} busy={busy} onStatus={(o) => void changeStatus(o)} onMotorista={(m) => void changeMotorista(m)} onOpenReserva={() => source.openReserva(detailed.id)} />
-  ) : null
+  const renderDetail = (r: Reserva) => (
+    <ServiceDetail reserva={r} filhos={op.data?.passageiros[r.id] ?? []} motoristas={motoristas} reservas={op.reservas} now={now}
+      statusOptions={statusOptions} busy={busy} onStatus={(o) => void changeStatus({ reservaId: r.id, codigo: r.codigo }, o)}
+      onMotorista={(m) => void changeMotorista({ reservaId: r.id, codigo: r.codigo }, m)} onOpenReserva={() => source.openReserva(r.id)} />
+  )
+  const panel = detailed ? renderDetail(detailed) : <EmptyState compact align="start" title="Selecione um serviço para ver os detalhes" />
 
   let body
   if (op.loading && !op.data) body = <AgendaSkeleton />
@@ -129,28 +146,28 @@ function Operacional({ host }: { host: Host }) {
   return (
     <PageLayout eyebrow="Operacional" title="Resumo Operacional">
       <div className="op">
-        <DayHeader dayKey={dayKey} today={today} onChangeDay={(k) => { setDayKey(k); setSelectedId(null) }}
+        <DayHeader dayKey={dayKey} today={today} onChangeDay={changeDay}
           freshness={freshness} freshnessWarning={op.refreshFailed} refreshing={manualRefresh && op.refreshing}
           onRefresh={() => { setManualRefresh(true); void op.refresh() }} total={visible.length}
           motoristas={motoristas} motoristaId={motoristaId} onMotorista={setMotoristaId} showConcluded={showConcluded} onShowConcluded={setShowConcluded} mock={source.mock} />
         {op.data?.queryMode === 'safe' ? <Alert tone="info">Alguns campos não estão disponíveis; mostrando a versão reduzida.</Alert> : null}
         <div className="op-split">
           <div>{body}</div>
-          {wide && !landscape && detail ? <Surface className="op-split__detail">{detail}</Surface> : null}
+          {wide && !landscape && op.reservas.length ? <Surface className="op-split__detail">{panel}</Surface> : null}
         </div>
       </div>
 
       {!wide || landscape ? (
-        <Sheet open={Boolean(selected)} onClose={() => setSelectedId(null)} eyebrow={selected ? `Serviço #${selected.codigo}` : undefined}
-          title={selected ? (selected.motorista || 'Sem motorista') : ''} footer={selected ? <ServiceActions motorista={motoristas.find((m) => m.id === selected.motoristaId)} /> : undefined}>
-          {detail}
+        <Sheet open={Boolean(selected)} onClose={() => setSelectedId(null)} eyebrow={sheetReserva ? `Serviço #${sheetReserva.codigo}` : undefined}
+          title={sheetReserva ? (sheetReserva.motorista || 'Sem motorista') : ''} footer={sheetReserva ? <ServiceActions motorista={motoristas.find((m) => m.id === sheetReserva.motoristaId)} /> : undefined}>
+          {sheetReserva ? renderDetail(sheetReserva) : null}
         </Sheet>
       ) : null}
 
-      <Dialog open={Boolean(confirmCancel)} onClose={() => setConfirmCancel(null)} tone="danger" title={`Cancelar o serviço #${detailed?.codigo ?? ''}?`}
+      <Dialog open={Boolean(confirmCancel)} onClose={() => setConfirmCancel(null)} tone="danger" title={`Cancelar o serviço #${confirmCancel?.codigo ?? ''}?`}
         actions={<>
           <Button variant="secondary" onClick={() => setConfirmCancel(null)}>Manter serviço</Button>
-          <Button variant="danger" onClick={() => { const option = confirmCancel!; setConfirmCancel(null); void changeStatus(option, true) }}>Cancelar serviço</Button>
+          <Button variant="danger" onClick={() => { const pending = confirmCancel!; setConfirmCancel(null); void changeStatus(pending, pending.option, true) }}>Cancelar serviço</Button>
         </>}>
         O motorista e o cliente podem já estar contando com este serviço.
       </Dialog>
