@@ -10,6 +10,7 @@
 @import './components/segmented-control.css';
 @import './components/surface.css';
 @import './components/page-header.css';
+@import './components/page-toolbar.css';
 @import './components/metric-card.css';
 @import './components/date-tile.css';
 @import './components/table.css';
