@@ -12213,3 +12213,8 @@ select,
     animation: none !important;
   }
 }
+
+/* ActionButton: entrada do conteúdo de loading/sucesso via CSS (fim sempre visível, sem blur). */
+.action-button-content.is-entering { animation: action-button-content-in 150ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+@keyframes action-button-content-in { from { opacity: 0; transform: translateY(3px) scale(0.97); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .action-button-content.is-entering { animation: none; } }
