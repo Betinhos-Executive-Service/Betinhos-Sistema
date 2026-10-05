@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { normalizeSearch } from './Select'
+import { ShellHeaderContext, useShellHeaderEntry, useShellHeaderStore } from './ShellHeader'
 
 export type NavItem = {
   id: string
@@ -28,8 +29,10 @@ export type AppShellProps = {
   groups: NavGroup[]
   /** Id do item ativo; o grupo dele abre sozinho. */
   activeId: string
-  /** Título da tela, mostrado no cabeçalho do celular. */
+  /** Título da tela, mostrado no cabeçalho do celular; uma rota com `useShellHeader` pode trocá-lo. */
   title: string
+  /** Ações à direita do cabeçalho do celular (em geral só atualizar, ícone com `aria-label`). */
+  headerActions?: ReactNode
   /** Estado de conexão no rodapé: ponto e texto, nunca só o ponto. */
   status?: { tone: 'success' | 'warning' | 'danger'; text: string }
   /** Usuário conectado, no rodapé; no trilho vira só o avatar. */
@@ -74,7 +77,7 @@ function useMediaQuery(query: string) {
  * (grupos em acordeão, busca, rodapé) e trilho de 72px (só ícones, popover ao pousar). No celular a
  * sidebar vira gaveta e entra o cabeçalho fixo.
  */
-export function AppShell({ brand, groups, activeId, title, status, user, footer, collapsible = true, searchable, children }: AppShellProps) {
+export function AppShell({ brand, groups, activeId, title, headerActions, status, user, footer, collapsible = true, searchable, children }: AppShellProps) {
   const activeGroup = groups.find((group) => group.items.some((item) => item.id === activeId)) ?? null
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set(activeGroup ? [activeGroup.id] : []))
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -92,6 +95,9 @@ export function AppShell({ brand, groups, activeId, title, status, user, footer,
   const total = groups.reduce((sum, group) => sum + group.items.length, 0)
   const showSearch = searchable ?? total > 12
   const rail = desktop && collapsible && collapsed
+  const headerStore = useShellHeaderStore()
+  const page = useShellHeaderEntry(headerStore)
+  const mobileActions = page?.actions ?? headerActions
 
   // Ao navegar, o grupo do item ativo abre, a gaveta do celular fecha e o popover some.
   useEffect(() => {
@@ -181,7 +187,8 @@ export function AppShell({ brand, groups, activeId, title, status, user, footer,
     <div ref={rootRef} className={['bt-shell', rail && 'bt-shell--rail'].filter(Boolean).join(' ')} data-drawer={drawerOpen ? 'open' : 'closed'} onKeyDown={onKeyDown}>
       <header className="bt-shell__header">
         <button type="button" className="bt-shell__icon-button" aria-label="Abrir menu" aria-expanded={drawerOpen} aria-controls={navId} onClick={() => setDrawerOpen(true)}>{I.menu}</button>
-        <span className="bt-shell__header-title">{title}</span>
+        <span className="bt-shell__header-title">{page?.title ?? title}</span>
+        {mobileActions != null ? <div className="bt-shell__header-actions">{mobileActions}</div> : null}
       </header>
       <div className="bt-shell__backdrop" onClick={() => setDrawerOpen(false)} aria-hidden="true" />
 
@@ -284,7 +291,9 @@ export function AppShell({ brand, groups, activeId, title, status, user, footer,
         </nav>
       )}
 
-      <main className="bt-shell__main">{children}</main>
+      <main className="bt-shell__main">
+        <ShellHeaderContext.Provider value={headerStore}>{children}</ShellHeaderContext.Provider>
+      </main>
 
       {rail && popoverGroup ? (
         <div className="bt-shell__popover" role="menu" aria-label={popoverGroup.label} style={{ top: popover?.top }} onMouseEnter={keepPopover} onMouseLeave={hidePopover}>
