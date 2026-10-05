@@ -1,13 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
 import { Alert, BuildBadge, Button, Skeleton, Tabs, useToast } from '@betinhos/ui'
-import { addDays, recordKey, mergeEdits, planSave, toKey, weekendLabel, weekendOf, type Edicao, type Registro } from './domain/escala'
-import { createSource, janelaPara, type Dados, type Janela } from './data/source'
+import {
+  addDays, aplicarPendencias, planSave, semPendencias, toKey, totalPendencias, weekendLabel, weekendOf,
+  type Compromisso, type Dados, type Padrao, type Pendencias, type Situacao,
+} from './domain/escala'
+import { createSource, janelaPara, type Janela } from './data/source'
 import { EscalaTab } from './components/EscalaTab'
-import { AusenciasTab } from './components/AusenciasTab'
+import { AgendaTab } from './components/AgendaTab'
 import { RodizioTab } from './components/RodizioTab'
+import { PadroesTab } from './components/PadroesTab'
+import type { FormInicial } from './components/CompromissoForm'
 
-type Aba = 'escala' | 'ausencias' | 'rodizio'
+type Aba = 'escala' | 'agenda' | 'rodizio' | 'padroes'
 
 const precisaRecarregar = (janela: Janela, sabado: string) => janelaPara(sabado).inicio !== janela.inicio || addDays(sabado, 7) > janela.fim
 
@@ -20,8 +25,10 @@ export function App() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [edits, setEdits] = useState<Map<string, Edicao>>(new Map())
+  const [pend, setPend] = useState<Pendencias>(semPendencias)
   const [aba, setAba] = useState<Aba>('escala')
+  const [formInicial, setFormInicial] = useState<FormInicial | null>(null)
+  const total = totalPendencias(pend)
 
   const load = useCallback(async (target: Janela) => {
     setLoading(true)
@@ -33,52 +40,62 @@ export function App() {
 
   useEffect(() => { void load(janela) }, [load, janela])
 
-  // Fechar o painel nativo não pode ser interceptado; o navegador ao menos avisa sobre o que não foi salvo.
   useEffect(() => {
     // O overlay do botão (cr40f_escalafds_commands.js) usa isto para pedir "Descartar alterações?" ao fechar.
-    if (window.parent !== window) window.parent.postMessage({ type: 'escala-fds:dirty', dirty: edits.size > 0 }, '*')
-    if (!edits.size) return
+    if (window.parent !== window) window.parent.postMessage({ type: 'escala-fds:dirty', dirty: total > 0 }, '*')
+    if (!total) return
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault() }
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
-  }, [edits.size])
+  }, [total])
 
   const irPara = (proximo: string) => {
     setSabado(proximo)
     if (precisaRecarregar(janela, proximo)) setJanela(janelaPara(proximo))
   }
 
-  const registros = useMemo(() => mergeEdits(dados?.registros ?? [], edits), [dados, edits])
-  const salvos = useMemo(() => new Map<string, Registro>((dados?.registros ?? []).map((r) => [recordKey(r.motoristaId, r.data), r])), [dados])
-  const editar = useCallback((changes: [string, Edicao][]) => setEdits((current) => {
-    const next = new Map(current)
-    for (const [key, edit] of changes) {
-      const saved = salvos.get(key)
-      const igual = edit === null ? !saved : saved && saved.status === edit.status && saved.observacao === edit.observacao && (saved.motivo ?? null) === (edit.status === 'indisponivel' ? edit.motivo : null)
-      if (igual) next.delete(key)
-      else next.set(key, edit)
-    }
+  const view = useMemo(() => (dados ? aplicarPendencias(dados, pend) : null), [dados, pend])
+
+  const update = (fn: (p: Pendencias) => void) => setPend((current) => {
+    const next: Pendencias = { excecoes: new Map(current.excecoes), padroes: new Map(current.padroes), novos: [...current.novos], excluidos: new Set(current.excluidos) }
+    fn(next)
     return next
-  }), [salvos])
+  })
+  const setExcecao = (key: string, situacao: Situacao | null) => update((p) => {
+    const salva = dados?.excecoes.find((e) => `${e.motoristaId}|${e.data}` === key)
+    if ((salva?.situacao ?? null) === situacao) p.excecoes.delete(key)
+    else p.excecoes.set(key, situacao)
+  })
+  const setPadrao = (motoristaId: string, padrao: Padrao) => update((p) => {
+    const salvo = dados?.motoristas.find((m) => m.id === motoristaId)?.padrao
+    if (salvo && salvo.sab === padrao.sab && salvo.dom === padrao.dom) p.padroes.delete(motoristaId)
+    else p.padroes.set(motoristaId, padrao)
+  })
+  const addCompromisso = (c: Compromisso) => update((p) => { p.novos.push(c) })
+  const removeCompromisso = (c: Compromisso) => update((p) => {
+    if (c.id) p.excluidos.add(c.id)
+    else p.novos = p.novos.filter((n) => n !== c)
+  })
+  const novoCompromisso = (inicial: FormInicial) => { setFormInicial(inicial); setAba('agenda') }
 
   const salvar = async () => {
-    const ops = planSave(dados?.registros ?? [], edits)
-    if (!ops.length) { setEdits(new Map()); return }
+    if (!dados) return
+    const ops = planSave(dados, pend)
+    if (!ops.length) { setPend(semPendencias()); return }
     setSaving(true)
     try {
       await source.save(ops)
-      setEdits(new Map())
+      setPend(semPendencias())
       toast({ tone: 'success', message: ops.length === 1 ? 'Escala atualizada.' : `Escala atualizada: ${ops.length} alterações.` })
       await load(janela)
     } catch (reason) {
-      // A edição continua na tela; o que já foi gravado aparece ao recarregar.
+      // As pendências continuam na tela; o que já foi gravado aparece ao recarregar.
       toast({ tone: 'danger', message: `Não foi possível salvar. ${reason instanceof Error ? reason.message : ''}`.trim() })
       await load(janela)
     } finally { setSaving(false) }
   }
 
   const hoje = toKey(new Date())
-  const ausenciasFuturas = [...registros.values()].filter((r: Registro) => r.status === 'indisponivel' && r.data >= hoje).length
 
   return (
     <div className="escala">
@@ -100,30 +117,33 @@ export function App() {
         onChange={setAba}
         tabs={[
           { value: 'escala', label: 'Escala' },
-          { value: 'ausencias', label: 'Ausências', badge: ausenciasFuturas || undefined },
+          { value: 'agenda', label: 'Agenda' },
           { value: 'rodizio', label: 'Rodízio' },
+          { value: 'padroes', label: 'Padrões' },
         ]}
       />
 
       <main className="escala__body" aria-busy={loading}>
         {error ? (
           <Alert tone="danger" title="Não foi possível carregar a escala." action={<Button size="compact" variant="secondary" onClick={() => void load(janela)}>Tentar de novo</Button>}>{error}</Alert>
-        ) : !dados ? (
+        ) : !view ? (
           <div className="escala__skeleton">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} height={56} />)}</div>
         ) : aba === 'escala' ? (
-          <EscalaTab sabado={sabado} motoristas={dados.motoristas} registros={registros} onChange={editar} />
-        ) : aba === 'ausencias' ? (
-          <AusenciasTab hoje={hoje} motoristas={dados.motoristas} registros={registros} onChange={editar} />
+          <EscalaTab sabado={sabado} view={view} onExcecao={setExcecao} onNovoCompromisso={novoCompromisso} />
+        ) : aba === 'agenda' ? (
+          <AgendaTab hoje={hoje} view={view} formInicial={formInicial} onFormClose={() => setFormInicial(null)} onAdd={addCompromisso} onRemove={removeCompromisso} />
+        ) : aba === 'rodizio' ? (
+          <RodizioTab sabado={sabado} view={view} />
         ) : (
-          <RodizioTab sabado={sabado} motoristas={dados.motoristas} registros={registros} />
+          <PadroesTab view={view} onPadrao={setPadrao} />
         )}
       </main>
 
-      {edits.size > 0 ? (
+      {total > 0 ? (
         <footer className="escala__foot" role="status">
-          <span>{edits.size === 1 ? '1 alteração não salva' : `${edits.size} alterações não salvas`}</span>
+          <span>{total === 1 ? '1 alteração não salva' : `${total} alterações não salvas`}</span>
           <div className="escala__foot-actions">
-            <Button variant="secondary" onClick={() => setEdits(new Map())} disabled={saving}>Descartar</Button>
+            <Button variant="secondary" onClick={() => setPend(semPendencias())} disabled={saving}>Descartar</Button>
             <Button variant="primary" onClick={() => void salvar()} loading={saving}>Salvar escala</Button>
           </div>
         </footer>

@@ -1,57 +1,80 @@
 import { describe, expect, it } from 'vitest'
-import { dateRange, planSave, rodizio, weekendOf, type Edicao, type Registro } from './escala'
+import {
+  aplicarPendencias, compromissosDoDia, planSave, recordKey, rodizio, semPendencias, situacaoDoDia, weekendOf,
+  type Compromisso, type Dados, type Excecao, type Motorista,
+} from './escala'
 
-const reg = (motoristaId: string, data: string, status: Registro['status'], id: string | null = `${motoristaId}-${data}`): Registro =>
-  ({ id, motoristaId, data, status, motivo: status === 'indisponivel' ? 'medico' : null, observacao: '' })
+const danilo: Motorista = { id: 'd', nome: 'Danilo', padrao: { sab: 'plantao', dom: 'plantao' } }
+const bruno: Motorista = { id: 'b', nome: 'Bruno', padrao: { sab: null, dom: null } }
+const exc = (motoristaId: string, data: string, situacao: Excecao['situacao']): Excecao => ({ id: `${motoristaId}-${data}`, motoristaId, data, situacao })
+const mapa = (list: Excecao[]) => new Map(list.map((e) => [recordKey(e.motoristaId, e.data), e]))
+const comp = (inicio: string, fim: string, diaInteiro = false): Compromisso =>
+  ({ id: null, motoristaId: 'd', inicio, fim, diaInteiro, motivo: 'medico', observacao: '', registradoEm: null })
 
 describe('weekendOf', () => {
   it('leva dias úteis ao próximo sábado e domingo ao sábado anterior', () => {
-    expect(weekendOf(new Date(2026, 9, 5))).toBe('2026-10-10') // segunda
-    expect(weekendOf(new Date(2026, 9, 10))).toBe('2026-10-10') // sábado
-    expect(weekendOf(new Date(2026, 9, 11))).toBe('2026-10-10') // domingo
+    expect(weekendOf(new Date(2026, 9, 5))).toBe('2026-10-10')
+    expect(weekendOf(new Date(2026, 9, 11))).toBe('2026-10-10')
   })
 })
 
-describe('planSave', () => {
-  it('cria, atualiza, exclui e ignora edição sem mudança', () => {
-    const registros = [reg('a', '2026-10-10', 'trabalha'), reg('b', '2026-10-10', 'folga'), reg('c', '2026-10-10', 'plantao')]
-    const edits = new Map<string, Edicao>([
-      ['a|2026-10-10', null],
-      ['b|2026-10-10', { status: 'plantao', motivo: null, observacao: '' }],
-      ['c|2026-10-10', { status: 'plantao', motivo: null, observacao: '' }],
-      ['d|2026-10-11', { status: 'indisponivel', motivo: 'ferias', observacao: 'Viagem' }],
-    ])
-    const ops = planSave(registros, edits)
-    expect(ops.map((o) => o.tipo)).toEqual(['excluir', 'atualizar', 'criar'])
-    expect(ops[2]).toMatchObject({ registro: { motoristaId: 'd', data: '2026-10-11', motivo: 'ferias' } })
+describe('situacaoDoDia', () => {
+  it('usa a exceção, senão o padrão, senão nada', () => {
+    const excecoes = mapa([exc('d', '2026-10-11', 'folga')])
+    expect(situacaoDoDia(danilo, '2026-10-10', excecoes)).toEqual({ situacao: 'plantao', origem: 'padrao' })
+    expect(situacaoDoDia(danilo, '2026-10-11', excecoes)).toEqual({ situacao: 'folga', origem: 'excecao' })
+    expect(situacaoDoDia(bruno, '2026-10-10', excecoes)).toEqual({ situacao: null, origem: null })
+    expect(situacaoDoDia(danilo, '2026-10-07', excecoes).situacao).toBeNull()
+  })
+})
+
+describe('compromissosDoDia', () => {
+  it('descreve o trecho do dia ocupado', () => {
+    const textos = (c: Compromisso, data: string) => compromissosDoDia([c], data).map((r) => r.texto)
+    expect(textos(comp('2026-10-10T00:00', '2026-10-10T12:00'), '2026-10-10')).toEqual(['Indisponível até 12h'])
+    expect(textos(comp('2026-10-10T14:30', '2026-10-10T23:59'), '2026-10-10')).toEqual(['Indisponível a partir das 14h30'])
+    expect(textos(comp('2026-10-07T10:00', '2026-10-07T12:00'), '2026-10-07')).toEqual(['Indisponível das 10h às 12h'])
+    expect(textos(comp('2026-10-07T00:00', '2026-10-07T23:59', true), '2026-10-08')).toEqual([])
   })
 
-  it('descarta o motivo quando o status não é Indisponível', () => {
-    const ops = planSave([], new Map<string, Edicao>([['a|2026-10-10', { status: 'trabalha', motivo: 'medico', observacao: '' }]]))
-    expect(ops[0]).toMatchObject({ tipo: 'criar', registro: { motivo: null } })
+  it('período de vários dias ocupa os dias do meio inteiros', () => {
+    const ferias = comp('2026-10-09T00:00', '2026-10-12T23:59', true)
+    expect(compromissosDoDia([ferias], '2026-10-10')[0]).toMatchObject({ diaTodo: true, texto: 'Indisponível o dia todo' })
+  })
+})
+
+describe('pendências', () => {
+  const dados: Dados = { motoristas: [danilo, bruno], excecoes: [exc('b', '2026-10-10', 'trabalha')], compromissos: [{ ...comp('2026-10-10T00:00', '2026-10-10T12:00'), id: 'c1' }] }
+
+  it('aplica exceções, padrões e compromissos para exibição', () => {
+    const p = semPendencias()
+    p.excecoes.set('b|2026-10-10', null)
+    p.padroes.set('b', { sab: 'trabalha', dom: null })
+    p.excluidos.add('c1')
+    const view = aplicarPendencias(dados, p)
+    expect(view.excecoes.size).toBe(0)
+    expect(view.motoristas[1].padrao.sab).toBe('trabalha')
+    expect(view.compromissos).toEqual([])
+  })
+
+  it('gera operações na ordem e ignora o que não muda', () => {
+    const p = semPendencias()
+    p.excecoes.set('b|2026-10-10', 'trabalha') // igual ao salvo
+    p.excecoes.set('d|2026-10-11', 'folga')
+    p.novos.push(comp('2026-10-14T09:00', '2026-10-14T11:00'))
+    p.excluidos.add('c1')
+    p.padroes.set('d', danilo.padrao) // igual ao salvo
+    p.padroes.set('b', { sab: 'trabalha', dom: null })
+    expect(planSave(dados, p).map((o) => o.tipo)).toEqual(['criarExcecao', 'criarCompromisso', 'excluirCompromisso', 'padrao'])
   })
 })
 
 describe('rodizio', () => {
-  const motoristas = [{ id: 'a', nome: 'Ana' }, { id: 'b', nome: 'Bruno' }, { id: 'c', nome: 'Caio' }]
-
-  it('conta cada fim de semana uma vez e ignora folga, dias úteis e datas futuras', () => {
-    const registros = [
-      reg('a', '2026-10-10', 'trabalha'), reg('a', '2026-10-11', 'plantao'), // mesmo fim de semana
-      reg('a', '2026-10-03', 'trabalha'),
-      reg('a', '2026-10-17', 'trabalha'), // depois da referência
-      reg('b', '2026-10-10', 'folga'),
-      reg('b', '2026-10-07', 'trabalha'), // quarta
-      reg('c', '2026-08-01', 'trabalha'), // fora das 8 semanas, dentro do ano
-    ]
-    const linhas = rodizio(motoristas, registros, '2026-10-10')
-    expect(linhas.map((l) => [l.motorista.id, l.ultimas8, l.ano])).toEqual([['b', 0, 0], ['c', 0, 1], ['a', 2, 2]])
-    expect(linhas.find((l) => l.motorista.id === 'a')?.acimaDaMedia).toBe(true)
-  })
-})
-
-describe('dateRange', () => {
-  it('inclui as pontas e atravessa o mês', () => {
-    expect(dateRange('2026-10-30', '2026-11-02')).toEqual(['2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02'])
+  it('conta o padrão fixo e as exceções por categoria', () => {
+    const excecoes = mapa([exc('d', '2026-10-10', 'folga'), exc('d', '2026-10-11', 'folga'), exc('b', '2026-10-03', 'trabalha'), exc('b', '2026-10-04', 'trabalha')])
+    const linhas = rodizio([danilo, bruno], excecoes, '2026-10-10')
+    expect(linhas.map((l) => [l.motorista.id, l.plantao8, l.trabalha8])).toEqual([['b', 0, 1], ['d', 7, 0]])
+    expect(linhas[1].ano).toBe(40) // 41 fins de semana até 10/10, menos a folga da referência
+    expect(linhas[1].acimaDaMedia).toBe(true)
   })
 })

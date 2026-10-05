@@ -196,11 +196,80 @@ if ($keys.Count -eq 0 -and $Apply) {
 elseif ($keys.Count -eq 0) { Write-Step "DRY RUN criaria chave $keyName" }
 if ($keys.Count -eq 1) { Add-SolutionComponent $keys[0].MetadataId 14 "chave $keyName"; Write-Step "chave ${keyName}: $($keys[0].EntityKeyIndexStatus)" }
 
-# 5. Publicacao e validacao
+# 5. Padrao fixo opcional em cr40f_funcionarios (vazio = sem padrao). Valores iguais aos de cr40f_status.
+function Ensure-AttributeOn([string] $Entity, [hashtable] $Payload) {
+  $logical = $Payload.SchemaName.ToLowerInvariant()
+  $id = Get-AttributeId $Entity $logical
+  if (-not $id) {
+    if (-not $Apply) { Write-Step "DRY RUN criaria $Entity.$logical"; return }
+    if (-not $Payload.ContainsKey("RequiredLevel")) { $Payload.RequiredLevel = @{ Value = "None" } }
+    Invoke-Dataverse "POST" "EntityDefinitions(LogicalName='$Entity')/Attributes" $Payload | Out-Null
+    Write-Step "coluna criada $Entity.$logical"
+    $id = Get-AttributeId $Entity $logical
+  }
+  Add-SolutionComponent $id 2 "$Entity.$logical"
+}
+Ensure-AttributeOn "cr40f_funcionarios" (Picklist "cr40f_FdsPadraoSabado" "Padrão FDS sábado" "Situação fixa do motorista aos sábados (vazio = sem padrão)" @("Trabalha", "Plantão"))
+Ensure-AttributeOn "cr40f_funcionarios" (Picklist "cr40f_FdsPadraoDomingo" "Padrão FDS domingo" "Situação fixa do motorista aos domingos (vazio = sem padrão)" @("Trabalha", "Plantão"))
+
+# 6. Compromissos do motorista (qualquer dia, com ou sem horario)
+$compromisso = "cr40f_compromissofds"
+$compromissoId = Get-EntityId $compromisso
+if (-not $compromissoId -and $Apply) {
+  Invoke-Dataverse "POST" "EntityDefinitions" @{
+    "@odata.type" = "Microsoft.Dynamics.CRM.EntityMetadata"
+    SchemaName = "cr40f_CompromissoFds"
+    DisplayName = Label "Compromisso do motorista"
+    DisplayCollectionName = Label "Compromissos dos motoristas"
+    Description = Label "Indisponibilidade do motorista (médico, pessoal, férias), de dia inteiro ou por horário."
+    OwnershipType = "UserOwned"; HasActivities = $false; HasNotes = $false; IsActivity = $false
+    PrimaryNameAttribute = "cr40f_name"
+    Attributes = @(@{
+      "@odata.type" = "Microsoft.Dynamics.CRM.StringAttributeMetadata"
+      SchemaName = "cr40f_Name"; IsPrimaryName = $true; MaxLength = 100; FormatName = @{ Value = "Text" }; RequiredLevel = @{ Value = "None" }
+      DisplayName = Label "Título"; Description = Label "Motorista e data, gerado pela tela"
+    })
+  } | Out-Null
+  Write-Step "tabela criada $compromisso"
+  $compromissoId = Get-EntityId $compromisso
+}
+elseif (-not $compromissoId) { Write-Step "DRY RUN criaria a tabela $compromisso" }
+if ($compromissoId) {
+  Add-SolutionComponent $compromissoId 1 "tabela $compromisso" -IncludeSubcomponents
+  $dt = @{ Format = "DateAndTime"; DateTimeBehavior = @{ Value = "UserLocal" }; RequiredLevel = @{ Value = "ApplicationRequired" } }
+  Ensure-AttributeOn $compromisso (@{ "@odata.type" = "Microsoft.Dynamics.CRM.DateTimeAttributeMetadata"; SchemaName = "cr40f_Inicio"; DisplayName = Label "Início"; Description = Label "Início da indisponibilidade" } + $dt)
+  Ensure-AttributeOn $compromisso (@{ "@odata.type" = "Microsoft.Dynamics.CRM.DateTimeAttributeMetadata"; SchemaName = "cr40f_Fim"; DisplayName = Label "Fim"; Description = Label "Fim da indisponibilidade" } + $dt)
+  Ensure-AttributeOn $compromisso @{ "@odata.type" = "Microsoft.Dynamics.CRM.BooleanAttributeMetadata"; SchemaName = "cr40f_DiaInteiro"; DisplayName = Label "Dia inteiro"; Description = Label "Ocupa os dias inteiros do período"; DefaultValue = $false
+    OptionSet = @{ TrueOption = @{ Value = 1; Label = Label "Sim" }; FalseOption = @{ Value = 0; Label = Label "Não" } } }
+  Ensure-AttributeOn $compromisso (Picklist "cr40f_Motivo" "Motivo" "Motivo do compromisso" @("Médico", "Pessoal", "Férias", "Outro") "ApplicationRequired")
+  Ensure-AttributeOn $compromisso @{ "@odata.type" = "Microsoft.Dynamics.CRM.MemoAttributeMetadata"; SchemaName = "cr40f_Observacao"; DisplayName = Label "Observação"; Description = Label "Detalhe do compromisso"; MaxLength = 2000; Format = "TextArea" }
+
+  $relC = "cr40f_funcionarios_cr40f_compromissofds_motorista"
+  $rows = @(Get-Rows $relPath "MetadataId" "SchemaName eq '$relC'")
+  if ($rows.Count -eq 0 -and $Apply) {
+    Invoke-Dataverse "POST" "RelationshipDefinitions" @{
+      "@odata.type" = "Microsoft.Dynamics.CRM.OneToManyRelationshipMetadata"
+      SchemaName = $relC; ReferencedEntity = "cr40f_funcionarios"; ReferencedAttribute = "cr40f_funcionariosid"; ReferencingEntity = $compromisso
+      CascadeConfiguration = @{ Assign = "NoCascade"; Delete = "Cascade"; Merge = "NoCascade"; Reparent = "NoCascade"; Share = "NoCascade"; Unshare = "NoCascade" }
+      Lookup = @{ "@odata.type" = "Microsoft.Dynamics.CRM.LookupAttributeMetadata"; SchemaName = "cr40f_Motorista"; DisplayName = Label "Motorista"; Description = Label "Motorista do compromisso"; RequiredLevel = @{ Value = "ApplicationRequired" } }
+    } | Out-Null
+    Write-Step "lookup criado $compromisso.cr40f_motorista"
+    $rows = @(Get-Rows $relPath "MetadataId" "SchemaName eq '$relC'")
+  }
+  if ($rows.Count -eq 1) {
+    Add-SolutionComponent $rows[0].MetadataId 10 "relacionamento $relC"
+    Add-SolutionComponent (Get-AttributeId $compromisso "cr40f_motorista") 2 "$compromisso.cr40f_motorista"
+  }
+}
+
+# 7. Publicacao e validacao
 if ($Apply) {
-  Invoke-Dataverse "POST" "PublishXml" @{ ParameterXml = "<importexportxml><entities><entity>$entity</entity></entities></importexportxml>" } | Out-Null
+  Invoke-Dataverse "POST" "PublishXml" @{ ParameterXml = "<importexportxml><entities><entity>$entity</entity><entity>$compromisso</entity><entity>cr40f_funcionarios</entity></entities></importexportxml>" } | Out-Null
   $missing = @(@("cr40f_name", "cr40f_data", "cr40f_status", "cr40f_motivo", "cr40f_turno", "cr40f_observacao", "cr40f_motorista") | Where-Object { -not (Get-AttributeId $entity $_) })
+  $missing += @(@("cr40f_inicio", "cr40f_fim", "cr40f_diainteiro", "cr40f_motivo", "cr40f_observacao", "cr40f_motorista") | Where-Object { -not (Get-AttributeId $compromisso $_) } | ForEach-Object { "$compromisso.$_" })
+  $missing += @(@("cr40f_fdspadraosabado", "cr40f_fdspadraodomingo") | Where-Object { -not (Get-AttributeId "cr40f_funcionarios" $_) } | ForEach-Object { "cr40f_funcionarios.$_" })
   if ($missing.Count) { throw "Colunas ausentes apos a publicacao: $($missing -join ', ')" }
+  if (@(Get-Rows "solutioncomponents" "solutioncomponentid" "_solutionid_value eq $solutionId and objectid eq $compromissoId and componenttype eq 1").Count -eq 0) { throw "$compromisso nao esta na solucao $SolutionUniqueName." }
   if (@(Get-Rows "solutioncomponents" "solutioncomponentid" "_solutionid_value eq $solutionId and objectid eq $entityId and componenttype eq 1").Count -eq 0) { throw "$entity nao esta na solucao $SolutionUniqueName." }
   Write-Step "SCHEMA OK: $entity publicado e na solucao $SolutionUniqueName"
 }
