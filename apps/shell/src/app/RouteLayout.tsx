@@ -4,6 +4,7 @@ import type { Host } from '../host'
 import { DEFAULT_ITEM, type MenuGroup, type MenuItem } from '../nav/menu'
 import { hrefFor } from '../nav/useHashRoute'
 import { ComponentsPage } from '../pages/ComponentsPage'
+import { OperacionalPage } from '../pages/operacional/OperacionalPage'
 import { EmptyState, buttonClassName } from '@betinhos/ui'
 import { PageLayout } from './PageLayout'
 
@@ -57,7 +58,7 @@ export function RouteLayout({ host, group, item, label }: Props) {
     )
   }
 
-  if (item.kind === 'page') return <ComponentsPage />
+  if (item.kind === 'page') return item.page === 'operacional' ? <OperacionalPage host={host} /> : <ComponentsPage />
 
   if (host.mode === 'mock') {
     const target = item.kind === 'webresource' ? item.resource : item.kind === 'entity' ? item.entity : item.url

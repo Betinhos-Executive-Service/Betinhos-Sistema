@@ -63,3 +63,24 @@
   .op-row:hover { background-color: var(--bt-color-surface-soft); }
   .op-icon:hover { color: var(--bt-color-text-primary); }
 }
+
+.op-detail { display: grid; gap: var(--bt-space-3); }
+.op-detail__summary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1-5); }
+.op-detail__meta { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.op-detail__route { margin: 0; font-size: var(--bt-font-size-14); }
+.op-detail__controls { display: grid; grid-template-columns: 1fr 1fr; gap: var(--bt-space-2); }
+.op-detail__control { display: grid; gap: var(--bt-space-1); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-text-secondary); }
+.op-detail__grid { display: grid; gap: var(--bt-space-2); margin: 0; }
+.op-detail__info { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: var(--bt-space-2); padding: var(--bt-space-2); border-radius: var(--bt-radius-sm); background-color: var(--bt-color-surface-neutral); font-size: var(--bt-font-size-13); }
+.op-detail__info dt { font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); text-transform: uppercase; color: var(--bt-color-text-secondary); }
+.op-detail__info dd { display: flex; align-items: center; gap: var(--bt-space-1-5); margin: 0; overflow-wrap: anywhere; }
+.op-detail__pax { display: grid; gap: var(--bt-space-1-5); }
+.op-detail__paxrow { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--bt-space-2); padding: var(--bt-space-2); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); }
+.op-detail__paxrow > .op-detail__contact, .op-detail__paxrow > .op-detail__nophone { grid-column: 1 / -1; }
+.op-detail__paxinfo { display: grid; min-width: 0; font-size: var(--bt-font-size-13); }
+.op-detail__paxinfo span { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.op-detail__contact { display: grid; grid-template-columns: 1fr 1fr; gap: var(--bt-space-2); }
+.op-detail__contact a { justify-content: center; min-height: var(--bt-control-height-touch); }
+.op-detail__nophone { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.op-detail__note { margin: 0; white-space: pre-wrap; font-size: var(--bt-font-size-13); }
+@media (max-width: 380px) { .op-detail__controls { grid-template-columns: 1fr; } .op-detail__info { grid-template-columns: 1fr; } }
