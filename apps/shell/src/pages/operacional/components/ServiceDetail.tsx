@@ -3,7 +3,7 @@ import { ExternalLink, MessageCircle, Phone } from 'lucide-react'
 import { Avatar, Button, Select, StatusBadge, buttonClassName } from '@betinhos/ui'
 import type { ChoiceOption } from '@betinhos/dataverse'
 import type { Motorista, PassageiroServico, Reserva } from '../domain/types'
-import { conflictFor } from '../domain/conflicts'
+import { motoristaOptions } from '../domain/driverOptions'
 import { passengerList } from '../domain/passengers'
 import { telHref, whatsappHref } from '../domain/phone'
 import { serviceState, statusTone } from '../domain/serviceState'
@@ -32,15 +32,7 @@ type Props = {
 /** Resumo + ações no topo (cabe na metade do sheet); detalhe completo abaixo. */
 export function ServiceDetail({ reserva, filhos, motoristas, reservas, now, statusOptions, busy, onStatus, onMotorista, onOpenReserva }: Props) {
   const state = serviceState(reserva, now)
-  const nextOf = (m: Motorista) => reservas.find((r) => r.motoristaId === m.id && r.id !== reserva.id && r.saida && r.saida > now)
-  const motoristaOptions = motoristas.map((m) => {
-    const conflict = conflictFor(reservas, m.id, reserva.saida, reserva.id)
-    const next = nextOf(m)
-    return {
-      value: m.id, label: m.nome, search: m.apelido,
-      subtitle: conflict?.saida ? `Conflito: saída às ${formatHour(conflict.saida)}` : next?.saida ? `Próximo às ${formatHour(next.saida)}` : 'Livre',
-    }
-  })
+  const options = motoristaOptions(reserva, motoristas, reservas, now)
 
   return (
     <div className="op-detail">
@@ -58,7 +50,7 @@ export function ServiceDetail({ reserva, filhos, motoristas, reservas, now, stat
             onChange={(value) => { const option = statusOptions.find((o) => String(o.value) === value); if (option) onStatus(option) }} />
         </label>
         <label className="op-detail__control"><span>Motorista</span>
-          <Select aria-label="Motorista do serviço" disabled={busy} searchable clearable placeholder="Sem motorista" options={motoristaOptions}
+          <Select aria-label="Motorista do serviço" disabled={busy} searchable clearable placeholder="Sem motorista" options={options}
             value={reserva.motoristaId} onChange={(value) => onMotorista(motoristas.find((m) => m.id === value) ?? null)} />
         </label>
       </div>
