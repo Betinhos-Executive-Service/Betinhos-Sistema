@@ -16,24 +16,28 @@ Deixar explícito, no registro e no App Motoristas, se a troca tem **horário ma
 | Padrão no registro de Troca | `Entre serviços` |
 | Trocas existentes | Tratadas como Horário marcado (campo vazio = Horário marcado) |
 | Âncora do Entre serviços | **Posição na agenda, uma por motorista**: "depois da OS-A, antes da OS-B". Sem cálculo de horário de término (só 12% dos serviços têm retorno previsto: 161/1.289 em set/2026, PROD) |
-| Extremos | "Depois de" vazio = desde o início do dia; "antes de" vazio = até o fim do dia; ao menos um dos dois por motorista |
+| Extremos | "Depois de" vazio = desde o início do dia; "antes de" vazio = até o fim do dia. Âncoras opcionais: motorista sem serviço no dia fica sem âncoras = livre o dia todo |
 | Janela gravada (técnica) | `inicio` = menor saída entre os "depois de" (ou 00:00 do dia); `fim` = maior saída entre os "antes de" (ou 23:59). Serve só ao `ExchangeConflictValidator`; não é exibida como horário |
 | Agenda muda | Serviço-âncora cancelado, reatribuído a outro motorista, ou ordem invertida (OS-B antes da OS-A) → alerta para a gestão; mudança de horário → recalcula a janela técnica |
 | Confirmação fora da janela | Horário marcado: fora de início–fim. Entre serviços: depois da saída da própria OS-B. Permitida com **motivo obrigatório**; marca alerta |
-| App Motoristas | Selo + frase (ver abaixo) |
+| Local da troca | Campo opcional; app mostra se preenchido |
+| Conclusão | Inalterada: conclui quando os dois motoristas confirmam |
+| Atrasada | Calculada na exibição (OS-B do motorista já saiu e troca não concluída); destaque na tela da gestão. Sem agendador/flow |
+| App Motoristas | Selo + frase (ver abaixo); cada motorista vê só a própria frase |
 
 ## Schema (`cr40f_trocasdecarro`)
 - `new_mododajanela` — choice: Horário marcado 100000000 · Entre serviços 100000001. Opcional (vazio = Horário marcado).
-- `new_m1depoisde`, `new_m1antesde`, `new_m2depoisde`, `new_m2antesde` — lookups `cr40f_reservadeveculos` (âncoras por motorista). Entre serviços exige ao menos um por motorista.
+- `new_m1depoisde`, `new_m1antesde`, `new_m2depoisde`, `new_m2antesde` — lookups `cr40f_reservadeveculos` (âncoras por motorista), todas opcionais.
+- `new_localdatroca` — texto (200), opcional.
 - `new_alertajanela` — texto (500). Motivo do alerta atual; vazio = sem alerta.
 - `new_motivoforadajanelamotorista1` / `...motorista2` — texto multilinha.
 Incluir na solução AppBetinhos; publicar.
 
 ## Custom APIs
-- `new_RegistrarTrocaDeCarro`: novos inputs opcionais `new_ModoJanela` (int) e `new_M1DepoisDe`, `new_M1AntesDe`, `new_M2DepoisDe`, `new_M2AntesDe` (EntityReference). Com Entre serviços, o servidor ignora `new_Inicio`/`new_Fim` enviados e calcula a janela técnica. Entram no `new_requesthash`.
+- `new_RegistrarTrocaDeCarro`: novos inputs opcionais `new_ModoJanela` (int) e `new_M1DepoisDe`, `new_M1AntesDe`, `new_M2DepoisDe`, `new_M2AntesDe` (EntityReference) e `new_Local` (string). Com Entre serviços, o servidor ignora `new_Inicio`/`new_Fim` enviados e calcula a janela técnica. Entram no `new_requesthash`.
 - `new_AtualizarTrocaDeCarro`: aceita trocar modo e âncoras (mesmas regras).
 - `new_ConfirmarTrocaMotorista`: novo input `new_MotivoForaDaJanela`; obrigatório se agora estiver fora da janela (modo Horário marcado) ou depois da saída da OS-B do próprio motorista (Entre serviços). Grava no campo do motorista e preenche `new_alertajanela`.
-- Validação: Entre serviços exige tipo Troca; cada âncora ativa, do mesmo dia, atribuída ao respectivo motorista; OS-A sai antes da OS-B; OS-B ainda não saiu. Erros: `[EXCHANGE_ANCHOR_REQUIRED]`, `[EXCHANGE_ANCHOR_INVALID]`, `[EXCHANGE_WINDOW_MODE_INVALID]`, `[EXCHANGE_OUT_OF_WINDOW_REASON_REQUIRED]`.
+- Validação: Entre serviços exige tipo Troca; cada âncora ativa, do mesmo dia, atribuída ao respectivo motorista; OS-A sai antes da OS-B; OS-B ainda não saiu. Erros: `[EXCHANGE_ANCHOR_INVALID]`, `[EXCHANGE_WINDOW_MODE_INVALID]`, `[EXCHANGE_OUT_OF_WINDOW_REASON_REQUIRED]`.
 
 ## Plugins
 - `ExchangeLifecycleCommandHandler`: cálculo da janela no registro/atualização; motivo fora da janela na confirmação.
@@ -42,10 +46,11 @@ Incluir na solução AppBetinhos; publicar.
 - `ServiceExchangeSynchronizer` (ou novo passo no update da reserva): quando `cr40f_dataehorriodesada`, status ou motorista de um serviço-âncora mudar, recalcular a janela técnica das trocas abertas que o apontam, ou gravar `new_alertajanela`.
 
 ## Telas
-- **Tela Funções Operacionais** (registro): seletor de modo (padrão Entre serviços para Troca); em Entre serviços, mostrar a agenda do dia de cada motorista e escolher a posição ("depois de / antes de") para cada um; em Horário marcado, início/fim como hoje. Lista/detalhe exibe selo e alerta.
+- **Tela Funções Operacionais** (registro): seletor de modo (padrão Entre serviços para Troca); em Entre serviços, mostrar a agenda do dia de cada motorista e escolher a posição ("depois de / antes de") para cada um; em Horário marcado, início/fim como hoje. Campo local opcional. Lista/detalhe exibe selo, alerta e "atrasada".
 - **App Motoristas** (card da troca):
   - Horário marcado → selo "Horário marcado" + "Troque entre 14:00 e 15:00".
-  - Entre serviços → selo "Entre serviços" + "Troque depois da OS-1230 e antes da OS-1234" (a frase de cada motorista usa as próprias âncoras).
+  - Entre serviços → selo "Entre serviços" + "Troque depois da OS-1230 e antes da OS-1234" (a frase de cada motorista usa as próprias âncoras). Sem âncoras → "Troque com o <outro motorista>".
+  - Local preenchido → linha "Local: …".
   - Confirmar fora da janela → pede motivo curto.
 - Model-driven (formulário de troca): campos novos somente leitura.
 
