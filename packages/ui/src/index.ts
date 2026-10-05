@@ -12,6 +12,8 @@ export {
 } from './components/Misc'
 export { Tabs, type TabItem, type TabsProps } from './components/Tabs'
 export { Drawer, type DrawerProps } from './components/Drawer'
+export { Sheet, type SheetProps } from './components/Sheet'
+export { resolveSnap, dampen, type SheetLevel } from './components/sheetGesture'
 export { Upload, acceptFiles, formatFileSize, type UploadFile, type UploadProps } from './components/Upload'
 export { EmptyState, type EmptyStateProps } from './components/EmptyState'
 export { MetricCard, type MetricCardProps, type MetricTone } from './components/MetricCard'

@@ -1,7 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Check, ChevronRight, CircleCheck, Clock, Copy, EllipsisVertical, Home, Inbox, LayoutDashboard, Pencil, Plus, PlugZap, SearchX, Trash2, TriangleAlert, Truck, X } from 'lucide-react'
 import {
-  Alert, Avatar, BottomNav, Breadcrumb, Button, Checkbox, ChoiceGroup, Cluster, DateTile, Dialog, Drawer, EmptyState, Field, Grid, Input, Menu, MetricCard, PageHeader, Pagination, Progress, Radio, SearchBox, SegmentedControl, Select, Skeleton, Spinner, Stack, StatusBadge, Surface, Switch, Table, TableTitle, Tabs, Textarea, ToastProvider, Tooltip, Upload,
+  Alert, Avatar, BottomNav, Breadcrumb, Button, Checkbox, ChoiceGroup, Cluster, DateTile, Dialog, Drawer, EmptyState, Field, Grid, Input, Menu, MetricCard, PageHeader, Pagination, Progress, Radio, SearchBox, SegmentedControl, Select, Sheet, Skeleton, Spinner, Stack, StatusBadge, Surface, Switch, Table, TableTitle, Tabs, Textarea, ToastProvider, Tooltip, Upload,
   filterOptions, useToast, type AlertTone, type ButtonSize, type ButtonVariant, type ControlSize, type SelectOption, type StatusTone, type UploadFile,
 } from '@betinhos/ui'
 import { PageLayout } from '../app/PageLayout'
@@ -508,6 +508,25 @@ function DrawerShowcase() {
   )
 }
 
+function SheetShowcase() {
+  const [open, setOpen] = useState(false)
+  return (
+    <Section name="Sheet" summary="Bottom sheet modal para celular: abre pela metade, expande para a altura cheia, arrasta pela alça e fecha por X, Esc, fundo ou gesto.">
+      <Cluster gap="3">
+        <Button onClick={() => setOpen(true)}>Abrir sheet</Button>
+      </Cluster>
+      <Sheet open={open} onClose={() => setOpen(false)} eyebrow="Serviço #4205" title="Aeroporto de Congonhas para Itaim Bibi"
+        footer={<><Button variant="secondary" onClick={() => setOpen(false)}>Fechar</Button><Button onClick={() => setOpen(false)}>Ligar para o motorista</Button></>}>
+        <Stack gap="3">
+          <Alert tone="info">Saída às 14:30, motorista confirmado.</Alert>
+          <Surface>Passageiro: Ana Souza · 2 malas · voo LA3040.</Surface>
+          <Surface>Observação: aguardar na área de desembarque com placa.</Surface>
+        </Stack>
+      </Sheet>
+    </Section>
+  )
+}
+
 function UploadShowcase() {
   const [files, setFiles] = useState<UploadFile[]>([{ name: 'foto-painel.jpg', size: 348160, url: '#' }])
   return (
@@ -685,6 +704,7 @@ export function ComponentsPage() {
         <DateTileShowcase />
         <TableShowcase />
         <DrawerShowcase />
+        <SheetShowcase />
         <UploadShowcase />
         <ChoiceShowcase />
         <TabsShowcase />
