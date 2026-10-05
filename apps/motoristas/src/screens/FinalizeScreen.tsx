@@ -4,6 +4,7 @@ import { FieldError, MoneyInputField, SelectField, TextAreaField } from "../comp
 import { PhotoAddButton } from "../components/common/PhotoAddButton";
 import { AppShell } from "../components/layout/AppShell";
 import { FormMenu } from "../components/navigation/FormMenu";
+import { isExchangeOutsideWindow, type ExchangeWindowCheck } from "../lib/dataverse";
 import { matchesExpenseCitySearch, type ExpenseReferenceData } from "../lib/expenses";
 import { buildWhatsAppUrl, openExternalUrl } from "../lib/localWorkflow";
 import { validateMaintenanceFinalizeFields, type MaintenanceFinalizeErrors } from "../lib/maintenanceFinalize";
@@ -125,18 +126,38 @@ function ServiceFinalize({ detail, onDone, submitState, initialObservation = "" 
 }
 function ExchangeFinalize({ detail, onDone, submitState }: { detail: DetailData; onDone: (fields: Record<string, string>) => void; submitState: ActionButtonState }) {
   const [obs, setObs] = useState("");
+  const [reason, setReason] = useState("");
+  const [reasonMissing, setReasonMissing] = useState(false);
+  const record = detail.dataverse?.record as { __windowCheck?: ExchangeWindowCheck } | undefined;
+  const outside = isExchangeOutsideWindow(record?.__windowCheck);
+
+  // Fora do combinado o motivo é obrigatório (o servidor também exige).
+  const finish = (observation: string) => {
+    if (outside && !reason.trim()) {
+      setReasonMissing(true);
+      return;
+    }
+    onDone({ "Observações": observation, ...(outside ? { "Motivo fora da janela": reason.trim() } : {}) });
+  };
 
   return (
     <article className="finalize-card">
       <div className="finalize-title">{detail.id}</div>
       <div className="finalize-scroll">
         <div className="finalize-form">
+          {outside ? (
+            <>
+              <p className="form-error-summary" role="status">A troca está fora do combinado. Conte rapidamente o motivo.</p>
+              <TextAreaBlock label="Motivo da troca fora do combinado" value={reason} onChange={(value) => { setReason(value); setReasonMissing(false); }} />
+              <FieldError error={reasonMissing ? "Escreva o motivo para confirmar." : ""} />
+            </>
+          ) : null}
           <TextAreaBlock label="Observação da troca" value={obs} onChange={setObs} />
         </div>
       </div>
       <FinalizeActions
-        onNone={() => onDone({ "Observações": "Sem observação." })}
-        onConfirm={() => onDone({ "Observações": obs || "Sem observação." })}
+        onNone={() => finish("Sem observação.")}
+        onConfirm={() => finish(obs || "Sem observação.")}
         submitState={submitState}
       />
     </article>
