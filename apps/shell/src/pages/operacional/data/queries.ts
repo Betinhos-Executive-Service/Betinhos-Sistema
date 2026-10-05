@@ -1,4 +1,4 @@
-import { chunk, cleanId, formatted, type DataverseClient, type Row } from '@betinhos/dataverse'
+import { DataverseError, chunk, cleanId, formatted, type DataverseClient, type Row } from '@betinhos/dataverse'
 import type { Motorista, OperacionalData, PassageiroServico, Reserva } from '../domain/types'
 import { dayRange } from '../domain/time'
 
@@ -66,18 +66,23 @@ async function loadReservas(client: DataverseClient, entitySet: string, key: str
   }
 }
 
-async function loadMotoristas(client: DataverseClient, entitySet: string, reservas: Reserva[]) {
+const isAuthError = (error: unknown) => error instanceof DataverseError && (error.status === 401 || error.status === 403)
+
+async function loadMotoristas(client: DataverseClient, entitySet: string, reservas: Reserva[], warnings: string[]) {
   try {
     const rows = await client.getAll(`${entitySet}?$select=cr40f_funcionariosid,cr40f_nomecompleto,new_apelido,cr40f_funcao,cr40f_status,cr40f_celular&$filter=statecode eq 0&$orderby=cr40f_nomecompleto asc`)
     const motoristas = rows.filter((row) => /motorista/i.test(formatted(row, 'cr40f_funcao'))).map(mapMotorista)
     if (motoristas.length) return motoristas
-  } catch { /* cai no derivado, como o legado */ }
+  } catch (error) {
+    if (isAuthError(error)) throw error
+    warnings.push('Não foi possível carregar a lista de motoristas; mostrando os que aparecem nas reservas.')
+  }
   const derived = new Map<string, Motorista>()
   for (const r of reservas) if (r.motoristaId && !derived.has(r.motoristaId)) derived.set(r.motoristaId, { id: r.motoristaId, nome: r.motorista, apelido: '', celular: '' })
   return [...derived.values()]
 }
 
-async function loadPassageiros(client: DataverseClient, entitySet: string, reservaIds: string[]) {
+async function loadPassageiros(client: DataverseClient, entitySet: string, reservaIds: string[], warnings: string[]) {
   const result: Record<string, PassageiroServico[]> = {}
   try {
     for (const ids of chunk(reservaIds, 10)) {
@@ -94,7 +99,11 @@ async function loadPassageiros(client: DataverseClient, entitySet: string, reser
         })
       }
     }
-  } catch { return {} }
+  } catch (error) {
+    if (isAuthError(error)) throw error
+    warnings.push('Não foi possível carregar os passageiros vinculados.')
+    return {}
+  }
   return result
 }
 
@@ -102,9 +111,10 @@ async function loadPassageiros(client: DataverseClient, entitySet: string, reser
 export async function loadOperacional(client: DataverseClient, sets: EntitySets, key: string): Promise<OperacionalData> {
   const { rows, queryMode } = await loadReservas(client, sets.reserva, key)
   const reservas = rows.map(mapReserva)
+  const warnings: string[] = []
   const [passageiros, motoristas] = await Promise.all([
-    loadPassageiros(client, sets.passageiro, reservas.map((r) => r.id)),
-    loadMotoristas(client, sets.funcionario, reservas),
+    loadPassageiros(client, sets.passageiro, reservas.map((r) => r.id), warnings),
+    loadMotoristas(client, sets.funcionario, reservas, warnings),
   ])
-  return { reservas, motoristas, passageiros, queryMode }
+  return { reservas, motoristas, passageiros, queryMode, warnings }
 }

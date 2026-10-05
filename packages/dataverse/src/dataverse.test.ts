@@ -30,6 +30,14 @@ describe('client', () => {
     expect(fetchMock.mock.calls[1][0]).toBe('https://org.example/api/data/v9.2/contas?$skiptoken=x')
   })
 
+  it('update usa PATCH com If-Match * para nunca virar upsert', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
+    await createClient('https://org.example', fetchMock).update('contas', '{ABC}', { nome: 'x' })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://org.example/api/data/v9.2/contas(abc)')
+    expect(init.method).toBe('PATCH')
+    expect(init.headers['If-Match']).toBe('*')
+  })
   it('expõe a mensagem de erro do Dataverse', async () => {
     const fetchMock = vi.fn().mockResolvedValue(json({ error: { message: 'Coluna inexistente' } }, { status: 400 }))
     await expect(createClient('https://org.example', fetchMock).request('contas')).rejects.toMatchObject({ message: 'Coluna inexistente', status: 400 })

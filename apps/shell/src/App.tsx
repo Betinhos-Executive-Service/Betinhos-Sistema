@@ -29,7 +29,7 @@ export function App() {
   useEffect(() => { document.title = `${label} · Sistema Betinhos` }, [label])
 
   const connection = host.mode === 'mock'
-    ? { ok: false, text: 'Fora do Dataverse (sem dados)' }
+    ? { ok: false, text: 'Fora do Dataverse (dados de exemplo nas telas migradas)' }
     : error
       ? { ok: false, text: 'Dataverse sem resposta. Recarregue a página.' }
       : { ok: true, text: 'Conectado ao Dataverse' }

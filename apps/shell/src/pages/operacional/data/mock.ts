@@ -49,5 +49,6 @@ export function createMockData(now: Date): OperacionalData {
     motoristas: MOTORISTAS,
     passageiros: { [first.id]: [{ id: 'sp-1', ordem: 1, nome: 'Ana Souza', enderecoSaida: 'Rua Haddock Lobo, 595' }] },
     queryMode: 'full',
+    warnings: [],
   }
 }
