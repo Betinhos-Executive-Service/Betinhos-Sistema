@@ -24,6 +24,8 @@ type Props = {
   selectedId: string;
   onSelectedIdChange: (id: string) => void;
   onBack: () => void;
+  /** Quando definido, o Voltar no detalhe chama isto em vez de voltar para a lista. */
+  onCloseDetail?: () => void;
   onReload: () => Promise<void>;
   driverName: string;
 };
@@ -37,7 +39,7 @@ function formatDate(value: string | null) {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(value));
 }
 
-export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onSelectedIdChange, onBack, onReload, driverName }: Props) {
+export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onSelectedIdChange, onBack, onCloseDetail, onReload, driverName }: Props) {
   const [strokes, setStrokes] = useState<SignatureStrokes>([]);
   const [observacao, setObservacao] = useState("");
   const [busy, setBusy] = useState(false);
@@ -123,7 +125,7 @@ export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onS
         eyebrow={isMockComunicados() ? "Operação · Mock local" : "Operação"}
         homeLabel="Voltar"
         homeIcon="arrowLeft"
-        onHome={selected ? () => openItem("") : onBack}
+        onHome={selected ? (onCloseDetail ?? (() => openItem(""))) : onBack}
         onRefresh={refresh}
       />
       <section className="comunicado-screen" aria-label={selected ? "Detalhes do comunicado" : "Lista de comunicados"}>

@@ -434,6 +434,8 @@ function App() {
   const [comunicados, setComunicados] = useState<ComunicadoDestinatario[]>([]);
   const [comunicadosStatus, setComunicadosStatus] = useState<ComunicadosLoadStatus>(() => isMockComunicados() || hasDataverseRuntime() ? "loading" : "ready");
   const [selectedComunicadoId, setSelectedComunicadoId] = useState("");
+  // Tela de origem ao abrir um comunicado direto (ex.: aba Serviços), para o Voltar retornar a ela.
+  const [comunicadoOrigin, setComunicadoOrigin] = useState<"servicos" | "">("");
   const pendingComunicadoDeepLinkRef = useRef(getInitialComunicadoId());
   const [voucherDrafts, setVoucherDrafts] = useState<Record<string, Record<string, string>>>(() => loadVoucherDrafts());
   const [serviceObservationDrafts, setServiceObservationDrafts] = useState<Record<string, string>>(() => loadServiceObservationDrafts());
@@ -1581,6 +1583,7 @@ function App() {
       return;
     }
     if (screenName === "servicos" || screenName === "comunicados" || screenName === "historico" || screenName === "solicitarManutencao" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias") {
+      setComunicadoOrigin("");
       setScreen(screenName);
     }
   };
@@ -2921,7 +2924,7 @@ function App() {
       <ServicesScreen
         items={store.agenda}
         pendingComunicados={comunicados.filter(isComunicadoPending)}
-        onOpenComunicado={(id) => { setSelectedComunicadoId(id); setScreen("comunicados"); }}
+        onOpenComunicado={(id) => { setSelectedComunicadoId(id); setComunicadoOrigin("servicos"); setScreen("comunicados"); }}
         onHome={() => setScreen("inicio")}
         onRefresh={refreshLocal}
         completingDetailKey={completingDetailKey}
@@ -2954,7 +2957,8 @@ function App() {
         items={comunicados}
         selectedId={selectedComunicadoId}
         onSelectedIdChange={setSelectedComunicadoId}
-        onBack={() => setScreen("inicio")}
+        onBack={() => { setComunicadoOrigin(""); setScreen("inicio"); }}
+        onCloseDetail={comunicadoOrigin === "servicos" ? () => { setSelectedComunicadoId(""); setComunicadoOrigin(""); setScreen("servicos"); } : undefined}
         onReload={reloadComunicados}
         loadStatus={comunicadosStatus}
         driverName={driverContext?.fullName ?? (isMockComunicados() ? "Renan" : "")}
