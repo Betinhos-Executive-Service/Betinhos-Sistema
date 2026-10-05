@@ -46,13 +46,10 @@
 .comunicado-service-notices { width:100%; flex:0 0 auto; padding:12px 0 4px; max-height:45vh; overflow-y:auto; }
 .comunicado-service-notices h2 { margin:0 0 8px; color:#293b51; font-size:.75rem; font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
 .comunicado-service-item { margin-bottom:12px; }
-/* Pendente: borda lateral + selo semântico; concluído: superfície neutra, sem sombra, texto secundário. */
-.services-panel .comunicado-service-item[data-comunicado-state] .agenda-card { border-left-width:4px !important; border-left-style:solid !important; }
-.services-panel .comunicado-service-item[data-comunicado-state="assinatura"] .agenda-card { border-left-color:#856000 !important; }
+/* Pendente: selo semântico; concluído: superfície neutra, sem sombra, texto secundário. */
 .services-panel .comunicado-service-item[data-comunicado-state="assinatura"] .agenda-label { background:#fff7df !important; color:#856000 !important; }
-.services-panel .comunicado-service-item[data-comunicado-state="informativo"] .agenda-card { border-left-color:#2159d2 !important; }
 .services-panel .comunicado-service-item[data-comunicado-state="informativo"] .agenda-label { background:#edf3ff !important; color:#285db5 !important; }
-.services-panel .comunicado-service-item[data-comunicado-state="concluido"] .agenda-card { border-left-color:#e2e8f0 !important; background:#fcfcfb !important; box-shadow:none !important; }
+.services-panel .comunicado-service-item[data-comunicado-state="concluido"] .agenda-card { background:#fcfcfb !important; box-shadow:none !important; }
 .services-panel .comunicado-service-item[data-comunicado-state="concluido"] .agenda-label { background:#eaf8f1 !important; color:#147a4b !important; }
 .services-panel .comunicado-service-item[data-comunicado-state="concluido"] .agenda-time strong,
 .services-panel .comunicado-service-item[data-comunicado-state="concluido"] .agenda-trajectory strong { color:#64748b !important; }
