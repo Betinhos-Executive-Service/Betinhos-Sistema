@@ -35,6 +35,8 @@ export function App() {
 
   // Fechar o painel nativo não pode ser interceptado; o navegador ao menos avisa sobre o que não foi salvo.
   useEffect(() => {
+    // O overlay do botão (cr40f_escalafds_commands.js) usa isto para pedir "Descartar alterações?" ao fechar.
+    if (window.parent !== window) window.parent.postMessage({ type: 'escala-fds:dirty', dirty: edits.size > 0 }, '*')
     if (!edits.size) return
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault() }
     window.addEventListener('beforeunload', warn)
