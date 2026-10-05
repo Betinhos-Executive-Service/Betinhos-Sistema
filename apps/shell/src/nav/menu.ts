@@ -10,7 +10,7 @@ export type MenuItem =
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
-  | { kind: 'page'; id: string; label: string; page: 'componentes' }
+  | { kind: 'page'; id: string; label: string; page: 'componentes' | 'operacional' }
 
 export type MenuGroup = { id: string; label: string; items: MenuItem[] }
 
@@ -29,7 +29,7 @@ export const MENU: MenuGroup[] = [
     items: [
       table('cr40f_reservadeveculos'),
       wr('Dashboard', 'new_dashboard'),
-      wr('Resumo Operacional', 'new_TelaOperacional'),
+      { kind: 'page', id: 'operacional', label: 'Resumo Operacional', page: 'operacional' },
       wr('Funções Operacionais', 'new_telafuncoesoperacionais'),
       table('cr40f_trocasdecarro'),
       table('new_possedeveiculo'),

@@ -11,6 +11,11 @@ it('localiza item e grupo pelo id', () => {
   expect(findItem('inexistente')).toBeNull()
 })
 
+it('Resumo Operacional é rota React do shell', () => {
+  expect(findItem('operacional')?.item).toMatchObject({ kind: 'page', page: 'operacional', label: 'Resumo Operacional' })
+  expect(findItem('new_telaoperacional')).toBeNull()
+})
+
 it('usa rótulo do sitemap, depois metadata, depois nome lógico', () => {
   const labels = new Map([['cr40f_financeiro', 'Financeiros']])
   expect(itemLabel(findItem('cr40f_clientes1')!.item, labels)).toBe('Clientes')
