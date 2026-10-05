@@ -296,7 +296,7 @@ function dataverseError(message: string, data?: unknown) {
     return;
   }
   console.error(DV_LOG_PREFIX, message, data);
-  (window as WindowWithFlowEnv).__APP_REPORT_ERROR?.(data, {
+  (window as WindowWithFlowEnv).__APP_REPORT_ERROR?.(new Error(message), {
     severity: "error",
     source: "dataverse",
     action: message,
@@ -1828,10 +1828,8 @@ function describeFlowUrlForDebug(url: string) {
   try {
     const parsed = new URL(url);
     const params = Array.from(parsed.searchParams.keys());
-    const sig = parsed.searchParams.get("sig") ?? parsed.searchParams.get("code") ?? "";
     const redactedParams = params.length ? `?${params.join("=&")}=` : " sem query";
-    const sigHint = sig ? ` sig/code final: ...${sig.slice(-8)}` : "";
-    return `${parsed.origin}${parsed.pathname}${redactedParams}${sigHint}`;
+    return `${parsed.origin}${parsed.pathname}${redactedParams}`;
   } catch {
     return "URL invalida";
   }
@@ -3280,6 +3278,15 @@ async function resolveFlowUrl(envKey: string) {
   return flowEnv[envKey] ?? "";
 }
 
+class HttpFlowError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 async function runHttpFlow(envKey: string, payload: Record<string, unknown>) {
   const url = await resolveFlowUrl(envKey);
   if (!url) throw new Error(`URL do Flow nao configurada: ${envKey}. Configure a variavel Dataverse ou window.__APP_FLOW_ENV.`);
@@ -3314,7 +3321,7 @@ async function runHttpFlow(envKey: string, payload: Record<string, unknown>) {
       payloadResumo: summarizeFlowPayload(payload),
       responseText
     });
-    throw new Error(buildHttpFlowErrorMessage(envKey, url, response, responseText));
+    throw new HttpFlowError(buildHttpFlowErrorMessage(envKey, url, response, responseText), response.status);
   }
   dataverseLog("Flow HTTP concluido.", {
     envKey,
@@ -3352,8 +3359,16 @@ export async function saveVoucherRemote(payload: FinalizePayload) {
   const record = dv.record ?? {};
   dataverseLog("Finalizacao por voucher iniciada.", { detailId: payload.detail.id, dataverseId: dv.id });
   payload.onProgress?.("Preparando dados do voucher.");
+  const voucherStateSelect = "$select=cr40f_status,new_linkdovoucher";
+  const before = await retrieveOne(DATAVERSE.geral, dv.id, voucherStateSelect);
+  const previousLink = String(before.new_linkdovoucher ?? "").trim();
+  if (Number(before.cr40f_status) === OPERATION_STATUS.concluido && previousLink) {
+    return { id: payload.detail.id };
+  }
   payload.onProgress?.("Enviando voucher para o Flow.");
-  const flowResult = await runHttpFlow(FLOW_URLS.gerarVoucher, {
+  let flowResult;
+  try {
+    flowResult = await runHttpFlow(FLOW_URLS.gerarVoucher, {
     text: record.cr40f_reservadeveculosid ?? dv.id,
     text_1: dataUrlToBase64(payload.signatureDataUrl ?? ""),
     text_2: String(payload.fields.Desvio ?? "").trim() || "Não",
@@ -3368,7 +3383,33 @@ export async function saveVoucherRemote(payload: FinalizePayload) {
     text_13: getFieldValue(payload.fields, "Observação Voucher", "Observacao Voucher"),
     text_14: getFieldValue(payload.fields, "Horário Final", "Horario Final"),
     text_15: new Date().toISOString()
-  });
+    });
+  } catch (error) {
+    if (!(error instanceof HttpFlowError) || error.status !== 504) throw error;
+    payload.onProgress?.("O envio demorou. Conferindo se o voucher foi gerado.");
+    let voucherConfirmed = false;
+    // O timeout HTTP não cancela o Flow. Consulte o resultado sem repetir o POST.
+    for (let attempt = 0; attempt < 21; attempt++) {
+      if (attempt > 0) await new Promise<void>((resolve) => window.setTimeout(resolve, 3000));
+      let current;
+      try {
+        current = await retrieveOne(DATAVERSE.geral, dv.id, voucherStateSelect);
+      } catch {
+        continue;
+      }
+      const link = String(current.new_linkdovoucher ?? "").trim();
+      if (!link) continue;
+      if (Number(current.cr40f_status) === OPERATION_STATUS.concluido) {
+        return { id: payload.detail.id };
+      }
+      if (link !== previousLink) {
+        voucherConfirmed = true;
+        break;
+      }
+    }
+    if (!voucherConfirmed) throw error;
+    flowResult = { id: payload.detail.id };
+  }
   payload.onProgress?.("Validando retorno do Flow.");
   assertFlowSuccess(flowResult, "FlowGerarVoucher");
   payload.onProgress?.("Atualizando status no Dataverse.");
