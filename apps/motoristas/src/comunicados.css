@@ -7,9 +7,6 @@
 .comunicado-refresh { flex:0 0 auto; margin-left:auto; padding:10px 12px; border:0; border-radius:9px; background:#e7ecf1; color:#102139; font-size:.78rem; font-weight:800; cursor:pointer; }
 .comunicado-refresh:disabled { opacity:.6; cursor:wait; }
 .comunicado-list,.comunicado-detail { max-width:760px; margin:0 auto; }
-.comunicado-list-intro { margin:4px 0 20px; padding:17px 18px; border:1px solid rgba(0,26,61,.07); border-radius:16px; background:#fff; box-shadow:0 6px 18px rgba(0,14,35,.04); }
-.comunicado-list-intro span { display:block; color:#536174; font-size:.68rem; font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
-.comunicado-list-intro p { margin:5px 0 0; color:#000e23; font-size:.96rem; font-weight:800; line-height:1.4; }
 .comunicado-list h2 { display:flex; align-items:center; gap:8px; margin:22px 4px 10px; color:#536174; font-size:.72rem; font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
 .comunicado-list h2 span { display:inline-grid; place-items:center; min-width:22px; height:22px; border-radius:999px; background:#e8edf3; color:#001a3d; font-size:.72rem; }
 .comunicado-row { width:100%; display:grid; grid-template-columns:minmax(0,1fr) auto 24px; align-items:center; gap:12px; min-height:86px; padding:15px 16px; margin-bottom:11px; border:1px solid rgba(0,26,61,.07); border-left:3px solid #bf8c36; border-radius:15px; background:white; color:#000e23; text-align:left; cursor:pointer; box-shadow:0 7px 20px rgba(0,14,35,.045); }
@@ -49,6 +46,16 @@
 .comunicado-service-notices { width:100%; flex:0 0 auto; padding:12px 0 4px; max-height:45vh; overflow-y:auto; }
 .comunicado-service-notices h2 { margin:0 0 8px; color:#293b51; font-size:.75rem; font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
 .comunicado-service-item { margin-bottom:12px; }
+/* Pendente: borda lateral + selo semântico; concluído: superfície neutra, sem sombra, texto secundário. */
+.services-panel .comunicado-service-item[data-comunicado-state] .agenda-card { border-left-width:4px !important; border-left-style:solid !important; }
+.services-panel .comunicado-service-item[data-comunicado-state="assinatura"] .agenda-card { border-left-color:#856000 !important; }
+.services-panel .comunicado-service-item[data-comunicado-state="assinatura"] .agenda-label { background:#fff7df !important; color:#856000 !important; }
+.services-panel .comunicado-service-item[data-comunicado-state="informativo"] .agenda-card { border-left-color:#2159d2 !important; }
+.services-panel .comunicado-service-item[data-comunicado-state="informativo"] .agenda-label { background:#edf3ff !important; color:#285db5 !important; }
+.services-panel .comunicado-service-item[data-comunicado-state="concluido"] .agenda-card { border-left-color:#e2e8f0 !important; background:#fcfcfb !important; box-shadow:none !important; }
+.services-panel .comunicado-service-item[data-comunicado-state="concluido"] .agenda-label { background:#eaf8f1 !important; color:#147a4b !important; }
+.services-panel .comunicado-service-item[data-comunicado-state="concluido"] .agenda-time strong,
+.services-panel .comunicado-service-item[data-comunicado-state="concluido"] .agenda-trajectory strong { color:#64748b !important; }
 .comunicado-skeleton { display:grid; gap:12px; margin-top:8px; }
 .comunicado-skeleton span { display:block; height:88px; border-radius:12px; background:#f7f9fc; border:1px solid #e2e8f0; }
 @media (prefers-reduced-motion:no-preference) { .comunicado-skeleton span { animation:comunicado-skeleton-pulse 1.2s ease-in-out infinite alternate; } }

@@ -170,7 +170,6 @@ export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onS
           </article>
         ) : (
           <div className="comunicado-list services-panel">
-            <div className="comunicado-list-intro"><span>Central de avisos</span><p>Informações e avisos enviados pela operação.</p></div>
             {loadStatus === "loading" && !items.length ? (
               <div className="comunicado-skeleton" role="status" aria-busy="true" aria-label="Carregando comunicados">
                 <span /><span /><span />
@@ -181,12 +180,12 @@ export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onS
                 <ActionButton variant="secondary" idleLabel="Tentar novamente" loadingLabel="Carregando" state={busy ? "loading" : "idle"} onClick={() => { setBusy(true); void refresh().finally(() => setBusy(false)); }} />
               </div>
             ) : <>
-            <h2>Pendentes <span>{pending.length}</span></h2>
+            <h2>Aguardando sua ciência <span>{pending.length}</span></h2>
             {pending.length ? pending.map((item) => (
               <ComunicadoAgendaCard key={item.id} item={item} onOpen={openItem} />
-            )) : <p className="comunicado-empty">Nenhum comunicado pendente.</p>}
+            )) : <p className="comunicado-empty">Tudo em dia. Nenhum comunicado aguardando sua ciência.</p>}
             </>}
-            {completed.length ? <><h2>Concluídos</h2>{completed.map((item) => (
+            {completed.length ? <><h2>Já cientes</h2>{completed.map((item) => (
               <ComunicadoAgendaCard key={item.id} item={item} onOpen={openItem} />
             ))}</> : null}
           </div>

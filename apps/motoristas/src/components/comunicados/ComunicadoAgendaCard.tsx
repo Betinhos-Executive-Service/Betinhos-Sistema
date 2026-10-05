@@ -13,9 +13,10 @@ export function ComunicadoAgendaCard({ item, onOpen }: Props) {
     ? item.tipo === COMUNICADO_TIPO.ciencia ? "ASSINATURA OBRIGATÓRIA" : "INFORMATIVO"
     : item.cienteEm ? "CIÊNCIA ASSINADA" : "CIÊNCIA REGISTRADA";
   const label = unread ? `NOVO · ${typeLabel}` : typeLabel;
+  const state = !pending ? "concluido" : item.tipo === COMUNICADO_TIPO.ciencia ? "assinatura" : "informativo";
 
   return (
-    <div className="agenda-layout-item comunicado-service-item" data-comunicado-unread={unread ? "true" : undefined}>
+    <div className="agenda-layout-item comunicado-service-item" data-comunicado-unread={unread ? "true" : undefined} data-comunicado-state={state}>
       <AgendaCard
         item={{
           id: item.id,
