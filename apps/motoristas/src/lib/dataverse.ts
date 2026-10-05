@@ -260,7 +260,7 @@ const MAINTENANCE_SELECT =
 const MAINTENANCE_REQUEST_PHOTO_FIELDS = ["cr40f_foto01", "cr40f_linkdaevidencia", "cr40f_foto03"] as const;
 
 const EXCHANGE_SELECT =
-  "$select=cr40f_trocasdecarroid,cr40f_id,cr40f_iniciodajaneladetroca,cr40f_fimdajaneladetroca,_cr40f_motorista1_value,_cr40f_motorista2_value,_cr40f_veiculo1antesdatroca_value,_cr40f_veiculo2antesdatroca_value,cr40f_observacao,cr40f_statusdatroca,new_tipodetroca,new_concluidomotorista1,new_concluidomotorista2,new_observacaodomotorista1,new_observacaodomotorista2";
+  "$select=cr40f_trocasdecarroid,cr40f_id,cr40f_iniciodajaneladetroca,cr40f_fimdajaneladetroca,_cr40f_motorista1_value,_cr40f_motorista2_value,_cr40f_veiculo1antesdatroca_value,_cr40f_veiculo2antesdatroca_value,cr40f_observacao,cr40f_statusdatroca,new_tipodetroca,new_concluidomotorista1,new_concluidomotorista2,new_observacaodomotorista1,new_observacaodomotorista2,new_mododajanela,new_localdatroca,_new_m1depoisde_value,_new_m1antesde_value,_new_m2depoisde_value,_new_m2antesde_value";
 
 const DV_LOG_PREFIX = "[AppMotoristas:Dataverse]";
 let lastRuntimeLogKey = "";
@@ -2507,6 +2507,104 @@ async function hydrateExchangeVehicleLabels(exchanges: DataverseRecord[], readMu
   }
 }
 
+const EXCHANGE_WINDOW_MODE_BETWEEN = 100000001;
+const EXCHANGE_ANCHOR_LOOKUPS = ["new_m1depoisde", "new_m1antesde", "new_m2depoisde", "new_m2antesde"] as const;
+
+type ExchangeAnchor = { id: string; label: string; departure: string };
+
+async function hydrateExchangeAnchors(exchanges: DataverseRecord[], readMultiple = retrieveMultiple) {
+  const anchorIds = Array.from(
+    new Set(exchanges.flatMap((exchange) => EXCHANGE_ANCHOR_LOOKUPS.map((lookup) => getLookupId(exchange, lookup))).filter(Boolean))
+  );
+  if (anchorIds.length === 0) return exchanges;
+  try {
+    const result = await readMultiple(
+      DATAVERSE.geral,
+      [
+        "$select=cr40f_reservadeveculosid,cr40f_id,cr40f_dataehorriodesada",
+        `$filter=${anchorIds.map((id) => `cr40f_reservadeveculosid eq ${id}`).join(" or ")}`,
+        `$top=${anchorIds.length}`
+      ].join("&")
+    );
+    const byId = new Map(
+      result.entities.map((row) => [cleanODataGuid(row.cr40f_reservadeveculosid), { id: cleanODataGuid(row.cr40f_reservadeveculosid), label: String(row.cr40f_id ?? ""), departure: String(row.cr40f_dataehorriodesada ?? "") }] as const)
+    );
+    return exchanges.map((exchange) => {
+      const anchors: Record<string, ExchangeAnchor> = {};
+      for (const lookup of EXCHANGE_ANCHOR_LOOKUPS) {
+        const id = getLookupId(exchange, lookup);
+        if (id) anchors[lookup] = byId.get(id) ?? { id, label: getLookupName(exchange, lookup), departure: "" };
+      }
+      return { ...exchange, __anchors: anchors };
+    });
+  } catch (error) {
+    dataverseWarn("Falha ao carregar os serviços de referência da troca.", { error });
+    return exchanges;
+  }
+}
+
+export type ExchangeWindowCheck = { mode: "fixed" | "between"; start: string; end: string; ownBeforeDeparture: string };
+
+/** Fora da janela: horário marcado fora de início–fim; entre serviços, depois da saída da própria OS "antes de". */
+export function isExchangeOutsideWindow(check: ExchangeWindowCheck | undefined, now = new Date()) {
+  if (!check) return false;
+  if (check.mode === "between") {
+    const before = toDate(check.ownBeforeDeparture);
+    return !!before && now > before;
+  }
+  const start = toDate(check.start);
+  const end = toDate(check.end);
+  return (!!start && now < start) || (!!end && now > end);
+}
+
+function anchorText(anchor: ExchangeAnchor | undefined) {
+  if (!anchor) return "";
+  const at = toDate(anchor.departure);
+  const time = at ? at.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "";
+  return [anchor.label || "serviço", time ? `(${time})` : ""].filter(Boolean).join(" ");
+}
+
+/** Selo e frase da janela para o motorista que está vendo a troca. */
+export function buildExchangeWindowInfo(exchange: DataverseRecord, driver?: DriverContext | null) {
+  const driverId = cleanGuid(driver?.id ?? "");
+  const isDriver2 = !!driverId && cleanODataGuid(exchange._cr40f_motorista2_value) === driverId;
+  const between = Number(exchange.new_mododajanela) === EXCHANGE_WINDOW_MODE_BETWEEN;
+  const location = String(exchange.new_localdatroca ?? "").trim();
+  const start = toDate(exchange.cr40f_iniciodajaneladetroca);
+  const end = toDate(exchange.cr40f_fimdajaneladetroca);
+  if (!between) {
+    return {
+      mode: "fixed" as const,
+      seal: "Horário marcado",
+      phrase: start && end
+        ? `Troque em ${start.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} entre ${start.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} e ${end.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.`
+        : "Troque no horário combinado.",
+      location,
+      check: { mode: "fixed" as const, start: String(exchange.cr40f_iniciodajaneladetroca ?? ""), end: String(exchange.cr40f_fimdajaneladetroca ?? ""), ownBeforeDeparture: "" }
+    };
+  }
+  const anchors = (exchange.__anchors ?? {}) as Record<string, ExchangeAnchor>;
+  const after = anchors[isDriver2 ? "new_m2depoisde" : "new_m1depoisde"];
+  const before = anchors[isDriver2 ? "new_m2antesde" : "new_m1antesde"];
+  const other = getLookupName(exchange, isDriver2 ? "cr40f_motorista1" : "cr40f_motorista2");
+  const phrase = after && before
+    ? `Troque depois da ${anchorText(after)} e antes da ${anchorText(before)}.`
+    : after
+      ? `Troque depois da ${anchorText(after)}.`
+      : before
+        ? `Troque antes da ${anchorText(before)}.`
+        : other
+          ? `Troque com ${other} quando os dois estiverem livres.`
+          : "Troque assim que estiver livre.";
+  return {
+    mode: "between" as const,
+    seal: "Entre serviços",
+    phrase,
+    location,
+    check: { mode: "between" as const, start: "", end: "", ownBeforeDeparture: before?.departure ?? "" }
+  };
+}
+
 function getOtherExchangeDriverId(exchange: DataverseRecord, driverId: string) {
   const cleanDriverId = cleanGuid(driverId);
   const driver1Id = getLookupId(exchange, "cr40f_motorista1");
@@ -2990,8 +3088,10 @@ function mapMaintenance(geral: DataverseRecord, maintenance: DataverseRecord): A
 
 function buildExchangeFields(exchange: DataverseRecord, geral?: DataverseRecord, driver?: DriverContext | null): DetailField[] {
   const display = buildExchangeDisplay(exchange, driver);
+  const windowInfo = buildExchangeWindowInfo(exchange, driver);
   return [
-    { label: "Janela da Troca", value: display.window },
+    { label: windowInfo.mode === "between" ? "Quando trocar · Entre serviços" : "Quando trocar · Horário marcado", value: windowInfo.phrase, strong: true },
+    ...(windowInfo.location ? [{ label: "Local da troca", value: windowInfo.location }] : []),
     { label: "Resumo", value: display.summary, strong: true },
     ...display.fields,
     { label: "Tipo de Troca", value: getFormatted(exchange, "new_tipodetroca") },
@@ -3006,6 +3106,7 @@ function mapExchange(exchange: DataverseRecord, geral: DataverseRecord | undefin
   const businessId = getBusinessId(exchange, exchangeId);
   const geralId = geral ? getGeralId(geral) : "";
   const display = buildExchangeDisplay(exchange, driver);
+  const windowInfo = buildExchangeWindowInfo(exchange, driver);
   const detail: DetailData = {
     type: "TROCA",
     id: businessId,
@@ -3015,7 +3116,7 @@ function mapExchange(exchange: DataverseRecord, geral: DataverseRecord | undefin
     dataverse: {
       entitySetName: DATAVERSE.trocas,
       id: exchangeId,
-      record: { ...exchange, __geralId: geralId, __geral: geral }
+      record: { ...exchange, __geralId: geralId, __geral: geral, __windowCheck: windowInfo.check }
     }
   };
 
@@ -3023,7 +3124,8 @@ function mapExchange(exchange: DataverseRecord, geral: DataverseRecord | undefin
     id: `trc-${exchangeId}`,
     tipo: "TROCA",
     label: display.label,
-    time: formatAgendaTime(start),
+    // Entre serviços não tem horário fixo: a agenda mostra "Livre" em vez da janela técnica.
+    time: windowInfo.mode === "between" ? "Livre" : formatAgendaTime(start),
     description: display.description,
     priority: 0,
     searchText: `${businessId} ${exchangeId} ${display.label} ${display.description} ${display.summary} ${getLookupName(exchange, "cr40f_motorista1")} ${getLookupName(exchange, "cr40f_motorista2")}`.toLowerCase(),
@@ -3169,7 +3271,7 @@ export async function loadRemoteStore(): Promise<RemoteStore> {
     programmedExchangeGeralResult.entities.map((geral) => [getExchangeIdFromGeral(geral), geral] as const).filter(([id]) => Boolean(id))
   );
 
-  const exchangeRows = await hydrateExchangeDriverContactPhones(await hydrateExchangeVehicleLabels(exchangeResult.entities, readMultiple), driver, readMultiple);
+  const exchangeRows = await hydrateExchangeAnchors(await hydrateExchangeDriverContactPhones(await hydrateExchangeVehicleLabels(exchangeResult.entities, readMultiple), driver, readMultiple), readMultiple);
 
   const exchangeItems = exchangeRows
     .filter((exchange) => shouldShowOpenExchangeForDriver(exchange, driver.id))
@@ -3207,7 +3309,7 @@ export async function loadRemoteStore(): Promise<RemoteStore> {
   const historyItems = [
     ...historyServiceItems,
     ...historyMaintenanceRows.filter((item): item is AgendaItem => Boolean(item)),
-    ...(await hydrateExchangeDriverContactPhones(await hydrateExchangeVehicleLabels(historyExchangeResult.entities, readMultiple), driver, readMultiple))
+    ...(await hydrateExchangeAnchors(await hydrateExchangeDriverContactPhones(await hydrateExchangeVehicleLabels(historyExchangeResult.entities, readMultiple), driver, readMultiple), readMultiple))
       .map((exchange) => mapExchange(exchange, historyExchangeGeralById.get(getRecordId(exchange, "cr40f_trocasdecarroid")), driver))
   ].sort((a, b) => getItemDateMs(b) - getItemDateMs(a)).map(asHistoryItem);
   const history = addHistoryDateHeaders(historyItems);
@@ -3260,10 +3362,10 @@ export async function loadRemoteDetailByParams(servicoId: string, tipo = ""): Pr
 
   if (!normalizedType || normalizedType === "TROCA") {
     try {
-      const [exchange] = await hydrateExchangeDriverContactPhones(
+      const [exchange] = await hydrateExchangeAnchors(await hydrateExchangeDriverContactPhones(
         await hydrateExchangeVehicleLabels([await retrieveOne(DATAVERSE.trocas, id, EXCHANGE_SELECT)]),
         driver
-      );
+      ));
       const linkedGeral = await retrieveMultiple(
         DATAVERSE.geral,
         [
@@ -3897,10 +3999,12 @@ export async function finalizeExchangeRemote(payload: FinalizePayload) {
   );
   const webApi = getWebApi();
   if (!webApi.online?.execute) throw new Error("[FORBIDDEN_LIFECYCLE] API de confirmação indisponível neste contexto.");
+  const outOfWindowReason = getFieldValue(payload.fields, "Motivo fora da janela").trim();
   const request: Record<string, unknown> = {
     entity: { entityType: "cr40f_trocasdecarro", id: cleanGuid(dv.id) },
     new_Motivo: observation,
     new_VersaoEsperada: String(record["@odata.etag"] ?? "").replace(/^W\/\"|\"$/g, ""),
+    ...(outOfWindowReason ? { new_MotivoForaDaJanela: outOfWindowReason } : {}),
     getMetadata: () => ({
       boundParameter: "entity",
       operationType: 0,
@@ -3908,7 +4012,8 @@ export async function finalizeExchangeRemote(payload: FinalizePayload) {
       parameterTypes: {
         entity: { typeName: "mscrm.cr40f_trocasdecarro", structuralProperty: 5 },
         new_Motivo: { typeName: "Edm.String", structuralProperty: 1 },
-        new_VersaoEsperada: { typeName: "Edm.String", structuralProperty: 1 }
+        new_VersaoEsperada: { typeName: "Edm.String", structuralProperty: 1 },
+        new_MotivoForaDaJanela: { typeName: "Edm.String", structuralProperty: 1 }
       }
     })
   };

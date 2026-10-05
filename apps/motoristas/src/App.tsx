@@ -82,7 +82,8 @@ const EXCHANGE_ERROR_MESSAGES: Record<string, string> = {
   POSSESSION_OVERLAP: "Existe sobreposição no histórico de posse. Contate a operação.",
   POSSESSION_NOT_OPEN: "A posse esperada do veículo não está aberta. Contate a operação.",
   IDENTITY_NOT_MAPPED: "Seu usuário não está vinculado a um funcionário ativo. Contate a operação.",
-  FORBIDDEN_LIFECYCLE: "Você não tem permissão ou esta troca não aceita essa ação."
+  FORBIDDEN_LIFECYCLE: "Você não tem permissão ou esta troca não aceita essa ação.",
+  EXCHANGE_OUT_OF_WINDOW_REASON_REQUIRED: "A troca está fora do combinado. Conte o motivo antes de confirmar."
 };
 
 function exchangeUserError(error: unknown): string {
