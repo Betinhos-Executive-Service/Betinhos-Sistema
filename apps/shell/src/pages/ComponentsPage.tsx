@@ -1,12 +1,12 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Check, ChevronRight, CircleCheck, Clock, Copy, EllipsisVertical, Home, Inbox, LayoutDashboard, Pencil, Plus, PlugZap, RefreshCw, SearchX, Trash2, TriangleAlert, Truck, X } from 'lucide-react'
 import {
-  Alert, Avatar, BottomNav, Breadcrumb, Button, Checkbox, ChoiceGroup, Cluster, DateTile, Dialog, Drawer, EmptyState, Field, Grid, Input, Menu, MetricCard, PageHeader, PageToolbar, Pagination, Progress, Radio, SearchBox, SegmentedControl, Select, Skeleton, Spinner, Stack, StatusBadge, Surface, Switch, Table, TableTitle, Tabs, Textarea, ToastProvider, Tooltip, Upload,
+  Alert, Avatar, BottomNav, Breadcrumb, Button, Checkbox, ChoiceGroup, Cluster, DateTile, Dialog, Drawer, EmptyState, Field, Grid, Input, Menu, MetricCard, PageHeader, PageToolbar, Pagination, Progress, Radio, SearchBox, SegmentedControl, Select, Sheet, Skeleton, Spinner, Stack, StatusBadge, Surface, Switch, Table, TableTitle, Tabs, Textarea, ToastProvider, Tooltip, Upload,
   filterOptions, useShellHeader, useToast, type AlertTone, type ButtonSize, type ButtonVariant, type ControlSize, type SelectOption, type StatusTone, type UploadFile,
 } from '@betinhos/ui'
 import { PageLayout } from '../app/PageLayout'
 
-const CLIENTES: SelectOption[] = ['Embraer', 'Tenaris', 'Kenvue', 'Johnson & Johnson'].map((label) => ({ value: label, label }))
+const CLIENTES: SelectOption[] = ['Cliente Alfa', 'Cliente Beta', 'Cliente Gama', 'Cliente Delta'].map((label) => ({ value: label, label }))
 const VEICULOS: SelectOption[] = [
   { value: 'v1', label: 'Corolla · ABC1D23', group: 'Sedan' },
   { value: 'v2', label: 'Civic · EFG4H56', group: 'Sedan' },
@@ -17,11 +17,11 @@ const VEICULOS: SelectOption[] = [
 const STATUS: SelectOption[] = ['Aberto', 'Em andamento', 'Concluído', 'Cancelado'].map((label) => ({ value: label, label, disabled: label === 'Cancelado' }))
 const MOTORISTAS: SelectOption[] = ['André Luís', 'Bruno Araújo', 'Cláudio Ferraz', 'Érica Nunes', 'João Conceição', 'Márcio Sá', 'Patrícia Gusmão', 'Sérgio Antônio'].map((label) => ({ value: label, label }))
 const PESSOAS: SelectOption[] = [
-  { value: 'p1', label: 'Marina Lopes', subtitle: 'Embraer', search: 'mari' },
-  { value: 'p2', label: 'Carlos Prado', subtitle: 'Tenaris' },
-  { value: 'p3', label: 'Ana Ribeiro', subtitle: 'Kenvue' },
-  { value: 'p4', label: 'João Araújo', subtitle: 'Embraer' },
-  { value: 'p5', label: 'Renata Sá', subtitle: 'Johnson & Johnson' },
+  { value: 'p1', label: 'Marina Lopes', subtitle: 'Cliente Alfa', search: 'mari' },
+  { value: 'p2', label: 'Carlos Prado', subtitle: 'Cliente Beta' },
+  { value: 'p3', label: 'Ana Ribeiro', subtitle: 'Cliente Gama' },
+  { value: 'p4', label: 'João Araújo', subtitle: 'Cliente Alfa' },
+  { value: 'p5', label: 'Renata Sá', subtitle: 'Cliente Delta' },
 ]
 
 const VARIANTS: ButtonVariant[] = ['primary', 'secondary', 'action', 'ghost', 'danger']
@@ -32,9 +32,9 @@ const PENDING: string[] = []
 
 type Ocorrencia = { id: string; titulo: string; local: string; cliente: string; responsavel: string; prazo: string; status: StatusTone; statusLabel: string; gravidade: 'success' | 'warning' | 'danger'; gravidadeLabel: string }
 const OCORRENCIAS: Ocorrencia[] = [
-  { id: 'OC-0412', titulo: 'Atraso na apresentação do motorista', local: 'Aeroporto de Guarulhos', cliente: 'Embraer', responsavel: 'Marina Lopes', prazo: '2026-09-28', status: 'danger', statusLabel: 'Atrasado', gravidade: 'danger', gravidadeLabel: 'Gravidade crítica' },
-  { id: 'OC-0409', titulo: 'Veículo diferente do confirmado', local: 'São José dos Campos', cliente: 'Johnson & Johnson', responsavel: 'Carlos Prado', prazo: '2026-10-06', status: 'info', statusLabel: 'Em andamento', gravidade: 'warning', gravidadeLabel: 'Gravidade média' },
-  { id: 'OC-0403', titulo: 'Voucher enviado sem telefone do passageiro', local: 'Congonhas', cliente: 'Tenaris', responsavel: 'Ana Ribeiro', prazo: '2026-10-12', status: 'success', statusLabel: 'Concluído', gravidade: 'success', gravidadeLabel: 'Gravidade baixa' },
+  { id: 'OC-0412', titulo: 'Atraso na apresentação do motorista', local: 'Aeroporto de Guarulhos', cliente: 'Cliente Alfa', responsavel: 'Marina Lopes', prazo: '2026-09-28', status: 'danger', statusLabel: 'Atrasado', gravidade: 'danger', gravidadeLabel: 'Gravidade crítica' },
+  { id: 'OC-0409', titulo: 'Veículo diferente do confirmado', local: 'São José dos Campos', cliente: 'Cliente Delta', responsavel: 'Carlos Prado', prazo: '2026-10-06', status: 'info', statusLabel: 'Em andamento', gravidade: 'warning', gravidadeLabel: 'Gravidade média' },
+  { id: 'OC-0403', titulo: 'Voucher enviado sem telefone do passageiro', local: 'Congonhas', cliente: 'Cliente Beta', responsavel: 'Ana Ribeiro', prazo: '2026-10-12', status: 'success', statusLabel: 'Concluído', gravidade: 'success', gravidadeLabel: 'Gravidade baixa' },
 ]
 const dataBR = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR')
 
@@ -170,7 +170,7 @@ function FieldShowcase() {
           required={required}
           disabled={disabled}
         >
-          {control === 'Input' ? <Input size={size} placeholder="Ex.: Embraer" prefix={affix ? 'R$' : undefined} suffix={affix ? 'km' : undefined} /> : null}
+          {control === 'Input' ? <Input size={size} placeholder="Ex.: Cliente Alfa" prefix={affix ? 'R$' : undefined} suffix={affix ? 'km' : undefined} /> : null}
           {control === 'Textarea' ? <Textarea placeholder="Descreva o que aconteceu" /> : null}
         </Field>
       </div>
@@ -196,7 +196,7 @@ function FieldShowcase() {
               <Input value={form.titulo} onChange={update('titulo')} placeholder="Ex.: Atraso na apresentação" />
             </Field>
             <Field label="Cliente" required error={submitted && missing.gravidade ? 'Informe o cliente.' : undefined}>
-              <Input value={form.gravidade} onChange={update('gravidade')} placeholder="Ex.: Embraer" />
+              <Input value={form.gravidade} onChange={update('gravidade')} placeholder="Ex.: Cliente Alfa" />
             </Field>
             <Field label="Valor do reembolso" hint="Opcional.">
               <Input value={form.valor} onChange={update('valor')} inputMode="decimal" prefix="R$" placeholder="0,00" />
@@ -223,7 +223,7 @@ function SelectShowcase() {
   const [remoto, setRemoto] = useState<string | null>(null)
   const [found, setFound] = useState<SelectOption[]>([])
   const [loading, setLoading] = useState(false)
-  const [bloqueado] = useState<string | null>('Embraer')
+  const [bloqueado] = useState<string | null>('Cliente Alfa')
   const [veiculo, setVeiculo] = useState<string | null>(null)
   const [centros, setCentros] = useState<SelectOption[]>(['Operação', 'Comercial', 'Frota'].map((label) => ({ value: label, label })))
   const [centro, setCentro] = useState<string | null>(null)
@@ -553,6 +553,25 @@ function DrawerShowcase() {
   )
 }
 
+function SheetShowcase() {
+  const [open, setOpen] = useState(false)
+  return (
+    <Section name="Sheet" summary="Bottom sheet modal para celular: abre pela metade, expande para a altura cheia, arrasta pela alça e fecha por X, Esc, fundo ou gesto.">
+      <Cluster gap="3">
+        <Button onClick={() => setOpen(true)}>Abrir sheet</Button>
+      </Cluster>
+      <Sheet open={open} onClose={() => setOpen(false)} eyebrow="Serviço #4205" title="Aeroporto de Congonhas para Itaim Bibi"
+        footer={<><Button variant="secondary" onClick={() => setOpen(false)}>Fechar</Button><Button onClick={() => setOpen(false)}>Ligar para o motorista</Button></>}>
+        <Stack gap="3">
+          <Alert tone="info">Saída às 14:30, motorista confirmado.</Alert>
+          <Surface>Passageiro: Ana Souza · 2 malas · voo LA3040.</Surface>
+          <Surface>Observação: aguardar na área de desembarque com placa.</Surface>
+        </Stack>
+      </Sheet>
+    </Section>
+  )
+}
+
 function UploadShowcase() {
   const [files, setFiles] = useState<UploadFile[]>([{ name: 'foto-painel.jpg', size: 348160, url: '#' }])
   return (
@@ -730,6 +749,7 @@ export function ComponentsPage() {
         <DateTileShowcase />
         <TableShowcase />
         <DrawerShowcase />
+        <SheetShowcase />
         <UploadShowcase />
         <ChoiceShowcase />
         <TabsShowcase />
