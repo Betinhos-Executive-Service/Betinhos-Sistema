@@ -1,4 +1,4 @@
-import { useRef, type PointerEvent } from 'react'
+import { useEffect, useRef, type PointerEvent } from 'react'
 import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
 import { Select, StatusBadge, Switch } from '@betinhos/ui'
 import type { Motorista } from '../domain/types'
@@ -15,6 +15,16 @@ type Props = {
 export function DayHeader(props: Props) {
   const swipe = useRef<{ x: number; y: number } | null>(null)
   const { dayKey, onChangeDay } = props
+  const headerRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const el = headerRef.current
+    if (!el) return
+    const apply = () => document.documentElement.style.setProperty('--op-day-height', `${el.offsetHeight}px`)
+    apply()
+    const observer = new ResizeObserver(apply)
+    observer.observe(el)
+    return () => { observer.disconnect(); document.documentElement.style.removeProperty('--op-day-height') }
+  }, [])
   const go = (days: number) => onChangeDay(addDays(dayKey, days))
 
   const onDown = (e: PointerEvent) => { swipe.current = { x: e.clientX, y: e.clientY } }
@@ -27,17 +37,18 @@ export function DayHeader(props: Props) {
   }
 
   return (
-    <header className="op-day" onPointerDown={onDown} onPointerUp={onUp}>
+    <header ref={headerRef} className="op-day" onPointerDown={onDown} onPointerUp={onUp}>
       <div className="op-day__row">
         <button type="button" className="op-icon" aria-label="Dia anterior" onClick={() => go(-1)}><ChevronLeft size={20} /></button>
         <h2 className="op-day__label">{dayLabel(dayKey, props.today)}</h2>
         <button type="button" className="op-icon" aria-label="Próximo dia" onClick={() => go(1)}><ChevronRight size={20} /></button>
-        <button type="button" className="op-icon op-day__refresh" aria-label="Atualizar agora" aria-busy={props.refreshing} onClick={props.onRefresh} data-spinning={props.refreshing || undefined}><RefreshCw size={18} /></button>
+        <button type="button" className="op-icon op-day__refresh" aria-label="Atualizar agora" onClick={props.onRefresh} data-spinning={props.refreshing || undefined}><RefreshCw size={18} /></button>
       </div>
-      <p className="op-day__fresh" role="status" aria-live="polite" data-warning={props.freshnessWarning || undefined}>
+      <p className="op-day__fresh" data-warning={props.freshnessWarning || undefined}>
         {props.freshness} · {props.total} {props.total === 1 ? 'serviço' : 'serviços'}
         {props.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
       </p>
+      <span className="op-sr-only" role="status">{props.freshnessWarning ? props.freshness : ''}</span>
       <div className="op-day__filters">
         <Select
           aria-label="Filtrar por motorista" placeholder="Todos os motoristas" searchable clearable size="compact"

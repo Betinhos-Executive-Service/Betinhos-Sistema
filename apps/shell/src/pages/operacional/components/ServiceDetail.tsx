@@ -15,7 +15,7 @@ function ContactLinks({ phone, name }: { phone: string; name: string }) {
   return (
     <span className="op-detail__contact">
       <a className={buttonClassName({ variant: 'secondary', size: 'compact' })} href={tel} aria-label={`Ligar para ${name}`}><Phone size={16} aria-hidden="true" />Ligar</a>
-      <a className={buttonClassName({ variant: 'secondary', size: 'compact' })} href={wa!} target="_blank" rel="noopener" aria-label={`WhatsApp para ${name}`}><MessageCircle size={16} aria-hidden="true" />WhatsApp</a>
+      <a className={buttonClassName({ variant: 'secondary', size: 'compact' })} href={wa!} target="_blank" rel="noopener" aria-label={`WhatsApp para ${name} (abre em nova aba)`}><MessageCircle size={16} aria-hidden="true" />WhatsApp</a>
     </span>
   )
 }
