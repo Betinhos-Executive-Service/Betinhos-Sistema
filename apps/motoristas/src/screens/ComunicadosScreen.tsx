@@ -43,6 +43,11 @@ export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onS
   const [strokes, setStrokes] = useState<SignatureStrokes>([]);
   const [observacao, setObservacao] = useState("");
   const [busy, setBusy] = useState(false);
+  // "success" segura o botão em estado de sucesso antes de trocar a tela, para o motorista ver a confirmação.
+  const [phase, setPhase] = useState<"idle" | "success">("idle");
+  const [justSigned, setJustSigned] = useState(false);
+  const locked = busy || phase === "success";
+  const buttonState = busy ? "loading" : phase === "success" ? "success" : "idle";
   const [error, setError] = useState("");
   const selected = items.find((item) => item.id === selectedId);
   const pending = items.filter(isComunicadoPending);
@@ -67,14 +72,19 @@ export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onS
     return () => { active = false; };
   }, [selected?.id, selected?.tipo, selected?.abertoEm]);
 
+  const holdSuccess = () => new Promise((resolve) => window.setTimeout(resolve, 700));
+
   const acknowledge = async () => {
-    if (!selected || selected.tipo !== COMUNICADO_TIPO.informativo || busy) return;
+    if (!selected || selected.tipo !== COMUNICADO_TIPO.informativo || locked) return;
     setBusy(true);
     setError("");
     let recorded = false;
     try {
       await abrirComunicado(selected.id);
       recorded = true;
+      setBusy(false);
+      setPhase("success");
+      await holdSuccess();
       await onReload();
       onSelectedIdChange("");
     } catch (cause) {
@@ -82,6 +92,7 @@ export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onS
       setError(recorded ? "Ciência registrada, mas não foi possível atualizar a lista. Tente atualizar." : cause instanceof Error ? cause.message : "Não foi possível registrar a ciência. Tente novamente.");
     } finally {
       setBusy(false);
+      setPhase("idle");
     }
   };
 
@@ -89,23 +100,30 @@ export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onS
     setStrokes([]);
     setObservacao("");
     setError("");
+    setPhase("idle");
+    setJustSigned(false);
     onSelectedIdChange(id);
   };
 
   const sign = async () => {
-    if (!selected || busy) return;
+    if (!selected || locked) return;
     setBusy(true);
     setError("");
     let signed = false;
     try {
       await assinarComunicado(selected.id, strokes, observacao);
       signed = true;
+      setBusy(false);
+      setPhase("success");
+      await holdSuccess();
+      setJustSigned(true);
       await onReload();
     } catch (cause) {
       reportAppError(cause, { source: "comunicados", action: "assinarComunicado", phase: signed ? "reload-after-sign" : "execute-or-validation", screen: "Comunicados", detailId: selected.id, detailType: "COMUNICADO", payload: { signed, strokeCount: strokes.length, observationLength: observacao.length }, notifyUser: false });
       setError(signed ? "Ciência registrada, mas não foi possível atualizar a lista. Tente novamente." : cause instanceof Error ? cause.message : "Não foi possível salvar a ciência.");
     } finally {
       setBusy(false);
+      setPhase("idle");
     }
   };
 
@@ -141,24 +159,24 @@ export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onS
               <p className="comunicado-body">{selected.corpo}</p>
             </div>
             {selected.tipo === COMUNICADO_TIPO.ciencia && !selected.cienteEm ? (
-              <section className="comunicado-ack" aria-label="Registro de ciência">
+              <section className="comunicado-ack" aria-label="Registro de ciência" aria-busy={locked} data-locked={locked || undefined}>
                 <div className="comunicado-ack-intro">
                   <h2>Registrar ciência</h2>
                   <p>A assinatura será registrada em seu nome: <strong>{driverName}</strong>.</p>
                 </div>
                 <div className="comunicado-field">
                   <label htmlFor="comunicado-observacao">Observação <span>(opcional)</span></label>
-                  <TextAreaControl id="comunicado-observacao" value={observacao} maxLength={1000} onChange={(event) => setObservacao(event.target.value)} placeholder="Escreva aqui se precisar acrescentar algo." />
+                  <TextAreaControl id="comunicado-observacao" disabled={locked} value={observacao} maxLength={1000} onChange={(event) => setObservacao(event.target.value)} placeholder="Escreva aqui se precisar acrescentar algo." />
                 </div>
                 <div className="comunicado-field comunicado-field-signature">
                   <label>Assine abaixo</label>
                   <SignaturePad value={strokes} onChange={setStrokes} />
                 </div>
-                <ActionButton className="comunicado-primary" variant="primary" idleLabel="Assinar ciência" loadingLabel="Salvando ciência" state={busy ? "loading" : "idle"} onClick={() => void sign()} />
+                <ActionButton className="comunicado-primary" variant="primary" idleLabel="Assinar ciência" loadingLabel="Salvando ciência" successLabel="Ciência registrada" state={buttonState} onClick={() => void sign()} />
               </section>
             ) : selected.cienteEm ? (
-              <section className="comunicado-signed">
-                <h2>Ciência registrada</h2>
+              <section className={`comunicado-signed${justSigned ? " is-fresh" : ""}`}>
+                <h2><span className="comunicado-signed-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg></span>Ciência registrada</h2>
                 <p>{selected.nomeAssinante} · {formatDate(selected.cienteEm)}</p>
                 <SignatureDrawing value={parseStrokes(selected.assinaturaJson)} />
                 {selected.observacao ? <p>Observação: {selected.observacao}</p> : null}
@@ -166,7 +184,7 @@ export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onS
             ) : selected.lidoEm ? <p className="comunicado-read-state">Ciência registrada em {formatDate(selected.lidoEm)}.</p> : (
               <section className="comunicado-ack comunicado-ack-simple" aria-label="Confirmar ciência">
                 <p>Ao continuar, sua ciência deste informativo será registrada.</p>
-                <ActionButton className="comunicado-primary" variant="primary" idleLabel="Seguinte" loadingLabel="Registrando ciência" state={busy ? "loading" : "idle"} onClick={() => void acknowledge()} />
+                <ActionButton className="comunicado-primary" variant="primary" idleLabel="Seguinte" loadingLabel="Registrando ciência" successLabel="Ciência registrada" state={buttonState} onClick={() => void acknowledge()} />
               </section>
             )}
           </article>

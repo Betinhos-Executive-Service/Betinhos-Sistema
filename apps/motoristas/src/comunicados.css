@@ -66,3 +66,17 @@
   .comunicado-field:nth-of-type(3) { animation-delay:80ms; }
 }
 @keyframes comunicado-form-enter { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+
+/* Envio da ciência: trava o formulário enquanto salva e confirma com check desenhado. */
+.comunicado-ack .comunicado-field { transition:border-color 160ms ease,box-shadow 160ms ease,opacity 200ms ease; }
+.comunicado-ack[data-locked] .comunicado-field { opacity:.6; pointer-events:none; }
+.comunicado-signed h2 { display:flex; align-items:center; gap:8px; }
+.comunicado-signed-check { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; flex:none; border-radius:999px; background:#eaf8f1; color:#147a4b; }
+.comunicado-signed-check svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2.6; stroke-linecap:round; stroke-linejoin:round; }
+@media (prefers-reduced-motion:no-preference) {
+  .comunicado-signed.is-fresh { animation:comunicado-form-enter 240ms cubic-bezier(.23,1,.32,1) both; }
+  .comunicado-signed.is-fresh .comunicado-signed-check { animation:comunicado-check-pop 260ms cubic-bezier(.23,1,.32,1) both; }
+  .comunicado-signed.is-fresh .comunicado-signed-check path { stroke-dasharray:24; stroke-dashoffset:24; animation:comunicado-check-draw 280ms cubic-bezier(.23,1,.32,1) 120ms forwards; }
+}
+@keyframes comunicado-check-pop { from { opacity:0; transform:scale(.8); } to { opacity:1; transform:scale(1); } }
+@keyframes comunicado-check-draw { to { stroke-dashoffset:0; } }
