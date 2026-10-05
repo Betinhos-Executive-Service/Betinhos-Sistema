@@ -6,7 +6,7 @@ Data: 05/10/2026 · Status: design aprovado por Renan · Ambiente de implementa�
 A janela da troca (`cr40f_iniciodajaneladetroca`–`cr40f_fimdajaneladetroca`) é lida pelos motoristas como horário obrigatório. Caso real: dois motoristas livres de manhã esperaram a janela da tarde para trocar. A gestão usa a janela, na maioria das vezes, como sugestão.
 
 ## Objetivo
-Deixar explícito, no registro e no App Motoristas, se a troca tem **horário marcado** (obrigatório) ou deve acontecer **assim que os motoristas estiverem livres, antes de um serviço-alvo**.
+Deixar explícito, no registro e no App Motoristas, se a troca tem **horário marcado** (obrigatório) ou deve acontecer **entre dois serviços da agenda de cada motorista**, no momento em que ambos estiverem livres.
 
 ## Decisões
 | Tema | Decisão |
