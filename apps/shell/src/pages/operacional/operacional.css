@@ -85,3 +85,19 @@
 .op-detail__note { margin: 0; white-space: pre-wrap; font-size: var(--bt-font-size-13); }
 @media (max-width: 380px) { .op-detail__controls { grid-template-columns: 1fr; } .op-detail__info { grid-template-columns: 1fr; } }
 .op-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Celular: o shell já mostra o título; evita repeti-lo no H1 da página. */
+@media (max-width: 820px) {
+  .page:has(.op) .page__header { display: none; }
+}
+
+/* Paisagem compacta: somente leitura e densa; o cabeçalho do dia vira uma linha. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .page:has(.op) .page__header { display: none; }
+  .op-day { position: static; display: flex; align-items: center; gap: var(--bt-space-2); padding: var(--bt-space-2); }
+  .op-day__row { flex: 0 0 auto; }
+  .op-day__label { font-size: var(--bt-font-size-14); white-space: nowrap; }
+  .op-day__fresh { flex: 1; min-width: 0; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .op-day__filters { display: none; }
+  .op-day .op-icon { width: 32px; height: 32px; }
+}
