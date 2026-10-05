@@ -531,6 +531,54 @@ test("descricao de retirada e devolucao na base usa acao certa", () => {
   assert.equal(devolucao.fields.some((field) => field.label === "Você entrega" && field.value === "Corolla ABC1D23"), true);
 });
 
+test("retirada e devolucao mostram o local da base com endereco e mapa", () => {
+  const driver = { id: "driver-1", email: "", fullName: "Ana", funcionario: {} };
+  const devolucao = buildExchangeDisplay(
+    {
+      new_tipodetroca: 100000001,
+      _cr40f_motorista1_value: "driver-1",
+      "_cr40f_veiculo1antesdatroca_value@OData.Community.Display.V1.FormattedValue": "Corolla ABC1D23",
+      __baseLocationName: "Casa do Betinho",
+      __baseLocationAddress: "Rua das Flores, 10 - São Paulo",
+      __baseLocationMapUrl: ""
+    },
+    driver
+  );
+
+  assert.match(devolucao.description, /Devolver Corolla ABC1D23 em Casa do Betinho/);
+  assert.equal(devolucao.fields.find((field) => field.label === "Local")?.value, "Casa do Betinho");
+  assert.equal(devolucao.fields.find((field) => field.label === "Endereço")?.value, "Rua das Flores, 10 - São Paulo");
+  assert.match(devolucao.fields.find((field) => field.label === "Mapa")?.value ?? "", /^https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=Rua%20das%20Flores/);
+
+  const retiradaSemLocal = buildExchangeDisplay(
+    {
+      new_tipodetroca: 100000002,
+      _cr40f_motorista1_value: "driver-1",
+      "_cr40f_veiculo2antesdatroca_value@OData.Community.Display.V1.FormattedValue": "Civic XYZ9A87"
+    },
+    driver
+  );
+  assert.equal(retiradaSemLocal.fields.find((field) => field.label === "Local")?.value, "Base operacional");
+  assert.equal(retiradaSemLocal.fields.some((field) => field.label === "Mapa"), false);
+});
+
+test("repasse usa rotulo proprio para quem entrega e quem recebe", () => {
+  const exchange = {
+    new_tipodetroca: 100000003,
+    _cr40f_motorista1_value: "driver-1",
+    _cr40f_motorista2_value: "driver-2",
+    "_cr40f_motorista1_value@OData.Community.Display.V1.FormattedValue": "Ana",
+    "_cr40f_motorista2_value@OData.Community.Display.V1.FormattedValue": "Bruno",
+    "_cr40f_veiculo1antesdatroca_value@OData.Community.Display.V1.FormattedValue": "Corolla ABC1D23"
+  };
+  const giver = buildExchangeDisplay(exchange, { id: "driver-1", email: "", fullName: "Ana", funcionario: {} });
+  const receiver = buildExchangeDisplay(exchange, { id: "driver-2", email: "", fullName: "Bruno", funcionario: {} });
+
+  assert.equal(giver.label, "Repasse de Veículo");
+  assert.match(giver.description, /Entregar Corolla ABC1D23 para Bruno/);
+  assert.match(receiver.description, /Receber Corolla ABC1D23 de Ana/);
+});
+
 test("identificador de recibo usa padrao R-XXXX", () => {
   assert.equal(normalizeReceiptIdentifier("12"), "R-0012");
   assert.equal(normalizeReceiptIdentifier("R-7"), "R-0007");
