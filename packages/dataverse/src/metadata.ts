@@ -9,6 +9,12 @@ type EntityDefinition = {
   DisplayCollectionName?: { UserLocalizedLabel?: { Label?: string } | null }
 }
 
+export type ChoiceOption = { value: number; label: string }
+
+type PicklistDefinition = {
+  OptionSet?: { Options: { Value: number; Label?: { UserLocalizedLabel?: { Label?: string } | null } }[] }
+}
+
 const SELECT = '$select=LogicalName,EntitySetName,DisplayCollectionName'
 
 /** Nomes reais (entity set e rótulo plural) lidos da metadata, com cache por cliente. */
@@ -48,5 +54,24 @@ export function createMetadata(client: DataverseClient) {
     return result
   }
 
-  return { entity, entities }
+  const choiceCache = new Map<string, Promise<ChoiceOption[]>>()
+
+  /** Opções reais de uma coluna choice (nunca valores fixos no código), com cache por cliente. */
+  function choices(entityName: string, attribute: string) {
+    const key = `${entityName}.${attribute}`
+    let options = choiceCache.get(key)
+    if (!options) {
+      const path = `EntityDefinitions(LogicalName='${odataString(entityName)}')/Attributes(LogicalName='${odataString(attribute)}')`
+        + '/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?$select=LogicalName&$expand=OptionSet($select=Options)'
+      options = client.request<PicklistDefinition>(path).then((definition) => (definition.OptionSet?.Options ?? []).map((option) => ({
+        value: option.Value,
+        label: option.Label?.UserLocalizedLabel?.Label || String(option.Value),
+      })))
+      options.catch(() => choiceCache.delete(key))
+      choiceCache.set(key, options)
+    }
+    return options
+  }
+
+  return { entity, entities, choices }
 }

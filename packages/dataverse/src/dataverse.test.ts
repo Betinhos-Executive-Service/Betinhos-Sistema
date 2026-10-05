@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { chunk, createClient, createXrmShim, formatted } from './index'
+import { chunk, createClient, createMetadata, createXrmShim, formatted } from './index'
 
 function json(body: unknown, init: ResponseInit = {}) {
   return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' }, ...init })
@@ -55,5 +55,22 @@ describe('xrm shim', () => {
     await xrm.WebApi!.retrieveMultipleRecords('cr40f_reserva')
     expect(fetchMock.mock.calls.filter(([url]) => url.includes('EntityDefinitions'))).toHaveLength(1)
     expect(xrm.Utility!.getGlobalContext().getClientUrl()).toBe('https://org.example')
+  })
+})
+
+describe('metadata.choices', () => {
+  it('lê as opções reais da coluna e guarda em cache', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(json({
+      OptionSet: { Options: [
+        { Value: 202410001, Label: { UserLocalizedLabel: { Label: 'Confirmado' } } },
+        { Value: 202410008, Label: { UserLocalizedLabel: null } },
+      ] },
+    }))
+    const metadata = createMetadata(createClient('https://org.example', fetchMock))
+    const options = await metadata.choices('cr40f_reservadeveculos', 'cr40f_status')
+    expect(options).toEqual([{ value: 202410001, label: 'Confirmado' }, { value: 202410008, label: '202410008' }])
+    await metadata.choices('cr40f_reservadeveculos', 'cr40f_status')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0][0]).toBe("https://org.example/api/data/v9.2/EntityDefinitions(LogicalName='cr40f_reservadeveculos')/Attributes(LogicalName='cr40f_status')/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?$select=LogicalName&$expand=OptionSet($select=Options)")
   })
 })
