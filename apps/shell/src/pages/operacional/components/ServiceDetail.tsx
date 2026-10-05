@@ -51,7 +51,12 @@ export function ServiceDetail({ reserva, filhos, motoristas, reservas, now, stat
         </label>
         <label className="op-detail__control"><span>Motorista</span>
           <Select aria-label="Motorista do serviço" disabled={busy} searchable clearable placeholder="Sem motorista" options={options}
-            value={reserva.motoristaId} onChange={(value) => onMotorista(motoristas.find((m) => m.id === value) ?? null)} />
+            value={reserva.motoristaId} onChange={(value) => {
+              if (value === reserva.motoristaId) return
+              const motorista = motoristas.find((m) => m.id === value)
+              if (value !== null && !motorista) return // motorista atual fora da lista: não trocar nem remover
+              onMotorista(motorista ?? null)
+            }} />
         </label>
       </div>
 
