@@ -32,7 +32,7 @@ const ITEM_ICONS: Record<string, ReactNode> = {
   cr40f_homebetinhos: <Home />,
   cr40f_reservadeveculos: <Calendar />,
   new_dashboard: <LayoutDashboard />,
-  new_telaoperacional: <Clock />,
+  operacional: <Clock />,
   new_telafuncoesoperacionais: <Wrench />,
   cr40f_trocasdecarro: <Shuffle />,
   new_possedeveiculo: <KeyRound />,
