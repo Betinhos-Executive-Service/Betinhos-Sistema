@@ -1,8 +1,8 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
-import { Check, ChevronRight, CircleCheck, Clock, Copy, EllipsisVertical, Home, Inbox, LayoutDashboard, Pencil, Plus, PlugZap, SearchX, Trash2, TriangleAlert, Truck, X } from 'lucide-react'
+import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { Check, ChevronRight, CircleCheck, Clock, Copy, EllipsisVertical, Home, Inbox, LayoutDashboard, Pencil, Plus, PlugZap, RefreshCw, SearchX, Trash2, TriangleAlert, Truck, X } from 'lucide-react'
 import {
-  Alert, Avatar, BottomNav, Breadcrumb, Button, Checkbox, ChoiceGroup, Cluster, DateTile, Dialog, Drawer, EmptyState, Field, Grid, Input, Menu, MetricCard, PageHeader, Pagination, Progress, Radio, SearchBox, SegmentedControl, Select, Skeleton, Spinner, Stack, StatusBadge, Surface, Switch, Table, TableTitle, Tabs, Textarea, ToastProvider, Tooltip, Upload,
-  filterOptions, useToast, type AlertTone, type ButtonSize, type ButtonVariant, type ControlSize, type SelectOption, type StatusTone, type UploadFile,
+  Alert, Avatar, BottomNav, Breadcrumb, Button, Checkbox, ChoiceGroup, Cluster, DateTile, Dialog, Drawer, EmptyState, Field, Grid, Input, Menu, MetricCard, PageHeader, PageToolbar, Pagination, Progress, Radio, SearchBox, SegmentedControl, Select, Skeleton, Spinner, Stack, StatusBadge, Surface, Switch, Table, TableTitle, Tabs, Textarea, ToastProvider, Tooltip, Upload,
+  filterOptions, useShellHeader, useToast, type AlertTone, type ButtonSize, type ButtonVariant, type ControlSize, type SelectOption, type StatusTone, type UploadFile,
 } from '@betinhos/ui'
 import { PageLayout } from '../app/PageLayout'
 
@@ -406,12 +406,57 @@ function SurfaceShowcase() {
   )
 }
 
+/** Registra o botão de atualizar no cabeçalho do celular enquanto estiver montado. */
+function MobileRefresh() {
+  const toast = useToast()
+  const actions = useMemo(() => (
+    <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar" onClick={() => toast({ tone: 'info', message: 'Lista atualizada.' })} />
+  ), [toast])
+  useShellHeader({ actions })
+  return null
+}
+
 function PageHeaderShowcase() {
+  const [view, setView] = useState('lista')
+  const [query, setQuery] = useState('')
+  const [mobile, setMobile] = useState(false)
   return (
-    <Section name="PageHeader" summary="Cabeçalho de página: eyebrow, título em Centabel Book, descrição e até duas ações.">
+    <Section name="PageHeader e PageToolbar" summary="Topo de toda tela React: cabeçalho com slots, barra de filtros ou utilitária e ações no cabeçalho do celular. Nenhuma tela cria CSS próprio de header.">
+      <p className="showcase__label">Simples: eyebrow, título, descrição e duas ações</p>
       <div className="showcase__stage showcase__stage--form" style={{ maxWidth: 'none' }}>
         <PageHeader eyebrow="Qualidade" title="Gestão de ocorrências" description="Registre, acompanhe e encerre as ocorrências da operação." actions={<><Button variant="secondary">Exportar lista</Button><Button icon={<Plus size={16} />}>Registrar ocorrência</Button></>} />
       </div>
+      <p className="showcase__label">Detalhe: caminho, meta ao lado do título e KPIs abaixo</p>
+      <div className="showcase__stage showcase__stage--form" style={{ maxWidth: 'none' }}>
+        <PageHeader
+          breadcrumb={<Breadcrumb items={[{ label: 'Financeiro', href: '#/componentes' }, { label: 'Pagantes', href: '#/componentes' }, { label: 'Lote 0187' }]} />}
+          title="Lote 0187"
+          meta={<><span>12 serviços</span><StatusBadge tone="warning" dot>Não balanceado</StatusBadge></>}
+          actions={<><Button variant="secondary">Fechar</Button><Button>Gerar pagantes</Button></>}
+        >
+          <Grid min={180}>
+            <MetricCard label="Total do lote" value="R$ 18.420,00" />
+            <MetricCard tone="warning" label="Diferença" value="R$ 340,00" />
+          </Grid>
+        </PageHeader>
+      </div>
+      <p className="showcase__label">PageToolbar: filtros (quebra no celular) e utilitária (some no celular)</p>
+      <div className="showcase__stage showcase__stage--form" style={{ maxWidth: 'none' }}>
+        <Stack gap="3">
+          <PageToolbar
+            variant="utility"
+            start={<StatusBadge tone="info" dot>Ambiente DEV</StatusBadge>}
+            end={<><Button variant="secondary" size="compact">Limpar cache</Button><Button variant="secondary" size="compact" icon={<RefreshCw size={16} />}>Atualizar</Button></>}
+          />
+          <PageToolbar
+            start={<><SearchBox size="compact" value={query} onChange={setQuery} placeholder="Buscar ocorrência" aria-label="Buscar ocorrência" /><SegmentedControl size="compact" aria-label="Modo de exibição" value={view} onChange={setView} options={[{ value: 'lista', label: 'Lista' }, { value: 'quadro', label: 'Quadro' }]} /></>}
+            end={<Button variant="secondary" size="compact">Exportar</Button>}
+          />
+        </Stack>
+      </div>
+      <p className="showcase__label">Cabeçalho do celular (abaixo de 820 px)</p>
+      <Switch label="Registrar atualizar no cabeçalho do celular" description={mobile ? 'Ligado: o botão aparece ao lado do título; ao desligar, o registro é limpo.' : 'Desligado: o cabeçalho mostra só o título.'} checked={mobile} onChange={(event) => setMobile(event.target.checked)} />
+      {mobile ? <MobileRefresh /> : null}
     </Section>
   )
 }
