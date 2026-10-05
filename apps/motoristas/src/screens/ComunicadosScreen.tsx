@@ -139,7 +139,7 @@ export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onS
   return (
     <AppShell screenLabel="Comunicados">
       <ServicesMenu
-        title={selected ? selected.titulo : "Comunicados"}
+        title="Comunicados"
         eyebrow={isMockComunicados() ? "Operação · Mock local" : "Operação"}
         homeLabel="Voltar"
         homeIcon="arrowLeft"
@@ -152,10 +152,11 @@ export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onS
         {selected ? (
           <article className="comunicado-detail">
             <div className="comunicado-message">
-              <div className="comunicado-detail-meta">
+              <div className="comunicado-detail-meta" data-comunicado-tipo={selected.tipo === COMUNICADO_TIPO.ciencia ? "assinatura" : "informativo"}>
                 <span>{selected.tipo === COMUNICADO_TIPO.ciencia ? "Assinatura obrigatória" : "Informativo"}</span>
                 <time>{formatDate(selected.enviadoEm)}</time>
               </div>
+              <h2 className="comunicado-detail-title">{selected.titulo}</h2>
               <p className="comunicado-body">{selected.corpo}</p>
             </div>
             {selected.tipo === COMUNICADO_TIPO.ciencia && !selected.cienteEm ? (
@@ -177,9 +178,12 @@ export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onS
             ) : selected.cienteEm ? (
               <section className={`comunicado-signed${justSigned ? " is-fresh" : ""}`}>
                 <h2><span className="comunicado-signed-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg></span>Ciência registrada</h2>
-                <p>{selected.nomeAssinante} · {formatDate(selected.cienteEm)}</p>
+                <dl className="comunicado-signed-meta">
+                  <div><dt>Assinado por</dt><dd>{selected.nomeAssinante}</dd></div>
+                  <div><dt>Data</dt><dd>{formatDate(selected.cienteEm)}</dd></div>
+                </dl>
                 <SignatureDrawing value={parseStrokes(selected.assinaturaJson)} />
-                {selected.observacao ? <p>Observação: {selected.observacao}</p> : null}
+                {selected.observacao ? <div className="comunicado-signed-note"><span>Observação</span><p>{selected.observacao}</p></div> : null}
               </section>
             ) : selected.lidoEm ? <p className="comunicado-read-state">Ciência registrada em {formatDate(selected.lidoEm)}.</p> : (
               <section className="comunicado-ack comunicado-ack-simple" aria-label="Confirmar ciência">
