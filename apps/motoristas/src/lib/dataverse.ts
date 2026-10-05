@@ -103,7 +103,8 @@ export const SERVICE_VEHICLE_ORIGIN = {
 const EXCHANGE_TYPE = {
   troca: 100000000,
   devolucaoBase: 100000001,
-  retiradaBase: 100000002
+  retiradaBase: 100000002,
+  repasse: 100000003
 } as const;
 
 const OPERATION_STATUS = {
@@ -194,6 +195,7 @@ export const DATAVERSE = {
   trocas: "cr40f_trocasdecarros",
   servicosPorPassageiro: "cr40f_servicosporpassageiros",
   posseVeiculos: "new_possedeveiculos",
+  locaisBase: "new_localdebases",
   fotosManutencao: "new_fotomanutencao",
   boasIdeias: "cr40f_boasideiases",
   comunicados: "new_comunicadomotoristas",
@@ -224,6 +226,7 @@ const ENTITY_SET_TO_ENTITY_NAME: Record<string, string> = {
   [DATAVERSE.trocas]: "cr40f_trocasdecarro",
   [DATAVERSE.servicosPorPassageiro]: "cr40f_servicosporpassageiro",
   [DATAVERSE.posseVeiculos]: "new_possedeveiculo",
+  [DATAVERSE.locaisBase]: "new_localdebase",
   [DATAVERSE.fotosManutencao]: "new_fotomanutencao",
   [DATAVERSE.boasIdeias]: "cr40f_boasideias",
   [DATAVERSE.comunicados]: "new_comunicadomotorista",
@@ -260,7 +263,7 @@ const MAINTENANCE_SELECT =
 const MAINTENANCE_REQUEST_PHOTO_FIELDS = ["cr40f_foto01", "cr40f_linkdaevidencia", "cr40f_foto03"] as const;
 
 const EXCHANGE_SELECT =
-  "$select=cr40f_trocasdecarroid,cr40f_id,cr40f_iniciodajaneladetroca,cr40f_fimdajaneladetroca,_cr40f_motorista1_value,_cr40f_motorista2_value,_cr40f_veiculo1antesdatroca_value,_cr40f_veiculo2antesdatroca_value,cr40f_observacao,cr40f_statusdatroca,new_tipodetroca,new_concluidomotorista1,new_concluidomotorista2,new_observacaodomotorista1,new_observacaodomotorista2,new_mododajanela,new_localdatroca,_new_m1depoisde_value,_new_m1antesde_value,_new_m2depoisde_value,_new_m2antesde_value";
+  "$select=cr40f_trocasdecarroid,cr40f_id,cr40f_iniciodajaneladetroca,cr40f_fimdajaneladetroca,_cr40f_motorista1_value,_cr40f_motorista2_value,_cr40f_veiculo1antesdatroca_value,_cr40f_veiculo2antesdatroca_value,cr40f_observacao,cr40f_statusdatroca,new_tipodetroca,new_concluidomotorista1,new_concluidomotorista2,new_observacaodomotorista1,new_observacaodomotorista2,new_mododajanela,new_localdatroca,_new_m1depoisde_value,_new_m1antesde_value,_new_m2depoisde_value,_new_m2antesde_value,_new_localdebase_value";
 
 const DV_LOG_PREFIX = "[AppMotoristas:Dataverse]";
 let lastRuntimeLogKey = "";
@@ -2543,6 +2546,41 @@ async function hydrateExchangeAnchors(exchanges: DataverseRecord[], readMultiple
   }
 }
 
+async function hydrateExchangeBaseLocations(exchanges: DataverseRecord[], readMultiple = retrieveMultiple) {
+  const locationIds = Array.from(new Set(exchanges.map((exchange) => getLookupId(exchange, "new_localdebase")).filter(Boolean)));
+  if (locationIds.length === 0) return exchanges;
+
+  try {
+    const locationResult = await readMultiple(
+      DATAVERSE.locaisBase,
+      [
+        "$select=new_localdebaseid,new_name,new_endereco,new_linkmapa",
+        `$filter=${locationIds.map((id) => `new_localdebaseid eq ${id}`).join(" or ")}`,
+        `$top=${locationIds.length}`
+      ].join("&")
+    );
+    const locationById = new Map(
+      locationResult.entities
+        .map((location) => [cleanODataGuid(location.new_localdebaseid), location] as const)
+        .filter(([id]) => Boolean(id))
+    );
+
+    return exchanges.map((exchange) => {
+      const location = locationById.get(getLookupId(exchange, "new_localdebase"));
+      if (!location) return exchange;
+      return {
+        ...exchange,
+        __baseLocationName: String(location.new_name ?? ""),
+        __baseLocationAddress: String(location.new_endereco ?? ""),
+        __baseLocationMapUrl: String(location.new_linkmapa ?? "")
+      };
+    });
+  } catch (error) {
+    dataverseWarn("Falha ao enriquecer o local da base da troca.", { error });
+    return exchanges;
+  }
+}
+
 export type ExchangeWindowCheck = { mode: "fixed" | "between"; start: string; end: string; ownBeforeDeparture: string };
 
 /** Fora da janela: horário marcado fora de início–fim; entre serviços, depois da saída da própria OS "antes de". */
@@ -2603,6 +2641,10 @@ export function buildExchangeWindowInfo(exchange: DataverseRecord, driver?: Driv
     location,
     check: { mode: "between" as const, start: "", end: "", ownBeforeDeparture: before?.departure ?? "" }
   };
+}
+
+async function hydrateExchangeDetails(exchanges: DataverseRecord[], readMultiple = retrieveMultiple) {
+  return hydrateExchangeBaseLocations(await hydrateExchangeVehicleLabels(exchanges, readMultiple), readMultiple);
 }
 
 function getOtherExchangeDriverId(exchange: DataverseRecord, driverId: string) {
@@ -2715,6 +2757,19 @@ function notInformed(value: string, fallback = "Não informado") {
   return value.trim() || fallback;
 }
 
+function getBaseLocation(exchange: DataverseRecord) {
+  const name = String(exchange.__baseLocationName ?? getLookupName(exchange, "new_localdebase") ?? "").trim();
+  const address = String(exchange.__baseLocationAddress ?? "").trim();
+  const mapUrl = String(exchange.__baseLocationMapUrl ?? "").trim();
+  const mapLink = mapUrl || (address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : "");
+  const fields: DetailField[] = [
+    { label: "Local", value: name || "Base operacional", strong: Boolean(name) },
+    ...(address ? [{ label: "Endereço", value: address }] : []),
+    ...(mapLink ? [{ label: "Mapa", value: mapLink }] : [])
+  ];
+  return { name, place: name ? `em ${name}` : "na base", fields };
+}
+
 export function buildExchangeDisplay(exchange: DataverseRecord, driver?: DriverContext | null) {
   const kind = getExchangeKind(exchange);
   const start = toDate(exchange.cr40f_iniciodajaneladetroca);
@@ -2732,34 +2787,36 @@ export function buildExchangeDisplay(exchange: DataverseRecord, driver?: DriverC
 
   if (kind === "retiradaBase") {
     const receiving = notInformed(vehicle2);
+    const location = getBaseLocation(exchange);
     return {
       label: "Retirada na Base",
       title: "Retirada na Base",
-      description: `Retirar ${receiving} na base`,
-      summary: `Retire ${receiving} na base operacional.`,
+      description: `Retirar ${receiving} ${location.place}`,
+      summary: location.name ? `Retire ${receiving} em ${location.name}.` : `Retire ${receiving} na base operacional.`,
       window: joinDateRange(start, end),
       fields: [
         { label: "O que fazer", value: `Retirar veículo na base`, strong: true },
         { label: "Você recebe", value: receiving, strong: true },
-        { label: "Local", value: "Base operacional" },
-        { label: "Motorista", value: notInformed(driver1) }
+        ...location.fields,
+        { label: "Responsável", value: notInformed(driver1) }
       ]
     };
   }
 
   if (kind === "devolucaoBase") {
     const delivering = notInformed(vehicle1);
+    const location = getBaseLocation(exchange);
     return {
       label: "Devolução à Base",
       title: "Devolução à Base",
-      description: `Devolver ${delivering} na base`,
-      summary: `Devolva ${delivering} na base operacional.`,
+      description: `Devolver ${delivering} ${location.place}`,
+      summary: location.name ? `Devolva ${delivering} em ${location.name}.` : `Devolva ${delivering} na base operacional.`,
       window: joinDateRange(start, end),
       fields: [
         { label: "O que fazer", value: `Devolver veículo na base`, strong: true },
         { label: "Você entrega", value: delivering, strong: true },
-        { label: "Local", value: "Base operacional" },
-        { label: "Motorista", value: notInformed(driver1) }
+        ...location.fields,
+        { label: "Responsável", value: notInformed(driver1) }
       ]
     };
   }
@@ -2770,9 +2827,10 @@ export function buildExchangeDisplay(exchange: DataverseRecord, driver?: DriverC
       const contact = notInformed(otherDriver, "Outro motorista não informado");
       const otherDriverPhone = String(exchange.__otherDriverPhone ?? "").trim();
       const giver = isDriver1;
+      const handoffLabel = Number(exchange.new_tipodetroca) === EXCHANGE_TYPE.repasse ? "Repasse de Veículo" : "Transferência de Veículo";
       return {
-        label: "Transferência de Veículo",
-        title: "Transferência de Veículo",
+        label: handoffLabel,
+        title: handoffLabel,
         description: giver
           ? `Entregar ${transferredVehicle} para ${contact}`
           : `Receber ${transferredVehicle} de ${contact}`,
@@ -3271,7 +3329,7 @@ export async function loadRemoteStore(): Promise<RemoteStore> {
     programmedExchangeGeralResult.entities.map((geral) => [getExchangeIdFromGeral(geral), geral] as const).filter(([id]) => Boolean(id))
   );
 
-  const exchangeRows = await hydrateExchangeAnchors(await hydrateExchangeDriverContactPhones(await hydrateExchangeVehicleLabels(exchangeResult.entities, readMultiple), driver, readMultiple), readMultiple);
+  const exchangeRows = await hydrateExchangeAnchors(await hydrateExchangeDriverContactPhones(await hydrateExchangeDetails(exchangeResult.entities, readMultiple), driver, readMultiple), readMultiple);
 
   const exchangeItems = exchangeRows
     .filter((exchange) => shouldShowOpenExchangeForDriver(exchange, driver.id))
@@ -3309,7 +3367,7 @@ export async function loadRemoteStore(): Promise<RemoteStore> {
   const historyItems = [
     ...historyServiceItems,
     ...historyMaintenanceRows.filter((item): item is AgendaItem => Boolean(item)),
-    ...(await hydrateExchangeAnchors(await hydrateExchangeDriverContactPhones(await hydrateExchangeVehicleLabels(historyExchangeResult.entities, readMultiple), driver, readMultiple), readMultiple))
+    ...(await hydrateExchangeAnchors(await hydrateExchangeDriverContactPhones(await hydrateExchangeDetails(historyExchangeResult.entities, readMultiple), driver, readMultiple), readMultiple))
       .map((exchange) => mapExchange(exchange, historyExchangeGeralById.get(getRecordId(exchange, "cr40f_trocasdecarroid")), driver))
   ].sort((a, b) => getItemDateMs(b) - getItemDateMs(a)).map(asHistoryItem);
   const history = addHistoryDateHeaders(historyItems);
@@ -3363,7 +3421,7 @@ export async function loadRemoteDetailByParams(servicoId: string, tipo = ""): Pr
   if (!normalizedType || normalizedType === "TROCA") {
     try {
       const [exchange] = await hydrateExchangeAnchors(await hydrateExchangeDriverContactPhones(
-        await hydrateExchangeVehicleLabels([await retrieveOne(DATAVERSE.trocas, id, EXCHANGE_SELECT)]),
+        await hydrateExchangeDetails([await retrieveOne(DATAVERSE.trocas, id, EXCHANGE_SELECT)]),
         driver
       ));
       const linkedGeral = await retrieveMultiple(
