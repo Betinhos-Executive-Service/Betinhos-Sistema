@@ -17,7 +17,7 @@ export type Source = {
   save: (ops: Operacao[]) => Promise<void>
 }
 
-/** Janela que cobre o rodízio do fim de semana `sabado` e 26 semanas à frente. */
+/** Janela de dados: do início do ano (ou 8 semanas antes de `sabado`) até 26 semanas à frente. */
 export function janelaPara(sabado: string): Janela {
   const ano = `${sabado.slice(0, 4)}-01-01`
   const oitoSemanas = addDays(sabado, -7 * 8)
