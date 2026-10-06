@@ -5,7 +5,8 @@ export type Situacao = 'plantao' | 'trabalha' | 'folga'
 export type Motivo = 'medico' | 'pessoal' | 'ferias' | 'outro'
 
 export type Padrao = { sab: Situacao | null; dom: Situacao | null }
-export type Motorista = { id: string; nome: string; padrao: Padrao }
+/** Só motoristas com status Ativo; `terceiro` = vínculo Terceiro (cr40f_tipodevinculo = 1). */
+export type Motorista = { id: string; nome: string; padrao: Padrao; terceiro: boolean }
 
 /** Exceção de um dia (linha de cr40f_escalafds): sobrescreve o padrão do motorista naquela data. */
 export type Excecao = { id: string | null; motoristaId: string; data: string; situacao: Situacao }

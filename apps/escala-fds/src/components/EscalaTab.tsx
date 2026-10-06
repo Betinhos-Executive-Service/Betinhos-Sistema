@@ -58,6 +58,7 @@ export function EscalaTab({ sabado, view, onExcecao, onNovoCompromisso }: Props)
               <div className="escala__row-main">
                 <span className="escala__name">
                   {m.nome}
+                  {m.terceiro ? <StatusBadge tone="neutral">Terceiro</StatusBadge> : null}
                   {atual.origem === 'padrao' ? <StatusBadge tone="info">Padrão</StatusBadge> : null}
                   {atual.origem === 'excecao' && padraoDia ? <StatusBadge tone="warning">Exceção</StatusBadge> : null}
                 </span>
