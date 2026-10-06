@@ -1,0 +1,301 @@
+{
+  "categorias": [
+    {
+      "value": 100000000,
+      "label": "Motor e lubrificação"
+    },
+    {
+      "value": 100000001,
+      "label": "Freios"
+    },
+    {
+      "value": 100000002,
+      "label": "Pneus e rodas"
+    },
+    {
+      "value": 100000003,
+      "label": "Suspensão e direção"
+    },
+    {
+      "value": 100000004,
+      "label": "Transmissão e embreagem"
+    },
+    {
+      "value": 100000005,
+      "label": "Elétrica e bateria"
+    },
+    {
+      "value": 100000006,
+      "label": "Ar-condicionado"
+    },
+    {
+      "value": 100000007,
+      "label": "Funilaria, pintura e vidros"
+    },
+    {
+      "value": 100000008,
+      "label": "Estética e conservação"
+    },
+    {
+      "value": 100000009,
+      "label": "Revisão programada"
+    },
+    {
+      "value": 100000011,
+      "label": "Diagnóstico e ruídos"
+    },
+    {
+      "value": 100000010,
+      "label": "Outros / revisar"
+    }
+  ],
+  "servicos": [
+    {
+      "value": 100000000,
+      "categoria": 100000000,
+      "label": "Troca de óleo e filtro de óleo",
+      "criterio": "Troca ou complemento do óleo do motor e/ou do filtro de óleo; óleo vencido, baixo ou sujo. Vale também quando a troca de óleo aparece numa lista de serviços (revisão, preventiva) ou no serviço realizado pela oficina."
+    },
+    {
+      "value": 100000001,
+      "categoria": 100000000,
+      "label": "Filtro de ar do motor",
+      "criterio": "Troca ou limpeza do filtro de ar do motor (não o filtro de cabine do ar-condicionado)."
+    },
+    {
+      "value": 100000002,
+      "categoria": 100000000,
+      "label": "Filtro de combustível",
+      "criterio": "Troca do filtro de combustível."
+    },
+    {
+      "value": 100000003,
+      "categoria": 100000000,
+      "label": "Velas e ignição",
+      "criterio": "Velas, cabos de vela ou bobina de ignição; motor falhando por ignição."
+    },
+    {
+      "value": 100000004,
+      "categoria": 100000000,
+      "label": "Correias",
+      "criterio": "Correia dentada, correia do alternador ou auxiliar, tensor; barulho ou chiado de correia."
+    },
+    {
+      "value": 100000005,
+      "categoria": 100000000,
+      "label": "Arrefecimento",
+      "criterio": "Radiador, aditivo, bomba d'água, mangueiras ou ventoinha; motor esquentando ou superaquecendo."
+    },
+    {
+      "value": 100000006,
+      "categoria": 100000000,
+      "label": "Motor e injeção (diagnóstico)",
+      "criterio": "Luz da injeção acesa, perda de potência, motor falhando sem causa definida, vazamento de óleo do motor, bicos injetores."
+    },
+    {
+      "value": 100000007,
+      "categoria": 100000001,
+      "label": "Pastilhas de freio",
+      "criterio": "Troca das pastilhas de freio; freio chiando ou pastilha gasta."
+    },
+    {
+      "value": 100000008,
+      "categoria": 100000001,
+      "label": "Discos de freio",
+      "criterio": "Troca ou retífica dos discos de freio; trepidação ao frear."
+    },
+    {
+      "value": 100000009,
+      "categoria": 100000001,
+      "label": "Fluido de freio",
+      "criterio": "Troca ou complemento do fluido de freio; pedal de freio baixo ou mole."
+    },
+    {
+      "value": 100000010,
+      "categoria": 100000001,
+      "label": "Lonas e tambores",
+      "criterio": "Lonas, sapatas ou tambores do freio traseiro."
+    },
+    {
+      "value": 100000011,
+      "categoria": 100000001,
+      "label": "Outros reparos de freio",
+      "criterio": "Freio de mão, pinça, cilindro, ABS ou falha de freio que não seja pastilha, disco, fluido ou lona."
+    },
+    {
+      "value": 100000012,
+      "categoria": 100000002,
+      "label": "Troca de pneu",
+      "criterio": "Substituição de pneu: pneu careca, gasto, rasgado, com bolha ou estourado."
+    },
+    {
+      "value": 100000013,
+      "categoria": 100000002,
+      "label": "Conserto de pneu",
+      "criterio": "Reparo de pneu furado ou murcho, remendo ou vazamento de ar. Não inclui pneu gasto ou careca, que é troca."
+    },
+    {
+      "value": 100000014,
+      "categoria": 100000002,
+      "label": "Alinhamento e balanceamento",
+      "criterio": "Alinhamento ou balanceamento; carro puxando para um lado, volante tremendo ou pneu com desgaste irregular."
+    },
+    {
+      "value": 100000015,
+      "categoria": 100000002,
+      "label": "Rodízio e calibragem",
+      "criterio": "Rodízio de pneus ou calibragem."
+    },
+    {
+      "value": 100000016,
+      "categoria": 100000002,
+      "label": "Rodas e calotas",
+      "criterio": "Dano físico na roda (empenada, trincada, amassada ou com avaria), calota, parafusos ou porcas de roda. Volante tremendo ou carro puxando, sem dano na roda, é alinhamento e balanceamento."
+    },
+    {
+      "value": 100000017,
+      "categoria": 100000003,
+      "label": "Amortecedores e molas",
+      "criterio": "Amortecedores, molas, coxins ou batentes; carro batendo ou balançando."
+    },
+    {
+      "value": 100000018,
+      "categoria": 100000003,
+      "label": "Buchas, bandejas e pivôs",
+      "criterio": "Buchas, bandejas, pivôs, bieletas ou barra estabilizadora; barulho na suspensão."
+    },
+    {
+      "value": 100000019,
+      "categoria": 100000003,
+      "label": "Direção",
+      "criterio": "Caixa de direção, terminais, barra axial, direção hidráulica ou elétrica; direção dura ou com folga."
+    },
+    {
+      "value": 100000020,
+      "categoria": 100000004,
+      "label": "Embreagem",
+      "criterio": "Kit de embreagem, platô, disco, atuador ou pedal de embreagem; embreagem patinando."
+    },
+    {
+      "value": 100000021,
+      "categoria": 100000004,
+      "label": "Câmbio e óleo da transmissão",
+      "criterio": "Câmbio manual ou automático, óleo da transmissão, trocas de marcha com tranco ou ruído."
+    },
+    {
+      "value": 100000022,
+      "categoria": 100000005,
+      "label": "Bateria",
+      "criterio": "Troca, carga ou teste de bateria; carro não liga por bateria fraca ou descarregada."
+    },
+    {
+      "value": 100000023,
+      "categoria": 100000005,
+      "label": "Alternador e motor de partida",
+      "criterio": "Alternador ou motor de arranque citados, ou bateria que continua descarregando mesmo depois de trocada ou carregada. Bateria fraca ou descarregada sozinha é só bateria."
+    },
+    {
+      "value": 100000024,
+      "categoria": 100000005,
+      "label": "Faróis, lanternas e lâmpadas",
+      "criterio": "Farol, lanterna, seta, luz de freio ou lâmpadas queimadas ou quebradas."
+    },
+    {
+      "value": 100000025,
+      "categoria": 100000005,
+      "label": "Elétrica e eletrônica embarcada",
+      "criterio": "Vidro elétrico, interruptores e botões, trava, alarme, multimídia, sensores, câmera, painel, chicote ou fusíveis. Não inclui luz da injeção ou do motor acesa, falha ou perda de força do motor (isso é motor e injeção)."
+    },
+    {
+      "value": 100000026,
+      "categoria": 100000006,
+      "label": "Filtro de cabine",
+      "criterio": "Troca do filtro de cabine ou antipólen do ar-condicionado."
+    },
+    {
+      "value": 100000027,
+      "categoria": 100000006,
+      "label": "Recarga e higienização do ar",
+      "criterio": "Recarga de gás, higienização ou mau cheiro do ar-condicionado; ar não gela."
+    },
+    {
+      "value": 100000028,
+      "categoria": 100000006,
+      "label": "Compressor e componentes do ar",
+      "criterio": "Compressor, condensador, evaporador, ventilador ou vazamento do sistema de ar-condicionado."
+    },
+    {
+      "value": 100000029,
+      "categoria": 100000007,
+      "label": "Funilaria e lataria",
+      "criterio": "Amassado, para-choque, porta, capô, retrovisor ou peças externas danificadas."
+    },
+    {
+      "value": 100000030,
+      "categoria": 100000007,
+      "label": "Pintura e retoque",
+      "criterio": "Pintura, retoque, risco ou arranhão na lataria."
+    },
+    {
+      "value": 100000031,
+      "categoria": 100000007,
+      "label": "Para-brisa, vidros e palhetas",
+      "criterio": "Para-brisa trincado, vidro quebrado, película ou palhetas do limpador."
+    },
+    {
+      "value": 100000032,
+      "categoria": 100000008,
+      "label": "Lavagem e higienização",
+      "criterio": "Lavagem, higienização interna, limpeza de bancos ou carpetes, odor no interior."
+    },
+    {
+      "value": 100000033,
+      "categoria": 100000008,
+      "label": "Polimento e cristalização",
+      "criterio": "Polimento, cristalização, vitrificação ou enceramento."
+    },
+    {
+      "value": 100000034,
+      "categoria": 100000008,
+      "label": "Bancos e acabamento interno",
+      "criterio": "Bancos, forração, tapetes, painel interno ou acabamentos rasgados ou soltos."
+    },
+    {
+      "value": 100000035,
+      "categoria": 100000009,
+      "label": "Revisão periódica",
+      "criterio": "Somente quando a solicitação cita explicitamente revisão (programada, periódica, por quilometragem, na concessionária) ou manutenção preventiva geral. Trocar uma peça ou o óleo por quilometragem, sem falar em revisão, NÃO é revisão periódica."
+    },
+    {
+      "value": 100000037,
+      "categoria": 100000003,
+      "label": "Rolamentos e cubos de roda",
+      "criterio": "Rolamento ou cubo de roda; ronco ou zumbido que aumenta com a velocidade."
+    },
+    {
+      "value": 100000038,
+      "categoria": 100000007,
+      "label": "Borrachas, vedação e fechaduras",
+      "criterio": "Borracha de porta ou porta-malas, infiltração de água ou sujeira, fechadura, maçaneta ou dobradiça."
+    },
+    {
+      "value": 100000039,
+      "categoria": 100000005,
+      "label": "Chave e controle",
+      "criterio": "Chave do carro, controle remoto, bateria da chave, cópia ou programação de chave."
+    },
+    {
+      "value": 100000040,
+      "categoria": 100000011,
+      "label": "Ruído ou diagnóstico geral",
+      "criterio": "Somente quando a solicitação relata barulho, vibração ou comportamento estranho SEM indicar nenhum sistema ou peça (freio, pneu, suspensão, direção, motor etc.), ou dano após passar por objeto na via. Se o sistema ou a peça for citado ou óbvio pelo sintoma, NÃO marque este serviço."
+    },
+    {
+      "value": 100000036,
+      "categoria": 100000010,
+      "label": "Outros serviços",
+      "criterio": "Não se encaixa em nenhum serviço da lista.",
+      "ia": false
+    }
+  ]
+}

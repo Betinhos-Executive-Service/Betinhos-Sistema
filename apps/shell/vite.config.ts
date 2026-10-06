@@ -11,4 +11,5 @@ export default defineConfig({
     __BUILD_DATE__: JSON.stringify(new Date().toISOString()),
   },
   build: { outDir: 'dist', emptyOutDir: true, cssCodeSplit: false, assetsInlineLimit: 200_000 },
+  test: { setupFiles: ['./src/test-setup.ts'], testTimeout: 15_000 },
 })
