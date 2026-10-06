@@ -6,6 +6,7 @@ import { hrefFor } from '../nav/useHashRoute'
 import { ComponentsPage } from '../pages/ComponentsPage'
 import { OperacionalPage } from '../pages/operacional/OperacionalPage'
 import { FrotaPage } from '../pages/frota/FrotaPage'
+import { FuncionariosPage } from '../pages/funcionarios/FuncionariosPage'
 import { EmptyState, buttonClassName } from '@betinhos/ui'
 import { PageLayout } from './PageLayout'
 
@@ -62,6 +63,7 @@ export function RouteLayout({ host, group, item, label }: Props) {
   if (item.kind === 'page') {
     if (item.page === 'operacional') return <OperacionalPage host={host} />
     if (item.page === 'frota') return <FrotaPage host={host} />
+    if (item.page === 'funcionarios') return <FuncionariosPage host={host} />
     return <ComponentsPage />
   }
 
