@@ -96,7 +96,7 @@ export function Registros({ kinds, data, source, onOpen, onReload }: { kinds: Ki
           { key: 'data', header: 'Data', width: 'minmax(92px, .6fr)', cell: (linha) => <span className="frota-nowrap">{formatBR(linha.dia)}</span> },
           { key: 'veiculo', header: 'Veículo', width: 'minmax(90px, .7fr)', hideBelow: 'mobile', cell: (linha) => <span className="frota-nowrap">{linha.veiculo?.label || '—'}</span> },
           { key: 'pessoa', header: PESSOA[kind], hideBelow: 'mobile', cell: (linha) => linha.pessoa?.label || '—' },
-          { key: 'extra', header: EXTRA[kind], hideBelow: 'mobile', cell: (linha) => <span className="frota-nowrap">{linha.extra}</span> },
+          { key: 'extra', header: EXTRA[kind], hideBelow: 'compact', cell: (linha) => <span className="frota-nowrap">{linha.extra}</span> },
           { key: 'status', header: 'Status', width: 'minmax(110px, .8fr)', cell: (linha) => <StatusBadge kind={linha.kind} value={linha.status} /> },
         ]}
       />
