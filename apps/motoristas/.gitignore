@@ -15,3 +15,6 @@ tmp/
 *.zip
 plugins/ExpenseUpload/ExpenseUpload.snk
 .playwright-cli/
+
+# Memória local de sessões (Memsearch)
+.memsearch/
