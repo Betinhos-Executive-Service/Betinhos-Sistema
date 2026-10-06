@@ -1,7 +1,7 @@
 {
   "name": "@betinhos/escala-fds",
   "private": true,
-  "version": "0.0.15",
+  "version": "0.0.16",
   "type": "module",
   "scripts": {
     "dev": "node ../../packages/deploy/dev-restart.mjs 36481 .",
