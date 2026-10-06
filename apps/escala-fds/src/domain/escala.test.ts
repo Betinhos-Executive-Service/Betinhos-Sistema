@@ -4,8 +4,8 @@ import {
   type Compromisso, type Dados, type Excecao, type Motorista,
 } from './escala'
 
-const danilo: Motorista = { id: 'd', nome: 'Danilo', padrao: { sab: 'plantao', dom: 'plantao' } }
-const bruno: Motorista = { id: 'b', nome: 'Bruno', padrao: { sab: null, dom: null } }
+const danilo: Motorista = { id: 'd', nome: 'Danilo', padrao: { sab: 'plantao', dom: 'plantao' }, terceiro: false }
+const bruno: Motorista = { id: 'b', nome: 'Bruno', padrao: { sab: null, dom: null }, terceiro: true }
 const exc = (motoristaId: string, data: string, situacao: Excecao['situacao']): Excecao => ({ id: `${motoristaId}-${data}`, motoristaId, data, situacao })
 const mapa = (list: Excecao[]) => new Map(list.map((e) => [recordKey(e.motoristaId, e.data), e]))
 const comp = (inicio: string, fim: string, diaInteiro = false): Compromisso =>
