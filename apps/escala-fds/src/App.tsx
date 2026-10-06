@@ -1,20 +1,23 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Check, ChevronLeft, ChevronRight, CircleAlert, LoaderCircle, RefreshCw } from 'lucide-react'
 import { Alert, BuildBadge, Button, Skeleton, Tabs, useToast } from '@betinhos/ui'
 import {
-  addDays, aplicarPendencias, planSave, semPendencias, toKey, totalPendencias, weekendLabel, weekendOf,
+  addDays, aplicarPendencias, clonarPendencias, descontarSalvas, planSave, semPendencias, toKey, totalPendencias, weekendLabel, weekendOf,
   type Compromisso, type Dados, type Padrao, type Pendencias, type Situacao,
 } from './domain/escala'
 import { createSource, janelaPara, type Janela } from './data/source'
 import { EscalaTab } from './components/EscalaTab'
 import { AgendaTab } from './components/AgendaTab'
-import { RodizioTab } from './components/RodizioTab'
 import { PadroesTab } from './components/PadroesTab'
 import type { FormInicial } from './components/CompromissoForm'
 
-type Aba = 'escala' | 'agenda' | 'rodizio' | 'padroes'
+type Aba = 'escala' | 'agenda' | 'padroes'
+
+/** Espera após a última alteração antes de gravar, para juntar toques seguidos num lote só. */
+const AUTOSAVE_MS = 700
 
 const precisaRecarregar = (janela: Janela, sabado: string) => janelaPara(sabado).inicio !== janela.inicio || addDays(sabado, 7) > janela.fim
+const horaAgora = () => new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }).format(new Date())
 
 export function App() {
   const source = useMemo(createSource, [])
@@ -25,10 +28,16 @@ export function App() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [salvarErro, setSalvarErro] = useState(false)
+  const [salvoEm, setSalvoEm] = useState<string | null>(null)
   const [pend, setPend] = useState<Pendencias>(semPendencias)
   const [aba, setAba] = useState<Aba>('escala')
   const [formInicial, setFormInicial] = useState<FormInicial | null>(null)
   const total = totalPendencias(pend)
+
+  // O salvamento roda fora do ciclo de render: lê sempre o estado mais recente.
+  const ref = useRef({ dados, pend, janela, saving })
+  ref.current = { dados, pend, janela, saving: ref.current.saving }
 
   const load = useCallback(async (target: Janela) => {
     setLoading(true)
@@ -40,14 +49,51 @@ export function App() {
 
   useEffect(() => { void load(janela) }, [load, janela])
 
+  const dirty = total > 0 || saving
   useEffect(() => {
     // O overlay do botão (cr40f_escalafds_commands.js) usa isto para pedir "Descartar alterações?" ao fechar.
-    if (window.parent !== window) window.parent.postMessage({ type: 'escala-fds:dirty', dirty: total > 0 }, '*')
-    if (!total) return
+    if (window.parent !== window) window.parent.postMessage({ type: 'escala-fds:dirty', dirty }, '*')
+    if (!dirty) return
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault() }
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
-  }, [total])
+  }, [dirty])
+
+  const salvar = useCallback(async () => {
+    const { dados: base, pend: lote, janela: alvo } = ref.current
+    if (!base || ref.current.saving) return
+    const ops = planSave(base, lote)
+    if (!ops.length) { setPend((p) => descontarSalvas(p, lote, base)); return }
+    ref.current.saving = true
+    setSaving(true)
+    let feitas = 0
+    let falha: unknown = null
+    try {
+      // Uma operação por vez: na falha, só o que não foi gravado continua pendente.
+      for (const op of ops) { await source.save([op]); feitas++ }
+    } catch (reason) { falha = reason }
+    try {
+      // Recarrega para obter os IDs criados; alterações feitas durante a gravação continuam pendentes.
+      const novos = await source.load(alvo)
+      setDados(novos)
+      setPend((p) => descontarSalvas(p, lote, base, falha ? ops.slice(0, feitas) : undefined))
+    } catch (reason) {
+      setPend((p) => descontarSalvas(p, lote, base, ops.slice(0, feitas)))
+      setError(reason instanceof Error ? reason.message : String(reason))
+    }
+    if (falha) {
+      setSalvarErro(true)
+      toast({ tone: 'danger', message: `Não foi possível salvar. ${falha instanceof Error ? falha.message : ''}`.trim() })
+    } else setSalvoEm(horaAgora())
+    ref.current.saving = false
+    setSaving(false)
+  }, [source, toast])
+
+  useEffect(() => {
+    if (!total || saving || salvarErro) return
+    const timer = setTimeout(() => void salvar(), AUTOSAVE_MS)
+    return () => clearTimeout(timer)
+  }, [pend, total, saving, salvarErro, salvar])
 
   const irPara = (proximo: string) => {
     setSabado(proximo)
@@ -56,11 +102,10 @@ export function App() {
 
   const view = useMemo(() => (dados ? aplicarPendencias(dados, pend) : null), [dados, pend])
 
-  const update = (fn: (p: Pendencias) => void) => setPend((current) => {
-    const next: Pendencias = { excecoes: new Map(current.excecoes), padroes: new Map(current.padroes), novos: [...current.novos], excluidos: new Set(current.excluidos) }
-    fn(next)
-    return next
-  })
+  const update = (fn: (p: Pendencias) => void) => {
+    setSalvarErro(false) // Nova alteração tenta gravar de novo, junto com o que falhou.
+    setPend((current) => { const next = clonarPendencias(current); fn(next); return next })
+  }
   const setExcecao = (key: string, situacao: Situacao | null) => update((p) => {
     const salva = dados?.excecoes.find((e) => `${e.motoristaId}|${e.data}` === key)
     if ((salva?.situacao ?? null) === situacao) p.excecoes.delete(key)
@@ -78,23 +123,6 @@ export function App() {
   })
   const novoCompromisso = (inicial: FormInicial) => { setFormInicial(inicial); setAba('agenda') }
 
-  const salvar = async () => {
-    if (!dados) return
-    const ops = planSave(dados, pend)
-    if (!ops.length) { setPend(semPendencias()); return }
-    setSaving(true)
-    try {
-      await source.save(ops)
-      setPend(semPendencias())
-      toast({ tone: 'success', message: ops.length === 1 ? 'Escala atualizada.' : `Escala atualizada: ${ops.length} alterações.` })
-      await load(janela)
-    } catch (reason) {
-      // As pendências continuam na tela; o que já foi gravado aparece ao recarregar.
-      toast({ tone: 'danger', message: `Não foi possível salvar. ${reason instanceof Error ? reason.message : ''}`.trim() })
-      await load(janela)
-    } finally { setSaving(false) }
-  }
-
   const hoje = toKey(new Date())
 
   return (
@@ -108,7 +136,18 @@ export function App() {
           </div>
           <Button variant="secondary" size="compact" aria-label="Próximo fim de semana" icon={<ChevronRight size={16} />} onClick={() => irPara(addDays(sabado, 7))} />
         </div>
-        <Button variant="ghost" size="compact" icon={<RefreshCw size={16} />} onClick={() => void load(janela)} disabled={loading || saving}>Atualizar</Button>
+        <div className="escala__head-end">
+          <span className={salvarErro ? 'escala__save is-error' : 'escala__save'} aria-live="polite">
+            {salvarErro ? (
+              <><CircleAlert size={14} aria-hidden="true" />Não salvo<Button variant="ghost" size="compact" onClick={() => setSalvarErro(false)}>Tentar de novo</Button></>
+            ) : dirty ? (
+              <><LoaderCircle size={14} className="escala__spin" aria-hidden="true" />Salvando…</>
+            ) : salvoEm ? (
+              <><Check size={14} aria-hidden="true" />Salvo às {salvoEm}</>
+            ) : null}
+          </span>
+          <Button variant="ghost" size="compact" icon={<RefreshCw size={16} />} onClick={() => void load(janela)} disabled={loading || dirty}>Atualizar</Button>
+        </div>
       </header>
 
       <Tabs<Aba>
@@ -118,7 +157,6 @@ export function App() {
         tabs={[
           { value: 'escala', label: 'Escala' },
           { value: 'agenda', label: 'Agenda' },
-          { value: 'rodizio', label: 'Rodízio' },
           { value: 'padroes', label: 'Padrões' },
         ]}
       />
@@ -131,23 +169,11 @@ export function App() {
         ) : aba === 'escala' ? (
           <EscalaTab sabado={sabado} view={view} onExcecao={setExcecao} onNovoCompromisso={novoCompromisso} />
         ) : aba === 'agenda' ? (
-          <AgendaTab hoje={hoje} view={view} formInicial={formInicial} onFormClose={() => setFormInicial(null)} onAdd={addCompromisso} onRemove={removeCompromisso} />
-        ) : aba === 'rodizio' ? (
-          <RodizioTab sabado={sabado} view={view} />
+          <AgendaTab hoje={hoje} sabado={sabado} view={view} formInicial={formInicial} onFormClose={() => setFormInicial(null)} onAdd={addCompromisso} onRemove={removeCompromisso} />
         ) : (
           <PadroesTab view={view} onPadrao={setPadrao} />
         )}
       </main>
-
-      {total > 0 ? (
-        <footer className="escala__foot" role="status">
-          <span>{total === 1 ? '1 alteração não salva' : `${total} alterações não salvas`}</span>
-          <div className="escala__foot-actions">
-            <Button variant="secondary" onClick={() => setPend(semPendencias())} disabled={saving}>Descartar</Button>
-            <Button variant="primary" onClick={() => void salvar()} loading={saving}>Salvar escala</Button>
-          </div>
-        </footer>
-      ) : null}
 
       {source.mock ? <p className="escala__mock">Dados de exemplo (fora do Dataverse)</p> : null}
       <BuildBadge version={__APP_VERSION__} isoDate={__BUILD_DATE__} />

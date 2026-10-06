@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  aplicarPendencias, compromissosDoDia, planSave, recordKey, rodizio, semPendencias, situacaoDoDia, weekendOf,
+  aplicarPendencias, compromissosDoDia, descontarSalvas, planSave, recordKey, semPendencias, situacaoDoDia, weekendOf,
   type Compromisso, type Dados, type Excecao, type Motorista,
 } from './escala'
 
@@ -69,12 +69,29 @@ describe('pendências', () => {
   })
 })
 
-describe('rodizio', () => {
-  it('conta o padrão fixo e as exceções por categoria', () => {
-    const excecoes = mapa([exc('d', '2026-10-10', 'folga'), exc('d', '2026-10-11', 'folga'), exc('b', '2026-10-03', 'trabalha'), exc('b', '2026-10-04', 'trabalha')])
-    const linhas = rodizio([danilo, bruno], excecoes, '2026-10-10')
-    expect(linhas.map((l) => [l.motorista.id, l.plantao8, l.trabalha8])).toEqual([['b', 0, 1], ['d', 7, 0]])
-    expect(linhas[1].ano).toBe(40) // 41 fins de semana até 10/10, menos a folga da referência
-    expect(linhas[1].acimaDaMedia).toBe(true)
+describe('descontarSalvas', () => {
+  const dados: Dados = { motoristas: [danilo, bruno], excecoes: [exc('b', '2026-10-10', 'trabalha')], compromissos: [] }
+  const lote = () => {
+    const p = semPendencias()
+    p.excecoes.set('d|2026-10-10', 'folga')
+    p.novos.push(comp('2026-10-14T09:00', '2026-10-14T11:00'))
+    return p
+  }
+
+  it('tira o lote gravado e preserva o que mudou durante a gravação', () => {
+    const salvo = lote()
+    const atual = descontarSalvas(salvo, salvo, dados)
+    expect(atual.excecoes.size + atual.novos.length).toBe(0)
+    const mudou = lote()
+    const durante = { ...mudou, excecoes: new Map([['d|2026-10-10', 'trabalha' as const]]) }
+    expect([...descontarSalvas(durante, mudou, dados).excecoes]).toEqual([['d|2026-10-10', 'trabalha']])
+  })
+
+  it('na falha, mantém só o que não foi gravado', () => {
+    const p = lote()
+    const ops = planSave(dados, p)
+    const atual = descontarSalvas(p, p, dados, ops.slice(0, 1))
+    expect(atual.excecoes.size).toBe(0)
+    expect(atual.novos).toHaveLength(1)
   })
 })
