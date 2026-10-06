@@ -1,0 +1,248 @@
+import { CAMPO, lerMulti } from '../domain/manutencaoCatalogo'
+import type { DateBehavior } from './dates'
+import { cleanId, mapColisao, mapInfracao, mapManutencao, mapMulta, mapPosse, mapVeiculo, SELECT } from './mappers'
+import { KIND_TABLE, STATUS_FIELD, TABLE } from './schema'
+import { base64ToBlob, callSpFlow, escolherPrincipal, FOTO_MAX_BYTES, fileToBase64, nomeFoto, pastaFotoVeiculo, SP_VARS, toArquivo, type SpKey } from './sharepoint'
+import { EMPTY_DATA, FlowIncertoError, type DataSource, type FlowId, type FlowResult, type LoadResult } from './source'
+import type { FrotaData, Kind, TableKey } from './types'
+import { errorMessage, type XrmHost, type XrmWebApi } from './xrm'
+
+type Row = Record<string, unknown>
+type Behaviors = Record<string, DateBehavior>
+
+export function getDataverseEnvironmentLabel(clientUrl: string) {
+  const hostname = new URL(clientUrl).hostname.toLowerCase()
+  if (hostname === 'org23b93544.crm2.dynamics.com') return 'DEV'
+  if (hostname === 'orgf261ae8e.crm2.dynamics.com') return 'PROD'
+  return 'Dataverse'
+}
+
+const ORDER: Record<TableKey, string> = {
+  veiculos: 'cr40f_placa asc',
+  manutencoes: 'createdon desc',
+  multas: 'createdon desc',
+  infracoes: 'cr40f_codigodainfracao asc',
+  colisoes: 'createdon desc',
+  posses: 'new_iniciodaposse desc',
+}
+
+const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const FLOWS: Record<FlowId, { envVar: string; body: (id: string) => Record<string, string>; timeoutMs: number; nome: string }> = {
+  aprovarManutencao: { envVar: 'new_FlowUrlManutencao', body: (id) => ({ guids: id }), timeoutMs: 60_000, nome: 'Agendar manutenção' },
+  notificarCondutor: { envVar: 'new_FlowUrlNotificarMotoristaMultas', body: (id) => ({ guids: id }), timeoutMs: 30_000, nome: 'Notificar condutor' },
+  gerarContrato: { envVar: 'new_FlowUrlGerarContratoMultas', body: (id) => ({ GUID_MULTA: id }), timeoutMs: 40_000, nome: 'Gerar contrato' },
+}
+
+const FLOW_CLASSIFICAR_VAR = 'new_FlowUrlClassificarManutencao'
+
+export function createXrmSource(xrm: XrmHost): DataSource {
+  let classificarUrl: string | null = null
+  const api = xrm.WebApi as XrmWebApi
+  const clientUrl = xrm.Utility?.getGlobalContext().getClientUrl().replace(/\/+$/, '') ?? location.origin
+  const apiUrl = `${clientUrl}/api/data/v9.2`
+  const behaviorCache = new Map<string, Promise<Behaviors>>()
+  // A URL do Flow tem assinatura: fica só aqui, em memória, e nunca sai em mensagem, log ou retorno.
+  const flowUrls = new Map<FlowId, string>()
+
+  async function getJson<T>(path: string): Promise<T> {
+    const response = await fetch(`${apiUrl}/${path}`, { credentials: 'same-origin', headers: { Accept: 'application/json', 'OData-Version': '4.0', 'OData-MaxVersion': '4.0' } })
+    if (!response.ok) throw new Error(`Metadata indisponível (${response.status}) em ${path.split('?')[0]}`)
+    return response.json() as Promise<T>
+  }
+
+  /** Comportamento das colunas de data lido da metadata real, nunca chutado. */
+  function loadBehaviors(table: string) {
+    let cached = behaviorCache.get(table)
+    if (!cached) {
+      cached = getJson<{ value: { LogicalName: string; DateTimeBehavior?: { Value: DateBehavior } }[] }>(`EntityDefinitions(LogicalName='${table}')/Attributes/Microsoft.Dynamics.CRM.DateTimeAttributeMetadata?$select=LogicalName,DateTimeBehavior`)
+        .then((result) => Object.fromEntries(result.value.map((item) => [item.LogicalName, item.DateTimeBehavior?.Value ?? 'UserLocal'])))
+      cached.catch(() => behaviorCache.delete(table))
+      behaviorCache.set(table, cached)
+    }
+    return cached
+  }
+
+  async function retrieveAll(key: TableKey) {
+    const options = `?$select=${SELECT[key].join(',')}&$filter=statecode eq 0&$orderby=${ORDER[key]}`
+    const rows: Row[] = []
+    let page = await api.retrieveMultipleRecords(TABLE[key], options, 500)
+    rows.push(...page.entities)
+    while (page.nextLink) {
+      page = await api.retrieveMultipleRecords(TABLE[key], page.nextLink.slice(page.nextLink.indexOf('?')), 500)
+      rows.push(...page.entities)
+    }
+    return rows
+  }
+
+  /** Valor sobrescrito (environmentvariablevalue) primeiro; sem ele, o padrão da definição. */
+  async function readEnvVar(schemaName: string): Promise<string | null> {
+    const overrides = await api.retrieveMultipleRecords('environmentvariablevalue', `?$select=value&$expand=EnvironmentVariableDefinitionId($select=schemaname)&$filter=EnvironmentVariableDefinitionId/schemaname eq '${schemaName}'`)
+    const override = overrides.entities.length > 0 ? (overrides.entities[0].value as string | null) : null
+    if (override) return override
+    const definitions = await api.retrieveMultipleRecords('environmentvariabledefinition', `?$select=defaultvalue&$filter=schemaname eq '${schemaName}'`)
+    return definitions.entities.length > 0 ? ((definitions.entities[0].defaultvalue as string | null) ?? null) : null
+  }
+
+  async function flowUrl(flow: FlowId) {
+    const cached = flowUrls.get(flow)
+    if (cached) return cached
+    const { envVar, nome } = FLOWS[flow]
+    const url = await readEnvVar(envVar)
+    if (!url) throw new Error(`URL do Flow "${nome}" não configurada (variável ${envVar})`)
+    flowUrls.set(flow, url)
+    return url
+  }
+
+  const envLabel = getDataverseEnvironmentLabel(clientUrl)
+  const spUrls = new Map<SpKey, string>()
+  async function spUrl(key: SpKey) {
+    const cached = spUrls.get(key)
+    if (cached) return cached
+    const url = await readEnvVar(SP_VARS[key])
+    if (!url || !/^https:\/\//i.test(url)) throw new Error(`Fotos não configuradas neste ambiente (variável ${SP_VARS[key]})`)
+    spUrls.set(key, url)
+    return url
+  }
+
+  const loaders:{ [K in TableKey]: () => Promise<FrotaData[K]> } = {
+    veiculos: async () => (await retrieveAll('veiculos')).map(mapVeiculo),
+    manutencoes: async () => {
+      const [rows, behaviors] = await Promise.all([retrieveAll('manutencoes'), loadBehaviors(TABLE.manutencoes)])
+      return rows.map((row) => mapManutencao(row, behaviors))
+    },
+    multas: async () => {
+      const [rows, behaviors] = await Promise.all([retrieveAll('multas'), loadBehaviors(TABLE.multas)])
+      return rows.map((row) => mapMulta(row, behaviors))
+    },
+    infracoes: async () => (await retrieveAll('infracoes')).map(mapInfracao),
+    colisoes: async () => (await retrieveAll('colisoes')).map(mapColisao),
+    posses: async () => (await retrieveAll('posses')).map(mapPosse),
+  }
+
+  return {
+    mode: 'xrm',
+    envLabel,
+
+    async load(): Promise<LoadResult> {
+      const keys = Object.keys(loaders) as TableKey[]
+      const settled = await Promise.allSettled(keys.map((key) => loaders[key]()))
+      const data: FrotaData = { ...EMPTY_DATA }
+      const errors: LoadResult['errors'] = {}
+      settled.forEach((result, index) => {
+        const key = keys[index]
+        if (result.status === 'fulfilled') (data[key] as unknown) = result.value
+        else errors[key] = errorMessage(result.reason)
+      })
+      return { data, errors }
+    },
+
+    async currentStatus(kind: Kind, id: string) {
+      const row = await api.retrieveRecord(KIND_TABLE[kind], id, `?$select=${STATUS_FIELD[kind]}`)
+      const value = row[STATUS_FIELD[kind]]
+      return typeof value === 'number' ? value : null
+    },
+
+    dateBehaviors(kind: Kind) {
+      return loadBehaviors(KIND_TABLE[kind])
+    },
+
+    async update(kind: Kind, id: string, patch: Record<string, unknown>) {
+      await api.updateRecord(KIND_TABLE[kind], cleanId(id), patch)
+    },
+
+    async classificacao(id: string) {
+      const row = await api.retrieveRecord(KIND_TABLE.manutencao, cleanId(id), `?$select=${CAMPO.servicos},${CAMPO.categorias},${CAMPO.origem},${CAMPO.confianca}`)
+      const num = (value: unknown) => (typeof value === 'number' ? value : null)
+      return { servicos: lerMulti(row[CAMPO.servicos]), categorias: lerMulti(row[CAMPO.categorias]), origem: num(row[CAMPO.origem]), confianca: num(row[CAMPO.confianca]) }
+    },
+
+    async classificarAgora(id: string) {
+      if (!GUID.test(id)) throw new Error('Identificador inválido')
+      const url = classificarUrl ?? (classificarUrl = await readEnvVar(FLOW_CLASSIFICAR_VAR))
+      if (!url) throw new Error(`URL da classificação não configurada (variável ${FLOW_CLASSIFICAR_VAR})`)
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 20_000)
+      try {
+        const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: cleanId(id) }), signal: controller.signal })
+        if (!response.ok) throw new Error(`A classificação respondeu ${response.status}`)
+        const body = (await response.json()) as Record<string, unknown>
+        const lista = (value: unknown) => (Array.isArray(value) ? value.map(Number).filter(Number.isFinite) : [])
+        const num = (value: unknown) => (typeof value === 'number' ? value : null)
+        return { servicos: lista(body.servicos), categorias: lista(body.categorias), origem: num(body.origem), confianca: num(body.confianca) }
+      } catch (reason) {
+        // O erro original pode citar a URL assinada; só a mensagem própria sai daqui.
+        throw new Error(reason instanceof Error && reason.message.startsWith('A classificação') ? reason.message : 'Não foi possível chamar a classificação agora')
+      } finally {
+        clearTimeout(timer)
+      }
+    },
+
+    async openForm(kind, id) {
+      const entityName = kind === 'veiculo' ? TABLE.veiculos : KIND_TABLE[kind]
+      const navigation = xrm.Navigation
+      if (navigation?.navigateTo) await navigation.navigateTo({ pageType: 'entityrecord', entityName, entityId: id }, { target: 2, position: 1, width: { value: 70, unit: '%' } })
+      else if (navigation?.openForm) await navigation.openForm({ entityName, entityId: id })
+      else {
+        // Shell aberto por URL direta, fora do model-driven: o formulário abre em outra aba.
+        const params = new URLSearchParams({ pagetype: 'entityrecord', etn: entityName })
+        if (id) params.set('id', cleanId(id))
+        window.open(`${clientUrl}/main.aspx?${params}`, '_blank', 'noopener')
+      }
+    },
+
+    async prepareFlow(flow: FlowId) {
+      await flowUrl(flow)
+    },
+
+    async runFlow(flow: FlowId, id: string): Promise<FlowResult> {
+      if (!GUID.test(id)) throw new Error('Identificador inválido')
+      const { body, timeoutMs, nome } = FLOWS[flow]
+      const url = await flowUrl(flow)
+
+      const controller = new AbortController()
+      let timedOut = false
+      const timer = setTimeout(() => { timedOut = true; controller.abort() }, timeoutMs)
+      let response: Response
+      try {
+        response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body(id)), signal: controller.signal })
+      } catch {
+        // O erro original pode citar a URL; só a mensagem própria sai daqui.
+        clearTimeout(timer)
+        if (timedOut) throw new FlowIncertoError(`O Flow "${nome}" não respondeu em ${timeoutMs / 1000} s. Confira o registro antes de tentar de novo`)
+        throw new FlowIncertoError(`Não foi possível chamar o Flow "${nome}" (rede ou bloqueio do navegador)`)
+      }
+
+      let payload: Record<string, unknown> = {}
+      try {
+        const parsed: unknown = await response.json()
+        if (parsed && typeof parsed === 'object') payload = parsed as Record<string, unknown>
+      } catch { /* Corpo vazio ou não JSON. */ } finally { clearTimeout(timer) }
+
+      const status = response.status
+      if (flow === 'notificarCondutor' && (status === 207 || status === 400) && Number(payload.noDriver) > 0) throw new Error('A multa não tem motorista. Nada foi enviado')
+      if (status < 200 || status > 299 || status === 207) throw new Error(`O Flow "${nome}" respondeu ${status}. Confira o registro antes de tentar de novo`)
+      return { message: typeof payload.message === 'string' ? payload.message : null, shareUrl: typeof payload.shareUrl === 'string' ? payload.shareUrl : null }
+    },
+
+    async fotoVeiculo(id: string) {
+      const listado = await callSpFlow(await spUrl('listar'), { caminhoCompleto: pastaFotoVeiculo(cleanId(id), envLabel) })
+      const principal = escolherPrincipal((Array.isArray(listado.arquivos) ? listado.arquivos as Record<string, unknown>[] : []).map(toArquivo))
+      if (!principal) return null
+      const result = await callSpFlow(await spUrl('consultar'), { id: principal.id || principal.caminho, fileLocator: principal.id, caminhoSharePoint: principal.caminho, nomeArquivo: principal.nome })
+      return base64ToBlob(String(result.conteudoBase64 ?? ''), String(result.mimeType || principal.mimeType || 'image/png'))
+    },
+
+    async enviarFotoVeiculo(id: string, file: File) {
+      if (!file.type.startsWith('image/')) throw new Error('Envie uma imagem (PNG, JPG ou WEBP)')
+      if (file.size > FOTO_MAX_BYTES) throw new Error('A imagem passa de 10 MB')
+      await callSpFlow(await spUrl('salvar'), {
+        caminhoCompleto: pastaFotoVeiculo(cleanId(id), envLabel),
+        nomeArquivo: nomeFoto(file),
+        conteudoBase64: await fileToBase64(file),
+        mimeType: file.type,
+        metadados: { tarefaId: cleanId(id), origem: 'TELA_FROTA' },
+      })
+    },
+  }
+}
