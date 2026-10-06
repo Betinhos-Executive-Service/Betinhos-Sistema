@@ -92,16 +92,17 @@ function createDataverseSource(): Source {
       // Compromissos que cruzam a janela (inclui férias que começaram antes).
       const compromissoFilter = `cr40f_inicio le ${fim}T23:59:59Z and cr40f_fim ge ${inicio}T00:00:00Z and statecode eq 0`
       const [funcionarios, excecoes, compromissos] = await Promise.all([
-        client.getAll(`${s.funcionario}?$select=cr40f_funcionariosid,cr40f_nomecompleto,new_apelido,cr40f_funcao,cr40f_fdspadraosabado,cr40f_fdspadraodomingo&$filter=statecode eq 0&$orderby=cr40f_nomecompleto asc`),
+        // Motoristas (função 202410000) com status Ativo (0); colaboradores e terceiros.
+        client.getAll(`${s.funcionario}?$select=cr40f_funcionariosid,cr40f_nomecompleto,new_apelido,cr40f_tipodevinculo,cr40f_fdspadraosabado,cr40f_fdspadraodomingo&$filter=${encodeURIComponent('statecode eq 0 and cr40f_funcao eq 202410000 and cr40f_status eq 0')}&$orderby=new_apelido asc`),
         client.getAll(`${s.escala}?$select=cr40f_escalafdsid,_cr40f_motorista_value,cr40f_data,cr40f_status&$filter=${encodeURIComponent(escalaFilter)}`),
         client.getAll(`${s.compromisso}?$select=cr40f_compromissofdsid,_cr40f_motorista_value,cr40f_inicio,cr40f_fim,cr40f_diainteiro,cr40f_motivo,cr40f_observacao,createdon&$filter=${encodeURIComponent(compromissoFilter)}&$orderby=cr40f_inicio asc`),
       ])
       const motoristas: Motorista[] = funcionarios
-        .filter((row) => /motorista/i.test(text(row, 'cr40f_funcao')))
         .map((row) => ({
           id: cleanId(String(row.cr40f_funcionariosid)),
           nome: text(row, 'new_apelido') || text(row, 'cr40f_nomecompleto'),
           padrao: { sab: situacaoFromValue(row.cr40f_fdspadraosabado), dom: situacaoFromValue(row.cr40f_fdspadraodomingo) },
+          terceiro: row.cr40f_tipodevinculo === 1,
         }))
       for (const m of motoristas) nomes.set(m.id, m.nome)
       return {
@@ -130,7 +131,7 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 function createMockSource(): Source {
   const nomes = ['Danilo', 'Adriano', 'Bruno Lima', 'Carlos Souza', 'Diego', 'Edson Ramos', 'Fábio', 'Gilberto']
-  const motoristas: Motorista[] = nomes.map((nome, i) => ({ id: `m${i + 1}`, nome, padrao: { sab: null, dom: null } }))
+  const motoristas: Motorista[] = nomes.map((nome, i) => ({ id: `m${i + 1}`, nome, padrao: { sab: null, dom: null }, terceiro: i === 7 }))
   motoristas[0].padrao = { sab: 'plantao', dom: 'plantao' }
   motoristas[1].padrao = { sab: 'plantao', dom: null }
   const hoje = toKey(new Date())
