@@ -28,14 +28,20 @@ export type TableProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'children'> &
   loading?: boolean
 }
 
+/** Trilhas do grid: `full` com todas as colunas e `compact` (até 1120px) sem as colunas `hideBelow: 'compact'`. */
+export function tableTemplates<Row>(columns: TableColumn<Row>[], chevron: boolean) {
+  const build = (visible: TableColumn<Row>[]) => [...visible.map((column) => column.width ?? 'minmax(0, 1fr)'), chevron ? '24px' : null].filter(Boolean).join(' ')
+  return { full: build(columns), compact: build(columns.filter((column) => column.hideBelow !== 'compact')) }
+}
+
 /** Lista operacional em linhas: cabeçalho off-white, barra de gravidade, linha clicável e cabeçalho que some no mobile. */
 export function Table<Row>({ columns, rows, rowKey, onRowClick, severity, empty, footer, loading = false, className, style, ...rest }: TableProps<Row>) {
-  const template = [...columns.map((column) => column.width ?? 'minmax(0, 1fr)'), onRowClick ? '24px' : null].filter(Boolean).join(' ')
+  const template = tableTemplates(columns, Boolean(onRowClick))
   const cellClass = (column: TableColumn<Row>) => ['bt-table__cell', column.hideBelow && `bt-table__cell--hide-${column.hideBelow}`, column.align === 'end' && 'bt-table__cell--end'].filter(Boolean).join(' ')
   const RowTag = onRowClick ? 'button' : 'div'
 
   return (
-    <div className={['bt-table', className].filter(Boolean).join(' ')} style={{ ...style, ['--bt-table-columns' as string]: template }} role="table" aria-busy={loading || undefined} {...rest}>
+    <div className={['bt-table', className].filter(Boolean).join(' ')} style={{ ...style, ['--bt-table-columns' as string]: template.full, ['--bt-table-columns-compact' as string]: template.compact }} role="table" aria-busy={loading || undefined} {...rest}>
       <div className="bt-table__head" role="row">
         {columns.map((column) => <span key={column.key} role="columnheader" className={cellClass(column)}>{column.header}</span>)}
         {onRowClick ? <span aria-hidden="true" /> : null}
