@@ -89,7 +89,7 @@ export function compromissosDoDia(compromissos: Iterable<Compromisso>, data: str
   return result.sort((a, b) => Number(b.diaTodo) - Number(a.diaTodo) || a.compromisso.inicio.localeCompare(b.compromisso.inicio))
 }
 
-/** Alterações pendentes até "Salvar". Exceção `null` = volta ao padrão. */
+/** Alterações ainda não gravadas (o salvamento automático as grava em seguida). Exceção `null` = volta ao padrão. */
 export type Pendencias = {
   excecoes: Map<string, Situacao | null>
   padroes: Map<string, Padrao>
@@ -98,6 +98,7 @@ export type Pendencias = {
 }
 export const semPendencias = (): Pendencias => ({ excecoes: new Map(), padroes: new Map(), novos: [], excluidos: new Set() })
 export const totalPendencias = (p: Pendencias) => p.excecoes.size + p.padroes.size + p.novos.length + p.excluidos.size
+export const clonarPendencias = (p: Pendencias): Pendencias => ({ excecoes: new Map(p.excecoes), padroes: new Map(p.padroes), novos: [...p.novos], excluidos: new Set(p.excluidos) })
 
 export type Dados = { motoristas: Motorista[]; excecoes: Excecao[]; compromissos: Compromisso[] }
 
@@ -143,33 +144,25 @@ export function planSave(dados: Dados, p: Pendencias): Operacao[] {
   return ops
 }
 
-export type LinhaRodizio = { motorista: Motorista; plantao8: number; trabalha8: number; ano: number; acimaDaMedia: boolean }
-
 /**
- * Fins de semana com Plantão e com Trabalha (situação efetiva: padrão + exceções), nas 8 semanas que
- * terminam no fim de semana de referência, e o total de fins de semana trabalhados no ano até ela.
- * Cada fim de semana conta uma vez por categoria, mesmo com sábado e domingo.
+ * Tira de `atual` o que o `lote` gravou. Só sai a pendência que continua igual à do lote: o que mudou
+ * durante a gravação fica para o próximo lote. `feitas` = operações concluídas (falha no meio); sem ela, o lote inteiro.
  */
-export function rodizio(motoristas: Motorista[], excecoes: Map<string, Excecao>, referencia: string): LinhaRodizio[] {
-  const inicio8 = addDays(referencia, -7 * 7)
-  const inicioAno = `${referencia.slice(0, 4)}-01-01`
-  const primeiroSabado = weekendOf(fromKey(inicioAno < inicio8 ? inicioAno : inicio8))
-  const linhas = motoristas.map((motorista) => {
-    let plantao8 = 0, trabalha8 = 0, ano = 0
-    for (let sabado = primeiroSabado; sabado <= referencia; sabado = addDays(sabado, 7)) {
-      const dias = [sabado, addDays(sabado, 1)].map((data) => situacaoDoDia(motorista, data, excecoes).situacao)
-      const plantao = dias.includes('plantao')
-      const trabalha = dias.includes('trabalha')
-      if (sabado >= inicio8) { if (plantao) plantao8++; if (trabalha) trabalha8++ }
-      if (addDays(sabado, 1) >= inicioAno && (plantao || trabalha)) ano++
-    }
-    return { motorista, plantao8, trabalha8, ano }
-  })
-  const media = linhas.length ? linhas.reduce((sum, l) => sum + l.plantao8 + l.trabalha8, 0) / linhas.length : 0
-  return linhas
-    .map((l) => ({ ...l, acimaDaMedia: l.plantao8 + l.trabalha8 > media + 0.5 }))
-    .sort((a, b) => a.plantao8 + a.trabalha8 - (b.plantao8 + b.trabalha8) || a.ano - b.ano || a.motorista.nome.localeCompare(b.motorista.nome, 'pt-BR'))
+export function descontarSalvas(atual: Pendencias, lote: Pendencias, dados: Dados, feitas?: Operacao[]): Pendencias {
+  const next = clonarPendencias(atual)
+  const chaveDoId = new Map(dados.excecoes.flatMap((e) => (e.id ? [[e.id, recordKey(e.motoristaId, e.data)] as const] : [])))
+  const excecoes = feitas && new Set(feitas.flatMap((o) => (o.tipo === 'criarExcecao' || o.tipo === 'atualizarExcecao' ? [recordKey(o.excecao.motoristaId, o.excecao.data)]
+    : o.tipo === 'excluirExcecao' ? [chaveDoId.get(o.id) ?? ''] : [])))
+  const padroes = feitas && new Set(feitas.flatMap((o) => (o.tipo === 'padrao' ? [o.motoristaId] : [])))
+  const novos = new Set(feitas ? feitas.flatMap((o) => (o.tipo === 'criarCompromisso' ? [o.compromisso] : [])) : lote.novos)
+  const excluidos = feitas ? feitas.flatMap((o) => (o.tipo === 'excluirCompromisso' ? [o.id] : [])) : [...lote.excluidos]
+  for (const [key, situacao] of lote.excecoes) if ((!excecoes || excecoes.has(key)) && next.excecoes.has(key) && next.excecoes.get(key) === situacao) next.excecoes.delete(key)
+  for (const [id, padrao] of lote.padroes) if ((!padroes || padroes.has(id)) && next.padroes.get(id) === padrao) next.padroes.delete(id)
+  next.novos = next.novos.filter((c) => !novos.has(c))
+  for (const id of excluidos) next.excluidos.delete(id)
+  return next
 }
+
 export type View = ReturnType<typeof aplicarPendencias>
 
 /** Dias de `inicio` a `fim` (inclusive); limitado a 62 dias para evitar lote acidental. */
