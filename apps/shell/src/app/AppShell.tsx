@@ -41,7 +41,7 @@ const ITEM_ICONS: Record<string, ReactNode> = {
   new_telaplanner: <ClipboardList />,
   cr40f_composicaodeprecos: <Calculator />,
   cr40f_financeiro: <Coins />,
-  cr40f_pagantes: <Users />,
+  pagantes: <Users />,
   cr40f_recibos_v2: <Receipt />,
   cr40f_pedidodecotacao: <Mail />,
   cr40f_telapagamentofornecedores: <Banknote />,
