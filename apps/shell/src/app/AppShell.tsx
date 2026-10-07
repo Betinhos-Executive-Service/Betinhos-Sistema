@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import {
-  AlertTriangle, Banknote, BookUser, Calculator, Calendar, Camera, Car, CarFront, ClipboardList, Clock, Coins, Database, Download,
+  AlertTriangle, Banknote, BookUser, Calculator, Calendar, Camera, Car, CarFront, ClipboardList, Clock, Coins, Contact, Database, Download,
   FileText, FolderCog, Home, KeyRound, Landmark, LayoutDashboard, List, Mail, Megaphone, MapPin, Paperclip, Palette, Receipt, Route,
   ScrollText, Shield, Shuffle, Tag, TrendingUp, Users, Wallet, Wrench,
 } from 'lucide-react'
@@ -49,7 +49,7 @@ const ITEM_ICONS: Record<string, ReactNode> = {
   cr40f_manutencoes: <Wrench />,
   cr40f_multas: <AlertTriangle />,
   cr40f_colisao_v2: <Camera />,
-  cr40f_bancodedados: <Database />,
+  pessoas: <Contact />,
   cr40f_clientes1: <Landmark />,
   cr40f_veiculos: <CarFront />,
   cr40f_funcionarios: <BookUser />,
