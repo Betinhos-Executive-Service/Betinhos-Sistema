@@ -36,10 +36,11 @@ export function useCopyLink() {
   }
 }
 
-type Props = { p: Pagante; contato?: Contato; size?: ButtonSize; labels?: boolean }
+/** `contatoLoading`: o contato ainda está chegando; o WhatsApp não pode dizer "sem celular" antes da hora. */
+type Props = { p: Pagante; contato?: Contato; size?: ButtonSize; labels?: boolean; contatoLoading?: boolean }
 
 /** WhatsApp com a mensagem pronta e cópia do link; desabilitados explicam o motivo. */
-export function QuickActions({ p, contato, size = 'compact', labels = false }: Props) {
+export function QuickActions({ p, contato, size = 'compact', labels = false, contatoLoading = false }: Props) {
   const copy = useCopyLink()
   const wa = whatsappUrl(p, contato)
   const link = linkToShare(p)
@@ -53,7 +54,9 @@ export function QuickActions({ p, contato, size = 'compact', labels = false }: P
           <MessageCircle size={16} aria-hidden="true" />{labels ? <span className="bt-button__label">WhatsApp</span> : null}
         </a>
       ) : (
-        <Button variant="secondary" size={size} icon={<MessageCircle size={16} />} disabled aria-label={labels ? undefined : 'WhatsApp indisponível: pagante sem celular'} title="Pagante sem celular cadastrado">{labels ? 'WhatsApp' : undefined}</Button>
+        <Button variant="secondary" size={size} icon={<MessageCircle size={16} />} disabled aria-busy={contatoLoading || undefined}
+          aria-label={labels ? undefined : contatoLoading ? 'WhatsApp: carregando contato' : 'WhatsApp indisponível: pagante sem celular'}
+          title={contatoLoading ? 'Carregando contato…' : 'Pagante sem celular cadastrado'}>{labels ? 'WhatsApp' : undefined}</Button>
       )}
       <Button variant="secondary" size={size} icon={<Copy size={16} />} disabled={!link} onClick={() => void copy(p)} aria-label={labels ? undefined : noLink} title={noLink}>{labels ? (link?.kind === 'recibo' ? 'Copiar recibo' : 'Copiar link') : undefined}</Button>
     </span>

@@ -22,7 +22,8 @@ describe('Pagantes', () => {
     await openRow('PAG-1201')
 
     const ficha = await screen.findByRole('dialog', { name: 'Mariana Albuquerque' })
-    expect(within(ficha).getByRole('link', { name: 'WhatsApp' }).getAttribute('href')).toMatch(/^https:\/\/wa\.me\/5511998124410/)
+    // O contato chega depois da lista (no CI, mais lento): espera o link aparecer.
+    expect((await within(ficha).findByRole('link', { name: 'WhatsApp' })).getAttribute('href')).toMatch(/^https:\/\/wa\.me\/5511998124410/)
     expect(await within(ficha).findByText(/2 parcelas/)).toBeTruthy()
 
     fireEvent.click(within(ficha).getByRole('button', { name: 'Marcar como pago' }))
