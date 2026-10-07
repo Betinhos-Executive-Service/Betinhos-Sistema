@@ -115,7 +115,7 @@ export function PaganteDrawer({ p, onClose, onOpen, choices, contatos, source, o
           {!p.pessoaId ? <Alert tone="warning" title="Pagante sem pessoa vinculada">Sem pessoa não há contato para cobrar nem destinatário para o recibo automático.</Alert> : null}
 
           <div className="pg-ficha__actions">
-            <QuickActions p={p} contato={contato} size="default" labels />
+            <QuickActions p={p} contato={contato} size="default" labels contatoLoading={contatoLoading} />
             {canGerarRecibo(p) ? (
               <Button variant="secondary" icon={<FileText size={16} />} loading={busy} onClick={() => onRecibo(p)}>{reciboEnviado(p) || p.linkRecibo ? 'Reenviar recibo' : 'Gerar recibo'}</Button>
             ) : null}
