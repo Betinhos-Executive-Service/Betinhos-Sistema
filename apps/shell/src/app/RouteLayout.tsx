@@ -9,6 +9,7 @@ import { FrotaPage } from '../pages/frota/FrotaPage'
 import { FuncionariosPage } from '../pages/funcionarios/FuncionariosPage'
 import { CurriculosPage } from '../pages/curriculos/CurriculosPage'
 import { PagantesPage } from '../pages/pagantes/PagantesPage'
+import { PessoasPage } from '../pages/pessoas/PessoasPage'
 import { EmptyState, buttonClassName } from '@betinhos/ui'
 import { PageLayout } from './PageLayout'
 
@@ -68,6 +69,7 @@ export function RouteLayout({ host, group, item, label }: Props) {
     if (item.page === 'funcionarios') return <FuncionariosPage host={host} />
     if (item.page === 'curriculos') return <CurriculosPage host={host} />
     if (item.page === 'pagantes') return <PagantesPage host={host} />
+    if (item.page === 'pessoas') return <PessoasPage host={host} />
     return <ComponentsPage />
   }
 
