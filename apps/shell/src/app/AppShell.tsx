@@ -54,6 +54,7 @@ const ITEM_ICONS: Record<string, ReactNode> = {
   cr40f_veiculos: <CarFront />,
   cr40f_funcionarios: <BookUser />,
   new_curriculo: <ScrollText />,
+  curriculos: <ScrollText />,
   cr40f_infracaodetransito: <AlertTriangle />,
   new_marketing: <Megaphone />,
   cr40f_servicosporpassageiro: <List />,
