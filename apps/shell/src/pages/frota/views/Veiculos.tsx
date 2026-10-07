@@ -7,11 +7,12 @@ import { CATEGORIA, label, VEICULO, VEICULO_STATUS } from '../data/schema'
 import type { DataSource } from '../data/source'
 import type { FrotaData, Veiculo } from '../data/types'
 import { custoVeiculo, ultimos12Meses } from '../domain/indicadores'
+import { motoristaAtual, possesAbertas, rotuloMotoristaAtual } from '../domain/motoristaAtual'
 import { buildPendencias } from '../domain/pendencias'
 
 const SEM_STATUS = 'sem'
 
-type Linha = { veiculo: Veiculo; pendencias: number; custo: ReturnType<typeof custoVeiculo> }
+type Linha = { veiculo: Veiculo; motorista: string | null; pendencias: number; custo: ReturnType<typeof custoVeiculo> }
 
 export function Veiculos({ data, today, source, onOpenVeiculo }: { data: FrotaData; source: DataSource; today: string; onOpenVeiculo: (id: string) => void }) {
   const [busca, setBusca] = useState('')
@@ -20,8 +21,10 @@ export function Veiculos({ data, today, source, onOpenVeiculo }: { data: FrotaDa
   const linhas = useMemo<Linha[]>(() => {
     const periodo = ultimos12Meses(today)
     const pendencias = buildPendencias(data, today)
+    const abertas = possesAbertas(data.posses)
     return data.veiculos.map((veiculo) => ({
       veiculo,
+      motorista: rotuloMotoristaAtual(motoristaAtual(veiculo, abertas)),
       pendencias: pendencias.filter((item) => item.veiculo?.id === veiculo.id).length,
       custo: custoVeiculo(data.manutencoes, veiculo.id, periodo),
     }))
@@ -29,8 +32,8 @@ export function Veiculos({ data, today, source, onOpenVeiculo }: { data: FrotaDa
 
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase()
-    return linhas.filter(({ veiculo }) =>
-      (!termo || [veiculo.placa, veiculo.marca, veiculo.modelo, veiculo.motorista?.label].some((valor) => valor?.toLowerCase().includes(termo)))
+    return linhas.filter(({ veiculo, motorista }) =>
+      (!termo || [veiculo.placa, veiculo.marca, veiculo.modelo, motorista].some((valor) => valor?.toLowerCase().includes(termo)))
       && (!status || (status === SEM_STATUS ? veiculo.status === null : String(veiculo.status) === status)))
   }, [linhas, busca, status])
 
@@ -53,7 +56,7 @@ export function Veiculos({ data, today, source, onOpenVeiculo }: { data: FrotaDa
           { key: 'placa', header: 'Placa', width: 'minmax(150px, 1.2fr)', cell: ({ veiculo }) => <TableTitle title={veiculo.placa || 'Sem placa'} meta={[veiculo.marca, veiculo.modelo].filter(Boolean).join(' ') || undefined} /> },
           { key: 'categoria', header: 'Categoria', hideBelow: 'compact', cell: ({ veiculo }) => label(CATEGORIA, veiculo.categoria) },
           { key: 'status', header: 'Status', width: 'minmax(96px, .7fr)', cell: ({ veiculo }) => <StatusBadge tone={veiculo.status === VEICULO.ATIVO ? 'success' : veiculo.status === null ? 'warning' : 'neutral'}>{label(VEICULO_STATUS, veiculo.status, 'Sem status')}</StatusBadge> },
-          { key: 'motorista', header: 'Motorista atual', hideBelow: 'mobile', cell: ({ veiculo }) => veiculo.motorista?.label || '—' },
+          { key: 'motorista', header: 'Motorista atual', hideBelow: 'mobile', cell: ({ motorista }) => motorista || '—' },
           { key: 'pendencias', header: 'Pendências', width: 'minmax(90px, .6fr)', cell: ({ pendencias }) => (pendencias > 0 ? <StatusBadge tone="danger">{pendencias}</StatusBadge> : '—') },
           { key: 'custo', header: 'Custo (12 meses)', align: 'end', hideBelow: 'compact', cell: ({ custo }) => (
             <span className="frota-nowrap">
