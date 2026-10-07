@@ -61,3 +61,20 @@ Rótulos de choice vêm da metadata (`host.metadata.choices`); os valores acima 
 - Lista abre em mock e no Dataverse DEV; filtros, busca e visões persistem; ficha mostra rateio, serviços e linha do tempo.
 - Ações rápidas abrem WhatsApp/copiam link; status manual pede confirmação e atualiza a linha.
 - `pnpm test` e `pnpm typecheck` verdes; sem cor fora dos tokens, sem gradiente; 320 px sem rolagem horizontal.
+
+## 8. Endurecimento (07/10/2026, após revisão e conferência no Dataverse DEV)
+
+Schema conferido em DEV pela metadata real. Ajustes feitos por causa de dados e flows reais:
+
+- Colunas opcionais também incluem `new_statusgeracaorecibo`, `new_errogeracaorecibo` e `cr40f_datadoprimeiropagamento`; falha de recibo conta como falha (filtro, selo, alerta e linha do tempo).
+- Texto `"null"`/`"undefined"` gravado por flow conta como vazio; datas inválidas viram vazio.
+- Pagantes antigos sem pessoa ou sem OP: ficha pelo código, aviso, sem ações de OP.
+- Recibo automático (Flow Enviar Recibo Automático) falha sem pessoa ou sem cliente: a opção fica desabilitada com o motivo.
+- Rateio ignora parcelas canceladas e compara com o total da OP (soma de `new_valortotal` da composição de preços dos serviços, a mesma conta do plugin); diferença gera alerta.
+- Gerar recibo vale para qualquer status menos Cancelado (paridade com o botão nativo) e fecha a ficha antes de abrir o gerador, que desenha no documento.
+- Links só http(s); IDs validados como GUID antes de entrar em `$filter`; contatos em ondas de 4 blocos de 15 com aviso quando falham.
+- Um pagante por vez com gravação ou recibo em andamento; recarga antiga não desfaz status já gravado.
+- Visões salvas: campos validados um a um, visão escolhida desempata filtros iguais, duplicata de visão pronta é recusada, qualquer visão do usuário pode ser excluída. A visão "Pendentes" virou "A receber" (Pendente, Negado, Expirado, Não finalizado, Aguardando facial).
+- Gerar Pagantes embutido: fundo e Esc pedem "Descartar alterações?".
+- Lista paginada em 50; metadata fora do ar usa os rótulos conhecidos.
+- Design System: toasts passam a nascer dentro do modal aberto (antes ficavam inertes atrás de Drawer/Dialog), e o recuo de cópia usa o mesmo destino.

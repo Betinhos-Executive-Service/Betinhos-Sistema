@@ -20,6 +20,10 @@ export type Pagante = {
   /** Geração do link Cielo e envio do e-mail; null quando a coluna não existe no ambiente. */
   link: { status: number | null; erro: string }
   email: { status: number | null; erro: string; enviadoEm: Date | null }
+  /** Geração do recibo pelo flow (`new_statusgeracaorecibo`). */
+  reciboGeracao: { status: number | null; erro: string }
+  /** `cr40f_datadoprimeiropagamento`, quando algum processo a preencher. */
+  pagoEm: Date | null
 }
 
 /** Pessoa de `cr40f_bancodedados` que paga a parcela. */
@@ -28,4 +32,4 @@ export type Contato = { nome: string; telefone: string; email: string; cliente: 
 export type ChoiceSet = { status: ChoiceOption[]; forma: ChoiceOption[]; recibo: ChoiceOption[] }
 
 /** Serviço (reserva) faturado na mesma OP. */
-export type ServicoOp = { id: string; codigo: string; data: Date | null; destino: string; status: string }
+export type ServicoOp = { id: string; codigo: string; data: Date | null; destino: string; status: string; valor: number | null }

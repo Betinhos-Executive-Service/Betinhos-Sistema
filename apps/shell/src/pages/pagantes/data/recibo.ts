@@ -29,8 +29,8 @@ function loadScript(clientUrl: string) {
     const script = document.createElement('script')
     script.src = `${clientUrl}/WebResources/${RECIBO_RESOURCE}`
     script.async = true
-    script.onload = () => (window.GerarRecibo ? resolve() : reject(new Error('O gerador de recibo foi carregado, mas não iniciou.')))
-    script.onerror = () => reject(new Error('Não foi possível carregar o gerador de recibo do Dataverse.'))
+    script.onload = () => { if (window.GerarRecibo) resolve(); else { script.remove(); reject(new Error('O gerador de recibo foi carregado, mas não iniciou.')) } }
+    script.onerror = () => { script.remove(); reject(new Error('Não foi possível carregar o gerador de recibo do Dataverse.')) }
     document.head.append(script)
   }).catch((error) => { loading = null; throw error }))
 }

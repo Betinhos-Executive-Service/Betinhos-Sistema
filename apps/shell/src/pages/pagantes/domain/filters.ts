@@ -76,13 +76,40 @@ export const BUILTIN_VIEWS: View[] = [
 export const VIEWS_KEY = 'betinhos.pagantes.visoes.v1'
 type Stored = { views: View[]; last: string | null }
 
+const PERIODO_VALUES = new Set<string>(PERIODOS.map((p) => p.value))
+
+/** Filtros vindos do armazenamento: cada campo é validado; inválido vira null (visão descartada). */
+export function parseStoredFilters(raw: unknown): Omit<Filters, 'query'> | null {
+  if (!raw || typeof raw !== 'object') return null
+  const f = raw as Record<string, unknown>
+  const periodo = f.periodo ?? EMPTY_FILTERS.periodo
+  if (typeof periodo !== 'string' || !PERIODO_VALUES.has(periodo)) return null
+  const status = f.status ?? []
+  if (!Array.isArray(status) || !status.every((s) => typeof s === 'number' && Number.isInteger(s))) return null
+  const forma = f.forma ?? null
+  if (forma !== null && !(typeof forma === 'number' && Number.isInteger(forma))) return null
+  const recibo = f.recibo ?? null
+  if (recibo !== null && recibo !== 'enviado' && recibo !== 'nao-enviado') return null
+  const falhas = f.falhas ?? false
+  if (typeof falhas !== 'boolean') return null
+  return { periodo: periodo as Periodo, status: [...status] as number[], forma: forma as number | null, recibo: recibo as ReciboFiltro | null, falhas }
+}
+
 export function loadViews(kv: KV): Stored {
   try {
     const raw = kv.getItem(VIEWS_KEY)
     if (!raw) return { views: [], last: null }
-    const data = JSON.parse(raw) as Partial<Stored>
-    const views = Array.isArray(data.views) ? data.views.filter((v) => v && typeof v.id === 'string' && typeof v.nome === 'string' && v.filters) : []
-    return { views: views.map((v) => ({ ...v, builtin: false, filters: { ...base(), ...v.filters } })), last: typeof data.last === 'string' ? data.last : null }
+    const data = JSON.parse(raw) as { views?: unknown; last?: unknown } | null
+    const list = data && Array.isArray(data.views) ? data.views : []
+    const views: View[] = []
+    for (const item of list) {
+      const v = item as Partial<View> | null
+      if (!v || typeof v.id !== 'string' || !v.id || typeof v.nome !== 'string' || !v.nome.trim()) continue
+      if (BUILTIN_VIEWS.some((b) => b.id === v.id) || views.some((x) => x.id === v.id)) continue
+      const filters = parseStoredFilters(v.filters)
+      if (filters) views.push({ id: v.id, nome: v.nome.trim().slice(0, 40), filters })
+    }
+    return { views, last: data && typeof data.last === 'string' ? data.last : null }
   } catch {
     return { views: [], last: null }
   }
@@ -96,11 +123,16 @@ export function viewFilters(view: View, query = ''): Filters {
   return { ...view.filters, status: [...view.filters.status], query }
 }
 
-/** Visão cujos filtros batem com os atuais (ignorando a busca); null = filtros avulsos. */
-export function matchView(views: View[], f: Filters) {
-  const key = (x: Omit<Filters, 'query'>) => JSON.stringify([x.periodo, [...x.status].sort(), x.forma, x.recibo, x.falhas])
-  const current = key(f)
-  return views.find((v) => key(v.filters) === current) ?? null
+const viewKey = (x: Omit<Filters, 'query'>) => JSON.stringify([x.periodo, [...x.status].sort((a, b) => a - b), x.forma, x.recibo, x.falhas])
+
+/**
+ * Visão cujos filtros batem com os atuais (ignorando a busca); null = filtros avulsos.
+ * `preferId` desempata quando duas visões têm os mesmos filtros (a escolhida pelo usuário vence).
+ */
+export function matchView(views: View[], f: Omit<Filters, 'query'>, preferId?: string | null) {
+  const current = viewKey(f)
+  const preferred = preferId ? views.find((v) => v.id === preferId && viewKey(v.filters) === current) : undefined
+  return preferred ?? views.find((v) => viewKey(v.filters) === current) ?? null
 }
 
 export function newView(nome: string, f: Filters, now = Date.now()): View {
