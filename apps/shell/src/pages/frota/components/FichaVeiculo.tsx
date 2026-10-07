@@ -8,6 +8,7 @@ import type { DataSource, LoadResult } from '../data/source'
 import type { FrotaData, Kind } from '../data/types'
 import { errorMessage } from '../data/xrm'
 import { custoVeiculo, ultimos12Meses } from '../domain/indicadores'
+import { motoristaAtual, possesAbertas, rotuloMotoristaAtual } from '../domain/motoristaAtual'
 import { buildTimeline } from '../domain/timeline'
 import { buildPromptImagem, faltasPrompt } from '../domain/promptImagem'
 import { FotoVeiculo, invalidarFoto } from './FotoVeiculo'
@@ -25,6 +26,7 @@ export function FichaVeiculo({ source, id, data, errors, today, onClose, onOpen,
   const veiculo = data.veiculos.find((item) => item.id === id)
   const timeline = useMemo(() => buildTimeline(id, data), [id, data])
   const custo = useMemo(() => custoVeiculo(data.manutencoes, id, periodo), [data.manutencoes, id, periodo])
+  const motorista = useMemo(() => (veiculo ? rotuloMotoristaAtual(motoristaAtual(veiculo, possesAbertas(data.posses))) : null), [veiculo, data.posses])
 
   const [copiado, setCopiado] = useState(false)
   const [enviando, setEnviando] = useState(false)
@@ -141,7 +143,7 @@ export function FichaVeiculo({ source, id, data, errors, today, onClose, onOpen,
               <dt>Ano do modelo</dt><dd>{veiculo.anoModelo ?? NAO_INFORMADO}</dd>
               <dt>Cor</dt><dd>{veiculo.cor || NAO_INFORMADO}</dd>
               <dt>Categoria</dt><dd>{label(CATEGORIA, veiculo.categoria)}</dd>
-              <dt>Motorista atual</dt><dd>{veiculo.motorista?.label || 'Sem motorista'}</dd>
+              <dt>Motorista atual</dt><dd>{motorista || 'Sem motorista'}</dd>
             </dl>
           </section>
           <section className="frota-group" aria-labelledby={`${id}-custo`}>

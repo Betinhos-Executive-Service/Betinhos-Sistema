@@ -14,7 +14,7 @@ const data: FrotaData = {
     { id: 'm2', codigo: 'M2', descricao: 'Pneu', status: MANUT.SOLICITADO, grau: 3, tipo: 2, agendarPara: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: { id: 'v2', label: 'EFG4H56' }, solicitante: null, criadoEm: '2026-10-01T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null },
   ],
   multas: [{ id: 'u1', titulo: 'AIT 1', status: 202410000, dataHora: '2026-09-25T12:00:00Z', local: 'Av. Brasil', dataParaIndicar: null, indicado: false, dataAviso: null, dataIndicacao: null, veiculo: v1, motorista: { id: 'f1', label: 'Ana' }, infracaoId: null, criadoEm: '2026-09-26T12:00:00Z' }],
-  posses: [{ id: 'p1', inicio: '2026-08-01T12:00:00Z', fim: null, veiculo: v1, motorista: { id: 'f1', label: 'Ana' } }],
+  posses: [{ id: 'p1', inicio: '2026-08-01T12:00:00Z', fim: null, veiculo: v1, motorista: { id: 'f1', label: 'Ana' }, localBase: null }],
 }
 
 describe('buildTimeline', () => {

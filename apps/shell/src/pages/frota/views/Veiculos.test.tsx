@@ -25,6 +25,25 @@ const data: FrotaData = {
 afterEach(cleanup)
 
 describe('Veiculos', () => {
+  it('mostra quem está com o carro pela posse aberta, com "Na base" e fallback no cadastro', () => {
+    const comPosses: FrotaData = {
+      ...data,
+      veiculos: [base, { ...base, id: 'v2', placa: 'TST2B22', motorista: { id: 'f9', label: 'Cadastro antigo' } }, { ...base, id: 'v3', placa: 'TST3C33' }],
+      posses: [
+        { id: 'p1', inicio: '2026-09-01T12:00:00Z', fim: null, veiculo: { id: 'v1', label: 'TST1A11' }, motorista: { id: 'f2', label: 'Bruno' }, localBase: null },
+        { id: 'p2', inicio: '2026-09-15T12:00:00Z', fim: null, veiculo: { id: 'v2', label: 'TST2B22' }, motorista: null, localBase: { id: 'b1', label: 'Base Centro' } },
+      ],
+    }
+    render(<Veiculos data={comPosses} today="2026-10-02" source={source} onOpenVeiculo={() => {}} />)
+    expect(screen.getByText('Bruno')).toBeTruthy()
+    expect(screen.getByText('Na base · Base Centro')).toBeTruthy()
+    expect(screen.queryByText('Cadastro antigo')).toBeNull()
+    expect(screen.getByText('Ana')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('Buscar veículo'), { target: { value: 'base centro' } })
+    expect(screen.getByText('TST2B22')).toBeTruthy()
+    expect(screen.queryByText('TST1A11')).toBeNull()
+  })
+
   it('abre filtrada em Ativo', () => {
     render(<Veiculos data={data} today="2026-10-02" source={source} onOpenVeiculo={() => {}} />)
     expect(screen.getByText('TST1A11')).toBeTruthy()
