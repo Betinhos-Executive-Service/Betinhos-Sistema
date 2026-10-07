@@ -20,6 +20,8 @@ export type XrmHost = {
       getClientUrl: () => string
       getCurrentAppProperties?: () => Promise<{ appId?: string }>
     }
+    showProgressIndicator?: (message: string) => void
+    closeProgressIndicator?: () => void
   }
 }
 
@@ -64,6 +66,14 @@ export function createXrmShim(client: DataverseClient, clientUrl: string): XrmHo
         return { entityType: entity, id: cleanId(id) }
       },
     },
-    Utility: { getGlobalContext: () => ({ getClientUrl: () => clientUrl }) },
+    // Scripts de comando do model-driven (ex.: gerador de recibo) usam estes avisos simples.
+    Navigation: {
+      openAlertDialog: async (options: { text?: string }) => { window.alert(options?.text ?? '') },
+    },
+    Utility: {
+      getGlobalContext: () => ({ getClientUrl: () => clientUrl }),
+      showProgressIndicator: () => { /* sem indicador fora do model-driven */ },
+      closeProgressIndicator: () => { /* sem indicador fora do model-driven */ },
+    },
   }
 }
