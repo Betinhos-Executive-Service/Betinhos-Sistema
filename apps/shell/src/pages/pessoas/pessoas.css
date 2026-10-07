@@ -1,0 +1,64 @@
+/* Pessoas: lista, ficha e formulário. Só tokens do Design System 1.4.0. */
+.ps-meta { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--bt-space-2); font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }
+.ps-num { font-variant-numeric: tabular-nums; }
+.ps-muted { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.ps-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.ps-badges { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1); }
+.ps-actions { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1); }
+.ps-contato { display: grid; gap: var(--bt-space-0-5); min-width: 0; }
+.ps-contato span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.ps-filters__view { flex: 0 1 220px; min-width: 180px; }
+.ps-filters__search { flex: 1 1 260px; min-width: 200px; max-width: 360px; }
+.ps-filters__select { flex: 0 1 170px; min-width: 150px; }
+
+.ps-open { display: grid; gap: var(--bt-space-0-5); min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
+.ps-open strong { overflow: hidden; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); text-overflow: ellipsis; white-space: nowrap; }
+.ps-open span { overflow: hidden; font-size: var(--bt-font-size-11); color: var(--bt-color-text-secondary); text-overflow: ellipsis; white-space: nowrap; }
+.ps-open:focus-visible, .ps-card__open:focus-visible, .ps-link:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+
+/* Linha e cartão inteiros abrem a ficha (clique delegado ao botão do nome). */
+.ps-table .bt-table__row:not(.bt-table__row--loading), .ps-card { cursor: pointer; }
+@media (hover: hover) and (pointer: fine) {
+  .ps-table .bt-table__row:not(.bt-table__row--loading):hover, .ps-card:hover { background-color: var(--bt-color-surface-soft); }
+  .ps-open:hover strong { color: var(--bt-color-action); }
+}
+
+.ps-cards { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
+.ps-card { border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
+.ps-card__open { display: grid; gap: var(--bt-space-1); width: 100%; min-height: var(--bt-control-height-touch); padding: var(--bt-space-3) var(--bt-space-3) var(--bt-space-2); border: 0; border-radius: inherit; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform var(--bt-duration-fast) var(--bt-ease-out); }
+.ps-card__open:active { transform: scale(0.97); }
+.ps-card__name { font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); overflow-wrap: anywhere; }
+.ps-card__meta { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); overflow-wrap: anywhere; }
+.ps-card__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--bt-space-2); padding: 0 var(--bt-space-3) var(--bt-space-3); }
+
+/* Ficha */
+.ps-ficha { display: grid; gap: var(--bt-space-4); }
+.ps-ficha__hero { display: flex; align-items: center; gap: var(--bt-space-3); }
+.ps-ficha__ident { display: grid; gap: var(--bt-space-1); min-width: 0; }
+.ps-ficha__block { display: grid; gap: var(--bt-space-2); padding: var(--bt-space-3-5); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background-color: var(--bt-color-surface); }
+.ps-ficha__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--bt-space-1) var(--bt-space-2); }
+.ps-ficha__head h3, .ps-form__legend { margin: 0; padding: 0; font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); letter-spacing: 0.08em; text-transform: uppercase; color: var(--bt-color-text-secondary); }
+.ps-ficha__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--bt-space-2) var(--bt-space-4); margin: 0; }
+.ps-ficha__item { display: grid; gap: var(--bt-space-0-5); min-width: 0; }
+.ps-ficha__item dt { font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-secondary); }
+.ps-ficha__item dd { margin: 0; font-size: var(--bt-font-size-13); color: var(--bt-color-text-primary); overflow-wrap: anywhere; }
+.ps-ficha__text { margin: 0; font-size: var(--bt-font-size-13); color: var(--bt-color-text-primary); overflow-wrap: anywhere; }
+.ps-ficha__loading { display: grid; gap: var(--bt-space-2); }
+.ps-rows { display: grid; gap: var(--bt-space-1); margin: 0; padding: 0; list-style: none; }
+.ps-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--bt-space-2); min-height: var(--bt-control-height-default); padding: var(--bt-space-1-5) var(--bt-space-2-5); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); font-size: var(--bt-font-size-13); }
+.ps-dups { margin: 0 0 var(--bt-space-1); padding-left: var(--bt-space-4); }
+.ps-link { padding: 0; border: 0; background: transparent; color: var(--bt-color-action); font: inherit; font-weight: var(--bt-font-weight-bold); text-decoration: underline; cursor: pointer; border-radius: var(--bt-radius-xs); }
+
+/* Formulário */
+.ps-form { display: grid; gap: var(--bt-space-4); }
+.ps-form__section { display: grid; gap: var(--bt-space-3); min-width: 0; margin: 0; padding: var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
+.ps-form__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--bt-space-3); }
+.ps-form__wide { grid-column: 1 / -1; }
+
+@media (max-width: 560px) {
+  .ps-ficha__grid, .ps-form__grid { grid-template-columns: minmax(0, 1fr); }
+  .ps-filters__view, .ps-filters__search { flex: 1 1 100%; max-width: none; }
+  .ps-filters__select { flex: 1 1 calc(50% - var(--bt-space-2)); min-width: 0; }
+  .ps-row { grid-template-columns: minmax(0, 1fr); }
+}
