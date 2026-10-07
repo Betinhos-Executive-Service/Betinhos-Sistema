@@ -23,7 +23,7 @@ export function CurriculosPage({ host }: { host: Host }) {
 const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
 function Curriculos({ host }: { host: Host }) {
-  const source = useMemo(() => createSource(host, import.meta.env.VITE_CURRICULO_UPLOAD_URL), [host])
+  const source = useMemo(() => createSource(host), [host])
   const cv = useCurriculos(source)
   const toast = useToast()
   const mobile = useMedia('(max-width: 820px)')

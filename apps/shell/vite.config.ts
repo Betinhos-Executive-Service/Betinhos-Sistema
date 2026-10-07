@@ -6,7 +6,6 @@ const packageJson = JSON.parse(readFileSync(new URL('./package.json', import.met
 
 export default defineConfig({
   plugins: [react()],
-  envDir: '../..',
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version),
     __BUILD_DATE__: JSON.stringify(new Date().toISOString()),

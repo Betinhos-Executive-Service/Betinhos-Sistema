@@ -1,6 +1,8 @@
-import type { ReactNode } from 'react'
-import { buttonClassName } from '@betinhos/ui'
-import { ExternalLink, MessageCircle, Phone } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { Button, buttonClassName } from '@betinhos/ui'
+import { ExternalLink, FileText, MessageCircle, Phone } from 'lucide-react'
+import type { Documento } from '../../funcionarios/data/types'
+import type { Source } from '../data/source'
 import type { ChoiceSet, Curriculo } from '../domain/types'
 import { choiceLabel } from '../domain/funnel'
 import { formatDate, formatMoney } from '../domain/text'
@@ -12,7 +14,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** Visão somente leitura do candidato, em blocos (contato, perfil, origem, textos e arquivo). */
-export function CurriculoView({ c, choices }: { c: Curriculo; choices: ChoiceSet }) {
+export function CurriculoView({ c, choices, source }: { c: Curriculo; choices: ChoiceSet; source: Source }) {
   const tel = telHref(c.telefone)
   const wa = whatsappHref(c.whatsapp || c.telefone)
   const place = [c.cidade, c.estado].filter(Boolean).join('/')
@@ -58,10 +60,63 @@ export function CurriculoView({ c, choices }: { c: Curriculo; choices: ChoiceSet
       {c.observacoes ? <section className="cv-view__block"><h3 className="cv-view__title">Observações internas</h3><p className="cv-view__text">{c.observacoes}</p></section> : null}
       <section className="cv-view__block">
         <h3 className="cv-view__title">Currículo</h3>
-        {c.link
-          ? <div className="cv-view__actions"><a className={buttonClassName({ variant: 'secondary' })} href={c.link} target="_blank" rel="noopener noreferrer"><ExternalLink size={16} aria-hidden="true" />Abrir currículo</a></div>
-          : <p className="cv-view__muted">Sem arquivo anexado.</p>}
+        <Arquivos id={c.id} link={c.link} source={source} />
       </section>
     </div>
+  )
+}
+
+type Lista = { state: 'loading' } | { state: 'error'; message: string } | { state: 'ready'; docs: Documento[] }
+
+/** Link antigo (legado) e arquivos da pasta do candidato no SharePoint, abertos pelo Flow Consultar. */
+function Arquivos({ id, link, source }: { id: string; link: string; source: Source }) {
+  const [lista, setLista] = useState<Lista>({ state: 'loading' })
+  const [abrindo, setAbrindo] = useState<string | null>(null)
+  const [erroAbrir, setErroAbrir] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    setLista({ state: 'loading' })
+    source.files(id).then(
+      (docs) => { if (alive) setLista({ state: 'ready', docs }) },
+      (reason: unknown) => { if (alive) setLista({ state: 'error', message: reason instanceof Error ? reason.message : String(reason) }) },
+    )
+    return () => { alive = false }
+  }, [id, source])
+
+  async function abrir(doc: Documento) {
+    const janela = window.open('', '_blank')
+    setAbrindo(doc.id)
+    setErroAbrir(null)
+    try {
+      const { blob } = await source.openFile(doc)
+      const url = URL.createObjectURL(blob)
+      if (janela) janela.location.href = url
+      else window.location.assign(url)
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (reason) {
+      janela?.close()
+      setErroAbrir(`Não foi possível abrir ${doc.nome}: ${reason instanceof Error ? reason.message : String(reason)}`)
+    } finally {
+      setAbrindo(null)
+    }
+  }
+
+  const docs = lista.state === 'ready' ? lista.docs : []
+  return (
+    <>
+      {link || docs.length ? (
+        <div className="cv-view__actions">
+          {link ? <a className={buttonClassName({ variant: 'secondary' })} href={link} target="_blank" rel="noopener noreferrer"><ExternalLink size={16} aria-hidden="true" />Abrir currículo</a> : null}
+          {docs.map((doc) => (
+            <Button key={doc.id || doc.caminho} variant="secondary" icon={<FileText size={16} />} loading={abrindo === doc.id} onClick={() => void abrir(doc)}>{`Abrir ${doc.nome}`}</Button>
+          ))}
+        </div>
+      ) : null}
+      {lista.state === 'loading' ? <p className="cv-view__muted">Carregando arquivos…</p> : null}
+      {lista.state === 'error' ? <p className="cv-view__muted" role="alert">Não foi possível listar os arquivos: {lista.message}</p> : null}
+      {lista.state === 'ready' && !link && !docs.length ? <p className="cv-view__muted">Sem arquivo anexado.</p> : null}
+      {erroAbrir ? <p className="cv-view__muted" role="alert">{erroAbrir}</p> : null}
+    </>
   )
 }
