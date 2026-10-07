@@ -16,8 +16,8 @@ export const DOC_MAX_BYTES = 10 * 1024 * 1024
 export const DOC_ROOT = 'Funcionarios'
 
 /** Pasta estável por colaborador (id não muda quando o nome muda). DEV fica separado. */
-export function pastaFuncionario(id: string, envLabel: string) {
-  return `${DOC_ROOT}/${envLabel === 'DEV' ? 'DEV/' : ''}${id}`
+export function pastaFuncionario(id: string, envLabel: string, root = DOC_ROOT) {
+  return `${root}/${envLabel === 'DEV' ? 'DEV/' : ''}${id}`
 }
 
 /** O flow Salvar recusa "/", "\" e "..". Mantém a extensão e limita o tamanho. */
@@ -73,7 +73,8 @@ function toDocumento(item: Record<string, unknown>): Documento {
   }
 }
 
-export function createSharePointDocs(api: XrmWebApi, envLabel: string) {
+/** `root` é a pasta-raiz do módulo na biblioteca (Funcionarios, Curriculos…). */
+export function createSharePointDocs(api: XrmWebApi, envLabel: string, root = DOC_ROOT) {
   const urls = new Map<FlowKey, Promise<string>>()
 
   async function readEnvVar(schemaName: string) {
@@ -97,17 +98,17 @@ export function createSharePointDocs(api: XrmWebApi, envLabel: string) {
   }
 
   return {
-    pasta: (id: string) => pastaFuncionario(id, envLabel),
+    pasta: (id: string) => pastaFuncionario(id, envLabel, root),
 
     async listar(id: string): Promise<Documento[]> {
-      const result = await callFlow(await flowUrl('listar'), { caminhoCompleto: pastaFuncionario(id, envLabel) })
+      const result = await callFlow(await flowUrl('listar'), { caminhoCompleto: pastaFuncionario(id, envLabel, root) })
       const itens = Array.isArray(result.arquivos) ? (result.arquivos as Record<string, unknown>[]) : []
       return itens.map(toDocumento).sort((a, b) => String(b.modificadoEm).localeCompare(String(a.modificadoEm)))
     },
 
     async enviar(id: string, file: File, nome: string, subpasta?: string): Promise<Documento> {
       const result = await callFlow(await flowUrl('salvar'), {
-        caminhoCompleto: subpasta ? `${pastaFuncionario(id, envLabel)}/${subpasta}` : pastaFuncionario(id, envLabel),
+        caminhoCompleto: subpasta ? `${pastaFuncionario(id, envLabel, root)}/${subpasta}` : pastaFuncionario(id, envLabel, root),
         nomeArquivo: nome,
         conteudoBase64: await fileToBase64(file),
         mimeType: file.type || 'application/octet-stream',

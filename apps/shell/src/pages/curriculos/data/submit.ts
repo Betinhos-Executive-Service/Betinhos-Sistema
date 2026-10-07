@@ -52,7 +52,7 @@ export async function submitNew(deps: SubmitDeps, payload: Row, file: File | nul
   }
   clearPending(deps.kv)
   const message = resumed ? 'Cadastro concluído sem duplicar o registro.'
-    : webUrl ? 'Currículo registrado e arquivo anexado.' : 'Currículo registrado; o envio do arquivo não devolveu o link.'
+    : 'Currículo registrado e arquivo anexado.'
   return { recordId, link: webUrl || null, message, uploadFailed: false }
 }
 
@@ -68,5 +68,5 @@ export async function saveExisting(deps: SubmitDeps, id: string, changes: Row, f
     return { link: null, message: 'Alterações salvas, mas o envio do arquivo falhou. Anexe de novo e salve para tentar outra vez.', uploadFailed: true }
   }
   if (webUrl) await deps.update(id, linkPatch(webUrl))
-  return { link: webUrl || null, message: webUrl ? 'Alterações salvas e arquivo anexado.' : 'Alterações salvas; o envio do arquivo não devolveu o link.', uploadFailed: false }
+  return { link: webUrl || null, message: 'Alterações salvas e arquivo anexado.', uploadFailed: false }
 }

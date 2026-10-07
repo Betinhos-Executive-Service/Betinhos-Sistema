@@ -4,19 +4,26 @@ import type { ChoiceSet, Curriculo } from '../domain/types'
 import type { KV } from '../domain/submission'
 import { MOCK_CHOICES, createMockRows } from './mock'
 import { ENTITY, loadCurriculos, mapCurriculo } from './queries'
-import { flowBody, postToFlow, toBase64 } from './upload'
+import { getDataverseEnvironmentLabel } from '../../funcionarios/data/dataverse'
+import { createSharePointDocs, nomeComData } from '../../funcionarios/data/sharepoint'
+import type { Documento } from '../../funcionarios/data/types'
+import type { XrmHost } from '../../funcionarios/data/xrm'
 
 /** Tudo que a tela precisa do mundo externo; Dataverse em produção, memória no pnpm dev. */
 export type Source = {
   mock: boolean
-  /** false quando o build não tem VITE_CURRICULO_UPLOAD_URL. */
   uploadEnabled: boolean
   load: () => Promise<Curriculo[]>
   choices: () => Promise<ChoiceSet>
   create: (payload: Row) => Promise<string>
   update: (id: string, payload: Row) => Promise<void>
-  /** Envia o arquivo ao Flow e devolve o webUrl (vazio quando o Flow não devolve). */
+  /**
+   * Salva o arquivo na pasta do candidato no SharePoint (Flows comuns do AppBetinhos).
+   * Devolve '' porque o Flow não gera link web; o arquivo é aberto por `openFile`.
+   */
   upload: (recordId: string, file: File, payload: Row) => Promise<string>
+  files: (recordId: string) => Promise<Documento[]>
+  openFile: (doc: Documento) => Promise<{ nome: string; blob: Blob }>
   kv: KV
 }
 
@@ -38,18 +45,11 @@ function browserKV(): KV {
 }
 const DRAFT_PROBE = 'betinhos.curriculos.probe'
 
-function userName() {
-  try {
-    const context = getHostXrm()?.Utility?.getGlobalContext() as { userSettings?: { userName?: string } } | undefined
-    return context?.userSettings?.userName || 'Usuário não identificado'
-  } catch {
-    return 'Usuário não identificado'
-  }
-}
-
 function createMockSource(): Source {
   const rows = createMockRows(new Date())
   let seq = 0
+  const files = new Map<string, Documento[]>()
+  const blobs = new Map<string, Blob>()
   return {
     mock: true,
     uploadEnabled: true,
@@ -68,17 +68,25 @@ function createMockSource(): Source {
       if (!row) throw new Error('Currículo não encontrado.')
       Object.assign(row, payload)
     },
-    async upload(_recordId, file) {
+    async upload(recordId, file) {
       await wait(700) // upload simulado: nada sai do navegador
-      return `https://exemplo.invalid/curriculos/${encodeURIComponent(file.name)}`
+      const nome = nomeComData(file.name)
+      const doc: Documento = { id: `mock-doc-${++seq}`, nome, caminho: `/Documentos Compartilhados/Curriculos/DEV/${recordId}/${nome}`, tamanho: file.size, modificadoEm: new Date().toISOString(), mimeType: file.type || null }
+      files.set(recordId, [doc, ...(files.get(recordId) ?? [])])
+      blobs.set(doc.id, file)
+      return ''
     },
+    async files(recordId) { await wait(250); return files.get(recordId) ?? [] },
+    async openFile(doc) { return { nome: doc.nome, blob: blobs.get(doc.id) ?? new Blob([]) } },
     kv: browserKV(),
   }
 }
 
-export function createSource(host: Host, uploadUrl: string | undefined): Source {
+export function createSource(host: Host): Source {
   if (host.mode === 'mock') return createMockSource()
-  const url = uploadUrl?.trim() ?? ''
+  const xrm = (getHostXrm() ?? window.Xrm) as XrmHost | undefined
+  if (!xrm?.WebApi) throw new Error('A API do Dataverse não está disponível nesta janela')
+  const docs = createSharePointDocs(xrm.WebApi, getDataverseEnvironmentLabel(host.clientUrl), 'Curriculos')
   let set: Promise<string> | null = null
   const entitySet = () => (set ??= host.metadata.entities([ENTITY]).then((info) => {
     const value = info.get(ENTITY)?.entitySetName
@@ -88,7 +96,7 @@ export function createSource(host: Host, uploadUrl: string | undefined): Source 
 
   return {
     mock: false,
-    uploadEnabled: url !== '',
+    uploadEnabled: true,
     load: async () => loadCurriculos(host.client, await entitySet()),
     async choices() {
       const [status, cnh, origem, disponibilidade] = await Promise.all(
@@ -98,11 +106,12 @@ export function createSource(host: Host, uploadUrl: string | undefined): Source 
     },
     create: async (payload) => host.client.create(await entitySet(), payload),
     update: async (id, payload) => host.client.update(await entitySet(), id, payload),
-    async upload(recordId, file, payload) {
-      if (!url) throw new Error('Envio de arquivo indisponível neste ambiente.')
-      const base64 = await toBase64(file)
-      return postToFlow(url, flowBody(recordId, { name: file.name, type: file.type, size: file.size, base64 }, payload, userName(), new Date().toISOString()))
+    async upload(recordId, file) {
+      await docs.enviar(recordId, file, nomeComData(file.name))
+      return ''
     },
+    files: (recordId) => docs.listar(recordId),
+    openFile: (doc) => docs.abrir(doc),
     kv: browserKV(),
   }
 }

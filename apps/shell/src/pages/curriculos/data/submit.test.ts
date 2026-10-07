@@ -27,6 +27,13 @@ describe('submitNew', () => {
     expect(t.update).toHaveBeenCalledWith('r1', { new_linkcurriculo: 'https://s/cv.pdf' })
     expect(readPending(t.kv)).toBeNull()
   })
+  it('arquivo salvo no SharePoint sem link: conclui sem gravar new_linkcurriculo', async () => {
+    const t = setup(async () => '')
+    expect(await submitNew(t.deps, payload, file)).toEqual({ recordId: 'r1', link: null, message: 'Currículo registrado e arquivo anexado.', uploadFailed: false })
+    expect(t.update).not.toHaveBeenCalled()
+    expect(await saveExisting(t.deps, 'r9', {}, file, payload)).toEqual({ link: null, message: 'Alterações salvas e arquivo anexado.', uploadFailed: false })
+    expect(readPending(t.kv)).toBeNull()
+  })
   it('não duplica o registro quando o upload falha e o usuário salva de novo', async () => {
     let fail = true
     const t = setup(async () => { if (fail) throw new Error('HTTP 502'); return 'https://s/cv.pdf' })

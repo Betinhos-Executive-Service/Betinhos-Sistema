@@ -175,7 +175,7 @@ export function CurriculoDrawer({ target, onTarget, list, choices, stages, sourc
       </>
     )
   } else if (current) {
-    body = <CurriculoView c={current} choices={choices} />
+    body = <CurriculoView c={current} choices={choices} source={source} />
   } else if (target) {
     body = <EmptyState align="start" icon={<SearchX size={36} />} title="Currículo não encontrado">Ele pode ter sido inativado. Atualize a página.</EmptyState>
   }

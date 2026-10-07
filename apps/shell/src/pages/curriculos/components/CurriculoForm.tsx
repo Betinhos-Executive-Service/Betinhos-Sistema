@@ -106,7 +106,7 @@ export function CurriculoForm({ formId, form, errors, onChange, onSubmit, choice
               maxFiles={1}
               disabled={disabled || !uploadEnabled}
               label="Arraste o currículo ou escolha o arquivo"
-              hint={uploadEnabled ? 'PDF, DOC, DOCX, PNG ou JPG até 10 MB. Ao salvar, o link é preenchido.' : 'Envio de arquivo indisponível neste ambiente'}
+              hint={uploadEnabled ? 'PDF, DOC, DOCX, PNG ou JPG até 10 MB. Ao salvar, o arquivo vai para a pasta do candidato.' : 'Envio de arquivo indisponível neste ambiente'}
               aria-label="Escolher arquivo do currículo"
             />
             {fileError ? <p className="cv-form__error" role="alert">{fileError}</p> : null}
