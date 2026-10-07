@@ -17,6 +17,12 @@
 .pg-open:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
 @media (hover: hover) and (pointer: fine) { .pg-open:hover strong { color: var(--bt-color-action); } }
 
+/* Linha inteira abre a ficha (o clique é delegado ao botão do nome). */
+.pg-table .bt-table__row:not(.bt-table__row--loading), .pg-card { cursor: pointer; }
+@media (hover: hover) and (pointer: fine) {
+  .pg-table .bt-table__row:not(.bt-table__row--loading):hover, .pg-card:hover { background-color: var(--bt-color-surface-soft); }
+}
+
 /* Celular: cartões. */
 .pg-cards { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
 .pg-card { border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }

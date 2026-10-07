@@ -1,3 +1,4 @@
+import type { MouseEvent } from 'react'
 import { Table, type TableColumn } from '@betinhos/ui'
 import { formatDate, formatMoney } from '../domain/messages'
 import { hasFalha, label, statusTone } from '../domain/status'
@@ -17,6 +18,17 @@ function OpenName({ p, onOpen }: { p: Pagante; onOpen: (id: string) => void }) {
   )
 }
 
+/**
+ * Clique em qualquer ponto da linha (ou do cartão) abre a ficha. O teclado continua no botão do
+ * nome; WhatsApp, copiar e outros controles da linha mantêm a própria ação; seleção de texto não abre.
+ */
+export function openFromRow(event: MouseEvent<HTMLElement>, rowSelector: string, openSelector: string) {
+  const target = event.target as HTMLElement
+  if (target.closest('a, button, input, select, textarea, label, [role="menu"], [role="menuitem"]')) return
+  if (window.getSelection?.()?.toString()) return
+  target.closest(rowSelector)?.querySelector<HTMLButtonElement>(openSelector)?.click()
+}
+
 const severity = (p: Pagante) => {
   if (hasFalha(p)) return { tone: 'danger' as const, label: 'Falha de envio' }
   const tone = statusTone(p.status)
@@ -34,13 +46,17 @@ export function PagantesTable({ list, choices, contatos, onOpen, loading }: Prop
     { key: 'criado', header: 'Criado em', width: 'minmax(88px, .7fr)', hideBelow: 'compact', cell: (p) => formatDate(p.criadoEm) },
     { key: 'acoes', header: <span className="pg-sr">Ações rápidas</span>, width: '84px', align: 'end', cell: (p) => <QuickActions p={p} contato={contatos.get(p.pessoaId)} /> },
   ]
-  return <Table className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} severity={severity} loading={loading} />
+  return (
+    <div className="pg-table-wrap" onClick={(event) => openFromRow(event, '.bt-table__row', '.pg-open')}>
+      <Table className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} severity={severity} loading={loading} />
+    </div>
+  )
 }
 
 /** Celular: cartão com o essencial e as mesmas ações rápidas. */
 export function PagantesCards({ list, choices, contatos, onOpen }: Props) {
   return (
-    <ul className="pg-cards" aria-label="Pagantes">
+    <ul className="pg-cards" aria-label="Pagantes" onClick={(event) => openFromRow(event, '.pg-card', '.pg-card__open')}>
       {list.map((p) => (
         <li key={p.id} className="pg-card">
           <button type="button" className="pg-card__open" onClick={() => onOpen(p.id)}>
