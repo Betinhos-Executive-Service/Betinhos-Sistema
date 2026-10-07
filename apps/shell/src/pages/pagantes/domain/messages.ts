@@ -1,5 +1,5 @@
 import { phoneDigits } from '../../operacional/domain/phone'
-import { isPaid } from './status'
+import { STATUS, isPaid } from './status'
 import type { Contato, Pagante } from './types'
 
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -12,10 +12,27 @@ export const formatDate = (value: Date | null) => (value ? dateOnly.format(value
 
 export type SharedLink = { kind: 'pagamento' | 'recibo'; url: string }
 
-/** Link que faz sentido mandar agora: recibo depois de pago, pagamento antes. */
+/** Só http(s): um `javascript:` gravado no Dataverse nunca vira link clicável. */
+export function safeUrl(raw: string) {
+  try {
+    const url = new URL(raw.trim())
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Link que faz sentido mandar agora: recibo depois de pago; antes, o de pagamento
+ * e, sem ele (Pix ou pedido de compra), o recibo já emitido. Cancelado não tem link.
+ */
 export function linkToShare(p: Pagante): SharedLink | null {
-  if (isPaid(p)) return p.linkRecibo ? { kind: 'recibo', url: p.linkRecibo } : null
-  return p.linkPagamento ? { kind: 'pagamento', url: p.linkPagamento } : null
+  if (p.status === STATUS.cancelado) return null
+  const pagamento = safeUrl(p.linkPagamento)
+  const recibo = safeUrl(p.linkRecibo)
+  if (isPaid(p)) return recibo ? { kind: 'recibo', url: recibo } : null
+  if (pagamento) return { kind: 'pagamento', url: pagamento }
+  return recibo ? { kind: 'recibo', url: recibo } : null
 }
 
 const firstName = (nome: string) => nome.trim().split(/\s+/)[0] ?? ''
@@ -29,7 +46,8 @@ export function whatsappText(p: Pagante, contato?: Contato) {
     return `${saudacao} Aqui é da Betinhos Executive Service.\n\nSegue o link para o pagamento do seu serviço (${ref}):\n${link.url}\n\nQualquer dúvida, estamos à disposição.`
   }
   if (link?.kind === 'recibo') {
-    return `${saudacao} Aqui é da Betinhos Executive Service.\n\nObrigado pelo pagamento (${ref}). Segue o seu recibo:\n${link.url}`
+    const abertura = isPaid(p) ? `Obrigado pelo pagamento (${ref}). Segue o seu recibo:` : `Segue o recibo do seu serviço (${ref}):`
+    return `${saudacao} Aqui é da Betinhos Executive Service.\n\n${abertura}\n${link.url}`
   }
   return `${saudacao} Aqui é da Betinhos Executive Service.`
 }

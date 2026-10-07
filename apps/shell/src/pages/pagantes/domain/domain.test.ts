@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { createMockPagantes, MOCK_CHOICES, MOCK_CONTATOS } from '../data/mock'
-import { BUILTIN_VIEWS, EMPTY_FILTERS, VIEWS_KEY, filterPagantes, hasFilters, loadViews, matchView, newView, periodoStart, saveViews, total, viewFilters, type KV } from './filters'
-import { linkToShare, whatsappText, whatsappUrl } from './messages'
-import { ETAPA, RECIBO, STATUS, canCancel, canMarkPaid, applyPatch, statusPatch, statusTone } from './status'
+import { BUILTIN_VIEWS, EMPTY_FILTERS, VIEWS_KEY, filterPagantes, hasFilters, loadViews, matchView, newView, parseStoredFilters, periodoStart, saveViews, total, viewFilters, type Filters, type KV } from './filters'
+import { linkToShare, safeUrl, whatsappText, whatsappUrl } from './messages'
+import { FALLBACK_CHOICES, withFallback } from './choices'
+import { reciboBloqueado } from '../components/Dialogs'
+import { reconcile } from '../usePagantes'
+import { ETAPA, GERACAO_RECIBO, RECIBO, STATUS, canCancel, canGerarRecibo, canMarkPaid, applyPatch, statusPatch, statusTone } from './status'
 import { buildTimeline } from './timeline'
 import type { Pagante } from './types'
 
@@ -54,7 +57,7 @@ describe('filtros', () => {
     const pagosSemRecibo = filterPagantes(list, viewFilters(BUILTIN_VIEWS.find((v) => v.id === 'pagos-sem-recibo')!), MOCK_CONTATOS)
     expect(pagosSemRecibo.map((p) => p.codigo).sort()).toEqual(['PAG-1205', 'PAG-1206'])
     const falhas = filterPagantes(list, { ...EMPTY_FILTERS, falhas: true }, MOCK_CONTATOS)
-    expect(falhas.map((p) => p.codigo).sort()).toEqual(['PAG-1204', 'PAG-1210'])
+    expect(falhas.map((p) => p.codigo).sort()).toEqual(['PAG-1204', 'PAG-1205', 'PAG-1210'])
   })
 
   it('período conta dias para trás desde a meia-noite; "tudo" não limita', () => {
@@ -78,9 +81,44 @@ describe('visões salvas', () => {
     saveViews(kv, { views: [view], last: view.id })
     const loaded = loadViews(kv)
     expect(loaded.last).toBe(view.id)
-    expect(loaded.views[0]).toMatchObject({ nome: 'Pix pendentes', builtin: false })
-    expect(matchView([...BUILTIN_VIEWS, ...loaded.views], { ...EMPTY_FILTERS, query: 'outra', forma: 202410002, status: [STATUS.pendente] })?.id).toBe(view.id)
+    expect(loaded.views[0]).toMatchObject({ nome: 'Pix pendentes' })
+    expect(loaded.views[0].builtin).toBeFalsy()
+    const atual: Filters = { ...EMPTY_FILTERS, query: 'outra', forma: 202410002, status: [STATUS.pendente] }
+    expect(matchView([...BUILTIN_VIEWS, ...loaded.views], atual)?.id).toBe(view.id)
     expect(matchView(BUILTIN_VIEWS, EMPTY_FILTERS)?.id).toBe('todos')
+  })
+
+  it('a visão escolhida vence outra com os mesmos filtros', () => {
+    const minha = newView('Meus pendentes', viewFilters(BUILTIN_VIEWS.find((v) => v.id === 'a-receber')!), 2)
+    const todas = [...BUILTIN_VIEWS, minha]
+    expect(matchView(todas, minha.filters)?.id).toBe('a-receber')
+    expect(matchView(todas, minha.filters, minha.id)?.id).toBe(minha.id)
+    expect(matchView(todas, EMPTY_FILTERS, minha.id)?.id).toBe('todos')
+  })
+
+  it('descarta visões com campos adulterados em vez de quebrar a tela', () => {
+    const kv = memory()
+    const ok = { id: 'v-ok', nome: 'Boa', filters: { periodo: '30', status: [STATUS.pago], forma: null, recibo: null, falhas: false } }
+    kv.setItem(VIEWS_KEY, JSON.stringify({
+      views: [
+        ok,
+        { id: 'v1', nome: 'status nulo vira vazio', filters: { status: null } },
+        { id: 'v2', nome: 'status texto', filters: { status: 'pago' } },
+        { id: 'v3', nome: 'período inválido', filters: { periodo: '999' } },
+        { id: 'v4', nome: 'recibo inválido', filters: { recibo: 'x' } },
+        { id: 'todos', nome: 'imita pronta', filters: {} },
+        { id: 'v-ok', nome: 'duplicada', filters: {} },
+        { id: 'v5', nome: '   ', filters: {} },
+        null, 42,
+      ],
+      last: 7,
+    }))
+    const loaded = loadViews(kv)
+    expect(loaded.views.map((v) => v.id)).toEqual(['v-ok', 'v1'])
+    expect(loaded.views[1].filters.status).toEqual([])
+    expect(loaded.last).toBeNull()
+    expect(parseStoredFilters({})).toEqual({ periodo: '90', status: [], forma: null, recibo: null, falhas: false })
+    expect(parseStoredFilters(null)).toBeNull()
   })
 
   it('ignora conteúdo corrompido e armazenamento que falha', () => {
@@ -109,6 +147,52 @@ describe('mensagens', () => {
   })
 })
 
+describe('links e recibo', () => {
+  it('só aceita http(s) como link', () => {
+    expect(safeUrl('javascript:alert(1)')).toBeNull()
+    expect(safeUrl('data:text/html,oi')).toBeNull()
+    expect(safeUrl('não é url')).toBeNull()
+    expect(safeUrl(' https://cielolink.com.br/x ')).toBe('https://cielolink.com.br/x')
+    expect(linkToShare({ ...byCode('PAG-1201'), linkPagamento: 'javascript:alert(1)' })).toBeNull()
+  })
+
+  it('pendente sem link de pagamento compartilha o recibo já emitido; cancelado não compartilha nada', () => {
+    const p = byCode('PAG-1212')
+    expect(linkToShare(p)).toEqual({ kind: 'recibo', url: 'https://onedrive.exemplo/recibo-12.pdf' })
+    expect(whatsappText(p)).toMatch(/Segue o recibo do seu serviço/)
+    expect(linkToShare({ ...byCode('PAG-1201'), status: STATUS.cancelado })).toBeNull()
+  })
+
+  it('bloqueia o recibo automático sem pessoa ou sem cliente', () => {
+    expect(reciboBloqueado(byCode('PAG-1212'))).toMatch(/não tem pessoa/)
+    expect(reciboBloqueado(byCode('PAG-1201'), { nome: 'Ana', telefone: '', email: '', cliente: '' })).toMatch(/cliente/)
+    expect(reciboBloqueado(byCode('PAG-1201'), MOCK_CONTATOS.get('p1'))).toBeNull()
+    expect(canGerarRecibo({ status: STATUS.cancelado })).toBe(false)
+    expect(canGerarRecibo({ status: STATUS.pendente })).toBe(true)
+  })
+
+  it('usa rótulos conhecidos quando a metadata falha', () => {
+    expect(withFallback({ status: [], forma: undefined, recibo: [{ value: 1, label: 'X' }] })).toMatchObject({ status: FALLBACK_CHOICES.status, forma: FALLBACK_CHOICES.forma, recibo: [{ value: 1, label: 'X' }] })
+  })
+})
+
+describe('reconciliação', () => {
+  const at = new Date('2026-10-07T12:00:00Z').getTime()
+  const base = { ...byCode('PAG-1201'), alteradoEm: new Date(at - 60_000) }
+  it('recarga lida antes da gravação não desfaz o status; a lida depois vence', () => {
+    const confirmed = new Map([[base.id, { at, patch: { status: STATUS.pago } as Partial<Pagante> }]])
+    expect(reconcile([base], confirmed, at + 1000)[0].status).toBe(STATUS.pago)
+    expect(confirmed.size).toBe(1)
+    const newer = { ...base, status: STATUS.cancelado as number, alteradoEm: new Date(at + 2000) }
+    expect(reconcile([newer], confirmed, at + 3000)[0].status).toBe(STATUS.cancelado)
+    expect(confirmed.size).toBe(0)
+  })
+  it('entrada vence depois de 2 minutos', () => {
+    const confirmed = new Map([[base.id, { at, patch: { status: STATUS.pago } as Partial<Pagante> }]])
+    expect(reconcile([base], confirmed, at + 121_000)[0].status).toBe(STATUS.pendente)
+  })
+})
+
 describe('linha do tempo', () => {
   it('põe eventos datados primeiro, do mais recente, e mostra as falhas', () => {
     const p: Pagante = { ...byCode('PAG-1204'), ultimoLembrete: new Date('2026-10-06T09:00:00-03:00') }
@@ -117,5 +201,8 @@ describe('linha do tempo', () => {
     expect(events.map((e) => e.title)).toEqual(expect.arrayContaining(['Falha ao gerar o link de pagamento', 'Falha ao enviar o e-mail de cobrança']))
     expect(events.find((e) => e.key === 'link')?.detail).toMatch(/Cielo/)
     expect(buildTimeline({ ...p, link: { status: ETAPA.concluido, erro: '' } }, MOCK_CHOICES).some((e) => e.title === 'Link de pagamento gerado')).toBe(true)
+    const recibo = buildTimeline({ ...p, reciboGeracao: { status: GERACAO_RECIBO.erro, erro: 'PDF falhou' }, pagoEm: new Date('2026-10-06T10:00:00-03:00') }, MOCK_CHOICES)
+    expect(recibo.find((e) => e.key === 'recibo-erro')?.detail).toBe('PDF falhou')
+    expect(recibo.some((e) => e.key === 'pago')).toBe(true)
   })
 })

@@ -1,4 +1,4 @@
-import { Button, buttonClassName, useToast, type ButtonSize } from '@betinhos/ui'
+import { Button, buttonClassName, topModalDialog, useToast, type ButtonSize } from '@betinhos/ui'
 import { Copy, MessageCircle } from 'lucide-react'
 import { linkToShare, whatsappUrl } from '../domain/messages'
 import type { Contato, Pagante } from '../domain/types'
@@ -14,7 +14,8 @@ export async function copyText(text: string) {
   area.setAttribute('readonly', '')
   area.style.position = 'fixed'
   area.style.opacity = '0'
-  document.body.append(area)
+  // Com a ficha aberta (modal), o resto da página fica inerte: o campo precisa nascer dentro dela.
+  ;(topModalDialog() ?? document.body).append(area)
   area.select()
   const ok = document.execCommand('copy')
   area.remove()

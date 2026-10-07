@@ -2,6 +2,7 @@ import { cleanId, type Row } from '@betinhos/dataverse'
 import type { Host } from '../../../host'
 import type { ChoiceSet, Contato, Pagante, ServicoOp } from '../domain/types'
 import type { KV } from '../domain/filters'
+import { withFallback } from '../domain/choices'
 import { MOCK_CHOICES, MOCK_CONTATOS, createMockPagantes, mockServicos } from './mock'
 import { ENTITIES, loadContatos, loadPagantes, loadServicos, opFilter, periodFilter, type EntitySets } from './queries'
 import { abrirGeradorDeRecibo } from './recibo'
@@ -73,21 +74,22 @@ export function createSource(host: Host): Source {
       if (!value) throw new Error(`Tabela ${name} não encontrada na metadata.`)
       return value
     }
-    return { pagante: get(ENTITIES.pagante), pessoa: get(ENTITIES.pessoa), reserva: get(ENTITIES.reserva) }
+    return { pagante: get(ENTITIES.pagante), pessoa: get(ENTITIES.pessoa), reserva: get(ENTITIES.reserva), composicao: get(ENTITIES.composicao) }
   }).catch((error) => { sets = null; throw error }))
 
   return {
     mock: false,
     load: async (since) => loadPagantes(host.client, (await entitySets()).pagante, periodFilter(since)),
+    // Rótulo é acessório: metadata fora do ar cai nos rótulos conhecidos em vez de travar a lista.
     async choices() {
       const [status, forma, recibo] = await Promise.all(
-        ['cr40f_status', 'cr40f_formadepagamento', 'cr40f_statusdorecibo'].map((attribute) => host.metadata.choices(ENTITIES.pagante, attribute)),
+        ['cr40f_status', 'cr40f_formadepagamento', 'cr40f_statusdorecibo'].map((attribute) => host.metadata.choices(ENTITIES.pagante, attribute).catch(() => [])),
       )
-      return { status, forma, recibo }
+      return withFallback({ status, forma, recibo })
     },
     contatos: async (ids) => loadContatos(host.client, (await entitySets()).pessoa, ids),
     rateio: async (opId) => loadPagantes(host.client, (await entitySets()).pagante, opFilter(opId)),
-    servicos: async (opId) => loadServicos(host.client, (await entitySets()).reserva, opId),
+    servicos: async (opId) => loadServicos(host.client, await entitySets(), opId),
     update: async (id, payload) => host.client.update((await entitySets()).pagante, id, payload),
     gerarRecibo: (ids, onRefresh) => abrirGeradorDeRecibo(host.clientUrl, ENTITIES.pagante, ids, onRefresh),
     gerarPagantesUrl: (opId) => `${host.clientUrl}/WebResources/Tela_GerarPagantes/index.html?recordId=${encodeURIComponent(cleanId(opId))}&embedded=1`,

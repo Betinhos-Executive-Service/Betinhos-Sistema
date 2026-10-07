@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type HTMLAttributes, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useRef, useState, type HTMLAttributes, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
 export type AlertTone = 'info' | 'success' | 'warning' | 'danger'
 
@@ -53,9 +54,34 @@ type ToastItem = ToastOptions & { id: number; tone: AlertTone }
 
 const ToastContext = createContext<((options: ToastOptions) => void) | null>(null)
 
+/**
+ * Modal aberto mais recente (Drawer, Dialog, Sheet). Um modal deixa o resto da página inerte
+ * e acima dele só a top layer: o toast precisa nascer dentro dele para ficar visível e clicável.
+ */
+export function topModalDialog(doc: Document = document): HTMLDialogElement | null {
+  const open = [...doc.querySelectorAll('dialog')].filter((dialog) => {
+    try { return dialog.matches(':modal') } catch { return dialog.open }
+  })
+  return open.at(-1) ?? null
+}
+
 /** Envolve o app uma vez; os toasts aparecem no topo, centralizados, um sobre o outro. */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([])
+  const [host, setHost] = useState<HTMLDialogElement | null>(null)
+  const showing = items.length > 0
+  // Reavalia o destino quando um toast aparece e quando um modal abre ou fecha com toast na tela.
+  useLayoutEffect(() => {
+    if (!showing) { setHost(null); return }
+    const update = () => setHost(topModalDialog())
+    update()
+    document.addEventListener('close', update, true)
+    document.addEventListener('toggle', update, true)
+    return () => {
+      document.removeEventListener('close', update, true)
+      document.removeEventListener('toggle', update, true)
+    }
+  }, [showing, items])
   const seq = useRef(0)
   const dismiss = useCallback((id: number) => setItems((list) => list.filter((item) => item.id !== id)), [])
   const toast = useCallback((options: ToastOptions) => {
@@ -65,18 +91,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     if (duration > 0) setTimeout(() => dismiss(item.id), duration)
   }, [dismiss])
 
+  const region = (
+    <div className="bt-toast-region">
+      {items.map((item) => (
+        <div key={item.id} className={`bt-toast bt-toast--${item.tone}`} role={item.tone === 'danger' ? 'alert' : 'status'}>
+          <span className="bt-alert__icon"><Icon tone={item.tone} /></span>
+          <span className="bt-toast__text">{item.message}</span>
+          <button type="button" className="bt-alert__close" aria-label="Fechar aviso" onClick={() => dismiss(item.id)}><Close /></button>
+        </div>
+      ))}
+    </div>
+  )
   return (
     <ToastContext.Provider value={toast}>
       {children}
-      <div className="bt-toast-region">
-        {items.map((item) => (
-          <div key={item.id} className={`bt-toast bt-toast--${item.tone}`} role={item.tone === 'danger' ? 'alert' : 'status'}>
-            <span className="bt-alert__icon"><Icon tone={item.tone} /></span>
-            <span className="bt-toast__text">{item.message}</span>
-            <button type="button" className="bt-alert__close" aria-label="Fechar aviso" onClick={() => dismiss(item.id)}><Close /></button>
-          </div>
-        ))}
-      </div>
+      {host ? createPortal(region, host) : region}
     </ToastContext.Provider>
   )
 }

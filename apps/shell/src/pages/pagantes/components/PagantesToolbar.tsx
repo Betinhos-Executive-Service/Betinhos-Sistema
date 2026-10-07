@@ -5,7 +5,7 @@ import type { ChoiceSet } from '../domain/types'
 
 type Props = {
   filters: Filters
-  onChange: (filters: Filters) => void
+  onChange: (filters: Filters, viewId?: string) => void
   choices: ChoiceSet
   views: View[]
   activeView: View | null
@@ -25,7 +25,7 @@ export function PagantesToolbar({ filters, onChange, choices, views, activeView,
       label="Filtros de pagantes"
       start={<>
         <Select className="pg-filters__view" aria-label="Visão" placeholder="Filtros avulsos" searchable={false} clearable={false} options={viewOptions} value={activeView?.id ?? null}
-          onChange={(id) => { const view = views.find((v) => v.id === id); if (view) onChange(viewFilters(view, filters.query)) }} />
+          onChange={(id) => { const view = views.find((v) => v.id === id); if (view) onChange(viewFilters(view, filters.query), view.id) }} />
         <SearchBox className="pg-filters__search" value={filters.query} onChange={(query) => set({ query })} placeholder="Buscar por pagante, PAG, OP, telefone ou e-mail" aria-label="Buscar pagantes" />
         <Select className="pg-filters__select" aria-label="Período de criação" searchable={false} clearable={false} options={PERIODOS} value={filters.periodo} onChange={(periodo) => set({ periodo: (periodo ?? EMPTY_FILTERS.periodo) as Periodo })} />
         <Select className="pg-filters__select" aria-label="Status do pagamento" placeholder="Pagamento" multiple searchable={false} clearable
@@ -41,7 +41,8 @@ export function PagantesToolbar({ filters, onChange, choices, views, activeView,
           trigger={(props) => <Button {...props} variant="secondary" icon={<Bookmark size={16} />}>Visões</Button>}
           actions={[
             { id: 'salvar', label: 'Salvar filtros como visão', icon: <BookmarkPlus size={16} />, onSelect: onSaveView },
-            ...(activeView && !activeView.builtin ? [{ id: 'excluir', label: `Excluir visão “${activeView.nome}”`, icon: <Trash2 size={16} />, tone: 'danger' as const, onSelect: () => onDeleteView(activeView) }] : []),
+            // Todas as visões do usuário podem ser excluídas, mesmo as que não estão ativas.
+            ...views.filter((v) => !v.builtin).map((v) => ({ id: `excluir-${v.id}`, label: `Excluir visão “${v.nome}”`, icon: <Trash2 size={16} />, tone: 'danger' as const, onSelect: () => onDeleteView(v) })),
           ]}
         />
       </>}

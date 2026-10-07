@@ -21,6 +21,9 @@ export const RECIBO = { pendente: 202410000, enviado: 202410001, gerado: 2024100
 /** `cr40f_statusgeracaolink` e `cr40f_statusenvioemail`. */
 export const ETAPA = { naoAplicavel: 202410000, pendente: 202410001, concluido: 202410002, erro: 202410003 } as const
 
+/** `new_statusgeracaorecibo` (choice local, outra faixa de valores). */
+export const GERACAO_RECIBO = { naoAplicavel: 100000000, processando: 100000001, concluido: 100000002, erro: 100000003 } as const
+
 export const A_RECEBER: number[] = [STATUS.pendente, STATUS.negado, STATUS.expirado, STATUS.naoFinalizado, STATUS.aguardandoFacial]
 
 /** Pago e Autorizado ficam travados pelo plugin do Gerar Pagantes. */
@@ -28,7 +31,10 @@ export const isPaid = (p: Pick<Pagante, 'status'>) => p.status === STATUS.pago |
 const isClosed = (p: Pick<Pagante, 'status'>) => isPaid(p) || p.status === STATUS.cancelado
 export const canMarkPaid = (p: Pick<Pagante, 'status'>) => !isClosed(p)
 export const canCancel = (p: Pick<Pagante, 'status'>) => !isClosed(p)
-export const hasFalha = (p: Pick<Pagante, 'link' | 'email'>) => p.link.status === ETAPA.erro || p.email.status === ETAPA.erro
+export const hasFalha = (p: Pick<Pagante, 'link' | 'email' | 'reciboGeracao'>) =>
+  p.link.status === ETAPA.erro || p.email.status === ETAPA.erro || p.reciboGeracao.status === GERACAO_RECIBO.erro
+/** O gerador de recibo do model-driven aceita qualquer status; só o cancelado não faz sentido. */
+export const canGerarRecibo = (p: Pick<Pagante, 'status'>) => p.status !== STATUS.cancelado
 export const reciboEnviado = (p: Pick<Pagante, 'recibo'>) => p.recibo === RECIBO.enviado
 
 export function statusTone(status: number | null): StatusTone {
