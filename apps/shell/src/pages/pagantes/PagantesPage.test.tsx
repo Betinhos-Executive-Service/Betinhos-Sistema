@@ -77,6 +77,15 @@ describe('Pagantes', () => {
     expect(within(confirm).queryByRole('checkbox', { name: /Gerar e enviar o recibo/ })).toBeNull()
   })
 
+  it('clique em qualquer ponto da linha abre a ficha; ações rápidas não', async () => {
+    render(<PagantesPage host={{ mode: 'mock' }} />)
+    const row = (await screen.findByText('PAG-1203')).closest('.bt-table__row') as HTMLElement
+    fireEvent.click(within(row).getByRole('button', { name: /Copiar link|Sem link/ }))
+    expect(screen.queryByRole('dialog', { name: 'Helena Prado' })).toBeNull()
+    fireEvent.click(within(row).getByText(/860,50/))
+    expect(await screen.findByRole('dialog', { name: 'Helena Prado' })).toBeTruthy()
+  })
+
   it('gerar recibo fecha a ficha antes de abrir o gerador e mostra o erro', async () => {
     render(<PagantesPage host={{ mode: 'mock' }} />)
     await openRow('PAG-1202')
