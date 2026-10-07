@@ -146,7 +146,7 @@ export function CurriculoDrawer({ target, onTarget, list, choices, stages, sourc
     footer = (
       <div className="cv-drawer__actions">
         <Button variant="secondary" disabled={saving} onClick={() => requestClose(target.mode === 'edit' ? { mode: 'view', id: target.id } : null)}>Cancelar</Button>
-        <Button type="submit" form={formId} loading={saving}>{target.mode === 'create' ? 'Salvar currículo' : 'Salvar alterações'}</Button>
+        <Button key="submit" type="submit" form={formId} loading={saving}>{target.mode === 'create' ? 'Salvar currículo' : 'Salvar alterações'}</Button>
       </div>
     )
   } else if (current && stage) {
@@ -157,7 +157,7 @@ export function CurriculoDrawer({ target, onTarget, list, choices, stages, sourc
           trigger={(props) => <Button variant="secondary" icon={<ArrowRightLeft size={16} />} {...props}>Mover para…</Button>}
           actions={stages.filter((s) => s.value !== stage.value).map((s) => ({ id: String(s.value), label: s.short, onSelect: () => onMove(current, s) }))}
         />
-        <Button icon={<Pencil size={16} />} onClick={() => onTarget({ mode: 'edit', id: current.id })}>Editar</Button>
+        <Button key="edit" icon={<Pencil size={16} />} onClick={() => onTarget({ mode: 'edit', id: current.id })}>Editar</Button>
       </div>
     )
   }
