@@ -22,7 +22,7 @@ describe('Pagantes', () => {
     await openRow('PAG-1201')
 
     const ficha = await screen.findByRole('dialog', { name: 'Mariana Albuquerque' })
-    // O contato chega depois da lista (no CI, mais lento): espera o link aparecer.
+    // O contato carrega depois da ficha abrir; até lá o WhatsApp é um botão desabilitado.
     expect((await within(ficha).findByRole('link', { name: 'WhatsApp' })).getAttribute('href')).toMatch(/^https:\/\/wa\.me\/5511998124410/)
     expect(await within(ficha).findByText(/2 parcelas/)).toBeTruthy()
 
