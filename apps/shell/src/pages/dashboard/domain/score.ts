@@ -1,5 +1,5 @@
 import { int } from './format'
-import { entre } from './periodo'
+import { entre, mesRotulo } from './periodo'
 import type { AlertaItem, EventoConducao, TelemetriaDia, Tom, Viagem } from './types'
 
 /** Uma linha por (motorista, mês), como `scoreRowsByKey` do `renderDriverSafetyScore` do legado. */
@@ -14,6 +14,10 @@ export type LinhaScore = {
   taxaOcioso: number | null
   suficiente: boolean
   nota: number | null
+  /** Nota (0–100, sem arredondar) de cada componente; null quando a linha não é suficiente. */
+  notaAceleracao: number | null
+  notaFrenagem: number | null
+  notaOcioso: number | null
 }
 export type ResultadoScore = { media: number | null; validas: number }
 
@@ -71,10 +75,11 @@ export function linhasScore(viagens: Viagem[], eventos: EventoConducao[], teleme
     const taxaFrenagem = l.distancia ? (l.frenagem / l.distancia) * 100 : null
     const taxaOcioso = l.distancia && l.ocioConhecido ? (l.ocioso / l.distancia) * 100 : null
     const suficiente = l.distancia >= DISTANCIA_MINIMA_KM && taxaOcioso !== null
-    const nota = suficiente
-      ? Math.round(componente(taxaAceleracao as number, 0.5, 4) * 0.35 + componente(taxaFrenagem as number, 0.5, 4) * 0.35 + componente(taxaOcioso as number, 5, 25) * 0.3)
-      : null
-    return { motoristaId: l.motoristaId, mes: l.mes, distancia: l.distancia, taxaAceleracao, taxaFrenagem, taxaOcioso, suficiente, nota }
+    const notaAceleracao = suficiente ? componente(taxaAceleracao as number, 0.5, 4) : null
+    const notaFrenagem = suficiente ? componente(taxaFrenagem as number, 0.5, 4) : null
+    const notaOcioso = suficiente ? componente(taxaOcioso as number, 5, 25) : null
+    const nota = suficiente ? Math.round((notaAceleracao as number) * 0.35 + (notaFrenagem as number) * 0.35 + (notaOcioso as number) * 0.3) : null
+    return { motoristaId: l.motoristaId, mes: l.mes, distancia: l.distancia, taxaAceleracao, taxaFrenagem, taxaOcioso, suficiente, nota, notaAceleracao, notaFrenagem, notaOcioso }
   })
 }
 
@@ -82,6 +87,44 @@ export function linhasScore(viagens: Viagem[], eventos: EventoConducao[], teleme
 export function scoreMotoristas(viagens: Viagem[], eventos: EventoConducao[], telemetria: TelemetriaDia[], inicio: string, fim: string): ResultadoScore {
   const notas = linhasScore(viagens, eventos, telemetria, inicio, fim).flatMap((l) => (l.suficiente && l.nota !== null ? [l.nota] : []))
   return { media: notas.length ? Math.round(notas.reduce((t, n) => t + n, 0) / notas.length) : null, validas: notas.length }
+}
+
+/** Ordem da tabela "Score por motorista e mês" do legado: mês desc, nota desc (sem nota conta como -1) e km desc. */
+export const ordenarLinhasScore = (linhas: LinhaScore[]) =>
+  [...linhas].sort((a, b) => b.mes.localeCompare(a.mes) || (b.nota ?? -1) - (a.nota ?? -1) || b.distancia - a.distancia)
+
+export type PosicaoMensal = { motoristaId: string; nome: string; nota: number; distancia: number }
+export type RankingMes = { mes: string; rotulo: string; ranking: PosicaoMensal[] }
+
+/** `tblTopMotMonthly`: por mês (em ordem), as 5 maiores notas válidas; desempate por km desc e depois pelo nome. */
+export function rankingMensal(linhas: LinhaScore[], nome: (motoristaId: string) => string): RankingMes[] {
+  const validas = linhas.filter((l) => l.suficiente && l.nota !== null)
+  return [...new Set(validas.map((l) => l.mes))].sort().map((mes) => ({
+    mes,
+    rotulo: mesRotulo(mes),
+    ranking: validas
+      .filter((l) => l.mes === mes)
+      .sort((a, b) => (b.nota as number) - (a.nota as number) || b.distancia - a.distancia || nome(a.motoristaId).localeCompare(nome(b.motoristaId)))
+      .slice(0, 5)
+      .map((l) => ({ motoristaId: l.motoristaId, nome: nome(l.motoristaId), nota: l.nota as number, distancia: l.distancia })),
+  }))
+}
+
+export type NotaMes = { mes: string; rotulo: string; nota: number; validas: number }
+
+/** `cDriverSafetyScore`: média (sem arredondar, como o gráfico do legado) das notas válidas de cada mês, meses em ordem. */
+export function notaPorMes(linhas: LinhaScore[]): NotaMes[] {
+  const porMes = new Map<string, number[]>()
+  for (const l of linhas) {
+    if (!l.suficiente || l.nota === null) continue
+    const notas = porMes.get(l.mes) ?? []
+    notas.push(l.nota)
+    porMes.set(l.mes, notas)
+  }
+  return [...porMes.keys()].sort().map((mes) => {
+    const notas = porMes.get(mes) ?? []
+    return { mes, rotulo: mesRotulo(mes), nota: notas.reduce((t, n) => t + n, 0) / notas.length, validas: notas.length }
+  })
 }
 
 /** Alerta "Score motoristas" da faixa Operação. `indisponivel`: algum dos três conjuntos do Infleet não carregou. */

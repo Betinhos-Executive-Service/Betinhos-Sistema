@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { alertaScore, linhasScore, scoreMotoristas } from './score'
+import { alertaScore, linhasScore, notaPorMes, ordenarLinhasScore, rankingMensal, scoreMotoristas } from './score'
 import { evento, telemetria, viagem } from './test-utils'
 import type { EventoConducao, TelemetriaDia, Viagem } from './types'
 
@@ -130,5 +130,66 @@ describe('alertaScore', () => {
 
   it('conjunto indisponível vira s/dado neutro', () => {
     expect(alertaScore({ media: 90, validas: 4 }, true)).toEqual({ id: 'score', valor: '—', rotulo: 'Score motoristas', status: 's/dado', tom: 'neutral' })
+  })
+})
+
+describe('linhas, ranking mensal e nota por mês (tblDriverSafetyScore, tblTopMotMonthly e cDriverSafetyScore do legado)', () => {
+  it('cada linha expõe a nota de cada componente; linha insuficiente fica sem componentes', () => {
+    // 200 km, 3 acelerações (1,5 → 71,43), 1 frenagem (0,5 → 100), 21 min ociosos (10,5 → 72,5).
+    const viagens = [v({ distancia: 200 }), v({ motoristaId: 'm2', veiculoId: 'v2', distancia: 50 })]
+    const eventos = [...mais(3, () => e()), e({ tipo: 'hardbraking' })]
+    const linhas = linhasScore(viagens, eventos, [t({ ociosoMin: 21 }), t({ veiculoId: 'v2' })], INI, FIM)
+    const m1 = linhas.find((l) => l.motoristaId === 'm1')
+    expect(m1?.notaAceleracao).toBeCloseTo(71.428571, 5)
+    expect(m1?.notaFrenagem).toBe(100)
+    expect(m1?.notaOcioso).toBeCloseTo(72.5, 10)
+    expect(linhas.find((l) => l.motoristaId === 'm2')).toMatchObject({ suficiente: false, nota: null, notaAceleracao: null, notaFrenagem: null, notaOcioso: null })
+  })
+
+  it('ordena por mês desc, nota desc (sem nota por último) e km desc', () => {
+    const viagens = [
+      v({ dia: '2026-09-10', mes: '2026-09', distancia: 150 }),
+      v({ motoristaId: 'm2', veiculoId: 'v2', distancia: 300 }),
+      v({ motoristaId: 'm3', veiculoId: 'v3', distancia: 500 }),
+      v({ motoristaId: 'm4', veiculoId: 'v4', distancia: 50 }),
+      v({ motoristaId: 'm5', veiculoId: 'v5', distancia: 120 }),
+    ]
+    const eventos = [...mais(4, () => e({ motoristaId: 'm3' }))]
+    const telemetria = [t({ dia: '2026-09-10', mes: '2026-09' }), t({ veiculoId: 'v2' }), t({ veiculoId: 'v3' }), t({ veiculoId: 'v4' }), t({ veiculoId: 'v5' })]
+    const ordem = ordenarLinhasScore(linhasScore(viagens, eventos, telemetria, '2026-09-01', FIM)).map((l) => `${l.mes}:${l.motoristaId}`)
+    // out: m2 (100, 300 km), m5 (100, 120 km), m3 (0,8/100 km → 91 com ocioso 0: nota menor), m4 sem nota; set: m1.
+    expect(ordem).toEqual(['2026-10:m2', '2026-10:m5', '2026-10:m3', '2026-10:m4', '2026-09:m1'])
+  })
+
+  it('ranking mensal: meses em ordem, top 5 notas válidas, desempate por km e depois por nome', () => {
+    const ids = ['a', 'b', 'c', 'd', 'e', 'f']
+    const viagens = [
+      ...ids.map((id, i) => v({ motoristaId: id, veiculoId: `v${id}`, distancia: 200 + (i === 1 ? 100 : 0) })),
+      v({ dia: '2026-09-10', mes: '2026-09', motoristaId: 'a', veiculoId: 'va', distancia: 100 }),
+      v({ motoristaId: 'g', veiculoId: 'vg', distancia: 80 }),
+    ]
+    // f perde nota (8 acelerações em 200 km = 4/100 km → componente 0 → nota 65).
+    const eventos = mais(8, () => e({ motoristaId: 'f' }))
+    const telemetria = [...ids.map((id) => t({ veiculoId: `v${id}` })), t({ dia: '2026-09-10', mes: '2026-09', veiculoId: 'va' }), t({ veiculoId: 'vg' })]
+    const nomes: Record<string, string> = { a: 'Zeca', b: 'Bia', c: 'Ana', d: 'Caio', e: 'Duda', f: 'Fábio' }
+    const r = rankingMensal(linhasScore(viagens, eventos, telemetria, '2026-09-01', FIM), (id) => nomes[id] ?? 'Motorista vinculado')
+    expect(r.map((m) => m.mes)).toEqual(['2026-09', '2026-10'])
+    expect(r[0]).toMatchObject({ rotulo: 'set/26', ranking: [{ motoristaId: 'a', nome: 'Zeca', nota: 100, distancia: 100 }] })
+    // out: todos 100 exceto f (65); b tem mais km; c, d, e, a empatam em km → por nome: Ana, Caio, Duda, Zeca. g sem nota fica fora.
+    expect(r[1].ranking.map((p) => p.nome)).toEqual(['Bia', 'Ana', 'Caio', 'Duda', 'Zeca'])
+  })
+
+  it('nota por mês: média sem arredondar das notas válidas de cada mês, meses em ordem', () => {
+    const viagens = [
+      v({ distancia: 200 }), v({ motoristaId: 'm2', veiculoId: 'v2', distancia: 100 }),
+      v({ dia: '2026-09-10', mes: '2026-09', motoristaId: 'm3', veiculoId: 'v3', distancia: 150 }),
+      v({ dia: '2026-08-10', mes: '2026-08', motoristaId: 'm4', veiculoId: 'v4', distancia: 50 }),
+    ]
+    const eventos = [...mais(3, () => e()), e({ tipo: 'hardbraking' }), ...mais(4, () => e({ motoristaId: 'm2' })), ...mais(4, () => e({ motoristaId: 'm2', tipo: 'hardbraking' }))]
+    const telemetria = [t({ ociosoMin: 21 }), t({ veiculoId: 'v2', ociosoMin: 25 }), t({ dia: '2026-09-10', mes: '2026-09', veiculoId: 'v3' }), t({ dia: '2026-08-10', mes: '2026-08', veiculoId: 'v4' })]
+    expect(notaPorMes(linhasScore(viagens, eventos, telemetria, '2026-08-01', FIM))).toEqual([
+      { mes: '2026-09', rotulo: 'set/26', nota: 100, validas: 1 },
+      { mes: '2026-10', rotulo: 'out/26', nota: 41, validas: 2 },
+    ])
   })
 })
