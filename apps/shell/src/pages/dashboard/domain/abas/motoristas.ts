@@ -31,6 +31,8 @@ export type LinhaScoreMotorista = LinhaScore & { nome: string; rotulo: string }
 export type Motoristas = {
   /** `null` = s/dado (conjunto não carregou). */
   kpis: { total: number | null; cnhAtencao: number | null; score: ResultadoScore | null }
+  /** Veículos não carregaram: `propria` fica null em todas as linhas e a UI avisa que o filtro próprio/terceiro não se aplica. */
+  veiculosIndisponiveis: boolean
   /** `months` do legado: meses com serviço no recorte (mínimo 1), divisor do "/mês" do ranking. */
   mesesBase: number
   ranking: LinhaRankingMotorista[]
@@ -70,7 +72,8 @@ export function calcularMotoristas(ctx: Contexto, dados: Dados): Motoristas {
   const semInfleet = fora('viagens') || fora('eventos') || fora('telemetria')
   const ativos = semFuncionarios ? [] : dados.funcionarios.filter(ativo)
 
-  const categoria = new Map(dados.veiculos.map((v) => [v.id, v.categoria as string]))
+  const veiculosIndisponiveis = fora('veiculos')
+  const categoria = new Map((veiculosIndisponiveis ? [] : dados.veiculos).map((v) => [v.id, v.categoria as string]))
   const porId = agrupar(rv.filter((r) => r.motoristaId), (r) => r.motoristaId)
   const porNome = agrupar(rv, (r) => r.motorista)
   const meses = mesesComDados(rv)
@@ -117,6 +120,7 @@ export function calcularMotoristas(ctx: Contexto, dados: Dados): Motoristas {
       cnhAtencao: semFuncionarios ? null : cnhVencendo.length,
       score: semInfleet ? null : scoreMotoristas(dados.viagens, dados.eventos, dados.telemetria, f.inicio, f.fim),
     },
+    veiculosIndisponiveis,
     mesesBase: Math.max(1, meses.length),
     ranking,
     cnhVencendo,
