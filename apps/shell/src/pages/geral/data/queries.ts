@@ -38,6 +38,12 @@ export function parsePage(body: FetchResponse): Page {
   return { rows: body.value, cookie, more: body['@Microsoft.Dynamics.CRM.morerecords'] === true, total: typeof count === 'number' && count >= 0 ? count : null }
 }
 
+/** Total vindo do FetchXML agregado (`alias="total"`); sem número, `null`. */
+export function parseCount(body: { value: Row[] }): number | null {
+  const total = body.value[0]?.total
+  return typeof total === 'number' && total >= 0 ? total : null
+}
+
 export function searchPath(set: string, idAttribute: string, nameAttribute: string, query: string) {
   const q = query.trim()
   const filter = q ? `statecode eq 0 and contains(${nameAttribute},'${odataString(q)}')` : 'statecode eq 0'

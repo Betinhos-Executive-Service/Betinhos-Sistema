@@ -3,17 +3,18 @@ import type { Host } from '../../../host'
 import { browserKV } from '../../pagantes/data/source'
 import type { KV } from '../domain/columns'
 import { COPY_SELECT } from '../domain/copy'
-import { buildFetch, quickFindAttributes } from '../domain/fetch'
+import { buildCountFetch, buildFetch, quickFindAttributes } from '../domain/fetch'
 import { formatDateTime, formatMoney } from '../domain/format'
 import { ENTITY, ID_ATTRIBUTE, PAGE_SIZE, type AttributeInfo, type AttributeMap, type LookupBind, type LookupOption, type Page, type Sort, type View } from '../domain/types'
 import { MOCK_ATTRIBUTES, MOCK_BINDS, MOCK_LOOKUPS, applyMockFetch, createMockRows, createMockViews } from './mock'
-import { copyPath, fetchPath, mapViews, parsePage, quickFindPath, relationshipPath, reloadPath, searchPath, viewsPaths, type FetchResponse } from './queries'
+import { copyPath, fetchPath, mapViews, parseCount, parsePage, quickFindPath, relationshipPath, reloadPath, searchPath, viewsPaths, type FetchResponse } from './queries'
 
 export const FORM_WEBRESOURCE = 'new_formulario_geral.html'
 export const VOUCHER_WEBRESOURCE = 'cr40f_VoucherConfirmacao.html'
 export const ESCALA_FDS_WEBRESOURCE = 'cr40f_EscalaFDS.html'
 
-export type PageRequest = { fetchxml: string; page: number; cookie: string | null; sort: Sort; query: string; quickFind: string[]; /** Linhas por página; sem valor, `PAGE_SIZE`. */ pageSize?: number }
+export type PageRequest = { fetchxml: string; page: number; cookie: string | null; sort: Sort; query: string; quickFind: string[] }
+export type CountRequest = { fetchxml: string; query: string; quickFind: string[] }
 
 /** Tudo que a tela precisa do mundo externo; Dataverse em produção, memória no pnpm dev. */
 export type Source = {
@@ -22,6 +23,8 @@ export type Source = {
   quickFind(): Promise<string[]>
   attributes(entity: string): Promise<AttributeMap>
   page(req: PageRequest): Promise<Page>
+  /** Total de linhas da visão (com a busca); `null` quando a contagem falha. */
+  count(req: CountRequest): Promise<number | null>
   update(id: string, patch: Row): Promise<void>
   clearLookup(id: string, attribute: string): Promise<void>
   lookupBind(attribute: string): Promise<LookupBind>
@@ -74,8 +77,12 @@ function createMockSource({ latency = 1 }: SourceOptions = {}): Source {
     attributes: async (entity) => (entity === ENTITY ? new Map(MOCK_ATTRIBUTES) : new Map<string, AttributeInfo>()),
     async page(req) {
       await wait(300)
-      const page = applyMockFetch(rows, req.fetchxml, { ...req, pageSize: req.pageSize ?? PAGE_SIZE, now: new Date() })
+      const page = applyMockFetch(rows, req.fetchxml, { ...req, pageSize: PAGE_SIZE, now: new Date() })
       return { ...page, rows: page.rows.map((r) => ({ ...r })) }
+    },
+    async count(req) {
+      await wait(150)
+      return applyMockFetch(rows, req.fetchxml, { ...req, page: 1, pageSize: Number.MAX_SAFE_INTEGER, sort: null, now: new Date() }).total
     },
     async update(id, patch) {
       await wait(350)
@@ -198,8 +205,14 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
     },
     attributes,
     async page(req) {
-      const fetchxml = buildFetch(req.fetchxml, { page: req.page, pageSize: req.pageSize ?? PAGE_SIZE, cookie: req.cookie, sort: req.sort, query: req.query, quickFind: req.quickFind })
+      const fetchxml = buildFetch(req.fetchxml, { page: req.page, pageSize: PAGE_SIZE, cookie: req.cookie, sort: req.sort, query: req.query, quickFind: req.quickFind })
       return parsePage(await host.client.request<FetchResponse>(fetchPath(await entitySet(), fetchxml)))
+    },
+    async count(req) {
+      try {
+        const fetchxml = buildCountFetch(req.fetchxml, { query: req.query, quickFind: req.quickFind })
+        return parseCount(await host.client.request<{ value: Row[] }>(fetchPath(await entitySet(), fetchxml)))
+      } catch { return null }
     },
     update: async (id, patch) => host.client.update(await entitySet(), id, patch),
     async clearLookup(id, attribute) {

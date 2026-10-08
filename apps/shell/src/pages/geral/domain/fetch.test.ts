@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { buildFetch, defaultSort, linkEntities, quickFindAttributes } from './fetch'
+import { buildCountFetch, buildFetch, defaultSort, linkEntities, quickFindAttributes } from './fetch'
 
 const AGENDA = `<fetch version="1.0" output-format="xml-platform" mapping="logical" distinct="false" count="25" page="3" paging-cookie="x" returntotalrecordcount="false">
 <entity name="cr40f_reservadeveculos"><attribute name="cr40f_id" /><attribute name="cr40f_status" /><attribute name="cr40f_dataehorriodesada" />
@@ -75,6 +75,47 @@ describe('buildFetch', () => {
 
   it('FetchXML inválido lança erro legível', () => {
     expect(() => buildFetch('<fetch><entity>', base)).toThrow('FetchXML da visão inválido.')
+  })
+})
+
+describe('buildCountFetch', () => {
+  const count = (query = '', quickFind: string[] = []) => parse(buildCountFetch(AGENDA, { query, quickFind }))
+
+  it('vira agregação de contagem: sem paginação, ordem e atributos da visão', () => {
+    const doc = count()
+    const fetch = doc.documentElement
+    expect(fetch.getAttribute('aggregate')).toBe('true')
+    for (const name of ['count', 'page', 'paging-cookie', 'returntotalrecordcount', 'distinct']) expect(fetch.hasAttribute(name)).toBe(false)
+    expect(doc.querySelectorAll('order').length).toBe(0)
+    const attributes = doc.querySelectorAll('entity > attribute')
+    expect(attributes.length).toBe(1)
+    expect(attributes[0].getAttribute('name')).toBe('cr40f_reservadeveculosid')
+    expect(attributes[0].getAttribute('alias')).toBe('total')
+    expect(attributes[0].getAttribute('aggregate')).toBe('count')
+    expect(doc.querySelector('entity')?.firstElementChild).toBe(attributes[0])
+    expect(doc.querySelectorAll('attribute').length).toBe(1)
+  })
+
+  it('preserva filtro e link-entity (sem atributos)', () => {
+    const doc = count()
+    expect(doc.querySelectorAll('entity > filter > condition').length).toBe(1)
+    const link = doc.querySelector('link-entity')
+    expect(link?.getAttribute('alias')).toBe('a_2b63')
+    expect(link?.querySelectorAll('attribute').length).toBe(0)
+  })
+
+  it('injeta a busca igual ao buildFetch', () => {
+    const doc = count("OS-19 d'água", ['cr40f_id', 'cr40f_trajeto'])
+    const filters = doc.querySelectorAll('entity > filter')
+    expect(filters.length).toBe(2)
+    expect(Array.from(filters[1].querySelectorAll('condition')).map((c) => c.getAttribute('value'))).toEqual(["%OS-19 d'água%", "%OS-19 d'água%"])
+    expect(count('   ', ['cr40f_id']).querySelectorAll('entity > filter').length).toBe(1)
+  })
+
+  it('remove order de link-entity e FetchXML inválido lança erro legível', () => {
+    const withLinkOrder = AGENDA.replace('<attribute name="new_valortotal" />', '<attribute name="new_valortotal" /><order attribute="new_valortotal" />')
+    expect(parse(buildCountFetch(withLinkOrder, { query: '', quickFind: [] })).querySelectorAll('order').length).toBe(0)
+    expect(() => buildCountFetch('<fetch><entity>', { query: '', quickFind: [] })).toThrow('FetchXML da visão inválido.')
   })
 })
 

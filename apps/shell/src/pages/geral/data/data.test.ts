@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
 import type { Host } from '../../../host'
-import { fetchPath, mapViews, parsePage, reloadPath, searchPath } from './queries'
+import { fetchPath, mapViews, parseCount, parsePage, reloadPath, searchPath } from './queries'
 import { applyMockFetch, createMockRows, createMockViews, MOCK_ROW_COUNT } from './mock'
+import { PAGE_SIZE } from '../domain/types'
 import { createSource } from './source'
 
 describe('queries', () => {
@@ -15,6 +16,11 @@ describe('queries', () => {
   })
   it('fetchPath codifica o FetchXML', () => {
     expect(fetchPath('cr40f_reservadeveculoses', '<fetch count="50"/>')).toBe('cr40f_reservadeveculoses?fetchXml=%3Cfetch%20count%3D%2250%22%2F%3E')
+  })
+  it('parseCount lê o total da agregação ou devolve null', () => {
+    expect(parseCount({ value: [{ total: 220 }] })).toBe(220)
+    expect(parseCount({ value: [] })).toBeNull()
+    expect(parseCount({ value: [{ total: 'x' }] })).toBeNull()
   })
   it('parsePage extrai total, cookie decodificado e se há mais', () => {
     const page = parsePage({
@@ -42,29 +48,35 @@ describe('mock', () => {
     const rows = createMockRows(now)
     expect(views.find((v) => v.padrao)?.nome).toContain('Agenda')
     expect(rows.length).toBe(MOCK_ROW_COUNT)
-    const page = applyMockFetch(rows, views[0].fetchxml, { page: 1, pageSize: 50, sort: null, query: '', quickFind: ['cr40f_id'], now })
-    expect(page.rows.length).toBe(50)
+    const page = applyMockFetch(rows, views[0].fetchxml, { page: 1, pageSize: PAGE_SIZE, sort: null, query: '', quickFind: ['cr40f_id'], now })
+    expect(page.rows.length).toBe(PAGE_SIZE)
     expect(page.more).toBe(true)
     expect(page.total).toBe(rows.length)
-    // A OS-1013 (linha bloqueada dos testes) fica entre as 50 primeiras da Agenda.
+    // A OS-1013 (linha bloqueada dos testes) fica entre as 100 primeiras da Agenda.
     expect(page.rows.some((r) => r.cr40f_id === 'OS-1013')).toBe(true)
-    for (const pageSize of [100, 200]) {
-      const bigger = applyMockFetch(rows, views[0].fetchxml, { page: 1, pageSize, sort: null, query: '', quickFind: [], now })
-      expect(bigger.rows.length).toBe(pageSize)
-    }
-    const hoje = applyMockFetch(rows, views.find((v) => v.nome === 'Hoje')!.fetchxml, { page: 1, pageSize: 50, sort: null, query: '', quickFind: [], now })
+    const hoje = applyMockFetch(rows, views.find((v) => v.nome === 'Hoje')!.fetchxml, { page: 1, pageSize: PAGE_SIZE, sort: null, query: '', quickFind: [], now })
     expect(hoje.rows.every((r) => String(r.cr40f_dataehorriodesada).startsWith('2026-10-08'))).toBe(true)
-    const busca = applyMockFetch(rows, views[0].fetchxml, { page: 1, pageSize: 50, sort: null, query: 'OS-10', quickFind: ['cr40f_id'], now })
+    const busca = applyMockFetch(rows, views[0].fetchxml, { page: 1, pageSize: PAGE_SIZE, sort: null, query: 'OS-10', quickFind: ['cr40f_id'], now })
     expect(busca.rows.every((r) => String(r.cr40f_id).includes('OS-10'))).toBe(true)
   })
-  it('source mock respeita o pageSize do pedido e usa 50 sem ele', async () => {
+  it('source mock devolve páginas de 100 linhas', async () => {
     const source = createSource({ mode: 'mock' }, { latency: 0 })
     const [view] = await source.views()
     const request = { fetchxml: view.fetchxml, page: 1, cookie: null, sort: null, query: '', quickFind: [] }
-    expect((await source.page(request)).rows).toHaveLength(50)
-    expect((await source.page({ ...request, pageSize: 100 })).rows).toHaveLength(100)
-    expect((await source.page({ ...request, page: 2, pageSize: 100 })).rows).toHaveLength(100)
-    expect((await source.page({ ...request, page: 2, pageSize: 200 })).rows).toHaveLength(MOCK_ROW_COUNT - 200)
+    expect((await source.page(request)).rows).toHaveLength(PAGE_SIZE)
+    expect((await source.page({ ...request, page: 2 })).rows).toHaveLength(PAGE_SIZE)
+    expect((await source.page({ ...request, page: 3 })).rows).toHaveLength(MOCK_ROW_COUNT - 2 * PAGE_SIZE)
+  })
+  it('source mock conta o total da visão e o filtrado', async () => {
+    const source = createSource({ mode: 'mock' }, { latency: 0 })
+    const views = await source.views()
+    const agenda = views.find((v) => v.padrao)!
+    expect(await source.count({ fetchxml: agenda.fetchxml, query: '', quickFind: [] })).toBe(MOCK_ROW_COUNT)
+    const sem = views.find((v) => v.nome.includes('Sem motorista'))!
+    const filtrado = await source.count({ fetchxml: sem.fetchxml, query: '', quickFind: [] })
+    const pagina = await source.page({ fetchxml: sem.fetchxml, page: 1, cookie: null, sort: null, query: '', quickFind: [] })
+    expect(filtrado).toBe(pagina.total)
+    expect(filtrado).toBeLessThan(MOCK_ROW_COUNT)
   })
   it('source mock grava e relê', async () => {
     const source = createSource({ mode: 'mock' })
@@ -142,13 +154,20 @@ describe('source Dataverse', () => {
     expect(page.cookie).toBe('<c/>')
     const url = decodeURIComponent(String(request.mock.calls[0][0]))
     expect(url).toContain('cr40f_reservadeveculoses?fetchXml=')
-    expect(url).toContain('count="50"')
+    expect(url).toContain('count="100"')
     expect(url).toContain('page="2"')
   })
-  it('page usa o pageSize do pedido no count do FetchXML', async () => {
-    const { host, request } = fakeHost({ request: () => ({ value: [] }) })
-    await createSource(host).page({ fetchxml: '<fetch><entity name="cr40f_reservadeveculos" /></fetch>', page: 1, cookie: null, sort: null, query: '', quickFind: [], pageSize: 200 })
-    expect(decodeURIComponent(String(request.mock.calls[0][0]))).toContain('count="200"')
+  it('count pede a agregação por FetchXML e devolve o número; erro vira null', async () => {
+    const { host, request } = fakeHost({ request: () => ({ value: [{ total: 1234 }] }) })
+    const total = await createSource(host).count({ fetchxml: '<fetch count="100" page="2"><entity name="cr40f_reservadeveculos"><attribute name="cr40f_id" /><order attribute="cr40f_id" /></entity></fetch>', query: '', quickFind: [] })
+    expect(total).toBe(1234)
+    const url = decodeURIComponent(String(request.mock.calls[0][0]))
+    expect(url).toContain('cr40f_reservadeveculoses?fetchXml=')
+    expect(url).toContain('aggregate="true"')
+    expect(url).not.toContain('<order')
+    const ruim = fakeHost({ request: () => { throw new Error('boom') } })
+    expect(await createSource(ruim.host).count({ fetchxml: '<fetch><entity name="cr40f_reservadeveculos" /></fetch>', query: '', quickFind: [] })).toBeNull()
+    expect(await createSource(fakeHost().host).count({ fetchxml: '<fetch><entity>', query: '', quickFind: [] })).toBeNull()
   })
   it('lookupBind lê a relação e falha com mensagem clara quando não existe', async () => {
     const ok = fakeHost({ request: () => ({ value: [{ ReferencingEntityNavigationPropertyName: 'cr40f_Motorista', ReferencedEntity: 'cr40f_funcionarios' }] }) })
