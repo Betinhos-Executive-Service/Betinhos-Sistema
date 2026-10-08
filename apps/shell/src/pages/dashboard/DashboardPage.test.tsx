@@ -12,7 +12,13 @@ beforeEach(() => {
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
   history.replaceState(null, '', '#/dashboard')
 })
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); history.replaceState(null, '', '#') })
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+  history.replaceState(null, '', '#')
+  // jsdom não tem scrollIntoView; o teste dos atalhos instala um espião.
+  delete (Element.prototype as Partial<Element>).scrollIntoView
+})
 
 describe('Dashboard', () => {
   it('abre no mock com "Este ano" e mostra as seções', async () => {
