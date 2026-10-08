@@ -12,7 +12,7 @@ import { ApoioChip, ApoioTexto, KpiChip } from './KpiChip'
 import { KPI_PLACEHOLDER, KpiGrid } from './KpiGrid'
 import { ResumoSecoes } from './ResumoSecoes'
 import { calcularResumo } from '../domain/resumo'
-import { reserva } from '../domain/test-utils'
+import { manutencao, reserva, veiculo } from '../domain/test-utils'
 import type { Dados, Filtros } from '../domain/types'
 import type { Host } from '../../../host'
 
@@ -36,11 +36,11 @@ const TITULOS = [
 const resumoDe = (dados: Dados, p: Partial<Filtros> = {}) =>
   calcularResumo(dados, { atalho: 'esteMes', inicio: '2026-10-01', fim: '2026-10-15', status: [], clientes: [], motoristas: [], tipos: [], ...p }, new Date('2026-10-15T15:00:00Z'))
 const renderResumo = (dados: Dados) => render(<ResumoSecoes resumo={resumoDe(dados)} periodo={PERIODO} />)
-const VAZIO: Dados = { reservas: [], manutencoes: [], multas: [], ocorrencias: [], funcionarios: [], veiculos: [], viagens: [], eventos: [], telemetria: [], indisponiveis: [] }
+const VAZIO: Dados = { reservas: [], manutencoes: [], multas: [], ocorrencias: [], funcionarios: [], veiculos: [], viagens: [], eventos: [], telemetria: [], pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], indisponiveis: [] }
 const UM_SERVICO: Dados = {
   reservas: [reserva({ saidaRaw: '2026-10-02T12:00:00Z', criadoRaw: '2026-10-02T08:00:00Z', valor: 500, cliente: 'Tenaris', motoristaId: 'm', motoristaKey: 'm', motorista: 'Ana', veiculoId: 'v1' })],
-  manutencoes: [{ dia: '2026-10-03', valor: 100 }], multas: [], ocorrencias: [], funcionarios: [], viagens: [], eventos: [], telemetria: [], indisponiveis: [],
-  veiculos: [{ id: 'v1', statusLabel: 'Disponível', categoria: 'Propria' }],
+  manutencoes: [manutencao({ dia: '2026-10-03', valor: 100 })], multas: [], ocorrencias: [], funcionarios: [], viagens: [], eventos: [], telemetria: [], pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], indisponiveis: [],
+  veiculos: [veiculo({ id: 'v1', statusLabel: 'Disponível', categoria: 'Propria' })],
 }
 
 /** Dois clientes e dois motoristas no mesmo mês, todos emergenciais: Tenaris com 2 serviços (R$ 1.000) e Embraer com 1 (R$ 300). */

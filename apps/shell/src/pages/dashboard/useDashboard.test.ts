@@ -3,9 +3,10 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { INTERVALO_MS, useDashboard } from './useDashboard'
 import type { Source } from './data/source'
+import { manutencao } from './domain/test-utils'
 import type { Dados } from './domain/types'
 
-const dados = (n: number): Dados => ({ reservas: [], manutencoes: Array.from({ length: n }, () => ({ dia: '2026-10-01', valor: 1 })), multas: [], ocorrencias: [], funcionarios: [], veiculos: [], viagens: [], eventos: [], telemetria: [], indisponiveis: [] })
+const dados = (n: number): Dados => ({ reservas: [], manutencoes: Array.from({ length: n }, () => manutencao({ dia: '2026-10-01', valor: 1 })), multas: [], ocorrencias: [], funcionarios: [], veiculos: [], viagens: [], eventos: [], telemetria: [], pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], indisponiveis: [] })
 const fonte = (impl: Source['carregar']): Source => ({ mock: true, carregar: vi.fn(impl) })
 const visibilidade = (estado: 'visible' | 'hidden') => Object.defineProperty(document, 'visibilityState', { value: estado, configurable: true })
 

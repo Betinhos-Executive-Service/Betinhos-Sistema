@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { alertaScore, linhasScore, scoreMotoristas } from './score'
+import { evento, telemetria, viagem } from './test-utils'
 import type { EventoConducao, TelemetriaDia, Viagem } from './types'
 
-const v = (p: Partial<Viagem> = {}): Viagem => ({ dia: '2026-10-05', mes: '2026-10', veiculoId: 'v1', motoristaId: 'm1', distancia: 100, ...p })
-const e = (p: Partial<EventoConducao> = {}): EventoConducao => ({ dia: '2026-10-05', mes: '2026-10', motoristaId: 'm1', tipo: 'hardAcceleration', ...p })
-const t = (p: Partial<TelemetriaDia> = {}): TelemetriaDia => ({ dia: '2026-10-05', mes: '2026-10', veiculoId: 'v1', ociosoMin: 0, ...p })
+const v = (p: Partial<Viagem> = {}): Viagem => viagem({ dia: '2026-10-05', mes: '2026-10', veiculoId: 'v1', motoristaId: 'm1', distancia: 100, ...p })
+const e = (p: Partial<EventoConducao> = {}): EventoConducao => evento({ dia: '2026-10-05', mes: '2026-10', motoristaId: 'm1', tipo: 'hardAcceleration', ...p })
+const t = (p: Partial<TelemetriaDia> = {}): TelemetriaDia => telemetria({ dia: '2026-10-05', mes: '2026-10', veiculoId: 'v1', ociosoMin: 0, ...p })
 const mais = <T,>(n: number, make: () => T) => Array.from({ length: n }, make)
 const INI = '2026-10-01'
 const FIM = '2026-10-15'
