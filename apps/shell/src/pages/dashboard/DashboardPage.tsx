@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react'
-import { Alert, Button, EmptyState, StatusBadge, Tabs, buttonClassName, useShellHeader } from '@betinhos/ui'
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
+import { Alert, Button, EmptyState, StatusBadge, Tabs, buttonClassName, tabId, useShellHeader } from '@betinhos/ui'
 import { ExternalLink, Info, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
@@ -12,7 +12,7 @@ import type { Contexto } from './domain/kpis'
 import { atalho, cargaDesde } from './domain/periodo'
 import type { Filtros } from './domain/types'
 import { useDashboard } from './useDashboard'
-import { ABAS, ABAS_POR_SERVICO, abaDaUrl, avisoSegmento, rotuloAba, type Aba, type PropsAba } from './components/abas/abas'
+import { ABAS, ABAS_POR_SERVICO, abaDaUrl, avisoSegmento, type Aba, type PropsAba } from './components/abas/abas'
 import { ResumoTab } from './components/abas/ResumoTab'
 import { ServicosTab } from './components/abas/ServicosTab'
 import { FinanceiroTab } from './components/abas/FinanceiroTab'
@@ -24,6 +24,7 @@ import { MultasTab } from './components/abas/MultasTab'
 import { DashboardToolbar } from './components/DashboardToolbar'
 import './dashboard.css'
 
+const PAINEL_ID = 'dash-painel'
 const SEM_OPCOES: OpcoesFiltro = { status: [], clientes: [], motoristas: [], tipos: [] }
 const dataBR = (dia: string) => dia.split('-').reverse().join('/')
 const horaBR = (d: Date) => d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
@@ -71,16 +72,6 @@ export function DashboardPage({ host }: { host: Host }) {
   const periodo = `${dataBR(filtros.inicio)} a ${dataBR(filtros.fim)}`
   const carregandoPrimeira = !db.dados && db.carregando
 
-  // O painel liga-se à aba ativa pelos ids que o `Tabs` do DS gera (`aria-controls` do botão e o `id` dele): lidos do DOM após montar.
-  const abasRef = useRef<HTMLDivElement>(null)
-  const [ligacao, setLigacao] = useState<{ painel?: string; aba?: string }>({})
-  useLayoutEffect(() => {
-    const botao = abasRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
-    const painel = botao?.getAttribute('aria-controls') || undefined
-    const id = botao?.id || undefined
-    setLigacao((l) => (l.painel === painel && l.aba === id ? l : { painel, aba: id }))
-  }, [aba])
-
   const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar dashboard" onClick={() => void db.atualizar()} />, [db.atualizar])
   useShellHeader({ title: 'Dashboard', actions: headerActions })
 
@@ -116,12 +107,12 @@ export function DashboardPage({ host }: { host: Host }) {
         <a className={buttonClassName({ variant: 'secondary' })} href={hrefFor('new_dashboard')}><ExternalLink size={16} aria-hidden="true" /> Abrir dashboard completo</a>
         {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} loading={db.carregando && Boolean(db.dados)} onClick={() => void db.atualizar()}>Atualizar</Button>}
       </>}
-      tabs={<div className="dash-abas" ref={abasRef}><Tabs tabs={[...ABAS]} value={aba} onChange={trocarAba} aria-label="Abas do dashboard" /></div>}
+      tabs={<div className="dash-abas"><Tabs tabs={[...ABAS]} value={aba} onChange={trocarAba} panelId={PAINEL_ID} aria-label="Abas do dashboard" /></div>}
       toolbar={<DashboardToolbar filtros={filtros} opcoes={opcoes} now={now} onChange={setFiltros} />}
     >
       <div
-        className="dash-corpo" role="tabpanel" id={ligacao.painel} aria-labelledby={ligacao.aba}
-        aria-label={ligacao.aba ? undefined : rotuloAba(aba)} aria-busy={carregandoPrimeira || undefined}
+        className="dash-corpo" role="tabpanel" id={PAINEL_ID} aria-labelledby={tabId(PAINEL_ID, aba)}
+        aria-busy={carregandoPrimeira || undefined}
       >
         {db.erro && db.dados ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={() => void db.atualizar()}>Tentar de novo</Button>}>{db.erro} Os números são da carga anterior.</Alert> : null}
         {db.erro && !db.dados && !db.carregando ? (

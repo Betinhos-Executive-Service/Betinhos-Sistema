@@ -7,7 +7,7 @@ const TOKENS = {
   successSoft: ['--bt-color-success-soft', '#eaf8f1'],
   warning: ['--bt-color-warning', '#856000'],
   warningSoft: ['--bt-color-warning-soft', '#fff7df'],
-  secondary: ['--bt-color-text-secondary', '#64748b'],
+  secondary: ['--bt-color-text-secondary', '#5f6e85'],
   border: ['--bt-color-border', '#e2e8f0'],
   surface: ['--bt-color-surface', '#ffffff'],
   surfaceSoft: ['--bt-color-surface-soft', '#f7f9fc'],
