@@ -1,5 +1,5 @@
 import { dayKey } from './periodo'
-import type { Dados, EventoConducao, Funcionario, Manutencao, Multa, Reserva, TelemetriaDia, Veiculo, Viagem } from './types'
+import type { EventoConducao, Funcionario, Manutencao, Multa, Reserva, TelemetriaDia, Veiculo, Viagem } from './types'
 
 /** Reserva de teste: serviço concluído de R$ 0 sem motorista, cliente nem veículo; sobrescreva o que importa. */
 export function reserva(p: Partial<Reserva> & { saidaRaw?: string } = {}): Reserva {
@@ -16,7 +16,9 @@ export function reserva(p: Partial<Reserva> & { saidaRaw?: string } = {}): Reser
 }
 
 /** Fábricas de teste dos conjuntos secundários: campos extras vazios/zerados; sobrescreva o que importa. */
-export const manutencao = (p: Partial<Manutencao> = {}): Manutencao => ({ dia: '2026-10-05', valor: 0, aprovacaoDia: '', statusLabel: '', tipoReparo: '—', veiculoId: '', ...p })
+export const manutencao = (p: Partial<Manutencao> = {}): Manutencao => ({
+  dia: '2026-10-05', valor: 0, aprovacaoDia: '', statusLabel: '', tipoReparo: '—', veiculoId: '', criadoDia: '', ...p,
+})
 export const multa = (p: Partial<Multa> = {}): Multa => ({
   dia: '2026-10-05', status: null, statusLabel: '', motoristaId: '', motorista: '—', veiculoId: '', infracaoCodigo: '', infracaoDescricao: '', ...p,
 })
@@ -30,8 +32,4 @@ export const evento = (p: Partial<EventoConducao> = {}): EventoConducao => ({
 })
 export const telemetria = (p: Partial<TelemetriaDia> = {}): TelemetriaDia => ({
   dia: '2026-10-05', mes: '2026-10', veiculoId: '', ociosoMin: 0, distanciaKm: 0, velocidadeMedia: 0, velocidadeMaxima: 0, excessos: 0, autonomia: 0, tempoAcimaMin: 0, ...p,
-})
-export const dadosVazios = (p: Partial<Dados> = {}): Dados => ({
-  reservas: [], manutencoes: [], multas: [], ocorrencias: [], funcionarios: [], veiculos: [], viagens: [], eventos: [], telemetria: [],
-  pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], indisponiveis: [], ...p,
 })

@@ -29,6 +29,8 @@ const VEICULOS: Veiculo[] = [
   { id: 'mock-v4', statusLabel: 'Disponível', categoria: 'Terceirizada', placa: 'TRC4D56', marca: 'Mercedes-Benz', modelo: 'Sprinter', blindado: false, ano: 2020 },
   { id: 'mock-v5', statusLabel: 'Disponível', categoria: 'Terceirizada', placa: 'TRC5E67', marca: 'Volkswagen', modelo: 'Virtus', blindado: false, ano: 2024 },
 ]
+/** Fora de VEICULOS para não mudar o sorteio de veículos das reservas: entra em ~5% delas por um gerador à parte. */
+const VEICULO_ALUGUEL: Veiculo = { id: 'mock-v6', statusLabel: 'Disponível', categoria: 'Aluguel', placa: 'ALG6F78', marca: 'Fiat', modelo: 'Cronos', blindado: false, ano: 2025 }
 const TIPOS = ['Executivo', 'Blindado', 'Van']
 const TIPOS_SERVICO = ['São Paulo', 'Guarulhos', 'Congonhas', 'Campinas', 'Vale do Paraíba', 'Rio de Janeiro', 'Dentro de São Paulo']
 const FAT = [
@@ -177,7 +179,7 @@ function criarDespesasMock(reservas: Reserva[], funcionarios: Funcionario[], now
       const fin = rand()
       const anexo = rand()
       const vinculo = rand()
-      const dia = dayKey(new Date(t + Math.floor(rand() * 6) * HORA).toISOString())
+      const dia = new Date(t + Math.floor(rand() * 6) * HORA).toISOString().slice(0, 10)
       const statusAnexo = anexo < 0.85 ? 100000002 : anexo < 0.95 ? 100000000 : 100000004
       n++
       despesas.push({
@@ -226,7 +228,8 @@ export function criarDadosMock(now: Date): Dados {
       const cancelado = !futuro && rand() < 0.06
       const status = futuro ? (rand() < 0.5 ? { code: 202410005, label: 'Programado' } : { code: 202410001, label: 'Confirmado' }) : cancelado ? { code: null, label: 'Cancelado' } : { code: 202410008, label: 'Concluído' }
       const mot = rand() < 0.9 ? pick(MOTORISTAS) : null
-      const vei = rand() < 0.9 ? pick(VEICULOS) : null
+      const sorteado = rand() < 0.9 ? pick(VEICULOS) : null
+      const vei = sorteado && extra() < 0.05 ? VEICULO_ALUGUEL : sorteado
       const temCp = !cancelado && rand() < 0.85
       const concluida = temCp && rand() < 0.8
       const fat = pick(FAT)
@@ -249,10 +252,14 @@ export function criarDadosMock(now: Date): Dados {
     }
   }
   const dias = (qtd: number) => Array.from({ length: qtd }, (_, i) => dayKey(new Date(now.getTime() - i * 9 * DIA).toISOString()))
-  const manutencoes: Manutencao[] = dias(40).map((dia, i) => ({
-    dia, valor: Math.round(200 + rand() * 3800), aprovacaoDia: dayKey(new Date(Date.parse(`${dia}T15:00:00Z`) - (1 + Math.floor(extra() * 12)) * DIA).toISOString()),
-    statusLabel: pickExtra(STATUS_MANUTENCAO), tipoReparo: pickExtra(TIPOS_REPARO), veiculoId: VEICULOS[i % VEICULOS.length].id,
-  }))
+  const manutencoes: Manutencao[] = dias(40).map((dia, i) => {
+    const aprovacaoMs = Date.parse(`${dia}T15:00:00Z`) - (1 + Math.floor(extra() * 12)) * DIA
+    return {
+      dia, valor: Math.round(200 + rand() * 3800), aprovacaoDia: dayKey(new Date(aprovacaoMs).toISOString()),
+      statusLabel: pickExtra(STATUS_MANUTENCAO), tipoReparo: pickExtra(TIPOS_REPARO), veiculoId: VEICULOS[i % VEICULOS.length].id,
+      criadoDia: dayKey(new Date(aprovacaoMs - Math.floor(extra() * 4) * DIA).toISOString()),
+    }
+  })
   const multas: Multa[] = dias(25).map((dia) => {
     const pendente = rand() < 0.3
     const status = pendente ? { code: MULTA_NOTIFICAR, label: 'Notificar o Condutor' } : pickExtra(STATUS_MULTA_RESOLVIDA)
@@ -272,7 +279,7 @@ export function criarDadosMock(now: Date): Dados {
     multas,
     ocorrencias: dias(30).map((dia) => ({ dia })),
     funcionarios,
-    veiculos: VEICULOS,
+    veiculos: [...VEICULOS, VEICULO_ALUGUEL],
     ...criarInfleetMock(now),
     pagantes: criarPagantesMock(reservas, now),
     despesas: criarDespesasMock(reservas, funcionarios, now),

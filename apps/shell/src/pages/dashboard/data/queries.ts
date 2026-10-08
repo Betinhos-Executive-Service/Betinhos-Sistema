@@ -37,7 +37,7 @@ export function reservasPath(set: string, desde: string, ate: string) {
 }
 export const composicoesPath = (set: string) => `${set}?$select=cr40f_composicaodeprecosid,new_valortotal,new_status`
 export const manutencoesPath = (set: string) =>
-  `${set}?$select=cr40f_datamanutencao,cr40f_valor,cr40f_datadaaprovacao,cr40f_status,cr40f_tipodoreparo,_cr40f_placa_carro_value`
+  `${set}?$select=cr40f_datamanutencao,cr40f_valor,cr40f_datadaaprovacao,cr40f_status,cr40f_tipodoreparo,_cr40f_placa_carro_value,createdon`
 const MULTA_SELECT = 'cr40f_dataehorario,cr40f_status,_cr40f_codigodainfracao_value,_cr40f_motorista_value,_cr40f_placa_value'
 /** Multas com a infração pelo `$expand` (legado L11531); `comInfracao = false` é a consulta reduzida usada se a navegação falhar. */
 export const multasPath = (set: string, comInfracao = true) =>
@@ -62,11 +62,11 @@ export const eventosPath = (set: string, desde: string, ate: string) =>
 
 const PAGANTE_SELECT = 'cr40f_pagantesid,createdon,_cr40f_financeiro_value,cr40f_status,cr40f_valor,cr40f_formadepagamento,_cr40f_bancodedados_value'
 /**
- * Todos os pagantes ativos, sem janela de datas: como o `loadPagantes` do legado, "Atrasados" e "CP mais antiga" dependem dos pendentes antigos.
+ * Todos os pagantes, sem `$filter`: como o `loadPagantes` do legado, "Atrasados" e "CP mais antiga" dependem dos pendentes antigos.
  * `comPrimeiroPagamento = false` é a consulta sem `cr40f_datadoprimeiropagamento`.
  */
 export const pagantesPath = (set: string, comPrimeiroPagamento = true) =>
-  `${set}?$select=${PAGANTE_SELECT}${comPrimeiroPagamento ? ',cr40f_datadoprimeiropagamento' : ''}&$filter=${encodeURIComponent('statecode eq 0')}`
+  `${set}?$select=${PAGANTE_SELECT}${comPrimeiroPagamento ? ',cr40f_datadoprimeiropagamento' : ''}`
 /** Despesas ativas com data do gasto na janela (`cr40f_datagasto` é DateTime). */
 export const despesasPath = (set: string, desde: string, ate: string) =>
   `${set}?$select=cr40f_despesaoperacionalid,cr40f_nome,cr40f_datagasto,cr40f_valor,_cr40f_categoria_value,_cr40f_formapagamento_value,_cr40f_motorista_value,_cr40f_reserva_value,cr40f_statusfinanceiro,cr40f_statusanexo&$filter=${encodeURIComponent('statecode eq 0 and ')}${janelaDataHora('cr40f_datagasto', desde, ate)}&$orderby=${encodeURIComponent('cr40f_datagasto desc')}`
@@ -120,6 +120,7 @@ export function mapReserva(row: Row, cps: Map<string, Cp>): Reserva {
 export const mapManutencao = (row: Row): Manutencao => ({
   dia: dayKey(str(row.cr40f_datamanutencao)), valor: Number(row.cr40f_valor) || 0, aprovacaoDia: dayKey(str(row.cr40f_datadaaprovacao)),
   statusLabel: formatted(row, 'cr40f_status'), tipoReparo: formatted(row, 'cr40f_tipodoreparo') || '—', veiculoId: lower(row._cr40f_placa_carro_value),
+  criadoDia: dayKey(str(row.createdon)),
 })
 
 /** `funcMapGlobal` do legado por id: id do funcionário → apelido (ou nome completo). */
@@ -253,7 +254,8 @@ export function mapDespesa(row: Row, ctx: ContextoDespesa): Despesa {
   const formaId = lower(row._cr40f_formapagamento_value)
   const motoristaId = lower(row._cr40f_motorista_value)
   const func = ctx.funcionarios.get(motoristaId)
-  const dia = dayKey(str(row.cr40f_datagasto))
+  // `dateKey` do legado: texto bruto, sem fuso.
+  const dia = str(row.cr40f_datagasto).slice(0, 10)
   return {
     id, dia, mes: dia.slice(0, 7), valor: Number(row.cr40f_valor) || 0,
     categoriaId, categoria: ctx.categorias.get(categoriaId)?.nome || rotulo(row, '_cr40f_categoria_value') || 'Sem categoria',

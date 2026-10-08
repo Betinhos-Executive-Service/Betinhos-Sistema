@@ -29,9 +29,17 @@ async function comLimite<T>(tarefas: (() => Promise<T>)[], limite: number) {
   return resultados
 }
 
-/** Tenta a consulta completa; se ela falhar (coluna ou navegação ausente no ambiente), usa a reduzida, como o `loadPagantes` do legado. */
+/**
+ * Tenta a consulta completa; se ela falhar (coluna ou navegação ausente no ambiente), registra o erro e usa a reduzida,
+ * como o `loadPagantes` do legado.
+ */
 async function comAlternativa(principal: () => Promise<Row[]>, reduzida: () => Promise<Row[]>) {
-  try { return await principal() } catch { return reduzida() }
+  try {
+    return await principal()
+  } catch (error) {
+    console.warn('Dashboard: consulta completa falhou; usando a reduzida.', String(error))
+    return reduzida()
+  }
 }
 
 /**
