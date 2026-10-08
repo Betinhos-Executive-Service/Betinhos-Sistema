@@ -1,41 +1,21 @@
-import { Skeleton } from '@betinhos/ui'
-import { Sparkline } from '../charts/Charts'
-import type { CorToken } from '../charts/tokens'
 import type { Kpi, KpiId } from '../domain/types'
-import { Chips } from './KpiChip'
+import { KpiCard, KpiLinha, KpisCarregando, type TomKpi } from './KpiCard'
 
-/** Cor de cada indicador: borda superior, linha da sparkline e área no tom suave do mesmo papel. */
-const TOM: Record<KpiId, { classe: string; linha: CorToken; area: CorToken }> = {
-  faturamento: { classe: 'action', linha: 'action', area: 'actionSoft' },
-  servicos: { classe: 'brand', linha: 'brand', area: 'border' },
-  ticket: { classe: 'action', linha: 'action', area: 'actionSoft' },
-  aReceber: { classe: 'success', linha: 'success', area: 'successSoft' },
-  cpPendente: { classe: 'warning', linha: 'warning', area: 'warningSoft' },
-  recebimento: { classe: 'success', linha: 'success', area: 'successSoft' },
+/** Cor de cada indicador executivo: borda superior e sparkline no mesmo papel. */
+const TOM: Record<KpiId, TomKpi> = {
+  faturamento: 'action', servicos: 'brand', ticket: 'action', aReceber: 'success', cpPendente: 'warning', recebimento: 'success',
 }
-const ROTULOS: [KpiId, string][] = [['faturamento', 'Faturamento'], ['servicos', 'Serviços'], ['ticket', 'Ticket médio'], ['aReceber', 'A receber'], ['cpPendente', 'CP pendente'], ['recebimento', 'Recebimento']]
-/** Cards vazios para o skeleton da primeira carga. */
-export const KPI_PLACEHOLDER: Kpi[] = ROTULOS.map(([id, rotulo]) => ({ id, rotulo, valor: '—', chips: [], apoio: [], serie: [] }))
+const ROTULO = 'Indicadores executivos'
+export const ROTULOS_RESUMO = ['Faturamento', 'Serviços', 'Ticket médio', 'A receber', 'CP pendente', 'Recebimento'] as const
 
-/** Seis KPIs executivos: borda superior na cor do indicador, valor, chips sempre visíveis e sparkline na base. */
-export function KpiGrid({ kpis, carregando }: { kpis: Kpi[]; carregando: boolean }) {
+/** Seis KPIs executivos do Resumo: o card único (`KpiCard`) com chips sempre visíveis e sparkline na base. */
+export function KpiGrid({ kpis }: { kpis: Kpi[] }) {
   return (
-    <section className="dash-kpis" aria-label="Indicadores executivos" aria-busy={carregando || undefined}>
-      {kpis.map((k) => (
-        <article key={k.id} className={`dash-kpi dash-kpi--${TOM[k.id].classe}`} aria-label={k.rotulo}>
-          <span className="dash-kpi__rotulo">{k.rotulo}</span>
-          {carregando ? <>
-            <Skeleton height={26} width="62%" />
-            <Skeleton height={22} width="84%" />
-            <span className="dash-sr">Carregando</span>
-            <Skeleton className="dash-spark" shape="rect" width="auto" />
-          </> : <>
-            <strong className="dash-kpi__valor">{k.valor}</strong>
-            {k.chips.length || k.apoio.length ? <div className="dash-kpi__extras"><Chips chips={k.chips} apoio={k.apoio} /></div> : null}
-            {k.serie.length ? <Sparkline dados={k.serie} linha={TOM[k.id].linha} area={TOM[k.id].area} /> : null}
-          </>}
-        </article>
-      ))}
-    </section>
+    <KpiLinha rotulo={ROTULO} colunas={6}>
+      {kpis.map((k) => <KpiCard key={k.id} rotulo={k.rotulo} valor={k.valor} tom={TOM[k.id]} chips={k.chips} apoio={k.apoio} serie={k.serie} />)}
+    </KpiLinha>
   )
 }
+
+/** Primeira carga do Resumo: os seis cards no formato final, com o espaço da sparkline reservado. */
+export const KpiGridCarregando = () => <KpisCarregando rotulo={ROTULO} rotulos={ROTULOS_RESUMO} colunas={6} serie />

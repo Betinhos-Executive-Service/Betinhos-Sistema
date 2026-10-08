@@ -1,6 +1,7 @@
 import { agrupar, passaSegmentos } from '../base'
-import { normL, stL } from '../format'
+import { normL } from '../format'
 import type { Contexto } from '../kpis'
+import { manutencaoEmAndamento } from './manutencoes'
 import { entre, fmtDia, mesRotulo, parseDia } from '../periodo'
 import type { Conjunto, Dados, EventoConducao, Reserva, Veiculo } from '../types'
 
@@ -9,7 +10,16 @@ export const CORTE_USO_FROTA = '2026-06-01'
 const INFLEET: Conjunto[] = ['viagens', 'eventos', 'telemetria']
 
 export type KpisFrota = {
-  total: number; disponiveis: number; blindados: number; emManutencao: number
+  /** Frota: o cadastro sem os veículos de status "Vendido" (spec §6). */
+  total: number
+  /** Cadastro inteiro e quantos dele estão vendidos (apoio do total). */
+  cadastrados: number; vendidos: number
+  /** Status "ativo" ou "ativo(a)" (`isActiveVehicle` do legado; spec §6). */
+  disponiveis: number
+  /** Blindados da frota (sem os vendidos). */
+  blindados: number
+  /** Veículos distintos da frota com manutenção em andamento no período (spec §6); null = manutenções indisponíveis (s/dado). */
+  emManutencao: number | null
   /** Média dos percentuais diários de uso da frota própria na janela do uso mensal; null sem próprios ativos ou sem dias. */
   usoMedioPropria: number | null
   /** `veiculos` falhou: cards cadastrais e uso em s/dado. */
@@ -79,6 +89,7 @@ export function tendenciaLinear(valores: number[]) {
 
 /** `isActiveVehicle` do legado: só "ativo" ou "ativo(a)". */
 const ativo = (v: Veiculo) => { const s = normL(v.statusLabel).trim(); return s === 'ativo' || s === 'ativo(a)' }
+const vendido = (v: Veiculo) => normL(v.statusLabel).includes('vendid')
 /** `isReservableService` do legado. */
 const reservavel = (r: Reserva) => { const k = normL(r.statusLabel); return !k.includes('cancel') && !k.includes('recus') }
 
@@ -155,6 +166,9 @@ function usoFrota(vei: Veiculo[], ctx: Contexto) {
 /**
  * Aba Frota (`renderFrota` + `renderInfleetTelemetry` do legado). KPIs cadastrais: a frota inteira (`dados.veiculos`), pois
  * descrevem o cadastro e o template do legado que os escopava nunca foi montado (decisão do controller, Fix round 1).
+ * Divergência consciente (spec §6): o status do veículo só tem Ativo, Vendido ou vazio, então "Em manutenção" por palavra-chave
+ * ficava sempre em 0. Agora a frota exclui os vendidos, "Disponíveis" são os ativos e "Em manutenção" são os veículos distintos da
+ * frota com manutenção em andamento (Solicitado, Aprovado ou Programado) pela data da manutenção no período do filtro.
  * Uso da frota própria, telemetria, viagens e eventos mantêm o escopo do legado: como o filtro de datas está sempre
  * preenchido (`hasFleetFilters` verdadeiro), só os veículos com serviço em `ctx.rv`, no período do filtro (dia em Brasília).
  */
@@ -164,14 +178,20 @@ export function calcularFrota(ctx: Contexto, dados: Dados): Frota {
   const veiIndisp = dados.indisponiveis.includes('veiculos')
   const cadastro = veiIndisp ? [] : dados.veiculos
   const vei = cadastro.filter((v) => escopo.has(v.id))
-  const status = (v: Veiculo) => stL(v.statusLabel)
   const uso = veiIndisp ? { usoMensal: [], usoMedio: null, totais: { proprios: 0, terceiros: 0, aluguel: 0 } } : usoFrota(vei, ctx)
+  const frota = cadastro.filter((v) => !vendido(v))
+  const idsFrota = new Set(frota.map((v) => v.id).filter(Boolean))
+  const emManutencao = dados.indisponiveis.includes('manutencoes') ? null : new Set(dados.manutencoes
+    .filter((m) => m.veiculoId && idsFrota.has(m.veiculoId) && entre(m.dia, f.inicio, f.fim) && manutencaoEmAndamento(m.statusLabel))
+    .map((m) => m.veiculoId)).size
 
   const kpis: KpisFrota = {
-    total: cadastro.length,
-    disponiveis: cadastro.filter((v) => { const s = status(v); return s.includes('dispon') || s.includes('ativo') || s.includes('livre') }).length,
-    blindados: cadastro.filter((v) => v.blindado).length,
-    emManutencao: cadastro.filter((v) => status(v).includes('manut')).length,
+    total: frota.length,
+    cadastrados: cadastro.length,
+    vendidos: cadastro.length - frota.length,
+    disponiveis: frota.filter(ativo).length,
+    blindados: frota.filter((v) => v.blindado).length,
+    emManutencao,
     usoMedioPropria: uso.usoMedio,
     indisponivel: veiIndisp,
   }

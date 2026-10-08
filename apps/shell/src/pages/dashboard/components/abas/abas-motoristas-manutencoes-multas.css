@@ -1,16 +1,5 @@
 /* Abas Motoristas (dash-mo-), Manutenções (dash-ma-) e Multas (dash-mu-). Só tokens --bt-*; light-only; sem gradiente. */
 
-/* ---------- KPIs: uma coluna no estreito; 3 (Motoristas, Multas) ou 5 (Manutenções) na largura cheia ---------- */
-.dash-mo-kpis, .dash-ma-kpis, .dash-mu-kpis { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--bt-space-3); }
-@container dash (min-width: 540px) {
-  .dash-mo-kpis, .dash-mu-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .dash-ma-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@container dash (min-width: 800px) { .dash-ma-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@container dash (min-width: 1080px) { .dash-ma-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
-/* Sem sparkline, o card fica na altura do conteúdo, com o mínimo do metric card do DS (§10.7). */
-.dash-mo-kpis .dash-kpi, .dash-ma-kpis .dash-kpi, .dash-mu-kpis .dash-kpi { min-height: 96px; }
-
 /* ---------- Motoristas: filtro da frota e meses do ranking ---------- */
 .dash-mo-filtro { display: grid; justify-items: end; gap: var(--bt-space-1); max-width: 100%; }
 .dash-mo-filtro__nota { max-width: 280px; margin: 0; color: var(--bt-color-warning); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); line-height: var(--bt-typography-body-small-line-height); text-align: right; }

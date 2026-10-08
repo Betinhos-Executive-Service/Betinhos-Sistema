@@ -1,6 +1,6 @@
 import { topByShare } from '../analises'
 import { agrupar, soma } from '../base'
-import { normL, stL } from '../format'
+import { normL } from '../format'
 import type { Contexto } from '../kpis'
 import { DIA_MS, entre, mesRotulo, mostrarLM, periodoAnoAnterior, periodoMesAnterior, type Periodo } from '../periodo'
 import type { Dados, Manutencao } from '../types'
@@ -25,6 +25,18 @@ export function categoriaManutencao(tipo: string): CategoriaManutencao {
   if (k.includes('condic') || k.includes('pneu') || k.includes('eletric') || k.includes('ar condicionado')) return 'Preventiva por condição'
   if (k.includes('prevent') || k.includes('revis') || k.includes('oleo')) return 'Preventiva programada'
   return 'Corretiva não crítica'
+}
+
+/** Status reais de `cr40f_manutencoes.cr40f_status` que contam como em andamento (metadata DEV; spec §6). */
+const STATUS_EM_ANDAMENTO: ReadonlySet<string> = new Set(['solicitado', 'aprovado', 'programado'])
+/**
+ * Manutenção em andamento. Divergência consciente (spec §6): o legado só olhava "andamento", "aberto" e "pend", que nenhum status real
+ * contém (Solicitado, Aprovado, Programado, Realizado, Cancelado, Reprovado), e o card ficava sempre em 0. Agora Solicitado, Aprovado e
+ * Programado contam (rótulo comparado sem acento e sem caixa); as palavras antigas continuam valendo.
+ */
+export function manutencaoEmAndamento(statusLabel: string) {
+  const k = normL(statusLabel).trim()
+  return STATUS_EM_ANDAMENTO.has(k) || k.includes('andamento') || k.includes('aberto') || k.includes('pend')
 }
 
 export type StatusMeta = 'dentro' | 'fora' | 'sem-meta' | 'sem-dado'
@@ -110,7 +122,7 @@ export function calcularManutencoes(ctx: Contexto, dados: Dados): Manutencoes {
 
   const total = custo(mans)
   const fat = soma(rv)
-  const emAndamento = mans.filter((m) => { const k = stL(m.statusLabel); return k.includes('andamento') || k.includes('aberto') || k.includes('pend') }).length
+  const emAndamento = mans.filter((m) => manutencaoEmAndamento(m.statusLabel)).length
 
   const porMes = agrupar(mans, (m) => m.dia.slice(0, 7))
   const custoPorMes = [...porMes.keys()].filter(Boolean).sort().map((mes) => ({ mes, rotulo: mesRotulo(mes), valor: custo(porMes.get(mes) ?? []) }))

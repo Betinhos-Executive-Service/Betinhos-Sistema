@@ -24,13 +24,23 @@
 .dash-datas, .dash-segmentos { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); min-width: 0; }
 .dash-erro { align-self: center; color: var(--bt-color-danger); font-size: var(--bt-font-size-12); }
 
-/* ---------- KPIs executivos ---------- */
+/* ---------- KPIs (card único de todas as abas) ---------- */
+/* `--N` é o número de cards na largura cheia; abaixo disso, 3, 2 e 1 coluna conforme a largura útil do corpo. */
 .dash-kpis { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--bt-space-3); }
-@container dash (min-width: 540px) { .dash-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@container dash (min-width: 800px) { .dash-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@container dash (min-width: 1080px) { .dash-kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+@container dash (min-width: 540px) {
+  .dash-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dash-kpis--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@container dash (min-width: 800px) {
+  .dash-kpis--5, .dash-kpis--6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .dash-kpis--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@container dash (min-width: 1080px) {
+  .dash-kpis--5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .dash-kpis--6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
 
-.dash-kpi { --dash-kpi-cor: var(--bt-color-action); container-type: inline-size; position: relative; display: flex; flex-direction: column; gap: var(--bt-space-1-5); min-width: 0; padding: var(--bt-space-3); overflow: hidden; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background-color: var(--bt-color-surface); box-shadow: var(--bt-shadow-surface); font-family: var(--bt-font-family-sans); }
+.dash-kpi { --dash-kpi-cor: var(--bt-color-action); container-type: inline-size; position: relative; display: flex; flex-direction: column; gap: var(--bt-space-1-5); min-width: 0; min-height: 96px; padding: var(--bt-space-3); overflow: hidden; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background-color: var(--bt-color-surface); box-shadow: var(--bt-shadow-surface); font-family: var(--bt-font-family-sans); }
 /* Borda superior de 3 px na cor do indicador, recortada pelo raio do card. */
 .dash-kpi::before { content: ''; position: absolute; inset: 0 0 auto; height: var(--bt-border-width-severity); background-color: var(--dash-kpi-cor); }
 .dash-kpi--brand { --dash-kpi-cor: var(--bt-color-brand); }
@@ -38,6 +48,9 @@
 .dash-kpi--warning { --dash-kpi-cor: var(--bt-color-warning); }
 .dash-kpi__rotulo { margin-top: var(--bt-space-0-5); }
 .dash-kpi__valor { font-size: clamp(var(--bt-font-size-20), 17cqi, var(--bt-font-size-26)); font-weight: var(--bt-font-weight-extrabold); line-height: 1.1; color: var(--bt-color-brand); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* "s/dado" no lugar do número (KPI, card e lista): mesmo lugar, tom secundário, para não parecer um zero. */
+.dash-kpi__valor--semdado, .dash-card__valor--semdado, .dash-lista__valor--semdado { color: var(--bt-color-text-secondary); }
+.dash-lista__valor--semdado { font-size: var(--bt-font-size-14); }
 .dash-kpi__extras { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1); }
 .dash-kpi__extras > .dash-apoio { flex-basis: 100%; }
 /* Sparkline encostada na base e nas laterais do card. */
@@ -93,6 +106,11 @@
 .dash-card__chips { display: flex; flex-direction: column; align-items: flex-end; gap: var(--bt-space-1); max-width: 100%; }
 .dash-card__corpo { display: flex; flex: 1 1 auto; flex-direction: column; gap: var(--bt-space-3); min-width: 0; min-height: 0; }
 .dash-card__tabela { min-width: 0; }
+/* Miolo do bloco na primeira carga: ocupa a altura de um gráfico. */
+.dash-card__esqueleto { flex: 1 1 auto; min-height: 200px; }
+/* Aviso discreto de filtros de segmento que não valem na aba. */
+.dash-aviso-filtros { display: flex; align-items: flex-start; gap: var(--bt-space-1-5); margin: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); line-height: var(--bt-typography-body-small-line-height); }
+.dash-aviso-filtros > svg { flex: 0 0 auto; margin-top: 2px; }
 .dash-card__nota { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--bt-space-2); min-height: 24px; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-11); line-height: var(--bt-typography-label-micro-line-height); }
 /* Tabela dentro do card é bloco de 3º nível (DS §10.6): borda, sem sombra própria. */
 .dash-card .bt-table { box-shadow: none; }
@@ -130,6 +148,8 @@
 .dash-legenda__traco--brand { border-top-color: var(--bt-color-brand); }
 .dash-legenda__traco--secondary { border-top-color: var(--bt-color-text-secondary); }
 .dash-legenda__traco--tracejada { border-top-style: dashed; }
+/* Amostra da legenda das barras: mesmo padrão da série. */
+.dash-legenda__amostra { flex: 0 0 auto; display: block; }
 
 /* ---------- Células das tabelas ---------- */
 .dash-forte { color: var(--bt-color-text-primary); font-weight: var(--bt-font-weight-bold); }

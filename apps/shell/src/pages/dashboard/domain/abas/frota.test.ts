@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { filtrarServicos } from '../base'
 import type { Contexto } from '../kpis'
-import { dadosVazios, evento, reserva, telemetria, veiculo, viagem } from '../test-utils'
+import { dadosVazios, evento, manutencao, reserva, telemetria, veiculo, viagem } from '../test-utils'
 import type { Dados, Filtros, Reserva } from '../types'
 import { calcularFrota, tendenciaLinear } from './frota'
 
@@ -12,22 +12,29 @@ const ctxDe = (rows: Reserva[], f: Filtros = filtro()): Contexto => ({ todas: ro
 const servico = (veiculoId: string, dia = '2026-10-05', p: Partial<Reserva> = {}) => reserva({ veiculoId, saidaRaw: `${dia}T15:00:00Z`, ...p })
 
 describe('calcularFrota — KPIs cadastrais', () => {
-  it('frota inteira (sem escopo do período): disponíveis por dispon/ativo/livre, blindados e em manutenção', () => {
+  it('frota inteira sem os vendidos (spec §6): disponíveis são os ativos, blindados da frota, em manutenção pelas manutenções em andamento', () => {
     const veiculos = [
-      veiculo({ id: 'v1', statusLabel: 'Disponível', blindado: true }),
-      veiculo({ id: 'v2', statusLabel: 'Ativo' }),
-      veiculo({ id: 'v3', statusLabel: 'Em manutenção', blindado: true }),
-      veiculo({ id: 'v4', statusLabel: 'Livre' }),
-      veiculo({ id: 'v5', statusLabel: 'Livre' }),
+      veiculo({ id: 'v1', statusLabel: 'Ativo', blindado: true }),
+      veiculo({ id: 'v2', statusLabel: 'Ativo(a)' }),
+      veiculo({ id: 'v3', statusLabel: '', blindado: true }),
+      veiculo({ id: 'v4', statusLabel: 'Vendido', blindado: true }),
+      veiculo({ id: 'v5', statusLabel: 'Ativo' }),
     ]
-    const rows = [
-      servico('v1'), servico('v2'), servico('v3'),
-      servico('v5', '2026-10-05', { categoriaItem: 100000001 }),
-      servico('v5', '2026-09-20'),
+    const manutencoes = [
+      manutencao({ veiculoId: 'v1', statusLabel: 'Solicitado' }),
+      manutencao({ veiculoId: 'v1', statusLabel: 'Aprovado' }),
+      manutencao({ veiculoId: 'v3', statusLabel: 'Programado' }),
+      manutencao({ veiculoId: 'v2', statusLabel: 'Realizado' }),
+      // Vendido, fora do período e sem veículo não contam.
+      manutencao({ veiculoId: 'v4', statusLabel: 'Solicitado' }),
+      manutencao({ veiculoId: 'v5', statusLabel: 'Solicitado', dia: '2026-09-20' }),
+      manutencao({ statusLabel: 'Solicitado' }),
     ]
-    const fr = calcularFrota(ctxDe(rows), dadosVazios({ veiculos }))
-    expect(fr.kpis).toMatchObject({ total: 5, disponiveis: 4, blindados: 2, emManutencao: 1, indisponivel: false })
-    expect(calcularFrota(ctxDe([]), dadosVazios({ veiculos })).kpis.total).toBe(5)
+    const fr = calcularFrota(ctxDe([servico('v1')]), dadosVazios({ veiculos, manutencoes }))
+    expect(fr.kpis).toMatchObject({ total: 4, cadastrados: 5, vendidos: 1, disponiveis: 3, blindados: 2, emManutencao: 2, indisponivel: false })
+    expect(calcularFrota(ctxDe([]), dadosVazios({ veiculos })).kpis).toMatchObject({ total: 4, emManutencao: 0 })
+    // Sem a tabela de manutenções, "Em manutenção" fica s/dado; o resto do cadastro segue.
+    expect(calcularFrota(ctxDe([]), dadosVazios({ veiculos, manutencoes, indisponiveis: ['manutencoes'] })).kpis).toMatchObject({ total: 4, emManutencao: null })
   })
 
   it('veículos indisponíveis: KPIs cadastrais marcados e uso vazio', () => {

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { filtrarServicos } from '../../domain/base'
 import { FAT_PAGO } from '../../domain/codes'
 import { dadosVazios, reserva, veiculo } from '../../domain/test-utils'
 import type { Conjunto, Dados, Filtros, Pagante } from '../../domain/types'
@@ -46,8 +47,9 @@ const BASE: Dados = dadosVazios({
 })
 const indisponivel = (dados: Dados, ...conjuntos: Conjunto[]): Dados => ({ ...dados, indisponiveis: conjuntos })
 
-const renderServicos = (dados: Dados) => semAvisoDeGrafico(() => render(<ServicosTab dados={dados} filtros={FILTROS} now={AGORA} periodo={PERIODO} />))
-const renderFinanceiro = (dados: Dados) => semAvisoDeGrafico(() => render(<FinanceiroTab dados={dados} filtros={FILTROS} now={AGORA} periodo={PERIODO} />))
+const ctxDe = (dados: Dados) => ({ todas: dados.reservas, rv: filtrarServicos(dados.reservas, FILTROS), f: FILTROS, now: AGORA })
+const renderServicos = (dados: Dados) => semAvisoDeGrafico(() => render(<ServicosTab ctx={ctxDe(dados)} dados={dados} periodo={PERIODO} />))
+const renderFinanceiro = (dados: Dados) => semAvisoDeGrafico(() => render(<FinanceiroTab ctx={ctxDe(dados)} dados={dados} periodo={PERIODO} />))
 const kpi = (rotulo: string) => screen.getByRole('article', { name: rotulo })
 const bloco = (titulo: string) => screen.getByRole('region', { name: titulo })
 const titulos = () => screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
@@ -99,7 +101,7 @@ describe('aba Financeiro', () => {
     expect(within(kpi('Clientes ativos')).getByText('2')).toBeTruthy()
     expect(within(kpi('Atrasados > 5 dias')).getByText('0')).toBeTruthy()
     expect(within(kpi('Tempo médio de pagamento')).getByText('2,0 dias')).toBeTruthy()
-    expect(within(kpi('Tempo médio de pagamento')).getByText('1 de 1 pagamentos com data confiável')).toBeTruthy()
+    expect(within(kpi('Tempo médio de pagamento')).getByText('1 de 1 pagamentos com data confiável · todo o histórico')).toBeTruthy()
     expect(titulos()).toEqual(['Ciclo financeiro', 'Status de faturamento', 'Ticket médio — mensal', 'Recebimentos', 'Clientes'])
   })
 
@@ -119,6 +121,13 @@ describe('aba Financeiro', () => {
     expect(within(item).getByText('14 dias')).toBeTruthy()
     expect(within(item).getByText(/R\$\s200,00 desde 01\/10\/2026/)).toBeTruthy()
     expect(within(kpi('Atrasados > 5 dias')).getByText('1')).toBeTruthy()
+  })
+
+  it('pagantes cobrem todo o histórico: Recebimentos, Cartão e Atrasados dizem isso no lugar do período (spec §6)', () => {
+    renderFinanceiro(BASE)
+    expect(within(bloco('Recebimentos')).getByText(/^Todo o histórico ·/)).toBeTruthy()
+    expect(within(bloco('Recebimentos')).queryByText(new RegExp(PERIODO))).toBeNull()
+    for (const rotulo of ['Cartão', 'Atrasados > 5 dias']) expect(within(kpi(rotulo)).getByText(/todo o histórico/)).toBeTruthy()
   })
 
   it('sem pagantes: cartão, atrasados, tempo médio, ciclo e recebimentos em s/dado; total recebido vem das reservas', () => {

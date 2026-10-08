@@ -1,4 +1,5 @@
 import { CAT_ITEM_SERVICO, CSV_2026_FIM, CSV_2026_INICIO, MULTA_NOTIFICAR, SEM_CLIENTE, SEM_MOTORISTA } from '../domain/codes'
+import { normL } from '../domain/format'
 import { dayKey } from '../domain/periodo'
 import type { CategoriaDespesa, Dados, Despesa, EventoConducao, FormaPagamento, Funcionario, Manutencao, Multa, Pagante, Reserva, TelemetriaDia, Veiculo, Viagem } from '../domain/types'
 
@@ -25,12 +26,14 @@ const MOTORISTAS = [
 const VEICULOS: Veiculo[] = [
   { id: 'mock-v1', statusLabel: 'Ativo', categoria: 'Propria', placa: 'BTN1A23', marca: 'Toyota', modelo: 'Corolla Altis', blindado: true, ano: 2023 },
   { id: 'mock-v2', statusLabel: 'Ativo', categoria: 'Propria', placa: 'BTN2B34', marca: 'Toyota', modelo: 'SW4', blindado: true, ano: 2022 },
-  { id: 'mock-v3', statusLabel: 'Em manutenção', categoria: 'Propria', placa: 'BTN3C45', marca: 'Chevrolet', modelo: 'Spin', blindado: false, ano: 2021 },
-  { id: 'mock-v4', statusLabel: 'Disponível', categoria: 'Terceirizada', placa: 'TRC4D56', marca: 'Mercedes-Benz', modelo: 'Sprinter', blindado: false, ano: 2020 },
-  { id: 'mock-v5', statusLabel: 'Disponível', categoria: 'Terceirizada', placa: 'TRC5E67', marca: 'Volkswagen', modelo: 'Virtus', blindado: false, ano: 2024 },
+  { id: 'mock-v3', statusLabel: 'Ativo', categoria: 'Propria', placa: 'BTN3C45', marca: 'Chevrolet', modelo: 'Spin', blindado: false, ano: 2021 },
+  { id: 'mock-v4', statusLabel: 'Ativo', categoria: 'Terceirizada', placa: 'TRC4D56', marca: 'Mercedes-Benz', modelo: 'Sprinter', blindado: false, ano: 2020 },
+  { id: 'mock-v5', statusLabel: '', categoria: 'Terceirizada', placa: 'TRC5E67', marca: 'Volkswagen', modelo: 'Virtus', blindado: false, ano: 2024 },
 ]
+/** Vendido: fica no cadastro (como em produção), sem reservas; fora de VEICULOS para não mudar o sorteio. */
+const VEICULO_VENDIDO: Veiculo = { id: 'mock-v7', statusLabel: 'Vendido', categoria: 'Propria', placa: 'BTN7G89', marca: 'Toyota', modelo: 'Corolla', blindado: true, ano: 2019 }
 /** Fora de VEICULOS para não mudar o sorteio de veículos das reservas: entra em ~5% delas por um gerador à parte. */
-const VEICULO_ALUGUEL: Veiculo = { id: 'mock-v6', statusLabel: 'Disponível', categoria: 'Aluguel', placa: 'ALG6F78', marca: 'Fiat', modelo: 'Cronos', blindado: false, ano: 2025 }
+const VEICULO_ALUGUEL: Veiculo = { id: 'mock-v6', statusLabel: 'Ativo', categoria: 'Aluguel', placa: 'ALG6F78', marca: 'Fiat', modelo: 'Cronos', blindado: false, ano: 2025 }
 const TIPOS = ['Executivo', 'Blindado', 'Van']
 const TIPOS_SERVICO = ['São Paulo', 'Guarulhos', 'Congonhas', 'Campinas', 'Vale do Paraíba', 'Rio de Janeiro', 'Dentro de São Paulo']
 const FAT = [
@@ -195,7 +198,8 @@ function criarDespesasMock(reservas: Reserva[], funcionarios: Funcionario[], now
 }
 
 const TIPOS_REPARO = ['Preventiva sistemática', 'Corretiva não crítica', 'Corretiva crítica', 'Conservação, conforto e imagem', 'Avaria']
-const STATUS_MANUTENCAO = ['Realizado', 'Realizado', 'Realizado', 'Aprovado', 'Programado', 'Solicitado']
+/** Rótulos reais de `cr40f_status` da manutenção (metadata DEV); Solicitado, Aprovado e Programado contam como em andamento. */
+const STATUS_MANUTENCAO = ['Realizado', 'Realizado', 'Realizado', 'Aprovado', 'Programado', 'Solicitado', 'Cancelado']
 const INFRACOES = [
   { codigo: '745-50', descricao: 'Transitar em velocidade superior à máxima permitida em até 20%' },
   { codigo: '746-30', descricao: 'Transitar em velocidade superior à máxima permitida em mais de 20% até 50%' },
@@ -203,7 +207,8 @@ const INFRACOES = [
   { codigo: '605-03', descricao: 'Avançar o sinal vermelho do semáforo' },
   { codigo: '763-31', descricao: 'Dirigir segurando ou manuseando telefone celular' },
 ]
-const STATUS_MULTA_RESOLVIDA = [
+/** Demais status reais da multa (metadata DEV) além de "Notificar o Condutor": Pago, Finalizado e Descontado contam como resolvidas. */
+const STATUS_MULTA_DEMAIS = [
   { code: 202410001, label: 'Indicada' }, { code: 202410006, label: 'Pago' }, { code: 202410005, label: 'Finalizado' }, { code: 202410003, label: 'Descontado' },
 ]
 
@@ -244,7 +249,7 @@ export function criarDadosMock(now: Date): Dados {
         status: status.code, statusLabel: status.label, fatStatus: fat.code, fatStatusLabel: fat.label,
         categoriaItem: CAT_ITEM_SERVICO, categoriaItemLabel: 'Serviço',
         tipoVeiculoRaw: rand() < 0.95 ? '1' : '', tipoVeiculo: pick(TIPOS),
-        veiculoId: vei?.id ?? '', motoristaId: mot?.id ?? '', motoristaKey: mot?.id ?? `nome:${motorista.toLowerCase()}`, motorista,
+        veiculoId: vei?.id ?? '', motoristaId: mot?.id ?? '', motoristaKey: mot?.id ?? `nome:${normL(motorista)}`, motorista,
         cliente: pick(CLIENTES), cpId: temCp ? `mock-cp-${n}` : '', valor: temCp ? Math.round(300 + rand() * 2200) : 0,
         cpPendente: temCp && !concluida, cpConcluida: concluida, opId: concluida && rand() < 0.7 ? `mock-op-${n}` : '',
         tipoServico, finalizadoRaw: status.label === 'Concluído' && finalizadoMs <= now.getTime() ? new Date(finalizadoMs).toISOString() : '',
@@ -264,7 +269,7 @@ export function criarDadosMock(now: Date): Dados {
   })
   const multas: Multa[] = dias(25).map((dia) => {
     const pendente = rand() < 0.3
-    const status = pendente ? { code: MULTA_NOTIFICAR, label: 'Notificar o Condutor' } : pickExtra(STATUS_MULTA_RESOLVIDA)
+    const status = pendente ? { code: MULTA_NOTIFICAR, label: 'Notificar o Condutor' } : pickExtra(STATUS_MULTA_DEMAIS)
     const m = pickExtra(MOTORISTAS)
     const infracao = pickExtra(INFRACOES)
     return {
@@ -281,7 +286,7 @@ export function criarDadosMock(now: Date): Dados {
     multas,
     ocorrencias: dias(30).map((dia) => ({ dia })),
     funcionarios,
-    veiculos: [...VEICULOS, VEICULO_ALUGUEL],
+    veiculos: [...VEICULOS, VEICULO_ALUGUEL, VEICULO_VENDIDO],
     ...criarInfleetMock(now),
     pagantes: criarPagantesMock(reservas, now),
     despesas: criarDespesasMock(reservas, funcionarios, now),

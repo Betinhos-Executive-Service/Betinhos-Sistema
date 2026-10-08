@@ -7,7 +7,8 @@ type Props = {
   titulo: string
   periodo: string
   unidade: string
-  valor?: string
+  /** Valor de destaque; `null` é "s/dado" (conjunto que não carregou), em tom secundário. Ausente, o card não tem valor. */
+  valor?: string | null
   sub?: string
   chips?: Chip[]
   apoio?: Apoio[]
@@ -36,7 +37,7 @@ export function AnaliseCard({ titulo, periodo, unidade, valor, sub, chips = [], 
       <header className="dash-card__head">
         <div className="dash-card__resumo">
           <h2 className="dash-card__titulo" id={`${id}-t`}>{titulo}</h2>
-          {valor != null ? <strong className="dash-card__valor">{valor}</strong> : null}
+          {valor === null ? <strong className="dash-card__valor dash-card__valor--semdado">s/dado</strong> : valor != null ? <strong className="dash-card__valor">{valor}</strong> : null}
           {sub ? <p className="dash-card__sub">{sub}</p> : null}
         </div>
         {temLado ? <div className="dash-card__lado">{extra}{chips.length || apoio.length ? <span className="dash-card__chips"><Chips chips={chips} apoio={apoio} /></span> : null}</div> : null}

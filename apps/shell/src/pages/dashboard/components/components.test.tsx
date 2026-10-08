@@ -7,14 +7,15 @@ import { tomStatus } from './Celulas'
 import { DashboardToolbar } from './DashboardToolbar'
 import { Emergenciais } from './Emergenciais'
 import { ApoioChip, ApoioTexto, KpiChip } from './KpiChip'
-import { KPI_PLACEHOLDER, KpiGrid } from './KpiGrid'
+import { KpiCard } from './KpiCard'
+import { KpiGrid, KpiGridCarregando } from './KpiGrid'
+import { SemDadoBloco } from './Estados'
 import { StatusServicosCard } from './Analises'
 import { ProducaoPropriaTerceira } from './ProducaoPropriaTerceira'
 import { ResumoTab } from './abas/ResumoTab'
 import { statusServicos } from '../domain/analises'
 import { filtrarServicos } from '../domain/base'
 import { emergenciais, producaoPropriaTerceira } from '../domain/destaques'
-import { calcularResumo } from '../domain/resumo'
 import { manutencao, reserva, veiculo } from '../domain/test-utils'
 import type { Dados, Filtros } from '../domain/types'
 
@@ -34,12 +35,12 @@ const PERIODO = '01/10/2026 a 15/10/2026'
 const TITULOS = ['Alertas de operação', 'Qualidade dos dados', 'Total produzido', 'Meta × realizado']
 const FILTROS: Filtros = { atalho: 'esteMes', inicio: '2026-10-01', fim: '2026-10-15', status: [], clientes: [], motoristas: [], tipos: [] }
 const AGORA = new Date('2026-10-15T15:00:00Z')
-const resumoDe = (dados: Dados) => calcularResumo(dados, FILTROS, AGORA)
-const renderResumo = (dados: Dados) => render(<ResumoTab resumo={resumoDe(dados)} periodo={PERIODO} />)
 const rvDe = (dados: Dados) => filtrarServicos(dados.reservas, FILTROS)
+const ctxDe = (dados: Dados) => ({ todas: dados.reservas, rv: rvDe(dados), f: FILTROS, now: AGORA })
+const renderResumo = (dados: Dados) => render(<ResumoTab ctx={ctxDe(dados)} dados={dados} periodo={PERIODO} />)
 /** Cards que as abas Serviços e Financeiro reaproveitam, montados direto do domínio. */
 const renderBlocos = (dados: Dados) => render(<>
-  <ResumoTab resumo={resumoDe(dados)} periodo={PERIODO} />
+  <ResumoTab ctx={ctxDe(dados)} dados={dados} periodo={PERIODO} />
   <ProducaoPropriaTerceira dados={producaoPropriaTerceira(rvDe(dados), dados.veiculos)} periodo={PERIODO} />
   <Emergenciais dados={emergenciais(rvDe(dados))} periodo={PERIODO} />
   <StatusServicosCard dados={statusServicos({ todas: dados.reservas, rv: rvDe(dados), f: FILTROS, now: AGORA })} periodo={PERIODO} />
@@ -118,7 +119,7 @@ describe('componentes do Dashboard', () => {
 
   it('KPI: valor, chips e apoio sempre visíveis e sparkline dentro do próprio card', () => {
     const kpis = [{ id: 'faturamento' as const, rotulo: 'Faturamento', valor: 'R$ 10,0k', chips: [{ rotulo: 'LM', tipo: 'valor' as const, anterior: 'R$ 9,0k', variacao: 11.1 }], apoio: [{ rotulo: 'Previsão', texto: 'R$ 12,0k' }], serie: [{ mes: '2026-09', rotulo: 'set/26', valor: 1 }, { mes: '2026-10', rotulo: 'out/26', valor: 2 }] }]
-    semAvisoDeGrafico(() => render(<KpiGrid kpis={kpis} carregando={false} />))
+    semAvisoDeGrafico(() => render(<KpiGrid kpis={kpis} />))
     const card = screen.getByRole('article', { name: 'Faturamento' })
     expect(within(card).getByText('R$ 10,0k')).toBeTruthy()
     expect(within(card).getByText('R$ 9,0k').parentElement?.textContent).toBe('LM R$ 9,0k +11,1%')
@@ -126,8 +127,22 @@ describe('componentes do Dashboard', () => {
     expect(card.lastElementChild?.getAttribute('aria-hidden')).toBe('true')
   })
 
+  it('s/dado tem uma regra só: o valor do KPI e o do bloco viram "s/dado" em tom secundário, e o bloco traz o motivo', () => {
+    render(<>
+      <KpiCard rotulo="Multas" valor={null} tom="brand" />
+      <SemDadoBloco titulo="Por infração" periodo={PERIODO} unidade="multas" motivo="A tabela de multas não respondeu nesta carga." />
+    </>)
+    const kpi = screen.getByRole('article', { name: 'Multas' })
+    expect(within(kpi).getByText('s/dado').className).toBe('dash-kpi__valor dash-kpi__valor--semdado')
+    expect(kpi.textContent).not.toContain('—')
+    const bloco = screen.getByRole('region', { name: 'Por infração' })
+    expect(within(bloco).getByText('s/dado').className).toBe('dash-card__valor dash-card__valor--semdado')
+    expect(within(bloco).getByText('A tabela de multas não respondeu nesta carga.')).toBeTruthy()
+    expect(within(bloco).queryByRole('table')).toBeNull()
+  })
+
   it('KPI na primeira carga: seis cards no formato final, ocupados e sem números', () => {
-    render(<KpiGrid kpis={KPI_PLACEHOLDER} carregando />)
+    render(<KpiGridCarregando />)
     const grade = screen.getByRole('region', { name: 'Indicadores executivos' })
     expect(grade.getAttribute('aria-busy')).toBe('true')
     expect(within(grade).getAllByRole('article').length).toBe(6)
