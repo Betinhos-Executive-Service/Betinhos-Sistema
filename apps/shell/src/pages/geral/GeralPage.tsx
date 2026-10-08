@@ -1,6 +1,6 @@
 import { useCallback, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
-import { Alert, Button, EmptyState, Menu, Pagination, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
+import { Alert, Button, EmptyState, Menu, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
 import { Archive, ArchiveRestore, CalendarDays, ClipboardList, Copy, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Ticket, X } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
@@ -17,7 +17,7 @@ import { GeralToolbar } from './components/GeralToolbar'
 import { VoucherOverlay } from './components/VoucherOverlay'
 import { copyText } from './domain/copy'
 import { applyColumnPrefs, loadColumnPrefs, saveColumnPrefs, type ColumnPrefs } from './domain/columns'
-import { ID_ATTRIBUTE, PAGE_SIZE, type CellStatus, type Column } from './domain/types'
+import { ID_ATTRIBUTE, type CellStatus, type Column } from './domain/types'
 import { cellKey, useGeral, type SaveFailure } from './useGeral'
 import './geral.css'
 
@@ -44,7 +44,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     toast({ tone: 'danger', message: `Não foi possível salvar ${failure.label} do serviço ${failure.serviceName}: ${failure.message}` })
   }, [toast])
   const geral = useGeral(source, { onSaveFail })
-  const { view, rows, page, total, more, loading, query, attributes } = geral
+  const { view, rows, total, more, loading, loadingMore, loadError, query, attributes } = geral
 
   // Preferências de colunas por visão: lidas do armazenamento local ao entrar na visão, gravadas ao aplicar.
   const [saved, setSaved] = useState<Record<string, ColumnPrefs | null>>({})
@@ -57,7 +57,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     setSaved((s) => ({ ...s, [viewId]: next }))
   }, [source.kv, viewId])
 
-  const { reload, refresh, goTo, setQuery, selectView, clearSelection } = geral
+  const { reload, refresh, loadMore, retryLoadMore, setQuery, selectView, clearSelection } = geral
   const [mockForm, setMockForm] = useState(false)
   const [copy, setCopy] = useState<{ open: boolean; loading: boolean; text: string }>({ open: false, loading: false, text: '' })
   const [stateRequest, setStateRequest] = useState<StateRequest | null>(null)
@@ -231,21 +231,16 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
 
   const editRow = editId == null ? undefined : rowOf(editId)
 
-  const start = rows.length ? (page - 1) * PAGE_SIZE + 1 : 0
-  const end = start + rows.length - 1
+  // Rodapé provisório: o Bloco A3 refaz esta parte com a rolagem infinita.
   const footer = (
     <>
       <span className="gr-footer__left">
-        <span>{loading ? 'Carregando…' : rows.length ? `Linhas ${start}–${end}${total != null ? ` de ${total}` : ''}` : 'Nenhuma linha'}</span>
+        <span>{loading ? 'Carregando…' : rows.length ? `Linhas 1–${rows.length}${total != null ? ` de ${total}` : ''}` : 'Nenhuma linha'}</span>
+        {loadError ? <span role="alert">{loadError}</span> : null}
       </span>
-      {total != null
-        ? <Pagination page={page} pageSize={PAGE_SIZE} total={total} onChange={goTo} noun="serviços" />
-        : (
-          <span className="gr-footer__pages">
-            <Button variant="secondary" size="compact" disabled={page <= 1 || loading} onClick={() => goTo(page - 1)}>Anterior</Button>
-            <Button variant="secondary" size="compact" disabled={!more || loading} onClick={() => goTo(page + 1)}>Próxima</Button>
-          </span>
-        )}
+      {loadError
+        ? <Button variant="secondary" size="compact" onClick={retryLoadMore}>Tentar de novo</Button>
+        : more ? <Button variant="ghost" size="compact" loading={loadingMore} disabled={loading} onClick={loadMore}>Carregar mais</Button> : null}
     </>
   )
 

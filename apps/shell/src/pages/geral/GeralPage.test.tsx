@@ -67,8 +67,8 @@ describe('Geral', () => {
     expect(screen.getByText(/Linhas 1–100 de/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /Status de Operação/, hidden: true }))
     await waitFor(() => expect(screen.getByRole('columnheader', { name: /Status de Operação/, hidden: true }).getAttribute('aria-sort')).toBe('ascending'))
-    fireEvent.click(screen.getByRole('button', { name: 'Próxima' }))
-    await screen.findByText(/Linhas 101–/)
+    fireEvent.click(screen.getByRole('button', { name: 'Carregar mais' }))
+    await screen.findByText(`Linhas 1–200 de ${MOCK_ROW_COUNT}`)
     // O primeiro teste paga a carga fria dos módulos: com a máquina ocupada passa dos 30 s do padrão.
   }, 60_000)
 

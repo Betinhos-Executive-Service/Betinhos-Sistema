@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, configure, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { MOCK_ROW_COUNT } from './data/mock'
 import { createSource, type Source } from './data/source'
 import { SAVED_VISIBLE_MS } from './domain/edit'
 import { useGeral } from './useGeral'
@@ -14,21 +15,16 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 const idOf = (row: { cr40f_reservadeveculosid?: unknown }) => String(row.cr40f_reservadeveculosid)
 
 describe('useGeral', () => {
-  it('carrega a visão padrão, pagina e ordena', async () => {
+  it('carrega a visão padrão, seleciona e ordena', async () => {
     const { result } = renderHook(() => useGeral(createSource({ mode: 'mock' }, { latency: 0 })))
     await waitFor(() => expect(result.current.rows.length).toBe(100))
     expect(result.current.view?.padrao).toBe(true)
     expect(result.current.columns[0].attribute).toBe('cr40f_id')
     expect(result.current.attributes?.get('cr40f_status')?.type).toBe('Picklist')
-    act(() => result.current.toggle(String(result.current.rows[0].cr40f_reservadeveculosid)))
+    act(() => result.current.toggle(idOf(result.current.rows[0])))
     expect(result.current.selected.size).toBe(1)
-    act(() => result.current.goTo(2))
-    await waitFor(() => expect(result.current.page).toBe(2))
-    expect(result.current.selected.size).toBe(0)
-    await waitFor(() => expect(result.current.loading).toBe(false))
-    expect(result.current.rows.length).toBeGreaterThan(0)
     act(() => result.current.setSort({ attribute: 'cr40f_id', alias: null, descending: true }))
-    await waitFor(() => expect(result.current.page).toBe(1))
+    await waitFor(() => expect(result.current.selected.size).toBe(0))
     await waitFor(() => expect(result.current.loading).toBe(false))
     const ids = result.current.rows.map((r) => String(r.cr40f_id))
     expect([...ids].sort().reverse()).toEqual(ids)
@@ -175,29 +171,6 @@ describe('useGeral: gravação', () => {
 })
 
 describe('useGeral: atualização e ordem', () => {
-  it('refresh relê a página atual sem voltar à primeira nem limpar a seleção', async () => {
-    const base = createSource({ mode: 'mock' }, { latency: 0 })
-    const page = vi.fn(base.page)
-    const source: Source = { ...base, page }
-    const { result } = renderHook(() => useGeral(source))
-    await waitFor(() => expect(result.current.rows.length).toBe(100))
-    act(() => result.current.goTo(2))
-    await waitFor(() => expect(result.current.page).toBe(2))
-    await waitFor(() => expect(result.current.loading).toBe(false))
-    act(() => result.current.toggle(idOf(result.current.rows[0])))
-    const calls = page.mock.calls.length
-    act(() => result.current.refresh())
-    await waitFor(() => expect(page.mock.calls.length).toBeGreaterThan(calls))
-    await waitFor(() => expect(result.current.loading).toBe(false))
-    expect(page.mock.calls.at(-1)?.[0].page).toBe(2)
-    expect(result.current.page).toBe(2)
-    expect(result.current.selected.size).toBe(1)
-    // O botão Atualizar continua voltando à primeira página.
-    act(() => result.current.reload())
-    await waitFor(() => expect(result.current.page).toBe(1))
-    expect(result.current.selected.size).toBe(0)
-  })
-
   it('começa sem ordenação própria e expõe a ordem da visão para o indicador', async () => {
     const base = createSource({ mode: 'mock' }, { latency: 0 })
     const page = vi.fn(base.page)
@@ -207,5 +180,140 @@ describe('useGeral: atualização e ordem', () => {
     expect(result.current.sort).toBeNull()
     expect(page.mock.calls[0][0].sort).toBeNull()
     expect(result.current.defaultOrder).toEqual({ attribute: 'cr40f_dataehorriodesada', alias: null, descending: false })
+  })
+})
+
+const open = async (source: Source) => {
+  const hook = renderHook(() => useGeral(source))
+  await waitFor(() => expect(hook.result.current.rows.length).toBe(100))
+  return hook
+}
+
+describe('useGeral: rolagem infinita', () => {
+  it('abre com 100 linhas, mais páginas e total, e acumula sem repetir ids', async () => {
+    const { result } = await open(createSource({ mode: 'mock' }, { latency: 0 }))
+    expect(result.current.more).toBe(true)
+    expect(result.current.pagesLoaded).toBe(1)
+    await waitFor(() => expect(result.current.total).toBe(MOCK_ROW_COUNT))
+    act(() => result.current.loadMore())
+    await waitFor(() => expect(result.current.rows.length).toBe(200))
+    expect(result.current.loadingMore).toBe(false)
+    expect(result.current.more).toBe(true)
+    act(() => result.current.loadMore())
+    await waitFor(() => expect(result.current.rows.length).toBe(MOCK_ROW_COUNT))
+    expect(result.current.more).toBe(false)
+    expect(result.current.pagesLoaded).toBe(3)
+    const ids = result.current.rows.map(idOf)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('loadMore sem mais páginas não chama a fonte', async () => {
+    const base = createSource({ mode: 'mock' }, { latency: 0 })
+    const page = vi.fn(base.page)
+    const { result } = await open({ ...base, page })
+    act(() => result.current.loadMore())
+    await waitFor(() => expect(result.current.rows.length).toBe(200))
+    act(() => result.current.loadMore())
+    await waitFor(() => expect(result.current.more).toBe(false))
+    const calls = page.mock.calls.length
+    act(() => result.current.loadMore())
+    await sleep(20)
+    expect(page.mock.calls.length).toBe(calls)
+  })
+
+  it('trocar a ordenação volta a 100 linhas e à página 1', async () => {
+    const { result } = await open(createSource({ mode: 'mock' }, { latency: 0 }))
+    act(() => result.current.loadMore())
+    await waitFor(() => expect(result.current.rows.length).toBe(200))
+    act(() => result.current.toggle(idOf(result.current.rows[0])))
+    act(() => result.current.setSort({ attribute: 'cr40f_id', alias: null, descending: true }))
+    await waitFor(() => expect(result.current.pagesLoaded).toBe(1))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.rows.length).toBe(100)
+    expect(result.current.selected.size).toBe(0)
+  })
+
+  it('reload com duas páginas carregadas mantém 200 linhas e a seleção dos ids presentes', async () => {
+    const base = createSource({ mode: 'mock' }, { latency: 0 })
+    const page = vi.fn(base.page)
+    const { result } = await open({ ...base, page })
+    act(() => result.current.loadMore())
+    await waitFor(() => expect(result.current.rows.length).toBe(200))
+    const chosen = idOf(result.current.rows[150])
+    act(() => result.current.toggle(chosen))
+    act(() => result.current.toggle('id-que-nao-existe-mais'))
+    const calls = page.mock.calls.length
+    act(() => result.current.reload())
+    await waitFor(() => expect(page.mock.calls.length).toBe(calls + 2))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(page.mock.calls.slice(calls).map((c) => c[0].page)).toEqual([1, 2])
+    expect(result.current.rows.length).toBe(200)
+    expect(result.current.pagesLoaded).toBe(2)
+    expect([...result.current.selected]).toEqual([chosen])
+  })
+
+  it('toggleAll marca e desmarca todas as linhas carregadas', async () => {
+    const { result } = await open(createSource({ mode: 'mock' }, { latency: 0 }))
+    act(() => result.current.loadMore())
+    await waitFor(() => expect(result.current.rows.length).toBe(200))
+    act(() => result.current.toggleAll())
+    expect(result.current.selected.size).toBe(200)
+    act(() => result.current.toggleAll())
+    expect(result.current.selected.size).toBe(0)
+  })
+
+  it('descarta a resposta de uma ordem antiga que chega depois', async () => {
+    const base = createSource({ mode: 'mock' }, { latency: 0 })
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const spy: Source = {
+      ...base,
+      page: vi.fn(async (req) => {
+        // A primeira ordem (a da visão) demora; a ordem nova responde na hora.
+        if (req.sort == null) await gate
+        return base.page(req)
+      }),
+    }
+    const { result } = renderHook(() => useGeral(spy))
+    await waitFor(() => expect(spy.page).toHaveBeenCalled())
+    act(() => result.current.setSort({ attribute: 'cr40f_id', alias: null, descending: true }))
+    await waitFor(() => expect(result.current.rows.length).toBe(100))
+    const ordered = result.current.rows.map((r) => String(r.cr40f_id))
+    expect([...ordered].sort().reverse()).toEqual(ordered)
+    await act(async () => { release(); await sleep(20) })
+    expect(result.current.rows.map((r) => String(r.cr40f_id))).toEqual(ordered)
+    expect(result.current.pagesLoaded).toBe(1)
+  })
+
+  it('cookie repetido para a carga com erro, sem duplicar, e retryLoadMore limpa o erro', async () => {
+    const base = createSource({ mode: 'mock' }, { latency: 0 })
+    let stuck = true
+    const page = vi.fn(async (req: Parameters<Source['page']>[0]) => {
+      const result = await base.page(req)
+      return { ...result, cookie: stuck ? 'fixo' : `c${req.page}` }
+    })
+    const { result } = await open({ ...base, page })
+    act(() => result.current.loadMore())
+    await waitFor(() => expect(result.current.loadError).toBe('A consulta não avançou. Tente atualizar.'))
+    expect(result.current.rows.length).toBe(100)
+    expect(result.current.loadingMore).toBe(false)
+    expect(result.current.pagesLoaded).toBe(1)
+    // Com erro pendente, loadMore não pede de novo.
+    const calls = page.mock.calls.length
+    act(() => result.current.loadMore())
+    expect(page.mock.calls.length).toBe(calls)
+    stuck = false
+    act(() => result.current.retryLoadMore())
+    await waitFor(() => expect(result.current.rows.length).toBe(200))
+    expect(result.current.loadError).toBeNull()
+    expect(new Set(result.current.rows.map(idOf)).size).toBe(200)
+  })
+
+  it('sem total na resposta, a contagem chega em paralelo sem travar a lista', async () => {
+    const base = createSource({ mode: 'mock' }, { latency: 0 })
+    const count = vi.fn(async () => 220)
+    const { result } = await open({ ...base, page: async (req) => ({ ...(await base.page(req)), total: null }), count })
+    await waitFor(() => expect(result.current.total).toBe(220))
+    expect(count).toHaveBeenCalledTimes(1)
   })
 })

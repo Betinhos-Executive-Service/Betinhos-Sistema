@@ -6,7 +6,7 @@ import { buildPatch, reduceCell, validateEdit, SAVED_VISIBLE_MS, type CellEvent,
 import { defaultSort, linkEntities } from './domain/fetch'
 import { formatDateTime } from './domain/format'
 import { columnLabel, parseLayout, rowKey } from './domain/layout'
-import { ENTITY, ID_ATTRIBUTE, type AttributeInfo, type AttributeMap, type CellKind, type CellStatus, type Column, type Sort, type View } from './domain/types'
+import { ENTITY, ID_ATTRIBUTE, type AttributeInfo, type AttributeMap, type CellKind, type CellStatus, type Column, type Page, type Sort, type View } from './domain/types'
 
 const message = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 export const cellKey = (id: string, attribute: string) => `${id}|${attribute}`
@@ -23,8 +23,8 @@ export type GeralState = {
   attributes: AttributeMap | null
   attributesError: string | null
   quickFind: string[]
-  rows: Row[]; page: number; total: number | null; more: boolean; cookies: (string | null)[]
-  loading: boolean; pageError: string | null
+  rows: Row[]; total: number | null; more: boolean; pagesLoaded: number
+  loading: boolean; loadingMore: boolean; pageError: string | null; loadError: string | null
   sort: Sort; query: string
   selected: Set<string>
   cells: Map<string, CellStatus>
@@ -84,24 +84,34 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   const [attributesError, setAttributesError] = useState<string | null>(null)
   const [quickFind, setQuickFind] = useState<string[]>([])
   const [rows, setRowsState] = useState<Row[]>([])
-  const [page, setPage] = useState(1)
   const [total, setTotal] = useState<number | null>(null)
   const [more, setMore] = useState(false)
-  const [cookies, setCookiesState] = useState<(string | null)[]>([null])
+  const [pagesLoaded, setPagesLoaded] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [pageError, setPageError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [sort, setSortState] = useState<Sort>(null)
   const [query, setQueryState] = useState('')
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [cells, setCells] = useState<Map<string, CellStatus>>(() => new Map())
-  const [nonce, setNonce] = useState(0)
   const defaultOrder = useMemo<Sort>(() => { try { return view ? defaultSort(view.fetchxml) : null } catch { return null } }, [view])
 
-  // Espelhos síncronos: callbacks (save, efeito de página) leem o valor corrente, não o do último render.
+  // Espelhos síncronos: callbacks (save, carga de páginas) leem o valor corrente, não o do último render.
   const rowsRef = useRef<Row[]>([])
-  const cookiesRef = useRef<(string | null)[]>([null])
+  /** Cookie da última página recebida (`null` antes da primeira ou quando o servidor não devolve). */
+  const cookieRef = useRef<string | null>(null)
+  const pagesRef = useRef(0)
+  const moreRef = useRef(false)
+  const loadingRef = useRef(true)
+  const loadingMoreRef = useRef(false)
+  const loadErrorRef = useRef<string | null>(null)
+  /** Visão, ordem e busca correntes: `loadMore` e `reload` pedem sempre com o contexto do último render. */
+  const context = useRef({ view: null as View | null, sort: null as Sort, query: '', quickFind: [] as string[] })
+  context.current = { view, sort, query, quickFind }
   // Um fim de "salvo" por célula: gravar de novo na mesma célula cancela o anterior.
   const settleTimers = useRef(new Map<string, number>())
+  /** Cada primeira página ou releitura invalida as respostas que ainda estão a caminho. */
   const pageToken = useRef(0)
   const onSaveFail = useRef(options.onSaveFail)
   onSaveFail.current = options.onSaveFail
@@ -110,7 +120,10 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     rowsRef.current = update(rowsRef.current)
     setRowsState(rowsRef.current)
   }, [])
-  const setCookies = useCallback((next: (string | null)[]) => { cookiesRef.current = next; setCookiesState(next) }, [])
+  const setLoadingFlag = useCallback((value: boolean) => { loadingRef.current = value; setLoading(value) }, [])
+  const setLoadingMoreFlag = useCallback((value: boolean) => { loadingMoreRef.current = value; setLoadingMore(value) }, [])
+  const setLoadErrorValue = useCallback((value: string | null) => { loadErrorRef.current = value; setLoadError(value) }, [])
+  const setMoreValue = useCallback((value: boolean) => { moreRef.current = value; setMore(value) }, [])
 
   useEffect(() => {
     const pending = settleTimers.current
@@ -122,13 +135,10 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     setColumns(parseLayout(next.layoutxml))
     // Sem ordenação própria, a consulta mantém todos os `<order>` da visão (inclusive os secundários).
     setSortState(null)
-    setPage(1)
-    setCookies([null])
-    setSelected(new Set())
     setCells(new Map())
     setAttributes(null)
     setAttributesError(null)
-  }, [setCookies])
+  }, [])
 
   // Efeito 1: visões e localização rápida em paralelo; a localização rápida nunca bloqueia a tela.
   useEffect(() => {
@@ -141,12 +151,12 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
         setViewsError(null)
         const first = list.find((v) => v.padrao) ?? list[0]
         if (first) enterView(first)
-        else setLoading(false)
+        else setLoadingFlag(false)
       },
-      (reason) => { if (alive) { setViewsError(message(reason)); setLoading(false) } },
+      (reason) => { if (alive) { setViewsError(message(reason)); setLoadingFlag(false) } },
     )
     return () => { alive = false }
-  }, [source, enterView])
+  }, [source, enterView, setLoadingFlag])
 
   // Efeito 2: metadata da raiz e das tabelas ligadas da visão ativa.
   useEffect(() => {
@@ -160,44 +170,142 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     return () => { alive = false }
   }, [source, view])
 
-  // Efeito 3: página; o token descarta respostas fora de ordem.
+  /** Total da visão: o da própria resposta quando vem; senão pergunta à contagem, sem travar a lista. */
+  const resolveTotal = useCallback((result: Page, token: number) => {
+    if (result.total != null && result.total >= 0) { setTotal(result.total); return }
+    const { view: current, query: text, quickFind: fields } = context.current
+    if (!current) return
+    void source.count({ fetchxml: current.fetchxml, query: text, quickFind: fields }).then(
+      (count) => { if (token === pageToken.current && count != null) setTotal(count) },
+      () => { /* sem contagem: o rodapé mostra só o que já carregou */ },
+    )
+  }, [source])
+
+  // Efeito 3: primeira página. Trocar visão, ordem ou busca recomeça do zero; o token descarta respostas antigas.
   useEffect(() => {
     if (!view) return
-    const current = ++pageToken.current
-    setLoading(true)
+    const token = ++pageToken.current
+    rowsRef.current = []
+    setRowsState([])
+    cookieRef.current = null
+    pagesRef.current = 0
+    setPagesLoaded(0)
+    setSelected(new Set())
+    setTotal(null)
+    setMoreValue(false)
+    setLoadErrorValue(null)
+    setLoadingMoreFlag(false)
     setPageError(null)
-    source.page({ fetchxml: view.fetchxml, page, cookie: cookiesRef.current[page - 1] ?? null, sort, query, quickFind }).then(
+    setLoadingFlag(true)
+    source.page({ fetchxml: view.fetchxml, page: 1, cookie: null, sort, query, quickFind }).then(
       (result) => {
-        if (current !== pageToken.current) return
-        setRows(() => result.rows)
-        setTotal(result.total)
-        setMore(result.more)
-        const next = cookiesRef.current.slice(0, page)
-        next[page] = result.cookie
-        setCookies(next)
-        setLoading(false)
+        if (token !== pageToken.current) return
+        rowsRef.current = result.rows
+        setRowsState(result.rows)
+        cookieRef.current = result.cookie
+        pagesRef.current = 1
+        setPagesLoaded(1)
+        setMoreValue(result.more)
+        resolveTotal(result, token)
+        setLoadingFlag(false)
       },
       (reason) => {
-        if (current !== pageToken.current) return
+        if (token !== pageToken.current) return
         setPageError(message(reason))
-        setLoading(false)
+        setLoadingFlag(false)
       },
     )
-  }, [source, view, sort, query, page, nonce, quickFind, setRows, setCookies])
+  }, [source, view, sort, query, quickFind, resolveTotal, setLoadingFlag, setLoadingMoreFlag, setLoadErrorValue, setMoreValue])
+
+  /** Pede a próxima página e acrescenta só as linhas que ainda não estão na lista. */
+  const loadMore = useCallback(() => {
+    const { view: current, sort: order, query: text, quickFind: fields } = context.current
+    if (!current || loadingRef.current || loadingMoreRef.current || !moreRef.current || loadErrorRef.current) return
+    const token = pageToken.current
+    const previous = cookieRef.current
+    setLoadingMoreFlag(true)
+    source.page({ fetchxml: current.fetchxml, page: pagesRef.current + 1, cookie: previous, sort: order, query: text, quickFind: fields }).then(
+      (result) => {
+        if (token !== pageToken.current) return
+        setLoadingMoreFlag(false)
+        // Mesmo cookie com "há mais": a consulta não andou. Não acrescenta nada para não repetir linhas.
+        if (result.more && result.cookie != null && result.cookie === previous) {
+          setLoadErrorValue('A consulta não avançou. Tente atualizar.')
+          return
+        }
+        const known = new Set(rowsRef.current.map((r) => String(r[ID_ATTRIBUTE])))
+        const fresh = result.rows.filter((r) => !known.has(String(r[ID_ATTRIBUTE])))
+        if (fresh.length) setRows((list) => [...list, ...fresh])
+        cookieRef.current = result.cookie
+        pagesRef.current += 1
+        setPagesLoaded(pagesRef.current)
+        setMoreValue(result.more)
+      },
+      (reason) => {
+        if (token !== pageToken.current) return
+        setLoadingMoreFlag(false)
+        setLoadErrorValue(message(reason))
+      },
+    )
+  }, [source, setRows, setLoadingMoreFlag, setLoadErrorValue, setMoreValue])
+
+  const retryLoadMore = useCallback(() => { setLoadErrorValue(null); loadMore() }, [setLoadErrorValue, loadMore])
+
+  /** Relê da página 1 até a última carregada, em sequência (cada página com o cookie da anterior). A lista só troca ao final. */
+  const reload = useCallback(() => {
+    const { view: current, sort: order, query: text, quickFind: fields } = context.current
+    if (!current) return
+    const token = ++pageToken.current
+    const target = Math.max(1, pagesRef.current)
+    setLoadingFlag(true)
+    setLoadingMoreFlag(false)
+    setLoadErrorValue(null)
+    setPageError(null)
+    void (async () => {
+      try {
+        const list: Row[] = []
+        const seen = new Set<string>()
+        let cookie: string | null = null
+        let hasMore = false
+        let loaded = 0
+        let first: Page | null = null
+        for (let n = 1; n <= target; n += 1) {
+          const result: Page = await source.page({ fetchxml: current.fetchxml, page: n, cookie, sort: order, query: text, quickFind: fields })
+          if (token !== pageToken.current) return
+          first ??= result
+          for (const row of result.rows) {
+            const id = String(row[ID_ATTRIBUTE])
+            if (!seen.has(id)) { seen.add(id); list.push(row) }
+          }
+          cookie = result.cookie
+          hasMore = result.more
+          loaded = n
+          if (!result.more) break
+        }
+        rowsRef.current = list
+        setRowsState(list)
+        cookieRef.current = cookie
+        pagesRef.current = loaded
+        setPagesLoaded(loaded)
+        setMoreValue(hasMore)
+        setSelected((s) => (s.size === 0 ? s : new Set([...s].filter((id) => seen.has(id)))))
+        if (first) resolveTotal(first, token)
+        setLoadingFlag(false)
+      } catch (reason) {
+        if (token !== pageToken.current) return
+        setPageError(message(reason))
+        setLoadingFlag(false)
+      }
+    })()
+  }, [source, resolveTotal, setLoadingFlag, setLoadingMoreFlag, setLoadErrorValue, setMoreValue])
 
   const selectView = useCallback((id: string) => {
     const next = views.find((v) => v.id === id)
     if (next) enterView(next)
   }, [views, enterView])
 
-  const backToFirst = useCallback(() => { setPage(1); setCookies([null]); setSelected(new Set()) }, [setCookies])
-  const setSort = useCallback((next: Sort) => { setSortState(next); backToFirst() }, [backToFirst])
-  const setQuery = useCallback((next: string) => { setQueryState(next); backToFirst() }, [backToFirst])
-  // A seleção vale para a página visível: trocar de página a limpa.
-  const goTo = useCallback((next: number) => { setPage(Math.max(1, Math.floor(next))); setSelected(new Set()) }, [])
-  const reload = useCallback(() => { backToFirst(); setNonce((n) => n + 1) }, [backToFirst])
-  /** Relê a página atual sem voltar à primeira nem limpar a seleção. */
-  const refresh = useCallback(() => setNonce((n) => n + 1), [])
+  const setSort = useCallback((next: Sort) => setSortState(next), [])
+  const setQuery = useCallback((next: string) => setQueryState(next), [])
 
   const toggle = useCallback((id: string) => setSelected((s) => {
     const next = new Set(s)
@@ -283,6 +391,6 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     return true
   }, [attributes, columns, source, setCell, setRows, scheduleSettle])
 
-  const state: GeralState = { views, viewsError, view, columns, attributes, attributesError, quickFind, rows, page, total, more, cookies, loading, pageError, sort, query, selected, cells }
-  return { ...state, defaultOrder, selectView, setSort, setQuery, goTo, reload, refresh, toggle, toggleAll, clearSelection, save, resetCell }
+  const state: GeralState = { views, viewsError, view, columns, attributes, attributesError, quickFind, rows, total, more, pagesLoaded, loading, loadingMore, pageError, loadError, sort, query, selected, cells }
+  return { ...state, defaultOrder, selectView, setSort, setQuery, loadMore, retryLoadMore, reload, refresh: reload, toggle, toggleAll, clearSelection, save, resetCell }
 }
