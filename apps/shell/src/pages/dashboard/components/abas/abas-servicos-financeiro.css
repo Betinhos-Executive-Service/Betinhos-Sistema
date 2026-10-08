@@ -1,0 +1,21 @@
+/* Abas Serviços e Financeiro: só o que os componentes compartilhados do dashboard não cobrem. Só tokens --bt-*, tema claro. */
+
+/* ---------- KPIs ---------- */
+/* Serviços tem quatro KPIs: quatro colunas na largura cheia (DS §8.1), duas no médio e uma no estreito (regras de .dash-kpis). */
+@container dash (min-width: 800px) { .dash-kpis.dash-sv-kpis--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+/* Valor sem dado ("s/dado"): mesmo lugar do número, em tom secundário, para não parecer um zero. */
+.dash-sv-semdado { color: var(--bt-color-text-secondary); }
+.dash-lista__valor.dash-sv-semdado { font-size: var(--bt-font-size-14); }
+
+/* ---------- Recebimentos: duas tabelas no mesmo bloco ---------- */
+.dash-fi-recebimentos { display: grid; gap: var(--bt-space-4); min-width: 0; }
+.dash-fi-recebimentos > section { display: grid; gap: var(--bt-space-2); min-width: 0; }
+.dash-fi-subtitulo { margin: 0; color: var(--bt-color-text-primary); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); line-height: var(--bt-typography-body-small-line-height); }
+
+/* ---------- Clientes: linha com "Ver meses" ---------- */
+.dash-fi-clientes .bt-table__cell--end .bt-button { margin-right: calc(-1 * var(--bt-space-2)); }
+/* O detalhe aberto ocupa a linha inteira, abaixo das colunas (a trilha dele tem 0 px enquanto fechado). */
+.dash-fi-clientes .bt-table__row > .bt-table__cell:has(> .dash-fi-meses) { grid-column: 1 / -1; }
+.dash-fi-meses { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: var(--bt-space-2); width: 100%; margin: 0; padding: 0 0 var(--bt-space-1); list-style: none; }
+.dash-fi-meses__item { display: grid; gap: var(--bt-space-0-5); min-width: 0; padding: var(--bt-space-2) var(--bt-space-2-5); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); }
+.dash-fi-meses__rotulo { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); letter-spacing: .06em; text-transform: uppercase; }
