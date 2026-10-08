@@ -17,8 +17,8 @@ it('Resumo Operacional é rota React do shell', () => {
 })
 
 it('usa rótulo do sitemap, depois metadata, depois nome lógico', () => {
-  const labels = new Map([['cr40f_financeiro', 'Financeiros']])
+  const labels = new Map([['cr40f_recibos_v2', 'Recibos']])
   expect(itemLabel(findItem('cr40f_clientes1')!.item, labels)).toBe('Clientes')
-  expect(itemLabel(findItem('cr40f_financeiro')!.item, labels)).toBe('Financeiros')
+  expect(itemLabel(findItem('cr40f_recibos_v2')!.item, labels)).toBe('Recibos')
   expect(itemLabel(findItem('cr40f_multas')!.item, labels)).toBe('cr40f_multas')
 })
