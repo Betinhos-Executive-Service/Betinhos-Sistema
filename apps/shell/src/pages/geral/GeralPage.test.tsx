@@ -257,4 +257,15 @@ describe('Geral', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
     expect(await screen.findByRole('dialog', { name: 'Formulário Geral abre no Dataverse' })).toBeTruthy()
   })
+  it('no celular mostra cards e edita pela sheet', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('max-width: 820px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    const card = (await screen.findAllByRole('listitem'))[0]
+    fireEvent.click(within(card).getByRole('button', { name: 'Editar campos' }))
+    const sheet = await screen.findByRole('dialog', { name: /Serviço OS-/ })
+    const trajeto = within(sheet).getByLabelText('Trajeto') as HTMLInputElement
+    fireEvent.change(trajeto, { target: { value: 'Rota pelo celular' } })
+    fireEvent.blur(trajeto)
+    expect(await within(sheet).findByText('Salvo ✓')).toBeTruthy()
+  })
 })
