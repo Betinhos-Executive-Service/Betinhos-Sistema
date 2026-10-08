@@ -62,7 +62,7 @@ describe('Dashboard', () => {
     expect(location.hash).toBe('#/dashboard?tab=servicos')
     expect(within(abas).getByRole('tab', { name: 'Serviços' }).getAttribute('aria-selected')).toBe('true')
     const painel = screen.getByRole('tabpanel', { name: 'Serviços' })
-    expect(within(painel).getByText('A aba Serviços está em construção')).toBeTruthy()
+    expect(within(painel).getByRole('region', { name: 'Indicadores de serviços' })).toBeTruthy()
     // Só a aba ativa é renderizada.
     expect(screen.queryByRole('tabpanel', { name: 'Resumo' })).toBeNull()
     expect(screen.queryByRole('region', { name: 'Indicadores executivos' })).toBeNull()
@@ -72,7 +72,7 @@ describe('Dashboard', () => {
 
     fireEvent.click(within(abas).getByRole('tab', { name: 'Financeiro' }))
     expect(location.hash).toBe('#/dashboard?tab=financeiro')
-    expect(screen.getByRole('tabpanel', { name: 'Financeiro' })).toBeTruthy()
+    expect(within(screen.getByRole('tabpanel', { name: 'Financeiro' })).getByRole('region', { name: 'Indicadores financeiros' })).toBeTruthy()
 
     fireEvent.click(within(abas).getByRole('tab', { name: 'Resumo' }))
     expect(location.hash).toBe('#/dashboard')
