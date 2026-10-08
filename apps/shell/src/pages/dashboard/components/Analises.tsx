@@ -7,7 +7,7 @@ import type { Resumo } from '../domain/resumo'
 import { useMedia } from '../../operacional/useMedia'
 import { AnaliseCard } from './AnaliseCard'
 import { Duplo, Nome, Participacao, Rolagem, Status, ValorDelta, col, larguraMinima, pct } from './Celulas'
-import { COLUNA_LARGA, Linhas, MEDIA_MOBILE, juntar } from './Linhas'
+import { COLUNA_LARGA, Expansivel, Linhas, MEDIA_MOBILE, VER_MESES, juntar, useLinhasAbertas } from './Linhas'
 
 const delta = (d: Delta) => (d.tipo === 'novo' ? 'Novo' : d.tipo === 'nada' ? '—' : `${d.valor > 0 ? '+' : ''}${dec(d.valor, 1)}%`)
 type PontoTP = Resumo['totalProduzido']['pontos'][number]
@@ -27,6 +27,9 @@ export function Analises({ resumo, periodo }: { resumo: Resumo; periodo: string 
   const mobile = useMedia(MEDIA_MOBILE)
   const { totalProduzido: tp, metaRealizado: mr, clientes, ticketMensal: tm, status, custoFrota: cf, topVolume: tv, topFaturamento: tf, motoristas } = resumo
   const anos = tp.anos.map(String)
+  // Celular: clientes e motoristas mostram só o total e abrem os meses sob demanda (uma chave por linha).
+  const abertasClientes = useLinhasAbertas(clientes.linhas.map((l) => l.cliente))
+  const abertasMotoristas = useLinhasAbertas(motoristas.linhas.map((l) => l.key))
 
   const colTP: TableColumn<PontoTP>[] = mobile
     ? [{ key: 'm', header: 'Mês', cell: (p) => p.rotulo }, resto('Por ano', (p) => <Linhas itens={anos.map((a, i) => `${a}: ${brlS(p.valores[i])}`)} />)]
@@ -45,7 +48,13 @@ export function Analises({ resumo, periodo }: { resumo: Resumo; periodo: string 
   const colClientes: TableColumn<LinhaCliente>[] = mobile
     ? [
       { key: 'c', header: 'Cliente', cell: (l) => l.cliente },
-      resto('Por mês e total', (l) => <Linhas colunas itens={[...clientes.meses.map((m, i) => `${m.rotulo}: ${brlS(l.meses[i].valor)} · ${delta(l.meses[i].delta)}`), juntar(`Total ${brlS(l.total)}`, `Participação ${pct(l.participacao)}`)]} />),
+      resto('Total e participação', (l) => (
+        <Expansivel
+          resumo={juntar(`Total ${brlS(l.total)}`, `Participação ${pct(l.participacao)}`)} rotulos={VER_MESES}
+          itens={clientes.meses.map((m, i) => `${m.rotulo}: ${brlS(l.meses[i].valor)} · ${delta(l.meses[i].delta)}`)}
+          aberta={abertasClientes.aberta(l.cliente)} onAlternar={() => abertasClientes.alternar(l.cliente)}
+        />
+      )),
     ]
     : [
       { key: 'c', header: 'Cliente', width: trilhasCli[0].width, cell: (l) => <Nome texto={l.cliente} /> },
@@ -85,7 +94,13 @@ export function Analises({ resumo, periodo }: { resumo: Resumo; periodo: string 
   const colMotoristas: TableColumn<LinhaMotorista>[] = mobile
     ? [
       { key: 'n', header: 'Motorista', cell: (l) => l.nome },
-      resto('Por mês e total', (l) => <Linhas colunas itens={[...motoristas.meses.map((m, i) => `${m.rotulo}: ${int(l.meses[i].qtd)} · ${l.meses[i].pct}`), juntar(`Total ${int(l.total)}`, `Participação ${pct(l.pct)}`)]} />),
+      resto('Total e participação', (l) => (
+        <Expansivel
+          resumo={juntar(`Total ${int(l.total)}`, pct(l.pct))} rotulos={VER_MESES}
+          itens={motoristas.meses.map((m, i) => `${m.rotulo}: ${int(l.meses[i].qtd)} · ${l.meses[i].pct}`)}
+          aberta={abertasMotoristas.aberta(l.key)} onAlternar={() => abertasMotoristas.alternar(l.key)}
+        />
+      )),
     ]
     : [
       { key: 'n', header: 'Motorista', width: trilhasMot[0].width, cell: (l) => <Nome texto={l.nome} /> },

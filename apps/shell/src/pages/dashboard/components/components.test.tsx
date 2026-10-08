@@ -32,9 +32,10 @@ const TITULOS = [
   'Total produzido', 'Meta × realizado', 'Faturamento por cliente', 'Ticket médio — mensal', 'Status dos serviços',
   'Custo frota — manutenções', 'Top clientes — volume', 'Top clientes — faturamento', 'Serviços por motorista',
 ]
+const resumoDe = (dados: Dados, p: Partial<Filtros> = {}) =>
+  calcularResumo(dados, { atalho: 'esteMes', inicio: '2026-10-01', fim: '2026-10-15', status: [], clientes: [], motoristas: [], tipos: [], ...p }, new Date('2026-10-15T15:00:00Z'))
 function renderResumo(dados: Dados) {
-  const f: Filtros = { atalho: 'esteMes', inicio: '2026-10-01', fim: '2026-10-15', status: [], clientes: [], motoristas: [], tipos: [] }
-  const r = calcularResumo(dados, f, new Date('2026-10-15T15:00:00Z'))
+  const r = resumoDe(dados)
   return render(<>
     <ProducaoPropriaTerceira dados={r.producao} periodo={PERIODO} />
     <Emergenciais dados={r.emergenciais} periodo={PERIODO} />
@@ -49,6 +50,23 @@ const UM_SERVICO: Dados = {
   manutencoes: [{ dia: '2026-10-03', valor: 100 }], multas: [], ocorrencias: [], funcionarios: [], viagens: [], eventos: [], telemetria: [], indisponiveis: [],
   veiculos: [{ id: 'v1', statusLabel: 'Disponível', categoria: 'Propria' }],
 }
+
+/** Dois clientes e dois motoristas no mesmo mês, todos emergenciais: Tenaris com 2 serviços (R$ 1.000) e Embraer com 1 (R$ 300). */
+const DOIS_CLIENTES: Dados = {
+  ...VAZIO,
+  reservas: [
+    reserva({ saidaRaw: '2026-10-02T12:00:00Z', criadoRaw: '2026-10-02T08:00:00Z', valor: 500, cliente: 'Tenaris', motoristaId: 'm1', motoristaKey: 'm1', motorista: 'Ana' }),
+    reserva({ saidaRaw: '2026-10-03T12:00:00Z', criadoRaw: '2026-10-03T08:00:00Z', valor: 500, cliente: 'Tenaris', motoristaId: 'm1', motoristaKey: 'm1', motorista: 'Ana' }),
+    reserva({ saidaRaw: '2026-10-04T12:00:00Z', criadoRaw: '2026-10-04T08:00:00Z', valor: 300, cliente: 'Embraer', motoristaId: 'm2', motoristaKey: 'm2', motorista: 'Bia' }),
+  ],
+}
+/** Linha da lista cuja 1ª célula é `titulo`. */
+const linhaDe = (card: HTMLElement, titulo: string) => {
+  const linha = within(card).getAllByRole('row').find((l) => within(l).queryAllByRole('cell')[0]?.textContent === titulo)
+  if (!linha) throw new Error(`Linha "${titulo}" não encontrada`)
+  return linha
+}
+const detalheDe = (botao: HTMLElement) => document.getElementById(botao.getAttribute('aria-controls') ?? '')
 
 describe('componentes do Dashboard', () => {
   it('chip comparativo mostra rótulo, valor anterior, sinal e percentual, com seta', () => {
@@ -221,6 +239,7 @@ describe('componentes do Dashboard', () => {
     const { container } = semAvisoDeGrafico(() => {
       const r = renderResumo(UM_SERVICO)
       for (const b of screen.getAllByRole('button', { name: 'Ver valores' })) fireEvent.click(b)
+      for (const b of screen.getAllByRole('button', { name: 'Ver meses' })) fireEvent.click(b)
       return r
     })
     const texto = container.textContent ?? ''
@@ -231,11 +250,92 @@ describe('componentes do Dashboard', () => {
     expect(texto).toMatch(/Tenaris · 100,0%/)
     expect(texto).toMatch(/1º Tenaris · 1/)
     expect(texto).toMatch(/Total R\$[^·]*· Participação 100,0%/)
+    // Os meses de cliente e de motorista só aparecem depois de "Ver meses".
+    expect(texto).toMatch(/out\/26: R\$\s500,00 · —/)
+    expect(texto).toMatch(/out\/26: 1 · 100,0%/)
     // Nenhuma tabela rola no celular: todas viram lista.
     expect(screen.queryByRole('region', { name: /e mês$/ })).toBeNull()
     // Todas as linhas com dados têm exatamente 2 células.
     const linhas = screen.getAllByRole('row').filter((l) => within(l).queryAllByRole('cell').length > 0)
     expect(linhas.length).toBeGreaterThan(0)
     for (const l of linhas) expect(within(l).getAllByRole('cell').length).toBe(2)
+  })
+
+  describe('listas mensais no celular', () => {
+    beforeEach(() => telaCelular(true))
+
+    it('faturamento por cliente: a linha mostra só o total e os meses abrem sob demanda, na mesma célula', () => {
+      semAvisoDeGrafico(() => render(<Analises resumo={resumoDe(DOIS_CLIENTES)} periodo={PERIODO} />))
+      const card = screen.getByRole('region', { name: 'Faturamento por cliente' })
+      const tenaris = linhaDe(card, 'Tenaris')
+      expect(tenaris.textContent).toMatch(/Total R\$\s1,0k · Participação 76,9%/)
+      expect(tenaris.textContent).not.toMatch(/out\/26/)
+      const abrir = within(tenaris).getByRole('button', { name: 'Ver meses' })
+      expect(abrir.getAttribute('aria-expanded')).toBe('false')
+      expect(abrir.hasAttribute('aria-controls')).toBe(false)
+      // Alvo de toque de 44 px (size touch do DS).
+      expect(abrir.classList.contains('bt-button--touch')).toBe(true)
+      fireEvent.click(abrir)
+      const fechar = within(tenaris).getByRole('button', { name: 'Ocultar meses' })
+      expect(fechar.getAttribute('aria-expanded')).toBe('true')
+      expect(detalheDe(fechar)?.textContent).toMatch(/^out\/26: R\$\s1,0k · —$/)
+      expect(within(tenaris).getAllByRole('cell')).toHaveLength(2)
+      // Só a linha clicada abre.
+      expect(linhaDe(card, 'Embraer').textContent).not.toMatch(/out\/26/)
+      fireEvent.click(fechar)
+      expect(within(tenaris).getByRole('button', { name: 'Ver meses' }).getAttribute('aria-expanded')).toBe('false')
+      expect(tenaris.textContent).not.toMatch(/out\/26/)
+    })
+
+    it('serviços por motorista: a linha mostra o total e a participação, e os meses abrem sob demanda', () => {
+      semAvisoDeGrafico(() => render(<Analises resumo={resumoDe(DOIS_CLIENTES)} periodo={PERIODO} />))
+      const card = screen.getByRole('region', { name: 'Serviços por motorista' })
+      const ana = linhaDe(card, 'Ana')
+      expect(ana.textContent).toMatch(/Total 2 · 66,7%/)
+      expect(ana.textContent).not.toMatch(/out\/26/)
+      const abrir = within(ana).getByRole('button', { name: 'Ver meses' })
+      expect(abrir.getAttribute('aria-expanded')).toBe('false')
+      fireEvent.click(abrir)
+      const fechar = within(ana).getByRole('button', { name: 'Ocultar meses' })
+      expect(fechar.getAttribute('aria-expanded')).toBe('true')
+      expect(detalheDe(fechar)?.textContent).toBe('out/26: 2 · 66,7%')
+      expect(linhaDe(card, 'Bia').textContent).not.toMatch(/out\/26/)
+    })
+
+    it('emergenciais: a linha do mês mostra o 1º cliente e "Ver ranking" abre os demais', () => {
+      render(<Emergenciais dados={resumoDe(DOIS_CLIENTES).emergenciais} periodo={PERIODO} />)
+      const mes = linhaDe(screen.getByRole('region', { name: 'Serviços emergenciais' }), 'out/26')
+      expect(mes.textContent).toMatch(/1º Tenaris · 2/)
+      expect(mes.textContent).not.toMatch(/Embraer/)
+      const abrir = within(mes).getByRole('button', { name: 'Ver ranking' })
+      expect(abrir.getAttribute('aria-expanded')).toBe('false')
+      fireEvent.click(abrir)
+      const fechar = within(mes).getByRole('button', { name: 'Ocultar ranking' })
+      expect(fechar.getAttribute('aria-expanded')).toBe('true')
+      expect(detalheDe(fechar)?.textContent).toBe('2º Embraer · 1')
+      fireEvent.click(fechar)
+      expect(mes.textContent).not.toMatch(/Embraer/)
+    })
+
+    it('emergenciais: mês com um só cliente não tem botão, porque não há mais o que mostrar', () => {
+      render(<Emergenciais dados={resumoDe(UM_SERVICO).emergenciais} periodo={PERIODO} />)
+      const mes = linhaDe(screen.getByRole('region', { name: 'Serviços emergenciais' }), 'out/26')
+      expect(mes.textContent).toMatch(/1º Tenaris · 1/)
+      expect(within(mes).queryByRole('button')).toBeNull()
+    })
+
+    it('ao mudar o filtro, a linha aberta continua aberta só se a chave ainda existir', () => {
+      const painel = (p: Partial<Filtros> = {}) => <Analises resumo={resumoDe(DOIS_CLIENTES, p)} periodo={PERIODO} />
+      const { rerender } = semAvisoDeGrafico(() => render(painel()))
+      const card = () => screen.getByRole('region', { name: 'Faturamento por cliente' })
+      fireEvent.click(within(linhaDe(card(), 'Tenaris')).getByRole('button', { name: 'Ver meses' }))
+      semAvisoDeGrafico(() => rerender(painel({ clientes: ['Tenaris'] })))
+      expect(within(linhaDe(card(), 'Tenaris')).getByRole('button', { name: 'Ocultar meses' }).getAttribute('aria-expanded')).toBe('true')
+      // Tenaris sai da lista e, ao voltar, volta fechada.
+      semAvisoDeGrafico(() => rerender(painel({ clientes: ['Embraer'] })))
+      expect(() => linhaDe(card(), 'Tenaris')).toThrow()
+      semAvisoDeGrafico(() => rerender(painel()))
+      expect(within(linhaDe(card(), 'Tenaris')).getByRole('button', { name: 'Ver meses' }).getAttribute('aria-expanded')).toBe('false')
+    })
   })
 })
