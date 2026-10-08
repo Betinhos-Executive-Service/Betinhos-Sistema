@@ -4,7 +4,7 @@ import { dec, int } from '../domain/format'
 import { useMedia } from '../../operacional/useMedia'
 import { AnaliseCard } from './AnaliseCard'
 import { Duplo, Rolagem, col, larguraMinima } from './Celulas'
-import { COLUNA_LARGA, Linhas, MEDIA_MOBILE } from './Linhas'
+import { COLUNA_LARGA, Expansivel, MEDIA_MOBILE, VER_RANKING, useLinhasAbertas } from './Linhas'
 
 type Mes = Dados['meses'][number]
 const POSICOES = [0, 1, 2, 3, 4]
@@ -30,11 +30,24 @@ function Podio({ top3 }: { top3: Dados['top3'] }) {
 
 export function Emergenciais({ dados, periodo }: { dados: Dados; periodo: string }) {
   const mobile = useMedia(MEDIA_MOBILE)
-  /** No celular, o ranking do mês vira uma linha por posição; no desktop, uma coluna por posição. */
+  const abertas = useLinhasAbertas(dados.meses.map((m) => m.mes))
+  /** No celular, a linha do mês mostra só o 1º cliente e abre os demais sob demanda; no desktop, uma coluna por posição. */
   const colunas: TableColumn<Mes>[] = mobile
     ? [
       { key: 'mes', header: 'Mês', cell: (m) => m.rotulo },
-      { key: 'ranking', header: 'Ranking de clientes', width: COLUNA_LARGA, cell: (m) => <Linhas itens={m.ranking.length ? m.ranking.map((r, i) => `${i + 1}º ${r.cliente} · ${int(r.qtd)}`) : ['—']} /> },
+      {
+        key: 'ranking', header: 'Ranking de clientes', width: COLUNA_LARGA,
+        cell: (m) => {
+          const [primeiro, ...demais] = m.ranking
+          return (
+            <Expansivel
+              resumo={primeiro ? `1º ${primeiro.cliente} · ${int(primeiro.qtd)}` : '—'} rotulos={VER_RANKING}
+              itens={demais.map((r, i) => `${i + 2}º ${r.cliente} · ${int(r.qtd)}`)}
+              aberta={abertas.aberta(m.mes)} onAlternar={() => abertas.alternar(m.mes)}
+            />
+          )
+        },
+      },
     ]
     : [
       { key: 'mes', header: 'Mês', width: TRILHAS[0].width, cell: (m) => <strong className="dash-forte">{m.rotulo}</strong> },
