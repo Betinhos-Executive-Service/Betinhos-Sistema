@@ -127,6 +127,13 @@ function ButtonShowcase() {
         <Button variant="secondary" icon={<X size={16} />} aria-label="Fechar painel" />
       </Cluster>
 
+      <p className="showcase__label">Maiúsculas acentuadas (o acento não pode ser cortado)</p>
+      <Cluster gap="3">
+        <Button variant="secondary">Últimos 7 dias</Button>
+        <Button variant="secondary" size="compact">Ônibus</Button>
+        <Button variant="secondary" size="touch">Édito</Button>
+      </Cluster>
+
       <p className="showcase__label">Em uso: clique para salvar</p>
       <Cluster gap="3">
         <Button loading={saving} onClick={save}>{saving ? 'Salvando' : 'Salvar alterações'}</Button>
