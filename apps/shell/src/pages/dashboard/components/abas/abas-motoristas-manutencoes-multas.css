@@ -1,0 +1,34 @@
+/* Abas Motoristas (dash-mo-), Manutenções (dash-ma-) e Multas (dash-mu-). Só tokens --bt-*; light-only; sem gradiente. */
+
+/* ---------- KPIs: uma coluna no estreito; 3 (Motoristas, Multas) ou 5 (Manutenções) na largura cheia ---------- */
+.dash-mo-kpis, .dash-ma-kpis, .dash-mu-kpis { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--bt-space-3); }
+@container dash (min-width: 540px) {
+  .dash-mo-kpis, .dash-mu-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .dash-ma-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container dash (min-width: 800px) { .dash-ma-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@container dash (min-width: 1080px) { .dash-ma-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+/* Sem sparkline, o card fica na altura do conteúdo, com o mínimo do metric card do DS (§10.7). */
+.dash-mo-kpis .dash-kpi, .dash-ma-kpis .dash-kpi, .dash-mu-kpis .dash-kpi { min-height: 96px; }
+
+/* ---------- Motoristas: filtro da frota e meses do ranking ---------- */
+.dash-mo-filtro { display: grid; justify-items: end; gap: var(--bt-space-1); max-width: 100%; }
+.dash-mo-filtro__nota { max-width: 280px; margin: 0; color: var(--bt-color-warning); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); line-height: var(--bt-typography-body-small-line-height); text-align: right; }
+@container (max-width: 459px) {
+  .dash-mo-filtro { justify-items: start; }
+  .dash-mo-filtro__nota { max-width: none; text-align: left; }
+}
+/* Coluna do detalhe (trilha de 0 px): fechada, a célula vazia some; aberta, ocupa a linha inteira abaixo dos números. */
+.dash-mo-ranking .bt-table__head > :last-child, .dash-mo-ranking .bt-table__row > .bt-table__cell:last-child:empty { display: none; }
+.dash-mo-ranking .bt-table__row > .bt-table__cell:last-child:not(:empty) { grid-column: 1 / -1; position: static; margin: 0; padding: 0 0 var(--bt-space-1); box-shadow: none; }
+.dash-mo-meses { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: var(--bt-space-2); width: 100%; margin: 0; padding: 0; list-style: none; }
+.dash-mo-meses__item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; column-gap: var(--bt-space-2); padding: var(--bt-space-2) var(--bt-space-2-5); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); font-variant-numeric: tabular-nums; }
+.dash-mo-meses__mes { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); letter-spacing: .05em; text-transform: uppercase; }
+.dash-mo-meses__qtd { color: var(--bt-color-brand); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); }
+.dash-mo-meses__pct { grid-column: 1 / -1; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-11); }
+
+/* ---------- Manutenções: meta e selo no celular ---------- */
+.dash-ma-meta { display: grid; justify-items: start; gap: var(--bt-space-1-5); min-width: 0; }
+
+/* ---------- Multas: descrição da infração quebra (texto crítico), nunca corta ---------- */
+.dash-mu-infracao { min-width: 0; color: var(--bt-color-text-primary); font-weight: var(--bt-font-weight-bold); overflow-wrap: anywhere; }
