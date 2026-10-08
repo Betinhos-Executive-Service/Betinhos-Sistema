@@ -89,4 +89,33 @@ describe('Geral', () => {
     await screen.findByRole('columnheader', { name: /Status de Operação/ })
     expect(screen.queryByRole('columnheader', { name: /Trajeto/ })).toBeNull()
   })
+
+  it('fechar o diálogo de colunas com alterações pede confirmação antes de descartar', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByRole('columnheader', { name: /Trajeto/ })
+    fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Colunas da visão' })
+
+    // Sem alterações: fecha direto.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Fechar' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Colunas da visão' })).toBeNull())
+    expect(screen.queryByRole('dialog', { name: 'Descartar alterações?' })).toBeNull()
+
+    // Com alterações: X abre a confirmação; "Continuar editando" mantém o diálogo.
+    fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
+    const again = await screen.findByRole('dialog', { name: 'Colunas da visão' })
+    fireEvent.click(within(again).getByRole('checkbox', { name: 'Trajeto' }))
+    fireEvent.click(within(again).getByRole('button', { name: 'Fechar' }))
+    const confirm = await screen.findByRole('dialog', { name: 'Descartar alterações?' })
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Continuar editando' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Descartar alterações?' })).toBeNull())
+    expect(screen.getByRole('dialog', { name: 'Colunas da visão' })).toBeTruthy()
+
+    // Esc também pede confirmação; "Descartar" fecha sem aplicar.
+    fireEvent(again, new Event('cancel', { cancelable: true }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Descartar alterações?' })).getByRole('button', { name: 'Descartar' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Colunas da visão' })).toBeNull())
+    expect(screen.getByRole('columnheader', { name: /Trajeto/ })).toBeTruthy()
+    expect(window.localStorage.getItem('betinhos.geral.colunas.v1')).toBeNull()
+  })
 })

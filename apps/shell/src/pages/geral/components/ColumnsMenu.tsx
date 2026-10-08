@@ -19,11 +19,16 @@ function draftFrom(columns: Column[], prefs: ColumnPrefs | null): ColumnPrefs {
   return { order: ordered.map((c) => c.key), hidden: prefs?.hidden.filter((k) => columns.some((c) => c.key === k)) ?? [] }
 }
 
+/** Mesma ordem e mesmas colunas ocultas (a ordem das ocultas não importa). */
+const sameDraft = (a: ColumnPrefs, b: ColumnPrefs) =>
+  a.order.length === b.order.length && a.order.every((key, i) => key === b.order[i]) && a.hidden.length === b.hidden.length && a.hidden.every((key) => b.hidden.includes(key))
+
 const isDefault = (draft: ColumnPrefs, columns: Column[]) => draft.hidden.length === 0 && draft.order.every((key, i) => key === columns[i]?.key)
 
 /** Botão "Colunas" e o diálogo com mostrar/ocultar e ordem; só vale ao aplicar. */
 export function ColumnsMenu({ columns, attributes, prefs, onChange }: Props) {
   const [open, setOpen] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const [draft, setDraft] = useState<ColumnPrefs>({ hidden: [], order: [] })
   const byKey = new Map(columns.map((c) => [c.key, c]))
   const visibleCount = draft.order.filter((key) => !draft.hidden.includes(key)).length
@@ -40,6 +45,15 @@ export function ColumnsMenu({ columns, attributes, prefs, onChange }: Props) {
     ;[order[index], order[target]] = [order[target], order[index]]
     return { ...d, order }
   })
+  // Fechar com alterações no rascunho (X, Esc ou fundo) pede confirmação antes de descartar.
+  function requestClose() {
+    if (sameDraft(draft, draftFrom(columns, prefs))) setOpen(false)
+    else setConfirming(true)
+  }
+  function discard() {
+    setConfirming(false)
+    setOpen(false)
+  }
   function apply() {
     onChange(isDefault(draft, columns) ? null : draft)
     setOpen(false)
@@ -54,11 +68,11 @@ export function ColumnsMenu({ columns, attributes, prefs, onChange }: Props) {
       <Button variant="secondary" icon={<Columns3 size={16} />} aria-haspopup="dialog" onClick={show}>Colunas</Button>
       <Dialog
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={requestClose}
         title="Colunas da visão"
         actions={<>
           <Button variant="ghost" onClick={restore}>Restaurar colunas da visão</Button>
-          <Button variant="secondary" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button variant="secondary" onClick={requestClose}>Cancelar</Button>
           <Button onClick={apply}>Aplicar</Button>
         </>}
       >
@@ -81,6 +95,18 @@ export function ColumnsMenu({ columns, attributes, prefs, onChange }: Props) {
             })}
           </ul>
         ) : null}
+      </Dialog>
+      <Dialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        tone="danger"
+        title="Descartar alterações?"
+        actions={<>
+          <Button variant="secondary" onClick={() => setConfirming(false)}>Continuar editando</Button>
+          <Button variant="danger" onClick={discard}>Descartar</Button>
+        </>}
+      >
+        As mudanças nas colunas ainda não foram aplicadas.
       </Dialog>
     </>
   )

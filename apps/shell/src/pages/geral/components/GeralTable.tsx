@@ -97,7 +97,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, onSort, s
             )
           })}
       </div>
-      {!loading && rows.length === 0 ? <div className="bt-table__empty gr-empty">{empty}</div> : null}
+      {!loading && rows.length === 0 && empty != null ? <div className="bt-table__empty gr-empty">{empty}</div> : null}
       <div className="bt-table__footer gr-footer">{footer}</div>
     </div>
   )

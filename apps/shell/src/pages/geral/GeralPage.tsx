@@ -118,7 +118,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           onOpen={(id) => { void openForm('edit', id) }}
           renderCell={renderCell}
           footer={footer}
-          empty={empty}
+          empty={geral.pageError ? null : empty}
         />
       </>
     )

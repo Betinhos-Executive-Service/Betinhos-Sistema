@@ -174,7 +174,8 @@ export function useGeral(initialSource: Source) {
   const backToFirst = useCallback(() => { setPage(1); setCookies([null]); setSelected(new Set()) }, [setCookies])
   const setSort = useCallback((next: Sort) => { setSortState(next); backToFirst() }, [backToFirst])
   const setQuery = useCallback((next: string) => { setQueryState(next); backToFirst() }, [backToFirst])
-  const goTo = useCallback((next: number) => setPage(Math.max(1, Math.floor(next))), [])
+  // A seleção vale para a página visível: trocar de página a limpa.
+  const goTo = useCallback((next: number) => { setPage(Math.max(1, Math.floor(next))); setSelected(new Set()) }, [])
   const reload = useCallback(() => { backToFirst(); setNonce((n) => n + 1) }, [backToFirst])
 
   const toggle = useCallback((id: string) => setSelected((s) => {
