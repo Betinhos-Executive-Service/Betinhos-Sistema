@@ -17,6 +17,9 @@ import { AbaEmConstrucao } from './components/abas/AbaEmConstrucao'
 import { ResumoCarregando, ResumoTab } from './components/abas/ResumoTab'
 import { DespesasCarregando, DespesasTab, FILTROS_DESPESA_VAZIOS, type FiltrosDespesaProprios } from './components/abas/DespesasTab'
 import { FrotaCarregando, FrotaTab } from './components/abas/FrotaTab'
+import { MotoristasTab } from './components/abas/MotoristasTab'
+import { ManutencoesTab } from './components/abas/ManutencoesTab'
+import { MultasTab } from './components/abas/MultasTab'
 import { DashboardToolbar } from './components/DashboardToolbar'
 import './dashboard.css'
 
@@ -102,7 +105,10 @@ export function DashboardPage({ host }: { host: Host }) {
         {aba === 'resumo' ? (resumo ? <ResumoTab resumo={resumo} periodo={periodo} /> : carregandoPrimeira ? <ResumoCarregando /> : null) : null}
         {aba === 'despesas' ? (db.dados ? <DespesasTab dados={db.dados} filtros={filtros} periodo={periodo} proprios={filtrosDespesa} onProprios={setFiltrosDespesa} /> : carregandoPrimeira ? <DespesasCarregando /> : null) : null}
         {aba === 'frota' ? (db.dados ? <FrotaTab dados={db.dados} filtros={filtros} now={now} periodo={periodo} /> : carregandoPrimeira ? <FrotaCarregando /> : null) : null}
-        {aba !== 'resumo' && aba !== 'despesas' && aba !== 'frota' && (db.dados || carregandoPrimeira) ? <AbaEmConstrucao nome={rotuloAba(aba)} /> : null}
+        {aba === 'motoristas' && (db.dados || carregandoPrimeira) ? <MotoristasTab dados={db.dados} filtros={filtros} now={now} periodo={periodo} /> : null}
+        {aba === 'manutencoes' && (db.dados || carregandoPrimeira) ? <ManutencoesTab dados={db.dados} filtros={filtros} now={now} periodo={periodo} /> : null}
+        {aba === 'multas' && (db.dados || carregandoPrimeira) ? <MultasTab dados={db.dados} filtros={filtros} now={now} periodo={periodo} /> : null}
+        {aba !== 'resumo' && aba !== 'despesas' && aba !== 'frota' && aba !== 'motoristas' && aba !== 'manutencoes' && aba !== 'multas' && (db.dados || carregandoPrimeira) ? <AbaEmConstrucao nome={rotuloAba(aba)} /> : null}
       </div>
     </PageLayout>
   )
