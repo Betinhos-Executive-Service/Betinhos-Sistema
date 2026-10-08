@@ -7,7 +7,9 @@
 - O legado (`Dashboard Betinhos/Dashboard.html`, ~17,9 mil linhas) tem 12 abas, modo TV (Samsung Tizen, Chromium 63) e calcula tudo no navegador sobre o histórico inteiro. As fórmulas validadas estão em `Dashboard Betinhos/DOCUMENTACAO_KPIS_DASHBOARD.md` (§1–§6) e são a especificação desta entrega.
 - **Divisão:** esta entrega faz a base (rota, filtros globais, camada de dados com atualização real) e **só a aba Resumo**. As outras 11 abas viram specs seguintes, uma ou duas por vez.
 - **Fidelidade:** mesmas fórmulas e mesmos números do legado; layout novo no Design System. Divergência numérica com o legado é bug, salvo correção listada na §8.
-- **Histórico fixo 2023–2025:** mantido como constante isolada em `data/historico.ts`, testada e documentada.
+- **Histórico fixo 2023–2025:** mantido como constante isolada em `data/historico.ts`, testada e documentada (inclui `fat2026` jan–mar, usado só pela meta).
+- **Jan–mar/2026 vem do CSV legado** (escolha do Renan, 08/10/2026): as ~1.978 linhas embutidas no legado (`legacy2026Rows`) viram `data/historico2026.ts` e substituem as reservas do Dataverse com saída (texto bruto `slice(0,10)`) entre 2026-01-01 e 2026-03-31, como no legado.
+- **Referência literal do legado:** `2026-10-08-dashboard-resumo-legado.md` (trechos do `Dashboard.html` com linha). Em conflito entre a doc de KPIs e o código, vale o código (paridade numérica).
 - **Gráficos:** Recharts, com cores e tipografia vindas dos tokens `--bt-*`.
 - **Dados:** cálculo no cliente, com consulta limitada por janela de datas e `$select` mínimo (abordagem 1). Sem FetchXML agregado.
 - **Modo TV fica no legado.** O WebResource `new_dashboard` continua no menu como "Dashboard (completo)" até todas as abas migrarem.
@@ -17,16 +19,16 @@
 
 | Entidade (entity set) | Campos | Janela |
 |---|---|---|
-| `cr40f_reservadeveculos` (`cr40f_reservadeveculoses`) | `cr40f_reservadeveculosid`, `cr40f_dataehorriodesada`, `createdon`, `cr40f_status`, `cr40f_statusdefaturamento`, `cr40f_tipodoservico`, `cr40f_tipodeveiculo`, `_cr40f_veiculo_value`, `_cr40f_motorista_value`, `_cr40f_cliente_value`, `new_categoriadoitem`, `_new_composicaodepreco_value`, `_cr40f_financeiro_value` (+ FormattedValue) | saída ≥ 1º/jan de (ano do início do filtro − 3) e ≤ fim do filtro |
-| `cr40f_composicaodeprecos` | `new_valortotal`, `new_status` (100000000 pendente, 100000001 concluída) | só as CPs referenciadas pelas reservas carregadas: `$expand` pela navigation do lookup (nome confirmado na metadata); sem navigation, consulta por ID em lotes |
+| `cr40f_reservadeveculos` (`cr40f_reservadeveculoses`) | `cr40f_reservadeveculosid`, `cr40f_dataehorriodesada`, `createdon`, `cr40f_status`, `cr40f_statusdefaturamento`, `cr40f_tipodoservico`, `cr40f_tipodeveiculo`, `_cr40f_veiculo_value`, `new_categoriadoitem`, `_new_composicaodepreco_value`, `_cr40f_financeiro_value` (+ FormattedValue); `$expand=cr40f_Motorista($select=cr40f_funcionariosid,cr40f_nomecompleto,new_apelido),cr40f_Cliente($select=cr40f_nomedocliente)` | saída ≥ 1º/jan de min(ano do início − 1, ano atual − 2) e < fim do filtro + 1 dia (BRT) |
+| `cr40f_composicaodeprecos` | `cr40f_composicaodeprecosid`, `new_valortotal`, `new_status` (100000000 pendente, 100000001 concluída) | todas, como no legado (3 colunas, sem anotações), casadas pelo lookup `_new_composicaodepreco_value` |
 | `cr40f_manutencoes` | `cr40f_datamanutencao`, `cr40f_valor` | período do filtro (+ LM/LY quando exibidos) |
 | `cr40f_multas` | `cr40f_dataehorario`, `cr40f_status` (202410000 = pendente) | idem |
 | `cr40f_errooperacional` | `cr40f_dataocorrencia` | idem |
-| `cr40f_funcionarios` | `cr40f_nomecompleto`, `cr40f_status`, `cr40f_validadedacnh` | todos |
-| `cr40f_veiculos` | `cr40f_statusdoveiculo`, `new_categoriadoveiculo` (100000000 própria, 100000001 terceirizada) | todos |
+| `cr40f_funcionarios` | `cr40f_funcionariosid`, `cr40f_nomecompleto`, `cr40f_status`, `cr40f_validadedacnh` | todos |
+| `cr40f_veiculos` | `cr40f_veiculosid`, `cr40f_statusdoveiculo`, `new_categoriadoveiculo` (100000000 própria, 100000001 terceirizada) | todos |
 
-- Status de reserva usados: 202410001 Confirmado, 202410005 Programado, 202410008 Concluído. Faturamento Pago = 202410010; "Pagante em viagem" e "Mensal" pelos códigos levantados na Tarefa 0.
-- Rótulos vêm do FormattedValue/metadata; os códigos só decidem regras. Onde o legado classifica por texto ("cancel", "recus", "concluído/realizado/finalizado", "disponível/ativo", "pendente"), o domínio usa o código de option set quando a Tarefa 0 confirmar o mapeamento 1:1; se não houver, mantém o texto normalizado (sem acento, minúsculo) e registra o motivo.
+- Status de reserva usados: 202410001 Confirmado, 202410005 Programado, 202410008 Concluído. Faturamento: Pago 202410010, Pagante em viagem 202410006, Mensal 202410008. Multa pendente 202410000.
+- **Classificação literal do legado:** onde o legado usa texto ("cancel", "recus", "conclu/realiz/finaliz", "dispon/ativo", "pend"), o domínio usa o mesmo texto, com a mesma normalização (`normL` sem acento ou `stL` só minúsculas). Trocar por código fica para depois da paridade, numa mudança própria. A Tarefa 0 só confere na metadata de DEV que campos e códigos existem.
 - Paginação por `@odata.nextLink` com `Prefer: odata.maxpagesize=5000`. Coluna ausente na metadata: repete a consulta sem ela (mesmo "safe mode" do Operacional) e o KPI dependente mostra `s/dado`.
 
 ## 3. Regras (domínio puro)
@@ -58,6 +60,7 @@ Base `rv` = reservas com `new_categoriadoitem = 100000000`, enriquecidas com `va
 ## 4. Carga e atualização
 
 - `source.ts` expõe `load(filtro)` com implementações Dataverse e mock (mock automático sem `Xrm.WebApi`, selo "Dados de exemplo").
+- O período é sempre definido (atalho ou Personalizado com as duas datas); não há modo "sem data" como no legado.
 - Mudar o período recarrega a janela. Mudar só status, cliente, motorista ou tipo recalcula sem recarregar.
 - **Atualização a cada 60 s refaz a consulta** (corrige o legado) apenas com a aba visível (`visibilitychange`). Botão "Atualizar" no header mobile e na barra utilitária. Os dados antigos ficam na tela durante a recarga; uma recarga mais antiga nunca sobrescreve uma mais nova.
 - Consultas independentes rodam em paralelo (no máximo 4). Falha de um conjunto secundário (multas, ocorrências etc.) mostra `s/dado` só nos cards dele, com aviso; falha de reservas mostra o erro da página.
@@ -100,5 +103,6 @@ Composição do DS §11.1: anomalia e ação primeiro.
 
 - Atualização automática refaz a consulta (antes só re-renderizava com cache).
 - Carga limitada à janela de datas, em vez do histórico inteiro.
-- Datas de corte e códigos em constantes nomeadas; classificação por código quando houver mapeamento confirmado.
+- Datas de corte e códigos em constantes nomeadas.
+- Peculiaridades preservadas por paridade (registrar, não corrigir agora): CNH conta só funcionário com status "ativo" e validade preenchida até 90 dias (a doc diz que sem validade também conta); "Frota ativa" conta status com "dispon" ou "ativo" em minúsculas, o que inclui "Inativo"; emergencial e produção própria × terceirizada usam a data UTC bruta (`slice`), sem fuso; LY do Ticket médio no card de análise é sempre `s/dado`.
 - Qualquer outra divergência numérica encontrada na paridade é registrada aqui antes de ser aceita.
