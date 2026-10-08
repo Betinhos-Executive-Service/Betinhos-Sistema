@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, configure, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, configure, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DashboardPage } from './DashboardPage'
 import { atalho } from './domain/periodo'
@@ -10,8 +10,9 @@ vi.setConfig({ testTimeout: 30_000 })
 beforeEach(() => {
   vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+  history.replaceState(null, '', '#/dashboard')
 })
-afterEach(() => { cleanup(); vi.unstubAllGlobals() })
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); history.replaceState(null, '', '#') })
 
 describe('Dashboard', () => {
   it('abre no mock com "Este ano" e mostra as seções', async () => {
@@ -37,5 +38,43 @@ describe('Dashboard', () => {
     const p = atalho('mesAnt', new Date())
     const br = (d: string) => d.split('-').reverse().join('/')
     expect((await screen.findAllByText(`${br(p.inicio)} a ${br(p.fim)}`, { exact: false })).length).toBeGreaterThan(0)
+  })
+
+  it('abas do dashboard antigo: Serviços no mock avisa que abre no Dataverse, guarda a aba no hash e volta ao Resumo', async () => {
+    render(<DashboardPage host={{ mode: 'mock' }} />)
+    await screen.findByRole('region', { name: 'Indicadores executivos' })
+    const abas = screen.getByRole('tablist', { name: 'Abas do dashboard' })
+    expect(within(abas).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Resumo', 'Serviços', 'Faturamento', 'Pagamentos', 'Despesas', 'Frota', 'Motoristas', 'Manutenções', 'Multas', 'Trocas', 'Marketing'])
+    expect(within(abas).getByRole('tab', { name: 'Resumo' }).getAttribute('aria-selected')).toBe('true')
+
+    fireEvent.click(within(abas).getByRole('tab', { name: 'Serviços' }))
+    expect(location.hash).toBe('#/dashboard?tab=servicos')
+    expect(within(abas).getByRole('tab', { name: 'Serviços' }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByText('Esta aba abre dentro do Dataverse')).toBeTruthy()
+    expect(screen.getByText('new_dashboard?tab=servicos')).toBeTruthy()
+    // Filtros e indicadores pertencem ao Resumo.
+    expect(screen.queryByRole('group', { name: 'Período' })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Indicadores executivos' })).toBeNull()
+
+    fireEvent.click(within(abas).getByRole('tab', { name: 'Faturamento' }))
+    expect(location.hash).toBe('#/dashboard?tab=financeiro')
+
+    fireEvent.click(within(abas).getByRole('tab', { name: 'Resumo' }))
+    expect(location.hash).toBe('#/dashboard')
+    expect(await screen.findByRole('region', { name: 'Indicadores executivos' })).toBeTruthy()
+    expect(screen.getByRole('group', { name: 'Período' })).toBeTruthy()
+  })
+
+  it('abre direto na aba do hash e acompanha a navegação', async () => {
+    history.replaceState(null, '', '#/dashboard?tab=multas')
+    render(<DashboardPage host={{ mode: 'mock' }} />)
+    expect(screen.getByRole('tab', { name: 'Multas' }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByText('new_dashboard?tab=multas')).toBeTruthy()
+    act(() => {
+      history.replaceState(null, '', '#/dashboard?tab=inexistente')
+      window.dispatchEvent(new HashChangeEvent('hashchange'))
+    })
+    expect(screen.getByRole('tab', { name: 'Resumo' }).getAttribute('aria-selected')).toBe('true')
+    expect(await screen.findByRole('region', { name: 'Indicadores executivos' })).toBeTruthy()
   })
 })

@@ -3,6 +3,25 @@
 .dash-meta { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); font-variant-numeric: tabular-nums; }
 .dash-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
+/* ---------- Abas (linha extra do PageHeader, DS §10.2) ---------- */
+/* A barra rola na horizontal dentro do cabeçalho; a página nunca ganha rolagem lateral. */
+.dash-abas { min-width: 0; }
+.dash-abas .bt-tabs__list { scrollbar-width: thin; overscroll-behavior-x: contain; }
+/* Onze abas: o respiro lateral de 8 px (em vez de 10) faz todas caberem a 1440 px com a sidebar aberta. */
+.dash-abas .bt-tabs__tab { padding: 0 var(--bt-space-2); }
+
+/* Aba ainda no dashboard antigo: o iframe ocupa a altura útil da área, como as telas legadas do shell. */
+.dash-pagina--legado { display: flex; flex-direction: column; box-sizing: border-box; min-height: 100%; }
+.dash-pagina--legado > .bt-stack { flex: 1 1 auto; }
+.dash-painel--legado, .dash-legado { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
+.dash-legado { gap: var(--bt-space-2); }
+.dash-legado__aviso { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--bt-space-1) var(--bt-space-3); min-height: var(--bt-control-height-compact); color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); }
+.dash-legado__aviso > p { margin: 0; }
+.dash-legado__frame { flex: 1 1 auto; height: auto; min-height: 480px; overflow: hidden; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-lg); }
+.dash-legado__frame > .frame__iframe { position: absolute; inset: 0; height: 100%; }
+/* Enquanto carrega, o iframe fica oculto: o chrome do legado não pisca antes de ser escondido. */
+.dash-legado__frame[aria-busy="true"] > .frame__iframe { visibility: hidden; }
+
 /* Corpo da página: contêiner das consultas de largura (a sidebar aberta ou recolhida muda a largura útil). */
 .dash-corpo { container: dash / inline-size; display: grid; gap: var(--bt-space-4); min-width: 0; }
 

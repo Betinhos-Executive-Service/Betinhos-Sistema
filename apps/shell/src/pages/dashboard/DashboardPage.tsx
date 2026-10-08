@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, EmptyState, StatusBadge, buttonClassName, useShellHeader } from '@betinhos/ui'
+import { Alert, Button, EmptyState, StatusBadge, Tabs, buttonClassName, useShellHeader } from '@betinhos/ui'
 import { ExternalLink, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
-import { hrefFor } from '../../nav/useHashRoute'
+import { hrefFor, setHashQuery, useHashQuery } from '../../nav/useHashRoute'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
 import { opcoesFiltro, type OpcoesFiltro } from './domain/base'
@@ -14,6 +14,7 @@ import type { Filtros } from './domain/types'
 import { useDashboard } from './useDashboard'
 import { AlertList } from './components/AlertList'
 import { Analises } from './components/Analises'
+import { ABAS, AbaLegado, abaDaUrl, rotuloAba, type Aba } from './components/DashboardAbas'
 import { DashboardToolbar } from './components/DashboardToolbar'
 import { Emergenciais } from './components/Emergenciais'
 import { FrotaPessoas } from './components/FrotaPessoas'
@@ -28,6 +29,15 @@ const horaBR = (d: Date) => d.toLocaleTimeString('pt-BR', { hour: '2-digit', min
 export function DashboardPage({ host }: { host: Host }) {
   const source = useMemo(() => createSource(host), [host])
   const mobile = useMedia('(max-width: 820px)')
+  // A aba vive na URL (#/dashboard?tab=servicos): recarregar ou compartilhar o link mantém a aba.
+  const query = useHashQuery()
+  const aba = abaDaUrl(query.get('tab'))
+  const trocarAba = (proxima: Aba) => {
+    const params = new URLSearchParams(query)
+    if (proxima === 'resumo') params.delete('tab')
+    else params.set('tab', proxima)
+    setHashQuery(params)
+  }
   const [filtros, setFiltros] = useState<Filtros>(() => ({ atalho: 'esteAno', ...atalho('esteAno', new Date()), status: [], clientes: [], motoristas: [], tipos: [] }))
   const [now, setNow] = useState(() => new Date())
   const db = useDashboard(source, cargaDesde(filtros.inicio, now), filtros.fim)
@@ -51,29 +61,33 @@ export function DashboardPage({ host }: { host: Host }) {
   const carregandoPrimeira = !resumo && db.carregando
 
   const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar dashboard" onClick={() => void db.atualizar()} />, [db.atualizar])
-  useShellHeader({ title: 'Dashboard', actions: headerActions })
+  const resumoAtivo = aba === 'resumo'
+  useShellHeader({ title: 'Dashboard', actions: resumoAtivo ? headerActions : undefined })
 
   const segmentado = filtros.status.length + filtros.clientes.length + filtros.motoristas.length + filtros.tipos.length > 0
   const limpar = () => setFiltros((f) => ({ ...f, status: [], clientes: [], motoristas: [], tipos: [] }))
 
   return (
     <PageLayout
+      className={resumoAtivo ? 'dash-pagina' : 'dash-pagina dash-pagina--legado'}
       eyebrow="Operacional"
       title="Dashboard"
-      meta={<span className="dash-meta">
+      meta={resumoAtivo ? <span className="dash-meta">
         <span>{periodo}</span>
         {resumo ? <span>{int(resumo.servicos)} serviços</span> : null}
         {db.atualizadoEm ? <span>atualizado {horaBR(db.atualizadoEm)}</span> : null}
         {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-      </span>}
-      description="Indicadores executivos, alertas e análises da operação no período escolhido."
-      actions={<>
+      </span> : null}
+      description={resumoAtivo ? 'Indicadores executivos, alertas e análises da operação no período escolhido.' : 'Indicadores executivos, alertas e análises da operação.'}
+      actions={resumoAtivo ? <>
         <a className={buttonClassName({ variant: 'secondary' })} href={hrefFor('new_dashboard')}><ExternalLink size={16} aria-hidden="true" /> Abrir dashboard completo</a>
         {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} loading={db.carregando && Boolean(resumo)} onClick={() => void db.atualizar()}>Atualizar</Button>}
-      </>}
-      toolbar={<DashboardToolbar filtros={filtros} opcoes={opcoes} now={now} onChange={setFiltros} />}
+      </> : undefined}
+      tabs={<div className="dash-abas"><Tabs tabs={[...ABAS]} value={aba} onChange={trocarAba} aria-label="Abas do dashboard" /></div>}
+      toolbar={resumoAtivo ? <DashboardToolbar filtros={filtros} opcoes={opcoes} now={now} onChange={setFiltros} /> : undefined}
     >
-      <div className="dash-corpo">
+      {resumoAtivo ? null : <div className="dash-painel dash-painel--legado" role="tabpanel" aria-label={rotuloAba(aba)}><AbaLegado host={host} aba={aba} /></div>}
+      {resumoAtivo ? <div className="dash-corpo dash-painel" role="tabpanel" aria-label="Resumo">
         {db.erro && resumo ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={() => void db.atualizar()}>Tentar de novo</Button>}>{db.erro} Os números são da carga anterior.</Alert> : null}
         {db.erro && !resumo && !db.carregando ? (
           <EmptyState className="surface" align="start" icon={<SearchX size={36} />} title="Não foi possível carregar o dashboard" action={<Button variant="primary" onClick={() => void db.atualizar()}>Tentar de novo</Button>}>{db.erro}</EmptyState>
@@ -99,7 +113,7 @@ export function DashboardPage({ host }: { host: Host }) {
           </section>
           <Analises resumo={resumo} periodo={periodo} />
         </> : null}
-      </div>
+      </div> : null}
     </PageLayout>
   )
 }
