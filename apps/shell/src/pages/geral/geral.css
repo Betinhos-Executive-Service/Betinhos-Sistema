@@ -39,8 +39,8 @@
 
 /* O contêiner rola nos dois eixos; cabeçalho, seleção e primeira coluna ficam fixos. */
 .gr-grid { overflow: auto; }
-/* Densidade "tabela densa" aprovada em 08/10/2026; token table-row-dense pendente no DS (Módulo Qualidade). */
-.gr-table { --gr-row-height: 44px; }
+/* Densidade "tabela densa" (DS 1.5.0 §5.2/§10.9): linha 44 px via --bt-table-row-dense, cabeçalho 32 px. */
+.gr-table { --gr-row-height: var(--bt-table-row-dense); }
 .gr-table .bt-table__head, .gr-table .bt-table__row { grid-template-columns: var(--gr-columns); gap: 0; padding: 0; width: 100%; min-width: var(--gr-min-width, max-content); }
 .gr-table .bt-table__head { display: grid; position: sticky; top: 0; z-index: 2; }
 .gr-table .bt-table__row { min-height: var(--gr-row-height); }
