@@ -51,6 +51,7 @@ export function reloadPath(set: string, id: string, keys: string[]) {
     if (key.includes('.')) continue
     select.add(key)
   }
+  select.add('statecode')
   return `${set}(${cleanId(id)})?$select=${Array.from(select).join(',')}`
 }
 

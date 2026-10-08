@@ -219,4 +219,42 @@ describe('Geral', () => {
     expect(await within(cell).findByText('Sem permissão para alterar este serviço.')).toBeTruthy()
     expect((within(cell).getByRole('switch') as HTMLInputElement).checked).toBe(before)
   })
+
+  it('seleção mostra comandos; copiar abre a prévia com o bloco; desativar pede confirmação', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    // A linha do cabeçalho existe antes dos dados: espera as linhas chegarem.
+    await screen.findByText(/Linhas 1–50 de/)
+    const rows = screen.getAllByRole('row')
+    fireEvent.click(within(rows[1]).getByRole('checkbox'))
+    fireEvent.click(within(rows[2]).getByRole('checkbox'))
+    expect(screen.getByText('2 selecionados')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Editar' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Copiar Serviços' }))
+    const copy = await screen.findByRole('dialog', { name: 'Copiar serviços' })
+    expect((await within(copy).findByText(/\*ID:\* OS-/)).textContent).toContain('*Trajeto:*')
+    // O X do Dialog também se chama "Fechar": o botão de ação é o último.
+    fireEvent.click(within(copy).getAllByRole('button', { name: 'Fechar' }).at(-1) as HTMLElement)
+    fireEvent.click(screen.getByRole('button', { name: 'Desativar' }))
+    const confirm = await screen.findByRole('dialog', { name: 'Desativar 2 serviços?' })
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Desativar' }))
+    expect(await screen.findByText('2 serviços desativados.')).toBeTruthy()
+    await waitFor(() => expect(screen.queryByText('2 selecionados')).toBeNull())
+  })
+
+  it('em mock, criar avisa que o formulário abre no Dataverse', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findAllByRole('row')
+    fireEvent.click(screen.getByRole('button', { name: 'Criar serviço' }))
+    expect(await screen.findByRole('dialog', { name: 'Formulário Geral abre no Dataverse' })).toBeTruthy()
+  })
+
+  it('com 1 selecionado, Editar abre o formulário e Gerar Voucher avisa que só roda no Dataverse', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByText(/Linhas 1–50 de/)
+    fireEvent.click(within(screen.getAllByRole('row')[1]).getByRole('checkbox'))
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar Voucher' }))
+    expect(await screen.findByText('O voucher abre dentro do Dataverse.')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+    expect(await screen.findByRole('dialog', { name: 'Formulário Geral abre no Dataverse' })).toBeTruthy()
+  })
 })

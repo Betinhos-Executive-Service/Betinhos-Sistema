@@ -1,13 +1,18 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
-import { Alert, Button, EmptyState, Pagination, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
-import { Plus, RefreshCw, SearchX } from 'lucide-react'
+import { Alert, Button, EmptyState, Menu, Pagination, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
+import { Archive, ArchiveRestore, CalendarDays, ClipboardList, Copy, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Ticket, X } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
+import { hrefFor } from '../../nav/useHashRoute'
 import { createSource } from './data/source'
 import { Cell } from './components/Cell'
 import { GeralTable } from './components/GeralTable'
+import { CopyDialog, MockFormDialog, StateDialog, type StateRequest } from './components/Dialogs'
+import { EscalaFdsDrawer } from './components/EscalaFdsDrawer'
 import { GeralToolbar } from './components/GeralToolbar'
+import { VoucherOverlay } from './components/VoucherOverlay'
+import { copyText } from './domain/copy'
 import { applyColumnPrefs, loadColumnPrefs, saveColumnPrefs, type ColumnPrefs } from './domain/columns'
 import { ID_ATTRIBUTE, PAGE_SIZE, type CellStatus, type Column } from './domain/types'
 import { cellKey, useGeral } from './useGeral'
@@ -38,17 +43,101 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     setSaved((s) => ({ ...s, [viewId]: next }))
   }, [source.kv, viewId])
 
-  const { reload, goTo, setQuery, selectView } = geral
+  const { reload, goTo, setQuery, selectView, clearSelection } = geral
+  const [mockForm, setMockForm] = useState(false)
+  const [copy, setCopy] = useState<{ open: boolean; loading: boolean; text: string }>({ open: false, loading: false, text: '' })
+  const [stateRequest, setStateRequest] = useState<StateRequest | null>(null)
+  const [stateBusy, setStateBusy] = useState(false)
+  const [voucherUrl, setVoucherUrl] = useState<string | null>(null)
+  const [escalaOpen, setEscalaOpen] = useState(false)
   const openForm = useCallback(async (mode: 'create' | 'edit', id?: string) => {
     try {
       const result = await source.openForm(mode, id)
       if (result === 'closed') reload()
       else if (result === 'external') toast({ tone: 'info', message: 'O formulário abriu em outra aba. Clique em Atualizar quando terminar.' })
-      else toast({ tone: 'info', message: 'O Formulário Geral só abre dentro do Dataverse.' })
+      else setMockForm(true)
     } catch (reason) {
       toast({ tone: 'danger', message: reason instanceof Error ? reason.message : String(reason) })
     }
   }, [source, reload, toast])
+
+  const selectedIds = useMemo(() => Array.from(geral.selected), [geral.selected])
+  const rowOf = useCallback((id: string) => rows.find((r) => String(r[ID_ATTRIBUTE]) === id), [rows])
+  /** 0 = todos ativos, 1 = todos inativos, `null` = misturados ou sem estado conhecido. */
+  const selectedState = useMemo(() => {
+    const states = new Set(selectedIds.map((id) => { const state = rowOf(id)?.statecode; return typeof state === 'number' ? state : -1 }))
+    return states.size === 1 && !states.has(-1) ? (states.values().next().value as number) : null
+  }, [selectedIds, rowOf])
+
+  const copySelected = useCallback(async () => {
+    setCopy({ open: true, loading: true, text: '' })
+    try {
+      const text = copyText(await source.copyRows(selectedIds))
+      setCopy({ open: true, loading: false, text })
+    } catch (reason) {
+      setCopy({ open: false, loading: false, text: '' })
+      toast({ tone: 'danger', message: `Não foi possível montar o texto: ${reason instanceof Error ? reason.message : String(reason)}` })
+    }
+  }, [source, selectedIds, toast])
+
+  const askState = useCallback((active: boolean) => {
+    const labels = selectedIds.map((id) => { const name = rowOf(id)?.cr40f_id; return typeof name === 'string' && name ? name : id })
+    setStateRequest({ ids: selectedIds, labels, active })
+  }, [selectedIds, rowOf])
+
+  const confirmState = useCallback(async () => {
+    if (!stateRequest) return
+    const { ids, active } = stateRequest
+    setStateBusy(true)
+    try {
+      const { ok, failed } = await source.setState(ids, active)
+      if (failed.length === 0) {
+        const one = ok.length === 1
+        toast({ tone: 'success', message: `${ok.length} ${one ? 'serviço' : 'serviços'} ${active ? 'ativado' : 'desativado'}${one ? '' : 's'}.` })
+      } else toast({ tone: 'danger', message: `${failed.length} de ${ids.length} falharam: ${failed[0].message}` })
+    } catch (reason) {
+      toast({ tone: 'danger', message: reason instanceof Error ? reason.message : String(reason) })
+    } finally {
+      setStateBusy(false)
+      setStateRequest(null)
+      reload()
+      clearSelection()
+    }
+  }, [stateRequest, source, toast, reload, clearSelection])
+
+  const openVoucher = useCallback(() => {
+    const url = source.openVoucher(selectedIds)
+    if (url == null) toast({ tone: 'info', message: 'O voucher abre dentro do Dataverse.' })
+    else setVoucherUrl(url)
+  }, [source, selectedIds, toast])
+
+  const mixedTitle = 'Selecione só serviços ativos ou só inativos.'
+  const commands = (
+    <>
+      {selectedIds.length === 1 ? <Button variant="action" size="compact" icon={<Pencil size={16} />} onClick={() => { void openForm('edit', selectedIds[0]) }}>Editar</Button> : null}
+      <Button variant="action" size="compact" icon={<Ticket size={16} />} onClick={openVoucher}>Gerar Voucher</Button>
+      <Button variant="action" size="compact" icon={<Copy size={16} />} onClick={() => { void copySelected() }}>Copiar Serviços</Button>
+      {selectedState === 1
+        ? <Button variant="action" size="compact" icon={<ArchiveRestore size={16} />} onClick={() => askState(true)}>Ativar</Button>
+        : selectedState === 0
+          ? <Button variant="danger" size="compact" icon={<Archive size={16} />} onClick={() => askState(false)}>Desativar</Button>
+          : <>
+            <Button variant="danger" size="compact" icon={<Archive size={16} />} disabled title={mixedTitle}>Desativar</Button>
+            <Button variant="action" size="compact" icon={<ArchiveRestore size={16} />} disabled title={mixedTitle}>Ativar</Button>
+          </>}
+      <Button variant="ghost" size="compact" icon={<X size={16} />} onClick={clearSelection}>Limpar seleção</Button>
+    </>
+  )
+  const shortcuts = (
+    <Menu
+      trigger={(props) => <Button {...props} variant="secondary" icon={<MoreVertical size={18} />} aria-label="Mais ações" />}
+      actions={[
+        { id: 'funcoes', label: 'Funções Operacionais', icon: <ClipboardList size={16} />, onSelect: () => { location.hash = hrefFor('new_telafuncoesoperacionais') } },
+        { id: 'escala', label: 'Escala FDS', icon: <CalendarDays size={16} />, onSelect: () => setEscalaOpen(true) },
+        { id: 'contagem', label: 'Contagem de Serviços', icon: <ListChecks size={16} />, onSelect: () => { location.hash = hrefFor('operacional') } },
+      ]}
+    />
+  )
 
   const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar serviços" onClick={reload} />, [reload])
   useShellHeader({ title: 'Geral', actions: headerActions })
@@ -146,12 +235,17 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           prefs={prefs}
           onPrefs={setPrefs}
           selectedCount={geral.selected.size}
-          commands={null}
-          shortcuts={null}
+          commands={commands}
+          shortcuts={shortcuts}
         />
       }
     >
       {body}
+      <CopyDialog open={copy.open} loading={copy.loading} text={copy.text} onClose={() => setCopy((c) => ({ ...c, open: false }))} onCopied={() => { setCopy((c) => ({ ...c, open: false })); toast({ tone: 'success', message: 'Serviços copiados.' }) }} />
+      <StateDialog request={stateRequest} busy={stateBusy} onClose={() => setStateRequest(null)} onConfirm={() => { void confirmState() }} />
+      <MockFormDialog open={mockForm} onClose={() => setMockForm(false)} />
+      <EscalaFdsDrawer url={source.escalaFdsUrl()} open={escalaOpen} onClose={() => setEscalaOpen(false)} />
+      {voucherUrl ? <VoucherOverlay url={voucherUrl} onClose={() => setVoucherUrl(null)} /> : null}
     </PageLayout>
   )
 }

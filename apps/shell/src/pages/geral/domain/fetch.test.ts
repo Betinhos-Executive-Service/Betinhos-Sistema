@@ -18,6 +18,12 @@ const parse = (xml: string) => new DOMParser().parseFromString(xml, 'text/xml')
 const base = { page: 1, pageSize: 50, cookie: null, sort: null, query: '', quickFind: [] as string[] }
 
 describe('buildFetch', () => {
+  it('garante statecode entre os atributos da raiz', () => {
+    const doc = parse(buildFetch(AGENDA, base))
+    expect(doc.querySelectorAll('entity > attribute[name="statecode"]').length).toBe(1)
+    expect(parse(buildFetch(buildFetch(AGENDA, base), base)).querySelectorAll('entity > attribute[name="statecode"]').length).toBe(1)
+  })
+
   it('troca paginação, pede total e preserva filtro, ordem e link-entity', () => {
     const doc = parse(buildFetch(AGENDA, base))
     const fetch = doc.documentElement
