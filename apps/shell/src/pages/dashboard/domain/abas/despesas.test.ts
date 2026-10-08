@@ -4,7 +4,7 @@ import type { CategoriaDespesa, Despesa, FormaPagamento } from '../types'
 import { calcularDespesas, filtrarDespesas, periodoAnteriorDespesa, type FiltrosDespesa, type KpiDespesa } from './despesas'
 
 let seq = 0
-/** Despesa de teste: R$ 0 com comprovante completo, sem motorista nem reserva; sobrescreva o que importa. */
+/** Despesa de teste: R$ 0 com comprovante completo, sem motorista nem reserva; `mes` (Brasília) segue o dia salvo se não vier; sobrescreva o que importa. */
 function despesa(p: Partial<Despesa> = {}): Despesa {
   const dia = p.dia ?? '2026-10-05'
   seq++
@@ -79,18 +79,19 @@ describe('filtrarDespesas (expenseMatchesFilters)', () => {
 })
 
 describe('calcularDespesas: os 6 KPIs', () => {
-  const r = calcularDespesas([...atuais(), ...anteriores()], CATEGORIAS, FORMAS, OUT, SEM_FILTRO, periodoAnteriorDespesa(OUT.inicio, OUT.fim))
+  const r = calcularDespesas([...atuais(), ...anteriores()], CATEGORIAS, FORMAS, OUT, SEM_FILTRO, periodoAnteriorDespesa(OUT.inicio, OUT.fim), false)
 
-  it('valores do período', () => {
+  it('valores do período, crus, com o formato do legado (brlS, brl no ticket e na hospedagem, inteiro no sem comprovante)', () => {
     expect(r.lancamentos).toBe(5)
     expect(r.total).toBe(620)
-    expect(r.kpis.map((k) => k.id)).toEqual(['despesa', 'alimentacao', 'aguardando', 'ticket', 'semComprovante', 'hospedagem'])
-    expect(kpi(r.kpis, 'despesa').valor).toBe(brlS(620))
-    expect(kpi(r.kpis, 'alimentacao').valor).toBe(brlS(50))
-    expect(kpi(r.kpis, 'aguardando').valor).toBe(brlS(410))
-    expect(kpi(r.kpis, 'ticket').valor).toBe(brl(124))
-    expect(kpi(r.kpis, 'semComprovante').valor).toBe('2')
-    expect(kpi(r.kpis, 'hospedagem').valor).toBe(brl(150))
+    expect(r.kpis.map((k) => [k.id, k.valor, k.formato])).toEqual([
+      ['despesa', 620, 'brlS'],
+      ['alimentacao', 50, 'brlS'],
+      ['aguardando', 410, 'brlS'],
+      ['ticket', 124, 'brl'],
+      ['semComprovante', 2, 'int'],
+      ['hospedagem', 150, 'brl'],
+    ])
   })
 
   it('chip ANT. contra a janela anterior; subir é desfavorável', () => {
@@ -109,28 +110,42 @@ describe('calcularDespesas: os 6 KPIs', () => {
     expect(h.faixa).toEqual({ tom: 'ok', texto: 'Dentro da meta', apoio: `Alvo ${brl(150)} · teto ${brl(200)}` })
   })
 
+  it('variação zero é favorável (expenseDeltaMarkup: delta <= 0 com higherIsWorse)', () => {
+    const iguais = [despesa({ valor: 100 }), despesa({ valor: 100, dia: '2026-09-15' })]
+    const z = calcularDespesas(iguais, CATEGORIAS, FORMAS, OUT, SEM_FILTRO, periodoAnteriorDespesa(OUT.inicio, OUT.fim), false)
+    expect(kpi(z.kpis, 'despesa').chip).toEqual({ rotulo: 'ANT.', tipo: 'valor', anterior: brlS(100), variacao: 0, favoravel: true })
+  })
+
   it('base zero e sem período anterior', () => {
-    const base = calcularDespesas(atuais(), CATEGORIAS, FORMAS, OUT, SEM_FILTRO, { inicio: '2026-08-31', fim: '2026-09-30' })
+    const base = calcularDespesas(atuais(), CATEGORIAS, FORMAS, OUT, SEM_FILTRO, { inicio: '2026-08-31', fim: '2026-09-30' }, false)
     expect(kpi(base.kpis, 'despesa').chip).toEqual({ rotulo: 'ANT.', tipo: 'base-zero', anterior: brlS(0) })
     expect(kpi(base.kpis, 'semComprovante').chip).toEqual({ rotulo: 'ANT.', tipo: 'base-zero', anterior: '0' })
-    const sem = calcularDespesas(atuais(), CATEGORIAS, FORMAS, OUT, SEM_FILTRO, null)
+    const sem = calcularDespesas(atuais(), CATEGORIAS, FORMAS, OUT, SEM_FILTRO, null, false)
     expect(kpi(sem.kpis, 'despesa').chip).toEqual({ rotulo: 'ANT.', tipo: 'sem-dado' })
   })
 
+  it('despesas indisponíveis: KPIs null (s/dado), sem chip, série nem faixa, como o dvDisabled do legado', () => {
+    const fora = calcularDespesas(atuais(), CATEGORIAS, FORMAS, OUT, SEM_FILTRO, periodoAnteriorDespesa(OUT.inicio, OUT.fim), true)
+    expect(fora.kpis.map((k) => k.id)).toEqual(['despesa', 'alimentacao', 'aguardando', 'ticket', 'semComprovante', 'hospedagem'])
+    for (const k of fora.kpis) expect(k).toMatchObject({ valor: null, chip: null, serie: [] })
+    expect(kpi(fora.kpis, 'hospedagem').faixa).toBeUndefined()
+    expect(fora).toMatchObject({ lancamentos: 0, total: 0, porMes: [], porMotorista: [] })
+  })
+
   it('o período anterior respeita os filtros próprios', () => {
-    const f = calcularDespesas([...atuais(), ...anteriores()], CATEGORIAS, FORMAS, OUT, { ...SEM_FILTRO, categorias: ['c-hosp'] }, periodoAnteriorDespesa(OUT.inicio, OUT.fim))
+    const f = calcularDespesas([...atuais(), ...anteriores()], CATEGORIAS, FORMAS, OUT, { ...SEM_FILTRO, categorias: ['c-hosp'] }, periodoAnteriorDespesa(OUT.inicio, OUT.fim), false)
     expect(f.total).toBe(300)
     expect(kpi(f.kpis, 'despesa').chip).toMatchObject({ anterior: brlS(400), variacao: -25, favoravel: true })
   })
 
   it('faixas da hospedagem: atenção até R$ 200, fora acima, sem lançamentos', () => {
-    const faixa = (valor: number) => kpi(calcularDespesas([despesa({ ...cat('c-hosp'), valor })], CATEGORIAS, FORMAS, OUT, SEM_FILTRO, null).kpis, 'hospedagem').faixa
+    const faixa = (valor: number) => kpi(calcularDespesas([despesa({ ...cat('c-hosp'), valor })], CATEGORIAS, FORMAS, OUT, SEM_FILTRO, null, false).kpis, 'hospedagem').faixa
     expect(faixa(200)).toMatchObject({ tom: 'warn', texto: 'Atenção' })
     expect(faixa(200.01)).toMatchObject({ tom: 'danger', texto: 'Fora da política' })
-    const vazio = calcularDespesas([], CATEGORIAS, FORMAS, OUT, SEM_FILTRO, null)
-    expect(kpi(vazio.kpis, 'hospedagem').valor).toBe('—')
+    const vazio = calcularDespesas([], CATEGORIAS, FORMAS, OUT, SEM_FILTRO, null, false)
+    expect(kpi(vazio.kpis, 'hospedagem').valor).toBeNull()
     expect(kpi(vazio.kpis, 'hospedagem').faixa).toMatchObject({ tom: 'neutral', texto: 'Sem lançamentos' })
-    expect(kpi(vazio.kpis, 'ticket').valor).toBe(brl(0))
+    expect(kpi(vazio.kpis, 'ticket').valor).toBe(0)
   })
 
   it('séries mensais: totais por mês e média de hospedagem por mês', () => {
@@ -140,22 +155,33 @@ describe('calcularDespesas: os 6 KPIs', () => {
       despesa({ ...cat('c-hosp'), valor: 300, dia: '2026-10-02' }),
       despesa({ ...cat('c-hosp'), valor: 100, dia: '2026-10-03' }),
     ]
-    const s = calcularDespesas(rows, CATEGORIAS, FORMAS, { inicio: '2026-09-01', fim: '2026-10-31' }, SEM_FILTRO, null)
+    const s = calcularDespesas(rows, CATEGORIAS, FORMAS, { inicio: '2026-09-01', fim: '2026-10-31' }, SEM_FILTRO, null, false)
     expect(kpi(s.kpis, 'despesa').serie).toEqual([{ mes: '2026-09', rotulo: 'set/26', valor: 130 }, { mes: '2026-10', rotulo: 'out/26', valor: 400 }])
     expect(kpi(s.kpis, 'alimentacao').serie.map((p) => p.valor)).toEqual([30, 0])
     expect(kpi(s.kpis, 'ticket').serie.map((p) => p.valor)).toEqual([65, 200])
     expect(kpi(s.kpis, 'hospedagem').serie.map((p) => p.valor)).toEqual([100, 200])
   })
+
+  it('borda do mês: gasto às 23h de 30/09 em Brasília (01/10 02:00Z) entra no período pelo dia salvo e na série de setembro (mK)', () => {
+    // O mapper grava dia = texto bruto (2026-10-01) e mes = mês em Brasília (2026-09).
+    const borda = despesa({ ...cat('c-hosp'), valor: 120, dia: '2026-10-01', mes: '2026-09' })
+    const s = calcularDespesas([borda, despesa({ ...cat('c-hosp'), valor: 180, dia: '2026-10-02' })], CATEGORIAS, FORMAS, OUT, SEM_FILTRO, null, false)
+    expect(s.lancamentos).toBe(2)
+    expect(s.porMes.map((l) => [l.mes, l.valor])).toEqual([['2026-09', 120], ['2026-10', 180]])
+    expect(kpi(s.kpis, 'despesa').serie.map((p) => [p.mes, p.valor])).toEqual([['2026-09', 120], ['2026-10', 180]])
+    expect(kpi(s.kpis, 'hospedagem').serie.map((p) => [p.mes, p.valor])).toEqual([['2026-09', 120], ['2026-10', 180]])
+    expect(kpi(s.kpis, 'hospedagem').valor).toBe(150)
+  })
 })
 
 describe('calcularDespesas: blocos', () => {
-  const r = calcularDespesas([...atuais(), ...anteriores()], CATEGORIAS, FORMAS, OUT, SEM_FILTRO, null)
+  const r = calcularDespesas([...atuais(), ...anteriores()], CATEGORIAS, FORMAS, OUT, SEM_FILTRO, null, false)
 
   it('despesas por mês com lançamentos, despesa e alimentação', () => {
     const s = calcularDespesas([
       despesa({ ...cat('c-almoco'), valor: 30, dia: '2026-10-10', statusFinanceiro: 100000001, statusAnexo: 100000000 }),
       despesa({ ...cat('c-comb'), valor: 70, dia: '2026-09-11' }),
-    ], CATEGORIAS, FORMAS, { inicio: '2026-09-01', fim: '2026-10-31' }, SEM_FILTRO, null)
+    ], CATEGORIAS, FORMAS, { inicio: '2026-09-01', fim: '2026-10-31' }, SEM_FILTRO, null, false)
     expect(s.porMes).toEqual([
       { mes: '2026-09', rotulo: 'set/26', lancamentos: 1, valor: 70, alimentacao: 0, aguardando: 0, ticket: 70, semComprovante: 0 },
       { mes: '2026-10', rotulo: 'out/26', lancamentos: 1, valor: 30, alimentacao: 30, aguardando: 30, ticket: 30, semComprovante: 1 },
@@ -173,13 +199,13 @@ describe('calcularDespesas: blocos', () => {
   it('por empresa e grupos DRE (pelo cadastro da categoria; sem cadastro vira "Sem grupo DRE")', () => {
     expect(r.porEmpresa.linhas.map((l) => [l.rotulo, l.valor])).toEqual([['DEPAULA', 390], ['BETINHOS', 230]])
     expect(r.gruposDre.linhas.map((l) => [l.rotulo, l.valor])).toEqual([['Custos operacionais', 320], ['Viagens', 300]])
-    const semCadastro = calcularDespesas([despesa({ categoriaId: 'x', categoria: 'Outros', valor: 10 })], CATEGORIAS, FORMAS, OUT, SEM_FILTRO, null)
+    const semCadastro = calcularDespesas([despesa({ categoriaId: 'x', categoria: 'Outros', valor: 10 })], CATEGORIAS, FORMAS, OUT, SEM_FILTRO, null, false)
     expect(semCadastro.gruposDre.linhas.map((l) => l.rotulo)).toEqual(['Sem grupo DRE'])
   })
 
   it('topByShare corta a cauda abaixo de 10% quando sobram 3 ou mais', () => {
     const rows = [500, 400, 300, 10, 5].map((valor, i) => despesa({ categoriaId: `k${i}`, categoria: `Cat ${i}`, valor }))
-    const t = calcularDespesas(rows, CATEGORIAS, FORMAS, OUT, SEM_FILTRO, null)
+    const t = calcularDespesas(rows, CATEGORIAS, FORMAS, OUT, SEM_FILTRO, null, false)
     expect(t.porCategoria.linhas.map((l) => l.rotulo)).toEqual(['Cat 0', 'Cat 1', 'Cat 2'])
     expect(t.porCategoria.grupos).toBe(5)
     expect(t.porCategoria.grafico).toHaveLength(5)
@@ -198,12 +224,12 @@ describe('calcularDespesas: blocos', () => {
       despesa({ ...cat('c-jantar'), valor: 60, motoristaId: 'm1', motorista: 'Ana', dia: '2026-10-01' }),
       despesa({ ...cat('c-almoco'), valor: 50, motoristaId: 'm1', motorista: 'Ana', dia: '2026-10-02' }),
     ]
-    const m = calcularDespesas(rows, CATEGORIAS, FORMAS, OUT, SEM_FILTRO, null).porMotorista[0]
+    const m = calcularDespesas(rows, CATEGORIAS, FORMAS, OUT, SEM_FILTRO, null, false).porMotorista[0]
     expect(m).toMatchObject({ alimentacao: 150, alimentacaoMediaDia: 75, hospedagem: 0, hospedagemMedia: null, lancamentos: 3 })
   })
 
   it('opções: categorias e formas do cadastro, empresas distintas de todas as despesas, em ordem alfabética', () => {
-    const o = calcularDespesas([...atuais(), despesa({ empresa: 'ACME', dia: '2025-01-01' })], CATEGORIAS, FORMAS, OUT, SEM_FILTRO, null).opcoes
+    const o = calcularDespesas([...atuais(), despesa({ empresa: 'ACME', dia: '2025-01-01' })], CATEGORIAS, FORMAS, OUT, SEM_FILTRO, null, false).opcoes
     expect(o.categorias.map((c) => c.label)).toEqual(['Almoço', 'Café da manhã', 'Combustível', 'Hospedagem', 'Jantar'])
     expect(o.formas).toEqual([{ value: 'f-cartao', label: 'Cartão corporativo' }, { value: 'f-pix', label: 'Pix' }])
     expect(o.empresas.map((e) => e.value)).toEqual(['ACME', 'BETINHOS', 'DEPAULA'])

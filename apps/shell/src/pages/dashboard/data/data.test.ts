@@ -297,6 +297,9 @@ describe('conjuntos das abas', () => {
       id: '', dia: '', mes: '', valor: 0, categoriaId: '', categoria: 'Sem categoria', formaId: '', forma: 'Sem forma de pagamento', empresa: 'Sem empresa',
       motoristaId: '', motorista: 'Sem motorista', reservaId: '', statusFinanceiro: null, statusAnexo: null, anexos: 0, descricao: 'Despesa sem título',
     })
+    // Virada do mês: 23h de 30/09 em Brasília. O dia (filtro de período) é o texto bruto; o mês (séries) é o de Brasília (`mK`).
+    expect(mapDespesa({ cr40f_datagasto: '2026-10-01T02:00:00Z' }, vazio)).toMatchObject({ dia: '2026-10-01', mes: '2026-09' })
+    expect(mapDespesa({ cr40f_datagasto: '2026-10-01' }, vazio)).toMatchObject({ dia: '2026-10-01', mes: '2026-10' })
     const dePaula = { ...vazio, funcionarios: new Map([['m2', { id: 'm2', nome: '', apelido: 'Zé', statusLabel: 'Ativo', cnhMs: NaN, funcao: 'Motorista', empresa: 'DEPAULA L AUTO LTDA EPP' }]]) }
     expect(mapDespesa({ _cr40f_motorista_value: 'M2' }, dePaula)).toMatchObject({ motorista: 'Zé', empresa: 'DEPAULA' })
   })
