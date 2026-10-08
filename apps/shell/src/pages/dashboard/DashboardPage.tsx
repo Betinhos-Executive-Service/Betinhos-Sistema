@@ -15,6 +15,8 @@ import { useDashboard } from './useDashboard'
 import { ABAS, abaDaUrl, rotuloAba, type Aba } from './components/abas/abas'
 import { AbaEmConstrucao } from './components/abas/AbaEmConstrucao'
 import { ResumoCarregando, ResumoTab } from './components/abas/ResumoTab'
+import { DespesasCarregando, DespesasTab, FILTROS_DESPESA_VAZIOS, type FiltrosDespesaProprios } from './components/abas/DespesasTab'
+import { FrotaCarregando, FrotaTab } from './components/abas/FrotaTab'
 import { DashboardToolbar } from './components/DashboardToolbar'
 import './dashboard.css'
 
@@ -36,6 +38,8 @@ export function DashboardPage({ host }: { host: Host }) {
   }
   const [filtros, setFiltros] = useState<Filtros>(() => ({ atalho: 'esteAno', ...atalho('esteAno', new Date()), status: [], clientes: [], motoristas: [], tipos: [] }))
   const [now, setNow] = useState(() => new Date())
+  // Filtros próprios da aba Despesas: ficam na página para sobreviver à troca de aba.
+  const [filtrosDespesa, setFiltrosDespesa] = useState<FiltrosDespesaProprios>(FILTROS_DESPESA_VAZIOS)
   // Carga única com todos os conjuntos; a aba só escolhe o que calcular.
   const db = useDashboard(source, cargaDesde(filtros.inicio, now), filtros.fim)
 
@@ -96,7 +100,9 @@ export function DashboardPage({ host }: { host: Host }) {
         ) : null}
 
         {aba === 'resumo' ? (resumo ? <ResumoTab resumo={resumo} periodo={periodo} /> : carregandoPrimeira ? <ResumoCarregando /> : null) : null}
-        {aba !== 'resumo' && (db.dados || carregandoPrimeira) ? <AbaEmConstrucao nome={rotuloAba(aba)} /> : null}
+        {aba === 'despesas' ? (db.dados ? <DespesasTab dados={db.dados} filtros={filtros} periodo={periodo} proprios={filtrosDespesa} onProprios={setFiltrosDespesa} /> : carregandoPrimeira ? <DespesasCarregando /> : null) : null}
+        {aba === 'frota' ? (db.dados ? <FrotaTab dados={db.dados} filtros={filtros} now={now} periodo={periodo} /> : carregandoPrimeira ? <FrotaCarregando /> : null) : null}
+        {aba !== 'resumo' && aba !== 'despesas' && aba !== 'frota' && (db.dados || carregandoPrimeira) ? <AbaEmConstrucao nome={rotuloAba(aba)} /> : null}
       </div>
     </PageLayout>
   )
