@@ -8,6 +8,8 @@ it('não repete ids de rota', () => {
 
 it('localiza item e grupo pelo id', () => {
   expect(findItem('new_dashboard')?.group.id).toBe('operacional')
+  expect(findItem('dashboard')?.item).toMatchObject({ kind: 'page', page: 'dashboard', label: 'Dashboard' })
+  expect(findItem('new_dashboard')?.item).toMatchObject({ kind: 'webresource', label: 'Dashboard (completo)' })
   expect(findItem('inexistente')).toBeNull()
 })
 
