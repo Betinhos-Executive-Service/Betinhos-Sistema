@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
+import { useState } from 'react'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ManutencoesTab } from './ManutencoesTab'
-import { MotoristasTab } from './MotoristasTab'
+import { MotoristasTab, type FrotaMotorista } from './MotoristasTab'
 import { MultasTab } from './MultasTab'
+import { filtrarServicos } from '../../domain/base'
 import { MULTA_NOTIFICAR } from '../../domain/codes'
 import { dadosVazios, funcionario, manutencao, multa, reserva, veiculo } from '../../domain/test-utils'
 import type { Dados, Filtros } from '../../domain/types'
@@ -22,7 +24,12 @@ function semAvisoDeGrafico<T>(fn: () => T): T {
 const PERIODO = '01/10/2026 a 15/10/2026'
 const FILTROS: Filtros = { atalho: 'esteMes', inicio: '2026-10-01', fim: '2026-10-15', status: [], clientes: [], motoristas: [], tipos: [] }
 const AGORA = new Date('2026-10-15T15:00:00Z')
-const props = (dados: Dados | null) => ({ dados, filtros: FILTROS, now: AGORA, periodo: PERIODO })
+const props = (dados: Dados | null) => ({ ctx: dados ? { todas: dados.reservas, rv: filtrarServicos(dados.reservas, FILTROS), f: FILTROS, now: AGORA } : null, dados, periodo: PERIODO })
+/** A aba com o filtro Próprios/Terceiros em estado, como a página faz. */
+function Motoristas({ dados }: { dados: Dados | null }) {
+  const [frota, setFrota] = useState<FrotaMotorista>('todos')
+  return <MotoristasTab {...props(dados)} frota={frota} onFrota={setFrota} />
+}
 const kpi = (rotulo: string) => screen.getByRole('article', { name: rotulo })
 const card = (titulo: string) => screen.getByRole('heading', { name: titulo }).closest('section') as HTMLElement
 /** Títulos dos blocos (eyebrow do card), na ordem da página; os estados vazios também são h2 e ficam de fora. */
@@ -49,7 +56,7 @@ function dadosMotoristas(p: Partial<Dados> = {}): Dados {
 
 describe('MotoristasTab', () => {
   it('mostra os três KPIs e os blocos na ordem do brief', () => {
-    semAvisoDeGrafico(() => render(<MotoristasTab {...props(dadosMotoristas())} />))
+    semAvisoDeGrafico(() => render(<Motoristas dados={dadosMotoristas()} />))
     expect(within(kpi('Motoristas ativos')).getByText('2')).toBeTruthy()
     expect(within(kpi('CNH em atenção')).getByText('1')).toBeTruthy()
     expect(within(kpi('Score médio')).getByText('—')).toBeTruthy()
@@ -59,7 +66,7 @@ describe('MotoristasTab', () => {
   })
 
   it('filtra o ranking por Próprios e Terceiros', () => {
-    semAvisoDeGrafico(() => render(<MotoristasTab {...props(dadosMotoristas())} />))
+    semAvisoDeGrafico(() => render(<Motoristas dados={dadosMotoristas()} />))
     const ranking = card('Ranking de motoristas')
     expect(within(ranking).getByText('Ana')).toBeTruthy()
     expect(within(ranking).getByText('Beto')).toBeTruthy()
@@ -73,7 +80,7 @@ describe('MotoristasTab', () => {
   })
 
   it('abre e fecha os meses de um motorista', () => {
-    semAvisoDeGrafico(() => render(<MotoristasTab {...props(dadosMotoristas())} />))
+    semAvisoDeGrafico(() => render(<Motoristas dados={dadosMotoristas()} />))
     const botao = screen.getByRole('button', { name: 'Ver meses de Ana' })
     expect(botao.getAttribute('aria-expanded')).toBe('false')
     expect(screen.queryByRole('list', { name: 'Serviços de Ana por mês' })).toBeNull()
@@ -88,7 +95,7 @@ describe('MotoristasTab', () => {
   })
 
   it('sem veículos, desabilita Próprios/Terceiros e avisa em texto', () => {
-    semAvisoDeGrafico(() => render(<MotoristasTab {...props(dadosMotoristas({ indisponiveis: ['veiculos'] }))} />))
+    semAvisoDeGrafico(() => render(<Motoristas dados={dadosMotoristas({ indisponiveis: ['veiculos'] })} />))
     const ranking = card('Ranking de motoristas')
     expect((within(ranking).getByRole('radio', { name: 'Próprios' }) as HTMLButtonElement).disabled).toBe(true)
     expect((within(ranking).getByRole('radio', { name: 'Terceiros' }) as HTMLButtonElement).disabled).toBe(true)
@@ -97,7 +104,7 @@ describe('MotoristasTab', () => {
   })
 
   it('mostra s/dado quando funcionários e Infleet não carregam', () => {
-    render(<MotoristasTab {...props(dadosMotoristas({ indisponiveis: ['funcionarios', 'viagens'] }))} />)
+    render(<Motoristas dados={dadosMotoristas({ indisponiveis: ['funcionarios', 'viagens'] })} />)
     for (const rotulo of ['Motoristas ativos', 'CNH em atenção', 'Score médio']) expect(within(kpi(rotulo)).getByText('s/dado')).toBeTruthy()
     expect(within(card('Ranking de motoristas')).getByText(/cadastro de funcionários não respondeu/)).toBeTruthy()
     expect(within(card('Ranking mensal')).getByText(/Infleet não respondeu/)).toBeTruthy()
@@ -105,7 +112,7 @@ describe('MotoristasTab', () => {
 
   it('no celular, o ranking vira lista com rótulo inline e "Ver meses"', () => {
     telaCelular(true)
-    semAvisoDeGrafico(() => render(<MotoristasTab {...props(dadosMotoristas())} />))
+    semAvisoDeGrafico(() => render(<Motoristas dados={dadosMotoristas()} />))
     const ranking = card('Ranking de motoristas')
     const ana = linhaDe(ranking, 'Ana')
     expect(within(ana).getByText(/2 serviços .* · Faturamento R\$/)).toBeTruthy()
@@ -114,7 +121,7 @@ describe('MotoristasTab', () => {
   })
 
   it('na primeira carga mostra os KPIs ocupados, sem números', () => {
-    render(<MotoristasTab {...props(null)} />)
+    render(<Motoristas dados={null} />)
     expect(screen.getByRole('region', { name: 'Indicadores de motoristas' }).getAttribute('aria-busy')).toBe('true')
     expect(screen.queryByRole('heading', { level: 2 })).toBeNull()
   })

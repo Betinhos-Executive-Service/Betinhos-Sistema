@@ -1,12 +1,5 @@
 /* Abas Serviços e Financeiro: só o que os componentes compartilhados do dashboard não cobrem. Só tokens --bt-*, tema claro. */
 
-/* ---------- KPIs ---------- */
-/* Serviços tem quatro KPIs: quatro colunas na largura cheia (DS §8.1), duas no médio e uma no estreito (regras de .dash-kpis). */
-@container dash (min-width: 800px) { .dash-kpis.dash-sv-kpis--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-/* Valor sem dado ("s/dado"): mesmo lugar do número, em tom secundário, para não parecer um zero. */
-.dash-sv-semdado { color: var(--bt-color-text-secondary); }
-.dash-lista__valor.dash-sv-semdado { font-size: var(--bt-font-size-14); }
-
 /* ---------- Recebimentos: duas tabelas no mesmo bloco ---------- */
 .dash-fi-recebimentos { display: grid; gap: var(--bt-space-4); min-width: 0; }
 .dash-fi-recebimentos > section { display: grid; gap: var(--bt-space-2); min-width: 0; }

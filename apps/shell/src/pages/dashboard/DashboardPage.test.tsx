@@ -2,7 +2,9 @@
 import { act, cleanup, configure, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DashboardPage } from './DashboardPage'
+import { ABAS_POR_SERVICO, avisoSegmento } from './components/abas/abas'
 import { atalho } from './domain/periodo'
+import type { Filtros } from './domain/types'
 
 configure({ asyncUtilTimeout: 8000 })
 vi.setConfig({ testTimeout: 30_000 })
@@ -90,5 +92,60 @@ describe('Dashboard', () => {
     })
     expect(screen.getByRole('tab', { name: 'Resumo' }).getAttribute('aria-selected')).toBe('true')
     expect(await screen.findByRole('region', { name: 'Indicadores executivos' })).toBeTruthy()
+  })
+
+  it('o painel fica ligado à aba ativa pelos ids do Tabs (aria-controls ↔ id, aria-labelledby ↔ aba)', async () => {
+    render(<DashboardPage host={{ mode: 'mock' }} />)
+    await screen.findByRole('region', { name: 'Total produzido' })
+    const abas = screen.getByRole('tablist', { name: 'Abas do dashboard' })
+    for (const nome of ['Resumo', 'Frota']) {
+      fireEvent.click(within(abas).getByRole('tab', { name: nome }))
+      const aba = within(abas).getByRole('tab', { name: nome })
+      const painel = screen.getByRole('tabpanel', { name: nome })
+      expect(painel.id).toBeTruthy()
+      expect(aba.getAttribute('aria-controls')).toBe(painel.id)
+      expect(painel.getAttribute('aria-labelledby')).toBe(aba.id)
+    }
+  })
+
+  it('o filtro Próprios/Terceiros do ranking de motoristas sobrevive à troca de aba', async () => {
+    history.replaceState(null, '', '#/dashboard?tab=motoristas')
+    render(<DashboardPage host={{ mode: 'mock' }} />)
+    const terceiros = await screen.findByRole('radio', { name: 'Terceiros' })
+    fireEvent.click(terceiros)
+    expect(screen.getByRole('radio', { name: 'Terceiros' }).getAttribute('aria-checked')).toBe('true')
+    const abas = screen.getByRole('tablist', { name: 'Abas do dashboard' })
+    fireEvent.click(within(abas).getByRole('tab', { name: 'Multas' }))
+    expect(screen.queryByRole('radio', { name: 'Terceiros' })).toBeNull()
+    fireEvent.click(within(abas).getByRole('tab', { name: 'Motoristas' }))
+    expect(screen.getByRole('radio', { name: 'Terceiros' }).getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('na primeira carga, cada aba mostra KPIs e blocos ocupados no mesmo padrão', () => {
+    history.replaceState(null, '', '#/dashboard?tab=frota')
+    render(<DashboardPage host={{ mode: 'mock' }} />)
+    const kpis = screen.getByRole('region', { name: 'Indicadores da frota' })
+    expect(kpis.getAttribute('aria-busy')).toBe('true')
+    expect(within(kpis).getAllByText('Carregando')).toHaveLength(5)
+    expect(document.querySelectorAll('.dash-grade[aria-hidden="true"] .dash-card')).toHaveLength(4)
+  })
+})
+
+describe('filtros de segmento por aba', () => {
+  const f = (p: Partial<Filtros> = {}): Filtros => ({ atalho: 'esteMes', inicio: '2026-10-01', fim: '2026-10-15', status: [], clientes: [], motoristas: [], tipos: [], ...p })
+
+  it('"Nenhum serviço para estes filtros" só nas abas que respondem aos segmentos', () => {
+    expect([...ABAS_POR_SERVICO]).toEqual(['resumo', 'servicos', 'financeiro', 'motoristas'])
+  })
+
+  it('nas demais, uma linha diz quais segmentos não valem ali; sem segmento, nada', () => {
+    for (const aba of ['despesas', 'frota', 'manutencoes', 'multas'] as const) expect(avisoSegmento(aba, f())).toBeNull()
+    for (const aba of ['resumo', 'servicos', 'financeiro', 'motoristas'] as const) expect(avisoSegmento(aba, f({ clientes: ['Tenaris'] }))).toBeNull()
+    expect(avisoSegmento('despesas', f({ clientes: ['Tenaris'] }))).toBe('Status, cliente e tipo de veículo não se aplicam a esta aba.')
+    // Nas despesas o motorista vale (filtro global): sozinho, não há aviso.
+    expect(avisoSegmento('despesas', f({ motoristas: ['m1'] }))).toBeNull()
+    expect(avisoSegmento('multas', f({ motoristas: ['m1'] }))).toBe('Status, cliente, motorista e tipo de veículo não se aplicam a esta aba.')
+    expect(avisoSegmento('manutencoes', f({ status: ['Concluído'] }))).toMatch(/exceto no % da receita/)
+    expect(avisoSegmento('frota', f({ tipos: ['Van'] }))).toMatch(/KPIs do cadastro/)
   })
 })

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { Alert, Button, EmptyState, StatusBadge, Tabs, buttonClassName, useShellHeader } from '@betinhos/ui'
-import { ExternalLink, RefreshCw, SearchX } from 'lucide-react'
+import { ExternalLink, Info, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
 import { hrefFor, setHashQuery, useHashQuery } from '../../nav/useHashRoute'
@@ -8,18 +8,17 @@ import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
 import { filtrarServicos, opcoesFiltro, type OpcoesFiltro } from './domain/base'
 import { int } from './domain/format'
+import type { Contexto } from './domain/kpis'
 import { atalho, cargaDesde } from './domain/periodo'
-import { calcularResumo } from './domain/resumo'
 import type { Filtros } from './domain/types'
 import { useDashboard } from './useDashboard'
-import { ABAS, abaDaUrl, rotuloAba, type Aba } from './components/abas/abas'
-import { AbaEmConstrucao } from './components/abas/AbaEmConstrucao'
-import { ResumoCarregando, ResumoTab } from './components/abas/ResumoTab'
-import { ServicosCarregando, ServicosTab } from './components/abas/ServicosTab'
-import { FinanceiroCarregando, FinanceiroTab } from './components/abas/FinanceiroTab'
-import { DespesasCarregando, DespesasTab, FILTROS_DESPESA_VAZIOS, type FiltrosDespesaProprios } from './components/abas/DespesasTab'
-import { FrotaCarregando, FrotaTab } from './components/abas/FrotaTab'
-import { MotoristasTab } from './components/abas/MotoristasTab'
+import { ABAS, ABAS_POR_SERVICO, abaDaUrl, avisoSegmento, rotuloAba, type Aba, type PropsAba } from './components/abas/abas'
+import { ResumoTab } from './components/abas/ResumoTab'
+import { ServicosTab } from './components/abas/ServicosTab'
+import { FinanceiroTab } from './components/abas/FinanceiroTab'
+import { DespesasTab, FILTROS_DESPESA_VAZIOS, type FiltrosDespesaProprios } from './components/abas/DespesasTab'
+import { FrotaTab } from './components/abas/FrotaTab'
+import { MotoristasTab, type FrotaMotorista } from './components/abas/MotoristasTab'
 import { ManutencoesTab } from './components/abas/ManutencoesTab'
 import { MultasTab } from './components/abas/MultasTab'
 import { DashboardToolbar } from './components/DashboardToolbar'
@@ -43,8 +42,9 @@ export function DashboardPage({ host }: { host: Host }) {
   }
   const [filtros, setFiltros] = useState<Filtros>(() => ({ atalho: 'esteAno', ...atalho('esteAno', new Date()), status: [], clientes: [], motoristas: [], tipos: [] }))
   const [now, setNow] = useState(() => new Date())
-  // Filtros próprios da aba Despesas: ficam na página para sobreviver à troca de aba.
+  // Filtros próprios das abas (Despesas; Próprios/Terceiros do ranking de Motoristas): ficam na página para sobreviver à troca de aba.
   const [filtrosDespesa, setFiltrosDespesa] = useState<FiltrosDespesaProprios>(FILTROS_DESPESA_VAZIOS)
+  const [frotaMotorista, setFrotaMotorista] = useState<FrotaMotorista>('todos')
   // Carga única com todos os conjuntos; a aba só escolhe o que calcular.
   const db = useDashboard(source, cargaDesde(filtros.inicio, now), filtros.fim)
 
@@ -56,10 +56,12 @@ export function DashboardPage({ host }: { host: Host }) {
     if (p.inicio !== filtros.inicio || p.fim !== filtros.fim) setFiltros((f) => ({ ...f, ...p }))
   }, [now, filtros.atalho, filtros.inicio, filtros.fim])
 
-  // Serviços do recorte: contador do cabeçalho e estado vazio valem para todas as abas.
-  const servicos = useMemo(() => (db.dados ? filtrarServicos(db.dados.reservas, filtros).length : null), [db.dados, filtros])
-  // Um `useMemo` por aba: só a aba ativa calcula.
-  const resumo = useMemo(() => (aba === 'resumo' && db.dados ? calcularResumo(db.dados, filtros, now) : null), [aba, db.dados, filtros, now])
+  // Contexto único do recorte (todas, serviços filtrados, filtros e relógio): calculado uma vez e passado a todas as abas.
+  const ctx = useMemo<Contexto | null>(
+    () => (db.dados ? { todas: db.dados.reservas, rv: filtrarServicos(db.dados.reservas, filtros), f: filtros, now } : null),
+    [db.dados, filtros, now],
+  )
+  const servicos = ctx ? ctx.rv.length : null
   // Ao trocar de janela `db.dados` volta a null; as últimas opções conhecidas seguem nos filtros até a nova carga.
   const ultimasOpcoes = useRef(SEM_OPCOES)
   const opcoes = useMemo(() => {
@@ -69,11 +71,34 @@ export function DashboardPage({ host }: { host: Host }) {
   const periodo = `${dataBR(filtros.inicio)} a ${dataBR(filtros.fim)}`
   const carregandoPrimeira = !db.dados && db.carregando
 
+  // O painel liga-se à aba ativa pelos ids que o `Tabs` do DS gera (`aria-controls` do botão e o `id` dele): lidos do DOM após montar.
+  const abasRef = useRef<HTMLDivElement>(null)
+  const [ligacao, setLigacao] = useState<{ painel?: string; aba?: string }>({})
+  useLayoutEffect(() => {
+    const botao = abasRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
+    const painel = botao?.getAttribute('aria-controls') || undefined
+    const id = botao?.id || undefined
+    setLigacao((l) => (l.painel === painel && l.aba === id ? l : { painel, aba: id }))
+  }, [aba])
+
   const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar dashboard" onClick={() => void db.atualizar()} />, [db.atualizar])
   useShellHeader({ title: 'Dashboard', actions: headerActions })
 
   const segmentado = filtros.status.length + filtros.clientes.length + filtros.motoristas.length + filtros.tipos.length > 0
   const limpar = () => setFiltros((f) => ({ ...f, status: [], clientes: [], motoristas: [], tipos: [] }))
+  const aviso = avisoSegmento(aba, filtros)
+
+  const props: PropsAba = { ctx, dados: db.dados, periodo }
+  const conteudo = {
+    resumo: () => <ResumoTab {...props} />,
+    servicos: () => <ServicosTab {...props} />,
+    financeiro: () => <FinanceiroTab {...props} />,
+    despesas: () => <DespesasTab {...props} proprios={filtrosDespesa} onProprios={setFiltrosDespesa} />,
+    frota: () => <FrotaTab {...props} />,
+    motoristas: () => <MotoristasTab {...props} frota={frotaMotorista} onFrota={setFrotaMotorista} />,
+    manutencoes: () => <ManutencoesTab {...props} />,
+    multas: () => <MultasTab {...props} />,
+  } satisfies Record<Aba, () => ReactElement>
 
   return (
     <PageLayout
@@ -91,28 +116,24 @@ export function DashboardPage({ host }: { host: Host }) {
         <a className={buttonClassName({ variant: 'secondary' })} href={hrefFor('new_dashboard')}><ExternalLink size={16} aria-hidden="true" /> Abrir dashboard completo</a>
         {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} loading={db.carregando && Boolean(db.dados)} onClick={() => void db.atualizar()}>Atualizar</Button>}
       </>}
-      tabs={<div className="dash-abas"><Tabs tabs={[...ABAS]} value={aba} onChange={trocarAba} aria-label="Abas do dashboard" /></div>}
+      tabs={<div className="dash-abas" ref={abasRef}><Tabs tabs={[...ABAS]} value={aba} onChange={trocarAba} aria-label="Abas do dashboard" /></div>}
       toolbar={<DashboardToolbar filtros={filtros} opcoes={opcoes} now={now} onChange={setFiltros} />}
     >
-      <div className="dash-corpo" role="tabpanel" aria-label={rotuloAba(aba)} aria-busy={carregandoPrimeira || undefined}>
+      <div
+        className="dash-corpo" role="tabpanel" id={ligacao.painel} aria-labelledby={ligacao.aba}
+        aria-label={ligacao.aba ? undefined : rotuloAba(aba)} aria-busy={carregandoPrimeira || undefined}
+      >
         {db.erro && db.dados ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={() => void db.atualizar()}>Tentar de novo</Button>}>{db.erro} Os números são da carga anterior.</Alert> : null}
         {db.erro && !db.dados && !db.carregando ? (
           <EmptyState className="surface" align="start" icon={<SearchX size={36} />} title="Não foi possível carregar o dashboard" action={<Button variant="primary" onClick={() => void db.atualizar()}>Tentar de novo</Button>}>{db.erro}</EmptyState>
         ) : null}
         {db.dados?.indisponiveis.length ? <Alert tone="warning" title="Alguns dados não carregaram">Os cards marcados com s/dado dependem de tabelas que não responderam. Os demais números estão corretos.</Alert> : null}
-        {servicos === 0 && segmentado ? (
+        {servicos === 0 && segmentado && ABAS_POR_SERVICO.has(aba) ? (
           <EmptyState className="surface" align="start" icon={<SearchX size={36} />} title="Nenhum serviço para estes filtros" action={<Button variant="secondary" onClick={limpar}>Limpar filtros</Button>}>Ajuste o período ou limpe os filtros de status, cliente, motorista e tipo.</EmptyState>
         ) : null}
+        {aviso && db.dados ? <p className="dash-aviso-filtros"><Info size={14} aria-hidden="true" />{aviso}</p> : null}
 
-        {aba === 'resumo' ? (resumo ? <ResumoTab resumo={resumo} periodo={periodo} /> : carregandoPrimeira ? <ResumoCarregando /> : null) : null}
-        {aba === 'servicos' ? (db.dados ? <ServicosTab dados={db.dados} filtros={filtros} now={now} periodo={periodo} /> : carregandoPrimeira ? <ServicosCarregando /> : null) : null}
-        {aba === 'financeiro' ? (db.dados ? <FinanceiroTab dados={db.dados} filtros={filtros} now={now} periodo={periodo} /> : carregandoPrimeira ? <FinanceiroCarregando /> : null) : null}
-        {aba === 'despesas' ? (db.dados ? <DespesasTab dados={db.dados} filtros={filtros} periodo={periodo} proprios={filtrosDespesa} onProprios={setFiltrosDespesa} /> : carregandoPrimeira ? <DespesasCarregando /> : null) : null}
-        {aba === 'frota' ? (db.dados ? <FrotaTab dados={db.dados} filtros={filtros} now={now} periodo={periodo} /> : carregandoPrimeira ? <FrotaCarregando /> : null) : null}
-        {aba === 'motoristas' && (db.dados || carregandoPrimeira) ? <MotoristasTab dados={db.dados} filtros={filtros} now={now} periodo={periodo} /> : null}
-        {aba === 'manutencoes' && (db.dados || carregandoPrimeira) ? <ManutencoesTab dados={db.dados} filtros={filtros} now={now} periodo={periodo} /> : null}
-        {aba === 'multas' && (db.dados || carregandoPrimeira) ? <MultasTab dados={db.dados} filtros={filtros} now={now} periodo={periodo} /> : null}
-        {aba !== 'resumo' && aba !== 'servicos' && aba !== 'financeiro' && aba !== 'despesas' && aba !== 'frota' && aba !== 'motoristas' && aba !== 'manutencoes' && aba !== 'multas' && (db.dados || carregandoPrimeira) ? <AbaEmConstrucao nome={rotuloAba(aba)} /> : null}
+        {db.dados || carregandoPrimeira ? conteudo[aba]() : null}
       </div>
     </PageLayout>
   )

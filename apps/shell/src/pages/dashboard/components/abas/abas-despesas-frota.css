@@ -4,20 +4,11 @@
 .dash-de-filtros .bt-page-toolbar__start { gap: var(--bt-space-2); }
 .dash-de-filtros__nota { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); line-height: var(--bt-typography-body-small-line-height); }
 
-/* ---------- Frota: cinco KPIs ---------- */
-.dash-fr-kpis { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--bt-space-3); }
-@container dash (min-width: 540px) { .dash-fr-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@container dash (min-width: 800px) { .dash-fr-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@container dash (min-width: 1080px) { .dash-fr-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
-
 /* Medida da telemetria: unidade junto do número, sem quebrar. */
 .dash-fr-medida { font-size: var(--bt-font-size-17); white-space: nowrap; }
 
 /* Uso mensal: a linha de ociosos/terceiros/aluguel quebra dentro da coluna em vez de invadir a vizinha. */
 .dash-fr-uso .dash-duplo__apoio { white-space: normal; }
-
-/* Amostra da legenda das barras: mesmo padrão da série. */
-.dash-fr-amostra { flex: 0 0 auto; display: block; }
 
 @media (max-width: 820px) {
   .dash-de-filtros .bt-page-toolbar__start { flex-direction: column; flex-wrap: nowrap; align-items: stretch; width: 100%; }

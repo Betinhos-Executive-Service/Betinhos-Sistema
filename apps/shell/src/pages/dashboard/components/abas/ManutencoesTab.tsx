@@ -6,14 +6,19 @@ import { calcularManutencoes, type LinhaCategoria, type LinhaTipoReparo, type Ma
 import { brl, brlS, dec, int } from '../../domain/format'
 import type { Apoio } from '../../domain/types'
 import { AnaliseCard } from '../AnaliseCard'
+import { AbaCarregando } from '../Carregando'
 import { Duplo, Participacao, pct } from '../Celulas'
+import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
+import { KpiCard, KpiLinha } from '../KpiCard'
 import { MEDIA_MOBILE, juntar } from '../Linhas'
-import { KpisAba, KpisCarregando, forte, resto, semDadoBloco, useContexto, vazio, type KpiAba, type PropsAba } from './MoMaMuComum'
+import type { DadosAba, PropsAba } from './abas'
+import { forte, resto } from './MoMaMuComum'
 import './abas-motoristas-manutencoes-multas.css'
 
 const ROTULO_KPIS = 'Indicadores de manutenções'
 const KPIS = ['Manutenções', 'Custo total', 'Em andamento', 'Custo médio', 'Prazo médio']
-const FONTE = 'A tabela de manutenções'
+const BLOCOS = ['Custo por mês', 'Por tipo de reparo', 'Categorias com metas']
+const MOTIVO = naoRespondeu('A tabela de manutenções')
 type PontoCusto = Manutencoes['custoPorMes'][number]
 
 /** Selo da meta sempre com texto: Dentro da meta, Fora da meta, Sem meta ou s/dado. */
@@ -32,51 +37,60 @@ const anterior = (v: number | null) => (v == null ? '—' : v === 0 ? 's/dado' :
  * Aba Manutenções: KPIs (total, custo total com % da receita, em andamento, custo médio e prazo médio com % em até 10 dias);
  * Custo por mês | Por tipo de reparo; Categorias com metas na largura total, cada meta com selo em texto.
  */
-export function ManutencoesTab({ dados, filtros, now, periodo }: PropsAba) {
-  const ctx = useContexto(dados, filtros, now)
-  const ma = useMemo(() => (ctx && dados ? calcularManutencoes(ctx, dados) : null), [ctx, dados])
-  if (!ma) return <KpisCarregando rotulos={KPIS} classe="dash-ma-kpis" rotulo={ROTULO_KPIS} />
+export function ManutencoesTab({ ctx, dados, periodo }: PropsAba) {
+  if (!ctx || !dados) return <AbaCarregando rotulo={ROTULO_KPIS} kpis={KPIS} colunas={5} blocos={BLOCOS} />
+  return <ManutencoesAba ctx={ctx} dados={dados} periodo={periodo} />
+}
+
+function ManutencoesAba({ ctx, dados, periodo }: DadosAba) {
+  const ma = useMemo(() => calcularManutencoes(ctx, dados), [ctx, dados])
   const k = ma.kpis
   const prazo = ma.prazo
   const apoioPrazo: Apoio[] = prazo?.ate10 != null ? [{ rotulo: 'Até 10 dias', texto: pct(prazo.ate10) }] : []
   if (prazo && ma.mostrarLM) apoioPrazo.push({ rotulo: 'Mês anterior', texto: diasTexto(prazo.lm) })
   if (prazo) apoioPrazo.push({ rotulo: 'Ano anterior', texto: diasTexto(prazo.ly) })
-  const kpis: KpiAba[] = [
-    { id: 'total', rotulo: KPIS[0], tom: 'brand', valor: k ? int(k.total) : null },
-    { id: 'custo', rotulo: KPIS[1], tom: 'action', valor: k ? brl(k.custoTotal) : null, apoio: k ? [{ rotulo: '% da receita', texto: pct(k.pctReceita) }] : [] },
-    { id: 'andamento', rotulo: KPIS[2], tom: 'warning', valor: k ? int(k.emAndamento) : null },
-    { id: 'medio', rotulo: KPIS[3], tom: 'action', valor: k ? brl(k.custoMedio) : null },
-    { id: 'prazo', rotulo: KPIS[4], tom: 'success', valor: prazo ? (prazo.medio == null ? '—' : diasTexto(prazo.medio)) : null, apoio: apoioPrazo },
-  ]
-  const indisponivel = k == null
   return <>
-    <KpisAba itens={kpis} classe="dash-ma-kpis" rotulo={ROTULO_KPIS} />
-    <div className="dash-grade">
-      <CustoMesCard pontos={ma.custoPorMes} total={k?.custoTotal ?? null} indisponivel={indisponivel} periodo={periodo} />
-      <TipoReparoCard linhas={ma.porTipoReparo} indisponivel={indisponivel} periodo={periodo} />
-      <CategoriasCard linhas={ma.categorias} mostrarLM={ma.mostrarLM} indisponivel={indisponivel} periodo={periodo} />
-    </div>
+    <KpiLinha rotulo={ROTULO_KPIS} colunas={5}>
+      <KpiCard rotulo={KPIS[0]} tom="brand" valor={k ? int(k.total) : null} />
+      <KpiCard rotulo={KPIS[1]} tom="action" valor={k ? brl(k.custoTotal) : null} apoio={k ? [{ rotulo: '% da receita', texto: pct(k.pctReceita) }] : []} />
+      <KpiCard rotulo={KPIS[2]} tom="warning" valor={k ? int(k.emAndamento) : null} apoio={k ? 'solicitadas, aprovadas ou programadas' : undefined} />
+      <KpiCard rotulo={KPIS[3]} tom="action" valor={k ? brl(k.custoMedio) : null} />
+      <KpiCard rotulo={KPIS[4]} tom="success" valor={prazo ? (prazo.medio == null ? '—' : diasTexto(prazo.medio)) : null} apoio={apoioPrazo} />
+    </KpiLinha>
+    {k == null ? (
+      <div className="dash-grade">
+        <SemDadoBloco titulo={BLOCOS[0]} periodo={periodo} unidade="R$ por mês" motivo={MOTIVO} />
+        <SemDadoBloco titulo={BLOCOS[1]} periodo={periodo} unidade="registros e R$" motivo={MOTIVO} />
+        <SemDadoBloco largo titulo={BLOCOS[2]} periodo={periodo} unidade="registros por categoria" motivo={MOTIVO} />
+      </div>
+    ) : (
+      <div className="dash-grade">
+        <CustoMesCard pontos={ma.custoPorMes} total={k.custoTotal} periodo={periodo} />
+        <TipoReparoCard linhas={ma.porTipoReparo} periodo={periodo} />
+        <CategoriasCard linhas={ma.categorias} mostrarLM={ma.mostrarLM} periodo={periodo} />
+      </div>
+    )}
   </>
 }
 
 /** Custo por mês (barras) e os valores sob demanda. */
-function CustoMesCard({ pontos, total, indisponivel, periodo }: { pontos: PontoCusto[]; total: number | null; indisponivel: boolean; periodo: string }) {
+function CustoMesCard({ pontos, total, periodo }: { pontos: PontoCusto[]; total: number; periodo: string }) {
   const mobile = useMedia(MEDIA_MOBILE)
   const colunas: TableColumn<PontoCusto>[] = mobile
     ? [{ key: 'm', header: 'Mês', cell: (p) => p.rotulo }, resto('Custo', (p) => `Custo ${brl(p.valor)}`)]
     : [{ key: 'm', header: 'Mês', cell: (p) => forte(p.rotulo) }, { key: 'v', header: 'Custo', align: 'end', cell: (p) => brl(p.valor) }]
   return (
     <AnaliseCard
-      titulo="Custo por mês" periodo={periodo} unidade="R$ por mês" valor={indisponivel ? '—' : brl(total)} sub={indisponivel ? undefined : 'Custo das manutenções pela data da manutenção'}
-      grafico={!indisponivel && pontos.length ? <BarraChart descricao={`Custo de manutenção por mês, ${periodo}`} nome="Custo" formatar={brlS} dados={pontos} /> : undefined}
-      tabela={indisponivel ? semDadoBloco(FONTE) : pontos.length ? <Table columns={colunas} rows={pontos} rowKey={(p) => p.mes} /> : vazio('Nenhuma manutenção no período')}
-      tabelaSobDemanda={!indisponivel && pontos.length > 0}
+      titulo="Custo por mês" periodo={periodo} unidade="R$ por mês" valor={brl(total)} sub="Custo das manutenções pela data da manutenção"
+      grafico={pontos.length ? <BarraChart descricao={`Custo de manutenção por mês, ${periodo}`} nome="Custo" formatar={brlS} dados={pontos} /> : undefined}
+      tabela={pontos.length ? <Table columns={colunas} rows={pontos} rowKey={(p) => p.mes} /> : <Vazio titulo="Nenhuma manutenção no período" />}
+      tabelaSobDemanda={pontos.length > 0}
     />
   )
 }
 
 /** Por tipo de reparo: quantidade (e % dos registros), valor e participação no custo. */
-function TipoReparoCard({ linhas, indisponivel, periodo }: { linhas: LinhaTipoReparo[]; indisponivel: boolean; periodo: string }) {
+function TipoReparoCard({ linhas, periodo }: { linhas: LinhaTipoReparo[]; periodo: string }) {
   const mobile = useMedia(MEDIA_MOBILE)
   const colunas: TableColumn<LinhaTipoReparo>[] = mobile
     ? [{ key: 't', header: 'Tipo de reparo', cell: (l) => l.tipo }, resto('Custo', (l) => juntar(`${int(l.qtd)} registros`, `Custo ${brl(l.valor)}`, `Participação ${pct(l.pct)}`))]
@@ -90,14 +104,14 @@ function TipoReparoCard({ linhas, indisponivel, periodo }: { linhas: LinhaTipoRe
   return (
     <AnaliseCard
       titulo="Por tipo de reparo" periodo={periodo} unidade="registros e R$"
-      valor={!indisponivel && maior ? maior.tipo : undefined} sub={!indisponivel && maior ? `Mais frequente · ${int(maior.qtd)} registros · ${pct(maior.pct)} do custo` : undefined}
-      tabela={indisponivel ? semDadoBloco(FONTE) : <Table columns={colunas} rows={linhas} rowKey={(l) => l.tipo} empty={vazio('Nenhuma manutenção no período')} />}
+      valor={maior ? maior.tipo : undefined} sub={maior ? `Mais frequente · ${int(maior.qtd)} registros · ${pct(maior.pct)} do custo` : undefined}
+      tabela={<Table columns={colunas} rows={linhas} rowKey={(l) => l.tipo} empty={<Vazio titulo="Nenhuma manutenção no período" />} />}
     />
   )
 }
 
 /** Categorias (por palavra-chave do tipo de reparo) com a meta de cada uma e o selo Dentro/Fora da meta em texto. */
-function CategoriasCard({ linhas, mostrarLM, indisponivel, periodo }: { linhas: LinhaCategoria[]; mostrarLM: boolean; indisponivel: boolean; periodo: string }) {
+function CategoriasCard({ linhas, mostrarLM, periodo }: { linhas: LinhaCategoria[]; mostrarLM: boolean; periodo: string }) {
   const mobile = useMedia(MEDIA_MOBILE)
   const comparativo = (l: LinhaCategoria) => [mostrarLM ? `Mês anterior ${anterior(l.lm)}` : '', `Ano anterior ${anterior(l.ly)}`].filter(Boolean)
   const colunas: TableColumn<LinhaCategoria>[] = mobile
@@ -122,9 +136,9 @@ function CategoriasCard({ linhas, mostrarLM, indisponivel, periodo }: { linhas: 
   return (
     <AnaliseCard
       largo titulo="Categorias com metas" periodo={periodo} unidade="registros por categoria"
-      valor={indisponivel ? '—' : fora ? `${int(fora)} fora da meta` : 'Nenhuma fora da meta'}
-      sub={indisponivel ? undefined : 'Corretiva crítica: zero · Corretiva não crítica: até 5 por mês · Preventiva programada: da aprovação à data em até 10 dias'}
-      tabela={indisponivel ? semDadoBloco(FONTE) : <Table columns={colunas} rows={linhas} rowKey={(l) => l.categoria} />}
+      valor={fora ? `${int(fora)} fora da meta` : 'Nenhuma fora da meta'}
+      sub={'Corretiva crítica: zero · Corretiva não crítica: até 5 por mês · Preventiva programada: da aprovação à data em até 10 dias'}
+      tabela={<Table columns={colunas} rows={linhas} rowKey={(l) => l.categoria} />}
     />
   )
 }

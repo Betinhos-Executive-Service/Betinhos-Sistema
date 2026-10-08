@@ -16,7 +16,7 @@ A aba vive na URL (`#/dashboard?tab=<id>`). Filtros globais (período, status, c
 | **Despesas** | Os 6 KPIs do legado (conferir na referência; cortar os que repetem) | Despesas por mês · Por categoria · Por empresa · Grupos DRE · **Por motorista** (tabela única: hospedagem, alimentação, total) |
 | **Frota** | Total · Disponíveis · Blindados · Em manutenção · Uso da frota própria (% médio) | Telemetria Infleet (km, velocidade média/máx., excessos, consumo, motor ocioso) · Km por dia · Uso da frota própria por mês (dias úteis × fim de semana) · Eventos de condução por mês |
 | **Motoristas** | Total · CNH em atenção · Score médio | **Ranking** (serviços, faturamento, ticket, participação, CNH; linha expansível com serviços por mês; filtro próprio/terceiro) · CNH vencendo (lista com data) · Score por motorista e mês + ranking mensal · Nota de condução por mês (linha) |
-| **Manutenções** | Total · Custo total · Em andamento · Custo médio | Custo por mês · Por tipo de reparo (qtd, valor, %) · Categorias (6, por palavra-chave) com metas · % da receita |
+| **Manutenções** | Total · Custo total (apoio: % da receita) · Em andamento · Custo médio · Prazo médio (apoio: % em até 10 dias, mês e ano anteriores) | Custo por mês · Por tipo de reparo (qtd, valor, %) · Categorias (6, por palavra-chave) com metas |
 | **Multas** | Total · Pendentes · Resolvidas | Por motorista · Por infração (código/descrição) · Por mês |
 
 Saem: Trocas, Marketing, MarQPonto, faixa "Frota e pessoas", KPIs repetidos (faturamento/ticket/serviços/a receber fora do Resumo), gráfico mensal de faturamento, "por cliente" em Pagamentos, "por status" em Multas, Top 5 próprios/terceirizados como cards (viram filtro do ranking), chips 1º/2º quando a tabela já mostra.
@@ -66,6 +66,11 @@ Todas as consultas seguem a janela de datas da 1ª entrega (reservas: `cargaDesd
 - Clientes e despesas por motorista consolidados em tabelas únicas.
 - Top 5 próprios/terceirizados vira filtro do ranking de motoristas.
 - Categorias de manutenção: 'Corretiva não crítica' deixa de ser classificada como crítica (bug do legado).
+- Manutenções ganham um 5º KPI, **Prazo médio** (criação → data da manutenção, `daysBetweenValues` do legado, com % em até 10 dias e os comparativos do mês e do ano anteriores); o "% da receita" do legado vira apoio do KPI **Custo total** em vez de bloco próprio.
+- **Manutenções "Em andamento"**: o legado contava rótulos com "andamento", "aberto" ou "pend", que nenhum status real tem (Solicitado, Aprovado, Programado, Realizado, Cancelado, Reprovado) — o card ficava sempre em 0. Passa a contar **Solicitado, Aprovado e Programado** (rótulo sem acento e sem caixa); as palavras antigas continuam valendo.
+- **Multas "Resolvidas"**: o legado contava "pago", "resolvid" ou "conclu"; os status reais encerrados são Pago, Descontado e Finalizado (em PROD, Pago e Descontado somam 164 de 260 multas). Passa a contar **pago, descontado, finaliz, resolvid e conclu** (sem acento e sem caixa). Indicada, Recurso e Condutor Notificado seguem em aberto.
+- **Frota**: o status do veículo só tem Ativo, Vendido ou vazio, então "Em manutenção" por palavra-chave do status ficava sempre em 0. Agora: **Total de veículos** exclui os de status Vendido (o apoio mostra "Frota cadastrada: N · M vendidos"); **Disponíveis** são os de status "ativo"/"ativo(a)" (`isActiveVehicle` do legado); **Blindados** contam só a frota (sem vendidos), para o "% da frota" ficar coerente; **Em manutenção** são os veículos distintos da frota com manutenção em andamento (Solicitado, Aprovado ou Programado) pela data da manutenção no período do filtro — s/dado quando a tabela de manutenções não carrega.
+- **Pagantes cobrem o histórico inteiro** (como o `loadPagantes` do legado, sem janela de datas): o bloco Recebimentos e os KPIs Cartão e Atrasados > 5 dias dizem "todo o histórico" no rodapé/apoio, em vez do período do filtro. Pelo mesmo motivo, o apoio do KPI Tempo médio de pagamento e o "Prazo para pagar" do Ciclo financeiro também dizem "todo o histórico".
 
 ## 7. Conferência de metadata das abas (DEV, 08/10/2026)
 

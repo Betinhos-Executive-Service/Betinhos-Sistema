@@ -19,18 +19,22 @@ describe('infracaoDe (multaTipo do legado)', () => {
 })
 
 describe('calcularMultas', () => {
-  it('KPIs pela data da multa no período (segmentos não se aplicam): total, pendentes (Notificar) e resolvidas (pago/resolvid/conclu)', () => {
+  it('KPIs pela data da multa no período (segmentos não se aplicam): total, pendentes (Notificar) e resolvidas pelos status reais (spec §6)', () => {
     const muls = [
       multa({ status: 202410000, statusLabel: 'Notificar o Condutor' }),
       multa({ status: 202410000, statusLabel: 'Notificar o Condutor' }),
       multa({ status: 202410006, statusLabel: 'Pago' }),
+      multa({ status: 202410003, statusLabel: 'Descontado' }),
       multa({ status: 202410005, statusLabel: 'Finalizado' }),
+      multa({ status: 202410001, statusLabel: 'Indicada' }),
+      multa({ status: 202410002, statusLabel: 'Recurso' }),
       multa({ statusLabel: 'Resolvida' }),
       multa({ statusLabel: 'Concluída' }),
       multa({ dia: '2026-08-31', status: 202410000 }),
       multa({ dia: '', status: 202410000 }),
     ]
-    expect(calcularMultas(ctx, dadosCom(muls)).kpis).toEqual({ total: 6, pendentes: 2, resolvidas: 3 })
+    // Pago, Descontado, Finalizado, Resolvida e Concluída; Indicada e Recurso seguem em aberto.
+    expect(calcularMultas(ctx, dadosCom(muls)).kpis).toEqual({ total: 9, pendentes: 2, resolvidas: 5 })
   })
 
   it('conjunto fora do ar: KPIs null (s/dado) e listas vazias', () => {

@@ -3,7 +3,7 @@ import { filtrarServicos } from '../base'
 import type { Contexto } from '../kpis'
 import { dadosVazios, manutencao, reserva } from '../test-utils'
 import type { Dados, Filtros, Manutencao, Reserva } from '../types'
-import { calcularManutencoes, categoriaManutencao } from './manutencoes'
+import { calcularManutencoes, categoriaManutencao, manutencaoEmAndamento } from './manutencoes'
 
 const NOW = new Date('2026-10-15T15:00:00Z')
 const f: Filtros = { atalho: 'personalizado', inicio: '2026-09-01', fim: '2026-10-15', status: [], clientes: [], motoristas: [], tipos: [] }
@@ -43,6 +43,14 @@ describe('calcularManutencoes', () => {
       manutencao({ dia: '', valor: 999 }),
     ]
     expect(calcularManutencoes(ctxDe(rows), dadosCom(mans)).kpis).toEqual({ total: 4, custoTotal: 1000, emAndamento: 3, custoMedio: 250, pctReceita: 10 })
+  })
+
+  it('em andamento pelos status reais (spec §6): Solicitado, Aprovado e Programado contam; Realizado, Cancelado e Reprovado não', () => {
+    const mans = ['Solicitado', 'Aprovado', 'Programado', 'Realizado', 'Cancelado', 'Reprovado', 'APROVADO'].map((statusLabel) => manutencao({ statusLabel }))
+    expect(calcularManutencoes(ctxDe(), dadosCom(mans)).kpis?.emAndamento).toBe(4)
+    expect(manutencaoEmAndamento(' Programado ')).toBe(true)
+    expect(manutencaoEmAndamento('Reprovado')).toBe(false)
+    expect(manutencaoEmAndamento('')).toBe(false)
   })
 
   it('sem receita, % da receita é 0; sem registro, custo médio 0; conjunto fora do ar vira null (s/dado)', () => {
