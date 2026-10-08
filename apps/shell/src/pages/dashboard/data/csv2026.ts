@@ -5,7 +5,7 @@ import type { Reserva } from '../domain/types'
 import { CSV_2026, type Csv2026Row } from './historico2026'
 
 export function mapCsv2026(row: Csv2026Row, index: number): Reserva {
-  const [data, status, motorista, carro, , cliente, , veiculoTipo, valor] = row
+  const [data, status, motorista, carro, , cliente, tipo, veiculoTipo, valor] = row
   const ns = normL(status)
   const statusLabel = (ns === 'concluido' ? 'Concluído' : ns.indexOf('cancelado') === 0 ? 'Cancelado' : status) || 'Sem status'
   const mot = motorista && motorista !== '-' ? motorista : SEM_MOTORISTA
@@ -21,6 +21,7 @@ export function mapCsv2026(row: Csv2026Row, index: number): Reserva {
     veiculoId: veiNome === '—' ? '' : `legacy:${normL(veiNome)}`,
     motoristaId: '', motoristaKey: `nome:${normL(mot)}`, motorista: mot, cliente: cli,
     cpId: '', valor, cpPendente: false, cpConcluida: false, opId: '',
+    tipoServico: tipo || '—', finalizadoRaw: '',
   }
 }
 
