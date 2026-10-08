@@ -13,8 +13,6 @@
 .dash-filtros { align-items: flex-start; margin-bottom: var(--bt-space-3); }
 .dash-filtros .bt-page-toolbar__start { gap: var(--bt-space-2) var(--bt-space-3); }
 .dash-periodo { display: flex; flex-wrap: wrap; gap: var(--bt-space-1); min-width: 0; max-width: 100%; }
-/* O rótulo do Button do DS tem line-height 1 com overflow oculto, o que corta o acento de "Ú"; aqui a linha ganha a altura do label.micro. */
-.dash-periodo .bt-button__label { line-height: var(--bt-typography-label-micro-line-height); }
 .dash-datas, .dash-segmentos { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); min-width: 0; }
 .dash-erro { align-self: center; color: var(--bt-color-danger); font-size: var(--bt-font-size-12); }
 
