@@ -5,7 +5,7 @@ import type { KV } from '../domain/columns'
 import { COPY_SELECT } from '../domain/copy'
 import { buildFetch, quickFindAttributes } from '../domain/fetch'
 import { formatDateTime, formatMoney } from '../domain/format'
-import { ENTITY, PAGE_SIZE, type AttributeInfo, type AttributeMap, type LookupBind, type LookupOption, type Page, type Sort, type View } from '../domain/types'
+import { ENTITY, ID_ATTRIBUTE, PAGE_SIZE, type AttributeInfo, type AttributeMap, type LookupBind, type LookupOption, type Page, type Sort, type View } from '../domain/types'
 import { MOCK_ATTRIBUTES, MOCK_BINDS, MOCK_LOOKUPS, applyMockFetch, createMockRows, createMockViews } from './mock'
 import { copyPath, fetchPath, mapViews, parsePage, quickFindPath, relationshipPath, reloadPath, searchPath, viewsPaths, type FetchResponse } from './queries'
 
@@ -231,7 +231,9 @@ export function createSource(host: Host): Source {
     async copyRows(ids) {
       const set = await entitySet()
       const blocks = await Promise.all(chunk(ids, 20).map((block) => host.client.getAll(copyPath(set, block, COPY_SELECT))))
-      return blocks.flat()
+      // A consulta em blocos não garante ordem: devolve na ordem dos ids pedidos, como o mock.
+      const byId = new Map(blocks.flat().map((row) => [cleanId(String(row[ID_ATTRIBUTE])), row]))
+      return ids.flatMap((id) => { const row = byId.get(cleanId(id)); return row ? [row] : [] })
     },
     async openForm(mode, id) {
       const data = { mode, entityName: ENTITY, ...(id ? { id, recordId: id, entityId: id } : {}) }

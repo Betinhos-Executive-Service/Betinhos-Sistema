@@ -44,13 +44,12 @@ export function searchPath(set: string, idAttribute: string, nameAttribute: stri
   return `${set}?$select=${idAttribute},${nameAttribute}&$filter=${encodeURIComponent(filter)}&$orderby=${encodeURIComponent(`${nameAttribute} asc`)}&$top=25`
 }
 
-/** Releitura da linha com as colunas da visão (lookups voltam ao nome lógico; colunas de link ficam de fora). */
+/** Releitura da linha com as colunas da visão (lookups ficam como `_x_value`, único formato aceito no `$select`; colunas de link ficam de fora). */
 export function reloadPath(set: string, id: string, keys: string[]) {
   const select = new Set([ID_ATTRIBUTE])
   for (const key of keys) {
     if (key.includes('.')) continue
-    const lookup = /^_(.+)_value$/.exec(key)
-    select.add(lookup ? lookup[1] : key)
+    select.add(key)
   }
   return `${set}(${cleanId(id)})?$select=${Array.from(select).join(',')}`
 }

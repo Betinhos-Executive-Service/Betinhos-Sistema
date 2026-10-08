@@ -31,7 +31,7 @@ describe('queries', () => {
   })
   it('busca de lookup e releitura da linha', () => {
     expect(searchPath('cr40f_funcionarioses', 'cr40f_funcionariosid', 'cr40f_nomecompleto', "jo'ao")).toBe("cr40f_funcionarioses?$select=cr40f_funcionariosid,cr40f_nomecompleto&$filter=statecode%20eq%200%20and%20contains(cr40f_nomecompleto%2C'jo''ao')&$orderby=cr40f_nomecompleto%20asc&$top=25")
-    expect(reloadPath('cr40f_reservadeveculoses', '{ABC}', ['cr40f_id', '_cr40f_motorista_value', 'a_1.new_valortotal'])).toBe('cr40f_reservadeveculoses(abc)?$select=cr40f_reservadeveculosid,cr40f_id,cr40f_motorista')
+    expect(reloadPath('cr40f_reservadeveculoses', '{ABC}', ['cr40f_id', '_cr40f_motorista_value', 'a_1.new_valortotal'])).toBe('cr40f_reservadeveculoses(abc)?$select=cr40f_reservadeveculosid,cr40f_id,_cr40f_motorista_value')
   })
 })
 
@@ -156,5 +156,20 @@ describe('source Dataverse', () => {
     expect(await source.openForm('edit', 'x1')).toBe('external')
     expect(open).toHaveBeenCalledWith(expect.stringContaining('new_formulario_geral.html?data='), '_blank', 'noopener')
     vi.unstubAllGlobals()
+  })
+  it('copyRows devolve na ordem dos ids pedidos', async () => {
+    const { host } = fakeHost({ getAll: async () => [{ cr40f_reservadeveculosid: 'B-2', cr40f_id: 'OS-2' }, { cr40f_reservadeveculosid: 'a-1', cr40f_id: 'OS-1' }] })
+    const rows = await createSource(host).copyRows(['{A-1}', 'b-2', 'sem-linha'])
+    expect(rows.map((r) => r.cr40f_id)).toEqual(['OS-1', 'OS-2'])
+  })
+})
+
+describe('mock — releitura com chave de lookup', () => {
+  it('reload com _x_value devolve o lookup e o nome formatado', async () => {
+    const source = createSource({ mode: 'mock' })
+    const views = await source.views()
+    const first = (await source.page({ fetchxml: views[0].fetchxml, page: 1, cookie: null, sort: null, query: '', quickFind: [] })).rows[0]
+    const fresh = await source.reload(String(first.cr40f_reservadeveculosid), ['cr40f_id', '_cr40f_cliente_value'])
+    expect(fresh._cr40f_cliente_value).toBe(first._cr40f_cliente_value)
   })
 })
