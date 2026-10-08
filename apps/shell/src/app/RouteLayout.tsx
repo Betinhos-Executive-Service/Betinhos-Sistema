@@ -12,21 +12,10 @@ import { PagantesPage } from '../pages/pagantes/PagantesPage'
 import { PessoasPage } from '../pages/pessoas/PessoasPage'
 import { DashboardPage } from '../pages/dashboard/DashboardPage'
 import { EmptyState, buttonClassName } from '@betinhos/ui'
+import { Frame } from './Frame'
 import { PageLayout } from './PageLayout'
 
 type Props = { host: Host; group: MenuGroup | null; item: MenuItem | null; label: string }
-
-/** Tela legada (WebResource ou lista nativa) ocupando toda a área, sem cabeçalho duplicado. */
-function Frame({ src, title }: { src: string; title: string }) {
-  const [loaded, setLoaded] = useState(false)
-  useEffect(() => setLoaded(false), [src])
-  return (
-    <div className="frame" aria-busy={!loaded}>
-      {loaded ? null : <p className="frame__loading" role="status">Carregando {title}…</p>}
-      <iframe key={src} className="frame__iframe" src={src} title={title} onLoad={() => setLoaded(true)} />
-    </div>
-  )
-}
 
 function EntityFrame({ host, entity, title }: { host: Extract<Host, { mode: 'dataverse' }>; entity: string; title: string }) {
   const [src, setSrc] = useState<string | null>(null)
