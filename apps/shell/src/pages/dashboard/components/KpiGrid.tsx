@@ -18,13 +18,8 @@ export function KpiGrid({ kpis, carregando }: { kpis: Kpi[]; carregando: boolean
     <section className="dash-kpis" aria-label="Indicadores executivos">
       {kpis.map((k) => (
         <div key={k.id} className="dash-kpi">
-          <MetricCard
-            icon={ICONES[k.id]}
-            label={k.rotulo}
-            value={k.valor}
-            loading={carregando}
-            hint={<span className="dash-kpi__hint">{k.chips.map((c) => <KpiChip key={c.rotulo} chip={c} />)}{k.apoio.map((a) => <ApoioTexto key={a.rotulo} apoio={a} />)}</span>}
-          />
+          <MetricCard className="dash-kpi__metric" icon={ICONES[k.id]} label={k.rotulo} value={k.valor} loading={carregando} />
+          {!carregando && (k.chips.length || k.apoio.length) ? <div className="dash-kpi__extras">{k.chips.map((c) => <KpiChip key={c.rotulo} chip={c} />)}{k.apoio.map((a) => <ApoioTexto key={a.rotulo} apoio={a} />)}</div> : null}
           {!carregando && k.serie.length ? <Sparkline dados={k.serie} /> : null}
         </div>
       ))}

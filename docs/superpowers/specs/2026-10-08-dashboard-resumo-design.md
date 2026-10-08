@@ -105,6 +105,7 @@ Composição do DS §11.1: anomalia e ação primeiro.
 - Carga limitada à janela de datas, em vez do histórico inteiro.
 - Datas de corte e códigos em constantes nomeadas.
 - Peculiaridades preservadas por paridade (registrar, não corrigir agora): CNH conta só funcionário com status "ativo" e validade preenchida até 90 dias (a doc diz que sem validade também conta); "Frota ativa" conta status com "dispon" ou "ativo" em minúsculas, o que inclui "Inativo"; emergencial e produção própria × terceirizada usam a data UTC bruta (`slice`), sem fuso; LY do Ticket médio no card de análise é sempre `s/dado`.
+- Formato do `brlS`: a moeda curta usa vírgula decimal ("R$ 1,23M"), seguindo o padrão pt-BR do projeto; o legado mostra ponto ("R$ 1.23M"). Muda só o formato, o número é o mesmo.
 - Qualquer outra divergência numérica encontrada na paridade é registrada aqui antes de ser aceita.
 
 ## 9. Conferência de metadata (DEV, 08/10/2026)

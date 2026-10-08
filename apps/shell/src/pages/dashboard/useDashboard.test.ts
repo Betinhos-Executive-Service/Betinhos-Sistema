@@ -36,6 +36,31 @@ describe('useDashboard', () => {
     expect(result.current.dados?.manutencoes).toHaveLength(5)
   })
 
+  it('carga em andamento por mais de 60 s não é cancelada nem empilhada pelo relógio', async () => {
+    vi.useFakeTimers()
+    let resolver: (d: Dados) => void = () => undefined
+    const s = fonte(() => new Promise<Dados>((resolve) => { resolver = resolve }))
+    const { result } = renderHook(() => useDashboard(s, '2024-01-01', '2026-10-15'))
+    await act(async () => { vi.advanceTimersByTime(INTERVALO_MS) })
+    expect(s.carregar).toHaveBeenCalledTimes(1)
+    await act(async () => { resolver(dados(3)) })
+    expect(result.current.dados?.manutencoes).toHaveLength(3)
+    expect(result.current.carregando).toBe(false)
+    await act(async () => { vi.advanceTimersByTime(INTERVALO_MS) })
+    expect(s.carregar).toHaveBeenCalledTimes(2)
+  })
+
+  it('"Atualizar" substitui a carga em andamento', async () => {
+    const pendentes: ((d: Dados) => void)[] = []
+    const s = fonte(() => new Promise<Dados>((resolve) => pendentes.push(resolve)))
+    const { result } = renderHook(() => useDashboard(s, '2024-01-01', '2026-10-15'))
+    await act(async () => { void result.current.atualizar() })
+    expect(s.carregar).toHaveBeenCalledTimes(2)
+    await act(async () => { pendentes[1](dados(2)) })
+    await act(async () => { pendentes[0](dados(7)) })
+    expect(result.current.dados?.manutencoes).toHaveLength(2)
+  })
+
   it('erro mantém a mensagem e permite tentar de novo', async () => {
     let falhar = true
     const s = fonte(async () => { if (falhar) throw new Error('Sem conexão'); return dados(1) })

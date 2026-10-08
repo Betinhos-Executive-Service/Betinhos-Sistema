@@ -11,7 +11,7 @@ export const cnhEmAtencao = (funcionarios: Funcionario[], nowMs: number) =>
   funcionarios.filter((f) => stL(f.statusLabel) === 'ativo' && Number.isFinite(f.cnhMs) && (f.cnhMs - nowMs) / DIA_MS <= 90)
 export const multasPendentes = (multas: Multa[]) => multas.filter((m) => m.status === MULTA_NOTIFICAR)
 const pctMultas = (multas: Multa[]) => (multas.length ? ((multasPendentes(multas).length / multas.length) * 100).toFixed(0) : '0')
-const indisponivel = (id: string, rotulo: string): AlertaItem => ({ id, valor: '—', rotulo, status: 's/dado', tom: 'warn' })
+const indisponivel = (id: string, rotulo: string): AlertaItem => ({ id, valor: '—', rotulo, status: 's/dado', tom: 'neutral' })
 
 export function alertasOperacao(rv: Reserva[], s: Secundarios, nowMs: number): AlertaItem[] {
   const fora = (c: Conjunto) => s.indisponiveis.includes(c)
@@ -55,7 +55,7 @@ export function cardsFrotaPessoas(rv: Reserva[], s: Secundarios, nowMs: number):
   const cnh = cnhEmAtencao(s.funcionarios, nowMs).length
   const ativos = s.veiculos.filter((v) => { const k = stL(v.statusLabel); return k.includes('dispon') || k.includes('ativo') }).length
   return [
-    fora('manutencoes') ? semDado('manutencoes', 'Manutenções') : { id: 'manutencoes', rotulo: 'Manutenções', valor: int(s.manutencoes.length), apoio: `${brlS(custo)} · ${dec(pctRec, 1)}% da receita`, atencao: custo > fat * 0.1 },
+    fora('manutencoes') ? semDado('manutencoes', 'Manutenções') : { id: 'manutencoes', rotulo: 'Manutenções', valor: int(s.manutencoes.length), apoio: `${brlS(custo)} · ${dec(pctRec, 1)}% da receita`, atencao: pctRec > 10 },
     fora('multas') ? semDado('multas', 'Multas') : { id: 'multas', rotulo: 'Multas', valor: int(s.multas.length), apoio: `${int(pend)} pendentes · ${pctMultas(s.multas)}%`, atencao: pend > 0 },
     fora('funcionarios') ? semDado('cnh', 'CNH em atenção') : { id: 'cnh', rotulo: 'CNH em atenção', valor: int(cnh), apoio: cnh ? `${int(cnh)} em atenção` : 'OK', atencao: cnh > 0 },
     fora('veiculos') ? semDado('frota', 'Frota ativa') : { id: 'frota', rotulo: 'Frota ativa', valor: int(ativos), apoio: `Total: ${int(s.veiculos.length)}`, atencao: false },

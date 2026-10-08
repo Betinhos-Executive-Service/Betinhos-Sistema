@@ -30,7 +30,7 @@ describe('alertas', () => {
     expect(cnh).toEqual({ id: 'cnh', valor: '1', rotulo: 'CNH', status: 'Atenção', tom: 'danger' })
     expect(multas).toEqual({ id: 'multas', valor: '1', rotulo: 'Multas', status: '50% pendentes', tom: 'danger' })
     expect(oco).toEqual({ id: 'ocorrencias', valor: '1', rotulo: 'Ocorrências', status: '25,0% dos serviços · 1 a cada 4', tom: 'danger' })
-    expect(alertasOperacao(rv, { ...vazio, indisponiveis: ['funcionarios'] }, nowMs)[0]).toEqual({ id: 'cnh', valor: '—', rotulo: 'CNH', status: 's/dado', tom: 'warn' })
+    expect(alertasOperacao(rv, { ...vazio, indisponiveis: ['funcionarios'] }, nowMs)[0]).toEqual({ id: 'cnh', valor: '—', rotulo: 'CNH', status: 's/dado', tom: 'neutral' })
   })
 
   it('qualidade com as datas de corte do legado', () => {
@@ -55,9 +55,22 @@ describe('alertas', () => {
     expect(c.manutencoes).toMatchObject({ valor: '1', apoio: 'R$ 200,00 · 20,0% da receita', atencao: true })
     expect(c.frota).toMatchObject({ valor: '2', apoio: 'Total: 3' })
   })
+
+  it('manutenção sem receita no período não marca atenção (pctRec = 0, como o card de custo da frota)', () => {
+    const s: Secundarios = { ...vazio, manutencoes: [{ dia: '2026-10-02', valor: 200 }] }
+    const c = Object.fromEntries(cardsFrotaPessoas([], s, nowMs).map((x) => [x.id, x]))
+    expect(c.manutencoes).toMatchObject({ atencao: false })
+    expect(c.manutencoes.apoio).toMatch(/ · 0,0% da receita$/)
+  })
 })
 
 describe('destaques', () => {
+  it('top 5 mantém motoristas homônimos separados pela chave', () => {
+    const rv = [reserva({ veiculoId: 'v1', motorista: 'Ana', motoristaKey: 'k1', valor: 100 }), reserva({ veiculoId: 'v1', motorista: 'Ana', motoristaKey: 'k2', valor: 50 })]
+    const p = producaoPropriaTerceira(rv, [{ id: 'v1', statusLabel: 'Disponível', categoria: 'Propria' }])
+    expect(p.topPropria.map((t) => t.key)).toEqual(['k1', 'k2'])
+  })
+
   it('produção própria × terceirizada e top 5 por faturamento', () => {
     const rv = [
       reserva({ veiculoId: 'v1', motorista: 'Ana', motoristaKey: 'm1', valor: 100 }),
@@ -68,7 +81,7 @@ describe('destaques', () => {
     const p = producaoPropriaTerceira(rv, [{ id: 'v1', statusLabel: 'Disponível', categoria: 'Propria' }, { id: 'v2', statusLabel: 'Disponível', categoria: 'Terceirizada' }])
     expect(p.classificados).toBe(3)
     expect(p.meses).toEqual([{ mes: '2026-10', rotulo: 'out/26', propria: 2, terceirizada: 1 }])
-    expect(p.topPropria).toEqual([{ nome: 'Ana', qtd: 2, fat: 200 }])
+    expect(p.topPropria).toEqual([{ key: 'm1', nome: 'Ana', qtd: 2, fat: 200 }])
   })
 
   it('emergencial = criado no mesmo dia (texto UTC) da saída', () => {

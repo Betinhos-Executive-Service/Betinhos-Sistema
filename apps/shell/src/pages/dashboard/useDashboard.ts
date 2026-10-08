@@ -7,15 +7,18 @@ export const INTERVALO_MS = 60_000
 type Estado = { chave: string; dados: Dados | null; carregando: boolean; erro: string | null; atualizadoEm: Date | null }
 const mensagem = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
-/** Carga por janela, recarga a cada 60 s com a aba visível e proteção contra resposta fora de ordem. */
+/** Carga por janela, recarga a cada 60 s com a aba visível (sem empilhar consultas) e proteção contra resposta fora de ordem. */
 export function useDashboard(source: Source, desde: string, ate: string) {
   const chave = `${desde}|${ate}`
   const [estado, setEstado] = useState<Estado>({ chave: '', dados: null, carregando: true, erro: null, atualizadoEm: null })
   const token = useRef(0)
   const ultima = useRef(0)
+  /** Há carga em andamento da janela atual: o relógio e a volta da aba esperam; "Atualizar" e a troca de janela substituem. */
+  const emVoo = useRef(false)
 
   const atualizar = useCallback(async () => {
     const atual = ++token.current
+    emVoo.current = true
     setEstado((s) => ({ ...s, carregando: true, erro: null }))
     try {
       const dados = await source.carregar(desde, ate)
@@ -25,6 +28,8 @@ export function useDashboard(source: Source, desde: string, ate: string) {
     } catch (reason) {
       if (atual !== token.current) return
       setEstado((s) => ({ ...s, carregando: false, erro: mensagem(reason) }))
+    } finally {
+      if (atual === token.current) emVoo.current = false
     }
   }, [source, desde, ate, chave])
 
@@ -32,8 +37,8 @@ export function useDashboard(source: Source, desde: string, ate: string) {
 
   useEffect(() => {
     const visivel = () => document.visibilityState === 'visible'
-    const id = window.setInterval(() => { if (visivel()) void atualizar() }, INTERVALO_MS)
-    const aoVoltar = () => { if (visivel() && Date.now() - ultima.current >= INTERVALO_MS) void atualizar() }
+    const id = window.setInterval(() => { if (visivel() && !emVoo.current) void atualizar() }, INTERVALO_MS)
+    const aoVoltar = () => { if (visivel() && !emVoo.current && Date.now() - ultima.current >= INTERVALO_MS) void atualizar() }
     document.addEventListener('visibilitychange', aoVoltar)
     return () => { window.clearInterval(id); document.removeEventListener('visibilitychange', aoVoltar) }
   }, [atualizar])

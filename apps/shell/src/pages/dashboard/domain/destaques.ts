@@ -3,7 +3,7 @@ import { agrupar } from './base'
 import { mesRotulo } from './periodo'
 import type { CategoriaVeiculo, Reserva, Veiculo } from './types'
 
-export type TopMotorista = { nome: string; qtd: number; fat: number }
+export type TopMotorista = { key: string; nome: string; qtd: number; fat: number }
 export type ProducaoPT = { classificados: number; meses: { mes: string; rotulo: string; propria: number; terceirizada: number }[]; topPropria: TopMotorista[]; topTerceirizada: TopMotorista[] }
 
 export function producaoPropriaTerceira(rv: Reserva[], veiculos: Veiculo[]): ProducaoPT {
@@ -15,7 +15,7 @@ export function producaoPropriaTerceira(rv: Reserva[], veiculos: Veiculo[]): Pro
   const ranking = (kind: CategoriaVeiculo) => {
     const grupos = new Map<string, TopMotorista>()
     for (const { r } of classificados.filter((x) => x.kind === kind && x.r.motorista && x.r.motorista !== SEM_MOTORISTA)) {
-      const atual = grupos.get(r.motoristaKey) ?? { nome: r.motorista, qtd: 0, fat: 0 }
+      const atual = grupos.get(r.motoristaKey) ?? { key: r.motoristaKey, nome: r.motorista, qtd: 0, fat: 0 }
       atual.qtd += 1
       atual.fat += r.valor || 0
       grupos.set(r.motoristaKey, atual)
