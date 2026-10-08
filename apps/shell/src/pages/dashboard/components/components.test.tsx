@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AlertList } from './AlertList'
 import { AnaliseCard } from './AnaliseCard'
+import { AbaLegado, embutirLegado } from './DashboardAbas'
 import { tomStatus } from './Celulas'
 import { DashboardToolbar } from './DashboardToolbar'
 import { Emergenciais } from './Emergenciais'
@@ -13,6 +14,7 @@ import { ResumoSecoes } from './ResumoSecoes'
 import { calcularResumo } from '../domain/resumo'
 import { reserva } from '../domain/test-utils'
 import type { Dados, Filtros } from '../domain/types'
+import type { Host } from '../../../host'
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 const telaCelular = (mobile: boolean) => vi.stubGlobal('matchMedia', (query: string) => ({ matches: mobile && query.includes('820px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
@@ -326,6 +328,31 @@ describe('componentes do Dashboard', () => {
       expect(() => linhaDe(card(), 'Tenaris')).toThrow()
       semAvisoDeGrafico(() => rerender(painel()))
       expect(within(linhaDe(card(), 'Tenaris')).getByRole('button', { name: 'Ver meses' }).getAttribute('aria-expanded')).toBe('false')
+    })
+  })
+
+  describe('abas do dashboard antigo', () => {
+    it('no Dataverse abre a aba do legado em iframe, com aviso e "Abrir em tela cheia"', () => {
+      const host = { mode: 'dataverse', clientUrl: 'https://org.crm2.dynamics.com' } as unknown as Host
+      render(<AbaLegado host={host} aba="financeiro" />)
+      expect(screen.getByText('Esta aba ainda abre o dashboard antigo.')).toBeTruthy()
+      expect(screen.getByRole('link', { name: 'Abrir em tela cheia' }).getAttribute('href')).toBe('#/new_dashboard')
+      const iframe = screen.getByTitle('Dashboard antigo, aba Faturamento')
+      expect(iframe.getAttribute('src')).toBe('https://org.crm2.dynamics.com/WebResources/new_dashboard?tab=financeiro')
+      expect(screen.getByRole('status').textContent).toContain('Carregando')
+    })
+
+    it('esconde o chrome do legado na mesma origem, uma vez só, e ignora documento inacessível', () => {
+      const iframe = document.createElement('iframe')
+      document.body.appendChild(iframe)
+      embutirLegado(iframe)
+      embutirLegado(iframe)
+      const estilos = iframe.contentDocument!.querySelectorAll('#bt-shell-embutido')
+      expect(estilos.length).toBe(1)
+      expect(estilos[0].textContent).toContain('.topbar, .sidebar, .mobile-nav')
+      iframe.remove()
+      const bloqueado = { get contentDocument(): Document { throw new DOMException('Blocked', 'SecurityError') } } as unknown as HTMLIFrameElement
+      expect(() => embutirLegado(bloqueado)).not.toThrow()
     })
   })
 })
