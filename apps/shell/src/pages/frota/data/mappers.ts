@@ -13,7 +13,7 @@ export const SELECT = {
   multas: ['cr40f_multasid', 'cr40f_novacoluna', 'cr40f_status', 'cr40f_dataehorario', 'cr40f_localdainfracao', 'cr40f_dataparaindicar', 'cr40f_indicado', 'cr40f_datadeavisoaocondutor', 'cr40f_datadeindicacao', '_cr40f_placa_value', '_cr40f_motorista_value', '_cr40f_codigodainfracao_value', 'createdon'],
   infracoes: ['cr40f_infracaodetransitoid', 'cr40f_codigodainfracao', 'cr40f_descricaodainfracao', 'cr40f_gravidadedainfracao', 'cr40f_pontosnacnh', 'cr40f_valordamulta'],
   colisoes: ['cr40f_colisao_v2id', 'cr40f_name', 'cr40f_datahora', 'cr40f_local', 'cr40f_descricao', 'cr40f_statusoperacional', 'cr40f_tipoocorrencia', 'cr40f_houveterceiro', '_cr40f_veiculo_value', '_cr40f_motorista_value', 'createdon'],
-  posses: ['new_possedeveiculoid', 'new_iniciodaposse', 'new_fimdaposse', '_new_veiculo_value', '_new_motorista_value'],
+  posses: ['new_possedeveiculoid', 'new_iniciodaposse', 'new_fimdaposse', '_new_veiculo_value', '_new_motorista_value', '_new_localdebase_value'],
 } as const
 
 export function cleanId(value: unknown) {
@@ -119,5 +119,6 @@ export function mapPosse(row: Row): Posse {
     fim: str(row.new_fimdaposse),
     veiculo: ref(row, '_new_veiculo_value'),
     motorista: ref(row, '_new_motorista_value'),
+    localBase: ref(row, '_new_localdebase_value'),
   }
 }

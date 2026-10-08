@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FORMATTED, mapColisao, mapManutencao, mapMulta, mapVeiculo, ref } from './mappers'
+import { FORMATTED, mapColisao, mapManutencao, mapMulta, mapPosse, mapVeiculo, ref } from './mappers'
 
 describe('mappers', () => {
   it('lê lookup com id limpo e rótulo formatado', () => {
@@ -29,5 +29,10 @@ describe('mappers', () => {
   it('mapeia colisão', () => {
     const colisao = mapColisao({ cr40f_colisao_v2id: 'C1', cr40f_name: 'Colisão 1', cr40f_statusoperacional: 100000000, cr40f_houveterceiro: true, createdon: '2026-09-10T10:00:00Z' })
     expect(colisao).toMatchObject({ id: 'c1', status: 100000000, houveTerceiro: true })
+  })
+
+  it('mapeia posse com local de base', () => {
+    const posse = mapPosse({ new_possedeveiculoid: 'P1', new_iniciodaposse: '2026-10-01T12:00:00Z', _new_veiculo_value: 'V1', _new_localdebase_value: 'B1', [`_new_localdebase_value${FORMATTED}`]: 'Base Centro' })
+    expect(posse).toMatchObject({ id: 'p1', fim: null, motorista: null, localBase: { id: 'b1', label: 'Base Centro' } })
   })
 })
