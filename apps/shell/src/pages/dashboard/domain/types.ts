@@ -105,6 +105,11 @@ export type Dados = {
   formasPagamento: FormaPagamento[]
   /** Conjuntos secundários que falharam: os cards deles mostram s/dado. */
   indisponiveis: Conjunto[]
+  /**
+   * Conjuntos do estágio 2 (sob demanda) ainda não carregados nesta janela: ficam vazios e a aba mostra esqueleto, não s/dado.
+   * Ausente = nada pendente.
+   */
+  pendentes?: ('pagantes' | 'despesas')[]
 }
 export type Atalho = 'hoje' | 'ult7' | 'ult30' | 'esteMes' | 'mesAnt' | 'esteAno' | 'anoAnt' | 'personalizado'
 export type Filtros = {

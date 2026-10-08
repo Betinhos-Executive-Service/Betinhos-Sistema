@@ -5,7 +5,7 @@ import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
 import { hrefFor, setHashQuery, useHashQuery } from '../../nav/useHashRoute'
 import { useMedia } from '../operacional/useMedia'
-import { createSource } from './data/source'
+import { createSource, type ConjuntoExtra } from './data/source'
 import { filtrarServicos, opcoesFiltro, type OpcoesFiltro } from './domain/base'
 import { int } from './domain/format'
 import type { Contexto } from './domain/kpis'
@@ -25,6 +25,9 @@ import { DashboardToolbar } from './components/DashboardToolbar'
 import './dashboard.css'
 
 const PAINEL_ID = 'dash-painel'
+/** Conjuntos do estágio 2 que cada aba usa: carregados na primeira vez que ela abre e recarregados a cada 60 s só enquanto ela está ativa. */
+const SEM_EXTRAS: ReadonlySet<ConjuntoExtra> = new Set()
+const EXTRAS_POR_ABA: Partial<Record<Aba, ReadonlySet<ConjuntoExtra>>> = { financeiro: new Set(['pagantes']), despesas: new Set(['despesas']) }
 const SEM_OPCOES: OpcoesFiltro = { status: [], clientes: [], motoristas: [], tipos: [] }
 const dataBR = (dia: string) => dia.split('-').reverse().join('/')
 const horaBR = (d: Date) => d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
@@ -47,7 +50,8 @@ export function DashboardPage({ host }: { host: Host }) {
   const [filtrosDespesa, setFiltrosDespesa] = useState<FiltrosDespesaProprios>(FILTROS_DESPESA_VAZIOS)
   const [frotaMotorista, setFrotaMotorista] = useState<FrotaMotorista>('todos')
   // Carga única com todos os conjuntos; a aba só escolhe o que calcular.
-  const db = useDashboard(source, cargaDesde(filtros.inicio, now), filtros.fim)
+  const extrasDaAba = EXTRAS_POR_ABA[aba] ?? SEM_EXTRAS
+  const db = useDashboard(source, cargaDesde(filtros.inicio, now), filtros.fim, { conjuntosExtras: extrasDaAba })
 
   // Cada recarga avança o relógio; um atalho relativo ("Este mês") acompanha a virada do dia.
   useEffect(() => { if (db.atualizadoEm) setNow(db.atualizadoEm) }, [db.atualizadoEm])
@@ -70,7 +74,9 @@ export function DashboardPage({ host }: { host: Host }) {
     return ultimasOpcoes.current
   }, [db.dados])
   const periodo = `${dataBR(filtros.inicio)} a ${dataBR(filtros.fim)}`
-  const carregandoPrimeira = !db.dados && db.carregando
+  // Aba cujo conjunto do estágio 2 ainda não chegou nesta janela: mostra o esqueleto dela (não s/dado).
+  const abaPendente = [...extrasDaAba].some((c) => db.dados?.pendentes?.includes(c))
+  const carregandoPrimeira = (!db.dados && db.carregando) || abaPendente
 
   const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar dashboard" onClick={() => void db.atualizar()} />, [db.atualizar])
   useShellHeader({ title: 'Dashboard', actions: headerActions })
@@ -79,7 +85,7 @@ export function DashboardPage({ host }: { host: Host }) {
   const limpar = () => setFiltros((f) => ({ ...f, status: [], clientes: [], motoristas: [], tipos: [] }))
   const aviso = avisoSegmento(aba, filtros)
 
-  const props: PropsAba = { ctx, dados: db.dados, periodo }
+  const props: PropsAba = abaPendente ? { ctx: null, dados: null, periodo } : { ctx, dados: db.dados, periodo }
   const conteudo = {
     resumo: () => <ResumoTab {...props} />,
     servicos: () => <ServicosTab {...props} />,

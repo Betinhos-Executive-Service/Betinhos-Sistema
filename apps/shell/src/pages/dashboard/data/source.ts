@@ -12,8 +12,22 @@ import {
   veiculosPath, viagensPath, type EntitySets,
 } from './queries'
 
-/** Tudo que a tela precisa do mundo externo; Dataverse em produção, memória no pnpm dev. */
-export type Source = { mock: boolean; carregar: (desde: string, ate: string) => Promise<Dados> }
+/** Conjuntos do estágio 2 (sob demanda): só as abas Financeiro e Despesas os usam. */
+export type ConjuntoExtra = NonNullable<Dados['pendentes']>[number]
+/** Resposta de um conjunto do estágio 2: os campos dele em `Dados`; `indisponivel` quando a consulta falhou (s/dado nos cards). */
+export type ParteExtra = { campos: Partial<Pick<Dados, 'pagantes' | 'despesas' | 'categoriasDespesa' | 'formasPagamento'>>; indisponivel: boolean }
+
+/**
+ * Tudo que a tela precisa do mundo externo; Dataverse em produção, memória no pnpm dev.
+ * `carregar` é o estágio 1 (pagantes e despesas vazios e `pendentes`); `carregarExtra` traz um conjunto do estágio 2.
+ */
+export type Source = {
+  mock: boolean
+  carregar: (desde: string, ate: string) => Promise<Dados>
+  carregarExtra: (conjunto: ConjuntoExtra, desde: string, ate: string) => Promise<ParteExtra>
+}
+/** Estágio 2 ainda não carregado: os campos vazios que o estágio 1 devolve. */
+const EXTRAS_VAZIOS = { pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], pendentes: ['pagantes', 'despesas'] } satisfies Partial<Dados>
 
 /** Roda as tarefas com no máximo `limite` em paralelo e devolve o resultado de cada uma. */
 async function comLimite<T>(tarefas: (() => Promise<T>)[], limite: number) {
@@ -45,51 +59,40 @@ async function comAlternativa(principal: () => Promise<Row[]>, reduzida: () => P
 /** Tabela secundária sem entity set (ausente na metadata do ambiente): a consulta falha e o conjunto vira `indisponiveis`. */
 const ausente = (set: string) => Promise.reject(new Error(`Tabela ausente na metadata (${set || 'sem entity set'}).`))
 
+/** Consulta de um conjunto secundário: sem entity set, falha sem ir ao servidor. */
+const leitor = (client: DataverseClient) => (set: string, path: (set: string) => string) => (set ? client.getAll(path(set)) : ausente(set))
+const linhas = (r: PromiseSettledResult<Row[]>) => (r.status === 'fulfilled' ? r.value : [])
+
 /**
- * Reservas e CPs são obrigatórias; um conjunto secundário (inclusive as 3 tabelas do Infleet do Score motoristas) que falha vira `indisponiveis`.
+ * Estágio 1. Reservas e CPs são obrigatórias; um conjunto secundário (inclusive as 3 tabelas do Infleet do Score motoristas) que falha vira `indisponiveis`.
  * Entity set vazio (`''`) é tabela secundária que não existe na metadata do ambiente: conta como falha só daquele conjunto.
- * Despesas dependem de 4 tabelas (despesas, categorias, formas e anexos): se qualquer uma falhar, o conjunto `despesas` inteiro fica indisponível.
- * Multas e despesas usam os funcionários (apelido, nome e empresa); sem eles caem no rótulo do lookup e "Sem empresa".
+ * Manutenções, multas e ocorrências vêm pela mesma janela das reservas (colunas DateTime). Multas usam os funcionários (apelido).
+ * Pagantes e despesas ficam vazios e `pendentes`: são o estágio 2 (`carregarExtraDataverse`).
  */
 export async function carregarDataverse(client: DataverseClient, sets: EntitySets, desde: string, ate: string): Promise<Dados> {
-  /** Consulta de um conjunto secundário: sem entity set, falha sem ir ao servidor. */
-  const ler = (set: string, path: (set: string) => string) => (set ? client.getAll(path(set)) : ausente(set))
-  const [res, cps, man, mul, oco, fun, vei, via, eve, tel, pag, des, cat, frm, anx] = await comLimite<Row[]>([
+  const ler = leitor(client)
+  const [res, cps, man, mul, oco, fun, vei, via, eve, tel] = await comLimite<Row[]>([
     () => client.getAll(reservasPath(sets.reserva, desde, ate)),
     () => client.getAll(composicoesPath(sets.composicao)),
-    () => ler(sets.manutencao, manutencoesPath),
-    () => (sets.multa ? comAlternativa(() => client.getAll(multasPath(sets.multa)), () => client.getAll(multasPath(sets.multa, false))) : ausente(sets.multa)),
-    () => ler(sets.ocorrencia, ocorrenciasPath),
+    () => ler(sets.manutencao, (s) => manutencoesPath(s, desde, ate)),
+    () => (sets.multa ? comAlternativa(() => client.getAll(multasPath(sets.multa, desde, ate)), () => client.getAll(multasPath(sets.multa, desde, ate, false))) : ausente(sets.multa)),
+    () => ler(sets.ocorrencia, (s) => ocorrenciasPath(s, desde, ate)),
     () => ler(sets.funcionario, funcionariosPath),
     () => ler(sets.veiculo, veiculosPath),
     () => ler(sets.viagem, (s) => viagensPath(s, desde, ate)),
     () => ler(sets.evento, (s) => eventosPath(s, desde, ate)),
     () => ler(sets.telemetria, (s) => telemetriaPath(s, desde, ate)),
-    () => (sets.pagante ? comAlternativa(() => client.getAll(pagantesPath(sets.pagante)), () => client.getAll(pagantesPath(sets.pagante, false))) : ausente(sets.pagante)),
-    () => ler(sets.despesa, (s) => despesasPath(s, desde, ate)),
-    () => ler(sets.categoriaDespesa, categoriasDespesaPath),
-    () => ler(sets.formaPagamentoDespesa, formasPagamentoPath),
-    () => ler(sets.anexoDespesa, anexosDespesaPath),
   ], 4)
   if (res.status === 'rejected') throw res.reason
   if (cps.status === 'rejected') throw cps.reason
-  const linhas = (r: PromiseSettledResult<Row[]>) => (r.status === 'fulfilled' ? r.value : [])
   const secundarios: [Conjunto, PromiseSettledResult<Row[]>][] = [
-    ['manutencoes', man], ['multas', mul], ['ocorrencias', oco], ['funcionarios', fun], ['veiculos', vei], ['viagens', via], ['eventos', eve], ['telemetria', tel], ['pagantes', pag],
+    ['manutencoes', man], ['multas', mul], ['ocorrencias', oco], ['funcionarios', fun], ['veiculos', vei], ['viagens', via], ['eventos', eve], ['telemetria', tel],
   ]
   const indisponiveis = secundarios.filter(([, r]) => r.status === 'rejected').map(([conjunto]) => conjunto)
-  const despesasOk = [des, cat, frm, anx].every((r) => r.status === 'fulfilled')
-  if (!despesasOk) indisponiveis.push('despesas')
 
   const cpMap = mapCps(cps.value)
   const funcionarios = linhas(fun).map((row) => mapFuncionario(row))
   const apelidos = apelidosFuncionarios(funcionarios)
-  const categoriasDespesa = despesasOk ? linhas(cat).map((row) => mapCategoriaDespesa(row)) : []
-  const formasPagamento = despesasOk ? linhas(frm).map((row) => mapFormaPagamento(row)) : []
-  const ctxDespesa = {
-    categorias: new Map(categoriasDespesa.map((c) => [c.id, c])), formas: new Map(formasPagamento.map((f) => [f.id, f])),
-    funcionarios: new Map(funcionarios.filter((f) => f.id).map((f) => [f.id, f])), anexos: contarAnexos(linhas(anx)),
-  }
   return {
     reservas: aplicarCsv2026(res.value.map((row) => mapReserva(row, cpMap)), reservasCsv2026()),
     manutencoes: linhas(man).map((row) => mapManutencao(row)),
@@ -100,12 +103,43 @@ export async function carregarDataverse(client: DataverseClient, sets: EntitySet
     viagens: linhas(via).map((row) => mapViagem(row)),
     eventos: linhas(eve).map((row) => mapEvento(row)),
     telemetria: linhas(tel).map((row) => mapTelemetria(row)),
-    pagantes: linhas(pag).map((row) => mapPagante(row)),
-    despesas: despesasOk ? linhas(des).map((row) => mapDespesa(row, ctxDespesa)) : [],
-    categoriasDespesa,
-    formasPagamento,
+    ...EXTRAS_VAZIOS,
     indisponiveis,
   }
+}
+
+/**
+ * Estágio 2, um conjunto por vez. Pagantes: todos, sem `$filter` (como o legado), com a consulta reduzida se faltar a data do primeiro pagamento.
+ * Despesas dependem de 4 tabelas (despesas, categorias, formas e anexos): se qualquer uma falhar, o conjunto inteiro fica indisponível.
+ * Despesas usam os funcionários (nome e empresa), consultados de novo aqui para o estágio 2 não esperar o 1; sem eles caem no rótulo do lookup e "Sem empresa".
+ */
+export async function carregarExtraDataverse(client: DataverseClient, sets: EntitySets, conjunto: ConjuntoExtra, desde: string, ate: string): Promise<ParteExtra> {
+  const ler = leitor(client)
+  if (conjunto === 'pagantes') {
+    try {
+      const rows = await (sets.pagante ? comAlternativa(() => client.getAll(pagantesPath(sets.pagante)), () => client.getAll(pagantesPath(sets.pagante, false))) : ausente(sets.pagante))
+      return { campos: { pagantes: rows.map((row) => mapPagante(row)) }, indisponivel: false }
+    } catch (error) {
+      console.warn('Dashboard: pagantes não carregaram; os cards deles ficam s/dado.', String(error))
+      return { campos: {}, indisponivel: true }
+    }
+  }
+  const [des, cat, frm, anx, fun] = await comLimite<Row[]>([
+    () => ler(sets.despesa, (s) => despesasPath(s, desde, ate)),
+    () => ler(sets.categoriaDespesa, categoriasDespesaPath),
+    () => ler(sets.formaPagamentoDespesa, formasPagamentoPath),
+    () => ler(sets.anexoDespesa, anexosDespesaPath),
+    () => ler(sets.funcionario, funcionariosPath),
+  ], 4)
+  if (![des, cat, frm, anx].every((r) => r.status === 'fulfilled')) return { campos: {}, indisponivel: true }
+  const categoriasDespesa = linhas(cat).map((row) => mapCategoriaDespesa(row))
+  const formasPagamento = linhas(frm).map((row) => mapFormaPagamento(row))
+  const funcionarios = linhas(fun).map((row) => mapFuncionario(row))
+  const ctxDespesa = {
+    categorias: new Map(categoriasDespesa.map((c) => [c.id, c])), formas: new Map(formasPagamento.map((f) => [f.id, f])),
+    funcionarios: new Map(funcionarios.filter((f) => f.id).map((f) => [f.id, f])), anexos: contarAnexos(linhas(anx)),
+  }
+  return { campos: { despesas: linhas(des).map((row) => mapDespesa(row, ctxDespesa)), categoriasDespesa, formasPagamento }, indisponivel: false }
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -119,10 +153,21 @@ function createMockSource(): Source {
       return {
         ...base,
         reservas: aplicarCsv2026(base.reservas.filter((r) => entre(r.dia, desde, ate)), reservasCsv2026()),
+        manutencoes: base.manutencoes.filter((x) => entre(x.dia, desde, ate)),
+        multas: base.multas.filter((x) => entre(x.dia, desde, ate)),
+        ocorrencias: base.ocorrencias.filter((x) => entre(x.dia, desde, ate)),
         viagens: base.viagens.filter((x) => entre(x.dia, desde, ate)),
         eventos: base.eventos.filter((x) => entre(x.dia, desde, ate)),
         telemetria: base.telemetria.filter((x) => entre(x.dia, desde, ate)),
-        despesas: base.despesas.filter((x) => entre(x.dia, desde, ate)),
+        ...EXTRAS_VAZIOS,
+      }
+    },
+    async carregarExtra(conjunto, desde, ate) {
+      await wait(300)
+      if (conjunto === 'pagantes') return { campos: { pagantes: base.pagantes }, indisponivel: false }
+      return {
+        campos: { despesas: base.despesas.filter((x) => entre(x.dia, desde, ate)), categoriasDespesa: base.categoriasDespesa, formasPagamento: base.formasPagamento },
+        indisponivel: false,
       }
     },
   }
@@ -159,5 +204,9 @@ export function createSource(host: Host): Source {
   if (host.mode === 'mock') return createMockSource()
   let sets: Promise<EntitySets> | null = null
   const entitySets = () => (sets ??= host.metadata.entities(Object.values(ENTITIES)).then((info) => resolverEntitySets(info)).catch((error) => { sets = null; throw error }))
-  return { mock: false, carregar: async (desde, ate) => carregarDataverse(host.client, await entitySets(), desde, ate) }
+  return {
+    mock: false,
+    carregar: async (desde, ate) => carregarDataverse(host.client, await entitySets(), desde, ate),
+    carregarExtra: async (conjunto, desde, ate) => carregarExtraDataverse(host.client, await entitySets(), conjunto, desde, ate),
+  }
 }
