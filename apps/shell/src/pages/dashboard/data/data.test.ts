@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { DataverseClient, Row } from '@betinhos/dataverse'
-import { carregarDataverse, createSource, resolverEntitySets } from './source'
+import { carregarDataverse, carregarExtraDataverse, createSource, resolverEntitySets, type Source } from './source'
 import { calcularResumo } from '../domain/resumo'
 import { linhasScore } from '../domain/score'
 import {
-  ENTITIES, anexosDespesaPath, categoriasDespesaPath, despesasPath, eventosPath, formasPagamentoPath, funcionariosPath, manutencoesPath, mapCategoriaDespesa, mapCps,
+  ENTITIES, anexosDespesaPath, categoriasDespesaPath, despesasPath, eventosPath, formasPagamentoPath, funcionariosPath, manutencoesPath, ocorrenciasPath, mapCategoriaDespesa, mapCps,
   mapDespesa, mapEvento, mapFormaPagamento, mapFuncionario, mapManutencao, mapMulta, mapPagante, mapReserva, mapTelemetria, mapVeiculo, mapViagem, multasPath,
   pagantesPath, reservasPath, telemetriaPath, veiculosPath, viagensPath,
 } from './queries'
@@ -15,6 +15,16 @@ const SETS = {
   pagante: 'pag', despesa: 'des', categoriaDespesa: 'cat', formaPagamentoDespesa: 'frm', anexoDespesa: 'anx',
 }
 const client = (getAll: (path: string) => Promise<Row[]>) => ({ apiUrl: '', request: vi.fn(), getAll: vi.fn(getAll), create: vi.fn(), update: vi.fn(), remove: vi.fn() }) as unknown as DataverseClient
+/** Os dois estágios juntos, mesclados como o `useDashboard` faz quando as duas abas do estágio 2 já abriram. */
+async function carregarTudo(c: DataverseClient, sets: typeof SETS, desde: string, ate: string) {
+  const [d, pag, des] = await Promise.all([carregarDataverse(c, sets, desde, ate), carregarExtraDataverse(c, sets, 'pagantes', desde, ate), carregarExtraDataverse(c, sets, 'despesas', desde, ate)])
+  const falhas = (['pagantes', 'despesas'] as const).filter((_, i) => [pag, des][i].indisponivel)
+  return { ...d, ...pag.campos, ...des.campos, indisponiveis: [...d.indisponiveis, ...falhas], pendentes: [] }
+}
+async function mockTudo(s: Source, desde: string, ate: string) {
+  const [d, pag, des] = await Promise.all([s.carregar(desde, ate), s.carregarExtra('pagantes', desde, ate), s.carregarExtra('despesas', desde, ate)])
+  return { ...d, ...pag.campos, ...des.campos }
+}
 
 describe('consultas do Dashboard', () => {
   it('janela de reservas em Brasília com fim inclusivo', () => {
@@ -157,12 +167,18 @@ describe('conjuntos das abas', () => {
     expect(reservasPath('res', '2024-01-01', '2026-10-15')).toContain(',new_datadefinalizacao')
     expect(veiculosPath('vei')).toBe('vei?$select=cr40f_veiculosid,cr40f_statusdoveiculo,new_categoriadoveiculo,cr40f_placa,cr40f_marca,cr40f_modelo,cr40f_blindado,cr40f_anodefabricacao')
     expect(funcionariosPath('fun')).toBe('fun?$select=cr40f_funcionariosid,cr40f_nomecompleto,cr40f_status,cr40f_validadedacnh,cr40f_funcao,new_apelido,cr40f_nomedaempresa')
-    expect(manutencoesPath('man')).toBe('man?$select=cr40f_datamanutencao,cr40f_valor,cr40f_datadaaprovacao,cr40f_status,cr40f_tipodoreparo,_cr40f_placa_carro_value,createdon')
+    expect(decodeURIComponent(manutencoesPath('man', '2024-01-01', '2026-10-15'))).toBe(`man?$select=cr40f_datamanutencao,cr40f_valor,cr40f_datadaaprovacao,cr40f_status,cr40f_tipodoreparo,_cr40f_placa_carro_value,createdon&$filter=${J('cr40f_datamanutencao')}`)
+  })
+
+  it('manutenções, multas e ocorrências pela janela das reservas (colunas DateTime, fim inclusivo em Brasília)', () => {
+    expect(decodeURIComponent(ocorrenciasPath('oco', '2024-01-01', '2026-10-15'))).toBe(`oco?$select=cr40f_dataocorrencia&$filter=${J('cr40f_dataocorrencia')}`)
+    expect(decodeURIComponent(multasPath('mul', '2024-01-01', '2026-10-15'))).toContain(`&$filter=${J('cr40f_dataehorario')}`)
+    expect(decodeURIComponent(reservasPath('res', '2024-01-01', '2026-10-15'))).toContain(J('cr40f_dataehorriodesada'))
   })
 
   it('multas com $expand da infração e versão sem expand (fallback)', () => {
-    expect(multasPath('mul')).toBe('mul?$select=cr40f_dataehorario,cr40f_status,_cr40f_codigodainfracao_value,_cr40f_motorista_value,_cr40f_placa_value&$expand=cr40f_Codigodainfracao($select=cr40f_codigodainfracao,cr40f_descricaodainfracao)')
-    expect(multasPath('mul', false)).toBe('mul?$select=cr40f_dataehorario,cr40f_status,_cr40f_codigodainfracao_value,_cr40f_motorista_value,_cr40f_placa_value')
+    expect(decodeURIComponent(multasPath('mul', '2024-01-01', '2026-10-15'))).toBe(`mul?$select=cr40f_dataehorario,cr40f_status,_cr40f_codigodainfracao_value,_cr40f_motorista_value,_cr40f_placa_value&$expand=cr40f_Codigodainfracao($select=cr40f_codigodainfracao,cr40f_descricaodainfracao)&$filter=${J('cr40f_dataehorario')}`)
+    expect(decodeURIComponent(multasPath('mul', '2024-01-01', '2026-10-15', false))).toBe(`mul?$select=cr40f_dataehorario,cr40f_status,_cr40f_codigodainfracao_value,_cr40f_motorista_value,_cr40f_placa_value&$filter=${J('cr40f_dataehorario')}`)
   })
 
   it('pagantes inteiros, sem filtro (como o legado); despesas pela janela; cadastros de despesa inteiros e ativos', () => {
@@ -317,7 +333,7 @@ describe('conjuntos das abas', () => {
       if (path.startsWith('mul?')) return [{ _cr40f_motorista_value: 'M1', cr40f_Codigodainfracao: { cr40f_codigodainfracao: '745-50', cr40f_descricaodainfracao: 'Velocidade' } }]
       return []
     }
-    const ok = await carregarDataverse(client(async (path) => linhas(path)), SETS, '2024-01-01', '2026-10-15')
+    const ok = await carregarTudo(client(async (path) => linhas(path)), SETS, '2024-01-01', '2026-10-15')
     expect(ok.indisponiveis).toEqual([])
     expect(ok.pagantes).toMatchObject([{ id: 'p1', opId: 'op1', valor: 100, status: 202410002 }])
     expect(ok.categoriasDespesa).toEqual([{ id: 'c1', nome: 'Alimentação', grupoDre: 'Custos' }])
@@ -325,13 +341,13 @@ describe('conjuntos das abas', () => {
     expect(ok.despesas).toMatchObject([{ id: 'd1', categoria: 'Alimentação', forma: 'Pix', motorista: 'Carlos Oliveira', empresa: 'BETINHOS', anexos: 2 }])
     expect(ok.multas).toMatchObject([{ motorista: 'Oliveira', infracaoCodigo: '745-50', infracaoDescricao: 'Velocidade' }])
 
-    const semPagantes = await carregarDataverse(client(async (path) => { if (path.startsWith('pag?')) throw new Error('sem permissão'); return linhas(path) }), SETS, '2024-01-01', '2026-10-15')
+    const semPagantes = await carregarTudo(client(async (path) => { if (path.startsWith('pag?')) throw new Error('sem permissão'); return linhas(path) }), SETS, '2024-01-01', '2026-10-15')
     expect(semPagantes.indisponiveis).toEqual(['pagantes'])
     expect(semPagantes.pagantes).toEqual([])
     expect(semPagantes.despesas).toHaveLength(1)
 
     // Funcionários que falham marcam só 'funcionarios': despesas seguem disponíveis, com motorista pelo rótulo do lookup e "Sem empresa".
-    const semFuncionarios = await carregarDataverse(client(async (path) => {
+    const semFuncionarios = await carregarTudo(client(async (path) => {
       if (path.startsWith('fun?')) throw new Error('sem permissão')
       if (path.startsWith('des?')) return [{ cr40f_despesaoperacionalid: 'D1', _cr40f_motorista_value: 'M1', [`_cr40f_motorista_value${F}`]: 'Carlos Oliveira' }]
       return linhas(path)
@@ -349,7 +365,7 @@ describe('conjuntos das abas', () => {
       return []
     })
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const d = await carregarDataverse(c, SETS, '2024-01-01', '2026-10-15')
+    const d = await carregarTudo(c, SETS, '2024-01-01', '2026-10-15')
     expect(d.indisponiveis).toEqual([])
     expect(d.pagantes).toMatchObject([{ id: 'p1', valor: 10, primeiroPagamentoRaw: '' }])
     expect(d.multas).toMatchObject([{ infracaoCodigo: '745-50', infracaoDescricao: '' }])
@@ -366,7 +382,7 @@ describe('conjuntos das abas', () => {
     expect(sets).toMatchObject({ multa: '', anexoDespesa: '', reserva: `${ENTITIES.reserva}s` })
     expect(warn).toHaveBeenCalledTimes(2)
     const consultas: string[] = []
-    const d = await carregarDataverse(client(async (path) => { consultas.push(path); return [] }), { ...SETS, multa: '', anexoDespesa: '' }, '2024-01-01', '2026-10-15')
+    const d = await carregarTudo(client(async (path) => { consultas.push(path); return [] }), { ...SETS, multa: '', anexoDespesa: '' }, '2024-01-01', '2026-10-15')
     expect(d.indisponiveis).toEqual(['multas', 'despesas'])
     expect(consultas.some((c) => c.startsWith('?'))).toBe(false)
     const semReserva = new Map([...info].filter(([n]) => n !== ENTITIES.reserva))
@@ -376,7 +392,7 @@ describe('conjuntos das abas', () => {
 
   it('despesas: falha em qualquer tabela de despesa marca o conjunto inteiro', async () => {
     for (const prefixo of ['des?', 'cat?', 'frm?', 'anx?']) {
-      const d = await carregarDataverse(client(async (path) => {
+      const d = await carregarTudo(client(async (path) => {
         if (path.startsWith(prefixo)) throw new Error('falhou')
         if (path.startsWith('des?')) return [{ cr40f_despesaoperacionalid: 'D1' }]
         return []
@@ -388,14 +404,14 @@ describe('conjuntos das abas', () => {
 
   it('mock: pagantes nas OPs das reservas, despesas coerentes com cadastros, campos extras; determinístico e na janela', async () => {
     const hoje = new Date().toISOString().slice(0, 10)
-    const d = await createSource({ mode: 'mock' }).carregar('2025-01-01', hoje)
+    const d = await mockTudo(createSource({ mode: 'mock' }), '2025-01-01', hoje)
     // A OP pode ser de um serviço que sai depois de hoje (pagante criado antes da saída): confere contra todas as reservas.
-    const tudo = await createSource({ mode: 'mock' }).carregar('2025-01-01', '2099-12-31')
+    const tudo = await mockTudo(createSource({ mode: 'mock' }), '2025-01-01', '2099-12-31')
     const ops = new Set(tudo.reservas.map((r) => r.opId).filter(Boolean))
     expect(d.pagantes.length).toBeGreaterThan(20)
     expect(d.pagantes.every((p) => ops.has(p.opId) && p.criadoDia >= '2025-01-01' && p.criadoDia <= hoje)).toBe(true)
     // Como no Dataverse, o mock devolve todos os pagantes, qualquer que seja a janela.
-    expect((await createSource({ mode: 'mock' }).carregar('2026-09-01', '2026-09-30')).pagantes).toEqual(d.pagantes)
+    expect((await mockTudo(createSource({ mode: 'mock' }), '2026-09-01', '2026-09-30')).pagantes).toEqual(d.pagantes)
     expect(d.pagantes.some((p) => p.statusLabel === 'Pago' && p.primeiroPagamentoRaw)).toBe(true)
     expect(d.pagantes.some((p) => p.status !== 202410002)).toBe(true)
     expect(new Set(d.pagantes.map((p) => p.formaLabel)).size).toBeGreaterThan(1)
@@ -429,7 +445,33 @@ describe('conjuntos das abas', () => {
     expect(d.multas.some((m) => m.status === 202410000)).toBe(true)
     expect(d.telemetria.some((t) => t.distanciaKm > 0 && t.velocidadeMaxima > 0)).toBe(true)
     expect(d.viagens.some((v) => v.combustivelL > 0)).toBe(true)
-    const outra = await createSource({ mode: 'mock' }).carregar('2025-01-01', hoje)
+    const outra = await mockTudo(createSource({ mode: 'mock' }), '2025-01-01', hoje)
     expect({ p: outra.pagantes, d: outra.despesas }).toEqual({ p: d.pagantes, d: d.despesas })
+  })
+
+  it('estágio 1 não consulta pagantes nem despesas e os marca pendentes; estágio 2 consulta só o conjunto pedido', async () => {
+    const consultas: string[] = []
+    const c = client(async (path) => { consultas.push(path.slice(0, 3)); return [] })
+    const d = await carregarDataverse(c, SETS, '2024-01-01', '2026-10-15')
+    expect(consultas.sort()).toEqual(['cps', 'eve', 'fun', 'man', 'mul', 'oco', 'res', 'tel', 'vei', 'via'])
+    expect(d.pendentes).toEqual(['pagantes', 'despesas'])
+    expect({ p: d.pagantes, d: d.despesas, c: d.categoriasDespesa, f: d.formasPagamento }).toEqual({ p: [], d: [], c: [], f: [] })
+    consultas.length = 0
+    expect(await carregarExtraDataverse(c, SETS, 'pagantes', '2024-01-01', '2026-10-15')).toEqual({ campos: { pagantes: [] }, indisponivel: false })
+    expect(consultas).toEqual(['pag'])
+    consultas.length = 0
+    await carregarExtraDataverse(c, SETS, 'despesas', '2024-01-01', '2026-10-15')
+    expect(consultas.sort()).toEqual(['anx', 'cat', 'des', 'frm', 'fun'])
+  })
+
+  it('mock: estágio 1 com manutenções, multas e ocorrências na janela e pagantes/despesas pendentes', async () => {
+    const s = createSource({ mode: 'mock' })
+    const d = await s.carregar('2026-09-01', '2026-09-30')
+    const na = (x: { dia: string }) => x.dia >= '2026-09-01' && x.dia <= '2026-09-30'
+    expect(d.manutencoes.every(na) && d.multas.every(na) && d.ocorrencias.every(na)).toBe(true)
+    expect(d.pendentes).toEqual(['pagantes', 'despesas'])
+    expect(d.pagantes).toEqual([])
+    const extra = await s.carregarExtra('despesas', '2026-09-01', '2026-09-30')
+    expect(extra.campos.despesas?.every(na)).toBe(true)
   })
 })

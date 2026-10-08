@@ -35,22 +35,27 @@ export function reservasPath(set: string, desde: string, ate: string) {
   const filtro = `cr40f_dataehorriodesada ge ${new Date(inicioMs(desde)).toISOString()} and cr40f_dataehorriodesada lt ${new Date(inicioMs(ate) + DIA_MS).toISOString()}`
   return `${set}?$select=${RESERVA_SELECT.join(',')}&$expand=${RESERVA_EXPAND}&$filter=${encodeURIComponent(filtro)}&$orderby=${encodeURIComponent('cr40f_dataehorriodesada desc')}`
 }
+/** Janela [desde, ate] em Brasília, fim inclusivo, para colunas DateTime (mesma das reservas). */
+const janelaDataHora = (campo: string, desde: string, ate: string) =>
+  encodeURIComponent(`${campo} ge ${new Date(inicioMs(desde)).toISOString()} and ${campo} lt ${new Date(inicioMs(ate) + DIA_MS).toISOString()}`)
+
 export const composicoesPath = (set: string) => `${set}?$select=cr40f_composicaodeprecosid,new_valortotal,new_status`
-export const manutencoesPath = (set: string) =>
-  `${set}?$select=cr40f_datamanutencao,cr40f_valor,cr40f_datadaaprovacao,cr40f_status,cr40f_tipodoreparo,_cr40f_placa_carro_value,createdon`
+/** Manutenções com data na janela (`cr40f_datamanutencao` é DateTime na metadata DEV). */
+export const manutencoesPath = (set: string, desde: string, ate: string) =>
+  `${set}?$select=cr40f_datamanutencao,cr40f_valor,cr40f_datadaaprovacao,cr40f_status,cr40f_tipodoreparo,_cr40f_placa_carro_value,createdon&$filter=${janelaDataHora('cr40f_datamanutencao', desde, ate)}`
 const MULTA_SELECT = 'cr40f_dataehorario,cr40f_status,_cr40f_codigodainfracao_value,_cr40f_motorista_value,_cr40f_placa_value'
-/** Multas com a infração pelo `$expand` (legado L11531); `comInfracao = false` é a consulta reduzida usada se a navegação falhar. */
-export const multasPath = (set: string, comInfracao = true) =>
-  `${set}?$select=${MULTA_SELECT}${comInfracao ? '&$expand=cr40f_Codigodainfracao($select=cr40f_codigodainfracao,cr40f_descricaodainfracao)' : ''}`
-export const ocorrenciasPath = (set: string) => `${set}?$select=cr40f_dataocorrencia`
+/**
+ * Multas na janela (`cr40f_dataehorario` é DateTime) com a infração pelo `$expand` (legado L11531);
+ * `comInfracao = false` é a consulta reduzida usada se a navegação falhar.
+ */
+export const multasPath = (set: string, desde: string, ate: string, comInfracao = true) =>
+  `${set}?$select=${MULTA_SELECT}${comInfracao ? '&$expand=cr40f_Codigodainfracao($select=cr40f_codigodainfracao,cr40f_descricaodainfracao)' : ''}&$filter=${janelaDataHora('cr40f_dataehorario', desde, ate)}`
+/** Ocorrências na janela (`cr40f_dataocorrencia` é DateTime). */
+export const ocorrenciasPath = (set: string, desde: string, ate: string) => `${set}?$select=cr40f_dataocorrencia&$filter=${janelaDataHora('cr40f_dataocorrencia', desde, ate)}`
 export const funcionariosPath = (set: string) =>
   `${set}?$select=cr40f_funcionariosid,cr40f_nomecompleto,cr40f_status,cr40f_validadedacnh,cr40f_funcao,new_apelido,cr40f_nomedaempresa`
 export const veiculosPath = (set: string) =>
   `${set}?$select=cr40f_veiculosid,cr40f_statusdoveiculo,new_categoriadoveiculo,cr40f_placa,cr40f_marca,cr40f_modelo,cr40f_blindado,cr40f_anodefabricacao`
-
-/** Janela [desde, ate] em Brasília, fim inclusivo, para colunas DateTime (mesma das reservas). */
-const janelaDataHora = (campo: string, desde: string, ate: string) =>
-  encodeURIComponent(`${campo} ge ${new Date(inicioMs(desde)).toISOString()} and ${campo} lt ${new Date(inicioMs(ate) + DIA_MS).toISOString()}`)
 
 /** Telemetria diária do Infleet: `new_data` é DateOnly, então o filtro usa a data pura, sem hora. */
 export const telemetriaPath = (set: string, desde: string, ate: string) =>

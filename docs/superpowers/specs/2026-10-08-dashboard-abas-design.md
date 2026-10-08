@@ -36,6 +36,8 @@ Saem: Trocas, Marketing, MarQPonto, faixa "Frota e pessoas", KPIs repetidos (fat
 
 Todas as consultas seguem a janela de datas da 1ª entrega (reservas: `cargaDesde`; secundários: a mesma janela onde houver campo de data; cadastros inteiros). Metadata conferida em DEV, só leitura, antes de codar (Tarefa 0 do plano). Falha em conjunto secundário → `s/dado` só nos cards dele.
 
+**Carga em dois estágios (melhorias, Lote A, 08/10/2026).** Estágio 1, sempre: reservas, composições, funcionários, veículos, manutenções, multas, ocorrências e as 3 tabelas do Infleet (o que Resumo, Serviços, Frota, Motoristas, Manutenções e Multas usam). Estágio 2, sob demanda: pagantes (aba Financeiro) e as 4 tabelas de despesas (aba Despesas), carregados na primeira vez que a aba abre e guardados; a recarga de 60 s e o "Atualizar" só refazem o estágio 2 da aba ativa (ao voltar a uma aba com estágio 2 de mais de 60 s, ele é atualizado em segundo plano). Conjunto do estágio 2 ainda não carregado fica vazio e listado em `Dados.pendentes`: a aba mostra esqueleto, não s/dado. Manutenções (`cr40f_datamanutencao`), multas (`cr40f_dataehorario`) e ocorrências (`cr40f_dataocorrencia`), todas DateTime na metadata DEV, passam a vir pela janela das reservas (`cargaDesde`..fim do filtro), em vez de inteiras.
+
 ## 3. Layout (Design System)
 
 - `PageHeader` com `Tabs` do DS no slot `children`; barra de filtros abaixo; cada aba é um `role="tabpanel"`.
@@ -71,6 +73,9 @@ Todas as consultas seguem a janela de datas da 1ª entrega (reservas: `cargaDesd
 - **Multas "Resolvidas"**: o legado contava "pago", "resolvid" ou "conclu"; os status reais encerrados são Pago, Descontado e Finalizado (em PROD, Pago e Descontado somam 164 de 260 multas). Passa a contar **pago, descontado, finaliz, resolvid e conclu** (sem acento e sem caixa). Indicada, Recurso e Condutor Notificado seguem em aberto.
 - **Frota**: o status do veículo só tem Ativo, Vendido ou vazio, então "Em manutenção" por palavra-chave do status ficava sempre em 0. Agora: **Total de veículos** exclui os de status Vendido (o apoio mostra "Frota cadastrada: N · M vendidos"); **Disponíveis** são os de status "ativo"/"ativo(a)" (`isActiveVehicle` do legado); **Blindados** contam só a frota (sem vendidos), para o "% da frota" ficar coerente; **Em manutenção** são os veículos distintos da frota com manutenção em andamento (Solicitado, Aprovado ou Programado) pela data da manutenção no período do filtro — s/dado quando a tabela de manutenções não carrega.
 - **Pagantes cobrem o histórico inteiro** (como o `loadPagantes` do legado, sem janela de datas): o bloco Recebimentos e os KPIs Cartão e Atrasados > 5 dias dizem "todo o histórico" no rodapé/apoio, em vez do período do filtro. Pelo mesmo motivo, o apoio do KPI Tempo médio de pagamento e o "Prazo para pagar" do Ciclo financeiro também dizem "todo o histórico".
+
+- **Janela nas manutenções, multas e ocorrências** (Lote A): antes vinham inteiras; agora pela janela das reservas. Todo cálculo dessas tabelas já filtra pelo período (ou pelo mês/ano anterior, dentro de `cargaDesde`), então os números não mudam; registros sem data deixam de vir (já não entravam em nenhum período).
+- **Pagantes e despesas sob demanda** (Lote A): o legado carregava tudo junto; aqui só quando Financeiro ou Despesas abrem (detalhe na §2). Despesas consultam os funcionários de novo no estágio 2 (nome e empresa), para não esperar o estágio 1.
 
 ## 7. Conferência de metadata das abas (DEV, 08/10/2026)
 
