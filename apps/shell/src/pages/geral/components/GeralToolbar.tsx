@@ -40,7 +40,7 @@ export function GeralToolbar({ views, view, onSelectView, query, onQuery, search
         {selectedCount > 0 ? <span className="gr-filters__selected"><span role="status">{selectedCount === 1 ? '1 selecionado' : `${selectedCount} selecionados`}</span>{commands}</span> : null}
       </>}
       end={<>
-        <ColumnsMenu columns={columns} attributes={attributes} prefs={prefs} onChange={onPrefs} />
+        <span className="gr-filters__columns"><ColumnsMenu columns={columns} attributes={attributes} prefs={prefs} onChange={onPrefs} /></span>
         {shortcuts}
       </>}
     />

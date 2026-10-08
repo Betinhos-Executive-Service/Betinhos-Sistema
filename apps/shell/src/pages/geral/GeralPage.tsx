@@ -4,9 +4,12 @@ import { Alert, Button, EmptyState, Menu, Pagination, StatusBadge, ToastProvider
 import { Archive, ArchiveRestore, CalendarDays, ClipboardList, Copy, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Ticket, X } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
+import { useMedia } from '../operacional/useMedia'
 import { hrefFor } from '../../nav/useHashRoute'
 import { createSource } from './data/source'
 import { Cell } from './components/Cell'
+import { GeralCards } from './components/GeralCards'
+import { GeralSheet } from './components/GeralSheet'
 import { GeralTable } from './components/GeralTable'
 import { CopyDialog, MockFormDialog, StateDialog, type StateRequest } from './components/Dialogs'
 import { EscalaFdsDrawer } from './components/EscalaFdsDrawer'
@@ -30,6 +33,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const source = useMemo(() => createSource(host), [host])
   const toast = useToast()
   const geral = useGeral(source)
+  const mobile = useMedia('(max-width: 820px)')
+  const [editId, setEditId] = useState<string | null>(null)
   const { view, rows, page, total, more, loading, query, attributes } = geral
 
   // Preferências de colunas por visão: lidas do armazenamento local ao entrar na visão, gravadas ao aplicar.
@@ -159,6 +164,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     )
   }, [attributes, cells, save, resetCell, source])
 
+  const editRow = editId == null ? undefined : rowOf(editId)
+
   const start = rows.length ? (page - 1) * PAGE_SIZE + 1 : 0
   const end = start + rows.length - 1
   const footer = (
@@ -194,21 +201,40 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       <>
         {geral.attributesError ? <Alert tone="warning">Edição indisponível no momento: {geral.attributesError}</Alert> : null}
         {geral.pageError ? <Alert tone="danger" title="Não foi possível carregar os serviços" action={<Button variant="secondary" onClick={backToAgenda}>Voltar para a Agenda</Button>}>{geral.pageError}</Alert> : null}
-        <GeralTable
-          columns={visibleColumns}
-          attributes={attributes}
-          rows={rows}
-          loading={loading}
-          sort={geral.sort}
-          onSort={geral.setSort}
-          selected={geral.selected}
-          onToggle={geral.toggle}
-          onToggleAll={geral.toggleAll}
-          onOpen={(id) => { void openForm('edit', id) }}
-          renderCell={renderCell}
-          footer={footer}
-          empty={geral.pageError ? null : empty}
-        />
+        {mobile
+          ? (
+            <div className={geral.selected.size > 0 ? 'gr-mobile has-selection' : 'gr-mobile'}>
+              <GeralCards
+                rows={rows}
+                columns={visibleColumns}
+                attributes={attributes}
+                loading={loading}
+                selected={geral.selected}
+                onToggle={geral.toggle}
+                onOpen={(id) => { void openForm('edit', id) }}
+                onEdit={setEditId}
+              />
+              {!loading && rows.length === 0 && !geral.pageError ? <div className="gr-empty">{empty}</div> : null}
+              <div className="gr-footer">{footer}</div>
+            </div>
+          )
+          : (
+            <GeralTable
+              columns={visibleColumns}
+              attributes={attributes}
+              rows={rows}
+              loading={loading}
+              sort={geral.sort}
+              onSort={geral.setSort}
+              selected={geral.selected}
+              onToggle={geral.toggle}
+              onToggleAll={geral.toggleAll}
+              onOpen={(id) => { void openForm('edit', id) }}
+              renderCell={renderCell}
+              footer={footer}
+              empty={geral.pageError ? null : empty}
+            />
+          )}
       </>
     )
   }
@@ -234,13 +260,32 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           attributes={attributes}
           prefs={prefs}
           onPrefs={setPrefs}
-          selectedCount={geral.selected.size}
+          selectedCount={mobile ? 0 : geral.selected.size}
           commands={commands}
           shortcuts={shortcuts}
         />
       }
     >
       {body}
+      {mobile && geral.selected.size > 0 ? (
+        <div className="gr-selbar" role="toolbar" aria-label="Ações dos serviços selecionados">
+          <span role="status" className="gr-selbar__count">{geral.selected.size === 1 ? '1 selecionado' : `${geral.selected.size} selecionados`}</span>
+          {commands}
+        </div>
+      ) : null}
+      {mobile && editRow ? (
+        <GeralSheet
+          row={editRow}
+          columns={visibleColumns}
+          attributes={attributes}
+          cellStatus={(attribute) => cells.get(cellKey(String(editRow[ID_ATTRIBUTE]), attribute)) ?? IDLE}
+          open
+          onClose={() => setEditId(null)}
+          onSave={(column, value) => save(String(editRow[ID_ATTRIBUTE]), column, value)}
+          onReset={(column) => resetCell(String(editRow[ID_ATTRIBUTE]), column.attribute)}
+          search={(column, text) => source.search(column.attribute, text)}
+        />
+      ) : null}
       <CopyDialog open={copy.open} loading={copy.loading} text={copy.text} onClose={() => setCopy((c) => ({ ...c, open: false }))} onCopied={() => { setCopy((c) => ({ ...c, open: false })); toast({ tone: 'success', message: 'Serviços copiados.' }) }} />
       <StateDialog request={stateRequest} busy={stateBusy} onClose={() => setStateRequest(null)} onConfirm={() => { void confirmState() }} />
       <MockFormDialog open={mockForm} onClose={() => setMockForm(false)} />
