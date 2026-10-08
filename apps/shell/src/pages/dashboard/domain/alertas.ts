@@ -31,14 +31,25 @@ export function alertasOperacao(rv: Reserva[], s: Secundarios, nowMs: number, sc
   ]
 }
 
+const jaSaiu = (r: Reserva, nowMs: number) => Number.isFinite(r.saidaMs) && r.saidaMs <= nowMs
+/** Regras dos alertas de qualidade (também listadas no drill-down): mesmas datas de corte do legado. */
+export const QUALIDADE = {
+  semVeiculo: (r: Reserva, nowMs: number) => !stL(r.statusLabel).includes('cancel') && Boolean(r.motoristaId) && !r.veiculoId && jaSaiu(r, nowMs) && r.saidaMs >= CORTE_SEM_VEICULO,
+  semTipoVeiculo: (r: Reserva) => !r.tipoVeiculoRaw,
+  semMotorista: (r: Reserva, nowMs: number) =>
+    !r.motoristaId && jaSaiu(r, nowMs) && r.saidaMs >= CORTE_SEM_MOTORISTA && r.status != null && STATUS_SEM_MOTORISTA.has(r.status) && r.categoriaItem === CAT_ITEM_SERVICO,
+  semCliente: (r: Reserva) => r.saidaRaw.slice(0, 10) >= CORTE_SEM_CLIENTE && r.cliente === SEM_CLIENTE,
+} as const
+export type AlertaQualidade = keyof typeof QUALIDADE
+
 export function alertasQualidade(rv: Reserva[], nowMs: number): AlertaItem[] {
   const share = (n: number) => (rv.length ? `${dec((n / rv.length) * 100, 1)}% dos serviços` : 's/dado')
   const item = (id: string, rotulo: string, n: number): AlertaItem => ({ id, valor: int(n), rotulo, status: share(n), tom: n ? 'warn' : 'ok' })
-  const ok = (r: Reserva) => Number.isFinite(r.saidaMs) && r.saidaMs <= nowMs
-  const semVeiculo = rv.filter((r) => !stL(r.statusLabel).includes('cancel') && Boolean(r.motoristaId) && !r.veiculoId && ok(r) && r.saidaMs >= CORTE_SEM_VEICULO).length
-  const semTipo = rv.filter((r) => !r.tipoVeiculoRaw).length
-  const semMotorista = rv.filter((r) => !r.motoristaId && ok(r) && r.saidaMs >= CORTE_SEM_MOTORISTA && r.status != null && STATUS_SEM_MOTORISTA.has(r.status) && r.categoriaItem === CAT_ITEM_SERVICO).length
-  const semCliente = rv.filter((r) => r.saidaRaw.slice(0, 10) >= CORTE_SEM_CLIENTE && r.cliente === SEM_CLIENTE).length
+  const conta = (id: AlertaQualidade) => rv.filter((r) => QUALIDADE[id](r, nowMs)).length
+  const semVeiculo = conta('semVeiculo')
+  const semTipo = conta('semTipoVeiculo')
+  const semMotorista = conta('semMotorista')
+  const semCliente = conta('semCliente')
   return [
     item('semVeiculo', 'Sem veículo', semVeiculo),
     item('semTipoVeiculo', 'Sem tipo de veículo', semTipo),

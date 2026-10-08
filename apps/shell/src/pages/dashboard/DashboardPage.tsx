@@ -22,6 +22,7 @@ import { MotoristasTab, type FrotaMotorista } from './components/abas/Motoristas
 import { ManutencoesTab } from './components/abas/ManutencoesTab'
 import { MultasTab } from './components/abas/MultasTab'
 import { DashboardToolbar } from './components/DashboardToolbar'
+import { DetalheProvider } from './components/DetalheDrawer'
 import './dashboard.css'
 
 const PAINEL_ID = 'dash-painel'
@@ -133,7 +134,10 @@ export function DashboardPage({ host }: { host: Host }) {
         ) : null}
         {aviso && db.dados ? <p className="dash-aviso-filtros"><Info size={14} aria-hidden="true" />{aviso}</p> : null}
 
-        {db.dados || carregandoPrimeira ? conteudo[aba]() : null}
+        {/* Drill-down: um Drawer para a página; links "Abrir no Dataverse" só no modo Dataverse. */}
+        <DetalheProvider clientUrl={host.mode === 'dataverse' ? host.clientUrl : null}>
+          {db.dados || carregandoPrimeira ? conteudo[aba]() : null}
+        </DetalheProvider>
       </div>
     </PageLayout>
   )

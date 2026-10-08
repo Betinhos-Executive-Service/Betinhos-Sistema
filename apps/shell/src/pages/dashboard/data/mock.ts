@@ -250,10 +250,13 @@ export function criarDadosMock(now: Date): Dados {
         categoriaItem: CAT_ITEM_SERVICO, categoriaItemLabel: 'Serviço',
         tipoVeiculoRaw: rand() < 0.95 ? '1' : '', tipoVeiculo: pick(TIPOS),
         veiculoId: vei?.id ?? '', motoristaId: mot?.id ?? '', motoristaKey: mot?.id ?? `nome:${normL(motorista)}`, motorista,
-        cliente: pick(CLIENTES), cpId: temCp ? `mock-cp-${n}` : '', valor: temCp ? Math.round(300 + rand() * 2200) : 0,
-        cpPendente: temCp && !concluida, cpConcluida: concluida, opId: concluida && rand() < 0.7 ? `mock-op-${n}` : '',
+        cliente: pick(CLIENTES), cpId: temCp ? `mock-cp-${n}` : '', cpCodigo: temCp ? `CP-${String(n).padStart(5, '0')}` : '', valor: temCp ? Math.round(300 + rand() * 2200) : 0,
+        cpPendente: temCp && !concluida, cpConcluida: concluida, opId: concluida && rand() < 0.7 ? `mock-op-${n}` : '', opCodigo: '',
         tipoServico, finalizadoRaw: status.label === 'Concluído' && finalizadoMs <= now.getTime() ? new Date(finalizadoMs).toISOString() : '',
       })
+      // Código da OP sem consumir o gerador: a sequência das reservas não muda.
+      const ultima = reservas[reservas.length - 1]
+      if (ultima.opId) ultima.opCodigo = `OP-${String(n).padStart(5, '0')}`
     }
   }
   const dias = (qtd: number) => Array.from({ length: qtd }, (_, i) => dayKey(new Date(now.getTime() - i * 9 * DIA).toISOString()))
@@ -267,13 +270,13 @@ export function criarDadosMock(now: Date): Dados {
       criadoDia: dayKey(new Date(criadoMs).toISOString()), criadoMs,
     }
   })
-  const multas: Multa[] = dias(25).map((dia) => {
+  const multas: Multa[] = dias(25).map((dia, i) => {
     const pendente = rand() < 0.3
     const status = pendente ? { code: MULTA_NOTIFICAR, label: 'Notificar o Condutor' } : pickExtra(STATUS_MULTA_DEMAIS)
     const m = pickExtra(MOTORISTAS)
     const infracao = pickExtra(INFRACOES)
     return {
-      dia, status: status.code, statusLabel: status.label, motoristaId: m.id, motorista: m.apelido, veiculoId: pickExtra(VEICULOS).id,
+      id: `mock-multa-${i + 1}`, dia, status: status.code, statusLabel: status.label, motoristaId: m.id, motorista: m.apelido, veiculoId: pickExtra(VEICULOS).id,
       infracaoCodigo: infracao.codigo, infracaoDescricao: infracao.descricao,
     }
   })

@@ -20,7 +20,7 @@ export function mapCsv2026(row: Csv2026Row, index: number): Reserva {
     tipoVeiculoRaw: veiculoTipo, tipoVeiculo: veiculoTipo || '—',
     veiculoId: veiNome === '—' ? '' : `legacy:${normL(veiNome)}`,
     motoristaId: '', motoristaKey: `nome:${normL(mot)}`, motorista: mot, cliente: cli,
-    cpId: '', valor, cpPendente: false, cpConcluida: false, opId: '',
+    cpId: '', cpCodigo: '', valor, cpPendente: false, cpConcluida: false, opId: '', opCodigo: '',
     tipoServico: tipo || '—', finalizadoRaw: '',
   }
 }

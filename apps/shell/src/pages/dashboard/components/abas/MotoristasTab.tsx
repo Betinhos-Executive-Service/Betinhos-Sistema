@@ -3,7 +3,10 @@ import { Button, SegmentedControl, StatusBadge, Table, type TableColumn } from '
 import { useMedia } from '../../../operacional/useMedia'
 import { LinhaChart } from '../../charts/Charts'
 import { calcularMotoristas, type CnhVencendo, type LinhaRankingMotorista, type LinhaScoreMotorista, type Motoristas } from '../../domain/abas/motoristas'
+import { detalheCnh, detalheServicosMotorista } from '../../domain/detalhes'
 import { brl, brlS, dec, int } from '../../domain/format'
+import type { Reserva } from '../../domain/types'
+import { useDetalhe } from '../DetalheDrawer'
 import type { NotaMes, RankingMes } from '../../domain/score'
 import { AnaliseCard } from '../AnaliseCard'
 import { AbaCarregando } from '../Carregando'
@@ -44,12 +47,14 @@ function MotoristasAba({ ctx, dados, periodo, frota, onFrota }: DadosAba & Props
   const mo = useMemo(() => calcularMotoristas(ctx, dados), [ctx, dados])
   const semInfleet = mo.kpis.score == null
   const semFuncionarios = mo.kpis.total == null
+  const abrir = useDetalhe()
+  const verCnh = abrir && mo.kpis.cnhAtencao ? { texto: 'Ver motoristas', onAbrir: () => abrir(detalheCnh(dados.funcionarios, ctx.now)) } : undefined
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={3}>
       <KpiCard rotulo={KPIS[0]} tom="brand" valor={mo.kpis.total == null ? null : int(mo.kpis.total)} />
       <KpiCard
         rotulo={KPIS[1]} tom="warning" valor={mo.kpis.cnhAtencao == null ? null : int(mo.kpis.cnhAtencao)}
-        apoio={mo.kpis.cnhAtencao ? [{ rotulo: 'Validade', texto: 'vencida ou em até 90 dias', atencao: true }] : []}
+        apoio={mo.kpis.cnhAtencao ? [{ rotulo: 'Validade', texto: 'vencida ou em até 90 dias', atencao: true }] : []} acao={verCnh}
       />
       <KpiCard
         rotulo={KPIS[2]} tom="success" valor={mo.kpis.score == null ? null : nota(mo.kpis.score.media)}
@@ -59,7 +64,7 @@ function MotoristasAba({ ctx, dados, periodo, frota, onFrota }: DadosAba & Props
     <div className="dash-grade">
       {semFuncionarios
         ? <SemDadoBloco largo titulo={BLOCOS[0]} periodo={periodo} unidade="serviços e R$" motivo={SEM_FUNCIONARIOS} />
-        : <RankingCard mo={mo} periodo={periodo} frota={frota} onFrota={onFrota} />}
+        : <RankingCard mo={mo} rv={ctx.rv} periodo={periodo} frota={frota} onFrota={onFrota} />}
       {mo.kpis.cnhAtencao == null
         ? <SemDadoBloco titulo={BLOCOS[1]} periodo={periodo} unidade="validade da CNH" motivo={SEM_FUNCIONARIOS} />
         : <CnhCard itens={mo.cnhVencendo} periodo={periodo} />}
@@ -71,8 +76,11 @@ function MotoristasAba({ ctx, dados, periodo, frota, onFrota }: DadosAba & Props
 }
 
 /** Ranking de motoristas: serviços, faturamento, ticket, participação e CNH; filtro próprio/terceiro e "Ver meses" por linha. */
-function RankingCard({ mo, periodo, frota, onFrota }: { mo: Motoristas; periodo: string } & PropsFrota) {
+function RankingCard({ mo, rv, periodo, frota, onFrota }: { mo: Motoristas; rv: Reserva[]; periodo: string } & PropsFrota) {
   const mobile = useMedia(MEDIA_MOBILE)
+  const abrir = useDetalhe()
+  /** Drill-down da linha: os serviços do motorista no recorte (só com serviço). */
+  const verServicos = (l: LinhaRankingMotorista) => (abrir && l.servicos ? () => abrir(detalheServicosMotorista(rv, l)) : undefined)
   const uid = useId()
   const filtro = mo.veiculosIndisponiveis ? 'todos' : frota
   const linhas = filtro === 'todos' ? mo.ranking : mo.ranking.filter((l) => l.propria === (filtro === 'proprios'))
@@ -85,15 +93,25 @@ function RankingCard({ mo, periodo, frota, onFrota }: { mo: Motoristas; periodo:
   const colunas: TableColumn<LinhaRankingMotorista>[] = mobile
     ? [
       { key: 'n', header: 'Motorista', cell: (l) => l.nome },
-      resto('Ranking', (l) => (
-        <Expansivel
-          resumo={juntar(`${int(l.servicos)} serviços (${porMes(l)}/mês)`, `Faturamento ${brlS(l.faturamento)}`, `Ticket ${brl(l.ticket)}`, `Participação ${pct(l.pct)}`, `CNH ${dataBR(l.cnhDia)}`)}
-          itens={mesesTexto(l)} rotulos={VER_MESES} aberta={abertas.aberta(l.key)} onAlternar={() => abertas.alternar(l.key)}
-        />
-      )),
+      resto('Ranking', (l) => {
+        const ver = verServicos(l)
+        return <>
+          <Expansivel
+            resumo={juntar(`${int(l.servicos)} serviços (${porMes(l)}/mês)`, `Faturamento ${brlS(l.faturamento)}`, `Ticket ${brl(l.ticket)}`, `Participação ${pct(l.pct)}`, `CNH ${dataBR(l.cnhDia)}`)}
+            itens={mesesTexto(l)} rotulos={VER_MESES} aberta={abertas.aberta(l.key)} onAlternar={() => abertas.alternar(l.key)}
+          />
+          {ver ? <Button className="dash-expansivel__botao" variant="ghost" size="touch" onClick={ver}>Ver serviços{' '}<span className="dash-sr">de {l.nome}</span></Button> : null}
+        </>
+      }),
     ]
     : [
-      { key: 'n', header: 'Motorista', width: 'minmax(180px, 1.6fr)', cell: (l) => <Nome texto={l.nome} meta={[l.funcao, frotaDe(l.propria)].filter((t) => t && t !== '—').join(' · ') || undefined} /> },
+      {
+        key: 'n', header: 'Motorista', width: 'minmax(180px, 1.6fr)', cell: (l) => {
+          const nome = <Nome texto={l.nome} meta={[l.funcao, frotaDe(l.propria)].filter((t) => t && t !== '—').join(' · ') || undefined} />
+          const ver = verServicos(l)
+          return ver ? <button type="button" className="dash-link-linha" onClick={ver} title={`Ver serviços de ${l.nome}`}>{nome}<span className="dash-sr">: ver serviços</span></button> : nome
+        },
+      },
       { key: 's', header: 'Serviços', align: 'end', width: 'minmax(84px, .8fr)', cell: (l) => <Duplo valor={int(l.servicos)} apoio={`${porMes(l)}/mês`} /> },
       { key: 'f', header: 'Faturamento', align: 'end', cell: (l) => forte(brl(l.faturamento)) },
       { key: 't', header: 'Ticket', align: 'end', hideBelow: 'compact', cell: (l) => brl(l.ticket) },
