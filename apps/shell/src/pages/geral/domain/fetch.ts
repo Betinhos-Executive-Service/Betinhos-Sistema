@@ -20,6 +20,15 @@ export function buildFetch(fetchxml: string, { page, pageSize, cookie, sort, que
   if (cookie) root.setAttribute('paging-cookie', cookie)
   root.setAttribute('returntotalrecordcount', 'true')
 
+  // Os comandos Desativar/Ativar dependem do estado da linha: toda visão precisa trazê-lo.
+  // `all-attributes` já inclui o estado; misturar os dois é inválido.
+  const has = Array.from(entity.children).some((c) => c.tagName === 'all-attributes' || (c.tagName === 'attribute' && c.getAttribute('name') === 'statecode'))
+  if (!has) {
+    const attribute = doc.createElement('attribute')
+    attribute.setAttribute('name', 'statecode')
+    entity.insertBefore(attribute, entity.firstChild)
+  }
+
   if (sort) {
     for (const order of Array.from(entity.children).filter((c) => c.tagName === 'order')) order.remove()
     const order = doc.createElement('order')
