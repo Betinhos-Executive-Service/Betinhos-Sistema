@@ -94,6 +94,8 @@ export function Cell({ row, column, info, status, onSave, onReset, search, edita
   // Último valor digitado ou escolhido, para "Tentar de novo" reabrir a edição de onde parou.
   const retryRef = useRef<{ draft: string; pick: Pick | null }>({ draft: '', pick: null })
   const keepRef = useRef<Pick | null>(null)
+  // Boolean não tem modo de edição: guarda o último valor tentado para o "Tentar de novo" regravar.
+  const lastBoolean = useRef<boolean | null>(null)
   const timerRef = useRef(0)
   const tokenRef = useRef(0)
 
@@ -208,6 +210,12 @@ export function Cell({ row, column, info, status, onSave, onReset, search, edita
     }
   }
 
+  const retry = () => {
+    if (kind !== 'boolean') { begin(undefined, true); return }
+    onReset()
+    submit(lastBoolean.current ?? raw !== true)
+  }
+
   const cancel = () => { finish(); restoreFocus() }
 
   const chosen = (value: string | null) => {
@@ -306,7 +314,7 @@ export function Cell({ row, column, info, status, onSave, onReset, search, edita
         options={options}
         value={pick?.value ?? null}
         searchable={kind === 'lookup'}
-        clearable
+        clearable={kind === 'lookup'}
         loading={searching}
         onSearchChange={kind === 'lookup' ? onSearch : undefined}
         onChange={chosen}
@@ -326,7 +334,7 @@ export function Cell({ row, column, info, status, onSave, onReset, search, edita
         aria-label={label}
         checked={raw === true}
         disabled={!editable || status.kind === 'saving'}
-        onChange={(event) => submit(event.target.checked)}
+        onChange={(event) => { lastBoolean.current = event.target.checked; submit(event.target.checked) }}
       />
     )
   } else if (badge) value = <StatusBadge tone={statusTone(column.attribute, rawStatus)}>{text}</StatusBadge>
@@ -358,7 +366,7 @@ export function Cell({ row, column, info, status, onSave, onReset, search, edita
           <span id={describedBy} className="gr-sr">Erro: {message}</span>
         </>
       ) : null}
-      {!editing && status.kind === 'error' ? <Button variant="ghost" size="compact" onClick={() => begin(undefined, true)}>Tentar de novo</Button> : null}
+      {!editing && status.kind === 'error' ? <Button variant="ghost" size="compact" onClick={retry}>Tentar de novo</Button> : null}
       {kind === 'readonly' && editable && !message ? <span className="gr-cell__mark gr-cell__lock" role="img" aria-label="Somente leitura"><Lock size={12} aria-hidden="true" /></span> : null}
     </div>
   )

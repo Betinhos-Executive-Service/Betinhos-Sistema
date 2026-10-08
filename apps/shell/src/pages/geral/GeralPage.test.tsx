@@ -206,4 +206,17 @@ describe('Geral', () => {
     expect(await within(cell).findByLabelText('Salvo')).toBeTruthy()
     expect(within(cell).getByText('Bruno Dias')).toBeTruthy()
   })
+
+  it('tentar de novo regrava o Sim/Não que falhou', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    const opener = await screen.findByRole('button', { name: 'Abrir serviço OS-1013 no Formulário Geral' })
+    const cell = await cellOf(opener.closest('[role="row"]') as HTMLElement, 'boolean')
+    const before = (within(cell).getByRole('switch') as HTMLInputElement).checked
+    fireEvent.click(within(cell).getByRole('switch'))
+    fireEvent.click(await within(cell).findByRole('button', { name: 'Tentar de novo' }))
+    // Regravar volta ao estado "gravando" e, como a OS-1013 segue bloqueada, termina no erro de novo.
+    expect(within(cell).getByLabelText('Gravando')).toBeTruthy()
+    expect(await within(cell).findByText('Sem permissão para alterar este serviço.')).toBeTruthy()
+    expect((within(cell).getByRole('switch') as HTMLInputElement).checked).toBe(before)
+  })
 })
