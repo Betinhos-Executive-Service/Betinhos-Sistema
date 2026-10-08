@@ -5,12 +5,11 @@ import { AlertList } from './AlertList'
 import { AnaliseCard } from './AnaliseCard'
 import { tomStatus } from './Celulas'
 import { DashboardToolbar } from './DashboardToolbar'
-import { Analises } from './Analises'
 import { Emergenciais } from './Emergenciais'
 import { FrotaPessoas } from './FrotaPessoas'
 import { ApoioChip, ApoioTexto, KpiChip } from './KpiChip'
 import { KPI_PLACEHOLDER, KpiGrid } from './KpiGrid'
-import { ProducaoPropriaTerceira, TopMotoristas } from './ProducaoPropriaTerceira'
+import { ResumoSecoes } from './ResumoSecoes'
 import { calcularResumo } from '../domain/resumo'
 import { reserva } from '../domain/test-utils'
 import type { Dados, Filtros } from '../domain/types'
@@ -34,16 +33,7 @@ const TITULOS = [
 ]
 const resumoDe = (dados: Dados, p: Partial<Filtros> = {}) =>
   calcularResumo(dados, { atalho: 'esteMes', inicio: '2026-10-01', fim: '2026-10-15', status: [], clientes: [], motoristas: [], tipos: [], ...p }, new Date('2026-10-15T15:00:00Z'))
-function renderResumo(dados: Dados) {
-  const r = resumoDe(dados)
-  return render(<>
-    <ProducaoPropriaTerceira dados={r.producao} periodo={PERIODO} />
-    <Emergenciais dados={r.emergenciais} periodo={PERIODO} />
-    <TopMotoristas titulo="Top 5 motoristas próprios" rows={r.producao.topPropria} periodo={PERIODO} />
-    <TopMotoristas titulo="Top 5 motoristas terceirizados" rows={r.producao.topTerceirizada} periodo={PERIODO} />
-    <Analises resumo={r} periodo={PERIODO} />
-  </>)
-}
+const renderResumo = (dados: Dados) => render(<ResumoSecoes resumo={resumoDe(dados)} periodo={PERIODO} />)
 const VAZIO: Dados = { reservas: [], manutencoes: [], multas: [], ocorrencias: [], funcionarios: [], veiculos: [], viagens: [], eventos: [], telemetria: [], indisponiveis: [] }
 const UM_SERVICO: Dados = {
   reservas: [reserva({ saidaRaw: '2026-10-02T12:00:00Z', criadoRaw: '2026-10-02T08:00:00Z', valor: 500, cliente: 'Tenaris', motoristaId: 'm', motoristaKey: 'm', motorista: 'Ana', veiculoId: 'v1' })],
@@ -265,7 +255,7 @@ describe('componentes do Dashboard', () => {
     beforeEach(() => telaCelular(true))
 
     it('faturamento por cliente: a linha mostra só o total e os meses abrem sob demanda, na mesma célula', () => {
-      semAvisoDeGrafico(() => render(<Analises resumo={resumoDe(DOIS_CLIENTES)} periodo={PERIODO} />))
+      semAvisoDeGrafico(() => render(<ResumoSecoes resumo={resumoDe(DOIS_CLIENTES)} periodo={PERIODO} />))
       const card = screen.getByRole('region', { name: 'Faturamento por cliente' })
       const tenaris = linhaDe(card, 'Tenaris')
       expect(tenaris.textContent).toMatch(/Total R\$\s1,0k · Participação 76,9%/)
@@ -288,7 +278,7 @@ describe('componentes do Dashboard', () => {
     })
 
     it('serviços por motorista: a linha mostra o total e a participação, e os meses abrem sob demanda', () => {
-      semAvisoDeGrafico(() => render(<Analises resumo={resumoDe(DOIS_CLIENTES)} periodo={PERIODO} />))
+      semAvisoDeGrafico(() => render(<ResumoSecoes resumo={resumoDe(DOIS_CLIENTES)} periodo={PERIODO} />))
       const card = screen.getByRole('region', { name: 'Serviços por motorista' })
       const ana = linhaDe(card, 'Ana')
       expect(ana.textContent).toMatch(/Total 2 · 66,7%/)
@@ -325,7 +315,7 @@ describe('componentes do Dashboard', () => {
     })
 
     it('ao mudar o filtro, a linha aberta continua aberta só se a chave ainda existir', () => {
-      const painel = (p: Partial<Filtros> = {}) => <Analises resumo={resumoDe(DOIS_CLIENTES, p)} periodo={PERIODO} />
+      const painel = (p: Partial<Filtros> = {}) => <ResumoSecoes resumo={resumoDe(DOIS_CLIENTES, p)} periodo={PERIODO} />
       const { rerender } = semAvisoDeGrafico(() => render(painel()))
       const card = () => screen.getByRole('region', { name: 'Faturamento por cliente' })
       fireEvent.click(within(linhaDe(card(), 'Tenaris')).getByRole('button', { name: 'Ver meses' }))
