@@ -1,21 +1,31 @@
 import type { DataverseClient } from './client'
 import { chunk, odataString } from './format'
 
-export type EntityInfo = { logicalName: string; entitySetName: string; label: string }
+export type EntityInfo = { logicalName: string; entitySetName: string; label: string; primaryName: string }
 
 type EntityDefinition = {
   LogicalName: string
   EntitySetName: string
+  PrimaryNameAttribute?: string
   DisplayCollectionName?: { UserLocalizedLabel?: { Label?: string } | null }
 }
 
 export type ChoiceOption = { value: number; label: string }
 
+export type AttributeMeta = { logicalName: string; type: string; label: string; updatable: boolean; targets: string[] }
+
+type AttributeDefinition = {
+  LogicalName: string
+  AttributeType: string
+  IsValidForUpdate?: boolean
+  DisplayName?: { UserLocalizedLabel?: { Label?: string } | null }
+}
+
 type PicklistDefinition = {
   OptionSet?: { Options: { Value: number; Label?: { UserLocalizedLabel?: { Label?: string } | null } }[] }
 }
 
-const SELECT = '$select=LogicalName,EntitySetName,DisplayCollectionName'
+const SELECT = '$select=LogicalName,EntitySetName,PrimaryNameAttribute,DisplayCollectionName'
 
 /** Nomes reais (entity set e rótulo plural) lidos da metadata, com cache por cliente. */
 export function createMetadata(client: DataverseClient) {
@@ -26,6 +36,7 @@ export function createMetadata(client: DataverseClient) {
       logicalName: definition.LogicalName,
       entitySetName: definition.EntitySetName,
       label: definition.DisplayCollectionName?.UserLocalizedLabel?.Label || definition.LogicalName,
+      primaryName: definition.PrimaryNameAttribute ?? '',
     }
   }
 
@@ -73,5 +84,31 @@ export function createMetadata(client: DataverseClient) {
     return options
   }
 
-  return { entity, entities, choices }
+  const attributeCache = new Map<string, Promise<AttributeMeta[]>>()
+
+  /** Tipo, rótulo e alvos de lookup de todas as colunas de uma tabela, em duas chamadas, com cache. */
+  function attributes(entityName: string) {
+    let list = attributeCache.get(entityName)
+    if (!list) {
+      const base = `EntityDefinitions(LogicalName='${odataString(entityName)}')/Attributes`
+      list = Promise.all([
+        client.request<{ value: AttributeDefinition[] }>(`${base}?$select=LogicalName,AttributeType,DisplayName,IsValidForUpdate`),
+        client.request<{ value: { LogicalName: string; Targets?: string[] }[] }>(`${base}/Microsoft.Dynamics.CRM.LookupAttributeMetadata?$select=LogicalName,Targets`),
+      ]).then(([all, lookups]) => {
+        const targets = new Map(lookups.value.map((l) => [l.LogicalName, l.Targets ?? []]))
+        return all.value.map((a) => ({
+          logicalName: a.LogicalName,
+          type: a.AttributeType,
+          label: a.DisplayName?.UserLocalizedLabel?.Label || a.LogicalName,
+          updatable: a.IsValidForUpdate === true,
+          targets: targets.get(a.LogicalName) ?? [],
+        }))
+      })
+      list.catch(() => attributeCache.delete(entityName))
+      attributeCache.set(entityName, list)
+    }
+    return list
+  }
+
+  return { entity, entities, choices, attributes }
 }
