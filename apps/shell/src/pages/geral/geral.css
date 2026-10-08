@@ -2,7 +2,7 @@
 .gr-meta { display: inline-flex; align-items: center; gap: var(--bt-space-2); font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); font-variant-numeric: tabular-nums; }
 .gr-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .gr-filters__view { flex: 0 1 200px; min-width: 160px; }
-.gr-filters__search { flex: 1 1 220px; min-width: 140px; max-width: 420px; }
+.gr-filters__search { flex: 1 1 220px; min-width: 140px; max-width: 520px; }
 .gr-filters__selected { display: inline-flex; align-items: center; flex: 0 0 auto; }
 /* Numa linha de 40 px, sem quebrar, quando cabe: com a navegação no trilho a partir de 1200 px; com ela aberta (238 px a mais) a partir de 1360 px.
    Abaixo disso (e no celular) a barra quebra em vez de cortar comandos. */
@@ -41,14 +41,14 @@
 .gr-grid { overflow: auto; }
 /* Densidade "tabela densa" aprovada em 08/10/2026; token table-row-dense pendente no DS (Módulo Qualidade). */
 .gr-table { --gr-row-height: 44px; }
-.gr-table .bt-table__head, .gr-table .bt-table__row { grid-template-columns: var(--gr-columns); gap: 0; padding: 0; min-width: max-content; }
+.gr-table .bt-table__head, .gr-table .bt-table__row { grid-template-columns: var(--gr-columns); gap: 0; padding: 0; width: 100%; min-width: var(--gr-min-width, max-content); }
 .gr-table .bt-table__head { display: grid; position: sticky; top: 0; z-index: 2; }
 .gr-table .bt-table__row { min-height: var(--gr-row-height); }
 .gr-table .bt-table__row.is-selected { background-color: var(--bt-color-action-soft); }
-.gr-table .bt-table__cell { padding: 0 var(--bt-space-2); min-height: calc(var(--gr-row-height) - var(--bt-border-width-default)); border-right: var(--bt-border-width-default) solid var(--bt-color-border); }
+.gr-table .bt-table__cell { padding: 0 var(--bt-space-3); min-height: calc(var(--gr-row-height) - var(--bt-border-width-default)); border-right: var(--bt-border-width-default) solid var(--bt-color-border); }
 .gr-table .bt-table__head, .gr-table .bt-table__head .bt-table__cell { min-height: 32px; }
 .gr-cell--select { position: sticky; left: 0; z-index: 1; justify-content: center; background-color: var(--bt-color-surface); }
-.gr-cell--first { position: sticky; left: 36px; z-index: 1; background-color: var(--bt-color-surface); box-shadow: 1px 0 0 var(--bt-color-border); }
+.gr-cell--first { position: sticky; left: 40px; z-index: 1; background-color: var(--bt-color-surface); box-shadow: 1px 0 0 var(--bt-color-border); }
 .gr-table .bt-table__row.is-selected .gr-cell--select, .gr-table .bt-table__row.is-selected .gr-cell--first { background-color: var(--bt-color-action-soft); }
 .gr-table .bt-table__head .gr-cell--select, .gr-table .bt-table__head .gr-cell--first { background-color: var(--bt-color-surface-neutral); }
 .gr-table .gr-cell--select { padding: 0; }
@@ -91,7 +91,9 @@
 
 /* Desktop: a grade ocupa a altura da janela e rola por dentro; a página não rola. O celular segue com a rolagem normal (cards). */
 @media (min-width: 821px) {
-  .page.gr-page { height: 100dvh; display: flex; flex-direction: column; padding-top: var(--bt-space-3); padding-bottom: var(--bt-space-3); overflow-x: hidden; overflow-y: auto; }
+  .page.gr-page { max-width: none; height: 100dvh; display: flex; flex-direction: column; padding-top: var(--bt-space-3); padding-bottom: var(--bt-space-3); overflow-x: hidden; overflow-y: auto; }
+  .gr-page .bt-page-toolbar__start, .gr-page .bt-page-toolbar__end { gap: var(--bt-space-3); }
+  .gr-page .bt-table__footer { padding: 0 var(--bt-space-4); }
   .gr-page .page__header { margin-bottom: var(--bt-space-2); }
   .gr-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   /* Em janela muito baixa a grade não some: o piso de 240 px faz a página rolar (overflow-y) em vez de espremê-la. */
