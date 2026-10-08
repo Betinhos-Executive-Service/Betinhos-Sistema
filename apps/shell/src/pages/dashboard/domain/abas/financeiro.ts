@@ -1,9 +1,9 @@
-import { topByShare, ticketMensal, type Delta, type TicketMensal } from '../analises'
-import { agrupar, mesesComDados, soma } from '../base'
+import { mesesComDelta, mesesOuAno, topByShare, ticketMensal, type MesComDelta, type TicketMensal } from '../analises'
+import { agrupar, soma } from '../base'
 import { SEM_CLIENTE } from '../codes'
 import { normL } from '../format'
 import { comparacao, recebimentoStats, ticketStats, type Contexto } from '../kpis'
-import { DIA_MS, hojeBR, mesRotulo, mesesDoAno, parseDia } from '../periodo'
+import { DIA_MS, mesRotulo } from '../periodo'
 import type { Pagante, Reserva } from '../types'
 
 /** Status "Pago" de `cr40f_pagantes` (`isReceivedPayment` do legado, L10465). */
@@ -61,7 +61,7 @@ export type LinhaClienteFin = {
   pct: number
   /** Participação nos serviços (coluna de quantidade do `tbFat`). */
   pctServicos: number
-  meses: { mes: string; valor: number; delta: Delta }[]
+  meses: MesComDelta[]
 }
 export type Financeiro = {
   kpis: KpisFinanceiro
@@ -120,19 +120,12 @@ function clientes(rv: Reserva[], meses: string[]): LinhaClienteFin[] {
   const fat = soma(rv)
   return [...agrupar(rv, (r) => r.cliente)]
     .map(([cliente, rows]): LinhaClienteFin => {
-      const porMes = agrupar(rows, (r) => r.mes)
       const faturamento = soma(rows)
       return {
         cliente, servicos: rows.length, faturamento, ticket: ticketStats(rows).ticket,
         pct: fat > 0 ? (faturamento / fat) * 100 : 0,
         pctServicos: rv.length ? (rows.length / rv.length) * 100 : 0,
-        meses: meses.map((mes, i) => {
-          const valor = soma(porMes.get(mes) ?? [])
-          const anterior = i > 0 ? soma(porMes.get(meses[i - 1]) ?? []) : null
-          // Mesma regra do Faturamento por cliente do Resumo (`fatCliDelta`).
-          const delta: Delta = anterior === null || anterior === 0 ? (anterior === 0 && valor > 0 ? { tipo: 'novo' } : { tipo: 'nada' }) : { tipo: 'pct', valor: ((valor - anterior) / anterior) * 100 }
-          return { mes, valor, delta }
-        }),
+        meses: mesesComDelta(rows, meses),
       }
     })
     .sort((a, b) => Number(a.cliente === SEM_CLIENTE) - Number(b.cliente === SEM_CLIENTE) || b.faturamento - a.faturamento)
@@ -146,8 +139,7 @@ export function calcularFinanceiro(ctx: Contexto, pagantes: Pagante[], indisponi
   const recebidos = pags.filter(recebido)
   const ciclo = cicloFinanceiro(rv, pags, nowMs)
   const atrasados = pags.filter((p) => { const t = Date.parse(p.criadoRaw || ''); return !recebido(p) && Number.isFinite(t) && nowMs - t > LIMITE_ATRASO_MS })
-  const comDados = mesesComDados(rv)
-  const meses = comDados.length ? comDados : mesesDoAno(parseDia(hojeBR(now)).y)
+  const meses = mesesOuAno(rv, now)
   const statusRows = rv.filter((r) => r.saidaRaw.slice(0, 10) >= CORTE_STATUS_FATURAMENTO)
   return {
     kpis: {

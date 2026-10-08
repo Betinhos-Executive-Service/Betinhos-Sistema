@@ -20,7 +20,7 @@ export function topByShare<T>(rows: T[], total: number, valor: (r: T) => number,
 }
 
 /** Meses do recorte; sem serviço, os 12 do ano corrente. */
-const mesesOuAno = (rv: Reserva[], now: Date) => { const m = mesesComDados(rv); return m.length ? m : mesesDoAno(anoAtual(now)) }
+export const mesesOuAno = (rv: Reserva[], now: Date) => { const m = mesesComDados(rv); return m.length ? m : mesesDoAno(anoAtual(now)) }
 
 export type TotalProduzido = Destaque & { anos: [number, number, number]; pontos: { rotulo: string; valores: (number | null)[] }[] }
 
@@ -98,6 +98,21 @@ export function metaRealizado(ctx: Contexto, cmp: Comparacao): MetaRealizado {
 }
 
 export type Delta = { tipo: 'novo' } | { tipo: 'nada' } | { tipo: 'pct'; valor: number }
+export type MesComDelta = { mes: string; valor: number; delta: Delta }
+
+/**
+ * Faturamento de `rows` em cada mês de `meses` e a variação contra o mês anterior da lista (`fatCliDelta` do legado):
+ * o primeiro mês não tem delta; anterior 0 vira "novo" se houver valor, senão "nada"; nos demais, variação %.
+ */
+export function mesesComDelta(rows: Reserva[], meses: string[]): MesComDelta[] {
+  const porMes = agrupar(rows, (r) => r.mes)
+  return meses.map((mes, i) => {
+    const valor = soma(porMes.get(mes) ?? [])
+    const anterior = i > 0 ? soma(porMes.get(meses[i - 1]) ?? []) : null
+    const delta: Delta = anterior === null || anterior === 0 ? (anterior === 0 && valor > 0 ? { tipo: 'novo' } : { tipo: 'nada' }) : { tipo: 'pct', valor: ((valor - anterior) / anterior) * 100 }
+    return { mes, valor, delta }
+  })
+}
 export type TicketMensal = Destaque & { pontos: { rotulo: string; valor: number | null }[] }
 
 export function ticketMensal(ctx: Contexto, cmp: Comparacao): TicketMensal {
