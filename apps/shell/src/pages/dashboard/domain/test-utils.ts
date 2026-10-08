@@ -1,5 +1,11 @@
 import { dayKey } from './periodo'
-import type { EventoConducao, Funcionario, Manutencao, Multa, Reserva, TelemetriaDia, Veiculo, Viagem } from './types'
+import type { Dados, EventoConducao, Funcionario, Manutencao, Multa, Reserva, TelemetriaDia, Veiculo, Viagem } from './types'
+
+/** Todos os conjuntos vazios e disponíveis; sobrescreva o que importa. */
+export const dadosVazios = (p: Partial<Dados> = {}): Dados => ({
+  reservas: [], manutencoes: [], multas: [], ocorrencias: [], funcionarios: [], veiculos: [], viagens: [], eventos: [], telemetria: [],
+  pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], indisponiveis: [], ...p,
+})
 
 /** Reserva de teste: serviço concluído de R$ 0 sem motorista, cliente nem veículo; sobrescreva o que importa. */
 export function reserva(p: Partial<Reserva> & { saidaRaw?: string } = {}): Reserva {

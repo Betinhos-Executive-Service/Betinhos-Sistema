@@ -157,7 +157,7 @@ describe('linhas, ranking mensal e nota por mês (tblDriverSafetyScore, tblTopMo
     const eventos = [...mais(4, () => e({ motoristaId: 'm3' }))]
     const telemetria = [t({ dia: '2026-09-10', mes: '2026-09' }), t({ veiculoId: 'v2' }), t({ veiculoId: 'v3' }), t({ veiculoId: 'v4' }), t({ veiculoId: 'v5' })]
     const ordem = ordenarLinhasScore(linhasScore(viagens, eventos, telemetria, '2026-09-01', FIM)).map((l) => `${l.mes}:${l.motoristaId}`)
-    // out: m2 (100, 300 km), m5 (100, 120 km), m3 (0,8/100 km → 91 com ocioso 0: nota menor), m4 sem nota; set: m1.
+    // out: m2 (100, 300 km), m5 (100, 120 km), m3 (0,8/100 km → 97 com ocioso 0: nota menor), m4 sem nota; set: m1.
     expect(ordem).toEqual(['2026-10:m2', '2026-10:m5', '2026-10:m3', '2026-10:m4', '2026-09:m1'])
   })
 

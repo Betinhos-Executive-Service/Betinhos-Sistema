@@ -1,17 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { filtrarServicos } from '../base'
 import type { Contexto } from '../kpis'
-import { manutencao, reserva } from '../test-utils'
+import { dadosVazios, manutencao, reserva } from '../test-utils'
 import type { Dados, Filtros, Manutencao, Reserva } from '../types'
 import { calcularManutencoes, categoriaManutencao } from './manutencoes'
 
 const NOW = new Date('2026-10-15T15:00:00Z')
 const f: Filtros = { atalho: 'personalizado', inicio: '2026-09-01', fim: '2026-10-15', status: [], clientes: [], motoristas: [], tipos: [] }
 const ctxDe = (rows: Reserva[] = [], filtros: Filtros = f): Contexto => ({ todas: rows, rv: filtrarServicos(rows, filtros), f: filtros, now: NOW })
-const dadosCom = (manutencoes: Manutencao[], p: Partial<Dados> = {}): Dados => ({
-  reservas: [], manutencoes, multas: [], ocorrencias: [], funcionarios: [], veiculos: [], viagens: [], eventos: [], telemetria: [],
-  pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], indisponiveis: [], ...p,
-})
+const dadosCom = (manutencoes: Manutencao[], p: Partial<Dados> = {}) => dadosVazios({ manutencoes, ...p })
 const cat = (r: ReturnType<typeof calcularManutencoes>, nome: string) => r.categorias.find((c) => c.categoria === nome)
 
 describe('categoriaManutencao (maintenanceCategory do legado)', () => {
