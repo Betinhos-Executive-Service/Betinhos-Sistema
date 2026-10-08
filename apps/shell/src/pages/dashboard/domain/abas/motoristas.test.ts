@@ -1,15 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { filtrarServicos } from '../base'
 import type { Contexto } from '../kpis'
-import { evento, funcionario, reserva, telemetria, veiculo, viagem } from '../test-utils'
+import { dadosVazios, evento, funcionario, reserva, telemetria, veiculo, viagem } from '../test-utils'
 import type { Dados, Filtros, Reserva } from '../types'
 import { calcularMotoristas } from './motoristas'
 
 const NOW = new Date('2026-10-15T15:00:00Z')
-const dadosVazios = (p: Partial<Dados> = {}): Dados => ({
-  reservas: [], manutencoes: [], multas: [], ocorrencias: [], funcionarios: [], veiculos: [], viagens: [], eventos: [], telemetria: [],
-  pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], indisponiveis: [], ...p,
-})
 const DIA = 86_400_000
 const f: Filtros = { atalho: 'personalizado', inicio: '2026-09-01', fim: '2026-10-15', status: [], clientes: [], motoristas: [], tipos: [] }
 const ctxDe = (rows: Reserva[]): Contexto => ({ todas: rows, rv: filtrarServicos(rows, f), f, now: NOW })
@@ -40,6 +36,17 @@ describe('calcularMotoristas', () => {
     expect(m.ranking).toEqual([])
     expect(m.cnhVencendo).toEqual([])
     expect(calcularMotoristas(ctxDe([]), dadosVazios({ indisponiveis: ['telemetria'] })).kpis).toEqual({ total: 0, cnhAtencao: 0, score: null })
+  })
+
+  it('veículos fora do ar: avisa que o filtro próprio/terceiro não se aplica (propria fica null)', () => {
+    const funcionarios = [funcionario({ id: 'a', nome: 'Ana' })]
+    const rows = [srv('a', { veiculoId: 'v1' })]
+    const fora = calcularMotoristas(ctxDe(rows), dadosVazios({ funcionarios, indisponiveis: ['veiculos'] }))
+    expect(fora.veiculosIndisponiveis).toBe(true)
+    expect(fora.ranking[0]).toMatchObject({ key: 'a', servicos: 1, propria: null })
+    const ok = calcularMotoristas(ctxDe(rows), dadosVazios({ funcionarios, veiculos: [veiculo({ id: 'v1', categoria: 'Propria' })] }))
+    expect(ok.veiculosIndisponiveis).toBe(false)
+    expect(ok.ranking[0].propria).toBe(true)
   })
 
   it('ranking: base = funcionários ativos, serviços por id (ou pelo nome sem id), ordenado por quantidade', () => {
