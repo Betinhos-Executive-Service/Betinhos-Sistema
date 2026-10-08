@@ -168,7 +168,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     onClick: (event: MouseEvent<HTMLButtonElement>) => event.preventDefault(),
   })
   const none = selectedIds.length === 0
-  const createButton = <Button size="compact" icon={<Plus size={16} />} onClick={() => { void openForm('create') }}>Criar serviço</Button>
+  const createButton = <Button size={mobile ? 'touch' : 'compact'} icon={<Plus size={16} />} onClick={() => { void openForm('create') }}>Criar serviço</Button>
   // Desktop: todos os comandos ficam sempre na barra (a posição não pula); sem seleção servível ficam inertes, com o motivo.
   const commands = mobile ? createButton : (
     <>
@@ -199,7 +199,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   )
   const shortcuts = (
     <Menu
-      trigger={(props) => <Button {...props} variant="secondary" size="compact" icon={<MoreVertical size={16} />} aria-label="Mais ações" />}
+      trigger={(props) => <Button {...props} variant="secondary" size={mobile ? 'touch' : 'compact'} icon={<MoreVertical size={16} />} aria-label="Mais ações" />}
       actions={[
         { id: 'funcoes', label: 'Funções Operacionais', icon: <ClipboardList size={16} />, onSelect: () => { location.hash = hrefFor('new_telafuncoesoperacionais') } },
         { id: 'escala', label: 'Escala FDS', icon: <CalendarDays size={16} />, onSelect: () => setEscalaOpen(true) },
@@ -339,6 +339,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           prefs={prefs}
           onPrefs={setPrefs}
           selectedCount={mobile ? 0 : geral.selected.size}
+          mobile={mobile}
           commands={commands}
           shortcuts={shortcuts}
         />

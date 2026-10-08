@@ -17,6 +17,8 @@ type Props = {
   prefs: ColumnPrefs | null
   onPrefs: (prefs: ColumnPrefs | null) => void
   selectedCount: number
+  /** Celular: controles em tamanho de toque (44 px); no desktop ficam compactos (32 px). */
+  mobile: boolean
   /** Comandos sempre visíveis; os que dependem da seleção ficam inertes (aria-disabled) enquanto ela não serve. */
   commands: ReactNode
   /** Atalhos fixos à direita. */
@@ -24,7 +26,8 @@ type Props = {
 }
 
 /** Uma linha só: visão e busca à esquerda; contagem da seleção, comandos, colunas e atalhos à direita. */
-export function GeralToolbar({ views, view, onSelectView, query, onQuery, searching, columns, attributes, prefs, onPrefs, selectedCount, commands, shortcuts }: Props) {
+export function GeralToolbar({ views, view, onSelectView, query, onQuery, searching, columns, attributes, prefs, onPrefs, selectedCount, mobile, commands, shortcuts }: Props) {
+  const size = mobile ? 'touch' : 'compact'
   const options: SelectOption[] = views.map((v) => ({ value: v.id, label: v.nome, group: v.grupo === 'sistema' ? 'Visões do sistema' : 'Minhas visões' }))
   // O texto digitado fica local; a busca de verdade sai depois da pausa. Mudança externa (limpar busca) ressincroniza.
   const [text, setText] = useState(query)
@@ -36,13 +39,13 @@ export function GeralToolbar({ views, view, onSelectView, query, onQuery, search
       label="Filtros de serviços"
       className="gr-toolbar"
       start={<>
-        <Select className="gr-filters__view" size="compact" aria-label="Visão" placeholder="Selecione uma visão" searchable={false} clearable={false} options={options} value={view?.id ?? null} onChange={(id) => { if (id) onSelectView(id) }} />
-        <SearchBox className="gr-filters__search" size="compact" aria-label="Buscar serviços" placeholder="Buscar por ID, trajeto, cliente…" value={text} onChange={setText} onSearch={(value) => { if (value.trim() !== query) onQuery(value.trim()) }} debounce={300} loading={searching} />
+        <Select className="gr-filters__view" size={size} aria-label="Visão" placeholder="Selecione uma visão" searchable={false} clearable={false} options={options} value={view?.id ?? null} onChange={(id) => { if (id) onSelectView(id) }} />
+        <SearchBox className="gr-filters__search" size={size} aria-label="Buscar serviços" placeholder="Buscar por ID, trajeto, cliente…" value={text} onChange={setText} onSearch={(value) => { if (value.trim() !== query) onQuery(value.trim()) }} debounce={300} loading={searching} />
       </>}
       end={<>
         {selectedCount > 0 ? <span role="status" className="gr-filters__selected"><StatusBadge tone="info">{selectedCount === 1 ? '1 selecionado' : `${selectedCount} selecionados`}</StatusBadge></span> : null}
         {commands}
-        <span className="gr-filters__columns"><ColumnsMenu columns={columns} attributes={attributes} prefs={prefs} onChange={onPrefs} /></span>
+        <span className="gr-filters__columns"><ColumnsMenu size={size} columns={columns} attributes={attributes} prefs={prefs} onChange={onPrefs} /></span>
         {shortcuts}
       </>}
     />
