@@ -30,7 +30,10 @@ type Props = {
 const SKELETON_ROWS = 8
 /** Grid editável com rolagem horizontal, seleção por linha e a primeira coluna fixa. As classes visuais são as da tabela do DS. */
 export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, selected, onToggle, onToggleAll, onOpen, renderCell, footer, empty }: Props) {
-  const style = { '--gr-columns': `36px ${columns.map((c) => `minmax(${Math.max(90, c.width)}px, ${c.width}px)`).join(' ')}` } as CSSProperties
+  // Trilhas crescem na proporção da largura da visão (fr) e nunca ficam abaixo do mínimo; a largura mínima total
+  // garante que cabeçalho e linhas compartilhem as mesmas trilhas quando a soma dos mínimos excede o contêiner.
+  const minTotal = 40 + columns.reduce((sum, c) => sum + Math.max(90, c.width), 0)
+  const style = { '--gr-columns': `40px ${columns.map((c) => `minmax(${Math.max(90, c.width)}px, ${c.width}fr)`).join(' ')}`, '--gr-min-width': `${minTotal}px` } as CSSProperties
   const ids = rows.map((r) => String(r[ID_ATTRIBUTE]))
   const all = ids.length > 0 && ids.every((id) => selected.has(id))
   const some = !all && ids.some((id) => selected.has(id))
