@@ -18,7 +18,7 @@ export function ResumoTab({ ctx, dados, periodo }: PropsAba) {
 }
 
 function Resumo({ ctx, dados, periodo }: DadosAba) {
-  const resumo = useMemo(() => calcularResumo(dados, ctx.f, ctx.now), [dados, ctx])
+  const resumo = useMemo(() => calcularResumo(ctx, dados), [dados, ctx])
   // Drill-down: as listas saem do mesmo recorte dos números (sem consulta nova).
   const abrir = useDetalhe()
   const nowMs = ctx.now.getTime()
