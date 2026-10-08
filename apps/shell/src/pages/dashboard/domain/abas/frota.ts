@@ -31,8 +31,15 @@ export type UsoMes = {
   usados: number; ociosos: number; terceiros: number; aluguel: number
   uteis: BucketUso; fds: BucketUso
 }
-/** Eventos classificados por mês; `excesso` é a 1ª categoria do legado e tem precedência na classificação. */
-export type EventosMes = { mes: string; rotulo: string; aceleracao: number; frenagem: number; curva: number; excesso: number }
+/**
+ * Eventos classificados por mês; `excesso` é a 1ª categoria do legado e tem precedência na classificação.
+ * `total` soma as 4 categorias; `km` é a distância diária do mês (mesmo escopo e período); `taxa` = total / km × 1.000
+ * (0 sem km), a medida do `cFrotaEventosMensal`; `tendencia` é a reta de mínimos quadrados sobre as taxas (`rateTrend`).
+ */
+export type EventosMes = {
+  mes: string; rotulo: string; aceleracao: number; frenagem: number; curva: number; excesso: number
+  total: number; km: number; taxa: number; tendencia: number
+}
 export type Frota = {
   kpis: KpisFrota
   /** null quando qualquer conjunto Infleet falhou. */
@@ -57,6 +64,17 @@ const classificar = (e: EventoConducao) => {
   const tipo = e.tipo.toLowerCase()
   const texto = e.descricao.toLowerCase()
   return CATEGORIAS.find((c) => c.match(tipo, texto))?.key ?? null
+}
+
+/** `rateTrend` do legado: regressão linear pelos índices, limitada a ≥ 0; com menos de 2 pontos devolve os próprios valores. */
+export function tendenciaLinear(valores: number[]) {
+  const n = valores.length
+  if (n < 2) return [...valores]
+  const xMedia = (n - 1) / 2
+  const yMedia = valores.reduce((s, v) => s + v, 0) / n
+  const den = valores.reduce((s, _, i) => s + (i - xMedia) ** 2, 0)
+  const incl = den ? valores.reduce((s, v, i) => s + (i - xMedia) * (v - yMedia), 0) / den : 0
+  return valores.map((_, i) => Math.max(0, yMedia + incl * (i - xMedia)))
 }
 
 /** `isActiveVehicle` do legado: só "ativo" ou "ativo(a)". */
@@ -135,23 +153,25 @@ function usoFrota(vei: Veiculo[], ctx: Contexto) {
 }
 
 /**
- * Aba Frota (`renderFrota` + `renderInfleetTelemetry` do legado). Escopo: como o filtro de datas está sempre preenchido
- * (`hasFleetFilters` verdadeiro), só entram os veículos com serviço em `ctx.rv`; telemetria, viagens e eventos também ficam
- * no período do filtro (dia em Brasília) e nesse escopo.
+ * Aba Frota (`renderFrota` + `renderInfleetTelemetry` do legado). KPIs cadastrais: a frota inteira (`dados.veiculos`), pois
+ * descrevem o cadastro e o template do legado que os escopava nunca foi montado (decisão do controller, Fix round 1).
+ * Uso da frota própria, telemetria, viagens e eventos mantêm o escopo do legado: como o filtro de datas está sempre
+ * preenchido (`hasFleetFilters` verdadeiro), só os veículos com serviço em `ctx.rv`, no período do filtro (dia em Brasília).
  */
 export function calcularFrota(ctx: Contexto, dados: Dados): Frota {
   const { f } = ctx
   const escopo = new Set(ctx.rv.map((r) => r.veiculoId).filter(Boolean))
   const veiIndisp = dados.indisponiveis.includes('veiculos')
-  const vei = veiIndisp ? [] : dados.veiculos.filter((v) => escopo.has(v.id))
+  const cadastro = veiIndisp ? [] : dados.veiculos
+  const vei = cadastro.filter((v) => escopo.has(v.id))
   const status = (v: Veiculo) => stL(v.statusLabel)
   const uso = veiIndisp ? { usoMensal: [], usoMedio: null, totais: { proprios: 0, terceiros: 0, aluguel: 0 } } : usoFrota(vei, ctx)
 
   const kpis: KpisFrota = {
-    total: vei.length,
-    disponiveis: vei.filter((v) => { const s = status(v); return s.includes('dispon') || s.includes('ativo') || s.includes('livre') }).length,
-    blindados: vei.filter((v) => v.blindado).length,
-    emManutencao: vei.filter((v) => status(v).includes('manut')).length,
+    total: cadastro.length,
+    disponiveis: cadastro.filter((v) => { const s = status(v); return s.includes('dispon') || s.includes('ativo') || s.includes('livre') }).length,
+    blindados: cadastro.filter((v) => v.blindado).length,
+    emManutencao: cadastro.filter((v) => status(v).includes('manut')).length,
     usoMedioPropria: uso.usoMedio,
     indisponivel: veiIndisp,
   }
@@ -184,15 +204,24 @@ export function calcularFrota(ctx: Contexto, dados: Dados): Frota {
     .map(([dia, rows]) => ({ dia, km: rows.reduce((s, t) => s + t.distanciaKm, 0) }))
     .sort((a, b) => a.dia.localeCompare(b.dia))
 
-  const porMes = new Map<string, EventosMes>()
+  const porMes = new Map<string, Record<Categoria, number>>()
   for (const e of eventos) {
     const cat = classificar(e)
     if (!cat || !e.mes) continue
     let linha = porMes.get(e.mes)
-    if (!linha) { linha = { mes: e.mes, rotulo: mesRotulo(e.mes), aceleracao: 0, frenagem: 0, curva: 0, excesso: 0 }; porMes.set(e.mes, linha) }
+    if (!linha) { linha = { aceleracao: 0, frenagem: 0, curva: 0, excesso: 0 }; porMes.set(e.mes, linha) }
     linha[cat] += 1
   }
-  const eventosPorMes = [...porMes.values()].sort((a, b) => a.mes.localeCompare(b.mes))
+  // monthKm do legado: distância diária com `data.slice(0, 7)` igual ao mês do evento.
+  const kmMes = new Map<string, number>()
+  for (const t of diarias) kmMes.set(t.mes, (kmMes.get(t.mes) ?? 0) + t.distanciaKm)
+  const linhasEventos = [...porMes].sort((a, b) => a[0].localeCompare(b[0])).map(([mes, c]) => {
+    const total = c.aceleracao + c.frenagem + c.curva + c.excesso
+    const km = kmMes.get(mes) ?? 0
+    return { mes, rotulo: mesRotulo(mes), ...c, total, km, taxa: km ? (total / km) * 1000 : 0 }
+  })
+  const tendencia = tendenciaLinear(linhasEventos.map((l) => l.taxa))
+  const eventosPorMes: EventosMes[] = linhasEventos.map((l, i) => ({ ...l, tendencia: tendencia[i] }))
 
   return { ...base, telemetria, kmPorDia, eventosPorMes }
 }
