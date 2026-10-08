@@ -10,12 +10,11 @@ const vazio: Dados = { reservas: [], manutencoes: [], multas: [], ocorrencias: [
 describe('calcularResumo', () => {
   it('não quebra sem dados', () => {
     const r = calcularResumo(vazio, f, NOW)
-    expect(r.servicos).toBe(0)
     expect(r.kpis).toHaveLength(6)
     expect(r.qualidade.every((a) => a.status === 's/dado')).toBe(true)
   })
 
-  it('filtra secundários pelo período e compõe as seções', () => {
+  it('devolve só o que o Resumo mostra e filtra secundários pelo período', () => {
     const dados: Dados = {
       ...vazio,
       reservas: [reserva({ saidaRaw: '2026-10-02T12:00:00Z', valor: 500, cliente: 'Tenaris' }), reserva({ saidaRaw: '2026-09-02T12:00:00Z', valor: 900 })],
@@ -23,10 +22,10 @@ describe('calcularResumo', () => {
       ocorrencias: [{ dia: '2026-10-05' }, { dia: '2026-08-01' }],
     }
     const r = calcularResumo(dados, f, NOW)
-    expect(r.servicos).toBe(1)
-    expect(r.custoFrota.valor).toBe('R$\u00a0100,00')
+    expect(Object.keys(r)).toEqual(['kpis', 'operacao', 'qualidade', 'totalProduzido', 'metaRealizado'])
+    expect(r.kpis.find((k) => k.id === 'servicos')?.valor).toBe('1')
     expect(r.operacao.find((a) => a.id === 'ocorrencias')?.valor).toBe('1')
-    expect(r.clientes.linhas[0].cliente).toBe('Tenaris')
+    expect(r.metaRealizado.linhas.find((l) => l.mes === '2026-10')?.real).toBe(500)
   })
 
   it('Operação traz o Score motoristas calculado só com o que cai no período', () => {

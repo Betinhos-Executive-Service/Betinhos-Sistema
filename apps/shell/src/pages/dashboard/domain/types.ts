@@ -117,4 +117,3 @@ export type KpiId = 'faturamento' | 'servicos' | 'ticket' | 'aReceber' | 'cpPend
 export type Kpi = { id: KpiId; rotulo: string; valor: string; chips: Chip[]; apoio: Apoio[]; serie: PontoSerie[] }
 export type Tom = 'ok' | 'warn' | 'danger' | 'neutral'
 export type AlertaItem = { id: string; valor: string; rotulo: string; status: string; tom: Tom }
-export type CardSecundario = { id: string; rotulo: string; valor: string; apoio: string; atencao: boolean }

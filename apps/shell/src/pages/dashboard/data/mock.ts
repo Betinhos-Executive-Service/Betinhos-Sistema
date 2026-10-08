@@ -23,8 +23,8 @@ const MOTORISTAS = [
   { id: 'mock-m5', apelido: 'Juliana', nome: 'Juliana Costa', empresa: DEPAULA }, { id: 'mock-m6', apelido: 'Paulo', nome: 'Paulo Henrique Souza', empresa: DEPAULA },
 ]
 const VEICULOS: Veiculo[] = [
-  { id: 'mock-v1', statusLabel: 'Disponível', categoria: 'Propria', placa: 'BTN1A23', marca: 'Toyota', modelo: 'Corolla Altis', blindado: true, ano: 2023 },
-  { id: 'mock-v2', statusLabel: 'Disponível', categoria: 'Propria', placa: 'BTN2B34', marca: 'Toyota', modelo: 'SW4', blindado: true, ano: 2022 },
+  { id: 'mock-v1', statusLabel: 'Ativo', categoria: 'Propria', placa: 'BTN1A23', marca: 'Toyota', modelo: 'Corolla Altis', blindado: true, ano: 2023 },
+  { id: 'mock-v2', statusLabel: 'Ativo', categoria: 'Propria', placa: 'BTN2B34', marca: 'Toyota', modelo: 'SW4', blindado: true, ano: 2022 },
   { id: 'mock-v3', statusLabel: 'Em manutenção', categoria: 'Propria', placa: 'BTN3C45', marca: 'Chevrolet', modelo: 'Spin', blindado: false, ano: 2021 },
   { id: 'mock-v4', statusLabel: 'Disponível', categoria: 'Terceirizada', placa: 'TRC4D56', marca: 'Mercedes-Benz', modelo: 'Sprinter', blindado: false, ano: 2020 },
   { id: 'mock-v5', statusLabel: 'Disponível', categoria: 'Terceirizada', placa: 'TRC5E67', marca: 'Volkswagen', modelo: 'Virtus', blindado: false, ano: 2024 },

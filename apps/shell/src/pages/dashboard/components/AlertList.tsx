@@ -26,12 +26,12 @@ export function AlertaCard({ valor, rotulo, status, tom }: { valor: string; rotu
   )
 }
 
-/** Faixa de alertas com eyebrow ("OPERAÇÃO") e cards em grade fluida. */
+/** Faixa de alertas com eyebrow ("ALERTAS DE OPERAÇÃO") e cards em grade fluida. */
 export function Faixa({ titulo, itens, children }: { titulo: string; itens: number; children: ReactNode }) {
   const id = useId()
   return (
     <section className="dash-faixa" aria-labelledby={id}>
-      <h3 className="dash-faixa__titulo" id={id}>{titulo}</h3>
+      <h2 className="dash-faixa__titulo" id={id}>{titulo}</h2>
       <ul className={`dash-faixa__lista dash-faixa__lista--${itens}`}>{children}</ul>
     </section>
   )
@@ -45,13 +45,14 @@ export function AlertList({ titulo, itens }: { titulo: string; itens: AlertaItem
   )
 }
 
-const FAIXAS = ['Operação', 'Qualidade dos dados', 'Frota e pessoas']
+/** Títulos das duas faixas do Resumo, na ordem da página. */
+export const FAIXAS_RESUMO = ['Alertas de operação', 'Qualidade dos dados'] as const
 
-/** Primeira carga: as três faixas no formato final, com quatro cards ocupados cada e sem números. */
+/** Primeira carga: as duas faixas no formato final, com quatro cards ocupados cada e sem números. */
 export function AlertasCarregando() {
   return (
     <div className="dash-faixas">
-      {FAIXAS.map((titulo) => (
+      {FAIXAS_RESUMO.map((titulo) => (
         <Faixa key={titulo} titulo={titulo} itens={4}>
           {[0, 1, 2, 3].map((i) => (
             <li key={i} className="dash-alerta" aria-hidden="true">

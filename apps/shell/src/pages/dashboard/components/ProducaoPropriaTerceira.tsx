@@ -1,40 +1,13 @@
 import { EmptyState, Table, type TableColumn } from '@betinhos/ui'
 import { Inbox } from 'lucide-react'
 import { LinhaChart } from '../charts/Charts'
-import type { ProducaoPT, TopMotorista } from '../domain/destaques'
-import { brl, brlS, int } from '../domain/format'
+import type { ProducaoPT } from '../domain/destaques'
+import { int } from '../domain/format'
 import { useMedia } from '../../operacional/useMedia'
 import { AnaliseCard } from './AnaliseCard'
-import { Nome } from './Celulas'
 import { COLUNA_LARGA, MEDIA_MOBILE, juntar } from './Linhas'
 
 type Mes = ProducaoPT['meses'][number]
-
-/** Top 5 motoristas de uma frota: o 1º em destaque no topo, tabela Motorista · Serviços · Faturamento. */
-export function TopMotoristas({ titulo, rows, periodo }: { titulo: string; rows: TopMotorista[]; periodo: string }) {
-  const mobile = useMedia(MEDIA_MOBILE)
-  const colunas: TableColumn<TopMotorista>[] = mobile
-    ? [
-      { key: 'nome', header: 'Motorista', cell: (r) => r.nome },
-      { key: 'resto', header: 'Serviços e faturamento', width: COLUNA_LARGA, cell: (r) => juntar(`${int(r.qtd)} serviços`, brl(r.fat)) },
-    ]
-    : [
-      { key: 'nome', header: 'Motorista', width: 'minmax(0, 1.4fr)', cell: (r) => <Nome texto={r.nome} /> },
-      { key: 'qtd', header: 'Serviços', align: 'end', cell: (r) => <strong className="dash-forte">{int(r.qtd)}</strong> },
-      { key: 'fat', header: 'Faturamento', align: 'end', cell: (r) => <strong className="dash-forte">{brl(r.fat)}</strong> },
-    ]
-  const lider = rows[0]
-  return (
-    <AnaliseCard
-      titulo={titulo}
-      periodo={periodo}
-      unidade="serviços e R$"
-      valor={lider ? brlS(lider.fat) : undefined}
-      sub={lider ? `${lider.nome} · ${int(lider.qtd)} serviços` : 'Serviços e faturamento'}
-      tabela={<Table columns={colunas} rows={rows} rowKey={(r) => r.key} empty={<EmptyState compact icon={<Inbox />} title="Nenhum registro no período" />} />}
-    />
-  )
-}
 
 export function ProducaoPropriaTerceira({ dados, periodo }: { dados: ProducaoPT; periodo: string }) {
   const mobile = useMedia(MEDIA_MOBILE)
