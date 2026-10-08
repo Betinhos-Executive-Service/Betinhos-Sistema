@@ -9,10 +9,14 @@ const ROTULO = 'Indicadores executivos'
 export const ROTULOS_RESUMO = ['Faturamento', 'Serviços', 'Ticket médio', 'A receber', 'CP pendente', 'Recebimento'] as const
 
 /** Seis KPIs executivos do Resumo: o card único (`KpiCard`) com chips sempre visíveis e sparkline na base. */
-export function KpiGrid({ kpis }: { kpis: Kpi[] }) {
+/** `abrir`: drill-down por KPI (CP pendente e A receber). */
+export function KpiGrid({ kpis, abrir = {} }: { kpis: Kpi[]; abrir?: Partial<Record<KpiId, () => void>> }) {
   return (
     <KpiLinha rotulo={ROTULO} colunas={6}>
-      {kpis.map((k) => <KpiCard key={k.id} rotulo={k.rotulo} valor={k.valor} tom={TOM[k.id]} chips={k.chips} apoio={k.apoio} serie={k.serie} />)}
+      {kpis.map((k) => {
+        const onAbrir = abrir[k.id]
+        return <KpiCard key={k.id} rotulo={k.rotulo} valor={k.valor} tom={TOM[k.id]} chips={k.chips} apoio={k.apoio} serie={k.serie} acao={onAbrir ? { texto: 'Ver serviços', onAbrir } : undefined} />
+      })}
     </KpiLinha>
   )
 }

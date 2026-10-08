@@ -67,11 +67,11 @@ describe('consultas do Dashboard', () => {
       cr40f_reservadeveculosid: 'R1', cr40f_dataehorriodesada: '2026-10-02T12:00:00Z', createdon: '2026-10-01T10:00:00Z',
       cr40f_status: 202410008, [`cr40f_status${F}`]: 'Concluído', cr40f_statusdefaturamento: 202410010, [`cr40f_statusdefaturamento${F}`]: 'Pago',
       new_categoriadoitem: 100000000, [`new_categoriadoitem${F}`]: 'Serviço', cr40f_tipodeveiculo: 3, [`cr40f_tipodeveiculo${F}`]: 'Executivo',
-      _cr40f_veiculo_value: 'V1', _new_composicaodepreco_value: 'cp1', _cr40f_financeiro_value: 'OP1',
+      _cr40f_veiculo_value: 'V1', _new_composicaodepreco_value: 'cp1', [`_new_composicaodepreco_value${F}`]: 'CP-0042', _cr40f_financeiro_value: 'OP1', [`_cr40f_financeiro_value${F}`]: 'OP-0042',
       cr40f_Motorista: { cr40f_funcionariosid: 'M1', cr40f_nomecompleto: 'Carlos Oliveira', new_apelido: 'Oliveira' },
       cr40f_Cliente: { cr40f_nomedocliente: 'Tenaris' },
     }, cps)
-    expect(r).toMatchObject({ id: 'r1', dia: '2026-10-02', mes: '2026-10', statusLabel: 'Concluído', fatStatus: 202410010, tipoVeiculo: 'Executivo', tipoVeiculoRaw: '3', veiculoId: 'v1', motoristaId: 'm1', motoristaKey: 'm1', motorista: 'Oliveira', cliente: 'Tenaris', valor: 850.5, cpConcluida: true, opId: 'op1' })
+    expect(r).toMatchObject({ id: 'r1', dia: '2026-10-02', mes: '2026-10', statusLabel: 'Concluído', fatStatus: 202410010, tipoVeiculo: 'Executivo', tipoVeiculoRaw: '3', veiculoId: 'v1', motoristaId: 'm1', motoristaKey: 'm1', motorista: 'Oliveira', cliente: 'Tenaris', valor: 850.5, cpConcluida: true, opId: 'op1', cpCodigo: 'CP-0042', opCodigo: 'OP-0042' })
     // Sem id do funcionário, a chave é o nome sem acento e sem caixa (`normL`), como nas despesas e no CSV 2026.
     expect(mapReserva({ cr40f_reservadeveculosid: 'R3', cr40f_Motorista: { cr40f_nomecompleto: 'João Ávila' } }, cps)).toMatchObject({ motoristaId: '', motoristaKey: 'nome:joao avila' })
     expect(mapReserva({ cr40f_reservadeveculosid: 'R2' }, cps)).toMatchObject({ motorista: 'Sem motorista', motoristaKey: 'nome:sem motorista', cliente: 'Sem cliente', valor: 0, dia: '', statusLabel: 'Sem status' })
@@ -177,8 +177,8 @@ describe('conjuntos das abas', () => {
   })
 
   it('multas com $expand da infração e versão sem expand (fallback)', () => {
-    expect(decodeURIComponent(multasPath('mul', '2024-01-01', '2026-10-15'))).toBe(`mul?$select=cr40f_dataehorario,cr40f_status,_cr40f_codigodainfracao_value,_cr40f_motorista_value,_cr40f_placa_value&$expand=cr40f_Codigodainfracao($select=cr40f_codigodainfracao,cr40f_descricaodainfracao)&$filter=${J('cr40f_dataehorario')}`)
-    expect(decodeURIComponent(multasPath('mul', '2024-01-01', '2026-10-15', false))).toBe(`mul?$select=cr40f_dataehorario,cr40f_status,_cr40f_codigodainfracao_value,_cr40f_motorista_value,_cr40f_placa_value&$filter=${J('cr40f_dataehorario')}`)
+    expect(decodeURIComponent(multasPath('mul', '2024-01-01', '2026-10-15'))).toBe(`mul?$select=cr40f_multasid,cr40f_dataehorario,cr40f_status,_cr40f_codigodainfracao_value,_cr40f_motorista_value,_cr40f_placa_value&$expand=cr40f_Codigodainfracao($select=cr40f_codigodainfracao,cr40f_descricaodainfracao)&$filter=${J('cr40f_dataehorario')}`)
+    expect(decodeURIComponent(multasPath('mul', '2024-01-01', '2026-10-15', false))).toBe(`mul?$select=cr40f_multasid,cr40f_dataehorario,cr40f_status,_cr40f_codigodainfracao_value,_cr40f_motorista_value,_cr40f_placa_value&$filter=${J('cr40f_dataehorario')}`)
   })
 
   it('pagantes inteiros, sem filtro (como o legado); despesas pela janela; cadastros de despesa inteiros e ativos', () => {
@@ -241,17 +241,17 @@ describe('conjuntos das abas', () => {
   it('multa: infração pelo $expand, motorista pelo apelido do funcionário, fallback no rótulo do lookup', () => {
     const apelidos = new Map([['m1', 'Oliveira']])
     expect(mapMulta({
-      cr40f_dataehorario: '2026-10-02T12:00:00Z', cr40f_status: 202410000, [`cr40f_status${F}`]: 'Notificar o Condutor',
+      cr40f_multasid: 'MU1', cr40f_dataehorario: '2026-10-02T12:00:00Z', cr40f_status: 202410000, [`cr40f_status${F}`]: 'Notificar o Condutor',
       _cr40f_motorista_value: 'M1', [`_cr40f_motorista_value${F}`]: 'Carlos Oliveira', _cr40f_placa_value: 'V1', [`_cr40f_placa_value${F}`]: 'ABC1D23',
       _cr40f_codigodainfracao_value: 'I1', [`_cr40f_codigodainfracao_value${F}`]: '745-50',
       cr40f_Codigodainfracao: { cr40f_codigodainfracao: ' 745-50 ', cr40f_descricaodainfracao: ' Transitar em velocidade superior ' },
     }, apelidos)).toEqual({
-      dia: '2026-10-02', status: 202410000, statusLabel: 'Notificar o Condutor', motoristaId: 'm1', motorista: 'Oliveira', veiculoId: 'v1',
+      id: 'mu1', dia: '2026-10-02', status: 202410000, statusLabel: 'Notificar o Condutor', motoristaId: 'm1', motorista: 'Oliveira', veiculoId: 'v1',
       infracaoCodigo: '745-50', infracaoDescricao: 'Transitar em velocidade superior',
     })
     expect(mapMulta({ _cr40f_motorista_value: 'M9', [`_cr40f_motorista_value${F}`]: 'Fulano', _cr40f_codigodainfracao_value: 'I2', [`_cr40f_codigodainfracao_value${F}`]: '501-00' }))
       .toMatchObject({ motorista: 'Fulano', infracaoCodigo: '501-00', infracaoDescricao: '' })
-    expect(mapMulta({})).toEqual({ dia: '', status: null, statusLabel: '', motoristaId: '', motorista: '—', veiculoId: '', infracaoCodigo: '', infracaoDescricao: '' })
+    expect(mapMulta({})).toEqual({ id: '', dia: '', status: null, statusLabel: '', motoristaId: '', motorista: '—', veiculoId: '', infracaoCodigo: '', infracaoDescricao: '' })
   })
 
   it('Infleet: campos de km, velocidades, excessos, consumo e eventos', () => {

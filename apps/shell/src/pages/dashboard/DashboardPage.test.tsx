@@ -121,6 +121,32 @@ describe('Dashboard', () => {
     expect(screen.getByRole('radio', { name: 'Terceiros' }).getAttribute('aria-checked')).toBe('true')
   })
 
+  it('drill-down: KPI, alerta e linha do ranking abrem o Drawer com a lista; fecha pelo X', async () => {
+    render(<DashboardPage host={{ mode: 'mock' }} />)
+    await screen.findByRole('region', { name: 'Total produzido' })
+    fireEvent.click(screen.getByRole('button', { name: 'Ver serviços de CP pendente' }))
+    const drawer = screen.getByRole('dialog', { name: 'CP pendente' })
+    const valorKpi = within(screen.getByRole('article', { name: 'CP pendente' })).getByText(/^R\$/).textContent
+    // Resumo do Drawer: quantidade e a mesma soma do card (moeda curta no card, cheia no Drawer).
+    expect(within(drawer).getByText(/serviços? · R\$/)).toBeTruthy()
+    expect(valorKpi).toBeTruthy()
+    expect(within(drawer).getAllByRole('row').length).toBeGreaterThan(1)
+    // Modo exemplo: sem link para o Dataverse.
+    expect(within(drawer).queryByRole('link', { name: /Abrir no Dataverse/ })).toBeNull()
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Fechar painel' }))
+    expect(screen.queryByRole('dialog', { name: 'CP pendente' })).toBeNull()
+    const cnh = screen.queryByRole('button', { name: 'Ver lista de CNH' })
+    if (cnh) {
+      fireEvent.click(cnh)
+      expect(screen.getByRole('dialog', { name: 'CNH em atenção' })).toBeTruthy()
+    }
+    const abas = screen.getByRole('tablist', { name: 'Abas do dashboard' })
+    fireEvent.click(within(abas).getByRole('tab', { name: 'Motoristas' }))
+    const [primeiro] = await screen.findAllByRole('button', { name: /: ver serviços$/ })
+    fireEvent.click(primeiro)
+    expect(screen.getByRole('dialog', { name: /^Serviços de / })).toBeTruthy()
+  })
+
   it('na primeira carga, cada aba mostra KPIs e blocos ocupados no mesmo padrão', () => {
     history.replaceState(null, '', '#/dashboard?tab=frota')
     render(<DashboardPage host={{ mode: 'mock' }} />)

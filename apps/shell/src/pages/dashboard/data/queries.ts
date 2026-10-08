@@ -43,7 +43,7 @@ export const composicoesPath = (set: string) => `${set}?$select=cr40f_composicao
 /** Manutenções com data na janela (`cr40f_datamanutencao` é DateTime na metadata DEV). */
 export const manutencoesPath = (set: string, desde: string, ate: string) =>
   `${set}?$select=cr40f_datamanutencao,cr40f_valor,cr40f_datadaaprovacao,cr40f_status,cr40f_tipodoreparo,_cr40f_placa_carro_value,createdon&$filter=${janelaDataHora('cr40f_datamanutencao', desde, ate)}`
-const MULTA_SELECT = 'cr40f_dataehorario,cr40f_status,_cr40f_codigodainfracao_value,_cr40f_motorista_value,_cr40f_placa_value'
+const MULTA_SELECT = 'cr40f_multasid,cr40f_dataehorario,cr40f_status,_cr40f_codigodainfracao_value,_cr40f_motorista_value,_cr40f_placa_value'
 /**
  * Multas na janela (`cr40f_dataehorario` é DateTime) com a infração pelo `$expand` (legado L11531);
  * `comInfracao = false` é a consulta reduzida usada se a navegação falhar.
@@ -117,8 +117,8 @@ export function mapReserva(row: Row, cps: Map<string, Cp>): Reserva {
     // Sem id, a chave é o nome sem acento e sem caixa (`normL`), a mesma das despesas e do CSV 2026.
     motoristaId, motoristaKey: motoristaId || `nome:${normL(motorista)}`, motorista,
     cliente: str(asRow(row.cr40f_Cliente)?.cr40f_nomedocliente) || SEM_CLIENTE,
-    cpId, valor: cp?.valor ?? 0, cpPendente: cp?.pendente ?? false, cpConcluida: cp?.concluida ?? false,
-    opId: lower(row._cr40f_financeiro_value),
+    cpId, cpCodigo: rotulo(row, '_new_composicaodepreco_value'), valor: cp?.valor ?? 0, cpPendente: cp?.pendente ?? false, cpConcluida: cp?.concluida ?? false,
+    opId: lower(row._cr40f_financeiro_value), opCodigo: rotulo(row, '_cr40f_financeiro_value'),
     tipoServico: formatted(row, 'cr40f_tipodoservico') || '—', finalizadoRaw: str(row.new_datadefinalizacao),
   }
 }
@@ -146,7 +146,7 @@ export function mapMulta(row: Row, apelidos: ReadonlyMap<string, string> = new M
   const motoristaId = lower(row._cr40f_motorista_value)
   const infracao = asRow(row.cr40f_Codigodainfracao)
   return {
-    dia: dayKey(str(row.cr40f_dataehorario)), status: num(row.cr40f_status), statusLabel: formatted(row, 'cr40f_status'),
+    id: lower(row.cr40f_multasid), dia: dayKey(str(row.cr40f_dataehorario)), status: num(row.cr40f_status), statusLabel: formatted(row, 'cr40f_status'),
     motoristaId, motorista: apelidos.get(motoristaId) || rotulo(row, '_cr40f_motorista_value') || '—', veiculoId: lower(row._cr40f_placa_value),
     infracaoCodigo: (str(infracao?.cr40f_codigodainfracao) || formatted(row, '_cr40f_codigodainfracao_value')).trim(),
     infracaoDescricao: str(infracao?.cr40f_descricaodainfracao).trim(),

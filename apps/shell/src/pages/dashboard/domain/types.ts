@@ -27,10 +27,14 @@ export type Reserva = {
   motorista: string
   cliente: string
   cpId: string
+  /** Nome (código) da composição de preço, rótulo formatado do lookup ('' sem CP); coluna "Código" do drill-down. */
+  cpCodigo: string
   valor: number
   cpPendente: boolean
   cpConcluida: boolean
   opId: string
+  /** Nome (código) da OP, rótulo formatado do lookup `cr40f_financeiro` ('' sem OP). */
+  opCodigo: string
   /** Rótulo de `cr40f_tipodoservico` ('—' vazio), o `_tipoL` do legado. */
   tipoServico: string
   /** Valor bruto de `new_datadefinalizacao` ('' sem data). */
@@ -46,6 +50,8 @@ export type Manutencao = {
 }
 /** `motorista` é o apelido do funcionário (via id) ou o rótulo do lookup ('—'); infração pelo `$expand`, código cai no rótulo do lookup. */
 export type Multa = {
+  /** `cr40f_multasid` (minúsculo; '' no teste): link "Abrir no Dataverse" do drill-down. */
+  id: string
   dia: string; status: number | null; statusLabel: string; motoristaId: string; motorista: string; veiculoId: string; infracaoCodigo: string; infracaoDescricao: string
 }
 export type Ocorrencia = { dia: string }

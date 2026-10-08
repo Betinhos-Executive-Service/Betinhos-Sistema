@@ -56,6 +56,30 @@
 /* Sparkline encostada na base e nas laterais do card. */
 .dash-kpi .dash-spark { flex: 0 0 auto; display: block; width: auto; height: 44px; margin: auto calc(-1 * var(--bt-space-3)) calc(-1 * var(--bt-space-3)); border-radius: 0; pointer-events: none; }
 
+/* ---------- Drill-down (KPI, alerta e linha abrem o Drawer com a lista) ---------- */
+/* O botão "Ver …" estica o alvo pelo card inteiro (::after), sem aninhar elementos interativos. */
+.dash-kpi--abre, .dash-alerta--abre { position: relative; }
+.dash-abre { align-self: flex-start; margin-left: calc(-1 * var(--bt-space-2)); }
+.dash-abre::after { content: ''; position: absolute; inset: 0; border-radius: var(--bt-radius-lg); }
+.dash-abre:focus-visible::after { box-shadow: var(--bt-focus-ring); }
+@media (hover: hover) and (pointer: fine) {
+  .dash-kpi--abre:hover, .dash-alerta--abre:hover { border-color: var(--bt-color-action); }
+}
+.dash-alerta--abre { grid-template-areas: "valor rotulo" "valor selo" "valor abre"; }
+.dash-alerta__abre { grid-area: abre; justify-self: start; margin-left: calc(-1 * var(--bt-space-2)); }
+/* Nome do motorista no ranking: botão sem aparência própria, sublinhado no hover. */
+.dash-link-linha { display: grid; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: start; cursor: pointer; }
+.dash-link-linha:hover .bt-table__title strong { color: var(--bt-color-action); text-decoration: underline; }
+.dash-link-linha:focus-visible { outline: 0; border-radius: var(--bt-radius-xs); box-shadow: var(--bt-focus-ring); }
+.dash-detalhe { display: grid; gap: var(--bt-space-3); min-width: 0; }
+.dash-detalhe__descricao { margin: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); line-height: var(--bt-typography-body-small-line-height); }
+.dash-detalhe__resumo { margin: 0; color: var(--bt-color-text-primary); font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-bold); font-variant-numeric: tabular-nums; }
+.dash-detalhe .bt-table__cell { font-variant-numeric: tabular-nums; }
+.dash-detalhe__celula { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); }
+.dash-detalhe__abrir { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: var(--bt-radius-sm); color: var(--bt-color-action); }
+.dash-detalhe__abrir:hover { background-color: var(--bt-color-surface-neutral); }
+.dash-detalhe__abrir:focus-visible { outline: 0; box-shadow: var(--bt-focus-ring); }
+
 /* ---------- Chips (comparativos e apoios rotulados) ---------- */
 .dash-chip { display: inline-flex; align-items: center; gap: var(--bt-space-1); max-width: 100%; min-height: 22px; padding: var(--bt-space-0-5) var(--bt-space-1-5) var(--bt-space-0-5) var(--bt-space-0-5); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-sm); background-color: var(--bt-color-surface-neutral); color: var(--bt-color-text-primary); font-family: var(--bt-font-family-sans); font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-bold); line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .dash-chip__rotulo { flex: 0 0 auto; align-self: stretch; display: inline-grid; place-items: center; min-width: 22px; margin-right: var(--bt-space-0-5); padding: 0 var(--bt-space-1); border-radius: var(--bt-radius-xs); background-color: var(--bt-color-brand); color: var(--bt-color-surface); font-weight: var(--bt-font-weight-extrabold); letter-spacing: .04em; text-transform: uppercase; }
@@ -193,8 +217,10 @@
   .dash-periodo { flex-wrap: nowrap; margin: calc(-1 * var(--bt-space-1)); padding: var(--bt-space-1); overflow-x: auto; overscroll-behavior-x: contain; }
   .dash-periodo > .bt-button { flex: 0 0 auto; }
   /* O DS usa "1fr auto" no celular; com texto rotulado na 2ª coluna o "auto" esmagaria a 1ª. */
-  .dash-card .bt-table__row { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); align-items: start; }
-  .dash-card .bt-table__cell { align-items: flex-start; }
+  .dash-card .bt-table__row, .dash-detalhe .bt-table__row { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); align-items: start; }
+  .dash-detalhe .bt-table__row:has(.dash-detalhe__abrir) { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) 44px; }
+  .dash-card .bt-table__cell, .dash-detalhe .bt-table__cell { align-items: flex-start; }
+  .dash-detalhe__abrir { width: 44px; height: 44px; }
   /* Na lista do celular, a 1ª coluna (título da linha) leva a hierarquia. */
   .dash-card .bt-table__row > .bt-table__cell:first-child { color: var(--bt-color-text-primary); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); overflow-wrap: anywhere; }
 }

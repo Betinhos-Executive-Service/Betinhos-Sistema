@@ -40,7 +40,9 @@ export function cpPendentes(rows: Reserva[]) {
 export const servicosFuturos = (rows: Reserva[], nowMs: number) =>
   rows.filter((r) => Number.isFinite(r.saidaMs) && r.saidaMs > nowMs && normL(r.categoriaItemLabel).includes('servico') && reservavel(r) && !produzido(r))
 
-export const aReceber = (rows: Reserva[]) => soma(rows.filter((r) => r.cpConcluida && r.opId && r.fatStatus !== FAT_PAGO && r.valor > 0))
+/** Serviço que entra no "A receber": CP concluída, com OP, faturamento não pago e valor positivo. */
+export const aReceberLinha = (r: Reserva) => r.cpConcluida && Boolean(r.opId) && r.fatStatus !== FAT_PAGO && r.valor > 0
+export const aReceber = (rows: Reserva[]) => soma(rows.filter(aReceberLinha))
 
 /** `getPeriodValueAndCount`: soma do Dataverse; zero sem segmento cai no histórico fixo (contagem fica null). */
 export function valorDoPeriodo(todas: Reserva[], inicio: string, fim: string, f: Filtros) {
