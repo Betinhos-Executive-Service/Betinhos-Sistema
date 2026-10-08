@@ -12,7 +12,7 @@ import { KpiCard, KpiLinha } from '../KpiCard'
 import { ChipAnt } from '../KpiChip'
 import { SemDadoBloco, Vazio } from '../Estados'
 import { Duplo, Nome, Participacao, Rolagem, Status, ValorDelta, col, larguraMinima, pct, tomStatus } from '../Celulas'
-import { COLUNA_LARGA, Expansivel, MEDIA_MOBILE, VER_MESES, juntar, useLinhasAbertas } from '../Linhas'
+import { COLUNA_LARGA, Expansivel, MEDIA_MOBILE, VER_MESES, juntar, useLinhasAbertas, useTopCelular } from '../Linhas'
 import type { DadosAba, PropsAba } from './abas'
 import './abas-servicos-financeiro.css'
 
@@ -178,12 +178,13 @@ function ClientesCard({ fi, periodo }: { fi: Financeiro; periodo: string }) {
         ) : null),
       },
     ]
-  const tabela = <Table className="dash-fi-clientes" columns={colunas} rows={fi.clientes} rowKey={(l) => l.cliente} empty={<Vazio titulo="Nenhum cliente no período" />} style={mobile ? undefined : { minWidth: larguraMinima(TRILHAS, VAO) }} />
+  const top = useTopCelular(fi.clientes, mobile)
+  const tabela = <Table className="dash-fi-clientes" columns={colunas} rows={top.linhas} rowKey={(l) => l.cliente} empty={<Vazio titulo="Nenhum cliente no período" />} style={mobile ? undefined : { minWidth: larguraMinima(TRILHAS, VAO) }} />
   return (
     <AnaliseCard
       titulo="Clientes" periodo={periodo} unidade="R$ e serviços por cliente" valor={int(fi.kpis.clientesAtivos)}
       sub={`${fi.kpis.clientesAtivos === 1 ? 'cliente ativo' : 'clientes ativos'} · ordenados por faturamento`} largo
-      tabela={mobile ? tabela : <Rolagem rotulo="Faturamento por cliente" alturaMax={560}>{tabela}</Rolagem>}
+      tabela={mobile ? <>{tabela}{top.botao}</> : <Rolagem rotulo="Faturamento por cliente" alturaMax={560}>{tabela}</Rolagem>}
     />
   )
 }

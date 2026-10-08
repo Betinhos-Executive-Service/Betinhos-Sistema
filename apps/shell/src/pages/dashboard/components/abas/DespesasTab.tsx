@@ -14,7 +14,7 @@ import { AbaCarregando } from '../Carregando'
 import { Duplo, Nome, Participacao, Rolagem, pct } from '../Celulas'
 import { KpiCard, KpiLinha, type TomKpi } from '../KpiCard'
 import { ChipAnt } from '../KpiChip'
-import { COLUNA_LARGA, Linhas, MEDIA_MOBILE, juntar } from '../Linhas'
+import { COLUNA_LARGA, Linhas, MEDIA_MOBILE, juntar, useTopCelular } from '../Linhas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
 import type { DadosAba, PropsAba } from './abas'
 import './abas-despesas-frota.css'
@@ -171,7 +171,8 @@ function PorMotoristaCard({ linhas, periodo, mobile }: Bloco & { linhas: LinhaMo
       { key: 'a', header: 'Alimentação', align: 'end', cell: (l) => <Duplo valor={brl(l.alimentacao)} apoio={`${brl(l.alimentacaoMediaDia)}/dia`} /> },
       { key: 't', header: 'Total', align: 'end', cell: (l) => forte(brl(l.total)) },
     ]
-  const tabela = <Table columns={colunas} rows={linhas} rowKey={(l) => l.key} empty={<Vazio titulo="Nenhuma despesa com motorista no período" />} />
+  const top = useTopCelular(linhas, mobile)
+  const tabela = <><Table columns={colunas} rows={top.linhas} rowKey={(l) => l.key} empty={<Vazio titulo="Nenhuma despesa com motorista no período" />} />{top.botao}</>
   return (
     <AnaliseCard
       titulo="Por motorista" periodo={periodo} unidade="R$ por motorista" largo

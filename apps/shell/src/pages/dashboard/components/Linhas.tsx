@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useId, useState } from 'react'
+import { useCallback, useEffect, useId, useState, type ReactNode } from 'react'
 import { Button } from '@betinhos/ui'
+import { int } from '../domain/format'
 
 /** Viewport em que o `Table` do DS esconde o cabeçalho e mostra só duas colunas. */
 export const MEDIA_MOBILE = '(max-width: 820px)'
@@ -9,6 +10,26 @@ export const COLUNA_LARGA = 'minmax(0, 2fr)'
 /** Várias linhas de texto dentro de uma célula (ex.: uma por mês). Valores vazios são ignorados. */
 export function Linhas({ itens }: { itens: string[] }) {
   return <span className="dash-linhas">{itens.filter(Boolean).map((texto, i) => <span key={i}>{texto}</span>)}</span>
+}
+
+/** Quantas linhas as listas longas mostram no celular antes do "Ver todos". */
+export const TOP_CELULAR = 10
+
+/**
+ * Listas longas no celular (≤ 820 px): só as 10 primeiras linhas e o botão "Ver todos (N)", que alterna com "Mostrar só as 10 primeiras".
+ * No desktop devolve todas as linhas e nenhum botão (comportamento inalterado).
+ */
+export function useTopCelular<T>(linhas: T[], mobile: boolean): { linhas: T[]; botao: ReactNode } {
+  const [todas, setTodas] = useState(false)
+  if (!mobile || linhas.length <= TOP_CELULAR) return { linhas, botao: null }
+  return {
+    linhas: todas ? linhas : linhas.slice(0, TOP_CELULAR),
+    botao: (
+      <Button className="dash-ver-todos" variant="secondary" size="touch" fullWidth aria-expanded={todas} onClick={() => setTodas(!todas)}>
+        {todas ? `Mostrar só as ${TOP_CELULAR} primeiras` : `Ver todos (${int(linhas.length)})`}
+      </Button>
+    ),
+  }
 }
 
 /** Junta partes de uma linha rotulada: "Meta R$ 1,0k · Realizado R$ 2,0k". */

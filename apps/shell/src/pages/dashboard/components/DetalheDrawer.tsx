@@ -6,7 +6,7 @@ import { brl, int } from '../domain/format'
 import { useMedia } from '../../operacional/useMedia'
 import { forte, resto, dataBR } from './abas/MoMaMuComum'
 import { Vazio } from './Estados'
-import { MEDIA_MOBILE, juntar } from './Linhas'
+import { MEDIA_MOBILE, juntar, useTopCelular } from './Linhas'
 
 /* Drill-down: um único Drawer (DS §10.12, wide) na página; KPIs, alertas e linhas o abrem com a lista já calculada no domínio. */
 
@@ -48,7 +48,7 @@ export function DetalheDrawer({ detalhe, aberto, onFechar, clientUrl }: { detalh
     <Drawer open={aberto} onClose={onFechar} title={detalhe.titulo} eyebrow="Detalhe do indicador" size="wide">
       <div className="dash-detalhe">
         <p className="dash-detalhe__descricao">{detalhe.descricao}</p>
-        <Lista detalhe={detalhe} clientUrl={clientUrl} />
+        <Lista key={detalhe.titulo} detalhe={detalhe} clientUrl={clientUrl} />
       </div>
     </Drawer>
   )
@@ -56,6 +56,9 @@ export function DetalheDrawer({ detalhe, aberto, onFechar, clientUrl }: { detalh
 
 function Lista({ detalhe, clientUrl }: { detalhe: Detalhe; clientUrl: string | null }) {
   const mobile = useMedia(MEDIA_MOBILE)
+  // Celular: as 10 primeiras e "Ver todos (N)" (o resumo acima sempre conta a lista inteira).
+  const top = useTopCelular<{ id: string }>(detalhe.linhas, mobile)
+  const rows = <R,>() => top.linhas as unknown as R[]
   const link = (entidade: Entidade, id: string) => linkRegistro(clientUrl, entidade, id)
   const linkCol = <R extends { id: string },>(entidade: Entidade, nome: (r: R) => string): TableColumn<R> =>
     ({ key: 'abrir', header: <span className="dash-sr">Abrir no Dataverse</span>, width: '44px', align: 'end', cell: (r) => <Abrir href={link(entidade, r.id)} nome={nome(r)} /> })
@@ -80,7 +83,8 @@ function Lista({ detalhe, clientUrl }: { detalhe: Detalhe; clientUrl: string | n
     if (comLink) colunas.push(linkCol<LinhaServicoDetalhe>('reserva', (l) => `serviço ${codigo(l)} de ${dataBR(l.dia)}`))
     return <>
       <p className="dash-detalhe__resumo">{plural(detalhe.linhas.length, 'serviço', 'serviços')} · {brl(total)}</p>
-      <Table columns={colunas} rows={detalhe.linhas} rowKey={(l) => l.id} empty={<Vazio titulo="Nenhum serviço nesta lista" />} />
+      <Table columns={colunas} rows={rows<LinhaServicoDetalhe>()} rowKey={(l) => l.id} empty={<Vazio titulo="Nenhum serviço nesta lista" />} />
+      {top.botao}
     </>
   }
 
@@ -98,7 +102,8 @@ function Lista({ detalhe, clientUrl }: { detalhe: Detalhe; clientUrl: string | n
     if (comLink) colunas.push(linkCol<LinhaCnhDetalhe>('funcionario', (l) => l.motorista))
     return <>
       <p className="dash-detalhe__resumo">{plural(detalhe.linhas.length, 'motorista', 'motoristas')}</p>
-      <Table columns={colunas} rows={detalhe.linhas} rowKey={(l) => `${l.id}-${l.validade}`} empty={<Vazio titulo="Nenhuma CNH em atenção" />} />
+      <Table columns={colunas} rows={rows<LinhaCnhDetalhe>()} rowKey={(l) => `${l.id}-${l.validade}`} empty={<Vazio titulo="Nenhuma CNH em atenção" />} />
+      {top.botao}
     </>
   }
 
@@ -112,6 +117,7 @@ function Lista({ detalhe, clientUrl }: { detalhe: Detalhe; clientUrl: string | n
   if (comLink) colunas.push(linkCol<LinhaMultaDetalhe>('multa', (l) => `multa de ${dataBR(l.dia)}`))
   return <>
     <p className="dash-detalhe__resumo">{plural(detalhe.linhas.length, 'multa', 'multas')}</p>
-    <Table columns={colunas} rows={detalhe.linhas} rowKey={(l) => l.id || `${l.dia}-${l.motorista}-${l.infracao}`} empty={<Vazio titulo="Nenhuma multa pendente no período" />} />
+    <Table columns={colunas} rows={rows<LinhaMultaDetalhe>()} rowKey={(l) => l.id || `${l.dia}-${l.motorista}-${l.infracao}`} empty={<Vazio titulo="Nenhuma multa pendente no período" />} />
+    {top.botao}
   </>
 }
