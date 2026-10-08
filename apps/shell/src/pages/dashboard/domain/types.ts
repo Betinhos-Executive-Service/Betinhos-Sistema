@@ -36,8 +36,8 @@ export type Reserva = {
   /** Valor bruto de `new_datadefinalizacao` ('' sem data). */
   finalizadoRaw: string
 }
-/** `dia` e `aprovacaoDia` em Brasília; `tipoReparo` é o rótulo de `cr40f_tipodoreparo` ('—' vazio). */
-export type Manutencao = { dia: string; valor: number; aprovacaoDia: string; statusLabel: string; tipoReparo: string; veiculoId: string }
+/** `dia`, `aprovacaoDia` e `criadoDia` (`createdon`) em Brasília; `tipoReparo` é o rótulo de `cr40f_tipodoreparo` ('—' vazio). */
+export type Manutencao = { dia: string; valor: number; aprovacaoDia: string; statusLabel: string; tipoReparo: string; veiculoId: string; criadoDia: string }
 /** `motorista` é o apelido do funcionário (via id) ou o rótulo do lookup ('—'); infração pelo `$expand`, código cai no rótulo do lookup. */
 export type Multa = {
   dia: string; status: number | null; statusLabel: string; motoristaId: string; motorista: string; veiculoId: string; infracaoCodigo: string; infracaoDescricao: string
@@ -68,7 +68,10 @@ export type Pagante = {
   forma: number | null; formaLabel: string; status: number | null; statusLabel: string
   criadoRaw: string; criadoDia: string; primeiroPagamentoRaw: string
 }
-/** Linha do `buildExpenseRows` do legado: categoria/forma pelos cadastros, motorista pelo nome completo e empresa normalizada (BETINHOS/DEPAULA). */
+/**
+ * Linha do `buildExpenseRows` do legado: categoria/forma pelos cadastros, motorista pelo nome completo e empresa normalizada (BETINHOS/DEPAULA).
+ * `dia` é o texto bruto `slice(0, 10)` de `cr40f_datagasto` (o `dateKey` do legado); `mes` é `dia.slice(0, 7)`.
+ */
 export type Despesa = {
   id: string; dia: string; mes: string; valor: number
   categoriaId: string; categoria: string; formaId: string; forma: string; empresa: string

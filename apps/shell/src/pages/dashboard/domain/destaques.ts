@@ -8,7 +8,8 @@ export type ProducaoPT = { classificados: number; meses: { mes: string; rotulo: 
 
 export function producaoPropriaTerceira(rv: Reserva[], veiculos: Veiculo[]): ProducaoPT {
   const tipo = new Map(veiculos.map((v) => [v.id, v.categoria]))
-  const classificados = rv.map((r) => ({ r, kind: (tipo.get(r.veiculoId) ?? '') as CategoriaVeiculo })).filter((x) => x.kind)
+  // Só Própria e Terceirizada contam (como o legado); Aluguel e sem categoria ficam de fora do total e do gráfico.
+  const classificados = rv.map((r) => ({ r, kind: (tipo.get(r.veiculoId) ?? '') as CategoriaVeiculo })).filter((x) => x.kind === 'Propria' || x.kind === 'Terceirizada')
   // O legado usa o mês do texto bruto (UTC), sem fuso.
   const meses = [...new Set(classificados.map(({ r }) => r.saidaRaw.slice(0, 7)).filter(Boolean))].sort()
   const conta = (mes: string, kind: CategoriaVeiculo) => classificados.filter((x) => x.kind === kind && x.r.saidaRaw.slice(0, 7) === mes).length

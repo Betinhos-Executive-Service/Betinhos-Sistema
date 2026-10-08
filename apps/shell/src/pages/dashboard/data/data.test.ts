@@ -155,7 +155,7 @@ describe('conjuntos das abas', () => {
     expect(reservasPath('res', '2024-01-01', '2026-10-15')).toContain(',new_datadefinalizacao')
     expect(veiculosPath('vei')).toBe('vei?$select=cr40f_veiculosid,cr40f_statusdoveiculo,new_categoriadoveiculo,cr40f_placa,cr40f_marca,cr40f_modelo,cr40f_blindado,cr40f_anodefabricacao')
     expect(funcionariosPath('fun')).toBe('fun?$select=cr40f_funcionariosid,cr40f_nomecompleto,cr40f_status,cr40f_validadedacnh,cr40f_funcao,new_apelido,cr40f_nomedaempresa')
-    expect(manutencoesPath('man')).toBe('man?$select=cr40f_datamanutencao,cr40f_valor,cr40f_datadaaprovacao,cr40f_status,cr40f_tipodoreparo,_cr40f_placa_carro_value')
+    expect(manutencoesPath('man')).toBe('man?$select=cr40f_datamanutencao,cr40f_valor,cr40f_datadaaprovacao,cr40f_status,cr40f_tipodoreparo,_cr40f_placa_carro_value,createdon')
   })
 
   it('multas com $expand da infração e versão sem expand (fallback)', () => {
@@ -163,10 +163,10 @@ describe('conjuntos das abas', () => {
     expect(multasPath('mul', false)).toBe('mul?$select=cr40f_dataehorario,cr40f_status,_cr40f_codigodainfracao_value,_cr40f_motorista_value,_cr40f_placa_value')
   })
 
-  it('pagantes e despesas pela janela; cadastros de despesa inteiros e ativos', () => {
-    // Pagantes: todos os ativos, sem janela (o legado não filtra; atrasados e CP mais antiga dependem dos pendentes antigos).
-    expect(decodeURIComponent(pagantesPath('pag'))).toBe('pag?$select=cr40f_pagantesid,createdon,_cr40f_financeiro_value,cr40f_status,cr40f_valor,cr40f_formadepagamento,_cr40f_bancodedados_value,cr40f_datadoprimeiropagamento&$filter=statecode eq 0')
-    expect(decodeURIComponent(pagantesPath('pag', false))).toBe('pag?$select=cr40f_pagantesid,createdon,_cr40f_financeiro_value,cr40f_status,cr40f_valor,cr40f_formadepagamento,_cr40f_bancodedados_value&$filter=statecode eq 0')
+  it('pagantes inteiros, sem filtro (como o legado); despesas pela janela; cadastros de despesa inteiros e ativos', () => {
+    // Pagantes: todos, sem $filter (o legado não filtra; atrasados e CP mais antiga dependem dos pendentes antigos).
+    expect(pagantesPath('pag')).toBe('pag?$select=cr40f_pagantesid,createdon,_cr40f_financeiro_value,cr40f_status,cr40f_valor,cr40f_formadepagamento,_cr40f_bancodedados_value,cr40f_datadoprimeiropagamento')
+    expect(pagantesPath('pag', false)).toBe('pag?$select=cr40f_pagantesid,createdon,_cr40f_financeiro_value,cr40f_status,cr40f_valor,cr40f_formadepagamento,_cr40f_bancodedados_value')
     const des = despesasPath('des', '2024-01-01', '2026-10-15')
     expect(des).toContain('des?$select=cr40f_despesaoperacionalid,cr40f_nome,cr40f_datagasto,cr40f_valor,_cr40f_categoria_value,_cr40f_formapagamento_value,_cr40f_motorista_value,_cr40f_reserva_value,cr40f_statusfinanceiro,cr40f_statusanexo&$filter=')
     expect(decodeURIComponent(des)).toContain(`statecode eq 0 and ${J('cr40f_datagasto')}`)
@@ -212,9 +212,9 @@ describe('conjuntos das abas', () => {
   it('manutenção com aprovação, status, tipo do reparo e veículo', () => {
     expect(mapManutencao({
       cr40f_datamanutencao: '2026-10-02T12:00:00Z', cr40f_valor: 450, cr40f_datadaaprovacao: '2026-09-28T13:00:00Z', cr40f_status: 202410002, [`cr40f_status${F}`]: 'Realizado',
-      cr40f_tipodoreparo: 1, [`cr40f_tipodoreparo${F}`]: 'Preventiva sistemática', _cr40f_placa_carro_value: 'V1',
-    })).toEqual({ dia: '2026-10-02', valor: 450, aprovacaoDia: '2026-09-28', statusLabel: 'Realizado', tipoReparo: 'Preventiva sistemática', veiculoId: 'v1' })
-    expect(mapManutencao({})).toEqual({ dia: '', valor: 0, aprovacaoDia: '', statusLabel: '', tipoReparo: '—', veiculoId: '' })
+      cr40f_tipodoreparo: 1, [`cr40f_tipodoreparo${F}`]: 'Preventiva sistemática', _cr40f_placa_carro_value: 'V1', createdon: '2026-09-27T01:00:00Z',
+    })).toEqual({ dia: '2026-10-02', valor: 450, aprovacaoDia: '2026-09-28', statusLabel: 'Realizado', tipoReparo: 'Preventiva sistemática', veiculoId: 'v1', criadoDia: '2026-09-26' })
+    expect(mapManutencao({})).toEqual({ dia: '', valor: 0, aprovacaoDia: '', statusLabel: '', tipoReparo: '—', veiculoId: '', criadoDia: '' })
   })
 
   it('multa: infração pelo $expand, motorista pelo apelido do funcionário, fallback no rótulo do lookup', () => {
@@ -281,7 +281,8 @@ describe('conjuntos das abas', () => {
       _cr40f_categoria_value: 'C1', _cr40f_formapagamento_value: 'FP1', _cr40f_motorista_value: 'M1', _cr40f_reserva_value: 'R1',
       cr40f_statusfinanceiro: 100000001, [`cr40f_statusfinanceiro${F}`]: 'Aguardando pagamento', cr40f_statusanexo: 100000002,
     }, ctx)).toEqual({
-      id: 'd1', dia: '2026-10-01', mes: '2026-10', valor: 180, categoriaId: 'c1', categoria: 'Hospedagem', formaId: 'fp1', forma: 'Pix', empresa: 'BETINHOS',
+      // `dia` é o texto bruto slice(0, 10), como o `dateKey` do legado (01:00Z seria 01/10 em Brasília).
+      id: 'd1', dia: '2026-10-02', mes: '2026-10', valor: 180, categoriaId: 'c1', categoria: 'Hospedagem', formaId: 'fp1', forma: 'Pix', empresa: 'BETINHOS',
       motoristaId: 'm1', motorista: 'Carlos Oliveira', reservaId: 'r1', statusFinanceiro: 100000001, statusAnexo: 100000002, anexos: 2, descricao: 'Hotel Ibis',
     })
     const vazio = { categorias: new Map(), formas: new Map(), funcionarios: new Map(), anexos: new Map() }
@@ -339,10 +340,15 @@ describe('conjuntos das abas', () => {
       if (path.startsWith('mul?')) return [{ _cr40f_codigodainfracao_value: 'I1', [`_cr40f_codigodainfracao_value${F}`]: '745-50' }]
       return []
     })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const d = await carregarDataverse(c, SETS, '2024-01-01', '2026-10-15')
     expect(d.indisponiveis).toEqual([])
     expect(d.pagantes).toMatchObject([{ id: 'p1', valor: 10, primeiroPagamentoRaw: '' }])
     expect(d.multas).toMatchObject([{ infracaoCodigo: '745-50', infracaoDescricao: '' }])
+    // O erro da consulta completa fica registrado antes da alternativa.
+    expect(warn).toHaveBeenCalledTimes(2)
+    expect(warn.mock.calls.map((c) => String(c[1]))).toEqual(expect.arrayContaining(['Error: coluna inexistente', 'Error: navegação inexistente']))
+    warn.mockRestore()
   })
 
   it('despesas: falha em qualquer tabela de despesa marca o conjunto inteiro', async () => {
@@ -391,7 +397,11 @@ describe('conjuntos das abas', () => {
     expect(d.reservas.filter((r) => !r.id.startsWith('legacy-')).every((r) => r.tipoServico !== '—')).toBe(true)
     expect(d.reservas.some((r) => r.finalizadoRaw)).toBe(true)
     expect(new Set(d.manutencoes.map((m) => m.tipoReparo)).size).toBeGreaterThan(2)
-    expect(d.manutencoes.every((m) => m.statusLabel && m.veiculoId && m.aprovacaoDia && m.aprovacaoDia <= m.dia)).toBe(true)
+    expect(d.manutencoes.every((m) => m.statusLabel && m.veiculoId && m.aprovacaoDia && m.aprovacaoDia <= m.dia && m.criadoDia && m.criadoDia <= m.aprovacaoDia)).toBe(true)
+    // Um veículo de aluguel, usado em parte das reservas.
+    const aluguel = d.veiculos.filter((v) => v.categoria === 'Aluguel').map((v) => v.id)
+    expect(aluguel).toHaveLength(1)
+    expect(d.reservas.some((r) => r.veiculoId === aluguel[0])).toBe(true)
     expect(d.multas.every((m) => m.motoristaId && m.motorista && m.infracaoCodigo && m.infracaoDescricao && m.statusLabel)).toBe(true)
     expect(d.multas.some((m) => m.status === 202410000)).toBe(true)
     expect(d.telemetria.some((t) => t.distanciaKm > 0 && t.velocidadeMaxima > 0)).toBe(true)

@@ -98,6 +98,20 @@ describe('destaques', () => {
     expect(p.topPropria).toEqual([{ key: 'm1', nome: 'Ana', qtd: 2, fat: 200 }])
   })
 
+  it('produção própria × terceirizada: veículo de aluguel não entra nos classificados', () => {
+    const rv = [
+      reserva({ veiculoId: 'v1', motorista: 'Ana', motoristaKey: 'm1', valor: 100 }),
+      reserva({ veiculoId: 'v2', motorista: 'Bia', motoristaKey: 'm2', valor: 500 }),
+      reserva({ veiculoId: 'v3', motorista: 'Cid', motoristaKey: 'm3', valor: 900 }),
+    ]
+    const p = producaoPropriaTerceira(rv, [
+      veiculo({ id: 'v1', categoria: 'Propria' }), veiculo({ id: 'v2', categoria: 'Terceirizada' }), veiculo({ id: 'v3', categoria: 'Aluguel' }),
+    ])
+    expect(p.classificados).toBe(2)
+    expect(p.meses).toEqual([{ mes: '2026-10', rotulo: 'out/26', propria: 1, terceirizada: 1 }])
+    expect([...p.topPropria, ...p.topTerceirizada].map((t) => t.key)).toEqual(['m1', 'm2'])
+  })
+
   it('emergencial = criado no mesmo dia (texto UTC) da saída', () => {
     const rv = [
       reserva({ cliente: 'Tenaris', criadoRaw: '2026-10-05T09:00:00Z', saidaRaw: '2026-10-05T15:00:00Z' }),
