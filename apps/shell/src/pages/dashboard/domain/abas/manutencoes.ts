@@ -40,7 +40,7 @@ export type LinhaCategoria = {
   ly: number
 }
 export type PrazoManutencao = {
-  /** Média de dias entre `createdon` e a data da manutenção; null = s/dado. */
+  /** Média dos dias inteiros (floor) entre `createdon` e a data da manutenção; null = s/dado. */
   medio: number | null
   /** % dos prazos em até 10 dias; null = s/dado. */
   ate10: number | null
@@ -64,8 +64,12 @@ export type Manutencoes = {
 const custo = (rows: Manutencao[]) => rows.reduce((t, m) => t + (m.valor || 0), 0)
 /** Dias corridos entre dois dias (AAAA-MM-DD); null sem um deles. */
 const dias = (de: string, ate: string) => (de && ate ? Math.round((Date.parse(ate) - Date.parse(de)) / DIA_MS) : null)
-const prazos = (rows: Manutencao[], de: (m: Manutencao) => string) =>
-  rows.map((m) => dias(de(m), m.dia)).filter((d): d is number => d !== null && d >= 0)
+/** Aprovação → data da manutenção (meta da preventiva programada), em dias de calendário; negativos ficam fora. */
+const prazosAprovacao = (rows: Manutencao[]) =>
+  rows.map((m) => dias(m.aprovacaoDia, m.dia)).filter((d): d is number => d !== null && d >= 0)
+/** `daysBetweenValues` do legado (L10509): `floor` da diferença entre os instantes de `createdon` e da data; negativos e sem data ficam fora. */
+const prazosCriacao = (rows: Manutencao[]) =>
+  rows.map((m) => Math.floor((m.dataMs - m.criadoMs) / DIA_MS)).filter((d) => Number.isFinite(d) && d >= 0)
 const media = (v: number[]) => (v.length ? v.reduce((t, x) => t + x, 0) / v.length : null)
 const META_PREVENTIVA_DIAS = 10
 const META_NAO_CRITICA_MES = 5
@@ -79,7 +83,7 @@ function metaDe(categoria: CategoriaManutencao, rows: Manutencao[]): Pick<LinhaC
       return { meta: `Até ${META_NAO_CRITICA_MES} por mês`, status: [...porMes.values()].every((l) => l.length <= META_NAO_CRITICA_MES) ? 'dentro' : 'fora' }
     }
     case 'Preventiva programada': {
-      const medidos = prazos(rows, (m) => m.aprovacaoDia)
+      const medidos = prazosAprovacao(rows)
       const status: StatusMeta = !medidos.length ? 'sem-dado' : medidos.every((d) => d <= META_PREVENTIVA_DIAS) ? 'dentro' : 'fora'
       return { meta: `Aprovação até a data em até ${META_PREVENTIVA_DIAS} dias`, status }
     }
@@ -129,7 +133,7 @@ export function calcularManutencoes(ctx: Contexto, dados: Dados): Manutencoes {
     return { categoria, qtd: rows.length, ...metaDe(categoria, rows), lm: lmCat ? lmCat.get(categoria)?.length ?? 0 : null, ly: lyCat.get(categoria)?.length ?? 0 }
   })
 
-  const medidos = prazos(mans, (m) => m.criadoDia)
+  const medidos = prazosCriacao(mans)
   return {
     kpis: { total: mans.length, custoTotal: total, emAndamento, custoMedio: mans.length ? total / mans.length : 0, pctReceita: fat > 0 ? (total / fat) * 100 : 0 },
     custoPorMes,
@@ -139,8 +143,8 @@ export function calcularManutencoes(ctx: Contexto, dados: Dados): Manutencoes {
       medio: media(medidos),
       ate10: medidos.length ? (medidos.filter((d) => d <= META_PREVENTIVA_DIAS).length / medidos.length) * 100 : null,
       medidos: medidos.length,
-      lm: lmRows ? media(prazos(lmRows, (m) => m.criadoDia)) : null,
-      ly: media(prazos(lyRows, (m) => m.criadoDia)),
+      lm: lmRows ? media(prazosCriacao(lmRows)) : null,
+      ly: media(prazosCriacao(lyRows)),
     },
     mostrarLM: lmVisivel,
   }

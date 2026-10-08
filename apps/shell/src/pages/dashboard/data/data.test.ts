@@ -213,8 +213,11 @@ describe('conjuntos das abas', () => {
     expect(mapManutencao({
       cr40f_datamanutencao: '2026-10-02T12:00:00Z', cr40f_valor: 450, cr40f_datadaaprovacao: '2026-09-28T13:00:00Z', cr40f_status: 202410002, [`cr40f_status${F}`]: 'Realizado',
       cr40f_tipodoreparo: 1, [`cr40f_tipodoreparo${F}`]: 'Preventiva sistemática', _cr40f_placa_carro_value: 'V1', createdon: '2026-09-27T01:00:00Z',
-    })).toEqual({ dia: '2026-10-02', valor: 450, aprovacaoDia: '2026-09-28', statusLabel: 'Realizado', tipoReparo: 'Preventiva sistemática', veiculoId: 'v1', criadoDia: '2026-09-26' })
-    expect(mapManutencao({})).toEqual({ dia: '', valor: 0, aprovacaoDia: '', statusLabel: '', tipoReparo: '—', veiculoId: '', criadoDia: '' })
+    })).toEqual({
+      dia: '2026-10-02', valor: 450, aprovacaoDia: '2026-09-28', statusLabel: 'Realizado', tipoReparo: 'Preventiva sistemática', veiculoId: 'v1', criadoDia: '2026-09-26',
+      dataMs: Date.parse('2026-10-02T12:00:00Z'), criadoMs: Date.parse('2026-09-27T01:00:00Z'),
+    })
+    expect(mapManutencao({})).toEqual({ dia: '', valor: 0, aprovacaoDia: '', statusLabel: '', tipoReparo: '—', veiculoId: '', criadoDia: '', dataMs: NaN, criadoMs: NaN })
   })
 
   it('multa: infração pelo $expand, motorista pelo apelido do funcionário, fallback no rótulo do lookup', () => {

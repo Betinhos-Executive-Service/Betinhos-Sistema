@@ -122,18 +122,19 @@ describe('calcularManutencoes', () => {
     expect(cat(calcularManutencoes(ctxDe(), dadosCom([prev(''), prev('2026-10-13')])), 'Preventiva programada')).toMatchObject({ status: 'sem-dado' })
   })
 
-  it('prazo: média de dias entre a criação (createdon) e a data, % em até 10 dias; negativos e sem data ficam fora; LM/LY', () => {
+  it('prazo: dias inteiros (floor) entre a criação (createdon) e a data, sobre os instantes, como o daysBetweenValues; % em até 10; LM/LY', () => {
     const outubro: Filtros = { ...f, inicio: '2026-10-01', fim: '2026-10-15' }
+    const m = (dia: string, criado: string, data: string) => manutencao({ dia, criadoMs: criado ? Date.parse(criado) : NaN, dataMs: Date.parse(data) })
     const mans = [
-      manutencao({ dia: '2026-10-11', criadoDia: '2026-10-01' }),
-      manutencao({ dia: '2026-10-14', criadoDia: '2026-10-01' }),
-      manutencao({ dia: '2026-10-05', criadoDia: '2026-10-05' }),
-      manutencao({ dia: '2026-10-05', criadoDia: '2026-10-06' }),
-      manutencao({ dia: '2026-10-05', criadoDia: '' }),
-      manutencao({ dia: '2026-09-10', criadoDia: '2026-09-06' }),
+      m('2026-10-11', '2026-10-01T20:00:00Z', '2026-10-11T12:00:00Z'), // 9,67 → 9 (arredondando daria 10)
+      m('2026-10-14', '2026-10-01T12:00:00Z', '2026-10-14T12:00:00Z'), // 13
+      m('2026-10-05', '2026-10-05T10:00:00Z', '2026-10-05T15:00:00Z'), // 0,2 → 0
+      m('2026-10-05', '2026-10-05T16:00:00Z', '2026-10-05T15:00:00Z'), // −0,04 → −1: fica fora (arredondando daria 0 e entraria)
+      m('2026-10-05', '', '2026-10-05T15:00:00Z'), // sem createdon: fora
+      m('2026-09-10', '2026-09-06T00:00:00Z', '2026-09-10T12:00:00Z'), // LM: 4,5 → 4
     ]
     const r = calcularManutencoes(ctxDe([], outubro), dadosCom(mans))
-    expect(r.prazo?.medio).toBeCloseTo(23 / 3, 10)
+    expect(r.prazo?.medio).toBeCloseTo(22 / 3, 10)
     expect(r.prazo).toMatchObject({ medidos: 3, lm: 4, ly: null })
     expect(r.prazo?.ate10).toBeCloseTo(200 / 3, 10)
     expect(calcularManutencoes(ctxDe(), dadosCom([manutencao()])).prazo).toMatchObject({ medio: null, ate10: null, medidos: 0 })
