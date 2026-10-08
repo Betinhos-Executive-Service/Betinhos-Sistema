@@ -4,9 +4,11 @@ import { Button, Input, Select, Spinner, StatusBadge, Switch, Textarea, Tooltip,
 import { AlertTriangle, Check, Lock } from 'lucide-react'
 import { cellKind, statusTone } from '../domain/cells'
 import type { EditValue } from '../domain/edit'
-import { formatCell, parseMoney, toDateTimeLocal } from '../domain/format'
+import { decideChoice, decideCommit, draftOf, lookupOptions, sameId, type PickedOption } from '../domain/editing'
+import { formatCell } from '../domain/format'
 import { columnLabel, rowKey } from '../domain/layout'
 import type { AttributeInfo, CellStatus, Column, LookupOption } from '../domain/types'
+import { useLookupSearch } from './useLookupSearch'
 
 type Props = {
   row: Row
@@ -23,15 +25,12 @@ type Props = {
   editable: boolean
 }
 
-type Pick = { value: string; label: string }
+type Pick = PickedOption
 
 const STATUS_COLUMNS: ReadonlySet<string> = new Set(['cr40f_status', 'cr40f_statusdefaturamento'])
-const SEARCH_DELAY_MS = 250
 const MEMO_MAX_LINES = 8
-const moneyInput = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })
 
 const isSelect = (kind: string) => kind === 'choice' || kind === 'lookup'
-const sameId = (a: unknown, b: unknown) => a != null && b != null && String(a).toLowerCase() === String(b).toLowerCase()
 const cellsOf = (row: Element) => Array.from(row.children).filter((child) => child.getAttribute('role') === 'gridcell')
 
 /** Foca a célula; as que não são focáveis (primeira coluna, seleção) entregam o foco ao controle de dentro. */
@@ -89,29 +88,22 @@ export function Cell({ row, column, info, status, onSave, onReset, search, edita
   const [draft, setDraft] = useState('')
   const [pick, setPick] = useState<Pick | null>(null)
   const [options, setOptions] = useState<SelectOption[]>([])
-  const [searching, setSearching] = useState(false)
+  const lookup = useLookupSearch(search)
   const [localError, setLocalError] = useState<string | null>(null)
   // Último valor digitado ou escolhido, para "Tentar de novo" reabrir a edição de onde parou.
   const retryRef = useRef<{ draft: string; pick: Pick | null }>({ draft: '', pick: null })
   const keepRef = useRef<Pick | null>(null)
   // Boolean não tem modo de edição: guarda o último valor tentado para o "Tentar de novo" regravar.
   const lastBoolean = useRef<boolean | null>(null)
-  const timerRef = useRef(0)
-  const tokenRef = useRef(0)
 
   const setEditing = (value: boolean) => { editingRef.current = value; setEditingState(value) }
-  useEffect(() => () => window.clearTimeout(timerRef.current), [])
 
+  // Lookup: depois da busca, as opções vêm do servidor, com a atual no topo.
+  const selectOptions = kind === 'lookup' && lookup.found ? lookupOptions(lookup.found, keepRef.current) : options
   const message = localError ?? (status.kind === 'error' ? status.message : null)
   const state = message ? 'error' : status.kind
 
   const current = (): Pick | null => (raw == null || raw === '' ? null : { value: String(raw), label: text })
-  const initialDraft = () => {
-    if (raw == null) return ''
-    if (kind === 'money') return typeof raw === 'number' ? moneyInput.format(raw) : ''
-    if (kind === 'datetime') return toDateTimeLocal(String(raw))
-    return String(raw)
-  }
 
   const restoreFocus = () => {
     // Depois do commit: se o foco caiu no corpo da página (o controle saiu), devolve à célula; se o usuário foi para outra, não toma.
@@ -122,9 +114,7 @@ export function Cell({ row, column, info, status, onSave, onReset, search, edita
   }
 
   const finish = () => {
-    window.clearTimeout(timerRef.current)
-    tokenRef.current += 1
-    setSearching(false)
+    lookup.reset()
     setLocalError(null)
     setEditing(false)
   }
@@ -135,6 +125,7 @@ export function Cell({ row, column, info, status, onSave, onReset, search, edita
     if (!canEdit || editingRef.current || status.kind === 'saving') return
     if (status.kind === 'error') onReset()
     setLocalError(null)
+    lookup.reset()
     if (isSelect(kind)) {
       const chosen = retry ? retryRef.current.pick : current()
       const keep = current()
@@ -148,7 +139,7 @@ export function Cell({ row, column, info, status, onSave, onReset, search, edita
         setOptions(list.filter((o, i) => list.findIndex((p) => sameId(p.value, o.value)) === i))
       }
     } else {
-      setDraft(retry ? retryRef.current.draft : char ?? initialDraft())
+      setDraft(retry ? retryRef.current.draft : char ?? draftOf(kind, row, key))
     }
     setEditing(true)
   }
@@ -173,41 +164,14 @@ export function Cell({ row, column, info, status, onSave, onReset, search, edita
   /** Confirma o que está digitado. `false` quando o valor é inválido e a edição continua aberta. */
   const confirm = (): boolean => {
     if (!editingRef.current) return true
-    switch (kind) {
-      case 'text': case 'memo': {
-        const before = raw == null ? '' : String(raw)
-        retryRef.current = { draft, pick: null }
-        finish()
-        if (draft.trim() !== before.trim()) submit(draft)
-        return true
-      }
-      case 'money': {
-        const typed = draft.trim()
-        retryRef.current = { draft, pick: null }
-        if (typed === '') {
-          finish()
-          if (raw != null) submit(null)
-          return true
-        }
-        const value = parseMoney(typed)
-        if (value == null) { setLocalError('Valor inválido.'); return false }
-        finish()
-        if (value !== raw) submit(value)
-        return true
-      }
-      case 'datetime': {
-        // Data pela metade (campo do navegador incompleto) chega como '' e apagaria o valor: trata como inválida.
-        if (inputRef.current?.validity.badInput) { setLocalError('Data ou hora inválida.'); return false }
-        retryRef.current = { draft, pick: null }
-        finish()
-        if (draft !== toDateTimeLocal(raw == null ? null : String(raw))) submit(draft)
-        return true
-      }
-      default:
-        // Choice e lookup já gravaram ao escolher; sair sem escolher só fecha.
-        finish()
-        return true
-    }
+    // Choice e lookup já gravaram ao escolher; sair sem escolher só fecha.
+    if (isSelect(kind)) { finish(); return true }
+    const decision = decideCommit(kind, draft, raw, inputRef.current?.validity.badInput === true)
+    retryRef.current = { draft, pick: null }
+    if (decision && 'error' in decision) { setLocalError(decision.error); return false }
+    finish()
+    if (decision) submit(decision.submit)
+    return true
   }
 
   const retry = () => {
@@ -219,38 +183,12 @@ export function Cell({ row, column, info, status, onSave, onReset, search, edita
   const cancel = () => { finish(); restoreFocus() }
 
   const chosen = (value: string | null) => {
-    const option = options.find((o) => o.value === value)
+    const option = selectOptions.find((o) => o.value === value)
     retryRef.current = { draft: '', pick: value == null ? null : { value, label: option?.label ?? value } }
     finish()
     restoreFocus()
-    if (value == null) {
-      if (raw != null) submit(null)
-    } else if (kind === 'choice') {
-      if (Number(value) !== raw) submit(Number(value))
-    } else if (!sameId(value, raw)) {
-      submit({ id: value, nome: option?.label ?? '' })
-    }
-  }
-
-  const onSearch = (typed: string) => {
-    window.clearTimeout(timerRef.current)
-    const run = () => {
-      const token = ++tokenRef.current
-      setSearching(true)
-      search(typed).then(
-        (list) => {
-          if (token !== tokenRef.current) return
-          const keep = keepRef.current
-          const found = list.map((o) => ({ value: keep && sameId(keep.value, o.id) ? keep.value : o.id, label: o.nome }))
-          setOptions(keep && !found.some((o) => o.value === keep.value) ? [keep, ...found] : found)
-          setSearching(false)
-        },
-        () => { if (token === tokenRef.current) setSearching(false) },
-      )
-    }
-    if (typed.trim() === '') { run(); return }
-    setSearching(true)
-    timerRef.current = window.setTimeout(run, SEARCH_DELAY_MS)
+    const decision = decideChoice(kind, value, raw, option?.label ?? '')
+    if (decision) submit(decision.submit)
   }
 
   const onKeyDownCapture = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -311,12 +249,12 @@ export function Cell({ row, column, info, status, onSave, onReset, search, edita
         ref={triggerRef}
         size="compact"
         aria-label={label}
-        options={options}
+        options={selectOptions}
         value={pick?.value ?? null}
         searchable={kind === 'lookup'}
         clearable={kind === 'lookup'}
-        loading={searching}
-        onSearchChange={kind === 'lookup' ? onSearch : undefined}
+        loading={lookup.searching}
+        onSearchChange={kind === 'lookup' ? lookup.onSearch : undefined}
         onChange={chosen}
       />
     )

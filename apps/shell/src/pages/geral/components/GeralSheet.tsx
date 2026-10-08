@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Row } from '@betinhos/dataverse'
-import { Button, Field, Input, Select, Sheet, Switch, Textarea, type SelectOption } from '@betinhos/ui'
+import { Button, Field, Input, Select, Sheet, Switch, Textarea } from '@betinhos/ui'
 import { cellKind } from '../domain/cells'
 import type { EditValue } from '../domain/edit'
-import { formatCell, parseMoney, toDateTimeLocal } from '../domain/format'
+import { decideChoice, decideCommit, draftOf, lookupOptions, type PickedOption } from '../domain/editing'
+import { formatCell } from '../domain/format'
 import { columnLabel, rowKey } from '../domain/layout'
 import type { AttributeInfo, AttributeMap, CellStatus, Column, LookupOption } from '../domain/types'
+import { useLookupSearch } from './useLookupSearch'
 
 type Props = {
   row: Row
@@ -32,17 +34,6 @@ type FieldProps = {
   search: (text: string) => Promise<LookupOption[]>
 }
 
-const SEARCH_DELAY_MS = 250
-const moneyInput = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })
-const sameId = (a: unknown, b: unknown) => a != null && b != null && String(a).toLowerCase() === String(b).toLowerCase()
-
-function draftOf(kind: string, raw: unknown) {
-  if (raw == null) return ''
-  if (kind === 'money') return typeof raw === 'number' ? moneyInput.format(raw) : ''
-  if (kind === 'datetime') return toDateTimeLocal(String(raw))
-  return String(raw)
-}
-
 /** Um campo da sheet: mesmos controles da célula, em tamanho de toque, gravando ao sair do controle ou ao escolher. */
 function SheetField({ row, column, info, status, onSave, onReset, search }: FieldProps) {
   const key = rowKey(column, info)
@@ -51,45 +42,23 @@ function SheetField({ row, column, info, status, onSave, onReset, search }: Fiel
   const text = formatCell(kind, row, key)
   const label = columnLabel(column, info)
 
-  const [draft, setDraft] = useState(() => draftOf(kind, raw))
+  const [draft, setDraft] = useState(() => draftOf(kind, row, key))
   const [localError, setLocalError] = useState<string | null>(null)
-  const [found, setFound] = useState<SelectOption[] | null>(null)
-  const [searching, setSearching] = useState(false)
+  const lookup = useLookupSearch(search)
   const lastRef = useRef<EditValue>(null)
-  const timerRef = useRef(0)
-  const tokenRef = useRef(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // O valor gravado (ou revertido por erro) volta para o controle; digitar não passa por aqui.
-  useEffect(() => { setDraft(draftOf(kind, raw)); setLocalError(null) }, [kind, raw])
-  useEffect(() => () => window.clearTimeout(timerRef.current), [])
+  useEffect(() => { setDraft(draftOf(kind, row, key)); setLocalError(null) }, [kind, key, raw]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const submit = (value: EditValue) => { lastRef.current = value; void onSave(value).catch(() => undefined) }
   const message = localError ?? (status.kind === 'error' ? status.message : null)
   const hint = status.kind === 'saving' ? 'Gravando…' : status.kind === 'saved' ? 'Salvo ✓' : undefined
 
   const commit = () => {
-    switch (kind) {
-      case 'text': case 'memo': {
-        const before = raw == null ? '' : String(raw)
-        if (draft.trim() !== before.trim()) submit(draft)
-        return
-      }
-      case 'money': {
-        const typed = draft.trim()
-        if (typed === '') { if (raw != null) submit(null); return }
-        const value = parseMoney(typed)
-        if (value == null) { setLocalError('Valor inválido.'); return }
-        if (value !== raw) submit(value)
-        return
-      }
-      case 'datetime': {
-        // Data pela metade (campo do navegador incompleto) chega como '' e apagaria o valor.
-        if (inputRef.current?.validity.badInput) { setLocalError('Data ou hora inválida.'); return }
-        if (draft !== toDateTimeLocal(raw == null ? null : String(raw))) submit(draft)
-        return
-      }
-    }
+    const decision = decideCommit(kind, draft, raw, inputRef.current?.validity.badInput === true)
+    if (decision && 'error' in decision) setLocalError(decision.error)
+    else if (decision) submit(decision.submit)
   }
 
   const onType = (event: { target: { value: string } }) => { setDraft(event.target.value); setLocalError(null) }
@@ -104,31 +73,12 @@ function SheetField({ row, column, info, status, onSave, onReset, search }: Fiel
     submit(lastRef.current)
   }
 
-  const current: SelectOption | null = raw == null || raw === '' ? null : { value: String(raw), label: text }
+  const current: PickedOption | null = raw == null || raw === '' ? null : { value: String(raw), label: text }
+  const lookupList = lookupOptions(lookup.found, current)
   const choose = (value: string | null) => {
     setLocalError(null)
-    if (kind === 'choice') {
-      if (value != null && Number(value) !== raw) submit(Number(value))
-    } else if (value == null) {
-      if (raw != null) submit(null)
-    } else if (!sameId(value, raw)) {
-      submit({ id: value, nome: found?.find((o) => o.value === value)?.label ?? '' })
-    }
-  }
-
-  const onSearch = (typed: string) => {
-    window.clearTimeout(timerRef.current)
-    const run = () => {
-      const token = ++tokenRef.current
-      setSearching(true)
-      search(typed).then(
-        (list) => { if (token === tokenRef.current) { setFound(list.map((o) => ({ value: o.id, label: o.nome }))); setSearching(false) } },
-        () => { if (token === tokenRef.current) setSearching(false) },
-      )
-    }
-    if (typed.trim() === '') { run(); return }
-    setSearching(true)
-    timerRef.current = window.setTimeout(run, SEARCH_DELAY_MS)
+    const decision = decideChoice(kind, value, raw, lookupList.find((o) => o.value === value)?.label ?? '')
+    if (decision) submit(decision.submit)
   }
 
   let control
@@ -141,9 +91,7 @@ function SheetField({ row, column, info, status, onSave, onReset, search }: Fiel
     const options = current && !list.some((o) => o.value === current.value) ? [current, ...list] : list
     control = <Select size="touch" options={options} value={current?.value ?? null} searchable={false} clearable={false} onChange={choose} />
   } else if (kind === 'lookup') {
-    const list = found ?? []
-    const options = current && !list.some((o) => sameId(o.value, current.value)) ? [current, ...list] : list
-    control = <Select size="touch" options={options} value={current?.value ?? null} searchable clearable loading={searching} onSearchChange={onSearch} onChange={choose} />
+    control = <Select size="touch" options={lookupList} value={current?.value ?? null} searchable clearable loading={lookup.searching} onSearchChange={lookup.onSearch} onChange={choose} />
   }
 
   const retryButton = status.kind === 'error' ? <Button variant="ghost" size="touch" onClick={retry}>Tentar de novo</Button> : null
@@ -176,7 +124,7 @@ function SheetField({ row, column, info, status, onSave, onReset, search }: Fiel
 export function GeralSheet({ row, columns, attributes, cellStatus, open, onClose, onSave, onReset, search }: Props) {
   const name = formatCell('readonly', row, 'cr40f_id')
   return (
-    <Sheet open={open} onClose={onClose} eyebrow="Editar campos" title={`Serviço ${name}`}>
+    <Sheet open={open} onClose={onClose} eyebrow="Editar campos" expandLabel="Ver todos os campos" title={`Serviço ${name}`}>
       <div className="gr-sheet">
         {columns.map((column) => {
           if (!column.alias && column.attribute === 'cr40f_id') return null

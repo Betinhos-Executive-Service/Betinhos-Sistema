@@ -20,7 +20,6 @@ type Props = {
 }
 
 const SKELETON_CARDS = 4
-const ID = 'cr40f_id'
 const STATUS = 'cr40f_status'
 const DATA = 'cr40f_dataehorriodesada'
 
@@ -28,7 +27,7 @@ const DATA = 'cr40f_dataehorriodesada'
 export function GeralCards({ rows, columns, attributes, loading, selected, onToggle, onOpen, onEdit }: Props) {
   const find = (attribute: string) => columns.find((c) => !c.alias && c.attribute === attribute)
   const has = {
-    id: find(ID), status: find(STATUS), data: find(DATA), cliente: find('cr40f_cliente'), motorista: find('cr40f_motorista'), trajeto: find('cr40f_trajeto'),
+    status: find(STATUS), data: find(DATA), cliente: find('cr40f_cliente'), motorista: find('cr40f_motorista'), trajeto: find('cr40f_trajeto'),
   }
   const valueOf = (row: Row, column: Column | undefined) => (column ? formatCell('readonly', row, rowKey(column, attributes?.get(column.key))) : '—')
 
@@ -47,7 +46,8 @@ export function GeralCards({ rows, columns, attributes, loading, selected, onTog
         const name = formatCell('readonly', row, 'cr40f_id')
         const statusRaw = has.status ? row[STATUS] : null
         const data = has.data ? formatCell('datetime', row, rowKey(has.data, attributes?.get(has.data.key))) : null
-        const motorista = has.motorista && attributes ? valueOf(row, has.motorista) : null
+        // Só decide "sem motorista" com a metadata carregada: antes dela o lookup nem tem chave conhecida.
+        const motoristaKey = has.motorista && attributes ? rowKey(has.motorista, attributes.get(has.motorista.key)) : null
         return (
           <li key={id} className={selected.has(id) ? 'gr-card is-selected' : 'gr-card'}>
             <div className="gr-card__head">
@@ -59,9 +59,9 @@ export function GeralCards({ rows, columns, attributes, loading, selected, onTog
             </div>
             {data != null ? <p className="gr-card__line"><strong>{data}</strong></p> : null}
             {has.cliente ? <p className="gr-card__line">{valueOf(row, has.cliente)}</p> : null}
-            {motorista != null ? (
+            {motoristaKey != null ? (
               <p className="gr-card__line">
-                {motorista === '—' ? <StatusBadge tone="warning">Sem motorista</StatusBadge> : <>Motorista: <strong>{motorista}</strong></>}
+                {row[motoristaKey] == null ? <StatusBadge tone="warning">Sem motorista</StatusBadge> : <>Motorista: <strong>{formatCell('readonly', row, motoristaKey)}</strong></>}
               </p>
             ) : null}
             {has.trajeto ? <p className="gr-card__line gr-card__route">{valueOf(row, has.trajeto)}</p> : null}

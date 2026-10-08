@@ -76,7 +76,9 @@
 .gr-card__head { display: flex; align-items: center; gap: var(--bt-space-2); min-width: 0; }
 .gr-card__head .gr-open { display: inline-flex; align-items: center; min-height: var(--bt-control-height-touch); }
 .gr-card__head .bt-badge { margin-left: auto; }
-.gr-card__check { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; min-width: var(--bt-control-height-touch); min-height: var(--bt-control-height-touch); }
+.gr-card__check { display: inline-flex; flex: 0 0 auto; }
+.gr-card__check .bt-choice { align-items: center; justify-content: center; min-width: var(--bt-control-height-touch); min-height: var(--bt-control-height-touch); }
+.gr-card__check .bt-choice__control { margin-top: 0; }
 .gr-card__line { margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); overflow-wrap: anywhere; }
 .gr-card__line strong { color: var(--bt-color-text-primary); }
 .gr-card__route { color: var(--bt-color-text-primary); }
