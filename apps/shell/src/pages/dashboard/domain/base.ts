@@ -1,4 +1,4 @@
-import { CAT_ITEM_SERVICO, CSV_2026_FIM, CSV_2026_INICIO, SEM_MOTORISTA } from './codes'
+import { CAT_ITEM_SERVICO, CSV_2026_FIM, CSV_2026_INICIO } from './codes'
 import { entre } from './periodo'
 import type { Filtros, Reserva } from './types'
 
@@ -42,18 +42,20 @@ export type OpcoesFiltro = { status: Opcao[]; clientes: Opcao[]; motoristas: Opc
 
 const ordenar = (map: Map<string, string>) => [...map].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
 
-/** Opções dos filtros a partir de todas as reservas de serviço carregadas. */
+/** `populateFilters` do legado: opções de todas as reservas carregadas; o primeiro rótulo de cada chave vale, vazios ficam fora. */
 export function opcoesFiltro(todas: Reserva[]): OpcoesFiltro {
   const status = new Map<string, string>()
   const clientes = new Map<string, string>()
   const motoristas = new Map<string, string>()
   const tipos = new Map<string, string>()
+  const add = (map: Map<string, string>, value: string, label: string) => {
+    if (value && label && !map.has(value)) map.set(value, label)
+  }
   for (const r of todas) {
-    if (!ehServico(r)) continue
-    status.set(r.statusLabel, r.statusLabel)
-    clientes.set(r.cliente, r.cliente)
-    if (r.motorista !== SEM_MOTORISTA) motoristas.set(r.motoristaKey, r.motorista)
-    tipos.set(r.tipoVeiculo, r.tipoVeiculo)
+    add(status, r.statusLabel, r.statusLabel)
+    add(clientes, r.cliente, r.cliente)
+    add(motoristas, r.motoristaKey, r.motorista)
+    add(tipos, r.tipoVeiculo, r.tipoVeiculo)
   }
   return { status: ordenar(status), clientes: ordenar(clientes), motoristas: ordenar(motoristas), tipos: ordenar(tipos) }
 }

@@ -25,6 +25,19 @@ describe('base', () => {
     expect(filtrarServicos(todas, f({ clientes: ['Tenaris'] })).map((r) => r.id)).toEqual(['1'])
     expect(opcoesFiltro(todas).clientes.map((o) => o.value)).toEqual(['Embraer', 'Tenaris'])
   })
+
+  it('opções dos filtros espelham populateFilters: todas as reservas, com "Sem motorista", primeiro rótulo e sem vazios', () => {
+    const todas = [
+      reserva({ cliente: 'Tenaris' }),
+      reserva({ cliente: 'Hotel X', categoriaItem: 1 }),
+      reserva({ motoristaKey: 'id:1', motorista: 'Ana' }),
+      reserva({ motoristaKey: 'id:1', motorista: 'Ana Maria' }),
+      reserva({ cliente: '' }),
+    ]
+    const o = opcoesFiltro(todas)
+    expect(o.motoristas).toEqual([{ value: 'id:1', label: 'Ana' }, { value: 'nome:sem motorista', label: 'Sem motorista' }])
+    expect(o.clientes.map((c) => c.value)).toEqual(['Hotel X', 'Sem cliente', 'Tenaris'])
+  })
 })
 
 describe('KPIs', () => {
