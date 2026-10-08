@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ticketMensal } from '../analises'
+import { mesesComDelta, mesesOuAno, ticketMensal } from '../analises'
 import { comparacao, type Contexto } from '../kpis'
 import { reserva } from '../test-utils'
 import type { Filtros, Pagante, Reserva } from '../types'
@@ -16,6 +16,29 @@ const pagante = (p: Partial<Pagante> = {}): Pagante => ({
   status: 202410001, statusLabel: 'Pendente', criadoRaw: '2026-10-01T12:00:00Z', criadoDia: '2026-10-01', primeiroPagamentoRaw: '', ...p,
 })
 const pago = (p: Partial<Pagante> = {}) => pagante({ status: 202410002, statusLabel: 'Pago', ...p })
+
+describe('mesesOuAno e mesesComDelta (regra compartilhada do delta mensal, `fatCliDelta`)', () => {
+  it('meses com serviço; sem serviço, os 12 do ano corrente', () => {
+    expect(mesesOuAno([reserva({ saidaRaw: '2026-09-10T15:00:00Z' }), reserva()], NOW)).toEqual(['2026-09', '2026-10'])
+    expect(mesesOuAno([], NOW)).toHaveLength(12)
+    expect(mesesOuAno([], NOW)[0]).toBe('2026-01')
+  })
+  it('primeiro mês sem delta; anterior 0 com valor é novo; anterior 0 sem valor é nada; senão variação %', () => {
+    const rows = [
+      reserva({ saidaRaw: '2026-08-10T15:00:00Z', valor: 100 }),
+      reserva({ saidaRaw: '2026-10-10T15:00:00Z', valor: 300 }),
+      reserva({ saidaRaw: '2026-11-10T15:00:00Z', valor: 150 }),
+    ]
+    expect(mesesComDelta(rows, ['2026-08', '2026-09', '2026-10', '2026-11', '2026-12'])).toEqual([
+      { mes: '2026-08', valor: 100, delta: { tipo: 'nada' } },
+      { mes: '2026-09', valor: 0, delta: { tipo: 'pct', valor: -100 } },
+      { mes: '2026-10', valor: 300, delta: { tipo: 'novo' } },
+      { mes: '2026-11', valor: 150, delta: { tipo: 'pct', valor: -50 } },
+      { mes: '2026-12', valor: 0, delta: { tipo: 'pct', valor: -100 } },
+    ])
+    expect(mesesComDelta([], ['2026-09', '2026-10'])).toEqual([{ mes: '2026-09', valor: 0, delta: { tipo: 'nada' } }, { mes: '2026-10', valor: 0, delta: { tipo: 'nada' } }])
+  })
+})
 
 describe('recebido (isReceivedPayment do legado)', () => {
   it('status 202410002 ou rótulo exatamente "pago"/"paga", sem acento e sem caixa', () => {
