@@ -10,6 +10,7 @@ import { FuncionariosPage } from '../pages/funcionarios/FuncionariosPage'
 import { CurriculosPage } from '../pages/curriculos/CurriculosPage'
 import { PagantesPage } from '../pages/pagantes/PagantesPage'
 import { PessoasPage } from '../pages/pessoas/PessoasPage'
+import { GeralPage } from '../pages/geral/GeralPage'
 import { EmptyState, buttonClassName } from '@betinhos/ui'
 import { PageLayout } from './PageLayout'
 
@@ -70,6 +71,7 @@ export function RouteLayout({ host, group, item, label }: Props) {
     if (item.page === 'curriculos') return <CurriculosPage host={host} />
     if (item.page === 'pagantes') return <PagantesPage host={host} />
     if (item.page === 'pessoas') return <PessoasPage host={host} />
+    if (item.page === 'geral') return <GeralPage host={host} />
     return <ComponentsPage />
   }
 

@@ -36,7 +36,7 @@ const info = (logicalName: string, type: string, label: string, extra: Partial<A
 
 export const MOCK_ATTRIBUTES: AttributeMap = new Map([
   info('cr40f_id', 'String', 'ID', { updatable: false }),
-  info('cr40f_status', 'Picklist', 'Status', { options: STATUS }),
+  info('cr40f_status', 'Picklist', 'Status de Operação', { options: STATUS }),
   info('cr40f_statusdefaturamento', 'Picklist', 'Status de faturamento', { options: FATURAMENTO }),
   info('cr40f_dataehorriodesada', 'DateTime', 'Data e horário de saída'),
   info('cr40f_motorista', 'Lookup', 'Motorista', { targets: ['cr40f_funcionarios'] }),

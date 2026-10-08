@@ -1,0 +1,43 @@
+/* Geral: lista editável de serviços. Só tokens do Design System 1.4.0. */
+.gr-meta { display: inline-flex; align-items: center; gap: var(--bt-space-2); font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); font-variant-numeric: tabular-nums; }
+.gr-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.gr-filters__view { flex: 0 1 260px; min-width: 200px; }
+.gr-filters__search { flex: 1 1 260px; min-width: 200px; max-width: 380px; }
+.gr-filters__selected { display: inline-flex; align-items: center; gap: var(--bt-space-2); padding-left: var(--bt-space-2); border-left: var(--bt-border-width-default) solid var(--bt-color-border); font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+
+/* O contêiner rola nos dois eixos; cabeçalho, seleção e primeira coluna ficam fixos. */
+.gr-grid { overflow: auto; max-height: calc(100vh - 220px); }
+.gr-table .bt-table__head, .gr-table .bt-table__row { grid-template-columns: var(--gr-columns); gap: 0; padding: 0; min-width: max-content; }
+.gr-table .bt-table__head { display: grid; position: sticky; top: 0; z-index: 2; }
+.gr-table .bt-table__row { min-height: 54px; }
+.gr-table .bt-table__row.is-selected { background-color: var(--bt-color-action-soft); }
+.gr-table .bt-table__cell { padding: 0 var(--bt-space-3); min-height: 54px; border-right: var(--bt-border-width-default) solid var(--bt-color-border); }
+.gr-table .bt-table__head .bt-table__cell { min-height: 36px; }
+.gr-cell--select { position: sticky; left: 0; z-index: 1; justify-content: center; background-color: var(--bt-color-surface); }
+.gr-cell--first { position: sticky; left: 36px; z-index: 1; background-color: var(--bt-color-surface); box-shadow: 1px 0 0 var(--bt-color-border); }
+.gr-table .bt-table__row.is-selected .gr-cell--select, .gr-table .bt-table__row.is-selected .gr-cell--first { background-color: var(--bt-color-action-soft); }
+.gr-table .bt-table__head .gr-cell--select, .gr-table .bt-table__head .gr-cell--first { background-color: var(--bt-color-surface-neutral); }
+.gr-table .gr-cell--select { padding: 0; }
+.gr-cell__text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gr-head__sort { display: inline-flex; align-items: center; gap: var(--bt-space-1); min-height: 36px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
+.gr-head__sort:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border); border-radius: var(--bt-radius-xs); }
+.gr-head__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gr-open { padding: 0; border: 0; background: transparent; color: var(--bt-color-brand); font: inherit; font-weight: var(--bt-font-weight-extrabold); text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
+.gr-open:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+.gr-open:active { transform: scale(.97); }
+.gr-footer__pages { display: inline-flex; gap: var(--bt-space-2); }
+.gr-footer .bt-pagination__count { display: none; }
+.gr-empty > .bt-empty { padding: var(--bt-space-8) var(--bt-space-4); }
+
+/* Diálogo de colunas. */
+.gr-columns { display: grid; gap: var(--bt-space-1); max-height: 50vh; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.gr-columns__item { display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-2); min-height: 36px; }
+.gr-columns__move { display: inline-flex; gap: var(--bt-space-1); }
+
+@media (hover: hover) and (pointer: fine) {
+  .gr-open:hover { color: var(--bt-color-action); }
+  .gr-table .bt-table__row:not(.is-selected):hover .bt-table__cell { background-color: var(--bt-color-surface-soft); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gr-open:active { transform: none; }
+}
