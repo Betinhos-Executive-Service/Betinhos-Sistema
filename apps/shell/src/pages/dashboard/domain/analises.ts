@@ -4,7 +4,7 @@ import { agrupar, mesesComDados, soma, temSegmento } from './base'
 import { brl, brlS, dec, int, stL } from './format'
 import { chipOuSemDado, chipValor, produzido, semDado, ticketDoPeriodo, ticketStats, valorDoPeriodo, type Comparacao, type Contexto } from './kpis'
 import { metaMensal, metaProporcional, totalFixoNoPeriodo } from './meta'
-import { diasNoMes, hojeBR, mesRotulo, mesesDoAno, parseDia } from './periodo'
+import { diasNoMes, fmtDia, hojeBR, mesRotulo, mesesDoAno, parseDia, periodoNoAno } from './periodo'
 import type { Apoio, Chip, Manutencao, Reserva } from './types'
 
 export type Destaque = { valor: string; sub: string; chips: Chip[]; apoio: Apoio[] }
@@ -24,23 +24,37 @@ const mesesOuAno = (rv: Reserva[], now: Date) => { const m = mesesComDados(rv); 
 
 export type TotalProduzido = Destaque & { anos: [number, number, number]; pontos: { rotulo: string; valores: (number | null)[] }[] }
 
+/**
+ * Compara os mesmos meses em cada ano: para cada ano do gráfico, o filtro é deslocado para esse ano (`periodoNoAno`)
+ * e a série mensal sai dessa janela. O legado aplicava as datas do filtro a cada ano e deixava os anos anteriores vazios.
+ * O ano rotula aquele em que a janela termina; um filtro que cruza o ano traz os meses do início no ano anterior.
+ * Meses 2026+ vêm do Dataverse; antes disso, da tabela fixa (e só sem segmento).
+ */
 export function totalProduzido(ctx: Contexto, cmp: Comparacao): TotalProduzido {
   const { todas, f, now } = ctx
   const a1 = anoAtual(now)
   const anos: [number, number, number] = [a1 - 2, a1 - 1, a1]
-  const recorte = (ano: number, mes: number) => {
-    const ms = `${ano}-${String(mes + 1).padStart(2, '0')}-01`
-    const me = `${ano}-${String(mes + 1).padStart(2, '0')}-${String(diasNoMes(ano, mes)).padStart(2, '0')}`
-    return { rs: f.inicio > ms ? f.inicio : ms, re: f.fim < me ? f.fim : me }
-  }
-  const serie = (ano: number) => Array.from({ length: 12 }, (_, mes) => {
-    const { rs, re } = recorte(ano, mes)
-    if (ano >= 2026) return rs > re ? null : valorDoPeriodo(todas, rs, re, f).value || null
+  const valorDoMes = (ano: number, rs: string, re: string) => {
+    if (ano >= 2026) return valorDoPeriodo(todas, rs, re, f).value || null
     const valores = ANOS_MAPA.includes(ano) ? FAT_FIXO[ano] ?? [] : []
-    return !temSegmento(f) && rs <= re ? totalFixoNoPeriodo(valores, ano, rs, re) : null
-  })
+    return !temSegmento(f) ? totalFixoNoPeriodo(valores, ano, rs, re) : null
+  }
+  const serie = (ano: number) => {
+    const { inicio, fim } = periodoNoAno(f.inicio, f.fim, ano)
+    const fimJanela = parseDia(fim)
+    const valores: (number | null)[] = Array.from({ length: 12 }, () => null)
+    for (let { y, m } = parseDia(inicio); y < fimJanela.y || (y === fimJanela.y && m <= fimJanela.m); m === 11 ? (y++, (m = 0)) : m++) {
+      const ms = fmtDia(y, m, 1)
+      const me = fmtDia(y, m, diasNoMes(y, m))
+      const v = valorDoMes(y, inicio > ms ? inicio : ms, fim < me ? fim : me)
+      if (v !== null) valores[m] = (valores[m] ?? 0) + v
+    }
+    return valores
+  }
   const series = anos.map(serie)
-  const indices = Array.from({ length: 12 }, (_, i) => i).filter((i) => series.some((s) => s[i] !== null))
+  // Eixo: meses cobertos pela janela do filtro, a partir do mês inicial; sem nenhum valor, os 12.
+  const ordem = Array.from({ length: 12 }, (_, k) => (parseDia(f.inicio).m + k) % 12)
+  const indices = ordem.filter((i) => series.some((s) => s[i] !== null))
   const usar = indices.length ? indices : Array.from({ length: 12 }, (_, i) => i)
   const meta = metaProporcional(f.inicio, f.fim)
   const acumulado = cmp.produzido

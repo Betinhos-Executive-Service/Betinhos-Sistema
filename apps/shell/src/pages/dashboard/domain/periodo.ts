@@ -58,6 +58,16 @@ export function periodoMesAnterior(inicio: string, fim: string): Periodo {
   return { inicio: clamp(s.y, s.m - 1, s.d), fim: clamp(e.y, e.m - 1, e.d) }
 }
 
+/**
+ * Janela do filtro deslocada para terminar no ano `ano`, mantendo a diferença de anos entre início e fim
+ * (filtro de dez a jan continua cruzando o ano) e limitando 29/02. Com `ano` igual ao do fim, devolve o próprio filtro.
+ */
+export function periodoNoAno(inicio: string, fim: string, ano: number): Periodo {
+  const s = parseDia(inicio)
+  const e = parseDia(fim)
+  return { inicio: clamp(ano - (e.y - s.y), s.m, s.d), fim: clamp(ano, e.m, e.d) }
+}
+
 /** `samePeriodLastYear` do legado. */
 export function periodoAnoAnterior(inicio: string, fim: string): Periodo {
   const s = parseDia(inicio)
