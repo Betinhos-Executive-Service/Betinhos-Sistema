@@ -27,12 +27,17 @@ const SELO: Record<StatusMeta, { tom: StatusTone; texto: string }> = {
   dentro: { tom: 'success', texto: 'Dentro da meta' },
   fora: { tom: 'danger', texto: 'Fora da meta' },
   'sem-meta': { tom: 'neutral', texto: 'Sem meta' },
-  'sem-dado': { tom: 'neutral', texto: 's/dado' },
+  // A tabela respondeu, mas nenhuma preventiva programada tem aprovação e data para medir: não é s/dado (regra da spec §3).
+  'sem-dado': { tom: 'neutral', texto: 'Sem medição' },
 }
 const Selo = ({ status }: { status: StatusMeta }) => <StatusBadge tone={SELO[status].tom} dot>{SELO[status].texto}</StatusBadge>
-const diasTexto = (v: number | null) => (v == null ? 's/dado' : `${dec(v, 1)} ${v === 1 ? 'dia' : 'dias'}`)
-/** Contagem do mesmo período anterior: 0 vira s/dado, como os chips do legado. */
-const anterior = (v: number | null) => (v == null ? '—' : v === 0 ? 's/dado' : int(v))
+/**
+ * Regra de vazio (spec §3): "—" = a tabela respondeu e não há registro (prazo sem manutenção medida, período anterior sem registro);
+ * "s/dado" só quando a tabela de manutenções não carregou (KPIs e blocos inteiros, via `kpis`/`prazo` null).
+ */
+const diasTexto = (v: number | null) => (v == null ? '—' : `${dec(v, 1)} ${v === 1 ? 'dia' : 'dias'}`)
+/** Contagem do mesmo período anterior: sem registro vira "—" (o legado mostrava s/dado). */
+const anterior = (v: number | null) => (v == null || v === 0 ? '—' : int(v))
 
 /**
  * Aba Manutenções: KPIs (total, custo total com % da receita, em andamento, custo médio e prazo médio com % em até 10 dias);
@@ -58,7 +63,7 @@ function ManutencoesAba({ ctx, dados, periodo }: DadosAba) {
       </KpiCard>
       <KpiCard rotulo={KPIS[2]} tom="warning" valor={k ? int(k.emAndamento) : null} apoio={k ? 'solicitadas, aprovadas ou programadas' : undefined} />
       <KpiCard rotulo={KPIS[3]} tom="action" valor={k ? brl(k.custoMedio) : null} />
-      <KpiCard rotulo={KPIS[4]} tom="success" valor={prazo ? (prazo.medio == null ? '—' : diasTexto(prazo.medio)) : null} apoio={apoioPrazo} />
+      <KpiCard rotulo={KPIS[4]} tom="success" valor={prazo ? diasTexto(prazo.medio) : null} apoio={apoioPrazo} />
     </KpiLinha>
     {k == null ? (
       <div className="dash-grade">

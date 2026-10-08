@@ -147,6 +147,17 @@ describe('ManutencoesTab', () => {
     expect(within(kpi('Prazo médio')).getByText('50,0%')).toBeTruthy()
   })
 
+  it('regra de vazio: tabela no ar sem prazo medido mostra "—", nunca s/dado', () => {
+    semAvisoDeGrafico(() => render(<ManutencoesTab {...props(dadosVazios({ manutencoes: [manutencao({ dia: '2026-10-05', tipoReparo: 'Preventiva programada' })] }))} />))
+    const prazo = kpi('Prazo médio')
+    expect(prazo.querySelector('.dash-kpi__valor')?.textContent).toBe('—')
+    expect(within(prazo).queryByText('s/dado')).toBeNull()
+    expect(within(prazo).getByText('Ano anterior').parentElement?.textContent).toContain('—')
+    const categorias = card('Categorias com metas')
+    expect(within(linhaDe(categorias, 'Preventiva programada')).getByText('Sem medição')).toBeTruthy()
+    expect(within(categorias).queryByText('s/dado')).toBeNull()
+  })
+
   it('dá o selo Dentro/Fora da meta em texto a cada categoria', () => {
     semAvisoDeGrafico(() => render(<ManutencoesTab {...props(dados())} />))
     const categorias = card('Categorias com metas')

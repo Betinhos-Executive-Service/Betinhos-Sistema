@@ -202,7 +202,7 @@ function NotaMesCard({ pontos, mo, periodo }: { pontos: NotaMes[]; mo: Motorista
   return (
     <AnaliseCard
       titulo="Nota de condução por mês" periodo={periodo} unidade="nota de 0 a 100"
-      valor={!score ? '—' : nota(score.media)} sub={!score ? undefined : `Média do período · ${int(score.validas)} notas válidas`}
+      valor={score ? nota(score.media) : null} sub={score ? `Média do período · ${int(score.validas)} notas válidas` : undefined}
       grafico={pontos.length ? (
         <LinhaChart descricao={`Nota média de condução por mês, ${periodo}`} formatar={(v) => int(Math.round(v))} larguraEixo={36}
           dados={pontos.map((p) => ({ rotulo: p.rotulo, nota: Math.round(p.nota * 10) / 10 }))} series={[{ chave: 'nota', nome: 'Nota média', cor: 'action' }]} />
