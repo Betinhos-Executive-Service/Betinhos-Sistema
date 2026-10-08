@@ -1,16 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { Contexto } from '../kpis'
-import { multa } from '../test-utils'
+import { dadosVazios, multa } from '../test-utils'
 import type { Dados, Filtros, Multa } from '../types'
 import { calcularMultas, infracaoDe } from './multas'
 
 const NOW = new Date('2026-10-15T15:00:00Z')
 const f: Filtros = { atalho: 'personalizado', inicio: '2026-09-01', fim: '2026-10-15', status: ['Concluído'], clientes: ['X'], motoristas: [], tipos: [] }
 const ctx: Contexto = { todas: [], rv: [], f, now: NOW }
-const dadosCom = (multas: Multa[], p: Partial<Dados> = {}): Dados => ({
-  reservas: [], manutencoes: [], multas, ocorrencias: [], funcionarios: [], veiculos: [], viagens: [], eventos: [], telemetria: [],
-  pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], indisponiveis: [], ...p,
-})
+const dadosCom = (multas: Multa[], p: Partial<Dados> = {}) => dadosVazios({ multas, ...p })
 
 describe('infracaoDe (multaTipo do legado)', () => {
   it('"código - descrição", só um dos dois, ou "Sem tipo"', () => {

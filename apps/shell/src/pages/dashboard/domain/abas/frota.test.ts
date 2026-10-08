@@ -1,18 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { filtrarServicos } from '../base'
 import type { Contexto } from '../kpis'
-import { evento, reserva, telemetria, veiculo, viagem } from '../test-utils'
+import { dadosVazios, evento, reserva, telemetria, veiculo, viagem } from '../test-utils'
 import type { Dados, Filtros, Reserva } from '../types'
 import { calcularFrota, tendenciaLinear } from './frota'
 
 const NOW = new Date('2026-10-15T15:00:00Z')
 const filtro = (p: Partial<Filtros> = {}): Filtros => ({ atalho: 'personalizado', inicio: '2026-10-01', fim: '2026-10-15', status: [], clientes: [], motoristas: [], tipos: [], ...p })
 const ctxDe = (rows: Reserva[], f: Filtros = filtro()): Contexto => ({ todas: rows, rv: filtrarServicos(rows, f), f, now: NOW })
-/** Dados vazios locais (não depende de fábrica compartilhada que outras tarefas editam). */
-const dadosVazios = (p: Partial<Dados> = {}): Dados => ({
-  reservas: [], manutencoes: [], multas: [], ocorrencias: [], funcionarios: [], veiculos: [], viagens: [], eventos: [], telemetria: [],
-  pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], indisponiveis: [], ...p,
-})
 /** Serviço no veículo, saída às 12h de Brasília do dia. */
 const servico = (veiculoId: string, dia = '2026-10-05', p: Partial<Reserva> = {}) => reserva({ veiculoId, saidaRaw: `${dia}T15:00:00Z`, ...p })
 
