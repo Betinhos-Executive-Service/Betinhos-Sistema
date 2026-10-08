@@ -3,9 +3,12 @@ import type { AttributeInfo, CellKind, Column } from './types'
 
 /** Nunca editáveis na célula: identificação, auditoria, campos VIEW gerados por flow e voucher. */
 export const READONLY: ReadonlySet<string> = new Set([
-  'cr40f_id', 'cr40f_idjuntado', 'cr40f_idnovo', 'cr40f_reservadeveculosid', 'createdon', 'createdby', 'modifiedon', 'modifiedby', 'ownerid',
+  'cr40f_id', 'cr40f_idjuntado', 'cr40f_idnovo', 'cr40f_reservadeveculosid', 'createdon', 'createdby', 'modifiedon', 'modifiedby', 'ownerid', 'cr40f_criadopor', 'cr40f_modificadopor',
   'cr40f_passageirosetelefonedecontato', 'cr40f_endereodesada', 'cr40f_perfildopassageiro', 'new_linkdovoucher', 'statecode', 'statuscode',
 ])
+
+/** Aviso do editor de motorista: a troca dispara avisos e a atribuição automática de veículo no Dataverse. */
+export const MOTORISTA_TITLE = 'Trocar o motorista dispara os avisos e a atribuição automática de veículo.'
 
 const KINDS: Record<string, CellKind> = {
   Picklist: 'choice', Lookup: 'lookup', DateTime: 'datetime', String: 'text', Memo: 'memo', Money: 'money', Boolean: 'boolean',

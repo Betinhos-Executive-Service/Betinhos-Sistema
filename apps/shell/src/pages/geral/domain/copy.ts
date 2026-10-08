@@ -6,8 +6,10 @@ export const COPY_SELECT = [
   'cr40f_passageirosetelefonedecontato', 'cr40f_endereodesada', 'cr40f_destino', 'cr40f_obsdeoperao', 'cr40f_perfildopassageiro',
 ]
 
-const dateTime = new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
-const hour = new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false })
+const dateTime = new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+const hour = new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+/** Separador do script legado new_ScriptCopiarServicos entre um serviço e o seguinte. */
+const BLOCK_SEPARATOR = '\n\n━━━━━━━━━━━━━━━━━━━━\n\n'
 const date = (v: unknown) => { const d = typeof v === 'string' ? new Date(v) : null; return d && !Number.isNaN(d.getTime()) ? d : null }
 const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v : '—')
 
@@ -32,5 +34,5 @@ export function copyText(rows: Row[]) {
         `*Perfil do Passageiro:* ${text(r.cr40f_perfildopassageiro)}`,
       ].join('\n')
     })
-    .join('\n\n')
+    .join(BLOCK_SEPARATOR)
 }

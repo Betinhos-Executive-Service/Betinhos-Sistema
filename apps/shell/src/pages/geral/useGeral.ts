@@ -1,16 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Row } from '@betinhos/dataverse'
 import type { Source } from './data/source'
 import { cellKind } from './domain/cells'
 import { buildPatch, reduceCell, validateEdit, SAVED_VISIBLE_MS, type CellEvent, type EditValue } from './domain/edit'
 import { defaultSort, linkEntities } from './domain/fetch'
 import { formatDateTime } from './domain/format'
-import { parseLayout, rowKey } from './domain/layout'
+import { columnLabel, parseLayout, rowKey } from './domain/layout'
 import { ENTITY, ID_ATTRIBUTE, type AttributeInfo, type AttributeMap, type CellKind, type CellStatus, type Column, type Sort, type View } from './domain/types'
 
 const message = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 export const cellKey = (id: string, attribute: string) => `${id}|${attribute}`
 const FORMATTED = '@OData.Community.Display.V1.FormattedValue'
+
+/** Falha de gravação, com o que o aviso precisa dizer (a célula guarda só a mensagem). */
+export type SaveFailure = { id: string; serviceName: string; label: string; message: string }
+export type GeralOptions = { onSaveFail?: (failure: SaveFailure) => void }
 
 export type GeralState = {
   views: View[]; viewsError: string | null
@@ -44,6 +48,16 @@ function optimistic(row: Row, key: string, kind: CellKind, info: AttributeInfo |
   return next
 }
 
+/** Devolve à linha só a chave (e a anotação formatada) que o usuário editou, como estava antes. */
+function restoreKey(row: Row, before: Row, key: string): Row {
+  const next: Row = { ...row }
+  for (const name of [key, `${key}${FORMATTED}`]) {
+    if (name in before) next[name] = before[name]
+    else delete next[name]
+  }
+  return next
+}
+
 /** Raiz + tabelas ligadas (`alias.atributo`). Falha na raiz = sem metadata; falha em link é ignorada. */
 async function loadAttributes(source: Source, view: View): Promise<{ map: AttributeMap | null; error: string | null }> {
   let root: AttributeMap
@@ -60,7 +74,7 @@ async function loadAttributes(source: Source, view: View): Promise<{ map: Attrib
 }
 
 /** O `source` é fixado na primeira renderização: quem chama pode recriá-lo a cada render sem reiniciar a tela. */
-export function useGeral(initialSource: Source) {
+export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   const [source] = useState(initialSource)
   const [views, setViews] = useState<View[]>([])
   const [viewsError, setViewsError] = useState<string | null>(null)
@@ -81,12 +95,16 @@ export function useGeral(initialSource: Source) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [cells, setCells] = useState<Map<string, CellStatus>>(() => new Map())
   const [nonce, setNonce] = useState(0)
+  const defaultOrder = useMemo<Sort>(() => { try { return view ? defaultSort(view.fetchxml) : null } catch { return null } }, [view])
 
   // Espelhos síncronos: callbacks (save, efeito de página) leem o valor corrente, não o do último render.
   const rowsRef = useRef<Row[]>([])
   const cookiesRef = useRef<(string | null)[]>([null])
-  const timers = useRef(new Set<number>())
+  // Um fim de "salvo" por célula: gravar de novo na mesma célula cancela o anterior.
+  const settleTimers = useRef(new Map<string, number>())
   const pageToken = useRef(0)
+  const onSaveFail = useRef(options.onSaveFail)
+  onSaveFail.current = options.onSaveFail
 
   const setRows = useCallback((update: (list: Row[]) => Row[]) => {
     rowsRef.current = update(rowsRef.current)
@@ -95,14 +113,15 @@ export function useGeral(initialSource: Source) {
   const setCookies = useCallback((next: (string | null)[]) => { cookiesRef.current = next; setCookiesState(next) }, [])
 
   useEffect(() => {
-    const pending = timers.current
+    const pending = settleTimers.current
     return () => { pending.forEach((t) => window.clearTimeout(t)); pending.clear() }
   }, [])
 
   const enterView = useCallback((next: View) => {
     setView(next)
     setColumns(parseLayout(next.layoutxml))
-    setSortState(defaultSort(next.fetchxml))
+    // Sem ordenação própria, a consulta mantém todos os `<order>` da visão (inclusive os secundários).
+    setSortState(null)
     setPage(1)
     setCookies([null])
     setSelected(new Set())
@@ -177,6 +196,8 @@ export function useGeral(initialSource: Source) {
   // A seleção vale para a página visível: trocar de página a limpa.
   const goTo = useCallback((next: number) => { setPage(Math.max(1, Math.floor(next))); setSelected(new Set()) }, [])
   const reload = useCallback(() => { backToFirst(); setNonce((n) => n + 1) }, [backToFirst])
+  /** Relê a página atual sem voltar à primeira nem limpar a seleção. */
+  const refresh = useCallback(() => setNonce((n) => n + 1), [])
 
   const toggle = useCallback((id: string) => setSelected((s) => {
     const next = new Set(s)
@@ -196,38 +217,72 @@ export function useGeral(initialSource: Source) {
   }), [])
   const resetCell = useCallback((id: string, attribute: string) => setCell(cellKey(id, attribute), { type: 'reset' }), [setCell])
 
+  const scheduleSettle = useCallback((key: string) => {
+    window.clearTimeout(settleTimers.current.get(key))
+    const timer = window.setTimeout(() => { settleTimers.current.delete(key); setCell(key, { type: 'settle' }) }, SAVED_VISIBLE_MS)
+    settleTimers.current.set(key, timer)
+  }, [setCell])
+
   const save = useCallback(async (id: string, column: Column, value: EditValue) => {
     const info = attributes?.get(column.key)
     const kind = cellKind(column, info)
     const key = cellKey(id, column.attribute)
+    const label = columnLabel(column, info)
+    const serviceName = () => { const name = rowsRef.current.find((r) => String(r[ID_ATTRIBUTE]) === id)?.cr40f_id; return typeof name === 'string' && name ? name : id }
+    const fail = (message: string) => {
+      setCell(key, { type: 'fail', message })
+      onSaveFail.current?.({ id, serviceName: serviceName(), label, message })
+      return false
+    }
     const invalid = validateEdit(kind, value)
-    if (invalid) { setCell(key, { type: 'fail', message: invalid }); return false }
-    const bind = kind === 'lookup' ? await source.lookupBind(column.attribute).catch((e) => { setCell(key, { type: 'fail', message: message(e) }); return null }) : undefined
-    if (kind === 'lookup' && !bind) return false
+    if (invalid) return fail(invalid)
+    let bindError: string | null = null
+    const bind = kind === 'lookup' ? await source.lookupBind(column.attribute).catch((e) => { bindError = message(e); return null }) : undefined
+    if (kind === 'lookup' && !bind) return fail(bindError ?? 'Relação do campo não encontrada.')
     const action = buildPatch(kind, column.attribute, value, bind ?? undefined)
-    if (!action) { setCell(key, { type: 'fail', message: 'Este campo não pode ser editado aqui.' }); return false }
+    if (!action) return fail('Este campo não pode ser editado aqui.')
     const before = rowsRef.current.find((r) => String(r[ID_ATTRIBUTE]) === id)
     if (!before) return false
     const rKey = rowKey(column, info)
     const raw = 'clearLookup' in action ? null : kind === 'lookup' ? (typeof value === 'object' && value ? value.id : null) : action.patch[column.attribute]
+    window.clearTimeout(settleTimers.current.get(key))
+    settleTimers.current.delete(key)
     setCell(key, { type: 'save' })
     setRows((list) => list.map((r) => (r === before ? optimistic(r, rKey, kind, info, value, raw) : r)))
+
+    // 1) Escrita. Só aqui um erro significa "não gravou": desfaz apenas a chave editada.
     try {
       if ('clearLookup' in action) await source.clearLookup(id, column.attribute)
       else await source.update(id, action.patch)
-      const fresh = await source.reload(id, columns.map((c) => rowKey(c, attributes?.get(c.key))))
-      setRows((list) => list.map((r) => (String(r[ID_ATTRIBUTE]) === id ? { ...r, ...fresh } : r)))
-      setCell(key, { type: 'ok', at: Date.now() })
-      const timer = window.setTimeout(() => { timers.current.delete(timer); setCell(key, { type: 'settle' }) }, SAVED_VISIBLE_MS)
-      timers.current.add(timer)
-      return true
     } catch (reason) {
-      setRows((list) => list.map((r) => (String(r[ID_ATTRIBUTE]) === id ? before : r)))
-      setCell(key, { type: 'fail', message: message(reason) })
-      return false
+      setRows((list) => list.map((r) => (String(r[ID_ATTRIBUTE]) === id ? restoreKey(r, before, rKey) : r)))
+      return fail(message(reason))
     }
-  }, [attributes, columns, source, setCell, setRows])
+
+    // 2) Releitura. Escrita aceita não vira erro por causa dela: mantém o valor otimista.
+    const changed: string[] = []
+    try {
+      // Só colunas com metadata: uma coluna da visão sem atributo conhecido faria o `$select` falhar.
+      const known = columns.flatMap((c) => { const meta = attributes?.get(c.key); return meta ? [{ column: c, name: rowKey(c, meta) }] : [] })
+      const fresh = await source.reload(id, known.map((k) => k.name))
+      setRows((list) => list.map((r) => (String(r[ID_ATTRIBUTE]) === id ? { ...r, ...fresh } : r)))
+      // Células que um flow ou plugin mexeu depois da escrita também mostram "salvo".
+      for (const { column: other, name } of known) {
+        if (!other.alias && other.attribute !== column.attribute && name in fresh && fresh[name] !== before[name]) changed.push(other.attribute)
+      }
+    } catch { /* o servidor aceitou a escrita: o valor otimista fica até a próxima leitura */ }
+    const at = Date.now()
+    setCell(key, { type: 'ok', at })
+    scheduleSettle(key)
+    for (const attribute of changed) {
+      const other = cellKey(id, attribute)
+      // Uma gravação em andamento na outra célula manda no estado dela.
+      setCells((m) => (m.get(other)?.kind === 'saving' ? m : new Map(m).set(other, reduceCell(m.get(other) ?? { kind: 'idle' }, { type: 'ok', at }))))
+      scheduleSettle(other)
+    }
+    return true
+  }, [attributes, columns, source, setCell, setRows, scheduleSettle])
 
   const state: GeralState = { views, viewsError, view, columns, attributes, attributesError, quickFind, rows, page, total, more, cookies, loading, pageError, sort, query, selected, cells }
-  return { ...state, selectView, setSort, setQuery, goTo, reload, toggle, toggleAll, clearSelection, save, resetCell }
+  return { ...state, defaultOrder, selectView, setSort, setQuery, goTo, reload, refresh, toggle, toggleAll, clearSelection, save, resetCell }
 }

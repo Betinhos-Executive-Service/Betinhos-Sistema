@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent
 import type { Row } from '@betinhos/dataverse'
 import { Button, Input, Select, Spinner, StatusBadge, Switch, Textarea, Tooltip, type SelectOption } from '@betinhos/ui'
 import { AlertTriangle, Check, Lock } from 'lucide-react'
-import { cellKind, statusTone } from '../domain/cells'
+import { cellKind, MOTORISTA_TITLE, statusTone } from '../domain/cells'
 import type { EditValue } from '../domain/edit'
 import { decideChoice, decideCommit, draftOf, lookupOptions, sameId, type PickedOption } from '../domain/editing'
 import { formatCell } from '../domain/format'
@@ -244,7 +244,7 @@ export function Cell({ row, column, info, status, onSave, onReset, search, edita
   else if (kind === 'datetime') control = <Input ref={inputRef} size="compact" type="datetime-local" value={draft} aria-label={label} invalid={localError != null} onChange={type(setDraft)} />
   else if (kind === 'memo') control = <Textarea ref={areaRef} rows={3} value={draft} aria-label={label} invalid={localError != null} onChange={(event) => { type(setDraft)(event); grow(event.target) }} />
   else if (isSelect(kind)) {
-    control = (
+    const select = (
       <Select
         ref={triggerRef}
         size="compact"
@@ -258,6 +258,7 @@ export function Cell({ row, column, info, status, onSave, onReset, search, edita
         onChange={chosen}
       />
     )
+    control = column.attribute === 'cr40f_motorista' && !column.alias ? <div title={MOTORISTA_TITLE}>{select}</div> : select
   }
 
   const rawStatus = typeof raw === 'number' ? raw : null
