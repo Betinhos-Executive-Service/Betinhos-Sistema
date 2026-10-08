@@ -51,7 +51,7 @@ export async function carregarDataverse(client: DataverseClient, sets: EntitySet
     () => client.getAll(viagensPath(sets.viagem, desde, ate)),
     () => client.getAll(eventosPath(sets.evento, desde, ate)),
     () => client.getAll(telemetriaPath(sets.telemetria, desde, ate)),
-    () => comAlternativa(() => client.getAll(pagantesPath(sets.pagante, desde, ate)), () => client.getAll(pagantesPath(sets.pagante, desde, ate, false))),
+    () => comAlternativa(() => client.getAll(pagantesPath(sets.pagante)), () => client.getAll(pagantesPath(sets.pagante, false))),
     () => client.getAll(despesasPath(sets.despesa, desde, ate)),
     () => client.getAll(categoriasDespesaPath(sets.categoriaDespesa)),
     () => client.getAll(formasPagamentoPath(sets.formaPagamentoDespesa)),
@@ -108,7 +108,6 @@ function createMockSource(): Source {
         viagens: base.viagens.filter((x) => entre(x.dia, desde, ate)),
         eventos: base.eventos.filter((x) => entre(x.dia, desde, ate)),
         telemetria: base.telemetria.filter((x) => entre(x.dia, desde, ate)),
-        pagantes: base.pagantes.filter((x) => entre(x.criadoDia, desde, ate)),
         despesas: base.despesas.filter((x) => entre(x.dia, desde, ate)),
       }
     },

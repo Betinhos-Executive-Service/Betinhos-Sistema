@@ -45,7 +45,8 @@ export type Multa = {
 export type Ocorrencia = { dia: string }
 /** `funcao` é o rótulo ('—' vazio); `empresa` é o rótulo bruto de `cr40f_nomedaempresa` ('' vazio). */
 export type Funcionario = { id: string; nome: string; apelido: string; statusLabel: string; cnhMs: number; funcao: string; empresa: string }
-export type CategoriaVeiculo = 'Propria' | 'Terceirizada' | ''
+/** 'Aluguel' é o código 100000002 de `new_categoriadoveiculo` (o legado não o trata; regra da Fix round 1 da Task 1). */
+export type CategoriaVeiculo = 'Propria' | 'Terceirizada' | 'Aluguel' | ''
 export type Veiculo = {
   id: string; statusLabel: string; categoria: CategoriaVeiculo; placa: string; marca: string; modelo: string; blindado: boolean; ano: number | null
 }
