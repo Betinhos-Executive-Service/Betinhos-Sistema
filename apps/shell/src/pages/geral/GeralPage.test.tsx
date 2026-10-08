@@ -268,4 +268,17 @@ describe('Geral', () => {
     fireEvent.blur(trajeto)
     expect(await within(sheet).findByText('Salvo ✓')).toBeTruthy()
   })
+  it('no celular, fechar a sheet com o campo em edição grava o que foi digitado', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('max-width: 820px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    const card = (await screen.findAllByRole('listitem'))[0]
+    fireEvent.click(within(card).getByRole('button', { name: 'Editar campos' }))
+    const sheet = await screen.findByRole('dialog', { name: /Serviço OS-/ })
+    const trajeto = within(sheet).getByLabelText('Trajeto') as HTMLInputElement
+    trajeto.focus()
+    fireEvent.change(trajeto, { target: { value: 'Rota sem blur' } })
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Fechar' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /Serviço OS-/ })).toBeNull())
+    expect(await within((await screen.findAllByRole('listitem'))[0]).findByText('Rota sem blur')).toBeTruthy()
+  })
 })

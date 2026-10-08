@@ -268,7 +268,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     >
       {body}
       {mobile && geral.selected.size > 0 ? (
-        <div className="gr-selbar" role="toolbar" aria-label="Ações dos serviços selecionados">
+        <div className="gr-selbar" role="group" aria-label="Ações sobre os selecionados">
           <span role="status" className="gr-selbar__count">{geral.selected.size === 1 ? '1 selecionado' : `${geral.selected.size} selecionados`}</span>
           {commands}
         </div>
@@ -280,7 +280,11 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           attributes={attributes}
           cellStatus={(attribute) => cells.get(cellKey(String(editRow[ID_ATTRIBUTE]), attribute)) ?? IDLE}
           open
-          onClose={() => setEditId(null)}
+          onClose={() => {
+            // A gravação é ao sair do campo: tira o foco antes de fechar para não perder o que foi digitado.
+            if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+            setEditId(null)
+          }}
           onSave={(column, value) => save(String(editRow[ID_ATTRIBUTE]), column, value)}
           onReset={(column) => resetCell(String(editRow[ID_ATTRIBUTE]), column.attribute)}
           search={(column, text) => source.search(column.attribute, text)}
