@@ -13,12 +13,13 @@ export const CATEGORIAS_MANUTENCAO: readonly CategoriaManutencao[] = [
 ]
 
 /**
- * `maintenanceCategory` do legado (L10516), regras na mesma ordem sobre o rótulo do tipo de reparo. Port literal: o rótulo
- * "Corretiva não crítica" contém "crit" e cai em "Corretiva crítica", como no legado.
+ * `maintenanceCategory` do legado (L10516), regras na mesma ordem sobre o rótulo do tipo de reparo. Divergência consciente
+ * (spec §6): "nao crit" é testado antes de "crit", porque o legado classificava "Corretiva não crítica" como crítica.
  */
 export function categoriaManutencao(tipo: string): CategoriaManutencao {
   const k = normL(tipo)
   if (k.includes('avaria') || k.includes('sinistro') || k.includes('colis')) return 'Avaria'
+  if (k.includes('nao crit')) return 'Corretiva não crítica'
   if (k.includes('crit') || k.includes('pane') || k.includes('emerg')) return 'Corretiva crítica'
   if (k.includes('conserv') || k.includes('confort') || k.includes('imagem') || k.includes('limpeza') || k.includes('funilar')) return 'Conservação'
   if (k.includes('condic') || k.includes('pneu') || k.includes('eletric') || k.includes('ar condicionado')) return 'Preventiva por condição'

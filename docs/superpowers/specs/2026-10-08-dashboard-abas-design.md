@@ -65,6 +65,7 @@ Todas as consultas seguem a janela de datas da 1ª entrega (reservas: `cargaDesd
 - Itens repetidos removidos (lista na §1).
 - Clientes e despesas por motorista consolidados em tabelas únicas.
 - Top 5 próprios/terceirizados vira filtro do ranking de motoristas.
+- Categorias de manutenção: 'Corretiva não crítica' deixa de ser classificada como crítica (bug do legado).
 
 ## 7. Conferência de metadata das abas (DEV, 08/10/2026)
 

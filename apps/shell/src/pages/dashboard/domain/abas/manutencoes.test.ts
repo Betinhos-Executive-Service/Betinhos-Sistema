@@ -26,8 +26,9 @@ describe('categoriaManutencao (maintenanceCategory do legado)', () => {
     expect(categoriaManutencao('Ar condicionado')).toBe('Preventiva por condição')
     expect(categoriaManutencao('Preventiva sistemática')).toBe('Preventiva programada')
     expect(categoriaManutencao('Troca de óleo')).toBe('Preventiva programada')
-    // Port literal: "não crítica" contém "crit" e o legado a conta como crítica (rótulo real do option set em DEV).
-    expect(categoriaManutencao('Corretiva não crítica')).toBe('Corretiva crítica')
+    // Correção do bug do legado (spec §6): "não crítica" contém "crit", mas não é crítica (rótulo real do option set em DEV).
+    expect(categoriaManutencao('Corretiva não crítica')).toBe('Corretiva não crítica')
+    expect(categoriaManutencao('CORRETIVA NAO CRITICA')).toBe('Corretiva não crítica')
     expect(categoriaManutencao('Mecânica geral')).toBe('Corretiva não crítica')
     expect(categoriaManutencao('—')).toBe('Corretiva não crítica')
   })
