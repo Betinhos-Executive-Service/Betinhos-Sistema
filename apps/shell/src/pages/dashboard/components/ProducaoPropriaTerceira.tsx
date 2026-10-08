@@ -38,7 +38,7 @@ export function ProducaoPropriaTerceira({ dados, periodo }: { dados: ProducaoPT;
           descricao="Serviços por mês com veículo próprio e terceirizado"
           formatar={int}
           dados={dados.meses.map((m) => ({ rotulo: m.rotulo, propria: m.propria, terceirizada: m.terceirizada }))}
-          series={[{ chave: 'propria', nome: 'Própria', cor: 'action' }, { chave: 'terceirizada', nome: 'Terceirizada', cor: 'brand' }]}
+          series={[{ chave: 'propria', nome: 'Própria', cor: 'action' }, { chave: 'terceirizada', nome: 'Terceirizada', cor: 'brand', tracejada: true }]}
         />
         {tops}
       </> : undefined}

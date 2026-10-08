@@ -4,6 +4,7 @@ const TOKENS = {
   brand: ['--bt-color-brand', '#001a3d'],
   secondary: ['--bt-color-text-secondary', '#64748b'],
   border: ['--bt-color-border', '#e2e8f0'],
+  surface: ['--bt-color-surface', '#ffffff'],
 } as const
 export type CorToken = keyof typeof TOKENS
 
