@@ -1,6 +1,6 @@
 import { FAT_MENSAL, FAT_PAGANTE_EM_VIAGEM, FAT_PAGO, MESES_CURTOS } from './codes'
 import { agrupar, ehServico, mesesComDados, passaSegmentos, soma, temSegmento } from './base'
-import { brl, brlS, int, normL } from './format'
+import { brl, brlS, int, normL, stL } from './format'
 import { fixoNoPeriodo } from './meta'
 import { entre, mesesDoAno, mostrarLM, parseDia, hojeBR, periodoAnoAnterior, periodoMesAnterior, type Periodo } from './periodo'
 import { previsao } from './previsao'
@@ -21,6 +21,8 @@ export function recebimentoStats(rows: Reserva[]) {
 
 /** `isProducedReservation`. */
 export const produzido = (r: Reserva) => { const k = normL(r.statusLabel); return k.includes('conclu') || k.includes('realiz') || k.includes('finaliz') }
+/** Cancelado ou recusado pelo rótulo (`stL`, como a contagem de cancelados do legado, L13411). */
+export const cancelado = (r: Reserva) => { const k = stL(r.statusLabel); return k.includes('cancel') || k.includes('recus') }
 /** `isReservableService`. */
 export const reservavel = (r: Reserva) => { const k = normL(r.statusLabel); return !k.includes('cancel') && !k.includes('recus') }
 

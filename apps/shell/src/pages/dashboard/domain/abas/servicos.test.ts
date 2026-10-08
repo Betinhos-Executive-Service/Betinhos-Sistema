@@ -21,7 +21,7 @@ describe('calcularServicos', () => {
       reserva({ statusLabel: 'Confirmado' }),
       reserva({ statusLabel: 'Finalizado', categoriaItem: 100000001 }),
     ]
-    const s = calcularServicos(ctxDe(rows), [])
+    const s = calcularServicos(ctxDe(rows), [], false)
     expect(s.kpis).toEqual({
       total: 5,
       concluidos: { valor: 2, pct: 40 },
@@ -31,7 +31,7 @@ describe('calcularServicos', () => {
   })
 
   it('sem serviços: zeros e percentuais 0', () => {
-    const s = calcularServicos(ctxDe([]), [])
+    const s = calcularServicos(ctxDe([]), [], false)
     expect(s.kpis).toEqual({ total: 0, concluidos: { valor: 0, pct: 0 }, cancelados: { valor: 0, pct: 0 }, emergenciais: { valor: 0, pct: 0 } })
     expect(s.porMes).toEqual([])
     expect(s.porTipoServico).toEqual([])
@@ -44,7 +44,7 @@ describe('calcularServicos', () => {
       reserva({ saidaRaw: '2026-08-10T15:00:00Z' }),
       reserva({ saidaRaw: '2026-10-07T15:00:00Z' }),
     ]
-    expect(calcularServicos(ctxDe(rows), []).porMes).toEqual([
+    expect(calcularServicos(ctxDe(rows), [], false).porMes).toEqual([
       { mes: '2026-08', rotulo: 'ago/26', qtd: 1 },
       { mes: '2026-10', rotulo: 'out/26', qtd: 2 },
     ])
@@ -57,7 +57,7 @@ describe('calcularServicos', () => {
       reserva({ tipoServico: 'Diária', valor: 600 }),
       reserva({ tipoServico: 'Roteiro', valor: 200 }),
     ]
-    const { porTipoServico } = calcularServicos(ctxDe(rows), [])
+    const { porTipoServico } = calcularServicos(ctxDe(rows), [], false)
     expect(porTipoServico).toEqual([
       { tipo: 'Diária', qtd: 1, fat: 600, pctQtd: 25, pctFat: 60 },
       { tipo: 'Transfer', qtd: 2, fat: 200, pctQtd: 50, pctFat: 20 },
@@ -71,7 +71,7 @@ describe('calcularServicos', () => {
       reserva({ tipoServico: 'B', valor: 0 }),
       reserva({ tipoServico: 'B', valor: 0 }),
     ]
-    expect(calcularServicos(ctxDe(rows), []).porTipoServico.map((l) => [l.tipo, l.pctFat])).toEqual([['B', 0], ['A', 0]])
+    expect(calcularServicos(ctxDe(rows), [], false).porTipoServico.map((l) => [l.tipo, l.pctFat])).toEqual([['B', 0], ['A', 0]])
   })
 
   it('por tipo de veículo: mesma regra; vazio aparece como "—"', () => {
@@ -80,7 +80,7 @@ describe('calcularServicos', () => {
       reserva({ tipoVeiculo: 'Executivo', valor: 100 }),
       reserva({ tipoVeiculo: '—', valor: 100 }),
     ]
-    const { porTipoVeiculo } = calcularServicos(ctxDe(rows), [])
+    const { porTipoVeiculo } = calcularServicos(ctxDe(rows), [], false)
     expect(porTipoVeiculo.map((l) => l.tipo)).toEqual(['Blindado', 'Executivo', '—'])
     expect(porTipoVeiculo[0]).toMatchObject({ tipo: 'Blindado', qtd: 1, fat: 300, pctFat: 60 })
     expect(porTipoVeiculo[0].pctQtd).toBeCloseTo(100 / 3, 10)
@@ -90,11 +90,11 @@ describe('calcularServicos', () => {
     const tipos = ['A', 'B', 'C', 'D', 'E']
     const valores = [500, 300, 150, 40, 10]
     const rows = tipos.map((t, i) => reserva({ tipoServico: t, valor: valores[i] }))
-    expect(calcularServicos(ctxDe(rows), []).porTipoServico.map((l) => l.tipo)).toEqual(['A', 'B', 'C'])
+    expect(calcularServicos(ctxDe(rows), [], false).porTipoServico.map((l) => l.tipo)).toEqual(['A', 'B', 'C'])
     const poucos = ['A', 'B', 'C', 'D'].map((t) => reserva({ tipoServico: t, valor: 1 }))
-    expect(calcularServicos(ctxDe(poucos), []).porTipoServico).toHaveLength(4)
+    expect(calcularServicos(ctxDe(poucos), [], false).porTipoServico).toHaveLength(4)
     const cauda = [800, 100, 60, 40].map((v, i) => reserva({ tipoServico: `T${i}`, valor: v }))
-    expect(calcularServicos(ctxDe(cauda), []).porTipoServico.map((l) => l.tipo)).toEqual(['T0', 'T1', 'T2'])
+    expect(calcularServicos(ctxDe(cauda), [], false).porTipoServico.map((l) => l.tipo)).toEqual(['T0', 'T1', 'T2'])
   })
 
   it('respeita o filtro (rv): categoria diferente de serviço e fora do período não entram', () => {
@@ -103,7 +103,7 @@ describe('calcularServicos', () => {
       reserva({ tipoServico: 'Transfer', valor: 100, categoriaItem: 100000001 }),
       reserva({ tipoServico: 'Transfer', valor: 100, saidaRaw: '2026-01-10T12:00:00Z' }),
     ]
-    const s = calcularServicos(ctxDe(rows), [])
+    const s = calcularServicos(ctxDe(rows), [], false)
     expect(s.kpis.total).toBe(1)
     expect(s.porTipoServico).toEqual([{ tipo: 'Transfer', qtd: 1, fat: 100, pctQtd: 100, pctFat: 100 }])
   })
@@ -115,11 +115,18 @@ describe('calcularServicos', () => {
       reserva({ veiculoId: 'v2', statusLabel: 'Cancelado' }),
     ]
     const ctx = ctxDe(rows)
-    const s = calcularServicos(ctx, veiculos)
+    const s = calcularServicos(ctx, veiculos, false)
     expect(s.status).toEqual(statusServicos(ctx))
     expect(s.producao).toEqual(producaoPropriaTerceira(ctx.rv, veiculos))
     expect(s.emergenciais).toEqual(emergenciais(ctx.rv))
-    expect(s.producao.classificados).toBe(2)
+    expect(s.producao?.classificados).toBe(2)
     expect(s.emergenciais.total).toBe(1)
+  })
+
+  it('veículos indisponíveis: produção própria × terceirizada vira null (s/dado); o resto não muda', () => {
+    const rows = [reserva({ veiculoId: 'v1', valor: 50 }), reserva({ statusLabel: 'Cancelado' })]
+    const s = calcularServicos(ctxDe(rows), [veiculo({ id: 'v1', categoria: 'Propria' })], true)
+    expect(s.producao).toBeNull()
+    expect(s.kpis).toMatchObject({ total: 2, concluidos: { valor: 1 }, cancelados: { valor: 1 } })
   })
 })

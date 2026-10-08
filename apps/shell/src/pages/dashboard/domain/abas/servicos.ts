@@ -1,8 +1,7 @@
 import { statusServicos, topByShare, type StatusServicos } from '../analises'
 import { agrupar, mesesComDados, soma } from '../base'
 import { emergenciais, producaoPropriaTerceira, type Emergenciais, type ProducaoPT } from '../destaques'
-import { stL } from '../format'
-import { produzido, type Contexto } from '../kpis'
+import { cancelado, produzido, type Contexto } from '../kpis'
 import { mesRotulo } from '../periodo'
 import type { Reserva, Veiculo } from '../types'
 
@@ -15,7 +14,8 @@ export type Servicos = {
   status: StatusServicos
   porTipoServico: LinhaParticipacao[]
   porTipoVeiculo: LinhaParticipacao[]
-  producao: ProducaoPT
+  /** null = s/dado (veículos não carregaram: sem a categoria não há como separar própria × terceirizada). */
+  producao: ProducaoPT | null
   emergenciais: Emergenciais
 }
 
@@ -37,12 +37,15 @@ function tabelaParticipacao(rv: Reserva[], rotulo: (r: Reserva) => string): Linh
 
 const pct = (parte: number, total: number) => (total ? (parte / total) * 100 : 0)
 
-/** Aba Serviços: tudo calculado de `ctx.rv` (serviços no período e nos segmentos); `veiculos` classifica própria × terceirizada. */
-export function calcularServicos(ctx: Contexto, veiculos: Veiculo[]): Servicos {
+/**
+ * Aba Serviços: tudo calculado de `ctx.rv` (serviços no período e nos segmentos); `veiculos` classifica própria × terceirizada.
+ * `indisponivel`: o conjunto de veículos falhou e a produção própria × terceirizada mostra s/dado.
+ */
+export function calcularServicos(ctx: Contexto, veiculos: Veiculo[], indisponivel: boolean): Servicos {
   const { rv } = ctx
   const total = rv.length
   const concluidos = rv.filter(produzido).length
-  const cancelados = rv.filter((r) => { const k = stL(r.statusLabel); return k.includes('cancel') || k.includes('recus') }).length
+  const cancelados = rv.filter(cancelado).length
   const emerg = emergenciais(rv)
   const porMes = agrupar(rv, (r) => r.mes)
   return {
@@ -56,7 +59,7 @@ export function calcularServicos(ctx: Contexto, veiculos: Veiculo[]): Servicos {
     status: statusServicos(ctx),
     porTipoServico: tabelaParticipacao(rv, (r) => r.tipoServico),
     porTipoVeiculo: tabelaParticipacao(rv, (r) => r.tipoVeiculo),
-    producao: producaoPropriaTerceira(rv, veiculos),
+    producao: indisponivel ? null : producaoPropriaTerceira(rv, veiculos),
     emergenciais: emerg,
   }
 }
