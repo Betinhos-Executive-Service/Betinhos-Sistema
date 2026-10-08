@@ -135,6 +135,7 @@
 .dash-lista__rotulo { color: var(--bt-color-text-primary); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); }
 .dash-lista__apoio { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); line-height: var(--bt-typography-body-small-line-height); font-variant-numeric: tabular-nums; }
 .dash-lista__item--atencao .dash-lista__apoio { color: var(--bt-color-warning); font-weight: var(--bt-font-weight-bold); }
+.dash-lista__chip { display: flex; margin-top: var(--bt-space-0-5); }
 .dash-lista__valor { flex: 0 0 auto; color: var(--bt-color-brand); font-size: var(--bt-font-size-20); font-weight: var(--bt-font-weight-extrabold); line-height: 1; font-variant-numeric: tabular-nums; }
 
 /* ---------- Gráficos ---------- */

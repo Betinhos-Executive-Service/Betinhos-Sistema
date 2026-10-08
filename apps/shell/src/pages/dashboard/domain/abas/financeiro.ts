@@ -1,7 +1,8 @@
 import { mesesComDelta, mesesOuAno, topByShare, ticketMensal, type MesComDelta, type TicketMensal } from '../analises'
 import { agrupar, soma } from '../base'
 import { SEM_CLIENTE } from '../codes'
-import { normL } from '../format'
+import { comparar, servicosAnteriores, type ChipAnterior } from '../comparar'
+import { brlS, int, normL } from '../format'
 import { comparacao, recebimentoStats, ticketStats, type Contexto } from '../kpis'
 import { DIA_MS, mesRotulo } from '../periodo'
 import type { Pagante, Reserva } from '../types'
@@ -65,6 +66,8 @@ export type LinhaClienteFin = {
 }
 export type Financeiro = {
   kpis: KpisFinanceiro
+  /** Chips "ANT." de Maior serviço e Clientes ativos (só reservas) contra o período anterior de mesma duração. */
+  ant: { maiorServico: ChipAnterior; clientesAtivos: ChipAnterior }
   ciclo: CicloFinanceiro
   statusFaturamento: LinhaStatusFat[]
   ticketMensal: TicketMensal
@@ -131,6 +134,9 @@ function clientes(rv: Reserva[], meses: string[]): LinhaClienteFin[] {
     .sort((a, b) => Number(a.cliente === SEM_CLIENTE) - Number(b.cliente === SEM_CLIENTE) || b.faturamento - a.faturamento)
 }
 
+const maior = (rows: Reserva[]) => rows.reduce((m, r) => Math.max(m, r.valor || 0), 0)
+const ativos = (rows: Reserva[]) => new Set(rows.map((r) => r.cliente).filter((c) => c !== SEM_CLIENTE)).size
+
 /** Aba Financeiro (= Faturamento + Pagamentos do legado). `indisponivel`: pagantes falharam e os cards deles mostram s/dado. */
 export function calcularFinanceiro(ctx: Contexto, pagantes: Pagante[], indisponivel: boolean): Financeiro {
   const { rv, now } = ctx
@@ -141,10 +147,17 @@ export function calcularFinanceiro(ctx: Contexto, pagantes: Pagante[], indisponi
   const atrasados = pags.filter((p) => { const t = Date.parse(p.criadoRaw || ''); return !recebido(p) && Number.isFinite(t) && nowMs - t > LIMITE_ATRASO_MS })
   const meses = mesesOuAno(rv, now)
   const statusRows = rv.filter((r) => r.saidaRaw.slice(0, 10) >= CORTE_STATUS_FATURAMENTO)
+  const ant = servicosAnteriores(ctx)
+  const maiorServico = maior(rv)
+  const clientesAtivos = ativos(rv)
   return {
+    ant: {
+      maiorServico: comparar(maiorServico, ant ? maior(ant) : null, brlS, 'sobe'),
+      clientesAtivos: comparar(clientesAtivos, ant ? ativos(ant) : null, int, 'sobe'),
+    },
     kpis: {
-      maiorServico: rv.reduce((m, r) => Math.max(m, r.valor || 0), 0),
-      clientesAtivos: new Set(rv.map((r) => r.cliente).filter((c) => c !== SEM_CLIENTE)).size,
+      maiorServico,
+      clientesAtivos,
       totalRecebido: recebimentoStats(rv).recebido,
       cartao: indisponivel ? null : somaPag(recebidos.filter(cartao)),
       atrasados: indisponivel ? null : atrasados.length,

@@ -75,6 +75,18 @@ export function periodoAnoAnterior(inicio: string, fim: string): Periodo {
   return { inicio: clamp(s.y - 1, s.m, s.d), fim: clamp(e.y - 1, e.m, e.d) }
 }
 
+/**
+ * `getPreviousExpensePeriod` do legado (Despesas), usado em todos os comparativos "ANT.": a janela imediatamente anterior com o mesmo
+ * número de dias; null sem período válido.
+ */
+export function periodoAnterior(inicio: string, fim: string): Periodo | null {
+  if (!inicio || !fim || fim < inicio) return null
+  const s = parseDia(inicio)
+  const e = parseDia(fim)
+  const dias = Math.round((Date.UTC(e.y, e.m, e.d) - Date.UTC(s.y, s.m, s.d)) / 86_400_000) + 1
+  return { inicio: fmtDia(s.y, s.m, s.d - dias), fim: fmtDia(s.y, s.m, s.d - 1) }
+}
+
 /** `shouldShowLM` do legado: o filtro inteiro dentro do mês corrente. */
 export function mostrarLM(inicio: string, fim: string, now: Date) {
   const h = parseDia(hojeBR(now))

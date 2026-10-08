@@ -10,6 +10,7 @@ import { AbaCarregando } from '../Carregando'
 import { Duplo, Participacao, pct } from '../Celulas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
 import { KpiCard, KpiLinha } from '../KpiCard'
+import { ChipAnt } from '../KpiChip'
 import { MEDIA_MOBILE, juntar } from '../Linhas'
 import type { DadosAba, PropsAba } from './abas'
 import { forte, resto } from './MoMaMuComum'
@@ -51,8 +52,10 @@ function ManutencoesAba({ ctx, dados, periodo }: DadosAba) {
   if (prazo) apoioPrazo.push({ rotulo: 'Ano anterior', texto: diasTexto(prazo.ly) })
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={5}>
-      <KpiCard rotulo={KPIS[0]} tom="brand" valor={k ? int(k.total) : null} />
-      <KpiCard rotulo={KPIS[1]} tom="action" valor={k ? brl(k.custoTotal) : null} apoio={k ? [{ rotulo: '% da receita', texto: pct(k.pctReceita) }] : []} />
+      <KpiCard rotulo={KPIS[0]} tom="brand" valor={k ? int(k.total) : null}>{ma.ant ? <ChipAnt chip={ma.ant.total} /> : undefined}</KpiCard>
+      <KpiCard rotulo={KPIS[1]} tom="action" valor={k ? brl(k.custoTotal) : null} apoio={k ? [{ rotulo: '% da receita', texto: pct(k.pctReceita) }] : []}>
+        {ma.ant ? <ChipAnt chip={ma.ant.custoTotal} /> : undefined}
+      </KpiCard>
       <KpiCard rotulo={KPIS[2]} tom="warning" valor={k ? int(k.emAndamento) : null} apoio={k ? 'solicitadas, aprovadas ou programadas' : undefined} />
       <KpiCard rotulo={KPIS[3]} tom="action" valor={k ? brl(k.custoMedio) : null} />
       <KpiCard rotulo={KPIS[4]} tom="success" valor={prazo ? (prazo.medio == null ? '—' : diasTexto(prazo.medio)) : null} apoio={apoioPrazo} />

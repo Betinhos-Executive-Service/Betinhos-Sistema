@@ -10,6 +10,7 @@ import { AbaCarregando } from '../Carregando'
 import { Duplo, Nome, Participacao, pct } from '../Celulas'
 import { Emergenciais } from '../Emergenciais'
 import { KpiCard, KpiLinha } from '../KpiCard'
+import { ChipAnt } from '../KpiChip'
 import { COLUNA_LARGA, MEDIA_MOBILE, juntar } from '../Linhas'
 import { ProducaoPropriaTerceira } from '../ProducaoPropriaTerceira'
 import { SemDadoBloco, Vazio } from '../Estados'
@@ -76,10 +77,10 @@ function ServicosAba({ ctx, dados, periodo }: DadosAba) {
   const { kpis } = sv
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={4}>
-      <KpiCard rotulo={ROTULOS_SERVICOS[0]} valor={int(kpis.total)} tom="brand" serie={sv.porMes.map((m) => ({ mes: m.mes, rotulo: m.rotulo, valor: m.qtd }))} />
-      <KpiCard rotulo={ROTULOS_SERVICOS[1]} valor={int(kpis.concluidos.valor)} tom="success" apoio={`${pct(kpis.concluidos.pct)} do total`} />
-      <KpiCard rotulo={ROTULOS_SERVICOS[2]} valor={int(kpis.cancelados.valor)} tom="warning" apoio={`${pct(kpis.cancelados.pct)} do total`} />
-      <KpiCard rotulo={ROTULOS_SERVICOS[3]} valor={int(kpis.emergenciais.valor)} tom="action" apoio={`${pct(kpis.emergenciais.pct)} do total`} />
+      <KpiCard rotulo={ROTULOS_SERVICOS[0]} valor={int(kpis.total)} tom="brand" serie={sv.porMes.map((m) => ({ mes: m.mes, rotulo: m.rotulo, valor: m.qtd }))}><ChipAnt chip={sv.ant.total} /></KpiCard>
+      <KpiCard rotulo={ROTULOS_SERVICOS[1]} valor={int(kpis.concluidos.valor)} tom="success" apoio={`${pct(kpis.concluidos.pct)} do total`}><ChipAnt chip={sv.ant.concluidos} /></KpiCard>
+      <KpiCard rotulo={ROTULOS_SERVICOS[2]} valor={int(kpis.cancelados.valor)} tom="warning" apoio={`${pct(kpis.cancelados.pct)} do total`}><ChipAnt chip={sv.ant.cancelados} /></KpiCard>
+      <KpiCard rotulo={ROTULOS_SERVICOS[3]} valor={int(kpis.emergenciais.valor)} tom="action" apoio={`${pct(kpis.emergenciais.pct)} do total`}><ChipAnt chip={sv.ant.emergenciais} /></KpiCard>
     </KpiLinha>
     <div className="dash-grade">
       <PorMesCard dados={sv} periodo={periodo} />

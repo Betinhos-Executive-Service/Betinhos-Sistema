@@ -1,4 +1,5 @@
 import { AlertTriangle, ArrowDownRight, ArrowUpRight } from 'lucide-react'
+import type { ChipAnterior } from '../domain/comparar'
 import { dec } from '../domain/format'
 import type { Apoio, Chip } from '../domain/types'
 
@@ -56,4 +57,22 @@ export function Chips({ chips = [], apoio = [] }: { chips?: Chip[]; apoio?: Apoi
     {chips.map((c) => <KpiChip key={c.rotulo} chip={c} />)}
     {apoio.map((a) => (virouChip(a.rotulo) ? <ApoioChip key={a.rotulo} apoio={a} /> : <ApoioTexto key={a.rotulo} apoio={a} />))}
   </>
+}
+
+/**
+ * Chip "ANT." contra o período anterior de mesma duração: a cor segue `favoravel` (definido por indicador no domínio); seta, sinal e
+ * "favorável/desfavorável" em texto, além da cor.
+ */
+export function ChipAnt({ chip }: { chip: ChipAnterior }) {
+  const rotulo = <><span className="dash-chip__rotulo" aria-hidden="true">{chip.rotulo}</span><span className="dash-sr">Período anterior</span></>
+  if (chip.tipo === 'sem-dado') return <span className="dash-chip dash-chip--neutro">{rotulo} <span className="dash-chip__texto">s/dado</span></span>
+  if (chip.tipo === 'base-zero') return <span className="dash-chip dash-chip--neutro">{rotulo} <span className="dash-chip__texto">{chip.anterior} · base zero</span></span>
+  const sobe = chip.variacao >= 0
+  return (
+    <span className={chip.favoravel ? 'dash-chip dash-chip--sobe' : 'dash-chip dash-chip--desce'}>
+      {rotulo} <span className="dash-chip__texto">{chip.anterior}</span>{' '}
+      <span className="dash-chip__delta">{sobe ? <ArrowUpRight size={12} aria-hidden="true" /> : <ArrowDownRight size={12} aria-hidden="true" />}{sobe ? '+' : '−'}{dec(Math.abs(chip.variacao), 1)}%</span>
+      <span className="dash-sr">{chip.favoravel ? ', favorável' : ', desfavorável'}</span>
+    </span>
+  )
 }

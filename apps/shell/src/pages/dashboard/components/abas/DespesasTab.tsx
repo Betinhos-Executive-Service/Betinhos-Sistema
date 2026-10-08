@@ -1,18 +1,19 @@
 import { useMemo } from 'react'
 import { Button, PageToolbar, Select, StatusBadge, Table, type StatusTone, type TableColumn } from '@betinhos/ui'
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, CircleCheck, X } from 'lucide-react'
+import { AlertTriangle, CircleCheck, X } from 'lucide-react'
 import { LinhaChart } from '../../charts/Charts'
 import {
   calcularDespesas, periodoAnteriorDespesa,
-  type ChipAnterior, type Distribuicao, type KpiDespesa, type KpiDespesaId, type LinhaDistribuicao, type LinhaMes, type LinhaMotorista,
+  type Distribuicao, type KpiDespesa, type KpiDespesaId, type LinhaDistribuicao, type LinhaMes, type LinhaMotorista,
 } from '../../domain/abas/despesas'
-import { brl, brlS, dec, int } from '../../domain/format'
+import { brl, brlS, int } from '../../domain/format'
 import type { Tom } from '../../domain/types'
 import { useMedia } from '../../../operacional/useMedia'
 import { AnaliseCard } from '../AnaliseCard'
 import { AbaCarregando } from '../Carregando'
 import { Duplo, Nome, Participacao, Rolagem, pct } from '../Celulas'
 import { KpiCard, KpiLinha, type TomKpi } from '../KpiCard'
+import { ChipAnt } from '../KpiChip'
 import { COLUNA_LARGA, Linhas, MEDIA_MOBILE, juntar } from '../Linhas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
 import type { DadosAba, PropsAba } from './abas'
@@ -33,21 +34,6 @@ const MOTIVO = naoRespondeu('A tabela de despesas')
 const formatarKpi = (k: KpiDespesa, indisponivel: boolean) =>
   (indisponivel ? null : k.valor == null ? '—' : k.formato === 'brlS' ? brlS(k.valor) : k.formato === 'brl' ? brl(k.valor) : int(k.valor))
 const forte = (texto: string) => <strong className="dash-forte">{texto}</strong>
-
-/** Chip "ANT." contra o período anterior: subir é desfavorável; seta, sinal e "favorável/desfavorável" em texto, além da cor. */
-export function ChipAnt({ chip }: { chip: ChipAnterior }) {
-  const rotulo = <><span className="dash-chip__rotulo" aria-hidden="true">{chip.rotulo}</span><span className="dash-sr">Período anterior</span></>
-  if (chip.tipo === 'sem-dado') return <span className="dash-chip dash-chip--neutro">{rotulo} <span className="dash-chip__texto">s/dado</span></span>
-  if (chip.tipo === 'base-zero') return <span className="dash-chip dash-chip--neutro">{rotulo} <span className="dash-chip__texto">{chip.anterior} · base zero</span></span>
-  const sobe = chip.variacao >= 0
-  return (
-    <span className={chip.favoravel ? 'dash-chip dash-chip--sobe' : 'dash-chip dash-chip--desce'}>
-      {rotulo} <span className="dash-chip__texto">{chip.anterior}</span>{' '}
-      <span className="dash-chip__delta">{sobe ? <ArrowUpRight size={12} aria-hidden="true" /> : <ArrowDownRight size={12} aria-hidden="true" />}{sobe ? '+' : '−'}{dec(Math.abs(chip.variacao), 1)}%</span>
-      <span className="dash-sr">{chip.favoravel ? ', favorável' : ', desfavorável'}</span>
-    </span>
-  )
-}
 
 /** KPI de despesa: o card único com o chip ANT. e, na hospedagem, a faixa da política (com texto) como extras. */
 function KpiDespesaCartao({ k, indisponivel }: { k: KpiDespesa; indisponivel: boolean }) {

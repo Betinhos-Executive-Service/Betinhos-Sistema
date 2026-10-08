@@ -38,7 +38,7 @@ describe('calcularMultas', () => {
   })
 
   it('conjunto fora do ar: KPIs null (s/dado) e listas vazias', () => {
-    expect(calcularMultas(ctx, dadosCom([multa()], { indisponiveis: ['multas'] }))).toEqual({ kpis: null, porMotorista: [], porInfracao: [], porMes: [] })
+    expect(calcularMultas(ctx, dadosCom([multa()], { indisponiveis: ['multas'] }))).toEqual({ kpis: null, ant: null, porMotorista: [], porInfracao: [], porMes: [] })
   })
 
   it('por motorista: nome já resolvido (apelido ou rótulo do lookup), ordenado por quantidade, % sobre o total e topByShare', () => {
