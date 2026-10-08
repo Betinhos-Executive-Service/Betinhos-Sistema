@@ -5,14 +5,12 @@ import { Plus, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
 import { createSource } from './data/source'
+import { Cell } from './components/Cell'
 import { GeralTable } from './components/GeralTable'
 import { GeralToolbar } from './components/GeralToolbar'
-import { cellKind, statusTone } from './domain/cells'
 import { applyColumnPrefs, loadColumnPrefs, saveColumnPrefs, type ColumnPrefs } from './domain/columns'
-import { formatCell } from './domain/format'
-import { rowKey } from './domain/layout'
-import { PAGE_SIZE, type Column } from './domain/types'
-import { useGeral } from './useGeral'
+import { ID_ATTRIBUTE, PAGE_SIZE, type CellStatus, type Column } from './domain/types'
+import { cellKey, useGeral } from './useGeral'
 import './geral.css'
 
 export function GeralPage({ host }: { host: Host }) {
@@ -21,7 +19,7 @@ export function GeralPage({ host }: { host: Host }) {
   return <ToastProvider><Geral key={attempt} host={host} onRetry={() => setAttempt((n) => n + 1)} /></ToastProvider>
 }
 
-const STATUS_COLUMNS: ReadonlySet<string> = new Set(['cr40f_status', 'cr40f_statusdefaturamento'])
+const IDLE: CellStatus = { kind: 'idle' }
 
 function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const source = useMemo(() => createSource(host), [host])
@@ -55,20 +53,22 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar serviços" onClick={reload} />, [reload])
   useShellHeader({ title: 'Geral', actions: headerActions })
 
-  // Leitura apenas: a Tarefa 10 troca este texto pela célula editável.
+  const { save, resetCell, cells } = geral
   const renderCell = useCallback((row: Row, column: Column): ReactNode => {
-    const info = attributes?.get(column.key)
-    const key = rowKey(column, info)
-    const kind = cellKind(column, info)
-    const text = formatCell(kind, row, key)
-    const raw = row[key]
-    const badge = !column.alias && STATUS_COLUMNS.has(column.attribute) && typeof raw === 'number'
+    const id = String(row[ID_ATTRIBUTE])
     return (
-      <div className={`bt-table__cell gr-cell gr-cell--${kind}`} role="gridcell">
-        {badge ? <StatusBadge tone={statusTone(column.attribute, raw)}>{text}</StatusBadge> : <span className="gr-cell__text" title={text}>{text}</span>}
-      </div>
+      <Cell
+        row={row}
+        column={column}
+        info={attributes?.get(column.key)}
+        status={cells.get(cellKey(id, column.attribute)) ?? IDLE}
+        onSave={(value) => save(id, column, value)}
+        onReset={() => resetCell(id, column.attribute)}
+        search={(text) => source.search(column.attribute, text)}
+        editable={attributes != null}
+      />
     )
-  }, [attributes])
+  }, [attributes, cells, save, resetCell, source])
 
   const start = rows.length ? (page - 1) * PAGE_SIZE + 1 : 0
   const end = start + rows.length - 1

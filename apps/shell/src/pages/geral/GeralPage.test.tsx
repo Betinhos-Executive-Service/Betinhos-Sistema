@@ -13,6 +13,14 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
+/** A célula só vira editável quando a metadata chega: espera a classe do tipo aparecer na linha. */
+const cellOf = (row: HTMLElement, kind: string) =>
+  waitFor(() => {
+    const cell = within(row).getAllByRole('gridcell').find((c) => c.className.includes(`gr-cell--${kind}`))
+    if (!cell) throw new Error(`Sem célula ${kind}`)
+    return cell
+  })
+
 describe('Geral', () => {
   it('abre a Agenda com as colunas da visão, pagina e ordena', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
@@ -117,5 +125,85 @@ describe('Geral', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Colunas da visão' })).toBeNull())
     expect(screen.getByRole('columnheader', { name: /Trajeto/ })).toBeTruthy()
     expect(window.localStorage.getItem('betinhos.geral.colunas.v1')).toBeNull()
+  })
+
+  it('edita texto na célula com Enter e mostra salvo', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByText(/Linhas 1–50 de/)
+    const cell = await cellOf((await screen.findAllByRole('row'))[1], 'text')
+    fireEvent.keyDown(cell, { key: 'Enter' })
+    const input = within(cell).getByRole('textbox')
+    fireEvent.change(input, { target: { value: 'Rota editada' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(await within(cell).findByLabelText('Salvo')).toBeTruthy()
+    expect(within(cell).getByText('Rota editada')).toBeTruthy()
+  })
+
+  it('erro do servidor restaura o valor, mostra aviso e permite tentar de novo', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    const opener = await screen.findByRole('button', { name: 'Abrir serviço OS-1013 no Formulário Geral' })
+    const row = opener.closest('[role="row"]') as HTMLElement
+    const cell = await cellOf(row, 'text')
+    const before = cell.textContent
+    fireEvent.doubleClick(cell)
+    const input = within(cell).getByRole('textbox')
+    fireEvent.change(input, { target: { value: 'Não vai' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(await within(cell).findByText('Sem permissão para alterar este serviço.')).toBeTruthy()
+    expect(cell.getAttribute('aria-invalid')).toBe('true')
+    expect(within(cell).getByText(before!.replace(/Somente leitura/, '').trim() || '—')).toBeTruthy()
+    expect(within(cell).getByRole('button', { name: 'Tentar de novo' })).toBeTruthy()
+  })
+
+  it('Esc cancela sem gravar e status abre um select', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByText(/Linhas 1–50 de/)
+    const first = (await screen.findAllByRole('row'))[1]
+    const text = await cellOf(first, 'text')
+    const original = text.textContent
+    fireEvent.keyDown(text, { key: 'Enter' })
+    fireEvent.change(within(text).getByRole('textbox'), { target: { value: 'descartar' } })
+    fireEvent.keyDown(within(text).getByRole('textbox'), { key: 'Escape' })
+    expect(text.textContent).toBe(original)
+    const status = await cellOf(first, 'choice')
+    fireEvent.keyDown(status, { key: 'Enter' })
+    // O painel do Select usa `popover`, que o jsdom não exibe: a opção existe, mas fica fora da árvore acessível.
+    expect(await within(status).findByRole('option', { name: 'Confirmado', hidden: true })).toBeTruthy()
+  })
+
+  it('dinheiro inválido mostra o erro local e mantém o campo aberto sem gravar', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByText(/Linhas 1–50 de/)
+    const cell = await cellOf((await screen.findAllByRole('row'))[1], 'money')
+    fireEvent.keyDown(cell, { key: 'Enter' })
+    const input = within(cell).getByRole('textbox')
+    fireEvent.change(input, { target: { value: 'abc' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(await within(cell).findByText('Valor inválido.')).toBeTruthy()
+    expect(cell.getAttribute('aria-invalid')).toBe('true')
+    expect(within(cell).getByRole('textbox')).toBe(input)
+    expect(within(cell).queryByLabelText('Salvo')).toBeNull()
+  })
+
+  it('tentar de novo reabre a edição com o último valor digitado', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    const opener = await screen.findByRole('button', { name: 'Abrir serviço OS-1013 no Formulário Geral' })
+    const cell = await cellOf(opener.closest('[role="row"]') as HTMLElement, 'text')
+    fireEvent.doubleClick(cell)
+    fireEvent.change(within(cell).getByRole('textbox'), { target: { value: 'Não vai' } })
+    fireEvent.keyDown(within(cell).getByRole('textbox'), { key: 'Enter' })
+    fireEvent.click(await within(cell).findByRole('button', { name: 'Tentar de novo' }))
+    expect((within(cell).getByRole('textbox') as HTMLInputElement).value).toBe('Não vai')
+    expect(cell.getAttribute('aria-invalid')).toBeNull()
+  })
+
+  it('escolher outro motorista grava e mostra salvo', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByText(/Linhas 1–50 de/)
+    const cell = await cellOf((await screen.findAllByRole('row'))[1], 'lookup')
+    fireEvent.keyDown(cell, { key: 'Enter' })
+    fireEvent.click(await within(cell).findByRole('option', { name: 'Bruno Dias', hidden: true }))
+    expect(await within(cell).findByLabelText('Salvo')).toBeTruthy()
+    expect(within(cell).getByText('Bruno Dias')).toBeTruthy()
   })
 })
