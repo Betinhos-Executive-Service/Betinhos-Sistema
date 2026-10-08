@@ -106,3 +106,27 @@ Composição do DS §11.1: anomalia e ação primeiro.
 - Datas de corte e códigos em constantes nomeadas.
 - Peculiaridades preservadas por paridade (registrar, não corrigir agora): CNH conta só funcionário com status "ativo" e validade preenchida até 90 dias (a doc diz que sem validade também conta); "Frota ativa" conta status com "dispon" ou "ativo" em minúsculas, o que inclui "Inativo"; emergencial e produção própria × terceirizada usam a data UTC bruta (`slice`), sem fuso; LY do Ticket médio no card de análise é sempre `s/dado`.
 - Qualquer outra divergência numérica encontrada na paridade é registrada aqui antes de ser aceita.
+
+## 9. Conferência de metadata (DEV, 08/10/2026)
+
+Conferida no MCP `Dataverse_DEV`, somente leitura (`describe` e `read_query`).
+
+| Item | Resultado |
+|---|---|
+| `cr40f_reservadeveculos`, entity set `cr40f_reservadeveculoses` | ok |
+| Colunas da reserva: `cr40f_reservadeveculosid`, `cr40f_dataehorriodesada`, `createdon`, `cr40f_status`, `cr40f_statusdefaturamento`, `cr40f_tipodoservico`, `cr40f_tipodeveiculo`, `new_categoriadoitem` | ok (todas existem) |
+| Lookups da reserva: `cr40f_veiculo` (→ `_cr40f_veiculo_value`), `new_composicaodepreco` (→ `_new_composicaodepreco_value`), `cr40f_financeiro` (→ `_cr40f_financeiro_value`) | ok |
+| Navigation `cr40f_Motorista` → `cr40f_funcionarios` (`cr40f_funcionariosid`, `cr40f_nomecompleto`, `new_apelido`) | ok: lookup `cr40f_motorista` e as 3 colunas existem; join por SQL retornou linhas; nome `cr40f_Motorista` já usado no shell (operacional) |
+| Navigation `cr40f_Cliente` → `cr40f_clientes1` (`cr40f_nomedocliente`) | ok: lookup `cr40f_cliente` e a coluna existem; join por SQL retornou linhas. A capitalização `cr40f_Cliente` vem do `$expand` do legado: o MCP não expõe nomes de navigation property |
+| `cr40f_statusdefaturamento`: 202410010, 202410006, 202410008 | ok, valores existem; rótulos reais "Pago", "Pagante em Viagem" e "Faturamento Mensal" (o legado usa só o código) |
+| `cr40f_status` da reserva: 202410001, 202410005, 202410008 | ok (Confirmado, Programado, Concluído) |
+| `new_categoriadoitem`: 100000000 | ok (Serviço) |
+| `cr40f_composicaodeprecos`, entity set `cr40f_composicaodeprecoses`: `cr40f_composicaodeprecosid`, `new_valortotal`, `new_status` | ok |
+| `new_status` da composição: 100000000, 100000001 | ok (Pendente, Concluido) |
+| `cr40f_manutencoes`, entity set `cr40f_manutencoeses`: `cr40f_datamanutencao`, `cr40f_valor` | ok |
+| `cr40f_multas`, entity set `cr40f_multases`: `cr40f_dataehorario`, `cr40f_status` | ok |
+| `cr40f_multas.cr40f_status`: 202410000 | ok (Notificar o Condutor) |
+| `cr40f_errooperacional`, entity set `cr40f_errooperacionals`: `cr40f_dataocorrencia` | ok |
+| `cr40f_funcionarios`, entity set `cr40f_funcionarioses`: `cr40f_funcionariosid`, `cr40f_nomecompleto`, `cr40f_status`, `cr40f_validadedacnh` | ok |
+| `cr40f_veiculos`, entity set `cr40f_veiculoses`: `cr40f_veiculosid`, `cr40f_statusdoveiculo`, `new_categoriadoveiculo` | ok |
+| `cr40f_veiculos.new_categoriadoveiculo`: 100000000, 100000001 | ok (Próprio, Terceiro; existe também 100000002, Aluguel) |
