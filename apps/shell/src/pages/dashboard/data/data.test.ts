@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { DataverseClient, Row } from '@betinhos/dataverse'
 import { carregarDataverse, carregarExtraDataverse, createSource, resolverEntitySets, type Source } from './source'
+import { filtrarServicos } from '../domain/base'
 import { calcularResumo } from '../domain/resumo'
 import { linhasScore } from '../domain/score'
 import {
@@ -149,7 +150,7 @@ describe('consultas do Dashboard', () => {
     const anterior = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth() - 1, 1)).toISOString().slice(0, 7)
     expect(validas.filter((l) => l.mes === anterior).length).toBeGreaterThanOrEqual(3)
     const f = { atalho: 'personalizado' as const, inicio: `${anterior}-01`, fim: `${anterior}-28`, status: [], clientes: [], motoristas: [], tipos: [] }
-    const score = calcularResumo(d, f, hoje).operacao.find((a) => a.id === 'score')
+    const score = calcularResumo({ todas: d.reservas, rv: filtrarServicos(d.reservas, f), f, now: hoje }, d).operacao.find((a) => a.id === 'score')
     expect(score?.valor).not.toBe('—')
     expect(score?.tom).not.toBe('neutral')
   })

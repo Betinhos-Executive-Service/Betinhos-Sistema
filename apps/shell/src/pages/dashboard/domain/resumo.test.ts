@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { calcularResumo } from './resumo'
+import { filtrarServicos } from './base'
+import { calcularResumo as calcular } from './resumo'
 import { evento, manutencao, reserva, telemetria, viagem } from './test-utils'
 import type { Dados, Filtros } from './types'
 
 const NOW = new Date('2026-10-15T15:00:00Z')
 const f: Filtros = { atalho: 'esteMes', inicio: '2026-10-01', fim: '2026-10-15', status: [], clientes: [], motoristas: [], tipos: [] }
+/** O recorte que a página monta (todas, rv, f, now). */
+const calcularResumo = (d: Dados, filtros: Filtros, now: Date) => calcular({ todas: d.reservas, rv: filtrarServicos(d.reservas, filtros), f: filtros, now }, d)
 const vazio: Dados = { reservas: [], manutencoes: [], multas: [], ocorrencias: [], funcionarios: [], veiculos: [], viagens: [], eventos: [], telemetria: [], pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], indisponiveis: [] }
 
 describe('calcularResumo', () => {
@@ -57,5 +60,12 @@ describe('calcularResumo', () => {
   it('conjunto do Infleet indisponível deixa o Score motoristas em s/dado', () => {
     const r = calcularResumo({ ...vazio, indisponiveis: ['viagens'] }, f, NOW)
     expect(r.operacao[3]).toEqual({ id: 'score', valor: '—', rotulo: 'Score motoristas', status: 's/dado', tom: 'neutral' })
+  })
+
+  it('usa o recorte do ctx sem refiltrar as reservas', () => {
+    const dados: Dados = { ...vazio, reservas: [reserva({ saidaRaw: '2026-10-02T12:00:00Z', valor: 500 }), reserva({ saidaRaw: '2026-10-03T12:00:00Z', valor: 700 })] }
+    // `rv` com só a segunda reserva: o Resumo conta 1 serviço, mesmo com as duas no período.
+    const r = calcular({ todas: dados.reservas, rv: [dados.reservas[1]], f, now: NOW }, dados)
+    expect(r.kpis.find((k) => k.id === 'servicos')?.valor).toBe('1')
   })
 })
