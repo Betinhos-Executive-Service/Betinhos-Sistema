@@ -40,7 +40,7 @@ const ITEM_ICONS: Record<string, ReactNode> = {
   infleet: <MapPin />,
   new_telaplanner: <ClipboardList />,
   cr40f_composicaodeprecos: <Calculator />,
-  cr40f_financeiro: <Coins />,
+  ops: <Coins />,
   pagantes: <Users />,
   cr40f_recibos_v2: <Receipt />,
   cr40f_pedidodecotacao: <Mail />,
