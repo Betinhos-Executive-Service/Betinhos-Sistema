@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AlertList } from './AlertList'
 import { AnaliseCard } from './AnaliseCard'
 import { DashboardToolbar } from './DashboardToolbar'
@@ -14,8 +14,8 @@ import { calcularResumo } from '../domain/resumo'
 import { reserva } from '../domain/test-utils'
 import type { Dados, Filtros } from '../domain/types'
 
-afterEach(cleanup)
-vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
+beforeEach(() => { vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }) })
 
 describe('componentes do Dashboard', () => {
   it('chip mostra seta, sinal e texto', () => {
@@ -35,6 +35,15 @@ describe('componentes do Dashboard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ver tabela' }))
     expect(screen.getByText('tabela')).toBeTruthy()
     expect(screen.queryByText('grafico')).toBeNull()
+  })
+
+  it('card de análise sem gráfico na primeira renderização passa a mostrar o gráfico quando ele chega', () => {
+    const props = { titulo: 'Custo', periodo: 'p', unidade: 'R$', valor: '1', tabela: <p>tabela</p> }
+    const { rerender } = render(<AnaliseCard {...props} />)
+    expect(screen.getByText('tabela')).toBeTruthy()
+    rerender(<AnaliseCard {...props} grafico={<p>grafico</p>} />)
+    expect(screen.getByText('grafico')).toBeTruthy()
+    expect(screen.queryByText('tabela')).toBeNull()
   })
 
   it('card de análise sem gráfico mostra só a tabela, sem botão de alternar', () => {
@@ -72,19 +81,22 @@ describe('componentes do Dashboard', () => {
     const cheio: Dados = { ...vazio, reservas: [reserva({ saidaRaw: '2026-10-02T12:00:00Z', valor: 500, cliente: 'Tenaris' })], manutencoes: [{ dia: '2026-10-03', valor: 100 }] }
     // Recharts avisa que o contêiner tem 0 x 0 no jsdom; o aviso é esperado aqui.
     const aviso = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    for (const dados of [vazio, cheio]) {
-      const r = calcularResumo(dados, f, now)
-      const { container } = render(<>
-        <KpiGrid kpis={r.kpis} carregando={false} />
-        <FrotaPessoas cards={r.frota} />
-        <ProducaoPropriaTerceira dados={r.producao} periodo="01/10/2026 a 15/10/2026" />
-        <Emergenciais dados={r.emergenciais} periodo="01/10/2026 a 15/10/2026" />
-        <Analises resumo={r} periodo="01/10/2026 a 15/10/2026" />
-      </>)
-      expect(container.querySelectorAll('.dash-analise').length).toBe(11)
-      expect(screen.getAllByText('Meta × realizado').length).toBe(1)
-      cleanup()
+    try {
+      for (const dados of [vazio, cheio]) {
+        const r = calcularResumo(dados, f, now)
+        const { container } = render(<>
+          <KpiGrid kpis={r.kpis} carregando={false} />
+          <FrotaPessoas cards={r.frota} />
+          <ProducaoPropriaTerceira dados={r.producao} periodo="01/10/2026 a 15/10/2026" />
+          <Emergenciais dados={r.emergenciais} periodo="01/10/2026 a 15/10/2026" />
+          <Analises resumo={r} periodo="01/10/2026 a 15/10/2026" />
+        </>)
+        expect(container.querySelectorAll('.dash-analise').length).toBe(11)
+        expect(screen.getAllByText('Meta × realizado').length).toBe(1)
+        cleanup()
+      }
+    } finally {
+      aviso.mockRestore()
     }
-    aviso.mockRestore()
   })
 })

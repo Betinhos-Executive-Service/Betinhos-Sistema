@@ -7,13 +7,14 @@ type Props = { titulo: string; periodo: string; unidade: string; valor: string; 
 
 /** Card de análise do DS §10.16: título, período, unidade, gráfico e alternativa em tabela. */
 export function AnaliseCard({ titulo, periodo, unidade, valor, sub, chips = [], apoio = [], grafico, tabela }: Props) {
-  const [verTabela, setVerTabela] = useState(!grafico)
+  const [escolha, setEscolha] = useState<boolean | null>(null)
+  const verTabela = escolha ?? !grafico
   return (
     <Surface
       className="dash-analise"
       eyebrow={`${periodo} · ${unidade}`}
       title={titulo}
-      action={grafico ? <Button variant="ghost" size="compact" onClick={() => setVerTabela((v) => !v)}>{verTabela ? 'Ver gráfico' : 'Ver tabela'}</Button> : undefined}
+      action={grafico ? <Button variant="ghost" size="compact" onClick={() => setEscolha(!verTabela)}>{verTabela ? 'Ver gráfico' : 'Ver tabela'}</Button> : undefined}
     >
       <div className="dash-analise__topo">
         <strong className="dash-analise__valor">{valor}</strong>
