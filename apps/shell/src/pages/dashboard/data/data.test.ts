@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { DataverseClient, Row } from '@betinhos/dataverse'
-import { carregarDataverse, createSource } from './source'
+import { carregarDataverse, createSource, resolverEntitySets } from './source'
 import { calcularResumo } from '../domain/resumo'
 import { linhasScore } from '../domain/score'
 import {
@@ -62,6 +62,8 @@ describe('consultas do Dashboard', () => {
       cr40f_Cliente: { cr40f_nomedocliente: 'Tenaris' },
     }, cps)
     expect(r).toMatchObject({ id: 'r1', dia: '2026-10-02', mes: '2026-10', statusLabel: 'Concluído', fatStatus: 202410010, tipoVeiculo: 'Executivo', tipoVeiculoRaw: '3', veiculoId: 'v1', motoristaId: 'm1', motoristaKey: 'm1', motorista: 'Oliveira', cliente: 'Tenaris', valor: 850.5, cpConcluida: true, opId: 'op1' })
+    // Sem id do funcionário, a chave é o nome sem acento e sem caixa (`normL`), como nas despesas e no CSV 2026.
+    expect(mapReserva({ cr40f_reservadeveculosid: 'R3', cr40f_Motorista: { cr40f_nomecompleto: 'João Ávila' } }, cps)).toMatchObject({ motoristaId: '', motoristaKey: 'nome:joao avila' })
     expect(mapReserva({ cr40f_reservadeveculosid: 'R2' }, cps)).toMatchObject({ motorista: 'Sem motorista', motoristaKey: 'nome:sem motorista', cliente: 'Sem cliente', valor: 0, dia: '', statusLabel: 'Sem status' })
   })
 
@@ -354,6 +356,21 @@ describe('conjuntos das abas', () => {
     // O erro da consulta completa fica registrado antes da alternativa.
     expect(warn).toHaveBeenCalledTimes(2)
     expect(warn.mock.calls.map((c) => String(c[1]))).toEqual(expect.arrayContaining(['Error: coluna inexistente', 'Error: navegação inexistente']))
+    warn.mockRestore()
+  })
+
+  it('tabela secundária ausente na metadata vira indisponível, sem consulta; reservas e CPs ausentes derrubam a tela', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const info = new Map(Object.values(ENTITIES).filter((n) => n !== ENTITIES.multa && n !== ENTITIES.anexoDespesa).map((n) => [n, { entitySetName: `${n}s` }]))
+    const sets = resolverEntitySets(info)
+    expect(sets).toMatchObject({ multa: '', anexoDespesa: '', reserva: `${ENTITIES.reserva}s` })
+    expect(warn).toHaveBeenCalledTimes(2)
+    const consultas: string[] = []
+    const d = await carregarDataverse(client(async (path) => { consultas.push(path); return [] }), { ...SETS, multa: '', anexoDespesa: '' }, '2024-01-01', '2026-10-15')
+    expect(d.indisponiveis).toEqual(['multas', 'despesas'])
+    expect(consultas.some((c) => c.startsWith('?'))).toBe(false)
+    const semReserva = new Map([...info].filter(([n]) => n !== ENTITIES.reserva))
+    expect(() => resolverEntitySets(semReserva)).toThrow(/cr40f_reservadeveculos/)
     warn.mockRestore()
   })
 

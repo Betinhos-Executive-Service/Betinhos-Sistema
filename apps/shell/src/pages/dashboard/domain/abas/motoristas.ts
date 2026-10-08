@@ -1,6 +1,6 @@
 import { cnhEmAtencao } from '../alertas'
 import { agrupar, mesesComDados, soma } from '../base'
-import { stL } from '../format'
+import { normL, stL } from '../format'
 import { ticketStats, type Contexto } from '../kpis'
 import { DIA_MS, hojeBR, mesRotulo } from '../periodo'
 import { linhasScore, notaPorMes, ordenarLinhasScore, rankingMensal, scoreMotoristas, type LinhaScore, type NotaMes, type RankingMes, type ResultadoScore } from '../score'
@@ -83,7 +83,7 @@ export function calcularMotoristas(ctx: Contexto, dados: Dados): Motoristas {
     const srvs = (fu.id ? porId.get(fu.id) : porNome.get(nome)) ?? []
     const doMotorista = agrupar(srvs, (r) => r.mes)
     return {
-      key: fu.id || `nome:${nome.toLowerCase()}`,
+      key: fu.id || `nome:${normL(nome)}`,
       nome,
       nomeCompleto: fu.nome || nome,
       funcao: fu.funcao,

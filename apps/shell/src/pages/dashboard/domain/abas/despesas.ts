@@ -35,7 +35,8 @@ export function periodoAnteriorDespesa(inicio: string, fim: string): Periodo | n
 
 /** `expenseMatchesFilters` sem a parte de data (motorista global, empresa, categoria, forma). */
 function passaFiltros(d: Despesa, f: FiltrosDespesa) {
-  const motoristas = (f.motoristas ?? []).map((v) => idNorm(v) || normL(v))
+  // Valor do filtro: id (sem chaves, minúsculo) ou "nome:<normL>" quando o motorista não tem id (mesma chave das reservas).
+  const motoristas = (f.motoristas ?? []).map((v) => (v.startsWith('nome:') ? normL(v) : idNorm(v)))
   if (motoristas.length && !motoristas.includes(chaveMotorista(d)) && !motoristas.includes(`nome:${normL(d.motorista)}`)) return false
   if (f.empresas.length && !f.empresas.includes(d.empresa)) return false
   if (f.categorias.length && !f.categorias.includes(d.categoriaId)) return false

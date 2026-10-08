@@ -109,7 +109,8 @@ export function mapReserva(row: Row, cps: Map<string, Cp>): Reserva {
     tipoVeiculoRaw: row.cr40f_tipodeveiculo == null ? '' : String(row.cr40f_tipodeveiculo),
     tipoVeiculo: formatted(row, 'cr40f_tipodeveiculo') || '—',
     veiculoId: lower(row._cr40f_veiculo_value),
-    motoristaId, motoristaKey: motoristaId || `nome:${motorista.toLowerCase()}`, motorista,
+    // Sem id, a chave é o nome sem acento e sem caixa (`normL`), a mesma das despesas e do CSV 2026.
+    motoristaId, motoristaKey: motoristaId || `nome:${normL(motorista)}`, motorista,
     cliente: str(asRow(row.cr40f_Cliente)?.cr40f_nomedocliente) || SEM_CLIENTE,
     cpId, valor: cp?.valor ?? 0, cpPendente: cp?.pendente ?? false, cpConcluida: cp?.concluida ?? false,
     opId: lower(row._cr40f_financeiro_value),

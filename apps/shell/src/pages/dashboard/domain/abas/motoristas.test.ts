@@ -54,7 +54,7 @@ describe('calcularMotoristas', () => {
       srv('a', { valor: 300, cpConcluida: true, veiculoId: 'v1' }), srv('a', { valor: 100, cpConcluida: true, veiculoId: 'v1' }),
       srv('a', { valor: 50, veiculoId: 'v2' }),
       srv('c', { valor: 200, cpConcluida: true, veiculoId: 'v2' }),
-      reserva({ motoristaId: '', motoristaKey: 'nome:zé', motorista: 'Zé', valor: 80 }),
+      reserva({ motoristaId: '', motoristaKey: 'nome:ze', motorista: 'Zé', valor: 80 }),
       srv('a', { categoriaItem: 100000001, valor: 999 }),
       srv('c', { saidaRaw: '2026-08-20T15:00:00Z', valor: 999 }),
     ]
@@ -74,7 +74,7 @@ describe('calcularMotoristas', () => {
     expect(ana).toMatchObject({ key: 'a', nomeCompleto: 'Ana Souza', funcao: 'Motorista', servicos: 3, faturamento: 450, ticket: 200, propria: true, cnhDia: '' })
     expect(ana.pct).toBeCloseTo(60, 10)
     expect(caio).toMatchObject({ key: 'c', servicos: 1, faturamento: 200, ticket: 200, propria: false, cnhDia: '2027-03-10', pct: 20 })
-    expect(ze).toMatchObject({ key: 'nome:zé', servicos: 1, faturamento: 80, propria: null })
+    expect(ze).toMatchObject({ key: 'nome:ze', servicos: 1, faturamento: 80, propria: null })
     expect(sem).toMatchObject({ key: 'x', servicos: 0, faturamento: 0, ticket: 0, pct: 0, propria: null })
   })
 

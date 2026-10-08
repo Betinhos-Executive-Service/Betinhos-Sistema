@@ -74,6 +74,8 @@ describe('filtrarDespesas (expenseMatchesFilters)', () => {
   it('motorista do filtro global casa pelo id ou pela chave nome: normalizada', () => {
     expect(ids({ motoristas: ['{M1}'] })).toEqual(['a'])
     expect(ids({ motoristas: ['nome:joao paulo'] })).toEqual(['b'])
+    // A chave das reservas sem id é `nome:` + normL: acento e caixa não separam o mesmo motorista.
+    expect(ids({ motoristas: ['nome:João Paulo'] })).toEqual(['b'])
     expect(ids({ motoristas: ['m9'] })).toEqual([])
   })
 })

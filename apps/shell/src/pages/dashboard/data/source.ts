@@ -42,28 +42,34 @@ async function comAlternativa(principal: () => Promise<Row[]>, reduzida: () => P
   }
 }
 
+/** Tabela secundária sem entity set (ausente na metadata do ambiente): a consulta falha e o conjunto vira `indisponiveis`. */
+const ausente = (set: string) => Promise.reject(new Error(`Tabela ausente na metadata (${set || 'sem entity set'}).`))
+
 /**
  * Reservas e CPs são obrigatórias; um conjunto secundário (inclusive as 3 tabelas do Infleet do Score motoristas) que falha vira `indisponiveis`.
+ * Entity set vazio (`''`) é tabela secundária que não existe na metadata do ambiente: conta como falha só daquele conjunto.
  * Despesas dependem de 4 tabelas (despesas, categorias, formas e anexos): se qualquer uma falhar, o conjunto `despesas` inteiro fica indisponível.
  * Multas e despesas usam os funcionários (apelido, nome e empresa); sem eles caem no rótulo do lookup e "Sem empresa".
  */
 export async function carregarDataverse(client: DataverseClient, sets: EntitySets, desde: string, ate: string): Promise<Dados> {
+  /** Consulta de um conjunto secundário: sem entity set, falha sem ir ao servidor. */
+  const ler = (set: string, path: (set: string) => string) => (set ? client.getAll(path(set)) : ausente(set))
   const [res, cps, man, mul, oco, fun, vei, via, eve, tel, pag, des, cat, frm, anx] = await comLimite<Row[]>([
     () => client.getAll(reservasPath(sets.reserva, desde, ate)),
     () => client.getAll(composicoesPath(sets.composicao)),
-    () => client.getAll(manutencoesPath(sets.manutencao)),
-    () => comAlternativa(() => client.getAll(multasPath(sets.multa)), () => client.getAll(multasPath(sets.multa, false))),
-    () => client.getAll(ocorrenciasPath(sets.ocorrencia)),
-    () => client.getAll(funcionariosPath(sets.funcionario)),
-    () => client.getAll(veiculosPath(sets.veiculo)),
-    () => client.getAll(viagensPath(sets.viagem, desde, ate)),
-    () => client.getAll(eventosPath(sets.evento, desde, ate)),
-    () => client.getAll(telemetriaPath(sets.telemetria, desde, ate)),
-    () => comAlternativa(() => client.getAll(pagantesPath(sets.pagante)), () => client.getAll(pagantesPath(sets.pagante, false))),
-    () => client.getAll(despesasPath(sets.despesa, desde, ate)),
-    () => client.getAll(categoriasDespesaPath(sets.categoriaDespesa)),
-    () => client.getAll(formasPagamentoPath(sets.formaPagamentoDespesa)),
-    () => client.getAll(anexosDespesaPath(sets.anexoDespesa)),
+    () => ler(sets.manutencao, manutencoesPath),
+    () => (sets.multa ? comAlternativa(() => client.getAll(multasPath(sets.multa)), () => client.getAll(multasPath(sets.multa, false))) : ausente(sets.multa)),
+    () => ler(sets.ocorrencia, ocorrenciasPath),
+    () => ler(sets.funcionario, funcionariosPath),
+    () => ler(sets.veiculo, veiculosPath),
+    () => ler(sets.viagem, (s) => viagensPath(s, desde, ate)),
+    () => ler(sets.evento, (s) => eventosPath(s, desde, ate)),
+    () => ler(sets.telemetria, (s) => telemetriaPath(s, desde, ate)),
+    () => (sets.pagante ? comAlternativa(() => client.getAll(pagantesPath(sets.pagante)), () => client.getAll(pagantesPath(sets.pagante, false))) : ausente(sets.pagante)),
+    () => ler(sets.despesa, (s) => despesasPath(s, desde, ate)),
+    () => ler(sets.categoriaDespesa, categoriasDespesaPath),
+    () => ler(sets.formaPagamentoDespesa, formasPagamentoPath),
+    () => ler(sets.anexoDespesa, anexosDespesaPath),
   ], 4)
   if (res.status === 'rejected') throw res.reason
   if (cps.status === 'rejected') throw cps.reason
@@ -122,22 +128,36 @@ function createMockSource(): Source {
   }
 }
 
+/**
+ * Entity sets pela metadata: reservas e composições são obrigatórias (sem elas, erro da tela); cada tabela secundária ausente vira `''`
+ * (aviso no console) e a carga marca só o conjunto dela como indisponível, em vez de derrubar a tela.
+ */
+export function resolverEntitySets(info: ReadonlyMap<string, { entitySetName: string }>): EntitySets {
+  const obrigatoria = (name: string) => {
+    const value = info.get(name)?.entitySetName
+    if (!value) throw new Error(`Tabela ${name} não encontrada na metadata.`)
+    return value
+  }
+  const opcional = (name: string) => {
+    try {
+      return obrigatoria(name)
+    } catch (error) {
+      console.warn('Dashboard: tabela secundária ausente; os cards dela ficam s/dado.', String(error))
+      return ''
+    }
+  }
+  return {
+    reserva: obrigatoria(ENTITIES.reserva), composicao: obrigatoria(ENTITIES.composicao), manutencao: opcional(ENTITIES.manutencao), multa: opcional(ENTITIES.multa),
+    ocorrencia: opcional(ENTITIES.ocorrencia), funcionario: opcional(ENTITIES.funcionario), veiculo: opcional(ENTITIES.veiculo),
+    telemetria: opcional(ENTITIES.telemetria), evento: opcional(ENTITIES.evento), viagem: opcional(ENTITIES.viagem),
+    pagante: opcional(ENTITIES.pagante), despesa: opcional(ENTITIES.despesa), categoriaDespesa: opcional(ENTITIES.categoriaDespesa),
+    formaPagamentoDespesa: opcional(ENTITIES.formaPagamentoDespesa), anexoDespesa: opcional(ENTITIES.anexoDespesa),
+  }
+}
+
 export function createSource(host: Host): Source {
   if (host.mode === 'mock') return createMockSource()
   let sets: Promise<EntitySets> | null = null
-  const entitySets = () => (sets ??= host.metadata.entities(Object.values(ENTITIES)).then((info) => {
-    const get = (name: string) => {
-      const value = info.get(name)?.entitySetName
-      if (!value) throw new Error(`Tabela ${name} não encontrada na metadata.`)
-      return value
-    }
-    return {
-      reserva: get(ENTITIES.reserva), composicao: get(ENTITIES.composicao), manutencao: get(ENTITIES.manutencao), multa: get(ENTITIES.multa),
-      ocorrencia: get(ENTITIES.ocorrencia), funcionario: get(ENTITIES.funcionario), veiculo: get(ENTITIES.veiculo),
-      telemetria: get(ENTITIES.telemetria), evento: get(ENTITIES.evento), viagem: get(ENTITIES.viagem),
-      pagante: get(ENTITIES.pagante), despesa: get(ENTITIES.despesa), categoriaDespesa: get(ENTITIES.categoriaDespesa),
-      formaPagamentoDespesa: get(ENTITIES.formaPagamentoDespesa), anexoDespesa: get(ENTITIES.anexoDespesa),
-    }
-  }).catch((error) => { sets = null; throw error }))
+  const entitySets = () => (sets ??= host.metadata.entities(Object.values(ENTITIES)).then((info) => resolverEntitySets(info)).catch((error) => { sets = null; throw error }))
   return { mock: false, carregar: async (desde, ate) => carregarDataverse(host.client, await entitySets(), desde, ate) }
 }
