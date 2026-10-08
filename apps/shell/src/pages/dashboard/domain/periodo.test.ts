@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { atalho, cargaDesde, dayKey, diasNoMes, entre, hojeBR, mesRotulo, periodoAnoAnterior, periodoMesAnterior, mostrarLM } from './periodo'
+import { atalho, cargaDesde, dayKey, diasNoMes, entre, hojeBR, mesRotulo, periodoAnoAnterior, periodoMesAnterior, periodoNoAno, mostrarLM } from './periodo'
 
 const NOW = new Date('2026-10-15T15:00:00Z') // 12:00 em Brasília
 
@@ -41,6 +41,13 @@ describe('período', () => {
   it('LY desloca um ano e limita 29/02', () => {
     expect(periodoAnoAnterior('2026-01-01', '2026-10-15')).toEqual({ inicio: '2025-01-01', fim: '2025-10-15' })
     expect(periodoAnoAnterior('2028-02-29', '2028-02-29')).toEqual({ inicio: '2027-02-28', fim: '2027-02-28' })
+  })
+
+  it('janela do filtro deslocada para terminar em outro ano, mantendo a diferença de anos e limitando 29/02', () => {
+    expect(periodoNoAno('2026-01-01', '2026-10-08', 2024)).toEqual({ inicio: '2024-01-01', fim: '2024-10-08' })
+    expect(periodoNoAno('2026-01-01', '2026-10-08', 2026)).toEqual({ inicio: '2026-01-01', fim: '2026-10-08' })
+    expect(periodoNoAno('2025-12-01', '2026-01-31', 2025)).toEqual({ inicio: '2024-12-01', fim: '2025-01-31' })
+    expect(periodoNoAno('2028-02-29', '2028-02-29', 2026)).toEqual({ inicio: '2026-02-28', fim: '2026-02-28' })
   })
 
   it('LM só aparece com o filtro inteiro dentro do mês corrente', () => {

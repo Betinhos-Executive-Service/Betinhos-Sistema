@@ -127,17 +127,52 @@ describe('análises', () => {
     expect(topByShare([1, 2], 0, (x) => x)).toEqual([1, 2])
   })
 
-  it('total produzido: 3 anos recortados pelo filtro (como o legado), 2026 do Dataverse e meta proporcional', () => {
+  it('total produzido: compara os mesmos meses nos 3 anos (filtro deslocado para cada ano), 2026 do Dataverse e meta proporcional', () => {
     const t = totalProduzido(ctx, cmp)
     expect(t.anos).toEqual([2024, 2025, 2026])
     expect(t.valor).toBe('R$ 1,0k')
-    // O recorte usa as datas do filtro: anos fora dele ficam null e só outubro tem ponto.
-    expect(t.pontos).toEqual([{ rotulo: 'Out', valores: [null, null, 1000] }])
+    // 01 a 15/out de cada ano: 2024 e 2025 vêm da tabela fixa rateada pelos 15 dias; 2026 do Dataverse.
+    expect(t.pontos).toHaveLength(1)
+    expect(t.pontos[0].rotulo).toBe('Out')
+    expect(t.pontos[0].valores[0]).toBeCloseTo((553994.72 / 31) * 15, 4)
+    expect(t.pontos[0].valores[1]).toBeCloseTo((434559.4 / 31) * 15, 4)
+    expect(t.pontos[0].valores[2]).toBe(1000)
     expect(t.apoio[0].rotulo).toBe('Meta')
     const anoTodo = { ...ctx, f: f({ atalho: 'anoAnt', inicio: '2025-01-01', fim: '2025-12-31' }) }
     const t2 = totalProduzido({ ...anoTodo, rv: filtrarServicos(todas, anoTodo.f) }, comparacao({ ...anoTodo, rv: [] }))
     expect(t2.pontos).toHaveLength(12)
     expect(t2.pontos[0].valores[1]).toBeCloseTo(336469.65, 4)
+  })
+
+  it('total produzido: filtro do ano corrente mostra os meses cobertos e os mesmos meses dos anos anteriores', () => {
+    const esteAno = { ...ctx, f: f({ atalho: 'esteAno', inicio: '2026-01-01', fim: '2026-10-15' }) }
+    const t = totalProduzido({ ...esteAno, rv: filtrarServicos(todas, esteAno.f) }, comparacao({ ...esteAno, rv: [] }))
+    // Jan a set só têm dado nos anos fixos; out tem 2026 do Dataverse e o rateio de 15 dias dos anos fixos.
+    expect(t.pontos.map((p) => p.rotulo)).toEqual(['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out'])
+    expect(t.pontos[0].valores[0]).toBeCloseTo(213816.57, 4)
+    expect(t.pontos[0].valores[1]).toBeCloseTo(336469.65, 4)
+    expect(t.pontos[0].valores[2]).toBeNull()
+    expect(t.pontos[9].valores[1]).toBeCloseTo((434559.4 / 31) * 15, 4)
+    expect(t.pontos[9].valores[2]).toBe(1000)
+  })
+
+  it('total produzido: com segmento os anos fixos ficam sem dado e só o Dataverse de 2026 aparece', () => {
+    const seg = { ...ctx, f: f({ clientes: ['Tenaris'] }) }
+    const t = totalProduzido({ ...seg, rv: filtrarServicos(todas, seg.f) }, comparacao({ ...seg, rv: [] }))
+    expect(t.pontos).toEqual([{ rotulo: 'Out', valores: [null, null, 600] }])
+  })
+
+  it('total produzido: filtro que cruza o ano desloca mantendo a diferença de anos e começa pelo mês inicial', () => {
+    const cruza = f({ atalho: 'personalizado', inicio: '2025-12-01', fim: '2026-01-31' })
+    const dados = [...todas, reserva({ saidaRaw: '2026-01-10T12:00:00Z', valor: 700 })]
+    const c = { todas: dados, rv: filtrarServicos(dados, cruza), f: cruza, now: NOW }
+    const t = totalProduzido(c, comparacao(c))
+    // Cada série cobre dez do ano anterior e jan do ano seguinte: [2023-12 e 2024-01], [2024-12 e 2025-01], [2025-12 e 2026-01].
+    expect(t.pontos.map((p) => p.rotulo)).toEqual(['Dez', 'Jan'])
+    const [dez, jan] = t.pontos.map((p) => p.valores)
+    ;[281865.47, 330595.71, 438377.83].forEach((v, i) => expect(dez[i]).toBeCloseTo(v, 4))
+    ;[213816.57, 336469.65].forEach((v, i) => expect(jan[i]).toBeCloseTo(v, 4))
+    expect(jan[2]).toBe(700)
   })
 
   it('meta × realizado por mês do recorte', () => {
