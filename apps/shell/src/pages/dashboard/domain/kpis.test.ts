@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { aplicarCsv2026, filtrarServicos, opcoesFiltro } from './base'
-import { aReceber, comparacao, cpPendentes, kpisExecutivos, recebimentoStats, servicosFuturos, ticketStats, valorDoPeriodo } from './kpis'
+import { aReceber, cancelado, comparacao, cpPendentes, kpisExecutivos, recebimentoStats, servicosFuturos, ticketStats, valorDoPeriodo } from './kpis'
 import { previsao } from './previsao'
 import { reserva } from './test-utils'
 import type { Filtros } from './types'
@@ -56,6 +56,10 @@ describe('KPIs', () => {
     const base = { cpPendente: true, fatStatusLabel: 'Pendente', statusLabel: 'Concluído' }
     const rows = [reserva({ ...base, cpId: 'cp1' }), reserva({ ...base, cpId: 'cp1' }), reserva({ ...base, cpId: 'cp2', statusLabel: 'Programado' }), reserva({ ...base, cpId: 'cp3', fatStatusLabel: 'Faturado' }), reserva({ ...base, cpId: '' }), reserva({ ...base, cpId: 'cp4', categoriaItemLabel: 'Hospedagem' })]
     expect(cpPendentes(rows)).toHaveLength(1)
+  })
+
+  it('cancelado: rótulo com "cancel" ou "recus" (stL, como o KPI de cancelados do legado)', () => {
+    expect(['Cancelado', 'CANCELADA pelo cliente', 'Recusado', 'Concluído', 'Confirmado'].map((statusLabel) => cancelado(reserva({ statusLabel })))).toEqual([true, true, true, false, false])
   })
 
   it('futuros: depois de agora, não cancelado/recusado nem produzido', () => {

@@ -1,8 +1,8 @@
 import { ANOS_MAPA, FAT_FIXO } from '../data/historico'
 import { MESES_CURTOS, MESES_TITULO } from './codes'
 import { agrupar, mesesComDados, soma, temSegmento } from './base'
-import { brl, brlS, dec, int, stL } from './format'
-import { chipOuSemDado, chipValor, produzido, semDado, ticketDoPeriodo, ticketStats, valorDoPeriodo, type Comparacao, type Contexto } from './kpis'
+import { brl, brlS, dec, int } from './format'
+import { cancelado, chipOuSemDado, chipValor, produzido, semDado, ticketDoPeriodo, ticketStats, valorDoPeriodo, type Comparacao, type Contexto } from './kpis'
 import { metaMensal, metaProporcional, totalFixoNoPeriodo } from './meta'
 import { diasNoMes, fmtDia, hojeBR, mesRotulo, mesesDoAno, parseDia, periodoNoAno } from './periodo'
 import type { Apoio, Chip, Reserva } from './types'
@@ -138,7 +138,7 @@ export function statusServicos(ctx: Contexto): StatusServicos {
   const por = agrupar(rv, (r) => r.statusLabel)
   const chaves = [...por.keys()].sort((a, b) => (por.get(b)?.length ?? 0) - (por.get(a)?.length ?? 0))
   const conc = rv.filter(produzido).length
-  const canc = rv.filter((r) => { const k = stL(r.statusLabel); return k.includes('cancel') || k.includes('recus') }).length
+  const canc = rv.filter(cancelado).length
   const concPct = rv.length ? (conc / rv.length) * 100 : 0
   return {
     linhas: topByShare(chaves, rv.length, (k) => por.get(k)?.length ?? 0).map((status) => {
