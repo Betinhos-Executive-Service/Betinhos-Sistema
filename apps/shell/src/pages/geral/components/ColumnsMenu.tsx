@@ -6,6 +6,8 @@ import { columnLabel } from '../domain/layout'
 import type { AttributeMap, Column } from '../domain/types'
 
 type Props = {
+  /** Tamanho do botão que abre o diálogo. */
+  size?: 'compact' | 'touch'
   /** Todas as colunas da visão, sem as preferências aplicadas. */
   columns: Column[]
   attributes: AttributeMap | null
@@ -26,7 +28,7 @@ const sameDraft = (a: ColumnPrefs, b: ColumnPrefs) =>
 const isDefault = (draft: ColumnPrefs, columns: Column[]) => draft.hidden.length === 0 && draft.order.every((key, i) => key === columns[i]?.key)
 
 /** Botão "Colunas" e o diálogo com mostrar/ocultar e ordem; só vale ao aplicar. */
-export function ColumnsMenu({ columns, attributes, prefs, onChange }: Props) {
+export function ColumnsMenu({ size = 'compact', columns, attributes, prefs, onChange }: Props) {
   const [open, setOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [draft, setDraft] = useState<ColumnPrefs>({ hidden: [], order: [] })
@@ -65,7 +67,7 @@ export function ColumnsMenu({ columns, attributes, prefs, onChange }: Props) {
 
   return (
     <>
-      <Button variant="secondary" size="compact" icon={<Columns3 size={16} />} aria-haspopup="dialog" onClick={show}>Colunas</Button>
+      <Button variant="secondary" size={size} icon={<Columns3 size={16} />} aria-haspopup="dialog" onClick={show}>Colunas</Button>
       <Dialog
         open={open}
         onClose={requestClose}

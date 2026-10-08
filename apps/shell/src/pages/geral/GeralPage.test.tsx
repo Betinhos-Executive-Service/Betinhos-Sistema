@@ -535,6 +535,36 @@ describe('Geral: espaço e densidade', () => {
     expect(screen.getByRole('combobox', { name: 'Serviços por página' }).textContent).toContain('100 por página')
   })
 
+  it('no desktop a barra usa controles compactos', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByText(/Linhas 1–50 de/)
+    const toolbar = screen.getByRole('toolbar', { name: 'Filtros de serviços' })
+    expect(within(toolbar).getByRole('combobox', { name: 'Visão' }).closest('.bt-control')?.classList.contains('bt-control--compact')).toBe(true)
+    expect(within(toolbar).getByRole('searchbox', { name: 'Buscar serviços' }).closest('.bt-control')?.classList.contains('bt-control--compact')).toBe(true)
+    for (const name of ['Criar serviço', 'Colunas', 'Mais ações']) expect(within(toolbar).getByRole('button', { name }).classList.contains('bt-button--compact')).toBe(true)
+  })
+
+  it('no celular a barra usa tamanho de toque (44 px), nunca o compacto de 32 px', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('max-width: 820px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findAllByRole('listitem')
+    const toolbar = screen.getByRole('toolbar', { name: 'Filtros de serviços' })
+    for (const control of [
+      within(toolbar).getByRole('combobox', { name: 'Visão' }).closest('.bt-control'),
+      within(toolbar).getByRole('searchbox', { name: 'Buscar serviços' }).closest('.bt-control'),
+    ]) {
+      expect(control?.classList.contains('bt-control--compact')).toBe(false)
+      expect(control?.classList.contains('bt-control--touch')).toBe(true)
+    }
+    for (const name of ['Criar serviço', 'Mais ações']) {
+      const button = within(toolbar).getByRole('button', { name })
+      expect(button.classList.contains('bt-button--compact')).toBe(false)
+      expect(button.classList.contains('bt-button--touch')).toBe(true)
+    }
+    // O botão Colunas some no celular (CSS), mas também sai do tamanho compacto.
+    expect(within(toolbar).getByRole('button', { name: 'Colunas' }).classList.contains('bt-button--compact')).toBe(false)
+  })
+
   it('valor salvo inválido volta para 50 por página', async () => {
     window.localStorage.setItem('betinhos.geral.pagina.v1', '75')
     render(<GeralPage host={{ mode: 'mock' }} />)
