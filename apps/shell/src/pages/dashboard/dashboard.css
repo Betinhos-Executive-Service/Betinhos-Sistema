@@ -1,60 +1,18 @@
-/* Aba Resumo do Dashboard: composição densa do legado com tokens e componentes do DS. Só tokens --bt-*, tema claro. */
+/* Dashboard em abas: composição densa do legado com tokens e componentes do DS. Só tokens --bt-*, tema claro. */
 
 .dash-meta { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); font-variant-numeric: tabular-nums; }
 .dash-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 /* Contém os elementos absolutos da página (textos só para leitor de tela): sem isso eles escapam do `.bt-shell__main`
-   rolável, alongam o documento e o scrollIntoView dos atalhos acabava rolando a janela inteira. */
+   rolável e alongam o documento. */
 .dash-pagina { position: relative; }
 
 /* ---------- Abas (linha extra do PageHeader, DS §10.2) ---------- */
 /* A barra rola na horizontal dentro do cabeçalho; a página nunca ganha rolagem lateral. */
 .dash-abas { min-width: 0; }
 .dash-abas .bt-tabs__list { scrollbar-width: thin; overscroll-behavior-x: contain; }
-/* Onze abas: o respiro lateral de 8 px (em vez de 10) faz todas caberem a 1440 px com a sidebar aberta. */
-.dash-abas .bt-tabs__tab { padding: 0 var(--bt-space-2); }
 
-/* Aba ainda no dashboard antigo: o iframe ocupa a altura útil da área, como as telas legadas do shell. */
-.dash-pagina--legado { display: flex; flex-direction: column; box-sizing: border-box; min-height: 100%; }
-.dash-pagina--legado > .bt-stack { flex: 1 1 auto; }
-.dash-painel--legado, .dash-legado { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
-.dash-legado { gap: var(--bt-space-2); }
-.dash-legado__aviso { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--bt-space-1) var(--bt-space-3); min-height: var(--bt-control-height-compact); color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); }
-.dash-legado__aviso > p { margin: 0; }
-.dash-legado__frame { flex: 1 1 auto; height: auto; min-height: 480px; overflow: hidden; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-lg); }
-.dash-legado__frame > .frame__iframe { position: absolute; inset: 0; height: 100%; }
-/* Enquanto carrega, o iframe fica oculto: o chrome do legado não pisca antes de ser escondido. */
-.dash-legado__frame[aria-busy="true"] > .frame__iframe { visibility: hidden; }
-
-/* Corpo da página: contêiner das consultas de largura (a sidebar aberta ou recolhida muda a largura útil).
-   24 px entre seções; a altura da barra de atalhos fixa compensa a rolagem até cada seção. */
-.dash-corpo { --dash-secoes-altura: calc(var(--bt-control-height-compact) + 2 * var(--bt-space-2) + var(--bt-border-width-default)); container: dash / inline-size; display: grid; gap: var(--bt-space-6); min-width: 0; }
-
-/* ---------- Barra de atalhos das seções (fixa no topo da rolagem) ---------- */
-.dash-secoes { position: sticky; top: 0; z-index: var(--bt-z-index-sticky-header); min-width: 0; margin-bottom: calc(-1 * var(--bt-space-2)); border-bottom: var(--bt-border-width-default) solid var(--bt-color-border); background-color: var(--bt-color-canvas); font-family: var(--bt-font-family-sans); }
-/* Respiro de 4 px nas pontas: o anel de foco do 1º e do último atalho não é cortado pela rolagem lateral. */
-.dash-secoes__lista { display: flex; gap: var(--bt-space-1); margin: 0; padding: var(--bt-space-2) var(--bt-space-1); overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; list-style: none; }
-.dash-secoes__lista > li { flex: 0 0 auto; }
-.dash-secoes__item { display: inline-flex; align-items: center; gap: var(--bt-space-1-5); height: var(--bt-control-height-compact); padding: 0 var(--bt-space-2-5); border: var(--bt-border-width-default) solid transparent; border-radius: var(--bt-radius-sm); background-color: transparent; color: var(--bt-color-text-secondary); font: inherit; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); white-space: nowrap; cursor: pointer; transition: background-color var(--bt-duration-fast) ease, color var(--bt-duration-fast) ease, border-color var(--bt-duration-fast) ease; }
-.dash-secoes__numero { min-width: 1ch; font-weight: var(--bt-font-weight-extrabold); font-variant-numeric: tabular-nums; }
-.dash-secoes__item[aria-current] { border-color: var(--bt-color-border); background-color: var(--bt-color-surface); color: var(--bt-color-brand); }
-.dash-secoes__item[aria-current] .dash-secoes__numero { color: var(--bt-color-action); }
-.dash-secoes__item:focus-visible { outline: 0; border-color: var(--bt-focus-border); box-shadow: var(--bt-focus-ring); }
-.dash-secoes__item:active { transform: scale(.97); }
-@media (hover: hover) and (pointer: fine) { .dash-secoes__item:hover:not([aria-current]) { color: var(--bt-color-text-primary); background-color: var(--bt-color-surface-soft); } }
-@media (pointer: coarse) {
-  .dash-corpo { --dash-secoes-altura: calc(var(--bt-control-height-touch) + 2 * var(--bt-space-1) + var(--bt-border-width-default)); }
-  .dash-secoes__lista { padding-block: var(--bt-space-1); }
-  .dash-secoes__item { height: var(--bt-control-height-touch); }
-}
-
-/* ---------- Seção: cabeçalho numerado (h2 17/800 navy, número em slate) e descrição de 13 px ---------- */
-.dash-secao { display: grid; gap: var(--bt-space-3); min-width: 0; scroll-margin-top: calc(var(--dash-secoes-altura) + var(--bt-space-3)); }
-.dash-secao__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--bt-space-0-5) var(--bt-space-3); min-width: 0; }
-.dash-secao__titulo { display: inline-flex; align-items: baseline; gap: var(--bt-space-2); margin: 0; color: var(--bt-color-brand); font-size: var(--bt-typography-heading-card-font-size); font-weight: var(--bt-font-weight-extrabold); line-height: var(--bt-typography-heading-card-line-height); }
-/* Recebe o foco do atalho só para leitor de tela e teclado seguirem dali; não é controle, então não ganha anel. */
-.dash-secao__titulo:focus, .dash-secao__titulo:focus-visible { outline: 0; border-color: transparent; box-shadow: none; }
-.dash-secao__numero { color: var(--bt-color-text-secondary); font-variant-numeric: tabular-nums; }
-.dash-secao__descricao { margin: 0; min-width: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); line-height: var(--bt-typography-body-default-line-height); }
+/* Corpo da aba: contêiner das consultas de largura (a sidebar aberta ou recolhida muda a largura útil); 16 px entre linhas. */
+.dash-corpo { container: dash / inline-size; display: grid; gap: var(--bt-space-4); min-width: 0; }
 
 /* Eyebrow do DS (§4.3): caixa alta, 800, 11 px, slate. */
 .dash-kpi__rotulo, .dash-faixa__titulo, .dash-card__titulo { margin: 0; font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); line-height: var(--bt-typography-label-micro-line-height); letter-spacing: .08em; text-transform: uppercase; color: var(--bt-color-text-secondary); }
@@ -102,13 +60,14 @@
 .dash-apoio__icone { vertical-align: -2px; margin-right: var(--bt-space-1); }
 
 /* ---------- Faixas de alerta ---------- */
-.dash-faixas { display: grid; gap: var(--bt-space-3); }
-.dash-faixa { display: grid; gap: var(--bt-space-2); min-width: 0; }
-/* As três faixas na mesma grade fixa, cards alinhados entre elas: 4 colunas na largura cheia (tela acima de ~1120 px com a
-   sidebar), 2 na intermediária e 1 no estreito (até ~560 px). */
+/* Alertas de operação | Qualidade dos dados: duas colunas na largura cheia, uma no estreito (mesmo corte da grade de cards). */
+.dash-faixas { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--bt-space-3); }
+@container dash (min-width: 900px) { .dash-faixas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.dash-faixa { container: dash-faixa / inline-size; display: grid; align-content: start; gap: var(--bt-space-2); min-width: 0; }
+/* Cards da faixa pela largura da própria faixa: 1 coluna no estreito, 2 (2 × 2) a partir de ~400 px e 4 numa faixa larga. */
 .dash-faixa__lista { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--bt-space-2) var(--bt-space-3); margin: 0; padding: 0; list-style: none; }
-@container dash (min-width: 520px) { .dash-faixa__lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@container dash (min-width: 860px) { .dash-faixa__lista { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@container dash-faixa (min-width: 400px) { .dash-faixa__lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container dash-faixa (min-width: 860px) { .dash-faixa__lista { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .dash-alerta { --dash-tom: var(--bt-color-brand); display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "valor rotulo" "valor selo"; align-items: center; column-gap: var(--bt-space-3); row-gap: var(--bt-space-1); min-width: 0; min-height: 64px; padding: var(--bt-space-2-5) var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background-color: var(--bt-color-surface); box-shadow: var(--bt-shadow-surface); font-family: var(--bt-font-family-sans); }
 .dash-alerta--danger { --dash-tom: var(--bt-color-danger); }
 .dash-alerta--warning { --dash-tom: var(--bt-color-warning); }
@@ -151,7 +110,7 @@
   .dash-podio { flex-direction: row; flex-wrap: wrap; align-items: center; }
 }
 
-/* Lista compacta dentro do card (Frota): blocos neutros com rótulo e apoio à esquerda e o número à direita. */
+/* Lista compacta dentro do card: blocos neutros com rótulo e apoio à esquerda e o número à direita. */
 .dash-lista { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
 .dash-lista__item { display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-3); min-height: 56px; padding: var(--bt-space-2) var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); }
 .dash-lista__texto { display: grid; gap: var(--bt-space-0-5); min-width: 0; }

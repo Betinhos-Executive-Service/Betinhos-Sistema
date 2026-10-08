@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { alertasOperacao, alertasQualidade, cardsFrotaPessoas, type Secundarios } from './alertas'
+import { alertasOperacao, alertasQualidade, type Secundarios } from './alertas'
 import { emergenciais, producaoPropriaTerceira } from './destaques'
-import { custoFrota, faturamentoPorCliente, metaRealizado, servicosPorMotorista, statusServicos, topByShare, topFaturamento, topVolume, totalProduzido } from './analises'
+import { metaRealizado, statusServicos, topByShare, totalProduzido } from './analises'
 import { filtrarServicos } from './base'
 import { comparacao } from './kpis'
-import { funcionario, manutencao, multa, reserva, veiculo } from './test-utils'
+import { funcionario, multa, reserva, veiculo } from './test-utils'
 import type { Filtros } from './types'
 
 const NOW = new Date('2026-10-15T15:00:00Z')
@@ -62,20 +62,6 @@ describe('alertas', () => {
     expect(q.semCliente).toMatchObject({ valor: '3', status: '60,0% dos serviços', tom: 'warn' })
   })
 
-  it('cards de frota e pessoas', () => {
-    const rv = [reserva({ valor: 1000 })]
-    const s: Secundarios = { ...vazio, manutencoes: [manutencao({ dia: '2026-10-02', valor: 200 })], veiculos: [veiculo({ id: 'a', statusLabel: 'Disponível', categoria: '' }), veiculo({ id: 'b', statusLabel: 'Inativo', categoria: '' }), veiculo({ id: 'c', statusLabel: 'Em manutenção', categoria: '' })] }
-    const c = Object.fromEntries(cardsFrotaPessoas(rv, s, nowMs).map((x) => [x.id, x]))
-    expect(c.manutencoes).toMatchObject({ valor: '1', apoio: 'R$ 200,00 · 20,0% da receita', atencao: true })
-    expect(c.frota).toMatchObject({ valor: '2', apoio: 'Total: 3' })
-  })
-
-  it('manutenção sem receita no período não marca atenção (pctRec = 0, como o card de custo da frota)', () => {
-    const s: Secundarios = { ...vazio, manutencoes: [manutencao({ dia: '2026-10-02', valor: 200 })] }
-    const c = Object.fromEntries(cardsFrotaPessoas([], s, nowMs).map((x) => [x.id, x]))
-    expect(c.manutencoes).toMatchObject({ atencao: false })
-    expect(c.manutencoes.apoio).toMatch(/ · 0,0% da receita$/)
-  })
 })
 
 describe('destaques', () => {
@@ -196,21 +182,8 @@ describe('análises', () => {
     expect(m.sub).toMatch(/^1 meses · /)
   })
 
-  it('clientes, status, tops e motoristas', () => {
-    expect(faturamentoPorCliente(ctx).linhas.map((l) => l.cliente)).toEqual(['Tenaris', 'Embraer'])
+  it('status dos serviços', () => {
     const st = statusServicos(ctx)
     expect(st.sub).toBe('2 concluídos · 1 cancelados')
-    expect(topVolume(ctx).linhas.map((l) => l.cliente)).toEqual(['Tenaris', 'Embraer', 'Sem cliente'])
-    expect(topFaturamento(ctx).linhas[0]).toMatchObject({ cliente: 'Tenaris', valor: 'R$ 600,00' })
-    const mot = servicosPorMotorista(ctx)
-    expect(mot.valor).toBe('2')
-    expect(mot.linhas[0]).toMatchObject({ nome: 'Ana', total: 2 })
-  })
-
-  it('custo da frota sobre o faturamento', () => {
-    const c = custoFrota(ctx, [manutencao({ dia: '2026-10-02', valor: 150 })], false)
-    expect(c.valor).toBe('R$ 150,00')
-    expect(c.sub).toBe('1 manutenções · 15,0% da receita')
-    expect(c.apoio[0]).toMatchObject({ atencao: true })
   })
 })

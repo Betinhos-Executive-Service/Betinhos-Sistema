@@ -1,9 +1,8 @@
 import { CAT_ITEM_SERVICO, CORTE_SEM_CLIENTE, CORTE_SEM_MOTORISTA, CORTE_SEM_VEICULO, MULTA_NOTIFICAR, SEM_CLIENTE, STATUS_SEM_MOTORISTA } from './codes'
-import { soma } from './base'
-import { brlS, dec, int, stL } from './format'
+import { dec, int, stL } from './format'
 import { DIA_MS } from './periodo'
 import { alertaScore, type ResultadoScore } from './score'
-import type { AlertaItem, CardSecundario, Conjunto, Funcionario, Manutencao, Multa, Ocorrencia, Reserva, Veiculo } from './types'
+import type { AlertaItem, Conjunto, Funcionario, Manutencao, Multa, Ocorrencia, Reserva, Veiculo } from './types'
 
 export type Secundarios = { manutencoes: Manutencao[]; multas: Multa[]; ocorrencias: Ocorrencia[]; funcionarios: Funcionario[]; veiculos: Veiculo[]; indisponiveis: Conjunto[] }
 
@@ -45,22 +44,5 @@ export function alertasQualidade(rv: Reserva[], nowMs: number): AlertaItem[] {
     item('semTipoVeiculo', 'Sem tipo de veículo', semTipo),
     item('semMotorista', 'Sem motorista', semMotorista),
     item('semCliente', 'Sem cliente', semCliente),
-  ]
-}
-
-export function cardsFrotaPessoas(rv: Reserva[], s: Secundarios, nowMs: number): CardSecundario[] {
-  const fora = (c: Conjunto) => s.indisponiveis.includes(c)
-  const semDado = (id: string, rotulo: string): CardSecundario => ({ id, rotulo, valor: '—', apoio: 's/dado', atencao: false })
-  const fat = soma(rv)
-  const custo = s.manutencoes.reduce((t, m) => t + (m.valor || 0), 0)
-  const pctRec = fat > 0 ? (custo / fat) * 100 : 0
-  const pend = multasPendentes(s.multas).length
-  const cnh = cnhEmAtencao(s.funcionarios, nowMs).length
-  const ativos = s.veiculos.filter((v) => { const k = stL(v.statusLabel); return k.includes('dispon') || k.includes('ativo') }).length
-  return [
-    fora('manutencoes') ? semDado('manutencoes', 'Manutenções') : { id: 'manutencoes', rotulo: 'Manutenções', valor: int(s.manutencoes.length), apoio: `${brlS(custo)} · ${dec(pctRec, 1)}% da receita`, atencao: pctRec > 10 },
-    fora('multas') ? semDado('multas', 'Multas') : { id: 'multas', rotulo: 'Multas', valor: int(s.multas.length), apoio: `${int(pend)} pendentes · ${pctMultas(s.multas)}%`, atencao: pend > 0 },
-    fora('funcionarios') ? semDado('cnh', 'CNH em atenção') : { id: 'cnh', rotulo: 'CNH em atenção', valor: int(cnh), apoio: cnh ? `${int(cnh)} em atenção` : 'OK', atencao: cnh > 0 },
-    fora('veiculos') ? semDado('frota', 'Frota ativa') : { id: 'frota', rotulo: 'Frota ativa', valor: int(ativos), apoio: `Total: ${int(s.veiculos.length)}`, atencao: false },
   ]
 }

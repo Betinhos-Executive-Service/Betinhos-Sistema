@@ -6,15 +6,16 @@ import { PageLayout } from '../../app/PageLayout'
 import { hrefFor, setHashQuery, useHashQuery } from '../../nav/useHashRoute'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
-import { opcoesFiltro, type OpcoesFiltro } from './domain/base'
+import { filtrarServicos, opcoesFiltro, type OpcoesFiltro } from './domain/base'
 import { int } from './domain/format'
 import { atalho, cargaDesde } from './domain/periodo'
 import { calcularResumo } from './domain/resumo'
 import type { Filtros } from './domain/types'
 import { useDashboard } from './useDashboard'
-import { ABAS, AbaLegado, abaDaUrl, rotuloAba, type Aba } from './components/DashboardAbas'
+import { ABAS, abaDaUrl, rotuloAba, type Aba } from './components/abas/abas'
+import { AbaEmConstrucao } from './components/abas/AbaEmConstrucao'
+import { ResumoCarregando, ResumoTab } from './components/abas/ResumoTab'
 import { DashboardToolbar } from './components/DashboardToolbar'
-import { ResumoCarregando, ResumoSecoes } from './components/ResumoSecoes'
 import './dashboard.css'
 
 const SEM_OPCOES: OpcoesFiltro = { status: [], clientes: [], motoristas: [], tipos: [] }
@@ -35,6 +36,7 @@ export function DashboardPage({ host }: { host: Host }) {
   }
   const [filtros, setFiltros] = useState<Filtros>(() => ({ atalho: 'esteAno', ...atalho('esteAno', new Date()), status: [], clientes: [], motoristas: [], tipos: [] }))
   const [now, setNow] = useState(() => new Date())
+  // Carga única com todos os conjuntos; a aba só escolhe o que calcular.
   const db = useDashboard(source, cargaDesde(filtros.inicio, now), filtros.fim)
 
   // Cada recarga avança o relógio; um atalho relativo ("Este mês") acompanha a virada do dia.
@@ -45,7 +47,10 @@ export function DashboardPage({ host }: { host: Host }) {
     if (p.inicio !== filtros.inicio || p.fim !== filtros.fim) setFiltros((f) => ({ ...f, ...p }))
   }, [now, filtros.atalho, filtros.inicio, filtros.fim])
 
-  const resumo = useMemo(() => (db.dados ? calcularResumo(db.dados, filtros, now) : null), [db.dados, filtros, now])
+  // Serviços do recorte: contador do cabeçalho e estado vazio valem para todas as abas.
+  const servicos = useMemo(() => (db.dados ? filtrarServicos(db.dados.reservas, filtros).length : null), [db.dados, filtros])
+  // Um `useMemo` por aba: só a aba ativa calcula.
+  const resumo = useMemo(() => (aba === 'resumo' && db.dados ? calcularResumo(db.dados, filtros, now) : null), [aba, db.dados, filtros, now])
   // Ao trocar de janela `db.dados` volta a null; as últimas opções conhecidas seguem nos filtros até a nova carga.
   const ultimasOpcoes = useRef(SEM_OPCOES)
   const opcoes = useMemo(() => {
@@ -53,48 +58,46 @@ export function DashboardPage({ host }: { host: Host }) {
     return ultimasOpcoes.current
   }, [db.dados])
   const periodo = `${dataBR(filtros.inicio)} a ${dataBR(filtros.fim)}`
-  const carregandoPrimeira = !resumo && db.carregando
+  const carregandoPrimeira = !db.dados && db.carregando
 
   const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar dashboard" onClick={() => void db.atualizar()} />, [db.atualizar])
-  const resumoAtivo = aba === 'resumo'
-  useShellHeader({ title: 'Dashboard', actions: resumoAtivo ? headerActions : undefined })
+  useShellHeader({ title: 'Dashboard', actions: headerActions })
 
   const segmentado = filtros.status.length + filtros.clientes.length + filtros.motoristas.length + filtros.tipos.length > 0
   const limpar = () => setFiltros((f) => ({ ...f, status: [], clientes: [], motoristas: [], tipos: [] }))
 
   return (
     <PageLayout
-      className={resumoAtivo ? 'dash-pagina' : 'dash-pagina dash-pagina--legado'}
+      className="dash-pagina"
       eyebrow="Operacional"
       title="Dashboard"
-      meta={resumoAtivo ? <span className="dash-meta">
+      meta={<span className="dash-meta">
         <span>{periodo}</span>
-        {resumo ? <span>{int(resumo.servicos)} serviços</span> : null}
+        {servicos != null ? <span>{int(servicos)} serviços</span> : null}
         {db.atualizadoEm ? <span>atualizado {horaBR(db.atualizadoEm)}</span> : null}
         {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-      </span> : null}
-      description={resumoAtivo ? 'Indicadores executivos, alertas e análises da operação no período escolhido.' : 'Indicadores executivos, alertas e análises da operação.'}
-      actions={resumoAtivo ? <>
+      </span>}
+      description="Indicadores executivos, alertas e análises da operação no período escolhido."
+      actions={<>
         <a className={buttonClassName({ variant: 'secondary' })} href={hrefFor('new_dashboard')}><ExternalLink size={16} aria-hidden="true" /> Abrir dashboard completo</a>
-        {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} loading={db.carregando && Boolean(resumo)} onClick={() => void db.atualizar()}>Atualizar</Button>}
-      </> : undefined}
+        {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} loading={db.carregando && Boolean(db.dados)} onClick={() => void db.atualizar()}>Atualizar</Button>}
+      </>}
       tabs={<div className="dash-abas"><Tabs tabs={[...ABAS]} value={aba} onChange={trocarAba} aria-label="Abas do dashboard" /></div>}
-      toolbar={resumoAtivo ? <DashboardToolbar filtros={filtros} opcoes={opcoes} now={now} onChange={setFiltros} /> : undefined}
+      toolbar={<DashboardToolbar filtros={filtros} opcoes={opcoes} now={now} onChange={setFiltros} />}
     >
-      {resumoAtivo ? null : <div className="dash-painel dash-painel--legado" role="tabpanel" aria-label={rotuloAba(aba)}><AbaLegado host={host} aba={aba} /></div>}
-      {resumoAtivo ? <div className="dash-corpo dash-painel" role="tabpanel" aria-label="Resumo">
-        {db.erro && resumo ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={() => void db.atualizar()}>Tentar de novo</Button>}>{db.erro} Os números são da carga anterior.</Alert> : null}
-        {db.erro && !resumo && !db.carregando ? (
+      <div className="dash-corpo" role="tabpanel" aria-label={rotuloAba(aba)} aria-busy={carregandoPrimeira || undefined}>
+        {db.erro && db.dados ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={() => void db.atualizar()}>Tentar de novo</Button>}>{db.erro} Os números são da carga anterior.</Alert> : null}
+        {db.erro && !db.dados && !db.carregando ? (
           <EmptyState className="surface" align="start" icon={<SearchX size={36} />} title="Não foi possível carregar o dashboard" action={<Button variant="primary" onClick={() => void db.atualizar()}>Tentar de novo</Button>}>{db.erro}</EmptyState>
         ) : null}
         {db.dados?.indisponiveis.length ? <Alert tone="warning" title="Alguns dados não carregaram">Os cards marcados com s/dado dependem de tabelas que não responderam. Os demais números estão corretos.</Alert> : null}
-
-        {carregandoPrimeira ? <ResumoCarregando /> : null}
-        {resumo && resumo.servicos === 0 && segmentado ? (
+        {servicos === 0 && segmentado ? (
           <EmptyState className="surface" align="start" icon={<SearchX size={36} />} title="Nenhum serviço para estes filtros" action={<Button variant="secondary" onClick={limpar}>Limpar filtros</Button>}>Ajuste o período ou limpe os filtros de status, cliente, motorista e tipo.</EmptyState>
         ) : null}
-        {resumo ? <ResumoSecoes resumo={resumo} periodo={periodo} /> : null}
-      </div> : null}
+
+        {aba === 'resumo' ? (resumo ? <ResumoTab resumo={resumo} periodo={periodo} /> : carregandoPrimeira ? <ResumoCarregando /> : null) : null}
+        {aba !== 'resumo' && (db.dados || carregandoPrimeira) ? <AbaEmConstrucao nome={rotuloAba(aba)} /> : null}
+      </div>
     </PageLayout>
   )
 }

@@ -35,7 +35,7 @@ export function AnaliseCard({ titulo, periodo, unidade, valor, sub, chips = [], 
     <Surface className={['dash-card', largo && 'dash-grade__largo', natural && 'dash-grade__natural'].filter(Boolean).join(' ')} aria-labelledby={`${id}-t`}>
       <header className="dash-card__head">
         <div className="dash-card__resumo">
-          <h3 className="dash-card__titulo" id={`${id}-t`}>{titulo}</h3>
+          <h2 className="dash-card__titulo" id={`${id}-t`}>{titulo}</h2>
           {valor != null ? <strong className="dash-card__valor">{valor}</strong> : null}
           {sub ? <p className="dash-card__sub">{sub}</p> : null}
         </div>
