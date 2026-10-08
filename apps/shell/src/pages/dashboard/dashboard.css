@@ -1,14 +1,17 @@
 .dash-meta { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); font-variant-numeric: tabular-nums; }
 
 .dash-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--bt-space-3); }
-.dash-kpi { position: relative; display: flex; flex-direction: column; min-width: 0; }
-.dash-kpi .bt-metric { flex: 1; }
-.dash-kpi__hint { display: flex; flex-wrap: wrap; gap: var(--bt-space-1); align-items: center; }
-.dash-spark { height: 36px; margin-top: calc(-1 * var(--bt-space-2)); padding: 0 var(--bt-space-3) var(--bt-space-2); pointer-events: none; }
+.dash-kpi { position: relative; display: flex; flex-direction: column; min-width: 0; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background-color: var(--bt-color-surface); box-shadow: var(--bt-shadow-surface); }
+/* O MetricCard do DS esconde o hint no celular; por isso chips e apoio ficam em .dash-kpi__extras e o card do DS vira só o miolo. */
+.dash-kpi .dash-kpi__metric { border: 0; border-radius: 0; box-shadow: none; background: transparent; min-height: 0; }
+.dash-kpi__extras { display: flex; flex: 1; flex-wrap: wrap; align-items: flex-start; align-content: flex-start; gap: var(--bt-space-1); padding: 0 var(--bt-space-3-5) var(--bt-space-3-5); }
+.dash-spark { height: 36px; margin: 0 var(--bt-space-3-5) var(--bt-space-3-5); pointer-events: none; }
+.dash-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 .dash-apoio { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); }
 .dash-apoio__rotulo { font-weight: var(--bt-font-weight-bold); }
 .dash-apoio--atencao { color: var(--bt-color-warning); }
+.dash-apoio__icone { vertical-align: -2px; margin-right: var(--bt-space-1); }
 .dash-chips { display: flex; flex-wrap: wrap; gap: var(--bt-space-1); align-items: center; }
 
 .dash-alertas-grid, .dash-destaques { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--bt-space-3); }
@@ -30,7 +33,7 @@
 .dash-chart { margin: 0; width: 100%; }
 .dash-tops { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--bt-space-3); margin-top: var(--bt-space-3); }
 .dash-top__titulo { margin: 0 0 var(--bt-space-2); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-text-primary); }
-.dash-analise .bt-table, .dash-tops .bt-table { overflow-x: auto; }
+.dash-linhas { display: grid; gap: var(--bt-space-0-5); min-width: 0; }
 .dash-erro { color: var(--bt-color-danger); font-size: var(--bt-font-size-12); align-self: center; }
 
 @media (max-width: 1120px) {
@@ -39,7 +42,12 @@
 }
 @media (max-width: 820px) {
   .dash-alertas-grid, .dash-destaques, .dash-analises, .dash-tops { grid-template-columns: minmax(0, 1fr); }
+  /* O DS usa "1fr auto" no celular; com texto rotulado na 2ª coluna o "auto" esmagaria a 1ª. */
+  .dash-analise .bt-table__row { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); align-items: start; }
+  .dash-analise .bt-table__cell { align-items: flex-start; }
 }
 @media (max-width: 560px) {
   .dash-kpis, .dash-frota { grid-template-columns: minmax(0, 1fr); }
+  .dash-kpi__extras { padding: 0 var(--bt-space-2-5) var(--bt-space-2-5); }
+  .dash-spark { margin: 0 var(--bt-space-2-5) var(--bt-space-2-5); }
 }

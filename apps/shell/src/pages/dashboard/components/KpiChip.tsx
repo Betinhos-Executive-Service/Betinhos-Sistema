@@ -1,5 +1,5 @@
 import { StatusBadge } from '@betinhos/ui'
-import { TrendingDown, TrendingUp } from 'lucide-react'
+import { AlertTriangle, TrendingDown, TrendingUp } from 'lucide-react'
 import { dec } from '../domain/format'
 import type { Apoio, Chip } from '../domain/types'
 
@@ -14,9 +14,11 @@ export function KpiChip({ chip }: { chip: Chip }) {
   )
 }
 
+/** Linha de apoio; em atenção leva ícone e "Atenção:" em texto oculto, para não depender só da cor. */
 export function ApoioTexto({ apoio }: { apoio: Apoio }) {
   return (
     <span className={apoio.atencao ? 'dash-apoio dash-apoio--atencao' : 'dash-apoio'}>
+      {apoio.atencao ? <><AlertTriangle className="dash-apoio__icone" size={14} aria-hidden="true" /><span className="dash-sr">Atenção:</span></> : null}
       <span className="dash-apoio__rotulo">{apoio.rotulo}</span> {apoio.texto}
     </span>
   )

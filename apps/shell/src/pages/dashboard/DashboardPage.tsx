@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, EmptyState, StatusBadge, buttonClassName, useShellHeader } from '@betinhos/ui'
 import { ExternalLink, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
@@ -41,7 +41,12 @@ export function DashboardPage({ host }: { host: Host }) {
   }, [now, filtros.atalho, filtros.inicio, filtros.fim])
 
   const resumo = useMemo(() => (db.dados ? calcularResumo(db.dados, filtros, now) : null), [db.dados, filtros, now])
-  const opcoes = useMemo(() => (db.dados ? opcoesFiltro(db.dados.reservas) : SEM_OPCOES), [db.dados])
+  // Ao trocar de janela `db.dados` volta a null; as últimas opções conhecidas seguem nos filtros até a nova carga.
+  const ultimasOpcoes = useRef(SEM_OPCOES)
+  const opcoes = useMemo(() => {
+    if (db.dados) ultimasOpcoes.current = opcoesFiltro(db.dados.reservas)
+    return ultimasOpcoes.current
+  }, [db.dados])
   const periodo = `${dataBR(filtros.inicio)} a ${dataBR(filtros.fim)}`
   const carregandoPrimeira = !resumo && db.carregando
 

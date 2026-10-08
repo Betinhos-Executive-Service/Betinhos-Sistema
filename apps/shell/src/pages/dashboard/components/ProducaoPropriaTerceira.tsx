@@ -1,23 +1,31 @@
-import { Table } from '@betinhos/ui'
+import { Table, type TableColumn } from '@betinhos/ui'
 import { LinhaChart } from '../charts/Charts'
 import type { ProducaoPT, TopMotorista } from '../domain/destaques'
 import { brl, int } from '../domain/format'
+import { useMedia } from '../../operacional/useMedia'
 import { AnaliseCard } from './AnaliseCard'
+import { COLUNA_LARGA, MEDIA_MOBILE, juntar } from './Linhas'
 
 type Mes = ProducaoPT['meses'][number]
 
-function Top({ titulo, rows }: { titulo: string; rows: TopMotorista[] }) {
+function Top({ titulo, rows, mobile }: { titulo: string; rows: TopMotorista[]; mobile: boolean }) {
+  const colunas: TableColumn<TopMotorista>[] = mobile
+    ? [
+      { key: 'nome', header: 'Motorista', cell: (r) => r.nome },
+      { key: 'resto', header: 'Serviços e faturamento', width: COLUNA_LARGA, cell: (r) => juntar(`${int(r.qtd)} serviços`, brl(r.fat)) },
+    ]
+    : [
+      { key: 'nome', header: 'Motorista', cell: (r) => r.nome },
+      { key: 'qtd', header: 'Serviços', align: 'end', cell: (r) => int(r.qtd) },
+      { key: 'fat', header: 'Faturamento', align: 'end', cell: (r) => brl(r.fat) },
+    ]
   return (
     <div className="dash-top">
       <h3 className="dash-top__titulo">{titulo}</h3>
       <Table
-        columns={[
-          { key: 'nome', header: 'Motorista', cell: (r: TopMotorista) => r.nome },
-          { key: 'qtd', header: 'Serviços', align: 'end', cell: (r: TopMotorista) => int(r.qtd) },
-          { key: 'fat', header: 'Faturamento', align: 'end', cell: (r: TopMotorista) => brl(r.fat) },
-        ]}
+        columns={colunas}
         rows={rows}
-        rowKey={(r) => r.nome}
+        rowKey={(r) => r.key}
         empty="Nenhum serviço no período."
       />
     </div>
@@ -25,7 +33,18 @@ function Top({ titulo, rows }: { titulo: string; rows: TopMotorista[] }) {
 }
 
 export function ProducaoPropriaTerceira({ dados, periodo }: { dados: ProducaoPT; periodo: string }) {
-  const tops = <div className="dash-tops"><Top titulo="Top 5 motoristas próprios" rows={dados.topPropria} /><Top titulo="Top 5 motoristas terceirizados" rows={dados.topTerceirizada} /></div>
+  const mobile = useMedia(MEDIA_MOBILE)
+  const tops = <div className="dash-tops"><Top titulo="Top 5 motoristas próprios" rows={dados.topPropria} mobile={mobile} /><Top titulo="Top 5 motoristas terceirizados" rows={dados.topTerceirizada} mobile={mobile} /></div>
+  const colunasMes: TableColumn<Mes>[] = mobile
+    ? [
+      { key: 'm', header: 'Mês', cell: (m) => m.rotulo },
+      { key: 'resto', header: 'Própria e terceirizada', width: COLUNA_LARGA, cell: (m) => juntar(`Própria ${int(m.propria)}`, `Terceirizada ${int(m.terceirizada)}`) },
+    ]
+    : [
+      { key: 'm', header: 'Mês', cell: (m) => m.rotulo },
+      { key: 'p', header: 'Própria', align: 'end', cell: (m) => int(m.propria) },
+      { key: 't', header: 'Terceirizada', align: 'end', cell: (m) => int(m.terceirizada) },
+    ]
   return (
     <AnaliseCard
       titulo="Produção própria × terceirizada"
@@ -44,11 +63,7 @@ export function ProducaoPropriaTerceira({ dados, periodo }: { dados: ProducaoPT;
       </> : undefined}
       tabela={<>
         <Table
-          columns={[
-            { key: 'm', header: 'Mês', cell: (m: Mes) => m.rotulo },
-            { key: 'p', header: 'Própria', align: 'end', cell: (m: Mes) => int(m.propria) },
-            { key: 't', header: 'Terceirizada', align: 'end', cell: (m: Mes) => int(m.terceirizada) },
-          ]}
+          columns={colunasMes}
           rows={dados.meses}
           rowKey={(m) => m.mes}
           empty="Nenhum serviço com veículo classificado."

@@ -1,7 +1,7 @@
 import { StatusBadge, Surface, type StatusTone } from '@betinhos/ui'
 import type { AlertaItem, Tom } from '../domain/types'
 
-const TOM: Record<Tom, { tone: StatusTone; texto: string }> = { ok: { tone: 'success', texto: 'OK' }, warn: { tone: 'warning', texto: 'Atenção' }, danger: { tone: 'danger', texto: 'Atenção' } }
+const TOM: Record<Tom, { tone: StatusTone; texto: string }> = { ok: { tone: 'success', texto: 'OK' }, warn: { tone: 'warning', texto: 'Atenção' }, danger: { tone: 'danger', texto: 'Atenção' }, neutral: { tone: 'neutral', texto: 's/dado' } }
 
 export function AlertList({ titulo, itens }: { titulo: string; itens: AlertaItem[] }) {
   return (
