@@ -26,6 +26,8 @@ describe('cellKind', () => {
     expect(cellKind(col('new_valortotal', 'a_1'), info('Money'))).toBe('readonly')
     expect(cellKind(col('ownerid'), info('Owner'))).toBe('readonly')
     expect(READONLY.has('cr40f_endereodesada')).toBe(true)
+    expect(cellKind(col('cr40f_criadopor'), info('Lookup'))).toBe('readonly')
+    expect(cellKind(col('cr40f_modificadopor'), info('Lookup'))).toBe('readonly')
   })
 })
 
@@ -64,6 +66,14 @@ describe('format', () => {
     expect(formatMoney(null)).toBe('—')
     expect(parseMoney('R$ 1.234,50')).toBe(1234.5)
     expect(parseMoney('1234.5')).toBe(1234.5)
+    // Sem vírgula, grupos de três depois do ponto são milhar (digitação pt-BR); com uma casa ou duas, é decimal.
+    expect(parseMoney('1.500')).toBe(1500)
+    expect(parseMoney('1.234')).toBe(1234)
+    expect(parseMoney('1.234.567')).toBe(1234567)
+    expect(parseMoney('1.234,50')).toBe(1234.5)
+    expect(parseMoney('1.5')).toBe(1.5)
+    expect(parseMoney('12.50')).toBe(12.5)
+    expect(parseMoney('0.500')).toBe(0.5)
     expect(parseMoney('')).toBeNull()
     expect(parseMoney('abc')).toBeNull()
     expect(formatCell('money', { v: 10 }, 'v')).toBe('R$ 10,00')

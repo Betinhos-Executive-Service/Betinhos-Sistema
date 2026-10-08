@@ -1,7 +1,35 @@
 // @vitest-environment jsdom
-import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { Source } from './data/source'
 import { GeralPage } from './GeralPage'
+
+// Ganchos para simular o que o mock não faz: falha parcial de estado, linha inativa e cópia lenta.
+const hooks = vi.hoisted(() => ({
+  setState: null as null | Source['setState'],
+  copyRows: null as null | Source['copyRows'],
+  update: null as null | Source['update'],
+  mixedState: false,
+}))
+vi.mock('./data/source', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./data/source')>()
+  return {
+    ...actual,
+    createSource: (host: Parameters<typeof actual.createSource>[0]): Source => {
+      const source = actual.createSource(host)
+      return {
+        ...source,
+        setState: (ids, active) => (hooks.setState ? hooks.setState(ids, active) : source.setState(ids, active)),
+        copyRows: (ids) => (hooks.copyRows ? hooks.copyRows(ids) : source.copyRows(ids)),
+        update: (id, patch) => (hooks.update ? hooks.update(id, patch) : source.update(id, patch)),
+        page: async (request) => {
+          const page = await source.page(request)
+          return hooks.mixedState ? { ...page, rows: page.rows.map((row, index) => (index === 1 ? { ...row, statecode: 1 } : row)) } : page
+        },
+      }
+    },
+  }
+})
 
 // O mock simula latência; com a suíte inteira em paralelo a máquina fica lenta.
 configure({ asyncUtilTimeout: 8000 })
@@ -11,7 +39,14 @@ beforeEach(() => {
   window.localStorage.clear()
   vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
 })
-afterEach(() => { cleanup(); vi.unstubAllGlobals() })
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+  hooks.setState = null
+  hooks.copyRows = null
+  hooks.update = null
+  hooks.mixedState = false
+})
 
 /** A célula só vira editável quando a metadata chega: espera a classe do tipo aparecer na linha. */
 const cellOf = (row: HTMLElement, kind: string) =>
@@ -32,7 +67,8 @@ describe('Geral', () => {
     await waitFor(() => expect(screen.getByRole('columnheader', { name: /Status de Operação/ }).getAttribute('aria-sort')).toBe('ascending'))
     fireEvent.click(screen.getByRole('button', { name: 'Próxima' }))
     await screen.findByText(/Linhas 51–/)
-  })
+    // O primeiro teste paga a carga fria dos módulos: com a máquina ocupada passa dos 30 s do padrão.
+  }, 60_000)
 
   it('troca de visão e busca por palavra-chave', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
@@ -71,7 +107,7 @@ describe('Geral', () => {
     await screen.findByText(/Linhas 1–50 de/)
     sort()
     await waitFor(() => expect(header().getAttribute('aria-sort')).toBe('none'))
-  })
+  }, 60_000)
 
   it('busca sem resultado mostra o estado vazio e limpar busca volta à lista', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
@@ -280,5 +316,156 @@ describe('Geral', () => {
     fireEvent.click(within(sheet).getByRole('button', { name: 'Fechar' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: /Serviço OS-/ })).toBeNull())
     expect(await within((await screen.findAllByRole('listitem'))[0]).findByText('Rota sem blur')).toBeTruthy()
+  })
+})
+
+describe('Geral: correções finais', () => {
+  const opener = (name: string) => ({ name: `Abrir serviço ${name} no Formulário Geral` })
+
+  it('trocar de visão e buscar mudam de fato as linhas', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByText(/Linhas 1–50/)
+    // OS-1057 não tem motorista, mas cai na segunda página da Agenda; OS-1000 tem motorista.
+    expect(screen.queryByRole('button', opener('OS-1057'))).toBeNull()
+    expect(screen.getByRole('button', opener('OS-1000'))).toBeTruthy()
+    fireEvent.click(screen.getByRole('combobox', { name: 'Visão' }))
+    fireEvent.click(await screen.findByRole('option', { name: 'Sem motorista', hidden: true }))
+    expect(await screen.findByRole('button', opener('OS-1057'))).toBeTruthy()
+    await waitFor(() => expect(screen.queryByRole('button', opener('OS-1000'))).toBeNull())
+    expect(screen.getByRole('button', opener('OS-1052'))).toBeTruthy()
+    // A busca é no servidor: some o que não bate, fica o que bate.
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar serviços' }), { target: { value: 'OS-1057' } })
+    await waitFor(() => expect(screen.queryByRole('button', opener('OS-1052'))).toBeNull())
+    expect(screen.getByRole('button', opener('OS-1057'))).toBeTruthy()
+  })
+
+  it('o cabeçalho mostra a ordem da visão e o primeiro clique nela inverte', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByText(/Linhas 1–50 de/)
+    const header = () => screen.getByRole('columnheader', { name: /Data e horário de saída/ })
+    expect(header().getAttribute('aria-sort')).toBe('ascending')
+    fireEvent.click(within(header()).getByRole('button'))
+    await waitFor(() => expect(header().getAttribute('aria-sort')).toBe('descending'))
+    await screen.findByText(/Linhas 1–50 de/)
+    fireEvent.click(within(header()).getByRole('button'))
+    await waitFor(() => expect(header().getAttribute('aria-sort')).toBe('ascending'))
+  })
+
+  it('o aviso do motorista aparece no editor da célula', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByText(/Linhas 1–50 de/)
+    const cell = await cellOf((await screen.findAllByRole('row'))[1], 'lookup')
+    fireEvent.keyDown(cell, { key: 'Enter' })
+    expect(await within(cell).findByTitle('Trocar o motorista dispara os avisos e a atribuição automática de veículo.')).toBeTruthy()
+  })
+
+  it('falha parcial ao desativar lista os ids que falharam e o primeiro erro', async () => {
+    hooks.setState = async (ids) => ({ ok: [ids[0]], failed: [{ id: ids[1], message: 'Sem permissão' }] })
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByText(/Linhas 1–50 de/)
+    const rows = screen.getAllByRole('row')
+    const failedName = within(rows[2]).getByRole('button', { name: /Abrir serviço/ }).textContent
+    fireEvent.click(within(rows[1]).getByRole('checkbox'))
+    fireEvent.click(within(rows[2]).getByRole('checkbox'))
+    fireEvent.click(screen.getByRole('button', { name: 'Desativar' }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Desativar 2 serviços?' })).getByRole('button', { name: 'Desativar' }))
+    expect(await screen.findByText(`1 de 2 serviços desativados; falharam: ${failedName}. Sem permissão`)).toBeTruthy()
+  })
+
+  it('Desativar e Ativar com seleção mista ficam focáveis, explicam o motivo e não fazem nada', async () => {
+    hooks.mixedState = true
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByText(/Linhas 1–50 de/)
+    const rows = screen.getAllByRole('row')
+    fireEvent.click(within(rows[1]).getByRole('checkbox'))
+    fireEvent.click(within(rows[2]).getByRole('checkbox'))
+    const reason = 'Selecione só serviços ativos ou só inativos.'
+    for (const name of ['Desativar', 'Ativar']) {
+      const button = screen.getByRole('button', { name })
+      expect(button.getAttribute('aria-disabled')).toBe('true')
+      expect((button as HTMLButtonElement).disabled).toBe(false)
+      expect(button.getAttribute('title')).toBe(reason)
+      expect(document.getElementById(button.getAttribute('aria-describedby') ?? '')?.textContent).toBe(reason)
+      fireEvent.click(button)
+    }
+    expect(screen.queryByRole('dialog', { name: /serviços?\?/ })).toBeNull()
+  })
+
+  it('fechar a prévia de cópia antes do texto chegar não a reabre', async () => {
+    hooks.copyRows = () => new Promise((resolve) => { window.setTimeout(() => resolve([]), 400) })
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByText(/Linhas 1–50 de/)
+    fireEvent.click(within(screen.getAllByRole('row')[1]).getByRole('checkbox'))
+    fireEvent.click(screen.getByRole('button', { name: 'Copiar Serviços' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Copiar serviços' })
+    fireEvent.click(within(dialog).getAllByRole('button', { name: 'Fechar' }).at(-1) as HTMLElement)
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Copiar serviços' })).toBeNull())
+    await new Promise((resolve) => { window.setTimeout(resolve, 700) })
+    expect(screen.queryByRole('dialog', { name: 'Copiar serviços' })).toBeNull()
+  })
+
+  describe('no celular', () => {
+    beforeEach(() => {
+      vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('max-width: 820px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
+    })
+    const openSheet = async (name?: string) => {
+      render(<GeralPage host={{ mode: 'mock' }} />)
+      const cards = await screen.findAllByRole('listitem')
+      const card = name ? cards.find((c) => c.textContent?.includes(name)) : cards[0]
+      fireEvent.click(within(card as HTMLElement).getByRole('button', { name: 'Editar campos' }))
+      return screen.findByRole('dialog', { name: /Serviço OS-/ })
+    }
+
+    it('não fecha enquanto um campo grava e anuncia o estado numa região viva', async () => {
+      // A gravação só termina quando o teste libera: o estado "gravando" não depende da velocidade da máquina.
+      let release: () => void = () => undefined
+      hooks.update = () => new Promise<void>((resolve) => { release = resolve })
+      const sheet = await openSheet()
+      const trajeto = within(sheet).getByLabelText('Trajeto') as HTMLInputElement
+      fireEvent.change(trajeto, { target: { value: 'Rota lenta' } })
+      fireEvent.blur(trajeto)
+      expect(await within(sheet).findByText('Gravando…')).toBeTruthy()
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Fechar' }))
+      // O Sheet anima a saída, pede o fechamento ao pai e, recusado, volta: espera esse retorno.
+      await waitFor(() => expect(sheet.hasAttribute('data-closing')).toBe(false))
+      expect(within(sheet).getByText('Gravando…')).toBeTruthy()
+      expect(screen.getByRole('dialog', { name: /Serviço OS-/ })).toBeTruthy()
+      await act(async () => { release() })
+      const saved = await within(sheet).findByText('Salvo ✓')
+      expect(saved.closest('[aria-live="polite"]')).not.toBeNull()
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Fechar' }))
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: /Serviço OS-/ })).toBeNull())
+    })
+
+    it('com valor inválido digitado pede confirmação antes de descartar', async () => {
+      const sheet = await openSheet()
+      const cotacao = within(sheet).getByLabelText('Cotação') as HTMLInputElement
+      cotacao.focus()
+      fireEvent.change(cotacao, { target: { value: 'abc' } })
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Fechar' }))
+      const confirm = await screen.findByRole('dialog', { name: 'Descartar alterações?' })
+      fireEvent.click(within(confirm).getByRole('button', { name: 'Continuar editando' }))
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Descartar alterações?' })).toBeNull())
+      expect(screen.getByRole('dialog', { name: /Serviço OS-/ })).toBeTruthy()
+      expect(await within(sheet).findByText('Valor inválido.')).toBeTruthy()
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Fechar' }))
+      fireEvent.click(within(await screen.findByRole('dialog', { name: 'Descartar alterações?' })).getByRole('button', { name: 'Descartar' }))
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: /Serviço OS-/ })).toBeNull())
+    })
+
+    it('erro de gravação com a sheet já fechada vira aviso com campo, serviço e motivo', async () => {
+      const sheet = await openSheet('OS-1013')
+      const trajeto = within(sheet).getByLabelText('Trajeto') as HTMLInputElement
+      trajeto.focus()
+      fireEvent.change(trajeto, { target: { value: 'Não vai' } })
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Fechar' }))
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: /Serviço OS-/ })).toBeNull())
+      expect(await screen.findByText('Não foi possível salvar Trajeto do serviço OS-1013: Sem permissão para alterar este serviço.')).toBeTruthy()
+    })
+
+    it('o aviso do motorista aparece no campo da sheet', async () => {
+      const sheet = await openSheet()
+      expect(within(sheet).getByTitle('Trocar o motorista dispara os avisos e a atribuição automática de veículo.')).toBeTruthy()
+    })
   })
 })

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
 import { Alert, Button, EmptyState, Menu, Pagination, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
 import { Archive, ArchiveRestore, CalendarDays, ClipboardList, Copy, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Ticket, X } from 'lucide-react'
@@ -18,7 +18,7 @@ import { VoucherOverlay } from './components/VoucherOverlay'
 import { copyText } from './domain/copy'
 import { applyColumnPrefs, loadColumnPrefs, saveColumnPrefs, type ColumnPrefs } from './domain/columns'
 import { ID_ATTRIBUTE, PAGE_SIZE, type CellStatus, type Column } from './domain/types'
-import { cellKey, useGeral } from './useGeral'
+import { cellKey, useGeral, type SaveFailure } from './useGeral'
 import './geral.css'
 
 export function GeralPage({ host }: { host: Host }) {
@@ -32,9 +32,18 @@ const IDLE: CellStatus = { kind: 'idle' }
 function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const source = useMemo(() => createSource(host), [host])
   const toast = useToast()
-  const geral = useGeral(source)
   const mobile = useMedia('(max-width: 820px)')
   const [editId, setEditId] = useState<string | null>(null)
+  // Falha numa linha cuja sheet não está aberta (celular) não tem onde aparecer: vira aviso.
+  const editIdRef = useRef(editId)
+  editIdRef.current = editId
+  const mobileRef = useRef(mobile)
+  mobileRef.current = mobile
+  const onSaveFail = useCallback((failure: SaveFailure) => {
+    if (!mobileRef.current || editIdRef.current === failure.id) return
+    toast({ tone: 'danger', message: `Não foi possível salvar ${failure.label} do serviço ${failure.serviceName}: ${failure.message}` })
+  }, [toast])
+  const geral = useGeral(source, { onSaveFail })
   const { view, rows, page, total, more, loading, query, attributes } = geral
 
   // Preferências de colunas por visão: lidas do armazenamento local ao entrar na visão, gravadas ao aplicar.
@@ -48,7 +57,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     setSaved((s) => ({ ...s, [viewId]: next }))
   }, [source.kv, viewId])
 
-  const { reload, goTo, setQuery, selectView, clearSelection } = geral
+  const { reload, refresh, goTo, setQuery, selectView, clearSelection } = geral
   const [mockForm, setMockForm] = useState(false)
   const [copy, setCopy] = useState<{ open: boolean; loading: boolean; text: string }>({ open: false, loading: false, text: '' })
   const [stateRequest, setStateRequest] = useState<StateRequest | null>(null)
@@ -58,13 +67,13 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const openForm = useCallback(async (mode: 'create' | 'edit', id?: string) => {
     try {
       const result = await source.openForm(mode, id)
-      if (result === 'closed') reload()
+      if (result === 'closed') refresh()
       else if (result === 'external') toast({ tone: 'info', message: 'O formulário abriu em outra aba. Clique em Atualizar quando terminar.' })
       else setMockForm(true)
     } catch (reason) {
       toast({ tone: 'danger', message: reason instanceof Error ? reason.message : String(reason) })
     }
-  }, [source, reload, toast])
+  }, [source, refresh, toast])
 
   const selectedIds = useMemo(() => Array.from(geral.selected), [geral.selected])
   const rowOf = useCallback((id: string) => rows.find((r) => String(r[ID_ATTRIBUTE]) === id), [rows])
@@ -74,12 +83,17 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     return states.size === 1 && !states.has(-1) ? (states.values().next().value as number) : null
   }, [selectedIds, rowOf])
 
+  // Cada pedido tem um número; fechar o diálogo invalida o pedido em andamento, que não pode reabri-lo ao chegar.
+  const copyRequest = useRef(0)
+  const closeCopy = useCallback(() => { copyRequest.current += 1; setCopy((c) => ({ ...c, open: false, loading: false })) }, [])
   const copySelected = useCallback(async () => {
+    const mine = ++copyRequest.current
     setCopy({ open: true, loading: true, text: '' })
     try {
       const text = copyText(await source.copyRows(selectedIds))
-      setCopy({ open: true, loading: false, text })
+      if (mine === copyRequest.current) setCopy({ open: true, loading: false, text })
     } catch (reason) {
+      if (mine !== copyRequest.current) return
       setCopy({ open: false, loading: false, text: '' })
       toast({ tone: 'danger', message: `Não foi possível montar o texto: ${reason instanceof Error ? reason.message : String(reason)}` })
     }
@@ -99,7 +113,10 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       if (failed.length === 0) {
         const one = ok.length === 1
         toast({ tone: 'success', message: `${ok.length} ${one ? 'serviço' : 'serviços'} ${active ? 'ativado' : 'desativado'}${one ? '' : 's'}.` })
-      } else toast({ tone: 'danger', message: `${failed.length} de ${ids.length} falharam: ${failed[0].message}` })
+      } else {
+        const names = failed.map((item) => { const name = rowOf(item.id)?.cr40f_id; return typeof name === 'string' && name ? name : item.id })
+        toast({ tone: 'danger', message: `${ok.length} de ${ids.length} serviços ${active ? 'ativados' : 'desativados'}; falharam: ${names.join(', ')}. ${failed[0].message}` })
+      }
     } catch (reason) {
       toast({ tone: 'danger', message: reason instanceof Error ? reason.message : String(reason) })
     } finally {
@@ -108,7 +125,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       reload()
       clearSelection()
     }
-  }, [stateRequest, source, toast, reload, clearSelection])
+  }, [stateRequest, source, toast, reload, clearSelection, rowOf])
 
   const openVoucher = useCallback(() => {
     const url = source.openVoucher(selectedIds)
@@ -117,6 +134,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   }, [source, selectedIds, toast])
 
   const mixedTitle = 'Selecione só serviços ativos ou só inativos.'
+  const mixedId = useId()
   const commands = (
     <>
       {selectedIds.length === 1 ? <Button variant="action" size="compact" icon={<Pencil size={16} />} onClick={() => { void openForm('edit', selectedIds[0]) }}>Editar</Button> : null}
@@ -126,9 +144,11 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         ? <Button variant="action" size="compact" icon={<ArchiveRestore size={16} />} onClick={() => askState(true)}>Ativar</Button>
         : selectedState === 0
           ? <Button variant="danger" size="compact" icon={<Archive size={16} />} onClick={() => askState(false)}>Desativar</Button>
+          // aria-disabled (não disabled): continua focável e o leitor de tela lê o motivo; o clique não faz nada.
           : <>
-            <Button variant="danger" size="compact" icon={<Archive size={16} />} disabled title={mixedTitle}>Desativar</Button>
-            <Button variant="action" size="compact" icon={<ArchiveRestore size={16} />} disabled title={mixedTitle}>Ativar</Button>
+            <Button variant="danger" size="compact" className="gr-btn--blocked" icon={<Archive size={16} />} aria-disabled="true" aria-describedby={mixedId} title={mixedTitle} onClick={(event) => event.preventDefault()}>Desativar</Button>
+            <Button variant="action" size="compact" className="gr-btn--blocked" icon={<ArchiveRestore size={16} />} aria-disabled="true" aria-describedby={mixedId} title={mixedTitle} onClick={(event) => event.preventDefault()}>Ativar</Button>
+            <span id={mixedId} className="gr-sr">{mixedTitle}</span>
           </>}
       <Button variant="ghost" size="compact" icon={<X size={16} />} onClick={clearSelection}>Limpar seleção</Button>
     </>
@@ -225,6 +245,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               rows={rows}
               loading={loading}
               sort={geral.sort}
+              defaultSort={geral.defaultOrder}
               onSort={geral.setSort}
               selected={geral.selected}
               onToggle={geral.toggle}
@@ -280,17 +301,13 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           attributes={attributes}
           cellStatus={(attribute) => cells.get(cellKey(String(editRow[ID_ATTRIBUTE]), attribute)) ?? IDLE}
           open
-          onClose={() => {
-            // A gravação é ao sair do campo: tira o foco antes de fechar para não perder o que foi digitado.
-            if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
-            setEditId(null)
-          }}
+          onClose={() => setEditId(null)}
           onSave={(column, value) => save(String(editRow[ID_ATTRIBUTE]), column, value)}
           onReset={(column) => resetCell(String(editRow[ID_ATTRIBUTE]), column.attribute)}
           search={(column, text) => source.search(column.attribute, text)}
         />
       ) : null}
-      <CopyDialog open={copy.open} loading={copy.loading} text={copy.text} onClose={() => setCopy((c) => ({ ...c, open: false }))} onCopied={() => { setCopy((c) => ({ ...c, open: false })); toast({ tone: 'success', message: 'Serviços copiados.' }) }} />
+      <CopyDialog open={copy.open} loading={copy.loading} text={copy.text} onClose={closeCopy} onCopied={() => { closeCopy(); toast({ tone: 'success', message: 'Serviços copiados.' }) }} />
       <StateDialog request={stateRequest} busy={stateBusy} onClose={() => setStateRequest(null)} onConfirm={() => { void confirmState() }} />
       <MockFormDialog open={mockForm} onClose={() => setMockForm(false)} />
       <EscalaFdsDrawer url={source.escalaFdsUrl()} open={escalaOpen} onClose={() => setEscalaOpen(false)} />

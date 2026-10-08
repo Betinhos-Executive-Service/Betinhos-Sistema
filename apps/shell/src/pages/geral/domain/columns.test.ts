@@ -38,6 +38,8 @@ describe('copyText', () => {
       '*Data:* 08/10/2026 16:00', '*ID:* OS-1', '*Horário:* 16:00', '*Cliente:* —', '*Receber:* ✓', '*Trajeto:* —', '*Passageiro:* Ana (11) 9',
       '*Local de saída:* Rua A', '*Destino:* Rua B', '*Obs ao motorista:* Placa', '*Perfil do Passageiro:* VIP',
       '',
+      '━━━━━━━━━━━━━━━━━━━━',
+      '',
       '*Data:* 09/10/2026 10:30', '*ID:* OS-2', '*Horário:* 10:30', '*Cliente:* Tenaris', '*Receber:* ✗', '*Trajeto:* GRU → Hotel', '*Passageiro:* —',
       '*Local de saída:* —', '*Destino:* —', '*Obs ao motorista:* —', '*Perfil do Passageiro:* —',
     ].join('\n'))

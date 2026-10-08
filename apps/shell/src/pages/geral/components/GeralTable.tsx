@@ -4,6 +4,7 @@ import { Checkbox } from '@betinhos/ui'
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import { columnLabel, rowKey } from '../domain/layout'
 import { formatCell } from '../domain/format'
+import { nextSort, sameSort } from '../domain/sort'
 import { ID_ATTRIBUTE, type AttributeMap, type Column, type Sort } from '../domain/types'
 
 type Props = {
@@ -11,7 +12,10 @@ type Props = {
   attributes: AttributeMap | null
   rows: Row[]
   loading: boolean
+  /** Ordenação escolhida pelo usuário; `null` = a da própria visão. */
   sort: Sort
+  /** Ordem da visão, mostrada no cabeçalho enquanto `sort` é `null`. */
+  defaultSort: Sort
   onSort: (sort: Sort) => void
   selected: Set<string>
   onToggle: (id: string) => void
@@ -24,21 +28,14 @@ type Props = {
 }
 
 const SKELETON_ROWS = 8
-const sameSort = (sort: Sort, column: Column) => sort != null && sort.attribute === column.attribute && sort.alias === column.alias
-
-/** Ordem do clique: crescente, decrescente, depois a ordem original da visão. */
-function nextSort(sort: Sort, column: Column): Sort {
-  if (!sameSort(sort, column)) return { attribute: column.attribute, alias: column.alias, descending: false }
-  return sort?.descending ? null : { attribute: column.attribute, alias: column.alias, descending: true }
-}
-
 /** Grid editável com rolagem horizontal, seleção por linha e a primeira coluna fixa. As classes visuais são as da tabela do DS. */
-export function GeralTable({ columns, attributes, rows, loading, sort, onSort, selected, onToggle, onToggleAll, onOpen, renderCell, footer, empty }: Props) {
+export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, selected, onToggle, onToggleAll, onOpen, renderCell, footer, empty }: Props) {
   const style = { '--gr-columns': `36px ${columns.map((c) => `minmax(${Math.max(90, c.width)}px, ${c.width}px)`).join(' ')}` } as CSSProperties
   const ids = rows.map((r) => String(r[ID_ATTRIBUTE]))
   const all = ids.length > 0 && ids.every((id) => selected.has(id))
   const some = !all && ids.some((id) => selected.has(id))
   const skeleton = loading && rows.length === 0
+  const shown = sort ?? defaultSort
 
   return (
     <div className="bt-table gr-table">
@@ -54,13 +51,13 @@ export function GeralTable({ columns, attributes, rows, loading, sort, onSort, s
             />
           </div>
           {columns.map((column, index) => {
-            const active = sameSort(sort, column)
+            const active = sameSort(shown, column)
             const label = columnLabel(column, attributes?.get(column.key))
             return (
-              <div key={column.key} className={index === 0 ? 'bt-table__cell gr-cell--first' : 'bt-table__cell'} role="columnheader" aria-sort={active ? (sort?.descending ? 'descending' : 'ascending') : 'none'}>
-                <button type="button" className="gr-head__sort" onClick={() => onSort(nextSort(sort, column))}>
+              <div key={column.key} className={index === 0 ? 'bt-table__cell gr-cell--first' : 'bt-table__cell'} role="columnheader" aria-sort={active ? (shown?.descending ? 'descending' : 'ascending') : 'none'}>
+                <button type="button" className="gr-head__sort" onClick={() => onSort(nextSort(sort, defaultSort, column))}>
                   <span className="gr-head__label">{label}</span>
-                  {active ? (sort?.descending ? <ArrowDown size={14} /> : <ArrowUp size={14} />) : null}
+                  {active ? (shown?.descending ? <ArrowDown size={14} /> : <ArrowUp size={14} />) : null}
                 </button>
               </div>
             )
