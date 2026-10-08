@@ -164,12 +164,9 @@ describe('conjuntos das abas', () => {
   })
 
   it('pagantes e despesas pela janela; cadastros de despesa inteiros e ativos', () => {
-    const pag = pagantesPath('pag', '2024-01-01', '2026-10-15')
-    expect(pag).toContain('pag?$select=cr40f_pagantesid,createdon,_cr40f_financeiro_value,cr40f_status,cr40f_valor,cr40f_formadepagamento,_cr40f_bancodedados_value,cr40f_datadoprimeiropagamento&$filter=')
-    expect(decodeURIComponent(pag)).toContain(J('createdon'))
-    const semData = pagantesPath('pag', '2024-01-01', '2026-10-15', false)
-    expect(semData).toContain('pag?$select=cr40f_pagantesid,createdon,_cr40f_financeiro_value,cr40f_status,cr40f_valor,cr40f_formadepagamento,_cr40f_bancodedados_value&$filter=')
-    expect(decodeURIComponent(semData)).toContain(J('createdon'))
+    // Pagantes: todos os ativos, sem janela (o legado não filtra; atrasados e CP mais antiga dependem dos pendentes antigos).
+    expect(decodeURIComponent(pagantesPath('pag'))).toBe('pag?$select=cr40f_pagantesid,createdon,_cr40f_financeiro_value,cr40f_status,cr40f_valor,cr40f_formadepagamento,_cr40f_bancodedados_value,cr40f_datadoprimeiropagamento&$filter=statecode eq 0')
+    expect(decodeURIComponent(pagantesPath('pag', false))).toBe('pag?$select=cr40f_pagantesid,createdon,_cr40f_financeiro_value,cr40f_status,cr40f_valor,cr40f_formadepagamento,_cr40f_bancodedados_value&$filter=statecode eq 0')
     const des = despesasPath('des', '2024-01-01', '2026-10-15')
     expect(des).toContain('des?$select=cr40f_despesaoperacionalid,cr40f_nome,cr40f_datagasto,cr40f_valor,_cr40f_categoria_value,_cr40f_formapagamento_value,_cr40f_motorista_value,_cr40f_reserva_value,cr40f_statusfinanceiro,cr40f_statusanexo&$filter=')
     expect(decodeURIComponent(des)).toContain(`statecode eq 0 and ${J('cr40f_datagasto')}`)
@@ -192,6 +189,16 @@ describe('conjuntos das abas', () => {
     expect(mapVeiculo({ cr40f_veiculosid: 'V2', cr40f_blindado: 1, cr40f_anodefabricacao: '2019' })).toMatchObject({ blindado: true, ano: 2019, placa: '', marca: '', modelo: '' })
     expect(mapVeiculo({ cr40f_veiculosid: 'V3', cr40f_blindado: 'true' }).blindado).toBe(true)
     expect(mapVeiculo({ cr40f_veiculosid: 'V4', cr40f_blindado: false, cr40f_anodefabricacao: null })).toMatchObject({ blindado: false, ano: null })
+  })
+
+  it('categoria do veículo: Própria, Terceirizada, Aluguel (código 100000002 ou rótulo) e vazia', () => {
+    const cat = (raw: unknown, rotulo?: string) => mapVeiculo({ cr40f_veiculosid: 'V', new_categoriadoveiculo: raw, ...(rotulo ? { [`new_categoriadoveiculo${F}`]: rotulo } : {}) }).categoria
+    expect(cat(100000000, 'Próprio')).toBe('Propria')
+    expect(cat(100000001, 'Terceiro')).toBe('Terceirizada')
+    expect(cat(100000002, 'Aluguel')).toBe('Aluguel')
+    expect(cat(100000002)).toBe('Aluguel')
+    expect(cat(7, 'Veículo de aluguel')).toBe('Aluguel')
+    expect(cat(null)).toBe('')
   })
 
   it('funcionário com id, nome, apelido, função e empresa formatadas', () => {
@@ -313,6 +320,15 @@ describe('conjuntos das abas', () => {
     expect(semPagantes.indisponiveis).toEqual(['pagantes'])
     expect(semPagantes.pagantes).toEqual([])
     expect(semPagantes.despesas).toHaveLength(1)
+
+    // Funcionários que falham marcam só 'funcionarios': despesas seguem disponíveis, com motorista pelo rótulo do lookup e "Sem empresa".
+    const semFuncionarios = await carregarDataverse(client(async (path) => {
+      if (path.startsWith('fun?')) throw new Error('sem permissão')
+      if (path.startsWith('des?')) return [{ cr40f_despesaoperacionalid: 'D1', _cr40f_motorista_value: 'M1', [`_cr40f_motorista_value${F}`]: 'Carlos Oliveira' }]
+      return linhas(path)
+    }), SETS, '2024-01-01', '2026-10-15')
+    expect(semFuncionarios.indisponiveis).toEqual(['funcionarios'])
+    expect(semFuncionarios.despesas).toMatchObject([{ id: 'd1', motorista: 'Carlos Oliveira', empresa: 'Sem empresa' }])
   })
 
   it('pagantes sem a data do primeiro pagamento e multas sem o $expand caem na consulta reduzida', async () => {
@@ -349,6 +365,8 @@ describe('conjuntos das abas', () => {
     const ops = new Set(tudo.reservas.map((r) => r.opId).filter(Boolean))
     expect(d.pagantes.length).toBeGreaterThan(20)
     expect(d.pagantes.every((p) => ops.has(p.opId) && p.criadoDia >= '2025-01-01' && p.criadoDia <= hoje)).toBe(true)
+    // Como no Dataverse, o mock devolve todos os pagantes, qualquer que seja a janela.
+    expect((await createSource({ mode: 'mock' }).carregar('2026-09-01', '2026-09-30')).pagantes).toEqual(d.pagantes)
     expect(d.pagantes.some((p) => p.statusLabel === 'Pago' && p.primeiroPagamentoRaw)).toBe(true)
     expect(d.pagantes.some((p) => p.status !== 202410002)).toBe(true)
     expect(new Set(d.pagantes.map((p) => p.formaLabel)).size).toBeGreaterThan(1)

@@ -61,9 +61,12 @@ export const eventosPath = (set: string, desde: string, ate: string) =>
   `${set}?$select=new_reportadoem,_new_motorista_value,new_slug,_new_veiculo_value,new_descricao,new_velocidaderegistrada,new_limitedevelocidade&$filter=${janelaDataHora('new_reportadoem', desde, ate)}`
 
 const PAGANTE_SELECT = 'cr40f_pagantesid,createdon,_cr40f_financeiro_value,cr40f_status,cr40f_valor,cr40f_formadepagamento,_cr40f_bancodedados_value'
-/** Pagantes criados na janela. Como o `loadPagantes` do legado, `comPrimeiroPagamento = false` é a consulta sem `cr40f_datadoprimeiropagamento`. */
-export const pagantesPath = (set: string, desde: string, ate: string, comPrimeiroPagamento = true) =>
-  `${set}?$select=${PAGANTE_SELECT}${comPrimeiroPagamento ? ',cr40f_datadoprimeiropagamento' : ''}&$filter=${janelaDataHora('createdon', desde, ate)}`
+/**
+ * Todos os pagantes ativos, sem janela de datas: como o `loadPagantes` do legado, "Atrasados" e "CP mais antiga" dependem dos pendentes antigos.
+ * `comPrimeiroPagamento = false` é a consulta sem `cr40f_datadoprimeiropagamento`.
+ */
+export const pagantesPath = (set: string, comPrimeiroPagamento = true) =>
+  `${set}?$select=${PAGANTE_SELECT}${comPrimeiroPagamento ? ',cr40f_datadoprimeiropagamento' : ''}&$filter=${encodeURIComponent('statecode eq 0')}`
 /** Despesas ativas com data do gasto na janela (`cr40f_datagasto` é DateTime). */
 export const despesasPath = (set: string, desde: string, ate: string) =>
   `${set}?$select=cr40f_despesaoperacionalid,cr40f_nome,cr40f_datagasto,cr40f_valor,_cr40f_categoria_value,_cr40f_formapagamento_value,_cr40f_motorista_value,_cr40f_reserva_value,cr40f_statusfinanceiro,cr40f_statusanexo&$filter=${encodeURIComponent('statecode eq 0 and ')}${janelaDataHora('cr40f_datagasto', desde, ate)}&$orderby=${encodeURIComponent('cr40f_datagasto desc')}`
@@ -156,11 +159,17 @@ function anoFabricacao(row: Row) {
   const m = /(19|20)\d{2}/.exec(raw == null ? '' : String(raw))
   return m ? Number(m[0]) : null
 }
-/** Categoria pelo código ou pelo rótulo, como o legado (L14175–14180); blindado como o legado (L15824: true, "true" ou 1). */
+/** Código de Aluguel em `new_categoriadoveiculo` (metadata DEV, spec §7). */
+const VEICULO_ALUGUEL = '100000002'
+/**
+ * Categoria pelo código ou pelo rótulo, como o legado (L14175–14180), mais Aluguel (código 100000002 ou rótulo com "aluguel"), que o legado não trata;
+ * blindado como o legado (L15824: true, "true" ou 1).
+ */
 export function mapVeiculo(row: Row): Veiculo {
   const raw = row.new_categoriadoveiculo == null ? '' : String(row.new_categoriadoveiculo)
   const label = normL(formatted(row, 'new_categoriadoveiculo'))
-  const categoria: CategoriaVeiculo = raw === VEICULO_PROPRIO || label.includes('proprio') ? 'Propria' : raw === VEICULO_TERCEIRO || label.includes('terceiro') ? 'Terceirizada' : ''
+  const categoria: CategoriaVeiculo = raw === VEICULO_PROPRIO || label.includes('proprio') ? 'Propria' : raw === VEICULO_TERCEIRO || label.includes('terceiro') ? 'Terceirizada'
+    : raw === VEICULO_ALUGUEL || label.includes('aluguel') ? 'Aluguel' : ''
   const b = row.cr40f_blindado
   return {
     id: lower(row.cr40f_veiculosid), statusLabel: formatted(row, 'cr40f_statusdoveiculo'), categoria,
