@@ -5,7 +5,7 @@ import { createSource, type Source } from './data/source'
 import { SAVED_VISIBLE_MS } from './domain/edit'
 import { useGeral } from './useGeral'
 
-// O mock simula latência; com a suíte inteira em paralelo a máquina fica lenta.
+// O mock sem latência (`latency: 0`); com a suíte inteira em paralelo a máquina fica lenta.
 configure({ asyncUtilTimeout: 8000 })
 vi.setConfig({ testTimeout: 30_000 })
 
@@ -15,7 +15,7 @@ const idOf = (row: { cr40f_reservadeveculosid?: unknown }) => String(row.cr40f_r
 
 describe('useGeral', () => {
   it('carrega a visão padrão, pagina e ordena', async () => {
-    const { result } = renderHook(() => useGeral(createSource({ mode: 'mock' })))
+    const { result } = renderHook(() => useGeral(createSource({ mode: 'mock' }, { latency: 0 })))
     await waitFor(() => expect(result.current.rows.length).toBe(50))
     expect(result.current.view?.padrao).toBe(true)
     expect(result.current.columns[0].attribute).toBe('cr40f_id')
@@ -35,7 +35,7 @@ describe('useGeral', () => {
   })
 
   it('salva com estados gravando/salvo e erro restaurando o valor', async () => {
-    const { result } = renderHook(() => useGeral(createSource({ mode: 'mock' })))
+    const { result } = renderHook(() => useGeral(createSource({ mode: 'mock' }, { latency: 0 })))
     await waitFor(() => expect(result.current.rows.length).toBe(50))
     const row = result.current.rows[0]
     const id = String(row.cr40f_reservadeveculosid)
@@ -57,7 +57,7 @@ describe('useGeral', () => {
   })
 
   it('validação barra antes do servidor', async () => {
-    const { result } = renderHook(() => useGeral(createSource({ mode: 'mock' })))
+    const { result } = renderHook(() => useGeral(createSource({ mode: 'mock' }, { latency: 0 })))
     await waitFor(() => expect(result.current.rows.length).toBe(50))
     const id = String(result.current.rows[0].cr40f_reservadeveculosid)
     const cotacao = result.current.columns.find((c) => c.attribute === 'cr40f_cotao')!
@@ -70,7 +70,7 @@ describe('useGeral', () => {
 
 describe('useGeral: gravação', () => {
   it('escrita aceita e releitura que falha: mantém o valor otimista e marca salvo', async () => {
-    const base = createSource({ mode: 'mock' })
+    const base = createSource({ mode: 'mock' }, { latency: 0 })
     const source: Source = { ...base, reload: vi.fn().mockRejectedValue(new Error('rede caiu')) }
     const { result } = renderHook(() => useGeral(source))
     await waitFor(() => expect(result.current.rows.length).toBe(50))
@@ -84,7 +84,7 @@ describe('useGeral: gravação', () => {
   })
 
   it('a releitura pede só colunas com metadata', async () => {
-    const base = createSource({ mode: 'mock' })
+    const base = createSource({ mode: 'mock' }, { latency: 0 })
     const reload = vi.fn(base.reload)
     const source: Source = {
       ...base,
@@ -103,11 +103,11 @@ describe('useGeral: gravação', () => {
   })
 
   it('erro de escrita restaura só a chave editada, sem desfazer outra gravação da mesma linha', async () => {
-    const base = createSource({ mode: 'mock' })
+    const base = createSource({ mode: 'mock' }, { latency: 0 })
     const source: Source = {
       ...base,
       update: async (id, patch) => {
-        if ('cr40f_trajeto' in patch) { await sleep(900); throw new Error('Não gravou') }
+        if ('cr40f_trajeto' in patch) { await sleep(150); throw new Error('Não gravou') }
         return base.update(id, patch)
       },
     }
@@ -129,7 +129,7 @@ describe('useGeral: gravação', () => {
   })
 
   it('célula alterada por flow na releitura também aparece como salva', async () => {
-    const base = createSource({ mode: 'mock' })
+    const base = createSource({ mode: 'mock' }, { latency: 0 })
     let novo = 0
     const source: Source = {
       ...base,
@@ -148,7 +148,7 @@ describe('useGeral: gravação', () => {
   })
 
   it('uma nova gravação na mesma célula cancela o fim do "salvo" anterior e o desmonte limpa tudo', async () => {
-    const base = createSource({ mode: 'mock' })
+    const base = createSource({ mode: 'mock' }, { latency: 0 })
     const { result, unmount } = renderHook(() => useGeral(base))
     await waitFor(() => expect(result.current.rows.length).toBe(50))
     const id = idOf(result.current.rows[0])
@@ -176,7 +176,7 @@ describe('useGeral: gravação', () => {
 
 describe('useGeral: atualização e ordem', () => {
   it('refresh relê a página atual sem voltar à primeira nem limpar a seleção', async () => {
-    const base = createSource({ mode: 'mock' })
+    const base = createSource({ mode: 'mock' }, { latency: 0 })
     const page = vi.fn(base.page)
     const source: Source = { ...base, page }
     const { result } = renderHook(() => useGeral(source))
@@ -199,7 +199,7 @@ describe('useGeral: atualização e ordem', () => {
   })
 
   it('começa sem ordenação própria e expõe a ordem da visão para o indicador', async () => {
-    const base = createSource({ mode: 'mock' })
+    const base = createSource({ mode: 'mock' }, { latency: 0 })
     const page = vi.fn(base.page)
     const source: Source = { ...base, page }
     const { result } = renderHook(() => useGeral(source))

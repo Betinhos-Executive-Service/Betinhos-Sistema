@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react'
+import { memo, useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react'
 import type { Row } from '@betinhos/dataverse'
 import { Button, Input, Select, Spinner, StatusBadge, Switch, Textarea, Tooltip, type SelectOption } from '@betinhos/ui'
 import { AlertTriangle, Check, Lock } from 'lucide-react'
@@ -7,7 +7,7 @@ import type { EditValue } from '../domain/edit'
 import { decideChoice, decideCommit, draftOf, lookupOptions, sameId, type PickedOption } from '../domain/editing'
 import { formatCell } from '../domain/format'
 import { columnLabel, rowKey } from '../domain/layout'
-import type { AttributeInfo, CellStatus, Column, LookupOption } from '../domain/types'
+import { ID_ATTRIBUTE, type AttributeInfo, type CellStatus, type Column, type LookupOption } from '../domain/types'
 import { useLookupSearch } from './useLookupSearch'
 
 type Props = {
@@ -15,12 +15,12 @@ type Props = {
   column: Column
   info: AttributeInfo | undefined
   status: CellStatus
-  /** Grava o valor; devolve `false` quando falhou (o erro chega por `status`). */
-  onSave: (value: EditValue) => Promise<boolean>
-  /** Limpa o aviso de erro da célula. */
-  onReset: () => void
-  /** Busca no servidor as opções de um lookup. */
-  search: (text: string) => Promise<LookupOption[]>
+  /** Grava o valor; devolve `false` quando falhou (o erro chega por `status`). Estável: a célula passa o próprio id e coluna. */
+  onSave: (id: string, column: Column, value: EditValue) => Promise<boolean>
+  /** Limpa o aviso de erro da célula. Estável. */
+  onReset: (id: string, attribute: string) => void
+  /** Busca no servidor as opções de um lookup. Estável. */
+  search: (attribute: string, text: string) => Promise<LookupOption[]>
   /** `false` enquanto a metadata não chegou: nenhuma célula edita. */
   editable: boolean
 }
@@ -69,7 +69,7 @@ function grow(area: HTMLTextAreaElement) {
 }
 
 /** Célula do grid: lê o valor e, ao editar, troca pelo controle do tipo com feedback de gravação ali mesmo. */
-export function Cell({ row, column, info, status, onSave, onReset, search, editable }: Props) {
+export const Cell = memo(function Cell({ row, column, info, status, onSave, onReset, search, editable }: Props) {
   const key = rowKey(column, info)
   const kind = cellKind(column, info)
   const raw = row[key]
@@ -88,7 +88,8 @@ export function Cell({ row, column, info, status, onSave, onReset, search, edita
   const [draft, setDraft] = useState('')
   const [pick, setPick] = useState<Pick | null>(null)
   const [options, setOptions] = useState<SelectOption[]>([])
-  const lookup = useLookupSearch(search)
+  const id = String(row[ID_ATTRIBUTE])
+  const lookup = useLookupSearch((text) => search(column.attribute, text))
   const [localError, setLocalError] = useState<string | null>(null)
   // Último valor digitado ou escolhido, para "Tentar de novo" reabrir a edição de onde parou.
   const retryRef = useRef<{ draft: string; pick: Pick | null }>({ draft: '', pick: null })
@@ -119,11 +120,11 @@ export function Cell({ row, column, info, status, onSave, onReset, search, edita
     setEditing(false)
   }
 
-  const submit = (value: EditValue) => { void onSave(value).catch(() => undefined) }
+  const submit = (value: EditValue) => { void onSave(id, column, value).catch(() => undefined) }
 
   const begin = (char?: string, retry = false) => {
     if (!canEdit || editingRef.current || status.kind === 'saving') return
-    if (status.kind === 'error') onReset()
+    if (status.kind === 'error') onReset(id, column.attribute)
     setLocalError(null)
     lookup.reset()
     if (isSelect(kind)) {
@@ -176,7 +177,7 @@ export function Cell({ row, column, info, status, onSave, onReset, search, edita
 
   const retry = () => {
     if (kind !== 'boolean') { begin(undefined, true); return }
-    onReset()
+    onReset(id, column.attribute)
     submit(lastBoolean.current ?? raw !== true)
   }
 
@@ -309,4 +310,4 @@ export function Cell({ row, column, info, status, onSave, onReset, search, edita
       {kind === 'readonly' && editable && !message ? <span className="gr-cell__mark gr-cell__lock" role="img" aria-label="Somente leitura"><Lock size={12} aria-hidden="true" /></span> : null}
     </div>
   )
-}
+})

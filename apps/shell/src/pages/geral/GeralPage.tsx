@@ -168,6 +168,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   useShellHeader({ title: 'Geral', actions: headerActions })
 
   const { save, resetCell, cells } = geral
+  // Callbacks estáveis: a célula passa o próprio id/coluna, então só a que mudou de status ou de linha renderiza de novo.
+  const searchLookup = useCallback((attribute: string, text: string) => source.search(attribute, text), [source])
   const renderCell = useCallback((row: Row, column: Column): ReactNode => {
     const id = String(row[ID_ATTRIBUTE])
     return (
@@ -176,13 +178,13 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         column={column}
         info={attributes?.get(column.key)}
         status={cells.get(cellKey(id, column.attribute)) ?? IDLE}
-        onSave={(value) => save(id, column, value)}
-        onReset={() => resetCell(id, column.attribute)}
-        search={(text) => source.search(column.attribute, text)}
+        onSave={save}
+        onReset={resetCell}
+        search={searchLookup}
         editable={attributes != null}
       />
     )
-  }, [attributes, cells, save, resetCell, source])
+  }, [attributes, cells, save, resetCell, searchLookup])
 
   const editRow = editId == null ? undefined : rowOf(editId)
 

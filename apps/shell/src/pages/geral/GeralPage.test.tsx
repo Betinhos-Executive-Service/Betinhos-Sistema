@@ -16,7 +16,8 @@ vi.mock('./data/source', async (importOriginal) => {
   return {
     ...actual,
     createSource: (host: Parameters<typeof actual.createSource>[0]): Source => {
-      const source = actual.createSource(host)
+      // Sem a latência simulada do pnpm dev: os testes não esperam timers artificiais.
+      const source = actual.createSource(host, { latency: 0 })
       return {
         ...source,
         setState: (ids, active) => (hooks.setState ? hooks.setState(ids, active) : source.setState(ids, active)),
@@ -59,12 +60,12 @@ const cellOf = (row: HTMLElement, kind: string) =>
 describe('Geral', () => {
   it('abre a Agenda com as colunas da visão, pagina e ordena', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    expect(await screen.findByRole('columnheader', { name: /Status de Operação/ })).toBeTruthy()
+    expect(await screen.findByRole('columnheader', { name: /Status de Operação/, hidden: true })).toBeTruthy()
     // A linha do cabeçalho já existe antes dos dados: espera as 50 linhas chegarem.
-    await waitFor(() => expect(screen.getAllByRole('row').length).toBeGreaterThan(10))
+    await waitFor(() => expect(screen.getAllByRole('row', { hidden: true }).length).toBeGreaterThan(10))
     expect(screen.getByText(/Linhas 1–50 de/)).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /Status de Operação/ }))
-    await waitFor(() => expect(screen.getByRole('columnheader', { name: /Status de Operação/ }).getAttribute('aria-sort')).toBe('ascending'))
+    fireEvent.click(screen.getByRole('button', { name: /Status de Operação/, hidden: true }))
+    await waitFor(() => expect(screen.getByRole('columnheader', { name: /Status de Operação/, hidden: true }).getAttribute('aria-sort')).toBe('ascending'))
     fireEvent.click(screen.getByRole('button', { name: 'Próxima' }))
     await screen.findByText(/Linhas 51–/)
     // O primeiro teste paga a carga fria dos módulos: com a máquina ocupada passa dos 30 s do padrão.
@@ -83,22 +84,22 @@ describe('Geral', () => {
 
   it('ocultar coluna some da tabela e volta com restaurar', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByRole('columnheader', { name: /Trajeto/ })
+    await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
     fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
     const dialog = await screen.findByRole('dialog', { name: 'Colunas da visão' })
     fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Trajeto' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Aplicar' }))
-    await waitFor(() => expect(screen.queryByRole('columnheader', { name: /Trajeto/ })).toBeNull())
+    await waitFor(() => expect(screen.queryByRole('columnheader', { name: /Trajeto/, hidden: true })).toBeNull())
     fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
     fireEvent.click(within(await screen.findByRole('dialog', { name: 'Colunas da visão' })).getByRole('button', { name: 'Restaurar colunas da visão' }))
-    await screen.findByRole('columnheader', { name: /Trajeto/ })
+    await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
   })
 
   it('o clique no cabeçalho cicla crescente, decrescente e ordem da visão', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findByText(/Linhas 1–50 de/)
-    const header = () => screen.getByRole('columnheader', { name: /Trajeto/ })
-    const sort = () => fireEvent.click(screen.getByRole('button', { name: /Trajeto/ }))
+    const header = () => screen.getByRole('columnheader', { name: /Trajeto/, hidden: true })
+    const sort = () => fireEvent.click(screen.getByRole('button', { name: /Trajeto/, hidden: true }))
     sort()
     await waitFor(() => expect(header().getAttribute('aria-sort')).toBe('ascending'))
     await screen.findByText(/Linhas 1–50 de/)
@@ -121,22 +122,22 @@ describe('Geral', () => {
 
   it('a coluna oculta fica salva por visão e volta ao reabrir a tela', async () => {
     const first = render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByRole('columnheader', { name: /Trajeto/ })
+    await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
     fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
     const dialog = await screen.findByRole('dialog', { name: 'Colunas da visão' })
     fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Trajeto' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Mover Trajeto para cima' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Aplicar' }))
-    await waitFor(() => expect(screen.queryByRole('columnheader', { name: /Trajeto/ })).toBeNull())
+    await waitFor(() => expect(screen.queryByRole('columnheader', { name: /Trajeto/, hidden: true })).toBeNull())
     first.unmount()
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByRole('columnheader', { name: /Status de Operação/ })
-    expect(screen.queryByRole('columnheader', { name: /Trajeto/ })).toBeNull()
+    await screen.findByRole('columnheader', { name: /Status de Operação/, hidden: true })
+    expect(screen.queryByRole('columnheader', { name: /Trajeto/, hidden: true })).toBeNull()
   })
 
   it('fechar o diálogo de colunas com alterações pede confirmação antes de descartar', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByRole('columnheader', { name: /Trajeto/ })
+    await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
     fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
     const dialog = await screen.findByRole('dialog', { name: 'Colunas da visão' })
 
@@ -159,14 +160,14 @@ describe('Geral', () => {
     fireEvent(again, new Event('cancel', { cancelable: true }))
     fireEvent.click(within(await screen.findByRole('dialog', { name: 'Descartar alterações?' })).getByRole('button', { name: 'Descartar' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Colunas da visão' })).toBeNull())
-    expect(screen.getByRole('columnheader', { name: /Trajeto/ })).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: /Trajeto/, hidden: true })).toBeTruthy()
     expect(window.localStorage.getItem('betinhos.geral.colunas.v1')).toBeNull()
   })
 
   it('edita texto na célula com Enter e mostra salvo', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findByText(/Linhas 1–50 de/)
-    const cell = await cellOf((await screen.findAllByRole('row'))[1], 'text')
+    const cell = await cellOf((await screen.findAllByRole('row', { hidden: true }))[1], 'text')
     fireEvent.keyDown(cell, { key: 'Enter' })
     const input = within(cell).getByRole('textbox')
     fireEvent.change(input, { target: { value: 'Rota editada' } })
@@ -177,7 +178,7 @@ describe('Geral', () => {
 
   it('erro do servidor restaura o valor, mostra aviso e permite tentar de novo', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    const opener = await screen.findByRole('button', { name: 'Abrir serviço OS-1013 no Formulário Geral' })
+    const opener = await screen.findByRole('button', { name: 'Abrir serviço OS-1013 no Formulário Geral', hidden: true })
     const row = opener.closest('[role="row"]') as HTMLElement
     const cell = await cellOf(row, 'text')
     const before = cell.textContent
@@ -194,7 +195,7 @@ describe('Geral', () => {
   it('Esc cancela sem gravar e status abre um select', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findByText(/Linhas 1–50 de/)
-    const first = (await screen.findAllByRole('row'))[1]
+    const first = (await screen.findAllByRole('row', { hidden: true }))[1]
     const text = await cellOf(first, 'text')
     const original = text.textContent
     fireEvent.keyDown(text, { key: 'Enter' })
@@ -210,7 +211,7 @@ describe('Geral', () => {
   it('dinheiro inválido mostra o erro local e mantém o campo aberto sem gravar', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findByText(/Linhas 1–50 de/)
-    const cell = await cellOf((await screen.findAllByRole('row'))[1], 'money')
+    const cell = await cellOf((await screen.findAllByRole('row', { hidden: true }))[1], 'money')
     fireEvent.keyDown(cell, { key: 'Enter' })
     const input = within(cell).getByRole('textbox')
     fireEvent.change(input, { target: { value: 'abc' } })
@@ -223,7 +224,7 @@ describe('Geral', () => {
 
   it('tentar de novo reabre a edição com o último valor digitado', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    const opener = await screen.findByRole('button', { name: 'Abrir serviço OS-1013 no Formulário Geral' })
+    const opener = await screen.findByRole('button', { name: 'Abrir serviço OS-1013 no Formulário Geral', hidden: true })
     const cell = await cellOf(opener.closest('[role="row"]') as HTMLElement, 'text')
     fireEvent.doubleClick(cell)
     fireEvent.change(within(cell).getByRole('textbox'), { target: { value: 'Não vai' } })
@@ -236,7 +237,7 @@ describe('Geral', () => {
   it('escolher outro motorista grava e mostra salvo', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findByText(/Linhas 1–50 de/)
-    const cell = await cellOf((await screen.findAllByRole('row'))[1], 'lookup')
+    const cell = await cellOf((await screen.findAllByRole('row', { hidden: true }))[1], 'lookup')
     fireEvent.keyDown(cell, { key: 'Enter' })
     fireEvent.click(await within(cell).findByRole('option', { name: 'Bruno Dias', hidden: true }))
     expect(await within(cell).findByLabelText('Salvo')).toBeTruthy()
@@ -245,7 +246,7 @@ describe('Geral', () => {
 
   it('tentar de novo regrava o Sim/Não que falhou', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    const opener = await screen.findByRole('button', { name: 'Abrir serviço OS-1013 no Formulário Geral' })
+    const opener = await screen.findByRole('button', { name: 'Abrir serviço OS-1013 no Formulário Geral', hidden: true })
     const cell = await cellOf(opener.closest('[role="row"]') as HTMLElement, 'boolean')
     const before = (within(cell).getByRole('switch') as HTMLInputElement).checked
     fireEvent.click(within(cell).getByRole('switch'))
@@ -260,7 +261,7 @@ describe('Geral', () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     // A linha do cabeçalho existe antes dos dados: espera as linhas chegarem.
     await screen.findByText(/Linhas 1–50 de/)
-    const rows = screen.getAllByRole('row')
+    const rows = screen.getAllByRole('row', { hidden: true })
     fireEvent.click(within(rows[1]).getByRole('checkbox'))
     fireEvent.click(within(rows[2]).getByRole('checkbox'))
     expect(screen.getByText('2 selecionados')).toBeTruthy()
@@ -279,7 +280,7 @@ describe('Geral', () => {
 
   it('em mock, criar avisa que o formulário abre no Dataverse', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findAllByRole('row')
+    await screen.findAllByRole('row', { hidden: true })
     fireEvent.click(screen.getByRole('button', { name: 'Criar serviço' }))
     expect(await screen.findByRole('dialog', { name: 'Formulário Geral abre no Dataverse' })).toBeTruthy()
   })
@@ -287,7 +288,7 @@ describe('Geral', () => {
   it('com 1 selecionado, Editar abre o formulário e Gerar Voucher avisa que só roda no Dataverse', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findByText(/Linhas 1–50 de/)
-    fireEvent.click(within(screen.getAllByRole('row')[1]).getByRole('checkbox'))
+    fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
     fireEvent.click(screen.getByRole('button', { name: 'Gerar Voucher' }))
     expect(await screen.findByText('O voucher abre dentro do Dataverse.')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
@@ -320,7 +321,7 @@ describe('Geral', () => {
 })
 
 describe('Geral: correções finais', () => {
-  const opener = (name: string) => ({ name: `Abrir serviço ${name} no Formulário Geral` })
+  const opener = (name: string) => ({ name: `Abrir serviço ${name} no Formulário Geral`, hidden: true })
 
   it('trocar de visão e buscar mudam de fato as linhas', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
@@ -342,7 +343,7 @@ describe('Geral: correções finais', () => {
   it('o cabeçalho mostra a ordem da visão e o primeiro clique nela inverte', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findByText(/Linhas 1–50 de/)
-    const header = () => screen.getByRole('columnheader', { name: /Data e horário de saída/ })
+    const header = () => screen.getByRole('columnheader', { name: /Data e horário de saída/, hidden: true })
     expect(header().getAttribute('aria-sort')).toBe('ascending')
     fireEvent.click(within(header()).getByRole('button'))
     await waitFor(() => expect(header().getAttribute('aria-sort')).toBe('descending'))
@@ -354,7 +355,7 @@ describe('Geral: correções finais', () => {
   it('o aviso do motorista aparece no editor da célula', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findByText(/Linhas 1–50 de/)
-    const cell = await cellOf((await screen.findAllByRole('row'))[1], 'lookup')
+    const cell = await cellOf((await screen.findAllByRole('row', { hidden: true }))[1], 'lookup')
     fireEvent.keyDown(cell, { key: 'Enter' })
     expect(await within(cell).findByTitle('Trocar o motorista dispara os avisos e a atribuição automática de veículo.')).toBeTruthy()
   })
@@ -363,7 +364,7 @@ describe('Geral: correções finais', () => {
     hooks.setState = async (ids) => ({ ok: [ids[0]], failed: [{ id: ids[1], message: 'Sem permissão' }] })
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findByText(/Linhas 1–50 de/)
-    const rows = screen.getAllByRole('row')
+    const rows = screen.getAllByRole('row', { hidden: true })
     const failedName = within(rows[2]).getByRole('button', { name: /Abrir serviço/ }).textContent
     fireEvent.click(within(rows[1]).getByRole('checkbox'))
     fireEvent.click(within(rows[2]).getByRole('checkbox'))
@@ -376,7 +377,7 @@ describe('Geral: correções finais', () => {
     hooks.mixedState = true
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findByText(/Linhas 1–50 de/)
-    const rows = screen.getAllByRole('row')
+    const rows = screen.getAllByRole('row', { hidden: true })
     fireEvent.click(within(rows[1]).getByRole('checkbox'))
     fireEvent.click(within(rows[2]).getByRole('checkbox'))
     const reason = 'Selecione só serviços ativos ou só inativos.'
@@ -395,7 +396,7 @@ describe('Geral: correções finais', () => {
     hooks.copyRows = () => new Promise((resolve) => { window.setTimeout(() => resolve([]), 400) })
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findByText(/Linhas 1–50 de/)
-    fireEvent.click(within(screen.getAllByRole('row')[1]).getByRole('checkbox'))
+    fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
     fireEvent.click(screen.getByRole('button', { name: 'Copiar Serviços' }))
     const dialog = await screen.findByRole('dialog', { name: 'Copiar serviços' })
     fireEvent.click(within(dialog).getAllByRole('button', { name: 'Fechar' }).at(-1) as HTMLElement)

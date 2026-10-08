@@ -36,14 +36,17 @@ export type Source = {
   kv: KV
 }
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 const same = (a: string, b: string) => cleanId(a) === cleanId(b)
 
 const BLOCKED_ID = 'OS-1013'
 const BIND_SUFFIX = '@odata.bind'
 
-function createMockSource(): Source {
+/** Opções do mock. `latency` multiplica as esperas simuladas (1 = as de `pnpm dev`; 0 = resposta imediata, para testes). */
+export type SourceOptions = { latency?: number }
+
+function createMockSource({ latency = 1 }: SourceOptions = {}): Source {
+  const wait = (ms: number) => (latency === 0 ? Promise.resolve() : new Promise((resolve) => setTimeout(resolve, ms * latency)))
   const now = new Date()
   const rows = createMockRows(now)
   const find = (id: string) => rows.find((r) => same(String(r.cr40f_reservadeveculosid), id))
@@ -138,8 +141,8 @@ function createMockSource(): Source {
   }
 }
 
-export function createSource(host: Host): Source {
-  if (host.mode === 'mock') return createMockSource()
+export function createSource(host: Host, options: SourceOptions = {}): Source {
+  if (host.mode === 'mock') return createMockSource(options)
 
   let setPromise: Promise<string> | null = null
   const entitySet = () => (setPromise ??= host.metadata.entities([ENTITY]).then((info) => {
