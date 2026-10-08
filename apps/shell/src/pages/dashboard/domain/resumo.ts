@@ -4,6 +4,7 @@ import { filtrarServicos } from './base'
 import { emergenciais, producaoPropriaTerceira } from './destaques'
 import { comparacao, kpisExecutivos } from './kpis'
 import { entre } from './periodo'
+import { scoreMotoristas } from './score'
 import type { Dados, Filtros } from './types'
 
 export type Resumo = ReturnType<typeof calcularResumo>
@@ -20,7 +21,7 @@ export function calcularResumo(dados: Dados, f: Filtros, now: Date) {
     servicos: rv.length,
     kpis: kpisExecutivos(ctx, cmp),
     frota: cardsFrotaPessoas(rv, sec, nowMs),
-    operacao: alertasOperacao(rv, sec, nowMs),
+    operacao: alertasOperacao(rv, sec, nowMs, scoreMotoristas(dados.viagens, dados.eventos, dados.telemetria, f.inicio, f.fim)),
     qualidade: alertasQualidade(rv, nowMs),
     producao: producaoPropriaTerceira(rv, dados.veiculos),
     emergenciais: emergenciais(rv),

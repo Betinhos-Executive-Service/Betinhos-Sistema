@@ -6,8 +6,8 @@ import type { Conjunto, Dados } from '../domain/types'
 import { reservasCsv2026 } from './csv2026'
 import { criarDadosMock } from './mock'
 import {
-  ENTITIES, composicoesPath, funcionariosPath, manutencoesPath, mapCps, mapFuncionario, mapManutencao, mapMulta, mapOcorrencia,
-  mapReserva, mapVeiculo, multasPath, ocorrenciasPath, reservasPath, veiculosPath, type EntitySets,
+  ENTITIES, composicoesPath, eventosPath, funcionariosPath, manutencoesPath, mapCps, mapEvento, mapFuncionario, mapManutencao, mapMulta, mapOcorrencia,
+  mapReserva, mapTelemetria, mapVeiculo, mapViagem, multasPath, ocorrenciasPath, reservasPath, telemetriaPath, veiculosPath, viagensPath, type EntitySets,
 } from './queries'
 
 /** Tudo que a tela precisa do mundo externo; Dataverse em produção, memória no pnpm dev. */
@@ -27,9 +27,9 @@ async function comLimite<T>(tarefas: (() => Promise<T>)[], limite: number) {
   return resultados
 }
 
-/** Reservas e CPs são obrigatórias; um conjunto secundário que falha vira `indisponiveis`. */
+/** Reservas e CPs são obrigatórias; um conjunto secundário (inclusive as 3 tabelas do Infleet do Score motoristas) que falha vira `indisponiveis`. */
 export async function carregarDataverse(client: DataverseClient, sets: EntitySets, desde: string, ate: string): Promise<Dados> {
-  const [res, cps, man, mul, oco, fun, vei] = await comLimite<Row[]>([
+  const [res, cps, man, mul, oco, fun, vei, via, eve, tel] = await comLimite<Row[]>([
     () => client.getAll(reservasPath(sets.reserva, desde, ate)),
     () => client.getAll(composicoesPath(sets.composicao)),
     () => client.getAll(manutencoesPath(sets.manutencao)),
@@ -37,6 +37,9 @@ export async function carregarDataverse(client: DataverseClient, sets: EntitySet
     () => client.getAll(ocorrenciasPath(sets.ocorrencia)),
     () => client.getAll(funcionariosPath(sets.funcionario)),
     () => client.getAll(veiculosPath(sets.veiculo)),
+    () => client.getAll(viagensPath(sets.viagem, desde, ate)),
+    () => client.getAll(eventosPath(sets.evento, desde, ate)),
+    () => client.getAll(telemetriaPath(sets.telemetria, desde, ate)),
   ], 4)
   if (res.status === 'rejected') throw res.reason
   if (cps.status === 'rejected') throw cps.reason
@@ -54,6 +57,9 @@ export async function carregarDataverse(client: DataverseClient, sets: EntitySet
     ocorrencias: ler(oco, 'ocorrencias', mapOcorrencia),
     funcionarios: ler(fun, 'funcionarios', mapFuncionario),
     veiculos: ler(vei, 'veiculos', mapVeiculo),
+    viagens: ler(via, 'viagens', mapViagem),
+    eventos: ler(eve, 'eventos', mapEvento),
+    telemetria: ler(tel, 'telemetria', mapTelemetria),
     indisponiveis,
   }
 }
@@ -66,7 +72,13 @@ function createMockSource(): Source {
     mock: true,
     async carregar(desde, ate) {
       await wait(300)
-      return { ...base, reservas: aplicarCsv2026(base.reservas.filter((r) => entre(r.dia, desde, ate)), reservasCsv2026()) }
+      return {
+        ...base,
+        reservas: aplicarCsv2026(base.reservas.filter((r) => entre(r.dia, desde, ate)), reservasCsv2026()),
+        viagens: base.viagens.filter((x) => entre(x.dia, desde, ate)),
+        eventos: base.eventos.filter((x) => entre(x.dia, desde, ate)),
+        telemetria: base.telemetria.filter((x) => entre(x.dia, desde, ate)),
+      }
     },
   }
 }
@@ -83,6 +95,7 @@ export function createSource(host: Host): Source {
     return {
       reserva: get(ENTITIES.reserva), composicao: get(ENTITIES.composicao), manutencao: get(ENTITIES.manutencao), multa: get(ENTITIES.multa),
       ocorrencia: get(ENTITIES.ocorrencia), funcionario: get(ENTITIES.funcionario), veiculo: get(ENTITIES.veiculo),
+      telemetria: get(ENTITIES.telemetria), evento: get(ENTITIES.evento), viagem: get(ENTITIES.viagem),
     }
   }).catch((error) => { sets = null; throw error }))
   return { mock: false, carregar: async (desde, ate) => carregarDataverse(host.client, await entitySets(), desde, ate) }

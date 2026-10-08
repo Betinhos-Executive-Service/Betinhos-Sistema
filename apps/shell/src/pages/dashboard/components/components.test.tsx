@@ -43,10 +43,10 @@ function renderResumo(dados: Dados) {
     <Analises resumo={r} periodo={PERIODO} />
   </>)
 }
-const VAZIO: Dados = { reservas: [], manutencoes: [], multas: [], ocorrencias: [], funcionarios: [], veiculos: [], indisponiveis: [] }
+const VAZIO: Dados = { reservas: [], manutencoes: [], multas: [], ocorrencias: [], funcionarios: [], veiculos: [], viagens: [], eventos: [], telemetria: [], indisponiveis: [] }
 const UM_SERVICO: Dados = {
   reservas: [reserva({ saidaRaw: '2026-10-02T12:00:00Z', criadoRaw: '2026-10-02T08:00:00Z', valor: 500, cliente: 'Tenaris', motoristaId: 'm', motoristaKey: 'm', motorista: 'Ana', veiculoId: 'v1' })],
-  manutencoes: [{ dia: '2026-10-03', valor: 100 }], multas: [], ocorrencias: [], funcionarios: [], indisponiveis: [],
+  manutencoes: [{ dia: '2026-10-03', valor: 100 }], multas: [], ocorrencias: [], funcionarios: [], viagens: [], eventos: [], telemetria: [], indisponiveis: [],
   veiculos: [{ id: 'v1', statusLabel: 'Disponível', categoria: 'Propria' }],
 }
 

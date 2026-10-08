@@ -2,6 +2,7 @@ import { CAT_ITEM_SERVICO, CORTE_SEM_CLIENTE, CORTE_SEM_MOTORISTA, CORTE_SEM_VEI
 import { soma } from './base'
 import { brlS, dec, int, stL } from './format'
 import { DIA_MS } from './periodo'
+import { alertaScore, type ResultadoScore } from './score'
 import type { AlertaItem, CardSecundario, Conjunto, Funcionario, Manutencao, Multa, Ocorrencia, Reserva, Veiculo } from './types'
 
 export type Secundarios = { manutencoes: Manutencao[]; multas: Multa[]; ocorrencias: Ocorrencia[]; funcionarios: Funcionario[]; veiculos: Veiculo[]; indisponiveis: Conjunto[] }
@@ -13,7 +14,8 @@ export const multasPendentes = (multas: Multa[]) => multas.filter((m) => m.statu
 const pctMultas = (multas: Multa[]) => (multas.length ? ((multasPendentes(multas).length / multas.length) * 100).toFixed(0) : '0')
 const indisponivel = (id: string, rotulo: string): AlertaItem => ({ id, valor: '—', rotulo, status: 's/dado', tom: 'neutral' })
 
-export function alertasOperacao(rv: Reserva[], s: Secundarios, nowMs: number): AlertaItem[] {
+/** `score`: resultado de `scoreMotoristas` já filtrado pelo período; vira s/dado se algum conjunto do Infleet não carregou. */
+export function alertasOperacao(rv: Reserva[], s: Secundarios, nowMs: number, score: ResultadoScore): AlertaItem[] {
   const fora = (c: Conjunto) => s.indisponiveis.includes(c)
   const cnh = cnhEmAtencao(s.funcionarios, nowMs).length
   const pend = multasPendentes(s.multas).length
@@ -26,6 +28,7 @@ export function alertasOperacao(rv: Reserva[], s: Secundarios, nowMs: number): A
       status: rv.length && oco ? `${dec((oco / rv.length) * 100, 1)}% dos serviços · 1 a cada ${int(Math.round(rv.length / oco))}` : 's/dado',
       tom: oco ? 'danger' : 'ok',
     },
+    alertaScore(score, fora('viagens') || fora('eventos') || fora('telemetria')),
   ]
 }
 

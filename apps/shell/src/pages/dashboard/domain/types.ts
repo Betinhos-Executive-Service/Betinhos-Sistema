@@ -38,7 +38,13 @@ export type Ocorrencia = { dia: string }
 export type Funcionario = { statusLabel: string; cnhMs: number }
 export type CategoriaVeiculo = 'Propria' | 'Terceirizada' | ''
 export type Veiculo = { id: string; statusLabel: string; categoria: CategoriaVeiculo }
-export type Conjunto = 'manutencoes' | 'multas' | 'ocorrencias' | 'funcionarios' | 'veiculos'
+/** Viagem do Infleet. `mes` é o texto bruto `slice(0, 7)` (sem fuso, como o legado); `dia` é o dia em Brasília. */
+export type Viagem = { dia: string; mes: string; veiculoId: string; motoristaId: string; distancia: number }
+/** Evento do Infleet. `tipo` é o `new_slug` bruto; o score o normaliza (`trim().toLowerCase()`). */
+export type EventoConducao = { dia: string; mes: string; motoristaId: string; tipo: string }
+/** Telemetria diária do Infleet: minutos de motor ocioso do veículo no dia. */
+export type TelemetriaDia = { dia: string; mes: string; veiculoId: string; ociosoMin: number }
+export type Conjunto = 'manutencoes' | 'multas' | 'ocorrencias' | 'funcionarios' | 'veiculos' | 'viagens' | 'eventos' | 'telemetria'
 export type Dados = {
   reservas: Reserva[]
   manutencoes: Manutencao[]
@@ -46,6 +52,9 @@ export type Dados = {
   ocorrencias: Ocorrencia[]
   funcionarios: Funcionario[]
   veiculos: Veiculo[]
+  viagens: Viagem[]
+  eventos: EventoConducao[]
+  telemetria: TelemetriaDia[]
   /** Conjuntos secundários que falharam: os cards deles mostram s/dado. */
   indisponiveis: Conjunto[]
 }
