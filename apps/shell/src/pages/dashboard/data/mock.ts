@@ -253,11 +253,13 @@ export function criarDadosMock(now: Date): Dados {
   }
   const dias = (qtd: number) => Array.from({ length: qtd }, (_, i) => dayKey(new Date(now.getTime() - i * 9 * DIA).toISOString()))
   const manutencoes: Manutencao[] = dias(40).map((dia, i) => {
-    const aprovacaoMs = Date.parse(`${dia}T15:00:00Z`) - (1 + Math.floor(extra() * 12)) * DIA
+    const dataMs = Date.parse(`${dia}T15:00:00Z`)
+    const aprovacaoMs = dataMs - (1 + Math.floor(extra() * 12)) * DIA
+    const criadoMs = aprovacaoMs - Math.floor(extra() * 4) * DIA
     return {
-      dia, valor: Math.round(200 + rand() * 3800), aprovacaoDia: dayKey(new Date(aprovacaoMs).toISOString()),
+      dia, dataMs, valor: Math.round(200 + rand() * 3800), aprovacaoDia: dayKey(new Date(aprovacaoMs).toISOString()),
       statusLabel: pickExtra(STATUS_MANUTENCAO), tipoReparo: pickExtra(TIPOS_REPARO), veiculoId: VEICULOS[i % VEICULOS.length].id,
-      criadoDia: dayKey(new Date(aprovacaoMs - Math.floor(extra() * 4) * DIA).toISOString()),
+      criadoDia: dayKey(new Date(criadoMs).toISOString()), criadoMs,
     }
   })
   const multas: Multa[] = dias(25).map((dia) => {
