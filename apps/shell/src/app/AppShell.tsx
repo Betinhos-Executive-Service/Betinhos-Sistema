@@ -14,6 +14,8 @@ type Props = {
   title: string
   entityLabels: Map<string, string>
   connection: { ok: boolean; text: string }
+  /** A tela ativa pede a navegação recolhida no trilho (grades largas), se o usuário não escolheu outra coisa. */
+  defaultCollapsed?: boolean
   children: ReactNode
 }
 
@@ -91,7 +93,7 @@ function toNavGroup(group: MenuGroup, entityLabels: Map<string, string>): NavGro
 }
 
 /** Chrome persistente do Sistema Betinhos: AppShell do pacote alimentado pelo sitemap e pelo estado de conexão. */
-export function AppShell({ activeId, title, entityLabels, connection, children }: Props) {
+export function AppShell({ activeId, title, entityLabels, connection, defaultCollapsed, children }: Props) {
   const install = useInstallPrompt()
   return (
     <Shell
@@ -99,6 +101,7 @@ export function AppShell({ activeId, title, entityLabels, connection, children }
       groups={MENU.map((group) => toNavGroup(group, entityLabels))}
       activeId={activeId}
       title={title}
+      defaultCollapsed={defaultCollapsed}
       status={{ tone: connection.ok ? 'success' : 'warning', text: connection.text }}
       footer={install ? (
         <button type="button" className="bt-shell__item" onClick={install}>
