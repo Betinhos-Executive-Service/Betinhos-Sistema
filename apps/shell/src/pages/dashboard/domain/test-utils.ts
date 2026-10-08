@@ -17,7 +17,7 @@ export function reserva(p: Partial<Reserva> & { saidaRaw?: string } = {}): Reser
 
 /** Fábricas de teste dos conjuntos secundários: campos extras vazios/zerados; sobrescreva o que importa. */
 export const manutencao = (p: Partial<Manutencao> = {}): Manutencao => ({
-  dia: '2026-10-05', valor: 0, aprovacaoDia: '', statusLabel: '', tipoReparo: '—', veiculoId: '', criadoDia: '', ...p,
+  dia: '2026-10-05', valor: 0, aprovacaoDia: '', statusLabel: '', tipoReparo: '—', veiculoId: '', criadoDia: '', dataMs: NaN, criadoMs: NaN, ...p,
 })
 export const multa = (p: Partial<Multa> = {}): Multa => ({
   dia: '2026-10-05', status: null, statusLabel: '', motoristaId: '', motorista: '—', veiculoId: '', infracaoCodigo: '', infracaoDescricao: '', ...p,

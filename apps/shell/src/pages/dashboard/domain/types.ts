@@ -36,8 +36,14 @@ export type Reserva = {
   /** Valor bruto de `new_datadefinalizacao` ('' sem data). */
   finalizadoRaw: string
 }
-/** `dia`, `aprovacaoDia` e `criadoDia` (`createdon`) em Brasília; `tipoReparo` é o rótulo de `cr40f_tipodoreparo` ('—' vazio). */
-export type Manutencao = { dia: string; valor: number; aprovacaoDia: string; statusLabel: string; tipoReparo: string; veiculoId: string; criadoDia: string }
+/**
+ * `dia`, `aprovacaoDia` e `criadoDia` (`createdon`) em Brasília; `tipoReparo` é o rótulo de `cr40f_tipodoreparo` ('—' vazio).
+ * `dataMs` (`cr40f_datamanutencao`) e `criadoMs` (`createdon`) são os instantes crus (NaN sem data), para o prazo do `daysBetweenValues`.
+ */
+export type Manutencao = {
+  dia: string; valor: number; aprovacaoDia: string; statusLabel: string; tipoReparo: string; veiculoId: string; criadoDia: string
+  dataMs: number; criadoMs: number
+}
 /** `motorista` é o apelido do funcionário (via id) ou o rótulo do lookup ('—'); infração pelo `$expand`, código cai no rótulo do lookup. */
 export type Multa = {
   dia: string; status: number | null; statusLabel: string; motoristaId: string; motorista: string; veiculoId: string; infracaoCodigo: string; infracaoDescricao: string

@@ -117,10 +117,12 @@ export function mapReserva(row: Row, cps: Map<string, Cp>): Reserva {
   }
 }
 
+/** Instante de um datetime/date cru; NaN sem data (`daysBetweenValues` do legado devolve null nesses casos). */
+const instante = (v: unknown) => { const s = str(v); return s ? Date.parse(s) : NaN }
 export const mapManutencao = (row: Row): Manutencao => ({
   dia: dayKey(str(row.cr40f_datamanutencao)), valor: Number(row.cr40f_valor) || 0, aprovacaoDia: dayKey(str(row.cr40f_datadaaprovacao)),
   statusLabel: formatted(row, 'cr40f_status'), tipoReparo: formatted(row, 'cr40f_tipodoreparo') || '—', veiculoId: lower(row._cr40f_placa_carro_value),
-  criadoDia: dayKey(str(row.createdon)),
+  criadoDia: dayKey(str(row.createdon)), dataMs: instante(row.cr40f_datamanutencao), criadoMs: instante(row.createdon),
 })
 
 /** `funcMapGlobal` do legado por id: id do funcionário → apelido (ou nome completo). */
