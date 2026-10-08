@@ -65,7 +65,7 @@ export function ColumnsMenu({ columns, attributes, prefs, onChange }: Props) {
 
   return (
     <>
-      <Button variant="secondary" icon={<Columns3 size={16} />} aria-haspopup="dialog" onClick={show}>Colunas</Button>
+      <Button variant="secondary" size="compact" icon={<Columns3 size={16} />} aria-haspopup="dialog" onClick={show}>Colunas</Button>
       <Dialog
         open={open}
         onClose={requestClose}

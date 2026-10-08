@@ -1,9 +1,22 @@
 /* Geral: lista editável de serviços. Só tokens do Design System 1.4.0. */
 .gr-meta { display: inline-flex; align-items: center; gap: var(--bt-space-2); font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); font-variant-numeric: tabular-nums; }
 .gr-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.gr-filters__view { flex: 0 1 260px; min-width: 200px; }
-.gr-filters__search { flex: 1 1 260px; min-width: 200px; max-width: 380px; }
-.gr-filters__selected { display: inline-flex; align-items: center; gap: var(--bt-space-2); padding-left: var(--bt-space-2); border-left: var(--bt-border-width-default) solid var(--bt-color-border); font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.gr-filters__view { flex: 0 1 200px; min-width: 160px; }
+.gr-filters__search { flex: 1 1 220px; min-width: 140px; max-width: 420px; }
+.gr-filters__selected { display: inline-flex; align-items: center; flex: 0 0 auto; }
+/* Numa linha de 40 px, sem quebrar, quando cabe: com a navegação no trilho a partir de 1200 px; com ela aberta (238 px a mais) a partir de 1360 px.
+   Abaixo disso (e no celular) a barra quebra em vez de cortar comandos. */
+.gr-toolbar .bt-button { white-space: nowrap; }
+@media (min-width: 1200px) {
+  .bt-shell--rail .gr-toolbar, .bt-shell--rail .gr-toolbar .bt-page-toolbar__start, .bt-shell--rail .gr-toolbar .bt-page-toolbar__end { flex-wrap: nowrap; }
+  .bt-shell--rail .gr-toolbar .bt-page-toolbar__start { flex: 1 1 auto; }
+  .bt-shell--rail .gr-toolbar .bt-page-toolbar__end { flex: 0 0 auto; }
+}
+@media (min-width: 1360px) {
+  .gr-toolbar, .gr-toolbar .bt-page-toolbar__start, .gr-toolbar .bt-page-toolbar__end { flex-wrap: nowrap; }
+  .gr-toolbar .bt-page-toolbar__start { flex: 1 1 auto; }
+  .gr-toolbar .bt-page-toolbar__end { flex: 0 0 auto; }
+}
 
 /* Células editáveis. As regras de posição vêm antes das colunas fixas (.gr-cell--first/select) para elas prevalecerem. */
 .gr-cell { position: relative; display: flex; align-items: center; gap: var(--bt-space-2); min-width: 0; outline: 0; }
@@ -25,25 +38,29 @@
 @keyframes gr-mark-in { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: none; } }
 
 /* O contêiner rola nos dois eixos; cabeçalho, seleção e primeira coluna ficam fixos. */
-.gr-grid { overflow: auto; max-height: calc(100vh - 220px); }
+.gr-grid { overflow: auto; }
+/* Densidade "tabela densa" aprovada em 08/10/2026; token table-row-dense pendente no DS (Módulo Qualidade). */
+.gr-table { --gr-row-height: 44px; }
 .gr-table .bt-table__head, .gr-table .bt-table__row { grid-template-columns: var(--gr-columns); gap: 0; padding: 0; min-width: max-content; }
 .gr-table .bt-table__head { display: grid; position: sticky; top: 0; z-index: 2; }
-.gr-table .bt-table__row { min-height: 54px; }
+.gr-table .bt-table__row { min-height: var(--gr-row-height); }
 .gr-table .bt-table__row.is-selected { background-color: var(--bt-color-action-soft); }
-.gr-table .bt-table__cell { padding: 0 var(--bt-space-3); min-height: 54px; border-right: var(--bt-border-width-default) solid var(--bt-color-border); }
-.gr-table .bt-table__head .bt-table__cell { min-height: 36px; }
+.gr-table .bt-table__cell { padding: 0 var(--bt-space-2); min-height: calc(var(--gr-row-height) - var(--bt-border-width-default)); border-right: var(--bt-border-width-default) solid var(--bt-color-border); }
+.gr-table .bt-table__head, .gr-table .bt-table__head .bt-table__cell { min-height: 32px; }
 .gr-cell--select { position: sticky; left: 0; z-index: 1; justify-content: center; background-color: var(--bt-color-surface); }
 .gr-cell--first { position: sticky; left: 36px; z-index: 1; background-color: var(--bt-color-surface); box-shadow: 1px 0 0 var(--bt-color-border); }
 .gr-table .bt-table__row.is-selected .gr-cell--select, .gr-table .bt-table__row.is-selected .gr-cell--first { background-color: var(--bt-color-action-soft); }
 .gr-table .bt-table__head .gr-cell--select, .gr-table .bt-table__head .gr-cell--first { background-color: var(--bt-color-surface-neutral); }
 .gr-table .gr-cell--select { padding: 0; }
-.gr-head__sort { display: inline-flex; align-items: center; gap: var(--bt-space-1); min-height: 36px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
+.gr-head__sort { display: inline-flex; align-items: center; gap: var(--bt-space-1); min-width: 0; max-width: 100%; min-height: 32px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
 .gr-head__sort:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border); border-radius: var(--bt-radius-xs); }
-.gr-head__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gr-head__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gr-open { padding: 0; border: 0; background: transparent; color: var(--bt-color-brand); font: inherit; font-weight: var(--bt-font-weight-extrabold); text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
 .gr-open:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
 .gr-open:active { transform: scale(.97); }
 .gr-footer__pages { display: inline-flex; gap: var(--bt-space-2); }
+.gr-footer__left { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--bt-space-2); min-width: 0; }
+.gr-footer__size { flex: 0 0 auto; width: 140px; }
 .gr-footer .bt-pagination__count { display: none; }
 .gr-empty > .bt-empty { padding: var(--bt-space-8) var(--bt-space-4); }
 
@@ -71,6 +88,16 @@
 .gr-voucher__backdrop { position: absolute; inset: 0; background: rgba(0, 26, 61, .22); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 .gr-voucher__frame { position: relative; z-index: 1; width: min(1480px, calc(100% - 48px)); height: min(940px, calc(100% - 40px)); border: 0; border-radius: var(--bt-radius-lg); background: transparent; }
 @media (max-width: 820px) { .gr-voucher__frame { width: 100%; height: 100%; border-radius: 0; } }
+
+/* Desktop: a grade ocupa a altura da janela e rola por dentro; a página não rola. O celular segue com a rolagem normal (cards). */
+@media (min-width: 821px) {
+  .page.gr-page { height: 100dvh; display: flex; flex-direction: column; padding-top: var(--bt-space-3); padding-bottom: var(--bt-space-3); overflow-x: hidden; overflow-y: auto; }
+  .gr-page .page__header { margin-bottom: var(--bt-space-2); }
+  .gr-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  /* Em janela muito baixa a grade não some: o piso de 240 px faz a página rolar (overflow-y) em vez de espremê-la. */
+  .gr-table { display: flex; flex-direction: column; flex: 1; min-height: 240px; }
+  .gr-grid { flex: 1; min-height: 0; overflow: auto; }
+}
 
 /* Celular: cards, sheet de edição e barra de seleção. */
 .gr-mobile { display: grid; gap: var(--bt-space-3); min-width: 0; }

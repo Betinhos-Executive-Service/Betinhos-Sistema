@@ -1,6 +1,6 @@
-import { useCallback, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
-import { Alert, Button, EmptyState, Menu, Pagination, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
+import { Alert, Button, EmptyState, Menu, Pagination, Select, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
 import { Archive, ArchiveRestore, CalendarDays, ClipboardList, Copy, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Ticket, X } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
@@ -17,7 +17,8 @@ import { GeralToolbar } from './components/GeralToolbar'
 import { VoucherOverlay } from './components/VoucherOverlay'
 import { copyText } from './domain/copy'
 import { applyColumnPrefs, loadColumnPrefs, saveColumnPrefs, type ColumnPrefs } from './domain/columns'
-import { ID_ATTRIBUTE, PAGE_SIZE, type CellStatus, type Column } from './domain/types'
+import { PAGE_SIZES } from './domain/pageSize'
+import { ID_ATTRIBUTE, type CellStatus, type Column } from './domain/types'
 import { cellKey, useGeral, type SaveFailure } from './useGeral'
 import './geral.css'
 
@@ -44,7 +45,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     toast({ tone: 'danger', message: `Não foi possível salvar ${failure.label} do serviço ${failure.serviceName}: ${failure.message}` })
   }, [toast])
   const geral = useGeral(source, { onSaveFail })
-  const { view, rows, page, total, more, loading, query, attributes } = geral
+  const { view, rows, page, pageSize, total, more, loading, query, attributes } = geral
 
   // Preferências de colunas por visão: lidas do armazenamento local ao entrar na visão, gravadas ao aplicar.
   const [saved, setSaved] = useState<Record<string, ColumnPrefs | null>>({})
@@ -57,7 +58,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     setSaved((s) => ({ ...s, [viewId]: next }))
   }, [source.kv, viewId])
 
-  const { reload, refresh, goTo, setQuery, selectView, clearSelection } = geral
+  const { reload, refresh, goTo, setQuery, setPageSize, selectView, clearSelection } = geral
   const [mockForm, setMockForm] = useState(false)
   const [copy, setCopy] = useState<{ open: boolean; loading: boolean; text: string }>({ open: false, loading: false, text: '' })
   const [stateRequest, setStateRequest] = useState<StateRequest | null>(null)
@@ -135,7 +136,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
 
   const mixedTitle = 'Selecione só serviços ativos ou só inativos.'
   const mixedId = useId()
-  const commands = (
+  // Barra de seleção do celular: só aparece com linhas marcadas.
+  const selectionCommands = (
     <>
       {selectedIds.length === 1 ? <Button variant="action" size="compact" icon={<Pencil size={16} />} onClick={() => { void openForm('edit', selectedIds[0]) }}>Editar</Button> : null}
       <Button variant="action" size="compact" icon={<Ticket size={16} />} onClick={openVoucher}>Gerar Voucher</Button>
@@ -153,9 +155,51 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       <Button variant="ghost" size="compact" icon={<X size={16} />} onClick={clearSelection}>Limpar seleção</Button>
     </>
   )
+  const noneTitle = 'Selecione ao menos um serviço.'
+  const oneTitle = 'Selecione exatamente um serviço.'
+  const noneId = useId()
+  const oneId = useId()
+  // aria-disabled (não disabled): o botão continua focável, o leitor de tela lê o motivo e o clique não faz nada.
+  const blocked = (reason: string, describedBy: string) => ({
+    className: 'gr-btn--blocked',
+    'aria-disabled': 'true' as const,
+    'aria-describedby': describedBy,
+    title: reason,
+    onClick: (event: MouseEvent<HTMLButtonElement>) => event.preventDefault(),
+  })
+  const none = selectedIds.length === 0
+  const createButton = <Button size="compact" icon={<Plus size={16} />} onClick={() => { void openForm('create') }}>Criar serviço</Button>
+  // Desktop: todos os comandos ficam sempre na barra (a posição não pula); sem seleção servível ficam inertes, com o motivo.
+  const commands = mobile ? createButton : (
+    <>
+      {createButton}
+      {selectedIds.length === 1
+        ? <Button variant="action" size="compact" icon={<Pencil size={16} />} onClick={() => { void openForm('edit', selectedIds[0]) }}>Editar</Button>
+        : <Button variant="action" size="compact" icon={<Pencil size={16} />} {...blocked(oneTitle, oneId)}>Editar</Button>}
+      {none
+        ? <Button variant="action" size="compact" icon={<Ticket size={16} />} {...blocked(noneTitle, noneId)}>Gerar Voucher</Button>
+        : <Button variant="action" size="compact" icon={<Ticket size={16} />} onClick={openVoucher}>Gerar Voucher</Button>}
+      {none
+        ? <Button variant="action" size="compact" icon={<Copy size={16} />} {...blocked(noneTitle, noneId)}>Copiar Serviços</Button>
+        : <Button variant="action" size="compact" icon={<Copy size={16} />} onClick={() => { void copySelected() }}>Copiar Serviços</Button>}
+      {none
+        ? <Button variant="danger" size="compact" icon={<Archive size={16} />} {...blocked(noneTitle, noneId)}>Desativar</Button>
+        : selectedState === 1
+          ? <Button variant="action" size="compact" icon={<ArchiveRestore size={16} />} onClick={() => askState(true)}>Ativar</Button>
+          : selectedState === 0
+            ? <Button variant="danger" size="compact" icon={<Archive size={16} />} onClick={() => askState(false)}>Desativar</Button>
+            : <>
+              <Button variant="danger" size="compact" icon={<Archive size={16} />} {...blocked(mixedTitle, mixedId)}>Desativar</Button>
+              <Button variant="action" size="compact" icon={<ArchiveRestore size={16} />} {...blocked(mixedTitle, mixedId)}>Ativar</Button>
+            </>}
+      <span id={oneId} className="gr-sr">{oneTitle}</span>
+      <span id={noneId} className="gr-sr">{noneTitle}</span>
+      <span id={mixedId} className="gr-sr">{mixedTitle}</span>
+    </>
+  )
   const shortcuts = (
     <Menu
-      trigger={(props) => <Button {...props} variant="secondary" icon={<MoreVertical size={18} />} aria-label="Mais ações" />}
+      trigger={(props) => <Button {...props} variant="secondary" size="compact" icon={<MoreVertical size={16} />} aria-label="Mais ações" />}
       actions={[
         { id: 'funcoes', label: 'Funções Operacionais', icon: <ClipboardList size={16} />, onSelect: () => { location.hash = hrefFor('new_telafuncoesoperacionais') } },
         { id: 'escala', label: 'Escala FDS', icon: <CalendarDays size={16} />, onSelect: () => setEscalaOpen(true) },
@@ -188,13 +232,25 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
 
   const editRow = editId == null ? undefined : rowOf(editId)
 
-  const start = rows.length ? (page - 1) * PAGE_SIZE + 1 : 0
+  const start = rows.length ? (page - 1) * pageSize + 1 : 0
   const end = start + rows.length - 1
   const footer = (
     <>
-      <span>{loading ? 'Carregando…' : rows.length ? `Linhas ${start}–${end}${total != null ? ` de ${total}` : ''}` : 'Nenhuma linha'}</span>
+      <span className="gr-footer__left">
+        <span>{loading ? 'Carregando…' : rows.length ? `Linhas ${start}–${end}${total != null ? ` de ${total}` : ''}` : 'Nenhuma linha'}</span>
+        <Select
+          className="gr-footer__size"
+          size={mobile ? 'touch' : 'compact'}
+          searchable={false}
+          clearable={false}
+          aria-label="Serviços por página"
+          options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} por página` }))}
+          value={String(pageSize)}
+          onChange={(value) => { if (value) setPageSize(Number(value)) }}
+        />
+      </span>
       {total != null
-        ? <Pagination page={page} pageSize={PAGE_SIZE} total={total} onChange={goTo} noun="serviços" />
+        ? <Pagination page={page} pageSize={pageSize} total={total} onChange={goTo} noun="serviços" />
         : (
           <span className="gr-footer__pages">
             <Button variant="secondary" size="compact" disabled={page <= 1 || loading} onClick={() => goTo(page - 1)}>Anterior</Button>
@@ -267,10 +323,9 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       eyebrow="Operacional"
       title="Geral"
       meta={<span className="gr-meta">{total != null ? `${total} serviços` : null}{source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}</span>}
-      actions={<>
-        <Button variant="secondary" icon={<RefreshCw size={16} />} loading={loading && rows.length > 0} onClick={reload}>Atualizar</Button>
-        <Button icon={<Plus size={16} />} onClick={() => { void openForm('create') }}>Criar serviço</Button>
-      </>}
+      className="gr-page"
+      bodyClassName="gr-body"
+      actions={<Button variant="secondary" icon={<RefreshCw size={16} />} loading={loading && rows.length > 0} onClick={reload}>Atualizar</Button>}
       toolbar={
         <GeralToolbar
           views={geral.views}
@@ -293,7 +348,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       {mobile && geral.selected.size > 0 ? (
         <div className="gr-selbar" role="group" aria-label="Ações sobre os selecionados">
           <span role="status" className="gr-selbar__count">{geral.selected.size === 1 ? '1 selecionado' : `${geral.selected.size} selecionados`}</span>
-          {commands}
+          {selectionCommands}
         </div>
       ) : null}
       {mobile && editRow ? (

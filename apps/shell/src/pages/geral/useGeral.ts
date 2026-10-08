@@ -5,6 +5,7 @@ import { cellKind } from './domain/cells'
 import { buildPatch, reduceCell, validateEdit, SAVED_VISIBLE_MS, type CellEvent, type EditValue } from './domain/edit'
 import { defaultSort, linkEntities } from './domain/fetch'
 import { formatDateTime } from './domain/format'
+import { isPageSize, loadPageSize, savePageSize } from './domain/pageSize'
 import { columnLabel, parseLayout, rowKey } from './domain/layout'
 import { ENTITY, ID_ATTRIBUTE, type AttributeInfo, type AttributeMap, type CellKind, type CellStatus, type Column, type Sort, type View } from './domain/types'
 
@@ -23,7 +24,7 @@ export type GeralState = {
   attributes: AttributeMap | null
   attributesError: string | null
   quickFind: string[]
-  rows: Row[]; page: number; total: number | null; more: boolean; cookies: (string | null)[]
+  rows: Row[]; page: number; pageSize: number; total: number | null; more: boolean; cookies: (string | null)[]
   loading: boolean; pageError: string | null
   sort: Sort; query: string
   selected: Set<string>
@@ -85,6 +86,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   const [quickFind, setQuickFind] = useState<string[]>([])
   const [rows, setRowsState] = useState<Row[]>([])
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSizeState] = useState(() => loadPageSize(initialSource.kv))
   const [total, setTotal] = useState<number | null>(null)
   const [more, setMore] = useState(false)
   const [cookies, setCookiesState] = useState<(string | null)[]>([null])
@@ -166,7 +168,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     const current = ++pageToken.current
     setLoading(true)
     setPageError(null)
-    source.page({ fetchxml: view.fetchxml, page, cookie: cookiesRef.current[page - 1] ?? null, sort, query, quickFind }).then(
+    source.page({ fetchxml: view.fetchxml, page, cookie: cookiesRef.current[page - 1] ?? null, sort, query, quickFind, pageSize }).then(
       (result) => {
         if (current !== pageToken.current) return
         setRows(() => result.rows)
@@ -183,7 +185,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
         setLoading(false)
       },
     )
-  }, [source, view, sort, query, page, nonce, quickFind, setRows, setCookies])
+  }, [source, view, sort, query, page, pageSize, nonce, quickFind, setRows, setCookies])
 
   const selectView = useCallback((id: string) => {
     const next = views.find((v) => v.id === id)
@@ -193,6 +195,13 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   const backToFirst = useCallback(() => { setPage(1); setCookies([null]); setSelected(new Set()) }, [setCookies])
   const setSort = useCallback((next: Sort) => { setSortState(next); backToFirst() }, [backToFirst])
   const setQuery = useCallback((next: string) => { setQueryState(next); backToFirst() }, [backToFirst])
+  /** Linhas por página (50, 100 ou 200): volta à primeira página e fica salva para a próxima visita. */
+  const setPageSize = useCallback((next: number) => {
+    if (!isPageSize(next)) return
+    savePageSize(source.kv, next)
+    setPageSizeState(next)
+    backToFirst()
+  }, [source, backToFirst])
   // A seleção vale para a página visível: trocar de página a limpa.
   const goTo = useCallback((next: number) => { setPage(Math.max(1, Math.floor(next))); setSelected(new Set()) }, [])
   const reload = useCallback(() => { backToFirst(); setNonce((n) => n + 1) }, [backToFirst])
@@ -283,6 +292,6 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     return true
   }, [attributes, columns, source, setCell, setRows, scheduleSettle])
 
-  const state: GeralState = { views, viewsError, view, columns, attributes, attributesError, quickFind, rows, page, total, more, cookies, loading, pageError, sort, query, selected, cells }
-  return { ...state, defaultOrder, selectView, setSort, setQuery, goTo, reload, refresh, toggle, toggleAll, clearSelection, save, resetCell }
+  const state: GeralState = { views, viewsError, view, columns, attributes, attributesError, quickFind, rows, page, pageSize, total, more, cookies, loading, pageError, sort, query, selected, cells }
+  return { ...state, defaultOrder, selectView, setSort, setQuery, setPageSize, goTo, reload, refresh, toggle, toggleAll, clearSelection, save, resetCell }
 }

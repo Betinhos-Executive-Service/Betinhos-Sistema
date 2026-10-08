@@ -2,6 +2,7 @@
 import { act, cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Source } from './data/source'
+import { MOCK_ROW_COUNT } from './data/mock'
 import { GeralPage } from './GeralPage'
 
 // Ganchos para simular o que o mock não faz: falha parcial de estado, linha inativa e cópia lenta.
@@ -265,7 +266,8 @@ describe('Geral', () => {
     fireEvent.click(within(rows[1]).getByRole('checkbox'))
     fireEvent.click(within(rows[2]).getByRole('checkbox'))
     expect(screen.getByText('2 selecionados')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Editar' })).toBeNull()
+    // Os comandos estão sempre na barra; com 2 selecionados só o Editar (exige exatamente um) fica inerte.
+    expect(screen.getByRole('button', { name: 'Editar' }).getAttribute('aria-disabled')).toBe('true')
     fireEvent.click(screen.getByRole('button', { name: 'Copiar Serviços' }))
     const copy = await screen.findByRole('dialog', { name: 'Copiar serviços' })
     expect((await within(copy).findByText(/\*ID:\* OS-/)).textContent).toContain('*Trajeto:*')
@@ -468,5 +470,74 @@ describe('Geral: correções finais', () => {
       const sheet = await openSheet()
       expect(within(sheet).getByTitle('Trocar o motorista dispara os avisos e a atribuição automática de veículo.')).toBeTruthy()
     })
+  })
+})
+
+describe('Geral: espaço e densidade', () => {
+  const blockedReason = { Editar: 'Selecione exatamente um serviço.', 'Gerar Voucher': 'Selecione ao menos um serviço.', 'Copiar Serviços': 'Selecione ao menos um serviço.', Desativar: 'Selecione ao menos um serviço.' }
+
+  it('os comandos ficam sempre na barra: sem seleção os que dependem dela ficam inertes, com o motivo', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByText(/Linhas 1–50 de/)
+    const toolbar = screen.getByRole('toolbar', { name: 'Filtros de serviços' })
+    expect(within(toolbar).getByRole('button', { name: 'Criar serviço' }).getAttribute('aria-disabled')).toBeNull()
+    for (const [name, reason] of Object.entries(blockedReason)) {
+      const button = within(toolbar).getByRole('button', { name })
+      expect(button.getAttribute('aria-disabled')).toBe('true')
+      expect((button as HTMLButtonElement).disabled).toBe(false)
+      expect(button.getAttribute('title')).toBe(reason)
+      expect(document.getElementById(button.getAttribute('aria-describedby') ?? '')?.textContent).toBe(reason)
+    }
+    expect(within(toolbar).queryByRole('button', { name: 'Ativar' })).toBeNull()
+    expect(within(toolbar).queryByText(/selecionado/)).toBeNull()
+    // Clicar num inerte não faz nada.
+    fireEvent.click(within(toolbar).getByRole('button', { name: 'Copiar Serviços' }))
+    fireEvent.click(within(toolbar).getByRole('button', { name: 'Editar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('com 1 selecionado os comandos se habilitam e a contagem aparece como badge', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByText(/Linhas 1–50 de/)
+    fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
+    const toolbar = screen.getByRole('toolbar', { name: 'Filtros de serviços' })
+    const count = within(toolbar).getByText('1 selecionado')
+    expect(count.closest('.bt-badge')).not.toBeNull()
+    for (const name of ['Editar', 'Gerar Voucher', 'Copiar Serviços', 'Desativar']) expect(within(toolbar).getByRole('button', { name }).getAttribute('aria-disabled')).toBeNull()
+  })
+
+  it('o cabeçalho tem só Atualizar e o total; Criar serviço fica na barra', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByText(/Linhas 1–50 de/)
+    const header = screen.getByRole('banner')
+    expect(within(header).getByRole('heading', { name: 'Geral' })).toBeTruthy()
+    expect(within(header).getByText(`${MOCK_ROW_COUNT} serviços`)).toBeTruthy()
+    expect(within(header).getByRole('button', { name: 'Atualizar' })).toBeTruthy()
+    expect(within(header).queryByRole('button', { name: 'Criar serviço' })).toBeNull()
+  })
+
+  it('cada título de coluna tem o rótulo completo em title (o texto pode ser cortado)', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    const header = await screen.findByRole('columnheader', { name: /Status de faturamento/, hidden: true })
+    expect(header.getAttribute('title')).toBe('Status de faturamento')
+  })
+
+  it('serviços por página: 100 mostra 1–100 e a escolha fica salva ao reabrir a tela', async () => {
+    const first = render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByText(`Linhas 1–50 de ${MOCK_ROW_COUNT}`)
+    fireEvent.click(screen.getByRole('combobox', { name: 'Serviços por página' }))
+    fireEvent.click(await screen.findByRole('option', { name: '100 por página', hidden: true }))
+    expect(await screen.findByText(`Linhas 1–100 de ${MOCK_ROW_COUNT}`)).toBeTruthy()
+    expect(window.localStorage.getItem('betinhos.geral.pagina.v1')).toBe('100')
+    first.unmount()
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    expect(await screen.findByText(`Linhas 1–100 de ${MOCK_ROW_COUNT}`)).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: 'Serviços por página' }).textContent).toContain('100 por página')
+  })
+
+  it('valor salvo inválido volta para 50 por página', async () => {
+    window.localStorage.setItem('betinhos.geral.pagina.v1', '75')
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    expect(await screen.findByText(`Linhas 1–50 de ${MOCK_ROW_COUNT}`)).toBeTruthy()
   })
 })

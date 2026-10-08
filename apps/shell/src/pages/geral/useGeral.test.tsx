@@ -14,6 +14,29 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 const idOf = (row: { cr40f_reservadeveculosid?: unknown }) => String(row.cr40f_reservadeveculosid)
 
 describe('useGeral', () => {
+  it('pageSize: muda a quantidade, volta à página 1, salva e ignora valor inválido', async () => {
+    window.localStorage.clear()
+    try {
+      const source = createSource({ mode: 'mock' }, { latency: 0 })
+      const { result } = renderHook(() => useGeral(source))
+      await waitFor(() => expect(result.current.rows.length).toBe(50))
+      expect(result.current.pageSize).toBe(50)
+      act(() => result.current.goTo(2))
+      await waitFor(() => expect(result.current.page).toBe(2))
+      act(() => result.current.setPageSize(100))
+      await waitFor(() => expect(result.current.rows.length).toBe(100))
+      expect(result.current.page).toBe(1)
+      expect(result.current.pageSize).toBe(100)
+      expect(window.localStorage.getItem('betinhos.geral.pagina.v1')).toBe('100')
+      act(() => result.current.setPageSize(75))
+      expect(result.current.pageSize).toBe(100)
+      // Uma nova instância já nasce com a escolha salva.
+      const again = renderHook(() => useGeral(createSource({ mode: 'mock' }, { latency: 0 })))
+      expect(again.result.current.pageSize).toBe(100)
+      await waitFor(() => expect(again.result.current.rows.length).toBe(100))
+    } finally { window.localStorage.clear() }
+  })
+
   it('carrega a visão padrão, pagina e ordena', async () => {
     const { result } = renderHook(() => useGeral(createSource({ mode: 'mock' }, { latency: 0 })))
     await waitFor(() => expect(result.current.rows.length).toBe(50))
