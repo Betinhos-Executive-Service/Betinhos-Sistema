@@ -76,7 +76,8 @@ export type Pagante = {
 }
 /**
  * Linha do `buildExpenseRows` do legado: categoria/forma pelos cadastros, motorista pelo nome completo e empresa normalizada (BETINHOS/DEPAULA).
- * `dia` é o texto bruto `slice(0, 10)` de `cr40f_datagasto` (o `dateKey` do legado); `mes` é `dia.slice(0, 7)`.
+ * `dia` é o texto bruto `slice(0, 10)` de `cr40f_datagasto` (o `dateKey` do legado, usado no filtro de período); `mes` é o mês em
+ * Brasília (o `mK` do legado, usado nas séries mensais) e pode diferir de `dia.slice(0, 7)` na virada do mês (gasto após 21h do último dia).
  */
 export type Despesa = {
   id: string; dia: string; mes: string; valor: number

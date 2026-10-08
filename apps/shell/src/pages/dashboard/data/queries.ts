@@ -256,10 +256,11 @@ export function mapDespesa(row: Row, ctx: ContextoDespesa): Despesa {
   const formaId = lower(row._cr40f_formapagamento_value)
   const motoristaId = lower(row._cr40f_motorista_value)
   const func = ctx.funcionarios.get(motoristaId)
-  // `dateKey` do legado: texto bruto, sem fuso.
-  const dia = str(row.cr40f_datagasto).slice(0, 10)
+  // `dateKey` do legado: texto bruto, sem fuso (filtro de período). O mês das séries é o `mK` do legado: mês em Brasília.
+  const gasto = str(row.cr40f_datagasto)
+  const dia = gasto.slice(0, 10)
   return {
-    id, dia, mes: dia.slice(0, 7), valor: Number(row.cr40f_valor) || 0,
+    id, dia, mes: dayKey(gasto).slice(0, 7), valor: Number(row.cr40f_valor) || 0,
     categoriaId, categoria: ctx.categorias.get(categoriaId)?.nome || rotulo(row, '_cr40f_categoria_value') || 'Sem categoria',
     formaId, forma: ctx.formas.get(formaId)?.nome || rotulo(row, '_cr40f_formapagamento_value') || 'Sem forma de pagamento',
     empresa: func ? empresaDespesa(func.empresa) : 'Sem empresa',
