@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Host } from '../../../host'
 import { fetchPath, mapViews, parsePage, reloadPath, searchPath } from './queries'
-import { applyMockFetch, createMockRows, createMockViews } from './mock'
+import { applyMockFetch, createMockRows, createMockViews, MOCK_ROW_COUNT } from './mock'
 import { createSource } from './source'
 
 describe('queries', () => {
@@ -41,15 +41,30 @@ describe('mock', () => {
     const views = createMockViews()
     const rows = createMockRows(now)
     expect(views.find((v) => v.padrao)?.nome).toContain('Agenda')
-    expect(rows.length).toBeGreaterThanOrEqual(60)
+    expect(rows.length).toBe(MOCK_ROW_COUNT)
     const page = applyMockFetch(rows, views[0].fetchxml, { page: 1, pageSize: 50, sort: null, query: '', quickFind: ['cr40f_id'], now })
     expect(page.rows.length).toBe(50)
     expect(page.more).toBe(true)
     expect(page.total).toBe(rows.length)
+    // A OS-1013 (linha bloqueada dos testes) fica entre as 50 primeiras da Agenda.
+    expect(page.rows.some((r) => r.cr40f_id === 'OS-1013')).toBe(true)
+    for (const pageSize of [100, 200]) {
+      const bigger = applyMockFetch(rows, views[0].fetchxml, { page: 1, pageSize, sort: null, query: '', quickFind: [], now })
+      expect(bigger.rows.length).toBe(pageSize)
+    }
     const hoje = applyMockFetch(rows, views.find((v) => v.nome === 'Hoje')!.fetchxml, { page: 1, pageSize: 50, sort: null, query: '', quickFind: [], now })
     expect(hoje.rows.every((r) => String(r.cr40f_dataehorriodesada).startsWith('2026-10-08'))).toBe(true)
     const busca = applyMockFetch(rows, views[0].fetchxml, { page: 1, pageSize: 50, sort: null, query: 'OS-10', quickFind: ['cr40f_id'], now })
     expect(busca.rows.every((r) => String(r.cr40f_id).includes('OS-10'))).toBe(true)
+  })
+  it('source mock respeita o pageSize do pedido e usa 50 sem ele', async () => {
+    const source = createSource({ mode: 'mock' }, { latency: 0 })
+    const [view] = await source.views()
+    const request = { fetchxml: view.fetchxml, page: 1, cookie: null, sort: null, query: '', quickFind: [] }
+    expect((await source.page(request)).rows).toHaveLength(50)
+    expect((await source.page({ ...request, pageSize: 100 })).rows).toHaveLength(100)
+    expect((await source.page({ ...request, page: 2, pageSize: 100 })).rows).toHaveLength(100)
+    expect((await source.page({ ...request, page: 2, pageSize: 200 })).rows).toHaveLength(MOCK_ROW_COUNT - 200)
   })
   it('source mock grava e relê', async () => {
     const source = createSource({ mode: 'mock' })
@@ -79,7 +94,8 @@ describe('mock — contrato da tela', () => {
     const source = createSource({ mode: 'mock' })
     const views = await source.views()
     const semMotorista = await source.page({ fetchxml: views[2].fetchxml, page: 1, cookie: null, sort: null, query: '', quickFind: [] })
-    expect(semMotorista.total).toBe(12)
+    expect(semMotorista.total).toBe(createMockRows(new Date()).filter((r) => r._cr40f_motorista_value == null).length)
+    expect(semMotorista.rows.length).toBeLessThanOrEqual(50)
     expect(semMotorista.rows.every((r) => r._cr40f_motorista_value == null)).toBe(true)
     const id = String(semMotorista.rows[0].cr40f_reservadeveculosid)
     const bind = await source.lookupBind('cr40f_motorista')
@@ -128,6 +144,11 @@ describe('source Dataverse', () => {
     expect(url).toContain('cr40f_reservadeveculoses?fetchXml=')
     expect(url).toContain('count="50"')
     expect(url).toContain('page="2"')
+  })
+  it('page usa o pageSize do pedido no count do FetchXML', async () => {
+    const { host, request } = fakeHost({ request: () => ({ value: [] }) })
+    await createSource(host).page({ fetchxml: '<fetch><entity name="cr40f_reservadeveculos" /></fetch>', page: 1, cookie: null, sort: null, query: '', quickFind: [], pageSize: 200 })
+    expect(decodeURIComponent(String(request.mock.calls[0][0]))).toContain('count="200"')
   })
   it('lookupBind lê a relação e falha com mensagem clara quando não existe', async () => {
     const ok = fakeHost({ request: () => ({ value: [{ ReferencingEntityNavigationPropertyName: 'cr40f_Motorista', ReferencedEntity: 'cr40f_funcionarios' }] }) })

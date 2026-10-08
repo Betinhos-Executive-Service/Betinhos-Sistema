@@ -13,7 +13,7 @@ export const FORM_WEBRESOURCE = 'new_formulario_geral.html'
 export const VOUCHER_WEBRESOURCE = 'cr40f_VoucherConfirmacao.html'
 export const ESCALA_FDS_WEBRESOURCE = 'cr40f_EscalaFDS.html'
 
-export type PageRequest = { fetchxml: string; page: number; cookie: string | null; sort: Sort; query: string; quickFind: string[] }
+export type PageRequest = { fetchxml: string; page: number; cookie: string | null; sort: Sort; query: string; quickFind: string[]; /** Linhas por página; sem valor, `PAGE_SIZE`. */ pageSize?: number }
 
 /** Tudo que a tela precisa do mundo externo; Dataverse em produção, memória no pnpm dev. */
 export type Source = {
@@ -74,7 +74,7 @@ function createMockSource({ latency = 1 }: SourceOptions = {}): Source {
     attributes: async (entity) => (entity === ENTITY ? new Map(MOCK_ATTRIBUTES) : new Map<string, AttributeInfo>()),
     async page(req) {
       await wait(300)
-      const page = applyMockFetch(rows, req.fetchxml, { ...req, pageSize: PAGE_SIZE, now: new Date() })
+      const page = applyMockFetch(rows, req.fetchxml, { ...req, pageSize: req.pageSize ?? PAGE_SIZE, now: new Date() })
       return { ...page, rows: page.rows.map((r) => ({ ...r })) }
     },
     async update(id, patch) {
@@ -198,7 +198,7 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
     },
     attributes,
     async page(req) {
-      const fetchxml = buildFetch(req.fetchxml, { page: req.page, pageSize: PAGE_SIZE, cookie: req.cookie, sort: req.sort, query: req.query, quickFind: req.quickFind })
+      const fetchxml = buildFetch(req.fetchxml, { page: req.page, pageSize: req.pageSize ?? PAGE_SIZE, cookie: req.cookie, sort: req.sort, query: req.query, quickFind: req.quickFind })
       return parsePage(await host.client.request<FetchResponse>(fetchPath(await entitySet(), fetchxml)))
     },
     update: async (id, patch) => host.client.update(await entitySet(), id, patch),

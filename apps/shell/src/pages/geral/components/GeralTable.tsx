@@ -54,7 +54,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
             const active = sameSort(shown, column)
             const label = columnLabel(column, attributes?.get(column.key))
             return (
-              <div key={column.key} className={index === 0 ? 'bt-table__cell gr-cell--first' : 'bt-table__cell'} role="columnheader" aria-sort={active ? (shown?.descending ? 'descending' : 'ascending') : 'none'}>
+              <div key={column.key} className={index === 0 ? 'bt-table__cell gr-cell--first' : 'bt-table__cell'} role="columnheader" title={label} aria-sort={active ? (shown?.descending ? 'descending' : 'ascending') : 'none'}>
                 <button type="button" className="gr-head__sort" onClick={() => onSort(nextSort(sort, defaultSort, column))}>
                   <span className="gr-head__label">{label}</span>
                   {active ? (shown?.descending ? <ArrowDown size={14} /> : <ArrowUp size={14} />) : null}

@@ -78,11 +78,14 @@ const DIA = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', mo
 /** `YYYY-MM-DD` no calendário de São Paulo. */
 const spDay = (d: Date) => DIA.format(d)
 
-/** 60 reservas (OS-1000…OS-1059) de hoje-2 a hoje+20 dias; a OS-1013 cai um dia depois de `now` para ficar entre as primeiras da Agenda. */
+/** Quantidade de reservas do mock (OS-1000…OS-1219): dá para testar as páginas de 50, 100 e 200 linhas. */
+export const MOCK_ROW_COUNT = 220
+
+/** As 60 primeiras reservas (OS-1000…OS-1059) vão de hoje-2 a hoje+20 dias e as demais seguem na mesma densidade, depois delas; a OS-1013 cai um dia depois de `now` para ficar entre as primeiras da Agenda. */
 export function createMockRows(now: Date): Row[] {
   const [year, month, day] = spDay(now).split('-').map(Number)
   const rows: Row[] = []
-  for (let i = 0; i < 60; i += 1) {
+  for (let i = 0; i < MOCK_ROW_COUNT; i += 1) {
     const offset = i === 13 ? 1 : -2 + Math.floor((i * 22) / 59)
     // 06:00–20:45 em São Paulo: o dia UTC da ISO coincide com o dia local.
     const date = new Date(Date.UTC(year, month - 1, day + offset, 6 + ((i * 7) % 15) + 3, (i * 15) % 60)).toISOString()
