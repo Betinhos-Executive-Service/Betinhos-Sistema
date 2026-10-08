@@ -9,6 +9,7 @@ import { AbaCarregando } from '../Carregando'
 import { Participacao, pct } from '../Celulas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
 import { KpiCard, KpiLinha } from '../KpiCard'
+import { ChipAnt } from '../KpiChip'
 import { MEDIA_MOBILE, juntar } from '../Linhas'
 import type { DadosAba, PropsAba } from './abas'
 import { forte, resto } from './MoMaMuComum'
@@ -32,8 +33,10 @@ function MultasAba({ ctx, dados, periodo }: DadosAba) {
   const parte = (n: number) => (k && k.total ? [{ rotulo: 'Do total', texto: pct((n / k.total) * 100) }] : [])
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={3}>
-      <KpiCard rotulo={KPIS[0]} tom="brand" valor={k ? int(k.total) : null} />
-      <KpiCard rotulo={KPIS[1]} tom="warning" valor={k ? int(k.pendentes) : null} apoio={k ? [{ rotulo: 'Status', texto: 'Notificar o condutor', atencao: k.pendentes > 0 }, ...parte(k.pendentes)] : []} />
+      <KpiCard rotulo={KPIS[0]} tom="brand" valor={k ? int(k.total) : null}>{mu.ant ? <ChipAnt chip={mu.ant.total} /> : undefined}</KpiCard>
+      <KpiCard rotulo={KPIS[1]} tom="warning" valor={k ? int(k.pendentes) : null} apoio={k ? [{ rotulo: 'Status', texto: 'Notificar o condutor', atencao: k.pendentes > 0 }, ...parte(k.pendentes)] : []}>
+        {mu.ant ? <ChipAnt chip={mu.ant.pendentes} /> : undefined}
+      </KpiCard>
       <KpiCard rotulo={KPIS[2]} tom="success" valor={k ? int(k.resolvidas) : null} apoio={k ? [{ rotulo: 'Status', texto: 'Pago, Descontado ou Finalizado' }, ...parte(k.resolvidas)] : []} />
     </KpiLinha>
     {k == null ? (

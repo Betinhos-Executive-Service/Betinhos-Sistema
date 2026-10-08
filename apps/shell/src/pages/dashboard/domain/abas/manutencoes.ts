@@ -1,6 +1,7 @@
 import { topByShare } from '../analises'
 import { agrupar, soma } from '../base'
-import { normL } from '../format'
+import { anteriorDe, comparar, type ChipAnterior } from '../comparar'
+import { brlS, int, normL } from '../format'
 import type { Contexto } from '../kpis'
 import { DIA_MS, entre, mesRotulo, mostrarLM, periodoAnoAnterior, periodoMesAnterior, type Periodo } from '../periodo'
 import type { Dados, Manutencao } from '../types'
@@ -65,6 +66,8 @@ export type LinhaTipoReparo = { tipo: string; qtd: number; valor: number; /** % 
 export type Manutencoes = {
   /** null = s/dado (conjunto não carregou). */
   kpis: { total: number; custoTotal: number; emAndamento: number; custoMedio: number; pctReceita: number } | null
+  /** Chips "ANT." de Manutenções e Custo total (cair é favorável); null com a tabela fora do ar. */
+  ant: { total: ChipAnterior; custoTotal: ChipAnterior } | null
   custoPorMes: { mes: string; rotulo: string; valor: number }[]
   porTipoReparo: LinhaTipoReparo[]
   categorias: LinhaCategoria[]
@@ -113,12 +116,14 @@ export function calcularManutencoes(ctx: Contexto, dados: Dados): Manutencoes {
   const { rv, f, now } = ctx
   const lmVisivel = mostrarLM(f.inicio, f.fim, now)
   if (dados.indisponiveis.includes('manutencoes')) {
-    return { kpis: null, custoPorMes: [], porTipoReparo: [], categorias: [], prazo: null, mostrarLM: lmVisivel }
+    return { kpis: null, ant: null, custoPorMes: [], porTipoReparo: [], categorias: [], prazo: null, mostrarLM: lmVisivel }
   }
   const noPeriodo = (p: Periodo) => dados.manutencoes.filter((m) => entre(m.dia, p.inicio, p.fim))
   const mans = noPeriodo(f)
   const lmRows = lmVisivel ? noPeriodo(periodoMesAnterior(f.inicio, f.fim)) : null
   const lyRows = noPeriodo(periodoAnoAnterior(f.inicio, f.fim))
+  const pAnt = anteriorDe(ctx)
+  const antRows = pAnt ? noPeriodo(pAnt) : null
 
   const total = custo(mans)
   const fat = soma(rv)
@@ -147,6 +152,10 @@ export function calcularManutencoes(ctx: Contexto, dados: Dados): Manutencoes {
 
   const medidos = prazosCriacao(mans)
   return {
+    ant: {
+      total: comparar(mans.length, antRows ? antRows.length : null, int, 'desce'),
+      custoTotal: comparar(total, antRows ? custo(antRows) : null, brlS, 'desce'),
+    },
     kpis: { total: mans.length, custoTotal: total, emAndamento, custoMedio: mans.length ? total / mans.length : 0, pctReceita: fat > 0 ? (total / fat) * 100 : 0 },
     custoPorMes,
     porTipoReparo,

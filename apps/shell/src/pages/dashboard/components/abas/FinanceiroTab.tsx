@@ -9,6 +9,7 @@ import { AnaliseCard } from '../AnaliseCard'
 import { TicketMensalCard } from '../Analises'
 import { AbaCarregando } from '../Carregando'
 import { KpiCard, KpiLinha } from '../KpiCard'
+import { ChipAnt } from '../KpiChip'
 import { SemDadoBloco, Vazio } from '../Estados'
 import { Duplo, Nome, Participacao, Rolagem, Status, ValorDelta, col, larguraMinima, pct, tomStatus } from '../Celulas'
 import { COLUNA_LARGA, Expansivel, MEDIA_MOBILE, VER_MESES, juntar, useLinhasAbertas } from '../Linhas'
@@ -205,8 +206,8 @@ function FinanceiroAba({ ctx, dados, periodo }: DadosAba) {
       : `${int(k.pagamentosMedidos)} de ${int(k.pagamentosRecebidos)} pagamentos com data confiável · ${HISTORICO}`
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={6}>
-      <KpiCard rotulo={ROTULOS_FINANCEIRO[0]} valor={brlS(k.maiorServico)} tom="action" />
-      <KpiCard rotulo={ROTULOS_FINANCEIRO[1]} valor={int(k.clientesAtivos)} tom="brand" />
+      <KpiCard rotulo={ROTULOS_FINANCEIRO[0]} valor={brlS(k.maiorServico)} tom="action"><ChipAnt chip={fi.ant.maiorServico} /></KpiCard>
+      <KpiCard rotulo={ROTULOS_FINANCEIRO[1]} valor={int(k.clientesAtivos)} tom="brand"><ChipAnt chip={fi.ant.clientesAtivos} /></KpiCard>
       <KpiCard rotulo={ROTULOS_FINANCEIRO[2]} valor={brlS(k.totalRecebido)} tom="success" apoio="serviços com faturamento pago" />
       <KpiCard rotulo={ROTULOS_FINANCEIRO[3]} valor={k.cartao == null ? null : brlS(k.cartao)} tom="action" apoio={indisponivel ? SEM_PAGANTES : `recebido em cartão, crédito, link ou máquina · ${HISTORICO}`} />
       <KpiCard rotulo={ROTULOS_FINANCEIRO[4]} valor={k.atrasados == null ? null : int(k.atrasados)} tom="warning" apoio={indisponivel ? SEM_PAGANTES : `pagamentos pendentes · ${HISTORICO}`} />

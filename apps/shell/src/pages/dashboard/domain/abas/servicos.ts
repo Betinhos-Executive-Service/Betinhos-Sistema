@@ -1,6 +1,8 @@
 import { statusServicos, topByShare, type StatusServicos } from '../analises'
 import { agrupar, mesesComDados, soma } from '../base'
 import { emergenciais, producaoPropriaTerceira, type Emergenciais, type ProducaoPT } from '../destaques'
+import { comparar, servicosAnteriores, type ChipAnterior } from '../comparar'
+import { int } from '../format'
 import { cancelado, produzido, type Contexto } from '../kpis'
 import { mesRotulo } from '../periodo'
 import type { Reserva, Veiculo } from '../types'
@@ -10,6 +12,8 @@ export type LinhaParticipacao = { tipo: string; qtd: number; fat: number; pctQtd
 export type KpiContagem = { valor: number; pct: number }
 export type Servicos = {
   kpis: { total: number; concluidos: KpiContagem; cancelados: KpiContagem; emergenciais: KpiContagem }
+  /** Chips "ANT." dos quatro KPIs contra o período anterior de mesma duração (mesmos segmentos). */
+  ant: Record<'total' | 'concluidos' | 'cancelados' | 'emergenciais', ChipAnterior>
   porMes: { mes: string; rotulo: string; qtd: number }[]
   status: StatusServicos
   porTipoServico: LinhaParticipacao[]
@@ -48,12 +52,21 @@ export function calcularServicos(ctx: Contexto, veiculos: Veiculo[], indisponive
   const cancelados = rv.filter(cancelado).length
   const emerg = emergenciais(rv)
   const porMes = agrupar(rv, (r) => r.mes)
+  // Cancelados e emergenciais (criados no dia da saída) pesam na operação: cair é favorável; total e concluídos, subir.
+  const ant = servicosAnteriores(ctx)
+  const chip = (atual: number, anterior: (rows: Reserva[]) => number, favoravel: 'sobe' | 'desce') => comparar(atual, ant ? anterior(ant) : null, int, favoravel)
   return {
     kpis: {
       total,
       concluidos: { valor: concluidos, pct: pct(concluidos, total) },
       cancelados: { valor: cancelados, pct: pct(cancelados, total) },
       emergenciais: { valor: emerg.total, pct: emerg.percentual },
+    },
+    ant: {
+      total: chip(total, (rows) => rows.length, 'sobe'),
+      concluidos: chip(concluidos, (rows) => rows.filter(produzido).length, 'sobe'),
+      cancelados: chip(cancelados, (rows) => rows.filter(cancelado).length, 'desce'),
+      emergenciais: chip(emerg.total, (rows) => emergenciais(rows).total, 'desce'),
     },
     porMes: mesesComDados(rv).map((mes) => ({ mes, rotulo: mesRotulo(mes), qtd: porMes.get(mes)?.length ?? 0 })),
     status: statusServicos(ctx),

@@ -1,7 +1,9 @@
 import { topByShare } from '../analises'
 import type { Opcao } from '../base'
 import { brl, brlS, int, normL } from '../format'
-import { fmtDia, mesRotulo, parseDia, type Periodo } from '../periodo'
+import { comparar, type ChipAnterior } from '../comparar'
+import { mesRotulo, periodoAnterior, type Periodo } from '../periodo'
+export type { ChipAnterior } from '../comparar'
 import type { CategoriaDespesa, Despesa, FormaPagamento, PontoSerie, Tom } from '../types'
 
 /** Filtros próprios da aba (ids de categoria/forma, rótulo da empresa) + o filtro global de motorista (`motoristaKey`). */
@@ -24,14 +26,8 @@ const semComprovante = (d: Despesa) => d.statusAnexo !== ANEXO_COMPLETO && d.ane
 const idNorm = (v: string) => v.replace(/[{}]/g, '').toLowerCase()
 const chaveMotorista = (d: Despesa) => d.motoristaId || `nome:${normL(d.motorista)}`
 
-/** `getPreviousExpensePeriod`: janela imediatamente anterior com o mesmo número de dias; null sem período válido. */
-export function periodoAnteriorDespesa(inicio: string, fim: string): Periodo | null {
-  if (!inicio || !fim || fim < inicio) return null
-  const s = parseDia(inicio)
-  const e = parseDia(fim)
-  const dias = Math.round((Date.UTC(e.y, e.m, e.d) - Date.UTC(s.y, s.m, s.d)) / 86_400_000) + 1
-  return { inicio: fmtDia(s.y, s.m, s.d - dias), fim: fmtDia(s.y, s.m, s.d - 1) }
-}
+/** `getPreviousExpensePeriod`: o período anterior de todos os comparativos "ANT." (`periodoAnterior`). */
+export const periodoAnteriorDespesa = periodoAnterior
 
 /** `expenseMatchesFilters` sem a parte de data (motorista global, empresa, categoria, forma). */
 function passaFiltros(d: Despesa, f: FiltrosDespesa) {
@@ -68,19 +64,9 @@ function metricas(rows: Despesa[]) {
 }
 type Metricas = ReturnType<typeof metricas>
 
-/** Chip "ANT." do `expenseDeltaMarkup`: s/dado sem período, base zero com anterior 0; subir é desfavorável, variação 0 é favorável (`delta <= 0`). */
-export type ChipAnterior =
-  | { rotulo: 'ANT.'; tipo: 'sem-dado' }
-  | { rotulo: 'ANT.'; tipo: 'base-zero'; anterior: string }
-  | { rotulo: 'ANT.'; tipo: 'valor'; anterior: string; variacao: number; favoravel: boolean }
-
-function chipAnterior(atual: number, anterior: number | null, moeda: boolean): ChipAnterior {
-  if (anterior == null) return { rotulo: 'ANT.', tipo: 'sem-dado' }
-  const rotulo = moeda ? brlS(anterior) : int(anterior)
-  if (!anterior) return { rotulo: 'ANT.', tipo: 'base-zero', anterior: rotulo }
-  const variacao = ((atual - anterior) / Math.abs(anterior)) * 100
-  return { rotulo: 'ANT.', tipo: 'valor', anterior: rotulo, variacao, favoravel: variacao <= 0 }
-}
+/** Chip "ANT." do `expenseDeltaMarkup`: nas despesas subir é desfavorável (variação 0 é favorável, `delta <= 0`). */
+const chipAnterior = (atual: number, anterior: number | null, moeda: boolean): ChipAnterior =>
+  comparar(atual, anterior, moeda ? brlS : int, 'desce')
 
 export type FaixaHospedagem = { tom: Tom; texto: string; apoio: string }
 /** Faixas da política de hospedagem (alvo R$ 150, teto R$ 200). */

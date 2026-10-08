@@ -1,9 +1,10 @@
 import { agrupar, passaSegmentos } from '../base'
-import { normL } from '../format'
+import { anteriorDe, comparar, servicosAnteriores, type ChipAnterior } from '../comparar'
+import { int, normL } from '../format'
 import type { Contexto } from '../kpis'
 import { manutencaoEmAndamento } from './manutencoes'
 import { entre, fmtDia, mesRotulo, parseDia } from '../periodo'
-import type { Conjunto, Dados, EventoConducao, Reserva, Veiculo } from '../types'
+import type { Conjunto, Dados, EventoConducao, Reserva, TelemetriaDia, Veiculo } from '../types'
 
 /** Início do uso mensal da frota própria (legado L15912: a contagem só vale a partir de 01/06/2026). */
 export const CORTE_USO_FROTA = '2026-06-01'
@@ -60,6 +61,11 @@ export type Frota = {
   usoTotais: { proprios: number; terceiros: number; aluguel: number }
   eventosPorMes: EventosMes[]
   infleetIndisponivel: boolean
+  /**
+   * Chips "ANT." de Km rodados (subir é favorável), Excessos e Motor ocioso (cair é favorável), com o mesmo escopo aplicado ao período
+   * anterior (veículos com serviço nele); null com o Infleet fora do ar.
+   */
+  ant: { km: ChipAnterior; excessos: ChipAnterior; ocioso: ChipAnterior } | null
 }
 
 type Categoria = 'excesso' | 'aceleracao' | 'frenagem' | 'curva'
@@ -198,10 +204,16 @@ export function calcularFrota(ctx: Contexto, dados: Dados): Frota {
 
   const infleetIndisponivel = INFLEET.some((c) => dados.indisponiveis.includes(c))
   const base = { kpis, usoMensal: uso.usoMensal, usoTotais: uso.totais, infleetIndisponivel }
-  if (infleetIndisponivel) return { ...base, telemetria: null, kmPorDia: [], eventosPorMes: [] }
+  if (infleetIndisponivel) return { ...base, telemetria: null, kmPorDia: [], eventosPorMes: [], ant: null }
 
   const noEscopo = (r: { dia: string; veiculoId: string }) => entre(r.dia, f.inicio, f.fim) && escopo.has(r.veiculoId)
   const diarias = dados.telemetria.filter(noEscopo)
+  // Período anterior com a mesma regra de escopo: os veículos com serviço nele, pela distância diária no período anterior.
+  const pAnt = anteriorDe(ctx)
+  const rvAnt = servicosAnteriores(ctx)
+  const escopoAnt = new Set((rvAnt ?? []).map((r) => r.veiculoId).filter(Boolean))
+  const diariasAnt = pAnt && rvAnt ? dados.telemetria.filter((t) => entre(t.dia, pAnt.inicio, pAnt.fim) && escopoAnt.has(t.veiculoId)) : null
+  const somaDe = (rows: TelemetriaDia[] | null, k: 'distanciaKm' | 'excessos' | 'ociosoMin') => (rows ? rows.reduce((s, t) => s + t[k], 0) : null)
   const viagens = dados.viagens.filter(noEscopo)
   const eventos = dados.eventos.filter(noEscopo)
 
@@ -243,5 +255,10 @@ export function calcularFrota(ctx: Contexto, dados: Dados): Frota {
   const tendencia = tendenciaLinear(linhasEventos.map((l) => l.taxa))
   const eventosPorMes: EventosMes[] = linhasEventos.map((l, i) => ({ ...l, tendencia: tendencia[i] }))
 
-  return { ...base, telemetria, kmPorDia, eventosPorMes }
+  const ant = {
+    km: comparar(telemetria.km, somaDe(diariasAnt, 'distanciaKm'), (v) => `${int(Math.round(v))} km`, 'sobe'),
+    excessos: comparar(telemetria.excessos, somaDe(diariasAnt, 'excessos'), int, 'desce'),
+    ocioso: comparar(telemetria.ociosoMin, somaDe(diariasAnt, 'ociosoMin'), (v) => `${int(Math.round(v))} min`, 'desce'),
+  }
+  return { ...base, telemetria, kmPorDia, eventosPorMes, ant }
 }

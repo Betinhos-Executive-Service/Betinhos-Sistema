@@ -9,7 +9,7 @@ import { createSource, type ConjuntoExtra } from './data/source'
 import { filtrarServicos, opcoesFiltro, type OpcoesFiltro } from './domain/base'
 import { int } from './domain/format'
 import type { Contexto } from './domain/kpis'
-import { atalho, cargaDesde } from './domain/periodo'
+import { atalho, cargaDesde, periodoAnterior } from './domain/periodo'
 import type { Filtros } from './domain/types'
 import { useDashboard } from './useDashboard'
 import { ABAS, ABAS_POR_SERVICO, abaDaUrl, avisoSegmento, type Aba, type PropsAba } from './components/abas/abas'
@@ -51,7 +51,8 @@ export function DashboardPage({ host }: { host: Host }) {
   const [frotaMotorista, setFrotaMotorista] = useState<FrotaMotorista>('todos')
   // Carga única com todos os conjuntos; a aba só escolhe o que calcular.
   const extrasDaAba = EXTRAS_POR_ABA[aba] ?? SEM_EXTRAS
-  const db = useDashboard(source, cargaDesde(filtros.inicio, now), filtros.fim, { conjuntosExtras: extrasDaAba })
+  const desde = cargaDesde(filtros.inicio, now)
+  const db = useDashboard(source, desde, filtros.fim, { conjuntosExtras: extrasDaAba })
 
   // Cada recarga avança o relógio; um atalho relativo ("Este mês") acompanha a virada do dia.
   useEffect(() => { if (db.atualizadoEm) setNow(db.atualizadoEm) }, [db.atualizadoEm])
@@ -62,10 +63,12 @@ export function DashboardPage({ host }: { host: Host }) {
   }, [now, filtros.atalho, filtros.inicio, filtros.fim])
 
   // Contexto único do recorte (todas, serviços filtrados, filtros e relógio): calculado uma vez e passado a todas as abas.
-  const ctx = useMemo<Contexto | null>(
-    () => (db.dados ? { todas: db.dados.reservas, rv: filtrarServicos(db.dados.reservas, filtros), f: filtros, now } : null),
-    [db.dados, filtros, now],
-  )
+  // `anterior`: período de mesma duração dos chips "ANT."; começando antes da janela carregada, os chips mostram s/dado.
+  const ctx = useMemo<Contexto | null>(() => {
+    if (!db.dados) return null
+    const p = periodoAnterior(filtros.inicio, filtros.fim)
+    return { todas: db.dados.reservas, rv: filtrarServicos(db.dados.reservas, filtros), f: filtros, now, anterior: p && p.inicio >= desde ? p : null }
+  }, [db.dados, filtros, now, desde])
   const servicos = ctx ? ctx.rv.length : null
   // Ao trocar de janela `db.dados` volta a null; as últimas opções conhecidas seguem nos filtros até a nova carga.
   const ultimasOpcoes = useRef(SEM_OPCOES)

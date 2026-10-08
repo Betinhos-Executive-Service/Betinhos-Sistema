@@ -10,6 +10,8 @@ import { AbaCarregando } from '../Carregando'
 import { Duplo, Rolagem, col, larguraMinima, pct } from '../Celulas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
 import { KpiCard, KpiLinha } from '../KpiCard'
+import { ChipAnt } from '../KpiChip'
+import type { ChipAnterior } from '../../domain/comparar'
 import { COLUNA_LARGA, Linhas, MEDIA_MOBILE, juntar } from '../Linhas'
 import type { DadosAba, PropsAba } from './abas'
 import './abas-despesas-frota.css'
@@ -53,7 +55,7 @@ function FrotaAba({ ctx, dados, periodo }: DadosAba) {
   return <>
     <KpisFrota frota={frota} />
     <div className="dash-grade">
-      {frota.telemetria ? <TelemetriaCard telemetria={frota.telemetria} periodo={periodo} /> : <SemDadoBloco titulo={BLOCOS[0]} periodo={periodo} unidade="veículos com serviço no período" motivo={SEM_INFLEET} />}
+      {frota.telemetria ? <TelemetriaCard telemetria={frota.telemetria} ant={frota.ant} periodo={periodo} /> : <SemDadoBloco titulo={BLOCOS[0]} periodo={periodo} unidade="veículos com serviço no período" motivo={SEM_INFLEET} />}
       {frota.infleetIndisponivel ? <SemDadoBloco titulo={BLOCOS[1]} periodo={periodo} unidade="km por dia" motivo={SEM_INFLEET} /> : <KmPorDiaCard dias={frota.kmPorDia} periodo={periodo} mobile={mobile} />}
       {semVeiculos ? <SemDadoBloco titulo={BLOCOS[2]} periodo={periodo} unidade="% médio diário dos próprios ativos" motivo={SEM_VEICULOS} /> : <UsoCard frota={frota} filtros={ctx.f} periodo={periodo} mobile={mobile} />}
       {frota.infleetIndisponivel ? <SemDadoBloco titulo={BLOCOS[3]} periodo={periodo} unidade="eventos e eventos por 1.000 km" motivo={SEM_INFLEET} /> : <EventosCard meses={frota.eventosPorMes} periodo={periodo} mobile={mobile} />}
@@ -93,14 +95,14 @@ function KpisFrota({ frota }: { frota: Frota }) {
 }
 
 /** As seis medidas da telemetria Infleet em lista (com o Infleet fora do ar, a aba mostra o bloco sem dado). */
-function TelemetriaCard({ telemetria: t, periodo }: { telemetria: TelemetriaFrota; periodo: string }) {
-  const itens: { rotulo: string; apoio: string; valor: (t: TelemetriaFrota) => string }[] = [
-    { rotulo: 'Km rodados', apoio: 'soma da distância diária', valor: (t) => `${num(t.km)} km` },
+function TelemetriaCard({ telemetria: t, ant, periodo }: { telemetria: TelemetriaFrota; ant: Frota['ant']; periodo: string }) {
+  const itens: { rotulo: string; apoio: string; valor: (t: TelemetriaFrota) => string; chip?: ChipAnterior }[] = [
+    { rotulo: 'Km rodados', apoio: 'soma da distância diária', valor: (t) => `${num(t.km)} km`, chip: ant?.km },
     { rotulo: 'Velocidade média', apoio: 'ponderada pela distância', valor: (t) => `${num(t.velocidadeMedia)} km/h` },
     { rotulo: 'Velocidade máxima', apoio: 'maior registro do período', valor: (t) => `${num(t.velocidadeMaxima)} km/h` },
-    { rotulo: 'Excessos de velocidade', apoio: 'ocorrências registradas', valor: (t) => int(t.excessos) },
+    { rotulo: 'Excessos de velocidade', apoio: 'ocorrências registradas', valor: (t) => int(t.excessos), chip: ant?.excessos },
     { rotulo: 'Consumo real', apoio: 'km das viagens ÷ litros', valor: (t) => (t.consumoKmL == null ? '—' : `${dec(t.consumoKmL, 2)} km/l`) },
-    { rotulo: 'Motor ocioso', apoio: 'tempo parado com motor ligado', valor: (t) => `${num(t.ociosoMin, 0)} min` },
+    { rotulo: 'Motor ocioso', apoio: 'tempo parado com motor ligado', valor: (t) => `${num(t.ociosoMin, 0)} min`, chip: ant?.ocioso },
   ]
   return (
     <AnaliseCard
@@ -113,6 +115,7 @@ function TelemetriaCard({ telemetria: t, periodo }: { telemetria: TelemetriaFrot
               <span className="dash-lista__texto">
                 <span className="dash-lista__rotulo">{i.rotulo}</span>
                 <span className="dash-lista__apoio">{t.consumoKmL == null && i.rotulo === 'Consumo real' ? 'sem km/litros ou fora da faixa de 2 a 30 km/l' : i.apoio}</span>
+                {i.chip ? <span className="dash-lista__chip"><ChipAnt chip={i.chip} /></span> : null}
               </span>
               <span className="dash-lista__valor dash-fr-medida">{i.valor(t)}</span>
             </li>

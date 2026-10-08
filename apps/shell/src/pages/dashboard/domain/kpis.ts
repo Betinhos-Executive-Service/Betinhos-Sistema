@@ -67,7 +67,11 @@ export const semDado = (rotulo: string): Chip => ({ rotulo, tipo: 'sem-dado' })
 export const chipOuSemDado = (rotulo: string, atual: number, anterior: number | null, fmt: (v: number) => string) =>
   chipValor(rotulo, atual, anterior ?? 0, fmt) ?? semDado(rotulo)
 
-export type Contexto = { todas: Reserva[]; rv: Reserva[]; f: Filtros; now: Date }
+/**
+ * Recorte calculado uma vez pela página. `anterior`: período anterior de mesma duração dos chips "ANT." (null quando começa antes da
+ * janela carregada, e o chip vira s/dado); ausente, cada cálculo usa a janela imediatamente anterior ao filtro.
+ */
+export type Contexto = { todas: Reserva[]; rv: Reserva[]; f: Filtros; now: Date; anterior?: Periodo | null }
 export type Comparacao = { lm: Periodo | null; ly: Periodo; lmValor: number; lyValor: number; lmServicos: number; lyServicos: number | null; produzido: number }
 
 /** LM/LY e faturamento produzido do período (L13440–13462). */

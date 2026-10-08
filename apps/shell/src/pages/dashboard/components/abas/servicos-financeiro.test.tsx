@@ -93,6 +93,22 @@ describe('aba Serviços', () => {
   })
 })
 
+describe('chips ANT. (período anterior de mesma duração)', () => {
+  it('Serviços e Financeiro mostram o anterior, a variação e se é favorável em texto', () => {
+    renderServicos(BASE)
+    // 01/09–15/10 (45 dias): o anterior é 18/07–31/08, sem serviços → base zero.
+    expect(within(kpi('Total de serviços')).getByText('0 · base zero')).toBeTruthy()
+    expect(within(kpi('Cancelados')).getByText('Período anterior')).toBeTruthy()
+    cleanup()
+    const anterior = { ...BASE, reservas: [...BASE.reservas, reserva({ saidaRaw: '2026-08-10T12:00:00Z', valor: 2000, cliente: 'Tenaris' })] }
+    renderFinanceiro(anterior)
+    const maior = kpi('Maior serviço')
+    expect(within(maior).getByText(/R\$\s2,0k/)).toBeTruthy()
+    expect(within(maior).getByText('−50,0%')).toBeTruthy()
+    expect(within(maior).getByText(', desfavorável')).toBeTruthy()
+  })
+})
+
 describe('aba Financeiro', () => {
   it('mostra os seis KPIs e os cinco blocos na ordem, Clientes por último', () => {
     renderFinanceiro(BASE)
