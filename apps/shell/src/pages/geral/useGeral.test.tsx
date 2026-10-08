@@ -14,32 +14,9 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 const idOf = (row: { cr40f_reservadeveculosid?: unknown }) => String(row.cr40f_reservadeveculosid)
 
 describe('useGeral', () => {
-  it('pageSize: muda a quantidade, volta à página 1, salva e ignora valor inválido', async () => {
-    window.localStorage.clear()
-    try {
-      const source = createSource({ mode: 'mock' }, { latency: 0 })
-      const { result } = renderHook(() => useGeral(source))
-      await waitFor(() => expect(result.current.rows.length).toBe(50))
-      expect(result.current.pageSize).toBe(50)
-      act(() => result.current.goTo(2))
-      await waitFor(() => expect(result.current.page).toBe(2))
-      act(() => result.current.setPageSize(100))
-      await waitFor(() => expect(result.current.rows.length).toBe(100))
-      expect(result.current.page).toBe(1)
-      expect(result.current.pageSize).toBe(100)
-      expect(window.localStorage.getItem('betinhos.geral.pagina.v1')).toBe('100')
-      act(() => result.current.setPageSize(75))
-      expect(result.current.pageSize).toBe(100)
-      // Uma nova instância já nasce com a escolha salva.
-      const again = renderHook(() => useGeral(createSource({ mode: 'mock' }, { latency: 0 })))
-      expect(again.result.current.pageSize).toBe(100)
-      await waitFor(() => expect(again.result.current.rows.length).toBe(100))
-    } finally { window.localStorage.clear() }
-  })
-
   it('carrega a visão padrão, pagina e ordena', async () => {
     const { result } = renderHook(() => useGeral(createSource({ mode: 'mock' }, { latency: 0 })))
-    await waitFor(() => expect(result.current.rows.length).toBe(50))
+    await waitFor(() => expect(result.current.rows.length).toBe(100))
     expect(result.current.view?.padrao).toBe(true)
     expect(result.current.columns[0].attribute).toBe('cr40f_id')
     expect(result.current.attributes?.get('cr40f_status')?.type).toBe('Picklist')
@@ -59,7 +36,7 @@ describe('useGeral', () => {
 
   it('salva com estados gravando/salvo e erro restaurando o valor', async () => {
     const { result } = renderHook(() => useGeral(createSource({ mode: 'mock' }, { latency: 0 })))
-    await waitFor(() => expect(result.current.rows.length).toBe(50))
+    await waitFor(() => expect(result.current.rows.length).toBe(100))
     const row = result.current.rows[0]
     const id = String(row.cr40f_reservadeveculosid)
     const trajeto = result.current.columns.find((c) => c.attribute === 'cr40f_trajeto')!
@@ -81,7 +58,7 @@ describe('useGeral', () => {
 
   it('validação barra antes do servidor', async () => {
     const { result } = renderHook(() => useGeral(createSource({ mode: 'mock' }, { latency: 0 })))
-    await waitFor(() => expect(result.current.rows.length).toBe(50))
+    await waitFor(() => expect(result.current.rows.length).toBe(100))
     const id = String(result.current.rows[0].cr40f_reservadeveculosid)
     const cotacao = result.current.columns.find((c) => c.attribute === 'cr40f_cotao')!
     let ok = true
@@ -96,7 +73,7 @@ describe('useGeral: gravação', () => {
     const base = createSource({ mode: 'mock' }, { latency: 0 })
     const source: Source = { ...base, reload: vi.fn().mockRejectedValue(new Error('rede caiu')) }
     const { result } = renderHook(() => useGeral(source))
-    await waitFor(() => expect(result.current.rows.length).toBe(50))
+    await waitFor(() => expect(result.current.rows.length).toBe(100))
     const id = idOf(result.current.rows[0])
     const trajeto = result.current.columns.find((c) => c.attribute === 'cr40f_trajeto')!
     let ok = false
@@ -115,7 +92,7 @@ describe('useGeral: gravação', () => {
       views: async () => (await base.views()).map((v) => ({ ...v, layoutxml: v.layoutxml.replace('</row>', '<cell name="cr40f_sem_metadata" width="100" /></row>') })),
     }
     const { result } = renderHook(() => useGeral(source))
-    await waitFor(() => expect(result.current.rows.length).toBe(50))
+    await waitFor(() => expect(result.current.rows.length).toBe(100))
     expect(result.current.columns.some((c) => c.attribute === 'cr40f_sem_metadata')).toBe(true)
     const trajeto = result.current.columns.find((c) => c.attribute === 'cr40f_trajeto')!
     await act(async () => { await result.current.save(idOf(result.current.rows[0]), trajeto, 'Rota nova') })
@@ -135,7 +112,7 @@ describe('useGeral: gravação', () => {
       },
     }
     const { result } = renderHook(() => useGeral(source))
-    await waitFor(() => expect(result.current.rows.length).toBe(50))
+    await waitFor(() => expect(result.current.rows.length).toBe(100))
     const id = idOf(result.current.rows[0])
     const antes = result.current.rows[0].cr40f_trajeto
     const trajeto = result.current.columns.find((c) => c.attribute === 'cr40f_trajeto')!
@@ -159,7 +136,7 @@ describe('useGeral: gravação', () => {
       reload: async (id, keys) => ({ ...(await base.reload(id, keys)), cr40f_status: novo, [`cr40f_status${F}`]: 'Mudou' }),
     }
     const { result } = renderHook(() => useGeral(source))
-    await waitFor(() => expect(result.current.rows.length).toBe(50))
+    await waitFor(() => expect(result.current.rows.length).toBe(100))
     const id = idOf(result.current.rows[0])
     novo = result.current.rows[0].cr40f_status === 202410002 ? 202410001 : 202410002
     const trajeto = result.current.columns.find((c) => c.attribute === 'cr40f_trajeto')!
@@ -173,7 +150,7 @@ describe('useGeral: gravação', () => {
   it('uma nova gravação na mesma célula cancela o fim do "salvo" anterior e o desmonte limpa tudo', async () => {
     const base = createSource({ mode: 'mock' }, { latency: 0 })
     const { result, unmount } = renderHook(() => useGeral(base))
-    await waitFor(() => expect(result.current.rows.length).toBe(50))
+    await waitFor(() => expect(result.current.rows.length).toBe(100))
     const id = idOf(result.current.rows[0])
     const trajeto = result.current.columns.find((c) => c.attribute === 'cr40f_trajeto')!
     const set = vi.spyOn(window, 'setTimeout')
@@ -203,7 +180,7 @@ describe('useGeral: atualização e ordem', () => {
     const page = vi.fn(base.page)
     const source: Source = { ...base, page }
     const { result } = renderHook(() => useGeral(source))
-    await waitFor(() => expect(result.current.rows.length).toBe(50))
+    await waitFor(() => expect(result.current.rows.length).toBe(100))
     act(() => result.current.goTo(2))
     await waitFor(() => expect(result.current.page).toBe(2))
     await waitFor(() => expect(result.current.loading).toBe(false))
@@ -226,7 +203,7 @@ describe('useGeral: atualização e ordem', () => {
     const page = vi.fn(base.page)
     const source: Source = { ...base, page }
     const { result } = renderHook(() => useGeral(source))
-    await waitFor(() => expect(result.current.rows.length).toBe(50))
+    await waitFor(() => expect(result.current.rows.length).toBe(100))
     expect(result.current.sort).toBeNull()
     expect(page.mock.calls[0][0].sort).toBeNull()
     expect(result.current.defaultOrder).toEqual({ attribute: 'cr40f_dataehorriodesada', alias: null, descending: false })

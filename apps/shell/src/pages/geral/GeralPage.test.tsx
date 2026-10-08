@@ -62,23 +62,23 @@ describe('Geral', () => {
   it('abre a Agenda com as colunas da visão, pagina e ordena', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     expect(await screen.findByRole('columnheader', { name: /Status de Operação/, hidden: true })).toBeTruthy()
-    // A linha do cabeçalho já existe antes dos dados: espera as 50 linhas chegarem.
+    // A linha do cabeçalho já existe antes dos dados: espera as 100 linhas chegarem.
     await waitFor(() => expect(screen.getAllByRole('row', { hidden: true }).length).toBeGreaterThan(10))
-    expect(screen.getByText(/Linhas 1–50 de/)).toBeTruthy()
+    expect(screen.getByText(/Linhas 1–100 de/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /Status de Operação/, hidden: true }))
     await waitFor(() => expect(screen.getByRole('columnheader', { name: /Status de Operação/, hidden: true }).getAttribute('aria-sort')).toBe('ascending'))
     fireEvent.click(screen.getByRole('button', { name: 'Próxima' }))
-    await screen.findByText(/Linhas 51–/)
+    await screen.findByText(/Linhas 101–/)
     // O primeiro teste paga a carga fria dos módulos: com a máquina ocupada passa dos 30 s do padrão.
   }, 60_000)
 
   it('troca de visão e busca por palavra-chave', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–50/)
+    await screen.findByText(/Linhas 1–100/)
     fireEvent.click(screen.getByRole('combobox', { name: 'Visão' }))
     // O painel do Select usa `popover`, que o jsdom não exibe: as opções existem, mas ficam fora da árvore acessível.
     fireEvent.click(await screen.findByRole('option', { name: 'Sem motorista', hidden: true }))
-    await waitFor(() => expect(screen.queryByText(/Linhas 1–50/)).toBeNull())
+    await waitFor(() => expect(screen.queryByText(/Linhas 1–100/)).toBeNull())
     fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar serviços' }), { target: { value: 'OS-10' } })
     await waitFor(() => expect(screen.getAllByText(/OS-10\d/).length).toBeGreaterThan(0), { timeout: 4000 })
   })
@@ -98,27 +98,27 @@ describe('Geral', () => {
 
   it('o clique no cabeçalho cicla crescente, decrescente e ordem da visão', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–50 de/)
+    await screen.findByText(/Linhas 1–100 de/)
     const header = () => screen.getByRole('columnheader', { name: /Trajeto/, hidden: true })
     const sort = () => fireEvent.click(screen.getByRole('button', { name: /Trajeto/, hidden: true }))
     sort()
     await waitFor(() => expect(header().getAttribute('aria-sort')).toBe('ascending'))
-    await screen.findByText(/Linhas 1–50 de/)
+    await screen.findByText(/Linhas 1–100 de/)
     sort()
     await waitFor(() => expect(header().getAttribute('aria-sort')).toBe('descending'))
-    await screen.findByText(/Linhas 1–50 de/)
+    await screen.findByText(/Linhas 1–100 de/)
     sort()
     await waitFor(() => expect(header().getAttribute('aria-sort')).toBe('none'))
   }, 60_000)
 
   it('busca sem resultado mostra o estado vazio e limpar busca volta à lista', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–50 de/)
+    await screen.findByText(/Linhas 1–100 de/)
     fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar serviços' }), { target: { value: 'zzzz-nada' } })
     const empty = (await screen.findByText('Nenhum serviço nesta visão', {}, { timeout: 4000 })).closest('section') as HTMLElement
     // A caixa de busca também tem um "Limpar busca"; o do estado vazio é o que está dentro da seção.
     fireEvent.click(within(empty).getByRole('button', { name: 'Limpar busca' }))
-    await screen.findByText(/Linhas 1–50 de/)
+    await screen.findByText(/Linhas 1–100 de/)
   })
 
   it('a coluna oculta fica salva por visão e volta ao reabrir a tela', async () => {
@@ -167,7 +167,7 @@ describe('Geral', () => {
 
   it('edita texto na célula com Enter e mostra salvo', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–50 de/)
+    await screen.findByText(/Linhas 1–100 de/)
     const cell = await cellOf((await screen.findAllByRole('row', { hidden: true }))[1], 'text')
     fireEvent.keyDown(cell, { key: 'Enter' })
     const input = within(cell).getByRole('textbox')
@@ -195,7 +195,7 @@ describe('Geral', () => {
 
   it('Esc cancela sem gravar e status abre um select', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–50 de/)
+    await screen.findByText(/Linhas 1–100 de/)
     const first = (await screen.findAllByRole('row', { hidden: true }))[1]
     const text = await cellOf(first, 'text')
     const original = text.textContent
@@ -211,7 +211,7 @@ describe('Geral', () => {
 
   it('dinheiro inválido mostra o erro local e mantém o campo aberto sem gravar', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–50 de/)
+    await screen.findByText(/Linhas 1–100 de/)
     const cell = await cellOf((await screen.findAllByRole('row', { hidden: true }))[1], 'money')
     fireEvent.keyDown(cell, { key: 'Enter' })
     const input = within(cell).getByRole('textbox')
@@ -237,7 +237,7 @@ describe('Geral', () => {
 
   it('escolher outro motorista grava e mostra salvo', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–50 de/)
+    await screen.findByText(/Linhas 1–100 de/)
     const cell = await cellOf((await screen.findAllByRole('row', { hidden: true }))[1], 'lookup')
     fireEvent.keyDown(cell, { key: 'Enter' })
     fireEvent.click(await within(cell).findByRole('option', { name: 'Bruno Dias', hidden: true }))
@@ -261,7 +261,7 @@ describe('Geral', () => {
   it('seleção mostra comandos; copiar abre a prévia com o bloco; desativar pede confirmação', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     // A linha do cabeçalho existe antes dos dados: espera as linhas chegarem.
-    await screen.findByText(/Linhas 1–50 de/)
+    await screen.findByText(/Linhas 1–100 de/)
     const rows = screen.getAllByRole('row', { hidden: true })
     fireEvent.click(within(rows[1]).getByRole('checkbox'))
     fireEvent.click(within(rows[2]).getByRole('checkbox'))
@@ -289,7 +289,7 @@ describe('Geral', () => {
 
   it('com 1 selecionado, Editar abre o formulário e Gerar Voucher avisa que só roda no Dataverse', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–50 de/)
+    await screen.findByText(/Linhas 1–100 de/)
     fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
     fireEvent.click(screen.getByRole('button', { name: 'Gerar Voucher' }))
     expect(await screen.findByText('O voucher abre dentro do Dataverse.')).toBeTruthy()
@@ -327,36 +327,36 @@ describe('Geral: correções finais', () => {
 
   it('trocar de visão e buscar mudam de fato as linhas', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–50/)
-    // OS-1057 não tem motorista, mas cai na segunda página da Agenda; OS-1000 tem motorista.
-    expect(screen.queryByRole('button', opener('OS-1057'))).toBeNull()
+    await screen.findByText(/Linhas 1–100/)
+    // OS-1217 não tem motorista, mas fica além da primeira página (100 linhas) da Agenda; OS-1000 tem motorista.
+    expect(screen.queryByRole('button', opener('OS-1217'))).toBeNull()
     expect(screen.getByRole('button', opener('OS-1000'))).toBeTruthy()
     fireEvent.click(screen.getByRole('combobox', { name: 'Visão' }))
     fireEvent.click(await screen.findByRole('option', { name: 'Sem motorista', hidden: true }))
-    expect(await screen.findByRole('button', opener('OS-1057'))).toBeTruthy()
+    expect(await screen.findByRole('button', opener('OS-1217'))).toBeTruthy()
     await waitFor(() => expect(screen.queryByRole('button', opener('OS-1000'))).toBeNull())
     expect(screen.getByRole('button', opener('OS-1052'))).toBeTruthy()
     // A busca é no servidor: some o que não bate, fica o que bate.
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar serviços' }), { target: { value: 'OS-1057' } })
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar serviços' }), { target: { value: 'OS-1217' } })
     await waitFor(() => expect(screen.queryByRole('button', opener('OS-1052'))).toBeNull())
-    expect(screen.getByRole('button', opener('OS-1057'))).toBeTruthy()
+    expect(screen.getByRole('button', opener('OS-1217'))).toBeTruthy()
   })
 
   it('o cabeçalho mostra a ordem da visão e o primeiro clique nela inverte', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–50 de/)
+    await screen.findByText(/Linhas 1–100 de/)
     const header = () => screen.getByRole('columnheader', { name: /Data e horário de saída/, hidden: true })
     expect(header().getAttribute('aria-sort')).toBe('ascending')
     fireEvent.click(within(header()).getByRole('button'))
     await waitFor(() => expect(header().getAttribute('aria-sort')).toBe('descending'))
-    await screen.findByText(/Linhas 1–50 de/)
+    await screen.findByText(/Linhas 1–100 de/)
     fireEvent.click(within(header()).getByRole('button'))
     await waitFor(() => expect(header().getAttribute('aria-sort')).toBe('ascending'))
   })
 
   it('o aviso do motorista aparece no editor da célula', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–50 de/)
+    await screen.findByText(/Linhas 1–100 de/)
     const cell = await cellOf((await screen.findAllByRole('row', { hidden: true }))[1], 'lookup')
     fireEvent.keyDown(cell, { key: 'Enter' })
     expect(await within(cell).findByTitle('Trocar o motorista dispara os avisos e a atribuição automática de veículo.')).toBeTruthy()
@@ -365,7 +365,7 @@ describe('Geral: correções finais', () => {
   it('falha parcial ao desativar lista os ids que falharam e o primeiro erro', async () => {
     hooks.setState = async (ids) => ({ ok: [ids[0]], failed: [{ id: ids[1], message: 'Sem permissão' }] })
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–50 de/)
+    await screen.findByText(/Linhas 1–100 de/)
     const rows = screen.getAllByRole('row', { hidden: true })
     const failedName = within(rows[2]).getByRole('button', { name: /Abrir serviço/ }).textContent
     fireEvent.click(within(rows[1]).getByRole('checkbox'))
@@ -378,7 +378,7 @@ describe('Geral: correções finais', () => {
   it('Desativar e Ativar com seleção mista ficam focáveis, explicam o motivo e não fazem nada', async () => {
     hooks.mixedState = true
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–50 de/)
+    await screen.findByText(/Linhas 1–100 de/)
     const rows = screen.getAllByRole('row', { hidden: true })
     fireEvent.click(within(rows[1]).getByRole('checkbox'))
     fireEvent.click(within(rows[2]).getByRole('checkbox'))
@@ -397,7 +397,7 @@ describe('Geral: correções finais', () => {
   it('fechar a prévia de cópia antes do texto chegar não a reabre', async () => {
     hooks.copyRows = () => new Promise((resolve) => { window.setTimeout(() => resolve([]), 400) })
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–50 de/)
+    await screen.findByText(/Linhas 1–100 de/)
     fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
     fireEvent.click(screen.getByRole('button', { name: 'Copiar Serviços' }))
     const dialog = await screen.findByRole('dialog', { name: 'Copiar serviços' })
@@ -478,7 +478,7 @@ describe('Geral: espaço e densidade', () => {
 
   it('os comandos ficam sempre na barra: sem seleção os que dependem dela ficam inertes, com o motivo', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–50 de/)
+    await screen.findByText(/Linhas 1–100 de/)
     const toolbar = screen.getByRole('toolbar', { name: 'Filtros de serviços' })
     expect(within(toolbar).getByRole('button', { name: 'Criar serviço' }).getAttribute('aria-disabled')).toBeNull()
     for (const [name, reason] of Object.entries(blockedReason)) {
@@ -498,7 +498,7 @@ describe('Geral: espaço e densidade', () => {
 
   it('com 1 selecionado os comandos se habilitam e a contagem aparece como badge', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–50 de/)
+    await screen.findByText(/Linhas 1–100 de/)
     fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
     const toolbar = screen.getByRole('toolbar', { name: 'Filtros de serviços' })
     const count = within(toolbar).getByText('1 selecionado')
@@ -508,7 +508,7 @@ describe('Geral: espaço e densidade', () => {
 
   it('o cabeçalho tem só Atualizar e o total; Criar serviço fica na barra', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–50 de/)
+    await screen.findByText(/Linhas 1–100 de/)
     const header = screen.getByRole('banner')
     expect(within(header).getByRole('heading', { name: 'Geral' })).toBeTruthy()
     expect(within(header).getByText(`${MOCK_ROW_COUNT} serviços`)).toBeTruthy()
@@ -522,22 +522,15 @@ describe('Geral: espaço e densidade', () => {
     expect(header.getAttribute('title')).toBe('Status de faturamento')
   })
 
-  it('serviços por página: 100 mostra 1–100 e a escolha fica salva ao reabrir a tela', async () => {
-    const first = render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(`Linhas 1–50 de ${MOCK_ROW_COUNT}`)
-    fireEvent.click(screen.getByRole('combobox', { name: 'Serviços por página' }))
-    fireEvent.click(await screen.findByRole('option', { name: '100 por página', hidden: true }))
-    expect(await screen.findByText(`Linhas 1–100 de ${MOCK_ROW_COUNT}`)).toBeTruthy()
-    expect(window.localStorage.getItem('betinhos.geral.pagina.v1')).toBe('100')
-    first.unmount()
+  it('página fixa de 100: sem seletor de quantidade e rodapé 1–100', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     expect(await screen.findByText(`Linhas 1–100 de ${MOCK_ROW_COUNT}`)).toBeTruthy()
-    expect(screen.getByRole('combobox', { name: 'Serviços por página' }).textContent).toContain('100 por página')
+    expect(screen.queryByRole('combobox', { name: 'Serviços por página' })).toBeNull()
   })
 
   it('no desktop a barra usa controles compactos', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–50 de/)
+    await screen.findByText(/Linhas 1–100 de/)
     const toolbar = screen.getByRole('toolbar', { name: 'Filtros de serviços' })
     expect(within(toolbar).getByRole('combobox', { name: 'Visão' }).closest('.bt-control')?.classList.contains('bt-control--compact')).toBe(true)
     expect(within(toolbar).getByRole('searchbox', { name: 'Buscar serviços' }).closest('.bt-control')?.classList.contains('bt-control--compact')).toBe(true)
@@ -563,11 +556,5 @@ describe('Geral: espaço e densidade', () => {
     }
     // O botão Colunas some no celular (CSS), mas também sai do tamanho compacto.
     expect(within(toolbar).getByRole('button', { name: 'Colunas' }).classList.contains('bt-button--compact')).toBe(false)
-  })
-
-  it('valor salvo inválido volta para 50 por página', async () => {
-    window.localStorage.setItem('betinhos.geral.pagina.v1', '75')
-    render(<GeralPage host={{ mode: 'mock' }} />)
-    expect(await screen.findByText(`Linhas 1–50 de ${MOCK_ROW_COUNT}`)).toBeTruthy()
   })
 })

@@ -1,4 +1,4 @@
-import type { Sort } from './types'
+import { ID_ATTRIBUTE, type Sort } from './types'
 
 type BuildOptions = { page: number; pageSize: number; cookie: string | null; sort: Sort; query: string; quickFind: string[] }
 
@@ -8,6 +8,22 @@ function parse(fetchxml: string) {
   const entity = root?.tagName === 'fetch' ? Array.from(root.children).find((c) => c.tagName === 'entity') : undefined
   if (!root || doc.getElementsByTagName('parsererror').length || !entity) throw new Error('FetchXML da visão inválido.')
   return { doc, root, entity }
+}
+
+/** Busca por palavra-chave: filtro OR com `like` em cada campo de localização rápida. */
+function injectSearch(doc: Document, entity: Element, query: string, quickFind: string[]) {
+  const text = query.trim()
+  if (!text || !quickFind.length) return
+  const filter = doc.createElement('filter')
+  filter.setAttribute('type', 'or')
+  for (const attribute of quickFind) {
+    const condition = doc.createElement('condition')
+    condition.setAttribute('attribute', attribute)
+    condition.setAttribute('operator', 'like')
+    condition.setAttribute('value', `%${text}%`)
+    filter.appendChild(condition)
+  }
+  entity.appendChild(filter)
 }
 
 /** FetchXML da visão com paginação, ordenação da coluna e busca por palavra-chave injetadas; o resto fica intacto. */
@@ -39,20 +55,26 @@ export function buildFetch(fetchxml: string, { page, pageSize, cookie, sort, que
     ;(link ?? entity).appendChild(order)
   }
 
-  const text = query.trim()
-  if (text && quickFind.length) {
-    const filter = doc.createElement('filter')
-    filter.setAttribute('type', 'or')
-    for (const attribute of quickFind) {
-      const condition = doc.createElement('condition')
-      condition.setAttribute('attribute', attribute)
-      condition.setAttribute('operator', 'like')
-      condition.setAttribute('value', `%${text}%`)
-      filter.appendChild(condition)
-    }
-    entity.appendChild(filter)
-  }
+  injectSearch(doc, entity, query, quickFind)
 
+  return new XMLSerializer().serializeToString(doc)
+}
+
+/** FetchXML da visão convertido em contagem total (`aggregate`): sem paginação, ordem nem atributos; filtros, links e busca ficam. */
+export function buildCountFetch(fetchxml: string, { query, quickFind }: { query: string; quickFind: string[] }) {
+  const { doc, root, entity } = parse(fetchxml)
+
+  for (const name of ['count', 'page', 'paging-cookie', 'returntotalrecordcount', 'distinct']) root.removeAttribute(name)
+  root.setAttribute('aggregate', 'true')
+  for (const node of Array.from(entity.querySelectorAll('order, attribute, all-attributes'))) node.remove()
+
+  const total = doc.createElement('attribute')
+  total.setAttribute('name', ID_ATTRIBUTE)
+  total.setAttribute('alias', 'total')
+  total.setAttribute('aggregate', 'count')
+  entity.insertBefore(total, entity.firstChild)
+
+  injectSearch(doc, entity, query, quickFind)
   return new XMLSerializer().serializeToString(doc)
 }
 

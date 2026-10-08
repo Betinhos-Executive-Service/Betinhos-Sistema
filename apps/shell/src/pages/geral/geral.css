@@ -64,7 +64,6 @@
 .gr-open:active { transform: scale(.97); }
 .gr-footer__pages { display: inline-flex; gap: var(--bt-space-2); }
 .gr-footer__left { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--bt-space-2); min-width: 0; }
-.gr-footer__size { flex: 0 0 auto; width: 140px; }
 .gr-footer .bt-pagination__count { display: none; }
 .gr-empty > .bt-empty { padding: var(--bt-space-8) var(--bt-space-4); }
 

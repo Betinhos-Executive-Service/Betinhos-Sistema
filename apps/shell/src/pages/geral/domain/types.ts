@@ -26,4 +26,4 @@ export type LookupBind = { nav: string; set: string }
 
 export const ENTITY = 'cr40f_reservadeveculos'
 export const ID_ATTRIBUTE = 'cr40f_reservadeveculosid'
-export const PAGE_SIZE = 50
+export const PAGE_SIZE = 100
