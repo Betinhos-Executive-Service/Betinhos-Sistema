@@ -3,7 +3,7 @@ import { filtrarServicos } from '../base'
 import type { Contexto } from '../kpis'
 import { evento, reserva, telemetria, veiculo, viagem } from '../test-utils'
 import type { Dados, Filtros, Reserva } from '../types'
-import { calcularFrota } from './frota'
+import { calcularFrota, tendenciaLinear } from './frota'
 
 const NOW = new Date('2026-10-15T15:00:00Z')
 const filtro = (p: Partial<Filtros> = {}): Filtros => ({ atalho: 'personalizado', inicio: '2026-10-01', fim: '2026-10-15', status: [], clientes: [], motoristas: [], tipos: [], ...p })
@@ -17,7 +17,7 @@ const dadosVazios = (p: Partial<Dados> = {}): Dados => ({
 const servico = (veiculoId: string, dia = '2026-10-05', p: Partial<Reserva> = {}) => reserva({ veiculoId, saidaRaw: `${dia}T15:00:00Z`, ...p })
 
 describe('calcularFrota — KPIs cadastrais', () => {
-  it('escopo: só veículos com serviço em rv; disponíveis por dispon/ativo/livre, blindados e em manutenção', () => {
+  it('frota inteira (sem escopo do período): disponíveis por dispon/ativo/livre, blindados e em manutenção', () => {
     const veiculos = [
       veiculo({ id: 'v1', statusLabel: 'Disponível', blindado: true }),
       veiculo({ id: 'v2', statusLabel: 'Ativo' }),
@@ -31,7 +31,8 @@ describe('calcularFrota — KPIs cadastrais', () => {
       servico('v5', '2026-09-20'),
     ]
     const fr = calcularFrota(ctxDe(rows), dadosVazios({ veiculos }))
-    expect(fr.kpis).toMatchObject({ total: 3, disponiveis: 2, blindados: 2, emManutencao: 1, indisponivel: false })
+    expect(fr.kpis).toMatchObject({ total: 5, disponiveis: 4, blindados: 2, emManutencao: 1, indisponivel: false })
+    expect(calcularFrota(ctxDe([]), dadosVazios({ veiculos })).kpis.total).toBe(5)
   })
 
   it('veículos indisponíveis: KPIs cadastrais marcados e uso vazio', () => {
@@ -123,10 +124,42 @@ describe('calcularFrota — eventos por mês', () => {
         evento({ dia: '2026-07-20', mes: '2026-07', veiculoId: 'v1', tipo: 'hardBraking' }),
       ],
     }))
-    expect(fr.eventosPorMes).toEqual([
-      { mes: '2026-08', rotulo: 'ago/26', aceleracao: 1, frenagem: 2, curva: 0, excesso: 0 },
-      { mes: '2026-09', rotulo: 'set/26', aceleracao: 0, frenagem: 0, curva: 1, excesso: 2 },
+    const contagens = fr.eventosPorMes.map(({ mes, rotulo, aceleracao, frenagem, curva, excesso, total }) => ({ mes, rotulo, aceleracao, frenagem, curva, excesso, total }))
+    expect(contagens).toEqual([
+      { mes: '2026-08', rotulo: 'ago/26', aceleracao: 1, frenagem: 2, curva: 0, excesso: 0, total: 3 },
+      { mes: '2026-09', rotulo: 'set/26', aceleracao: 0, frenagem: 0, curva: 1, excesso: 2, total: 3 },
     ])
+  })
+
+  it('taxa por 1.000 km com o km diário do mês (escopo e período) e tendência linear do legado', () => {
+    const f = filtro({ inicio: '2026-07-01', fim: '2026-09-30' })
+    const fr = calcularFrota(ctxDe([servico('v1', '2026-07-05')], f), dadosVazios({
+      veiculos: [veiculo({ id: 'v1', statusLabel: 'Ativo' })],
+      telemetria: [
+        telemetria({ dia: '2026-07-10', mes: '2026-07', veiculoId: 'v1', distanciaKm: 1000 }),
+        telemetria({ dia: '2026-08-10', mes: '2026-08', veiculoId: 'v1', distanciaKm: 400 }),
+        telemetria({ dia: '2026-08-11', mes: '2026-08', veiculoId: 'v1', distanciaKm: 100 }),
+        telemetria({ dia: '2026-08-11', mes: '2026-08', veiculoId: 'v9', distanciaKm: 9000 }),
+      ],
+      eventos: [
+        evento({ dia: '2026-07-11', mes: '2026-07', veiculoId: 'v1', tipo: 'hardBraking' }),
+        evento({ dia: '2026-08-12', mes: '2026-08', veiculoId: 'v1', tipo: 'hardBraking' }),
+        evento({ dia: '2026-08-12', mes: '2026-08', veiculoId: 'v1', tipo: 'hardCornering' }),
+        evento({ dia: '2026-09-12', mes: '2026-09', veiculoId: 'v1', tipo: 'hardAcceleration' }),
+      ],
+    }))
+    expect(fr.eventosPorMes.map((l) => [l.mes, l.km, l.taxa])).toEqual([['2026-07', 1000, 1], ['2026-08', 500, 4], ['2026-09', 0, 0]])
+    // taxas 1, 4, 0: média 5/3 e inclinação -0,5 → 13/6, 10/6, 7/6
+    const tend = fr.eventosPorMes.map((l) => l.tendencia)
+    expect(tend[0]).toBeCloseTo(13 / 6)
+    expect(tend[1]).toBeCloseTo(10 / 6)
+    expect(tend[2]).toBeCloseTo(7 / 6)
+  })
+
+  it('tendência: limitada a 0 e, com menos de dois meses, igual às taxas', () => {
+    expect(tendenciaLinear([10, 0, 0, 0])).toEqual([7, 4, 1, 0])
+    expect(tendenciaLinear([3])).toEqual([3])
+    expect(tendenciaLinear([])).toEqual([])
   })
 })
 
