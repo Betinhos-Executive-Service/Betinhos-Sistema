@@ -12,14 +12,9 @@ import { atalho, cargaDesde } from './domain/periodo'
 import { calcularResumo } from './domain/resumo'
 import type { Filtros } from './domain/types'
 import { useDashboard } from './useDashboard'
-import { AlertList } from './components/AlertList'
-import { Analises } from './components/Analises'
 import { ABAS, AbaLegado, abaDaUrl, rotuloAba, type Aba } from './components/DashboardAbas'
 import { DashboardToolbar } from './components/DashboardToolbar'
-import { Emergenciais } from './components/Emergenciais'
-import { FrotaPessoas } from './components/FrotaPessoas'
-import { KPI_PLACEHOLDER, KpiGrid } from './components/KpiGrid'
-import { ProducaoPropriaTerceira, TopMotoristas } from './components/ProducaoPropriaTerceira'
+import { ResumoCarregando, ResumoSecoes } from './components/ResumoSecoes'
 import './dashboard.css'
 
 const SEM_OPCOES: OpcoesFiltro = { status: [], clientes: [], motoristas: [], tipos: [] }
@@ -94,25 +89,11 @@ export function DashboardPage({ host }: { host: Host }) {
         ) : null}
         {db.dados?.indisponiveis.length ? <Alert tone="warning" title="Alguns dados não carregaram">Os cards marcados com s/dado dependem de tabelas que não responderam. Os demais números estão corretos.</Alert> : null}
 
-        {carregandoPrimeira ? <KpiGrid kpis={KPI_PLACEHOLDER} carregando /> : null}
+        {carregandoPrimeira ? <ResumoCarregando /> : null}
         {resumo && resumo.servicos === 0 && segmentado ? (
           <EmptyState className="surface" align="start" icon={<SearchX size={36} />} title="Nenhum serviço para estes filtros" action={<Button variant="secondary" onClick={limpar}>Limpar filtros</Button>}>Ajuste o período ou limpe os filtros de status, cliente, motorista e tipo.</EmptyState>
         ) : null}
-        {resumo ? <>
-          <KpiGrid kpis={resumo.kpis} carregando={false} />
-          <div className="dash-faixas">
-            <AlertList titulo="Operação" itens={resumo.operacao} />
-            <AlertList titulo="Qualidade dos dados" itens={resumo.qualidade} />
-            <FrotaPessoas cards={resumo.frota} />
-          </div>
-          <section className="dash-grade" aria-label="Destaques">
-            <ProducaoPropriaTerceira dados={resumo.producao} periodo={periodo} />
-            <Emergenciais dados={resumo.emergenciais} periodo={periodo} />
-            <TopMotoristas titulo="Top 5 motoristas próprios" rows={resumo.producao.topPropria} periodo={periodo} />
-            <TopMotoristas titulo="Top 5 motoristas terceirizados" rows={resumo.producao.topTerceirizada} periodo={periodo} />
-          </section>
-          <Analises resumo={resumo} periodo={periodo} />
-        </> : null}
+        {resumo ? <ResumoSecoes resumo={resumo} periodo={periodo} /> : null}
       </div> : null}
     </PageLayout>
   )

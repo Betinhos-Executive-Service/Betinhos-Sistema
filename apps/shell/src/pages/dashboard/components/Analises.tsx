@@ -23,7 +23,11 @@ const forte = (texto: string) => <strong className="dash-forte">{texto}</strong>
 const VAO_DENSO = 8
 const vazio = (titulo: string) => <EmptyState compact icon={<Inbox />} title={titulo} />
 
-export function Analises({ resumo, periodo }: { resumo: Resumo; periodo: string }) {
+/**
+ * Cards de análise do Resumo, já montados; cada seção da página escolhe os seus (o layout fica em `ResumoSecoes`).
+ * É um hook porque as tabelas do celular guardam quais linhas estão abertas.
+ */
+export function useAnalises(resumo: Resumo, periodo: string) {
   const mobile = useMedia(MEDIA_MOBILE)
   const { totalProduzido: tp, metaRealizado: mr, clientes, ticketMensal: tm, status, custoFrota: cf, topVolume: tv, topFaturamento: tf, motoristas } = resumo
   const anos = tp.anos.map(String)
@@ -112,47 +116,45 @@ export function Analises({ resumo, periodo }: { resumo: Resumo; periodo: string 
   const tabelaClientes = <Table className="dash-tabela--densa" columns={colClientes} rows={clientes.linhas} rowKey={(l) => l.cliente} empty={vazio('Nenhum cliente com faturamento no período')} style={mobile ? undefined : { minWidth: larguraMinima(trilhasCli, VAO_DENSO) }} />
   const tabelaMotoristas = <Table className="dash-tabela--densa" columns={colMotoristas} rows={motoristas.linhas} rowKey={(l) => l.key} empty={vazio('Nenhum motorista no período')} style={mobile ? undefined : { minWidth: larguraMinima(trilhasMot, VAO_DENSO) }} />
 
-  return (
-    <section className="dash-grade" aria-label="Análises">
-      <AnaliseCard
-        titulo="Total produzido" periodo={periodo} unidade="R$ por mês" valor={tp.valor} sub={`Comparativo 3 anos · ${tp.sub}`} chips={tp.chips} apoio={tp.apoio}
-        grafico={<LinhaChart descricao={`Faturamento mensal de ${anos.join(', ')}, ${periodo}`} formatar={brlS} dados={tp.pontos.map((p) => ({ rotulo: p.rotulo, [anos[0]]: p.valores[0], [anos[1]]: p.valores[1], [anos[2]]: p.valores[2] }))} series={[{ chave: anos[0], nome: anos[0], cor: 'secondary', tracejada: true }, { chave: anos[1], nome: anos[1], cor: 'brand' }, { chave: anos[2], nome: anos[2], cor: 'action' }]} />}
-        tabela={<Table columns={colTP} rows={tp.pontos} rowKey={(p) => p.rotulo} />} tabelaSobDemanda
-      />
-      <AnaliseCard
-        titulo="Meta × realizado" periodo={periodo} unidade="R$ por mês" valor={mr.valor} sub={mr.sub} chips={mr.chips} apoio={mr.apoio}
-        tabela={<Table columns={colMeta} rows={mr.linhas} rowKey={(l) => l.mes} empty={vazio('Nenhuma meta no período')} />}
-      />
-      <AnaliseCard
-        largo titulo="Faturamento por cliente" periodo={periodo} unidade="R$ por mês" valor={clientes.valor} sub={clientes.sub} apoio={clientes.apoio}
-        tabela={mobile ? tabelaClientes : <Rolagem rotulo="Faturamento por cliente e mês">{tabelaClientes}</Rolagem>}
-      />
-      <AnaliseCard
-        titulo="Ticket médio — mensal" periodo={periodo} unidade="R$ por serviço" valor={tm.valor} sub={tm.sub} chips={tm.chips}
-        grafico={<BarraChart descricao={`Ticket médio por mês, ${periodo}`} nome="Ticket médio" formatar={brlS} dados={tm.pontos} />}
-        tabela={<Table columns={colTicket} rows={tm.pontos} rowKey={(p) => p.rotulo} />} tabelaSobDemanda
-      />
-      <AnaliseCard
-        titulo="Status dos serviços" periodo={periodo} unidade="serviços" valor={status.valor} sub={status.sub} apoio={status.apoio}
-        tabela={<Table columns={colStatus} rows={status.linhas} rowKey={(l) => l.status} empty={vazio('Nenhum serviço no período')} />}
-      />
-      <AnaliseCard
-        titulo="Custo frota — manutenções" periodo={periodo} unidade="R$ em manutenções" valor={cf.valor} sub={cf.sub} apoio={cf.apoio}
-        grafico={cf.pontos.length ? <BarraChart descricao={`Custo de manutenção por mês, ${periodo}`} nome="Custo" formatar={brlS} dados={cf.pontos} /> : vazio(cf.sub === 's/dado' ? 'Manutenções indisponíveis no momento' : 'Nenhuma manutenção no período')}
-        tabela={cf.pontos.length ? <Table columns={colCusto} rows={cf.pontos} rowKey={(p) => p.rotulo} /> : undefined} tabelaSobDemanda
-      />
-      <AnaliseCard
-        titulo="Top clientes — volume" periodo={periodo} unidade="serviços" valor={tv.valor} sub={tv.sub} apoio={tv.apoio}
-        tabela={<Table columns={colVolume} rows={tv.linhas} rowKey={(l) => l.cliente} empty={vazio('Nenhum serviço no período')} />}
-      />
-      <AnaliseCard
-        natural titulo="Top clientes — faturamento" periodo={periodo} unidade="R$" valor={tf.valor} sub={tf.sub} apoio={tf.apoio}
-        tabela={<Table columns={colFat} rows={tf.linhas} rowKey={(l) => l.cliente} empty={vazio('Nenhum serviço no período')} />}
-      />
-      <AnaliseCard
-        titulo="Serviços por motorista" periodo={periodo} unidade="serviços por mês" valor={motoristas.valor} sub={motoristas.sub} apoio={motoristas.apoio}
-        tabela={mobile ? tabelaMotoristas : <Rolagem rotulo="Serviços por motorista e mês" alturaMax={520}>{tabelaMotoristas}</Rolagem>}
-      />
-    </section>
-  )
+  return {
+    totalProduzido: <AnaliseCard
+      titulo="Total produzido" periodo={periodo} unidade="R$ por mês" valor={tp.valor} sub={`Comparativo 3 anos · ${tp.sub}`} chips={tp.chips} apoio={tp.apoio}
+      grafico={<LinhaChart descricao={`Faturamento mensal de ${anos.join(', ')}, ${periodo}`} formatar={brlS} dados={tp.pontos.map((p) => ({ rotulo: p.rotulo, [anos[0]]: p.valores[0], [anos[1]]: p.valores[1], [anos[2]]: p.valores[2] }))} series={[{ chave: anos[0], nome: anos[0], cor: 'secondary', tracejada: true }, { chave: anos[1], nome: anos[1], cor: 'brand' }, { chave: anos[2], nome: anos[2], cor: 'action' }]} />}
+      tabela={<Table columns={colTP} rows={tp.pontos} rowKey={(p) => p.rotulo} />} tabelaSobDemanda
+    />,
+    metaRealizado: <AnaliseCard
+      titulo="Meta × realizado" periodo={periodo} unidade="R$ por mês" valor={mr.valor} sub={mr.sub} chips={mr.chips} apoio={mr.apoio}
+      tabela={<Table columns={colMeta} rows={mr.linhas} rowKey={(l) => l.mes} empty={vazio('Nenhuma meta no período')} />}
+    />,
+    clientes: <AnaliseCard
+      largo titulo="Faturamento por cliente" periodo={periodo} unidade="R$ por mês" valor={clientes.valor} sub={clientes.sub} apoio={clientes.apoio}
+      tabela={mobile ? tabelaClientes : <Rolagem rotulo="Faturamento por cliente e mês">{tabelaClientes}</Rolagem>}
+    />,
+    ticket: <AnaliseCard
+      titulo="Ticket médio — mensal" periodo={periodo} unidade="R$ por serviço" valor={tm.valor} sub={tm.sub} chips={tm.chips}
+      grafico={<BarraChart descricao={`Ticket médio por mês, ${periodo}`} nome="Ticket médio" formatar={brlS} dados={tm.pontos} />}
+      tabela={<Table columns={colTicket} rows={tm.pontos} rowKey={(p) => p.rotulo} />} tabelaSobDemanda
+    />,
+    status: <AnaliseCard
+      titulo="Status dos serviços" periodo={periodo} unidade="serviços" valor={status.valor} sub={status.sub} apoio={status.apoio}
+      tabela={<Table columns={colStatus} rows={status.linhas} rowKey={(l) => l.status} empty={vazio('Nenhum serviço no período')} />}
+    />,
+    custoFrota: <AnaliseCard
+      titulo="Custo frota — manutenções" periodo={periodo} unidade="R$ em manutenções" valor={cf.valor} sub={cf.sub} apoio={cf.apoio}
+      grafico={cf.pontos.length ? <BarraChart descricao={`Custo de manutenção por mês, ${periodo}`} nome="Custo" formatar={brlS} dados={cf.pontos} /> : vazio(cf.sub === 's/dado' ? 'Manutenções indisponíveis no momento' : 'Nenhuma manutenção no período')}
+      tabela={cf.pontos.length ? <Table columns={colCusto} rows={cf.pontos} rowKey={(p) => p.rotulo} /> : undefined} tabelaSobDemanda
+    />,
+    topVolume: <AnaliseCard
+      titulo="Top clientes — volume" periodo={periodo} unidade="serviços" valor={tv.valor} sub={tv.sub} apoio={tv.apoio}
+      tabela={<Table columns={colVolume} rows={tv.linhas} rowKey={(l) => l.cliente} empty={vazio('Nenhum serviço no período')} />}
+    />,
+    topFaturamento: <AnaliseCard
+      titulo="Top clientes — faturamento" periodo={periodo} unidade="R$" valor={tf.valor} sub={tf.sub} apoio={tf.apoio}
+      tabela={<Table columns={colFat} rows={tf.linhas} rowKey={(l) => l.cliente} empty={vazio('Nenhum serviço no período')} />}
+    />,
+    motoristas: <AnaliseCard
+      titulo="Serviços por motorista" periodo={periodo} unidade="serviços por mês" valor={motoristas.valor} sub={motoristas.sub} apoio={motoristas.apoio}
+      tabela={mobile ? tabelaMotoristas : <Rolagem rotulo="Serviços por motorista e mês" alturaMax={520}>{tabelaMotoristas}</Rolagem>}
+    />,
+  }
 }

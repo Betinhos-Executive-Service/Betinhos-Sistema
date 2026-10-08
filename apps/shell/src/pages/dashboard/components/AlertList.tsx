@@ -1,5 +1,5 @@
 import { useId, type ReactNode } from 'react'
-import { StatusBadge, type StatusTone } from '@betinhos/ui'
+import { Skeleton, StatusBadge, type StatusTone } from '@betinhos/ui'
 import { AlertTriangle, CircleCheck } from 'lucide-react'
 import type { AlertaItem, Tom } from '../domain/types'
 
@@ -31,7 +31,7 @@ export function Faixa({ titulo, itens, children }: { titulo: string; itens: numb
   const id = useId()
   return (
     <section className="dash-faixa" aria-labelledby={id}>
-      <h2 className="dash-faixa__titulo" id={id}>{titulo}</h2>
+      <h3 className="dash-faixa__titulo" id={id}>{titulo}</h3>
       <ul className={`dash-faixa__lista dash-faixa__lista--${itens}`}>{children}</ul>
     </section>
   )
@@ -42,5 +42,27 @@ export function AlertList({ titulo, itens }: { titulo: string; itens: AlertaItem
     <Faixa titulo={titulo} itens={itens.length}>
       {itens.map((a) => <AlertaCard key={a.id} valor={a.valor} rotulo={a.rotulo} status={a.status} tom={TOM[a.tom]} />)}
     </Faixa>
+  )
+}
+
+const FAIXAS = ['Operação', 'Qualidade dos dados', 'Frota e pessoas']
+
+/** Primeira carga: as três faixas no formato final, com quatro cards ocupados cada e sem números. */
+export function AlertasCarregando() {
+  return (
+    <div className="dash-faixas">
+      {FAIXAS.map((titulo) => (
+        <Faixa key={titulo} titulo={titulo} itens={4}>
+          {[0, 1, 2, 3].map((i) => (
+            <li key={i} className="dash-alerta" aria-hidden="true">
+              <span className="dash-alerta__valor"><Skeleton width={28} height={20} /></span>
+              <span className="dash-alerta__rotulo"><Skeleton width="56%" height={11} /></span>
+              <span className="dash-alerta__selo"><Skeleton width="72%" height={22} /></span>
+            </li>
+          ))}
+        </Faixa>
+      ))}
+      <span className="dash-sr">Carregando alertas</span>
+    </div>
   )
 }
