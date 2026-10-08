@@ -71,6 +71,7 @@
 .dash-link-linha { display: grid; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: start; cursor: pointer; }
 .dash-link-linha:hover .bt-table__title strong { color: var(--bt-color-action); text-decoration: underline; }
 .dash-link-linha:focus-visible { outline: 0; border-radius: var(--bt-radius-xs); box-shadow: var(--bt-focus-ring); }
+.dash-ver-todos { margin-top: var(--bt-space-2); }
 .dash-detalhe { display: grid; gap: var(--bt-space-3); min-width: 0; }
 .dash-detalhe__descricao { margin: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); line-height: var(--bt-typography-body-small-line-height); }
 .dash-detalhe__resumo { margin: 0; color: var(--bt-color-text-primary); font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-bold); font-variant-numeric: tabular-nums; }

@@ -93,6 +93,27 @@ describe('aba Serviços', () => {
   })
 })
 
+describe('listas longas no celular (Top 10)', () => {
+  const muitos = dadosVazios({ reservas: Array.from({ length: 12 }, (_, i) => reserva({ saidaRaw: '2026-10-02T12:00:00Z', valor: 1000 - i, cliente: `Cliente ${String(i + 1).padStart(2, '0')}` })) })
+  const linhasClientes = () => within(bloco('Clientes')).getAllByRole('row').length - 1
+
+  it('Clientes mostra 10 e "Ver todos (12)" no celular; desktop mostra todos sem botão', () => {
+    telaCelular(true)
+    renderFinanceiro(muitos)
+    expect(linhasClientes()).toBe(10)
+    const ver = within(bloco('Clientes')).getByRole('button', { name: 'Ver todos (12)' })
+    expect(ver.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(ver)
+    expect(linhasClientes()).toBe(12)
+    expect(within(bloco('Clientes')).getByRole('button', { name: 'Mostrar só as 10 primeiras' }).getAttribute('aria-expanded')).toBe('true')
+    cleanup()
+    telaCelular(false)
+    renderFinanceiro(muitos)
+    expect(linhasClientes()).toBe(12)
+    expect(within(bloco('Clientes')).queryByRole('button', { name: /Ver todos/ })).toBeNull()
+  })
+})
+
 describe('chips ANT. (período anterior de mesma duração)', () => {
   it('Serviços e Financeiro mostram o anterior, a variação e se é favorável em texto', () => {
     renderServicos(BASE)

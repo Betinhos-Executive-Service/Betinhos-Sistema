@@ -13,7 +13,7 @@ import { AbaCarregando } from '../Carregando'
 import { Duplo, Nome, Participacao, Rolagem, col, larguraMinima, pct } from '../Celulas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
 import { KpiCard, KpiLinha } from '../KpiCard'
-import { Expansivel, Linhas, MEDIA_MOBILE, VER_MESES, VER_RANKING, juntar, useLinhasAbertas } from '../Linhas'
+import { Expansivel, Linhas, MEDIA_MOBILE, VER_MESES, VER_RANKING, juntar, useLinhasAbertas, useTopCelular } from '../Linhas'
 import type { DadosAba, PropsAba } from './abas'
 import { dataBR, forte, resto } from './MoMaMuComum'
 import './abas-motoristas-manutencoes-multas.css'
@@ -140,7 +140,8 @@ function RankingCard({ mo, rv, periodo, frota, onFrota }: { mo: Motoristas; rv: 
       },
     ]
   const vazioRanking = <Vazio titulo={filtro === 'todos' ? 'Nenhum motorista ativo' : 'Nenhum motorista neste filtro'} />
-  const tabela = <Table className="dash-mo-ranking" columns={colunas} rows={linhas} rowKey={(l) => l.key} empty={vazioRanking} />
+  const top = useTopCelular(linhas, mobile)
+  const tabela = <><Table className="dash-mo-ranking" columns={colunas} rows={top.linhas} rowKey={(l) => l.key} empty={vazioRanking} />{top.botao}</>
   const filtroFrota = (
     <div className="dash-mo-filtro">
       <SegmentedControl
@@ -230,12 +231,13 @@ function ScoreMesCard({ linhas, periodo }: { linhas: LinhaScoreMotorista[]; peri
       { key: 'f', header: 'Fren.', align: 'end', width: trilhas[4].width, cell: (l) => taxa(l.taxaFrenagem) },
       { key: 'o', header: 'Ocioso', align: 'end', width: trilhas[5].width, cell: (l) => taxa(l.taxaOcioso) },
     ]
-  const tabela = <Table columns={colunas} rows={linhas} rowKey={(l) => `${l.motoristaId}-${l.mes}`} empty={<Vazio titulo="Sem viagens do Infleet no período" />} style={mobile ? undefined : { minWidth: larguraMinima(trilhas, 12) }} />
+  const top = useTopCelular(linhas, mobile)
+  const tabela = <Table columns={colunas} rows={top.linhas} rowKey={(l) => `${l.motoristaId}-${l.mes}`} empty={<Vazio titulo="Sem viagens do Infleet no período" />} style={mobile ? undefined : { minWidth: larguraMinima(trilhas, 12) }} />
   return (
     <AnaliseCard
       titulo="Score por motorista e mês" periodo={periodo} unidade="nota de 0 a 100 · eventos e minutos ociosos por 100 km"
       sub="Nota só com 100 km ou mais no mês"
-      tabela={mobile ? tabela : <Rolagem rotulo="Score por motorista e mês" alturaMax={440}>{tabela}</Rolagem>}
+      tabela={mobile ? <>{tabela}{top.botao}</> : <Rolagem rotulo="Score por motorista e mês" alturaMax={440}>{tabela}</Rolagem>}
     />
   )
 }
