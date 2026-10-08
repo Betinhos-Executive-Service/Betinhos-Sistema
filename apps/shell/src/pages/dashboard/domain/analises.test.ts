@@ -11,6 +11,7 @@ const NOW = new Date('2026-10-15T15:00:00Z')
 const nowMs = NOW.getTime()
 const f = (p: Partial<Filtros> = {}): Filtros => ({ atalho: 'esteMes', inicio: '2026-10-01', fim: '2026-10-15', status: [], clientes: [], motoristas: [], tipos: [], ...p })
 const vazio: Secundarios = { manutencoes: [], multas: [], ocorrencias: [], funcionarios: [], veiculos: [], indisponiveis: [] }
+const SEM_NOTA = { media: null, validas: 0 }
 
 describe('alertas', () => {
   it('CNH: só funcionário "ativo" com validade até 90 dias; multas e ocorrências', () => {
@@ -26,11 +27,24 @@ describe('alertas', () => {
       ocorrencias: [{ dia: '2026-10-02' }],
     }
     const rv = [reserva(), reserva(), reserva(), reserva()]
-    const [cnh, multas, oco] = alertasOperacao(rv, s, nowMs)
+    const [cnh, multas, oco, score, ...resto] = alertasOperacao(rv, s, nowMs, { media: 72, validas: 3 })
     expect(cnh).toEqual({ id: 'cnh', valor: '1', rotulo: 'CNH', status: 'Atenção', tom: 'danger' })
     expect(multas).toEqual({ id: 'multas', valor: '1', rotulo: 'Multas', status: '50% pendentes', tom: 'danger' })
     expect(oco).toEqual({ id: 'ocorrencias', valor: '1', rotulo: 'Ocorrências', status: '25,0% dos serviços · 1 a cada 4', tom: 'danger' })
-    expect(alertasOperacao(rv, { ...vazio, indisponiveis: ['funcionarios'] }, nowMs)[0]).toEqual({ id: 'cnh', valor: '—', rotulo: 'CNH', status: 's/dado', tom: 'neutral' })
+    expect(score).toEqual({ id: 'score', valor: '72', rotulo: 'Score motoristas', status: '3 notas válidas', tom: 'warn' })
+    expect(resto).toEqual([])
+    expect(alertasOperacao(rv, { ...vazio, indisponiveis: ['funcionarios'] }, nowMs, SEM_NOTA)[0]).toEqual({ id: 'cnh', valor: '—', rotulo: 'CNH', status: 's/dado', tom: 'neutral' })
+    expect(alertasOperacao(rv, vazio, nowMs, SEM_NOTA)[3]).toEqual({ id: 'score', valor: '—', rotulo: 'Score motoristas', status: '0 notas válidas', tom: 'warn' })
+  })
+
+  it('Score motoristas vira s/dado se qualquer um dos três conjuntos do Infleet falhar, sem afetar os outros alertas', () => {
+    for (const conjunto of ['viagens', 'eventos', 'telemetria'] as const) {
+      const itens = alertasOperacao([], { ...vazio, indisponiveis: [conjunto] }, nowMs, { media: 90, validas: 4 })
+      expect(itens.map((a) => a.id)).toEqual(['cnh', 'multas', 'ocorrencias', 'score'])
+      expect(itens[3]).toEqual({ id: 'score', valor: '—', rotulo: 'Score motoristas', status: 's/dado', tom: 'neutral' })
+      expect(itens[0].status).not.toBe('s/dado')
+    }
+    expect(alertasOperacao([], { ...vazio, indisponiveis: ['multas'] }, nowMs, { media: 90, validas: 4 })[3]).toMatchObject({ valor: '90', tom: 'ok' })
   })
 
   it('qualidade com as datas de corte do legado', () => {

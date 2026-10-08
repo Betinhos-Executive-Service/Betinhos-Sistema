@@ -131,3 +131,31 @@ Conferida no MCP `Dataverse_DEV`, somente leitura (`describe` e `read_query`).
 | `cr40f_funcionarios`, entity set `cr40f_funcionarioses`: `cr40f_funcionariosid`, `cr40f_nomecompleto`, `cr40f_status`, `cr40f_validadedacnh` | ok |
 | `cr40f_veiculos`, entity set `cr40f_veiculoses`: `cr40f_veiculosid`, `cr40f_statusdoveiculo`, `new_categoriadoveiculo` | ok |
 | `cr40f_veiculos.new_categoriadoveiculo`: 100000000, 100000001 | ok (Próprio, Terceiro; existe também 100000002, Aluguel) |
+
+## 10. Score motoristas — metadata (DEV, 08/10/2026)
+
+Decisão do Renan (08/10/2026): o alerta **Score motoristas** entra na faixa "Operação", como no legado (`renderDriverSafetyScore`, Dashboard.html L15691–15763). Conferido no MCP `Dataverse_DEV`, somente leitura (`describe` e `read_query`).
+
+| Item | Resultado |
+|---|---|
+| `new_telemetriadiariainfleet`, entity set `new_telemetriadiariainfleets` | ok |
+| `new_data` | ok: tipo **DateOnly** (`DATE ONLY NOT NULL`); no `$filter` usa data pura (`new_data ge 2026-01-01`), sem hora |
+| `new_veiculo` (lookup → `cr40f_veiculos`, `_new_veiculo_value`) | ok, obrigatório |
+| `new_tempomotorociosomin` | ok: inteiro (minutos) |
+| `new_eventoinfleet`, entity set `new_eventoinfleets` | ok |
+| `new_reportadoem` | ok: DateTime (`DATETIME NOT NULL`) |
+| `new_motorista` (lookup → `cr40f_funcionarios`, `_new_motorista_value`) | ok, opcional |
+| `new_veiculo` do evento (`_new_veiculo_value`) | existe, mas o score não usa (sem escopo de veículo): fora do `$select` |
+| `new_slug` | ok: texto (`NVARCHAR(150)`). Valores reais em DEV: `driverChanged` (667), `hardBraking` (548), `hardCornering` (457), `hardAcceleration` (189). **Diferença do enunciado**: os slugs vêm em camelCase (`hardBraking`/`hardAcceleration`), não em minúsculas; o score normaliza com `trim().toLowerCase()` como o legado, então casa igual |
+| `new_viageminfleet`, entity set `new_viageminfleets` | ok |
+| `new_iniciadoem` | ok: DateTime (`DATETIME NOT NULL`) |
+| `new_veiculo` (lookup → `cr40f_veiculos`, `_new_veiculo_value`) e `new_motorista` (lookup → `cr40f_funcionarios`, `_new_motorista_value`) | ok; `new_motorista` pode vir nulo (viagem sem motorista é ignorada pelo score) |
+| `new_distanciakm` | ok: decimal (km) |
+
+Regras e decisões de implementação:
+- Entradas filtradas pelo período do filtro: `dayKey(campo)` entre `inicio` e `fim`, inclusivo. Telemetria por `new_data`, viagens por `new_iniciadoem`, eventos por `new_reportadoem`. Sem escopo de veículo.
+- O mês de cada linha é o texto bruto `slice(0, 7)` (sem fuso, como o `monthOf` do legado). Uma viagem às 22h do último dia do mês em Brasília tem `dia` no mês e `mes` (UTC) no mês seguinte; o legado se comporta igual e foi mantido.
+- O ocioso do veículo só vai para o motorista quando ele é o único motorista daquele veículo no mês; com 2 ou mais, ninguém recebe ocioso e as linhas ficam sem nota.
+- Nota por linha (motorista, mês), só com 100 km ou mais e ocioso conhecido: aceleração e frenagem (bom 0,5, ruim 4 por 100 km, peso 35% cada) e ocioso (bom 5, ruim 25 min por 100 km, peso 30%); o alerta mostra a média arredondada das notas válidas e `N notas válidas`. Tom: sem nota `warn`, 80 ou mais `ok`, 60 ou mais `warn`, abaixo `danger`; conjunto indisponível vira `s/dado` neutro.
+- Carga: as três tabelas entram como conjuntos secundários (limite de 4 consultas em paralelo), com `$filter` na mesma janela das reservas (`[desde, ate]`, Brasília, fim inclusivo; DateOnly com data pura). Falha de qualquer uma (`viagens`, `eventos` ou `telemetria`) deixa só o card do Score em `s/dado`.
+- Ponto a validar com o Renan no navegador autenticado (o MCP de SQL devolve `new_data` como `2026-08-02T00:00:00`, então não prova o formato da Web API): a Web API deve devolver `new_data` como data pura (`2026-08-02`), formato que `dayKey` aceita sem deslocar fuso.

@@ -2,17 +2,20 @@ import { formatted, type Row } from '@betinhos/dataverse'
 import { CP_CONCLUIDA, CP_PENDENTE, SEM_CLIENTE, SEM_MOTORISTA, VEICULO_PROPRIO, VEICULO_TERCEIRO } from '../domain/codes'
 import { normL } from '../domain/format'
 import { DIA_MS, dayKey, inicioMs } from '../domain/periodo'
-import type { CategoriaVeiculo, Funcionario, Manutencao, Multa, Ocorrencia, Reserva, Veiculo } from '../domain/types'
+import type { CategoriaVeiculo, EventoConducao, Funcionario, Manutencao, Multa, Ocorrencia, Reserva, TelemetriaDia, Veiculo, Viagem } from '../domain/types'
 
 export const ENTITIES = {
   reserva: 'cr40f_reservadeveculos', composicao: 'cr40f_composicaodeprecos', manutencao: 'cr40f_manutencoes', multa: 'cr40f_multas',
   ocorrencia: 'cr40f_errooperacional', funcionario: 'cr40f_funcionarios', veiculo: 'cr40f_veiculos',
+  telemetria: 'new_telemetriadiariainfleet', evento: 'new_eventoinfleet', viagem: 'new_viageminfleet',
 } as const
 export type EntitySets = Record<keyof typeof ENTITIES, string>
 
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 const lower = (v: unknown) => str(v).toLowerCase()
+/** `numberValue` do legado: número finito ou 0 (null, vazio e texto viram 0). */
+const numero = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0 }
 const asRow = (v: unknown) => (v && typeof v === 'object' ? (v as Row) : null)
 
 const RESERVA_SELECT = [
@@ -32,6 +35,18 @@ export const multasPath = (set: string) => `${set}?$select=cr40f_dataehorario,cr
 export const ocorrenciasPath = (set: string) => `${set}?$select=cr40f_dataocorrencia`
 export const funcionariosPath = (set: string) => `${set}?$select=cr40f_funcionariosid,cr40f_nomecompleto,cr40f_status,cr40f_validadedacnh`
 export const veiculosPath = (set: string) => `${set}?$select=cr40f_veiculosid,cr40f_statusdoveiculo,new_categoriadoveiculo`
+
+/** Janela [desde, ate] em Brasília, fim inclusivo, para colunas DateTime (mesma das reservas). */
+const janelaDataHora = (campo: string, desde: string, ate: string) =>
+  encodeURIComponent(`${campo} ge ${new Date(inicioMs(desde)).toISOString()} and ${campo} lt ${new Date(inicioMs(ate) + DIA_MS).toISOString()}`)
+
+/** Telemetria diária do Infleet: `new_data` é DateOnly, então o filtro usa a data pura, sem hora. */
+export const telemetriaPath = (set: string, desde: string, ate: string) =>
+  `${set}?$select=new_data,_new_veiculo_value,new_tempomotorociosomin&$filter=${encodeURIComponent(`new_data ge ${desde} and new_data le ${ate}`)}`
+export const viagensPath = (set: string, desde: string, ate: string) =>
+  `${set}?$select=new_iniciadoem,_new_veiculo_value,_new_motorista_value,new_distanciakm&$filter=${janelaDataHora('new_iniciadoem', desde, ate)}`
+export const eventosPath = (set: string, desde: string, ate: string) =>
+  `${set}?$select=new_reportadoem,_new_motorista_value,new_slug&$filter=${janelaDataHora('new_reportadoem', desde, ate)}`
 
 export type Cp = { valor: number; pendente: boolean; concluida: boolean }
 export function mapCps(rows: Row[]) {
@@ -84,4 +99,18 @@ export function mapVeiculo(row: Row): Veiculo {
   const label = normL(formatted(row, 'new_categoriadoveiculo'))
   const categoria: CategoriaVeiculo = raw === VEICULO_PROPRIO || label.includes('proprio') ? 'Propria' : raw === VEICULO_TERCEIRO || label.includes('terceiro') ? 'Terceirizada' : ''
   return { id: lower(row.cr40f_veiculosid), statusLabel: formatted(row, 'cr40f_statusdoveiculo'), categoria }
+}
+
+/** `mes` é o texto bruto `slice(0, 7)`, sem fuso, como o `monthOf` do legado; `dia` é o dia em Brasília. */
+export function mapViagem(row: Row): Viagem {
+  const iniciado = str(row.new_iniciadoem)
+  return { dia: dayKey(iniciado), mes: iniciado.slice(0, 7), veiculoId: lower(row._new_veiculo_value), motoristaId: lower(row._new_motorista_value), distancia: numero(row.new_distanciakm) }
+}
+export function mapEvento(row: Row): EventoConducao {
+  const reportado = str(row.new_reportadoem)
+  return { dia: dayKey(reportado), mes: reportado.slice(0, 7), motoristaId: lower(row._new_motorista_value), tipo: str(row.new_slug) }
+}
+export function mapTelemetria(row: Row): TelemetriaDia {
+  const data = str(row.new_data)
+  return { dia: dayKey(data), mes: data.slice(0, 7), veiculoId: lower(row._new_veiculo_value), ociosoMin: numero(row.new_tempomotorociosomin) }
 }
