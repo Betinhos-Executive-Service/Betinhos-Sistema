@@ -2,6 +2,7 @@ import { Fragment, type CSSProperties, type ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
 import { Checkbox } from '@betinhos/ui'
 import { ArrowDown, ArrowUp } from 'lucide-react'
+import { cellKind } from '../domain/cells'
 import { columnLabel, rowKey } from '../domain/layout'
 import { formatCell } from '../domain/format'
 import { nextSort, sameSort } from '../domain/sort'
@@ -32,8 +33,12 @@ const SKELETON_ROWS = 8
 export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, selected, onToggle, onToggleAll, onOpen, renderCell, footer, empty }: Props) {
   // Trilhas crescem na proporção da largura da visão (fr) e nunca ficam abaixo do mínimo; a largura mínima total
   // garante que cabeçalho e linhas compartilhem as mesmas trilhas quando a soma dos mínimos excede o contêiner.
-  const minTotal = 40 + columns.reduce((sum, c) => sum + Math.max(90, c.width), 0)
-  const style = { '--gr-columns': `40px ${columns.map((c) => `minmax(${Math.max(90, c.width)}px, ${c.width}fr)`).join(' ')}`, '--gr-min-width': `${minTotal}px` } as CSSProperties
+  // Sim/Não ocupa uma trilha fixa estreita: o conteúdo é um switch, não cresce com a tela.
+  const BOOLEAN_WIDTH = 96
+  const track = (c: Column) => (cellKind(c, attributes?.get(c.key)) === 'boolean' ? `${BOOLEAN_WIDTH}px` : `minmax(${Math.max(90, c.width)}px, ${c.width}fr)`)
+  const minOf = (c: Column) => (cellKind(c, attributes?.get(c.key)) === 'boolean' ? BOOLEAN_WIDTH : Math.max(90, c.width))
+  const minTotal = 40 + columns.reduce((sum, c) => sum + minOf(c), 0)
+  const style = { '--gr-columns': `40px ${columns.map(track).join(' ')}`, '--gr-min-width': `${minTotal}px` } as CSSProperties
   const ids = rows.map((r) => String(r[ID_ATTRIBUTE]))
   const all = ids.length > 0 && ids.every((id) => selected.has(id))
   const some = !all && ids.some((id) => selected.has(id))

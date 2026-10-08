@@ -52,6 +52,10 @@
 .gr-table .bt-table__row.is-selected .gr-cell--select, .gr-table .bt-table__row.is-selected .gr-cell--first { background-color: var(--bt-color-action-soft); }
 .gr-table .bt-table__head .gr-cell--select, .gr-table .bt-table__head .gr-cell--first { background-color: var(--bt-color-surface-neutral); }
 .gr-table .gr-cell--select { padding: 0; }
+/* Caixa de seleção centrada na trilha de 40 px: sem o espaço do rótulo (que é só para leitor de tela). */
+.gr-table .gr-cell--select .bt-choice { gap: 0; min-height: 0; align-items: center; }
+.gr-table .gr-cell--select .bt-choice__control { margin-top: 0; }
+.gr-table .gr-cell--select .bt-choice__text { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .gr-head__sort { display: inline-flex; align-items: center; gap: var(--bt-space-1); min-width: 0; max-width: 100%; min-height: 32px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
 .gr-head__sort:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border); border-radius: var(--bt-radius-xs); }
 .gr-head__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
