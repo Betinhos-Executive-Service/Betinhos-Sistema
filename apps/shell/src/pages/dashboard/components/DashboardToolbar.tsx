@@ -17,8 +17,8 @@ const DATA = /^\d{4}-\d{2}-\d{2}$/
 type Props = { filtros: Filtros; opcoes: OpcoesFiltro; now: Date; onChange: (f: Filtros) => void }
 
 /**
- * Barra de filtros (DS §10.2.2): atalhos de período visíveis, o escolhido em navy; depois os segmentos e "Limpar filtros".
- * São oito atalhos, acima do limite de cinco do SegmentedControl, por isso um grupo de botões compactos com `aria-pressed`.
+ * Barra de filtros (DS §10.2.2): período num seletor único (as datas aparecem só no "Personalizado"),
+ * depois os segmentos e "Limpar filtros". Tudo cabe numa linha no desktop.
  */
 export function DashboardToolbar({ filtros, opcoes, now, onChange }: Props) {
   const mobile = useMedia(MEDIA_MOBILE)
@@ -38,12 +38,7 @@ export function DashboardToolbar({ filtros, opcoes, now, onChange }: Props) {
       label="Filtros do dashboard"
       className="dash-filtros"
       start={<>
-        <div className="dash-periodo" role="group" aria-label="Período">
-          {ATALHOS.map((a) => {
-            const ativo = filtros.atalho === a.value
-            return <Button key={a.value} variant={ativo ? 'primary' : 'secondary'} size={mobile ? 'touch' : 'compact'} aria-pressed={ativo} onClick={() => escolher(a.value)}>{a.label}</Button>
-          })}
-        </div>
+        <Select size={tamanho} aria-label="Período" className="dash-periodo" searchable={false} clearable={false} options={ATALHOS} value={filtros.atalho} onChange={(v) => v && escolher(v as Atalho)} />
         {filtros.atalho === 'personalizado' ? (
           <div className="dash-datas">
             <Input type="date" size={tamanho} aria-label="Início" value={rascunho.inicio} invalid={invalido} onChange={(e) => datas({ ...rascunho, inicio: e.target.value })} />
