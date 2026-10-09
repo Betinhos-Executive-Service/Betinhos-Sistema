@@ -4,6 +4,9 @@ import { Checkbox } from '@betinhos/ui'
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import { cellKind } from '../domain/cells'
 import { columnLabel, rowKey } from '../domain/layout'
+import { isEmptyFilter, type FilterSet } from '../domain/filters'
+import { filterKindOf } from '../domain/filterKind'
+import { ColumnMenu } from './ColumnMenu'
 import { formatCell } from '../domain/format'
 import { nextSort, sameSort } from '../domain/sort'
 import { ID_ATTRIBUTE, type AttributeMap, type Column, type Sort } from '../domain/types'
@@ -18,6 +21,10 @@ type Props = {
   /** Ordem da visão, mostrada no cabeçalho enquanto `sort` é `null`. */
   defaultSort: Sort
   onSort: (sort: Sort) => void
+  filters: FilterSet
+  onEditFilter: (attribute: string) => void
+  onClearFilter: (attribute: string) => void
+  onHide: (key: string) => void
   selected: Set<string>
   onToggle: (id: string) => void
   onToggleAll: () => void
@@ -34,7 +41,7 @@ type Props = {
 
 const SKELETON_ROWS = 8
 /** Grid editável com rolagem horizontal, seleção por linha e a primeira coluna fixa. As classes visuais são as da tabela do DS. */
-export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, selected, onToggle, onToggleAll, onOpen, renderCell, scrollRef, tail, footer, empty }: Props) {
+export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, filters, onEditFilter, onClearFilter, onHide, selected, onToggle, onToggleAll, onOpen, renderCell, scrollRef, tail, footer, empty }: Props) {
   // Trilhas crescem na proporção da largura da visão (fr) e nunca ficam abaixo do mínimo; a largura mínima total
   // garante que cabeçalho e linhas compartilhem as mesmas trilhas quando a soma dos mínimos excede o contêiner.
   // Sim/Não ocupa uma trilha fixa estreita: o conteúdo é um switch, não cresce com a tela.
@@ -65,12 +72,25 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
           {columns.map((column, index) => {
             const active = sameSort(shown, column)
             const label = columnLabel(column, attributes?.get(column.key))
+            const filter = column.alias ? undefined : filters[column.attribute]
             return (
               <div key={column.key} className={index === 0 ? 'bt-table__cell gr-cell--first' : 'bt-table__cell'} role="columnheader" title={label} aria-sort={active ? (shown?.descending ? 'descending' : 'ascending') : 'none'}>
-                <button type="button" className="gr-head__sort" onClick={() => onSort(nextSort(sort, defaultSort, column))}>
-                  <span className="gr-head__label">{label}</span>
-                  {active ? (shown?.descending ? <ArrowDown size={14} /> : <ArrowUp size={14} />) : null}
-                </button>
+                <div className="gr-head">
+                  <button type="button" className="gr-head__sort" onClick={() => onSort(nextSort(sort, defaultSort, column))}>
+                    <span className="gr-head__label">{label}</span>
+                    {active ? (shown?.descending ? <ArrowDown size={14} /> : <ArrowUp size={14} />) : null}
+                  </button>
+                  <ColumnMenu
+                    label={label}
+                    filterable={!column.alias && filterKindOf(column.attribute, attributes?.get(column.key)) != null}
+                    filtered={filter != null && !isEmptyFilter(filter)}
+                    canHide={columns.length > 1}
+                    onSort={(descending) => onSort({ attribute: column.attribute, alias: column.alias, descending })}
+                    onFilter={() => onEditFilter(column.attribute)}
+                    onClearFilter={() => onClearFilter(column.attribute)}
+                    onHide={() => onHide(column.key)}
+                  />
+                </div>
               </div>
             )
           })}
