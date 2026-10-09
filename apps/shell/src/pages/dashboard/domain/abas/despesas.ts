@@ -2,6 +2,7 @@ import { topByShare } from '../analises'
 import type { Opcao } from '../base'
 import { brl, brlS, int, normL } from '../format'
 import { comparar, type ChipAnterior } from '../comparar'
+import { META_HOSPEDAGEM } from '../metas'
 import { mesRotulo, periodoAnterior, type Periodo } from '../periodo'
 export type { ChipAnterior } from '../comparar'
 import type { CategoriaDespesa, Despesa, FormaPagamento, PontoSerie, Tom } from '../types'
@@ -13,8 +14,8 @@ export type FiltrosDespesa = { categorias: string[]; formas: string[]; empresas:
 const CATEGORIAS_ALIMENTACAO: ReadonlySet<string> = new Set(['alimentacao', 'almoco', 'cafe', 'jantar', 'lanche'])
 const AGUARDANDO_PAGAMENTO = 100000001
 const ANEXO_COMPLETO = 100000002
-const HOSPEDAGEM_ALVO = 150
-const HOSPEDAGEM_TETO = 200
+const HOSPEDAGEM_ALVO = META_HOSPEDAGEM.alvo
+const HOSPEDAGEM_TETO = META_HOSPEDAGEM.teto
 const SEM_MOTORISTA = 'Sem motorista'
 
 const soma = (rows: Despesa[]) => rows.reduce((s, d) => s + d.valor, 0)

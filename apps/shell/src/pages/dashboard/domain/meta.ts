@@ -1,4 +1,5 @@
 import { ANOS_MAPA, FAT_FIXO } from '../data/historico'
+import { META_FATURAMENTO } from './metas'
 import { DIA_MS, diasNoMes, parseDia } from './periodo'
 
 const utc = (s: string) => { const { y, m, d } = parseDia(s); return Date.UTC(y, m, d) }
@@ -25,10 +26,10 @@ export const fixoNoPeriodo = (inicio: string, fim: string) =>
 /** `getHistoricalFat` do legado (inclui 2026). */
 export const historicoFat = (ano: number, mes: number) => FAT_FIXO[ano]?.[mes] || 0
 
-/** `calcularMetaMensal`: (50% N−1 + 40% N−2 + 10% N−3) × 1,13. */
+/** `calcularMetaMensal`: (50% N−1 + 40% N−2 + 10% N−3) × 1,13 (pesos e fator em `META_FATURAMENTO`). */
 export function metaMensal(ano: number, mes: number) {
-  const base = historicoFat(ano - 1, mes) * 0.5 + historicoFat(ano - 2, mes) * 0.4 + historicoFat(ano - 3, mes) * 0.1
-  return Math.round(base * 1.13)
+  const base = META_FATURAMENTO.pesos.reduce((s, peso, i) => s + historicoFat(ano - 1 - i, mes) * peso, 0)
+  return Math.round(base * META_FATURAMENTO.fator)
 }
 
 /** `getMetaParaPeriodoProporcional`: meta mensal rateada pelos dias do período. */

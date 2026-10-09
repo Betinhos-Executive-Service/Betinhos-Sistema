@@ -4,6 +4,7 @@ import { useMedia } from '../../../operacional/useMedia'
 import { BarraChart } from '../../charts/Charts'
 import { calcularManutencoes, type LinhaCategoria, type LinhaTipoReparo, type Manutencoes, type StatusMeta } from '../../domain/abas/manutencoes'
 import { brl, brlS, dec, int } from '../../domain/format'
+import { META_MANUTENCAO } from '../../domain/metas'
 import type { Apoio } from '../../domain/types'
 import { AnaliseCard } from '../AnaliseCard'
 import { tabelaCopia } from '../Copiar'
@@ -53,7 +54,7 @@ function ManutencoesAba({ ctx, dados, periodo }: DadosAba) {
   const ma = useMemo(() => calcularManutencoes(ctx, dados), [ctx, dados])
   const k = ma.kpis
   const prazo = ma.prazo
-  const apoioPrazo: Apoio[] = prazo?.ate10 != null ? [{ rotulo: 'Até 10 dias', texto: pct(prazo.ate10) }] : []
+  const apoioPrazo: Apoio[] = prazo?.ate10 != null ? [{ rotulo: `Até ${META_MANUTENCAO.preventivaDias} dias`, texto: pct(prazo.ate10) }] : []
   if (prazo && ma.mostrarLM) apoioPrazo.push({ rotulo: 'Mês anterior', texto: diasTexto(prazo.lm) })
   if (prazo) apoioPrazo.push({ rotulo: 'Ano anterior', texto: diasTexto(prazo.ly) })
   return <>
@@ -148,7 +149,7 @@ function CategoriasCard({ linhas, mostrarLM, periodo }: { linhas: LinhaCategoria
     <AnaliseCard
       largo titulo="Categorias com metas" periodo={periodo} unidade="registros por categoria"
       valor={fora ? `${int(fora)} fora da meta` : 'Nenhuma fora da meta'}
-      sub={'Corretiva crítica: zero · Corretiva não crítica: até 5 por mês · Preventiva programada: da aprovação à data em até 10 dias'}
+      sub={`Corretiva crítica: ${META_MANUTENCAO.corretivaCritica ? `até ${META_MANUTENCAO.corretivaCritica}` : 'zero'} · Corretiva não crítica: até ${META_MANUTENCAO.naoCriticaPorMes} por mês · Preventiva programada: da aprovação à data em até ${META_MANUTENCAO.preventivaDias} dias`}
       tabela={<Table columns={colunas} rows={linhas} rowKey={(l) => l.categoria} />}
       copiar={tabelaCopia(linhas, [
         ['Categoria', (l) => l.categoria], ['Registros', (l) => l.qtd], ...(mostrarLM ? [['Mês anterior', (l: LinhaCategoria) => anterior(l.lm)] as const] : []),

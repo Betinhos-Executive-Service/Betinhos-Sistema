@@ -7,9 +7,11 @@ it('não repete ids de rota', () => {
 })
 
 it('localiza item e grupo pelo id', () => {
-  expect(findItem('new_dashboard')?.group.id).toBe('operacional')
+  expect(findItem('dashboard')?.group.id).toBe('operacional')
   expect(findItem('dashboard')?.item).toMatchObject({ kind: 'page', page: 'dashboard', label: 'Dashboard' })
-  expect(findItem('new_dashboard')?.item).toMatchObject({ kind: 'webresource', label: 'Dashboard (completo)' })
+  // O legado vira o modo TV, no Back-End.
+  expect(findItem('new_dashboard')?.group.id).toBe('back-end')
+  expect(findItem('new_dashboard')?.item).toMatchObject({ kind: 'webresource', label: 'Dashboard antigo (TV)' })
   expect(findItem('inexistente')).toBeNull()
 })
 

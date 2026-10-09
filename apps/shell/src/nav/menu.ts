@@ -29,7 +29,6 @@ export const MENU: MenuGroup[] = [
     items: [
       table('cr40f_reservadeveculos'),
       { kind: 'page', id: 'dashboard', label: 'Dashboard', page: 'dashboard' },
-      wr('Dashboard (completo)', 'new_dashboard'),
       { kind: 'page', id: 'operacional', label: 'Resumo Operacional', page: 'operacional' },
       wr('Funções Operacionais', 'new_telafuncoesoperacionais'),
       table('cr40f_trocasdecarro'),
@@ -75,6 +74,8 @@ export const MENU: MenuGroup[] = [
     label: 'Back-End',
     items: [
       table('cr40f_servicosporpassageiro'),
+      // O dashboard React substitui o antigo no uso diário; o legado fica como modo TV (link "Abrir modo TV" no Dashboard).
+      wr('Dashboard antigo (TV)', 'new_dashboard'),
       wr('Despesas Operacionais', 'new_teladespesasoperacionais'),
       table('new_fotomanutencao'),
       table('new_appmotoristaslog'),
