@@ -91,6 +91,19 @@ describe('consultas do Dashboard', () => {
     await expect(carregarDataverse(client(async (p) => { if (p.startsWith('cps?')) throw new Error('falhou'); return [] }), SETS, '2024-01-01', '2026-10-15')).rejects.toThrow('falhou')
   })
 
+  it('com a navegação da CP, a composição vem no $expand das reservas e a tabela de CPs não é lida', async () => {
+    const lidos: string[] = []
+    const c = client(async (path) => {
+      lidos.push(path)
+      if (path.startsWith('res?')) return [{ cr40f_reservadeveculosid: 'R1', cr40f_dataehorriodesada: '2026-10-02T12:00:00Z', new_categoriadoitem: 100000000, _new_composicaodepreco_value: 'CP1', nav_cp: { cr40f_composicaodeprecosid: 'CP1', new_valortotal: 250, new_status: null } }]
+      return []
+    })
+    const d = await carregarDataverse(c, SETS, '2024-01-01', '2026-10-15', 'nav_cp')
+    expect(lidos.some((p) => p.startsWith('cps?'))).toBe(false)
+    expect(lidos.find((p) => p.startsWith('res?'))).toContain('nav_cp($select=')
+    expect(d.reservas.find((r) => r.id === 'r1')?.valor).toBe(250)
+  })
+
   it('carrega as três tabelas do Infleet; uma que falha vira indisponível só para ela', async () => {
     const c = client(async (path) => {
       if (path.startsWith('via?')) return [{ new_iniciadoem: '2026-10-02T12:00:00Z', _new_veiculo_value: 'V1', _new_motorista_value: 'M1', new_distanciakm: 120 }]
