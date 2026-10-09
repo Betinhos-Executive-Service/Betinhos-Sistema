@@ -59,6 +59,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
   const [announce, setAnnounce] = useState('')
   const root = useRef<HTMLDivElement>(null)
   const refocus = useRef<string | null>(null)
+  const pressing = useRef(false)
   useEffect(() => {
     const key = refocus.current
     if (!key) return
@@ -75,6 +76,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
   const resizeDown = (column: Column) => (e: PointerEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.stopPropagation()
+    pressing.current = true
     e.currentTarget.setPointerCapture?.(e.pointerId)
     drag.current = { key: column.key, startX: e.clientX, start: column.width, width: column.width }
   }
@@ -85,6 +87,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
     setLive((l) => ({ ...l, [d.key]: d.width }))
   }
   const resizeEnd = (e: PointerEvent<HTMLDivElement>) => {
+    pressing.current = false
     const d = drag.current
     drag.current = null
     if (!d) return
@@ -109,6 +112,8 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
     if (to < 0 || to >= columns.length) return
     e.preventDefault()
     refocus.current = column.key
+    // Vale só para o commit desta tecla; se a ordem não mudar, o pedido expira e não rouba o foco depois.
+    window.setTimeout(() => { refocus.current = null }, 0)
     onMove(column.key, to)
     setAnnounce(`Coluna ${columnLabel(column, attributes?.get(column.key))} movida para a posição ${to + 1}`)
   }
@@ -164,7 +169,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
                 title={label}
                 aria-sort={active ? (shown?.descending ? 'descending' : 'ascending') : 'none'}
                 draggable
-                onDragStart={(e) => { if ((e.target as HTMLElement).closest?.('.gr-resize')) { e.preventDefault(); return } e.dataTransfer.setData('text/x-gr-column', column.key); e.dataTransfer.effectAllowed = 'move' }}
+                onDragStart={(e) => { if (pressing.current || (e.target as HTMLElement).closest?.('.gr-resize')) { e.preventDefault(); return } e.dataTransfer.setData('text/x-gr-column', column.key); e.dataTransfer.effectAllowed = 'move' }}
                 onDragOver={dragOver(column)}
                 onDragLeave={(e) => { if (e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget)) return; setDropAt((d) => (d?.key === column.key ? null : d)) }}
                 onDrop={dropOn(column, index)}
