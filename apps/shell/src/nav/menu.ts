@@ -10,7 +10,7 @@ export type MenuItem =
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
-  | { kind: 'page'; id: string; label: string; page: 'componentes' | 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' }
+  | { kind: 'page'; id: string; label: string; page: 'componentes' | 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' }
 
 export type MenuGroup = { id: string; label: string; items: MenuItem[] }
 
@@ -43,7 +43,7 @@ export const MENU: MenuGroup[] = [
     label: 'Financeiro',
     items: [
       table('cr40f_composicaodeprecos'),
-      table('cr40f_financeiro'),
+      { kind: 'page', id: 'ops', label: 'Ordens de Pagamento', page: 'ops' },
       { kind: 'page', id: 'pagantes', label: 'Pagantes', page: 'pagantes' },
       table('cr40f_recibos_v2'),
       table('cr40f_pedidodecotacao'),
@@ -65,7 +65,7 @@ export const MENU: MenuGroup[] = [
       table('cr40f_veiculos'),
       { kind: 'page', id: 'funcionarios', label: 'Funcionários', page: 'funcionarios' },
       { kind: 'page', id: 'curriculos', label: 'Currículos', page: 'curriculos' },
-      table('cr40f_infracaodetransito'),
+      { kind: 'page', id: 'infracoes', label: 'Infrações de trânsito', page: 'infracoes' },
       table('new_marketing'),
     ],
   },
