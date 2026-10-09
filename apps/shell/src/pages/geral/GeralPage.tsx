@@ -5,7 +5,7 @@ import { Archive, ArchiveRestore, CalendarDays, ClipboardList, Copy, ListChecks,
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
 import { useMedia } from '../operacional/useMedia'
-import { hrefFor } from '../../nav/useHashRoute'
+import { hrefFor, queryFromHash } from '../../nav/useHashRoute'
 import { createSource } from './data/source'
 import { Cell } from './components/Cell'
 import { GeralCards } from './components/GeralCards'
@@ -19,6 +19,7 @@ import { VoucherOverlay } from './components/VoucherOverlay'
 import { copyText } from './domain/copy'
 import { applyColumnPrefs, loadColumnPrefs, saveColumnPrefs, type ColumnPrefs } from './domain/columns'
 import { ID_ATTRIBUTE, type CellStatus, type Column } from './domain/types'
+import { readUrlState, writeUrlState, type UrlState } from './domain/urlState'
 import { cellKey, useGeral, type SaveFailure } from './useGeral'
 import './geral.css'
 
@@ -44,7 +45,13 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     if (!mobileRef.current || editIdRef.current === failure.id) return
     toast({ tone: 'danger', message: `Não foi possível salvar ${failure.label} do serviço ${failure.serviceName}: ${failure.message}` })
   }, [toast])
-  const geral = useGeral(source, { onSaveFail })
+  // O estado da tela vive na URL (`#/geral?view=…`): lido uma vez ao montar e regravado sem empilhar histórico.
+  const [initial] = useState(() => readUrlState(queryFromHash(window.location.hash)))
+  const onStateChange = useCallback((state: UrlState) => {
+    const next = hrefFor('geral', new URLSearchParams(writeUrlState(state)))
+    if (next !== window.location.hash) window.history.replaceState(null, '', next)
+  }, [])
+  const geral = useGeral(source, { onSaveFail, initial, onStateChange })
   const { view, rows, total, more, loading, loadingMore, loadError, query, attributes } = geral
 
   // Preferências de colunas por visão: lidas do armazenamento local ao entrar na visão, gravadas ao aplicar.

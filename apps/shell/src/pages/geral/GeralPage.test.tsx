@@ -59,6 +59,8 @@ beforeEach(() => {
 })
 afterEach(() => {
   cleanup()
+  // A tela grava o estado no hash; sem limpar, o teste seguinte abriria na visão e na busca do anterior.
+  window.history.replaceState(null, '', window.location.pathname)
   vi.unstubAllGlobals()
   FakeObserver.instances = []
   hooks.setState = null
@@ -86,6 +88,25 @@ describe('Geral', () => {
     await waitFor(() => expect(screen.getByRole('columnheader', { name: /Status de Operação/, hidden: true }).getAttribute('aria-sort')).toBe('ascending'))
     // O primeiro teste paga a carga fria dos módulos: com a máquina ocupada passa dos 30 s do padrão.
   }, 60_000)
+
+  it('abre na visão pedida pela URL e grava o estado sem empilhar histórico', async () => {
+    window.location.hash = '#/geral?view=mock-sem-motorista'
+    const replace = vi.spyOn(window.history, 'replaceState')
+    const push = vi.spyOn(window.history, 'pushState')
+    try {
+      render(<GeralPage host={{ mode: 'mock' }} />)
+      await waitFor(() => expect(screen.getByRole('combobox', { name: 'Visão' }).textContent).toContain('Sem motorista'))
+      await waitFor(() => expect(window.location.hash).toBe('#/geral?view=mock-sem-motorista'))
+      fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar serviços' }), { target: { value: 'OS-10' } })
+      await waitFor(() => expect(window.location.hash).toBe('#/geral?view=mock-sem-motorista&q=OS-10'))
+      expect(replace).toHaveBeenCalled()
+      expect(push).not.toHaveBeenCalled()
+    } finally {
+      replace.mockRestore()
+      push.mockRestore()
+      window.location.hash = ''
+    }
+  })
 
   it('troca de visão e busca por palavra-chave', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)

@@ -4,8 +4,10 @@ import type { Source } from './data/source'
 import { cellKind } from './domain/cells'
 import { buildPatch, reduceCell, validateEdit, SAVED_VISIBLE_MS, type CellEvent, type EditValue } from './domain/edit'
 import { defaultSort, linkEntities } from './domain/fetch'
+import { injectFilters, isEmptyFilter, type Filter, type FilterSet } from './domain/filters'
 import { formatDateTime } from './domain/format'
 import { columnLabel, parseLayout, rowKey } from './domain/layout'
+import type { UrlState } from './domain/urlState'
 import { ENTITY, ID_ATTRIBUTE, type AttributeInfo, type AttributeMap, type CellKind, type CellStatus, type Column, type Page, type Sort, type View } from './domain/types'
 
 const message = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
@@ -14,7 +16,13 @@ const FORMATTED = '@OData.Community.Display.V1.FormattedValue'
 
 /** Falha de gravação, com o que o aviso precisa dizer (a célula guarda só a mensagem). */
 export type SaveFailure = { id: string; serviceName: string; label: string; message: string }
-export type GeralOptions = { onSaveFail?: (failure: SaveFailure) => void }
+export type GeralOptions = {
+  onSaveFail?: (failure: SaveFailure) => void
+  /** Estado vindo da URL: aplicado uma única vez, quando as visões chegam (visão inexistente cai na padrão). */
+  initial?: UrlState
+  /** Chamado quando visão, busca, ordem ou filtros mudam (inclusive o estado inicial já resolvido). */
+  onStateChange?: (state: UrlState) => void
+}
 
 export type GeralState = {
   views: View[]; viewsError: string | null
@@ -25,7 +33,7 @@ export type GeralState = {
   quickFind: string[]
   rows: Row[]; total: number | null; more: boolean; pagesLoaded: number
   loading: boolean; loadingMore: boolean; pageError: string | null; loadError: string | null
-  sort: Sort; query: string
+  sort: Sort; query: string; filters: FilterSet
   selected: Set<string>
   cells: Map<string, CellStatus>
 }
@@ -93,8 +101,18 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [sort, setSortState] = useState<Sort>(null)
   const [query, setQueryState] = useState('')
+  const [filters, setFilters] = useState<FilterSet>({})
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [cells, setCells] = useState<Map<string, CellStatus>>(() => new Map())
+  const hasFilters = useMemo(() => Object.values(filters).some((f) => !isEmptyFilter(f)), [filters])
+  /** Com filtros e a metadata ainda a caminho a consulta espera: pedir antes devolveria a lista sem filtrar. */
+  const filtersPending = view != null && hasFilters && attributes == null && attributesError == null
+  /** FetchXML da visão com os filtros por coluna; sem metadata (ou sem filtros) é o da própria visão. */
+  const effectiveFetch = useMemo(() => {
+    if (!view) return null
+    if (!attributes || !hasFilters) return view.fetchxml
+    try { return injectFilters(view.fetchxml, filters, attributes) } catch { return view.fetchxml }
+  }, [view, attributes, filters, hasFilters])
   const defaultOrder = useMemo<Sort>(() => { try { return view ? defaultSort(view.fetchxml) : null } catch { return null } }, [view])
 
   // Espelhos síncronos: callbacks (save, carga de páginas) leem o valor corrente, não o do último render.
@@ -107,14 +125,18 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   const loadingMoreRef = useRef(false)
   const loadErrorRef = useRef<string | null>(null)
   /** Visão, ordem e busca correntes: `loadMore` e `reload` pedem sempre com o contexto do último render. */
-  const context = useRef({ view: null as View | null, sort: null as Sort, query: '', quickFind: [] as string[] })
-  context.current = { view, sort, query, quickFind }
+  const context = useRef({ fetchxml: null as string | null, sort: null as Sort, query: '', quickFind: [] as string[] })
+  context.current = { fetchxml: filtersPending ? null : effectiveFetch, sort, query, quickFind }
   // Um fim de "salvo" por célula: gravar de novo na mesma célula cancela o anterior.
   const settleTimers = useRef(new Map<string, number>())
   /** Cada primeira página ou releitura invalida as respostas que ainda estão a caminho. */
   const pageToken = useRef(0)
   const onSaveFail = useRef(options.onSaveFail)
   onSaveFail.current = options.onSaveFail
+  const onStateChange = useRef(options.onStateChange)
+  onStateChange.current = options.onStateChange
+  /** O estado inicial da URL vale só para a primeira carga das visões. */
+  const initialRef = useRef(options.initial)
 
   const setRows = useCallback((update: (list: Row[]) => Row[]) => {
     rowsRef.current = update(rowsRef.current)
@@ -149,9 +171,17 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
         setViews(list)
         setQuickFind(fields)
         setViewsError(null)
-        const first = list.find((v) => v.padrao) ?? list[0]
-        if (first) enterView(first)
-        else setLoadingFlag(false)
+        const initial = initialRef.current
+        initialRef.current = undefined
+        const first = (initial?.view ? list.find((v) => v.id === initial.view) : undefined) ?? list.find((v) => v.padrao) ?? list[0]
+        if (first) {
+          enterView(first)
+          if (initial) {
+            if (initial.q) setQueryState(initial.q)
+            if (initial.sort) setSortState(initial.sort)
+            if (initial.filters) setFilters(initial.filters)
+          }
+        } else setLoadingFlag(false)
       },
       (reason) => { if (alive) { setViewsError(message(reason)); setLoadingFlag(false) } },
     )
@@ -173,9 +203,9 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   /** Total da visão: o da própria resposta quando vem; senão pergunta à contagem, sem travar a lista. */
   const resolveTotal = useCallback((result: Page, token: number) => {
     if (result.total != null && result.total >= 0) { setTotal(result.total); return }
-    const { view: current, query: text, quickFind: fields } = context.current
-    if (!current) return
-    void source.count({ fetchxml: current.fetchxml, query: text, quickFind: fields }).then(
+    const { fetchxml, query: text, quickFind: fields } = context.current
+    if (!fetchxml) return
+    void source.count({ fetchxml, query: text, quickFind: fields }).then(
       (count) => { if (token === pageToken.current && count != null) setTotal(count) },
       () => { /* sem contagem: o rodapé mostra só o que já carregou */ },
     )
@@ -183,7 +213,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
 
   // Efeito 3: primeira página. Trocar visão, ordem ou busca recomeça do zero; o token descarta respostas antigas.
   useEffect(() => {
-    if (!view) return
+    if (!view || !effectiveFetch) return
     const token = ++pageToken.current
     rowsRef.current = []
     setRowsState([])
@@ -197,7 +227,8 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     setLoadingMoreFlag(false)
     setPageError(null)
     setLoadingFlag(true)
-    source.page({ fetchxml: view.fetchxml, page: 1, cookie: null, sort, query, quickFind }).then(
+    if (filtersPending) return
+    source.page({ fetchxml: effectiveFetch, page: 1, cookie: null, sort, query, quickFind }).then(
       (result) => {
         if (token !== pageToken.current) return
         rowsRef.current = result.rows
@@ -215,16 +246,16 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
         setLoadingFlag(false)
       },
     )
-  }, [source, view, sort, query, quickFind, resolveTotal, setLoadingFlag, setLoadingMoreFlag, setLoadErrorValue, setMoreValue])
+  }, [source, view, effectiveFetch, filtersPending, sort, query, quickFind, resolveTotal, setLoadingFlag, setLoadingMoreFlag, setLoadErrorValue, setMoreValue])
 
   /** Pede a próxima página e acrescenta só as linhas que ainda não estão na lista. */
   const loadMore = useCallback(() => {
-    const { view: current, sort: order, query: text, quickFind: fields } = context.current
-    if (!current || loadingRef.current || loadingMoreRef.current || !moreRef.current || loadErrorRef.current) return
+    const { fetchxml, sort: order, query: text, quickFind: fields } = context.current
+    if (!fetchxml || loadingRef.current || loadingMoreRef.current || !moreRef.current || loadErrorRef.current) return
     const token = pageToken.current
     const previous = cookieRef.current
     setLoadingMoreFlag(true)
-    source.page({ fetchxml: current.fetchxml, page: pagesRef.current + 1, cookie: previous, sort: order, query: text, quickFind: fields }).then(
+    source.page({ fetchxml, page: pagesRef.current + 1, cookie: previous, sort: order, query: text, quickFind: fields }).then(
       (result) => {
         if (token !== pageToken.current) return
         setLoadingMoreFlag(false)
@@ -253,8 +284,8 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
 
   /** Relê da página 1 até a última carregada, em sequência (cada página com o cookie da anterior). A lista só troca ao final. */
   const reload = useCallback(() => {
-    const { view: current, sort: order, query: text, quickFind: fields } = context.current
-    if (!current) return
+    const { fetchxml, sort: order, query: text, quickFind: fields } = context.current
+    if (!fetchxml) return
     const token = ++pageToken.current
     const target = Math.max(1, pagesRef.current)
     setLoadingFlag(true)
@@ -270,7 +301,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
         let loaded = 0
         let first: Page | null = null
         for (let n = 1; n <= target; n += 1) {
-          const result: Page = await source.page({ fetchxml: current.fetchxml, page: n, cookie, sort: order, query: text, quickFind: fields })
+          const result: Page = await source.page({ fetchxml, page: n, cookie, sort: order, query: text, quickFind: fields })
           if (token !== pageToken.current) return
           first ??= result
           for (const row of result.rows) {
@@ -301,11 +332,35 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
 
   const selectView = useCallback((id: string) => {
     const next = views.find((v) => v.id === id)
-    if (next) enterView(next)
+    if (!next) return
+    enterView(next)
+    // Filtros são da visão: trocar de visão recomeça sem eles, como a ordenação.
+    setFilters((current) => (Object.keys(current).length ? {} : current))
   }, [views, enterView])
 
   const setSort = useCallback((next: Sort) => setSortState(next), [])
   const setQuery = useCallback((next: string) => setQueryState(next), [])
+  /** `null` (ou um filtro sem o valor que a operação exige) remove o filtro da coluna. */
+  const setFilter = useCallback((attribute: string, filter: Filter | null) => setFilters((current) => {
+    if (!filter || isEmptyFilter(filter)) {
+      if (!(attribute in current)) return current
+      const { [attribute]: _removed, ...rest } = current
+      return rest
+    }
+    return { ...current, [attribute]: filter }
+  }), [])
+  const clearFilters = useCallback(() => setFilters((current) => (Object.keys(current).length ? {} : current)), [])
+
+  // Avisa quem guarda o estado (a URL) sempre que visão, busca, ordem ou filtros mudam. Só depois de existir uma visão.
+  const viewId = view?.id
+  useEffect(() => {
+    if (!viewId) return
+    const state: UrlState = { view: viewId }
+    if (query) state.q = query
+    if (sort) state.sort = sort
+    if (hasFilters) state.filters = Object.fromEntries(Object.entries(filters).filter(([, f]) => !isEmptyFilter(f)))
+    onStateChange.current?.(state)
+  }, [viewId, query, sort, filters, hasFilters])
 
   const toggle = useCallback((id: string) => setSelected((s) => {
     const next = new Set(s)
@@ -391,6 +446,6 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     return true
   }, [attributes, columns, source, setCell, setRows, scheduleSettle])
 
-  const state: GeralState = { views, viewsError, view, columns, attributes, attributesError, quickFind, rows, total, more, pagesLoaded, loading, loadingMore, pageError, loadError, sort, query, selected, cells }
-  return { ...state, defaultOrder, selectView, setSort, setQuery, loadMore, retryLoadMore, reload, refresh: reload, toggle, toggleAll, clearSelection, save, resetCell }
+  const state: GeralState = { views, viewsError, view, columns, attributes, attributesError, quickFind, rows, total, more, pagesLoaded, loading, loadingMore, pageError, loadError, sort, query, filters, selected, cells }
+  return { ...state, defaultOrder, selectView, setSort, setQuery, setFilter, clearFilters, loadMore, retryLoadMore, reload, refresh: reload, toggle, toggleAll, clearSelection, save, resetCell }
 }
