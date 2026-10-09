@@ -13,6 +13,7 @@ import { OpsPage } from '../pages/ops/OpsPage'
 import { PessoasPage } from '../pages/pessoas/PessoasPage'
 import { DashboardPage } from '../pages/dashboard/DashboardPage'
 import { InfracoesPage } from '../pages/infracoes/InfracoesPage'
+import { DespesasPage } from '../pages/despesas/DespesasPage'
 import { EmptyState, buttonClassName } from '@betinhos/ui'
 import { Frame } from './Frame'
 import { PageLayout } from './PageLayout'
@@ -65,6 +66,7 @@ export function RouteLayout({ host, group, item, label }: Props) {
     if (item.page === 'pessoas') return <PessoasPage host={host} />
     if (item.page === 'dashboard') return <DashboardPage host={host} />
     if (item.page === 'infracoes') return <InfracoesPage host={host} />
+    if (item.page === 'despesas') return <DespesasPage host={host} />
     return <ComponentsPage />
   }
 
