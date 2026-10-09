@@ -39,17 +39,21 @@ export function useDashboard(source: Source, desde: string, ate: string, opcoes:
   const carregarExtra = useCallback(async (conjunto: ConjuntoExtra) => {
     const atual = ++tokenExtra.current[conjunto]
     vooExtra.current[conjunto] = chave
-    let parte: ParteExtra
+    let parte: ParteExtra | null = null
     try {
       parte = await source.carregarExtra(conjunto, desde, ate)
     } catch (reason) {
       console.warn(`Dashboard: ${conjunto} não carregou.`, mensagem(reason))
-      parte = { campos: {}, indisponivel: true }
     }
     if (atual !== tokenExtra.current[conjunto]) return
     delete vooExtra.current[conjunto]
     carregadoExtra.current[conjunto] = { chave, em: Date.now() }
-    setExtras((e) => ({ chave, partes: { ...(e.chave === chave ? e.partes : {}), [conjunto]: parte } }))
+    // Falha na recarga mantém os dados já mostrados da mesma janela (como o estágio 1); sem dados anteriores vira s/dado.
+    setExtras((e) => {
+      const anteriores = e.chave === chave ? e.partes : {}
+      const nova = parte ?? anteriores[conjunto] ?? { campos: {}, indisponivel: true }
+      return { chave, partes: { ...anteriores, [conjunto]: nova } }
+    })
   }, [source, desde, ate, chave])
 
   /** Estágio 1; com `comExtras`, também o estágio 2 da aba ativa (o que não estiver em voo, salvo `forcar`). */
