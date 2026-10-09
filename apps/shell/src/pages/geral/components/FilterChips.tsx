@@ -26,7 +26,7 @@ export function FilterChips({ filters, attributes, mobile, ignored, onEdit, onRe
         const label = info?.label || attribute
         return (
           <span key={attribute} className={ignored ? 'gr-chip is-ignored' : 'gr-chip'} title={ignored ? 'Este filtro não está sendo aplicado' : undefined}>
-            {ignored ? <TriangleAlert size={14} className="gr-chip__warn" aria-label="Este filtro não está sendo aplicado" /> : null}
+            {ignored ? <span role="img" className="gr-chip__warn" aria-label="Este filtro não está sendo aplicado"><TriangleAlert size={14} aria-hidden="true" /></span> : null}
             <button type="button" className="gr-chip__text" title={`Editar filtro ${label}`} onClick={() => onEdit(attribute)}>{describeFilter(attribute, filter, info)}</button>
             <button type="button" className="gr-chip__remove" aria-label={`Remover filtro ${label}`} onClick={() => onRemove(attribute)}><X size={14} /></button>
           </span>

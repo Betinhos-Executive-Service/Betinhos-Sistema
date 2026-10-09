@@ -732,14 +732,36 @@ describe('Geral: espaço e densidade', () => {
       expect(screen.queryByRole('group', { name: 'Filtros ativos' })).toBeNull()
     }, 60_000)
 
+    it('fechar o diálogo de filtro pelo X sem rascunho fecha direto; Continuar editando mantém aberto', async () => {
+      render(<GeralPage host={{ mode: 'mock' }} />)
+      await screen.findAllByText(PAGE1)
+      const open = async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Opções da coluna Trajeto', hidden: true }))
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'Filtrar por…', hidden: true }))
+        return screen.findByRole('dialog', { name: 'Filtrar Trajeto' })
+      }
+      const dialog = await open()
+      fireEvent.click(within(dialog).getByRole('button', { name: /Fechar/ }))
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Filtrar Trajeto' })).toBeNull())
+      const again = await open()
+      fireEvent.change(within(again).getByRole('textbox', { name: 'Valor' }), { target: { value: 'x' } })
+      fireEvent.click(within(again).getByRole('button', { name: /Fechar/ }))
+      fireEvent.click(within(await screen.findByRole('dialog', { name: 'Descartar alterações?' })).getByRole('button', { name: 'Continuar editando' }))
+      expect(await screen.findByRole('dialog', { name: 'Filtrar Trajeto' })).toBeTruthy()
+    }, 60_000)
+
     it('sem metadata os filtros ficam indisponíveis e o chip restaurado da URL avisa', async () => {
       hooks.attributes = () => Promise.reject(new Error('sem metadata'))
       window.location.hash = '#/geral?f=' + encodeFilters({ cr40f_trajeto: { kind: 'text', op: 'contains', value: 'Galeão' } })
       render(<GeralPage host={{ mode: 'mock' }} />)
       const button = await screen.findByRole('button', { name: 'Filtros (1)' })
-      await waitFor(() => expect(button.getAttribute('aria-disabled')).toBe('true'))
+      await waitFor(() => expect(button.getAttribute('title')).toBe('Filtros indisponíveis: não foi possível carregar os campos.'))
       expect(button.getAttribute('title')).toBe('Filtros indisponíveis: não foi possível carregar os campos.')
       expect((await screen.findAllByTitle('Este filtro não está sendo aplicado')).length).toBeGreaterThan(0)
+      fireEvent.click(button)
+      const drawer = await screen.findByRole('dialog', { name: 'Editar filtros' })
+      expect(within(drawer).getByText('Filtros indisponíveis: não foi possível carregar os campos.')).toBeTruthy()
+      expect(within(drawer).queryByText('Carregando campos…')).toBeNull()
     }, 60_000)
 
     it('no celular mostra o botão Filtros em tamanho de toque e os chips', async () => {

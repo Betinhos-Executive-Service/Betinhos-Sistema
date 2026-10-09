@@ -5,6 +5,7 @@ import { describeFilter, isEmptyFilter, type Filter, type FilterSet } from '../d
 import { filterKindOf } from '../domain/filterKind'
 import type { AttributeMap, Column, LookupOption } from '../domain/types'
 import { FilterEditor } from './FilterEditor'
+import { FILTERS_UNAVAILABLE } from './GeralToolbar'
 
 type Props = {
   open: boolean
@@ -19,10 +20,12 @@ type Props = {
   onClearAll: () => void
   /** Metadata indisponível: sem campos para filtrar. */
   unavailable?: boolean
+  /** Metadata ainda a caminho. */
+  loading?: boolean
 }
 
 /** Painel "Editar filtros": todos os campos filtráveis da raiz, um acordeão por campo; só vale ao aplicar. */
-export function FiltersDrawer({ open, onClose, filters, attributes, columns, search, onApply, onClearAll, unavailable }: Props) {
+export function FiltersDrawer({ open, onClose, filters, attributes, columns, search, onApply, onClearAll, unavailable, loading }: Props) {
   const [drafts, setDrafts] = useState<Record<string, Filter | null>>({})
   const [openKey, setOpenKey] = useState<string | null>(null)
   const [text, setText] = useState('')
@@ -61,7 +64,8 @@ export function FiltersDrawer({ open, onClose, filters, attributes, columns, sea
       >
         {open ? (
           <div className="gr-fd">
-            {unavailable ? <Alert tone="warning">Filtros indisponíveis: não foi possível carregar os campos.</Alert> : null}
+            {unavailable ? <Alert tone="warning">{FILTERS_UNAVAILABLE}</Alert> : null}
+            {loading ? <p className="gr-fd__loading" role="status">Carregando campos…</p> : null}
             <Input aria-label="Buscar campo" placeholder="Buscar campo…" value={text} onChange={(event) => setText(event.target.value)} />
             <ul className="gr-fd__list">
               {shown.map((item) => {

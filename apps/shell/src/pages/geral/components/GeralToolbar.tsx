@@ -23,7 +23,7 @@ type Props = {
   /** Filtros por coluna ativos. */
   filtersCount: number
   onOpenFilters: () => void
-  /** Metadata indisponível: o botão fica inerte, com o motivo. */
+  /** Metadata indisponível: o botão continua abrindo o painel (que explica) e leva o motivo no title. */
   filtersUnavailable?: boolean
   /** Celular: controles em tamanho de toque (44 px); no desktop ficam compactos (32 px). */
   mobile: boolean
@@ -53,7 +53,7 @@ export function GeralToolbar({ views, view, onSelectView, query, onQuery, search
       end={<>
         {selectedCount > 0 ? <span role="status" className="gr-filters__selected"><StatusBadge tone="info">{selectedCount === 1 ? '1 selecionado' : `${selectedCount} selecionados`}</StatusBadge></span> : null}
         {commands}
-        <Button variant="secondary" size={size} icon={<Filter size={16} />} aria-haspopup="dialog" aria-label={filtersCount > 0 ? `Filtros (${filtersCount})` : 'Filtros'} className={filtersUnavailable ? 'gr-btn--blocked' : undefined} aria-disabled={filtersUnavailable || undefined} title={filtersUnavailable ? FILTERS_UNAVAILABLE : undefined} onClick={(event) => { if (filtersUnavailable) event.preventDefault(); else onOpenFilters() }}>
+        <Button variant="secondary" size={size} icon={<Filter size={16} />} aria-haspopup="dialog" aria-label={filtersCount > 0 ? `Filtros (${filtersCount})` : 'Filtros'} title={filtersUnavailable ? FILTERS_UNAVAILABLE : undefined} onClick={onOpenFilters}>
           Filtros{filtersCount > 0 ? <span className="gr-filters__count">{filtersCount}</span> : null}
         </Button>
         <span className="gr-filters__columns"><ColumnsMenu size={size} columns={columns} attributes={attributes} prefs={prefs} onChange={onPrefs} /></span>
