@@ -89,6 +89,16 @@
 .gr-voucher__frame { position: relative; z-index: 1; width: min(1480px, calc(100% - 48px)); height: min(940px, calc(100% - 40px)); border: 0; border-radius: var(--bt-radius-lg); background: transparent; }
 @media (max-width: 820px) { .gr-voucher__frame { width: 100%; height: 100%; border-radius: 0; } }
 
+/* Auditoria: mesmo overlay do voucher, quadro de 92% x 88%. */
+.gr-auditoria { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; opacity: 0; transition: opacity 180ms var(--bt-ease-out); }
+.gr-auditoria:focus { outline: 0; }
+.gr-auditoria:not(.is-open) { transition-duration: 160ms; }
+.gr-auditoria.is-open { opacity: 1; }
+.gr-auditoria__backdrop { position: absolute; inset: 0; background: rgba(0, 26, 61, .22); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.gr-auditoria__frame { position: relative; z-index: 1; width: 92%; height: 88%; border: 0; border-radius: var(--bt-radius-lg); background: var(--bt-color-surface); }
+@media (max-width: 820px) { .gr-auditoria__frame { width: 100%; height: 100%; border-radius: 0; } }
+@media (prefers-reduced-motion: reduce) { .gr-auditoria { transition: none; } }
+
 /* Desktop: a grade ocupa a altura da janela e rola por dentro; a página não rola. O celular segue com a rolagem normal (cards). */
 @media (min-width: 821px) {
   .page.gr-page { max-width: none; height: 100dvh; display: flex; flex-direction: column; padding-top: var(--bt-space-3); padding-bottom: var(--bt-space-3); overflow-x: hidden; overflow-y: auto; }

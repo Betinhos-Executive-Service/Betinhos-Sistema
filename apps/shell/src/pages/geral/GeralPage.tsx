@@ -1,7 +1,7 @@
 import { useCallback, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
 import { Alert, Button, EmptyState, Menu, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
-import { Archive, ArchiveRestore, CalendarDays, ClipboardList, Copy, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Ticket, X } from 'lucide-react'
+import { Archive, ArchiveRestore, Bug, CalendarDays, ClipboardList, Copy, FilePlus2, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Send, ShieldCheck, Ticket, X } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
 import { useMedia } from '../operacional/useMedia'
@@ -11,7 +11,7 @@ import { Cell } from './components/Cell'
 import { GeralCards } from './components/GeralCards'
 import { GeralSheet } from './components/GeralSheet'
 import { GeralTable } from './components/GeralTable'
-import { CopyDialog, MockFormDialog, StateDialog, type StateRequest } from './components/Dialogs'
+import { CopyDialog, DispararDialog, GerarOpDialog, MockFormDialog, StateDialog, type DispararRequest, type OpRequest, type StateRequest } from './components/Dialogs'
 import { EscalaFdsDrawer } from './components/EscalaFdsDrawer'
 import { FilterChips } from './components/FilterChips'
 import { FilterDialog } from './components/FilterEditor'
@@ -19,8 +19,10 @@ import { FiltersDrawer } from './components/FiltersDrawer'
 import { LoadMore, LoadSentinel, statusText } from './components/LoadMore'
 import { GeralToolbar } from './components/GeralToolbar'
 import { ViewMenu } from './components/ViewMenu'
+import { AuditoriaOverlay } from './components/AuditoriaOverlay'
 import { VoucherOverlay } from './components/VoucherOverlay'
 import { copyText } from './domain/copy'
+import { splitOp } from './domain/commands'
 import { isEmptyFilter, type Filter } from './domain/filters'
 import { filterKindOf } from './domain/filterKind'
 import { applyColumnPrefs, loadColumnPrefs, saveColumnPrefs, type ColumnPrefs } from './domain/columns'
@@ -80,6 +82,12 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const [stateRequest, setStateRequest] = useState<StateRequest | null>(null)
   const [stateBusy, setStateBusy] = useState(false)
   const [voucherUrl, setVoucherUrl] = useState<string | null>(null)
+  const [auditoriaUrl, setAuditoriaUrl] = useState<string | null>(null)
+  const [opRequest, setOpRequest] = useState<OpRequest | null>(null)
+  const [opBusy, setOpBusy] = useState(false)
+  const [opError, setOpError] = useState<string | null>(null)
+  const [dispRequest, setDispRequest] = useState<DispararRequest | null>(null)
+  const [dispBusy, setDispBusy] = useState(false)
   const [escalaOpen, setEscalaOpen] = useState(false)
   // Filtro por coluna: `editingFilter` é o atributo no diálogo "Filtrar …"; o painel "Editar filtros" lista todos.
   const [editingFilter, setEditingFilter] = useState<string | null>(null)
@@ -233,6 +241,73 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     else setVoucherUrl(url)
   }, [source, selectedIds, toast])
 
+  const labelOf = useCallback((id: string) => { const name = rowOf(id)?.cr40f_id; return typeof name === 'string' && name ? name : id }, [rowOf])
+
+  const askOp = useCallback(() => {
+    const split = splitOp(selectedIds.map((id) => rowOf(id) ?? ({ [ID_ATTRIBUTE]: id } as Row)))
+    if (split.ok.length === 0) { toast({ tone: 'info', message: 'Todos os serviços selecionados já possuem OP.' }); return }
+    setOpError(null)
+    setOpRequest({ ids: split.ok.map((r) => String(r[ID_ATTRIBUTE])), labels: split.ok.map((r) => labelOf(String(r[ID_ATTRIBUTE]))), excluded: split.comOp.map((r) => labelOf(String(r[ID_ATTRIBUTE]))) })
+  }, [selectedIds, rowOf, labelOf, toast])
+
+  const confirmOp = useCallback(async () => {
+    if (!opRequest) return
+    setOpBusy(true)
+    setOpError(null)
+    try {
+      const url = await source.flowUrl('new_FlowUrlCriarOP')
+      if (url == null) { setOpError('Variável de ambiente new_FlowUrlCriarOP não configurada.'); return }
+      const { status } = await source.triggerFlow(url, { guids: opRequest.ids.join(',') })
+      if (status === 200 || status === 202) {
+        toast({ tone: 'success', message: `OP criada para ${opRequest.ids.length} serviço(s).` })
+        setOpRequest(null)
+        refresh()
+      } else setOpError(`Erro ao acionar o flow (status ${status})`)
+    } catch (reason) {
+      setOpError(reason instanceof Error ? reason.message : String(reason))
+    } finally {
+      setOpBusy(false)
+    }
+  }, [opRequest, source, toast, refresh])
+
+  const confirmDisparar = useCallback(async () => {
+    if (!dispRequest) return
+    const { ids } = dispRequest
+    setDispBusy(true)
+    try {
+      const { ok, failed } = await source.programar(ids)
+      if (failed.length === 0) toast({ tone: 'success', message: `${ok.length} serviço(s) programado(s).` })
+      else toast({ tone: 'danger', message: `${ok.length} de ${ids.length} programados; falharam: ${failed.map((f) => labelOf(f.id)).join(', ')}. ${failed[0].message}` })
+    } catch (reason) {
+      toast({ tone: 'danger', message: reason instanceof Error ? reason.message : String(reason) })
+    } finally {
+      setDispBusy(false)
+      setDispRequest(null)
+      refresh()
+      clearSelection()
+    }
+  }, [dispRequest, source, toast, refresh, clearSelection, labelOf])
+
+  const openAuditoria = useCallback(async () => {
+    try {
+      const result = await source.openAuditoria(selectedIds)
+      if (result === 'mock') toast({ tone: 'info', message: 'A auditoria abre dentro do Dataverse.' })
+      else if (result === 'external') { const url = source.auditoriaUrl(selectedIds); if (url) setAuditoriaUrl(url) }
+    } catch (reason) {
+      toast({ tone: 'danger', message: reason instanceof Error ? reason.message : String(reason) })
+    }
+  }, [source, selectedIds, toast])
+
+  const registrarErro = useCallback(async () => {
+    try {
+      const result = await source.openErroOperacional(selectedIds[0])
+      if (result === 'mock') toast({ tone: 'info', message: 'A Gestão de Qualidade abre dentro do Dataverse.' })
+      else if (result === 'closed') refresh()
+    } catch (reason) {
+      toast({ tone: 'danger', message: reason instanceof Error ? reason.message : String(reason) })
+    }
+  }, [source, selectedIds, toast, refresh])
+
   const mixedTitle = 'Selecione só serviços ativos ou só inativos.'
   const mixedId = useId()
   // Barra de seleção do celular: só aparece com linhas marcadas.
@@ -241,6 +316,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       {selectedIds.length === 1 ? <Button variant="action" size="compact" icon={<Pencil size={16} />} onClick={() => { void openForm('edit', selectedIds[0]) }}>Editar</Button> : null}
       <Button variant="action" size="compact" icon={<Ticket size={16} />} onClick={openVoucher}>Gerar Voucher</Button>
       <Button variant="action" size="compact" icon={<Copy size={16} />} onClick={() => { void copySelected() }}>Copiar Serviços</Button>
+      <Button variant="action" size="compact" icon={<FilePlus2 size={16} />} onClick={askOp}>Gerar OP</Button>
+      <Button variant="action" size="compact" icon={<Send size={16} />} onClick={() => setDispRequest({ ids: selectedIds })}>Disparar</Button>
       {selectedState === 1
         ? <Button variant="action" size="compact" icon={<ArchiveRestore size={16} />} onClick={() => askState(true)}>Ativar</Button>
         : selectedState === 0
@@ -282,6 +359,12 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         ? <Button variant="action" size="compact" icon={<Copy size={16} />} {...blocked(noneTitle, noneId)}>Copiar Serviços</Button>
         : <Button variant="action" size="compact" icon={<Copy size={16} />} onClick={() => { void copySelected() }}>Copiar Serviços</Button>}
       {none
+        ? <Button variant="action" size="compact" icon={<FilePlus2 size={16} />} {...blocked(noneTitle, noneId)}>Gerar OP</Button>
+        : <Button variant="action" size="compact" icon={<FilePlus2 size={16} />} onClick={askOp}>Gerar OP</Button>}
+      {none
+        ? <Button variant="action" size="compact" icon={<Send size={16} />} {...blocked(noneTitle, noneId)}>Disparar</Button>
+        : <Button variant="action" size="compact" icon={<Send size={16} />} onClick={() => setDispRequest({ ids: selectedIds })}>Disparar</Button>}
+      {none
         ? <Button variant="danger" size="compact" icon={<Archive size={16} />} {...blocked(noneTitle, noneId)}>Desativar</Button>
         : selectedState === 1
           ? <Button variant="action" size="compact" icon={<ArchiveRestore size={16} />} onClick={() => askState(true)}>Ativar</Button>
@@ -302,6 +385,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       actions={[
         { id: 'funcoes', label: 'Funções Operacionais', icon: <ClipboardList size={16} />, onSelect: () => { location.hash = hrefFor('new_telafuncoesoperacionais') } },
         { id: 'escala', label: 'Escala FDS', icon: <CalendarDays size={16} />, onSelect: () => setEscalaOpen(true) },
+        { id: 'auditoria', label: 'Auditoria', icon: <ShieldCheck size={16} />, onSelect: () => { void openAuditoria() } },
+        { id: 'erro', label: <span title={selectedIds.length === 1 ? undefined : oneTitle}>Registrar Erro</span>, icon: <Bug size={16} />, disabled: selectedIds.length !== 1, onSelect: () => { void registrarErro() } },
         { id: 'contagem', label: 'Contagem de Serviços', icon: <ListChecks size={16} />, onSelect: () => { location.hash = hrefFor('operacional') } },
       ]}
     />
@@ -468,6 +553,9 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       <StateDialog request={stateRequest} busy={stateBusy} onClose={() => setStateRequest(null)} onConfirm={() => { void confirmState() }} />
       <MockFormDialog open={mockForm} onClose={() => setMockForm(false)} />
       <EscalaFdsDrawer url={source.escalaFdsUrl()} open={escalaOpen} onClose={() => setEscalaOpen(false)} />
+      <GerarOpDialog request={opRequest} busy={opBusy} error={opError} onClose={() => setOpRequest(null)} onConfirm={() => { void confirmOp() }} />
+      <DispararDialog request={dispRequest} busy={dispBusy} onClose={() => setDispRequest(null)} onConfirm={() => { void confirmDisparar() }} />
+      {auditoriaUrl ? <AuditoriaOverlay url={auditoriaUrl} onClose={() => setAuditoriaUrl(null)} /> : null}
       {voucherUrl ? <VoucherOverlay url={voucherUrl} onClose={() => setVoucherUrl(null)} /> : null}
     </PageLayout>
   )
