@@ -66,3 +66,18 @@ export const relationshipPath = (attribute: string) =>
 
 export const copyPath = (set: string, ids: string[], select: string[]) =>
   `${set}?$select=${select.join(',')}&$filter=${encodeURIComponent(ids.map((id) => `${ID_ATTRIBUTE} eq ${cleanId(id)}`).join(' or '))}`
+
+/** Valor da variável de ambiente (primeiro lugar a consultar). */
+export const envVarPath = (schema: string) =>
+  `environmentvariablevalues?$select=value&$expand=EnvironmentVariableDefinitionId($select=schemaname)&$filter=${encodeURIComponent(`EnvironmentVariableDefinitionId/schemaname eq '${odataString(schema)}'`)}`
+/** Valor padrão da definição, quando não há valor atual. */
+export const envVarDefaultPath = (schema: string) =>
+  `environmentvariabledefinitions?$select=defaultvalue&$filter=${encodeURIComponent(`schemaname eq '${odataString(schema)}'`)}`
+
+/** Reservas com motorista na janela [start, end) para a contagem por motorista. */
+export const contagemPath = (set: string, start: string, end: string) =>
+  `${set}?$select=cr40f_reservadeveculosid,_cr40f_motorista_value,cr40f_dataehorriodesada,cr40f_trajeto&$filter=${encodeURIComponent(`_cr40f_motorista_value ne null and cr40f_dataehorriodesada ge ${start} and cr40f_dataehorriodesada lt ${end}`)}&$orderby=cr40f_dataehorriodesada asc`
+
+/** Funcionários ativos; `cr40f_funcao` é choice, então "motorista" é filtrado no cliente pelo valor formatado. */
+export const motoristasPath = (set: string) =>
+  `${set}?$select=cr40f_funcionariosid,cr40f_nomecompleto,new_apelido,cr40f_funcao&$filter=${encodeURIComponent('statecode eq 0')}&$orderby=cr40f_nomecompleto asc`

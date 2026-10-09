@@ -2,16 +2,20 @@ import { chunk, cleanId, formatted, getHostXrm, type Row } from '@betinhos/datav
 import type { Host } from '../../../host'
 import { browserKV } from '../../pagantes/data/source'
 import type { KV } from '../domain/columns'
+import { auditoriaData, dayWindow, programarPatch, type Motorista } from '../domain/commands'
 import { COPY_SELECT } from '../domain/copy'
 import { buildCountFetch, buildFetch, quickFindAttributes } from '../domain/fetch'
 import { formatDateTime, formatMoney } from '../domain/format'
 import { ENTITY, ID_ATTRIBUTE, PAGE_SIZE, type AttributeInfo, type AttributeMap, type LookupBind, type LookupOption, type Page, type Sort, type View } from '../domain/types'
 import { MOCK_ATTRIBUTES, MOCK_BINDS, MOCK_LOOKUPS, applyMockFetch, createMockRows, createMockViews } from './mock'
-import { copyPath, fetchPath, mapViews, parseCount, parsePage, quickFindPath, relationshipPath, reloadPath, searchPath, viewsPaths, type FetchResponse } from './queries'
+import { contagemPath, copyPath, envVarDefaultPath, envVarPath, motoristasPath, fetchPath, mapViews, parseCount, parsePage, quickFindPath, relationshipPath, reloadPath, searchPath, viewsPaths, type FetchResponse } from './queries'
 
 export const FORM_WEBRESOURCE = 'new_formulario_geral.html'
 export const VOUCHER_WEBRESOURCE = 'cr40f_VoucherConfirmacao.html'
 export const ESCALA_FDS_WEBRESOURCE = 'cr40f_EscalaFDS.html'
+export const AUDITORIA_WEBRESOURCE = 'new_betinhos_AuditoriaViewer'
+export const ERRO_OPERACIONAL_WEBRESOURCE = 'new_gestao_erros_operacionais.html'
+export const FUNCIONARIOS_ENTITY = 'cr40f_funcionarios'
 
 export type PageRequest = { fetchxml: string; page: number; cookie: string | null; sort: Sort; query: string; quickFind: string[] }
 export type CountRequest = { fetchxml: string; query: string; quickFind: string[] }
@@ -43,11 +47,33 @@ export type Source = {
   /** URL do iframe do voucher; `null` em mock. */
   openVoucher(ids: string[]): string | null
   escalaFdsUrl(): string | null
+  /** URL do fluxo (variável de ambiente: valor atual, depois padrão); `null` quando não configurada. */
+  flowUrl(schema: string): Promise<string | null>
+  /** POST JSON no fluxo (outro host: `fetch` direto, sem o cliente Dataverse). */
+  triggerFlow(url: string, body: unknown): Promise<{ status: number }>
+  /** Marca como Programado; falhas por serviço, sem abortar os demais. */
+  programar(ids: string[]): Promise<{ ok: string[]; failed: { id: string; message: string }[] }>
+  openAuditoria(ids: string[]): Promise<'closed' | 'external' | 'mock'>
+  /** URL do visualizador de auditoria para o fallback fora do model-driven; `null` em mock. */
+  auditoriaUrl(ids: string[]): string | null
+  openErroOperacional(id: string): Promise<'closed' | 'external' | 'mock'>
+  /** Reservas com motorista no dia (yyyy-mm-dd, São Paulo) e a lista de motoristas ativos. */
+  contagem(day: string): Promise<{ reservas: Row[]; motoristas: Motorista[] }>
   kv: KV
 }
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 const same = (a: string, b: string) => cleanId(a) === cleanId(b)
+
+function settle(ids: string[], results: PromiseSettledResult<unknown>[]) {
+  const ok: string[] = []
+  const failed: { id: string; message: string }[] = []
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled') ok.push(ids[index])
+    else failed.push({ id: ids[index], message: message(result.reason) })
+  })
+  return { ok, failed }
+}
 
 export const VIEW_DESCRIPTION = 'Criada no Sistema Betinhos'
 export const MOCK_OBJECT_TYPE_CODE = 10580
@@ -88,6 +114,23 @@ function createMockSource({ latency = 1 }: SourceOptions = {}): Source {
     else row[`${key}@OData.Community.Display.V1.FormattedValue`] = label
   }
 
+  const update = async (id: string, patch: Row) => {
+    await wait(350)
+    const row = find(id)
+    if (!row) throw new Error('Serviço não encontrado.')
+    if (row.cr40f_id === BLOCKED_ID) throw new Error('Sem permissão para alterar este serviço.')
+    for (const [key, value] of Object.entries(patch)) {
+      if (key.endsWith(BIND_SUFFIX)) {
+        const found = binds.find(([, bind]) => bind.nav === key.slice(0, -BIND_SUFFIX.length))
+        const target = /\(([^)]+)\)\s*$/.exec(String(value))?.[1]
+        const option = found && target ? MOCK_LOOKUPS[found[0]].find((o) => same(o.id, target)) : undefined
+        if (!found || !option) throw new Error('Registro relacionado não encontrado.')
+        row[`_${found[0]}_value`] = option.id
+        row[`_${found[0]}_value@OData.Community.Display.V1.FormattedValue`] = option.nome
+      } else apply(row, key, value)
+    }
+  }
+
   return {
     mock: true,
     views: async () => [...createMockViews(), ...mine.map((v) => ({ ...v }))],
@@ -123,22 +166,7 @@ function createMockSource({ latency = 1 }: SourceOptions = {}): Source {
       await wait(150)
       return applyMockFetch(rows, req.fetchxml, { ...req, page: 1, pageSize: Number.MAX_SAFE_INTEGER, sort: null, now: new Date() }).total
     },
-    async update(id, patch) {
-      await wait(350)
-      const row = find(id)
-      if (!row) throw new Error('Serviço não encontrado.')
-      if (row.cr40f_id === BLOCKED_ID) throw new Error('Sem permissão para alterar este serviço.')
-      for (const [key, value] of Object.entries(patch)) {
-        if (key.endsWith(BIND_SUFFIX)) {
-          const found = binds.find(([, bind]) => bind.nav === key.slice(0, -BIND_SUFFIX.length))
-          const target = /\(([^)]+)\)\s*$/.exec(String(value))?.[1]
-          const option = found && target ? MOCK_LOOKUPS[found[0]].find((o) => same(o.id, target)) : undefined
-          if (!found || !option) throw new Error('Registro relacionado não encontrado.')
-          row[`_${found[0]}_value`] = option.id
-          row[`_${found[0]}_value@OData.Community.Display.V1.FormattedValue`] = option.nome
-        } else apply(row, key, value)
-      }
-    },
+    update,
     async clearLookup(id, attribute) {
       await wait(350)
       const row = find(id)
@@ -183,6 +211,23 @@ function createMockSource({ latency = 1 }: SourceOptions = {}): Source {
     openForm: async () => 'mock',
     openVoucher: () => null,
     escalaFdsUrl: () => null,
+    flowUrl: async () => 'https://flow.mock/op',
+    async triggerFlow() {
+      await wait(300)
+      return { status: 202 }
+    },
+    async programar(ids) {
+      return settle(ids, await Promise.allSettled(ids.map((id) => update(id, programarPatch()))))
+    },
+    openAuditoria: async () => 'mock',
+    auditoriaUrl: () => null,
+    openErroOperacional: async () => 'mock',
+    async contagem(day) {
+      await wait(200)
+      const { start, end } = dayWindow(day)
+      const found = rows.filter((r) => r._cr40f_motorista_value && String(r.cr40f_dataehorriodesada) >= start && String(r.cr40f_dataehorriodesada) < end).map((r) => ({ ...r }))
+      return { reservas: found, motoristas: MOCK_LOOKUPS.cr40f_motorista.map((o) => ({ id: o.id, nome: o.nome })) }
+    },
     kv: browserKV(),
   }
 }
@@ -191,9 +236,11 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
   if (host.mode === 'mock') return createMockSource(options)
 
   let setPromise: Promise<string> | null = null
+  let knownSet: string | null = null
   const entitySet = () => (setPromise ??= host.metadata.entities([ENTITY]).then((info) => {
     const value = info.get(ENTITY)?.entitySetName
     if (!value) throw new Error(`Tabela ${ENTITY} não encontrada na metadata.`)
+    knownSet = value
     return value
   }).catch((error) => { setPromise = null; throw error }))
 
@@ -274,14 +321,7 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
     async setState(ids, active) {
       const set = await entitySet()
       const patch = active ? { statecode: 0, statuscode: 1 } : { statecode: 1, statuscode: 2 }
-      const results = await Promise.allSettled(ids.map((id) => host.client.update(set, id, patch)))
-      const ok: string[] = []
-      const failed: { id: string; message: string }[] = []
-      results.forEach((result, index) => {
-        if (result.status === 'fulfilled') ok.push(ids[index])
-        else failed.push({ id: ids[index], message: message(result.reason) })
-      })
-      return { ok, failed }
+      return settle(ids, await Promise.allSettled(ids.map((id) => host.client.update(set, id, patch))))
     },
     async search(attribute, text) {
       const target = (await attributes(ENTITY)).get(attribute)?.targets[0]
@@ -315,6 +355,56 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
     },
     openVoucher: (ids) => `${host.clientUrl}/WebResources/${VOUCHER_WEBRESOURCE}?ids=${encodeURIComponent(JSON.stringify(ids))}&cacheBust=${Date.now()}`,
     escalaFdsUrl: () => `${host.clientUrl}/WebResources/${ESCALA_FDS_WEBRESOURCE}`,
+    async flowUrl(schema) {
+      const current = await host.client.request<{ value: Row[] }>(envVarPath(schema))
+      const value = current.value[0]?.value
+      if (typeof value === 'string' && value.trim()) return value.trim()
+      const def = await host.client.request<{ value: Row[] }>(envVarDefaultPath(schema))
+      const fallback = def.value[0]?.defaultvalue
+      return typeof fallback === 'string' && fallback.trim() ? fallback.trim() : null
+    },
+    async triggerFlow(url, body) {
+      const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      return { status: response.status }
+    },
+    async programar(ids) {
+      const set = await entitySet()
+      return settle(ids, await Promise.allSettled(ids.map((id) => host.client.update(set, id, programarPatch()))))
+    },
+    async openAuditoria(ids) {
+      const data = auditoriaData(ids, await entitySet(), host.clientUrl)
+      const navigation = getHostXrm()?.Navigation as { navigateTo?: (page: object, options: object) => Promise<unknown> } | undefined
+      if (host.insideModelDriven && navigation?.navigateTo) {
+        await navigation.navigateTo(
+          { pageType: 'webresource', webresourceName: AUDITORIA_WEBRESOURCE, data: JSON.stringify(data) },
+          { target: 2, width: { value: 92, unit: '%' }, height: { value: 88, unit: '%' }, position: 1 },
+        )
+        return 'closed'
+      }
+      return 'external'
+    },
+    auditoriaUrl: (ids) => `${host.clientUrl}/WebResources/${AUDITORIA_WEBRESOURCE}?data=${encodeURIComponent(JSON.stringify(auditoriaData(ids, knownSet ?? `${ENTITY}s`, host.clientUrl)))}`,
+    async openErroOperacional(id) {
+      const data = `reservaId=${encodeURIComponent(cleanId(id).toLowerCase())}`
+      const navigation = getHostXrm()?.Navigation as { navigateTo?: (page: object, options: object) => Promise<unknown> } | undefined
+      if (host.insideModelDriven && navigation?.navigateTo) {
+        await navigation.navigateTo({ pageType: 'webresource', webresourceName: ERRO_OPERACIONAL_WEBRESOURCE, data }, { target: 1 })
+        return 'closed'
+      }
+      window.open?.(`${host.clientUrl}/WebResources/${ERRO_OPERACIONAL_WEBRESOURCE}?data=${encodeURIComponent(data)}`, '_blank', 'noopener')
+      return 'external'
+    },
+    async contagem(day) {
+      const { start, end } = dayWindow(day)
+      const [reservas, funcionarios] = await Promise.all([
+        entitySet().then((set) => host.client.getAll(contagemPath(set, start, end))),
+        host.metadata.entity(FUNCIONARIOS_ENTITY).then((info) => host.client.getAll(motoristasPath(info.entitySetName))),
+      ])
+      const motoristas = funcionarios
+        .filter((row) => /motorista/i.test(formatted(row, 'cr40f_funcao')))
+        .map((row): Motorista => ({ id: cleanId(String(row.cr40f_funcionariosid ?? '')), nome: String(row.cr40f_nomecompleto ?? '') }))
+      return { reservas, motoristas }
+    },
     kv: browserKV(),
   }
 }

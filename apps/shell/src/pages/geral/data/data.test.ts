@@ -368,3 +368,82 @@ describe('mock: filtros por coluna', () => {
     expect(searched.total).toBe(searched.rows.length)
   })
 })
+
+describe('comandos (caminhos e fonte)', () => {
+  it('caminhos de variável de ambiente e contagem', async () => {
+    const { envVarDefaultPath, envVarPath, contagemPath, motoristasPath } = await import('./queries')
+    expect(decodeURIComponent(envVarPath("new_Flow'X"))).toBe("environmentvariablevalues?$select=value&$expand=EnvironmentVariableDefinitionId($select=schemaname)&$filter=EnvironmentVariableDefinitionId/schemaname eq 'new_Flow''X'")
+    expect(decodeURIComponent(envVarDefaultPath('new_FlowUrlCriarOP'))).toBe("environmentvariabledefinitions?$select=defaultvalue&$filter=schemaname eq 'new_FlowUrlCriarOP'")
+    const path = decodeURIComponent(contagemPath('cr40f_reservadeveculoses', '2026-10-08T03:00:00.000Z', '2026-10-09T03:00:00.000Z'))
+    expect(path).toContain('_cr40f_motorista_value ne null and cr40f_dataehorriodesada ge 2026-10-08T03:00:00.000Z and cr40f_dataehorriodesada lt 2026-10-09T03:00:00.000Z')
+    expect(path).toContain('$orderby=cr40f_dataehorriodesada asc')
+    expect(motoristasPath('cr40f_funcionarioses')).toContain('cr40f_funcao')
+  })
+  it('flowUrl: valor, depois padrão, depois null', async () => {
+    const make = (answers: unknown[][]) => {
+      const request = vi.fn(async () => ({ value: answers.shift() ?? [] }))
+      const host = { mode: 'dataverse', clientUrl: 'https://org.crm.dynamics.com', insideModelDriven: false, client: { request }, metadata: {} } as unknown as Host
+      return { source: createSource(host), request }
+    }
+    const a = make([[{ value: ' https://flow/a ' }]])
+    expect(await a.source.flowUrl('s')).toBe('https://flow/a')
+    expect(a.request).toHaveBeenCalledTimes(1)
+    expect(await make([[], [{ defaultvalue: 'https://flow/d' }]]).source.flowUrl('s')).toBe('https://flow/d')
+    expect(await make([[], []]).source.flowUrl('s')).toBeNull()
+  })
+  it('triggerFlow faz POST JSON e devolve o status', async () => {
+    const fetchMock = vi.fn(async () => ({ status: 202 }))
+    vi.stubGlobal('fetch', fetchMock)
+    try {
+      const host = { mode: 'dataverse', clientUrl: 'https://org', insideModelDriven: false } as unknown as Host
+      expect(await createSource(host).triggerFlow('https://flow/x', { guids: ['a'] })).toEqual({ status: 202 })
+      expect(fetchMock).toHaveBeenCalledWith('https://flow/x', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"guids":["a"]}' })
+    } finally { vi.unstubAllGlobals() }
+  })
+  it('mock: flowUrl, triggerFlow, programar parcial e contagem', async () => {
+    const source = createSource({ mode: 'mock' }, { latency: 0 })
+    expect(await source.flowUrl('x')).toBe('https://flow.mock/op')
+    expect(await source.triggerFlow('u', {})).toEqual({ status: 202 })
+    const page = await source.page({ fetchxml: createMockViews()[0].fetchxml, page: 1, cookie: null, sort: null, query: '', quickFind: [] })
+    const ruim = page.rows.find((r) => r.cr40f_id === 'OS-1013')
+    const bom = page.rows.find((r) => r.cr40f_id !== 'OS-1013')
+    expect(ruim && bom).toBeTruthy()
+    const ids = [String(bom!.cr40f_reservadeveculosid), String(ruim!.cr40f_reservadeveculosid)]
+    const result = await source.programar(ids)
+    expect(result.ok).toEqual([ids[0]])
+    expect(result.failed).toEqual([{ id: ids[1], message: 'Sem permissão para alterar este serviço.' }])
+    const reloaded = await source.reload(ids[0], ['cr40f_status'])
+    expect(reloaded.cr40f_status).toBe(202410005)
+    expect(reloaded.new_foiprogramado).toBe(true)
+    expect(await source.openAuditoria(ids)).toBe('mock')
+    expect(source.auditoriaUrl(ids)).toBeNull()
+    expect(await source.openErroOperacional(ids[0])).toBe('mock')
+    const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
+    const dia = await source.contagem(hoje)
+    expect(dia.motoristas).toHaveLength(4)
+    expect(dia.reservas.length).toBeGreaterThan(0)
+    expect(dia.reservas.every((r) => r._cr40f_motorista_value)).toBe(true)
+  })
+  it('mock: OS-1004 já tem OP', () => {
+    const row = createMockRows(new Date('2026-10-08T12:00:00Z')).find((r) => r.cr40f_id === 'OS-1004')
+    expect(row?._cr40f_financeiro_value).toBeTruthy()
+  })
+  it('openAuditoria e openErroOperacional fora do model-driven devolvem external', async () => {
+    const host = {
+      mode: 'dataverse', clientUrl: 'https://org.crm.dynamics.com', insideModelDriven: false,
+      metadata: { entities: async () => new Map([['cr40f_reservadeveculos', { entitySetName: 'cr40f_reservadeveculoses' }]]) },
+    } as unknown as Host
+    const open = vi.fn()
+    vi.stubGlobal('open', open)
+    try {
+      const source = createSource(host)
+      const id = 'ABCDEF01-2345-4678-89AB-CDEF01234567'
+      expect(await source.openAuditoria([id])).toBe('external')
+      const url = source.auditoriaUrl([id])!
+      expect(url.startsWith('https://org.crm.dynamics.com/WebResources/new_betinhos_AuditoriaViewer?data=')).toBe(true)
+      expect(JSON.parse(decodeURIComponent(url.split('data=')[1]))).toMatchObject({ entitySetName: 'cr40f_reservadeveculoses', validIds: [id.toLowerCase()] })
+      expect(await source.openErroOperacional(id)).toBe('external')
+      expect(open.mock.calls[0][0]).toBe('https://org.crm.dynamics.com/WebResources/new_gestao_erros_operacionais.html?data=reservaId%3Dabcdef01-2345-4678-89ab-cdef01234567')
+    } finally { vi.unstubAllGlobals() }
+  })
+})
