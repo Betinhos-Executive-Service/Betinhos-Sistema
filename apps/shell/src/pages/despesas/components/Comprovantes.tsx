@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button, Spinner, StatusBadge } from '@betinhos/ui'
 import { ChevronLeft, ChevronRight, Download, ExternalLink, FileText, ImageOff, RefreshCw, X } from 'lucide-react'
+import { useQueryId } from '../../../nav/queryState'
 import { formatDateTime } from '../../pagantes/domain/messages'
 import { label } from '../../pagantes/domain/status'
 import { tipoPrevia } from '../domain/arquivo'
@@ -64,7 +65,11 @@ type Props = { anexos: Anexo[]; choices: DespesaChoices; ler: Ler }
 /** Cartões com miniatura; clicar abre o visualizador. Sem arquivo no OneDrive, só o aviso. */
 export function ComprovantesGaleria({ anexos, choices, ler }: Props) {
   const visiveis = anexos.filter(temArquivo)
-  const [aberto, setAberto] = useState<number | null>(null)
+  // O comprovante aberto no visualizador vive na URL (`comprovante=<id do anexo>`).
+  const [abertoId, setAbertoId] = useQueryId('comprovante')
+  const achado = abertoId ? visiveis.findIndex((a) => a.id === abertoId) : -1
+  const aberto = achado >= 0 ? achado : null
+  const setAberto = (indice: number | null) => setAbertoId(indice == null ? null : visiveis[indice]?.id ?? null)
   return (
     <>
       <ul className="dp-comprovantes">

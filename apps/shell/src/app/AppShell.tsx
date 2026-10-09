@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { AppShell as Shell, type NavGroup } from '@betinhos/ui'
 import { MENU, itemLabel, type MenuGroup } from '../nav/menu'
+import { useQueryBandeira, useQueryTexto } from '../nav/queryState'
 import { hrefFor } from '../nav/useHashRoute'
 import { useInstallPrompt } from './useInstallPrompt'
 
@@ -94,12 +95,19 @@ function toNavGroup(group: MenuGroup, entityLabels: Map<string, string>): NavGro
 /** Chrome persistente do Sistema Betinhos: AppShell do pacote alimentado pelo sitemap e pelo estado de conexão. */
 export function AppShell({ activeId, title, entityLabels, connection, children }: Props) {
   const install = useInstallPrompt()
+  // Gaveta do menu no celular e busca de telas também vivem na URL (`menu=1`, `busca=…`).
+  const [navOpen, setNavOpen] = useQueryBandeira('menu')
+  const [search, setSearch] = useQueryTexto('busca')
   return (
     <Shell
       brand={{ name: 'Betinhos', subtitle: 'Sistema interno', href: hrefFor(MENU[0].items[0].id) }}
       groups={MENU.map((group) => toNavGroup(group, entityLabels))}
       activeId={activeId}
       title={title}
+      navOpen={navOpen}
+      onNavOpenChange={setNavOpen}
+      search={search}
+      onSearchChange={setSearch}
       status={{ tone: connection.ok ? 'success' : 'warning', text: connection.text }}
       footer={install ? (
         <button type="button" className="bt-shell__item" onClick={install}>

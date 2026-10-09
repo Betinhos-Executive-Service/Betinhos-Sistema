@@ -3,7 +3,7 @@ import { Alert, Button, Dialog, EmptyState, Field, Input, Pagination, StatusBadg
 import { Plus, RefreshCw, SearchX, Users } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
-import { useQueryAlvo, useQueryFilters, useQueryPagina } from '../../nav/queryState'
+import { useQueryAlvo, useQueryBandeira, useQueryFilters, useQueryPagina } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
 import { label } from './domain/choices'
@@ -55,7 +55,7 @@ function Pessoas({ host }: { host: Host }) {
   const clientes = useMemo(() => clienteOptions(ps.list), [ps.list])
 
   const [target, setTarget] = useQueryAlvo()
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving] = useQueryBandeira('salvarvisao')
   const [viewName, setViewName] = useState('')
 
   const refresh = useCallback(() => { void ps.reload() }, [ps.reload])

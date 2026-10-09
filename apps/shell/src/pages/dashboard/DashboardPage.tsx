@@ -10,6 +10,7 @@ import { createSource, type ConjuntoExtra } from './data/source'
 import { filtrarServicos, opcoesFiltro, type OpcoesFiltro } from './domain/base'
 import { int } from './domain/format'
 import type { Contexto } from './domain/kpis'
+import { detalheDoId } from './domain/detalhes'
 import { cargaDesde, periodoAnterior } from './domain/periodo'
 import { dashboardQuery, despesasQuery, lerFrotaMotorista } from './domain/query'
 import type { Filtros } from './domain/types'
@@ -45,6 +46,8 @@ export function DashboardPage({ host }: { host: Host }) {
     const params = new URLSearchParams(query)
     if (proxima === 'resumo') params.delete('tab')
     else params.set('tab', proxima)
+    // O que estava aberto numa aba (drill-down, linhas e tabelas expandidas) não vale na outra.
+    for (const chave of ['detalhe', 'linha', 'tabela', 'todos']) params.delete(chave)
     setHashQuery(params)
   }
   const [now, setNow] = useState(() => new Date())
@@ -87,6 +90,8 @@ export function DashboardPage({ host }: { host: Host }) {
   const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar dashboard" onClick={() => void db.atualizar()} />, [db.atualizar])
   useShellHeader({ title: 'Dashboard', actions: headerActions })
 
+  // Drill-down aberto pela URL: refeito com o recorte atual assim que os dados chegam.
+  const resolverDetalhe = (id: string) => (ctx && db.dados ? detalheDoId(id, ctx, db.dados) : null)
   const segmentado = filtros.status.length + filtros.clientes.length + filtros.motoristas.length + filtros.tipos.length > 0
   const limpar = () => setFiltros({ ...filtros, status: [], clientes: [], motoristas: [], tipos: [] })
   const aviso = avisoSegmento(aba, filtros)
@@ -139,7 +144,7 @@ export function DashboardPage({ host }: { host: Host }) {
         {/* Drill-down: um Drawer para a página; links "Abrir no Dataverse" só no modo Dataverse. */}
         {/* Toast do DS ("Tabela copiada"): o shell não tem provider global, então a página monta o seu. */}
         <ToastProvider>
-          <DetalheProvider clientUrl={host.mode === 'dataverse' ? host.clientUrl : null}>
+          <DetalheProvider clientUrl={host.mode === 'dataverse' ? host.clientUrl : null} resolver={resolverDetalhe}>
             {db.dados || carregandoPrimeira ? conteudo[aba]() : null}
           </DetalheProvider>
         </ToastProvider>
