@@ -5,6 +5,7 @@ import type { LinhaMeta, MetaRealizado, StatusServicos, TicketMensal, TotalProdu
 import { brl, brlS, int } from '../domain/format'
 import { useMedia } from '../../operacional/useMedia'
 import { AnaliseCard } from './AnaliseCard'
+import { tabelaCopia } from './Copiar'
 import { Participacao, Status, pct } from './Celulas'
 import { COLUNA_LARGA, Linhas, MEDIA_MOBILE, juntar } from './Linhas'
 
@@ -28,6 +29,7 @@ export function TotalProduzidoCard({ dados: tp, periodo }: { dados: TotalProduzi
       titulo="Total produzido" periodo={periodo} unidade="R$ por mês" valor={tp.valor} sub={`Comparativo 3 anos · ${tp.sub}`} chips={tp.chips} apoio={tp.apoio}
       grafico={<LinhaChart descricao={`Faturamento mensal de ${anos.join(', ')}, ${periodo}`} formatar={brlS} dados={tp.pontos.map((p) => ({ rotulo: p.rotulo, [anos[0]]: p.valores[0], [anos[1]]: p.valores[1], [anos[2]]: p.valores[2] }))} series={[{ chave: anos[0], nome: anos[0], cor: 'secondary', tracejada: true }, { chave: anos[1], nome: anos[1], cor: 'brand' }, { chave: anos[2], nome: anos[2], cor: 'action' }]} />}
       tabela={<Table columns={colunas} rows={tp.pontos} rowKey={(p) => p.rotulo} />} tabelaSobDemanda
+      copiar={tabelaCopia(tp.pontos, [['Mês', (p) => p.rotulo], ...anos.map((a, i) => [a, (p: PontoTP) => brl(p.valores[i])] as const)])}
     />
   )
 }
@@ -47,6 +49,7 @@ export function MetaRealizadoCard({ dados: mr, periodo }: { dados: MetaRealizado
     <AnaliseCard
       titulo="Meta × realizado" periodo={periodo} unidade="R$ por mês" valor={mr.valor} sub={mr.sub} chips={mr.chips} apoio={mr.apoio}
       tabela={<Table columns={colunas} rows={mr.linhas} rowKey={(l) => l.mes} empty={vazio('Nenhuma meta no período')} />}
+      copiar={tabelaCopia(mr.linhas, [['Mês', (l) => l.rotulo], ['Meta', (l) => brl(l.meta)], ['Realizado', (l) => brl(l.real)], ['Atingimento', (l) => pct(l.pct)]])}
     />
   )
 }
@@ -62,6 +65,7 @@ export function TicketMensalCard({ dados: tm, periodo }: { dados: TicketMensal; 
       titulo="Ticket médio — mensal" periodo={periodo} unidade="R$ por serviço" valor={tm.valor} sub={tm.sub} chips={tm.chips}
       grafico={<BarraChart descricao={`Ticket médio por mês, ${periodo}`} nome="Ticket médio" formatar={brlS} dados={tm.pontos} />}
       tabela={<Table columns={colunas} rows={tm.pontos} rowKey={(p) => p.rotulo} />} tabelaSobDemanda
+      copiar={tabelaCopia(tm.pontos, [['Mês', (p) => p.rotulo], ['Ticket médio', (p) => (p.valor == null ? '—' : brl(p.valor))]])}
     />
   )
 }
@@ -79,6 +83,7 @@ export function StatusServicosCard({ dados: status, periodo }: { dados: StatusSe
     <AnaliseCard
       titulo="Status dos serviços" periodo={periodo} unidade="serviços" valor={status.valor} sub={status.sub} apoio={status.apoio}
       tabela={<Table columns={colunas} rows={status.linhas} rowKey={(l) => l.status} empty={vazio('Nenhum serviço no período')} />}
+      copiar={tabelaCopia(status.linhas, [['Status', (l) => l.status], ['Serviços', (l) => l.qtd], ['Participação', (l) => pct(l.pct)]])}
     />
   )
 }

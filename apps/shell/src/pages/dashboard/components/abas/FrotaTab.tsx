@@ -6,6 +6,7 @@ import { dec, int } from '../../domain/format'
 import type { Filtros, PontoSerie } from '../../domain/types'
 import { useMedia } from '../../../operacional/useMedia'
 import { AnaliseCard } from '../AnaliseCard'
+import { tabelaCopia } from '../Copiar'
 import { AbaCarregando } from '../Carregando'
 import { Duplo, Rolagem, col, larguraMinima, pct } from '../Celulas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
@@ -142,6 +143,7 @@ function KmPorDiaCard({ dias, periodo, mobile }: { dias: Frota['kmPorDia']; peri
       ) : <Vazio titulo="Sem telemetria no período" />}
       tabela={dias.length ? <Rolagem rotulo="Km por dia" alturaMax={320}><Table columns={colunas} rows={dias} rowKey={(d) => d.dia} /></Rolagem> : undefined}
       tabelaSobDemanda
+      copiar={tabelaCopia(dias, [['Dia', (d) => dataBR(d.dia)], ['Km', (d) => num(d.km)]])}
     />
   )
 }
@@ -179,6 +181,10 @@ function UsoCard({ frota, filtros, periodo, mobile }: { frota: Frota; filtros: F
         />
       ) : <Vazio titulo={antesDoCorte ? `O uso da frota é medido a partir de ${dataBR(CORTE_USO_FROTA)}` : 'Sem dias no período'} />}
       tabela={meses.length ? <Table className="dash-tabela--densa dash-fr-uso" columns={colunas} rows={meses} rowKey={(m) => m.mes} /> : undefined}
+      copiar={tabelaCopia(meses, [
+        ['Mês', (m) => m.rotulo], ['Uso dias úteis', (m) => (m.usoUteis == null ? '—' : pct(m.usoUteis))], ['Uso fim de semana', (m) => (m.usoFds == null ? '—' : pct(m.usoFds))],
+        ['Usados por dia', (m) => dec(m.usados, 1)], ['Ociosos por dia', (m) => dec(m.ociosos, 1)], ['Terceiros por dia', (m) => dec(m.terceiros, 1)], ['Aluguel por dia', (m) => dec(m.aluguel, 1)],
+      ])}
     />
   )
 }
@@ -232,6 +238,10 @@ function EventosCard({ meses, periodo, mobile }: { meses: EventosMes[]; periodo:
       ) : <Vazio titulo="Nenhum evento de condução no período" />}
       tabela={meses.length ? (mobile ? tabela : <Rolagem rotulo="Eventos de condução por mês">{tabela}</Rolagem>) : undefined}
       tabelaSobDemanda
+      copiar={tabelaCopia(meses, [
+        ['Mês', (m) => m.rotulo], ['Excesso de velocidade', (m) => m.excesso], ['Aceleração brusca', (m) => m.aceleracao], ['Frenagem brusca', (m) => m.frenagem], ['Curva brusca', (m) => m.curva],
+        ['Total', (m) => m.total], ['Km', (m) => num(m.km, 0)], ['Por 1.000 km', (m) => taxa(m.taxa)], ['Tendência', (m) => taxa(m.tendencia)],
+      ])}
     />
   )
 }

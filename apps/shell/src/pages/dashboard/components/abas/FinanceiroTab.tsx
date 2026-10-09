@@ -6,6 +6,7 @@ import { brl, brlS, dec, int, normL } from '../../domain/format'
 import type { Dados } from '../../domain/types'
 import { useMedia } from '../../../operacional/useMedia'
 import { AnaliseCard } from '../AnaliseCard'
+import { tabelaCopia } from '../Copiar'
 import { TicketMensalCard } from '../Analises'
 import { AbaCarregando } from '../Carregando'
 import { KpiCard, KpiLinha } from '../KpiCard'
@@ -77,6 +78,7 @@ function StatusFaturamentoCard({ linhas, periodo }: { linhas: LinhaStatusFat[]; 
       titulo="Status de faturamento" periodo={periodo} unidade="serviços e R$" valor={topo?.status ?? '—'}
       sub={topo ? `${pct(topo.pct)} dos serviços com saída a partir de 01/04/2026` : 'serviços com saída a partir de 01/04/2026'}
       tabela={<Table columns={colunas} rows={linhas} rowKey={(l) => l.status} empty={<Vazio titulo="Nenhum serviço com saída a partir de 01/04/2026" />} />}
+      copiar={tabelaCopia(linhas, [['Status', (l) => l.status], ['Serviços', (l) => l.qtd], ['Faturamento', (l) => brl(l.valor)], ['Participação', (l) => pct(l.pct)]])}
     />
   )
 }
@@ -115,6 +117,9 @@ function RecebimentosCard({ porForma, porStatus, pagantes }: { porForma: LinhaFo
     <AnaliseCard
       titulo="Recebimentos" periodo="Todo o histórico" unidade="R$ por registro de pagamento" valor={brlS(total)}
       sub={`${int(pagantes.length)} ${pagantes.length === 1 ? 'registro' : 'registros'} de pagamento · participação pelo valor`}
+      copiar={tabelaCopia([...porForma.map((l) => ({ grupo: 'Forma', rotulo: l.forma, ...l })), ...porStatus.map((l) => ({ grupo: 'Status', rotulo: l.status, ...l }))], [
+        ['Agrupamento', (l) => l.grupo], ['Forma ou status', (l) => l.rotulo], ['Registros', (l) => l.qtd], ['Valor', (l) => brl(l.valor)], ['Participação', (l) => pct(l.pct)],
+      ])}
       tabela={(
         <div className="dash-fi-recebimentos">
           <section aria-label="Recebimentos por forma"><h3 className="dash-fi-subtitulo">Por forma</h3><TabelaDistribuicao coluna="Forma" linhas={porForma.map((l) => ({ ...l, rotulo: l.forma }))} badge={false} mobile={mobile} /></section>
@@ -184,6 +189,10 @@ function ClientesCard({ fi, periodo }: { fi: Financeiro; periodo: string }) {
     <AnaliseCard
       titulo="Clientes" periodo={periodo} unidade="R$ e serviços por cliente" valor={int(fi.kpis.clientesAtivos)}
       sub={`${fi.kpis.clientesAtivos === 1 ? 'cliente ativo' : 'clientes ativos'} · ordenados por faturamento`} largo
+      copiar={tabelaCopia(fi.clientes, [
+        ['Cliente', (l) => l.cliente], ['Serviços', (l) => l.servicos], ['% dos serviços', (l) => pct(l.pctServicos)], ['Faturamento', (l) => brl(l.faturamento)],
+        ['Ticket médio', (l) => brl(l.ticket)], ['Participação', (l) => pct(l.pct)], ...fi.meses.map((m, i) => [m.rotulo, (l: LinhaClienteFin) => brl(l.meses[i]?.valor ?? 0)] as const),
+      ])}
       tabela={mobile ? <>{tabela}{top.botao}</> : <Rolagem rotulo="Faturamento por cliente" alturaMax={560}>{tabela}</Rolagem>}
     />
   )

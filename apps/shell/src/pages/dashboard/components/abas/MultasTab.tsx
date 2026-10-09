@@ -7,6 +7,7 @@ import { detalheMultasPendentes } from '../../domain/detalhes'
 import { int } from '../../domain/format'
 import { useDetalhe } from '../DetalheDrawer'
 import { AnaliseCard } from '../AnaliseCard'
+import { tabelaCopia } from '../Copiar'
 import { AbaCarregando } from '../Carregando'
 import { Participacao, pct } from '../Celulas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
@@ -74,6 +75,7 @@ function PorMesCard({ pontos, total, periodo }: { pontos: MultasMes[]; total: nu
       titulo="Multas por mês" periodo={periodo} unidade="multas por mês" valor={multas(total)} sub="Pela data da multa"
       grafico={pontos.length ? <BarraChart descricao={`Multas por mês, ${periodo}`} nome="Multas" formatar={int} larguraEixo={36} dados={pontos.map((p) => ({ rotulo: p.rotulo, valor: p.qtd }))} /> : undefined}
       tabela={pontos.length ? <Table columns={colunas} rows={pontos} rowKey={(p) => p.mes} /> : <Vazio titulo="Nenhuma multa no período" />}
+      copiar={tabelaCopia(pontos, [['Mês', (p) => p.rotulo], ['Multas', (p) => p.qtd], ['Pendentes', (p) => p.pendentes]])}
       tabelaSobDemanda={pontos.length > 0}
     />
   )
@@ -94,6 +96,7 @@ function PorMotoristaCard({ linhas, periodo }: { linhas: LinhaMultaMotorista[]; 
       titulo="Por motorista" periodo={periodo} unidade="multas"
       valor={maior ? maior.motorista : undefined} sub={maior ? `Mais multas · ${multas(maior.qtd)} · ${pct(maior.pct)} do total` : undefined}
       tabela={<Table columns={colunas} rows={linhas} rowKey={(l) => l.motorista} empty={<Vazio titulo="Nenhuma multa no período" />} />}
+      copiar={tabelaCopia(linhas, [['Motorista', (l) => l.motorista], ['Multas', (l) => l.qtd], ['Participação', (l) => pct(l.pct)]])}
     />
   )
 }
@@ -113,6 +116,7 @@ function PorInfracaoCard({ linhas, periodo }: { linhas: LinhaMultaInfracao[]; pe
       largo titulo="Por infração" periodo={periodo} unidade="multas"
       valor={maior ? multas(maior.qtd) : undefined} sub={maior ? `Infração mais frequente: ${maior.infracao}` : undefined}
       tabela={<Table columns={colunas} rows={linhas} rowKey={(l) => l.infracao} empty={<Vazio titulo="Nenhuma multa no período" />} />}
+      copiar={tabelaCopia(linhas, [['Infração', (l) => l.infracao], ['Multas', (l) => l.qtd], ['Participação', (l) => pct(l.pct)]])}
     />
   )
 }

@@ -9,6 +9,7 @@ import type { Reserva } from '../../domain/types'
 import { useDetalhe } from '../DetalheDrawer'
 import type { NotaMes, RankingMes } from '../../domain/score'
 import { AnaliseCard } from '../AnaliseCard'
+import { tabelaCopia } from '../Copiar'
 import { AbaCarregando } from '../Carregando'
 import { Duplo, Nome, Participacao, Rolagem, col, larguraMinima, pct } from '../Celulas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
@@ -157,6 +158,10 @@ function RankingCard({ mo, rv, periodo, frota, onFrota }: { mo: Motoristas; rv: 
       valor={`${int(linhas.length)} ${linhas.length === 1 ? 'motorista' : 'motoristas'}`}
       sub={`Ordenado por serviços · média por mês sobre ${int(mo.mesesBase)} ${mo.mesesBase === 1 ? 'mês' : 'meses'} com serviço`}
       extra={filtroFrota}
+      copiar={tabelaCopia(linhas, [
+        ['Motorista', (l) => l.nome], ['Função', (l) => l.funcao], ['Frota', (l) => frotaDe(l.propria) ?? '—'], ['Serviços', (l) => l.servicos], ['Serviços por mês', (l) => porMes(l)],
+        ['Faturamento', (l) => brl(l.faturamento)], ['Ticket', (l) => brl(l.ticket)], ['Participação', (l) => pct(l.pct)], ['CNH', (l) => dataBR(l.cnhDia)],
+      ])}
       tabela={mobile || linhas.length <= 10 ? tabela : <Rolagem rotulo="Ranking de motoristas" alturaMax={620}>{tabela}</Rolagem>}
     />
   )
@@ -208,6 +213,7 @@ function NotaMesCard({ pontos, mo, periodo }: { pontos: NotaMes[]; mo: Motorista
           dados={pontos.map((p) => ({ rotulo: p.rotulo, nota: Math.round(p.nota * 10) / 10 }))} series={[{ chave: 'nota', nome: 'Nota média', cor: 'action' }]} />
       ) : undefined}
       tabela={pontos.length ? <Table columns={colunas} rows={pontos} rowKey={(p) => p.mes} /> : <Vazio titulo="Sem notas válidas no período" />}
+      copiar={tabelaCopia(pontos, [['Mês', (p) => p.rotulo], ['Nota média', (p) => nota(p.nota)], ['Notas válidas', (p) => p.validas]])}
       tabelaSobDemanda={pontos.length > 0}
     />
   )
@@ -237,6 +243,10 @@ function ScoreMesCard({ linhas, periodo }: { linhas: LinhaScoreMotorista[]; peri
     <AnaliseCard
       titulo="Score por motorista e mês" periodo={periodo} unidade="nota de 0 a 100 · eventos e minutos ociosos por 100 km"
       sub="Nota só com 100 km ou mais no mês"
+      copiar={tabelaCopia(linhas, [
+        ['Motorista', (l) => l.nome], ['Mês', (l) => l.rotulo], ['Nota', notaCelula], ['Km', (l) => Math.round(l.distancia)],
+        ['Aceleração por 100 km', (l) => taxa(l.taxaAceleracao)], ['Frenagem por 100 km', (l) => taxa(l.taxaFrenagem)], ['Ocioso por 100 km', (l) => taxa(l.taxaOcioso)],
+      ])}
       tabela={mobile ? <>{tabela}{top.botao}</> : <Rolagem rotulo="Score por motorista e mês" alturaMax={440}>{tabela}</Rolagem>}
     />
   )
@@ -267,6 +277,9 @@ function RankingMensalCard({ meses, periodo }: { meses: RankingMes[]; periodo: s
       titulo="Ranking mensal" periodo={periodo} unidade="nota de 0 a 100"
       valor={ultimo?.ranking[0] ? ultimo.ranking[0].nome : undefined}
       sub={ultimo?.ranking[0] ? `1º em ${ultimo.rotulo} · nota ${int(ultimo.ranking[0].nota)}` : undefined}
+      copiar={tabelaCopia(linhas.flatMap((m) => m.ranking.map((p, i) => ({ mes: m.rotulo, pos: `${i + 1}º`, ...p }))), [
+        ['Mês', (p) => p.mes], ['Posição', (p) => p.pos], ['Motorista', (p) => p.nome], ['Nota', (p) => int(p.nota)], ['Km', (p) => Math.round(p.distancia)],
+      ])}
       tabela={mobile || linhas.length <= 3 ? tabela : <Rolagem rotulo="Ranking mensal" alturaMax={440}>{tabela}</Rolagem>}
     />
   )

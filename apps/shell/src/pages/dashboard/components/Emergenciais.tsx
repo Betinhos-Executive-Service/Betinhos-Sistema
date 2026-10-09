@@ -3,6 +3,7 @@ import type { Emergenciais as Dados } from '../domain/destaques'
 import { dec, int } from '../domain/format'
 import { useMedia } from '../../operacional/useMedia'
 import { AnaliseCard } from './AnaliseCard'
+import { tabelaCopia } from './Copiar'
 import { Duplo, Rolagem, col, larguraMinima } from './Celulas'
 import { COLUNA_LARGA, Expansivel, MEDIA_MOBILE, VER_RANKING, useLinhasAbertas } from './Linhas'
 
@@ -66,6 +67,7 @@ export function Emergenciais({ dados, periodo }: { dados: Dados; periodo: string
       sub={`de ${int(dados.de)} serviços · ${dec(dados.percentual, 1)}%`}
       extra={<Podio top3={dados.top3} />}
       tabela={mobile ? tabela : <Rolagem rotulo="Ranking mensal de clientes emergenciais" alturaMax={344}>{tabela}</Rolagem>}
+      copiar={tabelaCopia(dados.meses.flatMap((m) => m.ranking.map((r, i) => ({ mes: m.rotulo, pos: `${i + 1}º`, ...r }))), [['Mês', (r) => r.mes], ['Posição', (r) => r.pos], ['Cliente', (r) => r.cliente], ['Serviços', (r) => r.qtd]])}
     />
   )
 }

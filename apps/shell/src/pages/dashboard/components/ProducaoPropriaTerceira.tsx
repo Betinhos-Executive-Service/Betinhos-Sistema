@@ -5,6 +5,7 @@ import type { ProducaoPT } from '../domain/destaques'
 import { int } from '../domain/format'
 import { useMedia } from '../../operacional/useMedia'
 import { AnaliseCard } from './AnaliseCard'
+import { tabelaCopia } from './Copiar'
 import { COLUNA_LARGA, MEDIA_MOBILE, juntar } from './Linhas'
 
 type Mes = ProducaoPT['meses'][number]
@@ -40,6 +41,7 @@ export function ProducaoPropriaTerceira({ dados, periodo }: { dados: ProducaoPT;
       ) : <EmptyState compact icon={<Inbox />} title="Nenhum serviço com veículo classificado no período" />}
       tabela={dados.meses.length ? tabela : undefined}
       tabelaSobDemanda
+      copiar={tabelaCopia(dados.meses, [['Mês', (m) => m.rotulo], ['Própria', (m) => m.propria], ['Terceirizada', (m) => m.terceirizada]])}
     />
   )
 }

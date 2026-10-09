@@ -1,6 +1,7 @@
 import { useId, useState, type ReactNode } from 'react'
 import { Button, Surface } from '@betinhos/ui'
 import type { Apoio, Chip } from '../domain/types'
+import { BotaoCopiar, type TabelaCopiavel } from './Copiar'
 import { Chips } from './KpiChip'
 
 type Props = {
@@ -21,13 +22,15 @@ type Props = {
   largo?: boolean
   /** Fica na altura do próprio conteúdo em vez de esticar até o card vizinho. */
   natural?: boolean
+  /** Valores da tabela em texto: o rodapé ganha "Copiar tabela" (TSV para a planilha), mesmo com a tabela fechada. */
+  copiar?: TabelaCopiavel
 }
 
 /**
  * Card de análise no formato do legado com o DS (§10.16): título em eyebrow, valor grande, apoio e chips à direita;
  * gráfico e tabela juntos; período e unidade no rodapé; valores do gráfico disponíveis em tabela.
  */
-export function AnaliseCard({ titulo, periodo, unidade, valor, sub, chips = [], apoio = [], extra, grafico, tabela, tabelaSobDemanda = false, largo = false, natural = false }: Props) {
+export function AnaliseCard({ titulo, periodo, unidade, valor, sub, chips = [], apoio = [], extra, grafico, tabela, tabelaSobDemanda = false, largo = false, natural = false, copiar }: Props) {
   const id = useId()
   const [aberta, setAberta] = useState(false)
   const temLado = chips.length > 0 || apoio.length > 0 || extra != null
@@ -48,8 +51,13 @@ export function AnaliseCard({ titulo, periodo, unidade, valor, sub, chips = [], 
       </div>
       <footer className="dash-card__nota">
         <span>{periodo} · {unidade}</span>
-        {tabelaSobDemanda && tabela != null ? (
-          <Button variant="ghost" size="compact" aria-expanded={aberta} aria-controls={aberta ? `${id}-v` : undefined} onClick={() => setAberta(!aberta)}>{aberta ? 'Ocultar valores' : 'Ver valores'}</Button>
+        {(tabelaSobDemanda && tabela != null) || (copiar && copiar.linhas.length) ? (
+          <span className="dash-card__acoes">
+            {copiar && copiar.linhas.length ? <BotaoCopiar tabela={copiar} nome={`de ${titulo}`} /> : null}
+            {tabelaSobDemanda && tabela != null ? (
+              <Button variant="ghost" size="compact" aria-expanded={aberta} aria-controls={aberta ? `${id}-v` : undefined} onClick={() => setAberta(!aberta)}>{aberta ? 'Ocultar valores' : 'Ver valores'}</Button>
+            ) : null}
+          </span>
         ) : null}
       </footer>
     </Surface>
