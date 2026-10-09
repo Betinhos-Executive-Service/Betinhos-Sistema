@@ -11,23 +11,13 @@ import { CurriculosPage } from '../pages/curriculos/CurriculosPage'
 import { PagantesPage } from '../pages/pagantes/PagantesPage'
 import { OpsPage } from '../pages/ops/OpsPage'
 import { PessoasPage } from '../pages/pessoas/PessoasPage'
+import { DashboardPage } from '../pages/dashboard/DashboardPage'
 import { InfracoesPage } from '../pages/infracoes/InfracoesPage'
 import { EmptyState, buttonClassName } from '@betinhos/ui'
+import { Frame } from './Frame'
 import { PageLayout } from './PageLayout'
 
 type Props = { host: Host; group: MenuGroup | null; item: MenuItem | null; label: string }
-
-/** Tela legada (WebResource ou lista nativa) ocupando toda a área, sem cabeçalho duplicado. */
-function Frame({ src, title }: { src: string; title: string }) {
-  const [loaded, setLoaded] = useState(false)
-  useEffect(() => setLoaded(false), [src])
-  return (
-    <div className="frame" aria-busy={!loaded}>
-      {loaded ? null : <p className="frame__loading" role="status">Carregando {title}…</p>}
-      <iframe key={src} className="frame__iframe" src={src} title={title} onLoad={() => setLoaded(true)} />
-    </div>
-  )
-}
 
 function EntityFrame({ host, entity, title }: { host: Extract<Host, { mode: 'dataverse' }>; entity: string; title: string }) {
   const [src, setSrc] = useState<string | null>(null)
@@ -73,6 +63,7 @@ export function RouteLayout({ host, group, item, label }: Props) {
     if (item.page === 'pagantes') return <PagantesPage host={host} />
     if (item.page === 'ops') return <OpsPage host={host} />
     if (item.page === 'pessoas') return <PessoasPage host={host} />
+    if (item.page === 'dashboard') return <DashboardPage host={host} />
     if (item.page === 'infracoes') return <InfracoesPage host={host} />
     return <ComponentsPage />
   }

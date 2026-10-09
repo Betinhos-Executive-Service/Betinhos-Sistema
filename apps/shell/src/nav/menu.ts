@@ -10,7 +10,7 @@ export type MenuItem =
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
-  | { kind: 'page'; id: string; label: string; page: 'componentes' | 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'infracoes' | 'ops' }
+  | { kind: 'page'; id: string; label: string; page: 'componentes' | 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' }
 
 export type MenuGroup = { id: string; label: string; items: MenuItem[] }
 
@@ -28,7 +28,7 @@ export const MENU: MenuGroup[] = [
     label: 'Operacional',
     items: [
       table('cr40f_reservadeveculos'),
-      wr('Dashboard', 'new_dashboard'),
+      { kind: 'page', id: 'dashboard', label: 'Dashboard', page: 'dashboard' },
       { kind: 'page', id: 'operacional', label: 'Resumo Operacional', page: 'operacional' },
       wr('Funções Operacionais', 'new_telafuncoesoperacionais'),
       table('cr40f_trocasdecarro'),
@@ -74,6 +74,8 @@ export const MENU: MenuGroup[] = [
     label: 'Back-End',
     items: [
       table('cr40f_servicosporpassageiro'),
+      // O dashboard React substitui o antigo no uso diário; o legado fica como modo TV (link "Abrir modo TV" no Dashboard).
+      wr('Dashboard antigo (TV)', 'new_dashboard'),
       wr('Despesas Operacionais', 'new_teladespesasoperacionais'),
       table('new_fotomanutencao'),
       table('new_appmotoristaslog'),

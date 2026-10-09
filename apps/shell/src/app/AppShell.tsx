@@ -31,6 +31,7 @@ const GROUP_ICONS: Record<string, ReactNode> = {
 const ITEM_ICONS: Record<string, ReactNode> = {
   cr40f_homebetinhos: <Home />,
   cr40f_reservadeveculos: <Calendar />,
+  dashboard: <LayoutDashboard />,
   new_dashboard: <LayoutDashboard />,
   operacional: <Clock />,
   new_telafuncoesoperacionais: <Wrench />,
