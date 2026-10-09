@@ -3,11 +3,13 @@ import { Alert, Button, EmptyState, Grid, MetricCard, Pagination, StatusBadge, T
 import { Clock, Copy, Paperclip, ReceiptText, RefreshCw, SearchX, Wallet } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
+import { useQueryFilters, useQueryId, useQueryPagina } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { SaveViewDialog } from '../pagantes/components/Dialogs'
 import { formatMoney } from '../pagantes/domain/messages'
 import { createSource } from './data/source'
 import { BUILTIN_VIEWS, EMPTY_FILTERS, filterDespesas, loadViews, matchView, newView, opcoes, periodoStart, saveViews, viewFilters, type Filters, type View } from './domain/filters'
+import { despesasQuery } from './domain/query'
 import { resumo } from './domain/resumo'
 import { useDespesas } from './useDespesas'
 import { DespesasToolbar } from './components/DespesasToolbar'
@@ -31,14 +33,15 @@ function Despesas({ host }: { host: Host }) {
   // Visões: as prontas + as do usuário; a última usada volta ao abrir a tela.
   const [stored, setStored] = useState(() => loadViews(source.kv))
   const views = useMemo(() => [...BUILTIN_VIEWS, ...stored.views], [stored.views])
-  const [filters, setFiltersState] = useState<Filters>(() => {
+  // Filtros, página e despesa aberta vivem na URL (#/despesas?q=…&periodo=…&pagina=2&abrir=…); sem filtro na abertura, entra a última visão.
+  const [filters, setFiltersUrl] = useQueryFilters(despesasQuery, () => {
     const last = views.find((v) => v.id === stored.last)
     return last ? viewFilters(last) : { ...EMPTY_FILTERS }
   })
   const activeView = useMemo(() => matchView(views, filters, stored.last), [views, filters, stored.last])
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useQueryPagina()
   const setFilters = useCallback((next: Filters, viewId?: string) => {
-    setFiltersState(next)
+    setFiltersUrl(next)
     setStored((s) => {
       const last = viewId ?? matchView([...BUILTIN_VIEWS, ...s.views], next, s.last)?.id ?? null
       if (last === s.last) return s
@@ -46,8 +49,7 @@ function Despesas({ host }: { host: Host }) {
       saveViews(source.kv, data)
       return data
     })
-    setPage(1)
-  }, [source.kv])
+  }, [source.kv, setFiltersUrl])
 
   const since = useMemo(() => periodoStart(filters.periodo, new Date()), [filters.periodo])
   const despesas = useDespesas(source, since)
@@ -55,7 +57,7 @@ function Despesas({ host }: { host: Host }) {
   const totais = useMemo(() => resumo(visible), [visible])
   const { categorias, motoristas } = useMemo(() => opcoes(despesas.list), [despesas.list])
 
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useQueryId('abrir')
   const current = selectedId ? despesas.list.find((d) => d.id === selectedId) ?? null : null
   const [saving, setSaving] = useState(false)
   const [version, setVersion] = useState(0)
