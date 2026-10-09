@@ -1,0 +1,22 @@
+/* Despesas operacionais: reaproveita lista e ficha de Pagantes (pagantes.css). Só tokens do Design System. */
+.dp-alertas { display: flex; flex-wrap: wrap; gap: var(--bt-space-1); }
+.dp-page .pg-card__foot { justify-content: flex-start; }
+
+.dp-link { display: inline-flex; align-items: center; gap: var(--bt-space-1); color: var(--bt-color-action); font-weight: var(--bt-font-weight-bold); text-decoration: none; }
+.dp-link:focus-visible { outline: 0; border-radius: var(--bt-radius-xs); box-shadow: var(--bt-focus-ring); }
+@media (hover: hover) and (pointer: fine) { .dp-link:hover { text-decoration: underline; } }
+
+.dp-texto { white-space: pre-wrap; }
+.dp-ficha__full { grid-template-columns: minmax(0, 1fr); }
+
+/* Comprovante: arquivo, status e abrir. */
+.dp-anexo { grid-template-columns: minmax(0, 1fr) auto auto; }
+.dp-anexo__name { display: flex; align-items: center; gap: var(--bt-space-2); min-width: 0; }
+.dp-anexo__name svg { flex: none; color: var(--bt-color-text-secondary); }
+.dp-anexo__name > span { display: grid; gap: var(--bt-space-0-5); min-width: 0; }
+.dp-anexo__name strong { overflow: hidden; font-weight: var(--bt-font-weight-bold); text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 560px) {
+  .dp-anexo { grid-template-columns: minmax(0, 1fr) auto; }
+  .dp-anexo .bt-badge { grid-column: 1; grid-row: 2; justify-self: start; }
+}
