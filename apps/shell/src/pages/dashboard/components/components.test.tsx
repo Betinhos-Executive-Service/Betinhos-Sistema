@@ -181,15 +181,14 @@ describe('componentes do Dashboard', () => {
     expect(tomStatus('Mensal')).toBe('neutral')
   })
 
-  it('barra de filtros: atalhos visíveis, o escolhido marcado, e a troca recalcula o período', () => {
+  it('barra de filtros: período num seletor, o escolhido exibido, e a troca recalcula o período', async () => {
     const filtros: Filtros = { atalho: 'esteAno', inicio: '2026-01-01', fim: '2026-10-15', status: [], clientes: [], motoristas: [], tipos: [] }
     const onChange = vi.fn()
     render(<DashboardToolbar filtros={filtros} opcoes={{ status: [], clientes: [], motoristas: [], tipos: [] }} now={new Date('2026-10-15T12:00:00Z')} onChange={onChange} />)
-    const grupo = screen.getByRole('group', { name: 'Período' })
-    expect(within(grupo).getAllByRole('button').length).toBe(8)
-    expect(within(grupo).getByRole('button', { name: 'Este ano' }).getAttribute('aria-pressed')).toBe('true')
-    expect(within(grupo).getByRole('button', { name: 'Hoje' }).getAttribute('aria-pressed')).toBe('false')
-    fireEvent.click(within(grupo).getByRole('button', { name: 'Mês anterior' }))
+    const periodo = screen.getByRole('combobox', { name: 'Período' })
+    expect(periodo.textContent).toContain('Este ano')
+    fireEvent.click(periodo)
+    fireEvent.click(await screen.findByText('Mês anterior'))
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ atalho: 'mesAnt', inicio: '2026-09-01', fim: '2026-09-30' }))
   })
 

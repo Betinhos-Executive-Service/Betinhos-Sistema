@@ -221,6 +221,13 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
     <div
       ref={boxRef}
       className={controlClassName('combobox', size, control.invalid, [open && 'is-open', isDisabled && 'is-disabled', className].filter(Boolean).join(' ') || undefined)}
+      // A seta e o respiro da caixa ficam fora do botão: o clique neles também abre/fecha.
+      onClick={(event) => {
+        if (event.target !== event.currentTarget || isDisabled) return
+        triggerRef.current?.focus()
+        if (open) close(false)
+        else openPanel()
+      }}
     >
       <button
         ref={(node) => {
@@ -274,8 +281,8 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
           ) : null}
           {props.multiple && visible.length > 0 ? (
             <div className="bt-select-panel__actions">
-              <button type="button" onClick={() => emit([...new Set([...selected, ...visible.filter((option) => !option.disabled).map((option) => option.value)])])}>Selecionar todos</button>
-              <button type="button" onClick={() => emit([])}>Limpar</button>
+              <button type="button" disabled={visible.every((option) => option.disabled || selected.includes(option.value))} onClick={() => emit([...new Set([...selected, ...visible.filter((option) => !option.disabled).map((option) => option.value)])])}>Selecionar todos</button>
+              <button type="button" className="is-quiet" disabled={selected.length === 0} onClick={() => emit([])}>Limpar</button>
             </div>
           ) : null}
           <div className="bt-select-panel__list" id={listId} role="listbox" aria-multiselectable={props.multiple || undefined}>

@@ -41,7 +41,7 @@ describe('Dashboard', () => {
     expect(painel.textContent).not.toMatch(/Produção própria|Faturamento por cliente|Serviços por motorista|Top 5 motoristas|Frota e pessoas/)
     expect(screen.queryByRole('navigation', { name: 'Seções do resumo' })).toBeNull()
     expect(document.querySelector('iframe')).toBeNull()
-    expect(screen.getByRole('button', { name: 'Este ano' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('combobox', { name: 'Período' }).textContent).toContain('Este ano')
     // O dashboard antigo (legado) segue como modo TV.
     expect(screen.getByRole('link', { name: /Abrir modo TV/ }).getAttribute('href')).toContain('new_dashboard')
   })
@@ -49,8 +49,9 @@ describe('Dashboard', () => {
   it('trocar o período para "Mês anterior" recalcula', async () => {
     render(<DashboardPage host={{ mode: 'mock' }} />)
     await screen.findByRole('region', { name: 'Total produzido' })
-    fireEvent.click(within(screen.getByRole('group', { name: 'Período' })).getByRole('button', { name: 'Mês anterior' }))
-    expect(screen.getByRole('button', { name: 'Mês anterior' }).getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(screen.getByRole('combobox', { name: 'Período' }))
+    fireEvent.click(await screen.findByText('Mês anterior'))
+    expect(screen.getByRole('combobox', { name: 'Período' }).textContent).toContain('Mês anterior')
     const p = atalho('mesAnt', new Date())
     const br = (d: string) => d.split('-').reverse().join('/')
     expect((await screen.findAllByText(`${br(p.inicio)} a ${br(p.fim)}`, { exact: false })).length).toBeGreaterThan(0)
@@ -70,7 +71,7 @@ describe('Dashboard', () => {
     expect(screen.queryByRole('tabpanel', { name: 'Resumo' })).toBeNull()
     expect(screen.queryByRole('region', { name: 'Indicadores executivos' })).toBeNull()
     // Filtros globais e "Abrir modo TV" continuam fora do Resumo.
-    expect(screen.getByRole('group', { name: 'Período' })).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: 'Período' })).toBeTruthy()
     // O dashboard antigo (legado) segue como modo TV.
     expect(screen.getByRole('link', { name: /Abrir modo TV/ }).getAttribute('href')).toContain('new_dashboard')
 
