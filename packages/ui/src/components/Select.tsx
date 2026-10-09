@@ -281,8 +281,8 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
           ) : null}
           {props.multiple && visible.length > 0 ? (
             <div className="bt-select-panel__actions">
-              <button type="button" disabled={visible.every((option) => option.disabled || selected.includes(option.value))} onClick={() => emit([...new Set([...selected, ...visible.filter((option) => !option.disabled).map((option) => option.value)])])}>Selecionar todos</button>
-              <button type="button" className="is-quiet" disabled={selected.length === 0} onClick={() => emit([])}>Limpar</button>
+              <button type="button" disabled={visible.every((option) => option.disabled || selected.includes(option.value))} onClick={() => emit([...new Set([...selected, ...visible.filter((option) => !option.disabled).map((option) => option.value)])])}>{icon(<><path d="M18 6 7 17l-5-5" /><path d="m22 10-7.5 7.5L13 16" /></>, 14)}Selecionar todos</button>
+              <button type="button" className="is-quiet" disabled={selected.length === 0} onClick={() => emit([])}>{icon(<><path d="M18 6 6 18" /><path d="m6 6 12 12" /></>, 14)}Limpar</button>
             </div>
           ) : null}
           <div className="bt-select-panel__list" id={listId} role="listbox" aria-multiselectable={props.multiple || undefined}>
