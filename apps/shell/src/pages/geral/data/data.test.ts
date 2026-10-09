@@ -123,12 +123,14 @@ describe('source Dataverse', () => {
     const request = vi.fn(async (path: string, init?: RequestInit) => overrides.request?.(path, init) ?? { value: [] })
     const update = vi.fn(async (_set: string, id: string) => { if (id === 'ruim') throw new Error('Sem permissão.') })
     const getAll = vi.fn(overrides.getAll ?? (async () => []))
+    const create = vi.fn(async (_set: string, _data: unknown) => '{0F8FAD5B-D9CB-469F-A165-70867728950E}')
+    const remove = vi.fn(async (_set: string, _id: string) => undefined)
     const host = {
       mode: 'dataverse', clientUrl: 'https://org.crm.dynamics.com', insideModelDriven: false, appId: async () => undefined,
-      client: { request, update, getAll },
+      client: { request, update, getAll, create, remove },
       metadata: {
         entities: async () => new Map([['cr40f_reservadeveculos', { entitySetName: 'cr40f_reservadeveculoses' }]]),
-        entity: async (name: string) => ({ logicalName: name, entitySetName: `${name}s`, primaryName: overrides.primaryName ?? 'cr40f_nome' }),
+        entity: async (name: string) => ({ logicalName: name, entitySetName: `${name}s`, primaryName: overrides.primaryName ?? 'cr40f_nome', objectTypeCode: name === 'cr40f_reservadeveculos' ? 10580 : null }),
         attributes: async () => [
           { logicalName: 'cr40f_status', type: 'Picklist', label: 'Status', updatable: true, targets: [] },
           { logicalName: 'cr40f_receber', type: 'Boolean', label: 'Receber', updatable: true, targets: [] },
@@ -137,8 +139,40 @@ describe('source Dataverse', () => {
         choices: async () => [{ value: 1, label: 'Confirmado' }],
       },
     } as unknown as Host
-    return { host, request, update, getAll }
+    return { host, request, update, getAll, create, remove }
   }
+
+  it('createView posta a visão pessoal em userqueries com o corpo certo e devolve a visão da lista', async () => {
+    const { host, create } = fakeHost()
+    const view = await createSource(host).createView({ name: 'Minha', fetchxml: '<fetch/>', layoutxml: '<grid/>' })
+    expect(create).toHaveBeenCalledWith('userqueries', { name: 'Minha', returnedtypecode: 'cr40f_reservadeveculos', querytype: 0, fetchxml: '<fetch/>', layoutxml: '<grid/>', description: 'Criada no Sistema Betinhos' })
+    expect(view).toEqual({ id: '0f8fad5b-d9cb-469f-a165-70867728950e', nome: 'Minha', grupo: 'minhas', fetchxml: '<fetch/>', layoutxml: '<grid/>', padrao: false })
+  })
+
+  it('updateView, renameView e deleteView usam userqueries; objectTypeCode vem da metadata', async () => {
+    const { host, update, remove } = fakeHost()
+    const source = createSource(host)
+    await source.updateView('{ABC}', { fetchxml: '<f/>', layoutxml: '<g/>' })
+    await source.renameView('{ABC}', 'Novo nome')
+    await source.deleteView('{ABC}')
+    expect(update).toHaveBeenNthCalledWith(1, 'userqueries', '{ABC}', { fetchxml: '<f/>', layoutxml: '<g/>' })
+    expect(update).toHaveBeenNthCalledWith(2, 'userqueries', '{ABC}', { name: 'Novo nome' })
+    expect(remove).toHaveBeenCalledWith('userqueries', '{ABC}')
+    expect(await source.objectTypeCode()).toBe(10580)
+  })
+
+  it('mock: cria, atualiza, renomeia e exclui visões pessoais em memória', async () => {
+    const source = createSource({ mode: 'mock' }, { latency: 0 })
+    const created = await source.createView({ name: 'Minha', fetchxml: '<fetch/>', layoutxml: '<grid/>' })
+    expect((await source.views()).filter((v) => v.grupo === 'minhas').map((v) => v.nome)).toEqual(['Minha'])
+    await source.renameView(created.id, 'Outra')
+    await source.updateView(created.id, { fetchxml: '<fetch x="1"/>', layoutxml: '<grid/>' })
+    expect((await source.views()).find((v) => v.id === created.id)).toMatchObject({ nome: 'Outra', fetchxml: '<fetch x="1"/>' })
+    await source.deleteView(created.id)
+    expect((await source.views()).some((v) => v.id === created.id)).toBe(false)
+    await expect(source.deleteView('mock-agenda')).rejects.toThrow()
+    expect(await source.objectTypeCode()).toBe(10580)
+  })
 
   it('visões pessoais com 403 não derrubam as do sistema', async () => {
     const { host } = fakeHost({ getAll: async (path) => { if (path.startsWith('userqueries')) throw new Error('403'); return [{ savedqueryid: 'a', name: 'Agenda', fetchxml: '<fetch/>', layoutxml: '<grid/>', isdefault: true }] } })

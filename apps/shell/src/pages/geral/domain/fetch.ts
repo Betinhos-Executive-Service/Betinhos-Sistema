@@ -10,6 +10,17 @@ export function parse(fetchxml: string) {
   return { doc, root, entity }
 }
 
+/** Substitui todos os `<order>` da entidade pela ordenação da coluna (na entidade raiz ou no link-entity do alias). */
+export function applySort(doc: Document, entity: Element, sort: NonNullable<Sort>) {
+  for (const order of Array.from(entity.children).filter((c) => c.tagName === 'order')) order.remove()
+  const order = doc.createElement('order')
+  order.setAttribute('attribute', sort.attribute)
+  order.setAttribute('descending', String(sort.descending))
+  const link = sort.alias ? Array.from(entity.querySelectorAll('link-entity')).find((l) => l.getAttribute('alias') === sort.alias) : null
+  if (sort.alias && !link) throw new Error(`Coluna ${sort.alias}.${sort.attribute} não pertence a esta visão.`)
+  ;(link ?? entity).appendChild(order)
+}
+
 /** Busca por palavra-chave: filtro OR com `like` em cada campo de localização rápida. */
 function injectSearch(doc: Document, entity: Element, query: string, quickFind: string[]) {
   const text = query.trim()
@@ -45,15 +56,7 @@ export function buildFetch(fetchxml: string, { page, pageSize, cookie, sort, que
     entity.insertBefore(attribute, entity.firstChild)
   }
 
-  if (sort) {
-    for (const order of Array.from(entity.children).filter((c) => c.tagName === 'order')) order.remove()
-    const order = doc.createElement('order')
-    order.setAttribute('attribute', sort.attribute)
-    order.setAttribute('descending', String(sort.descending))
-    const link = sort.alias ? Array.from(entity.querySelectorAll('link-entity')).find((l) => l.getAttribute('alias') === sort.alias) : null
-    if (sort.alias && !link) throw new Error(`Coluna ${sort.alias}.${sort.attribute} não pertence a esta visão.`)
-    ;(link ?? entity).appendChild(order)
-  }
+  if (sort) applySort(doc, entity, sort)
 
   injectSearch(doc, entity, query, quickFind)
 

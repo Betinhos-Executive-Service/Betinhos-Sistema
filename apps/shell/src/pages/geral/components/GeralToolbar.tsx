@@ -11,6 +11,8 @@ type Props = {
   views: View[]
   view: View | null
   onSelectView: (id: string) => void
+  /** Menu de ações da visão (salvar, renomear, excluir, compartilhar). */
+  viewMenu?: ReactNode
   query: string
   onQuery: (query: string) => void
   searching: boolean
@@ -34,7 +36,7 @@ type Props = {
 }
 
 /** Uma linha só: visão e busca à esquerda; contagem da seleção, comandos, colunas e atalhos à direita. */
-export function GeralToolbar({ views, view, onSelectView, query, onQuery, searching, columns, attributes, prefs, onPrefs, selectedCount, filtersCount, onOpenFilters, filtersUnavailable, mobile, commands, shortcuts }: Props) {
+export function GeralToolbar({ views, view, onSelectView, viewMenu, query, onQuery, searching, columns, attributes, prefs, onPrefs, selectedCount, filtersCount, onOpenFilters, filtersUnavailable, mobile, commands, shortcuts }: Props) {
   const size = mobile ? 'touch' : 'compact'
   const options: SelectOption[] = views.map((v) => ({ value: v.id, label: v.nome, group: v.grupo === 'sistema' ? 'Visões do sistema' : 'Minhas visões' }))
   // O texto digitado fica local; a busca de verdade sai depois da pausa. Mudança externa (limpar busca) ressincroniza.
@@ -48,6 +50,7 @@ export function GeralToolbar({ views, view, onSelectView, query, onQuery, search
       className="gr-toolbar"
       start={<>
         <Select className="gr-filters__view" size={size} aria-label="Visão" placeholder="Selecione uma visão" searchable={false} clearable={false} options={options} value={view?.id ?? null} onChange={(id) => { if (id) onSelectView(id) }} />
+        {viewMenu}
         <SearchBox className="gr-filters__search" size={size} aria-label="Buscar serviços" placeholder="Buscar por ID, trajeto, cliente…" value={text} onChange={setText} onSearch={(value) => { if (value.trim() !== query) onQuery(value.trim()) }} debounce={300} loading={searching} />
       </>}
       end={<>

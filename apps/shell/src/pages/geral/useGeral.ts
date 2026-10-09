@@ -104,6 +104,8 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   const [filters, setFilters] = useState<FilterSet>({})
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [cells, setCells] = useState<Map<string, CellStatus>>(() => new Map())
+  const viewRef = useRef<View | null>(null)
+  viewRef.current = view
   const hasFilters = useMemo(() => Object.values(filters).some((f) => !isEmptyFilter(f)), [filters])
   /** Com filtros e a metadata ainda a caminho a consulta espera: pedir antes devolveria a lista sem filtrar. */
   const filtersPending = view != null && hasFilters && attributes == null && attributesError == null
@@ -338,6 +340,27 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     setFilters((current) => (Object.keys(current).length ? {} : current))
   }, [views, enterView])
 
+  /**
+   * Relê a lista de visões. Com `selectId` abre essa visão; sem ele mantém a atual (renomeada, regravada ou, se sumiu, a padrão).
+   * Visão que mudou de conteúdo recomeça sem os filtros avulsos: eles já estão dentro dela. Erros sobem para quem chamou.
+   */
+  const reloadViews = useCallback(async (selectId?: string) => {
+    const list = await source.views()
+    setViews(list)
+    const current = viewRef.current
+    const open = (next: View) => { enterView(next); setFilters((f) => (Object.keys(f).length ? {} : f)) }
+    const target = selectId ? list.find((v) => v.id === selectId) : undefined
+    if (target) { open(target); return }
+    const same = current ? list.find((v) => v.id === current.id) : undefined
+    if (!same) {
+      const first = list.find((v) => v.padrao) ?? list[0]
+      if (first) open(first)
+      return
+    }
+    if (current && (same.fetchxml !== current.fetchxml || same.layoutxml !== current.layoutxml)) open(same)
+    else if (current && same.nome !== current.nome) setView({ ...current, nome: same.nome })
+  }, [source, enterView])
+
   const setSort = useCallback((next: Sort) => setSortState(next), [])
   const setQuery = useCallback((next: string) => setQueryState(next), [])
   /** `null` (ou um filtro sem o valor que a operação exige) remove o filtro da coluna. */
@@ -449,5 +472,5 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   const state: GeralState = { views, viewsError, view, columns, attributes, attributesError, quickFind, rows, total, more, pagesLoaded, loading, loadingMore, pageError, loadError, sort, query, filters, selected, cells }
   /** Há filtros, mas a metadata falhou: a consulta segue sem eles. */
   const filtersIgnored = hasFilters && attributes == null && attributesError != null
-  return { ...state, filtersIgnored, defaultOrder, selectView, setSort, setQuery, setFilter, clearFilters, loadMore, retryLoadMore, reload, refresh: reload, toggle, toggleAll, clearSelection, save, resetCell }
+  return { ...state, filtersIgnored, defaultOrder, selectView, reloadViews, setSort, setQuery, setFilter, clearFilters, loadMore, retryLoadMore, reload, refresh: reload, toggle, toggleAll, clearSelection, save, resetCell }
 }
