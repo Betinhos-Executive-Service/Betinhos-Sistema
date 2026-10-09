@@ -2,7 +2,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Host } from '../../../host'
 import { fetchPath, mapViews, parseCount, parsePage, reloadPath, searchPath } from './queries'
-import { applyMockFetch, createMockRows, createMockViews, MOCK_ROW_COUNT } from './mock'
+import { applyMockFetch, createMockRows, createMockViews, MOCK_ATTRIBUTES, MOCK_ROW_COUNT } from './mock'
+import { injectFilters, type FilterSet } from '../domain/filters'
 import { PAGE_SIZE } from '../domain/types'
 import { createSource } from './source'
 
@@ -211,5 +212,125 @@ describe('mock — releitura com chave de lookup', () => {
     const first = (await source.page({ fetchxml: views[0].fetchxml, page: 1, cookie: null, sort: null, query: '', quickFind: [] })).rows[0]
     const fresh = await source.reload(String(first.cr40f_reservadeveculosid), ['cr40f_id', '_cr40f_cliente_value'])
     expect(fresh._cr40f_cliente_value).toBe(first._cr40f_cliente_value)
+  })
+})
+
+describe('mock: filtros por coluna', () => {
+  const now = new Date('2026-10-08T12:00:00Z') // quinta-feira; semana de 05/10 a 11/10 em São Paulo
+  const rows = createMockRows(now)
+  const agenda = createMockViews()[0].fetchxml
+  const runAt = (at: Date, base: typeof rows, filters: FilterSet, extra: { query?: string; quickFind?: string[] } = {}) =>
+    applyMockFetch(base, injectFilters(agenda, filters, MOCK_ATTRIBUTES), { page: 1, pageSize: 1000, sort: null, query: extra.query ?? '', quickFind: extra.quickFind ?? [], now: at })
+  const run = (filters: FilterSet) => runAt(now, rows, filters).rows
+  type R = (typeof rows)[number]
+  const day = (r: R) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(String(r.cr40f_dataehorriodesada)))
+  const cotacao = (r: R) => r.cr40f_cotao as number
+
+  it('sem filtros devolve a visão inteira', () => {
+    expect(run({})).toHaveLength(MOCK_ROW_COUNT)
+  })
+  it('texto: contains, not-contains, begins, eq, empty e not-empty', () => {
+    const gru = run({ cr40f_trajeto: { kind: 'text', op: 'contains', value: 'gru' } })
+    expect(gru.length).toBeGreaterThan(0)
+    expect(gru.every((r) => String(r.cr40f_trajeto).toLowerCase().includes('gru'))).toBe(true)
+    const sem = run({ cr40f_trajeto: { kind: 'text', op: 'not-contains', value: 'GRU' } })
+    expect(sem.every((r) => !String(r.cr40f_trajeto).toLowerCase().includes('gru'))).toBe(true)
+    expect(gru.length + sem.length).toBe(MOCK_ROW_COUNT)
+    expect(run({ cr40f_trajeto: { kind: 'text', op: 'begins', value: 'GRU' } }).every((r) => String(r.cr40f_trajeto).startsWith('GRU'))).toBe(true)
+    expect(run({ cr40f_id: { kind: 'text', op: 'eq', value: 'OS-1013' } }).map((r) => r.cr40f_id)).toEqual(['OS-1013'])
+    const vazias = run({ cr40f_observaointerna: { kind: 'text', op: 'empty' } })
+    const cheias = run({ cr40f_observaointerna: { kind: 'text', op: 'not-empty' } })
+    expect(vazias.every((r) => r.cr40f_observaointerna == null)).toBe(true)
+    expect(cheias.length).toBeGreaterThan(0)
+    expect(vazias.length + cheias.length).toBe(MOCK_ROW_COUNT)
+  })
+  it('texto: not-like não devolve vazios, como no SQL', () => {
+    expect(run({ cr40f_observaointerna: { kind: 'text', op: 'not-contains', value: 'placa' } })).toHaveLength(0)
+    const outros = run({ cr40f_observaointerna: { kind: 'text', op: 'not-contains', value: 'zzz' } })
+    expect(outros.length).toBeGreaterThan(0)
+    expect(outros.every((r) => r.cr40f_observaointerna != null)).toBe(true)
+  })
+  it('texto: curingas escapados viram literais', () => {
+    expect(run({ cr40f_trajeto: { kind: 'text', op: 'contains', value: 'GRU _ Hotel' } })).toHaveLength(0)
+    expect(run({ cr40f_trajeto: { kind: 'text', op: 'contains', value: '→' } }).length).toBeGreaterThan(0)
+    expect(run({ cr40f_trajeto: { kind: 'text', op: 'contains', value: '%' } })).toHaveLength(0)
+    expect(run({ cr40f_trajeto: { kind: 'text', op: 'contains', value: '[' } })).toHaveLength(0)
+  })
+  it('choice e lookup: in e empty', () => {
+    const status = run({ cr40f_status: { kind: 'choice', op: 'in', values: [202410001, 202410005] } })
+    expect(status.length).toBeGreaterThan(0)
+    expect(status.every((r) => [202410001, 202410005].includes(r.cr40f_status as number))).toBe(true)
+    const withDriver = rows.find((r) => r._cr40f_motorista_value)!
+    const one = run({ cr40f_motorista: { kind: 'lookup', op: 'in', values: [{ id: String(withDriver._cr40f_motorista_value).toUpperCase(), nome: 'x' }] } })
+    expect(one.length).toBeGreaterThan(0)
+    expect(one.every((r) => r._cr40f_motorista_value === withDriver._cr40f_motorista_value)).toBe(true)
+    const sem = run({ cr40f_motorista: { kind: 'lookup', op: 'empty' } })
+    expect(sem.length).toBeGreaterThan(0)
+    expect(sem.every((r) => r._cr40f_motorista_value == null)).toBe(true)
+    const ids = [...new Set(rows.map((r) => r._cr40f_motorista_value).filter(Boolean))].map((id) => ({ id: String(id), nome: '' }))
+    expect(sem.length + run({ cr40f_motorista: { kind: 'lookup', op: 'in', values: ids } }).length).toBe(MOCK_ROW_COUNT)
+  })
+  it('data: hoje, amanhã, ontem, esta semana, este mês, próximos e últimos 7 dias', () => {
+    const only = (op: 'today' | 'tomorrow' | 'yesterday' | 'this-week' | 'this-month' | 'next-7' | 'last-7') => run({ cr40f_dataehorriodesada: { kind: 'date', op } }).map(day)
+    expect(new Set(only('today'))).toEqual(new Set(['2026-10-08']))
+    expect(new Set(only('tomorrow'))).toEqual(new Set(['2026-10-09']))
+    expect(new Set(only('yesterday'))).toEqual(new Set(['2026-10-07']))
+    const week = only('this-week')
+    expect(week.length).toBe(rows.filter((r) => day(r) >= '2026-10-05' && day(r) <= '2026-10-11').length)
+    expect(week.every((d) => d >= '2026-10-05' && d <= '2026-10-11')).toBe(true)
+    expect(only('this-month').length).toBe(rows.filter((r) => day(r).startsWith('2026-10')).length)
+    const next = only('next-7')
+    expect(next.length).toBe(rows.filter((r) => day(r) >= '2026-10-08' && day(r) <= '2026-10-15').length)
+    const last = only('last-7')
+    expect(last.length).toBe(rows.filter((r) => day(r) >= '2026-10-01' && day(r) <= '2026-10-08').length)
+    expect(next.length).toBeGreaterThan(0)
+    expect(last.length).toBeGreaterThan(0)
+  })
+  it('data: semana vai de segunda a domingo e intervalo usa o dia de São Paulo', () => {
+    const sunday = new Date('2026-10-11T12:00:00Z')
+    const monday = new Date('2026-10-12T12:00:00Z')
+    const base = createMockRows(sunday)
+    const weekOf = (at: Date) => runAt(at, base, { cr40f_dataehorriodesada: { kind: 'date', op: 'this-week' } }).rows.map(day)
+    const onSunday = weekOf(sunday)
+    expect(onSunday.length).toBeGreaterThan(0)
+    expect(onSunday.every((d) => d >= '2026-10-05' && d <= '2026-10-11')).toBe(true)
+    const onMonday = weekOf(monday)
+    expect(onMonday.length).toBeGreaterThan(0)
+    expect(onMonday.every((d) => d >= '2026-10-12' && d <= '2026-10-18')).toBe(true)
+    const ranged = run({ cr40f_dataehorriodesada: { kind: 'date', op: 'range', from: '2026-10-08', to: '2026-10-09' } })
+    expect(new Set(ranged.map(day))).toEqual(new Set(['2026-10-08', '2026-10-09']))
+    expect(run({ cr40f_dataehorriodesada: { kind: 'date', op: 'range', from: '2026-10-20' } }).every((r) => day(r) >= '2026-10-20')).toBe(true)
+    expect(run({ cr40f_dataehorriodesada: { kind: 'date', op: 'range', to: '2026-10-07' } }).every((r) => day(r) <= '2026-10-07')).toBe(true)
+    expect(run({ cr40f_dataehorriodesada: { kind: 'date', op: 'empty' } })).toHaveLength(0)
+  })
+  it('número: eq, ge, le, between e empty', () => {
+    expect(run({ cr40f_cotao: { kind: 'number', op: 'eq', value: 347.5 } }).map(cotacao)).toEqual([347.5])
+    const ge = run({ cr40f_cotao: { kind: 'number', op: 'ge', value: 5000 } })
+    expect(ge.length).toBeGreaterThan(0)
+    expect(ge.every((r) => cotacao(r) >= 5000)).toBe(true)
+    const le = run({ cr40f_cotao: { kind: 'number', op: 'le', value: 5000 } })
+    expect(le.every((r) => cotacao(r) <= 5000)).toBe(true)
+    expect(ge.length + le.length).toBeGreaterThanOrEqual(MOCK_ROW_COUNT)
+    const between = run({ cr40f_cotao: { kind: 'number', op: 'between', value: 1000, to: 2000 } })
+    expect(between.length).toBeGreaterThan(0)
+    expect(between.every((r) => cotacao(r) >= 1000 && cotacao(r) <= 2000)).toBe(true)
+    expect(run({ cr40f_cotao: { kind: 'number', op: 'empty' } })).toHaveLength(0)
+  })
+  it('booleano: yes e no', () => {
+    const yes = run({ cr40f_receber: { kind: 'bool', op: 'yes' } })
+    const no = run({ cr40f_receber: { kind: 'bool', op: 'no' } })
+    expect(yes.every((r) => r.cr40f_receber === true)).toBe(true)
+    expect(no.every((r) => r.cr40f_receber === false)).toBe(true)
+    expect(no.length).toBeGreaterThan(0)
+    expect(yes.length + no.length).toBe(MOCK_ROW_COUNT)
+  })
+  it('combina filtros (and) com a busca por palavra-chave e a contagem', () => {
+    const combined = run({ cr40f_receber: { kind: 'bool', op: 'yes' }, cr40f_trajeto: { kind: 'text', op: 'contains', value: 'GRU' } })
+    expect(combined.length).toBeGreaterThan(0)
+    expect(combined.every((r) => r.cr40f_receber === true && String(r.cr40f_trajeto).includes('GRU'))).toBe(true)
+    const searched = runAt(now, rows, { cr40f_receber: { kind: 'bool', op: 'yes' } }, { query: 'OS-101', quickFind: ['cr40f_id'] })
+    expect(searched.rows.length).toBeGreaterThan(0)
+    expect(searched.rows.every((r) => r.cr40f_receber === true && String(r.cr40f_id).includes('OS-101'))).toBe(true)
+    expect(searched.total).toBe(searched.rows.length)
   })
 })

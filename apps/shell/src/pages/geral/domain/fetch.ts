@@ -2,7 +2,7 @@ import { ID_ATTRIBUTE, type Sort } from './types'
 
 type BuildOptions = { page: number; pageSize: number; cookie: string | null; sort: Sort; query: string; quickFind: string[] }
 
-function parse(fetchxml: string) {
+export function parse(fetchxml: string) {
   const doc = new DOMParser().parseFromString(fetchxml, 'text/xml')
   const root = doc.documentElement
   const entity = root?.tagName === 'fetch' ? Array.from(root.children).find((c) => c.tagName === 'entity') : undefined

@@ -140,25 +140,65 @@ const fold = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '').t
 const keyOf = (attribute: string) => (MOCK_ATTRIBUTES.get(attribute)?.type === 'Lookup' ? `_${attribute}_value` : attribute)
 const shown = (row: Row, key: string) => String(row[`${key}${F}`] ?? row[key] ?? '')
 
+/** Padrão `like` do Dataverse em RegExp: `%` e `_` são curingas e `[x]` escapa o caractere. */
+const literal = (char: string) => char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+function likeRegex(pattern: string) {
+  let source = ''
+  const text = fold(pattern)
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i]
+    if (char === '[' && text[i + 2] === ']') { source += literal(text[i + 1]); i += 2 }
+    else if (char === '%') source += '.*'
+    else if (char === '_') source += '.'
+    else source += literal(char)
+  }
+  return new RegExp(`^${source}$`, 's')
+}
+
 function likeMatches(row: Row, attribute: string, pattern: string) {
   const key = keyOf(attribute)
-  const regex = new RegExp(`^${pattern.split('%').map((part) => fold(part).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*')}$`)
+  const regex = likeRegex(pattern)
   return [shown(row, key), String(row[key] ?? '')].some((text) => regex.test(fold(text)))
 }
+
+const isEmpty = (raw: unknown) => raw == null || raw === ''
+const addDays = (day: string, n: number) => new Date(Date.parse(`${day}T00:00:00Z`) + n * DAY).toISOString().slice(0, 10)
+/** Segunda-feira da semana (segunda a domingo) do dia `YYYY-MM-DD`. */
+const weekStart = (day: string) => addDays(day, -((new Date(`${day}T00:00:00Z`).getUTCDay() + 6) % 7))
+const dayOf = (raw: unknown) => (typeof raw === 'string' && !Number.isNaN(Date.parse(raw)) ? spDay(new Date(raw)) : null)
+const numberOf = (raw: unknown) => (typeof raw === 'number' ? raw : typeof raw === 'string' && raw !== '' ? Number(raw) : NaN)
 
 /** `true`/`false` quando o mock sabe avaliar a condição; `null` quando o operador é desconhecido (ignorado). */
 function condition(el: Element, row: Row, now: Date): boolean | null {
   const attribute = el.getAttribute('attribute') ?? ''
   const value = el.getAttribute('value') ?? ''
   const raw = row[keyOf(attribute)]
+  const day = dayOf(raw)
+  const today = spDay(now)
   switch (el.getAttribute('operator')) {
-    case 'eq': return String(raw) === value
-    case 'null': return raw == null || raw === ''
+    case 'eq':
+      if (typeof raw === 'boolean') return (raw ? '1' : '0') === value || String(raw) === value
+      if (typeof raw === 'number' && value !== '') return raw === Number(value)
+      return String(raw) === value
+    case 'ge': return numberOf(raw) >= Number(value)
+    case 'le': return numberOf(raw) <= Number(value)
+    case 'in': return !isEmpty(raw) && Array.from(el.children).some((c) => c.tagName === 'value' && String(c.textContent).toLowerCase() === String(raw).toLowerCase())
+    case 'null': return isEmpty(raw)
+    case 'not-null': return !isEmpty(raw)
     case 'like': return likeMatches(row, attribute, value)
-    case 'today': return typeof raw === 'string' && spDay(new Date(raw)) === spDay(now)
-    case 'tomorrow': return typeof raw === 'string' && spDay(new Date(raw)) === spDay(new Date(now.getTime() + DAY))
+    // Como no SQL, `not-like` não devolve vazios.
+    case 'not-like': return !isEmpty(raw) && !likeMatches(row, attribute, value)
+    case 'today': return day === today
+    case 'tomorrow': return day === addDays(today, 1)
+    case 'yesterday': return day === addDays(today, -1)
+    case 'this-week': return day != null && day >= weekStart(today) && day <= addDays(weekStart(today), 6)
+    case 'this-month': return day != null && day.slice(0, 7) === today.slice(0, 7)
+    case 'on-or-after': return day != null && day >= value
+    case 'on-or-before': return day != null && day <= value
+    case 'last-x-days': return day != null && day >= addDays(today, -Number(value)) && day <= today
+    case 'next-x-days': return day != null && day >= today && day <= addDays(today, Number(value))
     // Sem limite superior: o mock não precisa do horizonte da visão real.
-    case 'next-x-days': case 'next-x-years': return typeof raw === 'string' && Date.parse(raw) >= now.getTime()
+    case 'next-x-years': return typeof raw === 'string' && Date.parse(raw) >= now.getTime()
     default: return null
   }
 }
