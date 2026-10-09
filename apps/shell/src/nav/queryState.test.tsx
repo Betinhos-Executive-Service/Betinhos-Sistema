@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, expect, it } from 'vitest'
-import { gravarInteiros, lerDia, lerInteiros, useQueryAlvo, useQueryFilters, useQueryId, useQueryPagina, useQueryPeriodo, useQueryTexto, type QueryCodec } from './queryState'
+import { gravarInteiros, lerDia, lerInteiros, useQueryAlvo, useQueryBandeira, useQueryConjunto, useQueryFilters, useQueryId, useQueryPagina, useQueryPeriodo, useQueryTexto, type QueryCodec } from './queryState'
 import { patchHashQuery } from './useHashRoute'
 
 beforeEach(() => { history.replaceState(null, '', '#/lista') })
@@ -90,4 +90,24 @@ it('useQueryId, useQueryTexto e useQueryPeriodo usam o padrão quando a URL não
   // Intervalo invertido na URL cai no padrão.
   act(() => patchHashQuery({ de: '2027-01-01' }))
   expect(result.current.periodo[0]).toEqual(padrao)
+})
+
+it('useQueryBandeira e useQueryConjunto: abrir/fechar itens, alternar sem perder o que já estava e descartar sumidos', () => {
+  const { result } = renderHook(() => ({ aberto: useQueryBandeira('menu'), linhas: useQueryConjunto('linha') }))
+  expect(result.current.aberto[0]).toBe(false)
+  act(() => result.current.aberto[1](true))
+  expect(location.hash).toBe('#/lista?menu=1')
+  act(() => result.current.aberto[1](false))
+  expect(location.hash).toBe('#/lista')
+
+  act(() => { result.current.linhas.alternar('a'); result.current.linhas.alternar('b') })
+  expect(location.hash).toBe('#/lista?linha=a&linha=b')
+  expect([...result.current.linhas.valores]).toEqual(['a', 'b'])
+  act(() => result.current.linhas.alternar('a'))
+  expect(location.hash).toBe('#/lista?linha=b')
+  // Lista ainda vazia (carregando) não apaga nada; com a lista carregada, só ficam os que existem.
+  act(() => result.current.linhas.manter(new Set()))
+  expect(location.hash).toBe('#/lista?linha=b')
+  act(() => result.current.linhas.manter(new Set(['z'])))
+  expect(location.hash).toBe('#/lista')
 })

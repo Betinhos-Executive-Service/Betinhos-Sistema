@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useId, useState, type ReactNode } from 'react'
+import { useEffect, useId, type ReactNode } from 'react'
 import { Button } from '@betinhos/ui'
+import { useQueryConjunto } from '../../../nav/queryState'
 import { int } from '../domain/format'
 
 /** Viewport em que o `Table` do DS esconde o cabeçalho e mostra só duas colunas. */
@@ -19,13 +20,15 @@ export const TOP_CELULAR = 10
  * Listas longas no celular (≤ 820 px): só as 10 primeiras linhas e o botão "Ver todos (N)", que alterna com "Mostrar só as 10 primeiras".
  * No desktop devolve todas as linhas e nenhum botão (comportamento inalterado).
  */
-export function useTopCelular<T>(linhas: T[], mobile: boolean): { linhas: T[]; botao: ReactNode } {
-  const [todas, setTodas] = useState(false)
+export function useTopCelular<T>(linhas: T[], mobile: boolean, chave: string): { linhas: T[]; botao: ReactNode } {
+  // "Ver todos" de cada lista vive na URL (`todos=<chave>`): reabrir o link mostra a lista inteira.
+  const { valores, alternar } = useQueryConjunto('todos')
+  const todas = valores.has(chave)
   if (!mobile || linhas.length <= TOP_CELULAR) return { linhas, botao: null }
   return {
     linhas: todas ? linhas : linhas.slice(0, TOP_CELULAR),
     botao: (
-      <Button className="dash-ver-todos" variant="secondary" size="touch" fullWidth aria-expanded={todas} onClick={() => setTodas(!todas)}>
+      <Button className="dash-ver-todos" variant="secondary" size="touch" fullWidth aria-expanded={todas} onClick={() => alternar(chave)}>
         {todas ? `Mostrar só as ${TOP_CELULAR} primeiras` : `Ver todos (${int(linhas.length)})`}
       </Button>
     ),
@@ -44,21 +47,11 @@ export const VER_RANKING = ['Ver ranking', 'Ocultar ranking'] as const
  * Ao trocar o filtro, a chave que deixou de existir sai do conjunto, então não reabre se voltar depois.
  */
 export function useLinhasAbertas(chaves: string[]) {
-  const [abertas, setAbertas] = useState<ReadonlySet<string>>(() => new Set())
+  // As linhas abertas vivem na URL (`linha=<chave>`): reabrir o link mostra as mesmas linhas abertas.
+  const { valores, alternar, manter } = useQueryConjunto('linha')
   const assinatura = JSON.stringify(chaves)
-  useEffect(() => {
-    const existentes = new Set<string>(JSON.parse(assinatura))
-    setAbertas((atual) => {
-      const mantidas = [...atual].filter((chave) => existentes.has(chave))
-      return mantidas.length === atual.size ? atual : new Set(mantidas)
-    })
-  }, [assinatura])
-  const alternar = useCallback((chave: string) => setAbertas((atual) => {
-    const proximo = new Set(atual)
-    if (!proximo.delete(chave)) proximo.add(chave)
-    return proximo
-  }), [])
-  return { aberta: (chave: string) => abertas.has(chave), alternar }
+  useEffect(() => { manter(new Set<string>(JSON.parse(assinatura))) }, [assinatura, manter])
+  return { aberta: (chave: string) => valores.has(chave), alternar }
 }
 
 type ExpansivelProps = {

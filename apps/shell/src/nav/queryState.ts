@@ -131,3 +131,32 @@ export function useQueryPeriodo(chaveDe: string, chaveAte: string, padrao: Perio
   }), [chaveDe, chaveAte, padrao.de, padrao.ate])
   return [periodo, alterar] as const
 }
+
+/** Liga/desliga simples na URL (`recolhido=1`); desligado é o padrão e some da URL. */
+export function useQueryBandeira(chave: string) {
+  const query = useHashQuery()
+  const ligada = lerBandeira(query, chave)
+  const alterar = useCallback((proximo: boolean) => patchHashQuery({ [chave]: proximo ? '1' : null }), [chave])
+  return [ligada, alterar] as const
+}
+
+/**
+ * Conjunto de itens abertos/expandidos (`linha=a&linha=b`). `alternar` lê a URL na hora; `manter` descarta os valores que não
+ * existem mais (só chame com a lista já carregada: lista vazia não apaga nada).
+ */
+export function useQueryConjunto(chave: string) {
+  const query = useHashQuery()
+  const assinatura = query.getAll(chave).join('\u0001')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const valores = useMemo<ReadonlySet<string>>(() => new Set(query.getAll(chave)), [chave, assinatura])
+  const alternar = useCallback((valor: string) => {
+    const atual = readHashQuery().getAll(chave)
+    patchHashQuery({ [chave]: atual.includes(valor) ? atual.filter((item) => item !== valor) : [...atual, valor] })
+  }, [chave])
+  const manter = useCallback((existentes: ReadonlySet<string>) => {
+    const atual = readHashQuery().getAll(chave)
+    const mantidos = atual.filter((item) => existentes.has(item))
+    if (existentes.size > 0 && mantidos.length !== atual.length) patchHashQuery({ [chave]: mantidos })
+  }, [chave])
+  return { valores, alternar, manter }
+}

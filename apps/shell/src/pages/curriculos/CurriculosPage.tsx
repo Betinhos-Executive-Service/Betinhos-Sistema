@@ -3,7 +3,7 @@ import { Alert, Button, Dialog, EmptyState, StatusBadge, ToastProvider, useToast
 import { Plus, ScrollText, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
-import { lerInteiro, useQueryAlvo, useQueryFilters } from '../../nav/queryState'
+import { lerInteiro, useQueryAlvo, useQueryBandeira, useQueryFilters } from '../../nav/queryState'
 import { patchHashQuery, useHashQuery } from '../../nav/useHashRoute'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
@@ -34,7 +34,9 @@ function Curriculos({ host }: { host: Host }) {
   const [filters, setFilters] = useQueryFilters(curriculosQuery)
   const [target, setTarget] = useQueryAlvo()
   const [confirm, setConfirm] = useState<{ c: Curriculo; stage: Stage } | null>(null)
-  const [collapsed, setCollapsed] = useState(true)
+  // Colunas do quadro: recolhidas por padrão; expandidas ficam na URL (`expandido=1`).
+  const [expanded, setExpanded] = useQueryBandeira('expandido')
+  const collapsed = !expanded
   const activeTab = lerInteiro(useHashQuery(), 'etapa')
   const setActiveTab = (value: number | null) => patchHashQuery({ etapa: value == null ? null : String(value) })
 
@@ -84,7 +86,7 @@ function Curriculos({ host }: { host: Host }) {
   } else if (mobile) {
     body = <FunnelTabs stages={stages} groups={groups} choices={cv.choices!} now={now} onOpen={openView} onMove={requestMove} active={activeTab} onActive={setActiveTab} />
   } else {
-    body = <FunnelBoard stages={stages} groups={groups} choices={cv.choices!} now={now} onOpen={openView} onMove={requestMove} drag={drag} collapsed={collapsed} onToggleCollapsed={() => setCollapsed((value) => !value)} />
+    body = <FunnelBoard stages={stages} groups={groups} choices={cv.choices!} now={now} onOpen={openView} onMove={requestMove} drag={drag} collapsed={collapsed} onToggleCollapsed={() => setExpanded(collapsed)} />
   }
 
   const reprovar = confirm?.stage.key === 'reprovado'

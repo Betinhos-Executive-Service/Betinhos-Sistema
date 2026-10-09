@@ -3,7 +3,7 @@ import { Button, SegmentedControl, StatusBadge, Table, type TableColumn } from '
 import { useMedia } from '../../../operacional/useMedia'
 import { LinhaChart } from '../../charts/Charts'
 import { calcularMotoristas, type CnhVencendo, type LinhaRankingMotorista, type LinhaScoreMotorista, type Motoristas } from '../../domain/abas/motoristas'
-import { detalheCnh, detalheServicosMotorista } from '../../domain/detalhes'
+import { idDetalheMotorista } from '../../domain/detalhes'
 import { brl, brlS, dec, int } from '../../domain/format'
 import type { Reserva } from '../../domain/types'
 import { useDetalhe } from '../DetalheDrawer'
@@ -49,7 +49,7 @@ function MotoristasAba({ ctx, dados, periodo, frota, onFrota }: DadosAba & Props
   const semInfleet = mo.kpis.score == null
   const semFuncionarios = mo.kpis.total == null
   const abrir = useDetalhe()
-  const verCnh = abrir && mo.kpis.cnhAtencao ? { texto: 'Ver motoristas', onAbrir: () => abrir(detalheCnh(dados.funcionarios, ctx.now)) } : undefined
+  const verCnh = abrir && mo.kpis.cnhAtencao ? { texto: 'Ver motoristas', onAbrir: () => abrir('cnh') } : undefined
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={3}>
       <KpiCard rotulo={KPIS[0]} tom="brand" valor={mo.kpis.total == null ? null : int(mo.kpis.total)} />
@@ -81,7 +81,7 @@ function RankingCard({ mo, rv, periodo, frota, onFrota }: { mo: Motoristas; rv: 
   const mobile = useMedia(MEDIA_MOBILE)
   const abrir = useDetalhe()
   /** Drill-down da linha: os serviços do motorista no recorte (só com serviço). */
-  const verServicos = (l: LinhaRankingMotorista) => (abrir && l.servicos ? () => abrir(detalheServicosMotorista(rv, l)) : undefined)
+  const verServicos = (l: LinhaRankingMotorista) => (abrir && l.servicos ? () => abrir(idDetalheMotorista(l.key)) : undefined)
   const uid = useId()
   const filtro = mo.veiculosIndisponiveis ? 'todos' : frota
   const linhas = filtro === 'todos' ? mo.ranking : mo.ranking.filter((l) => l.propria === (filtro === 'proprios'))
@@ -141,7 +141,7 @@ function RankingCard({ mo, rv, periodo, frota, onFrota }: { mo: Motoristas; rv: 
       },
     ]
   const vazioRanking = <Vazio titulo={filtro === 'todos' ? 'Nenhum motorista ativo' : 'Nenhum motorista neste filtro'} />
-  const top = useTopCelular(linhas, mobile)
+  const top = useTopCelular(linhas, mobile, 'ranking')
   const tabela = <><Table className="dash-mo-ranking" columns={colunas} rows={top.linhas} rowKey={(l) => l.key} empty={vazioRanking} />{top.botao}</>
   const filtroFrota = (
     <div className="dash-mo-filtro">
@@ -237,7 +237,7 @@ function ScoreMesCard({ linhas, periodo }: { linhas: LinhaScoreMotorista[]; peri
       { key: 'f', header: 'Fren.', align: 'end', width: trilhas[4].width, cell: (l) => taxa(l.taxaFrenagem) },
       { key: 'o', header: 'Ocioso', align: 'end', width: trilhas[5].width, cell: (l) => taxa(l.taxaOcioso) },
     ]
-  const top = useTopCelular(linhas, mobile)
+  const top = useTopCelular(linhas, mobile, 'score')
   const tabela = <Table columns={colunas} rows={top.linhas} rowKey={(l) => `${l.motoristaId}-${l.mes}`} empty={<Vazio titulo="Sem viagens do Infleet no período" />} style={mobile ? undefined : { minWidth: larguraMinima(trilhas, 12) }} />
   return (
     <AnaliseCard

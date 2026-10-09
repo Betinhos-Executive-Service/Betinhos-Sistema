@@ -3,7 +3,7 @@ import { Alert, Button, EmptyState, Pagination, StatusBadge, ToastProvider, useS
 import { FileStack, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
-import { useQueryFilters, useQueryId, useQueryPagina } from '../../nav/queryState'
+import { useQueryBandeira, useQueryFilters, useQueryId, useQueryPagina } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { GerarPagantesFrame, SaveViewDialog } from '../pagantes/components/Dialogs'
 import { formatMoney } from '../pagantes/domain/messages'
@@ -60,8 +60,10 @@ function Ops({ host }: { host: Host }) {
   const current = selectedId ? ops.list.find((op) => op.id === selectedId) ?? null : null
   const [cancelRequest, setCancelRequest] = useState<Op | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [frameUrl, setFrameUrl] = useState<string | null>(null)
+  const [saving, setSaving] = useQueryBandeira('salvarvisao')
+  // O Gerar Pagantes aberto (por cima da tela) também vive na URL: `gerar=<id da OP>`.
+  const [gerarOpId, setGerarOpId] = useQueryId('gerar')
+  const frameUrl = gerarOpId ? source.pagantes.gerarPagantesUrl(gerarOpId) : null
   const [version, setVersion] = useState(0)
 
   const refresh = useCallback(() => { setVersion((v) => v + 1); void ops.reload() }, [ops.reload])
@@ -87,10 +89,10 @@ function Ops({ host }: { host: Host }) {
     const url = source.pagantes.gerarPagantesUrl(op.id)
     if (!url) { toast({ tone: 'info', message: 'O Gerar Pagantes só abre dentro do Dataverse.' }); return }
     setSelectedId(null)
-    setFrameUrl(url)
+    setGerarOpId(op.id)
   }
 
-  const closeFrame = useCallback((reload: boolean) => { setFrameUrl(null); if (reload) refresh() }, [refresh])
+  const closeFrame = useCallback((reload: boolean) => { setGerarOpId(null); if (reload) refresh() }, [refresh, setGerarOpId])
 
   function saveView(nome: string) {
     const same = matchView(views, filters)

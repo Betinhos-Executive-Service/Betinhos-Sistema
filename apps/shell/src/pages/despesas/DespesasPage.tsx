@@ -3,7 +3,7 @@ import { Alert, Button, EmptyState, Grid, MetricCard, Pagination, StatusBadge, T
 import { Clock, Copy, Paperclip, ReceiptText, RefreshCw, SearchX, Wallet } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
-import { useQueryFilters, useQueryId, useQueryPagina } from '../../nav/queryState'
+import { useQueryBandeira, useQueryFilters, useQueryId, useQueryPagina } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { SaveViewDialog } from '../pagantes/components/Dialogs'
 import { formatMoney } from '../pagantes/domain/messages'
@@ -59,7 +59,7 @@ function Despesas({ host }: { host: Host }) {
 
   const [selectedId, setSelectedId] = useQueryId('abrir')
   const current = selectedId ? despesas.list.find((d) => d.id === selectedId) ?? null : null
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving] = useQueryBandeira('salvarvisao')
   const [version, setVersion] = useState(0)
 
   const refresh = useCallback(() => { setVersion((v) => v + 1); void despesas.reload() }, [despesas.reload])
