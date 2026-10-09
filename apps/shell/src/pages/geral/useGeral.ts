@@ -385,11 +385,30 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     onStateChange.current?.(state)
   }, [viewId, query, sort, filters, hasFilters])
 
-  const toggle = useCallback((id: string) => setSelected((s) => {
-    const next = new Set(s)
-    if (!next.delete(id)) next.add(id)
-    return next
-  }), [])
+  // Última linha clicada: ponto de partida da seleção por intervalo (Shift+clique).
+  const anchor = useRef<string | null>(null)
+  const toggle = useCallback((id: string) => {
+    anchor.current = id
+    setSelected((s) => {
+      const next = new Set(s)
+      if (!next.delete(id)) next.add(id)
+      return next
+    })
+  }, [])
+  /** Só esta linha fica selecionada; com `keep` e a linha já marcada, a seleção atual é mantida. */
+  const selectOnly = useCallback((id: string, keep = false) => {
+    anchor.current = id
+    setSelected((s) => (keep && s.has(id) ? s : new Set([id])))
+  }, [])
+  /** Seleciona do último clique até `toId`, na ordem das linhas carregadas (sem âncora, só `toId`). */
+  const selectRange = useCallback((toId: string) => {
+    const ids = rowsRef.current.map((r) => String(r[ID_ATTRIBUTE]))
+    const from = anchor.current == null ? -1 : ids.indexOf(anchor.current)
+    const to = ids.indexOf(toId)
+    if (to < 0) return
+    if (from < 0) { anchor.current = toId; setSelected(new Set([toId])); return }
+    setSelected(new Set(ids.slice(Math.min(from, to), Math.max(from, to) + 1)))
+  }, [])
   const toggleAll = useCallback(() => setSelected((s) => {
     const ids = rowsRef.current.map((r) => String(r[ID_ATTRIBUTE]))
     return ids.length > 0 && ids.every((id) => s.has(id)) ? new Set() : new Set(ids)
@@ -472,5 +491,5 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   const state: GeralState = { views, viewsError, view, columns, attributes, attributesError, quickFind, rows, total, more, pagesLoaded, loading, loadingMore, pageError, loadError, sort, query, filters, selected, cells }
   /** Há filtros, mas a metadata falhou: a consulta segue sem eles. */
   const filtersIgnored = hasFilters && attributes == null && attributesError != null
-  return { ...state, filtersIgnored, defaultOrder, selectView, reloadViews, setSort, setQuery, setFilter, clearFilters, loadMore, retryLoadMore, reload, refresh: reload, toggle, toggleAll, clearSelection, save, resetCell }
+  return { ...state, filtersIgnored, defaultOrder, selectView, reloadViews, setSort, setQuery, setFilter, clearFilters, loadMore, retryLoadMore, reload, refresh: reload, toggle, selectOnly, selectRange, toggleAll, clearSelection, save, resetCell }
 }

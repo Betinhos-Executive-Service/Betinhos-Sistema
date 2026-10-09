@@ -313,22 +313,22 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   // Barra de seleção do celular: só aparece com linhas marcadas.
   const selectionCommands = (
     <>
-      {selectedIds.length === 1 ? <Button variant="action" size="compact" icon={<Pencil size={16} />} onClick={() => { void openForm('edit', selectedIds[0]) }}>Editar</Button> : null}
-      <Button variant="action" size="compact" icon={<Ticket size={16} />} onClick={openVoucher}>Gerar Voucher</Button>
-      <Button variant="action" size="compact" icon={<Copy size={16} />} onClick={() => { void copySelected() }}>Copiar Serviços</Button>
-      <Button variant="action" size="compact" icon={<FilePlus2 size={16} />} onClick={askOp}>Gerar OP</Button>
-      <Button variant="action" size="compact" icon={<Send size={16} />} onClick={() => setDispRequest({ ids: selectedIds })}>Disparar</Button>
+      {selectedIds.length === 1 ? <Button variant="action" size="touch" icon={<Pencil size={16} />} onClick={() => { void openForm('edit', selectedIds[0]) }}>Editar</Button> : null}
+      <Button variant="action" size="touch" icon={<Ticket size={16} />} onClick={openVoucher}>Gerar Voucher</Button>
+      <Button variant="action" size="touch" icon={<Copy size={16} />} onClick={() => { void copySelected() }}>Copiar Serviços</Button>
+      <Button variant="action" size="touch" icon={<FilePlus2 size={16} />} onClick={askOp}>Gerar OP</Button>
+      <Button variant="action" size="touch" icon={<Send size={16} />} onClick={() => setDispRequest({ ids: selectedIds })}>Disparar</Button>
       {selectedState === 1
-        ? <Button variant="action" size="compact" icon={<ArchiveRestore size={16} />} onClick={() => askState(true)}>Ativar</Button>
+        ? <Button variant="action" size="touch" icon={<ArchiveRestore size={16} />} onClick={() => askState(true)}>Ativar</Button>
         : selectedState === 0
-          ? <Button variant="danger" size="compact" icon={<Archive size={16} />} onClick={() => askState(false)}>Desativar</Button>
+          ? <Button variant="danger" size="touch" icon={<Archive size={16} />} onClick={() => askState(false)}>Desativar</Button>
           // aria-disabled (não disabled): continua focável e o leitor de tela lê o motivo; o clique não faz nada.
           : <>
-            <Button variant="danger" size="compact" className="gr-btn--blocked" icon={<Archive size={16} />} aria-disabled="true" aria-describedby={mixedId} title={mixedTitle} onClick={(event) => event.preventDefault()}>Desativar</Button>
-            <Button variant="action" size="compact" className="gr-btn--blocked" icon={<ArchiveRestore size={16} />} aria-disabled="true" aria-describedby={mixedId} title={mixedTitle} onClick={(event) => event.preventDefault()}>Ativar</Button>
+            <Button variant="danger" size="touch" className="gr-btn--blocked" icon={<Archive size={16} />} aria-disabled="true" aria-describedby={mixedId} title={mixedTitle} onClick={(event) => event.preventDefault()}>Desativar</Button>
+            <Button variant="action" size="touch" className="gr-btn--blocked" icon={<ArchiveRestore size={16} />} aria-disabled="true" aria-describedby={mixedId} title={mixedTitle} onClick={(event) => event.preventDefault()}>Ativar</Button>
             <span id={mixedId} className="gr-sr">{mixedTitle}</span>
           </>}
-      <Button variant="ghost" size="compact" icon={<X size={16} />} onClick={clearSelection}>Limpar seleção</Button>
+      <Button variant="ghost" size="touch" icon={<X size={16} />} onClick={clearSelection}>Limpar seleção</Button>
     </>
   )
   const noneTitle = 'Selecione ao menos um serviço.'
@@ -386,7 +386,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         { id: 'funcoes', label: 'Funções Operacionais', icon: <ClipboardList size={16} />, onSelect: () => { location.hash = hrefFor('new_telafuncoesoperacionais') } },
         { id: 'escala', label: 'Escala FDS', icon: <CalendarDays size={16} />, onSelect: () => setEscalaOpen(true) },
         { id: 'auditoria', label: 'Auditoria', icon: <ShieldCheck size={16} />, onSelect: () => { void openAuditoria() } },
-        { id: 'erro', label: <span title={selectedIds.length === 1 ? undefined : oneTitle}>Registrar Erro</span>, icon: <Bug size={16} />, disabled: selectedIds.length !== 1, onSelect: () => { void registrarErro() } },
+        { id: 'erro', label: selectedIds.length === 1 ? 'Registrar Erro' : <span className="gr-menu__hint" title={oneTitle}>Registrar Erro<small>{oneTitle}</small></span>, icon: <Bug size={16} />, disabled: selectedIds.length !== 1, onSelect: () => { void registrarErro() } },
         { id: 'contagem', label: 'Contagem de Serviços', icon: <ListChecks size={16} />, onSelect: () => { location.hash = hrefFor('operacional') } },
       ]}
     />
@@ -395,7 +395,13 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar serviços" onClick={reload} />, [reload])
   useShellHeader({ title: 'Geral', actions: headerActions })
 
-  const { save, resetCell, cells } = geral
+  const { save, resetCell, cells, selectOnly, selectRange, toggle } = geral
+  const selectForEdit = useCallback((id: string) => selectOnly(id, true), [selectOnly])
+  const selectRow = useCallback((id: string, mode: 'only' | 'toggle' | 'range') => {
+    if (mode === 'range') selectRange(id)
+    else if (mode === 'toggle') toggle(id)
+    else selectOnly(id)
+  }, [selectOnly, selectRange, toggle])
   // Callbacks estáveis: a célula passa o próprio id/coluna, então só a que mudou de status ou de linha renderiza de novo.
   const searchLookup = useCallback((attribute: string, text: string) => source.search(attribute, text), [source])
   const renderCell = useCallback((row: Row, column: Column): ReactNode => {
@@ -408,11 +414,12 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         status={cells.get(cellKey(id, column.attribute)) ?? IDLE}
         onSave={save}
         onReset={resetCell}
+        onBeginEdit={selectForEdit}
         search={searchLookup}
         editable={attributes != null}
       />
     )
-  }, [attributes, cells, save, resetCell, searchLookup])
+  }, [attributes, cells, save, resetCell, searchLookup, selectForEdit])
 
   const editRow = editId == null ? undefined : rowOf(editId)
 
@@ -474,6 +481,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               onHide={hideColumn}
               selected={geral.selected}
               onToggle={geral.toggle}
+              onSelectRow={selectRow}
               onToggleAll={geral.toggleAll}
               onOpen={(id) => { void openForm('edit', id) }}
               renderCell={renderCell}

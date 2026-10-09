@@ -221,3 +221,6 @@
 .gr-chip__warn { margin-left: var(--bt-space-2); color: var(--bt-color-warning); flex: 0 0 auto; }
 .gr-chip.is-ignored { border-style: dashed; }
 .gr-fd__loading { margin: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); }
+
+.gr-menu__hint { display: grid; gap: 2px; text-align: left; }
+.gr-menu__hint small { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }

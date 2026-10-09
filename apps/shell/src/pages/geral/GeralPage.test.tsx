@@ -1082,8 +1082,63 @@ describe('Geral: comandos Auditoria, Gerar OP, Disparar e Registrar Erro', () =>
     render(<GeralPage host={{ mode: 'mock' }} />)
     await pick('OS-1005', 'OS-1006')
     fireEvent.click(within(toolbar()).getByRole('button', { name: 'Mais ações' }))
-    const item = (await screen.findByRole('menuitem', { name: 'Registrar Erro', hidden: true })) as HTMLButtonElement
+    const item = (await screen.findByRole('menuitem', { name: /Registrar Erro/, hidden: true })) as HTMLButtonElement
     expect(item.disabled).toBe(true)
-    expect(item.querySelector('[title="Selecione exatamente um serviço."]')).not.toBeNull()
+    expect(within(item).getByText('Selecione exatamente um serviço.')).toBeTruthy()
+  })
+})
+
+describe('Geral: seleção pela linha', () => {
+  const rowOf = async (id: string) => {
+    await screen.findAllByText(PAGE1)
+    const row = screen.getAllByRole('row', { hidden: true }).find((r) => within(r).queryByText(id))
+    if (!row) throw new Error(`Sem linha ${id}`)
+    return row
+  }
+  const selectedRows = () => screen.getAllByRole('row', { hidden: true }).filter((r) => r.getAttribute('aria-selected') === 'true')
+  const cellText = (row: HTMLElement) => within(row).getAllByRole('gridcell')[2]
+
+  it('clique simples na linha seleciona só ela; Ctrl+clique soma; Shift+clique marca o intervalo', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    const a = await rowOf('OS-1005')
+    fireEvent.click(cellText(a))
+    expect(selectedRows()).toHaveLength(1)
+    fireEvent.click(cellText(await rowOf('OS-1007')), { ctrlKey: true })
+    expect(selectedRows()).toHaveLength(2)
+    fireEvent.click(cellText(await rowOf('OS-1009')))
+    expect(selectedRows()).toHaveLength(1)
+    expect(selectedRows()[0].textContent).toContain('OS-1009')
+    fireEvent.click(cellText(await rowOf('OS-1011')), { shiftKey: true })
+    const ids = selectedRows().map((r) => r.textContent ?? '')
+    expect(ids).toHaveLength(3)
+    expect(ids.some((t) => t.includes('OS-1010'))).toBe(true)
+  })
+
+  it('clicar em Abrir serviço não muda a seleção', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    const row = await rowOf('OS-1005')
+    fireEvent.click(within(row).getByRole('button', { name: /Abrir serviço OS-1005/ }))
+    expect(selectedRows()).toHaveLength(0)
+  })
+
+  it('entrar em edição pela célula seleciona a linha', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    const row = await rowOf('OS-1005')
+    const cell = await cellOf(row, 'text')
+    fireEvent.doubleClick(cell)
+    await waitFor(() => expect(row.getAttribute('aria-selected')).toBe('true'))
+    expect(selectedRows()).toHaveLength(1)
+  })
+
+  it('no celular, tocar no corpo do card alterna a seleção', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('max-width: 820px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    const card = (await screen.findAllByRole('listitem'))[0]
+    fireEvent.click(card.querySelector('.gr-card__line') as HTMLElement)
+    expect(card.className).toContain('is-selected')
+    fireEvent.click(card.querySelector('.gr-card__line') as HTMLElement)
+    expect(card.className).not.toContain('is-selected')
+    fireEvent.click(within(card).getByRole('button', { name: /Abrir serviço/ }))
+    expect(card.className).not.toContain('is-selected')
   })
 })

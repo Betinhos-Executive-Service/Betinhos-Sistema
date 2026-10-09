@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
 import { Button, Checkbox, Skeleton, StatusBadge } from '@betinhos/ui'
 import { statusTone } from '../domain/cells'
@@ -53,7 +53,7 @@ export function GeralCards({ rows, columns, attributes, loading, selected, onTog
           // Só decide "sem motorista" com a metadata carregada: antes dela o lookup nem tem chave conhecida.
           const motoristaKey = has.motorista && attributes ? rowKey(has.motorista, attributes.get(has.motorista.key)) : null
           return (
-            <li key={id} className={selected.has(id) ? 'gr-card is-selected' : 'gr-card'}>
+            <li key={id} className={selected.has(id) ? 'gr-card is-selected' : 'gr-card'} onClick={(event: MouseEvent<HTMLLIElement>) => { if (!(event.target as HTMLElement).closest('button, input, a, label')) onToggle(id) }}>
               <div className="gr-card__head">
                 <span className="gr-card__check">
                   <Checkbox label={<span className="gr-sr">Selecionar serviço {name}</span>} checked={selected.has(id)} onChange={() => onToggle(id)} />

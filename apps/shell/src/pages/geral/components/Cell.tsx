@@ -19,6 +19,8 @@ type Props = {
   onSave: (id: string, column: Column, value: EditValue) => Promise<boolean>
   /** Limpa o aviso de erro da célula. Estável. */
   onReset: (id: string, attribute: string) => void
+  /** Chamado ao entrar em edição: a tela seleciona a linha. */
+  onBeginEdit?: (id: string) => void
   /** Busca no servidor as opções de um lookup. Estável. */
   search: (attribute: string, text: string) => Promise<LookupOption[]>
   /** `false` enquanto a metadata não chegou: nenhuma célula edita. */
@@ -69,7 +71,7 @@ function grow(area: HTMLTextAreaElement) {
 }
 
 /** Célula do grid: lê o valor e, ao editar, troca pelo controle do tipo com feedback de gravação ali mesmo. */
-export const Cell = memo(function Cell({ row, column, info, status, onSave, onReset, search, editable }: Props) {
+export const Cell = memo(function Cell({ row, column, info, status, onSave, onReset, onBeginEdit, search, editable }: Props) {
   const key = rowKey(column, info)
   const kind = cellKind(column, info)
   const raw = row[key]
@@ -142,6 +144,7 @@ export const Cell = memo(function Cell({ row, column, info, status, onSave, onRe
     } else {
       setDraft(retry ? retryRef.current.draft : char ?? draftOf(kind, row, key))
     }
+    onBeginEdit?.(id)
     setEditing(true)
   }
 
