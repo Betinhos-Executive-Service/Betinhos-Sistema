@@ -782,6 +782,7 @@ describe('Geral: espaço e densidade', () => {
   })
 })
 
+const BOOLEAN_LABELS = ['Receber']
 describe('Geral: redimensionar e reordenar colunas', () => {
   const track = (name: RegExp) => {
     const grid = screen.getByRole('grid', { name: 'Serviços', hidden: true })
@@ -861,11 +862,21 @@ describe('Geral: redimensionar e reordenar colunas', () => {
     expect(handle.getAttribute('aria-valuemin')).toBe('90')
   })
 
-  it('coluna Sim/Não não tem alça', async () => {
+  it('arrastar a alça não inicia reordenação; sem a alça o arraste do cabeçalho segue', async () => {
+    const handle = await open()
+    const header = screen.getByRole('columnheader', { name: /Trajeto/, hidden: true })
+    const data = { setData: () => undefined, getData: () => '', types: [] as string[], effectAllowed: '' }
+    fireEvent.pointerDown(handle, { clientX: 10, pointerId: 1 })
+    expect(fireEvent.dragStart(header, { dataTransfer: data })).toBe(false)
+    fireEvent.pointerUp(handle, { pointerId: 1 })
+    expect(fireEvent.dragStart(header, { dataTransfer: data })).toBe(true)
+  })
+
+  it('coluna Sim/Não não tem alça e as demais têm', async () => {
     await open()
-    const labels = screen.getAllByRole('columnheader', { hidden: true }).slice(1)
-    const withHandle = labels.filter((h) => h.querySelector('.gr-resize')).length
-    expect(withHandle).toBeLessThan(labels.length)
+    const headers = screen.getAllByRole('columnheader', { hidden: true }).slice(1)
+    const without = headers.filter((h) => h.querySelector('.gr-resize') === null)
+    expect(without.map((h) => h.getAttribute('title'))).toEqual(BOOLEAN_LABELS)
   })
 
   it('Alt+seta mantém o foco, preserva ocultas na ordem; Aplicar mantém larguras e Restaurar zera', async () => {
@@ -874,14 +885,15 @@ describe('Geral: redimensionar e reordenar colunas', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
     let dialog = await screen.findByRole('dialog', { name: 'Colunas da visão' })
     const boxes = within(dialog).getAllByRole('checkbox')
-    const hiddenName = boxes[boxes.length - 1].getAttribute('aria-label') ?? ''
+    const hiddenName = (boxes[boxes.length - 1] as HTMLInputElement).labels?.[0]?.textContent ?? ''
+    expect(hiddenName).not.toBe('')
     fireEvent.click(boxes[boxes.length - 1])
     fireEvent.click(within(dialog).getByRole('button', { name: 'Aplicar' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Colunas da visão' })).toBeNull())
     expect(window.localStorage.getItem(LS)).toContain('widths')
-    const names = () => screen.getAllByRole('columnheader', { hidden: true }).slice(1).map((h) => h.getAttribute('title'))
+    const names = () => Array.from(document.querySelectorAll('.bt-table__head [role=columnheader]')).slice(1).map((h) => h.getAttribute('title'))
     const second = names()[1]
-    const button = () => screen.getByRole('button', { name: new RegExp(`^${second}$`), hidden: true })
+    const button = () => Array.from(document.querySelectorAll<HTMLElement>('.gr-head__sort')).find((b) => b.textContent === second) as HTMLElement
     button().focus()
     fireEvent.keyDown(button(), { key: 'ArrowRight', altKey: true })
     await waitFor(() => expect(document.activeElement).toBe(button()))
@@ -889,7 +901,9 @@ describe('Geral: redimensionar e reordenar colunas', () => {
     await waitFor(() => expect(names().indexOf(second)).toBe(3))
     const saved = JSON.parse(window.localStorage.getItem(LS) ?? '{}') as Record<string, { hidden: string[]; order: string[] }>
     const pref = Object.values(saved)[0]
-    if (hiddenName) expect(pref.order.length).toBeGreaterThan(names().length - 1)
+    expect(pref.hidden.length).toBe(1)
+    expect(pref.order).toContain(pref.hidden[0])
+    expect(names()).not.toContain(hiddenName)
     fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
     dialog = await screen.findByRole('dialog', { name: 'Colunas da visão' })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Restaurar colunas da visão' }))
