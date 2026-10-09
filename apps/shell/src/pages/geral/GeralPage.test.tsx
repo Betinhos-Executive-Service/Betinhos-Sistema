@@ -1014,3 +1014,76 @@ describe('Geral: visões pessoais e link compartilhável', () => {
     expect(await screen.findByText(/Não foi possível copiar o link/)).toBeTruthy()
   }, 60_000)
 })
+
+describe('Geral: comandos Auditoria, Gerar OP, Disparar e Registrar Erro', () => {
+  const pick = async (...ids: string[]) => {
+    await screen.findAllByText(PAGE1)
+    for (const id of ids) {
+      const row = screen.getAllByRole('row', { hidden: true }).find((r) => within(r).queryByText(id))
+      if (!row) throw new Error(`Sem linha ${id}`)
+      fireEvent.click(within(row).getByRole('checkbox'))
+    }
+  }
+  const toolbar = () => screen.getByRole('toolbar', { name: 'Filtros de serviços' })
+
+  it('sem seleção Gerar OP e Disparar ficam inertes, com o motivo', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findAllByText(PAGE1)
+    for (const name of ['Gerar OP', 'Disparar']) {
+      const button = within(toolbar()).getByRole('button', { name })
+      expect(button.getAttribute('aria-disabled')).toBe('true')
+      expect(button.getAttribute('title')).toBe('Selecione ao menos um serviço.')
+    }
+  })
+
+  it('Gerar OP com um serviço que já tem OP mostra o diálogo parcial e, ao confirmar, avisa o sucesso', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await pick('OS-1004', 'OS-1005')
+    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Gerar OP' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Gerar OP' })
+    expect(within(dialog).getByText('Serviços com OP existente')).toBeTruthy()
+    expect(within(dialog).getByText('OS-1004')).toBeTruthy()
+    expect(within(dialog).getByText('Criar OP para 1 serviço(s) restante(s)?')).toBeTruthy()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Sim, continuar' }))
+    expect(await screen.findByText('OP criada para 1 serviço(s).')).toBeTruthy()
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Gerar OP' })).toBeNull())
+  })
+
+  it('Gerar OP só com serviços que já têm OP avisa e não abre o diálogo', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await pick('OS-1004')
+    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Gerar OP' }))
+    expect(await screen.findByText('Todos os serviços selecionados já possuem OP.')).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: 'Gerar OP' })).toBeNull()
+  })
+
+  it('Disparar com a OS-1013 reporta a falha parcial', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await pick('OS-1013', 'OS-1005')
+    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Disparar' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Marcar 2 serviço(s) como Programado?' })
+    expect(within(dialog).getByText('Serviços sem motorista são recusados pelo servidor.')).toBeTruthy()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Disparar' }))
+    expect(await screen.findByText(/1 de 2 programados; falharam: OS-1013\./)).toBeTruthy()
+  })
+
+  it('Auditoria e Registrar Erro em mock mostram os avisos', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await pick('OS-1005')
+    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Mais ações' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Auditoria', hidden: true }))
+    expect(await screen.findByText('A auditoria abre dentro do Dataverse.')).toBeTruthy()
+    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Mais ações' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Registrar Erro', hidden: true }))
+    expect(await screen.findByText('A Gestão de Qualidade abre dentro do Dataverse.')).toBeTruthy()
+  })
+
+  it('Registrar Erro fica inerte com 2 selecionados', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await pick('OS-1005', 'OS-1006')
+    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Mais ações' }))
+    const item = (await screen.findByRole('menuitem', { name: 'Registrar Erro', hidden: true })) as HTMLButtonElement
+    expect(item.disabled).toBe(true)
+    expect(item.querySelector('[title="Selecione exatamente um serviço."]')).not.toBeNull()
+  })
+})

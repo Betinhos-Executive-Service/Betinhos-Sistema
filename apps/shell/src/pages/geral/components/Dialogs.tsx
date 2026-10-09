@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Button, Dialog } from '@betinhos/ui'
+import { Alert, Button, Dialog } from '@betinhos/ui'
 
 const COPY_FAILED = 'Não foi possível copiar automaticamente. Selecione e copie.'
 
@@ -81,6 +81,63 @@ export function MockFormDialog({ open, onClose }: { open: boolean; onClose: () =
   return (
     <Dialog open={open} onClose={onClose} title="Formulário Geral abre no Dataverse" actions={<Button onClick={onClose}>Entendi</Button>}>
       Fora do ambiente não há formulário. Publique com pnpm push e abra o Sistema Betinhos no Dataverse.
+    </Dialog>
+  )
+}
+
+export type OpRequest = { ids: string[]; labels: string[]; excluded: string[] }
+
+/** Confirma a criação de OP; se algum serviço já tem OP, lista os que ficam de fora. */
+export function GerarOpDialog({ request, busy, error, onClose, onConfirm }: { request: OpRequest | null; busy: boolean; error: string | null; onClose: () => void; onConfirm: () => void }) {
+  const last = useRef<OpRequest | null>(null)
+  if (request) last.current = request
+  const shown = request ?? last.current
+  const count = shown?.ids.length ?? 0
+  const partial = (shown?.excluded.length ?? 0) > 0
+  return (
+    <Dialog
+      open={request != null}
+      onClose={() => { if (!busy) onClose() }}
+      title="Gerar OP"
+      actions={<>
+        <Button variant="secondary" disabled={busy} onClick={onClose}>Cancelar</Button>
+        <Button loading={busy} onClick={onConfirm}>{partial ? 'Sim, continuar' : 'Criar OP'}</Button>
+      </>}
+    >
+      <div className="gr-dialog">
+        {partial ? (
+          <>
+            <p>Serviços com OP existente</p>
+            <ul className="gr-ids">{shown?.excluded.map((label, index) => <li key={`${label}-${index}`}>{label}</li>)}</ul>
+            <p>Criar OP para {count} serviço(s) restante(s)?</p>
+          </>
+        ) : <p>Criar OP para {count} serviço(s)?</p>}
+        {error ? <Alert tone="danger">{error}</Alert> : null}
+      </div>
+    </Dialog>
+  )
+}
+
+export type DispararRequest = { ids: string[] }
+
+/** Confirma marcar os serviços como Programado (dispara o aviso ao motorista). */
+export function DispararDialog({ request, busy, onClose, onConfirm }: { request: DispararRequest | null; busy: boolean; onClose: () => void; onConfirm: () => void }) {
+  const last = useRef<DispararRequest | null>(null)
+  if (request) last.current = request
+  const count = (request ?? last.current)?.ids.length ?? 0
+  return (
+    <Dialog
+      open={request != null}
+      onClose={() => { if (!busy) onClose() }}
+      title={`Marcar ${count} serviço(s) como Programado?`}
+      actions={<>
+        <Button variant="secondary" disabled={busy} onClick={onClose}>Cancelar</Button>
+        <Button loading={busy} onClick={onConfirm}>Disparar</Button>
+      </>}
+    >
+      <div className="gr-dialog">
+        <p>Serviços sem motorista são recusados pelo servidor.</p>
+      </div>
     </Dialog>
   )
 }
