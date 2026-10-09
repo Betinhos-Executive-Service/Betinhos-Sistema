@@ -4,6 +4,8 @@ import type { ChoiceOption } from '@betinhos/dataverse'
 import { CalendarX } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
+import { lerDia, useQueryId } from '../../nav/queryState'
+import { patchHashQuery, useHashQuery } from '../../nav/useHashRoute'
 import { createSource } from './data/source'
 import type { Motorista, Reserva } from './domain/types'
 import { buildAttention, type AttentionItem } from './domain/alerts'
@@ -36,10 +38,15 @@ function Operacional({ host }: { host: Host }) {
   const toast = useToast()
   const now = useNow()
   const today = dateKey(now)
-  const [dayKey, setDayKey] = useState(today)
-  const [motoristaId, setMotoristaId] = useState<string | null>(null)
-  const [showConcluded, setShowConcluded] = useState(true)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  // Dia, filtro de motorista, concluídos e serviço aberto vivem na URL (#/operacional?dia=2026-10-12&motorista=<id>&concluidos=0&servico=<id>).
+  // Hoje, "todos os motoristas" e "mostrar concluídos" são o padrão e não aparecem na URL.
+  const query = useHashQuery()
+  const dayKey = lerDia(query, 'dia') ?? today
+  const motoristaId = query.get('motorista') || null
+  const showConcluded = query.get('concluidos') !== '0'
+  const [selectedId, setSelectedId] = useQueryId('servico')
+  const setMotoristaId = (id: string | null) => patchHashQuery({ motorista: id })
+  const setShowConcluded = (show: boolean) => patchHashQuery({ concluidos: show ? null : '0' })
   const [statusOptions, setStatusOptions] = useState<ChoiceOption[]>([])
   const [busy, setBusy] = useState(false)
   const [confirm, setConfirm] = useState<{ reservaId: string; codigo: string; kind: 'cancel' | 'motorista' | 'programar'; run: () => void } | null>(null)
@@ -48,7 +55,7 @@ function Operacional({ host }: { host: Host }) {
   const landscape = useMedia('(orientation: landscape) and (max-height: 560px)')
   const op = useOperacional(source, dayKey)
 
-  const changeDay = useCallback((key: string) => { setDayKey(key); setSelectedId(null) }, [])
+  const changeDay = useCallback((key: string) => patchHashQuery({ dia: key === today ? null : key, servico: null }), [today])
 
   useEffect(() => {
     let cancelled = false

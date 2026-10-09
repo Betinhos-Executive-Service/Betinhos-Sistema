@@ -3,15 +3,17 @@ import { Alert, Button, Dialog, EmptyState, Field, Input, Pagination, StatusBadg
 import { Plus, RefreshCw, SearchX, Users } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
+import { useQueryAlvo, useQueryFilters, useQueryPagina } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
 import { label } from './domain/choices'
 import { duplicateIndex } from './domain/duplicates'
 import { BUILTIN_VIEWS, EMPTY_FILTERS, clienteOptions, filterPessoas, loadViews, matchView, newView, saveViews, viewFilters, type Filters, type View } from './domain/filters'
+import { pessoasQuery } from './domain/query'
 import { usePessoas } from './usePessoas'
 import { PessoasToolbar } from './components/PessoasToolbar'
 import { PessoasCards, PessoasTable } from './components/PessoasList'
-import { PessoaDrawer, type DrawerTarget } from './components/PessoaDrawer'
+import { PessoaDrawer } from './components/PessoaDrawer'
 import './pessoas.css'
 
 export function PessoasPage({ host }: { host: Host }) {
@@ -28,15 +30,15 @@ function Pessoas({ host }: { host: Host }) {
 
   const [stored, setStored] = useState(() => loadViews(source.kv))
   const views = useMemo(() => [...BUILTIN_VIEWS, ...stored.views], [stored.views])
-  const [filters, setFiltersState] = useState<Filters>(() => {
+  // Filtros, página e gaveta vivem na URL (#/pessoas?q=…&cliente=…&pagina=2&ver=…); sem filtro na abertura, entra a última visão.
+  const [filters, setFiltersUrl] = useQueryFilters(pessoasQuery, () => {
     const last = views.find((v) => v.id === stored.last)
     return last ? viewFilters(last) : { ...EMPTY_FILTERS }
   })
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useQueryPagina()
   const activeView = useMemo(() => matchView(views, filters, stored.last), [views, filters, stored.last])
   const setFilters = useCallback((next: Filters, viewId?: string) => {
-    setFiltersState(next)
-    setPage(1)
+    setFiltersUrl(next)
     setStored((s) => {
       const last = viewId ?? matchView([...BUILTIN_VIEWS, ...s.views], next, s.last)?.id ?? null
       if (last === s.last) return s
@@ -44,7 +46,7 @@ function Pessoas({ host }: { host: Host }) {
       saveViews(source.kv, data)
       return data
     })
-  }, [source.kv])
+  }, [source.kv, setFiltersUrl])
 
   const dups = useMemo(() => duplicateIndex(ps.list), [ps.list])
   const dupIds = useMemo(() => new Set(dups.keys()), [dups])
@@ -52,7 +54,7 @@ function Pessoas({ host }: { host: Host }) {
   const visible = useMemo(() => (choices ? filterPessoas(ps.list, filters, dupIds, (p) => label(choices.cargo, p.cargo)) : []), [ps.list, filters, dupIds, choices])
   const clientes = useMemo(() => clienteOptions(ps.list), [ps.list])
 
-  const [target, setTarget] = useState<DrawerTarget>(null)
+  const [target, setTarget] = useQueryAlvo()
   const [saving, setSaving] = useState(false)
   const [viewName, setViewName] = useState('')
 
