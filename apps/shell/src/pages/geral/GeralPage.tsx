@@ -83,6 +83,12 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const [editingFilter, setEditingFilter] = useState<string | null>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const { filters, setFilter, clearFilters } = geral
+  // Ao fechar o diálogo de filtro (aplicar ou cancelar) o foco volta ao ▾ da coluna; o diálogo nativo devolveria ao item de menu já desmontado.
+  const closeFilter = useCallback(() => {
+    const label = editingFilter ? attributes?.get(editingFilter)?.label || editingFilter : null
+    setEditingFilter(null)
+    if (label) window.setTimeout(() => Array.from(document.querySelectorAll<HTMLElement>('.gr-head__menu')).find((el) => el.getAttribute('aria-label') === `Opções da coluna ${label}`)?.focus(), 0)
+  }, [editingFilter, attributes])
   const filtersCount = useMemo(() => Object.values(filters).filter((f) => !isEmptyFilter(f)).length, [filters])
   const applyFilters = useCallback((drafts: Record<string, Filter | null>) => { for (const [attribute, filter] of Object.entries(drafts)) setFilter(attribute, filter) }, [setFilter])
   const hideColumn = useCallback((key: string) => {
@@ -365,13 +371,14 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           selectedCount={mobile ? 0 : geral.selected.size}
           filtersCount={filtersCount}
           onOpenFilters={() => setFiltersOpen(true)}
+          filtersUnavailable={geral.attributesError != null}
           mobile={mobile}
           commands={commands}
           shortcuts={shortcuts}
         />
       }
     >
-      <FilterChips filters={filters} attributes={attributes} mobile={mobile} onEdit={setEditingFilter} onRemove={(attribute) => setFilter(attribute, null)} onClearAll={clearFilters} />
+      <FilterChips ignored={geral.filtersIgnored} filters={filters} attributes={attributes} mobile={mobile} onEdit={setEditingFilter} onRemove={(attribute) => setFilter(attribute, null)} onClearAll={clearFilters} />
       {body}
       <FilterDialog
         attribute={editingFilter}
@@ -380,9 +387,9 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         value={editingFilter ? filters[editingFilter] ?? null : null}
         search={searchLookup}
         onApply={setFilter}
-        onClose={() => setEditingFilter(null)}
+        onClose={closeFilter}
       />
-      <FiltersDrawer open={filtersOpen} onClose={() => setFiltersOpen(false)} filters={filters} attributes={attributes} columns={geral.columns} search={searchLookup} onApply={applyFilters} onClearAll={clearFilters} />
+      <FiltersDrawer open={filtersOpen} onClose={() => setFiltersOpen(false)} filters={filters} attributes={attributes} columns={geral.columns} search={searchLookup} onApply={applyFilters} onClearAll={clearFilters} unavailable={geral.filtersIgnored || attributes == null} />
       {mobile && geral.selected.size > 0 ? (
         <div className="gr-selbar" role="group" aria-label="Ações sobre os selecionados">
           <span role="status" className="gr-selbar__count">{geral.selected.size === 1 ? '1 selecionado' : `${geral.selected.size} selecionados`}</span>

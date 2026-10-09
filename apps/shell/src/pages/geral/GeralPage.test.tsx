@@ -4,12 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Source } from './data/source'
 import { MOCK_ROW_COUNT } from './data/mock'
 import { GeralPage } from './GeralPage'
+import { encodeFilters } from './domain/filters'
 
 // Ganchos para simular o que o mock não faz: falha parcial de estado, linha inativa e cópia lenta.
 const hooks = vi.hoisted(() => ({
   setState: null as null | Source['setState'],
   copyRows: null as null | Source['copyRows'],
   update: null as null | Source['update'],
+  attributes: null as null | Source['attributes'],
   mixedState: false,
 }))
 vi.mock('./data/source', async (importOriginal) => {
@@ -23,6 +25,7 @@ vi.mock('./data/source', async (importOriginal) => {
         ...source,
         setState: (ids, active) => (hooks.setState ? hooks.setState(ids, active) : source.setState(ids, active)),
         copyRows: (ids) => (hooks.copyRows ? hooks.copyRows(ids) : source.copyRows(ids)),
+        attributes: (entity) => (hooks.attributes ? hooks.attributes(entity) : source.attributes(entity)),
         update: (id, patch) => (hooks.update ? hooks.update(id, patch) : source.update(id, patch)),
         page: async (request) => {
           const page = await source.page(request)
@@ -66,6 +69,7 @@ afterEach(() => {
   hooks.setState = null
   hooks.copyRows = null
   hooks.update = null
+  hooks.attributes = null
   hooks.mixedState = false
 })
 
@@ -703,6 +707,39 @@ describe('Geral: espaço e densidade', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
       await screen.findAllByText(PAGE1)
       expect(screen.queryByRole('group', { name: 'Filtros ativos' })).toBeNull()
+    }, 60_000)
+
+    it('fechar o diálogo de filtro com rascunho pede confirmação, e o foco volta ao ▾ da coluna', async () => {
+      render(<GeralPage host={{ mode: 'mock' }} />)
+      await screen.findAllByText(PAGE1)
+      const opener = () => screen.getByRole('button', { name: 'Opções da coluna Trajeto', hidden: true })
+      fireEvent.click(opener())
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Filtrar por…', hidden: true }))
+      const dialog = await screen.findByRole('dialog', { name: 'Filtrar Trajeto' })
+      // Sem rascunho, fechar é direto e devolve o foco ao ▾.
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Limpar' }))
+      await waitFor(() => expect(document.activeElement).toBe(opener()))
+      // Com rascunho, pede confirmação.
+      fireEvent.click(opener())
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Filtrar por…', hidden: true }))
+      const again = await screen.findByRole('dialog', { name: 'Filtrar Trajeto' })
+      fireEvent.change(within(again).getByRole('textbox', { name: 'Valor' }), { target: { value: 'Galeão' } })
+      const close = within(again).queryByRole('button', { name: /Fechar/ })
+      fireEvent.click(close ?? again.querySelector('button')!)
+      const confirm = await screen.findByRole('dialog', { name: 'Descartar alterações?' })
+      fireEvent.click(within(confirm).getByRole('button', { name: 'Descartar' }))
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Filtrar Trajeto' })).toBeNull())
+      expect(screen.queryByRole('group', { name: 'Filtros ativos' })).toBeNull()
+    }, 60_000)
+
+    it('sem metadata os filtros ficam indisponíveis e o chip restaurado da URL avisa', async () => {
+      hooks.attributes = () => Promise.reject(new Error('sem metadata'))
+      window.location.hash = '#/geral?f=' + encodeFilters({ cr40f_trajeto: { kind: 'text', op: 'contains', value: 'Galeão' } })
+      render(<GeralPage host={{ mode: 'mock' }} />)
+      const button = await screen.findByRole('button', { name: 'Filtros (1)' })
+      await waitFor(() => expect(button.getAttribute('aria-disabled')).toBe('true'))
+      expect(button.getAttribute('title')).toBe('Filtros indisponíveis: não foi possível carregar os campos.')
+      expect((await screen.findAllByTitle('Este filtro não está sendo aplicado')).length).toBeGreaterThan(0)
     }, 60_000)
 
     it('no celular mostra o botão Filtros em tamanho de toque e os chips', async () => {
