@@ -3,11 +3,13 @@ import { Cake, CloudOff, IdCard, Plus, RefreshCw, Stethoscope } from 'lucide-rea
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
+import { useQueryFilters, useQueryId } from '../../nav/queryState'
 import type { AlertKind } from './data/alerts'
 import { todaySP } from './data/dates'
 import { applyBaseFilters, applyFilters, countAlertas, DEFAULT_FILTERS, loadFilters, saveFilters, withAlertas, type Filters, type SortKey } from './data/filters'
 import { EMPRESA, FUNCAO, STATUS, VINCULO, type Option } from './data/schema'
 import { createFuncionariosSource } from './data/hostSource'
+import { funcionariosQuery } from './data/query'
 import type { DataSource } from './data/source'
 import type { Funcionario } from './data/types'
 import { errorMessage } from './data/xrm'
@@ -59,8 +61,12 @@ export function Funcionarios({ source }: { source: DataSource }) {
   const [rows, setRows] = useState<Funcionario[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [filters, setFilters] = useState<Filters>(loadFilters)
-  const [selection, setSelection] = useState<Selection>({ mode: 'closed' })
+  // Filtros e ficha aberta vivem na URL (#/funcionarios?q=…&funcao=…&ficha=<id|novo>); sem filtro na abertura, entram os últimos usados neste navegador.
+  const [filters, setFiltersUrl] = useQueryFilters(funcionariosQuery, loadFilters)
+  const setFilters = (next: Filters) => setFiltersUrl(next)
+  const [fichaId, setFichaId] = useQueryId('ficha')
+  const selection: Selection = fichaId === null ? { mode: 'closed' } : fichaId === 'novo' ? { mode: 'new' } : { mode: 'open', id: fichaId }
+  const setSelection = (next: Selection) => setFichaId(next.mode === 'closed' ? null : next.mode === 'new' ? 'novo' : next.id)
   const mobile = useIsMobile()
   const today = todaySP()
 
@@ -84,7 +90,7 @@ export function Funcionarios({ source }: { source: DataSource }) {
   const visible = useMemo(() => applyFilters(views, filters), [views, filters])
   const counts = useMemo(() => countAlertas(base), [base])
 
-  const update = (patch: Partial<Filters>) => setFilters((current) => ({ ...current, ...patch }))
+  const update = (patch: Partial<Filters>) => setFilters({ ...filters, ...patch })
   const toggleStatus = (value: number) => update({ status: filters.status.includes(value) ? filters.status.filter((item) => item !== value) : [...filters.status, value] })
   const sort = (key: SortKey) => update({ sort: key, desc: filters.sort === key ? !filters.desc : false })
 

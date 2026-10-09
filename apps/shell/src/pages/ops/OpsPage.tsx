@@ -3,11 +3,13 @@ import { Alert, Button, EmptyState, Pagination, StatusBadge, ToastProvider, useS
 import { FileStack, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
+import { useQueryFilters, useQueryId, useQueryPagina } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { GerarPagantesFrame, SaveViewDialog } from '../pagantes/components/Dialogs'
 import { formatMoney } from '../pagantes/domain/messages'
 import { createSource } from './data/source'
 import { BUILTIN_VIEWS, EMPTY_FILTERS, filterOps, loadViews, matchView, newView, periodoStart, saveViews, total, viewFilters, type Filters, type View } from './domain/filters'
+import { opsQuery } from './domain/query'
 import type { Op } from './domain/types'
 import { useOps } from './useOps'
 import { OpsToolbar } from './components/OpsToolbar'
@@ -32,14 +34,15 @@ function Ops({ host }: { host: Host }) {
   // Visões: as prontas + as do usuário; a última usada volta ao abrir a tela.
   const [stored, setStored] = useState(() => loadViews(source.kv))
   const views = useMemo(() => [...BUILTIN_VIEWS, ...stored.views], [stored.views])
-  const [filters, setFiltersState] = useState<Filters>(() => {
+  // Filtros, página e OP aberta vivem na URL (#/ops?q=…&status=…&pagina=2&abrir=…); sem filtro na abertura, entra a última visão.
+  const [filters, setFiltersUrl] = useQueryFilters(opsQuery, () => {
     const last = views.find((v) => v.id === stored.last)
     return last ? viewFilters(last) : { ...EMPTY_FILTERS }
   })
   const activeView = useMemo(() => matchView(views, filters, stored.last), [views, filters, stored.last])
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useQueryPagina()
   const setFilters = useCallback((next: Filters, viewId?: string) => {
-    setFiltersState(next)
+    setFiltersUrl(next)
     setStored((s) => {
       const last = viewId ?? matchView([...BUILTIN_VIEWS, ...s.views], next, s.last)?.id ?? null
       if (last === s.last) return s
@@ -47,14 +50,13 @@ function Ops({ host }: { host: Host }) {
       saveViews(source.kv, data)
       return data
     })
-    setPage(1)
-  }, [source.kv])
+  }, [source.kv, setFiltersUrl])
 
   const since = useMemo(() => periodoStart(filters.periodo, new Date()), [filters.periodo])
   const ops = useOps(source, since)
   const visible = useMemo(() => filterOps(ops.list, filters), [ops.list, filters])
 
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useQueryId('abrir')
   const current = selectedId ? ops.list.find((op) => op.id === selectedId) ?? null : null
   const [cancelRequest, setCancelRequest] = useState<Op | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)

@@ -1,6 +1,7 @@
 import { CalendarClock, Car, CheckCircle2, ChevronRight, CircleAlert, FileWarning, ListTodo, Wrench } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { EmptyState, MetricCard, StatusBadge, Surface } from '@betinhos/ui'
+import { useQueryTexto } from '../../../nav/queryState'
 import { formatBR } from '../data/dates'
 import type { FrotaData, Kind } from '../data/types'
 import { buildPendencias, PENDENCIA_LABEL, PENDENCIA_ORDEM, type Pendencia, type PendenciaTipo } from '../domain/pendencias'
@@ -34,7 +35,8 @@ function Prazo({ item }: { item: Pendencia }) {
 
 export function Pendencias({ data, today, onOpen }: { data: FrotaData; today: string; onOpen: (kind: Kind, id: string) => void }) {
   const itens = useMemo(() => buildPendencias(data, today), [data, today])
-  const [filtro, setFiltro] = useState<PendenciaTipo | ''>('')
+  const [filtroUrl, setFiltro] = useQueryTexto('filtro')
+  const filtro = PENDENCIA_ORDEM.find((tipo) => tipo === filtroUrl) ?? ''
 
   if (!itens.length) return <EmptyState align="start" icon={<CheckCircle2 size={36} />} title="Nenhuma pendência de frota no momento">Aprovações, agendamentos, multas e colisões em aberto aparecem aqui.</EmptyState>
 
