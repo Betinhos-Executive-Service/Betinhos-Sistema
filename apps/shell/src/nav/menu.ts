@@ -10,7 +10,7 @@ export type MenuItem =
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
-  | { kind: 'page'; id: string; label: string; page: 'componentes' | 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' }
+  | { kind: 'page'; id: string; label: string; page: 'componentes' | 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' }
 
 export type MenuGroup = { id: string; label: string; items: MenuItem[] }
 
@@ -81,7 +81,7 @@ export const MENU: MenuGroup[] = [
       table('new_appmotoristaslog'),
       table('cr40f_anexodespesaoperacional'),
       table('cr40f_categoriadespesaoperacional'),
-      table('cr40f_despesaoperacional'),
+      { kind: 'page', id: 'despesas-operacionais', label: 'Despesas (App Motoristas)', page: 'despesas' },
       table('cr40f_formapagamentodespesa'),
       table('cr40f_anexocolisao_v2'),
       table('cr40f_anexorecebimento_v2'),
