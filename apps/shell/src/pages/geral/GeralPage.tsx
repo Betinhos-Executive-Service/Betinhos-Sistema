@@ -390,7 +390,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         onApply={setFilter}
         onClose={closeFilter}
       />
-      <FiltersDrawer open={filtersOpen} onClose={() => setFiltersOpen(false)} filters={filters} attributes={attributes} columns={geral.columns} search={searchLookup} onApply={applyFilters} onClearAll={clearFilters} unavailable={geral.filtersIgnored || attributes == null} />
+      <FiltersDrawer open={filtersOpen} onClose={() => setFiltersOpen(false)} filters={filters} attributes={attributes} columns={geral.columns} search={searchLookup} onApply={applyFilters} onClearAll={clearFilters} unavailable={geral.attributesError != null} loading={attributes == null && geral.attributesError == null} />
       {mobile && geral.selected.size > 0 ? (
         <div className="gr-selbar" role="group" aria-label="Ações sobre os selecionados">
           <span role="status" className="gr-selbar__count">{geral.selected.size === 1 ? '1 selecionado' : `${geral.selected.size} selecionados`}</span>
