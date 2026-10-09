@@ -1,4 +1,4 @@
-import { Fragment, useRef, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from 'react'
+import { Fragment, useEffect, useRef, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from 'react'
 import type { Row } from '@betinhos/dataverse'
 import { Checkbox } from '@betinhos/ui'
 import { ArrowDown, ArrowUp } from 'lucide-react'
@@ -25,6 +25,8 @@ type Props = {
   onEditFilter: (attribute: string) => void
   onClearFilter: (attribute: string) => void
   onHide: (key: string) => void
+  /** Larguras escolhidas pelo usuário: viram trilhas fixas (sem fr). */
+  customWidths?: Record<string, number>
   /** Grava a largura da coluna (px); `null` volta à largura da visão. */
   onResize: (key: string, width: number | null) => void
   /** Move a coluna para a posição indicada (0 = primeira coluna de dados) entre as visíveis. */
@@ -45,7 +47,7 @@ type Props = {
 
 const SKELETON_ROWS = 8
 /** Grid editável com rolagem horizontal, seleção por linha e a primeira coluna fixa. As classes visuais são as da tabela do DS. */
-export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, filters, onEditFilter, onClearFilter, onHide, onResize, onMove, selected, onToggle, onToggleAll, onOpen, renderCell, scrollRef, tail, footer, empty }: Props) {
+export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, filters, onEditFilter, onClearFilter, onHide, customWidths, onResize, onMove, selected, onToggle, onToggleAll, onOpen, renderCell, scrollRef, tail, footer, empty }: Props) {
   // Trilhas crescem na proporção da largura da visão (fr) e nunca ficam abaixo do mínimo; a largura mínima total
   // garante que cabeçalho e linhas compartilhem as mesmas trilhas quando a soma dos mínimos excede o contêiner.
   // Sim/Não ocupa uma trilha fixa estreita: o conteúdo é um switch, não cresce com a tela.
@@ -55,9 +57,19 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
   const drag = useRef<{ key: string; startX: number; start: number; width: number } | null>(null)
   const [dropAt, setDropAt] = useState<{ key: string; after: boolean } | null>(null)
   const [announce, setAnnounce] = useState('')
+  const root = useRef<HTMLDivElement>(null)
+  const refocus = useRef<string | null>(null)
+  useEffect(() => {
+    const key = refocus.current
+    if (!key) return
+    refocus.current = null
+    const buttons = root.current?.querySelectorAll<HTMLElement>('.gr-head__sort')
+    buttons?.forEach((b) => { if (b.dataset.col === key) b.focus() })
+  }, [columns])
   const widthOf = (c: Column) => live[c.key] ?? c.width
   const isBoolean = (c: Column) => cellKind(c, attributes?.get(c.key)) === 'boolean'
-  const track = (c: Column) => (isBoolean(c) ? `${BOOLEAN_WIDTH}px` : `minmax(${Math.max(90, widthOf(c))}px, ${widthOf(c)}fr)`)
+  const isFixed = (c: Column) => live[c.key] != null || customWidths?.[c.key] != null
+  const track = (c: Column) => (isBoolean(c) ? `${BOOLEAN_WIDTH}px` : isFixed(c) ? `minmax(${widthOf(c)}px, ${widthOf(c)}px)` : `minmax(${Math.max(90, widthOf(c))}px, ${widthOf(c)}fr)`)
   const minOf = (c: Column) => (isBoolean(c) ? BOOLEAN_WIDTH : Math.max(90, widthOf(c)))
   const clampW = (w: number) => Math.min(1200, Math.max(90, Math.round(w)))
   const resizeDown = (column: Column) => (e: PointerEvent<HTMLDivElement>) => {
@@ -68,7 +80,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
   }
   const resizeMove = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current
-    if (!d) return
+    if (!d || e.buttons === 0) return
     d.width = clampW(d.start + e.clientX - d.startX)
     setLive((l) => ({ ...l, [d.key]: d.width }))
   }
@@ -76,7 +88,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
     const d = drag.current
     drag.current = null
     if (!d) return
-    e.currentTarget.releasePointerCapture?.(e.pointerId)
+    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) e.currentTarget.releasePointerCapture?.(e.pointerId)
     if (d.width !== d.start) onResize(d.key, d.width)
     setLive((l) => { const { [d.key]: _gone, ...rest } = l; return rest })
   }
@@ -96,6 +108,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
     const to = index + (e.key === 'ArrowRight' ? 1 : -1)
     if (to < 0 || to >= columns.length) return
     e.preventDefault()
+    refocus.current = column.key
     onMove(column.key, to)
     setAnnounce(`Coluna ${columnLabel(column, attributes?.get(column.key))} movida para a posição ${to + 1}`)
   }
@@ -125,9 +138,9 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
   const shown = sort ?? defaultSort
 
   return (
-    <div className="bt-table gr-table">
+    <div ref={root} className="bt-table gr-table">
+      <span className="gr-sr" role="status">{announce}</span>
       <div ref={scrollRef} className="gr-grid" role="grid" aria-label="Serviços" aria-busy={loading || undefined} aria-colcount={columns.length + 1} style={style}>
-        <span className="gr-sr" role="status">{announce}</span>
         <div className="bt-table__head" role="row">
           <div className="bt-table__cell gr-cell--select" role="columnheader">
             <Checkbox
@@ -151,14 +164,14 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
                 title={label}
                 aria-sort={active ? (shown?.descending ? 'descending' : 'ascending') : 'none'}
                 draggable
-                onDragStart={(e) => { e.dataTransfer.setData('text/x-gr-column', column.key); e.dataTransfer.effectAllowed = 'move' }}
+                onDragStart={(e) => { if ((e.target as HTMLElement).closest?.('.gr-resize')) { e.preventDefault(); return } e.dataTransfer.setData('text/x-gr-column', column.key); e.dataTransfer.effectAllowed = 'move' }}
                 onDragOver={dragOver(column)}
-                onDragLeave={() => setDropAt((d) => (d?.key === column.key ? null : d))}
+                onDragLeave={(e) => { if (e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget)) return; setDropAt((d) => (d?.key === column.key ? null : d)) }}
                 onDrop={dropOn(column, index)}
                 onDragEnd={() => setDropAt(null)}
               >
                 <div className="gr-head">
-                  <button type="button" className="gr-head__sort" onKeyDown={moveKey(column, index)} onClick={() => onSort(nextSort(sort, defaultSort, column))}>
+                  <button type="button" className="gr-head__sort" data-col={column.key} onKeyDown={moveKey(column, index)} onClick={() => onSort(nextSort(sort, defaultSort, column))}>
                     <span className="gr-head__label">{label}</span>
                     {active ? (shown?.descending ? <ArrowDown size={14} /> : <ArrowUp size={14} />) : null}
                   </button>
@@ -185,6 +198,10 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
                     onPointerMove={resizeMove}
                     onPointerUp={resizeEnd}
                     onPointerCancel={resizeEnd}
+                    onLostPointerCapture={resizeEnd}
+                    aria-valuenow={widthOf(column)}
+                    aria-valuemin={90}
+                    aria-valuemax={1200}
                     onDoubleClick={() => onResize(column.key, null)}
                     onKeyDown={resizeKey(column)}
                   />

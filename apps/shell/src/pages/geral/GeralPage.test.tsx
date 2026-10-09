@@ -787,7 +787,7 @@ describe('Geral: redimensionar e reordenar colunas', () => {
     const before = px(track(/Trajeto/))
     const handle = screen.getByRole('separator', { name: 'Redimensionar coluna Trajeto', hidden: true })
     fireEvent.pointerDown(handle, { clientX: 100, pointerId: 1 })
-    fireEvent.pointerMove(handle, { clientX: 160, pointerId: 1 })
+    fireEvent.pointerMove(handle, { clientX: 160, pointerId: 1, buttons: 1 })
     expect(px(track(/Trajeto/))).toBe(before + 60)
     fireEvent.pointerUp(handle, { clientX: 160, pointerId: 1 })
     expect(px(track(/Trajeto/))).toBe(before + 60)
@@ -802,5 +802,75 @@ describe('Geral: redimensionar e reordenar colunas', () => {
     fireEvent.keyDown(screen.getByRole('button', { name: new RegExp(`^${second}$`), hidden: true }), { key: 'ArrowRight', altKey: true })
     await waitFor(() => expect(names().slice(0, 3)).toEqual([first, third, second]))
     expect(screen.getByText(`Coluna ${second} movida para a posição 3`)).toBeTruthy()
+  })
+
+  const LS = 'betinhos.geral.colunas.v1'
+  const open = async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
+    return screen.getByRole('separator', { name: 'Redimensionar coluna Trajeto', hidden: true })
+  }
+
+  it('largura personalizada vira trilha fixa; pointercancel encerra e grava; movimento sem botão é ignorado', async () => {
+    const handle = await open()
+    const before = px(track(/Trajeto/))
+    fireEvent.pointerDown(handle, { clientX: 100, pointerId: 1 })
+    fireEvent.pointerMove(handle, { clientX: 140, pointerId: 1, buttons: 0 })
+    expect(px(track(/Trajeto/))).toBe(before)
+    fireEvent.pointerMove(handle, { clientX: 140, pointerId: 1, buttons: 1 })
+    fireEvent.pointerCancel(handle, { pointerId: 1 })
+    await waitFor(() => expect(track(/Trajeto/)).toBe(`minmax(${before + 40}px, ${before + 40}px)`))
+    expect(window.localStorage.getItem(LS)).toContain(`${before + 40}`)
+  })
+
+  it('duplo clique volta ao padrão; limites 90 e 1200', async () => {
+    const handle = await open()
+    const before = px(track(/Trajeto/))
+    fireEvent.pointerDown(handle, { clientX: 0, pointerId: 1 })
+    fireEvent.pointerMove(handle, { clientX: 5000, pointerId: 1, buttons: 1 })
+    fireEvent.pointerUp(handle, { pointerId: 1 })
+    await waitFor(() => expect(px(track(/Trajeto/))).toBe(1200))
+    fireEvent.pointerDown(handle, { clientX: 5000, pointerId: 1 })
+    fireEvent.pointerMove(handle, { clientX: -5000, pointerId: 1, buttons: 1 })
+    fireEvent.pointerUp(handle, { pointerId: 1 })
+    await waitFor(() => expect(px(track(/Trajeto/))).toBe(90))
+    fireEvent.doubleClick(handle)
+    await waitFor(() => expect(px(track(/Trajeto/))).toBe(before))
+    expect(handle.getAttribute('aria-valuemin')).toBe('90')
+  })
+
+  it('coluna Sim/Não não tem alça', async () => {
+    await open()
+    const labels = screen.getAllByRole('columnheader', { hidden: true }).slice(1)
+    const withHandle = labels.filter((h) => h.querySelector('.gr-resize')).length
+    expect(withHandle).toBeLessThan(labels.length)
+  })
+
+  it('Alt+seta mantém o foco, preserva ocultas na ordem; Aplicar mantém larguras e Restaurar zera', async () => {
+    const handle = await open()
+    fireEvent.keyDown(handle, { key: 'ArrowRight' })
+    fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
+    let dialog = await screen.findByRole('dialog', { name: 'Colunas da visão' })
+    const boxes = within(dialog).getAllByRole('checkbox')
+    const hiddenName = boxes[boxes.length - 1].getAttribute('aria-label') ?? ''
+    fireEvent.click(boxes[boxes.length - 1])
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Aplicar' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Colunas da visão' })).toBeNull())
+    expect(window.localStorage.getItem(LS)).toContain('widths')
+    const names = () => screen.getAllByRole('columnheader', { hidden: true }).slice(1).map((h) => h.getAttribute('title'))
+    const second = names()[1]
+    const button = () => screen.getByRole('button', { name: new RegExp(`^${second}$`), hidden: true })
+    button().focus()
+    fireEvent.keyDown(button(), { key: 'ArrowRight', altKey: true })
+    await waitFor(() => expect(document.activeElement).toBe(button()))
+    fireEvent.keyDown(button(), { key: 'ArrowRight', altKey: true })
+    await waitFor(() => expect(names().indexOf(second)).toBe(3))
+    const saved = JSON.parse(window.localStorage.getItem(LS) ?? '{}') as Record<string, { hidden: string[]; order: string[] }>
+    const pref = Object.values(saved)[0]
+    if (hiddenName) expect(pref.order.length).toBeGreaterThan(names().length - 1)
+    fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
+    dialog = await screen.findByRole('dialog', { name: 'Colunas da visão' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Restaurar colunas da visão' }))
+    await waitFor(() => expect(window.localStorage.getItem(LS)).not.toContain('widths'))
   })
 })

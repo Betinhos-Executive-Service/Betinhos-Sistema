@@ -321,6 +321,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           : (
             <GeralTable
               columns={visibleColumns}
+              customWidths={prefs?.widths}
               onResize={resizeColumn}
               onMove={moveColumn}
               attributes={attributes}
