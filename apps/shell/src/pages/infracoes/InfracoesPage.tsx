@@ -1,16 +1,18 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo } from 'react'
 import { Alert, Button, EmptyState, Pagination, StatusBadge, ToastProvider, useShellHeader } from '@betinhos/ui'
 import { FileWarning, Plus, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
+import { useQueryAlvo, useQueryFilters, useQueryPagina } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
-import { EMPTY_FILTERS, filterInfracoes, type Filters } from './domain/filters'
+import { EMPTY_FILTERS, filterInfracoes } from './domain/filters'
+import { infracoesQuery } from './domain/query'
 import { usoIndex } from './domain/uso'
 import { useInfracoes } from './useInfracoes'
 import { InfracoesToolbar } from './components/InfracoesToolbar'
 import { InfracoesCards, InfracoesTable } from './components/InfracoesList'
-import { InfracaoDrawer, type DrawerTarget } from './components/InfracaoDrawer'
+import { InfracaoDrawer } from './components/InfracaoDrawer'
 import './infracoes.css'
 
 export function InfracoesPage({ host }: { host: Host }) {
@@ -24,9 +26,9 @@ function Infracoes({ host }: { host: Host }) {
   const mobile = useMedia('(max-width: 820px)')
   const data = useInfracoes(source)
 
-  const [filters, setFiltersState] = useState<Filters>({ ...EMPTY_FILTERS })
-  const [page, setPage] = useState(1)
-  const setFilters = useCallback((next: Filters) => { setFiltersState(next); setPage(1) }, [])
+  // Filtros, página e gaveta vivem na URL (#/infracoes?q=…&gravidade=…&pagina=2&ver=…).
+  const [filters, setFilters] = useQueryFilters(infracoesQuery)
+  const [page, setPage] = useQueryPagina()
 
   const uso = useMemo(() => usoIndex(data.multas), [data.multas])
   const comUso = useMemo(() => new Set(uso.keys()), [uso])
@@ -34,7 +36,7 @@ function Infracoes({ host }: { host: Host }) {
   const ativas = useMemo(() => data.list.filter((i) => i.ativo).length, [data.list])
   const usoState = data.multasError ?? (data.loading && !data.loaded ? 'loading' : 'ok')
 
-  const [target, setTarget] = useState<DrawerTarget>(null)
+  const [target, setTarget] = useQueryAlvo()
 
   const refresh = useCallback(() => { void data.reload() }, [data.reload])
   const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar infrações" onClick={refresh} />, [refresh])

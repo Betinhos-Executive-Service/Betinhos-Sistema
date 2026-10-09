@@ -3,20 +3,22 @@ import { Alert, Button, EmptyState, StatusBadge, Tabs, ToastProvider, buttonClas
 import { ExternalLink, Info, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
-import { hrefFor, setHashQuery, useHashQuery } from '../../nav/useHashRoute'
+import { useQueryFilters } from '../../nav/queryState'
+import { hrefFor, patchHashQuery, setHashQuery, useHashQuery } from '../../nav/useHashRoute'
 import { useMedia } from '../operacional/useMedia'
 import { createSource, type ConjuntoExtra } from './data/source'
 import { filtrarServicos, opcoesFiltro, type OpcoesFiltro } from './domain/base'
 import { int } from './domain/format'
 import type { Contexto } from './domain/kpis'
-import { atalho, cargaDesde, periodoAnterior } from './domain/periodo'
+import { cargaDesde, periodoAnterior } from './domain/periodo'
+import { dashboardQuery, despesasQuery, lerFrotaMotorista } from './domain/query'
 import type { Filtros } from './domain/types'
 import { useDashboard } from './useDashboard'
 import { ABAS, ABAS_POR_SERVICO, abaDaUrl, avisoSegmento, type Aba, type PropsAba } from './components/abas/abas'
 import { ResumoTab } from './components/abas/ResumoTab'
 import { ServicosTab } from './components/abas/ServicosTab'
 import { FinanceiroTab } from './components/abas/FinanceiroTab'
-import { DespesasTab, FILTROS_DESPESA_VAZIOS, type FiltrosDespesaProprios } from './components/abas/DespesasTab'
+import { DespesasTab } from './components/abas/DespesasTab'
 import { FrotaTab } from './components/abas/FrotaTab'
 import { MotoristasTab, type FrotaMotorista } from './components/abas/MotoristasTab'
 import { ManutencoesTab } from './components/abas/ManutencoesTab'
@@ -45,11 +47,16 @@ export function DashboardPage({ host }: { host: Host }) {
     else params.set('tab', proxima)
     setHashQuery(params)
   }
-  const [filtros, setFiltros] = useState<Filtros>(() => ({ atalho: 'esteAno', ...atalho('esteAno', new Date()), status: [], clientes: [], motoristas: [], tipos: [] }))
   const [now, setNow] = useState(() => new Date())
-  // Filtros próprios das abas (Despesas; Próprios/Terceiros do ranking de Motoristas): ficam na página para sobreviver à troca de aba.
-  const [filtrosDespesa, setFiltrosDespesa] = useState<FiltrosDespesaProprios>(FILTROS_DESPESA_VAZIOS)
-  const [frotaMotorista, setFrotaMotorista] = useState<FrotaMotorista>('todos')
+  // Período e segmentos também vivem na URL (#/dashboard?periodo=ult30&cliente=…&motorista=…): o atalho relativo ("Este mês") é recalculado
+  // com o relógio da página, então acompanha a virada do dia sem estado próprio.
+  const codecFiltros = useMemo(() => dashboardQuery(now), [now])
+  const [filtros, alterarFiltros] = useQueryFilters(codecFiltros)
+  const setFiltros = (proximo: Filtros) => alterarFiltros(proximo)
+  // Filtros próprios das abas (Despesas; Próprios/Terceiros do ranking de Motoristas): ficam na URL, então sobrevivem à troca de aba.
+  const [filtrosDespesa, setFiltrosDespesa] = useQueryFilters(despesasQuery)
+  const frotaMotorista = lerFrotaMotorista(query)
+  const setFrotaMotorista = (frota: FrotaMotorista) => patchHashQuery({ frota: frota === 'todos' ? null : frota })
   // Carga única com todos os conjuntos; a aba só escolhe o que calcular.
   const extrasDaAba = EXTRAS_POR_ABA[aba] ?? SEM_EXTRAS
   const desde = cargaDesde(filtros.inicio, now)
@@ -57,11 +64,6 @@ export function DashboardPage({ host }: { host: Host }) {
 
   // Cada recarga avança o relógio; um atalho relativo ("Este mês") acompanha a virada do dia.
   useEffect(() => { if (db.atualizadoEm) setNow(db.atualizadoEm) }, [db.atualizadoEm])
-  useEffect(() => {
-    if (filtros.atalho === 'personalizado') return
-    const p = atalho(filtros.atalho, now)
-    if (p.inicio !== filtros.inicio || p.fim !== filtros.fim) setFiltros((f) => ({ ...f, ...p }))
-  }, [now, filtros.atalho, filtros.inicio, filtros.fim])
 
   // Contexto único do recorte (todas, serviços filtrados, filtros e relógio): calculado uma vez e passado a todas as abas.
   // `anterior`: período de mesma duração dos chips "ANT."; começando antes da janela carregada, os chips mostram s/dado.
@@ -86,7 +88,7 @@ export function DashboardPage({ host }: { host: Host }) {
   useShellHeader({ title: 'Dashboard', actions: headerActions })
 
   const segmentado = filtros.status.length + filtros.clientes.length + filtros.motoristas.length + filtros.tipos.length > 0
-  const limpar = () => setFiltros((f) => ({ ...f, status: [], clientes: [], motoristas: [], tipos: [] }))
+  const limpar = () => setFiltros({ ...filtros, status: [], clientes: [], motoristas: [], tipos: [] })
   const aviso = avisoSegmento(aba, filtros)
 
   const props: PropsAba = abaPendente ? { ctx: null, dados: null, periodo } : { ctx, dados: db.dados, periodo }
