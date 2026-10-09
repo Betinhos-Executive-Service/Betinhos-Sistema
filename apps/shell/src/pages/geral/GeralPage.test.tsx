@@ -910,3 +910,107 @@ describe('Geral: redimensionar e reordenar colunas', () => {
     await waitFor(() => expect(window.localStorage.getItem(LS)).not.toContain('widths'))
   })
 })
+
+describe('Geral: visões pessoais e link compartilhável', () => {
+  const openMenu = () => fireEvent.click(screen.getByRole('button', { name: 'Opções da visão' }))
+  const choose = async (name: string) => fireEvent.click(await screen.findByRole('menuitem', { name, hidden: true }))
+  const viewName = () => screen.getByRole('combobox', { name: 'Visão' }).textContent ?? ''
+
+  async function saveAs(name: string) {
+    openMenu()
+    await choose('Salvar como visão…')
+    const dialog = await screen.findByRole('dialog', { name: 'Salvar como visão' })
+    fireEvent.change(within(dialog).getByLabelText(/Nome da visão/), { target: { value: name } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Salvar visão' }))
+    await waitFor(() => expect(viewName()).toContain(name))
+  }
+
+  it('visão do sistema só oferece salvar como e compartilhar', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findAllByText(PAGE1)
+    openMenu()
+    expect((await screen.findAllByRole('menuitem', { hidden: true })).map((item) => item.textContent)).toEqual(['Salvar como visão…', 'Compartilhar link'])
+  }, 60_000)
+
+  it('salvar como cria a visão pessoal, seleciona e some o filtro avulso; renomear e excluir', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findAllByText(PAGE1)
+    // Filtro avulso: Status = Confirmado.
+    fireEvent.click(screen.getByRole('button', { name: 'Opções da coluna Status de Operação', hidden: true }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Filtrar por…', hidden: true }))
+    const filter = await screen.findByRole('dialog', { name: 'Filtrar Status de Operação' })
+    fireEvent.click(within(filter).getByRole('checkbox', { name: 'Confirmado' }))
+    fireEvent.click(within(filter).getByRole('button', { name: 'Aplicar' }))
+    await screen.findByRole('button', { name: 'Remover filtro Status de Operação' })
+
+    await saveAs('Confirmados')
+    expect(await screen.findByText('Visão “Confirmados” criada.')).toBeTruthy()
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Remover filtro Status de Operação' })).toBeNull())
+    await waitFor(() => expect(window.location.hash).toContain('view=mock-minha-1'))
+    expect(window.location.hash).not.toContain('f=')
+    // O filtro foi para dentro da visão: a lista continua filtrada.
+    await waitFor(() => expect(screen.queryAllByText(PAGE1)).toHaveLength(0))
+
+    openMenu()
+    expect((await screen.findAllByRole('menuitem', { hidden: true })).map((item) => item.textContent)).toEqual(['Salvar como visão…', 'Salvar nesta visão', 'Renomear…', 'Excluir visão', 'Compartilhar link'])
+    await choose('Renomear…')
+    const rename = await screen.findByRole('dialog', { name: 'Renomear visão' })
+    fireEvent.change(within(rename).getByLabelText(/Nome da visão/), { target: { value: 'Só confirmados' } })
+    fireEvent.click(within(rename).getByRole('button', { name: 'Renomear' }))
+    await waitFor(() => expect(viewName()).toContain('Só confirmados'))
+    expect(await screen.findByText('Visão renomeada.')).toBeTruthy()
+
+    openMenu()
+    await choose('Excluir visão')
+    const confirm = await screen.findByRole('dialog', { name: 'Excluir esta visão?' })
+    expect(within(confirm).getByText(/Só confirmados/)).toBeTruthy()
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Excluir visão' }))
+    expect(await screen.findByText('Visão excluída.')).toBeTruthy()
+    await waitFor(() => expect(viewName()).toContain('Agenda'))
+    await screen.findAllByText(PAGE1)
+  }, 60_000)
+
+  it('salvar nesta visão regrava a visão pessoal com a ordenação atual', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findAllByText(PAGE1)
+    await saveAs('Minha agenda')
+    await screen.findAllByText(PAGE1)
+    fireEvent.click(screen.getByRole('button', { name: /^Trajeto$/, hidden: true }))
+    await waitFor(() => expect(screen.getByRole('columnheader', { name: /Trajeto/, hidden: true }).getAttribute('aria-sort')).toBe('ascending'))
+    openMenu()
+    await choose('Salvar nesta visão')
+    expect(await screen.findByText('Visão atualizada.')).toBeTruthy()
+    // A ordem agora é da visão: a coluna segue ordenada e a ordenação avulsa da URL some.
+    await waitFor(() => expect(window.location.hash).not.toContain('sort='))
+    expect(screen.getByRole('columnheader', { name: /Trajeto/, hidden: true }).getAttribute('aria-sort')).toBe('ascending')
+  }, 60_000)
+
+  it('Compartilhar link copia a URL atual com visão e ordenação e avisa', async () => {
+    const writeText = vi.fn(async (_text: string) => undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    try {
+      render(<GeralPage host={{ mode: 'mock' }} />)
+      await screen.findAllByText(PAGE1)
+      fireEvent.click(screen.getByRole('button', { name: /^Trajeto$/, hidden: true }))
+      await waitFor(() => expect(window.location.hash).toContain('sort='))
+      openMenu()
+      await choose('Compartilhar link')
+      expect(await screen.findByText('Link copiado.')).toBeTruthy()
+      expect(writeText).toHaveBeenCalledTimes(1)
+      const url = writeText.mock.calls[0][0]
+      expect(url).toBe(window.location.href)
+      expect(url).toContain('view=')
+      expect(url).toContain('sort=cr40f_trajeto')
+    } finally {
+      Reflect.deleteProperty(navigator, 'clipboard')
+    }
+  }, 60_000)
+
+  it('sem área de transferência o link não copia e o aviso orienta', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findAllByText(PAGE1)
+    openMenu()
+    await choose('Compartilhar link')
+    expect(await screen.findByText(/Não foi possível copiar o link/)).toBeTruthy()
+  }, 60_000)
+})

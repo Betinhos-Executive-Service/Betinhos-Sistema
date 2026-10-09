@@ -112,4 +112,14 @@ describe('metadata attributes', () => {
     expect(info.primaryName).toBe('cr40f_placa')
     expect(fetchMock.mock.calls[0][0]).toContain('PrimaryNameAttribute')
   })
+
+  it('expõe o ObjectTypeCode da tabela (null quando a metadata não traz)', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(json({ LogicalName: 'cr40f_reservadeveculos', EntitySetName: 'cr40f_reservadeveculoses', ObjectTypeCode: 10580 }))
+      .mockResolvedValueOnce(json({ LogicalName: 'cr40f_outra', EntitySetName: 'cr40f_outras' }))
+    const meta = createMetadata(createClient('https://org.example', fetchMock))
+    expect((await meta.entity('cr40f_reservadeveculos')).objectTypeCode).toBe(10580)
+    expect(fetchMock.mock.calls[0][0]).toContain('ObjectTypeCode')
+    expect((await meta.entity('cr40f_outra')).objectTypeCode).toBeNull()
+  })
 })

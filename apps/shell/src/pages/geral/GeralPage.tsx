@@ -18,11 +18,13 @@ import { FilterDialog } from './components/FilterEditor'
 import { FiltersDrawer } from './components/FiltersDrawer'
 import { LoadMore, LoadSentinel, statusText } from './components/LoadMore'
 import { GeralToolbar } from './components/GeralToolbar'
+import { ViewMenu } from './components/ViewMenu'
 import { VoucherOverlay } from './components/VoucherOverlay'
 import { copyText } from './domain/copy'
 import { isEmptyFilter, type Filter } from './domain/filters'
 import { filterKindOf } from './domain/filterKind'
 import { applyColumnPrefs, loadColumnPrefs, saveColumnPrefs, type ColumnPrefs } from './domain/columns'
+import { buildLayout, buildViewFetch } from './domain/views'
 import { ID_ATTRIBUTE, type CellStatus, type Column } from './domain/types'
 import { readUrlState, writeUrlState, type UrlState } from './domain/urlState'
 import { cellKey, useGeral, type SaveFailure } from './useGeral'
@@ -111,6 +113,57 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     const all = applyColumnPrefs(geral.columns, { ...base, hidden: [] }).map((c) => c.key)
     setPrefs({ ...base, order: [...next, ...all.filter((k) => !next.includes(k))] })
   }, [prefs, geral.columns, visibleColumns, setPrefs])
+  // Visões pessoais: o que está na tela (colunas, larguras, ordenação e filtros) vira o fetchxml/layoutxml da visão.
+  const { reloadViews } = geral
+  const viewPayload = useCallback(async () => {
+    if (!view) throw new Error('Nenhuma visão aberta.')
+    if (geral.filtersIgnored) throw new Error('Os filtros não puderam ser aplicados porque os campos não carregaram. Atualize e tente de novo.')
+    const fetchxml = buildViewFetch(view.fetchxml, geral.filters, geral.sort, attributes ?? new Map())
+    const layoutxml = buildLayout(visibleColumns, prefs?.widths, await source.objectTypeCode())
+    return { fetchxml, layoutxml }
+  }, [view, geral.filtersIgnored, geral.filters, geral.sort, attributes, visibleColumns, prefs, source])
+  const attemptAction = useCallback(async (action: () => Promise<void>, success: string, failure: string) => {
+    try {
+      await action()
+      toast({ tone: 'success', message: success })
+      return true
+    } catch (reason) {
+      toast({ tone: 'danger', message: `${failure}: ${reason instanceof Error ? reason.message : String(reason)}` })
+      return false
+    }
+  }, [toast])
+  const saveViewAs = useCallback((name: string) => attemptAction(async () => {
+    const created = await source.createView({ name, ...(await viewPayload()) })
+    await reloadViews(created.id)
+  }, `Visão “${name}” criada.`, 'Não foi possível criar a visão'), [attemptAction, source, viewPayload, reloadViews])
+  const saveView = useCallback(() => attemptAction(async () => {
+    if (!view) return
+    await source.updateView(view.id, await viewPayload())
+    // A visão agora carrega as colunas e larguras: as preferências locais já não têm o que acrescentar.
+    setPrefs(null)
+    await reloadViews()
+  }, 'Visão atualizada.', 'Não foi possível salvar a visão'), [attemptAction, view, source, viewPayload, setPrefs, reloadViews])
+  const renameView = useCallback((name: string) => attemptAction(async () => {
+    if (!view) return
+    await source.renameView(view.id, name)
+    await reloadViews()
+  }, 'Visão renomeada.', 'Não foi possível renomear a visão'), [attemptAction, view, source, reloadViews])
+  const deleteView = useCallback(() => attemptAction(async () => {
+    if (!view) return
+    await source.deleteView(view.id)
+    saveColumnPrefs(source.kv, view.id, null)
+    await reloadViews()
+  }, 'Visão excluída.', 'Não foi possível excluir a visão'), [attemptAction, view, source, reloadViews])
+  const shareLink = useCallback(async () => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Área de transferência indisponível.')
+      await navigator.clipboard.writeText(window.location.href)
+      toast({ tone: 'success', message: 'Link copiado.' })
+    } catch {
+      toast({ tone: 'danger', message: 'Não foi possível copiar o link. Copie o endereço do navegador.' })
+    }
+  }, [toast])
+
   const openForm = useCallback(async (mode: 'create' | 'edit', id?: string) => {
     try {
       const result = await source.openForm(mode, id)
@@ -362,6 +415,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           views={geral.views}
           view={view}
           onSelectView={selectView}
+          viewMenu={<ViewMenu view={view} mobile={mobile} onSaveAs={saveViewAs} onSave={saveView} onRename={renameView} onDelete={deleteView} onShare={() => { void shareLink() }} />}
           query={query}
           onQuery={setQuery}
           searching={loading && query !== ''}

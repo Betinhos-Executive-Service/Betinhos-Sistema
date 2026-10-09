@@ -1,12 +1,13 @@
 import type { DataverseClient } from './client'
 import { chunk, odataString } from './format'
 
-export type EntityInfo = { logicalName: string; entitySetName: string; label: string; primaryName: string }
+export type EntityInfo = { logicalName: string; entitySetName: string; label: string; primaryName: string; objectTypeCode: number | null }
 
 type EntityDefinition = {
   LogicalName: string
   EntitySetName: string
   PrimaryNameAttribute?: string
+  ObjectTypeCode?: number
   DisplayCollectionName?: { UserLocalizedLabel?: { Label?: string } | null }
 }
 
@@ -25,7 +26,7 @@ type PicklistDefinition = {
   OptionSet?: { Options: { Value: number; Label?: { UserLocalizedLabel?: { Label?: string } | null } }[] }
 }
 
-const SELECT = '$select=LogicalName,EntitySetName,PrimaryNameAttribute,DisplayCollectionName'
+const SELECT = '$select=LogicalName,EntitySetName,PrimaryNameAttribute,DisplayCollectionName,ObjectTypeCode'
 
 /** Nomes reais (entity set e rótulo plural) lidos da metadata, com cache por cliente. */
 export function createMetadata(client: DataverseClient) {
@@ -37,6 +38,7 @@ export function createMetadata(client: DataverseClient) {
       entitySetName: definition.EntitySetName,
       label: definition.DisplayCollectionName?.UserLocalizedLabel?.Label || definition.LogicalName,
       primaryName: definition.PrimaryNameAttribute ?? '',
+      objectTypeCode: typeof definition.ObjectTypeCode === 'number' ? definition.ObjectTypeCode : null,
     }
   }
 

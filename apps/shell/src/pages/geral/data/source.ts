@@ -20,6 +20,13 @@ export type CountRequest = { fetchxml: string; query: string; quickFind: string[
 export type Source = {
   mock: boolean
   views(): Promise<View[]>
+  /** Código do tipo da tabela (`object` do layoutxml), lido da metadata. */
+  objectTypeCode(): Promise<number>
+  /** Visão pessoal nova (`userqueries`); devolve a visão já no formato da lista. */
+  createView(input: { name: string; fetchxml: string; layoutxml: string }): Promise<View>
+  updateView(id: string, input: { fetchxml: string; layoutxml: string }): Promise<void>
+  renameView(id: string, name: string): Promise<void>
+  deleteView(id: string): Promise<void>
   quickFind(): Promise<string[]>
   attributes(entity: string): Promise<AttributeMap>
   page(req: PageRequest): Promise<Page>
@@ -42,6 +49,9 @@ export type Source = {
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 const same = (a: string, b: string) => cleanId(a) === cleanId(b)
 
+export const VIEW_DESCRIPTION = 'Criada no Sistema Betinhos'
+export const MOCK_OBJECT_TYPE_CODE = 10580
+
 const BLOCKED_ID = 'OS-1013'
 const BIND_SUFFIX = '@odata.bind'
 
@@ -54,6 +64,14 @@ function createMockSource({ latency = 1 }: SourceOptions = {}): Source {
   const rows = createMockRows(now)
   const find = (id: string) => rows.find((r) => same(String(r.cr40f_reservadeveculosid), id))
   const binds = Object.entries(MOCK_BINDS)
+  // Visões pessoais vivem em memória enquanto a tela estiver aberta.
+  const mine: View[] = []
+  let viewSeq = 0
+  const findMine = (id: string) => {
+    const view = mine.find((v) => v.id === id)
+    if (!view) throw new Error('Visão não encontrada ou sem permissão para alterar.')
+    return view
+  }
 
   /** Grava o valor e a anotação formatada, como a Web API devolveria na releitura. */
   function apply(row: Row, key: string, value: unknown) {
@@ -72,7 +90,28 @@ function createMockSource({ latency = 1 }: SourceOptions = {}): Source {
 
   return {
     mock: true,
-    views: async () => createMockViews(),
+    views: async () => [...createMockViews(), ...mine.map((v) => ({ ...v }))],
+    objectTypeCode: async () => MOCK_OBJECT_TYPE_CODE,
+    async createView({ name, fetchxml, layoutxml }) {
+      await wait(150)
+      viewSeq += 1
+      const view: View = { id: `mock-minha-${viewSeq}`, nome: name, grupo: 'minhas', fetchxml, layoutxml, padrao: false }
+      mine.push(view)
+      return { ...view }
+    },
+    async updateView(id, input) {
+      await wait(150)
+      Object.assign(findMine(id), input)
+    },
+    async renameView(id, name) {
+      await wait(150)
+      findMine(id).nome = name
+    },
+    async deleteView(id) {
+      await wait(150)
+      findMine(id)
+      mine.splice(mine.findIndex((v) => v.id === id), 1)
+    },
     quickFind: async () => ['cr40f_id', 'cr40f_trajeto', 'cr40f_cliente'],
     attributes: async (entity) => (entity === ENTITY ? new Map(MOCK_ATTRIBUTES) : new Map<string, AttributeInfo>()),
     async page(req) {
@@ -197,6 +236,18 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
         })))
       return mapViews(system, mine)
     },
+    async objectTypeCode() {
+      const code = (await host.metadata.entity(ENTITY)).objectTypeCode
+      if (code == null) throw new Error(`Código do tipo de ${ENTITY} não encontrado na metadata.`)
+      return code
+    },
+    async createView({ name, fetchxml, layoutxml }) {
+      const id = await host.client.create('userqueries', { name, returnedtypecode: ENTITY, querytype: 0, fetchxml, layoutxml, description: VIEW_DESCRIPTION })
+      return { id: cleanId(id), nome: name, grupo: 'minhas', fetchxml, layoutxml, padrao: false }
+    },
+    updateView: (id, input) => host.client.update('userqueries', id, input),
+    renameView: (id, name) => host.client.update('userqueries', id, { name }),
+    deleteView: (id) => host.client.remove('userqueries', id),
     async quickFind() {
       try {
         const [first] = await host.client.getAll(quickFindPath())
