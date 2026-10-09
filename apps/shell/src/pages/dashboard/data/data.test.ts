@@ -476,3 +476,21 @@ describe('conjuntos das abas', () => {
     expect(extra.campos.despesas?.every(na)).toBe(true)
   })
 })
+
+describe('comCacheCadastros', () => {
+  it('reaproveita cadastros dentro do TTL, não guarda falhas e nunca guarda consultas com janela', async () => {
+    const { comCacheCadastros } = await import('./source')
+    let chamadas = 0
+    let falhar = true
+    const base = { getAll: async (p: string) => { chamadas++; if (p === 'falha' && falhar) throw new Error('x'); return [{ p }] } } as unknown as Parameters<typeof comCacheCadastros>[0]
+    const c = comCacheCadastros(base, (p) => p !== 'janela', 1000)
+    await Promise.all([c.getAll('fun'), c.getAll('fun')])
+    await c.getAll('fun')
+    expect(chamadas).toBe(1)
+    await c.getAll('janela'); await c.getAll('janela')
+    expect(chamadas).toBe(3)
+    await expect(c.getAll('falha')).rejects.toThrow('x')
+    falhar = false
+    expect(await c.getAll('falha')).toEqual([{ p: 'falha' }])
+  })
+})
