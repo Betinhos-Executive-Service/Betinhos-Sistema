@@ -1078,6 +1078,16 @@ describe('Geral: comandos Auditoria, Gerar OP, Disparar e Registrar Erro', () =>
     expect(await screen.findByText('A Gestão de Qualidade abre dentro do Dataverse.')).toBeTruthy()
   })
 
+  it('Contagem de Serviços abre o painel com os motoristas do mock', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findAllByText(PAGE1)
+    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Mais ações' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Contagem de Serviços', hidden: true }))
+    const dialog = await screen.findByRole('dialog', { name: 'Serviços por motorista', hidden: true })
+    for (const nome of ['Carlos Lima', 'Ana Souza', 'Bruno Dias', 'Teste']) expect(await within(dialog).findByText(nome)).toBeTruthy()
+    expect(within(dialog).getByText(/^Total — /)).toBeTruthy()
+  })
+
   it('Registrar Erro fica inerte com 2 selecionados', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await pick('OS-1005', 'OS-1006')
