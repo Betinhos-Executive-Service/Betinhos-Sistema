@@ -57,7 +57,8 @@ export function ColumnsMenu({ size = 'compact', columns, attributes, prefs, onCh
     setOpen(false)
   }
   function apply() {
-    onChange(isDefault(draft, columns) ? null : draft)
+    const widths = prefs?.widths
+    onChange(isDefault(draft, columns) && !widths ? null : widths ? { ...draft, widths } : draft)
     setOpen(false)
   }
   function restore() {

@@ -722,3 +722,48 @@ describe('Geral: espaço e densidade', () => {
     }, 60_000)
   })
 })
+
+describe('Geral: redimensionar e reordenar colunas', () => {
+  const track = (name: RegExp) => {
+    const grid = screen.getByRole('grid', { name: 'Serviços', hidden: true })
+    const labels = screen.getAllByRole('columnheader', { hidden: true })
+    const index = labels.findIndex((h) => name.test(h.getAttribute('title') ?? ''))
+    return grid.style.getPropertyValue('--gr-columns').split(/ (?![^(]*\))/)[index]
+  }
+  const px = (t: string) => Number(/minmax\((\d+)px/.exec(t)?.[1])
+
+  it('setas na alça mudam 16 px e persistem; Enter volta ao padrão', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
+    const before = px(track(/Trajeto/))
+    const handle = screen.getByRole('separator', { name: 'Redimensionar coluna Trajeto', hidden: true })
+    fireEvent.keyDown(handle, { key: 'ArrowRight' })
+    await waitFor(() => expect(px(track(/Trajeto/))).toBe(before + 16))
+    expect(window.localStorage.getItem('betinhos.geral.colunas.v1')).toContain(`${before + 16}`)
+    fireEvent.keyDown(handle, { key: 'Enter' })
+    await waitFor(() => expect(px(track(/Trajeto/))).toBe(before))
+  })
+
+  it('arrastar a alça com o ponteiro cresce a trilha e grava ao soltar', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
+    const before = px(track(/Trajeto/))
+    const handle = screen.getByRole('separator', { name: 'Redimensionar coluna Trajeto', hidden: true })
+    fireEvent.pointerDown(handle, { clientX: 100, pointerId: 1 })
+    fireEvent.pointerMove(handle, { clientX: 160, pointerId: 1 })
+    expect(px(track(/Trajeto/))).toBe(before + 60)
+    fireEvent.pointerUp(handle, { clientX: 160, pointerId: 1 })
+    expect(px(track(/Trajeto/))).toBe(before + 60)
+    expect(window.localStorage.getItem('betinhos.geral.colunas.v1')).toContain(`${before + 60}`)
+  })
+
+  it('Alt+seta no cabeçalho move a coluna e avisa a nova posição', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
+    const names = () => screen.getAllByRole('columnheader', { hidden: true }).slice(1).map((h) => h.getAttribute('title'))
+    const [first, second, third] = names()
+    fireEvent.keyDown(screen.getByRole('button', { name: new RegExp(`^${second}$`), hidden: true }), { key: 'ArrowRight', altKey: true })
+    await waitFor(() => expect(names().slice(0, 3)).toEqual([first, third, second]))
+    expect(screen.getByText(`Coluna ${second} movida para a posição 3`)).toBeTruthy()
+  })
+})

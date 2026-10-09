@@ -46,4 +46,13 @@ describe('copyText', () => {
     expect(COPY_SELECT).toContain('_cr40f_cliente_value')
     expect(copyText([])).toBe('')
   })
+  it('larguras: aplica por coluna e descarta valores fora de 90–1200', () => {
+    const kv = mem()
+    saveColumnPrefs(kv, 'v1', { hidden: [], order: ['a', 'b'], widths: { a: 250, b: 50, c: 5000 } })
+    expect(loadColumnPrefs(kv, 'v1')).toEqual({ hidden: [], order: ['a', 'b'], widths: { a: 250 } })
+    kv.setItem(STORAGE_KEY, '{"v2": {"hidden": [], "order": [], "widths": {"a": "x", "b": 89, "c": 1201, "d": 90}}}')
+    expect(loadColumnPrefs(kv, 'v2')).toEqual({ hidden: [], order: [], widths: { d: 90 } })
+    const cols = [col('a'), col('b')]
+    expect(applyColumnPrefs(cols, { hidden: [], order: ['a', 'b'], widths: { b: 300 } }).map((c) => c.width)).toEqual([100, 300])
+  })
 })

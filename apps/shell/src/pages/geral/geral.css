@@ -196,3 +196,12 @@
 .gr-fd__chevron { margin-left: auto; flex: 0 0 auto; color: var(--bt-color-text-secondary); }
 .gr-fd__head[aria-expanded="true"] .gr-fd__chevron { transform: rotate(180deg); }
 .gr-fd__body { padding-bottom: var(--bt-space-3); }
+
+/* Redimensionar e reordenar colunas */
+.gr-table .bt-table__head .bt-table__cell { position: relative; }
+.gr-table .bt-table__head .gr-cell--first { position: sticky; }
+.gr-resize { position: absolute; top: 0; right: 0; bottom: 0; width: 6px; cursor: col-resize; touch-action: none; z-index: 2; }
+.gr-resize:focus-visible { outline: 0; box-shadow: inset -2px 0 0 var(--bt-focus-border); }
+@media (hover: hover) { .gr-resize:hover { box-shadow: inset -2px 0 0 var(--bt-color-action); } }
+.gr-drop--before { box-shadow: inset 2px 0 0 var(--bt-color-action); }
+.gr-drop--after { box-shadow: inset -2px 0 0 var(--bt-color-action); }

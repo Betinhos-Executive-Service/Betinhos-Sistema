@@ -89,6 +89,22 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     const base = prefs ?? { hidden: [], order: geral.columns.map((c) => c.key) }
     setPrefs({ ...base, hidden: base.hidden.includes(key) ? base.hidden : [...base.hidden, key] })
   }, [prefs, geral.columns, setPrefs])
+  const resizeColumn = useCallback((key: string, width: number | null) => {
+    const base = prefs ?? { hidden: [], order: geral.columns.map((c) => c.key) }
+    const { [key]: _old, ...rest } = base.widths ?? {}
+    const widths = width == null ? rest : { ...rest, [key]: width }
+    const { widths: _w, ...others } = base
+    setPrefs(Object.keys(widths).length ? { ...others, widths } : others)
+  }, [prefs, geral.columns, setPrefs])
+  const moveColumn = useCallback((key: string, toIndex: number) => {
+    const base = prefs ?? { hidden: [], order: geral.columns.map((c) => c.key) }
+    const keys = visibleColumns.map((c) => c.key)
+    if (!keys.includes(key)) return
+    const next = keys.filter((k) => k !== key)
+    next.splice(Math.max(0, Math.min(toIndex, next.length)), 0, key)
+    const all = applyColumnPrefs(geral.columns, { ...base, hidden: [] }).map((c) => c.key)
+    setPrefs({ ...base, order: [...next, ...all.filter((k) => !next.includes(k))] })
+  }, [prefs, geral.columns, visibleColumns, setPrefs])
   const openForm = useCallback(async (mode: 'create' | 'edit', id?: string) => {
     try {
       const result = await source.openForm(mode, id)
@@ -299,6 +315,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           : (
             <GeralTable
               columns={visibleColumns}
+              onResize={resizeColumn}
+              onMove={moveColumn}
               attributes={attributes}
               rows={rows}
               loading={loading}
