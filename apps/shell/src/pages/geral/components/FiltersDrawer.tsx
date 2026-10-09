@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Button, Dialog, Drawer, Input } from '@betinhos/ui'
+import { Alert, Button, Dialog, Drawer, Input } from '@betinhos/ui'
 import { ChevronDown } from 'lucide-react'
 import { describeFilter, isEmptyFilter, type Filter, type FilterSet } from '../domain/filters'
 import { filterKindOf } from '../domain/filterKind'
@@ -17,10 +17,12 @@ type Props = {
   /** Rascunhos por atributo (`null` = remover o filtro). */
   onApply: (drafts: Record<string, Filter | null>) => void
   onClearAll: () => void
+  /** Metadata indisponível: sem campos para filtrar. */
+  unavailable?: boolean
 }
 
 /** Painel "Editar filtros": todos os campos filtráveis da raiz, um acordeão por campo; só vale ao aplicar. */
-export function FiltersDrawer({ open, onClose, filters, attributes, columns, search, onApply, onClearAll }: Props) {
+export function FiltersDrawer({ open, onClose, filters, attributes, columns, search, onApply, onClearAll, unavailable }: Props) {
   const [drafts, setDrafts] = useState<Record<string, Filter | null>>({})
   const [openKey, setOpenKey] = useState<string | null>(null)
   const [text, setText] = useState('')
@@ -59,6 +61,7 @@ export function FiltersDrawer({ open, onClose, filters, attributes, columns, sea
       >
         {open ? (
           <div className="gr-fd">
+            {unavailable ? <Alert tone="warning">Filtros indisponíveis: não foi possível carregar os campos.</Alert> : null}
             <Input aria-label="Buscar campo" placeholder="Buscar campo…" value={text} onChange={(event) => setText(event.target.value)} />
             <ul className="gr-fd__list">
               {shown.map((item) => {

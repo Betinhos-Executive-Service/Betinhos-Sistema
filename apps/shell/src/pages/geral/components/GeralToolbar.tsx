@@ -5,6 +5,8 @@ import type { ColumnPrefs } from '../domain/columns'
 import type { AttributeMap, Column, View } from '../domain/types'
 import { ColumnsMenu } from './ColumnsMenu'
 
+export const FILTERS_UNAVAILABLE = 'Filtros indisponíveis: não foi possível carregar os campos.'
+
 type Props = {
   views: View[]
   view: View | null
@@ -21,6 +23,8 @@ type Props = {
   /** Filtros por coluna ativos. */
   filtersCount: number
   onOpenFilters: () => void
+  /** Metadata indisponível: o botão fica inerte, com o motivo. */
+  filtersUnavailable?: boolean
   /** Celular: controles em tamanho de toque (44 px); no desktop ficam compactos (32 px). */
   mobile: boolean
   /** Comandos sempre visíveis; os que dependem da seleção ficam inertes (aria-disabled) enquanto ela não serve. */
@@ -30,7 +34,7 @@ type Props = {
 }
 
 /** Uma linha só: visão e busca à esquerda; contagem da seleção, comandos, colunas e atalhos à direita. */
-export function GeralToolbar({ views, view, onSelectView, query, onQuery, searching, columns, attributes, prefs, onPrefs, selectedCount, filtersCount, onOpenFilters, mobile, commands, shortcuts }: Props) {
+export function GeralToolbar({ views, view, onSelectView, query, onQuery, searching, columns, attributes, prefs, onPrefs, selectedCount, filtersCount, onOpenFilters, filtersUnavailable, mobile, commands, shortcuts }: Props) {
   const size = mobile ? 'touch' : 'compact'
   const options: SelectOption[] = views.map((v) => ({ value: v.id, label: v.nome, group: v.grupo === 'sistema' ? 'Visões do sistema' : 'Minhas visões' }))
   // O texto digitado fica local; a busca de verdade sai depois da pausa. Mudança externa (limpar busca) ressincroniza.
@@ -49,7 +53,7 @@ export function GeralToolbar({ views, view, onSelectView, query, onQuery, search
       end={<>
         {selectedCount > 0 ? <span role="status" className="gr-filters__selected"><StatusBadge tone="info">{selectedCount === 1 ? '1 selecionado' : `${selectedCount} selecionados`}</StatusBadge></span> : null}
         {commands}
-        <Button variant="secondary" size={size} icon={<Filter size={16} />} aria-haspopup="dialog" aria-label={filtersCount > 0 ? `Filtros (${filtersCount})` : 'Filtros'} onClick={onOpenFilters}>
+        <Button variant="secondary" size={size} icon={<Filter size={16} />} aria-haspopup="dialog" aria-label={filtersCount > 0 ? `Filtros (${filtersCount})` : 'Filtros'} className={filtersUnavailable ? 'gr-btn--blocked' : undefined} aria-disabled={filtersUnavailable || undefined} title={filtersUnavailable ? FILTERS_UNAVAILABLE : undefined} onClick={(event) => { if (filtersUnavailable) event.preventDefault(); else onOpenFilters() }}>
           Filtros{filtersCount > 0 ? <span className="gr-filters__count">{filtersCount}</span> : null}
         </Button>
         <span className="gr-filters__columns"><ColumnsMenu size={size} columns={columns} attributes={attributes} prefs={prefs} onChange={onPrefs} /></span>

@@ -192,8 +192,12 @@ type DialogProps = {
 /** Editor de um filtro num diálogo centrado: "Filtrar {rótulo}". */
 export function FilterDialog({ attribute, info, kind, value, search, onApply, onClose }: DialogProps) {
   const ready = attribute != null && kind != null
+  const [dirty, setDirty] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const finish = () => { setDirty(false); setConfirming(false); onClose() }
   return (
-    <Dialog open={ready} onClose={onClose} title={`Filtrar ${info?.label || attribute || ''}`}>
+    <>
+    <Dialog open={ready && !confirming} onClose={() => { if (dirty) setConfirming(true); else finish() }} title={`Filtrar ${info?.label || attribute || ''}`}>
       {ready ? (
         <FilterEditor
           key={attribute}
@@ -202,10 +206,24 @@ export function FilterDialog({ attribute, info, kind, value, search, onApply, on
           kind={kind}
           value={value}
           search={search}
-          onApply={(filter) => { onApply(attribute, filter); onClose() }}
-          onClear={() => { onApply(attribute, null); onClose() }}
+          onDraft={() => setDirty(true)}
+          onApply={(filter) => { onApply(attribute, filter); finish() }}
+          onClear={() => { onApply(attribute, null); finish() }}
         />
       ) : null}
     </Dialog>
+    <Dialog
+      open={ready && confirming}
+      onClose={() => setConfirming(false)}
+      tone="danger"
+      title="Descartar alterações?"
+      actions={<>
+        <Button variant="secondary" onClick={() => setConfirming(false)}>Continuar editando</Button>
+        <Button variant="danger" onClick={finish}>Descartar</Button>
+      </>}
+    >
+      O filtro editado ainda não foi aplicado.
+    </Dialog>
+    </>
   )
 }

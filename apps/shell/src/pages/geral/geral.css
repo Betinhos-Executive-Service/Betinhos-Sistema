@@ -205,3 +205,8 @@
 @media (hover: hover) { .gr-resize:hover { box-shadow: inset -2px 0 0 var(--bt-color-action); } }
 .gr-drop--before { box-shadow: inset 2px 0 0 var(--bt-color-action); }
 .gr-drop--after { box-shadow: inset -2px 0 0 var(--bt-color-action); }
+
+/* Alvo de toque de 44 px no ▾ sem crescer o cabeçalho. */
+@media (pointer: coarse) { .gr-head__menu::after { content: ""; position: absolute; inset: -10px; } }
+.gr-chip__warn { margin-left: var(--bt-space-2); color: var(--bt-color-amber-800); flex: 0 0 auto; }
+.gr-chip.is-ignored { border-style: dashed; }

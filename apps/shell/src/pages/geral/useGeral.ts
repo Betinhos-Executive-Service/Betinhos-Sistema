@@ -447,5 +447,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   }, [attributes, columns, source, setCell, setRows, scheduleSettle])
 
   const state: GeralState = { views, viewsError, view, columns, attributes, attributesError, quickFind, rows, total, more, pagesLoaded, loading, loadingMore, pageError, loadError, sort, query, filters, selected, cells }
-  return { ...state, defaultOrder, selectView, setSort, setQuery, setFilter, clearFilters, loadMore, retryLoadMore, reload, refresh: reload, toggle, toggleAll, clearSelection, save, resetCell }
+  /** Há filtros, mas a metadata falhou: a consulta segue sem eles. */
+  const filtersIgnored = hasFilters && attributes == null && attributesError != null
+  return { ...state, filtersIgnored, defaultOrder, selectView, setSort, setQuery, setFilter, clearFilters, loadMore, retryLoadMore, reload, refresh: reload, toggle, toggleAll, clearSelection, save, resetCell }
 }
