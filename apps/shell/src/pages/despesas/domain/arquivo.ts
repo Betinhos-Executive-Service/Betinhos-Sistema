@@ -18,6 +18,3 @@ export function tipoPrevia(mime: string): Previa {
   if (mime === 'application/pdf') return 'pdf'
   return null
 }
-
-/** Pelo nome, antes de baixar: decide se vale buscar o conteúdo para a miniatura. */
-export const temPrevia = (nome: string) => tipoPrevia(mimeDoArquivo(nome, null)) != null

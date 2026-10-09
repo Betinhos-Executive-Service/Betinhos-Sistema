@@ -6,7 +6,7 @@ import type { Anexo, Arquivo } from '../domain/types'
 /** Flow HTTP "Flow - Consultar Arquivo OneDrive" (criado por packages/deploy/provision-flow-consultar-onedrive.ps1). */
 export const FLOW_VAR = 'new_URLFlowConsultarArquivoOneDrive'
 
-type FlowResult = { sucesso?: boolean; erro?: string; mimeType?: string; conteudoBase64?: string }
+type FlowResult = { sucesso?: boolean; erro?: string; nomeArquivo?: string; mimeType?: string; conteudoBase64?: string }
 
 /** Valor sobrescrito da variável primeiro; sem ele, o padrão da definição. */
 async function readEnvVar(client: DataverseClient, schemaName: string) {
@@ -18,7 +18,7 @@ async function readEnvVar(client: DataverseClient, schemaName: string) {
 }
 
 /**
- * Lê o comprovante no OneDrive pelo flow e devolve um blob URL local (sem depender do link do OneDrive,
+ * Lê o comprovante no OneDrive pelo flow (por id ou, nos antigos, pelo link) e devolve um blob URL local (sem depender do link do OneDrive,
  * que não abre em iframe). Cada arquivo é buscado uma vez por sessão.
  */
 export function createArquivos(client: DataverseClient) {
@@ -31,13 +31,17 @@ export function createArquivos(client: DataverseClient) {
   }).catch((error) => { url = null; throw error }))
 
   async function buscar(anexo: Anexo): Promise<Arquivo> {
-    if (!anexo.driveItemId) throw new Error('Este comprovante não tem o identificador do OneDrive.')
-    const response = await fetch(await flowUrl(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: anexo.driveItemId, nomeArquivo: anexo.nome }) })
+    // Comprovantes antigos não gravaram o id do OneDrive: o flow resolve pelo link de compartilhamento.
+    if (!anexo.driveItemId && !anexo.url) throw new Error('Este comprovante não tem o arquivo no OneDrive.')
+    const body = anexo.driveItemId ? { id: anexo.driveItemId, nomeArquivo: anexo.nome } : { link: anexo.url, nomeArquivo: anexo.nome }
+    const response = await fetch(await flowUrl(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     let result: FlowResult = {}
     try { result = await response.json() } catch { /* corpo vazio */ }
     if (!response.ok || result.sucesso !== true || !result.conteudoBase64) throw new Error(result.erro || `O OneDrive não respondeu (HTTP ${response.status}).`)
-    const mime = mimeDoArquivo(anexo.nome, result.mimeType)
-    return { nome: anexo.nome, mime, url: URL.createObjectURL(base64ToBlob(result.conteudoBase64, mime)) }
+    // O nome no OneDrive tem a extensão (o gravado no Dataverse às vezes não: "comprovante-1").
+    const nome = result.nomeArquivo?.trim() || anexo.nome
+    const mime = mimeDoArquivo(nome, result.mimeType)
+    return { nome, mime, url: URL.createObjectURL(base64ToBlob(result.conteudoBase64, mime)) }
   }
 
   return (anexo: Anexo) => {

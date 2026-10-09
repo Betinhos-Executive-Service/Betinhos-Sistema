@@ -1,8 +1,9 @@
 ﻿# Cria (ou atualiza) no DEV o flow HTTP "Flow - Consultar Arquivo OneDrive" e a variável de ambiente
 # new_URLFlowConsultarArquivoOneDrive, na solução AppBetinhos. Usado pela prévia dos comprovantes de
-# Despesas operacionais: recebe o id do item do OneDrive (cr40f_driveitemid) e devolve o conteúdo em
-# base64, no mesmo formato do "Flow - Consultar Arquivos Sharepoint" do Planner. Só lê arquivos dentro
-# de /Despesas/. Idempotente. Requer `az login` com acesso ao DEV e ao Power Automate.
+# Despesas operacionais: recebe o id do item do OneDrive (cr40f_driveitemid) ou, nos comprovantes antigos
+# que só têm o link de compartilhamento (cr40f_sharelink), o link; devolve o conteúdo em base64, no mesmo
+# formato do "Flow - Consultar Arquivos Sharepoint" do Planner. Só lê arquivos dentro de /Despesas/.
+# Idempotente. Requer `az login` com acesso ao DEV e ao Power Automate.
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $environmentUrl = 'https://org23b93544.crm2.dynamics.com'
@@ -11,6 +12,7 @@ $solutionName = 'AppBetinhos'
 $flowName = 'Flow - Consultar Arquivo OneDrive'
 $envVarName = 'new_URLFlowConsultarArquivoOneDrive'
 $referenceFlow = 'Flow Comprovantes Despesas Assincrono | App Motoristas'
+$sharePointFlow = 'Flow - Consultar Arquivos Sharepoint'
 if (([Uri]$environmentUrl).Host -ne 'org23b93544.crm2.dynamics.com') { throw 'Somente DEV.' }
 
 $dvToken = & az account get-access-token --resource "$environmentUrl/" --query accessToken -o tsv
@@ -45,6 +47,11 @@ $source = @((Dv GET "workflows?`$select=clientdata&`$filter=name eq '$referenceF
 if ($source.Count -ne 1) { throw 'Flow de referência dos comprovantes ausente no DEV.' }
 $onedrive = ($source[0].clientdata | ConvertFrom-Json).properties.connectionReferences.shared_onedriveforbusiness
 if (-not $onedrive.connection.connectionReferenceLogicalName) { throw 'Connection reference do OneDrive ausente.' }
+# Conexão do SharePoint (a do flow do Planner): resolve o link de compartilhamento pela API /shares.
+$spSource = @((Dv GET "workflows?`$select=clientdata&`$filter=name eq '$sharePointFlow' and category eq 5").value)
+if ($spSource.Count -ne 1) { throw 'Flow de referência do SharePoint ausente no DEV.' }
+$sharepoint = ($spSource[0].clientdata | ConvertFrom-Json).properties.connectionReferences.shared_sharepointonline
+if (-not $sharepoint.connection.connectionReferenceLogicalName) { throw 'Connection reference do SharePoint ausente.' }
 
 $definition = @'
 {
@@ -57,16 +64,45 @@ $definition = @'
   "triggers": {
     "manual": {
       "type": "Request", "kind": "Http",
-      "inputs": { "triggerAuthenticationType": "All", "schema": { "type": "object", "properties": { "id": { "type": "string" }, "nomeArquivo": { "type": "string" } } } }
+      "inputs": { "triggerAuthenticationType": "All", "schema": { "type": "object", "properties": { "id": { "type": "string" }, "link": { "type": "string" }, "nomeArquivo": { "type": "string" } } } }
     }
   },
   "actions": {
+    "Resolver": {
+      "type": "If", "runAfter": {},
+      "expression": { "and": [
+        { "equals": [ "@trim(coalesce(triggerBody()?['id'], ''))", "" ] },
+        { "not": { "equals": [ "@trim(coalesce(triggerBody()?['link'], ''))", "" ] } }
+      ] },
+      "actions": {
+        "Compartilhamento": {
+          "type": "OpenApiConnection", "runAfter": {}, "limit": { "timeout": "PT30S" },
+          "inputs": {
+            "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline", "connectionName": "shared_sharepointonline", "operationId": "HttpRequest" },
+            "parameters": {
+              "dataset": "https://betinhos-my.sharepoint.com/personal/noreply_betinhos_onmicrosoft_com",
+              "parameters/method": "GET",
+              "parameters/uri": "_api/v2.0/shares/@{concat('u!', replace(replace(replace(base64(trim(triggerBody()?['link'])), '=', ''), '/', '_'), '+', '-'))}/driveItem?$select=id,name,parentReference",
+              "parameters/headers": { "Accept": "application/json" }
+            },
+            "authentication": "@parameters('$authentication')",
+            "retryPolicy": { "type": "fixed", "count": 1, "interval": "PT5S" }
+          }
+        }
+      },
+      "else": { "actions": {} }
+    },
+    "IdArquivo": {
+      "type": "Compose", "runAfter": { "Resolver": ["Succeeded"] },
+      "inputs": "@if(equals(trim(coalesce(triggerBody()?['id'], '')), ''), concat(body('Compartilhamento')?['parentReference']?['driveId'], '.', body('Compartilhamento')?['id']), trim(triggerBody()?['id']))"
+    },
     "Metadados": {
-      "type": "OpenApiConnection", "runAfter": {},
+      "type": "OpenApiConnection", "runAfter": { "IdArquivo": ["Succeeded"] }, "limit": { "timeout": "PT30S" },
       "inputs": {
         "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_onedriveforbusiness", "connectionName": "shared_onedriveforbusiness", "operationId": "GetFileMetadata" },
-        "parameters": { "id": "@triggerBody()?['id']" },
-        "authentication": "@parameters('$authentication')"
+        "parameters": { "id": "@outputs('IdArquivo')" },
+        "authentication": "@parameters('$authentication')",
+            "retryPolicy": { "type": "fixed", "count": 1, "interval": "PT5S" }
       }
     },
     "DentroDeDespesas": {
@@ -74,18 +110,19 @@ $definition = @'
       "expression": { "and": [ { "startsWith": [ "@toLower(string(body('Metadados')?['Path']))", "/despesas/" ] } ] },
       "actions": {
         "Conteudo": {
-          "type": "OpenApiConnection", "runAfter": {},
+          "type": "OpenApiConnection", "runAfter": {}, "limit": { "timeout": "PT40S" },
           "inputs": {
             "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_onedriveforbusiness", "connectionName": "shared_onedriveforbusiness", "operationId": "GetFileContent" },
-            "parameters": { "id": "@triggerBody()?['id']", "inferContentType": true },
-            "authentication": "@parameters('$authentication')"
+            "parameters": { "id": "@outputs('IdArquivo')", "inferContentType": true },
+            "authentication": "@parameters('$authentication')",
+            "retryPolicy": { "type": "fixed", "count": 1, "interval": "PT5S" }
           }
         },
         "Resposta": {
           "type": "Response", "kind": "Http", "runAfter": { "Conteudo": ["Succeeded"] },
           "inputs": { "statusCode": 200, "body": {
             "sucesso": true,
-            "nomeArquivo": "@{coalesce(triggerBody()?['nomeArquivo'], body('Metadados')?['Name'])}",
+            "nomeArquivo": "@{body('Metadados')?['Name']}",
             "mimeType": "@{coalesce(outputs('Conteudo')?['headers']?['Content-Type'], body('Metadados')?['MediaType'], 'application/octet-stream')}",
             "conteudoBase64": "@{base64(body('Conteudo'))}"
           } }
@@ -108,7 +145,7 @@ $definition = @'
 }
 '@ | ConvertFrom-Json
 
-$clientData = @{ properties = @{ definition = $definition; connectionReferences = @{ shared_onedriveforbusiness = $onedrive } }; schemaVersion = '1.0.0.0' } | ConvertTo-Json -Depth 90 -Compress
+$clientData = @{ properties = @{ definition = $definition; connectionReferences = @{ shared_onedriveforbusiness = $onedrive; shared_sharepointonline = $sharepoint } }; schemaVersion = '1.0.0.0' } | ConvertTo-Json -Depth 90 -Compress
 
 $flows = @((Dv GET "workflows?`$select=workflowid,statecode,clientdata&`$filter=name eq '$flowName' and category eq 5").value)
 if ($flows.Count -gt 1) { throw 'Flow duplicado no DEV.' }
