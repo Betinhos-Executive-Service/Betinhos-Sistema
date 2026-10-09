@@ -6,6 +6,7 @@ import type { Source } from '../data/source'
 import type { KV } from '../domain/columns'
 import { contar, type Motorista } from '../domain/commands'
 import { TZ } from '../domain/format'
+import './contagem.css'
 
 export const EXCLUIDOS_KEY = 'betinhos.geral.contagem.excluidos.v1'
 const REFRESH_MS = 60_000
@@ -18,10 +19,15 @@ export const todayIso = () => dayFmt.format(new Date())
 export const shiftDay = (day: string, delta: number) => new Date(new Date(`${day}T12:00:00Z`).getTime() + delta * 86_400_000).toISOString().slice(0, 10)
 export const formatDay = (day: string) => day.split('-').reverse().join('/')
 
-function loadExcluidos(kv: KV): string[] {
+const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+const MAX_EXCLUIDOS = 500
+
+export function loadExcluidos(kv: KV): string[] {
   try {
     const parsed: unknown = JSON.parse(kv.getItem(EXCLUIDOS_KEY) ?? '[]')
-    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : []
+    if (!Array.isArray(parsed)) return []
+    const ids = parsed.filter((v): v is string => typeof v === 'string').map(cleanId).filter((v) => GUID.test(v))
+    return [...new Set(ids)].slice(0, MAX_EXCLUIDOS)
   } catch { return [] }
 }
 
@@ -63,7 +69,12 @@ export function ContagemDrawer({ open, onClose, source, initialDay, kv, mobile }
   const [day, setDay] = useState(initialDay)
   const [excluidos, setExcluidos] = useState(() => loadExcluidos(kv))
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  useEffect(() => { if (open) setDay(initialDay) }, [open, initialDay])
+  // Ao abrir, o dia volta ao inicial ainda na renderização: evita buscar o dia antigo antes.
+  const [wasOpen, setWasOpen] = useState(open)
+  if (open !== wasOpen) {
+    setWasOpen(open)
+    if (open) setDay(initialDay)
+  }
   const { data, error, loading, updatedAt, reload } = useContagem(source, day, open)
 
   const result = useMemo(() => (data ? contar(data.reservas, data.motoristas, new Set(excluidos)) : null), [data, excluidos])
@@ -99,7 +110,7 @@ export function ContagemDrawer({ open, onClose, source, initialDay, kv, mobile }
   const size = mobile ? 'touch' : 'compact'
 
   const body = (
-    <div className="gr-ct">
+    <div className={mobile ? 'gr-ct gr-ct--touch' : 'gr-ct'}>
       <div className="gr-ct__nav">
         <Button variant="secondary" size={size} icon={<ChevronLeft size={16} />} aria-label="Dia anterior" onClick={() => setDay(shiftDay(day, -1))} />
         <Button variant="secondary" size={size} disabled={isToday} onClick={() => setDay(todayIso())}>Hoje</Button>
@@ -124,7 +135,7 @@ export function ContagemDrawer({ open, onClose, source, initialDay, kv, mobile }
             return (
               <li key={id} className="gr-ct__item">
                 <div className="gr-ct__row">
-                  <button type="button" className="gr-ct__toggle" aria-expanded={isOpen} aria-controls={`gr-ct-${id}`} disabled={total === 0} onClick={() => toggleExpand(id)}>
+                  <button type="button" className="gr-ct__toggle" aria-expanded={isOpen} aria-controls={isOpen ? `gr-ct-${id}` : undefined} disabled={total === 0} onClick={() => toggleExpand(id)}>
                     <ChevronDown size={16} className="gr-ct__chev" aria-hidden="true" />
                     <span className="gr-ct__name">{motorista.nome}</span>
                   </button>
@@ -135,7 +146,7 @@ export function ContagemDrawer({ open, onClose, source, initialDay, kv, mobile }
                     {list.map((r, i) => <li key={i}><b>{r.hora}</b> · {r.trajeto}</li>)}
                   </ul>
                 ) : null}
-                <Checkbox label="Excluir da média" checked={skip.has(id)} onChange={() => toggleExcluido(id)} />
+                <Checkbox label="Excluir da média" aria-label={`Excluir da média: ${motorista.nome}`} checked={skip.has(id)} onChange={() => toggleExcluido(id)} />
               </li>
             )
           })}

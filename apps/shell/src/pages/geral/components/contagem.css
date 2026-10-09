@@ -1,0 +1,7 @@
+/* Alvos de toque do painel Serviços por motorista. */
+@media (pointer: coarse) {
+  .gr-ct__toggle { min-height: var(--bt-control-height-touch); }
+  .gr-ct__item .bt-choice { min-height: var(--bt-control-height-touch); align-items: center; }
+}
+.gr-ct--touch .gr-ct__toggle { min-height: var(--bt-control-height-touch); }
+.gr-ct--touch .gr-ct__item .bt-choice { min-height: var(--bt-control-height-touch); align-items: center; }
