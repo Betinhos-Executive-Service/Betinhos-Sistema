@@ -1,5 +1,6 @@
 import { ANEXO, FINANCEIRO, OPERACIONAL } from '../domain/status'
-import type { Anexo, Despesa } from '../domain/types'
+import { mimeDoArquivo } from '../domain/arquivo'
+import type { Anexo, Arquivo, Despesa } from '../domain/types'
 
 const CATEGORIAS = [['cat-1', 'Combustível'], ['cat-2', 'Pedágio'], ['cat-3', 'Estacionamento'], ['cat-4', 'Alimentação'], ['cat-5', 'Hospedagem'], ['cat-6', 'Lavagem']] as const
 const FORMAS = [['fp-1', 'Cartão empresa'], ['fp-2', 'Pix motorista'], ['fp-3', 'Tag CTF'], ['fp-4', 'Dinheiro motorista']] as const
@@ -56,8 +57,31 @@ export function createMockDespesas(now: Date): Despesa[] {
 export function createMockAnexos(d: Despesa): Anexo[] {
   if (d.statusAnexo === ANEXO.sem) return []
   const base = { enviadoEm: d.criadoEm, enviadoPor: d.motorista }
-  const comprovante: Anexo = { id: `${d.id}-a1`, nome: `cupom-${d.protocolo.toLowerCase()}.jpg`, tipo: 100000000, status: d.statusAnexo === ANEXO.falhou ? 100000002 : 100000001, url: d.statusAnexo === ANEXO.falhou ? null : 'https://example.com/comprovante.jpg', ...base }
+  const falhou = d.statusAnexo === ANEXO.falhou
+  const comprovante: Anexo = {
+    id: `${d.id}-a1`, nome: d.categoria === 'Hospedagem' ? `nota-${d.protocolo.toLowerCase()}.pdf` : `cupom-${d.protocolo.toLowerCase()}.jpg`,
+    tipo: 100000000, status: falhou ? 100000002 : 100000001, url: falhou ? null : 'https://example.com/comprovante', driveItemId: falhou ? '' : `drive-${d.id}-1`, ...base,
+  }
   return d.categoria === 'Combustível'
-    ? [comprovante, { id: `${d.id}-a2`, nome: 'painel-km.jpg', tipo: 100000001, status: 100000001, url: 'https://example.com/painel.jpg', ...base }]
+    ? [comprovante, { id: `${d.id}-a2`, nome: 'painel-km.jpg', tipo: 100000001, status: 100000001, url: 'https://example.com/painel', driveItemId: `drive-${d.id}-2`, ...base }]
     : [comprovante]
+}
+
+const esc = (t: string) => t.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!)
+
+/** Cupom desenhado em SVG (imagem) ou PDF mínimo, como data URL: o mock não depende de blob. */
+export function createMockArquivo(anexo: Anexo): Arquivo {
+  const mime = mimeDoArquivo(anexo.nome, null)
+  if (mime === 'application/pdf') {
+    const pdf = [
+      '%PDF-1.4',
+      '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj',
+      '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 200]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj',
+      '4 0 obj<</Length 52>>stream', 'BT /F1 18 Tf 40 100 Td (Nota fiscal - exemplo) Tj ET', 'endstream endobj',
+      '5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj', 'trailer<</Root 1 0 R>>', '%%EOF',
+    ].join('\n')
+    return { nome: anexo.nome, mime, url: `data:application/pdf;base64,${btoa(pdf)}` }
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="360" height="520" viewBox="0 0 360 520"><rect width="360" height="520" fill="#ffffff"/><rect x="24" y="24" width="312" height="472" fill="none" stroke="#E2E8F0" stroke-width="2"/><text x="180" y="80" font-family="Manrope, sans-serif" font-size="20" font-weight="700" text-anchor="middle" fill="#001A3D">CUPOM FISCAL</text><text x="180" y="112" font-family="Manrope, sans-serif" font-size="14" text-anchor="middle" fill="#64748B">${esc(anexo.nome)}</text>${[0, 1, 2, 3, 4, 5].map((i) => `<rect x="48" y="${160 + i * 40}" width="${180 - i * 12}" height="10" fill="#E2E8F0"/><rect x="262" y="${160 + i * 40}" width="50" height="10" fill="#E2E8F0"/>`).join('')}<text x="48" y="440" font-family="Manrope, sans-serif" font-size="18" font-weight="700" fill="#0F172A">TOTAL</text><text x="312" y="440" font-family="Manrope, sans-serif" font-size="18" font-weight="700" text-anchor="end" fill="#0F172A">R$ —</text></svg>`
+  return { nome: anexo.nome, mime: 'image/svg+xml', url: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}` }
 }

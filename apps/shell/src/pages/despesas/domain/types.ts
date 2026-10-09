@@ -45,9 +45,14 @@ export type Anexo = {
   tipo: number | null
   status: number | null
   url: string | null
+  /** Id do item no OneDrive (`cr40f_driveitemid`): é por ele que a prévia lê o arquivo. */
+  driveItemId: string
   enviadoEm: Date | null
   enviadoPor: string
 }
+
+/** Conteúdo do comprovante pronto para mostrar: `url` é blob/data URL local, nunca o link do OneDrive. */
+export type Arquivo = { nome: string; mime: string; url: string }
 
 export type DespesaChoices = {
   operacional: ChoiceOption[]

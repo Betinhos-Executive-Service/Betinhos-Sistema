@@ -23,7 +23,7 @@ export function despesasPath(entitySet: string, since: Date | null) {
   return `${entitySet}?$select=${SELECT.join(',')}&$filter=${encodeURIComponent(filter)}&$orderby=${encodeURIComponent('cr40f_datagasto desc')}`
 }
 
-const ANEXO_SELECT = ['cr40f_anexodespesaoperacionalid', 'cr40f_nome', 'cr40f_nomearquivo', 'cr40f_tipo', 'cr40f_status', 'cr40f_sharelink', 'cr40f_urlsharepoint', 'cr40f_dataenvio', 'createdon', '_cr40f_enviadopor_value']
+const ANEXO_SELECT = ['cr40f_anexodespesaoperacionalid', 'cr40f_nome', 'cr40f_nomearquivo', 'cr40f_tipo', 'cr40f_status', 'cr40f_sharelink', 'cr40f_urlsharepoint', 'cr40f_dataenvio', 'cr40f_driveitemid', 'createdon', '_cr40f_enviadopor_value']
 
 export function anexosPath(entitySet: string, despesaId: string) {
   const filter = `statecode eq 0 and _cr40f_despesa_value eq ${cleanId(despesaId)}`
@@ -92,6 +92,7 @@ export function mapAnexo(row: Row): Anexo {
     tipo: num(row.cr40f_tipo),
     status: num(row.cr40f_status),
     url,
+    driveItemId: str(row.cr40f_driveitemid),
     enviadoEm: date(row.cr40f_dataenvio) ?? date(row.createdon),
     enviadoPor: row._cr40f_enviadopor_value ? formatted(row, '_cr40f_enviadopor_value') : '',
   }

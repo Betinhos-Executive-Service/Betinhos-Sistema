@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createMockDespesas } from '../data/mock'
 import { BUILTIN_VIEWS, EMPTY_FILTERS, VIEWS_KEY, filterDespesas, loadViews, matchView, newView, opcoes, parseStoredFilters, saveViews } from './filters'
+import { mimeDoArquivo, temPrevia, tipoPrevia } from './arquivo'
 import { resumo } from './resumo'
 import { ANEXO, FINANCEIRO, OPERACIONAL, semComprovante, withFallback } from './status'
 import type { Despesa } from './types'
@@ -66,5 +67,22 @@ describe('resumo e status', () => {
     const c = withFallback({ operacional: [{ value: 1, label: 'X' }], financeiro: [] })
     expect(c.operacional).toEqual([{ value: 1, label: 'X' }])
     expect(c.financeiro[1]).toEqual({ value: FINANCEIRO.aguardando, label: 'Aguardando pagamento' })
+  })
+})
+
+describe('prévia de comprovante', () => {
+  it('usa o Content-Type do OneDrive e, se genérico, a extensão', () => {
+    expect(mimeDoArquivo('x.bin', 'image/png; charset=binary')).toBe('image/png')
+    expect(mimeDoArquivo('Nota.PDF', 'application/octet-stream')).toBe('application/pdf')
+    expect(mimeDoArquivo('cupom.jpeg', null)).toBe('image/jpeg')
+    expect(mimeDoArquivo('qa.txt', '')).toBe('application/octet-stream')
+  })
+
+  it('só imagem e PDF têm prévia', () => {
+    expect(tipoPrevia('image/webp')).toBe('imagem')
+    expect(tipoPrevia('application/pdf')).toBe('pdf')
+    expect(tipoPrevia('image/heic')).toBeNull()
+    expect(temPrevia('foto.jpg')).toBe(true)
+    expect(temPrevia('planilha.xlsx')).toBe(false)
   })
 })

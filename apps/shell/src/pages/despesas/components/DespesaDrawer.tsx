@@ -1,12 +1,12 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Alert, Drawer, Skeleton, StatusBadge } from '@betinhos/ui'
-import { ExternalLink, FileText, MapPin } from 'lucide-react'
+import { Alert, Drawer, Skeleton } from '@betinhos/ui'
+import { ExternalLink, MapPin } from 'lucide-react'
 import { formatDateTime, formatMoney } from '../../pagantes/domain/messages'
 import { label } from '../../pagantes/domain/status'
 import type { Source } from '../data/source'
 import { LINKED } from '../data/queries'
-import { arquivoTone } from '../domain/status'
 import type { Anexo, Despesa, DespesaChoices } from '../domain/types'
+import { ComprovantesGaleria } from './Comprovantes'
 import { Alertas, FinanceiroBadge, OperacionalBadge, titulo } from './DespesasList'
 
 type Props = { despesa: Despesa | null; onClose: () => void; choices: DespesaChoices; source: Source; version: number }
@@ -95,7 +95,7 @@ export function DespesaDrawer({ despesa: d, onClose, choices, source, version }:
             </Section>
           ) : null}
 
-          <Comprovantes anexos={anexos} choices={choices} statusAnexo={label(choices.anexo, d.statusAnexo, 'Sem status')} />
+          <Comprovantes anexos={anexos} choices={choices} statusAnexo={label(choices.anexo, d.statusAnexo, 'Sem status')} source={source} />
 
           <Section title="Origem e registro">
             <dl className="pg-ficha__grid">
@@ -112,27 +112,14 @@ export function DespesaDrawer({ despesa: d, onClose, choices, source, version }:
   )
 }
 
-function Comprovantes({ anexos, choices, statusAnexo }: { anexos: Anexos; choices: DespesaChoices; statusAnexo: string }) {
+function Comprovantes({ anexos, choices, statusAnexo, source }: { anexos: Anexos; choices: DespesaChoices; statusAnexo: string; source: Source }) {
   if (anexos == null) {
     return <Section title="Comprovantes"><div className="pg-ficha__loading" role="status" aria-label="Carregando comprovantes"><Skeleton height={18} /><Skeleton height={18} /></div></Section>
   }
   if ('error' in anexos) return <Alert tone="danger" title="Não foi possível carregar os comprovantes">{anexos.error}</Alert>
   return (
     <Section title="Comprovantes" aside={<span className="pg-muted">{statusAnexo}</span>}>
-      {anexos.length ? (
-        <ul className="pg-related">
-          {anexos.map((a) => (
-            <li key={a.id} className="pg-related__row dp-anexo">
-              <span className="dp-anexo__name">
-                <FileText size={16} aria-hidden="true" />
-                <span><strong>{a.nome}</strong><span className="pg-muted">{[label(choices.anexoTipo, a.tipo, ''), a.enviadoEm ? formatDateTime(a.enviadoEm) : ''].filter(Boolean).join(' · ')}</span></span>
-              </span>
-              <StatusBadge tone={arquivoTone(a.status)}>{label(choices.anexoStatus, a.status, 'Sem status')}</StatusBadge>
-              {a.url ? <a className="dp-link" href={a.url} target="_blank" rel="noopener noreferrer" aria-label={`Abrir ${a.nome}`}>Abrir<ExternalLink size={14} aria-hidden="true" /></a> : <span className="pg-muted">Sem link</span>}
-            </li>
-          ))}
-        </ul>
-      ) : <p className="pg-muted">Nenhum comprovante enviado.</p>}
+      {anexos.length ? <ComprovantesGaleria anexos={anexos} choices={choices} ler={source.arquivo} /> : <p className="pg-muted">Nenhum comprovante enviado.</p>}
     </Section>
   )
 }
