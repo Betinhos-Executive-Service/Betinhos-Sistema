@@ -1,6 +1,7 @@
 import { Check, Copy, ExternalLink, ImageUp } from 'lucide-react'
 import { Alert, Button, Drawer, EmptyState, Input, StatusBadge } from '@betinhos/ui'
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import { useQueryPeriodo } from '../../../nav/queryState'
 import { formatBR } from '../data/dates'
 import { brl, NAO_INFORMADO } from '../data/format'
 import { CATEGORIA, label, VEICULO, VEICULO_STATUS } from '../data/schema'
@@ -22,7 +23,8 @@ const TIPOS_FOTO = ['image/png', 'image/jpeg', 'image/webp']
 
 export function FichaVeiculo({ source, id, data, errors, today, onClose, onOpen, onReload }: { source: DataSource; id: string; errors: LoadResult['errors']; data: FrotaData; today: string; onClose: () => void; onOpen: (kind: Kind, id: string) => void; onReload: () => void }) {
   const notify = useNotify()
-  const [periodo, setPeriodo] = useState(() => ultimos12Meses(today))
+  const padrao = useMemo(() => ultimos12Meses(today), [today])
+  const [periodo, setPeriodo] = useQueryPeriodo('fde', 'fate', padrao)
   const veiculo = data.veiculos.find((item) => item.id === id)
   const timeline = useMemo(() => buildTimeline(id, data), [id, data])
   const custo = useMemo(() => custoVeiculo(data.manutencoes, id, periodo), [data.manutencoes, id, periodo])
@@ -149,8 +151,8 @@ export function FichaVeiculo({ source, id, data, errors, today, onClose, onOpen,
           <section className="frota-group" aria-labelledby={`${id}-custo`}>
             <h3 id={`${id}-custo`} className="frota-group__title">Custo de manutenção</h3>
             <div className="frota-cluster">
-              <Input className="frota-data" size="compact" type="date" aria-label="De" value={periodo.de} max={periodo.ate} onChange={(event) => { const de = event.target.value; if (de && de <= periodo.ate) setPeriodo((current) => ({ ...current, de })) }} />
-              <Input className="frota-data" size="compact" type="date" aria-label="Até" value={periodo.ate} min={periodo.de} onChange={(event) => { const ate = event.target.value; if (ate && ate >= periodo.de) setPeriodo((current) => ({ ...current, ate })) }} />
+              <Input className="frota-data" size="compact" type="date" aria-label="De" value={periodo.de} max={periodo.ate} onChange={(event) => { const de = event.target.value; if (de && de <= periodo.ate) setPeriodo({ ...periodo, de }) }} />
+              <Input className="frota-data" size="compact" type="date" aria-label="Até" value={periodo.ate} min={periodo.de} onChange={(event) => { const ate = event.target.value; if (ate && ate >= periodo.de) setPeriodo({ ...periodo, ate }) }} />
             </div>
             {errors.manutencoes ? erro('Manutenções', errors.manutencoes) : (
               <>

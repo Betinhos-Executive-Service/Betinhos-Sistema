@@ -47,4 +47,17 @@ describe('Frota', () => {
     expect(await screen.findByText('Nenhuma pendência de frota no momento')).toBeTruthy()
     expect(screen.getByText(texto)).toBeTruthy()
   })
+
+  it('guarda aba e ficha na URL; a aba padrão não aparece', async () => {
+    const source = fakeSource('xrm', 'DEV')
+    source.load = vi.fn(async () => ({ data: { ...EMPTY_DATA, veiculos: [{ id: 'v1', placa: 'TST1A11', marca: null, modelo: null, cor: null, anoModelo: null, status: VEICULO.ATIVO, categoria: null, motorista: null }] }, errors: {} }))
+    history.replaceState(null, '', '#/frota?aba=veiculos&q=TST')
+    renderFrota(source)
+    expect(screen.getByRole('tab', { name: 'Veículos' }).getAttribute('aria-selected')).toBe('true')
+    fireEvent.click(await screen.findByText('TST1A11'))
+    expect(await screen.findByRole('dialog', { name: 'TST1A11' })).toBeTruthy()
+    expect(location.hash).toBe('#/frota?aba=veiculos&q=TST&ficha=v1')
+    fireEvent.click(screen.getByRole('tab', { name: 'Pendências' }))
+    expect(location.hash).toBe('#/frota')
+  })
 })
