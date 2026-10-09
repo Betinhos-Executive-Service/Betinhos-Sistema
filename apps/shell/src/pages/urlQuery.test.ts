@@ -6,6 +6,8 @@ import { EMPTY_FILTERS as CURRICULOS_VAZIO } from './curriculos/domain/funnel'
 import { curriculosQuery } from './curriculos/domain/query'
 import { DEFAULT_FILTERS } from './funcionarios/data/filters'
 import { funcionariosQuery } from './funcionarios/data/query'
+import { EMPTY_FILTERS as DESPESAS_VAZIO } from './despesas/domain/filters'
+import { despesasQuery as despesasOperacionaisQuery } from './despesas/domain/query'
 import { EMPTY_FILTERS as INFRACOES_VAZIO } from './infracoes/domain/filters'
 import { infracoesQuery } from './infracoes/domain/query'
 import { EMPTY_FILTERS as OPS_VAZIO } from './ops/domain/filters'
@@ -28,7 +30,7 @@ function ida<F>(codec: QueryCodec<F>, filtros: F) {
 it('filtros padrão não vão para a URL (link curto)', () => {
   const casos: [QueryCodec<never>, unknown][] = [
     [pagantesQuery as QueryCodec<never>, PAGANTES_VAZIO], [pessoasQuery as QueryCodec<never>, PESSOAS_VAZIO], [infracoesQuery as QueryCodec<never>, INFRACOES_VAZIO],
-    [curriculosQuery as QueryCodec<never>, CURRICULOS_VAZIO], [funcionariosQuery as QueryCodec<never>, DEFAULT_FILTERS], [opsQuery as QueryCodec<never>, OPS_VAZIO],
+    [curriculosQuery as QueryCodec<never>, CURRICULOS_VAZIO], [funcionariosQuery as QueryCodec<never>, DEFAULT_FILTERS], [opsQuery as QueryCodec<never>, OPS_VAZIO], [despesasOperacionaisQuery as QueryCodec<never>, DESPESAS_VAZIO],
   ]
   for (const [codec, vazio] of casos) {
     const { q, filtros } = ida(codec, vazio as never)
@@ -48,6 +50,11 @@ it('Pagantes, Pessoas, Infrações, Currículos e Funcionários: ida e volta com
   expect(ida(curriculosQuery, curriculos).filtros).toEqual(curriculos)
   const func = { search: 'ze', status: [0], funcao: 1, empresa: 202410000, vinculo: 2, alerta: 'aso' as const, sort: 'cnh' as const, desc: true }
   expect(ida(funcionariosQuery, func).filtros).toEqual(func)
+})
+
+it('Despesas operacionais: ida e volta com ids em lista e alertas', () => {
+  const despesas = { query: 'posto', periodo: '30' as const, operacional: [1], financeiro: [2, 3], categoria: ['c-1', 'c-2'], motorista: ['m-1'], alertas: ['sem-comprovante' as const, 'duplicidade' as const] }
+  expect(ida(despesasOperacionaisQuery, despesas).filtros).toEqual(despesas)
 })
 
 it('Funcionários: "nenhum status" fica explícito e é diferente do padrão', () => {
