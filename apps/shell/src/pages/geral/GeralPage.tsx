@@ -13,10 +13,15 @@ import { GeralSheet } from './components/GeralSheet'
 import { GeralTable } from './components/GeralTable'
 import { CopyDialog, MockFormDialog, StateDialog, type StateRequest } from './components/Dialogs'
 import { EscalaFdsDrawer } from './components/EscalaFdsDrawer'
+import { FilterChips } from './components/FilterChips'
+import { FilterDialog } from './components/FilterEditor'
+import { FiltersDrawer } from './components/FiltersDrawer'
 import { LoadMore, LoadSentinel, statusText } from './components/LoadMore'
 import { GeralToolbar } from './components/GeralToolbar'
 import { VoucherOverlay } from './components/VoucherOverlay'
 import { copyText } from './domain/copy'
+import { isEmptyFilter, type Filter } from './domain/filters'
+import { filterKindOf } from './domain/filterKind'
 import { applyColumnPrefs, loadColumnPrefs, saveColumnPrefs, type ColumnPrefs } from './domain/columns'
 import { ID_ATTRIBUTE, type CellStatus, type Column } from './domain/types'
 import { readUrlState, writeUrlState, type UrlState } from './domain/urlState'
@@ -74,6 +79,16 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const [stateBusy, setStateBusy] = useState(false)
   const [voucherUrl, setVoucherUrl] = useState<string | null>(null)
   const [escalaOpen, setEscalaOpen] = useState(false)
+  // Filtro por coluna: `editingFilter` é o atributo no diálogo "Filtrar …"; o painel "Editar filtros" lista todos.
+  const [editingFilter, setEditingFilter] = useState<string | null>(null)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const { filters, setFilter, clearFilters } = geral
+  const filtersCount = useMemo(() => Object.values(filters).filter((f) => !isEmptyFilter(f)).length, [filters])
+  const applyFilters = useCallback((drafts: Record<string, Filter | null>) => { for (const [attribute, filter] of Object.entries(drafts)) setFilter(attribute, filter) }, [setFilter])
+  const hideColumn = useCallback((key: string) => {
+    const base = prefs ?? { hidden: [], order: geral.columns.map((c) => c.key) }
+    setPrefs({ ...base, hidden: base.hidden.includes(key) ? base.hidden : [...base.hidden, key] })
+  }, [prefs, geral.columns, setPrefs])
   const openForm = useCallback(async (mode: 'create' | 'edit', id?: string) => {
     try {
       const result = await source.openForm(mode, id)
@@ -290,6 +305,10 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               sort={geral.sort}
               defaultSort={geral.defaultOrder}
               onSort={geral.setSort}
+              filters={filters}
+              onEditFilter={setEditingFilter}
+              onClearFilter={(attribute) => setFilter(attribute, null)}
+              onHide={hideColumn}
               selected={geral.selected}
               onToggle={geral.toggle}
               onToggleAll={geral.toggleAll}
@@ -326,13 +345,26 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           prefs={prefs}
           onPrefs={setPrefs}
           selectedCount={mobile ? 0 : geral.selected.size}
+          filtersCount={filtersCount}
+          onOpenFilters={() => setFiltersOpen(true)}
           mobile={mobile}
           commands={commands}
           shortcuts={shortcuts}
         />
       }
     >
+      <FilterChips filters={filters} attributes={attributes} mobile={mobile} onEdit={setEditingFilter} onRemove={(attribute) => setFilter(attribute, null)} onClearAll={clearFilters} />
       {body}
+      <FilterDialog
+        attribute={editingFilter}
+        info={editingFilter ? attributes?.get(editingFilter) : undefined}
+        kind={editingFilter ? filterKindOf(editingFilter, attributes?.get(editingFilter)) : null}
+        value={editingFilter ? filters[editingFilter] ?? null : null}
+        search={searchLookup}
+        onApply={setFilter}
+        onClose={() => setEditingFilter(null)}
+      />
+      <FiltersDrawer open={filtersOpen} onClose={() => setFiltersOpen(false)} filters={filters} attributes={attributes} columns={geral.columns} search={searchLookup} onApply={applyFilters} onClearAll={clearFilters} />
       {mobile && geral.selected.size > 0 ? (
         <div className="gr-selbar" role="group" aria-label="Ações sobre os selecionados">
           <span role="status" className="gr-selbar__count">{geral.selected.size === 1 ? '1 selecionado' : `${geral.selected.size} selecionados`}</span>
