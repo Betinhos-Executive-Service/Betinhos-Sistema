@@ -3,7 +3,6 @@ import { Table, type TableColumn } from '@betinhos/ui'
 import { useMedia } from '../../../operacional/useMedia'
 import { BarraChart } from '../../charts/Charts'
 import { calcularMultas, type LinhaMultaInfracao, type LinhaMultaMotorista, type MultasMes } from '../../domain/abas/multas'
-import { detalheMultasPendentes } from '../../domain/detalhes'
 import { int } from '../../domain/format'
 import { useDetalhe } from '../DetalheDrawer'
 import { AnaliseCard } from '../AnaliseCard'
@@ -34,7 +33,7 @@ function MultasAba({ ctx, dados, periodo }: DadosAba) {
   const mu = useMemo(() => calcularMultas(ctx, dados), [ctx, dados])
   const k = mu.kpis
   const abrir = useDetalhe()
-  const verPendentes = abrir && k?.pendentes ? { texto: 'Ver multas', onAbrir: () => abrir(detalheMultasPendentes(dados.multas, ctx.f)) } : undefined
+  const verPendentes = abrir && k?.pendentes ? { texto: 'Ver multas', onAbrir: () => abrir('multas') } : undefined
   const parte = (n: number) => (k && k.total ? [{ rotulo: 'Do total', texto: pct((n / k.total) * 100) }] : [])
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={3}>

@@ -3,7 +3,7 @@ import { Alert, Button, EmptyState, Pagination, StatusBadge, ToastProvider, useS
 import { RefreshCw, SearchX, WalletCards } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
-import { useQueryFilters, useQueryId, useQueryPagina } from '../../nav/queryState'
+import { useQueryBandeira, useQueryFilters, useQueryId, useQueryPagina } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
 import { BUILTIN_VIEWS, EMPTY_FILTERS, filterPagantes, loadViews, matchView, newView, periodoStart, saveViews, total, viewFilters, type Filters, type View } from './domain/filters'
@@ -62,8 +62,10 @@ function Pagantes({ host }: { host: Host }) {
   const current = selectedId ? pg.list.find((p) => p.id === selectedId) ?? (selectedCopy?.id === selectedId ? selectedCopy : null) : null
   const setSelected = (p: Pagante | null) => { setSelectedCopy(p); setSelectedId(p?.id ?? null) }
   const [statusRequest, setStatusRequest] = useState<StatusRequest>(null)
-  const [saving, setSaving] = useState(false)
-  const [frameUrl, setFrameUrl] = useState<string | null>(null)
+  const [saving, setSaving] = useQueryBandeira('salvarvisao')
+  // O Gerar Pagantes aberto (por cima da tela) também vive na URL: `gerar=<id da OP>`.
+  const [gerarOpId, setGerarOpId] = useQueryId('gerar')
+  const frameUrl = gerarOpId ? source.gerarPagantesUrl(gerarOpId) : null
   const [version, setVersion] = useState(0)
   // Um pagante por vez com gravação ou recibo em andamento: evita duplo clique e envio duplicado.
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -115,10 +117,10 @@ function Pagantes({ host }: { host: Host }) {
     const url = source.gerarPagantesUrl(p.opId)
     if (!url) { toast({ tone: 'info', message: 'O Gerar Pagantes só abre dentro do Dataverse.' }); return }
     setSelected(null)
-    setFrameUrl(url)
+    setGerarOpId(p.opId)
   }
 
-  const closeFrame = useCallback((reload: boolean) => { setFrameUrl(null); if (reload) refresh() }, [refresh])
+  const closeFrame = useCallback((reload: boolean) => { setGerarOpId(null); if (reload) refresh() }, [refresh, setGerarOpId])
 
   function saveView(nome: string) {
     const same = matchView(views, filters)

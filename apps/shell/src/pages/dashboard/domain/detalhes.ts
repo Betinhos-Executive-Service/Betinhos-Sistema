@@ -2,7 +2,9 @@ import { QUALIDADE, cnhEmAtencao, multasPendentes, type AlertaQualidade } from '
 import { infracaoDe } from './abas/multas'
 import { aReceberLinha, cpPendentes } from './kpis'
 import { DIA_MS, entre, hojeBR, type Periodo } from './periodo'
-import type { Funcionario, Multa, Reserva } from './types'
+import { normL } from './format'
+import type { Contexto } from './kpis'
+import type { Dados, Funcionario, Multa, Reserva } from './types'
 
 /* Drill-down: as listas por trás de um KPI, alerta ou linha, tiradas do que já está carregado (sem consulta nova). */
 
@@ -79,4 +81,27 @@ const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export function linkRegistro(clientUrl: string | null, entidade: Entidade, id: string) {
   if (!clientUrl || !GUID.test(id)) return null
   return `${clientUrl}/main.aspx?etn=${ENTIDADE[entidade]}&id=${id}&pagetype=entityrecord`
+}
+
+/** Id do drill-down de uma linha do ranking de motoristas (`motorista:<key>`). */
+export const idDetalheMotorista = (key: string) => `motorista:${key}`
+
+/**
+ * Drill-down pelo id guardado na URL (`detalhe=cnh`): refaz a lista com o recorte atual.
+ * `null` enquanto os dados não chegaram ou se o id não existe mais (ex.: motorista fora do filtro).
+ */
+export function detalheDoId(id: string, ctx: Contexto, dados: Dados): Detalhe | null {
+  switch (id) {
+    case 'cp-pendente': return detalheCpPendente(ctx.rv)
+    case 'a-receber': return detalheAReceber(ctx.rv)
+    case 'cnh': return detalheCnh(dados.funcionarios, ctx.now)
+    case 'multas': return detalheMultasPendentes(dados.multas, ctx.f)
+    case 'sem-veiculo': return detalheQualidade('semVeiculo', ctx.rv, ctx.now.getTime())
+    case 'sem-motorista': return detalheQualidade('semMotorista', ctx.rv, ctx.now.getTime())
+    case 'sem-cliente': return detalheQualidade('semCliente', ctx.rv, ctx.now.getTime())
+  }
+  if (!id.startsWith('motorista:')) return null
+  const key = id.slice('motorista:'.length)
+  const nome = key.startsWith('nome:') ? ctx.rv.find((r) => r.motorista && `nome:${normL(r.motorista)}` === key)?.motorista : ctx.rv.find((r) => r.motoristaId === key)?.motorista
+  return nome ? detalheServicosMotorista(ctx.rv, { key, nome }) : null
 }
