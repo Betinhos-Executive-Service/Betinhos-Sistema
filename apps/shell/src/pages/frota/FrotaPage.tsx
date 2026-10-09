@@ -1,6 +1,6 @@
 import { RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, PageToolbar, StatusBadge, Tabs, ToastProvider, useShellHeader } from '@betinhos/ui'
+import { Alert, Button, StatusBadge, Tabs, ToastProvider, useShellHeader } from '@betinhos/ui'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
 import { lerOpcao } from '../../nav/queryState'
@@ -119,16 +119,9 @@ export function Frota({ source }: { source: DataSource }) {
 
   return (
     <PageLayout
-      eyebrow="Frota"
+      className="frota-page"
       title="Frota"
-      description="Pendências, veículos, manutenções, multas e colisões."
-      toolbar={(
-        <PageToolbar
-          variant="utility"
-          start={<StatusBadge tone={source.mode === 'mock' ? 'neutral' : 'info'} dot>{source.mode === 'mock' ? 'Dados de exemplo' : `Ambiente ${source.envLabel}`}</StatusBadge>}
-          end={<Button variant="secondary" size="compact" icon={<RefreshCw size={16} />} loading={loading} onClick={onReload}>Recarregar</Button>}
-        />
-      )}
+      meta={<StatusBadge tone={source.mode === 'mock' ? 'neutral' : 'info'} dot>{source.mode === 'mock' ? 'Dados de exemplo' : `Ambiente ${source.envLabel}`}</StatusBadge>}
     >
       <div className="frota">
         <Tabs

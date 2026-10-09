@@ -29,6 +29,29 @@ export type Source = {
 /** Estágio 2 ainda não carregado: os campos vazios que o estágio 1 devolve. */
 const EXTRAS_VAZIOS = { pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], pendentes: ['pagantes', 'despesas'] } satisfies Partial<Dados>
 
+/** Consultas simultâneas: o navegador abre até 6 conexões por host. */
+const PARALELO = 6
+/** Cadastros (sem janela de datas) mudam pouco: a recarga de 60 s reaproveita a última resposta por até 5 min. */
+export const CADASTRO_TTL_MS = 5 * 60_000
+
+/**
+ * Cliente que guarda as respostas das consultas de cadastro (`paths`) por `ttl`; as demais vão sempre ao servidor.
+ * Consulta em voo é compartilhada (estágios 1 e 2 pedem funcionários ao mesmo tempo); falha não fica guardada.
+ */
+export function comCacheCadastros(client: DataverseClient, paths: (path: string) => boolean, ttl = CADASTRO_TTL_MS): DataverseClient {
+  const cache = new Map<string, { em: number; rows: Promise<Row[]> }>()
+  const getAll = (path: string) => {
+    if (!paths(path)) return client.getAll(path)
+    const hit = cache.get(path)
+    if (hit && Date.now() - hit.em < ttl) return hit.rows
+    const rows = client.getAll(path)
+    cache.set(path, { em: Date.now(), rows })
+    rows.catch(() => { if (cache.get(path)?.rows === rows) cache.delete(path) })
+    return rows
+  }
+  return { ...client, getAll }
+}
+
 /** Roda as tarefas com no máximo `limite` em paralelo e devolve o resultado de cada uma. */
 async function comLimite<T>(tarefas: (() => Promise<T>)[], limite: number) {
   const resultados: PromiseSettledResult<T>[] = new Array(tarefas.length)
@@ -69,11 +92,11 @@ const linhas = (r: PromiseSettledResult<Row[]>) => (r.status === 'fulfilled' ? r
  * Manutenções, multas e ocorrências vêm pela mesma janela das reservas (colunas DateTime). Multas usam os funcionários (apelido).
  * Pagantes e despesas ficam vazios e `pendentes`: são o estágio 2 (`carregarExtraDataverse`).
  */
-export async function carregarDataverse(client: DataverseClient, sets: EntitySets, desde: string, ate: string): Promise<Dados> {
+export async function carregarDataverse(client: DataverseClient, sets: EntitySets, desde: string, ate: string, cpNav = ''): Promise<Dados> {
   const ler = leitor(client)
   const [res, cps, man, mul, oco, fun, vei, via, eve, tel] = await comLimite<Row[]>([
-    () => client.getAll(reservasPath(sets.reserva, desde, ate)),
-    () => client.getAll(composicoesPath(sets.composicao)),
+    () => client.getAll(reservasPath(sets.reserva, desde, ate, cpNav)),
+    () => (cpNav ? Promise.resolve([]) : client.getAll(composicoesPath(sets.composicao))),
     () => ler(sets.manutencao, (s) => manutencoesPath(s, desde, ate)),
     () => (sets.multa ? comAlternativa(() => client.getAll(multasPath(sets.multa, desde, ate)), () => client.getAll(multasPath(sets.multa, desde, ate, false))) : ausente(sets.multa)),
     () => ler(sets.ocorrencia, (s) => ocorrenciasPath(s, desde, ate)),
@@ -82,7 +105,7 @@ export async function carregarDataverse(client: DataverseClient, sets: EntitySet
     () => ler(sets.viagem, (s) => viagensPath(s, desde, ate)),
     () => ler(sets.evento, (s) => eventosPath(s, desde, ate)),
     () => ler(sets.telemetria, (s) => telemetriaPath(s, desde, ate)),
-  ], 4)
+  ], PARALELO)
   if (res.status === 'rejected') throw res.reason
   if (cps.status === 'rejected') throw cps.reason
   const secundarios: [Conjunto, PromiseSettledResult<Row[]>][] = [
@@ -90,7 +113,7 @@ export async function carregarDataverse(client: DataverseClient, sets: EntitySet
   ]
   const indisponiveis = secundarios.filter(([, r]) => r.status === 'rejected').map(([conjunto]) => conjunto)
 
-  const cpMap = mapCps(cps.value)
+  const cpMap = mapCps(cpNav ? res.value.map((row) => row[cpNav]).filter((cp): cp is Row => !!cp && typeof cp === 'object') : cps.value)
   const funcionarios = linhas(fun).map((row) => mapFuncionario(row))
   const apelidos = apelidosFuncionarios(funcionarios)
   return {
@@ -130,7 +153,7 @@ export async function carregarExtraDataverse(client: DataverseClient, sets: Enti
     () => ler(sets.formaPagamentoDespesa, formasPagamentoPath),
     () => ler(sets.anexoDespesa, anexosDespesaPath),
     () => ler(sets.funcionario, funcionariosPath),
-  ], 4)
+  ], PARALELO)
   if (![des, cat, frm, anx].every((r) => r.status === 'fulfilled')) return { campos: {}, indisponivel: true }
   const categoriasDespesa = linhas(cat).map((row) => mapCategoriaDespesa(row))
   const formasPagamento = linhas(frm).map((row) => mapFormaPagamento(row))
@@ -204,9 +227,19 @@ export function createSource(host: Host): Source {
   if (host.mode === 'mock') return createMockSource()
   let sets: Promise<EntitySets> | null = null
   const entitySets = () => (sets ??= host.metadata.entities(Object.values(ENTITIES)).then((info) => resolverEntitySets(info)).catch((error) => { sets = null; throw error }))
+  // Navegação da reserva para a composição de preço: com ela, as CPs vêm no `$expand` das reservas; sem ela, a tabela inteira (cacheada).
+  let nav: Promise<string> | null = null
+  const cpNav = () => (nav ??= host.client.request<{ value: { ReferencingEntityNavigationPropertyName?: string }[] }>(
+    `EntityDefinitions(LogicalName='${ENTITIES.reserva}')/ManyToOneRelationships?$select=ReferencingEntityNavigationPropertyName&$filter=${encodeURIComponent("ReferencingAttribute eq 'new_composicaodepreco'")}`,
+  ).then((r) => r.value[0]?.ReferencingEntityNavigationPropertyName ?? '').catch((error) => { console.warn('Dashboard: navegação da composição não resolvida; lendo a tabela inteira.', String(error)); return '' }))
+  let cliente: DataverseClient | null = null
+  const clienteCacheado = (s: EntitySets) => (cliente ??= comCacheCadastros(host.client, (path) => [
+    s.composicao && composicoesPath(s.composicao), s.funcionario && funcionariosPath(s.funcionario), s.veiculo && veiculosPath(s.veiculo),
+    s.categoriaDespesa && categoriasDespesaPath(s.categoriaDespesa), s.formaPagamentoDespesa && formasPagamentoPath(s.formaPagamentoDespesa),
+  ].includes(path)))
   return {
     mock: false,
-    carregar: async (desde, ate) => carregarDataverse(host.client, await entitySets(), desde, ate),
-    carregarExtra: async (conjunto, desde, ate) => carregarExtraDataverse(host.client, await entitySets(), conjunto, desde, ate),
+    carregar: async (desde, ate) => { const [s, n] = await Promise.all([entitySets(), cpNav()]); return carregarDataverse(clienteCacheado(s), s, desde, ate, n) },
+    carregarExtra: async (conjunto, desde, ate) => { const s = await entitySets(); return carregarExtraDataverse(clienteCacheado(s), s, conjunto, desde, ate) },
   }
 }
