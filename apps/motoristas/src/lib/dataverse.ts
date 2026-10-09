@@ -2936,6 +2936,19 @@ function escapeHtml(value: string) {
     .replace(/'/g, "&#039;");
 }
 
+// cr40f_idioma (cr40f_bancodedados): 202410000 Português, 202410001 Inglês; Espanhol pelo rótulo.
+export function getPassengerLanguageFlag(passenger: DataverseRecord) {
+  const code = Number(passenger.cr40f_idioma);
+  const label = getFormatted(passenger, "cr40f_idioma")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+  if (code === 202410000 || label.startsWith("portug")) return "🇧🇷";
+  if (code === 202410001 || label.startsWith("ingl") || label.startsWith("english")) return "🇺🇸";
+  if (label.startsWith("espanh") || label.startsWith("spanish")) return "🇪🇸";
+  return "";
+}
+
 async function buildPassengersHtml(geralId: string, serviceDate: Date | null, driverName: string, readMultiple = retrieveMultiple, readOne = retrieveOne) {
   if (!geralId) return "";
   const rows = await readMultiple(
@@ -2966,7 +2979,9 @@ async function buildPassengersHtml(geralId: string, serviceDate: Date | null, dr
       const phoneHtml = phone
         ? `<a href="https://wa.me/${phone}?text=${encodeURIComponent(message)}" target="_blank" rel="noopener noreferrer">${phoneText}</a>`
         : `<span style="color:#8a8a8a">${phoneText}</span>`;
-      return `<span>${escapeHtml(name)}${name && phoneRaw ? " - " : ""}${phoneHtml}</span>`;
+      const flag = getPassengerLanguageFlag(passenger);
+      const flagHtml = flag ? `<span title="${escapeHtml(getFormatted(passenger, "cr40f_idioma"))}">${flag}</span> ` : "";
+      return `<span>${flagHtml}${escapeHtml(name)}${name && phoneRaw ? " - " : ""}${phoneHtml}</span>`;
     })
   );
 
