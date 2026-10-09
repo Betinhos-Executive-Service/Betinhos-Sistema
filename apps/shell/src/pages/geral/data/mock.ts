@@ -127,6 +127,8 @@ export function createMockRows(now: Date): Row[] {
     lookup('cr40f_veiculo', i + 1)
     lookup('cr40f_cliente', i * 2)
     lookup('cr40f_solicitante', i * 3)
+    // OS-1004 já tem OP gerada: cobre o caso "com OP" do comando Gerar OP.
+    if (i === 4) row._cr40f_financeiro_value = 'cccccccc-0001-4000-8000-000000000004'
     rows.push(row)
   }
   return rows
