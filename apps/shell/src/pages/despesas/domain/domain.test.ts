@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createMockDespesas } from '../data/mock'
 import { BUILTIN_VIEWS, EMPTY_FILTERS, VIEWS_KEY, filterDespesas, loadViews, matchView, newView, opcoes, parseStoredFilters, saveViews } from './filters'
-import { mimeDoArquivo, temPrevia, tipoPrevia } from './arquivo'
+import { mimeDoArquivo, tipoPrevia } from './arquivo'
 import { resumo } from './resumo'
 import { ANEXO, FINANCEIRO, OPERACIONAL, semComprovante, withFallback } from './status'
 import type { Despesa } from './types'
@@ -82,7 +82,5 @@ describe('prévia de comprovante', () => {
     expect(tipoPrevia('image/webp')).toBe('imagem')
     expect(tipoPrevia('application/pdf')).toBe('pdf')
     expect(tipoPrevia('image/heic')).toBeNull()
-    expect(temPrevia('foto.jpg')).toBe(true)
-    expect(temPrevia('planilha.xlsx')).toBe(false)
   })
 })

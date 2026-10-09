@@ -62,6 +62,8 @@ export function createMockAnexos(d: Despesa): Anexo[] {
     id: `${d.id}-a1`, nome: d.categoria === 'Hospedagem' ? `nota-${d.protocolo.toLowerCase()}.pdf` : `cupom-${d.protocolo.toLowerCase()}.jpg`,
     tipo: 100000000, status: falhou ? 100000002 : 100000001, url: falhou ? null : 'https://example.com/comprovante', driveItemId: falhou ? '' : `drive-${d.id}-1`, ...base,
   }
+  // Comprovante antigo do App Motoristas: só o link, e o nome sem extensão.
+  if (d.categoria === 'Lavagem') return [{ ...comprovante, nome: 'comprovante-1', driveItemId: '', url: 'https://example.com/compartilhado' }]
   return d.categoria === 'Combustível'
     ? [comprovante, { id: `${d.id}-a2`, nome: 'painel-km.jpg', tipo: 100000001, status: 100000001, url: 'https://example.com/painel', driveItemId: `drive-${d.id}-2`, ...base }]
     : [comprovante]
@@ -71,6 +73,8 @@ const esc = (t: string) => t.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt
 
 /** Cupom desenhado em SVG (imagem) ou PDF mínimo, como data URL: o mock não depende de blob. */
 export function createMockArquivo(anexo: Anexo): Arquivo {
+  // Como o flow, devolve o nome do OneDrive (com extensão) mesmo quando o Dataverse gravou sem.
+  if (!/\.[a-z0-9]+$/i.test(anexo.nome)) anexo = { ...anexo, nome: `${anexo.nome}.jpg` }
   const mime = mimeDoArquivo(anexo.nome, null)
   if (mime === 'application/pdf') {
     const pdf = [
