@@ -30,10 +30,11 @@ const RESERVA_SELECT = [
 ]
 const RESERVA_EXPAND = 'cr40f_Motorista($select=cr40f_funcionariosid,cr40f_nomecompleto,new_apelido),cr40f_Cliente($select=cr40f_nomedocliente)'
 
-/** Reservas com saída de `desde` 00:00 até o fim de `ate` em Brasília, na ordem do legado. */
-export function reservasPath(set: string, desde: string, ate: string) {
+/** Reservas com saída (com `cpNav`, a composição de preço vem junto pelo `$expand`, sem ler a tabela inteira) de `desde` 00:00 até o fim de `ate` em Brasília, na ordem do legado. */
+export function reservasPath(set: string, desde: string, ate: string, cpNav = '') {
+  const expand = cpNav ? `${RESERVA_EXPAND},${cpNav}($select=cr40f_composicaodeprecosid,new_valortotal,new_status)` : RESERVA_EXPAND
   const filtro = `cr40f_dataehorriodesada ge ${new Date(inicioMs(desde)).toISOString()} and cr40f_dataehorriodesada lt ${new Date(inicioMs(ate) + DIA_MS).toISOString()}`
-  return `${set}?$select=${RESERVA_SELECT.join(',')}&$expand=${RESERVA_EXPAND}&$filter=${encodeURIComponent(filtro)}&$orderby=${encodeURIComponent('cr40f_dataehorriodesada desc')}`
+  return `${set}?$select=${RESERVA_SELECT.join(',')}&$expand=${expand}&$filter=${encodeURIComponent(filtro)}&$orderby=${encodeURIComponent('cr40f_dataehorriodesada desc')}`
 }
 /** Janela [desde, ate] em Brasília, fim inclusivo, para colunas DateTime (mesma das reservas). */
 const janelaDataHora = (campo: string, desde: string, ate: string) =>
