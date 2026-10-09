@@ -224,3 +224,21 @@
 
 .gr-menu__hint { display: grid; gap: 2px; text-align: left; }
 .gr-menu__hint small { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+
+/* Painel Serviços por motorista */
+.gr-ct { display: grid; gap: var(--bt-space-3); }
+.gr-ct__nav { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); }
+.gr-ct__updated { flex: 1 1 auto; min-width: 0; text-align: right; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.gr-ct__loading { margin: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); }
+.gr-ct__list, .gr-ct__routes { list-style: none; margin: 0; padding: 0; }
+.gr-ct__item { display: grid; gap: var(--bt-space-2); padding: var(--bt-space-3) 0; border-bottom: 1px solid var(--bt-color-border); }
+.gr-ct__row { display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-3); }
+.gr-ct__toggle { display: inline-flex; align-items: center; gap: var(--bt-space-2); min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
+.gr-ct__toggle:disabled { cursor: default; }
+.gr-ct__toggle:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border); border-radius: 4px; }
+.gr-ct__chev { flex: 0 0 auto; transition: transform 120ms; transform: rotate(-90deg); }
+.gr-ct__toggle[aria-expanded="true"] .gr-ct__chev { transform: none; }
+.gr-ct__toggle:disabled .gr-ct__chev { opacity: 0.3; }
+.gr-ct__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gr-ct__routes { display: grid; gap: var(--bt-space-1); padding-left: var(--bt-space-6); font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }
+.gr-ct__foot { display: flex; justify-content: space-between; gap: var(--bt-space-3); width: 100%; font-size: var(--bt-font-size-13); }

@@ -12,6 +12,7 @@ import { GeralCards } from './components/GeralCards'
 import { GeralSheet } from './components/GeralSheet'
 import { GeralTable } from './components/GeralTable'
 import { CopyDialog, DispararDialog, GerarOpDialog, MockFormDialog, StateDialog, type DispararRequest, type OpRequest, type StateRequest } from './components/Dialogs'
+import { ContagemDrawer, shiftDay, todayIso } from './components/ContagemDrawer'
 import { EscalaFdsDrawer } from './components/EscalaFdsDrawer'
 import { FilterChips } from './components/FilterChips'
 import { FilterDialog } from './components/FilterEditor'
@@ -89,6 +90,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const [dispRequest, setDispRequest] = useState<DispararRequest | null>(null)
   const [dispBusy, setDispBusy] = useState(false)
   const [escalaOpen, setEscalaOpen] = useState(false)
+  const [contagemOpen, setContagemOpen] = useState(false)
   // Filtro por coluna: `editingFilter` é o atributo no diálogo "Filtrar …"; o painel "Editar filtros" lista todos.
   const [editingFilter, setEditingFilter] = useState<string | null>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -99,6 +101,15 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     setEditingFilter(null)
     if (label) window.setTimeout(() => Array.from(document.querySelectorAll<HTMLElement>('.gr-head__menu')).find((el) => el.getAttribute('aria-label') === `Opções da coluna ${label}`)?.focus(), 0)
   }, [editingFilter, attributes])
+  const contagemDay = useMemo(() => {
+    const f = filters.cr40f_dataehorriodesada
+    if (f?.kind === 'date') {
+      if (f.op === 'today') return todayIso()
+      if (f.op === 'tomorrow') return shiftDay(todayIso(), 1)
+      if (f.op === 'range' && f.from && /^\d{4}-\d{2}-\d{2}/.test(f.from)) return f.from.slice(0, 10)
+    }
+    return todayIso()
+  }, [filters])
   const filtersCount = useMemo(() => Object.values(filters).filter((f) => !isEmptyFilter(f)).length, [filters])
   const applyFilters = useCallback((drafts: Record<string, Filter | null>) => { for (const [attribute, filter] of Object.entries(drafts)) setFilter(attribute, filter) }, [setFilter])
   const hideColumn = useCallback((key: string) => {
@@ -387,7 +398,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         { id: 'escala', label: 'Escala FDS', icon: <CalendarDays size={16} />, onSelect: () => setEscalaOpen(true) },
         { id: 'auditoria', label: 'Auditoria', icon: <ShieldCheck size={16} />, onSelect: () => { void openAuditoria() } },
         { id: 'erro', label: selectedIds.length === 1 ? 'Registrar Erro' : <span className="gr-menu__hint" title={oneTitle}>Registrar Erro<small>{oneTitle}</small></span>, icon: <Bug size={16} />, disabled: selectedIds.length !== 1, onSelect: () => { void registrarErro() } },
-        { id: 'contagem', label: 'Contagem de Serviços', icon: <ListChecks size={16} />, onSelect: () => { location.hash = hrefFor('operacional') } },
+        { id: 'contagem', label: 'Contagem de Serviços', icon: <ListChecks size={16} />, onSelect: () => setContagemOpen(true) },
       ]}
     />
   )
@@ -560,6 +571,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       <CopyDialog open={copy.open} loading={copy.loading} text={copy.text} onClose={closeCopy} onCopied={() => { closeCopy(); toast({ tone: 'success', message: 'Serviços copiados.' }) }} />
       <StateDialog request={stateRequest} busy={stateBusy} onClose={() => setStateRequest(null)} onConfirm={() => { void confirmState() }} />
       <MockFormDialog open={mockForm} onClose={() => setMockForm(false)} />
+      <ContagemDrawer open={contagemOpen} onClose={() => setContagemOpen(false)} source={source} initialDay={contagemDay} kv={source.kv} mobile={mobile} />
       <EscalaFdsDrawer url={source.escalaFdsUrl()} open={escalaOpen} onClose={() => setEscalaOpen(false)} />
       <GerarOpDialog request={opRequest} busy={opBusy} error={opError} onClose={() => setOpRequest(null)} onConfirm={() => { void confirmOp() }} />
       <DispararDialog request={dispRequest} busy={dispBusy} onClose={() => setDispRequest(null)} onConfirm={() => { void confirmDisparar() }} />
