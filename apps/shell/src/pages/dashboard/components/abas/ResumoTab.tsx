@@ -1,5 +1,4 @@
 import { useMemo } from 'react'
-import { detalheAReceber, detalheCnh, detalheCpPendente, detalheMultasPendentes, detalheQualidade } from '../../domain/detalhes'
 import { calcularResumo } from '../../domain/resumo'
 import { useDetalhe } from '../DetalheDrawer'
 import { AlertList, AlertasCarregando, FAIXAS_RESUMO } from '../AlertList'
@@ -21,13 +20,12 @@ function Resumo({ ctx, dados, periodo }: DadosAba) {
   const resumo = useMemo(() => calcularResumo(ctx, dados), [dados, ctx])
   // Drill-down: as listas saem do mesmo recorte dos números (sem consulta nova).
   const abrir = useDetalhe()
-  const nowMs = ctx.now.getTime()
-  const kpis = abrir ? { cpPendente: () => abrir(detalheCpPendente(ctx.rv)), aReceber: () => abrir(detalheAReceber(ctx.rv)) } : {}
-  const operacao = abrir ? { cnh: () => abrir(detalheCnh(dados.funcionarios, ctx.now)), multas: () => abrir(detalheMultasPendentes(dados.multas, ctx.f)) } : {}
+  const kpis = abrir ? { cpPendente: () => abrir('cp-pendente'), aReceber: () => abrir('a-receber') } : {}
+  const operacao = abrir ? { cnh: () => abrir('cnh'), multas: () => abrir('multas') } : {}
   const qualidade = abrir ? {
-    semVeiculo: () => abrir(detalheQualidade('semVeiculo', ctx.rv, nowMs)),
-    semMotorista: () => abrir(detalheQualidade('semMotorista', ctx.rv, nowMs)),
-    semCliente: () => abrir(detalheQualidade('semCliente', ctx.rv, nowMs)),
+    semVeiculo: () => abrir('sem-veiculo'),
+    semMotorista: () => abrir('sem-motorista'),
+    semCliente: () => abrir('sem-cliente'),
   } : {}
   return <>
     <KpiGrid kpis={resumo.kpis} abrir={kpis} />

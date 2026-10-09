@@ -1,5 +1,6 @@
-import { useId, useState, type ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import { Button, Surface } from '@betinhos/ui'
+import { useQueryConjunto } from '../../../nav/queryState'
 import type { Apoio, Chip } from '../domain/types'
 import { BotaoCopiar, type TabelaCopiavel } from './Copiar'
 import { Chips } from './KpiChip'
@@ -32,7 +33,9 @@ type Props = {
  */
 export function AnaliseCard({ titulo, periodo, unidade, valor, sub, chips = [], apoio = [], extra, grafico, tabela, tabelaSobDemanda = false, largo = false, natural = false, copiar }: Props) {
   const id = useId()
-  const [aberta, setAberta] = useState(false)
+  // A tabela sob demanda vive na URL (`tabela=<título do card>`): reabrir o link mostra as mesmas tabelas abertas.
+  const { valores, alternar } = useQueryConjunto('tabela')
+  const aberta = valores.has(titulo)
   const temLado = chips.length > 0 || apoio.length > 0 || extra != null
   const mostrarTabela = tabela != null && (!tabelaSobDemanda || aberta)
   return (
@@ -55,7 +58,7 @@ export function AnaliseCard({ titulo, periodo, unidade, valor, sub, chips = [], 
           <span className="dash-card__acoes">
             {copiar && copiar.linhas.length ? <BotaoCopiar tabela={copiar} nome={`de ${titulo}`} /> : null}
             {tabelaSobDemanda && tabela != null ? (
-              <Button variant="ghost" size="compact" aria-expanded={aberta} aria-controls={aberta ? `${id}-v` : undefined} onClick={() => setAberta(!aberta)}>{aberta ? 'Ocultar valores' : 'Ver valores'}</Button>
+              <Button variant="ghost" size="compact" aria-expanded={aberta} aria-controls={aberta ? `${id}-v` : undefined} onClick={() => alternar(titulo)}>{aberta ? 'Ocultar valores' : 'Ver valores'}</Button>
             ) : null}
           </span>
         ) : null}

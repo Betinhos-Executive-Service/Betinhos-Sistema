@@ -183,7 +183,7 @@ function ClientesCard({ fi, periodo }: { fi: Financeiro; periodo: string }) {
         ) : null),
       },
     ]
-  const top = useTopCelular(fi.clientes, mobile)
+  const top = useTopCelular(fi.clientes, mobile, 'clientes')
   const tabela = <Table className="dash-fi-clientes" columns={colunas} rows={top.linhas} rowKey={(l) => l.cliente} empty={<Vazio titulo="Nenhum cliente no período" />} style={mobile ? undefined : { minWidth: larguraMinima(TRILHAS, VAO) }} />
   return (
     <AnaliseCard
