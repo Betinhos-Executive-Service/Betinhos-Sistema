@@ -1,6 +1,7 @@
 import { topByShare } from '../analises'
 import { agrupar, soma } from '../base'
 import { anteriorDe, comparar, type ChipAnterior } from '../comparar'
+import { META_MANUTENCAO } from '../metas'
 import { brlS, int, normL } from '../format'
 import type { Contexto } from '../kpis'
 import { DIA_MS, entre, mesRotulo, mostrarLM, periodoAnoAnterior, periodoMesAnterior, type Periodo } from '../periodo'
@@ -86,13 +87,13 @@ const prazosAprovacao = (rows: Manutencao[]) =>
 const prazosCriacao = (rows: Manutencao[]) =>
   rows.map((m) => Math.floor((m.dataMs - m.criadoMs) / DIA_MS)).filter((d) => Number.isFinite(d) && d >= 0)
 const media = (v: number[]) => (v.length ? v.reduce((t, x) => t + x, 0) / v.length : null)
-const META_PREVENTIVA_DIAS = 10
-const META_NAO_CRITICA_MES = 5
+const META_PREVENTIVA_DIAS = META_MANUTENCAO.preventivaDias
+const META_NAO_CRITICA_MES = META_MANUTENCAO.naoCriticaPorMes
 
 function metaDe(categoria: CategoriaManutencao, rows: Manutencao[]): Pick<LinhaCategoria, 'meta' | 'status'> {
   switch (categoria) {
     case 'Corretiva crítica':
-      return { meta: 'Zero', status: rows.length === 0 ? 'dentro' : 'fora' }
+      return { meta: META_MANUTENCAO.corretivaCritica ? `Até ${META_MANUTENCAO.corretivaCritica}` : 'Zero', status: rows.length <= META_MANUTENCAO.corretivaCritica ? 'dentro' : 'fora' }
     case 'Corretiva não crítica': {
       const porMes = agrupar(rows, (m) => m.dia.slice(0, 7))
       return { meta: `Até ${META_NAO_CRITICA_MES} por mês`, status: [...porMes.values()].every((l) => l.length <= META_NAO_CRITICA_MES) ? 'dentro' : 'fora' }

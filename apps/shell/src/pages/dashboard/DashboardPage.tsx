@@ -114,7 +114,7 @@ export function DashboardPage({ host }: { host: Host }) {
       </span>}
       description="Indicadores executivos, alertas e análises da operação no período escolhido."
       actions={<>
-        <a className={buttonClassName({ variant: 'secondary' })} href={hrefFor('new_dashboard')}><ExternalLink size={16} aria-hidden="true" /> Abrir dashboard completo</a>
+        <a className={buttonClassName({ variant: 'secondary' })} href={hrefFor('new_dashboard')}><ExternalLink size={16} aria-hidden="true" /> Abrir modo TV</a>
         {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} loading={db.carregando && Boolean(db.dados)} onClick={() => void db.atualizar()}>Atualizar</Button>}
       </>}
       tabs={<div className="dash-abas"><Tabs tabs={[...ABAS]} value={aba} onChange={trocarAba} panelId={PAINEL_ID} aria-label="Abas do dashboard" /></div>}

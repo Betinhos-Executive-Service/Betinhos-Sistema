@@ -42,7 +42,8 @@ describe('Dashboard', () => {
     expect(screen.queryByRole('navigation', { name: 'Seções do resumo' })).toBeNull()
     expect(document.querySelector('iframe')).toBeNull()
     expect(screen.getByRole('button', { name: 'Este ano' }).getAttribute('aria-pressed')).toBe('true')
-    expect(screen.getByRole('link', { name: /Abrir dashboard completo/ })).toBeTruthy()
+    // O dashboard antigo (legado) segue como modo TV.
+    expect(screen.getByRole('link', { name: /Abrir modo TV/ }).getAttribute('href')).toContain('new_dashboard')
   })
 
   it('trocar o período para "Mês anterior" recalcula', async () => {
@@ -70,7 +71,8 @@ describe('Dashboard', () => {
     expect(screen.queryByRole('region', { name: 'Indicadores executivos' })).toBeNull()
     // Filtros globais e "Abrir dashboard completo" continuam fora do Resumo.
     expect(screen.getByRole('group', { name: 'Período' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: /Abrir dashboard completo/ })).toBeTruthy()
+    // O dashboard antigo (legado) segue como modo TV.
+    expect(screen.getByRole('link', { name: /Abrir modo TV/ }).getAttribute('href')).toContain('new_dashboard')
 
     fireEvent.click(within(abas).getByRole('tab', { name: 'Financeiro' }))
     expect(location.hash).toBe('#/dashboard?tab=financeiro')
