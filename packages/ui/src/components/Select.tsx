@@ -87,7 +87,7 @@ function placePanel(box: HTMLElement, panel: HTMLElement) {
   const below = window.innerHeight - rect.bottom - gap - inset
   const above = rect.top - gap - inset
   const up = below < Math.min(limit, 180) && above > below
-  const width = Math.min(Math.max(140, rect.width), window.innerWidth - inset * 2)
+  const width = Math.min(Math.max(240, rect.width), window.innerWidth - inset * 2)
   panel.style.width = `${width}px`
   panel.style.left = `${Math.min(Math.max(inset, rect.left), window.innerWidth - inset - width)}px`
   panel.style.maxHeight = `${Math.min(limit, up ? above : below)}px`
