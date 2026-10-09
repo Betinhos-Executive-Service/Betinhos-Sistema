@@ -65,8 +65,8 @@
 @media (hover: hover) and (pointer: fine) {
   .dash-kpi--abre:hover, .dash-alerta--abre:hover { border-color: var(--bt-color-action); }
 }
-.dash-alerta--abre { grid-template-areas: "valor rotulo" "valor selo" "valor abre"; }
-.dash-alerta__abre { grid-area: abre; justify-self: start; margin-left: calc(-1 * var(--bt-space-2)); }
+.dash-alerta.dash-alerta--abre { grid-template-areas: "valor rotulo" "valor selo" "valor abre"; }
+.dash-alerta .dash-alerta__abre { grid-area: abre; justify-self: start; margin-left: calc(-1 * var(--bt-space-2)); }
 /* Nome do motorista no ranking: botão sem aparência própria, sublinhado no hover. */
 .dash-link-linha { display: grid; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: start; cursor: pointer; }
 .dash-link-linha:hover .bt-table__title strong { color: var(--bt-color-action); text-decoration: underline; }
@@ -224,5 +224,5 @@
   .dash-card .bt-table__cell, .dash-detalhe .bt-table__cell { align-items: flex-start; }
   .dash-detalhe__abrir { width: 44px; height: 44px; }
   /* Na lista do celular, a 1ª coluna (título da linha) leva a hierarquia. */
-  .dash-card .bt-table__row > .bt-table__cell:first-child { color: var(--bt-color-text-primary); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); overflow-wrap: anywhere; }
+  .dash-card .bt-table__row > .bt-table__cell:first-child, .dash-detalhe .bt-table__row > .bt-table__cell:first-child { color: var(--bt-color-text-primary); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); overflow-wrap: anywhere; }
 }

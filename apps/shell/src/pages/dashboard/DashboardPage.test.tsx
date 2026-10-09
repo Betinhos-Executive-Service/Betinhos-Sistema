@@ -69,7 +69,7 @@ describe('Dashboard', () => {
     // Só a aba ativa é renderizada.
     expect(screen.queryByRole('tabpanel', { name: 'Resumo' })).toBeNull()
     expect(screen.queryByRole('region', { name: 'Indicadores executivos' })).toBeNull()
-    // Filtros globais e "Abrir dashboard completo" continuam fora do Resumo.
+    // Filtros globais e "Abrir modo TV" continuam fora do Resumo.
     expect(screen.getByRole('group', { name: 'Período' })).toBeTruthy()
     // O dashboard antigo (legado) segue como modo TV.
     expect(screen.getByRole('link', { name: /Abrir modo TV/ }).getAttribute('href')).toContain('new_dashboard')
