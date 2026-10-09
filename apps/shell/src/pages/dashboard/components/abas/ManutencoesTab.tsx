@@ -6,6 +6,7 @@ import { calcularManutencoes, type LinhaCategoria, type LinhaTipoReparo, type Ma
 import { brl, brlS, dec, int } from '../../domain/format'
 import type { Apoio } from '../../domain/types'
 import { AnaliseCard } from '../AnaliseCard'
+import { tabelaCopia } from '../Copiar'
 import { AbaCarregando } from '../Carregando'
 import { Duplo, Participacao, pct } from '../Celulas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
@@ -92,6 +93,7 @@ function CustoMesCard({ pontos, total, periodo }: { pontos: PontoCusto[]; total:
       titulo="Custo por mês" periodo={periodo} unidade="R$ por mês" valor={brl(total)} sub="Custo das manutenções pela data da manutenção"
       grafico={pontos.length ? <BarraChart descricao={`Custo de manutenção por mês, ${periodo}`} nome="Custo" formatar={brlS} dados={pontos} /> : undefined}
       tabela={pontos.length ? <Table columns={colunas} rows={pontos} rowKey={(p) => p.mes} /> : <Vazio titulo="Nenhuma manutenção no período" />}
+      copiar={tabelaCopia(pontos, [['Mês', (p) => p.rotulo], ['Custo', (p) => brl(p.valor)]])}
       tabelaSobDemanda={pontos.length > 0}
     />
   )
@@ -114,6 +116,7 @@ function TipoReparoCard({ linhas, periodo }: { linhas: LinhaTipoReparo[]; period
       titulo="Por tipo de reparo" periodo={periodo} unidade="registros e R$"
       valor={maior ? maior.tipo : undefined} sub={maior ? `Mais frequente · ${int(maior.qtd)} registros · ${pct(maior.pct)} do custo` : undefined}
       tabela={<Table columns={colunas} rows={linhas} rowKey={(l) => l.tipo} empty={<Vazio titulo="Nenhuma manutenção no período" />} />}
+      copiar={tabelaCopia(linhas, [['Tipo de reparo', (l) => l.tipo], ['Registros', (l) => l.qtd], ['% dos registros', (l) => pct(l.pctQtd)], ['Custo', (l) => brl(l.valor)], ['Participação no custo', (l) => pct(l.pct)]])}
     />
   )
 }
@@ -147,6 +150,10 @@ function CategoriasCard({ linhas, mostrarLM, periodo }: { linhas: LinhaCategoria
       valor={fora ? `${int(fora)} fora da meta` : 'Nenhuma fora da meta'}
       sub={'Corretiva crítica: zero · Corretiva não crítica: até 5 por mês · Preventiva programada: da aprovação à data em até 10 dias'}
       tabela={<Table columns={colunas} rows={linhas} rowKey={(l) => l.categoria} />}
+      copiar={tabelaCopia(linhas, [
+        ['Categoria', (l) => l.categoria], ['Registros', (l) => l.qtd], ...(mostrarLM ? [['Mês anterior', (l: LinhaCategoria) => anterior(l.lm)] as const] : []),
+        ['Ano anterior', (l) => anterior(l.ly)], ['Meta', (l) => l.meta ?? '—'], ['Status', (l) => SELO[l.status].texto],
+      ])}
     />
   )
 }

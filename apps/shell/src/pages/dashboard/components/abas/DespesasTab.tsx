@@ -10,6 +10,7 @@ import { brl, brlS, int } from '../../domain/format'
 import type { Tom } from '../../domain/types'
 import { useMedia } from '../../../operacional/useMedia'
 import { AnaliseCard } from '../AnaliseCard'
+import { tabelaCopia } from '../Copiar'
 import { AbaCarregando } from '../Carregando'
 import { Duplo, Nome, Participacao, Rolagem, pct } from '../Celulas'
 import { KpiCard, KpiLinha, type TomKpi } from '../KpiCard'
@@ -124,6 +125,7 @@ function PorMesCard({ linhas, total, lancamentos, periodo, mobile }: Bloco & { l
       ) : <Vazio titulo="Nenhuma despesa no período" />}
       tabela={linhas.length ? <Table columns={colunas} rows={linhas} rowKey={(l) => l.mes} /> : undefined}
       tabelaSobDemanda
+      copiar={tabelaCopia(linhas, [['Mês', (l) => l.rotulo], ['Lançamentos', (l) => l.lancamentos], ['Despesa', (l) => brl(l.valor)], ['Alimentação', (l) => brl(l.alimentacao)]])}
     />
   )
 }
@@ -147,6 +149,7 @@ function DistribuicaoCard({ titulo, coluna, plural, dist, periodo, mobile }: Blo
       sub={topo ? `Maior participação: ${pct(topo.participacao)} · ${brl(topo.valor)}` : `Nenhuma despesa no período`}
       apoio={resumo ? [{ rotulo: 'Mostrando', texto: resumo }] : []}
       tabela={<Table columns={colunas} rows={dist.linhas} rowKey={(l) => l.rotulo} empty={<Vazio titulo="Nenhuma despesa no período" />} />}
+      copiar={tabelaCopia(dist.linhas, [[coluna, (l) => l.rotulo], ['Lançamentos', (l) => l.lancamentos], ['% dos lançamentos', (l) => pct(l.pctLancamentos)], ['Valor', (l) => brl(l.valor)], ['Participação', (l) => pct(l.participacao)]])}
     />
   )
 }
@@ -177,6 +180,10 @@ function PorMotoristaCard({ linhas, periodo, mobile }: Bloco & { linhas: LinhaMo
     <AnaliseCard
       titulo="Por motorista" periodo={periodo} unidade="R$ por motorista" largo
       valor={int(linhas.length)} sub="motoristas com despesa · hospedagem, alimentação e total"
+      copiar={tabelaCopia(linhas, [
+        ['Motorista', (l) => l.motorista], ['Lançamentos', (l) => l.lancamentos], ['Hospedagem', (l) => brl(l.hospedagem)], ['Média hospedagem', (l) => (l.hospedagemMedia == null ? '—' : brl(l.hospedagemMedia))],
+        ['Alimentação', (l) => brl(l.alimentacao)], ['Alimentação por dia', (l) => brl(l.alimentacaoMediaDia)], ['Total', (l) => brl(l.total)],
+      ])}
       tabela={!mobile && linhas.length > 10 ? <Rolagem rotulo="Despesas por motorista" alturaMax={560}>{tabela}</Rolagem> : tabela}
     />
   )

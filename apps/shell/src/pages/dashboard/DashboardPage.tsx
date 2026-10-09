@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
-import { Alert, Button, EmptyState, StatusBadge, Tabs, buttonClassName, tabId, useShellHeader } from '@betinhos/ui'
+import { Alert, Button, EmptyState, StatusBadge, Tabs, ToastProvider, buttonClassName, tabId, useShellHeader } from '@betinhos/ui'
 import { ExternalLink, Info, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
@@ -135,9 +135,12 @@ export function DashboardPage({ host }: { host: Host }) {
         {aviso && db.dados ? <p className="dash-aviso-filtros"><Info size={14} aria-hidden="true" />{aviso}</p> : null}
 
         {/* Drill-down: um Drawer para a página; links "Abrir no Dataverse" só no modo Dataverse. */}
-        <DetalheProvider clientUrl={host.mode === 'dataverse' ? host.clientUrl : null}>
-          {db.dados || carregandoPrimeira ? conteudo[aba]() : null}
-        </DetalheProvider>
+        {/* Toast do DS ("Tabela copiada"): o shell não tem provider global, então a página monta o seu. */}
+        <ToastProvider>
+          <DetalheProvider clientUrl={host.mode === 'dataverse' ? host.clientUrl : null}>
+            {db.dados || carregandoPrimeira ? conteudo[aba]() : null}
+          </DetalheProvider>
+        </ToastProvider>
       </div>
     </PageLayout>
   )
