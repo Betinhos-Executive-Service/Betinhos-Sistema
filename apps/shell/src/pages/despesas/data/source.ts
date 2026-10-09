@@ -2,8 +2,9 @@ import type { Host } from '../../../host'
 import { browserKV } from '../../pagantes/data/source'
 import type { KV } from '../../pagantes/domain/filters'
 import { withFallback } from '../domain/status'
-import type { Anexo, Despesa, DespesaChoices } from '../domain/types'
-import { createMockAnexos, createMockDespesas } from './mock'
+import type { Anexo, Arquivo, Despesa, DespesaChoices } from '../domain/types'
+import { createArquivos } from './arquivo'
+import { createMockAnexos, createMockArquivo, createMockDespesas } from './mock'
 import { ENTITY_ANEXO, ENTITY_DESPESA, anexosPath, despesasPath, mapAnexo, mapDespesa } from './queries'
 
 /** Tudo que a tela precisa do mundo externo. Só leitura: a tela não grava nada. */
@@ -11,6 +12,8 @@ export type Source = {
   mock: boolean
   load: (since: Date | null) => Promise<Despesa[]>
   anexos: (despesaId: string) => Promise<Anexo[]>
+  /** Conteúdo do comprovante para a prévia (imagem ou PDF). */
+  arquivo: (anexo: Anexo) => Promise<Arquivo>
   choices: () => Promise<DespesaChoices>
   /** Ficha do registro no model-driven; null fora do Dataverse. */
   recordUrl: (entity: string, id: string) => string | null
@@ -25,6 +28,7 @@ function createMockSource(): Source {
     mock: true,
     async load(since) { await wait(300); return rows.filter((d) => !since || (d.data && d.data >= since)).map((d) => ({ ...d })) },
     async anexos(id) { await wait(250); const d = rows.find((x) => x.id === id); return d ? createMockAnexos(d) : [] },
+    async arquivo(anexo) { await wait(300); return createMockArquivo(anexo) },
     choices: async () => withFallback({}),
     recordUrl: () => null,
     kv: browserKV(),
@@ -50,6 +54,7 @@ export function createSource(host: Host): Source {
     mock: false,
     load: async (since) => (await host.client.getAll(despesasPath(await entitySet(ENTITY_DESPESA), since))).map(mapDespesa),
     anexos: async (id) => (await host.client.getAll(anexosPath(await entitySet(ENTITY_ANEXO), id))).map(mapAnexo),
+    arquivo: createArquivos(host.client),
     // Rótulo é acessório: metadata fora do ar cai nos rótulos conhecidos.
     async choices() {
       const [operacional, financeiro, anexo, origem, anexoTipo, anexoStatus] = await Promise.all([
