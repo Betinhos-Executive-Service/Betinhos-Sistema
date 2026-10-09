@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import {
   AlertTriangle, Banknote, BookUser, Calculator, Calendar, Camera, Car, CarFront, ClipboardList, Clock, Coins, Contact, Database, Download,
-  FileText, FolderCog, Home, KeyRound, Landmark, LayoutDashboard, List, Mail, Megaphone, MapPin, Paperclip, Palette, Receipt, Route,
+  FileText, FileWarning, FolderCog, Home, KeyRound, Landmark, LayoutDashboard, List, Mail, Megaphone, MapPin, Paperclip, Palette, Receipt, Route,
   ScrollText, Shield, Shuffle, Tag, TrendingUp, Users, Wallet, Wrench,
 } from 'lucide-react'
 import { AppShell as Shell, type NavGroup } from '@betinhos/ui'
@@ -41,7 +41,7 @@ const ITEM_ICONS: Record<string, ReactNode> = {
   infleet: <MapPin />,
   new_telaplanner: <ClipboardList />,
   cr40f_composicaodeprecos: <Calculator />,
-  cr40f_financeiro: <Coins />,
+  ops: <Coins />,
   pagantes: <Users />,
   cr40f_recibos_v2: <Receipt />,
   cr40f_pedidodecotacao: <Mail />,
@@ -56,7 +56,7 @@ const ITEM_ICONS: Record<string, ReactNode> = {
   cr40f_funcionarios: <BookUser />,
   new_curriculo: <ScrollText />,
   curriculos: <ScrollText />,
-  cr40f_infracaodetransito: <AlertTriangle />,
+  infracoes: <FileWarning />,
   new_marketing: <Megaphone />,
   cr40f_servicosporpassageiro: <List />,
   new_teladespesasoperacionais: <Coins />,
