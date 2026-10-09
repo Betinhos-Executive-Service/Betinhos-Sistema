@@ -1,4 +1,4 @@
-import { Fragment, type CSSProperties, type ReactNode } from 'react'
+import { Fragment, type CSSProperties, type ReactNode, type RefObject } from 'react'
 import type { Row } from '@betinhos/dataverse'
 import { Checkbox } from '@betinhos/ui'
 import { ArrowDown, ArrowUp } from 'lucide-react'
@@ -24,13 +24,17 @@ type Props = {
   onOpen: (id: string) => void
   /** Devolve o `gridcell` completo da coluna (a primeira coluna é desenhada aqui, como botão que abre o serviço). */
   renderCell: (row: Row, column: Column) => ReactNode
+  /** Contêiner de rolagem (`.gr-grid`): é a raiz do observador que carrega mais linhas. */
+  scrollRef?: RefObject<HTMLDivElement | null>
+  /** Dentro do contêiner de rolagem, logo depois da última linha (o sentinela da rolagem infinita). */
+  tail?: ReactNode
   footer: ReactNode
   empty: ReactNode
 }
 
 const SKELETON_ROWS = 8
 /** Grid editável com rolagem horizontal, seleção por linha e a primeira coluna fixa. As classes visuais são as da tabela do DS. */
-export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, selected, onToggle, onToggleAll, onOpen, renderCell, footer, empty }: Props) {
+export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, selected, onToggle, onToggleAll, onOpen, renderCell, scrollRef, tail, footer, empty }: Props) {
   // Trilhas crescem na proporção da largura da visão (fr) e nunca ficam abaixo do mínimo; a largura mínima total
   // garante que cabeçalho e linhas compartilhem as mesmas trilhas quando a soma dos mínimos excede o contêiner.
   // Sim/Não ocupa uma trilha fixa estreita: o conteúdo é um switch, não cresce com a tela.
@@ -47,11 +51,11 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
 
   return (
     <div className="bt-table gr-table">
-      <div className="gr-grid" role="grid" aria-label="Serviços" aria-busy={loading || undefined} aria-colcount={columns.length + 1} style={style}>
+      <div ref={scrollRef} className="gr-grid" role="grid" aria-label="Serviços" aria-busy={loading || undefined} aria-colcount={columns.length + 1} style={style}>
         <div className="bt-table__head" role="row">
           <div className="bt-table__cell gr-cell--select" role="columnheader">
             <Checkbox
-              label={<span className="gr-sr">Selecionar página</span>}
+              label={<span className="gr-sr">Selecionar carregados</span>}
               checked={all}
               ref={(node) => { if (node) node.indeterminate = some }}
               disabled={ids.length === 0}
@@ -101,9 +105,10 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
               </div>
             )
           })}
+        {tail}
       </div>
       {!loading && rows.length === 0 && empty != null ? <div className="bt-table__empty gr-empty">{empty}</div> : null}
-      <div className="bt-table__footer gr-footer">{footer}</div>
+      <div className="bt-table__footer">{footer}</div>
     </div>
   )
 }

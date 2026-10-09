@@ -35,7 +35,23 @@ vi.mock('./data/source', async (importOriginal) => {
 
 // O mock simula latência; com a suíte inteira em paralelo a máquina fica lenta.
 configure({ asyncUtilTimeout: 8000 })
-vi.setConfig({ testTimeout: 30_000 })
+
+/** Observador falso: guarda o callback e as opções; `trigger` simula a interseção do sentinela. */
+class FakeObserver {
+  static instances: FakeObserver[] = []
+  static trigger(entries: Array<{ isIntersecting: boolean }>) { for (const o of FakeObserver.instances.filter((i) => !i.closed)) o.callback(entries as IntersectionObserverEntry[], o as unknown as IntersectionObserver) }
+  closed = false
+  observed: Element[] = []
+  constructor(public callback: IntersectionObserverCallback, public options?: IntersectionObserverInit) { FakeObserver.instances.push(this) }
+  observe(element: Element) { this.observed.push(element) }
+  disconnect() { this.closed = true }
+  unobserve() {}
+  takeRecords() { return [] }
+}
+
+/** Status da primeira página (cabeçalho e rodapé mostram o mesmo texto). */
+const PAGE1 = /^100 de \d+ serviços$/
+vi.setConfig({ testTimeout: 60_000 })
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -44,6 +60,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+  FakeObserver.instances = []
   hooks.setState = null
   hooks.copyRows = null
   hooks.update = null
@@ -64,21 +81,19 @@ describe('Geral', () => {
     expect(await screen.findByRole('columnheader', { name: /Status de Operação/, hidden: true })).toBeTruthy()
     // A linha do cabeçalho já existe antes dos dados: espera as 100 linhas chegarem.
     await waitFor(() => expect(screen.getAllByRole('row', { hidden: true }).length).toBeGreaterThan(10))
-    expect(screen.getByText(/Linhas 1–100 de/)).toBeTruthy()
+    expect(screen.getAllByText(PAGE1)).toHaveLength(2)
     fireEvent.click(screen.getByRole('button', { name: /Status de Operação/, hidden: true }))
     await waitFor(() => expect(screen.getByRole('columnheader', { name: /Status de Operação/, hidden: true }).getAttribute('aria-sort')).toBe('ascending'))
-    fireEvent.click(screen.getByRole('button', { name: 'Carregar mais' }))
-    await screen.findByText(`Linhas 1–200 de ${MOCK_ROW_COUNT}`)
     // O primeiro teste paga a carga fria dos módulos: com a máquina ocupada passa dos 30 s do padrão.
   }, 60_000)
 
   it('troca de visão e busca por palavra-chave', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–100/)
+    await screen.findAllByText(PAGE1)
     fireEvent.click(screen.getByRole('combobox', { name: 'Visão' }))
     // O painel do Select usa `popover`, que o jsdom não exibe: as opções existem, mas ficam fora da árvore acessível.
     fireEvent.click(await screen.findByRole('option', { name: 'Sem motorista', hidden: true }))
-    await waitFor(() => expect(screen.queryByText(/Linhas 1–100/)).toBeNull())
+    await waitFor(() => expect(screen.queryAllByText(PAGE1)).toHaveLength(0))
     fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar serviços' }), { target: { value: 'OS-10' } })
     await waitFor(() => expect(screen.getAllByText(/OS-10\d/).length).toBeGreaterThan(0), { timeout: 4000 })
   })
@@ -98,27 +113,27 @@ describe('Geral', () => {
 
   it('o clique no cabeçalho cicla crescente, decrescente e ordem da visão', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–100 de/)
+    await screen.findAllByText(PAGE1)
     const header = () => screen.getByRole('columnheader', { name: /Trajeto/, hidden: true })
     const sort = () => fireEvent.click(screen.getByRole('button', { name: /Trajeto/, hidden: true }))
     sort()
     await waitFor(() => expect(header().getAttribute('aria-sort')).toBe('ascending'))
-    await screen.findByText(/Linhas 1–100 de/)
+    await screen.findAllByText(PAGE1)
     sort()
     await waitFor(() => expect(header().getAttribute('aria-sort')).toBe('descending'))
-    await screen.findByText(/Linhas 1–100 de/)
+    await screen.findAllByText(PAGE1)
     sort()
     await waitFor(() => expect(header().getAttribute('aria-sort')).toBe('none'))
   }, 60_000)
 
   it('busca sem resultado mostra o estado vazio e limpar busca volta à lista', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–100 de/)
+    await screen.findAllByText(PAGE1)
     fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar serviços' }), { target: { value: 'zzzz-nada' } })
     const empty = (await screen.findByText('Nenhum serviço nesta visão', {}, { timeout: 4000 })).closest('section') as HTMLElement
     // A caixa de busca também tem um "Limpar busca"; o do estado vazio é o que está dentro da seção.
     fireEvent.click(within(empty).getByRole('button', { name: 'Limpar busca' }))
-    await screen.findByText(/Linhas 1–100 de/)
+    await screen.findAllByText(PAGE1)
   })
 
   it('a coluna oculta fica salva por visão e volta ao reabrir a tela', async () => {
@@ -167,7 +182,7 @@ describe('Geral', () => {
 
   it('edita texto na célula com Enter e mostra salvo', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–100 de/)
+    await screen.findAllByText(PAGE1)
     const cell = await cellOf((await screen.findAllByRole('row', { hidden: true }))[1], 'text')
     fireEvent.keyDown(cell, { key: 'Enter' })
     const input = within(cell).getByRole('textbox')
@@ -195,7 +210,7 @@ describe('Geral', () => {
 
   it('Esc cancela sem gravar e status abre um select', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–100 de/)
+    await screen.findAllByText(PAGE1)
     const first = (await screen.findAllByRole('row', { hidden: true }))[1]
     const text = await cellOf(first, 'text')
     const original = text.textContent
@@ -211,7 +226,7 @@ describe('Geral', () => {
 
   it('dinheiro inválido mostra o erro local e mantém o campo aberto sem gravar', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–100 de/)
+    await screen.findAllByText(PAGE1)
     const cell = await cellOf((await screen.findAllByRole('row', { hidden: true }))[1], 'money')
     fireEvent.keyDown(cell, { key: 'Enter' })
     const input = within(cell).getByRole('textbox')
@@ -237,7 +252,7 @@ describe('Geral', () => {
 
   it('escolher outro motorista grava e mostra salvo', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–100 de/)
+    await screen.findAllByText(PAGE1)
     const cell = await cellOf((await screen.findAllByRole('row', { hidden: true }))[1], 'lookup')
     fireEvent.keyDown(cell, { key: 'Enter' })
     fireEvent.click(await within(cell).findByRole('option', { name: 'Bruno Dias', hidden: true }))
@@ -261,7 +276,7 @@ describe('Geral', () => {
   it('seleção mostra comandos; copiar abre a prévia com o bloco; desativar pede confirmação', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     // A linha do cabeçalho existe antes dos dados: espera as linhas chegarem.
-    await screen.findByText(/Linhas 1–100 de/)
+    await screen.findAllByText(PAGE1)
     const rows = screen.getAllByRole('row', { hidden: true })
     fireEvent.click(within(rows[1]).getByRole('checkbox'))
     fireEvent.click(within(rows[2]).getByRole('checkbox'))
@@ -289,7 +304,7 @@ describe('Geral', () => {
 
   it('com 1 selecionado, Editar abre o formulário e Gerar Voucher avisa que só roda no Dataverse', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–100 de/)
+    await screen.findAllByText(PAGE1)
     fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
     fireEvent.click(screen.getByRole('button', { name: 'Gerar Voucher' }))
     expect(await screen.findByText('O voucher abre dentro do Dataverse.')).toBeTruthy()
@@ -327,7 +342,7 @@ describe('Geral: correções finais', () => {
 
   it('trocar de visão e buscar mudam de fato as linhas', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–100/)
+    await screen.findAllByText(PAGE1)
     // OS-1217 não tem motorista, mas fica além da primeira página (100 linhas) da Agenda; OS-1000 tem motorista.
     expect(screen.queryByRole('button', opener('OS-1217'))).toBeNull()
     expect(screen.getByRole('button', opener('OS-1000'))).toBeTruthy()
@@ -344,19 +359,19 @@ describe('Geral: correções finais', () => {
 
   it('o cabeçalho mostra a ordem da visão e o primeiro clique nela inverte', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–100 de/)
+    await screen.findAllByText(PAGE1)
     const header = () => screen.getByRole('columnheader', { name: /Data e horário de saída/, hidden: true })
     expect(header().getAttribute('aria-sort')).toBe('ascending')
     fireEvent.click(within(header()).getByRole('button'))
     await waitFor(() => expect(header().getAttribute('aria-sort')).toBe('descending'))
-    await screen.findByText(/Linhas 1–100 de/)
+    await screen.findAllByText(PAGE1)
     fireEvent.click(within(header()).getByRole('button'))
     await waitFor(() => expect(header().getAttribute('aria-sort')).toBe('ascending'))
   })
 
   it('o aviso do motorista aparece no editor da célula', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–100 de/)
+    await screen.findAllByText(PAGE1)
     const cell = await cellOf((await screen.findAllByRole('row', { hidden: true }))[1], 'lookup')
     fireEvent.keyDown(cell, { key: 'Enter' })
     expect(await within(cell).findByTitle('Trocar o motorista dispara os avisos e a atribuição automática de veículo.')).toBeTruthy()
@@ -365,7 +380,7 @@ describe('Geral: correções finais', () => {
   it('falha parcial ao desativar lista os ids que falharam e o primeiro erro', async () => {
     hooks.setState = async (ids) => ({ ok: [ids[0]], failed: [{ id: ids[1], message: 'Sem permissão' }] })
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–100 de/)
+    await screen.findAllByText(PAGE1)
     const rows = screen.getAllByRole('row', { hidden: true })
     const failedName = within(rows[2]).getByRole('button', { name: /Abrir serviço/ }).textContent
     fireEvent.click(within(rows[1]).getByRole('checkbox'))
@@ -378,7 +393,7 @@ describe('Geral: correções finais', () => {
   it('Desativar e Ativar com seleção mista ficam focáveis, explicam o motivo e não fazem nada', async () => {
     hooks.mixedState = true
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–100 de/)
+    await screen.findAllByText(PAGE1)
     const rows = screen.getAllByRole('row', { hidden: true })
     fireEvent.click(within(rows[1]).getByRole('checkbox'))
     fireEvent.click(within(rows[2]).getByRole('checkbox'))
@@ -397,7 +412,7 @@ describe('Geral: correções finais', () => {
   it('fechar a prévia de cópia antes do texto chegar não a reabre', async () => {
     hooks.copyRows = () => new Promise((resolve) => { window.setTimeout(() => resolve([]), 400) })
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–100 de/)
+    await screen.findAllByText(PAGE1)
     fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
     fireEvent.click(screen.getByRole('button', { name: 'Copiar Serviços' }))
     const dialog = await screen.findByRole('dialog', { name: 'Copiar serviços' })
@@ -478,7 +493,7 @@ describe('Geral: espaço e densidade', () => {
 
   it('os comandos ficam sempre na barra: sem seleção os que dependem dela ficam inertes, com o motivo', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–100 de/)
+    await screen.findAllByText(PAGE1)
     const toolbar = screen.getByRole('toolbar', { name: 'Filtros de serviços' })
     expect(within(toolbar).getByRole('button', { name: 'Criar serviço' }).getAttribute('aria-disabled')).toBeNull()
     for (const [name, reason] of Object.entries(blockedReason)) {
@@ -498,7 +513,7 @@ describe('Geral: espaço e densidade', () => {
 
   it('com 1 selecionado os comandos se habilitam e a contagem aparece como badge', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–100 de/)
+    await screen.findAllByText(PAGE1)
     fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
     const toolbar = screen.getByRole('toolbar', { name: 'Filtros de serviços' })
     const count = within(toolbar).getByText('1 selecionado')
@@ -508,10 +523,10 @@ describe('Geral: espaço e densidade', () => {
 
   it('o cabeçalho tem só Atualizar e o total; Criar serviço fica na barra', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–100 de/)
+    await screen.findAllByText(PAGE1)
     const header = screen.getByRole('banner')
     expect(within(header).getByRole('heading', { name: 'Geral' })).toBeTruthy()
-    expect(within(header).getByText(`${MOCK_ROW_COUNT} serviços`)).toBeTruthy()
+    expect(within(header).getByText(`100 de ${MOCK_ROW_COUNT} serviços`)).toBeTruthy()
     expect(within(header).getByRole('button', { name: 'Atualizar' })).toBeTruthy()
     expect(within(header).queryByRole('button', { name: 'Criar serviço' })).toBeNull()
   })
@@ -522,15 +537,83 @@ describe('Geral: espaço e densidade', () => {
     expect(header.getAttribute('title')).toBe('Status de faturamento')
   })
 
-  it('página fixa de 100: sem seletor de quantidade e rodapé 1–100', async () => {
+  it('página fixa de 100: sem seletor de quantidade nem paginação numerada', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    expect(await screen.findByText(`Linhas 1–100 de ${MOCK_ROW_COUNT}`)).toBeTruthy()
+    expect(await screen.findAllByText(`100 de ${MOCK_ROW_COUNT} serviços`)).toHaveLength(2)
     expect(screen.queryByRole('combobox', { name: 'Serviços por página' })).toBeNull()
+    expect(screen.queryByText(/Anterior|Próxima/)).toBeNull()
   })
+
+  // Com 200+ linhas, consultas por papel (getByRole) percorrem milhares de nós no jsdom: aqui só consultas baratas.
+  const rowCount = () => document.querySelectorAll('.gr-grid [role="row"]').length - 1
+  const loadMoreButton = () => screen.getByText('Carregar mais').closest('button') as HTMLButtonElement
+
+  it('Carregar mais acumula 100, 200 e 220 linhas e termina em Fim da lista', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findAllByText(PAGE1)
+    expect(rowCount()).toBe(100)
+    fireEvent.click(loadMoreButton())
+    await screen.findAllByText(`200 de ${MOCK_ROW_COUNT} serviços`)
+    expect(rowCount()).toBe(200)
+    fireEvent.click(loadMoreButton())
+    await screen.findAllByText(`${MOCK_ROW_COUNT} serviços`)
+    expect(rowCount()).toBe(MOCK_ROW_COUNT)
+    expect(screen.getByText('Fim da lista')).toBeTruthy()
+    expect(screen.queryByText('Carregar mais')).toBeNull()
+  }, 90_000)
+
+  it('ordenar depois de carregar mais volta ao topo com 100 linhas', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findAllByText(PAGE1)
+    fireEvent.click(loadMoreButton())
+    await screen.findAllByText(`200 de ${MOCK_ROW_COUNT} serviços`)
+    fireEvent.click(screen.getByText('Trajeto').closest('button') as HTMLButtonElement)
+    await screen.findAllByText(PAGE1)
+    expect(rowCount()).toBe(100)
+  }, 90_000)
+
+  it('o observador carrega a próxima página sem clique e a seleção dos carregados é mantida', async () => {
+    vi.stubGlobal('IntersectionObserver', FakeObserver)
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findAllByText(PAGE1)
+    const grid = document.querySelector('.gr-grid') as HTMLElement
+    // O sentinela vive dentro do contêiner de rolagem, que é a raiz do observador.
+    await waitFor(() => expect(FakeObserver.instances.some((o) => !o.closed)).toBe(true))
+    const live = FakeObserver.instances.filter((o) => !o.closed)
+    // Comparações booleanas: se falhar, o diff de um elemento DOM inteiro travaria o jsdom.
+    expect(live.length).toBe(1)
+    expect(live[0].options?.root === grid).toBe(true)
+    expect(grid.contains(live[0].observed[0])).toBe(true)
+    // "Selecionar carregados" marca as linhas carregadas até aqui; carregar mais não desfaz a seleção.
+    // (Consulta direta ao DOM: getByLabelText percorre centenas de rótulos e trava o jsdom.)
+    const selectAll = document.querySelector('.gr-grid [role="columnheader"] input[type="checkbox"]') as HTMLInputElement
+    expect(selectAll.closest('label')?.textContent).toBe('Selecionar carregados')
+    fireEvent.click(selectAll)
+    await screen.findByText('100 selecionados')
+    await act(async () => { FakeObserver.trigger([{ isIntersecting: true }]) })
+    await screen.findAllByText(`200 de ${MOCK_ROW_COUNT} serviços`)
+    expect(document.querySelectorAll('.gr-grid [role="row"]').length - 1).toBe(200)
+    expect(screen.getByText('100 selecionados')).toBeTruthy()
+  }, 90_000)
+
+  it('no celular os cards usam a janela como raiz e o botão Carregar mais tem 44 px', async () => {
+    vi.stubGlobal('IntersectionObserver', FakeObserver)
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('max-width: 820px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findAllByText(PAGE1)
+    expect(document.querySelectorAll('.gr-cards > li')).toHaveLength(100)
+    expect(loadMoreButton().classList.contains('bt-button--touch')).toBe(true)
+    // O efeito que cria o observador roda depois da pintura: espera ele existir.
+    await waitFor(() => expect(FakeObserver.instances.filter((o) => !o.closed).length).toBe(1))
+    expect(FakeObserver.instances.filter((o) => !o.closed)[0].options?.root === null).toBe(true)
+    await act(async () => { FakeObserver.trigger([{ isIntersecting: true }]) })
+    await screen.findAllByText(`200 de ${MOCK_ROW_COUNT} serviços`)
+    expect(document.querySelectorAll('.gr-cards > li')).toHaveLength(200)
+  }, 90_000)
 
   it('no desktop a barra usa controles compactos', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    await screen.findByText(/Linhas 1–100 de/)
+    await screen.findAllByText(PAGE1)
     const toolbar = screen.getByRole('toolbar', { name: 'Filtros de serviços' })
     expect(within(toolbar).getByRole('combobox', { name: 'Visão' }).closest('.bt-control')?.classList.contains('bt-control--compact')).toBe(true)
     expect(within(toolbar).getByRole('searchbox', { name: 'Buscar serviços' }).closest('.bt-control')?.classList.contains('bt-control--compact')).toBe(true)

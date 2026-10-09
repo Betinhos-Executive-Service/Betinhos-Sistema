@@ -62,9 +62,6 @@
 .gr-open { padding: 0; border: 0; background: transparent; color: var(--bt-color-brand); font: inherit; font-weight: var(--bt-font-weight-extrabold); text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
 .gr-open:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
 .gr-open:active { transform: scale(.97); }
-.gr-footer__pages { display: inline-flex; gap: var(--bt-space-2); }
-.gr-footer__left { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--bt-space-2); min-width: 0; }
-.gr-footer .bt-pagination__count { display: none; }
 .gr-empty > .bt-empty { padding: var(--bt-space-8) var(--bt-space-4); }
 
 /* Desativar/Ativar com seleção mista: aria-disabled mantém o foco e o motivo; só o visual de desativado. */
@@ -96,7 +93,7 @@
 @media (min-width: 821px) {
   .page.gr-page { max-width: none; height: 100dvh; display: flex; flex-direction: column; padding-top: var(--bt-space-3); padding-bottom: var(--bt-space-3); overflow-x: hidden; overflow-y: auto; }
   .gr-page .bt-page-toolbar__start, .gr-page .bt-page-toolbar__end { gap: var(--bt-space-3); }
-  .gr-page .bt-table__footer { padding: 0 var(--bt-space-4); }
+  .gr-page .bt-table__footer { padding: 0; min-height: 40px; }
   .gr-page .page__header { margin-bottom: var(--bt-space-2); }
   .gr-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   /* Em janela muito baixa a grade não some: o piso de 240 px faz a página rolar (overflow-y) em vez de espremê-la. */
@@ -107,7 +104,6 @@
 /* Celular: cards, sheet de edição e barra de seleção. */
 .gr-mobile { display: grid; gap: var(--bt-space-3); min-width: 0; }
 .gr-mobile.has-selection { padding-bottom: 200px; }
-.gr-mobile .gr-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--bt-space-2); font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
 .gr-cards { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
 .gr-card { display: grid; gap: var(--bt-space-2); min-width: 0; padding: var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
 .gr-card.is-selected { background-color: var(--bt-color-action-soft); }
@@ -123,7 +119,12 @@
 .gr-selbar { position: fixed; inset: auto 0 0 0; z-index: 30; display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); padding: var(--bt-space-2) var(--bt-space-3) calc(var(--bt-space-2) + env(safe-area-inset-bottom)); border-top: var(--bt-border-width-default) solid var(--bt-color-border); background-color: var(--bt-color-surface); box-shadow: var(--bt-shadow-panel); }
 .gr-selbar__count { flex: 1 0 100%; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-text-secondary); }
 .gr-selbar .bt-button { min-height: var(--bt-control-height-touch); }
-.gr-mobile .gr-footer .bt-button, .gr-mobile .bt-pagination__button { min-height: var(--bt-control-height-touch); }
+/* Rodapé de estado da rolagem infinita: linha fina; no celular os botões usam o tamanho de toque (44 px). */
+.gr-sentinel { height: 1px; }
+.gr-loadmore { flex: 1; display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-3); min-height: 40px; padding: 0 var(--bt-space-4); font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); font-variant-numeric: tabular-nums; }
+.gr-loadmore__right { display: inline-flex; align-items: center; gap: var(--bt-space-2); min-width: 0; }
+.gr-loadmore__error { padding-block: var(--bt-space-1); }
+.gr-mobile .gr-loadmore { flex-wrap: wrap; padding-block: var(--bt-space-1); }
 .gr-sheet { display: grid; gap: var(--bt-space-3); padding-bottom: var(--bt-space-4); }
 .gr-sheet__field { display: grid; gap: var(--bt-space-1); min-width: 0; }
 .gr-sheet__line { display: grid; gap: 2px; margin: 0; font-size: var(--bt-font-size-13); overflow-wrap: anywhere; }

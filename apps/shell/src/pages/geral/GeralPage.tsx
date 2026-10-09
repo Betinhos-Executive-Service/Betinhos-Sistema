@@ -13,6 +13,7 @@ import { GeralSheet } from './components/GeralSheet'
 import { GeralTable } from './components/GeralTable'
 import { CopyDialog, MockFormDialog, StateDialog, type StateRequest } from './components/Dialogs'
 import { EscalaFdsDrawer } from './components/EscalaFdsDrawer'
+import { LoadMore, LoadSentinel, statusText } from './components/LoadMore'
 import { GeralToolbar } from './components/GeralToolbar'
 import { VoucherOverlay } from './components/VoucherOverlay'
 import { copyText } from './domain/copy'
@@ -58,6 +59,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   }, [source.kv, viewId])
 
   const { reload, refresh, loadMore, retryLoadMore, setQuery, selectView, clearSelection } = geral
+  // Contêiner de rolagem da tabela: raiz do observador que carrega mais linhas (nos cards a raiz é a janela).
+  const scrollRef = useRef<HTMLDivElement>(null)
   const [mockForm, setMockForm] = useState(false)
   const [copy, setCopy] = useState<{ open: boolean; loading: boolean; text: string }>({ open: false, loading: false, text: '' })
   const [stateRequest, setStateRequest] = useState<StateRequest | null>(null)
@@ -231,18 +234,9 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
 
   const editRow = editId == null ? undefined : rowOf(editId)
 
-  // Rodapé provisório: o Bloco A3 refaz esta parte com a rolagem infinita.
-  const footer = (
-    <>
-      <span className="gr-footer__left">
-        <span>{loading ? 'Carregando…' : rows.length ? `Linhas 1–${rows.length}${total != null ? ` de ${total}` : ''}` : 'Nenhuma linha'}</span>
-        {loadError ? <span role="alert">{loadError}</span> : null}
-      </span>
-      {loadError
-        ? <Button variant="secondary" size="compact" onClick={retryLoadMore}>Tentar de novo</Button>
-        : more ? <Button variant="ghost" size="compact" loading={loadingMore} disabled={loading} onClick={loadMore}>Carregar mais</Button> : null}
-    </>
-  )
+  const loadMoreProps = { more, loading, loadingMore, error: loadError, loaded: rows.length, total, onLoadMore: loadMore, onRetry: retryLoadMore, touch: mobile }
+  const sentinel = more && !loading && !loadingMore && !loadError
+  const status = loading && rows.length === 0 ? null : statusText(rows.length, total, more)
 
   const empty = (
     <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum serviço nesta visão" action={query ? <Button variant="secondary" onClick={() => setQuery('')}>Limpar busca</Button> : undefined}>
@@ -275,9 +269,9 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
                 onToggle={geral.toggle}
                 onOpen={(id) => { void openForm('edit', id) }}
                 onEdit={setEditId}
+                footer={rows.length > 0 || loadError ? <LoadMore root={null} {...loadMoreProps} /> : null}
               />
               {!loading && rows.length === 0 && !geral.pageError ? <div className="gr-empty">{empty}</div> : null}
-              <div className="gr-footer">{footer}</div>
             </div>
           )
           : (
@@ -294,7 +288,9 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               onToggleAll={geral.toggleAll}
               onOpen={(id) => { void openForm('edit', id) }}
               renderCell={renderCell}
-              footer={footer}
+              scrollRef={scrollRef}
+              tail={<LoadSentinel root={scrollRef} active={sentinel} loaded={rows.length} onLoadMore={loadMore} />}
+              footer={<LoadMore root={scrollRef} sentinel={false} {...loadMoreProps} />}
               empty={geral.pageError ? null : empty}
             />
           )}
@@ -306,7 +302,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     <PageLayout
       eyebrow="Operacional"
       title="Geral"
-      meta={<span className="gr-meta">{total != null ? `${total} serviços` : null}{source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}</span>}
+      meta={<span className="gr-meta">{status != null ? <span>{status}</span> : null}{source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}</span>}
       className="gr-page"
       bodyClassName="gr-body"
       actions={<Button variant="secondary" icon={<RefreshCw size={16} />} loading={loading && rows.length > 0} onClick={reload}>Atualizar</Button>}
