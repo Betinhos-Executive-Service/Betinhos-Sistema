@@ -113,7 +113,14 @@
   /* Em janela muito baixa a grade não some: o piso de 240 px faz a página rolar (overflow-y) em vez de espremê-la. */
   .gr-table { display: flex; flex-direction: column; flex: 1; min-height: 240px; }
   .gr-grid { flex: 1; min-height: 0; overflow: auto; }
+  /* Modo Cards no desktop: mesma altura da tabela; a grade rola por dentro. */
+  .gr-cardsview { display: flex; flex-direction: column; flex: 1; min-height: 240px; min-width: 0; }
+  .gr-cardsview__scroll { flex: 1; min-height: 0; overflow: auto; }
+  .gr-cards--grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--bt-space-3); }
+  .gr-cardsview .gr-card__head .gr-open, .gr-cardsview .gr-card__check .bt-choice { min-height: var(--bt-control-height-compact); }
+  .gr-cardsview .gr-loadmore { padding: 0 var(--bt-space-1); }
 }
+.gr-mode { display: inline-flex; align-items: center; gap: var(--bt-space-1); }
 
 /* Celular: cards, sheet de edição e barra de seleção. */
 .gr-mobile { display: grid; gap: var(--bt-space-3); min-width: 0; }

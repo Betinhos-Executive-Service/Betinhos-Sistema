@@ -23,6 +23,7 @@ import { ViewMenu } from './components/ViewMenu'
 import { AuditoriaOverlay } from './components/AuditoriaOverlay'
 import { VoucherOverlay } from './components/VoucherOverlay'
 import { copyText } from './domain/copy'
+import { loadViewMode, saveViewMode, type ViewMode } from './domain/viewMode'
 import { splitOp } from './domain/commands'
 import { isEmptyFilter, type Filter } from './domain/filters'
 import { filterKindOf } from './domain/filterKind'
@@ -45,12 +46,16 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const source = useMemo(() => createSource(host), [host])
   const toast = useToast()
   const mobile = useMedia('(max-width: 820px)')
+  const [mode, setModeState] = useState<ViewMode>(() => loadViewMode(source.kv))
+  // Celular é sempre cards; no desktop vale a escolha lembrada.
+  const cardsLayout = mobile || mode === 'cards'
+  const changeMode = useCallback((next: ViewMode) => { setModeState(next); setEditId(null); saveViewMode(source.kv, next) }, [source.kv])
   const [editId, setEditId] = useState<string | null>(null)
   // Falha numa linha cuja sheet não está aberta (celular) não tem onde aparecer: vira aviso.
   const editIdRef = useRef(editId)
   editIdRef.current = editId
-  const mobileRef = useRef(mobile)
-  mobileRef.current = mobile
+  const mobileRef = useRef(cardsLayout)
+  mobileRef.current = cardsLayout
   const onSaveFail = useCallback((failure: SaveFailure) => {
     if (!mobileRef.current || editIdRef.current === failure.id) return
     toast({ tone: 'danger', message: `Não foi possível salvar ${failure.label} do serviço ${failure.serviceName}: ${failure.message}` })
@@ -78,6 +83,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const { reload, refresh, loadMore, retryLoadMore, setQuery, selectView, clearSelection } = geral
   // Contêiner de rolagem da tabela: raiz do observador que carrega mais linhas (nos cards a raiz é a janela).
   const scrollRef = useRef<HTMLDivElement>(null)
+  const cardsScrollRef = useRef<HTMLDivElement>(null)
   const [mockForm, setMockForm] = useState(false)
   const [copy, setCopy] = useState<{ open: boolean; loading: boolean; text: string }>({ open: false, loading: false, text: '' })
   const [stateRequest, setStateRequest] = useState<StateRequest | null>(null)
@@ -457,10 +463,12 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       <>
         {geral.attributesError ? <Alert tone="warning">Edição indisponível no momento: {geral.attributesError}</Alert> : null}
         {geral.pageError ? <Alert tone="danger" title="Não foi possível carregar os serviços" action={<Button variant="secondary" onClick={backToAgenda}>Voltar para a Agenda</Button>}>{geral.pageError}</Alert> : null}
-        {mobile
+        {cardsLayout
           ? (
-            <div className={geral.selected.size > 0 ? 'gr-mobile has-selection' : 'gr-mobile'}>
+            <div className={mobile ? (geral.selected.size > 0 ? 'gr-mobile has-selection' : 'gr-mobile') : 'gr-cardsview'}>
+              <div ref={mobile ? undefined : cardsScrollRef} className={mobile ? undefined : 'gr-cardsview__scroll'}>
               <GeralCards
+                grid={!mobile}
                 rows={rows}
                 columns={visibleColumns}
                 attributes={attributes}
@@ -469,8 +477,9 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
                 onToggle={geral.toggle}
                 onOpen={(id) => { void openForm('edit', id) }}
                 onEdit={setEditId}
-                footer={rows.length > 0 || loadError ? <LoadMore root={null} {...loadMoreProps} /> : null}
+                footer={rows.length > 0 || loadError ? <LoadMore root={mobile ? null : cardsScrollRef} {...loadMoreProps} /> : null}
               />
+              </div>
               {!loading && rows.length === 0 && !geral.pageError ? <div className="gr-empty">{empty}</div> : null}
             </div>
           )
@@ -532,6 +541,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           onOpenFilters={() => setFiltersOpen(true)}
           filtersUnavailable={geral.attributesError != null}
           mobile={mobile}
+          mode={mobile ? undefined : mode}
+          onMode={changeMode}
           commands={commands}
           shortcuts={shortcuts}
         />
@@ -555,7 +566,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           {selectionCommands}
         </div>
       ) : null}
-      {mobile && editRow ? (
+      {cardsLayout && editRow ? (
         <GeralSheet
           row={editRow}
           columns={visibleColumns}
