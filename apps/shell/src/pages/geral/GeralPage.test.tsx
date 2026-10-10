@@ -1163,4 +1163,42 @@ describe('Geral: seleção pela linha', () => {
     fireEvent.click(within(card).getByRole('button', { name: /Abrir serviço/ }))
     expect(card.className).not.toContain('is-selected')
   })
+
+  describe('modo Tabela | Cards (desktop)', () => {
+    it('alterna para Cards, lembra a escolha ao remontar e volta para a Tabela', async () => {
+      const first = render(<GeralPage host={{ mode: 'mock' }} />)
+      await screen.findByRole('grid', { name: 'Serviços' })
+      const group = screen.getByRole('radiogroup', { name: 'Mostrar como' })
+      fireEvent.click(within(group).getByRole('radio', { name: /Cards/ }))
+      await waitFor(() => expect(document.querySelectorAll('.gr-card').length).toBeGreaterThan(10))
+      expect(screen.queryByRole('grid', { name: 'Serviços' })).toBeNull()
+      expect(document.querySelector('.gr-cards--grid')).toBeTruthy()
+      expect(window.localStorage.getItem('betinhos.geral.modo.v1')).toBe('cards')
+      first.unmount()
+      render(<GeralPage host={{ mode: 'mock' }} />)
+      await waitFor(() => expect(document.querySelectorAll('.gr-card').length).toBeGreaterThan(10))
+      fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Mostrar como' })).getByRole('radio', { name: /Tabela/ }))
+      expect(await screen.findByRole('grid', { name: 'Serviços' })).toBeTruthy()
+      expect(window.localStorage.getItem('betinhos.geral.modo.v1')).toBe('tabela')
+    })
+
+    it('nos cards do desktop o clique seleciona e "Editar campos" abre a sheet', async () => {
+      window.localStorage.setItem('betinhos.geral.modo.v1', 'cards')
+      render(<GeralPage host={{ mode: 'mock' }} />)
+      await waitFor(() => expect(document.querySelectorAll('.gr-card').length).toBeGreaterThan(10))
+      const card = document.querySelector('.gr-card') as HTMLElement
+      fireEvent.click(card)
+      expect(card.className).toContain('is-selected')
+      expect(screen.queryByRole('group', { name: 'Ações sobre os selecionados' })).toBeNull()
+      fireEvent.click(within(card).getByRole('button', { name: /Editar campos/ }))
+      expect(await screen.findByRole('dialog')).toBeTruthy()
+    })
+
+    it('no celular o alternador não aparece', async () => {
+      vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('max-width: 820px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
+      render(<GeralPage host={{ mode: 'mock' }} />)
+      await waitFor(() => expect(document.querySelectorAll('.gr-card').length).toBeGreaterThan(0))
+      expect(screen.queryByRole('radiogroup', { name: 'Mostrar como' })).toBeNull()
+    })
+  })
 })

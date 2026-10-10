@@ -20,6 +20,8 @@ type Props = {
   onEdit: (id: string) => void
   /** Depois da lista: o sentinela e o rodapé de estado da rolagem infinita. */
   footer?: ReactNode
+  /** Desktop: cards em grade responsiva. */
+  grid?: boolean
 }
 
 const SKELETON_CARDS = 4
@@ -27,7 +29,7 @@ const STATUS = 'cr40f_status'
 const DATA = 'cr40f_dataehorriodesada'
 
 /** Lista de serviços no celular: um card por linha com o essencial e o botão que abre a edição por campo. */
-export function GeralCards({ rows, columns, attributes, loading, selected, onToggle, onOpen, onEdit, footer }: Props) {
+export function GeralCards({ rows, columns, attributes, loading, selected, onToggle, onOpen, onEdit, footer, grid = false }: Props) {
   const find = (attribute: string) => columns.find((c) => !c.alias && c.attribute === attribute)
   const has = {
     status: find(STATUS), data: find(DATA), cliente: find('cr40f_cliente'), motorista: find('cr40f_motorista'), trajeto: find('cr40f_trajeto'),
@@ -36,7 +38,7 @@ export function GeralCards({ rows, columns, attributes, loading, selected, onTog
 
   if (loading && rows.length === 0) {
     return (
-      <ul className="gr-cards" aria-label="Carregando serviços" aria-busy="true">
+      <ul className={grid ? 'gr-cards gr-cards--grid' : 'gr-cards'} aria-label="Carregando serviços" aria-busy="true">
         {Array.from({ length: SKELETON_CARDS }, (_, i) => <li key={i} className="gr-card" aria-hidden="true"><Skeleton height={16} width="40%" /><Skeleton height={14} /><Skeleton height={14} width="70%" /></li>)}
       </ul>
     )
@@ -44,7 +46,7 @@ export function GeralCards({ rows, columns, attributes, loading, selected, onTog
 
   return (
     <>
-      <ul className="gr-cards" aria-label="Serviços">
+      <ul className={grid ? 'gr-cards gr-cards--grid' : 'gr-cards'} aria-label="Serviços">
         {rows.map((row) => {
           const id = String(row[ID_ATTRIBUTE])
           const name = formatCell('readonly', row, 'cr40f_id')

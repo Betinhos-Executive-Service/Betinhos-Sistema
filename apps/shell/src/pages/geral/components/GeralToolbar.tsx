@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Filter } from 'lucide-react'
-import { Button, PageToolbar, SearchBox, Select, StatusBadge, type SelectOption } from '@betinhos/ui'
+import { Filter, LayoutGrid, Table2 } from 'lucide-react'
+import { Button, PageToolbar, SearchBox, SegmentedControl, Select, StatusBadge, type SelectOption } from '@betinhos/ui'
 import type { ColumnPrefs } from '../domain/columns'
+import type { ViewMode } from '../domain/viewMode'
 import type { AttributeMap, Column, View } from '../domain/types'
 import { ColumnsMenu } from './ColumnsMenu'
 
@@ -29,6 +30,9 @@ type Props = {
   filtersUnavailable?: boolean
   /** Celular: controles em tamanho de toque (44 px); no desktop ficam compactos (32 px). */
   mobile: boolean
+  /** Desktop: modo de exibição atual; ausente no celular (sempre cards), onde o alternador não aparece. */
+  mode?: ViewMode
+  onMode?: (mode: ViewMode) => void
   /** Comandos sempre visíveis; os que dependem da seleção ficam inertes (aria-disabled) enquanto ela não serve. */
   commands: ReactNode
   /** Atalhos fixos à direita. */
@@ -36,7 +40,7 @@ type Props = {
 }
 
 /** Uma linha só: visão e busca à esquerda; contagem da seleção, comandos, colunas e atalhos à direita. */
-export function GeralToolbar({ views, view, onSelectView, viewMenu, query, onQuery, searching, columns, attributes, prefs, onPrefs, selectedCount, filtersCount, onOpenFilters, filtersUnavailable, mobile, commands, shortcuts }: Props) {
+export function GeralToolbar({ views, view, onSelectView, viewMenu, query, onQuery, searching, columns, attributes, prefs, onPrefs, selectedCount, filtersCount, onOpenFilters, filtersUnavailable, mobile, mode, onMode, commands, shortcuts }: Props) {
   const size = mobile ? 'touch' : 'compact'
   const options: SelectOption[] = views.map((v) => ({ value: v.id, label: v.nome, group: v.grupo === 'sistema' ? 'Visões do sistema' : 'Minhas visões' }))
   // O texto digitado fica local; a busca de verdade sai depois da pausa. Mudança externa (limpar busca) ressincroniza.
@@ -51,6 +55,12 @@ export function GeralToolbar({ views, view, onSelectView, viewMenu, query, onQue
       start={<>
         <Select className="gr-filters__view" size={size} aria-label="Visão" placeholder="Selecione uma visão" searchable={false} clearable={false} options={options} value={view?.id ?? null} onChange={(id) => { if (id) onSelectView(id) }} />
         {viewMenu}
+        {!mobile && mode && onMode ? (
+          <SegmentedControl<ViewMode> size="compact" aria-label="Mostrar como" value={mode} onChange={onMode} options={[
+            { value: 'tabela', label: <span className="gr-mode"><Table2 size={14} aria-hidden="true" />Tabela</span> },
+            { value: 'cards', label: <span className="gr-mode"><LayoutGrid size={14} aria-hidden="true" />Cards</span> },
+          ]} />
+        ) : null}
         <SearchBox className="gr-filters__search" size={size} aria-label="Buscar serviços" placeholder="Buscar por ID, trajeto, cliente…" value={text} onChange={setText} onSearch={(value) => { if (value.trim() !== query) onQuery(value.trim()) }} debounce={300} loading={searching} />
       </>}
       end={<>
