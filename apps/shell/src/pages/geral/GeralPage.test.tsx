@@ -1140,6 +1140,18 @@ describe('Geral: seleção pela linha', () => {
     expect(selectedRows()).toHaveLength(1)
   })
 
+  it('clicar dentro da célula em edição (mesmo com Shift) não altera a seleção', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    const row = await rowOf('OS-1005')
+    fireEvent.doubleClick(await cellOf(row, 'text'))
+    await waitFor(() => expect(row.getAttribute('aria-selected')).toBe('true'))
+    const editing = row.querySelector('.gr-cell--editing') as HTMLElement
+    expect(editing).toBeTruthy()
+    fireEvent.click(editing.querySelector('input, textarea') ?? editing, { shiftKey: true })
+    expect(selectedRows()).toHaveLength(1)
+    expect(selectedRows()[0]).toBe(row)
+  })
+
   it('no celular, tocar no corpo do card alterna a seleção', async () => {
     vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('max-width: 820px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
     render(<GeralPage host={{ mode: 'mock' }} />)
