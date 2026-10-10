@@ -43,11 +43,15 @@
 .gr-table { --gr-row-height: var(--bt-table-row-dense); }
 .gr-table .bt-table__head, .gr-table .bt-table__row { grid-template-columns: var(--gr-columns); gap: 0; padding: 0; width: 100%; min-width: var(--gr-min-width, max-content); }
 .gr-table .bt-table__head { display: grid; position: sticky; top: 0; z-index: 2; }
-.gr-table .bt-table__row { min-height: var(--gr-row-height); }
+.gr-table .bt-table__row { min-height: var(--gr-row-height); user-select: none; -webkit-user-select: none; }
+/* Shift+clique seleciona linhas, não texto; só a célula em edição permite selecionar. */
+.gr-table .gr-cell--editing, .gr-table .gr-cell--editing * { user-select: text; -webkit-user-select: text; }
 .gr-table .bt-table__row.is-selected { background-color: var(--bt-color-action-soft); }
 .gr-table .bt-table__cell { padding: 0 var(--bt-space-3); min-height: calc(var(--gr-row-height) - var(--bt-border-width-default)); border-right: var(--bt-border-width-default) solid var(--bt-color-border); }
 .gr-table .bt-table__head, .gr-table .bt-table__head .bt-table__cell { min-height: 32px; }
 .gr-cell--select { position: sticky; left: 0; z-index: 1; justify-content: center; background-color: var(--bt-color-surface); }
+/* O DS põe position: relative em toda célula do cabeçalho (especificidade maior): sem esta regra a caixa "Selecionar carregados" rolava embora enquanto as caixas das linhas ficavam fixas. */
+.gr-table .bt-table__head .bt-table__cell.gr-cell--select { position: sticky; }
 .gr-cell--first { position: sticky; left: 40px; z-index: 1; background-color: var(--bt-color-surface); box-shadow: 1px 0 0 var(--bt-color-border); }
 .gr-table .bt-table__row.is-selected .gr-cell--select, .gr-table .bt-table__row.is-selected .gr-cell--first { background-color: var(--bt-color-action-soft); }
 .gr-table .bt-table__head .gr-cell--select, .gr-table .bt-table__head .gr-cell--first { background-color: var(--bt-color-surface-neutral); }
