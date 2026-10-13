@@ -1,3 +1,4 @@
+export * from './constantes.ts'
 export * from './contexto.ts'
 export * from './prompt.ts'
 export * from './requisicao.ts'
