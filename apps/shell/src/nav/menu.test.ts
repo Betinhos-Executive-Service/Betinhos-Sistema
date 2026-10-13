@@ -26,3 +26,10 @@ it('usa rótulo do sitemap, depois metadata, depois nome lógico', () => {
   expect(itemLabel(findItem('cr40f_recibos_v2')!.item, labels)).toBe('Recibos')
   expect(itemLabel(findItem('cr40f_multas')!.item, labels)).toBe('cr40f_multas')
 })
+
+it('Documentos é rota React em Cadastros, logo após Funcionários', () => {
+  expect(findItem('documentos')?.group.id).toBe('cadastros')
+  expect(findItem('documentos')?.item).toMatchObject({ kind: 'page', page: 'documentos', label: 'Documentos' })
+  const ids = findItem('documentos')!.group.items.map((item) => item.id)
+  expect(ids.indexOf('documentos')).toBe(ids.indexOf('funcionarios') + 1)
+})
