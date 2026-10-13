@@ -714,9 +714,11 @@ function App() {
     });
   }, [isButtonPreviewMode, isReceiptPreviewMode, mediaDraftLoaded, screen]);
 
+  // Guarda o motorista logado para recarregar comunicados sem depender do estado ainda não aplicado.
+  const comunicadosDriverIdRef = useRef("");
   const reloadComunicados = useCallback(async () => {
     try {
-      setComunicados(await loadDriverComunicados());
+      setComunicados(await loadDriverComunicados(comunicadosDriverIdRef.current));
       setComunicadosStatus("ready");
     } catch (error) {
       // Mantém a lista já carregada; só exibe o estado de erro quando nunca houve carga.
@@ -760,6 +762,7 @@ function App() {
         const hashRoute = initialHashRouteRef.current;
         const remoteInitialDetail = hashRoute ? findDetailFromHashRoute(remoteStore, hashRoute) : getInitialDetail(remoteStore);
         setDriverContext(remote.driver);
+        comunicadosDriverIdRef.current = remote.driver?.id ?? "";
         reloadComunicados().catch((error) => {
           reportAppError(error, { severity: "warning", source: "app", action: "loadDriverComunicados", phase: "initial" });
           setToast("Não foi possível carregar comunicados. Atualize o aplicativo.", "warning");
@@ -1246,6 +1249,7 @@ function App() {
       try {
         const remote = await loadRemoteStore();
         setDriverContext(remote.driver);
+        comunicadosDriverIdRef.current = remote.driver?.id ?? "";
         setStore((current) => ({ ...current, agenda: remote.agenda, history: remote.history }));
         try {
           await reloadComunicados();
