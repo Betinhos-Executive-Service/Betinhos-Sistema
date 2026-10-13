@@ -25,6 +25,8 @@ describe('descreverCarro', () => {
   it('modelo, cor e placa; caixa alta suavizada', () => {
     expect(descreverCarro(ruh)).toBe('Corolla Prata · RUH7G45')
     expect(descreverCarro(fcb)).toBe('Compass Preta · FCB8B61')
+    expect(descreverCarro({ ...ruh, modelo: 'HB20', cor: 'PRATA' })).toBe('HB20 Prata · RUH7G45')
+    expect(descreverCarro({ ...ruh, modelo: 'HB20S SENSE', cor: 'Prata' })).toBe('HB20S Sense Prata · RUH7G45')
     expect(descreverCarro({ ...ruh, cor: '' })).toBe('Corolla · cor não cadastrada · RUH7G45')
   })
 })
