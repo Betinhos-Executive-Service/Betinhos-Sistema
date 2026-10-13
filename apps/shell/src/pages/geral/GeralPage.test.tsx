@@ -81,6 +81,14 @@ const cellOf = (row: HTMLElement, kind: string) =>
     return cell
   })
 
+
+/** Desktop: Gerar Voucher, Copiar Serviços, Gerar OP e Disparar vivem no menu "Ações" da barra. */
+async function acao(name: string) {
+  const toolbar = screen.getByRole('toolbar', { name: 'Filtros de serviços' })
+  fireEvent.click(within(toolbar).getByRole('button', { name: /^Ações/ }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: new RegExp(`^${name}`), hidden: true }))
+}
+
 describe('Geral', () => {
   it('abre a Agenda com as colunas da visão, pagina e ordena', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
@@ -308,7 +316,7 @@ describe('Geral', () => {
     expect(screen.getByText('2 selecionados')).toBeTruthy()
     // Os comandos estão sempre na barra; com 2 selecionados só o Editar (exige exatamente um) fica inerte.
     expect(screen.getByRole('button', { name: 'Editar' }).getAttribute('aria-disabled')).toBe('true')
-    fireEvent.click(screen.getByRole('button', { name: 'Copiar Serviços' }))
+    await acao('Copiar Serviços')
     const copy = await screen.findByRole('dialog', { name: 'Copiar serviços' })
     expect((await within(copy).findByText(/\*ID:\* OS-/)).textContent).toContain('*Trajeto:*')
     // O X do Dialog também se chama "Fechar": o botão de ação é o último.
@@ -331,7 +339,7 @@ describe('Geral', () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
     fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
-    fireEvent.click(screen.getByRole('button', { name: 'Gerar Voucher' }))
+    await acao('Gerar Voucher')
     expect(await screen.findByText('O voucher abre dentro do Dataverse.')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
     expect(await screen.findByRole('dialog', { name: 'Formulário Geral abre no Dataverse' })).toBeTruthy()
@@ -439,7 +447,7 @@ describe('Geral: correções finais', () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
     fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
-    fireEvent.click(screen.getByRole('button', { name: 'Copiar Serviços' }))
+    await acao('Copiar Serviços')
     const dialog = await screen.findByRole('dialog', { name: 'Copiar serviços' })
     fireEvent.click(within(dialog).getAllByRole('button', { name: 'Fechar' }).at(-1) as HTMLElement)
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Copiar serviços' })).toBeNull())
@@ -514,7 +522,7 @@ describe('Geral: correções finais', () => {
 })
 
 describe('Geral: espaço e densidade', () => {
-  const blockedReason = { Editar: 'Selecione exatamente um serviço.', 'Gerar Voucher': 'Selecione ao menos um serviço.', 'Copiar Serviços': 'Selecione ao menos um serviço.', Desativar: 'Selecione ao menos um serviço.' }
+  const blockedReason = { Editar: 'Selecione exatamente um serviço.', Desativar: 'Selecione ao menos um serviço.' }
 
   it('os comandos ficam sempre na barra: sem seleção os que dependem dela ficam inertes, com o motivo', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
@@ -531,8 +539,16 @@ describe('Geral: espaço e densidade', () => {
     expect(within(toolbar).queryByRole('button', { name: 'Ativar' })).toBeNull()
     expect(within(toolbar).queryByText(/selecionado/)).toBeNull()
     // Clicar num inerte não faz nada.
-    fireEvent.click(within(toolbar).getByRole('button', { name: 'Copiar Serviços' }))
     fireEvent.click(within(toolbar).getByRole('button', { name: 'Editar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    // Os demais comandos de seleção ficam no menu "Ações", desabilitados com o motivo.
+    fireEvent.click(within(toolbar).getByRole('button', { name: 'Ações' }))
+    for (const name of ['Gerar Voucher', 'Copiar Serviços', 'Gerar OP', 'Disparar']) {
+      const item = await screen.findByRole('menuitem', { name: new RegExp(`^${name}`), hidden: true })
+      expect((item as HTMLButtonElement).disabled).toBe(true)
+      expect(item.textContent).toContain('Selecione ao menos um serviço.')
+    }
+    fireEvent.click(await screen.findByRole('menuitem', { name: /^Copiar Serviços/, hidden: true }))
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
@@ -543,7 +559,9 @@ describe('Geral: espaço e densidade', () => {
     const toolbar = screen.getByRole('toolbar', { name: 'Filtros de serviços' })
     const count = within(toolbar).getByText('1 selecionado')
     expect(count.closest('.bt-badge')).not.toBeNull()
-    for (const name of ['Editar', 'Gerar Voucher', 'Copiar Serviços', 'Desativar']) expect(within(toolbar).getByRole('button', { name }).getAttribute('aria-disabled')).toBeNull()
+    for (const name of ['Editar', 'Desativar']) expect(within(toolbar).getByRole('button', { name }).getAttribute('aria-disabled')).toBeNull()
+    fireEvent.click(within(toolbar).getByRole('button', { name: 'Ações (1)' }))
+    for (const name of ['Gerar Voucher', 'Copiar Serviços']) expect(((await screen.findByRole('menuitem', { name, hidden: true })) as HTMLButtonElement).disabled).toBe(false)
   })
 
   it('o cabeçalho tem só Atualizar e o total; Criar serviço fica na barra', async () => {
@@ -1029,17 +1047,18 @@ describe('Geral: comandos Auditoria, Gerar OP, Disparar e Registrar Erro', () =>
   it('sem seleção Gerar OP e Disparar ficam inertes, com o motivo', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
+    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Ações' }))
     for (const name of ['Gerar OP', 'Disparar']) {
-      const button = within(toolbar()).getByRole('button', { name })
-      expect(button.getAttribute('aria-disabled')).toBe('true')
-      expect(button.getAttribute('title')).toBe('Selecione ao menos um serviço.')
+      const item = await screen.findByRole('menuitem', { name: new RegExp(`^${name}`), hidden: true })
+      expect((item as HTMLButtonElement).disabled).toBe(true)
+      expect(item.textContent).toContain('Selecione ao menos um serviço.')
     }
   })
 
   it('Gerar OP com um serviço que já tem OP mostra o diálogo parcial e, ao confirmar, avisa o sucesso', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await pick('OS-1004', 'OS-1005')
-    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Gerar OP' }))
+    await acao('Gerar OP')
     const dialog = await screen.findByRole('dialog', { name: 'Gerar OP' })
     expect(within(dialog).getByText('Serviços com OP existente')).toBeTruthy()
     expect(within(dialog).getByText('OS-1004')).toBeTruthy()
@@ -1052,7 +1071,7 @@ describe('Geral: comandos Auditoria, Gerar OP, Disparar e Registrar Erro', () =>
   it('Gerar OP só com serviços que já têm OP avisa e não abre o diálogo', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await pick('OS-1004')
-    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Gerar OP' }))
+    await acao('Gerar OP')
     expect(await screen.findByText('Todos os serviços selecionados já possuem OP.')).toBeTruthy()
     expect(screen.queryByRole('dialog', { name: 'Gerar OP' })).toBeNull()
   })
@@ -1060,7 +1079,7 @@ describe('Geral: comandos Auditoria, Gerar OP, Disparar e Registrar Erro', () =>
   it('Disparar com a OS-1013 reporta a falha parcial', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await pick('OS-1013', 'OS-1005')
-    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Disparar' }))
+    await acao('Disparar')
     const dialog = await screen.findByRole('dialog', { name: 'Marcar 2 serviço(s) como Programado?' })
     expect(within(dialog).getByText('Serviços sem motorista são recusados pelo servidor.')).toBeTruthy()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Disparar' }))

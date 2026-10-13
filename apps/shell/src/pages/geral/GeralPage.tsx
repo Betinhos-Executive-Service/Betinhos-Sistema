@@ -1,7 +1,7 @@
 import { useCallback, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
 import { Alert, Button, EmptyState, Menu, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
-import { Archive, ArchiveRestore, Bug, CalendarDays, ClipboardList, Copy, FilePlus2, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Send, ShieldCheck, Ticket, X } from 'lucide-react'
+import { Archive, ArchiveRestore, Bug, CalendarDays, ChevronDown, ClipboardList, Copy, FilePlus2, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Send, ShieldCheck, Ticket, X } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
 import { useMedia } from '../operacional/useMedia'
@@ -361,26 +361,27 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     onClick: (event: MouseEvent<HTMLButtonElement>) => event.preventDefault(),
   })
   const none = selectedIds.length === 0
+  // Rótulo de item de menu com o motivo embaixo quando o item está inerte.
+  const hint = (label: string, reason: string | null) => (reason ? <span className="gr-menu__hint" title={reason}>{label}<small>{reason}</small></span> : label)
   const createButton = <Button size={mobile ? 'touch' : 'compact'} icon={<Plus size={16} />} onClick={() => { void openForm('create') }}>Criar serviço</Button>
-  // Desktop: todos os comandos ficam sempre na barra (a posição não pula); sem seleção servível ficam inertes, com o motivo.
+  // Desktop: Criar, Editar e Desativar/Ativar ficam na barra (a posição não pula); os demais comandos de seleção vivem no menu "Ações".
+  // Sem seleção servível, botões e itens ficam inertes, com o motivo.
   const commands = mobile ? createButton : (
     <>
       {createButton}
       {selectedIds.length === 1
         ? <Button variant="action" size="compact" icon={<Pencil size={16} />} onClick={() => { void openForm('edit', selectedIds[0]) }}>Editar</Button>
         : <Button variant="action" size="compact" icon={<Pencil size={16} />} {...blocked(oneTitle, oneId)}>Editar</Button>}
-      {none
-        ? <Button variant="action" size="compact" icon={<Ticket size={16} />} {...blocked(noneTitle, noneId)}>Gerar Voucher</Button>
-        : <Button variant="action" size="compact" icon={<Ticket size={16} />} onClick={openVoucher}>Gerar Voucher</Button>}
-      {none
-        ? <Button variant="action" size="compact" icon={<Copy size={16} />} {...blocked(noneTitle, noneId)}>Copiar Serviços</Button>
-        : <Button variant="action" size="compact" icon={<Copy size={16} />} onClick={() => { void copySelected() }}>Copiar Serviços</Button>}
-      {none
-        ? <Button variant="action" size="compact" icon={<FilePlus2 size={16} />} {...blocked(noneTitle, noneId)}>Gerar OP</Button>
-        : <Button variant="action" size="compact" icon={<FilePlus2 size={16} />} onClick={askOp}>Gerar OP</Button>}
-      {none
-        ? <Button variant="action" size="compact" icon={<Send size={16} />} {...blocked(noneTitle, noneId)}>Disparar</Button>
-        : <Button variant="action" size="compact" icon={<Send size={16} />} onClick={() => setDispRequest({ ids: selectedIds })}>Disparar</Button>}
+      <Menu
+        align="start"
+        trigger={(props) => <Button {...props} variant="action" size="compact" icon={<ChevronDown size={16} />} aria-label={none ? 'Ações' : `Ações (${selectedIds.length})`}>Ações{none ? null : <span className="gr-filters__count">{selectedIds.length}</span>}</Button>}
+        actions={[
+          { id: 'voucher', label: hint('Gerar Voucher', none ? noneTitle : null), icon: <Ticket size={16} />, disabled: none, onSelect: openVoucher },
+          { id: 'copiar', label: hint('Copiar Serviços', none ? noneTitle : null), icon: <Copy size={16} />, disabled: none, onSelect: () => { void copySelected() } },
+          { id: 'op', label: hint('Gerar OP', none ? noneTitle : null), icon: <FilePlus2 size={16} />, disabled: none, onSelect: askOp },
+          { id: 'disparar', label: hint('Disparar', none ? noneTitle : null), icon: <Send size={16} />, disabled: none, onSelect: () => setDispRequest({ ids: selectedIds }) },
+        ]}
+      />
       {none
         ? <Button variant="danger" size="compact" icon={<Archive size={16} />} {...blocked(noneTitle, noneId)}>Desativar</Button>
         : selectedState === 1

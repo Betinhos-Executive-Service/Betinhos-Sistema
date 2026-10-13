@@ -7,6 +7,8 @@
 /* Numa linha de 40 px, sem quebrar, quando cabe: com a navegação no trilho a partir de 1200 px; com ela aberta (238 px a mais) a partir de 1360 px.
    Abaixo disso (e no celular) a barra quebra em vez de cortar comandos. */
 .gr-toolbar .bt-button { white-space: nowrap; }
+/* O alternador Tabela | Cards nunca encolhe nem ganha rolagem própria dentro da barra. */
+.gr-toolbar .bt-segmented { flex: 0 0 auto; overflow: visible; }
 @media (min-width: 1200px) {
   .bt-shell--rail .gr-toolbar, .bt-shell--rail .gr-toolbar .bt-page-toolbar__start, .bt-shell--rail .gr-toolbar .bt-page-toolbar__end { flex-wrap: nowrap; }
   .bt-shell--rail .gr-toolbar .bt-page-toolbar__start { flex: 1 1 auto; }
