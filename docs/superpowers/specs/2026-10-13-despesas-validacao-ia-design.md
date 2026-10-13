@@ -19,6 +19,13 @@ Motivação (PROD, 13/10/2026): 1.100 despesas (R$ 121,4 mil) desde 01/07 parada
 | Resultado | Colunas novas em `cr40f_despesaoperacional`. |
 | Conta API | Conta Anthropic existente; workspace próprio ("Despesas") com limite de gasto mensal. |
 | Modelo | `claude-opus-5-5`, effort `medium`, structured outputs. Custo estimado: ~R$ 0,10 por despesa, R$ 30–40/mês (~310 despesas/mês). |
+| Armazenamento | Comprovantes novos de despesa passam a ser salvos no SharePoint (mesmo site e biblioteca usados pelo "Flow - Consultar Arquivos Sharepoint"), pasta `Despesas/AAAA/MM`, e não mais no OneDrive da conta `noreply`. Arquivos antigos ficam onde estão. |
+
+## Armazenamento dos comprovantes
+- O upload de comprovante de despesa (hoje via "Flow Salvar Arquivos Onedrive" ou o fluxo que o App Motoristas chamar para despesas; confirmar no plano) grava no SharePoint em `Despesas/AAAA/MM/<protocolo ou id da despesa>-<ordem>.<ext>`.
+- O upload preenche no anexo: `cr40f_driveitemid` (id do item no SharePoint), `cr40f_urlsharepoint`, `cr40f_sharelink` (link interno da organização), `cr40f_mimetype` e `cr40f_tamanhobytes`.
+- Contrato com o App Motoristas preservado: mesma chamada, mesmos parâmetros e mesma resposta; só muda o destino. Se o flow for compartilhado com outros usos (não despesa), apenas o ramo de despesa muda.
+- O flow de análise lê o arquivo pelo id do item no SharePoint (conector SharePoint, "Obter conteúdo do arquivo").
 
 ## Fluxo
 1. **Gatilho**: linha modificada em `cr40f_despesaoperacional`, coluna `cr40f_statusanexo` = Completo, `cr40f_origem` = App Motoristas (100000000) e `cr40f_iastatusanalise` vazio ou Pendente. Primeira ação: gravar `Processando` (evita execução dupla).
@@ -26,7 +33,7 @@ Motivação (PROD, 13/10/2026): 1.100 despesas (R$ 121,4 mil) desde 01/07 parada
    - Comprovantes: anexos `cr40f_tipo` = Comprovante e `cr40f_status` = Enviado, até 3, por `cr40f_ordem`. Imagem (JPEG/PNG/WebP) vai como bloco `image`; PDF como `document`.
    - Lançamento: valor, data do gasto, categoria, forma de pagamento, estabelecimento, litros, km, observação.
    - OS do motorista no dia do gasto (America/Sao_Paulo): id, número, saída, destino, cliente, status.
-   - Possíveis duplicatas: despesas do mesmo motorista ou de outros com o mesmo `cr40f_sharelink`/`cr40f_urlsharepoint` de comprovante, ou mesmo valor e data em ±7 dias.
+   - Possíveis duplicatas: despesas com comprovante de mesmo `cr40f_tamanhobytes` e mesmo tipo de arquivo (mesma foto reenviada), ou mesmo valor e data em ±7 dias.
    - Referência da categoria: mediana e máximo de `cr40f_valor` nos últimos 90 dias (despesas validadas ou, enquanto não houver, todas).
 3. **Chamada**: `POST https://api.anthropic.com/v1/messages`, `anthropic-version: 2023-06-01`, `max_tokens` 4000, `output_config.format` com o schema abaixo. Chave em variável de ambiente secreta (Key Vault) ou, sem Key Vault, variável de ambiente com entradas/saídas seguras na ação HTTP.
 4. **Gravação**:
@@ -80,12 +87,13 @@ Campos ausentes no comprovante voltam `null`. `motivos` é obrigatório quando `
 Criadas no DEV, incluídas na solução AppBetinhos e publicadas; PROD via solução.
 
 ## Fora do escopo
-App Motoristas, despesas anteriores à implantação, tela React de Despesas (pode exibir as colunas `cr40f_ia*` depois), status financeiro e pagamento.
+Mudanças no App Motoristas, migração dos arquivos antigos do OneDrive, despesas anteriores à implantação, tela React de Despesas (pode exibir as colunas `cr40f_ia*` depois), status financeiro e pagamento.
 
 ## Pontos a confirmar na implementação
-- Os comprovantes estão no OneDrive da conta `noreply` (`cr40f_sharelink`); `cr40f_driveitemid`, `cr40f_mimetype`, `cr40f_tamanhobytes` e `cr40f_hasharquivo` estão vazios no PROD. O plano deve definir como o flow obtém o conteúdo (caminho conhecido pelo flow de upload "Salvar Arquivos OneDrive" ou resolução do link compartilhado via Graph).
-- Limite de 5 MB por imagem na API: medir o tamanho real das fotos no DEV; se necessário, o flow reduz ou a análise cai em Erro com motivo.
-- No PROD já há comprovantes com o mesmo link de arquivo em despesas diferentes (amostra de 13/10): o contexto de duplicidade por link cobre esse caso.
+- Qual flow o App Motoristas chama para subir o comprovante de despesa, se ele é compartilhado com outros uploads, e o site/biblioteca exatos usados pelo "Flow - Consultar Arquivos Sharepoint".
+- Hoje (PROD, 13/10) `cr40f_driveitemid`, `cr40f_mimetype`, `cr40f_tamanhobytes` e `cr40f_hasharquivo` estão vazios; o novo upload passa a preencher os três primeiros.
+- Limite de 5 MB por imagem na API: medir o tamanho real das fotos no DEV; se necessário, a análise cai em Erro com motivo "arquivo acima de 5 MB".
+- No PROD já há comprovantes com o mesmo link de arquivo em despesas diferentes (amostra de 13/10): indica reenvio ou duplicação no upload; investigar no plano.
 
 ## Verificação
 1. Conjunto de ~30 despesas reais copiadas para o DEV (fotos boas, ruins, PDF, duplicadas, valor divergente) com a decisão esperada anotada.
