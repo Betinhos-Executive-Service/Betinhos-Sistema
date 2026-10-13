@@ -1,0 +1,316 @@
+import { memo, useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react'
+import type { Row } from '@betinhos/dataverse'
+import { Button, Input, Select, Spinner, StatusBadge, Switch, Textarea, Tooltip, type SelectOption } from '@betinhos/ui'
+import { AlertTriangle, Check, Lock } from 'lucide-react'
+import { cellKind, MOTORISTA_TITLE, statusTone } from '../domain/cells'
+import type { EditValue } from '../domain/edit'
+import { decideChoice, decideCommit, draftOf, lookupOptions, sameId, type PickedOption } from '../domain/editing'
+import { formatCell } from '../domain/format'
+import { columnLabel, rowKey } from '../domain/layout'
+import { ID_ATTRIBUTE, type AttributeInfo, type CellStatus, type Column, type LookupOption } from '../domain/types'
+import { useLookupSearch } from './useLookupSearch'
+
+type Props = {
+  row: Row
+  column: Column
+  info: AttributeInfo | undefined
+  status: CellStatus
+  /** Grava o valor; devolve `false` quando falhou (o erro chega por `status`). Estável: a célula passa o próprio id e coluna. */
+  onSave: (id: string, column: Column, value: EditValue) => Promise<boolean>
+  /** Limpa o aviso de erro da célula. Estável. */
+  onReset: (id: string, attribute: string) => void
+  /** Chamado ao entrar em edição: a tela seleciona a linha. */
+  onBeginEdit?: (id: string) => void
+  /** Busca no servidor as opções de um lookup. Estável. */
+  search: (attribute: string, text: string) => Promise<LookupOption[]>
+  /** `false` enquanto a metadata não chegou: nenhuma célula edita. */
+  editable: boolean
+}
+
+type Pick = PickedOption
+
+const STATUS_COLUMNS: ReadonlySet<string> = new Set(['cr40f_status', 'cr40f_statusdefaturamento'])
+const MEMO_MAX_LINES = 8
+
+const isSelect = (kind: string) => kind === 'choice' || kind === 'lookup'
+const cellsOf = (row: Element) => Array.from(row.children).filter((child) => child.getAttribute('role') === 'gridcell')
+
+/** Foca a célula; as que não são focáveis (primeira coluna, seleção) entregam o foco ao controle de dentro. */
+function focusCell(target: Element | undefined) {
+  if (!(target instanceof HTMLElement)) return
+  if (target.tabIndex >= 0) target.focus()
+  else target.querySelector<HTMLElement>('button, input, [tabindex]')?.focus()
+}
+
+/** Setas: move o foco para a célula vizinha, na mesma coluna (cima e baixo) ou na mesma linha. */
+function moveFocus(from: HTMLElement, rows: number, columns: number) {
+  const row = from.closest('[role="row"]')
+  if (!row) return
+  const index = cellsOf(row).indexOf(from)
+  let target: Element | null = row
+  if (rows !== 0) {
+    target = rows > 0 ? row.nextElementSibling : row.previousElementSibling
+    while (target && target.getAttribute('role') !== 'row') target = rows > 0 ? target.nextElementSibling : target.previousElementSibling
+  }
+  if (target) focusCell(cellsOf(target)[index + columns])
+}
+
+/** Próxima (ou anterior) célula editável da mesma linha. */
+function siblingEditable(from: HTMLElement, step: 1 | -1) {
+  let next = step > 0 ? from.nextElementSibling : from.previousElementSibling
+  while (next && !next.matches('.gr-cell--editable')) next = step > 0 ? next.nextElementSibling : next.previousElementSibling
+  return next instanceof HTMLElement ? next : null
+}
+
+function grow(area: HTMLTextAreaElement) {
+  // O jsdom não calcula layout: scrollHeight vem 0 e não há o que ajustar.
+  if (area.scrollHeight === 0) return
+  const line = parseFloat(window.getComputedStyle(area).lineHeight) || 20
+  area.style.height = 'auto'
+  area.style.height = `${Math.min(area.scrollHeight, line * MEMO_MAX_LINES)}px`
+}
+
+/** Célula do grid: lê o valor e, ao editar, troca pelo controle do tipo com feedback de gravação ali mesmo. */
+export const Cell = memo(function Cell({ row, column, info, status, onSave, onReset, onBeginEdit, search, editable }: Props) {
+  const key = rowKey(column, info)
+  const kind = cellKind(column, info)
+  const raw = row[key]
+  const text = formatCell(kind, row, key)
+  const label = columnLabel(column, info)
+  const canEdit = editable && kind !== 'readonly' && kind !== 'boolean'
+
+  const rootRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const areaRef = useRef<HTMLTextAreaElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const describedBy = useId()
+
+  const editingRef = useRef(false)
+  const [editing, setEditingState] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [pick, setPick] = useState<Pick | null>(null)
+  const [options, setOptions] = useState<SelectOption[]>([])
+  const id = String(row[ID_ATTRIBUTE])
+  const lookup = useLookupSearch((text) => search(column.attribute, text))
+  const [localError, setLocalError] = useState<string | null>(null)
+  // Último valor digitado ou escolhido, para "Tentar de novo" reabrir a edição de onde parou.
+  const retryRef = useRef<{ draft: string; pick: Pick | null }>({ draft: '', pick: null })
+  const keepRef = useRef<Pick | null>(null)
+  // Boolean não tem modo de edição: guarda o último valor tentado para o "Tentar de novo" regravar.
+  const lastBoolean = useRef<boolean | null>(null)
+
+  const setEditing = (value: boolean) => { editingRef.current = value; setEditingState(value) }
+
+  // Lookup: depois da busca, as opções vêm do servidor, com a atual no topo.
+  const selectOptions = kind === 'lookup' && lookup.found ? lookupOptions(lookup.found, keepRef.current) : options
+  const message = localError ?? (status.kind === 'error' ? status.message : null)
+  const state = message ? 'error' : status.kind
+
+  const current = (): Pick | null => (raw == null || raw === '' ? null : { value: String(raw), label: text })
+
+  const restoreFocus = () => {
+    // Depois do commit: se o foco caiu no corpo da página (o controle saiu), devolve à célula; se o usuário foi para outra, não toma.
+    window.setTimeout(() => {
+      const active = document.activeElement
+      if (!active || active === document.body || rootRef.current?.contains(active)) rootRef.current?.focus()
+    }, 0)
+  }
+
+  const finish = () => {
+    lookup.reset()
+    setLocalError(null)
+    setEditing(false)
+  }
+
+  const submit = (value: EditValue) => { void onSave(id, column, value).catch(() => undefined) }
+
+  const begin = (char?: string, retry = false) => {
+    if (!canEdit || editingRef.current || status.kind === 'saving') return
+    if (status.kind === 'error') onReset(id, column.attribute)
+    setLocalError(null)
+    lookup.reset()
+    if (isSelect(kind)) {
+      const chosen = retry ? retryRef.current.pick : current()
+      const keep = current()
+      keepRef.current = keep
+      setPick(chosen)
+      if (kind === 'choice') {
+        const list = (info?.options ?? []).map((o) => ({ value: String(o.value), label: o.label }))
+        setOptions(keep && !list.some((o) => o.value === keep.value) ? [keep, ...list] : list)
+      } else {
+        const list = [keep, chosen].filter((o): o is Pick => o != null)
+        setOptions(list.filter((o, i) => list.findIndex((p) => sameId(p.value, o.value)) === i))
+      }
+    } else {
+      setDraft(retry ? retryRef.current.draft : char ?? draftOf(kind, row, key))
+    }
+    onBeginEdit?.(id)
+    setEditing(true)
+  }
+
+  useEffect(() => {
+    if (!editing) return
+    if (isSelect(kind)) {
+      // O gatilho do Select é um botão: foco + clique abre o painel já ao entrar em edição.
+      triggerRef.current?.focus()
+      triggerRef.current?.click()
+      return
+    }
+    const control = kind === 'memo' ? areaRef.current : inputRef.current
+    if (!control) return
+    control.focus()
+    if (control instanceof HTMLTextAreaElement) { control.setSelectionRange(control.value.length, control.value.length); grow(control) }
+    else if (control.type === 'text') control.setSelectionRange(control.value.length, control.value.length)
+    // Só ao entrar em edição: digitar não pode mover o cursor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing])
+
+  /** Confirma o que está digitado. `false` quando o valor é inválido e a edição continua aberta. */
+  const confirm = (): boolean => {
+    if (!editingRef.current) return true
+    // Choice e lookup já gravaram ao escolher; sair sem escolher só fecha.
+    if (isSelect(kind)) { finish(); return true }
+    const decision = decideCommit(kind, draft, raw, inputRef.current?.validity.badInput === true)
+    retryRef.current = { draft, pick: null }
+    if (decision && 'error' in decision) { setLocalError(decision.error); return false }
+    finish()
+    if (decision) submit(decision.submit)
+    return true
+  }
+
+  const retry = () => {
+    if (kind !== 'boolean') { begin(undefined, true); return }
+    onReset(id, column.attribute)
+    submit(lastBoolean.current ?? raw !== true)
+  }
+
+  const cancel = () => { finish(); restoreFocus() }
+
+  const chosen = (value: string | null) => {
+    const option = selectOptions.find((o) => o.value === value)
+    retryRef.current = { draft: '', pick: value == null ? null : { value, label: option?.label ?? value } }
+    finish()
+    restoreFocus()
+    const decision = decideChoice(kind, value, raw, option?.label ?? '')
+    if (decision) submit(decision.submit)
+  }
+
+  const onKeyDownCapture = (event: KeyboardEvent<HTMLDivElement>) => {
+    // O Select consome o Esc no próprio gatilho; a captura garante que cancelar sempre cancele a edição inteira.
+    if (editingRef.current && event.key === 'Escape') { event.stopPropagation(); event.preventDefault(); cancel() }
+  }
+
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.nativeEvent.isComposing) return
+    const root = event.currentTarget
+    if (editingRef.current) {
+      if (event.key === 'Tab') {
+        event.preventDefault()
+        if (!confirm()) return
+        const next = siblingEditable(root, event.shiftKey ? -1 : 1)
+        if (next) next.focus()
+        else restoreFocus()
+      } else if (event.key === 'Enter' && (kind === 'text' || kind === 'money' || kind === 'datetime' || (kind === 'memo' && (event.ctrlKey || event.metaKey)))) {
+        event.preventDefault()
+        if (confirm()) restoreFocus()
+      }
+      return
+    }
+    if (event.target !== root) return
+    const move = (rows: number, columns: number) => { event.preventDefault(); moveFocus(root, rows, columns) }
+    switch (event.key) {
+      case 'ArrowUp': return move(-1, 0)
+      case 'ArrowDown': return move(1, 0)
+      case 'ArrowLeft': return move(0, -1)
+      case 'ArrowRight': return move(0, 1)
+      case 'Enter': case 'F2': if (canEdit) { event.preventDefault(); begin() } return
+      default:
+        if (canEdit && (kind === 'text' || kind === 'memo' || kind === 'money') && event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+          // O caractere entra como rascunho; sem isso o navegador o digitaria de novo no campo recém-aberto.
+          event.preventDefault()
+          begin(event.key)
+        }
+    }
+  }
+
+  const onBlur = (event: FocusEvent<HTMLDivElement>) => {
+    if (!editingRef.current) return
+    const next = event.relatedTarget
+    if (next instanceof Node && (event.currentTarget.contains(next) || (next instanceof Element && next.closest('.bt-select-panel')))) return
+    confirm()
+  }
+
+  const type = (setter: (value: string) => void) => (event: { target: { value: string } }) => { setter(event.target.value); setLocalError(null) }
+
+  let control
+  if (kind === 'text') control = <Input ref={inputRef} size="compact" value={draft} aria-label={label} invalid={localError != null} onChange={type(setDraft)} />
+  else if (kind === 'money') control = <Input ref={inputRef} size="compact" inputMode="decimal" prefix="R$" value={draft} aria-label={label} invalid={localError != null} onChange={type(setDraft)} />
+  else if (kind === 'datetime') control = <Input ref={inputRef} size="compact" type="datetime-local" value={draft} aria-label={label} invalid={localError != null} onChange={type(setDraft)} />
+  else if (kind === 'memo') control = <Textarea ref={areaRef} rows={3} value={draft} aria-label={label} invalid={localError != null} onChange={(event) => { type(setDraft)(event); grow(event.target) }} />
+  else if (isSelect(kind)) {
+    const select = (
+      <Select
+        ref={triggerRef}
+        size="compact"
+        aria-label={label}
+        options={selectOptions}
+        value={pick?.value ?? null}
+        searchable={kind === 'lookup'}
+        clearable={kind === 'lookup'}
+        loading={lookup.searching}
+        onSearchChange={kind === 'lookup' ? lookup.onSearch : undefined}
+        onChange={chosen}
+      />
+    )
+    control = column.attribute === 'cr40f_motorista' && !column.alias ? <div title={MOTORISTA_TITLE}>{select}</div> : select
+  }
+
+  const rawStatus = typeof raw === 'number' ? raw : null
+  const badge = !column.alias && STATUS_COLUMNS.has(column.attribute) && rawStatus != null
+  const href = typeof raw === 'string' && /^https?:\/\//i.test(raw) ? raw : null
+
+  let value
+  if (kind === 'boolean') {
+    value = (
+      <Switch
+        label={null}
+        aria-label={label}
+        checked={raw === true}
+        disabled={!editable || status.kind === 'saving'}
+        onChange={(event) => { lastBoolean.current = event.target.checked; submit(event.target.checked) }}
+      />
+    )
+  } else if (badge) value = <StatusBadge tone={statusTone(column.attribute, rawStatus)}>{text}</StatusBadge>
+  else if (href && column.attribute === 'new_linkdovoucher') value = <a className="gr-cell__value" href={href} target="_blank" rel="noreferrer" title={text}>{text}</a>
+  else value = <span className="gr-cell__value" title={text}>{text}</span>
+
+  const classes = ['bt-table__cell', 'gr-cell', `gr-cell--${kind}`, canEdit && 'gr-cell--editable', editing && 'gr-cell--editing', `is-${state}`].filter(Boolean).join(' ')
+
+  return (
+    <div
+      ref={rootRef}
+      className={classes}
+      role="gridcell"
+      tabIndex={0}
+      aria-busy={status.kind === 'saving' || undefined}
+      aria-invalid={message ? true : undefined}
+      aria-describedby={message ? describedBy : undefined}
+      onKeyDownCapture={onKeyDownCapture}
+      onKeyDown={onKeyDown}
+      onDoubleClick={() => { if (!editingRef.current && canEdit) begin() }}
+      onBlur={onBlur}
+    >
+      {editing ? <div className="gr-cell__editor">{control}</div> : value}
+      {!editing && status.kind === 'saving' ? <span className="gr-cell__mark"><Spinner size={12} label="Gravando" /></span> : null}
+      {!editing && status.kind === 'saved' ? <span className="gr-cell__mark" role="img" aria-label="Salvo"><Check size={14} aria-hidden="true" /></span> : null}
+      {message ? (
+        <>
+          <Tooltip text={message} placement="bottom"><span className="gr-cell__mark"><AlertTriangle size={14} aria-hidden="true" /></span></Tooltip>
+          <span id={describedBy} className="gr-sr">Erro: {message}</span>
+        </>
+      ) : null}
+      {!editing && status.kind === 'error' ? <Button variant="ghost" size="compact" onClick={retry}>Tentar de novo</Button> : null}
+      {kind === 'readonly' && editable && !message ? <span className="gr-cell__mark gr-cell__lock" role="img" aria-label="Somente leitura"><Lock size={12} aria-hidden="true" /></span> : null}
+    </div>
+  )
+})

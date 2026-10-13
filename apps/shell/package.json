@@ -9,7 +9,8 @@
     "build": "node ../../packages/deploy/bump-version.mjs . && tsc --noEmit && vite build && node ../../packages/deploy/inline-webresource.mjs dist",
     "wr": "pnpm build",
     "test": "vitest run",
-    "push": "pnpm build && powershell.exe -NoProfile -ExecutionPolicy Bypass -File ../../packages/deploy/push-dev.ps1 -AppDir apps/shell -ResourceName cr40f_SistemaBetinhos.html -DisplayName \"Sistema Betinhos\" -LoaderName cr40f_SistemaBetinhosLoader.html -DeviceCode"
+    "push": "pnpm build && powershell.exe -NoProfile -ExecutionPolicy Bypass -File ../../packages/deploy/push-dev.ps1 -AppDir apps/shell -ResourceName cr40f_SistemaBetinhos.html -DisplayName \"Sistema Betinhos\" -LoaderName cr40f_SistemaBetinhosLoader.html -DeviceCode",
+    "sitemap:geral": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ../../packages/deploy/sitemap-dev.ps1 -SiteMapUniqueName cr40f_ModelDrivenBetinhos -AfterSubAreaId subarea_a5c599b3 -SubAreaId subarea_geral_novo -Title \"Geral (novo)\" -Url \"$webresource:cr40f_SistemaBetinhosLoader.html?data=geral\" -DeviceCode"
   },
   "dependencies": {
     "@betinhos/dataverse": "workspace:*",

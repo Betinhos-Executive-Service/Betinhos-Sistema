@@ -8,6 +8,7 @@
     "build": "pnpm --filter @betinhos/shell build",
     "wr": "pnpm --filter @betinhos/shell wr",
     "push": "pnpm --filter @betinhos/shell push",
+    "sitemap:geral": "pnpm --filter @betinhos/shell sitemap:geral",
     "test": "pnpm -r test",
     "typecheck": "pnpm --filter @betinhos/shell typecheck",
     "tokens": "node packages/deploy/sync-tokens.mjs"
