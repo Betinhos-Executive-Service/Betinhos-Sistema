@@ -3,7 +3,7 @@ import type { Motorista, Reserva, Veiculo } from './types'
 const STATUS_CONCLUIDO = 202410008
 
 const suavizar = (t: string) =>
-  t.length > 3 && t === t.toUpperCase() && t !== t.toLowerCase() ? t.toLowerCase().replace(/(^|\s)\p{L}/gu, (l) => l.toUpperCase()) : t
+  t.length > 3 && t === t.toUpperCase() && t !== t.toLowerCase() ? t.split(/(\s+)/).map((w) => (/\d/.test(w) ? w : w.toLowerCase().replace(/^\p{L}/u, (l) => l.toUpperCase()))).join('') : t
 
 const nomeDoCarro = (v: Veiculo) => [v.modelo, v.cor].map((p) => suavizar(p.trim())).filter(Boolean).join(' ')
 

@@ -79,7 +79,7 @@ export function createSource(host: Host): Source {
         method: 'POST',
         body: JSON.stringify({ new_ReservaId: reservaId }),
       })
-      return JSON.parse(r.new_LinkJson ?? '{"ok":false,"erro":"Resposta vazia."}')
+      return r.new_LinkJson ? JSON.parse(r.new_LinkJson) : { ok: false, erro: 'Não foi possível gerar o link agora.' }
     },
     openReserva(reservaId) {
       // XrmHost.Navigation é Record<string, unknown>: o cast para openForm continua necessário.

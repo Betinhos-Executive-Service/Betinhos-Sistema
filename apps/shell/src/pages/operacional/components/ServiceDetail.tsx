@@ -90,7 +90,7 @@ export function ServiceDetail({ reserva, filhos, motoristas, reservas, now, stat
 
       <dl className="op-detail__grid">
         <Info label="Motorista">{reserva.motorista ? <><Avatar name={reserva.motorista} size="sm" /> {reserva.motorista}</> : null}</Info>
-        <Info label="Veículo">{reserva.veiculo || reserva.tipoVeiculo}</Info>
+        <Info label="Tipo de veículo">{reserva.tipoVeiculo || '—'}</Info>
         <Info label="Carro">{carro ? descreverCarro(carro) : 'Carro não informado'}</Info>
         <Info label="Cliente">{reserva.cliente}</Info>
         <Info label="Solicitante">{reserva.solicitante}</Info>
