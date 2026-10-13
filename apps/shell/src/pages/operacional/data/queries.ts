@@ -50,11 +50,14 @@ export function mapReserva(row: Row): Reserva {
     solicitante: text(row, '_cr40f_solicitante_value'),
     passageirosLookup: PASSAGEIRO_LOOKUPS.flatMap((field) => (id(row[field]) ? [{ id: id(row[field])!, nome: text(row, field) }] : [])),
     passageirosTexto: text(row, 'cr40f_passageirosetelefonedecontato'),
+    veiculoId: id(row._cr40f_veiculo_value),
+    linkAcompanhamento: '',
+    linkExpiraEm: null,
   }
 }
 
 export function mapMotorista(row: Row): Motorista {
-  return { id: id(row.cr40f_funcionariosid) ?? '', nome: text(row, 'cr40f_nomecompleto'), apelido: text(row, 'new_apelido'), celular: text(row, 'cr40f_celular') }
+  return { id: id(row.cr40f_funcionariosid) ?? '', nome: text(row, 'cr40f_nomecompleto'), apelido: text(row, 'new_apelido'), celular: text(row, 'cr40f_celular'), veiculoAtualId: null, terceiro: false }
 }
 
 async function loadReservas(client: DataverseClient, entitySet: string, key: string) {
@@ -78,7 +81,7 @@ async function loadMotoristas(client: DataverseClient, entitySet: string, reserv
     warnings.push('Não foi possível carregar a lista de motoristas; mostrando os que aparecem nas reservas.')
   }
   const derived = new Map<string, Motorista>()
-  for (const r of reservas) if (r.motoristaId && !derived.has(r.motoristaId)) derived.set(r.motoristaId, { id: r.motoristaId, nome: r.motorista, apelido: '', celular: '' })
+  for (const r of reservas) if (r.motoristaId && !derived.has(r.motoristaId)) derived.set(r.motoristaId, { id: r.motoristaId, nome: r.motorista, apelido: '', celular: '', veiculoAtualId: null, terceiro: false })
   return [...derived.values()]
 }
 
@@ -116,5 +119,5 @@ export async function loadOperacional(client: DataverseClient, sets: EntitySets,
     loadPassageiros(client, sets.passageiro, reservas.map((r) => r.id), warnings),
     loadMotoristas(client, sets.funcionario, reservas, warnings),
   ])
-  return { reservas, motoristas, passageiros, queryMode, warnings }
+  return { reservas, motoristas, veiculos: [], passageiros, queryMode, warnings }
 }
