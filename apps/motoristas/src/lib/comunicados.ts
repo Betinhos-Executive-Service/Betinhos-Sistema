@@ -337,10 +337,13 @@ export async function loadMotoristasElegiveis(): Promise<MotoristaElegivel[]> {
 
 const DESTINATARIO_SELECT = "$select=new_comunicadodestinatarioid,_new_comunicado_value,_new_motorista_value,new_titulo,new_corpo,new_tipo,new_enviadoem,new_abertoem,new_lidoem,new_cienteem,new_nomeassinante,new_observacao,new_assinaturajson,new_pushstatus,new_pusherro";
 
-export async function loadDriverComunicados() {
+export async function loadDriverComunicados(motoristaId: string) {
   if (isMockComunicados()) return mockRequest<ComunicadoDestinatario[]>(`/recipients?driverId=${LOCAL_DRIVER_ID}`);
-  const rows = await allRows(DATAVERSE.comunicadoDestinatarios, `${DESTINATARIO_SELECT}&$orderby=new_enviadoem desc`);
-  return rows.map(mapDestinatario);
+  // Filtra pelo motorista logado: usuários com leitura ampla (admin) veriam a ciência de todos os motoristas.
+  const id = cleanGuid(motoristaId);
+  if (!GUID_PATTERN.test(id)) throw new Error("Motorista não identificado para carregar comunicados.");
+  const rows = await allRows(DATAVERSE.comunicadoDestinatarios, `${DESTINATARIO_SELECT}&$filter=_new_motorista_value eq ${id}&$orderby=new_enviadoem desc`);
+  return rows.map(mapDestinatario).filter((row) => cleanGuid(row.motoristaId) === id);
 }
 
 export async function loadGestaoComunicados() {
