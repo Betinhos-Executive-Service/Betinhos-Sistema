@@ -26,5 +26,5 @@ export function mensagemCliente({ motorista, carro, link }: { motorista: string;
 }
 
 export function linkValido(reserva: Reserva, now: Date) {
-  return reserva.linkAcompanhamento && reserva.linkExpiraEm && reserva.linkExpiraEm > now ? reserva.linkAcompanhamento : null
+  return (reserva.linkAcompanhamento && reserva.linkExpiraEm && reserva.linkExpiraEm > now ? reserva.linkAcompanhamento : null) || null
 }

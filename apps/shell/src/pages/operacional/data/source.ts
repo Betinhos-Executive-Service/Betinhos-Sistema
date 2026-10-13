@@ -13,6 +13,7 @@ export type Source = {
   setStatus: (reservaId: string, value: number) => Promise<void>
   setMotorista: (reservaId: string, motoristaId: string | null) => Promise<void>
   openReserva: (reservaId: string) => void
+  gerarLink: (reservaId: string) => Promise<{ ok: true; link: string; expiraEm: string } | { ok: false; erro: string }>
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -39,6 +40,14 @@ function createMockSource(): Source {
       if (r) Object.assign(r, { motoristaId: m?.id ?? null, motorista: m?.nome ?? '' })
     },
     openReserva() { /* fora do Dataverse não há formulário para abrir */ },
+    async gerarLink(reservaId) {
+      await wait(500)
+      const link = `https://acompanhar-motorista.example/r/${'0'.repeat(64)}`
+      const expiraEm = new Date(Date.now() + 4 * 3600e3)
+      const r = data?.reservas.find((item) => item.id === reservaId)
+      if (r) Object.assign(r, { linkAcompanhamento: link, linkExpiraEm: expiraEm })
+      return { ok: true, link, expiraEm: expiraEm.toISOString() }
+    },
   }
 }
 
@@ -52,7 +61,7 @@ export function createSource(host: Host): Source {
       if (!value) throw new Error(`Tabela ${name} não encontrada na metadata.`)
       return value
     }
-    return { reserva: set(ENTITIES.reserva), funcionario: set(ENTITIES.funcionario), passageiro: set(ENTITIES.passageiro) }
+    return { reserva: set(ENTITIES.reserva), funcionario: set(ENTITIES.funcionario), passageiro: set(ENTITIES.passageiro), veiculo: set(ENTITIES.veiculo) }
   }).catch((error) => { sets = null; throw error }))
 
   return {
@@ -64,6 +73,13 @@ export function createSource(host: Host): Source {
       const s = await entitySets()
       if (motoristaId === null) await host.client.request(motoristaRefPath(s.reserva, reservaId), { method: 'DELETE' })
       else await host.client.update(s.reserva, reservaId, motoristaPatch(s.funcionario, motoristaId))
+    },
+    async gerarLink(reservaId) {
+      const r = await host.client.request<{ new_LinkJson?: string }>('new_GerarLinkAcompanhamento', {
+        method: 'POST',
+        body: JSON.stringify({ new_ReservaId: reservaId }),
+      })
+      return JSON.parse(r.new_LinkJson ?? '{"ok":false,"erro":"Resposta vazia."}')
     },
     openReserva(reservaId) {
       // XrmHost.Navigation é Record<string, unknown>: o cast para openForm continua necessário.

@@ -147,7 +147,8 @@ function Operacional({ host }: { host: Host }) {
 
   const renderDetail = (r: Reserva) => (
     <ServiceDetail reserva={r} filhos={op.data?.passageiros[r.id] ?? []} motoristas={motoristas} reservas={op.reservas} now={now}
-      statusOptions={statusOptions} busy={busy} onStatus={(o) => void changeStatus({ reservaId: r.id, codigo: r.codigo }, o)}
+      statusOptions={statusOptions} busy={busy} veiculos={op.data?.veiculos ?? []}
+      onGerarLink={() => source.gerarLink(r.id).then((res) => { if (res.ok) void op.refresh(); return res })} onStatus={(o) => void changeStatus({ reservaId: r.id, codigo: r.codigo }, o)}
       onMotorista={(m) => void changeMotorista({ reservaId: r.id, codigo: r.codigo }, m)} onOpenReserva={() => source.openReserva(r.id)} />
   )
   const panel = detailed ? renderDetail(detailed) : <EmptyState compact align="start" title="Selecione um serviço para ver os detalhes" />
