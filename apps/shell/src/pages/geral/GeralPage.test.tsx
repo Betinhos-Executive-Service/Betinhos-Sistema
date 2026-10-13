@@ -13,6 +13,8 @@ const hooks = vi.hoisted(() => ({
   update: null as null | Source['update'],
   attributes: null as null | Source['attributes'],
   mixedState: false,
+  programada: false,
+  gerarLink: null as null | Source['gerarLink'],
 }))
 vi.mock('./data/source', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./data/source')>()
@@ -27,8 +29,10 @@ vi.mock('./data/source', async (importOriginal) => {
         copyRows: (ids) => (hooks.copyRows ? hooks.copyRows(ids) : source.copyRows(ids)),
         attributes: (entity) => (hooks.attributes ? hooks.attributes(entity) : source.attributes(entity)),
         update: (id, patch) => (hooks.update ? hooks.update(id, patch) : source.update(id, patch)),
+        gerarLink: (id) => (hooks.gerarLink ? hooks.gerarLink(id) : source.gerarLink(id)),
         page: async (request) => {
           const page = await source.page(request)
+          if (hooks.programada) return { ...page, rows: page.rows.map((row, index) => (index === 0 ? { ...row, cr40f_status: 202410005, _cr40f_motorista_value: 'm1' } : index === 1 ? { ...row, cr40f_status: 202410001 } : row)) }
           return hooks.mixedState ? { ...page, rows: page.rows.map((row, index) => (index === 1 ? { ...row, statecode: 1 } : row)) } : page
         },
       }
@@ -453,6 +457,45 @@ describe('Geral: correções finais', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Copiar serviços' })).toBeNull())
     await new Promise((resolve) => { window.setTimeout(resolve, 700) })
     expect(screen.queryByRole('dialog', { name: 'Copiar serviços' })).toBeNull()
+  })
+
+  describe('Gerar link', () => {
+    const writeText = vi.fn()
+    beforeEach(() => { hooks.programada = true; writeText.mockReset().mockResolvedValue(undefined); vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } }) })
+    afterEach(() => { hooks.programada = false; hooks.gerarLink = null; vi.unstubAllGlobals() })
+    const item = async () => {
+      fireEvent.click(within(screen.getByRole('toolbar', { name: 'Filtros de serviços' })).getByRole('button', { name: /^Ações/ }))
+      return screen.findByRole('menuitem', { name: /^Gerar link/, hidden: true })
+    }
+
+    it('fica inerte quando o serviço não está Programado', async () => {
+      render(<GeralPage host={{ mode: 'mock' }} />)
+      await screen.findAllByText(PAGE1)
+      fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[2]).getByRole('checkbox'))
+      const menuitem = await item()
+      expect(menuitem.getAttribute('aria-disabled') === 'true' || (menuitem as HTMLButtonElement).disabled).toBe(true)
+      expect(menuitem.textContent).toContain('Programado')
+    })
+
+    it('gera, copia e avisa', async () => {
+      hooks.gerarLink = async () => ({ ok: true, link: 'https://acompanhe.test/x' })
+      render(<GeralPage host={{ mode: 'mock' }} />)
+      await screen.findAllByText(PAGE1)
+      fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
+      fireEvent.click(await item())
+      expect(await screen.findByText('Link gerado e copiado.')).toBeTruthy()
+      expect(writeText).toHaveBeenCalledWith('https://acompanhe.test/x')
+    })
+
+    it('mostra o erro devolvido', async () => {
+      hooks.gerarLink = async () => ({ ok: false, erro: 'Sem rastreador.' })
+      render(<GeralPage host={{ mode: 'mock' }} />)
+      await screen.findAllByText(PAGE1)
+      fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
+      fireEvent.click(await item())
+      expect(await screen.findByText('Sem rastreador.')).toBeTruthy()
+      expect(writeText).not.toHaveBeenCalled()
+    })
   })
 
   describe('no celular', () => {
