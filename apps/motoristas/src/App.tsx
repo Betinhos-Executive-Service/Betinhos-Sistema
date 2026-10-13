@@ -137,6 +137,7 @@ import { VehicleChoiceDialog } from "./components/details/VehicleChoiceDialog";
 import {
   buildInfleetServiceVehiclePatch,
   needsDriverChoice,
+  thirdPartyResolution,
   type DriverVehicleChoice,
   type FleetVehicle,
   type InfleetVehicleResolution
@@ -1423,12 +1424,30 @@ function App() {
         let vehicleChoice: DriverVehicleChoice | null = null;
         if (detailToFinalize.type === "SERVICO" && detailToFinalize.dataverse?.id) {
           setProgress("Conferindo o carro na Infleet.");
-          vehicleResolution = await resolveServiceVehicleRemote(detailToFinalize.dataverse.id);
-          if (needsDriverChoice(vehicleResolution)) {
-            setRemoteOperation(null);
-            vehicleChoice = await askVehicleChoice(vehicleResolution, loadActiveFleetRemote);
-            if (!vehicleChoice) return;
-            setProgress("Registrando o carro escolhido.");
+          const thirdPartyDriver = driverContext ?? await getDriverContext();
+          if (isThirdPartyDriver(thirdPartyDriver?.funcionario)) {
+            // Terceiro não usa a Infleet: grava o carro atual dele ou pede a escolha entre os carros dele.
+            const myVehicles = await loadMyVehiclesRemote(thirdPartyDriver);
+            const currentId = getDriverCurrentVehicleId(thirdPartyDriver);
+            const current = myVehicles.find((vehicle) => vehicle.id === currentId) ?? null;
+            vehicleResolution = thirdPartyResolution(current);
+            if (current) {
+              vehicleChoice = { veiculoId: current.id, placa: current.placa, origem: "terceiro" };
+            } else {
+              setRemoteOperation(null);
+              const picked = await askVehicleChoice(vehicleResolution, async () => myVehicles);
+              if (!picked) return;
+              vehicleChoice = { ...picked, origem: "terceiro" };
+              setProgress("Registrando o carro escolhido.");
+            }
+          } else {
+            vehicleResolution = await resolveServiceVehicleRemote(detailToFinalize.dataverse.id);
+            if (needsDriverChoice(vehicleResolution)) {
+              setRemoteOperation(null);
+              vehicleChoice = await askVehicleChoice(vehicleResolution, loadActiveFleetRemote);
+              if (!vehicleChoice) return;
+              setProgress("Registrando o carro escolhido.");
+            }
           }
         }
 
@@ -1479,11 +1498,12 @@ function App() {
       if (needsDriverChoice(resolution)) {
         choice = await askVehicleChoice(resolution, createMockFleetLoader(scenario));
         if (!choice) return;
+        if (resolution.motivo === "motorista-terceiro") choice = { ...choice, origem: "terceiro" };
       }
       const patch = buildInfleetServiceVehiclePatch(resolution, choice, (vehicleId) => vehicleId);
       const outcome = resolution.decisao === "automatico"
         ? `automático: ${resolution.escolhido?.placa} (${resolution.escolhido?.percentual}%)`
-        : `escolhido pelo motorista (${choice?.origem === "frota" ? "frota" : "carros da janela"}): ${choice?.placa}`;
+        : `escolhido pelo motorista (${choice?.origem === "frota" ? "frota" : choice?.origem === "terceiro" ? "carros do terceiro" : "carros da janela"}): ${choice?.placa}`;
       console.info("[mock Infleet]", scenario, patch);
       setToast(`Teste Infleet (${scenario}) · ${outcome}`, "success");
     }

@@ -7,6 +7,7 @@ import {
   needsFleetChoice,
   parseInfleetVehicleResolution,
   selectableCandidates,
+  thirdPartyResolution,
   SERVICE_VEHICLE_ORIGIN_DRIVER_CHOSEN,
   SERVICE_VEHICLE_ORIGIN_INFLEET
 } from "../src/lib/serviceVehicleInfleet.ts";
@@ -120,4 +121,19 @@ test("descreve o carro por modelo e cor", () => {
   assert.equal(describeVehicle({ modelo: "", cor: "", placa: "RTI7G00" }), "RTI7G00");
   assert.equal(describeVehicle({ modelo: "Compass", cor: "PRETA", placa: "FCB8B61" }), "Compass Preta");
   assert.equal(describeVehicle({ modelo: "BMW", cor: "Azul", placa: "AAA" }), "BMW Azul");
+});
+
+test("terceiro com carro atual grava sem perguntar", () => {
+  const resolution = thirdPartyResolution({ id: RTI, placa: "RTI7G00", modelo: "Cruze", cor: "Prata" });
+  assert.equal(needsDriverChoice(resolution), true);
+  const patch = buildInfleetServiceVehiclePatch(resolution, { veiculoId: RTI, placa: "RTI7G00", origem: "terceiro" }, bind);
+  assert.equal(patch["cr40f_Veiculo@odata.bind"], bind(RTI));
+  assert.equal(patch.new_origemveiculo, SERVICE_VEHICLE_ORIGIN_DRIVER_CHOSEN);
+  assert.equal(patch.new_percentualveiculoinfleet, 0);
+  assert.equal(JSON.parse(String(patch.new_evidenciaveiculoinfleet)).motivo, "motorista-terceiro");
+});
+
+test("terceiro sem carro atual escolhe na frota dele", () => {
+  const resolution = thirdPartyResolution(null);
+  assert.equal(needsFleetChoice(resolution), true);
 });

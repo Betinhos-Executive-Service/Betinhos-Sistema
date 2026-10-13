@@ -1,6 +1,6 @@
 // Cenários da Infleet para testar a finalização no mock local (sem Dataverse e sem Infleet).
 // Escolha pela URL: ?mockInfleet=perguntar. Sem parâmetro, cada serviço usa um cenário diferente.
-import { parseInfleetVehicleResolution, type FleetVehicle, type InfleetVehicleCandidate, type InfleetVehicleResolution } from "./serviceVehicleInfleet.ts";
+import { parseInfleetVehicleResolution, thirdPartyResolution, type FleetVehicle, type InfleetVehicleCandidate, type InfleetVehicleResolution } from "./serviceVehicleInfleet.ts";
 
 export const MOCK_INFLEET_SCENARIOS = [
   "automatico",
@@ -12,7 +12,8 @@ export const MOCK_INFLEET_SCENARIOS = [
   "nao-cadastrado",
   "indisponivel",
   "lento",
-  "frota-erro"
+  "frota-erro",
+  "terceiro"
 ] as const;
 
 export type MockInfleetScenario = (typeof MOCK_INFLEET_SCENARIOS)[number];
@@ -60,6 +61,8 @@ export function buildMockInfleetResolution(scenario: MockInfleetScenario): Infle
         return { ...base, decisao: "indisponivel", motivo: "sem-viagens-do-motorista", totalSegundos: 0, candidatos: [] };
       case "nao-cadastrado":
         return { ...base, decisao: "indisponivel", motivo: "veiculo-nao-cadastrado", totalSegundos: 6000, candidatos: [ABC(100, 100)] };
+      case "terceiro":
+        return thirdPartyResolution(null);
       case "indisponivel":
       case "frota-erro":
         return { ...base, decisao: "indisponivel", motivo: "infleet-indisponivel: Infleet não respondeu a tempo.", totalSegundos: 0, candidatos: [] };
@@ -89,6 +92,6 @@ export function createMockFleetLoader(scenario: MockInfleetScenario) {
     attempts += 1;
     await new Promise((resolve) => setTimeout(resolve, 600));
     if (scenario === "frota-erro" && attempts === 1) throw new Error("Falha simulada ao carregar a frota.");
-    return MOCK_FLEET;
+    return scenario === "terceiro" ? MOCK_FLEET.slice(0, 2) : MOCK_FLEET;
   };
 }

@@ -20,19 +20,27 @@ export type InfleetVehicleResolution = {
   totalSegundos: number;
   candidatos: InfleetVehicleCandidate[];
   escolhido?: InfleetVehicleCandidate;
+  // Motorista terceiro: carro atual dele, gravado sem perguntar.
+  terceiroAtual?: FleetVehicle;
 };
 
 // Carro ativo do cadastro, oferecido quando a Infleet não identifica o carro do serviço.
 export type FleetVehicle = { id: string; placa: string; modelo: string; cor: string };
 
-// "candidato": um dos carros que a Infleet viu na janela; "frota": qualquer carro ativo, quando a Infleet não identifica.
-export type DriverVehicleChoice = { veiculoId: string; placa: string; origem: "candidato" | "frota" };
+// "candidato": um dos carros que a Infleet viu na janela; "frota": qualquer carro ativo, quando a Infleet não identifica;
+// "terceiro": carro do próprio motorista terceiro, sem Infleet.
+export type DriverVehicleChoice = { veiculoId: string; placa: string; origem: "candidato" | "frota" | "terceiro" };
 
 export const SERVICE_VEHICLE_ORIGIN_INFLEET = 100000002;
 export const SERVICE_VEHICLE_ORIGIN_DRIVER_CHOSEN = 100000003;
 
 export function unavailableResolution(motivo: string): InfleetVehicleResolution {
   return { decisao: "indisponivel", motivo, totalSegundos: 0, candidatos: [] };
+}
+
+// Motorista terceiro não usa a Infleet: grava o carro atual dele ou pede a escolha entre os carros dele.
+export function thirdPartyResolution(current: FleetVehicle | null): InfleetVehicleResolution {
+  return { decisao: "indisponivel", motivo: "motorista-terceiro", totalSegundos: 0, candidatos: [], terceiroAtual: current ?? undefined };
 }
 
 export function parseInfleetVehicleResolution(json: unknown): InfleetVehicleResolution {
