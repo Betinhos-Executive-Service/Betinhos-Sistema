@@ -57,6 +57,7 @@ export function RenovarDrawer({ alvo, source, onClose, onSaved }: Props) {
   }
 
   const uploadFiles: UploadFile[] = form.arquivos.map((f) => ({ name: f.name, size: f.size, type: f.type }))
+  // O Upload devolve os mesmos objetos que recebeu, menos o removido: reconcilia por posição, nunca por nome.
   const footer = (
     <>
       <Button variant="secondary" disabled={saving} onClick={fechar}>Cancelar</Button>
@@ -87,7 +88,7 @@ export function RenovarDrawer({ alvo, source, onClose, onSaved }: Props) {
             maxSize={DOC_MAX_BYTES}
             files={uploadFiles}
             disabled={saving}
-            onChange={(files, added) => set({ arquivos: [...form.arquivos.filter((f) => files.some((x) => x.name === f.name)), ...added] })}
+            onChange={(files, added) => set({ arquivos: [...form.arquivos.filter((_, i) => files.includes(uploadFiles[i])), ...added] })}
           />
         </form>
       </Drawer>
