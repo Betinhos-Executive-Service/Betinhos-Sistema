@@ -65,23 +65,23 @@ SharePoint (site Gestão Interna, flows `new_URLFlow*SharePoint` existentes):
 - `Veiculos/[DEV/]<veiculoId>/Documentos/<codigo>/`
 
 Nome do arquivo: `<codigo>_<validade ou emissão aaaa-mm-dd>_<nome original saneado>`. Tipos aceitos PDF, JPG, PNG; 10 MB.
-O módulo SharePoint de Funcionários vira compartilhado (`apps/shell/src/shared/sharepoint.ts`); a cópia da Frota passa a importá-lo.
+Reaproveita `createSharePointDocs` de `pages/funcionarios/data/sharepoint.ts` (como Currículos já faz), com raiz `Funcionarios` ou `Veiculos`; `listar` ganha `subpasta` opcional. A cópia da Frota (`frota/data/sharepoint.ts`, só fotos) não é mexida.
 
 ### Migração e compatibilidade
 - Script cria um `cr40f_documento` Vigente para cada funcionário com `cr40f_validadedacnh` (CNH) e com `cr40f_datadoaso` (ASO: emissão = data do ASO, validade = +12 meses). Idempotente: não cria se já existir Vigente do tipo. Arquivos existentes não são movidos.
 - Dual-write na transição: salvar CNH/ASO Vigente também atualiza `cr40f_validadedacnh` / `cr40f_datadoaso` do funcionário (Dashboard, App Motoristas e flows antigos continuam corretos).
 
-## 4. Regras de domínio (`apps/shell/src/shared/documentos/`)
+## 4. Regras de domínio (`apps/shell/src/pages/documentos/domain/`)
 
 - `diasPara(validade, hoje)`: dias inteiros em America/Sao_Paulo.
 - `marcoDe(dias)`: `vencido` se < 0; `7` se 0–7; `30` se 8–30; `60` se 31–60; `null` acima de 60.
-- `statusDocumento`: `vencido | vence7 | vence30 | vence60 | ok | semValidade`.
-- `faltantes(donos, tipos, documentos)`: para cada funcionário com `cr40f_status` Ativo ou Afastado (não Desligado) e veículo com status Ativo, tipos cuja `obrigatoriopara` contém a função/categoria e que não têm documento Vigente.
+- `statusDe`: `vencido | vence7 | vence30 | vence60 | ok | semValidade` (KPIs em faixas exclusivas: vencidos, até 7, 8–30, 31–60, faltando).
+- Faltantes (em `montarPendencias`): para cada funcionário com `cr40f_status` Ativo ou Afastado (não Desligado) e veículo não Vendido (`cr40f_statusdoveiculo` ≠ 202410000; terceiros sem status contam como ativos), tipos cuja `obrigatoriopara` contém a função/categoria e que não têm documento Vigente.
 - `validadeSugerida(tipo, emissao)`: emissão + `validadepadraomeses`.
 - `deveAvisar(marcoAtual, ultimoMarco)`: só quando o marco atual é mais grave (ordem 60 < 30 < 7 < vencido).
 - Renovar: cria novo Vigente e muda o anterior do mesmo dono+tipo para Substituído. Tipos sem validade também usam o fluxo (substituir arquivo).
 
-Alertas de CNH/ASO da tela Funcionários e o card de CNH do Dashboard passam a usar `marcoDe` (janela de 60 dias).
+Alertas de CNH/ASO da tela Funcionários e o card de CNH do Dashboard passam a usar `JANELA_DIAS` (60) deste módulo.
 
 ## 5. Telas (Design System Betinhos; `DESIGN_SYSTEM.md` lido antes de editar)
 
@@ -133,5 +133,5 @@ Versão `vX.Y.Z · dd/mm/aaaa HH:mm` segue o rodapé do shell.
 
 ## 9. Entregas
 1. Documentos: schema + seed + migração, domínio, central, abas nas fichas, unificação dos alertas.
-2. Lembretes: destinatários, variáveis, dois flows.
+2. Lembretes: variáveis e os dois flows — plano próprio, escrito ao concluir a Entrega 1 (destinatários e sua tela já entram na Entrega 1).
 3. Depois: WhatsApp, push App Motoristas.
