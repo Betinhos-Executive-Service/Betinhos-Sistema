@@ -104,3 +104,17 @@
 .frota-classif__grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--bt-space-3) var(--bt-space-4); }
 .frota-classif__cat { display: grid; align-content: start; gap: var(--bt-space-1-5); margin: 0; padding: var(--bt-space-2) var(--bt-space-3) var(--bt-space-2-5); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); }
 .frota-classif__cat legend { padding: 0 var(--bt-space-1); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); }
+
+/* Página compacta: cabeçalho enxuto e cards de dados menores. */
+.frota-page { padding-top: var(--bt-space-3); }
+.frota-page .page__header { margin-bottom: var(--bt-space-1); }
+.frota-page .frota .bt-tabs__panel { padding-top: var(--bt-space-3); }
+.frota-page .bt-page-header__row { min-height: 0; }
+.frota-page .bt-page-header__title { font-size: clamp(22px, 2.4vw, 28px); }
+.frota-page .bt-metric { min-height: 0; padding: var(--bt-space-2-5) var(--bt-space-3); gap: var(--bt-space-2-5); box-shadow: none; }
+.frota-page .bt-metric__icon { width: 32px; height: 32px; border-radius: var(--bt-radius-sm); }
+.frota-page .bt-metric__icon > svg { width: 16px; height: 16px; }
+.frota-page .bt-metric__value { font-size: var(--bt-font-size-20); }
+.frota-page .frota-kpis { gap: var(--bt-space-2); }
+.frota-page .frota-pend__item { min-height: 44px; padding-block: var(--bt-space-1-5); }
+.frota-page .frota-pend__head { padding-block: var(--bt-space-2); }

@@ -1,0 +1,59 @@
+/* Infrações de trânsito: lista, ficha e formulário. Só tokens do Design System 1.4.0. */
+.if-meta { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--bt-space-2); font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }
+.if-num { font-variant-numeric: tabular-nums; }
+.if-muted { margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.if-badges { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1); }
+
+.if-filters__search { flex: 1 1 260px; min-width: 200px; max-width: 360px; }
+.if-filters__select { flex: 0 1 170px; min-width: 150px; }
+
+.if-open { display: grid; gap: var(--bt-space-0-5); min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
+.if-open strong { font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); }
+/* Descrição do CTB é longa: duas linhas na tabela, inteira na ficha. */
+.if-open span { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.if-open:focus-visible, .if-card__open:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+
+/* Linha e cartão inteiros abrem a ficha (clique delegado ao botão do código). */
+.if-table .bt-table__row:not(.bt-table__row--loading), .if-card { cursor: pointer; }
+@media (hover: hover) and (pointer: fine) {
+  .if-table .bt-table__row:not(.bt-table__row--loading):hover, .if-card:hover { background-color: var(--bt-color-surface-soft); }
+  .if-open:hover strong { color: var(--bt-color-action); }
+}
+
+.if-cards { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
+.if-card { border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
+.if-card__open { display: grid; gap: var(--bt-space-1); width: 100%; min-height: var(--bt-control-height-touch); padding: var(--bt-space-3) var(--bt-space-3) var(--bt-space-2); border: 0; border-radius: inherit; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform var(--bt-duration-fast) var(--bt-ease-out); }
+.if-card__open:active { transform: scale(0.97); }
+.if-card__name { font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); }
+.if-card__desc { font-size: var(--bt-font-size-13); color: var(--bt-color-text-primary); overflow-wrap: anywhere; }
+.if-card__meta { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.if-card__foot { padding: 0 var(--bt-space-3) var(--bt-space-3); }
+
+/* Ficha */
+.if-ficha { display: grid; gap: var(--bt-space-4); }
+.if-ficha__hero { display: grid; gap: var(--bt-space-2); }
+.if-ficha__desc { margin: 0; font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-primary); overflow-wrap: anywhere; }
+.if-ficha__block { display: grid; gap: var(--bt-space-2); padding: var(--bt-space-3-5); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background-color: var(--bt-color-surface); }
+.if-ficha__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--bt-space-1) var(--bt-space-2); }
+.if-ficha__head h3, .if-form__legend { margin: 0; padding: 0; font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); letter-spacing: 0.08em; text-transform: uppercase; color: var(--bt-color-text-secondary); }
+.if-ficha__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--bt-space-2) var(--bt-space-4); margin: 0; }
+.if-ficha__item { display: grid; gap: var(--bt-space-0-5); min-width: 0; }
+.if-ficha__item dt { font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-secondary); }
+.if-ficha__item dd { margin: 0; font-size: var(--bt-font-size-13); color: var(--bt-color-text-primary); overflow-wrap: anywhere; }
+.if-ficha__loading { display: grid; gap: var(--bt-space-2); }
+.if-rows { display: grid; gap: var(--bt-space-1); margin: 0; padding: 0; list-style: none; }
+.if-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--bt-space-2); min-height: var(--bt-control-height-default); padding: var(--bt-space-1-5) var(--bt-space-2-5); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); font-size: var(--bt-font-size-13); }
+
+/* Formulário */
+.if-form { display: grid; gap: var(--bt-space-4); }
+.if-form__section { display: grid; gap: var(--bt-space-3); min-width: 0; margin: 0; padding: var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
+.if-form__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--bt-space-3); }
+.if-form__grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.if-form__wide { grid-column: 1 / -1; }
+
+@media (max-width: 560px) {
+  .if-ficha__grid, .if-form__grid, .if-form__grid--3 { grid-template-columns: minmax(0, 1fr); }
+  .if-filters__search { flex: 1 1 100%; max-width: none; }
+  .if-filters__select { flex: 1 1 calc(50% - var(--bt-space-2)); min-width: 0; }
+  .if-row { grid-template-columns: minmax(0, 1fr); }
+}

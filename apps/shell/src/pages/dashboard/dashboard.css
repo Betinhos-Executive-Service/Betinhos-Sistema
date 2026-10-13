@@ -1,0 +1,225 @@
+/* Dashboard em abas: composição densa do legado com tokens e componentes do DS. Só tokens --bt-*, tema claro. */
+
+.dash-meta { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); font-variant-numeric: tabular-nums; }
+.dash-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* Contém os elementos absolutos da página (textos só para leitor de tela): sem isso eles escapam do `.bt-shell__main`
+   rolável e alongam o documento. */
+.dash-pagina { position: relative; }
+
+/* ---------- Abas (linha extra do PageHeader, DS §10.2) ---------- */
+/* A barra rola na horizontal dentro do cabeçalho; a página nunca ganha rolagem lateral. */
+.dash-abas { min-width: 0; }
+.dash-abas .bt-tabs__list { scrollbar-width: thin; overscroll-behavior-x: contain; }
+
+/* Corpo da aba: contêiner das consultas de largura (a sidebar aberta ou recolhida muda a largura útil); 16 px entre linhas. */
+.dash-corpo { container: dash / inline-size; display: grid; gap: var(--bt-space-4); min-width: 0; }
+
+/* Eyebrow do DS (§4.3): caixa alta, 800, 11 px, slate. */
+.dash-kpi__rotulo, .dash-faixa__titulo, .dash-card__titulo { margin: 0; font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); line-height: var(--bt-typography-label-micro-line-height); letter-spacing: .08em; text-transform: uppercase; color: var(--bt-color-text-secondary); }
+
+/* ---------- Barra de filtros ---------- */
+.dash-filtros { align-items: flex-start; margin-bottom: var(--bt-space-3); }
+.dash-filtros .bt-page-toolbar__start { gap: var(--bt-space-2) var(--bt-space-3); }
+.dash-periodo { min-width: 168px; }
+.dash-datas, .dash-segmentos { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); min-width: 0; }
+.dash-erro { align-self: center; color: var(--bt-color-danger); font-size: var(--bt-font-size-12); }
+
+/* ---------- KPIs (card único de todas as abas) ---------- */
+/* `--N` é o número de cards na largura cheia; abaixo disso, 3, 2 e 1 coluna conforme a largura útil do corpo. */
+.dash-kpis { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--bt-space-3); }
+@container dash (min-width: 540px) {
+  .dash-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dash-kpis--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@container dash (min-width: 800px) {
+  .dash-kpis--5, .dash-kpis--6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .dash-kpis--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@container dash (min-width: 1080px) {
+  .dash-kpis--5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .dash-kpis--6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+
+.dash-kpi { --dash-kpi-cor: var(--bt-color-action); container-type: inline-size; position: relative; display: flex; flex-direction: column; gap: var(--bt-space-1-5); min-width: 0; min-height: 96px; padding: var(--bt-space-3); overflow: hidden; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background-color: var(--bt-color-surface); box-shadow: var(--bt-shadow-surface); font-family: var(--bt-font-family-sans); }
+/* Borda superior de 3 px na cor do indicador, recortada pelo raio do card. */
+.dash-kpi::before { content: ''; position: absolute; inset: 0 0 auto; height: var(--bt-border-width-severity); background-color: var(--dash-kpi-cor); }
+.dash-kpi--brand { --dash-kpi-cor: var(--bt-color-brand); }
+.dash-kpi--success { --dash-kpi-cor: var(--bt-color-success); }
+.dash-kpi--warning { --dash-kpi-cor: var(--bt-color-warning); }
+.dash-kpi__rotulo { margin-top: var(--bt-space-0-5); }
+.dash-kpi__valor { font-size: clamp(var(--bt-font-size-20), 17cqi, var(--bt-font-size-26)); font-weight: var(--bt-font-weight-extrabold); line-height: 1.1; color: var(--bt-color-brand); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* "s/dado" no lugar do número (KPI, card e lista): mesmo lugar, tom secundário, para não parecer um zero. */
+.dash-kpi__valor--semdado, .dash-card__valor--semdado, .dash-lista__valor--semdado { color: var(--bt-color-text-secondary); }
+.dash-lista__valor--semdado { font-size: var(--bt-font-size-14); }
+.dash-kpi__extras { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1); }
+.dash-kpi__extras > .dash-apoio { flex-basis: 100%; }
+/* Sparkline encostada na base e nas laterais do card. */
+.dash-kpi .dash-spark { flex: 0 0 auto; display: block; width: auto; height: 44px; margin: auto calc(-1 * var(--bt-space-3)) calc(-1 * var(--bt-space-3)); border-radius: 0; pointer-events: none; }
+
+/* ---------- Drill-down (KPI, alerta e linha abrem o Drawer com a lista) ---------- */
+/* O botão "Ver …" estica o alvo pelo card inteiro (::after), sem aninhar elementos interativos. */
+.dash-kpi--abre, .dash-alerta--abre { position: relative; }
+.dash-abre { align-self: flex-start; margin-left: calc(-1 * var(--bt-space-2)); }
+.dash-abre::after { content: ''; position: absolute; inset: 0; border-radius: var(--bt-radius-lg); }
+.dash-abre:focus-visible::after { box-shadow: var(--bt-focus-ring); }
+@media (hover: hover) and (pointer: fine) {
+  .dash-kpi--abre:hover, .dash-alerta--abre:hover { border-color: var(--bt-color-action); }
+}
+.dash-alerta.dash-alerta--abre { grid-template-areas: "valor rotulo" "valor selo" "valor abre"; }
+.dash-alerta .dash-alerta__abre { grid-area: abre; justify-self: start; margin-left: calc(-1 * var(--bt-space-2)); }
+/* Nome do motorista no ranking: botão sem aparência própria, sublinhado no hover. */
+.dash-link-linha { display: grid; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: start; cursor: pointer; }
+.dash-link-linha:hover .bt-table__title strong { color: var(--bt-color-action); text-decoration: underline; }
+.dash-link-linha:focus-visible { outline: 0; border-radius: var(--bt-radius-xs); box-shadow: var(--bt-focus-ring); }
+.dash-ver-todos { margin-top: var(--bt-space-2); }
+.dash-detalhe { display: grid; gap: var(--bt-space-3); min-width: 0; }
+.dash-detalhe__descricao { margin: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); line-height: var(--bt-typography-body-small-line-height); }
+.dash-detalhe__resumo { margin: 0; color: var(--bt-color-text-primary); font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-bold); font-variant-numeric: tabular-nums; }
+.dash-detalhe .bt-table__cell { font-variant-numeric: tabular-nums; }
+.dash-detalhe__celula { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); }
+.dash-detalhe__abrir { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: var(--bt-radius-sm); color: var(--bt-color-action); }
+.dash-detalhe__abrir:hover { background-color: var(--bt-color-surface-neutral); }
+.dash-detalhe__abrir:focus-visible { outline: 0; box-shadow: var(--bt-focus-ring); }
+
+/* ---------- Chips (comparativos e apoios rotulados) ---------- */
+.dash-chip { display: inline-flex; align-items: center; gap: var(--bt-space-1); max-width: 100%; min-height: 22px; padding: var(--bt-space-0-5) var(--bt-space-1-5) var(--bt-space-0-5) var(--bt-space-0-5); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-sm); background-color: var(--bt-color-surface-neutral); color: var(--bt-color-text-primary); font-family: var(--bt-font-family-sans); font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-bold); line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dash-chip__rotulo { flex: 0 0 auto; align-self: stretch; display: inline-grid; place-items: center; min-width: 22px; margin-right: var(--bt-space-0-5); padding: 0 var(--bt-space-1); border-radius: var(--bt-radius-xs); background-color: var(--bt-color-brand); color: var(--bt-color-surface); font-weight: var(--bt-font-weight-extrabold); letter-spacing: .04em; text-transform: uppercase; }
+.dash-chip__texto { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.dash-chip__delta { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 1px; font-weight: var(--bt-font-weight-extrabold); }
+.dash-chip--sobe .dash-chip__delta { color: var(--bt-color-success); }
+.dash-chip--desce .dash-chip__delta { color: var(--bt-color-danger); }
+.dash-chip--neutro .dash-chip__texto { color: var(--bt-color-text-secondary); }
+.dash-chip--atencao { border-color: var(--bt-color-warning-soft); background-color: var(--bt-color-warning-soft); color: var(--bt-color-warning); }
+.dash-chip__icone { flex: 0 0 auto; margin-right: calc(-1 * var(--bt-space-0-5)); }
+
+.dash-apoio { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); line-height: var(--bt-typography-body-small-line-height); }
+.dash-apoio__rotulo { font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-primary); }
+.dash-apoio--atencao, .dash-apoio--atencao .dash-apoio__rotulo { color: var(--bt-color-warning); }
+.dash-apoio__icone { vertical-align: -2px; margin-right: var(--bt-space-1); }
+
+/* ---------- Faixas de alerta ---------- */
+/* Alertas de operação | Qualidade dos dados: duas colunas na largura cheia, uma no estreito (mesmo corte da grade de cards). */
+.dash-faixas { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--bt-space-3); }
+@container dash (min-width: 900px) { .dash-faixas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.dash-faixa { container: dash-faixa / inline-size; display: grid; align-content: start; gap: var(--bt-space-2); min-width: 0; }
+/* Cards da faixa pela largura da própria faixa: 1 coluna no estreito, 2 (2 × 2) a partir de ~400 px e 4 numa faixa larga. */
+.dash-faixa__lista { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--bt-space-2) var(--bt-space-3); margin: 0; padding: 0; list-style: none; }
+@container dash-faixa (min-width: 400px) { .dash-faixa__lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container dash-faixa (min-width: 860px) { .dash-faixa__lista { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.dash-alerta { --dash-tom: var(--bt-color-brand); display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "valor rotulo" "valor selo"; align-items: center; column-gap: var(--bt-space-3); row-gap: var(--bt-space-1); min-width: 0; min-height: 64px; padding: var(--bt-space-2-5) var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background-color: var(--bt-color-surface); box-shadow: var(--bt-shadow-surface); font-family: var(--bt-font-family-sans); }
+.dash-alerta--danger { --dash-tom: var(--bt-color-danger); }
+.dash-alerta--warning { --dash-tom: var(--bt-color-warning); }
+.dash-alerta--success { --dash-tom: var(--bt-color-success); }
+.dash-alerta--neutral { --dash-tom: var(--bt-color-text-secondary); }
+.dash-alerta__valor { grid-area: valor; min-width: 2ch; font-size: var(--bt-font-size-20); font-weight: var(--bt-font-weight-extrabold); line-height: 1; color: var(--dash-tom); font-variant-numeric: tabular-nums; }
+.dash-alerta__rotulo { grid-area: rotulo; align-self: end; min-width: 0; color: var(--bt-color-text-primary); font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); line-height: var(--bt-typography-label-micro-line-height); letter-spacing: .06em; text-transform: uppercase; }
+.dash-alerta__selo { grid-area: selo; align-self: start; display: flex; min-width: 0; }
+
+/* ---------- Grade de cards (destaques e análises) ---------- */
+.dash-grade { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--bt-space-3); }
+@container dash (min-width: 900px) { .dash-grade { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.dash-grade__largo { grid-column: 1 / -1; }
+/* Card curto ao lado de um muito longo (última linha): fica na altura do conteúdo, sem miolo branco. */
+.dash-grade__natural { align-self: start; }
+
+.dash-card { container-type: inline-size; display: flex; flex-direction: column; gap: var(--bt-space-3); min-width: 0; }
+.dash-card__head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--bt-space-2) var(--bt-space-4); }
+.dash-card__resumo { display: grid; flex: 1 1 180px; gap: var(--bt-space-1); min-width: 0; }
+.dash-card__valor { font-size: var(--bt-font-size-26); font-weight: var(--bt-font-weight-extrabold); line-height: 1.1; color: var(--bt-color-brand); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.dash-card__sub { margin: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); line-height: var(--bt-typography-body-small-line-height); }
+.dash-card__lado { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: flex-end; gap: var(--bt-space-2); max-width: 100%; }
+.dash-card__chips { display: flex; flex-direction: column; align-items: flex-end; gap: var(--bt-space-1); max-width: 100%; }
+.dash-card__corpo { display: flex; flex: 1 1 auto; flex-direction: column; gap: var(--bt-space-3); min-width: 0; min-height: 0; }
+.dash-card__tabela { min-width: 0; }
+/* Miolo do bloco na primeira carga: ocupa a altura de um gráfico. */
+.dash-card__esqueleto { flex: 1 1 auto; min-height: 200px; }
+/* Aviso discreto de filtros de segmento que não valem na aba. */
+.dash-aviso-filtros { display: flex; align-items: flex-start; gap: var(--bt-space-1-5); margin: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); line-height: var(--bt-typography-body-small-line-height); }
+.dash-aviso-filtros > svg { flex: 0 0 auto; margin-top: 2px; }
+.dash-card__acoes { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1); margin-left: auto; }
+.dash-card__nota { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--bt-space-2); min-height: 24px; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-11); line-height: var(--bt-typography-label-micro-line-height); }
+/* Tabela dentro do card é bloco de 3º nível (DS §10.6): borda, sem sombra própria. */
+.dash-card .bt-table { box-shadow: none; }
+.dash-card .bt-table__cell { font-variant-numeric: tabular-nums; }
+@container (max-width: 459px) {
+  .dash-card__lado { justify-content: flex-start; width: 100%; }
+  .dash-card__chips { flex-direction: row; flex-wrap: wrap; align-items: center; }
+}
+
+/* Pódio 1º/2º/3º dos emergenciais: chips empilhados à direita do título, com nome e "% · qtd". */
+.dash-podio { display: flex; flex-direction: column; align-items: flex-end; gap: var(--bt-space-1); margin: 0; padding: 0; list-style: none; }
+.dash-podio__nome { min-width: 0; max-width: 160px; overflow: hidden; color: var(--bt-color-text-primary); font-weight: var(--bt-font-weight-extrabold); text-overflow: ellipsis; }
+.dash-podio__meta { flex: 0 0 auto; color: var(--bt-color-text-secondary); }
+@container (max-width: 459px) {
+  .dash-podio { flex-direction: row; flex-wrap: wrap; align-items: center; }
+}
+
+/* Lista compacta dentro do card: blocos neutros com rótulo e apoio à esquerda e o número à direita. */
+.dash-lista { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
+.dash-lista__item { display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-3); min-height: 56px; padding: var(--bt-space-2) var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); }
+.dash-lista__texto { display: grid; gap: var(--bt-space-0-5); min-width: 0; }
+.dash-lista__rotulo { color: var(--bt-color-text-primary); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); }
+.dash-lista__apoio { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); line-height: var(--bt-typography-body-small-line-height); font-variant-numeric: tabular-nums; }
+.dash-lista__item--atencao .dash-lista__apoio { color: var(--bt-color-warning); font-weight: var(--bt-font-weight-bold); }
+.dash-lista__chip { display: flex; margin-top: var(--bt-space-0-5); }
+.dash-lista__valor { flex: 0 0 auto; color: var(--bt-color-brand); font-size: var(--bt-font-size-20); font-weight: var(--bt-font-weight-extrabold); line-height: 1; font-variant-numeric: tabular-nums; }
+
+/* ---------- Gráficos ---------- */
+.dash-grafico { display: flex; flex: 1 1 auto; flex-direction: column; gap: var(--bt-space-2); min-height: 0; }
+/* Ocupa a altura que o card ganhar ao lado de uma tabela longa (mínimo de 240 px), sem vão branco abaixo do gráfico. */
+.dash-chart { position: relative; flex: 1 1 auto; min-height: 240px; margin: 0; }
+.dash-chart__area { position: absolute; inset: 0; }
+.dash-legenda { display: flex; flex-wrap: wrap; gap: var(--bt-space-1) var(--bt-space-4); margin: 0; padding: 0; list-style: none; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); }
+.dash-legenda > li { display: inline-flex; align-items: center; gap: var(--bt-space-1-5); }
+.dash-legenda__traco { width: 16px; border-top: var(--bt-border-width-emphasis) solid var(--bt-color-action); }
+.dash-legenda__traco--brand { border-top-color: var(--bt-color-brand); }
+.dash-legenda__traco--secondary { border-top-color: var(--bt-color-text-secondary); }
+.dash-legenda__traco--tracejada { border-top-style: dashed; }
+/* Amostra da legenda das barras: mesmo padrão da série. */
+.dash-legenda__amostra { flex: 0 0 auto; display: block; }
+
+/* ---------- Células das tabelas ---------- */
+.dash-forte { color: var(--bt-color-text-primary); font-weight: var(--bt-font-weight-bold); }
+/* Várias linhas de texto numa célula (variantes do celular: uma por mês ou posição). */
+.dash-linhas { display: grid; gap: var(--bt-space-0-5); min-width: 0; }
+/* Célula expansível do celular: resumo em destaque, botão de 44 px e o detalhe (meses ou ranking) na mesma célula. */
+.dash-expansivel { display: grid; flex: 1 1 auto; gap: var(--bt-space-0-5); width: 100%; min-width: 0; }
+.dash-expansivel__resumo { color: var(--bt-color-text-primary); font-weight: var(--bt-font-weight-bold); overflow-wrap: anywhere; }
+/* O rótulo alinha com o resumo: o recuo esquerdo do botão sai e o alvo de toque segue com 44 px de altura. */
+.dash-expansivel .dash-expansivel__botao { justify-self: start; padding-left: 0; }
+.dash-expansivel__detalhe { padding-bottom: var(--bt-space-1); }
+.dash-nome, .dash-celula-nome { display: grid; min-width: 0; }
+.dash-duplo { display: grid; gap: 1px; min-width: 0; line-height: 1.3; }
+.dash-duplo__valor { overflow: hidden; color: var(--bt-color-text-primary); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); text-overflow: ellipsis; white-space: nowrap; }
+.dash-duplo__apoio { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-11); white-space: nowrap; }
+.dash-duplo__apoio--sobe, .dash-duplo__apoio--novo { color: var(--bt-color-success); font-weight: var(--bt-font-weight-bold); }
+.dash-duplo__apoio--desce { color: var(--bt-color-danger); font-weight: var(--bt-font-weight-bold); }
+/* Participação: barra do DS (rótulo só para leitor de tela) com o percentual ao lado. */
+.dash-part { display: grid; grid-template-columns: minmax(32px, 1fr) minmax(48px, auto); align-items: center; gap: var(--bt-space-2-5); width: 100%; min-width: 0; }
+.dash-part .bt-progress { gap: 0; }
+.dash-part .bt-progress__head { display: none; }
+.dash-part .dash-duplo { text-align: right; }
+/* Participação depois de uma coluna numérica alinhada à direita: respiro extra para os títulos não colarem. */
+.dash-col-part { display: block; width: 100%; padding-left: var(--bt-space-3); }
+
+/* Tabelas mensais: vão de 8 px entre colunas para caber mais meses. */
+.dash-tabela--densa .bt-table__head, .dash-tabela--densa .bt-table__row { column-gap: var(--bt-space-2); }
+
+/* Região rolável: a tabela rola dentro do card (nunca a página); cabeçalho e 1ª coluna ficam fixos. */
+.dash-rolagem { overflow: auto; overscroll-behavior-x: contain; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background-color: var(--bt-color-surface); }
+.dash-rolagem:focus-visible { outline: 0; border-color: var(--bt-focus-border); box-shadow: var(--bt-focus-ring); }
+.dash-rolagem > .bt-table { overflow: visible; border: 0; border-radius: 0; }
+.dash-rolagem .bt-table__head { position: sticky; top: 0; z-index: 2; }
+.dash-rolagem .bt-table__head > :first-child, .dash-rolagem .bt-table__row > :first-child { position: sticky; left: 0; z-index: 1; align-self: stretch; margin: 0 calc(-1 * var(--bt-space-2)) 0 calc(-1 * var(--bt-space-3-5)); padding: 0 var(--bt-space-2) 0 var(--bt-space-3-5); background-color: var(--bt-color-surface); box-shadow: inset -1px 0 0 var(--bt-color-border); }
+.dash-rolagem .bt-table__head > :first-child { background-color: var(--bt-color-surface-neutral); }
+
+@media (max-width: 820px) {
+  .dash-filtros .bt-page-toolbar__start { flex-direction: column; flex-wrap: nowrap; align-items: stretch; width: 100%; }
+  /* O DS usa "1fr auto" no celular; com texto rotulado na 2ª coluna o "auto" esmagaria a 1ª. */
+  .dash-card .bt-table__row, .dash-detalhe .bt-table__row { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); align-items: start; }
+  .dash-detalhe .bt-table__row:has(.dash-detalhe__abrir) { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) 44px; }
+  .dash-card .bt-table__cell, .dash-detalhe .bt-table__cell { align-items: flex-start; }
+  .dash-detalhe__abrir { width: 44px; height: 44px; }
+  /* Na lista do celular, a 1ª coluna (título da linha) leva a hierarquia. */
+  .dash-card .bt-table__row > .bt-table__cell:first-child, .dash-detalhe .bt-table__row > .bt-table__cell:first-child { color: var(--bt-color-text-primary); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); overflow-wrap: anywhere; }
+}

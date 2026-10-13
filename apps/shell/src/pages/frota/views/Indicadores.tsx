@@ -1,6 +1,7 @@
 import { Download, FileWarning, Timer, Wallet, Wrench } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Button, EmptyState, Input, MetricCard, PageToolbar, Surface, Table } from '@betinhos/ui'
+import { useQueryPeriodo } from '../../../nav/queryState'
 import { Bars } from '../components/Ui'
 import { diaSP, formatBR } from '../data/dates'
 import { brl, NAO_INFORMADO } from '../data/format'
@@ -25,7 +26,9 @@ export function linhasCsv(data: FrotaData, periodo: Periodo) {
 }
 
 export function Indicadores({ data, today }: { data: FrotaData; today: string }) {
-  const [periodo, setPeriodo] = useState(() => ultimos12Meses(today))
+  // Período na URL (#/frota?aba=indicadores&de=…&ate=…); sem datas, valem os últimos 12 meses.
+  const padrao = useMemo(() => ultimos12Meses(today), [today])
+  const [periodo, setPeriodo] = useQueryPeriodo('de', 'ate', padrao)
   const calc = useMemo(() => {
     const feitas = realizadas(data.manutencoes, periodo)
     const multas = multasNoPeriodo(data.multas, periodo)
@@ -59,8 +62,8 @@ export function Indicadores({ data, today }: { data: FrotaData; today: string })
         label="Período"
         start={<>
           <span className="frota-muted">Período</span>
-          <Input className="frota-data" size="compact" type="date" aria-label="De" value={periodo.de} max={periodo.ate} onChange={(event) => { const de = event.target.value; if (de && de <= periodo.ate) setPeriodo((current) => ({ ...current, de })) }} />
-          <Input className="frota-data" size="compact" type="date" aria-label="Até" value={periodo.ate} min={periodo.de} onChange={(event) => { const ate = event.target.value; if (ate && ate >= periodo.de) setPeriodo((current) => ({ ...current, ate })) }} />
+          <Input className="frota-data" size="compact" type="date" aria-label="De" value={periodo.de} max={periodo.ate} onChange={(event) => { const de = event.target.value; if (de && de <= periodo.ate) setPeriodo({ ...periodo, de }) }} />
+          <Input className="frota-data" size="compact" type="date" aria-label="Até" value={periodo.ate} min={periodo.de} onChange={(event) => { const ate = event.target.value; if (ate && ate >= periodo.de) setPeriodo({ ...periodo, ate }) }} />
         </>}
         end={<Button variant="secondary" size="compact" icon={<Download size={16} />} onClick={exportar} disabled={calc.qtd === 0}>Exportar manutenções (CSV)</Button>}
       />
