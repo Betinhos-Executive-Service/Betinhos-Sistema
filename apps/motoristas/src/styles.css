@@ -3856,33 +3856,112 @@ svg {
 }
 
 /* Escolha do carro na finalização: reaproveita o diálogo de contato. */
+.vehicle-choice-list {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vehicle-choice-list li {
+  animation: vehicle-choice-option-enter 220ms cubic-bezier(0.23, 1, 0.32, 1) backwards;
+  animation-delay: calc(80ms + var(--vehicle-choice-index, 0) * 45ms);
+}
+
 .vehicle-choice-option {
   display: flex;
+  width: 100%;
+  min-height: 56px;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 0 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fcfcfb;
+  padding: 10px 14px;
+  color: #001a3d;
+  font-family: "Manrope", Arial, sans-serif;
   text-align: left;
+  cursor: pointer;
+  transition:
+    transform 140ms cubic-bezier(0.23, 1, 0.32, 1),
+    border-color 160ms ease,
+    background-color 160ms ease,
+    opacity 160ms ease;
 }
 
-.vehicle-choice-meta {
-  color: #536174;
-  font-size: 0.82rem;
+.vehicle-choice-name {
+  font-size: 0.98rem;
   font-weight: 800;
+  line-height: 1.25;
 }
 
-.vehicle-choice-other {
-  display: grid;
-  gap: 10px;
+.vehicle-choice-plate {
+  flex-shrink: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #ffffff;
+  padding: 3px 8px;
+  color: #475569;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
 }
 
-.vehicle-choice-confirm {
-  grid-template-columns: 1fr;
+.vehicle-choice-option:active {
+  transform: scale(0.97);
 }
 
-.vehicle-choice-confirm button:disabled {
+.vehicle-choice-option:focus-visible {
+  outline: 0;
+  border-color: #6c91e8;
+  box-shadow: 0 0 0 3px rgba(33, 89, 210, 0.11);
+}
+
+.vehicle-choice-option[data-selected] {
+  border-color: #2159d2;
+  background: #edf3ff;
+}
+
+.vehicle-choice-option[data-selected] .vehicle-choice-plate {
+  border-color: #2159d2;
+  color: #2159d2;
+}
+
+.vehicle-choice-option:disabled:not([data-selected]),
+.vehicle-choice-dialog .contact-choice-cancel:disabled {
   opacity: 0.55;
-  cursor: not-allowed;
+  cursor: default;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .vehicle-choice-option:not(:disabled):hover {
+    border-color: #c7d2e2;
+    background: #f7f9fc;
+  }
+}
+
+@keyframes vehicle-choice-option-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vehicle-choice-list li {
+    animation: none;
+  }
+
+  .vehicle-choice-option {
+    transition: border-color 160ms ease, background-color 160ms ease;
+  }
 }
 
 @keyframes contact-overlay-enter {

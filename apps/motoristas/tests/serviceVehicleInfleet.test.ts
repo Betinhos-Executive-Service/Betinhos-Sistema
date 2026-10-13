@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildInfleetServiceVehiclePatch,
-  formatUsageDuration,
+  describeVehicle,
   parseInfleetVehicleResolution,
   selectableCandidates,
   SERVICE_VEHICLE_ORIGIN_DRIVER_CHOSEN,
@@ -19,8 +19,8 @@ const automaticJson = JSON.stringify({
   regra: "ignicao-85-v1",
   janela: { inicio: "2026-10-12T15:00:00Z", fim: "2026-10-12T22:30:00Z" },
   totalSegundos: 7200,
-  candidatos: [{ veiculoId: RTI, placa: "RTI7G00", segundos: 7200, percentual: 100, cadastrado: true }],
-  escolhido: { veiculoId: RTI, placa: "RTI7G00", segundos: 7200, percentual: 100, cadastrado: true },
+  candidatos: [{ veiculoId: RTI, placa: "RTI7G00", modelo: "Corolla", cor: "Prata", segundos: 7200, percentual: 100, cadastrado: true }],
+  escolhido: { veiculoId: RTI, placa: "RTI7G00", modelo: "Corolla", cor: "Prata", segundos: 7200, percentual: 100, cadastrado: true },
   veiculoPosseId: GEZ
 });
 
@@ -29,8 +29,8 @@ const askJson = JSON.stringify({
   motivo: "abaixo-do-limite",
   totalSegundos: 10000,
   candidatos: [
-    { veiculoId: GEZ, placa: "GEZ6D67", segundos: 6000, percentual: 60, cadastrado: true },
-    { veiculoId: RTI, placa: "RTI7G00", segundos: 3000, percentual: 30, cadastrado: true },
+    { veiculoId: GEZ, placa: "GEZ6D67", modelo: "Corolla", cor: "Preto", segundos: 6000, percentual: 60, cadastrado: true },
+    { veiculoId: RTI, placa: "RTI7G00", modelo: "Corolla", cor: "Prata", segundos: 3000, percentual: 30, cadastrado: true },
     { veiculoId: null, placa: "ABC1D23", segundos: 1000, percentual: 10, cadastrado: false }
   ]
 });
@@ -49,21 +49,31 @@ test("decisão automática grava carro, origem Infleet, percentual e evidência"
 
 test("escolha do motorista grava origem própria e percentual do candidato", () => {
   const resolution = parseInfleetVehicleResolution(askJson);
-  const patch = buildInfleetServiceVehiclePatch(resolution, { veiculoId: RTI, placa: "RTI7G00", origem: "candidato" }, bind);
+  const patch = buildInfleetServiceVehiclePatch(resolution, { veiculoId: RTI, placa: "RTI7G00" }, bind);
 
   assert.equal(patch["cr40f_Veiculo@odata.bind"], bind(RTI));
   assert.equal(patch.new_origemveiculo, SERVICE_VEHICLE_ORIGIN_DRIVER_CHOSEN);
   assert.equal(patch.new_percentualveiculoinfleet, 30);
-  assert.equal(JSON.parse(String(patch.new_evidenciaveiculoinfleet)).escolhaMotorista.origem, "candidato");
+  assert.equal(JSON.parse(String(patch.new_evidenciaveiculoinfleet)).escolhaMotorista.veiculoId, RTI);
 });
 
-test("carro fora dos candidatos grava percentual zero", () => {
+test("carro fora dos usados na janela não é gravado", () => {
   const resolution = parseInfleetVehicleResolution(askJson);
-  const other = "33333333-3333-3333-3333-333333333333";
-  const patch = buildInfleetServiceVehiclePatch(resolution, { veiculoId: other, placa: "XYZ", origem: "outro" }, bind);
+  const patch = buildInfleetServiceVehiclePatch(resolution, { veiculoId: "33333333-3333-3333-3333-333333333333", placa: "XYZ" }, bind);
 
-  assert.equal(patch["cr40f_Veiculo@odata.bind"], bind(other));
-  assert.equal(patch.new_percentualveiculoinfleet, 0);
+  assert.equal(patch["cr40f_Veiculo@odata.bind"], undefined);
+  assert.equal(patch.new_origemveiculo, undefined);
+});
+
+test("perguntar sem carro cadastrado vira indisponível", () => {
+  const resolution = parseInfleetVehicleResolution(JSON.stringify({
+    decisao: "perguntar",
+    motivo: "veiculo-nao-cadastrado",
+    candidatos: [{ veiculoId: null, placa: "ABC1D23", segundos: 600, percentual: 100, cadastrado: false }]
+  }));
+
+  assert.equal(resolution.decisao, "indisponivel");
+  assert.equal(resolution.motivo, "veiculo-nao-cadastrado");
 });
 
 test("indisponível só grava evidência e não mexe no carro", () => {
@@ -84,8 +94,7 @@ test("motorista só escolhe entre carros cadastrados", () => {
   assert.deepEqual(options.map((item) => item.placa), ["GEZ6D67", "RTI7G00"]);
 });
 
-test("duração em minutos e horas", () => {
-  assert.equal(formatUsageDuration(1500), "25 min");
-  assert.equal(formatUsageDuration(7200), "2 h");
-  assert.equal(formatUsageDuration(8100), "2 h 15 min");
+test("descreve o carro por modelo e cor", () => {
+  assert.equal(describeVehicle({ modelo: "Corolla", cor: "Prata", placa: "RTI7G00" }), "Corolla Prata");
+  assert.equal(describeVehicle({ modelo: "", cor: "", placa: "RTI7G00" }), "RTI7G00");
 });

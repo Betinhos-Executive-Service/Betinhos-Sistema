@@ -129,8 +129,9 @@ import {
   type MaintenanceRequestPhoto
 } from "./screens/MaintenanceRequestScreen";
 import { IdeasScreen } from "./screens/IdeasScreen";
-import { VehicleChoiceDialog, type VehicleOption } from "./components/details/VehicleChoiceDialog";
-import type { DriverVehicleChoice, InfleetVehicleResolution } from "./lib/serviceVehicleInfleet";
+import { VehicleChoiceDialog } from "./components/details/VehicleChoiceDialog";
+import { buildInfleetServiceVehiclePatch, type DriverVehicleChoice, type InfleetVehicleResolution } from "./lib/serviceVehicleInfleet";
+import { pickMockInfleetScenario, resolveMockServiceVehicle } from "./lib/serviceVehicleInfleetMock";
 import { ServicesScreen } from "./screens/ServicesScreen";
 import { SignatureScreen } from "./screens/SignatureScreen";
 import { VoucherScreen } from "./screens/VoucherScreen";
@@ -1151,7 +1152,6 @@ function App() {
       {vehicleChoiceRequest ? (
         <VehicleChoiceDialog
           resolution={vehicleChoiceRequest.resolution}
-          loadVehicles={loadVehicleChoiceOptions}
           onChoose={closeVehicleChoice}
           onCancel={cancelVehicleChoice}
         />
@@ -1347,12 +1347,6 @@ function App() {
   }, []);
   const cancelVehicleChoice = useCallback(() => closeVehicleChoice(null), [closeVehicleChoice]);
 
-  const loadVehicleChoiceOptions = useCallback(async (): Promise<VehicleOption[]> => {
-    const driver = driverContext ?? await getDriverContext();
-    const vehicles = await loadMaintenanceRequestVehiclesRemote(driver, { activeOnly: true });
-    return vehicles.map((vehicle) => ({ id: vehicle.id, label: vehicle.label }));
-  }, [driverContext]);
-
   const finalizeSelected = async (fields: Record<string, string>) => {
     if (!selectedDetail || remoteOperation) return;
     const detailToFinalize = selectedDetail;
@@ -1462,6 +1456,25 @@ function App() {
         delete next[detailToFinalize.id];
         return next;
       });
+    } else if (detailToFinalize.type === "SERVICO") {
+      // Mock local: simula a Infleet para testar a UI sem Dataverse. Cenário por ?mockInfleet=.
+      const scenario = pickMockInfleetScenario(detailToFinalize.id);
+      setRemoteOperation({ title: "Finalizando serviço", message: "Conferindo o carro na Infleet.", detailId: detailToFinalize.id, phase: "loading" });
+      const resolution = await resolveMockServiceVehicle(scenario);
+      setRemoteOperation(null);
+      let choice: DriverVehicleChoice | null = null;
+      if (resolution.decisao === "perguntar") {
+        choice = await askVehicleChoice(resolution);
+        if (!choice) return;
+      }
+      const patch = buildInfleetServiceVehiclePatch(resolution, choice, (vehicleId) => vehicleId);
+      const outcome = resolution.decisao === "automatico"
+        ? `automático: ${resolution.escolhido?.placa} (${resolution.escolhido?.percentual}%)`
+        : resolution.decisao === "indisponivel"
+          ? `sem decisão (${resolution.motivo}), carro mantido pela posse`
+          : `escolhido pelo motorista: ${choice?.placa}`;
+      console.info("[mock Infleet]", scenario, patch);
+      setToast(`Teste Infleet (${scenario}) · ${outcome}`, resolution.decisao === "indisponivel" ? "warning" : "success");
     }
 
     setCompletingDetailKey(detailKey);
