@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DataSource } from '../data/source'
+import { createMockDocsSource } from '../../documentos/data/source'
 import type { Funcionario } from '../data/types'
 import { Ficha } from './Ficha'
 import { ToastProvider } from '@betinhos/ui'
@@ -56,5 +57,23 @@ describe('Ficha', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Salvar/ })) })
     expect(screen.getByText('CPF inválido')).toBeTruthy()
     expect(save).not.toHaveBeenCalled()
+  })
+
+  it('aba Documentos mostra o checklist de documentos controlados quando há fonte de documentos', async () => {
+    window.location.hash = '#/funcionarios?ficha=f1&secao=documentos'
+    render(<ToastProvider><Ficha source={fakeSource(vi.fn(async () => 'f1'))} id="f1" docs={createMockDocsSource()} onClose={() => {}} onSaved={() => {}} /></ToastProvider>)
+    // O id do mock de Funcionários (f1) não está nos donos do mock de documentos; a seção aparece mesmo assim.
+    expect(await screen.findByText('Cadastro não encontrado na lista de documentos.')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Outros arquivos' })).toBeTruthy()
+    window.location.hash = ''
+  })
+
+  it('aba Documentos não mostra o checklist sem fonte de documentos', async () => {
+    window.location.hash = '#/funcionarios?ficha=f1&secao=documentos'
+    render(<ToastProvider><Ficha source={fakeSource(vi.fn(async () => 'f1'))} id="f1" onClose={() => {}} onSaved={() => {}} /></ToastProvider>)
+    expect(await screen.findByRole('heading', { name: 'Arquivos' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Outros arquivos' })).toBeNull()
+    expect(screen.queryByText('Cadastro não encontrado na lista de documentos.')).toBeNull()
+    window.location.hash = ''
   })
 })

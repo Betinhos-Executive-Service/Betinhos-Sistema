@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MANUT, VEICULO } from '../data/schema'
 import { EMPTY_DATA, type DataSource } from '../data/source'
 import type { FrotaData } from '../data/types'
+import { createMockDocsSource } from '../../documentos/data/source'
 import { FichaVeiculo } from './FichaVeiculo'
 import { ToastProvider } from '@betinhos/ui'
 
@@ -91,5 +92,17 @@ describe('FichaVeiculo', () => {
     render(<FichaVeiculo errors={{}} source={source} id="v1" data={data} today="2026-10-02" onClose={() => {}} onOpen={() => {}} onReload={onReload} />)
     fireEvent.click(screen.getByRole('button', { name: /Abrir cadastro/ }))
     await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1))
+  })
+
+  it('mostra a seção Documentos quando há fonte de documentos', async () => {
+    render(<ToastProvider><FichaVeiculo errors={{}} source={source} id="v1" data={data} today="2026-10-02" docs={createMockDocsSource()} onClose={() => {}} onOpen={() => {}} onReload={() => {}} /></ToastProvider>)
+    expect(screen.getByRole('heading', { name: 'Documentos' })).toBeTruthy()
+    // O id v1 não está nos donos do mock de documentos; a seção aparece mesmo assim.
+    expect(await screen.findByText('Cadastro não encontrado na lista de documentos.')).toBeTruthy()
+  })
+
+  it('não mostra a seção Documentos sem fonte de documentos', () => {
+    render(<FichaVeiculo errors={{}} source={source} id="v1" data={data} today="2026-10-02" onClose={() => {}} onOpen={() => {}} onReload={() => {}} />)
+    expect(screen.queryByRole('heading', { name: 'Documentos' })).toBeNull()
   })
 })

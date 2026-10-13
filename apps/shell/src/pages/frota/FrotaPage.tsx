@@ -13,6 +13,7 @@ import { createFrotaSource } from './data/hostSource'
 import { EMPTY_DATA, type Classificacao, type DataSource, type LoadResult } from './data/source'
 import type { Kind, TableKey } from './data/types'
 import { errorMessage } from './data/xrm'
+import { createDocsSource, type DocsSource } from '../documentos/data/source'
 import { buildPendencias } from './domain/pendencias'
 import { liberarFlows } from './domain/transitions'
 import { Indicadores } from './views/Indicadores'
@@ -50,9 +51,10 @@ export function FrotaPage({ host }: { host: Host }) {
   const [state] = useState(() => {
     try { return { source: createFrotaSource(host), error: null } } catch (reason) { return { source: null, error: errorMessage(reason) } }
   })
+  const docs = useMemo(() => { try { return createDocsSource(host) } catch { return null } }, [host])
   return (
     <ToastProvider>
-      {state.source ? <Frota source={state.source} /> : (
+      {state.source ? <Frota source={state.source} docs={docs} /> : (
         <PageLayout eyebrow="Frota" title="Frota">
           <Alert tone="danger" title="Não foi possível abrir a Frota">{state.error}. Abra o Sistema Betinhos pelo Dataverse.</Alert>
         </PageLayout>
@@ -62,7 +64,7 @@ export function FrotaPage({ host }: { host: Host }) {
 }
 
 /** Página com a fonte já resolvida; exportada para os testes. */
-export function Frota({ source }: { source: DataSource }) {
+export function Frota({ source, docs }: { source: DataSource; docs?: DocsSource | null }) {
   const [result, setResult] = useState<LoadResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [fatal, setFatal] = useState<string | null>(null)
@@ -134,7 +136,7 @@ export function Frota({ source }: { source: DataSource }) {
         </Tabs>
       </div>
 
-      {result && !fatal && route.veiculo && !registro ? <FichaVeiculo errors={errors} source={source} id={route.veiculo} data={data} today={today} onClose={() => patchHashQuery({ ficha: null, fde: null, fate: null })} onOpen={onOpen} onReload={onReload} /> : null}
+      {result && !fatal && route.veiculo && !registro ? <FichaVeiculo errors={errors} source={source} docs={docs} id={route.veiculo} data={data} today={today} onClose={() => patchHashQuery({ ficha: null, fde: null, fate: null })} onOpen={onOpen} onReload={onReload} /> : null}
       {registro ? <RegistroDrawer key={`${registro.kind}-${registro.id}`} source={source} kind={registro.kind} id={registro.id} data={data} onClose={() => setRegistro(null)} onChanged={onReload} onClassificado={aplicarClassificacao} onOpenVeiculo={onOpenVeiculo} /> : null}
     </PageLayout>
   )

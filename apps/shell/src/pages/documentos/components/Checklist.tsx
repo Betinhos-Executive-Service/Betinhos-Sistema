@@ -34,8 +34,8 @@ export function Checklist({ source, donoId, titulo = 'Documentos controlados' }:
   if (!dono) return <p className="doc-muted">Cadastro não encontrado na lista de documentos.</p>
 
   return (
-    <section className="doc-checklist" aria-labelledby={`${donoId}-docs`}>
-      <h3 id={`${donoId}-docs`} className="doc-checklist__title">{titulo}</h3>
+    <section className="doc-checklist" aria-labelledby={titulo ? `${donoId}-docs` : undefined} aria-label={titulo ? undefined : 'Documentos'}>
+      {titulo ? <h3 id={`${donoId}-docs`} className="doc-checklist__title">{titulo}</h3> : null}
       {error ? <Alert tone="danger" title="Não foi possível atualizar os documentos" action={<Button variant="secondary" onClick={() => void reload()}>Tentar de novo</Button>}>{error}</Alert> : null}
       <ul className="doc-checklist__list">
         {itens.map((item) => <ItemLinha key={`${item.tipo.id}:${item.vigente?.id ?? 'novo'}`} item={item} source={source} onRenovar={() => setAlvo({ tipo: item.tipo, dono, anterior: item.vigente })} />)}
