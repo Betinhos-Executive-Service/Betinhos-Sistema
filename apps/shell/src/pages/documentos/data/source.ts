@@ -6,8 +6,8 @@ import { todaySP } from '../../funcionarios/data/dates'
 import { createSharePointDocs } from '../../funcionarios/data/sharepoint'
 import type { XrmHost } from '../../funcionarios/data/xrm'
 import { SITUACAO_CODE } from '../domain/codes'
-import { RAIZ, subpastaDoc } from '../domain/nomes'
-import type { Arquivo, Categoria, DocEmitido, DocsData } from '../domain/types'
+import { nomeArquivo, RAIZ, subpastaDoc } from '../domain/nomes'
+import type { Arquivo, Categoria, DocEmitido, DocsData, TipoDoc } from '../domain/types'
 import { createMockData } from './mock'
 import {
   ENTITIES, destinatarioPayload, destinatariosPath, docPayload, documentosPath, funcionariosPath, mapDestinatario, mapDoc,
@@ -28,7 +28,15 @@ export type DocsSource = {
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-const codigoDoTipo = (data: DocsData, tipoId: string) => data.tipos.find((t) => t.id === tipoId)?.codigo ?? 'OUTROS'
+
+/** Código do tipo do documento: último trecho da pasta; sem pasta, o código do tipo na lista carregada. */
+export function codigoDoDoc(doc: Pick<DocEmitido, 'pasta' | 'tipoId'>, tipos: Pick<TipoDoc, 'id' | 'codigo'>[] | null): string {
+  const daPasta = doc.pasta.split('/').filter(Boolean).pop()
+  if (daPasta) return daPasta
+  const doTipo = tipos?.find((t) => t.id === doc.tipoId)?.codigo
+  if (doTipo) return doTipo
+  throw new Error('Não foi possível identificar a pasta do documento. Recarregue a lista e tente de novo.')
+}
 
 export function createMockDocsSource(hoje = todaySP()): DocsSource {
   const data = createMockData(hoje)
@@ -61,7 +69,10 @@ export function createMockDocsSource(hoje = todaySP()): DocsSource {
         async dualWrite() { /* sem ficha no mock */ },
       }, input)
     },
-    async enviarArquivo(doc, file) { await wait(200); return guardar(doc, file, file.name) },
+    async enviarArquivo(doc, file) {
+      await wait(200)
+      return guardar(doc, file, nomeArquivo(codigoDoDoc(doc, data.tipos), doc.validade ?? doc.emissao, file.name))
+    },
     async salvarTipo(tipo, id) {
       await wait(200)
       if (id) { Object.assign(data.tipos.find((x) => x.id === id) ?? {}, tipo); return id }
@@ -90,10 +101,8 @@ export function createDocsSource(host: Host): DocsSource {
     return { tipo: get(ENTITIES.tipo), documento: get(ENTITIES.documento), destinatario: get(ENTITIES.destinatario), funcionario: get(ENTITIES.funcionario), veiculo: get(ENTITIES.veiculo) }
   }).catch((error) => { sets = null; throw error }))
 
-  const enviar = async (doc: DocEmitido, file: File, nome: string) => {
-    const codigo = cache ? codigoDoTipo(cache, doc.tipoId) : doc.pasta.split('/').pop() ?? 'OUTROS'
-    return sp[doc.categoria].enviar(doc.donoId, file, nome, subpastaDoc(codigo))
-  }
+  const subpasta = (doc: DocEmitido) => subpastaDoc(codigoDoDoc(doc, cache?.tipos ?? null))
+  const enviar = async (doc: DocEmitido, file: File, nome: string) => sp[doc.categoria].enviar(doc.donoId, file, nome, subpasta(doc))
 
   return {
     mock: false,
@@ -109,10 +118,7 @@ export function createDocsSource(host: Host): DocsSource {
       }
       return cache
     },
-    async arquivos(doc) {
-      const codigo = cache ? codigoDoTipo(cache, doc.tipoId) : 'OUTROS'
-      return sp[doc.categoria].listar(doc.donoId, subpastaDoc(codigo))
-    },
+    arquivos: async (doc) => sp[doc.categoria].listar(doc.donoId, subpasta(doc)),
     abrirArquivo: (arq) => sp.pessoas.abrir(arq),
     async salvarDocumento(input) {
       const s = await entitySets()
@@ -124,7 +130,7 @@ export function createDocsSource(host: Host): DocsSource {
         dualWrite: (funcionarioId, payload) => host.client.update(s.funcionario, funcionarioId, payload as Row),
       }, input)
     },
-    enviarArquivo: (doc, file) => enviar(doc, file, file.name),
+    enviarArquivo: (doc, file) => enviar(doc, file, nomeArquivo(codigoDoDoc(doc, cache?.tipos ?? null), doc.validade ?? doc.emissao, file.name)),
     async salvarTipo(tipo, id) {
       const s = await entitySets()
       if (id) { await host.client.update(s.tipo, id, tipoPayload(tipo)); return id }
