@@ -6,7 +6,7 @@
 .doc-checklist { display: grid; gap: var(--bt-space-2); }
 .doc-checklist__title { margin: 0; font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); letter-spacing: 0.08em; text-transform: uppercase; color: var(--bt-color-text-secondary); }
 .doc-checklist__list, .doc-item__arquivos, .doc-item__historico { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
-.doc-item { display: grid; gap: var(--bt-space-1-5); padding: var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
+.doc-item { display: grid; gap: var(--bt-space-1-5); padding: var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); }
 .doc-item__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--bt-space-2); }
 .doc-item__nome { font-size: var(--bt-font-size-14); color: var(--bt-color-text-primary); }
 .doc-item__acoes { display: flex; flex-wrap: wrap; gap: var(--bt-space-1); }
