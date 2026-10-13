@@ -1,0 +1,5 @@
+/* Documentos: central, checklist e drawers. Só tokens do Design System. */
+.doc-muted { margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.doc-form { display: grid; gap: var(--bt-space-3); container-type: inline-size; }
+.doc-form__datas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--bt-space-3); }
+@container (max-width: 420px) { .doc-form__datas { grid-template-columns: minmax(0, 1fr); } }
