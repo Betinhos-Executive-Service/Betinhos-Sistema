@@ -47,6 +47,8 @@ import {
   loadCollisionLookupNavigationNamesRemote,
   loadExpenseReferenceDataRemote,
   loadMyIdeasRemote,
+  loadMyVehiclesRemote,
+  setMyCurrentVehicleRemote,
   loadReceiptClienteOptionsRemote,
   loadExpenseLookupNavigationNamesRemote,
   loadMaintenanceRequestVehiclesRemote,
@@ -130,6 +132,7 @@ import {
   type MaintenanceRequestPhoto
 } from "./screens/MaintenanceRequestScreen";
 import { IdeasScreen } from "./screens/IdeasScreen";
+import { MyVehicleScreen } from "./screens/MyVehicleScreen";
 import { VehicleChoiceDialog } from "./components/details/VehicleChoiceDialog";
 import {
   buildInfleetServiceVehiclePatch,
@@ -138,7 +141,8 @@ import {
   type FleetVehicle,
   type InfleetVehicleResolution
 } from "./lib/serviceVehicleInfleet";
-import { createMockFleetLoader, pickMockInfleetScenario, resolveMockServiceVehicle } from "./lib/serviceVehicleInfleetMock";
+import { isThirdPartyDriver } from "./lib/myVehicle";
+import { createMockFleetLoader, MOCK_FLEET, pickMockInfleetScenario, resolveMockServiceVehicle } from "./lib/serviceVehicleInfleetMock";
 import { ServicesScreen } from "./screens/ServicesScreen";
 import { SignatureScreen } from "./screens/SignatureScreen";
 import { VoucherScreen } from "./screens/VoucherScreen";
@@ -1704,7 +1708,7 @@ function App() {
       openPersonalReceiptFromHome();
       return;
     }
-    if (screenName === "servicos" || screenName === "comunicados" || screenName === "historico" || screenName === "solicitarManutencao" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias") {
+    if (screenName === "servicos" || screenName === "comunicados" || screenName === "historico" || screenName === "solicitarManutencao" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro") {
       setComunicadoOrigin("");
       setScreen(screenName);
     }
@@ -2796,6 +2800,21 @@ function App() {
     );
   }
 
+  if (screen === "meuCarro") {
+    return show(
+      <MyVehicleScreen
+        onBack={() => setScreen("inicio")}
+        currentVehicleId={getDriverCurrentVehicleId(driverContext)}
+        loadVehicles={async () => (remoteMode ? loadMyVehiclesRemote(driverContext ?? await getDriverContext()) : MOCK_FLEET.slice(0, 2))}
+        saveVehicle={async (id) => {
+          const driver = driverContext ?? await getDriverContext();
+          if (remoteMode) await setMyCurrentVehicleRemote(driver, id);
+          setDriverContext({ ...driver, funcionario: { ...(driver.funcionario ?? {}), _cr40f_veiculoatual_value: id } });
+        }}
+      />
+    );
+  }
+
   if (screen === "colisoesInicio") {
     return show(
       <CollisionStartScreen
@@ -3174,6 +3193,7 @@ function App() {
       openPersonalReceipt={openPersonalReceiptFromHome}
       onRefresh={refreshLocal}
       canGeneratePersonalReceipt={canGeneratePersonalReceipt}
+      isThirdParty={isThirdPartyDriver(driverContext?.funcionario)}
       services={store.agenda}
       pendingComunicados={comunicados.filter(isComunicadoPending).length}
       driverName={driverContext?.fullName}

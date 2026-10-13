@@ -35,7 +35,8 @@ const SCREEN_HASH_PATHS: Record<Screen, string> = {
   canceladoLocal: "cancelado-local",
   fotoManutencao: "foto-manutencao",
   previewFotoManutencao: "preview-foto-manutencao",
-  boasIdeias: "boas-ideias"
+  boasIdeias: "boas-ideias",
+  meuCarro: "meu-carro"
 };
 
 const SCREEN_HASH_ALIASES: Record<string, Screen> = {
@@ -97,7 +98,9 @@ const SCREEN_HASH_ALIASES: Record<string, Screen> = {
   "boas-ideias": "boasIdeias",
   boasideias: "boasIdeias",
   ideias: "boasIdeias",
-  ideas: "boasIdeias"
+  ideas: "boasIdeias",
+  "meu-carro": "meuCarro",
+  meucarro: "meuCarro"
 };
 
 const HASH_ROUTE_DETAIL_SCREENS = new Set<Screen>([
@@ -208,7 +211,8 @@ const SCREEN_DEPTH: Record<Screen, number> = {
   assinatura: 4,
   fotoManutencao: 4,
   previewFotoManutencao: 5,
-  boasIdeias: 1
+  boasIdeias: 1,
+  meuCarro: 1
 };
 
 const drillSpring = {
@@ -244,7 +248,7 @@ const fastFade = {
   ease: "easeOut" as const
 };
 
-const isListScreen = (screenName: Screen) => screenName === "servicos" || screenName === "comunicados" || screenName === "historico" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias";
+const isListScreen = (screenName: Screen) => screenName === "servicos" || screenName === "comunicados" || screenName === "historico" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro";
 const isDetailScreen = (screenName: Screen) => screenName === "detalhes" || screenName === "detalhesHistorico";
 const isTaskScreen = (screenName: Screen) =>
   screenName === "receber" || screenName === "voucher" || screenName === "finalizar" || screenName === "canceladoLocal";

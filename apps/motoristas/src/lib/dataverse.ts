@@ -26,6 +26,7 @@ import {
   type InfleetVehicleResolution
 } from "./serviceVehicleInfleet.ts";
 import { createRemoteReadBatch } from "./remoteReadBatch.ts";
+import { buildCurrentVehiclePatch } from "./myVehicle.ts";
 import { buildIdeaRecord, normalizeIdeaRecord, validateIdeaDraft, type Idea, type IdeaDraft } from "./ideas.ts";
 
 type XrmLike = {
@@ -588,7 +589,9 @@ export async function getDriverContext(): Promise<DriverContext> {
         cr40f_funcionariosid: "localhost-driver",
         cr40f_nomecompleto: "Localhost",
         cr40f_emailmicrosoft: "",
-        cr40f_gerarrecibopersonalizado: true
+        cr40f_gerarrecibopersonalizado: true,
+        // Teste local do "Meu carro": abra com ?mockTerceiro=1.
+        ...(new URLSearchParams(window.location.search).get("mockTerceiro") === "1" ? { cr40f_tipodevinculo: 1 } : {})
       }
     };
   }
@@ -3757,6 +3760,30 @@ export async function loadActiveFleetRemote(): Promise<FleetVehicle[]> {
       cor: String(record.cr40f_cor ?? "").trim()
     }))
     .filter((vehicle) => vehicle.id && vehicle.placa);
+}
+
+// Carros de categoria "Carro de terceiro" vinculados ao motorista; ele escolhe qual está usando.
+export async function loadMyVehiclesRemote(driver: DriverContext): Promise<FleetVehicle[]> {
+  const result = await retrieveMultiple(
+    DATAVERSE.veiculos,
+    [
+      "$select=cr40f_veiculosid,cr40f_placa,cr40f_modelo,cr40f_cor",
+      `$filter=statecode eq 0 and new_categoriadoveiculo eq 100000001 and _cr40f_motoristaatual_value eq ${cleanGuid(driver.id)}`,
+      "$orderby=cr40f_modelo asc"
+    ].join("&")
+  );
+  return result.entities
+    .map((record) => ({
+      id: cleanODataGuid(record.cr40f_veiculosid),
+      placa: String(record.cr40f_placa ?? "").trim(),
+      modelo: String(record.cr40f_modelo ?? "").trim(),
+      cor: String(record.cr40f_cor ?? "").trim()
+    }))
+    .filter((vehicle) => vehicle.id && vehicle.placa);
+}
+
+export async function setMyCurrentVehicleRemote(driver: DriverContext, vehicleId: string) {
+  await updateOne(DATAVERSE.funcionarios, driver.id, buildCurrentVehiclePatch(vehicleId, (id) => bind(DATAVERSE.veiculos, id)));
 }
 
 export async function resolveServiceVehicleRemote(serviceDataverseId: string): Promise<InfleetVehicleResolution> {

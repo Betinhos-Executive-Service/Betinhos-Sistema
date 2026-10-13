@@ -76,6 +76,16 @@ const ideasModule = {
   disabled: false,
 };
 
+const myVehicleModule = {
+  id: "meuCarro",
+  label: "Meu carro",
+  detail: "Carro que você está usando",
+  action: "Trocar carro",
+  icon: "services",
+  tone: "neutral",
+  disabled: false,
+};
+
 const screenAliases: Record<string, string[]> = {
   comunicados: ["comunicados"],
   services: ["servicos", "services", "Services", "serviços"],
@@ -85,6 +95,7 @@ const screenAliases: Record<string, string[]> = {
   expenses: ["gastos", "expenses", "Expenses"],
   personalReceipt: ["reciboPersonalizado", "personalReceipt", "gerarReciboPersonalizado", "recibopersonalizado"],
   ideas: ["boasIdeias", "ideas", "ideias"],
+  meuCarro: ["meuCarro"],
 };
 
 const moduleHandlers: Record<string, string[]> = {
@@ -203,6 +214,7 @@ type InitialScreenProps = {
   services?: AgendaItem[];
   pendingComunicados?: number;
   canGeneratePersonalReceipt?: boolean;
+  isThirdParty?: boolean;
   showLocalReset?: boolean;
   onResetLocalData?: () => void;
   [key: string]: unknown;
@@ -390,8 +402,8 @@ export function InitialScreen(props: InitialScreenProps) {
           }
         ]
         : []
-    ).concat([ideasModule]),
-    [props.canGeneratePersonalReceipt]
+    ).concat(props.isThirdParty ? [myVehicleModule] : []).concat([ideasModule]),
+    [props.canGeneratePersonalReceipt, props.isThirdParty]
   );
   const buildInfo = useMemo(() => getBuildInfo(), []);
 
