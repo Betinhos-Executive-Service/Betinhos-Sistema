@@ -1427,7 +1427,21 @@ function App() {
           const driver = driverContext ?? await getDriverContext();
           if (isThirdPartyDriver(driver?.funcionario)) {
             // Terceiro não usa a Infleet: grava o carro atual dele ou pede a escolha entre os carros dele.
-            const myVehicles = await loadMyVehiclesRemote(driver);
+            let myVehicles: Awaited<ReturnType<typeof loadMyVehiclesRemote>> | null = null;
+            try {
+              myVehicles = await loadMyVehiclesRemote(driver);
+            } catch {
+              // Sem a lista do terceiro, cai na escolha entre a frota ativa.
+              myVehicles = null;
+            }
+            if (!myVehicles) {
+              vehicleResolution = thirdPartyResolution(null);
+              setRemoteOperation(null);
+              const pickedFallback = await askVehicleChoice(vehicleResolution, loadActiveFleetRemote);
+              if (!pickedFallback) return;
+              vehicleChoice = { ...pickedFallback, origem: "terceiro" };
+              setProgress("Registrando o carro escolhido.");
+            } else {
             const currentId = getDriverCurrentVehicleId(driver);
             const current = myVehicles.find((vehicle) => vehicle.id === currentId) ?? null;
             vehicleResolution = thirdPartyResolution(current);
@@ -1435,10 +1449,11 @@ function App() {
               vehicleChoice = { veiculoId: current.id, placa: current.placa, origem: "terceiro" };
             } else {
               setRemoteOperation(null);
-              const picked = await askVehicleChoice(vehicleResolution, async () => (myVehicles.length > 0 ? myVehicles : loadActiveFleetRemote()));
+              const picked = await askVehicleChoice(vehicleResolution, async () => (myVehicles!.length > 0 ? myVehicles! : loadActiveFleetRemote()));
               if (!picked) return;
               vehicleChoice = { ...picked, origem: "terceiro" };
               setProgress("Registrando o carro escolhido.");
+            }
             }
           } else {
             vehicleResolution = await resolveServiceVehicleRemote(detailToFinalize.dataverse.id);

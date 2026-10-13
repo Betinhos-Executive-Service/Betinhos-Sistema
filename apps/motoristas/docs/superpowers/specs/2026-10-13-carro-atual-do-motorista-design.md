@@ -142,7 +142,7 @@ Quando a placa da Infleet não existe em `cr40f_veiculos` (comparando `new_placa
 | --- | --- |
 | Infleet fora do ar no flow | Mantém o carro atual gravado; resumo com erro na execução do flow. |
 | Placa da Infleet sem cadastro | Cadastra o veículo (seção 3) e segue. |
-| Falha ao cadastrar veículo | Não troca o carro atual; registra no resumo. |
+| Falha ao cadastrar veículo ou atualizar funcionário | Tudo ou nada: o step roda na transação da Custom API, então a execução falha (InvalidPluginExecutionException com a placa ou o id do funcionário) e a próxima rodada do flow tenta de novo. "erros" fica sempre vazio no resumo, só por estabilidade de contrato. |
 | Bipe de motorista Terceiro | Ignorado. |
 | Motorista sem carro atual | Operacional mostra "Carro não informado"; mensagem omite a linha. |
 | Gerar link sem carro, terceiro ou sem rastreador | Mensagem com o motivo; nada é gravado. |
