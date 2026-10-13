@@ -1,0 +1,83 @@
+import { cleanId, odataString, type Row } from '@betinhos/dataverse'
+import { ENTITY, ID_ATTRIBUTE, type Page, type View } from '../domain/types'
+
+export const RESERVA_FILTER = `returnedtypecode eq '${ENTITY}' and statecode eq 0`
+
+export const viewsPaths = () => [
+  `savedqueries?$select=savedqueryid,name,fetchxml,layoutxml,isdefault&$filter=${encodeURIComponent(`${RESERVA_FILTER} and querytype eq 0`)}&$orderby=name asc`,
+  `userqueries?$select=userqueryid,name,fetchxml,layoutxml&$filter=${encodeURIComponent(RESERVA_FILTER)}&$orderby=name asc`,
+]
+export const quickFindPath = () => `savedqueries?$select=fetchxml&$filter=${encodeURIComponent(`${RESERVA_FILTER} and isquickfindquery eq true`)}`
+
+const str = (v: unknown) => (typeof v === 'string' ? v : '')
+
+export function mapViews(system: Row[], mine: Row[]): View[] {
+  const map = (rows: Row[], idKey: string, grupo: View['grupo']): View[] => rows
+    .filter((r) => str(r.fetchxml) && str(r.layoutxml))
+    .map((r) => ({ id: str(r[idKey]).replace(/[{}]/g, ''), nome: str(r.name).trim() || 'Sem nome', grupo, fetchxml: str(r.fetchxml), layoutxml: str(r.layoutxml), padrao: r.isdefault === true }))
+  return [...map(system, 'savedqueryid', 'sistema'), ...map(mine, 'userqueryid', 'minhas')]
+}
+
+export const fetchPath = (set: string, fetchxml: string) => `${set}?fetchXml=${encodeURIComponent(fetchxml)}`
+
+export type FetchResponse = {
+  value: Row[]
+  '@odata.count'?: number
+  '@Microsoft.Dynamics.CRM.totalrecordcount'?: number
+  '@Microsoft.Dynamics.CRM.morerecords'?: boolean
+  '@Microsoft.Dynamics.CRM.fetchxmlpagingcookie'?: string
+}
+
+/** O cookie volta embrulhado e codificado duas vezes: `<cookie pagingcookie="%253c..." />`. */
+export function parsePage(body: FetchResponse): Page {
+  const wrapped = body['@Microsoft.Dynamics.CRM.fetchxmlpagingcookie'] ?? ''
+  const match = /pagingcookie="([^"]*)"/.exec(wrapped)
+  let cookie: string | null = null
+  if (match?.[1]) { try { cookie = decodeURIComponent(decodeURIComponent(match[1])) } catch { cookie = null } }
+  const count = body['@Microsoft.Dynamics.CRM.totalrecordcount'] ?? body['@odata.count']
+  return { rows: body.value, cookie, more: body['@Microsoft.Dynamics.CRM.morerecords'] === true, total: typeof count === 'number' && count >= 0 ? count : null }
+}
+
+/** Total vindo do FetchXML agregado (`alias="total"`); sem número, `null`. */
+export function parseCount(body: { value: Row[] }): number | null {
+  const total = body.value[0]?.total
+  return typeof total === 'number' && total >= 0 ? total : null
+}
+
+export function searchPath(set: string, idAttribute: string, nameAttribute: string, query: string) {
+  const q = query.trim()
+  const filter = q ? `statecode eq 0 and contains(${nameAttribute},'${odataString(q)}')` : 'statecode eq 0'
+  return `${set}?$select=${idAttribute},${nameAttribute}&$filter=${encodeURIComponent(filter)}&$orderby=${encodeURIComponent(`${nameAttribute} asc`)}&$top=25`
+}
+
+/** Releitura da linha com as colunas da visão (lookups ficam como `_x_value`, único formato aceito no `$select`; colunas de link ficam de fora). */
+export function reloadPath(set: string, id: string, keys: string[]) {
+  const select = new Set([ID_ATTRIBUTE])
+  for (const key of keys) {
+    if (key.includes('.')) continue
+    select.add(key)
+  }
+  select.add('statecode')
+  return `${set}(${cleanId(id)})?$select=${Array.from(select).join(',')}`
+}
+
+export const relationshipPath = (attribute: string) =>
+  `EntityDefinitions(LogicalName='${ENTITY}')/ManyToOneRelationships?$select=ReferencingEntityNavigationPropertyName,ReferencedEntity&$filter=${encodeURIComponent(`ReferencingAttribute eq '${odataString(attribute)}'`)}`
+
+export const copyPath = (set: string, ids: string[], select: string[]) =>
+  `${set}?$select=${select.join(',')}&$filter=${encodeURIComponent(ids.map((id) => `${ID_ATTRIBUTE} eq ${cleanId(id)}`).join(' or '))}`
+
+/** Valor da variável de ambiente (primeiro lugar a consultar). */
+export const envVarPath = (schema: string) =>
+  `environmentvariablevalues?$select=value&$expand=EnvironmentVariableDefinitionId($select=schemaname)&$filter=${encodeURIComponent(`EnvironmentVariableDefinitionId/schemaname eq '${odataString(schema)}'`)}`
+/** Valor padrão da definição, quando não há valor atual. */
+export const envVarDefaultPath = (schema: string) =>
+  `environmentvariabledefinitions?$select=defaultvalue&$filter=${encodeURIComponent(`schemaname eq '${odataString(schema)}'`)}`
+
+/** Reservas com motorista na janela [start, end) para a contagem por motorista. */
+export const contagemPath = (set: string, start: string, end: string) =>
+  `${set}?$select=cr40f_reservadeveculosid,_cr40f_motorista_value,cr40f_dataehorriodesada,cr40f_trajeto&$filter=${encodeURIComponent(`_cr40f_motorista_value ne null and cr40f_dataehorriodesada ge ${start} and cr40f_dataehorriodesada lt ${end}`)}&$orderby=cr40f_dataehorriodesada asc`
+
+/** Funcionários ativos; `cr40f_funcao` é choice, então "motorista" é filtrado no cliente pelo valor formatado. */
+export const motoristasPath = (set: string) =>
+  `${set}?$select=cr40f_funcionariosid,cr40f_nomecompleto,new_apelido,cr40f_funcao&$filter=${encodeURIComponent('statecode eq 0')}&$orderby=cr40f_nomecompleto asc`
