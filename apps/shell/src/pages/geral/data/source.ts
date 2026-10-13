@@ -5,6 +5,7 @@ import type { KV } from '../domain/columns'
 import { auditoriaData, dayWindow, programarPatch, type Motorista } from '../domain/commands'
 import { COPY_SELECT } from '../domain/copy'
 import { buildCountFetch, buildFetch, quickFindAttributes } from '../domain/fetch'
+import { parseLinkJson, type LinkResult } from '../domain/link'
 import { formatDateTime, formatMoney } from '../domain/format'
 import { ENTITY, ID_ATTRIBUTE, PAGE_SIZE, type AttributeInfo, type AttributeMap, type LookupBind, type LookupOption, type Page, type Sort, type View } from '../domain/types'
 import { MOCK_ATTRIBUTES, MOCK_BINDS, MOCK_LOOKUPS, applyMockFetch, createMockRows, createMockViews } from './mock'
@@ -49,6 +50,8 @@ export type Source = {
   formUrl(mode: 'create' | 'edit', id?: string): string | null
   /** URL do iframe do voucher; `null` em mock. */
   openVoucher(ids: string[]): string | null
+  /** Gera o link de acompanhamento (Custom API `new_GerarLinkAcompanhamento`). */
+  gerarLink(reservaId: string): Promise<LinkResult>
   escalaFdsUrl(): string | null
   /** URL do fluxo (variável de ambiente: valor atual, depois padrão); `null` quando não configurada. */
   flowUrl(schema: string): Promise<string | null>
@@ -214,6 +217,10 @@ function createMockSource({ latency = 1 }: SourceOptions = {}): Source {
     openForm: async () => 'mock',
     formUrl: () => null,
     openVoucher: () => null,
+    async gerarLink() {
+      await wait(300)
+      return { ok: true, link: 'https://acompanhe.mock/abc123', expiraEm: new Date(Date.now() + 86_400_000).toISOString() }
+    },
     escalaFdsUrl: () => null,
     flowUrl: async () => 'https://flow.mock/op',
     async triggerFlow() {
@@ -358,6 +365,10 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
     },
     formUrl: (mode, id) => `${host.clientUrl}/WebResources/${FORM_WEBRESOURCE}?data=${encodeURIComponent(JSON.stringify(formData(mode, id)))}&host=shell`,
     openVoucher: (ids) => `${host.clientUrl}/WebResources/${VOUCHER_WEBRESOURCE}?ids=${encodeURIComponent(JSON.stringify(ids))}&cacheBust=${Date.now()}`,
+    async gerarLink(reservaId) {
+      const r = await host.client.request<{ new_LinkJson?: string }>('new_GerarLinkAcompanhamento', { method: 'POST', body: JSON.stringify({ new_ReservaId: cleanId(reservaId) }) })
+      return parseLinkJson(r?.new_LinkJson)
+    },
     escalaFdsUrl: () => `${host.clientUrl}/WebResources/${ESCALA_FDS_WEBRESOURCE}`,
     async flowUrl(schema) {
       const current = await host.client.request<{ value: Row[] }>(envVarPath(schema))
