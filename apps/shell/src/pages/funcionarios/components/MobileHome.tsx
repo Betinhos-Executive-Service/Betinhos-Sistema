@@ -1,6 +1,7 @@
 import { Button, EmptyState, PageHeader, SearchBox } from '@betinhos/ui'
 import { Cake, Check, ChevronRight, CloudOff, IdCard, Plus, RefreshCw, SearchX, SlidersHorizontal, Stethoscope } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useQueryBandeira } from '../../../nav/queryState'
+import { useEffect, useRef } from 'react'
 import type { AlertKind } from '../data/alerts'
 import type { Filters, SortKey } from '../data/filters'
 import { EMPRESA, FUNCAO, STATUS, VINCULO, optionLabel, type Option } from '../data/schema'
@@ -44,7 +45,8 @@ function filtrosExtras(filters: Filters) {
 
 export function MobileHome(props: Props) {
   const { views, visible, counts, filters, update, reset, ativos, loading, error, envLabel, onReload, onOpen, onNew } = props
-  const [sheet, setSheet] = useState(false)
+  // A folha de filtros aberta vive na URL (`filtros=1`).
+  const [sheet, setSheet] = useQueryBandeira('filtros')
   const extras = filtrosExtras(filters)
   const toggleStatus = (value: number) => update({ status: filters.status.includes(value) ? filters.status.filter((item) => item !== value) : [...filters.status, value] })
 

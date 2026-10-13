@@ -10,7 +10,7 @@ export type MenuItem =
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
-  | { kind: 'page'; id: string; label: string; page: 'componentes' | 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'geral' }
+  | { kind: 'page'; id: string; label: string; page: 'componentes' | 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'geral' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' }
 
 export type MenuGroup = { id: string; label: string; items: MenuItem[] }
 
@@ -28,7 +28,7 @@ export const MENU: MenuGroup[] = [
     label: 'Operacional',
     items: [
       { kind: 'page', id: 'geral', label: 'Geral', page: 'geral' },
-      wr('Dashboard', 'new_dashboard'),
+      { kind: 'page', id: 'dashboard', label: 'Dashboard', page: 'dashboard' },
       { kind: 'page', id: 'operacional', label: 'Resumo Operacional', page: 'operacional' },
       wr('Funções Operacionais', 'new_telafuncoesoperacionais'),
       table('cr40f_trocasdecarro'),
@@ -43,7 +43,7 @@ export const MENU: MenuGroup[] = [
     label: 'Financeiro',
     items: [
       table('cr40f_composicaodeprecos'),
-      table('cr40f_financeiro'),
+      { kind: 'page', id: 'ops', label: 'Ordens de Pagamento', page: 'ops' },
       { kind: 'page', id: 'pagantes', label: 'Pagantes', page: 'pagantes' },
       table('cr40f_recibos_v2'),
       table('cr40f_pedidodecotacao'),
@@ -65,7 +65,7 @@ export const MENU: MenuGroup[] = [
       table('cr40f_veiculos'),
       { kind: 'page', id: 'funcionarios', label: 'Funcionários', page: 'funcionarios' },
       { kind: 'page', id: 'curriculos', label: 'Currículos', page: 'curriculos' },
-      table('cr40f_infracaodetransito'),
+      { kind: 'page', id: 'infracoes', label: 'Infrações de trânsito', page: 'infracoes' },
       table('new_marketing'),
     ],
   },
@@ -74,12 +74,14 @@ export const MENU: MenuGroup[] = [
     label: 'Back-End',
     items: [
       table('cr40f_servicosporpassageiro'),
+      // O dashboard React substitui o antigo no uso diário; o legado fica como modo TV (link "Abrir modo TV" no Dashboard).
+      wr('Dashboard antigo (TV)', 'new_dashboard'),
       wr('Despesas Operacionais', 'new_teladespesasoperacionais'),
       table('new_fotomanutencao'),
       table('new_appmotoristaslog'),
       table('cr40f_anexodespesaoperacional'),
       table('cr40f_categoriadespesaoperacional'),
-      table('cr40f_despesaoperacional'),
+      { kind: 'page', id: 'despesas-operacionais', label: 'Despesas (App Motoristas)', page: 'despesas' },
       table('cr40f_formapagamentodespesa'),
       table('cr40f_anexocolisao_v2'),
       table('cr40f_anexorecebimento_v2'),
