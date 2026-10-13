@@ -1,10 +1,11 @@
 export type SafeDetailHtmlPart =
   | { type: "text"; value: string }
   | { type: "break" }
-  | { type: "link"; href: string; text: string };
+  | { type: "link"; href: string; text: string }
+  | { type: "flag"; code: "BR" | "US" | "ES" };
 
 const safeExternalUrlPattern = /^https?:\/\/[^\s<>"']+$/i;
-const supportedHtmlPattern = /<br\s*\/?>|<a\b[^>]*\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))[^>]*>([\s\S]*?)<\/a>/gi;
+const supportedHtmlPattern = /<br\s*\/?>|<span\b[^>]*\bdata-flag="(BR|US|ES)"[^>]*>|<a\b[^>]*\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))[^>]*>([\s\S]*?)<\/a>/gi;
 
 function decodeHtmlEntities(value: string) {
   return value.replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos|nbsp);/gi, (entity, code: string) => {
@@ -58,9 +59,11 @@ export function parseSafeDetailHtml(value: string): SafeDetailHtmlPart[] {
     const fullMatch = match[0];
     if (/^<br/i.test(fullMatch)) {
       parts.push({ type: "break" });
+    } else if (match[1]) {
+      parts.push({ type: "flag", code: match[1] as "BR" | "US" | "ES" });
     } else {
-      const href = decodeHtmlEntities((match[1] ?? match[2] ?? match[3] ?? "").trim());
-      const text = stripUnsupportedMarkup(match[4] ?? "").trim();
+      const href = decodeHtmlEntities((match[2] ?? match[3] ?? match[4] ?? "").trim());
+      const text = stripUnsupportedMarkup(match[5] ?? "").trim();
       if (safeExternalUrlPattern.test(href)) {
         parts.push({ type: "link", href, text: text || href });
       } else {

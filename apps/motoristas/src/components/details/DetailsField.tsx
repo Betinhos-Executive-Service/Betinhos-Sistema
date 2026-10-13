@@ -8,6 +8,22 @@ import { createPortal } from "react-dom";
 
 const externalUrlPattern = /^https?:\/\/\S+$/i;
 
+const LANGUAGE_FLAGS = {
+  BR: { label: "Português", svg: <><rect width="18" height="12" fill="#009C3B" /><path d="M9 1.5 16.5 6 9 10.5 1.5 6z" fill="#FFDF00" /><circle cx="9" cy="6" r="2.6" fill="#002776" /></> },
+  US: { label: "Inglês", svg: <><rect width="18" height="12" fill="#B22234" /><path d="M0 1.4h18M0 3.2h18M0 5h18M0 6.8h18M0 8.6h18M0 10.4h18" stroke="#fff" strokeWidth=".9" /><rect width="8" height="6.4" fill="#3C3B6E" /></> },
+  ES: { label: "Espanhol", svg: <><rect width="18" height="12" fill="#AA151B" /><rect y="3" width="18" height="6" fill="#F1BF00" /></> }
+};
+
+function LanguageFlag({ code }: { code: keyof typeof LANGUAGE_FLAGS }) {
+  const flag = LANGUAGE_FLAGS[code];
+  return (
+    <svg role="img" aria-label={flag.label} width="18" height="12" viewBox="0 0 18 12" style={{ display: "inline-block", marginRight: 6, verticalAlign: "-1px", borderRadius: 2, boxShadow: "0 0 0 0.5px rgba(0,0,0,.2)" }}>
+      <title>{flag.label}</title>
+      {flag.svg}
+    </svg>
+  );
+}
+
 function normalizePhoneDigits(phone: string) {
   const digits = phone.replace(/\D/g, "");
   if (!digits) return "";
@@ -179,6 +195,7 @@ export function DetailsField({ field }: { field: DetailField }) {
                 </button>
               );
             }
+            if (part.type === "flag") return <LanguageFlag key={`flag-${index}`} code={part.code} />;
             return <span key={`text-${index}`}>{part.value}</span>;
           })}
         </div>

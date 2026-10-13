@@ -2936,6 +2936,24 @@ function escapeHtml(value: string) {
     .replace(/'/g, "&#039;");
 }
 
+// cr40f_idioma (cr40f_bancodedados): 202410000 Português, 202410001 Inglês; Espanhol pelo rótulo.
+export function getPassengerLanguageCode(passenger: DataverseRecord) {
+  const code = Number(passenger.cr40f_idioma);
+  const label = getFormatted(passenger, "cr40f_idioma")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+  if (code === 202410000 || label.startsWith("portug")) return "BR";
+  if (code === 202410001 || label.startsWith("ingl") || label.startsWith("english")) return "US";
+  if (label.startsWith("espanh") || label.startsWith("spanish")) return "ES";
+  return "";
+}
+
+// Marcador lido por parseSafeDetailHtml e renderizado como SVG (emoji de bandeira não aparece no Windows).
+export function buildLanguageFlagHtml(code: string) {
+  return code ? `<span data-flag="${code}"></span>` : "";
+}
+
 async function buildPassengersHtml(geralId: string, serviceDate: Date | null, driverName: string, readMultiple = retrieveMultiple, readOne = retrieveOne) {
   if (!geralId) return "";
   const rows = await readMultiple(
@@ -2966,7 +2984,8 @@ async function buildPassengersHtml(geralId: string, serviceDate: Date | null, dr
       const phoneHtml = phone
         ? `<a href="https://wa.me/${phone}?text=${encodeURIComponent(message)}" target="_blank" rel="noopener noreferrer">${phoneText}</a>`
         : `<span style="color:#8a8a8a">${phoneText}</span>`;
-      return `<span>${escapeHtml(name)}${name && phoneRaw ? " - " : ""}${phoneHtml}</span>`;
+      const flagHtml = buildLanguageFlagHtml(getPassengerLanguageCode(passenger));
+      return `<span>${flagHtml}${escapeHtml(name)}${name && phoneRaw ? " - " : ""}${phoneHtml}</span>`;
     })
   );
 
