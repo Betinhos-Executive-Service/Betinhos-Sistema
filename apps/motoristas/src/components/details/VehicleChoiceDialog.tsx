@@ -12,6 +12,8 @@ import {
 type VehicleChoiceDialogProps = {
   resolution: InfleetVehicleResolution;
   loadFleet: () => Promise<FleetVehicle[]>;
+  // Frota ativa completa, oferecida em "Nenhuma das opções" quando a lista mostrada é restrita.
+  loadAllVehicles?: () => Promise<FleetVehicle[]>;
   onChoose: (choice: DriverVehicleChoice) => void;
   onCancel: () => void;
 };
@@ -27,8 +29,10 @@ function normalizeSearch(value: string) {
 
 // Pergunta qual carro o motorista usou: entre os carros da janela do serviço ou, se a Infleet
 // não identificou nenhum carro cadastrado, entre todos os carros ativos.
-export function VehicleChoiceDialog({ resolution, loadFleet, onChoose, onCancel }: VehicleChoiceDialogProps) {
-  const fleetMode = useMemo(() => needsFleetChoice(resolution), [resolution]);
+export function VehicleChoiceDialog({ resolution, loadFleet, loadAllVehicles, onChoose, onCancel }: VehicleChoiceDialogProps) {
+  // candidatos: carros vistos pela Infleet; lista: carros oferecidos pelo chamador; todos: frota ativa completa.
+  const [mode, setMode] = useState<"candidatos" | "lista" | "todos">(() => (needsFleetChoice(resolution) ? "lista" : "candidatos"));
+  const fleetMode = mode !== "candidatos";
   const candidates = useMemo<VehicleOption[]>(
     () => selectableCandidates(resolution).map((item) => ({ id: item.veiculoId as string, placa: item.placa, modelo: item.modelo, cor: item.cor })),
     [resolution]
@@ -57,9 +61,10 @@ export function VehicleChoiceDialog({ resolution, loadFleet, onChoose, onCancel 
 
   useEffect(() => {
     if (!fleetMode) return;
+    const loader = mode === "todos" && loadAllVehicles ? loadAllVehicles : loadFleet;
     let alive = true;
     setFleetState("loading");
-    loadFleet()
+    loader()
       .then((items) => {
         if (!alive) return;
         setFleet(items.map((item) => ({ id: item.id, placa: item.placa, modelo: item.modelo, cor: item.cor })));
@@ -71,7 +76,9 @@ export function VehicleChoiceDialog({ resolution, loadFleet, onChoose, onCancel 
     return () => {
       alive = false;
     };
-  }, [fleetMode, loadFleet, fleetAttempt]);
+  }, [fleetMode, mode, loadFleet, loadAllVehicles, fleetAttempt]);
+
+  const canChooseOther = Boolean(loadAllVehicles) && (mode === "candidatos" || (mode === "lista" && loadAllVehicles !== loadFleet));
 
   useEffect(() => {
     if (fleetState === "ready") firstFocusRef.current?.focus({ preventScroll: true });
@@ -105,8 +112,11 @@ export function VehicleChoiceDialog({ resolution, loadFleet, onChoose, onCancel 
     >
       <div className="contact-choice-dialog vehicle-choice-dialog" onClick={(event) => event.stopPropagation()}>
         <div className="contact-choice-title" id="vehicle-choice-title">Qual carro você usou?</div>
-        {fleetMode ? (
+        {mode === "lista" ? (
           <div className="contact-choice-phone vehicle-choice-hint">A Infleet não identificou o carro deste serviço.</div>
+        ) : null}
+        {mode === "todos" ? (
+          <div className="contact-choice-phone vehicle-choice-hint">Escolha na frota o carro que você usou.</div>
         ) : null}
 
         {fleetMode && fleetState === "ready" ? (
@@ -163,6 +173,20 @@ export function VehicleChoiceDialog({ resolution, loadFleet, onChoose, onCancel 
           ) : (
             <div className="contact-choice-phone vehicle-choice-status">Nenhum carro encontrado para “{query}”.</div>
           )
+        ) : null}
+
+        {canChooseOther && fleetState !== "loading" ? (
+          <button
+            className="contact-choice-cancel"
+            type="button"
+            disabled={Boolean(selectedId)}
+            onClick={() => {
+              setQuery("");
+              setMode("todos");
+            }}
+          >
+            Nenhuma das opções
+          </button>
         ) : null}
 
         <button className="contact-choice-cancel" type="button" disabled={Boolean(selectedId)} onClick={onCancel}>

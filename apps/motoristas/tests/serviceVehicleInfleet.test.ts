@@ -67,12 +67,15 @@ test("carro fora dos usados na janela não é gravado", () => {
   assert.equal(patch.new_origemveiculo, undefined);
 });
 
-test("com candidatos o motorista não escolhe na frota", () => {
+test("Nenhuma das opções: carro da frota é gravado com percentual 0", () => {
   const resolution = parseInfleetVehicleResolution(askJson);
-  const patch = buildInfleetServiceVehiclePatch(resolution, { veiculoId: "33333333-3333-3333-3333-333333333333", placa: "XYZ", origem: "frota" }, bind);
+  const other = "33333333-3333-3333-3333-333333333333";
+  const patch = buildInfleetServiceVehiclePatch(resolution, { veiculoId: other, placa: "XYZ", origem: "frota" }, bind);
 
   assert.equal(needsFleetChoice(resolution), false);
-  assert.equal(patch.new_origemveiculo, undefined);
+  assert.equal(patch["cr40f_Veiculo@odata.bind"], bind(other));
+  assert.equal(patch.new_origemveiculo, SERVICE_VEHICLE_ORIGIN_DRIVER_CHOSEN);
+  assert.equal(patch.new_percentualveiculoinfleet, 0);
 });
 
 test("sem decisão da Infleet o motorista escolhe qualquer carro ativo", () => {

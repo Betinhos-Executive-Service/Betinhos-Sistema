@@ -124,7 +124,6 @@ export function buildInfleetServiceVehiclePatch(
     patch.new_percentualveiculoinfleet = candidate.percentual;
     return patch;
   }
-  if (!needsFleetChoice(resolution)) return patch;
   patch["cr40f_Veiculo@odata.bind"] = vehicleBind(choice.veiculoId);
   patch.new_origemveiculo = SERVICE_VEHICLE_ORIGIN_DRIVER_CHOSEN;
   patch.new_percentualveiculoinfleet = 0;

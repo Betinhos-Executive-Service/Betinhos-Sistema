@@ -144,6 +144,9 @@ import {
 } from "./lib/serviceVehicleInfleet";
 import { isThirdPartyDriver } from "./lib/myVehicle";
 import { createMockFleetLoader, MOCK_FLEET, pickMockInfleetScenario, resolveMockServiceVehicle } from "./lib/serviceVehicleInfleetMock";
+
+// Referência estável: o diálogo compara com a lista exibida para saber se oferece "Nenhuma das opções".
+const loadMockAllFleet = async () => MOCK_FLEET;
 import { ServicesScreen } from "./screens/ServicesScreen";
 import { SignatureScreen } from "./screens/SignatureScreen";
 import { VoucherScreen } from "./screens/VoucherScreen";
@@ -1166,6 +1169,7 @@ function App() {
         <VehicleChoiceDialog
           resolution={vehicleChoiceRequest.resolution}
           loadFleet={vehicleChoiceRequest.loadFleet}
+          loadAllVehicles={remoteMode ? loadActiveFleetRemote : loadMockAllFleet}
           onChoose={closeVehicleChoice}
           onCancel={cancelVehicleChoice}
         />
