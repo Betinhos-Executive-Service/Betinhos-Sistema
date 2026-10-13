@@ -36,8 +36,9 @@ export function Checklist({ source, donoId, titulo = 'Documentos controlados' }:
   return (
     <section className="doc-checklist" aria-labelledby={`${donoId}-docs`}>
       <h3 id={`${donoId}-docs`} className="doc-checklist__title">{titulo}</h3>
+      {error ? <Alert tone="danger" title="Não foi possível atualizar os documentos" action={<Button variant="secondary" onClick={() => void reload()}>Tentar de novo</Button>}>{error}</Alert> : null}
       <ul className="doc-checklist__list">
-        {itens.map((item) => <ItemLinha key={item.tipo.id} item={item} source={source} onRenovar={() => setAlvo({ tipo: item.tipo, dono, anterior: item.vigente })} />)}
+        {itens.map((item) => <ItemLinha key={`${item.tipo.id}:${item.vigente?.id ?? 'novo'}`} item={item} source={source} onRenovar={() => setAlvo({ tipo: item.tipo, dono, anterior: item.vigente })} />)}
       </ul>
       <RenovarDrawer alvo={alvo} source={source} onClose={() => setAlvo(null)} onSaved={onSaved} />
     </section>
@@ -56,12 +57,18 @@ function ItemLinha({ item, source, onRenovar }: { item: ItemChecklist; source: D
   }
   const abrir = async (arq: Arquivo) => {
     setErroArq(null)
+    // Abre a janela já no clique (gesto do usuário); o arquivo entra depois do download.
+    const janela = window.open('', '_blank')
+    if (!janela) { setErroArq('O navegador bloqueou a abertura do arquivo. Permita pop-ups para este site e tente de novo.'); return }
     try {
       const { blob } = await source.abrirArquivo(arq)
       const url = URL.createObjectURL(blob)
-      window.open(url, '_blank', 'noopener')
+      janela.location.href = url
       setTimeout(() => URL.revokeObjectURL(url), 60_000)
-    } catch (e) { setErroArq(e instanceof Error ? e.message : String(e)) }
+    } catch (e) {
+      janela.close()
+      setErroArq(e instanceof Error ? e.message : String(e))
+    }
   }
 
   return (
