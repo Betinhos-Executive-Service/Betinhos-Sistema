@@ -1,7 +1,7 @@
 import { useCallback, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
 import { Alert, Button, EmptyState, Menu, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
-import { Archive, ArchiveRestore, Bug, CalendarDays, ChevronDown, ClipboardList, Copy, FilePlus2, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Send, ShieldCheck, Ticket, X } from 'lucide-react'
+import { Archive, ArchiveRestore, Bug, CalendarDays, ChevronDown, ClipboardList, Copy, FilePlus2, Link2, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Send, ShieldCheck, Ticket, X } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
 import { useMedia } from '../operacional/useMedia'
@@ -21,6 +21,7 @@ import { LoadMore, LoadSentinel, statusText } from './components/LoadMore'
 import { GeralToolbar } from './components/GeralToolbar'
 import { ViewMenu } from './components/ViewMenu'
 import { AuditoriaOverlay } from './components/AuditoriaOverlay'
+import { LINK_FALHA, gerarLinkBlock } from './domain/link'
 import { VoucherOverlay } from './components/VoucherOverlay'
 import { FormOverlay } from './components/FormOverlay'
 import { copyText } from './domain/copy'
@@ -260,6 +261,27 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     else setVoucherUrl(url)
   }, [source, selectedIds, toast])
 
+  const linkBlock = useMemo(() => {
+    const row = selectedIds.length === 1 ? rowOf(selectedIds[0]) : undefined
+    return gerarLinkBlock(row ? [row] : [], selectedIds.length)
+  }, [selectedIds, rowOf])
+  const gerarLink = useCallback(async () => {
+    if (linkBlock) return
+    try {
+      const result = await source.gerarLink(selectedIds[0])
+      if (!result.ok || !result.link) { toast({ tone: 'danger', message: result.erro || LINK_FALHA }); return }
+      try {
+        if (!navigator.clipboard?.writeText) throw new Error('Área de transferência indisponível.')
+        await navigator.clipboard.writeText(result.link)
+        toast({ tone: 'success', message: 'Link gerado e copiado.' })
+      } catch {
+        toast({ tone: 'info', message: `Link gerado, mas não foi possível copiar: ${result.link}` })
+      }
+    } catch (reason) {
+      toast({ tone: 'danger', message: reason instanceof Error ? reason.message : LINK_FALHA })
+    }
+  }, [linkBlock, source, selectedIds, toast])
+
   const labelOf = useCallback((id: string) => { const name = rowOf(id)?.cr40f_id; return typeof name === 'string' && name ? name : id }, [rowOf])
 
   const askOp = useCallback(() => {
@@ -381,6 +403,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           { id: 'voucher', label: hint('Gerar Voucher', none ? noneTitle : null), icon: <Ticket size={16} />, disabled: none, onSelect: openVoucher },
           { id: 'copiar', label: hint('Copiar Serviços', none ? noneTitle : null), icon: <Copy size={16} />, disabled: none, onSelect: () => { void copySelected() } },
           { id: 'op', label: hint('Gerar OP', none ? noneTitle : null), icon: <FilePlus2 size={16} />, disabled: none, onSelect: askOp },
+          { id: 'link', label: hint('Gerar link', none ? noneTitle : linkBlock), icon: <Link2 size={16} />, disabled: none || linkBlock != null, onSelect: () => { void gerarLink() } },
           { id: 'disparar', label: hint('Disparar', none ? noneTitle : null), icon: <Send size={16} />, disabled: none, onSelect: () => setDispRequest({ ids: selectedIds }) },
         ]}
       />
