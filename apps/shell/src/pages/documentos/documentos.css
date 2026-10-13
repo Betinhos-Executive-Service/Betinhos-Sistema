@@ -14,8 +14,22 @@
 .doc-link:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); border-radius: var(--bt-radius-xs); }
 
 /* Central #/documentos */
-.doc-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--bt-space-2); }
-@media (max-width: 820px) { .doc-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* KPIs: colunas pela largura do próprio bloco (container query), que já desconta menu lateral e margens da página.
+   Largura mínima do card = 14 + 14 de padding + 2 de borda + 42 de ícone + 12 de espaço + ~80 do rótulo mais longo ("31 a 60 dias") ~= 164px; usamos 176px.
+   Em celular (<= 560px) o MetricCard encolhe (padding 10, ícone 32, espaço 8) e o mínimo cai para ~142px; duas colunas só a partir de 308px (cards >= 150px). */
+.doc-kpis { container-type: inline-size; }
+.doc-kpis__grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--bt-space-2); }
+@container (min-width: 308px) {
+  .doc-kpis__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .doc-kpis__grid > :last-child { grid-column: 1 / -1; }
+}
+@container (min-width: 544px) {
+  .doc-kpis__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .doc-kpis__grid > :last-child { grid-column: auto; }
+}
+@container (min-width: 912px) {
+  .doc-kpis__grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
 .doc-kpi { display: block; padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; border-radius: var(--bt-radius-lg); }
 .doc-kpi:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
 .doc-kpi[aria-pressed="true"] > * { border-color: var(--bt-color-action); }
