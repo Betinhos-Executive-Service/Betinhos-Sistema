@@ -10,9 +10,11 @@ export function analisarMensagem(msg: MensagemApi, ctx: ContextoDespesa): Result
   const texto = msg.content.find((b) => b.type === 'text')?.text ?? ''
   let r: RespostaIA
   try { r = JSON.parse(texto) } catch { return { ok: false, erro: 'Resposta não é JSON válido.' } }
+  if (typeof r !== 'object' || r === null || Array.isArray(r)) return { ok: false, erro: 'Resposta não é um objeto JSON.' }
   const faltando = RESPOSTA_SCHEMA.required.filter((campo) => !(campo in (r as object)))
   if (faltando.length) return { ok: false, erro: `Campos ausentes: ${faltando.join(', ')}.` }
   if (!(DECISOES as readonly string[]).includes(r.decisao)) return { ok: false, erro: `Decisão inválida: ${r.decisao}.` }
+  if (!Array.isArray(r.motivos)) return { ok: false, erro: 'Motivos não é uma lista.' }
   if (r.decisao === 'precisa_corrigir' && !r.motivos.length) return { ok: false, erro: 'Decisão "precisa_corrigir" sem motivos.' }
   if (typeof r.confianca !== 'number' || r.confianca < 0 || r.confianca > 1) return { ok: false, erro: `Confiança fora de 0–1: ${r.confianca}.` }
   if (r.reserva_id !== null && !ctx.reservas.some((os) => os.id === r.reserva_id)) return { ok: false, erro: `OS indicada fora do contexto: ${r.reserva_id}.` }
