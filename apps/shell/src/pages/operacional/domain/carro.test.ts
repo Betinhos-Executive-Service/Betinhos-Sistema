@@ -44,5 +44,6 @@ describe('linkValido', () => {
     const now = new Date('2026-10-13T12:00:00Z')
     expect(linkValido({ ...base, linkAcompanhamento: 'https://l', linkExpiraEm: new Date('2026-10-13T13:00:00Z') }, now)).toBe('https://l')
     expect(linkValido({ ...base, linkAcompanhamento: 'https://l', linkExpiraEm: new Date('2026-10-13T11:00:00Z') }, now)).toBeNull()
+    expect(linkValido({ ...base, linkAcompanhamento: '', linkExpiraEm: new Date('2026-10-13T13:00:00Z') }, now)).toBeNull()
   })
 })
