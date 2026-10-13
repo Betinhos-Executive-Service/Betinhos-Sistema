@@ -1424,18 +1424,18 @@ function App() {
         let vehicleChoice: DriverVehicleChoice | null = null;
         if (detailToFinalize.type === "SERVICO" && detailToFinalize.dataverse?.id) {
           setProgress("Conferindo o carro na Infleet.");
-          const thirdPartyDriver = driverContext ?? await getDriverContext();
-          if (isThirdPartyDriver(thirdPartyDriver?.funcionario)) {
+          const driver = driverContext ?? await getDriverContext();
+          if (isThirdPartyDriver(driver?.funcionario)) {
             // Terceiro não usa a Infleet: grava o carro atual dele ou pede a escolha entre os carros dele.
-            const myVehicles = await loadMyVehiclesRemote(thirdPartyDriver);
-            const currentId = getDriverCurrentVehicleId(thirdPartyDriver);
+            const myVehicles = await loadMyVehiclesRemote(driver);
+            const currentId = getDriverCurrentVehicleId(driver);
             const current = myVehicles.find((vehicle) => vehicle.id === currentId) ?? null;
             vehicleResolution = thirdPartyResolution(current);
             if (current) {
               vehicleChoice = { veiculoId: current.id, placa: current.placa, origem: "terceiro" };
             } else {
               setRemoteOperation(null);
-              const picked = await askVehicleChoice(vehicleResolution, async () => myVehicles);
+              const picked = await askVehicleChoice(vehicleResolution, async () => (myVehicles.length > 0 ? myVehicles : loadActiveFleetRemote()));
               if (!picked) return;
               vehicleChoice = { ...picked, origem: "terceiro" };
               setProgress("Registrando o carro escolhido.");
@@ -1496,7 +1496,14 @@ function App() {
       setRemoteOperation(null);
       let choice: DriverVehicleChoice | null = null;
       if (needsDriverChoice(resolution)) {
-        choice = await askVehicleChoice(resolution, createMockFleetLoader(scenario));
+        const loadMockFleet = createMockFleetLoader(scenario);
+        // Terceiro sem carro cadastrado: a lista dele vem vazia e o diálogo oferece a frota ativa.
+        choice = await askVehicleChoice(resolution, resolution.motivo === "motorista-terceiro"
+          ? async () => {
+              const mine = await loadMockFleet();
+              return mine.length > 0 ? mine : MOCK_FLEET;
+            }
+          : loadMockFleet);
         if (!choice) return;
         if (resolution.motivo === "motorista-terceiro") choice = { ...choice, origem: "terceiro" };
       }

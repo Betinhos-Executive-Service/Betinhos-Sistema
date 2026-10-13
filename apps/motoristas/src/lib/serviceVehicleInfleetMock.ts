@@ -13,7 +13,8 @@ export const MOCK_INFLEET_SCENARIOS = [
   "indisponivel",
   "lento",
   "frota-erro",
-  "terceiro"
+  "terceiro",
+  "terceiro-sem-carro"
 ] as const;
 
 export type MockInfleetScenario = (typeof MOCK_INFLEET_SCENARIOS)[number];
@@ -62,6 +63,7 @@ export function buildMockInfleetResolution(scenario: MockInfleetScenario): Infle
       case "nao-cadastrado":
         return { ...base, decisao: "indisponivel", motivo: "veiculo-nao-cadastrado", totalSegundos: 6000, candidatos: [ABC(100, 100)] };
       case "terceiro":
+      case "terceiro-sem-carro":
         return thirdPartyResolution(null);
       case "indisponivel":
       case "frota-erro":
@@ -92,6 +94,7 @@ export function createMockFleetLoader(scenario: MockInfleetScenario) {
     attempts += 1;
     await new Promise((resolve) => setTimeout(resolve, 600));
     if (scenario === "frota-erro" && attempts === 1) throw new Error("Falha simulada ao carregar a frota.");
+    if (scenario === "terceiro-sem-carro") return [];
     return scenario === "terceiro" ? MOCK_FLEET.slice(0, 2) : MOCK_FLEET;
   };
 }
