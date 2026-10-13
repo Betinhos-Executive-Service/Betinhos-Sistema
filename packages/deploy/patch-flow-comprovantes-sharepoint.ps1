@@ -35,7 +35,13 @@ function Dv([string] $Method, [string] $Path, $Body = $null) {
     $params.Body = [Text.Encoding]::UTF8.GetBytes(($Body | ConvertTo-Json -Depth 90 -Compress))
     $params.ContentType = 'application/json; charset=utf-8'
   }
-  return Invoke-RestMethod @params
+  # O Dataverse responde sem charset; o PowerShell 5.1 leria como Latin-1 e corromperia os acentos. Decodifica UTF-8.
+  $bytes = (Invoke-WebRequest @params -UseBasicParsing).RawContentStream.ToArray()
+  if (-not $bytes.Length) { return $null }
+  return ([Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json)
+}
+function AssertSemMojibake([string] $s, [string] $origem) {
+  if ($s -cmatch 'Ã|Â|â€') { throw "Texto com acentuação corrompida em ${origem}; nada foi gravado." }
 }
 function Redact([string] $s) { return ($s -replace 'sig=[^&"\s]+', 'sig=REDACTED') }
 function Flow() {
@@ -46,18 +52,23 @@ function Flow() {
 function Backup($row) {
   if ($row.clientdata -match 'sig=') { throw 'O clientdata contém URL assinada (sig=); o backup redigido não serviria para restaurar. Revise antes de continuar.' }
   New-Item -ItemType Directory -Force $backupDir | Out-Null
-  $stamp = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, 'E. South America Standard Time').ToString('yyyyMMdd-HHmm')
+  $stamp = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, 'E. South America Standard Time').ToString('yyyyMMdd-HHmmss')
   $file = Join-Path $backupDir ("Flow-Comprovantes-Despesas-Assincrono-App-Motoristas-$stamp.json")
+  if (Test-Path $file) { throw "Backup $file já existe; rode de novo em instantes." }
   [IO.File]::WriteAllText($file, (Redact $row.clientdata), (New-Object Text.UTF8Encoding $false))
   Write-Host "[comprovantes-sharepoint] backup: $file"
 }
 function Apply($row, [string] $clientData) {
+  AssertSemMojibake $clientData 'clientdata a gravar'
   $id = $row.workflowid
   if ($row.statecode -eq 1) { Dv PATCH "workflows($id)" @{ statecode = 0 } | Out-Null }
-  Dv PATCH "workflows($id)" @{ clientdata = $clientData } | Out-Null
-  Dv PATCH "workflows($id)" @{ statecode = 1 } | Out-Null
-  $after = Dv GET "workflows($id)?`$select=statecode,statuscode"
-  if ($after.statecode -ne 1) { throw "Flow não reativou (statecode $($after.statecode)). Restaure com -Restaurar." }
+  # Mesmo que a gravação falhe, o flow volta a ficar ativo (com a definição anterior) e o erro sobe.
+  try { Dv PATCH "workflows($id)" @{ clientdata = $clientData } | Out-Null }
+  finally {
+    Dv PATCH "workflows($id)" @{ statecode = 1 } | Out-Null
+    $after = Dv GET "workflows($id)?`$select=statecode,statuscode"
+    if ($after.statecode -ne 1) { throw "Flow não reativou (statecode $($after.statecode)). Restaure com -Restaurar." }
+  }
 }
 
 $who = Dv GET WhoAmI
