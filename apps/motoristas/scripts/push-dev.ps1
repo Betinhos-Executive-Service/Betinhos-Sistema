@@ -79,7 +79,7 @@ function Assert-SolutionArchiveExchangeLifecycle([string] $ZipPath) {
     $customApiPath = Join-Path $extractPath "customapis"
     if (-not (Test-Path -LiteralPath $customApiPath)) { throw "ZIP final nao possui a pasta customapis." }
     $xmlText = ((Get-ChildItem -LiteralPath $customApiPath -Recurse -File -Filter "*.xml" | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }) -join "`n")
-    foreach ($required in @("new_ConcluirTrocaDeCarro", "new_CancelarTrocaDeCarro", "new_ReverterTrocaDeCarro", "new_ConfirmarTrocaMotorista", "new_AtualizarTrocaDeCarro", "new_RegistrarTrocaDeCarro", "new_Motivo", "new_DataEfetiva", "new_VersaoEsperada", "new_IdempotencyKey", "new_TrocaId", "new_TrocaCompensatoriaId", "new_DispararComunicadoMotorista", "new_AbrirComunicadoMotorista", "new_RegistrarCienciaComunicado", "new_ReenviarPushComunicado", "new_DestinatarioId", "new_ComunicadoId", "new_AssinaturaJson")) {
+    foreach ($required in @("new_ConcluirTrocaDeCarro", "new_CancelarTrocaDeCarro", "new_ReverterTrocaDeCarro", "new_ConfirmarTrocaMotorista", "new_AtualizarTrocaDeCarro", "new_RegistrarTrocaDeCarro", "new_Motivo", "new_DataEfetiva", "new_VersaoEsperada", "new_IdempotencyKey", "new_TrocaId", "new_TrocaCompensatoriaId", "new_DispararComunicadoMotorista", "new_AbrirComunicadoMotorista", "new_RegistrarCienciaComunicado", "new_ReenviarPushComunicado", "new_DestinatarioId", "new_ComunicadoId", "new_AssinaturaJson", "new_ResolverVeiculoDoServico", "new_ReservaId", "new_ResultadoJson", "new_SincronizarVeiculoAtual", "new_GerarLinkAcompanhamento", "new_ResumoJson", "new_LinkJson")) {
       if ($xmlText.IndexOf($required, [System.StringComparison]::Ordinal) -lt 0) { throw "ZIP final nao possui o componente esperado: $required" }
     }
     Write-Step "validacao do ZIP final OK: Custom APIs, parametros e retorno presentes"
@@ -153,6 +153,22 @@ Write-Step "provision comunicados metadata, Custom APIs e travas in DEV"
   -Apply `
   -DeviceCode:$DeviceCode
 if (-not $?) { throw "Provisionamento de comunicados falhou." }
+
+Write-Step "provision decisao do carro pela Infleet in DEV"
+& (Join-Path $PSScriptRoot "provision-infleet-vehicle.ps1") `
+  -EnvironmentUrl $environmentUrl `
+  -SolutionUniqueName $solutionUniqueName `
+  -Apply `
+  -DeviceCode:$DeviceCode
+if (-not $?) { throw "Provisionamento da decisao do carro pela Infleet falhou." }
+
+Write-Step "provision carro atual do motorista e link de acompanhamento in DEV"
+& (Join-Path $PSScriptRoot "provision-current-vehicle.ps1") `
+  -EnvironmentUrl $environmentUrl `
+  -SolutionUniqueName $solutionUniqueName `
+  -Apply `
+  -DeviceCode:$DeviceCode
+if (-not $?) { throw "Provisionamento do carro atual e do link de acompanhamento falhou." }
 
 Write-Step "provision exchange lifecycle metadata in DEV"
 & (Join-Path $PSScriptRoot "provision-exchange-lifecycle.ps1") `

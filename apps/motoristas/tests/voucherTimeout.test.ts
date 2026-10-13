@@ -5,6 +5,8 @@ import { saveVoucherRemote } from "../src/lib/dataverse.ts";
 const id = "11111111-1111-1111-1111-111111111111";
 const pending = { cr40f_status: 202410006, new_linkdovoucher: null };
 const completed = { cr40f_status: 202410008, new_linkdovoucher: "https://example.com/voucher.pdf" };
+const vehicle = { veiculoId: "22222222-2222-2222-2222-222222222222", placa: "RTI7G00", modelo: "Cruze", cor: "Prata", segundos: 3600, percentual: 100, cadastrado: true };
+const automaticVehicle = { decisao: "automatico" as const, motivo: "acima-do-limite", totalSegundos: 3600, candidatos: [vehicle], escolhido: vehicle };
 
 async function runVoucher(status: number, records: Record<string, unknown>[]) {
   const previousWindow = (globalThis as any).window;
@@ -32,7 +34,8 @@ async function runVoucher(status: number, records: Record<string, unknown>[]) {
     const result = await saveVoucherRemote({
       detail: { type: "SERVICO", id: "OS-9549", title: "Serviço", fields: [], actions: [],
         dataverse: { entitySetName: "cr40f_reservadeveculoses", id, record: {} } },
-      fields: { "Horário Inicial": "08:00", "Horário Final": "10:00" }
+      fields: { "Horário Inicial": "08:00", "Horário Final": "10:00" },
+      vehicleResolution: automaticVehicle
     });
     return { result, posts, reads, updates, reports };
   } catch (error) {
