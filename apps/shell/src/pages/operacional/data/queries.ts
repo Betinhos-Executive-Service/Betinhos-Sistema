@@ -1,9 +1,9 @@
 import { DataverseError, chunk, cleanId, formatted, type DataverseClient, type Row } from '@betinhos/dataverse'
-import type { Motorista, OperacionalData, PassageiroServico, Reserva } from '../domain/types'
+import type { Motorista, OperacionalData, PassageiroServico, Reserva, Veiculo } from '../domain/types'
 import { dayRange } from '../domain/time'
 
-export const ENTITIES = { reserva: 'cr40f_reservadeveculos', funcionario: 'cr40f_funcionarios', passageiro: 'cr40f_servicosporpassageiro' } as const
-export type EntitySets = { reserva: string; funcionario: string; passageiro: string }
+export const ENTITIES = { reserva: 'cr40f_reservadeveculos', funcionario: 'cr40f_funcionarios', passageiro: 'cr40f_servicosporpassageiro', veiculo: 'cr40f_veiculos' } as const
+export type EntitySets = { reserva: string; funcionario: string; passageiro: string; veiculo: string }
 
 const BASE = [
   'cr40f_reservadeveculosid', 'cr40f_id', 'cr40f_idnovo', 'cr40f_status', 'cr40f_statusdefaturamento', 'cr40f_tipodoservico', 'cr40f_tipodeveiculo',
@@ -11,7 +11,7 @@ const BASE = [
   'cr40f_trajeto', 'cr40f_obsdeoperao', 'cr40f_observaointerna', '_cr40f_solicitante_value',
 ]
 const PASSAGEIRO_LOOKUPS = ['_cr40f_passageiro1_value', '_cr40f_passageiro2_value', '_cr40f_passageiro3_value', '_cr40f_passageiro4_value']
-const EXTRA = ['_cr40f_motorista_value', '_cr40f_veiculo_value', '_cr40f_cliente_value', ...PASSAGEIRO_LOOKUPS]
+const EXTRA = ['_cr40f_motorista_value', '_cr40f_veiculo_value', '_cr40f_cliente_value', 'new_linkacompanhamento', 'new_linkacompanhamentoexpiraem', ...PASSAGEIRO_LOOKUPS]
 
 /** Erros de coluna inexistente que fazem o legado repetir a consulta só com os campos base. */
 export const SAFE_MODE_ERROR = /column metadata is not available|could not find a property named|does not contain a definition/i
@@ -50,11 +50,14 @@ export function mapReserva(row: Row): Reserva {
     solicitante: text(row, '_cr40f_solicitante_value'),
     passageirosLookup: PASSAGEIRO_LOOKUPS.flatMap((field) => (id(row[field]) ? [{ id: id(row[field])!, nome: text(row, field) }] : [])),
     passageirosTexto: text(row, 'cr40f_passageirosetelefonedecontato'),
+    veiculoId: id(row._cr40f_veiculo_value),
+    linkAcompanhamento: String(row.new_linkacompanhamento ?? ''),
+    linkExpiraEm: row.new_linkacompanhamentoexpiraem ? new Date(String(row.new_linkacompanhamentoexpiraem)) : null,
   }
 }
 
 export function mapMotorista(row: Row): Motorista {
-  return { id: id(row.cr40f_funcionariosid) ?? '', nome: text(row, 'cr40f_nomecompleto'), apelido: text(row, 'new_apelido'), celular: text(row, 'cr40f_celular') }
+  return { id: id(row.cr40f_funcionariosid) ?? '', nome: text(row, 'cr40f_nomecompleto'), apelido: text(row, 'new_apelido'), celular: text(row, 'cr40f_celular'), veiculoAtualId: id(row._cr40f_veiculoatual_value), terceiro: Number(row.cr40f_tipodevinculo) === 1 }
 }
 
 async function loadReservas(client: DataverseClient, entitySet: string, key: string) {
@@ -70,7 +73,7 @@ const isAuthError = (error: unknown) => error instanceof DataverseError && (erro
 
 async function loadMotoristas(client: DataverseClient, entitySet: string, reservas: Reserva[], warnings: string[]) {
   try {
-    const rows = await client.getAll(`${entitySet}?$select=cr40f_funcionariosid,cr40f_nomecompleto,new_apelido,cr40f_funcao,cr40f_status,cr40f_celular&$filter=statecode eq 0&$orderby=cr40f_nomecompleto asc`)
+    const rows = await client.getAll(`${entitySet}?$select=cr40f_funcionariosid,cr40f_nomecompleto,new_apelido,cr40f_funcao,cr40f_status,cr40f_celular,_cr40f_veiculoatual_value,cr40f_tipodevinculo&$filter=statecode eq 0&$orderby=cr40f_nomecompleto asc`)
     const motoristas = rows.filter((row) => /motorista/i.test(formatted(row, 'cr40f_funcao'))).map(mapMotorista)
     if (motoristas.length) return motoristas
   } catch (error) {
@@ -78,8 +81,19 @@ async function loadMotoristas(client: DataverseClient, entitySet: string, reserv
     warnings.push('Não foi possível carregar a lista de motoristas; mostrando os que aparecem nas reservas.')
   }
   const derived = new Map<string, Motorista>()
-  for (const r of reservas) if (r.motoristaId && !derived.has(r.motoristaId)) derived.set(r.motoristaId, { id: r.motoristaId, nome: r.motorista, apelido: '', celular: '' })
+  for (const r of reservas) if (r.motoristaId && !derived.has(r.motoristaId)) derived.set(r.motoristaId, { id: r.motoristaId, nome: r.motorista, apelido: '', celular: '', veiculoAtualId: null, terceiro: false })
   return [...derived.values()]
+}
+
+async function loadVeiculos(client: DataverseClient, entitySet: string, warnings: string[]): Promise<Veiculo[]> {
+  try {
+    const rows = await client.getAll(`${entitySet}?$select=cr40f_veiculosid,cr40f_placa,cr40f_modelo,cr40f_cor&$filter=statecode eq 0`)
+    return rows.map((row) => ({ id: id(row.cr40f_veiculosid) ?? '', placa: text(row, 'cr40f_placa'), modelo: text(row, 'cr40f_modelo'), cor: text(row, 'cr40f_cor') }))
+  } catch (error) {
+    if (isAuthError(error)) throw error
+    warnings.push('Não foi possível carregar os veículos; o carro dos serviços não será exibido.')
+    return []
+  }
 }
 
 async function loadPassageiros(client: DataverseClient, entitySet: string, reservaIds: string[], warnings: string[]) {
@@ -112,9 +126,10 @@ export async function loadOperacional(client: DataverseClient, sets: EntitySets,
   const { rows, queryMode } = await loadReservas(client, sets.reserva, key)
   const reservas = rows.map(mapReserva)
   const warnings: string[] = []
-  const [passageiros, motoristas] = await Promise.all([
+  const [passageiros, motoristas, veiculos] = await Promise.all([
     loadPassageiros(client, sets.passageiro, reservas.map((r) => r.id), warnings),
     loadMotoristas(client, sets.funcionario, reservas, warnings),
+    loadVeiculos(client, sets.veiculo, warnings),
   ])
-  return { reservas, motoristas, passageiros, queryMode, warnings }
+  return { reservas, motoristas, veiculos, passageiros, queryMode, warnings }
 }
