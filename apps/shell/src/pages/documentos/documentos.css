@@ -3,3 +3,12 @@
 .doc-form { display: grid; gap: var(--bt-space-3); container-type: inline-size; }
 .doc-form__datas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--bt-space-3); }
 @container (max-width: 420px) { .doc-form__datas { grid-template-columns: minmax(0, 1fr); } }
+.doc-checklist { display: grid; gap: var(--bt-space-2); }
+.doc-checklist__title { margin: 0; font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); letter-spacing: 0.08em; text-transform: uppercase; color: var(--bt-color-text-secondary); }
+.doc-checklist__list, .doc-item__arquivos, .doc-item__historico { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
+.doc-item { display: grid; gap: var(--bt-space-1-5); padding: var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
+.doc-item__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--bt-space-2); }
+.doc-item__nome { font-size: var(--bt-font-size-14); color: var(--bt-color-text-primary); }
+.doc-item__acoes { display: flex; flex-wrap: wrap; gap: var(--bt-space-1); }
+.doc-link { padding: 0; border: 0; background: transparent; color: var(--bt-color-action); font: inherit; font-size: var(--bt-font-size-13); text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.doc-link:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); border-radius: var(--bt-radius-xs); }
