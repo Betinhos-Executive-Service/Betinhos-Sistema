@@ -3858,7 +3858,7 @@ svg {
 /* Escolha do carro na finalização: reaproveita o diálogo de contato. */
 .vehicle-choice-list {
   display: grid;
-  gap: 8px;
+  gap: 12px;
   margin: 14px 0 0;
   padding: 0;
   list-style: none;
@@ -3902,9 +3902,9 @@ svg {
   border: 1px solid #e2e8f0;
   border-radius: 6px;
   background: #ffffff;
-  padding: 3px 8px;
+  padding: 4px 10px;
   color: #475569;
-  font-size: 0.74rem;
+  font-size: 0.84rem;
   font-weight: 800;
   letter-spacing: 0.06em;
   font-variant-numeric: tabular-nums;
