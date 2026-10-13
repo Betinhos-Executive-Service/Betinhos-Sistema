@@ -26,6 +26,7 @@ Motivação (PROD, 13/10/2026): 1.100 despesas (R$ 121,4 mil) desde 01/07 parada
 - O upload preenche no anexo: `cr40f_driveitemid` (id do item no SharePoint), `cr40f_urlsharepoint`, `cr40f_sharelink` (link interno da organização), `cr40f_mimetype` e `cr40f_tamanhobytes`.
 - Contrato com o App Motoristas preservado: mesma chamada, mesmos parâmetros e mesma resposta; só muda o destino. Se o flow for compartilhado com outros usos (não despesa), apenas o ramo de despesa muda.
 - O flow de análise lê o arquivo pelo id do item no SharePoint (conector SharePoint, "Obter conteúdo do arquivo").
+- A prévia de comprovantes da tela React (`apps/shell/src/pages/despesas/data/arquivo.ts`, via "Flow - Consultar Arquivo OneDrive") continua funcionando: o flow de consulta ganha um ramo para itens do SharePoint e a tela envia `origem: 'sharepoint'` quando o link do anexo não é do OneDrive (`betinhos-my`). Comprovantes antigos seguem pelo caminho atual.
 
 ## Fluxo
 1. **Gatilho**: linha modificada em `cr40f_despesaoperacional`, coluna `cr40f_statusanexo` = Completo, `cr40f_origem` = App Motoristas (100000000) e `cr40f_iastatusanalise` vazio ou Pendente. Primeira ação: gravar `Processando` (evita execução dupla).
