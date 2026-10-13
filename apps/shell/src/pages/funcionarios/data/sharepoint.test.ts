@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { callFlow, pastaFuncionario, sanitizeFileName, uniqueName } from './sharepoint'
+import { callFlow, createSharePointDocs, pastaFuncionario, sanitizeFileName, uniqueName } from './sharepoint'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -25,5 +25,20 @@ describe('sharepoint helpers', () => {
     await expect(callFlow('https://x', {})).rejects.toThrow('Solicitação inválida.')
     vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 502 })))
     await expect(callFlow('https://x', {})).rejects.toThrow('HTTP 502')
+  })
+})
+
+describe('createSharePointDocs.listar', () => {
+  it('lista uma subpasta do dono', async () => {
+    const api = {
+      retrieveMultipleRecords: vi.fn(async (entity: string) => entity === 'environmentvariabledefinition'
+        ? { entities: [{ environmentvariabledefinitionid: 'def', defaultvalue: 'https://flow/listar' }] }
+        : { entities: [] }),
+    }
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({ sucesso: true, arquivos: [] }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const docs = createSharePointDocs(api as never, 'DEV', 'Veiculos')
+    await docs.listar('v1', 'Documentos/CRLV')
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ caminhoCompleto: 'Veiculos/DEV/v1/Documentos/CRLV' })
   })
 })
