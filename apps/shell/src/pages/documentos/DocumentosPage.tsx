@@ -85,13 +85,14 @@ function Documentos({ host }: { host: Host }) {
     >
       {error && data ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{error} A lista mostra os dados da carga anterior.</Alert> : null}
       {data ? (
-        <div className="doc-kpis">
+        <div className="doc-kpis"><div className="doc-kpis__grid">
           {KPIS.map((k) => (
+            // O MetricCard fica dentro do botão de propósito: o cartão inteiro é um alternador de filtro acessível (aria-pressed).
             <button key={k} type="button" className="doc-kpi" aria-pressed={filtro.kpi === k} onClick={() => setFiltro({ ...filtro, kpi: filtro.kpi === k ? null : k })}>
               <MetricCard icon={KPI_ICONE[k]} tone={KPI_TOM[k]} label={KPI_LABEL[k]} value={kpis[k]} />
             </button>
           ))}
-        </div>
+        </div></div>
       ) : null}
       {body}
       {source ? <RenovarDrawer alvo={alvo} source={source} onClose={() => setAlvo(null)} onSaved={onSaved} /> : null}
