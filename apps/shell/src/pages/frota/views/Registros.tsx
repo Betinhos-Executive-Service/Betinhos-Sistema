@@ -1,6 +1,8 @@
 import { Plus } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Button, EmptyState, Input, PageToolbar, SearchBox, SegmentedControl, Table, TableTitle } from '@betinhos/ui'
+import { lerOpcao, useQueryTexto } from '../../../nav/queryState'
+import { patchHashQuery, useHashQuery } from '../../../nav/useHashRoute'
 import { useNotify } from '../components/Toasts'
 import { SelectFilter, StatusBadge } from '../components/Ui'
 import { formatBR } from '../data/dates'
@@ -24,14 +26,15 @@ const categoriasTexto = (valores: number[]) => valores.map((value) => CATEGORIAS
 
 export function Registros({ kinds, data, source, onOpen, onReload }: { kinds: Kind[]; data: FrotaData; source: DataSource; onOpen: (kind: Kind, id: string) => void; onReload: () => void }) {
   const notify = useNotify()
-  const [kind, setKind] = useState<Kind>(kinds[0])
-  const [busca, setBusca] = useState('')
-  const [status, setStatus] = useState('')
-  const [veiculo, setVeiculo] = useState('')
-  const [pessoa, setPessoa] = useState('')
-  const [categoria, setCategoria] = useState('')
-  const [de, setDe] = useState('')
-  const [ate, setAte] = useState('')
+  // Filtros na URL (#/frota?aba=manutencoes&q=…&status=…&veiculo=…&de=…); a troca de aba limpa todos.
+  const kind = lerOpcao(useHashQuery(), 'tipo', kinds, kinds[0])
+  const [busca, setBusca] = useQueryTexto('q')
+  const [status, setStatus] = useQueryTexto('status')
+  const [veiculo, setVeiculo] = useQueryTexto('veiculo')
+  const [pessoa, setPessoa] = useQueryTexto('pessoa')
+  const [categoria, setCategoria] = useQueryTexto('categoria')
+  const [de, setDe] = useQueryTexto('de')
+  const [ate, setAte] = useQueryTexto('ate')
 
   const todas = useMemo(() => linhas(kind, data), [kind, data])
   const opcoesVeiculo = useMemo(() => opcoes(todas.map((linha) => linha.veiculo)), [todas])
@@ -51,11 +54,7 @@ export function Registros({ kinds, data, source, onOpen, onReload }: { kinds: Ki
   }, [todas, busca, status, veiculoEfetivo, pessoaEfetiva, categoria, de, ate])
 
   function trocar(next: Kind) {
-    setKind(next)
-    setStatus('')
-    setVeiculo('')
-    setPessoa('')
-    setCategoria('')
+    patchHashQuery({ tipo: next === kinds[0] ? null : next, status: null, veiculo: null, pessoa: null, categoria: null })
   }
 
   async function novo() {

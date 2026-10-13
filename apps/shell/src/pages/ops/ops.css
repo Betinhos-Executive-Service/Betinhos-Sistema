@@ -1,0 +1,14 @@
+/* Ordens de Pagamento: reaproveita lista, ficha e linha do tempo de Pagantes (pagantes.css). Só tokens do Design System 1.4.0. */
+.op-lines { display: grid; gap: var(--bt-space-0-5); }
+
+.op-ficha__reason { display: flex; align-items: flex-start; gap: var(--bt-space-1-5); margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.op-ficha__reason svg { flex: none; margin-top: var(--bt-space-0-5); }
+
+/* Parcela do rateio: pessoa, valor, status e ações rápidas. */
+.op-rateio__row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: var(--bt-space-2); min-height: var(--bt-control-height-default); padding: var(--bt-space-1-5) var(--bt-space-2-5); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); font-size: var(--bt-font-size-13); color: var(--bt-color-text-primary); }
+.op-rateio__name { display: grid; gap: var(--bt-space-0-5); min-width: 0; }
+.op-rateio__name strong { overflow: hidden; font-weight: var(--bt-font-weight-bold); text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 560px) {
+  .op-rateio__row { grid-template-columns: minmax(0, 1fr) auto; }
+}

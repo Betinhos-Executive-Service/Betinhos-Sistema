@@ -3,17 +3,20 @@ import { Alert, Button, Dialog, EmptyState, StatusBadge, ToastProvider, useToast
 import { Plus, ScrollText, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
+import { lerInteiro, useQueryAlvo, useQueryBandeira, useQueryFilters } from '../../nav/queryState'
+import { patchHashQuery, useHashQuery } from '../../nav/useHashRoute'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
 import { statusPatch } from './data/mutations'
 import type { Curriculo } from './domain/types'
-import { EMPTY_FILTERS, buildStages, cargoOptions, filterCurriculos, groupByStage, stageFor, type Filters, type Stage } from './domain/funnel'
+import { EMPTY_FILTERS, buildStages, cargoOptions, filterCurriculos, groupByStage, stageFor, type Stage } from './domain/funnel'
+import { curriculosQuery } from './domain/query'
 import { useCurriculos } from './useCurriculos'
 import { useBoardDrag } from './useBoardDrag'
 import { CurriculoFilters } from './components/CurriculoFilters'
 import { BoardSkeleton, FunnelBoard } from './components/FunnelBoard'
 import { FunnelTabs } from './components/FunnelTabs'
-import { CurriculoDrawer, type DrawerTarget } from './components/CurriculoDrawer'
+import { CurriculoDrawer } from './components/CurriculoDrawer'
 import './curriculos.css'
 
 export function CurriculosPage({ host }: { host: Host }) {
@@ -27,11 +30,15 @@ function Curriculos({ host }: { host: Host }) {
   const cv = useCurriculos(source)
   const toast = useToast()
   const mobile = useMedia('(max-width: 820px)')
-  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
-  const [target, setTarget] = useState<DrawerTarget>(null)
+  // Filtros, candidato aberto e etapa do celular vivem na URL (#/curriculos?q=…&cargo=…&ver=…&etapa=…).
+  const [filters, setFilters] = useQueryFilters(curriculosQuery)
+  const [target, setTarget] = useQueryAlvo()
   const [confirm, setConfirm] = useState<{ c: Curriculo; stage: Stage } | null>(null)
-  const [collapsed, setCollapsed] = useState(true)
-  const [activeTab, setActiveTab] = useState<number | null>(null)
+  // Colunas do quadro: recolhidas por padrão; expandidas ficam na URL (`expandido=1`).
+  const [expanded, setExpanded] = useQueryBandeira('expandido')
+  const collapsed = !expanded
+  const activeTab = lerInteiro(useHashQuery(), 'etapa')
+  const setActiveTab = (value: number | null) => patchHashQuery({ etapa: value == null ? null : String(value) })
 
   const now = useMemo(() => new Date(), [cv.list])
   const stages = useMemo(() => buildStages(cv.choices?.status ?? []), [cv.choices])
@@ -79,7 +86,7 @@ function Curriculos({ host }: { host: Host }) {
   } else if (mobile) {
     body = <FunnelTabs stages={stages} groups={groups} choices={cv.choices!} now={now} onOpen={openView} onMove={requestMove} active={activeTab} onActive={setActiveTab} />
   } else {
-    body = <FunnelBoard stages={stages} groups={groups} choices={cv.choices!} now={now} onOpen={openView} onMove={requestMove} drag={drag} collapsed={collapsed} onToggleCollapsed={() => setCollapsed((value) => !value)} />
+    body = <FunnelBoard stages={stages} groups={groups} choices={cv.choices!} now={now} onOpen={openView} onMove={requestMove} drag={drag} collapsed={collapsed} onToggleCollapsed={() => setExpanded(collapsed)} />
   }
 
   const reprovar = confirm?.stage.key === 'reprovado'

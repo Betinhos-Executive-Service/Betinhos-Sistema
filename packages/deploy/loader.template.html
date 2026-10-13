@@ -10,11 +10,12 @@
 <p id="msg">Carregando…</p>
 <script>
 // Carregador: o model-driven serve WebResources por uma URL com marcador de cache que nem sempre
-// muda após publicar. Este arquivo quase nunca muda; ele busca a tela real pela URL direta,
-// sem cache, para que cada publicação apareça na hora.
+// muda após publicar. Este arquivo quase nunca muda; ele busca a tela real pela URL direta e
+// sempre revalida com o servidor (no-cache): publicação nova chega na hora e, sem mudança,
+// o navegador reaproveita a cópia guardada (304) em vez de baixar o app inteiro de novo.
 (async function () {
   try {
-    var response = await fetch('/WebResources/{{RESOURCE}}?v=' + Date.now(), { cache: 'no-store', credentials: 'same-origin' })
+    var response = await fetch('/WebResources/{{RESOURCE}}', { cache: 'no-cache', credentials: 'same-origin' })
     if (!response.ok) throw new Error('HTTP ' + response.status)
     var html = await response.text()
     document.open()

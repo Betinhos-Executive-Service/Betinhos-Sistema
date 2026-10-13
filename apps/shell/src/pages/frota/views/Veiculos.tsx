@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { EmptyState, PageToolbar, SearchBox, StatusBadge, Table, TableTitle } from '@betinhos/ui'
+import { useQueryTexto } from '../../../nav/queryState'
 import { FotoVeiculo } from '../components/FotoVeiculo'
 import { SelectFilter } from '../components/Ui'
 import { brl } from '../data/format'
@@ -15,8 +16,9 @@ const SEM_STATUS = 'sem'
 type Linha = { veiculo: Veiculo; motorista: string | null; pendencias: number; custo: ReturnType<typeof custoVeiculo> }
 
 export function Veiculos({ data, today, source, onOpenVeiculo }: { data: FrotaData; source: DataSource; today: string; onOpenVeiculo: (id: string) => void }) {
-  const [busca, setBusca] = useState('')
-  const [status, setStatus] = useState(String(VEICULO.ATIVO))
+  // Busca e status na URL (#/frota?aba=veiculos&q=…&status=…); só "Ativos" é o padrão, então "Todos os status" fica explícito (`status=`).
+  const [busca, setBusca] = useQueryTexto('q')
+  const [status, setStatus] = useQueryTexto('status', String(VEICULO.ATIVO))
 
   const linhas = useMemo<Linha[]>(() => {
     const periodo = ultimos12Meses(today)

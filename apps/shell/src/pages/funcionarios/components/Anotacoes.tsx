@@ -1,6 +1,7 @@
 import { Button, buttonClassName, SearchBox, Spinner } from '@betinhos/ui'
 import { ArrowLeft, ChevronRight, CloudUpload, Download, ExternalLink, FileText, ImageIcon, Paperclip, Pencil, Send, Trash2, X } from 'lucide-react'
 import { createElement, useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type CSSProperties, type DragEvent, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useQueryId, useQueryTexto } from '../../../nav/queryState'
 import { initials, normalizeSearch, richTextToPlain } from '../data/format'
 import { imagensNoDataverse, migrarImagens, type ResultadoMigracao } from '../data/migracao'
 import { buildNoteHtml, countInlineImages, extractSpAnexos, noteIsPlain, sanitizeNoteHtml, spWebUrl, textToNoteHtml, type SafeNode, type SpAnexo } from '../data/notes'
@@ -62,8 +63,9 @@ export function AnotacoesTab({ source, id }: { source: DataSource; id: string })
   const { data, loading, error, reload } = useLoad<Anotacao[]>(load)
   const limites = useLimites(source)
   const notes = useMemo<View[]>(() => (data ?? []).map(toView), [data])
-  const [busca, setBusca] = useState('')
-  const [openId, setOpenId] = useState<string | null>(null)
+  // Busca e nota aberta vivem na URL (`qnota=…&nota=<id>`).
+  const [busca, setBusca] = useQueryTexto('qnota')
+  const [openId, setOpenId] = useQueryId('nota')
   const cards = useRef(new Map<string, HTMLButtonElement>())
   const lastOpened = useRef<string | null>(null)
   const open = notes.find((nota) => nota.id === openId) ?? null

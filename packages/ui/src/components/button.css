@@ -11,7 +11,10 @@
   font-family: var(--bt-font-family-sans);
   font-size: var(--bt-font-size-13);
   font-weight: var(--bt-font-weight-extrabold);
-  line-height: 1;
+  /* Line-height da escala tipográfica do DS: com 1 o acento de maiúsculas ("Últimos", "Ônibus")
+     ficava fora da caixa da linha e era cortado pelo overflow do rótulo. A altura do botão vem
+     de min-height + flex, então o line-height não a altera. */
+  line-height: var(--bt-typography-body-default-line-height);
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
@@ -31,7 +34,7 @@
 .bt-button--ghost { color: var(--bt-color-action); background-color: transparent; }
 .bt-button--danger { color: var(--bt-color-surface); background-color: var(--bt-color-danger); }
 
-.bt-button--compact { min-height: var(--bt-control-height-compact); padding: 0 var(--bt-space-2-5); gap: var(--bt-space-1-5); border-radius: var(--bt-radius-sm); font-size: var(--bt-font-size-12); }
+.bt-button--compact { min-height: var(--bt-control-height-compact); padding: 0 var(--bt-space-2-5); gap: var(--bt-space-1-5); border-radius: var(--bt-radius-sm); font-size: var(--bt-font-size-12); line-height: var(--bt-typography-body-small-line-height); }
 .bt-button--touch { min-height: var(--bt-control-height-touch); }
 .bt-button--full { width: 100%; }
 .bt-button--icon { padding: 0; aspect-ratio: 1; }

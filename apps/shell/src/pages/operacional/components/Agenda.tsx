@@ -1,5 +1,5 @@
 import { ChevronDown } from 'lucide-react'
-import { useState } from 'react'
+import { useQueryBandeira } from '../../../nav/queryState'
 import { EmptyState, Skeleton, StatusBadge } from '@betinhos/ui'
 import type { HourGroup } from '../domain/bands'
 import type { Reserva } from '../domain/types'
@@ -41,7 +41,8 @@ type Props = {
 
 /** Agenda do dia por hora cheia; cabeçalhos de hora fixos ao rolar; concluídos recolhidos. */
 export function Agenda({ groups, concluded, showConcluded, now, selectedId, changed, onSelect }: Props) {
-  const [concludedOpen, setConcludedOpen] = useState(false)
+  // A seção de concluídos aberta vive na URL (`encerrados=1`).
+  const [concludedOpen, setConcludedOpen] = useQueryBandeira('encerrados')
   const row = (r: Reserva) => <ServiceRow key={r.id} reserva={r} now={now} selected={r.id === selectedId} changed={changed.has(r.id)} onSelect={onSelect} />
   return (
     <section className="op-agenda" aria-label="Agenda do dia">
@@ -53,7 +54,7 @@ export function Agenda({ groups, concluded, showConcluded, now, selectedId, chan
       ))}
       {showConcluded && concluded.length ? (
         <div className="op-agenda__group">
-          <button type="button" className="op-agenda__toggle" aria-expanded={concludedOpen} onClick={() => setConcludedOpen((v) => !v)}>
+          <button type="button" className="op-agenda__toggle" aria-expanded={concludedOpen} onClick={() => setConcludedOpen(!concludedOpen)}>
             <ChevronDown size={16} aria-hidden="true" data-open={concludedOpen || undefined} /> Concluídos e cancelados ({concluded.length})
           </button>
           {concludedOpen ? <ul className="op-agenda__list">{concluded.map(row)}</ul> : null}
