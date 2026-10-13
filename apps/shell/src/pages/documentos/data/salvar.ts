@@ -19,10 +19,11 @@ export type SalvarDeps = {
 const mensagem = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 /** Campos legados da ficha que Dashboard, App Motoristas e flows antigos ainda leem. */
-function legado(tipo: TipoDoc, input: SalvarDocInput): Record<string, string | null> | null {
-  if (input.dono.categoria !== 'pessoas') return null
-  if (tipo.codigo === 'CNH') return { cr40f_validadedacnh: input.validade }
-  if (tipo.codigo === 'ASO') return { cr40f_datadoaso: input.emissao }
+function legado(tipo: TipoDoc, dono: Dono, novo: NovoDoc): Record<string, string | null> | null {
+  if (dono.categoria !== 'pessoas') return null
+  // Valor nulo não é gravado: não apaga a data que a ficha já tem.
+  if (tipo.codigo === 'CNH' && novo.validade) return { cr40f_validadedacnh: novo.validade }
+  if (tipo.codigo === 'ASO' && novo.emissao) return { cr40f_datadoaso: novo.emissao }
   return null
 }
 
@@ -55,7 +56,7 @@ export async function salvarDocumento(deps: SalvarDeps, input: SalvarDocInput): 
     try { await deps.substituir(input.anterior.id) }
     catch (e) { avisos.push(`O documento anterior não foi marcado como substituído: ${mensagem(e)}`) }
   }
-  const payload = legado(tipo, input)
+  const payload = legado(tipo, dono, novo)
   if (payload) {
     try { await deps.dualWrite(dono.id, payload) }
     catch (e) { avisos.push(`A ficha do funcionário não foi atualizada: ${mensagem(e)}`) }
