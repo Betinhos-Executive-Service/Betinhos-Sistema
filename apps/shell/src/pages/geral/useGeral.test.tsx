@@ -125,7 +125,7 @@ describe('useGeral: gravação', () => {
     expect(result.current.cells.get(`${id}|cr40f_trajeto`)).toEqual({ kind: 'error', message: 'Não gravou' })
   })
 
-  it('célula alterada por flow na releitura também aparece como salva', async () => {
+  it('célula alterada por flow na releitura recebe o valor novo, mas só a célula editada mostra "salvo"', async () => {
     const base = createSource({ mode: 'mock' }, { latency: 0 })
     let novo = 0
     const source: Source = {
@@ -138,9 +138,9 @@ describe('useGeral: gravação', () => {
     novo = result.current.rows[0].cr40f_status === 202410002 ? 202410001 : 202410002
     const trajeto = result.current.columns.find((c) => c.attribute === 'cr40f_trajeto')!
     await act(async () => { await result.current.save(id, trajeto, 'Rota nova') })
-    expect(result.current.cells.get(`${id}|cr40f_status`)?.kind).toBe('saved')
+    expect(result.current.cells.get(`${id}|cr40f_trajeto`)?.kind).toBe('saved')
+    expect(result.current.cells.get(`${id}|cr40f_status`)).toBeUndefined()
     expect(result.current.rows[0].cr40f_status).toBe(novo)
-    // Colunas que não mudaram ficam como estavam.
     expect(result.current.cells.get(`${id}|cr40f_cliente`)).toBeUndefined()
   })
 

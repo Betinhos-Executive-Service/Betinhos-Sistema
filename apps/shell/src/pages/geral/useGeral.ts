@@ -465,26 +465,16 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     }
 
     // 2) Releitura. Escrita aceita não vira erro por causa dela: mantém o valor otimista.
-    const changed: string[] = []
+    // O feedback "salvo" fica só na célula editada: a linha recebe os valores novos (flows/plugins) sem marcar outras células.
     try {
       // Só colunas com metadata: uma coluna da visão sem atributo conhecido faria o `$select` falhar.
       const known = columns.flatMap((c) => { const meta = attributes?.get(c.key); return meta ? [{ column: c, name: rowKey(c, meta) }] : [] })
       const fresh = await source.reload(id, known.map((k) => k.name))
       setRows((list) => list.map((r) => (String(r[ID_ATTRIBUTE]) === id ? { ...r, ...fresh } : r)))
-      // Células que um flow ou plugin mexeu depois da escrita também mostram "salvo".
-      for (const { column: other, name } of known) {
-        if (!other.alias && other.attribute !== column.attribute && name in fresh && fresh[name] !== before[name]) changed.push(other.attribute)
-      }
     } catch { /* o servidor aceitou a escrita: o valor otimista fica até a próxima leitura */ }
     const at = Date.now()
     setCell(key, { type: 'ok', at })
     scheduleSettle(key)
-    for (const attribute of changed) {
-      const other = cellKey(id, attribute)
-      // Uma gravação em andamento na outra célula manda no estado dela.
-      setCells((m) => (m.get(other)?.kind === 'saving' ? m : new Map(m).set(other, reduceCell(m.get(other) ?? { kind: 'idle' }, { type: 'ok', at }))))
-      scheduleSettle(other)
-    }
     return true
   }, [attributes, columns, source, setCell, setRows, scheduleSettle])
 
