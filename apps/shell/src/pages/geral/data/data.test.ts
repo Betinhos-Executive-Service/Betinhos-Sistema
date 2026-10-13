@@ -222,14 +222,18 @@ describe('source Dataverse', () => {
     await source.clearLookup('{ABC}', 'cr40f_motorista')
     expect(request.mock.calls.at(-1)).toEqual(['cr40f_reservadeveculoses(abc)/cr40f_Motorista/$ref', { method: 'DELETE' }])
   })
-  it('URLs do voucher e da Escala FDS; formulário fora do model-driven abre outra aba', async () => {
+  it('URLs do voucher e da Escala FDS; formulário fora do model-driven abre no shell (não em outra aba)', async () => {
     const source = createSource(fakeHost().host)
     expect(source.openVoucher(['a'])).toMatch(/^https:\/\/org\.crm\.dynamics\.com\/WebResources\/cr40f_VoucherConfirmacao\.html\?ids=%5B%22a%22%5D&cacheBust=\d+$/)
     expect(source.escalaFdsUrl()).toBe('https://org.crm.dynamics.com/WebResources/cr40f_EscalaFDS.html')
     const open = vi.fn()
     vi.stubGlobal('open', open)
     expect(await source.openForm('edit', 'x1')).toBe('external')
-    expect(open).toHaveBeenCalledWith(expect.stringContaining('new_formulario_geral.html?data='), '_blank', 'noopener')
+    expect(open).not.toHaveBeenCalled()
+    const url = source.formUrl('edit', 'x1')!
+    expect(url.startsWith('https://org.crm.dynamics.com/WebResources/new_formulario_geral.html?data=')).toBe(true)
+    expect(url.endsWith('&host=shell')).toBe(true)
+    expect(JSON.parse(decodeURIComponent(new URL(url).searchParams.get('data')!))).toEqual({ mode: 'edit', entityName: 'cr40f_reservadeveculos', id: 'x1', recordId: 'x1', entityId: 'x1' })
     vi.unstubAllGlobals()
   })
   it('copyRows devolve na ordem dos ids pedidos', async () => {

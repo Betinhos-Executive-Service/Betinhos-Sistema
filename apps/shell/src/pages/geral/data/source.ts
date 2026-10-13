@@ -43,7 +43,10 @@ export type Source = {
   search(attribute: string, text: string): Promise<LookupOption[]>
   reload(id: string, keys: string[]): Promise<Row>
   copyRows(ids: string[]): Promise<Row[]>
+  /** Dentro do model-driven navega para o formulário e devolve `closed` ao voltar; fora, devolve `external` e a página o abre em `formUrl` (iframe no shell). */
   openForm(mode: 'create' | 'edit', id?: string): Promise<'closed' | 'external' | 'mock'>
+  /** URL do Formulário Geral para o iframe do shell (`host=shell` faz o formulário avisar ao fechar); `null` em mock. */
+  formUrl(mode: 'create' | 'edit', id?: string): string | null
   /** URL do iframe do voucher; `null` em mock. */
   openVoucher(ids: string[]): string | null
   escalaFdsUrl(): string | null
@@ -209,6 +212,7 @@ function createMockSource({ latency = 1 }: SourceOptions = {}): Source {
       return ids.flatMap((id) => { const row = find(id); return row ? [{ ...row }] : [] })
     },
     openForm: async () => 'mock',
+    formUrl: () => null,
     openVoucher: () => null,
     escalaFdsUrl: () => null,
     flowUrl: async () => 'https://flow.mock/op',
@@ -270,7 +274,7 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
     return bind
   }
 
-  const formUrl = (json: string) => `${host.clientUrl}/WebResources/${FORM_WEBRESOURCE}?data=${encodeURIComponent(json)}`
+  const formData = (mode: 'create' | 'edit', id?: string) => ({ mode, entityName: ENTITY, ...(id ? { id, recordId: id, entityId: id } : {}) })
 
   return {
     mock: false,
@@ -343,16 +347,16 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
       return ids.flatMap((id) => { const row = byId.get(cleanId(id)); return row ? [row] : [] })
     },
     async openForm(mode, id) {
-      const data = { mode, entityName: ENTITY, ...(id ? { id, recordId: id, entityId: id } : {}) }
+      const data = formData(mode, id)
       // XrmHost.Navigation é Record<string, unknown>: o cast para navigateTo continua necessário.
       const navigation = getHostXrm()?.Navigation as { navigateTo?: (page: object, options: object) => Promise<unknown> } | undefined
       if (host.insideModelDriven && navigation?.navigateTo) {
         await navigation.navigateTo({ pageType: 'webresource', webresourceName: FORM_WEBRESOURCE, data: JSON.stringify(data) }, { target: 1 })
         return 'closed'
       }
-      window.open?.(formUrl(JSON.stringify(data)), '_blank', 'noopener')
       return 'external'
     },
+    formUrl: (mode, id) => `${host.clientUrl}/WebResources/${FORM_WEBRESOURCE}?data=${encodeURIComponent(JSON.stringify(formData(mode, id)))}&host=shell`,
     openVoucher: (ids) => `${host.clientUrl}/WebResources/${VOUCHER_WEBRESOURCE}?ids=${encodeURIComponent(JSON.stringify(ids))}&cacheBust=${Date.now()}`,
     escalaFdsUrl: () => `${host.clientUrl}/WebResources/${ESCALA_FDS_WEBRESOURCE}`,
     async flowUrl(schema) {

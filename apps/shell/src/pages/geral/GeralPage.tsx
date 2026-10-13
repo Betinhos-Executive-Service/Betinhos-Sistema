@@ -22,6 +22,7 @@ import { GeralToolbar } from './components/GeralToolbar'
 import { ViewMenu } from './components/ViewMenu'
 import { AuditoriaOverlay } from './components/AuditoriaOverlay'
 import { VoucherOverlay } from './components/VoucherOverlay'
+import { FormOverlay } from './components/FormOverlay'
 import { copyText } from './domain/copy'
 import { loadViewMode, saveViewMode, type ViewMode } from './domain/viewMode'
 import { splitOp } from './domain/commands'
@@ -89,6 +90,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const [stateRequest, setStateRequest] = useState<StateRequest | null>(null)
   const [stateBusy, setStateBusy] = useState(false)
   const [voucherUrl, setVoucherUrl] = useState<string | null>(null)
+  const [formUrl, setFormUrl] = useState<string | null>(null)
   const [auditoriaUrl, setAuditoriaUrl] = useState<string | null>(null)
   const [opRequest, setOpRequest] = useState<OpRequest | null>(null)
   const [opBusy, setOpBusy] = useState(false)
@@ -193,7 +195,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     try {
       const result = await source.openForm(mode, id)
       if (result === 'closed') refresh()
-      else if (result === 'external') toast({ tone: 'info', message: 'O formulário abriu em outra aba. Clique em Atualizar quando terminar.' })
+      else if (result === 'external') setFormUrl(source.formUrl(mode, id))
       else setMockForm(true)
     } catch (reason) {
       toast({ tone: 'danger', message: reason instanceof Error ? reason.message : String(reason) })
@@ -589,6 +591,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       <DispararDialog request={dispRequest} busy={dispBusy} onClose={() => setDispRequest(null)} onConfirm={() => { void confirmDisparar() }} />
       {auditoriaUrl ? <AuditoriaOverlay url={auditoriaUrl} onClose={() => setAuditoriaUrl(null)} /> : null}
       {voucherUrl ? <VoucherOverlay url={voucherUrl} onClose={() => setVoucherUrl(null)} /> : null}
+      {formUrl ? <FormOverlay url={formUrl} onClose={() => { setFormUrl(null); refresh() }} /> : null}
     </PageLayout>
   )
 }
