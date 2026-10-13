@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { RESPOSTA_SCHEMA, SYSTEM_PROMPT, analisarMensagem, montarRequisicao, montarTextoUsuario, PREFIXO_USUARIO, type ContextoDespesa } from './index.ts'
+import { EFFORT, MAX_TOKENS, MODELO, RESPOSTA_SCHEMA, SYSTEM_PROMPT, analisarMensagem, montarRequisicao, montarTextoUsuario, PREFIXO_USUARIO, type ContextoDespesa } from './index.ts'
+import { constantesDoFlow } from './constantes.ts'
 
 const ctx: ContextoDespesa = {
   despesa: { id: 'd1', valor: 85.4, dataGasto: '2026-10-12', categoria: 'Combustível', formaPagamento: 'Cartão corporativo', estabelecimento: 'Posto X', litros: 32.5, km: 120345, observacao: null },
@@ -88,5 +89,11 @@ describe('analisarMensagem', () => {
     const sem: Record<string, unknown> = { ...valida }
     delete sem.confianca
     expect(analisarMensagem(msg(sem), ctx)).toEqual({ ok: false, erro: 'Campos ausentes: confianca.' })
+  })
+})
+
+describe('constantes do flow', () => {
+  it('espelham o pacote', () => {
+    expect(constantesDoFlow()).toEqual({ modelo: MODELO, maxTokens: MAX_TOKENS, effort: EFFORT, systemPrompt: SYSTEM_PROMPT, prefixoUsuario: PREFIXO_USUARIO, schema: RESPOSTA_SCHEMA })
   })
 })
