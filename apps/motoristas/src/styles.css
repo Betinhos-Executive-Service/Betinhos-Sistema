@@ -3855,6 +3855,36 @@ svg {
   transform: scale(0.97);
 }
 
+/* Escolha do carro na finalização: reaproveita o diálogo de contato. */
+.vehicle-choice-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px;
+  text-align: left;
+}
+
+.vehicle-choice-meta {
+  color: #536174;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.vehicle-choice-other {
+  display: grid;
+  gap: 10px;
+}
+
+.vehicle-choice-confirm {
+  grid-template-columns: 1fr;
+}
+
+.vehicle-choice-confirm button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 @keyframes contact-overlay-enter {
   from {
     opacity: 0;

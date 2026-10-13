@@ -17,6 +17,13 @@ import type { PersonalReceiptModel } from "./personalReceipt";
 import { normalizeReceiptLanguage, RECEIPT_LANGUAGE } from "./receiptLanguage.ts";
 
 import { getFieldValue } from "./fieldLookup.ts";
+import {
+  buildInfleetServiceVehiclePatch,
+  parseInfleetVehicleResolution,
+  unavailableResolution,
+  type DriverVehicleChoice,
+  type InfleetVehicleResolution
+} from "./serviceVehicleInfleet.ts";
 import { createRemoteReadBatch } from "./remoteReadBatch.ts";
 import { buildIdeaRecord, normalizeIdeaRecord, validateIdeaDraft, type Idea, type IdeaDraft } from "./ideas.ts";
 
@@ -63,6 +70,9 @@ export type FinalizePayload = {
   signatureDataUrl?: string;
   photos?: Partial<Record<MaintenancePhotoKind, string>>;
   onProgress?: (message: string) => void;
+  // Carro do serviço decidido pela Infleet antes de finalizar (somente SERVICO).
+  vehicleResolution?: InfleetVehicleResolution;
+  vehicleChoice?: DriverVehicleChoice | null;
 };
 
 export type MaintenanceRequestPayload = {
@@ -3645,8 +3655,7 @@ export async function saveVoucherRemote(payload: FinalizePayload) {
   payload.onProgress?.("Validando retorno do Flow.");
   assertFlowSuccess(flowResult, "FlowGerarVoucher");
   payload.onProgress?.("Atualizando status no Dataverse.");
-  payload.onProgress?.("Conferindo veiculo atual pela posse.");
-  const vehiclePatch = await buildCurrentPossessionVehiclePatchForService(dv.record);
+  const vehiclePatch = await buildFinalizeServiceVehiclePatch(dv.record, payload);
   await updateOne(DATAVERSE.geral, dv.id, {
     ...vehiclePatch,
     new_rascunhovoucher: null,
@@ -3747,12 +3756,53 @@ async function buildCurrentPossessionVehiclePatchForService(record: DataverseRec
   return buildAutomaticServiceVehiclePatch(record, result.entities[0]._new_veiculo_value);
 }
 
+// Infleet decide o carro; a posse só entra quando a Infleet não responde (plano B da Fase 1).
+async function buildFinalizeServiceVehiclePatch(record: DataverseRecord | undefined, payload: FinalizePayload) {
+  const resolution = payload.vehicleResolution;
+  const infleetPatch = resolution
+    ? buildInfleetServiceVehiclePatch(resolution, payload.vehicleChoice ?? null, (vehicleId) => bind(DATAVERSE.veiculos, vehicleId))
+    : {};
+  if (infleetPatch.new_origemveiculo) return infleetPatch;
+  // Sem decisão aplicável: posse define o carro e a evidência da Infleet fica registrada para comparação.
+  payload.onProgress?.("Conferindo veiculo atual pela posse.");
+  const possessionPatch = await buildCurrentPossessionVehiclePatchForService(record);
+  return { ...possessionPatch, ...infleetPatch };
+}
+
+export async function resolveServiceVehicleRemote(serviceDataverseId: string): Promise<InfleetVehicleResolution> {
+  try {
+    const online = getWebApi().online;
+    // O Xrm depende do `this`; extrair o método solto quebra com "reading '_execute'".
+    const execute = online?.execute?.bind(online);
+    if (!execute) return unavailableResolution("api-indisponivel");
+    const response = (await execute({
+      new_ReservaId: cleanGuid(serviceDataverseId),
+      getMetadata: () => ({
+        boundParameter: null,
+        operationType: 0,
+        operationName: "new_ResolverVeiculoDoServico",
+        // Com "Edm.Guid" o Xrm serializa a string como 'undefined'; o servidor converte o texto para Guid.
+        parameterTypes: { new_ReservaId: { typeName: "Edm.String", structuralProperty: 1 } }
+      })
+    })) as Response;
+    if (!response.ok) {
+      dataverseWarn("Resolvedor de veiculo da Infleet respondeu com erro.", { status: response.status });
+      return unavailableResolution(`erro-http-${response.status}`);
+    }
+    const body = await response.json();
+    return parseInfleetVehicleResolution(body?.new_ResultadoJson);
+  } catch (error) {
+    dataverseWarn("Resolvedor de veiculo da Infleet indisponivel.", { message: error instanceof Error ? error.message : String(error) });
+    return unavailableResolution("erro-ao-consultar");
+  }
+}
+
 export async function finalizeServiceRemote(payload: FinalizePayload) {
   const dv = payload.detail.dataverse;
   if (!dv?.id) throw new Error("Serviço sem referência Dataverse.");
   dataverseLog("Finalização simples de serviço iniciada.", { detailId: payload.detail.id, dataverseId: dv.id });
   payload.onProgress?.("Atualizando serviço no Dataverse.");
-  const vehiclePatch = await buildCurrentPossessionVehiclePatchForService(dv.record);
+  const vehiclePatch = await buildFinalizeServiceVehiclePatch(dv.record, payload);
   await updateOne(DATAVERSE.geral, dv.id, {
     ...vehiclePatch,
     new_observacaofinal: mergeMotoristObservation(dv.record?.new_observacaofinal, getFieldValue(payload.fields, "Observação Final", "Observacao Final")),

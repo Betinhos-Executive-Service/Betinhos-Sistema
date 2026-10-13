@@ -53,6 +53,7 @@ import {
   loadRemoteDetailByParams,
   loadRemoteStore,
   markDetailViewedRemote,
+  resolveServiceVehicleRemote,
   prefetchExpenseReferenceDataRemote,
   saveServiceObservationRemote,
   saveVoucherDraftRemote,
@@ -128,6 +129,8 @@ import {
   type MaintenanceRequestPhoto
 } from "./screens/MaintenanceRequestScreen";
 import { IdeasScreen } from "./screens/IdeasScreen";
+import { VehicleChoiceDialog, type VehicleOption } from "./components/details/VehicleChoiceDialog";
+import type { DriverVehicleChoice, InfleetVehicleResolution } from "./lib/serviceVehicleInfleet";
 import { ServicesScreen } from "./screens/ServicesScreen";
 import { SignatureScreen } from "./screens/SignatureScreen";
 import { VoucherScreen } from "./screens/VoucherScreen";
@@ -435,6 +438,10 @@ function App() {
   const [remoteOperation, setRemoteOperation] = useState<RemoteOperation | null>(null);
   const [remoteMode, setRemoteMode] = useState(false);
   const [driverContext, setDriverContext] = useState<DriverContext | null>(null);
+  const [vehicleChoiceRequest, setVehicleChoiceRequest] = useState<{
+    resolution: InfleetVehicleResolution;
+    resolve: (choice: DriverVehicleChoice | null) => void;
+  } | null>(null);
   const [comunicados, setComunicados] = useState<ComunicadoDestinatario[]>([]);
   const [comunicadosStatus, setComunicadosStatus] = useState<ComunicadosLoadStatus>(() => isMockComunicados() || hasDataverseRuntime() ? "loading" : "ready");
   const [selectedComunicadoId, setSelectedComunicadoId] = useState("");
@@ -1141,6 +1148,14 @@ function App() {
       <LocalToast toast={dataLoading ? null : toast} onDismiss={() => setToastState(null)} />
       <LoadingOverlay loading={dataLoading} />
       {remoteOperation ? <FlowProgressOverlay operation={remoteOperation} /> : null}
+      {vehicleChoiceRequest ? (
+        <VehicleChoiceDialog
+          resolution={vehicleChoiceRequest.resolution}
+          loadVehicles={loadVehicleChoiceOptions}
+          onChoose={closeVehicleChoice}
+          onCancel={cancelVehicleChoice}
+        />
+      ) : null}
       {criticalError ? (
         <div className="critical-error-overlay" role="dialog" aria-modal="true" aria-labelledby="critical-error-title">
           <div className="critical-error-card">
@@ -1320,6 +1335,24 @@ function App() {
     if (remoteMode) await saveServiceObservationRemote(selectedDetail, observation);
   };
 
+  // Abre a escolha do carro e espera a resposta do motorista (null = voltou sem escolher).
+  const askVehicleChoice = (resolution: InfleetVehicleResolution) =>
+    new Promise<DriverVehicleChoice | null>((resolve) => setVehicleChoiceRequest({ resolution, resolve }));
+
+  const closeVehicleChoice = useCallback((choice: DriverVehicleChoice | null) => {
+    setVehicleChoiceRequest((current) => {
+      current?.resolve(choice);
+      return null;
+    });
+  }, []);
+  const cancelVehicleChoice = useCallback(() => closeVehicleChoice(null), [closeVehicleChoice]);
+
+  const loadVehicleChoiceOptions = useCallback(async (): Promise<VehicleOption[]> => {
+    const driver = driverContext ?? await getDriverContext();
+    const vehicles = await loadMaintenanceRequestVehiclesRemote(driver, { activeOnly: true });
+    return vehicles.map((vehicle) => ({ id: vehicle.id, label: vehicle.label }));
+  }, [driverContext]);
+
   const finalizeSelected = async (fields: Record<string, string>) => {
     if (!selectedDetail || remoteOperation) return;
     const detailToFinalize = selectedDetail;
@@ -1378,12 +1411,26 @@ function App() {
           return;
         }
 
+        // Infleet decide o carro do serviço; abaixo de 85% o motorista escolhe. Falha da Infleet não bloqueia.
+        let vehicleResolution: InfleetVehicleResolution | undefined;
+        let vehicleChoice: DriverVehicleChoice | null = null;
+        if (detailToFinalize.type === "SERVICO" && detailToFinalize.dataverse?.id) {
+          setProgress("Conferindo o carro na Infleet.");
+          vehicleResolution = await resolveServiceVehicleRemote(detailToFinalize.dataverse.id);
+          if (vehicleResolution.decisao === "perguntar") {
+            setRemoteOperation(null);
+            vehicleChoice = await askVehicleChoice(vehicleResolution);
+            if (!vehicleChoice) return;
+            setProgress("Registrando o carro escolhido.");
+          }
+        }
+
         const signatureDataUrl = store.signatures[detailToFinalize.id];
         const photos = store.photos[detailToFinalize.id];
         if (detailToFinalize.type === "SERVICO" && isVoucher) {
-          await saveVoucherRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress });
+          await saveVoucherRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress, vehicleResolution, vehicleChoice });
         } else if (detailToFinalize.type === "SERVICO") {
-          await finalizeServiceRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress });
+          await finalizeServiceRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress, vehicleResolution, vehicleChoice });
         } else if (detailToFinalize.type === "MANUTENCAO") {
           await finalizeMaintenanceRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress });
         } else if (detailToFinalize.type === "TROCA") {
