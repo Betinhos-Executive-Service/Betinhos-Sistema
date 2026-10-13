@@ -20,11 +20,13 @@ export type InfleetVehicleResolution = {
   totalSegundos: number;
   candidatos: InfleetVehicleCandidate[];
   escolhido?: InfleetVehicleCandidate;
-  veiculoPosseId?: string | null;
 };
 
-// Escolha do motorista entre os carros que ele usou na janela do serviço.
-export type DriverVehicleChoice = { veiculoId: string; placa: string };
+// Carro ativo do cadastro, oferecido quando a Infleet não identifica o carro do serviço.
+export type FleetVehicle = { id: string; placa: string; modelo: string; cor: string };
+
+// "candidato": um dos carros que a Infleet viu na janela; "frota": qualquer carro ativo, quando a Infleet não identifica.
+export type DriverVehicleChoice = { veiculoId: string; placa: string; origem: "candidato" | "frota" };
 
 export const SERVICE_VEHICLE_ORIGIN_INFLEET = 100000002;
 export const SERVICE_VEHICLE_ORIGIN_DRIVER_CHOSEN = 100000003;
@@ -50,7 +52,7 @@ export function parseInfleetVehicleResolution(json: unknown): InfleetVehicleReso
   const candidatos = Array.isArray(raw.candidatos) ? raw.candidatos.map(parseCandidate).filter(isCandidate) : [];
   const escolhido = parseCandidate(raw.escolhido);
   if (decisao === "automatico" && !escolhido?.veiculoId) return unavailableResolution("resposta-invalida");
-  // Sem carro cadastrado para escolher, a posse decide (o motorista não escolhe fora da janela).
+  // Sem carro cadastrado entre os vistos pela Infleet, o motorista escolhe na frota ativa.
   if (decisao === "perguntar" && !candidatos.some((candidate) => candidate.cadastrado)) {
     return { ...unavailableResolution(String(raw.motivo || "sem-candidatos")), candidatos };
   }
@@ -61,8 +63,7 @@ export function parseInfleetVehicleResolution(json: unknown): InfleetVehicleReso
     janela: parseWindow(raw.janela),
     totalSegundos: Number(raw.totalSegundos) || 0,
     candidatos,
-    escolhido: escolhido ?? undefined,
-    veiculoPosseId: typeof raw.veiculoPosseId === "string" ? raw.veiculoPosseId : null
+    escolhido: escolhido ?? undefined
   };
 }
 
@@ -71,12 +72,26 @@ export function selectableCandidates(resolution: InfleetVehicleResolution) {
   return resolution.candidatos.filter((candidate) => candidate.cadastrado && candidate.veiculoId);
 }
 
-// "Corolla Prata"; sem modelo cadastrado, cai na placa.
-export function describeVehicle(candidate: Pick<InfleetVehicleCandidate, "modelo" | "cor" | "placa">) {
-  return [candidate.modelo, candidate.cor].map((part) => part.trim()).filter(Boolean).join(" ") || candidate.placa;
+// Sem decisão automática o motorista sempre escolhe; sem candidato cadastrado, escolhe na frota ativa.
+export function needsDriverChoice(resolution: InfleetVehicleResolution) {
+  return resolution.decisao !== "automatico";
 }
 
-// Patch da reserva para "automatico" e "perguntar". Em "indisponivel" o chamador usa a posse e só grava a evidência.
+export function needsFleetChoice(resolution: InfleetVehicleResolution) {
+  return needsDriverChoice(resolution) && selectableCandidates(resolution).length === 0;
+}
+
+// "Corolla Prata"; cadastro em caixa alta ("PRETA") vira "Preta"; sem modelo nem cor, cai na placa.
+export function describeVehicle(candidate: Pick<InfleetVehicleCandidate, "modelo" | "cor" | "placa">) {
+  return [candidate.modelo, candidate.cor].map((part) => softenUppercase(part.trim())).filter(Boolean).join(" ") || candidate.placa;
+}
+
+function softenUppercase(text: string) {
+  if (text.length <= 3 || text !== text.toUpperCase() || text === text.toLowerCase()) return text;
+  return text.toLowerCase().replace(/(^|\s)\p{L}/gu, (letter) => letter.toUpperCase());
+}
+
+// Patch da reserva: carro decidido pela Infleet ou escolhido pelo motorista. A posse não é usada.
 export function buildInfleetServiceVehiclePatch(
   resolution: InfleetVehicleResolution,
   choice: DriverVehicleChoice | null,
@@ -92,12 +107,19 @@ export function buildInfleetServiceVehiclePatch(
     return patch;
   }
 
-  const candidate = choice ? selectableCandidates(resolution).find((item) => item.veiculoId === choice.veiculoId) : undefined;
-  if (resolution.decisao === "perguntar" && candidate?.veiculoId) {
+  if (!choice?.veiculoId) return patch;
+  if (choice.origem === "candidato") {
+    const candidate = selectableCandidates(resolution).find((item) => item.veiculoId === choice.veiculoId);
+    if (resolution.decisao !== "perguntar" || !candidate?.veiculoId) return patch;
     patch["cr40f_Veiculo@odata.bind"] = vehicleBind(candidate.veiculoId);
     patch.new_origemveiculo = SERVICE_VEHICLE_ORIGIN_DRIVER_CHOSEN;
     patch.new_percentualveiculoinfleet = candidate.percentual;
+    return patch;
   }
+  if (!needsFleetChoice(resolution)) return patch;
+  patch["cr40f_Veiculo@odata.bind"] = vehicleBind(choice.veiculoId);
+  patch.new_origemveiculo = SERVICE_VEHICLE_ORIGIN_DRIVER_CHOSEN;
+  patch.new_percentualveiculoinfleet = 0;
   return patch;
 }
 

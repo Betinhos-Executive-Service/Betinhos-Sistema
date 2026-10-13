@@ -1,6 +1,6 @@
 // Cenários da Infleet para testar a finalização no mock local (sem Dataverse e sem Infleet).
 // Escolha pela URL: ?mockInfleet=perguntar. Sem parâmetro, cada serviço usa um cenário diferente.
-import { parseInfleetVehicleResolution, type InfleetVehicleCandidate, type InfleetVehicleResolution } from "./serviceVehicleInfleet.ts";
+import { parseInfleetVehicleResolution, type FleetVehicle, type InfleetVehicleCandidate, type InfleetVehicleResolution } from "./serviceVehicleInfleet.ts";
 
 export const MOCK_INFLEET_SCENARIOS = [
   "automatico",
@@ -11,7 +11,8 @@ export const MOCK_INFLEET_SCENARIOS = [
   "sem-viagens",
   "nao-cadastrado",
   "indisponivel",
-  "lento"
+  "lento",
+  "frota-erro"
 ] as const;
 
 export type MockInfleetScenario = (typeof MOCK_INFLEET_SCENARIOS)[number];
@@ -41,7 +42,7 @@ export function pickMockInfleetScenario(detailId: string, search = typeof window
 
 // Resposta crua como a Custom API devolveria; passa pelo mesmo parse do app real.
 export function buildMockInfleetResolution(scenario: MockInfleetScenario): InfleetVehicleResolution {
-  const base = { regra: "ignicao-85-v1", veiculoPosseId: "mock-veiculo-gez" };
+  const base = { regra: "ignicao-85-v1" };
   const raw = (() => {
     switch (scenario) {
       case "automatico":
@@ -60,6 +61,7 @@ export function buildMockInfleetResolution(scenario: MockInfleetScenario): Infle
       case "nao-cadastrado":
         return { ...base, decisao: "indisponivel", motivo: "veiculo-nao-cadastrado", totalSegundos: 6000, candidatos: [ABC(100, 100)] };
       case "indisponivel":
+      case "frota-erro":
         return { ...base, decisao: "indisponivel", motivo: "infleet-indisponivel: Infleet não respondeu a tempo.", totalSegundos: 0, candidatos: [] };
     }
   })();
@@ -69,4 +71,24 @@ export function buildMockInfleetResolution(scenario: MockInfleetScenario): Infle
 export async function resolveMockServiceVehicle(scenario: MockInfleetScenario): Promise<InfleetVehicleResolution> {
   await new Promise((resolve) => setTimeout(resolve, scenario === "lento" ? 4000 : 700));
   return buildMockInfleetResolution(scenario);
+}
+
+export const MOCK_FLEET: FleetVehicle[] = [
+  { id: "mock-veiculo-fcb", placa: "FCB8B61", modelo: "Compass", cor: "PRETA" },
+  { id: "mock-veiculo-ruh", placa: "RUH7G45", modelo: "Corolla", cor: "Prata" },
+  { id: "mock-veiculo-gez", placa: "GEZ6D67", modelo: "Cruze", cor: "Branca" },
+  { id: "mock-veiculo-rti", placa: "RTI7G00", modelo: "Cruze", cor: "Prata" },
+  { id: "mock-veiculo-tiu", placa: "TIU2F11", modelo: "Corolla", cor: "Preto" },
+  { id: "mock-veiculo-rup", placa: "RUP6H17", modelo: "Spin", cor: "Prata" }
+];
+
+// "frota-erro" falha na primeira carga da frota para testar o "Tentar de novo".
+export function createMockFleetLoader(scenario: MockInfleetScenario) {
+  let attempts = 0;
+  return async () => {
+    attempts += 1;
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    if (scenario === "frota-erro" && attempts === 1) throw new Error("Falha simulada ao carregar a frota.");
+    return MOCK_FLEET;
+  };
 }

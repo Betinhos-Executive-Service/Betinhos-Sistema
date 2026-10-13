@@ -2,25 +2,43 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { createPortal } from "react-dom";
 import {
   describeVehicle,
+  needsFleetChoice,
   selectableCandidates,
   type DriverVehicleChoice,
+  type FleetVehicle,
   type InfleetVehicleResolution
 } from "../../lib/serviceVehicleInfleet";
 
 type VehicleChoiceDialogProps = {
   resolution: InfleetVehicleResolution;
+  loadFleet: () => Promise<FleetVehicle[]>;
   onChoose: (choice: DriverVehicleChoice) => void;
   onCancel: () => void;
 };
 
+type VehicleOption = { id: string; placa: string; modelo: string; cor: string };
+
 // Tempo para o motorista ver a seleção confirmada antes de o diálogo fechar.
 const SELECTION_FEEDBACK_MS = 180;
 
-// Pergunta qual carro o motorista usou, só entre os carros registrados na janela do serviço.
-export function VehicleChoiceDialog({ resolution, onChoose, onCancel }: VehicleChoiceDialogProps) {
-  const candidates = useMemo(() => selectableCandidates(resolution), [resolution]);
+function normalizeSearch(value: string) {
+  return value.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/gi, "").toLowerCase();
+}
+
+// Pergunta qual carro o motorista usou: entre os carros da janela do serviço ou, se a Infleet
+// não identificou nenhum carro cadastrado, entre todos os carros ativos.
+export function VehicleChoiceDialog({ resolution, loadFleet, onChoose, onCancel }: VehicleChoiceDialogProps) {
+  const fleetMode = useMemo(() => needsFleetChoice(resolution), [resolution]);
+  const candidates = useMemo<VehicleOption[]>(
+    () => selectableCandidates(resolution).map((item) => ({ id: item.veiculoId as string, placa: item.placa, modelo: item.modelo, cor: item.cor })),
+    [resolution]
+  );
+  const [fleet, setFleet] = useState<VehicleOption[]>([]);
+  const [fleetState, setFleetState] = useState<"idle" | "loading" | "error" | "ready">(fleetMode ? "loading" : "ready");
+  const [fleetAttempt, setFleetAttempt] = useState(0);
+  const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState("");
-  const firstOptionRef = useRef<HTMLButtonElement>(null);
+  const firstFocusRef = useRef<HTMLButtonElement | HTMLInputElement | null>(null);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -30,7 +48,6 @@ export function VehicleChoiceDialog({ resolution, onChoose, onCancel }: VehicleC
     };
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", closeOnEscape);
-    firstOptionRef.current?.focus({ preventScroll: true });
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", closeOnEscape);
@@ -39,13 +56,42 @@ export function VehicleChoiceDialog({ resolution, onChoose, onCancel }: VehicleC
   }, [onCancel]);
 
   useEffect(() => {
+    if (!fleetMode) return;
+    let alive = true;
+    setFleetState("loading");
+    loadFleet()
+      .then((items) => {
+        if (!alive) return;
+        setFleet(items.map((item) => ({ id: item.id, placa: item.placa, modelo: item.modelo, cor: item.cor })));
+        setFleetState("ready");
+      })
+      .catch(() => {
+        if (alive) setFleetState("error");
+      });
+    return () => {
+      alive = false;
+    };
+  }, [fleetMode, loadFleet, fleetAttempt]);
+
+  useEffect(() => {
+    if (fleetState === "ready") firstFocusRef.current?.focus({ preventScroll: true });
+  }, [fleetState]);
+
+  const options = fleetMode ? fleet : candidates;
+  const visible = useMemo(() => {
+    const term = normalizeSearch(query);
+    if (!term) return options;
+    return options.filter((item) => normalizeSearch(`${item.placa} ${item.modelo} ${item.cor}`).includes(term));
+  }, [options, query]);
+
+  useEffect(() => {
     if (!selectedId) return;
-    const candidate = candidates.find((item) => item.veiculoId === selectedId);
+    const option = options.find((item) => item.id === selectedId);
     const timer = window.setTimeout(() => {
-      if (candidate?.veiculoId) onChoose({ veiculoId: candidate.veiculoId, placa: candidate.placa });
+      if (option) onChoose({ veiculoId: option.id, placa: option.placa, origem: fleetMode ? "frota" : "candidato" });
     }, SELECTION_FEEDBACK_MS);
     return () => window.clearTimeout(timer);
-  }, [selectedId, candidates, onChoose]);
+  }, [selectedId, options, fleetMode, onChoose]);
 
   if (typeof document === "undefined") return null;
 
@@ -59,28 +105,65 @@ export function VehicleChoiceDialog({ resolution, onChoose, onCancel }: VehicleC
     >
       <div className="contact-choice-dialog vehicle-choice-dialog" onClick={(event) => event.stopPropagation()}>
         <div className="contact-choice-title" id="vehicle-choice-title">Qual carro você usou?</div>
+        {fleetMode ? (
+          <div className="contact-choice-phone vehicle-choice-hint">A Infleet não identificou o carro deste serviço.</div>
+        ) : null}
 
-        <ul className="vehicle-choice-list" aria-labelledby="vehicle-choice-title">
-          {candidates.map((candidate, index) => {
-            const selected = candidate.veiculoId === selectedId;
-            return (
-              <li key={candidate.veiculoId} style={{ "--vehicle-choice-index": index } as CSSProperties}>
-                <button
-                  ref={index === 0 ? firstOptionRef : undefined}
-                  className="vehicle-choice-option"
-                  type="button"
-                  aria-pressed={selected}
-                  disabled={Boolean(selectedId) && !selected}
-                  data-selected={selected || undefined}
-                  onClick={() => setSelectedId(candidate.veiculoId as string)}
-                >
-                  <span className="vehicle-choice-name">{describeVehicle(candidate)}</span>
-                  <span className="vehicle-choice-plate">{candidate.placa}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        {fleetMode && fleetState === "ready" ? (
+          <input
+            ref={(node) => { firstFocusRef.current = node; }}
+            className="vehicle-choice-search"
+            type="search"
+            inputMode="search"
+            autoComplete="off"
+            placeholder="Buscar placa, modelo ou cor"
+            aria-label="Buscar carro"
+            value={query}
+            disabled={Boolean(selectedId)}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        ) : null}
+
+        {fleetState === "loading" ? (
+          <div className="contact-choice-phone vehicle-choice-status" role="status" aria-busy="true">Carregando carros…</div>
+        ) : null}
+
+        {fleetState === "error" ? (
+          <>
+            <div className="contact-choice-phone vehicle-choice-status" role="alert">Não foi possível carregar os carros.</div>
+            <button className="contact-choice-cancel" type="button" onClick={() => setFleetAttempt((value) => value + 1)}>
+              Tentar de novo
+            </button>
+          </>
+        ) : null}
+
+        {fleetState === "ready" ? (
+          visible.length ? (
+            <ul className={`vehicle-choice-list${fleetMode ? " is-fleet" : ""}`} aria-labelledby="vehicle-choice-title">
+              {visible.map((option, index) => {
+                const selected = option.id === selectedId;
+                return (
+                  <li key={option.id} style={{ "--vehicle-choice-index": Math.min(index, 6) } as CSSProperties}>
+                    <button
+                      ref={!fleetMode && index === 0 ? (node) => { firstFocusRef.current = node; } : undefined}
+                      className="vehicle-choice-option"
+                      type="button"
+                      aria-pressed={selected}
+                      disabled={Boolean(selectedId) && !selected}
+                      data-selected={selected || undefined}
+                      onClick={() => setSelectedId(option.id)}
+                    >
+                      <span className="vehicle-choice-name">{describeVehicle(option)}</span>
+                      <span className="vehicle-choice-plate">{option.placa}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className="contact-choice-phone vehicle-choice-status">Nenhum carro encontrado para “{query}”.</div>
+          )
+        ) : null}
 
         <button className="contact-choice-cancel" type="button" disabled={Boolean(selectedId)} onClick={onCancel}>
           Voltar

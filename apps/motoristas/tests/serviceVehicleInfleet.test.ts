@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   buildInfleetServiceVehiclePatch,
   describeVehicle,
+  needsDriverChoice,
+  needsFleetChoice,
   parseInfleetVehicleResolution,
   selectableCandidates,
   SERVICE_VEHICLE_ORIGIN_DRIVER_CHOSEN,
@@ -20,8 +22,7 @@ const automaticJson = JSON.stringify({
   janela: { inicio: "2026-10-12T15:00:00Z", fim: "2026-10-12T22:30:00Z" },
   totalSegundos: 7200,
   candidatos: [{ veiculoId: RTI, placa: "RTI7G00", modelo: "Corolla", cor: "Prata", segundos: 7200, percentual: 100, cadastrado: true }],
-  escolhido: { veiculoId: RTI, placa: "RTI7G00", modelo: "Corolla", cor: "Prata", segundos: 7200, percentual: 100, cadastrado: true },
-  veiculoPosseId: GEZ
+  escolhido: { veiculoId: RTI, placa: "RTI7G00", modelo: "Corolla", cor: "Prata", segundos: 7200, percentual: 100, cadastrado: true }
 });
 
 const askJson = JSON.stringify({
@@ -44,12 +45,12 @@ test("decisão automática grava carro, origem Infleet, percentual e evidência"
   assert.equal(patch.new_percentualveiculoinfleet, 100);
   const evidence = JSON.parse(String(patch.new_evidenciaveiculoinfleet));
   assert.equal(evidence.decisao, "automatico");
-  assert.equal(evidence.veiculoPosseId, GEZ);
+  assert.equal(needsDriverChoice(resolution), false);
 });
 
 test("escolha do motorista grava origem própria e percentual do candidato", () => {
   const resolution = parseInfleetVehicleResolution(askJson);
-  const patch = buildInfleetServiceVehiclePatch(resolution, { veiculoId: RTI, placa: "RTI7G00" }, bind);
+  const patch = buildInfleetServiceVehiclePatch(resolution, { veiculoId: RTI, placa: "RTI7G00", origem: "candidato" }, bind);
 
   assert.equal(patch["cr40f_Veiculo@odata.bind"], bind(RTI));
   assert.equal(patch.new_origemveiculo, SERVICE_VEHICLE_ORIGIN_DRIVER_CHOSEN);
@@ -59,10 +60,30 @@ test("escolha do motorista grava origem própria e percentual do candidato", () 
 
 test("carro fora dos usados na janela não é gravado", () => {
   const resolution = parseInfleetVehicleResolution(askJson);
-  const patch = buildInfleetServiceVehiclePatch(resolution, { veiculoId: "33333333-3333-3333-3333-333333333333", placa: "XYZ" }, bind);
+  const patch = buildInfleetServiceVehiclePatch(resolution, { veiculoId: "33333333-3333-3333-3333-333333333333", placa: "XYZ", origem: "candidato" }, bind);
 
   assert.equal(patch["cr40f_Veiculo@odata.bind"], undefined);
   assert.equal(patch.new_origemveiculo, undefined);
+});
+
+test("com candidatos o motorista não escolhe na frota", () => {
+  const resolution = parseInfleetVehicleResolution(askJson);
+  const patch = buildInfleetServiceVehiclePatch(resolution, { veiculoId: "33333333-3333-3333-3333-333333333333", placa: "XYZ", origem: "frota" }, bind);
+
+  assert.equal(needsFleetChoice(resolution), false);
+  assert.equal(patch.new_origemveiculo, undefined);
+});
+
+test("sem decisão da Infleet o motorista escolhe qualquer carro ativo", () => {
+  const resolution = parseInfleetVehicleResolution(JSON.stringify({ decisao: "indisponivel", motivo: "sem-viagens-do-motorista", candidatos: [] }));
+  const other = "33333333-3333-3333-3333-333333333333";
+  const patch = buildInfleetServiceVehiclePatch(resolution, { veiculoId: other, placa: "FCB8B61", origem: "frota" }, bind);
+
+  assert.equal(needsFleetChoice(resolution), true);
+  assert.equal(patch["cr40f_Veiculo@odata.bind"], bind(other));
+  assert.equal(patch.new_origemveiculo, SERVICE_VEHICLE_ORIGIN_DRIVER_CHOSEN);
+  assert.equal(patch.new_percentualveiculoinfleet, 0);
+  assert.equal(JSON.parse(String(patch.new_evidenciaveiculoinfleet)).escolhaMotorista.origem, "frota");
 });
 
 test("perguntar sem carro cadastrado vira indisponível", () => {
@@ -76,7 +97,7 @@ test("perguntar sem carro cadastrado vira indisponível", () => {
   assert.equal(resolution.motivo, "veiculo-nao-cadastrado");
 });
 
-test("indisponível só grava evidência e não mexe no carro", () => {
+test("sem escolha do motorista não grava carro", () => {
   const resolution = parseInfleetVehicleResolution(JSON.stringify({ decisao: "indisponivel", motivo: "infleet-indisponivel", candidatos: [] }));
   const patch = buildInfleetServiceVehiclePatch(resolution, null, bind);
 
@@ -97,4 +118,6 @@ test("motorista só escolhe entre carros cadastrados", () => {
 test("descreve o carro por modelo e cor", () => {
   assert.equal(describeVehicle({ modelo: "Corolla", cor: "Prata", placa: "RTI7G00" }), "Corolla Prata");
   assert.equal(describeVehicle({ modelo: "", cor: "", placa: "RTI7G00" }), "RTI7G00");
+  assert.equal(describeVehicle({ modelo: "Compass", cor: "PRETA", placa: "FCB8B61" }), "Compass Preta");
+  assert.equal(describeVehicle({ modelo: "BMW", cor: "Azul", placa: "AAA" }), "BMW Azul");
 });

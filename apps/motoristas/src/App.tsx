@@ -54,6 +54,7 @@ import {
   loadRemoteStore,
   markDetailViewedRemote,
   resolveServiceVehicleRemote,
+  loadActiveFleetRemote,
   prefetchExpenseReferenceDataRemote,
   saveServiceObservationRemote,
   saveVoucherDraftRemote,
@@ -130,8 +131,14 @@ import {
 } from "./screens/MaintenanceRequestScreen";
 import { IdeasScreen } from "./screens/IdeasScreen";
 import { VehicleChoiceDialog } from "./components/details/VehicleChoiceDialog";
-import { buildInfleetServiceVehiclePatch, type DriverVehicleChoice, type InfleetVehicleResolution } from "./lib/serviceVehicleInfleet";
-import { pickMockInfleetScenario, resolveMockServiceVehicle } from "./lib/serviceVehicleInfleetMock";
+import {
+  buildInfleetServiceVehiclePatch,
+  needsDriverChoice,
+  type DriverVehicleChoice,
+  type FleetVehicle,
+  type InfleetVehicleResolution
+} from "./lib/serviceVehicleInfleet";
+import { createMockFleetLoader, pickMockInfleetScenario, resolveMockServiceVehicle } from "./lib/serviceVehicleInfleetMock";
 import { ServicesScreen } from "./screens/ServicesScreen";
 import { SignatureScreen } from "./screens/SignatureScreen";
 import { VoucherScreen } from "./screens/VoucherScreen";
@@ -442,6 +449,7 @@ function App() {
   const [vehicleChoiceRequest, setVehicleChoiceRequest] = useState<{
     resolution: InfleetVehicleResolution;
     resolve: (choice: DriverVehicleChoice | null) => void;
+    loadFleet: () => Promise<FleetVehicle[]>;
   } | null>(null);
   const [comunicados, setComunicados] = useState<ComunicadoDestinatario[]>([]);
   const [comunicadosStatus, setComunicadosStatus] = useState<ComunicadosLoadStatus>(() => isMockComunicados() || hasDataverseRuntime() ? "loading" : "ready");
@@ -1152,6 +1160,7 @@ function App() {
       {vehicleChoiceRequest ? (
         <VehicleChoiceDialog
           resolution={vehicleChoiceRequest.resolution}
+          loadFleet={vehicleChoiceRequest.loadFleet}
           onChoose={closeVehicleChoice}
           onCancel={cancelVehicleChoice}
         />
@@ -1336,8 +1345,8 @@ function App() {
   };
 
   // Abre a escolha do carro e espera a resposta do motorista (null = voltou sem escolher).
-  const askVehicleChoice = (resolution: InfleetVehicleResolution) =>
-    new Promise<DriverVehicleChoice | null>((resolve) => setVehicleChoiceRequest({ resolution, resolve }));
+  const askVehicleChoice = (resolution: InfleetVehicleResolution, loadFleet: () => Promise<FleetVehicle[]>) =>
+    new Promise<DriverVehicleChoice | null>((resolve) => setVehicleChoiceRequest({ resolution, resolve, loadFleet }));
 
   const closeVehicleChoice = useCallback((choice: DriverVehicleChoice | null) => {
     setVehicleChoiceRequest((current) => {
@@ -1411,9 +1420,9 @@ function App() {
         if (detailToFinalize.type === "SERVICO" && detailToFinalize.dataverse?.id) {
           setProgress("Conferindo o carro na Infleet.");
           vehicleResolution = await resolveServiceVehicleRemote(detailToFinalize.dataverse.id);
-          if (vehicleResolution.decisao === "perguntar") {
+          if (needsDriverChoice(vehicleResolution)) {
             setRemoteOperation(null);
-            vehicleChoice = await askVehicleChoice(vehicleResolution);
+            vehicleChoice = await askVehicleChoice(vehicleResolution, loadActiveFleetRemote);
             if (!vehicleChoice) return;
             setProgress("Registrando o carro escolhido.");
           }
@@ -1463,18 +1472,16 @@ function App() {
       const resolution = await resolveMockServiceVehicle(scenario);
       setRemoteOperation(null);
       let choice: DriverVehicleChoice | null = null;
-      if (resolution.decisao === "perguntar") {
-        choice = await askVehicleChoice(resolution);
+      if (needsDriverChoice(resolution)) {
+        choice = await askVehicleChoice(resolution, createMockFleetLoader(scenario));
         if (!choice) return;
       }
       const patch = buildInfleetServiceVehiclePatch(resolution, choice, (vehicleId) => vehicleId);
       const outcome = resolution.decisao === "automatico"
         ? `automático: ${resolution.escolhido?.placa} (${resolution.escolhido?.percentual}%)`
-        : resolution.decisao === "indisponivel"
-          ? `sem decisão (${resolution.motivo}), carro mantido pela posse`
-          : `escolhido pelo motorista: ${choice?.placa}`;
+        : `escolhido pelo motorista (${choice?.origem === "frota" ? "frota" : "carros da janela"}): ${choice?.placa}`;
       console.info("[mock Infleet]", scenario, patch);
-      setToast(`Teste Infleet (${scenario}) · ${outcome}`, resolution.decisao === "indisponivel" ? "warning" : "success");
+      setToast(`Teste Infleet (${scenario}) · ${outcome}`, "success");
     }
 
     setCompletingDetailKey(detailKey);

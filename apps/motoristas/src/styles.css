@@ -3891,6 +3891,48 @@ svg {
     opacity 160ms ease;
 }
 
+.vehicle-choice-list.is-fleet {
+  max-height: min(46vh, 360px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin-right: -6px;
+  padding-right: 6px;
+}
+
+.vehicle-choice-hint {
+  margin: 6px 0 0;
+}
+
+.vehicle-choice-status {
+  margin: 14px 0 0;
+}
+
+.vehicle-choice-search {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fcfcfb;
+  padding: 0 12px;
+  color: #001a3d;
+  font-family: "Manrope", Arial, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.vehicle-choice-search::placeholder {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.vehicle-choice-search:focus-visible {
+  outline: 0;
+  border-color: #6c91e8;
+  box-shadow: 0 0 0 3px rgba(33, 89, 210, 0.11);
+}
+
 .vehicle-choice-name {
   font-size: 0.98rem;
   font-weight: 800;
