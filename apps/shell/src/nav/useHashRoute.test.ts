@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hrefFor, queryFromHash, routeFromHash } from './useHashRoute'
+import { applyRouteFromSearch, hashFromSearch, hrefFor, queryFromHash, routeFromHash } from './useHashRoute'
 
 describe('routeFromHash', () => {
   it('devolve o id da rota e ignora a query', () => {
@@ -37,5 +37,41 @@ describe('hrefFor', () => {
     expect(params.get('view')).toBe('a b')
     expect(params.get('q')).toBe('x&y')
     expect(hrefFor('geral', new URLSearchParams('view=a'))).toBe('#/geral?view=a')
+  })
+})
+
+describe('hashFromSearch (sitemap do model-driven: ?data=rota)', () => {
+  it('converte data=geral em #/geral quando não há hash', () => {
+    expect(hashFromSearch('?data=geral', '')).toBe('#/geral')
+    expect(hashFromSearch('?data=geral', '#/')).toBe('#/geral')
+    expect(hashFromSearch('?data=%2Fgeral', '')).toBe('#/geral')
+  })
+  it('preserva a query da rota codificada em data', () => {
+    const next = hashFromSearch('?data=geral%3Fview%3Da%26q%3Dx', '')!
+    expect(routeFromHash(next)).toBe('geral')
+    expect(queryFromHash(next).get('view')).toBe('a')
+    expect(queryFromHash(next).get('q')).toBe('x')
+  })
+  it('não sobrepõe uma rota já presente no hash e ignora data vazio', () => {
+    expect(hashFromSearch('?data=geral', '#/frota')).toBeNull()
+    expect(hashFromSearch('?data=', '')).toBeNull()
+    expect(hashFromSearch('', '')).toBeNull()
+    expect(hashFromSearch('?outro=1', '')).toBeNull()
+  })
+})
+
+describe('applyRouteFromSearch', () => {
+  it('troca a URL por replaceState mantendo pathname e query', () => {
+    const calls: unknown[][] = []
+    const win = {
+      location: { pathname: '/WebResources/x.html', search: '?data=geral', hash: '' },
+      history: { replaceState: (...args: unknown[]) => calls.push(args) },
+    } as unknown as Pick<Window, 'location' | 'history'>
+    expect(applyRouteFromSearch(win)).toBe('#/geral')
+    expect(calls).toEqual([[null, '', '/WebResources/x.html?data=geral#/geral']])
+  })
+  it('não mexe na URL sem data', () => {
+    const win = { location: { pathname: '/', search: '', hash: '#/frota' }, history: { replaceState: () => { throw new Error('não deveria') } } } as unknown as Pick<Window, 'location' | 'history'>
+    expect(applyRouteFromSearch(win)).toBeNull()
   })
 })

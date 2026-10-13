@@ -22,6 +22,27 @@ export function hrefFor(id: string, params?: URLSearchParams | Record<string, st
   return `#/${encodeURIComponent(id)}${query ? `?${query}` : ''}`
 }
 
+/**
+ * Rota inicial vinda da query da página (`?data=geral` ou `?data=geral%3Fview%3Dx`), como o
+ * sitemap do model-driven passa ao WebResource. Só vale quando ainda não há rota no hash.
+ * Devolve o hash a aplicar ou null.
+ */
+export function hashFromSearch(search: string, hash: string) {
+  if (routeFromHash(hash)) return null
+  const data = new URLSearchParams(search).get('data')?.trim()
+  if (!data) return null
+  const [id, query] = data.replace(/^#?\/?/, '').split(/\?(.*)/s)
+  if (!id) return null
+  return hrefFor(id, query ? new URLSearchParams(query) : undefined)
+}
+
+/** Aplica `hashFromSearch` na janela sem recarregar nem criar entrada no histórico. */
+export function applyRouteFromSearch(win: Pick<Window, 'location' | 'history'> = window) {
+  const next = hashFromSearch(win.location.search, win.location.hash)
+  if (next) win.history.replaceState(null, '', `${win.location.pathname}${win.location.search}${next}`)
+  return next
+}
+
 export function useHashRoute() {
   return useSyncExternalStore(subscribe, () => routeFromHash(location.hash))
 }
