@@ -95,4 +95,25 @@ describe('Pagantes', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Ricardo Menezes' })).toBeNull())
     expect(await screen.findByText(/só funciona dentro do Dataverse/)).toBeTruthy()
   })
+
+  it('guarda filtros e ficha aberta na URL e reabre igual pelo link', async () => {
+    history.replaceState(null, '', '#/pagantes?falhas=1')
+    render(<PagantesPage host={{ mode: 'mock' }} />)
+    await screen.findByText('PAG-1204')
+    expect(screen.queryByText('PAG-1201')).toBeNull()
+
+    fireEvent.click(screen.getByLabelText('Só com falha de envio'))
+    expect(location.hash).toBe('#/pagantes')
+    await openRow('PAG-1201')
+    await screen.findByRole('dialog', { name: 'Mariana Albuquerque' })
+    const link = location.hash
+    expect(link).toMatch(/^#\/pagantes\?abrir=./)
+
+    cleanup()
+    history.replaceState(null, '', link)
+    render(<PagantesPage host={{ mode: 'mock' }} />)
+    expect(await screen.findByRole('dialog', { name: 'Mariana Albuquerque' })).toBeTruthy()
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Mariana Albuquerque' })).getByRole('button', { name: /Fechar/ }))
+    await waitFor(() => expect(location.hash).toBe('#/pagantes'))
+  })
 })

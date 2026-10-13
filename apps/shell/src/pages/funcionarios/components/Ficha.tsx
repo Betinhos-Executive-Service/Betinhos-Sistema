@@ -1,5 +1,6 @@
 import { Alert, Button, buttonClassName, Dialog, Spinner, Tabs } from '@betinhos/ui'
 import { ChevronLeft, ExternalLink, FolderOpen, Save, Undo2, X } from 'lucide-react'
+import { useQueryTexto } from '../../../nav/queryState'
 import { useIsMobile } from '../lib/useMediaQuery'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { computeAlertas } from '../data/alerts'
@@ -44,13 +45,17 @@ export function Ficha({ source, id, onClose, onSaved }: Props) {
   const [loading, setLoading] = useState(Boolean(id))
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [tab, setTab] = useState<Tab>('dados')
+  // A seção aberta vive na URL (`secao=documentos`); "Dados" é o padrão. Colaborador novo só tem a seção Dados.
+  const [secao, setTab] = useQueryTexto('secao', 'dados')
+  const tab: Tab = !id ? 'dados' : TABS.find((item) => item.key === secao)?.key ?? 'dados'
+  const idAnterior = useRef(id)
   const [discarding, setDiscarding] = useState(false)
   const panel = useRef<HTMLElement>(null)
   const mobile = useIsMobile()
 
   useEffect(() => {
-    setTab('dados')
+    // Trocar de colaborador volta para Dados; na abertura da ficha vale a seção da URL.
+    if (idAnterior.current !== id) { idAnterior.current = id; setTab('dados') }
     setErrors({})
     if (!id) {
       setOriginal(null)
@@ -168,7 +173,7 @@ export function Ficha({ source, id, onClose, onSaved }: Props) {
         </header>
 
         <div className="drawer-tabs">
-          <Tabs aria-label="Seções da ficha" value={tab} onChange={setTab} tabs={TABS.map((item) => ({ value: item.key, label: item.label, disabled: isNew && item.key !== 'dados' }))} />
+          <Tabs aria-label="Seções da ficha" value={tab} onChange={(next) => setTab(next)} tabs={TABS.map((item) => ({ value: item.key, label: item.label, disabled: isNew && item.key !== 'dados' }))} />
         </div>
 
         <div className="drawer-body" role="tabpanel">

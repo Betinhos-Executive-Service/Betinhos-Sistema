@@ -7,7 +7,11 @@ it('não repete ids de rota', () => {
 })
 
 it('localiza item e grupo pelo id', () => {
-  expect(findItem('new_dashboard')?.group.id).toBe('operacional')
+  expect(findItem('dashboard')?.group.id).toBe('operacional')
+  expect(findItem('dashboard')?.item).toMatchObject({ kind: 'page', page: 'dashboard', label: 'Dashboard' })
+  // O legado vira o modo TV, no Back-End.
+  expect(findItem('new_dashboard')?.group.id).toBe('back-end')
+  expect(findItem('new_dashboard')?.item).toMatchObject({ kind: 'webresource', label: 'Dashboard antigo (TV)' })
   expect(findItem('inexistente')).toBeNull()
 })
 
@@ -17,9 +21,9 @@ it('Resumo Operacional é rota React do shell', () => {
 })
 
 it('usa rótulo do sitemap, depois metadata, depois nome lógico', () => {
-  const labels = new Map([['cr40f_financeiro', 'Financeiros']])
+  const labels = new Map([['cr40f_recibos_v2', 'Recibos']])
   expect(itemLabel(findItem('cr40f_clientes1')!.item, labels)).toBe('Clientes')
-  expect(itemLabel(findItem('cr40f_financeiro')!.item, labels)).toBe('Financeiros')
+  expect(itemLabel(findItem('cr40f_recibos_v2')!.item, labels)).toBe('Recibos')
   expect(itemLabel(findItem('cr40f_multas')!.item, labels)).toBe('cr40f_multas')
 })
 

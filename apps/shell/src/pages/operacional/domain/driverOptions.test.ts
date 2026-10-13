@@ -3,8 +3,8 @@ import { motoristaOptions } from './driverOptions'
 import { reserva } from './fixtures'
 
 const now = new Date('2026-10-05T08:00:00-03:00')
-const ana = { id: 'a', nome: 'Ana', apelido: 'Aninha', celular: '' }
-const beto = { id: 'b', nome: 'Beto', apelido: '', celular: '' }
+const ana = { id: 'a', nome: 'Ana', apelido: 'Aninha', celular: '', veiculoAtualId: null, terceiro: false }
+const beto = { id: 'b', nome: 'Beto', apelido: '', celular: '', veiculoAtualId: null, terceiro: false }
 
 it('inclui no início o motorista atual que não está na lista', () => {
   const r = reserva({ hora: '10:00', motoristaId: 'x', motorista: 'Carlos Júnior' })
@@ -24,6 +24,6 @@ it('avisa conflito, próxima saída ou livre', () => {
   const alvo = reserva({ hora: '10:00', motoristaId: null, motorista: '' })
   const doAna = reserva({ hora: '10:15', motoristaId: 'a' })
   const doBeto = reserva({ hora: '14:00', motoristaId: 'b' })
-  const options = motoristaOptions(alvo, [ana, beto, { id: 'c', nome: 'Caio', apelido: '', celular: '' }], [alvo, doAna, doBeto], now)
+  const options = motoristaOptions(alvo, [ana, beto, { id: 'c', nome: 'Caio', apelido: '', celular: '', veiculoAtualId: null, terceiro: false }], [alvo, doAna, doBeto], now)
   expect(options.map((o) => o.subtitle)).toEqual(['Conflito: saída às 10:15', 'Próximo às 14:00', 'Livre'])
 })

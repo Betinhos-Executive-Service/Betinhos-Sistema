@@ -3,10 +3,12 @@ import { Alert, Button, EmptyState, Pagination, StatusBadge, ToastProvider, useS
 import { RefreshCw, SearchX, WalletCards } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
+import { useQueryBandeira, useQueryFilters, useQueryId, useQueryPagina } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
 import { BUILTIN_VIEWS, EMPTY_FILTERS, filterPagantes, loadViews, matchView, newView, periodoStart, saveViews, total, viewFilters, type Filters, type View } from './domain/filters'
 import { formatMoney } from './domain/messages'
+import { pagantesQuery } from './domain/query'
 import { applyPatch, statusPatch } from './domain/status'
 import type { Pagante } from './domain/types'
 import { usePagantes } from './usePagantes'
@@ -31,14 +33,15 @@ function Pagantes({ host }: { host: Host }) {
   // Visões: as prontas + as do usuário; a última usada volta ao abrir a tela.
   const [stored, setStored] = useState(() => loadViews(source.kv))
   const views = useMemo(() => [...BUILTIN_VIEWS, ...stored.views], [stored.views])
-  const [filters, setFiltersState] = useState<Filters>(() => {
+  // Filtros, página e ficha aberta vivem na URL (#/pagantes?q=…&status=…&pagina=2&abrir=…); sem filtro na abertura, entra a última visão.
+  const [filters, setFiltersUrl] = useQueryFilters(pagantesQuery, () => {
     const last = views.find((v) => v.id === stored.last)
     return last ? viewFilters(last) : { ...EMPTY_FILTERS }
   })
   // A visão escolhida desempata quando outra tem os mesmos filtros.
   const activeView = useMemo(() => matchView(views, filters, stored.last), [views, filters, stored.last])
   const setFilters = useCallback((next: Filters, viewId?: string) => {
-    setFiltersState(next)
+    setFiltersUrl(next)
     setStored((s) => {
       const last = viewId ?? matchView([...BUILTIN_VIEWS, ...s.views], next, s.last)?.id ?? null
       if (last === s.last) return s
@@ -46,19 +49,23 @@ function Pagantes({ host }: { host: Host }) {
       saveViews(source.kv, data)
       return data
     })
-    setPage(1)
-  }, [source.kv])
-  const [page, setPage] = useState(1)
+  }, [source.kv, setFiltersUrl])
+  const [page, setPage] = useQueryPagina()
 
   const since = useMemo(() => periodoStart(filters.periodo, new Date()), [filters.periodo])
   const pg = usePagantes(source, since)
   const visible = useMemo(() => filterPagantes(pg.list, filters, pg.contatos), [pg.list, filters, pg.contatos])
 
-  const [selected, setSelected] = useState<Pagante | null>(null)
-  const current = selected ? pg.list.find((p) => p.id === selected.id) ?? selected : null
+  const [selectedId, setSelectedId] = useQueryId('abrir')
+  // A ficha pode vir do rateio (pagante fora da lista carregada): guarda a cópia dela para continuar aberta.
+  const [selectedCopy, setSelectedCopy] = useState<Pagante | null>(null)
+  const current = selectedId ? pg.list.find((p) => p.id === selectedId) ?? (selectedCopy?.id === selectedId ? selectedCopy : null) : null
+  const setSelected = (p: Pagante | null) => { setSelectedCopy(p); setSelectedId(p?.id ?? null) }
   const [statusRequest, setStatusRequest] = useState<StatusRequest>(null)
-  const [saving, setSaving] = useState(false)
-  const [frameUrl, setFrameUrl] = useState<string | null>(null)
+  const [saving, setSaving] = useQueryBandeira('salvarvisao')
+  // O Gerar Pagantes aberto (por cima da tela) também vive na URL: `gerar=<id da OP>`.
+  const [gerarOpId, setGerarOpId] = useQueryId('gerar')
+  const frameUrl = gerarOpId ? source.gerarPagantesUrl(gerarOpId) : null
   const [version, setVersion] = useState(0)
   // Um pagante por vez com gravação ou recibo em andamento: evita duplo clique e envio duplicado.
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -81,7 +88,7 @@ function Pagantes({ host }: { host: Host }) {
     try {
       await pg.update(p.id, payload)
       // A ficha pode ter vindo do rateio (fora da lista filtrada): atualiza a cópia dela também.
-      setSelected((s) => (s?.id === p.id ? { ...s, ...applyPatch(payload) } : s))
+      setSelectedCopy((s) => (s?.id === p.id ? { ...s, ...applyPatch(payload) } : s))
       setVersion((v) => v + 1)
       const recibo = payload.cr40f_statusdorecibo != null ? ' O recibo entra na fila de envio.' : ''
       toast({ tone: 'success', message: kind === 'pago' ? `${nome} marcado como pago.${recibo}` : `Pagante ${p.codigo} cancelado.` })
@@ -110,10 +117,10 @@ function Pagantes({ host }: { host: Host }) {
     const url = source.gerarPagantesUrl(p.opId)
     if (!url) { toast({ tone: 'info', message: 'O Gerar Pagantes só abre dentro do Dataverse.' }); return }
     setSelected(null)
-    setFrameUrl(url)
+    setGerarOpId(p.opId)
   }
 
-  const closeFrame = useCallback((reload: boolean) => { setFrameUrl(null); if (reload) refresh() }, [refresh])
+  const closeFrame = useCallback((reload: boolean) => { setGerarOpId(null); if (reload) refresh() }, [refresh, setGerarOpId])
 
   function saveView(nome: string) {
     const same = matchView(views, filters)

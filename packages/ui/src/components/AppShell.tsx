@@ -48,6 +48,12 @@ export type AppShellProps = {
   defaultCollapsed?: boolean
   /** Mostra a busca de telas; por padrão aparece com mais de 12 itens. */
   searchable?: boolean
+  /** Gaveta do celular aberta, controlada de fora (ex.: guardada na URL); sem isto o estado é interno. */
+  navOpen?: boolean
+  onNavOpenChange?: (open: boolean) => void
+  /** Texto da busca de telas, controlado de fora; sem isto o estado é interno. */
+  search?: string
+  onSearchChange?: (search: string) => void
   children: ReactNode
 }
 
@@ -88,16 +94,20 @@ function useMediaQuery(query: string) {
  * (grupos em acordeão, busca, rodapé) e trilho de 72px (só ícones, popover ao pousar). No celular a
  * sidebar vira gaveta e entra o cabeçalho fixo.
  */
-export function AppShell({ brand, groups, activeId, title, headerActions, status, user, footer, collapsible = true, defaultCollapsed = false, searchable, children }: AppShellProps) {
+export function AppShell({ brand, groups, activeId, title, headerActions, status, user, footer, collapsible = true, defaultCollapsed = false, searchable, navOpen, onNavOpenChange, search, onSearchChange, children }: AppShellProps) {
   const activeGroup = groups.find((group) => group.items.some((item) => item.id === activeId)) ?? null
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set(activeGroup ? [activeGroup.id] : []))
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [drawerInternal, setDrawerInternal] = useState(false)
+  const drawerOpen = navOpen ?? drawerInternal
+  const setDrawerOpen = (open: boolean) => { setDrawerInternal(open); onNavOpenChange?.(open) }
   const [collapsed, setCollapsed] = useState(() => {
     const stored = storedCollapsed()
     if (stored !== null) return collapsible && stored === '1'
     return collapsible && defaultCollapsed && isDesktop()
   })
-  const [query, setQuery] = useState('')
+  const [queryInternal, setQueryInternal] = useState('')
+  const query = search ?? queryInternal
+  const setQuery = (text: string) => { setQueryInternal(text); onSearchChange?.(text) }
   const [popover, setPopover] = useState<{ id: string; top: number } | null>(null)
   const popoverTimer = useRef<number | undefined>(undefined)
   const desktop = useMediaQuery(DESKTOP)
@@ -117,9 +127,11 @@ export function AppShell({ brand, groups, activeId, title, headerActions, status
   const mobileActions = page?.actions ?? headerActions
 
   // Ao navegar, o grupo do item ativo abre, a gaveta do celular fecha e o popover some.
+  const shownId = useRef(activeId)
   useEffect(() => {
     if (activeGroup) setOpenGroups((current) => (current.has(activeGroup.id) ? current : new Set(current).add(activeGroup.id)))
-    setDrawerOpen(false)
+    // Na abertura vale a gaveta que veio de fora (URL); só trocar de tela a fecha (comparar o id também vale no StrictMode, que roda o efeito duas vezes).
+    if (shownId.current !== activeId) { shownId.current = activeId; setDrawerOpen(false) }
     setPopover(null)
   }, [activeId, activeGroup])
 

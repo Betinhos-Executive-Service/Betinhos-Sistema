@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useQueryBandeira, useQueryTexto } from '../nav/queryState'
 import { Check, ChevronRight, CircleCheck, Clock, Copy, EllipsisVertical, Home, Inbox, LayoutDashboard, Pencil, Plus, PlugZap, RefreshCw, SearchX, Trash2, TriangleAlert, Truck, X } from 'lucide-react'
 import {
   Alert, Avatar, BottomNav, Breadcrumb, Button, Checkbox, ChoiceGroup, Cluster, DateTile, Dialog, Drawer, EmptyState, Field, Grid, Input, Menu, MetricCard, PageHeader, PageToolbar, Pagination, Progress, Radio, SearchBox, SegmentedControl, Select, Sheet, Skeleton, Spinner, Stack, StatusBadge, Surface, Switch, Table, TableTitle, Tabs, Textarea, ToastProvider, Tooltip, Upload,
@@ -125,6 +126,13 @@ function ButtonShowcase() {
         <Button variant="ghost" iconEnd={<ChevronRight size={14} />}>Ver ocorrência</Button>
         <Button variant="danger">Excluir opção</Button>
         <Button variant="secondary" icon={<X size={16} />} aria-label="Fechar painel" />
+      </Cluster>
+
+      <p className="showcase__label">Maiúsculas acentuadas (o acento não pode ser cortado)</p>
+      <Cluster gap="3">
+        <Button variant="secondary">Últimos 7 dias</Button>
+        <Button variant="secondary" size="compact">Ônibus</Button>
+        <Button variant="secondary" size="touch">Édito</Button>
       </Cluster>
 
       <p className="showcase__label">Em uso: clique para salvar</p>
@@ -343,7 +351,10 @@ function StatusBadgeShowcase() {
 }
 
 function EmptyStateShowcase() {
-  const [filtered, setFiltered] = useState(true)
+  // Os estados de navegação da galeria (aba, visão, gaveta, diálogo…) vivem na URL (`#/components?drawer=1&aba=acoes`).
+  const [semFiltro, setSemFiltro] = useQueryBandeira('vazio')
+  const filtered = !semFiltro
+  const setFiltered = (value: boolean) => setSemFiltro(!value)
   return (
     <Section name="EmptyState" summary="Estado vazio ou de erro: ícone, título, explicação curta e a ação que leva ao próximo passo.">
       <Grid gap="4" min={300}>
@@ -370,8 +381,8 @@ function EmptyStateShowcase() {
 }
 
 function SegmentedShowcase() {
-  const [periodo, setPeriodo] = useState('semana')
-  const [modo, setModo] = useState('timeline')
+  const [periodo, setPeriodo] = useQueryTexto('periodo', 'semana')
+  const [modo, setModo] = useQueryTexto('modo', 'timeline')
   return (
     <Section name="SegmentedControl" summary="Seletor de opções mutuamente exclusivas (2 a 5), item ativo em navy; setas trocam a opção.">
       <Cluster gap="4">
@@ -417,7 +428,7 @@ function MobileRefresh() {
 }
 
 function PageHeaderShowcase() {
-  const [view, setView] = useState('lista')
+  const [view, setView] = useQueryTexto('visao', 'lista')
   const [query, setQuery] = useState('')
   const [mobile, setMobile] = useState(false)
   return (
@@ -528,8 +539,8 @@ function TableShowcase() {
 
 function DrawerShowcase() {
   const toast = useToast()
-  const [open, setOpen] = useState(false)
-  const [wide, setWide] = useState(false)
+  const [open, setOpen] = useQueryBandeira('drawer')
+  const [wide, setWide] = useQueryBandeira('largo')
   const [titulo, setTitulo] = useState('')
   const [files, setFiles] = useState<UploadFile[]>([])
   return (
@@ -554,7 +565,7 @@ function DrawerShowcase() {
 }
 
 function SheetShowcase() {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useQueryBandeira('sheet')
   return (
     <Section name="Sheet" summary="Bottom sheet modal para celular: abre pela metade, expande para a altura cheia, arrasta pela alça e fecha por X, Esc, fundo ou gesto.">
       <Cluster gap="3">
@@ -610,7 +621,7 @@ function ChoiceShowcase() {
 }
 
 function TabsShowcase() {
-  const [tab, setTab] = useState('detalhes')
+  const [tab, setTab] = useQueryTexto('aba', 'detalhes')
   return (
     <Section name="Tabs" summary="Abas de uma mesma tela, com sublinhado azul; setas, Home e End trocam a aba.">
       <Surface>
@@ -624,8 +635,11 @@ function TabsShowcase() {
 
 function DialogMenuShowcase() {
   const toast = useToast()
-  const [confirm, setConfirm] = useState(false)
-  const [info, setInfo] = useState(false)
+  const [dialogo, setDialogo] = useQueryTexto('dialogo')
+  const confirm = dialogo === 'excluir'
+  const info = dialogo === 'aviso'
+  const setConfirm = (open: boolean) => setDialogo(open ? 'excluir' : '')
+  const setInfo = (open: boolean) => setDialogo(open ? 'aviso' : '')
   return (
     <Section name="Dialog e Menu" summary="Dialog: decisão curta no centro (confirmar, excluir). Menu: ações do registro atrás de um botão ⋯.">
       <Cluster gap="3">

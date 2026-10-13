@@ -87,7 +87,7 @@ function placePanel(box: HTMLElement, panel: HTMLElement) {
   const below = window.innerHeight - rect.bottom - gap - inset
   const above = rect.top - gap - inset
   const up = below < Math.min(limit, 180) && above > below
-  const width = Math.min(Math.max(140, rect.width), window.innerWidth - inset * 2)
+  const width = Math.min(Math.max(240, rect.width), window.innerWidth - inset * 2)
   panel.style.width = `${width}px`
   panel.style.left = `${Math.min(Math.max(inset, rect.left), window.innerWidth - inset - width)}px`
   panel.style.maxHeight = `${Math.min(limit, up ? above : below)}px`
@@ -221,6 +221,13 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
     <div
       ref={boxRef}
       className={controlClassName('combobox', size, control.invalid, [open && 'is-open', isDisabled && 'is-disabled', className].filter(Boolean).join(' ') || undefined)}
+      // A seta e o respiro da caixa ficam fora do botão: o clique neles também abre/fecha.
+      onClick={(event) => {
+        if (event.target !== event.currentTarget || isDisabled) return
+        triggerRef.current?.focus()
+        if (open) close(false)
+        else openPanel()
+      }}
     >
       <button
         ref={(node) => {
@@ -274,8 +281,8 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
           ) : null}
           {props.multiple && visible.length > 0 ? (
             <div className="bt-select-panel__actions">
-              <button type="button" onClick={() => emit([...new Set([...selected, ...visible.filter((option) => !option.disabled).map((option) => option.value)])])}>Selecionar todos</button>
-              <button type="button" onClick={() => emit([])}>Limpar</button>
+              <button type="button" disabled={visible.every((option) => option.disabled || selected.includes(option.value))} onClick={() => emit([...new Set([...selected, ...visible.filter((option) => !option.disabled).map((option) => option.value)])])}>{icon(<><path d="M18 6 7 17l-5-5" /><path d="m22 10-7.5 7.5L13 16" /></>, 14)}Selecionar todos</button>
+              <button type="button" className="is-quiet" disabled={selected.length === 0} onClick={() => emit([])}>{icon(<><path d="M18 6 6 18" /><path d="m6 6 12 12" /></>, 14)}Limpar</button>
             </div>
           ) : null}
           <div className="bt-select-panel__list" id={listId} role="listbox" aria-multiselectable={props.multiple || undefined}>

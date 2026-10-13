@@ -1,10 +1,16 @@
-import type { OperacionalData, Reserva } from '../domain/types'
+import type { Motorista, OperacionalData, Reserva, Veiculo } from '../domain/types'
 
-const MOTORISTAS = [
-  { id: 'm-carlos', nome: 'Carlos Henrique Lima', apelido: 'Carlão', celular: '(11) 98888-1001' },
-  { id: 'm-marina', nome: 'Marina Lopes', apelido: '', celular: '(11) 98888-1002' },
-  { id: 'm-joao', nome: 'João Pedro de Araújo', apelido: 'JP', celular: '' },
-  { id: 'm-rita', nome: 'Rita Fernandes', apelido: '', celular: '(11) 98888-1004' },
+const VEICULOS: Veiculo[] = [
+  { id: 'v-corolla', placa: 'RUH7G45', modelo: 'Corolla', cor: 'Prata' },
+  { id: 'v-compass', placa: 'FCB8B61', modelo: 'Compass', cor: 'PRETA' },
+  { id: 'v-spin', placa: 'GHT2C19', modelo: 'Spin', cor: '' },
+]
+
+const MOTORISTAS: Motorista[] = [
+  { id: 'm-carlos', nome: 'Carlos Henrique Lima', apelido: 'Carlão', celular: '(11) 98888-1001', veiculoAtualId: 'v-corolla', terceiro: false },
+  { id: 'm-marina', nome: 'Marina Lopes', apelido: '', celular: '(11) 98888-1002', veiculoAtualId: 'v-compass', terceiro: false },
+  { id: 'm-joao', nome: 'João Pedro de Araújo', apelido: 'JP', celular: '', veiculoAtualId: 'v-spin', terceiro: false },
+  { id: 'm-rita', nome: 'Rita Fernandes', apelido: '', celular: '(11) 98888-1004', veiculoAtualId: null, terceiro: true },
 ]
 
 export const MOCK_STATUS = [
@@ -27,7 +33,8 @@ export function createMockData(now: Date): OperacionalData {
       trajeto: seq % 2 ? 'GRU → Faria Lima' : 'Congonhas → Paulista', obsOperacao: seq === 2 ? 'Placa de recepção com o nome do cliente.' : '', obsInterna: '',
       motoristaId: motorista?.id ?? null, motorista: motorista?.nome ?? '', veiculo: motorista ? `Placa ABC-${1000 + seq}` : '',
       cliente: 'Cliente Exemplo S.A.', solicitante: 'Paula Martins', passageirosLookup: [],
-      passageirosTexto: 'Ana Souza - (11) 97777-0001\nBruno Teixeira - (21) 97777-0002', ...extra,
+      passageirosTexto: 'Ana Souza - (11) 97777-0001\nBruno Teixeira - (21) 97777-0002',
+      veiculoId: label === 'Concluído' ? motorista?.veiculoAtualId ?? null : null, linkAcompanhamento: '', linkExpiraEm: null, ...extra,
     }
   }
   const [carlos, marina, joao, rita] = MOTORISTAS
@@ -47,6 +54,7 @@ export function createMockData(now: Date): OperacionalData {
   return {
     reservas,
     motoristas: MOTORISTAS,
+    veiculos: VEICULOS,
     passageiros: { [first.id]: [{ id: 'sp-1', ordem: 1, nome: 'Ana Souza', enderecoSaida: 'Rua Haddock Lobo, 595' }] },
     queryMode: 'full',
     warnings: [],
