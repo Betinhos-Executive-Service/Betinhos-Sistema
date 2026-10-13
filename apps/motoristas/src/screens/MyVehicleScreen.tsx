@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { LocalToast, type ToastState } from "../components/common/LocalToast";
 import { AppShell } from "../components/layout/AppShell";
 import { FormMenu } from "../components/navigation/FormMenu";
@@ -18,18 +18,21 @@ export function MyVehicleScreen({ onBack, currentVehicleId, loadVehicles, saveVe
   const [savingId, setSavingId] = useState("");
   const [toast, setToast] = useState<ToastState | null>(null);
   const [selectedId, setSelectedId] = useState(currentVehicleId);
+  // O App recria os carregadores a cada render; guardar o mais recente evita recarregar a lista ao salvar.
+  const loadRef = useRef(loadVehicles);
+  loadRef.current = loadVehicles;
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setLoadError(false);
     try {
-      setVehicles(await loadVehicles());
+      setVehicles(await loadRef.current());
     } catch {
       setLoadError(true);
     } finally {
       setLoading(false);
     }
-  }, [loadVehicles]);
+  }, []);
 
   useEffect(() => {
     void refresh();
