@@ -57,6 +57,8 @@ export const formatDay = (key: string) => dayFormat.format(fromKey(key))
 export const formatDate = (key: string) => longFormat.format(fromKey(key))
 export const formatWeekday = (key: string) => weekdayFormat.format(fromKey(key)).replace('.', '')
 export const weekendLabel = (saturday: string) => `${formatDay(saturday)} e ${formatDay(addDays(saturday, 1))}`
+/** Segunda a sexta da semana que termina no fim de semana de `sabado`. */
+export const diasUteis = (sabado: string) => [-5, -4, -3, -2, -1].map((d) => addDays(sabado, d))
 const hora = (hhmm: string) => (hhmm.endsWith(':00') ? `${Number(hhmm.slice(0, 2))}h` : hhmm.replace(':', 'h'))
 
 export const recordKey = (motoristaId: string, data: string) => `${motoristaId}|${data}`

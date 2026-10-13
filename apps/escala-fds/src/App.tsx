@@ -2,16 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, CircleAlert, LoaderCircle, RefreshCw } from 'lucide-react'
 import { Alert, BuildBadge, Button, Skeleton, Tabs, useToast } from '@betinhos/ui'
 import {
-  addDays, aplicarPendencias, clonarPendencias, descontarSalvas, planSave, semPendencias, toKey, totalPendencias, weekendLabel, weekendOf,
+  addDays, aplicarPendencias, clonarPendencias, descontarSalvas, diasUteis, formatDay, planSave, semPendencias, toKey, totalPendencias, weekendLabel, weekendOf,
   type Compromisso, type Dados, type Padrao, type Pendencias, type Situacao,
 } from './domain/escala'
 import { createSource, janelaPara, type Janela } from './data/source'
 import { EscalaTab } from './components/EscalaTab'
 import { AgendaTab } from './components/AgendaTab'
+import { SemanaTab } from './components/SemanaTab'
 import { PadroesTab } from './components/PadroesTab'
 import type { FormInicial } from './components/CompromissoForm'
 
-type Aba = 'escala' | 'agenda' | 'padroes'
+type Aba = 'escala' | 'semana' | 'agenda' | 'padroes'
 
 /** Espera após a última alteração antes de gravar, para juntar toques seguidos num lote só. */
 const AUTOSAVE_MS = 700
@@ -124,17 +125,21 @@ export function App() {
   const novoCompromisso = (inicial: FormInicial) => { setFormInicial(inicial); setAba('agenda') }
 
   const hoje = toKey(new Date())
+  // A navegação anda de 7 em 7 dias; na aba Semana o rótulo mostra a segunda a sexta antes do fim de semana.
+  const semana = aba === 'semana'
+  const atual = sabado === weekendOf(new Date())
+  const uteis = diasUteis(sabado)
 
   return (
     <div className="escala">
       <header className="escala__head">
         <div className="escala__week">
-          <Button variant="secondary" size="compact" aria-label="Fim de semana anterior" icon={<ChevronLeft size={16} />} onClick={() => irPara(addDays(sabado, -7))} />
+          <Button variant="secondary" size="compact" aria-label={semana ? 'Semana anterior' : 'Fim de semana anterior'} icon={<ChevronLeft size={16} />} onClick={() => irPara(addDays(sabado, -7))} />
           <div className="escala__week-label">
-            <span className="escala__eyebrow">{sabado === weekendOf(new Date()) ? 'Este fim de semana' : 'Fim de semana'}</span>
-            <strong>{weekendLabel(sabado)}</strong>
+            <span className="escala__eyebrow">{semana ? (atual ? 'Esta semana' : 'Semana') : atual ? 'Este fim de semana' : 'Fim de semana'}</span>
+            <strong>{semana ? `${formatDay(uteis[0])} a ${formatDay(uteis[4])}` : weekendLabel(sabado)}</strong>
           </div>
-          <Button variant="secondary" size="compact" aria-label="Próximo fim de semana" icon={<ChevronRight size={16} />} onClick={() => irPara(addDays(sabado, 7))} />
+          <Button variant="secondary" size="compact" aria-label={semana ? 'Próxima semana' : 'Próximo fim de semana'} icon={<ChevronRight size={16} />} onClick={() => irPara(addDays(sabado, 7))} />
         </div>
         <div className="escala__head-end">
           <span className={salvarErro ? 'escala__save is-error' : 'escala__save'} aria-live="polite">
@@ -156,6 +161,7 @@ export function App() {
         onChange={setAba}
         tabs={[
           { value: 'escala', label: 'Escala' },
+          { value: 'semana', label: 'Semana' },
           { value: 'agenda', label: 'Agenda' },
           { value: 'padroes', label: 'Padrões' },
         ]}
@@ -168,6 +174,8 @@ export function App() {
           <div className="escala__skeleton">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} height={56} />)}</div>
         ) : aba === 'escala' ? (
           <EscalaTab sabado={sabado} view={view} onExcecao={setExcecao} onNovoCompromisso={novoCompromisso} />
+        ) : aba === 'semana' ? (
+          <SemanaTab hoje={hoje} sabado={sabado} view={view} onAdd={addCompromisso} />
         ) : aba === 'agenda' ? (
           <AgendaTab hoje={hoje} sabado={sabado} view={view} formInicial={formInicial} onFormClose={() => setFormInicial(null)} onAdd={addCompromisso} onRemove={removeCompromisso} />
         ) : (

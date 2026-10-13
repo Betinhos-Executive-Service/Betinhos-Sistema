@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  aplicarPendencias, compromissosDoDia, descontarSalvas, planSave, recordKey, semPendencias, situacaoDoDia, weekendOf,
+  aplicarPendencias, compromissosDoDia, descontarSalvas, diasUteis, planSave, recordKey, semPendencias, situacaoDoDia, weekendOf,
   type Compromisso, type Dados, type Excecao, type Motorista,
 } from './escala'
 
@@ -15,6 +15,13 @@ describe('weekendOf', () => {
   it('leva dias úteis ao próximo sábado e domingo ao sábado anterior', () => {
     expect(weekendOf(new Date(2026, 9, 5))).toBe('2026-10-10')
     expect(weekendOf(new Date(2026, 9, 11))).toBe('2026-10-10')
+  })
+})
+
+describe('diasUteis', () => {
+  it('vai de segunda a sexta antes do sábado, inclusive na virada do mês', () => {
+    expect(diasUteis('2026-10-17')).toEqual(['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16'])
+    expect(diasUteis('2026-10-03')).toEqual(['2026-09-28', '2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02'])
   })
 })
 

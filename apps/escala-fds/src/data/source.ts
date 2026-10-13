@@ -151,6 +151,7 @@ function createMockSource(): Source {
   c('m1', `${sabado}T00:00`, `${sabado}T12:00`, false, 'pessoal', 'Livre de manhã')
   c('m4', `${addDays(sabado, 1)}T00:00`, `${addDays(sabado, 1)}T23:59`, true, 'medico', 'Exame')
   c('m5', `${addDays(hoje, 2)}T10:00`, `${addDays(hoje, 2)}T12:00`, false, 'medico', 'Consulta')
+  c('m3', `${addDays(sabado, -4)}T00:00`, `${addDays(sabado, -4)}T23:59`, true, 'pessoal', 'Mudança')
   c('m6', `${addDays(sabado, 6)}T00:00`, `${addDays(sabado, 14)}T23:59`, true, 'ferias', 'Férias')
 
   return {
