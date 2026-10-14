@@ -4,18 +4,20 @@ import { Alert, Button, EmptyState, MetricCard, PageToolbar, SearchBox, Select, 
 import { AlertTriangle, CalendarClock, CalendarDays, CheckCircle2, Clock, FileX, RefreshCw, Settings } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
-import { useQueryFilters } from '../../nav/queryState'
+import { useQueryFilters, useQueryId } from '../../nav/queryState'
+import { parseHash, patchHashQuery, readHashQuery, hrefFor } from '../../nav/useHashRoute'
 import { todaySP } from '../funcionarios/data/dates'
 import { useMedia } from '../operacional/useMedia'
 import { createDocsSource, type DocsSource } from './data/source'
 import { avisoFalhas, type SalvarDocResult } from './data/salvar'
 import { KPIS, contarKpis, filtrarPendencias, montarPendencias } from './domain/pendencias'
 import { documentosQuery } from './domain/query'
-import type { Categoria, Kpi } from './domain/types'
+import type { Categoria, Kpi, Pendencia } from './domain/types'
 import { useDocumentos } from './useDocumentos'
 import { PendenciasLista } from './components/PendenciasLista'
 import { RenovarDrawer, type AlvoRenovar } from './components/RenovarDrawer'
 import { ConfigDrawer } from './components/ConfigDrawer'
+import { FichaPessoaCentral, FichaVeiculoCentral } from './components/FichaCentral'
 import './documentos.css'
 
 const KPI_LABEL: Record<Kpi, string> = { vencido: 'Vencidos', vence7: 'Até 7 dias', vence30: '8 a 30 dias', vence60: '31 a 60 dias', faltando: 'Faltando' }
@@ -35,6 +37,7 @@ function Documentos({ host }: { host: Host }) {
   const [filtro, setFiltro] = useQueryFilters(documentosQuery)
   const [alvo, setAlvo] = useState<AlvoRenovar | null>(null)
   const [config, setConfig] = useState(false)
+  const [fichaId] = useQueryId('ficha')
   const mobile = useMedia('(max-width: 820px)')
   const toast = useToast()
 
@@ -49,6 +52,17 @@ function Documentos({ host }: { host: Host }) {
   const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar documentos" onClick={refresh} />, [refresh])
   useShellHeader({ title: 'Documentos', actions: headerActions })
 
+  // A ficha aberta vive na URL (`ficha=<id>`, e `secao=documentos` para pessoas). Abrir cria entrada no histórico,
+  // então o voltar do navegador fecha; fechar pelo X só limpa a query.
+  const abrirFicha = (p: Pendencia) => {
+    const q = readHashQuery()
+    q.set('ficha', p.dono.id)
+    if (p.dono.categoria === 'pessoas') q.set('secao', 'documentos'); else q.delete('secao')
+    window.location.hash = `${hrefFor(parseHash(window.location.hash).id)}?${q.toString()}`
+  }
+  const fecharFicha = () => { patchHashQuery({ ficha: null, secao: null, fde: null, fate: null }); void reload() }
+  const donoFicha = fichaId && data ? data.donos.find((d) => d.id === fichaId) ?? null : null
+
   const onSaved = (r: SalvarDocResult) => {
     setAlvo(null)
     if (r.falhas.length) toast({ tone: 'warning', message: avisoFalhas(r.falhas, 'Abra a ficha e use “Enviar arquivo” neste documento para tentar de novo.') })
@@ -62,7 +76,7 @@ function Documentos({ host }: { host: Host }) {
   else if (error && !data) body = <Alert tone="danger" title="Não foi possível carregar os documentos" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{error}</Alert>
   else if (!data) body = <Skeleton shape="rect" height={240} />
   else if (!visiveis.length) body = <EmptyState className="surface" align="start" icon={<CheckCircle2 size={36} />} title={daAba.length ? 'Nenhum documento para estes filtros' : 'Tudo em dia'} action={daAba.length ? <Button variant="secondary" onClick={() => setFiltro({ ...filtro, kpi: null, tipo: null, q: '' })}>Limpar filtros</Button> : undefined} />
-  else body = <PendenciasLista lista={visiveis} mobile={mobile} onRenovar={(p) => setAlvo({ tipo: p.tipo, dono: p.dono, anterior: p.doc })} />
+  else body = <PendenciasLista lista={visiveis} mobile={mobile} onRenovar={(p) => setAlvo({ tipo: p.tipo, dono: p.dono, anterior: p.doc })} onAbrirFicha={abrirFicha} />
 
   return (
     <PageLayout
@@ -100,6 +114,8 @@ function Documentos({ host }: { host: Host }) {
       ) : null}
       {body}
       {source ? <RenovarDrawer alvo={alvo} source={source} onClose={() => setAlvo(null)} onSaved={onSaved} /> : null}
+      {source && donoFicha?.categoria === 'pessoas' ? <FichaPessoaCentral host={host} docs={source} id={donoFicha.id} onClose={fecharFicha} onChanged={refresh} /> : null}
+      {source && donoFicha?.categoria === 'frota' ? <FichaVeiculoCentral host={host} docs={source} id={donoFicha.id} onClose={fecharFicha} onChanged={refresh} /> : null}
       {source && data && config ? <ConfigDrawer source={source} data={data} onClose={() => setConfig(false)} onChanged={refresh} /> : null}
     </PageLayout>
   )

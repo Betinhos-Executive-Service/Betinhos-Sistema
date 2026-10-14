@@ -61,3 +61,9 @@
 .doc-fieldset legend { margin-bottom: var(--bt-space-1); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-primary); }
 .doc-acoes--cheia { display: flex; }
 .doc-acoes__select { flex: 1 1 220px; min-width: 0; }
+
+/* Linha e cartão da central abrem a renovação (o botão Renovar continua como atalho de teclado). */
+.doc-table--clicavel .bt-table__row, .doc-item--clicavel { cursor: pointer; transition: background-color var(--bt-duration-fast) ease; }
+@media (hover: hover) and (pointer: fine) {
+  .doc-table--clicavel .bt-table__row:hover, .doc-item--clicavel:hover { background-color: var(--bt-color-surface-soft); }
+}
