@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DataSource } from '../data/source'
+import { createMockDocsSource } from '../../documentos/data/source'
 import type { Funcionario } from '../data/types'
 import { Ficha } from './Ficha'
 import { ToastProvider } from '@betinhos/ui'
@@ -27,7 +28,7 @@ async function renderFicha(source: DataSource) {
   return screen.findByDisplayValue('Ana Souza')
 }
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); window.location.hash = ''; vi.unstubAllGlobals() })
 
 describe('Ficha', () => {
   it('salva somente o campo alterado', async () => {
@@ -38,6 +39,27 @@ describe('Ficha', () => {
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
     const [, draft] = save.mock.calls[0] as unknown as [Funcionario, { values: Record<string, unknown> }]
     expect(draft.values.new_apelido).toBe('Aninha')
+  })
+
+  it('Validade da CNH e Data do ASO aparecem somente leitura com a dica e não vão no PATCH', async () => {
+    const withDocs: Funcionario = { ...record, values: { ...record.values, cr40f_validadedacnh: '2027-01-10', cr40f_datadoaso: '2026-05-20' } }
+    const save = vi.fn(async () => 'f1')
+    const source = { ...fakeSource(save), get: async () => structuredClone(withDocs) }
+    await renderFicha(source)
+    for (const [label, valor] of [['Validade da CNH', '2027-01-10'], ['Data do ASO', '2026-05-20']] as const) {
+      const input = screen.getByLabelText(label) as HTMLInputElement
+      expect(input.value).toBe(valor)
+      expect(input.disabled).toBe(true)
+      const hint = within(input.closest('.bt-field') as HTMLElement).getByText('Edite em Documentos')
+      expect(input.getAttribute('aria-describedby')).toBe(hint.id)
+    }
+    fireEvent.change(screen.getByLabelText(/Apelido/), { target: { value: 'Aninha' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Salvar/ })) })
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
+    const [orig, draft] = save.mock.calls[0] as unknown as [Funcionario, { values: Record<string, unknown> }]
+    expect(orig.values.cr40f_validadedacnh).toBe('2027-01-10')
+    expect(draft.values.cr40f_validadedacnh).toBe('2027-01-10')
+    expect(draft.values.cr40f_datadoaso).toBe('2026-05-20')
   })
 
   it('mantém o rascunho quando o Dataverse recusa', async () => {
@@ -56,5 +78,35 @@ describe('Ficha', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Salvar/ })) })
     expect(screen.getByText('CPF inválido')).toBeTruthy()
     expect(save).not.toHaveBeenCalled()
+  })
+
+  it('aba Documentos mostra o checklist de documentos controlados quando há fonte de documentos', async () => {
+    window.location.hash = '#/funcionarios?ficha=f1&secao=documentos'
+    render(<ToastProvider><Ficha source={fakeSource(vi.fn(async () => 'f1'))} id="f1" docs={createMockDocsSource()} onClose={() => {}} onSaved={() => {}} /></ToastProvider>)
+    // O id do mock de Funcionários (f1) não está nos donos do mock de documentos; a seção aparece mesmo assim.
+    expect(await screen.findByText('Cadastro não encontrado na lista de documentos.')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Outros arquivos' })).toBeTruthy()
+  })
+
+  it('aba Documentos não mostra o checklist sem fonte de documentos', async () => {
+    window.location.hash = '#/funcionarios?ficha=f1&secao=documentos'
+    render(<ToastProvider><Ficha source={fakeSource(vi.fn(async () => 'f1'))} id="f1" onClose={() => {}} onSaved={() => {}} /></ToastProvider>)
+    expect(await screen.findByRole('heading', { name: 'Arquivos' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Outros arquivos' })).toBeNull()
+    expect(screen.queryByText('Cadastro não encontrado na lista de documentos.')).toBeNull()
+  })
+
+  it('Esc dentro do painel de renovação não fecha a ficha', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
+    window.location.hash = '#/funcionarios?ficha=m1&secao=documentos'
+    const onClose = vi.fn()
+    const base = fakeSource(vi.fn(async () => 'm1'))
+    const source: DataSource = { ...base, get: async () => structuredClone({ ...record, id: 'm1' }) }
+    render(<ToastProvider><Ficha source={source} id="m1" docs={createMockDocsSource()} onClose={onClose} onSaved={() => {}} /></ToastProvider>)
+    const cnh = await screen.findByRole('listitem', { name: 'CNH' })
+    fireEvent.click(within(cnh).getByRole('button', { name: 'Renovar' }))
+    const painel = await screen.findByRole('dialog', { name: 'Renovar CNH' })
+    fireEvent.keyDown(painel, { key: 'Escape' })
+    expect(onClose).not.toHaveBeenCalled()
   })
 })

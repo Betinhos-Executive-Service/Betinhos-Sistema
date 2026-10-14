@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   AlertTriangle, Banknote, BookUser, Calculator, Calendar, Camera, Car, CarFront, ClipboardList, Clock, Coins, Contact, Database, Download,
-  FileText, FileWarning, FolderCog, Home, KeyRound, Landmark, LayoutDashboard, List, Mail, Megaphone, MapPin, Paperclip, Palette, Receipt, ReceiptText, Route,
+  FileText, FileWarning, FolderCheck, FolderCog, Home, KeyRound, Landmark, LayoutDashboard, List, Mail, Megaphone, MapPin, Paperclip, Palette, Receipt, ReceiptText, Route,
   ScrollText, Shield, Shuffle, Tag, TrendingUp, Users, Wallet, Wrench,
 } from 'lucide-react'
 import { AppShell as Shell, type NavGroup } from '@betinhos/ui'
@@ -14,6 +14,8 @@ type Props = {
   title: string
   entityLabels: Map<string, string>
   connection: { ok: boolean; text: string }
+  /** Contador por id de item do menu (ex.: `documentos`). */
+  badges?: Record<string, ReactNode>
   /** A tela ativa pede a navegação recolhida no trilho (grades largas), se o usuário não escolheu outra coisa. */
   defaultCollapsed?: boolean
   children: ReactNode
@@ -54,6 +56,7 @@ const ITEM_ICONS: Record<string, ReactNode> = {
   cr40f_multas: <AlertTriangle />,
   cr40f_colisao_v2: <Camera />,
   pessoas: <Contact />,
+  documentos: <FolderCheck />,
   cr40f_clientes1: <Landmark />,
   cr40f_veiculos: <CarFront />,
   cr40f_funcionarios: <BookUser />,
@@ -78,7 +81,7 @@ const ITEM_ICONS: Record<string, ReactNode> = {
 }
 
 /** Traduz o sitemap do app para a navegação do AppShell do Design System. */
-function toNavGroup(group: MenuGroup, entityLabels: Map<string, string>): NavGroup {
+function toNavGroup(group: MenuGroup, entityLabels: Map<string, string>, badges?: Record<string, ReactNode>): NavGroup {
   return {
     id: group.id,
     label: group.label,
@@ -90,6 +93,7 @@ function toNavGroup(group: MenuGroup, entityLabels: Map<string, string>): NavGro
       href: item.kind === 'external' ? item.url : hrefFor(item.id),
       external: item.kind === 'external',
       icon: ITEM_ICONS[item.id],
+      badge: badges?.[item.id],
     })),
   }
 }
@@ -108,7 +112,7 @@ function useShellQuery(chave: string) {
 }
 
 /** Chrome persistente do Sistema Betinhos: AppShell do pacote alimentado pelo sitemap e pelo estado de conexão. */
-export function AppShell({ activeId, title, entityLabels, connection, defaultCollapsed, children }: Props) {
+export function AppShell({ activeId, title, entityLabels, connection, badges, defaultCollapsed, children }: Props) {
   const install = useInstallPrompt()
   // Gaveta do menu no celular e busca de telas também vivem na URL (`menu=1`, `busca=…`).
   const [menu, setMenu] = useShellQuery('menu')
@@ -122,7 +126,7 @@ export function AppShell({ activeId, title, entityLabels, connection, defaultCol
     setSearch('')
   }, [activeId, setSearch])
   // Grupos estáveis entre renders: sem isto o menu inteiro (ícones e filtro da busca) era refeito a cada render do shell.
-  const groups = useMemo(() => MENU.map((group) => toNavGroup(group, entityLabels)), [entityLabels])
+  const groups = useMemo(() => MENU.map((group) => toNavGroup(group, entityLabels, badges)), [entityLabels, badges])
   return (
     <Shell
       brand={{ name: 'Betinhos', subtitle: 'Sistema interno', href: hrefFor(MENU[0].items[0].id) }}

@@ -5,6 +5,14 @@ import type { Draft, FieldValue, Funcionario } from './types'
 
 export type DateBehavior = 'DateOnly' | 'UserLocal' | 'TimeZoneIndependent'
 
+/** Consulta da metadata com o DateTimeBehavior de cada coluna de data da tabela. */
+export const dateBehaviorsPath = (table: string) =>
+  `EntityDefinitions(LogicalName='${table}')/Attributes/Microsoft.Dynamics.CRM.DateTimeAttributeMetadata?$select=LogicalName,DateTimeBehavior`
+export type DateBehaviorsResponse = { value: { LogicalName: string; DateTimeBehavior?: { Value: DateBehavior } }[] }
+/** Coluna sem DateTimeBehavior na resposta é tratada como UserLocal (padrão do Dataverse). */
+export const toDateBehaviors = (response: DateBehaviorsResponse): Record<string, DateBehavior> =>
+  Object.fromEntries(response.value.map((item) => [item.LogicalName, item.DateTimeBehavior?.Value ?? 'UserLocal']))
+
 export type PatchContext = {
   veiculoNav: string
   veiculoSet: string

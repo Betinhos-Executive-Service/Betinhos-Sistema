@@ -100,8 +100,9 @@ export function createSharePointDocs(api: XrmWebApi, envLabel: string, root = DO
   return {
     pasta: (id: string) => pastaFuncionario(id, envLabel, root),
 
-    async listar(id: string): Promise<Documento[]> {
-      const result = await callFlow(await flowUrl('listar'), { caminhoCompleto: pastaFuncionario(id, envLabel, root) })
+    async listar(id: string, subpasta?: string): Promise<Documento[]> {
+      const pasta = pastaFuncionario(id, envLabel, root)
+      const result = await callFlow(await flowUrl('listar'), { caminhoCompleto: subpasta ? `${pasta}/${subpasta}` : pasta })
       const itens = Array.isArray(result.arquivos) ? (result.arquivos as Record<string, unknown>[]) : []
       return itens.map(toDocumento).sort((a, b) => String(b.modificadoEm).localeCompare(String(a.modificadoEm)))
     },
