@@ -35,4 +35,52 @@ public class SyncEngineTests
         var m = SyncEngine.Compute(op);
         Assert.Contains(m, x => x.Entidade == Codigos.Op && x.Para == Codigos.OpPaga);
     }
+
+    [Fact]
+    public void AlgumPago_OpParcial_ReservaECpIntactas()
+    {
+        var op = Op(Codigos.OpAberta, 10000, Pag(Codigos.PagPago, 4000), Pag(Codigos.PagPendente, 6000));
+        op.Reservas.Add(Res(Codigos.ReservaFatPagante, Codigos.CpPendente));
+        var m = SyncEngine.Compute(op);
+        Assert.Single(m);
+        Assert.Equal(Codigos.OpParcial, m[0].Para);
+    }
+
+    [Fact]
+    public void TodosPagosMasSomaMenorQueTotal_OpParcial()
+    {
+        var op = Op(Codigos.OpAberta, 10000, Pag(Codigos.PagPago, 4000));
+        var m = SyncEngine.Compute(op);
+        Assert.Single(m);
+        Assert.Equal(Codigos.OpParcial, m[0].Para);
+    }
+
+    [Fact]
+    public void NenhumPago_OpAberta_ReservaMarcadaPorEstaOpVoltaPendente()
+    {
+        var op = Op(Codigos.OpPaga, 10000, Pag(Codigos.PagCancelado, 10000));
+        op.Reservas.Add(Res(Codigos.ReservaFatPago, Codigos.CpConcluida, pagoPorOp: true));
+        var m = SyncEngine.Compute(op);
+        Assert.Contains(m, x => x.Entidade == Codigos.Op && x.Para == Codigos.OpAberta);
+        Assert.Contains(m, x => x.Entidade == Codigos.Reserva && x.Para == Codigos.ReservaFatPagamentoPendente);
+        Assert.Contains(m, x => x.Entidade == Codigos.Composicao && x.Para == Codigos.CpPendente);
+    }
+
+    [Fact]
+    public void NenhumPago_ReservaPagoNaMao_NaoRebaixa()
+    {
+        var op = Op(Codigos.OpAberta, 10000);
+        op.Reservas.Add(Res(Codigos.ReservaFatPago, Codigos.CpConcluida, pagoPorOp: false));
+        var m = SyncEngine.Compute(op);
+        Assert.DoesNotContain(m, x => x.Entidade == Codigos.Reserva);
+        Assert.DoesNotContain(m, x => x.Entidade == Codigos.Composicao);
+    }
+
+    [Fact]
+    public void NenhumPago_ReservaInformativa_NaoMexe()
+    {
+        var op = Op(Codigos.OpAberta, 10000, Pag(Codigos.PagPendente, 10000));
+        op.Reservas.Add(Res(Codigos.ReservaFatPagante, Codigos.CpPendente));
+        Assert.Empty(SyncEngine.Compute(op));
+    }
 }

@@ -24,7 +24,26 @@ public static class SyncEngine
                 if (r.CpId is { } cp) Set(mudancas, Codigos.Composicao, cp, Codigos.CpStatus, r.CpStatus, Codigos.CpConcluida, "OP paga.");
             }
         }
+        else if (pagos.Count > 0)
+        {
+            Set(mudancas, Codigos.Op, op.Id, Codigos.OpStatus, op.Status, Codigos.OpParcial, "Há pagamento, mas não cobre todos os pagantes ou o total.");
+        }
+        else
+        {
+            Set(mudancas, Codigos.Op, op.Id, Codigos.OpStatus, op.Status, Codigos.OpAberta, "Nenhum pagante ativo pago.");
+            Reverter(mudancas, op, Codigos.ReservaFatPagamentoPendente, "OP sem pagamento.");
+        }
         return mudancas;
+    }
+
+    /// <summary>Desfaz só o que este motor marcou (PagoPorEstaOp); CP acompanha a reserva. `alvo` = status de faturamento de destino.</summary>
+    internal static void Reverter(List<Mudanca> list, OpSnapshot op, int alvo, string motivo)
+    {
+        foreach (var r in op.Reservas.Where(r => r.PagoPorEstaOp && r.FatStatus == Codigos.ReservaFatPago))
+        {
+            Set(list, Codigos.Reserva, r.Id, Codigos.ReservaFatStatus, r.FatStatus, alvo, motivo);
+            if (r.CpId is { } cp) Set(list, Codigos.Composicao, cp, Codigos.CpStatus, r.CpStatus, Codigos.CpPendente, motivo);
+        }
     }
 
     internal static void Set(List<Mudanca> list, string entidade, System.Guid id, string campo, int? de, int para, string motivo)
