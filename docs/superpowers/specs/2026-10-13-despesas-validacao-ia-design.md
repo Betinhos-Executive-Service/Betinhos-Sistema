@@ -101,3 +101,23 @@ Mudanças no App Motoristas, migração dos arquivos antigos do OneDrive, despes
 2. Meta antes de ligar no PROD: 0 validações indevidas e ≥ 80% de acerto geral no conjunto.
 3. DEV autenticado: gatilho dispara uma vez, colunas gravadas, erro técnico não valida.
 4. PROD: primeira semana com relatório diário de decisões para conferência do financeiro.
+
+## Ampliação antifraude (14/10/2026, decisão de Renan)
+O objetivo principal passa a ser **detectar golpe**: comprovante de outro valor ou de outra despesa, foto reaproveitada, gasto incompatível ou fora do padrão. O vínculo com a OS continua, mas é secundário e nunca impede validar.
+
+**Contexto adicional por despesa** (o flow coleta, a IA julga):
+- `veiculo`: placa, modelo e capacidade do tanque em litros (se o cadastro tiver o campo; senão `null`) do veículo lançado na despesa (`cr40f_veiculo`), ou `null` sem veículo.
+- `historico.motorista`: outras despesas do mesmo motorista nos 7 dias anteriores à data do gasto e no mesmo dia (até 30, mais recentes primeiro).
+- `historico.veiculo`: outras despesas do mesmo veículo no mesmo período (até 30), com a marcação se foram do mesmo motorista.
+- Cada item do histórico: id, data e hora do gasto (ISO UTC), categoria, valor, litros, km informada, estabelecimento e status operacional.
+
+**Sinais que o prompt pede para avaliar** (qualquer um suspeito → `precisa_corrigir` com motivo claro):
+- valor, data ou estabelecimento do comprovante diferentes do lançado;
+- comprovante que parece ser de outra despesa (dados que batem com outra despesa do histórico) ou foto reaproveitada;
+- abastecimentos repetidos do mesmo veículo em intervalo curto, ou soma de litros no dia acima da capacidade do tanque;
+- litros lançados ou lidos acima da capacidade do tanque;
+- km informada que diminui ou não avança de forma coerente entre abastecimentos do mesmo veículo;
+- frequência ou valor fora do padrão do motorista ou da categoria (referência dos 90 dias);
+- gasto incompatível com a categoria ou sem relação com o serviço.
+
+**Fora desta ampliação:** dados da Infleet (abastecimento e km reais por telemetria). Ficam como evolução futura.
