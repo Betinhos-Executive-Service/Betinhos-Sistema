@@ -1,6 +1,6 @@
 import { Check, Copy, ExternalLink, ImageUp } from 'lucide-react'
 import { Alert, Button, Drawer, EmptyState, Input, StatusBadge } from '@betinhos/ui'
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent, type SyntheticEvent } from 'react'
 import { useQueryPeriodo } from '../../../nav/queryState'
 import { formatBR } from '../data/dates'
 import { brl, NAO_INFORMADO } from '../data/format'
@@ -22,6 +22,8 @@ const TABELAS_TIMELINE: { key: 'manutencoes' | 'multas' | 'colisoes' | 'posses';
 ]
 
 const TIPOS_FOTO = ['image/png', 'image/jpeg', 'image/webp']
+/** `onCancel` não está nos tipos de <div>, mas o React o repassa pela árvore; espalhado para o TS aceitar. */
+const pararCancel = { onCancel: (event: SyntheticEvent) => event.stopPropagation() }
 
 export function FichaVeiculo({ source, docs, id, data, errors, today, onClose, onOpen, onReload }: { source: DataSource; docs?: DocsSource | null; id: string; errors: LoadResult['errors']; data: FrotaData; today: string; onClose: () => void; onOpen: (kind: Kind, id: string) => void; onReload: () => void }) {
   const notify = useNotify()
@@ -153,7 +155,11 @@ export function FichaVeiculo({ source, docs, id, data, errors, today, onClose, o
           {docs ? (
             <section className="frota-group" aria-labelledby={`${id}-docs`}>
               <h3 id={`${id}-docs`} className="frota-group__title">Documentos</h3>
-              <Checklist source={docs} donoId={id} titulo="" />
+              {/* Diálogos do checklist (excluir, renovar) são <dialog> dentro deste Drawer: o "cancel" (Esc) deles sobe pela árvore do
+                  React e fecharia a ficha inteira; aqui ele para. */}
+              <div style={{ display: 'contents' }} {...pararCancel}>
+                <Checklist source={docs} donoId={id} titulo="" />
+              </div>
             </section>
           ) : null}
           <section className="frota-group" aria-labelledby={`${id}-custo`}>

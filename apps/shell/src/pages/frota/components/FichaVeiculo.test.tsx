@@ -101,6 +101,20 @@ describe('FichaVeiculo', () => {
     expect(await screen.findByRole('listitem', { name: 'CRLV / Licenciamento' })).toBeTruthy()
   })
 
+  it('Esc no diálogo de excluir arquivo fecha só o diálogo, não a ficha', async () => {
+    const docs = createMockDocsSource()
+    const dados = await docs.carregar()
+    const crlv = dados.docs.find((d) => d.donoId === 'v1' && d.tipoId === 't-crlv')!
+    await docs.enviarArquivo(crlv, new File(['x'], 'crlv.pdf', { type: 'application/pdf' }))
+    const onClose = vi.fn()
+    render(<ToastProvider><FichaVeiculo errors={{}} source={source} id="v1" data={data} today="2026-10-02" docs={docs} onClose={onClose} onOpen={() => {}} onReload={() => {}} /></ToastProvider>)
+    fireEvent.click(await screen.findByRole('button', { name: 'Excluir crlv.pdf' }, { timeout: 8000 }))
+    const confirmar = await screen.findByRole('dialog', { name: 'Excluir arquivo?' })
+    fireEvent(confirmar, new Event('cancel', { cancelable: true }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Excluir arquivo?' })).toBeNull())
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
   it('não mostra a seção Documentos sem fonte de documentos', () => {
     render(<FichaVeiculo errors={{}} source={source} id="v1" data={data} today="2026-10-02" onClose={() => {}} onOpen={() => {}} onReload={() => {}} />)
     expect(screen.queryByRole('heading', { name: 'Documentos' })).toBeNull()
