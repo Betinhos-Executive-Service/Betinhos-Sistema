@@ -113,3 +113,19 @@ Divergências calculadas **no cliente** a partir de reservas, CPs, OPs e pagante
 - Motor: cada linha da tabela do §3 coberta por teste; `aplicar` duas vezes seguidas = zero mudanças na segunda.
 - DEV: `simular` em 10 OPs reais devolve mudanças coerentes com o que a pessoa do financeiro faria; `aplicar` numa OP de teste grava status e log.
 - Tela: abre em mock com os 5 tipos; Corrigir mostra prévia e aplica; Fechar mês cria OP e abre Gerar Pagantes; `pnpm test` e `pnpm typecheck` verdes; 320 px sem rolagem horizontal; sem cor fora dos tokens.
+
+## 10. Metadata conferida (DEV, 14/10/2026)
+
+| Entidade | Entity set | Campo | Valores |
+|---|---|---|---|
+| cr40f_reservadeveculos | cr40f_reservadeveculoses | cr40f_statusdefaturamento | Não Faturável 202410011, Pendente 202410005, Composição Realizada 100000001, Cancelado Sem Taxa 202410000, Cancelado Com Taxa 202410002, Cortesia 202410003, Permuta 202410004, Pagante em Viagem 202410006, Pagamento Pendente 202410007, Pagamento Em Atraso 202410012, Faturamento Mensal 202410008, Pago 202410010 |
+| cr40f_reservadeveculos | | cr40f_status | Concluído 202410008 (demais: Cancelado 202410002, Requer Análise 100000001, Cancelado com Ressalvas 202410010, Pré-reserva 202410000, Solicitado 202410004, Confirmado 202410001, Programado 202410005, Em Execução 202410006) |
+| cr40f_reservadeveculos | | lookups | cr40f_financeiro → cr40f_financeiro; new_composicaodepreco → cr40f_composicaodeprecos; cr40f_cliente → cr40f_clientes1 |
+| cr40f_composicaodeprecos | cr40f_composicaodeprecoses | new_status | Pendente 100000000, Concluido 100000001 |
+| cr40f_composicaodeprecos | | new_valortotal (Money); cr40f_servicorelacionadogeral → reserva (NOT NULL) | |
+| cr40f_financeiro | cr40f_financeiros | cr40f_status | Aberta 202410000, Pagamento Pendente 100000001, Pagamento Parcial 202410006, Paga 202410003, Cancelada 202410004 |
+| cr40f_financeiro | | cr40f_valor (Money), cr40f_idfinanceiro | |
+| cr40f_pagantes | cr40f_paganteses | cr40f_status | Pendente 202410001, Pago 202410002, Negado 202410003, Expirado 202410004, Cancelado 202410005, Não Finalizado 202410006, Autorizado 202410007, Aguardando Facial 202410010 |
+| cr40f_pagantes | | cr40f_valor (Money, NOT NULL); cr40f_financeiro → OP | |
+
+Flows em DEV (category 5): "Flow Dar Baixa Status Pagantes -> OP" (4c6a5e89-a706-f111-8406-7ced8da8aedd, substituído pelo motor) e "Flow Dar Baixa Status OP -> Pagantes" (d0d43d01-2d43-f111-bec6-7ced8da82ee9, permanece ativo). Prefixo do publisher: cr40f. Em DEV, reservas com OP em aberto estão em "Pagamento Pendente" (202410007): por isso o motor reverte para 202410007 com OP viva e para "Pendente" (202410005) quando a OP é cancelada.
