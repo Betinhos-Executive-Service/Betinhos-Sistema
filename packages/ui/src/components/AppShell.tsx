@@ -41,6 +41,11 @@ export type AppShellProps = {
   footer?: ReactNode
   /** Permite recolher a navegação num trilho de 72px no desktop. */
   collapsible?: boolean
+  /**
+   * Telas largas (grades) abrem com a navegação recolhida no trilho. Vale só no desktop, com `collapsible` e
+   * enquanto o usuário não tiver escolhido nada: a preferência salva sempre vence e o padrão nunca é gravado.
+   */
+  defaultCollapsed?: boolean
   /** Mostra a busca de telas; por padrão aparece com mais de 12 itens. */
   searchable?: boolean
   /** Gaveta do celular aberta, controlada de fora (ex.: guardada na URL); sem isto o estado é interno. */
@@ -54,6 +59,12 @@ export type AppShellProps = {
 
 const STORAGE_KEY = 'bt-shell-collapsed'
 const DESKTOP = '(min-width: 821px)'
+
+/** Preferência salva do usuário (`'1'` recolhido, `'0'` aberto); `null` = nunca escolheu (ou sem storage). */
+function storedCollapsed() {
+  try { return localStorage.getItem(STORAGE_KEY) } catch { return null }
+}
+const isDesktop = () => typeof window !== 'undefined' && window.matchMedia(DESKTOP).matches
 const icon = (path: ReactNode, size = 20) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{path}</svg>
 )
@@ -83,14 +94,16 @@ function useMediaQuery(query: string) {
  * (grupos em acordeão, busca, rodapé) e trilho de 72px (só ícones, popover ao pousar). No celular a
  * sidebar vira gaveta e entra o cabeçalho fixo.
  */
-export function AppShell({ brand, groups, activeId, title, headerActions, status, user, footer, collapsible = true, searchable, navOpen, onNavOpenChange, search, onSearchChange, children }: AppShellProps) {
+export function AppShell({ brand, groups, activeId, title, headerActions, status, user, footer, collapsible = true, defaultCollapsed = false, searchable, navOpen, onNavOpenChange, search, onSearchChange, children }: AppShellProps) {
   const activeGroup = groups.find((group) => group.items.some((item) => item.id === activeId)) ?? null
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set(activeGroup ? [activeGroup.id] : []))
   const [drawerInternal, setDrawerInternal] = useState(false)
   const drawerOpen = navOpen ?? drawerInternal
   const setDrawerOpen = (open: boolean) => { setDrawerInternal(open); onNavOpenChange?.(open) }
   const [collapsed, setCollapsed] = useState(() => {
-    try { return collapsible && localStorage.getItem(STORAGE_KEY) === '1' } catch { return false }
+    const stored = storedCollapsed()
+    if (stored !== null) return collapsible && stored === '1'
+    return collapsible && defaultCollapsed && isDesktop()
   })
   const [queryInternal, setQueryInternal] = useState('')
   const query = search ?? queryInternal
@@ -105,6 +118,10 @@ export function AppShell({ brand, groups, activeId, title, headerActions, status
   const total = groups.reduce((sum, group) => sum + group.items.length, 0)
   const showSearch = searchable ?? total > 12
   const rail = desktop && collapsible && collapsed
+  // Entrar numa tela que pede o trilho recolhe a navegação, mas só para quem nunca escolheu; não grava nada.
+  useEffect(() => {
+    if (defaultCollapsed && collapsible && desktop && storedCollapsed() === null) setCollapsed(true)
+  }, [defaultCollapsed, collapsible, desktop])
   const headerStore = useShellHeaderStore()
   const page = useShellHeaderEntry(headerStore)
   const mobileActions = page?.actions ?? headerActions

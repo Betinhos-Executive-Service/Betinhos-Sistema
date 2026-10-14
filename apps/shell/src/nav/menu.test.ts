@@ -33,3 +33,9 @@ it('Documentos é rota React em Cadastros, logo após Funcionários', () => {
   const ids = findItem('documentos')!.group.items.map((item) => item.id)
   expect(ids.indexOf('documentos')).toBe(ids.indexOf('funcionarios') + 1)
 })
+
+it('Geral é rota React do shell no lugar da lista nativa de reservas', () => {
+  expect(findItem('geral')?.item).toMatchObject({ kind: 'page', page: 'geral', label: 'Geral' })
+  expect(findItem('geral')?.group.id).toBe('operacional')
+  expect(findItem('cr40f_reservadeveculos')).toBeNull()
+})
