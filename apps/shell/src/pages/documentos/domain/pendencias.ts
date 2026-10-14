@@ -61,7 +61,8 @@ export function montarChecklist(dono: Dono, tipos: TipoDoc[], docs: DocEmitido[]
     const doTipo = meus.filter((d) => d.tipoId === tipo.id).sort(maisRecente)
     const vigente = doTipo.find((d) => d.situacao === 'vigente') ?? null
     const historico = doTipo.filter((d) => d !== vigente)
-    if (!vigente) return { tipo, vigente, historico, estado: isObrigatorio(tipo, dono) ? 'faltando' : 'opcional', dias: null }
+    // Cadastro inativo (desligado, vendido) não cobra documento: ausente é sempre opcional.
+    if (!vigente) return { tipo, vigente, historico, estado: dono.ativo && isObrigatorio(tipo, dono) ? 'faltando' : 'opcional', dias: null }
     const { status, dias } = statusDe(vigente.validade, hoje, tipo.temValidade)
     return { tipo, vigente, historico, estado: status, dias }
   })

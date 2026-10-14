@@ -15,6 +15,8 @@ type Edicao = { id?: string; inicial: TipoInput; form: TipoInput }
 const CATEGORIAS: { value: Categoria; label: string }[] = [{ value: 'pessoas', label: 'Pessoas' }, { value: 'frota', label: 'Frota' }]
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e))
 const igual = (a: TipoInput, b: TipoInput) => JSON.stringify(a) === JSON.stringify(b)
+/** O código vira nome de pasta no SharePoint e prefixo dos arquivos. */
+const CODIGO_VALIDO = /^[A-Z0-9_-]{1,40}$/
 
 const novoTipo = (categoria: Categoria, ordem: number): TipoInput => ({ codigo: '', nome: '', categoria, temValidade: true, validadePadraoMeses: null, obrigatorioPara: [], ordem })
 const doTipo = (t: TipoDoc): TipoInput => ({ codigo: t.codigo, nome: t.nome, categoria: t.categoria, temValidade: t.temValidade, validadePadraoMeses: t.validadePadraoMeses, obrigatorioPara: [...t.obrigatorioPara], ordem: t.ordem })
@@ -24,24 +26,27 @@ export function ConfigDrawer({ source, data, onClose, onChanged }: Props) {
   const [aba, setAba] = useState<Aba>('tipos')
   const [edicao, setEdicao] = useState<Edicao | null>(null)
   const [saving, setSaving] = useState(false)
-  const [confirmar, setConfirmar] = useState(false)
+  /** O que o "Descartar" faz: fechar o drawer inteiro ou só voltar do formulário para a lista. */
+  const [confirmar, setConfirmar] = useState<'fechar' | 'voltar' | null>(null)
   const dirty = edicao != null && !igual(edicao.form, edicao.inicial)
 
-  const fechar = () => { if (saving) return; if (dirty) { setConfirmar(true); return } onClose() }
+  const fechar = () => { if (saving) return; if (dirty) { setConfirmar('fechar'); return } onClose() }
+  const voltar = () => { if (saving) return; if (dirty) { setConfirmar('voltar'); return } setEdicao(null) }
+  const descartar = () => { const acao = confirmar; setConfirmar(null); if (acao === 'voltar') setEdicao(null); else onClose() }
 
   return (
     <>
       <Drawer open onClose={fechar} size="wide" eyebrow="Documentos" title="Configurações de documentos">
         <Tabs aria-label="Configurações" value={aba} onChange={setAba} tabs={[{ value: 'tipos', label: 'Tipos de documento' }, { value: 'destinatarios', label: 'Destinatários' }]}>
           {aba === 'tipos'
-            ? <Tipos source={source} data={data} onChanged={onChanged} edicao={edicao} setEdicao={setEdicao} saving={saving} setSaving={setSaving} />
+            ? <Tipos source={source} data={data} onChanged={onChanged} edicao={edicao} setEdicao={setEdicao} saving={saving} setSaving={setSaving} onVoltar={voltar} />
             : <Destinatarios source={source} data={data} onChanged={onChanged} />}
         </Tabs>
       </Drawer>
-      <Dialog open={confirmar} onClose={() => setConfirmar(false)} title="Descartar alterações?"
+      <Dialog open={confirmar != null} onClose={() => setConfirmar(null)} title="Descartar alterações?"
         actions={<>
-          <Button variant="secondary" onClick={() => setConfirmar(false)}>Continuar editando</Button>
-          <Button variant="danger" onClick={() => { setConfirmar(false); onClose() }}>Descartar</Button>
+          <Button variant="secondary" onClick={() => setConfirmar(null)}>Continuar editando</Button>
+          <Button variant="danger" onClick={descartar}>Descartar</Button>
         </>}>
         O que foi alterado neste tipo de documento será perdido.
       </Dialog>
@@ -53,9 +58,10 @@ type TiposProps = {
   source: DocsSource; data: DocsData; onChanged: () => void
   edicao: Edicao | null; setEdicao: (e: Edicao | null | ((e: Edicao | null) => Edicao | null)) => void
   saving: boolean; setSaving: (v: boolean) => void
+  onVoltar: () => void
 }
 
-function Tipos({ source, data, onChanged, edicao, setEdicao, saving, setSaving }: TiposProps) {
+function Tipos({ source, data, onChanged, edicao, setEdicao, saving, setSaving, onVoltar }: TiposProps) {
   const toast = useToast()
   const formId = useId()
   const [erro, setErro] = useState<string | null>(null)
@@ -69,6 +75,7 @@ function Tipos({ source, data, onChanged, edicao, setEdicao, saving, setSaving }
     const { id } = edicao
     const form = { ...edicao.form, codigo: edicao.form.codigo.trim().toUpperCase(), nome: edicao.form.nome.trim() }
     if (!form.nome || !form.codigo) { setErro('Informe nome e código.'); return }
+    if (!CODIGO_VALIDO.test(form.codigo)) { setErro('Use só letras, números, - ou _ (até 40).'); return }
     if (data.tipos.some((t) => t.codigo.toUpperCase() === form.codigo && t.id !== id)) { setErro('Já existe um tipo com este código.'); return }
     setSaving(true); setErro(null)
     try { await source.salvarTipo(form, id); toast({ tone: 'success', message: 'Tipo salvo' }); setEdicao(null); onChanged() }
@@ -96,7 +103,7 @@ function Tipos({ source, data, onChanged, edicao, setEdicao, saving, setSaving }
           ))}
         </fieldset>
         <div className="doc-acoes">
-          <Button variant="secondary" disabled={saving} onClick={() => setEdicao(null)}>Voltar</Button>
+          <Button variant="secondary" disabled={saving} onClick={onVoltar}>Voltar</Button>
           <Button type="submit" loading={saving}>Salvar tipo</Button>
         </div>
       </form>

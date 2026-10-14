@@ -26,6 +26,25 @@ describe('Central de documentos', () => {
     expect((await screen.findAllByText('ABC1D23')).length).toBeGreaterThan(0)
   })
 
+  it('filtro de tipo começa em "Todos os tipos", filtra e limpa', async () => {
+    render(<DocumentosPage host={{ mode: 'mock' }} />)
+    const combo = await screen.findByRole('combobox', { name: 'Tipo de documento' })
+    expect(combo.textContent).toContain('Todos os tipos')
+    expect(combo.textContent).not.toContain('Selecione')
+    fireEvent.click(combo)
+    const opcao = await waitFor(() => {
+      const el = screen.getAllByText('ASO').map((e) => e.closest('[role="option"]')).find(Boolean)
+      if (!el) throw new Error('opção ASO não apareceu')
+      return el
+    })
+    expect(screen.queryAllByRole('option').some((o) => o.textContent === 'Todos os tipos')).toBe(false)
+    fireEvent.click(opcao)
+    await waitFor(() => expect(window.location.hash).toContain('tipo=t-aso'))
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar seleção' }))
+    await waitFor(() => expect(window.location.hash).not.toContain('tipo='))
+    expect(screen.getByRole('combobox', { name: 'Tipo de documento' }).textContent).toContain('Todos os tipos')
+  })
+
   it('Renovar abre o drawer do documento', async () => {
     render(<DocumentosPage host={{ mode: 'mock' }} />)
     const linha = (await screen.findAllByRole('row')).find((r) => /Bruno/.test(r.textContent ?? '') && /CNH/.test(r.textContent ?? ''))!

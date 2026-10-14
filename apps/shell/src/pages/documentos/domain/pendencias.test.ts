@@ -53,6 +53,12 @@ describe('pendências', () => {
     expect(itens[1].historico.map((d) => d.id)).toEqual(['aso-1'])
   })
 
+  it('checklist de cadastro inativo: documento ausente é opcional, nunca faltando', () => {
+    const caio = dono({ id: 'caio', ativo: false })
+    const itens = montarChecklist(caio, [CNH, ASO, RG], [doc({ id: 'cnh-caio', tipoId: 'cnh', donoId: 'caio', validade: '2026-10-01' })], HOJE)
+    expect(itens.map((i) => `${i.tipo.codigo}:${i.estado}`)).toEqual(['CNH:vencido', 'ASO:opcional', 'RG:opcional'])
+  })
+
   it('filtro por aba, KPI, tipo e busca sem acento', () => {
     const ana = dono({ id: 'ana', nome: 'Ana Júlia' })
     const lista = montarPendencias([CNH, RG], [ana], [doc({ tipoId: 'cnh', donoId: 'ana', validade: '2026-10-01' })], HOJE)
