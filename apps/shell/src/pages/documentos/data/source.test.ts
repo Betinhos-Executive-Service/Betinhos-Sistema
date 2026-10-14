@@ -42,6 +42,25 @@ describe('createMockDocsSource', () => {
   })
 })
 
+describe('excluirArquivo', () => {
+  it('mock: remove o arquivo da pasta e avisa o menu', async () => {
+    const dispatchEvent = vi.fn((_: Event) => true)
+    vi.stubGlobal('window', { dispatchEvent })
+    const source = createMockDocsSource('2026-10-13')
+    const data = await source.carregar()
+    const cnh = data.tipos.find((t) => t.codigo === 'CNH')!
+    const bruno = data.donos.find((d) => d.nome === 'Bruno')!
+    const doc = data.docs.find((d) => d.donoId === bruno.id && d.tipoId === cnh.id)!
+    const a = await source.enviarArquivo(doc, new File(['a'], 'a.pdf'))
+    const b = await source.enviarArquivo(doc, new File(['b'], 'b.pdf'))
+    dispatchEvent.mockClear()
+    await source.excluirArquivo(doc, a)
+    expect((await source.arquivos(doc)).map((x) => x.nome)).toEqual([b.nome])
+    expect(dispatchEvent).toHaveBeenCalledTimes(1)
+    expect(dispatchEvent.mock.calls[0][0].type).toBe(DOCUMENTOS_ALTERADOS)
+  })
+})
+
 describe('createMockDocsSource: arquivos do vigente', () => {
   it('lista só os arquivos com o prefixo do vigente; versões antigas na mesma pasta ficam de fora', async () => {
     const source = createMockDocsSource('2026-10-13')
@@ -125,6 +144,20 @@ describe('createDocsSource (Dataverse)', () => {
     expect(dispatchEvent.mock.calls[0][0].type).toBe(DOCUMENTOS_ALTERADOS)
     await source.salvarTipo({ codigo: 'X', nome: 'X', categoria: 'pessoas', temValidade: false, validadePadraoMeses: null, obrigatorioPara: [], ordem: 1 })
     expect(dispatchEvent).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('createDocsSource (Dataverse): excluirArquivo', () => {
+  it('chama o flow de exclusão do SharePoint com o dono e o arquivo e avisa o menu', async () => {
+    const { host, dispatchEvent } = hostFalso({})
+    const source = createDocsSource(host)
+    const arq = { id: 'sp-1', nome: 'CNH_2031-05-10_frente.pdf', caminho: 'Funcionarios/DEV/f-ana/Documentos/CNH/CNH_2031-05-10_frente.pdf', tamanho: 1, modificadoEm: null, mimeType: null }
+    await source.excluirArquivo(DOC({}), arq)
+    const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>
+    const corpo = JSON.parse(String((fetchMock.mock.calls.at(-1)![1] as RequestInit).body))
+    expect(corpo).toMatchObject({ fileLocator: 'sp-1', caminhoSharePoint: arq.caminho, nomeArquivo: arq.nome, tarefaId: 'f-ana' })
+    expect(dispatchEvent).toHaveBeenCalledTimes(1)
+    expect(dispatchEvent.mock.calls[0][0].type).toBe(DOCUMENTOS_ALTERADOS)
   })
 })
 
