@@ -129,3 +129,16 @@ Divergências calculadas **no cliente** a partir de reservas, CPs, OPs e pagante
 | cr40f_pagantes | | cr40f_valor (Money, NOT NULL); cr40f_financeiro → OP | |
 
 Flows em DEV (category 5): "Flow Dar Baixa Status Pagantes -> OP" (4c6a5e89-a706-f111-8406-7ced8da8aedd, substituído pelo motor) e "Flow Dar Baixa Status OP -> Pagantes" (d0d43d01-2d43-f111-bec6-7ced8da82ee9, permanece ativo). Prefixo do publisher: cr40f. Em DEV, reservas com OP em aberto estão em "Pagamento Pendente" (202410007): por isso o motor reverte para 202410007 com OP viva e para "Pendente" (202410005) quando a OP é cancelada.
+
+### 10.1 Validação `simular` em DEV (14/10/2026)
+
+DEV tem só 4 OPs, não as 10 previstas. Execução via `dotnet run --project packages/plugins/tools/Cr40f.Financeiro.Registrar -- --environmentUrl <dev> --simular <opId>` (o conector MCP não executa Custom API bound).
+
+| OP | Estado | Mudanças propostas | Coerente? |
+|---|---|---|---|
+| OP-55 | Pagamento Pendente, 1 pagante Pendente | nenhuma | sim |
+| OP-56 | Pagamento Pendente, 1 pagante Pendente | nenhuma | sim |
+| OP-58 | Pagamento Pendente, 1 pagante Pendente | nenhuma | sim |
+| OP-57 | Aberta, sem pagante | nenhuma | sim |
+
+A primeira rodada propunha "Pagamento Pendente → Aberta" nas três OPs com pagante. Isso virou regra: sem pagamento, OP com pagante ativo fica em Pagamento Pendente e sem pagante ativo fica em Aberta.
