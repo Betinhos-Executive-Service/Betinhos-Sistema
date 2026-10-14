@@ -115,4 +115,50 @@ public class SyncEngineTests
         }
         Assert.Empty(SyncEngine.Compute(op));
     }
+
+    [Fact]
+    public void TotalZeroOuDesconhecido_NaoQuita()
+    {
+        var op = Op(Codigos.OpAberta, 0, Pag(Codigos.PagPago, 5000));
+        var m = SyncEngine.Compute(op);
+        Assert.Single(m);
+        Assert.Equal(Codigos.Op, m[0].Entidade);
+        Assert.Equal(Codigos.OpParcial, m[0].Para);
+    }
+
+    [Fact]
+    public void TotalNuloComReservaSemCp_NaoQuita()
+    {
+        var op = Op(Codigos.OpAberta, null, Pag(Codigos.PagPago, 5000));
+        op.Reservas.Add(Res(Codigos.ReservaFatPagante, Codigos.CpPendente, cpCents: 5000));
+        op.Reservas.Add(new ReservaSnap { Id = Guid.NewGuid(), FatStatus = Codigos.ReservaFatPagante, CpId = null });
+        var m = SyncEngine.Compute(op);
+        Assert.Single(m);
+        Assert.Equal(Codigos.Op, m[0].Entidade);
+        Assert.Equal(Codigos.OpParcial, m[0].Para);
+    }
+
+    [Fact]
+    public void Parcial_ReservaMarcadaPeloMotorVoltaPagamentoPendente()
+    {
+        var op = Op(Codigos.OpPaga, 10000, Pag(Codigos.PagPago, 4000), Pag(Codigos.PagPendente, 6000));
+        op.Reservas.Add(Res(Codigos.ReservaFatPago, Codigos.CpConcluida, pagoPorOp: true));
+        var m = SyncEngine.Compute(op);
+        Assert.Equal(3, m.Count);
+        Assert.Contains(m, x => x.Entidade == Codigos.Op && x.Para == Codigos.OpParcial);
+        Assert.Contains(m, x => x.Entidade == Codigos.Reserva && x.Para == Codigos.ReservaFatPagamentoPendente);
+        Assert.Contains(m, x => x.Entidade == Codigos.Composicao && x.Para == Codigos.CpPendente);
+    }
+
+    [Fact]
+    public void OpCancelada_PagamentoPendenteVoltaPendente()
+    {
+        var op = Op(Codigos.OpCancelada, 10000);
+        var r = Res(Codigos.ReservaFatPagamentoPendente, Codigos.CpPendente);
+        op.Reservas.Add(r);
+        var m = SyncEngine.Compute(op);
+        Assert.Equal(2, m.Count);
+        Assert.Contains(m, x => x.Id == r.Id && x.Campo == Codigos.ReservaOpLookup && x.LimparLookup);
+        Assert.Contains(m, x => x.Id == r.Id && x.Campo == Codigos.ReservaFatStatus && x.Para == Codigos.ReservaFatPendente);
+    }
 }

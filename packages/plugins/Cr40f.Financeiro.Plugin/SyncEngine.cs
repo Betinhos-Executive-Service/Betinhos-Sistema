@@ -11,7 +11,11 @@ public static class SyncEngine
         if (op.Status == Codigos.OpCancelada)
         {
             foreach (var r in op.Reservas)
+            {
                 mudancas.Add(new Mudanca { Entidade = Codigos.Reserva, Id = r.Id, Campo = Codigos.ReservaOpLookup, LimparLookup = true, Motivo = "OP cancelada." });
+                if (r.FatStatus == Codigos.ReservaFatPagamentoPendente)
+                    Set(mudancas, Codigos.Reserva, r.Id, Codigos.ReservaFatStatus, r.FatStatus, Codigos.ReservaFatPendente, "OP cancelada.");
+            }
             Reverter(mudancas, op, Codigos.ReservaFatPendente, "OP cancelada.");
             return mudancas;
         }
@@ -19,7 +23,8 @@ public static class SyncEngine
         var pagos = ativos.Where(p => p.Status == Codigos.PagPago || p.Status == Codigos.PagAutorizado).ToList();
         var total = op.ValorCents ?? op.Reservas.Sum(r => r.CpValorCents);
         var somaPaga = pagos.Sum(p => p.ValorCents);
-        var quitada = ativos.Count > 0 && pagos.Count == ativos.Count && somaPaga >= total && total > 0;
+        var totalConhecido = op.ValorCents.HasValue || op.Reservas.All(r => r.CpId.HasValue);
+        var quitada = totalConhecido && ativos.Count > 0 && pagos.Count == ativos.Count && somaPaga >= total && total > 0;
 
         if (quitada)
         {
@@ -33,6 +38,7 @@ public static class SyncEngine
         else if (pagos.Count > 0)
         {
             Set(mudancas, Codigos.Op, op.Id, Codigos.OpStatus, op.Status, Codigos.OpParcial, "Há pagamento, mas não cobre todos os pagantes ou o total.");
+            Reverter(mudancas, op, Codigos.ReservaFatPagamentoPendente, "Pagamento deixou de cobrir a OP.");
         }
         else
         {
