@@ -32,7 +32,7 @@ describe('Indicadores', () => {
   it('mostra custo total no período (manutenção + multas + combustível), tempo médio e o custo total por mês', () => {
     render(<Indicadores data={data} today="2026-10-02" />)
     const kpi = within(screen.getByLabelText('Resumo')).getByText('Custo total no período').closest('article') as HTMLElement
-    expect(kpi.textContent).toMatch(/200,00/)
+    expect(kpi.textContent).toMatch(/R\$\s330,16/)
     expect(within(kpi).getByText('manutenção + multas + combustível')).toBeTruthy()
     expect(screen.queryByText('Custo de manutenção no período')).toBeNull()
     expect(painel('Custo total por mês').getByText(/R\$\s200,00 manut\. · R\$\s130,16 multas · R\$\s0,00 comb\./)).toBeTruthy()
