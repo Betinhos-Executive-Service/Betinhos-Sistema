@@ -41,6 +41,19 @@ describe('prompt', () => {
   ])('pede para avaliar o sinal "%s"', (trecho) => {
     expect(SYSTEM_PROMPT.toLowerCase()).toContain(trecho.toLowerCase())
   })
+  it.each([
+    ['Dado ausente (veiculo null, capacidadeTanque null, km ou litros null, histórico vazio) significa que o sinal correspondente não pode ser avaliado'],
+    ['Dado ausente nunca é motivo para "precisa_corrigir"'],
+    ['A dúvida vale para a leitura do comprovante e para evidências presentes no contexto'],
+    ['Histórico vazio significa nenhuma outra despesa no período, não é suspeita por si só'],
+    ['O mesmo id em historico.motorista e em historico.veiculo é a mesma despesa: conte uma vez só'],
+    ['Dois abastecimentos, por si sós, não são sinal de fraude'],
+    ['não cabem nos litros do segundo abastecimento considerando a km rodada desde o anterior'],
+    ['Nome fantasia x razão social, abreviações e maiúsculas/minúsculas no estabelecimento não são divergência'],
+    ['Com poucos itens no histórico não há padrão a inferir'],
+  ])('fixa a regra "%s"', (trecho) => {
+    expect(SYSTEM_PROMPT).toContain(trecho)
+  })
   it('mantém a regra de dúvida e a escolha restrita das OS', () => {
     expect(SYSTEM_PROMPT).toContain('Em qualquer dúvida, decida "precisa_corrigir"')
     expect(SYSTEM_PROMPT).toContain('somente entre as OS enviadas')
