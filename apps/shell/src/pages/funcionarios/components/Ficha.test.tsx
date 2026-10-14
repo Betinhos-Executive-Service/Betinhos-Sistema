@@ -98,11 +98,11 @@ describe('Ficha', () => {
 
   it('Esc dentro do painel de renovação não fecha a ficha', async () => {
     vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
-    window.location.hash = '#/funcionarios?ficha=f-ana&secao=documentos'
+    window.location.hash = '#/funcionarios?ficha=m1&secao=documentos'
     const onClose = vi.fn()
-    const base = fakeSource(vi.fn(async () => 'f-ana'))
-    const source: DataSource = { ...base, get: async () => structuredClone({ ...record, id: 'f-ana' }) }
-    render(<ToastProvider><Ficha source={source} id="f-ana" docs={createMockDocsSource()} onClose={onClose} onSaved={() => {}} /></ToastProvider>)
+    const base = fakeSource(vi.fn(async () => 'm1'))
+    const source: DataSource = { ...base, get: async () => structuredClone({ ...record, id: 'm1' }) }
+    render(<ToastProvider><Ficha source={source} id="m1" docs={createMockDocsSource()} onClose={onClose} onSaved={() => {}} /></ToastProvider>)
     const cnh = await screen.findByRole('listitem', { name: 'CNH' })
     fireEvent.click(within(cnh).getByRole('button', { name: 'Renovar' }))
     const painel = await screen.findByRole('dialog', { name: 'Renovar CNH' })

@@ -97,8 +97,8 @@ describe('FichaVeiculo', () => {
   it('mostra a seção Documentos quando há fonte de documentos', async () => {
     render(<ToastProvider><FichaVeiculo errors={{}} source={source} id="v1" data={data} today="2026-10-02" docs={createMockDocsSource()} onClose={() => {}} onOpen={() => {}} onReload={() => {}} /></ToastProvider>)
     expect(screen.getByRole('heading', { name: 'Documentos' })).toBeTruthy()
-    // O id v1 não está nos donos do mock de documentos; a seção aparece mesmo assim.
-    expect(await screen.findByText('Cadastro não encontrado na lista de documentos.')).toBeTruthy()
+    // O mock de documentos usa os mesmos ids do mock da Frota: o checklist do v1 aparece.
+    expect(await screen.findByRole('listitem', { name: 'CRLV / Licenciamento' })).toBeTruthy()
   })
 
   it('não mostra a seção Documentos sem fonte de documentos', () => {

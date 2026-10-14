@@ -13,16 +13,16 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 const pdf = (nome = 'cnh.pdf') => new File(['pdf'], nome, { type: 'application/pdf' })
 
-/** Mock com um arquivo já enviado na CNH vigente da Ana. */
+/** Mock com um arquivo já enviado na CNH vigente da Carlão. */
 async function comArquivoNaCnh(nome = 'cnh.pdf') {
   const source = createMockDocsSource()
   const data = await source.carregar()
-  const doc = data.docs.find((d) => d.donoId === 'f-ana' && d.tipoId === 't-cnh' && d.situacao === 'vigente')!
+  const doc = data.docs.find((d) => d.donoId === 'm1' && d.tipoId === 't-cnh' && d.situacao === 'vigente')!
   const arq = await source.enviarArquivo(doc, pdf(nome))
   return { source, doc, arq }
 }
 
-const renderChecklist = (source: DocsSource, donoId = 'f-ana') => render(<ToastProvider><Checklist source={source} donoId={donoId} /></ToastProvider>)
+const renderChecklist = (source: DocsSource, donoId = 'm1') => render(<ToastProvider><Checklist source={source} donoId={donoId} /></ToastProvider>)
 const itemCnh = () => screen.findByRole('listitem', { name: 'CNH' })
 
 describe('Checklist', () => {
@@ -75,7 +75,7 @@ describe('Checklist', () => {
 
   it('no máximo 3 listagens de arquivos ao mesmo tempo', async () => {
     const base = createMockDocsSource()
-    const extra = (tipoId: string, id: string): DocEmitido => ({ id, tipoId, donoId: 'f-ana', categoria: 'pessoas', numero: '', emissao: null, validade: null, situacao: 'vigente', pasta: '', observacao: '', ultimoMarco: null, modificadoEm: null })
+    const extra = (tipoId: string, id: string): DocEmitido => ({ id, tipoId, donoId: 'm1', categoria: 'pessoas', numero: '', emissao: null, validade: null, situacao: 'vigente', pasta: '', observacao: '', ultimoMarco: null, modificadoEm: null })
     let ativas = 0
     let pico = 0
     let chamadas = 0
