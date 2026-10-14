@@ -35,7 +35,7 @@ describe('Frota', () => {
     renderFrota(source)
     expect(screen.getByRole('status', { name: '' })).toBeTruthy()
     await act(async () => {
-      resolver({ data: { ...EMPTY_DATA, veiculos: [{ id: 'v1', placa: 'TST1A11', marca: null, modelo: null, cor: null, anoModelo: null, status: VEICULO.ATIVO, categoria: null, motorista: null }] }, errors: {} })
+      resolver({ data: { ...EMPTY_DATA, veiculos: [{ id: 'v1', placa: 'TST1A11', marca: null, modelo: null, cor: null, anoModelo: null, status: VEICULO.ATIVO, categoria: null, motorista: null, hodometro: null, hodometroEm: null }] }, errors: {} })
     })
     fireEvent.click(screen.getByRole('tab', { name: 'Veículos' }))
     fireEvent.click(await screen.findByText('TST1A11'))
@@ -50,7 +50,7 @@ describe('Frota', () => {
 
   it('guarda aba e ficha na URL; a aba padrão não aparece', async () => {
     const source = fakeSource('xrm', 'DEV')
-    source.load = vi.fn(async () => ({ data: { ...EMPTY_DATA, veiculos: [{ id: 'v1', placa: 'TST1A11', marca: null, modelo: null, cor: null, anoModelo: null, status: VEICULO.ATIVO, categoria: null, motorista: null }] }, errors: {} }))
+    source.load = vi.fn(async () => ({ data: { ...EMPTY_DATA, veiculos: [{ id: 'v1', placa: 'TST1A11', marca: null, modelo: null, cor: null, anoModelo: null, status: VEICULO.ATIVO, categoria: null, motorista: null, hodometro: null, hodometroEm: null }] }, errors: {} }))
     history.replaceState(null, '', '#/frota?aba=veiculos&q=TST')
     renderFrota(source)
     expect(screen.getByRole('tab', { name: 'Veículos' }).getAttribute('aria-selected')).toBe('true')
