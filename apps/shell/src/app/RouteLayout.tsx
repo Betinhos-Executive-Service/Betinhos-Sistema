@@ -50,7 +50,7 @@ export function RouteLayout({ host, group, item, label }: Props) {
     // Cada tela é um chunk próprio; enquanto ele chega, o cabeçalho da página já aparece com Skeleton.
     return (
       <RouteErrorBoundary key={item.id} title={label}>
-        <Suspense fallback={<PageFallback eyebrow={group?.label} title={label} />}>
+        <Suspense fallback={<PageFallback title={label} />}>
           <LazyPage page={item.page} host={host} />
         </Suspense>
       </RouteErrorBoundary>
