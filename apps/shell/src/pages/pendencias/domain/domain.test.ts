@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { CP, FAT, OP, PAG } from './codes'
 import { detectarPendencias } from './detect'
+import { BUILTIN_VIEWS, EMPTY_FILTERS, VIEWS_KEY, filterPendencias, loadViews, matchView, newView, viewFilters } from './filters'
+import { pendenciasQuery } from './query'
 import type { OpResumo, PaganteResumo, Reserva } from './types'
 
 const op = (id: string, status: number, valor: number | null = 1000): OpResumo => ({ id, codigo: `OP-${id}`, status, valor, cliente: 'AGC' })
@@ -53,5 +55,41 @@ describe('detectarPendencias', () => {
 
   it('ignora reservas informativas sem evento de dinheiro', () => {
     expect(detectarPendencias([op('1', OP.pendente)], [res('a', '1', FAT.pagante)], [pag('1', PAG.pendente, 1000)])).toEqual([])
+  })
+})
+
+describe('filterPendencias', () => {
+  const base = detectarPendencias(
+    [op('1', OP.paga), op('2', OP.cancelada)],
+    [res('a', '1', FAT.pagante), res('b', '2', FAT.pago)],
+    [pag('1', PAG.pago, 1000)],
+  )
+  it('filtra por tipo', () => {
+    expect(filterPendencias(base, { ...EMPTY_FILTERS, tipos: ['op-sem-pagamento-reserva-paga'] }).map((p) => p.opId)).toEqual(['2'])
+  })
+  it('busca por OP, OS e cliente sem acento nem caixa', () => {
+    expect(filterPendencias(base, { ...EMPTY_FILTERS, q: 'op-1' }).map((p) => p.opId)).toEqual(['1'])
+    expect(filterPendencias(base, { ...EMPTY_FILTERS, q: 'agc' })).toHaveLength(2)
+  })
+  it('visão "Corrigíveis" mostra só tipos 1 e 3', () => {
+    const v = BUILTIN_VIEWS.find((x) => x.id === 'corrigiveis')!
+    expect(filterPendencias(base, viewFilters(v)).every((p) => p.corrigivel)).toBe(true)
+  })
+  it('visões salvas: casa por filtros, descarta inválidas e usa a chave própria', () => {
+    expect(VIEWS_KEY).toBe('betinhos.pendencias.visoes.v1')
+    expect(matchView(BUILTIN_VIEWS, { periodo: '90', tipos: ['rateio-nao-fecha'] })?.id).toBe('rateio')
+    const kv = new Map<string, string>()
+    kv.set(VIEWS_KEY, JSON.stringify({ views: [{ id: 'a', nome: 'Boa', filters: { periodo: '30', tipos: ['rateio-nao-fecha'] } }, { id: 'b', nome: 'Ruim', filters: { periodo: '7' } }, { id: 'c', nome: 'Tipo', filters: { tipos: ['x'] } }], last: 'a' }))
+    expect(loadViews({ getItem: (k) => kv.get(k) ?? null, setItem: () => undefined, removeItem: () => undefined }).views.map((v) => v.nome)).toEqual(['Boa'])
+    expect(viewFilters(newView('Minha', { ...EMPTY_FILTERS, q: 'x', periodo: '30' }), 'abc')).toMatchObject({ q: 'abc', periodo: '30', tipos: [] })
+  })
+})
+
+describe('pendenciasQuery', () => {
+  it('lê e grava q, periodo e tipos', () => {
+    const f = pendenciasQuery.ler(new URLSearchParams('q=agc&periodo=30&tipos=rateio-nao-fecha,lixo'))
+    expect(f).toEqual({ q: 'agc', periodo: '30', tipos: ['rateio-nao-fecha'] })
+    expect(pendenciasQuery.gravar(EMPTY_FILTERS)).toEqual({ q: null, periodo: null, tipos: null })
+    expect(pendenciasQuery.gravar(f)).toEqual({ q: 'agc', periodo: '30', tipos: 'rateio-nao-fecha' })
   })
 })
