@@ -27,6 +27,26 @@ describe('useAgente', () => {
     expect(result.current.propostas[0]?.titulo).toBe('OS-9999 sem recibo')
     vi.useRealTimers()
   })
+  it('depois de analisar, o polling não recarrega a execução anterior e termina na nova', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const source = createSource({ mode: 'mock' })
+    // criar demora mais que um intervalo de polling: é a janela em que `atual` ainda é a execução concluída anterior.
+    const criarOriginal = source.criar
+    vi.spyOn(source, 'criar').mockImplementation(async (agente, pergunta) => { await new Promise((r) => setTimeout(r, 3500)); return criarOriginal(agente, pergunta) })
+    const buscar = vi.spyOn(source, 'buscar')
+    const propostas = vi.spyOn(source, 'propostas')
+    const { result } = renderHook(() => useAgente(source, 'financeiro'))
+    await waitFor(() => expect(result.current.atual?.id).toBe('mock-exec-fin-1'))
+    propostas.mockClear()
+    act(() => { void result.current.analisar('') })
+    for (let i = 0; i < 4; i++) await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
+    await waitFor(() => expect(result.current.atual?.status).toBe('concluida'))
+    expect(result.current.atual?.id).toMatch(/^mock-exec-novo-/)
+    expect(result.current.polling).toBe(false)
+    expect(buscar.mock.calls.filter(([id]) => id === 'mock-exec-fin-1')).toHaveLength(0)
+    expect(propostas.mock.calls.filter(([id]) => id === 'mock-exec-fin-1')).toHaveLength(0)
+    vi.useRealTimers()
+  })
   it('reaproveita execução em andamento em vez de criar outra', async () => {
     const source = createSource({ mode: 'mock' })
     const criar = vi.spyOn(source, 'criar')

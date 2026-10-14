@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { descreverAcao, gravacaoDaAcao } from './acoes'
 import { AGENTES, agentePorId } from './agentes'
 import type { Proposta } from './types'
+import { mapProposta } from '../data/queries'
 
 const base: Proposta = { id: 'p1', execucaoId: 'e1', tipo: 'ServicoSemMotorista', titulo: 'OS-11 sem motorista', justificativa: 'Saída 09:30.', prioridade: 'alta', entidadeAlvo: 'cr40f_reservadeveculos', idAlvo: 'r2', acao: { tipo: 'AtribuirMotorista', campos: { motoristaId: 'm1', motoristaNome: 'João' } }, decisao: 'pendente', motivoDescarte: '', decididoPor: '', decididoEm: null }
 
@@ -28,5 +29,21 @@ describe('agentes', () => {
     expect(AGENTES.map((a) => a.id)).toEqual(['financeiro', 'logistica', 'pessoas'])
     expect(agentePorId('logistica')?.rodaAoAbrirAposMin).toBe(30)
     expect(agentePorId('financeiro')?.rodaAoAbrirAposMin).toBeNull()
+  })
+})
+
+describe('cr40f_acao', () => {
+  const linha = (acao: unknown) => mapProposta({ cr40f_agentepropostaid: 'p9', cr40f_titulo: 'X', cr40f_acao: typeof acao === 'string' ? acao : JSON.stringify(acao) })
+  it('aceita o formato do flow e normaliza campos ausentes', () => {
+    expect(linha({ tipo: 'CriarPendencia', campos: { titulo: 'T', descricao: null } }).acao).toEqual({ tipo: 'CriarPendencia', campos: { titulo: 'T', descricao: null } })
+    expect(linha({ tipo: 'CriarPendencia' }).acao).toEqual({ tipo: 'CriarPendencia', campos: {} })
+  })
+  it('JSON malformado, tipo desconhecido ou campos inválidos viram ação nula sem lançar', () => {
+    for (const bruto of ['{nao é json', 'null', '"texto"', { tipo: 'ApagarTudo', campos: {} }, { campos: {} }, { tipo: 'AtribuirMotorista', campos: 'x' }, { tipo: 'AtribuirMotorista', campos: [] }]) {
+      const p = linha(bruto)
+      expect(p.acao).toBeNull()
+      expect(descreverAcao(p)).toBe('Só registrar a decisão; nada será gravado no registro.')
+      expect(gravacaoDaAcao(p)).toBeNull()
+    }
   })
 })
