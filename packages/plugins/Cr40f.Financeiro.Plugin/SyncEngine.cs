@@ -42,7 +42,10 @@ public static class SyncEngine
         }
         else
         {
-            Set(mudancas, Codigos.Op, op.Id, Codigos.OpStatus, op.Status, Codigos.OpAberta, "Nenhum pagante ativo pago.");
+            if (ativos.Count > 0)
+                Set(mudancas, Codigos.Op, op.Id, Codigos.OpStatus, op.Status, Codigos.OpPendente, "Pagantes gerados, nenhum pago.");
+            else
+                Set(mudancas, Codigos.Op, op.Id, Codigos.OpStatus, op.Status, Codigos.OpAberta, "Nenhum pagante ativo.");
             Reverter(mudancas, op, Codigos.ReservaFatPagamentoPendente, "OP sem pagamento.");
         }
         return mudancas;

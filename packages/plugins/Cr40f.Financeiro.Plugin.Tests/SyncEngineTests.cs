@@ -79,7 +79,7 @@ public class SyncEngineTests
     [Fact]
     public void NenhumPago_ReservaInformativa_NaoMexe()
     {
-        var op = Op(Codigos.OpAberta, 10000, Pag(Codigos.PagPendente, 10000));
+        var op = Op(Codigos.OpPendente, 10000, Pag(Codigos.PagPendente, 10000));
         op.Reservas.Add(Res(Codigos.ReservaFatPagante, Codigos.CpPendente));
         Assert.Empty(SyncEngine.Compute(op));
     }
@@ -160,5 +160,25 @@ public class SyncEngineTests
         Assert.Equal(2, m.Count);
         Assert.Contains(m, x => x.Id == r.Id && x.Campo == Codigos.ReservaOpLookup && x.LimparLookup);
         Assert.Contains(m, x => x.Id == r.Id && x.Campo == Codigos.ReservaFatStatus && x.Para == Codigos.ReservaFatPendente);
+    }
+
+    [Fact]
+    public void PagantesPendentes_OpAbertaViraPagamentoPendente()
+    {
+        var op = Op(Codigos.OpAberta, 10000, Pag(Codigos.PagPendente, 10000));
+        var m = SyncEngine.Compute(op);
+        Assert.Single(m);
+        Assert.Equal(Codigos.Op, m[0].Entidade);
+        Assert.Equal(Codigos.OpPendente, m[0].Para);
+    }
+
+    [Fact]
+    public void SemPagantesAtivos_OpPendenteViraAberta()
+    {
+        var op = Op(Codigos.OpPendente, 10000, Pag(Codigos.PagCancelado, 10000));
+        var m = SyncEngine.Compute(op);
+        Assert.Single(m);
+        Assert.Equal(Codigos.Op, m[0].Entidade);
+        Assert.Equal(Codigos.OpAberta, m[0].Para);
     }
 }
