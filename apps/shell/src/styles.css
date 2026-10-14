@@ -5,10 +5,6 @@
 /* Página do shell */
 .page { max-width: var(--bt-layout-content-max); margin: 0 auto; padding: 22px 26px var(--bt-space-8); }
 .page__header { margin-bottom: var(--bt-space-3); }
-/* Barra de filtros (DS §10.2.2) logo abaixo do header: mesmo respiro de 12 px da barra utilitária antes do conteúdo. */
-.page > .bt-page-toolbar--filters { margin-bottom: var(--bt-space-3); }
-/* O grupo de filtros ocupa a linha: sem isso ele encolhe até o conteúdo e a busca flexível empurra os selects para a linha de baixo. */
-.page > .bt-page-toolbar--filters .bt-page-toolbar__start { flex: 1 1 auto; }
 
 .surface { background-color: var(--bt-surface-background); border: var(--bt-border-width-default) solid var(--bt-surface-border); border-radius: var(--bt-surface-radius); box-shadow: var(--bt-surface-shadow); }
 
