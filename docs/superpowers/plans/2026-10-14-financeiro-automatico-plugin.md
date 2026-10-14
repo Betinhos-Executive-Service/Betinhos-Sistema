@@ -57,11 +57,11 @@
   - `cr40f_financeiro`: entity set; `cr40f_status` (confirmar 202410000 Aberta, 100000001 Pendente, 202410006 Parcial, 202410003 Paga, 202410004 Cancelada), `cr40f_valor` (Money), `cr40f_idfinanceiro`.
   - `cr40f_pagantes`: entity set; `cr40f_status` (202410001 Pendente, 202410002 Pago, 202410005 Cancelado, 202410007 Autorizado), `cr40f_valor` (Money), lookup `cr40f_financeiro`.
   - Prefixo de publisher da solução `appbetinhos` (esperado `cr40f`) e `customizationprefix`.
-  - Flow "Pagantes → OP": nome exato em `workflows` (`$filter=category eq 5 and contains(name,'Pagante')`), para o Task 10.
+  - Flows (conferidos 14/10 em DEV): "Flow Dar Baixa Status Pagantes -> OP" (id 4c6a5e89-a706-f111-8406-7ced8da8aedd) é o substituído; "Flow Dar Baixa Status OP -> Pagantes" (id d0d43d01-2d43-f111-bec6-7ced8da82ee9) **permanece ativo** (trata marcação manual da OP).
 
 - [ ] **Step 2: Se faltar qualquer item** (ex.: `cr40f_statusdefaturamento` sem valor "Pendente"), PARAR e reportar ao Renan com as opções reais; não inventar nome nem valor.
 
-- [ ] **Step 3: Escrever `Codigos.cs` com os valores conferidos** (substituir `/*CONFERIR*/` pelos valores reais do Step 1):
+- [ ] **Step 3: Escrever `Codigos.cs` com os valores conferidos** (valores abaixo já conferidos em DEV em 14/10/2026 pelo controlador; copiar verbatim):
 
 ```csharp
 namespace Cr40f.Financeiro.Plugin;
@@ -89,8 +89,9 @@ public static class Codigos
     public const int OpAberta = 202410000, OpPendente = 100000001, OpParcial = 202410006, OpPaga = 202410003, OpCancelada = 202410004;
     public const int PagPendente = 202410001, PagPago = 202410002, PagCancelado = 202410005, PagAutorizado = 202410007;
     public const int ReservaFatPago = 202410010, ReservaFatPagante = 202410006, ReservaFatMensal = 202410008;
-    public const int ReservaFatPendente = /*CONFERIR*/ 0;
-    public const int CpPendente = /*CONFERIR*/ 100000000, CpConcluida = /*CONFERIR*/ 100000001;
+    /// <summary>Sem OP (OP cancelada/desvinculada): "Pendente". Com OP ainda viva mas sem pagamento: "Pagamento Pendente" (é o que a Geral grava ao criar OP).</summary>
+    public const int ReservaFatPendente = 202410005, ReservaFatPagamentoPendente = 202410007;
+    public const int CpPendente = 100000000, CpConcluida = 100000001;
 }
 ```
 
@@ -397,7 +398,7 @@ git commit -m "financeiro: motor de sincronização marca OP, reservas e composi
         op.Reservas.Add(Res(Codigos.ReservaFatPago, Codigos.CpConcluida, pagoPorOp: true));
         var m = SyncEngine.Compute(op);
         Assert.Contains(m, x => x.Entidade == Codigos.Op && x.Para == Codigos.OpAberta);
-        Assert.Contains(m, x => x.Entidade == Codigos.Reserva && x.Para == Codigos.ReservaFatPendente);
+        Assert.Contains(m, x => x.Entidade == Codigos.Reserva && x.Para == Codigos.ReservaFatPagamentoPendente);
         Assert.Contains(m, x => x.Entidade == Codigos.Composicao && x.Para == Codigos.CpPendente);
     }
 
@@ -439,17 +440,17 @@ Expected: 4 falhas novas (parcial e aberta ainda não implementados).
         else
         {
             Set(mudancas, Codigos.Op, op.Id, Codigos.OpStatus, op.Status, Codigos.OpAberta, "Nenhum pagante ativo pago.");
-            Reverter(mudancas, op, "OP sem pagamento.");
+            Reverter(mudancas, op, Codigos.ReservaFatPagamentoPendente, "OP sem pagamento.");
         }
         return mudancas;
     }
 
-    /// <summary>Desfaz só o que este motor marcou (PagoPorEstaOp); CP acompanha a reserva.</summary>
-    internal static void Reverter(List<Mudanca> list, OpSnapshot op, string motivo)
+    /// <summary>Desfaz só o que este motor marcou (PagoPorEstaOp); CP acompanha a reserva. `alvo` = status de faturamento de destino.</summary>
+    internal static void Reverter(List<Mudanca> list, OpSnapshot op, int alvo, string motivo)
     {
         foreach (var r in op.Reservas.Where(r => r.PagoPorEstaOp && r.FatStatus == Codigos.ReservaFatPago))
         {
-            Set(list, Codigos.Reserva, r.Id, Codigos.ReservaFatStatus, r.FatStatus, Codigos.ReservaFatPendente, motivo);
+            Set(list, Codigos.Reserva, r.Id, Codigos.ReservaFatStatus, r.FatStatus, alvo, motivo);
             if (r.CpId is { } cp) Set(list, Codigos.Composicao, cp, Codigos.CpStatus, r.CpStatus, Codigos.CpPendente, motivo);
         }
     }
@@ -525,7 +526,7 @@ Expected: `OpCancelada_...` falha (retorna vazio).
         {
             foreach (var r in op.Reservas)
                 mudancas.Add(new Mudanca { Entidade = Codigos.Reserva, Id = r.Id, Campo = Codigos.ReservaOpLookup, LimparLookup = true, Motivo = "OP cancelada." });
-            Reverter(mudancas, op, "OP cancelada.");
+            Reverter(mudancas, op, Codigos.ReservaFatPendente, "OP cancelada.");
             return mudancas;
         }
 ```
@@ -1030,7 +1031,15 @@ public sealed class FinanceiroStepPlugin : IPlugin
         if (context.Depth > 1 && (context.SharedVariables.Contains(SincronizarFinanceiroPlugin.SharedFlag) || context.ParentContext?.SharedVariables.Contains(SincronizarFinanceiroPlugin.SharedFlag) == true)) return;
         if (context.MessageName != "Update" || context.InputParameters["Target"] is not Entity target) return;
 
-        Guid? opId = target.LogicalName == Codigos.Op ? target.Id : null;
+        Guid? opId = null;
+        if (target.LogicalName == Codigos.Op)
+        {
+            // Ruling 14/10: em OP só o cancelamento propaga (desvincular reservas). Outros status da OP são derivados dos pagantes;
+            // marcação manual de OP continua sendo tratada pelo flow "Flow Dar Baixa Status OP -> Pagantes" (assíncrono), que então aciona o step de Pagante.
+            var novo = target.GetAttributeValue<OptionSetValue>(Codigos.OpStatus)?.Value;
+            if (novo != Codigos.OpCancelada) return;
+            opId = target.Id;
+        }
         if (target.LogicalName == Codigos.Pagante)
         {
             var service0 = factory.CreateOrganizationService(null);
@@ -1114,7 +1123,7 @@ git commit -m "financeiro: step pós-Update em Pagante e OP aciona o motor em mo
 
 - [ ] **Step 1: Comparar** em DEV, nas 10 OPs do Task 8, o status atual da OP (resultado do flow) com o status que o motor calcula em `simular`. Divergência = caso novo: escrever teste no motor antes de prosseguir.
 
-- [ ] **Step 2: Desativar o flow** "Pagantes → OP" em DEV pelo Power Automate (nome confirmado no Task 0). Não excluir. Em PROD não mexer.
+- [ ] **Step 2: Desativar o flow** "Flow Dar Baixa Status Pagantes -> OP" em DEV pelo Power Automate. Não excluir. Manter ativo "Flow Dar Baixa Status OP -> Pagantes". Em PROD não mexer.
 
 - [ ] **Step 3: Repetir o Step 5 do Task 9** com o flow desligado e confirmar que o resultado é o mesmo.
 
