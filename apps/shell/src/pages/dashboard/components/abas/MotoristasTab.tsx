@@ -3,6 +3,7 @@ import { Button, SegmentedControl, StatusBadge, Table, type TableColumn } from '
 import { useMedia } from '../../../operacional/useMedia'
 import { LinhaChart } from '../../charts/Charts'
 import { calcularMotoristas, type CnhVencendo, type LinhaRankingMotorista, type LinhaScoreMotorista, type Motoristas } from '../../domain/abas/motoristas'
+import { JANELA_DIAS } from '../../../documentos/domain/vencimento'
 import { idDetalheMotorista } from '../../domain/detalhes'
 import { brl, brlS, dec, int } from '../../domain/format'
 import type { Reserva } from '../../domain/types'
@@ -55,7 +56,7 @@ function MotoristasAba({ ctx, dados, periodo, frota, onFrota }: DadosAba & Props
       <KpiCard rotulo={KPIS[0]} tom="brand" valor={mo.kpis.total == null ? null : int(mo.kpis.total)} />
       <KpiCard
         rotulo={KPIS[1]} tom="warning" valor={mo.kpis.cnhAtencao == null ? null : int(mo.kpis.cnhAtencao)}
-        apoio={mo.kpis.cnhAtencao ? [{ rotulo: 'Validade', texto: 'vencida ou em até 90 dias', atencao: true }] : []} acao={verCnh}
+        apoio={mo.kpis.cnhAtencao ? [{ rotulo: 'Validade', texto: `vencida ou em até ${JANELA_DIAS} dias`, atencao: true }] : []} acao={verCnh}
       />
       <KpiCard
         rotulo={KPIS[2]} tom="success" valor={mo.kpis.score == null ? null : nota(mo.kpis.score.media)}
@@ -167,7 +168,7 @@ function RankingCard({ mo, rv, periodo, frota, onFrota }: { mo: Motoristas; rv: 
   )
 }
 
-/** CNH vencida ou vencendo em até 90 dias, da mais antiga para a mais nova; prazo sempre em texto. */
+/** CNH vencida ou vencendo em até 60 dias (JANELA_DIAS), da mais antiga para a mais nova; prazo sempre em texto. */
 function CnhCard({ itens, periodo }: { itens: CnhVencendo[]; periodo: string }) {
   const selo = (c: CnhVencendo) => (c.dias < 0
     ? <StatusBadge tone="danger" dot>{`Vencida há ${dias(-c.dias)}`}</StatusBadge>
@@ -175,7 +176,7 @@ function CnhCard({ itens, periodo }: { itens: CnhVencendo[]; periodo: string }) 
   return (
     <AnaliseCard
       titulo="CNH vencendo" periodo={periodo} unidade="validade da CNH" natural
-      valor={int(itens.length)} sub="Vencidas ou com validade em até 90 dias"
+      valor={int(itens.length)} sub={`Vencidas ou com validade em até ${JANELA_DIAS} dias`}
       tabela={itens.length ? (
         <ul className="dash-lista" aria-label="CNH vencendo">
           {itens.map((c) => (
