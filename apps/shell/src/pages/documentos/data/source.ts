@@ -23,6 +23,7 @@ export type DocsSource = {
   abrirArquivo(arq: Arquivo): Promise<{ nome: string; blob: Blob }>
   salvarDocumento(input: SalvarDocInput): Promise<SalvarDocResult>
   enviarArquivo(doc: DocEmitido, file: File): Promise<Arquivo>
+  excluirArquivo(doc: DocEmitido, arq: Arquivo): Promise<void>
   salvarTipo(tipo: TipoInput, id?: string): Promise<string>
   adicionarDestinatario(categoria: Categoria, funcionarioId: string, nome: string): Promise<string>
   removerDestinatario(id: string): Promise<void>
@@ -89,6 +90,12 @@ export function createMockDocsSource(hoje = todaySP()): DocsSource {
       const arq = guardar(doc, file, nomeArquivo(codigoDoDoc(doc, data.tipos), doc.validade ?? doc.emissao, file.name))
       avisarAlteracao()
       return arq
+    },
+    async excluirArquivo(doc, arq) {
+      await wait(150)
+      arquivos.set(pastaDe(doc), (arquivos.get(pastaDe(doc)) ?? []).filter((a) => a.id !== arq.id))
+      blobs.delete(arq.id)
+      avisarAlteracao()
     },
     async salvarTipo(tipo, id) {
       await wait(200)
@@ -158,6 +165,7 @@ export function createDocsSource(host: Host): DocsSource {
       }, input))
     },
     enviarArquivo: async (doc, file) => comAviso(enviar(doc, file, nomeArquivo(codigoDoDoc(doc, cache?.tipos ?? null), doc.validade ?? doc.emissao, file.name))),
+    excluirArquivo: (doc, arq) => comAviso(sp[doc.categoria].excluir(doc.donoId, arq)),
     async salvarTipo(tipo, id) {
       const s = await entitySets()
       if (id) { await comAviso(host.client.update(s.tipo, id, tipoPayload(tipo))); return id }
