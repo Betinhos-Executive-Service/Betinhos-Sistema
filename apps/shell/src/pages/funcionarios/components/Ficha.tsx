@@ -210,7 +210,12 @@ export function Ficha({ source, docs, id, onClose, onSaved }: Props) {
 
           {!loading && original && tab === 'documentos' && (
             <div className="docs">
-              {docs ? <Checklist source={docs} donoId={original.id} /> : null}
+              {docs ? (
+                // O painel de renovação é um <dialog> nativo dentro desta ficha: o Esc dele não pode subir e fechar a ficha.
+                <div style={{ display: 'contents' }} onKeyDown={(event) => { if (event.key === 'Escape' && (event.target as HTMLElement).closest('dialog')) event.stopPropagation() }}>
+                  <Checklist source={docs} donoId={original.id} />
+                </div>
+              ) : null}
               {docs ? <h3 className="doc-checklist__title">Outros arquivos</h3> : null}
               <DocumentosArquivos source={source} id={original.id} />
               <div className="images">
