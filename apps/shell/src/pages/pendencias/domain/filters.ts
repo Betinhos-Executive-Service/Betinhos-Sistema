@@ -13,7 +13,7 @@ const TIPO_VALUES = new Set<string>(TIPOS)
 
 export const hasFilters = (f: Filters) => Boolean(f.q.trim()) || f.periodo !== EMPTY_FILTERS.periodo || f.tipos.length > 0
 
-const haystack = (p: Pendencia) => normalizeSearch([p.opCodigo, p.cliente, p.detalhe, TIPO_LABEL[p.tipo]].filter(Boolean).join(' '))
+const haystack = (p: Pendencia) => normalizeSearch([p.opCodigo, ...p.reservaCodigos, p.cliente, p.detalhe, TIPO_LABEL[p.tipo]].filter(Boolean).join(' '))
 
 export function filterPendencias(list: Pendencia[], f: Filters) {
   const words = normalizeSearch(f.q).split(/\s+/).filter(Boolean)

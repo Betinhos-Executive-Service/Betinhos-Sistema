@@ -58,6 +58,22 @@ describe('detectarPendencias', () => {
   })
 })
 
+describe('correções da revisão', () => {
+  it('tipo 2: ids distintos e valor da CP de cada reserva', () => {
+    const p = detectarPendencias([op('1', OP.parcial)], [res('a', '1', FAT.pago), res('b', '1', FAT.pago)], [pag('1', PAG.pago, 400), pag('1', PAG.pendente, 600)])
+    const t2 = p.filter((x) => x.tipo === 'pago-sem-op-paga')
+    expect(t2.map((x) => x.id).sort()).toEqual(['pago-sem-op-paga:a', 'pago-sem-op-paga:b'])
+    expect(t2.map((x) => x.valor)).toEqual([1000, 1000])
+  })
+  it('busca por código da OS', () => {
+    const p = detectarPendencias([op('1', OP.paga), op('2', OP.paga)], [res('a', '1', FAT.pagante), res('b', '2', FAT.pagante)], [pag('1', PAG.pago, 1000), pag('2', PAG.pago, 1000)])
+    expect(filterPendencias(p, { ...EMPTY_FILTERS, q: 'os-a' }).map((x) => x.opId)).toEqual(['1'])
+  })
+  it('tipo 5 compara em centavos', () => {
+    expect(detectarPendencias([op('1', OP.pendente, 0.3)], [res('a', '1', FAT.pagamentoPendente)], [pag('1', PAG.pendente, 0.1), pag('1', PAG.pendente, 0.2)])).toEqual([])
+  })
+})
+
 describe('filterPendencias', () => {
   const base = detectarPendencias(
     [op('1', OP.paga), op('2', OP.cancelada)],

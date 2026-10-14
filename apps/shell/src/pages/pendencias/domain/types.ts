@@ -14,6 +14,7 @@ export type Pendencia = {
   opId: string | null
   opCodigo: string
   reservaIds: string[]
+  reservaCodigos: string[]
   cliente: string
   data: Date | null          // saída mais recente das reservas envolvidas
   valor: number | null       // valor da OP, ou soma das CPs
