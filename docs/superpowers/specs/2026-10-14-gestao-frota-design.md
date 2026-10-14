@@ -25,49 +25,49 @@ Fora do escopo: vistorias, status operacional ao vivo (posição/ignição), e-m
 
 1. Núcleo: preventiva primeiro (A), custo total em seguida (B), ambos dentro de `#/frota`.
 2. Km atual vem do Infleet sincronizado para `cr40f_veiculos` (flow), com fallback para o maior `cr40f_kmatual` das manutenções do veículo, marcado como estimado. O shell nunca chama a Infleet.
-3. Plano preventivo é um só, padrão da frota (tabela `new_itemplanopreventivo`), aplicado a todo veículo Ativo e Próprio. Sem plano por veículo.
-4. Última execução de um item deriva das manutenções Realizadas que contêm o serviço; não há tabela de histórico. `new_baselinepreventiva` cobre apenas itens sem manutenção registrada.
+3. Plano preventivo é um só, padrão da frota (tabela `cr40f_itemplanopreventivo`), aplicado a todo veículo Ativo e Próprio. Sem plano por veículo.
+4. Última execução de um item deriva das manutenções Realizadas que contêm o serviço; não há tabela de histórico. `cr40f_baselinepreventiva` cobre apenas itens sem manutenção registrada.
 5. Lembrete: pendência tipo `preventiva` em `#/frota` e KPI na aba Frota do Dashboard. Sem e-mail nesta entrega; quando a central de avisos de Documentos (Entrega 2) existir, a preventiva entra como categoria.
 6. Combustível por veículo vem das despesas operacionais categoria "Abastecimento". A estimativa Infleet (`new_custocombustivelconsumido`) não entra.
 7. Despesas da categoria "Manutenção" não somam ao custo (evita dupla contagem com `cr40f_manutencoes`); as sem `_cr40f_manutencao_value` viram aviso na ficha.
 8. Regra de aviso padrão por item: a vencer com ≤ 1.000 km ou ≤ 30 dias; vencido quando passou km ou data; vence pelo que chegar primeiro.
 
-## 4. Schema (DEV; `pnpm push` cria, inclui na solução e publica)
+## 4. Schema (DEV; criado por `packages/deploy/provision-frota-preventiva.ps1`, no molde do `provision-documentos.ps1` da branch de Documentos; prefixo `cr40f_` do publisher da solução, como em Documentos)
 
 ### 4.1 `cr40f_veiculos` (colunas novas)
 
 | Coluna | Tipo | Uso |
 | --- | --- | --- |
-| `new_hodometro` | Whole number (km) | odômetro lido na Infleet |
-| `new_hodometroem` | DateTime | instante da leitura |
+| `cr40f_hodometro` | Whole number (km) | odômetro lido na Infleet |
+| `cr40f_hodometroem` | DateTime | instante da leitura |
 
-### 4.2 `new_itemplanopreventivo` (nova, escopo organização)
+### 4.2 `cr40f_itemplanopreventivo` (nova, escopo organização)
 
 | Coluna | Tipo | Regra |
 | --- | --- | --- |
-| `new_name` | Texto (primária) | nome exibido, ex.: "Troca de óleo" |
-| `new_servico` | Choice, single | mesmos valores do catálogo `new_servicosmanutencao` |
-| `new_intervalokm` | Whole number | opcional |
-| `new_intervalomeses` | Whole number | opcional; ao menos um dos dois intervalos obrigatório (validação no shell) |
-| `new_avisokm` | Whole number | padrão 1000 |
-| `new_avisodias` | Whole number | padrão 30 |
+| `cr40f_name` | Texto (primária) | nome exibido, ex.: "Troca de óleo" |
+| `cr40f_servico` | Choice, single | mesmos valores do catálogo `new_servicosmanutencao` |
+| `cr40f_intervalokm` | Whole number | opcional |
+| `cr40f_intervalomeses` | Whole number | opcional; ao menos um dos dois intervalos obrigatório (validação no shell) |
+| `cr40f_avisokm` | Whole number | padrão 1000 |
+| `cr40f_avisodias` | Whole number | padrão 30 |
 | `statecode`/`statuscode` | padrão | inativar em vez de excluir |
 
-### 4.3 `new_baselinepreventiva` (nova, escopo organização)
+### 4.3 `cr40f_baselinepreventiva` (nova, escopo organização)
 
 | Coluna | Tipo | Regra |
 | --- | --- | --- |
-| `new_name` | Texto (primária) | "placa · item", gerado pelo shell |
-| `new_veiculo` | Lookup `cr40f_veiculos` | obrigatório |
-| `new_item` | Lookup `new_itemplanopreventivo` | obrigatório |
-| `new_km` | Whole number | km da última execução conhecida |
-| `new_data` | DateOnly | data da última execução conhecida |
+| `cr40f_name` | Texto (primária) | "placa · item", gerado pelo shell |
+| `cr40f_veiculo` | Lookup `cr40f_veiculos` | obrigatório |
+| `cr40f_item` | Lookup `cr40f_itemplanopreventivo` | obrigatório |
+| `cr40f_km` | Whole number | km da última execução conhecida |
+| `cr40f_data` | DateOnly | data da última execução conhecida |
 
 Uma linha por veículo × item (o shell faz upsert: procura antes de criar).
 
 ### 4.4 Flow Infleet → hodômetro
 
-Editar o flow existente de sincronização Infleet (fora do repo) para gravar `new_hodometro` e `new_hodometroem` em cada sync, usando `odometer` e `location.fixTime` de `detalhes_veiculo`, casando por `new_infleetvehicleid`. Se o Renan preferir flow separado, muda só este item do plano. Nomes lógicos reais devem ser confirmados por `describe` antes dos mappers.
+Editar o flow existente de sincronização Infleet (fora do repo) para gravar `cr40f_hodometro` e `cr40f_hodometroem` em cada sync, usando `odometer` e `location.fixTime` de `detalhes_veiculo`, casando por `new_infleetvehicleid`. Se o Renan preferir flow separado, muda só este item do plano. Nomes lógicos reais devem ser confirmados por `describe` antes dos mappers.
 
 ## 5. Domínio
 
@@ -75,8 +75,8 @@ Editar o flow existente de sincronização Infleet (fora do repo) para gravar `n
 
 Entrada: veículos, manutenções, itens do plano, baselines, hoje. Para cada veículo com `status = Ativo` e `categoria = Próprio` × item ativo:
 
-- **Última execução:** manutenção `Realizado` mais recente do veículo cujo `servicos` inclui `new_servico`; usa `km` e `dataManutencao`. Sem nenhuma, usa o baseline; sem baseline, estado `sem_base`.
-- **Km atual:** `new_hodometro` se existir; senão maior `cr40f_kmatual` entre as manutenções do veículo (`kmEstimado: true`). Sem nenhum, aplica só a regra por tempo.
+- **Última execução:** manutenção `Realizado` mais recente do veículo cujo `servicos` inclui `cr40f_servico`; usa `km` e `dataManutencao`. Sem nenhuma, usa o baseline; sem baseline, estado `sem_base`.
+- **Km atual:** `cr40f_hodometro` se existir; senão maior `cr40f_kmatual` entre as manutenções do veículo (`kmEstimado: true`). Sem nenhum, aplica só a regra por tempo.
 - **Próxima:** `kmProxima = últimoKm + intervaloKm` (se houver intervalo km); `dataProxima = últimaData + intervaloMeses` (se houver intervalo meses). `faltamKm = kmProxima − kmAtual`; `faltamDias = dataProxima − hoje`.
 - **Estado:** `vencido` se `faltamKm < 0` ou `faltamDias < 0`; `a_vencer` se `faltamKm ≤ avisoKm` ou `faltamDias ≤ avisoDias`; senão `em_dia`.
 - **Em andamento:** se existe manutenção `Solicitado`, `Aprovado` ou `Programado` do veículo contendo o serviço, o item não gera pendência (`emAndamento: true`), mas continua na ficha.
@@ -118,14 +118,14 @@ Indicadores: `custoPorVeiculo(...)` (lista ordenável com total, R$/km e maior f
 
 - `FrotaData` ganha `planoPreventivo: ItemPlano[]`, `baselines: Baseline[]`, `despesasCombustivel: DespesaCombustivel[]`, `telemetriaKm: TelemetriaKm[]`; `TABLE`, `mappers`, `mock` e `source` acompanham.
 - Despesas: `cr40f_despesaoperacional` filtrado no servidor por categoria "Abastecimento" (resolver o id da categoria por nome uma vez) e `cr40f_datagasto` nos últimos 12 meses; `$select` só `cr40f_valor`, `cr40f_datagasto`, `_cr40f_veiculo_value`, `_cr40f_manutencao_value`, `_cr40f_categoria_value`. Também traz categoria "Manutenção" sem vínculo só para o aviso.
-- Telemetria: `new_telemetriadiariainfleet` com `new_data`, `_new_veiculo_value`, `new_distanciapercorridakm`, últimos 12 meses (mesma consulta do Dashboard).
-- Escritas (via `DataSource`): criar/editar/inativar item do plano; upsert de baseline. Privilégio checado como em `RegistroDrawer`.
+- Telemetria: `new_telemetriadiariainfleet` com `cr40f_data`, `_new_veiculo_value`, `new_distanciapercorridakm`, últimos 12 meses (mesma consulta do Dashboard).
+- Escritas (via `DataSource`): criar/editar/inativar item do plano; upsert de baseline. Sem checagem prévia de privilégio; o erro do Dataverse vira toast, como nas demais escritas do módulo.
 - `ViewGate` por aba: aba Plano exige só `planoPreventivo`; ficha não bloqueia por despesas ou telemetria (fonte marcada `indisponivel`, `custoPorKm = null`).
 - Mock cobre os quatro estados da preventiva, item em andamento, veículo sem hodômetro (estimado) e veículo sem telemetria.
 
 ## 7. UI (segue `DESIGN_SYSTEM.md`; só componentes e classes já usados em `#/frota`)
 
-- **Aba "Plano preventivo"** (`?aba=plano`): tabela neutra `#FCFCFB` com Item, Serviço, Intervalo (km / meses), Aviso, Ativo. "Novo item" abre `Drawer` com nome, serviço (Select do catálogo), km, meses, aviso km/dias; inativar no mesmo drawer. Botões de escrita só com privilégio.
+- **Aba "Plano preventivo"** (`?aba=plano`): tabela neutra `#FCFCFB` com Item, Serviço, Intervalo (km / meses), Aviso, Ativo. "Novo item" abre `Drawer` com nome, serviço (Select do catálogo), km, meses, aviso km/dias; inativar no mesmo drawer. Sem checagem prévia de privilégio (mesma convenção do módulo): o erro do Dataverse aparece em toast.
 - **Ficha do veículo**, seção "Preventivas" antes da linha do tempo: um item por linha com badge de estado (cor + texto: Vencido/erro, A vencer/aviso, Em dia/sucesso, Sem base/neutro, "Em andamento" como texto secundário), "faltam 850 km · 12 dias", última execução com link para a manutenção. `sem_base` mostra "Informar última execução" (drawer km + data → baseline). Linha "Hodômetro: 175.233 km · lido em 14/10 10:37" ou "km estimado pela última manutenção".
 - **Ficha, seção "Custo total"** substitui "Custo de manutenção": KPI total e R$/km, quatro linhas por fonte (qtd, valor, "indisponível" quando a consulta falhou), aviso de despesas de manutenção sem vínculo. Classes `frota-kpi` e `frota-muted`; sem gráfico novo.
 - **Pendências:** grupo "Preventivas" com os mesmos cartões; badge da aba soma.
