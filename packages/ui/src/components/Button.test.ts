@@ -11,8 +11,8 @@ it('combina variante, tamanho, largura total, ícone e classe extra', () => {
 })
 
 it('rótulo usa line-height da escala do DS (line-height 1 cortava o acento de "Últimos")', async () => {
-  // Sem @types/node no monorepo; o Vitest roda em Node e devolve '' para .css (até com ?raw).
-  // @ts-expect-error módulo sem tipos
+  // @types/node pode ou não estar no programa (vem como peer do vite); o Vitest roda em Node e devolve '' para .css (até com ?raw).
+  // @ts-ignore módulo pode estar sem tipos
   const { readFileSync } = await import('node:fs')
   const css: string = readFileSync(new URL('./button.css', import.meta.url), 'utf8')
   expect(css).not.toMatch(/\.bt-button\s*\{[^}]*line-height:\s*1\s*;/)
