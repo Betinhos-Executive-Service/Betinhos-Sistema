@@ -1,3 +1,5 @@
 export * from './tipos.ts'
 export { RESPOSTA_SCHEMA } from './schema.ts'
 export { analisarMensagem, MAX_PROPOSTAS, type MensagemApi, type Resultado } from './validar.ts'
+export { REGRAS_COMUNS, PREFIXO_USUARIO, montarTextoUsuario } from './comum.ts'
+export { SYSTEM_FINANCEIRO, montarContextoFinanceiro, type ContextoFinanceiro, type DadosFinanceiro } from './financeiro.ts'
