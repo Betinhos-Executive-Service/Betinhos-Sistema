@@ -62,7 +62,30 @@ $apiBaseUrl = "$environmentBaseUrl/api/data/v9.2"
 $resourcePath = Join-Path $appRoot "dist\webresource.html"
 if (-not (Test-Path -LiteralPath $resourcePath)) { throw "WebResource nao encontrado: $resourcePath. Rode o build antes." }
 
-$targets = @(@{ Name = $ResourceName; Display = $DisplayName; Path = $resourcePath; Type = 1 })
+$targets = @()
+# Code splitting: os chunks JS (dist/webresource-assets.json, gerado pelo inline-webresource) entram antes do HTML.
+# Nome com hash: chunk igual ao da publicacao anterior so e reenviado com o mesmo conteudo; chunks antigos ficam no ambiente.
+$resourceHtml = [IO.File]::ReadAllText($resourcePath, [Text.Encoding]::UTF8)
+$chunkManifestPath = Join-Path $appRoot "dist\webresource-assets.json"
+$chunkNames = @()
+if (Test-Path -LiteralPath $chunkManifestPath) {
+  $chunkPrefix = ($ResourceName -replace '\.html$', '') + "/assets/"
+  # Em variavel: no PowerShell 5.1 o ConvertFrom-Json devolve o array inteiro como um item so do pipeline.
+  $chunkList = [IO.File]::ReadAllText($chunkManifestPath, [Text.Encoding]::UTF8) | ConvertFrom-Json
+  foreach ($chunk in $chunkList) {
+    if (-not $chunk.name.StartsWith($chunkPrefix, [StringComparison]::Ordinal)) { throw "Chunk $($chunk.name) fora do prefixo $chunkPrefix. Deploy abortado." }
+    if ($chunk.name -notmatch '^[A-Za-z0-9_]+(/[A-Za-z0-9.]+)+\.js$') { throw "Nome de chunk invalido para WebResource: $($chunk.name)." }
+    $chunkPath = Join-Path $appRoot ("dist\" + $chunk.file.Replace("/", "\"))
+    if (-not (Test-Path -LiteralPath $chunkPath)) { throw "Chunk ausente no build: $chunkPath. Deploy abortado." }
+    $chunkNames += $chunk.name
+    $targets += @{ Name = $chunk.name; Display = "$DisplayName - $($chunk.file)"; Path = $chunkPath; Type = 3 }
+  }
+  if ($chunkNames.Count -eq 0) { throw "webresource-assets.json sem chunks. Rode o build de novo." }
+  foreach ($reference in [regex]::Matches($resourceHtml, '"/WebResources/([^"]+\.js)"')) {
+    if ($chunkNames -notcontains $reference.Groups[1].Value) { throw "webresource.html referencia $($reference.Groups[1].Value), que nao esta em webresource-assets.json. Rode o build de novo." }
+  }
+}
+$targets += @{ Name = $ResourceName; Display = $DisplayName; Path = $resourcePath; Type = 1 }
 if ($LoaderName) {
   $template = [IO.File]::ReadAllText((Join-Path $PSScriptRoot "loader.template.html"), [Text.Encoding]::UTF8)
   $loaderPath = Join-Path $appRoot "dist\loader.html"
