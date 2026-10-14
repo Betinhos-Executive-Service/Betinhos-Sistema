@@ -9,3 +9,5 @@ dist/
 *.log
 !.env.example
 out/
+
+packages/agentes-ia/.local/
