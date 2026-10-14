@@ -7,10 +7,13 @@ using Microsoft.Xrm.Sdk.Query;
 
 var options = Arguments.Parse(args);
 var environmentUrl = options.Require("environmentUrl");
-var dllPath = options.Require("dllPath");
-var solutionUniqueName = options.Require("solutionUniqueName");
+// Modo de validacao: --simular <opId> (ou --aplicar <opId>) chama a Custom API bound e imprime o ResponseJson.
+var simularId = options.Optional("simular");
+var aplicarId = options.Optional("aplicar");
+var dllPath = simularId is null && aplicarId is null ? options.Require("dllPath") : "";
+var solutionUniqueName = options.Optional("solutionUniqueName") ?? "appbetinhos";
 var publish = options.Has("publish");
-if (!File.Exists(dllPath))
+if (dllPath.Length > 0 && !File.Exists(dllPath))
 {
     throw new FileNotFoundException("DLL do plugin nao encontrada.", dllPath);
 }
@@ -29,6 +32,20 @@ using var service = new ServiceClient(connectionString);
 if (!service.IsReady)
 {
     throw new InvalidOperationException($"Falha ao conectar no Dataverse. {service.LastError}");
+}
+
+if (simularId is not null || aplicarId is not null)
+{
+    var opId = Guid.Parse(simularId ?? aplicarId!);
+    var modo = simularId is not null ? "simular" : "aplicar";
+    var request = new OrganizationRequest("cr40f_SincronizarFinanceiro")
+    {
+        ["Target"] = new EntityReference("cr40f_financeiro", opId),
+        ["cr40f_RequestJson"] = "{\"modo\":\"" + modo + "\",\"origem\":\"manual\"}",
+    };
+    var response = service.Execute(request);
+    Console.WriteLine(response["cr40f_ResponseJson"]);
+    return;
 }
 
 var assemblyInfo = AssemblyInfo.Read(dllPath);
