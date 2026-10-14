@@ -15,7 +15,7 @@ Três assistentes internos no Sistema Betinhos, um por departamento, que leem o 
 | Autonomia | Só sugere. Aprovar executa a ação com a sessão do usuário logado. |
 | Hospedagem | Power Automate (gatilho Dataverse + HTTP premium) chamando a API da Anthropic. Mesmo padrão de `Flow Despesas | Análise IA`. |
 | Modelo | `claude-opus-5-5`, `output_config.effort: medium`, structured output. Troca por Sonnet 5.5 só por avaliação offline, não por preço. |
-| Segredos | Variáveis de ambiente do Dataverse (`new_AnthropicApiKey`, chave do Infleet). O repositório é público: só nomes e scripts, nunca valores. |
+| Segredos | Variável de ambiente do Dataverse (`new_AnthropicApiKey`). O repositório é público: só nomes e scripts, nunca valores. |
 | Legado | Tabelas `cr40f_*ia*`, `cr40f_decisaooperacionalia`, `cr40f_contextooperacionalia`, `cr40f_filaagendamentoclaude`, `cr40f_solicitacaoiaagendamento` e Custom APIs `cr40f_AI*` não são usadas. |
 | Ambiente | Só DEV (`org23b93544`). PROD exige pedido explícito. |
 
@@ -30,13 +30,15 @@ Três assistentes internos no Sistema Betinhos, um por departamento, que leem o 
 ### Financeiro
 - Roda às 07:00 (dias úteis) e sob demanda. Janela: últimos 60 dias.
 - Lê `cr40f_financeiro`, `cr40f_recibos`, `cr40f_pagamentoaterceiro`, `cr40f_reservadeveculos`.
-- Propostas: `SemRecibo`, `FaturaVencendo`, `FaturaVencida`, `RepasseDivergente`, `OSSemCobranca`.
+- Propostas: `SemRecibo` (OS concluída sem `cr40f_recibos`), `OPPendenteAntiga` (OP em Pagamento Pendente ou Parcial há mais de 15 dias), `RepasseAguardando` (pagamento a terceiro aguardando há mais de 7 dias), `MargemNegativa` (pagamento a terceiro com `cr40f_margemtotal` negativa), `OSSemCobranca` (OS concluída sem OP vinculada).
 - Ação ao Aprovar: `CriarPendencia` (cria `cr40f_plannertarefa`). Nunca altera valores.
+- Fora da v1: vencimento de fatura (a tabela `cr40f_financeiro` não tem data de vencimento; entra quando houver).
 
 ### Logística
 - Roda ao abrir a página se a última execução tiver mais de 30 min, e sob demanda. Janela: hoje + 2 dias.
-- Lê `cr40f_reservadeveculos`, `cr40f_funcionarios` (motoristas), `cr40f_veiculos`, `cr40f_trocasdecarro` e posição atual dos veículos no Infleet.
-- Propostas: `ServicoSemMotorista`, `ServicoSemVeiculo`, `ConflitoHorario`, `RiscoAtraso`, `CarroForaDaBase`.
+- Lê `cr40f_reservadeveculos`, `cr40f_funcionarios` (motoristas ativos, com `cr40f_veiculoatual`), `cr40f_trocasdecarro`.
+- Propostas: `ServicoSemMotorista`, `ServicoSemVeiculo`, `ConflitoHorario`, `MotoristaSemVeiculoAtual`.
+- Fora da v1: `RiscoAtraso` e `CarroForaDaBase` dependem da posição Infleet em tempo real; entram quando a posição estiver sincronizada no Dataverse (sem chamada HTTP ao Infleet no flow).
 - Ações ao Aprovar: `AtribuirMotorista`, `AtribuirVeiculo` (update em `cr40f_reservadeveculos`).
 
 ### Pessoas (RH e gestão de pessoas)
