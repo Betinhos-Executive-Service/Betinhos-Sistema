@@ -14,12 +14,15 @@
 #
 # Antes de alterar o flow existente, salva o clientdata em packages/deploy/flows/backup/. Para reverter:
 #   powershell -File packages/deploy/provision-flow-despesas-ia.ps1 -Restaurar <arquivo de backup>
+# Enquanto a variável não tiver valor, o Power Automate não aceita gravar alterações neste flow. Para conferir a definição
+# sem gravar (checkFlowErrors): powershell -File packages/deploy/provision-flow-despesas-ia.ps1 -SomenteValidar
 # Requer `az login` com acesso ao DEV.
-param([string] $Restaurar = '')
+param([string] $Restaurar = '', [switch] $SomenteValidar)
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $environmentUrl = 'https://org23b93544.crm2.dynamics.com'
+$environmentId = '25a2ab78-cf07-ee41-a124-457aa2c29aea'
 $solutionName = 'AppBetinhos'
 $flowName = 'Flow Despesas | Análise IA'
 $envVarName = 'new_AnthropicApiKey'
@@ -163,22 +166,37 @@ $definitionText = @'
   "actions": {
     "Iniciar_motivo_erro": { "type": "InitializeVariable", "runAfter": {}, "inputs": { "variables": [ { "name": "Motivo_erro", "type": "string", "value": "" } ] } },
     "Iniciar_conteudo": { "type": "InitializeVariable", "runAfter": { "Iniciar_motivo_erro": ["Succeeded"] }, "inputs": { "variables": [ { "name": "Conteudo_mensagem", "type": "array", "value": [] } ] } },
-    "Marcar_processando": {
-      "type": "OpenApiConnection", "runAfter": { "Iniciar_conteudo": ["Succeeded"] },
-      "inputs": {
-        "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps", "connectionName": "shared_commondataserviceforapps", "operationId": "UpdateRecord" },
-        "parameters": { "entityName": "cr40f_despesaoperacionals", "recordId": "@triggerOutputs()?['body/cr40f_despesaoperacionalid']", "item/cr40f_iastatusanalise": 100000001 },
-        "authentication": "@parameters('$authentication')"
-      }
-    },
     "Escopo_analise": {
-      "type": "Scope", "runAfter": { "Marcar_processando": ["Succeeded"] },
+      "type": "Scope", "runAfter": { "Iniciar_conteudo": ["Succeeded"] },
       "actions": {
-        "Dia_do_gasto": { "type": "Compose", "runAfter": {}, "inputs": "@convertTimeZone(triggerOutputs()?['body/cr40f_datagasto'], 'UTC', 'E. South America Standard Time', 'yyyy-MM-dd')" },
+        "Marcar_processando": {
+          "type": "OpenApiConnection", "runAfter": {},
+          "inputs": {
+            "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps", "connectionName": "shared_commondataserviceforapps", "operationId": "UpdateRecord" },
+            "parameters": { "entityName": "cr40f_despesaoperacionals", "recordId": "@triggerOutputs()?['body/cr40f_despesaoperacionalid']", "item/cr40f_iastatusanalise": 100000001 },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Dia_do_gasto": { "type": "Compose", "runAfter": { "Marcar_processando": ["Succeeded"] }, "inputs": "@convertTimeZone(triggerOutputs()?['body/cr40f_datagasto'], 'UTC', 'E. South America Standard Time', 'yyyy-MM-dd')" },
         "Tipos_por_extensao": { "type": "Compose", "runAfter": { "Dia_do_gasto": ["Succeeded"] }, "inputs": { "jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp", "gif": "image/gif", "pdf": "application/pdf" } },
         "Decisoes_validas": { "type": "Compose", "runAfter": { "Tipos_por_extensao": ["Succeeded"] }, "inputs": "__DECISOES__" },
+        "Status_reserva": { "type": "Compose", "runAfter": { "Decisoes_validas": ["Succeeded"] }, "inputs": "__STATUS_RESERVA__" },
+        "Despesa_nomes": {
+          "type": "OpenApiConnection", "runAfter": { "Status_reserva": ["Succeeded"] },
+          "inputs": {
+            "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps", "connectionName": "shared_commondataserviceforapps", "operationId": "ListRecords" },
+            "parameters": {
+              "entityName": "cr40f_despesaoperacionals",
+              "$select": "cr40f_despesaoperacionalid",
+              "$filter": "cr40f_despesaoperacionalid eq @{triggerOutputs()?['body/cr40f_despesaoperacionalid']}",
+              "$expand": "cr40f_Categoria($select=cr40f_nome),cr40f_FormaPagamento($select=cr40f_nome)",
+              "$top": 1
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
         "Comprovantes": {
-          "type": "OpenApiConnection", "runAfter": { "Decisoes_validas": ["Succeeded"] },
+          "type": "OpenApiConnection", "runAfter": { "Despesa_nomes": ["Succeeded"] },
           "inputs": {
             "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps", "connectionName": "shared_commondataserviceforapps", "operationId": "ListRecords" },
             "parameters": {
@@ -205,8 +223,16 @@ $definitionText = @'
           "foreach": "@outputs('Comprovantes')?['body/value']",
           "runtimeConfiguration": { "concurrency": { "repetitions": 1 } },
           "actions": {
-            "Fora_do_sharepoint": {
+            "Erro_anterior": {
               "type": "If", "runAfter": {},
+              "expression": { "and": [ { "equals": [ "@empty(variables('Motivo_erro'))", false ] } ] },
+              "actions": {
+                "Falhar_erro_anterior": { "type": "Compose", "runAfter": {}, "inputs": "@int(variables('Motivo_erro'))" }
+              },
+              "else": { "actions": {} }
+            },
+            "Fora_do_sharepoint": {
+              "type": "If", "runAfter": { "Erro_anterior": ["Succeeded"] },
               "expression": { "and": [ { "equals": [ "@or(empty(trim(coalesce(items('Arquivos')?['cr40f_driveitemid'], ''))), contains(toLower(concat(coalesce(items('Arquivos')?['cr40f_urlsharepoint'], ''), ' ', coalesce(items('Arquivos')?['cr40f_sharelink'], ''))), 'betinhos-my'))", true ] } ] },
               "actions": {
                 "Motivo_fora_sharepoint": { "type": "SetVariable", "runAfter": {}, "inputs": { "name": "Motivo_erro", "value": "Comprovante fora do SharePoint." } },
@@ -274,7 +300,7 @@ $definitionText = @'
               "entityName": "cr40f_reservadeveculoses",
               "$select": "cr40f_reservadeveculosid,cr40f_dataehorriodesada,cr40f_status,_cr40f_cliente_value",
               "$filter": "_cr40f_motorista_value eq @{coalesce(triggerOutputs()?['body/_cr40f_motorista_value'], '00000000-0000-0000-0000-000000000000')} and cr40f_dataehorriodesada ge @{convertToUtc(concat(outputs('Dia_do_gasto'), 'T00:00:00'), 'E. South America Standard Time')} and cr40f_dataehorriodesada lt @{addDays(convertToUtc(concat(outputs('Dia_do_gasto'), 'T00:00:00'), 'E. South America Standard Time'), 1)}",
-              "$orderby": "cr40f_dataehorriodesada asc",
+              "$expand": "cr40f_Cliente($select=cr40f_nomedocliente)",
               "$top": 50
             },
             "authentication": "@parameters('$authentication')"
@@ -285,8 +311,8 @@ $definitionText = @'
           "inputs": { "from": "@outputs('Reservas')?['body/value']", "select": {
             "id": "@item()?['cr40f_reservadeveculosid']",
             "saida": "@item()?['cr40f_dataehorriodesada']",
-            "cliente": "@coalesce(item()?['_cr40f_cliente_value@OData.Community.Display.V1.FormattedValue'], '')",
-            "status": "@coalesce(item()?['cr40f_status@OData.Community.Display.V1.FormattedValue'], '')"
+            "cliente": "@coalesce(item()?['cr40f_Cliente']?['cr40f_nomedocliente'], '')",
+            "status": "@coalesce(outputs('Status_reserva')?[string(item()?['cr40f_status'])], '')"
           } }
         },
         "Ids_reservas": { "type": "Select", "runAfter": { "Reservas_contexto": ["Succeeded"] }, "inputs": { "from": "@outputs('Reservas')?['body/value']", "select": "@item()?['cr40f_reservadeveculosid']" } },
@@ -334,8 +360,8 @@ $definitionText = @'
               "id": "@triggerOutputs()?['body/cr40f_despesaoperacionalid']",
               "valor": "@triggerOutputs()?['body/cr40f_valor']",
               "dataGasto": "@outputs('Dia_do_gasto')",
-              "categoria": "@coalesce(triggerOutputs()?['body/_cr40f_categoria_value@OData.Community.Display.V1.FormattedValue'], '')",
-              "formaPagamento": "@coalesce(triggerOutputs()?['body/_cr40f_formapagamento_value@OData.Community.Display.V1.FormattedValue'], '')",
+              "categoria": "@coalesce(first(outputs('Despesa_nomes')?['body/value'])?['cr40f_Categoria']?['cr40f_nome'], '')",
+              "formaPagamento": "@coalesce(first(outputs('Despesa_nomes')?['body/value'])?['cr40f_FormaPagamento']?['cr40f_nome'], '')",
               "estabelecimento": "@triggerOutputs()?['body/cr40f_estabelecimento']",
               "litros": "@triggerOutputs()?['body/cr40f_litros']",
               "km": "@triggerOutputs()?['body/cr40f_kminformado']",
@@ -344,7 +370,7 @@ $definitionText = @'
             "reservas": "@body('Reservas_contexto')",
             "duplicatas": "@body('Duplicatas_contexto')",
             "referencia": {
-              "categoria": "@coalesce(triggerOutputs()?['body/_cr40f_categoria_value@OData.Community.Display.V1.FormattedValue'], '')",
+              "categoria": "@coalesce(first(outputs('Despesa_nomes')?['body/value'])?['cr40f_Categoria']?['cr40f_nome'], '')",
               "mediana": "@first(skip(outputs('Ordenados'), div(length(outputs('Ordenados')), 2)))",
               "maximo": "@last(outputs('Ordenados'))",
               "amostras": "@length(outputs('Ordenados'))"
@@ -547,6 +573,21 @@ $escopo = $definition.actions.Escopo_analise.actions
 # Constantes entram como valores JSON (sem concatenação de texto), então aspas e quebras de linha ficam escapadas pelo serializador.
 $escopo.Decisoes_validas.inputs = @($const.schema.properties.decisao.enum)
 $escopo.Campos_ausentes.inputs.from = @($const.schema.required)
+# O gatilho do Dataverse não traz FormattedValue de lookup (conferido em execuções do DEV): os nomes vêm por $expand e o
+# rótulo do status da OS por este mapa, lido da metadata (valor -> rótulo em pt-BR).
+$statusMeta = Dv GET "EntityDefinitions(LogicalName='cr40f_reservadeveculos')/Attributes(LogicalName='cr40f_status')/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?`$select=LogicalName&`$expand=OptionSet(`$select=Options)"
+$statusMapa = [ordered]@{}
+foreach ($o in @($statusMeta.OptionSet.Options)) {
+  $rotulo = @($o.Label.LocalizedLabels | Where-Object { $_.LanguageCode -eq 1046 } | ForEach-Object { $_.Label })[0]
+  if (-not $rotulo) { $rotulo = $o.Label.UserLocalizedLabel.Label }
+  if ($rotulo.Contains('@')) { throw "Rótulo de status com @: $rotulo" }
+  $statusMapa["$($o.Value)"] = $rotulo
+}
+if (-not $statusMapa.Count) { throw 'Opções de cr40f_status da reserva não encontradas.' }
+$escopo.Status_reserva.inputs = [pscustomobject]$statusMapa
+# Dia_do_gasto converte de UTC para São Paulo: só vale se cr40f_datagasto for UserLocal (gravado em UTC).
+$comportamento = (Dv GET "EntityDefinitions(LogicalName='cr40f_despesaoperacional')/Attributes(LogicalName='cr40f_datagasto')/Microsoft.Dynamics.CRM.DateTimeAttributeMetadata?`$select=DateTimeBehavior").DateTimeBehavior.Value
+if ($comportamento -ne 'UserLocal') { throw "cr40f_datagasto agora é $comportamento; revise Dia_do_gasto antes de gravar." }
 $escopo.Texto_usuario.inputs.value.text = $const.prefixoUsuario + "@{string(outputs('Contexto'))}"
 $body = $escopo.Chamar_Claude.inputs.body
 $body.model = $const.modelo
@@ -565,13 +606,57 @@ AssertSemMojibake $definitionJson 'definição do script'
 if ($definitionJson -match '__[A-Z_]+__') { throw "Marcador não substituído na definição: $($Matches[0])" }
 $clientData = @{ properties = @{ definition = $definition; connectionReferences = @{ shared_commondataserviceforapps = $dataverse; shared_sharepointonline = $sharepoint } }; schemaVersion = '1.0.0.0' } | ConvertTo-Json -Depth 90 -Compress
 
+# Conferências da definição: rodam sobre o que foi lido de volta do DEV (e, em -SomenteValidar, sobre a definição montada).
+function Conferir($lido, [string] $texto) {
+  $trigger = $lido.triggers.Quando_comprovante_completo
+  $http = $lido.actions.Escopo_analise.actions.Chamar_Claude
+  $erro = $lido.actions.Tratar_erro
+  $checks = [ordered]@{
+    'gatilho com filtro' = $trigger.inputs.parameters.'subscriptionRequest/filterexpression' -eq $triggerFilter
+    'gatilho só por cr40f_statusanexo' = $trigger.inputs.parameters.'subscriptionRequest/filteringattributes' -eq 'cr40f_statusanexo'
+    'concurrency.runs = 1' = $trigger.runtimeConfiguration.concurrency.runs -eq 1
+    'Chamar_Claude secureData inputs e outputs' = (@($http.runtimeConfiguration.secureData.properties) -join ',') -eq 'inputs,outputs'
+    'Chamar_Claude retry exponencial 2x' = $http.inputs.retryPolicy.type -eq 'exponential' -and $http.inputs.retryPolicy.count -eq 2
+    'Chamar_Claude timeout PT110S' = $http.limit.timeout -eq 'PT110S'
+    'Chamar_Claude chave pela variável' = $http.inputs.headers.'x-api-key' -eq "@parameters('$paramKey')"
+    'Chamar_Claude constantes' = $http.inputs.body.model -eq $const.modelo -and $http.inputs.body.max_tokens -eq $const.maxTokens -and $http.inputs.body.system -ceq $const.systemPrompt -and (($http.inputs.body.output_config.format.schema | ConvertTo-Json -Depth 30 -Compress) -ceq ($const.schema | ConvertTo-Json -Depth 30 -Compress))
+    'Tratar_erro após Failed/TimedOut' = (@($erro.runAfter.Escopo_analise) -join ',') -eq 'Failed,TimedOut'
+    'Tratar_erro não grava cr40f_statusoperacional' = -not (($erro | ConvertTo-Json -Depth 30 -Compress) -match 'cr40f_statusoperacional')
+    'Tratar_erro grava Erro (100000003)' = $erro.actions.Gravar_erro.inputs.parameters.'item/cr40f_iastatusanalise' -eq 100000003
+    'gatilho message 4 e scope 4' = $trigger.inputs.parameters.'subscriptionRequest/message' -eq 4 -and $trigger.inputs.parameters.'subscriptionRequest/scope' -eq 4
+    'Marcar_processando dentro do escopo' = $null -ne $lido.actions.Escopo_analise.actions.Marcar_processando -and -not ($lido.actions.PSObject.Properties.Name -contains 'Marcar_processando')
+    'Arquivos para no primeiro erro' = $null -ne $lido.actions.Escopo_analise.actions.Arquivos.actions.Erro_anterior -and (@($lido.actions.Escopo_analise.actions.Arquivos.actions.Fora_do_sharepoint.runAfter.Erro_anterior) -join ',') -eq 'Succeeded'
+    'sem FormattedValue de gatilho' = -not ($texto -match 'FormattedValue')
+  }
+  $falhas = @($checks.Keys | Where-Object { -not $checks[$_] })
+  if ($falhas.Count) { throw "Conferência falhou: $($falhas -join '; ')" }
+  $checks.Keys | ForEach-Object { Write-Host "[despesas-ia] ok: $_" }
+}
+
 $flows = @(FlowRows)
 if ($flows.Count -gt 1) { throw 'Flow duplicado no DEV.' }
+if ($SomenteValidar) {
+  # Validação do Power Automate (checkFlowErrors) sobre a definição montada, sem gravar nada.
+  if (-not $flows.Count) { throw 'Flow ainda não existe no DEV; não há o que validar.' }
+  $flowToken = & az account get-access-token --resource https://service.flow.microsoft.com/ --query accessToken -o tsv
+  if (-not $flowToken) { throw 'Token do Power Automate indisponível.' }
+  $flowApi = "https://api.flow.microsoft.com/providers/Microsoft.ProcessSimple/environments/$environmentId/flows/$($flows[0].workflowid)"
+  $props = (Invoke-RestMethod -Uri "$flowApi`?api-version=2016-11-01&`$expand=properties.definition,properties.connectionreferences" -Headers @{ Authorization = "Bearer $flowToken" }).properties
+  $props.definition = $definition
+  $check = [Text.Encoding]::UTF8.GetBytes((@{ properties = $props } | ConvertTo-Json -Depth 90 -Compress))
+  $r = Invoke-WebRequest -Method POST -Uri "$flowApi/checkFlowErrors?api-version=2016-11-01" -Headers @{ Authorization = "Bearer $flowToken" } -ContentType 'application/json; charset=utf-8' -Body $check -UseBasicParsing
+  $erros = [Text.Encoding]::UTF8.GetString($r.RawContentStream.ToArray())
+  Write-Output "checkFlowErrors: $erros"
+  if ($erros.Trim() -ne '[]') { throw 'A definição montada tem erros.' }
+  Conferir $definition $definitionJson
+  return
+}
 if ($flows.Count) {
   $flowId = $flows[0].workflowid
   AssertSemMojibake $flows[0].clientdata 'clientdata atual'
   $atual = ($flows[0].clientdata | ConvertFrom-Json) | ConvertTo-Json -Depth 90 -Compress
   $novo = ($clientData | ConvertFrom-Json) | ConvertTo-Json -Depth 90 -Compress
+  if ($atual -ne $novo -and -not $temValor) { throw "A definição mudou, mas o Power Automate só aceita gravar este flow quando $envVarName tiver valor no DEV. Preencha o valor e rode de novo (use -SomenteValidar para conferir a definição antes)." }
   if ($atual -ne $novo) {
     Backup $flows[0]
     Apply $flows[0] $clientData
@@ -588,26 +673,8 @@ if ($flow.statecode -ne 1 -and $temValor) { Dv PATCH "workflows($flowId)" @{ sta
 $row = Dv GET "workflows($flowId)?`$select=statecode,clientdata"
 if ($temValor -and $row.statecode -ne 1) { throw 'Flow não ativou.' }
 AssertSemMojibake $row.clientdata 'clientdata gravado'
-$lido = ($row.clientdata | ConvertFrom-Json).properties.definition
-$trigger = $lido.triggers.Quando_comprovante_completo
-$http = $lido.actions.Escopo_analise.actions.Chamar_Claude
-$erro = $lido.actions.Tratar_erro
-$checks = [ordered]@{
-  'gatilho com filtro' = $trigger.inputs.parameters.'subscriptionRequest/filterexpression' -eq $triggerFilter
-  'gatilho só por cr40f_statusanexo' = $trigger.inputs.parameters.'subscriptionRequest/filteringattributes' -eq 'cr40f_statusanexo'
-  'concurrency.runs = 1' = $trigger.runtimeConfiguration.concurrency.runs -eq 1
-  'Chamar_Claude secureData inputs e outputs' = (@($http.runtimeConfiguration.secureData.properties) -join ',') -eq 'inputs,outputs'
-  'Chamar_Claude retry exponencial 2x' = $http.inputs.retryPolicy.type -eq 'exponential' -and $http.inputs.retryPolicy.count -eq 2
-  'Chamar_Claude timeout PT110S' = $http.limit.timeout -eq 'PT110S'
-  'Chamar_Claude chave pela variável' = $http.inputs.headers.'x-api-key' -eq "@parameters('$paramKey')"
-  'Chamar_Claude constantes' = $http.inputs.body.model -eq $const.modelo -and $http.inputs.body.max_tokens -eq $const.maxTokens -and $http.inputs.body.system -ceq $const.systemPrompt -and (($http.inputs.body.output_config.format.schema | ConvertTo-Json -Depth 30 -Compress) -ceq ($const.schema | ConvertTo-Json -Depth 30 -Compress))
-  'Tratar_erro após Failed/TimedOut' = (@($erro.runAfter.Escopo_analise) -join ',') -eq 'Failed,TimedOut'
-  'Tratar_erro não grava cr40f_statusoperacional' = -not (($erro | ConvertTo-Json -Depth 30 -Compress) -match 'cr40f_statusoperacional')
-}
-$falhas = @($checks.Keys | Where-Object { -not $checks[$_] })
-if ($falhas.Count) { throw "Conferência falhou: $($falhas -join '; ')" }
+Conferir (($row.clientdata | ConvertFrom-Json).properties.definition) $row.clientdata
 if (-not @((Dv GET "solutioncomponents?`$select=solutioncomponentid&`$filter=_solutionid_value eq $solutionId and componenttype eq 29 and objectid eq $flowId").value).Count) { throw 'Flow fora da AppBetinhos.' }
-$checks.Keys | ForEach-Object { Write-Host "[despesas-ia] ok: $_" }
 if (-not $temValor) {
   Write-Output "DEV: '$flowName' gravado e DESLIGADO ($flowId), na $solutionName. Preencha o valor de $envVarName no DEV (Soluções > $solutionName > Variáveis de ambiente) e rode este script de novo para ativar."
   return
