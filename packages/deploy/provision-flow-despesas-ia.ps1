@@ -113,13 +113,16 @@ $const = $constantesText | ConvertFrom-Json
 foreach ($campo in 'modelo', 'maxTokens', 'effort', 'systemPrompt', 'prefixoUsuario', 'schema') { if ($null -eq $const.$campo) { throw "constantes.json sem $campo." } }
 
 # Variável da chave: só a definição (String, sem valor padrão). O valor fica no ambiente, preenchido pelo Renan.
-$envDefs = @((Dv GET "environmentvariabledefinitions?`$select=environmentvariabledefinitionid,defaultvalue&`$filter=schemaname eq '$envVarName'").value)
+$envDefs = @((Dv GET "environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq '$envVarName'").value)
 if (-not $envDefs.Count) {
   Dv POST environmentvariabledefinitions @{ schemaname = $envVarName; displayname = $envVarDisplay; type = 100000000; description = 'Chave da API do Claude (workspace Despesas) usada pelo Flow Despesas | Análise IA. Valor preenchido só no ambiente.' } | Out-Null
-  $envDefs = @((Dv GET "environmentvariabledefinitions?`$select=environmentvariabledefinitionid,defaultvalue&`$filter=schemaname eq '$envVarName'").value)
+  $envDefs = @((Dv GET "environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq '$envVarName'").value)
 }
 if ($envDefs.Count -ne 1) { throw "Variável $envVarName ausente ou duplicada." }
-if ($envDefs[0].defaultvalue) { throw "A variável $envVarName tem valor padrão; ele iria no export da solução. Remova o valor padrão." }
+# Valor padrão faz parte da definição e iria no export da solução. Confere pelo filtro, sem trazer o valor.
+$temPadrao = [bool]@((Dv GET "environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq '$envVarName' and defaultvalue ne null").value).Count
+if ($temPadrao -and -not $SomenteValidar) { throw "A variável $envVarName tem valor padrão; ele iria no export da solução. Mova a chave para o valor atual (fora da $solutionName) e apague o valor padrão." }
+if ($temPadrao) { Write-Warning "$envVarName tem valor padrão (iria no export)." }
 Include $envDefs[0].environmentvariabledefinitionid 380
 # O Power Automate só ativa o flow quando a variável tem valor no ambiente. Sem valor, o flow fica gravado e desligado.
 $envId = $envDefs[0].environmentvariabledefinitionid
@@ -301,6 +304,7 @@ $definitionText = @'
               "$select": "cr40f_reservadeveculosid,cr40f_dataehorriodesada,cr40f_status,_cr40f_cliente_value",
               "$filter": "_cr40f_motorista_value eq @{coalesce(triggerOutputs()?['body/_cr40f_motorista_value'], '00000000-0000-0000-0000-000000000000')} and cr40f_dataehorriodesada ge @{convertToUtc(concat(outputs('Dia_do_gasto'), 'T00:00:00'), 'E. South America Standard Time')} and cr40f_dataehorriodesada lt @{addDays(convertToUtc(concat(outputs('Dia_do_gasto'), 'T00:00:00'), 'E. South America Standard Time'), 1)}",
               "$expand": "cr40f_Cliente($select=cr40f_nomedocliente)",
+              "$orderby": "cr40f_dataehorriodesada asc",
               "$top": 50
             },
             "authentication": "@parameters('$authentication')"
@@ -611,6 +615,7 @@ function Conferir($lido, [string] $texto) {
   $trigger = $lido.triggers.Quando_comprovante_completo
   $http = $lido.actions.Escopo_analise.actions.Chamar_Claude
   $erro = $lido.actions.Tratar_erro
+  $ea = $lido.actions.Escopo_analise.actions.Arquivos.actions.Erro_anterior
   $checks = [ordered]@{
     'gatilho com filtro' = $trigger.inputs.parameters.'subscriptionRequest/filterexpression' -eq $triggerFilter
     'gatilho só por cr40f_statusanexo' = $trigger.inputs.parameters.'subscriptionRequest/filteringattributes' -eq 'cr40f_statusanexo'
@@ -625,7 +630,7 @@ function Conferir($lido, [string] $texto) {
     'Tratar_erro grava Erro (100000003)' = $erro.actions.Gravar_erro.inputs.parameters.'item/cr40f_iastatusanalise' -eq 100000003
     'gatilho message 4 e scope 4' = $trigger.inputs.parameters.'subscriptionRequest/message' -eq 4 -and $trigger.inputs.parameters.'subscriptionRequest/scope' -eq 4
     'Marcar_processando dentro do escopo' = $null -ne $lido.actions.Escopo_analise.actions.Marcar_processando -and -not ($lido.actions.PSObject.Properties.Name -contains 'Marcar_processando')
-    'Arquivos para no primeiro erro' = $null -ne $lido.actions.Escopo_analise.actions.Arquivos.actions.Erro_anterior -and (@($lido.actions.Escopo_analise.actions.Arquivos.actions.Fora_do_sharepoint.runAfter.Erro_anterior) -join ',') -eq 'Succeeded'
+    'Arquivos para no primeiro erro' = ($null -ne $ea) -and (@($ea.runAfter.PSObject.Properties).Count -eq 0) -and (($ea.expression | ConvertTo-Json -Depth 10 -Compress) -ceq '{"and":[{"equals":["@empty(variables(\u0027Motivo_erro\u0027))",false]}]}') -and ($ea.actions.Falhar_erro_anterior.inputs -ceq "@int(variables('Motivo_erro'))") -and ((@($lido.actions.Escopo_analise.actions.Arquivos.actions.Fora_do_sharepoint.runAfter.Erro_anterior) -join ',') -eq 'Succeeded')
     'sem FormattedValue de gatilho' = -not ($texto -match 'FormattedValue')
   }
   $falhas = @($checks.Keys | Where-Object { -not $checks[$_] })
