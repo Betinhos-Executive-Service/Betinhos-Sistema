@@ -6,9 +6,9 @@ import type { Conjunto, Dados } from '../domain/types'
 import { reservasCsv2026 } from './csv2026'
 import { criarDadosMock } from './mock'
 import {
-  ENTITIES, anexosDespesaPath, apelidosFuncionarios, categoriasDespesaPath, composicoesPath, contarAnexos, despesasPath, eventosPath, formasPagamentoPath,
-  funcionariosPath, manutencoesPath, mapCategoriaDespesa, mapCps, mapDespesa, mapEvento, mapFormaPagamento, mapFuncionario, mapManutencao, mapMulta,
-  mapOcorrencia, mapPagante, mapReserva, mapTelemetria, mapVeiculo, mapViagem, multasPath, ocorrenciasPath, pagantesPath, reservasPath, telemetriaPath,
+  ENTITIES, anexosDespesaPath, apelidosFuncionarios, baselinesPath, categoriasDespesaPath, composicoesPath, contarAnexos, despesasPath, eventosPath, formasPagamentoPath,
+  funcionariosPath, itensPlanoPath, manutencoesPath, manutencoesPreventivaPath, mapBaselineDash, mapCategoriaDespesa, mapCps, mapDespesa, mapEvento, mapFormaPagamento, mapFuncionario, mapItemPlanoDash, mapManutencao, mapManutencaoPrev, mapMulta,
+  mapOcorrencia, mapPagante, mapReserva, mapTelemetria, mapVeiculo, mapVeiculoPrev, mapViagem, multasPath, ocorrenciasPath, pagantesPath, reservasPath, telemetriaPath,
   veiculosPath, viagensPath, type EntitySets,
 } from './queries'
 
@@ -28,6 +28,9 @@ export type Source = {
 }
 /** Estágio 2 ainda não carregado: os campos vazios que o estágio 1 devolve. */
 const EXTRAS_VAZIOS = { pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], pendentes: ['pagantes', 'despesas'] } satisfies Partial<Dados>
+
+/** Entrada vazia das preventivas (conjunto indisponível). */
+const PREVENTIVAS_VAZIAS: Dados['preventivas'] = { veiculos: [], manutencoes: [], itens: [], baselines: [] }
 
 /** Consultas simultâneas: o navegador abre até 6 conexões por host. */
 const PARALELO = 6
@@ -90,11 +93,13 @@ const linhas = (r: PromiseSettledResult<Row[]>) => (r.status === 'fulfilled' ? r
  * Estágio 1. Reservas e CPs são obrigatórias; um conjunto secundário (inclusive as 3 tabelas do Infleet do Score motoristas) que falha vira `indisponiveis`.
  * Entity set vazio (`''`) é tabela secundária que não existe na metadata do ambiente: conta como falha só daquele conjunto.
  * Manutenções, multas e ocorrências vêm pela mesma janela das reservas (colunas DateTime). Multas usam os funcionários (apelido).
+ * Preventivas: plano, baselines e manutenções sem janela, mais os veículos já consultados (sem segunda consulta); qualquer das 4 que falha
+ * marca só `preventivas` e deixa a entrada vazia.
  * Pagantes e despesas ficam vazios e `pendentes`: são o estágio 2 (`carregarExtraDataverse`).
  */
 export async function carregarDataverse(client: DataverseClient, sets: EntitySets, desde: string, ate: string, cpNav = ''): Promise<Dados> {
   const ler = leitor(client)
-  const [res, cps, man, mul, oco, fun, vei, via, eve, tel] = await comLimite<Row[]>([
+  const [res, cps, man, mul, oco, fun, vei, via, eve, tel, itp, bas, mpr] = await comLimite<Row[]>([
     () => client.getAll(reservasPath(sets.reserva, desde, ate, cpNav)),
     () => (cpNav ? Promise.resolve([]) : client.getAll(composicoesPath(sets.composicao))),
     () => ler(sets.manutencao, (s) => manutencoesPath(s, desde, ate)),
@@ -105,6 +110,9 @@ export async function carregarDataverse(client: DataverseClient, sets: EntitySet
     () => ler(sets.viagem, (s) => viagensPath(s, desde, ate)),
     () => ler(sets.evento, (s) => eventosPath(s, desde, ate)),
     () => ler(sets.telemetria, (s) => telemetriaPath(s, desde, ate)),
+    () => ler(sets.itemPlano, itensPlanoPath),
+    () => ler(sets.baseline, baselinesPath),
+    () => ler(sets.manutencao, manutencoesPreventivaPath),
   ], PARALELO)
   if (res.status === 'rejected') throw res.reason
   if (cps.status === 'rejected') throw cps.reason
@@ -112,6 +120,8 @@ export async function carregarDataverse(client: DataverseClient, sets: EntitySet
     ['manutencoes', man], ['multas', mul], ['ocorrencias', oco], ['funcionarios', fun], ['veiculos', vei], ['viagens', via], ['eventos', eve], ['telemetria', tel],
   ]
   const indisponiveis = secundarios.filter(([, r]) => r.status === 'rejected').map(([conjunto]) => conjunto)
+  const semPreventivas = [vei, itp, bas, mpr].some((r) => r.status === 'rejected')
+  if (semPreventivas) indisponiveis.push('preventivas')
 
   const cpMap = mapCps(cpNav ? res.value.map((row) => row[cpNav]).filter((cp): cp is Row => !!cp && typeof cp === 'object') : cps.value)
   const funcionarios = linhas(fun).map((row) => mapFuncionario(row))
@@ -126,6 +136,10 @@ export async function carregarDataverse(client: DataverseClient, sets: EntitySet
     viagens: linhas(via).map((row) => mapViagem(row)),
     eventos: linhas(eve).map((row) => mapEvento(row)),
     telemetria: linhas(tel).map((row) => mapTelemetria(row)),
+    preventivas: semPreventivas ? PREVENTIVAS_VAZIAS : {
+      veiculos: linhas(vei).map((row) => mapVeiculoPrev(row)), manutencoes: linhas(mpr).map((row) => mapManutencaoPrev(row)),
+      itens: linhas(itp).map((row) => mapItemPlanoDash(row)), baselines: linhas(bas).map((row) => mapBaselineDash(row)),
+    },
     ...EXTRAS_VAZIOS,
     indisponiveis,
   }
@@ -220,6 +234,7 @@ export function resolverEntitySets(info: ReadonlyMap<string, { entitySetName: st
     telemetria: opcional(ENTITIES.telemetria), evento: opcional(ENTITIES.evento), viagem: opcional(ENTITIES.viagem),
     pagante: opcional(ENTITIES.pagante), despesa: opcional(ENTITIES.despesa), categoriaDespesa: opcional(ENTITIES.categoriaDespesa),
     formaPagamentoDespesa: opcional(ENTITIES.formaPagamentoDespesa), anexoDespesa: opcional(ENTITIES.anexoDespesa),
+    itemPlano: opcional(ENTITIES.itemPlano), baseline: opcional(ENTITIES.baseline),
   }
 }
 
@@ -236,6 +251,7 @@ export function createSource(host: Host): Source {
   const clienteCacheado = (s: EntitySets) => (cliente ??= comCacheCadastros(host.client, (path) => [
     s.composicao && composicoesPath(s.composicao), s.funcionario && funcionariosPath(s.funcionario), s.veiculo && veiculosPath(s.veiculo),
     s.categoriaDespesa && categoriasDespesaPath(s.categoriaDespesa), s.formaPagamentoDespesa && formasPagamentoPath(s.formaPagamentoDespesa),
+    s.itemPlano && itensPlanoPath(s.itemPlano), s.baseline && baselinesPath(s.baseline),
   ].includes(path)))
   return {
     mock: false,
