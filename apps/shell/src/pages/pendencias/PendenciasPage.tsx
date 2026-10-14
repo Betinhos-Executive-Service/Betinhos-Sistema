@@ -17,20 +17,21 @@ import { usePendencias } from './usePendencias'
 import { PendenciasToolbar } from './components/PendenciasToolbar'
 import { PendenciasCards, PendenciasTable } from './components/PendenciasList'
 import { PendenciaDrawer } from './components/PendenciaDrawer'
+import { CorrigirDialog } from './components/CorrigirDialog'
 import '../pagantes/pagantes.css'
 import './pendencias.css'
 
-type Props = { host: Host; onCorrigir?: (p: Pendencia) => void }
+type Props = { host: Host }
 
-export function PendenciasPage({ host, onCorrigir }: Props) {
-  return <ToastProvider><Pendencias host={host} onCorrigir={onCorrigir} /></ToastProvider>
+export function PendenciasPage({ host }: Props) {
+  return <ToastProvider><Pendencias host={host} /></ToastProvider>
 }
 
 const PAGE_SIZE = 50
 const soma = (list: Pendencia[]) => list.reduce((acc, p) => acc + (p.valor ?? 0), 0)
 const noop = () => undefined
 
-function Pendencias({ host, onCorrigir = noop }: Props) {
+function Pendencias({ host }: Props) {
   const source = useMemo(() => createSource(host), [host])
   const pagantes = useMemo(() => createPagantesSource(host), [host])
   const toast = useToast()
@@ -66,6 +67,7 @@ function Pendencias({ host, onCorrigir = noop }: Props) {
   const [saving, setSaving] = useQueryBandeira('salvarvisao')
   // O Gerar Pagantes aberto por cima da tela também vive na URL: `gerar=<id da OP>`.
   const [gerarOpId, setGerarOpId] = useQueryId('gerar')
+  const [corrigir, setCorrigir] = useState<Pendencia | null>(null)
   const frameUrl = gerarOpId ? pagantes.gerarPagantesUrl(gerarOpId) : null
 
   const refresh = useCallback(() => { void pend.reload() }, [pend.reload])
@@ -73,7 +75,7 @@ function Pendencias({ host, onCorrigir = noop }: Props) {
   useShellHeader({ title: 'Pendências', actions: headerActions })
 
   const acoes = {
-    onCorrigir,
+    onCorrigir: (p: Pendencia) => { setSelectedId(null); setCorrigir(p) },
     onAbrirOp: (opId: string) => { window.location.hash = hrefFor('ops', { abrir: opId }) },
     onVerServico: (reservaId: string) => { window.location.hash = hrefFor('geral', { abrir: reservaId }) },
     onRateio: (p: Pendencia) => {
@@ -135,6 +137,8 @@ function Pendencias({ host, onCorrigir = noop }: Props) {
       {pend.error && pend.loaded ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{pend.error} A lista mostra os dados da carga anterior.</Alert> : null}
       {body}
       <PendenciaDrawer pendencia={current} onClose={() => setSelectedId(null)} {...acoes} />
+      <CorrigirDialog pendencia={corrigir} source={source} onClose={() => setCorrigir(null)}
+        onApplied={(n) => { setCorrigir(null); toast({ tone: 'success', message: n === 1 ? '1 alteração aplicada.' : `${n} alterações aplicadas.` }); refresh() }} />
       <SaveViewDialog open={saving} onClose={() => setSaving(false)} onSave={saveView} />
       <GerarPagantesFrame url={frameUrl} onClose={closeFrame} />
     </PageLayout>
