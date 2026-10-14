@@ -26,10 +26,11 @@ function Rota({ id }: { id: string }) {
 }
 
 describe('rotas sob demanda', () => {
-  it('mostra o cabeçalho com Skeleton enquanto o chunk da tela chega e depois a tela', async () => {
+  it('mostra o cabeçalho neutro com Skeleton enquanto o chunk da tela chega e depois a tela', async () => {
     render(<Rota id="despesas-operacionais" />)
     expect(screen.getByRole('status', { name: 'Carregando Despesas (App Motoristas)' })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: 'Despesas (App Motoristas)' })).toBeTruthy()
+    // Cabeçalho neutro: reserva a altura do PageHeader sem adivinhar o título/eyebrow da tela real.
+    expect(screen.getByRole('heading', { level: 1 }).querySelector('.bt-skeleton')).toBeTruthy()
     expect(await screen.findByText('Tela de despesas')).toBeTruthy()
     expect(screen.queryByRole('status', { name: /^Carregando/ })).toBeNull()
   })

@@ -21,6 +21,13 @@ const assetFiles = await readdir(resolve(dist, 'assets'))
 const jsFiles = assetFiles.filter((name) => name.endsWith('.js'))
 const split = jsFiles.length > 1
 
+// Git Bash (MSYS) converte argumentos que começam com "/" em caminho do Windows
+// ("/WebResources/..." vira "C:/Program Files/Git/WebResources/..."). O `pnpm build` roda pelo cmd e não
+// sofre isso; chamando este script direto no Git Bash, use `MSYS_NO_PATHCONV=1 node inline-webresource.mjs ...`.
+if (assetsUrl && /^[A-Za-z]:[\\/]/.test(assetsUrl)) {
+  throw new Error(`--assets-url virou caminho do Windows (${assetsUrl}): o Git Bash converteu o argumento. Rode com MSYS_NO_PATHCONV=1 ou pelo pnpm build.`)
+}
+
 if (split) {
   if (!assetsUrl || !/^\/WebResources\/[A-Za-z0-9_]+(\/[A-Za-z0-9_.]+)*\/$/.test(assetsUrl)) {
     throw new Error('Build com vários chunks: informe --assets-url /WebResources/<prefixo>/assets/ (com barra no fim).')

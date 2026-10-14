@@ -1,15 +1,17 @@
 import { Component, lazy, useEffect, type ComponentType, type LazyExoticComponent, type ReactNode } from 'react'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
-import { Button, EmptyState, Skeleton, Stack } from '@betinhos/ui'
+import { Button, EmptyState, PageHeader, Skeleton, Stack } from '@betinhos/ui'
 import type { Host } from '../host'
 import { findItem, type MenuItem } from '../nav/menu'
-import { PageLayout } from './PageLayout'
 
 type PageId = Extract<MenuItem, { kind: 'page' }>['page']
 type PageProps = { host: Host }
 
-/** Um chunk por tela: só a rota aberta é baixada e avaliada na carga (Recharts fica no chunk do Dashboard). */
-const LOADERS: Record<PageId, () => Promise<ComponentType<PageProps>>> = {
+/**
+ * Um chunk por tela: só a rota aberta é baixada e avaliada na carga (Recharts fica no chunk do Dashboard).
+ * Mutável só para os testes trocarem o carregador de uma tela.
+ */
+export const PAGE_LOADERS: Record<PageId, () => Promise<ComponentType<PageProps>>> = {
   operacional: () => import('../pages/operacional/OperacionalPage').then((m) => m.OperacionalPage),
   frota: () => import('../pages/frota/FrotaPage').then((m) => m.FrotaPage),
   funcionarios: () => import('../pages/funcionarios/FuncionariosPage').then((m) => m.FuncionariosPage),
@@ -24,35 +26,46 @@ const LOADERS: Record<PageId, () => Promise<ComponentType<PageProps>>> = {
   componentes: () => import('../pages/ComponentsPage').then((m) => m.ComponentsPage),
 }
 
-const RELOAD_KEY = 'bt-chunk-reload'
 const pending = new Map<PageId, Promise<ComponentType<PageProps>>>()
 
-/**
- * Baixa o chunk da tela uma única vez (prefetch e render compartilham a promessa).
- * Falha de rede some do cache para tentar de novo; chunk inexistente após uma publicação nova
- * (aba antiga com nomes de arquivo antigos) recarrega a página uma vez para pegar o build atual.
- */
-export function loadPage(page: PageId) {
+/** Baixa o chunk da tela uma vez (prefetch e render compartilham a promessa); falha sai do cache para tentar de novo. */
+function fetchPage(page: PageId) {
   let promise = pending.get(page)
   if (!promise) {
-    promise = LOADERS[page]()
-      .then((component) => { try { sessionStorage.removeItem(RELOAD_KEY) } catch { /* sem storage */ } return component })
-      .catch((error: unknown) => {
-        pending.delete(page)
-        let reloaded = true
-        try { reloaded = sessionStorage.getItem(RELOAD_KEY) === '1'; if (!reloaded) sessionStorage.setItem(RELOAD_KEY, '1') } catch { /* sem storage: não recarrega em laço */ }
-        if (!reloaded) location.reload()
-        throw error
-      })
+    promise = PAGE_LOADERS[page]().catch((error: unknown) => { pending.delete(page); throw error })
     pending.set(page, promise)
   }
   return promise
 }
 
-/** Prefetch pela rota do menu (`#/<id>`): só itens que são telas React. */
+/** Erro do navegador ao baixar um chunk (Chrome, Firefox e Safari), e não erro do código da tela. */
+export function isChunkLoadError(error: unknown) {
+  return error instanceof TypeError && /dynamically imported module|importing a module script failed/i.test(error.message)
+}
+
+/** Indireção para os testes observarem o reload. */
+export const navegador = { recarregar: () => { window.location.reload() } }
+
+const RELOAD_KEY = `bt-chunk-reload:${__APP_VERSION__}`
+
+/**
+ * Chunk ausente quase sempre é aba antiga depois de uma publicação nova (os nomes têm hash).
+ * Recarrega uma única vez por build nesta sessão; se o build novo também falhar, o erro fica na tela.
+ */
+function reloadOncePerBuild() {
+  try {
+    if (sessionStorage.getItem(RELOAD_KEY) === '1') return false
+    sessionStorage.setItem(RELOAD_KEY, '1')
+  } catch { return false /* sem storage: não arrisca recarregar em laço */ }
+  navegador.recarregar()
+  return true
+}
+
+/** Prefetch pela rota do menu (`#/<id>`): só telas React; falha nunca recarrega, só avisa no console. */
 export function prefetchRoute(id: string) {
   const found = findItem(id)
-  if (found?.item.kind === 'page') void loadPage(found.item.page).catch(() => undefined)
+  if (found?.item.kind !== 'page') return
+  fetchPage(found.item.page).catch((error: unknown) => { console.warn(`Prefetch da tela ${id} falhou`, error) })
 }
 
 /**
@@ -76,7 +89,19 @@ export function usePrefetchOnIntent() {
 const lazies = new Map<PageId, LazyExoticComponent<ComponentType<PageProps>>>()
 const lazyFor = (page: PageId) => {
   let component = lazies.get(page)
-  if (!component) lazies.set(page, (component = lazy(() => loadPage(page).then((loaded) => ({ default: loaded })))))
+  if (!component) {
+    component = lazy(() => fetchPage(page).then(
+      (loaded) => ({ default: loaded }),
+      (error: unknown) => {
+        // Lazy rejeitado fica rejeitado para sempre: sai do cache para a próxima visita à rota tentar de novo.
+        lazies.delete(page)
+        // Recarregando: segura o Suspense no fallback em vez de piscar o erro antes do reload.
+        if (isChunkLoadError(error) && reloadOncePerBuild()) return new Promise<never>(() => {})
+        throw error
+      },
+    ))
+    lazies.set(page, component)
+  }
   return component
 }
 
@@ -85,10 +110,23 @@ export function LazyPage({ page, host }: { page: PageId; host: Host }) {
   return <Page host={host} />
 }
 
-/** Fallback do Suspense: o mesmo PageLayout das telas com Skeleton, para o cabeçalho não pular quando o chunk chega. */
-export function PageFallback({ eyebrow, title }: { eyebrow?: string; title: string }) {
+/**
+ * Moldura das telas enquanto carregam ou quando falham: o mesmo `.page` e o `PageHeader` (com a altura mínima
+ * reservada pelo DS), sem adivinhar eyebrow/descrição que a tela real pode não ter.
+ */
+function RouteFrame({ title, children }: { title: ReactNode; children: ReactNode }) {
   return (
-    <PageLayout eyebrow={eyebrow} title={title}>
+    <div className="page">
+      <PageHeader className="page__header" title={title} />
+      <Stack gap="4">{children}</Stack>
+    </div>
+  )
+}
+
+/** Fallback do Suspense: cabeçalho neutro (título em Skeleton) e o corpo em Skeleton. */
+export function PageFallback({ title }: { title: string }) {
+  return (
+    <RouteFrame title={<Skeleton width={220} height={32} />}>
       <div className="surface" role="status" aria-label={`Carregando ${title}`}>
         <Stack gap="3">
           <Skeleton width="40%" height={20} />
@@ -96,7 +134,7 @@ export function PageFallback({ eyebrow, title }: { eyebrow?: string; title: stri
           <Skeleton shape="rect" height={96} />
         </Stack>
       </div>
-    </PageLayout>
+    </RouteFrame>
   )
 }
 
@@ -109,11 +147,11 @@ export class RouteErrorBoundary extends Component<BoundaryProps, { error: Error 
   render() {
     if (!this.state.error) return this.props.children
     return (
-      <PageLayout title={this.props.title}>
-        <EmptyState className="surface" align="start" icon={<AlertTriangle size={36} />} title="Não foi possível abrir esta tela" action={<Button variant="primary" icon={<RefreshCw size={16} />} onClick={() => location.reload()}>Recarregar</Button>}>
+      <RouteFrame title={this.props.title}>
+        <EmptyState className="surface" align="start" icon={<AlertTriangle size={36} />} title="Não foi possível abrir esta tela" action={<Button variant="primary" icon={<RefreshCw size={16} />} onClick={() => navegador.recarregar()}>Recarregar</Button>}>
           {this.state.error.message}
         </EmptyState>
-      </PageLayout>
+      </RouteFrame>
     )
   }
 }
