@@ -93,7 +93,7 @@ Write-Step "Concluido. Confira no DEV: $item, $base e as colunas de hodometro em
 ```
 
 - [ ] **Passo 4:** conferir sintaxe sem executar: `powershell.exe -NoProfile -Command "[scriptblock]::Create((Get-Content -Raw packages/deploy/provision-frota-preventiva.ps1)) | Out-Null; 'ok'"`. Esperado: `ok`.
-- [ ] **Passo 5:** **pedir ao Renan** para executar (precisa do `.env` e do login dele): `powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/provision-frota-preventiva.ps1 -DeviceCode`. Depois confirmar com o MCP `Dataverse_DEV` `describe('tables/cr40f_itemplanopreventivo')`, `describe('tables/cr40f_baselinepreventiva')` e `describe('tables/cr40f_veiculos')` (colunas `cr40f_hodometro`, `cr40f_hodometroem`). Anotar os nomes lógicos reais; se divergirem do plano, corrigir `schema.ts` na Tarefa 3.
+- [ ] **Passo 5:** **pedir ao Renan** para executar (precisa do `.env` e do login dele): `powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/provision-frota-preventiva.ps1 -Apply -DeviceCode` (sem `-Apply` o script só simula). Depois confirmar com o MCP `Dataverse_DEV` `describe('tables/cr40f_itemplanopreventivo')`, `describe('tables/cr40f_baselinepreventiva')` e `describe('tables/cr40f_veiculos')` (colunas `cr40f_hodometro`, `cr40f_hodometroem`). Anotar os nomes lógicos reais; se divergirem do plano, corrigir `schema.ts` na Tarefa 3.
 - [ ] **Passo 6: commit** — `deploy: script que cria o schema da manutenção preventiva no DEV (hodômetro do veículo, item do plano e baseline)`.
 
 ---
