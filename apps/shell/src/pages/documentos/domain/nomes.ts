@@ -16,3 +16,13 @@ export const prefixoArquivo = (codigo: string, data: string | null) => `${codigo
 
 /** `CNH_2031-05-10_frente.pdf`: a data é a validade (ou a emissão, sem validade). */
 export const nomeArquivo = (codigo: string, data: string | null, original: string) => sanitizeFileName(`${prefixoArquivo(codigo, data)}${original}`)
+
+/** Nome para mostrar: sem o prefixo `código_data_` que separa as versões na pasta (`CNH_2031-05-10_frente.pdf` → `frente.pdf`). */
+export const nomeAmigavel = (nome: string) => /^.+?_(?:\d{4}-\d{2}-\d{2}|sem-data)_(.+)$/.exec(nome)?.[1] ?? nome
+
+/** Corta no meio para caber em `max` caracteres, mantendo o começo e o fim (a extensão). */
+export function elipseMeio(nome: string, max = 28) {
+  if (nome.length <= max) return nome
+  const fim = Math.ceil((max - 1) * 0.4)
+  return `${nome.slice(0, max - 1 - fim)}…${nome.slice(nome.length - fim)}`
+}
