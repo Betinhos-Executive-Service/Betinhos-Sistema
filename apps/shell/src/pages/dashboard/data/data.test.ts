@@ -5,15 +5,15 @@ import { filtrarServicos } from '../domain/base'
 import { calcularResumo } from '../domain/resumo'
 import { linhasScore } from '../domain/score'
 import {
-  ENTITIES, anexosDespesaPath, categoriasDespesaPath, despesasPath, eventosPath, formasPagamentoPath, funcionariosPath, manutencoesPath, ocorrenciasPath, mapCategoriaDespesa, mapCps,
+  ENTITIES, anexosDespesaPath, baselinesPath, categoriasDespesaPath, despesasPath, eventosPath, formasPagamentoPath, funcionariosPath, manutencoesPath, ocorrenciasPath, mapCategoriaDespesa, mapCps,
   mapDespesa, mapEvento, mapFormaPagamento, mapFuncionario, mapManutencao, mapMulta, mapPagante, mapReserva, mapTelemetria, mapVeiculo, mapViagem, multasPath,
-  pagantesPath, reservasPath, telemetriaPath, veiculosPath, viagensPath,
+  itensPlanoPath, manutencoesPreventivaPath, pagantesPath, reservasPath, telemetriaPath, veiculosPath, viagensPath,
 } from './queries'
 
 const F = '@OData.Community.Display.V1.FormattedValue'
 const SETS = {
   reserva: 'res', composicao: 'cps', manutencao: 'man', multa: 'mul', ocorrencia: 'oco', funcionario: 'fun', veiculo: 'vei', telemetria: 'tel', evento: 'eve', viagem: 'via',
-  pagante: 'pag', despesa: 'des', categoriaDespesa: 'cat', formaPagamentoDespesa: 'frm', anexoDespesa: 'anx',
+  pagante: 'pag', despesa: 'des', categoriaDespesa: 'cat', formaPagamentoDespesa: 'frm', anexoDespesa: 'anx', itemPlano: 'itp', baseline: 'bas',
 }
 const client = (getAll: (path: string) => Promise<Row[]>) => ({ apiUrl: '', request: vi.fn(), getAll: vi.fn(getAll), create: vi.fn(), update: vi.fn(), remove: vi.fn() }) as unknown as DataverseClient
 /** Os dois estágios juntos, mesclados como o `useDashboard` faz quando as duas abas do estágio 2 já abriram. */
@@ -179,7 +179,7 @@ describe('conjuntos das abas', () => {
     })
     expect(reservasPath('res', '2024-01-01', '2026-10-15')).toContain('cr40f_tipodoservico,')
     expect(reservasPath('res', '2024-01-01', '2026-10-15')).toContain(',new_datadefinalizacao')
-    expect(veiculosPath('vei')).toBe('vei?$select=cr40f_veiculosid,cr40f_statusdoveiculo,new_categoriadoveiculo,cr40f_placa,cr40f_marca,cr40f_modelo,cr40f_blindado,cr40f_anodefabricacao')
+    expect(veiculosPath('vei')).toBe('vei?$select=cr40f_veiculosid,cr40f_statusdoveiculo,new_categoriadoveiculo,cr40f_placa,cr40f_marca,cr40f_modelo,cr40f_blindado,cr40f_anodefabricacao,cr40f_hodometro,cr40f_hodometroem')
     expect(funcionariosPath('fun')).toBe('fun?$select=cr40f_funcionariosid,cr40f_nomecompleto,cr40f_status,cr40f_validadedacnh,cr40f_funcao,new_apelido,cr40f_nomedaempresa')
     expect(decodeURIComponent(manutencoesPath('man', '2024-01-01', '2026-10-15'))).toBe(`man?$select=cr40f_datamanutencao,cr40f_valor,cr40f_datadaaprovacao,cr40f_status,cr40f_tipodoreparo,_cr40f_placa_carro_value,createdon&$filter=${J('cr40f_datamanutencao')}`)
   })
@@ -467,7 +467,8 @@ describe('conjuntos das abas', () => {
     const consultas: string[] = []
     const c = client(async (path) => { consultas.push(path.slice(0, 3)); return [] })
     const d = await carregarDataverse(c, SETS, '2024-01-01', '2026-10-15')
-    expect(consultas.sort()).toEqual(['cps', 'eve', 'fun', 'man', 'mul', 'oco', 'res', 'tel', 'vei', 'via'])
+    // Preventivas: plano (itp), baselines (bas) e as manutenções sem janela (segundo man); os veículos são os mesmos.
+    expect(consultas.sort()).toEqual(['bas', 'cps', 'eve', 'fun', 'itp', 'man', 'man', 'mul', 'oco', 'res', 'tel', 'vei', 'via'])
     expect(d.pendentes).toEqual(['pagantes', 'despesas'])
     expect({ p: d.pagantes, d: d.despesas, c: d.categoriasDespesa, f: d.formasPagamento }).toEqual({ p: [], d: [], c: [], f: [] })
     consultas.length = 0
@@ -487,6 +488,55 @@ describe('conjuntos das abas', () => {
     expect(d.pagantes).toEqual([])
     const extra = await s.carregarExtra('despesas', '2026-09-01', '2026-09-30')
     expect(extra.campos.despesas?.every(na)).toBe(true)
+  })
+
+  it('preventivas: itens do plano, baselines, manutenções sem janela e hodômetro do veículo', () => {
+    expect(ENTITIES).toMatchObject({ itemPlano: 'cr40f_itemplanopreventivo', baseline: 'cr40f_baselinepreventiva' })
+    expect(itensPlanoPath('itp')).toBe('itp?$select=cr40f_itemplanopreventivoid,cr40f_name,cr40f_servico,cr40f_intervalokm,cr40f_intervalomeses,cr40f_avisokm,cr40f_avisodias&$filter=statecode eq 0')
+    expect(baselinesPath('bas')).toBe('bas?$select=cr40f_baselinepreventivaid,_cr40f_veiculo_value,_cr40f_item_value,cr40f_km,cr40f_data')
+    expect(manutencoesPreventivaPath('man')).toBe('man?$select=cr40f_manutencoesid,cr40f_status,cr40f_datamanutencao,createdon,cr40f_kmatual,_cr40f_placa_carro_value,new_servicosmanutencao&$filter=statecode eq 0 and (cr40f_status eq 202410002 or cr40f_status eq 0 or cr40f_status eq 202410001 or cr40f_status eq 202410005)')
+  })
+
+  it('carrega as preventivas reaproveitando os veículos; qualquer das 4 consultas que falha marca só preventivas', async () => {
+    const lidos: string[] = []
+    const responder = (falha = '') => client(async (path) => {
+      lidos.push(path)
+      if (falha && path.startsWith(falha)) throw new Error('falhou')
+      if (path.startsWith('vei?')) return [{ cr40f_veiculosid: 'V1', cr40f_placa: 'ABC1D23', cr40f_statusdoveiculo: 202410001, new_categoriadoveiculo: 100000000, cr40f_hodometro: 21000, cr40f_hodometroem: '2026-10-14T12:00:00Z' }]
+      if (path.startsWith('itp?')) return [{ cr40f_itemplanopreventivoid: 'I1', cr40f_name: 'Troca de óleo', cr40f_servico: 7, cr40f_intervalokm: 10000, cr40f_intervalomeses: 6 }]
+      if (path.startsWith('bas?')) return [{ cr40f_baselinepreventivaid: 'B1', _cr40f_veiculo_value: 'V1', [`_cr40f_veiculo_value${F}`]: 'ABC1D23', _cr40f_item_value: 'I1', cr40f_km: 10000, cr40f_data: '2026-01-10' }]
+      if (path.startsWith('man?$select=cr40f_manutencoesid')) return [{ cr40f_manutencoesid: 'M1', cr40f_status: 202410002, cr40f_datamanutencao: '2026-02-01T12:00:00Z', createdon: '2026-02-01T12:00:00Z', cr40f_kmatual: 12000, _cr40f_placa_carro_value: 'V1', new_servicosmanutencao: '7,9' }]
+      return []
+    })
+    const ok = await carregarDataverse(responder(), SETS, '2024-01-01', '2026-10-15')
+    expect(ok.indisponiveis).toEqual([])
+    expect(lidos.filter((p) => p.startsWith('vei?'))).toHaveLength(1)
+    expect(ok.preventivas).toEqual({
+      veiculos: [{ id: 'v1', placa: 'ABC1D23', status: 202410001, categoria: 100000000, hodometro: 21000, hodometroEm: '2026-10-14T12:00:00Z' }],
+      manutencoes: [{ id: 'm1', status: 202410002, dataManutencao: '2026-02-01T12:00:00Z', criadoEm: '2026-02-01T12:00:00Z', km: 12000, veiculo: { id: 'v1', label: '' }, servicos: [7, 9] }],
+      itens: [{ id: 'i1', nome: 'Troca de óleo', servico: 7, intervaloKm: 10000, intervaloMeses: 6, avisoKm: 1000, avisoDias: 30, ativo: true }],
+      baselines: [{ id: 'b1', veiculo: { id: 'v1', label: 'ABC1D23' }, item: { id: 'i1', label: '' }, km: 10000, data: '2026-01-10' }],
+    })
+    // A janela das manutenções do período segue só nas manutenções da aba; a das preventivas não tem filtro de data.
+    expect(lidos.find((p) => p.startsWith('man?$select=cr40f_manutencoesid'))).not.toContain('cr40f_datamanutencao ge')
+
+    const vazio = { veiculos: [], manutencoes: [], itens: [], baselines: [] }
+    for (const prefixo of ['itp?', 'bas?', 'man?$select=cr40f_manutencoesid']) {
+      const d = await carregarDataverse(responder(prefixo), SETS, '2024-01-01', '2026-10-15')
+      expect(d.indisponiveis).toEqual(['preventivas'])
+      expect(d.preventivas).toEqual(vazio)
+      expect(d.veiculos).toHaveLength(1)
+    }
+    const semVeiculos = await carregarDataverse(responder('vei?'), SETS, '2024-01-01', '2026-10-15')
+    expect(semVeiculos.indisponiveis).toEqual(['veiculos', 'preventivas'])
+    expect(semVeiculos.preventivas).toEqual(vazio)
+  })
+
+  it('plano preventivo ausente na metadata: preventivas indisponível, sem consulta', async () => {
+    const consultas: string[] = []
+    const d = await carregarDataverse(client(async (path) => { consultas.push(path); return [] }), { ...SETS, itemPlano: '' }, '2024-01-01', '2026-10-15')
+    expect(d.indisponiveis).toEqual(['preventivas'])
+    expect(consultas.some((c) => c.startsWith('?'))).toBe(false)
   })
 })
 
