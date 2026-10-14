@@ -43,7 +43,12 @@ export type FieldDef = {
   options?: Option[]
   required?: boolean
   readonly?: boolean
+  /** Texto de apoio abaixo do campo (padrão `Field` do Design System). */
+  hint?: string
 }
+
+/** CNH e ASO são mantidos pelo módulo Documentos (dual-write de cr40f_documento); aqui só leitura. */
+const HINT_DOCUMENTOS = 'Edite em Documentos'
 
 export const FIELDS: FieldDef[] = [
   { key: 'cr40f_nomecompleto', label: 'Nome completo', kind: 'text', group: 'pessoais', required: true },
@@ -54,7 +59,7 @@ export const FIELDS: FieldDef[] = [
   { key: 'cr40f_filiacao', label: 'Filiação', kind: 'text', group: 'pessoais' },
   { key: 'cr40f_enderecocompleto', label: 'Endereço completo', kind: 'textarea', group: 'pessoais' },
   { key: 'cr40f_cnhtexto', label: 'Categoria da CNH', kind: 'text', group: 'pessoais' },
-  { key: 'cr40f_validadedacnh', label: 'Validade da CNH', kind: 'date', group: 'pessoais' },
+  { key: 'cr40f_validadedacnh', label: 'Validade da CNH', kind: 'date', group: 'pessoais', readonly: true, hint: HINT_DOCUMENTOS },
 
   { key: 'cr40f_status', label: 'Status', kind: 'choice', group: 'vinculo', options: STATUS, required: true },
   { key: 'cr40f_funcao', label: 'Função', kind: 'choice', group: 'vinculo', options: FUNCAO, required: true },
@@ -62,7 +67,7 @@ export const FIELDS: FieldDef[] = [
   { key: 'cr40f_tipodevinculo', label: 'Vínculo', kind: 'choice', group: 'vinculo', options: VINCULO },
   { key: 'cr40f_datadeadmissao', label: 'Data de admissão', kind: 'date', group: 'vinculo' },
   { key: 'cr40f_datadedemissao', label: 'Data de demissão', kind: 'date', group: 'vinculo' },
-  { key: 'cr40f_datadoaso', label: 'Data do ASO', kind: 'date', group: 'vinculo' },
+  { key: 'cr40f_datadoaso', label: 'Data do ASO', kind: 'date', group: 'vinculo', readonly: true, hint: HINT_DOCUMENTOS },
   { key: 'cr40f_relacaotrabalhista', label: 'Relação trabalhista', kind: 'text', group: 'vinculo' },
 
   { key: 'cr40f_telefonecorporativo', label: 'Telefone corporativo', kind: 'phone', group: 'contato' },

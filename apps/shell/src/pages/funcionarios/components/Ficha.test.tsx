@@ -41,6 +41,27 @@ describe('Ficha', () => {
     expect(draft.values.new_apelido).toBe('Aninha')
   })
 
+  it('Validade da CNH e Data do ASO aparecem somente leitura com a dica e não vão no PATCH', async () => {
+    const withDocs: Funcionario = { ...record, values: { ...record.values, cr40f_validadedacnh: '2027-01-10', cr40f_datadoaso: '2026-05-20' } }
+    const save = vi.fn(async () => 'f1')
+    const source = { ...fakeSource(save), get: async () => structuredClone(withDocs) }
+    await renderFicha(source)
+    for (const [label, valor] of [['Validade da CNH', '2027-01-10'], ['Data do ASO', '2026-05-20']] as const) {
+      const input = screen.getByLabelText(label) as HTMLInputElement
+      expect(input.value).toBe(valor)
+      expect(input.disabled).toBe(true)
+      const hint = within(input.closest('.bt-field') as HTMLElement).getByText('Edite em Documentos')
+      expect(input.getAttribute('aria-describedby')).toBe(hint.id)
+    }
+    fireEvent.change(screen.getByLabelText(/Apelido/), { target: { value: 'Aninha' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Salvar/ })) })
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
+    const [orig, draft] = save.mock.calls[0] as unknown as [Funcionario, { values: Record<string, unknown> }]
+    expect(orig.values.cr40f_validadedacnh).toBe('2027-01-10')
+    expect(draft.values.cr40f_validadedacnh).toBe('2027-01-10')
+    expect(draft.values.cr40f_datadoaso).toBe('2026-05-20')
+  })
+
   it('mantém o rascunho quando o Dataverse recusa', async () => {
     const save = vi.fn(async () => { throw new Error('Permissão negada.') })
     await renderFicha(fakeSource(save))
