@@ -3,6 +3,7 @@ import { BuildBadge } from '@betinhos/ui'
 import { AppShell } from './app/AppShell'
 import { useDocumentosBadge } from './app/useDocumentosBadge'
 import { RouteLayout } from './app/RouteLayout'
+import { usePrefetchOnIntent } from './app/routes'
 import { createHost } from './host'
 import { DEFAULT_ITEM, ENTITY_NAMES, findItem, itemLabel } from './nav/menu'
 import { useHashRoute } from './nav/useHashRoute'
@@ -14,6 +15,7 @@ export function App() {
   const docsUrgentes = useDocumentosBadge(host)
   const badges = useMemo(() => (docsUrgentes ? { documentos: docsUrgentes } : undefined), [docsUrgentes])
   const route = useHashRoute()
+  usePrefetchOnIntent()
   const activeId = route || DEFAULT_ITEM.id
   const found = findItem(activeId)
   const [{ labels, error }, setLabels] = useState<LabelsState>({ labels: new Map(), error: null })
