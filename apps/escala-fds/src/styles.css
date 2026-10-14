@@ -46,7 +46,7 @@ body { background-color: var(--bt-color-canvas); font-family: var(--bt-font-fami
 @media (hover: hover) and (pointer: fine) { .escala__toggle[aria-pressed="false"]:hover { background-color: var(--bt-color-surface-soft); } }
 
 .escala__chips { display: flex; flex-wrap: wrap; gap: var(--bt-space-1-5); margin: 0; padding: 0; list-style: none; }
-.escala__chip { min-height: 32px; padding: var(--bt-space-1) var(--bt-space-2); border: 0; border-radius: var(--bt-radius-sm); background-color: var(--bt-color-warning-soft); color: var(--bt-color-warning); font: inherit; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); text-align: left; cursor: pointer; }
+.escala__chip { min-height: var(--bt-control-height-compact); padding: var(--bt-space-1) var(--bt-space-2); border: 0; border-radius: var(--bt-radius-sm); background-color: var(--bt-color-warning-soft); color: var(--bt-color-warning); font: inherit; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); text-align: left; cursor: pointer; }
 .escala__row.is-unavailable .escala__chip { background-color: var(--bt-color-surface); }
 .escala__chip:focus-visible { outline: 0; box-shadow: var(--bt-focus-ring); }
 .escala__chip-confirm { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--bt-space-1); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-primary); }

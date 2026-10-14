@@ -84,7 +84,9 @@ function createDataverseSource(): Source {
       const s = await entitySets()
       const escalaFilter = `cr40f_data ge ${inicio} and cr40f_data le ${fim} and statecode eq 0`
       // Ausências que cruzam a semana (inclui férias que começaram antes).
-      const compromissoFilter = `cr40f_inicio le ${fim}T23:59:59Z and cr40f_fim ge ${inicio}T00:00:00Z and statecode eq 0`
+      const de = new Date(`${inicio}T00:00:00`).toISOString()
+      const ate = new Date(`${fim}T23:59:59`).toISOString()
+      const compromissoFilter = `cr40f_inicio le ${ate} and cr40f_fim ge ${de} and statecode eq 0`
       const [funcionarios, marcacoes, compromissos] = await Promise.all([
         // Motoristas (função 202410000) com status Ativo (0).
         client.getAll(`${s.funcionario}?$select=cr40f_funcionariosid,cr40f_nomecompleto,new_apelido&$filter=${encodeURIComponent('statecode eq 0 and cr40f_funcao eq 202410000 and cr40f_status eq 0')}&$orderby=new_apelido asc`),

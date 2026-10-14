@@ -61,6 +61,13 @@ describe('ausenciasDosDias', () => {
   })
 })
 
+describe('ausenciasDosDias com dias vazios', () => {
+  it('ignora strings vazias em dias', () => {
+    const lista = ausenciasDosDias({ ...nova, dias: ['', '2026-10-12'], diaInteiro: true })
+    expect(lista.map((c) => [c.inicio, c.fim])).toEqual([['2026-10-12T00:00', '2026-10-12T23:59']])
+  })
+})
+
 describe('chips da semana', () => {
   const segunda = '2026-10-12'
 

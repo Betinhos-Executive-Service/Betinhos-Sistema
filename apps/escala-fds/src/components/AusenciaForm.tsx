@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Button, Checkbox, Field, Input, SegmentedControl } from '@betinhos/ui'
-import { MOTIVO_LABEL, ausenciasDosDias, dateRange, diaCurto, diasDaSemana, formatDay, type Compromisso, type Motivo } from '../domain/escala'
+import { MOTIVO_LABEL, addDays, ausenciasDosDias, dateRange, diaCurto, diasDaSemana, formatDay, type Compromisso, type Motivo } from '../domain/escala'
 
 type Props = {
   hoje: string
@@ -27,9 +27,11 @@ export function AusenciaForm({ hoje, segunda, motoristaId, onCancel, onAdd }: Pr
   const [observacao, setObservacao] = useState('')
 
   const escolhidos = outro ? dateRange(de, ate) : dias
-  const erro = outro && ate < de ? 'A data final deve ser igual ou posterior à inicial.'
-    : outro && escolhidos.length >= 62 ? 'Registre no máximo 62 dias por vez.'
-      : !outro && !diaInteiro && horaFim <= horaInicio ? 'O horário final deve ser depois do inicial.' : null
+  const erro = outro && (!de || !ate) ? 'Informe as datas.'
+    : !outro && !diaInteiro && (!horaInicio || !horaFim) ? 'Informe o horário.'
+      : outro && ate < de ? 'A data final deve ser igual ou posterior à inicial.'
+        : outro && ate > addDays(de, 61) ? 'Registre no máximo 62 dias por vez.'
+          : !outro && !diaInteiro && horaFim <= horaInicio ? 'O horário final deve ser depois do inicial.' : null
 
   const alternarDia = (d: string) => setDias((atual) => (atual.includes(d) ? atual.filter((x) => x !== d) : [...atual, d]))
   const registrar = () => {
