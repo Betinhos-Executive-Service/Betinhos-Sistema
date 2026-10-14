@@ -3,7 +3,8 @@
 #
 # O flow roda quando a despesa do App Motoristas fica com o comprovante completo (cr40f_statusanexo = Completo):
 # marca a análise como Processando, monta o contexto (até 3 comprovantes do SharePoint, OS do motorista no dia,
-# possíveis duplicatas por valor e data, referência de valores da categoria), chama a API do Claude com saída
+# possíveis duplicatas por valor e data, referência de valores da categoria, veículo da despesa e histórico antifraude
+# de 7 dias do motorista e do veículo), chama a API do Claude com saída
 # estruturada e grava a decisão. As travas técnicas são as mesmas de analisarMensagem (packages/despesas-ia/src/resposta.ts),
 # com as mesmas mensagens. Qualquer falha no escopo de análise grava cr40f_iastatusanalise = Erro e o motivo em
 # cr40f_iamotivos, sem tocar em cr40f_statusoperacional.
@@ -184,8 +185,9 @@ $definitionText = @'
         "Tipos_por_extensao": { "type": "Compose", "runAfter": { "Dia_do_gasto": ["Succeeded"] }, "inputs": { "jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp", "gif": "image/gif", "pdf": "application/pdf" } },
         "Decisoes_validas": { "type": "Compose", "runAfter": { "Tipos_por_extensao": ["Succeeded"] }, "inputs": "__DECISOES__" },
         "Status_reserva": { "type": "Compose", "runAfter": { "Decisoes_validas": ["Succeeded"] }, "inputs": "__STATUS_RESERVA__" },
+        "Status_despesa": { "type": "Compose", "runAfter": { "Status_reserva": ["Succeeded"] }, "inputs": "__STATUS_DESPESA__" },
         "Despesa_nomes": {
-          "type": "OpenApiConnection", "runAfter": { "Status_reserva": ["Succeeded"] },
+          "type": "OpenApiConnection", "runAfter": { "Status_despesa": ["Succeeded"] },
           "inputs": {
             "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps", "connectionName": "shared_commondataserviceforapps", "operationId": "ListRecords" },
             "parameters": {
@@ -198,8 +200,69 @@ $definitionText = @'
             "authentication": "@parameters('$authentication')"
           }
         },
-        "Comprovantes": {
+        "Historico_motorista": {
           "type": "OpenApiConnection", "runAfter": { "Despesa_nomes": ["Succeeded"] },
+          "inputs": {
+            "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps", "connectionName": "shared_commondataserviceforapps", "operationId": "ListRecords" },
+            "parameters": {
+              "entityName": "cr40f_despesaoperacionals",
+              "$select": "__HIST_SELECT__",
+              "$filter": "_cr40f_motorista_value eq @{coalesce(triggerOutputs()?['body/_cr40f_motorista_value'], '00000000-0000-0000-0000-000000000000')} and __HIST_JANELA__",
+              "$expand": "cr40f_Categoria($select=cr40f_nome)",
+              "$orderby": "cr40f_datagasto desc",
+              "$top": 30
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Com_veiculo": {
+          "type": "If", "runAfter": { "Historico_motorista": ["Succeeded"] },
+          "expression": { "and": [ { "equals": [ "@empty(coalesce(triggerOutputs()?['body/_cr40f_veiculo_value'], ''))", false ] } ] },
+          "actions": {
+            "Veiculo": {
+              "type": "OpenApiConnection", "runAfter": {},
+              "inputs": {
+                "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps", "connectionName": "shared_commondataserviceforapps", "operationId": "GetItem" },
+                "parameters": { "entityName": "cr40f_veiculoses", "recordId": "@triggerOutputs()?['body/_cr40f_veiculo_value']", "$select": "cr40f_placa,cr40f_modelo" },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Historico_veiculo": {
+              "type": "OpenApiConnection", "runAfter": { "Veiculo": ["Succeeded"] },
+              "inputs": {
+                "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps", "connectionName": "shared_commondataserviceforapps", "operationId": "ListRecords" },
+                "parameters": {
+                  "entityName": "cr40f_despesaoperacionals",
+                  "$select": "__HIST_SELECT__",
+                  "$filter": "_cr40f_veiculo_value eq @{triggerOutputs()?['body/_cr40f_veiculo_value']} and __HIST_JANELA__",
+                  "$expand": "cr40f_Categoria($select=cr40f_nome)",
+                  "$orderby": "cr40f_datagasto desc",
+                  "$top": 30
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Veiculo_dados": {
+              "type": "Compose", "runAfter": { "Historico_veiculo": ["Succeeded"] },
+              "inputs": { "placa": "@coalesce(outputs('Veiculo')?['body/cr40f_placa'], '')", "modelo": "@coalesce(outputs('Veiculo')?['body/cr40f_modelo'], '')", "capacidadeTanque": null }
+            }
+          },
+          "else": { "actions": {} }
+        },
+        "Historico_motorista_contexto": {
+          "type": "Select", "runAfter": { "Com_veiculo": ["Succeeded"] },
+          "inputs": { "from": "@outputs('Historico_motorista')?['body/value']", "select": "__HIST_ITEM_MOTORISTA__" }
+        },
+        "Historico_veiculo_contexto": {
+          "type": "Select", "runAfter": { "Historico_motorista_contexto": ["Succeeded"] },
+          "inputs": { "from": "@if(empty(coalesce(triggerOutputs()?['body/_cr40f_veiculo_value'], '')), json('[]'), outputs('Historico_veiculo')?['body/value'])", "select": "__HIST_ITEM_VEICULO__" }
+        },
+        "Veiculo_contexto": {
+          "type": "Compose", "runAfter": { "Historico_veiculo_contexto": ["Succeeded"] },
+          "inputs": "@if(empty(coalesce(triggerOutputs()?['body/_cr40f_veiculo_value'], '')), null, outputs('Veiculo_dados'))"
+        },
+        "Comprovantes": {
+          "type": "OpenApiConnection", "runAfter": { "Veiculo_contexto": ["Succeeded"] },
           "inputs": {
             "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps", "connectionName": "shared_commondataserviceforapps", "operationId": "ListRecords" },
             "parameters": {
@@ -378,7 +441,9 @@ $definitionText = @'
               "mediana": "@first(skip(outputs('Ordenados'), div(length(outputs('Ordenados')), 2)))",
               "maximo": "@last(outputs('Ordenados'))",
               "amostras": "@length(outputs('Ordenados'))"
-            }
+            },
+            "veiculo": "@outputs('Veiculo_contexto')",
+            "historico": { "motorista": "@body('Historico_motorista_contexto')", "veiculo": "@body('Historico_veiculo_contexto')" }
           }
         },
         "Texto_usuario": {
@@ -416,7 +481,7 @@ $definitionText = @'
         "Falhar_chamada": { "type": "Compose", "runAfter": { "Motivo_chamada": ["Succeeded"] }, "inputs": "@int(variables('Motivo_erro'))" },
         "Blocos_texto": {
           "type": "Query", "runAfter": { "Chamar_Claude": ["Succeeded"] },
-          "inputs": { "from": "@coalesce(body('Chamar_Claude')?['content'], createArray())", "where": "@equals(item()?['type'], 'text')" }
+          "inputs": { "from": "@coalesce(body('Chamar_Claude')?['content'], json('[]'))", "where": "@equals(item()?['type'], 'text')" }
         },
         "Texto_resposta": { "type": "Compose", "runAfter": { "Blocos_texto": ["Succeeded"] }, "inputs": "@coalesce(first(body('Blocos_texto'))?['text'], '')" },
         "Resposta_incompleta": {
@@ -571,24 +636,50 @@ $gravarText = @'
 }
 '@
 
-$definitionText = $definitionText.Replace('__PARAM_KEY__', $paramKey).Replace('__ENV_VAR__', $envVarName).Replace('__TRIGGER_FILTER__', $triggerFilter).Replace('__SITE_URL__', $siteUrl).Replace('__LIBRARY_ID__', $libraryId)
+# Histórico antifraude: outras despesas do mesmo motorista (e do mesmo veículo) de 7 dias antes do dia do gasto até o fim
+# desse dia (São Paulo), sem a própria despesa, até 30, mais recentes primeiro. Categoria por $expand; status pelo mapa.
+$histSelect = 'cr40f_despesaoperacionalid,cr40f_datagasto,cr40f_valor,cr40f_litros,cr40f_kminformado,cr40f_estabelecimento,cr40f_statusoperacional,_cr40f_motorista_value'
+$histJanela = @'
+cr40f_despesaoperacionalid ne @{triggerOutputs()?['body/cr40f_despesaoperacionalid']} and cr40f_datagasto ge @{addDays(convertToUtc(concat(outputs('Dia_do_gasto'), 'T00:00:00'), 'E. South America Standard Time'), -7)} and cr40f_datagasto lt @{addDays(convertToUtc(concat(outputs('Dia_do_gasto'), 'T00:00:00'), 'E. South America Standard Time'), 1)}
+'@
+$definitionText = $definitionText.Replace('__PARAM_KEY__', $paramKey).Replace('__ENV_VAR__', $envVarName).Replace('__TRIGGER_FILTER__', $triggerFilter).Replace('__SITE_URL__', $siteUrl).Replace('__LIBRARY_ID__', $libraryId).Replace('__HIST_SELECT__', $histSelect).Replace('__HIST_JANELA__', $histJanela.Trim())
 $definition = $definitionText | ConvertFrom-Json
 $escopo = $definition.actions.Escopo_analise.actions
 # Constantes entram como valores JSON (sem concatenação de texto), então aspas e quebras de linha ficam escapadas pelo serializador.
 $escopo.Decisoes_validas.inputs = @($const.schema.properties.decisao.enum)
 $escopo.Campos_ausentes.inputs.from = @($const.schema.required)
-# O gatilho do Dataverse não traz FormattedValue de lookup (conferido em execuções do DEV): os nomes vêm por $expand e o
-# rótulo do status da OS por este mapa, lido da metadata (valor -> rótulo em pt-BR).
-$statusMeta = Dv GET "EntityDefinitions(LogicalName='cr40f_reservadeveculos')/Attributes(LogicalName='cr40f_status')/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?`$select=LogicalName&`$expand=OptionSet(`$select=Options)"
-$statusMapa = [ordered]@{}
-foreach ($o in @($statusMeta.OptionSet.Options)) {
-  $rotulo = @($o.Label.LocalizedLabels | Where-Object { $_.LanguageCode -eq 1046 } | ForEach-Object { $_.Label })[0]
-  if (-not $rotulo) { $rotulo = $o.Label.UserLocalizedLabel.Label }
-  if ($rotulo.Contains('@')) { throw "Rótulo de status com @: $rotulo" }
-  $statusMapa["$($o.Value)"] = $rotulo
+# O gatilho do Dataverse não traz FormattedValue de lookup (conferido em execuções do DEV): os nomes vêm por $expand e os
+# rótulos de status (da OS e das despesas do histórico) por mapas lidos da metadata (valor -> rótulo em pt-BR).
+function MapaOpcoes([string] $entidade, [string] $atributo) {
+  $meta = Dv GET "EntityDefinitions(LogicalName='$entidade')/Attributes(LogicalName='$atributo')/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?`$select=LogicalName&`$expand=OptionSet(`$select=Options)"
+  $mapa = [ordered]@{}
+  foreach ($o in @($meta.OptionSet.Options)) {
+    $rotulo = @($o.Label.LocalizedLabels | Where-Object { $_.LanguageCode -eq 1046 } | ForEach-Object { $_.Label })[0]
+    if (-not $rotulo) { $rotulo = $o.Label.UserLocalizedLabel.Label }
+    if ($rotulo.Contains('@')) { throw "Rótulo de $atributo com @: $rotulo" }
+    $mapa["$($o.Value)"] = $rotulo
+  }
+  if (-not $mapa.Count) { throw "Opções de $entidade.$atributo não encontradas." }
+  return [pscustomobject]$mapa
 }
-if (-not $statusMapa.Count) { throw 'Opções de cr40f_status da reserva não encontradas.' }
-$escopo.Status_reserva.inputs = [pscustomobject]$statusMapa
+$escopo.Status_reserva.inputs = MapaOpcoes 'cr40f_reservadeveculos' 'cr40f_status'
+$escopo.Status_despesa.inputs = MapaOpcoes 'cr40f_despesaoperacional' 'cr40f_statusoperacional'
+# Itens do histórico no formato de ItemHistorico (packages/despesas-ia/src/contexto.ts). dataHora vem do Dataverse em ISO UTC.
+function ItemHistorico($mesmoMotorista) {
+  [pscustomobject][ordered]@{
+    id = "@item()?['cr40f_despesaoperacionalid']"
+    dataHora = "@item()?['cr40f_datagasto']"
+    categoria = "@coalesce(item()?['cr40f_Categoria']?['cr40f_nome'], '')"
+    valor = "@item()?['cr40f_valor']"
+    litros = "@item()?['cr40f_litros']"
+    km = "@item()?['cr40f_kminformado']"
+    estabelecimento = "@item()?['cr40f_estabelecimento']"
+    status = "@coalesce(outputs('Status_despesa')?[string(item()?['cr40f_statusoperacional'])], '')"
+    mesmoMotorista = $mesmoMotorista
+  }
+}
+$escopo.Historico_motorista_contexto.inputs.select = ItemHistorico $true
+$escopo.Historico_veiculo_contexto.inputs.select = ItemHistorico "@and(not(empty(coalesce(triggerOutputs()?['body/_cr40f_motorista_value'], ''))), equals(toLower(coalesce(item()?['_cr40f_motorista_value'], '')), toLower(coalesce(triggerOutputs()?['body/_cr40f_motorista_value'], ''))))"
 # Dia_do_gasto converte de UTC para São Paulo: só vale se cr40f_datagasto for UserLocal (gravado em UTC).
 $comportamento = (Dv GET "EntityDefinitions(LogicalName='cr40f_despesaoperacional')/Attributes(LogicalName='cr40f_datagasto')/Microsoft.Dynamics.CRM.DateTimeAttributeMetadata?`$select=DateTimeBehavior").DateTimeBehavior.Value
 if ($comportamento -ne 'UserLocal') { throw "cr40f_datagasto agora é $comportamento; revise Dia_do_gasto antes de gravar." }
@@ -616,6 +707,15 @@ function Conferir($lido, [string] $texto) {
   $http = $lido.actions.Escopo_analise.actions.Chamar_Claude
   $erro = $lido.actions.Tratar_erro
   $ea = $lido.actions.Escopo_analise.actions.Arquivos.actions.Erro_anterior
+  $a = $lido.actions.Escopo_analise.actions
+  $hm = $a.Historico_motorista
+  $cv = $a.Com_veiculo
+  $ctx = $a.Contexto.inputs
+  $itemCampos = 'id,dataHora,categoria,valor,litros,km,estabelecimento,status,mesmoMotorista'
+  function HistoricoOk($acao, [string] $prefixo) {
+    $p = $acao.inputs.parameters
+    return ($acao.inputs.host.operationId -eq 'ListRecords') -and ($p.entityName -eq 'cr40f_despesaoperacionals') -and ($p.'$select' -ceq $histSelect) -and $p.'$filter'.StartsWith($prefixo) -and $p.'$filter'.EndsWith(" and $($histJanela.Trim())") -and ($p.'$top' -eq 30) -and ($p.'$orderby' -ceq 'cr40f_datagasto desc') -and ($p.'$expand' -ceq 'cr40f_Categoria($select=cr40f_nome)')
+  }
   $checks = [ordered]@{
     'gatilho com filtro' = $trigger.inputs.parameters.'subscriptionRequest/filterexpression' -eq $triggerFilter
     'gatilho só por cr40f_statusanexo' = $trigger.inputs.parameters.'subscriptionRequest/filteringattributes' -eq 'cr40f_statusanexo'
@@ -632,6 +732,14 @@ function Conferir($lido, [string] $texto) {
     'Marcar_processando dentro do escopo' = $null -ne $lido.actions.Escopo_analise.actions.Marcar_processando -and -not ($lido.actions.PSObject.Properties.Name -contains 'Marcar_processando')
     'Arquivos para no primeiro erro' = ($null -ne $ea) -and (@($ea.runAfter.PSObject.Properties).Count -eq 0) -and (($ea.expression | ConvertTo-Json -Depth 10 -Compress) -ceq '{"and":[{"equals":["@empty(variables(\u0027Motivo_erro\u0027))",false]}]}') -and ($ea.actions.Falhar_erro_anterior.inputs -ceq "@int(variables('Motivo_erro'))") -and ((@($lido.actions.Escopo_analise.actions.Arquivos.actions.Fora_do_sharepoint.runAfter.Erro_anterior) -join ',') -eq 'Succeeded')
     'sem FormattedValue de gatilho' = -not ($texto -match 'FormattedValue')
+    'Historico_motorista: motorista, 7 dias, sem a própria, top 30, desc, categoria por expand' = HistoricoOk $hm '_cr40f_motorista_value eq '
+    'Com_veiculo: só com veículo' = ($cv.type -eq 'If') -and (@($cv.expression.and).Count -eq 1) -and ($cv.expression.and[0].equals[0] -ceq "@empty(coalesce(triggerOutputs()?['body/_cr40f_veiculo_value'], ''))") -and ($cv.expression.and[0].equals[1] -eq $false) -and (@($cv.else.actions.PSObject.Properties).Count -eq 0)
+    'Veiculo: GetItem em cr40f_veiculoses (placa, modelo)' = ($cv.actions.Veiculo.inputs.host.operationId -eq 'GetItem') -and ($cv.actions.Veiculo.inputs.parameters.entityName -eq 'cr40f_veiculoses') -and ($cv.actions.Veiculo.inputs.parameters.recordId -ceq "@triggerOutputs()?['body/_cr40f_veiculo_value']") -and ($cv.actions.Veiculo.inputs.parameters.'$select' -eq 'cr40f_placa,cr40f_modelo') -and ($null -eq $cv.actions.Veiculo_dados.inputs.capacidadeTanque)
+    'Historico_veiculo: veículo, mesma janela e limites' = HistoricoOk $cv.actions.Historico_veiculo '_cr40f_veiculo_value eq '
+    'Selects no formato de ItemHistorico' = ((@($a.Historico_motorista_contexto.inputs.select.PSObject.Properties.Name) -join ',') -ceq $itemCampos) -and ((@($a.Historico_veiculo_contexto.inputs.select.PSObject.Properties.Name) -join ',') -ceq $itemCampos) -and ($a.Historico_motorista_contexto.inputs.select.mesmoMotorista -eq $true) -and ($a.Historico_veiculo_contexto.inputs.select.mesmoMotorista -like '@and(*')
+    'Status_despesa com rótulos da metadata' = @($a.Status_despesa.inputs.PSObject.Properties).Count -gt 0
+    'Contexto com veiculo e historico' = ($ctx.veiculo -ceq "@outputs('Veiculo_contexto')") -and ($ctx.historico.motorista -ceq "@body('Historico_motorista_contexto')") -and ($ctx.historico.veiculo -ceq "@body('Historico_veiculo_contexto')")
+    'histórico antes dos comprovantes' = (@($a.Comprovantes.runAfter.Veiculo_contexto) -join ',') -eq 'Succeeded'
   }
   $falhas = @($checks.Keys | Where-Object { -not $checks[$_] })
   if ($falhas.Count) { throw "Conferência falhou: $($falhas -join '; ')" }
