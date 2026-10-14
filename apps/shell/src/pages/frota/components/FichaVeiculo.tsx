@@ -1,6 +1,6 @@
 import { Check, Copy, ExternalLink, ImageUp } from 'lucide-react'
 import { Alert, Button, Drawer, EmptyState, Input, StatusBadge } from '@betinhos/ui'
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent, type SyntheticEvent } from 'react'
 import { useQueryPeriodo } from '../../../nav/queryState'
 import { formatBR } from '../data/dates'
 import { brl, NAO_INFORMADO } from '../data/format'
@@ -14,14 +14,18 @@ import { buildTimeline } from '../domain/timeline'
 import { buildPromptImagem, faltasPrompt } from '../domain/promptImagem'
 import { FotoVeiculo, invalidarFoto } from './FotoVeiculo'
 import { useNotify } from './Toasts'
+import { Checklist } from '../../documentos/components/Checklist'
+import type { DocsSource } from '../../documentos/data/source'
 
 const TABELAS_TIMELINE: { key: 'manutencoes' | 'multas' | 'colisoes' | 'posses'; nome: string }[] = [
   { key: 'manutencoes', nome: 'Manutenções' }, { key: 'multas', nome: 'Multas' }, { key: 'colisoes', nome: 'Colisões' }, { key: 'posses', nome: 'Posses' },
 ]
 
 const TIPOS_FOTO = ['image/png', 'image/jpeg', 'image/webp']
+/** `onCancel` não está nos tipos de <div>, mas o React o repassa pela árvore; espalhado para o TS aceitar. */
+const pararCancel = { onCancel: (event: SyntheticEvent) => event.stopPropagation() }
 
-export function FichaVeiculo({ source, id, data, errors, today, onClose, onOpen, onReload }: { source: DataSource; id: string; errors: LoadResult['errors']; data: FrotaData; today: string; onClose: () => void; onOpen: (kind: Kind, id: string) => void; onReload: () => void }) {
+export function FichaVeiculo({ source, docs, id, data, errors, today, onClose, onOpen, onReload }: { source: DataSource; docs?: DocsSource | null; id: string; errors: LoadResult['errors']; data: FrotaData; today: string; onClose: () => void; onOpen: (kind: Kind, id: string) => void; onReload: () => void }) {
   const notify = useNotify()
   const padrao = useMemo(() => ultimos12Meses(today), [today])
   const [periodo, setPeriodo] = useQueryPeriodo('fde', 'fate', padrao)
@@ -148,6 +152,16 @@ export function FichaVeiculo({ source, id, data, errors, today, onClose, onOpen,
               <dt>Motorista atual</dt><dd>{motorista || 'Sem motorista'}</dd>
             </dl>
           </section>
+          {docs ? (
+            <section className="frota-group" aria-labelledby={`${id}-docs`}>
+              <h3 id={`${id}-docs`} className="frota-group__title">Documentos</h3>
+              {/* Diálogos do checklist (excluir, renovar) são <dialog> dentro deste Drawer: o "cancel" (Esc) deles sobe pela árvore do
+                  React e fecharia a ficha inteira; aqui ele para. */}
+              <div style={{ display: 'contents' }} {...pararCancel}>
+                <Checklist source={docs} donoId={id} titulo="" />
+              </div>
+            </section>
+          ) : null}
           <section className="frota-group" aria-labelledby={`${id}-custo`}>
             <h3 id={`${id}-custo`} className="frota-group__title">Custo de manutenção</h3>
             <div className="frota-cluster">

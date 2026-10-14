@@ -1,3 +1,4 @@
+import { JANELA_DIAS } from '../../documentos/domain/vencimento'
 import { addMonths, daysBetween, formatBR, nextBirthday } from './dates'
 
 export type AlertKind = 'cnh' | 'aso' | 'aniversario'
@@ -14,7 +15,7 @@ export type Alerta = {
 /** Periodicidade do ASO em meses. Assumido anual; confirmar com o RH. */
 export const ASO_VALIDADE_MESES = 12
 export const DIAS_CRITICO = 30
-export const DIAS_ATENCAO = 60
+export const DIAS_ATENCAO = JANELA_DIAS
 export const DIAS_ANIVERSARIO = 7
 
 type AlertSource = {

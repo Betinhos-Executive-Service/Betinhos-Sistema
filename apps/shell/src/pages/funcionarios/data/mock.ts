@@ -108,7 +108,10 @@ export function createMockSource(): DataSource {
     mode: 'mock',
     envLabel: 'MOCK',
     list: () => delay(rows),
-    get: (id) => delay(rows.find((row) => row.id === id)!),
+    get: (id) => {
+      const row = rows.find((item) => item.id === id)
+      return row ? delay(row) : Promise.reject(new Error('Colaborador não encontrado nos dados de exemplo.'))
+    },
     async save(original, draft) {
       const payload = buildPatch(original, draft, context)
       if (!Object.keys(payload).length && original) return original.id
