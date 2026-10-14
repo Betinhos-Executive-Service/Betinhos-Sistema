@@ -76,7 +76,7 @@ export function PendenciasCards({ list, onOpen, loading: _loading, ...acoes }: P
             </span>
             <span className="pg-card__meta">{[p.cliente, formatDate(p.data), servicosTexto(p.reservaIds.length)].filter(Boolean).join(' · ')}</span>
           </button>
-          <div className="pg-card__foot pend-card__foot"><TipoBadge p={p} /><AcaoPendencia p={p} {...acoes} /></div>
+          <div className="pg-card__foot"><TipoBadge p={p} /><AcaoPendencia p={p} {...acoes} /></div>
         </li>
       ))}
     </ul>
