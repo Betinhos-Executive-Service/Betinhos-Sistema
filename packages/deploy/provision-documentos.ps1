@@ -223,7 +223,8 @@ Ensure-AttributeOn $doc @{ "@odata.type" = "Microsoft.Dynamics.CRM.DateTimeAttri
 # Tipo obrigatorio (spec): todo documento pertence a um tipo do catalogo.
 Ensure-Lookup "cr40f_tipodocumento_cr40f_documento_tipo" $tipo $doc "cr40f_Tipo" "Tipo" "Tipo do documento" "Restrict" "ApplicationRequired"
 Ensure-Lookup "cr40f_funcionarios_cr40f_documento_funcionario" "cr40f_funcionarios" $doc "cr40f_Funcionario" "Funcionário" "Dono do documento (pessoas)" "Cascade"
-Ensure-Lookup "cr40f_veiculos_cr40f_documento_veiculo" "cr40f_veiculos" $doc "cr40f_Veiculo" "Veículo" "Dono do documento (frota)" "Cascade"
+# Dataverse aceita uma unica relacao parental (Cascade) por tabela: a do funcionario. Veiculo usa Restrict.
+Ensure-Lookup "cr40f_veiculos_cr40f_documento_veiculo" "cr40f_veiculos" $doc "cr40f_Veiculo" "Veículo" "Dono do documento (frota)" "Restrict"
 
 # Destinatário
 Ensure-AttributeOn $dest (Picklist "cr40f_Categoria" "Categoria" "Pessoas ou Frota" @("Pessoas", "Frota") "ApplicationRequired")
