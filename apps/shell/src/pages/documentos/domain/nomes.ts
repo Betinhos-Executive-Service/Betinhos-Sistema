@@ -11,5 +11,8 @@ export const pastaDoc = (categoria: Categoria, donoId: string, codigo: string, e
 
 export const nomeDocumento = (tipo: Pick<TipoDoc, 'nome'>, dono: Pick<Dono, 'nome'>) => `${tipo.nome} · ${dono.nome}`.slice(0, 850)
 
+/** Início do nome dos arquivos de um documento: separa a versão vigente das antigas na mesma pasta. */
+export const prefixoArquivo = (codigo: string, data: string | null) => `${codigo}_${data ?? 'sem-data'}_`
+
 /** `CNH_2031-05-10_frente.pdf`: a data é a validade (ou a emissão, sem validade). */
-export const nomeArquivo = (codigo: string, data: string | null, original: string) => sanitizeFileName(`${codigo}_${data ?? 'sem-data'}_${original}`)
+export const nomeArquivo = (codigo: string, data: string | null, original: string) => sanitizeFileName(`${prefixoArquivo(codigo, data)}${original}`)

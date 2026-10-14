@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { salvarDocumento, type SalvarDeps } from './salvar'
+import { avisoFalhas, salvarDocumento, type SalvarDeps } from './salvar'
 import type { DocEmitido, Dono, TipoDoc } from '../domain/types'
 
 const CNH: TipoDoc = { id: 'cnh', codigo: 'CNH', nome: 'CNH', categoria: 'pessoas', temValidade: true, validadePadraoMeses: null, obrigatorioPara: [100000000], ordem: 1, ativo: true }
@@ -102,5 +102,12 @@ describe('salvarDocumento', () => {
     const r = await salvarDocumento(d, { tipo: CNH, dono: ANA, anterior: null, numero: '', emissao: null, validade: '2031-10-10', observacao: '', arquivos: [file('bom.pdf'), file('ruim.pdf')] })
     expect(r.enviados).toHaveLength(1)
     expect(r.falhas).toEqual([{ nome: 'ruim.pdf', erro: 'timeout' }])
+  })
+})
+
+describe('avisoFalhas', () => {
+  it('lista os arquivos que falharam e diz onde tentar de novo', () => {
+    expect(avisoFalhas([{ nome: 'a.pdf', erro: 'timeout' }, { nome: 'b.png', erro: '413' }], 'Use “Enviar arquivo” neste documento para tentar de novo.'))
+      .toBe('Documento salvo, mas arquivos não foram enviados: a.pdf (timeout) · b.png (413). Use “Enviar arquivo” neste documento para tentar de novo.')
   })
 })
