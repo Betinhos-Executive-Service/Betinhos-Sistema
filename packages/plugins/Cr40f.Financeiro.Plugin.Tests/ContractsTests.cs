@@ -18,4 +18,11 @@ public class ContractsTests
         var r = new SincronizarRequest { Modo = "x" };
         Assert.Throws<Microsoft.Xrm.Sdk.InvalidPluginExecutionException>(() => r.Validate());
     }
+
+    [Fact]
+    public void OrigemInvalidaFalha()
+    {
+        var r = new SincronizarRequest { Origem = "x" };
+        Assert.Throws<Microsoft.Xrm.Sdk.InvalidPluginExecutionException>(() => r.Validate());
+    }
 }
