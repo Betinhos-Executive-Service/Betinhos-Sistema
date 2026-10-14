@@ -8,7 +8,13 @@ public static class SyncEngine
     public static IReadOnlyList<Mudanca> Compute(OpSnapshot op)
     {
         var mudancas = new List<Mudanca>();
-        if (op.Status == Codigos.OpCancelada) return mudancas; // Task 4
+        if (op.Status == Codigos.OpCancelada)
+        {
+            foreach (var r in op.Reservas)
+                mudancas.Add(new Mudanca { Entidade = Codigos.Reserva, Id = r.Id, Campo = Codigos.ReservaOpLookup, LimparLookup = true, Motivo = "OP cancelada." });
+            Reverter(mudancas, op, Codigos.ReservaFatPendente, "OP cancelada.");
+            return mudancas;
+        }
         var ativos = op.Pagantes.Where(p => p.Status != Codigos.PagCancelado).ToList();
         var pagos = ativos.Where(p => p.Status == Codigos.PagPago || p.Status == Codigos.PagAutorizado).ToList();
         var total = op.ValorCents ?? op.Reservas.Sum(r => r.CpValorCents);
