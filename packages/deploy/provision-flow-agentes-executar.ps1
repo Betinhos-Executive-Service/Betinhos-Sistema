@@ -16,6 +16,10 @@
 # Para conferir a definição sem gravar (checkFlowErrors):
 #   powershell -File packages/deploy/provision-flow-agentes-executar.ps1 -SomenteValidar
 # Requer `az login` com acesso ao DEV.
+#
+# Limites das consultas: cada ListRecords dos ramos traz no máximo 150 linhas ($top 150, sem paginação). No Financeiro, os
+# recibos vêm junto de cada OS por $expand de cr40f_cr40f_reservadeveculos_Reserva_cr40f_recibos (só recibos ativos), então
+# temRecibo não depende de uma segunda lista com corte próprio: OS antigas da janela de 60 dias não perdem o recibo.
 param([string] $Restaurar = '', [switch] $SomenteValidar)
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $ErrorActionPreference = 'Stop'
@@ -385,12 +389,14 @@ function Ramo([object[]] $passos) {
 }
 function DefinirVar([string] $variavel, $valor) { [ordered]@{ type = 'SetVariable'; runAfter = $null; inputs = [ordered]@{ name = $variavel; value = $valor } } }
 function Compor([string] $expr) { [ordered]@{ type = 'Compose'; runAfter = $null; inputs = $expr } }
-function Listar([string] $entidade, [string] $select, [string] $filtro, [string] $ordem) {
+function Listar([string] $entidade, [string] $select, [string] $filtro, [string] $ordem, [string] $expand = '') {
+  $parametros = [ordered]@{ entityName = $entidade; '$select' = $select; '$filter' = $filtro; '$orderby' = $ordem; '$top' = 150 }
+  if ($expand) { $parametros['$expand'] = $expand }
   [ordered]@{
     type = 'OpenApiConnection'; runAfter = $null
     inputs = [ordered]@{
       host = [ordered]@{ apiId = $dvApi; connectionName = 'shared_commondataserviceforapps'; operationId = 'ListRecords' }
-      parameters = [ordered]@{ entityName = $entidade; '$select' = $select; '$filter' = $filtro; '$orderby' = $ordem; '$top' = 150 }
+      parameters = $parametros
       authentication = "@parameters('`$authentication')"
     }
   }
@@ -414,10 +420,9 @@ function Agente([string] $ag, [string] $suf) {
 # $select de cada consulta (conferidos com -ceq em Conferir).
 $sel = [ordered]@{
   OS_concluidas = 'cr40f_reservadeveculosid,cr40f_idnovo,cr40f_id,cr40f_dataehorriodesada,cr40f_statusdefaturamento,cr40f_valor_a_receber,_cr40f_financeiro_value,_cr40f_cliente_value'
-  Recibos = 'cr40f_recibosid,_cr40f_reserva_value'
   OPs_pendentes = 'cr40f_financeiroid,cr40f_idfinanceiro,cr40f_status,cr40f_valor,createdon,new_clientedaop'
   Pagamentos_terceiro = 'cr40f_pagamentoaterceiroid,cr40f_name,cr40f_status,cr40f_totalrepasse,cr40f_margemtotal,createdon,_cr40f_terceirofavorecido_value'
-  Servicos = 'cr40f_reservadeveculosid,cr40f_idnovo,cr40f_id,cr40f_status,cr40f_dataehorriodesada,cr40f_horrioprevistoderetorno,cr40f_tipodeveiculo,cr40f_destino,cr40f_endereodesada,_cr40f_motorista_value,_cr40f_veiculo_value,_cr40f_cliente_value'
+  Servicos = 'cr40f_reservadeveculosid,cr40f_idnovo,cr40f_id,cr40f_status,cr40f_dataehorriodesada,cr40f_horrioprevistoderetorno,cr40f_tipodeveiculo,cr40f_destino,_cr40f_motorista_value,_cr40f_veiculo_value,_cr40f_cliente_value'
   Motoristas = 'cr40f_funcionariosid,new_apelido,_cr40f_veiculoatual_value'
   Trocas = 'cr40f_trocasdecarroid,cr40f_id,cr40f_statusdatroca,cr40f_iniciodajaneladetroca,cr40f_fimdajaneladetroca,_cr40f_motorista1_value,_cr40f_motorista2_value'
   Funcionarios = 'cr40f_funcionariosid,new_apelido,cr40f_funcao,cr40f_validadedacnh,cr40f_datadoaso,cr40f_datadeaniversario,cr40f_datadeadmissao'
@@ -425,19 +430,20 @@ $sel = [ordered]@{
   Multas = 'cr40f_multasid,cr40f_id_multa,cr40f_dataehorario,cr40f_dataparaindicar,_cr40f_motorista_value,_cr40f_placa_value'
   Comunicados = 'cr40f_comunicadohomeid,cr40f_titulo,cr40f_inicio,cr40f_fim'
 }
-$ramoPorAcao = @{ OS_concluidas = 'Financeiro'; Recibos = 'Financeiro'; OPs_pendentes = 'Financeiro'; Pagamentos_terceiro = 'Financeiro'; Servicos = 'Logistica'; Motoristas = 'Logistica'; Trocas = 'Logistica'; Funcionarios = 'Pessoas'; Documentos = 'Pessoas'; Multas = 'Pessoas'; Comunicados = 'Pessoas' }
+$ramoPorAcao = @{ OS_concluidas = 'Financeiro'; OPs_pendentes = 'Financeiro'; Pagamentos_terceiro = 'Financeiro'; Servicos = 'Logistica'; Motoristas = 'Logistica'; Trocas = 'Logistica'; Funcionarios = 'Pessoas'; Documentos = 'Pessoas'; Multas = 'Pessoas'; Comunicados = 'Pessoas' }
 
+# Recibos ativos de cada OS, pela relação 1:N reserva -> recibo (cr40f_reserva).
+$navRecibos = 'cr40f_cr40f_reservadeveculos_Reserva_cr40f_recibos'
+$expandRecibos = "$navRecibos(`$select=cr40f_recibosid;`$filter=statecode eq 0)"
 $ramoFinanceiro = Ramo (@(Agente 'financeiro' 'fin') + @(
   (Passo 'Janela_60d' (Compor "@addDays(outputs('Inicio_do_dia_utc'), -60)")),
-  (Passo 'OS_concluidas' (Listar 'cr40f_reservadeveculoses' $sel.OS_concluidas "statecode eq 0 and cr40f_status eq 202410008 and cr40f_dataehorriodesada ge @{outputs('Janela_60d')} and cr40f_statusdefaturamento ne 202410011 and cr40f_statusdefaturamento ne 202410003 and cr40f_statusdefaturamento ne 202410004 and cr40f_statusdefaturamento ne 202410000" 'cr40f_dataehorriodesada asc')),
-  (Passo 'Recibos' (Listar 'cr40f_reciboses' $sel.Recibos "statecode eq 0 and createdon ge @{outputs('Janela_60d')}" 'createdon desc')),
+  (Passo 'OS_concluidas' (Listar 'cr40f_reservadeveculoses' $sel.OS_concluidas "statecode eq 0 and cr40f_status eq 202410008 and cr40f_dataehorriodesada ge @{outputs('Janela_60d')} and cr40f_statusdefaturamento ne 202410011 and cr40f_statusdefaturamento ne 202410003 and cr40f_statusdefaturamento ne 202410004 and cr40f_statusdefaturamento ne 202410000" 'cr40f_dataehorriodesada asc' $expandRecibos)),
   (Passo 'OPs_pendentes' (Listar 'cr40f_financeiros' $sel.OPs_pendentes 'statecode eq 0 and (cr40f_status eq 100000001 or cr40f_status eq 202410006)' 'createdon asc')),
   (Passo 'Pagamentos_terceiro' (Listar 'cr40f_pagamentoaterceiros' $sel.Pagamentos_terceiro 'statecode eq 0 and (cr40f_status eq 100000002 or cr40f_margemtotal lt 0)' 'createdon asc')),
-  (Passo 'Ids_com_recibo' (Selecionar "@outputs('Recibos')?['body/value']" "@toLower(coalesce(item()?['_cr40f_reserva_value'], ''))")),
   (Passo 'OS_contexto' (Selecionar "@outputs('OS_concluidas')?['body/value']" ([ordered]@{
     id = Id 'cr40f_reservadeveculosid'; codigo = "@coalesce(item()?['cr40f_idnovo'], item()?['cr40f_id'], '')"; saida = Txt 'cr40f_dataehorriodesada'
     faturamento = Num 'cr40f_statusdefaturamento'; valorAReceber = Num 'cr40f_valor_a_receber'; temOP = "@not(equals(item()?['_cr40f_financeiro_value'], null))"
-    temRecibo = "@contains(body('Ids_com_recibo'), toLower(item()?['cr40f_reservadeveculosid']))"; cliente = Rot '_cr40f_cliente_value'
+    temRecibo = "@greater(length(coalesce(item()?['$navRecibos'], createArray())), 0)"; cliente = Rot '_cr40f_cliente_value'
   }))),
   (Passo 'OPs_contexto' (Selecionar "@outputs('OPs_pendentes')?['body/value']" ([ordered]@{
     id = Id 'cr40f_financeiroid'; codigo = Txt 'cr40f_idfinanceiro'; status = Num 'cr40f_status'; valor = Num 'cr40f_valor'; criadaEm = Txt 'createdon'; cliente = Txt 'new_clientedaop'
@@ -456,7 +462,7 @@ $ramoLogistica = Ramo (@(Agente 'logistica' 'log') + @(
   (Passo 'Trocas' (Listar 'cr40f_trocasdecarros' $sel.Trocas "statecode eq 0 and (cr40f_statusdatroca eq 202410000 or cr40f_statusdatroca eq 100000001) and cr40f_fimdajaneladetroca ge @{outputs('Inicio_do_dia_utc')} and cr40f_iniciodajaneladetroca lt @{outputs('Fim_janela')}" 'cr40f_iniciodajaneladetroca asc')),
   (Passo 'Servicos_contexto' (Selecionar "@outputs('Servicos')?['body/value']" ([ordered]@{
     id = Id 'cr40f_reservadeveculosid'; codigo = "@coalesce(item()?['cr40f_idnovo'], item()?['cr40f_id'], '')"; status = Num 'cr40f_status'; saida = Txt 'cr40f_dataehorriodesada'
-    retorno = Txt 'cr40f_horrioprevistoderetorno'; tipoVeiculo = Rot 'cr40f_tipodeveiculo'; destino = Txt 'cr40f_destino'; enderecoSaida = Txt 'cr40f_endereodesada'
+    retorno = Txt 'cr40f_horrioprevistoderetorno'; tipoVeiculo = Rot 'cr40f_tipodeveiculo'; destino = Txt 'cr40f_destino'
     motoristaId = Id '_cr40f_motorista_value'; veiculoId = Id '_cr40f_veiculo_value'; cliente = Rot '_cr40f_cliente_value'
   }))),
   (Passo 'Motoristas_contexto' (Selecionar "@outputs('Motoristas')?['body/value']" ([ordered]@{
@@ -530,8 +536,8 @@ function Conferir($lido) {
   $listas = @()
   foreach ($nome in $sel.Keys) { $listas += [pscustomobject]@{ nome = $nome; acao = $cases.($ramoPorAcao[$nome]).actions.$nome } }
   $selectsOk = @($listas | Where-Object { -not ($_.acao -and $_.acao.inputs.host.operationId -eq 'ListRecords' -and $_.acao.inputs.parameters.'$top' -eq 150 -and ($_.acao.inputs.parameters.'$select' -ceq $sel[$_.nome])) }).Count -eq 0
-  $camposSensiveis = @($listas | ForEach-Object { $_.acao.inputs.parameters.'$select'.Split(',') } | Where-Object { $_ -match 'cpf|rg$|telefone|phone|email|e-mail|endere|conta' -and $_ -cne 'cr40f_endereodesada' })
-  $todosSelects = @(($lido | ConvertTo-Json -Depth 90 -Compress) | Select-String -Pattern '"\$select":"([^"]*)"' -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Groups[1].Value.Split(',') } | Where-Object { $_ -match 'cpf|telefone|email|endere' -and $_ -cne 'cr40f_endereodesada' })
+  $camposSensiveis = @($listas | ForEach-Object { $_.acao.inputs.parameters.'$select'.Split(',') } | Where-Object { $_ -match 'cpf|rg$|telefone|phone|email|e-mail|endere|conta' })
+  $todosSelects = @(($lido | ConvertTo-Json -Depth 90 -Compress) | Select-String -Pattern '"\$select":"([^"]*)"' -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Groups[1].Value.Split(',') } | Where-Object { $_ -match 'cpf|telefone|email|endere' })
   $promptsOk = ($cases.Financeiro.actions.Definir_system_fin.inputs.value -ceq $const.agentes.financeiro.systemPrompt) -and ($cases.Logistica.actions.Definir_system_log.inputs.value -ceq $const.agentes.logistica.systemPrompt) -and ($cases.Pessoas.actions.Definir_system_pes.inputs.value -ceq $const.agentes.pessoas.systemPrompt)
   $listasAgenteOk = $true
   foreach ($par in @(@('Financeiro', 'fin', 'financeiro'), @('Logistica', 'log', 'logistica'), @('Pessoas', 'pes', 'pessoas'))) {
@@ -559,7 +565,9 @@ function Conferir($lido) {
     'Criar_propostas depois de Mapa_prioridade (após todas as travas)' = (@($a.Criar_propostas.runAfter.Mapa_prioridade) -join ',') -eq 'Succeeded' -and (@($a.Mapa_tipos.runAfter.Com_alvo_invalido) -join ',') -eq 'Succeeded'
     'Criar_proposta vincula cr40f_Execucao' = $a.Criar_propostas.actions.Criar_proposta.inputs.parameters.'item/cr40f_Execucao@odata.bind' -ceq "@concat('/cr40f_agenteexecucaos(', triggerOutputs()?['body/cr40f_agenteexecucaoid'], ')')"
     'ListRecords dos ramos com $top 150 e $select exatos' = $selectsOk
-    'nenhum $select com CPF, RG, conta, telefone, e-mail ou endereço (exceto cr40f_endereodesada)' = ($camposSensiveis.Count -eq 0) -and ($todosSelects.Count -eq 0)
+    'OS_concluidas expande os recibos ativos e não há lista Recibos separada' = $cases.Financeiro.actions.OS_concluidas.inputs.parameters.'$expand' -ceq $expandRecibos -and -not ($cases.Financeiro.actions.PSObject.Properties.Name -contains 'Recibos') -and -not ($cases.Financeiro.actions.PSObject.Properties.Name -contains 'Ids_com_recibo')
+    'temRecibo pelo $expand de OS_concluidas' = $cases.Financeiro.actions.OS_contexto.inputs.select.temRecibo -ceq "@greater(length(coalesce(item()?['$navRecibos'], createArray())), 0)"
+    'nenhum $select com CPF, RG, conta, telefone, e-mail ou endereço' = ($camposSensiveis.Count -eq 0) -and ($todosSelects.Count -eq 0)
     'Marcar_processando dentro do escopo' = $null -ne $a.Marcar_processando -and -not ($lido.actions.PSObject.Properties.Name -contains 'Marcar_processando')
   }
   $falhas = @($checks.Keys | Where-Object { -not $checks[$_] })

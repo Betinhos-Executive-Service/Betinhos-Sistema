@@ -89,13 +89,14 @@ import { SYSTEM_LOGISTICA, montarContextoLogistica } from './index.ts'
 
 describe('logistica', () => {
   const dados = {
-    servicos: [{ cr40f_reservadeveculosid: 'R2', cr40f_idnovo: 'OS-11', cr40f_status: 202410005, cr40f_dataehorriodesada: '2026-10-15T12:30:00Z', cr40f_horrioprevistoderetorno: null, cr40f_tipodeveiculo: 202410001, cr40f_destino: 'GRU', cr40f_endereodesada: 'Rua X, 10', _cr40f_motorista_value: null, _cr40f_veiculo_value: null, 'cr40f_tipodeveiculo@OData.Community.Display.V1.FormattedValue': 'Executivo', '_cr40f_cliente_value@OData.Community.Display.V1.FormattedValue': 'Embraer' }],
+    servicos: [{ cr40f_reservadeveculosid: 'R2', cr40f_idnovo: 'OS-11', cr40f_status: 202410005, cr40f_dataehorriodesada: '2026-10-15T12:30:00Z', cr40f_horrioprevistoderetorno: null, cr40f_tipodeveiculo: 202410001, cr40f_destino: 'GRU', _cr40f_motorista_value: null, _cr40f_veiculo_value: null, 'cr40f_tipodeveiculo@OData.Community.Display.V1.FormattedValue': 'Executivo', '_cr40f_cliente_value@OData.Community.Display.V1.FormattedValue': 'Embraer' }],
     motoristas: [{ cr40f_funcionariosid: 'M1', new_apelido: 'João', _cr40f_veiculoatual_value: 'V1', '_cr40f_veiculoatual_value@OData.Community.Display.V1.FormattedValue': 'ABC1D23', cr40f_telefonepessoal: '11999' }],
     trocas: [{ cr40f_trocasdecarroid: 'T1', cr40f_id: 'OT-3', cr40f_statusdatroca: 202410000, cr40f_iniciodajaneladetroca: '2026-10-15T10:00:00Z', cr40f_fimdajaneladetroca: '2026-10-15T11:00:00Z', _cr40f_motorista1_value: 'M1', _cr40f_motorista2_value: null }],
   }
   it('monta serviços, motoristas e trocas sem telefone', () => {
     const ctx = montarContextoLogistica(dados, '2026-10-14')
-    expect(ctx.servicos[0]).toEqual({ id: 'r2', codigo: 'OS-11', status: 202410005, saida: '2026-10-15T12:30:00Z', retorno: '', tipoVeiculo: 'Executivo', destino: 'GRU', enderecoSaida: 'Rua X, 10', motoristaId: '', veiculoId: '', cliente: 'Embraer' })
+    expect(ctx.servicos[0]).toEqual({ id: 'r2', codigo: 'OS-11', status: 202410005, saida: '2026-10-15T12:30:00Z', retorno: '', tipoVeiculo: 'Executivo', destino: 'GRU', motoristaId: '', veiculoId: '', cliente: 'Embraer' })
+    expect(JSON.stringify(ctx)).not.toMatch(/endere/i)
     expect(ctx.motoristas[0]).toEqual({ id: 'm1', apelido: 'João', veiculoAtualId: 'v1', veiculoAtual: 'ABC1D23' })
     expect(ctx.trocas[0]).toEqual({ id: 't1', codigo: 'OT-3', status: 202410000, inicio: '2026-10-15T10:00:00Z', fim: '2026-10-15T11:00:00Z', motorista1Id: 'm1', motorista2Id: '' })
     expect(JSON.stringify(ctx)).not.toContain('11999')
