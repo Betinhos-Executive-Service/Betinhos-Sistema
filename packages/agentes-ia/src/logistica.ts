@@ -4,7 +4,7 @@ type Row = Record<string, unknown>
 export type DadosLogistica = { servicos: Row[]; motoristas: Row[]; trocas: Row[] }
 export type ContextoLogistica = {
   hoje: string
-  servicos: { id: string; codigo: string; status: number | null; saida: string; retorno: string; tipoVeiculo: string; destino: string; enderecoSaida: string; motoristaId: string; veiculoId: string; cliente: string }[]
+  servicos: { id: string; codigo: string; status: number | null; saida: string; retorno: string; tipoVeiculo: string; destino: string; motoristaId: string; veiculoId: string; cliente: string }[]
   motoristas: { id: string; apelido: string; veiculoAtualId: string; veiculoAtual: string }[]
   trocas: { id: string; codigo: string; status: number | null; inicio: string; fim: string; motorista1Id: string; motorista2Id: string }[]
 }
@@ -14,7 +14,7 @@ export function montarContextoLogistica(d: DadosLogistica, hoje: string): Contex
     hoje,
     servicos: d.servicos.map((r) => ({
       id: id(r.cr40f_reservadeveculosid), codigo: str(r.cr40f_idnovo) || str(r.cr40f_id), status: num(r.cr40f_status), saida: str(r.cr40f_dataehorriodesada), retorno: str(r.cr40f_horrioprevistoderetorno),
-      tipoVeiculo: rotulo(r, 'cr40f_tipodeveiculo'), destino: str(r.cr40f_destino), enderecoSaida: str(r.cr40f_endereodesada),
+      tipoVeiculo: rotulo(r, 'cr40f_tipodeveiculo'), destino: str(r.cr40f_destino),
       motoristaId: id(r._cr40f_motorista_value), veiculoId: id(r._cr40f_veiculo_value), cliente: rotulo(r, '_cr40f_cliente_value'),
     })),
     motoristas: d.motoristas.map((r) => ({ id: id(r.cr40f_funcionariosid), apelido: str(r.new_apelido), veiculoAtualId: id(r._cr40f_veiculoatual_value), veiculoAtual: rotulo(r, '_cr40f_veiculoatual_value') })),
