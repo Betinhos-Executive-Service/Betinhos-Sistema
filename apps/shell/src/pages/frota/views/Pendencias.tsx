@@ -1,4 +1,4 @@
-import { CalendarClock, Car, CheckCircle2, ChevronRight, CircleAlert, FileWarning, ListTodo, Wrench } from 'lucide-react'
+import { CalendarClock, Car, CheckCircle2, ChevronRight, CircleAlert, FileWarning, Gauge, ListTodo, Wrench } from 'lucide-react'
 import { useMemo } from 'react'
 import { EmptyState, MetricCard, StatusBadge, Surface } from '@betinhos/ui'
 import { useQueryTexto } from '../../../nav/queryState'
@@ -8,6 +8,7 @@ import { buildPendencias, PENDENCIA_LABEL, PENDENCIA_ORDEM, type Pendencia, type
 
 const CURTO: Record<PendenciaTipo, string> = {
   aprovar: 'Aprovar manutenção',
+  preventiva: 'Preventiva do plano',
   programar: 'Programar manutenção',
   agendada: 'Manutenção agendada',
   notificar: 'Notificar condutor',
@@ -15,7 +16,7 @@ const CURTO: Record<PendenciaTipo, string> = {
   colisao: 'Colisão em aberto',
 }
 
-const ICONE: Record<Kind, typeof Wrench> = { manutencao: Wrench, multa: FileWarning, colisao: Car }
+const ICONE: Record<Kind | 'preventiva', typeof Wrench> = { manutencao: Wrench, preventiva: Gauge, multa: FileWarning, colisao: Car }
 
 type Urgencia = 'atrasado' | 'hoje' | 'breve'
 
@@ -78,7 +79,7 @@ export function Pendencias({ data, today, onOpen }: { data: FrotaData; today: st
                 const nivel = urgencia(item)
                 return (
                   <li key={`${item.kind}-${item.id}`}>
-                    <button type="button" className="frota-pend__item" data-urgencia={nivel ?? undefined} onClick={() => onOpen(item.kind, item.id)}>
+                    <button type="button" className="frota-pend__item" data-urgencia={nivel ?? undefined} onClick={() => { if (item.kind !== 'preventiva') onOpen(item.kind, item.id) }}>
                       <span className="frota-pend__icone" aria-hidden><Icone size={16} /></span>
                       <span className="frota-pend__texto">
                         <strong>{item.titulo}</strong>
