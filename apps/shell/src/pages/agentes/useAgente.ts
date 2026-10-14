@@ -34,7 +34,9 @@ export function useAgente(source: Source, agente: Agente) {
 
   // Polling: a cada 3 s enquanto em andamento; para após 90 s com aviso.
   useEffect(() => {
-    if (!state.polling || !state.atual) { pollingDesde.current = null; return }
+    // Só agenda com a execução em andamento: logo após analisar, `atual` ainda é a anterior (concluída).
+    const emAndamento = state.atual?.status === 'pendente' || state.atual?.status === 'processando'
+    if (!state.polling || !state.atual || !emAndamento) { pollingDesde.current = null; return }
     pollingDesde.current ??= Date.now()
     const id = state.atual.id
     const timer = setTimeout(() => {
@@ -73,5 +75,8 @@ export function useAgente(source: Source, agente: Agente) {
 
   const abrir = useCallback((execucaoId: string) => { void carregar(execucaoId) }, [carregar])
 
-  return { ...state, analisar, aprovar, descartar, abrir, reload: () => carregar(state.atual?.id) }
+  const atualId = state.atual?.id
+  const reload = useCallback(() => carregar(atualId), [carregar, atualId])
+
+  return { ...state, analisar, aprovar, descartar, abrir, reload }
 }

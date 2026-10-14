@@ -33,13 +33,14 @@ function Agentes({ host, agente }: { host: Host; agente: Agente }) {
   // Logística: roda sozinha ao abrir se a última execução for antiga.
   const [autoDisparado, setAutoDisparado] = useState(false)
   useEffect(() => {
-    if (autoDisparado || estado.loading || info.rodaAoAbrirAposMin == null) return
+    if (autoDisparado || estado.loading || estado.error || info.rodaAoAbrirAposMin == null) return
     setAutoDisparado(true)
     const ultima = estado.atual?.criadaEm?.getTime() ?? 0
     if (Date.now() - ultima > info.rodaAoAbrirAposMin * 60_000) void estado.analisar('')
   }, [autoDisparado, estado, info.rodaAoAbrirAposMin])
 
-  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar" onClick={() => void estado.reload()} />, [estado])
+  const { reload } = estado
+  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar" onClick={() => void reload()} />, [reload])
   useShellHeader({ title: info.label, actions: headerActions })
 
   const linkAlvo = (p: Proposta) => (host.mode === 'dataverse' && ENTITY_SET[p.entidadeAlvo] ? `${host.clientUrl}/main.aspx?pagetype=entityrecord&etn=${ENTITY_SET[p.entidadeAlvo]}&id=${p.idAlvo}` : null)

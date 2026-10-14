@@ -1,6 +1,6 @@
 import { cleanId, type Row } from '@betinhos/dataverse'
 import { agentePorValor } from '../domain/agentes'
-import type { Agente, Execucao, Proposta } from '../domain/types'
+import type { Agente, Execucao, Proposta, TipoAcao } from '../domain/types'
 
 export const ENTITY_EXECUCAO = 'cr40f_agenteexecucao'
 export const ENTITY_PROPOSTA = 'cr40f_agenteproposta'
@@ -28,10 +28,22 @@ export function mapExecucao(row: Row): Execucao {
     tokensEntrada: num(row.cr40f_tokensentrada) ?? 0, tokensSaida: num(row.cr40f_tokenssaida) ?? 0, criadaEm: date(row.createdon),
   }
 }
+const TIPOS_ACAO: readonly TipoAcao[] = ['CriarPendencia', 'AtribuirMotorista', 'AtribuirVeiculo', 'CriarComunicadoRascunho']
+
+/** JSON de cr40f_acao vindo do flow; tipo desconhecido ou campos fora do formato viram `null` (só registra a decisão). */
+export function parseAcao(bruto: string): Proposta['acao'] {
+  if (!bruto) return null
+  let v: unknown
+  try { v = JSON.parse(bruto) } catch { return null }
+  if (!v || typeof v !== 'object') return null
+  const { tipo, campos } = v as { tipo?: unknown; campos?: unknown }
+  if (typeof tipo !== 'string' || !(TIPOS_ACAO as readonly string[]).includes(tipo)) return null
+  if (campos != null && (typeof campos !== 'object' || Array.isArray(campos))) return null
+  return { tipo: tipo as TipoAcao, campos: (campos ?? {}) as Record<string, string | number | null> }
+}
+
 export function mapProposta(row: Row): Proposta {
-  let acao: Proposta['acao'] = null
-  const bruto = str(row.cr40f_acao)
-  if (bruto) { try { acao = JSON.parse(bruto) } catch { acao = null } }
+  const acao = parseAcao(str(row.cr40f_acao))
   return {
     id: cleanId(str(row.cr40f_agentepropostaid)), execucaoId: cleanId(str(row._cr40f_execucao_value)), tipo: fmt(row, 'cr40f_tipo') || String(num(row.cr40f_tipo) ?? ''),
     titulo: str(row.cr40f_titulo), justificativa: str(row.cr40f_justificativa), prioridade: PRIORIDADE[num(row.cr40f_prioridade) ?? -1] ?? 'media',
