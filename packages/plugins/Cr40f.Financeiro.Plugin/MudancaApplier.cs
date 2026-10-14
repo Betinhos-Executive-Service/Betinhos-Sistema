@@ -12,6 +12,7 @@ public static class MudancaApplier
     {
         foreach (var m in mudancas)
         {
+            if (!m.LimparLookup && m.Para is null) throw new InvalidPluginExecutionException($"Mudança sem valor de destino: {m.Entidade}.{m.Campo} ({m.Id}).");
             var row = new Entity(m.Entidade, m.Id);
             if (m.LimparLookup) row[m.Campo] = null;
             else row[m.Campo] = new OptionSetValue(m.Para!.Value);

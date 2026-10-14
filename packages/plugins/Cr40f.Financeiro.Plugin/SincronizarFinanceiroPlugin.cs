@@ -15,21 +15,38 @@ public sealed class SincronizarFinanceiroPlugin : IPlugin
         var context = (IPluginExecutionContext)serviceProvider.GetService(typeof(IPluginExecutionContext));
         var tracing = (ITracingService)serviceProvider.GetService(typeof(ITracingService));
         var factory = (IOrganizationServiceFactory)serviceProvider.GetService(typeof(IOrganizationServiceFactory));
-        var userService = factory.CreateOrganizationService(context.UserId);
-        var systemService = factory.CreateOrganizationService(null);
+        try
+        {
+            var userService = factory.CreateOrganizationService(context.UserId);
+            var systemService = factory.CreateOrganizationService(null);
 
-        if (!context.InputParameters.Contains("Target") || context.InputParameters["Target"] is not EntityReference target || target.LogicalName != Codigos.Op)
-            throw new InvalidPluginExecutionException("A Custom API deve ser vinculada a uma OP.");
-        var json = context.InputParameters.Contains("cr40f_RequestJson") ? context.InputParameters["cr40f_RequestJson"] as string : null;
-        var request = string.IsNullOrWhiteSpace(json) ? new SincronizarRequest() : JsonConvert.DeserializeObject<SincronizarRequest>(json!) ?? new SincronizarRequest();
-        request.Validate();
+            if (!context.InputParameters.Contains("Target") || context.InputParameters["Target"] is not EntityReference target || target.LogicalName != Codigos.Op)
+                throw new InvalidPluginExecutionException("A Custom API deve ser vinculada a uma OP.");
+            var json = context.InputParameters.Contains("cr40f_RequestJson") ? context.InputParameters["cr40f_RequestJson"] as string : null;
+            SincronizarRequest request;
+            try
+            {
+                request = string.IsNullOrWhiteSpace(json) ? new SincronizarRequest() : JsonConvert.DeserializeObject<SincronizarRequest>(json!) ?? new SincronizarRequest();
+            }
+            catch (JsonException)
+            {
+                throw new InvalidPluginExecutionException("Payload inválido.");
+            }
+            request.Validate();
 
-        var access = (RetrievePrincipalAccessResponse)userService.Execute(new RetrievePrincipalAccessRequest { Target = target, Principal = new EntityReference("systemuser", context.UserId) });
-        if (!access.AccessRights.HasFlag(AccessRights.WriteAccess)) throw new InvalidPluginExecutionException("Sem permissão de escrita nesta OP.");
+            var access = (RetrievePrincipalAccessResponse)userService.Execute(new RetrievePrincipalAccessRequest { Target = target, Principal = new EntityReference("systemuser", context.UserId) });
+            if (!access.AccessRights.HasFlag(AccessRights.WriteAccess)) throw new InvalidPluginExecutionException("Sem permissão de escrita nesta OP.");
 
-        var response = Executar(systemService, tracing, target.Id, request, context.UserId);
-        if (request.Modo == "aplicar") context.SharedVariables[SharedFlag] = true;
-        context.OutputParameters["cr40f_ResponseJson"] = JsonConvert.SerializeObject(response);
+            // A flag precisa existir antes das escritas: os pipelines filhos disparados pelos updates a leem.
+            if (request.Modo == "aplicar") context.SharedVariables[SharedFlag] = true;
+            var response = Executar(systemService, tracing, target.Id, request, context.UserId);
+            context.OutputParameters["cr40f_ResponseJson"] = JsonConvert.SerializeObject(response);
+        }
+        catch (Exception error)
+        {
+            tracing.Trace("cr40f_SincronizarFinanceiro: {0}", error);
+            throw error is InvalidPluginExecutionException ? error : new InvalidPluginExecutionException("Não foi possível sincronizar o financeiro. " + error.Message, error);
+        }
     }
 
     /// <summary>Compartilhado com o step automático (Task 9).</summary>
