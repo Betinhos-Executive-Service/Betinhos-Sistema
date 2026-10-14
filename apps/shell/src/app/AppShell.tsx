@@ -15,6 +15,8 @@ type Props = {
   title: string
   entityLabels: Map<string, string>
   connection: { ok: boolean; text: string }
+  /** Contador por id de item do menu (ex.: `documentos`). */
+  badges?: Record<string, ReactNode>
   children: ReactNode
 }
 
@@ -77,7 +79,7 @@ const ITEM_ICONS: Record<string, ReactNode> = {
 }
 
 /** Traduz o sitemap do app para a navegação do AppShell do Design System. */
-function toNavGroup(group: MenuGroup, entityLabels: Map<string, string>): NavGroup {
+function toNavGroup(group: MenuGroup, entityLabels: Map<string, string>, badges?: Record<string, ReactNode>): NavGroup {
   return {
     id: group.id,
     label: group.label,
@@ -89,12 +91,13 @@ function toNavGroup(group: MenuGroup, entityLabels: Map<string, string>): NavGro
       href: item.kind === 'external' ? item.url : hrefFor(item.id),
       external: item.kind === 'external',
       icon: ITEM_ICONS[item.id],
+      badge: badges?.[item.id],
     })),
   }
 }
 
 /** Chrome persistente do Sistema Betinhos: AppShell do pacote alimentado pelo sitemap e pelo estado de conexão. */
-export function AppShell({ activeId, title, entityLabels, connection, children }: Props) {
+export function AppShell({ activeId, title, entityLabels, connection, badges, children }: Props) {
   const install = useInstallPrompt()
   // Gaveta do menu no celular e busca de telas também vivem na URL (`menu=1`, `busca=…`).
   const [navOpen, setNavOpen] = useQueryBandeira('menu')
@@ -102,7 +105,7 @@ export function AppShell({ activeId, title, entityLabels, connection, children }
   return (
     <Shell
       brand={{ name: 'Betinhos', subtitle: 'Sistema interno', href: hrefFor(MENU[0].items[0].id) }}
-      groups={MENU.map((group) => toNavGroup(group, entityLabels))}
+      groups={MENU.map((group) => toNavGroup(group, entityLabels, badges))}
       activeId={activeId}
       title={title}
       navOpen={navOpen}
