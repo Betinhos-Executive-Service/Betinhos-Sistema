@@ -1,8 +1,8 @@
 import { gravarTexto, lerOpcao, type QueryCodec } from '../../../nav/queryState'
-import { EMPTY_FILTERS, TIPOS, type Filters, type Periodo } from './filters'
+import { EMPTY_FILTERS, PERIODOS as PERIODO_OPCOES, TIPOS, type Filters, type Periodo } from './filters'
 import type { TipoPendencia } from './types'
 
-const PERIODOS: readonly Periodo[] = ['30', '90', '365', 'all']
+const PERIODOS: readonly Periodo[] = PERIODO_OPCOES.map((p) => p.value)
 
 /** Filtros das Pendências na URL: `q`, `periodo`, `tipos` (lista separada por vírgula; valor desconhecido é ignorado). */
 export const pendenciasQuery: QueryCodec<Filters> = {

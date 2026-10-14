@@ -14,10 +14,10 @@ export function detectarPendencias(ops: OpResumo[], reservas: Reserva[], pagante
   for (const p of pagantes) pagsPorOp.set(p.opId, [...(pagsPorOp.get(p.opId) ?? []), p])
   const jaListadas = new Set<string>()
 
-  const push = (tipo: TipoPendencia, o: OpResumo | null, rs: Reserva[], detalhe: string, corrigivel: boolean) => {
-    const valor = o?.valor ?? (rs.length ? rs.reduce((s, r) => s + (r.cpValor ?? 0), 0) : null)
+  const push = (tipo: TipoPendencia, o: OpResumo | null, rs: Reserva[], detalhe: string, corrigivel: boolean, extra?: { id?: string; valor?: number | null }) => {
+    const valor = extra?.valor !== undefined ? extra.valor : o?.valor ?? (rs.length ? rs.reduce((s, r) => s + (r.cpValor ?? 0), 0) : null)
     out.push({
-      id: `${tipo}:${o?.id ?? rs[0]?.id}`, tipo, opId: o?.id ?? null, opCodigo: o?.codigo ?? '', reservaIds: rs.map((r) => r.id),
+      id: extra?.id ?? `${tipo}:${o?.id ?? rs[0]?.id}`, tipo, opId: o?.id ?? null, opCodigo: o?.codigo ?? '', reservaIds: rs.map((r) => r.id), reservaCodigos: rs.map((r) => r.codigo),
       cliente: o?.cliente || rs[0]?.cliente || '', data: latest(rs), valor, detalhe, corrigivel,
     })
   }
@@ -25,6 +25,7 @@ export function detectarPendencias(ops: OpResumo[], reservas: Reserva[], pagante
   for (const o of ops) {
     const rs = porOp.get(o.id) ?? []
     const ativos = (pagsPorOp.get(o.id) ?? []).filter((p) => p.status !== PAG.cancelado)
+    // Intencional: OP Paga não é conferida contra os pagantes; o motor trata isso no próximo evento de dinheiro.
     if (o.status === OP.paga) {
       const desalinhadas = rs.filter((r) => r.fatStatus !== FAT.pago || (r.cpId != null && r.cpStatus !== CP.concluida))
       if (desalinhadas.length) push('op-paga-desalinhada', o, desalinhadas, `${desalinhadas.length} serviço(s) sem Pago/Concluída`, true)
@@ -36,6 +37,7 @@ export function detectarPendencias(ops: OpResumo[], reservas: Reserva[], pagante
       push('op-sem-pagamento-reserva-paga', o, pagasNaReserva, o.status === OP.cancelada ? 'OP cancelada' : 'Nenhum pagante ativo pago', true)
       pagasNaReserva.forEach((r) => jaListadas.add(r.id))
     }
+    // Rateio é por OP: lista todas as reservas da OP de propósito (sem duplicar por reserva).
     if (o.status !== OP.cancelada && ativos.length) {
       const total = o.valor ?? (rs.length && rs.every((r) => r.cpId) ? rs.reduce((s, r) => s + (r.cpValor ?? 0), 0) : null)
       const soma = ativos.reduce((s, p) => s + cents(p.valor), 0)
@@ -48,7 +50,7 @@ export function detectarPendencias(ops: OpResumo[], reservas: Reserva[], pagante
     if (r.fatStatus !== FAT.pago || jaListadas.has(r.id)) continue
     const o = r.opId ? opPorId.get(r.opId) : undefined
     if (o?.status === OP.paga) continue
-    push('pago-sem-op-paga', o ?? null, [r], o ? `OP ${o.codigo} não está paga` : 'Sem OP', false)
+    push('pago-sem-op-paga', o ?? null, [r], o ? `OP ${o.codigo} não está paga` : 'Sem OP', false, { id: `pago-sem-op-paga:${r.id}`, valor: r.cpValor })
   }
   return out.sort((a, b) => (b.data?.getTime() ?? 0) - (a.data?.getTime() ?? 0))
 }
