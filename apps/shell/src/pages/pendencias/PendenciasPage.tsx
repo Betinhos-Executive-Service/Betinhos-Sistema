@@ -103,7 +103,7 @@ function Pendencias({ host, onCorrigir = noop }: Props) {
   let body
   if (pend.error && !pend.loaded) {
     body = <Alert tone="danger" title="Não foi possível carregar as pendências" action={<Button variant="secondary" onClick={() => void pend.reload()}>Tentar de novo</Button>}>{pend.error}</Alert>
-  } else if (!pend.loaded) {
+  } else if (!pend.loaded || (pend.loading && !visible.length)) {
     body = <PendenciasTable list={[]} onOpen={noop} loading {...acoes} />
   } else if (!pend.loading && !pend.list.length) {
     body = <EmptyState className="surface" align="start" icon={<CircleCheck size={36} />} title="Nenhuma pendência neste período">OPs, pagantes e serviços estão alinhados. Amplie o período para conferir os mais antigos.</EmptyState>
