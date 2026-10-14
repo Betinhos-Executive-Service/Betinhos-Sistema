@@ -171,6 +171,7 @@ export function mapDespesaCombustivel(row: Row, categoriaDe: (id: string) => 'co
 export function mapTelemetriaKm(row: Row): TelemetriaKm | null {
   const veiculo = ref(row, '_new_veiculo_value')
   const km = row.new_distanciapercorridakm
-  if (!veiculo || typeof km !== 'number' || !Number.isFinite(km)) return null
-  return { dia: String(row.new_data), veiculoId: veiculo.id, km }
+  const dia = str(row.new_data)
+  if (!veiculo || !dia || typeof km !== 'number' || !Number.isFinite(km)) return null
+  return { dia, veiculoId: veiculo.id, km }
 }

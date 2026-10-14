@@ -20,6 +20,9 @@ function fakeSource(mode: DataSource['mode'], envLabel: string): DataSource {
     fotoVeiculo: async () => null,
     enviarFotoVeiculo: async () => {},
     runFlow: async () => ({ message: null, shareUrl: null }),
+    salvarItemPlano: async () => {},
+    inativarItemPlano: async () => {},
+    salvarBaseline: async () => {},
   }
 }
 

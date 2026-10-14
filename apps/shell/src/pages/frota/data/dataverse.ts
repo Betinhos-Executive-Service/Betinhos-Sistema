@@ -1,10 +1,10 @@
 import { CAMPO, lerMulti } from '../domain/manutencaoCatalogo'
-import type { DateBehavior } from './dates'
-import { cleanId, mapColisao, mapInfracao, mapManutencao, mapMulta, mapPosse, mapVeiculo, SELECT } from './mappers'
-import { KIND_TABLE, STATUS_FIELD, TABLE } from './schema'
+import { addMonths, todaySP, type DateBehavior } from './dates'
+import { cleanId, mapBaseline, mapColisao, mapDespesaCombustivel, mapInfracao, mapItemPlano, mapManutencao, mapMulta, mapPosse, mapTelemetriaKm, mapVeiculo, SELECT } from './mappers'
+import { BASELINE, CATEGORIA_DESPESA_TABLE, ENTITY_SET, ITEM_PLANO, KIND_TABLE, STATUS_FIELD, TABLE } from './schema'
 import { base64ToBlob, callSpFlow, escolherPrincipal, FOTO_MAX_BYTES, fileToBase64, nomeFoto, pastaFotoVeiculo, SP_VARS, toArquivo, type SpKey } from './sharepoint'
-import { EMPTY_DATA, FlowIncertoError, type DataSource, type FlowId, type FlowResult, type LoadResult } from './source'
-import type { FrotaData, Kind, TableKey } from './types'
+import { EMPTY_DATA, FlowIncertoError, type DataSource, type FlowId, type FlowResult, type ItemPlanoInput, type LoadResult } from './source'
+import type { DespesaCombustivel, FrotaData, Kind, TableKey, TelemetriaKm } from './types'
 import { errorMessage, type XrmHost, type XrmWebApi } from './xrm'
 
 type Row = Record<string, unknown>
@@ -67,8 +67,8 @@ export function createXrmSource(xrm: XrmHost): DataSource {
     return cached
   }
 
-  async function retrieveAll(key: TableKey) {
-    const options = `?$select=${SELECT[key].join(',')}&$filter=statecode eq 0&$orderby=${ORDER[key]}`
+  async function retrieveAll(key: TableKey, filter = 'statecode eq 0') {
+    const options = `?$select=${SELECT[key].join(',')}&$filter=${filter}&$orderby=${ORDER[key]}`
     const rows: Row[] = []
     let page = await api.retrieveMultipleRecords(TABLE[key], options, 500)
     rows.push(...page.entities)
@@ -122,11 +122,24 @@ export function createXrmSource(xrm: XrmHost): DataSource {
     infracoes: async () => (await retrieveAll('infracoes')).map(mapInfracao),
     colisoes: async () => (await retrieveAll('colisoes')).map(mapColisao),
     posses: async () => (await retrieveAll('posses')).map(mapPosse),
-    // Tarefa 6: loaders reais
-    planoPreventivo: async () => [],
-    baselines: async () => [],
-    despesasCombustivel: async () => [],
-    telemetriaKm: async () => [],
+    // Inativos também: a aba do plano mostra e permite reativar.
+    planoPreventivo: async () => (await retrieveAll('planoPreventivo', 'statecode eq 0 or statecode eq 1')).map(mapItemPlano),
+    baselines: async () => (await retrieveAll('baselines')).map(mapBaseline),
+    despesasCombustivel: async () => {
+      const categorias = await api.retrieveMultipleRecords(CATEGORIA_DESPESA_TABLE, "?$select=cr40f_categoriadespesaoperacionalid,cr40f_nome&$filter=cr40f_nome eq 'Abastecimento' or cr40f_nome eq 'Manutenção'")
+      const tipoDe = new Map<string, 'combustivel' | 'manutencao'>()
+      for (const row of categorias.entities) {
+        if (row.cr40f_nome === 'Abastecimento') tipoDe.set(cleanId(row.cr40f_categoriadespesaoperacionalid), 'combustivel')
+        else if (row.cr40f_nome === 'Manutenção') tipoDe.set(cleanId(row.cr40f_categoriadespesaoperacionalid), 'manutencao')
+      }
+      if (![...tipoDe.values()].includes('combustivel')) throw new Error('Categoria "Abastecimento" não encontrada nas despesas')
+      const desde = addMonths(todaySP(), -12)
+      const porCategoria = [...tipoDe.keys()].map((id) => `_cr40f_categoria_value eq ${id}`).join(' or ')
+      const rows = await retrieveAll('despesasCombustivel', `statecode eq 0 and cr40f_datagasto ge ${desde}T00:00:00Z and (${porCategoria})`)
+      return rows.map((row) => mapDespesaCombustivel(row, (id) => tipoDe.get(id) ?? null)).filter((item): item is DespesaCombustivel => item !== null)
+    },
+    // DateOnly e sem statecode: a tabela de telemetria não é desativada por linha.
+    telemetriaKm: async () => (await retrieveAll('telemetriaKm', `new_data ge ${addMonths(todaySP(), -12)}`)).map(mapTelemetriaKm).filter((item): item is TelemetriaKm => item !== null),
   }
 
   return {
@@ -251,6 +264,44 @@ export function createXrmSource(xrm: XrmHost): DataSource {
         conteudoBase64: await fileToBase64(file),
         mimeType: file.type,
         metadados: { tarefaId: cleanId(id), origem: 'TELA_FROTA' },
+      })
+    },
+
+    async salvarItemPlano(input: ItemPlanoInput, id?: string) {
+      const patch = {
+        [ITEM_PLANO.nome]: input.nome,
+        [ITEM_PLANO.servico]: input.servico,
+        [ITEM_PLANO.intervaloKm]: input.intervaloKm,
+        [ITEM_PLANO.intervaloMeses]: input.intervaloMeses,
+        [ITEM_PLANO.avisoKm]: input.avisoKm,
+        [ITEM_PLANO.avisoDias]: input.avisoDias,
+      }
+      if (id) await api.updateRecord(TABLE.planoPreventivo, cleanId(id), patch)
+      else await api.createRecord(TABLE.planoPreventivo, patch)
+    },
+
+    async inativarItemPlano(id: string, ativo: boolean) {
+      await api.updateRecord(TABLE.planoPreventivo, cleanId(id), { statecode: ativo ? 0 : 1, statuscode: ativo ? 1 : 2 })
+    },
+
+    async salvarBaseline(veiculoId: string, itemId: string, km: number | null, data: string | null) {
+      const v = cleanId(veiculoId)
+      const i = cleanId(itemId)
+      const existentes = await api.retrieveMultipleRecords(TABLE.baselines, `?$select=cr40f_baselinepreventivaid&$filter=_cr40f_veiculo_value eq ${v} and _cr40f_item_value eq ${i}`)
+      const valores = { [BASELINE.km]: km, [BASELINE.data]: data }
+      if (existentes.entities.length > 0) {
+        await api.updateRecord(TABLE.baselines, cleanId(existentes.entities[0].cr40f_baselinepreventivaid), valores)
+        return
+      }
+      const [veiculo, item] = await Promise.all([
+        api.retrieveRecord(TABLE.veiculos, v, '?$select=cr40f_placa'),
+        api.retrieveRecord(TABLE.planoPreventivo, i, '?$select=cr40f_name'),
+      ])
+      await api.createRecord(TABLE.baselines, {
+        [BASELINE.nome]: `${String(veiculo.cr40f_placa ?? '')} · ${String(item.cr40f_name ?? '')}`,
+        [BASELINE.veiculo]: `/${ENTITY_SET.veiculos}(${v})`,
+        [BASELINE.item]: `/${ENTITY_SET.planoPreventivo}(${i})`,
+        ...valores,
       })
     },
   }
