@@ -36,8 +36,10 @@ function ultimaExecucao(item: ItemPlano, doVeiculo: ManutencaoPrev[], baseline: 
     if (dia && (!melhor || dia > melhor.dia)) melhor = { m, dia }
   }
   if (melhor) {
-    // A data sempre existe (manutenção sem dia não entra); o km pode faltar e vir da última execução informada.
-    const km = melhor.m.km ?? baseline?.km ?? null
+    // A data sempre existe (manutenção sem dia não entra); o km pode faltar e vir da última execução informada,
+    // só se ela não for anterior à manutenção (baseline mais antiga daria um km velho para uma execução nova).
+    const baselineValida = baseline && (baseline.data === null || baseline.data >= melhor.dia) ? baseline : undefined
+    const km = melhor.m.km ?? baselineValida?.km ?? null
     return { km, data: melhor.dia, origem: 'manutencao', manutencaoId: melhor.m.id, complementadaPorBaseline: melhor.m.km === null && km !== null }
   }
   if (baseline && (baseline.km !== null || baseline.data !== null)) return { km: baseline.km, data: baseline.data, origem: 'baseline', manutencaoId: null, complementadaPorBaseline: false }

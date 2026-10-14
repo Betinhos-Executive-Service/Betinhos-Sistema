@@ -30,13 +30,12 @@ function textoFaltam(p: Preventiva): string {
 
 /**
  * Botão de informar a última execução: sem base, ou quando a última execução não tem o dado que a regra do item pede.
- * Sem km conhecido do veículo a regra por km nunca é avaliada: o botão só aparece se faltar a data.
+ * Sem km conhecido do veículo a regra por km nunca é avaliada: o aviso aparece junto do botão (spec §5).
  */
 function acoesUltima(p: Preventiva): { botao: boolean; semKm: boolean } {
   const precisaKm = p.item.intervaloKm !== null && (p.ultima === null || p.ultima.km === null)
   const precisaData = p.item.intervaloMeses !== null && (p.ultima === null || p.ultima.data === null)
   const semKm = p.kmAtual === null && p.item.intervaloKm !== null
-  if (semKm) return { botao: precisaData, semKm }
   return { botao: p.estado === 'sem_base' || (p.ultima !== null && (precisaKm || precisaData)), semKm }
 }
 

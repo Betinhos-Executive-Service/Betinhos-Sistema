@@ -116,11 +116,11 @@ describe('Preventivas', () => {
     expect(within(linha('Pastilhas de freio')).getByRole('button', { name: 'Informar última execução' })).toBeTruthy()
   })
 
-  it('veículo sem km conhecido: avisa que a regra por km não é avaliada e só oferece a data quando ela falta', () => {
+  it('veículo sem km conhecido: avisa que a regra por km não é avaliada e mantém o botão no item sem base', () => {
     renderPrev('v5')
     const aviso = 'Veículo sem km conhecido: a regra por km não é avaliada'
     expect(within(linha('Troca de óleo')).getByText(aviso)).toBeTruthy()
-    expect(within(linha('Troca de óleo')).queryByRole('button', { name: 'Informar última execução' })).toBeNull()
+    expect(within(linha('Troca de óleo')).getByRole('button', { name: 'Informar última execução' })).toBeTruthy()
     expect(within(linha('Pastilhas de freio')).getByText(aviso)).toBeTruthy()
     expect(within(linha('Pastilhas de freio')).getByRole('button', { name: 'Informar última execução' })).toBeTruthy()
     expect(within(linha('Revisão anual')).queryByText(aviso)).toBeNull()
