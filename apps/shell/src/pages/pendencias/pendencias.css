@@ -1,0 +1,3 @@
+/* Pendências: reaproveita lista, cartões e ficha de Pagantes (pagantes.css). Só tokens do Design System. */
+.pend-card__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--bt-space-2); }
+.pend-servico { grid-template-columns: minmax(0, 1fr); }
