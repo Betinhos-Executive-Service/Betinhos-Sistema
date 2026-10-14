@@ -7,6 +7,17 @@ const exige = (p: Proposta, campo: string) => {
   return v
 }
 
+export const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+export const ehGuid = (v: string) => GUID.test(v)
+const guid = (v: string, rotulo: string) => {
+  if (!ehGuid(v)) throw new Error(`Identificador inválido para ${rotulo}: ${v || '(vazio)'}.`)
+  return v
+}
+const alvoReserva = (p: Proposta) => {
+  if (p.entidadeAlvo !== 'cr40f_reservadeveculos') throw new Error(`Ação ${p.acao?.tipo} exige um serviço como alvo, não ${p.entidadeAlvo || '(vazio)'}.`)
+  return guid(p.idAlvo, 'o serviço')
+}
+
 /** Frase mostrada na confirmação antes de gravar. */
 export function descreverAcao(p: Proposta): string {
   if (!p.acao) return 'Só registrar a decisão; nada será gravado no registro.'
@@ -23,8 +34,8 @@ export function descreverAcao(p: Proposta): string {
 export function gravacaoDaAcao(p: Proposta): Gravacao | null {
   if (!p.acao) return null
   switch (p.acao.tipo) {
-    case 'AtribuirMotorista': return { kind: 'update', entity: 'cr40f_reservadeveculos', id: p.idAlvo, data: { 'cr40f_Motorista@odata.bind': `/cr40f_funcionarioses(${exige(p, 'motoristaId')})` } }
-    case 'AtribuirVeiculo': return { kind: 'update', entity: 'cr40f_reservadeveculos', id: p.idAlvo, data: { 'cr40f_Veiculo@odata.bind': `/cr40f_veiculoses(${exige(p, 'veiculoId')})` } }
+    case 'AtribuirMotorista': return { kind: 'update', entity: 'cr40f_reservadeveculos', id: alvoReserva(p), data: { 'cr40f_Motorista@odata.bind': `/cr40f_funcionarioses(${guid(exige(p, 'motoristaId'), 'o motorista')})` } }
+    case 'AtribuirVeiculo': return { kind: 'update', entity: 'cr40f_reservadeveculos', id: alvoReserva(p), data: { 'cr40f_Veiculo@odata.bind': `/cr40f_veiculoses(${guid(exige(p, 'veiculoId'), 'o veículo')})` } }
     case 'CriarPendencia': {
       const titulo = exige(p, 'titulo').slice(0, 200)
       return { kind: 'create', entity: 'cr40f_plannertarefa', data: { cr40f_name: titulo.slice(0, 100), cr40f_titulo: titulo, cr40f_descricao: texto(p.acao.campos.descricao), cr40f_status: 100000000, cr40f_origem: 100000000, cr40f_prioridade: p.prioridade === 'alta' ? 100000002 : p.prioridade === 'media' ? 100000001 : 100000000, cr40f_codigoorigem: `agente:${p.id}` } }

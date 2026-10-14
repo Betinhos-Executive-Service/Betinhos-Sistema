@@ -69,8 +69,21 @@ export function createSource(host: Host): Source {
       const g = gravacaoDaAcao(proposta)
       if (!g) return
       const set = await entitySet(g.entity)
-      if (g.kind === 'update') await host.client.update(set, g.id, g.data)
-      else await host.client.create(set, g.data)
+      if (g.kind === 'update') {
+        // Não sobrescreve escala feita por alguém depois da análise.
+        const atual = await host.client.request<Record<string, unknown>>(`${set}(${g.id})?$select=_cr40f_motorista_value,_cr40f_veiculo_value`)
+        if (proposta.acao?.tipo === 'AtribuirMotorista' && atual._cr40f_motorista_value) throw new Error('Este serviço já tem motorista escalado.')
+        if (proposta.acao?.tipo === 'AtribuirVeiculo' && atual._cr40f_veiculo_value) throw new Error('Este serviço já tem veículo.')
+        await host.client.update(set, g.id, g.data)
+        return
+      }
+      if (proposta.acao?.tipo === 'CriarPendencia') {
+        // Idempotente: aprovar de novo a mesma proposta não duplica a pendência.
+        const filtro = encodeURIComponent(`cr40f_codigoorigem eq 'agente:${proposta.id.replace(/'/g, "''")}'`)
+        const existentes = await host.client.getAll(`${set}?$select=cr40f_plannertarefaid&$filter=${filtro}&$top=1`)
+        if (existentes.length > 0) return
+      }
+      await host.client.create(set, g.data)
     },
   }
 }

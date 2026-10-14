@@ -5,6 +5,7 @@ import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
 import { createSource } from './data/source'
 import { agentePorId } from './domain/agentes'
+import { ehGuid } from './domain/acoes'
 import type { Agente, Proposta } from './domain/types'
 import { useAgente } from './useAgente'
 import { PropostaCard } from './components/PropostaCard'
@@ -43,7 +44,7 @@ function Agentes({ host, agente }: { host: Host; agente: Agente }) {
   const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar" onClick={() => void reload()} />, [reload])
   useShellHeader({ title: info.label, actions: headerActions })
 
-  const linkAlvo = (p: Proposta) => (host.mode === 'dataverse' && ENTITY_SET[p.entidadeAlvo] ? `${host.clientUrl}/main.aspx?pagetype=entityrecord&etn=${ENTITY_SET[p.entidadeAlvo]}&id=${p.idAlvo}` : null)
+  const linkAlvo = (p: Proposta) => (host.mode === 'dataverse' && ENTITY_SET[p.entidadeAlvo] && ehGuid(p.idAlvo) ? `${host.clientUrl}/main.aspx?pagetype=entityrecord&etn=${ENTITY_SET[p.entidadeAlvo]}&id=${p.idAlvo}` : null)
 
   async function confirmarAprovar(p: Proposta) {
     setBusyId(p.id)
