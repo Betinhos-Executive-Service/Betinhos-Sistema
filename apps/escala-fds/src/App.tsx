@@ -123,7 +123,7 @@ export function App() {
         <div className="escala__head-end">
           <span className={salvarErro ? 'escala__save is-error' : 'escala__save'} aria-live="polite">
             {salvarErro ? (
-              <><CircleAlert size={14} aria-hidden="true" />Não salvo<Button variant="ghost" size="compact" onClick={() => setSalvarErro(false)}>Tentar de novo</Button></>
+              <><CircleAlert size={14} aria-hidden="true" />Não salvo<Button variant="ghost" size="compact" onClick={() => setSalvarErro(false)}>Tentar de novo</Button><Button variant="ghost" size="compact" onClick={() => { setPend(semPendencias()); setSalvarErro(false); void load(janela) }}>Descartar alterações</Button></>
             ) : dirty ? (
               <><LoaderCircle size={14} className="escala__spin" aria-hidden="true" />Salvando…</>
             ) : salvoEm ? (

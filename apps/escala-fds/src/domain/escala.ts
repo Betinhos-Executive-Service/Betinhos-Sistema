@@ -117,7 +117,7 @@ export type NovaAusencia = { motoristaId: string; dias: string[]; diaInteiro: bo
 
 /** Registros a gravar: dia todo junta dias seguidos num registro; com horário, um registro por dia. */
 export function ausenciasDosDias(a: NovaAusencia): Compromisso[] {
-  const dias = [...new Set(a.dias)].sort()
+  const dias = [...new Set(a.dias.filter(Boolean))].sort()
   const base = { id: null, motoristaId: a.motoristaId, diaInteiro: a.diaInteiro, motivo: a.motivo, observacao: a.observacao.trim(), registradoEm: null }
   if (!a.diaInteiro) return dias.map((d) => ({ ...base, inicio: `${d}T${a.horaInicio}`, fim: `${d}T${a.horaFim}` }))
   const blocos: string[][] = []
