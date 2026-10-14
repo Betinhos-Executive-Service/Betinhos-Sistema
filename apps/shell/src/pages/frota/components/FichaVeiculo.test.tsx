@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MANUT, VEICULO } from '../data/schema'
 import { EMPTY_DATA, type DataSource } from '../data/source'
@@ -15,6 +15,7 @@ const data: FrotaData = {
     { id: 'm1', codigo: 'M1', descricao: 'Troca de óleo', status: MANUT.REALIZADO, grau: 1, tipo: 1, agendarPara: null, dataManutencao: '2026-09-20T12:00:00Z', valor: 200, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: v1, solicitante: null, criadoEm: '2026-09-01T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null },
     { id: 'm2', codigo: 'M2', descricao: 'Alinhamento', status: MANUT.REALIZADO, grau: 1, tipo: 1, agendarPara: null, dataManutencao: '2026-09-25T12:00:00Z', valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: v1, solicitante: null, criadoEm: '2026-09-21T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null },
   ],
+  planoPreventivo: [{ id: 'i1', nome: 'Revisão anual', servico: 100000035, intervaloKm: null, intervaloMeses: 12, avisoKm: 1000, avisoDias: 30, ativo: true }],
 }
 const source = { openForm: vi.fn(async () => {}) } as unknown as DataSource
 
@@ -27,7 +28,8 @@ describe('FichaVeiculo', () => {
     expect(screen.getByText('Ana')).toBeTruthy()
     expect(screen.getAllByText(/200,00/).length).toBeGreaterThan(0)
     expect(screen.getByText('1 manutenção sem valor informado')).toBeTruthy()
-    expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([expect.stringContaining('Alinhamento'), expect.stringContaining('Troca de óleo')])
+    const linha = screen.getByRole('heading', { name: 'Linha do tempo' }).closest('section')!
+    expect(within(linha).getAllByRole('listitem').map((item) => item.textContent)).toEqual([expect.stringContaining('Alinhamento'), expect.stringContaining('Troca de óleo')])
   })
 
   it('abre o registro ao clicar em um item da linha do tempo', () => {
@@ -84,6 +86,24 @@ describe('FichaVeiculo', () => {
     expect(screen.getByText('Não foi possível carregar Veículos: Falha')).toBeTruthy()
     expect(screen.queryByText('Custo de manutenção')).toBeNull()
     expect(screen.queryByText('Linha do tempo')).toBeNull()
+  })
+
+  it('mostra a seção Preventivas antes da linha do tempo', () => {
+    render(<FichaVeiculo errors={{}} source={source} id="v1" data={data} today="2026-10-02" onClose={() => {}} onOpen={() => {}} onReload={() => {}} />)
+    const secao = screen.getByRole('region', { name: 'Preventivas' })
+    expect(secao.id).toBe('v1-preventivas')
+    expect(secao.textContent).toContain('Revisão anual')
+    expect(secao.textContent).toContain('Sem base')
+    const linha = screen.getByRole('region', { name: 'Linha do tempo' })
+    expect(secao.compareDocumentPosition(linha) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('com secao="preventivas", rola até a seção', () => {
+    const scroll = vi.fn()
+    Element.prototype.scrollIntoView = scroll
+    render(<FichaVeiculo errors={{}} source={source} id="v1" data={data} today="2026-10-02" secao="preventivas" onClose={() => {}} onOpen={() => {}} onReload={() => {}} />)
+    expect(scroll).toHaveBeenCalledWith({ block: 'start' })
+    expect(scroll.mock.contexts[0]).toBe(document.getElementById('v1-preventivas'))
   })
 
   it('recarrega depois de abrir o cadastro com sucesso', async () => {

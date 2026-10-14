@@ -13,6 +13,7 @@ import { motoristaAtual, possesAbertas, rotuloMotoristaAtual } from '../domain/m
 import { buildTimeline } from '../domain/timeline'
 import { buildPromptImagem, faltasPrompt } from '../domain/promptImagem'
 import { FotoVeiculo, invalidarFoto } from './FotoVeiculo'
+import { Preventivas } from './Preventivas'
 import { useNotify } from './Toasts'
 
 const TABELAS_TIMELINE: { key: 'manutencoes' | 'multas' | 'colisoes' | 'posses'; nome: string }[] = [
@@ -21,7 +22,7 @@ const TABELAS_TIMELINE: { key: 'manutencoes' | 'multas' | 'colisoes' | 'posses';
 
 const TIPOS_FOTO = ['image/png', 'image/jpeg', 'image/webp']
 
-export function FichaVeiculo({ source, id, data, errors, today, onClose, onOpen, onReload }: { source: DataSource; id: string; errors: LoadResult['errors']; data: FrotaData; today: string; onClose: () => void; onOpen: (kind: Kind, id: string) => void; onReload: () => void }) {
+export function FichaVeiculo({ source, id, data, errors, today, secao = null, onClose, onOpen, onReload }: { source: DataSource; id: string; errors: LoadResult['errors']; data: FrotaData; today: string; secao?: 'preventivas' | null; onClose: () => void; onOpen: (kind: Kind, id: string) => void; onReload: () => void }) {
   const notify = useNotify()
   const padrao = useMemo(() => ultimos12Meses(today), [today])
   const [periodo, setPeriodo] = useQueryPeriodo('fde', 'fate', padrao)
@@ -100,6 +101,12 @@ export function FichaVeiculo({ source, id, data, errors, today, onClose, onOpen,
     onReload()
   }
 
+  // Aberta a partir de uma pendência de preventiva, a ficha já mostra a seção.
+  const temVeiculo = Boolean(veiculo)
+  useEffect(() => {
+    if (secao === 'preventivas' && temVeiculo) document.getElementById(`${id}-preventivas`)?.scrollIntoView?.({ block: 'start' })
+  }, [secao, id, temVeiculo])
+
   const erro = (nome: string, mensagem: string) => <Alert key={nome} tone="danger">Não foi possível carregar {nome}: {mensagem}</Alert>
 
   return (
@@ -160,6 +167,10 @@ export function FichaVeiculo({ source, id, data, errors, today, onClose, onOpen,
                 {custo.semValor > 0 && <p className="frota-muted">{custo.semValor} {custo.semValor === 1 ? 'manutenção sem valor informado' : 'manutenções sem valor informado'}</p>}
               </>
             )}
+          </section>
+          <section className="frota-group" id={`${id}-preventivas`} aria-labelledby={`${id}-prev-titulo`}>
+            <h3 id={`${id}-prev-titulo`} className="frota-group__title">Preventivas</h3>
+            <Preventivas data={data} veiculoId={id} today={today} source={source} errors={errors} onOpen={onOpen} onReload={onReload} />
           </section>
           <section className="frota-group" aria-labelledby={`${id}-linha`}>
             <h3 id={`${id}-linha`} className="frota-group__title">Linha do tempo</h3>
