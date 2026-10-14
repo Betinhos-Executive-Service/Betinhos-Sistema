@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DataSource } from '../data/source'
 import { createMockDocsSource } from '../../documentos/data/source'
@@ -28,7 +28,7 @@ async function renderFicha(source: DataSource) {
   return screen.findByDisplayValue('Ana Souza')
 }
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); window.location.hash = ''; vi.unstubAllGlobals() })
 
 describe('Ficha', () => {
   it('salva somente o campo alterado', async () => {
@@ -65,7 +65,6 @@ describe('Ficha', () => {
     // O id do mock de Funcionários (f1) não está nos donos do mock de documentos; a seção aparece mesmo assim.
     expect(await screen.findByText('Cadastro não encontrado na lista de documentos.')).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Outros arquivos' })).toBeTruthy()
-    window.location.hash = ''
   })
 
   it('aba Documentos não mostra o checklist sem fonte de documentos', async () => {
@@ -74,6 +73,19 @@ describe('Ficha', () => {
     expect(await screen.findByRole('heading', { name: 'Arquivos' })).toBeTruthy()
     expect(screen.queryByRole('heading', { name: 'Outros arquivos' })).toBeNull()
     expect(screen.queryByText('Cadastro não encontrado na lista de documentos.')).toBeNull()
-    window.location.hash = ''
+  })
+
+  it('Esc dentro do painel de renovação não fecha a ficha', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
+    window.location.hash = '#/funcionarios?ficha=f-ana&secao=documentos'
+    const onClose = vi.fn()
+    const base = fakeSource(vi.fn(async () => 'f-ana'))
+    const source: DataSource = { ...base, get: async () => structuredClone({ ...record, id: 'f-ana' }) }
+    render(<ToastProvider><Ficha source={source} id="f-ana" docs={createMockDocsSource()} onClose={onClose} onSaved={() => {}} /></ToastProvider>)
+    const cnh = await screen.findByRole('listitem', { name: 'CNH' })
+    fireEvent.click(within(cnh).getByRole('button', { name: 'Renovar' }))
+    const painel = await screen.findByRole('dialog', { name: 'Renovar CNH' })
+    fireEvent.keyDown(painel, { key: 'Escape' })
+    expect(onClose).not.toHaveBeenCalled()
   })
 })
