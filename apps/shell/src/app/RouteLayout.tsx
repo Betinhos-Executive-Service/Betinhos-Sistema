@@ -10,6 +10,7 @@ import { FuncionariosPage } from '../pages/funcionarios/FuncionariosPage'
 import { CurriculosPage } from '../pages/curriculos/CurriculosPage'
 import { PagantesPage } from '../pages/pagantes/PagantesPage'
 import { OpsPage } from '../pages/ops/OpsPage'
+import { PendenciasPage } from '../pages/pendencias/PendenciasPage'
 import { PessoasPage } from '../pages/pessoas/PessoasPage'
 import { GeralPage } from '../pages/geral/GeralPage'
 import { DashboardPage } from '../pages/dashboard/DashboardPage'
@@ -64,6 +65,7 @@ export function RouteLayout({ host, group, item, label }: Props) {
     if (item.page === 'curriculos') return <CurriculosPage host={host} />
     if (item.page === 'pagantes') return <PagantesPage host={host} />
     if (item.page === 'ops') return <OpsPage host={host} />
+    if (item.page === 'pendencias') return <PendenciasPage host={host} />
     if (item.page === 'pessoas') return <PessoasPage host={host} />
     if (item.page === 'geral') return <GeralPage host={host} />
     if (item.page === 'dashboard') return <DashboardPage host={host} />
