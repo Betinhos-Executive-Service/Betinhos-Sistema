@@ -29,10 +29,10 @@ Entrada: uma OP (ou uma Reserva, que resolve para a OP dela). Saída: lista de m
 
 | Situação da OP (pagantes ativos = não cancelados) | Efeito |
 |---|---|
-| Todos Pago/Autorizado e soma ≥ total da OP | OP → Paga; cada Reserva da OP → Pago; CP de cada reserva → Concluída |
-| Algum pago, não todos (ou soma < total) | OP → Pagamento Parcial; Reserva e CP não mudam |
-| Nenhum pago (todos cancelados ou sem pagante) | OP → Aberta; Reserva que estava Pago **por essa OP** (há log) → Pendente; CP → Pendente |
-| OP cancelada | Reserva perde o vínculo `_cr40f_financeiro_value`; se estava Pago por essa OP → Pendente; CP → Pendente |
+| Todos os pagantes ativos pagos e soma ≥ total conhecido (total conhecido = valor da OP, ou toda reserva com CP; total > 0) | OP → Paga; Reservas → Pago; CPs → Concluída |
+| Algum pago, mas sem cobrir o total | OP → Pagamento Parcial; Reservas que o motor tinha marcado Pago → Pagamento Pendente e a CP delas → Pendente; as demais não mudam |
+| Nenhum pago | OP → Pagamento Pendente se há pagantes ativos, Aberta se não há; Reservas marcadas pelo motor → Pagamento Pendente e CP → Pendente |
+| OP cancelada | Reservas perdem o vínculo `_cr40f_financeiro_value`; as marcadas Pago pelo motor → Pendente; as em Pagamento Pendente → Pendente; CP das revertidas → Pendente |
 | Reserva Pago na mão sem OP, ou com OP não paga | Não mexe. Vira pendência tipo 2 |
 | Reserva "Pagante em viagem", "Mensal" e outros informativos | Não mexe até evento de dinheiro. Mensal sem OP vira pendência tipo 4 só depois do mês fechar |
 
@@ -47,7 +47,7 @@ Mesmo molde do `cr40f_GerarPagantes` (`C:\Users\mendo\Desktop\vscode\Tela Gerar 
 ### 4.1 `cr40f_SincronizarFinanceiro` (bound a `cr40f_financeiro`)
 
 - Request: `{ "modo": "simular" | "aplicar", "origem": "manual" | "automatico" }`.
-- Response: `{ "mudancas": [...], "aplicadas": bool, "erros": [...] }`.
+- Response: `{ "mudancas": [...], "aplicadas": bool, "erros": [...] }`. `aplicadas` é false quando há zero mudanças.
 - `simular` não grava. `aplicar` grava em contexto elevado, numa transação, e insere o log.
 - Permissão: usuário precisa de Write na OP (mesma checagem `RetrievePrincipalAccessRequest` do Gerar Pagantes).
 
@@ -55,7 +55,9 @@ Mesmo molde do `cr40f_GerarPagantes` (`C:\Users\mendo\Desktop\vscode\Tela Gerar 
 
 - Pós-operação `Update` de `cr40f_pagantes` (filtro `cr40f_status`) e de `cr40f_financeiro` (filtro `cr40f_status`): chama o motor em modo `aplicar`, origem `automatico`, para a OP afetada.
 - Anti-loop: ignora execução com `Depth > 1` vinda do próprio motor e marca `SharedVariables["cr40f_sync"]`.
-- Substitui o flow "Pagantes → OP": desativado em DEV após comparar resultado nas mesmas OPs; não excluído.
+- O step de `cr40f_financeiro` só age quando o novo status é Cancelada. O flow "Flow Dar Baixa Status OP -> Pagantes" continua ativo e trata OPs marcadas manualmente (assíncrono): uma OP paga na mão só chega à reserva depois que esse flow rodar.
+- Os steps são síncronos: erro do motor desfaz o salvamento do usuário (mantém os dados consistentes).
+- Só o "Flow Dar Baixa Status Pagantes -> OP" foi substituído: desativado em DEV após comparar resultado nas mesmas OPs; não excluído.
 
 ### 4.3 `cr40f_FecharMesCliente` (unbound)
 
@@ -92,6 +94,7 @@ Divergências calculadas **no cliente** a partir de reservas, CPs, OPs e pagante
 
 - Plugin: novo projeto `packages/plugins/Cr40f.Financeiro.Plugin/` (motor em classe pura `SyncEngine` testável sem Dataverse; `SincronizarFinanceiroPlugin`, `FecharMesClientePlugin`, `PaganteOpStepPlugin`). Testes xUnit em `packages/plugins/Cr40f.Financeiro.Plugin.Tests/`. Registrador em `packages/plugins/tools/` copiado do molde.
 - Shell: `apps/shell/src/pages/pendencias/` com `domain/` (tipos, detecção das 5 divergências, agrupamento mensal; puros e testados), `data/` (queries, source dataverse/mock, chamadas das APIs via `host.client.request`), `usePendencias.ts`, `components/`, `pendencias.css`. Rota e item no menu do grupo Financeiro.
+- A chave de assinatura `%USERPROFILE%\.codex\keys\Cr40f.Financeiro.Plugin.snk` é criada pelo script de push se não existir e nunca é commitada.
 - Schema versionado: tabela de log, Custom APIs e steps na solução AppBetinhos via `pnpm push`.
 
 ## 7. Entregas (cada uma publicável sozinha)
@@ -103,7 +106,7 @@ Divergências calculadas **no cliente** a partir de reservas, CPs, OPs e pagante
 
 ## 8. Riscos
 
-- **Metadata não conferida nesta sessão** (MCP `Dataverse_DEV` fora): valores de `cr40f_statusdefaturamento` (qual é "Pendente"), `new_status` da CP, lookups reserva→OP/CP e nome do entity set. Passo 0 do plano; se faltar, parar e reportar.
+- Metadata conferida em DEV em 14/10/2026 (ver §10).
 - **Loop plugin ↔ plugin**: anti-loop por `Depth` + `SharedVariables`.
 - **Dados antigos**: a primeira rodada da tela vai listar muita coisa histórica; o período padrão de 90 dias limita, e nada é corrigido sem clique.
 - **PROD**: tudo em DEV até pedido explícito; solução versionada antes de promover.
