@@ -83,4 +83,36 @@ public class SyncEngineTests
         op.Reservas.Add(Res(Codigos.ReservaFatPagante, Codigos.CpPendente));
         Assert.Empty(SyncEngine.Compute(op));
     }
+
+    [Fact]
+    public void OpCancelada_DesvinculaReservasERevertePagoPorEla()
+    {
+        var op = Op(Codigos.OpCancelada, 10000);
+        var r1 = Res(Codigos.ReservaFatPago, Codigos.CpConcluida, pagoPorOp: true);
+        var r2 = Res(Codigos.ReservaFatPagante, Codigos.CpPendente);
+        op.Reservas.Add(r1); op.Reservas.Add(r2);
+        var m = SyncEngine.Compute(op);
+        Assert.DoesNotContain(m, x => x.Entidade == Codigos.Op);
+        Assert.Equal(2, m.Count(x => x.Entidade == Codigos.Reserva && x.Campo == Codigos.ReservaOpLookup && x.LimparLookup));
+        Assert.Contains(m, x => x.Id == r1.Id && x.Campo == Codigos.ReservaFatStatus && x.Para == Codigos.ReservaFatPendente);
+        Assert.Contains(m, x => x.Id == r1.CpId && x.Para == Codigos.CpPendente);
+        Assert.DoesNotContain(m, x => x.Id == r2.Id && x.Campo == Codigos.ReservaFatStatus);
+    }
+
+    [Fact]
+    public void Idempotente_SegundaRodadaNaoMudaNada()
+    {
+        var op = Op(Codigos.OpAberta, 10000, Pag(Codigos.PagPago, 10000));
+        op.Reservas.Add(Res(Codigos.ReservaFatPagante, Codigos.CpPendente));
+        var primeira = SyncEngine.Compute(op);
+        Assert.NotEmpty(primeira);
+        foreach (var m in primeira)
+        {
+            if (m.Entidade == Codigos.Op) op.Status = m.Para;
+            var r = op.Reservas.FirstOrDefault(x => x.Id == m.Id || x.CpId == m.Id);
+            if (r != null && m.Entidade == Codigos.Reserva) { r.FatStatus = m.Para; r.PagoPorEstaOp = true; }
+            if (r != null && m.Entidade == Codigos.Composicao) r.CpStatus = m.Para;
+        }
+        Assert.Empty(SyncEngine.Compute(op));
+    }
 }
