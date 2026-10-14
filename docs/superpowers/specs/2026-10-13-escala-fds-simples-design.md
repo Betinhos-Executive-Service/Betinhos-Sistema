@@ -14,9 +14,9 @@ Deixar a escala extremamente simples e rápida de usar: menos toques e menos inf
 
 - **Cabeçalho:** ‹ `Semana dd/mm a dd/mm` › (segunda a domingo; eyebrow "Esta semana" ou "Semana"), estado do salvamento ("Salvando…", "Salvo às HH:mm", "Não salvo · Tentar de novo") e botão Atualizar.
 - **Lista de motoristas** ativos, em ordem alfabética pelo apelido. Cada linha:
-  - nome · `Sáb [Plantão] [Trabalha]` · `Dom [Plantão] [Trabalha]` · botão **Ausência**;
+  - 1ª linha: nome e botão **Ausência**; 2ª linha: `Sáb [Plantão] [Trabalha]` e `Dom [Plantão] [Trabalha]` (os grupos quebram de linha em telas estreitas);
   - um toque marca; tocar no botão ativo desmarca (sem marcação = folga). Ativo em navy; inativo em `#FCFCFB` com borda;
-  - abaixo do nome, chips amarelos com as ausências que tocam a semana: "Ter · dia todo · Médico", "Sáb · até 12h · Pessoal", "Férias até 25/10". Toque no chip mostra Excluir/Cancelar na própria linha; para registro que ultrapassa a semana, o texto avisa que o período inteiro será excluído;
+  - abaixo do nome, chips amarelos com as ausências que tocam a semana: "Ter · dia todo · Médico", "Sáb · até 12h · Pessoal", "Ter a Qui · Médico" e, para registro que passa da semana, "Férias · 16/10 a 25/10". Toque no chip mostra Excluir/Cancelar na própria linha; para registro que ultrapassa a semana, o texto avisa que o período inteiro será excluído;
   - linha com ausência de dia todo em sábado ou domingo recebe o fundo de atenção, como hoje.
 - **Formulário de ausência** abre logo abaixo da linha (um por vez; o botão Ausência alterna):
   1. chips Seg…Dom da semana, seleção múltipla; hoje já marcado se estiver na semana, senão nenhum;
@@ -24,9 +24,10 @@ Deixar a escala extremamente simples e rápida de usar: menos toques e menos inf
   3. motivo em botões (Médico, Pessoal, Férias, Outro), Médico pré-selecionado;
   4. observação opcional;
   5. **Registrar ausência** (desabilitado sem dia ou com horário inválido) e Cancelar.
-  - Link "Outro período" troca os chips por datas De/Até (até 62 dias), para férias e afastamentos longos.
+  - Link "Outro período" troca os chips por datas De/Até (até 62 dias, sempre dia todo), para férias e afastamentos longos.
 - Sem motoristas: estado vazio atual ("Nenhum motorista ativo encontrado."). Erro de carga: alerta atual com "Tentar de novo". Carregando: skeleton.
-- Layout funciona de 320 px ao painel de 520 px; abaixo de 420 px os grupos Sáb/Dom quebram para a linha de baixo. Alvos de toque de 44 px nos botões de situação.
+- Layout funciona de 320 px ao painel de 520 px. Alvos de toque de 44 px nos botões de situação e nos chips de dia do formulário.
+- Navegação de semana e Atualizar ficam desabilitados enquanto há gravação pendente (o plano de gravação compara com a semana carregada).
 
 ## Dados (sem mudança de schema)
 
