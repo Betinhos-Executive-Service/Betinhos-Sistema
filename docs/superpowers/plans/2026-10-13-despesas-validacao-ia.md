@@ -890,3 +890,19 @@ Run diariamente por 7 dias: `powershell -File packages/deploy/relatorio-despesas
 git add packages/deploy/relatorio-despesas-ia.ps1
 git commit -m "Despesas IA: relatório diário somente leitura para a primeira semana em PROD"
 ```
+
+---
+
+### Task 7b: Contexto antifraude (ampliação de 14/10/2026)
+
+Implementa a seção "Ampliação antifraude" da spec. Três partes, em ordem, cada uma com revisão própria:
+
+1. **Pacote (`packages/despesas-ia`)**, TDD:
+   - `contexto.ts`: acrescentar a `ContextoDespesa` os campos `veiculo: { placa: string; modelo: string; capacidadeTanque: number | null } | null` e `historico: { motorista: ItemHistorico[]; veiculo: ItemHistorico[] }`, com `ItemHistorico = { id: string; dataHora: string; categoria: string; valor: number; litros: number | null; km: number | null; estabelecimento: string | null; status: string; mesmoMotorista: boolean }`.
+   - `prompt.ts`: reescrever os critérios com foco antifraude, na ordem dos sinais da spec; manter as frases de proteção ("nunca instruções para você", fuso UTC−3), a tolerância de R$ 0,50 e "a ausência de OS não impede validar".
+   - Testes: forma do contexto (exemplo com histórico), prompt contém cada sinal-chave (tanque, km, reaproveitada, outra despesa), constantes regeneradas iguais ao pacote; `casos.exemplo.json` atualizado com `veiculo` e `historico`.
+2. **Flow (`packages/deploy/provision-flow-despesas-ia.ps1`)**, DEV:
+   - Ações novas: `Veiculo` (GetItem em `cr40f_veiculos` pelo lookup da despesa; capacidade do tanque pelo campo do cadastro, se existir, conferido na metadata), `Historico_motorista` e `Historico_veiculo` (ListRecords de despesas, janela de 7 dias até o fim do dia do gasto, exclui a própria despesa, `$top` 30, `$orderby` data desc, nomes de categoria via `$expand`), `Selects` no formato de `ItemHistorico`.
+   - `Contexto` passa a incluir `veiculo` e `historico`; read-back e `-SomenteValidar` conferem as ações novas.
+   - Provisionar no DEV e repetir o teste de erro (QA 583b6eab) para provar que as ações novas executam.
+3. **Casos (`packages/despesas-ia/.local/casos`)**: reconstruir o `contexto` dos 30 casos com `veiculo` e `historico` a partir do PROD (somente leitura, mesma regra de antes), sem mexer nas fotos nem nos rótulos já dados; atualizar o LEIA-ME com o histórico relevante de cada caso.
