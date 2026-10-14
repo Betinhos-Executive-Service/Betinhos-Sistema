@@ -126,3 +126,17 @@ describe('pessoas', () => {
     for (const t of ['CNHVencendo', 'ASOVencendo', 'DocumentoVencido', 'Aniversario', 'MultaSemMotorista', 'ComunicadoSugerido', 'CriarPendencia', 'CriarComunicadoRascunho', '30 dias', '12 meses']) expect(SYSTEM_PESSOAS).toContain(t)
   })
 })
+
+import { constantesDoFlow } from './constantes.ts'
+
+describe('constantes do flow', () => {
+  it('reúne modelo, schema e os três agentes, sem @ (o Logic Apps leria como expressão)', () => {
+    const c = constantesDoFlow()
+    expect(c.modelo).toBe('claude-opus-5-5')
+    expect(c.maxTokens).toBe(8000)
+    expect(c.effort).toBe('medium')
+    expect(Object.keys(c.agentes)).toEqual(['financeiro', 'logistica', 'pessoas'])
+    expect(c.agentes.logistica.acoes).toEqual(['AtribuirMotorista', 'AtribuirVeiculo'])
+    expect(JSON.stringify(c)).not.toContain('@')
+  })
+})
