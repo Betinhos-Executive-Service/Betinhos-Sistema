@@ -44,9 +44,10 @@ function useFrotaRota() {
   const veiculo = query.get('ficha') || null
   const [kind, id] = (query.get('registro') ?? '').split(':')
   const registro = KINDS.find((item) => item === kind) && id ? { kind: kind as Kind, id } : null
-  return { tab, veiculo, registro }
+  const secao = query.get('secao') === 'preventivas' ? ('preventivas' as const) : null
+  return { tab, veiculo, registro, secao }
 }
-const abrirAba = (tab: Tab) => patchHashQuery({ aba: tab === 'pendencias' ? null : tab, ficha: null, registro: null, ...Object.fromEntries(FILTROS_DAS_VISOES.map((chave) => [chave, null])) })
+const abrirAba = (tab: Tab) => patchHashQuery({ aba: tab === 'pendencias' ? null : tab, ficha: null, registro: null, secao: null, ...Object.fromEntries(FILTROS_DAS_VISOES.map((chave) => [chave, null])) })
 
 export function FrotaPage({ host }: { host: Host }) {
   const [state] = useState(() => {
@@ -98,7 +99,7 @@ export function Frota({ source }: { source: DataSource }) {
   const pendentes = useMemo(() => buildPendencias(data, today).length, [data, today])
   const tab = TABS.find((item) => item.id === route.tab)!
   const onOpen = (kind: Kind, id: string) => setRegistro({ kind, id })
-  const onOpenVeiculo = (id: string) => patchHashQuery({ registro: null, ficha: id })
+  const onOpenVeiculo = (id: string, secao?: 'preventivas') => patchHashQuery({ registro: null, ficha: id, secao: secao ?? null })
   const onReload = () => void reload()
 
   const refreshButton = useMemo(() => (
@@ -111,7 +112,7 @@ export function Frota({ source }: { source: DataSource }) {
   else if (fatal) body = <Alert tone="danger" title="Não foi possível carregar a frota" action={<Button variant="secondary" size="compact" onClick={onReload}>Tentar de novo</Button>}>{fatal}</Alert>
   else body = (
     <ViewGate errors={errors} tables={tab.tables} onRetry={onReload}>
-      {route.tab === 'pendencias' && <Pendencias data={data} today={today} onOpen={onOpen} />}
+      {route.tab === 'pendencias' && <Pendencias data={data} today={today} onOpen={onOpen} onOpenVeiculo={onOpenVeiculo} />}
       {route.tab === 'veiculos' && <Veiculos data={data} today={today} source={source} onOpenVeiculo={onOpenVeiculo} />}
       {route.tab === 'manutencoes' && <Registros key="manutencoes" kinds={['manutencao']} data={data} source={source} onOpen={onOpen} onReload={onReload} />}
       {route.tab === 'ocorrencias' && <Registros key="ocorrencias" kinds={['multa', 'colisao']} data={data} source={source} onOpen={onOpen} onReload={onReload} />}
@@ -137,7 +138,7 @@ export function Frota({ source }: { source: DataSource }) {
         </Tabs>
       </div>
 
-      {result && !fatal && route.veiculo && !registro ? <FichaVeiculo errors={errors} source={source} id={route.veiculo} data={data} today={today} onClose={() => patchHashQuery({ ficha: null, fde: null, fate: null })} onOpen={onOpen} onReload={onReload} /> : null}
+      {result && !fatal && route.veiculo && !registro ? <FichaVeiculo errors={errors} source={source} id={route.veiculo} secao={route.secao} data={data} today={today} onClose={() => patchHashQuery({ ficha: null, secao: null, fde: null, fate: null })} onOpen={onOpen} onReload={onReload} /> : null}
       {registro ? <RegistroDrawer key={`${registro.kind}-${registro.id}`} source={source} kind={registro.kind} id={registro.id} data={data} onClose={() => setRegistro(null)} onChanged={onReload} onClassificado={aplicarClassificacao} onOpenVeiculo={onOpenVeiculo} /> : null}
     </PageLayout>
   )

@@ -34,7 +34,14 @@ function Prazo({ item }: { item: Pendencia }) {
   return <StatusBadge tone={TOM[nivel]} icon={<CalendarClock size={12} />} title={formatBR(item.prazo)}>{texto}</StatusBadge>
 }
 
-export function Pendencias({ data, today, onOpen }: { data: FrotaData; today: string; onOpen: (kind: Kind, id: string) => void }) {
+function Km({ item }: { item: Pendencia }) {
+  if (item.prazo || item.faltamKm === null) return null
+  const vencido = item.faltamKm < 0
+  const texto = vencido ? `Vencido há ${Math.abs(item.faltamKm).toLocaleString('pt-BR')} km` : `Em ${item.faltamKm.toLocaleString('pt-BR')} km`
+  return <StatusBadge tone={vencido ? 'danger' : 'info'} icon={<Gauge size={12} />}>{texto}</StatusBadge>
+}
+
+export function Pendencias({ data, today, onOpen, onOpenVeiculo }: { data: FrotaData; today: string; onOpen: (kind: Kind, id: string) => void; onOpenVeiculo: (id: string, secao: 'preventivas') => void }) {
   const itens = useMemo(() => buildPendencias(data, today), [data, today])
   const [filtroUrl, setFiltro] = useQueryTexto('filtro')
   const filtro = PENDENCIA_ORDEM.find((tipo) => tipo === filtroUrl) ?? ''
@@ -79,13 +86,14 @@ export function Pendencias({ data, today, onOpen }: { data: FrotaData; today: st
                 const nivel = urgencia(item)
                 return (
                   <li key={`${item.kind}-${item.id}`}>
-                    <button type="button" className="frota-pend__item" data-urgencia={nivel ?? undefined} onClick={() => { if (item.kind !== 'preventiva') onOpen(item.kind, item.id) }}>
+                    <button type="button" className="frota-pend__item" data-urgencia={nivel ?? undefined} onClick={() => { if (item.kind === 'preventiva') { if (item.veiculoId) onOpenVeiculo(item.veiculoId, 'preventivas') } else onOpen(item.kind, item.id) }}>
                       <span className="frota-pend__icone" aria-hidden><Icone size={16} /></span>
                       <span className="frota-pend__texto">
                         <strong>{item.titulo}</strong>
                         <span>{[item.veiculo?.label, item.pessoa?.label].filter(Boolean).join(' · ') || 'Sem veículo informado'}</span>
                       </span>
                       <Prazo item={item} />
+                      <Km item={item} />
                       <ChevronRight size={16} className="frota-pend__seta" aria-hidden />
                     </button>
                   </li>
