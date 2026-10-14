@@ -99,6 +99,17 @@ const linhas = (r: PromiseSettledResult<Row[]>) => (r.status === 'fulfilled' ? r
  */
 export async function carregarDataverse(client: DataverseClient, sets: EntitySets, desde: string, ate: string, cpNav = ''): Promise<Dados> {
   const ler = leitor(client)
+  // Sem as colunas de hodômetro no ambiente, os veículos vêm sem elas; as preventivas ficam indisponíveis (km desconhecido).
+  let semHodometro = false
+  const lerVeiculos = async () => {
+    try {
+      return await ler(sets.veiculo, veiculosPath)
+    } catch (error) {
+      if (!/hodometro/i.test(String(error instanceof Error ? error.message : error))) throw error
+      semHodometro = true
+      return ler(sets.veiculo, (s) => veiculosPath(s, false))
+    }
+  }
   const [res, cps, man, mul, oco, fun, vei, via, eve, tel, itp, bas, mpr] = await comLimite<Row[]>([
     () => client.getAll(reservasPath(sets.reserva, desde, ate, cpNav)),
     () => (cpNav ? Promise.resolve([]) : client.getAll(composicoesPath(sets.composicao))),
@@ -106,7 +117,7 @@ export async function carregarDataverse(client: DataverseClient, sets: EntitySet
     () => (sets.multa ? comAlternativa(() => client.getAll(multasPath(sets.multa, desde, ate)), () => client.getAll(multasPath(sets.multa, desde, ate, false))) : ausente(sets.multa)),
     () => ler(sets.ocorrencia, (s) => ocorrenciasPath(s, desde, ate)),
     () => ler(sets.funcionario, funcionariosPath),
-    () => ler(sets.veiculo, veiculosPath),
+    lerVeiculos,
     () => ler(sets.viagem, (s) => viagensPath(s, desde, ate)),
     () => ler(sets.evento, (s) => eventosPath(s, desde, ate)),
     () => ler(sets.telemetria, (s) => telemetriaPath(s, desde, ate)),
@@ -120,7 +131,7 @@ export async function carregarDataverse(client: DataverseClient, sets: EntitySet
     ['manutencoes', man], ['multas', mul], ['ocorrencias', oco], ['funcionarios', fun], ['veiculos', vei], ['viagens', via], ['eventos', eve], ['telemetria', tel],
   ]
   const indisponiveis = secundarios.filter(([, r]) => r.status === 'rejected').map(([conjunto]) => conjunto)
-  const semPreventivas = [vei, itp, bas, mpr].some((r) => r.status === 'rejected')
+  const semPreventivas = semHodometro || [vei, itp, bas, mpr].some((r) => r.status === 'rejected')
   if (semPreventivas) indisponiveis.push('preventivas')
 
   const cpMap = mapCps(cpNav ? res.value.map((row) => row[cpNav]).filter((cp): cp is Row => !!cp && typeof cp === 'object') : cps.value)
@@ -249,7 +260,7 @@ export function createSource(host: Host): Source {
   ).then((r) => r.value[0]?.ReferencingEntityNavigationPropertyName ?? '').catch((error) => { console.warn('Dashboard: navegação da composição não resolvida; lendo a tabela inteira.', String(error)); return '' }))
   let cliente: DataverseClient | null = null
   const clienteCacheado = (s: EntitySets) => (cliente ??= comCacheCadastros(host.client, (path) => [
-    s.composicao && composicoesPath(s.composicao), s.funcionario && funcionariosPath(s.funcionario), s.veiculo && veiculosPath(s.veiculo),
+    s.composicao && composicoesPath(s.composicao), s.funcionario && funcionariosPath(s.funcionario), s.veiculo && veiculosPath(s.veiculo), s.veiculo && veiculosPath(s.veiculo, false),
     s.categoriaDespesa && categoriasDespesaPath(s.categoriaDespesa), s.formaPagamentoDespesa && formasPagamentoPath(s.formaPagamentoDespesa),
     s.itemPlano && itensPlanoPath(s.itemPlano), s.baseline && baselinesPath(s.baseline),
   ].includes(path)))

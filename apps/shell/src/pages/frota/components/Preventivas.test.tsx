@@ -19,6 +19,8 @@ const data: FrotaData = {
     veiculo('v1', 'TST1A11', { hodometro: 171000, hodometroEm: '2026-10-14T13:37:00Z' }),
     veiculo('v2', 'TST2B22', {}),
     veiculo('v3', 'TST3C33', { status: VEICULO.VENDIDO }),
+    veiculo('v4', 'TST4D44', { hodometro: 150000 }),
+    veiculo('v5', 'TST5E55', {}),
   ],
   planoPreventivo: [
     item('i1', 'Troca de óleo', { servico: 100000000, intervaloKm: 10000 }),
@@ -30,6 +32,7 @@ const data: FrotaData = {
     manut('m4', 'v1', { km: 160000, dataManutencao: '2026-06-10', servicos: [100000000] }),
     manut('m5', 'v1', { status: MANUT.SOLICITADO, servicos: [100000012] }),
     manut('m6', 'v2', { km: 61000, dataManutencao: '2026-08-01' }),
+    manut('m7', 'v4', { dataManutencao: '2026-09-01', servicos: [100000007] }),
   ],
   baselines: [
     base('b1', 'v1', 'i2', 141850, '2026-04-26'),
@@ -105,6 +108,23 @@ describe('Preventivas', () => {
     expect(source.salvarBaseline).toHaveBeenCalledWith('v2', 'i3', 45000, '2026-04-01')
     expect(onReload).toHaveBeenCalled()
     expect(await screen.findByText('Última execução registrada.')).toBeTruthy()
+  })
+
+  it('manutenção sem km: mostra "Informar última execução" para completar o km', () => {
+    renderPrev('v4')
+    expect(linha('Pastilhas de freio').textContent).toContain('Em dia')
+    expect(within(linha('Pastilhas de freio')).getByRole('button', { name: 'Informar última execução' })).toBeTruthy()
+  })
+
+  it('veículo sem km conhecido: avisa que a regra por km não é avaliada e só oferece a data quando ela falta', () => {
+    renderPrev('v5')
+    const aviso = 'Veículo sem km conhecido: a regra por km não é avaliada'
+    expect(within(linha('Troca de óleo')).getByText(aviso)).toBeTruthy()
+    expect(within(linha('Troca de óleo')).queryByRole('button', { name: 'Informar última execução' })).toBeNull()
+    expect(within(linha('Pastilhas de freio')).getByText(aviso)).toBeTruthy()
+    expect(within(linha('Pastilhas de freio')).getByRole('button', { name: 'Informar última execução' })).toBeTruthy()
+    expect(within(linha('Revisão anual')).queryByText(aviso)).toBeNull()
+    expect(within(linha('Revisão anual')).getByRole('button', { name: 'Informar última execução' })).toBeTruthy()
   })
 
   it('veículo vendido mostra só o aviso de escopo', () => {

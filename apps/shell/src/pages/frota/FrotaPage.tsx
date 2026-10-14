@@ -25,7 +25,7 @@ import './frota.css'
 export type Tab = 'pendencias' | 'veiculos' | 'manutencoes' | 'ocorrencias' | 'indicadores' | 'plano'
 
 const TABS: { id: Tab; label: string; tables: TableKey[] }[] = [
-  { id: 'pendencias', label: 'Pendências', tables: ['manutencoes', 'multas', 'colisoes', 'veiculos', 'planoPreventivo', 'baselines'] },
+  { id: 'pendencias', label: 'Pendências', tables: ['manutencoes', 'multas', 'colisoes'] },
   { id: 'veiculos', label: 'Veículos', tables: ['veiculos', 'manutencoes', 'multas', 'colisoes'] },
   { id: 'manutencoes', label: 'Manutenções', tables: ['manutencoes'] },
   { id: 'ocorrencias', label: 'Multas e colisões', tables: ['multas', 'colisoes', 'infracoes'] },
@@ -112,11 +112,11 @@ export function Frota({ source }: { source: DataSource }) {
   else if (fatal) body = <Alert tone="danger" title="Não foi possível carregar a frota" action={<Button variant="secondary" size="compact" onClick={onReload}>Tentar de novo</Button>}>{fatal}</Alert>
   else body = (
     <ViewGate errors={errors} tables={tab.tables} onRetry={onReload}>
-      {route.tab === 'pendencias' && <Pendencias data={data} today={today} onOpen={onOpen} onOpenVeiculo={onOpenVeiculo} />}
+      {route.tab === 'pendencias' && <Pendencias data={data} errors={errors} today={today} onOpen={onOpen} onOpenVeiculo={onOpenVeiculo} />}
       {route.tab === 'veiculos' && <Veiculos data={data} today={today} source={source} onOpenVeiculo={onOpenVeiculo} />}
       {route.tab === 'manutencoes' && <Registros key="manutencoes" kinds={['manutencao']} data={data} source={source} onOpen={onOpen} onReload={onReload} />}
       {route.tab === 'ocorrencias' && <Registros key="ocorrencias" kinds={['multa', 'colisao']} data={data} source={source} onOpen={onOpen} onReload={onReload} />}
-      {route.tab === 'indicadores' && <Indicadores data={data} today={today} />}
+      {route.tab === 'indicadores' && <Indicadores data={data} errors={errors} today={today} />}
       {route.tab === 'plano' && <PlanoPreventivo data={data} source={source} onReload={onReload} />}
     </ViewGate>
   )

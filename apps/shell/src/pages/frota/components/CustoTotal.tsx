@@ -3,7 +3,7 @@ import { useMemo } from 'react'
 import { brl, NAO_INFORMADO } from '../data/format'
 import type { LoadResult } from '../data/source'
 import type { FrotaData } from '../data/types'
-import { custoTotalVeiculo, FONTE_LABEL, FONTES, type EntradaCusto, type ParcelaCusto } from '../domain/custoTotal'
+import { AVISO_12_MESES, custoTotalVeiculo, FONTE_LABEL, FONTES, indisponiveisDe, periodoAlemDe12Meses, type EntradaCusto, type ParcelaCusto } from '../domain/custoTotal'
 import type { Periodo } from '../domain/indicadores'
 
 const registros = (qtd: number) => `${qtd} ${qtd === 1 ? 'registro' : 'registros'}`
@@ -16,7 +16,7 @@ function textoParcela(parcela: ParcelaCusto) {
 }
 
 /** Custo total do veículo no período: manutenção, multas, combustível e documentos, com R$/km pela telemetria. */
-export function CustoTotal({ data, errors, veiculoId, periodo, onPeriodo }: { data: FrotaData; errors: LoadResult['errors']; veiculoId: string; periodo: Periodo; onPeriodo: (p: Periodo) => void }) {
+export function CustoTotal({ data, errors, veiculoId, periodo, today, onPeriodo }: { data: FrotaData; errors: LoadResult['errors']; veiculoId: string; periodo: Periodo; today: string; onPeriodo: (p: Periodo) => void }) {
   const custo = useMemo(() => {
     const entrada: EntradaCusto = {
       manutencoes: data.manutencoes,
@@ -26,7 +26,7 @@ export function CustoTotal({ data, errors, veiculoId, periodo, onPeriodo }: { da
       telemetriaKm: data.telemetriaKm,
       // Documentos (IPVA e seguro) ficam vazios até a branch de Documentos ser mesclada (spec §9.4).
       documentos: [],
-      indisponiveis: { combustivel: !!errors.despesasCombustivel, telemetria: !!errors.telemetriaKm, manutencao: !!errors.manutencoes, multas: !!errors.multas || !!errors.infracoes, documentos: false },
+      indisponiveis: indisponiveisDe(errors),
     }
     return custoTotalVeiculo(entrada, veiculoId, periodo)
   }, [data.manutencoes, data.multas, data.infracoes, data.despesasCombustivel, data.telemetriaKm, errors.despesasCombustivel, errors.telemetriaKm, errors.manutencoes, errors.multas, errors.infracoes, veiculoId, periodo])
@@ -39,8 +39,11 @@ export function CustoTotal({ data, errors, veiculoId, periodo, onPeriodo }: { da
       </div>
       <p className="frota-kpi">
         <strong>{brl(custo.total)}</strong>
-        <span>{custo.custoPorKm === null ? 'R$/km indisponível (sem telemetria no período)' : `${brl(custo.custoPorKm)} por km · ${(custo.kmRodado ?? 0).toLocaleString('pt-BR')} km rodados`}</span>
+        <span>{custo.custoPorKm !== null
+          ? `${brl(custo.custoPorKm)} por km · ${(custo.kmRodado ?? 0).toLocaleString('pt-BR')} km rodados`
+          : errors.telemetriaKm ? 'R$/km indisponível (telemetria indisponível)' : 'R$/km indisponível (sem telemetria no período)'}</span>
       </p>
+      {periodoAlemDe12Meses(periodo, today) && <p className="frota-muted">{AVISO_12_MESES}</p>}
       <dl className="frota-detail">
         {FONTES.map((fonte) => {
           const parcela = custo.porFonte[fonte]

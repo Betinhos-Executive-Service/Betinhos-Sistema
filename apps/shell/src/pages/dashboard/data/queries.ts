@@ -60,8 +60,9 @@ export const multasPath = (set: string, desde: string, ate: string, comInfracao 
 export const ocorrenciasPath = (set: string, desde: string, ate: string) => `${set}?$select=cr40f_dataocorrencia&$filter=${janelaDataHora('cr40f_dataocorrencia', desde, ate)}`
 export const funcionariosPath = (set: string) =>
   `${set}?$select=cr40f_funcionariosid,cr40f_nomecompleto,cr40f_status,cr40f_validadedacnh,cr40f_funcao,new_apelido,cr40f_nomedaempresa`
-export const veiculosPath = (set: string) =>
-  `${set}?$select=cr40f_veiculosid,cr40f_statusdoveiculo,new_categoriadoveiculo,cr40f_placa,cr40f_marca,cr40f_modelo,cr40f_blindado,cr40f_anodefabricacao,cr40f_hodometro,cr40f_hodometroem`
+/** `comHodometro = false` é a consulta de ambientes onde as colunas de hodômetro ainda não existem. */
+export const veiculosPath = (set: string, comHodometro = true) =>
+  `${set}?$select=cr40f_veiculosid,cr40f_statusdoveiculo,new_categoriadoveiculo,cr40f_placa,cr40f_marca,cr40f_modelo,cr40f_blindado,cr40f_anodefabricacao${comHodometro ? ',cr40f_hodometro,cr40f_hodometroem' : ''}`
 
 /** Plano preventivo ativo (aba Plano preventivo da Frota). */
 export const itensPlanoPath = (set: string) =>

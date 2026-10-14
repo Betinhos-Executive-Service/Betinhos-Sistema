@@ -532,6 +532,23 @@ describe('conjuntos das abas', () => {
     expect(semVeiculos.preventivas).toEqual(vazio)
   })
 
+  it('sem as colunas de hodômetro: veículos carregam sem elas e preventivas ficam indisponíveis', async () => {
+    const lidos: string[] = []
+    const d = await carregarDataverse(client(async (path) => {
+      lidos.push(path)
+      if (path.startsWith('vei?') && path.includes('cr40f_hodometro')) throw new Error("Could not find a property named 'cr40f_hodometro' on type 'Microsoft.Dynamics.CRM.cr40f_veiculos'.")
+      if (path.startsWith('vei?')) return [{ cr40f_veiculosid: 'V1', cr40f_placa: 'ABC1D23', cr40f_statusdoveiculo: 202410001, new_categoriadoveiculo: 100000000 }]
+      return []
+    }), SETS, '2024-01-01', '2026-10-15')
+    const consultasVeiculos = lidos.filter((p) => p.startsWith('vei?'))
+    expect(consultasVeiculos).toHaveLength(2)
+    expect(consultasVeiculos[1]).toBe(veiculosPath('vei', false))
+    expect(consultasVeiculos[1]).not.toContain('hodometro')
+    expect(d.veiculos).toHaveLength(1)
+    expect(d.indisponiveis).toEqual(['preventivas'])
+    expect(d.preventivas).toEqual({ veiculos: [], manutencoes: [], itens: [], baselines: [] })
+  })
+
   it('plano preventivo ausente na metadata: preventivas indisponível, sem consulta', async () => {
     const consultas: string[] = []
     const d = await carregarDataverse(client(async (path) => { consultas.push(path); return [] }), { ...SETS, itemPlano: '' }, '2024-01-01', '2026-10-15')

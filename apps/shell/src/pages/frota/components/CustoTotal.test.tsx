@@ -24,7 +24,7 @@ const linha = (rotulo: string) => screen.getByText(rotulo, { selector: 'dt' }).n
 
 describe('CustoTotal', () => {
   it('mostra total, R$/km, km rodados e cada fonte com registros', () => {
-    render(<CustoTotal data={data} errors={{}} veiculoId="v1" periodo={periodo} onPeriodo={() => {}} />)
+    render(<CustoTotal data={data} errors={{}} veiculoId="v1" periodo={periodo} today="2026-10-02" onPeriodo={() => {}} />)
     const kpi = document.querySelector('.frota-kpi') as HTMLElement
     expect(kpi.querySelector('strong')?.textContent).toMatch(/^R\$\s1\.534,56$/)
     expect(kpi.querySelector('span')?.textContent).toMatch(/^R\$\s1,24 por km · 1\.234 km rodados$/)
@@ -36,7 +36,7 @@ describe('CustoTotal', () => {
   })
 
   it('mostra a fonte que falhou como Indisponível', () => {
-    render(<CustoTotal data={data} errors={{ despesasCombustivel: 'Falha', multas: 'Falha' }} veiculoId="v1" periodo={periodo} onPeriodo={() => {}} />)
+    render(<CustoTotal data={data} errors={{ despesasCombustivel: 'Falha', multas: 'Falha' }} veiculoId="v1" periodo={periodo} today="2026-10-02" onPeriodo={() => {}} />)
     expect(linha('Combustível').textContent).toBe('Indisponível')
     expect(linha('Multas').textContent).toBe('Indisponível')
     expect(document.querySelector('.frota-kpi strong')?.textContent).toMatch(/^R\$\s1\.234,56$/)
@@ -44,23 +44,37 @@ describe('CustoTotal', () => {
 
   it('mostra Não informado quando todos os registros da fonte estão sem valor', () => {
     const semValor: FrotaData = { ...data, manutencoes: [manut('m2', {})] }
-    render(<CustoTotal data={semValor} errors={{}} veiculoId="v1" periodo={periodo} onPeriodo={() => {}} />)
+    render(<CustoTotal data={semValor} errors={{}} veiculoId="v1" periodo={periodo} today="2026-10-02" onPeriodo={() => {}} />)
     expect(linha('Manutenção').textContent).toBe('Não informado')
   })
 
   it('sem telemetria no período, avisa que o R$/km está indisponível', () => {
-    render(<CustoTotal data={{ ...data, telemetriaKm: [] }} errors={{}} veiculoId="v1" periodo={periodo} onPeriodo={() => {}} />)
+    render(<CustoTotal data={{ ...data, telemetriaKm: [] }} errors={{}} veiculoId="v1" periodo={periodo} today="2026-10-02" onPeriodo={() => {}} />)
     expect(document.querySelector('.frota-kpi span')?.textContent).toBe('R$/km indisponível (sem telemetria no período)')
   })
 
+  it('telemetria que falhou: o R$/km diz que a telemetria está indisponível', () => {
+    render(<CustoTotal data={{ ...data, telemetriaKm: [] }} errors={{ telemetriaKm: 'Sem privilégio' }} veiculoId="v1" periodo={periodo} today="2026-10-02" onPeriodo={() => {}} />)
+    expect(document.querySelector('.frota-kpi span')?.textContent).toBe('R$/km indisponível (telemetria indisponível)')
+  })
+
+  it('período que começa antes dos últimos 12 meses avisa que combustível e km são parciais', () => {
+    const aviso = 'Combustível e km consideram só os últimos 12 meses.'
+    render(<CustoTotal data={data} errors={{}} veiculoId="v1" periodo={periodo} today="2026-10-02" onPeriodo={() => {}} />)
+    expect(screen.queryByText(aviso)).toBeNull()
+    cleanup()
+    render(<CustoTotal data={data} errors={{}} veiculoId="v1" periodo={{ de: '2025-10-01', ate: '2026-10-02' }} today="2026-10-02" onPeriodo={() => {}} />)
+    expect(screen.getByText(aviso)).toBeTruthy()
+  })
+
   it('avisa as despesas de manutenção sem vínculo, que não entram na soma', () => {
-    render(<CustoTotal data={data} errors={{}} veiculoId="v1" periodo={periodo} onPeriodo={() => {}} />)
+    render(<CustoTotal data={data} errors={{}} veiculoId="v1" periodo={periodo} today="2026-10-02" onPeriodo={() => {}} />)
     expect(screen.getByText('2 despesas de manutenção sem vínculo com uma manutenção (não somadas)')).toBeTruthy()
   })
 
   it('altera o período pelos campos De e Até e ignora período invertido', () => {
     const onPeriodo = vi.fn()
-    render(<CustoTotal data={data} errors={{}} veiculoId="v1" periodo={periodo} onPeriodo={onPeriodo} />)
+    render(<CustoTotal data={data} errors={{}} veiculoId="v1" periodo={periodo} today="2026-10-02" onPeriodo={onPeriodo} />)
     const grupo = within(document.body)
     fireEvent.change(grupo.getByLabelText('De'), { target: { value: '2026-01-01' } })
     expect(onPeriodo).toHaveBeenCalledWith({ de: '2026-01-01', ate: '2026-10-02' })

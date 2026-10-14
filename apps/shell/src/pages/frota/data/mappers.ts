@@ -21,6 +21,9 @@ export const SELECT = {
   telemetriaKm: ['new_data', '_new_veiculo_value', 'new_distanciapercorridakm'],
 } as const
 
+/** Veículos sem as colunas de hodômetro, para ambientes onde elas ainda não existem. */
+export const SELECT_VEICULOS_SEM_HODOMETRO = SELECT.veiculos.filter((campo) => campo !== 'cr40f_hodometro' && campo !== 'cr40f_hodometroem')
+
 export function cleanId(value: unknown) {
   return String(value).replace(/[{}]/g, '').toLowerCase()
 }

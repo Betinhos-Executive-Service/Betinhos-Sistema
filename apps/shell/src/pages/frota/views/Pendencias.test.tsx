@@ -35,4 +35,34 @@ describe('Pendencias - preventiva do plano', () => {
     render(<Pendencias data={dados(171000)} today={today} onOpen={vi.fn()} onOpenVeiculo={vi.fn()} />)
     expect(screen.getByText('Vencido há 1.000 km')).toBeTruthy()
   })
+
+  /** Item com km e meses: a data da próxima fica no futuro (2027-07-14). */
+  function comMeses(hodometro: number): FrotaData {
+    const base = dados(hodometro)
+    return { ...base, planoPreventivo: [{ ...base.planoPreventivo[0], intervaloMeses: 12 }] }
+  }
+
+  it('vencida por km com prazo futuro: badge de km em perigo, sem "Vence em", e conta como atrasada', () => {
+    render(<Pendencias data={comMeses(171000)} today={today} onOpen={vi.fn()} onOpenVeiculo={vi.fn()} />)
+    const badge = screen.getByText('Vencido há 1.000 km').closest('.bt-badge')!
+    expect(badge.className).toContain('bt-badge--danger')
+    expect(screen.queryByText(/Vence em/)).toBeNull()
+    expect(screen.getByText(/Troca de óleo/).closest('button')!.getAttribute('data-urgencia')).toBe('atrasado')
+    expect(screen.getByText('Atrasadas').closest('.bt-metric')!.querySelector('.bt-metric__value')!.textContent).toBe('1')
+  })
+
+  it('a vencer por km: "Em 800 km" em alerta, sem o prazo da data', () => {
+    render(<Pendencias data={comMeses(169200)} today={today} onOpen={vi.fn()} onOpenVeiculo={vi.fn()} />)
+    const badge = screen.getByText('Em 800 km').closest('.bt-badge')!
+    expect(badge.className).toContain('bt-badge--warning')
+    expect(screen.queryByText(/Vence em/)).toBeNull()
+  })
+
+  it('sem o plano preventivo: avisa que as preventivas estão indisponíveis e mostra as demais pendências', () => {
+    const data = { ...dados(171000), manutencoes: [{ ...dados(0).manutencoes[0], id: 'm2', descricao: 'Freio', status: MANUT.SOLICITADO }] }
+    render(<Pendencias data={data} errors={{ planoPreventivo: 'Sem privilégio' }} today={today} onOpen={vi.fn()} onOpenVeiculo={vi.fn()} />)
+    expect(screen.getByText('Preventivas indisponíveis: Sem privilégio')).toBeTruthy()
+    expect(screen.getByText('Freio')).toBeTruthy()
+    expect(screen.queryByText(/Troca de óleo/)).toBeNull()
+  })
 })

@@ -3,7 +3,8 @@ import { MANUT, PROPRIO, VEICULO } from '../data/schema'
 import type { Baseline, ItemPlano, Manutencao, Ref, Veiculo } from '../data/types'
 
 export type EstadoPreventiva = 'vencido' | 'a_vencer' | 'em_dia' | 'sem_base'
-export type UltimaExecucao = { km: number | null; data: string | null; origem: 'manutencao' | 'baseline'; manutencaoId: string | null }
+/** `complementadaPorBaseline`: a manutenção não tinha km ou data e o campo veio da última execução informada. */
+export type UltimaExecucao = { km: number | null; data: string | null; origem: 'manutencao' | 'baseline'; manutencaoId: string | null; complementadaPorBaseline: boolean }
 export type Preventiva = {
   veiculo: Ref; item: ItemPlano; estado: EstadoPreventiva; emAndamento: boolean
   kmAtual: number | null; kmEstimado: boolean
@@ -34,8 +35,12 @@ function ultimaExecucao(item: ItemPlano, doVeiculo: ManutencaoPrev[], baseline: 
     const dia = diaSP(m.dataManutencao ?? m.criadoEm)
     if (dia && (!melhor || dia > melhor.dia)) melhor = { m, dia }
   }
-  if (melhor) return { km: melhor.m.km, data: melhor.dia, origem: 'manutencao', manutencaoId: melhor.m.id }
-  if (baseline && (baseline.km !== null || baseline.data !== null)) return { km: baseline.km, data: baseline.data, origem: 'baseline', manutencaoId: null }
+  if (melhor) {
+    // A data sempre existe (manutenção sem dia não entra); o km pode faltar e vir da última execução informada.
+    const km = melhor.m.km ?? baseline?.km ?? null
+    return { km, data: melhor.dia, origem: 'manutencao', manutencaoId: melhor.m.id, complementadaPorBaseline: melhor.m.km === null && km !== null }
+  }
+  if (baseline && (baseline.km !== null || baseline.data !== null)) return { km: baseline.km, data: baseline.data, origem: 'baseline', manutencaoId: null, complementadaPorBaseline: false }
   return null
 }
 
