@@ -63,4 +63,16 @@ describe('Frota', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Pendências' }))
     expect(location.hash).toBe('#/frota')
   })
+
+  it('a aba "Plano preventivo" mostra a tabela dos itens', async () => {
+    const source = fakeSource('xrm', 'DEV')
+    source.load = vi.fn(async () => ({ data: { ...EMPTY_DATA, planoPreventivo: [{ id: 'i1', nome: 'Troca de óleo e filtro', servico: null, intervaloKm: 10000, intervaloMeses: null, avisoKm: 1000, avisoDias: 30, ativo: true }] }, errors: {} }))
+    history.replaceState(null, '', '#/frota')
+    renderFrota(source)
+    expect(await screen.findByText('Nenhuma pendência de frota no momento')).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: 'Plano preventivo' }))
+    expect(location.hash).toBe('#/frota?aba=plano')
+    expect(await screen.findByRole('table', { name: 'Itens do plano preventivo' })).toBeTruthy()
+    expect(screen.getByText('Troca de óleo e filtro')).toBeTruthy()
+  })
 })

@@ -17,18 +17,20 @@ import { buildPendencias } from './domain/pendencias'
 import { liberarFlows } from './domain/transitions'
 import { Indicadores } from './views/Indicadores'
 import { Pendencias } from './views/Pendencias'
+import { PlanoPreventivo } from './views/PlanoPreventivo'
 import { Registros } from './views/Registros'
 import { Veiculos } from './views/Veiculos'
 import './frota.css'
 
-export type Tab = 'pendencias' | 'veiculos' | 'manutencoes' | 'ocorrencias' | 'indicadores'
+export type Tab = 'pendencias' | 'veiculos' | 'manutencoes' | 'ocorrencias' | 'indicadores' | 'plano'
 
 const TABS: { id: Tab; label: string; tables: TableKey[] }[] = [
-  { id: 'pendencias', label: 'Pendências', tables: ['manutencoes', 'multas', 'colisoes'] },
+  { id: 'pendencias', label: 'Pendências', tables: ['manutencoes', 'multas', 'colisoes', 'veiculos', 'planoPreventivo', 'baselines'] },
   { id: 'veiculos', label: 'Veículos', tables: ['veiculos', 'manutencoes', 'multas', 'colisoes'] },
   { id: 'manutencoes', label: 'Manutenções', tables: ['manutencoes'] },
   { id: 'ocorrencias', label: 'Multas e colisões', tables: ['multas', 'colisoes', 'infracoes'] },
   { id: 'indicadores', label: 'Indicadores', tables: ['manutencoes', 'multas', 'infracoes'] },
+  { id: 'plano', label: 'Plano preventivo', tables: ['planoPreventivo'] },
 ]
 
 const KINDS: readonly Kind[] = ['manutencao', 'multa', 'colisao']
@@ -114,6 +116,7 @@ export function Frota({ source }: { source: DataSource }) {
       {route.tab === 'manutencoes' && <Registros key="manutencoes" kinds={['manutencao']} data={data} source={source} onOpen={onOpen} onReload={onReload} />}
       {route.tab === 'ocorrencias' && <Registros key="ocorrencias" kinds={['multa', 'colisao']} data={data} source={source} onOpen={onOpen} onReload={onReload} />}
       {route.tab === 'indicadores' && <Indicadores data={data} today={today} />}
+      {route.tab === 'plano' && <PlanoPreventivo data={data} source={source} onReload={onReload} />}
     </ViewGate>
   )
 
