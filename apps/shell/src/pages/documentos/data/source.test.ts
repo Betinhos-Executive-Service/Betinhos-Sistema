@@ -11,7 +11,7 @@ describe('createMockDocsSource', () => {
     const source = createMockDocsSource('2026-10-13')
     const antes = await source.carregar()
     const cnh = antes.tipos.find((t) => t.codigo === 'CNH')!
-    const ana = antes.donos.find((d) => d.nome === 'Ana')!
+    const ana = antes.donos.find((d) => d.nome === 'Carlão')!
     const anterior = antes.docs.find((d) => d.donoId === ana.id && d.tipoId === cnh.id && d.situacao === 'vigente')!
     const r = await source.salvarDocumento({ tipo: cnh, dono: ana, anterior, numero: '9', emissao: '2026-10-13', validade: '2031-10-13', observacao: '', arquivos: [new File(['x'], 'cnh.pdf')] })
     expect(r.enviados).toHaveLength(1)
@@ -24,17 +24,17 @@ describe('createMockDocsSource', () => {
 
   it('destinatários: adicionar e remover', async () => {
     const source = createMockDocsSource('2026-10-13')
-    const novo = await source.adicionarDestinatario('frota', 'f-bruno', 'Bruno')
-    expect((await source.carregar()).destinatarios.map((d) => d.nome)).toContain('Bruno')
+    const novo = await source.adicionarDestinatario('frota', 'm2', 'Bruna')
+    expect((await source.carregar()).destinatarios.map((d) => d.nome)).toContain('Bruna')
     await source.removerDestinatario(novo)
-    expect((await source.carregar()).destinatarios.map((d) => d.nome)).not.toContain('Bruno')
+    expect((await source.carregar()).destinatarios.map((d) => d.nome)).not.toContain('Bruna')
   })
 
   it('enviarArquivo nomeia como o salvarDocumento (código_validade_original, sanitizado)', async () => {
     const source = createMockDocsSource('2026-10-13')
     const data = await source.carregar()
     const cnh = data.tipos.find((t) => t.codigo === 'CNH')!
-    const bruno = data.donos.find((d) => d.nome === 'Bruno')!
+    const bruno = data.donos.find((d) => d.nome === 'Bruna')!
     const doc = data.docs.find((d) => d.donoId === bruno.id && d.tipoId === cnh.id)!
     const arq = await source.enviarArquivo(doc, new File(['x'], 'frente/verso.pdf'))
     expect(arq.nome).toBe(`CNH_${doc.validade}_frente_verso.pdf`)
@@ -49,7 +49,7 @@ describe('excluirArquivo', () => {
     const source = createMockDocsSource('2026-10-13')
     const data = await source.carregar()
     const cnh = data.tipos.find((t) => t.codigo === 'CNH')!
-    const bruno = data.donos.find((d) => d.nome === 'Bruno')!
+    const bruno = data.donos.find((d) => d.nome === 'Bruna')!
     const doc = data.docs.find((d) => d.donoId === bruno.id && d.tipoId === cnh.id)!
     const a = await source.enviarArquivo(doc, new File(['a'], 'a.pdf'))
     const b = await source.enviarArquivo(doc, new File(['b'], 'b.pdf'))
@@ -66,7 +66,7 @@ describe('createMockDocsSource: arquivos do vigente', () => {
     const source = createMockDocsSource('2026-10-13')
     const data = await source.carregar()
     const cnh = data.tipos.find((t) => t.codigo === 'CNH')!
-    const ana = data.donos.find((d) => d.nome === 'Ana')!
+    const ana = data.donos.find((d) => d.nome === 'Carlão')!
     const anterior = data.docs.find((d) => d.donoId === ana.id && d.tipoId === cnh.id && d.situacao === 'vigente')!
     const velho = await source.enviarArquivo(anterior, new File(['v'], 'antiga.pdf'))
     expect((await source.arquivos(anterior)).map((a) => a.nome)).toEqual([velho.nome])
@@ -99,8 +99,8 @@ function hostFalso(behaviors: Record<string, string>, arquivos: { nomeArquivo: s
 }
 
 const TIPO = (codigo: string, extra: Partial<TipoDoc> = {}): TipoDoc => ({ id: `t-${codigo}`, codigo, nome: codigo, categoria: 'pessoas', temValidade: true, validadePadraoMeses: null, obrigatorioPara: [], ordem: 1, ativo: true, ...extra })
-const ANA: Dono = { id: 'f-ana', categoria: 'pessoas', nome: 'Ana', detalhe: 'Motorista', obrigKey: 100000000, ativo: true, email: '' }
-const DOC = (extra: Partial<DocEmitido>): DocEmitido => ({ id: 'd-1', tipoId: 't-CNH', donoId: 'f-ana', categoria: 'pessoas', numero: '', emissao: null, validade: '2031-05-10', situacao: 'vigente', pasta: 'Funcionarios/DEV/f-ana/Documentos/CNH', observacao: '', ultimoMarco: null, modificadoEm: null, ...extra })
+const ANA: Dono = { id: 'm1', categoria: 'pessoas', nome: 'Carlão', detalhe: 'Motorista', obrigKey: 100000000, ativo: true, email: '' }
+const DOC = (extra: Partial<DocEmitido>): DocEmitido => ({ id: 'd-1', tipoId: 't-CNH', donoId: 'm1', categoria: 'pessoas', numero: '', emissao: null, validade: '2031-05-10', situacao: 'vigente', pasta: 'Funcionarios/DEV/m1/Documentos/CNH', observacao: '', ultimoMarco: null, modificadoEm: null, ...extra })
 
 describe('createDocsSource (Dataverse)', () => {
   it('dual-write grava as datas da ficha no formato do DateTimeBehavior lido da metadata', async () => {
@@ -108,8 +108,8 @@ describe('createDocsSource (Dataverse)', () => {
     const source = createDocsSource(host)
     await source.salvarDocumento({ tipo: TIPO('CNH'), dono: ANA, anterior: null, numero: '', emissao: null, validade: '2031-10-13', observacao: '', arquivos: [] })
     await source.salvarDocumento({ tipo: TIPO('ASO', { validadePadraoMeses: 12 }), dono: ANA, anterior: null, numero: '', emissao: '2026-10-10', validade: '2027-10-10', observacao: '', arquivos: [] })
-    expect(update).toHaveBeenCalledWith('cr40f_funcionarioss', 'f-ana', { cr40f_validadedacnh: '2031-10-13T03:00:00Z' })
-    expect(update).toHaveBeenCalledWith('cr40f_funcionarioss', 'f-ana', { cr40f_datadoaso: '2026-10-10' })
+    expect(update).toHaveBeenCalledWith('cr40f_funcionarioss', 'm1', { cr40f_validadedacnh: '2031-10-13T03:00:00Z' })
+    expect(update).toHaveBeenCalledWith('cr40f_funcionarioss', 'm1', { cr40f_datadoaso: '2026-10-10' })
     expect(request.mock.calls.filter(([p]) => String(p).includes('DateTimeAttributeMetadata'))).toHaveLength(1)
   })
 
@@ -131,7 +131,7 @@ describe('createDocsSource (Dataverse)', () => {
   it('arquivos de documento sem validade usam a emissão e, sem datas, sem-data', async () => {
     const { host } = hostFalso({}, [{ nomeArquivo: 'RG_2020-01-02_rg.pdf' }, { nomeArquivo: 'RG_sem-data_rg.pdf' }])
     const source = createDocsSource(host)
-    const rg = { pasta: 'Funcionarios/DEV/f-ana/Documentos/RG', tipoId: 't-RG', validade: null }
+    const rg = { pasta: 'Funcionarios/DEV/m1/Documentos/RG', tipoId: 't-RG', validade: null }
     expect((await source.arquivos(DOC({ ...rg, emissao: '2020-01-02' }))).map((a) => a.nome)).toEqual(['RG_2020-01-02_rg.pdf'])
     expect((await source.arquivos(DOC({ ...rg, emissao: null }))).map((a) => a.nome)).toEqual(['RG_sem-data_rg.pdf'])
   })
@@ -147,15 +147,64 @@ describe('createDocsSource (Dataverse)', () => {
   })
 })
 
+describe('cache da listagem de arquivos por documento', () => {
+  const listagens = () => (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.length
+
+  it('Dataverse: lista no SharePoint uma vez por documento; excluir invalida só aquele documento', async () => {
+    const { host } = hostFalso({}, [{ nomeArquivo: 'CNH_2031-05-10_frente.pdf' }])
+    const source = createDocsSource(host)
+    const cnh = DOC({})
+    const aso = DOC({ id: 'd-2', tipoId: 't-ASO', pasta: 'Funcionarios/DEV/m1/Documentos/ASO' })
+    expect((await source.arquivos(cnh)).map((a) => a.nome)).toEqual(['CNH_2031-05-10_frente.pdf'])
+    await source.arquivos(cnh)
+    await source.arquivos(aso)
+    expect(listagens()).toBe(2)
+    const [arq] = await source.arquivos(cnh)
+    await source.excluirArquivo(cnh, arq)
+    const depoisDaExclusao = listagens()
+    await source.arquivos(cnh)
+    await source.arquivos(aso)
+    expect(listagens()).toBe(depoisDaExclusao + 1)
+    source.invalidarArquivos()
+    await source.arquivos(aso)
+    expect(listagens()).toBe(depoisDaExclusao + 2)
+  })
+
+  it('falha na listagem não fica no cache', async () => {
+    const { host } = hostFalso({}, [])
+    const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>
+    fetchMock.mockRejectedValueOnce(new Error('rede'))
+    const source = createDocsSource(host)
+    await expect(source.arquivos(DOC({}))).rejects.toThrow('rede')
+    expect(await source.arquivos(DOC({}))).toEqual([])
+  })
+
+  it('mock: renovar invalida o anterior, e a lista devolvida é uma cópia', async () => {
+    const source = createMockDocsSource('2026-10-13')
+    const data = await source.carregar()
+    const cnh = data.tipos.find((t) => t.codigo === 'CNH')!
+    const dono = data.donos.find((d) => d.id === 'm2')!
+    const anterior = data.docs.find((d) => d.donoId === 'm2' && d.tipoId === cnh.id)!
+    const lista = await source.arquivos(anterior)
+    lista.push({ id: 'x', nome: 'intruso', caminho: '', tamanho: 0, modificadoEm: null, mimeType: null })
+    expect(await source.arquivos(anterior)).toEqual([])
+    await source.enviarArquivo(anterior, new File(['a'], 'a.pdf'))
+    expect(await source.arquivos(anterior)).toHaveLength(1)
+    const r = await source.salvarDocumento({ tipo: cnh, dono, anterior, numero: '', emissao: null, validade: anterior.validade, observacao: '', arquivos: [new File(['b'], 'b.pdf')] })
+    expect(await source.arquivos(anterior)).toHaveLength(2)
+    expect(await source.arquivos(r.doc)).toHaveLength(2)
+  })
+})
+
 describe('createDocsSource (Dataverse): excluirArquivo', () => {
   it('chama o flow de exclusão do SharePoint com o dono e o arquivo e avisa o menu', async () => {
     const { host, dispatchEvent } = hostFalso({})
     const source = createDocsSource(host)
-    const arq = { id: 'sp-1', nome: 'CNH_2031-05-10_frente.pdf', caminho: 'Funcionarios/DEV/f-ana/Documentos/CNH/CNH_2031-05-10_frente.pdf', tamanho: 1, modificadoEm: null, mimeType: null }
+    const arq = { id: 'sp-1', nome: 'CNH_2031-05-10_frente.pdf', caminho: 'Funcionarios/DEV/m1/Documentos/CNH/CNH_2031-05-10_frente.pdf', tamanho: 1, modificadoEm: null, mimeType: null }
     await source.excluirArquivo(DOC({}), arq)
     const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>
     const corpo = JSON.parse(String((fetchMock.mock.calls.at(-1)![1] as RequestInit).body))
-    expect(corpo).toMatchObject({ fileLocator: 'sp-1', caminhoSharePoint: arq.caminho, nomeArquivo: arq.nome, tarefaId: 'f-ana' })
+    expect(corpo).toMatchObject({ fileLocator: 'sp-1', caminhoSharePoint: arq.caminho, nomeArquivo: arq.nome, tarefaId: 'm1' })
     expect(dispatchEvent).toHaveBeenCalledTimes(1)
     expect(dispatchEvent.mock.calls[0][0].type).toBe(DOCUMENTOS_ALTERADOS)
   })
@@ -168,7 +217,7 @@ describe('createMockDocsSource: aviso ao menu', () => {
     const source = createMockDocsSource('2026-10-13')
     const data = await source.carregar()
     const cnh = data.tipos.find((t) => t.codigo === 'CNH')!
-    const ana = data.donos.find((d) => d.nome === 'Ana')!
+    const ana = data.donos.find((d) => d.nome === 'Carlão')!
     const r = await source.salvarDocumento({ tipo: cnh, dono: ana, anterior: null, numero: '', emissao: null, validade: '2031-10-13', observacao: '', arquivos: [] })
     await source.enviarArquivo(r.doc, new File(['x'], 'a.pdf'))
     await source.salvarTipo({ codigo: 'Y', nome: 'Y', categoria: 'pessoas', temValidade: false, validadePadraoMeses: null, obrigatorioPara: [], ordem: 9 })

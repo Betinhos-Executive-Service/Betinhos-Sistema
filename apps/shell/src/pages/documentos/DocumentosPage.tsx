@@ -1,5 +1,5 @@
 // DocumentosPage.tsx
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Alert, Button, EmptyState, MetricCard, PageToolbar, SearchBox, Select, Skeleton, StatusBadge, Tabs, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
 import { AlertTriangle, CalendarClock, CalendarDays, CheckCircle2, Clock, FileX, RefreshCw, Settings } from 'lucide-react'
 import type { Host } from '../../host'
@@ -8,7 +8,7 @@ import { useQueryFilters, useQueryId } from '../../nav/queryState'
 import { parseHash, patchHashQuery, readHashQuery, hrefFor } from '../../nav/useHashRoute'
 import { todaySP } from '../funcionarios/data/dates'
 import { useMedia } from '../operacional/useMedia'
-import { createDocsSource, type DocsSource } from './data/source'
+import { createDocsSource, DOCUMENTOS_ALTERADOS, type DocsSource } from './data/source'
 import { avisoFalhas, type SalvarDocResult } from './data/salvar'
 import { KPIS, contarKpis, filtrarPendencias, montarPendencias } from './domain/pendencias'
 import { documentosQuery } from './domain/query'
@@ -38,6 +38,9 @@ function Documentos({ host }: { host: Host }) {
   const [alvo, setAlvo] = useState<AlvoRenovar | null>(null)
   const [config, setConfig] = useState(false)
   const [fichaId] = useQueryId('ficha')
+  const [fichaPerdida, setFichaPerdida] = useState(false)
+  // Algo mudou enquanto a ficha estava aberta (documento, arquivo, cadastro)? Só então fechar recarrega a central.
+  const sujo = useRef(false)
   const mobile = useMedia('(max-width: 820px)')
   const toast = useToast()
 
@@ -49,7 +52,9 @@ function Documentos({ host }: { host: Host }) {
   const tiposDaAba = useMemo(() => (data?.tipos ?? []).filter((t) => t.categoria === filtro.aba && t.ativo), [data, filtro.aba])
 
   const refresh = useCallback(() => { void reload() }, [reload])
-  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar documentos" onClick={refresh} />, [refresh])
+  // Atualizar pedido pelo usuário também descarta as listagens de arquivos guardadas.
+  const atualizar = useCallback(() => { source?.invalidarArquivos(); void reload() }, [source, reload])
+  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar documentos" onClick={atualizar} />, [atualizar])
   useShellHeader({ title: 'Documentos', actions: headerActions })
 
   // A ficha aberta vive na URL (`ficha=<id>`, e `secao=documentos` para pessoas). Abrir cria entrada no histórico,
@@ -58,10 +63,27 @@ function Documentos({ host }: { host: Host }) {
     const q = readHashQuery()
     q.set('ficha', p.dono.id)
     if (p.dono.categoria === 'pessoas') q.set('secao', 'documentos'); else q.delete('secao')
+    sujo.current = false
+    setFichaPerdida(false)
     window.location.hash = `${hrefFor(parseHash(window.location.hash).id)}?${q.toString()}`
   }
-  const fecharFicha = () => { patchHashQuery({ ficha: null, secao: null, fde: null, fate: null }); void reload() }
+  const fecharFicha = () => {
+    patchHashQuery({ ficha: null, secao: null, fde: null, fate: null })
+    if (sujo.current) { sujo.current = false; void reload() }
+  }
+  const marcarSujo = useCallback(() => { sujo.current = true }, [])
+  useEffect(() => {
+    window.addEventListener(DOCUMENTOS_ALTERADOS, marcarSujo)
+    return () => window.removeEventListener(DOCUMENTOS_ALTERADOS, marcarSujo)
+  }, [marcarSujo])
   const donoFicha = fichaId && data ? data.donos.find((d) => d.id === fichaId) ?? null : null
+  // Link com ficha de cadastro que não está na lista: tira o parâmetro e avisa.
+  const fichaInexistente = Boolean(fichaId && data && !donoFicha)
+  useEffect(() => {
+    if (!fichaInexistente) return
+    setFichaPerdida(true)
+    patchHashQuery({ ficha: null, secao: null, fde: null, fate: null })
+  }, [fichaInexistente])
 
   const onSaved = (r: SalvarDocResult) => {
     setAlvo(null)
@@ -85,7 +107,7 @@ function Documentos({ host }: { host: Host }) {
       meta={source?.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : undefined}
       description="Vencimentos e documentos obrigatórios de funcionários e da frota."
       actions={<>
-        {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} loading={loading && Boolean(data)} onClick={refresh}>Atualizar</Button>}
+        {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} loading={loading && Boolean(data)} onClick={atualizar}>Atualizar</Button>}
         <Button variant="secondary" icon={<Settings size={16} />} disabled={!data} onClick={() => setConfig(true)}>Configurações</Button>
       </>}
       tabs={<Tabs aria-label="Categoria" value={filtro.aba} onChange={(aba) => setFiltro({ aba, kpi: null, tipo: null, q: filtro.q })} tabs={ABAS} />}
@@ -101,6 +123,7 @@ function Documentos({ host }: { host: Host }) {
         />
       ) : undefined}
     >
+      {fichaPerdida ? <Alert tone="warning" title="Cadastro não encontrado" onDismiss={() => setFichaPerdida(false)}>O link abria a ficha de um cadastro que não está na lista de documentos.</Alert> : null}
       {error && data ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{error} A lista mostra os dados da carga anterior.</Alert> : null}
       {data ? (
         <div className="doc-kpis"><div className="doc-kpis__grid">
@@ -114,8 +137,8 @@ function Documentos({ host }: { host: Host }) {
       ) : null}
       {body}
       {source ? <RenovarDrawer alvo={alvo} source={source} onClose={() => setAlvo(null)} onSaved={onSaved} /> : null}
-      {source && donoFicha?.categoria === 'pessoas' ? <FichaPessoaCentral host={host} docs={source} id={donoFicha.id} onClose={fecharFicha} onChanged={refresh} /> : null}
-      {source && donoFicha?.categoria === 'frota' ? <FichaVeiculoCentral host={host} docs={source} id={donoFicha.id} onClose={fecharFicha} onChanged={refresh} /> : null}
+      {source && donoFicha?.categoria === 'pessoas' ? <FichaPessoaCentral host={host} docs={source} id={donoFicha.id} onClose={fecharFicha} onChanged={marcarSujo} /> : null}
+      {source && donoFicha?.categoria === 'frota' ? <FichaVeiculoCentral host={host} docs={source} id={donoFicha.id} onClose={fecharFicha} onChanged={marcarSujo} /> : null}
       {source && data && config ? <ConfigDrawer source={source} data={data} onClose={() => setConfig(false)} onChanged={refresh} /> : null}
     </PageLayout>
   )

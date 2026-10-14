@@ -16,7 +16,7 @@ async function montar(ajustar?: (source: DocsSource) => DocsSource, onSaved = vi
   const source = ajustar ? ajustar(base) : base
   const data = await base.carregar()
   const aso = data.tipos.find((t) => t.codigo === 'ASO')!
-  const ana = data.donos.find((d) => d.nome === 'Ana')!
+  const ana = data.donos.find((d) => d.nome === 'Carlão')!
   const anterior = data.docs.find((d) => d.donoId === ana.id && d.tipoId === aso.id && d.situacao === 'vigente')!
   const onClose = vi.fn()
   render(<ToastProvider><RenovarDrawer alvo={{ tipo: aso, dono: ana, anterior }} source={source} onClose={onClose} onSaved={onSaved} /></ToastProvider>)
@@ -52,7 +52,7 @@ describe('RenovarDrawer', () => {
     const base = createMockDocsSource('2026-10-13')
     const data = await base.carregar()
     const cnh = data.tipos.find((t) => t.codigo === 'CNH')!
-    const ana = data.donos.find((d) => d.nome === 'Ana')!
+    const ana = data.donos.find((d) => d.nome === 'Carlão')!
     const onSaved = vi.fn()
     render(<ToastProvider><RenovarDrawer alvo={{ tipo: cnh, dono: ana, anterior: null }} source={base} onClose={vi.fn()} onSaved={onSaved} /></ToastProvider>)
     const dialog = await screen.findByRole('dialog', { name: 'Adicionar CNH' })

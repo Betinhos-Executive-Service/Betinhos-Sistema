@@ -31,28 +31,29 @@ const carro = (id: string, placa: string, detalhe: string, obrigKey: number): Do
 
 export function createMockData(hoje: string): DocsData {
   const donos = [
-    pessoa('f-ana', 'Ana', true), pessoa('f-bruno', 'Bruno', true), pessoa('f-carla', 'Carla', false), pessoa('f-diego', 'Diego', true),
-    carro('v-1', 'ABC1D23', 'Toyota Corolla', 100000002), carro('v-2', 'EFG4H56', 'Chevrolet Spin', 100000003), carro('v-3', 'IJK7L89', 'Jeep Compass', 100000004),
+    // Mesmos ids e apelidos dos mocks de Funcionários (m1…) e Frota (v1…): a ficha aberta pela central encontra o cadastro no `pnpm dev`.
+    pessoa('m1', 'Carlão', true), pessoa('m2', 'Bruna', true), pessoa('m4', 'Elaine', false), pessoa('m3', 'Diego', true),
+    carro('v1', 'TST1A11', 'Toyota Corolla', 100000002), carro('v4', 'TST4D44', 'Kia Carnival', 100000003), carro('v2', 'TST2B22', 'VW Virtus', 100000004),
   ]
   let n = 0
   const d = (tipoId: string, donoId: string, validade: string | null, extra: Partial<DocEmitido> = {}): DocEmitido => ({
-    id: `d-${++n}`, tipoId, donoId, categoria: donoId.startsWith('v-') ? 'frota' : 'pessoas', numero: '', emissao: null, validade,
+    id: `d-${++n}`, tipoId, donoId, categoria: donoId.startsWith('v') ? 'frota' : 'pessoas', numero: '', emissao: null, validade,
     situacao: 'vigente', pasta: '', observacao: '', ultimoMarco: null, modificadoEm: null, ...extra,
   })
   const docs = [
-    d('t-cnh', 'f-ana', dia(hoje, -5)),
-    d('t-cnh', 'f-ana', dia(hoje, -370), { situacao: 'substituido' }),
-    d('t-aso', 'f-ana', dia(hoje, 25), { emissao: addMonths(dia(hoje, 25), -12) }),
-    d('t-rg', 'f-ana', null),
-    d('t-cnh', 'f-bruno', dia(hoje, 6)),
-    d('t-aso', 'f-bruno', dia(hoje, 200)),
-    d('t-aso', 'f-carla', dia(hoje, 50)),
-    d('t-cnh', 'f-diego', dia(hoje, 900)),
-    d('t-crlv', 'v-1', dia(hoje, 3)),
-    d('t-ipva', 'v-1', dia(hoje, -20), { observacao: 'Parcela 3 de 3' }),
-    d('t-seg', 'v-1', dia(hoje, 120), { observacao: 'Porto Seguro' }),
-    d('t-crlv', 'v-2', dia(hoje, 40)),
+    d('t-cnh', 'm1', dia(hoje, -5)),
+    d('t-cnh', 'm1', dia(hoje, -370), { situacao: 'substituido' }),
+    d('t-aso', 'm1', dia(hoje, 25), { emissao: addMonths(dia(hoje, 25), -12) }),
+    d('t-rg', 'm1', null),
+    d('t-cnh', 'm2', dia(hoje, 6)),
+    d('t-aso', 'm2', dia(hoje, 200)),
+    d('t-aso', 'm4', dia(hoje, 50)),
+    d('t-cnh', 'm3', dia(hoje, 900)),
+    d('t-crlv', 'v1', dia(hoje, 3)),
+    d('t-ipva', 'v1', dia(hoje, -20), { observacao: 'Parcela 3 de 3' }),
+    d('t-seg', 'v1', dia(hoje, 120), { observacao: 'Porto Seguro' }),
+    d('t-crlv', 'v4', dia(hoje, 40)),
   ]
-  const destinatarios = [{ id: 'a-1', categoria: 'pessoas' as const, funcionarioId: 'f-carla', nome: 'Carla' }]
+  const destinatarios = [{ id: 'a-1', categoria: 'pessoas' as const, funcionarioId: 'm4', nome: 'Elaine' }]
   return { tipos: MOCK_TIPOS.map((x) => ({ ...x, obrigatorioPara: [...x.obrigatorioPara] })), donos, docs, destinatarios }
 }

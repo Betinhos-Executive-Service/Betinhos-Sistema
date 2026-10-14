@@ -129,9 +129,9 @@ describe('ConfigDrawer', () => {
   it('adiciona e remove destinatário da categoria', async () => {
     const { dialog, source } = await montar()
     fireEvent.click(within(dialog).getByRole('tab', { name: 'Destinatários' }))
-    await escolher(dialog, 'Funcionário para Frota', 'Bruno')
+    await escolher(dialog, 'Funcionário para Frota', 'Bruna')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Adicionar em Frota' }))
-    await waitFor(async () => expect((await source.carregar()).destinatarios.some((d) => d.categoria === 'frota' && d.funcionarioId === 'f-bruno')).toBe(true))
+    await waitFor(async () => expect((await source.carregar()).destinatarios.some((d) => d.categoria === 'frota' && d.funcionarioId === 'm2')).toBe(true))
     const existente = (await source.carregar()).destinatarios[0]
     fireEvent.click(within(dialog).getByRole('button', { name: `Remover ${existente.nome} de ${existente.categoria === 'frota' ? 'Frota' : 'Pessoas'}` }))
     await waitFor(async () => expect((await source.carregar()).destinatarios.some((d) => d.id === existente.id)).toBe(false))

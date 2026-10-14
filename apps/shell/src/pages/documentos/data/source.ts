@@ -27,6 +27,48 @@ export type DocsSource = {
   salvarTipo(tipo: TipoInput, id?: string): Promise<string>
   adicionarDestinatario(categoria: Categoria, funcionarioId: string, nome: string): Promise<string>
   removerDestinatario(id: string): Promise<void>
+  /** Descarta a listagem de arquivos guardada (ex.: botão Atualizar). */
+  invalidarArquivos(): void
+}
+
+type FonteSemCache = Omit<DocsSource, 'invalidarArquivos'>
+
+/**
+ * Guarda a listagem do SharePoint por documento: reabrir a ficha ou o checklist não lista de novo.
+ * Enviar, excluir e salvar documento invalidam só os documentos envolvidos; listagem que falhou não fica guardada.
+ */
+export function comCacheDeArquivos(base: FonteSemCache): DocsSource {
+  // A chave inclui as datas: a lista do vigente depende do prefixo `código_data_`.
+  const cache = new Map<string, Promise<Arquivo[]>>()
+  const chave = (doc: DocEmitido) => `${doc.id}|${doc.validade ?? ''}|${doc.emissao ?? ''}`
+  const invalidar = (id: string | null | undefined) => {
+    if (!id) return
+    for (const k of [...cache.keys()]) if (k.startsWith(`${id}|`)) cache.delete(k)
+  }
+  return {
+    ...base,
+    arquivos(doc) {
+      const k = chave(doc)
+      let lista = cache.get(k)
+      if (!lista) {
+        const nova = base.arquivos(doc)
+        cache.set(k, nova)
+        nova.catch(() => { if (cache.get(k) === nova) cache.delete(k) })
+        lista = nova
+      }
+      return lista.then((itens) => [...itens])
+    },
+    async enviarArquivo(doc, file) { try { return await base.enviarArquivo(doc, file) } finally { invalidar(doc.id) } },
+    async excluirArquivo(doc, arq) { try { await base.excluirArquivo(doc, arq) } finally { invalidar(doc.id) } },
+    async salvarDocumento(input) {
+      try {
+        const r = await base.salvarDocumento(input)
+        invalidar(r.doc.id)
+        return r
+      } finally { invalidar(input.anterior?.id) }
+    },
+    invalidarArquivos() { cache.clear() },
+  }
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -52,7 +94,7 @@ export function codigoDoDoc(doc: Pick<DocEmitido, 'pasta' | 'tipoId'>, tipos: Pi
   throw new Error('Não foi possível identificar a pasta do documento. Recarregue a lista e tente de novo.')
 }
 
-export function createMockDocsSource(hoje = todaySP()): DocsSource {
+export function createMockDocsSource(hoje = todaySP(), { cacheArquivos = true }: { cacheArquivos?: boolean } = {}): DocsSource {
   const data = createMockData(hoje)
   const arquivos = new Map<string, Arquivo[]>()
   const blobs = new Map<string, Blob>()
@@ -66,7 +108,7 @@ export function createMockDocsSource(hoje = todaySP()): DocsSource {
     blobs.set(arq.id, file)
     return arq
   }
-  return {
+  const fonte: FonteSemCache = {
     mock: true,
     async carregar() { await wait(250); return structuredClone(data) },
     async arquivos(doc) { await wait(150); return doVigente(doc, codigoDoDoc(doc, data.tipos), arquivos.get(pastaDe(doc)) ?? []) },
@@ -105,6 +147,7 @@ export function createMockDocsSource(hoje = todaySP()): DocsSource {
     async adicionarDestinatario(categoria, funcionarioId, nome) { await wait(150); const id = novoId(); data.destinatarios.push({ id, categoria, funcionarioId, nome }); return id },
     async removerDestinatario(id) { await wait(150); data.destinatarios = data.destinatarios.filter((d) => d.id !== id) },
   }
+  return cacheArquivos ? comCacheDeArquivos(fonte) : { ...fonte, invalidarArquivos() { /* sem cache */ } }
 }
 
 export function createDocsSource(host: Host): DocsSource {
@@ -138,7 +181,7 @@ export function createDocsSource(host: Host): DocsSource {
     await host.client.update(s.funcionario, funcionarioId, datas as Row)
   }
 
-  return {
+  return comCacheDeArquivos({
     mock: false,
     async carregar() {
       const s = await entitySets()
@@ -179,5 +222,5 @@ export function createDocsSource(host: Host): DocsSource {
       const s = await entitySets()
       await host.client.update(s.destinatario, id, { statecode: 1, statuscode: 2 })
     },
-  }
+  })
 }
