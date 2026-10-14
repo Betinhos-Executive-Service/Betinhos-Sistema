@@ -6,9 +6,10 @@ import { Bars } from '../components/Ui'
 import { diaSP, formatBR } from '../data/dates'
 import { brl, NAO_INFORMADO } from '../data/format'
 import { GRAVIDADE, label, STATUS_OPTIONS, TIPO_REPARO } from '../data/schema'
+import type { LoadResult } from '../data/source'
 import type { FrotaData } from '../data/types'
 import { downloadCsv, toCsv } from '../domain/csv'
-import { custoPorMesEmpilhado, custoPorVeiculo, FONTE_LABEL, type CustoVeiculo, type EntradaCusto } from '../domain/custoTotal'
+import { AVISO_12_MESES, custoPorMesEmpilhado, custoPorVeiculo, FONTE_LABEL, indisponiveisDe, periodoAlemDe12Meses, type CustoVeiculo, type EntradaCusto, type Fonte } from '../domain/custoTotal'
 import { centavos, contarPor, custoPor, multasNoPeriodo, multasPorMotorista, realizadas, tempoMedioDias, ultimos12Meses, type Custo, type Periodo } from '../domain/indicadores'
 
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
@@ -47,14 +48,26 @@ export function linhasCsv(data: FrotaData, periodo: Periodo) {
   return { headers: ['Data', 'Veículo', 'Descrição', 'Tipo de reparo', 'Estabelecimento', 'Valor'], rows }
 }
 
-export function Indicadores({ data, today }: { data: FrotaData; today: string }) {
+const FONTES_KPI: [Fonte, string][] = [['manutencao', 'manutenção'], ['multas', 'multas'], ['combustivel', 'combustível']]
+
+/** Fontes que entram no KPI; as que falharam saem da soma e aparecem como indisponíveis. */
+export function hintCustoTotal(indisponiveis: EntradaCusto['indisponiveis']): string {
+  const disponiveis = FONTES_KPI.filter(([f]) => !indisponiveis[f]).map(([, nome]) => nome)
+  const faltam = FONTES_KPI.filter(([f]) => indisponiveis[f]).map(([, nome]) => nome)
+  const partes = [disponiveis.join(' + ') || 'nenhuma fonte']
+  if (faltam.length) partes.push(`${faltam.join(' e ')} ${faltam.length === 1 ? 'indisponível' : 'indisponíveis'}`)
+  return partes.join(' · ')
+}
+
+export function Indicadores({ data, errors, today }: { data: FrotaData; errors: LoadResult['errors']; today: string }) {
   // Período na URL (#/frota?aba=indicadores&de=…&ate=…); sem datas, valem os últimos 12 meses.
   const padrao = useMemo(() => ultimos12Meses(today), [today])
   const [periodo, setPeriodo] = useQueryPeriodo('de', 'ate', padrao)
   const [ordem, setOrdem] = useState<Ordem>('total')
+  const indisponiveis = useMemo(() => indisponiveisDe(errors), [errors])
   const calc = useMemo(() => {
-    // O ViewGate já bloqueia a aba quando manutenções, multas ou infrações falham; falhas de despesas e telemetria não chegam aqui.
-    const entrada: EntradaCusto = { manutencoes: data.manutencoes, multas: data.multas, infracoes: data.infracoes, despesasCombustivel: data.despesasCombustivel, telemetriaKm: data.telemetriaKm, documentos: [], indisponiveis: {} }
+    // O ViewGate bloqueia a aba quando manutenções, multas ou infrações falham; despesas e telemetria que falham saem da soma e do hint.
+    const entrada: EntradaCusto = { manutencoes: data.manutencoes, multas: data.multas, infracoes: data.infracoes, despesasCombustivel: data.despesasCombustivel, telemetriaKm: data.telemetriaKm, documentos: [], indisponiveis }
     const porVeiculo = custoPorVeiculo(entrada, data.veiculos, periodo)
     // KPI na mesma base do gráfico por mês: inclui lançamentos sem veículo.
     const porMes = custoPorMesEmpilhado(entrada, periodo)
@@ -73,7 +86,7 @@ export function Indicadores({ data, today }: { data: FrotaData; today: string })
       porGravidade: contarPor(multas, (item) => (item.infracaoId ? label(GRAVIDADE, infracoes.get(item.infracaoId)?.gravidade ?? null) : 'Sem código de infração')),
       porStatus: contarPor(multas, (item) => label(STATUS_OPTIONS.multa, item.status, 'Sem status')),
     }
-  }, [data, periodo])
+  }, [data, periodo, indisponiveis])
 
   function exportar() {
     const { headers, rows } = linhasCsv(data, periodo)
@@ -96,11 +109,13 @@ export function Indicadores({ data, today }: { data: FrotaData; today: string })
       />
 
       <div className="frota-kpis frota-kpis--4" aria-label="Resumo">
-        <MetricCard icon={<Wallet size={20} />} label="Custo total no período" value={brl(calc.total)} hint="manutenção + multas + combustível" />
+        <MetricCard icon={<Wallet size={20} />} label="Custo total no período" value={brl(calc.total)} hint={hintCustoTotal(indisponiveis)} />
         <MetricCard icon={<Wrench size={20} />} label="Manutenções realizadas" value={calc.qtd} />
         <MetricCard icon={<Timer size={20} />} label="Tempo médio entre solicitação e realização" value={calc.tempo === null ? NAO_INFORMADO : `${String(calc.tempo).replace('.', ',')} dias`} />
         <MetricCard icon={<FileWarning size={20} />} tone="warning" label="Multas no período" value={calc.multas} />
       </div>
+
+      {periodoAlemDe12Meses(periodo, today) && <p className="frota-muted">{AVISO_12_MESES}</p>}
 
       <Surface title="Custo total por mês"><Bars items={calc.porMes.map((m) => ({ label: mesLabel(m.chave), value: m.total, hint: `${brl(m.porFonte.manutencao)} manut. · ${brl(m.porFonte.multas)} multas · ${brl(m.porFonte.combustivel)} comb.` }))} format={brl} /></Surface>
 

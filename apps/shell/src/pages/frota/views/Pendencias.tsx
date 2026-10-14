@@ -1,8 +1,9 @@
 import { CalendarClock, Car, CheckCircle2, ChevronRight, CircleAlert, FileWarning, Gauge, ListTodo, Wrench } from 'lucide-react'
 import { useMemo } from 'react'
-import { EmptyState, MetricCard, StatusBadge, Surface } from '@betinhos/ui'
+import { Alert, EmptyState, MetricCard, StatusBadge, Surface } from '@betinhos/ui'
 import { useQueryTexto } from '../../../nav/queryState'
 import { formatBR } from '../data/dates'
+import type { LoadResult } from '../data/source'
 import type { FrotaData, Kind } from '../data/types'
 import { buildPendencias, PENDENCIA_LABEL, PENDENCIA_ORDEM, type Pendencia, type PendenciaTipo } from '../domain/pendencias'
 
@@ -21,6 +22,10 @@ const ICONE: Record<Kind | 'preventiva', typeof Wrench> = { manutencao: Wrench, 
 type Urgencia = 'atrasado' | 'hoje' | 'breve'
 
 function urgencia(item: Pendencia): Urgencia | null {
+  if (item.kind === 'preventiva') {
+    if (item.estado === 'vencido') return 'atrasado'
+    if (item.criterio !== 'data') return null
+  }
   if (item.dias === null || !item.prazo) return null
   return item.dias < 0 ? 'atrasado' : item.dias === 0 ? 'hoje' : 'breve'
 }
@@ -35,18 +40,32 @@ function Prazo({ item }: { item: Pendencia }) {
 }
 
 function Km({ item }: { item: Pendencia }) {
-  if (item.prazo || item.faltamKm === null) return null
+  if (item.faltamKm === null) return null
   const vencido = item.faltamKm < 0
   const texto = vencido ? `Vencido há ${Math.abs(item.faltamKm).toLocaleString('pt-BR')} km` : `Em ${item.faltamKm.toLocaleString('pt-BR')} km`
-  return <StatusBadge tone={vencido ? 'danger' : 'info'} icon={<Gauge size={12} />}>{texto}</StatusBadge>
+  return <StatusBadge tone={vencido ? 'danger' : item.estado === 'a_vencer' ? 'warning' : 'info'} icon={<Gauge size={12} />}>{texto}</StatusBadge>
 }
 
-export function Pendencias({ data, today, onOpen, onOpenVeiculo }: { data: FrotaData; today: string; onOpen: (kind: Kind, id: string) => void; onOpenVeiculo: (id: string, secao: 'preventivas') => void }) {
-  const itens = useMemo(() => buildPendencias(data, today), [data, today])
+/** Um badge só: na preventiva, o da regra que decide (km ou data); nos demais, o prazo. */
+function Badge({ item }: { item: Pendencia }) {
+  if (item.kind === 'preventiva' && item.criterio === 'km') return <Km item={item} />
+  return <Prazo item={item} />
+}
+
+const TABELAS_PREVENTIVA = ['planoPreventivo', 'baselines', 'veiculos'] as const
+
+export function Pendencias({ data, errors = {}, today, onOpen, onOpenVeiculo }: { data: FrotaData; errors?: LoadResult['errors']; today: string; onOpen: (kind: Kind, id: string) => void; onOpenVeiculo: (id: string, secao: 'preventivas') => void }) {
+  // Sem plano, baselines ou veículos as preventivas não são calculadas; as demais pendências seguem.
+  const erroPreventiva = TABELAS_PREVENTIVA.map((key) => errors[key]).find(Boolean) ?? null
+  const itens = useMemo(
+    () => buildPendencias(erroPreventiva ? { ...data, veiculos: [], planoPreventivo: [], baselines: [] } : data, today),
+    [data, today, erroPreventiva],
+  )
   const [filtroUrl, setFiltro] = useQueryTexto('filtro')
   const filtro = PENDENCIA_ORDEM.find((tipo) => tipo === filtroUrl) ?? ''
 
-  if (!itens.length) return <EmptyState align="start" icon={<CheckCircle2 size={36} />} title="Nenhuma pendência de frota no momento">Aprovações, agendamentos, multas e colisões em aberto aparecem aqui.</EmptyState>
+  const aviso = erroPreventiva ? <Alert tone="warning">Preventivas indisponíveis: {erroPreventiva}</Alert> : null
+  if (!itens.length) return <>{aviso}<EmptyState align="start" icon={<CheckCircle2 size={36} />} title="Nenhuma pendência de frota no momento">Aprovações, agendamentos, multas e colisões em aberto aparecem aqui.</EmptyState></>
 
   const contagem = (tipo: PendenciaTipo) => itens.filter((item) => item.tipo === tipo).length
   const atrasadas = itens.filter((item) => urgencia(item) === 'atrasado').length
@@ -56,6 +75,7 @@ export function Pendencias({ data, today, onOpen, onOpenVeiculo }: { data: Frota
 
   return (
     <div className="frota-pend">
+      {aviso}
       <div className="frota-kpis">
         <MetricCard icon={<ListTodo size={20} />} tone="info" label="Pendências" value={itens.length} />
         <MetricCard icon={<CircleAlert size={20} />} tone={atrasadas ? 'danger' : 'info'} label="Atrasadas" value={atrasadas} />
@@ -92,8 +112,7 @@ export function Pendencias({ data, today, onOpen, onOpenVeiculo }: { data: Frota
                         <strong>{item.titulo}</strong>
                         <span>{[item.veiculo?.label, item.pessoa?.label].filter(Boolean).join(' · ') || 'Sem veículo informado'}</span>
                       </span>
-                      <Prazo item={item} />
-                      <Km item={item} />
+                      <Badge item={item} />
                       <ChevronRight size={16} className="frota-pend__seta" aria-hidden />
                     </button>
                   </li>

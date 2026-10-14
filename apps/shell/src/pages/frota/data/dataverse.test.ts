@@ -38,6 +38,28 @@ describe('createXrmSource', () => {
     expect(result.errors).toEqual({ multas: 'Sem privilégio de leitura' })
   })
 
+  it('sem as colunas de hodômetro, carrega os veículos de novo sem elas', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ value: [] }) })))
+    let tentativas = 0
+    const retrieveMultipleRecords = vi.fn(async (entity: string, _options?: string) => {
+      if (entity === 'cr40f_veiculos') {
+        tentativas += 1
+        if (tentativas === 1) throw new Error("Could not find a property named 'cr40f_hodometro' on type 'Microsoft.Dynamics.CRM.cr40f_veiculos'.")
+        return { entities: [{ cr40f_veiculosid: 'V1', cr40f_placa: 'ABC1D23' }] }
+      }
+      if (entity === 'cr40f_categoriadespesaoperacional') return { entities: [{ cr40f_categoriadespesaoperacionalid: 'CA', cr40f_nome: 'Abastecimento' }] }
+      return { entities: [] }
+    })
+    const { xrm } = host({ retrieveMultipleRecords })
+    const result = await createXrmSource(xrm).load()
+    const chamadas = retrieveMultipleRecords.mock.calls.filter((call) => call[0] === 'cr40f_veiculos')
+    expect(chamadas).toHaveLength(2)
+    expect(chamadas[0][1]).toContain('cr40f_hodometro')
+    expect(chamadas[1][1]).not.toContain('cr40f_hodometro')
+    expect(result.errors.veiculos).toBeUndefined()
+    expect(result.data.veiculos).toEqual([expect.objectContaining({ id: 'v1', placa: 'ABC1D23', hodometro: null, hodometroEm: null })])
+  })
+
   it('lê o status atual pelo campo de status da tabela', async () => {
     const { xrm, WebApi } = host()
     expect(await createXrmSource(xrm).currentStatus('manutencao', 'm1')).toBe(202410001)

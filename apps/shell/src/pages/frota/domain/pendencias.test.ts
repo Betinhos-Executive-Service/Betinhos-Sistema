@@ -84,9 +84,28 @@ describe('buildPendencias', () => {
       expect(result).toEqual([])
     })
 
+    const ambos = [item('oleo', { nome: 'Troca de óleo', intervaloKm: 10000, intervaloMeses: 12 })]
+
+    it('vencida por km com data futura: estado vencido, critério km e peso pelo km negativo', () => {
+      const [p] = build({ veiculos: [veic('v1', 'AAA1A11', 20000)], planoPreventivo: ambos, baselines: [base('v1', 'oleo', 9000, '2026-06-01')] })
+      expect(p).toMatchObject({ estado: 'vencido', criterio: 'km', faltamKm: -1000, prazo: '2027-06-01', peso: -2000 })
+      expect(p.dias).toBeGreaterThan(0)
+    })
+
+    it('vencida por data com km positivo: critério data e peso negativo pelos dias', () => {
+      const [p] = build({ veiculos: [veic('v1', 'AAA1A11', 20000)], planoPreventivo: ambos, baselines: [base('v1', 'oleo', 15000, '2025-09-01')] })
+      expect(p).toMatchObject({ estado: 'vencido', criterio: 'data', faltamKm: 5000, dias: -31, peso: -1031 })
+    })
+
+    it('a vencer: critério da regra com menos folga e peso pelo menor valor', () => {
+      const [p] = build({ veiculos: [veic('v1', 'AAA1A11', 18200)], planoPreventivo: ambos, baselines: [base('v1', 'oleo', 9000, '2026-06-01')] })
+      expect(p).toMatchObject({ estado: 'a_vencer', criterio: 'km', faltamKm: 800 })
+      expect(p.peso).toBe(Math.min(800, p.dias as number))
+    })
+
     it('demais pendências levam veiculoId e faltamKm nulo', () => {
       const [p] = build({ manutencoes: [manut('a', { veiculo: { id: 'v9', label: 'X' } })], colisoes: [colisao('c', COLISAO.ENVIADO)] })
-      expect(p).toMatchObject({ veiculoId: 'v9', faltamKm: null })
+      expect(p).toMatchObject({ veiculoId: 'v9', faltamKm: null, estado: null, criterio: null })
       expect(build({ colisoes: [colisao('c', COLISAO.ENVIADO)] })[0]).toMatchObject({ veiculoId: null, faltamKm: null })
     })
   })

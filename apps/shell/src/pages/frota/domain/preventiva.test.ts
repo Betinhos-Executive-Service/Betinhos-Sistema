@@ -22,7 +22,17 @@ describe('preventiva', () => {
         manut('solicitada', { veiculo: ref('a'), status: MANUT.SOLICITADO, servicos: [3], dataManutencao: '2026-10-10' }),
       ],
     }), today)
-    expect(result).toEqual([expect.objectContaining({ ultima: { km: 160000, data: '2026-09-05', origem: 'manutencao', manutencaoId: 'set' }, kmProxima: 170000, dataProxima: '2027-03-05', faltamKm: 5000, estado: 'em_dia' })])
+    expect(result).toEqual([expect.objectContaining({ ultima: { km: 160000, data: '2026-09-05', origem: 'manutencao', manutencaoId: 'set', complementadaPorBaseline: false }, kmProxima: 170000, dataProxima: '2027-03-05', faltamKm: 5000, estado: 'em_dia' })])
+  })
+
+  it('manutenção sem km: o km vem da última execução informada e a regra por km é calculada', () => {
+    const [p] = calcularPreventivas(entrada({
+      veiculos: [veic('a', { hodometro: 165000 })],
+      manutencoes: [manut('sem-km', { veiculo: ref('a'), servicos: [1], dataManutencao: '2026-09-05' })],
+      baselines: [base('a', 'oleo', { km: 158000, data: '2026-08-01' })],
+    }), today)
+    expect(p.ultima).toEqual({ km: 158000, data: '2026-09-05', origem: 'manutencao', manutencaoId: 'sem-km', complementadaPorBaseline: true })
+    expect(p).toMatchObject({ kmProxima: 168000, faltamKm: 3000, dataProxima: '2027-03-05' })
   })
 
   it('usa o hodômetro Infleet e marca estimado quando só há km de manutenção', () => {
@@ -50,7 +60,7 @@ describe('preventiva', () => {
       baselines: [base('a', 'oleo', { km: 112000, data: '2026-08-01' }), base('c', 'oleo')],
     }), today)
     expect(result).toEqual([
-      expect.objectContaining({ veiculo: ref('a'), estado: 'em_dia', ultima: { km: 112000, data: '2026-08-01', origem: 'baseline', manutencaoId: null }, kmProxima: 122000, dataProxima: '2027-02-01', faltamKm: 2000, faltamDias: 110 }),
+      expect.objectContaining({ veiculo: ref('a'), estado: 'em_dia', ultima: { km: 112000, data: '2026-08-01', origem: 'baseline', manutencaoId: null, complementadaPorBaseline: false }, kmProxima: 122000, dataProxima: '2027-02-01', faltamKm: 2000, faltamDias: 110 }),
       expect.objectContaining({ veiculo: ref('b'), estado: 'sem_base', ultima: null, kmProxima: null, dataProxima: null, faltamKm: null, faltamDias: null }),
       expect.objectContaining({ veiculo: ref('c'), estado: 'sem_base', ultima: null }),
     ])

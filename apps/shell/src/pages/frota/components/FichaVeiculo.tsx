@@ -157,7 +157,7 @@ export function FichaVeiculo({ source, id, data, errors, today, secao = null, on
           </section>
           <section className="frota-group" aria-labelledby={`${id}-custo`}>
             <h3 id={`${id}-custo`} className="frota-group__title">Custo total</h3>
-            <CustoTotal data={data} errors={errors} veiculoId={id} periodo={periodo} onPeriodo={setPeriodo} />
+            <CustoTotal data={data} errors={errors} veiculoId={id} periodo={periodo} today={today} onPeriodo={setPeriodo} />
           </section>
           <section className="frota-group" id={`${id}-preventivas`} aria-labelledby={`${id}-prev-titulo`}>
             <h3 id={`${id}-prev-titulo`} className="frota-group__title">Preventivas</h3>

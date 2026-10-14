@@ -16,6 +16,18 @@ export type CustoMesEmpilhado = { chave: string; porFonte: Record<Fonte, number>
 
 type Lancamento = { fonte: Fonte; dia: string; veiculoId: string | undefined; valor: number | null }
 
+/** Fontes de custo que falharam na carga (as chaves de erro do LoadResult). */
+export function indisponiveisDe(errors: Partial<Record<string, string>>): EntradaCusto['indisponiveis'] {
+  return { combustivel: !!errors.despesasCombustivel, telemetria: !!errors.telemetriaKm, manutencao: !!errors.manutencoes, multas: !!errors.multas || !!errors.infracoes, documentos: false }
+}
+
+/** Combustível e telemetria são carregados só dos últimos 12 meses: período que começa antes disso fica parcial. */
+export function periodoAlemDe12Meses(periodo: Periodo, today: string): boolean {
+  return periodo.de < addMonths(today, -12)
+}
+
+export const AVISO_12_MESES = 'Combustível e km consideram só os últimos 12 meses.'
+
 /** Todos os lançamentos de custo do período, já com dia (America/Sao_Paulo) e valor; ignora multa finalizada sem valor. */
 function lancamentos(entrada: EntradaCusto, periodo: Periodo): Lancamento[] {
   const valorInfracao = (id: string | null) => entrada.infracoes.find((item) => item.id === id)?.valor ?? null

@@ -1,6 +1,6 @@
 import { CAMPO, lerMulti } from '../domain/manutencaoCatalogo'
 import { addMonths, todaySP, type DateBehavior } from './dates'
-import { cleanId, mapBaseline, mapColisao, mapDespesaCombustivel, mapInfracao, mapItemPlano, mapManutencao, mapMulta, mapPosse, mapTelemetriaKm, mapVeiculo, SELECT } from './mappers'
+import { cleanId, mapBaseline, mapColisao, mapDespesaCombustivel, mapInfracao, mapItemPlano, mapManutencao, mapMulta, mapPosse, mapTelemetriaKm, mapVeiculo, SELECT, SELECT_VEICULOS_SEM_HODOMETRO } from './mappers'
 import { BASELINE, CATEGORIA_DESPESA_TABLE, ENTITY_SET, ITEM_PLANO, KIND_TABLE, STATUS_FIELD, TABLE } from './schema'
 import { base64ToBlob, callSpFlow, escolherPrincipal, FOTO_MAX_BYTES, fileToBase64, nomeFoto, pastaFotoVeiculo, SP_VARS, toArquivo, type SpKey } from './sharepoint'
 import { EMPTY_DATA, FlowIncertoError, type DataSource, type FlowId, type FlowResult, type ItemPlanoInput, type LoadResult } from './source'
@@ -67,8 +67,8 @@ export function createXrmSource(xrm: XrmHost): DataSource {
     return cached
   }
 
-  async function retrieveAll(key: TableKey, filter = 'statecode eq 0') {
-    const options = `?$select=${SELECT[key].join(',')}&$filter=${filter}&$orderby=${ORDER[key]}`
+  async function retrieveAll(key: TableKey, filter = 'statecode eq 0', select: readonly string[] = SELECT[key]) {
+    const options = `?$select=${select.join(',')}&$filter=${filter}&$orderby=${ORDER[key]}`
     const rows: Row[] = []
     let page = await api.retrieveMultipleRecords(TABLE[key], options, 500)
     rows.push(...page.entities)
@@ -110,7 +110,15 @@ export function createXrmSource(xrm: XrmHost): DataSource {
   }
 
   const loaders:{ [K in TableKey]: () => Promise<FrotaData[K]> } = {
-    veiculos: async () => (await retrieveAll('veiculos')).map(mapVeiculo),
+    veiculos: async () => {
+      try {
+        return (await retrieveAll('veiculos')).map(mapVeiculo)
+      } catch (reason) {
+        // Ambiente sem as colunas de hodômetro (schema novo não publicado): os veículos carregam, sem km.
+        if (!/hodometro/i.test(errorMessage(reason))) throw reason
+        return (await retrieveAll('veiculos', undefined, SELECT_VEICULOS_SEM_HODOMETRO)).map((row) => ({ ...mapVeiculo(row), hodometro: null, hodometroEm: null }))
+      }
+    },
     manutencoes: async () => {
       const [rows, behaviors] = await Promise.all([retrieveAll('manutencoes'), loadBehaviors(TABLE.manutencoes)])
       return rows.map((row) => mapManutencao(row, behaviors))
