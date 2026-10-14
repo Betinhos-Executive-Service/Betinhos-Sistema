@@ -5,7 +5,7 @@ export function createMockData(now: Date) {
   const execucoes: Execucao[] = [
     { id: 'mock-exec-fin-1', agente: 'financeiro', origem: 'agendado', pergunta: '', status: 'concluida', erro: '', resumo: 'Duas OS concluídas sem recibo e uma OP pendente há 20 dias.', modelo: 'claude-opus-5-5', tokensEntrada: 7800, tokensSaida: 1200, criadaEm: antes(120) },
     { id: 'mock-exec-fin-0', agente: 'financeiro', origem: 'manual', pergunta: 'quais OPs vencem esta semana?', status: 'erro', erro: 'Tempo esgotado na chamada à API do Claude.', resumo: '', modelo: '', tokensEntrada: 0, tokensSaida: 0, criadaEm: antes(1500) },
-    { id: 'mock-exec-log-1', agente: 'logistica', origem: 'manual', pergunta: '', status: 'concluida', erro: '', resumo: 'Um serviço sem motorista amanhã às 09:30.', modelo: 'claude-opus-5-5', tokensEntrada: 5100, tokensSaida: 600, criadaEm: antes(45) },
+    { id: 'mock-exec-log-1', agente: 'logistica', origem: 'manual', pergunta: '', status: 'concluida', erro: '', resumo: 'Um serviço sem motorista amanhã às 09:30.', modelo: 'claude-opus-5-5', tokensEntrada: 5100, tokensSaida: 600, criadaEm: antes(20) },
     { id: 'mock-exec-pes-1', agente: 'pessoas', origem: 'agendado', pergunta: '', status: 'concluida', erro: '', resumo: 'CNH de um motorista vence em 20 dias; nenhum ASO vencido.', modelo: 'claude-opus-5-5', tokensEntrada: 6400, tokensSaida: 700, criadaEm: antes(200) },
   ]
   const propostas: Proposta[] = [

@@ -15,6 +15,7 @@ import { GeralPage } from '../pages/geral/GeralPage'
 import { DashboardPage } from '../pages/dashboard/DashboardPage'
 import { InfracoesPage } from '../pages/infracoes/InfracoesPage'
 import { DespesasPage } from '../pages/despesas/DespesasPage'
+import { AgentesPage } from '../pages/agentes/AgentesPage'
 import { EmptyState, buttonClassName } from '@betinhos/ui'
 import { Frame } from './Frame'
 import { PageLayout } from './PageLayout'
@@ -69,6 +70,8 @@ export function RouteLayout({ host, group, item, label }: Props) {
     if (item.page === 'dashboard') return <DashboardPage host={host} />
     if (item.page === 'infracoes') return <InfracoesPage host={host} />
     if (item.page === 'despesas') return <DespesasPage host={host} />
+    // key: trocar de assistente remonta a página (estado e disparo automático são por agente).
+    if (item.page === 'agentes') return <AgentesPage key={item.id} host={host} agente={item.agente ?? 'financeiro'} />
     return <ComponentsPage />
   }
 

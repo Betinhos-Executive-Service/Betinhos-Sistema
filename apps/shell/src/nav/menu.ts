@@ -10,7 +10,7 @@ export type MenuItem =
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
-  | { kind: 'page'; id: string; label: string; page: 'componentes' | 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' }
+  | { kind: 'page'; id: string; label: string; page: 'componentes' | 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'agentes'; agente?: 'financeiro' | 'logistica' | 'pessoas' }
 
 export type MenuGroup = { id: string; label: string; items: MenuItem[] }
 
@@ -30,6 +30,7 @@ export const MENU: MenuGroup[] = [
       { kind: 'page', id: 'geral', label: 'Geral', page: 'geral' },
       { kind: 'page', id: 'dashboard', label: 'Dashboard', page: 'dashboard' },
       { kind: 'page', id: 'operacional', label: 'Resumo Operacional', page: 'operacional' },
+      { kind: 'page', id: 'assistente-logistica', label: 'Assistente', page: 'agentes', agente: 'logistica' },
       wr('Funções Operacionais', 'new_telafuncoesoperacionais'),
       table('cr40f_trocasdecarro'),
       table('new_possedeveiculo'),
@@ -45,6 +46,7 @@ export const MENU: MenuGroup[] = [
       table('cr40f_composicaodeprecos'),
       { kind: 'page', id: 'ops', label: 'Ordens de Pagamento', page: 'ops' },
       { kind: 'page', id: 'pagantes', label: 'Pagantes', page: 'pagantes' },
+      { kind: 'page', id: 'assistente-financeiro', label: 'Assistente', page: 'agentes', agente: 'financeiro' },
       table('cr40f_recibos_v2'),
       table('cr40f_pedidodecotacao'),
       wr('Pagamento de Fornecedores', 'cr40f_TelaPagamentoFornecedores.html'),
@@ -64,6 +66,7 @@ export const MENU: MenuGroup[] = [
       table('cr40f_clientes1', 'Clientes'),
       table('cr40f_veiculos'),
       { kind: 'page', id: 'funcionarios', label: 'Funcionários', page: 'funcionarios' },
+      { kind: 'page', id: 'assistente-pessoas', label: 'Assistente', page: 'agentes', agente: 'pessoas' },
       { kind: 'page', id: 'curriculos', label: 'Currículos', page: 'curriculos' },
       { kind: 'page', id: 'infracoes', label: 'Infrações de trânsito', page: 'infracoes' },
       table('new_marketing'),
