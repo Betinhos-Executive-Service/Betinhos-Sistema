@@ -6,13 +6,17 @@ type Caso = { id: string; esperado: Decisao | null; arquivos: string[]; contexto
 const MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', pdf: 'application/pdf' }
 const pasta = new URL('../.local/casos/', import.meta.url)
 const casos: Caso[] = JSON.parse(readFileSync(new URL('casos.json', pasta), 'utf8'))
+if (!casos.length) throw new Error('casos.json vazio.')
 const semRotulo = casos.filter((c) => !c.esperado)
 if (semRotulo.length) throw new Error(`Casos sem "esperado": ${semRotulo.map((c) => c.id).join(', ')}`)
 
+// Lê todos os arquivos antes de criar o cliente: arquivo ausente falha aqui, sem nenhuma chamada paga.
+const comprovantesPorCaso = casos.map((caso) => caso.arquivos.map((nome) => ({ mime: MIME[nome.split('.').pop()!.toLowerCase()] ?? 'application/octet-stream', base64: readFileSync(new URL(nome, pasta)).toString('base64') })))
+
 const client = new Anthropic()
 const linhas = []
-for (const caso of casos) {
-  const comprovantes = caso.arquivos.map((nome) => ({ mime: MIME[nome.split('.').pop()!.toLowerCase()] ?? 'application/octet-stream', base64: readFileSync(new URL(nome, pasta)).toString('base64') }))
+for (const [indice, caso] of casos.entries()) {
+  const comprovantes = comprovantesPorCaso[indice]!
   try {
     const msg = await client.messages.create(montarRequisicao(caso.contexto, comprovantes) as unknown as Anthropic.MessageCreateParamsNonStreaming)
     const r = analisarMensagem(msg as unknown as Parameters<typeof analisarMensagem>[0], caso.contexto)
