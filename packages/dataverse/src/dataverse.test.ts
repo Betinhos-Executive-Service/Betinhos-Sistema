@@ -82,3 +82,44 @@ describe('metadata.choices', () => {
     expect(fetchMock.mock.calls[0][0]).toBe("https://org.example/api/data/v9.2/EntityDefinitions(LogicalName='cr40f_reservadeveculos')/Attributes(LogicalName='cr40f_status')/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?$select=LogicalName&$expand=OptionSet($select=Options)")
   })
 })
+
+describe('metadata attributes', () => {
+  it('lê tipo, rótulo, updatable e alvos de lookup em duas chamadas', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(json({ value: [
+        { LogicalName: 'cr40f_status', AttributeType: 'Picklist', IsValidForUpdate: true, DisplayName: { UserLocalizedLabel: { Label: 'Status de Operação' } } },
+        { LogicalName: 'cr40f_motorista', AttributeType: 'Lookup', IsValidForUpdate: true, DisplayName: { UserLocalizedLabel: { Label: 'Motorista' } } },
+        { LogicalName: 'cr40f_id', AttributeType: 'String', IsValidForUpdate: false, DisplayName: { UserLocalizedLabel: null } },
+      ] }))
+      .mockResolvedValueOnce(json({ value: [{ LogicalName: 'cr40f_motorista', Targets: ['cr40f_funcionarios'] }] }))
+    const meta = createMetadata(createClient('https://org.example', fetchMock))
+    const list = await meta.attributes('cr40f_reservadeveculos')
+    expect(list).toEqual([
+      { logicalName: 'cr40f_status', type: 'Picklist', label: 'Status de Operação', updatable: true, targets: [] },
+      { logicalName: 'cr40f_motorista', type: 'Lookup', label: 'Motorista', updatable: true, targets: ['cr40f_funcionarios'] },
+      { logicalName: 'cr40f_id', type: 'String', label: 'cr40f_id', updatable: false, targets: [] },
+    ])
+    expect(fetchMock.mock.calls[0][0]).toContain("EntityDefinitions(LogicalName='cr40f_reservadeveculos')/Attributes?$select=LogicalName,AttributeType,DisplayName,IsValidForUpdate")
+    expect(fetchMock.mock.calls[1][0]).toContain('/Attributes/Microsoft.Dynamics.CRM.LookupAttributeMetadata?$select=LogicalName,Targets')
+    // segunda leitura vem do cache
+    await meta.attributes('cr40f_reservadeveculos')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('expõe o nome primário da tabela', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(json({ LogicalName: 'cr40f_veiculos', EntitySetName: 'cr40f_veiculoses', PrimaryNameAttribute: 'cr40f_placa', DisplayCollectionName: { UserLocalizedLabel: { Label: 'Veículos' } } }))
+    const info = await createMetadata(createClient('https://org.example', fetchMock)).entity('cr40f_veiculos')
+    expect(info.primaryName).toBe('cr40f_placa')
+    expect(fetchMock.mock.calls[0][0]).toContain('PrimaryNameAttribute')
+  })
+
+  it('expõe o ObjectTypeCode da tabela (null quando a metadata não traz)', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(json({ LogicalName: 'cr40f_reservadeveculos', EntitySetName: 'cr40f_reservadeveculoses', ObjectTypeCode: 10580 }))
+      .mockResolvedValueOnce(json({ LogicalName: 'cr40f_outra', EntitySetName: 'cr40f_outras' }))
+    const meta = createMetadata(createClient('https://org.example', fetchMock))
+    expect((await meta.entity('cr40f_reservadeveculos')).objectTypeCode).toBe(10580)
+    expect(fetchMock.mock.calls[0][0]).toContain('ObjectTypeCode')
+    expect((await meta.entity('cr40f_outra')).objectTypeCode).toBeNull()
+  })
+})

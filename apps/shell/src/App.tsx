@@ -41,7 +41,7 @@ export function App() {
 
   return (
     <>
-      <AppShell activeId={activeId} title={label} entityLabels={labels} connection={connection} badges={badges}>
+      <AppShell activeId={activeId} title={label} entityLabels={labels} connection={connection} badges={badges} defaultCollapsed={found?.item.kind === 'page' && found.item.page === 'geral'}>
         <RouteLayout host={host} group={found?.group ?? null} item={found?.item ?? null} label={label} />
       </AppShell>
       <BuildBadge version={__APP_VERSION__} isoDate={__BUILD_DATE__} />

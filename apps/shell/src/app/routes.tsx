@@ -19,6 +19,7 @@ export const PAGE_LOADERS: Record<PageId, () => Promise<ComponentType<PageProps>
   pagantes: () => import('../pages/pagantes/PagantesPage').then((m) => m.PagantesPage),
   ops: () => import('../pages/ops/OpsPage').then((m) => m.OpsPage),
   pessoas: () => import('../pages/pessoas/PessoasPage').then((m) => m.PessoasPage),
+  geral: () => import('../pages/geral/GeralPage').then((m) => m.GeralPage),
   dashboard: () => import('../pages/dashboard/DashboardPage').then((m) => m.DashboardPage),
   infracoes: () => import('../pages/infracoes/InfracoesPage').then((m) => m.InfracoesPage),
   despesas: () => import('../pages/despesas/DespesasPage').then((m) => m.DespesasPage),

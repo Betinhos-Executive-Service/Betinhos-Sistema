@@ -17,6 +17,8 @@ type Props = {
   connection: { ok: boolean; text: string }
   /** Contador por id de item do menu (ex.: `documentos`). */
   badges?: Record<string, ReactNode>
+  /** A tela ativa pede a navegação recolhida no trilho (grades largas), se o usuário não escolheu outra coisa. */
+  defaultCollapsed?: boolean
   children: ReactNode
 }
 
@@ -33,6 +35,7 @@ const GROUP_ICONS: Record<string, ReactNode> = {
 // Um ícone por tela (id do sitemap); sem entrada, o item fica só com o rótulo.
 const ITEM_ICONS: Record<string, ReactNode> = {
   cr40f_homebetinhos: <Home />,
+  geral: <Calendar />,
   cr40f_reservadeveculos: <Calendar />,
   dashboard: <LayoutDashboard />,
   new_dashboard: <LayoutDashboard />,
@@ -97,7 +100,7 @@ function toNavGroup(group: MenuGroup, entityLabels: Map<string, string>, badges?
 }
 
 /** Chrome persistente do Sistema Betinhos: AppShell do pacote alimentado pelo sitemap e pelo estado de conexão. */
-export function AppShell({ activeId, title, entityLabels, connection, badges, children }: Props) {
+export function AppShell({ activeId, title, entityLabels, connection, badges, defaultCollapsed, children }: Props) {
   const install = useInstallPrompt()
   // Gaveta do menu no celular e busca de telas também vivem na URL (`menu=1`, `busca=…`).
   const [navOpen, setNavOpen] = useQueryBandeira('menu')
@@ -108,6 +111,7 @@ export function AppShell({ activeId, title, entityLabels, connection, badges, ch
       groups={MENU.map((group) => toNavGroup(group, entityLabels, badges))}
       activeId={activeId}
       title={title}
+      defaultCollapsed={defaultCollapsed}
       navOpen={navOpen}
       onNavOpenChange={setNavOpen}
       search={search}
