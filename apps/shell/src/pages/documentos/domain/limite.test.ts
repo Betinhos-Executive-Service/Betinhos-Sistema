@@ -12,6 +12,7 @@ describe('criarLimite', () => {
     let pico = 0
     const iniciadas: number[] = []
     const resultados = tarefas.map((t, i) => limite(async () => { iniciadas.push(i); ativas++; pico = Math.max(pico, ativas); try { return await t.p } finally { ativas-- } }))
+    const primeira = resultados[0].catch((e: Error) => e)
     await tick()
     expect(iniciadas).toEqual([0, 1, 2])
     tarefas[1].resolver('b')
@@ -21,7 +22,7 @@ describe('criarLimite', () => {
     await tick()
     expect(iniciadas).toEqual([0, 1, 2, 3, 4])
     tarefas[2].resolver('c'); tarefas[3].resolver('d'); tarefas[4].resolver('e')
-    await expect(resultados[0]).rejects.toThrow('falhou')
+    expect((await primeira as Error).message).toBe('falhou')
     expect(await Promise.all(resultados.slice(1))).toEqual(['b', 'c', 'd', 'e'])
     expect(pico).toBe(3)
   })
