@@ -4,3 +4,4 @@ export { analisarMensagem, MAX_PROPOSTAS, type MensagemApi, type Resultado } fro
 export { REGRAS_COMUNS, PREFIXO_USUARIO, montarTextoUsuario } from './comum.ts'
 export { SYSTEM_FINANCEIRO, montarContextoFinanceiro, type ContextoFinanceiro, type DadosFinanceiro } from './financeiro.ts'
 export { SYSTEM_LOGISTICA, montarContextoLogistica, type ContextoLogistica, type DadosLogistica } from './logistica.ts'
+export { SYSTEM_PESSOAS, montarContextoPessoas, type ContextoPessoas, type DadosPessoas } from './pessoas.ts'
