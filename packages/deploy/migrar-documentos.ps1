@@ -8,6 +8,8 @@
 # Arquivo salvo com BOM: o Windows PowerShell 5.1 precisa dele para ler textos acentuados.
 
 $ErrorActionPreference = "Stop"
+# Os rotulos acentuados e o BOM dependem do Windows PowerShell 5.1 (pwsh le o arquivo de outro jeito).
+if ($PSVersionTable.PSEdition -ne "Desktop") { throw "Rode com powershell.exe (Windows PowerShell 5.1)." }
 Set-StrictMode -Version Latest
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 
@@ -34,6 +36,9 @@ $environmentUrl = Get-Setting "DV_ENVIRONMENT_URL"
 if ([string]::IsNullOrWhiteSpace($environmentUrl)) { throw "DV_ENVIRONMENT_URL ausente no .env." }
 $script:baseUrl = $environmentUrl.TrimEnd("/")
 $environmentHost = ([Uri] $script:baseUrl).Host.ToLowerInvariant()
+# PROD bloqueado no codigo, alem do DV_BLOCKED_HOSTS: este script so roda no DEV.
+$prodHost = "orgf261ae8e.crm2.dynamics.com"
+if ($environmentHost -eq $prodHost) { throw "$environmentHost e o PROD: este script nunca roda em PROD." }
 $blockedHosts = @((Get-Setting "DV_BLOCKED_HOSTS") -split "," | ForEach-Object { $_.Trim().ToLowerInvariant() } | Where-Object { $_ })
 if ($blockedHosts.Count -eq 0) { throw "DV_BLOCKED_HOSTS ausente. Informe o host de PROD." }
 if ($blockedHosts -contains $environmentHost) { throw "$environmentHost esta bloqueado (PROD exige pedido explicito)." }

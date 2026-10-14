@@ -8,6 +8,8 @@
 # Arquivo salvo com BOM: o Windows PowerShell 5.1 precisa dele para ler os rotulos acentuados.
 
 $ErrorActionPreference = "Stop"
+# Os rotulos acentuados e o BOM dependem do Windows PowerShell 5.1 (pwsh le o arquivo de outro jeito).
+if ($PSVersionTable.PSEdition -ne "Desktop") { throw "Rode com powershell.exe (Windows PowerShell 5.1)." }
 Set-StrictMode -Version Latest
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 
@@ -34,6 +36,9 @@ $environmentUrl = Get-Setting "DV_ENVIRONMENT_URL"
 if ([string]::IsNullOrWhiteSpace($environmentUrl)) { throw "DV_ENVIRONMENT_URL ausente no .env." }
 $script:baseUrl = $environmentUrl.TrimEnd("/")
 $environmentHost = ([Uri] $script:baseUrl).Host.ToLowerInvariant()
+# PROD bloqueado no codigo, alem do DV_BLOCKED_HOSTS: este script so roda no DEV.
+$prodHost = "orgf261ae8e.crm2.dynamics.com"
+if ($environmentHost -eq $prodHost) { throw "$environmentHost e o PROD: este script nunca roda em PROD." }
 $blockedHosts = @((Get-Setting "DV_BLOCKED_HOSTS") -split "," | ForEach-Object { $_.Trim().ToLowerInvariant() } | Where-Object { $_ })
 if ($blockedHosts.Count -eq 0) { throw "DV_BLOCKED_HOSTS ausente. Informe o host de PROD." }
 if ($blockedHosts -contains $environmentHost) { throw "$environmentHost esta bloqueado (PROD exige pedido explicito)." }
@@ -67,8 +72,9 @@ $script:token = Get-AccessToken
 if ([string]::IsNullOrWhiteSpace($script:token)) { throw "Token Dataverse nao obtido." }
 
 function Invoke-Dataverse {
-  param([string] $Method, [string] $Path, [object] $Body)
+  param([string] $Method, [string] $Path, [object] $Body, [hashtable] $ExtraHeaders = @{})
   $headers = @{ Authorization = "Bearer $script:token"; Accept = "application/json"; "OData-MaxVersion" = "4.0"; "OData-Version" = "4.0"; "MSCRM.SolutionUniqueName" = $SolutionUniqueName }
+  foreach ($key in $ExtraHeaders.Keys) { $headers[$key] = $ExtraHeaders[$key] }
   $params = @{ Method = $Method; Uri = "$script:baseUrl/api/data/v9.2/$Path"; Headers = $headers; ContentType = "application/json; charset=utf-8" }
   if ($null -ne $Body) { $params.Body = [Text.Encoding]::UTF8.GetBytes(($Body | ConvertTo-Json -Depth 20 -Compress)) }
   try { return Invoke-RestMethod @params }
@@ -157,20 +163,33 @@ function Ensure-Table([string] $Logical, [string] $Schema, [string] $Display, [s
   return $id
 }
 $relPath = "RelationshipDefinitions/Microsoft.Dynamics.CRM.OneToManyRelationshipMetadata"
-function Ensure-Lookup([string] $Relationship, [string] $Referenced, [string] $Referencing, [string] $Schema, [string] $Display, [string] $Description, [string] $Delete) {
+# Deixa o RequiredLevel de um lookup existente igual ao esperado (PUT da metadata completa, como a Web API exige).
+function Ensure-LookupRequired([string] $Entity, [string] $Logical, [string] $Required) {
+  $path = "EntityDefinitions(LogicalName='$Entity')/Attributes(LogicalName='$Logical')/Microsoft.Dynamics.CRM.LookupAttributeMetadata"
+  $attr = Invoke-Dataverse "GET" $path
+  if ($attr.RequiredLevel.Value -eq $Required) { return }
+  if (-not $Apply) { Write-Step "DRY RUN mudaria $Entity.$Logical para RequiredLevel $Required"; return }
+  foreach ($name in @($attr.PSObject.Properties | Where-Object { $_.Name -like "@odata.*" } | ForEach-Object { $_.Name })) { $attr.PSObject.Properties.Remove($name) }
+  $attr | Add-Member -NotePropertyName "@odata.type" -NotePropertyValue "Microsoft.Dynamics.CRM.LookupAttributeMetadata" -Force
+  $attr.RequiredLevel.Value = $Required
+  Invoke-Dataverse "PUT" "EntityDefinitions(LogicalName='$Entity')/Attributes(LogicalName='$Logical')" $attr -ExtraHeaders @{ "MSCRM.MergeLabels" = "true" } | Out-Null
+  Write-Step "RequiredLevel $Required em $Entity.$Logical"
+}
+function Ensure-Lookup([string] $Relationship, [string] $Referenced, [string] $Referencing, [string] $Schema, [string] $Display, [string] $Description, [string] $Delete, [string] $Required = "None") {
   $rows = @(Get-Rows $relPath "MetadataId" "SchemaName eq '$Relationship'")
   if ($rows.Count -eq 0 -and $Apply) {
     Invoke-Dataverse "POST" "RelationshipDefinitions" @{
       "@odata.type" = "Microsoft.Dynamics.CRM.OneToManyRelationshipMetadata"; SchemaName = $Relationship
       ReferencedEntity = $Referenced; ReferencedAttribute = "${Referenced}id"; ReferencingEntity = $Referencing
       CascadeConfiguration = @{ Assign = "NoCascade"; Delete = $Delete; Merge = "NoCascade"; Reparent = "NoCascade"; Share = "NoCascade"; Unshare = "NoCascade" }
-      Lookup = @{ "@odata.type" = "Microsoft.Dynamics.CRM.LookupAttributeMetadata"; SchemaName = $Schema; DisplayName = Label $Display; Description = Label $Description; RequiredLevel = @{ Value = "None" } }
+      Lookup = @{ "@odata.type" = "Microsoft.Dynamics.CRM.LookupAttributeMetadata"; SchemaName = $Schema; DisplayName = Label $Display; Description = Label $Description; RequiredLevel = @{ Value = $Required } }
     } | Out-Null
     Write-Step "lookup criado $Referencing.$($Schema.ToLowerInvariant())"
     $rows = @(Get-Rows $relPath "MetadataId" "SchemaName eq '$Relationship'")
   }
   elseif ($rows.Count -eq 0) { Write-Step "DRY RUN criaria lookup $Referencing.$($Schema.ToLowerInvariant())" }
   if ($rows.Count -eq 1) {
+    Ensure-LookupRequired $Referencing $Schema.ToLowerInvariant() $Required
     Add-SolutionComponent $rows[0].MetadataId 10 "relacionamento $Relationship"
     Add-SolutionComponent (Get-AttributeId $Referencing $Schema.ToLowerInvariant()) 2 "$Referencing.$($Schema.ToLowerInvariant())"
   }
@@ -201,7 +220,8 @@ Ensure-AttributeOn $doc (Text "cr40f_Pasta" "Pasta" "Caminho da pasta no SharePo
 Ensure-AttributeOn $doc @{ "@odata.type" = "Microsoft.Dynamics.CRM.MemoAttributeMetadata"; SchemaName = "cr40f_Observacao"; DisplayName = Label "Observação"; Description = Label "Seguradora, valor do IPVA etc."; MaxLength = 2000; Format = "TextArea" }
 Ensure-AttributeOn $doc (Picklist "cr40f_UltimoMarcoAvisado" "Último marco avisado" "Controle anti-repetição dos e-mails" @("60 dias", "30 dias", "7 dias", "Vencido"))
 Ensure-AttributeOn $doc @{ "@odata.type" = "Microsoft.Dynamics.CRM.DateTimeAttributeMetadata"; SchemaName = "cr40f_UltimoAvisoEm"; DisplayName = Label "Último aviso em"; Description = Label "Quando o último e-mail foi enviado"; Format = "DateAndTime"; DateTimeBehavior = @{ Value = "UserLocal" } }
-Ensure-Lookup "cr40f_tipodocumento_cr40f_documento_tipo" $tipo $doc "cr40f_Tipo" "Tipo" "Tipo do documento" "Restrict"
+# Tipo obrigatorio (spec): todo documento pertence a um tipo do catalogo.
+Ensure-Lookup "cr40f_tipodocumento_cr40f_documento_tipo" $tipo $doc "cr40f_Tipo" "Tipo" "Tipo do documento" "Restrict" "ApplicationRequired"
 Ensure-Lookup "cr40f_funcionarios_cr40f_documento_funcionario" "cr40f_funcionarios" $doc "cr40f_Funcionario" "Funcionário" "Dono do documento (pessoas)" "Cascade"
 Ensure-Lookup "cr40f_veiculos_cr40f_documento_veiculo" "cr40f_veiculos" $doc "cr40f_Veiculo" "Veículo" "Dono do documento (frota)" "Cascade"
 
@@ -243,5 +263,31 @@ if ($Apply) {
     Write-Step "tipo criado $($s[0])"
   }
   Write-Step "SCHEMA OK: tabelas publicadas, na solucao $SolutionUniqueName e tipos semeados"
+
+  # LGPD (spec secao 7): o script NAO concede privilegios. So lista (GET) os papeis que ja acessam cr40f_funcionarios.
+  Write-Step "papeis de seguranca com privilegio em cr40f_funcionarios (somente leitura):"
+  try {
+    $privileges = @(Get-Rows "privileges" "privilegeid,name" "endswith(name,'cr40f_funcionarios')")
+    $porPapel = @{}
+    foreach ($p in $privileges) {
+      $acao = $p.name -replace '^prv', '' -replace 'cr40f_funcionarios$', ''
+      foreach ($rp in @(Get-Rows "roleprivilegescollection" "roleid" "privilegeid eq $($p.privilegeid)")) {
+        if (-not $porPapel.ContainsKey($rp.roleid)) { $porPapel[$rp.roleid] = @() }
+        $porPapel[$rp.roleid] += $acao
+      }
+    }
+    $linhas = @{}
+    foreach ($roleId in $porPapel.Keys) {
+      $role = @(Get-Rows "roles" "name" "roleid eq $roleId")
+      if ($role.Count -eq 0) { continue }
+      $nome = $role[0].name
+      if (-not $linhas.ContainsKey($nome)) { $linhas[$nome] = @() }
+      $linhas[$nome] = @($linhas[$nome] + $porPapel[$roleId] | Sort-Object -Unique)
+    }
+    if ($linhas.Count -eq 0) { Write-Step "  nenhum papel encontrado" }
+    foreach ($nome in @($linhas.Keys | Sort-Object)) { Write-Step "  $nome : $($linhas[$nome] -join ', ')" }
+  }
+  catch { Write-Step "  nao foi possivel listar os papeis: $($_.Exception.Message)" }
+  Write-Step "LEMBRETE LGPD: antes de liberar a gestao de documentos para quem nao e administrador, de a esses mesmos papeis privilegios equivalentes em cr40f_tipodocumento, cr40f_documento e cr40f_avisodestinatario (Antecedentes criminais e dado sensivel). Este script nao concede privilegios."
 }
 else { Write-Step "DRY RUN OK; use -Apply" }
