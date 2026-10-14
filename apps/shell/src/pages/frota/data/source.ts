@@ -3,7 +3,7 @@ import type { FrotaData, Kind, TableKey } from './types'
 
 export type LoadResult = { data: FrotaData; errors: Partial<Record<TableKey, string>> }
 
-export const EMPTY_DATA: FrotaData = { veiculos: [], manutencoes: [], multas: [], infracoes: [], colisoes: [], posses: [] }
+export const EMPTY_DATA: FrotaData = { veiculos: [], manutencoes: [], multas: [], infracoes: [], colisoes: [], posses: [], planoPreventivo: [], baselines: [], despesasCombustivel: [], telemetriaKm: [] }
 
 /** Classificação atual da manutenção no servidor (para acompanhar o flow do JEV sem recarregar tudo). */
 export type Classificacao = { servicos: number[]; categorias: number[]; origem: number | null; confianca: number | null }

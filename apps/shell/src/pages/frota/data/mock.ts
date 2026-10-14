@@ -30,10 +30,10 @@ function colisao(id: string, status: number): Colisao {
 function seed(): FrotaData {
   return {
     veiculos: [
-      { id: 'v1', placa: 'TST1A11', marca: 'Toyota', modelo: 'Corolla', cor: 'Preto', anoModelo: 2024, status: VEICULO.ATIVO, categoria: 100000000, motorista: bruno },
-      { id: 'v2', placa: 'TST2B22', marca: 'VW', modelo: 'Virtus', cor: 'Prata', anoModelo: 2023, status: VEICULO.ATIVO, categoria: 100000002, motorista: ana },
-      { id: 'v3', placa: 'TST3C33', marca: 'Nissan', modelo: 'Versa', cor: 'Branco', anoModelo: 2020, status: VEICULO.VENDIDO, categoria: 100000000, motorista: null },
-      { id: 'v4', placa: 'TST4D44', marca: 'Kia', modelo: 'Carnival', cor: 'Preto', anoModelo: 2025, status: null, categoria: 100000001, motorista: null },
+      { id: 'v1', placa: 'TST1A11', marca: 'Toyota', modelo: 'Corolla', cor: 'Preto', anoModelo: 2024, status: VEICULO.ATIVO, categoria: 100000000, motorista: bruno, hodometro: null, hodometroEm: null },
+      { id: 'v2', placa: 'TST2B22', marca: 'VW', modelo: 'Virtus', cor: 'Prata', anoModelo: 2023, status: VEICULO.ATIVO, categoria: 100000002, motorista: ana, hodometro: null, hodometroEm: null },
+      { id: 'v3', placa: 'TST3C33', marca: 'Nissan', modelo: 'Versa', cor: 'Branco', anoModelo: 2020, status: VEICULO.VENDIDO, categoria: 100000000, motorista: null, hodometro: null, hodometroEm: null },
+      { id: 'v4', placa: 'TST4D44', marca: 'Kia', modelo: 'Carnival', cor: 'Preto', anoModelo: 2025, status: null, categoria: 100000001, motorista: null, hodometro: null, hodometroEm: null },
     ],
     manutencoes: [
       manut('m1', v1, { grau: 4, descricao: 'Freio com ruído (fictício)', servicos: [100000007], categorias: [100000001], origemClassificacao: ORIGEM.IA, confiancaIa: 0.93 }),
@@ -56,6 +56,7 @@ function seed(): FrotaData {
       { id: 'p2', inicio: `${addMonths(todaySP(), -12)}T12:00:00Z`, fim: `${addMonths(todaySP(), -6)}T12:00:00Z`, veiculo: v1, motorista: ana, localBase: null },
       { id: 'p3', inicio: `${addMonths(todaySP(), -1)}T12:00:00Z`, fim: null, veiculo: { id: 'v4', label: 'TST4D44' }, motorista: null, localBase: { id: 'b1', label: 'Base Centro (fictício)' } },
     ],
+    planoPreventivo: [], baselines: [], despesasCombustivel: [], telemetriaKm: [], // Tarefa 6 preenche
   }
 }
 

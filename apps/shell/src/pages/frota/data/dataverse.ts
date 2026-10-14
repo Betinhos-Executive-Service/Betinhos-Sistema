@@ -24,6 +24,10 @@ const ORDER: Record<TableKey, string> = {
   infracoes: 'cr40f_codigodainfracao asc',
   colisoes: 'createdon desc',
   posses: 'new_iniciodaposse desc',
+  planoPreventivo: 'cr40f_name asc',
+  baselines: 'createdon desc',
+  despesasCombustivel: 'cr40f_datagasto desc',
+  telemetriaKm: 'new_data desc',
 }
 
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -118,6 +122,11 @@ export function createXrmSource(xrm: XrmHost): DataSource {
     infracoes: async () => (await retrieveAll('infracoes')).map(mapInfracao),
     colisoes: async () => (await retrieveAll('colisoes')).map(mapColisao),
     posses: async () => (await retrieveAll('posses')).map(mapPosse),
+    // Tarefa 6: loaders reais
+    planoPreventivo: async () => [],
+    baselines: async () => [],
+    despesasCombustivel: async () => [],
+    telemetriaKm: async () => [],
   }
 
   return {
