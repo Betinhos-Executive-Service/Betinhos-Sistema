@@ -9,7 +9,7 @@ import { GRAVIDADE, label, STATUS_OPTIONS, TIPO_REPARO } from '../data/schema'
 import type { FrotaData } from '../data/types'
 import { downloadCsv, toCsv } from '../domain/csv'
 import { custoPorMesEmpilhado, custoPorVeiculo, FONTE_LABEL, type CustoVeiculo, type EntradaCusto } from '../domain/custoTotal'
-import { contarPor, custoPor, multasNoPeriodo, multasPorMotorista, realizadas, tempoMedioDias, ultimos12Meses, type Custo, type Periodo } from '../domain/indicadores'
+import { centavos, contarPor, custoPor, multasNoPeriodo, multasPorMotorista, realizadas, tempoMedioDias, ultimos12Meses, type Custo, type Periodo } from '../domain/indicadores'
 
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
 const mesLabel = (chave: string) => `${MESES[Number(chave.slice(5, 7)) - 1]}/${chave.slice(2, 4)}`
@@ -56,14 +56,16 @@ export function Indicadores({ data, today }: { data: FrotaData; today: string })
     // O ViewGate já bloqueia a aba quando manutenções, multas ou infrações falham; falhas de despesas e telemetria não chegam aqui.
     const entrada: EntradaCusto = { manutencoes: data.manutencoes, multas: data.multas, infracoes: data.infracoes, despesasCombustivel: data.despesasCombustivel, telemetriaKm: data.telemetriaKm, documentos: [], indisponiveis: {} }
     const porVeiculo = custoPorVeiculo(entrada, data.veiculos, periodo)
+    // KPI na mesma base do gráfico por mês: inclui lançamentos sem veículo.
+    const porMes = custoPorMesEmpilhado(entrada, periodo)
     const feitas = realizadas(data.manutencoes, periodo)
     const multas = multasNoPeriodo(data.multas, periodo)
     const infracoes = new Map(data.infracoes.map((item) => [item.id, item]))
     return {
-      total: porVeiculo.reduce((sum, item) => sum + item.total, 0),
+      total: centavos(porMes.reduce((sum, item) => sum + item.total, 0)),
       qtd: feitas.length,
       tempo: tempoMedioDias(data.manutencoes, periodo),
-      porMes: custoPorMesEmpilhado(entrada, periodo),
+      porMes,
       porVeiculo,
       porTipo: custoPor(data.manutencoes, periodo, (item) => label(TIPO_REPARO, item.tipo)),
       multas: multas.length,
