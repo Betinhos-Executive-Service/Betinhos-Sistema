@@ -142,3 +142,19 @@ DEV tem só 4 OPs, não as 10 previstas. Execução via `dotnet run --project pa
 | OP-57 | Aberta, sem pagante | nenhuma | sim |
 
 A primeira rodada propunha "Pagamento Pendente → Aberta" nas três OPs com pagante. Isso virou regra: sem pagamento, OP com pagante ativo fica em Pagamento Pendente e sem pagante ativo fica em Aberta.
+
+### 10.2 Teste autenticado dos steps em DEV (14/10/2026)
+
+OP-58, com 1 reserva (OS-1732), CP de R$ 1.000 e pagante PAG-295 de R$ 1.000.
+
+| Ação | Resultado |
+|---|---|
+| PAG-295 → Pago | OP Paga, OS-1732 Pago, CP Concluída, 3 linhas de log com origem Automático |
+| `simular` em seguida | nenhuma mudança (idempotente) |
+| PAG-295 → Pendente | OP Pagamento Pendente, OS-1732 Pagamento Pendente, CP Pendente |
+| "Flow Dar Baixa Status Pagantes -> OP" desativado (Rascunho), PAG-295 → Pago | mesmo resultado, só pelo motor |
+| PAG-295 → Pendente | estado original restaurado |
+
+O flow "Flow Dar Baixa Status Pagantes -> OP" está desativado só em DEV, não foi excluído. O flow "OP -> Pagantes" segue ativo. PROD não foi alterado.
+
+Limitações conhecidas: não há step para criação ou exclusão de pagante, nem para pagante que troca de OP. Nesses casos, chame `simular`/`aplicar` manualmente.
