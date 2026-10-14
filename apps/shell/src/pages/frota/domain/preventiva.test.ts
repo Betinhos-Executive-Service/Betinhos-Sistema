@@ -29,10 +29,21 @@ describe('preventiva', () => {
     const [p] = calcularPreventivas(entrada({
       veiculos: [veic('a', { hodometro: 165000 })],
       manutencoes: [manut('sem-km', { veiculo: ref('a'), servicos: [1], dataManutencao: '2026-09-05' })],
-      baselines: [base('a', 'oleo', { km: 158000, data: '2026-08-01' })],
+      baselines: [base('a', 'oleo', { km: 158000, data: '2026-09-05' })],
     }), today)
     expect(p.ultima).toEqual({ km: 158000, data: '2026-09-05', origem: 'manutencao', manutencaoId: 'sem-km', complementadaPorBaseline: true })
     expect(p).toMatchObject({ kmProxima: 168000, faltamKm: 3000, dataProxima: '2027-03-05' })
+  })
+
+  it('manutenção sem km não usa baseline anterior a ela', () => {
+    const [p] = calcularPreventivas(entrada({
+      itens: [item('oleo', { intervaloMeses: null })],
+      veiculos: [veic('a', { hodometro: 171000 })],
+      manutencoes: [manut('sem-km', { veiculo: ref('a'), servicos: [1], dataManutencao: '2026-09-05' })],
+      baselines: [base('a', 'oleo', { km: 141850, data: '2026-04-26' })],
+    }), today)
+    expect(p.ultima).toMatchObject({ km: null, origem: 'manutencao', complementadaPorBaseline: false })
+    expect(p).toMatchObject({ kmProxima: null, faltamKm: null, estado: 'sem_base' })
   })
 
   it('usa o hodômetro Infleet e marca estimado quando só há km de manutenção', () => {
