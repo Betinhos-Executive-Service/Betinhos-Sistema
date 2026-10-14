@@ -18,7 +18,7 @@
 .dash-kpi__rotulo, .dash-faixa__titulo, .dash-card__titulo { margin: 0; font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); line-height: var(--bt-typography-label-micro-line-height); letter-spacing: .08em; text-transform: uppercase; color: var(--bt-color-text-secondary); }
 
 /* ---------- Barra de filtros ---------- */
-.dash-filtros { align-items: flex-start; margin-bottom: var(--bt-space-3); }
+.dash-filtros { align-items: flex-start; }
 .dash-filtros .bt-page-toolbar__start { gap: var(--bt-space-2) var(--bt-space-3); }
 .dash-periodo { min-width: 168px; }
 .dash-datas, .dash-segmentos { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); min-width: 0; }
