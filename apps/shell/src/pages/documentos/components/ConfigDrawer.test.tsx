@@ -62,6 +62,41 @@ describe('ConfigDrawer', () => {
     expect(onChanged).not.toHaveBeenCalled()
   })
 
+  it('código com caractere inválido ou maior que 40 não salva', async () => {
+    const { dialog, onChanged } = await montar()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Novo tipo' }))
+    fireEvent.change(within(dialog).getByLabelText(/^Nome/), { target: { value: 'Curso' } })
+    fireEvent.change(within(dialog).getByLabelText(/^Código/), { target: { value: 'curso/2' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Salvar tipo' }))
+    expect(await within(dialog).findByText('Use só letras, números, - ou _ (até 40).')).toBeTruthy()
+    fireEvent.change(within(dialog).getByLabelText(/^Código/), { target: { value: 'A'.repeat(41) } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Salvar tipo' }))
+    expect(await within(dialog).findByText('Use só letras, números, - ou _ (até 40).')).toBeTruthy()
+    expect(onChanged).not.toHaveBeenCalled()
+  })
+
+  it('Voltar com o formulário alterado pede para descartar e, ao descartar, volta para a lista sem fechar', async () => {
+    const { dialog, onClose } = await montar()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Novo tipo' }))
+    fireEvent.change(within(dialog).getByLabelText(/^Nome/), { target: { value: 'Rascunho' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Voltar' }))
+    const confirmar = await screen.findByRole('dialog', { name: 'Descartar alterações?' })
+    fireEvent.click(within(confirmar).getByRole('button', { name: 'Continuar editando' }))
+    expect((within(dialog).getByLabelText(/^Nome/) as HTMLInputElement).value).toBe('Rascunho')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Voltar' }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Descartar alterações?' })).getByRole('button', { name: 'Descartar' }))
+    expect(await within(dialog).findByRole('button', { name: 'Novo tipo' })).toBeTruthy()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('Voltar sem alteração volta direto para a lista', async () => {
+    const { dialog } = await montar()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Novo tipo' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Voltar' }))
+    expect(within(dialog).getByRole('button', { name: 'Novo tipo' })).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: 'Descartar alterações?' })).toBeNull()
+  })
+
   it('ao editar um tipo o código fica bloqueado', async () => {
     const { dialog, data } = await montar()
     const cnh = data.tipos.find((t) => t.codigo === 'CNH')!

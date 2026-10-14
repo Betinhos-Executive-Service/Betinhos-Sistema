@@ -78,8 +78,8 @@ function Documentos({ host }: { host: Host }) {
       toolbar={data ? (
         <div className="doc-toolbar">
           <SearchBox className="doc-toolbar__search" value={filtro.q} onChange={(q) => setFiltro({ ...filtro, q })} placeholder={filtro.aba === 'pessoas' ? 'Buscar funcionário ou documento' : 'Buscar placa ou documento'} aria-label="Buscar documentos" />
-          <Select className="doc-toolbar__select" aria-label="Tipo de documento" searchable={false} clearable={false} value={filtro.tipo ?? ''} onChange={(v) => setFiltro({ ...filtro, tipo: v || null })}
-            options={[{ value: '', label: 'Todos os tipos' }, ...tiposDaAba.map((t) => ({ value: t.id, label: t.nome }))]} />
+          <Select className="doc-toolbar__select" aria-label="Tipo de documento" placeholder="Todos os tipos" searchable={false} clearable value={filtro.tipo} onChange={(v) => setFiltro({ ...filtro, tipo: v })}
+            options={tiposDaAba.map((t) => ({ value: t.id, label: t.nome }))} />
         </div>
       ) : undefined}
     >
