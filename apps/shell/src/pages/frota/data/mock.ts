@@ -2,7 +2,7 @@ import { CAMPO, lerMulti, ORIGEM } from '../domain/manutencaoCatalogo'
 import { addMonths, todaySP } from './dates'
 import { COLISAO, MANUT, MULTA, STATUS_FIELD, VEICULO } from './schema'
 import type { DataSource, FlowId } from './source'
-import type { Colisao, FrotaData, Kind, Manutencao, Multa, Ref } from './types'
+import type { Colisao, DespesaCombustivel, FrotaData, ItemPlano, Kind, Manutencao, Multa, Ref, TelemetriaKm } from './types'
 
 // Dados fictícios só para `pnpm dev` em localhost. Nunca usados dentro do Dataverse.
 function offset(days: number) {
@@ -27,19 +27,29 @@ function colisao(id: string, status: number): Colisao {
   return { id, titulo: `Colisão fictícia ${id}`, status, tipo: 100000001, dataHora: iso(-6), local: 'Rua de Teste, 50', descricao: 'Batida leve na traseira.', houveTerceiro: true, veiculo: v2, motorista: ana, criadoEm: iso(-6) }
 }
 
+function item(id: string, nome: string, extra: Partial<ItemPlano>): ItemPlano {
+  return { id, nome, servico: null, intervaloKm: null, intervaloMeses: null, avisoKm: 1000, avisoDias: 30, ativo: true, ...extra }
+}
+function despesa(id: string, veiculo: Ref, mesesAtras: number, valor: number, categoria: DespesaCombustivel['categoria'] = 'combustivel'): DespesaCombustivel {
+  return { id, dia: addMonths(offset(-3), -mesesAtras), valor, veiculo, manutencao: null, categoria }
+}
+function telemetria(veiculoId: string, dias: number, km: number): TelemetriaKm[] {
+  return Array.from({ length: dias }, (_, index) => ({ dia: offset(-(index + 1)), veiculoId, km }))
+}
+
 function seed(): FrotaData {
   return {
     veiculos: [
-      { id: 'v1', placa: 'TST1A11', marca: 'Toyota', modelo: 'Corolla', cor: 'Preto', anoModelo: 2024, status: VEICULO.ATIVO, categoria: 100000000, motorista: bruno, hodometro: null, hodometroEm: null },
-      { id: 'v2', placa: 'TST2B22', marca: 'VW', modelo: 'Virtus', cor: 'Prata', anoModelo: 2023, status: VEICULO.ATIVO, categoria: 100000002, motorista: ana, hodometro: null, hodometroEm: null },
+      { id: 'v1', placa: 'TST1A11', marca: 'Toyota', modelo: 'Corolla', cor: 'Preto', anoModelo: 2024, status: VEICULO.ATIVO, categoria: 100000000, motorista: bruno, hodometro: 171000, hodometroEm: iso(0) },
+      { id: 'v2', placa: 'TST2B22', marca: 'VW', modelo: 'Virtus', cor: 'Prata', anoModelo: 2023, status: VEICULO.ATIVO, categoria: 100000000, motorista: ana, hodometro: null, hodometroEm: null },
       { id: 'v3', placa: 'TST3C33', marca: 'Nissan', modelo: 'Versa', cor: 'Branco', anoModelo: 2020, status: VEICULO.VENDIDO, categoria: 100000000, motorista: null, hodometro: null, hodometroEm: null },
-      { id: 'v4', placa: 'TST4D44', marca: 'Kia', modelo: 'Carnival', cor: 'Preto', anoModelo: 2025, status: null, categoria: 100000001, motorista: null, hodometro: null, hodometroEm: null },
+      { id: 'v4', placa: 'TST4D44', marca: 'Kia', modelo: 'Carnival', cor: 'Preto', anoModelo: 2025, status: null, categoria: 100000002, motorista: null, hodometro: null, hodometroEm: null },
     ],
     manutencoes: [
       manut('m1', v1, { grau: 4, descricao: 'Freio com ruído (fictício)', servicos: [100000007], categorias: [100000001], origemClassificacao: ORIGEM.IA, confiancaIa: 0.93 }),
       manut('m2', v2, { status: MANUT.APROVADO, comentarioAprovador: 'Ok' }),
       manut('m3', v1, { status: MANUT.PROGRAMADO, agendarPara: offset(-1) }),
-      manut('m4', v1, { status: MANUT.REALIZADO, dataManutencao: iso(-40), valor: 480.9, estabelecimento: 'Oficina Teste', servicoRealizado: 'Troca de óleo', criadoEm: iso(-45), servicos: [100000000, 100000001], categorias: [100000000], origemClassificacao: ORIGEM.MANUAL }),
+      manut('m4', v1, { status: MANUT.REALIZADO, dataManutencao: iso(-40), valor: 480.9, estabelecimento: 'Oficina Teste', servicoRealizado: 'Troca de óleo', criadoEm: iso(-45), km: 160000, servicos: [100000000, 100000001], categorias: [100000000], origemClassificacao: ORIGEM.MANUAL }),
       manut('m5', v2, { status: MANUT.REALIZADO, dataManutencao: iso(-100), valor: 1250, tipo: 100000001, criadoEm: iso(-110) }),
       manut('m6', v2, { status: MANUT.REALIZADO, dataManutencao: iso(-70), tipo: 2, criadoEm: iso(-72) }),
     ],
@@ -56,7 +66,21 @@ function seed(): FrotaData {
       { id: 'p2', inicio: `${addMonths(todaySP(), -12)}T12:00:00Z`, fim: `${addMonths(todaySP(), -6)}T12:00:00Z`, veiculo: v1, motorista: ana, localBase: null },
       { id: 'p3', inicio: `${addMonths(todaySP(), -1)}T12:00:00Z`, fim: null, veiculo: { id: 'v4', label: 'TST4D44' }, motorista: null, localBase: { id: 'b1', label: 'Base Centro (fictício)' } },
     ],
-    planoPreventivo: [], baselines: [], despesasCombustivel: [], telemetriaKm: [], // Tarefa 6 preenche
+    // v1/i1 vencido por km (171000 > 160000 + 10000); v1/i2 em andamento (m1 solicitada); v2/i3 sem base.
+    planoPreventivo: [
+      item('i1', 'Troca de óleo e filtro', { servico: 100000000, intervaloKm: 10000, intervaloMeses: 6 }),
+      item('i2', 'Pastilhas de freio', { servico: 100000007, intervaloKm: 30000 }),
+      item('i3', 'Revisão anual', { servico: 100000035, intervaloMeses: 12 }),
+      item('i4', 'Troca de correia (inativo)', { servico: 100000004, intervaloKm: 60000, ativo: false }),
+    ],
+    baselines: [{ id: 'b1', veiculo: v2, item: { id: 'i1', label: 'Troca de óleo e filtro' }, km: 40000, data: addMonths(todaySP(), -5) }],
+    despesasCombustivel: [
+      despesa('d1', v1, 0, 412.5), despesa('d2', v1, 1, 380), despesa('d3', v1, 2, 345.9),
+      despesa('d4', v1, 3, 450), despesa('d5', v1, 4, 300), despesa('d6', v1, 5, 398.4),
+      despesa('d7', v2, 0, 280), despesa('d8', v2, 2, 310),
+      despesa('d9', v1, 1, 480.9, 'manutencao'),
+    ],
+    telemetriaKm: [...telemetria('v1', 30, 120), ...telemetria('v2', 10, 85)],
   }
 }
 
@@ -124,6 +148,34 @@ export function createMockSource(): DataSource {
     async enviarFotoVeiculo(id, file) {
       await delay()
       fotos.set(id, file)
+    },
+    async salvarItemPlano(input, id) {
+      await delay()
+      if (id) {
+        const atual = data.planoPreventivo.find((row) => row.id === id)
+        if (!atual) throw new Error('Registro não encontrado no mock.')
+        Object.assign(atual, input)
+        return
+      }
+      data.planoPreventivo.push({ ...input, id: `i${data.planoPreventivo.length + 1}`, ativo: true })
+    },
+    async inativarItemPlano(id, ativo) {
+      await delay()
+      const atual = data.planoPreventivo.find((row) => row.id === id)
+      if (!atual) throw new Error('Registro não encontrado no mock.')
+      atual.ativo = ativo
+    },
+    async salvarBaseline(veiculoId, itemId, km, dia) {
+      await delay()
+      const atual = data.baselines.find((row) => row.veiculo?.id === veiculoId && row.item?.id === itemId)
+      if (atual) {
+        Object.assign(atual, { km, data: dia })
+        return
+      }
+      const veiculo = data.veiculos.find((row) => row.id === veiculoId)
+      const plano = data.planoPreventivo.find((row) => row.id === itemId)
+      if (!veiculo || !plano) throw new Error('Registro não encontrado no mock.')
+      data.baselines.push({ id: `b${data.baselines.length + 1}`, veiculo: { id: veiculo.id, label: veiculo.placa }, item: { id: plano.id, label: plano.nome }, km, data: dia })
     },
     async runFlow(flow: FlowId, id: string) {
       await delay()

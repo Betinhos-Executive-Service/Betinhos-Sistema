@@ -17,6 +17,10 @@ export const TABLE: Record<TableKey, string> = {
   telemetriaKm: 'new_telemetriadiariainfleet',
 }
 
+/** Entity sets usados nos @odata.bind. */
+// confirmar no DEV após provisionar
+export const ENTITY_SET = { veiculos: 'cr40f_veiculoses', planoPreventivo: 'cr40f_itemplanopreventivos' } as const
+
 export const CATEGORIA_DESPESA_TABLE = 'cr40f_categoriadespesaoperacional'
 export const ITEM_PLANO = { nome: 'cr40f_name', servico: 'cr40f_servico', intervaloKm: 'cr40f_intervalokm', intervaloMeses: 'cr40f_intervalomeses', avisoKm: 'cr40f_avisokm', avisoDias: 'cr40f_avisodias' } as const
 export const BASELINE = { nome: 'cr40f_name', veiculo: 'cr40f_Veiculo@odata.bind', item: 'cr40f_Item@odata.bind', km: 'cr40f_km', data: 'cr40f_data' } as const

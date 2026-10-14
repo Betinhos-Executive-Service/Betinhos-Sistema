@@ -8,10 +8,12 @@ function host(overrides: Partial<NonNullable<XrmHost['WebApi']>> = {}) {
     retrieveMultipleRecords: vi.fn(async (entity: string) => {
       if (entity === 'cr40f_multas') throw new Error('Sem privilégio de leitura.')
       if (entity === 'cr40f_veiculos') return { entities: [{ cr40f_veiculosid: 'V1', cr40f_placa: 'ABC1D23' }] }
+      if (entity === 'cr40f_categoriadespesaoperacional') return { entities: [{ cr40f_categoriadespesaoperacionalid: 'CA', cr40f_nome: 'Abastecimento' }] }
       return { entities: [] }
     }),
     retrieveRecord: vi.fn(async () => ({ cr40f_status: 202410001 })),
     updateRecord: vi.fn(async () => ({})),
+    createRecord: vi.fn(async () => ({ id: 'novo' })),
     ...overrides,
   }
   const xrm: XrmHost = { WebApi, Navigation: { openForm: vi.fn(async () => {}) }, Utility: { getGlobalContext: () => ({ getClientUrl: () => 'https://org23b93544.crm2.dynamics.com/' }) } }
@@ -84,6 +86,115 @@ describe('createXrmSource', () => {
       expect(second.errors.manutencoes).toBeUndefined()
       expect(second.errors.multas).toBeUndefined()
     })
+  })
+})
+
+describe('plano preventivo, baselines, despesas e telemetria', () => {
+  const okFetch = () => vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ value: [] }) })))
+
+  it('carrega o plano com inativos e isola a falha da telemetria', async () => {
+    okFetch()
+    const retrieveMultipleRecords = vi.fn(async (entity: string, _options?: string) => {
+      if (entity === 'new_telemetriadiariainfleet') throw new Error('Sem privilégio na telemetria.')
+      if (entity === 'cr40f_categoriadespesaoperacional') return { entities: [{ cr40f_categoriadespesaoperacionalid: 'CA', cr40f_nome: 'Abastecimento' }] }
+      if (entity === 'cr40f_itemplanopreventivo') return { entities: [
+        { cr40f_itemplanopreventivoid: 'I1', cr40f_name: 'Troca de óleo', cr40f_servico: 100000000, cr40f_intervalokm: 10000, statecode: 0 },
+        { cr40f_itemplanopreventivoid: 'I2', cr40f_name: 'Antigo', statecode: 1 },
+      ] }
+      return { entities: [] }
+    })
+    const { xrm } = host({ retrieveMultipleRecords })
+    const result = await createXrmSource(xrm).load()
+    expect(result.data.planoPreventivo.map((item) => [item.id, item.ativo])).toEqual([['i1', true], ['i2', false]])
+    const planoOptions = retrieveMultipleRecords.mock.calls.find((call) => call[0] === 'cr40f_itemplanopreventivo')?.[1]
+    expect(planoOptions).toContain('$filter=statecode eq 0 or statecode eq 1')
+    expect(planoOptions).toContain('$orderby=cr40f_name asc')
+    expect(result.errors).toEqual({ telemetriaKm: 'Sem privilégio na telemetria' })
+    expect(result.data.telemetriaKm).toEqual([])
+    const telemetriaOptions = retrieveMultipleRecords.mock.calls.find((call) => call[0] === 'new_telemetriadiariainfleet')?.[1]
+    expect(telemetriaOptions).toMatch(/\$filter=new_data ge \d{4}-\d{2}-\d{2}&\$orderby=new_data desc$/)
+    expect(telemetriaOptions).not.toContain('statecode')
+  })
+
+  it('consulta as categorias antes das despesas e filtra pelos dois ids', async () => {
+    okFetch()
+    const retrieveMultipleRecords = vi.fn(async (entity: string, _options?: string) => {
+      if (entity === 'cr40f_categoriadespesaoperacional') return { entities: [
+        { cr40f_categoriadespesaoperacionalid: '{AAA}', cr40f_nome: 'Abastecimento' },
+        { cr40f_categoriadespesaoperacionalid: 'BBB', cr40f_nome: 'Manutenção' },
+      ] }
+      if (entity === 'cr40f_despesaoperacional') return { entities: [
+        { cr40f_despesaoperacionalid: 'D1', cr40f_datagasto: '2026-09-01T12:00:00Z', cr40f_valor: 300, _cr40f_veiculo_value: 'V1', _cr40f_categoria_value: 'AAA' },
+        { cr40f_despesaoperacionalid: 'D2', cr40f_datagasto: '2026-09-02T12:00:00Z', cr40f_valor: 90, _cr40f_veiculo_value: 'V1', _cr40f_categoria_value: 'bbb' },
+      ] }
+      return { entities: [] }
+    })
+    const { xrm } = host({ retrieveMultipleRecords })
+    const result = await createXrmSource(xrm).load()
+    const entities = retrieveMultipleRecords.mock.calls.map((call) => call[0])
+    expect(entities.indexOf('cr40f_categoriadespesaoperacional')).toBeLessThan(entities.indexOf('cr40f_despesaoperacional'))
+    const categoriaOptions = retrieveMultipleRecords.mock.calls.find((call) => call[0] === 'cr40f_categoriadespesaoperacional')?.[1]
+    expect(categoriaOptions).toBe("?$select=cr40f_categoriadespesaoperacionalid,cr40f_nome&$filter=cr40f_nome eq 'Abastecimento' or cr40f_nome eq 'Manutenção'")
+    const despesaOptions = retrieveMultipleRecords.mock.calls.find((call) => call[0] === 'cr40f_despesaoperacional')?.[1]
+    expect(despesaOptions).toMatch(/\$filter=statecode eq 0 and cr40f_datagasto ge \d{4}-\d{2}-\d{2}T00:00:00Z and \(_cr40f_categoria_value eq aaa or _cr40f_categoria_value eq bbb\)&\$orderby=cr40f_datagasto desc$/)
+    expect(result.data.despesasCombustivel.map((d) => [d.id, d.categoria])).toEqual([['d1', 'combustivel'], ['d2', 'manutencao']])
+    expect(result.errors.despesasCombustivel).toBeUndefined()
+  })
+
+  it('sem a categoria Abastecimento, as despesas falham com mensagem clara', async () => {
+    okFetch()
+    const retrieveMultipleRecords = vi.fn(async (entity: string, _options?: string) =>
+      entity === 'cr40f_categoriadespesaoperacional' ? { entities: [{ cr40f_categoriadespesaoperacionalid: 'BBB', cr40f_nome: 'Manutenção' }] } : { entities: [] })
+    const { xrm } = host({ retrieveMultipleRecords })
+    const result = await createXrmSource(xrm).load()
+    expect(result.errors.despesasCombustivel).toBe('Categoria "Abastecimento" não encontrada nas despesas')
+    expect(retrieveMultipleRecords.mock.calls.some((call) => call[0] === 'cr40f_despesaoperacional')).toBe(false)
+  })
+
+  it('salvarBaseline cria quando não existe, com nome e binds', async () => {
+    const retrieveMultipleRecords = vi.fn(async (_entity: string, _options?: string) => ({ entities: [] }))
+    const retrieveRecord = vi.fn(async (entity: string, _id?: string, _options?: string) => (entity === 'cr40f_veiculos' ? { cr40f_placa: 'ABC1D23' } : { cr40f_name: 'Troca de óleo' }))
+    const { xrm, WebApi } = host({ retrieveMultipleRecords, retrieveRecord })
+    await createXrmSource(xrm).salvarBaseline('{V1}', 'I1', 160000, '2026-05-10')
+    expect(retrieveMultipleRecords).toHaveBeenCalledWith('cr40f_baselinepreventiva', '?$select=cr40f_baselinepreventivaid&$filter=_cr40f_veiculo_value eq v1 and _cr40f_item_value eq i1')
+    expect(retrieveRecord).toHaveBeenCalledWith('cr40f_veiculos', 'v1', '?$select=cr40f_placa')
+    expect(retrieveRecord).toHaveBeenCalledWith('cr40f_itemplanopreventivo', 'i1', '?$select=cr40f_name')
+    expect(WebApi.createRecord).toHaveBeenCalledWith('cr40f_baselinepreventiva', {
+      cr40f_name: 'ABC1D23 · Troca de óleo',
+      'cr40f_Veiculo@odata.bind': '/cr40f_veiculoses(v1)',
+      'cr40f_Item@odata.bind': '/cr40f_itemplanopreventivos(i1)',
+      cr40f_km: 160000,
+      cr40f_data: '2026-05-10',
+    })
+    expect(WebApi.updateRecord).not.toHaveBeenCalled()
+  })
+
+  it('salvarBaseline atualiza quando já existe', async () => {
+    const retrieveMultipleRecords = vi.fn(async (_entity: string, _options?: string) => ({ entities: [{ cr40f_baselinepreventivaid: '{B1}' }] }))
+    const { xrm, WebApi } = host({ retrieveMultipleRecords })
+    await createXrmSource(xrm).salvarBaseline('v1', 'i1', null, '2026-05-10')
+    expect(WebApi.updateRecord).toHaveBeenCalledWith('cr40f_baselinepreventiva', 'b1', { cr40f_km: null, cr40f_data: '2026-05-10' })
+    expect(WebApi.createRecord).not.toHaveBeenCalled()
+  })
+
+  it('salvarItemPlano cria sem id e atualiza com id', async () => {
+    const { xrm, WebApi } = host()
+    const source = createXrmSource(xrm)
+    const input = { nome: 'Troca de óleo', servico: 100000000, intervaloKm: 10000, intervaloMeses: 6, avisoKm: 1000, avisoDias: 30 }
+    const patch = { cr40f_name: 'Troca de óleo', cr40f_servico: 100000000, cr40f_intervalokm: 10000, cr40f_intervalomeses: 6, cr40f_avisokm: 1000, cr40f_avisodias: 30 }
+    await source.salvarItemPlano(input)
+    expect(WebApi.createRecord).toHaveBeenCalledWith('cr40f_itemplanopreventivo', patch)
+    await source.salvarItemPlano(input, '{I1}')
+    expect(WebApi.updateRecord).toHaveBeenCalledWith('cr40f_itemplanopreventivo', 'i1', patch)
+  })
+
+  it('inativarItemPlano manda statecode 1 / statuscode 2 e reativa com 0 / 1', async () => {
+    const { xrm, WebApi } = host()
+    const source = createXrmSource(xrm)
+    await source.inativarItemPlano('{I1}', false)
+    expect(WebApi.updateRecord).toHaveBeenCalledWith('cr40f_itemplanopreventivo', 'i1', { statecode: 1, statuscode: 2 })
+    await source.inativarItemPlano('i1', true)
+    expect(WebApi.updateRecord).toHaveBeenLastCalledWith('cr40f_itemplanopreventivo', 'i1', { statecode: 0, statuscode: 1 })
   })
 })
 

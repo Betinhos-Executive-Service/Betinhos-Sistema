@@ -24,6 +24,7 @@ describe('mappers', () => {
   it('mapeia telemetria diária e descarta linha sem veículo', () => {
     expect(mapTelemetriaKm({ new_data: '2026-09-01', _new_veiculo_value: 'V1', new_distanciapercorridakm: 120.4 })).toEqual({ dia: '2026-09-01', veiculoId: 'v1', km: 120.4 })
     expect(mapTelemetriaKm({ new_data: '2026-09-01', new_distanciapercorridakm: 5 })).toBeNull()
+    expect(mapTelemetriaKm({ _new_veiculo_value: 'V1', new_distanciapercorridakm: 5 })).toBeNull()
   })
 
   it('lê lookup com id limpo e rótulo formatado', () => {
