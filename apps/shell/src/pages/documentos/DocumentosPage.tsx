@@ -8,7 +8,7 @@ import { useQueryFilters } from '../../nav/queryState'
 import { todaySP } from '../funcionarios/data/dates'
 import { useMedia } from '../operacional/useMedia'
 import { createDocsSource, type DocsSource } from './data/source'
-import type { SalvarDocResult } from './data/salvar'
+import { avisoFalhas, type SalvarDocResult } from './data/salvar'
 import { KPIS, contarKpis, filtrarPendencias, montarPendencias } from './domain/pendencias'
 import { documentosQuery } from './domain/query'
 import type { Categoria, Kpi } from './domain/types'
@@ -51,7 +51,7 @@ function Documentos({ host }: { host: Host }) {
 
   const onSaved = (r: SalvarDocResult) => {
     setAlvo(null)
-    if (r.falhas.length) toast({ tone: 'warning', message: `Documento salvo, mas arquivos não foram enviados: ${r.falhas.map((f) => `${f.nome} (${f.erro})`).join(' · ')}` })
+    if (r.falhas.length) toast({ tone: 'warning', message: avisoFalhas(r.falhas, 'Abra a ficha e use “Enviar arquivo” neste documento para tentar de novo.') })
     else toast({ tone: 'success', message: 'Documento salvo' })
     for (const aviso of r.avisos) toast({ tone: 'warning', message: aviso })
     void reload()

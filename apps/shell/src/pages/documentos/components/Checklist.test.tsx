@@ -3,6 +3,7 @@ import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ToastProvider } from '@betinhos/ui'
 import { createMockDocsSource, type DocsSource } from '../data/source'
+import type { DocEmitido } from '../domain/types'
 import { Checklist } from './Checklist'
 
 configure({ asyncUtilTimeout: 8000 })
@@ -105,6 +106,66 @@ describe('Checklist', () => {
     const cnh = await screen.findByRole('listitem', { name: 'CNH' })
     fireEvent.click(within(cnh).getByRole('button', { name: 'Arquivos' }))
     expect((await within(cnh).findByRole('alert')).textContent).toBe('SharePoint indisponível.')
+  })
+
+  it('Enviar arquivo só aparece em item com documento vigente', async () => {
+    render(<ToastProvider><Checklist source={createMockDocsSource()} donoId="f-ana" /></ToastProvider>)
+    const cnh = await screen.findByRole('listitem', { name: 'CNH' })
+    expect(within(cnh).getByRole('button', { name: 'Enviar arquivo' })).toBeTruthy()
+    expect(within(screen.getByRole('listitem', { name: 'Antecedentes criminais' })).queryByRole('button', { name: 'Enviar arquivo' })).toBeNull()
+  })
+
+  it('Enviar arquivo no vigente: envia, avisa e mostra a lista de Arquivos atualizada', async () => {
+    const base = createMockDocsSource()
+    const enviarArquivo = vi.fn(base.enviarArquivo)
+    render(<ToastProvider><Checklist source={{ ...base, enviarArquivo }} donoId="f-ana" /></ToastProvider>)
+    const cnh = await screen.findByRole('listitem', { name: 'CNH' })
+    fireEvent.click(within(cnh).getByRole('button', { name: 'Enviar arquivo' }))
+    fireEvent.change(within(cnh).getByLabelText('Arquivo para CNH', { selector: 'input' }), { target: { files: [new File(['pdf'], 'cnh.pdf', { type: 'application/pdf' })] } })
+    expect(await screen.findByText('Arquivo enviado')).toBeTruthy()
+    expect(enviarArquivo).toHaveBeenCalledTimes(1)
+    expect(await within(cnh).findByRole('button', { name: /_cnh\.pdf$/ })).toBeTruthy()
+  })
+
+  it('falha no envio mostra o erro no item e Tentar enviar de novo reenvia o mesmo arquivo', async () => {
+    const base = createMockDocsSource()
+    let chamadas = 0
+    const enviarArquivo = vi.fn((doc: DocEmitido, file: File) => (++chamadas === 1 ? Promise.reject(new Error('SharePoint fora do ar.')) : base.enviarArquivo(doc, file)))
+    render(<ToastProvider><Checklist source={{ ...base, enviarArquivo }} donoId="f-ana" /></ToastProvider>)
+    const cnh = await screen.findByRole('listitem', { name: 'CNH' })
+    const arquivo = new File(['pdf'], 'cnh.pdf', { type: 'application/pdf' })
+    fireEvent.change(within(cnh).getByLabelText('Arquivo para CNH', { selector: 'input' }), { target: { files: [arquivo] } })
+    const alerta = await within(cnh).findByRole('alert')
+    expect(alerta.textContent).toMatch(/Arquivo não enviado/)
+    expect(alerta.textContent).toMatch(/SharePoint fora do ar\./)
+    fireEvent.click(within(cnh).getByRole('button', { name: 'Tentar enviar de novo' }))
+    expect(await screen.findByText('Arquivo enviado')).toBeTruthy()
+    expect(enviarArquivo).toHaveBeenCalledTimes(2)
+    expect(enviarArquivo.mock.calls[1][1]).toBe(arquivo)
+    await waitFor(() => expect(within(cnh).queryByText(/Arquivo não enviado/)).toBeNull())
+  })
+
+  it('arquivo de tipo não aceito ou acima do limite não é enviado', async () => {
+    const base = createMockDocsSource()
+    const enviarArquivo = vi.fn(base.enviarArquivo)
+    render(<ToastProvider><Checklist source={{ ...base, enviarArquivo }} donoId="f-ana" /></ToastProvider>)
+    const cnh = await screen.findByRole('listitem', { name: 'CNH' })
+    const input = within(cnh).getByLabelText('Arquivo para CNH', { selector: 'input' })
+    fireEvent.change(input, { target: { files: [new File(['x'], 'planilha.xlsx', { type: 'application/vnd.ms-excel' })] } })
+    expect((await within(cnh).findByRole('alert')).textContent).toBe('planilha.xlsx não é PDF, JPG ou PNG.')
+    const grande = new File(['x'], 'grande.pdf', { type: 'application/pdf' })
+    Object.defineProperty(grande, 'size', { value: 11 * 1024 * 1024 })
+    fireEvent.change(input, { target: { files: [grande] } })
+    expect((await within(cnh).findByRole('alert')).textContent).toMatch(/^grande\.pdf passa de 10/)
+    expect(enviarArquivo).not.toHaveBeenCalled()
+  })
+
+  it('renovar com arquivo que falhou orienta a usar Enviar arquivo', async () => {
+    const base = createMockDocsSource()
+    const source: DocsSource = { ...base, salvarDocumento: async (input) => ({ ...(await base.salvarDocumento({ ...input, arquivos: [] })), falhas: [{ nome: 'cnh.pdf', erro: 'Tempo esgotado' }] }) }
+    render(<ToastProvider><Checklist source={source} donoId="f-ana" /></ToastProvider>)
+    await renovarCnh()
+    expect(await screen.findByText('Documento salvo, mas arquivos não foram enviados: cnh.pdf (Tempo esgotado). Use “Enviar arquivo” neste documento para tentar de novo.')).toBeTruthy()
   })
 
   it('recarga que falha depois de salvar mantém a lista e mostra o alerta com Tentar de novo', async () => {

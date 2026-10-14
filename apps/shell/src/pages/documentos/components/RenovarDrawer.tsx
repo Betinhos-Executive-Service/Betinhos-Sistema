@@ -10,7 +10,7 @@ import '../documentos.css'
 export type AlvoRenovar = { tipo: TipoDoc; dono: Dono; anterior: DocEmitido | null }
 type Form = { numero: string; emissao: string; validade: string; observacao: string; arquivos: File[] }
 const VAZIO: Form = { numero: '', emissao: '', validade: '', observacao: '', arquivos: [] }
-const ACCEPT = '.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png'
+export const ACCEPT = '.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png'
 
 type Props = { alvo: AlvoRenovar | null; source: DocsSource; onClose: () => void; onSaved: (r: SalvarDocResult) => void }
 
@@ -28,6 +28,8 @@ export function RenovarDrawer({ alvo, source, onClose, onSaved }: Props) {
 
   if (!alvo) return null
   const { tipo, dono, anterior } = alvo
+  // Tipo com validade padrão (ASO): a emissão é a data do exame que a ficha e o App Motoristas usam para calcular o vencimento.
+  const exigeEmissao = tipo.validadePadraoMeses != null
   const dirty = form.numero !== '' || form.emissao !== '' || form.validade !== '' || form.observacao !== '' || form.arquivos.length > 0
 
   const fechar = () => { if (saving) return; if (dirty) { setConfirmar(true); return } onClose() }
@@ -39,6 +41,7 @@ export function RenovarDrawer({ alvo, source, onClose, onSaved }: Props) {
 
   const validar = () => {
     const e: Record<string, string> = {}
+    if (exigeEmissao && !form.emissao) e.emissao = 'Informe a data de emissão.'
     if (tipo.temValidade && !form.validade) e.validade = 'Informe a validade.'
     if (form.emissao && form.validade && form.validade < form.emissao) e.validade = 'A validade não pode ser antes da emissão.'
     setErros(e)
@@ -48,12 +51,15 @@ export function RenovarDrawer({ alvo, source, onClose, onSaved }: Props) {
   const salvar = async () => {
     if (saving || !validar()) return
     setSaving(true); setFalha(null)
+    let r: SalvarDocResult
     try {
-      const r = await source.salvarDocumento({ tipo, dono, anterior, numero: form.numero, emissao: form.emissao || null, validade: form.validade || null, observacao: form.observacao, arquivos: form.arquivos })
-      onSaved(r)
+      r = await source.salvarDocumento({ tipo, dono, anterior, numero: form.numero, emissao: form.emissao || null, validade: form.validade || null, observacao: form.observacao, arquivos: form.arquivos })
     } catch (reason) {
       setFalha(reason instanceof Error ? reason.message : String(reason))
+      return
     } finally { setSaving(false) }
+    // Fora do try: o documento já foi salvo; um erro de quem chamou não pode pedir para salvar de novo.
+    onSaved(r)
   }
 
   const uploadFiles: UploadFile[] = form.arquivos.map((f) => ({ name: f.name, size: f.size, type: f.type }))
@@ -73,7 +79,7 @@ export function RenovarDrawer({ alvo, source, onClose, onSaved }: Props) {
           {anterior ? <p className="doc-muted">O documento atual vira histórico ao salvar.</p> : null}
           <Field label="Número"><Input value={form.numero} disabled={saving} onChange={(e) => set({ numero: e.target.value })} /></Field>
           <div className="doc-form__datas">
-            <Field label="Emissão"><Input type="date" value={form.emissao} disabled={saving} onChange={(e) => mudarEmissao(e.target.value)} /></Field>
+            <Field label="Emissão" required={exigeEmissao} error={erros.emissao}><Input type="date" value={form.emissao} disabled={saving} onChange={(e) => mudarEmissao(e.target.value)} /></Field>
             {tipo.temValidade ? (
               <Field label="Validade" required error={erros.validade} hint={tipo.validadePadraoMeses ? `Sugerida: emissão + ${tipo.validadePadraoMeses} meses` : undefined}>
                 <Input type="date" value={form.validade} disabled={saving} onChange={(e) => { setValidadeManual(true); set({ validade: e.target.value }) }} />

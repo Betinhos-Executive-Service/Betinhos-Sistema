@@ -18,6 +18,10 @@ export type SalvarDeps = {
 
 const mensagem = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
+/** Toast de documento salvo com arquivos que não subiram; `ondeTentar` diz onde fica o "Enviar arquivo". */
+export const avisoFalhas = (falhas: SalvarDocResult['falhas'], ondeTentar: string) =>
+  `Documento salvo, mas arquivos não foram enviados: ${falhas.map((f) => `${f.nome} (${f.erro})`).join(' · ')}. ${ondeTentar}`
+
 /** Campos legados da ficha que Dashboard, App Motoristas e flows antigos ainda leem. */
 function legado(tipo: TipoDoc, dono: Dono, novo: NovoDoc): Record<string, string | null> | null {
   if (dono.categoria !== 'pessoas') return null
