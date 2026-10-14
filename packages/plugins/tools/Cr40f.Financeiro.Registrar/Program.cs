@@ -93,6 +93,11 @@ static void EnsureLogTable(ServiceClient service, string solution)
         };
         service.Execute(create);
     }
+    else
+    {
+        var meta = (RetrieveEntityResponse)service.Execute(new RetrieveEntityRequest { LogicalName = logical, EntityFilters = EntityFilters.Entity });
+        EnsureSolutionComponent(service, meta.EntityMetadata.MetadataId!.Value, solution, 1);
+    }
     EnsureString(service, solution, logical, "cr40f_entidade", "Entidade", 100);
     EnsureString(service, solution, logical, "cr40f_campo", "Campo", 100);
     EnsureString(service, solution, logical, "cr40f_de", "De", 100);
@@ -310,7 +315,16 @@ static Guid UpsertPluginTypeNamed(ServiceClient service, Guid assemblyId, string
 
 static void EnsureUpdateStep(ServiceClient service, Guid pluginTypeId, string entity, string filter, string name, string solutionUniqueName)
 {
-    if (FindSingleOrNone(service, "sdkmessageprocessingstep", ("name", name)) is not null) { Log($"step já existe: {name}"); return; }
+    if (FindSingleOrNone(service, "sdkmessageprocessingstep", ("name", name)) is { } existing)
+    {
+        EnsureSolutionComponent(service, existing.Id, solutionUniqueName, 92);
+        service.Update(new Entity("sdkmessageprocessingstep", existing.Id)
+        {
+            ["filteringattributes"] = filter, ["stage"] = new OptionSetValue(40), ["mode"] = new OptionSetValue(0),
+        });
+        Log($"step reconciliado: {name}");
+        return;
+    }
     var message = FindSingleOrNone(service, "sdkmessage", ("name", "Update")) ?? throw new InvalidOperationException("sdkmessage Update não encontrada.");
     var filterRow = service.RetrieveMultiple(new QueryExpression("sdkmessagefilter")
     {
