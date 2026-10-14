@@ -1,6 +1,6 @@
 // DocumentosPage.tsx
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
-import { Alert, Button, EmptyState, MetricCard, SearchBox, Select, Skeleton, StatusBadge, Tabs, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
+import { Alert, Button, EmptyState, MetricCard, PageToolbar, SearchBox, Select, Skeleton, StatusBadge, Tabs, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
 import { AlertTriangle, CalendarClock, CalendarDays, CheckCircle2, Clock, FileX, RefreshCw, Settings } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
@@ -76,11 +76,15 @@ function Documentos({ host }: { host: Host }) {
       </>}
       tabs={<Tabs aria-label="Categoria" value={filtro.aba} onChange={(aba) => setFiltro({ aba, kpi: null, tipo: null, q: filtro.q })} tabs={ABAS} />}
       toolbar={data ? (
-        <div className="doc-toolbar">
-          <SearchBox className="doc-toolbar__search" value={filtro.q} onChange={(q) => setFiltro({ ...filtro, q })} placeholder={filtro.aba === 'pessoas' ? 'Buscar funcionário ou documento' : 'Buscar placa ou documento'} aria-label="Buscar documentos" />
-          <Select className="doc-toolbar__select" aria-label="Tipo de documento" placeholder="Todos os tipos" searchable={false} clearable value={filtro.tipo} onChange={(v) => setFiltro({ ...filtro, tipo: v })}
-            options={tiposDaAba.map((t) => ({ value: t.id, label: t.nome }))} />
-        </div>
+        <PageToolbar
+          variant="filters"
+          label="Filtros de documentos"
+          start={<>
+            <SearchBox className="doc-toolbar__search" value={filtro.q} onChange={(q) => setFiltro({ ...filtro, q })} placeholder={filtro.aba === 'pessoas' ? 'Buscar funcionário ou documento' : 'Buscar placa ou documento'} aria-label="Buscar documentos" />
+            <Select className="doc-toolbar__select" aria-label="Tipo de documento" placeholder="Todos os tipos" searchable={false} clearable value={filtro.tipo} onChange={(v) => setFiltro({ ...filtro, tipo: v })}
+              options={tiposDaAba.map((t) => ({ value: t.id, label: t.nome }))} />
+          </>}
+        />
       ) : undefined}
     >
       {error && data ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{error} A lista mostra os dados da carga anterior.</Alert> : null}

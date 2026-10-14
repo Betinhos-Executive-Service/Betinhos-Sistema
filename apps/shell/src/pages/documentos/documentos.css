@@ -33,7 +33,6 @@
 .doc-kpi { display: block; padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; border-radius: var(--bt-radius-lg); }
 .doc-kpi:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
 .doc-kpi[aria-pressed="true"] > * { border-color: var(--bt-color-action); }
-.doc-toolbar { display: flex; flex-wrap: wrap; gap: var(--bt-space-2); }
 .doc-toolbar__search { flex: 1 1 260px; min-width: 200px; max-width: 360px; }
 .doc-toolbar__select { flex: 0 1 220px; min-width: 170px; }
 .doc-dono { display: grid; gap: var(--bt-space-0-5); }
