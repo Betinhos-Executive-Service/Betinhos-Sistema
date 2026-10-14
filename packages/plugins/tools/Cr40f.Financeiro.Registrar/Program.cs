@@ -56,6 +56,9 @@ EnsureSolutionComponent(service, assemblyId, solutionUniqueName, PluginAssemblyC
 EnsureLogTable(service, solutionUniqueName);
 var customApiId = EnsureCustomApi(service, pluginTypeId, solutionUniqueName, CustomApiMessageName, BoundEntity);
 ConfigureMainOperationStep(service, customApiId, pluginTypeId);
+var stepTypeId = UpsertPluginTypeNamed(service, assemblyId, "Cr40f.Financeiro.Plugin.FinanceiroStepPlugin");
+EnsureUpdateStep(service, stepTypeId, "cr40f_pagantes", "cr40f_status", "Cr40f.Financeiro: Pagante → OP", solutionUniqueName);
+EnsureUpdateStep(service, stepTypeId, "cr40f_financeiro", "cr40f_status", "Cr40f.Financeiro: OP → Reservas", solutionUniqueName);
 
 if (publish)
 {
@@ -296,6 +299,33 @@ static Guid ConfigureMainOperationStep(
     var step = rows.Single();
 
     return step.Id;
+}
+
+static Guid UpsertPluginTypeNamed(ServiceClient service, Guid assemblyId, string typeName)
+{
+    var existing = FindSingleOrNone(service, "plugintype", ("typename", typeName));
+    if (existing is not null) return existing.Id;
+    return service.Create(new Entity("plugintype") { ["pluginassemblyid"] = Ref("pluginassembly", assemblyId), ["typename"] = typeName, ["friendlyname"] = typeName, ["name"] = typeName });
+}
+
+static void EnsureUpdateStep(ServiceClient service, Guid pluginTypeId, string entity, string filter, string name, string solutionUniqueName)
+{
+    if (FindSingleOrNone(service, "sdkmessageprocessingstep", ("name", name)) is not null) { Log($"step já existe: {name}"); return; }
+    var message = FindSingleOrNone(service, "sdkmessage", ("name", "Update")) ?? throw new InvalidOperationException("sdkmessage Update não encontrada.");
+    var filterRow = service.RetrieveMultiple(new QueryExpression("sdkmessagefilter")
+    {
+        ColumnSet = new ColumnSet("sdkmessagefilterid"),
+        Criteria = { Conditions = { new ConditionExpression("sdkmessageid", ConditionOperator.Equal, message.Id), new ConditionExpression("primaryobjecttypecode", ConditionOperator.Equal, entity) } },
+    }).Entities.Single();
+    var stepId = service.Create(new Entity("sdkmessageprocessingstep")
+    {
+        ["name"] = name, ["mode"] = new OptionSetValue(0), ["stage"] = new OptionSetValue(40), ["rank"] = 10,
+        ["supporteddeployment"] = new OptionSetValue(0), ["filteringattributes"] = filter,
+        ["sdkmessageid"] = Ref("sdkmessage", message.Id), ["sdkmessagefilterid"] = Ref("sdkmessagefilter", filterRow.Id),
+        ["eventhandler"] = Ref("plugintype", pluginTypeId), ["asyncautodelete"] = false,
+    });
+    EnsureSolutionComponent(service, stepId, solutionUniqueName, 92);
+    Log($"step criado: {name}");
 }
 
 static void EnsureSolutionComponent(ServiceClient service, Guid componentId, string solutionUniqueName, int componentType)
