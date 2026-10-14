@@ -69,7 +69,7 @@ static void EnsureLogTable(ServiceClient service, string solution)
                 Description = new Label("Log imutável das alterações feitas pelo motor financeiro.", 1046),
                 OwnershipType = OwnershipTypes.UserOwned, IsActivity = false,
             },
-            PrimaryAttribute = new StringAttributeMetadata { SchemaName = "cr40f_name", LogicalName = "cr40f_name", MaxLength = 400, DisplayName = new Label("Resumo", 1046), RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None) },
+            PrimaryAttribute = new StringAttributeMetadata { SchemaName = "cr40f_name", LogicalName = "cr40f_name", MaxLength = 400, FormatName = StringFormatName.Text, DisplayName = new Label("Resumo", 1046), RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None) },
         };
         service.Execute(create);
     }
@@ -93,12 +93,14 @@ static bool AttributeExists(ServiceClient service, string entity, string attribu
 static void EnsureString(ServiceClient service, string solution, string entity, string name, string label, int max)
 {
     if (AttributeExists(service, entity, name)) return;
-    service.Execute(new CreateAttributeRequest { SolutionUniqueName = solution, EntityName = entity, Attribute = new StringAttributeMetadata { SchemaName = name, LogicalName = name, MaxLength = max, DisplayName = new Label(label, 1046), RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None) } });
+    Log($"criando coluna {name}");
+    service.Execute(new CreateAttributeRequest { SolutionUniqueName = solution, EntityName = entity, Attribute = new StringAttributeMetadata { SchemaName = name, LogicalName = name, MaxLength = max, FormatName = StringFormatName.Text, DisplayName = new Label(label, 1046), RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None) } });
 }
 
 static void EnsurePicklist(ServiceClient service, string solution, string entity, string name, string label, params (int value, string text)[] options)
 {
     if (AttributeExists(service, entity, name)) return;
+    Log($"criando coluna {name}");
     var set = new OptionSetMetadata { IsGlobal = false, OptionSetType = OptionSetType.Picklist };
     foreach (var (value, text) in options) set.Options.Add(new OptionMetadata(new Label(text, 1046), value));
     service.Execute(new CreateAttributeRequest { SolutionUniqueName = solution, EntityName = entity, Attribute = new PicklistAttributeMetadata { SchemaName = name, LogicalName = name, DisplayName = new Label(label, 1046), OptionSet = set, RequiredLevel = new AttributeRequiredLevelManagedProperty(AttributeRequiredLevel.None) } });
@@ -107,6 +109,7 @@ static void EnsurePicklist(ServiceClient service, string solution, string entity
 static void EnsureLookup(ServiceClient service, string solution, string entity, string name, string label, string target, string relationship)
 {
     if (AttributeExists(service, entity, name)) return;
+    Log($"criando coluna {name}");
     service.Execute(new CreateOneToManyRequest
     {
         SolutionUniqueName = solution,
@@ -172,6 +175,7 @@ static Guid EnsureCustomApi(ServiceClient service, Guid pluginTypeId, string sol
         };
         updateRequest["SolutionUniqueName"] = solutionUniqueName;
         service.Execute(updateRequest);
+        EnsureCustomApiChildren(service, existing.Id, solutionUniqueName, customApiMessageName);
         return existing.Id;
     }
 
@@ -195,30 +199,58 @@ static Guid EnsureCustomApi(ServiceClient service, Guid pluginTypeId, string sol
     createRequest["SolutionUniqueName"] = solutionUniqueName;
     var customApiId = ((CreateResponse)service.Execute(createRequest)).id;
 
-    service.Create(new Entity("customapirequestparameter")
-    {
-        ["customapiid"] = Ref("customapi", customApiId),
-        ["description"] = "JSON da solicitação de sincronização (modo simular ou aplicar).",
-        ["displayname"] = "Request JSON",
-        ["isoptional"] = true,
-        ["name"] = $"{customApiMessageName}.cr40f_RequestJson",
-        ["type"] = new OptionSetValue(10),
-        ["uniquename"] = "cr40f_RequestJson",
-        ["iscustomizable"] = new BooleanManagedProperty(false)
-    });
-
-    service.Create(new Entity("customapiresponseproperty")
-    {
-        ["customapiid"] = Ref("customapi", customApiId),
-        ["description"] = "JSON do resultado da operação.",
-        ["displayname"] = "Response JSON",
-        ["name"] = $"{customApiMessageName}.cr40f_ResponseJson",
-        ["type"] = new OptionSetValue(10),
-        ["uniquename"] = "cr40f_ResponseJson",
-        ["iscustomizable"] = new BooleanManagedProperty(false)
-    });
+    EnsureCustomApiChildren(service, customApiId, solutionUniqueName, customApiMessageName);
 
     return customApiId;
+}
+
+static bool ChildExists(ServiceClient service, string logicalName, Guid customApiId, string uniqueName)
+{
+    var query = new QueryExpression(logicalName) { ColumnSet = new ColumnSet(false), TopCount = 1 };
+    query.Criteria.AddCondition("customapiid", ConditionOperator.Equal, customApiId);
+    query.Criteria.AddCondition("uniquename", ConditionOperator.Equal, uniqueName);
+    return service.RetrieveMultiple(query).Entities.Count > 0;
+}
+
+static void CreateInSolution(ServiceClient service, Entity entity, string solutionUniqueName)
+{
+    var request = new CreateRequest { Target = entity };
+    request["SolutionUniqueName"] = solutionUniqueName;
+    service.Execute(request);
+}
+
+static void EnsureCustomApiChildren(ServiceClient service, Guid customApiId, string solutionUniqueName, string customApiMessageName)
+{
+    if (!ChildExists(service, "customapirequestparameter", customApiId, "cr40f_RequestJson"))
+    {
+        Log("criando parâmetro cr40f_RequestJson");
+        CreateInSolution(service, new Entity("customapirequestparameter")
+        {
+            ["customapiid"] = Ref("customapi", customApiId),
+            ["description"] = "JSON da solicitação de sincronização (modo simular ou aplicar).",
+            ["displayname"] = "Request JSON",
+            ["isoptional"] = true,
+            ["name"] = $"{customApiMessageName}.cr40f_RequestJson",
+            ["type"] = new OptionSetValue(10),
+            ["uniquename"] = "cr40f_RequestJson",
+            ["iscustomizable"] = new BooleanManagedProperty(false)
+        }, solutionUniqueName);
+    }
+
+    if (!ChildExists(service, "customapiresponseproperty", customApiId, "cr40f_ResponseJson"))
+    {
+        Log("criando resposta cr40f_ResponseJson");
+        CreateInSolution(service, new Entity("customapiresponseproperty")
+        {
+            ["customapiid"] = Ref("customapi", customApiId),
+            ["description"] = "JSON do resultado da operação.",
+            ["displayname"] = "Response JSON",
+            ["name"] = $"{customApiMessageName}.cr40f_ResponseJson",
+            ["type"] = new OptionSetValue(10),
+            ["uniquename"] = "cr40f_ResponseJson",
+            ["iscustomizable"] = new BooleanManagedProperty(false)
+        }, solutionUniqueName);
+    }
 }
 
 static Guid ConfigureMainOperationStep(
