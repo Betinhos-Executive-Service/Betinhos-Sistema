@@ -66,7 +66,11 @@ export function useTableView({ tela, columns, store, defaultSort = null, default
   const [activeId, setActiveId] = useState(DEFAULT_VIEW_ID)
   const [config, setConfigState] = useState<ViewConfig>(fallback)
   const live = useRef(true)
-  useEffect(() => () => { live.current = false }, [])
+  // Volta a `true` na remontagem do StrictMode; só a desmontagem real deixa `false`.
+  useEffect(() => {
+    live.current = true
+    return () => { live.current = false }
+  }, [])
 
   const active = views.find((v) => v.id === activeId) ?? views[0]
 

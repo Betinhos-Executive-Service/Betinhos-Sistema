@@ -99,6 +99,18 @@ export function moveColumn(config: ViewConfig, defs: ViewColumnDef[], key: strin
   return { ...config, columns }
 }
 
+/**
+ * Move entre as colunas visíveis (arraste no cabeçalho e `Alt+←/→`): `index` é a posição final entre as visíveis.
+ * As ocultas não contam e ficam onde estavam em relação às demais.
+ */
+export function moveVisibleColumn(config: ViewConfig, defs: ViewColumnDef[], key: string, index: number): ViewConfig {
+  const rest = config.columns.filter((c) => c.key !== key)
+  const visible = rest.filter((c) => c.visible)
+  if (!config.columns.some((c) => c.key === key) || !visible.length) return config
+  const to = index < visible.length ? rest.indexOf(visible[Math.max(index, 0)]) : rest.indexOf(visible[visible.length - 1]) + 1
+  return moveColumn(config, defs, key, to)
+}
+
 /** Mostra ou oculta; a primeira coluna e a última visível não podem ser ocultadas. */
 export function toggleColumn(config: ViewConfig, defs: ViewColumnDef[], key: string): ViewConfig {
   const target = config.columns.find((c) => c.key === key)
