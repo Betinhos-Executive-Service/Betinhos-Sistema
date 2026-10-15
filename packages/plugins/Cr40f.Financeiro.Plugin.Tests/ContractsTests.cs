@@ -26,3 +26,23 @@ public class ContractsTests
         Assert.Throws<Microsoft.Xrm.Sdk.InvalidPluginExecutionException>(() => r.Validate());
     }
 }
+
+public class FecharMesContractTests
+{
+    [Fact]
+    public void RequestValidoDesserializa()
+    {
+        var id = System.Guid.NewGuid();
+        var r = JsonConvert.DeserializeObject<FecharMesRequest>("{\"clienteId\":\"" + id + "\",\"mes\":\"2026-09\"}")!;
+        r.Validate();
+        Assert.Equal(id, r.ClienteId);
+        Assert.Equal("2026-09", r.Mes);
+    }
+
+    [Fact]
+    public void ClienteVazioFalha()
+    {
+        var r = new FecharMesRequest { Mes = "2026-09" };
+        Assert.Throws<Microsoft.Xrm.Sdk.InvalidPluginExecutionException>(() => r.Validate());
+    }
+}
