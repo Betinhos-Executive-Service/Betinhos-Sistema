@@ -157,5 +157,5 @@ Aviso ao motorista ou ao cliente, ação automática sobre o serviço, alerta de
 
 ## Planos seguintes
 
-- **Fase 0:** campo de endereço do Google (Places) no formulário legado `Tela Formulário Geral`, gravando latitude, longitude e identificador do lugar no serviço. É um repositório e um arquivo de mais de 15 mil linhas, com plano próprio. Enquanto não existir, o geocoding do flow cobre.
+- **Fase 0:** campo de endereço do Google (Places), gravando latitude, longitude e identificador do lugar no serviço. **Restrição do Renan (15/10/2026):** a mudança vale só para uma cópia do formulário dentro do Sistema Betinhos. O WebResource ativo no model-driven (`new_formulario_geral.html`, que o shell abre hoje no overlay da tela Geral) não pode ser alterado. A Fase 0 cria um WebResource novo, copiado do código de `Tela Formulário Geral` (um arquivo de mais de 15 mil linhas, com plano próprio), e só aponta o shell para ele (`FORM_WEBRESOURCE` em `apps/shell/src/pages/geral/data/source.ts`) depois da validação do Renan. Enquanto não existir, o geocoding do flow cobre.
 - **Fase 3:** alertas ativos na página do Assistente de Logística, com "Resolver manualmente". Depende da mescla da branch dos Assistentes.
