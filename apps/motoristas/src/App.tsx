@@ -47,12 +47,16 @@ import {
   loadCollisionLookupNavigationNamesRemote,
   loadExpenseReferenceDataRemote,
   loadMyIdeasRemote,
+  loadMyVehiclesRemote,
+  setMyCurrentVehicleRemote,
   loadReceiptClienteOptionsRemote,
   loadExpenseLookupNavigationNamesRemote,
   loadMaintenanceRequestVehiclesRemote,
   loadRemoteDetailByParams,
   loadRemoteStore,
   markDetailViewedRemote,
+  resolveServiceVehicleRemote,
+  loadActiveFleetRemote,
   prefetchExpenseReferenceDataRemote,
   saveServiceObservationRemote,
   saveVoucherDraftRemote,
@@ -140,6 +144,21 @@ import {
   type MaintenanceRequestPhoto
 } from "./screens/MaintenanceRequestScreen";
 import { IdeasScreen } from "./screens/IdeasScreen";
+import { MyVehicleScreen } from "./screens/MyVehicleScreen";
+import { VehicleChoiceDialog } from "./components/details/VehicleChoiceDialog";
+import {
+  buildInfleetServiceVehiclePatch,
+  needsDriverChoice,
+  thirdPartyResolution,
+  type DriverVehicleChoice,
+  type FleetVehicle,
+  type InfleetVehicleResolution
+} from "./lib/serviceVehicleInfleet";
+import { isThirdPartyDriver } from "./lib/myVehicle";
+import { createMockFleetLoader, MOCK_FLEET, pickMockInfleetScenario, resolveMockServiceVehicle } from "./lib/serviceVehicleInfleetMock";
+
+// Referência estável: o diálogo compara com a lista exibida para saber se oferece "Nenhuma das opções".
+const loadMockAllFleet = async () => MOCK_FLEET;
 import { ServicesScreen } from "./screens/ServicesScreen";
 import { SignatureScreen } from "./screens/SignatureScreen";
 import { VoucherScreen } from "./screens/VoucherScreen";
@@ -447,6 +466,11 @@ function App() {
   const [remoteOperation, setRemoteOperation] = useState<RemoteOperation | null>(null);
   const [remoteMode, setRemoteMode] = useState(false);
   const [driverContext, setDriverContext] = useState<DriverContext | null>(null);
+  const [vehicleChoiceRequest, setVehicleChoiceRequest] = useState<{
+    resolution: InfleetVehicleResolution;
+    resolve: (choice: DriverVehicleChoice | null) => void;
+    loadFleet: () => Promise<FleetVehicle[]>;
+  } | null>(null);
   const [comunicados, setComunicados] = useState<ComunicadoDestinatario[]>([]);
   const [comunicadosStatus, setComunicadosStatus] = useState<ComunicadosLoadStatus>(() => isMockComunicados() || hasDataverseRuntime() ? "loading" : "ready");
   const [selectedComunicadoId, setSelectedComunicadoId] = useState("");
@@ -730,9 +754,11 @@ function App() {
     });
   }, [isButtonPreviewMode, isReceiptPreviewMode, mediaDraftLoaded, screen]);
 
+  // Guarda o motorista logado para recarregar comunicados sem depender do estado ainda não aplicado.
+  const comunicadosDriverIdRef = useRef("");
   const reloadComunicados = useCallback(async () => {
     try {
-      setComunicados(await loadDriverComunicados());
+      setComunicados(await loadDriverComunicados(comunicadosDriverIdRef.current));
       setComunicadosStatus("ready");
     } catch (error) {
       // Mantém a lista já carregada; só exibe o estado de erro quando nunca houve carga.
@@ -776,6 +802,7 @@ function App() {
         const hashRoute = initialHashRouteRef.current;
         const remoteInitialDetail = hashRoute ? findDetailFromHashRoute(remoteStore, hashRoute) : getInitialDetail(remoteStore);
         setDriverContext(remote.driver);
+        comunicadosDriverIdRef.current = remote.driver?.id ?? "";
         reloadComunicados().catch((error) => {
           reportAppError(error, { severity: "warning", source: "app", action: "loadDriverComunicados", phase: "initial" });
           setToast("Não foi possível carregar comunicados. Atualize o aplicativo.", "warning");
@@ -1157,6 +1184,15 @@ function App() {
       <LocalToast toast={dataLoading ? null : toast} onDismiss={() => setToastState(null)} />
       <LoadingOverlay loading={dataLoading} />
       {remoteOperation ? <FlowProgressOverlay operation={remoteOperation} /> : null}
+      {vehicleChoiceRequest ? (
+        <VehicleChoiceDialog
+          resolution={vehicleChoiceRequest.resolution}
+          loadFleet={vehicleChoiceRequest.loadFleet}
+          loadAllVehicles={remoteMode ? loadActiveFleetRemote : loadMockAllFleet}
+          onChoose={closeVehicleChoice}
+          onCancel={cancelVehicleChoice}
+        />
+      ) : null}
       {criticalError ? (
         <div className="critical-error-overlay" role="dialog" aria-modal="true" aria-labelledby="critical-error-title">
           <div className="critical-error-card">
@@ -1263,6 +1299,7 @@ function App() {
       try {
         const remote = await loadRemoteStore();
         setDriverContext(remote.driver);
+        comunicadosDriverIdRef.current = remote.driver?.id ?? "";
         setStore((current) => ({ ...current, agenda: remote.agenda, history: remote.history }));
         try {
           await reloadComunicados();
@@ -1337,6 +1374,18 @@ function App() {
     if (remoteMode) await saveServiceObservationRemote(selectedDetail, observation);
   };
 
+  // Abre a escolha do carro e espera a resposta do motorista (null = voltou sem escolher).
+  const askVehicleChoice = (resolution: InfleetVehicleResolution, loadFleet: () => Promise<FleetVehicle[]>) =>
+    new Promise<DriverVehicleChoice | null>((resolve) => setVehicleChoiceRequest({ resolution, resolve, loadFleet }));
+
+  const closeVehicleChoice = useCallback((choice: DriverVehicleChoice | null) => {
+    setVehicleChoiceRequest((current) => {
+      current?.resolve(choice);
+      return null;
+    });
+  }, []);
+  const cancelVehicleChoice = useCallback(() => closeVehicleChoice(null), [closeVehicleChoice]);
+
   const finalizeSelected = async (fields: Record<string, string>) => {
     if (!selectedDetail || remoteOperation) return;
     const detailToFinalize = selectedDetail;
@@ -1395,12 +1444,59 @@ function App() {
           return;
         }
 
+        // Infleet decide o carro do serviço; abaixo de 85% o motorista escolhe. Falha da Infleet não bloqueia.
+        let vehicleResolution: InfleetVehicleResolution | undefined;
+        let vehicleChoice: DriverVehicleChoice | null = null;
+        if (detailToFinalize.type === "SERVICO" && detailToFinalize.dataverse?.id) {
+          setProgress("Conferindo o carro na Infleet.");
+          const driver = driverContext ?? await getDriverContext();
+          if (isThirdPartyDriver(driver?.funcionario)) {
+            // Terceiro não usa a Infleet: grava o carro atual dele ou pede a escolha entre os carros dele.
+            let myVehicles: Awaited<ReturnType<typeof loadMyVehiclesRemote>> | null = null;
+            try {
+              myVehicles = await loadMyVehiclesRemote(driver);
+            } catch {
+              // Sem a lista do terceiro, cai na escolha entre a frota ativa.
+              myVehicles = null;
+            }
+            if (!myVehicles) {
+              vehicleResolution = thirdPartyResolution(null);
+              setRemoteOperation(null);
+              const pickedFallback = await askVehicleChoice(vehicleResolution, loadActiveFleetRemote);
+              if (!pickedFallback) return;
+              vehicleChoice = { ...pickedFallback, origem: "terceiro" };
+              setProgress("Registrando o carro escolhido.");
+            } else {
+            const currentId = getDriverCurrentVehicleId(driver);
+            const current = myVehicles.find((vehicle) => vehicle.id === currentId) ?? null;
+            vehicleResolution = thirdPartyResolution(current);
+            if (current) {
+              vehicleChoice = { veiculoId: current.id, placa: current.placa, origem: "terceiro" };
+            } else {
+              setRemoteOperation(null);
+              const picked = await askVehicleChoice(vehicleResolution, async () => (myVehicles!.length > 0 ? myVehicles! : loadActiveFleetRemote()));
+              if (!picked) return;
+              vehicleChoice = { ...picked, origem: "terceiro" };
+              setProgress("Registrando o carro escolhido.");
+            }
+            }
+          } else {
+            vehicleResolution = await resolveServiceVehicleRemote(detailToFinalize.dataverse.id);
+            if (needsDriverChoice(vehicleResolution)) {
+              setRemoteOperation(null);
+              vehicleChoice = await askVehicleChoice(vehicleResolution, loadActiveFleetRemote);
+              if (!vehicleChoice) return;
+              setProgress("Registrando o carro escolhido.");
+            }
+          }
+        }
+
         const signatureDataUrl = store.signatures[detailToFinalize.id];
         const photos = store.photos[detailToFinalize.id];
         if (detailToFinalize.type === "SERVICO" && isVoucher) {
-          await saveVoucherRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress });
+          await saveVoucherRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress, vehicleResolution, vehicleChoice });
         } else if (detailToFinalize.type === "SERVICO") {
-          await finalizeServiceRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress });
+          await finalizeServiceRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress, vehicleResolution, vehicleChoice });
         } else if (detailToFinalize.type === "MANUTENCAO") {
           await finalizeMaintenanceRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress });
         } else if (detailToFinalize.type === "TROCA") {
@@ -1432,6 +1528,31 @@ function App() {
         delete next[detailToFinalize.id];
         return next;
       });
+    } else if (detailToFinalize.type === "SERVICO") {
+      // Mock local: simula a Infleet para testar a UI sem Dataverse. Cenário por ?mockInfleet=.
+      const scenario = pickMockInfleetScenario(detailToFinalize.id);
+      setRemoteOperation({ title: "Finalizando serviço", message: "Conferindo o carro na Infleet.", detailId: detailToFinalize.id, phase: "loading" });
+      const resolution = await resolveMockServiceVehicle(scenario);
+      setRemoteOperation(null);
+      let choice: DriverVehicleChoice | null = null;
+      if (needsDriverChoice(resolution)) {
+        const loadMockFleet = createMockFleetLoader(scenario);
+        // Terceiro sem carro cadastrado: a lista dele vem vazia e o diálogo oferece a frota ativa.
+        choice = await askVehicleChoice(resolution, resolution.motivo === "motorista-terceiro"
+          ? async () => {
+              const mine = await loadMockFleet();
+              return mine.length > 0 ? mine : MOCK_FLEET;
+            }
+          : loadMockFleet);
+        if (!choice) return;
+        if (resolution.motivo === "motorista-terceiro") choice = { ...choice, origem: "terceiro" };
+      }
+      const patch = buildInfleetServiceVehiclePatch(resolution, choice, (vehicleId) => vehicleId);
+      const outcome = resolution.decisao === "automatico"
+        ? `automático: ${resolution.escolhido?.placa} (${resolution.escolhido?.percentual}%)`
+        : `escolhido pelo motorista (${choice?.origem === "frota" ? "frota" : choice?.origem === "terceiro" ? "carros do terceiro" : "carros da janela"}): ${choice?.placa}`;
+      console.info("[mock Infleet]", scenario, patch);
+      setToast(`Teste Infleet (${scenario}) · ${outcome}`, "success");
     }
 
     setCompletingDetailKey(detailKey);
@@ -1663,7 +1784,7 @@ function App() {
       openPersonalReceiptFromHome();
       return;
     }
-    if (screenName === "servicos" || screenName === "comunicados" || screenName === "historico" || screenName === "solicitarManutencao" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias") {
+    if (screenName === "servicos" || screenName === "comunicados" || screenName === "historico" || screenName === "solicitarManutencao" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro") {
       setComunicadoOrigin("");
       setScreen(screenName);
     }
@@ -2829,6 +2950,21 @@ function App() {
     );
   }
 
+  if (screen === "meuCarro") {
+    return show(
+      <MyVehicleScreen
+        onBack={() => setScreen("inicio")}
+        currentVehicleId={getDriverCurrentVehicleId(driverContext)}
+        loadVehicles={async () => (remoteMode ? loadMyVehiclesRemote(driverContext ?? await getDriverContext()) : MOCK_FLEET.slice(0, 2))}
+        saveVehicle={async (id) => {
+          const driver = driverContext ?? await getDriverContext();
+          if (remoteMode) await setMyCurrentVehicleRemote(driver, id);
+          setDriverContext({ ...driver, funcionario: { ...(driver.funcionario ?? {}), _cr40f_veiculoatual_value: id } });
+        }}
+      />
+    );
+  }
+
   if (screen === "colisoesInicio") {
     return show(
       <CollisionStartScreen
@@ -3207,6 +3343,7 @@ function App() {
       openPersonalReceipt={openPersonalReceiptFromHome}
       onRefresh={refreshLocal}
       canGeneratePersonalReceipt={canGeneratePersonalReceipt}
+      isThirdParty={isThirdPartyDriver(driverContext?.funcionario)}
       services={store.agenda}
       pendingComunicados={comunicados.filter(isComunicadoPending).length}
       driverName={driverContext?.fullName}
