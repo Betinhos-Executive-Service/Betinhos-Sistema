@@ -49,13 +49,13 @@ Data: 14/10/2026 · Aprovado por: Renan · Base: `2026-10-13-gestao-documentos-d
       "categoria": "pessoas",
       "contagens": { "vencido": 0, "vence7": 0, "vence30": 0, "vence60": 0, "faltando": 0 },
       "urgentes": [
-        { "dono": "Nome", "detalhe": "Motorista", "tipo": "CNH", "validade": "2026-10-15", "estado": "vencido", "dias": -4 }
+        { "dono": "Nome", "detalhe": "Motorista", "tipo": "CNH", "validade": "2026-10-15", "estado": "vencido", "dias": -4, "quantidade": 1 }
       ]
     }
   ]
 }
 ```
-`urgentes` contém só `vencido`, `vence7` e `faltando`, já ordenados. `validade` e `dias` são `null` para faltantes. As duas categorias (`pessoas`, `frota`) sempre aparecem.
+`urgentes` contém só `vencido`, `vence7` e `faltando`, já ordenados. `vencido` e `vence7` saem um por documento (`quantidade` 1); os faltantes são agrupados por dono (uma linha por dono: `tipo` lista os nomes separados por ", " e `quantidade` é o número de documentos faltando). `validade` e `dias` são `null` para faltantes. As duas categorias (`pessoas`, `frota`) sempre aparecem.
 
 ## 3. Flow "Documentos | Resumo semanal"
 
@@ -102,3 +102,5 @@ Aviso diário por marco, WhatsApp, push no App Motoristas, exclusão dos campos 
 - **Envio:** "Enviar um email (V2)" com "De (Enviar como)" = noreply, o padrão dos flows existentes. O e-mail ao administrador sai sem "De", para não depender da mesma permissão que pode ter causado a falha.
 - **Provisionamento:** plugin e Custom API pelo registrador (login interativo do Dataverse); variáveis e flow por `provision-flow-documentos-resumo.ps1` com `az login`. E-mail da noreply, URL do Sistema e e-mail do admin entram por parâmetro.
 - **Paridade:** o fixture `Fixtures/paridade.json` é escrito à mão, cobrindo os limites e casos da §5, em vez de exportar o mock do shell.
+
+- **Faltantes agrupados por dono (15/10/2026):** com dados reais do DEV a lista teria ~450 linhas; o Renan escolheu uma linha por dono com a quantidade. As contagens continuam por documento.

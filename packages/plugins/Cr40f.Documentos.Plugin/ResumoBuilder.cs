@@ -75,18 +75,43 @@ public static class ResumoBuilder
                     Vence60 = daCategoria.Count(p => p.Estado == Status.Vence60),
                     Faltando = daCategoria.Count(p => p.Estado == Status.Faltando),
                 },
-                Urgentes = daCategoria.Where(p => Urgente.Contains(p.Estado)).Select(p => new ItemUrgente
-                {
-                    Dono = p.Dono.Nome,
-                    Detalhe = p.Dono.Detalhe,
-                    Tipo = p.Tipo.Nome,
-                    Validade = p.Doc?.Validade,
-                    Estado = p.Estado,
-                    Dias = p.Dias,
-                }).ToList(),
+                Urgentes = MontarUrgentes(daCategoria),
             });
         }
         return resumo;
+    }
+
+    /// <summary>Vencido/vence7: uma linha por documento. Faltando: uma linha por dono, com a quantidade.</summary>
+    private static List<ItemUrgente> MontarUrgentes(List<Pendencia> daCategoria)
+    {
+        var itens = daCategoria
+            .Where(p => p.Estado == Status.Vencido || p.Estado == Status.Vence7)
+            .Select(p => new ItemUrgente
+            {
+                Dono = p.Dono.Nome,
+                Detalhe = p.Dono.Detalhe,
+                Tipo = p.Tipo.Nome,
+                Validade = p.Doc?.Validade,
+                Estado = p.Estado,
+                Dias = p.Dias,
+                Quantidade = 1,
+            }).ToList();
+        var faltantes = daCategoria.Where(p => p.Estado == Status.Faltando).ToList();
+        foreach (var grupo in faltantes.GroupBy(p => p.Dono.Id))
+        {
+            var docs = grupo.ToList();
+            itens.Add(new ItemUrgente
+            {
+                Dono = docs[0].Dono.Nome,
+                Detalhe = docs[0].Dono.Detalhe,
+                Tipo = string.Join(", ", docs.Select(p => p.Tipo.Nome)),
+                Validade = null,
+                Estado = Status.Faltando,
+                Dias = null,
+                Quantidade = docs.Count,
+            });
+        }
+        return itens;
     }
 
     private static int Comparar(Pendencia a, Pendencia b)
