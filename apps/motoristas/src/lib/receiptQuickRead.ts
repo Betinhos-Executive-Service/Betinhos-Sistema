@@ -57,7 +57,14 @@ export function applyQuickReadToDraft(
 }
 
 export const QUICK_READ_MAX_TENTATIVAS = 3;
-export const QUICK_READ_TIMEOUT_MS = 10_000;
+/** Tempo total da leitura (listas + imagem + flow). Passou disso, segue para o preenchimento manual. */
+export const QUICK_READ_TIMEOUT_MS = 20_000;
+/** A partir daqui a tela de leitura avisa que está demorando mais que o normal. */
+export const QUICK_READ_SLOW_NOTICE_MS = 8_000;
+/** Duração do passo "Enviando foto" antes de mostrar "Lendo valor e data". */
+export const QUICK_READ_SEND_STEP_MS = 1_500;
+/** Tempo em que "Preenchendo despesa" fica visível antes de abrir o formulário. */
+export const QUICK_READ_FILL_STEP_MS = 450;
 
 export type QuickReadStatus = "idle" | "lendo" | "preenchido" | "ilegivel" | "manual";
 export type QuickReadState = { status: QuickReadStatus; tentativas: number };
@@ -65,6 +72,97 @@ export const INITIAL_QUICK_READ: QuickReadState = { status: "idle", tentativas: 
 
 export function shouldRunQuickRead(state: QuickReadState) {
   return state.status === "idle" || state.status === "ilegivel";
+}
+
+/** Começa uma leitura. Sem internet não tenta: vai direto para o preenchimento manual. */
+export function startQuickReadState(state: QuickReadState, env: { online: boolean }): QuickReadState {
+  return { ...state, status: env.online ? "lendo" : "manual" };
+}
+
+/** Enquanto lê, a tela de gastos mostra só a leitura (sem formulário); nos demais estados, o formulário. */
+export function expenseFlowView(state: QuickReadState): "leitura" | "formulario" {
+  return state.status === "lendo" ? "leitura" : "formulario";
+}
+
+export type QuickReadProgress = { step: 0 | 1 | 2; slow: boolean };
+
+/** Passos da tela de leitura: 0 enviando foto, 1 lendo valor e data, 2 preenchendo despesa (só com o resultado). */
+export function quickReadProgress(elapsedMs: number, filling: boolean): QuickReadProgress {
+  if (filling) return { step: 2, slow: false };
+  return { step: elapsedMs < QUICK_READ_SEND_STEP_MS ? 0 : 1, slow: elapsedMs >= QUICK_READ_SLOW_NOTICE_MS };
+}
+
+/** Listas vindas do Dataverse. As listas padrão do app usam ids locais (local-*), que não existem no Dataverse. */
+export function hasRemoteReferenceData(data: ExpenseReferenceData) {
+  const isRemoteId = (id: string) => Boolean(id) && !id.startsWith("local-");
+  return data.categories.length > 0 && data.paymentMethods.length > 0 &&
+    data.categories.every((item) => isRemoteId(item.id)) && data.paymentMethods.every((item) => isRemoteId(item.id));
+}
+
+export type QuickReadPipelineDeps = {
+  referenceData: ExpenseReferenceData;
+  isReferenceReady: (data: ExpenseReferenceData) => boolean;
+  loadReferenceData: () => Promise<ExpenseReferenceData>;
+  prepareImage: () => Promise<string>;
+  read: (imagemBase64: string, categorias: string[], formasPagamento: string[], timeoutMs: number) => Promise<unknown>;
+  timeoutMs?: number;
+};
+
+export type QuickReadPipelineResult = { outcome: QuickReadOutcome; referenceData: ExpenseReferenceData | null };
+
+/**
+ * Leitura completa com um só prazo: espera as listas de categoria e forma de pagamento (sem ids locais), prepara a
+ * imagem e chama o flow com o tempo que sobrou. Qualquer erro, lista ausente ou estouro de prazo vira falha (manual).
+ */
+export async function runQuickReadPipeline(deps: QuickReadPipelineDeps): Promise<QuickReadPipelineResult> {
+  const timeoutMs = deps.timeoutMs ?? QUICK_READ_TIMEOUT_MS;
+  const startedAt = Date.now();
+  const failure: QuickReadPipelineResult = { outcome: { kind: "falha" }, referenceData: null };
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<QuickReadPipelineResult>((resolve) => {
+    timer = setTimeout(() => resolve(failure), timeoutMs);
+  });
+  const work = (async (): Promise<QuickReadPipelineResult> => {
+    try {
+      const referencePromise = deps.isReferenceReady(deps.referenceData)
+        ? Promise.resolve(deps.referenceData)
+        : deps.loadReferenceData().catch(() => null);
+      const [referenceData, base64] = await Promise.all([referencePromise, deps.prepareImage()]);
+      if (!referenceData || !deps.isReferenceReady(referenceData)) return failure;
+      const remaining = timeoutMs - (Date.now() - startedAt);
+      if (remaining <= 0) return failure;
+      const body = await deps.read(
+        base64,
+        referenceData.categories.map((category) => category.name),
+        referenceData.paymentMethods.map((method) => method.name),
+        remaining
+      );
+      return { outcome: parseQuickReadResponse(body), referenceData };
+    } catch {
+      return failure;
+    }
+  })();
+  try {
+    return await Promise.race([work, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export type QuickReadFilledFields = Partial<Record<keyof ExpenseDraft, string>>;
+
+/** Campos que a leitura preencheu (valor depois da leitura diferente do anterior). */
+export function quickReadFilledFields(before: ExpenseDraft, after: ExpenseDraft): QuickReadFilledFields {
+  const filled: QuickReadFilledFields = {};
+  for (const key of Object.keys(after) as Array<keyof ExpenseDraft>) {
+    if (after[key] && after[key] !== before[key]) filled[key] = after[key];
+  }
+  return filled;
+}
+
+/** Destaque some quando o motorista muda o campo. */
+export function isQuickReadFieldHighlighted(draft: ExpenseDraft, filled: QuickReadFilledFields, key: keyof ExpenseDraft) {
+  return filled[key] !== undefined && draft[key] === filled[key];
 }
 
 export function nextQuickReadState(state: QuickReadState, outcome: QuickReadOutcome): QuickReadState {
