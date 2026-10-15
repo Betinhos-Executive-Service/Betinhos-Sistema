@@ -20,6 +20,8 @@ public static class FechamentoMensal
 {
     static readonly TimeSpan Offset = TimeSpan.FromHours(3); // America/Sao_Paulo, UTC-03:00 sem horário de verão
 
+    public static DateTime DataSaoPaulo(DateTime utc) => utc.AddHours(-Offset.TotalHours).Date;
+
     public static (DateTime Inicio, DateTime Fim) Janela(string mes)
     {
         if (!DateTime.TryParseExact(mes + "-01", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))

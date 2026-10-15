@@ -49,6 +49,11 @@ public sealed class FecharMesClientePlugin : IPlugin
     static FecharMesResponse Executar(IOrganizationService userService, IOrganizationService systemService, ITracingService tracing, FecharMesRequest request, Guid usuarioId, ParameterCollection shared)
     {
         var (ini, fim) = FechamentoMensal.Janela(request.Mes);
+        // Lê o cliente com a permissão do usuário e reescreve o mesmo nome: o lock de escrita serializa fechamentos concorrentes do mesmo cliente.
+        var cliente = userService.Retrieve(Cliente, request.ClienteId, new ColumnSet("cr40f_nomedocliente"));
+        var nomeCliente = cliente.GetAttributeValue<string>("cr40f_nomedocliente");
+        systemService.Update(new Entity(Cliente, request.ClienteId) { ["cr40f_nomedocliente"] = nomeCliente });
+
         var query = new QueryExpression(Codigos.Reserva) { ColumnSet = new ColumnSet(ReservaSaida, Codigos.ReservaCpLookup, "cr40f_status", Codigos.ReservaFatStatus, Codigos.ReservaOpLookup) };
         query.Criteria.AddCondition(ReservaCliente, ConditionOperator.Equal, request.ClienteId);
         query.Criteria.AddCondition(Codigos.ReservaFatStatus, ConditionOperator.Equal, Codigos.ReservaFatMensal);
@@ -72,6 +77,10 @@ public sealed class FecharMesClientePlugin : IPlugin
             }
         }
 
+        var comCp = entidades.Count(e => e.GetAttributeValue<EntityReference>(Codigos.ReservaCpLookup) != null);
+        if (cpValores.Count < comCp)
+            tracing.Trace("cr40f_FecharMesCliente: {0} CPs com valor para {1} CPs referenciadas ({2} reservas com CP)", cpValores.Count, cpIds.Count, comCp);
+
         var reservas = entidades.Select(e =>
         {
             var cpId = e.GetAttributeValue<EntityReference>(Codigos.ReservaCpLookup)?.Id;
@@ -90,15 +99,14 @@ public sealed class FecharMesClientePlugin : IPlugin
         if (elegiveis.Count == 0) throw new InvalidPluginExecutionException("Nenhum serviço mensal concluído sem OP para este cliente no mês.");
         var totalCents = FechamentoMensal.TotalCents(elegiveis);
 
-        var cliente = systemService.Retrieve(Cliente, request.ClienteId, new ColumnSet("cr40f_nomedocliente"));
-        var primeiro = elegiveis.Min(r => r.SaidaUtc).AddHours(-3).Date;
-        var ultimo = elegiveis.Max(r => r.SaidaUtc).AddHours(-3).Date;
+        var primeiro = FechamentoMensal.DataSaoPaulo(elegiveis.Min(r => r.SaidaUtc));
+        var ultimo = FechamentoMensal.DataSaoPaulo(elegiveis.Max(r => r.SaidaUtc));
         var valorTotal = totalCents / 100m;
 
         var op = new Entity(Codigos.Op);
         op[Codigos.OpStatus] = new OptionSetValue(Codigos.OpAberta);
         op[Codigos.OpValor] = new Money(valorTotal);
-        op["new_clientedaop"] = cliente.GetAttributeValue<string>("cr40f_nomedocliente");
+        op["new_clientedaop"] = nomeCliente;
         op["cr40f_datado1servico"] = primeiro;
         op["cr40f_datadoultimoservico"] = ultimo;
         var opId = userService.Create(op);
