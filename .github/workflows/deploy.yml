@@ -42,13 +42,13 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-          # @betinhos/ui vem do GitHub Packages (repo design-system-betinhos). Lê com o secret PACKAGES_READ_TOKEN
-          # (PAT read:packages) e, sem ele, com o GITHUB_TOKEN liberado em Manage Actions access do pacote.
+          # @betinhos/ui vem do GitHub Packages (repo design-system-betinhos). O GITHUB_TOKEN lê porque cada pacote
+          # (ui e tokens) lista este repo em Package settings → Manage Actions access (Read).
           registry-url: https://npm.pkg.github.com
           scope: '@betinhos-executive-service'
       - run: pnpm install --frozen-lockfile
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN || secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: pnpm push
 
   # TEST e PROD recebem a solução inteira como managed: tela, schema, flows e plugins.
@@ -64,13 +64,13 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-          # @betinhos/ui vem do GitHub Packages (repo design-system-betinhos). Lê com o secret PACKAGES_READ_TOKEN
-          # (PAT read:packages) e, sem ele, com o GITHUB_TOKEN liberado em Manage Actions access do pacote.
+          # @betinhos/ui vem do GitHub Packages (repo design-system-betinhos). O GITHUB_TOKEN lê porque cada pacote
+          # (ui e tokens) lista este repo em Package settings → Manage Actions access (Read).
           registry-url: https://npm.pkg.github.com
           scope: '@betinhos-executive-service'
       - run: pnpm install --frozen-lockfile
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN || secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: pnpm build
       - name: Injeta o build na solução
         run: node packages/deploy/inject-solution.mjs apps/shell "solution/$SOLUTION" "$RESOURCE_NAME" "$LOADER_NAME" "$DISPLAY_NAME"
