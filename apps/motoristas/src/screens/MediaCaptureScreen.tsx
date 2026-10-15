@@ -4,6 +4,7 @@ import { SystemIcon } from "../components/icons/SystemIcon";
 import { AppShell } from "../components/layout/AppShell";
 import { FormMenu } from "../components/navigation/FormMenu";
 import { reportAppError } from "../lib/appErrorLogger";
+import { describeStreamSize, getDocumentStreamConstraints, getDocumentTrackConstraints } from "../lib/cameraConstraints";
 import {
   captureVideoFrameDataUrlAsync,
   formatVideoDuration,
@@ -19,6 +20,8 @@ type MediaCaptureScreenProps = {
   onCapture: (photoDataUrl: string) => void;
   onCaptureVideo?: (video: CapturedVideoDraft) => void;
   onSwitchCamera: () => void;
+  /** Documento (comprovante): stream 4:3 em alta resolução, para a foto não sair 9:16 cortada. */
+  documentFraming?: boolean;
 };
 
 type VideoCaptureProfile = {
@@ -120,8 +123,10 @@ function getPreferredVideoProfile(track: MediaStreamTrack): VideoCaptureProfile 
 function buildTrackConstraints(
   mode: "environment" | "user",
   profile: VideoCaptureProfile,
-  continuousFocus = false
+  continuousFocus = false,
+  documentFraming = false
 ): MediaTrackConstraints {
+  if (documentFraming) return getDocumentTrackConstraints(mode, profile.frameRate, continuousFocus);
   const constraints: FocusAwareMediaTrackConstraints = {
     facingMode: { ideal: mode },
     height: { ideal: 1080, min: 720 },
@@ -135,7 +140,7 @@ function buildTrackConstraints(
   return constraints;
 }
 
-async function preferTrackProfile(track: MediaStreamTrack, mode: "environment" | "user") {
+async function preferTrackProfile(track: MediaStreamTrack, mode: "environment" | "user", documentFraming = false) {
   const preferredProfile = getPreferredVideoProfile(track);
   let supportsContinuousFocus = false;
 
@@ -148,7 +153,7 @@ async function preferTrackProfile(track: MediaStreamTrack, mode: "environment" |
 
   const applyProfile = async (profile: VideoCaptureProfile, withContinuousFocus: boolean) => {
     try {
-      await track.applyConstraints(buildTrackConstraints(mode, profile, withContinuousFocus));
+      await track.applyConstraints(buildTrackConstraints(mode, profile, withContinuousFocus, documentFraming));
       return true;
     } catch {
       return false;
@@ -225,7 +230,7 @@ async function captureTrackPhotoDataUrl(stream: MediaStream) {
   return readBlobAsDataUrl(photoBlob);
 }
 
-export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVideo, onSwitchCamera }: MediaCaptureScreenProps) {
+export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVideo, onSwitchCamera, documentFraming = false }: MediaCaptureScreenProps) {
   const photoInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -251,6 +256,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
   const [showSupportMessage, setShowSupportMessage] = useState(false);
   const [recording, setRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [streamSize, setStreamSize] = useState("");
 
   const useLiveCamera = shouldUseLiveCameraCapture();
   const useAppleMobile = isAppleMobileDevice();
@@ -315,7 +321,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
       let stream: MediaStream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: getPreferredCameraVideoConstraints(mode),
+          video: documentFraming ? getDocumentStreamConstraints(mode) : getPreferredCameraVideoConstraints(mode),
           audio: false
         });
       } catch {
@@ -334,8 +340,13 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
       streamRef.current = stream;
       const videoTrack = stream.getVideoTracks()[0];
       if (videoTrack) {
-        activeVideoProfileRef.current = await preferTrackProfile(videoTrack, mode);
+        activeVideoProfileRef.current = await preferTrackProfile(videoTrack, mode, documentFraming);
         updateTrackContentHint(false);
+        try {
+          setStreamSize(describeStreamSize(videoTrack.getSettings?.() ?? {}));
+        } catch {
+          setStreamSize("");
+        }
       }
 
       if (videoRef.current && useLivePreview) {
@@ -423,8 +434,18 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
       if (stream) {
         try {
           photoDataUrl = await captureTrackPhotoDataUrl(stream);
-        } catch {
+        } catch (error) {
           photoDataUrl = "";
+          if (documentFraming) {
+            reportAppError(error, {
+              severity: "warning",
+              source: "media-capture",
+              action: "image-capture-take-photo",
+              component: "MediaCaptureScreen",
+              screen: "TelaCameraMidia",
+              payload: { streamSize, fallback: "quadro inteiro do video" }
+            });
+          }
         }
       }
       if (!photoDataUrl && video) photoDataUrl = await captureVideoFrameDataUrlAsync(video);
@@ -652,7 +673,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
       <section className="main-panel photo-main">
         <article className="photo-card camera-capture-card">
           <div className="photo-body">
-            <div className="camera-view real-camera-view native-camera-view">
+            <div className="camera-view real-camera-view native-camera-view" data-stream-size={streamSize || undefined}>
               {useLivePreview ? (
                 <>
                   <video
