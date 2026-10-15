@@ -18,3 +18,5 @@ plugins/ExpenseUpload/ExpenseUpload.snk
 
 # Memória local de sessões (Memsearch)
 .memsearch/
+
+.worktrees/
