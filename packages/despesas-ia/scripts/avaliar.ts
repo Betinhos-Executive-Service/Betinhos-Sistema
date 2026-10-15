@@ -13,12 +13,15 @@ if (semRotulo.length) throw new Error(`Casos sem "esperado": ${semRotulo.map((c)
 // Lê todos os arquivos antes de criar o cliente: arquivo ausente falha aqui, sem nenhuma chamada paga.
 const comprovantesPorCaso = casos.map((caso) => caso.arquivos.map((nome) => ({ mime: MIME[nome.split('.').pop()!.toLowerCase()] ?? 'application/octet-stream', base64: readFileSync(new URL(nome, pasta)).toString('base64') })))
 
+// MODELO_AVALIACAO troca o modelo só nesta avaliação (ex.: comparar Sonnet com o Opus de produção).
+const modeloAvaliacao = process.env.MODELO_AVALIACAO?.trim() || null
 const client = new Anthropic()
 const linhas = []
 for (const [indice, caso] of casos.entries()) {
   const comprovantes = comprovantesPorCaso[indice]!
   try {
-    const msg = await client.messages.create(montarRequisicao(caso.contexto, comprovantes) as unknown as Anthropic.MessageCreateParamsNonStreaming)
+    const req = montarRequisicao(caso.contexto, comprovantes)
+    const msg = await client.messages.create({ ...req, ...(modeloAvaliacao ? { model: modeloAvaliacao } : {}) } as unknown as Anthropic.MessageCreateParamsNonStreaming)
     const r = analisarMensagem(msg as unknown as Parameters<typeof analisarMensagem>[0], caso.contexto)
     linhas.push({ id: caso.id, esperado: caso.esperado, obtido: r.ok ? r.resposta.decisao : null, erro: r.ok ? null : r.erro, resposta: r.ok ? r.resposta : null, uso: msg.usage })
   } catch (e) {
@@ -28,6 +31,7 @@ for (const [indice, caso] of casos.entries()) {
 }
 const acertos = linhas.filter((l) => l.obtido === l.esperado).length
 const resumo = {
+  modelo: modeloAvaliacao ?? 'padrão do pacote',
   total: linhas.length,
   acertos,
   taxaAcerto: acertos / linhas.length,
@@ -35,6 +39,6 @@ const resumo = {
   errosTecnicos: linhas.filter((l) => l.obtido === null).length,
 }
 const carimbo = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')
-writeFileSync(new URL(`../.local/avaliacao-${carimbo}.json`, import.meta.url), JSON.stringify({ resumo, linhas }, null, 2))
+writeFileSync(new URL(`../.local/avaliacao-${carimbo}${modeloAvaliacao ? '-' + modeloAvaliacao : ''}.json`, import.meta.url), JSON.stringify({ resumo, linhas }, null, 2))
 console.log(resumo)
 if (resumo.validacoesIndevidas > 0 || resumo.taxaAcerto < 0.8) process.exit(1)
