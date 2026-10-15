@@ -78,10 +78,11 @@ export function useGeralViewState(o: Options): { state: TableViewState; columnDe
     const entries = o.views.map((v): TableViewEntry => ({
       id: v.id, name: v.nome, scope: v.padrao ? 'padrao' : v.grupo === 'minhas' ? 'pessoal' : 'publica', canEdit: v.grupo === 'minhas', config: baseline,
     }))
+    // Enquanto as visões não chegam (ou se falharam), a barra mostra uma entrada provisória: ela sempre lê a primeira.
+    if (!entries.length) return [{ id: '', name: o.viewsError ? 'Visões indisponíveis' : 'Carregando visões…', scope: 'padrao', canEdit: false, config: baseline }]
     return [...entries.filter((e) => e.scope === 'padrao'), ...entries.filter((e) => e.scope !== 'padrao')]
-  }, [o.views, baseline])
-  const fallback: TableViewEntry = { id: '', name: 'Carregando visões…', scope: 'padrao', canEdit: false, config: baseline }
-  const active = views.find((e) => e.id === o.view?.id) ?? views[0] ?? fallback
+  }, [o.views, o.viewsError, baseline])
+  const active = views.find((e) => e.id === o.view?.id) ?? views[0]
 
   const { setPrefs, setSort, setFilters, columns, prefs, sort, filters } = o
   const setConfig = useCallback((update: (c: ViewConfig) => ViewConfig) => {
@@ -113,7 +114,7 @@ export function useGeralViewState(o: Options): { state: TableViewState; columnDe
   const { selectView, reloadViews, createView, updateView, renameView, deleteView } = o
   const restore = useCallback(() => {
     const padrao = views.find((e) => e.scope === 'padrao') ?? views[0]
-    if (!padrao) return
+    if (!padrao?.id) return
     if (padrao.id !== active.id) { selectView(padrao.id); return }
     // Já na padrão: tira as mudanças da tela (colunas, ordem e filtros).
     setPrefs(null)
