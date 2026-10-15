@@ -1,12 +1,14 @@
-import { CP, FAT, OP, PAG } from './codes'
+import { CP, FAT, OP, PAG, RESERVA_CONCLUIDA } from './codes'
 import type { OpResumo, PaganteResumo, Pendencia, Reserva, TipoPendencia } from './types'
 
 const cents = (v: number | null | undefined) => Math.round((v ?? 0) * 100)
 const isPago = (s: number | null) => s === PAG.pago || s === PAG.autorizado
+/** 'AAAA-MM' no fuso de São Paulo (UTC-3, sem horário de verão). */
+export const mesSP = (d: Date) => new Date(d.getTime() - 3 * 3600e3).toISOString().slice(0, 7)
 const latest = (rs: Reserva[]) => rs.reduce<Date | null>((d, r) => (r.saida && (!d || r.saida > d) ? r.saida : d), null)
 
 /** Espelha spec §3: só aponta o que o motor corrigiria (1, 3) ou o que precisa de gente (2, 5). */
-export function detectarPendencias(ops: OpResumo[], reservas: Reserva[], pagantes: PaganteResumo[]): Pendencia[] {
+export function detectarPendencias(ops: OpResumo[], reservas: Reserva[], pagantes: PaganteResumo[], agora = new Date()): Pendencia[] {
   const out: Pendencia[] = []
   const porOp = new Map<string, Reserva[]>()
   for (const r of reservas) if (r.opId) porOp.set(r.opId, [...(porOp.get(r.opId) ?? []), r])
@@ -14,11 +16,11 @@ export function detectarPendencias(ops: OpResumo[], reservas: Reserva[], pagante
   for (const p of pagantes) pagsPorOp.set(p.opId, [...(pagsPorOp.get(p.opId) ?? []), p])
   const jaListadas = new Set<string>()
 
-  const push = (tipo: TipoPendencia, o: OpResumo | null, rs: Reserva[], detalhe: string, corrigivel: boolean, extra?: { id?: string; valor?: number | null }) => {
+  const push = (tipo: TipoPendencia, o: OpResumo | null, rs: Reserva[], detalhe: string, corrigivel: boolean, extra?: { id?: string; valor?: number | null; mes?: string }) => {
     const valor = extra?.valor !== undefined ? extra.valor : o?.valor ?? (rs.length ? rs.reduce((s, r) => s + (r.cpValor ?? 0), 0) : null)
     out.push({
       id: extra?.id ?? `${tipo}:${o?.id ?? rs[0]?.id}`, tipo, opId: o?.id ?? null, opCodigo: o?.codigo ?? '', reservaIds: rs.map((r) => r.id), reservaCodigos: rs.map((r) => r.codigo),
-      cliente: o?.cliente || rs[0]?.cliente || '', data: latest(rs), valor, detalhe, corrigivel,
+      cliente: o?.cliente || rs[0]?.cliente || '', clienteId: rs[0]?.clienteId ?? '', mes: extra?.mes ?? null, data: latest(rs), valor, detalhe, corrigivel,
     })
   }
 
@@ -51,6 +53,20 @@ export function detectarPendencias(ops: OpResumo[], reservas: Reserva[], pagante
     const o = r.opId ? opPorId.get(r.opId) : undefined
     if (o?.status === OP.paga) continue
     push('pago-sem-op-paga', o ?? null, [r], o ? `OP ${o.codigo} não está paga` : 'Sem OP', false, { id: `pago-sem-op-paga:${r.id}`, valor: r.cpValor })
+  }
+  // Tipo 4: serviços mensais concluídos sem OP em mês já encerrado (São Paulo), um por cliente e mês.
+  const mesAtual = mesSP(agora)
+  const mensais = new Map<string, Reserva[]>()
+  for (const r of reservas) {
+    if (r.status !== RESERVA_CONCLUIDA || r.fatStatus !== FAT.mensal || r.opId != null || !r.saida || !r.clienteId) continue
+    const mes = mesSP(r.saida)
+    if (mes >= mesAtual) continue
+    const k = `${r.clienteId}|${mes}`
+    mensais.set(k, [...(mensais.get(k) ?? []), r])
+  }
+  for (const [k, rs] of mensais) {
+    const [clienteId, mes] = k.split('|')
+    push('mensal-sem-op', null, rs, `${rs.length} serviço(s) de ${mes}`, false, { id: `mensal-sem-op:${clienteId}:${mes}`, valor: rs.reduce((s, r) => s + (r.cpValor ?? 0), 0), mes })
   }
   return out.sort((a, b) => (b.data?.getTime() ?? 0) - (a.data?.getTime() ?? 0))
 }

@@ -18,6 +18,7 @@ import { PendenciasToolbar } from './components/PendenciasToolbar'
 import { PendenciasCards, PendenciasTable } from './components/PendenciasList'
 import { PendenciaDrawer } from './components/PendenciaDrawer'
 import { CorrigirDialog } from './components/CorrigirDialog'
+import { FecharMesDialog } from './components/FecharMesDialog'
 import '../pagantes/pagantes.css'
 import './pendencias.css'
 
@@ -68,6 +69,7 @@ function Pendencias({ host }: Props) {
   // O Gerar Pagantes aberto por cima da tela também vive na URL: `gerar=<id da OP>`.
   const [gerarOpId, setGerarOpId] = useQueryId('gerar')
   const [corrigir, setCorrigir] = useState<Pendencia | null>(null)
+  const [fecharMes, setFecharMes] = useState<Pendencia | null>(null)
   const frameUrl = gerarOpId ? pagantes.gerarPagantesUrl(gerarOpId) : null
 
   const refresh = useCallback(() => { void pend.reload() }, [pend.reload])
@@ -78,12 +80,14 @@ function Pendencias({ host }: Props) {
     onCorrigir: (p: Pendencia) => { setSelectedId(null); setCorrigir(p) },
     onAbrirOp: (opId: string) => { window.location.hash = hrefFor('ops', { abrir: opId }) },
     onVerServico: (reservaId: string) => { window.location.hash = hrefFor('geral', { abrir: reservaId }) },
-    onRateio: (p: Pendencia) => {
-      if (!p.opId) return
-      if (!pagantes.gerarPagantesUrl(p.opId)) { toast({ tone: 'info', message: 'O Gerar Pagantes só abre dentro do Dataverse.' }); return }
-      setSelectedId(null)
-      setGerarOpId(p.opId)
-    },
+    onRateio: (p: Pendencia) => { if (p.opId) abrirGerarPagantes(p.opId) },
+    onFecharMes: (p: Pendencia) => { setSelectedId(null); setFecharMes(p) },
+  }
+
+  function abrirGerarPagantes(opId: string) {
+    if (!pagantes.gerarPagantesUrl(opId)) { toast({ tone: 'info', message: 'O Gerar Pagantes só abre dentro do Dataverse.' }); return }
+    setSelectedId(null)
+    setGerarOpId(opId)
   }
 
   const closeFrame = useCallback((reload: boolean) => { setGerarOpId(null); if (reload) refresh() }, [refresh, setGerarOpId])
@@ -139,6 +143,8 @@ function Pendencias({ host }: Props) {
       <PendenciaDrawer pendencia={current} onClose={() => setSelectedId(null)} {...acoes} />
       <CorrigirDialog pendencia={corrigir} source={source} onClose={() => setCorrigir(null)}
         onApplied={(n) => { setCorrigir(null); toast({ tone: 'success', message: n === 1 ? '1 alteração aplicada.' : `${n} alterações aplicadas.` }); refresh() }} />
+      <FecharMesDialog pendencia={fecharMes} source={source} onClose={() => setFecharMes(null)}
+        onDone={(r) => { setFecharMes(null); toast({ tone: 'success', message: `OP criada com ${r.reservas} serviço(s).` }); refresh(); abrirGerarPagantes(r.opId) }} />
       <SaveViewDialog open={saving} onClose={() => setSaving(false)} onSave={saveView} />
       <GerarPagantesFrame url={frameUrl} onClose={closeFrame} />
     </PageLayout>

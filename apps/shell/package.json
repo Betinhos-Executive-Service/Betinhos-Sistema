@@ -1,7 +1,7 @@
 {
   "name": "@betinhos/shell",
   "private": true,
-  "version": "0.0.33",
+  "version": "0.0.37",
   "type": "module",
   "scripts": {
     "dev": "node ../../packages/deploy/dev-restart.mjs 36472 .",
@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@betinhos/dataverse": "workspace:*",
-    "@betinhos/ui": "workspace:*",
+    "@betinhos/ui": "npm:@betinhos-executive-service/ui@^1.8.0",
     "lucide-react": "^1.47.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

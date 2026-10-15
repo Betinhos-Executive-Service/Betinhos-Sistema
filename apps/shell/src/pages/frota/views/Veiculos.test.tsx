@@ -10,7 +10,7 @@ import { Veiculos } from './Veiculos'
 
 const source = createMockSource()
 
-const base: Veiculo = { id: 'v1', placa: 'TST1A11', marca: 'Toyota', modelo: 'Corolla', cor: null, anoModelo: null, status: VEICULO.ATIVO, categoria: null, motorista: { id: 'f1', label: 'Ana' } }
+const base: Veiculo = { id: 'v1', placa: 'TST1A11', marca: 'Toyota', modelo: 'Corolla', cor: null, anoModelo: null, status: VEICULO.ATIVO, categoria: null, motorista: { id: 'f1', label: 'Ana' }, hodometro: null, hodometroEm: null }
 const data: FrotaData = {
   ...EMPTY_DATA,
   veiculos: [

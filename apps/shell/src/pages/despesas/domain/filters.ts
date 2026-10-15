@@ -1,14 +1,16 @@
 import { normalizeSearch } from '@betinhos/ui'
 import { PERIODOS, type KV, type Periodo } from '../../pagantes/domain/filters'
+import { suspeitaIA } from './ia'
 import { FINANCEIRO, OPERACIONAL, semComprovante } from './status'
 import type { Despesa } from './types'
 
 export { PERIODOS, periodoStart, type KV, type Periodo } from '../../pagantes/domain/filters'
 
-export type Alerta = 'sem-comprovante' | 'duplicidade'
+export type Alerta = 'sem-comprovante' | 'duplicidade' | 'ia-suspeita'
 export const ALERTAS: { value: Alerta; label: string }[] = [
   { value: 'sem-comprovante', label: 'Sem comprovante' },
   { value: 'duplicidade', label: 'Possível duplicidade' },
+  { value: 'ia-suspeita', label: 'Suspeita da IA' },
 ]
 
 export type Filters = {
@@ -39,6 +41,7 @@ export function filterDespesas(list: Despesa[], f: Filters) {
     if (f.motorista.length && !f.motorista.includes(d.motoristaId)) return false
     if (f.alertas.includes('sem-comprovante') && !semComprovante(d)) return false
     if (f.alertas.includes('duplicidade') && !d.possivelDuplicidade) return false
+    if (f.alertas.includes('ia-suspeita') && !suspeitaIA(d)) return false
     if (words.length) {
       const text = haystack(d)
       if (!words.every((w) => text.includes(w))) return false
@@ -71,6 +74,7 @@ export const BUILTIN_VIEWS: View[] = [
   { id: 'corrigir', nome: 'Precisa corrigir', builtin: true, filters: { ...base(), operacional: [OPERACIONAL.corrigir] } },
   { id: 'sem-comprovante', nome: 'Sem comprovante', builtin: true, filters: { ...base(), alertas: ['sem-comprovante'] } },
   { id: 'duplicidade', nome: 'Possível duplicidade', builtin: true, filters: { ...base(), alertas: ['duplicidade'] } },
+  { id: 'ia-suspeita', nome: 'Suspeitas da IA', builtin: true, filters: { ...base(), alertas: ['ia-suspeita'] } },
 ]
 
 export const VIEWS_KEY = 'betinhos.despesas.visoes.v1'

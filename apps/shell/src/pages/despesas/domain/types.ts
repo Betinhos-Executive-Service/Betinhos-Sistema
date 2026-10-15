@@ -1,4 +1,5 @@
 import type { ChoiceOption } from '@betinhos/dataverse'
+import type { AnaliseIA } from './ia'
 
 /** Despesa Operacional (`cr40f_despesaoperacional`): gasto lançado pelo motorista no App Motoristas. */
 export type Despesa = {
@@ -36,6 +37,8 @@ export type Despesa = {
   criadoPor: string
   alteradoEm: Date | null
   alteradoPor: string
+  /** Colunas `cr40f_ia*`: análise automática do comprovante. */
+  ia: AnaliseIA
 }
 
 /** Comprovante (`cr40f_anexodespesaoperacional`): arquivo no OneDrive/SharePoint, só o link fica no Dataverse. */
