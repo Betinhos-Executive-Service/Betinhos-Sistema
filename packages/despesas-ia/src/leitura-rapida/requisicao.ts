@@ -4,6 +4,8 @@ import { schemaLeituraRapida } from './schema.ts'
 export const MODELO_LEITURA = 'claude-haiku-5-5'
 export const MAX_TOKENS_LEITURA = 1024
 export const EFFORT_LEITURA = 'low'
+/** Sem raciocínio: a resposta vem só com o bloco de texto (o Haiku 5.5 aceita desligar com effort high ou abaixo). */
+export const THINKING_LEITURA = { type: 'disabled' as const }
 export const LIMITE_BASE64_LEITURA = 2_800_000
 const MIMES = ['image/jpeg', 'image/png', 'image/webp']
 
@@ -16,6 +18,7 @@ export function montarRequisicaoLeitura(e: EntradaLeitura) {
     model: MODELO_LEITURA,
     max_tokens: MAX_TOKENS_LEITURA,
     system: SYSTEM_PROMPT_LEITURA,
+    thinking: THINKING_LEITURA,
     output_config: {
       effort: EFFORT_LEITURA,
       format: { type: 'json_schema' as const, schema: schemaLeituraRapida(e.categorias, e.formasPagamento) },
