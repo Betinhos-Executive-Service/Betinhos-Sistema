@@ -1,5 +1,7 @@
 # Alertas proativos de operação
 
+> **Status: substituída em 15/10/2026.** O módulo `server/vigilancia/` do `whatsapp-inbox` (PR 93, mesclado em 14/10/2026) já cobre risco de atraso com trânsito, carro parado, sem sinal e sem programação, com aviso no grupo de WhatsApp da operação, e o chat "Vigilância da operação" o está migrando para um Worker da Cloudflare. Esta spec fica como referência histórica. **Só o resumo diário de documentos e multas segue em frente**, como um flow pequeno de Power Automate: ver a seção "Escopo remanescente" no fim. Não execute o resto (geocoding, Worker, tabela de alertas, e-mail e Teams de atraso), porque duplica o outro módulo e a operação receberia o mesmo atraso duas vezes.
+
 Data: 15/10/2026. Desenho aprovado por Renan no brainstorm desta data e revisado no mesmo dia: o verificador roda em um **Cloudflare Worker no plano grátis**, não no Power Automate. Escopo: Fases 1 e 2 (alertas). A Fase 0 (campo de endereço do Google, em uma cópia do formulário) e a Fase 3 (alertas na tela do Assistente) têm planos próprios.
 
 ## Objetivo
@@ -178,3 +180,25 @@ Aviso ao motorista ou ao cliente, ação automática sobre o serviço, alerta de
 
 - **Fase 0:** campo de endereço do Google (Places), gravando latitude, longitude e identificador do lugar no serviço. **Restrição do Renan (15/10/2026):** a mudança vale só para uma cópia do formulário dentro do Sistema Betinhos. O WebResource ativo no model-driven (`new_formulario_geral.html`, que o shell abre hoje no overlay da tela Geral) não pode ser alterado. A Fase 0 cria um WebResource novo, copiado do código de `Tela Formulário Geral` (um arquivo de mais de 15 mil linhas, com plano próprio), e só aponta o shell para ele (`FORM_WEBRESOURCE` em `apps/shell/src/pages/geral/data/source.ts`) depois da validação do Renan. Enquanto não existir, o geocoding do Worker cobre.
 - **Fase 3:** alertas ativos na página do Assistente de Logística, com "Resolver manualmente". Depende da mescla da branch dos Assistentes.
+
+
+---
+
+## Escopo remanescente: resumo diário de pendências
+
+Decisão do Renan em 15/10/2026: manter só o resumo diário de documentos e multas, como um flow de Power Automate na solução AppBetinhos. Sem Worker, sem tabela nova e sem app do Entra ID. O módulo de vigilância do `whatsapp-inbox` cobre o resto; pelo resumo do PR 93 ele não cobre documentos nem multas (confirmar com o outro chat).
+
+| Item | Decisão |
+|---|---|
+| Quando | 07:00 de Brasília, dias úteis. |
+| O quê | Um único e-mail à operação, só se houver itens: CNH vencida e ASO vencido de motorista escalado hoje; documento Vigente vencido de veículo escalado hoje; multa sem condutor com prazo de indicação em até 3 dias (multa não depende de escala). |
+| Regras | As três últimas linhas da tabela "Regras" acima (CNH ou ASO vencido, documento do veículo vencido, multa sem condutor). |
+| Hospedagem | Flow `Flow Alertas | Resumo diário` no Power Automate, na AppBetinhos, criado desligado e ativado pelo Renan. Ligar e desligar é ativar ou desativar o flow. |
+| Configuração | Variável de ambiente `cr40f_ResumoEmailOperacao` (e-mails separados por ponto e vírgula, valor preenchido pelo Renan) e a referência de conexão do Office 365 Outlook na solução. |
+| Histórico | O próprio e-mail. Falha de execução aparece no histórico do flow e no aviso padrão do Power Automate ao dono. |
+| Conteúdo do e-mail | Apelido do motorista, placa do veículo, nome do documento e código da multa. Sem CPF, RG, telefone, e-mail de passageiro ou nome de passageiro. |
+| Limites | Até 150 serviços do dia e até 150 itens por consulta. |
+| Custo em ações | Cerca de 18 a 26 por execução e 22 execuções por mês, ou seja, de 400 a 600 ações por mês, contra o teto de 10.000 do Renan. É estimativa: a prova mede as ações reais. |
+| Ambiente | Só DEV até pedido explícito. |
+
+Como as consultas filtram: motoristas ativos (`cr40f_status` 0, `cr40f_funcao` 202410000) com `cr40f_validadedacnh` anterior a hoje ou `cr40f_datadoaso` anterior a hoje menos 12 meses; documentos com `cr40f_situacao` 100000000 (Vigente), veículo preenchido e `cr40f_validade` anterior a hoje; multas com `cr40f_status` 202410000 (Notificar o Condutor), motorista vazio e `cr40f_dataparaindicar` até hoje mais 3 dias. "Escalado hoje" é um serviço Confirmado (202410001), Programado (202410005) ou Em Execução (202410006) com saída entre 00:00 e 24:00 de Brasília.
