@@ -16,7 +16,7 @@ export type Pendencia = {
   reservaIds: string[]
   reservaCodigos: string[]
   cliente: string
-  clienteId: string
+  clienteId: string          // confiável só no tipo 4 (nos demais vem da primeira reserva)
   mes: string | null         // 'AAAA-MM' (tipo 4)
   data: Date | null          // saída mais recente das reservas envolvidas
   valor: number | null       // valor da OP, ou soma das CPs

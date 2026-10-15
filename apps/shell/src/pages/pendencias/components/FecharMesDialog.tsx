@@ -42,7 +42,8 @@ export function FecharMesDialog({ pendencia, escolha, source, onClose, onDone }:
     .sort((a, b) => (b.mes ?? '').localeCompare(a.mes ?? '')).map((o) => ({ value: o.mes!, label: formatMes(o.mes) })), [opcoes, clienteId])
 
   // Ao abrir ou trocar as opções, pré-escolhe o primeiro cliente e o mês mais recente dele.
-  useEffect(() => { setFechando(false); setErro(null); setClienteId(clientes[0]?.value ?? null) }, [open, clientes])
+  useEffect(() => { if (open) { setFechando(false); setErro(null) } }, [open])
+  useEffect(() => { setClienteId(clientes[0]?.value ?? null) }, [clientes])
   useEffect(() => { setMes(meses[0]?.value ?? null) }, [meses])
 
   const p = escolha ? (opcoes ?? []).find((o) => o.clienteId === clienteId && o.mes === mes) ?? null : pendencia ?? null
