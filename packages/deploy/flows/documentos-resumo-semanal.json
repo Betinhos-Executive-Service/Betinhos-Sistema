@@ -138,6 +138,7 @@
           "inputs": {
             "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365", "connectionName": "shared_office365", "operationId": "SendEmailV2" },
             "parameters": {
+              "emailMessage/From": "__REMETENTE__",
               "emailMessage/To": "@{parameters('E-mail do administrador dos avisos (new_EmailAdminAvisos)')}",
               "emailMessage/Subject": "Documentos | Resumo semanal falhou",
               "emailMessage/Body": "@{concat('<p>O resumo semanal de documentos falhou na execução ', workflow()?['run']?['name'], '.</p><p>Etapas com problema:</p><pre>', string(body('Falhas')), '</pre>')}",
