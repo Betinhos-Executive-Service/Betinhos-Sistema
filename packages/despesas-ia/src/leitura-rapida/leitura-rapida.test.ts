@@ -26,6 +26,10 @@ describe('montarRequisicaoLeitura', () => {
     expect(r.output_config.format.type).toBe('json_schema')
     expect(r.output_config.effort).toBe('low')
   })
+  it('desliga o raciocínio para a resposta vir só com o bloco de texto', () => {
+    const r = montarRequisicaoLeitura({ imagemBase64: 'AAAA', mime: 'image/jpeg', categorias: [], formasPagamento: [] })
+    expect(r.thinking).toEqual({ type: 'disabled' })
+  })
   it('recusa mime fora de imagem e base64 acima do limite', () => {
     expect(() => montarRequisicaoLeitura({ imagemBase64: 'AAAA', mime: 'application/pdf', categorias: [], formasPagamento: [] })).toThrow('Tipo de imagem não suportado')
     expect(() => montarRequisicaoLeitura({ imagemBase64: 'A'.repeat(2_900_000), mime: 'image/jpeg', categorias: [], formasPagamento: [] })).toThrow('Imagem acima do limite')
@@ -39,6 +43,10 @@ const msg = (o: unknown, stop = 'end_turn') => ({ stop_reason: stop, model: 'cla
 
 describe('interpretarLeitura', () => {
   it('aceita leitura válida', () => expect(interpretarLeitura(msg(base))).toEqual({ ok: true, leitura: base }))
+  it('lê o bloco de texto mesmo quando um bloco thinking vem antes', () => {
+    const m = msg(base)
+    expect(interpretarLeitura({ ...m, content: [{ type: 'thinking', text: '' }, ...m.content] })).toEqual({ ok: true, leitura: base })
+  })
   it('falha quando stop_reason não é end_turn', () => expect(interpretarLeitura(msg(base, 'max_tokens')).ok).toBe(false))
   it('legível sem valor vira ilegível', () => {
     expect(interpretarLeitura(msg({ ...base, valor: null }))).toEqual({ ok: true, leitura: { ...base, valor: null, legivel: false, motivo_ilegivel: 'Valor ou data não identificados.' } })
@@ -54,6 +62,6 @@ import { TEXTO_USUARIO_LEITURA } from './prompt.ts'
 
 describe('constantesDaLeituraRapida', () => {
   it('expõe o que o provisionamento do flow precisa', () => {
-    expect(constantesDaLeituraRapida()).toEqual({ modelo: 'claude-haiku-5-5', maxTokens: 1024, effort: 'low', systemPrompt: SYSTEM_PROMPT_LEITURA, textoUsuario: TEXTO_USUARIO_LEITURA, limiteBase64: 2_800_000 })
+    expect(constantesDaLeituraRapida()).toEqual({ modelo: 'claude-haiku-5-5', maxTokens: 1024, effort: 'low', thinking: { type: 'disabled' }, systemPrompt: SYSTEM_PROMPT_LEITURA, textoUsuario: TEXTO_USUARIO_LEITURA, limiteBase64: 2_800_000 })
   })
 })
