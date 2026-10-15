@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { normalizeSearch } from './Select'
 import { ShellHeaderContext, useShellHeaderEntry, useShellHeaderStore } from './ShellHeader'
 
@@ -89,6 +89,62 @@ function useMediaQuery(query: string) {
   return matches
 }
 
+function renderItem(item: NavItem, className: string, activeId: string) {
+  const active = item.id === activeId
+  return (
+    <li key={item.id}>
+      <a
+        className={className}
+        href={item.href}
+        target={item.external ? '_blank' : undefined}
+        rel={item.external ? 'noreferrer' : undefined}
+        aria-current={active ? 'page' : undefined}
+        data-active={active || undefined}
+      >
+        {item.icon != null ? <span className="bt-shell__item-icon" aria-hidden="true">{item.icon}</span> : null}
+        <span className="bt-shell__item-label">{item.label}</span>
+        {item.badge != null ? <span className="bt-shell__badge">{item.badge}</span> : null}
+        {item.external ? <span className="bt-shell__item-external" aria-label="abre em nova aba">{I.external}</span> : null}
+      </a>
+    </li>
+  )
+}
+
+type NavGroupsProps = { groups: NavGroup[]; openGroups: Set<string>; filtering: boolean; activeId: string; navId: string; onToggle: (id: string) => void }
+
+/**
+ * Lista de grupos em acordeão, memoizada: abrir a gaveta, pousar no trilho ou trocar o popover não a re-renderiza;
+ * só grupos visíveis, grupos abertos, busca ou item ativo.
+ */
+const NavGroups = memo(function NavGroups({ groups, openGroups, filtering, activeId, navId, onToggle }: NavGroupsProps) {
+  return (
+    <div className="bt-shell__groups">
+      {groups.length === 0 ? <p className="bt-shell__empty">Nenhuma tela com esse nome.</p> : null}
+      {groups.map((group, index) => {
+        const open = filtering || openGroups.has(group.id)
+        const panelId = `${navId}-${group.id}`
+        const firstAdmin = group.admin && !groups[index - 1]?.admin
+        return (
+          <section key={group.id} className="bt-shell__group" data-open={open || undefined}>
+            {firstAdmin ? <p className="bt-shell__section-label">Administração</p> : null}
+            <button type="button" className="bt-shell__group-toggle" aria-expanded={open} aria-controls={panelId} onClick={(event) => { event.currentTarget.blur(); onToggle(group.id) }}>
+              {group.icon != null ? <span className="bt-shell__group-icon" aria-hidden="true">{group.icon}</span> : null}
+              <span className="bt-shell__group-label">{group.label}</span>
+              {!open ? <span className="bt-shell__group-count" aria-hidden="true">{group.items.length}</span> : null}
+              <span className="bt-shell__group-chevron" aria-hidden="true">{I.chevron}</span>
+            </button>
+            <div className="bt-shell__panel">
+              <ul id={panelId} className="bt-shell__items">
+                {group.items.map((item) => renderItem(item, 'bt-shell__item', activeId))}
+              </ul>
+            </div>
+          </section>
+        )
+      })}
+    </div>
+  )
+})
+
 /**
  * Chrome persistente: navegação navy à esquerda com dois desenhos independentes, sidebar de 238px
  * (grupos em acordeão, busca, rodapé) e trilho de 72px (só ícones, popover ao pousar). No celular a
@@ -149,11 +205,11 @@ export function AppShell({ brand, groups, activeId, title, headerActions, status
     setPopover(null)
   }
   const openGroup = (id: string) => setOpenGroups((current) => new Set(current).add(id))
-  const toggleGroup = (id: string) => setOpenGroups((current) => {
+  const toggleGroup = useCallback((id: string) => setOpenGroups((current) => {
     const next = new Set(current)
     if (!next.delete(id)) next.add(id)
     return next
-  })
+  }), [])
   const focusSearch = () => window.setTimeout(() => searchRef.current?.focus(), 50)
 
   // Popover do trilho: abre ao pousar no grupo, fecha 120ms depois de sair (dá tempo de entrar nele).
@@ -182,27 +238,6 @@ export function AppShell({ brand, groups, activeId, title, headerActions, status
       if (rail) setCollapsedPersist(false)
       focusSearch()
     }
-  }
-
-  const renderItem = (item: NavItem, className: string) => {
-    const active = item.id === activeId
-    return (
-      <li key={item.id}>
-        <a
-          className={className}
-          href={item.href}
-          target={item.external ? '_blank' : undefined}
-          rel={item.external ? 'noreferrer' : undefined}
-          aria-current={active ? 'page' : undefined}
-          data-active={active || undefined}
-        >
-          {item.icon != null ? <span className="bt-shell__item-icon" aria-hidden="true">{item.icon}</span> : null}
-          <span className="bt-shell__item-label">{item.label}</span>
-          {item.badge != null ? <span className="bt-shell__badge">{item.badge}</span> : null}
-          {item.external ? <span className="bt-shell__item-external" aria-label="abre em nova aba">{I.external}</span> : null}
-        </a>
-      </li>
-    )
   }
 
   const avatar = user ? (
@@ -275,30 +310,7 @@ export function AppShell({ brand, groups, activeId, title, headerActions, status
             </label>
           ) : null}
 
-          <div className="bt-shell__groups">
-            {visible.length === 0 ? <p className="bt-shell__empty">Nenhuma tela com esse nome.</p> : null}
-            {visible.map((group, index) => {
-              const open = filtering || openGroups.has(group.id)
-              const panelId = `${navId}-${group.id}`
-              const firstAdmin = group.admin && !visible[index - 1]?.admin
-              return (
-                <section key={group.id} className="bt-shell__group" data-open={open || undefined}>
-                  {firstAdmin ? <p className="bt-shell__section-label">Administração</p> : null}
-                  <button type="button" className="bt-shell__group-toggle" aria-expanded={open} aria-controls={panelId} onClick={(event) => { event.currentTarget.blur(); toggleGroup(group.id) }}>
-                    {group.icon != null ? <span className="bt-shell__group-icon" aria-hidden="true">{group.icon}</span> : null}
-                    <span className="bt-shell__group-label">{group.label}</span>
-                    {!open ? <span className="bt-shell__group-count" aria-hidden="true">{group.items.length}</span> : null}
-                    <span className="bt-shell__group-chevron" aria-hidden="true">{I.chevron}</span>
-                  </button>
-                  <div className="bt-shell__panel">
-                    <ul id={panelId} className="bt-shell__items">
-                      {group.items.map((item) => renderItem(item, 'bt-shell__item'))}
-                    </ul>
-                  </div>
-                </section>
-              )
-            })}
-          </div>
+          <NavGroups groups={visible} openGroups={openGroups} filtering={filtering} activeId={activeId} navId={navId} onToggle={toggleGroup} />
 
           <div className="bt-shell__foot">
             {footer}
@@ -328,7 +340,7 @@ export function AppShell({ brand, groups, activeId, title, headerActions, status
         <div className="bt-shell__popover" role="menu" aria-label={popoverGroup.label} style={{ top: popover?.top }} onMouseEnter={keepPopover} onMouseLeave={hidePopover}>
           <p className="bt-shell__popover-title">{popoverGroup.label}</p>
           <ul className="bt-shell__popover-items">
-            {popoverGroup.items.map((item) => renderItem(item, 'bt-shell__popover-item'))}
+            {popoverGroup.items.map((item) => renderItem(item, 'bt-shell__popover-item', activeId))}
           </ul>
         </div>
       ) : null}

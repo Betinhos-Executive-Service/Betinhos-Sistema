@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MANUT, VEICULO } from '../data/schema'
 import { EMPTY_DATA, type DataSource } from '../data/source'
 import type { FrotaData } from '../data/types'
+import { createMockDocsSource } from '../../documentos/data/source'
 import { FichaVeiculo } from './FichaVeiculo'
 import { ToastProvider } from '@betinhos/ui'
 
@@ -110,5 +111,31 @@ describe('FichaVeiculo', () => {
     render(<FichaVeiculo errors={{}} source={source} id="v1" data={data} today="2026-10-02" onClose={() => {}} onOpen={() => {}} onReload={onReload} />)
     fireEvent.click(screen.getByRole('button', { name: /Abrir cadastro/ }))
     await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1))
+  })
+
+  it('mostra a seção Documentos quando há fonte de documentos', async () => {
+    render(<ToastProvider><FichaVeiculo errors={{}} source={source} id="v1" data={data} today="2026-10-02" docs={createMockDocsSource()} onClose={() => {}} onOpen={() => {}} onReload={() => {}} /></ToastProvider>)
+    expect(screen.getByRole('heading', { name: 'Documentos' })).toBeTruthy()
+    // O mock de documentos usa os mesmos ids do mock da Frota: o checklist do v1 aparece.
+    expect(await screen.findByRole('listitem', { name: 'CRLV / Licenciamento' })).toBeTruthy()
+  })
+
+  it('Esc no diálogo de excluir arquivo fecha só o diálogo, não a ficha', async () => {
+    const docs = createMockDocsSource()
+    const dados = await docs.carregar()
+    const crlv = dados.docs.find((d) => d.donoId === 'v1' && d.tipoId === 't-crlv')!
+    await docs.enviarArquivo(crlv, new File(['x'], 'crlv.pdf', { type: 'application/pdf' }))
+    const onClose = vi.fn()
+    render(<ToastProvider><FichaVeiculo errors={{}} source={source} id="v1" data={data} today="2026-10-02" docs={docs} onClose={onClose} onOpen={() => {}} onReload={() => {}} /></ToastProvider>)
+    fireEvent.click(await screen.findByRole('button', { name: 'Excluir crlv.pdf' }, { timeout: 8000 }))
+    const confirmar = await screen.findByRole('dialog', { name: 'Excluir arquivo?' })
+    fireEvent(confirmar, new Event('cancel', { cancelable: true }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Excluir arquivo?' })).toBeNull())
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('não mostra a seção Documentos sem fonte de documentos', () => {
+    render(<FichaVeiculo errors={{}} source={source} id="v1" data={data} today="2026-10-02" onClose={() => {}} onOpen={() => {}} onReload={() => {}} />)
+    expect(screen.queryByRole('heading', { name: 'Documentos' })).toBeNull()
   })
 })

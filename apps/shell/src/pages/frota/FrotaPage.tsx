@@ -1,5 +1,5 @@
 import { RefreshCw } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Alert, Button, StatusBadge, Tabs, ToastProvider, useShellHeader } from '@betinhos/ui'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
@@ -10,16 +10,17 @@ import { RegistroDrawer } from './components/RegistroDrawer'
 import { Carregando, ViewGate } from './components/Ui'
 import { todaySP } from './data/dates'
 import { createFrotaSource } from './data/hostSource'
-import { EMPTY_DATA, type Classificacao, type DataSource, type LoadResult } from './data/source'
+import { EMPTY_DATA, type Classificacao, type DataSource } from './data/source'
 import type { Kind, TableKey } from './data/types'
 import { errorMessage } from './data/xrm'
+import { createDocsSource, type DocsSource } from '../documentos/data/source'
 import { buildPendencias } from './domain/pendencias'
-import { liberarFlows } from './domain/transitions'
 import { Indicadores } from './views/Indicadores'
 import { Pendencias } from './views/Pendencias'
 import { PlanoPreventivo } from './views/PlanoPreventivo'
 import { Registros } from './views/Registros'
 import { Veiculos } from './views/Veiculos'
+import { useFrotaCarga } from './useFrotaCarga'
 import './frota.css'
 
 export type Tab = 'pendencias' | 'veiculos' | 'manutencoes' | 'ocorrencias' | 'indicadores' | 'plano'
@@ -53,9 +54,10 @@ export function FrotaPage({ host }: { host: Host }) {
   const [state] = useState(() => {
     try { return { source: createFrotaSource(host), error: null } } catch (reason) { return { source: null, error: errorMessage(reason) } }
   })
+  const docs = useMemo(() => { try { return createDocsSource(host) } catch { return null } }, [host])
   return (
     <ToastProvider>
-      {state.source ? <Frota source={state.source} /> : (
+      {state.source ? <Frota source={state.source} docs={docs} /> : (
         <PageLayout eyebrow="Frota" title="Frota">
           <Alert tone="danger" title="Não foi possível abrir a Frota">{state.error}. Abra o Sistema Betinhos pelo Dataverse.</Alert>
         </PageLayout>
@@ -65,29 +67,12 @@ export function FrotaPage({ host }: { host: Host }) {
 }
 
 /** Página com a fonte já resolvida; exportada para os testes. */
-export function Frota({ source }: { source: DataSource }) {
-  const [result, setResult] = useState<LoadResult | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [fatal, setFatal] = useState<string | null>(null)
+export function Frota({ source, docs }: { source: DataSource; docs?: DocsSource | null }) {
+  const { result, setResult, loading, fatal, reload } = useFrotaCarga(source)
   const route = useFrotaRota()
   const registro = route.registro
   const setRegistro = (next: { kind: Kind; id: string } | null) => patchHashQuery({ registro: next ? `${next.kind}:${next.id}` : null })
   const today = todaySP()
-
-  const reload = useCallback(async () => {
-    setLoading(true)
-    setFatal(null)
-    try {
-      setResult(await source.load())
-      liberarFlows()
-    } catch (reason) {
-      setFatal(errorMessage(reason))
-    } finally {
-      setLoading(false)
-    }
-  }, [source])
-
-  useEffect(() => { void reload() }, [reload])
 
   /** Aplica a classificação de uma manutenção sem recarregar todas as tabelas. */
   const aplicarClassificacao = useCallback((id: string, c: Classificacao) => {
@@ -138,7 +123,7 @@ export function Frota({ source }: { source: DataSource }) {
         </Tabs>
       </div>
 
-      {result && !fatal && route.veiculo && !registro ? <FichaVeiculo errors={errors} source={source} id={route.veiculo} secao={route.secao} data={data} today={today} onClose={() => patchHashQuery({ ficha: null, secao: null, fde: null, fate: null })} onOpen={onOpen} onReload={onReload} /> : null}
+      {result && !fatal && route.veiculo && !registro ? <FichaVeiculo errors={errors} source={source} docs={docs} id={route.veiculo} secao={route.secao} data={data} today={today} onClose={() => patchHashQuery({ ficha: null, secao: null, fde: null, fate: null })} onOpen={onOpen} onReload={onReload} /> : null}
       {registro ? <RegistroDrawer key={`${registro.kind}-${registro.id}`} source={source} kind={registro.kind} id={registro.id} data={data} onClose={() => setRegistro(null)} onChanged={onReload} onClassificado={aplicarClassificacao} onOpenVeiculo={onOpenVeiculo} /> : null}
     </PageLayout>
   )

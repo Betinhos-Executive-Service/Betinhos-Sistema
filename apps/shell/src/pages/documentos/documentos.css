@@ -1,0 +1,69 @@
+/* Documentos: central, checklist e drawers. Só tokens do Design System. */
+.doc-muted { margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.doc-form { display: grid; gap: var(--bt-space-3); container-type: inline-size; }
+.doc-form__datas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--bt-space-3); }
+@container (max-width: 420px) { .doc-form__datas { grid-template-columns: minmax(0, 1fr); } }
+.doc-checklist { display: grid; gap: var(--bt-space-2); }
+.doc-checklist__title { margin: 0; font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); letter-spacing: 0.08em; text-transform: uppercase; color: var(--bt-color-text-secondary); }
+.doc-checklist__list, .doc-item__historico { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
+.doc-item { display: grid; gap: var(--bt-space-1-5); padding: var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); }
+.doc-item__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--bt-space-2); }
+.doc-item__nome { font-size: var(--bt-font-size-14); color: var(--bt-color-text-primary); }
+.doc-item__acoes { display: flex; flex-wrap: wrap; gap: var(--bt-space-1); }
+.doc-item__estado { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1); }
+.doc-contador { display: inline-grid; place-items: center; min-width: 16px; height: 16px; padding: 0 var(--bt-space-1); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-full); background-color: var(--bt-color-surface-neutral); color: var(--bt-color-text-primary); font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); line-height: 1; font-variant-numeric: tabular-nums; }
+/* Arquivos do vigente sempre à vista: um chip por arquivo (abrir) com a lixeira ao lado. */
+.doc-arquivos { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1-5); min-width: 0; }
+.doc-arquivos__lista { display: flex; flex-wrap: wrap; gap: var(--bt-space-1-5); min-width: 0; margin: 0; padding: 0; list-style: none; }
+.doc-arquivos__skeleton { max-width: 240px; border-radius: var(--bt-radius-sm); }
+.doc-arq { display: inline-flex; align-items: center; max-width: 100%; min-width: 0; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-sm); background-color: var(--bt-color-surface); }
+.doc-arq__abrir { display: inline-flex; align-items: center; gap: var(--bt-space-1-5); min-width: 0; min-height: var(--bt-control-height-compact); padding: 0 var(--bt-space-1) 0 var(--bt-space-2); border: 0; border-radius: var(--bt-radius-sm); background: transparent; color: var(--bt-color-action); font: inherit; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); cursor: pointer; transition: background-color var(--bt-duration-fast) ease; }
+.doc-arq__abrir svg { flex: none; }
+.doc-arq__abrir:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+.doc-arq__nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-arq__excluir { color: var(--bt-color-text-secondary); }
+@media (hover: hover) and (pointer: fine) {
+  .doc-arq__abrir:hover { background-color: var(--bt-color-surface-soft); }
+  .doc-arq__excluir:hover { color: var(--bt-color-danger); }
+}
+.doc-link { padding: 0; border: 0; background: transparent; color: var(--bt-color-action); font: inherit; font-size: var(--bt-font-size-13); text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.doc-link:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); border-radius: var(--bt-radius-xs); }
+
+/* Central #/documentos */
+/* KPIs: colunas pela largura do próprio bloco (container query), que já desconta menu lateral e margens da página.
+   Largura mínima do card = 14 + 14 de padding + 2 de borda + 42 de ícone + 12 de espaço + ~80 do rótulo mais longo ("31 a 60 dias") ~= 164px; usamos 176px.
+   Em celular (<= 560px) o MetricCard encolhe (padding 10, ícone 32, espaço 8) e o mínimo cai para ~142px; duas colunas só a partir de 308px (cards >= 150px). */
+.doc-kpis { container-type: inline-size; }
+.doc-kpis__grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--bt-space-2); }
+@container (min-width: 308px) {
+  .doc-kpis__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .doc-kpis__grid > :last-child { grid-column: 1 / -1; }
+}
+@container (min-width: 544px) {
+  .doc-kpis__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .doc-kpis__grid > :last-child { grid-column: auto; }
+}
+@container (min-width: 912px) {
+  .doc-kpis__grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+.doc-kpi { display: block; padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; border-radius: var(--bt-radius-lg); }
+.doc-kpi:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+.doc-kpi[aria-pressed="true"] > * { border-color: var(--bt-color-action); }
+.doc-toolbar__search { flex: 1 1 260px; min-width: 200px; max-width: 360px; }
+.doc-toolbar__select { flex: 0 1 220px; min-width: 170px; }
+.doc-dono { display: grid; gap: var(--bt-space-0-5); }
+.doc-dono span { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.doc-acoes { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); }
+.doc-cards { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
+
+/* Configurações */
+.doc-fieldset { display: grid; gap: var(--bt-space-1-5); margin: 0; padding: 0; border: 0; }
+.doc-fieldset legend { margin-bottom: var(--bt-space-1); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-primary); }
+.doc-acoes--cheia { display: flex; }
+.doc-acoes__select { flex: 1 1 220px; min-width: 0; }
+
+/* Linha e cartão da central abrem a renovação (o botão Renovar continua como atalho de teclado). */
+.doc-table--clicavel .bt-table__row, .doc-item--clicavel { cursor: pointer; transition: background-color var(--bt-duration-fast) ease; }
+@media (hover: hover) and (pointer: fine) {
+  .doc-table--clicavel .bt-table__row:hover, .doc-item--clicavel:hover { background-color: var(--bt-color-surface-soft); }
+}
