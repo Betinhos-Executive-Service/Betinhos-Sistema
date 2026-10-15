@@ -24,7 +24,7 @@ function encodePhotoCanvas(canvas: HTMLCanvasElement) {
   return canvas.toDataURL(PHOTO_OUTPUT_MIME_TYPE, PHOTO_OUTPUT_QUALITY);
 }
 
-function encodePhotoCanvasAsync(canvas: HTMLCanvasElement) {
+function encodePhotoCanvasAsync(canvas: HTMLCanvasElement, quality = PHOTO_OUTPUT_QUALITY) {
   return new Promise<string>((resolve) => {
     canvas.toBlob((blob) => {
       if (!blob) {
@@ -35,7 +35,7 @@ function encodePhotoCanvasAsync(canvas: HTMLCanvasElement) {
       reader.onload = () => resolve(String(reader.result ?? ""));
       reader.onerror = () => resolve(encodePhotoCanvas(canvas));
       reader.readAsDataURL(blob);
-    }, PHOTO_OUTPUT_MIME_TYPE, PHOTO_OUTPUT_QUALITY);
+    }, PHOTO_OUTPUT_MIME_TYPE, quality);
   });
 }
 
@@ -98,7 +98,7 @@ export function captureVideoFrameDataUrl(video: HTMLVideoElement, orientationAng
   return encodePhotoCanvas(canvas);
 }
 
-export async function captureVideoFrameDataUrlAsync(video: HTMLVideoElement, orientationAngle = getViewportOrientationAngle()) {
+export async function captureVideoFrameDataUrlAsync(video: HTMLVideoElement, orientationAngle = getViewportOrientationAngle(), quality = PHOTO_OUTPUT_QUALITY) {
   const sourceWidth = video.videoWidth;
   const sourceHeight = video.videoHeight;
   const normalizedAngle = normalizeAngle(orientationAngle);
@@ -116,7 +116,7 @@ export async function captureVideoFrameDataUrlAsync(video: HTMLVideoElement, ori
   if (!context) return "";
 
   context.drawImage(video, 0, 0, canvas.width, canvas.height);
-  return encodePhotoCanvasAsync(canvas);
+  return encodePhotoCanvasAsync(canvas, quality);
 }
 
 export function readFileAsDataUrl(file: File): Promise<string> {

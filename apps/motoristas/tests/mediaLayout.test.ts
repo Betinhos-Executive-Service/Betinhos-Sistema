@@ -121,6 +121,9 @@ test("foto android prioriza ImageCapture e jpeg com baixa compressao", () => {
   assert.match(mediaCaptureScreen, /readBlobAsDataUrl\(photoBlob\)/);
   assert.match(mediaCaptureScreen, /if \(!photoDataUrl && video\) photoDataUrl = await captureVideoFrameDataUrlAsync\(video\);/);
   assert.match(photoOrientation, /const PHOTO_OUTPUT_QUALITY = 0\.98;/);
+  // Comprovante: não espera o takePhoto; vai direto ao quadro do vídeo com a qualidade do plano.
+  assert.match(mediaCaptureScreen, /if \(!capturePlan\.useSensorPhoto && video\) \{\s*photoDataUrl = await captureVideoFrameDataUrlAsync\(video, undefined, capturePlan\.jpegQuality\);/);
+  assert.match(mediaCaptureScreen, /\} else if \(stream\) \{/);
 });
 
 test("camera pendente mostra suporte apos um segundo", () => {

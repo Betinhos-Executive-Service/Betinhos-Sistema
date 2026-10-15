@@ -28,17 +28,11 @@ test("descreve o tamanho real do stream e a proporção", () => {
   assert.equal(describeStreamSize({}), "desconhecido");
 });
 
-test("comprovante: foto do takePhoto com proporção diferente da prévia é descartada (usa o quadro inteiro)", async () => {
-  const { chooseDocumentCaptureSource } = await import("../src/lib/cameraConstraints.ts");
-  const preview = { width: 1440, height: 1920 };
-  // Caso do celular do Renan (15/10 15:40): prévia 3:4, takePhoto devolveu 9:16 cortado nas laterais.
-  assert.equal(chooseDocumentCaptureSource({ width: 1080, height: 1920 }, preview), "frame");
-  assert.equal(chooseDocumentCaptureSource({ width: 2296, height: 4080 }, preview), "frame");
-  // Mesma proporção (retrato ou paisagem com EXIF): mantém a foto do sensor.
-  assert.equal(chooseDocumentCaptureSource({ width: 3072, height: 4080 }, preview), "photo");
-  assert.equal(chooseDocumentCaptureSource({ width: 4080, height: 3072 }, preview), "photo");
-  assert.equal(chooseDocumentCaptureSource({ width: 3000, height: 4000 }, preview), "photo");
-  // Sem como conferir a foto: prefere o quadro que o motorista viu. Sem prévia: fica com a foto.
-  assert.equal(chooseDocumentCaptureSource({ width: 0, height: 0 }, preview), "frame");
-  assert.equal(chooseDocumentCaptureSource({ width: 3072, height: 4080 }, { width: 0, height: 0 }), "photo");
+test("comprovante captura o quadro do vídeo na hora, sem takePhoto, em JPEG 0,85", async () => {
+  // Celular do Renan (15/10 15:57, v2.1.716): takePhoto devolveu foto com enquadramento diferente da prévia
+  // (aviso image-capture-framing-mismatch) e o motorista esperava o takePhoto + conversão inteira só para descartar.
+  const { planLivePhotoCapture } = await import("../src/lib/cameraConstraints.ts");
+  assert.deepEqual(planLivePhotoCapture(true), { useSensorPhoto: false, jpegQuality: 0.85 });
+  // Demais câmeras (vistoria, manutenção, colisão) continuam com a foto do sensor e JPEG 0,98.
+  assert.deepEqual(planLivePhotoCapture(false), { useSensorPhoto: true, jpegQuality: 0.98 });
 });
