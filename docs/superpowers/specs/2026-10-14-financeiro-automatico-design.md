@@ -61,7 +61,7 @@ Mesmo molde do `cr40f_GerarPagantes` (`C:\Users\mendo\Desktop\vscode\Tela Gerar 
 
 ### 4.3 `cr40f_FecharMesCliente` (unbound)
 
-- Request: `{ "clienteId", "mes": "AAAA-MM" }`.
+- Request: `{ "clienteId", "mes": "AAAA-MM" }`; a UI envia `clienteId` sem chaves e `mes` 'AAAA-MM' no horário de São Paulo.
 - Seleciona reservas do cliente com `cr40f_status` Concluído, `cr40f_statusdefaturamento` Mensal, sem OP, saída dentro do mês (fuso America/Sao_Paulo).
 - Cria a OP (`cr40f_financeiro`) com valor = soma das CPs, vincula as reservas, grava log. Não cria pagante; devolve `{ "opId", "reservas": n, "valor" }`.
 - Sem reserva elegível: erro claro, nada criado.
@@ -86,6 +86,7 @@ Divergências calculadas **no cliente** a partir de reservas, CPs, OPs e pagante
 
 - **Corrigir**: chama `simular`, mostra "vai mudar X → Y" em diálogo, confirma, chama `aplicar`, recarrega a linha. Erros em toast com a mensagem da API.
 - **Fechar mês**: diálogo com reservas, total e cliente; confirma → `cr40f_FecharMesCliente` → abre `GerarPagantesFrame` com a OP nova; ao fechar com `refresh`, recarrega.
+- Fechar mês também no cabeçalho de `#/ops`, com seletores de cliente (padrão: primeiro em ordem alfabética) e mês (padrão: mais recente), a partir das pendências tipo 4 dos últimos 365 dias.
 - Filtros: período (90 dias padrão, por data de saída), tipo, cliente, busca local. Visões salvas em `localStorage` (`betinhos.pendencias.visoes.v1`), funciona sem storage.
 - Drawer: detalhe (reserva, OP, pagantes, valores) e histórico do log daquela OP.
 - Sem ações em lote. Mock sem Xrm com dados de exemplo cobrindo os 5 tipos. Versão de build `vX.Y.Z · dd/mm/aaaa HH:mm` no canto, como nas outras telas.

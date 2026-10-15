@@ -22,7 +22,7 @@ public static class Codigos
 
     public const int OpAberta = 202410000, OpPendente = 100000001, OpParcial = 202410006, OpPaga = 202410003, OpCancelada = 202410004;
     public const int PagPendente = 202410001, PagPago = 202410002, PagCancelado = 202410005, PagAutorizado = 202410007;
-    public const int ReservaFatPago = 202410010, ReservaFatPagante = 202410006, ReservaFatMensal = 202410008;
+    public const int ReservaFatPago = 202410010, ReservaFatPagante = 202410006, ReservaFatMensal = 202410008, ReservaConcluida = 202410008;
     /// <summary>Sem OP (OP cancelada/desvinculada): "Pendente". Com OP ainda viva mas sem pagamento: "Pagamento Pendente" (é o que a Geral grava ao criar OP).</summary>
     public const int ReservaFatPendente = 202410005, ReservaFatPagamentoPendente = 202410007;
     public const int CpPendente = 100000000, CpConcluida = 100000001;

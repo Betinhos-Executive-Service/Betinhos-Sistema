@@ -45,10 +45,10 @@ const renderBlocos = (dados: Dados) => render(<>
   <Emergenciais dados={emergenciais(rvDe(dados))} periodo={PERIODO} />
   <StatusServicosCard dados={statusServicos({ todas: dados.reservas, rv: rvDe(dados), f: FILTROS, now: AGORA })} periodo={PERIODO} />
 </>)
-const VAZIO: Dados = { reservas: [], manutencoes: [], multas: [], ocorrencias: [], funcionarios: [], veiculos: [], viagens: [], eventos: [], telemetria: [], pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], indisponiveis: [] }
+const VAZIO: Dados = { reservas: [], manutencoes: [], multas: [], ocorrencias: [], funcionarios: [], veiculos: [], viagens: [], eventos: [], telemetria: [], pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], preventivas: { veiculos: [], manutencoes: [], itens: [], baselines: [] }, indisponiveis: [] }
 const UM_SERVICO: Dados = {
   reservas: [reserva({ saidaRaw: '2026-10-02T12:00:00Z', criadoRaw: '2026-10-02T08:00:00Z', valor: 500, cliente: 'Tenaris', motoristaId: 'm', motoristaKey: 'm', motorista: 'Ana', veiculoId: 'v1' })],
-  manutencoes: [manutencao({ dia: '2026-10-03', valor: 100 })], multas: [], ocorrencias: [], funcionarios: [], viagens: [], eventos: [], telemetria: [], pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], indisponiveis: [],
+  manutencoes: [manutencao({ dia: '2026-10-03', valor: 100 })], multas: [], ocorrencias: [], funcionarios: [], viagens: [], eventos: [], telemetria: [], pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], preventivas: { veiculos: [], manutencoes: [], itens: [], baselines: [] }, indisponiveis: [],
   veiculos: [veiculo({ id: 'v1', statusLabel: 'Disponível', categoria: 'Propria' })],
 }
 

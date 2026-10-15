@@ -2,6 +2,7 @@ export type XrmWebApi = {
   retrieveMultipleRecords: (entity: string, options?: string, maxPageSize?: number) => Promise<{ entities: Record<string, unknown>[]; nextLink?: string }>
   retrieveRecord: (entity: string, id: string, options?: string) => Promise<Record<string, unknown>>
   updateRecord: (entity: string, id: string, data: Record<string, unknown>) => Promise<unknown>
+  createRecord: (entity: string, data: Record<string, unknown>) => Promise<{ id: string }>
 }
 
 /** Recorte do Xrm que a Frota usa; o shell entrega o do model-driven ou o mínimo sobre a Web API. */

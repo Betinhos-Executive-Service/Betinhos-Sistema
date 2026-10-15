@@ -8,19 +8,6 @@
 
 .surface { background-color: var(--bt-surface-background); border: var(--bt-border-width-default) solid var(--bt-surface-border); border-radius: var(--bt-surface-radius); box-shadow: var(--bt-surface-shadow); }
 
-/* Vitrine de componentes (só no pnpm dev) */
-.showcase { display: flex; flex-direction: column; gap: var(--bt-space-3-5); padding: var(--bt-space-4); }
-.showcase__title { margin: 0; font-size: var(--bt-font-size-17); font-weight: var(--bt-font-weight-extrabold); line-height: 1.29; color: var(--bt-color-brand); }
-.showcase__summary { margin: var(--bt-space-1) 0 0; font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }
-.showcase__stage { display: grid; place-items: center; min-height: 76px; padding: var(--bt-space-4); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); }
-.showcase__stage--form { place-items: stretch; max-width: 420px; }
-.showcase__label { margin: 0; font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); letter-spacing: 0.8px; text-transform: uppercase; color: var(--bt-color-text-secondary); }
-.showcase__control { display: grid; gap: var(--bt-space-1); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-text-secondary); }
-.showcase__control select, .showcase__control input { min-height: var(--bt-control-height-compact); padding: 0 var(--bt-space-2); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-sm); background-color: var(--bt-color-surface-neutral); font-weight: var(--bt-font-weight-medium); color: var(--bt-color-text-primary); }
-.showcase__toggle { display: inline-flex; align-items: center; gap: var(--bt-space-1-5); min-height: var(--bt-control-height-compact); align-self: end; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); }
-.showcase__pending { display: flex; flex-wrap: wrap; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
-.showcase__pending li { padding: var(--bt-space-1) var(--bt-space-2); border-radius: var(--bt-radius-full); background-color: var(--bt-color-surface-soft); border: var(--bt-border-width-default) solid var(--bt-color-border); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); }
-
 /* Moldura das telas legadas */
 .frame { position: relative; height: 100%; background-color: var(--bt-color-canvas); }
 .frame__iframe { display: block; width: 100%; height: 100%; border: 0; }

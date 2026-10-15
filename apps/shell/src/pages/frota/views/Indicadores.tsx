@@ -1,14 +1,16 @@
 import { Download, FileWarning, Timer, Wallet, Wrench } from 'lucide-react'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Button, EmptyState, Input, MetricCard, PageToolbar, Surface, Table } from '@betinhos/ui'
 import { useQueryPeriodo } from '../../../nav/queryState'
 import { Bars } from '../components/Ui'
 import { diaSP, formatBR } from '../data/dates'
 import { brl, NAO_INFORMADO } from '../data/format'
 import { GRAVIDADE, label, STATUS_OPTIONS, TIPO_REPARO } from '../data/schema'
+import type { LoadResult } from '../data/source'
 import type { FrotaData } from '../data/types'
 import { downloadCsv, toCsv } from '../domain/csv'
-import { contarPor, custoPor, custoPorMes, multasNoPeriodo, multasPorMotorista, realizadas, tempoMedioDias, ultimos12Meses, type Custo, type Periodo } from '../domain/indicadores'
+import { AVISO_12_MESES, custoPorMesEmpilhado, custoPorVeiculo, FONTE_LABEL, indisponiveisDe, periodoAlemDe12Meses, type CustoVeiculo, type EntradaCusto, type Fonte } from '../domain/custoTotal'
+import { centavos, contarPor, custoPor, multasNoPeriodo, multasPorMotorista, realizadas, tempoMedioDias, ultimos12Meses, type Custo, type Periodo } from '../domain/indicadores'
 
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
 const mesLabel = (chave: string) => `${MESES[Number(chave.slice(5, 7)) - 1]}/${chave.slice(2, 4)}`
@@ -16,6 +18,27 @@ const hint = (semValor: number) => (semValor > 0 ? `${semValor} sem valor` : und
 /** Grupo com manutenções, mas nenhuma com valor: o total zero não é um custo real. */
 const todasSemValor = (item: { qtd: number; semValor: number }) => item.qtd > 0 && item.qtd === item.semValor
 const barraCusto = (rotulo: string, item: Custo) => ({ label: rotulo, value: item.total, hint: hint(item.semValor), text: todasSemValor(item) ? NAO_INFORMADO : undefined })
+
+type Ordem = 'total' | 'custoPorKm'
+
+/** Ordem decrescente pela coluna escolhida; sem R$/km vai para o fim e o empate fica pela placa. */
+function ordenar(linhas: CustoVeiculo[], ordem: Ordem) {
+  return [...linhas].sort((a, b) => {
+    const va = a[ordem]
+    const vb = b[ordem]
+    if (va === null || vb === null) return va === vb ? a.placa.localeCompare(b.placa) : va === null ? 1 : -1
+    return vb - va || a.placa.localeCompare(b.placa)
+  })
+}
+
+/** Botão de ordenação no cabeçalho da tabela; marca `aria-sort` na célula de cabeçalho (o `Table` não expõe a prop). */
+function Ordenar({ rotulo, ativo, onClick }: { rotulo: string; ativo: boolean; onClick: () => void }) {
+  return (
+    <button type="button" className="frota-link" onClick={onClick} ref={(el) => { el?.closest('[role="columnheader"]')?.setAttribute('aria-sort', ativo ? 'descending' : 'none') }}>
+      {rotulo}{ativo && <span aria-hidden="true"> ↓</span>}
+    </button>
+  )
+}
 
 export function linhasCsv(data: FrotaData, periodo: Periodo) {
   const rows = realizadas(data.manutencoes, periodo)
@@ -25,28 +48,45 @@ export function linhasCsv(data: FrotaData, periodo: Periodo) {
   return { headers: ['Data', 'Veículo', 'Descrição', 'Tipo de reparo', 'Estabelecimento', 'Valor'], rows }
 }
 
-export function Indicadores({ data, today }: { data: FrotaData; today: string }) {
+const FONTES_KPI: [Fonte, string][] = [['manutencao', 'manutenção'], ['multas', 'multas'], ['combustivel', 'combustível']]
+
+/** Fontes que entram no KPI; as que falharam saem da soma e aparecem como indisponíveis. */
+export function hintCustoTotal(indisponiveis: EntradaCusto['indisponiveis']): string {
+  const disponiveis = FONTES_KPI.filter(([f]) => !indisponiveis[f]).map(([, nome]) => nome)
+  const faltam = FONTES_KPI.filter(([f]) => indisponiveis[f]).map(([, nome]) => nome)
+  const partes = [disponiveis.join(' + ') || 'nenhuma fonte']
+  if (faltam.length) partes.push(`${faltam.join(' e ')} ${faltam.length === 1 ? 'indisponível' : 'indisponíveis'}`)
+  return partes.join(' · ')
+}
+
+export function Indicadores({ data, errors, today }: { data: FrotaData; errors: LoadResult['errors']; today: string }) {
   // Período na URL (#/frota?aba=indicadores&de=…&ate=…); sem datas, valem os últimos 12 meses.
   const padrao = useMemo(() => ultimos12Meses(today), [today])
   const [periodo, setPeriodo] = useQueryPeriodo('de', 'ate', padrao)
+  const [ordem, setOrdem] = useState<Ordem>('total')
+  const indisponiveis = useMemo(() => indisponiveisDe(errors), [errors])
   const calc = useMemo(() => {
+    // O ViewGate bloqueia a aba quando manutenções, multas ou infrações falham; despesas e telemetria que falham saem da soma e do hint.
+    const entrada: EntradaCusto = { manutencoes: data.manutencoes, multas: data.multas, infracoes: data.infracoes, despesasCombustivel: data.despesasCombustivel, telemetriaKm: data.telemetriaKm, documentos: [], indisponiveis }
+    const porVeiculo = custoPorVeiculo(entrada, data.veiculos, periodo)
+    // KPI na mesma base do gráfico por mês: inclui lançamentos sem veículo.
+    const porMes = custoPorMesEmpilhado(entrada, periodo)
     const feitas = realizadas(data.manutencoes, periodo)
     const multas = multasNoPeriodo(data.multas, periodo)
     const infracoes = new Map(data.infracoes.map((item) => [item.id, item]))
     return {
-      total: feitas.reduce((sum, item) => sum + (item.valor ?? 0), 0),
+      total: centavos(porMes.reduce((sum, item) => sum + item.total, 0)),
       qtd: feitas.length,
-      semValor: feitas.filter((item) => item.valor === null).length,
       tempo: tempoMedioDias(data.manutencoes, periodo),
-      porMes: custoPorMes(data.manutencoes, periodo),
-      porVeiculo: custoPor(data.manutencoes, periodo, (item) => item.veiculo?.label || 'Sem veículo'),
+      porMes,
+      porVeiculo,
       porTipo: custoPor(data.manutencoes, periodo, (item) => label(TIPO_REPARO, item.tipo)),
       multas: multas.length,
       porMotorista: multasPorMotorista(data.multas, data.infracoes, periodo),
       porGravidade: contarPor(multas, (item) => (item.infracaoId ? label(GRAVIDADE, infracoes.get(item.infracaoId)?.gravidade ?? null) : 'Sem código de infração')),
       porStatus: contarPor(multas, (item) => label(STATUS_OPTIONS.multa, item.status, 'Sem status')),
     }
-  }, [data, periodo])
+  }, [data, periodo, indisponiveis])
 
   function exportar() {
     const { headers, rows } = linhasCsv(data, periodo)
@@ -69,16 +109,30 @@ export function Indicadores({ data, today }: { data: FrotaData; today: string })
       />
 
       <div className="frota-kpis frota-kpis--4" aria-label="Resumo">
-        <MetricCard icon={<Wallet size={20} />} label="Custo de manutenção no período" value={todasSemValor(calc) ? NAO_INFORMADO : brl(calc.total)} hint={calc.semValor > 0 ? `${calc.semValor} sem valor informado` : undefined} />
+        <MetricCard icon={<Wallet size={20} />} label="Custo total no período" value={brl(calc.total)} hint={hintCustoTotal(indisponiveis)} />
         <MetricCard icon={<Wrench size={20} />} label="Manutenções realizadas" value={calc.qtd} />
         <MetricCard icon={<Timer size={20} />} label="Tempo médio entre solicitação e realização" value={calc.tempo === null ? NAO_INFORMADO : `${String(calc.tempo).replace('.', ',')} dias`} />
         <MetricCard icon={<FileWarning size={20} />} tone="warning" label="Multas no período" value={calc.multas} />
       </div>
 
-      <Surface title="Custo de manutenção por mês"><Bars items={calc.porMes.map((item) => barraCusto(mesLabel(item.chave), item))} format={brl} /></Surface>
+      {periodoAlemDe12Meses(periodo, today) && <p className="frota-muted">{AVISO_12_MESES}</p>}
+
+      <Surface title="Custo total por mês"><Bars items={calc.porMes.map((m) => ({ label: mesLabel(m.chave), value: m.total, hint: `${brl(m.porFonte.manutencao)} manut. · ${brl(m.porFonte.multas)} multas · ${brl(m.porFonte.combustivel)} comb.` }))} format={brl} /></Surface>
 
       <div className="frota-cols">
-        <Surface title="Custo por veículo"><Bars items={calc.porVeiculo.map((item) => barraCusto(item.chave, item))} format={brl} /></Surface>
+        <Surface title="Custo por veículo" flush>
+          <Table<CustoVeiculo>
+            rows={ordenar(calc.porVeiculo, ordem)}
+            rowKey={(item) => item.veiculoId}
+            empty={<EmptyState compact align="start" title="Sem veículos" />}
+            columns={[
+              { key: 'veiculo', header: 'Veículo', width: 'minmax(110px, 1.2fr)', cell: (item) => item.placa || 'Sem placa' },
+              { key: 'total', header: <Ordenar rotulo="Total" ativo={ordem === 'total'} onClick={() => setOrdem('total')} />, align: 'end', cell: (item) => <span className="frota-nowrap">{brl(item.total)}</span> },
+              { key: 'custoPorKm', header: <Ordenar rotulo="R$/km" ativo={ordem === 'custoPorKm'} onClick={() => setOrdem('custoPorKm')} />, align: 'end', cell: (item) => <span className="frota-nowrap">{item.custoPorKm === null ? '—' : brl(item.custoPorKm)}</span> },
+              { key: 'maiorFonte', header: 'Maior fonte', cell: (item) => (item.maiorFonte ? FONTE_LABEL[item.maiorFonte] : '—') },
+            ]}
+          />
+        </Surface>
         <Surface title="Custo por tipo de reparo"><Bars items={calc.porTipo.map((item) => barraCusto(item.chave, item))} format={brl} /></Surface>
       </div>
 

@@ -1,3 +1,4 @@
+import { IA_DECISAO, IA_STATUS, IA_VAZIA, type AnaliseIA } from '../domain/ia'
 import { ANEXO, FINANCEIRO, OPERACIONAL } from '../domain/status'
 import { mimeDoArquivo } from '../domain/arquivo'
 import type { Anexo, Arquivo, Despesa } from '../domain/types'
@@ -6,6 +7,23 @@ const CATEGORIAS = [['cat-1', 'Combustível'], ['cat-2', 'Pedágio'], ['cat-3', 
 const FORMAS = [['fp-1', 'Cartão empresa'], ['fp-2', 'Pix motorista'], ['fp-3', 'Tag CTF'], ['fp-4', 'Dinheiro motorista']] as const
 const MOTORISTAS = [['mot-1', 'Carlos Oliveira'], ['mot-2', 'Ana Ribeiro'], ['mot-3', 'Marcos Lima'], ['mot-4', 'Juliana Souza']] as const
 const VEICULOS = [['vei-1', 'Mercedes S500 · FJK-2B19'], ['vei-2', 'Toyota Corolla Cross · RTA-4C21']] as const
+/** Análise da IA de exemplo: suspeita (2, 9), processando (0), erro (7), sem análise (13 em diante) e validada no resto. */
+function mockIA(i: number, valor: number, data: Date): AnaliseIA {
+  if (i >= 13) return IA_VAZIA
+  if (i === 0) return { ...IA_VAZIA, status: IA_STATUS.processando }
+  if (i === 7) return { ...IA_VAZIA, status: IA_STATUS.erro, motivos: ['Comprovante ilegível para download (timeout no SharePoint).'] }
+  const corrigir = i === 2 || i === 9
+  const dia = data.toISOString().slice(0, 10)
+  return {
+    status: IA_STATUS.concluida,
+    decisao: corrigir ? IA_DECISAO.corrigir : IA_DECISAO.validar,
+    motivos: corrigir ? ['Valor do cupom diverge do lançado.', 'Cupom com data diferente da data do gasto.'] : ['Comprovante legível e coerente com o lançamento.'],
+    valorLido: corrigir ? valor + 12.5 : valor,
+    dataLida: dia, cnpjLido: '12.345.678/0001-90', estabelecimentoLido: 'Estabelecimento lido no cupom',
+    confianca: corrigir ? 0.72 : 0.95, modelo: 'claude-mock', analisadaEm: data,
+  }
+}
+
 const LOCAIS = ['Posto Shell Faria Lima', 'Ecovias Imigrantes', 'Estapar GRU T3', 'Restaurante Frango Assado', 'Hotel Ibis Campinas', 'Lava Rápido Itaim']
 
 /** ~30 despesas de exemplo do `pnpm dev`, cobrindo todos os status e alertas. */
@@ -20,12 +38,13 @@ export function createMockDespesas(now: Date): Despesa[] {
     const [veiculoId, veiculo] = VEICULOS[i % VEICULOS.length]
     const [formaId, forma] = FORMAS[i % FORMAS.length]
     const operacional = i === 2 || i === 9 ? OPERACIONAL.corrigir : i === 5 ? OPERACIONAL.recusado : i === 0 || i === 7 ? OPERACIONAL.enviado : i === 13 ? OPERACIONAL.cancelado : OPERACIONAL.validado
+    const valor = [212.4, 38.9, 64, 57.5, 289, 45][c] + (i % 3) * 7.35
     const financeiro = i === 13 ? FINANCEIRO.cancelado : forma.includes('motorista') ? (i < 12 ? FINANCEIRO.aguardando : FINANCEIRO.pago) : FINANCEIRO.naoReembolsavel
     return {
       id: `mock-desp-${n}`,
       nome: `${CATEGORIAS[c][1]} · ${motorista.split(' ')[0]}`,
       data,
-      valor: [212.4, 38.9, 64, 57.5, 289, 45][c] + (i % 3) * 7.35,
+      valor,
       estabelecimento: LOCAIS[c],
       categoriaId: CATEGORIAS[c][0], categoria: CATEGORIAS[c][1],
       formaId, forma,
@@ -50,6 +69,7 @@ export function createMockDespesas(now: Date): Despesa[] {
       criadoPor: 'App Motoristas',
       alteradoEm: data,
       alteradoPor: 'App Motoristas',
+      ia: mockIA(i, valor, data),
     }
   })
 }
