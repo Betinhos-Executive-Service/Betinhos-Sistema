@@ -155,7 +155,7 @@ describe('Dashboard', () => {
     render(<DashboardPage host={{ mode: 'mock' }} />)
     const kpis = screen.getByRole('region', { name: 'Indicadores da frota' })
     expect(kpis.getAttribute('aria-busy')).toBe('true')
-    expect(within(kpis).getAllByText('Carregando')).toHaveLength(5)
+    expect(within(kpis).getAllByText('Carregando')).toHaveLength(6)
     expect(document.querySelectorAll('.dash-grade[aria-hidden="true"] .dash-card')).toHaveLength(4)
   })
 })

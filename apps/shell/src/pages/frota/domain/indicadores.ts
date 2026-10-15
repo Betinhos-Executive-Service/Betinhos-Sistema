@@ -12,7 +12,7 @@ export function ultimos12Meses(today: string): Periodo {
 
 const dentro = (dia: string | null, periodo: Periodo) => dia !== null && dia >= periodo.de && dia <= periodo.ate
 const diaRealizacao = (item: Manutencao) => diaSP(item.dataManutencao ?? item.criadoEm)
-const centavos = (valor: number) => Math.round(valor * 100) / 100
+export const centavos = (valor: number) => Math.round(valor * 100) / 100
 
 /** Manutenções realizadas dentro do período (pela data da manutenção; sem ela, pela criação). */
 export function realizadas(manutencoes: Manutencao[], periodo: Periodo) {

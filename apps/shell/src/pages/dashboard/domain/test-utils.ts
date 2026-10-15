@@ -4,7 +4,7 @@ import type { Dados, EventoConducao, Funcionario, Manutencao, Multa, Reserva, Te
 /** Todos os conjuntos vazios e disponíveis; sobrescreva o que importa. */
 export const dadosVazios = (p: Partial<Dados> = {}): Dados => ({
   reservas: [], manutencoes: [], multas: [], ocorrencias: [], funcionarios: [], veiculos: [], viagens: [], eventos: [], telemetria: [],
-  pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], indisponiveis: [], ...p,
+  pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], preventivas: { veiculos: [], manutencoes: [], itens: [], baselines: [] }, indisponiveis: [], ...p,
 })
 
 /** Reserva de teste: serviço concluído de R$ 0 sem motorista, cliente nem veículo; sobrescreva o que importa. */

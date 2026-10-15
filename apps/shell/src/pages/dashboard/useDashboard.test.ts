@@ -6,7 +6,7 @@ import type { ConjuntoExtra, ParteExtra, Source } from './data/source'
 import { manutencao } from './domain/test-utils'
 import type { Dados, Pagante } from './domain/types'
 
-const dados = (n: number): Dados => ({ reservas: [], manutencoes: Array.from({ length: n }, () => manutencao({ dia: '2026-10-01', valor: 1 })), multas: [], ocorrencias: [], funcionarios: [], veiculos: [], viagens: [], eventos: [], telemetria: [], pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], indisponiveis: [], pendentes: ['pagantes', 'despesas'] })
+const dados = (n: number): Dados => ({ reservas: [], manutencoes: Array.from({ length: n }, () => manutencao({ dia: '2026-10-01', valor: 1 })), multas: [], ocorrencias: [], funcionarios: [], veiculos: [], viagens: [], eventos: [], telemetria: [], pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], preventivas: { veiculos: [], manutencoes: [], itens: [], baselines: [] }, indisponiveis: [], pendentes: ['pagantes', 'despesas'] })
 const pagantes = (n: number): ParteExtra => ({ campos: { pagantes: Array.from({ length: n }, (_, i) => ({ id: `p${i}` }) as Pagante) }, indisponivel: false })
 const fonte = (impl: Source['carregar'], extra: Source['carregarExtra'] = async () => pagantes(1)): Source => ({ mock: true, carregar: vi.fn(impl), carregarExtra: vi.fn(extra) })
 const PAG: ReadonlySet<ConjuntoExtra> = new Set(['pagantes'])

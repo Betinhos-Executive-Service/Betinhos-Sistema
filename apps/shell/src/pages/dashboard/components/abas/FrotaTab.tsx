@@ -23,7 +23,7 @@ const forte = (texto: string) => <strong className="dash-forte">{texto}</strong>
 const dataBR = (dia: string) => dia.split('-').reverse().join('/')
 const diaMes = (dia: string) => dataBR(dia).slice(0, 5)
 const ROTULO_KPIS = 'Indicadores da frota'
-const ROTULOS_KPI = ['Total de veículos', 'Disponíveis', 'Blindados', 'Em manutenção', 'Uso da frota própria']
+const ROTULOS_KPI = ['Total de veículos', 'Disponíveis', 'Blindados', 'Em manutenção', 'Uso da frota própria', 'Preventivas']
 const BLOCOS = ['Telemetria Infleet', 'Km por dia', 'Uso da frota própria por mês', 'Eventos de condução por mês']
 const SEM_INFLEET = naoRespondeu('O Infleet')
 const SEM_VEICULOS = naoRespondeu('O cadastro de veículos')
@@ -41,7 +41,7 @@ const SERIES_USO: SerieBarra[] = [
 ]
 
 /**
- * Aba Frota: cinco KPIs (cadastro e uso médio da frota própria); Telemetria Infleet | Km por dia;
+ * Aba Frota: seis KPIs (cadastro, uso médio da frota própria e preventivas vencidas); Telemetria Infleet | Km por dia;
  * Uso da frota própria por mês | Eventos de condução por mês.
  */
 export function FrotaTab({ ctx, dados, periodo }: PropsAba) {
@@ -64,22 +64,26 @@ function FrotaAba({ ctx, dados, periodo }: DadosAba) {
   </>
 }
 
-/** Primeira carga da aba Frota: os cinco KPIs e os quatro blocos ocupados. */
-export const FrotaCarregando = () => <AbaCarregando rotulo={ROTULO_KPIS} kpis={ROTULOS_KPI} colunas={5} blocos={BLOCOS} />
+/** Primeira carga da aba Frota: os seis KPIs e os quatro blocos ocupados. */
+export const FrotaCarregando = () => <AbaCarregando rotulo={ROTULO_KPIS} kpis={ROTULOS_KPI} colunas={6} blocos={BLOCOS} />
 
 /** % médio de uso dos próprios no mês inteiro (úteis + fim de semana, pesados pelos dias). */
 const usoDoMes = (m: UsoMes) => { const dias = m.uteis.dias + m.fds.dias; return dias ? (m.uteis.pct * m.uteis.dias + m.fds.pct * m.fds.dias) / dias : 0 }
 
-/** KPIs da frota (spec §6): total sem os vendidos, disponíveis = ativos, em manutenção = veículos com manutenção em andamento. */
+/**
+ * KPIs da frota (spec §6): total sem os vendidos, disponíveis = ativos, em manutenção = veículos com manutenção em andamento;
+ * preventivas vencidas (com as a vencer no apoio) pelo domínio da Frota, com atalho para o módulo Frota.
+ */
 function KpisFrota({ frota }: { frota: Frota }) {
   const k = frota.kpis
   const fora = k.indisponivel
   const valor = (v: number | null) => (fora || v == null ? null : int(v))
   const parte = (v: number | null) => (!fora && v != null && k.total ? `${pct((v / k.total) * 100)} da frota` : undefined)
   const serieUso: PontoSerie[] = frota.usoMensal.map((m) => ({ mes: m.mes, rotulo: m.rotulo, valor: usoDoMes(m) }))
+  const prev = frota.preventivas
   const cadastro = `Frota cadastrada: ${int(k.cadastrados)} · ${int(k.vendidos)} ${k.vendidos === 1 ? 'vendido' : 'vendidos'}`
   return (
-    <KpiLinha rotulo={ROTULO_KPIS} colunas={5}>
+    <KpiLinha rotulo={ROTULO_KPIS} colunas={6}>
       <KpiCard rotulo={ROTULOS_KPI[0]} valor={valor(k.total)} tom="brand" apoio={fora ? SEM_VEICULOS : cadastro} />
       <KpiCard rotulo={ROTULOS_KPI[1]} valor={valor(k.disponiveis)} tom="success" apoio={fora ? undefined : parte(k.disponiveis) ?? 'status Ativo'} />
       <KpiCard rotulo={ROTULOS_KPI[2]} valor={valor(k.blindados)} tom="brand" apoio={parte(k.blindados)} />
@@ -90,6 +94,11 @@ function KpisFrota({ frota }: { frota: Frota }) {
       <KpiCard
         rotulo={ROTULOS_KPI[4]} valor={fora ? null : k.usoMedioPropria == null ? '—' : pct(k.usoMedioPropria)} tom="action" serie={serieUso}
         apoio={fora ? undefined : k.usoMedioPropria == null ? 'sem próprios ativos com dias no período' : `média diária desde ${dataBR(CORTE_USO_FROTA)}`}
+      />
+      <KpiCard
+        rotulo={ROTULOS_KPI[5]} valor={prev ? int(prev.vencidas) : null} tom={prev?.vencidas ? 'warning' : 'success'}
+        apoio={prev ? `${int(prev.aVencer)} a vencer` : naoRespondeu('O plano preventivo')}
+        acao={{ texto: 'Abrir frota', onAbrir: () => { location.hash = '#/frota' } }}
       />
     </KpiLinha>
   )

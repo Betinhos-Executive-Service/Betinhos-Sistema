@@ -8,7 +8,7 @@ const NOW = new Date('2026-10-15T15:00:00Z')
 const f: Filtros = { atalho: 'esteMes', inicio: '2026-10-01', fim: '2026-10-15', status: [], clientes: [], motoristas: [], tipos: [] }
 /** O recorte que a página monta (todas, rv, f, now). */
 const calcularResumo = (d: Dados, filtros: Filtros, now: Date) => calcular({ todas: d.reservas, rv: filtrarServicos(d.reservas, filtros), f: filtros, now }, d)
-const vazio: Dados = { reservas: [], manutencoes: [], multas: [], ocorrencias: [], funcionarios: [], veiculos: [], viagens: [], eventos: [], telemetria: [], pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], indisponiveis: [] }
+const vazio: Dados = { reservas: [], manutencoes: [], multas: [], ocorrencias: [], funcionarios: [], veiculos: [], viagens: [], eventos: [], telemetria: [], pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], preventivas: { veiculos: [], manutencoes: [], itens: [], baselines: [] }, indisponiveis: [] }
 
 describe('calcularResumo', () => {
   it('não quebra sem dados', () => {
