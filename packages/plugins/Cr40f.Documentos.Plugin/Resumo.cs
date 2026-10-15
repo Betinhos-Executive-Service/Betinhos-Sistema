@@ -37,4 +37,5 @@ public sealed class ItemUrgente
     [DataMember(Name = "validade", Order = 3)] public string? Validade { get; set; }
     [DataMember(Name = "estado", Order = 4)] public string Estado { get; set; } = "";
     [DataMember(Name = "dias", Order = 5)] public int? Dias { get; set; }
+    [DataMember(Name = "quantidade", Order = 6)] public int Quantidade { get; set; } = 1;
 }
