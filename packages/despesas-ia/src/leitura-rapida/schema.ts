@@ -8,6 +8,8 @@ export type LeituraRapida = {
   estabelecimento: string | null
   cnpj: string | null
   litros: number | null
+  cidade: string | null
+  uf: string | null
   categoria_sugerida: string | null
   forma_pagamento_sugerida: string | null
   motivo_ilegivel: string | null
@@ -22,6 +24,8 @@ export function schemaLeituraRapida(categorias: string[], formasPagamento: strin
     estabelecimento: anulavel({ type: 'string' }),
     cnpj: anulavel({ type: 'string' }),
     litros: anulavel({ type: 'number' }),
+    cidade: anulavel({ type: 'string' }),
+    uf: anulavel({ type: 'string' }),
     categoria_sugerida: anulavel({ type: 'string', enum: [...categorias] }),
     forma_pagamento_sugerida: anulavel({ type: 'string', enum: [...formasPagamento] }),
     motivo_ilegivel: anulavel({ type: 'string' }),

@@ -10,6 +10,21 @@ describe('schemaLeituraRapida', () => {
     expect(s.properties.forma_pagamento_sugerida).toEqual({ anyOf: [{ type: 'string', enum: ['Cartão de crédito'] }, { type: 'null' }] })
     expect(s.properties.legivel).toEqual({ type: 'boolean' })
   })
+  it('pede cidade e UF do comprovante, ambos anuláveis', () => {
+    const s = schemaLeituraRapida([], [])
+    expect(s.properties.cidade).toEqual({ anyOf: [{ type: 'string' }, { type: 'null' }] })
+    expect(s.properties.uf).toEqual({ anyOf: [{ type: 'string' }, { type: 'null' }] })
+    expect(s.required).toContain('cidade')
+    expect(s.required).toContain('uf')
+  })
+})
+
+describe('SYSTEM_PROMPT_LEITURA', () => {
+  it('orienta nome fantasia no estabelecimento e cidade/UF do endereço impresso', () => {
+    expect(SYSTEM_PROMPT_LEITURA).toContain('nome fantasia')
+    expect(SYSTEM_PROMPT_LEITURA).toMatch(/cidade: município do endereço impresso/)
+    expect(SYSTEM_PROMPT_LEITURA).toMatch(/uf: sigla do estado com 2 letras/)
+  })
 })
 
 import { montarRequisicaoLeitura, MODELO_LEITURA, MAX_TOKENS_LEITURA } from './requisicao.ts'
@@ -38,7 +53,7 @@ describe('montarRequisicaoLeitura', () => {
 
 import { interpretarLeitura } from './resposta.ts'
 
-const base = { legivel: true, valor: 85.4, data: '2026-10-12', hora: '14:32', estabelecimento: 'Posto X', cnpj: null, litros: 32.5, categoria_sugerida: 'Abastecimento', forma_pagamento_sugerida: null, motivo_ilegivel: null }
+const base = { legivel: true, valor: 85.4, data: '2026-10-12', hora: '14:32', estabelecimento: 'Posto X', cnpj: null, litros: 32.5, cidade: 'Taubaté', uf: 'SP', categoria_sugerida: 'Abastecimento', forma_pagamento_sugerida: null, motivo_ilegivel: null }
 const msg = (o: unknown, stop = 'end_turn') => ({ stop_reason: stop, model: 'claude-haiku-5-5', content: [{ type: 'text', text: JSON.stringify(o) }] })
 
 describe('interpretarLeitura', () => {
