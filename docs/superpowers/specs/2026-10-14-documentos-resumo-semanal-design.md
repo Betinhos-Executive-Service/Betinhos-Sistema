@@ -94,3 +94,11 @@ Script `packages/deploy/provision-documentos-resumo.ps1` (PowerShell 5.1, device
 ## 7. Fora do escopo
 
 Aviso diário por marco, WhatsApp, push no App Motoristas, exclusão dos campos de marco sem uso.
+
+## 8. Ajustes de implementação (15/10/2026)
+
+- **Padrão de plugin da main:** projeto `packages/plugins/Cr40f.Documentos.Plugin` (+ `.Tests`) e registrador `packages/plugins/tools/Cr40f.Documentos.Registrar`, no molde do `Cr40f.Financeiro.Plugin`. A chave fica em `%USERPROFILE%\.codex\keys\Cr40f.Documentos.Plugin.snk`, criada pelo script de push; substitui o `generate-strong-name-key.ps1` citado na §2.
+- **Ação, não função:** a Custom API é uma ação global (`isfunction` false). O conector Dataverse do Power Automate só executa ações não associadas. Continua sem efeitos colaterais.
+- **Envio:** "Enviar um email (V2)" com "De (Enviar como)" = noreply, o padrão dos flows existentes. O e-mail ao administrador sai sem "De", para não depender da mesma permissão que pode ter causado a falha.
+- **Provisionamento:** plugin e Custom API pelo registrador (login interativo do Dataverse); variáveis e flow por `provision-flow-documentos-resumo.ps1` com `az login`. E-mail da noreply, URL do Sistema e e-mail do admin entram por parâmetro.
+- **Paridade:** o fixture `Fixtures/paridade.json` é escrito à mão, cobrindo os limites e casos da §5, em vez de exportar o mock do shell.
