@@ -31,3 +31,13 @@ export { SearchBox, type SearchBoxProps } from './components/SearchBox'
 export { StatusBadge, statusBadgeClassName, type StatusBadgeProps, type StatusTone } from './components/StatusBadge'
 export { Select, filterOptions, normalizeSearch, type SelectOption, type SelectProps } from './components/Select'
 export { Cluster, Grid, Split, Stack } from './primitives'
+export {
+  CONFIG_VERSION, MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH, cleanWidth, defaultConfig, moveColumn, normalizeConfig, parseConfig, resizeColumn,
+  sameConfig, serializeConfig, setFilters, toggleColumn, toggleSort, visibleColumns,
+  type SortDir, type ViewColumnDef, type ViewColumnState, type ViewConfig, type ViewFilters, type ViewSort,
+} from './tableView/config'
+export {
+  DEFAULT_VIEW_ID, DEFAULT_VIEW_NAME, buildEntries, createMemoryViewStore, pickInitial,
+  type StoredView, type TableViewEntry, type ViewScope, type ViewStore,
+} from './tableView/store'
+export { useTableView, type TableViewState, type UseTableViewOptions } from './tableView/useTableView'
