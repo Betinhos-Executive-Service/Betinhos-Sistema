@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BuildBadge } from '@betinhos/ui'
 import { AppShell } from './app/AppShell'
+import { useDocumentosBadge } from './app/useDocumentosBadge'
 import { RouteLayout } from './app/RouteLayout'
+import { usePrefetchOnIntent } from './app/routes'
 import { createHost } from './host'
 import { DEFAULT_ITEM, ENTITY_NAMES, findItem, itemLabel } from './nav/menu'
 import { useHashRoute } from './nav/useHashRoute'
@@ -10,7 +12,10 @@ type LabelsState = { labels: Map<string, string>; error: string | null }
 
 export function App() {
   const host = useMemo(createHost, [])
+  const docsUrgentes = useDocumentosBadge(host)
+  const badges = useMemo(() => (docsUrgentes ? { documentos: docsUrgentes } : undefined), [docsUrgentes])
   const route = useHashRoute()
+  usePrefetchOnIntent()
   const activeId = route || DEFAULT_ITEM.id
   const found = findItem(activeId)
   const [{ labels, error }, setLabels] = useState<LabelsState>({ labels: new Map(), error: null })
@@ -36,7 +41,7 @@ export function App() {
 
   return (
     <>
-      <AppShell activeId={activeId} title={label} entityLabels={labels} connection={connection} defaultCollapsed={found?.item.kind === 'page' && found.item.page === 'geral'}>
+      <AppShell activeId={activeId} title={label} entityLabels={labels} connection={connection} badges={badges} defaultCollapsed={found?.item.kind === 'page' && found.item.page === 'geral'}>
         <RouteLayout host={host} group={found?.group ?? null} item={found?.item ?? null} label={label} />
       </AppShell>
       <BuildBadge version={__APP_VERSION__} isoDate={__BUILD_DATE__} />

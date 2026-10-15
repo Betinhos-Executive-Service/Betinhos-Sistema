@@ -62,7 +62,33 @@ $apiBaseUrl = "$environmentBaseUrl/api/data/v9.2"
 $resourcePath = Join-Path $appRoot "dist\webresource.html"
 if (-not (Test-Path -LiteralPath $resourcePath)) { throw "WebResource nao encontrado: $resourcePath. Rode o build antes." }
 
-$targets = @(@{ Name = $ResourceName; Display = $DisplayName; Path = $resourcePath; Type = 1 })
+$targets = @()
+# Code splitting: os chunks JS (dist/webresource-assets.json, gerado pelo inline-webresource) entram antes do HTML.
+# Nome com hash: chunk com o mesmo conteudo do ambiente nao e reenviado (Publish-WebResource compara o base64).
+# Chunks de builds anteriores ficam no ambiente: aba aberta com o build antigo ainda os encontra.
+$resourceHtml = [IO.File]::ReadAllText($resourcePath, [Text.Encoding]::UTF8)
+$chunkManifestPath = Join-Path $appRoot "dist\webresource-assets.json"
+$chunkNames = @()
+if (Test-Path -LiteralPath $chunkManifestPath) {
+  $chunkPrefix = ($ResourceName -replace '\.html$', '') + "/assets/"
+  # Em variavel: no PowerShell 5.1 o ConvertFrom-Json devolve o array inteiro como um item so do pipeline.
+  $chunkList = [IO.File]::ReadAllText($chunkManifestPath, [Text.Encoding]::UTF8) | ConvertFrom-Json
+  foreach ($chunk in $chunkList) {
+    if (-not $chunk.name.StartsWith($chunkPrefix, [StringComparison]::Ordinal)) { throw "Chunk $($chunk.name) fora do prefixo $chunkPrefix. Deploy abortado." }
+    if ($chunk.name -notmatch '^[A-Za-z0-9_]+(/[A-Za-z0-9.]+)+\.js$') { throw "Nome de chunk invalido para WebResource: $($chunk.name)." }
+    $chunkPath = Join-Path $appRoot ("dist\" + $chunk.file.Replace("/", "\"))
+    if (-not (Test-Path -LiteralPath $chunkPath)) { throw "Chunk ausente no build: $chunkPath. Deploy abortado." }
+    $chunkNames += $chunk.name
+    $targets += @{ Name = $chunk.name; Display = "$DisplayName - $($chunk.file)"; Path = $chunkPath; Type = 3 }
+  }
+  if ($chunkNames.Count -eq 0) { throw "webresource-assets.json sem chunks. Rode o build de novo." }
+}
+# Vale com ou sem manifesto: script externo citado no HTML precisa ser publicado junto.
+foreach ($reference in [regex]::Matches($resourceHtml, '<script[^>]+src="/WebResources/([^"]+\.js)"|<link[^>]+href="/WebResources/([^"]+\.js)"')) {
+  $referenced = @($reference.Groups[1].Value, $reference.Groups[2].Value) | Where-Object { $_ } | Select-Object -First 1
+  if ($chunkNames -notcontains $referenced) { throw "webresource.html referencia /WebResources/$referenced, que nao esta em webresource-assets.json. Rode o build de novo." }
+}
+$targets += @{ Name = $ResourceName; Display = $DisplayName; Path = $resourcePath; Type = 1 }
 if ($LoaderName) {
   $template = [IO.File]::ReadAllText((Join-Path $PSScriptRoot "loader.template.html"), [Text.Encoding]::UTF8)
   $loaderPath = Join-Path $appRoot "dist\loader.html"
@@ -124,7 +150,7 @@ $solutionId = $solutions[0].solutionid
 
 function Publish-WebResource([string] $Name, [string] $Display, [string] $Path, [int] $Type) {
   $escapedName = Escape-OData $Name
-  $lookupUri = "$apiBaseUrl/webresourceset?`$select=webresourceid,name,webresourcetype&`$filter=name eq '$escapedName'"
+  $lookupUri = "$apiBaseUrl/webresourceset?`$select=webresourceid,name,webresourcetype,content&`$filter=name eq '$escapedName'"
   $found = @((Invoke-RestMethod -Method Get -Uri $lookupUri -Headers $headers).value)
   if ($found.Count -gt 1) { throw "Mais de um WebResource encontrado para $Name. Deploy abortado." }
   $content = [Convert]::ToBase64String([IO.File]::ReadAllBytes($Path))
@@ -137,9 +163,12 @@ function Publish-WebResource([string] $Name, [string] $Display, [string] $Path, 
   else {
     if ($found[0].webresourcetype -ne $Type) { throw "$Name ja existe com outro tipo ($($found[0].webresourcetype)). Deploy abortado." }
     $id = $found[0].webresourceid
-    Write-Step "atualizando $Name"
-    $body = @{ displayname = $Display; content = $content; isenabledformobileclient = $true } | ConvertTo-Json -Depth 4
-    Invoke-RestMethod -Method Patch -Uri "$apiBaseUrl/webresourceset($id)" -Headers $headers -ContentType "application/json; charset=utf-8" -Body $body | Out-Null
+    if ($found[0].content -eq $content) { Write-Step "$Name sem mudanca" }
+    else {
+      Write-Step "atualizando $Name"
+      $body = @{ displayname = $Display; content = $content; isenabledformobileclient = $true } | ConvertTo-Json -Depth 4
+      Invoke-RestMethod -Method Patch -Uri "$apiBaseUrl/webresourceset($id)" -Headers $headers -ContentType "application/json; charset=utf-8" -Body $body | Out-Null
+    }
   }
   $componentUri = "$apiBaseUrl/solutioncomponents?`$select=solutioncomponentid&`$filter=_solutionid_value eq $solutionId and objectid eq $id and componenttype eq 61"
   if (@((Invoke-RestMethod -Method Get -Uri $componentUri -Headers $headers).value).Count -eq 0) {
