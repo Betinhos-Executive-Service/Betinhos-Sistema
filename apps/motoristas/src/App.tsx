@@ -140,6 +140,7 @@ import { InitialScreen } from "./screens/InitialScreen";
 import { LocalCancelScreen } from "./screens/LocalCancelScreen";
 import { MediaCaptureScreen } from "./screens/MediaCaptureScreen";
 import { ReceiptReadingScreen } from "./screens/ReceiptReadingScreen";
+import { ReceiptIllegibleScreen } from "./screens/ReceiptIllegibleScreen";
 import { MaintenancePhotoPreviewScreen } from "./screens/MaintenancePhotoPreviewScreen";
 import { ReceiveScreen } from "./screens/ReceiveScreen";
 import { ReceiptPreviewScreen, ReceiptScreen } from "./screens/ReceiptScreen";
@@ -2940,6 +2941,12 @@ function App() {
     );
   }
 
+  if (screen === "gastos" && expenseFlowView(expenseQuickRead) === "ilegivel") {
+    return show(
+      <ReceiptIllegibleScreen photoDataUrl={expenseQuickReadPhoto} onRetake={retakeQuickReadPhoto} onBack={cancelExpenseQuickRead} />
+    );
+  }
+
   if (screen === "gastos") {
     return show(
       <ExpenseScreen
@@ -2967,7 +2974,6 @@ function App() {
         currentVehicleId={maintenanceCurrentVehicleId}
         quickRead={expenseQuickRead}
         quickReadFilled={expenseQuickReadFilled}
-        onRetakeQuickReadPhoto={retakeQuickReadPhoto}
       />
     );
   }

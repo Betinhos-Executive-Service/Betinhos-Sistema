@@ -1,8 +1,8 @@
 import {
   findExpenseCategory,
   findExpenseCategoryByName,
-  findExpensePaymentMethodByName,
   getExpenseCategoryRules,
+  type ExpenseCityOption,
   type ExpenseDraft,
   type ExpenseReferenceData
 } from "./expenses.ts";
@@ -15,6 +15,9 @@ export type QuickReadLeitura = {
   estabelecimento: string | null;
   cnpj: string | null;
   litros: number | null;
+  /** Município do endereço impresso (flow a partir de 15/10/2026); ausente nas respostas antigas. */
+  cidade?: string | null;
+  uf?: string | null;
   categoria_sugerida: string | null;
   forma_pagamento_sugerida: string | null;
   motivo_ilegivel: string | null;
@@ -39,6 +42,30 @@ export type ApplyQuickReadOptions = {
   replaceAutoDate?: boolean;
 };
 
+const normalizeCityText = (value: string) =>
+  value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+/** Cidade lida → id da lista do app: nome + UF exatos; senão só o nome, se for único; senão vazio. */
+export function matchQuickReadCity(cities: ExpenseCityOption[], cidade: string | null | undefined, uf: string | null | undefined) {
+  const name = normalizeCityText(cidade ?? "");
+  if (!name) return "";
+  const sameName = cities.filter((city) => normalizeCityText(city.name.split(" - ")[0] ?? city.name) === name);
+  const state = (uf ?? "").trim().toUpperCase();
+  const exact = state ? sameName.filter((city) => city.uf.toUpperCase() === state) : [];
+  if (exact.length === 1) return exact[0].id;
+  return sameName.length === 1 ? sameName[0].id : "";
+}
+
+export const QUICK_READ_DESCRIPTION_MAX = 120;
+
+/** Descrição curta e determinística: "Categoria · Nome fantasia · 32,5 L" (litros só quando a categoria exige). */
+export function buildQuickReadDescription(input: { categoria: string; estabelecimento: string | null; litros: number | null; exigeLitros: boolean }) {
+  const parts = [input.categoria.trim(), (input.estabelecimento ?? "").trim()];
+  if (input.exigeLitros && input.litros !== null && input.litros > 0) parts.push(`${formatDecimal(input.litros, 0, 3)} L`);
+  const text = parts.filter(Boolean).join(" · ");
+  return text.length > QUICK_READ_DESCRIPTION_MAX ? `${text.slice(0, QUICK_READ_DESCRIPTION_MAX - 1).trimEnd()}…` : text;
+}
+
 export function applyQuickReadToDraft(
   draft: ExpenseDraft,
   leitura: QuickReadLeitura,
@@ -47,12 +74,21 @@ export function applyQuickReadToDraft(
 ): ExpenseDraft {
   const next = { ...draft };
   if (!next.categoriaId && leitura.categoria_sugerida) next.categoriaId = findExpenseCategoryByName(referenceData, [leitura.categoria_sugerida])?.id ?? "";
-  if (!next.formaPagamentoId && leitura.forma_pagamento_sugerida) next.formaPagamentoId = findExpensePaymentMethodByName(referenceData, [leitura.forma_pagamento_sugerida])?.id ?? "";
+  // Forma de pagamento fica com o motorista: a leitura não preenche.
   if (!next.valor && leitura.valor !== null) next.valor = formatDecimal(leitura.valor, 2);
   if ((!next.dataGasto || options.replaceAutoDate) && leitura.data) next.dataGasto = leitura.data;
   if (!next.estabelecimento && leitura.estabelecimento) next.estabelecimento = leitura.estabelecimento.trim();
   const rules = getExpenseCategoryRules(findExpenseCategory(referenceData, next.categoriaId));
   if (!next.litros && rules.exigeLitros && leitura.litros !== null) next.litros = formatDecimal(leitura.litros, 0, 3);
+  if (!next.cidadeId) next.cidadeId = matchQuickReadCity(referenceData.cities, leitura.cidade, leitura.uf);
+  if (!next.descricao) {
+    next.descricao = buildQuickReadDescription({
+      categoria: findExpenseCategory(referenceData, next.categoriaId)?.name ?? "",
+      estabelecimento: leitura.estabelecimento,
+      litros: leitura.litros,
+      exigeLitros: rules.exigeLitros
+    });
+  }
   return next;
 }
 
@@ -79,9 +115,14 @@ export function startQuickReadState(state: QuickReadState, env: { online: boolea
   return { ...state, status: env.online ? "lendo" : "manual" };
 }
 
-/** Enquanto lê, a tela de gastos mostra só a leitura (sem formulário); nos demais estados, o formulário. */
-export function expenseFlowView(state: QuickReadState): "leitura" | "formulario" {
-  return state.status === "lendo" ? "leitura" : "formulario";
+/**
+ * Enquanto lê, a tela de gastos mostra só a leitura; com foto ilegível (1ª e 2ª), a tela de nova foto;
+ * nos demais estados (lido, falha, offline, 3ª ilegível), o formulário.
+ */
+export function expenseFlowView(state: QuickReadState): "leitura" | "ilegivel" | "formulario" {
+  if (state.status === "lendo") return "leitura";
+  if (state.status === "ilegivel") return "ilegivel";
+  return "formulario";
 }
 
 export type QuickReadProgress = { step: 0 | 1 | 2; slow: boolean };

@@ -40,7 +40,6 @@ type ExpenseScreenProps = {
   quickRead?: QuickReadState;
   /** Campos preenchidos pela leitura rápida (destacados até o motorista alterar). */
   quickReadFilled?: QuickReadFilledFields;
-  onRetakeQuickReadPhoto?: () => void;
 };
 
 function focusInvalidField(element: HTMLElement | null) {
@@ -68,8 +67,7 @@ export function ExpenseScreen({
   vehiclesLoading,
   currentVehicleId,
   quickRead,
-  quickReadFilled = {},
-  onRetakeQuickReadPhoto
+  quickReadFilled = {}
 }: ExpenseScreenProps) {
   const isSubmitting = submitState !== "idle";
   const quickReadClass = (key: keyof ExpenseDraft) =>
@@ -173,12 +171,6 @@ export function ExpenseScreen({
               {errorCount ? <div className="form-error-summary">Revise {errorCount} campo(s) destacado(s).</div> : null}
               {quickRead?.status === "lendo" ? <div className="form-error-summary is-info" role="status" aria-live="polite">Lendo comprovante…</div> : null}
               {quickRead?.status === "preenchido" ? <div className="form-error-summary is-info" role="status">Confira os campos destacados, lidos do comprovante.</div> : null}
-              {quickRead?.status === "ilegivel" ? (
-                <div className="form-error-summary" role="alert">
-                  Não consegui ler o comprovante. Tire outra foto mais perto, com luz e sem cortar.
-                  <ActionButton variant="secondary" idleLabel="TIRAR OUTRA FOTO" state="idle" disabled={isSubmitting} onClick={() => onRetakeQuickReadPhoto?.()} />
-                </div>
-              ) : null}
               {quickRead?.status === "manual" && quickRead.tentativas < QUICK_READ_MAX_TENTATIVAS ? (
                 <div className="form-error-summary is-info" role="status">Preencha os dados do comprovante.</div>
               ) : null}
@@ -258,6 +250,7 @@ export function ExpenseScreen({
                 ref={cityRef}
                 required
                 label="Cidade"
+                fieldClassName={quickReadClass("cidadeId")}
                 error={errors.cidadeId}
                 value={draft.cidadeId}
                 options={cityOptions}
@@ -337,6 +330,7 @@ export function ExpenseScreen({
 
               <TextAreaField
                 label="Descrição"
+                fieldClassName={quickReadClass("descricao")}
                 placeholder="Opcional"
                 rows={3}
                 value={draft.descricao}

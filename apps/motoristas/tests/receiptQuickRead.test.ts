@@ -21,13 +21,13 @@ import { DEFAULT_EXPENSE_REFERENCE_DATA, type ExpenseDraft } from "../src/lib/ex
 
 const vazio: ExpenseDraft = { categoriaId: "", veiculoId: "", valor: "", dataGasto: "", formaPagamentoId: "", cidadeId: "", estabelecimento: "", descricao: "", kmInformado: "", litros: "" };
 
-test("applyQuickReadToDraft preenche só campos vazios e casa categoria e pagamento por nome", () => {
+test("applyQuickReadToDraft preenche só campos vazios, casa a categoria por nome e não preenche a forma de pagamento", () => {
   const draft = applyQuickReadToDraft({ ...vazio, valor: "90,00" }, { ...leitura, forma_pagamento_sugerida: "TicketLog" }, DEFAULT_EXPENSE_REFERENCE_DATA);
   assert.equal(draft.valor, "90,00");
   assert.equal(draft.dataGasto, "2026-10-12");
   assert.equal(draft.estabelecimento, "Posto X");
   assert.equal(draft.categoriaId, "local-abastecimento");
-  assert.equal(draft.formaPagamentoId, "local-ticketlog");
+  assert.equal(draft.formaPagamentoId, "");
   assert.equal(draft.litros, "32,5");
 });
 test("applyQuickReadToDraft formata valor em pt-BR e ignora litros quando a categoria não exige", () => {
@@ -70,4 +70,47 @@ test("applyQuickReadToDraft troca a data automática (hoje) quando o motorista n
   const comHoje = { ...vazio, dataGasto: "2026-10-15" };
   assert.equal(applyQuickReadToDraft(comHoje, leitura, DEFAULT_EXPENSE_REFERENCE_DATA).dataGasto, "2026-10-15");
   assert.equal(applyQuickReadToDraft(comHoje, leitura, DEFAULT_EXPENSE_REFERENCE_DATA, { replaceAutoDate: true }).dataGasto, "2026-10-12");
+});
+
+import { buildQuickReadDescription, matchQuickReadCity, QUICK_READ_DESCRIPTION_MAX } from "../src/lib/receiptQuickRead.ts";
+import type { ExpenseCityOption, ExpenseReferenceData } from "../src/lib/expenses.ts";
+
+const cidade = (id: string, nome: string, uf: string): ExpenseCityOption => ({ id, name: `${nome} - ${uf}`, order: 0, uf, pais: "Brasil", codigoIbge: "" });
+const cidades = [cidade("tbt", "Taubaté", "SP"), cidade("bj-pi", "Bom Jesus", "PI"), cidade("bj-rn", "Bom Jesus", "RN"), cidade("cps", "Campinas", "SP"), cidade("sp", "São Paulo", "SP")];
+
+test("matchQuickReadCity casa nome e UF sem acento nem caixa; só nome quando único; senão vazio", () => {
+  assert.equal(matchQuickReadCity(cidades, "TAUBATE", "sp"), "tbt");
+  assert.equal(matchQuickReadCity(cidades, "Bom Jesus", "RN"), "bj-rn");
+  assert.equal(matchQuickReadCity(cidades, "Bom Jesus", null), "");
+  assert.equal(matchQuickReadCity(cidades, "campinas", null), "cps");
+  assert.equal(matchQuickReadCity(cidades, "Sao Paulo", "SP"), "sp");
+  assert.equal(matchQuickReadCity(cidades, "Pindamonhangaba", "SP"), "");
+  assert.equal(matchQuickReadCity(cidades, null, "SP"), "");
+  assert.equal(matchQuickReadCity([], "Taubaté", "SP"), "");
+});
+
+const comCidades: ExpenseReferenceData = { ...DEFAULT_EXPENSE_REFERENCE_DATA, cities: cidades };
+
+test("applyQuickReadToDraft preenche a cidade lida sem sobrescrever a escolhida pelo motorista", () => {
+  assert.equal(applyQuickReadToDraft(vazio, { ...leitura, cidade: "Taubaté", uf: "SP" }, comCidades).cidadeId, "tbt");
+  assert.equal(applyQuickReadToDraft({ ...vazio, cidadeId: "sp" }, { ...leitura, cidade: "Taubaté", uf: "SP" }, comCidades).cidadeId, "sp");
+  assert.equal(applyQuickReadToDraft(vazio, { ...leitura, cidade: null, uf: "SP" }, comCidades).cidadeId, "");
+  assert.equal(applyQuickReadToDraft(vazio, leitura, comCidades).cidadeId, "");
+});
+
+test("buildQuickReadDescription: categoria · nome fantasia · litros (combustível), curta", () => {
+  assert.equal(buildQuickReadDescription({ categoria: "Abastecimento", estabelecimento: " Posto Ipiranga Moreira César ", litros: 32.5, exigeLitros: true }), "Abastecimento · Posto Ipiranga Moreira César · 32,5 L");
+  assert.equal(buildQuickReadDescription({ categoria: "Almoço", estabelecimento: "Burger King", litros: 3, exigeLitros: false }), "Almoço · Burger King");
+  assert.equal(buildQuickReadDescription({ categoria: "", estabelecimento: "Netpark JK", litros: null, exigeLitros: false }), "Netpark JK");
+  assert.equal(buildQuickReadDescription({ categoria: "", estabelecimento: null, litros: null, exigeLitros: false }), "");
+  const longa = buildQuickReadDescription({ categoria: "Estacionamento", estabelecimento: "X".repeat(200), litros: null, exigeLitros: false });
+  assert.equal(QUICK_READ_DESCRIPTION_MAX, 120);
+  assert.equal(longa.length, 120);
+  assert.ok(longa.startsWith("Estacionamento · X") && longa.endsWith("…"));
+});
+
+test("applyQuickReadToDraft preenche a descrição só quando vazia", () => {
+  const lido = { ...leitura, estabelecimento: "Posto Ipiranga Moreira César", litros: 32.5 };
+  assert.equal(applyQuickReadToDraft(vazio, lido, comCidades).descricao, "Abastecimento · Posto Ipiranga Moreira César · 32,5 L");
+  assert.equal(applyQuickReadToDraft({ ...vazio, descricao: "minha nota" }, lido, comCidades).descricao, "minha nota");
 });

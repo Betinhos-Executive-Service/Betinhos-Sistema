@@ -21,7 +21,7 @@ export async function readReceiptQuickMock(mode: QuickReadMockMode, categorias: 
   await wait(mode === "lento" ? 11_000 : 2_500);
   if (mode === "falha") return { ok: false, erro: "leitura_indisponivel" };
   if (mode === "ilegivel") {
-    return { ok: true, leitura: { legivel: false, valor: null, data: null, hora: null, estabelecimento: null, cnpj: null, litros: null, categoria_sugerida: null, forma_pagamento_sugerida: null, motivo_ilegivel: "Foto borrada." } };
+    return { ok: true, leitura: { legivel: false, valor: null, data: null, hora: null, estabelecimento: null, cnpj: null, litros: null, cidade: null, uf: null, categoria_sugerida: null, forma_pagamento_sugerida: null, motivo_ilegivel: "Foto borrada." } };
   }
   return {
     ok: true,
@@ -33,6 +33,8 @@ export async function readReceiptQuickMock(mode: QuickReadMockMode, categorias: 
       estabelecimento: "Burger King",
       cnpj: null,
       litros: null,
+      cidade: "São Paulo",
+      uf: "SP",
       categoria_sugerida: categorias.find((name) => /almo/i.test(name)) ?? null,
       forma_pagamento_sugerida: formasPagamento.find((name) => /cr[eé]dito/i.test(name)) ?? null,
       motivo_ilegivel: null

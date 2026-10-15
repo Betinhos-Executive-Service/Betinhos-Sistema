@@ -53,6 +53,14 @@ test("3ª foto ilegível vai em silêncio para o manual, sem contador visível",
   state = nextQuickReadState(startQuickReadState(state, { online: true }), { kind: "ilegivel" });
   assert.equal(state.status, "manual");
   assert.equal(state.tentativas, 3);
+  assert.equal(expenseFlowView(state), "formulario");
+});
+
+test("foto ilegível abre a tela de nova foto, não o formulário; falha e offline vão ao formulário", () => {
+  const ilegivel = nextQuickReadState(startQuickReadState(INITIAL_QUICK_READ, { online: true }), { kind: "ilegivel" });
+  assert.equal(expenseFlowView(ilegivel), "ilegivel");
+  assert.equal(expenseFlowView(nextQuickReadState(startQuickReadState(INITIAL_QUICK_READ, { online: true }), { kind: "falha" })), "formulario");
+  assert.equal(expenseFlowView(startQuickReadState(INITIAL_QUICK_READ, { online: false })), "formulario");
 });
 
 test("progresso: enviando, depois lendo, preenchendo só com o resultado; aviso de demora após 8 s", () => {

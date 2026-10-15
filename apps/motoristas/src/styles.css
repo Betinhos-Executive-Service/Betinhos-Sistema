@@ -12519,7 +12519,8 @@ select,
 /* Campo preenchido pela leitura: fundo informativo suave; some quando o motorista altera o valor. */
 .is-quick-read-filled .form-control-input,
 .is-quick-read-filled .form-control-shell,
-.is-quick-read-filled .form-control-trigger {
+.is-quick-read-filled .form-control-trigger,
+.is-quick-read-filled .form-control-textarea {
   background-color: #edf3ff !important;
 }
 
@@ -12529,4 +12530,83 @@ select,
   background: #edf3ff !important;
   color: #285db5 !important;
   box-shadow: none !important;
+}
+
+/* Comprovante ilegível: mesma superfície da tela de leitura; atenção em par aprovado (#856000 / #FFF7DF), ação primária navy. */
+.receipt-illegible-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.receipt-illegible-icon {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #fff7df;
+  color: #856000;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.receipt-illegible-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.receipt-illegible-tips {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.receipt-illegible-tip {
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fcfcfb;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.receipt-illegible-tip-icon {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  color: #2159d2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.receipt-illegible-tip-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.receipt-illegible-retake {
+  width: 100%;
+  min-height: 44px;
+}
+
+/* Ação primária da tela de ilegível sem gradiente (navy.900; hover navy.800). */
+.receipt-illegible-retake.action-button--primary {
+  background: #001a3d !important;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .receipt-illegible-retake.action-button--primary:not(:disabled):hover {
+    background: #0b2d5a !important;
+  }
 }
