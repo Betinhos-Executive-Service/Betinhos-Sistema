@@ -92,11 +92,13 @@ $definitionText = @'
               "estabelecimento": { "anyOf": [ { "type": "string" }, { "type": "null" } ] },
               "cnpj": { "anyOf": [ { "type": "string" }, { "type": "null" } ] },
               "litros": { "anyOf": [ { "type": "number" }, { "type": "null" } ] },
+              "cidade": { "anyOf": [ { "type": "string" }, { "type": "null" } ] },
+              "uf": { "anyOf": [ { "type": "string" }, { "type": "null" } ] },
               "categoria_sugerida": { "anyOf": [ { "type": "string", "enum": "@triggerBody()?['categorias']" }, { "type": "null" } ] },
               "forma_pagamento_sugerida": { "anyOf": [ { "type": "string", "enum": "@triggerBody()?['formasPagamento']" }, { "type": "null" } ] },
               "motivo_ilegivel": { "anyOf": [ { "type": "string" }, { "type": "null" } ] }
             },
-            "required": [ "legivel", "valor", "data", "hora", "estabelecimento", "cnpj", "litros", "categoria_sugerida", "forma_pagamento_sugerida", "motivo_ilegivel" ]
+            "required": [ "legivel", "valor", "data", "hora", "estabelecimento", "cnpj", "litros", "cidade", "uf", "categoria_sugerida", "forma_pagamento_sugerida", "motivo_ilegivel" ]
           }
         },
         "Chamar_Claude": {
@@ -213,6 +215,7 @@ function Conferir($lido) {
     'Chamar_Claude sem raciocínio (thinking disabled)' = $http.inputs.body.thinking.type -ceq 'disabled' -and $http.inputs.body.thinking.type -ceq $const.thinking.type
     'Leitura pega o primeiro bloco de texto (nunca first(content))' = $t.Blocos_de_texto.type -eq 'Query' -and $t.Blocos_de_texto.inputs.from -ceq "@body('Chamar_Claude')?['content']" -and $t.Blocos_de_texto.inputs.where -ceq "@equals(item()?['type'], 'text')" -and $t.Leitura.inputs -ceq "@json(first(body('Blocos_de_texto'))?['text'])"
     'Chamar_Claude schema dinâmico' = $http.inputs.body.output_config.format.type -eq 'json_schema' -and $http.inputs.body.output_config.format.schema -ceq "@outputs('Montar_schema')"
+    'schema pede cidade e uf (anuláveis)' = (@($t.Montar_schema.inputs.required) -join ',') -eq 'legivel,valor,data,hora,estabelecimento,cnpj,litros,cidade,uf,categoria_sugerida,forma_pagamento_sugerida,motivo_ilegivel' -and ($t.Montar_schema.inputs.properties.cidade | ConvertTo-Json -Compress -Depth 5) -ceq '{"anyOf":[{"type":"string"},{"type":"null"}]}' -and ($t.Montar_schema.inputs.properties.uf | ConvertTo-Json -Compress -Depth 5) -ceq '{"anyOf":[{"type":"string"},{"type":"null"}]}'
     'Chamar_Claude secureData inputs e outputs' = (@($http.runtimeConfiguration.secureData.properties) -join ',') -eq 'inputs,outputs'
     'Chamar_Claude sem retry' = $http.inputs.retryPolicy.type -eq 'none'
     'Chamar_Claude timeout PT8S' = $http.limit.timeout -eq 'PT8S'
