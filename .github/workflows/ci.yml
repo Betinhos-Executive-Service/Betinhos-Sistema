@@ -14,12 +14,13 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-          # @betinhos/ui vem do GitHub Packages (repo design-system-betinhos); o GITHUB_TOKEN lê porque o pacote libera este repo.
+          # @betinhos/ui vem do GitHub Packages (repo design-system-betinhos). Lê com o secret PACKAGES_READ_TOKEN
+          # (PAT read:packages) e, sem ele, com o GITHUB_TOKEN liberado em Manage Actions access do pacote.
           registry-url: https://npm.pkg.github.com
           scope: '@betinhos-executive-service'
       - name: Diagnóstico temporário do acesso ao GitHub Packages
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           for p in ui tokens; do
             code=$(curl -s -o /tmp/meta.json -w "%{http_code}" -H "Authorization: Bearer $NODE_AUTH_TOKEN" "https://npm.pkg.github.com/@betinhos-executive-service%2F$p")
@@ -29,7 +30,7 @@ jobs:
           pnpm config get @betinhos-executive-service:registry || true
       - run: pnpm install --frozen-lockfile
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN || secrets.GITHUB_TOKEN }}
       - run: pnpm typecheck
       - run: pnpm test
       - name: Varredura de segredos na solução
