@@ -37,14 +37,14 @@
 .bt-shell__search > input::-webkit-search-cancel-button { filter: invert(1); }
 .bt-shell__empty { margin: var(--bt-space-2) var(--bt-space-2-5); font-size: var(--bt-font-size-12); color: var(--bt-color-border); }
 
-/* Lista rolável: barra fina que só aparece ao pousar o mouse. */
-.bt-shell__groups { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding: 0 var(--bt-space-2) var(--bt-space-2); scrollbar-width: thin; scrollbar-color: transparent transparent; }
+/* Lista rolável: barra fina que só aparece ao pousar o mouse. `contain: strict` isola o acordeão: a animação de altura não refaz o layout da tela. */
+.bt-shell__groups { contain: strict; flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding: 0 var(--bt-space-2) var(--bt-space-2); scrollbar-width: thin; scrollbar-color: transparent transparent; }
 .bt-shell__groups:hover { scrollbar-color: var(--bt-color-brand-hover) transparent; }
 .bt-shell__groups::-webkit-scrollbar { width: 6px; }
 .bt-shell__groups::-webkit-scrollbar-thumb { background: transparent; border-radius: var(--bt-radius-full); }
 .bt-shell__groups:hover::-webkit-scrollbar-thumb { background: var(--bt-color-brand-hover); }
 
-/* Grupos em acordeão: grid-template-rows anima, itens entram em cascata curta e saem mais rápido. */
+/* Grupos em acordeão: grid-template-rows anima e a lista inteira faz um fade (uma animação só; cascata por item custava ~50 camadas por quadro). */
 .bt-shell__group { margin-bottom: 2px; }
 .bt-shell__section-label { margin: var(--bt-space-3-5) var(--bt-space-2-5) var(--bt-space-1-5); padding-top: var(--bt-space-3); border-top: var(--bt-border-width-default) solid var(--bt-color-brand-hover); font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); letter-spacing: 0.8px; text-transform: uppercase; color: var(--bt-color-text-secondary); }
 .bt-shell__group-toggle { width: 100%; color: var(--bt-color-surface); }
@@ -56,24 +56,15 @@
 .bt-shell__group[data-open] .bt-shell__group-chevron { transform: rotate(180deg); }
 .bt-shell__panel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--bt-duration-fast) var(--bt-ease-out); }
 .bt-shell__group[data-open] .bt-shell__panel { grid-template-rows: 1fr; transition-duration: var(--bt-duration-normal); }
-.bt-shell__items { list-style: none; min-height: 0; min-width: 0; overflow: hidden; visibility: hidden; margin: 2px 2px var(--bt-space-1-5) 20px; padding: 0 0 0 var(--bt-space-2-5); border-left: var(--bt-border-width-default) solid var(--bt-color-brand-hover); display: grid; gap: 2px; transition: visibility 0s linear var(--bt-duration-fast); }
-.bt-shell__group[data-open] .bt-shell__items { visibility: visible; transition-delay: 0s; }
+.bt-shell__items { list-style: none; min-height: 0; min-width: 0; overflow: hidden; visibility: hidden; opacity: 0; margin: 2px 2px var(--bt-space-1-5) 20px; padding: 0 0 0 var(--bt-space-2-5); border-left: var(--bt-border-width-default) solid var(--bt-color-brand-hover); display: grid; gap: 2px; transition: opacity 100ms ease, visibility 0s linear var(--bt-duration-fast); }
+.bt-shell__group[data-open] .bt-shell__items { visibility: visible; opacity: 1; transition: opacity 160ms var(--bt-ease-out), visibility 0s; }
 .bt-shell__items > li { min-width: 0; }
-.bt-shell__item { position: relative; height: 36px; border-radius: var(--bt-radius-sm); font-weight: var(--bt-font-weight-medium); opacity: 0; transform: translateY(-3px); transition: opacity 100ms ease, transform 100ms ease, background-color var(--bt-duration-fast) ease, color var(--bt-duration-fast) ease; }
-.bt-shell__group[data-open] .bt-shell__item { opacity: 1; transform: none; transition: opacity 160ms var(--bt-ease-out), transform 160ms var(--bt-ease-out), background-color var(--bt-duration-fast) ease, color var(--bt-duration-fast) ease; }
-.bt-shell__group[data-open] li:nth-child(2) .bt-shell__item { transition-delay: 25ms; }
-.bt-shell__group[data-open] li:nth-child(3) .bt-shell__item { transition-delay: 50ms; }
-.bt-shell__group[data-open] li:nth-child(4) .bt-shell__item { transition-delay: 75ms; }
-.bt-shell__group[data-open] li:nth-child(5) .bt-shell__item { transition-delay: 100ms; }
-.bt-shell__group[data-open] li:nth-child(6) .bt-shell__item { transition-delay: 125ms; }
-.bt-shell__group[data-open] li:nth-child(7) .bt-shell__item { transition-delay: 150ms; }
-.bt-shell__group[data-open] li:nth-child(n+8) .bt-shell__item { transition-delay: 175ms; }
+.bt-shell__item { position: relative; height: 36px; border-radius: var(--bt-radius-sm); font-weight: var(--bt-font-weight-medium); }
 .bt-shell__item[data-active] { background-color: var(--bt-color-brand-hover); color: var(--bt-color-surface); font-weight: var(--bt-font-weight-bold); }
 .bt-shell__item[data-active]::before { content: ""; position: absolute; left: -11px; top: var(--bt-space-2); bottom: var(--bt-space-2); width: 3px; border-radius: var(--bt-radius-full); background-color: var(--bt-color-action); }
 
 /* Rodapé da sidebar */
 .bt-shell__foot { display: grid; gap: var(--bt-space-2); padding: var(--bt-space-3) var(--bt-space-3) calc(var(--bt-space-3-5) + env(safe-area-inset-bottom)); border-top: var(--bt-border-width-default) solid var(--bt-color-brand-hover); }
-.bt-shell__foot > .bt-shell__item { opacity: 1; transform: none; }
 .bt-shell__user { display: flex; align-items: center; gap: var(--bt-space-2-5); padding: 0 var(--bt-space-1-5); }
 .bt-shell__user-text { display: grid; gap: 2px; min-width: 0; }
 .bt-shell__user-name { overflow: hidden; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); white-space: nowrap; text-overflow: ellipsis; }
@@ -134,7 +125,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .bt-shell__nav, .bt-shell__panel, .bt-shell__group-chevron, .bt-shell__item, .bt-shell__popover-item, .bt-shell__nav-button, .bt-shell__rail-button, .bt-shell__group-toggle { transition: none; transform: none; }
-  .bt-shell__group[data-open] .bt-shell__item { transition: opacity 120ms ease; }
+  .bt-shell__items, .bt-shell__group[data-open] .bt-shell__items { transition: opacity 120ms ease, visibility 0s; }
   .bt-shell__popover { animation: bt-shell-fade 120ms ease both; }
 }
 @keyframes bt-shell-fade { from { opacity: 0; } to { opacity: 1; } }

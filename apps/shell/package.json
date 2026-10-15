@@ -1,12 +1,12 @@
 {
   "name": "@betinhos/shell",
   "private": true,
-  "version": "0.0.30",
+  "version": "0.0.32",
   "type": "module",
   "scripts": {
     "dev": "node ../../packages/deploy/dev-restart.mjs 36472 .",
     "typecheck": "tsc --noEmit",
-    "build": "node ../../packages/deploy/bump-version.mjs . && tsc --noEmit && vite build && node ../../packages/deploy/inline-webresource.mjs dist",
+    "build": "node ../../packages/deploy/bump-version.mjs . && tsc --noEmit && vite build && node ../../packages/deploy/inline-webresource.mjs dist --assets-url /WebResources/cr40f_SistemaBetinhos/assets/",
     "wr": "pnpm build",
     "test": "vitest run",
     "push": "pnpm build && powershell.exe -NoProfile -ExecutionPolicy Bypass -File ../../packages/deploy/push-dev.ps1 -AppDir apps/shell -ResourceName cr40f_SistemaBetinhos.html -DisplayName \"Sistema Betinhos\" -LoaderName cr40f_SistemaBetinhosLoader.html -DeviceCode",
