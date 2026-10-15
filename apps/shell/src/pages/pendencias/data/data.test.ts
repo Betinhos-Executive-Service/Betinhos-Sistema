@@ -23,6 +23,7 @@ describe('queries', () => {
     const p = decodeURIComponent(reservasPath('set', new Date('2026-01-01T00:00:00Z'), 'nav_cp'))
     expect(p).toContain('cr40f_dataehorriodesada ge 2026-01-01')
     expect(p).toContain('_cr40f_financeiro_value ne null')
+    expect(p).toContain('cr40f_statusdefaturamento eq 202410008')
     expect(p).toContain('$expand=nav_cp($select=new_status,new_valortotal)')
     expect(decodeURIComponent(reservasPath('set', null))).not.toContain('cr40f_dataehorriodesada ge')
     expect(decodeURIComponent(opsChunkPath('ops', [G, G]))).toContain(`cr40f_financeiroid eq ${G} or cr40f_financeiroid eq ${G}`)
@@ -33,7 +34,7 @@ describe('mock', () => {
   it('produz um caso de cada tipo', () => {
     const d = createMockPendencias(new Date())
     expect(detectarPendencias(d.ops, d.reservas, d.pagantes).map((p) => p.tipo).sort())
-      .toEqual(['op-paga-desalinhada', 'op-sem-pagamento-reserva-paga', 'pago-sem-op-paga', 'rateio-nao-fecha'])
+      .toEqual(['mensal-sem-op', 'op-paga-desalinhada', 'op-sem-pagamento-reserva-paga', 'pago-sem-op-paga', 'rateio-nao-fecha'])
   })
 
   it('sincronizar aplicar remove o tipo 1; simular não altera', async () => {
@@ -46,5 +47,16 @@ describe('mock', () => {
     const ap = await source.sincronizar('mock-op-p1', 'aplicar')
     expect(ap.aplicadas).toBe(true)
     expect(await tipos()).not.toContain('op-paga-desalinhada')
+  })
+
+  it('fecharMes cria a OP, vincula as reservas e remove o tipo 4', async () => {
+    const source = createSource({ mode: 'mock' } as never)
+    const pend = async () => { const d = await source.load(null); return detectarPendencias(d.ops, d.reservas, d.pagantes) }
+    const t4 = (await pend()).find((p) => p.tipo === 'mensal-sem-op')!
+    const r = await source.fecharMes(t4.clienteId, t4.mes!)
+    expect(r).toMatchObject({ reservas: 2, valor: 900 })
+    expect(r.opId).toBeTruthy()
+    expect((await pend()).map((p) => p.tipo)).not.toContain('mensal-sem-op')
+    await expect(source.fecharMes(t4.clienteId, t4.mes!)).rejects.toThrow()
   })
 })

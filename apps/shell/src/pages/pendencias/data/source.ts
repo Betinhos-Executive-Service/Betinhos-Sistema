@@ -2,17 +2,21 @@ import { cleanId } from '@betinhos/dataverse'
 import type { Host } from '../../../host'
 import { browserKV } from '../../pagantes/data/source'
 import type { KV } from '../../pagantes/domain/filters'
-import { CP, FAT, OP } from '../domain/codes'
+import { CP, FAT, OP, RESERVA_CONCLUIDA } from '../domain/codes'
+import { mesSP } from '../domain/detect'
 import type { OpResumo, PaganteResumo, Reserva } from '../domain/types'
 import { createMockPendencias } from './mock'
 import { ENTITY_OP, ENTITY_PAGANTE, ENTITY_RESERVA, loadPendenciasData, resolveCpNav, type EntitySets } from './queries'
 
 export type Mudanca = { entidade: string; id: string; campo: string; de: number | null; para: number | null; limparLookup: boolean; motivo: string }
 export type Sincronizacao = { opId: string; modo: 'simular' | 'aplicar'; mudancas: Mudanca[]; aplicadas: boolean }
+export type FechamentoMes = { opId: string; reservas: number; valor: number }
 export type Source = {
   mock: boolean
   load: (since: Date | null) => Promise<{ ops: OpResumo[]; reservas: Reserva[]; pagantes: PaganteResumo[] }>
   sincronizar: (opId: string, modo: 'simular' | 'aplicar') => Promise<Sincronizacao>
+  /** Fecha o mês ('AAAA-MM') do cliente: cria a OP consolidada e vincula os serviços mensais. */
+  fecharMes: (clienteId: string, mes: string) => Promise<FechamentoMes>
   kv: KV
 }
 
@@ -56,6 +60,17 @@ function createMockSource(): Source {
       }
       return { opId, modo, mudancas, aplicadas: modo === 'aplicar' }
     },
+    async fecharMes(clienteId, mes) {
+      await wait(400)
+      const rs = data.reservas.filter((r) => r.clienteId === clienteId && r.status === RESERVA_CONCLUIDA && r.fatStatus === FAT.mensal && !r.opId && r.saida && mesSP(r.saida) === mes)
+      if (!rs.length) throw new Error('Nenhum serviço mensal sem OP neste mês.')
+      const valor = rs.reduce((s, r) => s + (r.cpValor ?? 0), 0)
+      const n = data.ops.length + 900
+      const op: OpResumo = { id: `mock-op-p${n}`, codigo: `OP-${500 + n}`, status: OP.aberta, valor, cliente: rs[0].cliente }
+      data.ops.push(op)
+      for (const r of rs) { r.opId = op.id; r.opCodigo = op.codigo }
+      return { opId: op.id, reservas: rs.length, valor }
+    },
     kv: browserKV(),
   }
 }
@@ -85,6 +100,12 @@ export function createSource(host: Host): Source {
         { method: 'POST', body: JSON.stringify(body) },
       )
       return JSON.parse(res.cr40f_ResponseJson) as Sincronizacao
+    },
+    async fecharMes(clienteId, mes) {
+      const res = await host.client.request<{ cr40f_ResponseJson: string }>('cr40f_FecharMesCliente', {
+        method: 'POST', body: JSON.stringify({ cr40f_RequestJson: JSON.stringify({ clienteId: cleanId(clienteId), mes }) }),
+      })
+      return JSON.parse(res.cr40f_ResponseJson) as FechamentoMes
     },
     kv: browserKV(),
   }
