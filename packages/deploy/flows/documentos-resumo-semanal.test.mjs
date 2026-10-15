@@ -26,10 +26,10 @@ test('envia pela noreply só para destinatários com e-mail', () => {
   assert.equal(email.inputs.parameters['emailMessage/From'], '__REMETENTE__')
 })
 
-test('Catch roda só quando o Try falha, avisa o admin sem depender da noreply e marca a execução como falha', () => {
+test('Catch roda só quando o Try falha, avisa o admin pela noreply e marca a execução como falha', () => {
   assert.deepEqual(flow.actions.Catch.runAfter, { Try: ['Failed', 'TimedOut'] })
   const aviso = flow.actions.Catch.actions.Avisar_admin
-  assert.equal(aviso.inputs.parameters['emailMessage/From'], undefined)
+  assert.equal(aviso.inputs.parameters['emailMessage/From'], '__REMETENTE__')
   assert.match(aviso.inputs.parameters['emailMessage/To'], /new_EmailAdminAvisos/)
   assert.equal(flow.actions.Catch.actions.Marcar_falha.type, 'Terminate')
 })
