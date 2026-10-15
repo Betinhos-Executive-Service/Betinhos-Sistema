@@ -1,9 +1,8 @@
-import { useCallback, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
-import { Alert, Button, EmptyState, Menu, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
-import { Archive, ArchiveRestore, Bug, CalendarDays, ChevronDown, ClipboardList, Copy, FilePlus2, Link2, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Send, ShieldCheck, Ticket, X } from 'lucide-react'
+import { Alert, Button, EmptyState, Menu, SearchBox, SegmentedControl, Stack, StatusBadge, ToastProvider, ViewBar, readFilters, useShellHeader, useToast, type FilterGroup, type FilterOption } from '@betinhos/ui'
+import { Archive, ArchiveRestore, Bug, CalendarDays, ChevronDown, ClipboardList, Copy, FilePlus2, LayoutGrid, Link2, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Send, ShieldCheck, Table2, Ticket, X } from 'lucide-react'
 import type { Host } from '../../host'
-import { PageLayout } from '../../app/PageLayout'
 import { useMedia } from '../operacional/useMedia'
 import { hrefFor, queryFromHash } from '../../nav/useHashRoute'
 import { createSource } from './data/source'
@@ -14,12 +13,7 @@ import { GeralTable } from './components/GeralTable'
 import { CopyDialog, DispararDialog, GerarOpDialog, MockFormDialog, StateDialog, type DispararRequest, type OpRequest, type StateRequest } from './components/Dialogs'
 import { ContagemDrawer, shiftDay, todayIso } from './components/ContagemDrawer'
 import { EscalaFdsDrawer } from './components/EscalaFdsDrawer'
-import { FilterChips } from './components/FilterChips'
-import { FilterDialog } from './components/FilterEditor'
-import { FiltersDrawer } from './components/FiltersDrawer'
 import { LoadMore, LoadSentinel, statusText } from './components/LoadMore'
-import { GeralToolbar } from './components/GeralToolbar'
-import { ViewMenu } from './components/ViewMenu'
 import { AuditoriaOverlay } from './components/AuditoriaOverlay'
 import { LINK_FALHA, gerarLinkBlock } from './domain/link'
 import { VoucherOverlay } from './components/VoucherOverlay'
@@ -27,13 +21,12 @@ import { FormOverlay } from './components/FormOverlay'
 import { copyText } from './domain/copy'
 import { loadViewMode, saveViewMode, type ViewMode } from './domain/viewMode'
 import { splitOp } from './domain/commands'
-import { isEmptyFilter, type Filter } from './domain/filters'
-import { filterKindOf } from './domain/filterKind'
 import { applyColumnPrefs, loadColumnPrefs, saveColumnPrefs, type ColumnPrefs } from './domain/columns'
 import { buildLayout, buildViewFetch } from './domain/views'
 import { ID_ATTRIBUTE, type CellStatus, type Column } from './domain/types'
 import { readUrlState, writeUrlState, type UrlState } from './domain/urlState'
 import { cellKey, useGeral, type SaveFailure } from './useGeral'
+import { useGeralViewState } from './useGeralViewState'
 import './geral.css'
 
 export function GeralPage({ host }: { host: Host }) {
@@ -100,27 +93,22 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const [dispBusy, setDispBusy] = useState(false)
   const [escalaOpen, setEscalaOpen] = useState(false)
   const [contagemOpen, setContagemOpen] = useState(false)
-  // Filtro por coluna: `editingFilter` é o atributo no diálogo "Filtrar …"; o painel "Editar filtros" lista todos.
-  const [editingFilter, setEditingFilter] = useState<string | null>(null)
-  const [filtersOpen, setFiltersOpen] = useState(false)
-  const { filters, setFilter, clearFilters } = geral
-  // Ao fechar o diálogo de filtro (aplicar ou cancelar) o foco volta ao ▾ da coluna; o diálogo nativo devolveria ao item de menu já desmontado.
-  const closeFilter = useCallback(() => {
-    const label = editingFilter ? attributes?.get(editingFilter)?.label || editingFilter : null
-    setEditingFilter(null)
-    if (label) window.setTimeout(() => Array.from(document.querySelectorAll<HTMLElement>('.gr-head__menu')).find((el) => el.getAttribute('aria-label') === `Opções da coluna ${label}`)?.focus(), 0)
-  }, [editingFilter, attributes])
+  // Filtros do Design System (§10.9.2): rápidos por coluna e avançado E/OU; valem os que casam com os campos da metadata.
+  const { filters, setFilters, setQuickFilter, filterFields } = geral
+  const valid = useMemo(() => readFilters(filters, filterFields), [filters, filterFields])
+  const filteredKeys = useMemo(() => {
+    const keys = new Set(Object.keys(valid.quick))
+    const walk = (group: FilterGroup) => group.items.forEach((item) => (item.type === 'group' ? walk(item) : keys.add(item.field)))
+    walk(valid.advanced)
+    return [...keys]
+  }, [valid])
   const contagemDay = useMemo(() => {
-    const f = filters.cr40f_dataehorriodesada
-    if (f?.kind === 'date') {
-      if (f.op === 'today') return todayIso()
-      if (f.op === 'tomorrow') return shiftDay(todayIso(), 1)
-      if (f.op === 'range' && f.from && /^\d{4}-\d{2}-\d{2}/.test(f.from)) return f.from.slice(0, 10)
-    }
+    const f = valid.quick.cr40f_dataehorriodesada
+    if (f?.op === 'today') return todayIso()
+    if (f?.op === 'tomorrow') return shiftDay(todayIso(), 1)
+    if (f?.op === 'between' && typeof f.value === 'string') return f.value.slice(0, 10)
     return todayIso()
-  }, [filters])
-  const filtersCount = useMemo(() => Object.values(filters).filter((f) => !isEmptyFilter(f)).length, [filters])
-  const applyFilters = useCallback((drafts: Record<string, Filter | null>) => { for (const [attribute, filter] of Object.entries(drafts)) setFilter(attribute, filter) }, [setFilter])
+  }, [valid])
   const hideColumn = useCallback((key: string) => {
     const base = prefs ?? { hidden: [], order: geral.columns.map((c) => c.key) }
     setPrefs({ ...base, hidden: base.hidden.includes(key) ? base.hidden : [...base.hidden, key] })
@@ -146,42 +134,34 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const viewPayload = useCallback(async () => {
     if (!view) throw new Error('Nenhuma visão aberta.')
     if (geral.filtersIgnored) throw new Error('Os filtros não puderam ser aplicados porque os campos não carregaram. Atualize e tente de novo.')
-    const fetchxml = buildViewFetch(view.fetchxml, geral.filters, geral.sort, attributes ?? new Map())
+    const fetchxml = buildViewFetch(view.fetchxml, geral.filters, geral.sort, geral.filterFields)
     const layoutxml = buildLayout(visibleColumns, prefs?.widths, await source.objectTypeCode())
     return { fetchxml, layoutxml }
-  }, [view, geral.filtersIgnored, geral.filters, geral.sort, attributes, visibleColumns, prefs, source])
-  const attemptAction = useCallback(async (action: () => Promise<void>, success: string, failure: string) => {
-    try {
-      await action()
-      toast({ tone: 'success', message: success })
-      return true
-    } catch (reason) {
-      toast({ tone: 'danger', message: `${failure}: ${reason instanceof Error ? reason.message : String(reason)}` })
-      return false
-    }
-  }, [toast])
-  const saveViewAs = useCallback((name: string) => attemptAction(async () => {
-    const created = await source.createView({ name, ...(await viewPayload()) })
-    await reloadViews(created.id)
-  }, `Visão “${name}” criada.`, 'Não foi possível criar a visão'), [attemptAction, source, viewPayload, reloadViews])
-  const saveView = useCallback(() => attemptAction(async () => {
+  }, [view, geral.filtersIgnored, geral.filters, geral.sort, geral.filterFields, visibleColumns, prefs, source])
+  const createView = useCallback(async (name: string) => (await source.createView({ name, ...(await viewPayload()) })).id, [source, viewPayload])
+  const updateView = useCallback(async () => {
     if (!view) return
     await source.updateView(view.id, await viewPayload())
     // A visão agora carrega as colunas e larguras: as preferências locais já não têm o que acrescentar.
     setPrefs(null)
     await reloadViews()
-  }, 'Visão atualizada.', 'Não foi possível salvar a visão'), [attemptAction, view, source, viewPayload, setPrefs, reloadViews])
-  const renameView = useCallback((name: string) => attemptAction(async () => {
+  }, [view, source, viewPayload, setPrefs, reloadViews])
+  const renameView = useCallback(async (name: string) => {
     if (!view) return
     await source.renameView(view.id, name)
     await reloadViews()
-  }, 'Visão renomeada.', 'Não foi possível renomear a visão'), [attemptAction, view, source, reloadViews])
-  const deleteView = useCallback(() => attemptAction(async () => {
+  }, [view, source, reloadViews])
+  const deleteView = useCallback(async () => {
     if (!view) return
     await source.deleteView(view.id)
     saveColumnPrefs(source.kv, view.id, null)
     await reloadViews()
-  }, 'Visão excluída.', 'Não foi possível excluir a visão'), [attemptAction, view, source, reloadViews])
+  }, [view, source, reloadViews])
+  const { state: viewState, columnDefs } = useGeralViewState({
+    views: geral.views, view, viewsError: geral.viewsError, columns: geral.columns, attributes, prefs, setPrefs,
+    sort: geral.sort, setSort: geral.setSort, filters, setFilters, selectView, reloadViews,
+    createView, updateView, renameView, deleteView, kv: source.kv,
+  })
   const shareLink = useCallback(async () => {
     try {
       if (!navigator.clipboard?.writeText) throw new Error('Área de transferência indisponível.')
@@ -447,6 +427,18 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   }, [selectOnly, selectRange, toggle])
   // Callbacks estáveis: a célula passa o próprio id/coluna, então só a que mudou de status ou de linha renderiza de novo.
   const searchLookup = useCallback((attribute: string, text: string) => source.search(attribute, text), [source])
+  const searchFilter = useCallback(async (field: { key: string }, text: string): Promise<FilterOption[]> =>
+    (await source.search(field.key, text)).map((o) => ({ value: o.id, label: o.nome })), [source])
+  // "Filtrar por…" do ▾ da coluna: foca a célula da linha de filtro rápido (mostrando a linha, se estava escondida).
+  const { quickRow, setQuickRow } = viewState
+  const focusQuickFilter = useCallback((attribute: string) => {
+    const label = filterFields.find((f) => f.key === attribute)?.label ?? attribute
+    if (!quickRow) setQuickRow(true)
+    window.setTimeout(() => document.querySelector<HTMLElement>(`.gr-quickrow [aria-label="Filtrar ${CSS.escape(label)}"]`)?.focus(), 0)
+  }, [filterFields, quickRow, setQuickRow])
+  // Busca por palavra-chave: o texto fica local; a busca de verdade sai depois da pausa.
+  const [searchText, setSearchText] = useState(query)
+  useEffect(() => setSearchText(query), [query])
   const renderCell = useCallback((row: Row, column: Column): ReactNode => {
     const id = String(row[ID_ATTRIBUTE])
     return (
@@ -521,9 +513,10 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               sort={geral.sort}
               defaultSort={geral.defaultOrder}
               onSort={geral.setSort}
-              filters={filters}
-              onEditFilter={setEditingFilter}
-              onClearFilter={(attribute) => setFilter(attribute, null)}
+              filteredKeys={filteredKeys}
+              quick={{ fields: filterFields, value: valid.quick, onChange: setQuickFilter, search: searchFilter, visible: quickRow }}
+              onEditFilter={focusQuickFilter}
+              onClearFilter={(attribute) => setQuickFilter(attribute, null)}
               onHide={hideColumn}
               selected={geral.selected}
               onToggle={geral.toggle}
@@ -541,51 +534,32 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     )
   }
 
+  const size = mobile ? 'touch' : 'compact'
+  const notApplied = geral.filtersIgnored ? [...Object.keys(filters.quick), ...filters.advanced.items.map((i) => i.id)] : undefined
+
   return (
-    <PageLayout
-      eyebrow="Operacional"
-      title="Geral"
-      meta={<span className="gr-meta">{status != null ? <span>{status}</span> : null}{source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}</span>}
-      className="gr-page"
-      bodyClassName="gr-body"
-      actions={<Button variant="secondary" icon={<RefreshCw size={16} />} loading={loading && rows.length > 0} onClick={reload}>Atualizar</Button>}
-      toolbar={
-        <GeralToolbar
-          views={geral.views}
-          view={view}
-          onSelectView={selectView}
-          viewMenu={<ViewMenu view={view} mobile={mobile} onSaveAs={saveViewAs} onSave={saveView} onRename={renameView} onDelete={deleteView} onShare={() => { void shareLink() }} />}
-          query={query}
-          onQuery={setQuery}
-          searching={loading && query !== ''}
-          columns={geral.columns}
-          attributes={attributes}
-          prefs={prefs}
-          onPrefs={setPrefs}
-          selectedCount={mobile ? 0 : geral.selected.size}
-          filtersCount={filtersCount}
-          onOpenFilters={() => setFiltersOpen(true)}
-          filtersUnavailable={geral.attributesError != null}
-          mobile={mobile}
-          mode={mobile ? undefined : mode}
-          onMode={changeMode}
-          commands={commands}
-          shortcuts={shortcuts}
-        />
-      }
-    >
-      <FilterChips ignored={geral.filtersIgnored} filters={filters} attributes={attributes} mobile={mobile} onEdit={setEditingFilter} onRemove={(attribute) => setFilter(attribute, null)} onClearAll={clearFilters} />
+    <div className="page gr-page">
+      <ViewBar
+        view={viewState}
+        columns={columnDefs}
+        filters={{ fields: filterFields, search: searchFilter, notApplied }}
+      >
+        {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
+        {!mobile ? (
+          <SegmentedControl<ViewMode> size="compact" aria-label="Mostrar como" value={mode} onChange={changeMode} options={[
+            { value: 'tabela', label: <span className="gr-mode"><Table2 size={14} aria-hidden="true" />Tabela</span> },
+            { value: 'cards', label: <span className="gr-mode"><LayoutGrid size={14} aria-hidden="true" />Cards</span> },
+          ]} />
+        ) : null}
+        <SearchBox className="gr-filters__search" size={size} aria-label="Buscar serviços" placeholder="Buscar por ID, trajeto, cliente…" value={searchText} onChange={setSearchText} onSearch={(value) => { if (value.trim() !== query) setQuery(value.trim()) }} debounce={300} loading={loading && query !== ''} />
+        {!mobile && geral.selected.size > 0 ? <span role="status" className="gr-filters__selected"><StatusBadge tone="info">{geral.selected.size === 1 ? '1 selecionado' : `${geral.selected.size} selecionados`}</StatusBadge></span> : null}
+        {commands}
+        <Button variant="secondary" size={size} icon={<Link2 size={16} />} aria-label="Compartilhar link" title="Compartilhar link" onClick={() => { void shareLink() }} />
+        <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title={status ?? 'Atualizar'} loading={loading && rows.length > 0} onClick={reload} />
+        {shortcuts}
+      </ViewBar>
+      <Stack gap="4" className="gr-body">
       {body}
-      <FilterDialog
-        attribute={editingFilter}
-        info={editingFilter ? attributes?.get(editingFilter) : undefined}
-        kind={editingFilter ? filterKindOf(editingFilter, attributes?.get(editingFilter)) : null}
-        value={editingFilter ? filters[editingFilter] ?? null : null}
-        search={searchLookup}
-        onApply={setFilter}
-        onClose={closeFilter}
-      />
-      <FiltersDrawer open={filtersOpen} onClose={() => setFiltersOpen(false)} filters={filters} attributes={attributes} columns={geral.columns} search={searchLookup} onApply={applyFilters} onClearAll={clearFilters} unavailable={geral.attributesError != null} loading={attributes == null && geral.attributesError == null} />
       {mobile && geral.selected.size > 0 ? (
         <div className="gr-selbar" role="group" aria-label="Ações sobre os selecionados">
           <span role="status" className="gr-selbar__count">{geral.selected.size === 1 ? '1 selecionado' : `${geral.selected.size} selecionados`}</span>
@@ -615,6 +589,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       {auditoriaUrl ? <AuditoriaOverlay url={auditoriaUrl} onClose={() => setAuditoriaUrl(null)} /> : null}
       {voucherUrl ? <VoucherOverlay url={voucherUrl} onClose={() => setVoucherUrl(null)} /> : null}
       {formUrl ? <FormOverlay url={formUrl} onClose={() => { setFormUrl(null); refresh() }} /> : null}
-    </PageLayout>
+      </Stack>
+    </div>
   )
 }
