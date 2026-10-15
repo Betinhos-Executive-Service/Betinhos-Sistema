@@ -16,6 +16,7 @@ import {
   type ExpenseValidationErrors
 } from "../lib/expenses";
 import type { MaintenanceRequestVehicleOption } from "../lib/dataverse";
+import { QUICK_READ_MAX_TENTATIVAS, type QuickReadState } from "../lib/receiptQuickRead";
 
 type ExpenseScreenProps = {
   uploadMessage?: string;
@@ -36,6 +37,8 @@ type ExpenseScreenProps = {
   vehicles: MaintenanceRequestVehicleOption[];
   vehiclesLoading: boolean;
   currentVehicleId: string;
+  quickRead?: QuickReadState;
+  onRetakeQuickReadPhoto?: () => void;
 };
 
 function focusInvalidField(element: HTMLElement | null) {
@@ -61,7 +64,9 @@ export function ExpenseScreen({
   submitState,
   vehicles,
   vehiclesLoading,
-  currentVehicleId
+  currentVehicleId,
+  quickRead,
+  onRetakeQuickReadPhoto
 }: ExpenseScreenProps) {
   const isSubmitting = submitState !== "idle";
   const categoryRef = useRef<HTMLButtonElement | null>(null);
@@ -161,6 +166,19 @@ export function ExpenseScreen({
                 <div className="form-error-summary">Categorias, formas de pagamento ou cidades não encontradas no Dataverse.</div>
               ) : null}
               {errorCount ? <div className="form-error-summary">Revise {errorCount} campo(s) destacado(s).</div> : null}
+              {quickRead?.status === "lendo" ? <div className="form-error-summary" role="status" aria-live="polite">Lendo comprovante…</div> : null}
+              {quickRead?.status === "preenchido" ? <div className="form-error-summary" role="status">Confira os dados lidos do comprovante.</div> : null}
+              {quickRead?.status === "ilegivel" ? (
+                <div className="form-error-summary" role="alert">
+                  Não consegui ler o comprovante. Tire outra foto mais perto, com luz e sem cortar.
+                  <ActionButton variant="secondary" idleLabel="TIRAR OUTRA FOTO" state="idle" disabled={isSubmitting} onClick={() => onRetakeQuickReadPhoto?.()} />
+                </div>
+              ) : null}
+              {quickRead?.status === "manual" ? (
+                <div className="form-error-summary" role="status">
+                  {quickRead.tentativas >= QUICK_READ_MAX_TENTATIVAS ? "Preencha os dados do comprovante manualmente." : "Preencha os dados do comprovante."}
+                </div>
+              ) : null}
 
               <TextInputField
                 ref={dateRef}
