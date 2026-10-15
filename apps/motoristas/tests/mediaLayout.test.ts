@@ -65,7 +65,7 @@ test("controles da camera seguem visual minimalista do app", () => {
   assert.equal([...cameraControls, ...shutterShell, ...shutterCore, ...recordButton].some((block) => /linear-gradient|radial-gradient/i.test(block)), false);
 });
 
-test("tela de captura usa titulo no topo e preview transparente", () => {
+test("tela de captura usa titulo no topo e preview em fit com fundo neutro", () => {
   const cameraView = getBlocksContaining(".camera-capture-card .camera-view");
   const realCameraVideo = getBlocksContaining(".camera-capture-card .real-camera-video");
 
@@ -73,7 +73,8 @@ test("tela de captura usa titulo no topo e preview transparente", () => {
   assert.doesNotMatch(mediaCaptureScreen, /camera-capture-title/);
   assert.doesNotMatch(mediaCaptureScreen, /Camera nativa/i);
   assert.equal(cameraView.some((block) => /background:\s*transparent\s*!important/i.test(block)), true);
-  assert.equal(realCameraVideo.some((block) => /background:\s*transparent\s*!important/i.test(block)), true);
+  assert.equal(realCameraVideo.some((block) => /object-fit:\s*contain\s*!important/i.test(block)), true);
+  assert.equal(realCameraVideo.some((block) => /background:\s*#fcfcfb\s*!important/i.test(block)), true);
 });
 
 test("camera ao vivo evita proporcao fixa e pede qualidade HD quando possivel", () => {
