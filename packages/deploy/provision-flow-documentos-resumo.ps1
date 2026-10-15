@@ -109,7 +109,14 @@ $flows = @((Dv GET "workflows?`$select=workflowid,statecode,clientdata&`$filter=
 if ($flows.Count -gt 1) { throw 'Flow duplicado no DEV.' }
 if ($flows.Count) {
   $flowId = $flows[0].workflowid
-  if ($flows[0].clientdata -ne $clientData) {
+  # O Dataverse normaliza o clientdata; compara só definição e referências de conexão, ambas normalizadas igual.
+  $normalizar = { param($o) if ($null -eq $o) { '' } else { ($o | ConvertTo-Json -Depth 90 -Compress | ConvertFrom-Json | ConvertTo-Json -Depth 90 -Compress) } }
+  $guardado = $flows[0].clientdata | ConvertFrom-Json
+  $novo = $clientData | ConvertFrom-Json
+  $mudou = (& $normalizar $guardado.properties.definition) -ne (& $normalizar $novo.properties.definition) -or
+           (& $normalizar $guardado.properties.connectionReferences) -ne (& $normalizar $novo.properties.connectionReferences)
+  Write-Output "Definição do flow alterada: $(if ($mudou) { 'sim, atualizando' } else { 'não, mantida' })"
+  if ($mudou) {
     if ($flows[0].statecode -eq 1) { Dv PATCH "workflows($flowId)" @{ statecode = 0 } | Out-Null }
     Dv PATCH "workflows($flowId)" @{ clientdata = $clientData } | Out-Null
   }

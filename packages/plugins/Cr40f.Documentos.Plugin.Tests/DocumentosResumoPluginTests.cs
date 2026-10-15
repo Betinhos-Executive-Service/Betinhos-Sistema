@@ -60,4 +60,10 @@ public class DocumentosResumoPluginTests
         // 02:00 UTC de 20/10 ainda é 19/10 em Brasília (UTC-3).
         Assert.Equal("2026-10-19", DocumentosResumoPlugin.ResolverHoje(null, new DateTime(2026, 10, 20, 2, 0, 0, DateTimeKind.Utc)));
     }
+
+    [Fact]
+    public void Falha_ao_obter_o_fuso_cai_para_utc_menos_3()
+    {
+        Assert.Equal("2026-10-19", DocumentosResumoPlugin.ResolverHoje(null, new DateTime(2026, 10, 20, 2, 0, 0, DateTimeKind.Utc), () => throw new System.Security.SecurityException("sandbox")));
+    }
 }

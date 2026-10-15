@@ -40,15 +40,18 @@ public sealed class DocumentosResumoPlugin : IPlugin
     }
 
     public static string ResolverHoje(object? entrada, DateTime utcAgora)
+        => ResolverHoje(entrada, utcAgora, () => TimeZoneInfo.FindSystemTimeZoneById(FusoBrasilia));
+
+    public static string ResolverHoje(object? entrada, DateTime utcAgora, Func<TimeZoneInfo> fuso)
     {
         if (entrada is DateTime informado && informado != DateTime.MinValue)
             return informado.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         DateTime local;
         try
         {
-            local = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcAgora, DateTimeKind.Utc), TimeZoneInfo.FindSystemTimeZoneById(FusoBrasilia));
+            local = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcAgora, DateTimeKind.Utc), fuso());
         }
-        catch (TimeZoneNotFoundException)
+        catch (Exception) // No sandbox do Dataverse o fuso pode lançar SecurityException ou InvalidTimeZoneException.
         {
             local = utcAgora.AddHours(-3); // Brasília sem horário de verão desde 2019.
         }
