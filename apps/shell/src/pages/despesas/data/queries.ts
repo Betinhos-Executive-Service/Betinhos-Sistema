@@ -1,5 +1,6 @@
 import { cleanId, formatted, type Row } from '@betinhos/dataverse'
 import { safeUrl } from '../../pagantes/domain/messages'
+import type { AnaliseIA } from '../domain/ia'
 import type { Anexo, Despesa } from '../domain/types'
 
 export const ENTITY_DESPESA = 'cr40f_despesaoperacional'
@@ -14,7 +15,9 @@ const SELECT = [
   'cr40f_despesaoperacionalid', 'cr40f_nome', 'cr40f_datagasto', 'cr40f_valor', 'cr40f_estabelecimento',
   'cr40f_statusoperacional', 'cr40f_statusfinanceiro', 'cr40f_statusanexo', 'cr40f_origem',
   'cr40f_kminformado', 'cr40f_litros', 'cr40f_observacao', 'cr40f_observacaointerna', 'cr40f_protocolo', 'cr40f_possivelduplicidade',
-  'cr40f_latitude', 'cr40f_longitude', 'createdon', 'modifiedon', '_createdby_value', '_modifiedby_value', ...LOOKUPS,
+  'cr40f_latitude', 'cr40f_longitude',
+  'cr40f_iastatusanalise', 'cr40f_iadecisao', 'cr40f_iamotivos', 'cr40f_iavalorlido', 'cr40f_iadatalida', 'cr40f_iacnpjlido',
+  'cr40f_iaestabelecimentolido', 'cr40f_iaconfianca', 'cr40f_iamodelo', 'cr40f_iadataanalise', 'createdon', 'modifiedon', '_createdby_value', '_modifiedby_value', ...LOOKUPS,
 ]
 
 /** Despesas ativas com data do gasto a partir de `since` (null = todas), mais recentes primeiro. */
@@ -43,6 +46,19 @@ const lookup = (row: Row, name: string) => {
   return { id: id ? cleanId(id) : '', nome: id ? formatted(row, field) : '' }
 }
 const user = (row: Row, field: string) => (row[field] ? formatted(row, field) : '')
+
+const mapIA = (row: Row): AnaliseIA => ({
+  status: num(row.cr40f_iastatusanalise),
+  decisao: num(row.cr40f_iadecisao),
+  motivos: str(row.cr40f_iamotivos).split(/\r?\n/).map((m) => m.trim()).filter(Boolean),
+  valorLido: num(row.cr40f_iavalorlido),
+  dataLida: str(row.cr40f_iadatalida).slice(0, 10),
+  cnpjLido: str(row.cr40f_iacnpjlido),
+  estabelecimentoLido: str(row.cr40f_iaestabelecimentolido),
+  confianca: num(row.cr40f_iaconfianca),
+  modelo: str(row.cr40f_iamodelo),
+  analisadaEm: date(row.cr40f_iadataanalise),
+})
 
 export function mapDespesa(row: Row): Despesa {
   const categoria = lookup(row, 'categoria')
@@ -80,6 +96,7 @@ export function mapDespesa(row: Row): Despesa {
     criadoPor: user(row, '_createdby_value'),
     alteradoEm: date(row.modifiedon),
     alteradoPor: user(row, '_modifiedby_value'),
+    ia: mapIA(row),
   }
 }
 
