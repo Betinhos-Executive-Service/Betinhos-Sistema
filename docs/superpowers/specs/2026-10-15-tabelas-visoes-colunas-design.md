@@ -1,6 +1,6 @@
 # Tabelas: visões salvas e controle de colunas — design e plano
 
-Data: 15/10/2026 · Branch: `claude/design-system-tables-columns-b6e807` · Status: aprovado; etapa 1 concluída (Design System 1.6.0, commit 73e1bb5 no Módulo Qualidade, branch design/1.6.0-visoes-colunas)
+Data: 15/10/2026 · Branch: `claude/design-system-tables-columns-b6e807` · Status: aprovado; etapas 1–4 concluídas. Design System 1.6.0 + 1.7.0 no repo design-system-betinhos (PR design-system-betinhos#1), que passou a ser a fonte oficial em 15/10/2026
 
 ## Objetivo
 
@@ -29,7 +29,7 @@ Assumi: "controle de quais tabelas mostram" = quais **colunas** aparecem.
 
 Texto final em `DESIGN_SYSTEM.md` §10.2, §10.9.1 e §11.2. Resumo do que foi proposto:
 
-Editar no repo **Módulo Qualidade** e publicar com `npm run design:publish-parent` (arquivos em LF; sobe versão e changelog). Texto proposto:
+Editar no repo **design-system-betinhos** (até 15/10 era o Módulo Qualidade) e publicar com `npm run design:publish-parent` (arquivos em LF; sobe versão e changelog). Texto proposto:
 
 - **Barra de visão** no `PageToolbar`, à esquerda: seletor de visão + estado "Alterada" quando a tela difere da visão salva. Ações: Salvar, Salvar como, Renomear, Excluir, Tornar pública (só gestor), Restaurar padrão.
 - **Seletor** agrupa em "Padrão", "Públicas" e "Minhas", nessa ordem. Visão pública mostra ícone de grupo; nunca usa cor só para diferenciar.
@@ -83,7 +83,7 @@ Permissão de gestor: checar o perfil do usuário uma vez por sessão (`systemus
 
 | # | Etapa | Entrega / prova |
 |---|---|---|
-| 1 | Regras §10.9.1 no Módulo Qualidade + publish-parent | PR no tela-qualidade; `validate-design-system` passa |
+| 1 | Regras §10.9.1 (e §10.9.2) no design-system-betinhos + publish-parent | PR design-system-betinhos#1; `npm run check` passa |
 | 2 | `provision-visoes.ps1` + perfil "Gestor de visões" + equipe, em DEV | DRY RUN revisado; `-Apply`; metadata e pertencimento à solução conferidos |
 | 3 | `useTableView`, `ViewStore`, regras de merge do JSON | testes unitários (colunas novas/removidas, coluna obrigatória, versão) |
 | 4 | `Table` com arraste/resize/teclado, `ColumnsPanel`, `ViewBar` | testes de componente + navegador (clique, arraste, teclado, foco, mobile) |
