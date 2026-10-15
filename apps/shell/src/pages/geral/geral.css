@@ -1,0 +1,268 @@
+/* Geral: lista editável de serviços. Só tokens do Design System 1.4.0. */
+.gr-meta { display: inline-flex; align-items: center; gap: var(--bt-space-2); font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); font-variant-numeric: tabular-nums; }
+.gr-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.gr-filters__view { flex: 0 1 200px; min-width: 160px; }
+.gr-filters__search { flex: 1 1 220px; min-width: 140px; max-width: 520px; }
+.gr-filters__selected { display: inline-flex; align-items: center; flex: 0 0 auto; }
+/* Numa linha de 40 px, sem quebrar, quando cabe: com a navegação no trilho a partir de 1200 px; com ela aberta (238 px a mais) a partir de 1360 px.
+   Abaixo disso (e no celular) a barra quebra em vez de cortar comandos. */
+.gr-toolbar .bt-button { white-space: nowrap; }
+/* O alternador Tabela | Cards nunca encolhe nem ganha rolagem própria dentro da barra. */
+.gr-toolbar .bt-segmented { flex: 0 0 auto; overflow: visible; }
+@media (min-width: 1200px) {
+  .bt-shell--rail .gr-toolbar, .bt-shell--rail .gr-toolbar .bt-page-toolbar__start, .bt-shell--rail .gr-toolbar .bt-page-toolbar__end { flex-wrap: nowrap; }
+  .bt-shell--rail .gr-toolbar .bt-page-toolbar__start { flex: 1 1 auto; }
+  .bt-shell--rail .gr-toolbar .bt-page-toolbar__end { flex: 0 0 auto; }
+}
+@media (min-width: 1360px) {
+  .gr-toolbar, .gr-toolbar .bt-page-toolbar__start, .gr-toolbar .bt-page-toolbar__end { flex-wrap: nowrap; }
+  .gr-toolbar .bt-page-toolbar__start { flex: 1 1 auto; }
+  .gr-toolbar .bt-page-toolbar__end { flex: 0 0 auto; }
+}
+
+/* Células editáveis. As regras de posição vêm antes das colunas fixas (.gr-cell--first/select) para elas prevalecerem. */
+.gr-cell { position: relative; display: flex; align-items: center; gap: var(--bt-space-2); min-width: 0; outline: 0; }
+.gr-cell:focus-visible { box-shadow: inset 0 0 0 2px var(--bt-focus-border); }
+.gr-cell__value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto; color: inherit; }
+.gr-cell__editor { flex: 1 1 auto; min-width: 0; }
+.gr-cell__editor .bt-control { min-height: 32px; }
+.gr-cell__mark { flex: 0 0 auto; display: inline-flex; align-items: center; }
+.gr-cell__lock { opacity: 0; color: var(--bt-color-text-tertiary); }
+.gr-cell--readonly:focus-visible .gr-cell__lock { opacity: 1; }
+.gr-cell.is-saving { pointer-events: none; }
+.gr-cell.is-saved { animation: gr-saved-flash var(--bt-duration-normal) var(--bt-ease-out); }
+.gr-cell.is-saved .gr-cell__mark { color: var(--bt-color-success); animation: gr-mark-in 160ms var(--bt-ease-out); }
+.gr-cell.is-error { box-shadow: inset 2px 0 0 var(--bt-color-danger); }
+.gr-cell.is-error:focus-visible { box-shadow: inset 2px 0 0 var(--bt-color-danger), inset 0 0 0 2px var(--bt-focus-border); }
+.gr-cell.is-error .gr-cell__mark { color: var(--bt-color-danger); }
+.gr-cell.is-error:focus-within .bt-tooltip__bubble { opacity: 1; visibility: visible; transition-delay: 0s; }
+@keyframes gr-saved-flash { from { background-color: var(--bt-color-success-soft); } to { background-color: transparent; } }
+@keyframes gr-mark-in { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: none; } }
+
+/* O contêiner rola nos dois eixos; cabeçalho, seleção e primeira coluna ficam fixos. */
+.gr-grid { overflow: auto; }
+/* Densidade "tabela densa" (DS 1.5.0 §5.2/§10.9): linha 44 px via --bt-table-row-dense, cabeçalho 32 px. */
+.gr-table { --gr-row-height: var(--bt-table-row-dense); }
+.gr-table .bt-table__head, .gr-table .bt-table__row { grid-template-columns: var(--gr-columns); gap: 0; padding: 0; width: 100%; min-width: var(--gr-min-width, max-content); }
+.gr-table .bt-table__head { display: grid; position: sticky; top: 0; z-index: 2; }
+.gr-table .bt-table__row { min-height: var(--gr-row-height); user-select: none; -webkit-user-select: none; }
+/* Linhas fora da tela não pintam: sem isto cada quadro de animação do shell (acordeão, gaveta) recompunha a grade inteira. Listas e menus das células usam a top layer e não são cortados. */
+.gr-table .bt-table__row { content-visibility: auto; contain-intrinsic-size: auto var(--gr-row-height); }
+/* Shift+clique seleciona linhas, não texto; só a célula em edição permite selecionar. */
+.gr-table .gr-cell--editing, .gr-table .gr-cell--editing * { user-select: text; -webkit-user-select: text; }
+.gr-table .bt-table__row.is-selected { background-color: var(--bt-color-action-soft); }
+.gr-table .bt-table__cell { padding: 0 var(--bt-space-3); min-height: calc(var(--gr-row-height) - var(--bt-border-width-default)); border-right: var(--bt-border-width-default) solid var(--bt-color-border); }
+.gr-table .bt-table__head, .gr-table .bt-table__head .bt-table__cell { min-height: 32px; }
+.gr-cell--select { position: sticky; left: 0; z-index: 1; justify-content: center; background-color: var(--bt-color-surface); }
+/* O DS põe position: relative em toda célula do cabeçalho (especificidade maior): sem esta regra a caixa "Selecionar carregados" rolava embora enquanto as caixas das linhas ficavam fixas. */
+.gr-table .bt-table__head .bt-table__cell.gr-cell--select { position: sticky; }
+.gr-cell--first { position: sticky; left: 40px; z-index: 1; background-color: var(--bt-color-surface); box-shadow: 1px 0 0 var(--bt-color-border); }
+.gr-table .bt-table__row.is-selected .gr-cell--select, .gr-table .bt-table__row.is-selected .gr-cell--first { background-color: var(--bt-color-action-soft); }
+.gr-table .bt-table__head .gr-cell--select, .gr-table .bt-table__head .gr-cell--first { background-color: var(--bt-color-surface-neutral); }
+.gr-table .gr-cell--select { padding: 0; }
+/* Caixa de seleção centrada na trilha de 40 px: sem o espaço do rótulo (que é só para leitor de tela). */
+.gr-table .gr-cell--select .bt-choice { gap: 0; min-height: 0; align-items: center; }
+.gr-table .gr-cell--select .bt-choice__control { margin-top: 0; }
+.gr-table .gr-cell--select .bt-choice__text { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.gr-head__sort { display: inline-flex; align-items: center; gap: var(--bt-space-1); min-width: 0; max-width: 100%; min-height: 32px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
+.gr-head__sort:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border); border-radius: var(--bt-radius-xs); }
+.gr-head__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gr-open { padding: 0; border: 0; background: transparent; color: var(--bt-color-brand); font: inherit; font-weight: var(--bt-font-weight-extrabold); text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
+.gr-open:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+.gr-open:active { transform: scale(.97); }
+.gr-empty > .bt-empty { padding: var(--bt-space-8) var(--bt-space-4); }
+
+/* Desativar/Ativar com seleção mista: aria-disabled mantém o foco e o motivo; só o visual de desativado. */
+.gr-btn--blocked { opacity: var(--bt-opacity-disabled); cursor: not-allowed; }
+.bt-button.gr-btn--blocked:active { transform: none; }
+
+/* Diálogo de colunas. */
+.gr-columns { display: grid; gap: var(--bt-space-1); max-height: 50vh; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.gr-columns__item { display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-2); min-height: 36px; }
+.gr-columns__move { display: inline-flex; gap: var(--bt-space-1); }
+
+/* Diálogos de comando, escala FDS e voucher. */
+.gr-dialog { display: grid; gap: var(--bt-space-3); }
+.gr-dialog p { margin: 0; }
+.gr-dialog__warn { color: var(--bt-color-danger); font-size: var(--bt-font-size-12); }
+.gr-copy { max-height: 50vh; margin: 0; padding: var(--bt-space-3); overflow: auto; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); font: inherit; font-size: var(--bt-font-size-12); white-space: pre-wrap; }
+.gr-ids { margin: 0; padding-left: var(--bt-space-5); columns: 2; font-size: var(--bt-font-size-12); }
+.gr-frame { display: block; width: 100%; height: calc(100vh - 120px); border: 0; }
+.gr-voucher { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; opacity: 0; transition: opacity 180ms var(--bt-ease-out); }
+.gr-voucher:focus { outline: 0; }
+/* Saída: mesma duração do temporizador de VoucherOverlay (EXIT_MS = 160). */
+.gr-voucher:not(.is-open) { transition-duration: 160ms; }
+.gr-voucher.is-open { opacity: 1; }
+.gr-voucher__backdrop { position: absolute; inset: 0; background: rgba(0, 26, 61, .22); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.gr-voucher__frame { position: relative; z-index: 1; width: min(1480px, calc(100% - 48px)); height: min(940px, calc(100% - 40px)); border: 0; border-radius: var(--bt-radius-lg); background: transparent; }
+@media (max-width: 820px) { .gr-voucher__frame { width: 100%; height: 100%; border-radius: 0; } }
+/* Formulário Geral dentro do shell: mesmo padrão do voucher, quase a janela toda. Saída = EXIT_MS (160) do FormOverlay. */
+.gr-form { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; opacity: 0; transition: opacity 180ms var(--bt-ease-out); }
+.gr-form:focus { outline: 0; }
+.gr-form:not(.is-open) { transition-duration: 160ms; }
+.gr-form.is-open { opacity: 1; }
+.gr-form__backdrop { position: absolute; inset: 0; background: rgba(0, 26, 61, .22); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.gr-form__frame { position: relative; z-index: 1; width: min(1480px, calc(100% - 48px)); height: calc(100% - 40px); border: 0; border-radius: var(--bt-radius-lg); background: var(--bt-color-surface); }
+@media (max-width: 820px) { .gr-form__frame { width: 100%; height: 100%; border-radius: 0; } }
+@media (prefers-reduced-motion: reduce) { .gr-form { transition: none; } }
+
+/* Auditoria: mesmo overlay do voucher, quadro de 92% x 88%. */
+.gr-auditoria { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; opacity: 0; transition: opacity 180ms var(--bt-ease-out); }
+.gr-auditoria:focus { outline: 0; }
+.gr-auditoria:not(.is-open) { transition-duration: 160ms; }
+.gr-auditoria.is-open { opacity: 1; }
+.gr-auditoria__backdrop { position: absolute; inset: 0; background: rgba(0, 26, 61, .22); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.gr-auditoria__frame { position: relative; z-index: 1; width: 92%; height: 88%; border: 0; border-radius: var(--bt-radius-lg); background: var(--bt-color-surface); }
+@media (max-width: 820px) { .gr-auditoria__frame { width: 100%; height: 100%; border-radius: 0; } }
+@media (prefers-reduced-motion: reduce) { .gr-auditoria { transition: none; } }
+
+/* Desktop: a grade ocupa a altura da janela e rola por dentro; a página não rola. O celular segue com a rolagem normal (cards). */
+@media (min-width: 821px) {
+  .page.gr-page { max-width: none; height: 100dvh; display: flex; flex-direction: column; padding-top: var(--bt-space-3); padding-bottom: var(--bt-space-3); overflow-x: hidden; overflow-y: auto; }
+  .gr-page .bt-page-toolbar__start, .gr-page .bt-page-toolbar__end { gap: var(--bt-space-3); }
+  .gr-page .bt-table__footer { padding: 0; min-height: 40px; }
+  .gr-page .page__header { margin-bottom: var(--bt-space-2); }
+  .gr-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  /* Em janela muito baixa a grade não some: o piso de 240 px faz a página rolar (overflow-y) em vez de espremê-la. */
+  .gr-table { display: flex; flex-direction: column; flex: 1; min-height: 240px; }
+  .gr-grid { flex: 1; min-height: 0; overflow: auto; }
+  /* Modo Cards no desktop: mesma altura da tabela; a grade rola por dentro. */
+  .gr-cardsview { display: flex; flex-direction: column; flex: 1; min-height: 240px; min-width: 0; }
+  .gr-cardsview__scroll { flex: 1; min-height: 0; overflow: auto; }
+  .gr-cards--grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--bt-space-3); }
+  .gr-cardsview .gr-card__head .gr-open, .gr-cardsview .gr-card__check .bt-choice { min-height: var(--bt-control-height-compact); }
+  .gr-cardsview .gr-loadmore { padding: 0 var(--bt-space-1); }
+}
+.gr-mode { display: inline-flex; align-items: center; gap: var(--bt-space-1); }
+
+/* Celular: cards, sheet de edição e barra de seleção. */
+.gr-mobile { display: grid; gap: var(--bt-space-3); min-width: 0; }
+.gr-mobile.has-selection { padding-bottom: 200px; }
+.gr-cards { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
+.gr-card { display: grid; gap: var(--bt-space-2); min-width: 0; padding: var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
+.gr-card.is-selected { background-color: var(--bt-color-action-soft); }
+.gr-card__head { display: flex; align-items: center; gap: var(--bt-space-2); min-width: 0; }
+.gr-card__head .gr-open { display: inline-flex; align-items: center; min-height: var(--bt-control-height-touch); }
+.gr-card__head .bt-badge { margin-left: auto; }
+.gr-card__check { display: inline-flex; flex: 0 0 auto; }
+.gr-card__check .bt-choice { align-items: center; justify-content: center; min-width: var(--bt-control-height-touch); min-height: var(--bt-control-height-touch); }
+.gr-card__check .bt-choice__control { margin-top: 0; }
+.gr-card__line { margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); overflow-wrap: anywhere; }
+.gr-card__line strong { color: var(--bt-color-text-primary); }
+.gr-card__route { color: var(--bt-color-text-primary); }
+.gr-selbar { position: fixed; inset: auto 0 0 0; z-index: 30; display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); padding: var(--bt-space-2) var(--bt-space-3) calc(var(--bt-space-2) + env(safe-area-inset-bottom)); border-top: var(--bt-border-width-default) solid var(--bt-color-border); background-color: var(--bt-color-surface); box-shadow: var(--bt-shadow-panel); }
+.gr-selbar__count { flex: 1 0 100%; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-text-secondary); }
+.gr-selbar .bt-button { min-height: var(--bt-control-height-touch); }
+/* Rodapé de estado da rolagem infinita: linha fina; no celular os botões usam o tamanho de toque (44 px). */
+.gr-sentinel { height: 1px; }
+.gr-loadmore { flex: 1; display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-3); min-height: 40px; padding: 0 var(--bt-space-4); font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); font-variant-numeric: tabular-nums; }
+.gr-loadmore__right { display: inline-flex; align-items: center; gap: var(--bt-space-2); min-width: 0; }
+.gr-loadmore__error { padding-block: var(--bt-space-1); }
+.gr-mobile .gr-loadmore { flex-wrap: wrap; padding-block: var(--bt-space-1); }
+.gr-sheet { display: grid; gap: var(--bt-space-3); padding-bottom: var(--bt-space-4); }
+.gr-sheet__field { display: grid; gap: var(--bt-space-1); min-width: 0; }
+.gr-sheet__line { display: grid; gap: 2px; margin: 0; font-size: var(--bt-font-size-13); overflow-wrap: anywhere; }
+.gr-sheet__line span { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.gr-sheet__line strong { font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-primary); }
+@media (max-width: 820px) { .gr-filters__columns { display: none; } }
+
+@media (hover: hover) and (pointer: fine) {
+  .gr-open:hover { color: var(--bt-color-action); }
+  .gr-table .bt-table__row:not(.is-selected):hover .bt-table__cell { background-color: var(--bt-color-surface-soft); }
+  .gr-cell__lock { transition: opacity var(--bt-duration-fast) ease; }
+  .gr-cell--readonly:hover .gr-cell__lock { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gr-voucher { transition: none; }
+  .gr-open:active { transform: none; }
+  .gr-cell.is-saved, .gr-cell.is-saved .gr-cell__mark { animation: none; }
+  .gr-cell__lock { transition: none; }
+}
+
+/* Cabeçalho: ordenar + menu da coluna (▾ no hover/foco; sempre visível, com ponto de ação, quando filtrada). */
+.gr-head { display: flex; align-items: center; gap: var(--bt-space-1); min-width: 0; width: 100%; }
+.gr-head__sort { flex: 0 1 auto; }
+.gr-head__more { position: relative; flex: 0 0 auto; opacity: 0; }
+.gr-head__more.is-filtered, .gr-head__more:focus-within, .gr-head__more:has([aria-expanded="true"]) { opacity: 1; }
+.gr-head__menu { position: relative; display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--bt-radius-xs); background: transparent; color: var(--bt-color-text-secondary); cursor: pointer; }
+.gr-head__menu:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border); }
+.gr-head__more.is-filtered .gr-head__menu { color: var(--bt-color-action); }
+.gr-head__dot { position: absolute; top: 2px; right: 2px; width: 6px; height: 6px; border-radius: var(--bt-radius-full); background-color: var(--bt-color-action); }
+@media (hover: none), (pointer: coarse) { .gr-head__more { opacity: 1; } }
+@media (hover: hover) and (pointer: fine) {
+  .bt-table__cell:hover .gr-head__more { opacity: 1; }
+  .gr-head__menu:hover { background-color: var(--bt-color-surface-soft); color: var(--bt-color-action); }
+}
+
+/* Botão Filtros e contagem. */
+.gr-filters__count { display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-left: var(--bt-space-1-5); padding: 0 var(--bt-space-1); border-radius: var(--bt-radius-full); background-color: var(--bt-color-action); color: var(--bt-color-surface); font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-bold); }
+
+/* Chips dos filtros ativos, entre a barra e a tabela. */
+.gr-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); padding-bottom: var(--bt-space-2); }
+.gr-chip { display: inline-flex; align-items: center; max-width: 100%; min-height: 28px; border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-full); background-color: var(--bt-color-surface-neutral); font-size: var(--bt-font-size-12); }
+.gr-chip__text, .gr-chip__remove { display: inline-flex; align-items: center; border: 0; background: transparent; color: var(--bt-color-text-primary); font: inherit; cursor: pointer; }
+.gr-chip__text { min-width: 0; padding: 0 var(--bt-space-1) 0 var(--bt-space-3); min-height: 26px; border-radius: var(--bt-radius-full) 0 0 var(--bt-radius-full); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gr-chip__remove { justify-content: center; width: 26px; min-height: 26px; padding: 0; color: var(--bt-color-text-secondary); border-radius: 0 var(--bt-radius-full) var(--bt-radius-full) 0; }
+.gr-chip__text:focus-visible, .gr-chip__remove:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border); }
+.gr-chips--touch .gr-chip { min-height: 44px; }
+.gr-chips--touch .gr-chip__text { min-height: 42px; }
+.gr-chips--touch .gr-chip__remove { width: 44px; min-height: 42px; }
+@media (hover: hover) and (pointer: fine) {
+  .gr-chip__text:hover, .gr-chip__remove:hover { color: var(--bt-color-action); }
+}
+
+/* Editor de filtro (diálogo e acordeão do painel). */
+.gr-fe { display: grid; gap: var(--bt-space-3); min-width: min(320px, 100%); }
+.gr-fe--compact { gap: var(--bt-space-2); min-width: 0; }
+.gr-fe__list { display: grid; gap: var(--bt-space-2); max-height: 280px; overflow-y: auto; }
+.gr-fe__pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--bt-space-2); }
+.gr-fe__radios { display: flex; gap: var(--bt-space-4); }
+.gr-fe__actions { display: flex; justify-content: flex-end; gap: var(--bt-space-2); }
+
+/* Painel Editar filtros. */
+.gr-fd { display: grid; gap: var(--bt-space-3); }
+.gr-fd__list { display: grid; margin: 0; padding: 0; list-style: none; }
+.gr-fd__item { border-bottom: 1px solid var(--bt-color-border); }
+.gr-fd__head { display: flex; align-items: center; gap: var(--bt-space-2); width: 100%; min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--bt-color-text-primary); font: inherit; text-align: left; cursor: pointer; }
+.gr-fd__head:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border); border-radius: var(--bt-radius-xs); }
+.gr-fd__label { flex: 0 0 auto; font-weight: var(--bt-font-weight-semibold); }
+.gr-fd__summary { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--bt-color-action); font-size: var(--bt-font-size-12); }
+.gr-fd__chevron { margin-left: auto; flex: 0 0 auto; color: var(--bt-color-text-secondary); }
+.gr-fd__head[aria-expanded="true"] .gr-fd__chevron { transform: rotate(180deg); }
+.gr-fd__body { padding-bottom: var(--bt-space-3); }
+
+/* Redimensionar e reordenar colunas */
+.gr-table .bt-table__head .bt-table__cell { position: relative; }
+.gr-table .bt-table__head .gr-cell--first { position: sticky; }
+.gr-resize { position: absolute; top: 0; right: 0; bottom: 0; width: 6px; cursor: col-resize; touch-action: none; z-index: 2; }
+.gr-resize:focus-visible { outline: 0; box-shadow: inset -2px 0 0 var(--bt-focus-border); }
+@media (hover: hover) { .gr-resize:hover { box-shadow: inset -2px 0 0 var(--bt-color-action); } }
+.gr-drop--before { box-shadow: inset 2px 0 0 var(--bt-color-action); }
+.gr-drop--after { box-shadow: inset -2px 0 0 var(--bt-color-action); }
+
+/* Alvo de toque de 44 px no ▾ sem crescer o cabeçalho. */
+@media (pointer: coarse) { .gr-head__menu::after { content: ""; position: absolute; inset: -10px; } }
+.gr-chip__warn { margin-left: var(--bt-space-2); color: var(--bt-color-warning); flex: 0 0 auto; }
+.gr-chip.is-ignored { border-style: dashed; }
+.gr-fd__loading { margin: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); }
+
+.gr-menu__hint { display: grid; gap: 2px; text-align: left; }
+.gr-menu__hint small { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+
+/* Painel Serviços por motorista */
+.gr-ct { display: grid; gap: var(--bt-space-3); }
+.gr-ct__nav { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); }
+.gr-ct__updated { flex: 1 1 auto; min-width: 0; text-align: right; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.gr-ct__loading { margin: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); }
+.gr-ct__list, .gr-ct__routes { list-style: none; margin: 0; padding: 0; }
+.gr-ct__item { display: grid; gap: var(--bt-space-2); padding: var(--bt-space-3) 0; border-bottom: 1px solid var(--bt-color-border); }
+.gr-ct__row { display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-3); }
+.gr-ct__toggle { display: inline-flex; align-items: center; gap: var(--bt-space-2); min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
+.gr-ct__toggle:disabled { cursor: default; }
+.gr-ct__toggle:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border); border-radius: 4px; }
+.gr-ct__chev { flex: 0 0 auto; transition: transform 120ms; transform: rotate(-90deg); }
+.gr-ct__toggle[aria-expanded="true"] .gr-ct__chev { transform: none; }
+.gr-ct__toggle:disabled .gr-ct__chev { opacity: 0.3; }
+.gr-ct__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gr-ct__routes { display: grid; gap: var(--bt-space-1); padding-left: var(--bt-space-6); font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }
+.gr-ct__foot { display: flex; justify-content: space-between; gap: var(--bt-space-3); width: 100%; font-size: var(--bt-font-size-13); }

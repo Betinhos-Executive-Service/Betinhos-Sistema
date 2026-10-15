@@ -1,5 +1,5 @@
 import { toDateOnly } from './dates'
-import { buildPatch, type DateBehavior, type PatchContext } from './patch'
+import { buildPatch, dateBehaviorsPath, toDateBehaviors, type DateBehavior, type DateBehaviorsResponse, type PatchContext } from './patch'
 import { ENTITY_SET, FIELDS, TABLE, VEICULO_TABLE } from './schema'
 import { createSharePointDocs, nomeComData } from './sharepoint'
 import { buildNoteHtml, type SpAnexo } from './notes'
@@ -48,13 +48,13 @@ export function createXrmSource(xrm: XrmHost): DataSource {
       const [relations, veiculoEntity, dates] = await Promise.all([
         getJson<{ value: { ReferencingEntityNavigationPropertyName: string }[] }>(`EntityDefinitions(LogicalName='${TABLE}')/ManyToOneRelationships?$select=ReferencingEntityNavigationPropertyName&$filter=ReferencingAttribute eq 'cr40f_veiculoatual'`),
         getJson<{ EntitySetName: string }>(`EntityDefinitions(LogicalName='${VEICULO_TABLE}')?$select=EntitySetName`),
-        getJson<{ value: { LogicalName: string; DateTimeBehavior?: { Value: DateBehavior } }[] }>(`EntityDefinitions(LogicalName='${TABLE}')/Attributes/Microsoft.Dynamics.CRM.DateTimeAttributeMetadata?$select=LogicalName,DateTimeBehavior`),
+        getJson<DateBehaviorsResponse>(dateBehaviorsPath(TABLE)),
       ])
       if (relations.value.length !== 1) throw new Error('Relacionamento de Veículo Atual não encontrado na metadata.')
       return {
         veiculoNav: relations.value[0].ReferencingEntityNavigationPropertyName,
         veiculoSet: veiculoEntity.EntitySetName,
-        dateBehaviors: Object.fromEntries(dates.value.map((item) => [item.LogicalName, item.DateTimeBehavior?.Value ?? 'UserLocal'])),
+        dateBehaviors: toDateBehaviors(dates),
       }
     })()
     patchContext.catch(() => { patchContext = null })

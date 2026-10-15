@@ -109,7 +109,7 @@ describe('calcularMotoristas', () => {
     expect(propria).toEqual({ a: false, b: null, c: null })
   })
 
-  it('CNH vencendo: só ativos com validade até 90 dias (inclui vencidas), em ordem de validade, com dias corridos', () => {
+  it('CNH vencendo: só ativos com validade até 60 dias (inclui vencidas), em ordem de validade, com dias corridos', () => {
     const dados = dadosVazios({
       funcionarios: [
         funcionario({ id: 'a', nome: 'Ana Souza', apelido: 'Ana', cnhMs: Date.parse('2026-11-14') }),

@@ -13,6 +13,7 @@ import { funcionariosQuery } from './data/query'
 import type { DataSource } from './data/source'
 import type { Funcionario } from './data/types'
 import { errorMessage } from './data/xrm'
+import { createDocsSource, type DocsSource } from '../documentos/data/source'
 import { EnvBadge } from './components/Badges'
 import { Ficha } from './components/Ficha'
 import { MobileHome } from './components/MobileHome'
@@ -45,9 +46,10 @@ export function FuncionariosPage({ host }: { host: Host }) {
   const [state] = useState(() => {
     try { return { source: createFuncionariosSource(host), error: null } } catch (reason) { return { source: null, error: errorMessage(reason) } }
   })
+  const docs = useMemo(() => { try { return createDocsSource(host) } catch { return null } }, [host])
   return (
     <ToastProvider>
-      {state.source ? <Funcionarios source={state.source} /> : (
+      {state.source ? <Funcionarios source={state.source} docs={docs} /> : (
         <PageLayout eyebrow="Gestão de pessoas" title="Funcionários">
           <Alert tone="danger" title="Não foi possível abrir Funcionários">{state.error}. Abra o Sistema Betinhos pelo Dataverse.</Alert>
         </PageLayout>
@@ -57,7 +59,7 @@ export function FuncionariosPage({ host }: { host: Host }) {
 }
 
 /** Página com a fonte já resolvida; exportada para os testes. A rota do shell ocupa o hash, então a ficha aberta fica no estado. */
-export function Funcionarios({ source }: { source: DataSource }) {
+export function Funcionarios({ source, docs }: { source: DataSource; docs?: DocsSource | null }) {
   const [rows, setRows] = useState<Funcionario[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -106,7 +108,7 @@ export function Funcionarios({ source }: { source: DataSource }) {
 
   const ativos = views.filter((row) => row.values.cr40f_status === 0).length
   const ficha = selection.mode !== 'closed' && (
-    <Ficha source={source} id={selection.mode === 'open' ? selection.id : null} onClose={() => setSelection({ mode: 'closed' })} onSaved={onSaved} />
+    <Ficha source={source} docs={docs} id={selection.mode === 'open' ? selection.id : null} onClose={() => setSelection({ mode: 'closed' })} onSaved={onSaved} />
   )
 
   if (mobile) {

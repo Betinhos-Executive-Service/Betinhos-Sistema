@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createClient } from '@betinhos/dataverse'
-import { SAFE_MODE_ERROR, loadOperacional, mapReserva, reservasPath } from './queries'
+import { SAFE_MODE_ERROR, loadOperacional, mapMotorista, mapReserva, reservasPath } from './queries'
 import { motoristaPatch, motoristaRefPath, statusPatch } from './mutations'
 import { createMockData } from './mock'
 import { buildAttention } from '../domain/alerts'
 import { findConflicts } from '../domain/conflicts'
 
 const F = '@OData.Community.Display.V1.FormattedValue'
-const sets = { reserva: 'cr40f_reservadeveculoses', funcionario: 'cr40f_funcionarioses', passageiro: 'cr40f_servicosporpassageiros' }
+const sets = { reserva: 'cr40f_reservadeveculoses', funcionario: 'cr40f_funcionarioses', passageiro: 'cr40f_servicosporpassageiros', veiculo: 'cr40f_veiculos' }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 
 describe('consultas', () => {
@@ -82,5 +82,30 @@ describe('mock', () => {
     expect(reasons).toContain(1)
     expect(reasons).toContain(2)
     expect(findConflicts(data.reservas).length).toBeGreaterThan(0)
+  })
+})
+
+describe('carro e link', () => {
+  it('mapReserva e mapMotorista leem veículo, link e vínculo', () => {
+    const r = mapReserva({ cr40f_reservadeveculosid: 'A', _cr40f_veiculo_value: 'V1', new_linkacompanhamento: 'https://l/r/x', new_linkacompanhamentoexpiraem: '2026-10-05T15:00:00Z' })
+    expect(r).toMatchObject({ veiculoId: 'v1', linkAcompanhamento: 'https://l/r/x' })
+    expect(r.linkExpiraEm?.toISOString()).toBe('2026-10-05T15:00:00.000Z')
+    expect(mapMotorista({ cr40f_funcionariosid: 'M', _cr40f_veiculoatual_value: 'V2', cr40f_tipodevinculo: 1 })).toMatchObject({ veiculoAtualId: 'v2', terceiro: true })
+    expect(mapMotorista({ cr40f_funcionariosid: 'M', cr40f_tipodevinculo: 0 })).toMatchObject({ veiculoAtualId: null, terceiro: false })
+  })
+  it('carrega veículos e, se falhar, avisa com lista vazia', async () => {
+    const urls: string[] = []
+    const ok = vi.fn(async (url: string) => {
+      urls.push(decodeURIComponent(url))
+      if (url.includes('cr40f_veiculos')) return json({ value: [{ cr40f_veiculosid: 'V1', cr40f_placa: 'RUH7G45', cr40f_modelo: 'Corolla', cr40f_cor: 'Prata' }] })
+      return json({ value: [] })
+    })
+    const data = await loadOperacional(createClient('https://org.example', ok as typeof fetch), sets, '2026-10-05')
+    expect(data.veiculos).toEqual([{ id: 'v1', placa: 'RUH7G45', modelo: 'Corolla', cor: 'Prata' }])
+    expect(urls.some((u) => u.includes('cr40f_veiculos?$select=cr40f_veiculosid,cr40f_placa,cr40f_modelo,cr40f_cor&$filter=statecode eq 0'))).toBe(true)
+    const bad = vi.fn(async (url: string) => (url.includes('cr40f_veiculos') ? json({ error: { message: 'falhou' } }, 500) : json({ value: [] })))
+    const failed = await loadOperacional(createClient('https://org.example', bad as typeof fetch), sets, '2026-10-05')
+    expect(failed.veiculos).toEqual([])
+    expect(failed.warnings.some((w) => /veículos/.test(w))).toBe(true)
   })
 })

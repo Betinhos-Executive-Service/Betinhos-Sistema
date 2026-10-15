@@ -1,0 +1,620 @@
+import { useCallback, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import type { Row } from '@betinhos/dataverse'
+import { Alert, Button, EmptyState, Menu, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
+import { Archive, ArchiveRestore, Bug, CalendarDays, ChevronDown, ClipboardList, Copy, FilePlus2, Link2, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Send, ShieldCheck, Ticket, X } from 'lucide-react'
+import type { Host } from '../../host'
+import { PageLayout } from '../../app/PageLayout'
+import { useMedia } from '../operacional/useMedia'
+import { hrefFor, queryFromHash } from '../../nav/useHashRoute'
+import { createSource } from './data/source'
+import { Cell } from './components/Cell'
+import { GeralCards } from './components/GeralCards'
+import { GeralSheet } from './components/GeralSheet'
+import { GeralTable } from './components/GeralTable'
+import { CopyDialog, DispararDialog, GerarOpDialog, MockFormDialog, StateDialog, type DispararRequest, type OpRequest, type StateRequest } from './components/Dialogs'
+import { ContagemDrawer, shiftDay, todayIso } from './components/ContagemDrawer'
+import { EscalaFdsDrawer } from './components/EscalaFdsDrawer'
+import { FilterChips } from './components/FilterChips'
+import { FilterDialog } from './components/FilterEditor'
+import { FiltersDrawer } from './components/FiltersDrawer'
+import { LoadMore, LoadSentinel, statusText } from './components/LoadMore'
+import { GeralToolbar } from './components/GeralToolbar'
+import { ViewMenu } from './components/ViewMenu'
+import { AuditoriaOverlay } from './components/AuditoriaOverlay'
+import { LINK_FALHA, gerarLinkBlock } from './domain/link'
+import { VoucherOverlay } from './components/VoucherOverlay'
+import { FormOverlay } from './components/FormOverlay'
+import { copyText } from './domain/copy'
+import { loadViewMode, saveViewMode, type ViewMode } from './domain/viewMode'
+import { splitOp } from './domain/commands'
+import { isEmptyFilter, type Filter } from './domain/filters'
+import { filterKindOf } from './domain/filterKind'
+import { applyColumnPrefs, loadColumnPrefs, saveColumnPrefs, type ColumnPrefs } from './domain/columns'
+import { buildLayout, buildViewFetch } from './domain/views'
+import { ID_ATTRIBUTE, type CellStatus, type Column } from './domain/types'
+import { readUrlState, writeUrlState, type UrlState } from './domain/urlState'
+import { cellKey, useGeral, type SaveFailure } from './useGeral'
+import './geral.css'
+
+export function GeralPage({ host }: { host: Host }) {
+  // Trocar a chave recria a tela inteira: é o "Tentar de novo" quando as visões não carregam.
+  const [attempt, setAttempt] = useState(0)
+  return <ToastProvider><Geral key={attempt} host={host} onRetry={() => setAttempt((n) => n + 1)} /></ToastProvider>
+}
+
+const IDLE: CellStatus = { kind: 'idle' }
+
+function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
+  const source = useMemo(() => createSource(host), [host])
+  const toast = useToast()
+  const mobile = useMedia('(max-width: 820px)')
+  const [mode, setModeState] = useState<ViewMode>(() => loadViewMode(source.kv))
+  // Celular é sempre cards; no desktop vale a escolha lembrada.
+  const cardsLayout = mobile || mode === 'cards'
+  const changeMode = useCallback((next: ViewMode) => { setModeState(next); setEditId(null); saveViewMode(source.kv, next) }, [source.kv])
+  const [editId, setEditId] = useState<string | null>(null)
+  // Falha numa linha cuja sheet não está aberta (celular) não tem onde aparecer: vira aviso.
+  const editIdRef = useRef(editId)
+  editIdRef.current = editId
+  const mobileRef = useRef(cardsLayout)
+  mobileRef.current = cardsLayout
+  const onSaveFail = useCallback((failure: SaveFailure) => {
+    if (!mobileRef.current || editIdRef.current === failure.id) return
+    toast({ tone: 'danger', message: `Não foi possível salvar ${failure.label} do serviço ${failure.serviceName}: ${failure.message}` })
+  }, [toast])
+  // O estado da tela vive na URL (`#/geral?view=…`): lido uma vez ao montar e regravado sem empilhar histórico.
+  const [initial] = useState(() => readUrlState(queryFromHash(window.location.hash)))
+  const onStateChange = useCallback((state: UrlState) => {
+    const next = hrefFor('geral', new URLSearchParams(writeUrlState(state)))
+    if (next !== window.location.hash) window.history.replaceState(null, '', next)
+  }, [])
+  const geral = useGeral(source, { onSaveFail, initial, onStateChange })
+  const { view, rows, total, more, loading, loadingMore, loadError, query, attributes } = geral
+
+  // Preferências de colunas por visão: lidas do armazenamento local ao entrar na visão, gravadas ao aplicar.
+  const [saved, setSaved] = useState<Record<string, ColumnPrefs | null>>({})
+  const viewId = view?.id ?? null
+  const prefs = useMemo(() => (viewId == null ? null : viewId in saved ? saved[viewId] : loadColumnPrefs(source.kv, viewId)), [viewId, saved, source.kv])
+  const visibleColumns = useMemo(() => applyColumnPrefs(geral.columns, prefs), [geral.columns, prefs])
+  const setPrefs = useCallback((next: ColumnPrefs | null) => {
+    if (viewId == null) return
+    saveColumnPrefs(source.kv, viewId, next)
+    setSaved((s) => ({ ...s, [viewId]: next }))
+  }, [source.kv, viewId])
+
+  const { reload, refresh, loadMore, retryLoadMore, setQuery, selectView, clearSelection } = geral
+  // Contêiner de rolagem da tabela: raiz do observador que carrega mais linhas (nos cards a raiz é a janela).
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const cardsScrollRef = useRef<HTMLDivElement>(null)
+  const [mockForm, setMockForm] = useState(false)
+  const [copy, setCopy] = useState<{ open: boolean; loading: boolean; text: string }>({ open: false, loading: false, text: '' })
+  const [stateRequest, setStateRequest] = useState<StateRequest | null>(null)
+  const [stateBusy, setStateBusy] = useState(false)
+  const [voucherUrl, setVoucherUrl] = useState<string | null>(null)
+  const [formUrl, setFormUrl] = useState<string | null>(null)
+  const [auditoriaUrl, setAuditoriaUrl] = useState<string | null>(null)
+  const [opRequest, setOpRequest] = useState<OpRequest | null>(null)
+  const [opBusy, setOpBusy] = useState(false)
+  const [opError, setOpError] = useState<string | null>(null)
+  const [dispRequest, setDispRequest] = useState<DispararRequest | null>(null)
+  const [dispBusy, setDispBusy] = useState(false)
+  const [escalaOpen, setEscalaOpen] = useState(false)
+  const [contagemOpen, setContagemOpen] = useState(false)
+  // Filtro por coluna: `editingFilter` é o atributo no diálogo "Filtrar …"; o painel "Editar filtros" lista todos.
+  const [editingFilter, setEditingFilter] = useState<string | null>(null)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const { filters, setFilter, clearFilters } = geral
+  // Ao fechar o diálogo de filtro (aplicar ou cancelar) o foco volta ao ▾ da coluna; o diálogo nativo devolveria ao item de menu já desmontado.
+  const closeFilter = useCallback(() => {
+    const label = editingFilter ? attributes?.get(editingFilter)?.label || editingFilter : null
+    setEditingFilter(null)
+    if (label) window.setTimeout(() => Array.from(document.querySelectorAll<HTMLElement>('.gr-head__menu')).find((el) => el.getAttribute('aria-label') === `Opções da coluna ${label}`)?.focus(), 0)
+  }, [editingFilter, attributes])
+  const contagemDay = useMemo(() => {
+    const f = filters.cr40f_dataehorriodesada
+    if (f?.kind === 'date') {
+      if (f.op === 'today') return todayIso()
+      if (f.op === 'tomorrow') return shiftDay(todayIso(), 1)
+      if (f.op === 'range' && f.from && /^\d{4}-\d{2}-\d{2}/.test(f.from)) return f.from.slice(0, 10)
+    }
+    return todayIso()
+  }, [filters])
+  const filtersCount = useMemo(() => Object.values(filters).filter((f) => !isEmptyFilter(f)).length, [filters])
+  const applyFilters = useCallback((drafts: Record<string, Filter | null>) => { for (const [attribute, filter] of Object.entries(drafts)) setFilter(attribute, filter) }, [setFilter])
+  const hideColumn = useCallback((key: string) => {
+    const base = prefs ?? { hidden: [], order: geral.columns.map((c) => c.key) }
+    setPrefs({ ...base, hidden: base.hidden.includes(key) ? base.hidden : [...base.hidden, key] })
+  }, [prefs, geral.columns, setPrefs])
+  const resizeColumn = useCallback((key: string, width: number | null) => {
+    const base = prefs ?? { hidden: [], order: geral.columns.map((c) => c.key) }
+    const { [key]: _old, ...rest } = base.widths ?? {}
+    const widths = width == null ? rest : { ...rest, [key]: width }
+    const { widths: _w, ...others } = base
+    setPrefs(Object.keys(widths).length ? { ...others, widths } : others)
+  }, [prefs, geral.columns, setPrefs])
+  const moveColumn = useCallback((key: string, toIndex: number) => {
+    const base = prefs ?? { hidden: [], order: geral.columns.map((c) => c.key) }
+    const keys = visibleColumns.map((c) => c.key)
+    if (!keys.includes(key)) return
+    const next = keys.filter((k) => k !== key)
+    next.splice(Math.max(0, Math.min(toIndex, next.length)), 0, key)
+    const all = applyColumnPrefs(geral.columns, { ...base, hidden: [] }).map((c) => c.key)
+    setPrefs({ ...base, order: [...next, ...all.filter((k) => !next.includes(k))] })
+  }, [prefs, geral.columns, visibleColumns, setPrefs])
+  // Visões pessoais: o que está na tela (colunas, larguras, ordenação e filtros) vira o fetchxml/layoutxml da visão.
+  const { reloadViews } = geral
+  const viewPayload = useCallback(async () => {
+    if (!view) throw new Error('Nenhuma visão aberta.')
+    if (geral.filtersIgnored) throw new Error('Os filtros não puderam ser aplicados porque os campos não carregaram. Atualize e tente de novo.')
+    const fetchxml = buildViewFetch(view.fetchxml, geral.filters, geral.sort, attributes ?? new Map())
+    const layoutxml = buildLayout(visibleColumns, prefs?.widths, await source.objectTypeCode())
+    return { fetchxml, layoutxml }
+  }, [view, geral.filtersIgnored, geral.filters, geral.sort, attributes, visibleColumns, prefs, source])
+  const attemptAction = useCallback(async (action: () => Promise<void>, success: string, failure: string) => {
+    try {
+      await action()
+      toast({ tone: 'success', message: success })
+      return true
+    } catch (reason) {
+      toast({ tone: 'danger', message: `${failure}: ${reason instanceof Error ? reason.message : String(reason)}` })
+      return false
+    }
+  }, [toast])
+  const saveViewAs = useCallback((name: string) => attemptAction(async () => {
+    const created = await source.createView({ name, ...(await viewPayload()) })
+    await reloadViews(created.id)
+  }, `Visão “${name}” criada.`, 'Não foi possível criar a visão'), [attemptAction, source, viewPayload, reloadViews])
+  const saveView = useCallback(() => attemptAction(async () => {
+    if (!view) return
+    await source.updateView(view.id, await viewPayload())
+    // A visão agora carrega as colunas e larguras: as preferências locais já não têm o que acrescentar.
+    setPrefs(null)
+    await reloadViews()
+  }, 'Visão atualizada.', 'Não foi possível salvar a visão'), [attemptAction, view, source, viewPayload, setPrefs, reloadViews])
+  const renameView = useCallback((name: string) => attemptAction(async () => {
+    if (!view) return
+    await source.renameView(view.id, name)
+    await reloadViews()
+  }, 'Visão renomeada.', 'Não foi possível renomear a visão'), [attemptAction, view, source, reloadViews])
+  const deleteView = useCallback(() => attemptAction(async () => {
+    if (!view) return
+    await source.deleteView(view.id)
+    saveColumnPrefs(source.kv, view.id, null)
+    await reloadViews()
+  }, 'Visão excluída.', 'Não foi possível excluir a visão'), [attemptAction, view, source, reloadViews])
+  const shareLink = useCallback(async () => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Área de transferência indisponível.')
+      await navigator.clipboard.writeText(window.location.href)
+      toast({ tone: 'success', message: 'Link copiado.' })
+    } catch {
+      toast({ tone: 'danger', message: 'Não foi possível copiar o link. Copie o endereço do navegador.' })
+    }
+  }, [toast])
+
+  const openForm = useCallback(async (mode: 'create' | 'edit', id?: string) => {
+    try {
+      const result = await source.openForm(mode, id)
+      if (result === 'closed') refresh()
+      else if (result === 'external') setFormUrl(source.formUrl(mode, id))
+      else setMockForm(true)
+    } catch (reason) {
+      toast({ tone: 'danger', message: reason instanceof Error ? reason.message : String(reason) })
+    }
+  }, [source, refresh, toast])
+
+  const selectedIds = useMemo(() => Array.from(geral.selected), [geral.selected])
+  const rowOf = useCallback((id: string) => rows.find((r) => String(r[ID_ATTRIBUTE]) === id), [rows])
+  /** 0 = todos ativos, 1 = todos inativos, `null` = misturados ou sem estado conhecido. */
+  const selectedState = useMemo(() => {
+    const states = new Set(selectedIds.map((id) => { const state = rowOf(id)?.statecode; return typeof state === 'number' ? state : -1 }))
+    return states.size === 1 && !states.has(-1) ? (states.values().next().value as number) : null
+  }, [selectedIds, rowOf])
+
+  // Cada pedido tem um número; fechar o diálogo invalida o pedido em andamento, que não pode reabri-lo ao chegar.
+  const copyRequest = useRef(0)
+  const closeCopy = useCallback(() => { copyRequest.current += 1; setCopy((c) => ({ ...c, open: false, loading: false })) }, [])
+  const copySelected = useCallback(async () => {
+    const mine = ++copyRequest.current
+    setCopy({ open: true, loading: true, text: '' })
+    try {
+      const text = copyText(await source.copyRows(selectedIds))
+      if (mine === copyRequest.current) setCopy({ open: true, loading: false, text })
+    } catch (reason) {
+      if (mine !== copyRequest.current) return
+      setCopy({ open: false, loading: false, text: '' })
+      toast({ tone: 'danger', message: `Não foi possível montar o texto: ${reason instanceof Error ? reason.message : String(reason)}` })
+    }
+  }, [source, selectedIds, toast])
+
+  const askState = useCallback((active: boolean) => {
+    const labels = selectedIds.map((id) => { const name = rowOf(id)?.cr40f_id; return typeof name === 'string' && name ? name : id })
+    setStateRequest({ ids: selectedIds, labels, active })
+  }, [selectedIds, rowOf])
+
+  const confirmState = useCallback(async () => {
+    if (!stateRequest) return
+    const { ids, active } = stateRequest
+    setStateBusy(true)
+    try {
+      const { ok, failed } = await source.setState(ids, active)
+      if (failed.length === 0) {
+        const one = ok.length === 1
+        toast({ tone: 'success', message: `${ok.length} ${one ? 'serviço' : 'serviços'} ${active ? 'ativado' : 'desativado'}${one ? '' : 's'}.` })
+      } else {
+        const names = failed.map((item) => { const name = rowOf(item.id)?.cr40f_id; return typeof name === 'string' && name ? name : item.id })
+        toast({ tone: 'danger', message: `${ok.length} de ${ids.length} serviços ${active ? 'ativados' : 'desativados'}; falharam: ${names.join(', ')}. ${failed[0].message}` })
+      }
+    } catch (reason) {
+      toast({ tone: 'danger', message: reason instanceof Error ? reason.message : String(reason) })
+    } finally {
+      setStateBusy(false)
+      setStateRequest(null)
+      reload()
+      clearSelection()
+    }
+  }, [stateRequest, source, toast, reload, clearSelection, rowOf])
+
+  const openVoucher = useCallback(() => {
+    const url = source.openVoucher(selectedIds)
+    if (url == null) toast({ tone: 'info', message: 'O voucher abre dentro do Dataverse.' })
+    else setVoucherUrl(url)
+  }, [source, selectedIds, toast])
+
+  const linkBlock = useMemo(() => {
+    const row = selectedIds.length === 1 ? rowOf(selectedIds[0]) : undefined
+    return gerarLinkBlock(row ? [row] : [], selectedIds.length)
+  }, [selectedIds, rowOf])
+  const gerarLink = useCallback(async () => {
+    if (linkBlock) return
+    try {
+      const result = await source.gerarLink(selectedIds[0])
+      if (!result.ok || !result.link) { toast({ tone: 'danger', message: result.erro || LINK_FALHA }); return }
+      try {
+        if (!navigator.clipboard?.writeText) throw new Error('Área de transferência indisponível.')
+        await navigator.clipboard.writeText(result.link)
+        toast({ tone: 'success', message: 'Link gerado e copiado.' })
+      } catch {
+        toast({ tone: 'info', message: `Link gerado, mas não foi possível copiar: ${result.link}` })
+      }
+    } catch (reason) {
+      toast({ tone: 'danger', message: reason instanceof Error ? reason.message : LINK_FALHA })
+    }
+  }, [linkBlock, source, selectedIds, toast])
+
+  const labelOf = useCallback((id: string) => { const name = rowOf(id)?.cr40f_id; return typeof name === 'string' && name ? name : id }, [rowOf])
+
+  const askOp = useCallback(() => {
+    const split = splitOp(selectedIds.map((id) => rowOf(id) ?? ({ [ID_ATTRIBUTE]: id } as Row)))
+    if (split.ok.length === 0) { toast({ tone: 'info', message: 'Todos os serviços selecionados já possuem OP.' }); return }
+    setOpError(null)
+    setOpRequest({ ids: split.ok.map((r) => String(r[ID_ATTRIBUTE])), labels: split.ok.map((r) => labelOf(String(r[ID_ATTRIBUTE]))), excluded: split.comOp.map((r) => labelOf(String(r[ID_ATTRIBUTE]))) })
+  }, [selectedIds, rowOf, labelOf, toast])
+
+  const confirmOp = useCallback(async () => {
+    if (!opRequest) return
+    setOpBusy(true)
+    setOpError(null)
+    try {
+      const url = await source.flowUrl('new_FlowUrlCriarOP')
+      if (url == null) { setOpError('Variável de ambiente new_FlowUrlCriarOP não configurada.'); return }
+      const { status } = await source.triggerFlow(url, { guids: opRequest.ids.join(',') })
+      if (status === 200 || status === 202) {
+        toast({ tone: 'success', message: `OP criada para ${opRequest.ids.length} serviço(s).` })
+        setOpRequest(null)
+        refresh()
+      } else setOpError(`Erro ao acionar o flow (status ${status})`)
+    } catch (reason) {
+      setOpError(reason instanceof Error ? reason.message : String(reason))
+    } finally {
+      setOpBusy(false)
+    }
+  }, [opRequest, source, toast, refresh])
+
+  const confirmDisparar = useCallback(async () => {
+    if (!dispRequest) return
+    const { ids } = dispRequest
+    setDispBusy(true)
+    try {
+      const { ok, failed } = await source.programar(ids)
+      if (failed.length === 0) toast({ tone: 'success', message: `${ok.length} serviço(s) programado(s).` })
+      else toast({ tone: 'danger', message: `${ok.length} de ${ids.length} programados; falharam: ${failed.map((f) => labelOf(f.id)).join(', ')}. ${failed[0].message}` })
+    } catch (reason) {
+      toast({ tone: 'danger', message: reason instanceof Error ? reason.message : String(reason) })
+    } finally {
+      setDispBusy(false)
+      setDispRequest(null)
+      refresh()
+      clearSelection()
+    }
+  }, [dispRequest, source, toast, refresh, clearSelection, labelOf])
+
+  const openAuditoria = useCallback(async () => {
+    try {
+      const result = await source.openAuditoria(selectedIds)
+      if (result === 'mock') toast({ tone: 'info', message: 'A auditoria abre dentro do Dataverse.' })
+      else if (result === 'external') { const url = source.auditoriaUrl(selectedIds); if (url) setAuditoriaUrl(url) }
+    } catch (reason) {
+      toast({ tone: 'danger', message: reason instanceof Error ? reason.message : String(reason) })
+    }
+  }, [source, selectedIds, toast])
+
+  const registrarErro = useCallback(async () => {
+    try {
+      const result = await source.openErroOperacional(selectedIds[0])
+      if (result === 'mock') toast({ tone: 'info', message: 'A Gestão de Qualidade abre dentro do Dataverse.' })
+      else if (result === 'closed') refresh()
+    } catch (reason) {
+      toast({ tone: 'danger', message: reason instanceof Error ? reason.message : String(reason) })
+    }
+  }, [source, selectedIds, toast, refresh])
+
+  const mixedTitle = 'Selecione só serviços ativos ou só inativos.'
+  const mixedId = useId()
+  // Barra de seleção do celular: só aparece com linhas marcadas.
+  const selectionCommands = (
+    <>
+      {selectedIds.length === 1 ? <Button variant="action" size="touch" icon={<Pencil size={16} />} onClick={() => { void openForm('edit', selectedIds[0]) }}>Editar</Button> : null}
+      <Button variant="action" size="touch" icon={<Ticket size={16} />} onClick={openVoucher}>Gerar Voucher</Button>
+      <Button variant="action" size="touch" icon={<Copy size={16} />} onClick={() => { void copySelected() }}>Copiar Serviços</Button>
+      <Button variant="action" size="touch" icon={<FilePlus2 size={16} />} onClick={askOp}>Gerar OP</Button>
+      <Button variant="action" size="touch" icon={<Send size={16} />} onClick={() => setDispRequest({ ids: selectedIds })}>Disparar</Button>
+      {selectedState === 1
+        ? <Button variant="action" size="touch" icon={<ArchiveRestore size={16} />} onClick={() => askState(true)}>Ativar</Button>
+        : selectedState === 0
+          ? <Button variant="danger" size="touch" icon={<Archive size={16} />} onClick={() => askState(false)}>Desativar</Button>
+          // aria-disabled (não disabled): continua focável e o leitor de tela lê o motivo; o clique não faz nada.
+          : <>
+            <Button variant="danger" size="touch" className="gr-btn--blocked" icon={<Archive size={16} />} aria-disabled="true" aria-describedby={mixedId} title={mixedTitle} onClick={(event) => event.preventDefault()}>Desativar</Button>
+            <Button variant="action" size="touch" className="gr-btn--blocked" icon={<ArchiveRestore size={16} />} aria-disabled="true" aria-describedby={mixedId} title={mixedTitle} onClick={(event) => event.preventDefault()}>Ativar</Button>
+            <span id={mixedId} className="gr-sr">{mixedTitle}</span>
+          </>}
+      <Button variant="ghost" size="touch" icon={<X size={16} />} onClick={clearSelection}>Limpar seleção</Button>
+    </>
+  )
+  const noneTitle = 'Selecione ao menos um serviço.'
+  const oneTitle = 'Selecione exatamente um serviço.'
+  const noneId = useId()
+  const oneId = useId()
+  // aria-disabled (não disabled): o botão continua focável, o leitor de tela lê o motivo e o clique não faz nada.
+  const blocked = (reason: string, describedBy: string) => ({
+    className: 'gr-btn--blocked',
+    'aria-disabled': 'true' as const,
+    'aria-describedby': describedBy,
+    title: reason,
+    onClick: (event: MouseEvent<HTMLButtonElement>) => event.preventDefault(),
+  })
+  const none = selectedIds.length === 0
+  // Rótulo de item de menu com o motivo embaixo quando o item está inerte.
+  const hint = (label: string, reason: string | null) => (reason ? <span className="gr-menu__hint" title={reason}>{label}<small>{reason}</small></span> : label)
+  const createButton = <Button size={mobile ? 'touch' : 'compact'} icon={<Plus size={16} />} onClick={() => { void openForm('create') }}>Criar serviço</Button>
+  // Desktop: Criar, Editar e Desativar/Ativar ficam na barra (a posição não pula); os demais comandos de seleção vivem no menu "Ações".
+  // Sem seleção servível, botões e itens ficam inertes, com o motivo.
+  const commands = mobile ? createButton : (
+    <>
+      {createButton}
+      {selectedIds.length === 1
+        ? <Button variant="action" size="compact" icon={<Pencil size={16} />} onClick={() => { void openForm('edit', selectedIds[0]) }}>Editar</Button>
+        : <Button variant="action" size="compact" icon={<Pencil size={16} />} {...blocked(oneTitle, oneId)}>Editar</Button>}
+      <Menu
+        align="start"
+        trigger={(props) => <Button {...props} variant="action" size="compact" icon={<ChevronDown size={16} />} aria-label={none ? 'Ações' : `Ações (${selectedIds.length})`}>Ações{none ? null : <span className="gr-filters__count">{selectedIds.length}</span>}</Button>}
+        actions={[
+          { id: 'voucher', label: hint('Gerar Voucher', none ? noneTitle : null), icon: <Ticket size={16} />, disabled: none, onSelect: openVoucher },
+          { id: 'copiar', label: hint('Copiar Serviços', none ? noneTitle : null), icon: <Copy size={16} />, disabled: none, onSelect: () => { void copySelected() } },
+          { id: 'op', label: hint('Gerar OP', none ? noneTitle : null), icon: <FilePlus2 size={16} />, disabled: none, onSelect: askOp },
+          { id: 'link', label: hint('Gerar link', none ? noneTitle : linkBlock), icon: <Link2 size={16} />, disabled: none || linkBlock != null, onSelect: () => { void gerarLink() } },
+          { id: 'disparar', label: hint('Disparar', none ? noneTitle : null), icon: <Send size={16} />, disabled: none, onSelect: () => setDispRequest({ ids: selectedIds }) },
+        ]}
+      />
+      {none
+        ? <Button variant="danger" size="compact" icon={<Archive size={16} />} {...blocked(noneTitle, noneId)}>Desativar</Button>
+        : selectedState === 1
+          ? <Button variant="action" size="compact" icon={<ArchiveRestore size={16} />} onClick={() => askState(true)}>Ativar</Button>
+          : selectedState === 0
+            ? <Button variant="danger" size="compact" icon={<Archive size={16} />} onClick={() => askState(false)}>Desativar</Button>
+            : <>
+              <Button variant="danger" size="compact" icon={<Archive size={16} />} {...blocked(mixedTitle, mixedId)}>Desativar</Button>
+              <Button variant="action" size="compact" icon={<ArchiveRestore size={16} />} {...blocked(mixedTitle, mixedId)}>Ativar</Button>
+            </>}
+      <span id={oneId} className="gr-sr">{oneTitle}</span>
+      <span id={noneId} className="gr-sr">{noneTitle}</span>
+      <span id={mixedId} className="gr-sr">{mixedTitle}</span>
+    </>
+  )
+  const shortcuts = (
+    <Menu
+      trigger={(props) => <Button {...props} variant="secondary" size={mobile ? 'touch' : 'compact'} icon={<MoreVertical size={16} />} aria-label="Mais ações" />}
+      actions={[
+        { id: 'funcoes', label: 'Funções Operacionais', icon: <ClipboardList size={16} />, onSelect: () => { location.hash = hrefFor('new_telafuncoesoperacionais') } },
+        { id: 'escala', label: 'Escala FDS', icon: <CalendarDays size={16} />, onSelect: () => setEscalaOpen(true) },
+        { id: 'auditoria', label: 'Auditoria', icon: <ShieldCheck size={16} />, onSelect: () => { void openAuditoria() } },
+        { id: 'erro', label: selectedIds.length === 1 ? 'Registrar Erro' : <span className="gr-menu__hint" title={oneTitle}>Registrar Erro<small>{oneTitle}</small></span>, icon: <Bug size={16} />, disabled: selectedIds.length !== 1, onSelect: () => { void registrarErro() } },
+        { id: 'contagem', label: 'Contagem de Serviços', icon: <ListChecks size={16} />, onSelect: () => setContagemOpen(true) },
+      ]}
+    />
+  )
+
+  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar serviços" onClick={reload} />, [reload])
+  useShellHeader({ title: 'Geral', actions: headerActions })
+
+  const { save, resetCell, cells, selectOnly, selectRange, toggle } = geral
+  const selectForEdit = useCallback((id: string) => selectOnly(id, true), [selectOnly])
+  const selectRow = useCallback((id: string, mode: 'only' | 'toggle' | 'range') => {
+    if (mode === 'range') selectRange(id)
+    else if (mode === 'toggle') toggle(id)
+    else selectOnly(id)
+  }, [selectOnly, selectRange, toggle])
+  // Callbacks estáveis: a célula passa o próprio id/coluna, então só a que mudou de status ou de linha renderiza de novo.
+  const searchLookup = useCallback((attribute: string, text: string) => source.search(attribute, text), [source])
+  const renderCell = useCallback((row: Row, column: Column): ReactNode => {
+    const id = String(row[ID_ATTRIBUTE])
+    return (
+      <Cell
+        row={row}
+        column={column}
+        info={attributes?.get(column.key)}
+        status={cells.get(cellKey(id, column.attribute)) ?? IDLE}
+        onSave={save}
+        onReset={resetCell}
+        onBeginEdit={selectForEdit}
+        search={searchLookup}
+        editable={attributes != null}
+      />
+    )
+  }, [attributes, cells, save, resetCell, searchLookup, selectForEdit])
+
+  const editRow = editId == null ? undefined : rowOf(editId)
+
+  const loadMoreProps = { more, loading, loadingMore, error: loadError, loaded: rows.length, total, onLoadMore: loadMore, onRetry: retryLoadMore, touch: mobile }
+  const sentinel = more && !loading && !loadingMore && !loadError
+  const status = loading && rows.length === 0 ? null : statusText(rows.length, total, more)
+
+  const empty = (
+    <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum serviço nesta visão" action={query ? <Button variant="secondary" onClick={() => setQuery('')}>Limpar busca</Button> : undefined}>
+      {query ? `Nada encontrado para “${query}”.` : 'Troque de visão ou ajuste a busca.'}
+    </EmptyState>
+  )
+
+  const backToAgenda = () => {
+    const first = geral.views.find((v) => v.padrao) ?? geral.views[0]
+    if (first) selectView(first.id)
+  }
+
+  let body: ReactNode
+  if (geral.viewsError) {
+    body = <Alert tone="danger" title="Não foi possível carregar as visões" action={<Button variant="secondary" onClick={onRetry}>Tentar de novo</Button>}>{geral.viewsError}</Alert>
+  } else {
+    body = (
+      <>
+        {geral.attributesError ? <Alert tone="warning">Edição indisponível no momento: {geral.attributesError}</Alert> : null}
+        {geral.pageError ? <Alert tone="danger" title="Não foi possível carregar os serviços" action={<Button variant="secondary" onClick={backToAgenda}>Voltar para a Agenda</Button>}>{geral.pageError}</Alert> : null}
+        {cardsLayout
+          ? (
+            <div className={mobile ? (geral.selected.size > 0 ? 'gr-mobile has-selection' : 'gr-mobile') : 'gr-cardsview'}>
+              <div ref={mobile ? undefined : cardsScrollRef} className={mobile ? undefined : 'gr-cardsview__scroll'}>
+              <GeralCards
+                grid={!mobile}
+                rows={rows}
+                columns={visibleColumns}
+                attributes={attributes}
+                loading={loading}
+                selected={geral.selected}
+                onToggle={geral.toggle}
+                onOpen={(id) => { void openForm('edit', id) }}
+                onEdit={setEditId}
+                footer={rows.length > 0 || loadError ? <LoadMore root={mobile ? null : cardsScrollRef} {...loadMoreProps} /> : null}
+              />
+              </div>
+              {!loading && rows.length === 0 && !geral.pageError ? <div className="gr-empty">{empty}</div> : null}
+            </div>
+          )
+          : (
+            <GeralTable
+              columns={visibleColumns}
+              customWidths={prefs?.widths}
+              onResize={resizeColumn}
+              onMove={moveColumn}
+              attributes={attributes}
+              rows={rows}
+              loading={loading}
+              sort={geral.sort}
+              defaultSort={geral.defaultOrder}
+              onSort={geral.setSort}
+              filters={filters}
+              onEditFilter={setEditingFilter}
+              onClearFilter={(attribute) => setFilter(attribute, null)}
+              onHide={hideColumn}
+              selected={geral.selected}
+              onToggle={geral.toggle}
+              onSelectRow={selectRow}
+              onToggleAll={geral.toggleAll}
+              onOpen={(id) => { void openForm('edit', id) }}
+              renderCell={renderCell}
+              scrollRef={scrollRef}
+              tail={<LoadSentinel root={scrollRef} active={sentinel} loaded={rows.length} onLoadMore={loadMore} />}
+              footer={<LoadMore root={scrollRef} sentinel={false} {...loadMoreProps} />}
+              empty={geral.pageError ? null : empty}
+            />
+          )}
+      </>
+    )
+  }
+
+  return (
+    <PageLayout
+      eyebrow="Operacional"
+      title="Geral"
+      meta={<span className="gr-meta">{status != null ? <span>{status}</span> : null}{source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}</span>}
+      className="gr-page"
+      bodyClassName="gr-body"
+      actions={<Button variant="secondary" icon={<RefreshCw size={16} />} loading={loading && rows.length > 0} onClick={reload}>Atualizar</Button>}
+      toolbar={
+        <GeralToolbar
+          views={geral.views}
+          view={view}
+          onSelectView={selectView}
+          viewMenu={<ViewMenu view={view} mobile={mobile} onSaveAs={saveViewAs} onSave={saveView} onRename={renameView} onDelete={deleteView} onShare={() => { void shareLink() }} />}
+          query={query}
+          onQuery={setQuery}
+          searching={loading && query !== ''}
+          columns={geral.columns}
+          attributes={attributes}
+          prefs={prefs}
+          onPrefs={setPrefs}
+          selectedCount={mobile ? 0 : geral.selected.size}
+          filtersCount={filtersCount}
+          onOpenFilters={() => setFiltersOpen(true)}
+          filtersUnavailable={geral.attributesError != null}
+          mobile={mobile}
+          mode={mobile ? undefined : mode}
+          onMode={changeMode}
+          commands={commands}
+          shortcuts={shortcuts}
+        />
+      }
+    >
+      <FilterChips ignored={geral.filtersIgnored} filters={filters} attributes={attributes} mobile={mobile} onEdit={setEditingFilter} onRemove={(attribute) => setFilter(attribute, null)} onClearAll={clearFilters} />
+      {body}
+      <FilterDialog
+        attribute={editingFilter}
+        info={editingFilter ? attributes?.get(editingFilter) : undefined}
+        kind={editingFilter ? filterKindOf(editingFilter, attributes?.get(editingFilter)) : null}
+        value={editingFilter ? filters[editingFilter] ?? null : null}
+        search={searchLookup}
+        onApply={setFilter}
+        onClose={closeFilter}
+      />
+      <FiltersDrawer open={filtersOpen} onClose={() => setFiltersOpen(false)} filters={filters} attributes={attributes} columns={geral.columns} search={searchLookup} onApply={applyFilters} onClearAll={clearFilters} unavailable={geral.attributesError != null} loading={attributes == null && geral.attributesError == null} />
+      {mobile && geral.selected.size > 0 ? (
+        <div className="gr-selbar" role="group" aria-label="Ações sobre os selecionados">
+          <span role="status" className="gr-selbar__count">{geral.selected.size === 1 ? '1 selecionado' : `${geral.selected.size} selecionados`}</span>
+          {selectionCommands}
+        </div>
+      ) : null}
+      {cardsLayout && editRow ? (
+        <GeralSheet
+          row={editRow}
+          columns={visibleColumns}
+          attributes={attributes}
+          cellStatus={(attribute) => cells.get(cellKey(String(editRow[ID_ATTRIBUTE]), attribute)) ?? IDLE}
+          open
+          onClose={() => setEditId(null)}
+          onSave={(column, value) => save(String(editRow[ID_ATTRIBUTE]), column, value)}
+          onReset={(column) => resetCell(String(editRow[ID_ATTRIBUTE]), column.attribute)}
+          search={(column, text) => source.search(column.attribute, text)}
+        />
+      ) : null}
+      <CopyDialog open={copy.open} loading={copy.loading} text={copy.text} onClose={closeCopy} onCopied={() => { closeCopy(); toast({ tone: 'success', message: 'Serviços copiados.' }) }} />
+      <StateDialog request={stateRequest} busy={stateBusy} onClose={() => setStateRequest(null)} onConfirm={() => { void confirmState() }} />
+      <MockFormDialog open={mockForm} onClose={() => setMockForm(false)} />
+      <ContagemDrawer open={contagemOpen} onClose={() => setContagemOpen(false)} source={source} initialDay={contagemDay} kv={source.kv} mobile={mobile} />
+      <EscalaFdsDrawer url={source.escalaFdsUrl()} open={escalaOpen} onClose={() => setEscalaOpen(false)} />
+      <GerarOpDialog request={opRequest} busy={opBusy} error={opError} onClose={() => setOpRequest(null)} onConfirm={() => { void confirmOp() }} />
+      <DispararDialog request={dispRequest} busy={dispBusy} onClose={() => setDispRequest(null)} onConfirm={() => { void confirmDisparar() }} />
+      {auditoriaUrl ? <AuditoriaOverlay url={auditoriaUrl} onClose={() => setAuditoriaUrl(null)} /> : null}
+      {voucherUrl ? <VoucherOverlay url={voucherUrl} onClose={() => setVoucherUrl(null)} /> : null}
+      {formUrl ? <FormOverlay url={formUrl} onClose={() => { setFormUrl(null); refresh() }} /> : null}
+    </PageLayout>
+  )
+}

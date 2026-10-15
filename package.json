@@ -8,8 +8,10 @@
     "build": "pnpm --filter @betinhos/shell build",
     "wr": "pnpm --filter @betinhos/shell wr",
     "push": "pnpm --filter @betinhos/shell push",
+    "sitemap:geral": "pnpm --filter @betinhos/shell sitemap:geral",
     "test": "pnpm -r test",
     "typecheck": "pnpm --filter @betinhos/shell typecheck",
-    "tokens": "node packages/deploy/sync-tokens.mjs"
+    "tokens": "node packages/deploy/sync-tokens.mjs",
+    "push:plugin:financeiro:dev": "powershell -NoProfile -ExecutionPolicy Bypass -File packages/plugins/scripts/push-financeiro-plugin.ps1 -EnvironmentUrl https://org23b93544.crm2.dynamics.com -EnvironmentName dev"
   }
 }
