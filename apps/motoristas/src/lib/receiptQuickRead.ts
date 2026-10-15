@@ -45,3 +45,21 @@ export function applyQuickReadToDraft(draft: ExpenseDraft, leitura: QuickReadLei
   if (!next.litros && rules.exigeLitros && leitura.litros !== null) next.litros = formatDecimal(leitura.litros, 0, 3);
   return next;
 }
+
+export const QUICK_READ_MAX_TENTATIVAS = 3;
+export const QUICK_READ_TIMEOUT_MS = 10_000;
+
+export type QuickReadStatus = "idle" | "lendo" | "preenchido" | "ilegivel" | "manual";
+export type QuickReadState = { status: QuickReadStatus; tentativas: number };
+export const INITIAL_QUICK_READ: QuickReadState = { status: "idle", tentativas: 0 };
+
+export function shouldRunQuickRead(state: QuickReadState) {
+  return state.status === "idle" || state.status === "ilegivel";
+}
+
+export function nextQuickReadState(state: QuickReadState, outcome: QuickReadOutcome): QuickReadState {
+  if (outcome.kind === "lido") return { status: "preenchido", tentativas: state.tentativas + 1 };
+  if (outcome.kind === "falha") return { status: "manual", tentativas: state.tentativas };
+  const tentativas = state.tentativas + 1;
+  return { status: tentativas >= QUICK_READ_MAX_TENTATIVAS ? "manual" : "ilegivel", tentativas };
+}

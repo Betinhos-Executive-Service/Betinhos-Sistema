@@ -38,3 +38,23 @@ test("applyQuickReadToDraft formata valor em pt-BR e ignora litros quando a cate
 test("applyQuickReadToDraft ignora sugestão fora da lista", () => {
   assert.equal(applyQuickReadToDraft(vazio, { ...leitura, categoria_sugerida: "Bebida" }, DEFAULT_EXPENSE_REFERENCE_DATA).categoriaId, "");
 });
+
+import { INITIAL_QUICK_READ, nextQuickReadState, shouldRunQuickRead } from "../src/lib/receiptQuickRead.ts";
+
+test("terceira foto ilegível libera manual e para de ler", () => {
+  let s = nextQuickReadState(INITIAL_QUICK_READ, { kind: "ilegivel" });
+  assert.deepEqual(s, { status: "ilegivel", tentativas: 1 });
+  s = nextQuickReadState(s, { kind: "ilegivel" });
+  s = nextQuickReadState(s, { kind: "ilegivel" });
+  assert.deepEqual(s, { status: "manual", tentativas: 3 });
+  assert.equal(shouldRunQuickRead(s), false);
+});
+test("falha vai para manual sem contar tentativa; lido encerra", () => {
+  assert.deepEqual(nextQuickReadState(INITIAL_QUICK_READ, { kind: "falha" }), { status: "manual", tentativas: 0 });
+  assert.deepEqual(nextQuickReadState(INITIAL_QUICK_READ, { kind: "lido", leitura }), { status: "preenchido", tentativas: 1 });
+});
+test("shouldRunQuickRead só em idle ou ilegivel", () => {
+  assert.equal(shouldRunQuickRead(INITIAL_QUICK_READ), true);
+  assert.equal(shouldRunQuickRead({ status: "ilegivel", tentativas: 2 }), true);
+  assert.equal(shouldRunQuickRead({ status: "preenchido", tentativas: 1 }), false);
+});
