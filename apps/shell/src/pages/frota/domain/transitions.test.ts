@@ -136,7 +136,7 @@ describe('applyTransition', () => {
       prepareFlow: vi.fn(async () => {}),
       runFlow: vi.fn(async (): Promise<FlowResult> => ({ message: 'OM reservada.', shareUrl: null })),
       openForm: async () => {},
-      classificacao: async () => ({ servicos: [], categorias: [], origem: null, confianca: null }), classificarAgora: async () => { throw new Error("indisponível") }, fotoVeiculo: async () => null, enviarFotoVeiculo: async () => {},
+      classificacao: async () => ({ servicos: [], categorias: [], origem: null, confianca: null }), classificarAgora: async () => { throw new Error("indisponível") }, fotoVeiculo: async () => null, enviarFotoVeiculo: async () => {}, salvarItemPlano: async () => {}, inativarItemPlano: async () => {}, salvarBaseline: async () => {},
     } satisfies DataSource
   }
 
@@ -250,7 +250,7 @@ describe('Flow já em andamento', () => {
       prepareFlow: vi.fn(async () => {}),
       runFlow: vi.fn(async (): Promise<FlowResult> => ({ message: null, shareUrl: null })),
       openForm: async () => {},
-      classificacao: async () => ({ servicos: [], categorias: [], origem: null, confianca: null }), classificarAgora: async () => { throw new Error("indisponível") }, fotoVeiculo: async () => null, enviarFotoVeiculo: async () => {},
+      classificacao: async () => ({ servicos: [], categorias: [], origem: null, confianca: null }), classificarAgora: async () => { throw new Error("indisponível") }, fotoVeiculo: async () => null, enviarFotoVeiculo: async () => {}, salvarItemPlano: async () => {}, inativarItemPlano: async () => {}, salvarBaseline: async () => {},
     } satisfies DataSource
   }
   const aprovar = (source: DataSource, id = 'r1') => applyTransition(source, 'manutencao', registro(MANUT.SOLICITADO, { id }), pick('manutencao', MANUT.SOLICITADO, 'aprovar'), dados)

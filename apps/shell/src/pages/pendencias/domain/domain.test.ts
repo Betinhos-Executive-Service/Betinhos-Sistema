@@ -53,6 +53,26 @@ describe('detectarPendencias', () => {
     expect(detectarPendencias([op('2', OP.aberta, 1000)], [res('b', '2', FAT.pendente)], [])).toEqual([])
   })
 
+  it('tipo 4: mensais concluídos sem OP em mês fechado, agrupados por cliente e mês', () => {
+    const agora = new Date('2026-10-15T12:00:00Z')
+    const m = (id: string, saida: string, extra: Partial<Reserva> = {}): Reserva => ({ ...res(id, null, FAT.mensal, CP.pendente, 300), saida: new Date(saida), ...extra })
+    const p = detectarPendencias([], [m('a', '2026-09-10T12:00:00Z'), m('b', '2026-09-30T23:00:00Z'), m('c', '2026-10-01T02:00:00Z')], [], agora)
+    // 'c' é 30/09 23:00 em São Paulo → entra em setembro
+    expect(p).toHaveLength(1)
+    expect(p[0]).toMatchObject({ tipo: 'mensal-sem-op', id: 'mensal-sem-op:c1:2026-09', clienteId: 'c1', mes: '2026-09', valor: 900, corrigivel: false, detalhe: '3 serviço(s) de 2026-09' })
+    expect(p[0].reservaIds.sort()).toEqual(['a', 'b', 'c'])
+  })
+
+  it('tipo 4 ignora mês corrente, reserva com OP e status não concluído', () => {
+    const agora = new Date('2026-10-15T12:00:00Z')
+    const m = (id: string, extra: Partial<Reserva> = {}): Reserva => ({ ...res(id, null, FAT.mensal), saida: new Date('2026-09-10T12:00:00Z'), ...extra })
+    expect(detectarPendencias([], [m('a', { saida: new Date('2026-10-02T12:00:00Z') })], [], agora)).toEqual([])
+    expect(detectarPendencias([op('1', OP.aberta)], [m('b', { opId: '1' })], [], agora).filter((x) => x.tipo === 'mensal-sem-op')).toEqual([])
+    expect(detectarPendencias([], [m('c', { status: 202410001 })], [], agora)).toEqual([])
+    // 01/10 01:00 UTC ainda é 30/09 em São Paulo: setembro continua aberto
+    expect(detectarPendencias([], [m('d')], [], new Date('2026-10-01T01:00:00Z'))).toEqual([])
+  })
+
   it('ignora reservas informativas sem evento de dinheiro', () => {
     expect(detectarPendencias([op('1', OP.pendente)], [res('a', '1', FAT.pagante)], [pag('1', PAG.pendente, 1000)])).toEqual([])
   })

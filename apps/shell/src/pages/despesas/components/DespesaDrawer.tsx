@@ -6,6 +6,7 @@ import { label } from '../../pagantes/domain/status'
 import type { Source } from '../data/source'
 import { LINKED } from '../data/queries'
 import type { Anexo, Despesa, DespesaChoices } from '../domain/types'
+import { AnaliseIA } from './AnaliseIA'
 import { ComprovantesGaleria } from './Comprovantes'
 import { Alertas, FinanceiroBadge, OperacionalBadge, titulo } from './DespesasList'
 
@@ -63,6 +64,8 @@ export function DespesaDrawer({ despesa: d, onClose, choices, source, version }:
           </div>
 
           {d.possivelDuplicidade ? <Alert tone="warning" title="Possível duplicidade">O App Motoristas marcou esta despesa como parecida com outra já lançada. Confira antes de pagar.</Alert> : null}
+
+          <AnaliseIA ia={d.ia} valor={d.valor} />
 
           <Section title="Gasto">
             <dl className="pg-ficha__grid">

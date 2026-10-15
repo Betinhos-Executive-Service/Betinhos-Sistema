@@ -3,8 +3,9 @@ import { anteriorDe, comparar, servicosAnteriores, type ChipAnterior } from '../
 import { int, normL } from '../format'
 import type { Contexto } from '../kpis'
 import { manutencaoEmAndamento } from './manutencoes'
-import { entre, fmtDia, mesRotulo, parseDia } from '../periodo'
+import { entre, fmtDia, hojeBR, mesRotulo, parseDia } from '../periodo'
 import type { Conjunto, Dados, EventoConducao, Reserva, TelemetriaDia, Veiculo } from '../types'
+import { calcularPreventivas, resumoPreventivas } from '../../../frota/domain/preventiva'
 
 /** Início do uso mensal da frota própria (legado L15912: a contagem só vale a partir de 01/06/2026). */
 export const CORTE_USO_FROTA = '2026-06-01'
@@ -61,6 +62,8 @@ export type Frota = {
   usoTotais: { proprios: number; terceiros: number; aluguel: number }
   eventosPorMes: EventosMes[]
   infleetIndisponivel: boolean
+  /** Preventivas vencidas e a vencer pelo domínio da Frota (veículos próprios ativos × itens ativos), hoje em Brasília; null sem o plano. */
+  preventivas: { vencidas: number; aVencer: number } | null
   /**
    * Chips "ANT." de Km rodados (subir é favorável), Excessos e Motor ocioso (cair é favorável), com o mesmo escopo aplicado ao período
    * anterior (veículos com serviço nele); null com o Infleet fora do ar.
@@ -203,7 +206,8 @@ export function calcularFrota(ctx: Contexto, dados: Dados): Frota {
   }
 
   const infleetIndisponivel = INFLEET.some((c) => dados.indisponiveis.includes(c))
-  const base = { kpis, usoMensal: uso.usoMensal, usoTotais: uso.totais, infleetIndisponivel }
+  const preventivas = dados.indisponiveis.includes('preventivas') ? null : resumoPreventivas(calcularPreventivas(dados.preventivas, hojeBR(ctx.now)))
+  const base = { kpis, usoMensal: uso.usoMensal, usoTotais: uso.totais, infleetIndisponivel, preventivas }
   if (infleetIndisponivel) return { ...base, telemetria: null, kmPorDia: [], eventosPorMes: [], ant: null }
 
   const noEscopo = (r: { dia: string; veiculoId: string }) => entre(r.dia, f.inicio, f.fim) && escopo.has(r.veiculoId)

@@ -60,7 +60,7 @@ export function Veiculos({ data, today, source, onOpenVeiculo }: { data: FrotaDa
           { key: 'status', header: 'Status', width: 'minmax(96px, .7fr)', cell: ({ veiculo }) => <StatusBadge tone={veiculo.status === VEICULO.ATIVO ? 'success' : veiculo.status === null ? 'warning' : 'neutral'}>{label(VEICULO_STATUS, veiculo.status, 'Sem status')}</StatusBadge> },
           { key: 'motorista', header: 'Motorista atual', hideBelow: 'mobile', cell: ({ motorista }) => motorista || '—' },
           { key: 'pendencias', header: 'Pendências', width: 'minmax(90px, .6fr)', cell: ({ pendencias }) => (pendencias > 0 ? <StatusBadge tone="danger">{pendencias}</StatusBadge> : '—') },
-          { key: 'custo', header: 'Custo (12 meses)', align: 'end', hideBelow: 'compact', cell: ({ custo }) => (
+          { key: 'custo', header: 'Manutenção (12 meses)', align: 'end', hideBelow: 'compact', cell: ({ custo }) => (
             <span className="frota-nowrap">
               {custo.qtd === 0 ? '—' : custo.qtd === custo.semValor ? null : brl(custo.total)}
               {custo.semValor > 0 && <span className="frota-muted">{custo.qtd === custo.semValor ? '' : ' · '}{custo.semValor} sem valor</span>}

@@ -21,6 +21,8 @@ describe('Despesas operacionais', () => {
     expect(within(ficha).getByText('Carlos Oliveira', { selector: 'dd' })).toBeTruthy()
     expect(await within(ficha).findByText('painel-km.jpg')).toBeTruthy()
     expect(within(ficha).getAllByRole('link', { name: /Abrir/ }).length).toBeGreaterThan(0)
+    expect(within(ficha).getByText('Análise da IA')).toBeTruthy()
+    expect(within(ficha).getByText('Processando: a IA está lendo o comprovante.')).toBeTruthy()
     expect(within(ficha).queryByRole('button', { name: /Validar|Pagar|Cancelar|Salvar/ })).toBeNull()
   })
 
