@@ -37,3 +37,22 @@ public sealed class SincronizarResponse
     [JsonProperty("mudancas")] public List<MudancaDto> Mudancas { get; } = new();
     [JsonProperty("aplicadas")] public bool Aplicadas { get; set; }
 }
+
+public sealed class FecharMesRequest
+{
+    [JsonProperty("clienteId")] public Guid ClienteId { get; set; }
+    [JsonProperty("mes")] public string Mes { get; set; } = "";
+
+    public void Validate()
+    {
+        if (ClienteId == Guid.Empty) throw new InvalidPluginExecutionException("clienteId é obrigatório.");
+        FechamentoMensal.Janela(Mes ?? "");
+    }
+}
+
+public sealed class FecharMesResponse
+{
+    [JsonProperty("opId")] public Guid OpId { get; set; }
+    [JsonProperty("reservas")] public int Reservas { get; set; }
+    [JsonProperty("valor")] public decimal Valor { get; set; }
+}

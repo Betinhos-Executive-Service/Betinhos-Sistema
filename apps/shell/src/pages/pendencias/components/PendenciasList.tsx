@@ -1,5 +1,5 @@
 import { Button, StatusBadge, Table, type StatusTone, type TableColumn } from '@betinhos/ui'
-import { ExternalLink, Split, Wrench } from 'lucide-react'
+import { CalendarCheck, ExternalLink, Split, Wrench } from 'lucide-react'
 import { openFromRow } from '../../pagantes/components/PagantesList'
 import { formatDate, formatMoney } from '../../pagantes/domain/messages'
 import { TIPO_LABEL, type Pendencia, type TipoPendencia } from '../domain/types'
@@ -9,6 +9,7 @@ export type Acoes = {
   onAbrirOp: (opId: string) => void
   onVerServico: (reservaId: string) => void
   onRateio: (p: Pendencia) => void
+  onFecharMes: (p: Pendencia) => void
 }
 type Props = Acoes & { list: Pendencia[]; onOpen: (id: string) => void; loading?: boolean }
 
@@ -17,6 +18,7 @@ const TONE: Record<TipoPendencia, StatusTone> = {
   'pago-sem-op-paga': 'info',
   'op-sem-pagamento-reserva-paga': 'warning',
   'rateio-nao-fecha': 'danger',
+  'mensal-sem-op': 'info',
 }
 
 export function TipoBadge({ p }: { p: Pendencia }) {
@@ -26,9 +28,10 @@ export function TipoBadge({ p }: { p: Pendencia }) {
 export const titulo = (p: Pendencia) => p.opCodigo || p.reservaCodigos[0] || 'Sem código'
 export const servicosTexto = (n: number) => (n === 1 ? '1 serviço' : `${n} serviços`)
 
-/** Ação conforme o tipo: Corrigir (1 e 3), Rateio (5), Abrir OP ou Ver serviço (2). */
-export function AcaoPendencia({ p, onCorrigir, onAbrirOp, onVerServico, onRateio }: Acoes & { p: Pendencia }) {
+/** Ação conforme o tipo: Corrigir (1 e 3), Fechar mês (4), Rateio (5), Abrir OP ou Ver serviço (2). */
+export function AcaoPendencia({ p, onCorrigir, onAbrirOp, onVerServico, onRateio, onFecharMes }: Acoes & { p: Pendencia }) {
   if (p.corrigivel) return <Button size="compact" variant="secondary" icon={<Wrench size={14} />} onClick={() => onCorrigir(p)}>Corrigir</Button>
+  if (p.tipo === 'mensal-sem-op') return <Button size="compact" variant="secondary" icon={<CalendarCheck size={14} />} onClick={() => onFecharMes(p)}>Fechar mês</Button>
   if (p.tipo === 'rateio-nao-fecha' && p.opId) return <Button size="compact" variant="secondary" icon={<Split size={14} />} onClick={() => onRateio(p)}>Rateio</Button>
   const opId = p.opId
   if (opId) return <Button size="compact" variant="secondary" icon={<ExternalLink size={14} />} onClick={() => onAbrirOp(opId)}>Abrir OP</Button>
