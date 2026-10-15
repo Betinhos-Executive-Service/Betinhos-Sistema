@@ -1,8 +1,9 @@
 import { StatusBadge, Table, type TableColumn } from '@betinhos/ui'
-import { Copy, Paperclip } from 'lucide-react'
+import { Copy, Paperclip, Sparkles } from 'lucide-react'
 import { openFromRow } from '../../pagantes/components/PagantesList'
 import { formatDate, formatMoney } from '../../pagantes/domain/messages'
 import { label } from '../../pagantes/domain/status'
+import { suspeitaIA } from '../domain/ia'
 import { financeiroTone, operacionalTone, semComprovante } from '../domain/status'
 import type { Despesa, DespesaChoices } from '../domain/types'
 

@@ -38,6 +38,23 @@ describe('leitura do comprovante no OneDrive', () => {
     expect(JSON.parse(String(((fetchMock.mock.calls[0] as unknown[])[1] as RequestInit).body))).toEqual({ link: 'https://betinhos-my.sharepoint.com/:i:/g/x', nomeArquivo: 'comprovante-1' })
   })
 
+  it('comprovante novo no SharePoint vai com origem sharepoint', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ sucesso: true, nomeArquivo: 'd1-1.jpg', mimeType: 'image/jpeg', conteudoBase64: btoa('abc') }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:teste' }))
+    const novo = { ...anexo, driveItemId: '42', url: 'https://betinhos.sharepoint.com/:i:/s/sistema/abc' }
+    await createArquivos(client())(novo)
+    expect(JSON.parse(String(((fetchMock.mock.calls[0] as unknown[])[1] as RequestInit).body))).toEqual({ id: '42', nomeArquivo: 'cupom.jpg', origem: 'sharepoint' })
+  })
+
+  it('id do OneDrive com link do OneDrive pessoal (betinhos-my) continua sem origem', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ sucesso: true, mimeType: 'image/jpeg', conteudoBase64: btoa('abc') }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:teste' }))
+    await createArquivos(client())({ ...anexo, url: 'https://betinhos-my.sharepoint.com/:i:/g/x' })
+    expect(JSON.parse(String(((fetchMock.mock.calls[0] as unknown[])[1] as RequestInit).body))).toEqual({ id: 'DRIVE-1', nomeArquivo: 'cupom.jpg' })
+  })
+
   it('sem arquivo no OneDrive ou sem variável configurada, explica o motivo', async () => {
     await expect(createArquivos(client())({ ...anexo, driveItemId: '', url: null })).rejects.toThrow('não tem o arquivo no OneDrive')
     await expect(createArquivos(client(''))(anexo)).rejects.toThrow('new_URLFlowConsultarArquivoOneDrive')
