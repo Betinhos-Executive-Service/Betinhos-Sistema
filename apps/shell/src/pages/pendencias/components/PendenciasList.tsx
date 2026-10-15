@@ -17,6 +17,7 @@ const TONE: Record<TipoPendencia, StatusTone> = {
   'pago-sem-op-paga': 'info',
   'op-sem-pagamento-reserva-paga': 'warning',
   'rateio-nao-fecha': 'danger',
+  'mensal-sem-op': 'info',
 }
 
 export function TipoBadge({ p }: { p: Pendencia }) {

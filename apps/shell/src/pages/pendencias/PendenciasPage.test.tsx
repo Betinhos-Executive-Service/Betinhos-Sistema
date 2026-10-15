@@ -29,10 +29,10 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 const rows = () => document.querySelectorAll('.pg-open').length
 
 describe('Pendências', () => {
-  it('mostra as 4 pendências do mock e filtra pela visão Rateio', async () => {
+  it('mostra as 5 pendências do mock e filtra pela visão Rateio', async () => {
     render(<PendenciasPage host={{ mode: 'mock' }} />)
     await screen.findByText('OP-501')
-    expect(rows()).toBe(4)
+    expect(rows()).toBe(5)
     expect(screen.getByText('Dados de exemplo')).toBeTruthy()
     fireEvent.click(screen.getByRole('combobox', { name: 'Visão' }))
     await waitFor(() => expect(screen.getAllByText('Rateio').length).toBeGreaterThan(1))

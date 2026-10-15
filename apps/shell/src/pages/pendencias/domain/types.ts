@@ -1,4 +1,4 @@
-export type TipoPendencia = 'op-paga-desalinhada' | 'pago-sem-op-paga' | 'op-sem-pagamento-reserva-paga' | 'rateio-nao-fecha'
+export type TipoPendencia = 'op-paga-desalinhada' | 'pago-sem-op-paga' | 'op-sem-pagamento-reserva-paga' | 'rateio-nao-fecha' | 'mensal-sem-op'
 
 export type Reserva = {
   id: string; codigo: string; saida: Date | null; cliente: string; clienteId: string
@@ -16,6 +16,8 @@ export type Pendencia = {
   reservaIds: string[]
   reservaCodigos: string[]
   cliente: string
+  clienteId: string
+  mes: string | null         // 'AAAA-MM' (tipo 4)
   data: Date | null          // saída mais recente das reservas envolvidas
   valor: number | null       // valor da OP, ou soma das CPs
   detalhe: string            // frase curta para a lista
@@ -27,4 +29,5 @@ export const TIPO_LABEL: Record<TipoPendencia, string> = {
   'pago-sem-op-paga': 'Serviço pago sem OP paga',
   'op-sem-pagamento-reserva-paga': 'OP sem pagamento, serviço pago',
   'rateio-nao-fecha': 'Rateio não fecha',
+  'mensal-sem-op': 'Mensal sem OP',
 }

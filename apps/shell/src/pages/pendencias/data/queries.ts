@@ -38,7 +38,7 @@ export async function resolveCpNav(client: DataverseClient): Promise<string> {
 /** Reservas ativas que já estão em OP ou marcadas como Pago, desde `since` (data de saída). */
 export function reservasPath(entitySet: string, since: Date | null, cpNav = '') {
   const base = since ? `statecode eq 0 and cr40f_dataehorriodesada ge ${since.toISOString()}` : 'statecode eq 0'
-  const filter = `${base} and (cr40f_statusdefaturamento eq ${FAT.pago} or _cr40f_financeiro_value ne null)`
+  const filter = `${base} and (cr40f_statusdefaturamento eq ${FAT.pago} or cr40f_statusdefaturamento eq ${FAT.mensal} or _cr40f_financeiro_value ne null)`
   const expand = cpNav ? `&$expand=${cpNav}($select=new_status,new_valortotal)` : ''
   return `${entitySet}?$select=${SELECT.join(',')}${expand}&$filter=${encodeURIComponent(filter)}`
 }
