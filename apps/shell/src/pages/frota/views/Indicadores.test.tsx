@@ -8,6 +8,7 @@ import { Indicadores, linhasCsv } from './Indicadores'
 
 const data: FrotaData = {
   ...EMPTY_DATA,
+  veiculos: [{ id: 'v1', placa: 'TST1A11', marca: null, modelo: null, cor: null, anoModelo: null, status: null, categoria: null, motorista: null, hodometro: null, hodometroEm: null }],
   manutencoes: [
     { id: 'm1', codigo: 'M1', descricao: 'Troca de óleo', status: MANUT.REALIZADO, grau: 1, tipo: 1, agendarPara: null, dataManutencao: '2026-09-20T12:00:00Z', valor: 200, estabelecimento: 'Oficina', servicoRealizado: 'Óleo', comentarioAprovador: null, km: null, veiculo: { id: 'v1', label: 'TST1A11' }, solicitante: null, criadoEm: '2026-09-10T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null },
     { id: 'm2', codigo: 'M2', descricao: 'Alinhamento', status: MANUT.REALIZADO, grau: 1, tipo: 2, agendarPara: null, dataManutencao: '2026-09-25T12:00:00Z', valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: { id: 'v1', label: 'TST1A11' }, solicitante: null, criadoEm: '2026-09-21T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null },
@@ -28,12 +29,30 @@ afterEach(cleanup)
 const painel = (titulo: string) => within(screen.getByRole('heading', { name: titulo }).closest('section') as HTMLElement)
 
 describe('Indicadores', () => {
-  it('mostra custo total, quantidade sem valor e tempo médio', () => {
-    render(<Indicadores data={data} today="2026-10-02" />)
-    expect(screen.getAllByText(/200,00/).length).toBeGreaterThan(0)
-    expect(screen.getByText('1 sem valor informado')).toBeTruthy()
+  it('mostra custo total no período (manutenção + multas + combustível), tempo médio e o custo total por mês', () => {
+    render(<Indicadores errors={{}} data={data} today="2026-10-02" />)
+    const kpi = within(screen.getByLabelText('Resumo')).getByText('Custo total no período').closest('article') as HTMLElement
+    expect(kpi.textContent).toMatch(/R\$\s330,16/)
+    expect(within(kpi).getByText('manutenção + multas + combustível')).toBeTruthy()
+    expect(screen.queryByText('Custo de manutenção no período')).toBeNull()
+    expect(painel('Custo total por mês').getByText(/R\$\s200,00 manut\. · R\$\s130,16 multas · R\$\s0,00 comb\./)).toBeTruthy()
     expect(screen.getByText('7 dias')).toBeTruthy()
     expect(screen.getByText('Ana')).toBeTruthy()
+  })
+
+  it('combustível indisponível sai do hint do custo total', () => {
+    render(<Indicadores errors={{ despesasCombustivel: 'Sem privilégio' }} data={data} today="2026-10-02" />)
+    const kpi = screen.getByText('Custo total no período').closest('.bt-metric') as HTMLElement
+    expect(kpi.querySelector('.bt-metric__hint')?.textContent).toBe('manutenção + multas · combustível indisponível')
+  })
+
+  it('com todas as fontes, o hint lista as três; período além de 12 meses mostra o aviso', () => {
+    window.location.hash = '#/frota?aba=indicadores&de=2025-01-01&ate=2026-10-02'
+    render(<Indicadores errors={{}} data={data} today="2026-10-02" />)
+    const kpi = screen.getByText('Custo total no período').closest('.bt-metric') as HTMLElement
+    expect(kpi.querySelector('.bt-metric__hint')?.textContent).toBe('manutenção + multas + combustível')
+    expect(screen.getByText('Combustível e km consideram só os últimos 12 meses.')).toBeTruthy()
+    window.location.hash = ''
   })
 
   it('monta o CSV das manutenções realizadas no período', () => {
@@ -45,32 +64,44 @@ describe('Indicadores', () => {
     ])
   })
 
-  it('não mostra R$ 0,00 no custo quando todas as manutenções realizadas estão sem valor', () => {
-    render(<Indicadores data={semValores} today="2026-10-02" />)
-    const kpi = within(screen.getByLabelText('Resumo')).getByText('Custo de manutenção no período').closest('article') as HTMLElement
-    expect(within(kpi).getByText('Não informado')).toBeTruthy()
-    expect(kpi.textContent).not.toMatch(/0,00/)
-    expect(within(kpi).getByText('1 sem valor informado')).toBeTruthy()
-  })
-
-  it('mostra R$ 0,00 no custo quando não há manutenção realizada no período', () => {
-    render(<Indicadores data={EMPTY_DATA} today="2026-10-02" />)
-    const kpi = within(screen.getByLabelText('Resumo')).getByText('Custo de manutenção no período').closest('article') as HTMLElement
+  it('mostra R$ 0,00 no custo total quando não há custo no período', () => {
+    render(<Indicadores errors={{}} data={EMPTY_DATA} today="2026-10-02" />)
+    const kpi = within(screen.getByLabelText('Resumo')).getByText('Custo total no período').closest('article') as HTMLElement
     expect(kpi.textContent).toMatch(/0,00/)
     expect((screen.getByRole('button', { name: /Exportar/ }) as HTMLButtonElement).disabled).toBe(true)
   })
 
-  it('mostra Não informado, e não R$ 0,00, no custo por veículo sem valor', () => {
-    render(<Indicadores data={semValores} today="2026-10-02" />)
-    const porVeiculo = painel('Custo por veículo')
-    expect(porVeiculo.getByText('SEM2B22')).toBeTruthy()
-    expect(porVeiculo.getByText('Não informado')).toBeTruthy()
-    expect(porVeiculo.getByText(/1 sem valor/)).toBeTruthy()
-    expect(porVeiculo.queryByText(/0,00/)).toBeNull()
+  it('ordena a tabela Custo por veículo por total e, ao clicar, por R$/km', () => {
+    const v = (id: string, placa: string) => ({ ...data.veiculos[0], id, placa })
+    const m = data.manutencoes[0]
+    const frota: FrotaData = {
+      ...EMPTY_DATA,
+      veiculos: [v('a', 'AAA1A11'), v('b', 'BBB2B22'), v('c', 'CCC3C33')],
+      manutencoes: [
+        { ...m, id: 'x1', valor: 1000, veiculo: { id: 'a', label: 'AAA1A11' } },
+        { ...m, id: 'x2', valor: 500, veiculo: { id: 'b', label: 'BBB2B22' } },
+      ],
+      telemetriaKm: [{ dia: '2026-09-20', veiculoId: 'a', km: 10000 }, { dia: '2026-09-20', veiculoId: 'b', km: 100 }],
+    }
+    render(<Indicadores errors={{}} data={frota} today="2026-10-02" />)
+    const tabela = painel('Custo por veículo')
+    const placas = () => tabela.getAllByRole('row').slice(1).map((row) => row.querySelector('[role="cell"]')?.textContent)
+    expect(placas()).toEqual(['AAA1A11', 'BBB2B22', 'CCC3C33'])
+    const total = tabela.getByRole('button', { name: /Total/ })
+    expect(total.closest('[role="columnheader"]')?.getAttribute('aria-sort')).toBe('descending')
+    fireEvent.click(tabela.getByRole('button', { name: /R\$\/km/ }))
+    expect(placas()).toEqual(['BBB2B22', 'AAA1A11', 'CCC3C33'])
+    expect(tabela.getByRole('button', { name: /R\$\/km/ }).closest('[role="columnheader"]')?.getAttribute('aria-sort')).toBe('descending')
+    expect(total.closest('[role="columnheader"]')?.getAttribute('aria-sort')).toBe('none')
+    const linhaB = tabela.getAllByRole('row')[1]
+    expect(linhaB.textContent).toMatch(/R\$\s5,00/)
+    expect(linhaB.textContent).toContain('Manutenção')
+    const linhaC = tabela.getAllByRole('row')[3]
+    expect(within(linhaC).getAllByText('—').length).toBe(2)
   })
 
   it('mostra Não informado, e não R$ 0,00, nas multas do motorista sem valor de catálogo', () => {
-    render(<Indicadores data={semValores} today="2026-10-02" />)
+    render(<Indicadores errors={{}} data={semValores} today="2026-10-02" />)
     const linha = screen.getByText('Beto').closest('[role="row"]') as HTMLElement
     expect(within(linha).getByText('Não informado')).toBeTruthy()
     expect(within(linha).getByText(/1 sem valor/)).toBeTruthy()
@@ -78,7 +109,7 @@ describe('Indicadores', () => {
   })
 
   it('ignora período invertido', () => {
-    render(<Indicadores data={data} today="2026-10-02" />)
+    render(<Indicadores errors={{}} data={data} today="2026-10-02" />)
     const de = screen.getByLabelText('De') as HTMLInputElement
     const ate = screen.getByLabelText('Até') as HTMLInputElement
     fireEvent.change(de, { target: { value: '2026-11-01' } })

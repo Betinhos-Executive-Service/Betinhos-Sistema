@@ -17,7 +17,7 @@ function fakeSource(overrides: Partial<DataSource> = {}): DataSource {
     update: vi.fn(async () => {}),
     openForm: async () => {},
     prepareFlow: vi.fn(async () => {}),
-    classificacao: async () => ({ servicos: [], categorias: [], origem: null, confianca: null }), classificarAgora: async () => { throw new Error("indisponível") }, fotoVeiculo: async () => null, enviarFotoVeiculo: async () => {}, runFlow: vi.fn(async (): Promise<FlowResult> => ({ message: null, shareUrl: null })),
+    classificacao: async () => ({ servicos: [], categorias: [], origem: null, confianca: null }), classificarAgora: async () => { throw new Error("indisponível") }, fotoVeiculo: async () => null, enviarFotoVeiculo: async () => {}, runFlow: vi.fn(async (): Promise<FlowResult> => ({ message: null, shareUrl: null })), salvarItemPlano: async () => {}, inativarItemPlano: async () => {}, salvarBaseline: async () => {},
     ...overrides,
   }
 }
