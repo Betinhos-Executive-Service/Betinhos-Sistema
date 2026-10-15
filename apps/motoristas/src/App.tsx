@@ -68,6 +68,18 @@ import {
   type DriverContext,
   type MaintenanceRequestVehicleOption
 } from "./lib/dataverse";
+import { readReceiptQuick } from "./lib/dataverse";
+import {
+  INITIAL_QUICK_READ,
+  QUICK_READ_TIMEOUT_MS,
+  applyQuickReadToDraft,
+  downscaleForQuickRead,
+  nextQuickReadState,
+  parseQuickReadResponse,
+  shouldRunQuickRead,
+  type QuickReadOutcome,
+  type QuickReadState
+} from "./lib/receiptQuickRead";
 import { IDEA_STATUS, type Idea, type IdeaDraft } from "./lib/ideas";
 import { APP_CONNECTION_LOST_MESSAGE, APP_OPERATION_ERROR_MESSAGE, reportAppError, type AppErrorNotice } from "./lib/appErrorLogger";
 import { isComunicadoPending, isMockComunicados, loadDriverComunicados, type ComunicadoDestinatario } from "./lib/comunicados";
@@ -472,6 +484,10 @@ function App() {
   const [maintenanceVehiclesLoading, setMaintenanceVehiclesLoading] = useState(false);
   const [maintenanceRequestDraft, setMaintenanceRequestDraft] = useState<MaintenanceRequestDraft>({ ...EMPTY_MAINTENANCE_REQUEST_DRAFT });
   const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft>({ ...EMPTY_EXPENSE_DRAFT });
+  const [expenseQuickRead, setExpenseQuickRead] = useState<QuickReadState>(INITIAL_QUICK_READ);
+  const expenseQuickReadSeqRef = useRef(0);
+  const expenseRetakeTargetIdRef = useRef("");
+  const expenseDateTouchedRef = useRef(false);
   const [expenseReferenceData, setExpenseReferenceData] = useState<ExpenseReferenceData>(DEFAULT_EXPENSE_REFERENCE_DATA);
   const [expenseReferenceLoading, setExpenseReferenceLoading] = useState(false);
   const [expenseReferenceError, setExpenseReferenceError] = useState("");
@@ -1256,6 +1272,7 @@ function App() {
     setMaintenanceExistingPreview(false);
     setMaintenanceRequestDraft({ ...EMPTY_MAINTENANCE_REQUEST_DRAFT });
     setExpenseDraft({ ...EMPTY_EXPENSE_DRAFT });
+    resetExpenseQuickRead();
     setMaintenanceFinalizeDraft({ ...EMPTY_MAINTENANCE_FINALIZE_DRAFT });
     setPhotoDraft(null);
     setPhotoDraftPreviewUrl("");
@@ -1753,7 +1770,16 @@ function App() {
     }, 450);
   };
 
+  const isExpenseDraftBlank = (draft: ExpenseDraft) =>
+    !draft.categoriaId && !draft.veiculoId && !draft.valor && !draft.formaPagamentoId && !draft.cidadeId &&
+    !draft.estabelecimento && !draft.descricao && !draft.kmInformado && !draft.litros && !expenseDateTouchedRef.current;
+
   const navigateFromInitial = (screenName: string) => {
+    if (screenName === "gastos" && !expenseSubmission && expensePhotos.length === 0 && isExpenseDraftBlank(expenseDraft)) {
+      setComunicadoOrigin("");
+      openExpenseCamera();
+      return;
+    }
     if (screenName === "personalReceipt" || screenName === "reciboPersonalizado" || screenName === "gerarReciboPersonalizado") {
       openPersonalReceiptFromHome();
       return;
@@ -1778,6 +1804,7 @@ function App() {
         setExpenseSubmission(null);
         setExpenseUploadRows([]);
         setExpenseDraft({ ...EMPTY_EXPENSE_DRAFT });
+        resetExpenseQuickRead();
         revokePhotoPreviewUrls(expensePhotos);
         setExpensePhotos([]);
         setScreen("inicio");
@@ -1953,6 +1980,7 @@ function App() {
         kmInformado: "",
         litros: ""
       });
+      resetExpenseQuickRead();
       setExpensePhotos([]);
       clearExpensePhotoDraftState();
       setExpensePreviewPhotoId("");
@@ -2232,7 +2260,50 @@ function App() {
     setScreen("solicitarManutencao");
   };
 
+  function resetExpenseQuickRead() {
+    expenseQuickReadSeqRef.current++;
+    expenseRetakeTargetIdRef.current = "";
+    expenseDateTouchedRef.current = false;
+    setExpenseQuickRead(INITIAL_QUICK_READ);
+  }
+
+  const runExpenseQuickRead = async (dataUrl: string) => {
+    if (!remoteMode || !shouldRunQuickRead(expenseQuickRead)) return;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setExpenseQuickRead((current) => ({ ...current, status: "manual" }));
+      return;
+    }
+    const seq = ++expenseQuickReadSeqRef.current;
+    setExpenseQuickRead((current) => ({ ...current, status: "lendo" }));
+    let outcome: QuickReadOutcome = { kind: "falha" };
+    try {
+      const base64 = await downscaleForQuickRead(dataUrl);
+      outcome = parseQuickReadResponse(await readReceiptQuick(
+        base64,
+        expenseReferenceData.categories.map((category) => category.name),
+        expenseReferenceData.paymentMethods.map((method) => method.name),
+        QUICK_READ_TIMEOUT_MS
+      ));
+    } catch {
+      outcome = { kind: "falha" };
+    }
+    if (seq !== expenseQuickReadSeqRef.current) return;
+    setExpenseQuickRead((current) => nextQuickReadState(current, outcome));
+    if (outcome.kind === "lido") {
+      const leitura = outcome.leitura;
+      const replaceAutoDate = !expenseDateTouchedRef.current;
+      setExpenseDraft((current) => applyQuickReadToDraft(current, leitura, expenseReferenceData, { replaceAutoDate }));
+    }
+  };
+
+  const retakeQuickReadPhoto = () => {
+    const targetId = expensePhotos[0]?.id ?? "";
+    openExpenseCamera();
+    expenseRetakeTargetIdRef.current = targetId;
+  };
+
   const openExpenseCamera = () => {
+    expenseRetakeTargetIdRef.current = "";
     clearExpensePhotoDraftState();
     setExpensePreviewPhotoId("");
     setScreen("fotoGasto");
@@ -2263,6 +2334,12 @@ function App() {
   };
 
   const confirmExpensePhoto = () => {
+    const retakeTargetId = expenseRetakeTargetIdRef.current;
+    expenseRetakeTargetIdRef.current = "";
+    const isNewPhoto = !expensePreviewPhotoId;
+    const retaking = isNewPhoto && Boolean(retakeTargetId) && expensePhotos.some((photo) => photo.id === retakeTargetId);
+    const shouldQuickRead = isNewPhoto && !expensePhotoIsVideo && Boolean(expensePhotoDraft) && (expensePhotos.length === 0 || retaking);
+    const quickReadDataUrl = expensePhotoDraft;
     if (!hasMediaDraftContent({ dataUrl: expensePhotoDraft, rawBlob: expensePhotoRawBlob, mediaType: expensePhotoIsVideo ? "video" : "foto" })) {
       return setScreen("gastos");
     }
@@ -2270,6 +2347,22 @@ function App() {
       setExpensePhotos((current) =>
         current.map((photo) => {
           if (photo.id !== expensePreviewPhotoId) return photo;
+          if (photo.previewUrl && photo.previewUrl !== (expensePhotoPreviewUrl || undefined)) revokePreviewUrl(photo.previewUrl);
+          return {
+            ...photo,
+            dataUrl: expensePhotoDraft,
+            previewUrl: expensePhotoPreviewUrl || undefined,
+            posterUrl: expensePhotoPosterUrl || undefined,
+            durationLabel: expensePhotoDurationLabel || undefined,
+            mediaType: expensePhotoIsVideo ? "video" : "foto",
+            rawBlob: expensePhotoIsVideo ? expensePhotoRawBlob ?? undefined : undefined
+          };
+        })
+      );
+    } else if (retaking) {
+      setExpensePhotos((current) =>
+        current.map((photo) => {
+          if (photo.id !== retakeTargetId) return photo;
           if (photo.previewUrl && photo.previewUrl !== (expensePhotoPreviewUrl || undefined)) revokePreviewUrl(photo.previewUrl);
           return {
             ...photo,
@@ -2299,6 +2392,7 @@ function App() {
     clearExpensePhotoDraftState(true);
     setExpensePreviewPhotoId("");
     setScreen("gastos");
+    if (shouldQuickRead) void runExpenseQuickRead(quickReadDataUrl);
   };
 
   const deleteExpensePhoto = () => {
@@ -2826,7 +2920,11 @@ function App() {
         referenceData={expenseReferenceData}
         referenceLoading={expenseReferenceLoading}
         referenceError={!remoteMode ? "Visualização local. Para gravar, abra o app publicado no Model-driven." : expenseReferenceError}
-        onDraftChange={(draft) => { if (!expenseSubmission) setExpenseDraft(draft); }}
+        onDraftChange={(draft) => {
+          if (expenseSubmission) return;
+          if (draft.dataGasto !== expenseDraft.dataGasto) expenseDateTouchedRef.current = true;
+          setExpenseDraft(draft);
+        }}
         onAddPhoto={openExpenseCamera}
         onPreviewPhoto={openExpensePreview}
         onBack={() => setScreen("inicio")}
@@ -2835,6 +2933,8 @@ function App() {
         vehicles={maintenanceVehicles}
         vehiclesLoading={maintenanceVehiclesLoading}
         currentVehicleId={maintenanceCurrentVehicleId}
+        quickRead={expenseQuickRead}
+        onRetakeQuickReadPhoto={retakeQuickReadPhoto}
       />
     );
   }

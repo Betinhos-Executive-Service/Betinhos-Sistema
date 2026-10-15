@@ -8019,7 +8019,9 @@ button:disabled {
 .maintenance-photo-thumb video,
 .real-camera-video {
   object-fit: contain !important;
-  background: transparent !important;
+  object-position: center !important;
+  /* Foto/comprovante sempre inteiro (fit): a sobra da proporção fica no neutro do Design System (#FCFCFB). */
+  background: #fcfcfb !important;
 }
 
 .maintenance-photo-thumb img,
@@ -11061,7 +11063,8 @@ select,
 
 .camera-capture-card .real-camera-video {
   object-fit: contain !important;
-  background: transparent !important;
+  object-position: center !important;
+  background: #fcfcfb !important;
 }
 
 .camera-recording-pill {
