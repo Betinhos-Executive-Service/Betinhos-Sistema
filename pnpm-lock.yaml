@@ -172,8 +172,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/dataverse
       '@betinhos/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
+        specifier: npm:@betinhos-executive-service/ui@^1.8.0
+        version: '@betinhos-executive-service/ui@1.8.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)'
       lucide-react:
         specifier: ^1.47.0
         version: 1.49.0(@types/react@19.3.0)(react@19.3.0)
@@ -209,8 +209,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/dataverse
       '@betinhos/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
+        specifier: npm:@betinhos-executive-service/ui@^1.8.0
+        version: '@betinhos-executive-service/ui@1.8.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)'
       lucide-react:
         specifier: ^1.47.0
         version: 1.49.0(@types/react@19.3.0)(react@19.3.0)
@@ -268,27 +268,6 @@ importers:
       '@types/node':
         specifier: ^24.0.0
         version: 24.19.2
-      typescript:
-        specifier: ^5.9.0
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.0
-        version: 3.2.7(@types/node@24.19.2)(jsdom@27.4.0)
-
-  packages/ui:
-    devDependencies:
-      '@types/react':
-        specifier: ^19.2.0
-        version: 19.3.0
-      '@types/react-dom':
-        specifier: ^19.2.0
-        version: 19.3.0(@types/react@19.3.0)
-      react:
-        specifier: ^19.2.0
-        version: 19.3.0
-      react-dom:
-        specifier: ^19.2.0
-        version: 19.3.0(react@19.3.0)
       typescript:
         specifier: ^5.9.0
         version: 5.9.3
@@ -405,6 +384,15 @@ packages:
   '@babel/types@7.29.8':
     resolution: {integrity: sha512-Vj1jF3cPfxg7OAfoI7QnVKLoILlm2JF9pnVHrX8qx7AHMiYWT+NDAA7jChlNgRS4WTLc/fD1lXLmPixluj+3Gg==}
     engines: {node: '>=6.9.0'}
+
+  '@betinhos-executive-service/tokens@1.8.0':
+    resolution: {integrity: sha512-tiBnaCxBy5ZSEfBdhDU/uVvTQplcNiM1trpBSRpSCEWrvCK3ZCTdJlmkrTSB8rPFwKF6MamOatY8MetsbffBwg==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/tokens/1.8.0/b58732e14467c0a277a62c94f227c8370498e1b3}
+
+  '@betinhos-executive-service/ui@1.8.0':
+    resolution: {integrity: sha512-xcgPbmQBUTOTkQ89XIYs2L0osdEor0ymZEHncC/F+kIAq+Ly/D1MAW8PBE6egM3fQ23YcH0j+aAyxQVze9V9uA==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/ui/1.8.0/c44b2781ead14778793a17112cc91e6aa93cf064}
+    peerDependencies:
+      react: ^19.2.0
+      react-dom: ^19.2.0
 
   '@csstools/color-helpers@6.1.2':
     resolution: {integrity: sha512-grhRy3OKmniaAEKXMjua5z/EODX0MSqBGjunw8+j/3HQjOnahs2AGhvEOIYVUWcU6ScApbhLhVrQTX8XqrMrow==}
@@ -1637,6 +1625,14 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
+
+  '@betinhos-executive-service/tokens@1.8.0': {}
+
+  '@betinhos-executive-service/ui@1.8.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+    dependencies:
+      '@betinhos-executive-service/tokens': 1.8.0
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
 
   '@csstools/color-helpers@6.1.2': {}
 
