@@ -12,6 +12,8 @@ import { EMPTY_FILTERS as INFRACOES_VAZIO } from './infracoes/domain/filters'
 import { infracoesQuery } from './infracoes/domain/query'
 import { EMPTY_FILTERS as OPS_VAZIO } from './ops/domain/filters'
 import { opsQuery } from './ops/domain/query'
+import { pendenciasQuery } from './pendencias/domain/query'
+import { EMPTY_FILTERS as PENDENCIAS_VAZIO } from './pendencias/domain/filters'
 import { EMPTY_FILTERS as PAGANTES_VAZIO } from './pagantes/domain/filters'
 import { pagantesQuery } from './pagantes/domain/query'
 import { EMPTY_FILTERS as PESSOAS_VAZIO } from './pessoas/domain/filters'
@@ -30,7 +32,7 @@ function ida<F>(codec: QueryCodec<F>, filtros: F) {
 it('filtros padrão não vão para a URL (link curto)', () => {
   const casos: [QueryCodec<never>, unknown][] = [
     [pagantesQuery as QueryCodec<never>, PAGANTES_VAZIO], [pessoasQuery as QueryCodec<never>, PESSOAS_VAZIO], [infracoesQuery as QueryCodec<never>, INFRACOES_VAZIO],
-    [curriculosQuery as QueryCodec<never>, CURRICULOS_VAZIO], [funcionariosQuery as QueryCodec<never>, DEFAULT_FILTERS], [opsQuery as QueryCodec<never>, OPS_VAZIO], [despesasOperacionaisQuery as QueryCodec<never>, DESPESAS_VAZIO],
+    [curriculosQuery as QueryCodec<never>, CURRICULOS_VAZIO], [funcionariosQuery as QueryCodec<never>, DEFAULT_FILTERS], [opsQuery as QueryCodec<never>, OPS_VAZIO], [pendenciasQuery as QueryCodec<never>, PENDENCIAS_VAZIO], [despesasOperacionaisQuery as QueryCodec<never>, DESPESAS_VAZIO],
   ]
   for (const [codec, vazio] of casos) {
     const { q, filtros } = ida(codec, vazio as never)
