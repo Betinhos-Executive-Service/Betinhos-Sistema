@@ -51,6 +51,8 @@ describe('prompt', () => {
     ['não cabem nos litros do segundo abastecimento considerando a km rodada desde o anterior'],
     ['Nome fantasia x razão social, abreviações e maiúsculas/minúsculas no estabelecimento não são divergência'],
     ['Com poucos itens no histórico não há padrão a inferir'],
+    ['Nome de estabelecimento diferente, sozinho, nunca é motivo para "precisa_corrigir"'],
+    ['CTF, Tag CTF, cartão frota, débito e crédito são formas de pagamento compatíveis'],
   ])('fixa a regra "%s"', (trecho) => {
     expect(SYSTEM_PROMPT).toContain(trecho)
   })
