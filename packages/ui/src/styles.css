@@ -23,6 +23,7 @@
 @import './components/dialog.css';
 @import './components/menu.css';
 @import './components/misc.css';
+@import './tableView/table-view.css';
 
 /* Centabel Book: fonte de títulos da marca; na interface, só no título de página. */
 @font-face {

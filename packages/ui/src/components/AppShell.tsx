@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { normalizeSearch } from './Select'
 import { ShellHeaderContext, useShellHeaderEntry, useShellHeaderStore } from './ShellHeader'
+import { useMediaQuery } from '../useMediaQuery'
 
 export type NavItem = {
   id: string
@@ -76,17 +77,6 @@ const I = {
   expand: icon(<><path d="m6 17 5-5-5-5" /><path d="m13 17 5-5-5-5" /></>, 18),
   external: icon(<><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></>, 14),
   search: icon(<><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></>, 16),
-}
-
-function useMediaQuery(query: string) {
-  const [matches, setMatches] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches)
-  useEffect(() => {
-    const list = window.matchMedia(query)
-    const onChange = () => setMatches(list.matches)
-    list.addEventListener('change', onChange)
-    return () => list.removeEventListener('change', onChange)
-  }, [query])
-  return matches
 }
 
 function renderItem(item: NavItem, className: string, activeId: string) {

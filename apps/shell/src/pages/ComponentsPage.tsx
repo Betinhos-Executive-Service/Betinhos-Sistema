@@ -2,8 +2,8 @@ import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useQueryBandeira, useQueryTexto } from '../nav/queryState'
 import { Check, ChevronRight, CircleCheck, Clock, Copy, EllipsisVertical, Home, Inbox, LayoutDashboard, Pencil, Plus, PlugZap, RefreshCw, SearchX, Trash2, TriangleAlert, Truck, X } from 'lucide-react'
 import {
-  Alert, Avatar, BottomNav, Breadcrumb, Button, Checkbox, ChoiceGroup, Cluster, DateTile, Dialog, Drawer, EmptyState, Field, Grid, Input, Menu, MetricCard, PageHeader, PageToolbar, Pagination, Progress, Radio, SearchBox, SegmentedControl, Select, Sheet, Skeleton, Spinner, Stack, StatusBadge, Surface, Switch, Table, TableTitle, Tabs, Textarea, ToastProvider, Tooltip, Upload,
-  filterOptions, useShellHeader, useToast, type AlertTone, type ButtonSize, type ButtonVariant, type ControlSize, type SelectOption, type StatusTone, type UploadFile,
+  Alert, Avatar, BottomNav, Breadcrumb, Button, Checkbox, ChoiceGroup, Cluster, DateTile, Dialog, Drawer, EmptyState, Field, Grid, Input, Menu, MetricCard, PageHeader, PageToolbar, Pagination, Progress, Radio, SearchBox, SegmentedControl, Select, Sheet, Skeleton, Spinner, Stack, StatusBadge, Surface, Switch, Table, TableTitle, Tabs, Textarea, ToastProvider, Tooltip, Upload, ViewBar,
+  createMemoryViewStore, defaultConfig, filterOptions, serializeConfig, tableViewColumns, toggleColumn, useShellHeader, useTableView, useToast, type TableColumn, type AlertTone, type ButtonSize, type ButtonVariant, type ControlSize, type SelectOption, type StatusTone, type UploadFile,
 } from '@betinhos/ui'
 import { PageLayout } from '../app/PageLayout'
 
@@ -537,6 +537,50 @@ function TableShowcase() {
   )
 }
 
+const OCORRENCIA_COLUNAS: TableColumn<Ocorrencia>[] = [
+  { key: 'titulo', header: 'Ocorrência', defaultWidth: 280, sortable: true, cell: (row) => <TableTitle title={row.titulo} meta={`${row.id} · ${row.local}`} /> },
+  { key: 'status', header: 'Status', defaultWidth: 130, sortable: true, cell: (row) => <StatusBadge tone={row.status}>{row.statusLabel}</StatusBadge> },
+  { key: 'prazo', header: 'Prazo', defaultWidth: 110, sortable: true, cell: (row) => dataBR(row.prazo) },
+  { key: 'cliente', header: 'Cliente', sortable: true, cell: (row) => row.cliente },
+  { key: 'responsavel', header: 'Responsável', sortable: true, cell: (row) => row.responsavel },
+  { key: 'local', header: 'Local', defaultHidden: true, cell: (row) => row.local },
+  { key: 'gravidade', header: 'Gravidade', defaultHidden: true, cell: (row) => row.gravidadeLabel },
+]
+const OCORRENCIA_DEFS = tableViewColumns(OCORRENCIA_COLUNAS)
+
+function TableViewShowcase() {
+  const [gestor, setGestor] = useState(false)
+  const [busca, setBusca] = useState('')
+  // Uma pública já existente; o store recomeça ao trocar o perfil.
+  const store = useMemo(() => createMemoryViewStore([
+    { id: 'pub-1', name: 'Atrasadas por cliente', publica: true, mine: false, ordem: 1, config: serializeConfig({ ...toggleColumn(defaultConfig(OCORRENCIA_DEFS), OCORRENCIA_DEFS, 'responsavel'), sort: { key: 'cliente', dir: 'asc' } }) },
+  ], { canPublish: gestor }), [gestor])
+  const view = useTableView({ tela: 'componentes.ocorrencias', columns: OCORRENCIA_DEFS, store, defaultSort: { key: 'prazo', dir: 'asc' } })
+  const sort = view.config.sort
+  const rows = useMemo(() => {
+    if (!sort) return OCORRENCIAS
+    const value = (row: Ocorrencia) => String(row[sort.key as keyof Ocorrencia] ?? '')
+    return [...OCORRENCIAS].sort((a, b) => value(a).localeCompare(value(b), 'pt-BR') * (sort.dir === 'asc' ? 1 : -1))
+  }, [sort])
+  return (
+    <Section name="Visões e colunas" summary="§10.9.1: o seletor de visão é o título da lista; Colunas abre o painel; no cabeçalho, clique ordena, arraste reordena, a borda ajusta a largura e Alt+setas move a coluna em foco.">
+      <ViewBar view={view} columns={OCORRENCIA_DEFS}>
+        <SearchBox placeholder="Filtrar por palavra-chave" aria-label="Filtrar por palavra-chave" value={busca} onChange={setBusca} />
+        <Button icon={<Plus size={16} />}>Nova ocorrência</Button>
+      </ViewBar>
+      <Table<Ocorrencia>
+        rows={rows}
+        rowKey={(row) => row.id}
+        columns={OCORRENCIA_COLUNAS}
+        view={{ config: view.config, onChange: view.setConfig }}
+        severity={(row) => ({ tone: row.gravidade, label: row.gravidadeLabel })}
+        footer={<span>Linhas: {rows.length}</span>}
+      />
+      <Cluster gap="3"><Toggle label="perfil gestor (publica visões)" value={gestor} onChange={setGestor} /></Cluster>
+    </Section>
+  )
+}
+
 function DrawerShowcase() {
   const toast = useToast()
   const [open, setOpen] = useQueryBandeira('drawer')
@@ -762,6 +806,7 @@ export function ComponentsPage() {
         <MetricCardShowcase />
         <DateTileShowcase />
         <TableShowcase />
+        <TableViewShowcase />
         <DrawerShowcase />
         <SheetShowcase />
         <UploadShowcase />

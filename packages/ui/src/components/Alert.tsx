@@ -111,6 +111,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 }
 
 /** `const toast = useToast(); toast({ tone: 'success', message: 'Ocorrência registrada.' })` */
+/** Toast quando houver `ToastProvider` acima; `null` fora dele (componentes que avisam por conta própria). */
+export function useOptionalToast() {
+  return useContext(ToastContext)
+}
+
 export function useToast() {
   const toast = useContext(ToastContext)
   return useMemo(() => toast ?? (() => { throw new Error('useToast precisa de um ToastProvider acima.') }), [toast])
