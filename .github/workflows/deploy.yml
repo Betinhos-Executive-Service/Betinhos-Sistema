@@ -42,7 +42,12 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+          # @betinhos/ui vem do GitHub Packages (repo design-system-betinhos); o GITHUB_TOKEN lê porque o pacote libera este repo.
+          registry-url: https://npm.pkg.github.com
+          scope: '@betinhos-executive-service'
       - run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: pnpm push
 
   # TEST e PROD recebem a solução inteira como managed: tela, schema, flows e plugins.
@@ -58,7 +63,12 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+          # @betinhos/ui vem do GitHub Packages (repo design-system-betinhos); o GITHUB_TOKEN lê porque o pacote libera este repo.
+          registry-url: https://npm.pkg.github.com
+          scope: '@betinhos-executive-service'
       - run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: pnpm build
       - name: Injeta o build na solução
         run: node packages/deploy/inject-solution.mjs apps/shell "solution/$SOLUTION" "$RESOURCE_NAME" "$LOADER_NAME" "$DISPLAY_NAME"

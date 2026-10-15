@@ -42,5 +42,10 @@ export default defineConfig({
   // Imports dinâmicos e preloads resolvem a partir da URL do próprio chunk (e não da página),
   // então funcionam tanto no `vite preview` (/assets) quanto no Dataverse (/WebResources/...).
   experimental: { renderBuiltUrl: (_filename, { hostType }) => (hostType === 'js' ? { relative: true } : undefined) },
-  test: { setupFiles: ['./src/test-setup.ts'], testTimeout: 15_000 },
+  test: {
+    setupFiles: ['./src/test-setup.ts'],
+    testTimeout: 15_000,
+    // @betinhos/ui é publicado como fonte TS (e importa CSS): o Vitest precisa transformá-lo, não carregar direto no Node.
+    server: { deps: { inline: [/@betinhos(-executive-service)?\/(ui|tokens)/] } },
+  },
 })

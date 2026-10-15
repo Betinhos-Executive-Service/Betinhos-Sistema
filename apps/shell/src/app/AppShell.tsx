@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   AlertTriangle, Banknote, BookUser, Calculator, Calendar, Camera, Car, CarFront, ClipboardList, Clock, Coins, Contact, Database, Download,
-  FileText, FileWarning, FolderCheck, FolderCog, Home, KeyRound, Landmark, LayoutDashboard, List, Mail, Megaphone, MapPin, Paperclip, Palette, Receipt, ReceiptText, Route,
+  FileText, FileWarning, FolderCheck, FolderCog, Home, KeyRound, Landmark, LayoutDashboard, List, Mail, Megaphone, MapPin, Paperclip, Receipt, ReceiptText, Route,
   ScrollText, Shield, Shuffle, Tag, TrendingUp, Users, Wallet, Wrench,
 } from 'lucide-react'
 import { AppShell as Shell, type NavGroup } from '@betinhos/ui'
@@ -28,7 +28,6 @@ const GROUP_ICONS: Record<string, ReactNode> = {
   frota: <Car />,
   cadastros: <Database />,
   'back-end': <FolderCog />,
-  'design-system': <Palette />,
 }
 
 // Um ícone por tela (id do sitemap); sem entrada, o item fica só com o rótulo.
@@ -77,7 +76,6 @@ const ITEM_ICONS: Record<string, ReactNode> = {
   'custom-page-funcoes-operacionais': <Wrench />,
   cr40f_gerenciarcomunicados: <Megaphone />,
   new_telacomposicaopreco: <Calculator />,
-  componentes: <Palette />,
 }
 
 /** Traduz o sitemap do app para a navegação do AppShell do Design System. */
@@ -86,7 +84,7 @@ function toNavGroup(group: MenuGroup, entityLabels: Map<string, string>, badges?
     id: group.id,
     label: group.label,
     icon: GROUP_ICONS[group.id],
-    admin: group.id === 'back-end' || group.id === 'design-system',
+    admin: group.id === 'back-end',
     items: group.items.map((item) => ({
       id: item.id,
       label: itemLabel(item, entityLabels),

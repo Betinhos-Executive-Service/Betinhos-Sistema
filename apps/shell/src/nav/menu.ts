@@ -10,7 +10,7 @@ export type MenuItem =
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
-  | { kind: 'page'; id: string; label: string; page: 'componentes' | 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' }
+  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' }
 
 export type MenuGroup = { id: string; label: string; items: MenuItem[] }
 
@@ -92,10 +92,6 @@ export const MENU: MenuGroup[] = [
       table('new_marketing'),
     ],
   },
-  // Referência para quem desenvolve: só existe no `pnpm dev`, nunca no build publicado.
-  ...(import.meta.env.DEV
-    ? [{ id: 'design-system', label: 'Design System', items: [{ kind: 'page', id: 'componentes', label: 'Componentes', page: 'componentes' }] } satisfies MenuGroup]
-    : []),
 ]
 
 export const ALL_ITEMS = MENU.flatMap((group) => group.items)
