@@ -41,6 +41,20 @@ describe('Pendências', () => {
     expect(screen.getByText('OP-505')).toBeTruthy()
   })
 
+  it('fecha o mês do tipo 4: confirma, avisa e a pendência some', async () => {
+    render(<PendenciasPage host={{ mode: 'mock' }} />)
+    await screen.findByText('OP-501')
+    fireEvent.click(screen.getByRole('button', { name: 'Fechar mês' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Fechar mês?' })
+    expect(within(dialog).getByText('RES-741')).toBeTruthy()
+    expect(within(dialog).getByText('RES-742')).toBeTruthy()
+    expect(within(dialog).getByText('Construtora Horizonte')).toBeTruthy()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Fechar mês' }))
+    await screen.findByText('OP criada com 2 serviço(s).')
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Fechar mês' })).toBeNull())
+    await waitFor(() => expect(rows()).toBe(4))
+  })
+
   it('abre a ficha da pendência', async () => {
     render(<PendenciasPage host={{ mode: 'mock' }} />)
     fireEvent.click((await screen.findByText('OP-501')).closest('button')!)
