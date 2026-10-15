@@ -20,11 +20,11 @@ export function normalizeAngle(angle: number) {
 const PHOTO_OUTPUT_MIME_TYPE = "image/jpeg";
 const PHOTO_OUTPUT_QUALITY = 0.98;
 
-function encodePhotoCanvas(canvas: HTMLCanvasElement) {
-  return canvas.toDataURL(PHOTO_OUTPUT_MIME_TYPE, PHOTO_OUTPUT_QUALITY);
+function encodePhotoCanvas(canvas: HTMLCanvasElement, quality = PHOTO_OUTPUT_QUALITY) {
+  return canvas.toDataURL(PHOTO_OUTPUT_MIME_TYPE, quality);
 }
 
-function encodePhotoCanvasAsync(canvas: HTMLCanvasElement, quality = PHOTO_OUTPUT_QUALITY) {
+function encodePhotoCanvasAsync(canvas: HTMLCanvasElement) {
   return new Promise<string>((resolve) => {
     canvas.toBlob((blob) => {
       if (!blob) {
@@ -35,7 +35,7 @@ function encodePhotoCanvasAsync(canvas: HTMLCanvasElement, quality = PHOTO_OUTPU
       reader.onload = () => resolve(String(reader.result ?? ""));
       reader.onerror = () => resolve(encodePhotoCanvas(canvas));
       reader.readAsDataURL(blob);
-    }, PHOTO_OUTPUT_MIME_TYPE, quality);
+    }, PHOTO_OUTPUT_MIME_TYPE, PHOTO_OUTPUT_QUALITY);
   });
 }
 
@@ -77,7 +77,7 @@ function getRotationForOrientation(sourceWidth: number, sourceHeight: number, or
   return sourceIsLandscape ? 180 : 270;
 }
 
-export function captureVideoFrameDataUrl(video: HTMLVideoElement, orientationAngle = getViewportOrientationAngle()) {
+export function captureVideoFrameDataUrl(video: HTMLVideoElement, orientationAngle = getViewportOrientationAngle(), quality = PHOTO_OUTPUT_QUALITY) {
   const sourceWidth = video.videoWidth;
   const sourceHeight = video.videoHeight;
   const normalizedAngle = normalizeAngle(orientationAngle);
@@ -95,10 +95,10 @@ export function captureVideoFrameDataUrl(video: HTMLVideoElement, orientationAng
   if (!context) return "";
 
   context.drawImage(video, 0, 0, canvas.width, canvas.height);
-  return encodePhotoCanvas(canvas);
+  return encodePhotoCanvas(canvas, quality);
 }
 
-export async function captureVideoFrameDataUrlAsync(video: HTMLVideoElement, orientationAngle = getViewportOrientationAngle(), quality = PHOTO_OUTPUT_QUALITY) {
+export async function captureVideoFrameDataUrlAsync(video: HTMLVideoElement, orientationAngle = getViewportOrientationAngle()) {
   const sourceWidth = video.videoWidth;
   const sourceHeight = video.videoHeight;
   const normalizedAngle = normalizeAngle(orientationAngle);
@@ -116,7 +116,7 @@ export async function captureVideoFrameDataUrlAsync(video: HTMLVideoElement, ori
   if (!context) return "";
 
   context.drawImage(video, 0, 0, canvas.width, canvas.height);
-  return encodePhotoCanvasAsync(canvas, quality);
+  return encodePhotoCanvasAsync(canvas);
 }
 
 export function readFileAsDataUrl(file: File): Promise<string> {

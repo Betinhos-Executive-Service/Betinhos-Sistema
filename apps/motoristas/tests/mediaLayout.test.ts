@@ -122,7 +122,9 @@ test("foto android prioriza ImageCapture e jpeg com baixa compressao", () => {
   assert.match(mediaCaptureScreen, /if \(!photoDataUrl && video\) photoDataUrl = await captureVideoFrameDataUrlAsync\(video\);/);
   assert.match(photoOrientation, /const PHOTO_OUTPUT_QUALITY = 0\.98;/);
   // Comprovante: não espera o takePhoto; vai direto ao quadro do vídeo com a qualidade do plano.
-  assert.match(mediaCaptureScreen, /if \(!capturePlan\.useSensorPhoto && video\) \{\s*photoDataUrl = await captureVideoFrameDataUrlAsync\(video, undefined, capturePlan\.jpegQuality\);/);
+  assert.match(mediaCaptureScreen, /if \(!capturePlan\.useSensorPhoto && video\) \{\s*photoDataUrl = captureVideoFrameDataUrl\(video, undefined, capturePlan\.jpegQuality\);/);
+  // toBlob agenda a codificação em períodos ociosos e demora segundos com a câmera ao vivo; toDataURL é direto.
+  assert.match(photoOrientation, /export function captureVideoFrameDataUrl\(video: HTMLVideoElement, orientationAngle = getViewportOrientationAngle\(\), quality = PHOTO_OUTPUT_QUALITY\)/);
   assert.match(mediaCaptureScreen, /\} else if \(stream\) \{/);
 });
 

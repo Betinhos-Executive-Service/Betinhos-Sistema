@@ -6,6 +6,7 @@ import { FormMenu } from "../components/navigation/FormMenu";
 import { reportAppError } from "../lib/appErrorLogger";
 import { describeStreamSize, getDocumentStreamConstraints, getDocumentTrackConstraints, planLivePhotoCapture } from "../lib/cameraConstraints";
 import {
+  captureVideoFrameDataUrl,
   captureVideoFrameDataUrlAsync,
   formatVideoDuration,
   readBlobAsDataUrl,
@@ -433,7 +434,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
       let photoDataUrl = "";
       const capturePlan = planLivePhotoCapture(documentFraming);
       if (!capturePlan.useSensorPhoto && video) {
-        photoDataUrl = await captureVideoFrameDataUrlAsync(video, undefined, capturePlan.jpegQuality);
+        photoDataUrl = captureVideoFrameDataUrl(video, undefined, capturePlan.jpegQuality);
       } else if (stream) {
         try {
           photoDataUrl = await captureTrackPhotoDataUrl(stream);
