@@ -202,3 +202,13 @@ Decisão do Renan em 15/10/2026: manter só o resumo diário de documentos e mul
 | Ambiente | Só DEV até pedido explícito. |
 
 Como as consultas filtram: motoristas ativos (`cr40f_status` 0, `cr40f_funcao` 202410000) com `cr40f_validadedacnh` anterior a hoje ou `cr40f_datadoaso` anterior a hoje menos 12 meses; documentos com `cr40f_situacao` 100000000 (Vigente), veículo preenchido e `cr40f_validade` anterior a hoje; multas com `cr40f_status` 202410000 (Notificar o Condutor), motorista vazio e `cr40f_dataparaindicar` até hoje mais 3 dias. "Escalado hoje" é um serviço Confirmado (202410001), Programado (202410005) ou Em Execução (202410006) com saída entre 00:00 e 24:00 de Brasília.
+
+## Estado em 15/10/2026
+
+- Flow `Flow Alertas | Resumo diário` (id `2a319205-9fc8-f111-a05c-7ced8da8c473`) **ativo no DEV**, na AppBetinhos; `checkFlowErrors` sem erros e as 13 conferências por leitura de volta passaram.
+- **Sem itens:** a execução termina em `Encerrar_sem_itens`, sem e-mail, com 17 ações executadas.
+- **Com itens:** com dados de teste, o e-mail saiu com as quatro linhas (CNH vencida, ASO vencido, documento vencido do veículo com a placa e multa sem condutor), sem dado pessoal, e o motorista com CNH vencida sem serviço hoje ficou de fora. 24 ações executadas.
+- **Consumo estimado:** de 17 a 24 ações por execução, 22 dias úteis, ou seja, de 370 a 530 ações por mês contra o teto de 10.000.
+- **Achado da prova:** no DEV, uma automação limpa o veículo do serviço de origem "Automático" quando o motorista não tem veículo atual. O resumo só enxerga documento de veículo que está de fato no serviço; isso é o esperado.
+- Dados de teste apagados.
+- **Pendências do Renan:** repor em `cr40f_ResumoEmailOperacao` os e-mails reais (vários, separados por ponto e vírgula); decidir se troca a variável pela marcação "Notificações operacionais" do cadastro de funcionários; levar ao PROD só com pedido explícito.
