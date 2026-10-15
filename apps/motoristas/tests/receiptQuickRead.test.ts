@@ -22,7 +22,7 @@ import { DEFAULT_EXPENSE_REFERENCE_DATA, type ExpenseDraft } from "../src/lib/ex
 const vazio: ExpenseDraft = { categoriaId: "", veiculoId: "", valor: "", dataGasto: "", formaPagamentoId: "", cidadeId: "", estabelecimento: "", descricao: "", kmInformado: "", litros: "" };
 
 test("applyQuickReadToDraft preenche só campos vazios, casa a categoria por nome e não preenche a forma de pagamento", () => {
-  const draft = applyQuickReadToDraft({ ...vazio, valor: "90,00" }, { ...leitura, forma_pagamento_sugerida: "TicketLog" }, DEFAULT_EXPENSE_REFERENCE_DATA);
+  const draft = applyQuickReadToDraft({ ...vazio, valor: "90,00" }, { ...leitura, forma_pagamento_sugerida: "TicketLog" }, DEFAULT_EXPENSE_REFERENCE_DATA, { today: "2026-10-15" });
   assert.equal(draft.valor, "90,00");
   assert.equal(draft.dataGasto, "2026-10-12");
   assert.equal(draft.estabelecimento, "Posto X");
@@ -68,8 +68,8 @@ test("quickReadTargetSize limita o maior lado a 1600 mantendo proporção", () =
 
 test("applyQuickReadToDraft troca a data automática (hoje) quando o motorista não mexeu na data", () => {
   const comHoje = { ...vazio, dataGasto: "2026-10-15" };
-  assert.equal(applyQuickReadToDraft(comHoje, leitura, DEFAULT_EXPENSE_REFERENCE_DATA).dataGasto, "2026-10-15");
-  assert.equal(applyQuickReadToDraft(comHoje, leitura, DEFAULT_EXPENSE_REFERENCE_DATA, { replaceAutoDate: true }).dataGasto, "2026-10-12");
+  assert.equal(applyQuickReadToDraft(comHoje, leitura, DEFAULT_EXPENSE_REFERENCE_DATA, { today: "2026-10-15" }).dataGasto, "2026-10-15");
+  assert.equal(applyQuickReadToDraft(comHoje, leitura, DEFAULT_EXPENSE_REFERENCE_DATA, { replaceAutoDate: true, today: "2026-10-15" }).dataGasto, "2026-10-12");
 });
 
 import { buildQuickReadDescription, matchQuickReadCity, QUICK_READ_DESCRIPTION_MAX } from "../src/lib/receiptQuickRead.ts";
@@ -85,6 +85,8 @@ test("matchQuickReadCity casa nome e UF sem acento nem caixa; só nome quando ú
   assert.equal(matchQuickReadCity(cidades, "campinas", null), "cps");
   assert.equal(matchQuickReadCity(cidades, "Sao Paulo", "SP"), "sp");
   assert.equal(matchQuickReadCity(cidades, "Pindamonhangaba", "SP"), "");
+  // UF lida que não bate com nenhuma cidade desse nome: fica vazia (sem cair no "só nome").
+  assert.equal(matchQuickReadCity(cidades, "Campinas", "RJ"), "");
   assert.equal(matchQuickReadCity(cidades, null, "SP"), "");
   assert.equal(matchQuickReadCity([], "Taubaté", "SP"), "");
 });
@@ -113,4 +115,49 @@ test("applyQuickReadToDraft preenche a descrição só quando vazia", () => {
   const lido = { ...leitura, estabelecimento: "Posto Ipiranga Moreira César", litros: 32.5 };
   assert.equal(applyQuickReadToDraft(vazio, lido, comCidades).descricao, "Abastecimento · Posto Ipiranga Moreira César · 32,5 L");
   assert.equal(applyQuickReadToDraft({ ...vazio, descricao: "minha nota" }, lido, comCidades).descricao, "minha nota");
+});
+
+import { applyQuickRead, resolveQuickReadDate, todayInSaoPaulo } from "../src/lib/receiptQuickRead.ts";
+
+test("data lida: aceita só de hoje até 3 dias atrás (hoje em America/Sao_Paulo)", () => {
+  const hoje = "2026-10-15";
+  assert.equal(resolveQuickReadDate("2026-10-15", hoje), "2026-10-15");
+  assert.equal(resolveQuickReadDate("2026-10-12", hoje), "2026-10-12");
+  assert.equal(resolveQuickReadDate("2026-10-11", hoje), "");
+  assert.equal(resolveQuickReadDate(null, hoje), "");
+  assert.equal(resolveQuickReadDate("lixo", hoje), "");
+  // 23:30 de 15/10 em São Paulo ainda é 15/10 (UTC já é 16/10).
+  assert.equal(todayInSaoPaulo(new Date("2026-10-16T02:30:00Z")), "2026-10-15");
+});
+
+test("data lida: ano errado do OCR é corrigido para o ano atual (ou o anterior na virada) se cair na janela", () => {
+  assert.equal(resolveQuickReadDate("2020-10-15", "2026-10-15"), "2026-10-15");
+  assert.equal(resolveQuickReadDate("2062-10-14", "2026-10-15"), "2026-10-14");
+  assert.equal(resolveQuickReadDate("2026-12-30", "2027-01-01"), "2026-12-30");
+  assert.equal(resolveQuickReadDate("2027-12-31", "2027-01-01"), "2026-12-31");
+  // Futuro sem correção possível ou antigo demais no ano atual: vazio.
+  assert.equal(resolveQuickReadDate("2026-10-20", "2026-10-15"), "");
+  assert.equal(resolveQuickReadDate("2020-09-01", "2026-10-15"), "");
+});
+
+test("data fora da janela limpa a data automática; a digitada pelo motorista nunca muda", () => {
+  const auto = { ...vazio, dataGasto: "2026-10-15" };
+  const velho = { ...leitura, data: "2026-10-01" };
+  assert.equal(applyQuickReadToDraft(auto, velho, DEFAULT_EXPENSE_REFERENCE_DATA, { replaceAutoDate: true, today: "2026-10-15" }).dataGasto, "");
+  assert.equal(applyQuickReadToDraft(auto, { ...leitura, data: null }, DEFAULT_EXPENSE_REFERENCE_DATA, { replaceAutoDate: true, today: "2026-10-15" }).dataGasto, "");
+  assert.equal(applyQuickReadToDraft({ ...vazio, dataGasto: "2026-10-13" }, velho, DEFAULT_EXPENSE_REFERENCE_DATA, { replaceAutoDate: false, today: "2026-10-15" }).dataGasto, "2026-10-13");
+  assert.equal(applyQuickReadToDraft({ ...vazio, dataGasto: "2026-10-13" }, leitura, DEFAULT_EXPENSE_REFERENCE_DATA, { replaceAutoDate: false, today: "2026-10-15" }).dataGasto, "2026-10-13");
+});
+
+test("data só fica destacada quando veio da leitura (inclusive quando é a mesma de hoje)", () => {
+  const auto = { ...vazio, dataGasto: "2026-10-15" };
+  const hoje = { replaceAutoDate: true, today: "2026-10-15" };
+  assert.equal(applyQuickRead(auto, { ...leitura, data: "2026-10-15" }, DEFAULT_EXPENSE_REFERENCE_DATA, hoje).filled.dataGasto, "2026-10-15");
+  assert.equal(applyQuickRead(auto, { ...leitura, data: "2020-10-14" }, DEFAULT_EXPENSE_REFERENCE_DATA, hoje).filled.dataGasto, "2026-10-14");
+  const vazia = applyQuickRead(auto, { ...leitura, data: "2026-09-01" }, DEFAULT_EXPENSE_REFERENCE_DATA, hoje);
+  assert.equal(vazia.draft.dataGasto, "");
+  assert.equal(vazia.filled.dataGasto, undefined);
+  const digitada = applyQuickRead({ ...vazio, dataGasto: "2026-10-13" }, leitura, DEFAULT_EXPENSE_REFERENCE_DATA, { replaceAutoDate: false, today: "2026-10-15" });
+  assert.equal(digitada.filled.dataGasto, undefined);
+  assert.equal(digitada.filled.valor, "85,40");
 });

@@ -72,12 +72,11 @@ import { readReceiptQuick } from "./lib/dataverse";
 import {
   INITIAL_QUICK_READ,
   QUICK_READ_FILL_STEP_MS,
-  applyQuickReadToDraft,
+  applyQuickRead,
   downscaleForQuickRead,
   expenseFlowView,
   hasRemoteReferenceData,
   nextQuickReadState,
-  quickReadFilledFields,
   runQuickReadPipeline,
   shouldRunQuickRead,
   startQuickReadState,
@@ -2306,9 +2305,9 @@ function App() {
       await new Promise((resolve) => window.setTimeout(resolve, QUICK_READ_FILL_STEP_MS));
       if (seq !== expenseQuickReadSeqRef.current) return;
       const before = expenseDraftRef.current;
-      const after = applyQuickReadToDraft(before, outcome.leitura, referenceData, { replaceAutoDate: !expenseDateTouchedRef.current });
+      const { draft: after, filled } = applyQuickRead(before, outcome.leitura, referenceData, { replaceAutoDate: !expenseDateTouchedRef.current });
       setExpenseDraft(after);
-      setExpenseQuickReadFilled(quickReadFilledFields(before, after));
+      setExpenseQuickReadFilled(filled);
     }
     setExpenseQuickReadFilling(false);
     setExpenseQuickRead((current) => nextQuickReadState(current, outcome));

@@ -40,7 +40,12 @@ const formatDecimal = (value: number, minDigits: number, maxDigits = minDigits) 
 export type ApplyQuickReadOptions = {
   /** A data do rascunho é a automática (hoje) e o motorista não a alterou: pode ser trocada pela data lida. */
   replaceAutoDate?: boolean;
+  /** Hoje (AAAA-MM-DD) em America/Sao_Paulo; padrão: agora. */
+  today?: string;
 };
+
+/** A leitura pode definir a data: rascunho sem data ou com a data automática que o motorista não mexeu. */
+const canSetQuickReadDate = (draft: ExpenseDraft, options: ApplyQuickReadOptions) => !draft.dataGasto || Boolean(options.replaceAutoDate);
 
 const normalizeCityText = (value: string) =>
   value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -51,9 +56,53 @@ export function matchQuickReadCity(cities: ExpenseCityOption[], cidade: string |
   if (!name) return "";
   const sameName = cities.filter((city) => normalizeCityText(city.name.split(" - ")[0] ?? city.name) === name);
   const state = (uf ?? "").trim().toUpperCase();
-  const exact = state ? sameName.filter((city) => city.uf.toUpperCase() === state) : [];
-  if (exact.length === 1) return exact[0].id;
+  if (state) {
+    // Com UF lida, só o par nome + UF vale; UF que não bate fica vazia.
+    const exact = sameName.filter((city) => city.uf.toUpperCase() === state);
+    return exact.length === 1 ? exact[0].id : "";
+  }
   return sameName.length === 1 ? sameName[0].id : "";
+}
+
+/** "Hoje" no fuso da operação (AAAA-MM-DD). */
+export function todayInSaoPaulo(now = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+}
+
+/** Despesa lida vale de hoje até 3 dias atrás. */
+export const QUICK_READ_DATE_WINDOW_DAYS = 3;
+
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+const dayNumber = (iso: string) => {
+  const match = ISO_DATE.exec(iso);
+  if (!match) return null;
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const time = Date.UTC(year, month - 1, day);
+  const check = new Date(time);
+  if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) return null;
+  return time / 86_400_000;
+};
+
+/**
+ * Data lida → data da despesa: aceita só [hoje − 3 dias, hoje]. Fora disso tenta o mesmo dia/mês no ano atual e no
+ * anterior (ano trocado pelo OCR, virada do ano). Sem data ou ainda fora da janela: vazio.
+ */
+export function resolveQuickReadDate(read: string | null | undefined, today: string) {
+  const todayNumber = dayNumber(today);
+  if (!read || todayNumber === null) return "";
+  const inWindow = (iso: string) => {
+    const value = dayNumber(iso);
+    return value !== null && value <= todayNumber && value >= todayNumber - QUICK_READ_DATE_WINDOW_DAYS;
+  };
+  if (inWindow(read)) return read;
+  const match = ISO_DATE.exec(read);
+  if (!match) return "";
+  const year = Number(today.slice(0, 4));
+  for (const candidateYear of [year, year - 1]) {
+    const candidate = `${candidateYear}-${match[2]}-${match[3]}`;
+    if (inWindow(candidate)) return candidate;
+  }
+  return "";
 }
 
 export const QUICK_READ_DESCRIPTION_MAX = 120;
@@ -76,7 +125,7 @@ export function applyQuickReadToDraft(
   if (!next.categoriaId && leitura.categoria_sugerida) next.categoriaId = findExpenseCategoryByName(referenceData, [leitura.categoria_sugerida])?.id ?? "";
   // Forma de pagamento fica com o motorista: a leitura não preenche.
   if (!next.valor && leitura.valor !== null) next.valor = formatDecimal(leitura.valor, 2);
-  if ((!next.dataGasto || options.replaceAutoDate) && leitura.data) next.dataGasto = leitura.data;
+  if (canSetQuickReadDate(draft, options)) next.dataGasto = resolveQuickReadDate(leitura.data, options.today ?? todayInSaoPaulo());
   if (!next.estabelecimento && leitura.estabelecimento) next.estabelecimento = leitura.estabelecimento.trim();
   const rules = getExpenseCategoryRules(findExpenseCategory(referenceData, next.categoriaId));
   if (!next.litros && rules.exigeLitros && leitura.litros !== null) next.litros = formatDecimal(leitura.litros, 0, 3);
@@ -199,6 +248,14 @@ export function quickReadFilledFields(before: ExpenseDraft, after: ExpenseDraft)
     if (after[key] && after[key] !== before[key]) filled[key] = after[key];
   }
   return filled;
+}
+
+/** Aplica a leitura e diz o que destacar; a data é destacada sempre que veio da leitura, mesmo igual à de hoje. */
+export function applyQuickRead(before: ExpenseDraft, leitura: QuickReadLeitura, referenceData: ExpenseReferenceData, options: ApplyQuickReadOptions = {}) {
+  const draft = applyQuickReadToDraft(before, leitura, referenceData, options);
+  const filled = quickReadFilledFields(before, draft);
+  if (canSetQuickReadDate(before, options) && draft.dataGasto) filled.dataGasto = draft.dataGasto;
+  return { draft, filled };
 }
 
 /** Destaque some quando o motorista muda o campo. */
