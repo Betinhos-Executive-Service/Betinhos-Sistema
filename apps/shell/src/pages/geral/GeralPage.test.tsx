@@ -86,9 +86,17 @@ const cellOf = (row: HTMLElement, kind: string) =>
   })
 
 
+/** O seletor de visão é o título da lista (DS §10.9.1): um botão "Visão: <nome>" que abre o menu das visões. */
+const viewTrigger = () => screen.getByRole('button', { name: /^Visão: / })
+async function pickView(name: string) {
+  fireEvent.click(viewTrigger())
+  // O painel do Menu usa `popover`, que o jsdom não exibe: os itens existem, mas ficam fora da árvore acessível.
+  fireEvent.click(await screen.findByRole('menuitemradio', { name, hidden: true }))
+}
+
 /** Desktop: Gerar Voucher, Copiar Serviços, Gerar OP e Disparar vivem no menu "Ações" da barra. */
 async function acao(name: string) {
-  const toolbar = screen.getByRole('toolbar', { name: 'Filtros de serviços' })
+  const toolbar = screen.getByRole('toolbar', { name: 'Comandos de serviços' })
   fireEvent.click(within(toolbar).getByRole('button', { name: /^Ações/ }))
   fireEvent.click(await screen.findByRole('menuitem', { name: new RegExp(`^${name}`), hidden: true }))
 }
@@ -99,7 +107,7 @@ describe('Geral', () => {
     expect(await screen.findByRole('columnheader', { name: /Status de Operação/, hidden: true })).toBeTruthy()
     // A linha do cabeçalho já existe antes dos dados: espera as 100 linhas chegarem.
     await waitFor(() => expect(screen.getAllByRole('row', { hidden: true }).length).toBeGreaterThan(10))
-    expect(screen.getAllByText(PAGE1)).toHaveLength(2)
+    expect(screen.getAllByText(PAGE1)).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: /^Status de Operação$/, hidden: true }))
     await waitFor(() => expect(screen.getByRole('columnheader', { name: /Status de Operação/, hidden: true }).getAttribute('aria-sort')).toBe('ascending'))
     // O primeiro teste paga a carga fria dos módulos: com a máquina ocupada passa dos 30 s do padrão.
@@ -111,7 +119,7 @@ describe('Geral', () => {
     const push = vi.spyOn(window.history, 'pushState')
     try {
       render(<GeralPage host={{ mode: 'mock' }} />)
-      await waitFor(() => expect(screen.getByRole('combobox', { name: 'Visão' }).textContent).toContain('Sem motorista'))
+      await waitFor(() => expect(viewTrigger().textContent).toContain('Sem motorista'))
       await waitFor(() => expect(window.location.hash).toBe('#/geral?view=mock-sem-motorista'))
       fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar serviços' }), { target: { value: 'OS-10' } })
       await waitFor(() => expect(window.location.hash).toBe('#/geral?view=mock-sem-motorista&q=OS-10'))
@@ -127,9 +135,7 @@ describe('Geral', () => {
   it('troca de visão e busca por palavra-chave', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
-    fireEvent.click(screen.getByRole('combobox', { name: 'Visão' }))
-    // O painel do Select usa `popover`, que o jsdom não exibe: as opções existem, mas ficam fora da árvore acessível.
-    fireEvent.click(await screen.findByRole('option', { name: 'Sem motorista', hidden: true }))
+    await pickView('Sem motorista')
     await waitFor(() => expect(screen.queryAllByText(PAGE1)).toHaveLength(0))
     fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar serviços' }), { target: { value: 'OS-10' } })
     await waitFor(() => expect(screen.getAllByText(/OS-10\d/).length).toBeGreaterThan(0), { timeout: 4000 })
@@ -139,12 +145,12 @@ describe('Geral', () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
     fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Colunas da visão' })
+    const dialog = await screen.findByRole('dialog', { name: 'Colunas' })
     fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Trajeto' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Aplicar' }))
     await waitFor(() => expect(screen.queryByRole('columnheader', { name: /Trajeto/, hidden: true })).toBeNull())
     fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
-    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Colunas da visão' })).getByRole('button', { name: 'Restaurar colunas da visão' }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Colunas' })).getByRole('button', { name: 'Restaurar colunas' }))
     await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
   })
 
@@ -177,7 +183,7 @@ describe('Geral', () => {
     const first = render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
     fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Colunas da visão' })
+    const dialog = await screen.findByRole('dialog', { name: 'Colunas' })
     fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Trajeto' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Mover Trajeto para cima' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Aplicar' }))
@@ -192,27 +198,27 @@ describe('Geral', () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
     fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Colunas da visão' })
+    const dialog = await screen.findByRole('dialog', { name: 'Colunas' })
 
     // Sem alterações: fecha direto.
     fireEvent.click(within(dialog).getByRole('button', { name: 'Fechar' }))
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Colunas da visão' })).toBeNull())
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Colunas' })).toBeNull())
     expect(screen.queryByRole('dialog', { name: 'Descartar alterações?' })).toBeNull()
 
     // Com alterações: X abre a confirmação; "Continuar editando" mantém o diálogo.
     fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
-    const again = await screen.findByRole('dialog', { name: 'Colunas da visão' })
+    const again = await screen.findByRole('dialog', { name: 'Colunas' })
     fireEvent.click(within(again).getByRole('checkbox', { name: 'Trajeto' }))
     fireEvent.click(within(again).getByRole('button', { name: 'Fechar' }))
     const confirm = await screen.findByRole('dialog', { name: 'Descartar alterações?' })
     fireEvent.click(within(confirm).getByRole('button', { name: 'Continuar editando' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Descartar alterações?' })).toBeNull())
-    expect(screen.getByRole('dialog', { name: 'Colunas da visão' })).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: 'Colunas' })).toBeTruthy()
 
     // Esc também pede confirmação; "Descartar" fecha sem aplicar.
     fireEvent(again, new Event('cancel', { cancelable: true }))
     fireEvent.click(within(await screen.findByRole('dialog', { name: 'Descartar alterações?' })).getByRole('button', { name: 'Descartar' }))
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Colunas da visão' })).toBeNull())
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Colunas' })).toBeNull())
     expect(screen.getByRole('columnheader', { name: /Trajeto/, hidden: true })).toBeTruthy()
     expect(window.localStorage.getItem('betinhos.geral.colunas.v1')).toBeNull()
   })
@@ -383,8 +389,7 @@ describe('Geral: correções finais', () => {
     // OS-1217 não tem motorista, mas fica além da primeira página (100 linhas) da Agenda; OS-1000 tem motorista.
     expect(screen.queryByRole('button', opener('OS-1217'))).toBeNull()
     expect(screen.getByRole('button', opener('OS-1000'))).toBeTruthy()
-    fireEvent.click(screen.getByRole('combobox', { name: 'Visão' }))
-    fireEvent.click(await screen.findByRole('option', { name: 'Sem motorista', hidden: true }))
+    await pickView('Sem motorista')
     expect(await screen.findByRole('button', opener('OS-1217'))).toBeTruthy()
     await waitFor(() => expect(screen.queryByRole('button', opener('OS-1000'))).toBeNull())
     expect(screen.getByRole('button', opener('OS-1052'))).toBeTruthy()
@@ -464,7 +469,7 @@ describe('Geral: correções finais', () => {
     beforeEach(() => { hooks.programada = true; writeText.mockReset().mockResolvedValue(undefined); vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } }) })
     afterEach(() => { hooks.programada = false; hooks.gerarLink = null; vi.unstubAllGlobals() })
     const item = async () => {
-      fireEvent.click(within(screen.getByRole('toolbar', { name: 'Filtros de serviços' })).getByRole('button', { name: /^Ações/ }))
+      fireEvent.click(within(screen.getByRole('toolbar', { name: 'Comandos de serviços' })).getByRole('button', { name: /^Ações/ }))
       return screen.findByRole('menuitem', { name: /^Gerar link/, hidden: true })
     }
 
@@ -570,7 +575,7 @@ describe('Geral: espaço e densidade', () => {
   it('os comandos ficam sempre na barra: sem seleção os que dependem dela ficam inertes, com o motivo', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
-    const toolbar = screen.getByRole('toolbar', { name: 'Filtros de serviços' })
+    const toolbar = screen.getByRole('toolbar', { name: 'Comandos de serviços' })
     expect(within(toolbar).getByRole('button', { name: 'Criar serviço' }).getAttribute('aria-disabled')).toBeNull()
     for (const [name, reason] of Object.entries(blockedReason)) {
       const button = within(toolbar).getByRole('button', { name })
@@ -599,7 +604,7 @@ describe('Geral: espaço e densidade', () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
     fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
-    const toolbar = screen.getByRole('toolbar', { name: 'Filtros de serviços' })
+    const toolbar = screen.getByRole('toolbar', { name: 'Comandos de serviços' })
     const count = within(toolbar).getByText('1 selecionado')
     expect(count.closest('.bt-badge')).not.toBeNull()
     for (const name of ['Editar', 'Desativar']) expect(within(toolbar).getByRole('button', { name }).getAttribute('aria-disabled')).toBeNull()
@@ -607,14 +612,14 @@ describe('Geral: espaço e densidade', () => {
     for (const name of ['Gerar Voucher', 'Copiar Serviços']) expect(((await screen.findByRole('menuitem', { name, hidden: true })) as HTMLButtonElement).disabled).toBe(false)
   })
 
-  it('o cabeçalho tem só Atualizar e o total; Criar serviço fica na barra', async () => {
+  it('lista sem cabeçalho de página: o título é a visão e Atualizar fica na linha de comando', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
-    const header = screen.getByRole('banner')
-    expect(within(header).getByRole('heading', { name: 'Geral' })).toBeTruthy()
-    expect(within(header).getByText(`100 de ${MOCK_ROW_COUNT} serviços`)).toBeTruthy()
-    expect(within(header).getByRole('button', { name: 'Atualizar' })).toBeTruthy()
-    expect(within(header).queryByRole('button', { name: 'Criar serviço' })).toBeNull()
+    expect(screen.queryByRole('banner')).toBeNull()
+    expect(viewTrigger().textContent).toContain('Agenda')
+    const toolbar = screen.getByRole('toolbar', { name: 'Comandos de serviços' })
+    expect(within(toolbar).getByRole('button', { name: 'Atualizar' }).getAttribute('title')).toBe(`100 de ${MOCK_ROW_COUNT} serviços`)
+    expect(within(toolbar).getByRole('button', { name: 'Criar serviço' })).toBeTruthy()
   })
 
   it('cada título de coluna tem o rótulo completo em title (o texto pode ser cortado)', async () => {
@@ -625,7 +630,7 @@ describe('Geral: espaço e densidade', () => {
 
   it('página fixa de 100: sem seletor de quantidade nem paginação numerada', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
-    expect(await screen.findAllByText(`100 de ${MOCK_ROW_COUNT} serviços`)).toHaveLength(2)
+    expect(await screen.findAllByText(`100 de ${MOCK_ROW_COUNT} serviços`)).toHaveLength(1)
     expect(screen.queryByRole('combobox', { name: 'Serviços por página' })).toBeNull()
     expect(screen.queryByText(/Anterior|Próxima/)).toBeNull()
   })
@@ -697,37 +702,35 @@ describe('Geral: espaço e densidade', () => {
     expect(document.querySelectorAll('.gr-cards > li')).toHaveLength(200)
   }, 90_000)
 
-  it('no desktop a barra usa controles compactos', async () => {
+  it('no desktop os comandos da lista são compactos; Colunas e Filtros seguem a barra do Design System', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
-    const toolbar = screen.getByRole('toolbar', { name: 'Filtros de serviços' })
-    expect(within(toolbar).getByRole('combobox', { name: 'Visão' }).closest('.bt-control')?.classList.contains('bt-control--compact')).toBe(true)
+    const toolbar = screen.getByRole('toolbar', { name: 'Comandos de serviços' })
     expect(within(toolbar).getByRole('searchbox', { name: 'Buscar serviços' }).closest('.bt-control')?.classList.contains('bt-control--compact')).toBe(true)
-    for (const name of ['Criar serviço', 'Colunas', 'Mais ações']) expect(within(toolbar).getByRole('button', { name }).classList.contains('bt-button--compact')).toBe(true)
+    for (const name of ['Criar serviço', 'Mais ações']) expect(within(toolbar).getByRole('button', { name }).classList.contains('bt-button--compact')).toBe(true)
+    expect(within(toolbar).getByRole('button', { name: 'Colunas' })).toBeTruthy()
+    expect(within(toolbar).getByRole('button', { name: 'Filtro rápido' }).getAttribute('aria-pressed')).toBe('true')
   })
 
   it('no celular a barra usa tamanho de toque (44 px), nunca o compacto de 32 px', async () => {
     vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('max-width: 820px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByRole('listitem')
-    const toolbar = screen.getByRole('toolbar', { name: 'Filtros de serviços' })
-    for (const control of [
-      within(toolbar).getByRole('combobox', { name: 'Visão' }).closest('.bt-control'),
-      within(toolbar).getByRole('searchbox', { name: 'Buscar serviços' }).closest('.bt-control'),
-    ]) {
-      expect(control?.classList.contains('bt-control--compact')).toBe(false)
-      expect(control?.classList.contains('bt-control--touch')).toBe(true)
-    }
-    for (const name of ['Criar serviço', 'Mais ações']) {
+    const toolbar = screen.getByRole('toolbar', { name: 'Comandos de serviços' })
+    const search = within(toolbar).getByRole('searchbox', { name: 'Buscar serviços' }).closest('.bt-control')
+    expect(search?.classList.contains('bt-control--compact')).toBe(false)
+    expect(search?.classList.contains('bt-control--touch')).toBe(true)
+    for (const name of ['Criar serviço', 'Mais ações', 'Colunas', 'Filtros']) {
       const button = within(toolbar).getByRole('button', { name })
       expect(button.classList.contains('bt-button--compact')).toBe(false)
       expect(button.classList.contains('bt-button--touch')).toBe(true)
     }
-    // O botão Colunas some no celular (CSS), mas também sai do tamanho compacto.
-    expect(within(toolbar).getByRole('button', { name: 'Colunas' }).classList.contains('bt-button--compact')).toBe(false)
+    // No celular não há linha de filtro rápido: os filtros ficam no painel.
+    expect(within(toolbar).queryByRole('button', { name: 'Filtro rápido' })).toBeNull()
   })
-  describe('filtros por coluna', () => {
+  describe('filtros (DS §10.9.2)', () => {
     const header = (name: RegExp) => screen.getByRole('columnheader', { name, hidden: true })
+    const chips = () => screen.queryByRole('group', { name: 'Filtros ativos' })
 
     it('o menu da coluna abre e ordena', async () => {
       render(<GeralPage host={{ mode: 'mock' }} />)
@@ -738,107 +741,86 @@ describe('Geral: espaço e densidade', () => {
       await waitFor(() => expect(header(/Trajeto/).getAttribute('aria-sort')).toBe('descending'))
     }, 60_000)
 
-    it('filtrar Status por Confirmado reduz as linhas e cria o chip; remover restaura', async () => {
+    it('filtrar Status por Confirmado na linha rápida reduz as linhas e cria o chip; remover restaura', async () => {
       render(<GeralPage host={{ mode: 'mock' }} />)
       await screen.findAllByText(PAGE1)
-      fireEvent.click(screen.getByRole('button', { name: 'Opções da coluna Status de Operação', hidden: true }))
-      fireEvent.click(await screen.findByRole('menuitem', { name: 'Filtrar por…', hidden: true }))
-      const dialog = await screen.findByRole('dialog', { name: 'Filtrar Status de Operação' })
-      fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Confirmado' }))
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Aplicar' }))
-      const remove = await screen.findByRole('button', { name: 'Remover filtro Status de Operação' })
-      expect(screen.getByText('Status de Operação: Confirmado')).toBeTruthy()
+      fireEvent.click(await screen.findByRole('combobox', { name: 'Filtrar Status de Operação', hidden: true }))
+      fireEvent.click(await screen.findByRole('option', { name: 'Confirmado', hidden: true }))
+      expect(await screen.findByText('Status de Operação: Confirmado')).toBeTruthy()
       await waitFor(() => expect(screen.queryAllByText(PAGE1)).toHaveLength(0))
-      fireEvent.click(remove)
+      expect(viewTrigger().textContent).toContain('Alterada')
+      fireEvent.click(screen.getByRole('button', { name: 'Remover filtro Status de Operação: Confirmado' }))
       await screen.findAllByText(PAGE1)
-      expect(screen.queryByRole('button', { name: 'Remover filtro Status de Operação' })).toBeNull()
+      expect(chips()).toBeNull()
+      expect(viewTrigger().textContent).not.toContain('Alterada')
     }, 60_000)
 
-    it('Editar filtros aplica o período Hoje de uma data', async () => {
+    it('Filtrar por… no menu da coluna leva o foco para a célula do filtro rápido', async () => {
+      render(<GeralPage host={{ mode: 'mock' }} />)
+      await screen.findAllByText(PAGE1)
+      fireEvent.click(screen.getByRole('button', { name: 'Opções da coluna Trajeto', hidden: true }))
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Filtrar por…', hidden: true }))
+      await waitFor(() => expect(document.activeElement?.getAttribute('aria-label')).toBe('Filtrar Trajeto'))
+      fireEvent.change(document.activeElement as HTMLInputElement, { target: { value: '^Galeão' } })
+      fireEvent.keyDown(document.activeElement as HTMLInputElement, { key: 'Enter' })
+      expect(await screen.findByText('Trajeto: começa com Galeão')).toBeTruthy()
+      await waitFor(() => expect(window.location.hash).toContain('f='))
+    }, 60_000)
+
+    it('o painel Filtros aplica uma condição avançada, conta no botão e Limpar filtros tira tudo', async () => {
       render(<GeralPage host={{ mode: 'mock' }} />)
       await screen.findAllByText(PAGE1)
       fireEvent.click(screen.getByRole('button', { name: 'Filtros' }))
-      const drawer = await screen.findByRole('dialog', { name: 'Editar filtros' })
-      fireEvent.click(await within(drawer).findByRole('button', { name: /^Data e horário de saída/ }))
-      fireEvent.click(within(drawer).getByRole('combobox', { name: 'Período' }))
-      fireEvent.click(await screen.findByRole('option', { name: 'Hoje', hidden: true }))
-      fireEvent.click(within(drawer).getByRole('button', { name: 'Aplicar' }))
-      expect(await screen.findByText('Data e horário de saída: hoje')).toBeTruthy()
-      expect(screen.getByRole('button', { name: 'Filtros (1)' })).toBeTruthy()
-      fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
+      const panel = await screen.findByRole('dialog', { name: 'Filtros' })
+      fireEvent.click(within(panel).getByRole('tab', { name: /^Avançado/ }))
+      fireEvent.click(within(panel).getByRole('button', { name: 'Condição' }))
+      expect(within(panel).getByText('Digite um texto.')).toBeTruthy()
+      fireEvent.change(within(panel).getByRole('textbox', { name: 'Texto de ID' }), { target: { value: 'OS-1005' } })
+      fireEvent.click(within(panel).getByRole('button', { name: 'Aplicar' }))
+      expect(await screen.findByText('ID: OS-1005')).toBeTruthy()
+      await waitFor(() => expect(screen.getByRole('button', { name: /^Filtros/ }).textContent).toContain('1'))
+      fireEvent.click(within(chips() as HTMLElement).getByRole('button', { name: 'Limpar filtros' }))
       await screen.findAllByText(PAGE1)
-      expect(screen.queryByRole('group', { name: 'Filtros ativos' })).toBeNull()
+      expect(chips()).toBeNull()
     }, 60_000)
 
-    it('fechar o diálogo de filtro com rascunho pede confirmação, e o foco volta ao ▾ da coluna', async () => {
+    it('fechar o painel com rascunho pede confirmação', async () => {
       render(<GeralPage host={{ mode: 'mock' }} />)
       await screen.findAllByText(PAGE1)
-      const opener = () => screen.getByRole('button', { name: 'Opções da coluna Trajeto', hidden: true })
-      fireEvent.click(opener())
-      fireEvent.click(await screen.findByRole('menuitem', { name: 'Filtrar por…', hidden: true }))
-      const dialog = await screen.findByRole('dialog', { name: 'Filtrar Trajeto' })
-      // Sem rascunho, fechar é direto e devolve o foco ao ▾.
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Limpar' }))
-      await waitFor(() => expect(document.activeElement).toBe(opener()))
-      // Com rascunho, pede confirmação.
-      fireEvent.click(opener())
-      fireEvent.click(await screen.findByRole('menuitem', { name: 'Filtrar por…', hidden: true }))
-      const again = await screen.findByRole('dialog', { name: 'Filtrar Trajeto' })
-      fireEvent.change(within(again).getByRole('textbox', { name: 'Valor' }), { target: { value: 'Galeão' } })
-      const close = within(again).queryByRole('button', { name: /Fechar/ })
-      fireEvent.click(close ?? again.querySelector('button')!)
+      fireEvent.click(screen.getByRole('button', { name: 'Filtros' }))
+      const panel = await screen.findByRole('dialog', { name: 'Filtros' })
+      fireEvent.click(within(panel).getByRole('tab', { name: /^Avançado/ }))
+      fireEvent.click(within(panel).getByRole('button', { name: 'Condição' }))
+      fireEvent(panel, new Event('cancel', { cancelable: true }))
       const confirm = await screen.findByRole('dialog', { name: 'Descartar alterações?' })
-      fireEvent.click(within(confirm).getByRole('button', { name: 'Descartar' }))
-      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Filtrar Trajeto' })).toBeNull())
-      expect(screen.queryByRole('group', { name: 'Filtros ativos' })).toBeNull()
+      fireEvent.click(within(confirm).getByRole('button', { name: 'Continuar editando' }))
+      expect(screen.getByRole('dialog', { name: 'Filtros' })).toBeTruthy()
+      fireEvent(panel, new Event('cancel', { cancelable: true }))
+      fireEvent.click(within(await screen.findByRole('dialog', { name: 'Descartar alterações?' })).getByRole('button', { name: 'Descartar' }))
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Filtros' })).toBeNull())
+      expect(chips()).toBeNull()
     }, 60_000)
 
-    it('fechar o diálogo de filtro pelo X sem rascunho fecha direto; Continuar editando mantém aberto', async () => {
-      render(<GeralPage host={{ mode: 'mock' }} />)
-      await screen.findAllByText(PAGE1)
-      const open = async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Opções da coluna Trajeto', hidden: true }))
-        fireEvent.click(await screen.findByRole('menuitem', { name: 'Filtrar por…', hidden: true }))
-        return screen.findByRole('dialog', { name: 'Filtrar Trajeto' })
-      }
-      const dialog = await open()
-      fireEvent.click(within(dialog).getByRole('button', { name: /Fechar/ }))
-      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Filtrar Trajeto' })).toBeNull())
-      const again = await open()
-      fireEvent.change(within(again).getByRole('textbox', { name: 'Valor' }), { target: { value: 'x' } })
-      fireEvent.click(within(again).getByRole('button', { name: /Fechar/ }))
-      fireEvent.click(within(await screen.findByRole('dialog', { name: 'Descartar alterações?' })).getByRole('button', { name: 'Continuar editando' }))
-      expect(await screen.findByRole('dialog', { name: 'Filtrar Trajeto' })).toBeTruthy()
-    }, 60_000)
-
-    it('sem metadata os filtros ficam indisponíveis e o chip restaurado da URL avisa', async () => {
+    it('sem metadata o filtro restaurado da URL (link antigo) aparece como não aplicado', async () => {
       hooks.attributes = () => Promise.reject(new Error('sem metadata'))
       window.location.hash = '#/geral?f=' + encodeFilters({ cr40f_trajeto: { kind: 'text', op: 'contains', value: 'Galeão' } })
       render(<GeralPage host={{ mode: 'mock' }} />)
-      const button = await screen.findByRole('button', { name: 'Filtros (1)' })
-      await waitFor(() => expect(button.getAttribute('title')).toBe('Filtros indisponíveis: não foi possível carregar os campos.'))
-      expect(button.getAttribute('title')).toBe('Filtros indisponíveis: não foi possível carregar os campos.')
-      expect((await screen.findAllByTitle('Este filtro não está sendo aplicado')).length).toBeGreaterThan(0)
-      fireEvent.click(button)
-      const drawer = await screen.findByRole('dialog', { name: 'Editar filtros' })
-      expect(within(drawer).getByText('Filtros indisponíveis: não foi possível carregar os campos.')).toBeTruthy()
-      expect(within(drawer).queryByText('Carregando campos…')).toBeNull()
+      expect(await screen.findByRole('img', { name: 'Filtro não aplicado', hidden: true })).toBeTruthy()
+      expect(within(chips() as HTMLElement).getByText(/não aplicado/)).toBeTruthy()
     }, 60_000)
 
-    it('no celular mostra o botão Filtros em tamanho de toque e os chips', async () => {
+    it('no celular o botão Filtros tem tamanho de toque e o painel aplica por coluna', async () => {
       vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('max-width: 820px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
       render(<GeralPage host={{ mode: 'mock' }} />)
       await screen.findAllByRole('listitem')
-      const button = within(screen.getByRole('toolbar', { name: 'Filtros de serviços' })).getByRole('button', { name: 'Filtros' })
+      const button = within(screen.getByRole('toolbar', { name: 'Comandos de serviços' })).getByRole('button', { name: 'Filtros' })
       expect(button.classList.contains('bt-button--touch')).toBe(true)
       fireEvent.click(button)
-      const drawer = await screen.findByRole('dialog', { name: 'Editar filtros' })
-      fireEvent.click(await within(drawer).findByRole('button', { name: /^Status de Operação/ }))
-      fireEvent.click(within(drawer).getByRole('checkbox', { name: 'Confirmado' }))
-      fireEvent.click(within(drawer).getByRole('button', { name: 'Aplicar' }))
-      const chips = await screen.findByRole('group', { name: 'Filtros ativos' })
-      expect(chips.classList.contains('gr-chips--touch')).toBe(true)
-      expect(within(chips).getByText('Status de Operação: Confirmado')).toBeTruthy()
+      const panel = await screen.findByRole('dialog', { name: 'Filtros' })
+      fireEvent.click(within(panel).getByRole('combobox', { name: 'Filtrar Status de Operação', hidden: true }))
+      fireEvent.click(await screen.findByRole('option', { name: 'Confirmado', hidden: true }))
+      fireEvent.click(within(panel).getByRole('button', { name: 'Aplicar' }))
+      expect(within(await screen.findByRole('group', { name: 'Filtros ativos' })).getByText('Status de Operação: Confirmado')).toBeTruthy()
     }, 60_000)
   })
 })
@@ -944,13 +926,13 @@ describe('Geral: redimensionar e reordenar colunas', () => {
     const handle = await open()
     fireEvent.keyDown(handle, { key: 'ArrowRight' })
     fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
-    let dialog = await screen.findByRole('dialog', { name: 'Colunas da visão' })
+    let dialog = await screen.findByRole('dialog', { name: 'Colunas' })
     const boxes = within(dialog).getAllByRole('checkbox')
     const hiddenName = (boxes[boxes.length - 1] as HTMLInputElement).labels?.[0]?.textContent ?? ''
     expect(hiddenName).not.toBe('')
     fireEvent.click(boxes[boxes.length - 1])
     fireEvent.click(within(dialog).getByRole('button', { name: 'Aplicar' }))
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Colunas da visão' })).toBeNull())
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Colunas' })).toBeNull())
     expect(window.localStorage.getItem(LS)).toContain('widths')
     const names = () => Array.from(document.querySelectorAll('.bt-table__head [role=columnheader]')).slice(1).map((h) => h.getAttribute('title'))
     const second = names()[1]
@@ -966,54 +948,54 @@ describe('Geral: redimensionar e reordenar colunas', () => {
     expect(pref.order).toContain(pref.hidden[0])
     expect(names()).not.toContain(hiddenName)
     fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
-    dialog = await screen.findByRole('dialog', { name: 'Colunas da visão' })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Restaurar colunas da visão' }))
+    dialog = await screen.findByRole('dialog', { name: 'Colunas' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Restaurar colunas' }))
     await waitFor(() => expect(window.localStorage.getItem(LS)).not.toContain('widths'))
   })
 })
 
 describe('Geral: visões pessoais e link compartilhável', () => {
-  const openMenu = () => fireEvent.click(screen.getByRole('button', { name: 'Opções da visão' }))
+  const openMenu = () => fireEvent.click(viewTrigger())
   const choose = async (name: string) => fireEvent.click(await screen.findByRole('menuitem', { name, hidden: true }))
-  const viewName = () => screen.getByRole('combobox', { name: 'Visão' }).textContent ?? ''
+  const actions = async () => (await screen.findAllByRole('menuitem', { hidden: true })).map((item) => item.textContent)
+  const viewName = () => viewTrigger().textContent ?? ''
 
   async function saveAs(name: string) {
     openMenu()
-    await choose('Salvar como visão…')
+    await choose('Salvar como…')
     const dialog = await screen.findByRole('dialog', { name: 'Salvar como visão' })
     fireEvent.change(within(dialog).getByLabelText(/Nome da visão/), { target: { value: name } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Salvar visão' }))
     await waitFor(() => expect(viewName()).toContain(name))
   }
 
-  it('visão do sistema só oferece salvar como e compartilhar', async () => {
+  it('visão do sistema só oferece salvar como; as visões aparecem agrupadas', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
     openMenu()
-    expect((await screen.findAllByRole('menuitem', { hidden: true })).map((item) => item.textContent)).toEqual(['Salvar como visão…', 'Compartilhar link'])
+    expect(await actions()).toEqual(['Salvar como…'])
+    expect(screen.getByRole('menuitemradio', { name: /Agenda/, hidden: true }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByRole('menuitemradio', { name: 'Sem motorista', hidden: true })).toBeTruthy()
   }, 60_000)
 
-  it('salvar como cria a visão pessoal, seleciona e some o filtro avulso; renomear e excluir', async () => {
+  it('salvar como cria a visão pessoal com o filtro dentro; renomear e excluir', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
     // Filtro avulso: Status = Confirmado.
-    fireEvent.click(screen.getByRole('button', { name: 'Opções da coluna Status de Operação', hidden: true }))
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Filtrar por…', hidden: true }))
-    const filter = await screen.findByRole('dialog', { name: 'Filtrar Status de Operação' })
-    fireEvent.click(within(filter).getByRole('checkbox', { name: 'Confirmado' }))
-    fireEvent.click(within(filter).getByRole('button', { name: 'Aplicar' }))
-    await screen.findByRole('button', { name: 'Remover filtro Status de Operação' })
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Filtrar Status de Operação', hidden: true }))
+    fireEvent.click(await screen.findByRole('option', { name: 'Confirmado', hidden: true }))
+    await screen.findByText('Status de Operação: Confirmado')
 
     await saveAs('Confirmados')
-    expect(await screen.findByText('Visão “Confirmados” criada.')).toBeTruthy()
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Remover filtro Status de Operação' })).toBeNull())
+    expect(await screen.findByText('Visão salva. Ela fica só para você.')).toBeTruthy()
+    await waitFor(() => expect(screen.queryByText('Status de Operação: Confirmado')).toBeNull())
     await waitFor(() => expect(window.location.hash).toContain('view=mock-minha-1'))
     expect(window.location.hash).not.toContain('f=')
     // O filtro foi para dentro da visão: a lista continua filtrada.
     await waitFor(() => expect(screen.queryAllByText(PAGE1)).toHaveLength(0))
 
     openMenu()
-    expect((await screen.findAllByRole('menuitem', { hidden: true })).map((item) => item.textContent)).toEqual(['Salvar como visão…', 'Salvar nesta visão', 'Renomear…', 'Excluir visão', 'Compartilhar link'])
+    expect(await actions()).toEqual(['Salvar como…', 'Renomear…', 'Restaurar padrão', 'Excluir visão…'])
     await choose('Renomear…')
     const rename = await screen.findByRole('dialog', { name: 'Renomear visão' })
     fireEvent.change(within(rename).getByLabelText(/Nome da visão/), { target: { value: 'Só confirmados' } })
@@ -1022,7 +1004,7 @@ describe('Geral: visões pessoais e link compartilhável', () => {
     expect(await screen.findByText('Visão renomeada.')).toBeTruthy()
 
     openMenu()
-    await choose('Excluir visão')
+    await choose('Excluir visão…')
     const confirm = await screen.findByRole('dialog', { name: 'Excluir esta visão?' })
     expect(within(confirm).getByText(/Só confirmados/)).toBeTruthy()
     fireEvent.click(within(confirm).getByRole('button', { name: 'Excluir visão' }))
@@ -1031,16 +1013,17 @@ describe('Geral: visões pessoais e link compartilhável', () => {
     await screen.findAllByText(PAGE1)
   }, 60_000)
 
-  it('salvar nesta visão regrava a visão pessoal com a ordenação atual', async () => {
+  it('Salvar regrava a visão pessoal com a ordenação atual', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
     await saveAs('Minha agenda')
     await screen.findAllByText(PAGE1)
     fireEvent.click(screen.getByRole('button', { name: /^Trajeto$/, hidden: true }))
     await waitFor(() => expect(screen.getByRole('columnheader', { name: /Trajeto/, hidden: true }).getAttribute('aria-sort')).toBe('ascending'))
+    await waitFor(() => expect(viewName()).toContain('Alterada'))
     openMenu()
-    await choose('Salvar nesta visão')
-    expect(await screen.findByText('Visão atualizada.')).toBeTruthy()
+    await choose('Salvar')
+    expect(await screen.findByText('Visão salva.')).toBeTruthy()
     // A ordem agora é da visão: a coluna segue ordenada e a ordenação avulsa da URL some.
     await waitFor(() => expect(window.location.hash).not.toContain('sort='))
     expect(screen.getByRole('columnheader', { name: /Trajeto/, hidden: true }).getAttribute('aria-sort')).toBe('ascending')
@@ -1054,8 +1037,7 @@ describe('Geral: visões pessoais e link compartilhável', () => {
       await screen.findAllByText(PAGE1)
       fireEvent.click(screen.getByRole('button', { name: /^Trajeto$/, hidden: true }))
       await waitFor(() => expect(window.location.hash).toContain('sort='))
-      openMenu()
-      await choose('Compartilhar link')
+      fireEvent.click(screen.getByRole('button', { name: 'Compartilhar link' }))
       expect(await screen.findByText('Link copiado.')).toBeTruthy()
       expect(writeText).toHaveBeenCalledTimes(1)
       const url = writeText.mock.calls[0][0]
@@ -1070,8 +1052,7 @@ describe('Geral: visões pessoais e link compartilhável', () => {
   it('sem área de transferência o link não copia e o aviso orienta', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
-    openMenu()
-    await choose('Compartilhar link')
+    fireEvent.click(screen.getByRole('button', { name: 'Compartilhar link' }))
     expect(await screen.findByText(/Não foi possível copiar o link/)).toBeTruthy()
   }, 60_000)
 })
@@ -1085,7 +1066,7 @@ describe('Geral: comandos Auditoria, Gerar OP, Disparar e Registrar Erro', () =>
       fireEvent.click(within(row).getByRole('checkbox'))
     }
   }
-  const toolbar = () => screen.getByRole('toolbar', { name: 'Filtros de serviços' })
+  const toolbar = () => screen.getByRole('toolbar', { name: 'Comandos de serviços' })
 
   it('sem seleção Gerar OP e Disparar ficam inertes, com o motivo', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)

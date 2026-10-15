@@ -539,6 +539,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
 
   return (
     <div className="page gr-page">
+      {/* A linha de comando da lista (DS §10.9.1): visão, colunas, filtros, busca e comandos. */}
+      <div role="toolbar" aria-label="Comandos de serviços" className="gr-commandline">
       <ViewBar
         view={viewState}
         columns={columnDefs}
@@ -558,6 +560,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title={status ?? 'Atualizar'} loading={loading && rows.length > 0} onClick={reload} />
         {shortcuts}
       </ViewBar>
+      </div>
       <Stack gap="4" className="gr-body">
       {body}
       {mobile && geral.selected.size > 0 ? (
