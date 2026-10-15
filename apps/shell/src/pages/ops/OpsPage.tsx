@@ -85,7 +85,7 @@ function Ops({ host }: { host: Host }) {
   }, [fechar.open, pendSource])
   const abrirFechar = useCallback(() => setFechar({ open: true, opcoes: null, erro: null }), [])
   const headerActions = useMemo(() => <>
-    <Button icon={<CalendarCheck size={18} />} onClick={abrirFechar}>Fechar mês</Button>
+    <Button icon={<CalendarCheck size={18} />} aria-label="Fechar mês" onClick={abrirFechar} />
     <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar ordens de pagamento" onClick={refresh} />
   </>, [refresh, abrirFechar])
   useShellHeader({ title: 'Ordens de Pagamento', actions: headerActions })
@@ -175,6 +175,7 @@ function Ops({ host }: { host: Host }) {
         onDone={(r) => {
           setFechar({ open: false, opcoes: null, erro: null })
           toast({ tone: 'success', message: `OP criada com ${r.reservas} serviço(s).` })
+          // No mock a OP nova não aparece na lista de OPs: os sources de OPs e de Pendências são separados.
           refresh()
           if (!source.pagantes.gerarPagantesUrl(r.opId)) { toast({ tone: 'info', message: 'O Gerar Pagantes só abre dentro do Dataverse.' }); return }
           setSelectedId(null)
