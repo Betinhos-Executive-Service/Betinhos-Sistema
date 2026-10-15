@@ -40,4 +40,8 @@ public class FechamentoMensalTests
         Assert.Equal(25000, FechamentoMensal.TotalCents(new[] { R("2026-09-02T12:00:00Z", cp: 10000), R("2026-09-03T12:00:00Z", cp: 15000) }));
         Assert.Throws<Microsoft.Xrm.Sdk.InvalidPluginExecutionException>(() => FechamentoMensal.TotalCents(new[] { R("2026-09-02T12:00:00Z", cp: null) }));
     }
+
+    [Fact]
+    public void DataSaoPauloVirouODiaAnterior() =>
+        Assert.Equal(new DateTime(2026, 9, 30), FechamentoMensal.DataSaoPaulo(new DateTime(2026, 10, 1, 2, 30, 0, DateTimeKind.Utc)));
 }
