@@ -48,3 +48,12 @@ describe('interpretarLeitura', () => {
     expect(interpretarLeitura(msg({ ...base, data: '12/10/2026' })).ok).toBe(false)
   })
 })
+
+import { constantesDaLeituraRapida } from './index.ts'
+import { TEXTO_USUARIO_LEITURA } from './prompt.ts'
+
+describe('constantesDaLeituraRapida', () => {
+  it('expõe o que o provisionamento do flow precisa', () => {
+    expect(constantesDaLeituraRapida()).toEqual({ modelo: 'claude-haiku-5-5', maxTokens: 1024, effort: 'low', systemPrompt: SYSTEM_PROMPT_LEITURA, textoUsuario: TEXTO_USUARIO_LEITURA, limiteBase64: 2_800_000 })
+  })
+})
