@@ -6,7 +6,7 @@
 # Nada é gravado no Dataverse. Erro de modelo, timeout ou resposta inválida vira { ok: false, erro: 'leitura_indisponivel' }.
 # As travas são as mesmas de interpretarLeitura (packages/despesas-ia/src/leitura-rapida/resposta.ts).
 #
-# Constantes (modelo, max_tokens, effort, system prompt, texto do usuário, limite de base64) vêm de
+# Constantes (modelo, max_tokens, effort, thinking, system prompt, texto do usuário, limite de base64) vêm de
 # packages/despesas-ia/dist/constantes-leitura-rapida.json. Gere antes: pnpm --filter @betinhos/despesas-ia constantes
 # A chave da API fica só na variável new_AnthropicApiKey (valor atual no DEV); este script nunca lê nem imprime o valor.
 # A URL do gatilho (assinada, sig=) é gravada na variável sem ser impressa; o log mostra só o host.
@@ -42,7 +42,7 @@ $constantesText = [IO.File]::ReadAllText((Resolve-Path $constantesPath), [Text.E
 if ($constantesText.Contains('@')) { throw 'constantes-leitura-rapida.json contém @; escape antes de embutir no flow.' }
 AssertSemMojibake $constantesText 'constantes-leitura-rapida.json'
 $const = $constantesText | ConvertFrom-Json
-foreach ($campo in 'modelo', 'maxTokens', 'effort', 'systemPrompt', 'textoUsuario', 'limiteBase64') { if ($null -eq $const.$campo) { throw "constantes-leitura-rapida.json sem $campo." } }
+foreach ($campo in 'modelo', 'maxTokens', 'effort', 'thinking', 'systemPrompt', 'textoUsuario', 'limiteBase64') { if ($null -eq $const.$campo) { throw "constantes-leitura-rapida.json sem $campo." } }
 $triggerCondition = "@and(not(empty(triggerBody()?['imagemBase64'])), lessOrEquals(length(triggerBody()?['imagemBase64']), $([int]$const.limiteBase64)))"
 
 # Travas no Tentar: cada uma falha de propósito (int() de texto), o que faz o escopo falhar e o Falhou responder ok:false.
@@ -115,6 +115,7 @@ $definitionText = @'
               "model": "__MODELO__",
               "max_tokens": 0,
               "system": "__SYSTEM__",
+              "thinking": {},
               "output_config": { "effort": "__EFFORT__", "format": { "type": "json_schema", "schema": "@outputs('Montar_schema')" } },
               "messages": [ {
                 "role": "user",
@@ -133,9 +134,13 @@ $definitionText = @'
           "actions": { "Falhar_incompleto": { "type": "Compose", "runAfter": {}, "inputs": "@int('Resposta incompleta')" } },
           "else": { "actions": {} }
         },
+        "Blocos_de_texto": {
+          "type": "Query", "runAfter": { "Fim_incompleto": ["Succeeded"] },
+          "inputs": { "from": "@body('Chamar_Claude')?['content']", "where": "@equals(item()?['type'], 'text')" }
+        },
         "Leitura": {
-          "type": "Compose", "runAfter": { "Fim_incompleto": ["Succeeded"] },
-          "inputs": "@json(first(body('Chamar_Claude')?['content'])?['text'])"
+          "type": "Compose", "runAfter": { "Blocos_de_texto": ["Succeeded"] },
+          "inputs": "@json(first(body('Blocos_de_texto'))?['text'])"
         },
         "Leitura_invalida": {
           "type": "If", "runAfter": { "Leitura": ["Succeeded"] },
@@ -186,6 +191,7 @@ $body.model = $const.modelo
 $body.max_tokens = [int]$const.maxTokens
 $body.system = $const.systemPrompt
 $body.output_config.effort = $const.effort
+$body.thinking = $const.thinking
 $body.messages[0].content[1].text = $const.textoUsuario
 $definitionJson = $definition | ConvertTo-Json -Depth 90 -Compress
 AssertSemMojibake $definitionJson 'definição do script'
@@ -204,6 +210,8 @@ function Conferir($lido) {
     'Chamar_Claude chave pela variável' = $http.inputs.headers.'x-api-key' -eq "@parameters('$paramKey')"
     'Chamar_Claude modelo claude-haiku-5-5' = $http.inputs.body.model -ceq 'claude-haiku-5-5' -and $http.inputs.body.model -ceq $const.modelo
     'Chamar_Claude constantes' = $http.inputs.body.max_tokens -eq $const.maxTokens -and $http.inputs.body.system -ceq $const.systemPrompt -and $http.inputs.body.output_config.effort -ceq $const.effort -and $http.inputs.body.messages[0].content[1].text -ceq $const.textoUsuario
+    'Chamar_Claude sem raciocínio (thinking disabled)' = $http.inputs.body.thinking.type -ceq 'disabled' -and $http.inputs.body.thinking.type -ceq $const.thinking.type
+    'Leitura pega o primeiro bloco de texto (nunca first(content))' = $t.Blocos_de_texto.type -eq 'Query' -and $t.Blocos_de_texto.inputs.from -ceq "@body('Chamar_Claude')?['content']" -and $t.Blocos_de_texto.inputs.where -ceq "@equals(item()?['type'], 'text')" -and $t.Leitura.inputs -ceq "@json(first(body('Blocos_de_texto'))?['text'])"
     'Chamar_Claude schema dinâmico' = $http.inputs.body.output_config.format.type -eq 'json_schema' -and $http.inputs.body.output_config.format.schema -ceq "@outputs('Montar_schema')"
     'Chamar_Claude secureData inputs e outputs' = (@($http.runtimeConfiguration.secureData.properties) -join ',') -eq 'inputs,outputs'
     'Chamar_Claude sem retry' = $http.inputs.retryPolicy.type -eq 'none'
