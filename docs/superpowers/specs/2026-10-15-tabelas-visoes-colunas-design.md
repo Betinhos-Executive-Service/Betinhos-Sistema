@@ -21,6 +21,7 @@ Hoje só a Geral tem isso (visões via `userquery`, colunas no `localStorage`). 
 | Escopo obrigatório | Listas de registros: Geral, Pessoas, Despesas, Frota (Veículos, Registros), OPs, Pagantes, Infrações, Pendências (Financeiro e Documentos), Funcionários. Dispensadas: tabelas de resumo do Dashboard, drawers de detalhe e a tabela landscape do Operacional. |
 | Interação | Arrastar no cabeçalho e no painel, com alternativa por teclado/botões; largura arrastando a borda do cabeçalho. No mobile (e pointer grosso), só pelo painel. |
 | Página de lista | Sem `PageHeader`, descrição ou KPIs: o seletor de visão é o título e divide a linha com Colunas, Filtros, busca e ação primária; tabela logo abaixo (estilo grid nativo do model-driven). Pedido do Renan em 15/10/2026. |
+| Filtros (DS 1.7.0, §10.9.2) | Três camadas com E: filtro rápido por coluna (linha sob o cabeçalho, estilo Excel), avançado com grupos E/OU livres (até dois níveis) e busca. A visão guarda rápidos e avançados. Decisão do Renan em 15/10/2026. |
 
 Assumi: "controle de quais tabelas mostram" = quais **colunas** aparecem.
 
@@ -86,12 +87,13 @@ Permissão de gestor: checar o perfil do usuário uma vez por sessão (`systemus
 | 2 | `provision-visoes.ps1` + perfil "Gestor de visões" + equipe, em DEV | DRY RUN revisado; `-Apply`; metadata e pertencimento à solução conferidos |
 | 3 | `useTableView`, `ViewStore`, regras de merge do JSON | testes unitários (colunas novas/removidas, coluna obrigatória, versão) |
 | 4 | `Table` com arraste/resize/teclado, `ColumnsPanel`, `ViewBar` | testes de componente + navegador (clique, arraste, teclado, foco, mobile) |
+| 4b | Filtros no `@betinhos/ui`: modelo `FilterTree` (rápidos + grupos E/OU) no `ViewConfig.filters`, `QuickFilterRow` na `Table`, `FiltersPanel` (abas Por coluna/Avançado), `FilterChips` e gerador FetchXML/OData puro | testes do modelo e do FetchXML; navegador na ComponentsPage |
 | 5 | `dataverseViewStore` + `mockViewStore` | teste com mock; depois CRUD real no DEV |
 | 6 | Geral migra para `ColumnsPanel`/`ViewBar` com `geralViewStore` e deixa o `PageHeader` | comportamento atual preservado (testes existentes passam) |
 | 7 | Migrar as listas (sem `PageHeader`), uma por commit: Pessoas, Despesas, Frota, OPs, Pagantes, Infrações, Pendências ×2, Funcionários | cada uma com visão padrão igual às colunas de hoje |
 | 8 | `pnpm push` no checkout principal (DEV), conferência autenticada | versão publicada informada |
 
-Fora do escopo: visões compartilhadas com pessoas específicas, exportação, filtros novos nas listas que hoje não têm filtro (o JSON já comporta para depois).
+Fora do escopo: visões compartilhadas com pessoas específicas e exportação. A Geral reaproveita o `FilterEditor`/`filters.ts` atuais como base do modelo de filtros.
 
 ## Riscos
 
