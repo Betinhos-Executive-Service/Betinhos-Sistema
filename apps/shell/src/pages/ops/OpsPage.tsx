@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, EmptyState, Pagination, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
-import { FileStack, RefreshCw, SearchX } from 'lucide-react'
+import { CalendarCheck, FileStack, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
 import { useQueryBandeira, useQueryFilters, useQueryId, useQueryPagina } from '../../nav/queryState'
@@ -16,7 +16,12 @@ import { OpsToolbar } from './components/OpsToolbar'
 import { OpsCards, OpsTable } from './components/OpsList'
 import { OpDrawer } from './components/OpDrawer'
 import { CancelDialog } from './components/CancelDialog'
+import { FecharMesDialog } from '../pendencias/components/FecharMesDialog'
+import { createSource as createPendenciasSource } from '../pendencias/data/source'
+import { detectarPendencias } from '../pendencias/domain/detect'
+import type { Pendencia } from '../pendencias/domain/types'
 import '../pagantes/pagantes.css'
+import '../pendencias/pendencias.css'
 import './ops.css'
 
 export function OpsPage({ host }: { host: Host }) {
@@ -67,7 +72,22 @@ function Ops({ host }: { host: Host }) {
   const [version, setVersion] = useState(0)
 
   const refresh = useCallback(() => { setVersion((v) => v + 1); void ops.reload() }, [ops.reload])
-  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar ordens de pagamento" onClick={refresh} />, [refresh])
+  // Fechar mês: as opções são as pendências tipo 4 (cliente + mês com serviços mensais sem OP) dos últimos 12 meses.
+  const pendSource = useMemo(() => createPendenciasSource(host), [host])
+  const [fechar, setFechar] = useState<{ open: boolean; opcoes: Pendencia[] | null; erro: string | null }>({ open: false, opcoes: null, erro: null })
+  useEffect(() => {
+    if (!fechar.open) return
+    let cancelled = false
+    pendSource.load(periodoStart('365', new Date()))
+      .then((d) => { if (!cancelled) setFechar((s) => ({ ...s, opcoes: detectarPendencias(d.ops, d.reservas, d.pagantes).filter((p) => p.tipo === 'mensal-sem-op') })) })
+      .catch((reason) => { if (!cancelled) setFechar((s) => ({ ...s, erro: reasonText(reason) })) })
+    return () => { cancelled = true }
+  }, [fechar.open, pendSource])
+  const abrirFechar = useCallback(() => setFechar({ open: true, opcoes: null, erro: null }), [])
+  const headerActions = useMemo(() => <>
+    <Button icon={<CalendarCheck size={18} />} onClick={abrirFechar}>Fechar mês</Button>
+    <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar ordens de pagamento" onClick={refresh} />
+  </>, [refresh, abrirFechar])
   useShellHeader({ title: 'Ordens de Pagamento', actions: headerActions })
 
   async function confirmCancel(op: Op) {
@@ -137,7 +157,10 @@ function Ops({ host }: { host: Host }) {
       title="Ordens de Pagamento"
       meta={<span className="pg-meta">{ops.choices ? <span className="pg-num">{visible.length} {visible.length === 1 ? 'OP' : 'OPs'} · {formatMoney(total(visible))}</span> : null}{source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}</span>}
       description="Cobranças agrupadas por OP: acompanhe o rateio, o recebido e os serviços de cada uma."
-      actions={mobile ? undefined : <Button variant="secondary" icon={<RefreshCw size={16} />} loading={ops.loading && Boolean(ops.choices)} onClick={refresh}>Atualizar</Button>}
+      actions={mobile ? undefined : <>
+        <Button variant="secondary" icon={<RefreshCw size={16} />} loading={ops.loading && Boolean(ops.choices)} onClick={refresh}>Atualizar</Button>
+        <Button icon={<CalendarCheck size={16} />} onClick={abrirFechar}>Fechar mês</Button>
+      </>}
       toolbar={ops.choices ? <OpsToolbar filters={filters} onChange={setFilters} choices={ops.choices} views={views} activeView={activeView} onSaveView={() => setSaving(true)} onDeleteView={deleteView} /> : undefined}
     >
       {ops.error && ops.choices ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{ops.error} A lista mostra os dados da carga anterior.</Alert> : null}
@@ -148,6 +171,15 @@ function Ops({ host }: { host: Host }) {
       ) : null}
       <CancelDialog op={cancelRequest} onClose={() => setCancelRequest(null)} onConfirm={(op) => void confirmCancel(op)} />
       <SaveViewDialog open={saving} onClose={() => setSaving(false)} onSave={saveView} />
+      <FecharMesDialog escolha={fechar} source={pendSource} onClose={() => setFechar({ open: false, opcoes: null, erro: null })}
+        onDone={(r) => {
+          setFechar({ open: false, opcoes: null, erro: null })
+          toast({ tone: 'success', message: `OP criada com ${r.reservas} serviço(s).` })
+          refresh()
+          if (!source.pagantes.gerarPagantesUrl(r.opId)) { toast({ tone: 'info', message: 'O Gerar Pagantes só abre dentro do Dataverse.' }); return }
+          setSelectedId(null)
+          setGerarOpId(r.opId)
+        }} />
       <GerarPagantesFrame url={frameUrl} onClose={closeFrame} />
     </PageLayout>
   )

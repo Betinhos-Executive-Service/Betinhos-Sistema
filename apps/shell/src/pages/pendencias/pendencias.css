@@ -2,3 +2,4 @@
 .pend-servico { grid-template-columns: minmax(0, 1fr); }
 .pend-corrigir__loading { display: grid; gap: var(--bt-space-1-5); }
 .pend-corrigir__lista { display: grid; gap: var(--bt-space-1); margin: var(--bt-space-2) 0 0; padding-left: var(--bt-space-4); }
+.pend-fechar__campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--bt-space-2); margin-bottom: var(--bt-space-2); }
