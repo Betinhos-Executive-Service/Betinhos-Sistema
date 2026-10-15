@@ -19,7 +19,7 @@ export function Carregando() {
   )
 }
 
-const TABLE_LABEL: Record<TableKey, string> = { veiculos: 'Veículos', manutencoes: 'Manutenções', multas: 'Multas', infracoes: 'Infrações', colisoes: 'Colisões', posses: 'Posses' }
+const TABLE_LABEL: Record<TableKey, string> = { veiculos: 'Veículos', manutencoes: 'Manutenções', multas: 'Multas', infracoes: 'Infrações', colisoes: 'Colisões', posses: 'Posses', planoPreventivo: 'Plano preventivo', baselines: 'Baselines de preventiva', despesasCombustivel: 'Despesas de combustível', telemetriaKm: 'Telemetria Infleet' }
 
 /** Mostra o erro de carga só quando uma das tabelas que a visão usa falhou. */
 export function ViewGate({ errors, tables, onRetry, children }: { errors: LoadResult['errors']; tables: TableKey[]; onRetry: () => void; children: ReactNode }) {

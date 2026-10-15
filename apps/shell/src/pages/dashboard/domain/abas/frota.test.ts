@@ -224,3 +224,30 @@ describe('calcularFrota — uso mensal da frota própria', () => {
     expect(fr.kpis.usoMedioPropria).toBeNull()
   })
 })
+
+describe('calcularFrota — preventivas (domínio da Frota)', () => {
+  const ATIVO = 202410001
+  const PROPRIO = 100000000
+  const item = (id: string) => ({ id, nome: id, servico: 1, intervaloKm: 10000, intervaloMeses: null, avisoKm: 1000, avisoDias: 30, ativo: true })
+  const base = (item: string, km: number) => ({ id: `b-${item}`, veiculo: { id: 'v1', label: 'ABC1D23' }, item: { id: item, label: item }, km, data: null })
+  const entrada = {
+    veiculos: [
+      { id: 'v1', placa: 'ABC1D23', status: ATIVO, categoria: PROPRIO, hodometro: 21000, hodometroEm: null },
+      // Terceirizado fica fora do escopo da preventiva.
+      { id: 'v2', placa: 'TRC1A11', status: ATIVO, categoria: 100000001, hodometro: 99000, hodometroEm: null },
+    ],
+    manutencoes: [],
+    itens: [item('oleo'), item('filtro'), item('pneu')],
+    // óleo: próxima em 20.000 (vencido); filtro: 21.500 (a vencer, faltam 500 ≤ 1.000); pneu: 30.000 (em dia).
+    baselines: [base('oleo', 10000), base('filtro', 11500), base('pneu', 20000)],
+  }
+
+  it('conta vencidas e a vencer pela regra da Frota', () => {
+    expect(calcularFrota(ctxDe([]), dadosVazios({ preventivas: entrada })).preventivas).toEqual({ vencidas: 1, aVencer: 1 })
+    expect(calcularFrota(ctxDe([]), dadosVazios()).preventivas).toEqual({ vencidas: 0, aVencer: 0 })
+  })
+
+  it('null quando o plano preventivo não respondeu', () => {
+    expect(calcularFrota(ctxDe([]), dadosVazios({ preventivas: entrada, indisponiveis: ['preventivas'] })).preventivas).toBeNull()
+  })
+})
