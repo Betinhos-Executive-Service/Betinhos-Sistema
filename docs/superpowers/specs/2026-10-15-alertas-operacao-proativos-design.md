@@ -219,4 +219,4 @@ Como as consultas filtram: motoristas ativos (`cr40f_status` 0, `cr40f_funcao` 2
 - A consulta de destinatários só roda quando há itens. Sem ninguém marcado, a execução falha com o motivo (`SemDestinatarios`), visível no histórico do flow.
 - Prova no DEV: 4 itens, 1 destinatário (o Renan, único marcado no DEV), 27 ações executadas. Dados de teste apagados.
 - Consumo estimado: de 17 (sem itens) a 27 ações por execução, ou seja, de 370 a 600 ações por mês.
-- A variável `cr40f_ResumoEmailOperacao` ficou sem uso na solução AppBetinhos; pode ser excluída quando o Renan quiser.
+- A variável `cr40f_ResumoEmailOperacao` (valor e definição) foi excluída do DEV em 15/10/2026, a pedido do Renan, depois de confirmar que nenhum flow a usava.
