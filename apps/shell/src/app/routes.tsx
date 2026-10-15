@@ -18,6 +18,7 @@ export const PAGE_LOADERS: Record<PageId, () => Promise<ComponentType<PageProps>
   curriculos: () => import('../pages/curriculos/CurriculosPage').then((m) => m.CurriculosPage),
   pagantes: () => import('../pages/pagantes/PagantesPage').then((m) => m.PagantesPage),
   ops: () => import('../pages/ops/OpsPage').then((m) => m.OpsPage),
+  pendencias: () => import('../pages/pendencias/PendenciasPage').then((m) => m.PendenciasPage),
   pessoas: () => import('../pages/pessoas/PessoasPage').then((m) => m.PessoasPage),
   geral: () => import('../pages/geral/GeralPage').then((m) => m.GeralPage),
   dashboard: () => import('../pages/dashboard/DashboardPage').then((m) => m.DashboardPage),
