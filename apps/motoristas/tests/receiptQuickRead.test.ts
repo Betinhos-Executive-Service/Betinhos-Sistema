@@ -15,3 +15,26 @@ test("parseQuickReadResponse trata ok:false e corpo inválido como falha", () =>
   assert.equal(parseQuickReadResponse("texto").kind, "falha");
   assert.equal(parseQuickReadResponse({ ok: true, leitura: { legivel: "sim" } }).kind, "falha");
 });
+
+import { applyQuickReadToDraft } from "../src/lib/receiptQuickRead.ts";
+import { DEFAULT_EXPENSE_REFERENCE_DATA, type ExpenseDraft } from "../src/lib/expenses.ts";
+
+const vazio: ExpenseDraft = { categoriaId: "", veiculoId: "", valor: "", dataGasto: "", formaPagamentoId: "", cidadeId: "", estabelecimento: "", descricao: "", kmInformado: "", litros: "" };
+
+test("applyQuickReadToDraft preenche só campos vazios e casa categoria e pagamento por nome", () => {
+  const draft = applyQuickReadToDraft({ ...vazio, valor: "90,00" }, { ...leitura, forma_pagamento_sugerida: "TicketLog" }, DEFAULT_EXPENSE_REFERENCE_DATA);
+  assert.equal(draft.valor, "90,00");
+  assert.equal(draft.dataGasto, "2026-10-12");
+  assert.equal(draft.estabelecimento, "Posto X");
+  assert.equal(draft.categoriaId, "local-abastecimento");
+  assert.equal(draft.formaPagamentoId, "local-ticketlog");
+  assert.equal(draft.litros, "32,5");
+});
+test("applyQuickReadToDraft formata valor em pt-BR e ignora litros quando a categoria não exige", () => {
+  const draft = applyQuickReadToDraft(vazio, { ...leitura, categoria_sugerida: "Pedágio", valor: 12.3 }, DEFAULT_EXPENSE_REFERENCE_DATA);
+  assert.equal(draft.valor, "12,30");
+  assert.equal(draft.litros, "");
+});
+test("applyQuickReadToDraft ignora sugestão fora da lista", () => {
+  assert.equal(applyQuickReadToDraft(vazio, { ...leitura, categoria_sugerida: "Bebida" }, DEFAULT_EXPENSE_REFERENCE_DATA).categoriaId, "");
+});
