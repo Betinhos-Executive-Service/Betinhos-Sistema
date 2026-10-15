@@ -156,3 +156,14 @@ describe('createMemoryViewStore', () => {
     expect((await gestor.list('pessoas'))[0]).toMatchObject({ publica: true, mine: false })
   })
 })
+
+describe('moveVisibleColumn', () => {
+  it('conta só as visíveis e deixa as ocultas no lugar', async () => {
+    const { moveVisibleColumn } = await import('./config')
+    const base = defaultConfig(defs) // obs oculta no fim
+    const withObs = moveColumn(base, defs, 'obs', 1) // nome, obs(oculta), cliente, status
+    expect(keys(moveVisibleColumn(withObs, defs, 'status', 1))).toEqual(['nome', 'obs', 'status', 'cliente'])
+    expect(keys(moveVisibleColumn(base, defs, 'cliente', 9))).toEqual(['nome', 'status', 'cliente', 'obs'])
+    expect(moveVisibleColumn(base, defs, 'nome', 2)).toBe(base)
+  })
+})

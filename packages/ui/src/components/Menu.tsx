@@ -1,6 +1,12 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 
-export type MenuAction = { id: string; label: ReactNode; icon?: ReactNode; onSelect: () => void; tone?: 'neutral' | 'danger'; disabled?: boolean }
+export type MenuAction = {
+  id: string; label: ReactNode; icon?: ReactNode; onSelect: () => void; tone?: 'neutral' | 'danger'; disabled?: boolean
+  /** Itens seguidos com o mesmo grupo ficam sob o rótulo; mudar de grupo desenha um divisor. `''` = só divisor. */
+  group?: string
+  /** Item atual (ex.: visão ativa): marca com ✓ e `aria-checked`. */
+  selected?: boolean
+}
 
 export type MenuProps = {
   /** O gatilho: normalmente um `Button` de ícone com `aria-label`. Recebe os atributos do menu por `cloneElement`? Não: envolva seu botão e passe `trigger`. */
@@ -35,7 +41,7 @@ export function Menu({ trigger, actions, align = 'end' }: MenuProps) {
       panel.style.bottom = up ? `${window.innerHeight - r.top + 4}px` : 'auto'
     }
     place()
-    panel.querySelector<HTMLElement>('[role=menuitem]')?.focus()
+    panel.querySelector<HTMLElement>('[role^=menuitem]')?.focus()
     const outside = (event: PointerEvent) => { if (!box.contains(event.target as Node) && !panel.contains(event.target as Node)) setOpen(false) }
     document.addEventListener('pointerdown', outside)
     window.addEventListener('scroll', place, true)
@@ -43,7 +49,7 @@ export function Menu({ trigger, actions, align = 'end' }: MenuProps) {
   }, [open, align])
 
   useEffect(() => {
-    if (open) panelRef.current?.querySelectorAll<HTMLElement>('[role=menuitem]')[active]?.focus()
+    if (open) panelRef.current?.querySelectorAll<HTMLElement>('[role^=menuitem]')[active]?.focus()
   }, [open, active])
 
   const move = (step: number) => setActive((current) => {
@@ -68,12 +74,20 @@ export function Menu({ trigger, actions, align = 'end' }: MenuProps) {
       {trigger({ 'aria-haspopup': 'menu', 'aria-expanded': open, 'aria-controls': id, onClick: () => { setActive(enabledIndexes[0] ?? 0); setOpen((current) => !current) }, onKeyDown })}
       {open ? (
         <div ref={panelRef} id={id} role="menu" className="bt-menu__panel" popover="manual" onKeyDown={onKeyDown}>
-          {actions.map((action, index) => (
-            <button key={action.id} type="button" role="menuitem" tabIndex={index === active ? 0 : -1} disabled={action.disabled} className={['bt-menu__item', action.tone === 'danger' && 'bt-menu__item--danger'].filter(Boolean).join(' ')} onMouseEnter={() => setActive(index)} onClick={() => select(action)}>
-              {action.icon != null ? <span className="bt-menu__icon">{action.icon}</span> : null}
-              <span>{action.label}</span>
-            </button>
-          ))}
+          {actions.map((action, index) => {
+            const startsGroup = action.group !== undefined && action.group !== actions[index - 1]?.group
+            return (
+              <Fragment key={action.id}>
+                {startsGroup && index > 0 ? <div className="bt-menu__divider" role="separator" /> : null}
+                {startsGroup && action.group ? <div className="bt-menu__group" role="presentation">{action.group}</div> : null}
+                <button type="button" role={action.selected !== undefined ? 'menuitemradio' : 'menuitem'} aria-checked={action.selected} tabIndex={index === active ? 0 : -1} disabled={action.disabled} className={['bt-menu__item', action.tone === 'danger' && 'bt-menu__item--danger', action.selected && 'bt-menu__item--selected'].filter(Boolean).join(' ')} onMouseEnter={() => setActive(index)} onClick={() => select(action)}>
+                  {action.icon != null ? <span className="bt-menu__icon">{action.icon}</span> : null}
+                  <span className="bt-menu__label">{action.label}</span>
+                  {action.selected ? <svg className="bt-menu__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg> : null}
+                </button>
+              </Fragment>
+            )
+          })}
         </div>
       ) : null}
     </div>

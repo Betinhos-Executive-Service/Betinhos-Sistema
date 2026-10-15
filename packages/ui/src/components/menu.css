@@ -7,6 +7,11 @@
 .bt-menu__item:disabled { opacity: var(--bt-opacity-disabled); cursor: not-allowed; }
 .bt-menu__item--danger { color: var(--bt-color-danger); }
 .bt-menu__item--danger:focus { background-color: var(--bt-color-danger-soft); }
+.bt-menu__label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bt-menu__item--selected { color: var(--bt-color-brand); }
+.bt-menu__check { flex: 0 0 auto; color: var(--bt-color-action); }
+.bt-menu__group { padding: var(--bt-space-2) var(--bt-space-2-5) var(--bt-space-1); color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); letter-spacing: 0.05em; text-transform: uppercase; }
+.bt-menu__divider { height: 1px; margin: var(--bt-space-1) 0; background-color: var(--bt-color-border); }
 .bt-menu__icon { display: grid; place-items: center; color: var(--bt-color-text-secondary); }
 .bt-menu__item--danger .bt-menu__icon { color: inherit; }
 .bt-menu__icon > svg { width: 16px; height: 16px; }
