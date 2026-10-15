@@ -21,7 +21,9 @@ jobs:
       - name: Diagnóstico temporário do acesso ao GitHub Packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN || secrets.GITHUB_TOKEN }}
+          TEM_SECRET: ${{ secrets.PACKAGES_READ_TOKEN != '' }}
         run: |
+          echo "PACKAGES_READ_TOKEN presente: $TEM_SECRET"
           for p in ui tokens; do
             code=$(curl -s -o /tmp/meta.json -w "%{http_code}" -H "Authorization: Bearer $NODE_AUTH_TOKEN" "https://npm.pkg.github.com/@betinhos-executive-service%2F$p")
             echo "$p -> HTTP $code"; head -c 300 /tmp/meta.json; echo
