@@ -174,10 +174,8 @@ export function ExpenseScreen({
                   <ActionButton variant="secondary" idleLabel="TIRAR OUTRA FOTO" state="idle" disabled={isSubmitting} onClick={() => onRetakeQuickReadPhoto?.()} />
                 </div>
               ) : null}
-              {quickRead?.status === "manual" ? (
-                <div className="form-error-summary" role="status">
-                  {quickRead.tentativas >= QUICK_READ_MAX_TENTATIVAS ? "Preencha os dados do comprovante manualmente." : "Preencha os dados do comprovante."}
-                </div>
+              {quickRead?.status === "manual" && quickRead.tentativas < QUICK_READ_MAX_TENTATIVAS ? (
+                <div className="form-error-summary" role="status">Preencha os dados do comprovante.</div>
               ) : null}
 
               <TextInputField
