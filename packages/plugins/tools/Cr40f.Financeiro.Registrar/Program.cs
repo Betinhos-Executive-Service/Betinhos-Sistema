@@ -10,7 +10,9 @@ var environmentUrl = options.Require("environmentUrl");
 // Modo de validacao: --simular <opId> (ou --aplicar <opId>) chama a Custom API bound e imprime o ResponseJson.
 var simularId = options.Optional("simular");
 var aplicarId = options.Optional("aplicar");
-var dllPath = simularId is null && aplicarId is null ? options.Require("dllPath") : "";
+// Modo de validacao: --fechar <clienteId> --mes AAAA-MM chama a Custom API unbound cr40f_FecharMesCliente.
+var fecharId = options.Optional("fechar");
+var dllPath = simularId is null && aplicarId is null && fecharId is null ? options.Require("dllPath") : "";
 var solutionUniqueName = options.Optional("solutionUniqueName") ?? "appbetinhos";
 var publish = options.Has("publish");
 if (dllPath.Length > 0 && !File.Exists(dllPath))
@@ -21,6 +23,8 @@ if (dllPath.Length > 0 && !File.Exists(dllPath))
 const string PluginTypeName = "Cr40f.Financeiro.Plugin.SincronizarFinanceiroPlugin";
 const string CustomApiMessageName = "cr40f_SincronizarFinanceiro";
 const string BoundEntity = "cr40f_financeiro";
+const string FecharMesPluginTypeName = "Cr40f.Financeiro.Plugin.FecharMesClientePlugin";
+const string FecharMesMessageName = "cr40f_FecharMesCliente";
 const int PluginAssemblyComponentType = 91;
 
 Log("autenticando no Dataverse");
@@ -48,14 +52,31 @@ if (simularId is not null || aplicarId is not null)
     return;
 }
 
+if (fecharId is not null)
+{
+    var fecharRequest = new OrganizationRequest(FecharMesMessageName)
+    {
+        ["cr40f_RequestJson"] = "{\"clienteId\":\"" + Guid.Parse(fecharId) + "\",\"mes\":\"" + options.Require("mes") + "\"}",
+    };
+    Console.WriteLine(service.Execute(fecharRequest)["cr40f_ResponseJson"]);
+    return;
+}
+
 var assemblyInfo = AssemblyInfo.Read(dllPath);
 var assemblyContent = Convert.ToBase64String(File.ReadAllBytes(dllPath));
 var assemblyId = UpsertAssembly(service, assemblyInfo, assemblyContent);
 var pluginTypeId = UpsertPluginType(service, assemblyId);
 EnsureSolutionComponent(service, assemblyId, solutionUniqueName, PluginAssemblyComponentType);
 EnsureLogTable(service, solutionUniqueName);
-var customApiId = EnsureCustomApi(service, pluginTypeId, solutionUniqueName, CustomApiMessageName, BoundEntity);
+var customApiId = EnsureCustomApi(service, pluginTypeId, solutionUniqueName, CustomApiMessageName, BoundEntity,
+    "Sincronizar Financeiro", "Recalcula status de OP, reservas e composições a partir dos pagantes (simular/aplicar).",
+    "JSON da solicitação de sincronização (modo simular ou aplicar).", requestOptional: true);
 ConfigureMainOperationStep(service, customApiId, pluginTypeId);
+var fecharTypeId = UpsertPluginTypeNamed(service, assemblyId, FecharMesPluginTypeName);
+var fecharApiId = EnsureCustomApi(service, fecharTypeId, solutionUniqueName, FecharMesMessageName, null,
+    "Fechar Mês do Cliente", "Cria a OP consolidada do mês para os serviços mensais concluídos de um cliente e vincula os serviços.",
+    "JSON da solicitação de fechamento (clienteId e mes AAAA-MM).", requestOptional: false);
+ConfigureMainOperationStep(service, fecharApiId, fecharTypeId);
 var stepTypeId = UpsertPluginTypeNamed(service, assemblyId, "Cr40f.Financeiro.Plugin.FinanceiroStepPlugin");
 EnsureUpdateStep(service, stepTypeId, "cr40f_pagantes", "cr40f_status", "Cr40f.Financeiro: Pagante → OP", solutionUniqueName);
 EnsureUpdateStep(service, stepTypeId, "cr40f_financeiro", "cr40f_status", "Cr40f.Financeiro: OP → Reservas", solutionUniqueName);
@@ -185,7 +206,7 @@ static Guid UpsertPluginType(ServiceClient service, Guid assemblyId)
     });
 }
 
-static Guid EnsureCustomApi(ServiceClient service, Guid pluginTypeId, string solutionUniqueName, string customApiMessageName, string boundEntity)
+static Guid EnsureCustomApi(ServiceClient service, Guid pluginTypeId, string solutionUniqueName, string customApiMessageName, string? boundEntity, string displayName, string description, string requestDescription, bool requestOptional)
 {
     var existing = FindSingleOrNone(service, "customapi", ("uniquename", customApiMessageName));
     if (existing is not null)
@@ -200,7 +221,7 @@ static Guid EnsureCustomApi(ServiceClient service, Guid pluginTypeId, string sol
         };
         updateRequest["SolutionUniqueName"] = solutionUniqueName;
         service.Execute(updateRequest);
-        EnsureCustomApiChildren(service, existing.Id, solutionUniqueName, customApiMessageName);
+        EnsureCustomApiChildren(service, existing.Id, solutionUniqueName, customApiMessageName, requestDescription, requestOptional);
         return existing.Id;
     }
 
@@ -208,10 +229,9 @@ static Guid EnsureCustomApi(ServiceClient service, Guid pluginTypeId, string sol
     var customApi = new Entity("customapi")
     {
         ["allowedcustomprocessingsteptype"] = new OptionSetValue(0),
-        ["bindingtype"] = new OptionSetValue(1),
-        ["boundentitylogicalname"] = boundEntity,
-        ["description"] = "Recalcula status de OP, reservas e composições a partir dos pagantes (simular/aplicar).",
-        ["displayname"] = "Sincronizar Financeiro",
+        ["bindingtype"] = new OptionSetValue(boundEntity is null ? 0 : 1),
+        ["description"] = description,
+        ["displayname"] = displayName,
         ["isfunction"] = false,
         ["isprivate"] = false,
         ["name"] = customApiMessageName,
@@ -220,11 +240,12 @@ static Guid EnsureCustomApi(ServiceClient service, Guid pluginTypeId, string sol
         ["iscustomizable"] = new BooleanManagedProperty(false)
     };
 
+    if (boundEntity is not null) customApi["boundentitylogicalname"] = boundEntity;
     var createRequest = new CreateRequest { Target = customApi };
     createRequest["SolutionUniqueName"] = solutionUniqueName;
     var customApiId = ((CreateResponse)service.Execute(createRequest)).id;
 
-    EnsureCustomApiChildren(service, customApiId, solutionUniqueName, customApiMessageName);
+    EnsureCustomApiChildren(service, customApiId, solutionUniqueName, customApiMessageName, requestDescription, requestOptional);
 
     return customApiId;
 }
@@ -244,7 +265,7 @@ static void CreateInSolution(ServiceClient service, Entity entity, string soluti
     service.Execute(request);
 }
 
-static void EnsureCustomApiChildren(ServiceClient service, Guid customApiId, string solutionUniqueName, string customApiMessageName)
+static void EnsureCustomApiChildren(ServiceClient service, Guid customApiId, string solutionUniqueName, string customApiMessageName, string requestDescription, bool requestOptional)
 {
     if (!ChildExists(service, "customapirequestparameter", customApiId, "cr40f_RequestJson"))
     {
@@ -252,9 +273,9 @@ static void EnsureCustomApiChildren(ServiceClient service, Guid customApiId, str
         CreateInSolution(service, new Entity("customapirequestparameter")
         {
             ["customapiid"] = Ref("customapi", customApiId),
-            ["description"] = "JSON da solicitação de sincronização (modo simular ou aplicar).",
+            ["description"] = requestDescription,
             ["displayname"] = "Request JSON",
-            ["isoptional"] = true,
+            ["isoptional"] = requestOptional,
             ["name"] = $"{customApiMessageName}.cr40f_RequestJson",
             ["type"] = new OptionSetValue(10),
             ["uniquename"] = "cr40f_RequestJson",
