@@ -212,3 +212,11 @@ Como as consultas filtram: motoristas ativos (`cr40f_status` 0, `cr40f_funcao` 2
 - **Achado da prova:** no DEV, uma automação limpa o veículo do serviço de origem "Automático" quando o motorista não tem veículo atual. O resumo só enxerga documento de veículo que está de fato no serviço; isso é o esperado.
 - Dados de teste apagados.
 - **Pendências do Renan:** repor em `cr40f_ResumoEmailOperacao` os e-mails reais (vários, separados por ponto e vírgula); decidir se troca a variável pela marcação "Notificações operacionais" do cadastro de funcionários; levar ao PROD só com pedido explícito.
+
+### Destinatários pelo cadastro de funcionários (15/10/2026)
+
+- Decisão do Renan: o flow não usa mais a variável de ambiente. Recebe o resumo quem é funcionário ativo com "Notificações operacionais" marcado e "E-mail Betinhos" preenchido, editáveis na tela Funcionários do Sistema Betinhos.
+- A consulta de destinatários só roda quando há itens. Sem ninguém marcado, a execução falha com o motivo (`SemDestinatarios`), visível no histórico do flow.
+- Prova no DEV: 4 itens, 1 destinatário (o Renan, único marcado no DEV), 27 ações executadas. Dados de teste apagados.
+- Consumo estimado: de 17 (sem itens) a 27 ações por execução, ou seja, de 370 a 600 ações por mês.
+- A variável `cr40f_ResumoEmailOperacao` ficou sem uso na solução AppBetinhos; pode ser excluída quando o Renan quiser.

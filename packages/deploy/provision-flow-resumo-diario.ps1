@@ -1,17 +1,17 @@
-﻿# Somente DEV. Cria (ou atualiza) o flow "Flow Alertas | Resumo diário" e a variável de ambiente cr40f_ResumoEmailOperacao
-# (só a definição, sem valor) na solução AppBetinhos. O flow nasce DESLIGADO.
+﻿# Somente DEV. Cria (ou atualiza) o flow "Flow Alertas | Resumo diário" na solução AppBetinhos. O flow nasce DESLIGADO.
 #
 # Todo dia útil às 07:00 (America/Sao_Paulo) manda UM e-mail à operação com as pendências de hoje: CNH vencida e ASO vencido
 # de motorista escalado hoje, documento vigente vencido de veículo escalado hoje e multa sem condutor com prazo de indicação
 # em até 3 dias. Sem itens, o flow termina sem enviar. Sem tabela, sem Worker, sem segredo no repositório.
 #
-# O valor de cr40f_ResumoEmailOperacao (e-mails separados por ponto e vírgula) é preenchido pelo Renan no maker portal;
-# este script nunca lê nem grava esse valor. Exige uma referência de conexão do Office 365 Outlook na solução.
+# Destinatários: funcionários ativos com "Notificações operacionais" marcado e "E-mail Betinhos" preenchido (cadastro de
+# funcionários, editável na tela Funcionários do Sistema Betinhos). Sem ninguém marcado, a execução falha com o motivo.
+# Exige uma referência de conexão do Office 365 Outlook na solução.
 #
 # Antes de alterar o flow existente, salva o clientdata em packages/deploy/flows/backup/. Para reverter:
 #   powershell -File packages/deploy/provision-flow-resumo-diario.ps1 -Restaurar <arquivo de backup>
 # Para conferir a definição sem gravar (checkFlowErrors):   -SomenteValidar
-# Para ligar o flow (exige valor na variável de ambiente):  -Ativar
+# Para ligar o flow:                                         -Ativar
 # Requer `az login` com acesso ao DEV.
 param([string] $Restaurar = '', [switch] $SomenteValidar, [switch] $Ativar)
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
@@ -21,8 +21,6 @@ $environmentUrl = 'https://org23b93544.crm2.dynamics.com'
 $environmentId = '25a2ab78-cf07-ee41-a124-457aa2c29aea'
 $solutionName = 'AppBetinhos'
 $flowName = 'Flow Alertas | Resumo diário'
-$envVarName = 'cr40f_ResumoEmailOperacao'
-$paramEmail = "$envVarName ($envVarName)"
 $dataverseFlow = 'Flow Comprovantes Despesas Assincrono | App Motoristas'   # fonte da connection reference do Dataverse
 $backupDir = Join-Path $PSScriptRoot 'flows/backup'
 if (([Uri]$environmentUrl).Host -ne 'org23b93544.crm2.dynamics.com') { throw 'Somente DEV.' }
@@ -94,19 +92,6 @@ function Include([string] $id, [int] $type) {
   if (-not @((Dv GET $filter).value).Count) { throw "Componente $type/$id não entrou na $solutionName." }
 }
 
-# Variável de ambiente: só a definição (String, sem valor padrão). O valor é do Renan e este script nunca o lê.
-$envDefs = @((Dv GET "environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq '$envVarName'").value)
-if (-not $envDefs.Count) {
-  Dv POST environmentvariabledefinitions @{ schemaname = $envVarName; displayname = $envVarName; type = 100000000; description = 'E-mails da operação que recebem o resumo diário de pendências (CNH, ASO, documento do veículo e multa), separados por ponto e vírgula. Valor preenchido só no ambiente.' } | Out-Null
-  $envDefs = @((Dv GET "environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq '$envVarName'").value)
-}
-if ($envDefs.Count -ne 1) { throw "Variável $envVarName ausente ou duplicada." }
-# Valor padrão faz parte da definição e iria no export da solução. Confere pelo filtro, sem trazer o valor.
-if (@((Dv GET "environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq '$envVarName' and defaultvalue ne null").value).Count) { throw "A variável $envVarName tem valor padrão; ele iria no export da solução. Apague o valor padrão e use só o valor atual." }
-$envId = $envDefs[0].environmentvariabledefinitionid
-Include $envId 380
-$temValor = [bool]@((Dv GET "environmentvariablevalues?`$select=environmentvariablevalueid&`$filter=_environmentvariabledefinitionid_value eq $envId").value).Count
-
 # Connection references: Dataverse (a do flow de comprovantes) e Office 365 Outlook (uma da solução; criada pelo Renan no maker portal).
 $dvSource = @((Dv GET "workflows?`$select=clientdata&`$filter=name eq '$dataverseFlow' and category eq 5").value)
 if ($dvSource.Count -ne 1) { throw 'Flow de referência do Dataverse ausente no DEV.' }
@@ -122,8 +107,7 @@ $definitionText = @'
   "contentVersion": "1.0.0.0",
   "parameters": {
     "$authentication": { "defaultValue": {}, "type": "SecureObject" },
-    "$connections": { "defaultValue": {}, "type": "Object" },
-    "__PARAM_EMAIL__": { "defaultValue": "", "type": "String", "metadata": { "schemaName": "cr40f_ResumoEmailOperacao" } }
+    "$connections": { "defaultValue": {}, "type": "Object" }
   },
   "triggers": {
     "Dias_uteis_07h": {
@@ -220,7 +204,27 @@ $definitionText = @'
           "actions": { "Encerrar_sem_itens": { "type": "Terminate", "runAfter": {}, "inputs": { "runStatus": "Succeeded" } } },
           "else": { "actions": {} }
         },
-        "Linhas_cnh": { "type": "Select", "runAfter": { "Sem_itens": ["Succeeded"] }, "inputs": { "from": "@body('Cnh_escalados')", "select": "@concat('CNH vencida: ', item()?['new_apelido'], ' (validade ', formatDateTime(item()?['cr40f_validadedacnh'], 'dd/MM/yyyy'), ')')" } },
+        "Destinatarios": {
+          "type": "OpenApiConnection", "runAfter": { "Sem_itens": ["Succeeded"] },
+          "inputs": {
+            "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps", "connectionName": "shared_commondataserviceforapps", "operationId": "ListRecords" },
+            "parameters": {
+              "entityName": "cr40f_funcionarioses",
+              "$select": "cr40f_emailbetinhos",
+              "$filter": "statecode eq 0 and cr40f_status eq 0 and new_notificacoesoperacionais eq true and cr40f_emailbetinhos ne null",
+              "$top": 50
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Emails": { "type": "Select", "runAfter": { "Destinatarios": ["Succeeded"] }, "inputs": { "from": "@outputs('Destinatarios')?['body/value']", "select": "@item()?['cr40f_emailbetinhos']" } },
+        "Sem_destinatarios": {
+          "type": "If", "runAfter": { "Emails": ["Succeeded"] },
+          "expression": { "and": [ { "equals": [ "@empty(body('Emails'))", true ] } ] },
+          "actions": { "Encerrar_sem_destinatarios": { "type": "Terminate", "runAfter": {}, "inputs": { "runStatus": "Failed", "runError": { "code": "SemDestinatarios", "message": "Nenhum funcionário ativo com Notificações operacionais marcado e E-mail Betinhos preenchido." } } } },
+          "else": { "actions": {} }
+        },
+        "Linhas_cnh": { "type": "Select", "runAfter": { "Sem_destinatarios": ["Succeeded"] }, "inputs": { "from": "@body('Cnh_escalados')", "select": "@concat('CNH vencida: ', item()?['new_apelido'], ' (validade ', formatDateTime(item()?['cr40f_validadedacnh'], 'dd/MM/yyyy'), ')')" } },
         "Linhas_aso": { "type": "Select", "runAfter": { "Linhas_cnh": ["Succeeded"] }, "inputs": { "from": "@body('Aso_escalados')", "select": "@concat('ASO vencido: ', item()?['new_apelido'], ' (ASO de ', formatDateTime(item()?['cr40f_datadoaso'], 'dd/MM/yyyy'), ')')" } },
         "Linhas_docs": { "type": "Select", "runAfter": { "Linhas_aso": ["Succeeded"] }, "inputs": { "from": "@body('Docs_escalados')", "select": "@concat('Documento vencido do veículo ', coalesce(item()?['_cr40f_veiculo_value@OData.Community.Display.V1.FormattedValue'], ''), ': ', item()?['cr40f_name'], ' (validade ', formatDateTime(item()?['cr40f_validade'], 'dd/MM/yyyy'), ')')" } },
         "Linhas_multas": { "type": "Select", "runAfter": { "Linhas_docs": ["Succeeded"] }, "inputs": { "from": "@outputs('Multas')?['body/value']", "select": "@concat('Multa sem condutor: ', item()?['cr40f_id_multa'], ' (indicar até ', formatDateTime(item()?['cr40f_dataparaindicar'], 'dd/MM/yyyy'), ')')" } },
@@ -233,7 +237,7 @@ $definitionText = @'
           "inputs": {
             "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365", "connectionName": "shared_office365", "operationId": "SendEmailV2" },
             "parameters": {
-              "emailMessage/To": "@parameters('__PARAM_EMAIL__')",
+              "emailMessage/To": "@join(body('Emails'), ';')",
               "emailMessage/Subject": "@concat('[Operação] Pendências de hoje: ', outputs('Total'), if(equals(outputs('Total'), 1), ' item', ' itens'))",
               "emailMessage/Body": "@outputs('Resumo_html')",
               "emailMessage/Importance": "Normal"
@@ -247,7 +251,6 @@ $definitionText = @'
   "outputs": {}
 }
 '@
-$definitionText = $definitionText.Replace('__PARAM_EMAIL__', $paramEmail)
 if ($definitionText -match '__[A-Z_]+__') { throw "Marcador não substituído na definição: $($Matches[0])" }
 $definition = $definitionText | ConvertFrom-Json
 $definitionJson = $definition | ConvertTo-Json -Depth 90 -Compress
@@ -277,8 +280,11 @@ function Conferir($lido, [string] $texto) {
     'Docs: situação Vigente, veículo preenchido, validade anterior a hoje, top 150' = $doc.entityName -ceq 'cr40f_documentos' -and $doc.'$filter' -clike '*cr40f_situacao eq 100000000 and _cr40f_veiculo_value ne null and cr40f_validade lt*' -and $doc.'$top' -eq 150
     'Multas: Notificar o Condutor, sem motorista, prazo até o limite de 3 dias, top 150' = $mul.entityName -ceq 'cr40f_multases' -and $mul.'$filter' -clike '*cr40f_status eq 202410000 and _cr40f_motorista_value eq null and cr40f_dataparaindicar le*' -and $mul.'$top' -eq 150
     'Sem_itens encerra com Succeeded quando o total é 0' = $a.Sem_itens.type -eq 'If' -and $a.Sem_itens.actions.Encerrar_sem_itens.type -eq 'Terminate' -and $a.Sem_itens.actions.Encerrar_sem_itens.inputs.runStatus -eq 'Succeeded'
-    'Enviar_email: SendEmailV2 com destinatários do parâmetro de ambiente' = $mail.inputs.host.operationId -eq 'SendEmailV2' -and $mail.inputs.parameters.'emailMessage/To' -ceq "@parameters('$paramEmail')"
-    'parâmetro de ambiente com o schemaName da variável' = $lido.parameters.$paramEmail.metadata.schemaName -ceq $envVarName
+    'Destinatarios: funcionários ativos com Notificações operacionais e e-mail, top 50' = $a.Destinatarios.inputs.parameters.entityName -ceq 'cr40f_funcionarioses' -and $a.Destinatarios.inputs.parameters.'$filter' -ceq 'statecode eq 0 and cr40f_status eq 0 and new_notificacoesoperacionais eq true and cr40f_emailbetinhos ne null' -and $a.Destinatarios.inputs.parameters.'$top' -eq 50
+    'Destinatarios só roda quando há itens' = (@($a.Destinatarios.runAfter.Sem_itens) -join ',') -eq 'Succeeded'
+    'Sem_destinatarios falha com o motivo' = $a.Sem_destinatarios.actions.Encerrar_sem_destinatarios.inputs.runStatus -eq 'Failed' -and $a.Sem_destinatarios.actions.Encerrar_sem_destinatarios.inputs.runError.code -eq 'SemDestinatarios'
+    'Enviar_email: SendEmailV2 para os e-mails marcados' = $mail.inputs.host.operationId -eq 'SendEmailV2' -and $mail.inputs.parameters.'emailMessage/To' -ceq "@join(body('Emails'), ';')"
+    'sem parâmetro de variável de ambiente' = -not ($lido.parameters.PSObject.Properties.Name -match 'cr40f_ResumoEmailOperacao')
     'sem dado pessoal sensível na definição' = -not ($texto -match '(?i)telefone|celular|cpf|numerodocpf|numerodorg|passageiro')
   }
   $falhas = @($checks.Keys | Where-Object { -not $checks[$_] })
@@ -319,7 +325,6 @@ if ($flows.Count) {
 Include $flowId 29
 
 if ($Ativar) {
-  if (-not $temValor) { throw "NEEDS_CONTEXT: $envVarName sem valor atual no DEV. O Renan precisa preenchê-lo no maker portal antes de ligar o flow." }
   $estado = Dv GET "workflows($flowId)?`$select=statecode"
   if ($estado.statecode -ne 1) { Dv PATCH "workflows($flowId)" @{ statecode = 1 } | Out-Null }
 }
@@ -331,4 +336,4 @@ AssertSemMojibake $row.clientdata 'clientdata gravado'
 Conferir (($row.clientdata | ConvertFrom-Json).properties.definition) $row.clientdata
 if (-not @((Dv GET "solutioncomponents?`$select=solutioncomponentid&`$filter=_solutionid_value eq $solutionId and componenttype eq 29 and objectid eq $flowId").value).Count) { throw 'Flow fora da AppBetinhos.' }
 $situacao = if ($row.statecode -eq 1) { 'ATIVO' } else { 'DESLIGADO' }
-Write-Output "DEV: '$flowName' $situacao ($flowId), na $solutionName; $envVarName na solução $(if ($temValor) { 'com valor atual' } else { 'SEM valor atual (o Renan preenche no maker portal)' })."
+Write-Output "DEV: '$flowName' $situacao ($flowId), na $solutionName; destinatários: funcionários com Notificações operacionais."
