@@ -10,7 +10,7 @@ export type MenuItem =
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
-  | { kind: 'page'; id: string; label: string; page: 'componentes' | 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' }
+  | { kind: 'page'; id: string; label: string; page: 'componentes' | 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' }
 
 export type MenuGroup = { id: string; label: string; items: MenuItem[] }
 
@@ -27,7 +27,7 @@ export const MENU: MenuGroup[] = [
     id: 'operacional',
     label: 'Operacional',
     items: [
-      table('cr40f_reservadeveculos'),
+      { kind: 'page', id: 'geral', label: 'Geral', page: 'geral' },
       { kind: 'page', id: 'dashboard', label: 'Dashboard', page: 'dashboard' },
       { kind: 'page', id: 'operacional', label: 'Resumo Operacional', page: 'operacional' },
       wr('Funções Operacionais', 'new_telafuncoesoperacionais'),
@@ -42,14 +42,13 @@ export const MENU: MenuGroup[] = [
     id: 'financeiro',
     label: 'Financeiro',
     items: [
-      table('cr40f_composicaodeprecos'),
+      wr('Composição de Preço', 'new_TelaComposicaoPreco.html'),
       { kind: 'page', id: 'ops', label: 'Ordens de Pagamento', page: 'ops' },
       { kind: 'page', id: 'pagantes', label: 'Pagantes', page: 'pagantes' },
-      { kind: 'page', id: 'despesas-operacionais', label: 'Despesas (App Motoristas)', page: 'despesas' },
+      { kind: 'page', id: 'pendencias', label: 'Pendências', page: 'pendencias' },
       table('cr40f_recibos_v2'),
-      table('cr40f_pedidodecotacao'),
       wr('Pagamento de Fornecedores', 'cr40f_TelaPagamentoFornecedores.html'),
-      wr('Fluxo de Caixa', 'cr40f_TelaFluxoDeCaixa.html'),
+      { kind: 'page', id: 'despesas-operacionais', label: 'Despesas (App Motoristas)', page: 'despesas' },
     ],
   },
   {
@@ -65,9 +64,9 @@ export const MENU: MenuGroup[] = [
       table('cr40f_clientes1', 'Clientes'),
       table('cr40f_veiculos'),
       { kind: 'page', id: 'funcionarios', label: 'Funcionários', page: 'funcionarios' },
+      { kind: 'page', id: 'documentos', label: 'Documentos', page: 'documentos' },
       { kind: 'page', id: 'curriculos', label: 'Currículos', page: 'curriculos' },
       { kind: 'page', id: 'infracoes', label: 'Infrações de trânsito', page: 'infracoes' },
-      table('new_marketing'),
     ],
   },
   {
@@ -87,7 +86,10 @@ export const MENU: MenuGroup[] = [
       table('cr40f_anexorecebimento_v2'),
       { kind: 'unavailable', id: 'custom-page-funcoes-operacionais', label: 'Funções Operacionais (página personalizada)', reason: 'Esta página personalizada só abre pelo menu do app model-driven.' },
       wr('Comunicados', 'cr40f_GerenciarComunicados.html'),
-      wr('Composição de Preço', 'new_TelaComposicaoPreco.html'),
+      table('cr40f_pedidodecotacao'),
+      wr('Fluxo de Caixa', 'cr40f_TelaFluxoDeCaixa.html'),
+      table('cr40f_composicaodeprecos'),
+      table('new_marketing'),
     ],
   },
   // Referência para quem desenvolve: só existe no `pnpm dev`, nunca no build publicado.

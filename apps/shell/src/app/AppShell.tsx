@@ -1,13 +1,12 @@
-import type { ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   AlertTriangle, Banknote, BookUser, Calculator, Calendar, Camera, Car, CarFront, ClipboardList, Clock, Coins, Contact, Database, Download,
-  FileText, FileWarning, FolderCog, Home, KeyRound, Landmark, LayoutDashboard, List, Mail, Megaphone, MapPin, Paperclip, Palette, Receipt, ReceiptText, Route,
+  FileText, FileWarning, FolderCheck, FolderCog, Home, KeyRound, Landmark, LayoutDashboard, List, Mail, Megaphone, MapPin, Paperclip, Palette, Receipt, ReceiptText, Route,
   ScrollText, Shield, Shuffle, Tag, TrendingUp, Users, Wallet, Wrench,
 } from 'lucide-react'
 import { AppShell as Shell, type NavGroup } from '@betinhos/ui'
 import { MENU, itemLabel, type MenuGroup } from '../nav/menu'
-import { useQueryBandeira, useQueryTexto } from '../nav/queryState'
-import { hrefFor } from '../nav/useHashRoute'
+import { hrefFor, patchHashQuery, readHashQuery } from '../nav/useHashRoute'
 import { useInstallPrompt } from './useInstallPrompt'
 
 type Props = {
@@ -15,6 +14,10 @@ type Props = {
   title: string
   entityLabels: Map<string, string>
   connection: { ok: boolean; text: string }
+  /** Contador por id de item do menu (ex.: `documentos`). */
+  badges?: Record<string, ReactNode>
+  /** A tela ativa pede a navegação recolhida no trilho (grades largas), se o usuário não escolheu outra coisa. */
+  defaultCollapsed?: boolean
   children: ReactNode
 }
 
@@ -31,6 +34,7 @@ const GROUP_ICONS: Record<string, ReactNode> = {
 // Um ícone por tela (id do sitemap); sem entrada, o item fica só com o rótulo.
 const ITEM_ICONS: Record<string, ReactNode> = {
   cr40f_homebetinhos: <Home />,
+  geral: <Calendar />,
   cr40f_reservadeveculos: <Calendar />,
   dashboard: <LayoutDashboard />,
   new_dashboard: <LayoutDashboard />,
@@ -52,6 +56,7 @@ const ITEM_ICONS: Record<string, ReactNode> = {
   cr40f_multas: <AlertTriangle />,
   cr40f_colisao_v2: <Camera />,
   pessoas: <Contact />,
+  documentos: <FolderCheck />,
   cr40f_clientes1: <Landmark />,
   cr40f_veiculos: <CarFront />,
   cr40f_funcionarios: <BookUser />,
@@ -76,7 +81,7 @@ const ITEM_ICONS: Record<string, ReactNode> = {
 }
 
 /** Traduz o sitemap do app para a navegação do AppShell do Design System. */
-function toNavGroup(group: MenuGroup, entityLabels: Map<string, string>): NavGroup {
+function toNavGroup(group: MenuGroup, entityLabels: Map<string, string>, badges?: Record<string, ReactNode>): NavGroup {
   return {
     id: group.id,
     label: group.label,
@@ -88,23 +93,48 @@ function toNavGroup(group: MenuGroup, entityLabels: Map<string, string>): NavGro
       href: item.kind === 'external' ? item.url : hrefFor(item.id),
       external: item.kind === 'external',
       icon: ITEM_ICONS[item.id],
+      badge: badges?.[item.id],
     })),
   }
 }
 
+/**
+ * Estado do shell guardado na URL sem avisar as telas: lido uma vez na abertura e gravado em silêncio.
+ * Com `useHashQuery`, cada tecla na busca ou abrir a gaveta re-renderizava a tela inteira (ex.: a grade do Geral).
+ */
+function useShellQuery(chave: string) {
+  const [valor, setValor] = useState(() => readHashQuery().get(chave) ?? '')
+  const alterar = useCallback((proximo: string) => {
+    setValor(proximo)
+    patchHashQuery({ [chave]: proximo === '' ? null : proximo }, { silent: true })
+  }, [chave])
+  return [valor, alterar] as const
+}
+
 /** Chrome persistente do Sistema Betinhos: AppShell do pacote alimentado pelo sitemap e pelo estado de conexão. */
-export function AppShell({ activeId, title, entityLabels, connection, children }: Props) {
+export function AppShell({ activeId, title, entityLabels, connection, badges, defaultCollapsed, children }: Props) {
   const install = useInstallPrompt()
   // Gaveta do menu no celular e busca de telas também vivem na URL (`menu=1`, `busca=…`).
-  const [navOpen, setNavOpen] = useQueryBandeira('menu')
-  const [search, setSearch] = useQueryTexto('busca')
+  const [menu, setMenu] = useShellQuery('menu')
+  const setNavOpen = useCallback((open: boolean) => setMenu(open ? '1' : ''), [setMenu])
+  const [search, setSearch] = useShellQuery('busca')
+  // Trocar de tela leva uma URL sem `busca`; o campo acompanha e volta vazio, como antes.
+  const shownId = useRef(activeId)
+  useEffect(() => {
+    if (shownId.current === activeId) return
+    shownId.current = activeId
+    setSearch('')
+  }, [activeId, setSearch])
+  // Grupos estáveis entre renders: sem isto o menu inteiro (ícones e filtro da busca) era refeito a cada render do shell.
+  const groups = useMemo(() => MENU.map((group) => toNavGroup(group, entityLabels, badges)), [entityLabels, badges])
   return (
     <Shell
       brand={{ name: 'Betinhos', subtitle: 'Sistema interno', href: hrefFor(MENU[0].items[0].id) }}
-      groups={MENU.map((group) => toNavGroup(group, entityLabels))}
+      groups={groups}
       activeId={activeId}
       title={title}
-      navOpen={navOpen}
+      defaultCollapsed={defaultCollapsed}
+      navOpen={menu === '1'}
       onNavOpenChange={setNavOpen}
       search={search}
       onSearchChange={setSearch}
