@@ -2,48 +2,53 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Um agente proativo que avisa a operação, por e-mail, Teams e notificação do Power Apps, quando um motorista está atrasado ou não vai chegar ao embarque a tempo (com trânsito), e também em casos de serviço sem motorista e de documentos e multas pendentes.
+**Goal:** Um agente proativo que avisa a operação, por e-mail (e Teams, opcional), quando um motorista está atrasado ou não vai chegar ao embarque a tempo (com trânsito), e também em casos de serviço sem motorista e de documentos e multas pendentes.
 
-**Architecture:** Três flows de Power Automate na solução AppBetinhos. O avaliador (gatilho HTTP) é puro: recebe serviços já enriquecidos e devolve quais precisam do Google, as ações de aviso e os alertas a encerrar. O verificador (a cada 5 min) coleta Infleet, rota OSRM e Google, chama o avaliador e executa as ações. O resumo diário cuida de documentos e multas. As regras vivem em um pacote TS de referência com vetores de teste, e um script de conformidade confere o flow contra esses vetores.
+**Architecture:** Um Cloudflare Worker no plano grátis, com dois cron triggers (a cada 5 min e resumo diário às 07:00 de Brasília). O Worker lê serviços e alertas no Dataverse por um app do Entra ID, geocodifica embarques, lê a frota no Infleet, calcula rotas no OSRM, consulta o Google com trânsito só quando necessário, decide com o pacote puro `alertas-operacao` e envia e-mail direto pelo Microsoft Graph. O caminho recorrente não usa Power Automate (teto de 10.000 ações por mês do Renan).
 
-**Tech Stack:** pnpm workspace, TypeScript, vitest, Power Automate (Logic Apps JSON provisionado por PowerShell 5.1 via Web API do Dataverse), Infleet GraphQL, OSRM público, Google Routes API e Geocoding API.
+**Tech Stack:** pnpm workspace, TypeScript, vitest, Cloudflare Workers (`wrangler`), Dataverse Web API (client credentials), Infleet GraphQL, OSRM público, Google Routes API e Geocoding API, Microsoft Graph (`sendMail`).
 
 **Spec:** `docs/superpowers/specs/2026-10-15-alertas-operacao-proativos-design.md`
 
 ## Global Constraints
 
-- Ambiente: somente DEV `https://org23b93544.crm2.dynamics.com` (OrganizationId `7e5f59f4-efce-f011-89f6-000d3ac0a3e1`), solução `AppBetinhos`. Nenhuma escrita em PROD. Consultas em PROD só de leitura (`Dataverse_PROD`), apenas nas Tasks 6 e 10 (contagens e endereços, sem alterar nada).
-- Segredos: o repositório é público. Só nomes de variáveis de ambiente, nunca valores. Os valores de `new_InfleetToken` e `cr40f_GoogleMapsChave` são preenchidos pelo Renan no maker portal. Nenhum agente lê, copia ou imprime `.env` ou esses valores. Se um valor estiver ausente, o script falha com mensagem clara.
+- Ambiente: somente DEV `https://org23b93544.crm2.dynamics.com` (OrganizationId `7e5f59f4-efce-f011-89f6-000d3ac0a3e1`), solução `AppBetinhos`. Nenhuma escrita em PROD. Consultas em PROD só de leitura (`Dataverse_PROD`), apenas na Task 6.
+- Segredos: o repositório é público. Só nomes de secrets, nunca valores. Os secrets do Worker (`INFLEET_TOKEN`, `GOOGLE_MAPS_KEY`, `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID`, `ENTRA_CLIENT_SECRET`, `SEGREDO_EXECUCAO_MANUAL`, `TEAMS_WEBHOOK_URL`) são definidos pelo Renan com `wrangler secret put`. Nenhum agente lê, copia, imprime ou grava esses valores nem o `.env`. Criar credenciais e consentimentos do Entra ID é tarefa do Renan. O primeiro `wrangler deploy` na conta Cloudflare do Renan exige a confirmação dele.
 - A mensagem de alerta nunca contém telefone nem nome de passageiro. O texto enviado ao Google nunca contém nome de passageiro.
 - Regras só avisam pessoas: nenhuma escrita em registros de negócio além de `cr40f_alertaoperacao` e das colunas de coordenada em `cr40f_reservadeveculos`.
 - Constantes (verbatim da spec): margem 10 min; fator de trânsito 2,0; janela de 60 min antes a 180 min depois da saída; posição velha acima de 10 min; parado = até 3 km/h por 10 min; chegou = a até 150 m; sem motorista = a até 120 min da saída; atrasado = até 60 min após a saída; lembrete após 30 min; Google sempre nos últimos 30 min; parado só a mais de 500 m do embarque e a até 90 min da saída.
 - Status do serviço (`cr40f_reservadeveculos.cr40f_status`): Confirmado 202410001, Programado 202410005, Em Execução 202410006. Sem motorista só vale para Confirmado e Programado.
-- Logic Apps não tem trigonometria nem raiz quadrada: a lógica usa só comparações e aritmética simples. Ticks: 1 min = 600.000.000 ticks.
+- O Worker roda no plano grátis da Cloudflare: no máximo 50 chamadas externas e 10 ms de CPU por execução; o orçamento do Verificar é de 40 chamadas externas. O cron é em UTC (Brasília é UTC−3). O caminho recorrente não usa Power Automate.
 - Textos em pt-BR com acentuação correta (UTF-8). Scripts PowerShell salvos em UTF-8 com BOM.
 - Commits em português, detalhados, terminados com `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>` (a atribuição desta sessão). Quem executar com outro modelo usa a linha de atribuição da própria sessão.
-- Os scripts de flow dos Assistentes (`packages/deploy/provision-flow-agentes-executar.ps1`, `provision-agentes-schema.ps1`) existem só na branch `claude/compassionate-dubinsky-c4d8f9`. Para copiar as funções auxiliares (`Dv`, `AssertSemMojibake`, `Backup`, `Apply`, `FlowRows`, `Include`, `-Restaurar`, `-SomenteValidar`, leitura de volta), use `git show claude/compassionate-dubinsky-c4d8f9:packages/deploy/<arquivo>`; não faça checkout dessa branch.
+- O script `packages/deploy/provision-agentes-schema.ps1` dos Assistentes existe só na branch `claude/compassionate-dubinsky-c4d8f9`. Para copiar as funções auxiliares do schema (`Dv`, `Label`, `Base`, `Opcoes`, `Choice`, `Texto`, `Memo`, `Inteiro`, `DataHora`, `Tabela`, `Coluna`, `Lookup`), use `git show claude/compassionate-dubinsky-c4d8f9:packages/deploy/provision-agentes-schema.ps1`; não faça checkout dessa branch.
 - Esta branch não altera o shell React. Não há versão de build do shell a publicar nesta entrega.
-- Nada neste plano altera o WebResource `new_formulario_geral.html` (formulário ativo no model-driven e aberto pelo shell) nem a pasta `Tela Formulário Geral`. A mudança do campo de endereço é a Fase 0, fora deste plano, e vale só para uma cópia do formulário dentro do Sistema Betinhos. Aqui só se escrevem coordenadas em colunas novas de `cr40f_reservadeveculos`, pelo flow.
+- Nada neste plano altera o WebResource `new_formulario_geral.html` (formulário ativo no model-driven e aberto pelo shell) nem a pasta `Tela Formulário Geral`. A mudança do campo de endereço é a Fase 0, fora deste plano, e vale só para uma cópia do formulário dentro do Sistema Betinhos. Aqui só se escrevem coordenadas em colunas novas de `cr40f_reservadeveculos`, pelo Worker.
 
 ## Estrutura de arquivos
 
 ```
-packages/alertas-operacao/
+packages/alertas-operacao/            regras puras e testadas
   package.json, tsconfig.json
-  src/tipos.ts            Entrada, Saida, Alerta, Acao, Aberto, EntradaServico, Regra
-  src/constantes.ts       CONSTANTES (limites) e constantesDoFlow()
-  src/avaliar.ts          avaliar(entrada) -> Saida (regras, dedupe, encerramento)
-  src/fixtures.ts         construtores servico()/entrada() usados por testes e vetores
-  src/vetores.ts          VETORES: casos nomeados para teste e conformidade
+  src/tipos.ts, src/constantes.ts, src/avaliar.ts, src/fixtures.ts, src/vetores.ts, src/index.ts
   src/avaliar.test.ts
-  scripts/gerar-artefatos.ts   escreve dist/constantes.json e dist/vetores.json
+apps/alertas-worker/                  Cloudflare Worker
+  package.json, tsconfig.json, wrangler.toml
+  src/env.ts            tipo Env (secrets e variáveis)
+  src/orcamento.ts      contador de chamadas externas
+  src/endereco.ts       limparTexto e classificarGeocoding
+  src/entra.ts          token de aplicativo (Dataverse e Graph)
+  src/dataverse.ts      leituras, mapeamento das linhas e lote de gravação ($batch)
+  src/infleet.ts, src/osrm.ts, src/google.ts, src/graph.ts
+  src/verificar.ts      orquestração do ciclo de 5 min
+  src/notificar.ts      mensagens, e-mail, Teams opcional e falha ao TI
+  src/resumo.ts         resumo diário de documentos e multas
+  src/index.ts          scheduled(), POST /executar, GET /saude
+  src/*.test.ts
 packages/deploy/
-  provision-alertas-schema.ps1          tabela, colunas, variáveis de ambiente
-  provision-flow-alertas-avaliar.ps1    flow HTTP avaliador
-  conformidade-alertas.ps1              posta os vetores no avaliador e compara
-  provision-flow-alertas-verificar.ps1  flow recorrente
-  provision-flow-alertas-resumo.ps1     flow diário
-  medir-geocoding-alertas.ps1           medição com endereços do PROD (leitura)
+  provision-alertas-schema.ps1          tabela e colunas de coordenada
+  provision-alertas-acesso.ps1          usuário de aplicativo e papel de segurança
+  medir-geocoding-alertas.ps1           medição com endereços do PROD (o Renan roda)
 ```
 
 ---
@@ -70,8 +75,7 @@ packages/deploy/
   "types": "./src/index.ts",
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json",
-    "artefatos": "node scripts/gerar-artefatos.ts"
+    "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
@@ -85,7 +89,7 @@ packages/deploy/
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "allowImportingTsExtensions": true, "lib": ["ES2022"], "types": ["node"] },
-  "include": ["src", "scripts"]
+  "include": ["src"]
 }
 ```
 Rode `pnpm install` na raiz e confira com `git diff --stat pnpm-lock.yaml` que só este pacote entrou. Re-resolução de peers de `@types/node` em outros importadores, sem mudança de versão, é aceitável.
@@ -159,10 +163,6 @@ export type Constantes = typeof CONSTANTES
 export const STATUS = { confirmado: 202410001, programado: 202410005, emExecucao: 202410006 } as const
 export const STATUS_ATIVOS: readonly number[] = [STATUS.confirmado, STATUS.programado, STATUS.emExecucao]
 export const STATUS_SEM_MOTORISTA: readonly number[] = [STATUS.confirmado, STATUS.programado]
-
-export function constantesDoFlow() {
-  return { ...CONSTANTES, status: STATUS }
-}
 ```
 
 - [ ] **Step 3: Fixtures**
@@ -211,18 +211,17 @@ export { mais }
 ```ts
 import { describe, expect, it } from 'vitest'
 import { avaliar, chaveDe } from './avaliar.ts'
-import { CONSTANTES, constantesDoFlow } from './constantes.ts'
+import { CONSTANTES } from './constantes.ts'
 import { AGORA, entrada, mais, servico } from './fixtures.ts'
 import { STATUS } from './constantes.ts'
 
 const alertasDe = (s: Parameters<typeof servico>[0]) => avaliar(entrada([servico(s)]))
 
 describe('constantes', () => {
-  it('têm os valores da spec e nenhum @ nas constantes do flow', () => {
+  it('têm os valores da spec', () => {
     expect(CONSTANTES.margemMin).toBe(10)
     expect(CONSTANTES.fatorTransito).toBe(2)
     expect(CONSTANTES.chegouMetros).toBe(150)
-    expect(JSON.stringify(constantesDoFlow())).not.toContain('@')
   })
 })
 
@@ -446,7 +445,7 @@ function decidir(alerta: Alerta, aberto: Aberto | undefined, agora: string, c: C
   return null
 }
 
-/** Decisão pura: sem chamadas externas. O flow "Alertas | Avaliar" replica esta lógica; os vetores em vetores.ts garantem a equivalência. */
+/** Decisão pura: sem chamadas externas. O Worker chama esta função; os vetores em vetores.ts cobrem os limites e o dedupe. */
 export function avaliar(entrada: Entrada, c: Constantes = CONSTANTES): Saida {
   const completa = !entrada.regras
   const regras: readonly Regra[] = entrada.regras ?? REGRAS
@@ -483,7 +482,7 @@ export function avaliar(entrada: Entrada, c: Constantes = CONSTANTES): Saida {
 `src/index.ts`:
 ```ts
 export * from './tipos.ts'
-export { CONSTANTES, STATUS, STATUS_ATIVOS, STATUS_SEM_MOTORISTA, constantesDoFlow, type Constantes } from './constantes.ts'
+export { CONSTANTES, STATUS, STATUS_ATIVOS, STATUS_SEM_MOTORISTA, type Constantes } from './constantes.ts'
 export { avaliar, chaveDe } from './avaliar.ts'
 export { AGORA, entrada, mais, servico } from './fixtures.ts'
 ```
@@ -502,14 +501,14 @@ git commit -m "Alertas: pacote alertas-operacao com as regras de atraso, parado,
 
 ---
 
-### Task 2: Vetores de teste e artefatos para o flow
+### Task 2: Vetores de teste (tabela de casos)
 
 **Files:**
-- Create: `packages/alertas-operacao/src/vetores.ts`, `packages/alertas-operacao/scripts/gerar-artefatos.ts`
-- Modify: `packages/alertas-operacao/src/index.ts`, `packages/alertas-operacao/src/avaliar.test.ts`, `.gitignore` (raiz)
+- Create: `packages/alertas-operacao/src/vetores.ts`
+- Modify: `packages/alertas-operacao/src/index.ts`, `packages/alertas-operacao/src/avaliar.test.ts`
 
 **Interfaces:**
-- Produces: `VETORES: { nome: string; entrada: Entrada }[]`; comando `pnpm --filter @betinhos/alertas-operacao artefatos` que escreve `packages/alertas-operacao/dist/constantes.json` (objeto de `constantesDoFlow()`) e `dist/vetores.json` (`[{ nome, entrada, esperado }]`, com `esperado = avaliar(entrada)`). A Task 4 e a conformidade da Task 5 consomem os dois arquivos.
+- Produces: `VETORES: { nome: string; entrada: Entrada }[]`, uma tabela de 31 casos nomeados que cobre as quatro regras, os limites, o dedupe, o encerramento e a segunda chamada com `regras`. O teste do Worker (Task 7) reaproveita esses casos como entradas realistas.
 
 - [ ] **Step 1: Teste que falha**
 
@@ -517,7 +516,7 @@ Acrescente em `avaliar.test.ts`:
 ```ts
 import { VETORES } from './vetores.ts'
 
-describe('vetores de conformidade', () => {
+describe('vetores de teste', () => {
   it('têm nomes únicos e cobrem as quatro regras, dedupe e encerramento', () => {
     const nomes = VETORES.map((v) => v.nome)
     expect(new Set(nomes).size).toBe(nomes.length)
@@ -603,46 +602,35 @@ export const VETORES: { nome: string; entrada: Entrada }[] = [
   },
 ]
 ```
-`scripts/gerar-artefatos.ts`:
-```ts
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { avaliar } from '../src/avaliar.ts'
-import { constantesDoFlow } from '../src/constantes.ts'
-import { VETORES } from '../src/vetores.ts'
-
-mkdirSync(new URL('../dist/', import.meta.url), { recursive: true })
-writeFileSync(new URL('../dist/constantes.json', import.meta.url), JSON.stringify(constantesDoFlow(), null, 2), 'utf8')
-writeFileSync(new URL('../dist/vetores.json', import.meta.url), JSON.stringify(VETORES.map((v) => ({ nome: v.nome, entrada: v.entrada, esperado: avaliar(v.entrada) })), null, 2), 'utf8')
-console.log(`dist/constantes.json e dist/vetores.json gerados (${VETORES.length} vetores)`)
-```
-Em `index.ts` acrescente `export { VETORES } from './vetores.ts'`. Confira `.gitignore`: se `dist/` já estiver coberto (regra `dist/` na raiz), nada a fazer.
+Em `src/index.ts` acrescente `export { VETORES } from './vetores.ts'`.
 
 - [ ] **Step 4: Rodar e ver passar**
 
-Run: `pnpm --filter @betinhos/alertas-operacao test && pnpm --filter @betinhos/alertas-operacao typecheck && pnpm --filter @betinhos/alertas-operacao artefatos`
-Expected: PASS; imprime `... gerados (31 vetores)`; `git status` não mostra `dist/`.
+Run: `pnpm --filter @betinhos/alertas-operacao test && pnpm --filter @betinhos/alertas-operacao typecheck`
+Expected: PASS e sem erro de tipo.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add packages/alertas-operacao
-git commit -m "Alertas: vetores de conformidade e geração dos artefatos JSON para os flows"
+git commit -m "Alertas: tabela de 31 vetores de teste das regras, do dedupe e do encerramento"
 ```
 
 ---
 
-### Task 3: Schema no DEV (tabela de alertas, colunas de coordenada, variáveis de ambiente)
+### Task 3: Schema no DEV (tabela de alertas e colunas de coordenada)
 
 **Files:**
 - Create: `packages/deploy/provision-alertas-schema.ps1`
 - Reference: `git show claude/compassionate-dubinsky-c4d8f9:packages/deploy/provision-agentes-schema.ps1` (copie o prólogo e as funções `Dv`, `Label`, `Base`, `Opcoes`, `Choice`, `Texto`, `Memo`, `Inteiro`, `DataHora`, `Tabela`, `Coluna`, `Lookup`)
 
 **Interfaces:**
-- Produces no DEV: tabela `cr40f_alertaoperacao` com as colunas da spec, publicada e na AppBetinhos; colunas `cr40f_embarquelatitude`, `cr40f_embarquelongitude`, `cr40f_embarqueprecisao`, `cr40f_embarquetexto`, `cr40f_embarquegeocodificadoem` em `cr40f_reservadeveculos`; as 10 variáveis de ambiente (só definição, sem valor) na solução. O script imprime o `EntitySetName` real da tabela de alertas. Tasks 7 e 8 usam esse nome.
+- Produces no DEV: tabela `cr40f_alertaoperacao` (com as colunas da spec) publicada e na AppBetinhos; colunas `cr40f_embarquelatitude`, `cr40f_embarquelongitude`, `cr40f_embarqueprecisao`, `cr40f_embarquetexto`, `cr40f_embarquegeocodificadoem` em `cr40f_reservadeveculos`. O script imprime o `EntitySetName` real da tabela de alertas (esperado `cr40f_alertaoperacaos`); a Task 5 usa esse nome na constante `ALERTA_SET`.
+- Valores dos choices (100000000 + índice, na ordem abaixo): `cr40f_regra` NaoChegaraATempo, JaAtrasado, MotoristaParado, SemMotorista, DocumentosResumo, FalhaDoAgente; `cr40f_severidade` Média, Alta; `cr40f_status` Aberto, Resolvido; `cr40f_resolucao` Condição encerrada, Fora da janela; `cr40f_embarqueprecisao` Informado, Geocodificado, Aproximado, Indisponível.
 
 - [ ] **Step 1: Escrever o script**
 
-Mesmo prólogo do script de agentes (DEV only, `az` token, WhoAmI com OrganizationId, `MSCRM.SolutionUniqueName = AppBetinhos`, `Dv`). Acrescente a função de decimal e as listas abaixo.
+Mesmo prólogo do script de agentes (somente DEV, token do `az`, WhoAmI com OrganizationId `7e5f59f4-efce-f011-89f6-000d3ac0a3e1`, `MSCRM.SolutionUniqueName = AppBetinhos`, função `Dv`). Acrescente a função de decimal e as listas abaixo.
 
 ```powershell
 function Decimal([string] $schema, [string] $nome) {
@@ -651,8 +639,8 @@ function Decimal([string] $schema, [string] $nome) {
   $a
 }
 
-$exec = 'cr40f_alertaoperacao'
-Tabela $exec 'Alerta de operação' 'Alertas de operação' 'Aviso proativo gerado pelo agente de operação, com controle de envio e encerramento.'
+$alerta = 'cr40f_alertaoperacao'
+Tabela $alerta 'Alerta de operação' 'Alertas de operação' 'Aviso proativo gerado pelo agente de operação, com controle de envio e encerramento.'
 foreach ($c in @(
   (Choice 'cr40f_Regra' 'Regra' @('NaoChegaraATempo', 'JaAtrasado', 'MotoristaParado', 'SemMotorista', 'DocumentosResumo', 'FalhaDoAgente')),
   (Texto 'cr40f_Chave' 'Chave' 200),
@@ -664,8 +652,8 @@ foreach ($c in @(
   (DataHora 'cr40f_UltimoEnvioEm' 'Último envio em'),
   (DataHora 'cr40f_ResolvidoEm' 'Resolvido em'),
   (Texto 'cr40f_Canais' 'Canais' 100)
-)) { Coluna $exec $c }
-Lookup 'cr40f_reservadeveculos_alertaoperacao_reserva' $exec 'cr40f_reservadeveculos' 'cr40f_Reserva' 'Serviço'
+)) { Coluna $alerta $c }
+Lookup 'cr40f_reservadeveculos_alertaoperacao_reserva' $alerta 'cr40f_reservadeveculos' 'cr40f_Reserva' 'Serviço'
 
 $res = 'cr40f_reservadeveculos'
 foreach ($c in @(
@@ -676,50 +664,23 @@ foreach ($c in @(
   (DataHora 'cr40f_EmbarqueGeocodificadoEm' 'Embarque: geocodificado em')
 )) { Coluna $res $c }
 
-Dv POST PublishXml @{ ParameterXml = "<importexportxml><entities><entity>$exec</entity><entity>$res</entity></entities></importexportxml>" } | Out-Null
-
-# Variáveis de ambiente: só a definição (String, sem valor padrão). Os valores são do Renan.
-$variaveis = [ordered]@{
-  'new_InfleetToken'               = 'Token da API do Infleet (somente leitura de posição).'
-  'cr40f_GoogleMapsChave'          = 'Chave do Google Maps Platform restrita às APIs Routes e Geocoding.'
-  'cr40f_AlertasLigado'            = 'Chave geral dos alertas: sim ou não.'
-  'cr40f_AlertasCanais'            = 'Canais ligados, separados por vírgula: email,teams,push.'
-  'cr40f_AlertasEmailOperacao'     = 'E-mail(s) da operação que recebem os alertas, separados por ponto e vírgula.'
-  'cr40f_AlertasEmailTI'           = 'E-mail do TI que recebe falhas do agente.'
-  'cr40f_AlertasTeamsEquipeId'     = 'Id da equipe do Teams que recebe os alertas.'
-  'cr40f_AlertasTeamsCanalId'      = 'Id do canal do Teams que recebe os alertas.'
-  'cr40f_AlertasPushDestinatarios' = 'E-mails dos destinatários da notificação push, separados por ponto e vírgula.'
-  'cr40f_FlowUrlAlertasAvaliar'    = 'URL do flow Alertas | Avaliar (preenchida pelo script do avaliador).'
-}
-foreach ($nome in $variaveis.Keys) {
-  $def = @((Dv GET "environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq '$nome'").value)
-  if (-not $def.Count) {
-    Dv POST environmentvariabledefinitions @{ schemaname = $nome; displayname = $nome; type = 100000000; description = $variaveis[$nome] } | Out-Null
-    $def = @((Dv GET "environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq '$nome'").value)
-  }
-  if ($def.Count -ne 1) { throw "Variável $nome ausente ou duplicada." }
-  # Valor padrão iria no export da solução: recusa.
-  if (@((Dv GET "environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq '$nome' and defaultvalue ne null").value).Count) { throw "A variável $nome tem valor padrão; remova." }
-  $id = $def[0].environmentvariabledefinitionid
-  $filtro = "solutioncomponents?`$select=solutioncomponentid&`$filter=_solutionid_value eq $solutionId and componenttype eq 380 and objectid eq $id"
-  if (-not @((Dv GET $filtro).value).Count) { Dv POST AddSolutionComponent @{ ComponentId = $id; ComponentType = 380; SolutionUniqueName = $solutionName; AddRequiredComponents = $false } | Out-Null }
-}
+Dv POST PublishXml @{ ParameterXml = "<importexportxml><entities><entity>$alerta</entity><entity>$res</entity></entities></importexportxml>" } | Out-Null
 
 # Conferência por leitura de volta.
-$set = (Dv GET "EntityDefinitions(LogicalName='$exec')?`$select=EntitySetName").EntitySetName
-Write-Output "EntitySetName de ${exec}: $set"
-foreach ($col in 'cr40f_regra', 'cr40f_chave', 'cr40f_severidade', 'cr40f_status', 'cr40f_resolucao', 'cr40f_mensagem', 'cr40f_envios', 'cr40f_ultimoenvioem', 'cr40f_resolvidoem', 'cr40f_canais', 'cr40f_reserva') { Dv GET "EntityDefinitions(LogicalName='$exec')/Attributes(LogicalName='$col')?`$select=LogicalName" | Out-Null }
+$set = (Dv GET "EntityDefinitions(LogicalName='$alerta')?`$select=EntitySetName").EntitySetName
+Write-Output "EntitySetName de ${alerta}: $set"
+foreach ($col in 'cr40f_regra', 'cr40f_chave', 'cr40f_severidade', 'cr40f_status', 'cr40f_resolucao', 'cr40f_mensagem', 'cr40f_envios', 'cr40f_ultimoenvioem', 'cr40f_resolvidoem', 'cr40f_canais', 'cr40f_reserva') { Dv GET "EntityDefinitions(LogicalName='$alerta')/Attributes(LogicalName='$col')?`$select=LogicalName" | Out-Null }
 foreach ($col in 'cr40f_embarquelatitude', 'cr40f_embarquelongitude', 'cr40f_embarqueprecisao', 'cr40f_embarquetexto', 'cr40f_embarquegeocodificadoem') { Dv GET "EntityDefinitions(LogicalName='$res')/Attributes(LogicalName='$col')?`$select=LogicalName" | Out-Null }
-$regra = Dv GET "EntityDefinitions(LogicalName='$exec')/Attributes(LogicalName='cr40f_regra')/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?`$select=LogicalName&`$expand=OptionSet(`$select=Options)"
+$regra = Dv GET "EntityDefinitions(LogicalName='$alerta')/Attributes(LogicalName='cr40f_regra')/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?`$select=LogicalName&`$expand=OptionSet(`$select=Options)"
 if (@($regra.OptionSet.Options).Count -ne 6) { throw 'cr40f_regra deveria ter 6 opções.' }
-Write-Output "DEV: $exec, colunas de embarque em $res e $($variaveis.Count) variáveis de ambiente criadas e conferidas na $solutionName."
+Write-Output "DEV: $alerta e as colunas de embarque em $res criadas e conferidas na $solutionName."
 ```
-`$solutionId` vem da consulta da solução, como no script de flow dos Assistentes (`solutions?$filter=uniquename eq 'AppBetinhos'`); inclua essa consulta no prólogo. Salve o arquivo em UTF-8 com BOM.
+Salve em UTF-8 com BOM.
 
-- [ ] **Step 2: Rodar no DEV e repetir**
+- [ ] **Step 2: Rodar duas vezes no DEV**
 
 Run: `powershell -NoProfile -ExecutionPolicy Bypass -File packages/deploy/provision-alertas-schema.ps1` (duas vezes).
-Expected: a primeira cria; a segunda só mostra "já existe" e termina com a mesma linha final. Anote o `EntitySetName` impresso (esperado `cr40f_alertaoperacaos`); se for outro, use o real nas Tasks 7 e 8.
+Expected: a primeira cria; a segunda só mostra "já existe" e termina com a mesma linha final. Anote o `EntitySetName` impresso. Se não for `cr40f_alertaoperacaos`, use o real em `ALERTA_SET` na Task 5.
 
 - [ ] **Step 3: Conferir pelo MCP**
 
@@ -729,235 +690,26 @@ Expected: a primeira cria; a segunda só mostra "já existe" e termina com a mes
 
 ```bash
 git add packages/deploy/provision-alertas-schema.ps1
-git commit -m "Alertas: schema no DEV (tabela de alertas, colunas de coordenada do embarque e variáveis de ambiente)"
+git commit -m "Alertas: schema no DEV (tabela de alertas e colunas de coordenada do embarque em cr40f_reservadeveculos)"
 ```
 
 ---
 
-### Task 4: Flow "Alertas | Avaliar" (avaliador puro, gatilho HTTP)
+### Task 4: Usuário de aplicativo e papel de segurança no DEV
 
 **Files:**
-- Create: `packages/deploy/provision-flow-alertas-avaliar.ps1`
-- Reference: `git show claude/compassionate-dubinsky-c4d8f9:packages/deploy/provision-flow-agentes-agendado.ps1` (prólogo, `Backup`, `Apply`, `FlowRows`, `Include`, `-Restaurar`, `-SomenteValidar`, criação, ativação e leitura de volta; este flow não tem variável secreta)
+- Create: `packages/deploy/provision-alertas-acesso.ps1`
 
 **Interfaces:**
-- Consumes: `packages/alertas-operacao/dist/constantes.json` (Task 2).
-- Produces: flow ativo com gatilho `When_an_HTTP_request_is_received` (POST). Entrada e saída exatamente como `Entrada` e `Saida` de `packages/alertas-operacao/src/tipos.ts`. O script grava a URL do gatilho (com assinatura) em `cr40f_FlowUrlAlertasAvaliar` sem imprimi-la. A Task 5 e a Task 7 leem a URL dessa variável.
+- Consumes: Task 3 (tabelas) e o **Application (client) ID** do app do Entra ID que o Renan criou para o Worker (um GUID, não é segredo). **Se o Renan ainda não forneceu o GUID, pare com NEEDS_CONTEXT.** Criar o app, a credencial e o consentimento de `Mail.Send` é tarefa do Renan.
+- Produces: papel `Alertas Worker` no DEV e usuário de aplicativo associado a ele. O Worker acessa o Dataverse só com esse papel.
 
-**Regras de expressão do Logic Apps usadas aqui:** `ticks()` aceita ISO em UTC; 1 min = 600.000.000 ticks; `formatNumber(x, '0', 'en-US')` arredonda para inteiro; `formatNumber(x, '0.0', 'pt-BR')` dá vírgula decimal; `convertTimeZone(ts, 'UTC', 'E. South America Standard Time', 'HH:mm')` dá a hora de Brasília; `union()` de arrays de objetos junta sem repetir; `contains(array, valor)` serve para arrays de texto e de números. Os minutos do Google chegam inteiros (o verificador arredonda para cima).
+Privilégios do papel (profundidade Global): Read em `cr40f_reservadeveculos`, `cr40f_funcionarios`, `cr40f_veiculos`, `cr40f_clientes1`, `cr40f_documento`, `cr40f_tipodocumento`, `cr40f_multas`; Write em `cr40f_reservadeveculos` (o Worker só altera as colunas de embarque; o Dataverse concede por tabela); Create, Read, Write, Append e AppendTo em `cr40f_alertaoperacao`; AppendTo em `cr40f_reservadeveculos` (para ligar o alerta ao serviço). Nada além disso.
 
-- [ ] **Step 1: Definição do flow**
-
-No script, `$definitionText` é o JSON abaixo, com os marcadores `__X__` trocados pelas constantes (números) de `dist/constantes.json`: `__MARGEM__` margemMin, `__FATOR__` fatorTransito, `__POSVELHA__` posicaoVelhaMin, `__PARADO_MIN__` paradoMin, `__PARADO_VEL__` paradoVelKmh, `__PARADO_LONGE__` paradoLongeMetros, `__PARADO_JANELA__` paradoJanelaMin, `__CHEGOU__` chegouMetros, `__SEMMOT__` semMotoristaMin, `__ATRASADO__` atrasadoAteMin, `__LEMBRETE__` lembreteMin, `__FORCAR__` forcarGoogleMin. Depois de `ConvertFrom-Json`, o script falha se sobrar algum `__[A-Z_]+__`.
-
-```json
-{
-  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
-  "contentVersion": "1.0.0.0",
-  "parameters": { "$authentication": { "defaultValue": {}, "type": "SecureObject" }, "$connections": { "defaultValue": {}, "type": "Object" } },
-  "triggers": { "When_an_HTTP_request_is_received": { "type": "Request", "kind": "Http", "inputs": { "method": "POST", "schema": {} } } },
-  "actions": {
-    "Agora": { "type": "Compose", "runAfter": {}, "inputs": "@triggerBody()?['agora']" },
-    "Completa": { "type": "Compose", "runAfter": { "Agora": ["Succeeded"] }, "inputs": "@equals(triggerBody()?['regras'], null)" },
-    "Regras_pedidas": { "type": "Compose", "runAfter": { "Completa": ["Succeeded"] }, "inputs": "@coalesce(triggerBody()?['regras'], createArray('NaoChegaraATempo', 'JaAtrasado', 'MotoristaParado', 'SemMotorista'))" },
-    "Iniciar_acoes": { "type": "InitializeVariable", "runAfter": { "Regras_pedidas": ["Succeeded"] }, "inputs": { "variables": [ { "name": "Acoes_lista", "type": "array", "value": [] } ] } },
-    "Base": {
-      "type": "Select", "runAfter": { "Iniciar_acoes": ["Succeeded"] },
-      "inputs": {
-        "from": "@coalesce(triggerBody()?['servicos'], createArray())",
-        "select": {
-          "id": "@item()?['id']",
-          "codigo": "@item()?['codigo']",
-          "status": "@item()?['status']",
-          "saida": "@item()?['saida']",
-          "motoristaId": "@item()?['motoristaId']",
-          "motoristaNome": "@item()?['motoristaNome']",
-          "placa": "@item()?['placa']",
-          "cliente": "@item()?['cliente']",
-          "aproximado": "@equals(item()?['embarqueAproximado'], true)",
-          "min": "@div(float(sub(ticks(item()?['saida']), ticks(outputs('Agora')))), 600000000)",
-          "rastreado": "@and(not(equals(item()?['posicao'], null)), not(equals(item()?['rotaOsrm'], null)))",
-          "fixMin": "@if(equals(item()?['posicao'], null), 999999, div(float(sub(ticks(outputs('Agora')), ticks(item()?['posicao']?['fixTime']))), 600000000))",
-          "vel": "@if(equals(item()?['posicao'], null), 0, item()?['posicao']?['velocidadeKmh'])",
-          "osrmMin": "@if(equals(item()?['rotaOsrm'], null), 0, item()?['rotaOsrm']?['minutos'])",
-          "osrmM": "@if(equals(item()?['rotaOsrm'], null), 0, item()?['rotaOsrm']?['metros'])",
-          "temGoogle": "@not(equals(item()?['rotaGoogle'], null))",
-          "googleMin": "@if(equals(item()?['rotaGoogle'], null), 0, item()?['rotaGoogle']?['minutos'])",
-          "paradoMin": "@coalesce(item()?['paradoMin'], 0)"
-        }
-      }
-    },
-    "Ids_janela": { "type": "Select", "runAfter": { "Base": ["Succeeded"] }, "inputs": { "from": "@body('Base')", "select": "@item()?['id']" } },
-    "Elegiveis": {
-      "type": "Query", "runAfter": { "Ids_janela": ["Succeeded"] },
-      "inputs": { "from": "@body('Base')", "where": "@and(item()?['rastreado'], lessOrEquals(item()?['fixMin'], __POSVELHA__), greater(item()?['osrmM'], __CHEGOU__))" }
-    },
-    "F_sem_motorista": {
-      "type": "Query", "runAfter": { "Elegiveis": ["Succeeded"] },
-      "inputs": { "from": "@body('Base')", "where": "@and(equals(item()?['motoristaId'], null), contains(createArray(202410001, 202410005), item()?['status']), greaterOrEquals(item()?['min'], 0), lessOrEquals(item()?['min'], __SEMMOT__))" }
-    },
-    "A_sem_motorista": {
-      "type": "Select", "runAfter": { "F_sem_motorista": ["Succeeded"] },
-      "inputs": {
-        "from": "@body('F_sem_motorista')",
-        "select": {
-          "chave": "@concat('SemMotorista|', item()?['id'])", "regra": "SemMotorista", "reservaId": "@item()?['id']",
-          "severidade": "@if(lessOrEquals(item()?['min'], 60), 'alta', 'media')",
-          "titulo": "@concat('Sem motorista: OS ', item()?['codigo'], ' às ', convertTimeZone(item()?['saida'], 'UTC', 'E. South America Standard Time', 'HH:mm'))",
-          "mensagem": "@concat('Cliente ', item()?['cliente'], '. Saída em ', formatNumber(item()?['min'], '0', 'en-US'), ' min e o serviço está sem motorista.')"
-        }
-      }
-    },
-    "F_atrasado": {
-      "type": "Query", "runAfter": { "A_sem_motorista": ["Succeeded"] },
-      "inputs": { "from": "@body('Elegiveis')", "where": "@and(less(item()?['min'], 0), greaterOrEquals(item()?['min'], sub(0, __ATRASADO__)))" }
-    },
-    "A_atrasado": {
-      "type": "Select", "runAfter": { "F_atrasado": ["Succeeded"] },
-      "inputs": {
-        "from": "@body('F_atrasado')",
-        "select": {
-          "chave": "@concat('JaAtrasado|', item()?['id'])", "regra": "JaAtrasado", "reservaId": "@item()?['id']", "severidade": "alta",
-          "titulo": "@concat('Atraso: OS ', item()?['codigo'], ' saiu às ', convertTimeZone(item()?['saida'], 'UTC', 'E. South America Standard Time', 'HH:mm'))",
-          "mensagem": "@concat('Motorista ', item()?['motoristaNome'], ', placa ', item()?['placa'], ', cliente ', item()?['cliente'], '. Passaram ', formatNumber(sub(0, item()?['min']), '0', 'en-US'), ' min da saída e o veículo ainda está a ', formatNumber(div(float(item()?['osrmM']), 1000), '0.0', 'pt-BR'), ' km do embarque.')"
-        }
-      }
-    },
-    "F_precisa_google": {
-      "type": "Query", "runAfter": { "A_atrasado": ["Succeeded"] },
-      "inputs": { "from": "@body('Elegiveis')", "where": "@and(greaterOrEquals(item()?['min'], 0), not(item()?['temGoogle']), or(greater(mul(item()?['osrmMin'], __FATOR__), sub(item()?['min'], __MARGEM__)), lessOrEquals(item()?['min'], __FORCAR__)))" }
-    },
-    "Aguardando_google": { "type": "Select", "runAfter": { "F_precisa_google": ["Succeeded"] }, "inputs": { "from": "@body('F_precisa_google')", "select": "@item()?['id']" } },
-    "Precisa_google": { "type": "Compose", "runAfter": { "Aguardando_google": ["Succeeded"] }, "inputs": "@if(contains(outputs('Regras_pedidas'), 'NaoChegaraATempo'), body('Aguardando_google'), createArray())" },
-    "F_nao_chegara": {
-      "type": "Query", "runAfter": { "Precisa_google": ["Succeeded"] },
-      "inputs": { "from": "@body('Elegiveis')", "where": "@and(greaterOrEquals(item()?['min'], 0), item()?['temGoogle'], greater(item()?['googleMin'], sub(item()?['min'], __MARGEM__)))" }
-    },
-    "A_nao_chegara": {
-      "type": "Select", "runAfter": { "F_nao_chegara": ["Succeeded"] },
-      "inputs": {
-        "from": "@body('F_nao_chegara')",
-        "select": {
-          "chave": "@concat('NaoChegaraATempo|', item()?['id'])", "regra": "NaoChegaraATempo", "reservaId": "@item()?['id']",
-          "severidade": "@if(greater(item()?['googleMin'], item()?['min']), 'alta', 'media')",
-          "titulo": "@concat('Risco de atraso: OS ', item()?['codigo'], ' às ', convertTimeZone(item()?['saida'], 'UTC', 'E. South America Standard Time', 'HH:mm'))",
-          "mensagem": "@concat('Motorista ', item()?['motoristaNome'], ', placa ', item()?['placa'], ', cliente ', item()?['cliente'], '. Chegada prevista com trânsito às ', convertTimeZone(addToTime(outputs('Agora'), int(item()?['googleMin']), 'Minute'), 'UTC', 'E. South America Standard Time', 'HH:mm'), ', ', if(greater(item()?['googleMin'], item()?['min']), concat(formatNumber(sub(item()?['googleMin'], item()?['min']), '0', 'en-US'), ' min depois da saída'), concat(formatNumber(sub(item()?['min'], item()?['googleMin']), '0', 'en-US'), ' min antes da saída, abaixo da margem de __MARGEM__ min')), '.', if(item()?['aproximado'], ' Local aproximado.', ''))"
-        }
-      }
-    },
-    "F_parado": {
-      "type": "Query", "runAfter": { "A_nao_chegara": ["Succeeded"] },
-      "inputs": { "from": "@body('Elegiveis')", "where": "@and(greaterOrEquals(item()?['min'], 0), lessOrEquals(item()?['min'], __PARADO_JANELA__), greaterOrEquals(item()?['paradoMin'], __PARADO_MIN__), lessOrEquals(item()?['vel'], __PARADO_VEL__), greater(item()?['osrmM'], __PARADO_LONGE__))" }
-    },
-    "A_parado": {
-      "type": "Select", "runAfter": { "F_parado": ["Succeeded"] },
-      "inputs": {
-        "from": "@body('F_parado')",
-        "select": {
-          "chave": "@concat('MotoristaParado|', item()?['id'])", "regra": "MotoristaParado", "reservaId": "@item()?['id']",
-          "severidade": "@if(lessOrEquals(item()?['min'], 30), 'alta', 'media')",
-          "titulo": "@concat('Motorista parado: OS ', item()?['codigo'], ' às ', convertTimeZone(item()?['saida'], 'UTC', 'E. South America Standard Time', 'HH:mm'))",
-          "mensagem": "@concat('Motorista ', item()?['motoristaNome'], ', placa ', item()?['placa'], ', cliente ', item()?['cliente'], '. Parado há ', formatNumber(item()?['paradoMin'], '0', 'en-US'), ' min, a ', formatNumber(div(float(item()?['osrmM']), 1000), '0.0', 'pt-BR'), ' km do embarque, saída em ', formatNumber(item()?['min'], '0', 'en-US'), ' min.')"
-        }
-      }
-    },
-    "Alertas": {
-      "type": "Compose", "runAfter": { "A_parado": ["Succeeded"] },
-      "inputs": "@union(if(contains(outputs('Regras_pedidas'), 'SemMotorista'), body('A_sem_motorista'), createArray()), if(contains(outputs('Regras_pedidas'), 'JaAtrasado'), body('A_atrasado'), createArray()), if(contains(outputs('Regras_pedidas'), 'NaoChegaraATempo'), body('A_nao_chegara'), createArray()), if(contains(outputs('Regras_pedidas'), 'MotoristaParado'), body('A_parado'), createArray()))"
-    },
-    "Chaves_atuais": { "type": "Select", "runAfter": { "Alertas": ["Succeeded"] }, "inputs": { "from": "@outputs('Alertas')", "select": "@item()?['chave']" } },
-    "Cada_alerta": {
-      "type": "Foreach", "runAfter": { "Chaves_atuais": ["Succeeded"] }, "foreach": "@outputs('Alertas')",
-      "runtimeConfiguration": { "concurrency": { "repetitions": 1 } },
-      "actions": {
-        "Aberto_da_chave": { "type": "Query", "runAfter": {}, "inputs": { "from": "@coalesce(triggerBody()?['abertos'], createArray())", "where": "@equals(item()?['chave'], items('Cada_alerta')?['chave'])" } },
-        "Decisao": {
-          "type": "Compose", "runAfter": { "Aberto_da_chave": ["Succeeded"] },
-          "inputs": "@if(empty(body('Aberto_da_chave')), 'criar', if(greater(if(equals(items('Cada_alerta')?['severidade'], 'alta'), 2, 1), if(equals(first(body('Aberto_da_chave'))?['severidade'], 'alta'), 2, 1)), 'reenviar', if(and(equals(first(body('Aberto_da_chave'))?['envios'], 1), greaterOrEquals(div(float(sub(ticks(outputs('Agora')), ticks(first(body('Aberto_da_chave'))?['ultimoEnvioEm']))), 600000000), __LEMBRETE__)), 'lembrar', 'nada')))"
-        },
-        "Registrar_acao": {
-          "type": "If", "runAfter": { "Decisao": ["Succeeded"] },
-          "expression": { "and": [ { "not": { "equals": [ "@outputs('Decisao')", "nada" ] } } ] },
-          "actions": { "Acrescentar_acao": { "type": "AppendToArrayVariable", "runAfter": {}, "inputs": { "name": "Acoes_lista", "value": { "acao": "@outputs('Decisao')", "alerta": "@items('Cada_alerta')" } } } },
-          "else": { "actions": {} }
-        }
-      }
-    },
-    "Filtro_resolver": {
-      "type": "Query", "runAfter": { "Cada_alerta": ["Succeeded"] },
-      "inputs": {
-        "from": "@coalesce(triggerBody()?['abertos'], createArray())",
-        "where": "@and(contains(outputs('Regras_pedidas'), first(split(item()?['chave'], '|'))), if(contains(body('Ids_janela'), item()?['reservaId']), and(not(and(outputs('Completa'), equals(first(split(item()?['chave'], '|')), 'NaoChegaraATempo'), contains(body('Aguardando_google'), item()?['reservaId']))), not(contains(body('Chaves_atuais'), item()?['chave']))), outputs('Completa')))"
-      }
-    },
-    "Resolver": { "type": "Select", "runAfter": { "Filtro_resolver": ["Succeeded"] }, "inputs": { "from": "@body('Filtro_resolver')", "select": "@item()?['chave']" } },
-    "Resposta": {
-      "type": "Response", "runAfter": { "Resolver": ["Succeeded"] },
-      "inputs": { "statusCode": 200, "headers": { "Content-Type": "application/json" }, "body": { "precisaGoogle": "@outputs('Precisa_google')", "acoes": "@variables('Acoes_lista')", "resolver": "@body('Resolver')" } }
-    }
-  },
-  "outputs": {}
-}
-```
-
-- [ ] **Step 2: Script de provisionamento**
-
-Prólogo e helpers copiados do script de referência (backup com recusa de `sig=`, `Apply` com reativação em `finally`, `FlowRows`, `Include`). Partes próprias:
+- [ ] **Step 1: Escrever o script**
 
 ```powershell
-$flowName = 'Flow Alertas | Avaliar'
-$constantesPath = Join-Path $PSScriptRoot '../alertas-operacao/dist/constantes.json'
-if (-not (Test-Path $constantesPath)) { throw 'constantes.json ausente: rode pnpm --filter @betinhos/alertas-operacao artefatos.' }
-$c = ([IO.File]::ReadAllText((Resolve-Path $constantesPath), [Text.Encoding]::UTF8).TrimStart([char]0xFEFF)) | ConvertFrom-Json
-$troca = @{ '__MARGEM__' = $c.margemMin; '__FATOR__' = $c.fatorTransito; '__POSVELHA__' = $c.posicaoVelhaMin; '__PARADO_MIN__' = $c.paradoMin; '__PARADO_VEL__' = $c.paradoVelKmh; '__PARADO_LONGE__' = $c.paradoLongeMetros; '__PARADO_JANELA__' = $c.paradoJanelaMin; '__CHEGOU__' = $c.chegouMetros; '__SEMMOT__' = $c.semMotoristaMin; '__ATRASADO__' = $c.atrasadoAteMin; '__LEMBRETE__' = $c.lembreteMin; '__FORCAR__' = $c.forcarGoogleMin }
-foreach ($k in $troca.Keys) { $definitionText = $definitionText.Replace($k, ([string]$troca[$k]).Replace(',', '.')) }
-if ($definitionText -match '__[A-Z_]+__') { throw "Marcador não substituído: $($Matches[0])" }
-```
-Connection reference: este flow não usa conectores (só Request e Response). Mantenha `connectionReferences = @{}` no `clientdata`. Depois de criar e ativar o flow, grave a URL do gatilho sem imprimi-la:
-
-```powershell
-$flowToken = & az account get-access-token --resource https://service.flow.microsoft.com/ --query accessToken -o tsv
-$api = "https://api.flow.microsoft.com/providers/Microsoft.ProcessSimple/environments/$environmentId/flows/$flowId"
-$cb = Invoke-RestMethod -Method POST -Uri "$api/triggers/When_an_HTTP_request_is_received/listCallbackUrl?api-version=2016-11-01" -Headers @{ Authorization = "Bearer $flowToken" }
-if (-not $cb.response.value) { throw 'O gatilho não devolveu URL de callback (verifique a política de autenticação do tenant para gatilhos HTTP).' }
-$varDef = (Dv GET "environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq 'cr40f_FlowUrlAlertasAvaliar'").value[0].environmentvariabledefinitionid
-$existente = @((Dv GET "environmentvariablevalues?`$select=environmentvariablevalueid&`$filter=_environmentvariabledefinitionid_value eq $varDef").value)
-if ($existente.Count) { Dv PATCH "environmentvariablevalues($($existente[0].environmentvariablevalueid))" @{ value = $cb.response.value } | Out-Null }
-else { Dv POST environmentvariablevalues @{ value = $cb.response.value; 'EnvironmentVariableDefinitionId@odata.bind' = "/environmentvariabledefinitions($varDef)" } | Out-Null }
-Write-Host '[alertas-avaliar] URL do gatilho gravada em cr40f_FlowUrlAlertasAvaliar (valor não exibido).'
-```
-Cuidado: `Dv` imprime só método e caminho, nunca o corpo. Não use `Write-Output` com a URL.
-
-`Conferir` (leitura de volta) deve checar: gatilho `Request` método POST; existência das 25 ações da definição (nomes iguais aos de cima); `Resposta` do tipo `Response` com `statusCode 200`; ausência de qualquer `__X__`; constantes aplicadas: o texto do filtro `Elegiveis` contém `lessOrEquals(item()?['fixMin'], 10)` e `greater(item()?['osrmM'], 150)`, o filtro `F_sem_motorista` contém `lessOrEquals(item()?['min'], 120)`, `F_atrasado` contém `sub(0, 60)`, `F_precisa_google` contém `mul(item()?['osrmMin'], 2)` e `lessOrEquals(item()?['min'], 30)`; o flow pertence à solução (componenttype 29).
-
-- [ ] **Step 3: Gerar artefatos, validar e criar**
-
-Run: `pnpm --filter @betinhos/alertas-operacao artefatos` e depois `powershell -NoProfile -ExecutionPolicy Bypass -File packages/deploy/provision-flow-alertas-avaliar.ps1`.
-Expected: `checkFlowErrors: []`, todas as linhas `ok:` do `Conferir`, a linha de URL gravada, e `DEV: 'Flow Alertas | Avaliar' ativo (<id>), na AppBetinhos.` Se `checkFlowErrors` rejeitar alguma expressão, corrija a expressão mínima necessária e registre a mudança no relatório e no commit; a Task 5 é a autoridade sobre a lógica.
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add packages/deploy/provision-flow-alertas-avaliar.ps1 packages/deploy/flows/backup
-git commit -m "Alertas: flow avaliador por HTTP provisionado no DEV com as constantes do pacote"
-```
-(Inclua o backup do flow só se o script o tiver gerado, como nos flows dos Assistentes.)
-
----
-
-### Task 5: Conformidade do flow avaliador contra os vetores
-
-**Files:**
-- Create: `packages/deploy/conformidade-alertas.ps1`
-
-**Interfaces:**
-- Consumes: `packages/alertas-operacao/dist/vetores.json` (Task 2), URL em `cr40f_FlowUrlAlertasAvaliar` (Task 4).
-- Produces: relatório por vetor e código de saída 1 se algum diferir. A Task 7 só começa com esta conformidade verde.
-
-- [ ] **Step 1: Script**
-
-```powershell
-# Posta cada vetor no flow avaliador do DEV e compara com o esperado do pacote TS. Não imprime a URL.
+param([Parameter(Mandatory)] [Guid] $ClientId)
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -965,66 +717,765 @@ $environmentUrl = 'https://org23b93544.crm2.dynamics.com'
 if (([Uri]$environmentUrl).Host -ne 'org23b93544.crm2.dynamics.com') { throw 'Somente DEV.' }
 $token = & az account get-access-token --resource "$environmentUrl/" --query accessToken -o tsv
 if ($LASTEXITCODE -ne 0 -or -not $token) { throw 'Token do Dataverse DEV indisponível (rode az login).' }
-$h = @{ Authorization = "Bearer $token"; Accept = 'application/json' }
-$def = (Invoke-RestMethod -Headers $h -Uri "$environmentUrl/api/data/v9.2/environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq 'cr40f_FlowUrlAlertasAvaliar'").value
-if ($def.Count -ne 1) { throw 'Variável cr40f_FlowUrlAlertasAvaliar ausente.' }
-$val = (Invoke-RestMethod -Headers $h -Uri "$environmentUrl/api/data/v9.2/environmentvariablevalues?`$select=value&`$filter=_environmentvariabledefinitionid_value eq $($def[0].environmentvariabledefinitionid)").value
-if (-not $val.Count -or -not $val[0].value) { throw 'cr40f_FlowUrlAlertasAvaliar sem valor: rode provision-flow-alertas-avaliar.ps1.' }
-$url = $val[0].value
+$headers = @{ Authorization = "Bearer $token"; Accept = 'application/json'; 'OData-Version' = '4.0'; 'OData-MaxVersion' = '4.0' }
+function Dv([string] $Method, [string] $Path, $Body = $null) {
+  Write-Host "[alertas-acesso] $Method $($Path.Split('?')[0])"
+  $p = @{ Method = $Method; Uri = "$environmentUrl/api/data/v9.2/$Path"; Headers = $headers; TimeoutSec = 120 }
+  if ($null -ne $Body) { $p.Body = [Text.Encoding]::UTF8.GetBytes(($Body | ConvertTo-Json -Depth 20 -Compress)); $p.ContentType = 'application/json; charset=utf-8' }
+  $bytes = (Invoke-WebRequest @p -UseBasicParsing).RawContentStream.ToArray()
+  if (-not $bytes.Length) { return $null }
+  [Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json
+}
+if ((Dv GET WhoAmI).OrganizationId -ne '7e5f59f4-efce-f011-89f6-000d3ac0a3e1') { throw 'A API não respondeu pela organização DEV.' }
 
-function Canon($o) {
-  if ($null -eq $o) { return $null }
-  if ($o -is [System.Collections.IEnumerable] -and $o -isnot [string] -and $o -isnot [pscustomobject]) { return @($o | ForEach-Object { Canon $_ }) }
-  if ($o -is [pscustomobject]) { $r = [ordered]@{}; foreach ($p in ($o.PSObject.Properties | Sort-Object Name)) { $r[$p.Name] = Canon $p.Value }; return $r }
-  return $o
-}
-function Normalizar($saida) {
-  $acoes = @($saida.acoes | Sort-Object { $_.alerta.chave })
-  [pscustomobject]@{ precisaGoogle = @($saida.precisaGoogle | Sort-Object); acoes = $acoes; resolver = @($saida.resolver | Sort-Object) }
-}
-function Json($o) { (Canon $o) | ConvertTo-Json -Depth 30 -Compress }
+$bu = (Dv GET "businessunits?`$select=businessunitid&`$filter=parentbusinessunitid eq null").value
+if ($bu.Count -ne 1) { throw 'Unidade de negócio raiz ausente ou ambígua.' }
+$buId = $bu[0].businessunitid
 
-$vetoresPath = Join-Path $PSScriptRoot '../alertas-operacao/dist/vetores.json'
-if (-not (Test-Path $vetoresPath)) { throw 'vetores.json ausente: rode pnpm --filter @betinhos/alertas-operacao artefatos.' }
-$vetores = [IO.File]::ReadAllText((Resolve-Path $vetoresPath), [Text.Encoding]::UTF8).TrimStart([char]0xFEFF) | ConvertFrom-Json
-$falhas = 0
-foreach ($v in $vetores) {
-  $corpo = [Text.Encoding]::UTF8.GetBytes(($v.entrada | ConvertTo-Json -Depth 30 -Compress))
-  try {
-    $r = Invoke-WebRequest -Method POST -Uri $url -ContentType 'application/json; charset=utf-8' -Body $corpo -UseBasicParsing -TimeoutSec 120
-    $obtido = [Text.Encoding]::UTF8.GetString($r.RawContentStream.ToArray()) | ConvertFrom-Json
-  } catch { Write-Host "FALHA  $($v.nome): chamada recusada ($($_.Exception.Message))"; $falhas++; continue }
-  $a = Json (Normalizar $obtido); $e = Json (Normalizar $v.esperado)
-  if ($a -ceq $e) { Write-Host "ok     $($v.nome)" }
-  else { Write-Host "FALHA  $($v.nome)"; Write-Host "  esperado: $e"; Write-Host "  obtido:   $a"; $falhas++ }
+# Papel (cria se faltar)
+$nomePapel = 'Alertas Worker'
+$papel = @((Dv GET "roles?`$select=roleid&`$filter=name eq '$nomePapel' and _businessunitid_value eq $buId").value)
+if (-not $papel.Count) {
+  Dv POST roles @{ name = $nomePapel; 'businessunitid@odata.bind' = "/businessunits($buId)" } | Out-Null
+  $papel = @((Dv GET "roles?`$select=roleid&`$filter=name eq '$nomePapel' and _businessunitid_value eq $buId").value)
 }
-Write-Host "$($vetores.Count - $falhas) de $($vetores.Count) vetores conferem."
-if ($falhas) { exit 1 }
+$roleId = $papel[0].roleid
+
+function Priv([string] $nome) {
+  $p = @((Dv GET "privileges?`$select=privilegeid&`$filter=name eq '$nome'").value)
+  if ($p.Count -ne 1) { throw "Privilégio $nome ausente ou ambíguo." }
+  @{ PrivilegeId = $p[0].privilegeid; Depth = 'Global' }
+}
+$ler = 'cr40f_reservadeveculos', 'cr40f_funcionarios', 'cr40f_veiculos', 'cr40f_clientes1', 'cr40f_documento', 'cr40f_tipodocumento', 'cr40f_multas', 'cr40f_alertaoperacao'
+$nomes = @($ler | ForEach-Object { "prvRead$_" })
+$nomes += 'prvWritecr40f_reservadeveculos', 'prvAppendTocr40f_reservadeveculos'
+$nomes += 'prvCreatecr40f_alertaoperacao', 'prvWritecr40f_alertaoperacao', 'prvAppendcr40f_alertaoperacao', 'prvAppendTocr40f_alertaoperacao'
+Dv POST "roles($roleId)/Microsoft.Dynamics.CRM.AddPrivilegesRole" @{ Privileges = @($nomes | ForEach-Object { Priv $_ }) } | Out-Null
+
+# Usuário de aplicativo (cria se faltar)
+$usuario = @((Dv GET "systemusers?`$select=systemuserid&`$filter=applicationid eq $ClientId").value)
+if (-not $usuario.Count) {
+  try { Dv POST systemusers @{ applicationid = "$ClientId"; 'businessunitid@odata.bind' = "/businessunits($buId)" } | Out-Null }
+  catch { throw "O Dataverse recusou criar o usuário de aplicativo pela API. Crie no Power Platform admin center (Ambiente > Configurações > Usuários > Usuários de aplicativo > Novo) com o Application ID informado e rode este script de novo para associar o papel. Erro: $($_.Exception.Message)" }
+  $usuario = @((Dv GET "systemusers?`$select=systemuserid&`$filter=applicationid eq $ClientId").value)
+}
+$userId = $usuario[0].systemuserid
+
+# Associa o papel (idempotente)
+$ja = @((Dv GET "systemusers($userId)/systemuserroles_association?`$select=roleid&`$filter=roleid eq $roleId").value)
+if (-not $ja.Count) { Dv POST "systemusers($userId)/systemuserroles_association/`$ref" @{ '@odata.id' = "$environmentUrl/api/data/v9.2/roles($roleId)" } | Out-Null }
+
+# Conferência por leitura de volta
+$ok = @((Dv GET "systemusers($userId)/systemuserroles_association?`$select=name&`$filter=roleid eq $roleId").value)
+if (-not $ok.Count) { throw 'Papel não associado ao usuário de aplicativo.' }
+$privs = @((Dv GET "roles($roleId)/roleprivileges_association?`$select=name").value)
+if ($privs.Count -lt $nomes.Count) { throw "O papel tem $($privs.Count) privilégios; esperado pelo menos $($nomes.Count)." }
+Write-Output "DEV: papel '$nomePapel' com $($privs.Count) privilégios associado ao usuário de aplicativo (Application ID informado)."
 ```
-Salve em UTF-8 com BOM. Uma lista vazia no JSON de saída chega como `[]`; `Canon` mantém `@()` e `ConvertTo-Json` preserva arrays vazios. Se `ConvertTo-Json` achatar arrays de um elemento, envolva com `,@(...)` nas propriedades de `Normalizar`.
+Salve em UTF-8 com BOM. Se algum nome de privilégio não existir, `Priv` falha com o nome: confira o nome lógico da tabela (por exemplo `cr40f_clientes1`) com `describe` antes de ajustar.
 
 - [ ] **Step 2: Rodar**
 
-Run: `powershell -NoProfile -ExecutionPolicy Bypass -File packages/deploy/conformidade-alertas.ps1`
-Expected: `31 de 31 vetores conferem.` Cada divergência mostra esperado e obtido. Corrija o flow (Task 4) quando o TS estiver certo pelos testes unitários; corrija o TS (e regenere os artefatos) somente se o teste unitário da regra provar o erro no código de referência. Repita até 31 de 31.
+Run: `powershell -NoProfile -ExecutionPolicy Bypass -File packages/deploy/provision-alertas-acesso.ps1 -ClientId <GUID do Renan>` (duas vezes: a segunda deve ser idempotente).
+Expected: a linha final com o número de privilégios. A prova de que o app realmente consegue ler e gravar acontece na Task 10, com o Worker.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add packages/deploy/conformidade-alertas.ps1 packages/deploy/provision-flow-alertas-avaliar.ps1
-git commit -m "Alertas: script de conformidade que confere o avaliador do DEV contra os vetores do pacote"
+git add packages/deploy/provision-alertas-acesso.ps1
+git commit -m "Alertas: usuário de aplicativo e papel de segurança mínimo para o Worker no DEV"
 ```
 
 ---
 
-### Task 6: Medir a qualidade do geocoding com endereços reais (só leitura no PROD)
+### Task 5: Projeto do Worker e clientes das integrações (TDD)
+
+**Files:**
+- Create: `apps/alertas-worker/package.json`, `tsconfig.json`, `wrangler.toml`, `src/env.ts`, `src/orcamento.ts`, `src/endereco.ts`, `src/entra.ts`, `src/dataverse.ts`, `src/infleet.ts`, `src/osrm.ts`, `src/google.ts`, `src/graph.ts`
+- Test: `src/orcamento.test.ts`, `src/endereco.test.ts`, `src/dataverse.test.ts`, `src/integracoes.test.ts`
+
+**Interfaces:**
+- Produces: `Orcamento` e `Fetcher`; `limparTexto`, `classificarGeocoding`; `obterToken`; `Dataverse` (`listarServicos`, `listarAbertos`, `buscarPorChave`, `aplicar`) e os construtores `opGravarEmbarque`, `opCriarAlerta`, `opAtualizarAlerta`, `opResolver`, `montarBatch`; `listarVeiculos`, `posicoesRecentes`, `rotasOsrm`, `geocodificar`, `rotaComTransito`, `enviarEmail`. As Tasks 7 a 9 só usam estas assinaturas.
+
+- [ ] **Step 1: Criar o projeto**
+
+`apps/alertas-worker/package.json`:
+```json
+{
+  "name": "@betinhos/alertas-worker",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": { "@betinhos/alertas-operacao": "workspace:*" },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251001.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0",
+    "wrangler": "^4.0.0"
+  }
+}
+```
+`tsconfig.json`:
+```json
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "allowImportingTsExtensions": true, "lib": ["ES2022"], "types": ["@cloudflare/workers-types"], "noEmit": true },
+  "include": ["src"]
+}
+```
+`wrangler.toml` (sem segredos; `ALERTAS_LIGADO` começa em `nao`):
+```toml
+name = "betinhos-alertas-operacao"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[triggers]
+crons = ["*/5 7-23,0-2 * * *", "0 10 * * 1-5"]
+
+[vars]
+DATAVERSE_URL = "https://org23b93544.crm2.dynamics.com"
+ALERTAS_LIGADO = "nao"
+ALERTAS_CANAIS = "email"
+EMAIL_REMETENTE = ""
+EMAIL_OPERACAO = ""
+EMAIL_TI = ""
+```
+Rode `pnpm install` na raiz e confira `git diff --stat pnpm-lock.yaml` (só pacotes novos e re-resolução de peers sem mudança de versão).
+
+`src/env.ts`:
+```ts
+export type Env = {
+  DATAVERSE_URL: string
+  ALERTAS_LIGADO: string
+  ALERTAS_CANAIS: string
+  EMAIL_REMETENTE: string
+  EMAIL_OPERACAO: string
+  EMAIL_TI: string
+  INFLEET_TOKEN: string
+  GOOGLE_MAPS_KEY: string
+  ENTRA_TENANT_ID: string
+  ENTRA_CLIENT_ID: string
+  ENTRA_CLIENT_SECRET: string
+  SEGREDO_EXECUCAO_MANUAL: string
+  TEAMS_WEBHOOK_URL?: string
+}
+```
+
+- [ ] **Step 2: Escrever os testes que falham**
+
+`src/orcamento.test.ts`:
+```ts
+import { describe, expect, it } from 'vitest'
+import { Orcamento, OrcamentoEsgotado } from './orcamento.ts'
+
+describe('Orcamento', () => {
+  it('conta as chamadas e recusa depois do limite', async () => {
+    const base = async () => new Response('{}')
+    const o = new Orcamento(2, base as typeof fetch)
+    await o.fetch('https://a')
+    expect(o.restante()).toBe(1)
+    await o.fetch('https://b')
+    await expect(o.fetch('https://c')).rejects.toBeInstanceOf(OrcamentoEsgotado)
+    expect(o.usado).toBe(2)
+  })
+})
+```
+`src/endereco.test.ts`:
+```ts
+import { describe, expect, it } from 'vitest'
+import { classificarGeocoding, limparTexto } from './endereco.ts'
+
+describe('limparTexto', () => {
+  it.each([
+    ['Tenaris Tubos - Portaria 01', 'Tenaris Tubos - Portaria 01'],
+    ['1. John - Aerop. Guarulhos no voo DL105', 'Aerop. Guarulhos no voo DL105'],
+    ['1. Lucas de Souza - Avenida Martha 201, Pindamonhangaba; \n', 'Avenida Martha 201, Pindamonhangaba'],
+    ['2. Sem separador', 'Sem separador'],
+    ['Rua A, 10;\r\n2. Maria - Rua B, 20', 'Rua A, 10'],
+    ['', ''],
+    [null, ''],
+  ])('%j -> %j', (entrada, esperado) => expect(limparTexto(entrada as string | null)).toBe(esperado))
+  it('corta em 250 caracteres', () => expect(limparTexto('x'.repeat(300))).toHaveLength(250))
+  it('não deixa passar nome de passageiro de item numerado', () => expect(limparTexto('1. Maria Souza - Av. Paulista, 1000')).not.toContain('Maria'))
+})
+
+describe('classificarGeocoding', () => {
+  const resp = (tipo: string, parcial = false) => ({ results: [{ partial_match: parcial, geometry: { location_type: tipo, location: { lat: -23.5, lng: -46.6 } } }] })
+  it('ROOFTOP e RANGE_INTERPOLATED sem correspondência parcial são Geocodificado', () => {
+    expect(classificarGeocoding(resp('ROOFTOP'))).toEqual({ precisao: 'Geocodificado', lat: -23.5, lon: -46.6 })
+    expect(classificarGeocoding(resp('RANGE_INTERPOLATED')).precisao).toBe('Geocodificado')
+  })
+  it('GEOMETRIC_CENTER ou correspondência parcial são Aproximado', () => {
+    expect(classificarGeocoding(resp('GEOMETRIC_CENTER')).precisao).toBe('Aproximado')
+    expect(classificarGeocoding(resp('ROOFTOP', true)).precisao).toBe('Aproximado')
+  })
+  it('APPROXIMATE e sem resultado são Indisponivel, sem coordenadas', () => {
+    expect(classificarGeocoding(resp('APPROXIMATE'))).toEqual({ precisao: 'Indisponivel', lat: null, lon: null })
+    expect(classificarGeocoding({ results: [] }).precisao).toBe('Indisponivel')
+    expect(classificarGeocoding(null).precisao).toBe('Indisponivel')
+  })
+})
+```
+`src/dataverse.test.ts`:
+```ts
+import { describe, expect, it } from 'vitest'
+import { Dataverse, caminhoServicos, mapAberto, mapServico, montarBatch, opCriarAlerta, opResolver } from './dataverse.ts'
+import { limparCacheTokens } from './entra.ts'
+
+const env = { DATAVERSE_URL: 'https://org.example/', ENTRA_TENANT_ID: 't', ENTRA_CLIENT_ID: 'c', ENTRA_CLIENT_SECRET: 's' }
+const json = (corpo: unknown, status = 200) => new Response(JSON.stringify(corpo), { status, headers: { 'content-type': 'application/json' } })
+
+describe('mapeamento', () => {
+  it('mapeia o serviço com expand e anotações', () => {
+    const s = mapServico({
+      cr40f_reservadeveculosid: 'ABC', cr40f_idnovo: '1234', cr40f_status: 202410001, cr40f_dataehorriodesada: '2026-10-15T17:00:00Z',
+      _cr40f_motorista_value: 'M1', _cr40f_veiculo_value: 'V1', cr40f_Motorista: { new_apelido: 'João' }, cr40f_Veiculo: { cr40f_placa: 'ABC1D23' },
+      '_cr40f_cliente_value@OData.Community.Display.V1.FormattedValue': 'Embraer', new_enderecodesaidapersonalizado: null, cr40f_endereodesada: 'Rua A',
+      cr40f_embarquelatitude: -23.5, cr40f_embarquelongitude: -46.6, cr40f_embarqueprecisao: 100000001, cr40f_embarquetexto: 'Rua A', cr40f_embarquegeocodificadoem: '2026-10-14T10:00:00Z',
+    })
+    expect(s).toEqual({
+      id: 'abc', codigo: '1234', status: 202410001, saida: '2026-10-15T17:00:00Z', motoristaId: 'm1', motoristaNome: 'João', veiculoId: 'v1', placa: 'ABC1D23', cliente: 'Embraer',
+      textoEndereco: 'Rua A', embarque: { lat: -23.5, lon: -46.6, precisao: 'Geocodificado', texto: 'Rua A', geocodificadoEm: '2026-10-14T10:00:00Z' },
+    })
+  })
+  it('serviço sem motorista e sem embarque', () => {
+    const s = mapServico({ cr40f_reservadeveculosid: 'x', cr40f_status: 202410005, cr40f_dataehorriodesada: '2026-10-15T17:00:00Z', _cr40f_motorista_value: null })
+    expect(s.motoristaId).toBeNull()
+    expect(s.embarque).toEqual({ lat: null, lon: null, precisao: null, texto: null, geocodificadoEm: null })
+  })
+  it('mapeia o alerta aberto', () => {
+    expect(mapAberto({ cr40f_alertaoperacaoid: 'A1', cr40f_chave: 'JaAtrasado|r1', _cr40f_reserva_value: 'R1', cr40f_severidade: 100000001, cr40f_envios: 2, cr40f_ultimoenvioem: '2026-10-15T16:00:00Z' }))
+      .toEqual({ id: 'a1', chave: 'JaAtrasado|r1', reservaId: 'r1', severidade: 'alta', envios: 2, ultimoEnvioEm: '2026-10-15T16:00:00Z' })
+  })
+  it('o filtro dos serviços usa os três status e a janela', () => {
+    const c = decodeURIComponent(caminhoServicos('2026-10-15T15:00:00Z', '2026-10-15T19:00:00Z'))
+    expect(c).toContain('cr40f_status eq 202410001 or cr40f_status eq 202410005 or cr40f_status eq 202410006')
+    expect(c).toContain('cr40f_dataehorriodesada ge 2026-10-15T15:00:00Z')
+    expect(c).toContain('$top=150')
+  })
+})
+
+describe('lote', () => {
+  it('monta o corpo multipart com If-Match nos PATCH', () => {
+    const { limite, corpo } = montarBatch([
+      { metodo: 'PATCH', caminho: "cr40f_alertaoperacaos(a1)", corpo: { cr40f_envios: 2 } },
+      { metodo: 'POST', caminho: 'cr40f_alertaoperacaos', corpo: { cr40f_chave: 'k' } },
+    ], 'https://org.example/api/data/v9.2', 'xyz')
+    expect(limite).toBe('batch_xyz')
+    expect(corpo).toContain("PATCH https://org.example/api/data/v9.2/cr40f_alertaoperacaos(a1) HTTP/1.1")
+    expect(corpo).toContain('If-Match: *')
+    expect(corpo.match(/If-Match/g)).toHaveLength(1)
+    expect(corpo.endsWith('--batch_xyz--\r\n')).toBe(true)
+  })
+  it('opCriarAlerta liga o serviço e usa o id informado', () => {
+    const op = opCriarAlerta('id1', { chave: 'JaAtrasado|r1', regra: 'JaAtrasado', reservaId: 'r1', severidade: 'alta', titulo: 'T', mensagem: 'M' }, '2026-10-15T16:00:00Z', '')
+    expect(op.corpo).toMatchObject({ cr40f_alertaoperacaoid: 'id1', cr40f_regra: 100000001, cr40f_severidade: 100000001, cr40f_status: 100000000, cr40f_envios: 1, 'cr40f_Reserva@odata.bind': '/cr40f_reservadeveculoses(r1)' })
+  })
+  it('opResolver grava status e resolução', () => {
+    expect(opResolver('a1', '2026-10-15T16:00:00Z', 'foraDaJanela').corpo).toMatchObject({ cr40f_status: 100000001, cr40f_resolucao: 100000001 })
+    expect(opResolver('a1', '2026-10-15T16:00:00Z', 'condicao').corpo).toMatchObject({ cr40f_resolucao: 100000000 })
+  })
+})
+
+describe('Dataverse', () => {
+  it('pede token do Entra, lê a lista e reaproveita o token', async () => {
+    limparCacheTokens()
+    const chamadas: string[] = []
+    const f = async (url: string) => {
+      chamadas.push(url.split('?')[0]!)
+      if (url.includes('login.microsoftonline.com')) return json({ access_token: 'tok', expires_in: 3600 })
+      return json({ value: [] })
+    }
+    const dv = new Dataverse(f, env)
+    await dv.listarAbertos()
+    await dv.listarAbertos()
+    expect(chamadas.filter((c) => c.includes('login.microsoftonline.com'))).toHaveLength(1)
+    expect(chamadas.filter((c) => c.includes('/api/data/v9.2/cr40f_alertaoperacaos'))).toHaveLength(2)
+  })
+  it('aplicar falha com o status quando uma operação do lote é recusada, sem vazar o token', async () => {
+    limparCacheTokens()
+    const f = async (url: string) => {
+      if (url.includes('login.microsoftonline.com')) return json({ access_token: 'SEGREDO-TOKEN', expires_in: 3600 })
+      return new Response('--r\r\nContent-Type: application/http\r\n\r\nHTTP/1.1 204 No Content\r\n\r\n--r\r\nContent-Type: application/http\r\n\r\nHTTP/1.1 403 Forbidden\r\n\r\n{"error":{"message":"sem privilégio"}}\r\n--r--', { status: 200, headers: { 'content-type': 'multipart/mixed; boundary=r' } })
+    }
+    const dv = new Dataverse(f, env)
+    const erro = await dv.aplicar([{ metodo: 'POST', caminho: 'x', corpo: {} }, { metodo: 'POST', caminho: 'y', corpo: {} }]).catch((e: Error) => e)
+    expect(erro).toBeInstanceOf(Error)
+    expect((erro as Error).message).toContain('403')
+    expect((erro as Error).message).not.toContain('SEGREDO-TOKEN')
+  })
+  it('aplicar sem operações não faz chamada', async () => {
+    let n = 0
+    const dv = new Dataverse(async () => { n++; return json({}) }, env)
+    await dv.aplicar([])
+    expect(n).toBe(0)
+  })
+})
+```
+`src/integracoes.test.ts`:
+```ts
+import { describe, expect, it } from 'vitest'
+import { geocodificar, rotaComTransito } from './google.ts'
+import { enviarEmail } from './graph.ts'
+import { listarVeiculos, normalizarPlaca, posicoesRecentes } from './infleet.ts'
+import { rotasOsrm } from './osrm.ts'
+
+const json = (corpo: unknown, status = 200) => new Response(JSON.stringify(corpo), { status, headers: { 'content-type': 'application/json' } })
+
+describe('infleet', () => {
+  it('normaliza placas', () => expect(normalizarPlaca('abc-1d23')).toBe('ABC1D23'))
+  it('lista a frota em duas páginas só quando a primeira vem cheia', async () => {
+    const pagina = (n: number, p: string) => Array.from({ length: n }, (_, i) => ({ id: `${p}v${i}`, plate: `${p}${String(i).padStart(4, '0')}`, location: { latitude: -23, longitude: -46, speed: 0, fixTime: '2026-10-15T16:00:00Z' } }))
+    let chamadas = 0
+    const f = async (_url: string, init?: RequestInit) => {
+      chamadas++
+      const offset = JSON.parse(String(init?.body)).variables.offset
+      return json({ data: { listVehicles: offset === 0 ? pagina(100, 'AAA') : pagina(3, 'BBB') } })
+    }
+    const mapa = await listarVeiculos(f, 'tok')
+    expect(chamadas).toBe(2)
+    expect(mapa.size).toBe(103)
+    const v = mapa.get('AAA0001')!
+    expect(v).toMatchObject({ id: 'AAAv1', lat: -23, lon: -46, velocidadeKmh: 0 })
+  })
+  it('ignora veículo sem localização e usa o token só no cabeçalho', async () => {
+    let cabecalho = ''
+    const f = async (_u: string, init?: RequestInit) => { cabecalho = String((init?.headers as Record<string, string>).Authorization); return json({ data: { listVehicles: [{ id: 'v', plate: 'XYZ1A23', location: null }] } }) }
+    expect((await listarVeiculos(f, 'tok')).size).toBe(0)
+    expect(cabecalho).toBe('Bearer tok')
+  })
+  it('posições recentes com o filtro do Infleet', async () => {
+    let corpo: any
+    const f = async (_u: string, init?: RequestInit) => { corpo = JSON.parse(String(init?.body)); return json({ data: { listVehiclePositions: [{ fixTime: '2026-10-15T15:50:00Z', speed: 0 }] } }) }
+    const r = await posicoesRecentes(f, 'tok', 'v1', '2026-10-15T15:40:00Z', '2026-10-15T16:00:00Z')
+    expect(r).toEqual([{ fixTime: '2026-10-15T15:50:00Z', speed: 0 }])
+    expect(corpo.variables.f).toEqual({ vehicleId: 'v1', fixTime: { startAt: '2026-10-15T15:40:00Z', endAt: '2026-10-15T16:00:00Z' } })
+  })
+})
+
+describe('osrm', () => {
+  it('lê a diagonal da matriz e converte para minutos e metros', async () => {
+    let url = ''
+    const f = async (u: string) => { url = u; return json({ durations: [[600, 90], [30, 1200]], distances: [[5000, 1], [2, 20000]] }) }
+    const r = await rotasOsrm(f, [
+      { id: 'a', origem: { lat: -23.5, lon: -46.6 }, destino: { lat: -23.6, lon: -46.7 } },
+      { id: 'b', origem: { lat: -23.4, lon: -46.5 }, destino: { lat: -23.3, lon: -46.4 } },
+    ])
+    expect(r.get('a')).toEqual({ minutos: 10, metros: 5000 })
+    expect(r.get('b')).toEqual({ minutos: 20, metros: 20000 })
+    expect(url).toContain('/table/v1/driving/-46.6,-23.5;-46.5,-23.4;-46.7,-23.6;-46.4,-23.3')
+    expect(url).toContain('sources=0;1&destinations=2;3&annotations=duration,distance')
+  })
+  it('falha do OSRM devolve mapa vazio sem lançar', async () => {
+    const r = await rotasOsrm(async () => new Response('x', { status: 500 }), [{ id: 'a', origem: { lat: 0, lon: 0 }, destino: { lat: 1, lon: 1 } }])
+    expect(r.size).toBe(0)
+  })
+})
+
+describe('google', () => {
+  it('rota com trânsito arredonda os minutos para cima e usa o field mask', async () => {
+    let init: RequestInit | undefined
+    const f = async (_u: string, i?: RequestInit) => { init = i; return json({ routes: [{ duration: '3601s', distanceMeters: 42000 }] }) }
+    const r = await rotaComTransito(f, 'chave', { lat: -23.5, lon: -46.6 }, { lat: -23.2, lon: -46.9 })
+    expect(r).toEqual({ minutos: 61, metros: 42000 })
+    const h = init!.headers as Record<string, string>
+    expect(h['X-Goog-FieldMask']).toBe('routes.duration,routes.distanceMeters')
+    const corpo = JSON.parse(String(init!.body))
+    expect(corpo.routingPreference).toBe('TRAFFIC_AWARE')
+    expect(corpo.origin.location.latLng).toEqual({ latitude: -23.5, longitude: -46.6 })
+  })
+  it('sem rota devolve null; erro HTTP não vaza a chave', async () => {
+    expect(await rotaComTransito(async () => json({}), 'chave', { lat: 0, lon: 0 }, { lat: 1, lon: 1 })).toBeNull()
+    const erro = await geocodificar(async () => new Response('x', { status: 403 }), 'CHAVE-SECRETA', 'Rua A').catch((e: Error) => e)
+    expect((erro as Error).message).toContain('403')
+    expect((erro as Error).message).not.toContain('CHAVE-SECRETA')
+  })
+  it('geocodifica com região e país do Brasil e classifica', async () => {
+    let url = ''
+    const f = async (u: string) => { url = u; return json({ results: [{ partial_match: false, geometry: { location_type: 'ROOFTOP', location: { lat: -23.5, lng: -46.6 } } }] }) }
+    expect(await geocodificar(f, 'k', 'Av. Paulista, 1000')).toEqual({ precisao: 'Geocodificado', lat: -23.5, lon: -46.6 })
+    expect(url).toContain('region=br')
+    expect(url).toContain('components=country:BR')
+    expect(url).toContain(encodeURIComponent('Av. Paulista, 1000'))
+  })
+})
+
+describe('graph', () => {
+  it('envia e-mail HTML ao destinatário certo e aceita 202', async () => {
+    let corpo: any, url = ''
+    const f = async (u: string, init?: RequestInit) => { url = u; corpo = JSON.parse(String(init?.body)); return new Response(null, { status: 202 }) }
+    await enviarEmail(f, 'tok', 'alertas@betinhos.com.br', ['op@betinhos.com.br', 'ti@betinhos.com.br'], '[Operação] Teste', '<p>oi</p>', 'high')
+    expect(url).toBe('https://graph.microsoft.com/v1.0/users/alertas%40betinhos.com.br/sendMail')
+    expect(corpo.message).toMatchObject({ subject: '[Operação] Teste', importance: 'high', body: { contentType: 'HTML', content: '<p>oi</p>' } })
+    expect(corpo.message.toRecipients).toEqual([{ emailAddress: { address: 'op@betinhos.com.br' } }, { emailAddress: { address: 'ti@betinhos.com.br' } }])
+    expect(corpo.saveToSentItems).toBe(false)
+  })
+  it('falha com o status, sem o corpo', async () => {
+    await expect(enviarEmail(async () => new Response('detalhe', { status: 403 }), 'tok', 'a@b.c', ['x@y.z'], 's', 'h', 'normal')).rejects.toThrow('403')
+  })
+})
+```
+
+- [ ] **Step 3: Rodar e ver falhar**
+
+Run: `pnpm --filter @betinhos/alertas-worker test`
+Expected: FAIL (módulos ausentes).
+
+- [ ] **Step 4: Implementar**
+
+`src/orcamento.ts`:
+```ts
+export class OrcamentoEsgotado extends Error {
+  constructor(limite: number) { super(`Orçamento de ${limite} chamadas externas esgotado.`) }
+}
+export type Fetcher = (input: string, init?: RequestInit) => Promise<Response>
+
+/** Conta as chamadas externas da execução (o plano grátis permite 50 por execução). */
+export class Orcamento {
+  usado = 0
+  constructor(readonly limite: number, private readonly base: typeof fetch = fetch) {}
+  restante() { return this.limite - this.usado }
+  fetch: Fetcher = async (input, init) => {
+    if (this.usado >= this.limite) throw new OrcamentoEsgotado(this.limite)
+    this.usado++
+    return this.base(input, init)
+  }
+}
+```
+`src/endereco.ts`:
+```ts
+export type Precisao = 'Geocodificado' | 'Aproximado' | 'Indisponivel'
+export type Geocodificacao = { precisao: Precisao; lat: number | null; lon: number | null }
+
+/** Primeira linha ou item do texto livre; em item numerado ("1. Nome - endereço") fica só o endereço. Nome de passageiro não sai daqui. */
+export function limparTexto(bruto: string | null | undefined): string {
+  const linha = ((bruto ?? '').replace(/\r/g, '').replace(/;/g, '\n').split('\n')[0] ?? '').trim()
+  let t = linha
+  if (t.length > 3 && /\d/.test(t[0]!) && t.slice(1, 3) === '. ') {
+    t = t.includes(' - ') ? t.split(' - ').slice(1).join(' - ').trim() : t.slice(3).trim()
+  }
+  return t.slice(0, 250)
+}
+
+export function classificarGeocoding(resposta: any): Geocodificacao {
+  const r = resposta?.results?.[0]
+  const tipo = r?.geometry?.location_type
+  if (!r || tipo === 'APPROXIMATE') return { precisao: 'Indisponivel', lat: null, lon: null }
+  const aproximado = r.partial_match === true || tipo === 'GEOMETRIC_CENTER'
+  return { precisao: aproximado ? 'Aproximado' : 'Geocodificado', lat: r.geometry.location.lat, lon: r.geometry.location.lng }
+}
+```
+`src/entra.ts`:
+```ts
+import type { Fetcher } from './orcamento.ts'
+
+export type Credencial = { tenant: string; clientId: string; secret: string }
+const cache = new Map<string, { token: string; expira: number }>()
+
+/** Token de aplicativo (client credentials). Guarda em memória até 60 s antes de expirar. Nunca registra o token nem o corpo. */
+export async function obterToken(f: Fetcher, c: Credencial, escopo: string, agora = Date.now()): Promise<string> {
+  const chave = `${c.tenant}|${c.clientId}|${escopo}`
+  const guardado = cache.get(chave)
+  if (guardado && guardado.expira > agora + 60_000) return guardado.token
+  const r = await f(`https://login.microsoftonline.com/${c.tenant}/oauth2/v2.0/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: c.clientId, client_secret: c.secret, scope: escopo }),
+  })
+  if (!r.ok) throw new Error(`Falha ao obter token do Entra (${r.status}).`)
+  const j = (await r.json()) as { access_token: string; expires_in: number }
+  cache.set(chave, { token: j.access_token, expira: agora + j.expires_in * 1000 })
+  return j.access_token
+}
+export const limparCacheTokens = () => cache.clear()
+```
+`src/dataverse.ts`:
+```ts
+import type { Alerta, Severidade } from '@betinhos/alertas-operacao'
+import { obterToken } from './entra.ts'
+import type { Env } from './env.ts'
+import type { Fetcher } from './orcamento.ts'
+
+export const ALERTA_SET = 'cr40f_alertaoperacaos' // use o EntitySetName impresso na Task 3
+export const RESERVA_SET = 'cr40f_reservadeveculoses'
+export type PrecisaoDv = 'Informado' | 'Geocodificado' | 'Aproximado' | 'Indisponivel'
+const PRECISAO_VALOR: Record<PrecisaoDv, number> = { Informado: 100000000, Geocodificado: 100000001, Aproximado: 100000002, Indisponivel: 100000003 }
+const PRECISAO_NOME: Record<number, PrecisaoDv> = { 100000000: 'Informado', 100000001: 'Geocodificado', 100000002: 'Aproximado', 100000003: 'Indisponivel' }
+export const REGRA_VALOR = { NaoChegaraATempo: 100000000, JaAtrasado: 100000001, MotoristaParado: 100000002, SemMotorista: 100000003 } as const
+const SEVERIDADE_VALOR: Record<Severidade, number> = { media: 100000000, alta: 100000001 }
+
+export type ServicoDv = {
+  id: string; codigo: string; status: number; saida: string
+  motoristaId: string | null; motoristaNome: string; veiculoId: string | null; placa: string; cliente: string
+  /** Texto bruto do local de saída (personalizado ou o principal). */
+  textoEndereco: string
+  embarque: { lat: number | null; lon: number | null; precisao: PrecisaoDv | null; texto: string | null; geocodificadoEm: string | null }
+}
+export type AbertoDv = { id: string; chave: string; reservaId: string; severidade: Severidade; envios: number; ultimoEnvioEm: string | null }
+export type Operacao = { metodo: 'POST' | 'PATCH'; caminho: string; corpo: Record<string, unknown> }
+
+const str = (v: unknown) => (typeof v === 'string' ? v : '')
+const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+const idDe = (v: unknown) => str(v).replace(/[{}]/g, '').toLowerCase()
+const enc = encodeURIComponent
+
+const SELECT_SERVICO = [
+  'cr40f_reservadeveculosid', 'cr40f_idnovo', 'cr40f_id', 'cr40f_status', 'cr40f_dataehorriodesada', '_cr40f_motorista_value', '_cr40f_veiculo_value', '_cr40f_cliente_value',
+  'cr40f_endereodesada', 'new_enderecodesaidapersonalizado', 'cr40f_embarquelatitude', 'cr40f_embarquelongitude', 'cr40f_embarqueprecisao', 'cr40f_embarquetexto', 'cr40f_embarquegeocodificadoem',
+]
+
+export const caminhoServicos = (inicio: string, fim: string) =>
+  `${RESERVA_SET}?$select=${SELECT_SERVICO.join(',')}&$expand=${enc('cr40f_Motorista($select=new_apelido),cr40f_Veiculo($select=cr40f_placa)')}` +
+  `&$filter=${enc(`statecode eq 0 and (cr40f_status eq 202410001 or cr40f_status eq 202410005 or cr40f_status eq 202410006) and cr40f_dataehorriodesada ge ${inicio} and cr40f_dataehorriodesada le ${fim}`)}` +
+  `&$orderby=${enc('cr40f_dataehorriodesada asc')}&$top=150`
+export const caminhoAbertos = () =>
+  `${ALERTA_SET}?$select=cr40f_alertaoperacaoid,cr40f_chave,cr40f_severidade,cr40f_envios,cr40f_ultimoenvioem,_cr40f_reserva_value&$filter=${enc('cr40f_status eq 100000000 and cr40f_regra le 100000003')}&$top=500`
+
+export function mapServico(row: Record<string, any>): ServicoDv {
+  return {
+    id: idDe(row.cr40f_reservadeveculosid),
+    codigo: str(row.cr40f_idnovo) || str(row.cr40f_id),
+    status: num(row.cr40f_status) ?? 0,
+    saida: str(row.cr40f_dataehorriodesada),
+    motoristaId: row._cr40f_motorista_value ? idDe(row._cr40f_motorista_value) : null,
+    motoristaNome: str(row.cr40f_Motorista?.new_apelido),
+    veiculoId: row._cr40f_veiculo_value ? idDe(row._cr40f_veiculo_value) : null,
+    placa: str(row.cr40f_Veiculo?.cr40f_placa),
+    cliente: str(row['_cr40f_cliente_value@OData.Community.Display.V1.FormattedValue']),
+    textoEndereco: str(row.new_enderecodesaidapersonalizado) || str(row.cr40f_endereodesada),
+    embarque: {
+      lat: num(row.cr40f_embarquelatitude), lon: num(row.cr40f_embarquelongitude),
+      precisao: PRECISAO_NOME[num(row.cr40f_embarqueprecisao) ?? -1] ?? null,
+      texto: typeof row.cr40f_embarquetexto === 'string' ? row.cr40f_embarquetexto : null,
+      geocodificadoEm: typeof row.cr40f_embarquegeocodificadoem === 'string' ? row.cr40f_embarquegeocodificadoem : null,
+    },
+  }
+}
+export function mapAberto(row: Record<string, any>): AbertoDv {
+  return {
+    id: idDe(row.cr40f_alertaoperacaoid), chave: str(row.cr40f_chave), reservaId: idDe(row._cr40f_reserva_value),
+    severidade: num(row.cr40f_severidade) === 100000001 ? 'alta' : 'media', envios: num(row.cr40f_envios) ?? 0,
+    ultimoEnvioEm: typeof row.cr40f_ultimoenvioem === 'string' ? row.cr40f_ultimoenvioem : null,
+  }
+}
+
+export const opGravarEmbarque = (reservaId: string, geo: { precisao: PrecisaoDv; lat: number | null; lon: number | null }, texto: string, agoraIso: string): Operacao => ({
+  metodo: 'PATCH', caminho: `${RESERVA_SET}(${reservaId})`,
+  corpo: { cr40f_embarquelatitude: geo.lat, cr40f_embarquelongitude: geo.lon, cr40f_embarqueprecisao: PRECISAO_VALOR[geo.precisao], cr40f_embarquetexto: texto, cr40f_embarquegeocodificadoem: agoraIso },
+})
+export const opCriarAlerta = (id: string, a: Alerta, agoraIso: string, canais: string): Operacao => ({
+  metodo: 'POST', caminho: ALERTA_SET,
+  corpo: {
+    cr40f_alertaoperacaoid: id, cr40f_alertaoperacaonome: a.titulo.slice(0, 200), cr40f_regra: REGRA_VALOR[a.regra], cr40f_chave: a.chave,
+    'cr40f_Reserva@odata.bind': `/${RESERVA_SET}(${a.reservaId})`, cr40f_severidade: SEVERIDADE_VALOR[a.severidade], cr40f_status: 100000000,
+    cr40f_mensagem: a.mensagem, cr40f_envios: 1, cr40f_ultimoenvioem: agoraIso, cr40f_canais: canais,
+  },
+})
+export const opAtualizarAlerta = (id: string, patch: Record<string, unknown>): Operacao => ({ metodo: 'PATCH', caminho: `${ALERTA_SET}(${id})`, corpo: patch })
+export const opResolver = (id: string, agoraIso: string, resolucao: 'condicao' | 'foraDaJanela'): Operacao =>
+  opAtualizarAlerta(id, { cr40f_status: 100000001, cr40f_resolvidoem: agoraIso, cr40f_resolucao: resolucao === 'condicao' ? 100000000 : 100000001 })
+export const severidadeValor = (s: Severidade) => SEVERIDADE_VALOR[s]
+
+export function montarBatch(ops: Operacao[], apiUrl: string, id: string = crypto.randomUUID()) {
+  const limite = `batch_${id}`
+  const partes = ops.map((op) => [
+    `--${limite}`, 'Content-Type: application/http', 'Content-Transfer-Encoding: binary', '',
+    `${op.metodo} ${apiUrl}/${op.caminho} HTTP/1.1`, 'Content-Type: application/json; type=entry', 'Accept: application/json',
+    ...(op.metodo === 'PATCH' ? ['If-Match: *'] : []), '', JSON.stringify(op.corpo),
+  ].join('\r\n'))
+  return { limite, corpo: `${partes.join('\r\n')}\r\n--${limite}--\r\n` }
+}
+
+export class Dataverse {
+  private readonly base: string
+  constructor(private readonly f: Fetcher, private readonly env: Pick<Env, 'DATAVERSE_URL' | 'ENTRA_TENANT_ID' | 'ENTRA_CLIENT_ID' | 'ENTRA_CLIENT_SECRET'>) {
+    this.base = env.DATAVERSE_URL.replace(/\/+$/, '')
+  }
+  private get api() { return `${this.base}/api/data/v9.2` }
+  private token() {
+    return obterToken(this.f, { tenant: this.env.ENTRA_TENANT_ID, clientId: this.env.ENTRA_CLIENT_ID, secret: this.env.ENTRA_CLIENT_SECRET }, `${this.base}/.default`)
+  }
+  private async ler(caminho: string): Promise<Record<string, any>[]> {
+    const r = await this.f(`${this.api}/${caminho}`, {
+      headers: { Authorization: `Bearer ${await this.token()}`, Accept: 'application/json', 'OData-Version': '4.0', Prefer: 'odata.include-annotations="*"' },
+    })
+    if (!r.ok) throw new Error(`Falha ao ler o Dataverse (${r.status}).`)
+    return ((await r.json()) as { value: Record<string, any>[] }).value
+  }
+  async listarServicos(inicioIso: string, fimIso: string) { return (await this.ler(caminhoServicos(inicioIso, fimIso))).map(mapServico) }
+  async listarAbertos() { return (await this.ler(caminhoAbertos())).map(mapAberto) }
+  async buscarPorChave(chave: string) {
+    const rows = await this.ler(`${ALERTA_SET}?$select=cr40f_alertaoperacaoid&$filter=${enc(`cr40f_chave eq '${chave.replace(/'/g, "''")}'`)}&$top=1`)
+    return rows.length > 0
+  }
+  /** Grava em lote ($batch, até 100 operações por chamada). Falha com o status da primeira operação recusada. */
+  async aplicar(ops: Operacao[]): Promise<void> {
+    for (let i = 0; i < ops.length; i += 100) {
+      const { limite, corpo } = montarBatch(ops.slice(i, i + 100), this.api)
+      const r = await this.f(`${this.api}/$batch`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${await this.token()}`, 'Content-Type': `multipart/mixed;boundary=${limite}`, Accept: 'application/json', 'OData-Version': '4.0' },
+        body: corpo,
+      })
+      if (!r.ok) throw new Error(`Falha no lote do Dataverse (${r.status}).`)
+      const texto = await r.text()
+      const ruim = [...texto.matchAll(/HTTP\/1\.1 (\d{3})/g)].map((m) => Number(m[1])).filter((s) => s >= 400)
+      if (ruim.length) {
+        const msg = /"message":"([^"]{0,200})/.exec(texto)?.[1] ?? ''
+        throw new Error(`Operação recusada no lote do Dataverse (${ruim[0]}${msg ? `: ${msg}` : ''}).`)
+      }
+    }
+  }
+}
+```
+`src/infleet.ts`:
+```ts
+import type { Fetcher } from './orcamento.ts'
+
+export type VeiculoInfleet = { id: string; placa: string; lat: number; lon: number; velocidadeKmh: number; fixTime: string }
+export const normalizarPlaca = (p: string) => p.replace(/-/g, '').toUpperCase()
+const ENDPOINT = 'https://api.infleet.com.br/v1/graphql'
+
+async function gql<T>(f: Fetcher, token: string, query: string, variables: unknown): Promise<T> {
+  const r = await f(ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ query, variables }) })
+  if (!r.ok) throw new Error(`Falha na consulta ao Infleet (${r.status}).`)
+  const j = (await r.json()) as { data?: T; errors?: { message: string }[] }
+  if (j.errors?.length || !j.data) throw new Error('O Infleet devolveu erro na consulta.')
+  return j.data
+}
+
+const LISTA = 'query($offset:Int){ listVehicles(limit:100, offset:$offset, filter:{ deactivated: WITHOUT_DEACTIVATED }){ id plate location { latitude longitude speed fixTime } } }'
+type Linha = { id: string; plate: string; location: { latitude: number; longitude: number; speed: number | null; fixTime: string } | null }
+
+export async function listarVeiculos(f: Fetcher, token: string): Promise<Map<string, VeiculoInfleet>> {
+  const linhas: Linha[] = []
+  for (const offset of [0, 100]) {
+    const d = await gql<{ listVehicles: Linha[] }>(f, token, LISTA, { offset })
+    linhas.push(...d.listVehicles)
+    if (d.listVehicles.length < 100) break
+  }
+  const mapa = new Map<string, VeiculoInfleet>()
+  for (const v of linhas) {
+    if (!v.location) continue
+    mapa.set(normalizarPlaca(v.plate), { id: v.id, placa: v.plate, lat: v.location.latitude, lon: v.location.longitude, velocidadeKmh: v.location.speed ?? 0, fixTime: v.location.fixTime })
+  }
+  return mapa
+}
+
+export async function posicoesRecentes(f: Fetcher, token: string, veiculoId: string, desdeIso: string, ateIso: string): Promise<{ fixTime: string; speed: number }[]> {
+  const d = await gql<{ listVehiclePositions: { fixTime: string; speed: number | null }[] }>(
+    f, token, 'query($f: ListVehiclePositionsFilterInput!){ listVehiclePositions(filter:$f){ fixTime speed } }',
+    { f: { vehicleId: veiculoId, fixTime: { startAt: desdeIso, endAt: ateIso } } },
+  )
+  return d.listVehiclePositions.map((p) => ({ fixTime: p.fixTime, speed: p.speed ?? 0 }))
+}
+```
+`src/osrm.ts`:
+```ts
+import type { Fetcher } from './orcamento.ts'
+
+export type Ponto = { lat: number; lon: number }
+export type Par = { id: string; origem: Ponto; destino: Ponto }
+export type Rota = { minutos: number; metros: number }
+const LOTE = 25
+
+/** Uma chamada `table` por lote de até 25 pares: a diagonal da matriz é a rota de cada origem ao seu destino. Falha do servidor devolve menos rotas, sem lançar. */
+export async function rotasOsrm(f: Fetcher, pares: Par[]): Promise<Map<string, Rota>> {
+  const saida = new Map<string, Rota>()
+  for (let i = 0; i < pares.length; i += LOTE) {
+    const lote = pares.slice(i, i + LOTE)
+    const n = lote.length
+    const coords = [...lote.map((p) => p.origem), ...lote.map((p) => p.destino)].map((c) => `${c.lon},${c.lat}`).join(';')
+    const sources = lote.map((_, k) => k).join(';')
+    const destinations = lote.map((_, k) => n + k).join(';')
+    let r: Response
+    try { r = await f(`https://router.project-osrm.org/table/v1/driving/${coords}?sources=${sources}&destinations=${destinations}&annotations=duration,distance`) } catch { continue }
+    if (!r.ok) continue
+    const j = (await r.json()) as { durations?: (number | null)[][]; distances?: (number | null)[][] }
+    lote.forEach((p, k) => {
+      const d = j.durations?.[k]?.[k]
+      const m = j.distances?.[k]?.[k]
+      if (typeof d === 'number' && typeof m === 'number') saida.set(p.id, { minutos: d / 60, metros: m })
+    })
+  }
+  return saida
+}
+```
+`src/google.ts`:
+```ts
+import { classificarGeocoding, type Geocodificacao } from './endereco.ts'
+import type { Fetcher } from './orcamento.ts'
+import type { Ponto, Rota } from './osrm.ts'
+
+export async function geocodificar(f: Fetcher, chave: string, texto: string): Promise<Geocodificacao> {
+  const r = await f(`https://maps.googleapis.com/maps/api/geocode/json?region=br&components=country:BR&address=${encodeURIComponent(texto)}&key=${chave}`)
+  if (!r.ok) throw new Error(`Falha no geocoding do Google (${r.status}).`)
+  return classificarGeocoding(await r.json())
+}
+
+/** Rota com trânsito em tempo real. Minutos arredondados para cima. Nunca inclui a chave em mensagens de erro. */
+export async function rotaComTransito(f: Fetcher, chave: string, origem: Ponto, destino: Ponto): Promise<Rota | null> {
+  const r = await f('https://routes.googleapis.com/directions/v2:computeRoutes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': chave, 'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters' },
+    body: JSON.stringify({
+      origin: { location: { latLng: { latitude: origem.lat, longitude: origem.lon } } },
+      destination: { location: { latLng: { latitude: destino.lat, longitude: destino.lon } } },
+      travelMode: 'DRIVE', routingPreference: 'TRAFFIC_AWARE', languageCode: 'pt-BR', units: 'METRIC',
+    }),
+  })
+  if (!r.ok) throw new Error(`Falha na rota do Google (${r.status}).`)
+  const rota = ((await r.json()) as { routes?: { duration: string; distanceMeters: number }[] }).routes?.[0]
+  if (!rota) return null
+  const segundos = Number(rota.duration.replace('s', ''))
+  return { minutos: Math.ceil(segundos / 60), metros: rota.distanceMeters }
+}
+```
+`src/graph.ts`:
+```ts
+import type { Fetcher } from './orcamento.ts'
+
+export async function enviarEmail(f: Fetcher, token: string, remetente: string, para: string[], assunto: string, html: string, importancia: 'high' | 'normal'): Promise<void> {
+  const r = await f(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(remetente)}/sendMail`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: { subject: assunto, importance: importancia, body: { contentType: 'HTML', content: html }, toRecipients: para.map((address) => ({ emailAddress: { address } })) },
+      saveToSentItems: false,
+    }),
+  })
+  if (r.status !== 202) throw new Error(`Falha no envio de e-mail (${r.status}).`)
+}
+```
+
+- [ ] **Step 5: Rodar e ver passar**
+
+Run: `pnpm --filter @betinhos/alertas-worker test && pnpm --filter @betinhos/alertas-worker typecheck`
+Expected: PASS e sem erro de tipo. Ajuste só o código se um teste de borda falhar por detalhe de plataforma (por exemplo `Response` com `multipart`), registrando a mudança.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add apps/alertas-worker pnpm-lock.yaml
+git commit -m "Alertas: projeto do Worker com orçamento de chamadas, token do Entra, Dataverse, Infleet, OSRM, Google e Graph (testados com fetch simulado)"
+```
+
+---
+
+### Task 6: Medir a qualidade do geocoding com endereços reais (só leitura no PROD, o Renan roda)
 
 **Files:**
 - Create: `packages/deploy/medir-geocoding-alertas.ps1`
 
 **Interfaces:**
-- Consumes: variável `cr40f_GoogleMapsChave` com valor no DEV (pré-requisito do Renan). Se estiver sem valor, pare com status NEEDS_CONTEXT pedindo o valor ao Renan.
 - Produces: a taxa de endereços utilizáveis. **Portão:** se menos de 70% dos endereços ficarem Geocodificado ou Aproximado, pare e reporte ao Renan antes da Task 7: a Fase 0 vira pré-requisito dos alertas de atraso.
+- A chave do Google nunca passa por você. O script lê a chave da variável de ambiente `GOOGLE_MAPS_KEY` do terminal do **Renan**; você escreve o script, colhe os endereços e entrega os comandos para ele rodar.
 
 - [ ] **Step 1: Colher os endereços (leitura no PROD, pelo MCP `Dataverse_PROD`)**
 
@@ -1041,20 +1492,12 @@ param([Parameter(Mandatory)] [string] $Arquivo)
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-$environmentUrl = 'https://org23b93544.crm2.dynamics.com'
-if (([Uri]$environmentUrl).Host -ne 'org23b93544.crm2.dynamics.com') { throw 'Somente DEV.' }
-$token = & az account get-access-token --resource "$environmentUrl/" --query accessToken -o tsv
-if ($LASTEXITCODE -ne 0 -or -not $token) { throw 'Token do Dataverse DEV indisponível (rode az login).' }
-$h = @{ Authorization = "Bearer $token"; Accept = 'application/json' }
-$def = (Invoke-RestMethod -Headers $h -Uri "$environmentUrl/api/data/v9.2/environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq 'cr40f_GoogleMapsChave'").value
-if ($def.Count -ne 1) { throw 'Variável cr40f_GoogleMapsChave ausente: rode provision-alertas-schema.ps1.' }
-$val = (Invoke-RestMethod -Headers $h -Uri "$environmentUrl/api/data/v9.2/environmentvariablevalues?`$select=value&`$filter=_environmentvariabledefinitionid_value eq $($def[0].environmentvariabledefinitionid)").value
-if (-not $val.Count -or -not $val[0].value) { throw 'NEEDS_CONTEXT: cr40f_GoogleMapsChave sem valor no DEV. O Renan precisa preenchê-lo no maker portal.' }
-$chave = $val[0].value
+$chave = $env:GOOGLE_MAPS_KEY
+if (-not $chave) { throw 'Defina GOOGLE_MAPS_KEY no seu terminal antes de rodar (a chave nunca é impressa).' }
 
-# Mesma regra do flow Verificar: primeira linha/item; se começa com "N. ", usa o que vem depois do primeiro " - " (ou remove o número).
+# Mesma regra do Worker (apps/alertas-worker/src/endereco.ts).
 function LimparTexto([string] $bruto) {
-  $linha = (($bruto -replace "`r", '') -replace ';', "`n" -split "`n")[0]
+  $linha = (((($bruto -replace "`r", '') -replace ';', "`n") -split "`n")[0])
   if ($null -eq $linha) { return '' }
   $linha = $linha.Trim()
   if ($linha.Length -gt 3 -and $linha[0] -match '\d' -and $linha.Substring(1, 2) -eq '. ') {
@@ -1078,226 +1521,966 @@ foreach ($l in $linhas) {
   else { $classe = 'Geocodificado' }
   $cont[$classe]++
   $tipo = if ($res) { $res.geometry.location_type } else { 'sem resultado' }
-  Write-Host ("{0,-14} {1,-20} {2}" -f $classe, $tipo, $texto.Substring(0, [Math]::Min(50, $texto.Length)))
+  Write-Host ("{0,-14} {1,-20}" -f $classe, $tipo)
 }
 $total = $linhas.Count
 $uteis = $cont.Geocodificado + $cont.Aproximado
 Write-Host ("Geocodificado {0}, Aproximado {1}, Indisponível {2}, Sem texto {3}. Utilizáveis: {4} de {5} ({6:P0})." -f $cont.Geocodificado, $cont.Aproximado, $cont.Indisponivel, $cont.SemTexto, $uteis, $total, ($uteis / [Math]::Max(1, $total)))
 ```
-A chave nunca é impressa: o script imprime só a classe, o tipo e os 50 primeiros caracteres do texto já limpo. Se algum texto limpo ainda tiver nome de pessoa e você for colar a saída no relatório, troque por "(texto omitido)".
+O script imprime só a classe e o tipo (nenhum texto de endereço), então a saída pode ser colada sem expor nome de passageiro. Salve em UTF-8 com BOM.
 
-- [ ] **Step 3: Rodar e aplicar o portão**
+- [ ] **Step 3: Entregar ao Renan e aplicar o portão**
 
-Run: `powershell -NoProfile -ExecutionPolicy Bypass -File packages/deploy/medir-geocoding-alertas.ps1 -Arquivo <caminho do JSON no scratchpad>`
-Expected: a linha final com a taxa. Se `utilizáveis / total` for menor que 70%, pare e reporte (status DONE_WITH_CONCERNS com a distribuição e três exemplos de falha sem nomes).
+Diga ao Renan para rodar, no terminal dele:
+```powershell
+$env:GOOGLE_MAPS_KEY = Read-Host "Chave do Google"
+powershell -NoProfile -ExecutionPolicy Bypass -File packages/deploy/medir-geocoding-alertas.ps1 -Arquivo "<caminho do JSON no scratchpad>"
+```
+Peça a linha final. Se `utilizáveis / total` for menor que 70%, pare com DONE_WITH_CONCERNS e a distribuição. Sem a resposta do Renan, esta tarefa fica pendente e as Tasks 7 e seguintes podem andar (elas não dependem do resultado), mas a Task 10 só liga o Worker depois do portão.
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add packages/deploy/medir-geocoding-alertas.ps1
-git commit -m "Alertas: script de medição do geocoding com endereços reais (leitura no PROD, chave só no DEV)"
+git commit -m "Alertas: script de medição do geocoding com endereços reais (leitura no PROD, chave só no terminal do Renan)"
 ```
 
 ---
 
-### Task 7: Flow "Alertas | Verificar" — coleta, avaliação e registro dos alertas
+### Task 7: Worker — orquestração do Verificar (coleta, avaliação e registro)
 
 **Files:**
-- Create: `packages/deploy/provision-flow-alertas-verificar.ps1`
-- Reference: `git show claude/compassionate-dubinsky-c4d8f9:packages/deploy/provision-flow-agentes-executar.ps1` (prólogo, `Backup`, `Apply`, `FlowRows`, `Include`, variáveis de ambiente como parâmetros `schemaname (schemaname)`, referência de conexão do Dataverse lida do flow `Flow Comprovantes Despesas Assincrono | App Motoristas`, `-SomenteValidar`, `-Restaurar`, `Conferir` por leitura de volta)
+- Create: `apps/alertas-worker/src/verificar.ts`
+- Test: `apps/alertas-worker/src/verificar.test.ts`
 
 **Interfaces:**
-- Consumes: Task 3 (tabela `cr40f_alertaoperacaos` ou o nome real impresso lá, colunas e variáveis), Task 4 e Task 5 (avaliador conforme, URL na variável), constantes do pacote.
-- Produces: flow `Flow Alertas | Verificar`, **criado desligado** (a Task 10 liga). Ele coleta, geocodifica, chama o avaliador (uma ou duas vezes), grava e encerra alertas em `cr40f_alertaoperacao`. Os avisos nos canais entram na Task 8.
+- Consumes: Task 1 (`avaliar`, `CONSTANTES`), Task 5 (clientes, `Operacao`, builders, `limparTexto`, `normalizarPlaca`, tipos).
+- Produces: `verificar(deps: Deps): Promise<Resultado>`, `precisaGeocodificar`, `Deps`, `Resultado`, constantes `MAX_GEOCODE`, `MAX_PARADO`, `MAX_GOOGLE`, `RESERVA_FINAL`. A Task 8 implementa `deps.notificar`; a Task 10 monta as dependências reais em `index.ts`.
 
-Contrato dos parâmetros do flow: um parâmetro por variável de ambiente, com nome `"<schema> (<schema>)"` e `metadata.schemaName` igual ao schema, como no flow dos Assistentes. No texto abaixo, `P('x')` significa `parameters('x (x)')`.
+- [ ] **Step 1: Escrever os testes que falham**
 
-Helper de texto JSON seguro, usado para montar objetos-mapa por chave (o Logic Apps não tem dicionário): `JS(e)` = `substring(string(createArray(e)), 1, sub(length(string(createArray(e))), 2))`, que devolve o texto de `e` já entre aspas e com escapes. O script PowerShell gera essa expressão com uma função e a substitui nos marcadores `__JS(...)__`.
+`src/verificar.test.ts`:
+```ts
+import type { Acao } from '@betinhos/alertas-operacao'
+import { describe, expect, it, vi } from 'vitest'
+import type { AbertoDv, Operacao, ServicoDv } from './dataverse.ts'
+import { MAX_GEOCODE, precisaGeocodificar, verificar, type Deps } from './verificar.ts'
 
-- [ ] **Step 1: Definição do flow (parte de coleta e registro)**
+const AGORA = new Date('2026-10-15T16:00:00Z') // 13:00 em Brasília
+const emMin = (min: number) => new Date(AGORA.getTime() + min * 60_000).toISOString().replace('.000Z', 'Z')
 
-Gatilho: recorrência a cada 5 minutos, 04:00 a 23:59 em Brasília.
-```json
-"triggers": { "A_cada_5_min": { "type": "Recurrence", "recurrence": { "frequency": "Day", "interval": 1, "timeZone": "E. South America Standard Time", "schedule": { "hours": [4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23], "minutes": [0,5,10,15,20,25,30,35,40,45,50,55] } } } }
+const servico = (over: Partial<ServicoDv> = {}): ServicoDv => ({
+  id: 'r1', codigo: '1234', status: 202410001, saida: emMin(60), motoristaId: 'm1', motoristaNome: 'João', veiculoId: 'v1', placa: 'ABC1D23', cliente: 'Embraer',
+  textoEndereco: 'Tenaris Tubos - Portaria 01',
+  embarque: { lat: -23.5, lon: -46.6, precisao: 'Informado', texto: null, geocodificadoEm: null },
+  ...over,
+})
+const veiculo = { id: 'vi1', placa: 'ABC1D23', lat: -23.4, lon: -46.5, velocidadeKmh: 40, fixTime: emMin(-1) }
+
+function deps(o: { servicos?: ServicoDv[]; abertos?: AbertoDv[]; rotaOsrm?: { minutos: number; metros: number } | null; rotaGoogle?: { minutos: number; metros: number } | null; restante?: number; ligado?: boolean } = {}) {
+  const lotes: Operacao[][] = []
+  const avisos: Acao[] = []
+  const d = {
+    agora: () => AGORA,
+    ligado: o.ligado ?? true,
+    dv: { listarServicos: vi.fn(async () => o.servicos ?? []), listarAbertos: vi.fn(async () => o.abertos ?? []), aplicar: vi.fn(async (ops: Operacao[]) => { lotes.push(ops) }) },
+    infleet: { listarVeiculos: vi.fn(async () => new Map([['ABC1D23', veiculo]])), posicoes: vi.fn(async () => [{ fixTime: emMin(-8), speed: 0 }, { fixTime: emMin(-1), speed: 0 }]) },
+    osrm: { rotas: vi.fn(async (pares: { id: string }[]) => new Map(o.rotaOsrm === null ? [] : pares.map((p) => [p.id, o.rotaOsrm ?? { minutos: 12, metros: 8000 }] as const))) },
+    google: {
+      geocodificar: vi.fn(async () => ({ precisao: 'Geocodificado' as const, lat: -23.55, lon: -46.63 })),
+      rota: vi.fn(async () => o.rotaGoogle ?? { minutos: 62, metros: 20000 }),
+    },
+    notificar: { alerta: vi.fn(async (a: Acao) => { avisos.push(a); return ['email'] }) },
+    orcamento: { restante: () => o.restante ?? 40 },
+  } satisfies Deps
+  return { d, lotes, avisos }
+}
+
+describe('precisaGeocodificar', () => {
+  const base = servico({ embarque: { lat: null, lon: null, precisao: null, texto: null, geocodificadoEm: null } })
+  it('sem precisão ainda: geocodifica o texto limpo', () => expect(precisaGeocodificar(base, AGORA.getTime())).toBe('Tenaris Tubos - Portaria 01'))
+  it('texto vazio nunca geocodifica', () => expect(precisaGeocodificar({ ...base, textoEndereco: '' }, AGORA.getTime())).toBeNull())
+  it('Informado (Fase 0) nunca geocodifica', () => expect(precisaGeocodificar(servico(), AGORA.getTime())).toBeNull())
+  it('texto igual ao já geocodificado não repete; texto alterado repete', () => {
+    const ok = servico({ embarque: { lat: 1, lon: 1, precisao: 'Geocodificado', texto: 'Tenaris Tubos - Portaria 01', geocodificadoEm: emMin(-100) } })
+    expect(precisaGeocodificar(ok, AGORA.getTime())).toBeNull()
+    expect(precisaGeocodificar({ ...ok, textoEndereco: 'Outro lugar' }, AGORA.getTime())).toBe('Outro lugar')
+  })
+  it('Indisponível só tenta de novo depois de 24 h', () => {
+    const e = (h: number) => servico({ embarque: { lat: null, lon: null, precisao: 'Indisponivel', texto: 'Tenaris Tubos - Portaria 01', geocodificadoEm: emMin(-h * 60) } })
+    expect(precisaGeocodificar(e(23), AGORA.getTime())).toBeNull()
+    expect(precisaGeocodificar(e(24), AGORA.getTime())).toBe('Tenaris Tubos - Portaria 01')
+  })
+})
+
+describe('verificar', () => {
+  it('desligado não faz nenhuma chamada', async () => {
+    const { d } = deps({ ligado: false })
+    expect((await verificar(d)).estado).toBe('desligado')
+    expect(d.dv.listarServicos).not.toHaveBeenCalled()
+  })
+  it('sem serviços e sem alertas abertos encerra cedo, sem chamar o Infleet', async () => {
+    const { d } = deps()
+    expect((await verificar(d)).estado).toBe('ocioso')
+    expect(d.infleet.listarVeiculos).not.toHaveBeenCalled()
+  })
+  it('motorista folgado: nenhum alerta e nenhuma consulta ao Google', async () => {
+    const { d, avisos } = deps({ servicos: [servico()] })
+    const r = await verificar(d)
+    expect(r.criados).toBe(0)
+    expect(d.google.rota).not.toHaveBeenCalled()
+    expect(avisos).toEqual([])
+  })
+  it('não vai chegar a tempo: OSRM pessimista pede o Google, o Google confirma, grava e avisa', async () => {
+    const { d, lotes, avisos } = deps({ servicos: [servico()], rotaOsrm: { minutos: 30, metros: 20000 }, rotaGoogle: { minutos: 62, metros: 20000 } })
+    const r = await verificar(d)
+    expect(d.google.rota).toHaveBeenCalledTimes(1)
+    expect(r).toMatchObject({ estado: 'ok', criados: 1, avisos: 1, consultasGoogle: 1 })
+    expect(avisos[0]!.alerta).toMatchObject({ regra: 'NaoChegaraATempo', chave: 'NaoChegaraATempo|r1', severidade: 'alta' })
+    const criar = lotes[0]!.find((o) => o.metodo === 'POST')!
+    expect(criar.corpo).toMatchObject({ cr40f_chave: 'NaoChegaraATempo|r1', cr40f_regra: 100000000, cr40f_envios: 1, 'cr40f_Reserva@odata.bind': '/cr40f_reservadeveculoses(r1)' })
+    // segundo lote registra os canais usados
+    expect(lotes[1]![0]!.corpo).toEqual({ cr40f_canais: 'email' })
+  })
+  it('sem motorista alerta sem precisar de posição nem de Google', async () => {
+    const { d, avisos } = deps({ servicos: [servico({ motoristaId: null, motoristaNome: '', placa: '', saida: emMin(90) })] })
+    await verificar(d)
+    expect(avisos.map((a) => a.alerta.regra)).toEqual(['SemMotorista'])
+    expect(d.infleet.listarVeiculos).not.toHaveBeenCalled()
+  })
+  it('geocodifica o embarque novo, grava a coordenada e usa o resultado na rota', async () => {
+    const novo = servico({ embarque: { lat: null, lon: null, precisao: null, texto: null, geocodificadoEm: null } })
+    const { d, lotes } = deps({ servicos: [novo] })
+    const r = await verificar(d)
+    expect(d.google.geocodificar).toHaveBeenCalledWith('Tenaris Tubos - Portaria 01')
+    expect(r.geocodificados).toBe(1)
+    const patch = lotes[0]!.find((o) => o.caminho === 'cr40f_reservadeveculoses(r1)')!
+    expect(patch.corpo).toMatchObject({ cr40f_embarquelatitude: -23.55, cr40f_embarquelongitude: -46.63, cr40f_embarqueprecisao: 100000001, cr40f_embarquetexto: 'Tenaris Tubos - Portaria 01' })
+    expect(d.osrm.rotas).toHaveBeenCalledWith([{ id: 'r1', origem: { lat: -23.4, lon: -46.5 }, destino: { lat: -23.55, lon: -46.63 } }])
+  })
+  it('limita o geocoding por execução e registra o adiamento', async () => {
+    const lista = Array.from({ length: MAX_GEOCODE + 2 }, (_, i) => servico({ id: `r${i}`, placa: '', embarque: { lat: null, lon: null, precisao: null, texto: null, geocodificadoEm: null } }))
+    const { d } = deps({ servicos: lista })
+    const r = await verificar(d)
+    expect(d.google.geocodificar).toHaveBeenCalledTimes(MAX_GEOCODE)
+    expect(r.adiado).toContain('geocoding')
+  })
+  it('com pouco orçamento adia o geocoding em vez de estourar', async () => {
+    const { d } = deps({ servicos: [servico({ embarque: { lat: null, lon: null, precisao: null, texto: null, geocodificadoEm: null } })], restante: 12 })
+    const r = await verificar(d)
+    expect(d.google.geocodificar).not.toHaveBeenCalled()
+    expect(r.adiado).toContain('geocoding')
+  })
+  it('se o OSRM falha, o Google faz o papel da rota sem trânsito', async () => {
+    const { d } = deps({ servicos: [servico({ saida: emMin(-20) })], rotaOsrm: null, rotaGoogle: { minutos: 9, metros: 5000 } })
+    await verificar(d)
+    expect(d.google.rota).toHaveBeenCalled()
+    expect((d.notificar.alerta as ReturnType<typeof vi.fn>).mock.calls[0]![0].alerta.regra).toBe('JaAtrasado')
+  })
+  it('motorista parado: consulta as posições e alerta', async () => {
+    const parado = { ...veiculo, velocidadeKmh: 0 }
+    const { d, avisos } = deps({ servicos: [servico({ saida: emMin(60) })], rotaOsrm: { minutos: 8, metros: 3000 } })
+    d.infleet.listarVeiculos = vi.fn(async () => new Map([['ABC1D23', parado]]))
+    d.infleet.posicoes = vi.fn(async () => [{ fixTime: emMin(-12), speed: 0 }, { fixTime: emMin(-1), speed: 0 }])
+    await verificar(d)
+    expect(d.infleet.posicoes).toHaveBeenCalledWith('vi1', emMin(-20), emMin(0))
+    expect(avisos.map((a) => a.alerta.regra)).toContain('MotoristaParado')
+  })
+  it('encerra alerta cuja condição sumiu', async () => {
+    const aberto: AbertoDv = { id: 'a1', chave: 'JaAtrasado|r1', reservaId: 'r1', severidade: 'alta', envios: 1, ultimoEnvioEm: emMin(-5) }
+    const { d, lotes } = deps({ servicos: [servico()], abertos: [aberto] })
+    const r = await verificar(d)
+    expect(r.resolvidos).toBe(1)
+    expect(lotes[0]![0]).toMatchObject({ metodo: 'PATCH', caminho: 'cr40f_alertaoperacaos(a1)', corpo: { cr40f_status: 100000001, cr40f_resolucao: 100000000 } })
+  })
+  it('alerta de serviço que saiu da janela é encerrado como "fora da janela"', async () => {
+    const aberto: AbertoDv = { id: 'a2', chave: 'SemMotorista|outro', reservaId: 'outro', severidade: 'media', envios: 1, ultimoEnvioEm: emMin(-5) }
+    const { d, lotes } = deps({ servicos: [], abertos: [aberto] })
+    await verificar(d)
+    expect(lotes[0]![0]!.corpo).toMatchObject({ cr40f_resolucao: 100000001 })
+  })
+  it('lembrete atualiza o alerta existente em vez de criar outro', async () => {
+    const aberto: AbertoDv = { id: 'a3', chave: 'SemMotorista|r1', reservaId: 'r1', severidade: 'media', envios: 1, ultimoEnvioEm: emMin(-31) }
+    const { d, lotes, avisos } = deps({ servicos: [servico({ motoristaId: null, placa: '', saida: emMin(90) })], abertos: [aberto] })
+    const r = await verificar(d)
+    expect(r).toMatchObject({ criados: 0, atualizados: 1 })
+    expect(avisos[0]!.acao).toBe('lembrar')
+    expect(lotes[0]![0]).toMatchObject({ metodo: 'PATCH', caminho: 'cr40f_alertaoperacaos(a3)', corpo: { cr40f_envios: 2 } })
+  })
+  it('falha no aviso não derruba o ciclo: o alerta fica gravado e o canal marcado com erro', async () => {
+    const { d, lotes } = deps({ servicos: [servico({ motoristaId: null, placa: '', saida: emMin(90) })] })
+    d.notificar.alerta = vi.fn(async () => { throw new Error('graph fora') })
+    const r = await verificar(d)
+    expect(r.criados).toBe(1)
+    expect(lotes[1]![0]!.corpo).toEqual({ cr40f_canais: 'erro' })
+  })
+})
 ```
-Variáveis (todas no nível raiz, antes do escopo): `Geocodificados`, `Rotas_osrm`, `Parados`, `Rotas_google`, `Notificados` (arrays) e `Motivo_erro` (string).
 
-Escopo `Escopo_verificar` (as ações abaixo ficam dentro dele, encadeadas por `runAfter` na ordem listada). Todas as chamadas Dataverse usam `OpenApiConnection` com `operationId` `ListRecords`, `CreateRecord` ou `UpdateRecord` e `authentication` `@parameters('$authentication')`, como nos flows dos Assistentes.
+- [ ] **Step 2: Rodar e ver falhar** — `pnpm --filter @betinhos/alertas-worker test` → FAIL (`./verificar.ts` ausente).
 
-1. **`Se_desligado`** (If): `not(equals(toLower(P('cr40f_AlertasLigado')), 'sim'))` → `Terminate` com `runStatus` `Succeeded`.
-2. **`Agora`** `utcNow('yyyy-MM-ddTHH:mm:ssZ')`; **`Inicio`** `addToTime(outputs('Agora'), -60, 'Minute')`; **`Fim`** `addToTime(outputs('Agora'), 180, 'Minute')` (formato `yyyy-MM-ddTHH:mm:ssZ`).
-3. **`Servicos`** ListRecords `cr40f_reservadeveculoses`: `$select` = `cr40f_reservadeveculosid,cr40f_idnovo,cr40f_id,cr40f_status,cr40f_dataehorriodesada,_cr40f_motorista_value,_cr40f_veiculo_value,_cr40f_cliente_value,cr40f_endereodesada,new_enderecodesaidapersonalizado,cr40f_embarquelatitude,cr40f_embarquelongitude,cr40f_embarqueprecisao,cr40f_embarquetexto,cr40f_embarquegeocodificadoem`; `$expand` = `cr40f_Motorista($select=new_apelido),cr40f_Veiculo($select=cr40f_placa)`; `$filter` = `statecode eq 0 and (cr40f_status eq 202410001 or cr40f_status eq 202410005 or cr40f_status eq 202410006) and cr40f_dataehorriodesada ge @{outputs('Inicio')} and cr40f_dataehorriodesada le @{outputs('Fim')}`; `$orderby` = `cr40f_dataehorriodesada asc`; `$top` 150.
-4. **`Abertos`** ListRecords `cr40f_alertaoperacaos`: `$select` = `cr40f_alertaoperacaoid,cr40f_chave,cr40f_severidade,cr40f_envios,cr40f_ultimoenvioem,_cr40f_reserva_value,cr40f_regra`; `$filter` = `cr40f_status eq 100000000 and cr40f_regra le 100000003`; `$top` 500.
-5. **`Sem_nada`** (If): `and(empty(outputs('Servicos')?['body/value']), empty(outputs('Abertos')?['body/value']))` → Terminate Succeeded (caminho barato).
-6. **`T1`** Select de `outputs('Servicos')?['body/value']`: `{ "s": "@item()", "linha": "@trim(first(split(replace(replace(coalesce(item()?['new_enderecodesaidapersonalizado'], item()?['cr40f_endereodesada'], ''), ';', decodeUriComponent('%0A')), decodeUriComponent('%0D'), ''), decodeUriComponent('%0A'))))" }`.
-   **`T2`** Select de `body('T1')`: `{ "s": "@item()?['s']", "texto": "@take(if(and(greater(length(item()?['linha']), 3), isInt(substring(item()?['linha'], 0, 1)), equals(substring(item()?['linha'], 1, 2), '. ')), if(contains(item()?['linha'], ' - '), trim(join(skip(split(item()?['linha'], ' - '), 1), ' - ')), trim(substring(item()?['linha'], 3, sub(length(item()?['linha']), 3)))), item()?['linha']), 250)" }`.
-7. **`Precisam_geo`** Query de `body('T2')`: `@and(not(equals(item()?['texto'], '')), not(equals(item()?['s']?['cr40f_embarqueprecisao'], 100000000)), or(equals(item()?['s']?['cr40f_embarqueprecisao'], null), not(equals(item()?['texto'], item()?['s']?['cr40f_embarquetexto'])), and(equals(item()?['s']?['cr40f_embarqueprecisao'], 100000003), less(ticks(coalesce(item()?['s']?['cr40f_embarquegeocodificadoem'], '1970-01-01T00:00:00Z')), ticks(addToTime(outputs('Agora'), -24, 'Hour'))))))`.
-8. **`Cada_geo`** Foreach de `body('Precisam_geo')`, `repetitions` 4, com:
-   - `Geocodificar` HTTP GET `https://maps.googleapis.com/maps/api/geocode/json?region=br&components=country:BR&address=@{encodeUriComponent(item()?['texto'])}&key=@{P('cr40f_GoogleMapsChave')}`, `runtimeConfiguration.secureData.properties = ["inputs","outputs"]`, retry exponencial 2x.
-   - `Classe` Compose: `@if(or(empty(body('Geocodificar')?['results']), equals(first(body('Geocodificar')?['results'])?['geometry']?['location_type'], 'APPROXIMATE')), 100000003, if(or(equals(first(body('Geocodificar')?['results'])?['partial_match'], true), equals(first(body('Geocodificar')?['results'])?['geometry']?['location_type'], 'GEOMETRIC_CENTER')), 100000002, 100000001))`.
-   - `Gravar_geo` UpdateRecord em `cr40f_reservadeveculoses`, `recordId` `@items('Cada_geo')?['s']?['cr40f_reservadeveculosid']`: `item/cr40f_embarquelatitude` e `item/cr40f_embarquelongitude` = `@if(equals(outputs('Classe'), 100000003), null, first(body('Geocodificar')?['results'])?['geometry']?['location']?['lat'])` (e `lng`), `item/cr40f_embarqueprecisao` `@outputs('Classe')`, `item/cr40f_embarquetexto` `@items('Cada_geo')?['texto']`, `item/cr40f_embarquegeocodificadoem` `@outputs('Agora')`.
-   - Se o `Geocodificar` falhar (`runAfter` Failed/TimedOut): `Acrescentar_falha_geo` não faz nada além de seguir (o serviço fica sem coordenada e será tentado no próximo ciclo). Não derrube o escopo por uma falha de geocoding.
-   - `Acrescentar_geo` AppendToArrayVariable em `Geocodificados` com `@items('Cada_geo')?['s']?['cr40f_reservadeveculosid']`.
-9. **`Reler`** (If): `greater(length(variables('Geocodificados')), 0)` → ação `Servicos_2`, ListRecords idêntica à `Servicos`; else vazio. **`Servicos_final`** Compose: `@coalesce(actions('Servicos_2')?['outputs']?['body']?['value'], outputs('Servicos')?['body/value'])`.
-10. Infleet: **`Veiculos_1`** e **`Veiculos_2`** HTTP POST `https://api.infleet.com.br/v1/graphql`, cabeçalhos `Content-Type: application/json` e `Authorization: Bearer @{P('new_InfleetToken')}`, `secureData` em inputs e outputs, corpo `{ "query": "query($offset:Int){ listVehicles(limit:100, offset:$offset, filter:{ deactivated: WITHOUT_DEACTIVATED }){ id plate location { latitude longitude speed fixTime } } }", "variables": { "offset": 0 } }` (e `100` na segunda). **`Veiculos`** Compose `@union(coalesce(body('Veiculos_1')?['data']?['listVehicles'], createArray()), coalesce(body('Veiculos_2')?['data']?['listVehicles'], createArray()))`. **`Pares_veiculo`** Select de `outputs('Veiculos')` com `where` implícito por `Filtro_veiculo` (Query `not(equals(item()?['location'], null))`): `concat('"', toUpper(replace(item()?['plate'], '-', '')), '":', string(item()))`. **`Mapa_veiculo`** Compose `@json(concat('{', join(body('Pares_veiculo'), ','), '}'))`.
-11. **`Servicos_uso`** Select de `outputs('Servicos_final')`, com `pos` = `@outputs('Mapa_veiculo')?[toUpper(replace(coalesce(item()?['cr40f_Veiculo']?['cr40f_placa'], ''), '-', ''))]`, e os campos: `id` `cr40f_reservadeveculosid`; `codigo` `coalesce(cr40f_idnovo, cr40f_id, '')`; `status`; `saida` `cr40f_dataehorriodesada`; `motoristaId` `_cr40f_motorista_value`; `motoristaNome` `coalesce(cr40f_Motorista?['new_apelido'], '')`; `veiculoId` `_cr40f_veiculo_value`; `placa`; `cliente` `coalesce(item()?['_cr40f_cliente_value@OData.Community.Display.V1.FormattedValue'], '')`; `lat`/`lon`/`precisao` das colunas de embarque; `aproximado` `equals(precisao, 100000002)`. **`Servicos_pos`** Select de `body('Servicos_uso')` acrescentando `usavel` = `@and(not(equals(item()?['pos'], null)), not(equals(item()?['lat'], null)), not(equals(item()?['lon'], null)), not(equals(item()?['precisao'], 100000003)))`.
-12. OSRM: **`Para_osrm`** Query `usavel` de `body('Servicos_pos')`; **`Cada_osrm`** Foreach (4) com `OSRM` HTTP GET `https://router.project-osrm.org/route/v1/driving/@{item()?['pos']?['location']?['longitude']},@{item()?['pos']?['location']?['latitude']};@{item()?['lon']},@{item()?['lat']}?overview=false`; sucesso → `Acrescentar_osrm` em `Rotas_osrm` `{ "id": "@items('Cada_osrm')?['id']", "minutos": "@div(float(first(body('OSRM')?['routes'])?['duration']), 60)", "metros": "@first(body('OSRM')?['routes'])?['distance']" }`; falha (`runAfter` Failed) → `Google_reserva` com a mesma chamada da etapa 15 e `Acrescentar_osrm_reserva` com os números do Google (a spec manda cair no Google quando o OSRM falha). **`Mapa_osrm`** Compose `@json(concat('{', join(body('Pares_osrm'), ','), '}'))` com `Pares_osrm` Select de `variables('Rotas_osrm')`: `concat('"', item()?['id'], '":', string(item()))`.
-13. Parado: **`Para_parado`** Query de `body('Servicos_pos')` `@and(item()?['usavel'], lessOrEquals(item()?['pos']?['location']?['speed'], __PARADO_VEL__))`; **`Cada_parado`** Foreach (4) com HTTP POST Infleet `{ "query": "query($f: ListVehiclePositionsFilterInput!){ listVehiclePositions(filter:$f){ fixTime speed } }", "variables": { "f": { "vehicleId": "@{items('Cada_parado')?['pos']?['id']}", "fixTime": { "startAt": "@{addToTime(outputs('Agora'), -20, 'Minute')}", "endAt": "@{outputs('Agora')}" } } } }`; `Velocidades` Select `item()?['speed']`; `Ticks` Select `ticks(item()?['fixTime'])`; `Acrescentar_parado` em `Parados` `{ "id": ..., "paradoMin": "@if(or(empty(body('Posicoes')?['data']?['listVehiclePositions']), greater(max(body('Velocidades')), __PARADO_VEL__)), 0, div(float(sub(ticks(outputs('Agora')), min(body('Ticks')))), 600000000))" }`; **`Mapa_parado`** análogo ao `Mapa_osrm`.
-14. **`Entrada1`** Select de `body('Servicos_pos')` no formato exato de `EntradaServico`: `id`, `codigo`, `status`, `saida`, `motoristaId`, `motoristaNome`, `veiculoId`, `placa`, `cliente`; `posicao` `@if(equals(item()?['pos'], null), null, json(concat('{"velocidadeKmh":', string(item()?['pos']?['location']?['speed']), ',"fixTime":"', item()?['pos']?['location']?['fixTime'], '"}')))`; `rotaOsrm` `@if(contains(outputs('Mapa_osrm'), item()?['id']), outputs('Mapa_osrm')?[item()?['id']], null)`; `rotaGoogle` `null`; `paradoMin` `@if(contains(outputs('Mapa_parado'), item()?['id']), outputs('Mapa_parado')?[item()?['id']]?['paradoMin'], null)`; `embarqueAproximado` `@item()?['aproximado']`. **`Abertos_aval`** Select de `outputs('Abertos')?['body/value']`: `{ "chave": "@item()?['cr40f_chave']", "reservaId": "@item()?['_cr40f_reserva_value']", "severidade": "@if(equals(item()?['cr40f_severidade'], 100000001), 'alta', 'media')", "envios": "@coalesce(item()?['cr40f_envios'], 0)", "ultimoEnvioEm": "@coalesce(item()?['cr40f_ultimoenvioem'], outputs('Agora'))" }`.
-    Para o serviço sem posição, `pos` nulo faz `usavel` falso e `rotaOsrm` nulo: o avaliador não alerta atraso (lacuna explícita da spec).
-15. **`Aval1`** HTTP POST em `@P('cr40f_FlowUrlAlertasAvaliar')` com corpo `{ "agora": "@outputs('Agora')", "servicos": "@body('Entrada1')", "abertos": "@body('Abertos_aval')" }`, `secureData` em inputs e outputs (a URL tem assinatura), timeout `PT60S`, retry exponencial 2x. **`Para_google`** Query de `body('Entrada1')` `@contains(body('Aval1')?['precisaGoogle'], item()?['id'])`. **`Cada_google`** Foreach (4) de `body('Para_google')` com `Google` HTTP POST `https://routes.googleapis.com/directions/v2:computeRoutes`, cabeçalhos `X-Goog-Api-Key: @{P('cr40f_GoogleMapsChave')}`, `X-Goog-FieldMask: routes.duration,routes.distanceMeters`, corpo `{ "origin": { "location": { "latLng": { "latitude": <posição>, "longitude": <posição> } } }, "destination": { "location": { "latLng": { "latitude": <lat do serviço>, "longitude": <lon> } } }, "travelMode": "DRIVE", "routingPreference": "TRAFFIC_AWARE", "languageCode": "pt-BR", "units": "METRIC" }`, `secureData`. As coordenadas vêm do item correspondente em `body('Servicos_pos')` (`first(Query por id)`). `Acrescentar_google` em `Rotas_google` `{ "id": ..., "minutos": "@int(add(div(sub(int(replace(first(body('Google')?['routes'])?['duration'], 's', '')), mod(int(replace(first(body('Google')?['routes'])?['duration'], 's', '')), 60)), 60), if(equals(mod(int(replace(first(body('Google')?['routes'])?['duration'], 's', '')), 60), 0), 0, 1)))", "metros": "@first(body('Google')?['routes'])?['distanceMeters']" }` (arredonda os minutos para cima). **`Mapa_google`** análogo. **`Entrada2`** Select de `body('Para_google')` com os mesmos campos de `Entrada1`, trocando `rotaGoogle` por `@if(contains(outputs('Mapa_google'), item()?['id']), outputs('Mapa_google')?[item()?['id']], null)`. **`Aval2`** (If `greater(length(variables('Rotas_google')), 0)`): HTTP POST como o `Aval1` com `{ "agora", "servicos": "@body('Entrada2')", "abertos": "@body('Abertos_aval')", "regras": ["NaoChegaraATempo"] }`. Se a chamada ao Google falhar, o serviço fica sem `rotaGoogle` e o avaliador não decide o atraso (os alertas abertos dele ficam como estão).
-16. **`Acoes_total`** Compose `@union(coalesce(body('Aval1')?['acoes'], createArray()), coalesce(actions('Aval2')?['outputs']?['body']?['acoes'], createArray()))`; **`Resolver_total`** análogo com `resolver`. **`Mapa_regra`** Compose `{ "NaoChegaraATempo": 100000000, "JaAtrasado": 100000001, "MotoristaParado": 100000002, "SemMotorista": 100000003 }`.
-17. **`Cada_acao`** Foreach (1) de `outputs('Acoes_total')`:
-    - `Aberto_da_chave` Query de `outputs('Abertos')?['body/value']` `equals(item()?['cr40f_chave'], items('Cada_acao')?['alerta']?['chave'])`.
-    - Se `acao` é `criar`: `Criar_alerta` CreateRecord em `cr40f_alertaoperacaos`: `item/cr40f_alertaoperacaonome` (`take(titulo, 200)`), `item/cr40f_regra` `@outputs('Mapa_regra')?[items('Cada_acao')?['alerta']?['regra']]`, `item/cr40f_chave`, `item/cr40f_Reserva@odata.bind` `@concat('/cr40f_reservadeveculoses(', items('Cada_acao')?['alerta']?['reservaId'], ')')`, `item/cr40f_severidade` `@if(equals(items('Cada_acao')?['alerta']?['severidade'], 'alta'), 100000001, 100000000)`, `item/cr40f_status` 100000000, `item/cr40f_mensagem`, `item/cr40f_envios` 1, `item/cr40f_ultimoenvioem` `@outputs('Agora')`.
-    - Se `reenviar` ou `lembrar`: `Atualizar_alerta` UpdateRecord em `cr40f_alertaoperacaos` com `recordId` `@first(body('Aberto_da_chave'))?['cr40f_alertaoperacaoid']`: `cr40f_envios` `@add(coalesce(first(body('Aberto_da_chave'))?['cr40f_envios'], 0), 1)`, `cr40f_ultimoenvioem`, e quando `reenviar` também `cr40f_severidade` e `cr40f_mensagem`.
-    - `Acrescentar_notificado` em `Notificados` com `{ acao, alerta }` (a Task 8 envia os avisos a partir daqui, dentro do mesmo loop).
-18. **`Cada_resolver`** Foreach (1) de `outputs('Resolver_total')`: `Aberto_resolver` Query em `Abertos` por chave; `Resolver_alerta` UpdateRecord: `cr40f_status` 100000001, `cr40f_resolvidoem` `@outputs('Agora')`, `cr40f_resolucao` `@if(contains(body('Ids_servicos'), first(body('Aberto_resolver'))?['_cr40f_reserva_value']), 100000000, 100000001)` com `Ids_servicos` Select de `outputs('Servicos_final')` `cr40f_reservadeveculosid`.
-19. **`Tratar_erro`** (Scope, `runAfter` Failed/TimedOut do `Escopo_verificar`): grava `FalhaDoAgente` (a Task 8 acrescenta o e-mail ao TI) e `Encerrar_com_erro` (Terminate Failed) como nos flows dos Assistentes.
+- [ ] **Step 3: Implementar `src/verificar.ts`**
 
-- [ ] **Step 2: Script de provisionamento**
+```ts
+import { avaliar, CONSTANTES, type Acao, type EntradaServico, type Saida } from '@betinhos/alertas-operacao'
+import type { AbertoDv, Dataverse, Operacao, ServicoDv } from './dataverse.ts'
+import { opAtualizarAlerta, opCriarAlerta, opGravarEmbarque, opResolver, severidadeValor } from './dataverse.ts'
+import { limparTexto, type Geocodificacao } from './endereco.ts'
+import { normalizarPlaca, type VeiculoInfleet } from './infleet.ts'
+import type { Orcamento } from './orcamento.ts'
+import type { Par, Ponto, Rota } from './osrm.ts'
 
-Mesmo molde do script do avaliador: constantes de `dist/constantes.json` (`__PARADO_VEL__`), parâmetros de ambiente (os 10 da Task 3 que o flow usa: `new_InfleetToken`, `cr40f_GoogleMapsChave`, `cr40f_AlertasLigado`, `cr40f_FlowUrlAlertasAvaliar`; os demais entram na Task 8), referência de conexão do Dataverse como nos flows dos Assistentes, inclusão das variáveis e do flow na solução, criação **desligada** (não ative: sem os valores das variáveis o Power Automate recusa ativar, e a Task 10 liga). `Conferir` por leitura de volta: gatilho Recurrence com timezone `E. South America Standard Time`, 20 horas de 4 a 23 e 12 minutos; `Se_desligado` e `Sem_nada` com `Terminate`; todas as chamadas `Http` com `secureData` `inputs,outputs`; `Aval1` usa `P('cr40f_FlowUrlAlertasAvaliar')`; a chamada ao Google usa `TRAFFIC_AWARE` e o `X-Goog-FieldMask` exato; `$top` 150 em `Servicos` e 500 em `Abertos`; os valores de choice 100000000 a 100000003 em `Mapa_regra`; nenhuma ação lê `cr40f_endereodesada` além do `T1`; nenhum corpo de e-mail com `telefone` (a Task 8 confere o resto).
+export const MAX_GEOCODE = 5
+export const MAX_PARADO = 5
+export const MAX_GOOGLE = 5
+/** Chamadas externas reservadas para gravar, avisar e registrar canais. */
+export const RESERVA_FINAL = 12
+const MIN = 60_000
 
-- [ ] **Step 3: Validar e criar**
+export type Deps = {
+  agora: () => Date
+  ligado: boolean
+  dv: Pick<Dataverse, 'listarServicos' | 'listarAbertos' | 'aplicar'>
+  infleet: {
+    listarVeiculos(): Promise<Map<string, VeiculoInfleet>>
+    posicoes(veiculoId: string, desdeIso: string, ateIso: string): Promise<{ fixTime: string; speed: number }[]>
+  }
+  osrm: { rotas(pares: Par[]): Promise<Map<string, Rota>> }
+  google: { geocodificar(texto: string): Promise<Geocodificacao>; rota(origem: Ponto, destino: Ponto): Promise<Rota | null> }
+  notificar: { alerta(acao: Acao): Promise<string[]> }
+  orcamento: Pick<Orcamento, 'restante'>
+}
+export type Resultado = {
+  estado: 'desligado' | 'ocioso' | 'ok'
+  servicos: number
+  criados: number
+  atualizados: number
+  resolvidos: number
+  geocodificados: number
+  consultasGoogle: number
+  avisos: number
+  adiado: string[]
+}
 
-Run: `powershell -NoProfile -ExecutionPolicy Bypass -File packages/deploy/provision-flow-alertas-verificar.ps1 -SomenteValidar` e depois sem o parâmetro.
-Expected: `checkFlowErrors: []`, todas as linhas `ok:`, `DEV: 'Flow Alertas | Verificar' gravado e DESLIGADO (<id>), na AppBetinhos.` Expressões que o validador rejeitar: corrija o mínimo e registre cada mudança no relatório.
+const iso = (ms: number) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z')
+const podeGastar = (d: Deps) => d.orcamento.restante() - RESERVA_FINAL >= 1
+const embarqueUsavel = (s: ServicoDv) => s.embarque.lat !== null && s.embarque.lon !== null && s.embarque.precisao !== null && s.embarque.precisao !== 'Indisponivel'
 
-- [ ] **Step 4: Execução de prova pontual (sem ligar o agendamento)**
+/** Texto a geocodificar, ou null quando não precisa (vazio, Informado, já geocodificado com o mesmo texto, Indisponível há menos de 24 h). */
+export function precisaGeocodificar(s: ServicoDv, agoraMs: number): string | null {
+  const texto = limparTexto(s.textoEndereco)
+  if (!texto) return null
+  const e = s.embarque
+  if (e.precisao === 'Informado') return null
+  if (e.precisao === null || e.texto !== texto) return texto
+  if (e.precisao === 'Indisponivel' && agoraMs - Date.parse(e.geocodificadoEm ?? '1970-01-01T00:00:00Z') >= 24 * 60 * MIN) return texto
+  return null
+}
 
-Sem valores de variáveis o flow não roda. Se o Renan já preencheu `new_InfleetToken`, `cr40f_GoogleMapsChave` e `cr40f_AlertasLigado = sim`, dispare uma execução manual pela API do Power Automate (`POST .../flows/{id}/triggers/A_cada_5_min/run`, `api-version=2016-11-01`) e leia o resultado da execução (`.../runs?$top=1`): esperado `Succeeded` e, sem serviços na janela, término cedo em `Sem_nada`. Se os valores ainda não existirem, registre isso e deixe a prova para a Task 10.
+function minutosParado(posicoes: { fixTime: string; speed: number }[], agoraMs: number): number | null {
+  if (!posicoes.length) return null
+  if (Math.max(...posicoes.map((p) => p.speed)) > CONSTANTES.paradoVelKmh) return 0
+  return (agoraMs - Math.min(...posicoes.map((p) => Date.parse(p.fixTime)))) / MIN
+}
+
+export async function verificar(d: Deps): Promise<Resultado> {
+  const r: Resultado = { estado: 'ok', servicos: 0, criados: 0, atualizados: 0, resolvidos: 0, geocodificados: 0, consultasGoogle: 0, avisos: 0, adiado: [] }
+  if (!d.ligado) return { ...r, estado: 'desligado' }
+  const agora = d.agora().getTime()
+  const agoraIso = iso(agora)
+  const adiar = (o: string) => { if (!r.adiado.includes(o)) r.adiado.push(o) }
+
+  const [servicos, abertos] = await Promise.all([
+    d.dv.listarServicos(iso(agora - CONSTANTES.janelaAntesMin * MIN), iso(agora + CONSTANTES.janelaDepoisMin * MIN)),
+    d.dv.listarAbertos(),
+  ])
+  r.servicos = servicos.length
+  if (!servicos.length && !abertos.length) return { ...r, estado: 'ocioso' }
+  const ops: Operacao[] = []
+
+  // 1. Geocoding dos embarques novos ou alterados.
+  let tentativasGeo = 0
+  for (const s of servicos) {
+    const texto = precisaGeocodificar(s, agora)
+    if (!texto) continue
+    if (tentativasGeo >= MAX_GEOCODE || !podeGastar(d)) { adiar('geocoding'); continue }
+    tentativasGeo++
+    try {
+      const g = await d.google.geocodificar(texto)
+      s.embarque = { lat: g.lat, lon: g.lon, precisao: g.precisao, texto, geocodificadoEm: agoraIso }
+      ops.push(opGravarEmbarque(s.id, g, texto, agoraIso))
+      r.geocodificados++
+    } catch { /* o serviço será tentado de novo no próximo ciclo */ }
+  }
+
+  // 2. Posição da frota e rota sem trânsito.
+  const veiculos = servicos.some((s) => s.placa) ? await d.infleet.listarVeiculos() : new Map<string, VeiculoInfleet>()
+  const veiculoDe = (s: ServicoDv) => (s.placa ? veiculos.get(normalizarPlaca(s.placa)) : undefined)
+  const rastreaveis = servicos.filter((s) => veiculoDe(s) && embarqueUsavel(s))
+  const origemDe = (s: ServicoDv): Ponto => ({ lat: veiculoDe(s)!.lat, lon: veiculoDe(s)!.lon })
+  const destinoDe = (s: ServicoDv): Ponto => ({ lat: s.embarque.lat!, lon: s.embarque.lon! })
+  const rotas = rastreaveis.length
+    ? await d.osrm.rotas(rastreaveis.map((s) => ({ id: s.id, origem: origemDe(s), destino: destinoDe(s) })))
+    : new Map<string, Rota>()
+  let consultasGoogle = 0
+  for (const s of rastreaveis) {
+    if (rotas.has(s.id)) continue
+    if (consultasGoogle >= MAX_GOOGLE || !podeGastar(d)) { adiar('rota'); continue }
+    consultasGoogle++
+    try { const rota = await d.google.rota(origemDe(s), destinoDe(s)); if (rota) rotas.set(s.id, rota) } catch { /* sem rota neste ciclo */ }
+  }
+
+  // 3. Há quanto tempo está parado (só quando a regra poderia disparar).
+  const parados = new Map<string, number | null>()
+  let consultasParado = 0
+  for (const s of rastreaveis) {
+    const v = veiculoDe(s)!
+    const min = (Date.parse(s.saida) - agora) / MIN
+    if (v.velocidadeKmh > CONSTANTES.paradoVelKmh || !rotas.has(s.id) || min < 0 || min > CONSTANTES.paradoJanelaMin) continue
+    if (consultasParado >= MAX_PARADO || !podeGastar(d)) { adiar('parado'); continue }
+    consultasParado++
+    try { parados.set(s.id, minutosParado(await d.infleet.posicoes(v.id, iso(agora - 20 * MIN), agoraIso), agora)) } catch { /* sem dado neste ciclo */ }
+  }
+
+  // 4. Avaliação (primeira passada) e, para quem precisa, Google com trânsito (segunda passada).
+  const entradaServicos: EntradaServico[] = servicos.map((s) => {
+    const v = veiculoDe(s)
+    return {
+      id: s.id, codigo: s.codigo, status: s.status, saida: s.saida, motoristaId: s.motoristaId, motoristaNome: s.motoristaNome, veiculoId: s.veiculoId, placa: s.placa, cliente: s.cliente,
+      posicao: v ? { velocidadeKmh: v.velocidadeKmh, fixTime: v.fixTime } : null,
+      rotaOsrm: rotas.get(s.id) ?? null, rotaGoogle: null, paradoMin: parados.get(s.id) ?? null,
+      embarqueAproximado: s.embarque.precisao === 'Aproximado',
+    }
+  })
+  const abertosEntrada = abertos.map((a) => ({ chave: a.chave, reservaId: a.reservaId, severidade: a.severidade, envios: a.envios, ultimoEnvioEm: a.ultimoEnvioEm ?? agoraIso }))
+  const r1 = avaliar({ agora: agoraIso, servicos: entradaServicos, abertos: abertosEntrada })
+
+  const rotasGoogle = new Map<string, Rota>()
+  for (const id of r1.precisaGoogle) {
+    if (consultasGoogle >= MAX_GOOGLE || !podeGastar(d)) { adiar('google'); continue }
+    const s = rastreaveis.find((x) => x.id === id)
+    if (!s) continue
+    consultasGoogle++
+    try { const rota = await d.google.rota(origemDe(s), destinoDe(s)); if (rota) rotasGoogle.set(id, rota) } catch { /* o avaliador mantém os alertas como estão */ }
+  }
+  const vazio: Saida = { precisaGoogle: [], acoes: [], resolver: [] }
+  const r2 = rotasGoogle.size
+    ? avaliar({
+        agora: agoraIso,
+        servicos: entradaServicos.filter((e) => rotasGoogle.has(e.id)).map((e) => ({ ...e, rotaGoogle: rotasGoogle.get(e.id)! })),
+        abertos: abertosEntrada,
+        regras: ['NaoChegaraATempo'],
+      })
+    : vazio
+  r.consultasGoogle = consultasGoogle
+  const acoes = [...r1.acoes, ...r2.acoes]
+  const resolver = new Set([...r1.resolver, ...r2.resolver])
+
+  // 5. Gravação em lote.
+  const porChave = new Map<string, AbertoDv>(abertos.map((a) => [a.chave, a]))
+  const naJanela = new Set(servicos.map((s) => s.id))
+  const idsNovos = new Map<string, string>()
+  for (const { acao, alerta } of acoes) {
+    if (acao === 'criar') {
+      const id = crypto.randomUUID()
+      idsNovos.set(alerta.chave, id)
+      ops.push(opCriarAlerta(id, alerta, agoraIso, ''))
+      r.criados++
+    } else {
+      const a = porChave.get(alerta.chave)!
+      ops.push(opAtualizarAlerta(a.id, {
+        cr40f_envios: a.envios + 1, cr40f_ultimoenvioem: agoraIso,
+        ...(acao === 'reenviar' ? { cr40f_severidade: severidadeValor(alerta.severidade), cr40f_mensagem: alerta.mensagem } : {}),
+      }))
+      r.atualizados++
+    }
+  }
+  for (const chave of resolver) {
+    const a = porChave.get(chave)
+    if (!a) continue
+    ops.push(opResolver(a.id, agoraIso, naJanela.has(a.reservaId) ? 'condicao' : 'foraDaJanela'))
+    r.resolvidos++
+  }
+  await d.dv.aplicar(ops)
+
+  // 6. Avisos; falha de canal não derruba o ciclo. Depois registra quais canais foram usados.
+  const opsCanais: Operacao[] = []
+  for (const a of acoes) {
+    let canais: string[]
+    try { canais = await d.notificar.alerta(a) } catch { canais = ['erro'] }
+    r.avisos++
+    const id = a.acao === 'criar' ? idsNovos.get(a.alerta.chave)! : porChave.get(a.alerta.chave)!.id
+    opsCanais.push(opAtualizarAlerta(id, { cr40f_canais: canais.join(',') }))
+  }
+  await d.dv.aplicar(opsCanais)
+  return r
+}
+```
+
+- [ ] **Step 4: Rodar e ver passar** — `pnpm --filter @betinhos/alertas-worker test && pnpm --filter @betinhos/alertas-worker typecheck` → PASS. Se um teste de borda divergir do comportamento da Task 1, o pacote `alertas-operacao` é a autoridade.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/deploy/provision-flow-alertas-verificar.ps1 packages/deploy/flows/backup
-git commit -m "Alertas: flow Verificar no DEV (coleta Infleet/OSRM/Google, geocoding, avaliador e registro de alertas), desligado"
+git add apps/alertas-worker
+git commit -m "Alertas: orquestração do Verificar no Worker (geocoding, Infleet, OSRM, Google com trânsito, avaliação, lote e avisos), com orçamento de chamadas"
 ```
 
 ---
 
-### Task 8: Avisos nos canais e falha do agente (no flow Verificar)
+### Task 8: Worker — avisos por e-mail, Teams opcional e falha do agente
 
 **Files:**
-- Modify: `packages/deploy/provision-flow-alertas-verificar.ps1`
+- Create: `apps/alertas-worker/src/notificar.ts`
+- Test: `apps/alertas-worker/src/notificar.test.ts`
 
 **Interfaces:**
-- Consumes: Task 7 (loop `Cada_acao` com `Acrescentar_notificado`), variáveis `cr40f_AlertasCanais`, `cr40f_AlertasEmailOperacao`, `cr40f_AlertasEmailTI`, `cr40f_AlertasTeamsEquipeId`, `cr40f_AlertasTeamsCanalId`, `cr40f_AlertasPushDestinatarios`.
-- Produces: avisos por e-mail, Teams e push dentro do `Cada_acao`, atualização de `cr40f_canais`, e o e-mail de falha ao TI (no máximo um por hora).
+- Consumes: Task 5 (`enviarEmail`, `obterToken`, `Dataverse`, `ALERTA_SET`), Task 1 (`Acao`, `Alerta`), `Env`.
+- Produces: `criarNotificador(f, env)` com `alerta(acao): Promise<string[]>` e `email(assunto, html, para): Promise<void>`; `corpoHtml`, `assunto`, `linkServico`, `cartaoTeams`, `chaveFalha`, `registrarFalha`.
 
-**Referências de conexão:** o script procura, na tabela `connectionreferences` do DEV, uma referência por conector (`/providers/Microsoft.PowerApps/apis/shared_office365`, `shared_teams` e `shared_powerappsnotification`) pertencente à AppBetinhos e, se faltar alguma, falha com a mensagem `Crie uma referência de conexão <conector> na solução AppBetinhos (maker portal) e rode de novo.` Isso é pré-requisito do Renan (conexões da conta de serviço dona dos outros flows).
+- [ ] **Step 1: Testes que falham**
 
-- [ ] **Step 1: Ações de aviso dentro do `Cada_acao`**
+`src/notificar.test.ts`:
+```ts
+import type { Acao } from '@betinhos/alertas-operacao'
+import { describe, expect, it, vi } from 'vitest'
+import type { Env } from './env.ts'
+import { limparCacheTokens } from './entra.ts'
+import { assunto, cartaoTeams, chaveFalha, corpoHtml, criarNotificador, linkServico, registrarFalha } from './notificar.ts'
 
-Depois de `Criar_alerta`/`Atualizar_alerta`, acrescente:
-- `Canais` Compose `@toLower(P('cr40f_AlertasCanais'))`.
-- `Assunto` Compose `@concat('[Operação] ', if(equals(items('Cada_acao')?['acao'], 'lembrar'), 'Lembrete: ', ''), items('Cada_acao')?['alerta']?['titulo'])`.
-- `Link` Compose `@concat('https://org23b93544.crm2.dynamics.com/main.aspx?pagetype=entityrecord&etn=cr40f_reservadeveculos&id=', items('Cada_acao')?['alerta']?['reservaId'])`.
-- `Corpo_html` Compose `@concat('<p><b>', items('Cada_acao')?['alerta']?['titulo'], '</b></p><p>', items('Cada_acao')?['alerta']?['mensagem'], '</p><p><a href="', outputs('Link'), '">Abrir o serviço</a></p>')`.
-- **`Email`** (If `contains(outputs('Canais'), 'email')`): Office 365 Outlook `SendEmailV2` (`apiId` `/providers/Microsoft.PowerApps/apis/shared_office365`, `connectionName` `shared_office365`) com `emailMessage/To` `@P('cr40f_AlertasEmailOperacao')`, `emailMessage/Subject` `@outputs('Assunto')`, `emailMessage/Body` `@outputs('Corpo_html')`, `emailMessage/Importance` `@if(equals(items('Cada_acao')?['alerta']?['severidade'], 'alta'), 'High', 'Normal')`.
-- **`Teams`** (If `contains(outputs('Canais'), 'teams')`): Teams `PostMessageToConversation` (`apiId` `/providers/Microsoft.PowerApps/apis/shared_teams`) com `poster` `Flow bot`, `location` `Channel`, `body/recipient/groupId` `@P('cr40f_AlertasTeamsEquipeId')`, `body/recipient/channelId` `@P('cr40f_AlertasTeamsCanalId')`, `body/messageBody` `@outputs('Corpo_html')`.
-- **`Push`** (If `contains(outputs('Canais'), 'push')`): conector Notificações do Power Apps (`shared_powerappsnotification`), ação de envio de notificação push com destinatários `@split(P('cr40f_AlertasPushDestinatarios'), ';')` e texto `@concat(titulo, ' - saída ', hora)`. Os nomes exatos de operação e parâmetros dessa ação não são conhecidos de antemão: leia a definição do conector (`GET https://api.flow.microsoft.com/providers/Microsoft.ProcessSimple/environments/<envId>/apis/shared_powerappsnotification?api-version=2016-11-01&$expand=properties.swagger`, com token do Power Automate) e use o `operationId` e os parâmetros que o swagger declarar para envio de push a destinatários. Se o conector não oferecer envio a terceiros, deixe o canal `push` documentado como pendente com o motivo exato e conclua e-mail e Teams.
-- Cada aviso roda com `runAfter` `Succeeded` do registro e **não pode derrubar o loop**: coloque cada If com `runAfter` do anterior em `Succeeded` e `Failed` e deixe falha de canal registrada (a falha vira e-mail ao TI no `Tratar_erro` só se o escopo falhar; uma falha de canal isolada é registrada em `cr40f_canais` como `<canal>:erro`).
-- `Registrar_canais` UpdateRecord em `cr40f_alertaoperacaos` (criar: o id vem da saída do `Criar_alerta`; atualizar: id do aberto) com `cr40f_canais` = canais que enviaram (`concat` condicional por ação `Email`/`Teams`/`Push` com `actions('Email')?['status']`).
+const env: Env = {
+  DATAVERSE_URL: 'https://org.example', ALERTAS_LIGADO: 'sim', ALERTAS_CANAIS: 'email,teams', EMAIL_REMETENTE: 'alertas@betinhos.com.br', EMAIL_OPERACAO: 'op@betinhos.com.br;op2@betinhos.com.br', EMAIL_TI: 'ti@betinhos.com.br',
+  INFLEET_TOKEN: 'x', GOOGLE_MAPS_KEY: 'x', ENTRA_TENANT_ID: 't', ENTRA_CLIENT_ID: 'c', ENTRA_CLIENT_SECRET: 's', SEGREDO_EXECUCAO_MANUAL: 'x', TEAMS_WEBHOOK_URL: 'https://teams.example/hook',
+}
+const acao = (over: Partial<Acao['alerta']> = {}, tipo: Acao['acao'] = 'criar'): Acao => ({
+  acao: tipo, alerta: { chave: 'NaoChegaraATempo|r1', regra: 'NaoChegaraATempo', reservaId: 'r1', severidade: 'alta', titulo: 'Risco de atraso: OS 1234 às 14:00', mensagem: 'Motorista João <b>, placa ABC1D23.', ...over },
+})
 
-Os e-mails e mensagens usam só os textos do avaliador (sem telefone e sem nome de passageiro).
+describe('textos', () => {
+  it('assunto do lembrete e link do serviço', () => {
+    expect(assunto(acao())).toBe('[Operação] Risco de atraso: OS 1234 às 14:00')
+    expect(assunto(acao({}, 'lembrar'))).toBe('[Operação] Lembrete: Risco de atraso: OS 1234 às 14:00')
+    expect(linkServico('https://org.example/', 'r1')).toBe('https://org.example/main.aspx?pagetype=entityrecord&etn=cr40f_reservadeveculos&id=r1')
+  })
+  it('o corpo escapa HTML e tem o link', () => {
+    const html = corpoHtml(acao().alerta, 'https://x/y')
+    expect(html).toContain('Motorista João &lt;b&gt;, placa ABC1D23.')
+    expect(html).toContain('<a href="https://x/y">Abrir o serviço</a>')
+  })
+  it('o cartão do Teams é um AdaptiveCard com o texto', () => {
+    const c = cartaoTeams('T', 'M', 'https://x')
+    expect(c.attachments[0]!.contentType).toBe('application/vnd.microsoft.card.adaptive')
+    expect(JSON.stringify(c)).toContain('M')
+  })
+})
 
-- [ ] **Step 2: Falha do agente no `Tratar_erro`**
+describe('criarNotificador', () => {
+  const montar = () => {
+    limparCacheTokens()
+    const chamadas: { url: string; init?: RequestInit }[] = []
+    const f = async (url: string, init?: RequestInit) => {
+      chamadas.push({ url, init })
+      if (url.includes('login.microsoftonline.com')) return new Response(JSON.stringify({ access_token: 'tok', expires_in: 3600 }), { status: 200 })
+      if (url.includes('graph.microsoft.com')) return new Response(null, { status: 202 })
+      return new Response('ok', { status: 200 })
+    }
+    return { f, chamadas }
+  }
+  it('envia e-mail com importância alta e Teams só para alerta alto', async () => {
+    const { f, chamadas } = montar()
+    const usados = await criarNotificador(f, env).alerta(acao())
+    expect(usados).toEqual(['email', 'teams'])
+    const mail = chamadas.find((c) => c.url.includes('sendMail'))!
+    expect(JSON.parse(String(mail.init!.body)).message.importance).toBe('high')
+    expect(JSON.parse(String(mail.init!.body)).message.toRecipients).toHaveLength(2)
+    expect(chamadas.some((c) => c.url === 'https://teams.example/hook')).toBe(true)
+  })
+  it('alerta médio não vai ao Teams', async () => {
+    const { f, chamadas } = montar()
+    expect(await criarNotificador(f, env).alerta(acao({ severidade: 'media' }))).toEqual(['email'])
+    expect(chamadas.some((c) => c.url === 'https://teams.example/hook')).toBe(false)
+  })
+  it('respeita ALERTAS_CANAIS e a ausência de webhook', async () => {
+    const { f } = montar()
+    expect(await criarNotificador(f, { ...env, ALERTAS_CANAIS: 'email', TEAMS_WEBHOOK_URL: undefined }).alerta(acao())).toEqual(['email'])
+    expect(await criarNotificador(f, { ...env, ALERTAS_CANAIS: 'teams', TEAMS_WEBHOOK_URL: undefined }).alerta(acao())).toEqual([])
+  })
+  it('falha de canal vira marca de erro, não exceção', async () => {
+    limparCacheTokens()
+    const f = async (url: string) => (url.includes('login.microsoftonline.com') ? new Response(JSON.stringify({ access_token: 't', expires_in: 3600 })) : new Response('x', { status: 500 }))
+    expect(await criarNotificador(f, env).alerta(acao())).toEqual(['email:erro', 'teams:erro'])
+  })
+})
 
-Dentro do `Tratar_erro` (Task 7, etapa 19): `Chave_falha` Compose `@concat('FalhaDoAgente|', convertTimeZone(utcNow(), 'UTC', 'E. South America Standard Time', 'yyyy-MM-dd-HH'))`; `Falha_existente` ListRecords `cr40f_alertaoperacaos` com `$filter` `cr40f_chave eq '@{outputs('Chave_falha')}'` e `$top` 1; se vazio (no máximo um por hora): `Criar_falha` CreateRecord (`cr40f_regra` 100000005, `cr40f_chave`, `cr40f_status` 100000001, nome `Falha do agente de operação`, mensagem com o texto do erro do escopo) e `Email_ti` Outlook `SendEmailV2` para `@P('cr40f_AlertasEmailTI')` com assunto `[TI] Falha no agente de alertas de operação` e corpo com o motivo (`first(body('Falhas_escopo'))?['error']?['message']`, sem URLs assinadas: o `Falhas_escopo` é um `Query` com `secureData`, como nos flows dos Assistentes).
+describe('falha do agente', () => {
+  it('a chave muda a cada hora de Brasília', () => {
+    expect(chaveFalha(new Date('2026-10-15T16:20:00Z'))).toBe('FalhaDoAgente|2026-10-15-13')
+    expect(chaveFalha(new Date('2026-10-15T02:59:00Z'))).toBe('FalhaDoAgente|2026-10-14-23')
+  })
+  it('grava uma linha e avisa o TI; na mesma hora não repete', async () => {
+    const aplicar = vi.fn(async () => {})
+    const email = vi.fn(async () => {})
+    const dv = { buscarPorChave: vi.fn(async () => false), aplicar }
+    const agora = new Date('2026-10-15T16:20:00Z')
+    expect(await registrarFalha(dv, { email }, env, 'Falha ao ler o Dataverse (500).', agora)).toBe(true)
+    expect(aplicar).toHaveBeenCalledTimes(1)
+    expect(email).toHaveBeenCalledWith('[TI] Falha no agente de alertas de operação', expect.stringContaining('Falha ao ler o Dataverse (500).'), ['ti@betinhos.com.br'])
+    dv.buscarPorChave = vi.fn(async () => true)
+    expect(await registrarFalha(dv, { email }, env, 'outra', agora)).toBe(false)
+    expect(email).toHaveBeenCalledTimes(1)
+  })
+})
+```
 
-- [ ] **Step 3: Atualizar `Conferir` e reprovisionar**
+- [ ] **Step 2: Rodar e ver falhar** — FAIL (`./notificar.ts` ausente).
 
-Acrescente ao `Conferir`: `Cada_acao` contém `Email`, `Teams` e `Push` (ou o motivo do push pendente registrado no script); `SendEmailV2` e `PostMessageToConversation` com os parâmetros acima; `Tratar_erro` contém `Email_ti` e `Chave_falha`; as variáveis de e-mail, Teams e push entram nos parâmetros do flow; nenhum corpo de aviso referencia `telefone`, `celular` ou `passageiro`.
-Run: `... -SomenteValidar` e depois a execução real (o flow continua desligado).
-Expected: `checkFlowErrors: []` e todos os `ok:`.
+- [ ] **Step 3: Implementar `src/notificar.ts`**
 
-- [ ] **Step 4: Commit**
+```ts
+import type { Acao, Alerta } from '@betinhos/alertas-operacao'
+import { ALERTA_SET, type Dataverse } from './dataverse.ts'
+import { obterToken } from './entra.ts'
+import type { Env } from './env.ts'
+import { enviarEmail } from './graph.ts'
+import type { Fetcher } from './orcamento.ts'
+
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+export const linkServico = (dataverseUrl: string, id: string) => `${dataverseUrl.replace(/\/+$/, '')}/main.aspx?pagetype=entityrecord&etn=cr40f_reservadeveculos&id=${id}`
+export const assunto = (a: Acao) => `[Operação] ${a.acao === 'lembrar' ? 'Lembrete: ' : ''}${a.alerta.titulo}`
+export const corpoHtml = (a: Alerta, link: string) => `<p><b>${esc(a.titulo)}</b></p><p>${esc(a.mensagem)}</p><p><a href="${link}">Abrir o serviço</a></p>`
+export const cartaoTeams = (titulo: string, mensagem: string, link: string) => ({
+  type: 'message',
+  attachments: [{
+    contentType: 'application/vnd.microsoft.card.adaptive',
+    content: {
+      type: 'AdaptiveCard', version: '1.4',
+      body: [{ type: 'TextBlock', text: titulo, weight: 'Bolder', wrap: true }, { type: 'TextBlock', text: mensagem, wrap: true }],
+      actions: [{ type: 'Action.OpenUrl', title: 'Abrir o serviço', url: link }],
+    },
+  }],
+})
+
+const lista = (v: string) => v.split(/[;,]/).map((x) => x.trim()).filter(Boolean)
+
+export function criarNotificador(f: Fetcher, env: Env) {
+  const canais = lista(env.ALERTAS_CANAIS.toLowerCase())
+  const tokenGraph = () => obterToken(f, { tenant: env.ENTRA_TENANT_ID, clientId: env.ENTRA_CLIENT_ID, secret: env.ENTRA_CLIENT_SECRET }, 'https://graph.microsoft.com/.default')
+  return {
+    async email(assuntoTexto: string, html: string, para: string[], importancia: 'high' | 'normal' = 'normal') {
+      await enviarEmail(f, await tokenGraph(), env.EMAIL_REMETENTE, para, assuntoTexto, html, importancia)
+    },
+    /** Devolve os canais usados, com ":erro" no que falhou. Nunca lança por falha de canal. */
+    async alerta(a: Acao): Promise<string[]> {
+      const usados: string[] = []
+      const link = linkServico(env.DATAVERSE_URL, a.alerta.reservaId)
+      const para = lista(env.EMAIL_OPERACAO)
+      if (canais.includes('email') && env.EMAIL_REMETENTE && para.length) {
+        try { await enviarEmail(f, await tokenGraph(), env.EMAIL_REMETENTE, para, assunto(a), corpoHtml(a.alerta, link), a.alerta.severidade === 'alta' ? 'high' : 'normal'); usados.push('email') } catch { usados.push('email:erro') }
+      }
+      if (canais.includes('teams') && env.TEAMS_WEBHOOK_URL && a.alerta.severidade === 'alta') {
+        try {
+          const r = await f(env.TEAMS_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cartaoTeams(a.alerta.titulo, a.alerta.mensagem, link)) })
+          usados.push(r.ok ? 'teams' : 'teams:erro')
+        } catch { usados.push('teams:erro') }
+      }
+      return usados
+    },
+  }
+}
+
+/** Chave de uma falha por hora de Brasília: impede mais de um e-mail ao TI por hora. */
+export function chaveFalha(agora: Date) {
+  const partes = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' }).formatToParts(agora)
+  const g = (t: string) => partes.find((p) => p.type === t)!.value
+  return `FalhaDoAgente|${g('year')}-${g('month')}-${g('day')}-${g('hour')}`
+}
+
+export async function registrarFalha(
+  dv: Pick<Dataverse, 'buscarPorChave' | 'aplicar'>,
+  n: { email(assunto: string, html: string, para: string[]): Promise<void> },
+  env: Pick<Env, 'EMAIL_TI'>,
+  erro: string,
+  agora: Date,
+): Promise<boolean> {
+  const chave = chaveFalha(agora)
+  if (await dv.buscarPorChave(chave)) return false
+  const mensagem = erro.slice(0, 500)
+  await dv.aplicar([{
+    metodo: 'POST', caminho: ALERTA_SET,
+    corpo: {
+      cr40f_alertaoperacaonome: 'Falha do agente de operação', cr40f_regra: 100000005, cr40f_chave: chave, cr40f_severidade: 100000001, cr40f_status: 100000001,
+      cr40f_resolucao: 100000000, cr40f_mensagem: mensagem, cr40f_envios: 1, cr40f_ultimoenvioem: agora.toISOString().replace(/\.\d{3}Z$/, 'Z'), cr40f_canais: 'email',
+    },
+  }])
+  const para = lista(env.EMAIL_TI)
+  if (para.length) await n.email('[TI] Falha no agente de alertas de operação', `<p>O agente de alertas de operação falhou: ${esc(mensagem)}</p>`, para)
+  return true
+}
+```
+
+- [ ] **Step 4: Rodar e ver passar** — `pnpm --filter @betinhos/alertas-worker test && pnpm --filter @betinhos/alertas-worker typecheck` → PASS.
+
+- [ ] **Step 5: Commit**
 
 ```bash
-git add packages/deploy/provision-flow-alertas-verificar.ps1 packages/deploy/flows/backup
-git commit -m "Alertas: avisos por e-mail, Teams e push no Verificar e e-mail de falha ao TI (no máximo um por hora)"
+git add apps/alertas-worker
+git commit -m "Alertas: avisos por e-mail (Graph) e Teams opcional, e registro de falha do agente com e-mail ao TI (um por hora)"
 ```
 
 ---
 
-### Task 9: Flow "Alertas | Resumo diário" (CNH, ASO, documento do veículo e multa)
+### Task 9: Worker — resumo diário (CNH, ASO, documento do veículo e multa sem condutor)
 
 **Files:**
-- Create: `packages/deploy/provision-flow-alertas-resumo.ps1`
-- Reference: o script do Task 7 (prólogo, parâmetros de ambiente, conexões Dataverse e Outlook/Teams, `Conferir`)
+- Create: `apps/alertas-worker/src/resumo.ts`
+- Modify: `apps/alertas-worker/src/dataverse.ts` (consultas do resumo)
+- Test: `apps/alertas-worker/src/resumo.test.ts`
 
 **Interfaces:**
-- Consumes: Task 3 e as referências de conexão da Task 8.
-- Produces: flow de recorrência às 07:00 em dias úteis que manda um único resumo (e-mail e Teams, conforme `cr40f_AlertasCanais`) só quando há itens, e registra uma linha `DocumentosResumo` em `cr40f_alertaoperacao`.
+- Consumes: Task 5 e Task 8.
+- Produces: `montarResumo(dados, hojeBr)`, `rodarResumo(deps)`, e métodos de `Dataverse`: `listarEscalados(inicioIso, fimIso)`, `listarCnhVencida(hoje)`, `listarAsoVencido(limite)`, `listarDocumentosVencidos(hoje)`, `listarMultasSemCondutor(limite)`.
 
-- [ ] **Step 1: Definição**
+- [ ] **Step 1: Testes que falham**
 
-Gatilho: `{ "type": "Recurrence", "recurrence": { "frequency": "Week", "interval": 1, "timeZone": "E. South America Standard Time", "schedule": { "weekDays": ["Monday","Tuesday","Wednesday","Thursday","Friday"], "hours": ["7"], "minutes": [0] } } }`. Ações (todas dentro de `Escopo_resumo`, com `Se_desligado` como na Task 7):
-1. `Hoje` Compose `@convertTimeZone(utcNow(), 'UTC', 'E. South America Standard Time', 'yyyy-MM-dd')`; `Inicio_hoje` `@convertToUtc(concat(outputs('Hoje'), 'T00:00:00'), 'E. South America Standard Time')`; `Fim_hoje` `@addToTime(outputs('Inicio_hoje'), 1, 'Day')`; `Limite_aso` `@formatDateTime(addToTime(outputs('Hoje'), -12, 'Month'), 'yyyy-MM-dd')`; `Limite_multa` `@formatDateTime(addToTime(outputs('Hoje'), 3, 'Day'), 'yyyy-MM-dd')`.
-2. `Escalados` ListRecords `cr40f_reservadeveculoses` (`$select` `cr40f_reservadeveculosid,cr40f_idnovo,_cr40f_motorista_value,_cr40f_veiculo_value`, `$filter` `statecode eq 0 and (cr40f_status eq 202410001 or cr40f_status eq 202410005 or cr40f_status eq 202410006) and cr40f_dataehorriodesada ge @{outputs('Inicio_hoje')} and cr40f_dataehorriodesada lt @{outputs('Fim_hoje')}`, `$top` 150). `Ids_motoristas` Select `coalesce(item()?['_cr40f_motorista_value'], '')`; `Ids_veiculos` Select `coalesce(item()?['_cr40f_veiculo_value'], '')`.
-3. `Cnh` ListRecords `cr40f_funcionarioses`: `$select` `cr40f_funcionariosid,new_apelido,cr40f_validadedacnh`, `$filter` `statecode eq 0 and cr40f_status eq 0 and cr40f_funcao eq 202410000 and cr40f_validadedacnh lt @{outputs('Hoje')}`, `$top` 150. `Aso` igual com `$select` `...,cr40f_datadoaso` e `$filter` `... and cr40f_datadoaso lt @{outputs('Limite_aso')}`. `Cnh_escalados` e `Aso_escalados`: Query dos resultados com `contains(body('Ids_motoristas'), item()?['cr40f_funcionariosid'])`.
-4. `Docs` ListRecords `cr40f_documentos`: `$select` `cr40f_documentoid,cr40f_name,cr40f_validade,_cr40f_veiculo_value`, `$filter` `statecode eq 0 and cr40f_situacao eq 100000000 and _cr40f_veiculo_value ne null and cr40f_validade lt @{outputs('Hoje')}`, `$top` 150; `Docs_escalados` Query com `contains(body('Ids_veiculos'), item()?['_cr40f_veiculo_value'])`. O nome do veículo vem da anotação formatada `_cr40f_veiculo_value@OData.Community.Display.V1.FormattedValue`.
-5. `Multas` ListRecords `cr40f_multases`: `$select` `cr40f_multasid,cr40f_id_multa,cr40f_dataparaindicar`, `$filter` `statecode eq 0 and cr40f_status eq 202410000 and _cr40f_motorista_value eq null and cr40f_dataparaindicar le @{outputs('Limite_multa')}`, `$top` 150.
-6. `Total` Compose `@add(add(length(body('Cnh_escalados')), length(body('Aso_escalados'))), add(length(body('Docs_escalados')), length(outputs('Multas')?['body/value'])))`; `Sem_itens` If `equals(outputs('Total'), 0)` → Terminate Succeeded.
-7. `Linhas_*` Selects com texto por item: CNH `concat('CNH vencida: ', item()?['new_apelido'], ' (validade ', formatDateTime(item()?['cr40f_validadedacnh'], 'dd/MM/yyyy'), ')')`; ASO `concat('ASO vencido: ', item()?['new_apelido'], ' (ASO de ', formatDateTime(item()?['cr40f_datadoaso'], 'dd/MM/yyyy'), ')')`; documento `concat('Documento vencido do veículo ', coalesce(item()?['_cr40f_veiculo_value@OData.Community.Display.V1.FormattedValue'], ''), ': ', item()?['cr40f_name'], ' (validade ', formatDateTime(item()?['cr40f_validade'], 'dd/MM/yyyy'), ')')`; multa `concat('Multa sem condutor: ', item()?['cr40f_id_multa'], ' (indicar até ', formatDateTime(item()?['cr40f_dataparaindicar'], 'dd/MM/yyyy'), ')')`. `Resumo_html` Compose: `concat('<p><b>Pendências da operação para hoje (', formatDateTime(utcNow(), 'dd/MM'), ')</b></p><ul><li>', join(union(body('Linhas_cnh'), body('Linhas_aso'), body('Linhas_docs'), body('Linhas_multas')), '</li><li>'), '</li></ul>')`.
-8. `Email` e `Teams` como na Task 8 (assunto `[Operação] Pendências de hoje: <Total> itens`), controlados por `cr40f_AlertasCanais`. Sem push neste resumo.
-9. `Registrar` CreateRecord em `cr40f_alertaoperacaos` (`cr40f_regra` 100000004, `cr40f_chave` `concat('DocumentosResumo|', outputs('Hoje'))`, `cr40f_status` 100000001, `cr40f_resolucao` 100000000, `cr40f_mensagem` o `Resumo_html`, `cr40f_envios` 1, nome `Resumo diário de documentos e multas`).
-10. `Tratar_erro` como na Task 7 (registro e e-mail ao TI, um por hora).
+`src/resumo.test.ts`:
+```ts
+import { describe, expect, it, vi } from 'vitest'
+import { limitesDoDia, montarResumo, rodarResumo, type DadosResumo } from './resumo.ts'
 
-- [ ] **Step 2: Script, validação e criação**
+const vazio: DadosResumo = { cnh: [], aso: [], documentos: [], multas: [] }
 
-Mesmo molde dos scripts anteriores. `Conferir`: recorrência de segunda a sexta às 07:00 em Brasília; filtros de CNH (`cr40f_validadedacnh lt`), ASO (12 meses), documento (`cr40f_situacao eq 100000000`) e multa (`cr40f_status eq 202410000`, motorista nulo, 3 dias); `Sem_itens` encerra quando o total é 0; o resumo só cita apelido de motorista, placa do veículo, nome do documento e código da multa (sem CPF, RG nem telefone). Crie o flow **desligado**.
-Run: `powershell -NoProfile -ExecutionPolicy Bypass -File packages/deploy/provision-flow-alertas-resumo.ps1 -SomenteValidar` e depois a real.
-Expected: `checkFlowErrors: []`, todos os `ok:`.
+describe('montarResumo', () => {
+  it('sem itens: total zero', () => expect(montarResumo(vazio, '2026-10-15').total).toBe(0))
+  it('lista cada tipo com datas em dd/MM/yyyy e escapa HTML', () => {
+    const r = montarResumo({
+      cnh: [{ apelido: 'João <x>', validade: '2026-10-01' }], aso: [{ apelido: 'Maria', data: '2025-09-30' }],
+      documentos: [{ veiculo: 'ABC1D23', nome: 'CRLV', validade: '2026-09-30' }], multas: [{ codigo: 'AIT-9', indicarAte: '2026-10-16' }],
+    }, '2026-10-15')
+    expect(r.total).toBe(4)
+    expect(r.linhas).toEqual([
+      'CNH vencida: João <x> (validade 01/10/2026)',
+      'ASO vencido: Maria (ASO de 30/09/2025)',
+      'Documento vencido do veículo ABC1D23: CRLV (validade 30/09/2026)',
+      'Multa sem condutor: AIT-9 (indicar até 16/10/2026)',
+    ])
+    expect(r.html).toContain('João &lt;x&gt;')
+    expect(r.html).toContain('<li>CNH vencida')
+    expect(r.html).toContain('15/10')
+  })
+})
 
-- [ ] **Step 3: Commit**
+describe('limitesDoDia', () => {
+  it('início e fim do dia de Brasília em UTC, ASO de 12 meses e multa em 3 dias', () => {
+    expect(limitesDoDia(new Date('2026-10-15T10:00:00Z'))).toEqual({
+      hoje: '2026-10-15', inicioIso: '2026-10-15T03:00:00Z', fimIso: '2026-10-16T03:00:00Z', limiteAso: '2025-10-15', limiteMulta: '2026-10-18',
+    })
+  })
+})
+
+describe('rodarResumo', () => {
+  const montar = (dados: { cnh?: any[]; aso?: any[]; docs?: any[]; multas?: any[]; escalados?: { motoristaIds: string[]; veiculoIds: string[] } } = {}) => {
+    const aplicar = vi.fn(async () => {})
+    const email = vi.fn(async () => {})
+    const dv = {
+      listarEscalados: vi.fn(async () => dados.escalados ?? { motoristaIds: ['m1'], veiculoIds: ['v1'] }),
+      listarCnhVencida: vi.fn(async () => dados.cnh ?? []), listarAsoVencido: vi.fn(async () => dados.aso ?? []),
+      listarDocumentosVencidos: vi.fn(async () => dados.docs ?? []), listarMultasSemCondutor: vi.fn(async () => dados.multas ?? []), aplicar,
+    }
+    return { dv, aplicar, email, deps: { agora: () => new Date('2026-10-15T10:00:00Z'), dv, notificar: { email }, env: { EMAIL_OPERACAO: 'op@betinhos.com.br', EMAIL_TI: 'ti@betinhos.com.br' }, ligado: true } }
+  }
+  it('sem itens não envia nem grava', async () => {
+    const { deps, email, aplicar } = montar()
+    expect(await rodarResumo(deps)).toEqual({ enviado: false, total: 0 })
+    expect(email).not.toHaveBeenCalled()
+    expect(aplicar).not.toHaveBeenCalled()
+  })
+  it('só considera quem está escalado hoje', async () => {
+    const { deps, email } = montar({
+      cnh: [{ id: 'm1', apelido: 'João', validade: '2026-10-01' }, { id: 'm9', apelido: 'Fora', validade: '2026-10-01' }],
+      docs: [{ veiculoId: 'v1', veiculo: 'ABC1D23', nome: 'CRLV', validade: '2026-09-30' }, { veiculoId: 'v9', veiculo: 'ZZZ', nome: 'CRLV', validade: '2026-09-30' }],
+    })
+    const r = await rodarResumo(deps)
+    expect(r).toEqual({ enviado: true, total: 2 })
+    const html = email.mock.calls[0]![1] as string
+    expect(html).toContain('João')
+    expect(html).not.toContain('Fora')
+    expect(html).not.toContain('ZZZ')
+  })
+  it('multa sem condutor entra mesmo sem estar escalada; envia um e-mail e grava uma linha de histórico', async () => {
+    const { deps, email, aplicar } = montar({ multas: [{ codigo: 'AIT-9', indicarAte: '2026-10-16' }] })
+    expect(await rodarResumo(deps)).toEqual({ enviado: true, total: 1 })
+    expect(email).toHaveBeenCalledTimes(1)
+    expect(email.mock.calls[0]![0]).toBe('[Operação] Pendências de hoje: 1 item')
+    expect(aplicar.mock.calls[0]![0][0].corpo).toMatchObject({ cr40f_regra: 100000004, cr40f_chave: 'DocumentosResumo|2026-10-15', cr40f_status: 100000001 })
+  })
+  it('desligado não consulta nada', async () => {
+    const { deps, dv } = montar()
+    expect(await rodarResumo({ ...deps, ligado: false })).toEqual({ enviado: false, total: 0 })
+    expect(dv.listarEscalados).not.toHaveBeenCalled()
+  })
+})
+```
+
+- [ ] **Step 2: Rodar e ver falhar** — FAIL.
+
+- [ ] **Step 3: Implementar**
+
+Em `src/dataverse.ts`, dentro da classe `Dataverse`, acrescente (e exporte os tipos):
+```ts
+  async listarEscalados(inicioIso: string, fimIso: string) {
+    const rows = await this.ler(`${RESERVA_SET}?$select=_cr40f_motorista_value,_cr40f_veiculo_value&$filter=${enc(`statecode eq 0 and (cr40f_status eq 202410001 or cr40f_status eq 202410005 or cr40f_status eq 202410006) and cr40f_dataehorriodesada ge ${inicioIso} and cr40f_dataehorriodesada lt ${fimIso}`)}&$top=150`)
+    return { motoristaIds: rows.map((r) => idDe(r._cr40f_motorista_value)).filter(Boolean), veiculoIds: rows.map((r) => idDe(r._cr40f_veiculo_value)).filter(Boolean) }
+  }
+  async listarCnhVencida(hoje: string) {
+    const rows = await this.ler(`cr40f_funcionarioses?$select=cr40f_funcionariosid,new_apelido,cr40f_validadedacnh&$filter=${enc(`statecode eq 0 and cr40f_status eq 0 and cr40f_funcao eq 202410000 and cr40f_validadedacnh lt ${hoje}`)}&$top=150`)
+    return rows.map((r) => ({ id: idDe(r.cr40f_funcionariosid), apelido: str(r.new_apelido), validade: str(r.cr40f_validadedacnh).slice(0, 10) }))
+  }
+  async listarAsoVencido(limite: string) {
+    const rows = await this.ler(`cr40f_funcionarioses?$select=cr40f_funcionariosid,new_apelido,cr40f_datadoaso&$filter=${enc(`statecode eq 0 and cr40f_status eq 0 and cr40f_funcao eq 202410000 and cr40f_datadoaso lt ${limite}`)}&$top=150`)
+    return rows.map((r) => ({ id: idDe(r.cr40f_funcionariosid), apelido: str(r.new_apelido), data: str(r.cr40f_datadoaso).slice(0, 10) }))
+  }
+  async listarDocumentosVencidos(hoje: string) {
+    const rows = await this.ler(`cr40f_documentos?$select=cr40f_documentoid,cr40f_name,cr40f_validade,_cr40f_veiculo_value&$filter=${enc(`statecode eq 0 and cr40f_situacao eq 100000000 and _cr40f_veiculo_value ne null and cr40f_validade lt ${hoje}`)}&$top=150`)
+    return rows.map((r) => ({ veiculoId: idDe(r._cr40f_veiculo_value), veiculo: str(r['_cr40f_veiculo_value@OData.Community.Display.V1.FormattedValue']), nome: str(r.cr40f_name), validade: str(r.cr40f_validade).slice(0, 10) }))
+  }
+  async listarMultasSemCondutor(limite: string) {
+    const rows = await this.ler(`cr40f_multases?$select=cr40f_multasid,cr40f_id_multa,cr40f_dataparaindicar&$filter=${enc(`statecode eq 0 and cr40f_status eq 202410000 and _cr40f_motorista_value eq null and cr40f_dataparaindicar le ${limite}`)}&$top=150`)
+    return rows.map((r) => ({ codigo: str(r.cr40f_id_multa), indicarAte: str(r.cr40f_dataparaindicar).slice(0, 10) }))
+  }
+```
+`src/resumo.ts`:
+```ts
+import type { Dataverse } from './dataverse.ts'
+import { ALERTA_SET } from './dataverse.ts'
+
+export type DadosResumo = {
+  cnh: { apelido: string; validade: string }[]
+  aso: { apelido: string; data: string }[]
+  documentos: { veiculo: string; nome: string; validade: string }[]
+  multas: { codigo: string; indicarAte: string }[]
+}
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+const br = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`
+
+export function montarResumo(d: DadosResumo, hojeBr: string) {
+  const linhas = [
+    ...d.cnh.map((x) => `CNH vencida: ${x.apelido} (validade ${br(x.validade)})`),
+    ...d.aso.map((x) => `ASO vencido: ${x.apelido} (ASO de ${br(x.data)})`),
+    ...d.documentos.map((x) => `Documento vencido do veículo ${x.veiculo}: ${x.nome} (validade ${br(x.validade)})`),
+    ...d.multas.map((x) => `Multa sem condutor: ${x.codigo} (indicar até ${br(x.indicarAte)})`),
+  ]
+  const html = `<p><b>Pendências da operação para hoje (${hojeBr.slice(8, 10)}/${hojeBr.slice(5, 7)})</b></p><ul>${linhas.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>`
+  return { total: linhas.length, linhas, html }
+}
+
+/** Dia de Brasília (UTC−3, sem horário de verão) e os limites de data do resumo. */
+export function limitesDoDia(agora: Date) {
+  const brasilia = new Date(agora.getTime() - 3 * 3_600_000)
+  const hoje = brasilia.toISOString().slice(0, 10)
+  const inicio = new Date(`${hoje}T03:00:00Z`)
+  const fim = new Date(inicio.getTime() + 24 * 3_600_000)
+  const aso = new Date(`${hoje}T00:00:00Z`); aso.setUTCFullYear(aso.getUTCFullYear() - 1)
+  const multa = new Date(`${hoje}T00:00:00Z`); multa.setUTCDate(multa.getUTCDate() + 3)
+  const s = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z')
+  return { hoje, inicioIso: s(inicio), fimIso: s(fim), limiteAso: aso.toISOString().slice(0, 10), limiteMulta: multa.toISOString().slice(0, 10) }
+}
+
+export type DepsResumo = {
+  agora: () => Date
+  ligado: boolean
+  dv: Pick<Dataverse, 'listarEscalados' | 'listarCnhVencida' | 'listarAsoVencido' | 'listarDocumentosVencidos' | 'listarMultasSemCondutor' | 'aplicar'>
+  notificar: { email(assunto: string, html: string, para: string[]): Promise<void> }
+  env: { EMAIL_OPERACAO: string; EMAIL_TI: string }
+}
+
+export async function rodarResumo(d: DepsResumo): Promise<{ enviado: boolean; total: number }> {
+  if (!d.ligado) return { enviado: false, total: 0 }
+  const agora = d.agora()
+  const l = limitesDoDia(agora)
+  const [esc_, cnh, aso, docs, multas] = await Promise.all([
+    d.dv.listarEscalados(l.inicioIso, l.fimIso), d.dv.listarCnhVencida(l.hoje), d.dv.listarAsoVencido(l.limiteAso),
+    d.dv.listarDocumentosVencidos(l.hoje), d.dv.listarMultasSemCondutor(l.limiteMulta),
+  ])
+  const motoristas = new Set(esc_.motoristaIds)
+  const veiculos = new Set(esc_.veiculoIds)
+  const resumo = montarResumo({
+    cnh: cnh.filter((x) => motoristas.has(x.id)), aso: aso.filter((x) => motoristas.has(x.id)),
+    documentos: docs.filter((x) => veiculos.has(x.veiculoId)), multas,
+  }, l.hoje)
+  if (!resumo.total) return { enviado: false, total: 0 }
+  const para = d.env.EMAIL_OPERACAO.split(/[;,]/).map((x) => x.trim()).filter(Boolean)
+  await d.notificar.email(`[Operação] Pendências de hoje: ${resumo.total} ${resumo.total === 1 ? 'item' : 'itens'}`, resumo.html, para)
+  await d.dv.aplicar([{
+    metodo: 'POST', caminho: ALERTA_SET,
+    corpo: {
+      cr40f_alertaoperacaonome: 'Resumo diário de documentos e multas', cr40f_regra: 100000004, cr40f_chave: `DocumentosResumo|${l.hoje}`, cr40f_severidade: 100000000,
+      cr40f_status: 100000001, cr40f_resolucao: 100000000, cr40f_mensagem: resumo.html, cr40f_envios: 1, cr40f_ultimoenvioem: agora.toISOString().replace(/\.\d{3}Z$/, 'Z'), cr40f_canais: 'email',
+    },
+  }])
+  return { enviado: true, total: resumo.total }
+}
+```
+O resumo menciona só apelido de motorista, placa, nome do documento e código da multa (sem CPF, RG nem telefone).
+
+- [ ] **Step 4: Rodar e ver passar** — `pnpm --filter @betinhos/alertas-worker test && pnpm --filter @betinhos/alertas-worker typecheck` → PASS.
+
+- [ ] **Step 5: Commit**
 
 ```bash
-git add packages/deploy/provision-flow-alertas-resumo.ps1 packages/deploy/flows/backup
-git commit -m "Alertas: flow Resumo diário (CNH, ASO, documento do veículo e multa sem condutor) no DEV, desligado"
+git add apps/alertas-worker
+git commit -m "Alertas: resumo diário de CNH, ASO, documento do veículo e multa sem condutor no Worker"
 ```
 
 ---
 
-### Task 10: Prova ponta a ponta no DEV e ativação
+### Task 10: Ponto de entrada, publicação e prova ponta a ponta no DEV
 
 **Files:**
+- Create: `apps/alertas-worker/src/index.ts`, `apps/alertas-worker/src/index.test.ts`
 - Modify: `docs/superpowers/specs/2026-10-15-alertas-operacao-proativos-design.md` (seção final "Estado em <data>")
 
 **Interfaces:**
-- Consumes: tudo acima e os valores que o Renan preencheu no DEV. **Pare com NEEDS_CONTEXT** se faltar qualquer um destes: `new_InfleetToken`, `cr40f_GoogleMapsChave`, `cr40f_AlertasLigado`, `cr40f_AlertasCanais`, `cr40f_AlertasEmailOperacao`, `cr40f_AlertasEmailTI`, `cr40f_AlertasTeamsEquipeId`, `cr40f_AlertasTeamsCanalId`, `cr40f_AlertasPushDestinatarios`, as conexões Outlook, Teams e Notificações. Durante os testes, peça ao Renan para apontar os destinatários só para ele mesmo.
-- Produces: as sete regras provadas, dedupe provado, flows ligados, custo do Google em medição.
+- Consumes: Tasks 5 a 9.
+- Produces: Worker com `scheduled()`, `POST /executar?tarefa=verificar|resumo` (cabeçalho `x-segredo`) e `GET /saude`.
 
-- [ ] **Step 1: Ligar os flows**
+- [ ] **Step 1: Testes que falham**
 
-Ative `Flow Alertas | Verificar` e `Flow Alertas | Resumo diário` (`PATCH workflows(<id>)` com `statecode` 1, como o script do avaliador faz com o dele). Confirme `statecode` 1 por leitura.
+`src/index.test.ts`:
+```ts
+import { describe, expect, it } from 'vitest'
+import type { Env } from './env.ts'
+import worker, { segredoConfere } from './index.ts'
 
-- [ ] **Step 2: Prova de NaoChegaraATempo, dedupe e encerramento**
+const env = { SEGREDO_EXECUCAO_MANUAL: 'segredo-de-teste', ALERTAS_LIGADO: 'nao' } as Env
+const ctx = { waitUntil: () => {}, passThroughOnException: () => {} } as unknown as ExecutionContext
 
-Com o MCP `infleet` (somente leitura), escolha um veículo ativo e em movimento (`frota_agora`) e anote placa e posição. No DEV, crie por Web API um serviço de teste: `cr40f_status` 202410001, saída em 40 minutos, lookups de motorista e veículo (a placa escolhida), `cr40f_embarquelatitude`/`longitude` de um ponto a cerca de 60 km do veículo, `cr40f_embarqueprecisao` 100000000, `cr40f_endereodesada` `TESTE ALERTA - não é serviço real`. Aguarde até 10 minutos. Esperado: um `cr40f_alertaoperacao` Aberto com `cr40f_regra` 100000000 e chave `NaoChegaraATempo|<id>`, e o aviso chegando nos canais (peça ao Renan para confirmar e-mail, Teams e push). Depois confirme o **dedupe**: nos 25 minutos seguintes, nenhum aviso repetido (`cr40f_envios` continua 1); aos 30 minutos chega um único lembrete (`cr40f_envios` 2); depois disso nada mais. Em seguida **encerre**: mova o embarque para o ponto onde o veículo está agora; no ciclo seguinte o alerta deve ficar Resolvido (`cr40f_resolucao` 100000000).
+describe('segredoConfere', () => {
+  it('compara sem aceitar vazio', () => {
+    expect(segredoConfere('abc', 'abc')).toBe(true)
+    expect(segredoConfere('abc', 'abd')).toBe(false)
+    expect(segredoConfere('', '')).toBe(false)
+    expect(segredoConfere(null, 'abc')).toBe(false)
+  })
+})
 
-- [ ] **Step 3: Prova das demais regras**
+describe('rotas', () => {
+  it('/saude responde sem dados de serviços', async () => {
+    const r = await worker.fetch(new Request('https://w/saude'), env, ctx)
+    expect(r.status).toBe(200)
+    expect(await r.json()).toMatchObject({ ok: true, ligado: false })
+  })
+  it('/executar sem o segredo é 401', async () => {
+    expect((await worker.fetch(new Request('https://w/executar', { method: 'POST' }), env, ctx)).status).toBe(401)
+    expect((await worker.fetch(new Request('https://w/executar', { method: 'POST', headers: { 'x-segredo': 'errado' } }), env, ctx)).status).toBe(401)
+  })
+  it('rota desconhecida é 404', async () => {
+    expect((await worker.fetch(new Request('https://w/x'), env, ctx)).status).toBe(404)
+  })
+})
+```
 
-- **JaAtrasado:** serviço de teste com saída 15 minutos atrás e embarque longe: alerta alto.
-- **MotoristaParado:** use um veículo parado (velocidade 0 há mais de 10 minutos, via `frota_agora`/`trajeto`), saída em 60 minutos, embarque a mais de 500 m: alerta médio.
-- **SemMotorista:** serviço de teste sem motorista, saída em 90 minutos: alerta médio; em 50 minutos o alerta sobe para alto e é reenviado.
-- **Resumo diário:** dispare o `Alertas | Resumo diário` manualmente. Esperado: resumo só se houver CNH, ASO, documento ou multa pendentes para quem está escalado; sem itens, o flow termina sem enviar. Para forçar um item em DEV, crie um funcionário ou documento de teste com validade passada e escalado no serviço de teste de hoje, e apague depois.
-- **Falha do agente:** peça ao Renan para trocar, por cerca de 10 minutos, o valor de `new_InfleetToken` por um texto inválido. Confirme que chega um único e-mail de falha ao TI naquela hora (a chave `FalhaDoAgente|<data-hora>` impede repetição) e peça a ele para restaurar o valor correto. Você nunca lê nem grava o valor do token.
+- [ ] **Step 2: Rodar e ver falhar** — FAIL (`./index.ts` ausente).
 
-- [ ] **Step 4: Limpeza**
+- [ ] **Step 3: Implementar `src/index.ts`**
 
-Apague os serviços de teste e os `cr40f_alertaoperacao` gerados (alertas primeiro, depois serviços). Reponha os destinatários reais das variáveis com o Renan. Nenhum registro de teste fica no DEV.
+```ts
+import { Dataverse } from './dataverse.ts'
+import type { Env } from './env.ts'
+import { listarVeiculos, posicoesRecentes } from './infleet.ts'
+import { geocodificar, rotaComTransito } from './google.ts'
+import { criarNotificador, registrarFalha } from './notificar.ts'
+import { Orcamento } from './orcamento.ts'
+import { rotasOsrm } from './osrm.ts'
+import { rodarResumo } from './resumo.ts'
+import { verificar } from './verificar.ts'
 
-- [ ] **Step 5: Medição do custo e do volume de ações**
+type Tarefa = 'verificar' | 'resumo'
+const CRON_RESUMO = '0 10 * * 1-5'
+let ultimo: { tarefa: Tarefa; quando: string; estado: string } | null = null
 
-Durante 7 dias (ou o que o Renan decidir), registre: consultas ao Google por dia (relatório de uso do Google Cloud, pedido ao Renan), número de execuções do Verificar e de ações por execução (histórico do Power Automate), e quantos serviços do PROD teriam entrado na janela. Compare com a estimativa da spec e com o limite de 40.000 ações por 24 h; se estourar, abra o item "migrar o Verificar para Azure Function".
+/** Comparação em tempo constante; segredo vazio nunca confere. */
+export function segredoConfere(recebido: string | null, esperado: string): boolean {
+  if (!recebido || !esperado || recebido.length !== esperado.length) return false
+  let dif = 0
+  for (let i = 0; i < esperado.length; i++) dif |= recebido.charCodeAt(i) ^ esperado.charCodeAt(i)
+  return dif === 0
+}
 
-- [ ] **Step 6: Registrar o estado na spec e commitar**
+export async function executar(env: Env, tarefa: Tarefa, agora = new Date()): Promise<Record<string, unknown>> {
+  const orcamento = new Orcamento(tarefa === 'verificar' ? 40 : 30)
+  const dv = new Dataverse(orcamento.fetch, env)
+  const notificador = criarNotificador(orcamento.fetch, env)
+  const ligado = env.ALERTAS_LIGADO === 'sim'
+  try {
+    const resultado = tarefa === 'resumo'
+      ? await rodarResumo({ agora: () => agora, ligado, dv, notificar: notificador, env })
+      : await verificar({
+          agora: () => agora, ligado, dv, orcamento, notificar: notificador,
+          infleet: { listarVeiculos: () => listarVeiculos(orcamento.fetch, env.INFLEET_TOKEN), posicoes: (id, de, ate) => posicoesRecentes(orcamento.fetch, env.INFLEET_TOKEN, id, de, ate) },
+          osrm: { rotas: (pares) => rotasOsrm(orcamento.fetch, pares) },
+          google: { geocodificar: (t) => geocodificar(orcamento.fetch, env.GOOGLE_MAPS_KEY, t), rota: (o, d) => rotaComTransito(orcamento.fetch, env.GOOGLE_MAPS_KEY, o, d) },
+        })
+    ultimo = { tarefa, quando: agora.toISOString(), estado: String((resultado as { estado?: string }).estado ?? (resultado as { enviado?: boolean }).enviado ?? 'ok') }
+    return { ...resultado, chamadasExternas: orcamento.usado }
+  } catch (e) {
+    const mensagem = e instanceof Error ? e.message : String(e)
+    ultimo = { tarefa, quando: agora.toISOString(), estado: 'erro' }
+    // A falha usa um orçamento próprio: o da execução pode ter se esgotado.
+    const falha = new Orcamento(6)
+    try { await registrarFalha(new Dataverse(falha.fetch, env), criarNotificador(falha.fetch, env), env, mensagem, agora) } catch { /* sem como registrar: o erro vai no retorno */ }
+    return { estado: 'erro', erro: mensagem.slice(0, 200) }
+  }
+}
 
-Acrescente à spec a seção `## Estado em <data>`: o que foi provado, a taxa de geocoding da Task 6, o custo observado até o momento, lacunas e pendências para o Renan (por exemplo, push pendente, papel de segurança da tabela de alertas, Fase 0 e Fase 3).
+export default {
+  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(executar(env, controller.cron === CRON_RESUMO ? 'resumo' : 'verificar'))
+  },
+  async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url)
+    if (request.method === 'GET' && url.pathname === '/saude') return Response.json({ ok: true, ligado: env.ALERTAS_LIGADO === 'sim', ultimo })
+    if (request.method === 'POST' && url.pathname === '/executar') {
+      if (!segredoConfere(request.headers.get('x-segredo'), env.SEGREDO_EXECUCAO_MANUAL)) return new Response('não autorizado', { status: 401 })
+      return Response.json(await executar(env, url.searchParams.get('tarefa') === 'resumo' ? 'resumo' : 'verificar'))
+    }
+    return new Response('não encontrado', { status: 404 })
+  },
+}
+```
+O retorno de `/executar` traz só contagens (nenhum dado de serviço).
+
+- [ ] **Step 4: Rodar e ver passar**
+
+Run: `pnpm --filter @betinhos/alertas-worker test && pnpm --filter @betinhos/alertas-worker typecheck && pnpm --filter @betinhos/alertas-operacao test && pnpm --filter @betinhos/alertas-operacao typecheck`
+Expected: PASS nos dois pacotes. Rode também `pnpm -r test` para garantir que nada fora do escopo quebrou (a suíte do shell é lenta; se só `GeralPage.test.tsx` falhar por tempo, rode-o isolado e registre).
+
+- [ ] **Step 5: Commit do código**
+
+```bash
+git add apps/alertas-worker
+git commit -m "Alertas: ponto de entrada do Worker (cron do Verificar e do resumo, POST /executar protegido e GET /saude)"
+```
+
+- [ ] **Step 6: Publicação (com o Renan)**
+
+Antes de qualquer `wrangler deploy`, confirme com o Renan (publicar na conta Cloudflare dele é ação externa). Pré-requisitos dele, nesta ordem: `wrangler login`; preencher `EMAIL_REMETENTE`, `EMAIL_OPERACAO` (use só o e-mail do próprio Renan durante os testes) e `EMAIL_TI` em `wrangler.toml` (commitável, sem segredo); definir os secrets com `wrangler secret put` dentro de `apps/alertas-worker` (`INFLEET_TOKEN`, `GOOGLE_MAPS_KEY`, `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID`, `ENTRA_CLIENT_SECRET`, `SEGREDO_EXECUCAO_MANUAL` e, se quiser Teams, `TEAMS_WEBHOOK_URL`); manter `ALERTAS_LIGADO = "nao"` no primeiro deploy. Depois: `pnpm --filter @betinhos/alertas-worker deploy`. Confirme que o Worker apareceu com os dois cron triggers (`wrangler triggers` ou o painel) e que `GET https://<subdomínio>.workers.dev/saude` responde `ligado: false`. Se algum secret faltar, o erro aparece na primeira execução manual e o agente reporta qual nome falta (nunca o valor).
+
+- [ ] **Step 7: Prova ponta a ponta no DEV**
+
+Com `ALERTAS_LIGADO` trocado para `sim` e redeploy (peça ao Renan), e `POST /executar` com o cabeçalho `x-segredo` (o Renan roda o `curl` com o segredo dele e cola só o JSON de contagens):
+1. **NaoChegaraATempo, dedupe e encerramento:** com o MCP `infleet` (somente leitura), escolha um veículo ativo e em movimento (`frota_agora`) e anote placa e posição. No DEV, crie por Web API um serviço de teste: `cr40f_status` 202410001, saída em 40 minutos, lookups de motorista e veículo (a placa escolhida), `cr40f_embarquelatitude`/`longitude` de um ponto a cerca de 60 km do veículo, `cr40f_embarqueprecisao` 100000000, `cr40f_endereodesada` `TESTE ALERTA - não é serviço real`. No próximo cron (até 5 minutos) ou em `POST /executar`, esperado: um `cr40f_alertaoperacao` Aberto com chave `NaoChegaraATempo|<id>` e o e-mail na caixa do Renan. Confirme o **dedupe**: nos 25 minutos seguintes nenhum aviso repetido (`cr40f_envios` continua 1); aos 30 minutos chega um único lembrete (`cr40f_envios` 2); depois nada. **Encerre:** mova o embarque para onde o veículo está agora; no ciclo seguinte o alerta fica Resolvido (`cr40f_resolucao` 100000000).
+2. **JaAtrasado:** serviço de teste com saída 15 minutos atrás e embarque longe: alerta alto.
+3. **MotoristaParado:** use um veículo parado há mais de 10 minutos (`frota_agora` e `trajeto`), saída em 60 minutos, embarque a mais de 500 m: alerta médio.
+4. **SemMotorista:** serviço de teste sem motorista, saída em 90 minutos: médio; a 50 minutos sobe para alto e é reenviado.
+5. **Geocoding:** serviço de teste sem coordenada e com texto de local real: o Worker grava coordenada e precisão no serviço.
+6. **Resumo diário:** `POST /executar?tarefa=resumo`. Para forçar um item, crie funcionário ou documento de teste vencido ligado ao serviço de teste de hoje e apague depois. Sem itens, não envia nada.
+7. **Falha do agente:** peça ao Renan para trocar por cerca de 10 minutos o secret `INFLEET_TOKEN` por um texto inválido e rodar uma execução. Confirme um único e-mail de falha ao TI naquela hora e a linha `FalhaDoAgente`. Peça a ele para restaurar o valor correto. Você nunca lê nem grava o token.
+8. **CPU e chamadas externas:** o Renan lê, no painel do Worker (Observability), o tempo de CPU por execução e o número de execuções com erro `Exceeded CPU`. Meta: abaixo de 10 ms no p99. O JSON do `/executar` mostra `chamadasExternas` (meta: 40 ou menos). Se a CPU estourar, pare e reporte: a saída é o plano pago (US$ 5 por mês) ou a Azure.
+
+- [ ] **Step 8: Limpeza, ativação e estado**
+
+Apague os serviços de teste e os alertas gerados (alertas primeiro, depois serviços). Volte `EMAIL_OPERACAO` para os destinatários reais, com o Renan. Deixe `ALERTAS_LIGADO = "sim"` só se o Renan pedir. Registre na spec a seção `## Estado em <data>`: o que foi provado, a taxa de geocoding da Task 6, CPU e chamadas externas observadas, o custo do Google medido por 7 dias (relatório do Google Cloud, a cargo do Renan) e as pendências (Teams e push, papel de segurança, Fase 0 e Fase 3).
 ```bash
 git add docs/superpowers/specs/2026-10-15-alertas-operacao-proativos-design.md
-git commit -m "Alertas: provas no DEV das sete regras, dedupe e encerramento, e estado registrado na spec"
+git commit -m "Alertas: provas no DEV das sete regras, do dedupe e do encerramento, e estado registrado na spec"
 ```
