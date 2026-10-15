@@ -1,0 +1,22 @@
+[
+  {
+    "id": "exemplo-1",
+    "esperado": "validar",
+    "arquivos": ["exemplo-1.jpg"],
+    "contexto": {
+      "despesa": { "id": "exemplo-1", "valor": 85.4, "dataGasto": "2026-10-12", "categoria": "Combustível", "formaPagamento": "Cartão corporativo", "estabelecimento": "Posto X", "litros": 32.5, "km": 120345, "observacao": null },
+      "reservas": [{ "id": "r1", "saida": "2026-10-12T13:00:00Z", "cliente": "Embraer", "status": "Concluído" }],
+      "duplicatas": [],
+      "referencia": { "categoria": "Combustível", "mediana": 180, "maximo": 420, "amostras": 210 },
+      "veiculo": { "placa": "ABC1D23", "modelo": "Corolla", "capacidadeTanque": 50 },
+      "historico": {
+        "motorista": [
+          { "id": "h1", "dataHora": "2026-10-09T15:10:00Z", "categoria": "Combustível", "valor": 242.5, "litros": 44.1, "km": 119870, "estabelecimento": "Posto Y", "status": "Validada", "mesmoMotorista": true }
+        ],
+        "veiculo": [
+          { "id": "h1", "dataHora": "2026-10-09T15:10:00Z", "categoria": "Combustível", "valor": 242.5, "litros": 44.1, "km": 119870, "estabelecimento": "Posto Y", "status": "Validada", "mesmoMotorista": true }
+        ]
+      }
+    }
+  }
+]
