@@ -1,3 +1,4 @@
+import { JANELA_DIAS } from '../../documentos/domain/vencimento'
 import { QUALIDADE, cnhEmAtencao, multasPendentes, type AlertaQualidade } from './alertas'
 import { infracaoDe } from './abas/multas'
 import { aReceberLinha, cpPendentes } from './kpis'
@@ -58,14 +59,14 @@ export function detalheServicosMotorista(rv: Reserva[], motorista: { key: string
   return servicos(`Serviços de ${motorista.nome}`, 'Serviços do motorista no período e nos filtros do dashboard.', rows)
 }
 
-/** "CNH em atenção": funcionários ativos com CNH vencida ou vencendo em até 90 dias, da validade mais antiga para a mais nova. */
+/** "CNH em atenção": funcionários ativos com CNH vencida ou vencendo em até 60 dias (JANELA_DIAS), da validade mais antiga para a mais nova. */
 export function detalheCnh(funcionarios: Funcionario[], now: Date): Detalhe {
   const hoje = Date.parse(hojeBR(now))
   const linhas = cnhEmAtencao(funcionarios, now.getTime()).sort((a, b) => a.cnhMs - b.cnhMs).map((fu): LinhaCnhDetalhe => {
     const validade = new Date(fu.cnhMs).toISOString().slice(0, 10)
     return { id: fu.id, motorista: fu.apelido || fu.nome || '—', validade, dias: Math.round((Date.parse(validade) - hoje) / DIA_MS) }
   })
-  return { tipo: 'cnh', titulo: 'CNH em atenção', descricao: 'Motoristas ativos com CNH vencida ou com validade em até 90 dias.', linhas }
+  return { tipo: 'cnh', titulo: 'CNH em atenção', descricao: `Motoristas ativos com CNH vencida ou com validade em até ${JANELA_DIAS} dias.`, linhas }
 }
 
 /** "Multas pendentes": status Notificar o condutor, pela data da multa no período. */

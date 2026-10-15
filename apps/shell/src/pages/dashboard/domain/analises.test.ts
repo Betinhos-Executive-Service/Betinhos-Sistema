@@ -14,13 +14,15 @@ const vazio: Secundarios = { manutencoes: [], multas: [], ocorrencias: [], funci
 const SEM_NOTA = { media: null, validas: 0 }
 
 describe('alertas', () => {
-  it('CNH: só funcionário "ativo" com validade até 90 dias; multas e ocorrências', () => {
+  it('CNH: só funcionário "ativo" com validade até 60 dias; multas e ocorrências', () => {
     const s: Secundarios = {
       ...vazio,
       funcionarios: [
         funcionario({ statusLabel: 'Ativo', cnhMs: nowMs + 30 * 86_400_000 }),
         funcionario({ statusLabel: 'Ativo', cnhMs: NaN }),
         funcionario({ statusLabel: 'Inativo', cnhMs: nowMs }),
+        funcionario({ statusLabel: 'Ativo', cnhMs: nowMs + 60 * 86_400_000 }),
+        funcionario({ statusLabel: 'Ativo', cnhMs: nowMs + 61 * 86_400_000 }),
         funcionario({ statusLabel: 'Ativo', cnhMs: nowMs + 200 * 86_400_000 }),
       ],
       multas: [multa({ dia: '2026-10-02', status: 202410000 }), multa({ dia: '2026-10-03', status: 1 })],
@@ -28,7 +30,7 @@ describe('alertas', () => {
     }
     const rv = [reserva(), reserva(), reserva(), reserva()]
     const [cnh, multas, oco, score, ...resto] = alertasOperacao(rv, s, nowMs, { media: 72, validas: 3 })
-    expect(cnh).toEqual({ id: 'cnh', valor: '1', rotulo: 'CNH', status: 'Atenção', tom: 'danger' })
+    expect(cnh).toEqual({ id: 'cnh', valor: '2', rotulo: 'CNH', status: 'Atenção', tom: 'danger' })
     expect(multas).toEqual({ id: 'multas', valor: '1', rotulo: 'Multas', status: '50% pendentes', tom: 'danger' })
     expect(oco).toEqual({ id: 'ocorrencias', valor: '1', rotulo: 'Ocorrências', status: '25,0% dos serviços · 1 a cada 4', tom: 'danger' })
     expect(score).toEqual({ id: 'score', valor: '72', rotulo: 'Score motoristas', status: '3 notas válidas', tom: 'warn' })
