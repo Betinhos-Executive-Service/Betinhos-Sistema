@@ -4,7 +4,7 @@ import { SystemIcon } from "../components/icons/SystemIcon";
 import { AppShell } from "../components/layout/AppShell";
 import { FormMenu } from "../components/navigation/FormMenu";
 import { reportAppError } from "../lib/appErrorLogger";
-import { describeStreamSize, getDocumentStreamConstraints, getDocumentTrackConstraints } from "../lib/cameraConstraints";
+import { chooseDocumentCaptureSource, describeStreamSize, getDocumentStreamConstraints, getDocumentTrackConstraints } from "../lib/cameraConstraints";
 import {
   captureVideoFrameDataUrlAsync,
   formatVideoDuration,
@@ -230,6 +230,18 @@ async function captureTrackPhotoDataUrl(stream: MediaStream) {
   return readBlobAsDataUrl(photoBlob);
 }
 
+/** Tamanho exibido da foto (com a orientação EXIF aplicada, como na tela de revisão). */
+async function readDisplayedImageSize(dataUrl: string) {
+  try {
+    const image = new Image();
+    image.src = dataUrl;
+    await image.decode();
+    return { width: image.naturalWidth, height: image.naturalHeight };
+  } catch {
+    return { width: Number.NaN, height: Number.NaN };
+  }
+}
+
 export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVideo, onSwitchCamera, documentFraming = false }: MediaCaptureScreenProps) {
   const photoInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
@@ -446,6 +458,22 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
               payload: { streamSize, fallback: "quadro inteiro do video" }
             });
           }
+        }
+      }
+      if (photoDataUrl && documentFraming && video) {
+        const photoSize = await readDisplayedImageSize(photoDataUrl);
+        const previewSize = { width: video.videoWidth, height: video.videoHeight };
+        if (chooseDocumentCaptureSource(photoSize, previewSize) === "frame") {
+          photoDataUrl = "";
+          reportAppError(new Error("Foto do sensor com enquadramento diferente da previa; usando o quadro inteiro do video."), {
+            severity: "warning",
+            source: "media-capture",
+            action: "image-capture-framing-mismatch",
+            component: "MediaCaptureScreen",
+            screen: "TelaCameraMidia",
+            notifyUser: false,
+            payload: { streamSize, photo: `${photoSize.width}x${photoSize.height}`, preview: `${previewSize.width}x${previewSize.height}` }
+          });
         }
       }
       if (!photoDataUrl && video) photoDataUrl = await captureVideoFrameDataUrlAsync(video);
