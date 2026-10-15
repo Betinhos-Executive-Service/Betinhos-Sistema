@@ -31,3 +31,20 @@ describe('montarRequisicaoLeitura', () => {
     expect(() => montarRequisicaoLeitura({ imagemBase64: 'A'.repeat(2_900_000), mime: 'image/jpeg', categorias: [], formasPagamento: [] })).toThrow('Imagem acima do limite')
   })
 })
+
+import { interpretarLeitura } from './resposta.ts'
+
+const base = { legivel: true, valor: 85.4, data: '2026-10-12', hora: '14:32', estabelecimento: 'Posto X', cnpj: null, litros: 32.5, categoria_sugerida: 'Abastecimento', forma_pagamento_sugerida: null, motivo_ilegivel: null }
+const msg = (o: unknown, stop = 'end_turn') => ({ stop_reason: stop, model: 'claude-haiku-5-5', content: [{ type: 'text', text: JSON.stringify(o) }] })
+
+describe('interpretarLeitura', () => {
+  it('aceita leitura válida', () => expect(interpretarLeitura(msg(base))).toEqual({ ok: true, leitura: base }))
+  it('falha quando stop_reason não é end_turn', () => expect(interpretarLeitura(msg(base, 'max_tokens')).ok).toBe(false))
+  it('legível sem valor vira ilegível', () => {
+    expect(interpretarLeitura(msg({ ...base, valor: null }))).toEqual({ ok: true, leitura: { ...base, valor: null, legivel: false, motivo_ilegivel: 'Valor ou data não identificados.' } })
+  })
+  it('valor negativo ou data fora de AAAA-MM-DD falha', () => {
+    expect(interpretarLeitura(msg({ ...base, valor: -1 })).ok).toBe(false)
+    expect(interpretarLeitura(msg({ ...base, data: '12/10/2026' })).ok).toBe(false)
+  })
+})
