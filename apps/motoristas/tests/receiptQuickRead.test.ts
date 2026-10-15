@@ -58,3 +58,10 @@ test("shouldRunQuickRead só em idle ou ilegivel", () => {
   assert.equal(shouldRunQuickRead({ status: "ilegivel", tentativas: 2 }), true);
   assert.equal(shouldRunQuickRead({ status: "preenchido", tentativas: 1 }), false);
 });
+
+import { quickReadTargetSize } from "../src/lib/receiptQuickRead.ts";
+
+test("quickReadTargetSize limita o maior lado a 1600 mantendo proporção", () => {
+  assert.deepEqual(quickReadTargetSize(4000, 3000), { width: 1600, height: 1200 });
+  assert.deepEqual(quickReadTargetSize(800, 600), { width: 800, height: 600 });
+});

@@ -240,7 +240,8 @@ const FLOW_URLS = {
   expenseAsync: "VITE_FLOW_DESPESA_ASYNC_URL",
   gerarVoucher: "VITE_FLOW_GERAR_VOUCHER_URL",
   salvarFotosManutencao: "VITE_FLOW_SALVAR_FOTOS_MANUTENCAO_URL",
-  enviarReciboCliente: "VITE_FLOW_ENVIAR_RECIBO_CLIENTE_URL"
+  enviarReciboCliente: "VITE_FLOW_ENVIAR_RECIBO_CLIENTE_URL",
+  quickRead: "VITE_FLOW_LEITURA_RAPIDA_URL"
 } as const;
 
 const DEV_DATAVERSE_URL = "https://org23b93544.crm2.dynamics.com/";
@@ -249,7 +250,8 @@ const FLOW_DATAVERSE_ENVIRONMENT_VARIABLES: Record<string, string | undefined> =
   [FLOW_URLS.expenseAsync]: "new_FlowURLDespesaAsync",
   [FLOW_URLS.gerarVoucher]: "new_FlowURLFlowGerarVoucherAppMotoristasv2",
   [FLOW_URLS.salvarFotosManutencao]: "new_FlowURLFlowSalvarArquivosOnedrive",
-  [FLOW_URLS.enviarReciboCliente]: "new_FlowURLFlowEnviarReciboCliente"
+  [FLOW_URLS.enviarReciboCliente]: "new_FlowURLFlowEnviarReciboCliente",
+  [FLOW_URLS.quickRead]: "new_FlowURLDespesaLeituraRapida"
 };
 
 const GERAL_SELECT =
@@ -3508,6 +3510,36 @@ async function resolveFlowUrl(envKey: string) {
 
   const flowEnv = ((window as WindowWithFlowEnv).__APP_FLOW_ENV ?? {}) as AppResourceFlowEnv;
   return flowEnv[envKey] ?? "";
+}
+
+/**
+ * Leitura rapida do comprovante (Flow Despesas | Leitura rapida). Nao usa runHttpFlow: precisa de AbortSignal
+ * para o timeout e nao pode registrar resumo de payload (imagem). Nunca loga a imagem nem a URL completa.
+ * Nunca lanca: falha vira { ok: false } e o app segue no preenchimento manual.
+ */
+export async function readReceiptQuick(imagemBase64: string, categorias: string[], formasPagamento: string[], timeoutMs: number): Promise<unknown> {
+  const url = await resolveFlowUrl(FLOW_URLS.quickRead);
+  if (!url) return { ok: false, erro: "nao_configurado" };
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({ imagemBase64, mime: "image/jpeg", categorias, formasPagamento })
+    });
+    if (!response.ok) {
+      dataverseWarn("Leitura rapida falhou.", { status: response.status, endpoint: describeFlowUrl(url) });
+      return { ok: false };
+    }
+    return await response.json();
+  } catch (error) {
+    dataverseWarn("Leitura rapida sem resposta.", { endpoint: describeFlowUrl(url), error: error instanceof Error ? error.name : String(error) });
+    return { ok: false };
+  } finally {
+    window.clearTimeout(timer);
+  }
 }
 
 class HttpFlowError extends Error {
