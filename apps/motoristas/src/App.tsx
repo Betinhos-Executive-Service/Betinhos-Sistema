@@ -2874,7 +2874,6 @@ function App() {
       <MediaCaptureScreen
         kind="NOTAFISCAL"
         title="Comprovante"
-        documentFraming
         onBack={() => setScreen("gastos")}
         onCapture={(photoDataUrl) => {
           setExpensePhotoDraft(photoDataUrl);

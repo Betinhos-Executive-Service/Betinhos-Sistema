@@ -1,5 +1,5 @@
 /**
- * Câmera ao vivo para documentos (comprovante): stream 4:3 em alta resolução, igual ao formato da foto do sensor.
+ * Câmera ao vivo do app (todas as fotos): stream 4:3 em alta resolução, igual ao formato da foto do sensor.
  * Sem isso o WebView escolhe 1920x1080 (16:9) e a foto em retrato sai 9:16, cortando cerca de 25% do campo de visão.
  * Só usa `ideal` (nunca `min`/`exact`), então não gera OverconstrainedError; se o aparelho recusar, cai no fallback.
  */
@@ -43,12 +43,8 @@ export function describeStreamSize(settings: { width?: number; height?: number }
 }
 
 /**
- * Como a câmera ao vivo tira a foto.
- * Comprovante (documentFraming): o takePhoto do WebView Android devolve foto com enquadramento diferente
- * da prévia (16:9 com stream 4:3) e ainda custa segundos (foto do sensor + conversão para base64). Então o
- * comprovante usa direto o quadro inteiro do vídeo (o que o motorista viu) em JPEG 0,85.
- * Demais câmeras mantêm a foto do sensor e JPEG 0,98.
+ * Qualidade do JPEG de toda foto da câmera ao vivo. A foto é o quadro inteiro do vídeo (o que o motorista viu na
+ * prévia), codificado na hora com toDataURL: o takePhoto do WebView Android devolvia outro enquadramento (16:9 com
+ * stream 4:3) e custava segundos.
  */
-export function planLivePhotoCapture(documentFraming: boolean) {
-  return documentFraming ? { useSensorPhoto: false, jpegQuality: 0.85 } : { useSensorPhoto: true, jpegQuality: 0.98 };
-}
+export const LIVE_PHOTO_JPEG_QUALITY = 0.85;

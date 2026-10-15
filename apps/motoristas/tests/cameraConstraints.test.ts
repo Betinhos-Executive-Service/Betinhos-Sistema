@@ -28,11 +28,8 @@ test("descreve o tamanho real do stream e a proporção", () => {
   assert.equal(describeStreamSize({}), "desconhecido");
 });
 
-test("comprovante captura o quadro do vídeo na hora, sem takePhoto, em JPEG 0,85", async () => {
-  // Celular do Renan (15/10 15:57, v2.1.716): takePhoto devolveu foto com enquadramento diferente da prévia
-  // (aviso image-capture-framing-mismatch) e o motorista esperava o takePhoto + conversão inteira só para descartar.
-  const { planLivePhotoCapture } = await import("../src/lib/cameraConstraints.ts");
-  assert.deepEqual(planLivePhotoCapture(true), { useSensorPhoto: false, jpegQuality: 0.85 });
-  // Demais câmeras (vistoria, manutenção, colisão) continuam com a foto do sensor e JPEG 0,98.
-  assert.deepEqual(planLivePhotoCapture(false), { useSensorPhoto: true, jpegQuality: 0.98 });
+test("toda foto da câmera ao vivo é o quadro do vídeo em JPEG 0,85 (sem takePhoto)", async () => {
+  // Celular do Renan (15/10, v2.1.716): takePhoto devolveu outro enquadramento e custava segundos.
+  const { LIVE_PHOTO_JPEG_QUALITY } = await import("../src/lib/cameraConstraints.ts");
+  assert.equal(LIVE_PHOTO_JPEG_QUALITY, 0.85);
 });
