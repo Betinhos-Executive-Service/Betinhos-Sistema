@@ -104,3 +104,4 @@ Aviso diário por marco, WhatsApp, push no App Motoristas, exclusão dos campos 
 - **Paridade:** o fixture `Fixtures/paridade.json` é escrito à mão, cobrindo os limites e casos da §5, em vez de exportar o mock do shell.
 
 - **Faltantes agrupados por dono (15/10/2026):** com dados reais do DEV a lista teria ~450 linhas; o Renan escolheu uma linha por dono com a quantidade. As contagens continuam por documento.
+- **Validação no DEV (15/10/2026):** plugin publicado com os faltantes agrupados; `--testar 2026-10-19` devolveu Pessoas 14 vencidos e 435 faltando (46 linhas) e Frota 51 faltando (18 linhas). Flow "Documentos | Resumo semanal" provisionado e ativo, com as conexões mais usadas do DEV (Dataverse `new_sharedcommondataserviceforapps_5696d`, Outlook `new_sharedoffice365_f87d5`). Execução manual enviou o e-mail pela noreply, confirmado pelo Renan. O teste de falha forçada (aviso ao admin) ficou para depois.
