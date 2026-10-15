@@ -65,3 +65,9 @@ test("quickReadTargetSize limita o maior lado a 1600 mantendo proporção", () =
   assert.deepEqual(quickReadTargetSize(4000, 3000), { width: 1600, height: 1200 });
   assert.deepEqual(quickReadTargetSize(800, 600), { width: 800, height: 600 });
 });
+
+test("applyQuickReadToDraft troca a data automática (hoje) quando o motorista não mexeu na data", () => {
+  const comHoje = { ...vazio, dataGasto: "2026-10-15" };
+  assert.equal(applyQuickReadToDraft(comHoje, leitura, DEFAULT_EXPENSE_REFERENCE_DATA).dataGasto, "2026-10-15");
+  assert.equal(applyQuickReadToDraft(comHoje, leitura, DEFAULT_EXPENSE_REFERENCE_DATA, { replaceAutoDate: true }).dataGasto, "2026-10-12");
+});
