@@ -191,8 +191,10 @@
 /* Painel de filtro da coluna, ancorado ao título (top layer, como o menu do DS). */
 .gr-colfilter { position: fixed; inset: auto; z-index: var(--bt-z-index-popover); width: min(300px, calc(100vw - 16px)); margin: 0; padding: var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); color: var(--bt-color-text-primary); box-shadow: var(--bt-shadow-popover); font-family: var(--bt-font-family-sans); }
 .gr-colfilter__title { margin-bottom: var(--bt-space-2); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-primary); }
-.gr-colfilter__control { display: grid; }
-.gr-colfilter__control .bt-quick__input, .gr-colfilter__control .bt-quick__select { width: 100%; }
+.gr-colfilter__active { margin: 0 0 var(--bt-space-2); font-size: var(--bt-font-size-12); color: var(--bt-color-action); font-weight: var(--bt-font-weight-semibold); }
+.gr-colfilter__controls { display: grid; gap: var(--bt-space-2); }
+.gr-colfilter__controls .bt-control, .gr-colfilter__controls .bt-filters__pair { width: 100%; }
+.gr-colfilter__hint { margin: var(--bt-space-1) 0 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
 .gr-colfilter__actions { display: flex; justify-content: flex-end; gap: var(--bt-space-2); margin-top: var(--bt-space-3); }
 /* A barra do DS ainda oferece o botão da linha de filtro rápido; a Geral não usa essa linha. */
 .gr-commandline .bt-viewbar [aria-label="Filtro rápido"] { display: none; }
