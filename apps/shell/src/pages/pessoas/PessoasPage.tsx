@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, EmptyState, Pagination, SearchBox, StatusBadge, ToastProvider, ViewBar, matchesFilters, readFilters, storedFilters, useShellHeader, useTableFilters, useTableView, useToast, type TableFilters, type TableViewState, type ViewStore } from '@betinhos/ui'
+import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, matchesFilters, readFilters, storedFilters, useShellHeader, useTableFilters, useTableView, useToast, type TableFilters, type TableViewState, type ViewStore } from '@betinhos/ui'
 import { Plus, RefreshCw, SearchX, Users } from 'lucide-react'
 import type { Host } from '../../host'
 import { decodeTableFilters, encodeTableFilters } from '../../app/filtersUrl'
+import { LazyFooter, useLazySlice } from '../../app/LazyList'
 import { viewStoreFor, withBuiltinViews } from '../../app/viewStore'
-import { useQueryAlvo, useQueryPagina, useQueryTexto } from '../../nav/queryState'
+import { useQueryAlvo, useQueryTexto } from '../../nav/queryState'
 import { patchHashQuery, readHashQuery } from '../../nav/useHashRoute'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
@@ -22,7 +23,6 @@ export function PessoasPage({ host }: { host: Host }) {
   return <ToastProvider><Pessoas host={host} /></ToastProvider>
 }
 
-const PAGE_SIZE = 50
 /** Parâmetros da barra antiga na URL; links com eles abrem com os filtros equivalentes. */
 const LEGACY_KEYS = ['cliente', 'classificacao', 'idioma', 'status', 'duplicados'] as const
 
@@ -63,9 +63,8 @@ function Pessoas({ host }: { host: Host }) {
   }), [raw])
   const { filters, quickFilters } = useTableFilters(view, fields)
 
-  // Busca, página e gaveta continuam na URL; os filtros vão em `f=` (o link compartilhado abre igual).
+  // Busca e gaveta continuam na URL; os filtros vão em `f=` (o link compartilhado abre igual).
   const [query, setQuery] = useQueryTexto('q')
-  const [page, setPage] = useQueryPagina()
   const [target, setTarget] = useQueryAlvo()
   const urlApplied = useRef(false)
   const linked = useRef<TableFilters | null | undefined>(undefined)
@@ -118,6 +117,9 @@ function Pessoas({ host }: { host: Host }) {
     const sort = view.config.sort
     return sort ? sortPessoas(list, sort.key, sort.dir, choices) : list
   }, [ps.list, valid, fields, query, choices, dupIds, view.config.sort])
+  // Lazy loading de renderização: trocar filtro, busca ou ordenação volta ao primeiro lote; recarregar a lista não.
+  const lazyKey = useMemo(() => ({ valid, query, sort: view.config.sort }), [valid, query, view.config.sort])
+  const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
 
   const refresh = useCallback(() => { void ps.reload() }, [ps.reload])
   const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar pessoas" onClick={refresh} />, [refresh])
@@ -132,9 +134,6 @@ function Pessoas({ host }: { host: Host }) {
   } else if (!ps.list.length) {
     body = <EmptyState className="surface" align="start" icon={<Users size={36} />} title="Nenhuma pessoa cadastrada" action={<Button icon={<Plus size={16} />} onClick={() => setTarget({ mode: 'create' })}>Nova pessoa</Button>}>Cadastre passageiros e solicitantes para usar nas reservas.</EmptyState>
   } else {
-    const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
-    const safePage = Math.min(page, pages)
-    const slice = visible.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
     const open = (id: string) => setTarget({ mode: 'view', id })
     const footer = <span className="ps-num">{visible.length} de {ps.list.length} · {dupIds.size} possíveis duplicados</span>
     const empty = <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum registro com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
@@ -143,7 +142,7 @@ function Pessoas({ host }: { host: Host }) {
         {mobile
           ? (visible.length ? <PessoasCards list={slice} choices={choices} dups={dups} onOpen={open} /> : <div className="surface">{empty}</div>)
           : <PessoasTable list={slice} choices={choices} dups={dups} onOpen={open} view={{ config: view.config, onChange: setConfig }} quickFilters={quickFilters} footer={footer} empty={empty} />}
-        {visible.length > PAGE_SIZE ? <Pagination page={safePage} pageSize={PAGE_SIZE} total={visible.length} onChange={setPage} noun="pessoas" /> : null}
+        {more ? <LazyFooter loaded={slice.length} total={visible.length} more onLoadMore={loadMore} noun={['pessoa', 'pessoas']} touch={mobile} /> : null}
       </>
     )
   }

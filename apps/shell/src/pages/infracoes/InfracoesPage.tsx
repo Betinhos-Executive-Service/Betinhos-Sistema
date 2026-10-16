@@ -1,9 +1,10 @@
 import { useCallback, useMemo } from 'react'
-import { Alert, Button, EmptyState, Pagination, StatusBadge, ToastProvider, useShellHeader } from '@betinhos/ui'
+import { Alert, Button, EmptyState, StatusBadge, ToastProvider, useShellHeader } from '@betinhos/ui'
 import { FileWarning, Plus, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
-import { useQueryAlvo, useQueryFilters, useQueryPagina } from '../../nav/queryState'
+import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { useQueryAlvo, useQueryFilters } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
 import { EMPTY_FILTERS, filterInfracoes } from './domain/filters'
@@ -19,8 +20,6 @@ export function InfracoesPage({ host }: { host: Host }) {
   return <ToastProvider><Infracoes host={host} /></ToastProvider>
 }
 
-const PAGE_SIZE = 50
-
 function Infracoes({ host }: { host: Host }) {
   const source = useMemo(() => createSource(host), [host])
   const mobile = useMedia('(max-width: 820px)')
@@ -28,11 +27,11 @@ function Infracoes({ host }: { host: Host }) {
 
   // Filtros, página e gaveta vivem na URL (#/infracoes?q=…&gravidade=…&pagina=2&ver=…).
   const [filters, setFilters] = useQueryFilters(infracoesQuery)
-  const [page, setPage] = useQueryPagina()
 
   const uso = useMemo(() => usoIndex(data.multas), [data.multas])
   const comUso = useMemo(() => new Set(uso.keys()), [uso])
   const visible = useMemo(() => filterInfracoes(data.list, filters, comUso), [data.list, filters, comUso])
+  const { slice, more, loadMore } = useLazySlice(visible, filters)
   const ativas = useMemo(() => data.list.filter((i) => i.ativo).length, [data.list])
   const usoState = data.multasError ?? (data.loading && !data.loaded ? 'loading' : 'ok')
 
@@ -52,14 +51,11 @@ function Infracoes({ host }: { host: Host }) {
   } else if (!visible.length) {
     body = <EmptyState className="surface" align="start" icon={<SearchX size={36} />} title="Nenhuma infração encontrada para estes filtros" action={<Button variant="secondary" onClick={() => setFilters({ ...EMPTY_FILTERS })}>Limpar filtros</Button>} />
   } else {
-    const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
-    const safePage = Math.min(page, pages)
-    const slice = visible.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
     const open = (id: string) => setTarget({ mode: 'view', id })
     body = (
       <>
         {mobile ? <InfracoesCards list={slice} uso={uso} onOpen={open} /> : <InfracoesTable list={slice} uso={uso} onOpen={open} />}
-        {visible.length > PAGE_SIZE ? <Pagination page={safePage} pageSize={PAGE_SIZE} total={visible.length} onChange={setPage} noun="infrações" /> : null}
+        <LazyFooter loaded={slice.length} total={visible.length} more={more} onLoadMore={loadMore} noun={['infração', 'infrações']} touch={mobile} />
       </>
     )
   }
