@@ -477,14 +477,30 @@ describe('Geral: correções finais', () => {
       expect(menuitem.textContent).toContain('Programado')
     })
 
-    it('gera, copia e avisa', async () => {
-      hooks.gerarLink = async () => ({ ok: true, link: 'https://acompanhe.test/x' })
+    it('mostra o link para abrir e copia ao clicar', async () => {
+      hooks.gerarLink = async () => ({ ok: true, link: 'https://acompanhe.test/x', expiraEm: '2099-01-01T12:00:00Z' })
       render(<GeralPage host={{ mode: 'mock' }} />)
       await screen.findAllByText(PAGE1)
       fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
       fireEvent.click(await item())
-      expect(await screen.findByText('Link gerado e copiado.')).toBeTruthy()
-      expect(writeText).toHaveBeenCalledWith('https://acompanhe.test/x')
+      const dialog = await screen.findByRole('dialog', { name: /Link de acompanhamento/ })
+      const abrir = await within(dialog).findByRole('link', { name: /Abrir link de acompanhamento/ })
+      expect(abrir.getAttribute('href')).toBe('https://acompanhe.test/x')
+      expect(within(dialog).getByText(/Válido até 01\/01 09:00/)).toBeTruthy()
+      expect(writeText).not.toHaveBeenCalled()
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Copiar link' }))
+      await waitFor(() => expect(writeText).toHaveBeenCalledWith('https://acompanhe.test/x'))
+      expect(await screen.findByText('Link copiado.')).toBeTruthy()
+    })
+
+    it('explica quando o ambiente não está configurado', async () => {
+      hooks.gerarLink = async () => ({ ok: false, erro: 'Link de acompanhamento não configurado.' })
+      render(<GeralPage host={{ mode: 'mock' }} />)
+      await screen.findAllByText(PAGE1)
+      fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
+      fireEvent.click(await item())
+      expect(await screen.findByText('Link de acompanhamento não configurado neste ambiente')).toBeTruthy()
+      expect(screen.getByText(/Peça ao TI/)).toBeTruthy()
     })
 
     it('mostra o erro devolvido', async () => {

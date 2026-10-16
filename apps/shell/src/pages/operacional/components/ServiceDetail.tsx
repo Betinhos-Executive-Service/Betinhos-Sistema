@@ -1,10 +1,11 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Copy, ExternalLink, MapPin, MessageCircle, Phone } from 'lucide-react'
 import { Avatar, Button, Select, StatusBadge, buttonClassName, useToast } from '@betinhos/ui'
 import type { ChoiceOption } from '@betinhos/dataverse'
 import type { Motorista, PassageiroServico, Reserva, Veiculo } from '../domain/types'
 import { carroDoServico, descreverCarro, linkValido, mensagemCliente } from '../domain/carro'
 import { copyText } from '../../pagantes/components/QuickActions'
+import { LinkAcompanhamento, LinkErro } from '../../../app/LinkAcompanhamento'
 import { motoristaOptions } from '../domain/driverOptions'
 import { passengerList } from '../domain/passengers'
 import { telHref, whatsappHref } from '../domain/phone'
@@ -28,7 +29,7 @@ const Info = ({ label, children }: { label: string; children: ReactNode }) =>
 type Props = {
   reserva: Reserva; filhos: PassageiroServico[]; motoristas: Motorista[]; reservas: Reserva[]; now: Date
   statusOptions: ChoiceOption[]; busy: boolean; veiculos: Veiculo[]
-  onGerarLink: () => Promise<{ ok: boolean; link?: string; erro?: string }>
+  onGerarLink: () => Promise<{ ok: boolean; link?: string; expiraEm?: string; erro?: string }>
   onStatus: (option: ChoiceOption) => void; onMotorista: (motorista: Motorista | null) => void; onOpenReserva: () => void
 }
 
@@ -38,8 +39,15 @@ export function ServiceDetail({ reserva, filhos, motoristas, reservas, now, stat
   const options = motoristaOptions(reserva, motoristas, reservas, now)
   const toast = useToast()
   const [gerando, setGerando] = useState(false)
+  // Link recém-gerado: aparece na hora, antes do refresh trazer new_linkacompanhamento da reserva.
+  const [gerado, setGerado] = useState<{ link: string; expiraEm: string | null } | null>(null)
+  const [erroLink, setErroLink] = useState<string | null>(null)
+  useEffect(() => { setGerado(null); setErroLink(null) }, [reserva.id])
   const motorista = motoristas.find((m) => m.id === reserva.motoristaId)
   const carro = carroDoServico(reserva, motorista, veiculos)
+  const linkAtual = gerado?.link ?? linkValido(reserva, now)
+  const expiraEm = gerado ? gerado.expiraEm : reserva.linkExpiraEm
+  const copyFailed = (reason: unknown) => toast({ tone: 'danger', message: `Não foi possível copiar. ${reason instanceof Error ? reason.message : ''}`.trim() })
 
   async function copiar(link: string | null, aviso: string) {
     try {
@@ -53,12 +61,15 @@ export function ServiceDetail({ reserva, filhos, motoristas, reservas, now, stat
   async function gerar() {
     if (gerando) return
     setGerando(true)
+    setErroLink(null)
     try {
       const res = await onGerarLink()
-      if (res.ok && res.link) await copiar(res.link, 'Link gerado. Mensagem copiada.')
-      else toast({ tone: 'danger', message: res.erro || 'Não foi possível gerar o link.' })
+      if (res.ok && res.link) {
+        setGerado({ link: res.link, expiraEm: res.expiraEm ?? null })
+        toast({ tone: 'success', message: 'Link gerado.' })
+      } else setErroLink(res.erro || 'Não foi possível gerar o link.')
     } catch (reason) {
-      toast({ tone: 'danger', message: `Não foi possível gerar o link. ${reason instanceof Error ? reason.message : ''}`.trim() })
+      setErroLink(`Não foi possível gerar o link. ${reason instanceof Error ? reason.message : ''}`.trim())
     } finally { setGerando(false) }
   }
 
@@ -113,11 +124,19 @@ export function ServiceDetail({ reserva, filhos, motoristas, reservas, now, stat
       {reserva.obsOperacao ? <section><h3 className="op-section-title">Obs. de operação</h3><p className="op-detail__note">{reserva.obsOperacao}</p></section> : null}
       {reserva.obsInterna ? <section><h3 className="op-section-title">Observação interna</h3><p className="op-detail__note">{reserva.obsInterna}</p></section> : null}
 
-      <div className="op-detail__contact">
-        <Button variant="secondary" onClick={() => void copiar(linkValido(reserva, now), 'Mensagem copiada.')}><Copy size={16} aria-hidden="true" />Copiar para o cliente</Button>
-        <Button variant="secondary" onClick={() => void gerar()} disabled={motorista?.terceiro || gerando} aria-busy={gerando}
-          title={motorista?.terceiro ? 'Motorista terceiro sem rastreador' : undefined}><MapPin size={16} aria-hidden="true" />{gerando ? 'Gerando…' : 'Gerar link'}</Button>
-      </div>
+      <section className="op-detail__link" aria-label="Acompanhamento">
+        <h3 className="op-section-title">Acompanhamento</h3>
+        {erroLink ? <LinkErro erro={erroLink} onDismiss={() => setErroLink(null)} /> : null}
+        {linkAtual
+          ? <LinkAcompanhamento link={linkAtual} expiraEm={expiraEm} now={now} mensagem={mensagemCliente({ motorista: reserva.motorista, carro, link: linkAtual })}
+              onCopied={(what) => toast({ tone: 'success', message: what === 'link' ? 'Link copiado.' : 'Mensagem copiada.' })} onCopyFailed={copyFailed} />
+          : <p className="op-detail__nophone">{motorista?.terceiro ? 'Motorista terceiro sem rastreador: não há link de acompanhamento.' : 'Gere um link para o cliente acompanhar o carro ao vivo.'}</p>}
+        <div className="op-detail__contact">
+          <Button variant="secondary" onClick={() => void copiar(linkAtual, 'Mensagem copiada.')}><Copy size={16} aria-hidden="true" />Copiar para o cliente</Button>
+          <Button variant="secondary" onClick={() => void gerar()} disabled={motorista?.terceiro || gerando} aria-busy={gerando}
+            title={motorista?.terceiro ? 'Motorista terceiro sem rastreador' : undefined}><MapPin size={16} aria-hidden="true" />{gerando ? 'Gerando…' : linkAtual ? 'Gerar novo link' : 'Gerar link'}</Button>
+        </div>
+      </section>
 
       <Button variant="secondary" onClick={onOpenReserva}><ExternalLink size={16} aria-hidden="true" />Abrir reserva completa</Button>
     </div>
