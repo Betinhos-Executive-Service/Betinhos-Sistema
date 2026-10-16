@@ -36,7 +36,7 @@ const TABS: { id: Tab; label: string; tables: TableKey[] }[] = [
 
 const KINDS: readonly Kind[] = ['manutencao', 'multa', 'colisao']
 /** Parâmetros dos filtros das visões; sair de uma aba apaga todos, para o filtro de uma não vazar para a outra. */
-const FILTROS_DAS_VISOES = ['q', 'status', 'tipo', 'veiculo', 'pessoa', 'categoria', 'de', 'ate', 'filtro', 'fde', 'fate'] as const
+const FILTROS_DAS_VISOES = ['q', 'f', 'status', 'tipo', 'veiculo', 'pessoa', 'categoria', 'de', 'ate', 'filtro', 'fde', 'fate'] as const
 
 /** Aba, ficha do veículo e registro aberto vivem na URL: `#/frota?aba=veiculos&ficha=<id>&registro=multa:<id>` (pendências é a aba padrão). */
 function useFrotaRota() {
@@ -57,7 +57,7 @@ export function FrotaPage({ host }: { host: Host }) {
   const docs = useMemo(() => { try { return createDocsSource(host) } catch { return null } }, [host])
   return (
     <ToastProvider>
-      {state.source ? <Frota source={state.source} docs={docs} /> : (
+      {state.source ? <Frota source={state.source} docs={docs} host={host} /> : (
         <PageLayout eyebrow="Frota" title="Frota">
           <Alert tone="danger" title="Não foi possível abrir a Frota">{state.error}. Abra o Sistema Betinhos pelo Dataverse.</Alert>
         </PageLayout>
@@ -67,7 +67,7 @@ export function FrotaPage({ host }: { host: Host }) {
 }
 
 /** Página com a fonte já resolvida; exportada para os testes. */
-export function Frota({ source, docs }: { source: DataSource; docs?: DocsSource | null }) {
+export function Frota({ source, docs, host }: { source: DataSource; docs?: DocsSource | null; host?: Host }) {
   const { result, setResult, loading, fatal, reload } = useFrotaCarga(source)
   const route = useFrotaRota()
   const registro = route.registro
@@ -98,9 +98,9 @@ export function Frota({ source, docs }: { source: DataSource; docs?: DocsSource 
   else body = (
     <ViewGate errors={errors} tables={tab.tables} onRetry={onReload}>
       {route.tab === 'pendencias' && <Pendencias data={data} errors={errors} today={today} onOpen={onOpen} onOpenVeiculo={onOpenVeiculo} />}
-      {route.tab === 'veiculos' && <Veiculos data={data} today={today} source={source} onOpenVeiculo={onOpenVeiculo} />}
-      {route.tab === 'manutencoes' && <Registros key="manutencoes" kinds={['manutencao']} data={data} source={source} onOpen={onOpen} onReload={onReload} />}
-      {route.tab === 'ocorrencias' && <Registros key="ocorrencias" kinds={['multa', 'colisao']} data={data} source={source} onOpen={onOpen} onReload={onReload} />}
+      {route.tab === 'veiculos' && <Veiculos data={data} today={today} source={source} host={host} onOpenVeiculo={onOpenVeiculo} />}
+      {route.tab === 'manutencoes' && <Registros key="manutencoes" kinds={['manutencao']} data={data} source={source} host={host} onOpen={onOpen} onReload={onReload} />}
+      {route.tab === 'ocorrencias' && <Registros key="ocorrencias" kinds={['multa', 'colisao']} data={data} source={source} host={host} onOpen={onOpen} onReload={onReload} />}
       {route.tab === 'indicadores' && <Indicadores data={data} errors={errors} today={today} />}
       {route.tab === 'plano' && <PlanoPreventivo data={data} source={source} onReload={onReload} />}
     </ViewGate>

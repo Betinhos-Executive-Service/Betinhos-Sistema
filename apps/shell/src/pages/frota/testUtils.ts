@@ -16,5 +16,5 @@ export function limpar(filtro: string) {
 /** Texto mostrado no gatilho: a opção escolhida ou o "todos" do placeholder. */
 export const valorDoFiltro = (filtro: string) => screen.getByRole('combobox', { name: filtro }).textContent
 
-/** Linhas de dados da tabela do Design System (sem o cabeçalho). */
-export const linhasDaTabela = () => screen.getAllByRole('row').slice(1).map((row) => row.textContent)
+/** Linhas de dados da tabela do Design System (sem o cabeçalho nem a linha de filtro rápido). */
+export const linhasDaTabela = () => screen.getAllByRole('row').filter((row) => row.classList.contains('bt-table__row')).map((row) => row.textContent)
