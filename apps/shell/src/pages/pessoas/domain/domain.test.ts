@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { createMockPessoas } from '../data/mock'
 import { FALLBACK_CHOICES, STATUS, label, withFallback } from './choices'
 import { duplicateIndex, duplicatesFor, emailKey, nameKey, phoneKey } from './duplicates'
-import { BUILTIN_VIEWS, EMPTY_FILTERS, VIEWS_KEY, clienteOptions, filterPessoas, loadViews, matchView, newView, parseStoredFilters, saveViews, viewFilters, type KV } from './filters'
+import { matchesFilters, readFilters, type TableFilters } from '@betinhos/ui'
+import { EMPTY_FILTERS, VIEWS_KEY, clienteOptions, loadViews, parseStoredFilters, type KV } from './filters'
+import { builtinViews, fromLegacyFilters, legacyViewConfig, matchesKeyword, pessoaFields, readPessoa, sortPessoas } from './lista'
+import type { Pessoa } from './types'
 import { applyForm, buildPayload, emptyForm, isDirty, maskPhone, toForm, validateForm } from './form'
 import { mergeServicos, resumo } from './history'
 import { hojeSaoPaulo } from '../components/PessoaDrawer'
@@ -43,10 +46,15 @@ describe('duplicados', () => {
   })
 })
 
-describe('filtros e visões', () => {
+describe('lista (visões e filtros do Design System)', () => {
   const dups = new Set(duplicateIndex(list).keys())
+  const clientes = clienteOptions(list)
+  const fields = pessoaFields(FALLBACK_CHOICES, clientes)
+  const apply = (filters: TableFilters) => list.filter((p) => matchesFilters(p, readFilters(filters, fields), fields, (x, key) => readPessoa(x as Pessoa, key, dups))).map((p) => p.nome)
+  const viewFilters = (id: string) => (JSON.parse(builtinViews(FALLBACK_CHOICES).find((v) => v.id === id)!.config) as { filters: TableFilters }).filters
+
   it('busca sem acento por nome, cliente, celular sem máscara, e-mail e cargo', () => {
-    const q = (query: string) => filterPessoas(list, { ...EMPTY_FILTERS, query }, dups, cargo).map((p) => p.nome)
+    const q = (query: string) => list.filter((p) => matchesKeyword(p, query, cargo(p))).map((p) => p.nome)
     expect(q('lumen')).toEqual(expect.arrayContaining(['Helena Prado', 'Juliana Costa']))
     expect(q('97777')).toEqual(['Juliana Costa'])
     expect(q('ricardo@exemplo')).toEqual(['Ricardo Menezes'])
@@ -54,23 +62,32 @@ describe('filtros e visões', () => {
     expect(q('saude')).toEqual(['Grupo Congresso Saúde'])
   })
 
-  it('filtra por status, classificação e duplicados', () => {
-    expect(filterPessoas(list, { ...EMPTY_FILTERS, status: STATUS.inativo }, dups, cargo).map((p) => p.nome)).toEqual(['Paulo Tavares'])
-    expect(filterPessoas(list, viewFilters(BUILTIN_VIEWS.find((v) => v.id === 'duplicados')!), dups, cargo).length).toBe(dups.size)
-    expect(clienteOptions(list).map((c) => c.label)).toEqual(['Grupo Atlântico', 'Lumen Consultoria', 'Particular'])
+  it('visões prontas filtram por status e duplicados', () => {
+    expect(builtinViews(FALLBACK_CHOICES).map((v) => v.name)).toEqual(['Ativos', 'Passageiros frequentes', 'Solicitantes', 'Possíveis duplicados'])
+    expect(apply(viewFilters('ativos'))).not.toContain('Paulo Tavares')
+    expect(apply(viewFilters('duplicados')).length).toBe(dups.size)
+    expect(clientes.map((c) => c.label)).toEqual(['Grupo Atlântico', 'Lumen Consultoria', 'Particular'])
   })
 
-  it('visões: salvar, recarregar, desempatar e descartar adulteradas', () => {
+  it('filtros antigos (URL e visões do navegador) viram os novos', () => {
+    const lumen = clientes.find((c) => c.label === 'Lumen Consultoria')!
+    const f = fromLegacyFilters({ ...EMPTY_FILTERS, clienteId: lumen.value, status: STATUS.inativo }, FALLBACK_CHOICES, clientes)
+    expect(f.quick.cliente).toMatchObject({ op: 'in', values: [lumen] })
+    expect(apply(fromLegacyFilters({ ...EMPTY_FILTERS, status: STATUS.inativo }, FALLBACK_CHOICES, clientes))).toEqual(['Paulo Tavares'])
+    expect(apply(fromLegacyFilters({ ...EMPTY_FILTERS, duplicados: true }, FALLBACK_CHOICES, clientes)).length).toBe(dups.size)
+  })
+
+  it('ordena pela coluna com vazios por último', () => {
+    const nomes = sortPessoas(list, 'nome', 'desc', FALLBACK_CHOICES).map((p) => p.nome)
+    expect(nomes).toEqual([...nomes].sort((a, b) => b.localeCompare(a, 'pt-BR')))
+  })
+
+  it('importação: lê as visões do navegador e descarta adulteradas', () => {
     const kv = memory()
-    const v = newView('Meus ativos', viewFilters(BUILTIN_VIEWS.find((x) => x.id === 'ativos')!), 1)
-    saveViews(kv, { views: [v], last: v.id })
-    const loaded = loadViews(kv)
-    expect(loaded.views.map((x) => x.nome)).toEqual(['Meus ativos'])
-    expect(matchView([...BUILTIN_VIEWS, ...loaded.views], v.filters)?.id).toBe('ativos')
-    expect(matchView([...BUILTIN_VIEWS, ...loaded.views], v.filters, v.id)?.id).toBe(v.id)
-    kv.setItem(VIEWS_KEY, JSON.stringify({ views: [{ id: 'x', nome: 'cliente ruim', filters: { clienteId: "x' or 1 eq 1" } }, { id: 'y', nome: 'ok', filters: {} }] }))
+    kv.setItem(VIEWS_KEY, JSON.stringify({ views: [{ id: 'x', nome: 'cliente ruim', filters: { clienteId: "x' or 1 eq 1" } }, { id: 'ativos', nome: 'pronta', filters: {} }, { id: 'y', nome: 'ok', filters: {} }] }))
     expect(loadViews(kv).views.map((x) => x.id)).toEqual(['y'])
     expect(parseStoredFilters({ classificacao: ['a'] })).toBeNull()
+    expect(JSON.parse(legacyViewConfig(loadViews(kv).views[0].filters, FALLBACK_CHOICES, clientes))).toMatchObject({ v: 1, sort: { key: 'nome', dir: 'asc' } })
   })
 })
 
