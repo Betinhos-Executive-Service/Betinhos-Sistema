@@ -428,13 +428,6 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const searchLookup = useCallback((attribute: string, text: string) => source.search(attribute, text), [source])
   const searchFilter = useCallback(async (field: { key: string }, text: string): Promise<FilterOption[]> =>
     (await source.search(field.key, text)).map((o) => ({ value: o.id, label: o.nome })), [source])
-  // "Filtrar por…" do ▾ da coluna: foca a célula da linha de filtro rápido (mostrando a linha, se estava escondida).
-  const { quickRow, setQuickRow } = viewState
-  const focusQuickFilter = useCallback((attribute: string) => {
-    const label = filterFields.find((f) => f.key === attribute)?.label ?? attribute
-    if (!quickRow) setQuickRow(true)
-    window.setTimeout(() => Array.from(document.querySelectorAll<HTMLElement>('.gr-quickrow [aria-label]')).find((el) => el.getAttribute('aria-label') === `Filtrar ${label}`)?.focus(), 0)
-  }, [filterFields, quickRow, setQuickRow])
   // Busca por palavra-chave: o texto fica local; a busca de verdade sai depois da pausa.
   const [searchText, setSearchText] = useState(query)
   useEffect(() => setSearchText(query), [query])
@@ -513,8 +506,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               defaultSort={geral.defaultOrder}
               onSort={geral.setSort}
               filteredKeys={filteredKeys}
-              quick={{ fields: filterFields, value: valid.quick, onChange: setQuickFilter, search: searchFilter, visible: quickRow }}
-              onEditFilter={focusQuickFilter}
+              quick={{ fields: filterFields, value: valid.quick, onChange: setQuickFilter, search: searchFilter }}
               onClearFilter={(attribute) => setQuickFilter(attribute, null)}
               onHide={hideColumn}
               selected={geral.selected}
