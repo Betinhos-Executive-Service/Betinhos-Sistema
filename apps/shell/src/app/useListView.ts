@@ -13,6 +13,8 @@ type Options = {
   tela: string
   columns: ViewColumnDef[]
   defaultSort?: ViewSort
+  /** Filtros da Visão padrão (ex.: só ativos). */
+  defaultFilters?: TableFilters
   fields: FilterField[]
   /** Escolhas e opções carregadas: até lá a lista de visões espera e o link não é lido. */
   ready: boolean
@@ -45,7 +47,8 @@ export function useListView(o: Options) {
     const base = withBuiltinViews(viewStoreFor(o.host), () => latest.current.builtins())
     return { ...base, list: async (tela) => { await gate.ready; return base.list(tela) } }
   }, [o.host, gate])
-  const raw = useTableView({ tela: o.tela, columns: o.columns, store, defaultSort: o.defaultSort })
+  const defaultFilters = useMemo(() => (o.defaultFilters ? storedFilters(o.defaultFilters) : undefined), [JSON.stringify(o.defaultFilters ?? null)]) // eslint-disable-line react-hooks/exhaustive-deps
+  const raw = useTableView({ tela: o.tela, columns: o.columns, store, defaultSort: o.defaultSort, defaultFilters })
 
   // O que o usuário muda (visão, colunas, filtros) encerra o filtro vindo do link; até lá ele vale a cada recarga.
   const touched = useRef(false)
