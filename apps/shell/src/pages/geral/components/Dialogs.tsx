@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Alert, Button, Dialog } from '@betinhos/ui'
+import { LinkAcompanhamento, LinkErro } from '../../../app/LinkAcompanhamento'
 
 const COPY_FAILED = 'Não foi possível copiar automaticamente. Selecione e copie.'
 
@@ -137,6 +138,32 @@ export function DispararDialog({ request, busy, onClose, onConfirm }: { request:
     >
       <div className="gr-dialog">
         <p>Serviços sem motorista são recusados pelo servidor.</p>
+      </div>
+    </Dialog>
+  )
+}
+
+export type LinkRequest = { codigo: string; loading: boolean; link?: string; expiraEm?: string; erro?: string }
+
+/** Link de acompanhamento do serviço marcado: mostra o endereço para abrir ou copiar, ou o erro devolvido. */
+export function LinkDialog({ request, onClose, onCopied, onCopyFailed }: { request: LinkRequest | null; onClose: () => void; onCopied: (what: 'link' | 'mensagem') => void; onCopyFailed: (reason: unknown) => void }) {
+  const last = useRef<LinkRequest | null>(null)
+  if (request) last.current = request
+  const shown = request ?? last.current
+  return (
+    <Dialog
+      open={request != null}
+      onClose={onClose}
+      title={shown ? `Link de acompanhamento · ${shown.codigo}` : 'Link de acompanhamento'}
+      actions={<Button variant="secondary" onClick={onClose}>Fechar</Button>}
+    >
+      <div className="gr-dialog" aria-busy={shown?.loading || undefined}>
+        {shown?.loading ? <p role="status">Gerando o link…</p> : null}
+        {shown?.erro ? <LinkErro erro={shown.erro} /> : null}
+        {shown?.link ? <>
+          <p>Envie ao cliente ou passageiro: a página mostra o carro ao vivo e expira sozinha.</p>
+          <LinkAcompanhamento link={shown.link} expiraEm={shown.expiraEm} onCopied={onCopied} onCopyFailed={onCopyFailed} />
+        </> : null}
       </div>
     </Dialog>
   )
