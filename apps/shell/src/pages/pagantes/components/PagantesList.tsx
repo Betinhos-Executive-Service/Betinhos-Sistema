@@ -1,5 +1,5 @@
-import type { MouseEvent } from 'react'
-import { Table, type TableColumn } from '@betinhos/ui'
+import type { MouseEvent, ReactNode } from 'react'
+import { Table, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
 import { formatDate, formatMoney } from '../domain/messages'
 import { hasFalha, label, statusTone } from '../domain/status'
 import type { ChoiceSet, Contato, Pagante } from '../domain/types'
@@ -7,6 +7,7 @@ import { QuickActions } from './QuickActions'
 import { FalhaBadge, PagamentoBadge, ReciboBadge } from './StatusBadges'
 
 type Props = { list: Pagante[]; choices: ChoiceSet; contatos: Map<string, Contato>; onOpen: (id: string) => void; loading?: boolean }
+type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; footer?: ReactNode; empty?: ReactNode }
 
 /** Nome como botão real: a linha tem ações próprias e não pode ser um `button` inteiro. */
 function OpenName({ p, onOpen }: { p: Pagante; onOpen: (id: string) => void }) {
@@ -35,20 +36,20 @@ const severity = (p: Pagante) => {
   return tone === 'danger' || tone === 'warning' ? { tone, label: tone === 'danger' ? 'Pagamento recusado ou expirado' : 'Aguardando pagamento' } : null
 }
 
-export function PagantesTable({ list, choices, contatos, onOpen, loading }: Props) {
+export function PagantesTable({ list, choices, contatos, onOpen, loading, view, quickFilters, footer, empty }: TableProps) {
   const columns: TableColumn<Pagante>[] = [
-    { key: 'pessoa', header: 'Pagante', width: 'minmax(180px, 1.6fr)', cell: (p) => <OpenName p={p} onOpen={onOpen} /> },
-    { key: 'op', header: 'OP', width: 'minmax(80px, .7fr)', hideBelow: 'compact', cell: (p) => p.op || '—' },
-    { key: 'valor', header: 'Valor', width: 'minmax(96px, .8fr)', align: 'end', cell: (p) => <span className="pg-num">{formatMoney(p.valor)}</span> },
-    { key: 'forma', header: 'Forma', width: 'minmax(96px, .8fr)', hideBelow: 'compact', cell: (p) => label(choices.forma, p.forma) },
-    { key: 'status', header: 'Pagamento', width: 'minmax(140px, 1fr)', cell: (p) => <span className="pg-badges"><PagamentoBadge p={p} choices={choices} /><FalhaBadge p={p} /></span> },
-    { key: 'recibo', header: 'Recibo', width: 'minmax(120px, .9fr)', hideBelow: 'compact', cell: (p) => <ReciboBadge p={p} choices={choices} /> },
-    { key: 'criado', header: 'Criado em', width: 'minmax(88px, .7fr)', hideBelow: 'compact', cell: (p) => formatDate(p.criadoEm) },
-    { key: 'acoes', header: <span className="pg-sr">Ações rápidas</span>, width: '84px', align: 'end', cell: (p) => <QuickActions p={p} contato={contatos.get(p.pessoaId)} /> },
+    { key: 'pessoa', header: 'Pagante', label: 'Pagante', sortable: true, defaultWidth: 260, width: 'minmax(180px, 1.6fr)', cell: (p) => <OpenName p={p} onOpen={onOpen} /> },
+    { key: 'op', header: 'OP', label: 'OP', sortable: true, defaultWidth: 110, width: 'minmax(80px, .7fr)', hideBelow: 'compact', cell: (p) => p.op || '—' },
+    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 130, width: 'minmax(96px, .8fr)', align: 'end', cell: (p) => <span className="pg-num">{formatMoney(p.valor)}</span> },
+    { key: 'forma', header: 'Forma', label: 'Forma', sortable: true, defaultWidth: 130, width: 'minmax(96px, .8fr)', hideBelow: 'compact', cell: (p) => label(choices.forma, p.forma) },
+    { key: 'status', header: 'Pagamento', label: 'Pagamento', sortable: true, defaultWidth: 200, width: 'minmax(140px, 1fr)', cell: (p) => <span className="pg-badges"><PagamentoBadge p={p} choices={choices} /><FalhaBadge p={p} /></span> },
+    { key: 'recibo', header: 'Recibo', label: 'Recibo', sortable: true, defaultWidth: 160, width: 'minmax(120px, .9fr)', hideBelow: 'compact', cell: (p) => <ReciboBadge p={p} choices={choices} /> },
+    { key: 'criado', header: 'Criado em', label: 'Criado em', sortable: true, defaultWidth: 130, width: 'minmax(88px, .7fr)', hideBelow: 'compact', cell: (p) => formatDate(p.criadoEm) },
+    { key: 'acoes', header: <span className="pg-sr">Ações rápidas</span>, label: 'Ações rápidas', defaultWidth: 96, width: '84px', align: 'end', cell: (p) => <QuickActions p={p} contato={contatos.get(p.pessoaId)} /> },
   ]
   return (
     <div className="pg-table-wrap" onClick={(event) => openFromRow(event, '.bt-table__row', '.pg-open')}>
-      <Table className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} severity={severity} loading={loading} />
+      <Table className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} severity={severity} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }
