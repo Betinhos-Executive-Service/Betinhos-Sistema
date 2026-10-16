@@ -34,9 +34,13 @@ describe('Pendências', () => {
     await screen.findByText('OP-501')
     expect(rows()).toBe(5)
     expect(screen.getByText('Dados de exemplo')).toBeTruthy()
-    fireEvent.click(screen.getByRole('combobox', { name: 'Visão' }))
-    await waitFor(() => expect(screen.getAllByText('Rateio').length).toBeGreaterThan(1))
-    fireEvent.click(screen.getAllByText('Rateio').find((el) => !el.closest('.bt-button'))!)
+    fireEvent.click(screen.getByRole('button', { name: /^Visão:/ }))
+    const opcao = await waitFor(() => {
+      const el = screen.getAllByText('Rateio').map((e) => e.closest('[role="menuitemradio"]')).find(Boolean)
+      if (!el) throw new Error('visão não apareceu')
+      return el
+    })
+    fireEvent.click(opcao)
     await waitFor(() => expect(rows()).toBe(1))
     expect(screen.getByText('OP-505')).toBeTruthy()
   })
@@ -85,5 +89,14 @@ describe('Pendências', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Aplicar correção' }))
     expect(await within(dialog).findByText('Falha na Custom API')).toBeTruthy()
     expect(screen.getByRole('dialog', { name: /Corrigir OP-501/ })).toBeTruthy()
+  })
+
+  it('link antigo com tipos na URL abre filtrado e passa a usar f=', async () => {
+    window.location.hash = '#/pendencias?tipos=rateio-nao-fecha'
+    render(<PendenciasPage host={{ mode: 'mock' }} />)
+    await screen.findByText('OP-505')
+    await waitFor(() => expect(rows()).toBe(1))
+    await waitFor(() => expect(window.location.hash).toMatch(/[?&]f=/))
+    expect(window.location.hash).not.toMatch(/tipos=/)
   })
 })
