@@ -9,6 +9,9 @@ import { MENU, itemLabel, type MenuGroup } from '../nav/menu'
 import { hrefFor, patchHashQuery, readHashQuery } from '../nav/useHashRoute'
 import { useInstallPrompt } from './useInstallPrompt'
 
+// Logo B da Betinhos: o mesmo WebResource usado como favicon e ícone do app instalável.
+const BRAND_LOGO = '/WebResources/cr40f_SistemaBetinhosIcon192.png'
+
 type Props = {
   activeId: string
   title: string
@@ -129,7 +132,7 @@ export function AppShell({ activeId, title, entityLabels, connection, badges, de
   const groups = useMemo(() => MENU.map((group) => toNavGroup(group, entityLabels, badges)), [entityLabels, badges])
   return (
     <Shell
-      brand={{ name: 'Betinhos', subtitle: 'Sistema interno', href: hrefFor(MENU[0].items[0].id) }}
+      brand={{ name: 'Betinhos', subtitle: 'Sistema interno', logo: <img src={BRAND_LOGO} alt="" />, href: hrefFor(MENU[0].items[0].id) }}
       groups={groups}
       activeId={activeId}
       title={title}
