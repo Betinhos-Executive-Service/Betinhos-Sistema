@@ -4,7 +4,8 @@ import type { Source } from './data/source'
 import { cellKind } from './domain/cells'
 import { buildPatch, reduceCell, validateEdit, SAVED_VISIBLE_MS, type CellEvent, type EditValue } from './domain/edit'
 import { defaultSort, linkEntities } from './domain/fetch'
-import { injectFilters, isEmptyFilter, type Filter, type FilterSet } from './domain/filters'
+import { emptyFilters, type FilterCondition, type FilterField, type TableFilters } from '@betinhos/ui'
+import { geralFilterFields, hasActiveFilters, injectTableFilters } from './domain/tableFilters'
 import { formatDateTime } from './domain/format'
 import { columnLabel, parseLayout, rowKey } from './domain/layout'
 import type { UrlState } from './domain/urlState'
@@ -33,7 +34,11 @@ export type GeralState = {
   quickFind: string[]
   rows: Row[]; total: number | null; more: boolean; pagesLoaded: number
   loading: boolean; loadingMore: boolean; pageError: string | null; loadError: string | null
-  sort: Sort; query: string; filters: FilterSet
+  sort: Sort; query: string
+  /** Filtros como estão (vindos da URL ou da tela); valem os que casam com `filterFields`. */
+  filters: TableFilters
+  /** Campos filtráveis da raiz, a partir da metadata (vazio enquanto ela não chega). */
+  filterFields: FilterField[]
   selected: Set<string>
   cells: Map<string, CellStatus>
 }
@@ -101,20 +106,21 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [sort, setSortState] = useState<Sort>(null)
   const [query, setQueryState] = useState('')
-  const [filters, setFilters] = useState<FilterSet>({})
+  const [filters, setFiltersState] = useState<TableFilters>(emptyFilters)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [cells, setCells] = useState<Map<string, CellStatus>>(() => new Map())
   const viewRef = useRef<View | null>(null)
   viewRef.current = view
-  const hasFilters = useMemo(() => Object.values(filters).some((f) => !isEmptyFilter(f)), [filters])
+  const hasFilters = useMemo(() => hasActiveFilters(filters), [filters])
+  const filterFields = useMemo(() => geralFilterFields(attributes, columns.map((c) => c.key)), [attributes, columns])
   /** Com filtros e a metadata ainda a caminho a consulta espera: pedir antes devolveria a lista sem filtrar. */
   const filtersPending = view != null && hasFilters && attributes == null && attributesError == null
   /** FetchXML da visão com os filtros por coluna; sem metadata (ou sem filtros) é o da própria visão. */
   const effectiveFetch = useMemo(() => {
     if (!view) return null
     if (!attributes || !hasFilters) return view.fetchxml
-    try { return injectFilters(view.fetchxml, filters, attributes) } catch { return view.fetchxml }
-  }, [view, attributes, filters, hasFilters])
+    try { return injectTableFilters(view.fetchxml, filters, filterFields) } catch { return view.fetchxml }
+  }, [view, attributes, filters, hasFilters, filterFields])
   const defaultOrder = useMemo<Sort>(() => { try { return view ? defaultSort(view.fetchxml) : null } catch { return null } }, [view])
 
   // Espelhos síncronos: callbacks (save, carga de páginas) leem o valor corrente, não o do último render.
@@ -181,7 +187,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
           if (initial) {
             if (initial.q) setQueryState(initial.q)
             if (initial.sort) setSortState(initial.sort)
-            if (initial.filters) setFilters(initial.filters)
+            if (initial.filters) setFiltersState(initial.filters)
           }
         } else setLoadingFlag(false)
       },
@@ -337,7 +343,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     if (!next) return
     enterView(next)
     // Filtros são da visão: trocar de visão recomeça sem eles, como a ordenação.
-    setFilters((current) => (Object.keys(current).length ? {} : current))
+    setFiltersState((current) => (hasActiveFilters(current) ? emptyFilters() : current))
   }, [views, enterView])
 
   /**
@@ -348,7 +354,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     const list = await source.views()
     setViews(list)
     const current = viewRef.current
-    const open = (next: View) => { enterView(next); setFilters((f) => (Object.keys(f).length ? {} : f)) }
+    const open = (next: View) => { enterView(next); setFiltersState((f) => (hasActiveFilters(f) ? emptyFilters() : f)) }
     const target = selectId ? list.find((v) => v.id === selectId) : undefined
     if (target) { open(target); return }
     const same = current ? list.find((v) => v.id === current.id) : undefined
@@ -363,16 +369,17 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
 
   const setSort = useCallback((next: Sort) => setSortState(next), [])
   const setQuery = useCallback((next: string) => setQueryState(next), [])
-  /** `null` (ou um filtro sem o valor que a operação exige) remove o filtro da coluna. */
-  const setFilter = useCallback((attribute: string, filter: Filter | null) => setFilters((current) => {
-    if (!filter || isEmptyFilter(filter)) {
-      if (!(attribute in current)) return current
-      const { [attribute]: _removed, ...rest } = current
-      return rest
+  const setFilters = useCallback((next: TableFilters) => setFiltersState(next), [])
+  /** Filtro rápido de uma coluna; `null` remove. */
+  const setQuickFilter = useCallback((attribute: string, condition: FilterCondition | null) => setFiltersState((current) => {
+    if (!condition) {
+      if (!(attribute in current.quick)) return current
+      const { [attribute]: _removed, ...quick } = current.quick
+      return { ...current, quick }
     }
-    return { ...current, [attribute]: filter }
+    return { ...current, quick: { ...current.quick, [attribute]: condition } }
   }), [])
-  const clearFilters = useCallback(() => setFilters((current) => (Object.keys(current).length ? {} : current)), [])
+  const clearFilters = useCallback(() => setFiltersState((current) => (hasActiveFilters(current) ? emptyFilters() : current)), [])
 
   // Avisa quem guarda o estado (a URL) sempre que visão, busca, ordem ou filtros mudam. Só depois de existir uma visão.
   const viewId = view?.id
@@ -381,7 +388,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     const state: UrlState = { view: viewId }
     if (query) state.q = query
     if (sort) state.sort = sort
-    if (hasFilters) state.filters = Object.fromEntries(Object.entries(filters).filter(([, f]) => !isEmptyFilter(f)))
+    if (hasFilters) state.filters = filters
     onStateChange.current?.(state)
   }, [viewId, query, sort, filters, hasFilters])
 
@@ -478,8 +485,8 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     return true
   }, [attributes, columns, source, setCell, setRows, scheduleSettle])
 
-  const state: GeralState = { views, viewsError, view, columns, attributes, attributesError, quickFind, rows, total, more, pagesLoaded, loading, loadingMore, pageError, loadError, sort, query, filters, selected, cells }
+  const state: GeralState = { views, viewsError, view, columns, attributes, attributesError, quickFind, rows, total, more, pagesLoaded, loading, loadingMore, pageError, loadError, sort, query, filters, filterFields, selected, cells }
   /** Há filtros, mas a metadata falhou: a consulta segue sem eles. */
   const filtersIgnored = hasFilters && attributes == null && attributesError != null
-  return { ...state, filtersIgnored, defaultOrder, selectView, reloadViews, setSort, setQuery, setFilter, clearFilters, loadMore, retryLoadMore, reload, refresh: reload, toggle, selectOnly, selectRange, toggleAll, clearSelection, save, resetCell }
+  return { ...state, filtersIgnored, defaultOrder, selectView, reloadViews, setSort, setQuery, setFilters, setQuickFilter, clearFilters, loadMore, retryLoadMore, reload, refresh: reload, toggle, selectOnly, selectRange, toggleAll, clearSelection, save, resetCell }
 }

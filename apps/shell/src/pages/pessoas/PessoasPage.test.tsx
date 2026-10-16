@@ -2,6 +2,7 @@
 import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PessoasPage } from './PessoasPage'
+import { STATUS } from './domain/choices'
 
 // O mock simula latência; com a suíte inteira em paralelo a máquina fica lenta.
 configure({ asyncUtilTimeout: 8000 })
@@ -11,7 +12,7 @@ beforeEach(() => {
   window.localStorage.clear()
   vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
 })
-afterEach(() => { cleanup(); vi.unstubAllGlobals() })
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.location.hash = '' })
 
 const row = async (nome: string) => (await screen.findAllByText(nome))[0].closest('.bt-table__row') as HTMLElement
 
@@ -35,6 +36,15 @@ describe('Pessoas', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
     expect(await screen.findByText('Cadastro de John Carter salvo.')).toBeTruthy()
     await waitFor(() => expect(screen.getAllByText(/Compras/).length).toBeGreaterThan(0))
+  })
+
+  it('link antigo com filtro na URL abre filtrado e passa a usar f=', async () => {
+    window.location.hash = `#/pessoas?status=${STATUS.inativo}`
+    render(<PessoasPage host={{ mode: 'mock' }} />)
+    await row('Paulo Tavares')
+    await waitFor(() => expect(screen.queryAllByText('John Carter')).toHaveLength(0))
+    await waitFor(() => expect(window.location.hash).toMatch(/[?&]f=/))
+    expect(window.location.hash).not.toMatch(/[?&]status=/)
   })
 
   it('cadastro avisa duplicado, valida e pede confirmação ao fechar com alterações', async () => {

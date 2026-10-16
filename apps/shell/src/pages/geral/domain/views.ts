@@ -1,14 +1,15 @@
-import type { AttributeMap, Column, Sort } from './types'
+import type { Column, Sort } from './types'
 import { ID_ATTRIBUTE } from './types'
 import { applySort, parse } from './fetch'
-import { injectFilters, type FilterSet } from './filters'
+import type { FilterField, TableFilters } from '@betinhos/ui'
+import { injectTableFilters } from './tableFilters'
 
 /**
  * FetchXML para gravar numa visão pessoal: o da visão atual com os filtros por coluna e a ordenação corrente.
  * Sem paginação, contagem nem busca por palavra-chave (nada disso pertence à visão).
  */
-export function buildViewFetch(baseFetch: string, filters: FilterSet, sort: Sort, attributes: AttributeMap): string {
-  const injected = injectFilters(baseFetch, filters, attributes)
+export function buildViewFetch(baseFetch: string, filters: TableFilters, sort: Sort, fields: FilterField[]): string {
+  const injected = injectTableFilters(baseFetch, filters, fields)
   const { doc, root, entity } = parse(injected)
   for (const name of ['count', 'page', 'paging-cookie', 'returntotalrecordcount']) root.removeAttribute(name)
   if (sort) applySort(doc, entity, sort)
