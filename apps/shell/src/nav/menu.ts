@@ -10,7 +10,7 @@ export type MenuItem =
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
-  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes'; agente?: 'financeiro' | 'logistica' | 'pessoas' }
+  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados'; agente?: 'financeiro' | 'logistica' | 'pessoas' }
 
 export type MenuGroup = { id: string; label: string; items: MenuItem[] }
 
@@ -34,6 +34,7 @@ export const MENU: MenuGroup[] = [
       wr('Funções Operacionais', 'new_telafuncoesoperacionais'),
       table('cr40f_trocasdecarro'),
       table('new_possedeveiculo'),
+      { kind: 'page', id: 'comunicados', label: 'Comunicados', page: 'comunicados' },
       wr('Gestão de Qualidade', 'new_gestao_erros_operacionais.html'),
       { kind: 'external', id: 'infleet', label: 'Infleet', url: 'https://app.infleet.com.br/monitoring' },
       wr('Planner', 'new_TelaPlanner.html'),
@@ -88,7 +89,8 @@ export const MENU: MenuGroup[] = [
       table('cr40f_anexocolisao_v2'),
       table('cr40f_anexorecebimento_v2'),
       { kind: 'unavailable', id: 'custom-page-funcoes-operacionais', label: 'Funções Operacionais (página personalizada)', reason: 'Esta página personalizada só abre pelo menu do app model-driven.' },
-      wr('Comunicados', 'cr40f_GerenciarComunicados.html'),
+      // Substituído por #/comunicados (Operacional); fica aqui enquanto houver uso.
+      wr('Comunicados (antigo)', 'cr40f_GerenciarComunicados.html'),
       table('cr40f_pedidodecotacao'),
       wr('Fluxo de Caixa', 'cr40f_TelaFluxoDeCaixa.html'),
       table('cr40f_composicaodeprecos'),
