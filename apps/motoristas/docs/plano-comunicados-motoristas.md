@@ -68,6 +68,15 @@ Schema, APIs, papel, Flow ativo, web resources e item do menu foram publicados n
 - **Lembrete:** `new_ReenviarPushComunicado` aceita push `Falhou` (reenvio) ou `Enviado` com destinatário ainda pendente (lembrete). Destinatário concluído é recusado.
 - **Gestão:** excluir rascunho, duplicar (inclusive comunicado já enviado, como novo rascunho), busca e filtro de resultados por status, exportação CSV (UTF-8 com BOM, `;`) e "Lembrar pendentes".
 - **App:** informativos pendentes também aparecem em Serviços; item não aberto mostra "NOVO" no rótulo; a lista mostra skeleton na primeira carga e erro com nova tentativa em vez de "Nenhum comunicado pendente".
-- **Deep link:** o app abre o comunicado com `?comunicadoId=<destinatarioId>` ou `?data=comunicadoId%3D<destinatarioId>`. O Flow de push não foi alterado: `SendPushNotificationV2` para app model-driven abre o app, e não há comprovação de que repasse parâmetro ao web resource. Validar em aparelho antes de incluir o ID no push.
+- **Deep link:** o app abre o comunicado com `?comunicadoId=<destinatarioId>` ou `?data=comunicadoId%3D<destinatarioId>`.
+
+## Push abrindo o App no comunicado (16/10/2026, publicado no DEV)
+
+O conector Power Apps Notification V2, para app model-driven, só navega para tabela/registro (`dynamicParams/entityLogicalName` é obrigatório; não há destino de web resource). Para o toque na notificação cair no App Motoristas, e não no form padrão:
+
+- `Flow Push Comunicados | Motoristas` passa também `dynamicParams/recordId` = ID do destinatário (`scripts/provision-comunicados-push-flow.ps1`; o smoke confere).
+- `webresources/new_comunicadodestinatario_redirect.js` é registrado no OnLoad do form principal de `new_comunicadodestinatario` e chama `Xrm.Navigation.navigateTo` para `new_app-motoristas-v2` com `data=comunicadoId=<id>`; uma guarda em `sessionStorage` (15 s) evita loop ao tocar em Voltar. Teste: `tests/comunicadoRedirect.test.ts`.
+- `scripts/provision-comunicados-push-redirect.ps1` publica o web resource, registra o OnLoad, inclui tabela e form no app `new_AppMotoristasv2` e publica tudo; `pnpm push` o executa após `provision-comunicados.ps1`. Atenção: no Web API, `AddAppComponents` com `@odata.type` `Microsoft.Dynamics.CRM.entity` adiciona a tabela "entity"; o script usa o tipo OData da própria tabela com o MetadataId.
+- Validação feita: smoke, `ValidateApp` sem avisos, disparo controlado para a conta noreply com push enviado. O toque na notificação no aparelho (abrir o App já no comunicado) ainda precisa ser conferido em Android/iOS.
 - **Validação local:** testes do App, plugin (`dotnet test`), TypeScript e build do App e da Gestão; fluxo no navegador com o mock (criar, duplicar, excluir, filtrar, exportar, lembrar; Serviços, rótulo NOVO, deep link e estado de erro).
 
