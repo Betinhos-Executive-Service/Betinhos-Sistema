@@ -28,6 +28,7 @@ import {
 import { createRemoteReadBatch } from "./remoteReadBatch.ts";
 import { buildCurrentVehiclePatch } from "./myVehicle.ts";
 import { buildIdeaRecord, normalizeIdeaRecord, validateIdeaDraft, type Idea, type IdeaDraft } from "./ideas.ts";
+import { decideExpenseUploadMode, type ExpenseUploadMode } from "./expenseUploadMode.ts";
 
 type XrmLike = {
   Utility?: {
@@ -1281,8 +1282,32 @@ async function uploadMaintenancePhoto(
   });
 }
 
+let resolvedExpenseUploadMode: { clientUrl: string; mode: ExpenseUploadMode } | null = null;
+
+function getCurrentClientUrlKey() {
+  return String(getWindowXrm()?.Utility?.getGlobalContext?.().getClientUrl?.() ?? "").replace(/\/+$/, "").toLowerCase();
+}
+
+/**
+ * Decide o caminho de envio dos comprovantes pela configuracao do ambiente atual
+ * (new_FlowURLDespesaAsync + colunas do anexo), nunca pela URL do ambiente.
+ * Nunca lanca: qualquer falha antes de criar registros mantem o envio legado.
+ */
+export async function resolveExpenseUploadModeRemote(): Promise<ExpenseUploadMode> {
+  const mode = await decideExpenseUploadMode({
+    hasRuntime: hasDataverseRuntime,
+    resolveAsyncFlowUrl: () => resolveFlowUrl(FLOW_URLS.expenseAsync),
+    assertAsyncSchema: () => assertEntityHasAttributes(DATAVERSE.anexosDespesasOperacionais, "Anexos de despesas", ["new_uploadattemptid", "new_uploadrunid", "new_uploaderror", "cr40f_mimetype", "cr40f_driveitemid"]),
+    warn: dataverseWarn
+  });
+  resolvedExpenseUploadMode = { clientUrl: getCurrentClientUrlKey(), mode };
+  return mode;
+}
+
 export function usesAsyncExpenseUpload() {
-  return hasDataverseRuntime() && `${getClientUrl()}/`.toLowerCase() === DEV_DATAVERSE_URL.toLowerCase();
+  return hasDataverseRuntime()
+    && resolvedExpenseUploadMode?.mode === "async"
+    && resolvedExpenseUploadMode.clientUrl === getCurrentClientUrlKey();
 }
 
 export function expenseSubmissionStorageKey(motoristaId: string) {
@@ -1320,7 +1345,7 @@ async function ensureExpenseRecord(entitySet: string, id: string, payload: Recor
 }
 
 export async function ensureExpenseSubmissionRemote(submission: ExpenseSubmission) {
-  if (!usesAsyncExpenseUpload()) throw new Error("Envio assíncrono disponível somente no DEV.");
+  if (!usesAsyncExpenseUpload()) throw new Error("Envio assíncrono de despesas não configurado neste ambiente.");
   // Fail before creating any row when the deployment/permissions are incomplete.
   await assertEntityHasAttributes(DATAVERSE.anexosDespesasOperacionais, "Anexos de despesas", ["new_uploadattemptid", "new_uploadrunid", "new_uploaderror", "cr40f_mimetype", "cr40f_driveitemid"]);
   if (!await resolveFlowUrl(FLOW_URLS.expenseAsync)) throw new Error("Flow assíncrono de despesas não configurado.");
@@ -3478,7 +3503,8 @@ export async function loadRemoteDetailByParams(servicoId: string, tipo = ""): Pr
 }
 
 async function getDataverseEnvironmentVariableValue(schemaName: string) {
-  if (flowUrlCache.has(schemaName)) return flowUrlCache.get(schemaName) ?? "";
+  const cacheKey = `${getCurrentClientUrlKey()}|${schemaName}`;
+  if (flowUrlCache.has(cacheKey)) return flowUrlCache.get(cacheKey) ?? "";
 
   const definitionResult = await retrieveMultiple(
     "environmentvariabledefinitions",
@@ -3502,7 +3528,8 @@ async function getDataverseEnvironmentVariableValue(schemaName: string) {
     ].join("&")
   );
   const url = String(valueResult.entities[0]?.value ?? definition.defaultvalue ?? "").trim();
-  flowUrlCache.set(schemaName, url);
+  // Valor vazio nao e cacheado: uma variavel configurada depois passa a valer sem recarregar o app.
+  if (url) flowUrlCache.set(cacheKey, url);
   return url;
 }
 

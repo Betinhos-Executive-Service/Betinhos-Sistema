@@ -87,7 +87,8 @@ import type { ComunicadosLoadStatus } from "./screens/ComunicadosScreen";
 import { clearMediaDraft, loadMediaDraft, saveMediaDraft, touchMediaDraft } from "./lib/mediaDraftStore";
 import { summarizeExpenseUploads, type ExpenseSubmission, type ExpenseUploadRow } from "./lib/expenseUploadState";
 import { resumeExpenseSubmission } from "./lib/expenseSubmission";
-import { usesAsyncExpenseUpload, expenseSubmissionStorageKey, ensureExpenseSubmissionRemote, loadExpenseUploadRowsRemote, transitionExpenseUploadRemote, dispatchExpenseUploadRemote, createExpenseUploadItem } from "./lib/dataverse";
+import type { ExpenseUploadMode } from "./lib/expenseUploadMode";
+import { resolveExpenseUploadModeRemote, expenseSubmissionStorageKey, ensureExpenseSubmissionRemote, loadExpenseUploadRowsRemote, transitionExpenseUploadRemote, dispatchExpenseUploadRemote, createExpenseUploadItem } from "./lib/dataverse";
 
 const EXCHANGE_ERROR_MESSAGES: Record<string, string> = {
   EXCHANGE_CONCURRENCY_CONFLICT: "A troca foi alterada por outra pessoa. Atualize a agenda e tente novamente.",
@@ -496,6 +497,7 @@ function App() {
   const [expenseSubmission, setExpenseSubmission] = useState<ExpenseSubmission | null>(null);
   const [expenseUploadRows, setExpenseUploadRows] = useState<ExpenseUploadRow[]>([]);
   const [expenseUploadReady, setExpenseUploadReady] = useState(false);
+  const [expenseUploadMode, setExpenseUploadMode] = useState<ExpenseUploadMode | "pending">("pending");
   const expenseSubmissionRef = useRef<ExpenseSubmission | null>(null);
   const expenseSubmitBusyRef = useRef(false);
   const expenseUploadSummary = expenseSubmission?.expenseConfirmed ? summarizeExpenseUploads(expenseSubmission.items, expenseUploadRows) : null;
@@ -505,7 +507,15 @@ function App() {
     : `${expenseUploadSummary.sent} comprovante(s) enviado(s); ${expenseUploadSummary.failed} com falha confirmada.`;
 
   useEffect(() => {
-    if (!remoteMode || !driverContext || !usesAsyncExpenseUpload()) return;
+    if (!remoteMode) return;
+    let active = true;
+    // Decide pela configuracao do ambiente (Flow assincrono configurado), nao pela URL; nunca rejeita.
+    resolveExpenseUploadModeRemote().then(mode => { if (active) setExpenseUploadMode(mode); });
+    return () => { active = false; };
+  }, [remoteMode]);
+
+  useEffect(() => {
+    if (!remoteMode || !driverContext || expenseUploadMode !== "async") return;
     let active = true;
     setExpenseUploadReady(false);
     loadMediaDraft<ExpenseSubmission>(expenseSubmissionStorageKey(driverContext.id)).then(saved => {
@@ -519,7 +529,7 @@ function App() {
       setExpenseUploadReady(true);
     }).catch(error => { if (active) setCriticalError(error instanceof Error ? error.message : "Falha ao restaurar envio de despesa."); });
     return () => { active = false; };
-  }, [remoteMode, driverContext?.id]);
+  }, [remoteMode, driverContext?.id, expenseUploadMode]);
 
   useEffect(() => {
     if (!expenseSubmission || !remoteMode) return;
@@ -1865,8 +1875,8 @@ function App() {
   };
 
   const submitExpense = async (draft: ExpenseDraft) => {
-    if (usesAsyncExpenseUpload()) return submitExpenseAsync(draft);
-    if (remoteOperation) return;
+    if (remoteMode && expenseUploadMode === "async") return submitExpenseAsync(draft);
+    if (remoteOperation || (remoteMode && expenseUploadMode === "pending")) return;
     if (!remoteMode) {
       setToast("Abra no Power Apps para registrar no Dataverse.");
       return;
@@ -2914,7 +2924,7 @@ function App() {
         uploadMessage={expenseUploadMessage}
         formLocked={Boolean(expenseSubmission)}
         submitLabel={expenseUploadSummary?.complete ? "CONCLUIR" : expenseUploadSummary?.canRetry ? "TENTAR COMPROVANTES NOVAMENTE" : expenseSubmission?.items.every(item => item.dispatchStarted && !item.previousAttemptId) ? "VERIFICAR ENVIO" : expenseSubmission ? "CONTINUAR ENVIO" : "REGISTRAR"}
-        submitDisabled={usesAsyncExpenseUpload() && !expenseUploadReady}
+        submitDisabled={remoteMode && (expenseUploadMode === "pending" || (expenseUploadMode === "async" && !expenseUploadReady))}
         draft={expenseDraft}
         photos={expensePhotos}
         referenceData={expenseReferenceData}
