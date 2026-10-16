@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { createMockDespesas } from '../data/mock'
 import { mapDespesa } from '../data/queries'
-import { BUILTIN_VIEWS, EMPTY_FILTERS, filterDespesas, parseStoredFilters, viewFilters } from './filters'
+import { matchesFilters, readFilters, type TableFilters } from '@betinhos/ui'
+import { opcoes, parseStoredFilters } from './filters'
+import { builtinViews, despesaFields, readDespesa } from './lista'
+import { FALLBACK_CHOICES } from './status'
 import { IA_DECISAO, IA_STATUS, diferencaValor, suspeitaIA } from './ia'
 
 describe('análise da IA', () => {
@@ -30,12 +33,14 @@ describe('análise da IA', () => {
 
   it('visão pronta Suspeitas da IA filtra decisão Precisa corrigir', () => {
     const list = createMockDespesas(new Date(2026, 9, 9, 12))
-    const view = BUILTIN_VIEWS.find((v) => v.id === 'ia-suspeita')!
-    expect(view.nome).toBe('Suspeitas da IA')
-    const out = filterDespesas(list, viewFilters(view))
+    const view = builtinViews(FALLBACK_CHOICES).find((v) => v.id === 'ia-suspeita')!
+    expect(view.name).toBe('Suspeitas da IA')
+    const fields = despesaFields(FALLBACK_CHOICES, opcoes(list))
+    const filters = (JSON.parse(view.config) as { filters: TableFilters }).filters
+    const out = list.filter((d) => matchesFilters(d, readFilters(filters, fields), fields, readDespesa))
     expect(out.length).toBeGreaterThan(0)
     expect(out.every((d) => d.ia.decisao === IA_DECISAO.corrigir && suspeitaIA(d))).toBe(true)
-    expect(filterDespesas(list, EMPTY_FILTERS).length).toBeGreaterThan(out.length)
+    expect(list.length).toBeGreaterThan(out.length)
     expect(parseStoredFilters({ periodo: '90', alertas: ['ia-suspeita'] })?.alertas).toEqual(['ia-suspeita'])
   })
 })

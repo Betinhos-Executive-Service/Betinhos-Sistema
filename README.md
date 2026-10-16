@@ -8,7 +8,6 @@ O objetivo é substituir por completo o app model-driven por um shell React úni
 ```
 apps/shell/          Shell React (menu, rotas por hash, moldura das telas) -> cr40f_SistemaBetinhos.html
 packages/dataverse/  Cliente da Web API, metadata, valores formatados e Xrm mínimo para telas legadas
-packages/ui/         Tokens do Design System Betinhos, primitives de layout e selo de versão
 packages/deploy/     Bump de versão, HTML único e publicação no Dataverse DEV
 legacy/              Módulos atuais copiados como estão, até virarem rotas do shell
 ```
@@ -21,7 +20,18 @@ legacy/              Módulos atuais copiados como estão, até virarem rotas do
 | `pnpm test` | Testes de todos os pacotes |
 | `pnpm wr` | Incrementa a versão e gera `apps/shell/dist/webresource.html` |
 | `pnpm push` | `wr` + publica o shell e o carregador no Dataverse DEV, inclui na solução e valida |
-| `pnpm tokens` | Copia o `design-tokens.css` gerado pelo Design System Betinhos |
+
+## Design System
+
+Componentes, tokens e fontes vêm do repo [design-system-betinhos](https://github.com/Betinhos-Executive-Service/design-system-betinhos), publicados no GitHub Packages. Os apps instalam `"@betinhos/ui": "npm:@betinhos-executive-service/ui@^X.Y.Z"` (o alias mantém os imports `@betinhos/ui`). Mudança em componente se faz lá, com release; aqui só se atualiza a versão. A vitrine dos componentes também mora lá (`pnpm dev` no repo do Design System).
+
+Para instalar localmente é preciso um token com `read:packages` no `~/.npmrc`:
+
+```bash
+gh auth refresh -h github.com -s read:packages
+```
+
+e a linha `//npm.pkg.github.com/:_authToken=<saída de gh auth token>` no `~/.npmrc` (nunca no repo). No CI, o `setup-node` usa o `GITHUB_TOKEN`, liberado nos pacotes em *Package settings → Manage Actions access*.
 
 ## Configuração
 
