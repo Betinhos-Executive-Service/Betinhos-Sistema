@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { CP, FAT, OP, PAG } from './codes'
 import { detectarPendencias } from './detect'
-import { BUILTIN_VIEWS, EMPTY_FILTERS, VIEWS_KEY, filterPendencias, loadViews, matchView, newView, viewFilters } from './filters'
+import { matchesFilters, readFilters, type TableFilters } from '@betinhos/ui'
+import { EMPTY_FILTERS, VIEWS_KEY, loadViews } from './filters'
+import { PENDENCIA_FIELDS, builtinViews, fromLegacyFilters, legacyViewConfig, matchesKeyword, readPendencia, sortPendencias } from './lista'
 import { pendenciasQuery } from './query'
 import type { OpResumo, PaganteResumo, Reserva } from './types'
 
@@ -87,7 +89,7 @@ describe('correções da revisão', () => {
   })
   it('busca por código da OS', () => {
     const p = detectarPendencias([op('1', OP.paga), op('2', OP.paga)], [res('a', '1', FAT.pagante), res('b', '2', FAT.pagante)], [pag('1', PAG.pago, 1000), pag('2', PAG.pago, 1000)])
-    expect(filterPendencias(p, { ...EMPTY_FILTERS, q: 'os-a' }).map((x) => x.opId)).toEqual(['1'])
+    expect(p.filter((x) => matchesKeyword(x, 'os-a')).map((x) => x.opId)).toEqual(['1'])
   })
   it('tipo 5 compara em centavos', () => {
     expect(detectarPendencias([op('1', OP.pendente, 0.3)], [res('a', '1', FAT.pagamentoPendente)], [pag('1', PAG.pendente, 0.1), pag('1', PAG.pendente, 0.2)])).toEqual([])
@@ -100,24 +102,31 @@ describe('filterPendencias', () => {
     [res('a', '1', FAT.pagante), res('b', '2', FAT.pago)],
     [pag('1', PAG.pago, 1000)],
   )
-  it('filtra por tipo', () => {
-    expect(filterPendencias(base, { ...EMPTY_FILTERS, tipos: ['op-sem-pagamento-reserva-paga'] }).map((p) => p.opId)).toEqual(['2'])
+  const apply = (filters: TableFilters) => base.filter((p) => matchesFilters(p, readFilters(filters, PENDENCIA_FIELDS), PENDENCIA_FIELDS, readPendencia))
+  const view = (id: string) => (JSON.parse(builtinViews().find((v) => v.id === id)!.config) as { filters: TableFilters }).filters
+  it('filtra por tipo (link antigo)', () => {
+    expect(apply(fromLegacyFilters({ tipos: ['op-sem-pagamento-reserva-paga'] })).map((p) => p.opId)).toEqual(['2'])
   })
   it('busca por OP, OS e cliente sem acento nem caixa', () => {
-    expect(filterPendencias(base, { ...EMPTY_FILTERS, q: 'op-1' }).map((p) => p.opId)).toEqual(['1'])
-    expect(filterPendencias(base, { ...EMPTY_FILTERS, q: 'agc' })).toHaveLength(2)
+    expect(base.filter((p) => matchesKeyword(p, 'op-1')).map((p) => p.opId)).toEqual(['1'])
+    expect(base.filter((p) => matchesKeyword(p, 'agc'))).toHaveLength(2)
   })
-  it('visão "Corrigíveis" mostra só tipos 1 e 3', () => {
-    const v = BUILTIN_VIEWS.find((x) => x.id === 'corrigiveis')!
-    expect(filterPendencias(base, viewFilters(v)).every((p) => p.corrigivel)).toBe(true)
+  it('visão "Corrigíveis" mostra só tipos 1 e 3; "Rateio" só o tipo 5', () => {
+    expect(apply(view('corrigiveis')).every((p) => p.corrigivel)).toBe(true)
+    expect(apply(view('rateio')).every((p) => p.tipo === 'rateio-nao-fecha')).toBe(true)
+    expect(builtinViews().map((v) => v.name)).toEqual(['Corrigíveis', 'Rateio'])
   })
-  it('visões salvas: casa por filtros, descarta inválidas e usa a chave própria', () => {
+  it('ordena por valor', () => {
+    const valores = sortPendencias(base, { key: 'valor', dir: 'desc' }).map((p) => p.valor ?? -1)
+    expect(valores).toEqual([...valores].sort((x, y) => y - x))
+  })
+  it('importação: descarta visões inválidas, usa a chave própria e converte sem o período', () => {
     expect(VIEWS_KEY).toBe('betinhos.pendencias.visoes.v1')
-    expect(matchView(BUILTIN_VIEWS, { periodo: '90', tipos: ['rateio-nao-fecha'] })?.id).toBe('rateio')
     const kv = new Map<string, string>()
-    kv.set(VIEWS_KEY, JSON.stringify({ views: [{ id: 'a', nome: 'Boa', filters: { periodo: '30', tipos: ['rateio-nao-fecha'] } }, { id: 'b', nome: 'Ruim', filters: { periodo: '7' } }, { id: 'c', nome: 'Tipo', filters: { tipos: ['x'] } }], last: 'a' }))
-    expect(loadViews({ getItem: (k) => kv.get(k) ?? null, setItem: () => undefined, removeItem: () => undefined }).views.map((v) => v.nome)).toEqual(['Boa'])
-    expect(viewFilters(newView('Minha', { ...EMPTY_FILTERS, q: 'x', periodo: '30' }), 'abc')).toMatchObject({ q: 'abc', periodo: '30', tipos: [] })
+    kv.set(VIEWS_KEY, JSON.stringify({ views: [{ id: 'a', nome: 'Boa', filters: { periodo: '30', tipos: ['rateio-nao-fecha'] } }, { id: 'b', nome: 'Ruim', filters: { periodo: '7' } }, { id: 'c', nome: 'Tipo', filters: { tipos: ['x'] } }] }))
+    const views = loadViews({ getItem: (k) => kv.get(k) ?? null, setItem: () => undefined, removeItem: () => undefined }).views
+    expect(views.map((v) => v.nome)).toEqual(['Boa'])
+    expect(JSON.parse(legacyViewConfig(views[0].filters)).filters.quick.tipo).toMatchObject({ op: 'in', values: [{ value: 'rateio-nao-fecha' }] })
   })
 })
 
