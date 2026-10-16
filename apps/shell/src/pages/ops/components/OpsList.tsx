@@ -1,4 +1,5 @@
-import { StatusBadge, Table, type TableColumn } from '@betinhos/ui'
+import type { ReactNode } from 'react'
+import { StatusBadge, Table, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
 import { openFromRow } from '../../pagantes/components/PagantesList'
 import { formatDate, formatMoney } from '../../pagantes/domain/messages'
 import { label } from '../../pagantes/domain/status'
@@ -6,6 +7,7 @@ import { opTone } from '../domain/status'
 import type { Op, OpChoices } from '../domain/types'
 
 type Props = { list: Op[]; choices: OpChoices; onOpen: (id: string) => void; loading?: boolean }
+type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; footer?: ReactNode; empty?: ReactNode }
 
 /** "Fulano - telefone" por linha (texto do flow): na lista basta o nome. */
 export function passageirosCurto(texto: string) {
@@ -34,18 +36,18 @@ function OpenName({ op, onOpen }: { op: Op; onOpen: (id: string) => void }) {
   )
 }
 
-export function OpsTable({ list, choices, onOpen, loading }: Props) {
+export function OpsTable({ list, choices, onOpen, loading, view, quickFilters, footer, empty }: TableProps) {
   const columns: TableColumn<Op>[] = [
-    { key: 'op', header: 'OP', width: 'minmax(160px, 1.3fr)', cell: (op) => <OpenName op={op} onOpen={onOpen} /> },
-    { key: 'servicos', header: 'Serviços', width: 'minmax(130px, 1fr)', cell: (op) => <span className="pg-num">{periodo(op)}</span> },
-    { key: 'passageiros', header: 'Passageiros', width: 'minmax(160px, 1.4fr)', hideBelow: 'compact', cell: (op) => passageirosCurto(op.passageiros) || '—' },
-    { key: 'valor', header: 'Valor', width: 'minmax(104px, .8fr)', align: 'end', cell: (op) => <span className="pg-num">{formatMoney(op.valor)}</span> },
-    { key: 'status', header: 'Status', width: 'minmax(150px, 1fr)', cell: (op) => <OpBadge op={op} choices={choices} /> },
-    { key: 'criada', header: 'Criada em', width: 'minmax(88px, .7fr)', hideBelow: 'compact', cell: (op) => formatDate(op.criadoEm) },
+    { key: 'op', header: 'OP', label: 'OP', sortable: true, defaultWidth: 220, width: 'minmax(160px, 1.3fr)', cell: (op) => <OpenName op={op} onOpen={onOpen} /> },
+    { key: 'servicos', header: 'Serviços', label: 'Serviços', sortable: true, defaultWidth: 200, width: 'minmax(130px, 1fr)', cell: (op) => <span className="pg-num">{periodo(op)}</span> },
+    { key: 'passageiros', header: 'Passageiros', label: 'Passageiros', sortable: true, defaultWidth: 240, width: 'minmax(160px, 1.4fr)', hideBelow: 'compact', cell: (op) => passageirosCurto(op.passageiros) || '—' },
+    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 130, width: 'minmax(104px, .8fr)', align: 'end', cell: (op) => <span className="pg-num">{formatMoney(op.valor)}</span> },
+    { key: 'status', header: 'Status', label: 'Status', sortable: true, defaultWidth: 180, width: 'minmax(150px, 1fr)', cell: (op) => <OpBadge op={op} choices={choices} /> },
+    { key: 'criada', header: 'Criada em', label: 'Criada em', sortable: true, defaultWidth: 130, width: 'minmax(88px, .7fr)', hideBelow: 'compact', cell: (op) => formatDate(op.criadoEm) },
   ]
   return (
     <div className="pg-table-wrap" onClick={(event) => openFromRow(event, '.bt-table__row', '.pg-open')}>
-      <Table className="pg-table" columns={columns} rows={list} rowKey={(op) => op.id} loading={loading} />
+      <Table className="pg-table" columns={columns} rows={list} rowKey={(op) => op.id} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }
