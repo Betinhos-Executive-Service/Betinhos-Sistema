@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Alert, Button, EmptyState, Grid, MetricCard, Pagination, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
+import { Alert, Button, EmptyState, Grid, MetricCard, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
 import { Clock, Copy, Paperclip, ReceiptText, RefreshCw, SearchX, Wallet } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
-import { useQueryBandeira, useQueryFilters, useQueryId, useQueryPagina } from '../../nav/queryState'
+import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { useQueryBandeira, useQueryFilters, useQueryId } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { SaveViewDialog } from '../pagantes/components/Dialogs'
 import { formatMoney } from '../pagantes/domain/messages'
@@ -22,7 +23,6 @@ export function DespesasPage({ host }: { host: Host }) {
   return <ToastProvider><Despesas host={host} /></ToastProvider>
 }
 
-const PAGE_SIZE = 50
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`
 
 function Despesas({ host }: { host: Host }) {
@@ -39,7 +39,6 @@ function Despesas({ host }: { host: Host }) {
     return last ? viewFilters(last) : { ...EMPTY_FILTERS }
   })
   const activeView = useMemo(() => matchView(views, filters, stored.last), [views, filters, stored.last])
-  const [page, setPage] = useQueryPagina()
   const setFilters = useCallback((next: Filters, viewId?: string) => {
     setFiltersUrl(next)
     setStored((s) => {
@@ -54,6 +53,7 @@ function Despesas({ host }: { host: Host }) {
   const since = useMemo(() => periodoStart(filters.periodo, new Date()), [filters.periodo])
   const despesas = useDespesas(source, since)
   const visible = useMemo(() => filterDespesas(despesas.list, filters), [despesas.list, filters])
+  const { slice, more, loadMore } = useLazySlice(visible, filters)
   const totais = useMemo(() => resumo(visible), [visible])
   const { categorias, motoristas } = useMemo(() => opcoes(despesas.list), [despesas.list])
 
@@ -91,15 +91,12 @@ function Despesas({ host }: { host: Host }) {
   } else if (!despesas.loading && !visible.length) {
     body = <EmptyState className="surface" align="start" icon={<SearchX size={36} />} title="Nenhuma despesa encontrada para estes filtros" action={<Button variant="secondary" onClick={() => setFilters({ ...EMPTY_FILTERS })}>Limpar filtros</Button>} />
   } else {
-    const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
-    const safePage = Math.min(page, pages)
-    const slice = visible.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
     body = (
       <>
         {mobile
           ? <DespesasCards list={slice} choices={despesas.choices!} onOpen={setSelectedId} />
           : <DespesasTable list={slice} choices={despesas.choices!} onOpen={setSelectedId} />}
-        {visible.length > PAGE_SIZE ? <Pagination page={safePage} pageSize={PAGE_SIZE} total={visible.length} onChange={setPage} noun="despesas" /> : null}
+        <LazyFooter loaded={slice.length} total={visible.length} more={more} onLoadMore={loadMore} noun={['despesa', 'despesas']} touch={mobile} />
       </>
     )
   }

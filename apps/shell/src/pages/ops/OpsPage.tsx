@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, EmptyState, Pagination, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
+import { Alert, Button, EmptyState, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
 import { CalendarCheck, FileStack, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
-import { useQueryBandeira, useQueryFilters, useQueryId, useQueryPagina } from '../../nav/queryState'
+import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { useQueryBandeira, useQueryFilters, useQueryId } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { GerarPagantesFrame, SaveViewDialog } from '../pagantes/components/Dialogs'
 import { formatMoney } from '../pagantes/domain/messages'
@@ -28,7 +29,6 @@ export function OpsPage({ host }: { host: Host }) {
   return <ToastProvider><Ops host={host} /></ToastProvider>
 }
 
-const PAGE_SIZE = 50
 const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
 function Ops({ host }: { host: Host }) {
@@ -45,7 +45,6 @@ function Ops({ host }: { host: Host }) {
     return last ? viewFilters(last) : { ...EMPTY_FILTERS }
   })
   const activeView = useMemo(() => matchView(views, filters, stored.last), [views, filters, stored.last])
-  const [page, setPage] = useQueryPagina()
   const setFilters = useCallback((next: Filters, viewId?: string) => {
     setFiltersUrl(next)
     setStored((s) => {
@@ -60,6 +59,7 @@ function Ops({ host }: { host: Host }) {
   const since = useMemo(() => periodoStart(filters.periodo, new Date()), [filters.periodo])
   const ops = useOps(source, since)
   const visible = useMemo(() => filterOps(ops.list, filters), [ops.list, filters])
+  const { slice, more, loadMore } = useLazySlice(visible, filters)
 
   const [selectedId, setSelectedId] = useQueryId('abrir')
   const current = selectedId ? ops.list.find((op) => op.id === selectedId) ?? null : null
@@ -138,15 +138,12 @@ function Ops({ host }: { host: Host }) {
   } else if (!ops.loading && !visible.length) {
     body = <EmptyState className="surface" align="start" icon={<SearchX size={36} />} title="Nenhuma OP encontrada para estes filtros" action={<Button variant="secondary" onClick={() => setFilters({ ...EMPTY_FILTERS })}>Limpar filtros</Button>} />
   } else {
-    const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
-    const safePage = Math.min(page, pages)
-    const slice = visible.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
     body = (
       <>
         {mobile
           ? <OpsCards list={slice} choices={ops.choices} onOpen={setSelectedId} />
           : <OpsTable list={slice} choices={ops.choices} onOpen={setSelectedId} />}
-        {visible.length > PAGE_SIZE ? <Pagination page={safePage} pageSize={PAGE_SIZE} total={visible.length} onChange={setPage} noun="OPs" /> : null}
+        <LazyFooter loaded={slice.length} total={visible.length} more={more} onLoadMore={loadMore} noun={['OP', 'OPs']} touch={mobile} />
       </>
     )
   }

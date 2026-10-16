@@ -63,6 +63,3 @@
   .ps-row { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* Lazy loading: sentinela (classe do LoadSentinel compartilhado) e rodapé de contagem. */
-.gr-sentinel { height: 1px; }
-.ps-loadmore { display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-3); min-height: 40px; padding: 0 var(--bt-space-4); font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); font-variant-numeric: tabular-nums; }
