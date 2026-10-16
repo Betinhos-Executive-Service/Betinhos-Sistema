@@ -87,7 +87,7 @@ function VariavelDeAmbiente([string] $schema, [string] $display, [string] $valor
     Dv POST environmentvariablevalues @{ value = $valor; 'EnvironmentVariableDefinitionId@odata.bind' = "/environmentvariabledefinitions($defId)" } | Out-Null
     $valId = @((Dv GET "environmentvariablevalues?`$select=environmentvariablevalueid&`$filter=_environmentvariabledefinitionid_value eq $defId").value)[0].environmentvariablevalueid
   }
-  Include $valId 381
+  # Valor atual NAO entra na solucao (tipo 381): cada ambiente mantem o seu; senao o deploy sobrescreve TEST/PROD com a URL do DEV.
 }
 VariavelDeAmbiente 'new_URLSistemaBetinhos' 'URL do Sistema Betinhos' $UrlSistema.TrimEnd('/')
 VariavelDeAmbiente 'new_EmailAdminAvisos' 'E-mail do administrador dos avisos' $EmailAdmin
