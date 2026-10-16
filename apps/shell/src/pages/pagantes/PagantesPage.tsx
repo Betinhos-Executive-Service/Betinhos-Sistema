@@ -1,28 +1,31 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { Alert, Button, EmptyState, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
+import { Alert, Button, EmptyState, SearchBox, Select, StatusBadge, ToastProvider, ViewBar, matchesFilters, useShellHeader, useToast } from '@betinhos/ui'
 import { RefreshCw, SearchX, WalletCards } from 'lucide-react'
 import type { Host } from '../../host'
-import { PageLayout } from '../../app/PageLayout'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
-import { useQueryBandeira, useQueryFilters, useQueryId } from '../../nav/queryState'
+import { useListView } from '../../app/useListView'
+import { useQueryId, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
-import { BUILTIN_VIEWS, EMPTY_FILTERS, filterPagantes, loadViews, matchView, newView, periodoStart, saveViews, total, viewFilters, type Filters, type View } from './domain/filters'
+import { EMPTY_FILTERS, PERIODOS, VIEWS_KEY, loadViews, periodoStart, total, type Periodo } from './domain/filters'
+import { PAGANTE_COLUMNS, PAGANTE_SORT, TELA, builtinViews, fromLegacyFilters, legacyViewConfig, matchesKeyword, paganteFields, readPagante, sortPagantes } from './domain/lista'
 import { formatMoney } from './domain/messages'
 import { pagantesQuery } from './domain/query'
 import { applyPatch, statusPatch } from './domain/status'
 import type { Pagante } from './domain/types'
 import { usePagantes } from './usePagantes'
-import { PagantesToolbar } from './components/PagantesToolbar'
 import { PagantesCards, PagantesTable } from './components/PagantesList'
 import { PaganteDrawer } from './components/PaganteDrawer'
-import { GerarPagantesFrame, SaveViewDialog, StatusDialog, type StatusRequest } from './components/Dialogs'
+import { GerarPagantesFrame, StatusDialog, type StatusRequest } from './components/Dialogs'
 import './pagantes.css'
 
 export function PagantesPage({ host }: { host: Host }) {
   return <ToastProvider><Pagantes host={host} /></ToastProvider>
 }
 
+/** Parâmetros da barra antiga na URL; links com eles abrem com os filtros equivalentes. `q` e `periodo` continuam. */
+const LEGACY_KEYS = ['status', 'forma', 'recibo', 'falhas'] as const
+const isPeriodo = (v: string): v is Periodo => PERIODOS.some((p) => p.value === v)
 const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
 function Pagantes({ host }: { host: Host }) {
@@ -30,31 +33,41 @@ function Pagantes({ host }: { host: Host }) {
   const toast = useToast()
   const mobile = useMedia('(max-width: 820px)')
 
-  // Visões: as prontas + as do usuário; a última usada volta ao abrir a tela.
-  const [stored, setStored] = useState(() => loadViews(source.kv))
-  const views = useMemo(() => [...BUILTIN_VIEWS, ...stored.views], [stored.views])
-  // Filtros, página e ficha aberta vivem na URL (#/pagantes?q=…&status=…&pagina=2&abrir=…); sem filtro na abertura, entra a última visão.
-  const [filters, setFiltersUrl] = useQueryFilters(pagantesQuery, () => {
-    const last = views.find((v) => v.id === stored.last)
-    return last ? viewFilters(last) : { ...EMPTY_FILTERS }
-  })
-  // A visão escolhida desempata quando outra tem os mesmos filtros.
-  const activeView = useMemo(() => matchView(views, filters, stored.last), [views, filters, stored.last])
-  const setFilters = useCallback((next: Filters, viewId?: string) => {
-    setFiltersUrl(next)
-    setStored((s) => {
-      const last = viewId ?? matchView([...BUILTIN_VIEWS, ...s.views], next, s.last)?.id ?? null
-      if (last === s.last) return s
-      const data = { ...s, last }
-      saveViews(source.kv, data)
-      return data
-    })
-  }, [source.kv, setFiltersUrl])
-
-  const since = useMemo(() => periodoStart(filters.periodo, new Date()), [filters.periodo])
+  // O período decide o que carrega do Dataverse; fica na URL e fora da visão.
+  const [periodoUrl, setPeriodo] = useQueryTexto('periodo', EMPTY_FILTERS.periodo)
+  const periodo = isPeriodo(periodoUrl) ? periodoUrl : EMPTY_FILTERS.periodo
+  const since = useMemo(() => periodoStart(periodo, new Date()), [periodo])
   const pg = usePagantes(source, since)
-  const visible = useMemo(() => filterPagantes(pg.list, filters, pg.contatos), [pg.list, filters, pg.contatos])
-  const { slice, more, loadMore } = useLazySlice(visible, filters)
+  const choices = pg.choices
+  const fields = useMemo(() => (choices ? paganteFields(choices) : []), [choices])
+
+  const { view, filters, quickFilters, clearFilters } = useListView({
+    host,
+    tela: TELA,
+    columns: PAGANTE_COLUMNS,
+    defaultSort: PAGANTE_SORT,
+    fields,
+    ready: Boolean(choices),
+    builtins: () => (choices ? builtinViews(choices) : []),
+    legacy: { keys: LEGACY_KEYS, read: (q) => fromLegacyFilters(pagantesQuery.ler(q), choices!) },
+    imports: {
+      list: () => loadViews(source.kv).views.map((v) => ({ name: v.nome, config: legacyViewConfig(v.filters, choices!) })),
+      done: () => source.kv.removeItem(VIEWS_KEY),
+      onImported: (n) => toast({ tone: 'info', message: n === 1 ? 'A visão salva neste navegador agora fica em “Minhas”.' : `As ${n} visões salvas neste navegador agora ficam em “Minhas”.` }),
+    },
+  })
+
+  // Busca, ficha aberta e Gerar Pagantes continuam na URL; os filtros vão em `f=` (useListView).
+  const [query, setQuery] = useQueryTexto('q')
+  const visible = useMemo(() => {
+    if (!choices) return []
+    const list = pg.list.filter((p) => matchesFilters(p, filters, fields, readPagante) && matchesKeyword(p, query, pg.contatos.get(p.pessoaId)))
+    return sortPagantes(list, view.config.sort, choices)
+  }, [pg.list, pg.contatos, filters, fields, query, choices, view.config.sort])
+  // Lazy loading de renderização: trocar filtro, busca ou ordenação volta ao primeiro lote; recarregar a lista não.
+  const lazyKey = useMemo(() => ({ filters, query, sort: view.config.sort }), [filters, query, view.config.sort])
+  const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
+  const clearAll = () => { clearFilters(); setQuery('') }
 
   const [selectedId, setSelectedId] = useQueryId('abrir')
   // A ficha pode vir do rateio (pagante fora da lista carregada): guarda a cópia dela para continuar aberta.
@@ -62,7 +75,6 @@ function Pagantes({ host }: { host: Host }) {
   const current = selectedId ? pg.list.find((p) => p.id === selectedId) ?? (selectedCopy?.id === selectedId ? selectedCopy : null) : null
   const setSelected = (p: Pagante | null) => { setSelectedCopy(p); setSelectedId(p?.id ?? null) }
   const [statusRequest, setStatusRequest] = useState<StatusRequest>(null)
-  const [saving, setSaving] = useQueryBandeira('salvarvisao')
   // O Gerar Pagantes aberto (por cima da tela) também vive na URL: `gerar=<id da OP>`.
   const [gerarOpId, setGerarOpId] = useQueryId('gerar')
   const frameUrl = gerarOpId ? source.gerarPagantesUrl(gerarOpId) : null
@@ -122,24 +134,6 @@ function Pagantes({ host }: { host: Host }) {
 
   const closeFrame = useCallback((reload: boolean) => { setGerarOpId(null); if (reload) refresh() }, [refresh, setGerarOpId])
 
-  function saveView(nome: string) {
-    const same = matchView(views, filters)
-    if (same) {
-      setSaving(false)
-      toast({ tone: 'info', message: `Esses filtros já estão na visão “${same.nome}”.` })
-      return
-    }
-    const view = newView(nome, filters)
-    setStored((s) => { const data = { views: [...s.views, view], last: view.id }; saveViews(source.kv, data); return data })
-    setSaving(false)
-    toast({ tone: 'success', message: `Visão “${view.nome}” salva.` })
-  }
-
-  function deleteView(view: View) {
-    setStored((s) => { const data = { views: s.views.filter((v) => v.id !== view.id), last: s.last === view.id ? null : s.last }; saveViews(source.kv, data); return data })
-    toast({ tone: 'success', message: `Visão “${view.nome}” excluída.` })
-  }
-
   let body
   if (pg.error && !pg.choices) {
     body = <Alert tone="danger" title="Não foi possível carregar os pagantes" action={<Button variant="secondary" onClick={() => void pg.reload()}>Tentar de novo</Button>}>{pg.error}</Alert>
@@ -147,30 +141,30 @@ function Pagantes({ host }: { host: Host }) {
     body = <PagantesTable list={[]} choices={{ status: [], forma: [], recibo: [] }} contatos={pg.contatos} onOpen={() => undefined} loading />
   } else if (!pg.loading && !pg.list.length) {
     body = <EmptyState className="surface" align="start" icon={<WalletCards size={36} />} title="Nenhum pagante neste período">Os pagantes são criados no Gerar Pagantes, a partir de uma Ordem de Pagamento. Amplie o período para ver os mais antigos.</EmptyState>
-  } else if (!pg.loading && !visible.length) {
-    body = <EmptyState className="surface" align="start" icon={<SearchX size={36} />} title="Nenhum pagante encontrado para estes filtros" action={<Button variant="secondary" onClick={() => setFilters({ ...EMPTY_FILTERS })}>Limpar filtros</Button>} />
   } else {
-    // Paginado: com "Todo o período" a lista pode ter milhares de linhas, cada uma com ações.
     const open = (id: string) => setSelected(visible.find((p) => p.id === id) ?? null)
+    const footer = <span className="pg-num">{visible.length} {visible.length === 1 ? 'pagante' : 'pagantes'} · {formatMoney(total(visible))}</span>
+    const empty = <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum pagante com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
     body = (
       <>
         {mobile
-          ? <PagantesCards list={slice} choices={pg.choices} contatos={pg.contatos} onOpen={open} />
-          : <PagantesTable list={slice} choices={pg.choices} contatos={pg.contatos} onOpen={open} />}
-        <LazyFooter loaded={slice.length} total={visible.length} more={more} onLoadMore={loadMore} noun={['pagante', 'pagantes']} touch={mobile} />
+          ? (visible.length ? <PagantesCards list={slice} choices={pg.choices} contatos={pg.contatos} onOpen={open} /> : <div className="surface">{empty}</div>)
+          : <PagantesTable list={slice} choices={pg.choices} contatos={pg.contatos} onOpen={open} view={{ config: view.config, onChange: view.setConfig }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+        {more ? <LazyFooter loaded={slice.length} total={visible.length} more onLoadMore={loadMore} noun={['pagante', 'pagantes']} touch={mobile} /> : null}
       </>
     )
   }
 
   return (
-    <PageLayout
-      eyebrow="Financeiro"
-      title="Pagantes"
-      meta={<span className="pg-meta">{pg.choices ? <span className="pg-num">{visible.length} pagantes · {formatMoney(total(visible))}</span> : null}{source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}</span>}
-      description="Cobranças de cada Ordem de Pagamento: acompanhe, envie o link e confirme o recebimento."
-      actions={mobile ? undefined : <Button variant="secondary" icon={<RefreshCw size={16} />} loading={pg.loading && Boolean(pg.choices)} onClick={refresh}>Atualizar</Button>}
-      toolbar={pg.choices ? <PagantesToolbar filters={filters} onChange={setFilters} choices={pg.choices} views={views} activeView={activeView} onSaveView={() => setSaving(true)} onDeleteView={deleteView} /> : undefined}
-    >
+    <div className="page pg-page">
+      <div role="toolbar" aria-label="Comandos de pagantes">
+        <ViewBar view={view} columns={PAGANTE_COLUMNS} filters={choices ? { fields } : undefined}>
+          {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
+          <SearchBox className="pg-filters__search" value={query} onChange={setQuery} placeholder="Buscar por pagante, PAG, OP, telefone ou e-mail" aria-label="Buscar pagantes" />
+          <Select className="pg-filters__select" aria-label="Período de criação" searchable={false} clearable={false} options={PERIODOS} value={periodo} onChange={(v) => setPeriodo(v ?? EMPTY_FILTERS.periodo)} />
+          {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={pg.loading && Boolean(choices)} onClick={refresh} />}
+        </ViewBar>
+      </div>
       {pg.error && pg.choices ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{pg.error} A lista mostra os dados da carga anterior.</Alert> : null}
       {pg.contatosError && pg.choices ? <Alert tone="warning" title="Contatos não carregados">{pg.contatosError} Busca por telefone e WhatsApp ficam indisponíveis até atualizar.</Alert> : null}
       {body}
@@ -179,8 +173,7 @@ function Pagantes({ host }: { host: Host }) {
           onStatus={(p, kind) => setStatusRequest({ p, kind })} onRecibo={(p) => void gerarRecibo(p)} onAbrirOp={abrirOp} busyId={busyId} />
       ) : null}
       <StatusDialog request={statusRequest} contato={statusRequest ? pg.contatos.get(statusRequest.p.pessoaId) : undefined} onClose={() => setStatusRequest(null)} onConfirm={(enviar) => void confirmStatus(enviar)} />
-      <SaveViewDialog open={saving} onClose={() => setSaving(false)} onSave={saveView} />
       <GerarPagantesFrame url={frameUrl} onClose={closeFrame} />
-    </PageLayout>
+    </div>
   )
 }
