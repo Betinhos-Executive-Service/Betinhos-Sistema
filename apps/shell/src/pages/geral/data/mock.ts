@@ -177,14 +177,25 @@ function condition(el: Element, row: Row, now: Date): boolean | null {
   const raw = row[keyOf(attribute)]
   const day = dayOf(raw)
   const today = spDay(now)
+  const equals = () => {
+    if (typeof raw === 'boolean') return (raw ? '1' : '0') === value || String(raw) === value
+    if (typeof raw === 'number' && value !== '') return raw === Number(value)
+    return String(raw) === value
+  }
+  const listed = () => Array.from(el.children).some((c) => c.tagName === 'value' && String(c.textContent).toLowerCase() === String(raw).toLowerCase())
+  // Valor `AAAA-MM-DD` compara pelo dia (como o Dataverse faz com data); senão, como número.
+  const isDayValue = /^\d{4}-\d{2}-\d{2}$/.test(value)
   switch (el.getAttribute('operator')) {
-    case 'eq':
-      if (typeof raw === 'boolean') return (raw ? '1' : '0') === value || String(raw) === value
-      if (typeof raw === 'number' && value !== '') return raw === Number(value)
-      return String(raw) === value
+    case 'eq': return equals()
+    // Como no SQL, `ne` e `not-in` não devolvem vazios.
+    case 'ne': return !isEmpty(raw) && !equals()
     case 'ge': return numberOf(raw) >= Number(value)
     case 'le': return numberOf(raw) <= Number(value)
-    case 'in': return !isEmpty(raw) && Array.from(el.children).some((c) => c.tagName === 'value' && String(c.textContent).toLowerCase() === String(raw).toLowerCase())
+    case 'gt': return isDayValue ? day != null && day > value : numberOf(raw) > Number(value)
+    case 'lt': return isDayValue ? day != null && day < value : numberOf(raw) < Number(value)
+    case 'in': return !isEmpty(raw) && listed()
+    case 'not-in': return !isEmpty(raw) && !listed()
+    case 'on': return day === value
     case 'null': return isEmpty(raw)
     case 'not-null': return !isEmpty(raw)
     case 'like': return likeMatches(row, attribute, value)
@@ -195,6 +206,7 @@ function condition(el: Element, row: Row, now: Date): boolean | null {
     case 'yesterday': return day === addDays(today, -1)
     case 'this-week': return day != null && day >= weekStart(today) && day <= addDays(weekStart(today), 6)
     case 'this-month': return day != null && day.slice(0, 7) === today.slice(0, 7)
+    case 'last-month': return day != null && day.slice(0, 7) === addDays(`${today.slice(0, 7)}-01`, -1).slice(0, 7)
     case 'on-or-after': return day != null && day >= value
     case 'on-or-before': return day != null && day <= value
     case 'last-x-days': return day != null && day >= addDays(today, -Number(value)) && day <= today

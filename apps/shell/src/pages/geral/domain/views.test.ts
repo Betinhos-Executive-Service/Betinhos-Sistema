@@ -1,19 +1,22 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
+import { emptyFilters } from '@betinhos/ui'
 import { MOCK_ATTRIBUTES, createMockViews } from '../data/mock'
+import { geralFilterFields } from './tableFilters'
 import { parseLayout } from './layout'
 import { parse } from './fetch'
 import { buildLayout, buildViewFetch } from './views'
 
 const agenda = createMockViews()[0]
+const fields = geralFilterFields(MOCK_ATTRIBUTES)
 
 describe('buildViewFetch', () => {
   it('injeta os filtros e troca a ordenação, sem paginação nem contagem', () => {
     const xml = buildViewFetch(
       agenda.fetchxml.replace('<fetch ', '<fetch count="100" page="2" paging-cookie="x" returntotalrecordcount="true" '),
-      { cr40f_status: { kind: 'choice', op: 'in', values: [1] } },
+      { ...emptyFilters(), quick: { cr40f_status: { type: 'condition', id: 'a', field: 'cr40f_status', op: 'in', values: [{ value: '1', label: 'x' }] } } },
       { attribute: 'cr40f_trajeto', alias: null, descending: true },
-      MOCK_ATTRIBUTES,
+      fields,
     )
     const { root, entity } = parse(xml)
     for (const name of ['count', 'page', 'paging-cookie', 'returntotalrecordcount']) expect(root.hasAttribute(name)).toBe(false)
@@ -24,7 +27,7 @@ describe('buildViewFetch', () => {
   })
 
   it('sem ordenação própria mantém a ordem da visão; sem filtros devolve a visão', () => {
-    const xml = buildViewFetch(agenda.fetchxml, {}, null, MOCK_ATTRIBUTES)
+    const xml = buildViewFetch(agenda.fetchxml, emptyFilters(), null, fields)
     expect(parse(xml).entity.querySelector('order')?.getAttribute('attribute')).toBe('cr40f_dataehorriodesada')
     expect(parse(xml).entity.querySelectorAll('filter')).toHaveLength(1)
   })

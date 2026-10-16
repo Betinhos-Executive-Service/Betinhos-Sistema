@@ -1,8 +1,9 @@
-import { decodeFilters, encodeFilters, isEmptyFilter, type FilterSet } from './filters'
+import type { TableFilters } from '@betinhos/ui'
+import { decodeTableFilters, encodeTableFilters, hasActiveFilters } from './tableFilters'
 import type { Sort } from './types'
 
 /** Estado da tela que viaja na URL (`#/geral?view=…&q=…&sort=…&f=…`). */
-export type UrlState = { view?: string; q?: string; sort?: Sort; filters?: FilterSet }
+export type UrlState = { view?: string; q?: string; sort?: Sort; filters?: TableFilters }
 
 /** `attr:asc|desc`, com `alias.attr` quando a coluna vem de uma tabela ligada. */
 function parseSort(text: string | null): Sort | undefined {
@@ -32,8 +33,9 @@ export function readUrlState(params: URLSearchParams): UrlState {
   if (sort) state.sort = sort
   const f = params.get('f')
   if (f) {
-    const filters = decodeFilters(f)
-    if (Object.keys(filters).length) state.filters = filters
+    // Lê o formato novo e o antigo (links compartilhados antes dos filtros do Design System).
+    const filters = decodeTableFilters(f)
+    if (hasActiveFilters(filters)) state.filters = filters
   }
   return state
 }
@@ -44,7 +46,7 @@ export function writeUrlState(state: UrlState): string {
   if (state.view) params.set('view', state.view)
   if (state.q) params.set('q', state.q)
   if (state.sort) params.set('sort', sortText(state.sort))
-  const filters = Object.fromEntries(Object.entries(state.filters ?? {}).filter(([, f]) => !isEmptyFilter(f)))
-  if (Object.keys(filters).length) params.set('f', encodeFilters(filters))
+  const f = state.filters ? encodeTableFilters(state.filters) : ''
+  if (f) params.set('f', f)
   return params.toString()
 }
