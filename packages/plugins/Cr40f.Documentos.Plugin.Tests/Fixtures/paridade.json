@@ -1,0 +1,53 @@
+{
+  "hoje": "2026-10-19",
+  "tipos": [
+    { "id": "t-cnh", "codigo": "CNH", "nome": "CNH", "categoria": "pessoas", "temValidade": true, "validadePadraoMeses": 60, "obrigatorioPara": [100000000], "ordem": 1, "ativo": true },
+    { "id": "t-aso", "codigo": "ASO", "nome": "ASO", "categoria": "pessoas", "temValidade": true, "validadePadraoMeses": 12, "obrigatorioPara": [100000000, 100000001], "ordem": 2, "ativo": true },
+    { "id": "t-rg", "codigo": "RG", "nome": "RG", "categoria": "pessoas", "temValidade": false, "validadePadraoMeses": null, "obrigatorioPara": [100000000, 100000001], "ordem": 3, "ativo": true },
+    { "id": "t-cert", "codigo": "CERT", "nome": "Certidão", "categoria": "pessoas", "temValidade": true, "validadePadraoMeses": 6, "obrigatorioPara": [], "ordem": 4, "ativo": true },
+    { "id": "t-antec", "codigo": "ANTEC", "nome": "Antecedentes", "categoria": "pessoas", "temValidade": true, "validadePadraoMeses": 6, "obrigatorioPara": [], "ordem": 5, "ativo": true },
+    { "id": "t-velho", "codigo": "VELHO", "nome": "Tipo antigo", "categoria": "pessoas", "temValidade": true, "validadePadraoMeses": null, "obrigatorioPara": [100000000], "ordem": 6, "ativo": false },
+    { "id": "t-crlv", "codigo": "CRLV", "nome": "CRLV / Licenciamento", "categoria": "frota", "temValidade": true, "validadePadraoMeses": 12, "obrigatorioPara": [100000002, 100000003, 100000004], "ordem": 1, "ativo": true },
+    { "id": "t-seguro", "codigo": "SEGURO", "nome": "Seguro", "categoria": "frota", "temValidade": true, "validadePadraoMeses": 12, "obrigatorioPara": [100000002], "ordem": 2, "ativo": true }
+  ],
+  "donos": [
+    { "id": "p1", "categoria": "pessoas", "nome": "Ana Souza", "detalhe": "Motorista", "obrigKey": 100000000, "ativo": true, "email": "" },
+    { "id": "p2", "categoria": "pessoas", "nome": "Bruno Lima", "detalhe": "Administrativo", "obrigKey": 100000001, "ativo": true, "email": "" },
+    { "id": "p3", "categoria": "pessoas", "nome": "Carla Dias", "detalhe": "Motorista", "obrigKey": 100000000, "ativo": false, "email": "" },
+    { "id": "v1", "categoria": "frota", "nome": "ABC1D23", "detalhe": "Toyota Corolla", "obrigKey": 100000002, "ativo": true, "email": "" },
+    { "id": "v2", "categoria": "frota", "nome": "XYZ9W87", "detalhe": "Chevrolet Spin", "obrigKey": 100000004, "ativo": true, "email": "" }
+  ],
+  "docs": [
+    { "id": "d1", "tipoId": "t-cnh", "donoId": "p1", "categoria": "pessoas", "numero": "", "emissao": null, "validade": "2026-10-18", "situacao": "vigente", "pasta": "", "observacao": "", "ultimoMarco": null, "modificadoEm": "2026-01-01T00:00:00Z" },
+    { "id": "d2", "tipoId": "t-aso", "donoId": "p1", "categoria": "pessoas", "numero": "", "emissao": null, "validade": "2026-10-19", "situacao": "vigente", "pasta": "", "observacao": "", "ultimoMarco": null, "modificadoEm": "2026-01-01T00:00:00Z" },
+    { "id": "d3", "tipoId": "t-rg", "donoId": "p1", "categoria": "pessoas", "numero": "", "emissao": "2010-05-01", "validade": null, "situacao": "vigente", "pasta": "", "observacao": "", "ultimoMarco": null, "modificadoEm": "2026-01-01T00:00:00Z" },
+    { "id": "d4", "tipoId": "t-aso", "donoId": "p2", "categoria": "pessoas", "numero": "", "emissao": null, "validade": "2026-10-27", "situacao": "vigente", "pasta": "", "observacao": "", "ultimoMarco": null, "modificadoEm": "2026-01-01T00:00:00Z" },
+    { "id": "d6", "tipoId": "t-cert", "donoId": "p2", "categoria": "pessoas", "numero": "", "emissao": null, "validade": "2026-11-18", "situacao": "vigente", "pasta": "", "observacao": "", "ultimoMarco": null, "modificadoEm": "2026-01-01T00:00:00Z" },
+    { "id": "d7", "tipoId": "t-cnh", "donoId": "p3", "categoria": "pessoas", "numero": "", "emissao": null, "validade": "2026-10-01", "situacao": "vigente", "pasta": "", "observacao": "", "ultimoMarco": null, "modificadoEm": "2026-01-01T00:00:00Z" },
+    { "id": "d8", "tipoId": "t-crlv", "donoId": "v1", "categoria": "frota", "numero": "", "emissao": null, "validade": "2026-12-18", "situacao": "vigente", "pasta": "", "observacao": "", "ultimoMarco": null, "modificadoEm": "2026-01-01T00:00:00Z" },
+    { "id": "d9", "tipoId": "t-crlv", "donoId": "v2", "categoria": "frota", "numero": "", "emissao": null, "validade": "2026-12-19", "situacao": "vigente", "pasta": "", "observacao": "", "ultimoMarco": null, "modificadoEm": "2026-01-01T00:00:00Z" },
+    { "id": "d10", "tipoId": "t-crlv", "donoId": "v2", "categoria": "frota", "numero": "", "emissao": null, "validade": "2026-10-01", "situacao": "substituido", "pasta": "", "observacao": "", "ultimoMarco": null, "modificadoEm": "2026-01-01T00:00:00Z" },
+    { "id": "d12", "tipoId": "t-crlv", "donoId": "v2", "categoria": "frota", "numero": "", "emissao": null, "validade": "2026-10-25", "situacao": "vigente", "pasta": "", "observacao": "", "ultimoMarco": null, "modificadoEm": "2026-02-01T00:00:00Z" },
+    { "id": "d13", "tipoId": "t-velho", "donoId": "p1", "categoria": "pessoas", "numero": "", "emissao": null, "validade": "2026-10-01", "situacao": "vigente", "pasta": "", "observacao": "", "ultimoMarco": null, "modificadoEm": "2026-01-01T00:00:00Z" },
+    { "id": "d14", "tipoId": "t-cert", "donoId": "p1", "categoria": "pessoas", "numero": "", "emissao": null, "validade": "2026-10-26", "situacao": "vigente", "pasta": "", "observacao": "", "ultimoMarco": null, "modificadoEm": "2026-01-01T00:00:00Z" },
+    { "id": "d15", "tipoId": "t-antec", "donoId": "p1", "categoria": "pessoas", "numero": "", "emissao": null, "validade": "2026-11-19", "situacao": "vigente", "pasta": "", "observacao": "", "ultimoMarco": null, "modificadoEm": "2026-01-01T00:00:00Z" },
+    { "id": "d16", "tipoId": "t-antec", "donoId": "p2", "categoria": "pessoas", "numero": "", "emissao": null, "validade": "2026-12-19", "situacao": "vigente", "pasta": "", "observacao": "", "ultimoMarco": null, "modificadoEm": "2026-01-01T00:00:00Z" }
+  ],
+  "esperado": {
+    "pessoas": {
+      "contagens": { "vencido": 1, "vence7": 2, "vence30": 2, "vence60": 1, "faltando": 1 },
+      "urgentes": [
+        "Ana Souza|CNH|vencido|-1",
+        "Ana Souza|ASO|vence7|0",
+        "Ana Souza|Certidão|vence7|7",
+        "Bruno Lima|RG|faltando|"
+      ]
+    },
+    "frota": {
+      "contagens": { "vencido": 0, "vence7": 0, "vence30": 0, "vence60": 1, "faltando": 1 },
+      "urgentes": [
+        "ABC1D23|Seguro|faltando|"
+      ]
+    }
+  }
+}
