@@ -76,6 +76,8 @@ export type FinalizePayload = {
   // Carro do serviço decidido pela Infleet antes de finalizar (somente SERVICO).
   vehicleResolution?: InfleetVehicleResolution;
   vehicleChoice?: DriverVehicleChoice | null;
+  // Motorista terceiro: a finalização não grava o carro do serviço.
+  skipVehicle?: boolean;
 };
 
 export type MaintenanceRequestPayload = {
@@ -3793,6 +3795,7 @@ export function buildAutomaticServiceVehiclePatch(record: DataverseRecord | unde
 
 // Infleet decide o carro ou o motorista escolhe; a posse não entra na finalização.
 function buildFinalizeServiceVehiclePatch(payload: FinalizePayload) {
+  if (payload.skipVehicle) return {};
   const resolution = payload.vehicleResolution;
   if (!resolution) throw new Error("Carro do serviço não conferido. Tente finalizar novamente.");
   const patch = buildInfleetServiceVehiclePatch(resolution, payload.vehicleChoice ?? null, (vehicleId) => bind(DATAVERSE.veiculos, vehicleId));

@@ -156,7 +156,6 @@ import { VehicleChoiceDialog } from "./components/details/VehicleChoiceDialog";
 import {
   buildInfleetServiceVehiclePatch,
   needsDriverChoice,
-  thirdPartyResolution,
   type DriverVehicleChoice,
   type FleetVehicle,
   type InfleetVehicleResolution
@@ -1468,39 +1467,13 @@ function App() {
         // Infleet decide o carro do serviço; abaixo de 85% o motorista escolhe. Falha da Infleet não bloqueia.
         let vehicleResolution: InfleetVehicleResolution | undefined;
         let vehicleChoice: DriverVehicleChoice | null = null;
+        let skipVehicle = false;
         if (detailToFinalize.type === "SERVICO" && detailToFinalize.dataverse?.id) {
           setProgress("Conferindo o carro na Infleet.");
           const driver = driverContext ?? await getDriverContext();
           if (isThirdPartyDriver(driver?.funcionario)) {
-            // Terceiro não usa a Infleet: grava o carro atual dele ou pede a escolha entre os carros dele.
-            let myVehicles: Awaited<ReturnType<typeof loadMyVehiclesRemote>> | null = null;
-            try {
-              myVehicles = await loadMyVehiclesRemote(driver);
-            } catch {
-              // Sem a lista do terceiro, cai na escolha entre a frota ativa.
-              myVehicles = null;
-            }
-            if (!myVehicles) {
-              vehicleResolution = thirdPartyResolution(null);
-              setRemoteOperation(null);
-              const pickedFallback = await askVehicleChoice(vehicleResolution, loadActiveFleetRemote);
-              if (!pickedFallback) return;
-              vehicleChoice = { ...pickedFallback, origem: "terceiro" };
-              setProgress("Registrando o carro escolhido.");
-            } else {
-            const currentId = getDriverCurrentVehicleId(driver);
-            const current = myVehicles.find((vehicle) => vehicle.id === currentId) ?? null;
-            vehicleResolution = thirdPartyResolution(current);
-            if (current) {
-              vehicleChoice = { veiculoId: current.id, placa: current.placa, origem: "terceiro" };
-            } else {
-              setRemoteOperation(null);
-              const picked = await askVehicleChoice(vehicleResolution, async () => (myVehicles!.length > 0 ? myVehicles! : loadActiveFleetRemote()));
-              if (!picked) return;
-              vehicleChoice = { ...picked, origem: "terceiro" };
-              setProgress("Registrando o carro escolhido.");
-            }
-            }
+            // Terceiro não usa a Infleet nem escolhe carro: a finalização não grava o veículo.
+            skipVehicle = true;
           } else {
             vehicleResolution = await resolveServiceVehicleRemote(detailToFinalize.dataverse.id);
             if (needsDriverChoice(vehicleResolution)) {
@@ -1515,9 +1488,9 @@ function App() {
         const signatureDataUrl = store.signatures[detailToFinalize.id];
         const photos = store.photos[detailToFinalize.id];
         if (detailToFinalize.type === "SERVICO" && isVoucher) {
-          await saveVoucherRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress, vehicleResolution, vehicleChoice });
+          await saveVoucherRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress, vehicleResolution, vehicleChoice, skipVehicle });
         } else if (detailToFinalize.type === "SERVICO") {
-          await finalizeServiceRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress, vehicleResolution, vehicleChoice });
+          await finalizeServiceRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress, vehicleResolution, vehicleChoice, skipVehicle });
         } else if (detailToFinalize.type === "MANUTENCAO") {
           await finalizeMaintenanceRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress });
         } else if (detailToFinalize.type === "TROCA") {
