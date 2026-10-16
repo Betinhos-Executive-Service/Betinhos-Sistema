@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { Alert, Button, EmptyState, Pagination, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
+import { Alert, Button, EmptyState, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
 import { RefreshCw, SearchX, WalletCards } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
-import { useQueryBandeira, useQueryFilters, useQueryId, useQueryPagina } from '../../nav/queryState'
+import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { useQueryBandeira, useQueryFilters, useQueryId } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
 import { BUILTIN_VIEWS, EMPTY_FILTERS, filterPagantes, loadViews, matchView, newView, periodoStart, saveViews, total, viewFilters, type Filters, type View } from './domain/filters'
@@ -22,7 +23,6 @@ export function PagantesPage({ host }: { host: Host }) {
   return <ToastProvider><Pagantes host={host} /></ToastProvider>
 }
 
-const PAGE_SIZE = 50
 const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
 function Pagantes({ host }: { host: Host }) {
@@ -50,11 +50,11 @@ function Pagantes({ host }: { host: Host }) {
       return data
     })
   }, [source.kv, setFiltersUrl])
-  const [page, setPage] = useQueryPagina()
 
   const since = useMemo(() => periodoStart(filters.periodo, new Date()), [filters.periodo])
   const pg = usePagantes(source, since)
   const visible = useMemo(() => filterPagantes(pg.list, filters, pg.contatos), [pg.list, filters, pg.contatos])
+  const { slice, more, loadMore } = useLazySlice(visible, filters)
 
   const [selectedId, setSelectedId] = useQueryId('abrir')
   // A ficha pode vir do rateio (pagante fora da lista carregada): guarda a cópia dela para continuar aberta.
@@ -151,16 +151,13 @@ function Pagantes({ host }: { host: Host }) {
     body = <EmptyState className="surface" align="start" icon={<SearchX size={36} />} title="Nenhum pagante encontrado para estes filtros" action={<Button variant="secondary" onClick={() => setFilters({ ...EMPTY_FILTERS })}>Limpar filtros</Button>} />
   } else {
     // Paginado: com "Todo o período" a lista pode ter milhares de linhas, cada uma com ações.
-    const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
-    const safePage = Math.min(page, pages)
-    const slice = visible.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
     const open = (id: string) => setSelected(visible.find((p) => p.id === id) ?? null)
     body = (
       <>
         {mobile
           ? <PagantesCards list={slice} choices={pg.choices} contatos={pg.contatos} onOpen={open} />
           : <PagantesTable list={slice} choices={pg.choices} contatos={pg.contatos} onOpen={open} />}
-        {visible.length > PAGE_SIZE ? <Pagination page={safePage} pageSize={PAGE_SIZE} total={visible.length} onChange={setPage} noun="pagantes" /> : null}
+        <LazyFooter loaded={slice.length} total={visible.length} more={more} onLoadMore={loadMore} noun={['pagante', 'pagantes']} touch={mobile} />
       </>
     )
   }
