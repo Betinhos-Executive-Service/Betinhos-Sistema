@@ -467,6 +467,8 @@ describe('Geral: correções finais', () => {
       fireEvent.click(within(screen.getByRole('toolbar', { name: 'Filtros de serviços' })).getByRole('button', { name: /^Ações/ }))
       return screen.findByRole('menuitem', { name: /^Gerar link/, hidden: true })
     }
+    // Cabeçalho (marcar todos) e filtro rápido também têm role=row: escolhe a primeira linha de dados com checkbox, sem depender do índice.
+    const marcarPrimeira = () => fireEvent.click(within(screen.getAllByRole('row', { hidden: true }).find((r) => within(r).queryByRole('checkbox') && within(r).queryAllByRole('columnheader').length === 0) as HTMLElement).getByRole('checkbox'))
 
     it('fica inerte quando o serviço não está Programado', async () => {
       render(<GeralPage host={{ mode: 'mock' }} />)
@@ -481,7 +483,7 @@ describe('Geral: correções finais', () => {
       hooks.gerarLink = async () => ({ ok: true, link: 'https://acompanhe.test/x', expiraEm: '2099-01-01T12:00:00Z' })
       render(<GeralPage host={{ mode: 'mock' }} />)
       await screen.findAllByText(PAGE1)
-      fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
+      marcarPrimeira()
       fireEvent.click(await item())
       const dialog = await screen.findByRole('dialog', { name: /Link de acompanhamento/ })
       const abrir = await within(dialog).findByRole('link', { name: /Abrir link de acompanhamento/ })
@@ -497,7 +499,7 @@ describe('Geral: correções finais', () => {
       hooks.gerarLink = async () => ({ ok: false, erro: 'Link de acompanhamento não configurado.' })
       render(<GeralPage host={{ mode: 'mock' }} />)
       await screen.findAllByText(PAGE1)
-      fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
+      marcarPrimeira()
       fireEvent.click(await item())
       expect(await screen.findByText('Link de acompanhamento não configurado neste ambiente')).toBeTruthy()
       expect(screen.getByText(/Peça ao TI/)).toBeTruthy()
@@ -507,7 +509,7 @@ describe('Geral: correções finais', () => {
       hooks.gerarLink = async () => ({ ok: false, erro: 'Sem rastreador.' })
       render(<GeralPage host={{ mode: 'mock' }} />)
       await screen.findAllByText(PAGE1)
-      fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
+      marcarPrimeira()
       fireEvent.click(await item())
       expect(await screen.findByText('Sem rastreador.')).toBeTruthy()
       expect(writeText).not.toHaveBeenCalled()
