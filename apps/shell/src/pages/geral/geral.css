@@ -45,9 +45,6 @@
 .gr-table { --gr-row-height: var(--bt-table-row-dense); }
 .gr-table .bt-table__head, .gr-table .bt-table__row { grid-template-columns: var(--gr-columns); gap: 0; padding: 0; width: 100%; min-width: var(--gr-min-width, max-content); }
 .gr-table .bt-table__head { display: grid; position: sticky; top: 0; z-index: 2; }
-/* Linha de filtro rápido (DS §10.9.2): mesmas trilhas do grid, presa logo abaixo do cabeçalho. */
-.gr-table .gr-quickrow { grid-template-columns: var(--gr-columns); gap: 0; padding: 0; width: 100%; min-width: var(--gr-min-width, max-content); position: sticky; top: 32px; z-index: 2; }
-.gr-table .gr-quickrow .bt-table__cell { padding: var(--bt-space-1) var(--bt-space-2); background-color: var(--bt-color-surface-neutral); }
 .gr-table .bt-table__row { min-height: var(--gr-row-height); user-select: none; -webkit-user-select: none; }
 /* Linhas fora da tela não pintam: sem isto cada quadro de animação do shell (acordeão, gaveta) recompunha a grade inteira. Listas e menus das células usam a top layer e não são cortados. */
 .gr-table .bt-table__row { content-visibility: auto; contain-intrinsic-size: auto var(--gr-row-height); }
@@ -185,16 +182,23 @@
 /* Cabeçalho: ordenar + menu da coluna (▾ no hover/foco; sempre visível, com ponto de ação, quando filtrada). */
 .gr-head { display: flex; align-items: center; gap: var(--bt-space-1); min-width: 0; width: 100%; }
 .gr-head__sort { flex: 0 1 auto; }
-.gr-head__more { position: relative; flex: 0 0 auto; opacity: 0; }
-.gr-head__more.is-filtered, .gr-head__more:focus-within, .gr-head__more:has([aria-expanded="true"]) { opacity: 1; }
-.gr-head__menu { position: relative; display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--bt-radius-xs); background: transparent; color: var(--bt-color-text-secondary); cursor: pointer; }
-.gr-head__menu:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border); }
-.gr-head__more.is-filtered .gr-head__menu { color: var(--bt-color-action); }
-.gr-head__dot { position: absolute; top: 2px; right: 2px; width: 6px; height: 6px; border-radius: var(--bt-radius-full); background-color: var(--bt-color-action); }
-@media (hover: none), (pointer: coarse) { .gr-head__more { opacity: 1; } }
+/* O título é o gatilho do menu (como no model-driven): o ▾ só aparece no hover, no foco, com o menu aberto ou com filtro. */
+.gr-head__chevron { position: relative; display: inline-grid; place-items: center; flex: 0 0 auto; width: 18px; height: 18px; color: var(--bt-color-text-secondary); opacity: 0; }
+.gr-head__sort:focus-visible .gr-head__chevron, .gr-head__sort[aria-expanded="true"] .gr-head__chevron, .gr-head__sort.is-filtered .gr-head__chevron { opacity: 1; }
+.gr-head__sort.is-filtered .gr-head__chevron { color: var(--bt-color-action); }
+.gr-head__dot { position: absolute; top: -1px; right: -1px; width: 6px; height: 6px; border-radius: var(--bt-radius-full); background-color: var(--bt-color-action); }
+@media (hover: none), (pointer: coarse) { .gr-head__chevron { opacity: 1; } }
+/* Painel de filtro da coluna, ancorado ao título (top layer, como o menu do DS). */
+.gr-colfilter { position: fixed; inset: auto; z-index: var(--bt-z-index-popover); width: min(300px, calc(100vw - 16px)); margin: 0; padding: var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); color: var(--bt-color-text-primary); box-shadow: var(--bt-shadow-popover); font-family: var(--bt-font-family-sans); }
+.gr-colfilter__title { margin-bottom: var(--bt-space-2); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-primary); }
+.gr-colfilter__control { display: grid; }
+.gr-colfilter__control .bt-quick__input, .gr-colfilter__control .bt-quick__select { width: 100%; }
+.gr-colfilter__actions { display: flex; justify-content: flex-end; gap: var(--bt-space-2); margin-top: var(--bt-space-3); }
+/* A barra do DS ainda oferece o botão da linha de filtro rápido; a Geral não usa essa linha. */
+.gr-commandline .bt-viewbar [aria-label="Filtro rápido"] { display: none; }
 @media (hover: hover) and (pointer: fine) {
-  .bt-table__cell:hover .gr-head__more { opacity: 1; }
-  .gr-head__menu:hover { background-color: var(--bt-color-surface-soft); color: var(--bt-color-action); }
+  .bt-table__cell:hover .gr-head__chevron { opacity: 1; }
+  .gr-head__sort:hover .gr-head__chevron { color: var(--bt-color-action); }
 }
 
 /* Botão Filtros e contagem. */
@@ -244,7 +248,6 @@
 .gr-drop--after { box-shadow: inset -2px 0 0 var(--bt-color-action); }
 
 /* Alvo de toque de 44 px no ▾ sem crescer o cabeçalho. */
-@media (pointer: coarse) { .gr-head__menu::after { content: ""; position: absolute; inset: -10px; } }
 .gr-chip__warn { margin-left: var(--bt-space-2); color: var(--bt-color-warning); flex: 0 0 auto; }
 .gr-chip.is-ignored { border-style: dashed; }
 .gr-fd__loading { margin: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); }
