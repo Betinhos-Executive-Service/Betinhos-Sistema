@@ -299,5 +299,5 @@ else {
   Dv POST environmentvariablevalues @{ value = $callback; 'EnvironmentVariableDefinitionId@odata.bind' = "/environmentvariabledefinitions($definitionId)" } | Out-Null
   $valueId = @((Dv GET "environmentvariablevalues?`$select=environmentvariablevalueid&`$filter=_environmentvariabledefinitionid_value eq $definitionId").value)[0].environmentvariablevalueid
 }
-Include $valueId 381
+# Valor atual NAO entra na solucao (tipo 381): cada ambiente mantem o seu; senao o deploy sobrescreve TEST/PROD com a URL do DEV.
 Write-Output "DEV: '$flowName' ativo ($($flow.resourceid)), $envVarName configurada, tudo na $solutionName."
