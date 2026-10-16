@@ -13,7 +13,9 @@ import {
   getExchangeCompletionState,
   normalizeReceiptIdentifier,
   SERVICE_VEHICLE_ORIGIN,
-  shouldShowOpenExchangeForDriver
+  resolveExpenseUploadModeRemote,
+  shouldShowOpenExchangeForDriver,
+  usesAsyncExpenseUpload
 } from "../src/lib/dataverse.ts";
 
 test("receber exibe valor em reais somente quando marcado e positivo", () => {
@@ -617,4 +619,77 @@ test("conteudo de email do recibo segue idioma sem traduzir empresa", () => {
   assert.match(es.body, /Estimado\(a\) Renan/);
   assert.match(es.body, /transporte ejecutivo en Brasil/);
   assert.match(es.body, /Betinhos Executive Service$/);
+});
+
+function mockExpenseUploadRuntime(clientUrl: string, flowValue: () => string) {
+  const queried: string[] = [];
+  const windowMock: any = {
+    location: { hostname: new URL(clientUrl).hostname },
+    Xrm: {
+      Utility: { getGlobalContext: () => ({ userSettings: { userId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" }, getClientUrl: () => clientUrl }) },
+      WebApi: {
+        retrieveMultipleRecords: async (entityName: string) => {
+          queried.push(entityName);
+          if (entityName === "environmentvariabledefinition") {
+            return { entities: [{ environmentvariabledefinitionid: "33333333-3333-3333-3333-333333333333", schemaname: "new_FlowURLDespesaAsync", defaultvalue: null }] };
+          }
+          if (entityName === "environmentvariablevalue") {
+            const value = flowValue();
+            return { entities: value ? [{ value }] : [] };
+          }
+          return { entities: [] };
+        }
+      }
+    }
+  };
+  windowMock.parent = windowMock;
+  return { windowMock, queried };
+}
+
+async function withWindow<T>(windowMock: unknown, run: () => Promise<T>) {
+  const previousWindow = (globalThis as any).window;
+  (globalThis as any).window = windowMock;
+  try {
+    return await run();
+  } finally {
+    (globalThis as any).window = previousWindow;
+  }
+}
+
+test("PROD sem URL do Flow assíncrono mantém o envio legado e reconhece a URL quando ela for configurada", async () => {
+  let flowValue = "";
+  const runtime = mockExpenseUploadRuntime("https://orgf261ae8e.crm2.dynamics.com", () => flowValue);
+  await withWindow(runtime.windowMock, async () => {
+    assert.equal(await resolveExpenseUploadModeRemote(), "legacy");
+    assert.equal(usesAsyncExpenseUpload(), false);
+    assert.equal(runtime.queried.includes("cr40f_anexodespesaoperacional"), false);
+
+    flowValue = "https://flow.example/prod-async";
+    assert.equal(await resolveExpenseUploadModeRemote(), "async");
+    assert.equal(usesAsyncExpenseUpload(), true);
+  });
+});
+
+test("PROD com URL do Flow assíncrono configurada liga o envio assíncrono", async () => {
+  const runtime = mockExpenseUploadRuntime("https://orgf261ae8e.crm2.dynamics.com", () => "https://flow.example/prod-async");
+  await withWindow(runtime.windowMock, async () => {
+    assert.equal(await resolveExpenseUploadModeRemote(), "async");
+    assert.equal(usesAsyncExpenseUpload(), true);
+    assert.equal(runtime.queried.includes("cr40f_anexodespesaoperacional"), true);
+  });
+});
+
+test("DEV com URL do Flow assíncrono configurada continua no envio assíncrono", async () => {
+  const runtime = mockExpenseUploadRuntime("https://org23b93544.crm2.dynamics.com", () => "https://flow.example/dev-async");
+  await withWindow(runtime.windowMock, async () => {
+    assert.equal(await resolveExpenseUploadModeRemote(), "async");
+    assert.equal(usesAsyncExpenseUpload(), true);
+  });
+});
+
+test("modo assíncrono resolvido em um ambiente não vale para outro", async () => {
+  const dev = mockExpenseUploadRuntime("https://org23b93544.crm2.dynamics.com", () => "https://flow.example/dev-async");
+  await withWindow(dev.windowMock, async () => { assert.equal(await resolveExpenseUploadModeRemote(), "async"); });
+  const other = mockExpenseUploadRuntime("https://orgoutro.crm2.dynamics.com", () => "");
+  await withWindow(other.windowMock, async () => { assert.equal(usesAsyncExpenseUpload(), false); });
 });
