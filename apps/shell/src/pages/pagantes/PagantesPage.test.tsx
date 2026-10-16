@@ -36,33 +36,20 @@ describe('Pagantes', () => {
     expect(within(ficha).getByRole('button', { name: 'Gerar recibo' })).toBeTruthy()
   })
 
-  it('salva a visão atual no navegador', async () => {
+  it('importa as visões salvas no navegador para “Minhas” uma vez', async () => {
+    window.localStorage.setItem(VIEWS_KEY, JSON.stringify({ views: [{ id: 'v1', nome: 'Falhas desde sempre', filters: { periodo: 'all', falhas: true } }] }))
     render(<PagantesPage host={{ mode: 'mock' }} />)
-    await screen.findByText('PAG-1201')
-    fireEvent.click(screen.getByLabelText('Só com falha de envio'))
-    expect(screen.queryByText('PAG-1201')).toBeNull()
+    expect(await screen.findByText(/agora fica em “Minhas”/)).toBeTruthy()
+    expect(window.localStorage.getItem(VIEWS_KEY)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /^Visão:/ }))
+    const opcao = await waitFor(() => {
+      const el = screen.getAllByText('Falhas desde sempre').map((e) => e.closest('[role="menuitemradio"]')).find(Boolean)
+      if (!el) throw new Error('visão importada não apareceu')
+      return el
+    })
+    fireEvent.click(opcao)
+    await waitFor(() => expect(screen.queryByText('PAG-1201')).toBeNull())
     expect(screen.getByText('PAG-1204')).toBeTruthy()
-
-    const salvar = async (nome: string) => {
-      fireEvent.click(screen.getByRole('button', { name: 'Visões' }))
-      fireEvent.click(await screen.findByText('Salvar filtros como visão'))
-      fireEvent.change(await screen.findByLabelText(/Nome da visão/), { target: { value: nome } })
-      fireEvent.click(screen.getByRole('button', { name: 'Salvar visão' }))
-    }
-
-    // Mesmos filtros de uma visão pronta: não duplica.
-    await salvar('Falhas')
-    expect(await screen.findByText(/já estão na visão “Com falha de envio”/)).toBeTruthy()
-    expect(window.localStorage.getItem(VIEWS_KEY) ?? '').not.toContain('Falhas"')
-
-    fireEvent.click(screen.getByRole('combobox', { name: 'Período de criação' }))
-    fireEvent.click(await screen.findByText('Todo o período'))
-    await salvar('Falhas desde sempre')
-
-    expect(await screen.findByText(/Visão “Falhas desde sempre” salva/)).toBeTruthy()
-    const stored = JSON.parse(window.localStorage.getItem(VIEWS_KEY)!)
-    expect(stored.views[0]).toMatchObject({ nome: 'Falhas desde sempre', filters: { falhas: true, periodo: 'all' } })
-    expect(stored.last).toBe(stored.views[0].id)
   })
 
   it('pagante sem pessoa: ficha pelo código, aviso e recibo automático bloqueado', async () => {
@@ -96,24 +83,24 @@ describe('Pagantes', () => {
     expect(await screen.findByText(/só funciona dentro do Dataverse/)).toBeTruthy()
   })
 
-  it('guarda filtros e ficha aberta na URL e reabre igual pelo link', async () => {
+  it('link antigo com falhas=1 abre filtrado; filtros e ficha aberta ficam na URL e reabrem igual', async () => {
     history.replaceState(null, '', '#/pagantes?falhas=1')
     render(<PagantesPage host={{ mode: 'mock' }} />)
     await screen.findByText('PAG-1204')
-    expect(screen.queryByText('PAG-1201')).toBeNull()
+    await waitFor(() => expect(screen.queryByText('PAG-1201')).toBeNull())
+    await waitFor(() => expect(location.hash).toMatch(/[?&]f=/))
+    expect(location.hash).not.toMatch(/falhas=/)
 
-    fireEvent.click(screen.getByLabelText('Só com falha de envio'))
-    expect(location.hash).toBe('#/pagantes')
-    await openRow('PAG-1201')
-    await screen.findByRole('dialog', { name: 'Mariana Albuquerque' })
+    await openRow('PAG-1204')
+    await screen.findByRole('dialog')
     const link = location.hash
-    expect(link).toMatch(/^#\/pagantes\?abrir=./)
+    expect(link).toMatch(/[?&]abrir=/)
+    expect(link).toMatch(/[?&]f=/)
 
     cleanup()
     history.replaceState(null, '', link)
     render(<PagantesPage host={{ mode: 'mock' }} />)
-    expect(await screen.findByRole('dialog', { name: 'Mariana Albuquerque' })).toBeTruthy()
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'Mariana Albuquerque' })).getByRole('button', { name: /Fechar/ }))
-    await waitFor(() => expect(location.hash).toBe('#/pagantes'))
+    expect(await screen.findByRole('dialog')).toBeTruthy()
+    await waitFor(() => expect(screen.queryByText('PAG-1201')).toBeNull())
   })
 })
