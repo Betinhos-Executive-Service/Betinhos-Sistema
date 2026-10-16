@@ -1,0 +1,19 @@
+import type { Execucao, Proposta } from '../domain/types'
+
+export function createMockData(now: Date) {
+  const antes = (min: number) => new Date(now.getTime() - min * 60_000)
+  const execucoes: Execucao[] = [
+    { id: 'mock-exec-fin-1', agente: 'financeiro', origem: 'agendado', pergunta: '', status: 'concluida', erro: '', resumo: 'Duas OS concluídas sem recibo e uma OP pendente há 20 dias.', modelo: 'claude-opus-5-5', tokensEntrada: 7800, tokensSaida: 1200, criadaEm: antes(120) },
+    { id: 'mock-exec-fin-0', agente: 'financeiro', origem: 'manual', pergunta: 'quais OPs vencem esta semana?', status: 'erro', erro: 'Tempo esgotado na chamada à API do Claude.', resumo: '', modelo: '', tokensEntrada: 0, tokensSaida: 0, criadaEm: antes(1500) },
+    { id: 'mock-exec-log-1', agente: 'logistica', origem: 'manual', pergunta: '', status: 'concluida', erro: '', resumo: 'Um serviço sem motorista amanhã às 09:30.', modelo: 'claude-opus-5-5', tokensEntrada: 5100, tokensSaida: 600, criadaEm: antes(20) },
+    { id: 'mock-exec-pes-1', agente: 'pessoas', origem: 'agendado', pergunta: '', status: 'concluida', erro: '', resumo: 'CNH de um motorista vence em 20 dias; nenhum ASO vencido.', modelo: 'claude-opus-5-5', tokensEntrada: 6400, tokensSaida: 700, criadaEm: antes(200) },
+  ]
+  const propostas: Proposta[] = [
+    { id: 'mock-prop-1', execucaoId: 'mock-exec-fin-1', tipo: 'SemRecibo', titulo: 'OS-1234 sem recibo', justificativa: 'Concluída há 12 dias, faturável, sem recibo emitido.', prioridade: 'alta', entidadeAlvo: 'cr40f_reservadeveculos', idAlvo: '11111111-1111-1111-1111-111111111111', acao: { tipo: 'CriarPendencia', campos: { titulo: 'Emitir recibo da OS-1234', descricao: 'OS concluída em 02/10 sem recibo.' } }, decisao: 'pendente', motivoDescarte: '', decididoPor: '', decididoEm: null },
+    { id: 'mock-prop-2', execucaoId: 'mock-exec-fin-1', tipo: 'OPPendenteAntiga', titulo: 'OP-410 pendente há 20 dias', justificativa: 'Criada em 24/09, status Pagamento Pendente, R$ 2.500.', prioridade: 'alta', entidadeAlvo: 'cr40f_financeiro', idAlvo: '22222222-2222-2222-2222-222222222222', acao: { tipo: 'CriarPendencia', campos: { titulo: 'Cobrar OP-410', descricao: 'Pendente há 20 dias.' } }, decisao: 'aprovada', motivoDescarte: '', decididoPor: 'Renan Mendonça', decididoEm: antes(60) },
+    { id: 'mock-prop-3', execucaoId: 'mock-exec-fin-1', tipo: 'OSSemCobranca', titulo: 'OS-1230 sem OP', justificativa: 'Concluída há 5 dias sem OP vinculada.', prioridade: 'media', entidadeAlvo: 'cr40f_reservadeveculos', idAlvo: '33333333-3333-3333-3333-333333333333', acao: { tipo: 'CriarPendencia', campos: { titulo: 'Gerar OP da OS-1230', descricao: '' } }, decisao: 'pendente', motivoDescarte: '', decididoPor: '', decididoEm: null },
+    { id: 'mock-prop-4', execucaoId: 'mock-exec-log-1', tipo: 'ServicoSemMotorista', titulo: 'OS-1300 amanhã 09:30 sem motorista', justificativa: 'João está livre das 08:00 às 12:00 e tem carro.', prioridade: 'alta', entidadeAlvo: 'cr40f_reservadeveculos', idAlvo: '44444444-4444-4444-4444-444444444444', acao: { tipo: 'AtribuirMotorista', campos: { motoristaId: '55555555-5555-5555-5555-555555555555', motoristaNome: 'João' } }, decisao: 'pendente', motivoDescarte: '', decididoPor: '', decididoEm: null },
+    { id: 'mock-prop-5', execucaoId: 'mock-exec-pes-1', tipo: 'CNHVencendo', titulo: 'CNH de Marcos vence em 20 dias', justificativa: 'Validade 03/11/2026.', prioridade: 'media', entidadeAlvo: 'cr40f_funcionarios', idAlvo: '66666666-6666-6666-6666-666666666666', acao: { tipo: 'CriarPendencia', campos: { titulo: 'Renovar CNH de Marcos', descricao: 'Vence em 03/11.' } }, decisao: 'pendente', motivoDescarte: '', decididoPor: '', decididoEm: null },
+  ]
+  return { execucoes, propostas }
+}

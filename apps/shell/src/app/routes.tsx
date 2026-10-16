@@ -5,7 +5,8 @@ import type { Host } from '../host'
 import { findItem, type MenuItem } from '../nav/menu'
 
 type PageId = Extract<MenuItem, { kind: 'page' }>['page']
-type PageProps = { host: Host }
+type Agente = NonNullable<Extract<MenuItem, { kind: 'page' }>['agente']>
+type PageProps = { host: Host; agente?: Agente }
 
 /**
  * Um chunk por tela: só a rota aberta é baixada e avaliada na carga (Recharts fica no chunk do Dashboard).
@@ -26,6 +27,7 @@ export const PAGE_LOADERS: Record<PageId, () => Promise<ComponentType<PageProps>
   despesas: () => import('../pages/despesas/DespesasPage').then((m) => m.DespesasPage),
   documentos: () => import('../pages/documentos/DocumentosPage').then((m) => m.DocumentosPage),
   comunicados: () => import('../pages/comunicados/ComunicadosPage').then((m) => m.ComunicadosPage),
+  agentes: () => import('../pages/agentes/AgentesPage').then((m) => m.AgentesPage),
 }
 
 const pending = new Map<PageId, Promise<ComponentType<PageProps>>>()
@@ -107,9 +109,9 @@ const lazyFor = (page: PageId) => {
   return component
 }
 
-export function LazyPage({ page, host }: { page: PageId; host: Host }) {
+export function LazyPage({ page, host, agente }: { page: PageId; host: Host; agente?: Agente }) {
   const Page = lazyFor(page)
-  return <Page host={host} />
+  return <Page host={host} agente={agente} />
 }
 
 /**
