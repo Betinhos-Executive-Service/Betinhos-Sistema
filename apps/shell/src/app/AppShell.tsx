@@ -77,6 +77,7 @@ const ITEM_ICONS: Record<string, ReactNode> = {
   cr40f_anexocolisao_v2: <Paperclip />,
   cr40f_anexorecebimento_v2: <Paperclip />,
   'custom-page-funcoes-operacionais': <Wrench />,
+  comunicados: <Megaphone />,
   cr40f_gerenciarcomunicados: <Megaphone />,
   new_telacomposicaopreco: <Calculator />,
 }
