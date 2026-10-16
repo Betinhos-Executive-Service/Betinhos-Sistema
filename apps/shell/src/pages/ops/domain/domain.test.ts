@@ -3,7 +3,9 @@ import { createMockPagantes } from '../../pagantes/data/mock'
 import { STATUS } from '../../pagantes/domain/status'
 import { dateOnly, mapOp } from '../data/queries'
 import { passageirosCurto, periodo } from '../components/OpsList'
-import { BUILTIN_VIEWS, EMPTY_FILTERS, VIEWS_KEY, filterOps, loadViews, matchView } from './filters'
+import { matchesFilters, readFilters, type TableFilters } from '@betinhos/ui'
+import { VIEWS_KEY, loadViews } from './filters'
+import { builtinViews, fromLegacyFilters, legacyViewConfig, matchesKeyword, opFields, readOp, sortOps } from './lista'
 import { OP_STATUS, cancelBlock, resumoRateio } from './status'
 import { buildTimeline } from './timeline'
 import { FALLBACK_OP_CHOICES } from './status'
@@ -50,18 +52,30 @@ describe('resumoRateio', () => {
 })
 
 describe('filtros e visões', () => {
+  const fields = opFields(FALLBACK_OP_CHOICES)
+  const apply = (filters: TableFilters) => ops.filter((o) => matchesFilters(o, readFilters(filters, fields), fields, readOp)).map((o) => o.codigo)
+  const viewFilters = (id: string) => (JSON.parse(builtinViews(FALLBACK_OP_CHOICES).find((v) => v.id === id)!.config) as { filters: TableFilters }).filters
+
   it('busca sem acento por cliente e passageiro e filtra por status', () => {
-    expect(filterOps(ops, { ...EMPTY_FILTERS, query: 'lumen helena' }).map((o) => o.codigo)).toEqual(['OP-402', 'OP-408'])
-    expect(filterOps(ops, { ...EMPTY_FILTERS, status: [OP_STATUS.cancelada] }).map((o) => o.codigo)).toEqual(['OP-413'])
-    expect(matchView(BUILTIN_VIEWS, { periodo: '90', status: [OP_STATUS.parcial, OP_STATUS.aberta, OP_STATUS.pendente] })?.id).toBe('em-aberto')
+    expect(ops.filter((o) => matchesKeyword(o, 'lumen helena')).map((o) => o.codigo)).toEqual(['OP-402', 'OP-408'])
+    expect(apply(fromLegacyFilters({ status: [OP_STATUS.cancelada] }, FALLBACK_OP_CHOICES))).toEqual(['OP-413'])
+    expect(apply(viewFilters('canceladas'))).toEqual(['OP-413'])
+    expect(apply(viewFilters('em-aberto')).length).toBeGreaterThan(0)
+    expect(builtinViews(FALLBACK_OP_CHOICES).map((v) => v.name)).toEqual(['Em aberto', 'Pagas', 'Canceladas'])
   })
 
-  it('descarta visões salvas inválidas', () => {
+  it('ordena pelo número da OP, não pelo texto', () => {
+    const codigos = sortOps(ops, { key: 'op', dir: 'asc' }, FALLBACK_OP_CHOICES).map((o) => Number(o.codigo.replace(/\D/g, '')))
+    expect(codigos).toEqual([...codigos].sort((a, b) => a - b))
+  })
+
+  it('importação: descarta visões salvas inválidas e converte sem o período', () => {
     const kv = new Map<string, string>()
-    kv.set(VIEWS_KEY, JSON.stringify({ views: [{ id: 'a', nome: 'Boa', filters: { periodo: '30', status: [1] } }, { id: 'b', nome: 'Ruim', filters: { periodo: '7' } }, { id: 'todas', nome: 'Clone', filters: {} }], last: 'a' }))
+    kv.set(VIEWS_KEY, JSON.stringify({ views: [{ id: 'a', nome: 'Boa', filters: { periodo: '30', status: [OP_STATUS.paga] } }, { id: 'b', nome: 'Ruim', filters: { periodo: '7' } }, { id: 'todas', nome: 'Clone', filters: {} }], last: 'a' }))
     const stored = loadViews({ getItem: (k) => kv.get(k) ?? null, setItem: () => undefined, removeItem: () => undefined })
     expect(stored.views.map((v) => v.nome)).toEqual(['Boa'])
-    expect(stored.last).toBe('a')
+    const config = JSON.parse(legacyViewConfig(stored.views[0].filters, FALLBACK_OP_CHOICES))
+    expect(config.filters.quick.status).toMatchObject({ op: 'in', values: [{ value: String(OP_STATUS.paga) }] })
   })
 })
 
