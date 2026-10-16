@@ -1,24 +1,12 @@
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { MonitorOff, PlugZap, SearchX } from 'lucide-react'
 import type { Host } from '../host'
 import { DEFAULT_ITEM, type MenuGroup, type MenuItem } from '../nav/menu'
 import { hrefFor } from '../nav/useHashRoute'
-import { ComponentsPage } from '../pages/ComponentsPage'
-import { OperacionalPage } from '../pages/operacional/OperacionalPage'
-import { FrotaPage } from '../pages/frota/FrotaPage'
-import { FuncionariosPage } from '../pages/funcionarios/FuncionariosPage'
-import { CurriculosPage } from '../pages/curriculos/CurriculosPage'
-import { PagantesPage } from '../pages/pagantes/PagantesPage'
-import { OpsPage } from '../pages/ops/OpsPage'
-import { PessoasPage } from '../pages/pessoas/PessoasPage'
-import { GeralPage } from '../pages/geral/GeralPage'
-import { DashboardPage } from '../pages/dashboard/DashboardPage'
-import { InfracoesPage } from '../pages/infracoes/InfracoesPage'
-import { DespesasPage } from '../pages/despesas/DespesasPage'
-import { AgentesPage } from '../pages/agentes/AgentesPage'
 import { EmptyState, buttonClassName } from '@betinhos/ui'
 import { Frame } from './Frame'
 import { PageLayout } from './PageLayout'
+import { LazyPage, PageFallback, RouteErrorBoundary } from './routes'
 
 type Props = { host: Host; group: MenuGroup | null; item: MenuItem | null; label: string }
 
@@ -59,20 +47,14 @@ export function RouteLayout({ host, group, item, label }: Props) {
   }
 
   if (item.kind === 'page') {
-    if (item.page === 'operacional') return <OperacionalPage host={host} />
-    if (item.page === 'frota') return <FrotaPage host={host} />
-    if (item.page === 'funcionarios') return <FuncionariosPage host={host} />
-    if (item.page === 'curriculos') return <CurriculosPage host={host} />
-    if (item.page === 'pagantes') return <PagantesPage host={host} />
-    if (item.page === 'ops') return <OpsPage host={host} />
-    if (item.page === 'pessoas') return <PessoasPage host={host} />
-    if (item.page === 'geral') return <GeralPage host={host} />
-    if (item.page === 'dashboard') return <DashboardPage host={host} />
-    if (item.page === 'infracoes') return <InfracoesPage host={host} />
-    if (item.page === 'despesas') return <DespesasPage host={host} />
-    // key: trocar de assistente remonta a página (estado e disparo automático são por agente).
-    if (item.page === 'agentes') return <AgentesPage key={item.id} host={host} agente={item.agente ?? 'financeiro'} />
-    return <ComponentsPage />
+    // Cada tela é um chunk próprio; enquanto ele chega, o cabeçalho da página já aparece com Skeleton.
+    return (
+      <RouteErrorBoundary key={item.id} title={label}>
+        <Suspense fallback={<PageFallback title={label} />}>
+          <LazyPage page={item.page} host={host} agente={item.agente} />
+        </Suspense>
+      </RouteErrorBoundary>
+    )
   }
 
   if (host.mode === 'mock') {

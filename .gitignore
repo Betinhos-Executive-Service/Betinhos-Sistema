@@ -9,5 +9,7 @@ dist/
 *.log
 !.env.example
 out/
-
+packages/despesas-ia/.local/
+packages/plugins/**/bin/
+packages/plugins/**/obj/
 packages/agentes-ia/.local/

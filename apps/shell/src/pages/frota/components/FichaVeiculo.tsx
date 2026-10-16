@@ -1,33 +1,38 @@
 import { Check, Copy, ExternalLink, ImageUp } from 'lucide-react'
-import { Alert, Button, Drawer, EmptyState, Input, StatusBadge } from '@betinhos/ui'
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import { Alert, Button, Drawer, EmptyState, StatusBadge } from '@betinhos/ui'
+import { useEffect, useMemo, useRef, useState, type DragEvent, type SyntheticEvent } from 'react'
 import { useQueryPeriodo } from '../../../nav/queryState'
 import { formatBR } from '../data/dates'
-import { brl, NAO_INFORMADO } from '../data/format'
+import { NAO_INFORMADO } from '../data/format'
 import { CATEGORIA, label, VEICULO, VEICULO_STATUS } from '../data/schema'
 import type { DataSource, LoadResult } from '../data/source'
 import type { FrotaData, Kind } from '../data/types'
 import { errorMessage } from '../data/xrm'
-import { custoVeiculo, ultimos12Meses } from '../domain/indicadores'
+import { ultimos12Meses } from '../domain/indicadores'
 import { motoristaAtual, possesAbertas, rotuloMotoristaAtual } from '../domain/motoristaAtual'
 import { buildTimeline } from '../domain/timeline'
 import { buildPromptImagem, faltasPrompt } from '../domain/promptImagem'
+import { CustoTotal } from './CustoTotal'
 import { FotoVeiculo, invalidarFoto } from './FotoVeiculo'
+import { Preventivas } from './Preventivas'
 import { useNotify } from './Toasts'
+import { Checklist } from '../../documentos/components/Checklist'
+import type { DocsSource } from '../../documentos/data/source'
 
 const TABELAS_TIMELINE: { key: 'manutencoes' | 'multas' | 'colisoes' | 'posses'; nome: string }[] = [
   { key: 'manutencoes', nome: 'Manutenções' }, { key: 'multas', nome: 'Multas' }, { key: 'colisoes', nome: 'Colisões' }, { key: 'posses', nome: 'Posses' },
 ]
 
 const TIPOS_FOTO = ['image/png', 'image/jpeg', 'image/webp']
+/** `onCancel` não está nos tipos de <div>, mas o React o repassa pela árvore; espalhado para o TS aceitar. */
+const pararCancel = { onCancel: (event: SyntheticEvent) => event.stopPropagation() }
 
-export function FichaVeiculo({ source, id, data, errors, today, onClose, onOpen, onReload }: { source: DataSource; id: string; errors: LoadResult['errors']; data: FrotaData; today: string; onClose: () => void; onOpen: (kind: Kind, id: string) => void; onReload: () => void }) {
+export function FichaVeiculo({ source, docs, id, data, errors, today, secao = null, onClose, onOpen, onReload }: { source: DataSource; docs?: DocsSource | null; id: string; errors: LoadResult['errors']; data: FrotaData; today: string; secao?: 'preventivas' | null; onClose: () => void; onOpen: (kind: Kind, id: string) => void; onReload: () => void }) {
   const notify = useNotify()
   const padrao = useMemo(() => ultimos12Meses(today), [today])
   const [periodo, setPeriodo] = useQueryPeriodo('fde', 'fate', padrao)
   const veiculo = data.veiculos.find((item) => item.id === id)
   const timeline = useMemo(() => buildTimeline(id, data), [id, data])
-  const custo = useMemo(() => custoVeiculo(data.manutencoes, id, periodo), [data.manutencoes, id, periodo])
   const motorista = useMemo(() => (veiculo ? rotuloMotoristaAtual(motoristaAtual(veiculo, possesAbertas(data.posses))) : null), [veiculo, data.posses])
 
   const [copiado, setCopiado] = useState(false)
@@ -100,6 +105,12 @@ export function FichaVeiculo({ source, id, data, errors, today, onClose, onOpen,
     onReload()
   }
 
+  // Aberta a partir de uma pendência de preventiva, a ficha já mostra a seção.
+  const temVeiculo = Boolean(veiculo)
+  useEffect(() => {
+    if (secao === 'preventivas' && temVeiculo) document.getElementById(`${id}-preventivas`)?.scrollIntoView?.({ block: 'start' })
+  }, [secao, id, temVeiculo])
+
   const erro = (nome: string, mensagem: string) => <Alert key={nome} tone="danger">Não foi possível carregar {nome}: {mensagem}</Alert>
 
   return (
@@ -148,18 +159,23 @@ export function FichaVeiculo({ source, id, data, errors, today, onClose, onOpen,
               <dt>Motorista atual</dt><dd>{motorista || 'Sem motorista'}</dd>
             </dl>
           </section>
+          {docs ? (
+            <section className="frota-group" aria-labelledby={`${id}-docs`}>
+              <h3 id={`${id}-docs`} className="frota-group__title">Documentos</h3>
+              {/* Diálogos do checklist (excluir, renovar) são <dialog> dentro deste Drawer: o "cancel" (Esc) deles sobe pela árvore do
+                  React e fecharia a ficha inteira; aqui ele para. */}
+              <div style={{ display: 'contents' }} {...pararCancel}>
+                <Checklist source={docs} donoId={id} titulo="" />
+              </div>
+            </section>
+          ) : null}
           <section className="frota-group" aria-labelledby={`${id}-custo`}>
-            <h3 id={`${id}-custo`} className="frota-group__title">Custo de manutenção</h3>
-            <div className="frota-cluster">
-              <Input className="frota-data" size="compact" type="date" aria-label="De" value={periodo.de} max={periodo.ate} onChange={(event) => { const de = event.target.value; if (de && de <= periodo.ate) setPeriodo({ ...periodo, de }) }} />
-              <Input className="frota-data" size="compact" type="date" aria-label="Até" value={periodo.ate} min={periodo.de} onChange={(event) => { const ate = event.target.value; if (ate && ate >= periodo.de) setPeriodo({ ...periodo, ate }) }} />
-            </div>
-            {errors.manutencoes ? erro('Manutenções', errors.manutencoes) : (
-              <>
-                <p className="frota-kpi"><strong>{custo.qtd > 0 && custo.qtd === custo.semValor ? NAO_INFORMADO : brl(custo.total)}</strong><span>{custo.qtd} {custo.qtd === 1 ? 'manutenção realizada' : 'manutenções realizadas'} no período</span></p>
-                {custo.semValor > 0 && <p className="frota-muted">{custo.semValor} {custo.semValor === 1 ? 'manutenção sem valor informado' : 'manutenções sem valor informado'}</p>}
-              </>
-            )}
+            <h3 id={`${id}-custo`} className="frota-group__title">Custo total</h3>
+            <CustoTotal data={data} errors={errors} veiculoId={id} periodo={periodo} today={today} onPeriodo={setPeriodo} />
+          </section>
+          <section className="frota-group" id={`${id}-preventivas`} aria-labelledby={`${id}-prev-titulo`}>
+            <h3 id={`${id}-prev-titulo`} className="frota-group__title">Preventivas</h3>
+            <Preventivas data={data} veiculoId={id} today={today} source={source} errors={errors} onOpen={onOpen} onReload={onReload} />
           </section>
           <section className="frota-group" aria-labelledby={`${id}-linha`}>
             <h3 id={`${id}-linha`} className="frota-group__title">Linha do tempo</h3>

@@ -15,7 +15,8 @@ type Props = {
 /** Campo no padrão `Field` do Design System: rótulo acima, caixa `.bt-control`, erro com ícone. */
 export function FieldInput({ field, value, error, changed, onChange }: Props) {
   const id = `f-${field.key}`
-  const describedBy = error ? `${id}-err` : undefined
+  const hintId = field.hint ? `${id}-hint` : undefined
+  const describedBy = [error ? `${id}-err` : undefined, hintId].filter(Boolean).join(' ') || undefined
   const common = { id, className: 'bt-control__input', 'aria-invalid': Boolean(error), 'aria-describedby': describedBy, disabled: field.readonly }
 
   let control
@@ -61,7 +62,8 @@ export function FieldInput({ field, value, error, changed, onChange }: Props) {
         {changed && <span className="dot" title="Alterado" aria-label="alterado" />}
       </label>
       {box}
-      {error && <span id={describedBy} className="bt-field__error"><AlertCircle size={14} aria-hidden />{error}</span>}
+      {field.hint && <p id={hintId} className="bt-field__hint">{field.hint}</p>}
+      {error && <span id={`${id}-err`} className="bt-field__error"><AlertCircle size={14} aria-hidden />{error}</span>}
     </div>
   )
 }

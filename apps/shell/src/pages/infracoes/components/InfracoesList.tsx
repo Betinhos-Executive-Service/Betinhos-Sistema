@@ -1,9 +1,11 @@
-import { StatusBadge, Table, type TableColumn } from '@betinhos/ui'
+import type { ReactNode } from 'react'
+import { StatusBadge, Table, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
 import { openFromRow } from '../../pagantes/components/PagantesList'
 import { COMPETENCIA, GRAVIDADE, RESPONSABILIDADE, gravidadeTone, label, labels } from '../domain/choices'
 import type { Infracao, MultaUso } from '../domain/types'
 
 type Props = { list: Infracao[]; uso: Map<string, MultaUso[]>; onOpen: (id: string) => void; loading?: boolean }
+type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; footer?: ReactNode; empty?: ReactNode }
 
 export const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 const fmtValor = (v: number | null) => (v == null ? '—' : money.format(v))
@@ -29,19 +31,19 @@ export function Badges({ i }: { i: Infracao }) {
 
 const usoCount = (uso: Map<string, MultaUso[]>, id: string) => uso.get(id)?.length ?? 0
 
-export function InfracoesTable({ list, uso, onOpen, loading }: Props) {
+export function InfracoesTable({ list, uso, onOpen, loading, view, quickFilters, footer, empty }: TableProps) {
   const columns: TableColumn<Infracao>[] = [
-    { key: 'infracao', header: 'Infração', width: 'minmax(220px, 2.6fr)', cell: (i) => <OpenName i={i} onOpen={onOpen} /> },
-    { key: 'gravidade', header: 'Gravidade', width: 'minmax(120px, .8fr)', cell: (i) => <Badges i={i} /> },
-    { key: 'pontos', header: 'Pontos', width: '76px', align: 'end', cell: (i) => <span className="if-num">{i.pontos ?? '—'}</span> },
-    { key: 'valor', header: 'Valor', width: 'minmax(96px, .7fr)', align: 'end', cell: (i) => <span className="if-num">{fmtValor(i.valor)}</span> },
-    { key: 'competencia', header: 'Competência', width: 'minmax(120px, .9fr)', hideBelow: 'compact', cell: (i) => labels(COMPETENCIA, i.competencia) || '—' },
-    { key: 'responsavel', header: 'Responsável', width: 'minmax(100px, .7fr)', hideBelow: 'compact', cell: (i) => label(RESPONSABILIDADE, i.responsabilidade, '—') },
-    { key: 'multas', header: 'Multas', width: '72px', align: 'end', cell: (i) => <span className="if-num">{usoCount(uso, i.id) || '—'}</span> },
+    { key: 'infracao', header: 'Infração', label: 'Infração', sortable: true, defaultWidth: 360, width: 'minmax(220px, 2.6fr)', cell: (i) => <OpenName i={i} onOpen={onOpen} /> },
+    { key: 'gravidade', header: 'Gravidade', label: 'Gravidade', sortable: true, defaultWidth: 160, width: 'minmax(120px, .8fr)', cell: (i) => <Badges i={i} /> },
+    { key: 'pontos', header: 'Pontos', label: 'Pontos', sortable: true, defaultWidth: 100, width: '76px', align: 'end', cell: (i) => <span className="if-num">{i.pontos ?? '—'}</span> },
+    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 130, width: 'minmax(96px, .7fr)', align: 'end', cell: (i) => <span className="if-num">{fmtValor(i.valor)}</span> },
+    { key: 'competencia', header: 'Competência', label: 'Competência', sortable: true, defaultWidth: 170, width: 'minmax(120px, .9fr)', hideBelow: 'compact', cell: (i) => labels(COMPETENCIA, i.competencia) || '—' },
+    { key: 'responsavel', header: 'Responsável', label: 'Responsável', sortable: true, defaultWidth: 140, width: 'minmax(100px, .7fr)', hideBelow: 'compact', cell: (i) => label(RESPONSABILIDADE, i.responsabilidade, '—') },
+    { key: 'multas', header: 'Multas', label: 'Multas', sortable: true, defaultWidth: 100, width: '72px', align: 'end', cell: (i) => <span className="if-num">{usoCount(uso, i.id) || '—'}</span> },
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.if-open')}>
-      <Table className="if-table" columns={columns} rows={list} rowKey={(i) => i.id} loading={loading} />
+      <Table className="if-table" columns={columns} rows={list} rowKey={(i) => i.id} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

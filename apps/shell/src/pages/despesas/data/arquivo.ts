@@ -6,6 +6,9 @@ import type { Anexo, Arquivo } from '../domain/types'
 /** Flow HTTP "Flow - Consultar Arquivo OneDrive" (criado por packages/deploy/provision-flow-consultar-onedrive.ps1). */
 export const FLOW_VAR = 'new_URLFlowConsultarArquivoOneDrive'
 
+/** Comprovantes novos ficam no SharePoint do sistema; os antigos, no OneDrive do noreply (`betinhos-my`). */
+const noSharePoint = (url: string | null) => !!url && /^https:\/\/[^/]+\.sharepoint\.com\//i.test(url) && !/^https:\/\/[^/]+-my\.sharepoint\.com\//i.test(url)
+
 type FlowResult = { sucesso?: boolean; erro?: string; nomeArquivo?: string; mimeType?: string; conteudoBase64?: string }
 
 /** Valor sobrescrito da variável primeiro; sem ele, o padrão da definição. */
@@ -33,7 +36,9 @@ export function createArquivos(client: DataverseClient) {
   async function buscar(anexo: Anexo): Promise<Arquivo> {
     // Comprovantes antigos não gravaram o id do OneDrive: o flow resolve pelo link de compartilhamento.
     if (!anexo.driveItemId && !anexo.url) throw new Error('Este comprovante não tem o arquivo no OneDrive.')
-    const body = anexo.driveItemId ? { id: anexo.driveItemId, nomeArquivo: anexo.nome } : { link: anexo.url, nomeArquivo: anexo.nome }
+    const body = anexo.driveItemId
+      ? { id: anexo.driveItemId, nomeArquivo: anexo.nome, ...(noSharePoint(anexo.url) ? { origem: 'sharepoint' } : {}) }
+      : { link: anexo.url, nomeArquivo: anexo.nome }
     const response = await fetch(await flowUrl(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     let result: FlowResult = {}
     try { result = await response.json() } catch { /* corpo vazio */ }

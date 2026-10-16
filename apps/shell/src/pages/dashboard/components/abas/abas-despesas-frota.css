@@ -1,6 +1,8 @@
 /* Abas Despesas e Frota: só tokens --bt-*, tema claro, sem gradiente. Classes prefixadas dash-de-/dash-fr-. */
 
 /* ---------- Despesas: filtros próprios da aba ---------- */
+/* Barra dentro do corpo da aba: o espaçamento vem do Stack, não da margem do PageToolbar. */
+.dash-de-filtros { margin-bottom: 0; }
 .dash-de-filtros .bt-page-toolbar__start { gap: var(--bt-space-2); }
 .dash-de-filtros__nota { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); line-height: var(--bt-typography-body-small-line-height); }
 
