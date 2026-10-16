@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Alert, Button, Dialog, EmptyState, Field, Input, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
 import { Plus, RefreshCw, SearchX, Users } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
+import { LazyFooter, useLazySlice } from '../../app/LazyList'
 import { useQueryAlvo, useQueryBandeira, useQueryFilters } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
@@ -14,15 +15,11 @@ import { usePessoas } from './usePessoas'
 import { PessoasToolbar } from './components/PessoasToolbar'
 import { PessoasCards, PessoasTable } from './components/PessoasList'
 import { PessoaDrawer } from './components/PessoaDrawer'
-import { LoadSentinel } from '../geral/components/LoadMore'
 import './pessoas.css'
 
 export function PessoasPage({ host }: { host: Host }) {
   return <ToastProvider><Pessoas host={host} /></ToastProvider>
 }
-
-/** Lote de linhas reveladas por vez: a lista já está em memória, o lazy loading é só de renderização. */
-const PAGE_SIZE = 50
 
 function Pessoas({ host }: { host: Host }) {
   const source = useMemo(() => createSource(host), [host])
@@ -53,10 +50,8 @@ function Pessoas({ host }: { host: Host }) {
   const dupIds = useMemo(() => new Set(dups.keys()), [dups])
   const choices = ps.choices
   const visible = useMemo(() => (choices ? filterPessoas(ps.list, filters, dupIds, (p) => label(choices.cargo, p.cargo)) : []), [ps.list, filters, dupIds, choices])
+  const { slice, more, loadMore } = useLazySlice(visible, filters)
   const clientes = useMemo(() => clienteOptions(ps.list), [ps.list])
-  const [limit, setLimit] = useState(PAGE_SIZE)
-  useEffect(() => { setLimit(PAGE_SIZE) }, [filters])
-  const loadMore = useCallback(() => setLimit((n) => n + PAGE_SIZE), [])
 
   const [target, setTarget] = useQueryAlvo()
   const [saving, setSaving] = useQueryBandeira('salvarvisao')
@@ -91,17 +86,11 @@ function Pessoas({ host }: { host: Host }) {
   } else if (!visible.length) {
     body = <EmptyState className="surface" align="start" icon={<SearchX size={36} />} title="Nenhuma pessoa encontrada para estes filtros" action={<Button variant="secondary" onClick={() => setFilters({ ...EMPTY_FILTERS })}>Limpar filtros</Button>} />
   } else {
-    const slice = visible.slice(0, limit)
-    const more = visible.length > slice.length
     const open = (id: string) => setTarget({ mode: 'view', id })
     body = (
       <>
         {mobile ? <PessoasCards list={slice} choices={choices} dups={dups} onOpen={open} /> : <PessoasTable list={slice} choices={choices} dups={dups} onOpen={open} />}
-        <LoadSentinel root={null} active={more} loaded={slice.length} onLoadMore={loadMore} />
-        <div className="ps-loadmore" role="status">
-          <span>{more ? `${slice.length} de ${visible.length} pessoas` : `${visible.length} ${visible.length === 1 ? 'pessoa' : 'pessoas'}`}</span>
-          {more ? <Button variant="ghost" size={mobile ? 'touch' : 'compact'} onClick={loadMore}>Carregar mais</Button> : null}
-        </div>
+        <LazyFooter loaded={slice.length} total={visible.length} more={more} onLoadMore={loadMore} noun={['pessoa', 'pessoas']} touch={mobile} />
       </>
     )
   }
