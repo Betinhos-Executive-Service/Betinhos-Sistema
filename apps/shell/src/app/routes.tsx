@@ -25,6 +25,7 @@ export const PAGE_LOADERS: Record<PageId, () => Promise<ComponentType<PageProps>
   infracoes: () => import('../pages/infracoes/InfracoesPage').then((m) => m.InfracoesPage),
   despesas: () => import('../pages/despesas/DespesasPage').then((m) => m.DespesasPage),
   documentos: () => import('../pages/documentos/DocumentosPage').then((m) => m.DocumentosPage),
+  comunicados: () => import('../pages/comunicados/ComunicadosPage').then((m) => m.ComunicadosPage),
 }
 
 const pending = new Map<PageId, Promise<ComponentType<PageProps>>>()
