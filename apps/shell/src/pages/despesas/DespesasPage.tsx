@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Alert, Button, EmptyState, Grid, MetricCard, Pagination, SearchBox, Select, StatusBadge, ToastProvider, ViewBar, matchesFilters, useShellHeader, useToast } from '@betinhos/ui'
+import { Alert, Button, EmptyState, Grid, MetricCard, SearchBox, Select, StatusBadge, ToastProvider, ViewBar, matchesFilters, useShellHeader, useToast } from '@betinhos/ui'
 import { Clock, Copy, Paperclip, ReceiptText, RefreshCw, SearchX, Wallet } from 'lucide-react'
 import type { Host } from '../../host'
+import { LazyFooter, useLazySlice } from '../../app/LazyList'
 import { useListView } from '../../app/useListView'
-import { useQueryId, useQueryPagina, useQueryTexto } from '../../nav/queryState'
+import { useQueryId, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { formatMoney } from '../pagantes/domain/messages'
 import { createSource } from './data/source'
@@ -21,7 +22,6 @@ export function DespesasPage({ host }: { host: Host }) {
   return <ToastProvider><Despesas host={host} /></ToastProvider>
 }
 
-const PAGE_SIZE = 50
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`
 /** Parâmetros da barra antiga na URL; links com eles abrem com os filtros equivalentes. `q` e `periodo` continuam. */
 const LEGACY_KEYS = ['operacional', 'financeiro', 'categoria', 'motorista', 'alertas'] as const
@@ -57,9 +57,8 @@ function Despesas({ host }: { host: Host }) {
     },
   })
 
-  // Busca, página e despesa aberta continuam na URL; os filtros vão em `f=` (useListView).
+  // Busca e despesa aberta continuam na URL; os filtros vão em `f=` (useListView).
   const [query, setQuery] = useQueryTexto('q')
-  const [page, setPage] = useQueryPagina()
   const [selectedId, setSelectedId] = useQueryId('abrir')
   const current = selectedId ? despesas.list.find((d) => d.id === selectedId) ?? null : null
   const [version, setVersion] = useState(0)
@@ -71,6 +70,9 @@ function Despesas({ host }: { host: Host }) {
     return sort ? sortDespesas(list, sort.key, sort.dir, choices) : list
   }, [despesas.list, filters, fields, query, choices, view.config.sort])
   const totais = useMemo(() => resumo(visible), [visible])
+  // Lazy loading de renderização: trocar filtro, busca ou ordenação volta ao primeiro lote; recarregar a lista não.
+  const lazyKey = useMemo(() => ({ filters, query, sort: view.config.sort }), [filters, query, view.config.sort])
+  const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
 
   const refresh = useCallback(() => { setVersion((v) => v + 1); void despesas.reload() }, [despesas.reload])
   const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar despesas" onClick={refresh} />, [refresh])
@@ -86,9 +88,6 @@ function Despesas({ host }: { host: Host }) {
   } else if (!despesas.loading && !despesas.list.length) {
     body = <EmptyState className="surface" align="start" icon={<ReceiptText size={36} />} title="Nenhuma despesa neste período">As despesas são lançadas pelos motoristas no App Motoristas. Amplie o período para ver as mais antigas.</EmptyState>
   } else {
-    const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
-    const safePage = Math.min(page, pages)
-    const slice = visible.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
     const footer = <span className="pg-num">{plural(visible.length, 'despesa', 'despesas')} de {despesas.list.length} no período</span>
     const empty = <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhuma despesa com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
     body = (
@@ -96,7 +95,7 @@ function Despesas({ host }: { host: Host }) {
         {mobile
           ? (visible.length ? <DespesasCards list={slice} choices={choices} onOpen={setSelectedId} /> : <div className="surface">{empty}</div>)
           : <DespesasTable list={slice} choices={choices} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig }} quickFilters={quickFilters} footer={footer} empty={empty} loading={despesas.loading && !despesas.list.length} />}
-        {visible.length > PAGE_SIZE ? <Pagination page={safePage} pageSize={PAGE_SIZE} total={visible.length} onChange={setPage} noun="despesas" /> : null}
+        {more ? <LazyFooter loaded={slice.length} total={visible.length} more onLoadMore={loadMore} noun={['despesa', 'despesas']} touch={mobile} /> : null}
       </>
     )
   }
