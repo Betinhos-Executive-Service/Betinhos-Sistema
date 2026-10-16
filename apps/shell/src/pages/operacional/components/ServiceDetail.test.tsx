@@ -39,10 +39,23 @@ describe('ServiceDetail: carro e link', () => {
     expect(botao.title).toBe('Motorista terceiro sem rastreador')
   })
 
-  it('gera o link e mostra o erro em toast quando falha', async () => {
+  it('gera o link e mostra o erro no próprio detalhe quando falha', async () => {
     const onGerarLink = setup(motorista(), vi.fn().mockResolvedValue({ ok: false, erro: 'Sem rastreador.' }))
     fireEvent.click(screen.getByRole('button', { name: /Gerar link/ }))
     expect(await screen.findByText('Sem rastreador.')).toBeTruthy()
     expect(onGerarLink).toHaveBeenCalledTimes(1)
+  })
+
+  it('mostra o link gerado para abrir e copiar, e oferece gerar outro', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+    setup(motorista(), vi.fn().mockResolvedValue({ ok: true, link: 'https://l/r/x', expiraEm: '2026-10-05T16:00:00Z' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Gerar link/ }))
+    const abrir = await screen.findByRole('link', { name: /Abrir link de acompanhamento/ })
+    expect(abrir.getAttribute('href')).toBe('https://l/r/x')
+    expect(screen.getByText('Válido até 05/10 13:00')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Gerar novo link/ })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Copiar mensagem' }))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('*Seu motorista:* Carlos\n• *Carro:* Corolla Prata\n• *Placa:* RUH7G45\n• *Acompanhe:* https://l/r/x'))
   })
 })

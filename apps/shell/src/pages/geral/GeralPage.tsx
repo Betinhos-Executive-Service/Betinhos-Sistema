@@ -11,7 +11,7 @@ import { Cell } from './components/Cell'
 import { GeralCards } from './components/GeralCards'
 import { GeralSheet } from './components/GeralSheet'
 import { GeralTable } from './components/GeralTable'
-import { CopyDialog, DispararDialog, GerarOpDialog, MockFormDialog, StateDialog, type DispararRequest, type OpRequest, type StateRequest } from './components/Dialogs'
+import { CopyDialog, DispararDialog, GerarOpDialog, LinkDialog, MockFormDialog, StateDialog, type DispararRequest, type LinkRequest, type OpRequest, type StateRequest } from './components/Dialogs'
 import { ContagemDrawer, shiftDay, todayIso } from './components/ContagemDrawer'
 import { EscalaFdsDrawer } from './components/EscalaFdsDrawer'
 import { FilterChips } from './components/FilterChips'
@@ -265,22 +265,21 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     const row = selectedIds.length === 1 ? rowOf(selectedIds[0]) : undefined
     return gerarLinkBlock(row ? [row] : [], selectedIds.length)
   }, [selectedIds, rowOf])
+  const [linkRequest, setLinkRequest] = useState<LinkRequest | null>(null)
   const gerarLink = useCallback(async () => {
     if (linkBlock) return
+    const id = selectedIds[0]
+    const codigo = rowOf(id)?.cr40f_id
+    const base = { codigo: typeof codigo === 'string' && codigo ? codigo : id }
+    setLinkRequest({ ...base, loading: true })
     try {
-      const result = await source.gerarLink(selectedIds[0])
-      if (!result.ok || !result.link) { toast({ tone: 'danger', message: result.erro || LINK_FALHA }); return }
-      try {
-        if (!navigator.clipboard?.writeText) throw new Error('Área de transferência indisponível.')
-        await navigator.clipboard.writeText(result.link)
-        toast({ tone: 'success', message: 'Link gerado e copiado.' })
-      } catch {
-        toast({ tone: 'info', message: `Link gerado, mas não foi possível copiar: ${result.link}` })
-      }
+      const result = await source.gerarLink(id)
+      if (!result.ok || !result.link) setLinkRequest({ ...base, loading: false, erro: result.erro || LINK_FALHA })
+      else setLinkRequest({ ...base, loading: false, link: result.link, expiraEm: result.expiraEm })
     } catch (reason) {
-      toast({ tone: 'danger', message: reason instanceof Error ? reason.message : LINK_FALHA })
+      setLinkRequest({ ...base, loading: false, erro: reason instanceof Error ? reason.message : LINK_FALHA })
     }
-  }, [linkBlock, source, selectedIds, toast])
+  }, [linkBlock, source, selectedIds, rowOf])
 
   const labelOf = useCallback((id: string) => { const name = rowOf(id)?.cr40f_id; return typeof name === 'string' && name ? name : id }, [rowOf])
 
@@ -606,6 +605,9 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         />
       ) : null}
       <CopyDialog open={copy.open} loading={copy.loading} text={copy.text} onClose={closeCopy} onCopied={() => { closeCopy(); toast({ tone: 'success', message: 'Serviços copiados.' }) }} />
+      <LinkDialog request={linkRequest} onClose={() => setLinkRequest(null)}
+        onCopied={(what) => toast({ tone: 'success', message: what === 'link' ? 'Link copiado.' : 'Mensagem copiada.' })}
+        onCopyFailed={(reason) => toast({ tone: 'danger', message: `Não foi possível copiar. ${reason instanceof Error ? reason.message : ''}`.trim() })} />
       <StateDialog request={stateRequest} busy={stateBusy} onClose={() => setStateRequest(null)} onConfirm={() => { void confirmState() }} />
       <MockFormDialog open={mockForm} onClose={() => setMockForm(false)} />
       <ContagemDrawer open={contagemOpen} onClose={() => setContagemOpen(false)} source={source} initialDay={contagemDay} kv={source.kv} mobile={mobile} />
