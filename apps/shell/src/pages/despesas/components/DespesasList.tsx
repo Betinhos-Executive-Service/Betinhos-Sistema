@@ -1,4 +1,5 @@
-import { StatusBadge, Table, type TableColumn } from '@betinhos/ui'
+import type { ReactNode } from 'react'
+import { StatusBadge, Table, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
 import { Copy, Paperclip, Sparkles } from 'lucide-react'
 import { openFromRow } from '../../pagantes/components/PagantesList'
 import { formatDate, formatMoney } from '../../pagantes/domain/messages'
@@ -8,6 +9,7 @@ import { financeiroTone, operacionalTone, semComprovante } from '../domain/statu
 import type { Despesa, DespesaChoices } from '../domain/types'
 
 type Props = { list: Despesa[]; choices: DespesaChoices; onOpen: (id: string) => void; loading?: boolean }
+type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; footer?: ReactNode; empty?: ReactNode }
 
 export const titulo = (d: Despesa) => d.estabelecimento || d.nome || 'Despesa sem nome'
 
@@ -39,19 +41,19 @@ function OpenName({ d, onOpen }: { d: Despesa; onOpen: (id: string) => void }) {
   )
 }
 
-export function DespesasTable({ list, choices, onOpen, loading }: Props) {
+export function DespesasTable({ list, choices, onOpen, loading, view, quickFilters, footer, empty }: TableProps) {
   const columns: TableColumn<Despesa>[] = [
-    { key: 'despesa', header: 'Despesa', width: 'minmax(190px, 1.6fr)', cell: (d) => <OpenName d={d} onOpen={onOpen} /> },
-    { key: 'data', header: 'Data', width: 'minmax(92px, .7fr)', cell: (d) => <span className="pg-num">{formatDate(d.data)}</span> },
-    { key: 'motorista', header: 'Motorista', width: 'minmax(140px, 1fr)', hideBelow: 'compact', cell: (d) => d.motorista || '—' },
-    { key: 'valor', header: 'Valor', width: 'minmax(100px, .8fr)', align: 'end', cell: (d) => <span className="pg-num">{formatMoney(d.valor)}</span> },
-    { key: 'operacional', header: 'Operacional', width: 'minmax(140px, 1fr)', cell: (d) => <OperacionalBadge d={d} choices={choices} /> },
-    { key: 'financeiro', header: 'Financeiro', width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <FinanceiroBadge d={d} choices={choices} /> },
-    { key: 'alertas', header: 'Alertas', width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <Alertas d={d} /> },
+    { key: 'despesa', header: 'Despesa', label: 'Despesa', sortable: true, defaultWidth: 280, width: 'minmax(190px, 1.6fr)', cell: (d) => <OpenName d={d} onOpen={onOpen} /> },
+    { key: 'data', header: 'Data', label: 'Data', sortable: true, defaultWidth: 130, width: 'minmax(92px, .7fr)', cell: (d) => <span className="pg-num">{formatDate(d.data)}</span> },
+    { key: 'motorista', header: 'Motorista', label: 'Motorista', sortable: true, defaultWidth: 190, width: 'minmax(140px, 1fr)', hideBelow: 'compact', cell: (d) => d.motorista || '—' },
+    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 130, width: 'minmax(100px, .8fr)', align: 'end', cell: (d) => <span className="pg-num">{formatMoney(d.valor)}</span> },
+    { key: 'operacional', header: 'Operacional', label: 'Operacional', sortable: true, defaultWidth: 170, width: 'minmax(140px, 1fr)', cell: (d) => <OperacionalBadge d={d} choices={choices} /> },
+    { key: 'financeiro', header: 'Financeiro', label: 'Financeiro', sortable: true, defaultWidth: 190, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <FinanceiroBadge d={d} choices={choices} /> },
+    { key: 'alertas', header: 'Alertas', label: 'Alertas', defaultWidth: 220, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <Alertas d={d} /> },
   ]
   return (
     <div className="pg-table-wrap" onClick={(event) => openFromRow(event, '.bt-table__row', '.pg-open')}>
-      <Table className="pg-table" columns={columns} rows={list} rowKey={(d) => d.id} loading={loading} />
+      <Table className="pg-table" columns={columns} rows={list} rowKey={(d) => d.id} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

@@ -10,7 +10,7 @@ beforeEach(() => {
   window.localStorage.clear()
   vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
 })
-afterEach(() => { cleanup(); vi.unstubAllGlobals() })
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.location.hash = '' })
 
 describe('Despesas operacionais', () => {
   it('abre a ficha com vínculos e comprovantes, sem ações de escrita', async () => {
@@ -45,13 +45,22 @@ describe('Despesas operacionais', () => {
   it('a visão Possível duplicidade mostra só as marcadas', async () => {
     render(<DespesasPage host={{ mode: 'mock' }} />)
     await screen.findAllByText('Posto Shell Faria Lima')
-    fireEvent.click(screen.getByRole('combobox', { name: 'Visão' }))
+    fireEvent.click(await screen.findByRole('button', { name: /^Visão:/ }))
     const opcao = await waitFor(() => {
-      const el = screen.getAllByText('Possível duplicidade').map((e) => e.closest('[role="option"]')).find(Boolean)
-      if (!el) throw new Error('opção não apareceu')
+      const el = screen.getAllByText('Possível duplicidade').map((e) => e.closest('[role="menuitemradio"]')).find(Boolean)
+      if (!el) throw new Error('visão não apareceu')
       return el
     })
     fireEvent.click(opcao)
-    await waitFor(() => expect(screen.getAllByRole('row').length).toBe(3))
+    await waitFor(() => expect(document.querySelectorAll('.pg-open')).toHaveLength(2))
+    expect(screen.getByRole('button', { name: /^Visão: Possível duplicidade/ })).toBeTruthy()
+  })
+
+  it('link antigo com alertas na URL abre filtrado e passa a usar f=', async () => {
+    window.location.hash = '#/despesas?alertas=duplicidade'
+    render(<DespesasPage host={{ mode: 'mock' }} />)
+    await waitFor(() => expect(document.querySelectorAll('.pg-open')).toHaveLength(2))
+    await waitFor(() => expect(window.location.hash).toMatch(/[?&]f=/))
+    expect(window.location.hash).not.toMatch(/alertas=/)
   })
 })

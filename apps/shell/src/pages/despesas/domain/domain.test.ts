@@ -1,55 +1,73 @@
 import { describe, expect, it } from 'vitest'
 import { createMockDespesas } from '../data/mock'
-import { BUILTIN_VIEWS, EMPTY_FILTERS, VIEWS_KEY, filterDespesas, loadViews, matchView, newView, opcoes, parseStoredFilters, saveViews } from './filters'
+import { matchesFilters, readFilters, type TableFilters } from '@betinhos/ui'
+import { EMPTY_FILTERS, VIEWS_KEY, loadViews, opcoes, parseStoredFilters } from './filters'
+import { builtinViews, despesaFields, fromLegacyFilters, legacyViewConfig, matchesKeyword, readDespesa, sortDespesas } from './lista'
 import { mimeDoArquivo, tipoPrevia } from './arquivo'
 import { resumo } from './resumo'
-import { ANEXO, FINANCEIRO, OPERACIONAL, semComprovante, withFallback } from './status'
+import { ANEXO, FALLBACK_CHOICES, FINANCEIRO, OPERACIONAL, semComprovante, withFallback } from './status'
 import type { Despesa } from './types'
 
 const list = createMockDespesas(new Date(2026, 9, 9, 12))
 const memoryKV = () => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) } }
 
+const op = opcoes(list)
+const fields = despesaFields(FALLBACK_CHOICES, op)
+const apply = (filters: TableFilters) => list.filter((d) => matchesFilters(d, readFilters(filters, fields), fields, readDespesa))
+const legacy = (patch: Partial<typeof EMPTY_FILTERS>) => apply(fromLegacyFilters({ ...EMPTY_FILTERS, ...patch }, FALLBACK_CHOICES, op))
+const viewFilters = (id: string) => (JSON.parse(builtinViews(FALLBACK_CHOICES).find((v) => v.id === id)!.config) as { filters: TableFilters }).filters
+
 describe('filtros de despesas', () => {
-  it('filtra por status, categoria, motorista e alertas', () => {
-    const corrigir = filterDespesas(list, { ...EMPTY_FILTERS, operacional: [OPERACIONAL.corrigir] })
+  it('filtra por status, categoria, motorista e alertas (filtros antigos convertidos)', () => {
+    const corrigir = legacy({ operacional: [OPERACIONAL.corrigir] })
     expect(corrigir.length).toBe(2)
     expect(corrigir.every((d) => d.statusOperacional === OPERACIONAL.corrigir)).toBe(true)
-    expect(filterDespesas(list, { ...EMPTY_FILTERS, financeiro: [FINANCEIRO.aguardando] }).every((d) => d.statusFinanceiro === FINANCEIRO.aguardando)).toBe(true)
-    expect(filterDespesas(list, { ...EMPTY_FILTERS, categoria: ['cat-2'] }).every((d) => d.categoria === 'Pedágio')).toBe(true)
-    expect(filterDespesas(list, { ...EMPTY_FILTERS, motorista: ['mot-1'] }).every((d) => d.motorista === 'Carlos Oliveira')).toBe(true)
-    expect(filterDespesas(list, { ...EMPTY_FILTERS, alertas: ['duplicidade'] }).map((d) => d.id)).toEqual(['mock-desp-7', 'mock-desp-12'])
-    expect(filterDespesas(list, { ...EMPTY_FILTERS, alertas: ['sem-comprovante'] }).every(semComprovante)).toBe(true)
+    expect(legacy({ financeiro: [FINANCEIRO.aguardando] }).every((d) => d.statusFinanceiro === FINANCEIRO.aguardando)).toBe(true)
+    expect(legacy({ categoria: ['cat-2'] }).every((d) => d.categoria === 'Pedágio')).toBe(true)
+    expect(legacy({ motorista: ['mot-1'] }).every((d) => d.motorista === 'Carlos Oliveira')).toBe(true)
+    expect(legacy({ alertas: ['duplicidade'] }).map((d) => d.id)).toEqual(['mock-desp-7', 'mock-desp-12'])
+    expect(legacy({ alertas: ['sem-comprovante'] }).every(semComprovante)).toBe(true)
+    // Vários alertas: todos precisam valer, como na barra antiga.
+    expect(legacy({ alertas: ['duplicidade', 'sem-comprovante'] }).every((d) => d.possivelDuplicidade && semComprovante(d))).toBe(true)
   })
 
   it('busca por palavras sem acento em vários campos', () => {
-    expect(filterDespesas(list, { ...EMPTY_FILTERS, query: 'imigrantes ribeiro' }).every((d) => d.estabelecimento === 'Ecovias Imigrantes' && d.motorista === 'Ana Ribeiro')).toBe(true)
-    expect(filterDespesas(list, { ...EMPTY_FILTERS, query: 'desp-5003' }).map((d) => d.id)).toEqual(['mock-desp-3'])
-    expect(filterDespesas(list, { ...EMPTY_FILTERS, query: 'sao paulo' }).length).toBeGreaterThan(0)
+    const q = (query: string) => list.filter((d) => matchesKeyword(d, query))
+    expect(q('imigrantes ribeiro').every((d) => d.estabelecimento === 'Ecovias Imigrantes' && d.motorista === 'Ana Ribeiro')).toBe(true)
+    expect(q('desp-5003').map((d) => d.id)).toEqual(['mock-desp-3'])
+    expect(q('sao paulo').length).toBeGreaterThan(0)
   })
 
   it('opções de categoria e motorista vêm do que carregou, em ordem alfabética', () => {
-    const { categorias, motoristas } = opcoes(list)
-    expect(categorias.map((c) => c.label)).toEqual(['Alimentação', 'Combustível', 'Estacionamento', 'Hospedagem', 'Lavagem', 'Pedágio'])
-    expect(motoristas[0]).toEqual({ value: 'mot-2', label: 'Ana Ribeiro' })
+    expect(op.categorias.map((c) => c.label)).toEqual(['Alimentação', 'Combustível', 'Estacionamento', 'Hospedagem', 'Lavagem', 'Pedágio'])
+    expect(op.motoristas[0]).toEqual({ value: 'mot-2', label: 'Ana Ribeiro' })
+  })
+
+  it('ordena por valor e data com vazios por último', () => {
+    const valores = sortDespesas(list, 'valor', 'desc', FALLBACK_CHOICES).map((d) => d.valor).filter((v) => v != null) as number[]
+    expect(valores).toEqual([...valores].sort((a, b) => b - a))
+    const datas = sortDespesas(list, 'data', 'asc', FALLBACK_CHOICES).map((d) => d.data?.getTime() ?? Infinity)
+    expect(datas).toEqual([...datas].sort((a, b) => a - b))
   })
 })
 
 describe('visões', () => {
-  it('reconhece a visão pronta pelos filtros e salva visão pessoal', () => {
-    expect(matchView(BUILTIN_VIEWS, { ...EMPTY_FILTERS, financeiro: [FINANCEIRO.aguardando] })?.id).toBe('aguardando')
-    const kv = memoryKV()
-    const view = newView('  Pedágios  ', { ...EMPTY_FILTERS, categoria: ['cat-2'] }, 1)
-    saveViews(kv, { views: [view], last: view.id })
-    expect(loadViews(kv)).toEqual({ views: [{ ...view, nome: 'Pedágios' }], last: view.id })
+  it('visões prontas filtram como antes', () => {
+    expect(builtinViews(FALLBACK_CHOICES).map((v) => v.name)).toEqual(['Aguardando pagamento', 'Precisa corrigir', 'Sem comprovante', 'Possível duplicidade', 'Suspeitas da IA'])
+    expect(apply(viewFilters('aguardando')).every((d) => d.statusFinanceiro === FINANCEIRO.aguardando)).toBe(true)
+    expect(apply(viewFilters('duplicidade')).map((d) => d.id)).toEqual(['mock-desp-7', 'mock-desp-12'])
   })
 
-  it('descarta visão salva com filtro inválido', () => {
+  it('importação: lê as visões do navegador, descarta inválidas e converte sem o período', () => {
     expect(parseStoredFilters({ periodo: '7' })).toBeNull()
     expect(parseStoredFilters({ periodo: '90', alertas: ['outro'] })).toBeNull()
     expect(parseStoredFilters({ periodo: '90', categoria: [1] })).toBeNull()
     const kv = memoryKV()
-    kv.setItem(VIEWS_KEY, JSON.stringify({ views: [{ id: 'x', nome: 'X', filters: { periodo: 'nunca' } }, { id: 'todas', nome: 'Dup', filters: {} }], last: 'x' }))
-    expect(loadViews(kv).views).toEqual([])
+    kv.setItem(VIEWS_KEY, JSON.stringify({ views: [{ id: 'x', nome: 'X', filters: { periodo: 'nunca' } }, { id: 'todas', nome: 'Dup', filters: {} }, { id: 'v1', nome: ' Pedágios ', filters: { periodo: '30', categoria: ['cat-2'] } }] }))
+    const views = loadViews(kv).views
+    expect(views.map((v) => v.nome)).toEqual(['Pedágios'])
+    const config = JSON.parse(legacyViewConfig(views[0].filters, FALLBACK_CHOICES, op))
+    expect(config.filters.advanced.items[0]).toMatchObject({ field: 'categoria', op: 'in', values: [{ value: 'cat-2', label: 'Pedágio' }] })
   })
 })
 
