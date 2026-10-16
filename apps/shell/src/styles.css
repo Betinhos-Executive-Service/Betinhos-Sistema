@@ -2,6 +2,10 @@
 
 #root { height: 100%; }
 
+/* Marca na sidebar: a logo B em imagem fica sem a caixa branca por trás, só o símbolo sobre o navy.
+   (Regra a levar para o @betinhos/ui; aqui até o pacote publicar.) */
+.bt-shell__logo:has(> img), .bt-shell__rail-brand:has(> img) { background-color: transparent; }
+
 /* Página do shell */
 .page { max-width: var(--bt-layout-content-max); margin: 0 auto; padding: 22px 26px var(--bt-space-8); }
 .page__header { margin-bottom: var(--bt-space-3); }
