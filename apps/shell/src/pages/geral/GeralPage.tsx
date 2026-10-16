@@ -434,7 +434,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const focusQuickFilter = useCallback((attribute: string) => {
     const label = filterFields.find((f) => f.key === attribute)?.label ?? attribute
     if (!quickRow) setQuickRow(true)
-    window.setTimeout(() => document.querySelector<HTMLElement>(`.gr-quickrow [aria-label="Filtrar ${CSS.escape(label)}"]`)?.focus(), 0)
+    window.setTimeout(() => Array.from(document.querySelectorAll<HTMLElement>('.gr-quickrow [aria-label]')).find((el) => el.getAttribute('aria-label') === `Filtrar ${label}`)?.focus(), 0)
   }, [filterFields, quickRow, setQuickRow])
   // Busca por palavra-chave: o texto fica local; a busca de verdade sai depois da pausa.
   const [searchText, setSearchText] = useState(query)
