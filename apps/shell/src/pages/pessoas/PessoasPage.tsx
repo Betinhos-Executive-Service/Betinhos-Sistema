@@ -1,12 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, matchesFilters, readFilters, storedFilters, useShellHeader, useTableFilters, useTableView, useToast, type TableFilters, type TableViewState, type ViewStore } from '@betinhos/ui'
+import { useCallback, useMemo } from 'react'
+import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, matchesFilters, useShellHeader, useToast } from '@betinhos/ui'
 import { Plus, RefreshCw, SearchX, Users } from 'lucide-react'
 import type { Host } from '../../host'
-import { decodeTableFilters, encodeTableFilters } from '../../app/filtersUrl'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
-import { viewStoreFor, withBuiltinViews } from '../../app/viewStore'
+import { useListView } from '../../app/useListView'
 import { useQueryAlvo, useQueryTexto } from '../../nav/queryState'
-import { patchHashQuery, readHashQuery } from '../../nav/useHashRoute'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
 import { label } from './domain/choices'
@@ -38,77 +36,25 @@ function Pessoas({ host }: { host: Host }) {
   const clientes = useMemo(() => clienteOptions(ps.list), [ps.list])
   const fields = useMemo(() => (choices ? pessoaFields(choices, clientes) : []), [choices, clientes])
 
-  // Visões (DS §10.9.1): salvas no Dataverse, mais as prontas do código como públicas só leitura. As prontas dependem
-  // das escolhas; a lista espera por elas para o store não mudar (trocar o store recarrega e descarta o filtro da URL).
-  const choicesRef = useRef(choices)
-  choicesRef.current = choices
-  const [gate] = useState(() => {
-    let open = () => undefined as void
-    const ready = new Promise<void>((resolve) => { open = resolve })
-    return { ready, open: () => open() }
+  const { view, filters: valid, quickFilters, clearFilters } = useListView({
+    host,
+    tela: TELA,
+    columns: PESSOA_COLUMNS,
+    defaultSort: { key: 'nome', dir: 'asc' },
+    fields,
+    ready: Boolean(choices),
+    builtins: () => (choices ? builtinViews(choices) : []),
+    legacy: { keys: LEGACY_KEYS, read: (q) => fromLegacyFilters(pessoasQuery.ler(q), choices!, clientes) },
+    imports: {
+      list: () => loadViews(source.kv).views.map((v) => ({ name: v.nome, config: legacyViewConfig(v.filters, choices!, clientes) })),
+      done: () => source.kv.removeItem(VIEWS_KEY),
+      onImported: (n) => toast({ tone: 'info', message: n === 1 ? 'A visão salva neste navegador agora fica em “Minhas”.' : `As ${n} visões salvas neste navegador agora ficam em “Minhas”.` }),
+    },
   })
-  useEffect(() => { if (choices) gate.open() }, [choices, gate])
-  const store = useMemo<ViewStore>(() => {
-    const base = withBuiltinViews(viewStoreFor(host), () => (choicesRef.current ? builtinViews(choicesRef.current) : []))
-    return { ...base, list: async (tela) => { await gate.ready; return base.list(tela) } }
-  }, [host, gate])
-  const raw = useTableView({ tela: TELA, columns: PESSOA_COLUMNS, store, defaultSort: { key: 'nome', dir: 'asc' } })
-  // O que o usuário muda (visão, colunas, filtros) encerra o filtro vindo do link; até lá ele vale a cada recarga.
-  const touched = useRef(false)
-  const view = useMemo<TableViewState>(() => ({
-    ...raw,
-    setConfig: (update) => { touched.current = true; raw.setConfig(update) },
-    select: (id) => { touched.current = true; raw.select(id) },
-    restore: () => { touched.current = true; raw.restore() },
-  }), [raw])
-  const { filters, quickFilters } = useTableFilters(view, fields)
 
-  // Busca e gaveta continuam na URL; os filtros vão em `f=` (o link compartilhado abre igual).
+  // Busca e ficha continuam na URL; os filtros vão em `f=` (useListView).
   const [query, setQuery] = useQueryTexto('q')
   const [target, setTarget] = useQueryAlvo()
-  const urlApplied = useRef(false)
-  const linked = useRef<TableFilters | null | undefined>(undefined)
-  const { status, views } = raw
-  const applyConfig = raw.setConfig
-  useEffect(() => {
-    if (status !== 'ready' || !choices) return
-    if (linked.current === undefined) {
-      const q = readHashQuery()
-      const f = q.get('f')
-      const legacy = LEGACY_KEYS.some((k) => q.has(k)) ? fromLegacyFilters(pessoasQuery.ler(q), choices, clientes) : null
-      linked.current = (f ? decodeTableFilters(f) : null) ?? legacy
-      if (legacy) patchHashQuery(Object.fromEntries(LEGACY_KEYS.map((k) => [k, null])))
-    }
-    const next = linked.current
-    if (next && !touched.current) applyConfig((c) => ({ ...c, filters: storedFilters(next) }))
-    urlApplied.current = true
-  }, [status, views, choices, clientes, applyConfig])
-  const valid = useMemo(() => readFilters(filters, fields), [filters, fields])
-  useEffect(() => {
-    if (!urlApplied.current) return
-    const f = encodeTableFilters(valid)
-    if ((readHashQuery().get('f') ?? '') !== f) patchHashQuery({ f: f || null })
-  }, [valid])
-
-  // Visões salvas neste navegador (barra antiga) vão uma vez para o Dataverse, onde valem em qualquer dispositivo.
-  const imported = useRef(false)
-  const { reload, setConfig } = view
-  useEffect(() => {
-    if (imported.current || status !== 'ready' || !choices) return
-    imported.current = true
-    const old = loadViews(source.kv).views
-    if (!old.length) return
-    void (async () => {
-      try {
-        for (const v of old) await store.create(TELA, v.nome, legacyViewConfig(v.filters, choices, clientes))
-        source.kv.removeItem(VIEWS_KEY)
-        await reload()
-        toast({ tone: 'info', message: old.length === 1 ? 'A visão salva neste navegador agora fica em “Minhas”.' : `As ${old.length} visões salvas neste navegador agora ficam em “Minhas”.` })
-      } catch {
-        imported.current = false
-      }
-    })()
-  }, [status, choices, clientes, store, source.kv, reload, toast])
 
   const visible = useMemo(() => {
     if (!choices) return []
@@ -124,7 +70,7 @@ function Pessoas({ host }: { host: Host }) {
   const refresh = useCallback(() => { void ps.reload() }, [ps.reload])
   const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar pessoas" onClick={refresh} />, [refresh])
   useShellHeader({ title: 'Pessoas', actions: headerActions })
-  const clearAll = () => { setConfig((c) => ({ ...c, filters: {} })); setQuery('') }
+  const clearAll = () => { clearFilters(); setQuery('') }
 
   let body
   if (ps.error && !choices) {
@@ -141,7 +87,7 @@ function Pessoas({ host }: { host: Host }) {
       <>
         {mobile
           ? (visible.length ? <PessoasCards list={slice} choices={choices} dups={dups} onOpen={open} /> : <div className="surface">{empty}</div>)
-          : <PessoasTable list={slice} choices={choices} dups={dups} onOpen={open} view={{ config: view.config, onChange: setConfig }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+          : <PessoasTable list={slice} choices={choices} dups={dups} onOpen={open} view={{ config: view.config, onChange: view.setConfig }} quickFilters={quickFilters} footer={footer} empty={empty} />}
         {more ? <LazyFooter loaded={slice.length} total={visible.length} more onLoadMore={loadMore} noun={['pessoa', 'pessoas']} touch={mobile} /> : null}
       </>
     )
