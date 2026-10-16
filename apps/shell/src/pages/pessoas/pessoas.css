@@ -62,3 +62,4 @@
   .ps-filters__select { flex: 1 1 calc(50% - var(--bt-space-2)); min-width: 0; }
   .ps-row { grid-template-columns: minmax(0, 1fr); }
 }
+

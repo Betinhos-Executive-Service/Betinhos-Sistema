@@ -7,5 +7,9 @@ if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.sho
 }
 // Nem rolagem até a opção ativa do Select.
 if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = function scrollIntoView() {}
+// Nem matchMedia (barra de visões e layout responsivo): sem stub do teste, nenhuma media query bate.
+if (typeof window !== 'undefined' && !window.matchMedia) {
+  window.matchMedia = (query: string) => ({ matches: false, media: query, onchange: null, addEventListener: () => undefined, removeEventListener: () => undefined, addListener: () => undefined, removeListener: () => undefined, dispatchEvent: () => false })
+}
 // O estado das telas vive na query do hash (#/pagantes?status=1): sem limpar, o filtro de um teste vazaria para o seguinte.
 if (typeof history !== 'undefined') afterEach(() => { history.replaceState(null, '', '#') })
