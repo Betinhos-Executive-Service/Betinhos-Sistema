@@ -77,6 +77,10 @@ afterEach(() => {
   hooks.mixedState = false
 })
 
+/** Linhas da grade sem a linha de filtro rápido (DS §10.9.2), que também é um `row` logo abaixo do cabeçalho. */
+const dataRows = () => screen.getAllByRole('row', { hidden: true }).filter((r) => r.getAttribute('aria-label') !== 'Filtro rápido')
+const findDataRows = async () => { await screen.findAllByRole('row', { hidden: true }); return dataRows() }
+
 /** A célula só vira editável quando a metadata chega: espera a classe do tipo aparecer na linha. */
 const cellOf = (row: HTMLElement, kind: string) =>
   waitFor(() => {
@@ -106,7 +110,7 @@ describe('Geral', () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     expect(await screen.findByRole('columnheader', { name: /Status de Operação/, hidden: true })).toBeTruthy()
     // A linha do cabeçalho já existe antes dos dados: espera as 100 linhas chegarem.
-    await waitFor(() => expect(screen.getAllByRole('row', { hidden: true }).length).toBeGreaterThan(10))
+    await waitFor(() => expect(dataRows().length).toBeGreaterThan(10))
     expect(screen.getAllByText(PAGE1)).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: /^Status de Operação$/, hidden: true }))
     await waitFor(() => expect(screen.getByRole('columnheader', { name: /Status de Operação/, hidden: true }).getAttribute('aria-sort')).toBe('ascending'))
@@ -150,7 +154,9 @@ describe('Geral', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Aplicar' }))
     await waitFor(() => expect(screen.queryByRole('columnheader', { name: /Trajeto/, hidden: true })).toBeNull())
     fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
-    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Colunas' })).getByRole('button', { name: 'Restaurar colunas' }))
+    const restore = await screen.findByRole('dialog', { name: 'Colunas' })
+    fireEvent.click(within(restore).getByRole('button', { name: 'Restaurar colunas' }))
+    fireEvent.click(within(restore).getByRole('button', { name: 'Aplicar' }))
     await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
   })
 
@@ -201,7 +207,7 @@ describe('Geral', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Colunas' })
 
     // Sem alterações: fecha direto.
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Fechar' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Fechar painel' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Colunas' })).toBeNull())
     expect(screen.queryByRole('dialog', { name: 'Descartar alterações?' })).toBeNull()
 
@@ -209,7 +215,7 @@ describe('Geral', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
     const again = await screen.findByRole('dialog', { name: 'Colunas' })
     fireEvent.click(within(again).getByRole('checkbox', { name: 'Trajeto' }))
-    fireEvent.click(within(again).getByRole('button', { name: 'Fechar' }))
+    fireEvent.click(within(again).getByRole('button', { name: 'Fechar painel' }))
     const confirm = await screen.findByRole('dialog', { name: 'Descartar alterações?' })
     fireEvent.click(within(confirm).getByRole('button', { name: 'Continuar editando' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Descartar alterações?' })).toBeNull())
@@ -226,7 +232,7 @@ describe('Geral', () => {
   it('edita texto na célula com Enter e mostra salvo', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
-    const cell = await cellOf((await screen.findAllByRole('row', { hidden: true }))[1], 'text')
+    const cell = await cellOf((await findDataRows())[1], 'text')
     fireEvent.keyDown(cell, { key: 'Enter' })
     const input = within(cell).getByRole('textbox')
     fireEvent.change(input, { target: { value: 'Rota editada' } })
@@ -254,7 +260,7 @@ describe('Geral', () => {
   it('Esc cancela sem gravar e status abre um select', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
-    const first = (await screen.findAllByRole('row', { hidden: true }))[1]
+    const first = (await findDataRows())[1]
     const text = await cellOf(first, 'text')
     const original = text.textContent
     fireEvent.keyDown(text, { key: 'Enter' })
@@ -270,7 +276,7 @@ describe('Geral', () => {
   it('dinheiro inválido mostra o erro local e mantém o campo aberto sem gravar', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
-    const cell = await cellOf((await screen.findAllByRole('row', { hidden: true }))[1], 'money')
+    const cell = await cellOf((await findDataRows())[1], 'money')
     fireEvent.keyDown(cell, { key: 'Enter' })
     const input = within(cell).getByRole('textbox')
     fireEvent.change(input, { target: { value: 'abc' } })
@@ -296,7 +302,7 @@ describe('Geral', () => {
   it('escolher outro motorista grava e mostra salvo', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
-    const cell = await cellOf((await screen.findAllByRole('row', { hidden: true }))[1], 'lookup')
+    const cell = await cellOf((await findDataRows())[1], 'lookup')
     fireEvent.keyDown(cell, { key: 'Enter' })
     fireEvent.click(await within(cell).findByRole('option', { name: 'Bruno Dias', hidden: true }))
     expect(await within(cell).findByLabelText('Salvo')).toBeTruthy()
@@ -320,7 +326,7 @@ describe('Geral', () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     // A linha do cabeçalho existe antes dos dados: espera as linhas chegarem.
     await screen.findAllByText(PAGE1)
-    const rows = screen.getAllByRole('row', { hidden: true })
+    const rows = dataRows()
     fireEvent.click(within(rows[1]).getByRole('checkbox'))
     fireEvent.click(within(rows[2]).getByRole('checkbox'))
     expect(screen.getByText('2 selecionados')).toBeTruthy()
@@ -348,7 +354,7 @@ describe('Geral', () => {
   it('com 1 selecionado, Editar abre o formulário e Gerar Voucher avisa que só roda no Dataverse', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
-    fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
+    fireEvent.click(within(dataRows()[1]).getByRole('checkbox'))
     await acao('Gerar Voucher')
     expect(await screen.findByText('O voucher abre dentro do Dataverse.')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
@@ -414,7 +420,7 @@ describe('Geral: correções finais', () => {
   it('o aviso do motorista aparece no editor da célula', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
-    const cell = await cellOf((await screen.findAllByRole('row', { hidden: true }))[1], 'lookup')
+    const cell = await cellOf((await findDataRows())[1], 'lookup')
     fireEvent.keyDown(cell, { key: 'Enter' })
     expect(await within(cell).findByTitle('Trocar o motorista dispara os avisos e a atribuição automática de veículo.')).toBeTruthy()
   })
@@ -423,7 +429,7 @@ describe('Geral: correções finais', () => {
     hooks.setState = async (ids) => ({ ok: [ids[0]], failed: [{ id: ids[1], message: 'Sem permissão' }] })
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
-    const rows = screen.getAllByRole('row', { hidden: true })
+    const rows = dataRows()
     const failedName = within(rows[2]).getByRole('button', { name: /Abrir serviço/ }).textContent
     fireEvent.click(within(rows[1]).getByRole('checkbox'))
     fireEvent.click(within(rows[2]).getByRole('checkbox'))
@@ -436,7 +442,7 @@ describe('Geral: correções finais', () => {
     hooks.mixedState = true
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
-    const rows = screen.getAllByRole('row', { hidden: true })
+    const rows = dataRows()
     fireEvent.click(within(rows[1]).getByRole('checkbox'))
     fireEvent.click(within(rows[2]).getByRole('checkbox'))
     const reason = 'Selecione só serviços ativos ou só inativos.'
@@ -455,7 +461,7 @@ describe('Geral: correções finais', () => {
     hooks.copyRows = () => new Promise((resolve) => { window.setTimeout(() => resolve([]), 400) })
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
-    fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
+    fireEvent.click(within(dataRows()[1]).getByRole('checkbox'))
     await acao('Copiar Serviços')
     const dialog = await screen.findByRole('dialog', { name: 'Copiar serviços' })
     fireEvent.click(within(dialog).getAllByRole('button', { name: 'Fechar' }).at(-1) as HTMLElement)
@@ -476,7 +482,7 @@ describe('Geral: correções finais', () => {
     it('fica inerte quando o serviço não está Programado', async () => {
       render(<GeralPage host={{ mode: 'mock' }} />)
       await screen.findAllByText(PAGE1)
-      fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[2]).getByRole('checkbox'))
+      fireEvent.click(within(dataRows()[2]).getByRole('checkbox'))
       const menuitem = await item()
       expect(menuitem.getAttribute('aria-disabled') === 'true' || (menuitem as HTMLButtonElement).disabled).toBe(true)
       expect(menuitem.textContent).toContain('Programado')
@@ -486,7 +492,7 @@ describe('Geral: correções finais', () => {
       hooks.gerarLink = async () => ({ ok: true, link: 'https://acompanhe.test/x' })
       render(<GeralPage host={{ mode: 'mock' }} />)
       await screen.findAllByText(PAGE1)
-      fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
+      fireEvent.click(within(dataRows()[1]).getByRole('checkbox'))
       fireEvent.click(await item())
       expect(await screen.findByText('Link gerado e copiado.')).toBeTruthy()
       expect(writeText).toHaveBeenCalledWith('https://acompanhe.test/x')
@@ -496,7 +502,7 @@ describe('Geral: correções finais', () => {
       hooks.gerarLink = async () => ({ ok: false, erro: 'Sem rastreador.' })
       render(<GeralPage host={{ mode: 'mock' }} />)
       await screen.findAllByText(PAGE1)
-      fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
+      fireEvent.click(within(dataRows()[1]).getByRole('checkbox'))
       fireEvent.click(await item())
       expect(await screen.findByText('Sem rastreador.')).toBeTruthy()
       expect(writeText).not.toHaveBeenCalled()
@@ -603,7 +609,7 @@ describe('Geral: espaço e densidade', () => {
   it('com 1 selecionado os comandos se habilitam e a contagem aparece como badge', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
-    fireEvent.click(within(screen.getAllByRole('row', { hidden: true })[1]).getByRole('checkbox'))
+    fireEvent.click(within(dataRows()[1]).getByRole('checkbox'))
     const toolbar = screen.getByRole('toolbar', { name: 'Comandos de serviços' })
     const count = within(toolbar).getByText('1 selecionado')
     expect(count.closest('.bt-badge')).not.toBeNull()
@@ -636,7 +642,7 @@ describe('Geral: espaço e densidade', () => {
   })
 
   // Com 200+ linhas, consultas por papel (getByRole) percorrem milhares de nós no jsdom: aqui só consultas baratas.
-  const rowCount = () => document.querySelectorAll('.gr-grid [role="row"]').length - 1
+  const rowCount = () => document.querySelectorAll('.gr-grid [role="row"]:not(.gr-quickrow)').length - 1
   const loadMoreButton = () => screen.getByText('Carregar mais').closest('button') as HTMLButtonElement
 
   it('Carregar mais acumula 100, 200 e 220 linhas e termina em Fim da lista', async () => {
@@ -683,7 +689,7 @@ describe('Geral: espaço e densidade', () => {
     await screen.findByText('100 selecionados')
     await act(async () => { FakeObserver.trigger([{ isIntersecting: true }]) })
     await screen.findAllByText(`200 de ${MOCK_ROW_COUNT} serviços`)
-    expect(document.querySelectorAll('.gr-grid [role="row"]').length - 1).toBe(200)
+    expect(document.querySelectorAll('.gr-grid [role="row"]:not(.gr-quickrow)').length - 1).toBe(200)
     expect(screen.getByText('100 selecionados')).toBeTruthy()
   }, 90_000)
 
@@ -950,6 +956,7 @@ describe('Geral: redimensionar e reordenar colunas', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
     dialog = await screen.findByRole('dialog', { name: 'Colunas' })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Restaurar colunas' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Aplicar' }))
     await waitFor(() => expect(window.localStorage.getItem(LS)).not.toContain('widths'))
   })
 })
@@ -1061,7 +1068,7 @@ describe('Geral: comandos Auditoria, Gerar OP, Disparar e Registrar Erro', () =>
   const pick = async (...ids: string[]) => {
     await screen.findAllByText(PAGE1)
     for (const id of ids) {
-      const row = screen.getAllByRole('row', { hidden: true }).find((r) => within(r).queryByText(id))
+      const row = dataRows().find((r) => within(r).queryByText(id))
       if (!row) throw new Error(`Sem linha ${id}`)
       fireEvent.click(within(row).getByRole('checkbox'))
     }
@@ -1144,11 +1151,11 @@ describe('Geral: comandos Auditoria, Gerar OP, Disparar e Registrar Erro', () =>
 describe('Geral: seleção pela linha', () => {
   const rowOf = async (id: string) => {
     await screen.findAllByText(PAGE1)
-    const row = screen.getAllByRole('row', { hidden: true }).find((r) => within(r).queryByText(id))
+    const row = dataRows().find((r) => within(r).queryByText(id))
     if (!row) throw new Error(`Sem linha ${id}`)
     return row
   }
-  const selectedRows = () => screen.getAllByRole('row', { hidden: true }).filter((r) => r.getAttribute('aria-selected') === 'true')
+  const selectedRows = () => dataRows().filter((r) => r.getAttribute('aria-selected') === 'true')
   const cellText = (row: HTMLElement) => within(row).getAllByRole('gridcell')[2]
 
   it('clique simples na linha seleciona só ela; Ctrl+clique soma; Shift+clique marca o intervalo', async () => {
