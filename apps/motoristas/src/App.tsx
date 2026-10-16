@@ -66,7 +66,7 @@ import {
 } from "./lib/dataverse";
 import { IDEA_STATUS, type Idea, type IdeaDraft } from "./lib/ideas";
 import { APP_CONNECTION_LOST_MESSAGE, APP_OPERATION_ERROR_MESSAGE, reportAppError, type AppErrorNotice } from "./lib/appErrorLogger";
-import { isComunicadoPending, isMockComunicados, loadDriverComunicados, type ComunicadoDestinatario } from "./lib/comunicados";
+import { isComunicadoPending, isMockComunicados, loadDriverComunicado, loadDriverComunicados, type ComunicadoDestinatario } from "./lib/comunicados";
 import type { ComunicadosLoadStatus } from "./screens/ComunicadosScreen";
 import { clearMediaDraft, loadMediaDraft, saveMediaDraft, touchMediaDraft } from "./lib/mediaDraftStore";
 import { summarizeExpenseUploads, type ExpenseSubmission, type ExpenseUploadRow } from "./lib/expenseUploadState";
@@ -723,6 +723,29 @@ function App() {
       setComunicadosStatus((current) => current === "ready" ? current : "error");
       throw error;
     }
+  }, []);
+
+  // Deep link do push: busca só esse destinatário em paralelo com a agenda e abre o comunicado
+  // assim que ele chega, sem esperar loadRemoteStore nem a lista completa. A lista completa, ao
+  // chegar, substitui o item provisório; se esta busca falhar, o efeito abaixo segue como fallback.
+  useEffect(() => {
+    const deepLinkId = pendingComunicadoDeepLinkRef.current;
+    if (!deepLinkId || isButtonPreviewMode || isReceiptPreviewMode) return;
+    if (!hasDataverseRuntime() && !isMockComunicados()) return;
+    let alive = true;
+    loadDriverComunicado(deepLinkId)
+      .then((item) => {
+        if (!alive || !item || pendingComunicadoDeepLinkRef.current !== deepLinkId) return;
+        pendingComunicadoDeepLinkRef.current = "";
+        setComunicados((current) => current.some((row) => row.id === item.id) ? current : [item, ...current]);
+        setSelectedComunicadoId(item.id);
+        setScreen("comunicados");
+        setDataLoadingState(null);
+      })
+      .catch((error) => {
+        reportAppError(error, { severity: "warning", source: "app", action: "loadDriverComunicado", phase: "deep-link" });
+      });
+    return () => { alive = false; };
   }, []);
 
   useEffect(() => {

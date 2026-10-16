@@ -1,4 +1,4 @@
-import { createOne, DATAVERSE, deleteOne, retrieveMultiple, updateOne } from "./dataverse.ts";
+import { createOne, DATAVERSE, deleteOne, retrieveMultiple, retrieveOne, updateOne } from "./dataverse.ts";
 
 export const COMUNICADO_TIPO = { informativo: 100000000, ciencia: 100000001 } as const;
 export const COMUNICADO_ESCOPO = { todos: 100000000, selecionados: 100000001 } as const;
@@ -341,6 +341,17 @@ export async function loadDriverComunicados() {
   if (isMockComunicados()) return mockRequest<ComunicadoDestinatario[]>(`/recipients?driverId=${LOCAL_DRIVER_ID}`);
   const rows = await allRows(DATAVERSE.comunicadoDestinatarios, `${DESTINATARIO_SELECT}&$orderby=new_enviadoem desc`);
   return rows.map(mapDestinatario);
+}
+
+// Caminho rápido do deep link (push): lê só o destinatário apontado, sem esperar a lista completa.
+export async function loadDriverComunicado(id: string) {
+  const cleanId = cleanGuid(id);
+  if (isMockComunicados()) {
+    const rows = await mockRequest<ComunicadoDestinatario[]>(`/recipients?driverId=${LOCAL_DRIVER_ID}`);
+    return rows.find((item) => cleanGuid(item.id) === cleanId) ?? null;
+  }
+  const row = await retrieveOne(DATAVERSE.comunicadoDestinatarios, cleanId, DESTINATARIO_SELECT);
+  return row ? mapDestinatario(row as Record<string, unknown>) : null;
 }
 
 export async function loadGestaoComunicados() {
