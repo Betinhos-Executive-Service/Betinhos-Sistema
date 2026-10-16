@@ -1,4 +1,5 @@
-import { StatusBadge, Table, type TableColumn } from '@betinhos/ui'
+import type { ReactNode } from 'react'
+import { StatusBadge, Table, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
 import { Copy } from 'lucide-react'
 import { openFromRow } from '../../pagantes/components/PagantesList'
 import { STATUS, label } from '../domain/choices'
@@ -7,6 +8,8 @@ import type { ChoiceSet, Pessoa } from '../domain/types'
 import { ContatoActions } from './ContatoActions'
 
 type Props = { list: Pessoa[]; choices: ChoiceSet; dups: Map<string, DuplicateHit[]>; onOpen: (id: string) => void; loading?: boolean }
+/** Tabela com visão (DS §10.9.1/§10.9.2): ordem, largura, ordenação e filtro rápido vêm da visão. */
+type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; footer?: ReactNode; empty?: ReactNode }
 
 const formatDay = (iso: string) => (iso ? iso.split('-').reverse().join('/') : '—')
 
@@ -30,18 +33,18 @@ function Badges({ p, choices, dup }: { p: Pessoa; choices: ChoiceSet; dup: boole
   )
 }
 
-export function PessoasTable({ list, choices, dups, onOpen, loading }: Props) {
+export function PessoasTable({ list, choices, dups, onOpen, loading, view, quickFilters, footer, empty }: TableProps) {
   const columns: TableColumn<Pessoa>[] = [
-    { key: 'nome', header: 'Pessoa', width: 'minmax(180px, 1.5fr)', cell: (p) => <OpenName p={p} choices={choices} onOpen={onOpen} /> },
-    { key: 'cliente', header: 'Cliente', width: 'minmax(120px, 1fr)', cell: (p) => p.cliente || '—' },
-    { key: 'contato', header: 'Contato', width: 'minmax(150px, 1.1fr)', hideBelow: 'compact', cell: (p) => <span className="ps-contato"><span>{p.telefone || '—'}</span><span>{p.email}</span></span> },
-    { key: 'tags', header: 'Classificação', width: 'minmax(150px, 1fr)', cell: (p) => <Badges p={p} choices={choices} dup={dups.has(p.id)} /> },
-    { key: 'ultimo', header: 'Último serviço', width: 'minmax(96px, .7fr)', hideBelow: 'compact', cell: (p) => formatDay(p.ultimoServico) },
-    { key: 'acoes', header: <span className="ps-sr">Ações rápidas</span>, width: '84px', align: 'end', cell: (p) => <ContatoActions p={p} compact /> },
+    { key: 'nome', header: 'Pessoa', label: 'Pessoa', sortable: true, defaultWidth: 280, width: 'minmax(180px, 1.5fr)', cell: (p) => <OpenName p={p} choices={choices} onOpen={onOpen} /> },
+    { key: 'cliente', header: 'Cliente', label: 'Cliente', sortable: true, defaultWidth: 200, width: 'minmax(120px, 1fr)', cell: (p) => p.cliente || '—' },
+    { key: 'contato', header: 'Contato', label: 'Contato', defaultWidth: 220, width: 'minmax(150px, 1.1fr)', hideBelow: 'compact', cell: (p) => <span className="ps-contato"><span>{p.telefone || '—'}</span><span>{p.email}</span></span> },
+    { key: 'tags', header: 'Classificação', label: 'Classificação', sortable: true, defaultWidth: 240, width: 'minmax(150px, 1fr)', cell: (p) => <Badges p={p} choices={choices} dup={dups.has(p.id)} /> },
+    { key: 'ultimo', header: 'Último serviço', label: 'Último serviço', sortable: true, defaultWidth: 140, width: 'minmax(96px, .7fr)', hideBelow: 'compact', cell: (p) => formatDay(p.ultimoServico) },
+    { key: 'acoes', header: <span className="ps-sr">Ações rápidas</span>, label: 'Ações rápidas', defaultWidth: 96, width: '84px', align: 'end', cell: (p) => <ContatoActions p={p} compact /> },
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.ps-open')}>
-      <Table className="ps-table" columns={columns} rows={list} rowKey={(p) => p.id} loading={loading}
+      <Table className="ps-table" columns={columns} rows={list} rowKey={(p) => p.id} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty}
         severity={(p) => (dups.has(p.id) ? { tone: 'warning', label: 'Possível duplicado' } : null)} />
     </div>
   )
