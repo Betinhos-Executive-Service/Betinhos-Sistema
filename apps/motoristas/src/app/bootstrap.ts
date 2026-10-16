@@ -39,18 +39,24 @@ export function loadStore(storage: Storage = window.localStorage): LocalStore {
   return initialStore();
 }
 
-export function getInitialDetail(store: LocalStore, search = window.location.search): DetailData | null {
+// Lê um parâmetro direto (?servicoId=) ou dentro de ?data= (o Dynamics repassa ao web resource o
+// valor de navigateTo/Xrm como data=servicoId%3D...%26tipo%3DSERVICO, vindo do push via form OnLoad).
+function readLaunchParam(search: string, name: string) {
   const params = new URLSearchParams(search);
-  const serviceId = params.get("servicoId") ?? "";
-  const type = params.get("tipo") ?? "";
+  const direct = params.get(name);
+  if (direct) return direct;
+  return new URLSearchParams(params.get("data") ?? "").get(name) ?? "";
+}
+
+export function getInitialDetail(store: LocalStore, search = window.location.search): DetailData | null {
+  const { serviceId, type } = getInitialParams(search);
   return findDetailByParams([...store.agenda, ...store.history], serviceId, type);
 }
 
 export function getInitialParams(search = window.location.search) {
-  const params = new URLSearchParams(search);
   return {
-    serviceId: params.get("servicoId") ?? "",
-    type: params.get("tipo") ?? ""
+    serviceId: readLaunchParam(search, "servicoId").trim(),
+    type: readLaunchParam(search, "tipo").trim()
   };
 }
 
@@ -58,13 +64,7 @@ const COMUNICADO_ID_PATTERN = /^\{?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 
 // Deep link de comunicado: ?comunicadoId=<id> ou ?data=comunicadoId%3D<id> (parâmetro que o Dynamics repassa ao web resource).
 export function getInitialComunicadoId(search = window.location.search) {
-  const params = new URLSearchParams(search);
-  let value = params.get("comunicadoId") ?? "";
-  if (!value) {
-    const data = params.get("data") ?? "";
-    value = new URLSearchParams(data).get("comunicadoId") ?? "";
-  }
-  value = value.trim();
+  const value = readLaunchParam(search, "comunicadoId").trim();
   return COMUNICADO_ID_PATTERN.test(value) ? value.replace(/[{}]/g, "").toLowerCase() : "";
 }
 

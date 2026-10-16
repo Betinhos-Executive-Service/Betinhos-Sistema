@@ -154,13 +154,21 @@ Write-Step "provision comunicados metadata, Custom APIs e travas in DEV"
   -DeviceCode:$DeviceCode
 if (-not $?) { throw "Provisionamento de comunicados falhou." }
 
-Write-Step "publish comunicados push redirect (form OnLoad -> App Motoristas)"
-& (Join-Path $PSScriptRoot "provision-comunicados-push-redirect.ps1") `
+Write-Step "publish push redirect (forms OnLoad -> App Motoristas)"
+& (Join-Path $PSScriptRoot "provision-push-redirect.ps1") `
   -EnvironmentUrl $environmentUrl `
   -SolutionUniqueName $solutionUniqueName `
   -Apply `
   -DeviceCode:$DeviceCode
 if (-not $?) { throw "Publicacao do redirect de push falhou." }
+
+Write-Step "migrate driver push flows to App Motoristas v2"
+& (Join-Path $PSScriptRoot "provision-motorista-push-flows.ps1") `
+  -EnvironmentUrl $environmentUrl `
+  -SolutionUniqueName $solutionUniqueName `
+  -Apply `
+  -DeviceCode:$DeviceCode
+if (-not $?) { throw "Migracao dos Flows de push dos motoristas falhou." }
 
 Write-Step "provision exchange lifecycle metadata in DEV"
 & (Join-Path $PSScriptRoot "provision-exchange-lifecycle.ps1") `

@@ -70,13 +70,21 @@ Schema, APIs, papel, Flow ativo, web resources e item do menu foram publicados n
 - **App:** informativos pendentes também aparecem em Serviços; item não aberto mostra "NOVO" no rótulo; a lista mostra skeleton na primeira carga e erro com nova tentativa em vez de "Nenhum comunicado pendente".
 - **Deep link:** o app abre o comunicado com `?comunicadoId=<destinatarioId>` ou `?data=comunicadoId%3D<destinatarioId>`.
 
-## Push abrindo o App no comunicado (16/10/2026, publicado no DEV)
+## Push abrindo o App no lugar certo (16/10/2026, publicado no DEV)
 
-O conector Power Apps Notification V2, para app model-driven, só navega para tabela/registro (`dynamicParams/entityLogicalName` é obrigatório; não há destino de web resource). Para o toque na notificação cair no App Motoristas, e não no form padrão:
+O conector Power Apps Notification V2, para app model-driven, só navega para tabela/registro (`dynamicParams/entityLogicalName` é obrigatório; não há destino de web resource). Para todo toque de notificação do motorista cair no App Motoristas v2 na tela certa:
 
-- `Flow Push Comunicados | Motoristas` passa também `dynamicParams/recordId` = ID do destinatário (`scripts/provision-comunicados-push-flow.ps1`; o smoke confere).
-- `webresources/new_comunicadodestinatario_redirect.js` é registrado no OnLoad do form principal de `new_comunicadodestinatario` e chama `Xrm.Navigation.navigateTo` para `new_app-motoristas-v2` com `data=comunicadoId=<id>`; uma guarda em `sessionStorage` (15 s) evita loop ao tocar em Voltar. Teste: `tests/comunicadoRedirect.test.ts`.
-- `scripts/provision-comunicados-push-redirect.ps1` publica o web resource, registra o OnLoad, inclui tabela e form no app `new_AppMotoristasv2` e publica tudo; `pnpm push` o executa após `provision-comunicados.ps1`. Atenção: no Web API, `AddAppComponents` com `@odata.type` `Microsoft.Dynamics.CRM.entity` adiciona a tabela "entity"; o script usa o tipo OData da própria tabela com o MetadataId.
-- Validação feita: smoke, `ValidateApp` sem avisos, disparo controlado para a conta noreply com push enviado. O toque na notificação no aparelho (abrir o App já no comunicado) ainda precisa ser conferido em Android/iOS.
-- **Validação local:** testes do App, plugin (`dotnet test`), TypeScript e build do App e da Gestão; fluxo no navegador com o mock (criar, duplicar, excluir, filtrar, exportar, lembrar; Serviços, rótulo NOVO, deep link e estado de erro).
+| Notificação (Flow) | Abre no App |
+| --- | --- |
+| Push Comunicados \| Motoristas | Comunicado (`comunicadoId`) |
+| Novo Serviço \| Motoristas | Detalhe do serviço |
+| Serviço Editado \| Interno e Motoristas (ramo do motorista) | Detalhe do serviço |
+| Serviço Não Visualizado \| Interno e Motoristas (ramo do motorista) | Detalhe do serviço |
+| Serviço Retirado da Agenda \| Motoristas | Serviços (o serviço já não é do motorista) |
 
+- Os Flows de serviço passam a enviar para o app `new_AppMotoristasv2` (antes, o Canvas "App Betinhos Motoristas") com `entityLogicalName = cr40f_reservadeveculos` e `recordId` do serviço: `scripts/provision-motorista-push-flows.ps1` (idempotente, preserva o estado de cada Flow; pushes do App Betinhos Interno ficam intactos).
+- `webresources/new_appmotoristas_push_redirect.js` é o OnLoad dos forms de push e navega para `new_app-motoristas-v2` com `data=comunicadoId=<id>` ou `data=servicoId=<id>&tipo=SERVICO`. Só age dentro do App Motoristas v2 (`getCurrentAppProperties`), e uma guarda em `sessionStorage` (15 s) evita loop ao Voltar. Teste: `tests/pushRedirect.test.ts`.
+- `scripts/provision-push-redirect.ps1` publica o web resource, deixa o form do destinatário de comunicado só com Nome, cria o form leve "App Motoristas (push)" da reserva (visível só ao papel Acesso-Motoristas; o form "Informações" da operação não muda), inclui tabelas e forms no app e publica. `pnpm push` o executa após `provision-comunicados.ps1`. No Web API, `AddAppComponents` com `Microsoft.Dynamics.CRM.entity` adiciona a tabela "entity"; o script usa o tipo OData da própria tabela.
+- App (2.1.708): `?data=` é lido para `servicoId`/`tipo` e `comunicadoId`; serviço e comunicado do push são buscados em paralelo com a agenda e abrem assim que chegam. Serviço inacessível cai em Serviços com aviso.
+- Validação no DEV: testes, `ValidateApp` sem avisos, form da operação sem o redirect, push de comunicado aberto no aparelho, push de serviço aceito pelo conector (Flow ativado só para o teste e devolvido a rascunho).
+- PROD: os quatro Flows de serviço estão ativos e ainda apontam para o Canvas. Publicar exige rodar os dois scripts no ambiente de PROD depois de publicar o App; motoristas precisam ter aberto o App Motoristas v2 no Power Apps mobile nos últimos 30 dias para receber push.
