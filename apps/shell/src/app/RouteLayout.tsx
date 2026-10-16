@@ -51,7 +51,7 @@ export function RouteLayout({ host, group, item, label }: Props) {
     return (
       <RouteErrorBoundary key={item.id} title={label}>
         <Suspense fallback={<PageFallback title={label} />}>
-          <LazyPage page={item.page} host={host} />
+          <LazyPage page={item.page} host={host} agente={item.agente} />
         </Suspense>
       </RouteErrorBoundary>
     )
