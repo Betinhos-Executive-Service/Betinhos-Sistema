@@ -24,8 +24,8 @@
   /* ============ Página (desktop) — Página de gestão: cabeçalho, busca, filtros, tabela ============ */
   .app {
     display: grid;
-    grid-template-areas: "head" "search" "toolbar" "content";
-    grid-template-rows: auto auto auto 1fr;
+    grid-template-areas: "toolbar" "content";
+    grid-template-rows: auto 1fr;
     gap: var(--bt-space-3);
     width: 100%;
     max-width: var(--bt-layout-content-max);
