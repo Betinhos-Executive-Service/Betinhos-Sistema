@@ -16,7 +16,7 @@ import {
   type ExpenseValidationErrors
 } from "../lib/expenses";
 import type { MaintenanceRequestVehicleOption } from "../lib/dataverse";
-import { QUICK_READ_MAX_TENTATIVAS, type QuickReadState } from "../lib/receiptQuickRead";
+import { QUICK_READ_MAX_TENTATIVAS, isQuickReadFieldHighlighted, type QuickReadFilledFields, type QuickReadState } from "../lib/receiptQuickRead";
 
 type ExpenseScreenProps = {
   uploadMessage?: string;
@@ -38,7 +38,8 @@ type ExpenseScreenProps = {
   vehiclesLoading: boolean;
   currentVehicleId: string;
   quickRead?: QuickReadState;
-  onRetakeQuickReadPhoto?: () => void;
+  /** Campos preenchidos pela leitura rápida (destacados até o motorista alterar). */
+  quickReadFilled?: QuickReadFilledFields;
 };
 
 function focusInvalidField(element: HTMLElement | null) {
@@ -66,9 +67,11 @@ export function ExpenseScreen({
   vehiclesLoading,
   currentVehicleId,
   quickRead,
-  onRetakeQuickReadPhoto
+  quickReadFilled = {}
 }: ExpenseScreenProps) {
   const isSubmitting = submitState !== "idle";
+  const quickReadClass = (key: keyof ExpenseDraft) =>
+    isQuickReadFieldHighlighted(draft, quickReadFilled, key) ? "finalize-input-block is-quick-read-filled" : undefined;
   const categoryRef = useRef<HTMLButtonElement | null>(null);
   const vehicleRef = useRef<HTMLButtonElement | null>(null);
   const valueRef = useRef<HTMLInputElement | null>(null);
@@ -166,22 +169,17 @@ export function ExpenseScreen({
                 <div className="form-error-summary">Categorias, formas de pagamento ou cidades não encontradas no Dataverse.</div>
               ) : null}
               {errorCount ? <div className="form-error-summary">Revise {errorCount} campo(s) destacado(s).</div> : null}
-              {quickRead?.status === "lendo" ? <div className="form-error-summary" role="status" aria-live="polite">Lendo comprovante…</div> : null}
-              {quickRead?.status === "preenchido" ? <div className="form-error-summary" role="status">Confira os dados lidos do comprovante.</div> : null}
-              {quickRead?.status === "ilegivel" ? (
-                <div className="form-error-summary" role="alert">
-                  Não consegui ler o comprovante. Tire outra foto mais perto, com luz e sem cortar.
-                  <ActionButton variant="secondary" idleLabel="TIRAR OUTRA FOTO" state="idle" disabled={isSubmitting} onClick={() => onRetakeQuickReadPhoto?.()} />
-                </div>
-              ) : null}
+              {quickRead?.status === "lendo" ? <div className="form-error-summary is-info" role="status" aria-live="polite">Lendo comprovante…</div> : null}
+              {quickRead?.status === "preenchido" ? <div className="form-error-summary is-info" role="status">Confira os campos destacados, lidos do comprovante.</div> : null}
               {quickRead?.status === "manual" && quickRead.tentativas < QUICK_READ_MAX_TENTATIVAS ? (
-                <div className="form-error-summary" role="status">Preencha os dados do comprovante.</div>
+                <div className="form-error-summary is-info" role="status">Preencha os dados do comprovante.</div>
               ) : null}
 
               <TextInputField
                 ref={dateRef}
                 required
                 label="Data do gasto"
+                fieldClassName={quickReadClass("dataGasto")}
                 error={errors.dataGasto}
                 type="date"
                 value={draft.dataGasto}
@@ -195,6 +193,7 @@ export function ExpenseScreen({
                 ref={categoryRef}
                 required
                 label="Categoria"
+                fieldClassName={quickReadClass("categoriaId")}
                 error={errors.categoriaId}
                 value={draft.categoriaId}
                 options={categoryOptions}
@@ -218,6 +217,7 @@ export function ExpenseScreen({
                 ref={valueRef}
                 required
                 label="Valor"
+                fieldClassName={quickReadClass("valor")}
                 error={errors.valor}
                 inputMode="decimal"
                 pattern="[0-9.,]*"
@@ -233,6 +233,7 @@ export function ExpenseScreen({
                 ref={paymentRef}
                 required
                 label="Forma de pagamento"
+                fieldClassName={quickReadClass("formaPagamentoId")}
                 error={errors.formaPagamentoId}
                 value={draft.formaPagamentoId}
                 options={paymentOptions}
@@ -249,6 +250,7 @@ export function ExpenseScreen({
                 ref={cityRef}
                 required
                 label="Cidade"
+                fieldClassName={quickReadClass("cidadeId")}
                 error={errors.cidadeId}
                 value={draft.cidadeId}
                 options={cityOptions}
@@ -306,6 +308,7 @@ export function ExpenseScreen({
                   ref={litersRef}
                   required
                   label="Litros"
+                  fieldClassName={quickReadClass("litros")}
                   error={errors.litros}
                   inputMode="decimal"
                   placeholder="Ex.: 42,5"
@@ -319,6 +322,7 @@ export function ExpenseScreen({
 
               <TextInputField
                 label="Estabelecimento"
+                fieldClassName={quickReadClass("estabelecimento")}
                 placeholder="Ex.: Posto, estacionamento, hotel"
                 value={draft.estabelecimento}
                 onChange={(event) => updateDraft({ estabelecimento: event.target.value })}
@@ -326,6 +330,7 @@ export function ExpenseScreen({
 
               <TextAreaField
                 label="Descrição"
+                fieldClassName={quickReadClass("descricao")}
                 placeholder="Opcional"
                 rows={3}
                 value={draft.descricao}

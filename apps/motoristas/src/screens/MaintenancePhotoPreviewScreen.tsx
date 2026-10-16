@@ -19,6 +19,7 @@ type MaintenancePhotoPreviewScreenProps = {
   onDelete?: () => void;
   videoPreviewUrl?: string;
   confirmLabel?: string;
+  retakeLabel?: string;
   deleteOnly?: boolean;
 };
 
@@ -41,6 +42,7 @@ export function MaintenancePhotoPreviewScreen({
   onDelete,
   videoPreviewUrl: externalVideoPreviewUrl = "",
   confirmLabel = "Sim, Confirmar",
+  retakeLabel = "Não, refazer",
   deleteOnly = false
 }: MaintenancePhotoPreviewScreenProps) {
   const isInvoice = kind.startsWith("NOTAFISCAL");
@@ -152,7 +154,7 @@ export function MaintenancePhotoPreviewScreen({
               ) : (
                 <>
                   {onDelete ? <ActionButton className="maintenance-preview-secondary" variant="danger" label="Apagar foto" onClick={requestDelete} /> : null}
-                  <ActionButton className="maintenance-preview-secondary" label="Não, refazer" onClick={onRetake} />
+                  <ActionButton className="maintenance-preview-secondary" label={retakeLabel} onClick={onRetake} />
                   <ActionButton className="maintenance-preview-primary" variant="primary" label={confirmLabel} onClick={onConfirm} />
                 </>
               )}

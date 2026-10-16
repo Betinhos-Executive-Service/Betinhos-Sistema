@@ -12371,3 +12371,292 @@ select,
 .action-button-content.is-entering { animation: action-button-content-in 150ms cubic-bezier(0.23, 1, 0.32, 1) both; }
 @keyframes action-button-content-in { from { opacity: 0; transform: translateY(3px) scale(0.97); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .action-button-content.is-entering { animation: none; } }
+
+/* Comprovante: tela de leitura rápida e campos lidos. Valores do Betinhos Design System (design-tokens.json). */
+.receipt-reading-main {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.receipt-reading-card {
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(0, 26, 61, 0.045);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-family: "Manrope", "Segoe UI", sans-serif;
+}
+
+.receipt-reading-title {
+  margin: 0;
+  color: #001a3d;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.29;
+}
+
+.receipt-reading-thumb {
+  width: 100%;
+  height: min(40vh, 320px);
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fcfcfb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.receipt-reading-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+.receipt-reading-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.receipt-reading-step {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fcfcfb;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  transition: color 150ms cubic-bezier(0.23, 1, 0.32, 1), border-color 150ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.receipt-reading-step-icon {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #e2e8f0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.receipt-reading-step-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.receipt-reading-step.is-active {
+  border-color: #6c91e8;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.receipt-reading-step.is-active .receipt-reading-step-icon {
+  border-color: #edf3ff;
+  border-top-color: #2159d2;
+  animation: receipt-reading-spin 800ms linear infinite;
+}
+
+.receipt-reading-step.is-done {
+  color: #475569;
+}
+
+.receipt-reading-step.is-done .receipt-reading-step-icon {
+  border-color: #147a4b;
+  background: #eaf8f1;
+  color: #147a4b;
+}
+
+.receipt-reading-live {
+  margin: 0;
+  min-height: 20px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.54;
+  text-align: center;
+}
+
+.receipt-reading-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes receipt-reading-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .receipt-reading-step { transition: none; }
+  .receipt-reading-step.is-active .receipt-reading-step-icon { animation: none; border-color: #2159d2; }
+}
+
+/* Campo preenchido pela leitura: fundo informativo suave; some quando o motorista altera o valor. */
+.is-quick-read-filled .form-control-input,
+.is-quick-read-filled .form-control-shell,
+.is-quick-read-filled .form-control-trigger,
+.is-quick-read-filled .form-control-textarea {
+  background-color: #edf3ff !important;
+}
+
+/* Avisos da leitura rápida no formulário: informação (par azul aprovado), não erro. */
+.form-error-summary.is-info {
+  border-color: #e2e8f0 !important;
+  background: #edf3ff !important;
+  color: #285db5 !important;
+  box-shadow: none !important;
+}
+
+/* Comprovante ilegível: mesma superfície da tela de leitura; atenção em par aprovado (#856000 / #FFF7DF), ação primária navy. */
+.receipt-illegible-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.receipt-illegible-icon {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #fff7df;
+  color: #856000;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.receipt-illegible-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.receipt-illegible-tips {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.receipt-illegible-tip {
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fcfcfb;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.receipt-illegible-tip-icon {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  color: #2159d2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.receipt-illegible-tip-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.receipt-illegible-retake {
+  width: 100%;
+  min-height: 44px;
+}
+
+/* Ação primária da tela de ilegível sem gradiente (navy.900; hover navy.800). */
+.receipt-illegible-retake.action-button--primary {
+  background: #001a3d !important;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .receipt-illegible-retake.action-button--primary:not(:disabled):hover {
+    background: #0b2d5a !important;
+  }
+}
+
+/* Lanterna da câmera ao vivo: botão de ícone (44 px touch), só quando o aparelho suporta. Ligada = par informativo. */
+.camera-torch-toggle {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 4;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #475569;
+  box-shadow: 0 8px 24px rgba(0, 26, 61, 0.045);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 160ms cubic-bezier(0.23, 1, 0.32, 1), color 160ms cubic-bezier(0.23, 1, 0.32, 1), transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.camera-torch-toggle svg {
+  width: 20px;
+  height: 20px;
+}
+
+.camera-torch-toggle.is-on {
+  border-color: #6c91e8;
+  background: #edf3ff;
+  color: #2159d2;
+}
+
+.camera-torch-toggle:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.camera-torch-toggle:focus-visible {
+  outline: none;
+  border-color: #6c91e8;
+  box-shadow: 0 0 0 3px rgba(33, 89, 210, 0.11);
+}
+
+.camera-torch-toggle:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .camera-torch-toggle { transition: none; }
+}

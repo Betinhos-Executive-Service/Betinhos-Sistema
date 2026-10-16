@@ -71,15 +71,19 @@ import {
 import { readReceiptQuick } from "./lib/dataverse";
 import {
   INITIAL_QUICK_READ,
-  QUICK_READ_TIMEOUT_MS,
-  applyQuickReadToDraft,
+  QUICK_READ_FILL_STEP_MS,
+  applyQuickRead,
   downscaleForQuickRead,
+  expenseFlowView,
+  hasRemoteReferenceData,
   nextQuickReadState,
-  parseQuickReadResponse,
+  runQuickReadPipeline,
   shouldRunQuickRead,
-  type QuickReadOutcome,
+  startQuickReadState,
+  type QuickReadFilledFields,
   type QuickReadState
 } from "./lib/receiptQuickRead";
+import { getQuickReadMockMode, readReceiptQuickMock } from "./lib/receiptQuickReadMock";
 import { IDEA_STATUS, type Idea, type IdeaDraft } from "./lib/ideas";
 import { APP_CONNECTION_LOST_MESSAGE, APP_OPERATION_ERROR_MESSAGE, reportAppError, type AppErrorNotice } from "./lib/appErrorLogger";
 import { isComunicadoPending, isMockComunicados, loadDriverComunicados, type ComunicadoDestinatario } from "./lib/comunicados";
@@ -87,7 +91,8 @@ import type { ComunicadosLoadStatus } from "./screens/ComunicadosScreen";
 import { clearMediaDraft, loadMediaDraft, saveMediaDraft, touchMediaDraft } from "./lib/mediaDraftStore";
 import { summarizeExpenseUploads, type ExpenseSubmission, type ExpenseUploadRow } from "./lib/expenseUploadState";
 import { resumeExpenseSubmission } from "./lib/expenseSubmission";
-import { usesAsyncExpenseUpload, expenseSubmissionStorageKey, ensureExpenseSubmissionRemote, loadExpenseUploadRowsRemote, transitionExpenseUploadRemote, dispatchExpenseUploadRemote, createExpenseUploadItem } from "./lib/dataverse";
+import type { ExpenseUploadMode } from "./lib/expenseUploadMode";
+import { resolveExpenseUploadModeRemote, expenseSubmissionStorageKey, ensureExpenseSubmissionRemote, loadExpenseUploadRowsRemote, transitionExpenseUploadRemote, dispatchExpenseUploadRemote, createExpenseUploadItem } from "./lib/dataverse";
 
 const EXCHANGE_ERROR_MESSAGES: Record<string, string> = {
   EXCHANGE_CONCURRENCY_CONFLICT: "A troca foi alterada por outra pessoa. Atualize a agenda e tente novamente.",
@@ -134,6 +139,8 @@ import { HistoryScreen } from "./screens/HistoryScreen";
 import { InitialScreen } from "./screens/InitialScreen";
 import { LocalCancelScreen } from "./screens/LocalCancelScreen";
 import { MediaCaptureScreen } from "./screens/MediaCaptureScreen";
+import { ReceiptReadingScreen } from "./screens/ReceiptReadingScreen";
+import { ReceiptIllegibleScreen } from "./screens/ReceiptIllegibleScreen";
 import { MaintenancePhotoPreviewScreen } from "./screens/MaintenancePhotoPreviewScreen";
 import { ReceiveScreen } from "./screens/ReceiveScreen";
 import { ReceiptPreviewScreen, ReceiptScreen } from "./screens/ReceiptScreen";
@@ -486,6 +493,11 @@ function App() {
   const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft>({ ...EMPTY_EXPENSE_DRAFT });
   const [expenseQuickRead, setExpenseQuickRead] = useState<QuickReadState>(INITIAL_QUICK_READ);
   const expenseQuickReadSeqRef = useRef(0);
+  const [expenseQuickReadPhoto, setExpenseQuickReadPhoto] = useState("");
+  const [expenseQuickReadFilling, setExpenseQuickReadFilling] = useState(false);
+  const [expenseQuickReadFilled, setExpenseQuickReadFilled] = useState<QuickReadFilledFields>({});
+  const expenseDraftRef = useRef(expenseDraft);
+  expenseDraftRef.current = expenseDraft;
   const expenseRetakeTargetIdRef = useRef("");
   const expenseDateTouchedRef = useRef(false);
   const [expenseReferenceData, setExpenseReferenceData] = useState<ExpenseReferenceData>(DEFAULT_EXPENSE_REFERENCE_DATA);
@@ -496,6 +508,7 @@ function App() {
   const [expenseSubmission, setExpenseSubmission] = useState<ExpenseSubmission | null>(null);
   const [expenseUploadRows, setExpenseUploadRows] = useState<ExpenseUploadRow[]>([]);
   const [expenseUploadReady, setExpenseUploadReady] = useState(false);
+  const [expenseUploadMode, setExpenseUploadMode] = useState<ExpenseUploadMode | "pending">("pending");
   const expenseSubmissionRef = useRef<ExpenseSubmission | null>(null);
   const expenseSubmitBusyRef = useRef(false);
   const expenseUploadSummary = expenseSubmission?.expenseConfirmed ? summarizeExpenseUploads(expenseSubmission.items, expenseUploadRows) : null;
@@ -505,7 +518,15 @@ function App() {
     : `${expenseUploadSummary.sent} comprovante(s) enviado(s); ${expenseUploadSummary.failed} com falha confirmada.`;
 
   useEffect(() => {
-    if (!remoteMode || !driverContext || !usesAsyncExpenseUpload()) return;
+    if (!remoteMode) return;
+    let active = true;
+    // Decide pela configuracao do ambiente (Flow assincrono configurado), nao pela URL; nunca rejeita.
+    resolveExpenseUploadModeRemote().then(mode => { if (active) setExpenseUploadMode(mode); });
+    return () => { active = false; };
+  }, [remoteMode]);
+
+  useEffect(() => {
+    if (!remoteMode || !driverContext || expenseUploadMode !== "async") return;
     let active = true;
     setExpenseUploadReady(false);
     loadMediaDraft<ExpenseSubmission>(expenseSubmissionStorageKey(driverContext.id)).then(saved => {
@@ -519,7 +540,7 @@ function App() {
       setExpenseUploadReady(true);
     }).catch(error => { if (active) setCriticalError(error instanceof Error ? error.message : "Falha ao restaurar envio de despesa."); });
     return () => { active = false; };
-  }, [remoteMode, driverContext?.id]);
+  }, [remoteMode, driverContext?.id, expenseUploadMode]);
 
   useEffect(() => {
     if (!expenseSubmission || !remoteMode) return;
@@ -1865,8 +1886,8 @@ function App() {
   };
 
   const submitExpense = async (draft: ExpenseDraft) => {
-    if (usesAsyncExpenseUpload()) return submitExpenseAsync(draft);
-    if (remoteOperation) return;
+    if (remoteMode && expenseUploadMode === "async") return submitExpenseAsync(draft);
+    if (remoteOperation || (remoteMode && expenseUploadMode === "pending")) return;
     if (!remoteMode) {
       setToast("Abra no Power Apps para registrar no Dataverse.");
       return;
@@ -2265,35 +2286,48 @@ function App() {
     expenseRetakeTargetIdRef.current = "";
     expenseDateTouchedRef.current = false;
     setExpenseQuickRead(INITIAL_QUICK_READ);
+    setExpenseQuickReadPhoto("");
+    setExpenseQuickReadFilling(false);
+    setExpenseQuickReadFilled({});
   }
 
   const runExpenseQuickRead = async (dataUrl: string) => {
-    if (!remoteMode || !shouldRunQuickRead(expenseQuickRead)) return;
-    if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      setExpenseQuickRead((current) => ({ ...current, status: "manual" }));
-      return;
-    }
+    const mockMode = remoteMode ? null : getQuickReadMockMode();
+    if ((!remoteMode && !mockMode) || !shouldRunQuickRead(expenseQuickRead)) return;
+    const online = typeof navigator === "undefined" || navigator.onLine !== false;
+    const started = startQuickReadState(expenseQuickRead, { online });
+    setExpenseQuickRead(started);
+    if (started.status !== "lendo") return;
     const seq = ++expenseQuickReadSeqRef.current;
-    setExpenseQuickRead((current) => ({ ...current, status: "lendo" }));
-    let outcome: QuickReadOutcome = { kind: "falha" };
-    try {
-      const base64 = await downscaleForQuickRead(dataUrl);
-      outcome = parseQuickReadResponse(await readReceiptQuick(
-        base64,
-        expenseReferenceData.categories.map((category) => category.name),
-        expenseReferenceData.paymentMethods.map((method) => method.name),
-        QUICK_READ_TIMEOUT_MS
-      ));
-    } catch {
-      outcome = { kind: "falha" };
-    }
+    setExpenseQuickReadPhoto(dataUrl);
+    setExpenseQuickReadFilling(false);
+    const { outcome, referenceData } = await runQuickReadPipeline({
+      referenceData: expenseReferenceData,
+      isReferenceReady: mockMode ? (data) => data.categories.length > 0 && data.paymentMethods.length > 0 : hasRemoteReferenceData,
+      loadReferenceData: mockMode ? async () => DEFAULT_EXPENSE_REFERENCE_DATA : loadExpenseReferenceDataRemote,
+      prepareImage: () => downscaleForQuickRead(dataUrl),
+      read: mockMode ? (_base64, categorias, formas, timeoutMs) => readReceiptQuickMock(mockMode, categorias, formas, timeoutMs) : readReceiptQuick
+    });
     if (seq !== expenseQuickReadSeqRef.current) return;
-    setExpenseQuickRead((current) => nextQuickReadState(current, outcome));
-    if (outcome.kind === "lido") {
-      const leitura = outcome.leitura;
-      const replaceAutoDate = !expenseDateTouchedRef.current;
-      setExpenseDraft((current) => applyQuickReadToDraft(current, leitura, expenseReferenceData, { replaceAutoDate }));
+    if (referenceData && referenceData !== expenseReferenceData) setExpenseReferenceData(referenceData);
+    if (outcome.kind === "lido" && referenceData) {
+      setExpenseQuickReadFilling(true);
+      await new Promise((resolve) => window.setTimeout(resolve, QUICK_READ_FILL_STEP_MS));
+      if (seq !== expenseQuickReadSeqRef.current) return;
+      const before = expenseDraftRef.current;
+      const { draft: after, filled } = applyQuickRead(before, outcome.leitura, referenceData, { replaceAutoDate: !expenseDateTouchedRef.current });
+      setExpenseDraft(after);
+      setExpenseQuickReadFilled(filled);
     }
+    setExpenseQuickReadFilling(false);
+    setExpenseQuickRead((current) => nextQuickReadState(current, outcome));
+  };
+
+  /** Sai da tela de leitura: ignora a resposta que ainda vier e segue para o preenchimento manual. */
+  const cancelExpenseQuickRead = () => {
+    expenseQuickReadSeqRef.current++;
+    setExpenseQuickReadFilling(false);
+    setExpenseQuickRead((current) => ({ ...current, status: "manual" }));
   };
 
   const retakeQuickReadPhoto = () => {
@@ -2872,7 +2906,7 @@ function App() {
       <MaintenancePhotoPreviewScreen
         kind="NOTAFISCAL"
         title="Comprovante"
-        prompt={expensePhotoIsVideo ? "O vídeo está correto?" : "O comprovante está legível?"}
+        prompt={expensePhotoIsVideo ? "O vídeo está correto?" : "O comprovante está inteiro e legível?"}
         photoDataUrl={expensePhotoDraft}
         isVideo={expensePhotoIsVideo}
         videoPreviewUrl={expensePhotoPreviewUrl}
@@ -2884,7 +2918,8 @@ function App() {
         onRetake={openExpenseCamera}
         onDelete={expensePreviewPhotoId ? deleteExpensePhoto : undefined}
         onConfirm={confirmExpensePhoto}
-        confirmLabel={expensePreviewPhotoId ? "Voltar" : "Confirmar"}
+        confirmLabel={expensePreviewPhotoId ? "Voltar" : expensePhotoIsVideo ? "Confirmar" : "Usar esta foto"}
+        retakeLabel={expensePhotoIsVideo ? undefined : "Tirar outra"}
         deleteOnly={Boolean(expensePreviewPhotoId)}
       />
     );
@@ -2908,13 +2943,25 @@ function App() {
     );
   }
 
+  if (screen === "gastos" && expenseFlowView(expenseQuickRead) === "leitura") {
+    return show(
+      <ReceiptReadingScreen photoDataUrl={expenseQuickReadPhoto} filling={expenseQuickReadFilling} onCancel={cancelExpenseQuickRead} />
+    );
+  }
+
+  if (screen === "gastos" && expenseFlowView(expenseQuickRead) === "ilegivel") {
+    return show(
+      <ReceiptIllegibleScreen photoDataUrl={expenseQuickReadPhoto} onRetake={retakeQuickReadPhoto} onBack={cancelExpenseQuickRead} />
+    );
+  }
+
   if (screen === "gastos") {
     return show(
       <ExpenseScreen
         uploadMessage={expenseUploadMessage}
         formLocked={Boolean(expenseSubmission)}
         submitLabel={expenseUploadSummary?.complete ? "CONCLUIR" : expenseUploadSummary?.canRetry ? "TENTAR COMPROVANTES NOVAMENTE" : expenseSubmission?.items.every(item => item.dispatchStarted && !item.previousAttemptId) ? "VERIFICAR ENVIO" : expenseSubmission ? "CONTINUAR ENVIO" : "REGISTRAR"}
-        submitDisabled={usesAsyncExpenseUpload() && !expenseUploadReady}
+        submitDisabled={remoteMode && (expenseUploadMode === "pending" || (expenseUploadMode === "async" && !expenseUploadReady))}
         draft={expenseDraft}
         photos={expensePhotos}
         referenceData={expenseReferenceData}
@@ -2934,7 +2981,7 @@ function App() {
         vehiclesLoading={maintenanceVehiclesLoading}
         currentVehicleId={maintenanceCurrentVehicleId}
         quickRead={expenseQuickRead}
-        onRetakeQuickReadPhoto={retakeQuickReadPhoto}
+        quickReadFilled={expenseQuickReadFilled}
       />
     );
   }
