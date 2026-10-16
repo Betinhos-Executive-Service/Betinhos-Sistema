@@ -1,0 +1,11 @@
+/* Link de acompanhamento gerado: bloco neutro com o endereço clicável, validade e ações de cópia. */
+.bt-link { display: grid; gap: var(--bt-space-2); padding: var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); }
+.bt-link__url { display: inline-flex; align-items: center; gap: var(--bt-space-1-5); min-width: 0; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); text-decoration: none; }
+.bt-link__url > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bt-link__url > svg { flex: none; }
+.bt-link__url:hover { text-decoration: underline; }
+.bt-link__url:focus-visible { outline: 2px solid var(--bt-color-brand); outline-offset: 2px; border-radius: var(--bt-radius-sm); }
+.bt-link__meta { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.bt-link__meta--expired { color: var(--bt-color-danger); }
+.bt-link__actions { display: flex; flex-wrap: wrap; gap: var(--bt-space-2); }
+.bt-link__actions > * { flex: 1 1 auto; justify-content: center; }
