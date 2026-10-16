@@ -1,10 +1,11 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Alert, Button, EmptyState, Pagination, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
+import { Alert, Button, EmptyState, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
 import { CircleCheck, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
+import { LazyFooter, useLazySlice } from '../../app/LazyList'
 import { hrefFor } from '../../nav/useHashRoute'
-import { useQueryBandeira, useQueryFilters, useQueryId, useQueryPagina } from '../../nav/queryState'
+import { useQueryBandeira, useQueryFilters, useQueryId } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { GerarPagantesFrame, SaveViewDialog } from '../pagantes/components/Dialogs'
 import { formatMoney } from '../pagantes/domain/messages'
@@ -28,7 +29,6 @@ export function PendenciasPage({ host }: Props) {
   return <ToastProvider><Pendencias host={host} /></ToastProvider>
 }
 
-const PAGE_SIZE = 50
 const soma = (list: Pendencia[]) => list.reduce((acc, p) => acc + (p.valor ?? 0), 0)
 const noop = () => undefined
 
@@ -47,7 +47,6 @@ function Pendencias({ host }: Props) {
     return last ? viewFilters(last) : { ...EMPTY_FILTERS }
   })
   const activeView = useMemo(() => matchView(views, filters, stored.last), [views, filters, stored.last])
-  const [page, setPage] = useQueryPagina()
   const setFilters = useCallback((next: Filters, viewId?: string) => {
     setFiltersUrl(next)
     setStored((s) => {
@@ -62,6 +61,7 @@ function Pendencias({ host }: Props) {
   const since = useMemo(() => periodoStart(filters.periodo, new Date()), [filters.periodo])
   const pend = usePendencias(source, since)
   const visible = useMemo(() => filterPendencias(pend.list, filters), [pend.list, filters])
+  const { slice, more, loadMore } = useLazySlice(visible, filters)
 
   const [selectedId, setSelectedId] = useQueryId('abrir')
   const current = selectedId ? pend.list.find((p) => p.id === selectedId) ?? null : null
@@ -116,15 +116,12 @@ function Pendencias({ host }: Props) {
   } else if (!pend.loading && !visible.length) {
     body = <EmptyState className="surface" align="start" icon={<SearchX size={36} />} title="Nenhuma pendência encontrada para estes filtros" action={<Button variant="secondary" onClick={() => setFilters({ ...EMPTY_FILTERS })}>Limpar filtros</Button>} />
   } else {
-    const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
-    const safePage = Math.min(page, pages)
-    const slice = visible.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
     body = (
       <>
         {mobile
           ? <PendenciasCards list={slice} onOpen={setSelectedId} {...acoes} />
           : <PendenciasTable list={slice} onOpen={setSelectedId} {...acoes} />}
-        {visible.length > PAGE_SIZE ? <Pagination page={safePage} pageSize={PAGE_SIZE} total={visible.length} onChange={setPage} noun="pendências" /> : null}
+        <LazyFooter loaded={slice.length} total={visible.length} more={more} onLoadMore={loadMore} noun={['pendência', 'pendências']} touch={mobile} />
       </>
     )
   }
