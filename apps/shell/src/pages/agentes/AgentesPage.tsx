@@ -13,7 +13,7 @@ import { AprovarDialog, DescartarDialog } from './components/DecisaoDialogs'
 import { Historico } from './components/Historico'
 import './agentes.css'
 
-export function AgentesPage({ host, agente }: { host: Host; agente: Agente }) {
+export function AgentesPage({ host, agente = 'financeiro' }: { host: Host; agente?: Agente }) {
   return <ToastProvider><Agentes host={host} agente={agente} /></ToastProvider>
 }
 

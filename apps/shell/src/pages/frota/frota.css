@@ -86,6 +86,8 @@
 .frota-timeline li { position: relative; display: grid; gap: var(--bt-space-0-5); font-size: var(--bt-font-size-13); }
 .frota-timeline li::before { content: ""; position: absolute; left: -22px; top: 6px; width: 10px; height: 10px; border-radius: var(--bt-radius-full); background-color: var(--bt-color-border); }
 .frota-timeline li[data-atual]::before { background-color: var(--bt-color-success); }
+.frota-prev { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
+.frota-prev li { display: flex; align-items: center; gap: var(--bt-space-2); flex-wrap: wrap; }
 
 /* Foto principal do veículo (SharePoint) */
 .frota-foto { display: grid; place-items: center; flex: none; overflow: hidden; border-radius: var(--bt-radius-sm); background-color: var(--bt-color-surface-soft); color: var(--bt-color-text-secondary); }

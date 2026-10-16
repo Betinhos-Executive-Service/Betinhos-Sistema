@@ -4,5 +4,5 @@
     "types": ["vite/client"]
   },
   "include": ["src", "../../packages/*/src"],
-  "exclude": ["../../packages/agentes-ia"]
+  "exclude": ["../../packages/despesas-ia", "../../packages/agentes-ia"]
 }

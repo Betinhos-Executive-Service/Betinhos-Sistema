@@ -14,7 +14,13 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+          # @betinhos/ui vem do GitHub Packages (repo design-system-betinhos). O GITHUB_TOKEN lê porque cada pacote
+          # (ui e tokens) lista este repo em Package settings → Manage Actions access (Read).
+          registry-url: https://npm.pkg.github.com
+          scope: '@betinhos-executive-service'
       - run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: pnpm typecheck
       - run: pnpm test
       - name: Varredura de segredos na solução

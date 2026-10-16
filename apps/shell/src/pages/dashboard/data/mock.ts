@@ -30,6 +30,16 @@ const VEICULOS: Veiculo[] = [
   { id: 'mock-v4', statusLabel: 'Ativo', categoria: 'Terceirizada', placa: 'TRC4D56', marca: 'Mercedes-Benz', modelo: 'Sprinter', blindado: false, ano: 2020 },
   { id: 'mock-v5', statusLabel: '', categoria: 'Terceirizada', placa: 'TRC5E67', marca: 'Volkswagen', modelo: 'Virtus', blindado: false, ano: 2024 },
 ]
+/**
+ * Preventivas: o Corolla Altis (próprio e ativo; status 202410001 e categoria 100000000 crus) com hodômetro em 48.000 km e a troca de óleo
+ * a cada 10.000 km feita aos 35.000 km pela baseline: vencida por 3.000 km.
+ */
+const PREVENTIVAS_MOCK: Dados['preventivas'] = {
+  veiculos: [{ id: 'mock-v1', placa: 'BTN1A23', status: 202410001, categoria: 100000000, hodometro: 48000, hodometroEm: null }],
+  manutencoes: [],
+  itens: [{ id: 'mock-item-oleo', nome: 'Troca de óleo e filtro', servico: 1, intervaloKm: 10000, intervaloMeses: null, avisoKm: 1000, avisoDias: 30, ativo: true }],
+  baselines: [{ id: 'mock-base-oleo', veiculo: { id: 'mock-v1', label: 'BTN1A23' }, item: { id: 'mock-item-oleo', label: 'Troca de óleo e filtro' }, km: 35000, data: null }],
+}
 /** Vendido: fica no cadastro (como em produção), sem reservas; fora de VEICULOS para não mudar o sorteio. */
 const VEICULO_VENDIDO: Veiculo = { id: 'mock-v7', statusLabel: 'Vendido', categoria: 'Propria', placa: 'BTN7G89', marca: 'Toyota', modelo: 'Corolla', blindado: true, ano: 2019 }
 /** Fora de VEICULOS para não mudar o sorteio de veículos das reservas: entra em ~5% delas por um gerador à parte. */
@@ -295,6 +305,7 @@ export function criarDadosMock(now: Date): Dados {
     despesas: criarDespesasMock(reservas, funcionarios, now),
     categoriasDespesa: CATEGORIAS_DESPESA,
     formasPagamento: FORMAS_DESPESA,
+    preventivas: PREVENTIVAS_MOCK,
     indisponiveis: [],
   }
 }

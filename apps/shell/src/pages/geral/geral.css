@@ -45,7 +45,12 @@
 .gr-table { --gr-row-height: var(--bt-table-row-dense); }
 .gr-table .bt-table__head, .gr-table .bt-table__row { grid-template-columns: var(--gr-columns); gap: 0; padding: 0; width: 100%; min-width: var(--gr-min-width, max-content); }
 .gr-table .bt-table__head { display: grid; position: sticky; top: 0; z-index: 2; }
+/* Linha de filtro rápido (DS §10.9.2): mesmas trilhas do grid, presa logo abaixo do cabeçalho. */
+.gr-table .gr-quickrow { grid-template-columns: var(--gr-columns); gap: 0; padding: 0; width: 100%; min-width: var(--gr-min-width, max-content); position: sticky; top: 32px; z-index: 2; }
+.gr-table .gr-quickrow .bt-table__cell { padding: var(--bt-space-1) var(--bt-space-2); background-color: var(--bt-color-surface-neutral); }
 .gr-table .bt-table__row { min-height: var(--gr-row-height); user-select: none; -webkit-user-select: none; }
+/* Linhas fora da tela não pintam: sem isto cada quadro de animação do shell (acordeão, gaveta) recompunha a grade inteira. Listas e menus das células usam a top layer e não são cortados. */
+.gr-table .bt-table__row { content-visibility: auto; contain-intrinsic-size: auto var(--gr-row-height); }
 /* Shift+clique seleciona linhas, não texto; só a célula em edição permite selecionar. */
 .gr-table .gr-cell--editing, .gr-table .gr-cell--editing * { user-select: text; -webkit-user-select: text; }
 .gr-table .bt-table__row.is-selected { background-color: var(--bt-color-action-soft); }
