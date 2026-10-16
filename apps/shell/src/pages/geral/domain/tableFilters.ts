@@ -1,8 +1,11 @@
-import { emptyFilters, filtersToFetchXml, readFilters, storedFilters, type FilterCondition, type FilterField, type TableFilters } from '@betinhos/ui'
+import { emptyFilters, filtersToFetchXml, readFilters, type FilterCondition, type FilterField, type TableFilters } from '@betinhos/ui'
+import { decodeTableFilters as decodeShared } from '../../../app/filtersUrl'
 import { parse } from './fetch'
 import { decodeFilters, type Filter, type FilterSet } from './filters'
 import { filterKindOf } from './filterKind'
 import type { AttributeMap } from './types'
+
+export { encodeTableFilters, hasActiveFilters } from '../../../app/filtersUrl'
 
 /**
  * Ponte entre a Geral e os filtros do Design System (§10.9.2): campos filtráveis a partir da metadata, conversão do
@@ -78,41 +81,12 @@ export function fromLegacy(set: FilterSet, attributes: AttributeMap | null = nul
   return { ...emptyFilters(), quick }
 }
 
-export const hasActiveFilters = (filters: TableFilters) => Object.keys(filters.quick).length > 0 || filters.advanced.items.length > 0
-
-const toBase64Url = (text: string) => {
-  let binary = ''
-  for (const byte of new TextEncoder().encode(text)) binary += String.fromCharCode(byte)
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-const fromBase64Url = (text: string) => {
-  const base64 = text.trim().replace(/-/g, '+').replace(/_/g, '/')
-  const binary = atob(base64 + '='.repeat((4 - (base64.length % 4)) % 4))
-  return new TextDecoder().decode(Uint8Array.from(binary, (c) => c.charCodeAt(0)))
-}
-
-/** Filtros para a URL (`f=`): JSON em base64url; vazio quando não há filtro. */
-export function encodeTableFilters(filters: TableFilters): string {
-  return hasActiveFilters(filters) ? toBase64Url(JSON.stringify(storedFilters(filters))) : ''
-}
-
 /**
- * Lê `f=` nos dois formatos: o novo (`{quick, advanced}`) sai como veio, para ser conferido contra os campos quando a
- * metadata chegar; o antigo (um filtro por atributo) é convertido. Texto inválido vira "sem filtros".
+ * Lê `f=` nos dois formatos: o novo (comum às listas) e o antigo da Geral (um filtro por atributo), que é convertido.
+ * Texto inválido vira "sem filtros".
  */
 export function decodeTableFilters(text: string): TableFilters {
-  try {
-    const json: unknown = JSON.parse(fromBase64Url(text))
-    if (json && typeof json === 'object' && !Array.isArray(json) && ('quick' in json || 'advanced' in json)) {
-      const raw = json as Partial<TableFilters>
-      const base = emptyFilters()
-      return {
-        quick: raw.quick && typeof raw.quick === 'object' && !Array.isArray(raw.quick) ? raw.quick : {},
-        advanced: raw.advanced && typeof raw.advanced === 'object' && raw.advanced.type === 'group' ? { ...raw.advanced, id: 'raiz' } : base.advanced,
-      }
-    }
-  } catch { /* formato antigo ou inválido */ }
-  return fromLegacy(decodeFilters(text))
+  return decodeShared(text) ?? fromLegacy(decodeFilters(text))
 }
 
 /** Filtros conferidos contra os campos atuais (campo que sumiu, operador inválido e grupo fundo demais saem). */
