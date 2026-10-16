@@ -78,6 +78,13 @@ afterEach(() => {
 })
 
 const dataRows = () => screen.getAllByRole('row', { hidden: true })
+const colFilter = () => document.querySelector<HTMLElement>('.gr-colfilter')
+/** Painel "Filtrar por" da coluna (usa `popover`, que o jsdom deixa como display:none: o nome acessível sai vazio, então localiza pela classe). */
+async function openColumnFilter(name: RegExp, label: string) {
+  await columnMenu(name, 'Filtrar por…')
+  await waitFor(() => expect(colFilter()?.getAttribute('aria-label')).toBe(`Filtro da coluna ${label}`))
+  return colFilter() as HTMLElement
+}
 /** O título da coluna abre o menu (como no model-driven): escolhe um item dele. */
 const columnMenu = async (name: RegExp, item: string) => {
   fireEvent.click(screen.getByRole('button', { name, hidden: true }))
@@ -771,9 +778,13 @@ describe('Geral: espaço e densidade', () => {
     it('filtrar Status por Confirmado no painel da coluna reduz as linhas e cria o chip; remover restaura', async () => {
       render(<GeralPage host={{ mode: 'mock' }} />)
       await screen.findAllByText(PAGE1)
-      await columnMenu(/^Status de Operação$/, 'Filtrar por…')
-      fireEvent.click(await screen.findByRole('combobox', { name: 'Filtrar Status de Operação', hidden: true }))
+      const panel = await openColumnFilter(/^Status de Operação$/, 'Status de Operação')
+      expect(within(panel).getByRole('combobox', { name: 'Operador', hidden: true }).textContent).toContain('é um de')
+      expect(within(panel).getByRole('button', { name: 'Aplicar', hidden: true }).hasAttribute('disabled')).toBe(true)
+      fireEvent.click(within(panel).getByRole('combobox', { name: 'Valores de Status de Operação', hidden: true }))
       fireEvent.click(await screen.findByRole('option', { name: 'Confirmado', hidden: true }))
+      fireEvent.click(within(panel).getByRole('button', { name: 'Aplicar', hidden: true }))
+      await waitFor(() => expect(colFilter()).toBeNull())
       expect(await screen.findByText('Status de Operação: Confirmado')).toBeTruthy()
       await waitFor(() => expect(screen.queryAllByText(PAGE1)).toHaveLength(0))
       expect(viewTrigger().textContent).toContain('Alterada')
@@ -783,25 +794,36 @@ describe('Geral: espaço e densidade', () => {
       expect(viewTrigger().textContent).not.toContain('Alterada')
     }, 60_000)
 
-    it('Filtrar por… abre o painel ancorado ao título com o foco no campo; Esc fecha e devolve o foco', async () => {
+    it('Filtrar por… abre o painel com operador e valor; Aplicar grava, reabrir mostra o filtro ativo, Limpar tira', async () => {
       render(<GeralPage host={{ mode: 'mock' }} />)
       await screen.findAllByText(PAGE1)
-      await columnMenu(/^Trajeto$/, 'Filtrar por…')
-      // O painel usa `popover`, que o jsdom deixa como display:none: o nome acessível sai vazio, então localiza pela classe.
-      const colFilter = () => document.querySelector<HTMLElement>('.gr-colfilter')
-      await waitFor(() => expect(colFilter()?.getAttribute('aria-label')).toBe('Filtro da coluna Trajeto'))
-      const panel = colFilter() as HTMLElement
-      await waitFor(() => expect(document.activeElement?.getAttribute('aria-label')).toBe('Filtrar Trajeto'))
+      let panel = await openColumnFilter(/^Trajeto$/, 'Trajeto')
+      expect(within(panel).queryByRole('status', { hidden: true })).toBeNull()
       expect(within(panel).getByRole('button', { name: 'Limpar', hidden: true }).hasAttribute('disabled')).toBe(true)
-      fireEvent.change(document.activeElement as HTMLInputElement, { target: { value: '^Galeão' } })
-      fireEvent.keyDown(document.activeElement as HTMLInputElement, { key: 'Enter' })
+      // Operador do tipo texto, como no model-driven: troca para "começa com".
+      fireEvent.click(within(panel).getByRole('combobox', { name: 'Operador', hidden: true }))
+      fireEvent.click(await screen.findByRole('option', { name: 'começa com', hidden: true }))
+      const text = within(panel).getByRole('textbox', { name: 'Texto de Trajeto', hidden: true })
+      fireEvent.change(text, { target: { value: 'Galeão' } })
+      fireEvent.keyDown(text, { key: 'Enter' })
+      await waitFor(() => expect(colFilter()).toBeNull())
       expect(await screen.findByText('Trajeto: começa com Galeão')).toBeTruthy()
       await waitFor(() => expect(window.location.hash).toContain('f='))
-      await waitFor(() => expect(within(panel).getByRole('button', { name: 'Limpar', hidden: true }).hasAttribute('disabled')).toBe(false))
+      expect(document.activeElement?.textContent).toContain('Trajeto')
+      // Reabrir: mostra o filtro ativo e a condição já preenchida.
+      panel = await openColumnFilter(/^Trajeto$/, 'Trajeto')
+      expect(within(panel).getByRole('status', { hidden: true }).textContent).toBe('Filtro ativo: Trajeto: começa com Galeão')
+      expect(within(panel).getByRole('combobox', { name: 'Operador', hidden: true }).textContent).toContain('começa com')
+      expect((within(panel).getByRole('textbox', { name: 'Texto de Trajeto', hidden: true }) as HTMLInputElement).value).toBe('Galeão')
+      // Esc fecha sem mexer no filtro.
       fireEvent.keyDown(panel, { key: 'Escape' })
       await waitFor(() => expect(colFilter()).toBeNull())
-      expect(document.activeElement?.textContent).toContain('Trajeto')
       expect(screen.getByText('Trajeto: começa com Galeão')).toBeTruthy()
+      // Limpar tira o filtro e fecha.
+      panel = await openColumnFilter(/^Trajeto$/, 'Trajeto')
+      fireEvent.click(within(panel).getByRole('button', { name: 'Limpar', hidden: true }))
+      await waitFor(() => expect(colFilter()).toBeNull())
+      await waitFor(() => expect(screen.queryByText('Trajeto: começa com Galeão')).toBeNull())
     }, 60_000)
 
     it('o painel Filtros aplica uma condição avançada, conta no botão e Limpar filtros tira tudo', async () => {
@@ -1020,9 +1042,10 @@ describe('Geral: visões pessoais e link compartilhável', () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
     // Filtro avulso: Status = Confirmado.
-    await columnMenu(/^Status de Operação$/, 'Filtrar por…')
-    fireEvent.click(await screen.findByRole('combobox', { name: 'Filtrar Status de Operação', hidden: true }))
+    const panel = await openColumnFilter(/^Status de Operação$/, 'Status de Operação')
+    fireEvent.click(within(panel).getByRole('combobox', { name: 'Valores de Status de Operação', hidden: true }))
     fireEvent.click(await screen.findByRole('option', { name: 'Confirmado', hidden: true }))
+    fireEvent.click(within(panel).getByRole('button', { name: 'Aplicar', hidden: true }))
     await screen.findByText('Status de Operação: Confirmado')
 
     await saveAs('Confirmados')
