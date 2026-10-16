@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { MOCK_ROW_COUNT } from './data/mock'
 import { createSource, type Source } from './data/source'
 import { SAVED_VISIBLE_MS } from './domain/edit'
-import type { Filter } from './domain/filters'
+import { emptyFilters, type FilterCondition } from '@betinhos/ui'
 import { useGeral } from './useGeral'
 
 // O mock sem latência (`latency: 0`); com a suíte inteira em paralelo a máquina fica lenta.
@@ -320,7 +320,8 @@ describe('useGeral: rolagem infinita', () => {
 
   describe('filtros e estado da URL', () => {
     const CANCELADO = 202410002
-    const status: Filter = { kind: 'choice', op: 'in', values: [CANCELADO] }
+    const status: FilterCondition = { type: 'condition', id: 'rapido-cr40f_status', field: 'cr40f_status', op: 'in', values: [{ value: String(CANCELADO), label: 'Cancelado' }] }
+    const withStatus = { ...emptyFilters(), quick: { cr40f_status: status } }
     const make = () => createSource({ mode: 'mock' }, { latency: 0 })
 
     it('filtro de status reduz as linhas e limpar volta a 100', async () => {
@@ -329,7 +330,7 @@ describe('useGeral: rolagem infinita', () => {
       await waitFor(() => expect(result.current.attributes).not.toBeNull())
       act(() => result.current.toggle(idOf(result.current.rows[0])))
       expect(result.current.selected.size).toBe(1)
-      act(() => result.current.setFilter('cr40f_status', status))
+      act(() => result.current.setQuickFilter('cr40f_status', status))
       await waitFor(() => expect(result.current.rows.length).toBeLessThan(100))
       await waitFor(() => expect(result.current.loading).toBe(false))
       expect(result.current.rows.length).toBeGreaterThan(0)
@@ -338,22 +339,22 @@ describe('useGeral: rolagem infinita', () => {
       expect(result.current.total).toBe(result.current.rows.length)
       act(() => result.current.clearFilters())
       await waitFor(() => expect(result.current.rows.length).toBe(100))
-      expect(result.current.filters).toEqual({})
+      expect(result.current.filters).toEqual(emptyFilters())
     })
 
-    it('setFilter com null ou filtro vazio remove o filtro sem recarregar', async () => {
+    it('filtro rápido com null remove o filtro; sem filtro, limpar não recarrega', async () => {
       const source = make()
       const page = vi.fn(source.page)
       const { result } = renderHook(() => useGeral({ ...source, page }))
       await waitFor(() => expect(result.current.rows.length).toBe(100))
       await waitFor(() => expect(result.current.attributes).not.toBeNull())
-      act(() => result.current.setFilter('cr40f_status', status))
+      act(() => result.current.setQuickFilter('cr40f_status', status))
       await waitFor(() => expect(result.current.rows.length).toBeLessThan(100))
-      act(() => result.current.setFilter('cr40f_status', { kind: 'choice', op: 'in', values: [] }))
+      act(() => result.current.setQuickFilter('cr40f_status', null))
       await waitFor(() => expect(result.current.rows.length).toBe(100))
-      expect(result.current.filters).toEqual({})
+      expect(result.current.filters).toEqual(emptyFilters())
       const calls = page.mock.calls.length
-      act(() => result.current.setFilter('cr40f_status', null))
+      act(() => result.current.setQuickFilter('cr40f_status', null))
       act(() => result.current.clearFilters())
       await sleep(50)
       expect(page.mock.calls.length).toBe(calls)
@@ -362,14 +363,14 @@ describe('useGeral: rolagem infinita', () => {
     it('trocar de visão limpa os filtros', async () => {
       const { result } = renderHook(() => useGeral(make()))
       await waitFor(() => expect(result.current.rows.length).toBe(100))
-      act(() => result.current.setFilter('cr40f_status', status))
-      expect(Object.keys(result.current.filters)).toEqual(['cr40f_status'])
+      act(() => result.current.setQuickFilter('cr40f_status', status))
+      expect(Object.keys(result.current.filters.quick)).toEqual(['cr40f_status'])
       act(() => result.current.selectView('mock-hoje'))
-      expect(result.current.filters).toEqual({})
+      expect(result.current.filters).toEqual(emptyFilters())
     })
 
     it('estado inicial da URL aplica visão, busca, ordem e filtros', async () => {
-      const initial = { view: 'mock-sem-motorista', q: 'OS-1', sort: { attribute: 'cr40f_id', alias: null, descending: true }, filters: { cr40f_status: status } }
+      const initial = { view: 'mock-sem-motorista', q: 'OS-1', sort: { attribute: 'cr40f_id', alias: null, descending: true }, filters: withStatus }
       const { result } = renderHook(() => useGeral(make(), { initial }))
       await waitFor(() => expect(result.current.view?.id).toBe('mock-sem-motorista'))
       await waitFor(() => expect(result.current.loading).toBe(false))
@@ -384,7 +385,7 @@ describe('useGeral: rolagem infinita', () => {
     it('com filtro inicial a primeira consulta espera a metadata e já sai filtrada', async () => {
       const source = make()
       const page = vi.fn(source.page)
-      const { result } = renderHook(() => useGeral({ ...source, page }, { initial: { filters: { cr40f_status: status } } }))
+      const { result } = renderHook(() => useGeral({ ...source, page }, { initial: { filters: withStatus } }))
       await waitFor(() => expect(result.current.loading).toBe(false))
       expect(page).toHaveBeenCalledTimes(1)
       expect(page.mock.calls[0][0].fetchxml).toContain('cr40f_status')
@@ -406,10 +407,10 @@ describe('useGeral: rolagem infinita', () => {
       expect(onStateChange).toHaveBeenLastCalledWith({ view: 'mock-agenda' })
       act(() => result.current.setQuery('OS-10'))
       act(() => result.current.setSort({ attribute: 'cr40f_id', alias: null, descending: false }))
-      act(() => result.current.setFilter('cr40f_status', status))
+      act(() => result.current.setQuickFilter('cr40f_status', status))
       await waitFor(() => expect(onStateChange).toHaveBeenCalledTimes(4))
       expect(onStateChange).toHaveBeenLastCalledWith({
-        view: 'mock-agenda', q: 'OS-10', sort: { attribute: 'cr40f_id', alias: null, descending: false }, filters: { cr40f_status: status },
+        view: 'mock-agenda', q: 'OS-10', sort: { attribute: 'cr40f_id', alias: null, descending: false }, filters: withStatus,
       })
       await sleep(50)
       expect(onStateChange).toHaveBeenCalledTimes(4)
