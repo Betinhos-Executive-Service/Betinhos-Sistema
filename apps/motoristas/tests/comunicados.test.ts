@@ -16,6 +16,7 @@ import {
   getRecipientStatusLabel,
   matchesRecipientFilter,
   isComunicadoPending,
+  loadDriverComunicado,
   loadDriverComunicados,
   loadGestaoComunicados,
   loadMotoristasElegiveis,
@@ -158,6 +159,9 @@ test("localhost sem servidor mock usa comunicados em memória no navegador", asy
   try {
     const recebidos = await loadDriverComunicados();
     assert.equal(recebidos.length, 2);
+    // Caminho rápido do deep link: lê um destinatário pelo ID (com chaves/maiúsculas) e devolve null se não existir.
+    assert.equal((await loadDriverComunicado(`{${recebidos[0].id.toUpperCase()}}`))?.id, recebidos[0].id);
+    assert.equal(await loadDriverComunicado("00000000-0000-4000-8000-000000000000"), null);
     const ciencia = recebidos.find((item) => item.tipo === COMUNICADO_TIPO.ciencia)!;
     await assinarComunicado(ciencia.id, [[[0.1, 0.1], [0.5, 0.5]]], "Ok");
     const assinado = (await loadDriverComunicados()).find((item) => item.id === ciencia.id)!;
