@@ -6,7 +6,7 @@ import { createSource } from './source'
 
 const RESERVA = 'aaaaaaaa-0000-4000-8000-000000000002'
 const MOTORISTA = 'bbbbbbbb-0000-4000-8000-000000000001'
-const SETS: Record<string, string> = { cr40f_reservadeveculos: 'cr40f_reservadeveculoses', cr40f_plannertarefa: 'cr40f_plannertarefas' }
+const SETS: Record<string, string> = { cr40f_reservadeveculos: 'cr40f_reservadeveculoses', cr40f_plannertarefa: 'cr40f_plannertarefas', cr40f_agenteexecucao: 'cr40f_agenteexecucaos' }
 
 function fakeHost(opts: { reserva?: Row; pendencias?: Row[] } = {}) {
   const request = vi.fn(async (_path: string) => opts.reserva ?? {})
@@ -48,5 +48,22 @@ describe('createSource (Dataverse) executarAcao', () => {
     const f = fakeHost()
     await createSource(f.host).executarAcao(pendencia)
     expect(f.create).toHaveBeenCalledWith('cr40f_plannertarefas', expect.objectContaining({ cr40f_titulo: 'Emitir recibo', cr40f_codigoorigem: 'agente:p2' }))
+  })
+})
+
+describe('origem da execução', () => {
+  it('lê "(ao abrir)" no nome como origem Ao abrir; Agendado vem do choice', async () => {
+    const { mapExecucao } = await import('./queries')
+    expect(mapExecucao({ cr40f_agenteexecucaoid: 'e1', cr40f_origem: 100000001, cr40f_agenteexecucaonome: 'logistica 18/10/2026 18:58:00 (ao abrir)' }).origem).toBe('ao_abrir')
+    expect(mapExecucao({ cr40f_agenteexecucaoid: 'e2', cr40f_origem: 100000001, cr40f_agenteexecucaonome: 'logistica 18/10/2026 18:58:00' }).origem).toBe('manual')
+    expect(mapExecucao({ cr40f_agenteexecucaoid: 'e3', cr40f_origem: 100000000, cr40f_agenteexecucaonome: 'Financeiro 18/10 (agendado)' }).origem).toBe('agendado')
+  })
+
+  it('criar com origem ao_abrir grava o sufixo no nome e mantém o choice Manual', async () => {
+    const { host, create } = fakeHost()
+    await createSource(host).criar('logistica', '', 'ao_abrir')
+    const payload = (create.mock.calls[0] as unknown[])[1] as Row
+    expect(String(payload.cr40f_agenteexecucaonome)).toMatch(/\(ao abrir\)$/)
+    expect(payload.cr40f_origem).toBe(100000001)
   })
 })

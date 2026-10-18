@@ -6,7 +6,7 @@ export const ENTITY_EXECUCAO = 'cr40f_agenteexecucao'
 export const ENTITY_PROPOSTA = 'cr40f_agenteproposta'
 export const AGENTE_VALOR: Record<Agente, number> = { financeiro: 100000000, logistica: 100000001, pessoas: 100000002 }
 
-const SELECT_EXEC = ['cr40f_agenteexecucaoid', 'cr40f_agente', 'cr40f_origem', 'cr40f_pergunta', 'cr40f_status', 'cr40f_erro', 'cr40f_resumo', 'cr40f_modelo', 'cr40f_tokensentrada', 'cr40f_tokenssaida', 'createdon']
+const SELECT_EXEC = ['cr40f_agenteexecucaoid', 'cr40f_agenteexecucaonome', 'cr40f_agente', 'cr40f_origem', 'cr40f_pergunta', 'cr40f_status', 'cr40f_erro', 'cr40f_resumo', 'cr40f_modelo', 'cr40f_tokensentrada', 'cr40f_tokenssaida', 'createdon']
 const SELECT_PROP = ['cr40f_agentepropostaid', '_cr40f_execucao_value', 'cr40f_tipo', 'cr40f_titulo', 'cr40f_justificativa', 'cr40f_prioridade', 'cr40f_entidadealvo', 'cr40f_idalvo', 'cr40f_acao', 'cr40f_decisao', 'cr40f_motivodescarte', '_cr40f_decididopor_value', 'cr40f_decididoem']
 
 export const execucoesPath = (set: string, agente: Agente, top: number) => `${set}?$select=${SELECT_EXEC.join(',')}&$filter=${encodeURIComponent(`cr40f_agente eq ${AGENTE_VALOR[agente]}`)}&$orderby=createdon%20desc&$top=${top}`
@@ -17,13 +17,17 @@ const str = (v: unknown) => (typeof v === 'string' ? v : '')
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 const date = (v: unknown) => { const d = typeof v === 'string' && v ? new Date(v) : null; return d && !Number.isNaN(d.getTime()) ? d : null }
 const fmt = (row: Row, campo: string) => str(row[`${campo}@OData.Community.Display.V1.FormattedValue`])
+/** Execução criada sozinha ao abrir a tela: o choice Origem só tem Agendado/Manual, então o nome leva este sufixo. */
+export const SUFIXO_AO_ABRIR_TEXTO = '(ao abrir)'
+const SUFIXO_AO_ABRIR = /\(ao abrir\)\s*$/i
+
 const STATUS: Record<number, Execucao['status']> = { 100000000: 'pendente', 100000001: 'processando', 100000002: 'concluida', 100000003: 'erro' }
 const PRIORIDADE: Record<number, Proposta['prioridade']> = { 100000000: 'alta', 100000001: 'media', 100000002: 'baixa' }
 const DECISAO: Record<number, Proposta['decisao']> = { 100000000: 'pendente', 100000001: 'aprovada', 100000002: 'descartada' }
 
 export function mapExecucao(row: Row): Execucao {
   return {
-    id: cleanId(str(row.cr40f_agenteexecucaoid)), agente: agentePorValor(num(row.cr40f_agente)), origem: num(row.cr40f_origem) === 100000000 ? 'agendado' : 'manual',
+    id: cleanId(str(row.cr40f_agenteexecucaoid)), agente: agentePorValor(num(row.cr40f_agente)), origem: num(row.cr40f_origem) === 100000000 ? 'agendado' : SUFIXO_AO_ABRIR.test(str(row.cr40f_agenteexecucaonome)) ? 'ao_abrir' : 'manual',
     pergunta: str(row.cr40f_pergunta), status: STATUS[num(row.cr40f_status) ?? -1] ?? 'erro', erro: str(row.cr40f_erro), resumo: str(row.cr40f_resumo), modelo: str(row.cr40f_modelo),
     tokensEntrada: num(row.cr40f_tokensentrada) ?? 0, tokensSaida: num(row.cr40f_tokenssaida) ?? 0, criadaEm: date(row.createdon),
   }

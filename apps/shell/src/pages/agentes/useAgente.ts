@@ -49,12 +49,12 @@ export function useAgente(source: Source, agente: Agente) {
     return () => clearTimeout(timer)
   }, [state.polling, state.atual, carregar])
 
-  const analisar = useCallback(async (pergunta: string) => {
+  const analisar = useCallback(async (pergunta: string, origem: 'manual' | 'ao_abrir' = 'manual') => {
     const atual = state.atual
     if (atual && (atual.status === 'pendente' || atual.status === 'processando')) { setState((s) => ({ ...s, polling: true })); return }
     setState((s) => ({ ...s, polling: true, error: null }))
     try {
-      const id = await source.criar(agente, pergunta.trim())
+      const id = await source.criar(agente, pergunta.trim(), origem)
       await carregar(id)
     } catch (r) { setState((s) => ({ ...s, polling: false, error: message(r) })) }
   }, [source, agente, state.atual, carregar])
