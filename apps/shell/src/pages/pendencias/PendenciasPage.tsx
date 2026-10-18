@@ -47,6 +47,7 @@ function Pendencias({ host }: Props) {
 
   const { view, filters, quickFilters, clearFilters } = useListView({
     host,
+    defaultName: 'Todas as pendências',
     tela: TELA,
     columns: PENDENCIA_COLUMNS,
     defaultSort: PENDENCIA_SORT,
