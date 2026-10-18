@@ -2,7 +2,7 @@ import { CONFIG_VERSION, emptyFilters, normalizeSearch, type FilterCondition, ty
 import { sortRows } from '../../../app/listSort'
 import { label } from '../../pagantes/domain/status'
 import { EM_ABERTO, OP_STATUS } from './status'
-import type { Op, OpChoices } from './types'
+import { valorOp, type Op, type OpChoices } from './types'
 
 /**
  * A lista de Ordens de Pagamento no padrão do Design System (§10.9.1 e §10.9.2): colunas da visão, campos de filtro,
@@ -45,7 +45,7 @@ export function readOp(op: Op, key: string): unknown {
     case 'op': return [op.codigo, op.cliente].filter(Boolean).join(' ')
     case 'servicos': return op.primeiroServico
     case 'passageiros': return op.passageiros
-    case 'valor': return op.valor
+    case 'valor': return valorOp(op)
     case 'status': return op.status == null ? null : String(op.status)
     case 'criada': return op.criadoEm
     case 'cliente': return op.cliente
@@ -74,7 +74,7 @@ export function sortOps(list: Op[], sort: ViewSort | null, choices: OpChoices) {
       case 'op': return codigoNum(op.codigo) ?? (op.codigo || null)
       case 'servicos': return op.primeiroServico?.getTime()
       case 'passageiros': return op.passageiros
-      case 'valor': return op.valor
+      case 'valor': return valorOp(op)
       case 'status': return op.status == null ? null : label(choices.status, op.status, '')
       case 'criada': return op.criadoEm?.getTime()
       default: return null

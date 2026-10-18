@@ -4,7 +4,7 @@ import { openFromRow } from '../../pagantes/components/PagantesList'
 import { formatDate, formatMoney } from '../../pagantes/domain/messages'
 import { label } from '../../pagantes/domain/status'
 import { opTone } from '../domain/status'
-import type { Op, OpChoices } from '../domain/types'
+import { valorOp, type Op, type OpChoices } from '../domain/types'
 
 type Props = { list: Op[]; choices: OpChoices; onOpen: (id: string) => void; loading?: boolean }
 type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; footer?: ReactNode; empty?: ReactNode }
@@ -41,7 +41,7 @@ export function OpsTable({ list, choices, onOpen, loading, view, quickFilters, f
     { key: 'op', header: 'OP', label: 'OP', sortable: true, defaultWidth: 220, width: 'minmax(160px, 1.3fr)', cell: (op) => <OpenName op={op} onOpen={onOpen} /> },
     { key: 'servicos', header: 'Serviços', label: 'Serviços', sortable: true, defaultWidth: 200, width: 'minmax(130px, 1fr)', cell: (op) => <span className="pg-num">{periodo(op)}</span> },
     { key: 'passageiros', header: 'Passageiros', label: 'Passageiros', sortable: true, defaultWidth: 240, width: 'minmax(160px, 1.4fr)', hideBelow: 'compact', cell: (op) => passageirosCurto(op.passageiros) || '—' },
-    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 130, width: 'minmax(104px, .8fr)', align: 'end', cell: (op) => <span className="pg-num">{formatMoney(op.valor)}</span> },
+    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 130, width: 'minmax(104px, .8fr)', align: 'end', cell: (op) => <span className="pg-num" title={op.valor == null && op.valorServicos != null ? 'Soma dos serviços' : undefined}>{formatMoney(valorOp(op))}</span> },
     { key: 'status', header: 'Status', label: 'Status', sortable: true, defaultWidth: 180, width: 'minmax(150px, 1fr)', cell: (op) => <OpBadge op={op} choices={choices} /> },
     { key: 'criada', header: 'Criada em', label: 'Criada em', sortable: true, defaultWidth: 130, width: 'minmax(88px, .7fr)', hideBelow: 'compact', cell: (op) => formatDate(op.criadoEm) },
   ]
@@ -61,7 +61,7 @@ export function OpsCards({ list, choices, onOpen }: Props) {
           <button type="button" className="pg-card__open" onClick={() => onOpen(op.id)}>
             <span className="pg-card__top">
               <strong className="pg-card__name">{op.codigo || 'OP sem código'}</strong>
-              <span className="pg-num pg-card__value">{formatMoney(op.valor)}</span>
+              <span className="pg-num pg-card__value">{formatMoney(valorOp(op))}</span>
             </span>
             <span className="pg-card__meta">{[op.cliente, periodo(op)].filter(Boolean).join(' · ')}</span>
           </button>

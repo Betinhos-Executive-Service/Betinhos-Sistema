@@ -1,5 +1,43 @@
-import { cleanId, formatted, type Row } from '@betinhos/dataverse'
+import { chunk, cleanId, formatted, type DataverseClient, type Row } from '@betinhos/dataverse'
 import type { Op } from '../domain/types'
+
+const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Valor de cada OP pela composição de preços dos serviços, na mesma regra do detalhe (`loadServicos` + `totalOp`):
+ * soma as composições ativas de cada serviço; a OP fica null se não tem serviço ou se algum serviço não tem composição.
+ * Duas consultas por bloco de 15 OPs (reservas e composições, filtradas pela OP do serviço).
+ */
+export async function loadValoresServicos(client: DataverseClient, sets: { reserva: string; composicao: string }, opIds: string[]) {
+  const ids = [...new Set(opIds.map((id) => cleanId(id)).filter((id) => GUID.test(id)))]
+  const servicosPorOp = new Map<string, string[]>()
+  const valorPorServico = new Map<string, number>()
+  for (const part of chunk(ids, 15)) {
+    const porOp = part.map((id) => `_cr40f_financeiro_value eq ${id}`).join(' or ')
+    const porServico = part.map((id) => `cr40f_ServicoRelacionadoGeral/_cr40f_financeiro_value eq ${id}`).join(' or ')
+    const [reservas, composicoes] = await Promise.all([
+      client.getAll(`${sets.reserva}?$select=cr40f_reservadeveculosid,_cr40f_financeiro_value&$filter=${encodeURIComponent(porOp)}`),
+      client.getAll(`${sets.composicao}?$select=new_valortotal,_cr40f_servicorelacionadogeral_value&$filter=${encodeURIComponent(`statecode eq 0 and (${porServico})`)}`),
+    ])
+    for (const r of reservas) {
+      const op = cleanId(String(r._cr40f_financeiro_value ?? '')).toLowerCase()
+      const servico = cleanId(String(r.cr40f_reservadeveculosid ?? '')).toLowerCase()
+      if (op && servico) servicosPorOp.set(op, [...(servicosPorOp.get(op) ?? []), servico])
+    }
+    for (const c of composicoes) {
+      const servico = cleanId(String(c._cr40f_servicorelacionadogeral_value ?? '')).toLowerCase()
+      const valor = typeof c.new_valortotal === 'number' && Number.isFinite(c.new_valortotal) ? c.new_valortotal : 0
+      if (servico) valorPorServico.set(servico, (valorPorServico.get(servico) ?? 0) + valor)
+    }
+  }
+  const valores = new Map<string, number | null>()
+  for (const id of ids) {
+    const servicos = servicosPorOp.get(id.toLowerCase()) ?? []
+    const completo = servicos.length > 0 && servicos.every((s) => valorPorServico.has(s))
+    valores.set(id.toLowerCase(), completo ? Math.round(servicos.reduce((sum, s) => sum + valorPorServico.get(s)!, 0) * 100) / 100 : null)
+  }
+  return valores
+}
 
 export const ENTITY_OP = 'cr40f_financeiro'
 
