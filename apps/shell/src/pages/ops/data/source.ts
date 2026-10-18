@@ -4,7 +4,10 @@ import type { KV } from '../../pagantes/domain/filters'
 import { OP_STATUS, withOpFallback } from '../domain/status'
 import type { Op, OpChoices } from '../domain/types'
 import { createMockOps } from './mock'
-import { ENTITY_OP, mapOp, opsPath } from './queries'
+import { ENTITY_OP, loadValoresServicos, mapOp, opsPath } from './queries'
+
+const ENTITY_RESERVA = 'cr40f_reservadeveculos'
+const ENTITY_COMPOSICAO = 'cr40f_composicaodeprecos'
 
 /** Tudo que a tela precisa do mundo externo. Rateio, serviços e contatos vêm do Source de Pagantes. */
 export type Source = {
@@ -47,7 +50,20 @@ export function createSource(host: Host): Source {
 
   return {
     mock: false,
-    load: async (since) => (await host.client.getAll(opsPath(await entitySet(), since))).map(mapOp),
+    async load(since) {
+      const ops = (await host.client.getAll(opsPath(await entitySet(), since))).map(mapOp)
+      // O valor vem dos serviços; se essa parte falhar, a lista abre do mesmo jeito (valor "—").
+      try {
+        const info = await host.metadata.entities([ENTITY_RESERVA, ENTITY_COMPOSICAO])
+        const reserva = info.get(ENTITY_RESERVA)?.entitySetName
+        const composicao = info.get(ENTITY_COMPOSICAO)?.entitySetName
+        if (!reserva || !composicao) return ops
+        const valores = await loadValoresServicos(host.client, { reserva, composicao }, ops.map((op) => op.id))
+        return ops.map((op) => ({ ...op, valorServicos: valores.get(op.id.toLowerCase()) ?? null }))
+      } catch {
+        return ops
+      }
+    },
     // Rótulo é acessório: metadata fora do ar cai nos rótulos conhecidos.
     async choices() {
       const [status, idioma] = await Promise.all(['cr40f_status', 'cr40f_idioma'].map((attribute) => host.metadata.choices(ENTITY_OP, attribute).catch(() => [])))
