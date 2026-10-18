@@ -2,6 +2,8 @@ import { CP, FAT, OP, PAG, RESERVA_CONCLUIDA } from './codes'
 import type { OpResumo, PaganteResumo, Pendencia, Reserva, TipoPendencia } from './types'
 
 const cents = (v: number | null | undefined) => Math.round((v ?? 0) * 100)
+const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
+const brl = (v: number) => BRL.format(v)
 const isPago = (s: number | null) => s === PAG.pago || s === PAG.autorizado
 /** 'AAAA-MM' no fuso de São Paulo (UTC-3, sem horário de verão). */
 export const mesSP = (d: Date) => new Date(d.getTime() - 3 * 3600e3).toISOString().slice(0, 7)
@@ -43,7 +45,7 @@ export function detectarPendencias(ops: OpResumo[], reservas: Reserva[], pagante
     if (o.status !== OP.cancelada && ativos.length) {
       const total = o.valor ?? (rs.length && rs.every((r) => r.cpId) ? rs.reduce((s, r) => s + (r.cpValor ?? 0), 0) : null)
       const soma = ativos.reduce((s, p) => s + cents(p.valor), 0)
-      if (total != null && soma !== cents(total)) push('rateio-nao-fecha', o, rs, `Rateio ${(soma / 100).toFixed(2)} × total ${total.toFixed(2)}`, false)
+      if (total != null && soma !== cents(total)) push('rateio-nao-fecha', o, rs, `Rateio ${brl(soma / 100)} × total ${brl(total)}`, false)
     }
   }
 

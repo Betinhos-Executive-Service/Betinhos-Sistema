@@ -1,6 +1,6 @@
 import { Table, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
 import type { ReactNode } from 'react'
-import { ASO_VALIDADE_MESES } from '../data/alerts'
+import { ASO_VALIDADE_MESES, rotuloCurto } from '../data/alerts'
 import { addMonths, formatBR } from '../data/dates'
 import { contato } from '../data/lista'
 import { FUNCAO, optionLabel } from '../data/schema'
@@ -44,14 +44,14 @@ export function FuncionarioTable({ rows, onOpen, loading, view, quickFilters, fo
     {
       key: 'cnh', header: 'CNH', label: 'CNH', sortable: true, defaultWidth: 150, cell: (row) => {
         const cnh = row.alertas.find((alerta) => alerta.kind === 'cnh')
-        return <span className="nowrap">{cnh ? <AlertBadge alerta={cnh} /> : formatBR(row.values.cr40f_validadedacnh as string) || muted}</span>
+        return <span className="nowrap">{cnh ? <AlertBadge alerta={cnh} text={rotuloCurto(cnh)} /> : formatBR(row.values.cr40f_validadedacnh as string) || muted}</span>
       },
     },
     {
       key: 'aso', header: 'ASO vence', label: 'ASO vence', sortable: true, defaultWidth: 150, cell: (row) => {
         const aso = row.alertas.find((alerta) => alerta.kind === 'aso')
         const data = row.values.cr40f_datadoaso as string | null
-        return <span className="nowrap">{aso ? <AlertBadge alerta={aso} /> : data ? formatBR(addMonths(data, ASO_VALIDADE_MESES)) : muted}</span>
+        return <span className="nowrap">{aso ? <AlertBadge alerta={aso} text={rotuloCurto(aso)} /> : data ? formatBR(addMonths(data, ASO_VALIDADE_MESES)) : muted}</span>
       },
     },
     { key: 'admissao', header: 'Admissão', label: 'Admissão', sortable: true, defaultWidth: 120, cell: (row) => <span className="nowrap">{formatBR(row.values.cr40f_datadeadmissao as string) || muted}</span> },
