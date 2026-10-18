@@ -25,6 +25,14 @@ type AlertSource = {
   aniversario: string | null
 }
 
+/** Rótulo para as colunas CNH e ASO, que já dizem o documento: cabe na célula sem cortar a data. O completo fica na dica. */
+export function rotuloCurto(alerta: Alerta) {
+  if (alerta.kind !== 'cnh' && alerta.kind !== 'aso') return alerta.label
+  if (alerta.level === 'vencido') return `Venceu ${formatBR(alerta.date)}`
+  const semDocumento = alerta.label.replace(/^(CNH|ASO) /, '')
+  return semDocumento.charAt(0).toUpperCase() + semDocumento.slice(1)
+}
+
 function vencimento(kind: 'cnh' | 'aso', date: string, today: string): Alerta | null {
   const days = daysBetween(today, date)
   const nome = kind === 'cnh' ? 'CNH' : 'ASO'
