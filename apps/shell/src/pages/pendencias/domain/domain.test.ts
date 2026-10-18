@@ -50,6 +50,11 @@ describe('detectarPendencias', () => {
     expect(p.map((x) => x.tipo)).toEqual(['rateio-nao-fecha'])
   })
 
+  it('tipo 5: detalhe em reais', () => {
+    const p = detectarPendencias([op('1', OP.pendente, 1257)], [res('a', '1', FAT.pagamentoPendente)], [pag('1', PAG.pendente, 12)])
+    expect(p[0].detalhe.replace(/ /g, ' ')).toBe('Rateio R$ 12,00 × total R$ 1.257,00')
+  })
+
   it('tipo 5 usa a soma das CPs quando a OP não tem valor e ignora OP sem pagante', () => {
     expect(detectarPendencias([op('1', OP.pendente, null)], [res('a', '1', FAT.pagamentoPendente, CP.pendente, 1000)], [pag('1', PAG.pendente, 1000)])).toEqual([])
     expect(detectarPendencias([op('2', OP.aberta, 1000)], [res('b', '2', FAT.pendente)], [])).toEqual([])
