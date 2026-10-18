@@ -47,6 +47,7 @@ function Ops({ host }: { host: Host }) {
 
   const { view, filters, quickFilters, clearFilters } = useListView({
     host,
+    defaultName: 'Todas as OPs',
     tela: TELA,
     columns: OP_COLUMNS,
     defaultSort: OP_SORT,
