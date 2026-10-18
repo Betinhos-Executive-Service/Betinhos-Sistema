@@ -30,6 +30,7 @@ function Infracoes({ host }: { host: Host }) {
   // Visões, colunas e filtros (DS §10.9.1/§10.9.2); a Visão padrão mostra só as ativas. Busca em `q`, filtros em `f=`.
   const { view, filters, quickFilters, clearFilters } = useListView({
     host,
+    defaultName: 'Infrações ativas',
     tela: TELA,
     columns: INFRACAO_COLUMNS,
     defaultSort: INFRACAO_SORT,

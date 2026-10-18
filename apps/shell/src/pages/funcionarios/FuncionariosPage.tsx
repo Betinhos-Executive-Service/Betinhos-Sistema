@@ -89,6 +89,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   // Busca (`q`) e chips de alerta (`alerta`) ficam fora da visão; os filtros vão em `f=`.
   const lista = useListView({
     host,
+    defaultName: 'Funcionários',
     tela: TELA,
     columns: FUNCIONARIO_COLUMNS,
     defaultSort: FUNCIONARIO_SORT,

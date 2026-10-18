@@ -38,6 +38,7 @@ function Pessoas({ host }: { host: Host }) {
 
   const { view, filters: valid, quickFilters, clearFilters } = useListView({
     host,
+    defaultName: 'Todas as pessoas',
     tela: TELA,
     columns: PESSOA_COLUMNS,
     defaultSort: { key: 'nome', dir: 'asc' },
