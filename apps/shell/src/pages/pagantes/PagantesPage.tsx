@@ -43,6 +43,7 @@ function Pagantes({ host }: { host: Host }) {
 
   const { view, filters, quickFilters, clearFilters } = useListView({
     host,
+    defaultName: 'Todos os pagantes',
     tela: TELA,
     columns: PAGANTE_COLUMNS,
     defaultSort: PAGANTE_SORT,

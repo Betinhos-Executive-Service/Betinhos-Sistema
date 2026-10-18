@@ -43,6 +43,7 @@ function Despesas({ host }: { host: Host }) {
 
   const { view, filters, quickFilters, clearFilters } = useListView({
     host,
+    defaultName: 'Todas as despesas',
     tela: TELA,
     columns: DESPESA_COLUMNS,
     defaultSort: { key: 'data', dir: 'desc' },
