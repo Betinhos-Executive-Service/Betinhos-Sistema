@@ -68,7 +68,8 @@ export function RouteLayout({ host, group, item, label }: Props) {
     )
   }
 
-  if (item.kind === 'webresource') return <Frame src={`${host.clientUrl}/WebResources/${item.resource}`} title={label} />
+  // `host=shell`: a tela legada sabe que está dentro do shell e recolhe a própria barra lateral e o rodapé de versão.
+  if (item.kind === 'webresource') return <Frame src={`${host.clientUrl}/WebResources/${item.resource}${item.resource.includes('?') ? '&' : '?'}host=shell`} title={label} />
   if (item.kind === 'entity') return <EntityFrame host={host} entity={item.entity} title={label} />
   return null
 }
