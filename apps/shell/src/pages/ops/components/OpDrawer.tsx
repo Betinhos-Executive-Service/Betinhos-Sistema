@@ -8,7 +8,7 @@ import type { ChoiceSet, Contato, Pagante, ServicoOp } from '../../pagantes/doma
 import type { Source } from '../data/source'
 import { OP_STATUS, cancelBlock, resumoRateio } from '../domain/status'
 import { buildTimeline } from '../domain/timeline'
-import type { Op, OpChoices } from '../domain/types'
+import { valorOp, type Op, type OpChoices } from '../domain/types'
 import { OpBadge, periodo } from './OpsList'
 
 type Related = { rateio: Pagante[]; servicos: ServicoOp[]; contatos: Map<string, Contato>; pagChoices: ChoiceSet } | { error: string } | null
@@ -78,8 +78,8 @@ export function OpDrawer({ op, onClose, choices, source, version, busy, onCancel
         <div className="pg-ficha">
           <div className="pg-ficha__hero">
             <span className="pg-badges"><OpBadge op={op} choices={choices} /></span>
-            <strong className="pg-ficha__value pg-num">{formatMoney(op.valor)}</strong>
-            <span className="pg-muted">{[op.cliente || 'Sem cliente', periodo(op)].join(' · ')}</span>
+            <strong className="pg-ficha__value pg-num">{formatMoney(valorOp(op))}</strong>
+            <span className="pg-muted">{[op.valor == null && op.valorServicos != null ? 'Soma dos serviços' : '', op.cliente || 'Sem cliente', periodo(op)].filter(Boolean).join(' · ')}</span>
           </div>
 
           {bloqueio && !cancelada && rateio ? <p className="op-ficha__reason"><Lock size={14} aria-hidden="true" />Cancelamento indisponível: {bloqueio}</p> : null}
