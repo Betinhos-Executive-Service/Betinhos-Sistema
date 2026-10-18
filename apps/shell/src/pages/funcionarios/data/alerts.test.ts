@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeAlertas } from './alerts'
+import { computeAlertas, rotuloCurto } from './alerts'
 import { addMonths, nextBirthday, toDateOnly, todaySP } from './dates'
 
 const base = { status: 0, validadeCnh: null, dataAso: null, aniversario: null }
@@ -42,5 +42,13 @@ describe('datas', () => {
     expect(toDateOnly('2024-02-01T00:00:00Z', 'TimeZoneIndependent')).toBe('2024-02-01')
     expect(toDateOnly('2027-07-01T03:00:00Z', 'UserLocal')).toBe('2027-07-01')
     expect(todaySP(new Date('2026-10-02T02:30:00Z'))).toBe('2026-10-01')
+  })
+})
+
+describe('rotuloCurto', () => {
+  it('na coluna, tira o nome do documento e mostra a data do vencimento', () => {
+    expect(rotuloCurto({ kind: 'aso', level: 'vencido', days: -10, date: '2025-02-01', label: 'ASO vencido desde 01/02/2025' })).toBe('Venceu 01/02/2025')
+    expect(rotuloCurto({ kind: 'cnh', level: 'critico', days: 5, date: '2026-10-23', label: 'CNH vence em 5 dias' })).toBe('Vence em 5 dias')
+    expect(rotuloCurto({ kind: 'aniversario', level: 'info', days: 2, date: '2026-10-20', label: 'Aniversário em 2 dias' })).toBe('Aniversário em 2 dias')
   })
 })
