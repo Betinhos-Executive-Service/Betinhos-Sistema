@@ -6,7 +6,7 @@ import { PageLayout } from '../../app/PageLayout'
 import { createSource } from './data/source'
 import { agentePorId } from './domain/agentes'
 import { ehGuid } from './domain/acoes'
-import type { Agente, Proposta } from './domain/types'
+import { ORIGEM_ROTULO, type Agente, type Proposta } from './domain/types'
 import { useAgente } from './useAgente'
 import { PropostaCard } from './components/PropostaCard'
 import { AprovarDialog, DescartarDialog } from './components/DecisaoDialogs'
@@ -37,7 +37,7 @@ function Agentes({ host, agente }: { host: Host; agente: Agente }) {
     if (autoDisparado || estado.loading || estado.error || info.rodaAoAbrirAposMin == null) return
     setAutoDisparado(true)
     const ultima = estado.atual?.criadaEm?.getTime() ?? 0
-    if (Date.now() - ultima > info.rodaAoAbrirAposMin * 60_000) void estado.analisar('')
+    if (Date.now() - ultima > info.rodaAoAbrirAposMin * 60_000) void estado.analisar('', 'ao_abrir')
   }, [autoDisparado, estado, info.rodaAoAbrirAposMin])
 
   const { reload } = estado
@@ -58,7 +58,7 @@ function Agentes({ host, agente }: { host: Host; agente: Agente }) {
   }
 
   const atual = estado.atual
-  const meta = atual ? `Última execução ${fmtData(atual.criadaEm)} · ${atual.origem === 'agendado' ? 'agendada' : 'manual'}${atual.status === 'concluida' ? ` · ${atual.tokensEntrada + atual.tokensSaida} tokens` : ''}` : 'Nenhuma execução ainda'
+  const meta = atual ? `Última execução ${fmtData(atual.criadaEm)} · ${ORIGEM_ROTULO[atual.origem].toLowerCase()}${atual.status === 'concluida' ? ` · ${atual.tokensEntrada + atual.tokensSaida} tokens` : ''}` : 'Nenhuma execução ainda'
 
   return (
     <PageLayout eyebrow={info.grupo} title={info.label} description={info.descricao} meta={meta}
