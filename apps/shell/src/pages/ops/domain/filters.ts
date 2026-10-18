@@ -1,5 +1,5 @@
 import { PERIODOS, type KV, type Periodo } from '../../pagantes/domain/filters'
-import type { Op } from './types'
+import { valorOp, type Op } from './types'
 
 export { PERIODOS, periodoStart, type KV, type Periodo } from '../../pagantes/domain/filters'
 
@@ -11,7 +11,7 @@ export type Filters = { query: string; periodo: Periodo; status: number[] }
 
 export const EMPTY_FILTERS: Filters = { query: '', periodo: '90', status: [] }
 
-export const total = (list: Op[]) => list.reduce((sum, op) => sum + (op.valor ?? 0), 0)
+export const total = (list: Op[]) => list.reduce((sum, op) => sum + (valorOp(op) ?? 0), 0)
 
 // ---------- Visões salvas no navegador (só para importar) ----------
 
