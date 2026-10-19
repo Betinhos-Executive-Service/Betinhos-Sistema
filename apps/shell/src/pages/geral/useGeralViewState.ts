@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo } from 'react'
 import {
   emptyFilters, sameConfig, storedFilters,
   type TableFilters, type TableViewEntry, type TableViewState, type ViewColumnDef, type ViewConfig, type ViewSort,
@@ -31,7 +31,6 @@ type Options = {
   kv: KV
 }
 
-const QUICK_ROW_KEY = 'betinhos.filtroRapido.geral'
 const sortKey = (column: { attribute: string; alias: string | null }) => (column.alias ? `${column.alias}.${column.attribute}` : column.attribute)
 
 function toViewSort(sort: Sort): ViewSort {
@@ -103,13 +102,6 @@ export function useGeralViewState(o: Options): { state: TableViewState; columnDe
     }
   }, [columns, prefs, sort, filters, baseline, setPrefs, setSort, setFilters])
 
-  const [quickRow, setQuickRowState] = useState(() => {
-    try { return o.kv.getItem(QUICK_ROW_KEY) !== '0' } catch { return true }
-  })
-  const setQuickRow = useCallback((visible: boolean) => {
-    setQuickRowState(visible)
-    try { o.kv.setItem(QUICK_ROW_KEY, visible ? '1' : '0') } catch { /* sem armazenamento: só nesta sessão */ }
-  }, [o.kv])
 
   const { selectView, reloadViews, createView, updateView, renameView, deleteView } = o
   const restore = useCallback(() => {
@@ -139,8 +131,9 @@ export function useGeralViewState(o: Options): { state: TableViewState; columnDe
     remove: deleteView,
     publish: async () => { throw new Error('As visões da Geral não são publicadas por aqui.') },
     reload: () => reloadViews(),
-    quickRow,
-    setQuickRow,
+    // A Geral filtra pelo menu do título da coluna (painel ancorado), não pela linha sob o cabeçalho.
+    quickRow: false,
+    setQuickRow: () => undefined,
   }
   return { state, columnDefs }
 }
