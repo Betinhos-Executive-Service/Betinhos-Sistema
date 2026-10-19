@@ -6,7 +6,7 @@ description: "Verifica o backend do checklist de vistoria de veículo: plugin Ch
 
 ## Cobre
 - Código: `plugins/DriverRecordSharing/ChecklistCommandPlugin.cs`, `plugins/DriverRecordSharing/ChecklistAnswers.cs`, testes em `plugins/DriverRecordSharing.Tests/ChecklistCommandPluginTests.cs`.
-- Scripts: `scripts/provision-checklists.ps1`, `scripts/grant-checklists-role.ps1`, `scripts/smoke-checklists-dev.ps1`, bloco de checklists em `scripts/push-dev.ps1`, lista de tabelas em `scripts/schema-index.cjs`.
+- Scripts: `scripts/provision-checklists.ps1`, `scripts/provision-checklist-flows.ps1`, `scripts/grant-checklists-role.ps1`, `scripts/smoke-checklists-dev.ps1`, bloco de checklists em `scripts/push-dev.ps1`, lista de tabelas em `scripts/schema-index.cjs`.
 - Custom APIs: `new_SolicitarChecklistVeiculo`, `new_ProcessarChecklistsVeiculos`, `new_ReatribuirChecklistVeiculo`, `new_ConcluirChecklistVeiculo`, `new_CancelarChecklistVeiculo`, `new_ReenviarPushChecklist`.
 - Plano: `docs/superpowers/plans/2026-10-19-checklist-vistoria-veiculo.md`.
 
@@ -29,6 +29,10 @@ description: "Verifica o backend do checklist de vistoria de veículo: plugin Ch
    - `grant-checklists-role.ps1 -Apply` → as duas leituras Basic "concedido e verificado" (ou "ja tem").
    - `smoke-checklists-dev.ps1` → "API com plugin ativo" para as 5 APIs com identificador e "Trava de edicao do checklist ativa no DEV".
    - `new_ProcessarChecklistsVeiculos` (sem parâmetros): só chame enquanto não houver modelo em `new_checklistmodelos`; deve recusar com a mensagem de "modelo ativo como padrão quinzenal". Com modelo cadastrado, chamar cria checklists reais.
+
+6. Flows (DEV): `provision-checklist-flows.ps1` (dry-run) → "criaria/atualizaria" para `Flow Checklists | Rotina diaria` e `Flow Push Checklist | Motoristas`; com `-Apply` → "Flow ativo no DEV e na solucao" para os dois e "Contrato verificado: rotina diaria 06:30 e push do checklist ativos.". Conferir em `workflows` (category 5) que cada nome tem 1 registro com `statecode = 1`.
+   - O push dispara quando o plugin grava `new_pushstatus = 100000000` com `new_estado = 100000001`; o toque abre o registro e o redirect (área `verificar-push-redirect`) leva ao App com `checklistId`.
+   - A rotina roda todo dia 06:30 (America/Sao_Paulo). Sem modelo padrão ela falha de propósito (o plugin recusa); com modelo, cria checklists reais e manda push.
 
 ## Casos de borda (cobertos pelos testes)
 - Mais de um modelo padrão quinzenal → solicitação recusada.

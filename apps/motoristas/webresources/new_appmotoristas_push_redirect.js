@@ -11,6 +11,7 @@
 
   var ROUTES = {
     new_comunicadodestinatario: function (id) { return "comunicadoId=" + id; },
+    new_checklistveiculo: function (id) { return "checklistId=" + id; },
     cr40f_reservadeveculos: function (id) { return "servicoId=" + id + "&tipo=SERVICO"; }
   };
 
