@@ -181,6 +181,8 @@
 
 /* Cabeçalho: ordenar + menu da coluna (▾ no hover/foco; sempre visível, com ponto de ação, quando filtrada). */
 .gr-head { display: flex; align-items: center; gap: var(--bt-space-1); min-width: 0; width: 100%; }
+/* O gatilho do menu vem envolto no `.bt-menu` do DS (inline-flex): precisa encolher como item do flex para o rótulo truncar com reticências em vez de vazar sobre a coluna vizinha. */
+.gr-head > .bt-menu { display: flex; flex: 0 1 auto; min-width: 0; max-width: 100%; }
 .gr-head__sort { flex: 0 1 auto; }
 /* O título é o gatilho do menu (como no model-driven): o ▾ só aparece no hover, no foco, com o menu aberto ou com filtro. */
 .gr-head__chevron { position: relative; display: inline-grid; place-items: center; flex: 0 0 auto; width: 18px; height: 18px; color: var(--bt-color-text-secondary); opacity: 0; }
