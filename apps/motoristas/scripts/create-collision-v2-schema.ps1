@@ -5,6 +5,9 @@ param(
   [string] $SolutionUniqueName = "Betinhos_Core_Clean"
 )
 
+. (Join-Path $PSScriptRoot "lib/assert-dev-environment.ps1")
+Assert-DevEnvironment $EnvironmentUrl
+
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
