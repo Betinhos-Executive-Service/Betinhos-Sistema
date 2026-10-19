@@ -22,7 +22,13 @@ description: "Verifica o backend do checklist de vistoria de veículo: plugin Ch
 2. Suíte inteira do plugin (protege comunicados/trocas): `dotnet test -v q` → `Com falha: 0`.
 3. Sintaxe dos scripts: `[System.Management.Automation.Language.Parser]::ParseFile` em cada `.ps1` acima → 0 erros; `node --check scripts/schema-index.cjs` → sem saída.
 4. Dry-run em DEV (somente leitura): `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/provision-checklists.ps1` → termina em `[checklists] DRY RUN concluido.`. Antes de aplicar: 4 tabelas, 5 relacionamentos e 1 chave aparecem como "criaria". Depois de aplicar: nenhuma linha "criaria".
-5. Somente com autorização para alterar o DEV: publicar o assembly (`register-driver-record-sharing-plugin-webapi.ps1 -Apply`), `provision-checklists.ps1 -Apply`, `grant-checklists-role.ps1 -Apply` e então `smoke-checklists-dev.ps1` → cada API responde "API com plugin ativo" e "Trava de edicao do checklist ativa no DEV".
+5. Somente com autorização para alterar o DEV:
+   - Antes de publicar o assembly, a branch precisa conter todo o plugin já publicado: sincronize com `develop` e confira que cada `plugintype` do assembly `Betinhos.DriverRecordSharing` no DEV existe em `plugins/DriverRecordSharing/*.cs`. Publicar de uma branch atrasada apaga do DEV o código das outras.
+   - `dotnet build plugins/DriverRecordSharing.Tests/DriverRecordSharing.Tests.csproj -c Release`, depois `register-driver-record-sharing-plugin-webapi.ps1 -EnvironmentUrl https://org23b93544.crm2.dynamics.com/ -SolutionUniqueName AppBetinhos -Apply -AddExistingToSolution` → termina em `REGISTRO E VALIDACAO OK`.
+   - `provision-checklists.ps1 -Apply` → `schema e APIs publicados`; repetir sem `-Apply` → nenhuma linha "criaria".
+   - `grant-checklists-role.ps1 -Apply` → as duas leituras Basic "concedido e verificado" (ou "ja tem").
+   - `smoke-checklists-dev.ps1` → "API com plugin ativo" para as 5 APIs com identificador e "Trava de edicao do checklist ativa no DEV".
+   - `new_ProcessarChecklistsVeiculos` (sem parâmetros): só chame enquanto não houver modelo em `new_checklistmodelos`; deve recusar com a mensagem de "modelo ativo como padrão quinzenal". Com modelo cadastrado, chamar cria checklists reais.
 
 ## Casos de borda (cobertos pelos testes)
 - Mais de um modelo padrão quinzenal → solicitação recusada.
