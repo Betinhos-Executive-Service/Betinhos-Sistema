@@ -258,7 +258,7 @@ export async function loadDriverChecklist(id: string): Promise<ChecklistVeiculo 
 type XrmApi = { WebApi?: { online?: { execute?: (request: Record<string, unknown>) => Promise<Response> } } };
 
 // Copiado de executeComunicadoAction (comunicados.ts): parâmetros sempre Edm.String e execute com bind.
-async function executeChecklistAction(operationName: string, parameters: Record<string, string>) {
+export async function executeChecklistAction(operationName: string, parameters: Record<string, string>) {
   let xrm: XrmApi | undefined;
   try { xrm = (window.parent as Window & { Xrm?: XrmApi }).Xrm; } catch { /* Parent may be cross-origin. */ }
   xrm ??= (window as Window & { Xrm?: XrmApi }).Xrm;
