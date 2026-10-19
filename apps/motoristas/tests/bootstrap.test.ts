@@ -95,3 +95,11 @@ test("deep link de comunicado aceita comunicadoId direto ou dentro de data", () 
   assert.equal(getInitialComunicadoId("?comunicadoId=invalido"), "");
   assert.equal(getInitialComunicadoId(""), "");
 });
+
+test("deep link do push lê servicoId e tipo dentro de data=", async () => {
+  const { getInitialParams, getInitialComunicadoId } = await import("../src/app/bootstrap.ts");
+  assert.deepEqual(getInitialParams("?data=servicoId%3Dabc-1%26tipo%3DSERVICO"), { serviceId: "abc-1", type: "SERVICO" });
+  assert.deepEqual(getInitialParams("?servicoId=direto&tipo=TROCA&data=servicoId%3Doutro"), { serviceId: "direto", type: "TROCA" });
+  assert.deepEqual(getInitialParams(""), { serviceId: "", type: "" });
+  assert.equal(getInitialComunicadoId("?data=comunicadoId%3D3F2504E0-4F89-11D3-9A0C-0305E82C3301"), "3f2504e0-4f89-11d3-9a0c-0305e82c3301");
+});

@@ -16,6 +16,7 @@ import {
   getRecipientStatusLabel,
   matchesRecipientFilter,
   isComunicadoPending,
+  loadDriverComunicado,
   loadDriverComunicados,
   loadGestaoComunicados,
   loadMotoristasElegiveis,
@@ -156,22 +157,25 @@ test("localhost sem servidor mock usa comunicados em memória no navegador", asy
   (globalThis as any).window = { location: { hostname: "localhost", search: "" } };
   globalThis.fetch = (() => { throw new Error("fetch não deveria ser chamado"); }) as typeof fetch;
   try {
-    const recebidos = await loadDriverComunicados();
+    const recebidos = await loadDriverComunicados("");
     assert.equal(recebidos.length, 2);
+    // Caminho rápido do deep link: lê um destinatário pelo ID (com chaves/maiúsculas) e devolve null se não existir.
+    assert.equal((await loadDriverComunicado(`{${recebidos[0].id.toUpperCase()}}`))?.id, recebidos[0].id);
+    assert.equal(await loadDriverComunicado("00000000-0000-4000-8000-000000000000"), null);
     const ciencia = recebidos.find((item) => item.tipo === COMUNICADO_TIPO.ciencia)!;
     await assinarComunicado(ciencia.id, [[[0.1, 0.1], [0.5, 0.5]]], "Ok");
-    const assinado = (await loadDriverComunicados()).find((item) => item.id === ciencia.id)!;
+    const assinado = (await loadDriverComunicados("")).find((item) => item.id === ciencia.id)!;
     assert.ok(assinado.cienteEm);
     assert.equal(assinado.nomeAssinante, "Renan");
 
     const informativo = recebidos.find((item) => item.tipo === COMUNICADO_TIPO.informativo)!;
     await abrirComunicado(informativo.id);
-    assert.ok((await loadDriverComunicados()).find((item) => item.id === informativo.id)!.lidoEm);
+    assert.ok((await loadDriverComunicados("")).find((item) => item.id === informativo.id)!.lidoEm);
 
     const id = await saveDraft({ id: "", titulo: "Novo aviso", corpo: "Texto", tipo: COMUNICADO_TIPO.informativo, escopo: COMUNICADO_ESCOPO.todos, alvoIds: [], estado: COMUNICADO_ESTADO.rascunho, disparadoEm: null });
     await dispararComunicado(id);
     assert.equal((await loadGestaoComunicados()).find((item) => item.id === id)?.estado, COMUNICADO_ESTADO.disparado);
-    assert.equal((await loadDriverComunicados()).length, 3);
+    assert.equal((await loadDriverComunicados("")).length, 3);
   } finally {
     (globalThis as any).window = previousWindow;
     globalThis.fetch = previousFetch;

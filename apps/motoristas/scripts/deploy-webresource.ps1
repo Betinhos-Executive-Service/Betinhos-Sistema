@@ -18,8 +18,14 @@ param(
 
   [switch] $DeviceCode,
 
-  [switch] $NoPublish
+  [switch] $NoPublish,
+
+  # Opcional: aborta antes de qualquer escrita se o WhoAmI nao devolver esta organizacao.
+  [string] $ExpectedOrganizationId = ""
 )
+
+. (Join-Path $PSScriptRoot "lib/assert-dev-environment.ps1")
+Assert-DevEnvironment $EnvironmentUrl
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
@@ -146,6 +152,14 @@ $headers = @{
 }
 
 $apiBaseUrl = "$environmentBaseUrl/api/data/v9.2"
+if (-not [string]::IsNullOrWhiteSpace($ExpectedOrganizationId)) {
+  $whoAmI = Invoke-DataverseGet -Uri "$apiBaseUrl/WhoAmI" -RequestHeaders $headers
+  $actualOrganizationId = ([string]$whoAmI.OrganizationId).Trim("{}").ToLowerInvariant()
+  if ($actualOrganizationId -ne $ExpectedOrganizationId.Trim("{}").ToLowerInvariant()) {
+    throw "Organizacao inesperada em $environmentBaseUrl (WhoAmI=$actualOrganizationId). Deploy abortado."
+  }
+  Write-Step "WhoAmI ok organizacao $actualOrganizationId"
+}
 if ([string]::IsNullOrWhiteSpace($WebResourceName)) {
   Write-Step "lookup html webresource contendo '$SearchText'"
   $lookupUrl = "$apiBaseUrl/webresourceset?`$select=webresourceid,name,displayname,webresourcetype&`$filter=webresourcetype eq 1"

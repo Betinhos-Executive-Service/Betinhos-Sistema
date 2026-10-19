@@ -15,6 +15,9 @@ param(
   [switch] $DeviceCode
 )
 
+. (Join-Path $PSScriptRoot "lib/assert-dev-environment.ps1")
+Assert-DevEnvironment $EnvironmentUrl
+
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 

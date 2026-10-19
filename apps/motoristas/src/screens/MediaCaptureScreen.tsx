@@ -5,7 +5,10 @@ import { AppShell } from "../components/layout/AppShell";
 import { FormMenu } from "../components/navigation/FormMenu";
 import { reportAppError } from "../lib/appErrorLogger";
 import { describeCameraError } from "../lib/cameraErrors";
+import { describeStreamSize, getDocumentStreamConstraints, getDocumentTrackConstraints, LIVE_PHOTO_JPEG_QUALITY } from "../lib/cameraConstraints";
+import { setTorch, stopStreamTracks, supportsTorch } from "../lib/cameraTorch";
 import {
+  captureVideoFrameDataUrl,
   captureVideoFrameDataUrlAsync,
   formatVideoDuration,
   readBlobAsDataUrl,
@@ -42,10 +45,6 @@ type FocusAwareMediaTrackCapabilities = MediaTrackCapabilities & {
   focusMode?: string[];
 };
 
-type FocusAwareMediaTrackConstraints = MediaTrackConstraints & {
-  focusMode?: ConstrainDOMString;
-};
-
 const CAMERA_SUPPORT_MESSAGE_DELAY_MS = 1000;
 
 function getTitleByKind(kind: MaintenancePhotoKind) {
@@ -76,14 +75,6 @@ function shouldUseLiveCameraCapture() {
 
 function isAppleMobileDevice() {
   return /iPhone|iPad|iPod/i.test(globalThis.navigator?.userAgent ?? "");
-}
-
-function getPreferredCameraVideoConstraints(mode: "environment" | "user"): MediaTrackConstraints {
-  return {
-    facingMode: { ideal: mode },
-    height: { ideal: 1080, min: 720 },
-    frameRate: { ideal: 30, max: 30 }
-  };
 }
 
 function getFallbackCameraVideoConstraints(mode: "environment" | "user"): MediaTrackConstraints {
@@ -118,22 +109,9 @@ function getPreferredVideoProfile(track: MediaStreamTrack): VideoCaptureProfile 
   };
 }
 
-function buildTrackConstraints(
-  mode: "environment" | "user",
-  profile: VideoCaptureProfile,
-  continuousFocus = false
-): MediaTrackConstraints {
-  const constraints: FocusAwareMediaTrackConstraints = {
-    facingMode: { ideal: mode },
-    height: { ideal: 1080, min: 720 },
-    frameRate: { ideal: profile.frameRate, min: 24, max: profile.frameRate }
-  };
-
-  if (continuousFocus) {
-    constraints.focusMode = { ideal: "continuous" };
-  }
-
-  return constraints;
+/** Perfil reaplicado no track: mantém o 4:3 em alta resolução (foto com o quadro inteiro) e o foco contínuo quando houver. */
+function buildTrackConstraints(mode: "environment" | "user", profile: VideoCaptureProfile, continuousFocus = false): MediaTrackConstraints {
+  return getDocumentTrackConstraints(mode, profile.frameRate, continuousFocus);
 }
 
 async function preferTrackProfile(track: MediaStreamTrack, mode: "environment" | "user") {
@@ -252,6 +230,10 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
   const [showSupportMessage, setShowSupportMessage] = useState(false);
   const [recording, setRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [streamSize, setStreamSize] = useState("");
+  const [torchSupported, setTorchSupported] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
+  const torchOnRef = useRef(false);
 
   const useLiveCamera = shouldUseLiveCameraCapture();
   const useAppleMobile = isAppleMobileDevice();
@@ -270,8 +252,11 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
     }
     recorderRef.current = null;
     recordedChunksRef.current = [];
-    streamRef.current?.getTracks().forEach((track) => track.stop());
+    stopStreamTracks(streamRef.current, torchOnRef.current);
     streamRef.current = null;
+    torchOnRef.current = false;
+    setTorchOn(false);
+    setTorchSupported(false);
     setReady(false);
     setRecording(false);
     setRecordingSeconds(0);
@@ -316,7 +301,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
       let stream: MediaStream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: getPreferredCameraVideoConstraints(mode),
+          video: getDocumentStreamConstraints(mode),
           audio: false
         });
       } catch {
@@ -336,7 +321,13 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
       const videoTrack = stream.getVideoTracks()[0];
       if (videoTrack) {
         activeVideoProfileRef.current = await preferTrackProfile(videoTrack, mode);
+        setTorchSupported(supportsTorch(videoTrack));
         updateTrackContentHint(false);
+        try {
+          setStreamSize(describeStreamSize(videoTrack.getSettings?.() ?? {}));
+        } catch {
+          setStreamSize("");
+        }
       }
 
       if (videoRef.current && useLivePreview) {
@@ -397,6 +388,17 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
     videoInputRef.current?.click();
   };
 
+  const toggleTorch = async () => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    const next = !torchOnRef.current;
+    if (await setTorch(track, next)) {
+      torchOnRef.current = next;
+      setTorchOn(next);
+    } else if (next) {
+      setTorchSupported(false);
+    }
+  };
+
   const switchCamera = () => {
     if (processing || recording) return;
     const next = facingMode === "environment" ? "user" : "environment";
@@ -423,11 +425,22 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
         });
       });
       let photoDataUrl = "";
-      if (stream) {
+      if (video) {
+        photoDataUrl = captureVideoFrameDataUrl(video, undefined, LIVE_PHOTO_JPEG_QUALITY);
+      } else if (stream) {
         try {
           photoDataUrl = await captureTrackPhotoDataUrl(stream);
-        } catch {
+        } catch (error) {
           photoDataUrl = "";
+          reportAppError(error, {
+            severity: "warning",
+            source: "media-capture",
+            action: "image-capture-take-photo",
+            component: "MediaCaptureScreen",
+            screen: "TelaCameraMidia",
+            notifyUser: false,
+            payload: { streamSize }
+          });
         }
       }
       if (!photoDataUrl && video) photoDataUrl = await captureVideoFrameDataUrlAsync(video);
@@ -501,7 +514,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
         setRecording(false);
         let previewUrl = "";
         try {
-          if (!chunks.length) throw new Error("Nenhum dado de video capturado.");
+          if (!chunks.length) throw new Error("Nenhum dado de vídeo capturado.");
           const blob = new Blob(chunks, { type: recorder.mimeType || "video/webm" });
           previewUrl = URL.createObjectURL(blob);
           onCaptureVideo({
@@ -655,7 +668,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
       <section className="main-panel photo-main">
         <article className="photo-card camera-capture-card">
           <div className="photo-body">
-            <div className="camera-view real-camera-view native-camera-view">
+            <div className="camera-view real-camera-view native-camera-view" data-stream-size={streamSize || undefined}>
               {useLivePreview ? (
                 <>
                   <video
@@ -671,6 +684,19 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
                     disablePictureInPicture
                   />
                 </>
+              ) : null}
+
+              {torchSupported ? (
+                <button
+                  type="button"
+                  className={`camera-torch-toggle ${torchOn ? "is-on" : ""}`.trim()}
+                  onClick={() => void toggleTorch()}
+                  aria-pressed={torchOn}
+                  aria-label={torchOn ? "Desligar lanterna" : "Ligar lanterna"}
+                  disabled={processing}
+                >
+                  <SystemIcon name="flash" />
+                </button>
               ) : null}
 
               {useLiveCamera && capturingPhoto ? <div className="camera-shutter-flash" aria-hidden="true" /> : null}

@@ -17,8 +17,18 @@ import type { PersonalReceiptModel } from "./personalReceipt";
 import { normalizeReceiptLanguage, RECEIPT_LANGUAGE } from "./receiptLanguage.ts";
 
 import { getFieldValue } from "./fieldLookup.ts";
+import {
+  buildInfleetServiceVehiclePatch,
+  parseInfleetVehicleResolution,
+  unavailableResolution,
+  type DriverVehicleChoice,
+  type FleetVehicle,
+  type InfleetVehicleResolution
+} from "./serviceVehicleInfleet.ts";
 import { createRemoteReadBatch } from "./remoteReadBatch.ts";
+import { buildCurrentVehiclePatch } from "./myVehicle.ts";
 import { buildIdeaRecord, normalizeIdeaRecord, validateIdeaDraft, type Idea, type IdeaDraft } from "./ideas.ts";
+import { decideExpenseUploadMode, type ExpenseUploadMode } from "./expenseUploadMode.ts";
 
 type XrmLike = {
   Utility?: {
@@ -63,6 +73,11 @@ export type FinalizePayload = {
   signatureDataUrl?: string;
   photos?: Partial<Record<MaintenancePhotoKind, string>>;
   onProgress?: (message: string) => void;
+  // Carro do serviço decidido pela Infleet antes de finalizar (somente SERVICO).
+  vehicleResolution?: InfleetVehicleResolution;
+  vehicleChoice?: DriverVehicleChoice | null;
+  // Motorista terceiro: a finalização não grava o carro do serviço.
+  skipVehicle?: boolean;
 };
 
 export type MaintenanceRequestPayload = {
@@ -240,7 +255,8 @@ const FLOW_URLS = {
   expenseAsync: "VITE_FLOW_DESPESA_ASYNC_URL",
   gerarVoucher: "VITE_FLOW_GERAR_VOUCHER_URL",
   salvarFotosManutencao: "VITE_FLOW_SALVAR_FOTOS_MANUTENCAO_URL",
-  enviarReciboCliente: "VITE_FLOW_ENVIAR_RECIBO_CLIENTE_URL"
+  enviarReciboCliente: "VITE_FLOW_ENVIAR_RECIBO_CLIENTE_URL",
+  quickRead: "VITE_FLOW_LEITURA_RAPIDA_URL"
 } as const;
 
 const DEV_DATAVERSE_URL = "https://org23b93544.crm2.dynamics.com/";
@@ -249,7 +265,8 @@ const FLOW_DATAVERSE_ENVIRONMENT_VARIABLES: Record<string, string | undefined> =
   [FLOW_URLS.expenseAsync]: "new_FlowURLDespesaAsync",
   [FLOW_URLS.gerarVoucher]: "new_FlowURLFlowGerarVoucherAppMotoristasv2",
   [FLOW_URLS.salvarFotosManutencao]: "new_FlowURLFlowSalvarArquivosOnedrive",
-  [FLOW_URLS.enviarReciboCliente]: "new_FlowURLFlowEnviarReciboCliente"
+  [FLOW_URLS.enviarReciboCliente]: "new_FlowURLFlowEnviarReciboCliente",
+  [FLOW_URLS.quickRead]: "new_FlowURLDespesaLeituraRapida"
 };
 
 const GERAL_SELECT =
@@ -577,7 +594,9 @@ export async function getDriverContext(): Promise<DriverContext> {
         cr40f_funcionariosid: "localhost-driver",
         cr40f_nomecompleto: "Localhost",
         cr40f_emailmicrosoft: "",
-        cr40f_gerarrecibopersonalizado: true
+        cr40f_gerarrecibopersonalizado: true,
+        // Teste local do "Meu carro": abra com ?mockTerceiro=1.
+        ...(new URLSearchParams(window.location.search).get("mockTerceiro") === "1" ? { cr40f_tipodevinculo: 1 } : {})
       }
     };
   }
@@ -1265,8 +1284,32 @@ async function uploadMaintenancePhoto(
   });
 }
 
+let resolvedExpenseUploadMode: { clientUrl: string; mode: ExpenseUploadMode } | null = null;
+
+function getCurrentClientUrlKey() {
+  return String(getWindowXrm()?.Utility?.getGlobalContext?.().getClientUrl?.() ?? "").replace(/\/+$/, "").toLowerCase();
+}
+
+/**
+ * Decide o caminho de envio dos comprovantes pela configuracao do ambiente atual
+ * (new_FlowURLDespesaAsync + colunas do anexo), nunca pela URL do ambiente.
+ * Nunca lanca: qualquer falha antes de criar registros mantem o envio legado.
+ */
+export async function resolveExpenseUploadModeRemote(): Promise<ExpenseUploadMode> {
+  const mode = await decideExpenseUploadMode({
+    hasRuntime: hasDataverseRuntime,
+    resolveAsyncFlowUrl: () => resolveFlowUrl(FLOW_URLS.expenseAsync),
+    assertAsyncSchema: () => assertEntityHasAttributes(DATAVERSE.anexosDespesasOperacionais, "Anexos de despesas", ["new_uploadattemptid", "new_uploadrunid", "new_uploaderror", "cr40f_mimetype", "cr40f_driveitemid"]),
+    warn: dataverseWarn
+  });
+  resolvedExpenseUploadMode = { clientUrl: getCurrentClientUrlKey(), mode };
+  return mode;
+}
+
 export function usesAsyncExpenseUpload() {
-  return hasDataverseRuntime() && `${getClientUrl()}/`.toLowerCase() === DEV_DATAVERSE_URL.toLowerCase();
+  return hasDataverseRuntime()
+    && resolvedExpenseUploadMode?.mode === "async"
+    && resolvedExpenseUploadMode.clientUrl === getCurrentClientUrlKey();
 }
 
 export function expenseSubmissionStorageKey(motoristaId: string) {
@@ -1304,7 +1347,7 @@ async function ensureExpenseRecord(entitySet: string, id: string, payload: Recor
 }
 
 export async function ensureExpenseSubmissionRemote(submission: ExpenseSubmission) {
-  if (!usesAsyncExpenseUpload()) throw new Error("Envio assíncrono disponível somente no DEV.");
+  if (!usesAsyncExpenseUpload()) throw new Error("Envio assíncrono de despesas não configurado neste ambiente.");
   // Fail before creating any row when the deployment/permissions are incomplete.
   await assertEntityHasAttributes(DATAVERSE.anexosDespesasOperacionais, "Anexos de despesas", ["new_uploadattemptid", "new_uploadrunid", "new_uploaderror", "cr40f_mimetype", "cr40f_driveitemid"]);
   if (!await resolveFlowUrl(FLOW_URLS.expenseAsync)) throw new Error("Flow assíncrono de despesas não configurado.");
@@ -3462,7 +3505,8 @@ export async function loadRemoteDetailByParams(servicoId: string, tipo = ""): Pr
 }
 
 async function getDataverseEnvironmentVariableValue(schemaName: string) {
-  if (flowUrlCache.has(schemaName)) return flowUrlCache.get(schemaName) ?? "";
+  const cacheKey = `${getCurrentClientUrlKey()}|${schemaName}`;
+  if (flowUrlCache.has(cacheKey)) return flowUrlCache.get(cacheKey) ?? "";
 
   const definitionResult = await retrieveMultiple(
     "environmentvariabledefinitions",
@@ -3486,7 +3530,8 @@ async function getDataverseEnvironmentVariableValue(schemaName: string) {
     ].join("&")
   );
   const url = String(valueResult.entities[0]?.value ?? definition.defaultvalue ?? "").trim();
-  flowUrlCache.set(schemaName, url);
+  // Valor vazio nao e cacheado: uma variavel configurada depois passa a valer sem recarregar o app.
+  if (url) flowUrlCache.set(cacheKey, url);
   return url;
 }
 
@@ -3508,6 +3553,36 @@ async function resolveFlowUrl(envKey: string) {
 
   const flowEnv = ((window as WindowWithFlowEnv).__APP_FLOW_ENV ?? {}) as AppResourceFlowEnv;
   return flowEnv[envKey] ?? "";
+}
+
+/**
+ * Leitura rapida do comprovante (Flow Despesas | Leitura rapida). Nao usa runHttpFlow: precisa de AbortSignal
+ * para o timeout e nao pode registrar resumo de payload (imagem). Nunca loga a imagem nem a URL completa.
+ * Nunca lanca: falha vira { ok: false } e o app segue no preenchimento manual.
+ */
+export async function readReceiptQuick(imagemBase64: string, categorias: string[], formasPagamento: string[], timeoutMs: number): Promise<unknown> {
+  const url = await resolveFlowUrl(FLOW_URLS.quickRead);
+  if (!url) return { ok: false, erro: "nao_configurado" };
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({ imagemBase64, mime: "image/jpeg", categorias, formasPagamento })
+    });
+    if (!response.ok) {
+      dataverseWarn("Leitura rapida falhou.", { status: response.status, endpoint: describeFlowUrl(url) });
+      return { ok: false };
+    }
+    return await response.json();
+  } catch (error) {
+    dataverseWarn("Leitura rapida sem resposta.", { endpoint: describeFlowUrl(url), error: error instanceof Error ? error.name : String(error) });
+    return { ok: false };
+  } finally {
+    window.clearTimeout(timer);
+  }
 }
 
 class HttpFlowError extends Error {
@@ -3588,6 +3663,8 @@ function summarizeFlowPayload(payload: Record<string, unknown>) {
 export async function saveVoucherRemote(payload: FinalizePayload) {
   const dv = payload.detail.dataverse;
   if (!dv?.id) throw new Error("Serviço sem referência Dataverse.");
+  // Valida o carro antes de enviar o voucher, para não gerar voucher de serviço sem carro.
+  const vehiclePatch = buildFinalizeServiceVehiclePatch(payload);
   const record = dv.record ?? {};
   dataverseLog("Finalizacao por voucher iniciada.", { detailId: payload.detail.id, dataverseId: dv.id });
   payload.onProgress?.("Preparando dados do voucher.");
@@ -3645,8 +3722,6 @@ export async function saveVoucherRemote(payload: FinalizePayload) {
   payload.onProgress?.("Validando retorno do Flow.");
   assertFlowSuccess(flowResult, "FlowGerarVoucher");
   payload.onProgress?.("Atualizando status no Dataverse.");
-  payload.onProgress?.("Conferindo veiculo atual pela posse.");
-  const vehiclePatch = await buildCurrentPossessionVehiclePatchForService(dv.record);
   await updateOne(DATAVERSE.geral, dv.id, {
     ...vehiclePatch,
     new_rascunhovoucher: null,
@@ -3718,33 +3793,87 @@ export function buildAutomaticServiceVehiclePatch(record: DataverseRecord | unde
   return patch;
 }
 
-async function buildCurrentPossessionVehiclePatchForService(record: DataverseRecord | undefined) {
-  if (Number(record?.new_origemveiculo) === SERVICE_VEHICLE_ORIGIN.manual) return {};
-  const driverId = cleanODataGuid(record?._cr40f_motorista_value);
-  if (!driverId) return {};
+// Infleet decide o carro ou o motorista escolhe; a posse não entra na finalização.
+function buildFinalizeServiceVehiclePatch(payload: FinalizePayload) {
+  if (payload.skipVehicle) return {};
+  const resolution = payload.vehicleResolution;
+  if (!resolution) throw new Error("Carro do serviço não conferido. Tente finalizar novamente.");
+  const patch = buildInfleetServiceVehiclePatch(resolution, payload.vehicleChoice ?? null, (vehicleId) => bind(DATAVERSE.veiculos, vehicleId));
+  if (!patch.new_origemveiculo) throw new Error("Escolha o carro usado no serviço antes de finalizar.");
+  return patch;
+}
 
+// Frota ativa para o motorista escolher quando a Infleet não identifica o carro.
+export async function loadActiveFleetRemote(): Promise<FleetVehicle[]> {
   const result = await retrieveMultiple(
-    DATAVERSE.posseVeiculos,
+    DATAVERSE.veiculos,
     [
-      "$select=new_possedeveiculoid,_new_veiculo_value,new_iniciodaposse",
-      `$filter=_new_motorista_value eq ${driverId} and new_fimdaposse eq null`,
-      "$orderby=new_iniciodaposse desc",
-      "$top=2"
+      "$select=cr40f_veiculosid,cr40f_placa,cr40f_modelo,cr40f_cor",
+      `$filter=statecode eq 0 and ${ACTIVE_VEHICLE_FILTERS.join(" and ")}`,
+      "$orderby=cr40f_modelo asc,cr40f_placa asc",
+      "$top=300"
     ].join("&")
   );
+  return result.entities
+    .map((record) => ({
+      id: cleanODataGuid(record.cr40f_veiculosid),
+      placa: String(record.cr40f_placa ?? "").trim(),
+      modelo: String(record.cr40f_modelo ?? "").trim(),
+      cor: String(record.cr40f_cor ?? "").trim()
+    }))
+    .filter((vehicle) => vehicle.id && vehicle.placa);
+}
 
-  if (result.entities.length === 0) {
-    dataverseWarn("Servico sem posse aberta para atualizar veiculo na finalizacao.", {
-      serviceId: record?.cr40f_id,
-      driverId
-    });
-    return {};
-  }
-  if (result.entities.length > 1) {
-    throw new Error("Motorista possui mais de uma posse de veiculo aberta. Corrija a tabela de posse antes de finalizar o servico.");
-  }
+// Carros de categoria "Carro de terceiro" vinculados ao motorista; ele escolhe qual está usando.
+export async function loadMyVehiclesRemote(driver: DriverContext): Promise<FleetVehicle[]> {
+  const result = await retrieveMultiple(
+    DATAVERSE.veiculos,
+    [
+      "$select=cr40f_veiculosid,cr40f_placa,cr40f_modelo,cr40f_cor",
+      `$filter=statecode eq 0 and new_categoriadoveiculo eq 100000001 and _cr40f_motoristaatual_value eq ${cleanGuid(driver.id)}`,
+      "$orderby=cr40f_modelo asc"
+    ].join("&")
+  );
+  return result.entities
+    .map((record) => ({
+      id: cleanODataGuid(record.cr40f_veiculosid),
+      placa: String(record.cr40f_placa ?? "").trim(),
+      modelo: String(record.cr40f_modelo ?? "").trim(),
+      cor: String(record.cr40f_cor ?? "").trim()
+    }))
+    .filter((vehicle) => vehicle.id && vehicle.placa);
+}
 
-  return buildAutomaticServiceVehiclePatch(record, result.entities[0]._new_veiculo_value);
+export async function setMyCurrentVehicleRemote(driver: DriverContext, vehicleId: string) {
+  await updateOne(DATAVERSE.funcionarios, driver.id, buildCurrentVehiclePatch(vehicleId, (id) => bind(DATAVERSE.veiculos, id)));
+}
+
+export async function resolveServiceVehicleRemote(serviceDataverseId: string): Promise<InfleetVehicleResolution> {
+  try {
+    const online = getWebApi().online;
+    // O Xrm depende do `this`; extrair o método solto quebra com "reading '_execute'".
+    const execute = online?.execute?.bind(online);
+    if (!execute) return unavailableResolution("api-indisponivel");
+    const response = (await execute({
+      new_ReservaId: cleanGuid(serviceDataverseId),
+      getMetadata: () => ({
+        boundParameter: null,
+        operationType: 0,
+        operationName: "new_ResolverVeiculoDoServico",
+        // Com "Edm.Guid" o Xrm serializa a string como 'undefined'; o servidor converte o texto para Guid.
+        parameterTypes: { new_ReservaId: { typeName: "Edm.String", structuralProperty: 1 } }
+      })
+    })) as Response;
+    if (!response.ok) {
+      dataverseWarn("Resolvedor de veiculo da Infleet respondeu com erro.", { status: response.status });
+      return unavailableResolution(`erro-http-${response.status}`);
+    }
+    const body = await response.json();
+    return parseInfleetVehicleResolution(body?.new_ResultadoJson);
+  } catch (error) {
+    dataverseWarn("Resolvedor de veiculo da Infleet indisponivel.", { message: error instanceof Error ? error.message : String(error) });
+    return unavailableResolution("erro-ao-consultar");
+  }
 }
 
 export async function finalizeServiceRemote(payload: FinalizePayload) {
@@ -3752,7 +3881,7 @@ export async function finalizeServiceRemote(payload: FinalizePayload) {
   if (!dv?.id) throw new Error("Serviço sem referência Dataverse.");
   dataverseLog("Finalização simples de serviço iniciada.", { detailId: payload.detail.id, dataverseId: dv.id });
   payload.onProgress?.("Atualizando serviço no Dataverse.");
-  const vehiclePatch = await buildCurrentPossessionVehiclePatchForService(dv.record);
+  const vehiclePatch = buildFinalizeServiceVehiclePatch(payload);
   await updateOne(DATAVERSE.geral, dv.id, {
     ...vehiclePatch,
     new_observacaofinal: mergeMotoristObservation(dv.record?.new_observacaofinal, getFieldValue(payload.fields, "Observação Final", "Observacao Final")),
