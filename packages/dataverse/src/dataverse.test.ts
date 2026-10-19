@@ -64,6 +64,21 @@ describe('xrm shim', () => {
     expect(fetchMock.mock.calls.filter(([url]) => url.includes('EntityDefinitions'))).toHaveLength(1)
     expect(xrm.Utility!.getGlobalContext().getClientUrl()).toBe('https://org.example')
   })
+
+  it('executa Custom API sem vínculo por POST e devolve o erro do servidor como Response', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(json({ error: { message: 'Veículo sem motorista.' } }, { status: 400 }))
+    const xrm = createXrmShim(createClient('https://org.example', fetchMock as unknown as typeof fetch), 'https://org.example')
+    const request = (operationName: string) => ({ new_VeiculoId: 'abc', getMetadata: () => ({ boundParameter: null, operationType: 0, operationName, parameterTypes: { new_VeiculoId: {} } }) })
+    const ok = await xrm.WebApi!.online!.execute(request('new_SolicitarChecklistVeiculo'))
+    expect(ok.ok).toBe(true)
+    expect(fetchMock.mock.calls[0][0]).toBe('https://org.example/api/data/v9.2/new_SolicitarChecklistVeiculo')
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ new_VeiculoId: 'abc' })
+    const failed = await xrm.WebApi!.online!.execute(request('new_SolicitarChecklistVeiculo'))
+    expect(failed.status).toBe(400)
+    expect((await failed.json()).error.message).toContain('Veículo sem motorista.')
+  })
 })
 
 describe('metadata.choices', () => {
