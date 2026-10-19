@@ -3,9 +3,9 @@
 # Cada sessão cloud roda numa VM Linux própria: este script deixa a VM pronta para
 # codar, rodar typecheck/testes e verificar a UI no navegador headless.
 #
-# No ambiente cloud, configure:
-#   Setup script:  bash scripts/cloud-setup.sh
-#   Variável:      NODE_AUTH_TOKEN = token do GitHub com read:packages (Design System no GitHub Packages)
+# Roda pelo hook SessionStart (.claude/hooks/session-start.sh) a cada sessão cloud: o NODE_AUTH_TOKEN das
+# variáveis do ambiente só existe dentro da sessão, não no setup script do ambiente.
+#   Variável do ambiente: NODE_AUTH_TOKEN = token do GitHub com read:packages (Design System no GitHub Packages)
 # Nunca coloque credenciais do Dataverse aqui: a VM não publica nada (ver CLAUDE.md, "Ambiente cloud").
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -39,6 +39,11 @@ if [ "$(node_major)" -lt 24 ]; then
   done
 fi
 log "Node $(node -v)"
+# Rodando pelo hook SessionStart: o shell da sessão não lê o ~/.bashrc (sai cedo em shell não interativo),
+# então o PATH do Node 24 vai pelo arquivo de ambiente da sessão.
+if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
+  echo "export PATH=\"$(dirname "$(command -v node)"):\$PATH\"" >> "$CLAUDE_ENV_FILE"
+fi
 
 # 2. pnpm na versão do packageManager
 PNPM_VERSION="$(node -p 'require("./package.json").packageManager.split("@")[1]')"

@@ -9,7 +9,7 @@
 
 ## Ambiente cloud (sessões cloud do Claude Code)
 
-- Ambiente em claude.ai/code: setup script `bash scripts/cloud-setup.sh`; variável `NODE_AUTH_TOKEN` (token GitHub com `read:packages`). Sem credenciais do Dataverse.
+- Ambiente em claude.ai/code: variável `NODE_AUTH_TOKEN` (token GitHub com `read:packages`), sem credenciais do Dataverse. O preparo da VM roda no hook SessionStart (`.claude/hooks/session-start.sh` → `scripts/cloud-setup.sh`, log em `/tmp/cloud-setup.log`), porque o token não chega ao setup script do ambiente; o setup script pode ficar vazio.
 - Na VM o app roda em modo mock (`isLocalHost()`): sem dados do Dataverse, só navegação e UI. Dá para codar, rodar `pnpm typecheck`, `pnpm test`, `pnpm dev` (porta 36472) e verificar a UI no Chromium headless.
 - Comportamento que depende de dados reais, Custom API, plugin ou Flow não é verificável na VM: a sessão cloud entrega o PR e declara essa parte como "não verificada na nuvem"; a verificação com Dataverse DEV é feita localmente.
 - Sessões cloud nunca executam `pnpm push`, `pnpm wr` de publicação, `sitemap:*`, `push:plugin:*` nem scripts de `packages/deploy/provision-*` (todos alteram o Dataverse e exigem a `main` no checkout principal).
