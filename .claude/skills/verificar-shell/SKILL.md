@@ -20,7 +20,8 @@ description: "Verifica o shell React do Sistema Betinhos (apps/shell) e o pacote
 4. OPs: coluna Valor com R$ (não "—"); abrir uma OP → valor no cabeçalho do drawer.
 5. Geral: `#/geral?novo=1` abre "Criar serviço" (iframe do Formulário Geral) e o parâmetro some da URL; selo "Alterada" tem `title` com a dica.
 6. WebResource embutido: `document.querySelector('iframe').src` termina em `?host=shell`.
-7. Console sem erros em cada tela.
+7. Menu de visões em tela baixa: viewport 900x300 (ou celular deitado), abrir `.bt-viewbar__trigger` → `.bt-menu__panel` tem `max-height` inline, `overflow-y: auto` e o último item ("Salvar como…") fica alcançável rolando o painel, sem passar da tela (@betinhos/ui ≥ 1.10.1).
+8. Console sem erros em cada tela.
 
 ## Flows do Power Automate (`packages/deploy/provision-flow-*.ps1`)
 Não passam pelo `pnpm push`; cada script grava o clientdata direto no DEV (com backup em `flows/backup/`).
