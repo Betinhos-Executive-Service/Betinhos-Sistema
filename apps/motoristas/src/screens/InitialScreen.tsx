@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import betinhosLogo from "../../Logo Betinhos B.png";
+import betinhosLogo from "../assets/images/logo-betinhos-b-500.png";
 import carCrashIcon from "../assets/icons/car-crash-svgrepo-com.svg";
 import carIcon from "../assets/icons/car.svg";
 import historyIcon from "../assets/icons/clock.svg";
