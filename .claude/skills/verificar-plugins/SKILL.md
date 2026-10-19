@@ -18,7 +18,7 @@ description: "Verifica os plugins C# do Dataverse (Cr40f.Financeiro.Plugin, incl
 3. Simulação no DEV (só leitura): `dotnet run --project packages/plugins/tools/Cr40f.Financeiro.Registrar/Cr40f.Financeiro.Registrar.csproj -- --environmentUrl https://org23b93544.crm2.dynamics.com/ --simularValorOp` → linha `valor da OP: N OPs, M com reservas, K mudariam, 0 gravadas (simulação)`.
 4. Publicar no DEV (só da `main`, checkout principal): `pnpm push:plugin:financeiro:dev` → steps `Cr40f.ValorOp: …` criados/reconciliados e "plugin publicado com sucesso".
 5. Carga inicial no DEV: mesmo comando do passo 3 com `--recalcularValorOp` → `K gravadas`; repetir `--simularValorOp` → `0 mudariam`.
-6. Comportamento: no Sistema Betinhos (DEV) › Ordens de Pagamento, o valor de cada OP aparece sem o título "Soma dos serviços" (agora vem de `cr40f_valor`); alterar o `new_valortotal` de uma composição de teste ligada a uma reserva com OP e conferir a OP atualizada na hora.
+6. Comportamento: no Sistema Betinhos (DEV) › Ordens de Pagamento, o valor de cada OP aparece sem o título "Soma dos serviços" (agora vem de `cr40f_valor`); alterar um campo de origem (ex.: `new_valorpedagios`) de uma composição de teste — `new_valortotal` é calculada e não aceita escrita — ligada a uma reserva com OP e conferir a OP atualizada na hora.
 
 ## Casos de borda
 - Reserva sem composição conta 0 (como o `SyncEngine`); OP sem reserva fica sem valor (null).
