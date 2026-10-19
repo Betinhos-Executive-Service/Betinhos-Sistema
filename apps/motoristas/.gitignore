@@ -28,3 +28,9 @@ backup/prod-active-layers/
 
 # graphify (grafo gerado localmente)
 graphify-out/
+
+# Claude Code: versiona só skills, hooks e settings do projeto (valem também nas VMs cloud)
+.claude/*
+!.claude/skills/
+!.claude/hooks/
+!.claude/settings.json
