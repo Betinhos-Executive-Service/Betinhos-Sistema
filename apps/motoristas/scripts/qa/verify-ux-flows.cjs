@@ -58,11 +58,32 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
   const shot = (name) => page.screenshot({ path: path.join(SHOTS, `${name}.png`) });
   const main = () => page.locator("main").last();
   const open = async (hash, wait = 1300) => { await page.goto(`${BASE}?t=${Date.now()}#${hash}`); await page.waitForTimeout(wait); };
+  // Espera o estado esperado em vez de tempo fixo: a câmera simulada demora mais sob carga.
+  const waitForText = async (pattern, timeout = 10000) => {
+    const deadline = Date.now() + timeout;
+    while (Date.now() < deadline) {
+      if (pattern.test(await main().innerText().catch(() => ""))) return true;
+      await page.waitForTimeout(250);
+    }
+    return false;
+  };
+  const openCameraIfIdle = async () => {
+    const openButton = main().getByRole("button", { name: "Abrir câmera" });
+    // O painel some sozinho quando a câmera inicia; o clique é só para o caso de ela não ter iniciado.
+    if (await openButton.count()) await openButton.click({ timeout: 1500 }).catch(() => {});
+  };
   const takePhoto = async (confirmLabel = "Confirmar") => {
-    await page.waitForTimeout(1500);
-    await main().locator(".photo-capture").click();
-    await page.waitForTimeout(1500);
-    await main().getByRole("button", { name: confirmLabel }).last().click();
+    const shutter = main().locator(".photo-capture");
+    await shutter.waitFor({ state: "visible", timeout: 10000 });
+    await openCameraIfIdle();
+    await page.waitForFunction(() => {
+      const button = [...document.querySelectorAll("main")].pop()?.querySelector(".photo-capture");
+      return button && !button.disabled;
+    }, null, { timeout: 10000 });
+    await shutter.click();
+    const confirm = main().getByRole("button", { name: confirmLabel }).last();
+    await confirm.waitFor({ state: "visible", timeout: 10000 });
+    await confirm.click();
     await page.waitForTimeout(900);
   };
 
@@ -126,7 +147,9 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
     check("Receber: mostra o valor a receber", /R\$ 380,00/.test(await main().innerText()));
     await page.evaluate(() => { window.__cameraMode = "deny"; });
     await main().getByRole("button", { name: "Adicionar comprovante" }).click();
-    await page.waitForTimeout(1500);
+    if (!(await waitForText(/Câmera indisponível|Abrir câmera/))) await page.waitForTimeout(500);
+    await openCameraIfIdle();
+    await waitForText(/Câmera indisponível/);
     const deniedText = await main().innerText();
     check("Câmera negada: mensagem em português com 'Tentar de novo'", /Câmera indisponível/.test(deniedText) && /Permitir/.test(deniedText) && !/Permission denied/.test(deniedText), deniedText.replace(/\s+/g, " ").slice(0, 120));
     check("Câmera negada: sem aviso global duplicado", (await page.locator("text=Permission denied").count()) === 0);
@@ -134,6 +157,7 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
     await page.evaluate(() => { window.__cameraMode = "allow"; });
     await main().getByRole("button", { name: "Tentar de novo" }).click();
     await takePhoto("Confirmar");
+    await main().getByRole("button", { name: "Ver comprovante 1" }).waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
     check("Receber: comprovante anexado após 'Tentar de novo'", (await main().getByRole("button", { name: "Ver comprovante 1" }).count()) === 1);
     await main().getByRole("button", { name: "Ver comprovante 1" }).click();
     await page.waitForTimeout(800);
