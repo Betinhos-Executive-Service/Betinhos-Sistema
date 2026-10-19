@@ -23,7 +23,7 @@ description: "Verifica o backend do checklist de vistoria de veículo: plugin Ch
 3. Sintaxe dos scripts: `[System.Management.Automation.Language.Parser]::ParseFile` em cada `.ps1` acima → 0 erros; `node --check scripts/schema-index.cjs` → sem saída.
 4. Dry-run em DEV (somente leitura): `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/provision-checklists.ps1` → termina em `[checklists] DRY RUN concluido.`. Antes de aplicar: 4 tabelas, 5 relacionamentos e 1 chave aparecem como "criaria". Depois de aplicar: nenhuma linha "criaria".
 5. Somente com autorização para alterar o DEV:
-   - Antes de publicar o assembly, a branch precisa conter todo o plugin já publicado: sincronize com `develop` e confira que cada `plugintype` do assembly `Betinhos.DriverRecordSharing` no DEV existe em `plugins/DriverRecordSharing/*.cs`. Publicar de uma branch atrasada apaga do DEV o código das outras.
+   - Antes de publicar o assembly, a branch precisa conter todo o plugin já publicado: sincronize com `origin/main` e confira que cada `plugintype` do assembly `Betinhos.DriverRecordSharing` no DEV existe em `plugins/DriverRecordSharing/*.cs`. Publicar de uma branch atrasada apaga do DEV o código das outras.
    - `dotnet build plugins/DriverRecordSharing.Tests/DriverRecordSharing.Tests.csproj -c Release`, depois `register-driver-record-sharing-plugin-webapi.ps1 -EnvironmentUrl https://org23b93544.crm2.dynamics.com/ -SolutionUniqueName AppBetinhos -Apply -AddExistingToSolution` → termina em `REGISTRO E VALIDACAO OK`.
    - `provision-checklists.ps1 -Apply` → `schema e APIs publicados`; repetir sem `-Apply` → nenhuma linha "criaria".
    - `grant-checklists-role.ps1 -Apply` → as duas leituras Basic "concedido e verificado" (ou "ja tem").
