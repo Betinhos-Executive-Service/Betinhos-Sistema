@@ -10,7 +10,7 @@ namespace Cr40f.Financeiro.Plugin;
 /// Mantém cr40f_valor da OP igual à soma das composições das suas reservas (reserva.new_composicaodepreco →
 /// new_valortotal), a mesma soma que o SyncEngine usa quando a OP não tem valor. Nenhum outro processo preenche esse
 /// campo (PROD 18/10/2026: 596 OPs, 0 com valor), então relatórios e Power BI liam vazio.
-/// Steps (síncronos): composição Update(new_valortotal) pós; composição Delete pré e pós; reserva Create pós;
+/// Steps (síncronos): composição Update (qualquer campo: new_valortotal é calculada e nunca vem no Update) pós; composição Delete pré e pós; reserva Create pós;
 /// reserva Update(cr40f_financeiro, new_composicaodepreco) pós com imagem "pre"; reserva Delete pós com imagem "pre".
 /// </summary>
 public sealed class ValorOpPlugin : IPlugin
