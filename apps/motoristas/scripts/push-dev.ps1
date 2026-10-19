@@ -125,7 +125,7 @@ if ($IncludeOperacionais) {
   finally { Pop-Location }
 }
 else {
-  Write-Step "Tela Funcoes Operacionais fora desta publicacao (use -IncludeOperacionais ou `npm run push` no repo dela)"
+  Write-Step "Tela Funcoes Operacionais fora desta publicacao (use -IncludeOperacionais ou npm run push no repo dela)"
 }
 
 Write-Step "gate plugin: build e testes"
