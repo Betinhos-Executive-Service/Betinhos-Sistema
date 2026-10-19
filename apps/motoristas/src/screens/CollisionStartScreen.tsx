@@ -1,6 +1,7 @@
 import { AppShell } from "../components/layout/AppShell";
 import { FormMenu } from "../components/navigation/FormMenu";
 import type { CollisionType } from "../lib/collisions";
+import { openExternalUrl } from "../lib/localWorkflow";
 
 type CollisionStartScreenProps = {
   onBack: () => void;
@@ -13,7 +14,15 @@ export function CollisionStartScreen({ onBack, onSelect }: CollisionStartScreenP
       <FormMenu title="Colisões" onBack={onBack} />
       <section className="main-panel collision-start-main">
         <article className="collision-start-card">
-          <div className="collision-start-care-message">Antes de tudo, que bom que vocês estão bem. Agora escolha a opção que melhor descreve o ocorrido.</div>
+          <div className="collision-emergency" role="note">
+            <strong>Alguém se feriu?</strong>
+            <span>Ligue antes de registrar. O registro pode esperar.</span>
+            <div className="collision-emergency-actions">
+              <button type="button" onClick={() => openExternalUrl("tel:192")}>SAMU 192</button>
+              <button type="button" onClick={() => openExternalUrl("tel:190")}>Polícia 190</button>
+            </div>
+          </div>
+          <div className="collision-start-care-message">Se todos estão bem, escolha a opção que melhor descreve o ocorrido.</div>
           <div className="collision-start-kicker">O que aconteceu?</div>
           <div className="collision-choice-list">
             <button className="collision-choice collision-choice--primary" type="button" onClick={() => onSelect("eu_bati")}>

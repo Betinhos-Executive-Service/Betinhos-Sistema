@@ -1,11 +1,13 @@
 import { useMemo, useRef, useState, type Ref } from "react";
 import { AppShell } from "../components/layout/AppShell";
 import { ActionBar, ActionButton, type ActionButtonState } from "../components/common/ActionButton";
+import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { TextAreaControl, TextInputControl, SelectControl } from "../components/common/FormFields";
 import { FormMenu } from "../components/navigation/FormMenu";
 import { VoucherInputRow } from "../components/voucher/VoucherInputRow";
 import { VoucherSection } from "../components/voucher/VoucherSection";
 import { reportAppError } from "../lib/appErrorLogger";
+import { formatCurrencyInputOnBlur } from "../lib/currencyInput";
 import { getVoucherValidationResult, type VoucherValidationField } from "../lib/localWorkflow";
 import type { DetailData } from "../types";
 
@@ -69,7 +71,7 @@ function TimeSelects({
         value={hour}
         options={hourOptions}
         placeholder="Hora"
-        ariaLabel={`${prefix} hora`}
+        ariaLabel={`${prefix}: hora`}
         invalid={Boolean(error)}
         searchPlaceholder="Hora"
         onChange={onHourChange}
@@ -81,13 +83,21 @@ function TimeSelects({
         value={minute}
         options={minuteOptions}
         placeholder="Min"
-        ariaLabel={`${prefix} minuto`}
+        ariaLabel={`${prefix}: minuto`}
         invalid={Boolean(error)}
         searchPlaceholder="Min"
         onChange={onMinuteChange}
       />
     </div>
   );
+}
+
+// Horário agendado arredondado para a grade de 5 minutos dos seletores (ex.: "01/07/2026 14:32" -> 14:30).
+function getScheduledVoucherTime(dateValue = "") {
+  const match = dateValue.match(/(\d{2}):(\d{2})/);
+  if (!match) return null;
+  const minute = String(Math.floor(Number(match[2]) / 5) * 5).padStart(2, "0");
+  return { hour: match[1], minute };
 }
 
 function splitTime(value = "") {
@@ -172,6 +182,7 @@ export function VoucherScreen({
   const clientName = detail.fields.find((field) => field.label === "Cliente")?.value ?? "";
   const showSignature = /tenn?aris/i.test(clientName);
   const dateField = detail.fields.find((field) => /data|hora|hor\u00e1rio|janela/i.test(field.label));
+  const scheduledTime = getScheduledVoucherTime(dateField?.value);
   const draftRef = useRef(readVoucherDraft(detail, initialDraft));
   const startHourRef = useRef<HTMLButtonElement | null>(null);
   const startMinuteRef = useRef<HTMLButtonElement | null>(null);
@@ -198,6 +209,7 @@ export function VoucherScreen({
   const [fuel, setFuel] = useState(() => draftRef.current.combustivel ?? "");
   const [hotel, setHotel] = useState(() => draftRef.current.hospedagem ?? "");
   const [others, setOthers] = useState(() => draftRef.current.outros ?? "");
+  const [confirmClear, setConfirmClear] = useState(false);
   const [errors, setErrors] = useState<VoucherErrors>({});
 
   const clearError = (key: VoucherErrorKey) => {
@@ -348,10 +360,24 @@ export function VoucherScreen({
   };
 
   const errorCount = Object.values(errors).filter(Boolean).length;
+  const hasFilledFields = [startHour, startMinute, waitStartHour, waitStartMinute, waitEndHour, waitEndMinute, deviation, obs, toll, parking, fuel, hotel, others]
+    .some((value) => value.trim() !== "");
 
   return (
     <AppShell screenLabel="TelaVoucher">
-      <FormMenu title="Formulário de Voucher" onBack={isSubmitting ? undefined : onBack} rightIcon="eraser" rightLabel="Limpar rascunho" onRightClick={isSubmitting ? undefined : clear} />
+      <FormMenu title="Formulário de Voucher" onBack={isSubmitting ? undefined : onBack} rightIcon="eraser" rightLabel="Limpar formulário" onRightClick={isSubmitting || !hasFilledFields ? undefined : () => setConfirmClear(true)} />
+      {confirmClear ? (
+        <ConfirmDialog
+          title="Limpar o voucher?"
+          message="Horários, desvio, observação e despesas preenchidos serão apagados. A assinatura continua."
+          confirmLabel="Limpar"
+          onCancel={() => setConfirmClear(false)}
+          onConfirm={() => {
+            setConfirmClear(false);
+            clear();
+          }}
+        />
+      ) : null}
       <section className="main-panel voucher-main">
         <article className="voucher-card">
           <div className="details-header-v1 voucher-header-v1">
@@ -365,7 +391,7 @@ export function VoucherScreen({
               <VoucherSection>
                 <VoucherInputRow label="Horário Inicial" error={errors.startTime} required>
                   <TimeSelects
-                    prefix="horario-inicial"
+                    prefix="Horário inicial"
                     hour={startHour}
                     minute={startMinute}
                     error={errors.startTime}
@@ -382,13 +408,27 @@ export function VoucherScreen({
                       emitDraft({ "Horário Inicial": startHour && value ? `${startHour}:${value}` : "" });
                     }}
                   />
+                  {scheduledTime && !startHour && !startMinute ? (
+                    <button
+                      type="button"
+                      className="voucher-time-shortcut"
+                      onClick={() => {
+                        setStartHour(scheduledTime.hour);
+                        setStartMinute(scheduledTime.minute);
+                        clearError("startTime");
+                        emitDraft({ "Horário Inicial": `${scheduledTime.hour}:${scheduledTime.minute}` });
+                      }}
+                    >
+                      Usar {scheduledTime.hour}:{scheduledTime.minute} (agendado)
+                    </button>
+                  ) : null}
                 </VoucherInputRow>
               </VoucherSection>
 
               <VoucherSection title="Espera">
                 <VoucherInputRow label="Início" error={errors.waitStart || errors.waitRange}>
                   <TimeSelects
-                    prefix="espera-inicio"
+                    prefix="Início da espera"
                     hour={waitStartHour}
                     minute={waitStartMinute}
                     error={errors.waitStart || errors.waitRange}
@@ -410,7 +450,7 @@ export function VoucherScreen({
                 </VoucherInputRow>
                 <VoucherInputRow label="Final" error={errors.waitEnd || errors.waitRange}>
                   <TimeSelects
-                    prefix="espera-final"
+                    prefix="Fim da espera"
                     hour={waitEndHour}
                     minute={waitEndMinute}
                     error={errors.waitEnd || errors.waitRange}
@@ -466,6 +506,7 @@ export function VoucherScreen({
                     placeholder="R$ 0,00"
                     value={toll}
                     onChange={(event) => handleExpenseChange("toll", setToll, "Pedágio", event.target.value)}
+                    onBlur={(event) => handleExpenseChange("toll", setToll, "Pedágio", formatCurrencyInputOnBlur(event.target.value))}
                   />
                 </VoucherInputRow>
                 <VoucherInputRow label="Estacionamento" error={errors.parking}>
@@ -476,6 +517,7 @@ export function VoucherScreen({
                     placeholder="R$ 0,00"
                     value={parking}
                     onChange={(event) => handleExpenseChange("parking", setParking, "Estacionamento", event.target.value)}
+                    onBlur={(event) => handleExpenseChange("parking", setParking, "Estacionamento", formatCurrencyInputOnBlur(event.target.value))}
                   />
                 </VoucherInputRow>
                 <VoucherInputRow label="Combustível" error={errors.fuel}>
@@ -486,6 +528,7 @@ export function VoucherScreen({
                     placeholder="R$ 0,00"
                     value={fuel}
                     onChange={(event) => handleExpenseChange("fuel", setFuel, "Combustível", event.target.value)}
+                    onBlur={(event) => handleExpenseChange("fuel", setFuel, "Combustível", formatCurrencyInputOnBlur(event.target.value))}
                   />
                 </VoucherInputRow>
                 <VoucherInputRow label="Hospedagem" error={errors.hotel}>
@@ -496,6 +539,7 @@ export function VoucherScreen({
                     placeholder="R$ 0,00"
                     value={hotel}
                     onChange={(event) => handleExpenseChange("hotel", setHotel, "Hospedagem", event.target.value)}
+                    onBlur={(event) => handleExpenseChange("hotel", setHotel, "Hospedagem", formatCurrencyInputOnBlur(event.target.value))}
                   />
                 </VoucherInputRow>
                 <VoucherInputRow label="Outros" error={errors.others}>
@@ -506,6 +550,7 @@ export function VoucherScreen({
                     placeholder="R$ 0,00"
                     value={others}
                     onChange={(event) => handleExpenseChange("others", setOthers, "Outros", event.target.value)}
+                    onBlur={(event) => handleExpenseChange("others", setOthers, "Outros", formatCurrencyInputOnBlur(event.target.value))}
                   />
                 </VoucherInputRow>
               </VoucherSection>

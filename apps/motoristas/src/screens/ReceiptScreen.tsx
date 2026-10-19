@@ -1,6 +1,6 @@
 ﻿import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
-import logoBetinhosB from "../../Logo Betinhos B.png";
-import logoBetinhosPreta from "../../Logo Betinhos Preta.png";
+import logoBetinhosB from "../assets/images/logo-betinhos-b-500.png";
+import logoBetinhosPreta from "../assets/images/logo-betinhos-preta-1200.png";
 import nlaLogo from "../../NLA.jpg";
 import qrCodeAvaliacao from "../../QrCode-Avaliação.png";
 import invoiceReceiptIcon from "../assets/icons/invoice-receipt.svg";
@@ -14,6 +14,7 @@ import { createReceiptRecordRemote, hasDataverseRuntime, sendReceiptEmailRemote,
 import { buildPersonalReceiptDraft, buildPersonalReceiptModel, type PersonalReceiptEditableDraft, type PersonalReceiptModel } from "../lib/personalReceipt";
 import { getReceiptCopy, getReceiptDisplayClient, normalizeReceiptLanguage, RECEIPT_LANGUAGE, RECEIPT_LANGUAGE_OPTIONS } from "../lib/receiptLanguage";
 import { generateReceiptPdfBlob } from "../lib/receiptPdf";
+import { sanitizeCurrencyInput } from "../lib/currencyInput";
 import { createReceiptPdfCache } from "../lib/receiptPdfCache.ts";
 import type { DetailData } from "../types";
 
@@ -43,22 +44,6 @@ function validateReceiptDraft(draft: PersonalReceiptEditableDraft) {
 function displayReceiptValue(value: string) {
   const trimmed = value.trim();
   return trimmed || "-";
-}
-
-function sanitizeReceiptTotalInput(value: string) {
-  const cleaned = value.replace(/[^\d.,]/g, "");
-  const separatorMatches = [...cleaned.matchAll(/[.,]/g)];
-  if (!separatorMatches.length) return cleaned;
-
-  const lastSeparatorIndex = separatorMatches[separatorMatches.length - 1]?.index ?? -1;
-  if (lastSeparatorIndex < 0) return cleaned.replace(/[.,]/g, "");
-
-  const integerPart = cleaned.slice(0, lastSeparatorIndex).replace(/[.,]/g, "");
-  const fractionPart = cleaned.slice(lastSeparatorIndex + 1).replace(/[.,]/g, "").slice(0, 2);
-  const separator = cleaned[lastSeparatorIndex];
-
-  if (!fractionPart && cleaned.endsWith(separator)) return `${integerPart}${separator}`;
-  return fractionPart ? `${integerPart}${separator}${fractionPart}` : integerPart;
 }
 
 function ReceiptForm({
@@ -134,7 +119,7 @@ function ReceiptForm({
               pattern="[0-9.,]*"
               autoComplete="off"
               value={draft.valorTotal}
-              onChange={(event) => onChange("valorTotal", sanitizeReceiptTotalInput(event.target.value))}
+              onChange={(event) => onChange("valorTotal", sanitizeCurrencyInput(event.target.value))}
             />
             <TextAreaField
               fieldClassName={`finalize-input-block receipt-editor-block receipt-editor-block-span-2`}
@@ -364,6 +349,12 @@ function ReceiptPreview({
 }) {
   const copy = getReceiptCopy(model.idioma);
   const isGenerated = Boolean(receiptLink);
+  const expandedPanelRef = useRef<HTMLDivElement | null>(null);
+
+  // Painel oculto não pode receber foco (aria-hidden + botões focáveis); inert tira tudo da navegação.
+  useEffect(() => {
+    expandedPanelRef.current?.toggleAttribute("inert", !isGenerated);
+  }, [isGenerated]);
 
   return (
     <article className={`receipt-preview-card-shell ${isGenerated ? "is-generated" : ""}`.trim()}>
@@ -386,7 +377,7 @@ function ReceiptPreview({
         </button>
       ) : null}
 
-      <div className={`receipt-preview-expanded-panel ${isGenerated ? "is-visible" : ""}`.trim()} aria-hidden={!isGenerated}>
+      <div ref={expandedPanelRef} className={`receipt-preview-expanded-panel ${isGenerated ? "is-visible" : ""}`.trim()} aria-hidden={!isGenerated}>
         <div className="receipt-preview-expanded-copy">
           <div className="receipt-preview-expanded-copy-main">
             <span>Recibo gerado</span>
@@ -865,7 +856,7 @@ export function ReceiptScreen({
   }, [draft, model]);
 
   const updateField = (field: ReceiptDraftKey, value: string) => {
-    const nextValue = field === "valorTotal" ? sanitizeReceiptTotalInput(value) : value;
+    const nextValue = field === "valorTotal" ? sanitizeCurrencyInput(value) : value;
     setDraft((current) => ({ ...current, [field]: nextValue }));
     setErrors((current) => ({ ...current, [field]: undefined }));
     resetReceiptLink();

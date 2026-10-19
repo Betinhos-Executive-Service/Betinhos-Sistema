@@ -1,6 +1,6 @@
 import { PDFDocument } from "pdf-lib";
-import logoBetinhosBUrl from "../../Logo Betinhos B.png";
-import logoBetinhosPretaUrl from "../../Logo Betinhos Preta.png";
+import logoBetinhosBUrl from "../assets/images/logo-betinhos-b-500.png";
+import logoBetinhosPretaUrl from "../assets/images/logo-betinhos-preta-1200.png";
 import nlaLogoUrl from "../../NLA.jpg";
 import qrCodeAvaliacaoUrl from "../../QrCode-Avaliação.png";
 import centabelBookUrl from "../assets/fonts/Centabel-Book.ttf";

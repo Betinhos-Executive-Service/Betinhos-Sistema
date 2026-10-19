@@ -1635,7 +1635,7 @@ export async function createReceiptRecordRemote({
     cr40f_metodo_pagamento: truncateDataverseText(model.metodoPagamento, 1000),
     cr40f_periodo: truncateDataverseText(model.periodo, 1000),
     cr40f_trajetos: model.trajetos,
-    cr40f_observacoes: model.observacoes,
+    cr40f_observacoes: model.observacoes.trim() || "-",
     cr40f_mime_type: "application/pdf",
     cr40f_status_geracao: RECEIPT_STATUS.gerado,
     cr40f_modelo_json: JSON.stringify(model),

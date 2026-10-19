@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActionBar, ActionButton, type ActionButtonState } from "../components/common/ActionButton";
+import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { FieldError, MoneyInputField, SelectField, TextAreaField } from "../components/common/FormFields";
 import { PhotoAddButton } from "../components/common/PhotoAddButton";
 import { AppShell } from "../components/layout/AppShell";
@@ -43,7 +44,7 @@ function focusInvalidField(element: HTMLElement | null) {
   }, 40);
 }
 
-function FinalizeActions({ onNone, onConfirm, submitState }: { onNone: () => void; onConfirm: () => void; submitState: ActionButtonState }) {
+function FinalizeActions({ onNone, onConfirm, submitState, noneLabel = "Não tenho" }: { onNone: () => void; onConfirm: () => void; submitState: ActionButtonState; noneLabel?: string }) {
   const [activeAction, setActiveAction] = useState<"none" | "confirm" | "">("");
 
   useEffect(() => {
@@ -54,7 +55,7 @@ function FinalizeActions({ onNone, onConfirm, submitState }: { onNone: () => voi
     <ActionBar className="finalize-actions">
       <ActionButton
         className="finalize-secondary"
-        idleLabel="Não tenho"
+        idleLabel={noneLabel}
         state={submitState}
         active={activeAction === "none"}
         variant="secondary"
@@ -106,19 +107,21 @@ function ServiceFinalize({ detail, onDone, submitState, initialObservation = "" 
     setObs(initialObservation);
   }, [detail.id, initialObservation]);
 
-  const finalObservation = obs.trim() || initialObservation.trim() || "Sem observação.";
+  // Se o motorista já escreveu no detalhe, a tela confirma o texto em vez de perguntar de novo.
+  const hasObservation = obs.trim() !== "";
 
   return (
     <article className="finalize-card">
-      <div className="finalize-title">Digite abaixo sua observação</div>
+      <div className="finalize-title">{hasObservation ? "Confira sua observação" : "Digite abaixo sua observação"}</div>
       <div className="finalize-scroll">
         <div className="finalize-form">
           <TextAreaBlock label="Observação do serviço" value={obs} onChange={setObs} />
         </div>
       </div>
       <FinalizeActions
-        onNone={() => onDone({ "Observação Final": finalObservation })}
-        onConfirm={() => onDone({ "Observação Final": finalObservation })}
+        noneLabel={hasObservation ? "Enviar sem observação" : "Não tenho"}
+        onNone={() => onDone({ "Observação Final": "Sem observação." })}
+        onConfirm={() => onDone({ "Observação Final": obs.trim() || "Sem observação." })}
         submitState={submitState}
       />
     </article>
@@ -156,8 +159,9 @@ function ExchangeFinalize({ detail, onDone, submitState }: { detail: DetailData;
         </div>
       </div>
       <FinalizeActions
+        noneLabel={obs.trim() ? "Enviar sem observação" : "Não tenho"}
         onNone={() => finish("Sem observação.")}
-        onConfirm={() => finish(obs || "Sem observação.")}
+        onConfirm={() => finish(obs.trim() || "Sem observação.")}
         submitState={submitState}
       />
     </article>
@@ -502,12 +506,34 @@ export function FinalizeScreen({
   submitState = "idle",
   initialServiceObservation = ""
 }: FinalizeScreenProps) {
-  const title = detail.type === "MANUTENCAO" ? "Detalhes da Manutenção" : "Alguma Observação?";
+  const title = detail.type === "MANUTENCAO" ? "Detalhes da Manutenção" : "Observação final";
   const isSubmitting = submitState !== "idle";
+  const [confirmClearPhotos, setConfirmClearPhotos] = useState(false);
+  // O apagador só remove fotos; por isso aparece apenas na manutenção e quando há foto.
+  const photoCount = Object.values(maintenancePhotos).filter(Boolean).length;
+  const canClearPhotos = detail.type === "MANUTENCAO" && photoCount > 0 && Boolean(onClearPhotos);
 
   return (
     <AppShell screenLabel="TelaFinalizar">
-      <FormMenu title={title} onBack={isSubmitting ? undefined : onBack} rightIcon="eraser" rightLabel="Limpar campos" onRightClick={isSubmitting ? undefined : onClearPhotos} />
+      <FormMenu
+        title={title}
+        onBack={isSubmitting ? undefined : onBack}
+        rightIcon={canClearPhotos ? "eraser" : undefined}
+        rightLabel="Apagar fotos"
+        onRightClick={isSubmitting ? undefined : () => setConfirmClearPhotos(true)}
+      />
+      {confirmClearPhotos ? (
+        <ConfirmDialog
+          title={photoCount === 1 ? "Apagar 1 foto?" : `Apagar ${photoCount} fotos?`}
+          message="As fotos da nota fiscal e da manutenção desta tela serão removidas. Os textos continuam."
+          confirmLabel="Apagar"
+          onCancel={() => setConfirmClearPhotos(false)}
+          onConfirm={() => {
+            setConfirmClearPhotos(false);
+            onClearPhotos?.();
+          }}
+        />
+      ) : null}
       <section className="main-panel finalize-main">
         {detail.type === "TROCA" ? <ExchangeFinalize detail={detail} onDone={onDone} submitState={submitState} /> : null}
         {detail.type === "SERVICO" ? <ServiceFinalize detail={detail} onDone={onDone} submitState={submitState} initialObservation={initialServiceObservation} /> : null}

@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { ActionBar, ActionButton, type ActionButtonState } from "../components/common/ActionButton";
+import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { TextAreaField } from "../components/common/FormFields";
 import { AppShell } from "../components/layout/AppShell";
 import { FormMenu } from "../components/navigation/FormMenu";
@@ -16,6 +17,7 @@ type LocalCancelScreenProps = {
 export function LocalCancelScreen({ onBack, onWrongClick, onSubmit, submitState = "idle" }: LocalCancelScreenProps) {
   const [text, setText] = useState("");
   const [error, setError] = useState("");
+  const [confirmClear, setConfirmClear] = useState(false);
   const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
   const isSubmitting = submitState !== "idle";
   const submit = () => {
@@ -30,10 +32,20 @@ export function LocalCancelScreen({ onBack, onWrongClick, onSubmit, submitState 
 
   return (
     <AppShell screenLabel="TelaCanceladonoLocal">
-      <FormMenu title="Cancelado no Local" onBack={isSubmitting ? undefined : onBack} rightIcon="eraser" rightLabel="Limpar" onRightClick={isSubmitting ? undefined : () => {
-        setText("");
-        setError("");
-      }} />
+      <FormMenu title="Cancelado no Local" onBack={isSubmitting ? undefined : onBack} rightIcon="eraser" rightLabel="Limpar texto" onRightClick={isSubmitting || !text.trim() ? undefined : () => setConfirmClear(true)} />
+      {confirmClear ? (
+        <ConfirmDialog
+          title="Apagar o texto?"
+          message="A descrição do cancelamento que você escreveu será apagada."
+          confirmLabel="Apagar"
+          onCancel={() => setConfirmClear(false)}
+          onConfirm={() => {
+            setConfirmClear(false);
+            setText("");
+            setError("");
+          }}
+        />
+      ) : null}
       <section className="main-panel cancel-main">
         <article className="cancel-card">
           <div className="cancel-title">Descreva detalhadamente:</div>
