@@ -20,3 +20,5 @@ plugins/ExpenseUpload/ExpenseUpload.snk
 .memsearch/
 
 .worktrees/
+backup/prod-deploy/
+backup/prod-active-layers/

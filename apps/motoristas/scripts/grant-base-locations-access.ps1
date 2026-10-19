@@ -3,6 +3,9 @@
   [switch] $Apply
 )
 
+. (Join-Path $PSScriptRoot "lib/assert-dev-environment.ps1")
+Assert-DevEnvironment $EnvironmentUrl
+
 # Inclui a tabela Local de base (new_localdebase) no App Betinhos Interno, logo apos
 # Veiculos no menu, e concede leitura aos perfis operacionais. Sem -Apply roda em DRY RUN.
 
