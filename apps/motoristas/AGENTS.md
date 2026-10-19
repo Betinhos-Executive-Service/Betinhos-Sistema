@@ -17,7 +17,7 @@ Before any Codex file or code change, query the existing `graphify-out/graph.jso
 
 ## Build, Test, and Development Commands
 
-- `npm run dev` starts the local dev wrapper.
+- `npm run dev` starts the local dev wrapper on the port reserved for this checkout in `~/.codex/dev-ports.json` (or `PORT`). If the port is held by this checkout's dev server it restarts it; if another service holds it, it fails with PID and command (no fallback port).
 - `npm test` runs all tests with Node's built-in test runner and TypeScript stripping.
 - `npx tsc --noEmit --noUnusedLocals --noUnusedParameters` runs the strict type gate.
 - `npm run build` builds the single-file webresource into `dist/`.

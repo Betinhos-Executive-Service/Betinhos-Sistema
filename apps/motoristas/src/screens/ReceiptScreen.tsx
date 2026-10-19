@@ -1,6 +1,6 @@
 ﻿import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
-import logoBetinhosB from "../../Logo Betinhos B.png";
-import logoBetinhosPreta from "../../Logo Betinhos Preta.png";
+import logoBetinhosB from "../assets/images/logo-betinhos-b-500.png";
+import logoBetinhosPreta from "../assets/images/logo-betinhos-preta-1200.png";
 import nlaLogo from "../../NLA.jpg";
 import qrCodeAvaliacao from "../../QrCode-Avaliação.png";
 import invoiceReceiptIcon from "../assets/icons/invoice-receipt.svg";
