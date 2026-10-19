@@ -1,6 +1,8 @@
 .memsearch/
 .worktrees/
-.claude/
+# Só as skills de verificação são versionadas; worktrees e configurações locais ficam fora.
+.claude/*
+!.claude/skills/
 *.tsbuildinfo
 node_modules/
 dist/
