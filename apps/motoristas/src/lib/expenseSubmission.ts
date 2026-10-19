@@ -1,5 +1,7 @@
 import { canDispatchExpenseUpload, type ExpenseSubmission, type ExpenseUploadRow } from "./expenseUploadState.ts";
 
+export type ExpenseSubmissionProgress = { phase: "creating" } | { phase: "uploading"; order: number; total: number };
+
 export type ExpenseSubmissionDependencies = {
   save: (value: ExpenseSubmission) => Promise<void>;
   ensure: (value: ExpenseSubmission) => Promise<void>;
@@ -7,11 +9,13 @@ export type ExpenseSubmissionDependencies = {
   retry: (id: string, attempt: string, next: string) => Promise<unknown>;
   dispatch: (item: ExpenseSubmission["items"][number]) => Promise<void>;
   report: (error: unknown, attachmentId: string, attemptId: string) => void;
+  progress?: (event: ExpenseSubmissionProgress) => void;
 };
 
 // Journal changes before every mutation, including a retry and the dispatch itself.
 export async function resumeExpenseSubmission(submission: ExpenseSubmission, deps: ExpenseSubmissionDependencies, retryFailed = false) {
   await deps.save(submission);
+  deps.progress?.({ phase: "creating" });
   await deps.ensure(submission);
   submission.expenseConfirmed = true;
   await deps.save(submission);
@@ -37,6 +41,7 @@ export async function resumeExpenseSubmission(submission: ExpenseSubmission, dep
     if (!canDispatchExpenseUpload(item, row)) continue;
     item.dispatchStarted = true;
     await deps.save(submission);
+    deps.progress?.({ phase: "uploading", order: item.order, total: submission.items.length });
     try { await deps.dispatch(item); }
     catch (error) { deps.report(error, item.id, item.attemptId); }
   }

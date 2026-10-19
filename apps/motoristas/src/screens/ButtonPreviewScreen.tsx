@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import invoiceReceiptIcon from "../assets/icons/invoice-receipt.svg";
 import { ActionBar, ActionButton, type ActionButtonState } from "../components/common/ActionButton";
 import { LocalToast, type ToastState } from "../components/common/LocalToast";
+import { ExpenseSendOverlay, type ExpenseSendState } from "../components/common/ExpenseSendOverlay";
 import { SearchableSelect } from "../components/common/SearchableSelect";
 import { SystemIcon } from "../components/icons/SystemIcon";
 import { agendaMock, historyMock } from "../data/mockData";
@@ -13,7 +14,7 @@ import type { MaintenancePhotoKind, DetailData } from "../types";
 import { CollisionScreen } from "./CollisionScreen";
 import { CollisionStartScreen } from "./CollisionStartScreen";
 import { DetailsScreen } from "./DetailsScreen";
-import { ExpenseScreen } from "./ExpenseScreen";
+import { ExpenseScreen, type ExpenseUploadListItem } from "./ExpenseScreen";
 import { FinalizeScreen, type MaintenanceFinalizeDraft } from "./FinalizeScreen";
 import { HistoryDetailsScreen } from "./HistoryDetailsScreen";
 import { HistoryScreen } from "./HistoryScreen";
@@ -173,6 +174,16 @@ const PREVIEW_EXPENSE_REFERENCE_DATA: ExpenseReferenceData = {
     { id: "city-gru", name: "Guarulhos", uf: "SP", pais: "Brasil", codigoIbge: "3518800", order: 30 }
   ]
 };
+
+const PREVIEW_EXPENSE_UPLOAD_DRAFT: ExpenseDraft = {
+  categoriaId: "local-abastecimento", veiculoId: "", valor: "245,90", dataGasto: "2026-10-19", formaPagamentoId: "",
+  cidadeId: "", estabelecimento: "", descricao: "", kmInformado: "", litros: ""
+};
+
+const PREVIEW_EXPENSE_UPLOADS: ExpenseUploadListItem[] = [
+  { id: "preview-upload-waiting", draft: PREVIEW_EXPENSE_UPLOAD_DRAFT, status: { state: "interrupted", text: "Aguardando conexão para enviar.", action: "continue" } },
+  { id: "preview-upload-failed", draft: { ...PREVIEW_EXPENSE_UPLOAD_DRAFT, categoriaId: "local-almoco", valor: "58,00" }, status: { state: "failed", text: "Comprovante não foi anexado.", action: "retry" } }
+];
 
 const SERVICE_DETAIL = agendaMock.find((item) => item.detail?.type === "SERVICO")?.detail as DetailData;
 const EXCHANGE_DETAIL = agendaMock.find((item) => item.detail?.type === "TROCA")?.detail as DetailData;
@@ -462,6 +473,19 @@ export function ButtonPreviewScreen({ onShowToast }: ButtonPreviewScreenProps) {
     timersRef.current.push(successTimer, idleTimer);
   };
 
+  const [expenseSend, setExpenseSend] = useState<ExpenseSendState | null>(null);
+  // Mirrors the real send: save, one step per photo, success, then back.
+  const simulateExpenseSend = () => {
+    const total = expensePhotos.length;
+    const steps: ExpenseSendState[] = [
+      { phase: "saving", current: 0, total },
+      ...Array.from({ length: total }, (_, index) => ({ phase: "uploading" as const, current: index + 1, total })),
+      { phase: "done", current: total, total }
+    ];
+    steps.forEach((step, index) => timersRef.current.push(window.setTimeout(() => setExpenseSend(step), index * DEMO_DELAY_MS)));
+    timersRef.current.push(window.setTimeout(() => setExpenseSend(null), steps.length * DEMO_DELAY_MS + 300));
+  };
+
   const emitToast = (message: string, tone: ToastState["tone"] = "info") => {
     const nextToast = { id: Date.now() + Math.random(), message, tone };
     setInlineToast(nextToast);
@@ -705,6 +729,8 @@ export function ButtonPreviewScreen({ onShowToast }: ButtonPreviewScreenProps) {
     if (selectedDemo === "expense") {
       return (
         <ExpenseScreen
+          uploads={PREVIEW_EXPENSE_UPLOADS}
+          onUploadAction={() => emitToast("Nova tentativa de comprovante mockada.", "info")}
           draft={expenseDraft}
           photos={expensePhotos}
           referenceData={PREVIEW_EXPENSE_REFERENCE_DATA}
@@ -713,8 +739,8 @@ export function ButtonPreviewScreen({ onShowToast }: ButtonPreviewScreenProps) {
           onAddPhoto={() => emitToast("Adicionar comprovante de gasto mockado.", "info")}
           onPreviewPhoto={() => openDemo("photo-preview")}
           onBack={() => openDemo("initial")}
-          onSubmit={pulseSubmitState}
-          submitState={submitState}
+          onSubmit={simulateExpenseSend}
+          submitState={expenseSend ? "loading" : "idle"}
           vehicles={PREVIEW_VEHICLES}
           vehiclesLoading={false}
           currentVehicleId={PREVIEW_VEHICLES[0].id}
@@ -802,6 +828,7 @@ export function ButtonPreviewScreen({ onShowToast }: ButtonPreviewScreenProps) {
 
   return (
     <div className="button-preview-screen preview-lab-screen">
+      {expenseSend ? <ExpenseSendOverlay state={expenseSend} onClose={() => setExpenseSend(null)} /> : null}
       <PreviewNav selectedDemo={selectedDemo} onSelect={setSelectedDemo} />
       <div className="preview-lab-main">
         <header className="preview-lab-header">

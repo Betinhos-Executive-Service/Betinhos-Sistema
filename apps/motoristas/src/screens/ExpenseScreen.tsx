@@ -16,11 +16,31 @@ import {
   type ExpenseValidationErrors
 } from "../lib/expenses";
 import type { MaintenanceRequestVehicleOption } from "../lib/dataverse";
+import { parseCurrencyInput } from "../lib/expenses";
+import type { ExpenseSubmissionStatus } from "../lib/expenseUploadState";
+import { SystemIcon, type SystemIconName } from "../components/icons/SystemIcon";
+
+export type ExpenseUploadListItem = {
+  id: string;
+  draft: ExpenseDraft;
+  status: ExpenseSubmissionStatus;
+};
+
+const UPLOAD_ICON: Record<ExpenseSubmissionStatus["state"], SystemIconName> = {
+  interrupted: "warning",
+  processing: "sync",
+  unclaimed: "warning",
+  failed: "error",
+  complete: "check"
+};
+
+const UPLOAD_ACTION_LABEL = { continue: "Enviar agora", retry: "Tentar de novo", verify: "Verificar" } as const;
+
+const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 type ExpenseScreenProps = {
-  uploadMessage?: string;
-  formLocked?: boolean;
-  submitLabel?: string;
+  uploads?: ExpenseUploadListItem[];
+  onUploadAction?: (expenseId: string) => void;
   submitDisabled?: boolean;
   draft: ExpenseDraft;
   photos: ExpensePhoto[];
@@ -44,9 +64,8 @@ function focusInvalidField(element: HTMLElement | null) {
 }
 
 export function ExpenseScreen({
-  uploadMessage = "",
-  formLocked = false,
-  submitLabel = "REGISTRAR",
+  uploads = [],
+  onUploadAction,
   submitDisabled = false,
   draft,
   photos,
@@ -124,7 +143,6 @@ export function ExpenseScreen({
 
   const submit = () => {
     if (isSubmitting || submitDisabled) return;
-    if (formLocked) { onSubmit(draft); return; }
     const nextErrors = validateExpenseDraft(draft, photos, referenceData);
     setErrors(nextErrors);
     if (nextErrors.categoriaId) return focusInvalidField(categoryRef.current);
@@ -147,6 +165,11 @@ export function ExpenseScreen({
 
   const errorCount = Object.values(errors).filter(Boolean).length;
   const isVideo = (photo: ExpensePhoto) => photo.mediaType === "video" || Boolean(photo.rawBlob) || photo.dataUrl.startsWith("data:video/");
+  const uploadTitle = (item: ExpenseUploadListItem) => {
+    const name = findExpenseCategory(referenceData, item.draft.categoriaId)?.name ?? "Gasto";
+    const [, month, day] = item.draft.dataGasto.split("-");
+    return [name, BRL.format(parseCurrencyInput(item.draft.valor) || 0), day && month ? `${day}/${month}` : ""].filter(Boolean).join(" · ");
+  };
 
   return (
     <AppShell screenLabel="TelaGastos">
@@ -154,7 +177,28 @@ export function ExpenseScreen({
       <section className="main-panel maintenance-request-main">
         <article className="finalize-card maintenance-request-card">
           <div className="finalize-scroll">
-            <fieldset disabled={formLocked || isSubmitting} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }} className="finalize-form maintenance maintenance-request-form expense-form">
+            {uploads.length ? (
+              <section className="expense-uploads" aria-label="Envios pendentes">
+                <p className="expense-uploads-title">Envios pendentes</p>
+                <ul>
+                  {uploads.map((item) => (
+                    <li key={item.id} className={`expense-upload is-${item.status.state}`}>
+                      <span className="expense-upload-icon" aria-hidden="true"><SystemIcon name={UPLOAD_ICON[item.status.state]} /></span>
+                      <span className="expense-upload-text">
+                        <strong>{uploadTitle(item)}</strong>
+                        <span role="status">{item.status.text}</span>
+                      </span>
+                      {item.status.action && onUploadAction ? (
+                        <button type="button" className="expense-upload-action" disabled={isSubmitting} onClick={() => onUploadAction(item.id)}>
+                          {UPLOAD_ACTION_LABEL[item.status.action]}
+                        </button>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+            <fieldset disabled={isSubmitting} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }} className="finalize-form maintenance maintenance-request-form expense-form">
               {referenceLoading ? <div className="form-error-summary">Carregando regras de despesa.</div> : null}
               {!referenceLoading && referenceError ? <div className="form-error-summary">{referenceError}</div> : null}
               {!referenceLoading && !referenceError && (!categoriesReady || !paymentReady || !citiesReady) ? (
@@ -344,12 +388,11 @@ export function ExpenseScreen({
               </FormField>
             </fieldset>
           </div>
-          {uploadMessage ? <p role="status" aria-live="polite">{uploadMessage}</p> : null}
           <ActionBar className="finalize-actions maintenance-actions">
             <ActionButton
               className="finalize-primary"
               variant="primary"
-              idleLabel={submitLabel}
+              idleLabel="REGISTRAR"
               disabled={submitDisabled}
               loadingLabel="REGISTRANDO"
               successLabel="REGISTRADO"
