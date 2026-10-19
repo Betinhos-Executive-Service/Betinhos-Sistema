@@ -91,7 +91,9 @@ EnsureUpdateStep(service, stepTypeId, "cr40f_pagantes", "cr40f_status", "Cr40f.F
 EnsureUpdateStep(service, stepTypeId, "cr40f_financeiro", "cr40f_status", "Cr40f.Financeiro: OP → Reservas", solutionUniqueName);
 // Valor da OP = soma das composições das reservas (mesma soma do SyncEngine). Ver ValorOpPlugin.
 var valorOpTypeId = UpsertPluginTypeNamed(service, assemblyId, "Cr40f.Financeiro.Plugin.ValorOpPlugin");
-EnsureStep(service, valorOpTypeId, "Update", "cr40f_composicaodeprecos", 40, "new_valortotal", "Cr40f.ValorOp: composição alterada", solutionUniqueName);
+// new_valortotal é coluna calculada (subtotal + pedágios + passagens + estacionamento + combustível): não entra em Update,
+// então o step ouve qualquer alteração da composição; o plugin só grava a OP se o total mudar.
+EnsureStep(service, valorOpTypeId, "Update", "cr40f_composicaodeprecos", 40, null, "Cr40f.ValorOp: composição alterada", solutionUniqueName);
 EnsureStep(service, valorOpTypeId, "Delete", "cr40f_composicaodeprecos", 20, null, "Cr40f.ValorOp: composição excluída (antes)", solutionUniqueName);
 EnsureStep(service, valorOpTypeId, "Delete", "cr40f_composicaodeprecos", 40, null, "Cr40f.ValorOp: composição excluída", solutionUniqueName);
 EnsureStep(service, valorOpTypeId, "Create", "cr40f_reservadeveculos", 40, null, "Cr40f.ValorOp: reserva criada", solutionUniqueName);
