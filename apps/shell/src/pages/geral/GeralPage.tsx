@@ -4,7 +4,7 @@ import { Alert, Button, EmptyState, Menu, SearchBox, SegmentedControl, Stack, St
 import { Archive, ArchiveRestore, Bug, CalendarDays, ChevronDown, ClipboardList, Copy, FilePlus2, LayoutGrid, Link2, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Send, ShieldCheck, Table2, Ticket, X } from 'lucide-react'
 import type { Host } from '../../host'
 import { useMedia } from '../operacional/useMedia'
-import { hrefFor, queryFromHash } from '../../nav/useHashRoute'
+import { hrefFor, patchHashQuery, queryFromHash, readHashQuery } from '../../nav/useHashRoute'
 import { createSource } from './data/source'
 import { Cell } from './components/Cell'
 import { GeralCards } from './components/GeralCards'
@@ -182,6 +182,15 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       toast({ tone: 'danger', message: reason instanceof Error ? reason.message : String(reason) })
     }
   }, [source, refresh, toast])
+
+  // `#/geral?novo=1` (atalho "Novo serviço" da Página Inicial): abre a criação uma vez e tira o parâmetro do link.
+  const novoTratado = useRef(false)
+  useEffect(() => {
+    if (novoTratado.current || readHashQuery().get('novo') !== '1') return
+    novoTratado.current = true
+    patchHashQuery({ novo: null })
+    void openForm('create')
+  }, [openForm])
 
   const selectedIds = useMemo(() => Array.from(geral.selected), [geral.selected])
   const rowOf = useCallback((id: string) => rows.find((r) => String(r[ID_ATTRIBUTE]) === id), [rows])
