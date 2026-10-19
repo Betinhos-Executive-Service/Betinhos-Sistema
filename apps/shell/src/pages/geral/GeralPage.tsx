@@ -366,18 +366,20 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const none = selectedIds.length === 0
   // Rótulo de item de menu com o motivo embaixo quando o item está inerte.
   const hint = (label: string, reason: string | null) => (reason ? <span className="gr-menu__hint" title={reason}>{label}<small>{reason}</small></span> : label)
-  const createButton = <Button size={mobile ? 'touch' : 'compact'} icon={<Plus size={16} />} onClick={() => { void openForm('create') }}>Criar serviço</Button>
+  // Todos os comandos da linha têm o mesmo tamanho da barra do DS (40 px no desktop, 44 px no celular): nada de misturar compacto com padrão.
+  const size = mobile ? 'touch' : 'default'
+  const createButton = <Button size={size} icon={<Plus size={16} />} onClick={() => { void openForm('create') }}>Criar serviço</Button>
   // Desktop: Criar, Editar e Desativar/Ativar ficam na barra (a posição não pula); os demais comandos de seleção vivem no menu "Ações".
   // Sem seleção servível, botões e itens ficam inertes, com o motivo.
   const commands = mobile ? createButton : (
     <>
       {createButton}
       {selectedIds.length === 1
-        ? <Button variant="action" size="compact" icon={<Pencil size={16} />} onClick={() => { void openForm('edit', selectedIds[0]) }}>Editar</Button>
-        : <Button variant="action" size="compact" icon={<Pencil size={16} />} {...blocked(oneTitle, oneId)}>Editar</Button>}
+        ? <Button variant="action" size={size} icon={<Pencil size={16} />} onClick={() => { void openForm('edit', selectedIds[0]) }}>Editar</Button>
+        : <Button variant="action" size={size} icon={<Pencil size={16} />} {...blocked(oneTitle, oneId)}>Editar</Button>}
       <Menu
         align="start"
-        trigger={(props) => <Button {...props} variant="action" size="compact" icon={<ChevronDown size={16} />} aria-label={none ? 'Ações' : `Ações (${selectedIds.length})`}>Ações{none ? null : <span className="gr-filters__count">{selectedIds.length}</span>}</Button>}
+        trigger={(props) => <Button {...props} variant="action" size={size} icon={<ChevronDown size={16} />} aria-label={none ? 'Ações' : `Ações (${selectedIds.length})`}>Ações{none ? null : <span className="gr-filters__count">{selectedIds.length}</span>}</Button>}
         actions={[
           { id: 'voucher', label: hint('Gerar Voucher', none ? noneTitle : null), icon: <Ticket size={16} />, disabled: none, onSelect: openVoucher },
           { id: 'copiar', label: hint('Copiar Serviços', none ? noneTitle : null), icon: <Copy size={16} />, disabled: none, onSelect: () => { void copySelected() } },
@@ -387,14 +389,14 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         ]}
       />
       {none
-        ? <Button variant="danger" size="compact" icon={<Archive size={16} />} {...blocked(noneTitle, noneId)}>Desativar</Button>
+        ? <Button variant="danger" size={size} icon={<Archive size={16} />} {...blocked(noneTitle, noneId)}>Desativar</Button>
         : selectedState === 1
-          ? <Button variant="action" size="compact" icon={<ArchiveRestore size={16} />} onClick={() => askState(true)}>Ativar</Button>
+          ? <Button variant="action" size={size} icon={<ArchiveRestore size={16} />} onClick={() => askState(true)}>Ativar</Button>
           : selectedState === 0
-            ? <Button variant="danger" size="compact" icon={<Archive size={16} />} onClick={() => askState(false)}>Desativar</Button>
+            ? <Button variant="danger" size={size} icon={<Archive size={16} />} onClick={() => askState(false)}>Desativar</Button>
             : <>
-              <Button variant="danger" size="compact" icon={<Archive size={16} />} {...blocked(mixedTitle, mixedId)}>Desativar</Button>
-              <Button variant="action" size="compact" icon={<ArchiveRestore size={16} />} {...blocked(mixedTitle, mixedId)}>Ativar</Button>
+              <Button variant="danger" size={size} icon={<Archive size={16} />} {...blocked(mixedTitle, mixedId)}>Desativar</Button>
+              <Button variant="action" size={size} icon={<ArchiveRestore size={16} />} {...blocked(mixedTitle, mixedId)}>Ativar</Button>
             </>}
       <span id={oneId} className="gr-sr">{oneTitle}</span>
       <span id={noneId} className="gr-sr">{noneTitle}</span>
@@ -403,7 +405,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   )
   const shortcuts = (
     <Menu
-      trigger={(props) => <Button {...props} variant="secondary" size={mobile ? 'touch' : 'compact'} icon={<MoreVertical size={16} />} aria-label="Mais ações" />}
+      trigger={(props) => <Button {...props} variant="secondary" size={size} icon={<MoreVertical size={16} />} aria-label="Mais ações" />}
       actions={[
         { id: 'funcoes', label: 'Funções Operacionais', icon: <ClipboardList size={16} />, onSelect: () => { location.hash = hrefFor('new_telafuncoesoperacionais') } },
         { id: 'escala', label: 'Escala FDS', icon: <CalendarDays size={16} />, onSelect: () => setEscalaOpen(true) },
@@ -525,7 +527,6 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     )
   }
 
-  const size = mobile ? 'touch' : 'compact'
   const notApplied = geral.filtersIgnored ? [...Object.keys(filters.quick), ...filters.advanced.items.map((i) => i.id)] : undefined
 
   return (
@@ -539,7 +540,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       >
         {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
         {!mobile ? (
-          <SegmentedControl<ViewMode> size="compact" aria-label="Mostrar como" value={mode} onChange={changeMode} options={[
+          <SegmentedControl<ViewMode> aria-label="Mostrar como" value={mode} onChange={changeMode} options={[
             { value: 'tabela', label: <span className="gr-mode"><Table2 size={14} aria-hidden="true" />Tabela</span> },
             { value: 'cards', label: <span className="gr-mode"><LayoutGrid size={14} aria-hidden="true" />Cards</span> },
           ]} />

@@ -735,12 +735,19 @@ describe('Geral: espaço e densidade', () => {
     expect(document.querySelectorAll('.gr-cards > li')).toHaveLength(200)
   }, 90_000)
 
-  it('no desktop os comandos da lista são compactos; Colunas e Filtros seguem a barra do Design System', async () => {
+  it('no desktop todos os comandos da lista têm o tamanho padrão do DS (40 px), igual a Colunas e Filtros', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
     const toolbar = screen.getByRole('toolbar', { name: 'Comandos de serviços' })
-    expect(within(toolbar).getByRole('searchbox', { name: 'Buscar serviços' }).closest('.bt-control')?.classList.contains('bt-control--compact')).toBe(true)
-    for (const name of ['Criar serviço', 'Mais ações']) expect(within(toolbar).getByRole('button', { name }).classList.contains('bt-button--compact')).toBe(true)
+    const search = within(toolbar).getByRole('searchbox', { name: 'Buscar serviços' }).closest('.bt-control')
+    expect(search?.classList.contains('bt-control--compact')).toBe(false)
+    expect(search?.classList.contains('bt-control--touch')).toBe(false)
+    for (const name of ['Colunas', 'Filtros', 'Criar serviço', 'Editar', 'Mais ações', 'Compartilhar link', 'Atualizar']) {
+      const button = within(toolbar).getByRole('button', { name })
+      expect(button.classList.contains('bt-button--compact')).toBe(false)
+      expect(button.classList.contains('bt-button--touch')).toBe(false)
+    }
+    expect(within(toolbar).getByRole('radiogroup', { name: 'Mostrar como' }).classList.contains('bt-segmented--compact')).toBe(false)
     expect(within(toolbar).getByRole('button', { name: 'Colunas' })).toBeTruthy()
     // A Geral filtra pelo título da coluna: o botão da linha de filtro rápido da barra do DS fica desligado (e escondido no CSS).
     expect(within(toolbar).getByRole('button', { name: 'Filtro rápido' }).getAttribute('aria-pressed')).toBe('false')
