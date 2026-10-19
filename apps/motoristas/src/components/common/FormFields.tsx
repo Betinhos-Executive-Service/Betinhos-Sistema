@@ -1,4 +1,5 @@
-import { forwardRef, useEffect, useState, type ComponentPropsWithoutRef, type FocusEvent, type ReactNode } from "react";
+import { forwardRef, useEffect, useId, useState, type ChangeEvent, type ComponentPropsWithoutRef, type FocusEvent, type ReactNode } from "react";
+import { formatCurrencyInputOnBlur, sanitizeCurrencyInput } from "../../lib/currencyInput";
 import { SearchableSelect, type SearchableSelectProps } from "./SearchableSelect";
 
 type FormFieldProps = {
@@ -8,6 +9,8 @@ type FormFieldProps = {
   className?: string;
   labelClassName?: string;
   required?: boolean;
+  htmlFor?: string;
+  errorId?: string;
   children: ReactNode;
 };
 
@@ -20,9 +23,9 @@ type FieldComponentProps = {
   required?: boolean;
 };
 
-export function FieldError({ error, className = "" }: { error?: string; className?: string }) {
+export function FieldError({ error, className = "", id }: { error?: string; className?: string; id?: string }) {
   if (!error) return null;
-  return <div className={`field-error ${className}`.trim()}>{error}</div>;
+  return <div id={id} className={`field-error ${className}`.trim()}>{error}</div>;
 }
 
 export function FormField({
@@ -32,19 +35,21 @@ export function FormField({
   className = "finalize-input-block",
   labelClassName = "",
   required = false,
+  htmlFor,
+  errorId,
   children
 }: FormFieldProps) {
   return (
     <div className={`${className} ${error ? "is-invalid" : ""}`.trim()}>
       {label ? (
-        <label className={`form-field-label ${labelClassName}`.trim()}>
+        <label className={`form-field-label ${labelClassName}`.trim()} htmlFor={htmlFor}>
           <span>{label}</span>
           {required ? <span className="form-field-required" aria-hidden="true">*</span> : null}
         </label>
       ) : null}
       {children}
       {hint ? <div className="field-hint">{hint}</div> : null}
-      <FieldError error={error} />
+      <FieldError error={error} id={errorId} />
     </div>
   );
 }
@@ -132,6 +137,14 @@ function getSelectPlaceholder(label?: ReactNode) {
   return `Selecionar ${normalizedLabel}`;
 }
 
+// Liga o <label> e a mensagem de erro ao controle (nome acessível e aria-describedby).
+function useFieldIds(explicitId: string | undefined, error?: string) {
+  const generatedId = useId();
+  const id = explicitId ?? generatedId;
+  const errorId = error ? `${id}-error` : undefined;
+  return { id, errorId };
+}
+
 export const TextInputField = forwardRef<HTMLInputElement, TextInputFieldProps>(function TextInputField({
   label,
   error,
@@ -143,10 +156,11 @@ export const TextInputField = forwardRef<HTMLInputElement, TextInputFieldProps>(
   ...inputProps
 }, ref) {
   const resolvedPlaceholder = placeholder ?? getInputPlaceholder(label, inputProps.type, inputProps.inputMode);
+  const { id, errorId } = useFieldIds(inputProps.id, error);
 
   return (
-    <FormField label={label} error={error} hint={hint} className={fieldClassName} labelClassName={labelClassName} required={Boolean(required)}>
-      <TextInputControl ref={ref} aria-invalid={Boolean(error)} placeholder={resolvedPlaceholder} {...inputProps} />
+    <FormField label={label} error={error} hint={hint} className={fieldClassName} labelClassName={labelClassName} required={Boolean(required)} htmlFor={id} errorId={errorId}>
+      <TextInputControl ref={ref} aria-invalid={Boolean(error)} aria-describedby={errorId} placeholder={resolvedPlaceholder} {...inputProps} id={id} />
     </FormField>
   );
 });
@@ -162,13 +176,30 @@ export const MoneyInputField = forwardRef<HTMLInputElement, MoneyInputFieldProps
   currencyFieldClassName = "",
   currencyPrefixClassName = "",
   placeholder = "",
+  onChange,
+  onBlur,
   ...inputProps
 }, ref) {
+  const { id, errorId } = useFieldIds(inputProps.id, error);
+  // Valor monetário: só dígitos e separador decimal; ao sair, completa duas casas.
+  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
+    event.target.value = sanitizeCurrencyInput(event.target.value);
+    onChange?.(event);
+  };
+  const handleBlur = (event: FocusEvent<HTMLInputElement>) => {
+    const formatted = formatCurrencyInputOnBlur(event.target.value);
+    if (formatted !== event.target.value) {
+      event.target.value = formatted;
+      onChange?.(event as unknown as ChangeEvent<HTMLInputElement>);
+    }
+    onBlur?.(event);
+  };
+
   return (
-    <FormField label={label} error={error} hint={hint} className={fieldClassName} labelClassName={labelClassName} required={Boolean(required)}>
+    <FormField label={label} error={error} hint={hint} className={fieldClassName} labelClassName={labelClassName} required={Boolean(required)} htmlFor={id} errorId={errorId}>
       <div className={`money-input-field form-control-shell ${currencyFieldClassName}`.trim()}>
         <span className={`money-input-prefix form-control-value ${currencyPrefixClassName}`.trim()} aria-hidden="true">{prefix}</span>
-        <TextInputControl ref={ref} aria-invalid={Boolean(error)} placeholder={placeholder} {...inputProps} />
+        <TextInputControl ref={ref} aria-invalid={Boolean(error)} aria-describedby={errorId} placeholder={placeholder} inputMode="decimal" {...inputProps} id={id} onChange={handleChange} onBlur={handleBlur} />
       </div>
     </FormField>
   );
@@ -185,10 +216,11 @@ export const TextAreaField = forwardRef<HTMLTextAreaElement, TextAreaFieldProps>
   ...textareaProps
 }, ref) {
   const resolvedPlaceholder = placeholder ?? getTextareaPlaceholder(label);
+  const { id, errorId } = useFieldIds(textareaProps.id, error);
 
   return (
-    <FormField label={label} error={error} hint={hint} className={fieldClassName} labelClassName={labelClassName} required={Boolean(required)}>
-      <TextAreaControl ref={ref} aria-invalid={Boolean(error)} placeholder={resolvedPlaceholder} {...textareaProps} />
+    <FormField label={label} error={error} hint={hint} className={fieldClassName} labelClassName={labelClassName} required={Boolean(required)} htmlFor={id} errorId={errorId}>
+      <TextAreaControl ref={ref} aria-invalid={Boolean(error)} aria-describedby={errorId} placeholder={resolvedPlaceholder} {...textareaProps} id={id} />
     </FormField>
   );
 });

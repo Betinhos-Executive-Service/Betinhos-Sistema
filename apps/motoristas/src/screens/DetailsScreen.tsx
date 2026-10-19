@@ -92,6 +92,9 @@ export function DetailsScreen({
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [hasMoreContent, setHasMoreContent] = useState(false);
   const [shouldRenderScrollHint, setShouldRenderScrollHint] = useState(false);
+  // A pílula só orienta o primeiro gesto; depois de rolar ela sairia por cima do conteúdo.
+  const [hasScrolledDetails, setHasScrolledDetails] = useState(false);
+  const showScrollHint = hasMoreContent && !hasScrolledDetails;
   const [isScrollHintExiting, setIsScrollHintExiting] = useState(false);
   const [serviceObservation, setServiceObservation] = useState(initialServiceObservation);
   const [serviceObservationStatus, setServiceObservationStatus] = useState<ObservationSaveStatus>("idle");
@@ -174,6 +177,7 @@ export function DetailsScreen({
     if (!element) return;
     const remaining = Math.ceil(element.scrollHeight - element.scrollTop - element.clientHeight);
     setHasMoreContent(remaining > 16);
+    if (element.scrollTop > 24) setHasScrolledDetails(true);
   }, []);
 
   const scheduleScrollHintUpdate = useCallback(() => {
@@ -209,7 +213,11 @@ export function DetailsScreen({
   }, [confirmCancel]);
 
   useEffect(() => {
-    if (hasMoreContent) {
+    setHasScrolledDetails(false);
+  }, [detail.id]);
+
+  useEffect(() => {
+    if (showScrollHint) {
       setShouldRenderScrollHint(true);
       setIsScrollHintExiting(false);
       return;
@@ -222,7 +230,7 @@ export function DetailsScreen({
       setIsScrollHintExiting(false);
     }, 320);
     return () => window.clearTimeout(timer);
-  }, [hasMoreContent, shouldRenderScrollHint]);
+  }, [showScrollHint, shouldRenderScrollHint]);
 
   const handleCancel = () => {
     if (confirmCancel) {
@@ -298,7 +306,7 @@ export function DetailsScreen({
           ) : null}
 
           <footer className="details-footer-v1">
-            {confirmCancel ? <div className="cancel-confirm-warning">Serviço foi realmente cancelado no local? Clique novamente para confirmar.</div> : null}
+            {confirmCancel ? <div className="cancel-confirm-warning">O serviço foi mesmo cancelado no local? Toque de novo para confirmar.</div> : null}
             <div className={`detail-actions detail-actions-v1 ${detail.type.toLowerCase()}`}>
               {visibleActions.map((action) => (
                 <DetailActionButton
