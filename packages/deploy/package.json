@@ -4,6 +4,6 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "test": "node --test flows/documentos-resumo-semanal.test.mjs"
+    "test": "node --test flows/documentos-resumo-semanal.test.mjs flows/aniversariantes-diario.test.mjs"
   }
 }
