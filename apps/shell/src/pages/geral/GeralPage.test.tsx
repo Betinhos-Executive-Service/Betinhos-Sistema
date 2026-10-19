@@ -362,6 +362,17 @@ describe('Geral', () => {
     expect(await screen.findByRole('dialog', { name: 'Formulário Geral abre no Dataverse' })).toBeTruthy()
   })
 
+  it('novo=1 na URL (atalho da Página Inicial) abre a criação e tira o parâmetro do link', async () => {
+    window.location.hash = '#/geral?novo=1'
+    try {
+      render(<GeralPage host={{ mode: 'mock' }} />)
+      expect(await screen.findByRole('dialog', { name: 'Formulário Geral abre no Dataverse' })).toBeTruthy()
+      await waitFor(() => expect(window.location.hash).not.toContain('novo='))
+    } finally {
+      window.location.hash = ''
+    }
+  })
+
   it('com 1 selecionado, Editar abre o formulário e Gerar Voucher avisa que só roda no Dataverse', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
