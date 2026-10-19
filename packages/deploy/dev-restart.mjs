@@ -9,6 +9,9 @@ const projectRoot = resolve(appDir, '../..').toLowerCase()
 if (!port) throw new Error('Uso: node dev-restart.mjs <porta> [diretorio-do-app]')
 
 function pidsOnPort() {
+  // netstat -ano, PowerShell e taskkill só existem no Windows. Fora dele (VM cloud, WSL) não há o que encerrar:
+  // o --strictPort do Vite já falha com mensagem clara se a porta estiver ocupada.
+  if (process.platform !== 'win32') return []
   let out = ''
   try { out = execSync('netstat -ano', { encoding: 'utf8' }) } catch { return [] }
   const pids = new Set()
