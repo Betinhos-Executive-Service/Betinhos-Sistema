@@ -19,6 +19,7 @@ export type ExpenseSubmission = {
   draft: ExpenseDraft;
   payload: Record<string, unknown>;
   motoristaId: string;
+  vehicleId?: string;
   items: ExpenseUploadItem[];
 };
 
@@ -39,4 +40,30 @@ export function summarizeExpenseUploads(items: ExpenseUploadItem[], rows: Expens
 
 export function canDispatchExpenseUpload(item: ExpenseUploadItem, row?: ExpenseUploadRow) {
   return !item.dispatchStarted && row?.cr40f_status === ATTACHMENT_STATUS.pending && row.new_uploadattemptid === item.attemptId;
+}
+
+export type ExpenseSubmissionStatus = {
+  state: "interrupted" | "processing" | "unclaimed" | "failed" | "complete";
+  text: string;
+  action?: "continue" | "retry" | "verify";
+};
+
+// The journal holds several expenses so a slow receipt never blocks the next one.
+export function normalizeStoredExpenseSubmissions(value: unknown): ExpenseSubmission[] {
+  if (!value || typeof value !== "object") return [];
+  if (Array.isArray((value as { submissions?: unknown }).submissions)) return (value as { submissions: ExpenseSubmission[] }).submissions;
+  return typeof (value as ExpenseSubmission).expenseId === "string" ? [value as ExpenseSubmission] : [];
+}
+
+export function describeExpenseSubmission(submission: ExpenseSubmission, rows: ExpenseUploadRow[]): ExpenseSubmissionStatus {
+  if (!submission.expenseConfirmed || submission.items.some(item => !item.dispatchStarted || item.previousAttemptId)) {
+    return { state: "interrupted", text: "Aguardando conexão para enviar.", action: "continue" };
+  }
+  const summary = summarizeExpenseUploads(submission.items, rows);
+  if (summary.complete) return { state: "complete", text: "Comprovante anexado." };
+  if (summary.canRetry) return { state: "failed", text: "Comprovante não foi anexado.", action: "retry" };
+  const unclaimed = submission.items.some(item => rows.some(row => row.cr40f_anexodespesaoperacionalid === item.id && row.new_uploadattemptid === item.attemptId && row.cr40f_status === ATTACHMENT_STATUS.pending));
+  if (unclaimed) return { state: "unclaimed", text: "Servidor ainda não confirmou o comprovante.", action: "verify" };
+  const done = summary.sent + summary.failed;
+  return { state: "processing", text: submission.items.length > 1 ? `Anexando comprovantes (${done} de ${submission.items.length}).` : "Anexando comprovante." };
 }
