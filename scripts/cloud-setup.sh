@@ -15,13 +15,28 @@ log() { printf '\n[cloud-setup] %s\n' "$*"; }
 # 1. Node 24 (mesma versão do CI)
 node_major() { node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0; }
 if [ "$(node_major)" -lt 24 ]; then
-  log "Instalando Node 24 (atual: $(node -v 2>/dev/null || echo nenhum))"
-  export NVM_DIR="$HOME/.nvm"
-  [ -s "$NVM_DIR/nvm.sh" ] || curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+  # Usa o nvm que já existir (a imagem cloud traz um em /opt/nvm); senão instala em ~/.nvm.
+  for d in "${NVM_DIR:-}" /opt/nvm "$HOME/.nvm"; do
+    if [ -n "$d" ] && [ -s "$d/nvm.sh" ]; then export NVM_DIR="$d"; break; fi
+  done
+  if [ ! -s "${NVM_DIR:-}/nvm.sh" ]; then
+    export NVM_DIR="$HOME/.nvm"
+    curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+  fi
   # shellcheck disable=SC1091
   . "$NVM_DIR/nvm.sh"
-  nvm install 24 >/dev/null
+  if ! nvm use 24 >/dev/null 2>&1; then
+    log "Instalando Node 24 (atual: $(node -v 2>/dev/null || echo nenhum))"
+    nvm install 24 >/dev/null
+  fi
   nvm alias default 24 >/dev/null
+  # Shells novos (inclusive os da sessão) começam com o Node da imagem na frente do PATH (/opt/node22/bin):
+  # fixa o Node 24 no fim do ~/.bashrc (interativos) e do ~/.profile (login), trocando a linha de uma execução anterior.
+  NODE24_PATH="export PATH=\"$(dirname "$(nvm which 24)"):\$PATH\"  # cloud-setup: node 24"
+  for rc in "$HOME/.bashrc" "$HOME/.profile"; do
+    sed -i '/# cloud-setup: node 24$/d' "$rc" 2>/dev/null || true
+    echo "$NODE24_PATH" >> "$rc"
+  done
 fi
 log "Node $(node -v)"
 
