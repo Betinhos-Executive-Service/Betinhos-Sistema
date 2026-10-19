@@ -57,7 +57,7 @@ export const MENU: MenuGroup[] = [
   {
     id: 'frota',
     label: 'Frota',
-    items: [{ kind: 'page', id: 'frota', label: 'Painel da Frota', page: 'frota' }, table('cr40f_manutencoes'), table('cr40f_multas'), table('cr40f_colisao_v2')],
+    items: [{ kind: 'page', id: 'frota', label: 'Painel da Frota', page: 'frota' }, wr('Checklists de Veículos', 'new_gestaochecklistsveiculos'), table('cr40f_manutencoes'), table('cr40f_multas'), table('cr40f_colisao_v2')],
   },
   {
     id: 'cadastros',
