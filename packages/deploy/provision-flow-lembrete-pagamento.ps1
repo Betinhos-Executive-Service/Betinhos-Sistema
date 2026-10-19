@@ -7,7 +7,9 @@
 # Para conferir sem gravar (checkFlowErrors do Power Automate):
 #   powershell -File packages/deploy/provision-flow-lembrete-pagamento.ps1 -SomenteValidar
 # Requer `az login` com acesso ao DEV.
-param([string] $Restaurar = '', [switch] $SomenteValidar)
+# Para testar sem avisar o financeiro, aponte o resumo aos gestores só para o noreply e depois rode de novo sem o parâmetro:
+#   powershell -File packages/deploy/provision-flow-lembrete-pagamento.ps1 -ResumoPara noreply@betinhos.onmicrosoft.com
+param([string] $Restaurar = '', [switch] $SomenteValidar, [string] $ResumoPara = '')
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -16,6 +18,7 @@ $environmentId = '25a2ab78-cf07-ee41-a124-457aa2c29aea'
 $backupDir = Join-Path $PSScriptRoot 'flows/backup'
 if (([Uri]$environmentUrl).Host -ne 'org23b93544.crm2.dynamics.com') { throw 'Somente DEV.' }
 . (Join-Path $PSScriptRoot 'flows/lembrete-pagamento.ps1')
+if ($ResumoPara) { $script:GestoresTo = $ResumoPara }
 
 $dvToken = & az account get-access-token --resource "$environmentUrl/" --query accessToken -o tsv
 if ($LASTEXITCODE -ne 0 -or -not $dvToken) { throw 'Token do Dataverse DEV indisponível (rode az login).' }
