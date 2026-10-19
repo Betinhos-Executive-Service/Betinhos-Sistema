@@ -22,6 +22,16 @@ description: "Verifica o shell React do Sistema Betinhos (apps/shell) e o pacote
 6. WebResource embutido: `document.querySelector('iframe').src` termina em `?host=shell`.
 7. Console sem erros em cada tela.
 
+## Flows do Power Automate (`packages/deploy/provision-flow-*.ps1`)
+Não passam pelo `pnpm push`; cada script grava o clientdata direto no DEV (com backup em `flows/backup/`).
+1. `powershell -File packages/deploy/<script>.ps1 -SomenteValidar` → `checkFlowErrors: []` e conferências ok, sem gravar.
+2. Rodar sem parâmetro → backup gerado, flow reativado (`statecode=1`) e leitura de volta conferida.
+3. Execução real no DEV: preparar dado de teste que caia na regra (pagante com `overriddencreatedon` no passado, e-mail do próprio usuário), disparar `POST .../flows/<id>/triggers/<gatilho>/run?api-version=2016-11-01` (token `https://service.flow.microsoft.com/`) e listar `runs/<run>/actions` → ações esperadas `Succeeded`.
+4. Conferir o efeito no Dataverse (ex.: `cr40f_datadoultimolembrete` preenchido). As entradas do envio de e-mail não aparecem na API; o destinatário se confere na caixa de entrada.
+- Antes de criar dado de teste, ver os gatilhos de flows ativos na tabela (ex.: Recibo Automático em `cr40f_statusdorecibo`, RD Station em `cr40f_bancodedados`) para não disparar envios por engano.
+- `overriddencreatedon` sem hora vira 00:00 UTC (dia anterior em Brasília); use `AAAA-MM-DDT15:00:00Z`.
+- Scripts `.ps1` com acentos precisam de BOM UTF-8 (PowerShell 5.1).
+
 ## Casos de borda
 - Mock (`pnpm dev`): telas de WebResource mostram "Esta tela abre dentro do Dataverse".
 - Funcionários no celular usa cartões (rótulo de alerta completo); a coluna curta "Venceu dd/mm/aaaa" é só no desktop.
