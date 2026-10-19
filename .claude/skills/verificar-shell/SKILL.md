@@ -21,7 +21,8 @@ description: "Verifica o shell React do Sistema Betinhos (apps/shell) e o pacote
 5. Geral: `#/geral?novo=1` abre "Criar serviço" (iframe do Formulário Geral) e o parâmetro some da URL; selo "Alterada" tem `title` com a dica.
 6. WebResource embutido: `document.querySelector('iframe').src` termina em `?host=shell`.
 7. Menu de visões em tela baixa: viewport 900x300 (ou celular deitado), abrir `.bt-viewbar__trigger` → `.bt-menu__panel` tem `max-height` inline, `overflow-y: auto` e o último item ("Salvar como…") fica alcançável rolando o painel, sem passar da tela (@betinhos/ui ≥ 1.10.1).
-8. Console sem erros em cada tela.
+8. Frota → "Checklists de Veículos" (`#/new_gestaochecklistsveiculos`): o iframe carrega a Gestão de Checklists com a lista de veículos. Por URL direta o Xrm é o mínimo do shell; ação de Custom API (ex.: "Solicitar") precisa de `parent.Xrm.WebApi.online.execute` (`typeof parent.Xrm.WebApi.online.execute === 'function'` dentro do iframe) e mostra o erro do servidor quando falha.
+9. Console sem erros em cada tela.
 
 ## Flows do Power Automate (`packages/deploy/provision-flow-*.ps1`)
 Não passam pelo `pnpm push`; cada script grava o clientdata direto no DEV (com backup em `flows/backup/`).
