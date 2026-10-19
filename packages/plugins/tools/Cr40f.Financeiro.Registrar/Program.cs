@@ -12,7 +12,10 @@ var simularId = options.Optional("simular");
 var aplicarId = options.Optional("aplicar");
 // Modo de validacao: --fechar <clienteId> --mes AAAA-MM chama a Custom API unbound cr40f_FecharMesCliente.
 var fecharId = options.Optional("fechar");
-var dllPath = simularId is null && aplicarId is null && fecharId is null ? options.Require("dllPath") : "";
+// Carga inicial do valor da OP: --recalcularValorOp grava; --simularValorOp só conta o que mudaria. Mesma soma do ValorOpPlugin.
+var recalcularValorOp = options.Has("recalcularValorOp");
+var simularValorOp = options.Has("simularValorOp");
+var dllPath = simularId is null && aplicarId is null && fecharId is null && !recalcularValorOp && !simularValorOp ? options.Require("dllPath") : "";
 var solutionUniqueName = options.Optional("solutionUniqueName") ?? "appbetinhos";
 var publish = options.Has("publish");
 if (dllPath.Length > 0 && !File.Exists(dllPath))
@@ -36,6 +39,12 @@ using var service = new ServiceClient(connectionString);
 if (!service.IsReady)
 {
     throw new InvalidOperationException($"Falha ao conectar no Dataverse. {service.LastError}");
+}
+
+if (recalcularValorOp || simularValorOp)
+{
+    RecalcularValorOps(service, gravar: recalcularValorOp);
+    return;
 }
 
 if (simularId is not null || aplicarId is not null)
@@ -80,6 +89,14 @@ ConfigureMainOperationStep(service, fecharApiId, fecharTypeId);
 var stepTypeId = UpsertPluginTypeNamed(service, assemblyId, "Cr40f.Financeiro.Plugin.FinanceiroStepPlugin");
 EnsureUpdateStep(service, stepTypeId, "cr40f_pagantes", "cr40f_status", "Cr40f.Financeiro: Pagante → OP", solutionUniqueName);
 EnsureUpdateStep(service, stepTypeId, "cr40f_financeiro", "cr40f_status", "Cr40f.Financeiro: OP → Reservas", solutionUniqueName);
+// Valor da OP = soma das composições das reservas (mesma soma do SyncEngine). Ver ValorOpPlugin.
+var valorOpTypeId = UpsertPluginTypeNamed(service, assemblyId, "Cr40f.Financeiro.Plugin.ValorOpPlugin");
+EnsureStep(service, valorOpTypeId, "Update", "cr40f_composicaodeprecos", 40, "new_valortotal", "Cr40f.ValorOp: composição alterada", solutionUniqueName);
+EnsureStep(service, valorOpTypeId, "Delete", "cr40f_composicaodeprecos", 20, null, "Cr40f.ValorOp: composição excluída (antes)", solutionUniqueName);
+EnsureStep(service, valorOpTypeId, "Delete", "cr40f_composicaodeprecos", 40, null, "Cr40f.ValorOp: composição excluída", solutionUniqueName);
+EnsureStep(service, valorOpTypeId, "Create", "cr40f_reservadeveculos", 40, null, "Cr40f.ValorOp: reserva criada", solutionUniqueName);
+EnsureStep(service, valorOpTypeId, "Update", "cr40f_reservadeveculos", 40, "cr40f_financeiro,new_composicaodepreco", "Cr40f.ValorOp: reserva alterada", solutionUniqueName, preImageAttributes: "cr40f_financeiro");
+EnsureStep(service, valorOpTypeId, "Delete", "cr40f_reservadeveculos", 40, null, "Cr40f.ValorOp: reserva excluída", solutionUniqueName, preImageAttributes: "cr40f_financeiro");
 
 if (publish)
 {
@@ -91,6 +108,49 @@ if (publish)
 Log("plugin publicado com sucesso");
 
 static void Log(string message) => Console.WriteLine($"[financeiro:plugin] {message}");
+
+/// <summary>
+/// Valor de todas as OPs = soma das composições (new_valortotal) das reservas ligadas, 0 para reserva sem composição,
+/// null para OP sem reserva. Igual ao ValorOpPlugin.Calcular; grava só o que mudou.
+/// </summary>
+static void RecalcularValorOps(ServiceClient service, bool gravar)
+{
+    var ops = TodasAsLinhas(service, "cr40f_financeiro", "cr40f_valor", "cr40f_idfinanceiro");
+    var reservas = TodasAsLinhas(service, "cr40f_reservadeveculos", "cr40f_financeiro", "new_composicaodepreco")
+        .Where(r => r.GetAttributeValue<EntityReference>("cr40f_financeiro") != null).ToList();
+    var valorCp = TodasAsLinhas(service, "cr40f_composicaodeprecos", "new_valortotal")
+        .ToDictionary(c => c.Id, c => Centavos(c.GetAttributeValue<Money>("new_valortotal")) ?? 0);
+    var porOp = reservas.GroupBy(r => r.GetAttributeValue<EntityReference>("cr40f_financeiro")!.Id)
+        .ToDictionary(g => g.Key, g => g.Sum(r => r.GetAttributeValue<EntityReference>("new_composicaodepreco") is { } cp && valorCp.TryGetValue(cp.Id, out var v) ? v : 0));
+    int mudam = 0, gravadas = 0;
+    foreach (var op in ops)
+    {
+        int? atual = Centavos(op.GetAttributeValue<Money>("cr40f_valor"));
+        int? novo = porOp.TryGetValue(op.Id, out var soma) ? soma : null;
+        if (atual == novo) continue;
+        mudam++;
+        if (!gravar) continue;
+        service.Update(new Entity("cr40f_financeiro", op.Id) { ["cr40f_valor"] = novo is null ? null : new Money(novo.Value / 100m) });
+        gravadas++;
+    }
+    Log($"valor da OP: {ops.Count} OPs, {porOp.Count} com reservas, {mudam} mudariam, {gravadas} gravadas{(gravar ? "" : " (simulação)")}");
+}
+
+static int? Centavos(Money? money) => money == null ? null : (int)Math.Round(money.Value * 100m, MidpointRounding.AwayFromZero);
+
+static List<Entity> TodasAsLinhas(ServiceClient service, string entity, params string[] colunas)
+{
+    var linhas = new List<Entity>();
+    var query = new QueryExpression(entity) { ColumnSet = new ColumnSet(colunas), PageInfo = new PagingInfo { PageNumber = 1, Count = 5000 } };
+    while (true)
+    {
+        var pagina = service.RetrieveMultiple(query);
+        linhas.AddRange(pagina.Entities);
+        if (!pagina.MoreRecords) return linhas;
+        query.PageInfo.PageNumber++;
+        query.PageInfo.PagingCookie = pagina.PagingCookie;
+    }
+}
 static EntityReference Ref(string logicalName, Guid id) => new(logicalName, id);
 
 static void EnsureLogTable(ServiceClient service, string solution)
@@ -361,6 +421,46 @@ static void EnsureUpdateStep(ServiceClient service, Guid pluginTypeId, string en
     });
     EnsureSolutionComponent(service, stepId, solutionUniqueName, 92);
     Log($"step criado: {name}");
+}
+
+/// <summary>Step síncrono (mode 0) idempotente por nome, com imagem "pre" opcional (alias igual a ValorOpPlugin.ImagemAnterior).</summary>
+static void EnsureStep(ServiceClient service, Guid pluginTypeId, string messageName, string entity, int stage, string? filter, string name, string solutionUniqueName, string? preImageAttributes = null)
+{
+    Guid stepId;
+    if (FindSingleOrNone(service, "sdkmessageprocessingstep", ("name", name)) is { } existing)
+    {
+        stepId = existing.Id;
+        service.Update(new Entity("sdkmessageprocessingstep", stepId) { ["filteringattributes"] = filter, ["stage"] = new OptionSetValue(stage), ["mode"] = new OptionSetValue(0) });
+        Log($"step reconciliado: {name}");
+    }
+    else
+    {
+        var message = FindSingleOrNone(service, "sdkmessage", ("name", messageName)) ?? throw new InvalidOperationException($"sdkmessage {messageName} não encontrada.");
+        var filterRow = service.RetrieveMultiple(new QueryExpression("sdkmessagefilter")
+        {
+            ColumnSet = new ColumnSet("sdkmessagefilterid"),
+            Criteria = { Conditions = { new ConditionExpression("sdkmessageid", ConditionOperator.Equal, message.Id), new ConditionExpression("primaryobjecttypecode", ConditionOperator.Equal, entity) } },
+        }).Entities.Single();
+        stepId = service.Create(new Entity("sdkmessageprocessingstep")
+        {
+            ["name"] = name, ["mode"] = new OptionSetValue(0), ["stage"] = new OptionSetValue(stage), ["rank"] = 20,
+            ["supporteddeployment"] = new OptionSetValue(0), ["filteringattributes"] = filter,
+            ["sdkmessageid"] = Ref("sdkmessage", message.Id), ["sdkmessagefilterid"] = Ref("sdkmessagefilter", filterRow.Id),
+            ["eventhandler"] = Ref("plugintype", pluginTypeId), ["asyncautodelete"] = false,
+        });
+        Log($"step criado: {name}");
+    }
+    EnsureSolutionComponent(service, stepId, solutionUniqueName, 92);
+    if (preImageAttributes is null) return;
+    var image = FindSingleOrNone(service, "sdkmessageprocessingstepimage", ("sdkmessageprocessingstepid", stepId), ("entityalias", "pre"));
+    var dados = new Entity("sdkmessageprocessingstepimage")
+    {
+        ["name"] = "pre", ["entityalias"] = "pre", ["imagetype"] = new OptionSetValue(0),
+        ["messagepropertyname"] = "Target", ["attributes"] = preImageAttributes,
+        ["sdkmessageprocessingstepid"] = Ref("sdkmessageprocessingstep", stepId),
+    };
+    if (image is null) { service.Create(dados); Log($"imagem pre criada: {name}"); }
+    else { dados.Id = image.Id; service.Update(dados); Log($"imagem pre reconciliada: {name}"); }
 }
 
 static void EnsureSolutionComponent(ServiceClient service, Guid componentId, string solutionUniqueName, int componentType)
