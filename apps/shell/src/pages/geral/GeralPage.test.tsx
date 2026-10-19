@@ -1129,14 +1129,15 @@ describe('Geral: comandos Auditoria, Gerar OP, Disparar e Registrar Erro', () =>
   }
   const toolbar = () => screen.getByRole('toolbar', { name: 'Comandos de serviços' })
 
-  it('sem seleção Gerar OP e Disparar ficam inertes, com o motivo', async () => {
+  it('sem seleção o menu Ações não existe; com seleção, Gerar OP e Disparar aparecem habilitados', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
-    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Ações' }))
+    expect(within(toolbar()).queryByRole('button', { name: /^Ações/ })).toBeNull()
+    await pick('OS-1004')
+    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Ações (1)' }))
     for (const name of ['Gerar OP', 'Disparar']) {
-      const item = await screen.findByRole('menuitem', { name: new RegExp(`^${name}`), hidden: true })
-      expect((item as HTMLButtonElement).disabled).toBe(true)
-      expect(item.textContent).toContain('Selecione ao menos um serviço.')
+      const item = await screen.findByRole('menuitem', { name, hidden: true })
+      expect((item as HTMLButtonElement).disabled).toBe(false)
     }
   })
 
