@@ -47,12 +47,16 @@ import {
   loadCollisionLookupNavigationNamesRemote,
   loadExpenseReferenceDataRemote,
   loadMyIdeasRemote,
+  loadMyVehiclesRemote,
+  setMyCurrentVehicleRemote,
   loadReceiptClienteOptionsRemote,
   loadExpenseLookupNavigationNamesRemote,
   loadMaintenanceRequestVehiclesRemote,
   loadRemoteDetailByParams,
   loadRemoteStore,
   markDetailViewedRemote,
+  resolveServiceVehicleRemote,
+  loadActiveFleetRemote,
   prefetchExpenseReferenceDataRemote,
   saveServiceObservationRemote,
   saveVoucherDraftRemote,
@@ -64,6 +68,22 @@ import {
   type DriverContext,
   type MaintenanceRequestVehicleOption
 } from "./lib/dataverse";
+import { readReceiptQuick } from "./lib/dataverse";
+import {
+  INITIAL_QUICK_READ,
+  QUICK_READ_FILL_STEP_MS,
+  applyQuickRead,
+  downscaleForQuickRead,
+  expenseFlowView,
+  hasRemoteReferenceData,
+  nextQuickReadState,
+  runQuickReadPipeline,
+  shouldRunQuickRead,
+  startQuickReadState,
+  type QuickReadFilledFields,
+  type QuickReadState
+} from "./lib/receiptQuickRead";
+import { getQuickReadMockMode, readReceiptQuickMock } from "./lib/receiptQuickReadMock";
 import { IDEA_STATUS, type Idea, type IdeaDraft } from "./lib/ideas";
 import { APP_CONNECTION_LOST_MESSAGE, APP_OPERATION_ERROR_MESSAGE, reportAppError, type AppErrorNotice } from "./lib/appErrorLogger";
 import { isComunicadoPending, isMockComunicados, loadDriverComunicado, loadDriverComunicados, type ComunicadoDestinatario } from "./lib/comunicados";
@@ -72,7 +92,8 @@ import { clearMediaDraft, loadMediaDraft, saveMediaDraft, touchMediaDraft } from
 import { describeExpenseSubmission, normalizeStoredExpenseSubmissions, type ExpenseSubmission, type ExpenseUploadRow } from "./lib/expenseUploadState";
 import { resumeExpenseSubmission, type ExpenseSubmissionProgress } from "./lib/expenseSubmission";
 import { ExpenseSendOverlay, type ExpenseSendState } from "./components/common/ExpenseSendOverlay";
-import { usesAsyncExpenseUpload, expenseSubmissionStorageKey, ensureExpenseSubmissionRemote, loadExpenseUploadRowsRemote, transitionExpenseUploadRemote, dispatchExpenseUploadRemote, createExpenseUploadItem } from "./lib/dataverse";
+import type { ExpenseUploadMode } from "./lib/expenseUploadMode";
+import { resolveExpenseUploadModeRemote, expenseSubmissionStorageKey, ensureExpenseSubmissionRemote, loadExpenseUploadRowsRemote, transitionExpenseUploadRemote, dispatchExpenseUploadRemote, createExpenseUploadItem } from "./lib/dataverse";
 
 const EXCHANGE_ERROR_MESSAGES: Record<string, string> = {
   EXCHANGE_CONCURRENCY_CONFLICT: "A troca foi alterada por outra pessoa. Atualize a agenda e tente novamente.",
@@ -119,6 +140,8 @@ import { HistoryScreen } from "./screens/HistoryScreen";
 import { InitialScreen } from "./screens/InitialScreen";
 import { LocalCancelScreen } from "./screens/LocalCancelScreen";
 import { MediaCaptureScreen } from "./screens/MediaCaptureScreen";
+import { ReceiptReadingScreen } from "./screens/ReceiptReadingScreen";
+import { ReceiptIllegibleScreen } from "./screens/ReceiptIllegibleScreen";
 import { MaintenancePhotoPreviewScreen } from "./screens/MaintenancePhotoPreviewScreen";
 import { ReceiveScreen } from "./screens/ReceiveScreen";
 import { ReceiptPreviewScreen, ReceiptScreen } from "./screens/ReceiptScreen";
@@ -129,6 +152,20 @@ import {
   type MaintenanceRequestPhoto
 } from "./screens/MaintenanceRequestScreen";
 import { IdeasScreen } from "./screens/IdeasScreen";
+import { MyVehicleScreen } from "./screens/MyVehicleScreen";
+import { VehicleChoiceDialog } from "./components/details/VehicleChoiceDialog";
+import {
+  buildInfleetServiceVehiclePatch,
+  needsDriverChoice,
+  type DriverVehicleChoice,
+  type FleetVehicle,
+  type InfleetVehicleResolution
+} from "./lib/serviceVehicleInfleet";
+import { isThirdPartyDriver } from "./lib/myVehicle";
+import { createMockFleetLoader, MOCK_FLEET, pickMockInfleetScenario, resolveMockServiceVehicle } from "./lib/serviceVehicleInfleetMock";
+
+// Referência estável: o diálogo compara com a lista exibida para saber se oferece "Nenhuma das opções".
+const loadMockAllFleet = async () => MOCK_FLEET;
 import { ServicesScreen } from "./screens/ServicesScreen";
 import { SignatureScreen } from "./screens/SignatureScreen";
 import { VoucherScreen } from "./screens/VoucherScreen";
@@ -436,6 +473,11 @@ function App() {
   const [remoteOperation, setRemoteOperation] = useState<RemoteOperation | null>(null);
   const [remoteMode, setRemoteMode] = useState(false);
   const [driverContext, setDriverContext] = useState<DriverContext | null>(null);
+  const [vehicleChoiceRequest, setVehicleChoiceRequest] = useState<{
+    resolution: InfleetVehicleResolution;
+    resolve: (choice: DriverVehicleChoice | null) => void;
+    loadFleet: () => Promise<FleetVehicle[]>;
+  } | null>(null);
   const [comunicados, setComunicados] = useState<ComunicadoDestinatario[]>([]);
   const [comunicadosStatus, setComunicadosStatus] = useState<ComunicadosLoadStatus>(() => isMockComunicados() || hasDataverseRuntime() ? "loading" : "ready");
   const [selectedComunicadoId, setSelectedComunicadoId] = useState("");
@@ -452,6 +494,15 @@ function App() {
   const [maintenanceVehiclesLoading, setMaintenanceVehiclesLoading] = useState(false);
   const [maintenanceRequestDraft, setMaintenanceRequestDraft] = useState<MaintenanceRequestDraft>({ ...EMPTY_MAINTENANCE_REQUEST_DRAFT });
   const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft>({ ...EMPTY_EXPENSE_DRAFT });
+  const [expenseQuickRead, setExpenseQuickRead] = useState<QuickReadState>(INITIAL_QUICK_READ);
+  const expenseQuickReadSeqRef = useRef(0);
+  const [expenseQuickReadPhoto, setExpenseQuickReadPhoto] = useState("");
+  const [expenseQuickReadFilling, setExpenseQuickReadFilling] = useState(false);
+  const [expenseQuickReadFilled, setExpenseQuickReadFilled] = useState<QuickReadFilledFields>({});
+  const expenseDraftRef = useRef(expenseDraft);
+  expenseDraftRef.current = expenseDraft;
+  const expenseRetakeTargetIdRef = useRef("");
+  const expenseDateTouchedRef = useRef(false);
   const [expenseReferenceData, setExpenseReferenceData] = useState<ExpenseReferenceData>(DEFAULT_EXPENSE_REFERENCE_DATA);
   const [expenseReferenceLoading, setExpenseReferenceLoading] = useState(false);
   const [expenseReferenceError, setExpenseReferenceError] = useState("");
@@ -460,6 +511,7 @@ function App() {
   const [expenseSubmissions, setExpenseSubmissions] = useState<ExpenseSubmission[]>([]);
   const [expenseUploadRows, setExpenseUploadRows] = useState<Record<string, ExpenseUploadRow[]>>({});
   const [expenseUploadReady, setExpenseUploadReady] = useState(false);
+  const [expenseUploadMode, setExpenseUploadMode] = useState<ExpenseUploadMode | "pending">("pending");
   const expenseSubmissionsRef = useRef<ExpenseSubmission[]>([]);
   const expenseJournalQueueRef = useRef<Promise<void>>(Promise.resolve());
   const expenseNoticeRef = useRef(new Set<string>());
@@ -501,7 +553,15 @@ function App() {
   const removeExpenseSubmission = (motoristaId: string, expenseId: string) => commitExpenseSubmissions(motoristaId, list => list.filter(item => item.expenseId !== expenseId));
 
   useEffect(() => {
-    if (!remoteMode || !driverContext || !usesAsyncExpenseUpload()) return;
+    if (!remoteMode) return;
+    let active = true;
+    // Decide pela configuracao do ambiente (Flow assincrono configurado), nao pela URL; nunca rejeita.
+    resolveExpenseUploadModeRemote().then(mode => { if (active) setExpenseUploadMode(mode); });
+    return () => { active = false; };
+  }, [remoteMode]);
+
+  useEffect(() => {
+    if (!remoteMode || !driverContext || expenseUploadMode !== "async") return;
     let active = true;
     setExpenseUploadReady(false);
     loadMediaDraft<unknown>(expenseSubmissionStorageKey(driverContext.id)).then(saved => {
@@ -512,7 +572,7 @@ function App() {
       setExpenseUploadReady(true);
     }).catch(error => { if (active) setCriticalError(error instanceof Error ? error.message : "Falha ao restaurar envio de despesa."); });
     return () => { active = false; };
-  }, [remoteMode, driverContext?.id]);
+  }, [remoteMode, driverContext?.id, expenseUploadMode]);
 
   useEffect(() => {
     const tracked = expenseSubmissions.filter(submission => submission.expenseConfirmed).map(submission => submission.expenseId);
@@ -800,9 +860,11 @@ function App() {
     });
   }, [isButtonPreviewMode, isReceiptPreviewMode, mediaDraftLoaded, screen]);
 
+  // Guarda o motorista logado para recarregar comunicados sem depender do estado ainda não aplicado.
+  const comunicadosDriverIdRef = useRef("");
   const reloadComunicados = useCallback(async () => {
     try {
-      setComunicados(await loadDriverComunicados());
+      setComunicados(await loadDriverComunicados(comunicadosDriverIdRef.current));
       setComunicadosStatus("ready");
     } catch (error) {
       // Mantém a lista já carregada; só exibe o estado de erro quando nunca houve carga.
@@ -902,6 +964,7 @@ function App() {
         const hashRoute = initialHashRouteRef.current;
         const remoteInitialDetail = hashRoute ? findDetailFromHashRoute(remoteStore, hashRoute) : getInitialDetail(remoteStore);
         setDriverContext(remote.driver);
+        comunicadosDriverIdRef.current = remote.driver?.id ?? "";
         reloadComunicados().catch((error) => {
           reportAppError(error, { severity: "warning", source: "app", action: "loadDriverComunicados", phase: "initial" });
           setToast("Não foi possível carregar comunicados. Atualize o aplicativo.", "warning");
@@ -1292,6 +1355,15 @@ function App() {
       <LoadingOverlay loading={dataLoading} />
       {remoteOperation ? <FlowProgressOverlay operation={remoteOperation} /> : null}
       {expenseSend ? <ExpenseSendOverlay state={expenseSend} onClose={closeExpenseSendError} /> : null}
+      {vehicleChoiceRequest ? (
+        <VehicleChoiceDialog
+          resolution={vehicleChoiceRequest.resolution}
+          loadFleet={vehicleChoiceRequest.loadFleet}
+          loadAllVehicles={remoteMode ? loadActiveFleetRemote : loadMockAllFleet}
+          onChoose={closeVehicleChoice}
+          onCancel={cancelVehicleChoice}
+        />
+      ) : null}
       {criticalError ? (
         <div className="critical-error-overlay" role="dialog" aria-modal="true" aria-labelledby="critical-error-title">
           <div className="critical-error-card">
@@ -1371,6 +1443,7 @@ function App() {
     setMaintenanceExistingPreview(false);
     setMaintenanceRequestDraft({ ...EMPTY_MAINTENANCE_REQUEST_DRAFT });
     setExpenseDraft({ ...EMPTY_EXPENSE_DRAFT });
+    resetExpenseQuickRead();
     setMaintenanceFinalizeDraft({ ...EMPTY_MAINTENANCE_FINALIZE_DRAFT });
     setPhotoDraft(null);
     setPhotoDraftPreviewUrl("");
@@ -1397,6 +1470,7 @@ function App() {
       try {
         const remote = await loadRemoteStore();
         setDriverContext(remote.driver);
+        comunicadosDriverIdRef.current = remote.driver?.id ?? "";
         setStore((current) => ({ ...current, agenda: remote.agenda, history: remote.history }));
         try {
           await reloadComunicados();
@@ -1471,6 +1545,18 @@ function App() {
     if (remoteMode) await saveServiceObservationRemote(selectedDetail, observation);
   };
 
+  // Abre a escolha do carro e espera a resposta do motorista (null = voltou sem escolher).
+  const askVehicleChoice = (resolution: InfleetVehicleResolution, loadFleet: () => Promise<FleetVehicle[]>) =>
+    new Promise<DriverVehicleChoice | null>((resolve) => setVehicleChoiceRequest({ resolution, resolve, loadFleet }));
+
+  const closeVehicleChoice = useCallback((choice: DriverVehicleChoice | null) => {
+    setVehicleChoiceRequest((current) => {
+      current?.resolve(choice);
+      return null;
+    });
+  }, []);
+  const cancelVehicleChoice = useCallback(() => closeVehicleChoice(null), [closeVehicleChoice]);
+
   const finalizeSelected = async (fields: Record<string, string>) => {
     if (!selectedDetail || remoteOperation) return;
     const detailToFinalize = selectedDetail;
@@ -1529,12 +1615,33 @@ function App() {
           return;
         }
 
+        // Infleet decide o carro do serviço; abaixo de 85% o motorista escolhe. Falha da Infleet não bloqueia.
+        let vehicleResolution: InfleetVehicleResolution | undefined;
+        let vehicleChoice: DriverVehicleChoice | null = null;
+        let skipVehicle = false;
+        if (detailToFinalize.type === "SERVICO" && detailToFinalize.dataverse?.id) {
+          setProgress("Conferindo o carro na Infleet.");
+          const driver = driverContext ?? await getDriverContext();
+          if (isThirdPartyDriver(driver?.funcionario)) {
+            // Terceiro não usa a Infleet nem escolhe carro: a finalização não grava o veículo.
+            skipVehicle = true;
+          } else {
+            vehicleResolution = await resolveServiceVehicleRemote(detailToFinalize.dataverse.id);
+            if (needsDriverChoice(vehicleResolution)) {
+              setRemoteOperation(null);
+              vehicleChoice = await askVehicleChoice(vehicleResolution, loadActiveFleetRemote);
+              if (!vehicleChoice) return;
+              setProgress("Registrando o carro escolhido.");
+            }
+          }
+        }
+
         const signatureDataUrl = store.signatures[detailToFinalize.id];
         const photos = store.photos[detailToFinalize.id];
         if (detailToFinalize.type === "SERVICO" && isVoucher) {
-          await saveVoucherRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress });
+          await saveVoucherRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress, vehicleResolution, vehicleChoice, skipVehicle });
         } else if (detailToFinalize.type === "SERVICO") {
-          await finalizeServiceRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress });
+          await finalizeServiceRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress, vehicleResolution, vehicleChoice, skipVehicle });
         } else if (detailToFinalize.type === "MANUTENCAO") {
           await finalizeMaintenanceRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress });
         } else if (detailToFinalize.type === "TROCA") {
@@ -1566,6 +1673,31 @@ function App() {
         delete next[detailToFinalize.id];
         return next;
       });
+    } else if (detailToFinalize.type === "SERVICO") {
+      // Mock local: simula a Infleet para testar a UI sem Dataverse. Cenário por ?mockInfleet=.
+      const scenario = pickMockInfleetScenario(detailToFinalize.id);
+      setRemoteOperation({ title: "Finalizando serviço", message: "Conferindo o carro na Infleet.", detailId: detailToFinalize.id, phase: "loading" });
+      const resolution = await resolveMockServiceVehicle(scenario);
+      setRemoteOperation(null);
+      let choice: DriverVehicleChoice | null = null;
+      if (needsDriverChoice(resolution)) {
+        const loadMockFleet = createMockFleetLoader(scenario);
+        // Terceiro sem carro cadastrado: a lista dele vem vazia e o diálogo oferece a frota ativa.
+        choice = await askVehicleChoice(resolution, resolution.motivo === "motorista-terceiro"
+          ? async () => {
+              const mine = await loadMockFleet();
+              return mine.length > 0 ? mine : MOCK_FLEET;
+            }
+          : loadMockFleet);
+        if (!choice) return;
+        if (resolution.motivo === "motorista-terceiro") choice = { ...choice, origem: "terceiro" };
+      }
+      const patch = buildInfleetServiceVehiclePatch(resolution, choice, (vehicleId) => vehicleId);
+      const outcome = resolution.decisao === "automatico"
+        ? `automático: ${resolution.escolhido?.placa} (${resolution.escolhido?.percentual}%)`
+        : `escolhido pelo motorista (${choice?.origem === "frota" ? "frota" : choice?.origem === "terceiro" ? "carros do terceiro" : "carros da janela"}): ${choice?.placa}`;
+      console.info("[mock Infleet]", scenario, patch);
+      setToast(`Teste Infleet (${scenario}) · ${outcome}`, "success");
     }
 
     setCompletingDetailKey(detailKey);
@@ -1783,12 +1915,22 @@ function App() {
     }, 450);
   };
 
+  const isExpenseDraftBlank = (draft: ExpenseDraft) =>
+    !draft.categoriaId && !draft.veiculoId && !draft.valor && !draft.formaPagamentoId && !draft.cidadeId &&
+    !draft.estabelecimento && !draft.descricao && !draft.kmInformado && !draft.litros && !expenseDateTouchedRef.current;
+
   const navigateFromInitial = (screenName: string) => {
+    // Pending sends that need the driver go first; otherwise open the camera straight away.
+    if (screenName === "gastos" && !expenseUploadStatuses.length && expensePhotos.length === 0 && isExpenseDraftBlank(expenseDraft)) {
+      setComunicadoOrigin("");
+      openExpenseCamera();
+      return;
+    }
     if (screenName === "personalReceipt" || screenName === "reciboPersonalizado" || screenName === "gerarReciboPersonalizado") {
       openPersonalReceiptFromHome();
       return;
     }
-    if (screenName === "servicos" || screenName === "comunicados" || screenName === "historico" || screenName === "solicitarManutencao" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias") {
+    if (screenName === "servicos" || screenName === "comunicados" || screenName === "historico" || screenName === "solicitarManutencao" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro") {
       setComunicadoOrigin("");
       setScreen(screenName);
     }
@@ -1868,6 +2010,7 @@ function App() {
         setExpensePhotos([]);
         setExpensePreviewPhotoId("");
         setExpenseDraft({ ...EMPTY_EXPENSE_DRAFT, dataGasto: new Date().toISOString().slice(0, 10) });
+        resetExpenseQuickRead();
       };
       if (!accepted) {
         clearForm();
@@ -1932,8 +2075,8 @@ function App() {
   expenseWorkerRef.current = { run: runExpenseSubmission, verify: verifyExpenseUpload };
 
   const submitExpense = async (draft: ExpenseDraft) => {
-    if (usesAsyncExpenseUpload()) return submitExpenseAsync(draft);
-    if (remoteOperation) return;
+    if (remoteMode && expenseUploadMode === "async") return submitExpenseAsync(draft);
+    if (remoteOperation || (remoteMode && expenseUploadMode === "pending")) return;
     if (!remoteMode) {
       setToast("Abra no Power Apps para registrar no Dataverse.");
       return;
@@ -2047,6 +2190,7 @@ function App() {
         kmInformado: "",
         litros: ""
       });
+      resetExpenseQuickRead();
       setExpensePhotos([]);
       clearExpensePhotoDraftState();
       setExpensePreviewPhotoId("");
@@ -2326,7 +2470,63 @@ function App() {
     setScreen("solicitarManutencao");
   };
 
+  function resetExpenseQuickRead() {
+    expenseQuickReadSeqRef.current++;
+    expenseRetakeTargetIdRef.current = "";
+    expenseDateTouchedRef.current = false;
+    setExpenseQuickRead(INITIAL_QUICK_READ);
+    setExpenseQuickReadPhoto("");
+    setExpenseQuickReadFilling(false);
+    setExpenseQuickReadFilled({});
+  }
+
+  const runExpenseQuickRead = async (dataUrl: string) => {
+    const mockMode = remoteMode ? null : getQuickReadMockMode();
+    if ((!remoteMode && !mockMode) || !shouldRunQuickRead(expenseQuickRead)) return;
+    const online = typeof navigator === "undefined" || navigator.onLine !== false;
+    const started = startQuickReadState(expenseQuickRead, { online });
+    setExpenseQuickRead(started);
+    if (started.status !== "lendo") return;
+    const seq = ++expenseQuickReadSeqRef.current;
+    setExpenseQuickReadPhoto(dataUrl);
+    setExpenseQuickReadFilling(false);
+    const { outcome, referenceData } = await runQuickReadPipeline({
+      referenceData: expenseReferenceData,
+      isReferenceReady: mockMode ? (data) => data.categories.length > 0 && data.paymentMethods.length > 0 : hasRemoteReferenceData,
+      loadReferenceData: mockMode ? async () => DEFAULT_EXPENSE_REFERENCE_DATA : loadExpenseReferenceDataRemote,
+      prepareImage: () => downscaleForQuickRead(dataUrl),
+      read: mockMode ? (_base64, categorias, formas, timeoutMs) => readReceiptQuickMock(mockMode, categorias, formas, timeoutMs) : readReceiptQuick
+    });
+    if (seq !== expenseQuickReadSeqRef.current) return;
+    if (referenceData && referenceData !== expenseReferenceData) setExpenseReferenceData(referenceData);
+    if (outcome.kind === "lido" && referenceData) {
+      setExpenseQuickReadFilling(true);
+      await new Promise((resolve) => window.setTimeout(resolve, QUICK_READ_FILL_STEP_MS));
+      if (seq !== expenseQuickReadSeqRef.current) return;
+      const before = expenseDraftRef.current;
+      const { draft: after, filled } = applyQuickRead(before, outcome.leitura, referenceData, { replaceAutoDate: !expenseDateTouchedRef.current });
+      setExpenseDraft(after);
+      setExpenseQuickReadFilled(filled);
+    }
+    setExpenseQuickReadFilling(false);
+    setExpenseQuickRead((current) => nextQuickReadState(current, outcome));
+  };
+
+  /** Sai da tela de leitura: ignora a resposta que ainda vier e segue para o preenchimento manual. */
+  const cancelExpenseQuickRead = () => {
+    expenseQuickReadSeqRef.current++;
+    setExpenseQuickReadFilling(false);
+    setExpenseQuickRead((current) => ({ ...current, status: "manual" }));
+  };
+
+  const retakeQuickReadPhoto = () => {
+    const targetId = expensePhotos[0]?.id ?? "";
+    openExpenseCamera();
+    expenseRetakeTargetIdRef.current = targetId;
+  };
+
   const openExpenseCamera = () => {
+    expenseRetakeTargetIdRef.current = "";
     clearExpensePhotoDraftState();
     setExpensePreviewPhotoId("");
     setScreen("fotoGasto");
@@ -2357,6 +2557,12 @@ function App() {
   };
 
   const confirmExpensePhoto = () => {
+    const retakeTargetId = expenseRetakeTargetIdRef.current;
+    expenseRetakeTargetIdRef.current = "";
+    const isNewPhoto = !expensePreviewPhotoId;
+    const retaking = isNewPhoto && Boolean(retakeTargetId) && expensePhotos.some((photo) => photo.id === retakeTargetId);
+    const shouldQuickRead = isNewPhoto && !expensePhotoIsVideo && Boolean(expensePhotoDraft) && (expensePhotos.length === 0 || retaking);
+    const quickReadDataUrl = expensePhotoDraft;
     if (!hasMediaDraftContent({ dataUrl: expensePhotoDraft, rawBlob: expensePhotoRawBlob, mediaType: expensePhotoIsVideo ? "video" : "foto" })) {
       return setScreen("gastos");
     }
@@ -2364,6 +2570,22 @@ function App() {
       setExpensePhotos((current) =>
         current.map((photo) => {
           if (photo.id !== expensePreviewPhotoId) return photo;
+          if (photo.previewUrl && photo.previewUrl !== (expensePhotoPreviewUrl || undefined)) revokePreviewUrl(photo.previewUrl);
+          return {
+            ...photo,
+            dataUrl: expensePhotoDraft,
+            previewUrl: expensePhotoPreviewUrl || undefined,
+            posterUrl: expensePhotoPosterUrl || undefined,
+            durationLabel: expensePhotoDurationLabel || undefined,
+            mediaType: expensePhotoIsVideo ? "video" : "foto",
+            rawBlob: expensePhotoIsVideo ? expensePhotoRawBlob ?? undefined : undefined
+          };
+        })
+      );
+    } else if (retaking) {
+      setExpensePhotos((current) =>
+        current.map((photo) => {
+          if (photo.id !== retakeTargetId) return photo;
           if (photo.previewUrl && photo.previewUrl !== (expensePhotoPreviewUrl || undefined)) revokePreviewUrl(photo.previewUrl);
           return {
             ...photo,
@@ -2393,6 +2615,7 @@ function App() {
     clearExpensePhotoDraftState(true);
     setExpensePreviewPhotoId("");
     setScreen("gastos");
+    if (shouldQuickRead) void runExpenseQuickRead(quickReadDataUrl);
   };
 
   const deleteExpensePhoto = () => {
@@ -2872,7 +3095,7 @@ function App() {
       <MaintenancePhotoPreviewScreen
         kind="NOTAFISCAL"
         title="Comprovante"
-        prompt={expensePhotoIsVideo ? "O vídeo está correto?" : "O comprovante está legível?"}
+        prompt={expensePhotoIsVideo ? "O vídeo está correto?" : "O comprovante está inteiro e legível?"}
         photoDataUrl={expensePhotoDraft}
         isVideo={expensePhotoIsVideo}
         videoPreviewUrl={expensePhotoPreviewUrl}
@@ -2884,7 +3107,8 @@ function App() {
         onRetake={openExpenseCamera}
         onDelete={expensePreviewPhotoId ? deleteExpensePhoto : undefined}
         onConfirm={confirmExpensePhoto}
-        confirmLabel={expensePreviewPhotoId ? "Voltar" : "Confirmar"}
+        confirmLabel={expensePreviewPhotoId ? "Voltar" : expensePhotoIsVideo ? "Confirmar" : "Usar esta foto"}
+        retakeLabel={expensePhotoIsVideo ? undefined : "Tirar outra"}
         deleteOnly={Boolean(expensePreviewPhotoId)}
       />
     );
@@ -2908,18 +3132,33 @@ function App() {
     );
   }
 
+  if (screen === "gastos" && expenseFlowView(expenseQuickRead) === "leitura") {
+    return show(
+      <ReceiptReadingScreen photoDataUrl={expenseQuickReadPhoto} filling={expenseQuickReadFilling} onCancel={cancelExpenseQuickRead} />
+    );
+  }
+
+  if (screen === "gastos" && expenseFlowView(expenseQuickRead) === "ilegivel") {
+    return show(
+      <ReceiptIllegibleScreen photoDataUrl={expenseQuickReadPhoto} onRetake={retakeQuickReadPhoto} onBack={cancelExpenseQuickRead} />
+    );
+  }
+
   if (screen === "gastos") {
     return show(
       <ExpenseScreen
         uploads={expenseUploadStatuses.map(({ submission, status }) => ({ id: submission.expenseId, draft: submission.draft, status }))}
         onUploadAction={handleExpenseUploadAction}
-        submitDisabled={usesAsyncExpenseUpload() && !expenseUploadReady}
+        submitDisabled={remoteMode && (expenseUploadMode === "pending" || (expenseUploadMode === "async" && !expenseUploadReady))}
         draft={expenseDraft}
         photos={expensePhotos}
         referenceData={expenseReferenceData}
         referenceLoading={expenseReferenceLoading}
         referenceError={!remoteMode ? "Visualização local. Para gravar, abra o app publicado no Model-driven." : expenseReferenceError}
-        onDraftChange={setExpenseDraft}
+        onDraftChange={(draft) => {
+          if (draft.dataGasto !== expenseDraft.dataGasto) expenseDateTouchedRef.current = true;
+          setExpenseDraft(draft);
+        }}
         onAddPhoto={openExpenseCamera}
         onPreviewPhoto={openExpensePreview}
         onBack={() => setScreen("inicio")}
@@ -2928,6 +3167,8 @@ function App() {
         vehicles={maintenanceVehicles}
         vehiclesLoading={maintenanceVehiclesLoading}
         currentVehicleId={maintenanceCurrentVehicleId}
+        quickRead={expenseQuickRead}
+        quickReadFilled={expenseQuickReadFilled}
       />
     );
   }
@@ -2939,6 +3180,21 @@ function App() {
         loadIdeas={ideasGateway.load}
         createIdea={ideasGateway.create}
         localNotice={remoteMode ? undefined : "Visualização local. Para enviar à equipe, abra o app publicado no Model-driven."}
+      />
+    );
+  }
+
+  if (screen === "meuCarro") {
+    return show(
+      <MyVehicleScreen
+        onBack={() => setScreen("inicio")}
+        currentVehicleId={getDriverCurrentVehicleId(driverContext)}
+        loadVehicles={async () => (remoteMode ? loadMyVehiclesRemote(driverContext ?? await getDriverContext()) : MOCK_FLEET.slice(0, 2))}
+        saveVehicle={async (id) => {
+          const driver = driverContext ?? await getDriverContext();
+          if (remoteMode) await setMyCurrentVehicleRemote(driver, id);
+          setDriverContext({ ...driver, funcionario: { ...(driver.funcionario ?? {}), _cr40f_veiculoatual_value: id } });
+        }}
       />
     );
   }
@@ -3321,6 +3577,7 @@ function App() {
       openPersonalReceipt={openPersonalReceiptFromHome}
       onRefresh={refreshLocal}
       canGeneratePersonalReceipt={canGeneratePersonalReceipt}
+      isThirdParty={isThirdPartyDriver(driverContext?.funcionario)}
       services={store.agenda}
       pendingComunicados={comunicados.filter(isComunicadoPending).length}
       driverName={driverContext?.fullName}

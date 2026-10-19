@@ -20,3 +20,9 @@ plugins/ExpenseUpload/ExpenseUpload.snk
 .memsearch/
 
 .verificacao/
+.worktrees/
+backup/prod-deploy/
+backup/prod-active-layers/
+
+# graphify (grafo gerado localmente)
+graphify-out/

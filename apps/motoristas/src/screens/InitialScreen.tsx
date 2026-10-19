@@ -85,6 +85,7 @@ const screenAliases: Record<string, string[]> = {
   expenses: ["gastos", "expenses", "Expenses"],
   personalReceipt: ["reciboPersonalizado", "personalReceipt", "gerarReciboPersonalizado", "recibopersonalizado"],
   ideas: ["boasIdeias", "ideas", "ideias"],
+  meuCarro: ["meuCarro"],
 };
 
 const moduleHandlers: Record<string, string[]> = {
@@ -203,6 +204,7 @@ type InitialScreenProps = {
   services?: AgendaItem[];
   pendingComunicados?: number;
   canGeneratePersonalReceipt?: boolean;
+  isThirdParty?: boolean;
   showLocalReset?: boolean;
   onResetLocalData?: () => void;
   [key: string]: unknown;

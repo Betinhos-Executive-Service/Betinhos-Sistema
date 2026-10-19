@@ -1,6 +1,10 @@
 param(
   [switch] $DeviceCode,
-  [switch] $ExpenseUploadOnly
+  [switch] $ExpenseUploadOnly,
+  # Inclui a Tela Funcoes Operacionais na mesma publicacao (gates + build + deploy).
+  # Sem este switch ela nao e testada, compilada nem republicada: publique-a
+  # separadamente com `npm run push` no repo dela.
+  [switch] $IncludeOperacionais
 )
 
 if ($PSVersionTable.PSEdition -eq "Core" -or $PSHOME -like "*codex-runtimes*") {
@@ -8,6 +12,7 @@ if ($PSVersionTable.PSEdition -eq "Core" -or $PSHOME -like "*codex-runtimes*") {
   $arguments = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $PSCommandPath)
   if ($DeviceCode) { $arguments += "-DeviceCode" }
   if ($ExpenseUploadOnly) { $arguments += "-ExpenseUploadOnly" }
+  if ($IncludeOperacionais) { $arguments += "-IncludeOperacionais" }
   & $windowsPowerShell @arguments
   exit $LASTEXITCODE
 }
@@ -22,16 +27,19 @@ if ($ExpenseUploadOnly) {
 }
 
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
-# Sobe pelos ancestrais para funcionar tambem em git worktrees (.claude\worktrees\<nome>).
-$workspaceParent = Split-Path $root -Parent
-$operationsCandidates = @()
-while ($workspaceParent) {
-  $operationsCandidates = @(Get-ChildItem -LiteralPath $workspaceParent -Directory | Where-Object { $_.Name -like "Tela Fun*Operacionais" })
-  if ($operationsCandidates.Count -gt 0) { break }
-  $workspaceParent = Split-Path $workspaceParent -Parent
+$operationsRoot = $null
+if ($IncludeOperacionais) {
+  # Sobe pelos ancestrais para funcionar tambem em git worktrees (.claude\worktrees\<nome>).
+  $workspaceParent = Split-Path $root -Parent
+  $operationsCandidates = @()
+  while ($workspaceParent) {
+    $operationsCandidates = @(Get-ChildItem -LiteralPath $workspaceParent -Directory | Where-Object { $_.Name -like "Tela Fun*Operacionais" })
+    if ($operationsCandidates.Count -gt 0) { break }
+    $workspaceParent = Split-Path $workspaceParent -Parent
+  }
+  if ($operationsCandidates.Count -ne 1) { throw "Repositorio Tela Funcoes Operacionais nao encontrado de forma unica acima de $root." }
+  $operationsRoot = $operationsCandidates[0].FullName
 }
-if ($operationsCandidates.Count -ne 1) { throw "Repositorio Tela Funcoes Operacionais nao encontrado de forma unica acima de $root." }
-$operationsRoot = $operationsCandidates[0].FullName
 Set-Location $root
 
 $environmentUrl = "https://org23b93544.crm2.dynamics.com/"
@@ -79,7 +87,7 @@ function Assert-SolutionArchiveExchangeLifecycle([string] $ZipPath) {
     $customApiPath = Join-Path $extractPath "customapis"
     if (-not (Test-Path -LiteralPath $customApiPath)) { throw "ZIP final nao possui a pasta customapis." }
     $xmlText = ((Get-ChildItem -LiteralPath $customApiPath -Recurse -File -Filter "*.xml" | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }) -join "`n")
-    foreach ($required in @("new_ConcluirTrocaDeCarro", "new_CancelarTrocaDeCarro", "new_ReverterTrocaDeCarro", "new_ConfirmarTrocaMotorista", "new_AtualizarTrocaDeCarro", "new_RegistrarTrocaDeCarro", "new_Motivo", "new_DataEfetiva", "new_VersaoEsperada", "new_IdempotencyKey", "new_TrocaId", "new_TrocaCompensatoriaId", "new_DispararComunicadoMotorista", "new_AbrirComunicadoMotorista", "new_RegistrarCienciaComunicado", "new_ReenviarPushComunicado", "new_DestinatarioId", "new_ComunicadoId", "new_AssinaturaJson")) {
+    foreach ($required in @("new_ConcluirTrocaDeCarro", "new_CancelarTrocaDeCarro", "new_ReverterTrocaDeCarro", "new_ConfirmarTrocaMotorista", "new_AtualizarTrocaDeCarro", "new_RegistrarTrocaDeCarro", "new_Motivo", "new_DataEfetiva", "new_VersaoEsperada", "new_IdempotencyKey", "new_TrocaId", "new_TrocaCompensatoriaId", "new_DispararComunicadoMotorista", "new_AbrirComunicadoMotorista", "new_RegistrarCienciaComunicado", "new_ReenviarPushComunicado", "new_DestinatarioId", "new_ComunicadoId", "new_AssinaturaJson", "new_ResolverVeiculoDoServico", "new_ReservaId", "new_ResultadoJson", "new_SincronizarVeiculoAtual", "new_GerarLinkAcompanhamento", "new_ResumoJson", "new_LinkJson")) {
       if ($xmlText.IndexOf($required, [System.StringComparison]::Ordinal) -lt 0) { throw "ZIP final nao possui o componente esperado: $required" }
     }
     Write-Step "validacao do ZIP final OK: Custom APIs, parametros e retorno presentes"
@@ -103,17 +111,22 @@ if ($LASTEXITCODE -ne 0) { throw "TypeScript do App Motoristas falhou." }
 npm run build
 if ($LASTEXITCODE -ne 0) { throw "Build do App Motoristas falhou." }
 
-Write-Step "gate Tela Funcoes Operacionais: testes, TypeScript e build"
-Push-Location $operationsRoot
-try {
-  npm test
-  if ($LASTEXITCODE -ne 0) { throw "Testes da Tela Funcoes Operacionais falharam." }
-  npx tsc --noEmit
-  if ($LASTEXITCODE -ne 0) { throw "TypeScript da Tela Funcoes Operacionais falhou." }
-  npm run build
-  if ($LASTEXITCODE -ne 0) { throw "Build da Tela Funcoes Operacionais falhou." }
+if ($IncludeOperacionais) {
+  Write-Step "gate Tela Funcoes Operacionais: testes, TypeScript e build"
+  Push-Location $operationsRoot
+  try {
+    npm test
+    if ($LASTEXITCODE -ne 0) { throw "Testes da Tela Funcoes Operacionais falharam." }
+    npx tsc --noEmit
+    if ($LASTEXITCODE -ne 0) { throw "TypeScript da Tela Funcoes Operacionais falhou." }
+    npm run build
+    if ($LASTEXITCODE -ne 0) { throw "Build da Tela Funcoes Operacionais falhou." }
+  }
+  finally { Pop-Location }
 }
-finally { Pop-Location }
+else {
+  Write-Step "Tela Funcoes Operacionais fora desta publicacao (use -IncludeOperacionais ou npm run push no repo dela)"
+}
 
 Write-Step "gate plugin: build e testes"
 dotnet build "plugins/DriverRecordSharing.Tests/DriverRecordSharing.Tests.csproj" -c Release --nologo
@@ -131,12 +144,14 @@ Write-Step "publish webresource in $solutionUniqueName"
   -SolutionUniqueName $solutionUniqueName `
   -DeviceCode:$DeviceCode
 
-Write-Step "publish Tela Funcoes Operacionais"
-& (Join-Path $operationsRoot "scripts\deploy-webresource.ps1") `
-  -EnvironmentUrl $environmentUrl `
-  -WebResourceName "new_telafuncoesoperacionais" `
-  -SkipBuild `
-  -DeviceCode:$DeviceCode
+if ($IncludeOperacionais) {
+  Write-Step "publish Tela Funcoes Operacionais"
+  & (Join-Path $operationsRoot "scripts\deploy-webresource.ps1") `
+    -EnvironmentUrl $environmentUrl `
+    -WebResourceName "new_telafuncoesoperacionais" `
+    -SkipBuild `
+    -DeviceCode:$DeviceCode
+}
 
 Write-Step "publish plugin in $solutionUniqueName"
 & (Join-Path $PSScriptRoot "register-driver-record-sharing-plugin-webapi.ps1") `
@@ -153,6 +168,22 @@ Write-Step "provision comunicados metadata, Custom APIs e travas in DEV"
   -Apply `
   -DeviceCode:$DeviceCode
 if (-not $?) { throw "Provisionamento de comunicados falhou." }
+
+Write-Step "provision decisao do carro pela Infleet in DEV"
+& (Join-Path $PSScriptRoot "provision-infleet-vehicle.ps1") `
+  -EnvironmentUrl $environmentUrl `
+  -SolutionUniqueName $solutionUniqueName `
+  -Apply `
+  -DeviceCode:$DeviceCode
+if (-not $?) { throw "Provisionamento da decisao do carro pela Infleet falhou." }
+
+Write-Step "provision carro atual do motorista e link de acompanhamento in DEV"
+& (Join-Path $PSScriptRoot "provision-current-vehicle.ps1") `
+  -EnvironmentUrl $environmentUrl `
+  -SolutionUniqueName $solutionUniqueName `
+  -Apply `
+  -DeviceCode:$DeviceCode
+if (-not $?) { throw "Provisionamento do carro atual e do link de acompanhamento falhou." }
 
 Write-Step "publish push redirect (forms OnLoad -> App Motoristas)"
 & (Join-Path $PSScriptRoot "provision-push-redirect.ps1") `
