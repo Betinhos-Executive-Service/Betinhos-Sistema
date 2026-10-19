@@ -41,6 +41,12 @@ Recent history uses concise imperative messages, often with `feat:`, `fix:`, or 
 
 Pull requests should include the user-facing change, validation commands, Dataverse/Flow impact, and screenshots for UI changes. Call out generated `dist/` or `public/screens/` updates.
 
+### Branches (since 2026-10-19)
+
+- `main` is the integration and published line: open PRs against `main`, and publish DEV (`npm run push`) from an up-to-date `main`. PROD only through `scripts/deploy-prod.ps1`.
+- Before opening a PR, merge the latest `origin/main` into the branch. The DriverRecordSharing plugin assembly is shared by every front, so publishing from a stale branch drops other fronts' plugin types from DEV.
+- `develop` exists only as a mirror of `main` (it is still the GitHub default branch). Do not target it. After merging to `main`, fast-forward it: `git push origin origin/main:develop`. Never merge into `develop` directly; if it ever has commits that `main` lacks, open a PR from `develop` to `main` first.
+
 ## Security & Configuration Tips
 
 Never commit secrets, tokens, Flow URLs, or personal data. Redact phone numbers, emails, SharePoint links, base64 payloads, and auth headers in logs. Verify environment URLs and webresource names before publishing.
