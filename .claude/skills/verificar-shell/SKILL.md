@@ -43,3 +43,4 @@ Não passam pelo `pnpm push`; cada script grava o clientdata direto no DEV (com 
 
 ## Limites
 - Publicação só da `main`, no checkout principal (`pnpm push`), nunca de worktree. PROD só com aprovação.
+- Flows sem `-SomenteValidar` (ex.: `provision-flow-aniversariantes.ps1`): provisionar com destinatário só do usuário, disparar o gatilho e conferir as ações; depois reprovisionar com os destinatários reais.

@@ -1,0 +1,166 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$authentication": { "defaultValue": {}, "type": "SecureObject" },
+    "$connections": { "defaultValue": {}, "type": "Object" },
+    "E-mail do administrador dos avisos (new_EmailAdminAvisos)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": { "schemaName": "new_EmailAdminAvisos", "description": "Recebe o aviso quando o aviso de aniversariantes falha." }
+    }
+  },
+  "triggers": {
+    "Dias_uteis_8h30": {
+      "type": "Recurrence",
+      "recurrence": {
+        "frequency": "Week",
+        "interval": 1,
+        "timeZone": "E. South America Standard Time",
+        "startTime": "2026-10-20T08:30:00",
+        "schedule": { "weekDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], "hours": ["8"], "minutes": [30] }
+      }
+    }
+  },
+  "actions": {
+    "Iniciar_html": {
+      "type": "InitializeVariable",
+      "runAfter": {},
+      "inputs": { "variables": [ { "name": "Html", "type": "string", "value": "" } ] }
+    },
+    "Try": {
+      "type": "Scope",
+      "runAfter": { "Iniciar_html": ["Succeeded"] },
+      "actions": {
+        "Hoje": {
+          "type": "Compose",
+          "runAfter": {},
+          "inputs": "@convertFromUtc(utcNow(), 'E. South America Standard Time', 'yyyy-MM-dd')"
+        },
+        "Quantidade_de_dias": {
+          "type": "Compose",
+          "runAfter": { "Hoje": ["Succeeded"] },
+          "inputs": "@if(equals(dayOfWeek(outputs('Hoje')), 5), 3, 1)"
+        },
+        "Dias": {
+          "type": "Select",
+          "runAfter": { "Quantidade_de_dias": ["Succeeded"] },
+          "inputs": {
+            "from": "@range(0, outputs('Quantidade_de_dias'))",
+            "select": {
+              "mmdd": "@addDays(outputs('Hoje'), item(), 'MM-dd')",
+              "seguinte": "@addDays(outputs('Hoje'), add(item(), 1), 'MM-dd')",
+              "rotulo": "@concat(if(equals(item(), 0), 'Hoje, ', ''), createArray('domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado')[dayOfWeek(addDays(outputs('Hoje'), item()))], ' ', addDays(outputs('Hoje'), item(), 'dd/MM'))"
+            }
+          }
+        },
+        "Funcionarios": {
+          "type": "OpenApiConnection",
+          "runAfter": { "Dias": ["Succeeded"] },
+          "inputs": {
+            "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps", "connectionName": "shared_commondataserviceforapps", "operationId": "ListRecords" },
+            "parameters": {
+              "entityName": "__SET_FUNCIONARIOS__",
+              "$select": "cr40f_nomecompleto,new_apelido,cr40f_funcao,cr40f_datadeaniversario",
+              "$filter": "statecode eq 0 and cr40f_status ne 1 and cr40f_datadeaniversario ne null",
+              "$orderby": "cr40f_nomecompleto"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Por_dia": {
+          "type": "Foreach",
+          "foreach": "@body('Dias')",
+          "runAfter": { "Funcionarios": ["Succeeded"] },
+          "runtimeConfiguration": { "concurrency": { "repetitions": 1 } },
+          "actions": {
+            "Do_dia": {
+              "type": "Query",
+              "runAfter": {},
+              "inputs": {
+                "from": "@outputs('Funcionarios')?['body/value']",
+                "where": "@or(equals(formatDateTime(item()?['cr40f_datadeaniversario'], 'MM-dd'), items('Por_dia')?['mmdd']), and(equals(formatDateTime(item()?['cr40f_datadeaniversario'], 'MM-dd'), '02-29'), equals(items('Por_dia')?['mmdd'], '02-28'), equals(items('Por_dia')?['seguinte'], '03-01')))"
+              }
+            },
+            "Tem_aniversariante": {
+              "type": "If",
+              "runAfter": { "Do_dia": ["Succeeded"] },
+              "expression": { "and": [ { "greater": [ "@length(body('Do_dia'))", 0 ] } ] },
+              "actions": {
+                "Nomes": {
+                  "type": "Select",
+                  "runAfter": {},
+                  "inputs": {
+                    "from": "@body('Do_dia')",
+                    "select": "@concat('<li style=\"margin:2px 0\"><b>', coalesce(item()?['new_apelido'], item()?['cr40f_nomecompleto'], ''), '</b>', if(or(empty(item()?['new_apelido']), equals(item()?['new_apelido'], item()?['cr40f_nomecompleto'])), '', concat(' (', coalesce(item()?['cr40f_nomecompleto'], ''), ')')), if(empty(item()?['cr40f_funcao@OData.Community.Display.V1.FormattedValue']), '', concat(' · ', item()?['cr40f_funcao@OData.Community.Display.V1.FormattedValue'])), '</li>')"
+                  }
+                },
+                "Juntar_dia": {
+                  "type": "AppendToStringVariable",
+                  "runAfter": { "Nomes": ["Succeeded"] },
+                  "inputs": { "name": "Html", "value": "@concat('<p style=\"margin:16px 0 4px\"><b>', items('Por_dia')?['rotulo'], '</b></p><ul style=\"margin:0;padding-left:20px\">', join(body('Nomes'), ''), '</ul>')" }
+                }
+              },
+              "else": { "actions": {} }
+            }
+          }
+        },
+        "Algum_aniversariante": {
+          "type": "If",
+          "runAfter": { "Por_dia": ["Succeeded"] },
+          "expression": { "and": [ { "not": { "equals": [ "@variables('Html')", "" ] } } ] },
+          "actions": {
+            "E_mail": {
+              "type": "OpenApiConnection",
+              "runAfter": {},
+              "inputs": {
+                "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365", "connectionName": "shared_office365", "operationId": "SendEmailV2" },
+                "parameters": {
+                  "emailMessage/From": "__REMETENTE__",
+                  "emailMessage/To": "__DESTINATARIOS__",
+                  "emailMessage/Subject": "@{if(equals(outputs('Quantidade_de_dias'), 3), concat('Aniversariantes | hoje e fim de semana (', addDays(outputs('Hoje'), 0, 'dd/MM'), ' a ', addDays(outputs('Hoje'), 2, 'dd/MM'), ')'), concat('Aniversariantes | hoje (', addDays(outputs('Hoje'), 0, 'dd/MM'), ')'))}",
+                  "emailMessage/Body": "@{concat('<div style=\"font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1F2937\"><p>', if(equals(outputs('Quantidade_de_dias'), 3), 'Aniversariantes de hoje e do fim de semana:', 'Aniversariantes de hoje:'), '</p>', variables('Html'), '</div>')}",
+                  "emailMessage/Importance": "Normal"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            }
+          },
+          "else": { "actions": {} }
+        }
+      }
+    },
+    "Catch": {
+      "type": "Scope",
+      "runAfter": { "Try": ["Failed", "TimedOut"] },
+      "actions": {
+        "Falhas": {
+          "type": "Query",
+          "runAfter": {},
+          "inputs": { "from": "@result('Try')", "where": "@not(equals(item()?['status'], 'Succeeded'))" }
+        },
+        "Avisar_admin": {
+          "type": "OpenApiConnection",
+          "runAfter": { "Falhas": ["Succeeded"] },
+          "inputs": {
+            "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365", "connectionName": "shared_office365", "operationId": "SendEmailV2" },
+            "parameters": {
+              "emailMessage/From": "__REMETENTE__",
+              "emailMessage/To": "@{parameters('E-mail do administrador dos avisos (new_EmailAdminAvisos)')}",
+              "emailMessage/Subject": "Aniversariantes | Aviso diário falhou",
+              "emailMessage/Body": "@{concat('<p>O aviso diário de aniversariantes falhou na execução ', workflow()?['run']?['name'], '.</p><p>Etapas com problema:</p><pre>', string(body('Falhas')), '</pre>')}",
+              "emailMessage/Importance": "High"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Marcar_falha": {
+          "type": "Terminate",
+          "runAfter": { "Avisar_admin": ["Succeeded", "Failed"] },
+          "inputs": { "runStatus": "Failed", "runError": { "code": "AniversariantesFalhou", "message": "O aviso de aniversariantes falhou; o administrador foi avisado." } }
+        }
+      }
+    }
+  },
+  "outputs": {}
+}
