@@ -12,6 +12,8 @@ import {
   loadStore,
   STORAGE_KEY
 } from "./app/bootstrap";
+import { useHardwareBackGuard } from "./app/backGuard";
+import { BuildStamp } from "./components/layout/BuildStamp";
 import {
   getServiceTaskBackScreen,
   hasReceiveProofs,
@@ -1253,9 +1255,11 @@ function App() {
     previousScreenRef.current = screen;
   }, [screen]);
 
+  useHardwareBackGuard(screen, hashRoutingActive);
+
   useEffect(() => {
     if (!hashRoutingActive) return;
-    const hashDetail = screen === "reciboPersonalizado" ? receiptDetail : selectedDetail;
+    const hashDetail = screen ==="reciboPersonalizado" ? receiptDetail : selectedDetail;
     const nextHash = buildHashRoute(screen, hashDetail ? { id: hashDetail.id, type: hashDetail.type } : null);
     if (window.location.hash === nextHash) return;
     window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}${nextHash}`);
@@ -1432,6 +1436,7 @@ function App() {
           </div>
         </div>
       ) : null}
+      <BuildStamp />
     </>
   );
 

@@ -282,7 +282,7 @@ export function CollisionScreen({
                     value={draft.terceiroPlaca}
                     disabled={isSubmitting}
                     onChange={(event) => {
-                      updateDraft({ terceiroPlaca: event.target.value.toUpperCase() });
+                      updateDraft({ terceiroPlaca: event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7) });
                       clearError("terceiroPlaca");
                     }}
                   />

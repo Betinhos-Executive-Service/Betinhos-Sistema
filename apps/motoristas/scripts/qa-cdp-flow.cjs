@@ -139,8 +139,8 @@ async function main() {
         el.dispatchEvent(new Event("input", { bubbles: true }));
         el.dispatchEvent(new Event("change", { bubbles: true }));
       }
-      setValue(document.querySelector('select[aria-label="horario-inicial hora"]'), "14");
-      setValue(document.querySelector('select[aria-label="horario-inicial minuto"]'), "30");
+      setValue(document.querySelector('select[aria-label="Horário inicial: hora"]'), "14");
+      setValue(document.querySelector('select[aria-label="Horário inicial: minuto"]'), "30");
       const numbers = [...document.querySelectorAll('input[type="number"]')];
       setValue(numbers[0], "10");
       setValue(numbers[1], "20");

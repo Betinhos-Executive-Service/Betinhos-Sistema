@@ -7,6 +7,13 @@ export const tiles: Tile[] = [
   { label: "Solicitar Manutenções", variant: "active", icon: "tools", target: "servicos" }
 ];
 
+// Datas do mock relativas a hoje (dd/mm/aaaa), para "Hoje", "Amanhã" e "Próximo serviço" baterem com o relógio.
+function mockDate(offsetDays: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
 const GERAL_ENTITY_SET = "cr40f_reservadeveculoses";
 const TROCA_ENTITY_SET = "cr40f_trocasdecarros";
 const MANUTENCAO_ENTITY_SET = "cr40f_manutencoeses";
@@ -88,6 +95,13 @@ function parseBrazilianDateTime(value: string) {
   return new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute)).toISOString();
 }
 
+// Igual ao Dataverse real: telefones de passageiros chegam como link do WhatsApp.
+function linkMockPassengerPhones(html: string) {
+  return html.replace(/\+55 \(\d{2}\) \d{4,5}-\d{4}/g, (phoneText) =>
+    `<a href="https://wa.me/${phoneText.replace(/\D/g, "")}" target="_blank" rel="noopener noreferrer">${phoneText}</a>`
+  );
+}
+
 function serviceDetail(options: ServiceOptions): DetailData {
   const fields = [
     { label: "Data e Horário de Saída", value: options.departureAt },
@@ -97,7 +111,7 @@ function serviceDetail(options: ServiceOptions): DetailData {
     { label: "Receber", value: options.receive },
     { label: "Valor a Receber", value: options.amount },
     { label: "Trajeto", value: options.route },
-    { label: "Passageiros e Telefones de Contato", value: options.passengersHtml, html: true },
+    { label: "Passageiros e Telefones de Contato", value: linkMockPassengerPhones(options.passengersHtml), html: true },
     { label: "Endereço de Saída", value: options.departureAddress },
     { label: "Destino", value: options.destination },
     { label: "Obs de Operação", value: options.operationNotes },
@@ -237,8 +251,8 @@ export const agendaMock: AgendaItem[] = [
     receive: "Sim",
     amount: "R$ 380,00",
     amountValue: 380,
-    departureAt: "01/07/2026 09:15",
-    returnForecast: "01/07/2026 13:15",
+    departureAt: `${mockDate(0)} 09:15`,
+    returnForecast: `${mockDate(0)} 13:15`,
     route: "Base Betinhos -> Aeroporto de Guarulhos",
     passengersHtml: "Henrique Tavares<br />+55 (11) 90000-0008",
     departureAddress: "Rua das Acácias, 120 - Jardim Satélite, São José dos Campos - SP",
@@ -260,7 +274,7 @@ export const agendaMock: AgendaItem[] = [
     receive: "Não",
     amount: "R$ 0,00",
     amountValue: 0,
-    departureAt: "01/07/2026 14:30",
+    departureAt: `${mockDate(0)} 14:30`,
     route: "Hotel Fasano São Paulo -> Aeroporto de Congonhas",
     passengersHtml: "Ana Paula Martins<br />+55 (11) 90000-0010<br /><br />Roberto Almeida<br />+55 (11) 90000-0011",
     departureAddress: "Rua Vittorio Fasano, 88 - Jardins, São Paulo - SP",
@@ -280,7 +294,7 @@ export const agendaMock: AgendaItem[] = [
     time: "HOJE entre 16:00 e 17:00",
     description: "Entregar Corolla ABC1D23 e receber Civic XYZ9A87",
     priority: 3,
-    window: "01/07/2026 16:00 - 17:00",
+    window: `${mockDate(0)} 16:00 - 17:00`,
     summary: "Troque com Carlos Andrade. Entregue Corolla Preto ABC1D23 e receba Civic Prata XYZ9A87.",
     actionLabel: "Trocar veículo com Carlos Andrade",
     giving: "Corolla Preto ABC1D23",
@@ -300,7 +314,7 @@ export const agendaMock: AgendaItem[] = [
     time: "HOJE entre 17:20 e 18:00",
     description: "Retirar Spin Preta FGH4J21 na base",
     priority: 1,
-    window: "01/07/2026 17:20 - 18:00",
+    window: `${mockDate(0)} 17:20 - 18:00`,
     summary: "Retire Spin Preta FGH4J21 na base operacional.",
     actionLabel: "Retirar veículo na base",
     receiving: "Spin Preta FGH4J21",
@@ -314,7 +328,7 @@ export const agendaMock: AgendaItem[] = [
     id: "76",
     time: "HOJE 18:10",
     description: "Manutenção no Corolla Preto ABC1D23",
-    dateLabel: "01/07/2026 18:10",
+    dateLabel: `${mockDate(0)} 18:10`,
     vehicle: "Corolla Preto ABC1D23",
     scenario: "Verificar ruído no freio dianteiro, calibragem dos pneus e alinhamento após impacto em buraco.",
     driverComments: "Levar o veículo até a base, fotografar pneus e aguardar orientação do Júnior.",
@@ -336,7 +350,7 @@ export const agendaMock: AgendaItem[] = [
     receive: "Não",
     amount: "R$ 0,00",
     amountValue: 0,
-    departureAt: "02/07/2026 08:20",
+    departureAt: `${mockDate(1)} 08:20`,
     route: "Residencial Alphaville -> Reunião Faria Lima",
     passengersHtml: "Eduardo Ribeiro<br />+55 (11) 90000-0005",
     departureAddress: "Alameda Rio Negro, Alphaville - Barueri - SP",
@@ -358,7 +372,7 @@ export const agendaMock: AgendaItem[] = [
     receive: "Sim",
     amount: "R$ 1.250,00",
     amountValue: 1250,
-    departureAt: "02/07/2026 22:40",
+    departureAt: `${mockDate(1)} 22:40`,
     route: "Hotel Unique -> Fazenda Boa Vista",
     passengersHtml: "Luciana Ferraz<br />+55 (11) 90000-0006<br /><br />Criança 1<br />Cadeirinha obrigatória",
     departureAddress: "Av. Brigadeiro Luís Antônio, 4700 - Jardim Paulista, São Paulo - SP",
@@ -378,7 +392,7 @@ export const agendaMock: AgendaItem[] = [
     time: "AMANHÃ entre 11:00 e 12:00",
     description: "Devolver Civic Prata XYZ9A87 na base",
     priority: 0,
-    window: "02/07/2026 11:00 - 12:00",
+    window: `${mockDate(1)} 11:00 - 12:00`,
     summary: "Devolva Civic Prata XYZ9A87 na base operacional.",
     actionLabel: "Devolver veículo na base",
     giving: "Civic Prata XYZ9A87",
@@ -401,7 +415,7 @@ export const historyMock: AgendaItem[] = [
     receive: "Não",
     amount: "R$ 0,00",
     amountValue: 0,
-    departureAt: "01/07/2026 09:10",
+    departureAt: `${mockDate(0)} 09:10`,
     route: "Aeroporto de Guarulhos -> Escritório Tenaris",
     passengersHtml: "Marcelo Nunes<br />+55 (11) 90000-0009",
     departureAddress: "GRU Airport - Terminal 3",
@@ -412,7 +426,7 @@ export const historyMock: AgendaItem[] = [
     vehicle: "Corolla Preto ABC1D23",
     actions: [],
     searchText: "10239 guarulhos escritorio tenaris servico concluido hoje",
-    finalizationAt: "01/07/2026 10:05"
+    finalizationAt: `${mockDate(0)} 10:05`
   }),
   serviceItem({
     itemId: "hist-srv-10238",
@@ -424,7 +438,7 @@ export const historyMock: AgendaItem[] = [
     receive: "Sim",
     amount: "R$ 245,00",
     amountValue: 245,
-    departureAt: "30/06/2026 21:35",
+    departureAt: `${mockDate(-1)} 21:35`,
     route: "Shopping Iguatemi -> Aeroporto de Congonhas",
     passengersHtml: "Priscila Moraes<br />+55 (11) 90000-0007",
     departureAddress: "Av. Brigadeiro Faria Lima, 2232 - Jardim Paulistano, São Paulo - SP",
@@ -435,7 +449,7 @@ export const historyMock: AgendaItem[] = [
     vehicle: "Civic Prata XYZ9A87",
     actions: [],
     searchText: "10238 iguatemi congonhas receber concluido ontem",
-    finalizationAt: "30/06/2026 22:18",
+    finalizationAt: `${mockDate(-1)} 22:18`,
     finalObservation: "Pagamento confirmado via Pix e comprovantes enviados."
   }),
   exchangeItem({
@@ -446,7 +460,7 @@ export const historyMock: AgendaItem[] = [
     time: "ONTEM 17:30",
     description: "Troca concluída com Base Operacional",
     priority: 0,
-    window: "30/06/2026 17:00 - 18:00",
+    window: `${mockDate(-1)} 17:00 - 18:00`,
     summary: "Troca concluída com a base operacional sem pendências.",
     actionLabel: "Troca concluída",
     giving: "Corolla Preto ABC1D23",
@@ -462,7 +476,7 @@ export const historyMock: AgendaItem[] = [
     id: "72",
     time: "2 dias atrás 15:40",
     description: "Manutenção realizada no Civic Prata XYZ9A87",
-    dateLabel: "29/06/2026 15:40",
+    dateLabel: `${mockDate(-2)} 15:40`,
     vehicle: "Civic Prata XYZ9A87",
     scenario: "Troca de pastilhas de freio dianteiras e reaperto geral.",
     driverComments: "Serviço autorizado pelo Júnior.",
@@ -471,7 +485,7 @@ export const historyMock: AgendaItem[] = [
     establishment: "Auto Center Vila Olímpia",
     payment: "Cartão",
     value: "R$ 480,00",
-    finalizationAt: "29/06/2026 17:12",
+    finalizationAt: `${mockDate(-2)} 17:12`,
     invoiceLink: "https://example.com/mock/manutencao/72/nota-fiscal.pdf",
     finalLinks: [
       "https://example.com/mock/manutencao/72/final-1.jpg",
@@ -490,7 +504,7 @@ export const historyMock: AgendaItem[] = [
     receive: "Não",
     amount: "R$ 0,00",
     amountValue: 0,
-    departureAt: "26/06/2026 20:20",
+    departureAt: `${mockDate(-5)} 20:20`,
     route: "Hotel Unique -> Aeroporto de Viracopos",
     passengersHtml: "Não informado",
     departureAddress: "Hotel Unique - São Paulo - SP",

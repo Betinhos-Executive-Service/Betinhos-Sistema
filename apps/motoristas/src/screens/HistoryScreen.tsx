@@ -36,7 +36,9 @@ export function HistoryScreen({ items, onHome, onRefresh, onOpenDetails }: Histo
               </div>
             ))
           ) : (
-            <div className="history-empty">Nenhum serviço disponível no seu histórico.</div>
+            <div className="history-empty">
+              {query.trim() ? `Nenhum serviço encontrado para "${query.trim()}".` : "Nenhum serviço disponível no seu histórico."}
+            </div>
           )}
         </div>
         </PullToRefresh>

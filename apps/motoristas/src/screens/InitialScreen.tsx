@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import betinhosLogo from "../../Logo Betinhos B.png";
+import betinhosLogo from "../assets/images/logo-betinhos-b-500.png";
 import carCrashIcon from "../assets/icons/car-crash-svgrepo-com.svg";
 import carIcon from "../assets/icons/car.svg";
 import historyIcon from "../assets/icons/clock.svg";
@@ -222,15 +222,6 @@ type InitialScreenProps = {
   [key: string]: unknown;
 };
 
-type BuildInfo = {
-  version?: string;
-  builtAtLabel?: string;
-};
-
-function getBuildInfo() {
-  return ((window as Window & { __APP_BUILD_INFO?: BuildInfo }).__APP_BUILD_INFO ?? {}) as BuildInfo;
-}
-
 function getFirstName(name?: string) {
   return name?.trim().split(/\s+/)[0] || "Renan";
 }
@@ -412,7 +403,6 @@ export function InitialScreen(props: InitialScreenProps) {
     ).concat([ideasModule]),
     [props.canGeneratePersonalReceipt]
   );
-  const buildInfo = useMemo(() => getBuildInfo(), []);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
@@ -495,9 +485,6 @@ export function InitialScreen(props: InitialScreenProps) {
       </section>
 
       <footer className="concept-footer">
-        <span>
-          Versão {buildInfo.version ?? "local"} {buildInfo.builtAtLabel ? `- Build ${buildInfo.builtAtLabel}` : ""}
-        </span>
         {props.showLocalReset && props.onResetLocalData ? (
           <button type="button" className="local-reset" onClick={props.onResetLocalData}>
             Resetar dados locais
