@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
-  AlertTriangle, Banknote, BookUser, Calculator, Calendar, Camera, Car, CarFront, ClipboardList, Clock, Coins, Contact, Database, Download,
+  AlertTriangle, Banknote, BookUser, Calculator, Calendar, Camera, Car, CarFront, ClipboardCheck, ClipboardList, Clock, Coins, Contact, Database, Download,
   FileText, FileWarning, FolderCheck, FolderCog, Home, KeyRound, Landmark, LayoutDashboard, List, Mail, Megaphone, MapPin, Paperclip, Receipt, ReceiptText, Route,
   ScrollText, Shield, Shuffle, Tag, TrendingUp, Users, Wallet, Wrench,
 } from 'lucide-react'
@@ -44,6 +44,7 @@ const ITEM_ICONS: Record<string, ReactNode> = {
   new_telafuncoesoperacionais: <Wrench />,
   cr40f_trocasdecarro: <Shuffle />,
   new_possedeveiculo: <KeyRound />,
+  new_gestaochecklistsveiculos: <ClipboardCheck />,
   'new_gestao_erros_operacionais': <Shield />,
   infleet: <MapPin />,
   new_telaplanner: <ClipboardList />,
