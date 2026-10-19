@@ -1,0 +1,2 @@
+- verificar-gastos | src/screens/ExpenseScreen.tsx, src/components/common/ExpenseSendOverlay.tsx, src/lib/expense*.ts, src/lib/expenses*.ts, tests/expenseUpload.test.ts, tests/expenses.test.ts | tela Registrar gasto, carregamento do envio, envios pendentes e diário assíncrono
+- verificar-app-geral | src/**, tests/**, scripts/** | testes, TypeScript, build single-file e prévia local sem erros

@@ -7997,6 +7997,153 @@ button:disabled {
   display: block;
 }
 
+/* Envios anteriores de gasto: valores do Betinhos Design System (design-tokens.json). */
+.expense-uploads {
+  margin: 0 0 12px;
+  font-family: Manrope, "Segoe UI", sans-serif;
+}
+
+.expense-uploads-title {
+  margin: 0 0 8px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.expense-uploads ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.expense-upload {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fcfcfb;
+}
+
+.expense-upload-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: #2159d2;
+  background: #edf3ff;
+}
+
+.expense-upload-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.expense-upload.is-processing .expense-upload-icon svg {
+  animation: expense-upload-spin 800ms linear infinite;
+}
+
+.expense-upload.is-interrupted .expense-upload-icon,
+.expense-upload.is-unclaimed .expense-upload-icon {
+  color: #856000;
+  background: #fff7df;
+}
+
+.expense-upload.is-failed {
+  border-color: #f2c2cc;
+}
+
+.expense-upload.is-failed .expense-upload-icon {
+  color: #c12f45;
+  background: #fff0f3;
+}
+
+.expense-upload-text {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.expense-upload-text strong {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.expense-upload-text span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.expense-upload.is-failed .expense-upload-text span {
+  color: #9f2940;
+}
+
+.expense-upload-action {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0b2d5a;
+  font: 800 13px/1 Manrope, "Segoe UI", sans-serif;
+  cursor: pointer;
+  transition: transform 150ms cubic-bezier(.23, 1, .32, 1), background-color 150ms ease;
+}
+
+.expense-upload-action:active {
+  transform: scale(.97);
+}
+
+.expense-upload-action:focus-visible {
+  outline: 0;
+  border-color: #6c91e8;
+  box-shadow: 0 0 0 3px rgba(33, 89, 210, .11);
+}
+
+.expense-upload-action:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .expense-upload-action:hover:not(:disabled) {
+    background: #f7f9fc;
+  }
+}
+
+@media (max-width: 380px) {
+  .expense-upload {
+    flex-wrap: wrap;
+  }
+
+  .expense-upload-action {
+    width: 100%;
+  }
+}
+
+@keyframes expense-upload-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .expense-upload.is-processing .expense-upload-icon svg {
+    animation: none;
+  }
+}
+
 .maintenance-photo-block {
   gap: 8px;
 }
@@ -12659,4 +12806,234 @@ select,
 
 @media (prefers-reduced-motion: reduce) {
   .camera-torch-toggle { transition: none; }
+}
+
+/* Envio de gasto: carregamento bloqueante só até a foto ser aceita (Betinhos Design System). */
+.expense-send-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 26, 61, .48);
+  font-family: Manrope, "Segoe UI", sans-serif;
+  animation: expense-send-fade 200ms cubic-bezier(.23, 1, .32, 1) both;
+}
+
+.expense-send-card {
+  width: min(100%, 360px);
+  padding: 24px 20px 20px;
+  border: 1px solid rgba(0, 26, 61, .08);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, .18), 0 2px 7px rgba(15, 23, 42, .08);
+  text-align: center;
+  animation: expense-send-enter 220ms cubic-bezier(.23, 1, .32, 1) both;
+}
+
+.expense-send-hero {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 12px;
+  border-radius: 999px;
+  color: #2159d2;
+  background: #edf3ff;
+}
+
+.expense-send-hero svg {
+  width: 28px;
+  height: 28px;
+}
+
+.expense-send-card.is-done .expense-send-hero {
+  color: #147a4b;
+  background: #eaf8f1;
+  animation: expense-send-pop 220ms cubic-bezier(.23, 1, .32, 1) both;
+}
+
+.expense-send-card.is-error .expense-send-hero {
+  color: #856000;
+  background: #fff7df;
+}
+
+.expense-send-card h2 {
+  margin: 0;
+  color: #001a3d;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.29;
+}
+
+.expense-send-card p {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.54;
+}
+
+.expense-send-bar {
+  height: 6px;
+  margin: 16px 0 14px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+
+.expense-send-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2159d2;
+  transform-origin: left center;
+  transition: transform 300ms cubic-bezier(.23, 1, .32, 1);
+}
+
+.expense-send-card.is-done .expense-send-bar span {
+  background: #147a4b;
+}
+
+.expense-send-steps {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.expense-send-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fcfcfb;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.expense-send-step.is-active {
+  border-color: #6c91e8;
+  color: #0f172a;
+}
+
+.expense-send-step.is-done {
+  color: #0f172a;
+}
+
+.expense-send-step-mark {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #ffffff;
+}
+
+.expense-send-step.is-active .expense-send-step-mark {
+  border-color: transparent;
+  background: transparent;
+}
+
+.expense-send-step.is-done .expense-send-step-mark {
+  border-color: transparent;
+  color: #147a4b;
+  background: #eaf8f1;
+}
+
+.expense-send-step-mark svg {
+  width: 14px;
+  height: 14px;
+}
+
+.expense-send-spinner {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #edf3ff;
+  border-top-color: #2159d2;
+  border-radius: 999px;
+  animation: expense-upload-spin 800ms linear infinite;
+}
+
+.expense-send-spinner.is-large {
+  width: 28px;
+  height: 28px;
+  border-width: 3px;
+  border-color: #d6e2fb;
+  border-top-color: #2159d2;
+}
+
+.expense-send-close {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 16px;
+  border: 0;
+  border-radius: 10px;
+  background: #001a3d;
+  color: #ffffff;
+  font: 800 13px/1 Manrope, "Segoe UI", sans-serif;
+  cursor: pointer;
+  transition: transform 150ms cubic-bezier(.23, 1, .32, 1), background-color 150ms ease;
+}
+
+.expense-send-close:active {
+  transform: scale(.97);
+}
+
+.expense-send-close:focus-visible {
+  outline: 2px solid #ffffff;
+  box-shadow: 0 0 0 4px #6c91e8;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .expense-send-close:hover {
+    background: #0b2d5a;
+  }
+}
+
+.expense-send-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@keyframes expense-send-fade {
+  from { opacity: 0; }
+}
+
+@keyframes expense-send-enter {
+  from { opacity: 0; transform: translateY(8px) scale(.97); }
+}
+
+@keyframes expense-send-pop {
+  from { transform: scale(.95); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .expense-send-overlay,
+  .expense-send-card,
+  .expense-send-card.is-done .expense-send-hero {
+    animation: none;
+  }
+
+  .expense-send-spinner {
+    animation-duration: 2400ms;
+  }
+
+  .expense-send-bar span {
+    transition: none;
+  }
 }

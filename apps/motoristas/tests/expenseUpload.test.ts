@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { summarizeExpenseUploads, type ExpenseSubmission, type ExpenseUploadRow } from "../src/lib/expenseUploadState.ts";
+import { describeExpenseSubmission, normalizeStoredExpenseSubmissions, summarizeExpenseUploads, type ExpenseSubmission, type ExpenseUploadRow } from "../src/lib/expenseUploadState.ts";
 import { resumeExpenseSubmission, type ExpenseSubmissionDependencies } from "../src/lib/expenseSubmission.ts";
 
 function harness() {
@@ -91,4 +91,31 @@ test("falha de um arquivo mantém os concluídos e bloqueia retry enquanto outro
   assert.equal(summarizeExpenseUploads(h.submission.items, rows).canRetry, false);
   rows[1].cr40f_status = 100000001;
   assert.deepEqual(summarizeExpenseUploads(h.submission.items, rows), { sent: 1, failed: 1, pending: 0, complete: false, canRetry: true });
+});
+
+test("fila restaura envio único legado e lista nova", async () => {
+  const h = harness();
+  assert.deepEqual(normalizeStoredExpenseSubmissions(null), []);
+  assert.equal(normalizeStoredExpenseSubmissions(h.submission)[0].expenseId, h.submission.expenseId);
+  assert.equal(normalizeStoredExpenseSubmissions({ submissions: [h.submission, h.submission] }).length, 2);
+});
+
+test("status do envio orienta a próxima ação do motorista", async () => {
+  const h = harness();
+  assert.equal(describeExpenseSubmission(h.submission, h.rows).action, "continue");
+  await resumeExpenseSubmission(h.submission, h.deps);
+  assert.equal(describeExpenseSubmission(h.submission, h.rows).action, "verify");
+  h.rows[0].cr40f_status = 100000004;
+  assert.deepEqual(describeExpenseSubmission(h.submission, h.rows), { state: "processing", text: "Anexando comprovante." });
+  h.rows[0].cr40f_status = 100000002;
+  assert.equal(describeExpenseSubmission(h.submission, h.rows).action, "retry");
+  h.rows[0].cr40f_status = 100000001;
+  assert.equal(describeExpenseSubmission(h.submission, h.rows).state, "complete");
+});
+
+test("progresso informa criação e envio do comprovante", async () => {
+  const h = harness(); const events: unknown[] = [];
+  h.deps.progress = event => events.push(event);
+  await resumeExpenseSubmission(h.submission, h.deps);
+  assert.deepEqual(events, [{ phase: "creating" }, { phase: "uploading", order: 1, total: 1 }]);
 });
