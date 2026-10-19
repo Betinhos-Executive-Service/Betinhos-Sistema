@@ -77,8 +77,19 @@ afterEach(() => {
   hooks.mixedState = false
 })
 
-/** Linhas da grade sem a linha de filtro rápido (DS §10.9.2), que também é um `row` logo abaixo do cabeçalho. */
-const dataRows = () => screen.getAllByRole('row', { hidden: true }).filter((r) => r.getAttribute('aria-label') !== 'Filtro rápido')
+const dataRows = () => screen.getAllByRole('row', { hidden: true })
+const colFilter = () => document.querySelector<HTMLElement>('.gr-colfilter')
+/** Painel "Filtrar por" da coluna (usa `popover`, que o jsdom deixa como display:none: o nome acessível sai vazio, então localiza pela classe). */
+async function openColumnFilter(name: RegExp, label: string) {
+  await columnMenu(name, 'Filtrar por…')
+  await waitFor(() => expect(colFilter()?.getAttribute('aria-label')).toBe(`Filtro da coluna ${label}`))
+  return colFilter() as HTMLElement
+}
+/** O título da coluna abre o menu (como no model-driven): escolhe um item dele. */
+const columnMenu = async (name: RegExp, item: string) => {
+  fireEvent.click(screen.getByRole('button', { name, hidden: true }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: item, hidden: true }))
+}
 const findDataRows = async () => { await screen.findAllByRole('row', { hidden: true }); return dataRows() }
 
 /** A célula só vira editável quando a metadata chega: espera a classe do tipo aparecer na linha. */
@@ -112,7 +123,7 @@ describe('Geral', () => {
     // A linha do cabeçalho já existe antes dos dados: espera as 100 linhas chegarem.
     await waitFor(() => expect(dataRows().length).toBeGreaterThan(10))
     expect(screen.getAllByText(PAGE1)).toHaveLength(1)
-    fireEvent.click(screen.getByRole('button', { name: /^Status de Operação$/, hidden: true }))
+    await columnMenu(/^Status de Operação$/, 'Ordenar A→Z')
     await waitFor(() => expect(screen.getByRole('columnheader', { name: /Status de Operação/, hidden: true }).getAttribute('aria-sort')).toBe('ascending'))
     // O primeiro teste paga a carga fria dos módulos: com a máquina ocupada passa dos 30 s do padrão.
   }, 60_000)
@@ -160,18 +171,18 @@ describe('Geral', () => {
     await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
   })
 
-  it('o clique no cabeçalho cicla crescente, decrescente e ordem da visão', async () => {
+  it('o menu do título ordena crescente e decrescente; Restaurar padrão volta à ordem da visão', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
     const header = () => screen.getByRole('columnheader', { name: /Trajeto/, hidden: true })
-    const sort = () => fireEvent.click(screen.getByRole('button', { name: /^Trajeto$/, hidden: true }))
-    sort()
+    await columnMenu(/^Trajeto$/, 'Ordenar A→Z')
     await waitFor(() => expect(header().getAttribute('aria-sort')).toBe('ascending'))
     await screen.findAllByText(PAGE1)
-    sort()
+    await columnMenu(/^Trajeto$/, 'Ordenar Z→A')
     await waitFor(() => expect(header().getAttribute('aria-sort')).toBe('descending'))
     await screen.findAllByText(PAGE1)
-    sort()
+    fireEvent.click(viewTrigger())
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Restaurar padrão', hidden: true }))
     await waitFor(() => expect(header().getAttribute('aria-sort')).toBe('none'))
   }, 60_000)
 
@@ -405,15 +416,15 @@ describe('Geral: correções finais', () => {
     expect(screen.getByRole('button', opener('OS-1217'))).toBeTruthy()
   })
 
-  it('o cabeçalho mostra a ordem da visão e o primeiro clique nela inverte', async () => {
+  it('o cabeçalho mostra a ordem da visão e o menu do título a inverte', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
     const header = () => screen.getByRole('columnheader', { name: /Data e horário de saída/, hidden: true })
     expect(header().getAttribute('aria-sort')).toBe('ascending')
-    fireEvent.click(within(header()).getByRole('button', { name: /^Data e horário de saída$/ }))
+    await columnMenu(/^Data e horário de saída$/, 'Ordenar Z→A')
     await waitFor(() => expect(header().getAttribute('aria-sort')).toBe('descending'))
     await screen.findAllByText(PAGE1)
-    fireEvent.click(within(header()).getByRole('button', { name: /^Data e horário de saída$/ }))
+    await columnMenu(/^Data e horário de saída$/, 'Ordenar A→Z')
     await waitFor(() => expect(header().getAttribute('aria-sort')).toBe('ascending'))
   })
 
@@ -658,7 +669,7 @@ describe('Geral: espaço e densidade', () => {
   })
 
   // Com 200+ linhas, consultas por papel (getByRole) percorrem milhares de nós no jsdom: aqui só consultas baratas.
-  const rowCount = () => document.querySelectorAll('.gr-grid [role="row"]:not(.gr-quickrow)').length - 1
+  const rowCount = () => document.querySelectorAll('.gr-grid [role="row"]').length - 1
   const loadMoreButton = () => screen.getByText('Carregar mais').closest('button') as HTMLButtonElement
 
   it('Carregar mais acumula 100, 200 e 220 linhas e termina em Fim da lista', async () => {
@@ -680,7 +691,7 @@ describe('Geral: espaço e densidade', () => {
     await screen.findAllByText(PAGE1)
     fireEvent.click(loadMoreButton())
     await screen.findAllByText(`200 de ${MOCK_ROW_COUNT} serviços`)
-    fireEvent.click(screen.getByText('Trajeto').closest('button') as HTMLButtonElement)
+    await columnMenu(/^Trajeto$/, 'Ordenar A→Z')
     await screen.findAllByText(PAGE1)
     expect(rowCount()).toBe(100)
   }, 90_000)
@@ -705,7 +716,7 @@ describe('Geral: espaço e densidade', () => {
     await screen.findByText('100 selecionados')
     await act(async () => { FakeObserver.trigger([{ isIntersecting: true }]) })
     await screen.findAllByText(`200 de ${MOCK_ROW_COUNT} serviços`)
-    expect(document.querySelectorAll('.gr-grid [role="row"]:not(.gr-quickrow)').length - 1).toBe(200)
+    expect(document.querySelectorAll('.gr-grid [role="row"]').length - 1).toBe(200)
     expect(screen.getByText('100 selecionados')).toBeTruthy()
   }, 90_000)
 
@@ -731,7 +742,8 @@ describe('Geral: espaço e densidade', () => {
     expect(within(toolbar).getByRole('searchbox', { name: 'Buscar serviços' }).closest('.bt-control')?.classList.contains('bt-control--compact')).toBe(true)
     for (const name of ['Criar serviço', 'Mais ações']) expect(within(toolbar).getByRole('button', { name }).classList.contains('bt-button--compact')).toBe(true)
     expect(within(toolbar).getByRole('button', { name: 'Colunas' })).toBeTruthy()
-    expect(within(toolbar).getByRole('button', { name: 'Filtro rápido' }).getAttribute('aria-pressed')).toBe('true')
+    // A Geral filtra pelo título da coluna: o botão da linha de filtro rápido da barra do DS fica desligado (e escondido no CSS).
+    expect(within(toolbar).getByRole('button', { name: 'Filtro rápido' }).getAttribute('aria-pressed')).toBe('false')
   })
 
   it('no celular a barra usa tamanho de toque (44 px), nunca o compacto de 32 px', async () => {
@@ -757,17 +769,22 @@ describe('Geral: espaço e densidade', () => {
     it('o menu da coluna abre e ordena', async () => {
       render(<GeralPage host={{ mode: 'mock' }} />)
       await screen.findAllByText(PAGE1)
-      fireEvent.click(screen.getByRole('button', { name: 'Opções da coluna Trajeto', hidden: true }))
+      fireEvent.click(screen.getByRole('button', { name: /^Trajeto$/, hidden: true }))
       expect((await screen.findAllByRole('menuitem', { hidden: true })).map((item) => item.textContent)).toEqual(['Ordenar A→Z', 'Ordenar Z→A', 'Filtrar por…', 'Ocultar coluna'])
       fireEvent.click(screen.getByRole('menuitem', { name: 'Ordenar Z→A', hidden: true }))
       await waitFor(() => expect(header(/Trajeto/).getAttribute('aria-sort')).toBe('descending'))
     }, 60_000)
 
-    it('filtrar Status por Confirmado na linha rápida reduz as linhas e cria o chip; remover restaura', async () => {
+    it('filtrar Status por Confirmado no painel da coluna reduz as linhas e cria o chip; remover restaura', async () => {
       render(<GeralPage host={{ mode: 'mock' }} />)
       await screen.findAllByText(PAGE1)
-      fireEvent.click(await screen.findByRole('combobox', { name: 'Filtrar Status de Operação', hidden: true }))
+      const panel = await openColumnFilter(/^Status de Operação$/, 'Status de Operação')
+      expect(within(panel).getByRole('combobox', { name: 'Operador', hidden: true }).textContent).toContain('é um de')
+      expect(within(panel).getByRole('button', { name: 'Aplicar', hidden: true }).hasAttribute('disabled')).toBe(true)
+      fireEvent.click(within(panel).getByRole('combobox', { name: 'Valores de Status de Operação', hidden: true }))
       fireEvent.click(await screen.findByRole('option', { name: 'Confirmado', hidden: true }))
+      fireEvent.click(within(panel).getByRole('button', { name: 'Aplicar', hidden: true }))
+      await waitFor(() => expect(colFilter()).toBeNull())
       expect(await screen.findByText('Status de Operação: Confirmado')).toBeTruthy()
       await waitFor(() => expect(screen.queryAllByText(PAGE1)).toHaveLength(0))
       expect(viewTrigger().textContent).toContain('Alterada')
@@ -777,16 +794,36 @@ describe('Geral: espaço e densidade', () => {
       expect(viewTrigger().textContent).not.toContain('Alterada')
     }, 60_000)
 
-    it('Filtrar por… no menu da coluna leva o foco para a célula do filtro rápido', async () => {
+    it('Filtrar por… abre o painel com operador e valor; Aplicar grava, reabrir mostra o filtro ativo, Limpar tira', async () => {
       render(<GeralPage host={{ mode: 'mock' }} />)
       await screen.findAllByText(PAGE1)
-      fireEvent.click(screen.getByRole('button', { name: 'Opções da coluna Trajeto', hidden: true }))
-      fireEvent.click(await screen.findByRole('menuitem', { name: 'Filtrar por…', hidden: true }))
-      await waitFor(() => expect(document.activeElement?.getAttribute('aria-label')).toBe('Filtrar Trajeto'))
-      fireEvent.change(document.activeElement as HTMLInputElement, { target: { value: '^Galeão' } })
-      fireEvent.keyDown(document.activeElement as HTMLInputElement, { key: 'Enter' })
+      let panel = await openColumnFilter(/^Trajeto$/, 'Trajeto')
+      expect(within(panel).queryByRole('status', { hidden: true })).toBeNull()
+      expect(within(panel).getByRole('button', { name: 'Limpar', hidden: true }).hasAttribute('disabled')).toBe(true)
+      // Operador do tipo texto, como no model-driven: troca para "começa com".
+      fireEvent.click(within(panel).getByRole('combobox', { name: 'Operador', hidden: true }))
+      fireEvent.click(await screen.findByRole('option', { name: 'começa com', hidden: true }))
+      const text = within(panel).getByRole('textbox', { name: 'Texto de Trajeto', hidden: true })
+      fireEvent.change(text, { target: { value: 'Galeão' } })
+      fireEvent.keyDown(text, { key: 'Enter' })
+      await waitFor(() => expect(colFilter()).toBeNull())
       expect(await screen.findByText('Trajeto: começa com Galeão')).toBeTruthy()
       await waitFor(() => expect(window.location.hash).toContain('f='))
+      expect(document.activeElement?.textContent).toContain('Trajeto')
+      // Reabrir: mostra o filtro ativo e a condição já preenchida.
+      panel = await openColumnFilter(/^Trajeto$/, 'Trajeto')
+      expect(within(panel).getByRole('status', { hidden: true }).textContent).toBe('Filtro ativo: Trajeto: começa com Galeão')
+      expect(within(panel).getByRole('combobox', { name: 'Operador', hidden: true }).textContent).toContain('começa com')
+      expect((within(panel).getByRole('textbox', { name: 'Texto de Trajeto', hidden: true }) as HTMLInputElement).value).toBe('Galeão')
+      // Esc fecha sem mexer no filtro.
+      fireEvent.keyDown(panel, { key: 'Escape' })
+      await waitFor(() => expect(colFilter()).toBeNull())
+      expect(screen.getByText('Trajeto: começa com Galeão')).toBeTruthy()
+      // Limpar tira o filtro e fecha.
+      panel = await openColumnFilter(/^Trajeto$/, 'Trajeto')
+      fireEvent.click(within(panel).getByRole('button', { name: 'Limpar', hidden: true }))
+      await waitFor(() => expect(colFilter()).toBeNull())
+      await waitFor(() => expect(screen.queryByText('Trajeto: começa com Galeão')).toBeNull())
     }, 60_000)
 
     it('o painel Filtros aplica uma condição avançada, conta no botão e Limpar filtros tira tudo', async () => {
@@ -1005,8 +1042,10 @@ describe('Geral: visões pessoais e link compartilhável', () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
     // Filtro avulso: Status = Confirmado.
-    fireEvent.click(await screen.findByRole('combobox', { name: 'Filtrar Status de Operação', hidden: true }))
+    const panel = await openColumnFilter(/^Status de Operação$/, 'Status de Operação')
+    fireEvent.click(within(panel).getByRole('combobox', { name: 'Valores de Status de Operação', hidden: true }))
     fireEvent.click(await screen.findByRole('option', { name: 'Confirmado', hidden: true }))
+    fireEvent.click(within(panel).getByRole('button', { name: 'Aplicar', hidden: true }))
     await screen.findByText('Status de Operação: Confirmado')
 
     await saveAs('Confirmados')
@@ -1041,7 +1080,7 @@ describe('Geral: visões pessoais e link compartilhável', () => {
     await screen.findAllByText(PAGE1)
     await saveAs('Minha agenda')
     await screen.findAllByText(PAGE1)
-    fireEvent.click(screen.getByRole('button', { name: /^Trajeto$/, hidden: true }))
+    await columnMenu(/^Trajeto$/, 'Ordenar A→Z')
     await waitFor(() => expect(screen.getByRole('columnheader', { name: /Trajeto/, hidden: true }).getAttribute('aria-sort')).toBe('ascending'))
     await waitFor(() => expect(viewName()).toContain('Alterada'))
     openMenu()
@@ -1058,7 +1097,7 @@ describe('Geral: visões pessoais e link compartilhável', () => {
     try {
       render(<GeralPage host={{ mode: 'mock' }} />)
       await screen.findAllByText(PAGE1)
-      fireEvent.click(screen.getByRole('button', { name: /^Trajeto$/, hidden: true }))
+      await columnMenu(/^Trajeto$/, 'Ordenar A→Z')
       await waitFor(() => expect(window.location.hash).toContain('sort='))
       fireEvent.click(screen.getByRole('button', { name: 'Compartilhar link' }))
       expect(await screen.findByText('Link copiado.')).toBeTruthy()

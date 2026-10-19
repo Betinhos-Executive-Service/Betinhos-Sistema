@@ -1,13 +1,14 @@
-import { Fragment, useEffect, useRef, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from 'react'
 import type { Row } from '@betinhos/dataverse'
-import { Checkbox, QuickFilterCell, type TableQuickFilters } from '@betinhos/ui'
+import { Checkbox, type TableQuickFilters } from '@betinhos/ui'
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import { cellKind } from '../domain/cells'
 import { columnLabel, rowKey } from '../domain/layout'
 import { filterKindOf } from '../domain/filterKind'
+import { ColumnFilter } from './ColumnFilter'
 import { ColumnMenu } from './ColumnMenu'
 import { formatCell } from '../domain/format'
-import { nextSort, sameSort } from '../domain/sort'
+import { sameSort } from '../domain/sort'
 import { ID_ATTRIBUTE, type AttributeMap, type Column, type Sort } from '../domain/types'
 
 type Props = {
@@ -22,9 +23,8 @@ type Props = {
   onSort: (sort: Sort) => void
   /** Atributos com filtro valendo (rápido ou avançado): ponto no ▾ e "Limpar filtro" no menu da coluna. */
   filteredKeys: string[]
-  /** Linha de filtro rápido sob o cabeçalho (DS §10.9.2); `visible: false` esconde sem perder os valores. */
+  /** Filtro por coluna (DS §10.9.2): "Filtrar por…" no menu do título abre o painel ancorado ao cabeçalho; `visible` não se aplica. */
   quick?: TableQuickFilters
-  onEditFilter: (attribute: string) => void
   onClearFilter: (attribute: string) => void
   onHide: (key: string) => void
   /** Larguras escolhidas pelo usuário: viram trilhas fixas (sem fr). */
@@ -51,7 +51,7 @@ type Props = {
 
 const SKELETON_ROWS = 8
 /** Grid editável com rolagem horizontal, seleção por linha e a primeira coluna fixa. As classes visuais são as da tabela do DS. */
-export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, filteredKeys, quick, onEditFilter, onClearFilter, onHide, customWidths, onResize, onMove, selected, onToggle, onSelectRow, onToggleAll, onOpen, renderCell, scrollRef, tail, footer, empty }: Props) {
+export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, filteredKeys, quick, onClearFilter, onHide, customWidths, onResize, onMove, selected, onToggle, onSelectRow, onToggleAll, onOpen, renderCell, scrollRef, tail, footer, empty }: Props) {
   // Trilhas crescem na proporção da largura da visão (fr) e nunca ficam abaixo do mínimo; a largura mínima total
   // garante que cabeçalho e linhas compartilhem as mesmas trilhas quando a soma dos mínimos excede o contêiner.
   // Sim/Não ocupa uma trilha fixa estreita: o conteúdo é um switch, não cresce com a tela.
@@ -64,6 +64,12 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
   const root = useRef<HTMLDivElement>(null)
   const refocus = useRef<string | null>(null)
   const pressing = useRef(false)
+  // Coluna com o painel de filtro aberto (chave) e o cabeçalho que o ancora.
+  const [filterAt, setFilterAt] = useState<string | null>(null)
+  const filterAnchor = filterAt ? Array.from(root.current?.querySelectorAll<HTMLElement>('.gr-head__sort') ?? []).find((b) => b.dataset.col === filterAt) ?? null : null
+  const filterColumn = filterAt ? columns.find((c) => c.key === filterAt) : undefined
+  const filterField = filterColumn && !filterColumn.alias ? quick?.fields.find((f) => f.key === filterColumn.attribute && !f.advancedOnly) : undefined
+  const closeFilter = useCallback(() => setFilterAt(null), [])
   useEffect(() => {
     const key = refocus.current
     if (!key) return
@@ -186,19 +192,18 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
                 onDragEnd={() => setDropAt(null)}
               >
                 <div className="gr-head">
-                  <button type="button" className="gr-head__sort" data-col={column.key} onKeyDown={moveKey(column, index)} onClick={() => onSort(nextSort(sort, defaultSort, column))}>
-                    <span className="gr-head__label">{label}</span>
-                    {active ? (shown?.descending ? <ArrowDown size={14} /> : <ArrowUp size={14} />) : null}
-                  </button>
                   <ColumnMenu
                     label={label}
+                    columnKey={column.key}
+                    sortIcon={active ? (shown?.descending ? <ArrowDown size={14} /> : <ArrowUp size={14} />) : null}
                     filterable={!column.alias && filterKindOf(column.attribute, attributes?.get(column.key)) != null}
                     filtered={!column.alias && filteredKeys.includes(column.attribute)}
                     canHide={columns.length > 1}
                     onSort={(descending) => onSort({ attribute: column.attribute, alias: column.alias, descending })}
-                    onFilter={() => onEditFilter(column.attribute)}
+                    onFilter={() => setFilterAt(column.key)}
                     onClearFilter={() => onClearFilter(column.attribute)}
                     onHide={() => onHide(column.key)}
+                    onKeyDown={moveKey(column, index)}
                   />
                 </div>
                 {isBoolean(column) ? null : (
@@ -225,30 +230,6 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
             )
           })}
         </div>
-        {quick && quick.visible !== false ? (
-          <div className="bt-table__filters gr-quickrow" role="row" aria-label="Filtro rápido">
-            <div className="bt-table__cell gr-cell--select" role="cell" />
-            {columns.map((column, index) => {
-              const field = column.alias ? undefined : quick.fields.find((f) => f.key === column.attribute && !f.advancedOnly)
-              const active = Boolean(field && quick.value[field.key])
-              return (
-                <div key={column.key} role="cell" className={['bt-table__cell', 'bt-quick', index === 0 && 'gr-cell--first', active && 'is-active'].filter(Boolean).join(' ')}>
-                  {field ? (
-                    <>
-                      <QuickFilterCell field={field} value={quick.value[field.key]} search={quick.search} onChange={(condition) => quick.onChange(field.key, condition)} />
-                      {active ? (
-                        <button type="button" className="bt-quick__clear" aria-label={`Limpar filtro de ${field.label}`} onClick={() => quick.onChange(field.key, null)}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
-                        </button>
-                      ) : null}
-                    </>
-                  ) : null}
-                </div>
-              )
-            })}
-          </div>
-        ) : null}
-
         {skeleton
           ? Array.from({ length: SKELETON_ROWS }, (_, i) => (
             <div key={i} className="bt-table__row" role="row" aria-hidden="true">
@@ -282,6 +263,9 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
       </div>
       {!loading && rows.length === 0 && empty != null ? <div className="bt-table__empty gr-empty">{empty}</div> : null}
       <div className="bt-table__footer">{footer}</div>
+      {quick && filterField && filterAnchor ? (
+        <ColumnFilter anchor={filterAnchor} field={filterField} value={quick.value[filterField.key]} search={quick.search} onChange={(condition) => quick.onChange(filterField.key, condition)} onClose={closeFilter} />
+      ) : null}
     </div>
   )
 }
