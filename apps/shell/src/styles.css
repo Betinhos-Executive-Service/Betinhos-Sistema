@@ -5,6 +5,9 @@
 /* Marca na sidebar: a logo B em imagem fica sem a caixa branca por trás, só o símbolo sobre o navy.
    (Regra a levar para o @betinhos/ui; aqui até o pacote publicar.) */
 .bt-shell__logo:has(> img), .bt-shell__rail-brand:has(> img) { background-color: transparent; }
+/* Rodapé da sidebar: a coluna implícita do grid é `auto` e cresce até o texto do status, que vazava para fora da
+   sidebar em vez de cortar com reticências. (Regra a levar para o @betinhos/ui; aqui até o pacote publicar.) */
+.bt-shell__foot { grid-template-columns: minmax(0, 1fr); }
 
 /* Página do shell */
 .page { max-width: var(--bt-layout-content-max); margin: 0 auto; padding: 22px 26px var(--bt-space-8); }
