@@ -19,7 +19,11 @@ const interestingTables = new Set([
   "cr40f_servicosporpassageiro",
   "new_possedeveiculo",
   "new_comunicadomotorista",
-  "new_comunicadodestinatario"
+  "new_comunicadodestinatario",
+  "new_checklistmodelo",
+  "new_checklistmodeloitem",
+  "new_checklistveiculo",
+  "new_checklistveiculofoto"
 ]);
 
 const index = tables

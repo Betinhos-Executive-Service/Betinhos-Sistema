@@ -45,6 +45,12 @@ test("serviço abre o App Motoristas no detalhe do serviço", async () => {
   assert.equal(plain(calls[0].page).data, `servicoId=${ID}&tipo=SERVICO`);
 });
 
+test("checklist de vistoria abre o App Motoristas no checklist", async () => {
+  const { api, calls } = loadRedirect();
+  await api.onLoad(ctx("new_checklistveiculo", ID));
+  assert.equal(plain(calls[0].page).data, `checklistId=${ID}`);
+});
+
 test("fora do App Motoristas (ex.: app Interno) não redireciona", async () => {
   const interno = loadRedirect({ appName: "cr40f_ModelDrivenBetinhos" });
   await interno.api.onLoad(ctx("cr40f_reservadeveculos", ID));

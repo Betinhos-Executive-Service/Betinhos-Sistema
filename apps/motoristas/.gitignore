@@ -23,6 +23,8 @@ plugins/ExpenseUpload/ExpenseUpload.snk
 .worktrees/
 backup/prod-deploy/
 backup/prod-active-layers/
+.verificacao/
+.audit/
 
 # graphify (grafo gerado localmente)
 graphify-out/

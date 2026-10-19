@@ -6,8 +6,10 @@ import { AppShell } from "../components/layout/AppShell";
 import { ServicesMenu } from "../components/navigation/ServicesMenu";
 import { AgendaCard } from "../components/services/AgendaCard";
 import { ComunicadoAgendaCard } from "../components/comunicados/ComunicadoAgendaCard";
+import { ChecklistAgendaCard } from "../components/checklists/ChecklistAgendaCard";
 import { PullToRefresh } from "../components/common/PullToRefresh";
 import type { ComunicadoDestinatario } from "../lib/comunicados";
+import type { ChecklistVeiculo } from "../lib/checklists";
 
 type ServicesScreenProps = {
   items: AgendaItem[];
@@ -18,9 +20,11 @@ type ServicesScreenProps = {
   onOpenDetails: (detail: DetailData) => void;
   pendingComunicados?: ComunicadoDestinatario[];
   onOpenComunicado?: (id: string) => void;
+  pendingChecklists?: ChecklistVeiculo[];
+  onOpenChecklist?: (id: string) => void;
 };
 
-export function ServicesScreen({ items, onHome, onRefresh, completingDetailKey = "", queueHighlightDetailKey = "", onOpenDetails, pendingComunicados = [], onOpenComunicado }: ServicesScreenProps) {
+export function ServicesScreen({ items, onHome, onRefresh, completingDetailKey = "", queueHighlightDetailKey = "", onOpenDetails, pendingComunicados = [], onOpenComunicado, pendingChecklists = [], onOpenChecklist }: ServicesScreenProps) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const visibleItems = useMemo(() => filterAgendaGalleryItems(items, now), [items, now]);
@@ -46,6 +50,14 @@ export function ServicesScreen({ items, onHome, onRefresh, completingDetailKey =
             <h2>Comunicados pendentes</h2>
             {pendingComunicados.map((item) => (
               <ComunicadoAgendaCard key={item.id} item={item} onOpen={(id) => onOpenComunicado?.(id)} />
+            ))}
+          </section>
+        ) : null}
+        {pendingChecklists.length ? (
+          <section className="comunicado-service-notices" aria-label="Checklists pendentes">
+            <h2>Checklist do veículo</h2>
+            {pendingChecklists.map((item) => (
+              <ChecklistAgendaCard key={item.id} item={item} onOpen={(id) => onOpenChecklist?.(id)} />
             ))}
           </section>
         ) : null}
