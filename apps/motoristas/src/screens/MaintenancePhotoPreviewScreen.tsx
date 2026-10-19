@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ActionBar, ActionButton } from "../components/common/ActionButton";
+import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { SystemIcon } from "../components/icons/SystemIcon";
 import { AppShell } from "../components/layout/AppShell";
 import { FormMenu } from "../components/navigation/FormMenu";
@@ -40,7 +41,7 @@ export function MaintenancePhotoPreviewScreen({
   onConfirm,
   onDelete,
   videoPreviewUrl: externalVideoPreviewUrl = "",
-  confirmLabel = "Sim, Confirmar",
+  confirmLabel = "Confirmar",
   deleteOnly = false
 }: MaintenancePhotoPreviewScreenProps) {
   const isInvoice = kind.startsWith("NOTAFISCAL");
@@ -102,7 +103,7 @@ export function MaintenancePhotoPreviewScreen({
       <FormMenu title={title ?? getTitleByKind(kind)} onBack={onBack} />
       <section className="main-panel maintenance-preview-main">
         <article className={`maintenance-preview-card ${deleteOnly ? "is-delete-only" : ""}`}>
-          {deleteOnly ? null : <div className="maintenance-preview-title">{prompt ?? "A foto está legível e ideal?"}</div>}
+          {deleteOnly ? null : <div className="maintenance-preview-title">{prompt ?? "A foto está legível?"}</div>}
           <div className="maintenance-preview-body">
             <div className={`maintenance-preview-image ${isInvoice ? "invoice" : "vehicle"}`} aria-label="Preview da foto">
               {showVideo ? (
@@ -161,19 +162,13 @@ export function MaintenancePhotoPreviewScreen({
         </article>
       </section>
       {confirmDelete ? (
-        <div className="maintenance-delete-overlay" role="dialog" aria-modal="true" aria-labelledby="maintenance-delete-title">
-          <div className="maintenance-delete-dialog">
-            <div className="maintenance-delete-icon" aria-hidden="true">
-              <SystemIcon name="trash" />
-            </div>
-            <div id="maintenance-delete-title" className="maintenance-delete-title">Apagar foto?</div>
-            <p>Esta foto será removida da solicitação.</p>
-            <div className="maintenance-delete-actions">
-              <ActionButton className="maintenance-delete-cancel" label="Cancelar" onClick={() => setConfirmDelete(false)} />
-              <ActionButton className="maintenance-delete-confirm" variant="danger" label="Apagar" icon={<SystemIcon name="trash" />} onClick={confirmDeletePhoto} />
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title="Apagar foto?"
+          message="Esta foto será removida da solicitação."
+          confirmLabel="Apagar"
+          onCancel={() => setConfirmDelete(false)}
+          onConfirm={confirmDeletePhoto}
+        />
       ) : null}
     </AppShell>
   );

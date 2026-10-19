@@ -13,7 +13,8 @@ import {
   isComunicadoPending,
   isMockComunicados,
   type ComunicadoDestinatario,
-  type SignatureStrokes
+  type SignatureStrokes,
+  validateSignature
 } from "../lib/comunicados";
 
 export type ComunicadosLoadStatus = "loading" | "ready" | "error";
@@ -49,6 +50,8 @@ export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onS
   const locked = busy || phase === "success";
   const buttonState = busy ? "loading" : phase === "success" ? "success" : "idle";
   const [error, setError] = useState("");
+  // Falta de assinatura aparece junto do campo e do botão, não no topo da tela.
+  const [signatureError, setSignatureError] = useState("");
   const selected = items.find((item) => item.id === selectedId);
   const pending = items.filter(isComunicadoPending);
   const completed = items.filter((item) => !isComunicadoPending(item));
@@ -107,6 +110,11 @@ export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onS
 
   const sign = async () => {
     if (!selected || locked) return;
+    if (!validateSignature(strokes)) {
+      setSignatureError("Desenhe sua assinatura antes de confirmar.");
+      return;
+    }
+    setSignatureError("");
     setBusy(true);
     setError("");
     let signed = false;
@@ -171,7 +179,8 @@ export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onS
                 </div>
                 <div className="comunicado-field comunicado-field-signature">
                   <label>Assine abaixo</label>
-                  <SignaturePad value={strokes} onChange={setStrokes} />
+                  <SignaturePad value={strokes} onChange={(next) => { setStrokes(next); if (signatureError) setSignatureError(""); }} />
+                  {signatureError ? <p className="comunicado-error" role="alert">{signatureError}</p> : null}
                 </div>
                 <ActionButton className="comunicado-primary" variant="primary" idleLabel="Assinar ciência" loadingLabel="Salvando ciência" successLabel="Ciência registrada" state={buttonState} onClick={() => void sign()} />
               </section>

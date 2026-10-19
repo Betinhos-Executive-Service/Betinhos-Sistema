@@ -208,15 +208,6 @@ type InitialScreenProps = {
   [key: string]: unknown;
 };
 
-type BuildInfo = {
-  version?: string;
-  builtAtLabel?: string;
-};
-
-function getBuildInfo() {
-  return ((window as Window & { __APP_BUILD_INFO?: BuildInfo }).__APP_BUILD_INFO ?? {}) as BuildInfo;
-}
-
 function getFirstName(name?: string) {
   return name?.trim().split(/\s+/)[0] || "Renan";
 }
@@ -393,7 +384,6 @@ export function InitialScreen(props: InitialScreenProps) {
     ).concat([ideasModule]),
     [props.canGeneratePersonalReceipt]
   );
-  const buildInfo = useMemo(() => getBuildInfo(), []);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
@@ -475,9 +465,6 @@ export function InitialScreen(props: InitialScreenProps) {
       </section>
 
       <footer className="concept-footer">
-        <span>
-          Versão {buildInfo.version ?? "local"} {buildInfo.builtAtLabel ? `- Build ${buildInfo.builtAtLabel}` : ""}
-        </span>
         {props.showLocalReset && props.onResetLocalData ? (
           <button type="button" className="local-reset" onClick={props.onResetLocalData}>
             Resetar dados locais

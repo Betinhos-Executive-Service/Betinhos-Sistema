@@ -125,7 +125,7 @@ test("foto android prioriza ImageCapture e jpeg com baixa compressao", () => {
 test("camera pendente mostra suporte apos um segundo", () => {
   assert.match(mediaCaptureScreen, /const CAMERA_SUPPORT_MESSAGE_DELAY_MS = 1000;/);
   assert.match(mediaCaptureScreen, /setShowSupportMessage\(true\)/);
-  assert.match(mediaCaptureScreen, /Camera nao respondeu\. Fale com o suporte de TI da Betinhos\./);
+  assert.match(mediaCaptureScreen, /A câmera não respondeu\. Fale com o suporte de TI da Betinhos\./);
   assert.doesNotMatch(mediaCaptureScreen, /Liberar Câmera/);
   assert.doesNotMatch(styles, /camera-permission-action/);
 });

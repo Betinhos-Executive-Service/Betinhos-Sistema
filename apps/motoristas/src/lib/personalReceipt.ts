@@ -206,7 +206,8 @@ export function buildPersonalReceiptDraft(detail?: DetailData): PersonalReceiptE
       valorTotal: "",
       dataEmissao: toYmdDateString(getTodayDisplayDate()),
       metodoPagamento: getDefaultPaymentMethod(RECEIPT_LANGUAGE.portuguese),
-      observacoes: "-"
+      // Campo começa vazio; o "-" só aparece no documento quando não há observação.
+      observacoes: ""
     };
   }
 
@@ -222,6 +223,6 @@ export function buildPersonalReceiptDraft(detail?: DetailData): PersonalReceiptE
     valorTotal: rawValor,
     dataEmissao: toYmdDateString(getTodayDisplayDate()),
     metodoPagamento: getDefaultPaymentMethod(model.idioma),
-    observacoes: model.observacoes || "-"
+    observacoes: model.observacoes === "-" ? "" : model.observacoes
   };
 }
