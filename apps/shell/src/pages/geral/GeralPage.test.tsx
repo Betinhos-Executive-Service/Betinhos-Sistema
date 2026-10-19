@@ -341,8 +341,8 @@ describe('Geral', () => {
     fireEvent.click(within(rows[1]).getByRole('checkbox'))
     fireEvent.click(within(rows[2]).getByRole('checkbox'))
     expect(screen.getByText('2 selecionados')).toBeTruthy()
-    // Os comandos estão sempre na barra; com 2 selecionados só o Editar (exige exatamente um) fica inerte.
-    expect(screen.getByRole('button', { name: 'Editar' }).getAttribute('aria-disabled')).toBe('true')
+    // A linha de comando vira a barra da seleção; Editar (exige exatamente um) não aparece com 2 selecionados.
+    expect(screen.queryByRole('button', { name: 'Editar' })).toBeNull()
     await acao('Copiar Serviços')
     const copy = await screen.findByRole('dialog', { name: 'Copiar serviços' })
     expect((await within(copy).findByText(/\*ID:\* OS-/)).textContent).toContain('*Trajeto:*')
@@ -603,34 +603,18 @@ describe('Geral: correções finais', () => {
 })
 
 describe('Geral: espaço e densidade', () => {
-  const blockedReason = { Editar: 'Selecione exatamente um serviço.', Desativar: 'Selecione ao menos um serviço.' }
-
-  it('os comandos ficam sempre na barra: sem seleção os que dependem dela ficam inertes, com o motivo', async () => {
+  it('sem seleção a linha de comando tem só busca, Atualizar, Mais ações e Criar serviço (a primária, por último)', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
     const toolbar = screen.getByRole('toolbar', { name: 'Comandos de serviços' })
-    expect(within(toolbar).getByRole('button', { name: 'Criar serviço' }).getAttribute('aria-disabled')).toBeNull()
-    for (const [name, reason] of Object.entries(blockedReason)) {
-      const button = within(toolbar).getByRole('button', { name })
-      expect(button.getAttribute('aria-disabled')).toBe('true')
-      expect((button as HTMLButtonElement).disabled).toBe(false)
-      expect(button.getAttribute('title')).toBe(reason)
-      expect(document.getElementById(button.getAttribute('aria-describedby') ?? '')?.textContent).toBe(reason)
-    }
-    expect(within(toolbar).queryByRole('button', { name: 'Ativar' })).toBeNull()
+    expect(toolbar.classList.contains('is-selecting')).toBe(false)
+    for (const name of ['Editar', 'Desativar', 'Ativar', 'Limpar seleção']) expect(within(toolbar).queryByRole('button', { name })).toBeNull()
+    expect(within(toolbar).queryByRole('button', { name: /^Ações/ })).toBeNull()
     expect(within(toolbar).queryByText(/selecionado/)).toBeNull()
-    // Clicar num inerte não faz nada.
-    fireEvent.click(within(toolbar).getByRole('button', { name: 'Editar' }))
-    expect(screen.queryByRole('dialog')).toBeNull()
-    // Os demais comandos de seleção ficam no menu "Ações", desabilitados com o motivo.
-    fireEvent.click(within(toolbar).getByRole('button', { name: 'Ações' }))
-    for (const name of ['Gerar Voucher', 'Copiar Serviços', 'Gerar OP', 'Disparar']) {
-      const item = await screen.findByRole('menuitem', { name: new RegExp(`^${name}`), hidden: true })
-      expect((item as HTMLButtonElement).disabled).toBe(true)
-      expect(item.textContent).toContain('Selecione ao menos um serviço.')
-    }
-    fireEvent.click(await screen.findByRole('menuitem', { name: /^Copiar Serviços/, hidden: true }))
-    expect(screen.queryByRole('dialog')).toBeNull()
+    const buttons = within(toolbar).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent)
+    // Ordem da direita: …, Atualizar, Mais ações e a primária por último.
+    expect(buttons.slice(-3)).toEqual(['Atualizar', 'Mais ações', 'Criar serviço'])
+    expect(buttons.indexOf('Colunas')).toBeLessThan(buttons.indexOf('Atualizar'))
   })
 
   it('com 1 selecionado os comandos se habilitam e a contagem aparece como badge', async () => {
@@ -638,11 +622,18 @@ describe('Geral: espaço e densidade', () => {
     await screen.findAllByText(PAGE1)
     fireEvent.click(within(dataRows()[1]).getByRole('checkbox'))
     const toolbar = screen.getByRole('toolbar', { name: 'Comandos de serviços' })
+    expect(toolbar.classList.contains('is-selecting')).toBe(true)
     const count = within(toolbar).getByText('1 selecionado')
     expect(count.closest('.bt-badge')).not.toBeNull()
-    for (const name of ['Editar', 'Desativar']) expect(within(toolbar).getByRole('button', { name }).getAttribute('aria-disabled')).toBeNull()
+    for (const name of ['Editar', 'Desativar', 'Limpar seleção']) expect(within(toolbar).getByRole('button', { name }).getAttribute('aria-disabled')).toBeNull()
+    expect(within(toolbar).queryByRole('button', { name: 'Criar serviço' })).toBeNull()
+    expect(within(toolbar).queryByRole('searchbox', { name: 'Buscar serviços' })).toBeNull()
     fireEvent.click(within(toolbar).getByRole('button', { name: 'Ações (1)' }))
     for (const name of ['Gerar Voucher', 'Copiar Serviços']) expect(((await screen.findByRole('menuitem', { name, hidden: true })) as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Escape' })
+    fireEvent.click(within(toolbar).getByRole('button', { name: 'Limpar seleção' }))
+    await waitFor(() => expect(within(toolbar).queryByText(/selecionado/)).toBeNull())
+    expect(within(toolbar).getByRole('button', { name: 'Criar serviço' })).toBeTruthy()
   })
 
   it('lista sem cabeçalho de página: o título é a visão e Atualizar fica na linha de comando', async () => {
@@ -742,12 +733,11 @@ describe('Geral: espaço e densidade', () => {
     const search = within(toolbar).getByRole('searchbox', { name: 'Buscar serviços' }).closest('.bt-control')
     expect(search?.classList.contains('bt-control--compact')).toBe(false)
     expect(search?.classList.contains('bt-control--touch')).toBe(false)
-    for (const name of ['Colunas', 'Filtros', 'Criar serviço', 'Editar', 'Mais ações', 'Compartilhar link', 'Atualizar']) {
+    for (const name of ['Colunas', 'Filtros', 'Criar serviço', 'Mais ações', 'Atualizar']) {
       const button = within(toolbar).getByRole('button', { name })
       expect(button.classList.contains('bt-button--compact')).toBe(false)
       expect(button.classList.contains('bt-button--touch')).toBe(false)
     }
-    expect(within(toolbar).getByRole('radiogroup', { name: 'Mostrar como' }).classList.contains('bt-segmented--compact')).toBe(false)
     expect(within(toolbar).getByRole('button', { name: 'Colunas' })).toBeTruthy()
     // A Geral filtra pelo título da coluna: o botão da linha de filtro rápido da barra do DS fica desligado (e escondido no CSS).
     expect(within(toolbar).getByRole('button', { name: 'Filtro rápido' }).getAttribute('aria-pressed')).toBe('false')
@@ -1106,7 +1096,8 @@ describe('Geral: visões pessoais e link compartilhável', () => {
       await screen.findAllByText(PAGE1)
       await columnMenu(/^Trajeto$/, 'Ordenar A→Z')
       await waitFor(() => expect(window.location.hash).toContain('sort='))
-      fireEvent.click(screen.getByRole('button', { name: 'Compartilhar link' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Mais ações' }))
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Compartilhar link', hidden: true }))
       expect(await screen.findByText('Link copiado.')).toBeTruthy()
       expect(writeText).toHaveBeenCalledTimes(1)
       const url = writeText.mock.calls[0][0]
@@ -1121,7 +1112,8 @@ describe('Geral: visões pessoais e link compartilhável', () => {
   it('sem área de transferência o link não copia e o aviso orienta', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
-    fireEvent.click(screen.getByRole('button', { name: 'Compartilhar link' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Mais ações' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Compartilhar link', hidden: true }))
     expect(await screen.findByText(/Não foi possível copiar o link/)).toBeTruthy()
   }, 60_000)
 })
@@ -1280,8 +1272,9 @@ describe('Geral: seleção pela linha', () => {
     it('alterna para Cards, lembra a escolha ao remontar e volta para a Tabela', async () => {
       const first = render(<GeralPage host={{ mode: 'mock' }} />)
       await screen.findByRole('grid', { name: 'Serviços' })
-      const group = screen.getByRole('radiogroup', { name: 'Mostrar como' })
-      fireEvent.click(within(group).getByRole('radio', { name: /Cards/ }))
+      fireEvent.click(screen.getByRole('button', { name: 'Mais ações' }))
+      expect((await screen.findByRole('menuitemradio', { name: 'Ver como tabela', hidden: true })).getAttribute('aria-checked')).toBe('true')
+      fireEvent.click(screen.getByRole('menuitemradio', { name: 'Ver como cards', hidden: true }))
       await waitFor(() => expect(document.querySelectorAll('.gr-card').length).toBeGreaterThan(10))
       expect(screen.queryByRole('grid', { name: 'Serviços' })).toBeNull()
       expect(document.querySelector('.gr-cards--grid')).toBeTruthy()
@@ -1289,7 +1282,8 @@ describe('Geral: seleção pela linha', () => {
       first.unmount()
       render(<GeralPage host={{ mode: 'mock' }} />)
       await waitFor(() => expect(document.querySelectorAll('.gr-card').length).toBeGreaterThan(10))
-      fireEvent.click(within(screen.getByRole('radiogroup', { name: 'Mostrar como' })).getByRole('radio', { name: /Tabela/ }))
+      fireEvent.click(screen.getByRole('button', { name: 'Mais ações' }))
+      fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Ver como tabela', hidden: true }))
       expect(await screen.findByRole('grid', { name: 'Serviços' })).toBeTruthy()
       expect(window.localStorage.getItem('betinhos.geral.modo.v1')).toBe('tabela')
     })
@@ -1310,7 +1304,9 @@ describe('Geral: seleção pela linha', () => {
       vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('max-width: 820px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
       render(<GeralPage host={{ mode: 'mock' }} />)
       await waitFor(() => expect(document.querySelectorAll('.gr-card').length).toBeGreaterThan(0))
-      expect(screen.queryByRole('radiogroup', { name: 'Mostrar como' })).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: 'Mais ações' }))
+      await screen.findByRole('menuitem', { name: 'Compartilhar link', hidden: true })
+      expect(screen.queryByRole('menuitemradio', { name: 'Ver como cards', hidden: true })).toBeNull()
     })
   })
 })
