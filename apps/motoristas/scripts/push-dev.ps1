@@ -1,6 +1,10 @@
 param(
   [switch] $DeviceCode,
-  [switch] $ExpenseUploadOnly
+  [switch] $ExpenseUploadOnly,
+  # Inclui a Tela Funcoes Operacionais na mesma publicacao (gates + build + deploy).
+  # Sem este switch ela nao e testada, compilada nem republicada: publique-a
+  # separadamente com `npm run push` no repo dela.
+  [switch] $IncludeOperacionais
 )
 
 if ($PSVersionTable.PSEdition -eq "Core" -or $PSHOME -like "*codex-runtimes*") {
@@ -8,6 +12,7 @@ if ($PSVersionTable.PSEdition -eq "Core" -or $PSHOME -like "*codex-runtimes*") {
   $arguments = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $PSCommandPath)
   if ($DeviceCode) { $arguments += "-DeviceCode" }
   if ($ExpenseUploadOnly) { $arguments += "-ExpenseUploadOnly" }
+  if ($IncludeOperacionais) { $arguments += "-IncludeOperacionais" }
   & $windowsPowerShell @arguments
   exit $LASTEXITCODE
 }
@@ -22,16 +27,19 @@ if ($ExpenseUploadOnly) {
 }
 
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
-# Sobe pelos ancestrais para funcionar tambem em git worktrees (.claude\worktrees\<nome>).
-$workspaceParent = Split-Path $root -Parent
-$operationsCandidates = @()
-while ($workspaceParent) {
-  $operationsCandidates = @(Get-ChildItem -LiteralPath $workspaceParent -Directory | Where-Object { $_.Name -like "Tela Fun*Operacionais" })
-  if ($operationsCandidates.Count -gt 0) { break }
-  $workspaceParent = Split-Path $workspaceParent -Parent
+$operationsRoot = $null
+if ($IncludeOperacionais) {
+  # Sobe pelos ancestrais para funcionar tambem em git worktrees (.claude\worktrees\<nome>).
+  $workspaceParent = Split-Path $root -Parent
+  $operationsCandidates = @()
+  while ($workspaceParent) {
+    $operationsCandidates = @(Get-ChildItem -LiteralPath $workspaceParent -Directory | Where-Object { $_.Name -like "Tela Fun*Operacionais" })
+    if ($operationsCandidates.Count -gt 0) { break }
+    $workspaceParent = Split-Path $workspaceParent -Parent
+  }
+  if ($operationsCandidates.Count -ne 1) { throw "Repositorio Tela Funcoes Operacionais nao encontrado de forma unica acima de $root." }
+  $operationsRoot = $operationsCandidates[0].FullName
 }
-if ($operationsCandidates.Count -ne 1) { throw "Repositorio Tela Funcoes Operacionais nao encontrado de forma unica acima de $root." }
-$operationsRoot = $operationsCandidates[0].FullName
 Set-Location $root
 
 $environmentUrl = "https://org23b93544.crm2.dynamics.com/"
@@ -103,17 +111,22 @@ if ($LASTEXITCODE -ne 0) { throw "TypeScript do App Motoristas falhou." }
 npm run build
 if ($LASTEXITCODE -ne 0) { throw "Build do App Motoristas falhou." }
 
-Write-Step "gate Tela Funcoes Operacionais: testes, TypeScript e build"
-Push-Location $operationsRoot
-try {
-  npm test
-  if ($LASTEXITCODE -ne 0) { throw "Testes da Tela Funcoes Operacionais falharam." }
-  npx tsc --noEmit
-  if ($LASTEXITCODE -ne 0) { throw "TypeScript da Tela Funcoes Operacionais falhou." }
-  npm run build
-  if ($LASTEXITCODE -ne 0) { throw "Build da Tela Funcoes Operacionais falhou." }
+if ($IncludeOperacionais) {
+  Write-Step "gate Tela Funcoes Operacionais: testes, TypeScript e build"
+  Push-Location $operationsRoot
+  try {
+    npm test
+    if ($LASTEXITCODE -ne 0) { throw "Testes da Tela Funcoes Operacionais falharam." }
+    npx tsc --noEmit
+    if ($LASTEXITCODE -ne 0) { throw "TypeScript da Tela Funcoes Operacionais falhou." }
+    npm run build
+    if ($LASTEXITCODE -ne 0) { throw "Build da Tela Funcoes Operacionais falhou." }
+  }
+  finally { Pop-Location }
 }
-finally { Pop-Location }
+else {
+  Write-Step "Tela Funcoes Operacionais fora desta publicacao (use -IncludeOperacionais ou npm run push no repo dela)"
+}
 
 Write-Step "gate plugin: build e testes"
 dotnet build "plugins/DriverRecordSharing.Tests/DriverRecordSharing.Tests.csproj" -c Release --nologo
@@ -131,12 +144,14 @@ Write-Step "publish webresource in $solutionUniqueName"
   -SolutionUniqueName $solutionUniqueName `
   -DeviceCode:$DeviceCode
 
-Write-Step "publish Tela Funcoes Operacionais"
-& (Join-Path $operationsRoot "scripts\deploy-webresource.ps1") `
-  -EnvironmentUrl $environmentUrl `
-  -WebResourceName "new_telafuncoesoperacionais" `
-  -SkipBuild `
-  -DeviceCode:$DeviceCode
+if ($IncludeOperacionais) {
+  Write-Step "publish Tela Funcoes Operacionais"
+  & (Join-Path $operationsRoot "scripts\deploy-webresource.ps1") `
+    -EnvironmentUrl $environmentUrl `
+    -WebResourceName "new_telafuncoesoperacionais" `
+    -SkipBuild `
+    -DeviceCode:$DeviceCode
+}
 
 Write-Step "publish plugin in $solutionUniqueName"
 & (Join-Path $PSScriptRoot "register-driver-record-sharing-plugin-webapi.ps1") `
