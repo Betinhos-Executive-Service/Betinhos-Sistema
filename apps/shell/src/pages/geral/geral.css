@@ -126,6 +126,13 @@
   /* Em janela muito baixa a grade não some: o piso de 240 px faz a página rolar (overflow-y) em vez de espremê-la. */
   .gr-table { display: flex; flex-direction: column; flex: 1; min-height: 240px; }
   .gr-grid { flex: 1; min-height: 0; overflow: auto; }
+  /* Sem linhas, a grade encolhe ao cabeçalho e o estado vazio vem logo abaixo, em vez de uma área em branco com barra de rolagem. */
+  .gr-table--empty .gr-grid { flex: 0 0 auto; overflow: hidden; }
+  .gr-table--empty .gr-empty { flex: 1; }
+  /* Barra de comandos compacta: uma linha de 40 px, sem a margem da barra do DS; o espaço até a tabela vem do gap do corpo. */
+  .gr-commandline .bt-viewbar { margin-bottom: 0; }
+  .gr-page .gr-body { --bt-gap: var(--bt-space-2); }
+  .gr-chips { padding-bottom: 0; }
   /* Modo Cards no desktop: mesma altura da tabela; a grade rola por dentro. */
   .gr-cardsview { display: flex; flex-direction: column; flex: 1; min-height: 240px; min-width: 0; }
   .gr-cardsview__scroll { flex: 1; min-height: 0; overflow: auto; }
@@ -200,6 +207,11 @@
 .gr-colfilter__actions { display: flex; justify-content: flex-end; gap: var(--bt-space-2); margin-top: var(--bt-space-3); }
 /* A barra do DS ainda oferece o botão da linha de filtro rápido; a Geral não usa essa linha. */
 .gr-commandline .bt-viewbar [aria-label="Filtro rápido"] { display: none; }
+/* Em tela larga os comandos cabem numa linha: sem quebra, a busca encolhe antes de o "⋮" cair para uma segunda linha. */
+@media (min-width: 1400px) {
+  .gr-commandline .bt-viewbar__end { flex-wrap: nowrap; min-width: 0; }
+  .gr-commandline .gr-filters__search { flex: 1 1 160px; min-width: 120px; }
+}
 @media (hover: hover) and (pointer: fine) {
   .bt-table__cell:hover .gr-head__chevron { opacity: 1; }
   .gr-head__sort:hover .gr-head__chevron { color: var(--bt-color-action); }

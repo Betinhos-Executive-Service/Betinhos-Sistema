@@ -160,7 +160,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
   const shown = sort ?? defaultSort
 
   return (
-    <div ref={root} className="bt-table gr-table">
+    <div ref={root} className={!loading && rows.length === 0 ? 'bt-table gr-table gr-table--empty' : 'bt-table gr-table'}>
       <span className="gr-sr" role="status">{announce}</span>
       <div ref={scrollRef} className="gr-grid" role="grid" aria-label="Serviços" aria-busy={loading || undefined} aria-colcount={columns.length + 1} style={style}>
         <div className="bt-table__head" role="row">
