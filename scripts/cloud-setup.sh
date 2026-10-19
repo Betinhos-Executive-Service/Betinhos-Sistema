@@ -43,8 +43,17 @@ grep -q 'npm.pkg.github.com/:_authToken' "$HOME/.npmrc" 2>/dev/null \
 pnpm install --frozen-lockfile
 
 # 5. Navegador headless para as skills verificar-<area> (screenshots da UI em modo mock)
-PLAYWRIGHT_VERSION=1.55.0
-if ! npx -y "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium; then
+# A imagem cloud já traz o Chromium em $PLAYWRIGHT_BROWSERS_PATH (/opt/pw-browsers, build 1194 = playwright 1.56.1)
+# e o proxy bloqueia o CDN do Playwright: se os builds desta versão já estão lá, não baixa nada.
+PLAYWRIGHT_VERSION=1.56.1
+PW_DIRS="$(npx -y "playwright@${PLAYWRIGHT_VERSION}" install --dry-run chromium 2>/dev/null | sed -n 's/^ *Install location: *//p' || true)"
+pw_instalado() {
+  [ -n "$PW_DIRS" ] || return 1
+  while read -r dir; do [ -d "$dir" ] || return 1; done <<< "$PW_DIRS"
+}
+if pw_instalado; then
+  log "Chromium do playwright@${PLAYWRIGHT_VERSION} já instalado em ${PLAYWRIGHT_BROWSERS_PATH:-~/.cache/ms-playwright}; reaproveitando"
+elif ! npx -y "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium; then
   # Distro mais nova que a lista do Playwright: usa o build do Ubuntu 24.04, compatível.
   log "Plataforma não reconhecida pelo Playwright; usando build ubuntu24.04"
   PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64 npx -y "playwright@${PLAYWRIGHT_VERSION}" install chromium
