@@ -4,6 +4,7 @@
 .checklist-summary { flex-wrap: wrap; }
 .checklist-summary small { flex-basis: 100%; color: #fff; font-size: 12px; font-weight: 600; line-height: 1.42; }
 .checklist-instruction { margin: 2px 0 0; color: #64748b; font-size: 12px; font-weight: 500; line-height: 1.42; }
+.checklist-field-instruction { margin: -4px 0 8px; }
 .checklist-photo-item:focus { outline: 0; }
 .checklist-photo-item:focus-visible { border-color: #6c91e8; box-shadow: 0 0 0 3px rgba(33, 89, 210, .11); }
 .checklist-number { display: flex; align-items: center; gap: 8px; }

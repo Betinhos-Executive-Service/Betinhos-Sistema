@@ -446,7 +446,8 @@ function ChecklistField({ item, draft, error, disabled, onValue, onAddPhoto, onO
   const value = draft.valores[item.chave] ?? "";
   return (
     <div id={itemDomId(item.chave)} className="checklist-value-item">
-      <FormField label={item.rotulo} error={error} hint={item.instrucao || undefined} required={item.obrigatorio}>
+      <FormField label={item.rotulo} error={error} required={item.obrigatorio}>
+        {item.instrucao ? <p className="checklist-instruction checklist-field-instruction">{item.instrucao}</p> : null}
         {item.tipo === "numero" ? (
           <div className="checklist-number">
             <TextInputControl
