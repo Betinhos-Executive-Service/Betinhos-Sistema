@@ -1,0 +1,8 @@
+# Roteiro A executado em 19/10/2026 no WSL Ubuntu (Linux limpo, HOME temporário; sem /opt/nvm nem Chromium da imagem cloud)
+hook exit=0 | [cloud-setup] Pronto. Dev server: pnpm dev (porta 36472, modo mock sem Dataverse). Testes: pnpm test.
+env file: export PATH="/root/sbAhome/.nvm/versions/node/v24.22.0/bin:$PATH"
+shell novo: v24.22.0
+sem token exit=0 | FALHOU (exit 1). Últimas linhas de /tmp/cloud-setup.log:
+sem CLAUDE_CODE_REMOTE exit=0 | saída: 0 bytes
+linhas _authToken no ~/.npmrc: 1
+tokens nos logs: 0
