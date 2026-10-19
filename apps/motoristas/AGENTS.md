@@ -43,9 +43,9 @@ Pull requests should include the user-facing change, validation commands, Datave
 
 ### Branches (since 2026-10-19)
 
-- `main` is the integration and published line: open PRs against `main`, and publish DEV (`npm run push`) from an up-to-date `main`. PROD only through `scripts/deploy-prod.ps1`.
+- `main` is the only long-lived branch and the GitHub default. Work in short-lived branches (worktrees) and open PRs against `main`; there is no `develop` (removed on 2026-10-19 after it diverged from `main`).
+- Publish DEV (`npm run push`) from an up-to-date `main`. PROD only through `scripts/deploy-prod.ps1`.
 - Before opening a PR, merge the latest `origin/main` into the branch. The DriverRecordSharing plugin assembly is shared by every front, so publishing from a stale branch drops other fronts' plugin types from DEV.
-- `develop` exists only as a mirror of `main` (it is still the GitHub default branch). Do not target it. After merging to `main`, fast-forward it: `git push origin origin/main:develop`. Never merge into `develop` directly; if it ever has commits that `main` lacks, open a PR from `develop` to `main` first.
 
 ## Security & Configuration Tips
 
