@@ -19,4 +19,7 @@ plugins/ExpenseUpload/ExpenseUpload.snk
 # Memória local de sessões (Memsearch)
 .memsearch/
 
+.worktrees/
+backup/prod-deploy/
+backup/prod-active-layers/
 .verificacao/

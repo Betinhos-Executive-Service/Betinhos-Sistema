@@ -25,7 +25,8 @@ export type Screen =
   | "fotoManutencao"
   | "previewFotoManutencao"
   | "canceladoLocal"
-  | "boasIdeias";
+  | "boasIdeias"
+  | "meuCarro";
 
 export type TileIcon = "cars" | "clock" | "money" | "tools";
 

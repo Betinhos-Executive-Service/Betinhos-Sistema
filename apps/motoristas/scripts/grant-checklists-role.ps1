@@ -4,6 +4,9 @@ param(
 )
 
 # Motorista le somente os proprios checklists e fotos (Basic). Conclusao passa pela Custom API.
+. (Join-Path $PSScriptRoot "lib/assert-dev-environment.ps1")
+Assert-DevEnvironment $EnvironmentUrl
+
 $ErrorActionPreference = "Stop"
 $baseUrl = $EnvironmentUrl.TrimEnd("/")
 Import-Module MSAL.PS -ErrorAction Stop
