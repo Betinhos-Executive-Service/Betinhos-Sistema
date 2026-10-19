@@ -86,7 +86,7 @@ foreach ($papel in $papeis) {
   Dv POST "roles($($rs[0].roleid))/Microsoft.Dynamics.CRM.AddPrivilegesRole" @{ Privileges = $concessoes } | Out-Null
   $atual = @((Dv GET "roleprivilegescollection?`$select=privilegeid&`$filter=roleid eq $($rs[0].roleid)").value) | Where-Object { $priv.Values -contains $_.privilegeid }
   if (@($atual).Count -lt 2) { throw "$papel ficou com $(@($atual).Count) de 2 privilégios." }
-  Write-Host "[erros-schema] $papel: Create/Read (Usuário) em $entidade"
+  Write-Host "[erros-schema] ${papel}: Create/Read (Usuário) em $entidade"
 }
 
 # Conferência por leitura de volta.
