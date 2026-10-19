@@ -1018,7 +1018,7 @@ svg {
 .receipt-editor-block input::placeholder,
 .receipt-editor-block .searchable-select-trigger.is-placeholder,
 .receipt-editor-block .searchable-select-trigger.is-placeholder .searchable-select-value {
-  color: rgba(0, 14, 35, 0.42) !important;
+  color: #536174 !important;
   font-family: "Manrope", Arial, sans-serif;
   font-size: 16px;
   font-weight: 600;
@@ -1033,7 +1033,7 @@ svg {
   height: 42px;
   border: 1px solid rgba(0, 26, 61, 0.07);
   border-radius: 12px;
-  background: #f6f6f6;
+  background: #fcfcfb;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
   padding: 0 11px;
   box-sizing: border-box;
@@ -2793,7 +2793,7 @@ svg {
   min-height: 42px;
   border: 0;
   border-radius: 4px;
-  background: #f6f6f6;
+  background: #fcfcfb;
   color: rgb(0, 0, 0);
   font-family: "Manrope", sans-serif;
   font-size: 16px;
@@ -3273,7 +3273,7 @@ svg {
   border-radius: 14px;
   overflow: hidden;
   border: 1px dashed rgba(0, 26, 61, 0.18);
-  background: #f6f6f6;
+  background: #fcfcfb;
   color: rgb(0, 14, 35);
   display: grid;
   place-items: center;
@@ -3336,8 +3336,8 @@ svg {
   gap: 2px;
 }
 
-.collision-photos-header span {
-  color: rgb(111, 125, 145);
+.collision-photos-header > div > span {
+  color: #536174;
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 0;
@@ -7424,7 +7424,7 @@ button:disabled {
   min-height: 42px;
   border: 1px solid rgba(0, 26, 61, 0.07);
   border-radius: 12px;
-  background: #f6f6f6;
+  background: #fcfcfb;
   color: #000e23;
   font-family: "Manrope", Arial, sans-serif;
   font-size: 16px;
@@ -7481,7 +7481,7 @@ button:disabled {
 .voucher-row input[type="date"],
 .finalize-input-block input[type="date"],
 .cancel-input-block input[type="date"] {
-  background: #f6f6f6;
+  background: #fcfcfb;
   color-scheme: light;
 }
 
@@ -11729,7 +11729,7 @@ select,
   padding: 9px 42px 9px 12px !important;
   border: 0 !important;
   border-radius: 12px !important;
-  background: #f6f6f6 !important;
+  background: #fcfcfb !important;
   color: rgb(0, 0, 0) !important;
   display: flex !important;
   align-items: center !important;
@@ -11744,27 +11744,27 @@ select,
 }
 
 .receipt-editor-block .searchable-select-trigger {
-  background: #f6f6f6 !important;
+  background: #fcfcfb !important;
   box-shadow: inset 0 0 0 1px rgba(0, 14, 35, 0.08) !important;
 }
 
 .searchable-select-trigger.is-placeholder,
 .searchable-select-trigger.is-placeholder .searchable-select-value {
-  color: rgba(0, 14, 35, 0.42) !important;
+  color: #536174 !important;
 }
 
 .searchable-select-trigger:focus,
 .searchable-select-trigger:hover,
 .searchable-select.is-open .searchable-select-trigger {
   outline: 0 !important;
-  background: #f6f6f6 !important;
+  background: #f7f9fc !important;
   box-shadow: 0 0 0 2px rgba(0, 26, 61, 0.12), inset 0 0 0 1px rgba(0, 14, 35, 0.08) !important;
 }
 
 .receipt-editor-block .searchable-select-trigger:focus,
 .receipt-editor-block .searchable-select-trigger:hover,
 .receipt-editor-block .searchable-select.is-open .searchable-select-trigger {
-  background: #f6f6f6 !important;
+  background: #f7f9fc !important;
 }
 
 .searchable-select-value {
@@ -11787,13 +11787,20 @@ select,
   pointer-events: none !important;
 }
 
+.searchable-select.has-clear .searchable-select-trigger {
+  padding-right: 64px !important;
+}
+
 .searchable-select-clear {
   position: absolute !important;
-  right: 27px !important;
+  right: 28px !important;
   top: 50% !important;
-  width: 20px !important;
-  height: 20px !important;
-  margin-top: -10px !important;
+  width: 32px !important;
+  height: 32px !important;
+  margin-top: -16px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
   border-radius: 999px !important;
   color: #001a3d !important;
   display: grid !important;
@@ -11831,7 +11838,7 @@ select,
   padding: 10px 12px !important;
   border: 0 !important;
   border-radius: 12px !important;
-  background: #f6f6f6 !important;
+  background: #fcfcfb !important;
   color: #000e23 !important;
   font-family: "Manrope", Arial, sans-serif !important;
   font-size: 16px !important;
@@ -12371,6 +12378,122 @@ select,
 .action-button-content.is-entering { animation: action-button-content-in 150ms cubic-bezier(0.23, 1, 0.32, 1) both; }
 @keyframes action-button-content-in { from { opacity: 0; transform: translateY(3px) scale(0.97); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .action-button-content.is-entering { animation: none; } }
+
+/* Receber: valor e orientação de cobrança visíveis na tela do comprovante. */
+.receive-amount {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.receive-amount strong {
+  color: #000e23;
+  font-family: "Manrope", Arial, sans-serif;
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.receive-amount p {
+  margin: 0;
+  color: #536174;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* Alvos de toque: mínimo de 44px para uso com uma mão. Links em texto ganham área
+   vertical com padding + margem negativa, sem mudar o espaçamento visual. */
+.details-menu .details-back,
+.details-menu .details-copy,
+.form-menu .form-menu-button {
+  width: 44px !important;
+  min-width: 44px !important;
+  height: 44px !important;
+  min-height: 44px !important;
+}
+
+.details-card-v1 .detail-link,
+.detail-contact-link,
+.questions-box .questions-link,
+.finalize-help button {
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+  margin-top: -12px !important;
+  margin-bottom: -12px !important;
+}
+
+/* Voucher: atalho para preencher o horário inicial com o horário agendado (toque consciente). */
+.voucher-time-shortcut {
+  min-height: 36px;
+  margin-top: 8px;
+  padding: 6px 12px;
+  border: 1px solid rgba(0, 26, 61, 0.14);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #001a3d;
+  font-family: "Manrope", Arial, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* Carimbo de versão: canto inferior direito, discreto, não captura toque nem foco. */
+.build-stamp {
+  position: fixed;
+  right: 6px;
+  bottom: 1px;
+  z-index: 2147483000;
+  color: rgba(83, 97, 116, 0.6);
+  font-family: "Manrope", Arial, sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Colisões: orientação de emergência antes do formulário. */
+.collision-emergency {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(193, 47, 69, 0.22);
+  border-radius: 14px;
+  background: #fff0f3;
+  color: #c12f45;
+  font-family: "Manrope", Arial, sans-serif;
+}
+
+.collision-emergency strong {
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.collision-emergency span {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.collision-emergency-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.collision-emergency-actions button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: #c12f45;
+  color: #ffffff;
+  font-family: "Manrope", Arial, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 900;
+  cursor: pointer;
+}
 
 /* Comprovante: tela de leitura rápida e campos lidos. Valores do Betinhos Design System (design-tokens.json). */
 .receipt-reading-main {

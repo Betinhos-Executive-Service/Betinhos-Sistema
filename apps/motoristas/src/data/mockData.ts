@@ -95,6 +95,13 @@ function parseBrazilianDateTime(value: string) {
   return new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute)).toISOString();
 }
 
+// Igual ao Dataverse real: telefones de passageiros chegam como link do WhatsApp.
+function linkMockPassengerPhones(html: string) {
+  return html.replace(/\+55 \(\d{2}\) \d{4,5}-\d{4}/g, (phoneText) =>
+    `<a href="https://wa.me/${phoneText.replace(/\D/g, "")}" target="_blank" rel="noopener noreferrer">${phoneText}</a>`
+  );
+}
+
 function serviceDetail(options: ServiceOptions): DetailData {
   const fields = [
     { label: "Data e Horário de Saída", value: options.departureAt },
@@ -104,7 +111,7 @@ function serviceDetail(options: ServiceOptions): DetailData {
     { label: "Receber", value: options.receive },
     { label: "Valor a Receber", value: options.amount },
     { label: "Trajeto", value: options.route },
-    { label: "Passageiros e Telefones de Contato", value: options.passengersHtml, html: true },
+    { label: "Passageiros e Telefones de Contato", value: linkMockPassengerPhones(options.passengersHtml), html: true },
     { label: "Endereço de Saída", value: options.departureAddress },
     { label: "Destino", value: options.destination },
     { label: "Obs de Operação", value: options.operationNotes },

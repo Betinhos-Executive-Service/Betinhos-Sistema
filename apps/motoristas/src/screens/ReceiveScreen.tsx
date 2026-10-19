@@ -19,6 +19,13 @@ type ReceiveScreenProps = {
   submitState?: ActionButtonState;
 };
 
+const normalizeLabel = (label: string) =>
+  label.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+function getFieldValue(detail: DetailData, normalizedLabel: string) {
+  return detail.fields.find((field) => normalizeLabel(field.label) === normalizedLabel)?.value.trim() ?? "";
+}
+
 function focusInvalidField(element: HTMLElement | null) {
   element?.focus({ preventScroll: false });
   element?.scrollIntoView({ block: "center", behavior: "smooth" });
@@ -38,6 +45,9 @@ export function ReceiveScreen({
   const isSubmitting = submitState !== "idle";
   const photosRef = useRef<HTMLDivElement | null>(null);
   const [photosError, setPhotosError] = useState("");
+  // O motorista precisa ver quanto e como cobrar sem voltar ao detalhe.
+  const amountToReceive = getFieldValue(detail, "valorareceber");
+  const operationNote = getFieldValue(detail, "obsdeoperacao");
   const isVideo = (photo: ExpensePhoto) => photo.mediaType === "video" || Boolean(photo.rawBlob) || photo.dataUrl.startsWith("data:video/");
 
   const addPhoto = () => {
@@ -68,6 +78,13 @@ export function ReceiveScreen({
           <div className="finalize-title">Recebimento - {detail.id}</div>
           <div className="finalize-scroll">
             <div className="finalize-form maintenance maintenance-request-form expense-form receive-form">
+              {amountToReceive ? (
+                <div className="finalize-input-block receive-amount">
+                  <span className="form-field-label">Valor a receber</span>
+                  <strong>{amountToReceive}</strong>
+                  {operationNote ? <p>{operationNote}</p> : null}
+                </div>
+              ) : null}
 
               <div ref={photosRef} className={`finalize-input-block ${photosError ? "is-invalid" : ""}`} tabIndex={-1}>
                 <label className="form-field-label">

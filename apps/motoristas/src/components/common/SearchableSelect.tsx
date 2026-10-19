@@ -58,7 +58,7 @@ export const SearchableSelect = forwardRef<HTMLButtonElement, SearchableSelectPr
   invalid = false,
   ariaLabel,
   searchPlaceholder = "Pesquisar",
-  emptyLabel = "Nenhuma opcao encontrada.",
+  emptyLabel = "Nenhuma opção encontrada.",
   maxVisible = 80,
   className = "",
   renderOption,
@@ -199,7 +199,7 @@ export const SearchableSelect = forwardRef<HTMLButtonElement, SearchableSelectPr
   const displayValue = selectedOption?.label || value || placeholder;
 
   return (
-    <div ref={containerRef} className={`searchable-select ${isOpen ? "is-open" : ""} ${invalid ? "is-invalid" : ""} ${openDirection === "up" ? "is-open-up" : "is-open-down"} ${className}`}>
+    <div ref={containerRef} className={`searchable-select ${value ? "has-clear" : ""} ${isOpen ? "is-open" : ""} ${invalid ? "is-invalid" : ""} ${openDirection === "up" ? "is-open-up" : "is-open-down"} ${className}`}>
       <button
         ref={setTriggerRef}
         type="button"
@@ -229,23 +229,23 @@ export const SearchableSelect = forwardRef<HTMLButtonElement, SearchableSelectPr
         }}
       >
         <span className="searchable-select-value form-control-value">{displayValue}</span>
-        {value ? (
-          <span
-            role="button"
-            tabIndex={-1}
-            className="searchable-select-clear"
-            aria-label="Limpar selecao"
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              onChange("");
-            }}
-          >
-            x
-          </span>
-        ) : null}
         <span className="searchable-select-caret" aria-hidden="true" />
       </button>
+      {value && !disabled ? (
+        <button
+          type="button"
+          tabIndex={-1}
+          className="searchable-select-clear"
+          aria-label="Limpar seleção"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onChange("");
+          }}
+        >
+          ×
+        </button>
+      ) : null}
       {isOpen ? (
         <div ref={panelRef} className="searchable-select-panel" style={panelStyle} role="presentation">
           <input
@@ -255,7 +255,7 @@ export const SearchableSelect = forwardRef<HTMLButtonElement, SearchableSelectPr
             autoComplete="off"
             spellCheck={false}
             placeholder={searchPlaceholder}
-            aria-label="Pesquisar opcao"
+            aria-label="Pesquisar opção"
             onChange={(event) => {
               setQuery(event.target.value);
               setFocusedIndex(0);
@@ -283,7 +283,7 @@ export const SearchableSelect = forwardRef<HTMLButtonElement, SearchableSelectPr
               if (event.key === "Tab") closePanel();
             }}
           />
-          <div id={listboxId} className="searchable-select-options" role="listbox">
+          <div id={listboxId} className="searchable-select-options" role={filteredOptions.length ? "listbox" : undefined} aria-label={filteredOptions.length ? ariaLabel : undefined}>
             {filteredOptions.length ? (
               filteredOptions.map((option, index) => {
                 const isSelected = option.value === value;
