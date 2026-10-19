@@ -140,7 +140,9 @@
   .gr-cardsview .gr-card__head .gr-open, .gr-cardsview .gr-card__check .bt-choice { min-height: var(--bt-control-height-compact); }
   .gr-cardsview .gr-loadmore { padding: 0 var(--bt-space-1); }
 }
-.gr-mode { display: inline-flex; align-items: center; gap: var(--bt-space-1); }
+/* Barra da seleção (desktop): troca o lado direito da linha de comando enquanto houver linhas marcadas; Colunas e Filtros saem de cena. */
+.gr-selection { display: flex; align-items: center; gap: var(--bt-space-2); }
+.gr-commandline.is-selecting .bt-viewbar__end > .bt-button[aria-haspopup="dialog"] { display: none; }
 
 /* Celular: cards, sheet de edição e barra de seleção. */
 .gr-mobile { display: grid; gap: var(--bt-space-3); min-width: 0; }
