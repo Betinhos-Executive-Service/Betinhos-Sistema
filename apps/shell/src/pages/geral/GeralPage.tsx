@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
-import { Alert, Button, EmptyState, Menu, SearchBox, SegmentedControl, Stack, StatusBadge, ToastProvider, ViewBar, readFilters, useShellHeader, useToast, type FilterGroup, type FilterOption } from '@betinhos/ui'
+import { Alert, Button, EmptyState, Menu, SearchBox, Stack, StatusBadge, ToastProvider, ViewBar, readFilters, useShellHeader, useToast, type FilterGroup, type FilterOption } from '@betinhos/ui'
 import { Archive, ArchiveRestore, Bug, CalendarDays, ChevronDown, ClipboardList, Copy, FilePlus2, LayoutGrid, Link2, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Send, ShieldCheck, Table2, Ticket, X } from 'lucide-react'
 import type { Host } from '../../host'
 import { useMedia } from '../operacional/useMedia'
@@ -360,10 +360,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       <Button variant="ghost" size="touch" icon={<X size={16} />} onClick={clearSelection}>Limpar seleção</Button>
     </>
   )
-  const noneTitle = 'Selecione ao menos um serviço.'
   const oneTitle = 'Selecione exatamente um serviço.'
-  const noneId = useId()
-  const oneId = useId()
   // aria-disabled (não disabled): o botão continua focável, o leitor de tela lê o motivo e o clique não faz nada.
   const blocked = (reason: string, describedBy: string) => ({
     className: 'gr-btn--blocked',
@@ -372,53 +369,57 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     title: reason,
     onClick: (event: MouseEvent<HTMLButtonElement>) => event.preventDefault(),
   })
-  const none = selectedIds.length === 0
   // Rótulo de item de menu com o motivo embaixo quando o item está inerte.
   const hint = (label: string, reason: string | null) => (reason ? <span className="gr-menu__hint" title={reason}>{label}<small>{reason}</small></span> : label)
-  const createButton = <Button size={mobile ? 'touch' : 'compact'} icon={<Plus size={16} />} onClick={() => { void openForm('create') }}>Criar serviço</Button>
-  // Desktop: Criar, Editar e Desativar/Ativar ficam na barra (a posição não pula); os demais comandos de seleção vivem no menu "Ações".
-  // Sem seleção servível, botões e itens ficam inertes, com o motivo.
-  const commands = mobile ? createButton : (
-    <>
-      {createButton}
-      {selectedIds.length === 1
-        ? <Button variant="action" size="compact" icon={<Pencil size={16} />} onClick={() => { void openForm('edit', selectedIds[0]) }}>Editar</Button>
-        : <Button variant="action" size="compact" icon={<Pencil size={16} />} {...blocked(oneTitle, oneId)}>Editar</Button>}
+  // Todos os comandos da linha têm o mesmo tamanho da barra do DS (40 px no desktop, 44 px no celular): nada de misturar compacto com padrão.
+  const size = mobile ? 'touch' : 'default'
+  const createButton = <Button size={size} icon={<Plus size={16} />} onClick={() => { void openForm('create') }}>Criar serviço</Button>
+  // Desktop com linhas marcadas: a linha de comando vira a barra da seleção (como no model-driven). Sem seleção, os comandos
+  // que dependem dela não aparecem; a única ação primária da página é "Criar serviço", a última à direita (DS §10.9.1).
+  const selecting = !mobile && selectedIds.length > 0
+  const selectedLabel = selectedIds.length === 1 ? '1 selecionado' : `${selectedIds.length} selecionados`
+  const selectionBar = (
+    <div className="gr-selection" role="group" aria-label="Comandos da seleção">
+      <Button variant="ghost" size={size} icon={<X size={16} />} aria-label="Limpar seleção" title="Limpar seleção" onClick={clearSelection} />
+      <span role="status" className="gr-filters__selected"><StatusBadge tone="info">{selectedLabel}</StatusBadge></span>
+      {selectedIds.length === 1 ? <Button variant="action" size={size} icon={<Pencil size={16} />} onClick={() => { void openForm('edit', selectedIds[0]) }}>Editar</Button> : null}
+      {selectedState === 1
+        ? <Button variant="action" size={size} icon={<ArchiveRestore size={16} />} onClick={() => askState(true)}>Ativar</Button>
+        : selectedState === 0
+          ? <Button variant="danger" size={size} icon={<Archive size={16} />} onClick={() => askState(false)}>Desativar</Button>
+          : <>
+            <Button variant="danger" size={size} icon={<Archive size={16} />} {...blocked(mixedTitle, mixedId)}>Desativar</Button>
+            <Button variant="action" size={size} icon={<ArchiveRestore size={16} />} {...blocked(mixedTitle, mixedId)}>Ativar</Button>
+            <span id={mixedId} className="gr-sr">{mixedTitle}</span>
+          </>}
       <Menu
         align="start"
-        trigger={(props) => <Button {...props} variant="action" size="compact" icon={<ChevronDown size={16} />} aria-label={none ? 'Ações' : `Ações (${selectedIds.length})`}>Ações{none ? null : <span className="gr-filters__count">{selectedIds.length}</span>}</Button>}
+        trigger={(props) => <Button {...props} variant="action" size={size} icon={<ChevronDown size={16} />} aria-label={`Ações (${selectedIds.length})`}>Ações</Button>}
         actions={[
-          { id: 'voucher', label: hint('Gerar Voucher', none ? noneTitle : null), icon: <Ticket size={16} />, disabled: none, onSelect: openVoucher },
-          { id: 'copiar', label: hint('Copiar Serviços', none ? noneTitle : null), icon: <Copy size={16} />, disabled: none, onSelect: () => { void copySelected() } },
-          { id: 'op', label: hint('Gerar OP', none ? noneTitle : null), icon: <FilePlus2 size={16} />, disabled: none, onSelect: askOp },
-          { id: 'link', label: hint('Gerar link', none ? noneTitle : linkBlock), icon: <Link2 size={16} />, disabled: none || linkBlock != null, onSelect: () => { void gerarLink() } },
-          { id: 'disparar', label: hint('Disparar', none ? noneTitle : null), icon: <Send size={16} />, disabled: none, onSelect: () => setDispRequest({ ids: selectedIds }) },
+          { id: 'voucher', label: 'Gerar Voucher', icon: <Ticket size={16} />, onSelect: openVoucher },
+          { id: 'copiar', label: 'Copiar Serviços', icon: <Copy size={16} />, onSelect: () => { void copySelected() } },
+          { id: 'op', label: 'Gerar OP', icon: <FilePlus2 size={16} />, onSelect: askOp },
+          { id: 'link', label: hint('Gerar link', linkBlock), icon: <Link2 size={16} />, disabled: linkBlock != null, onSelect: () => { void gerarLink() } },
+          { id: 'disparar', label: 'Disparar', icon: <Send size={16} />, onSelect: () => setDispRequest({ ids: selectedIds }) },
         ]}
       />
-      {none
-        ? <Button variant="danger" size="compact" icon={<Archive size={16} />} {...blocked(noneTitle, noneId)}>Desativar</Button>
-        : selectedState === 1
-          ? <Button variant="action" size="compact" icon={<ArchiveRestore size={16} />} onClick={() => askState(true)}>Ativar</Button>
-          : selectedState === 0
-            ? <Button variant="danger" size="compact" icon={<Archive size={16} />} onClick={() => askState(false)}>Desativar</Button>
-            : <>
-              <Button variant="danger" size="compact" icon={<Archive size={16} />} {...blocked(mixedTitle, mixedId)}>Desativar</Button>
-              <Button variant="action" size="compact" icon={<ArchiveRestore size={16} />} {...blocked(mixedTitle, mixedId)}>Ativar</Button>
-            </>}
-      <span id={oneId} className="gr-sr">{oneTitle}</span>
-      <span id={noneId} className="gr-sr">{noneTitle}</span>
-      <span id={mixedId} className="gr-sr">{mixedTitle}</span>
-    </>
+    </div>
   )
+  // "⋮" (Mais ações): o que é raro sai da linha. Modo de exibição, link da tela e os atalhos para outras telas.
   const shortcuts = (
     <Menu
-      trigger={(props) => <Button {...props} variant="secondary" size={mobile ? 'touch' : 'compact'} icon={<MoreVertical size={16} />} aria-label="Mais ações" />}
+      trigger={(props) => <Button {...props} variant="secondary" size={size} icon={<MoreVertical size={16} />} aria-label="Mais ações" />}
       actions={[
-        { id: 'funcoes', label: 'Funções Operacionais', icon: <ClipboardList size={16} />, onSelect: () => { location.hash = hrefFor('new_telafuncoesoperacionais') } },
-        { id: 'escala', label: 'Escala FDS', icon: <CalendarDays size={16} />, onSelect: () => setEscalaOpen(true) },
-        { id: 'auditoria', label: 'Auditoria', icon: <ShieldCheck size={16} />, onSelect: () => { void openAuditoria() } },
-        { id: 'erro', label: selectedIds.length === 1 ? 'Registrar Erro' : <span className="gr-menu__hint" title={oneTitle}>Registrar Erro<small>{oneTitle}</small></span>, icon: <Bug size={16} />, disabled: selectedIds.length !== 1, onSelect: () => { void registrarErro() } },
-        { id: 'contagem', label: 'Contagem de Serviços', icon: <ListChecks size={16} />, onSelect: () => setContagemOpen(true) },
+        ...(mobile ? [] : [
+          { id: 'tabela', label: 'Ver como tabela', icon: <Table2 size={16} />, group: 'Mostrar como', selected: mode === 'tabela', onSelect: () => changeMode('tabela') },
+          { id: 'cards', label: 'Ver como cards', icon: <LayoutGrid size={16} />, group: 'Mostrar como', selected: mode === 'cards', onSelect: () => changeMode('cards') },
+        ]),
+        { id: 'compartilhar', label: 'Compartilhar link', icon: <Link2 size={16} />, group: '', onSelect: () => { void shareLink() } },
+        { id: 'funcoes', label: 'Funções Operacionais', icon: <ClipboardList size={16} />, group: 'Atalhos', onSelect: () => { location.hash = hrefFor('new_telafuncoesoperacionais') } },
+        { id: 'escala', label: 'Escala FDS', icon: <CalendarDays size={16} />, group: 'Atalhos', onSelect: () => setEscalaOpen(true) },
+        { id: 'auditoria', label: 'Auditoria', icon: <ShieldCheck size={16} />, group: 'Atalhos', onSelect: () => { void openAuditoria() } },
+        { id: 'erro', label: hint('Registrar Erro', selectedIds.length === 1 ? null : oneTitle), icon: <Bug size={16} />, group: 'Atalhos', disabled: selectedIds.length !== 1, onSelect: () => { void registrarErro() } },
+        { id: 'contagem', label: 'Contagem de Serviços', icon: <ListChecks size={16} />, group: 'Atalhos', onSelect: () => setContagemOpen(true) },
       ]}
     />
   )
@@ -534,31 +535,26 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     )
   }
 
-  const size = mobile ? 'touch' : 'compact'
   const notApplied = geral.filtersIgnored ? [...Object.keys(filters.quick), ...filters.advanced.items.map((i) => i.id)] : undefined
 
   return (
     <div className="page gr-page">
       {/* A linha de comando da lista (DS §10.9.1): visão, colunas, filtros, busca e comandos. */}
-      <div role="toolbar" aria-label="Comandos de serviços" className="gr-commandline">
+      <div role="toolbar" aria-label="Comandos de serviços" className={selecting ? 'gr-commandline is-selecting' : 'gr-commandline'}>
       <ViewBar
         view={viewState}
         columns={columnDefs}
         filters={{ fields: filterFields, search: searchFilter, notApplied }}
       >
         {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-        {!mobile ? (
-          <SegmentedControl<ViewMode> size="compact" aria-label="Mostrar como" value={mode} onChange={changeMode} options={[
-            { value: 'tabela', label: <span className="gr-mode"><Table2 size={14} aria-hidden="true" />Tabela</span> },
-            { value: 'cards', label: <span className="gr-mode"><LayoutGrid size={14} aria-hidden="true" />Cards</span> },
-          ]} />
-        ) : null}
-        <SearchBox className="gr-filters__search" size={size} aria-label="Buscar serviços" placeholder="Buscar por ID, trajeto, cliente…" value={searchText} onChange={setSearchText} onSearch={(value) => { if (value.trim() !== query) setQuery(value.trim()) }} debounce={300} loading={loading && query !== ''} />
-        {!mobile && geral.selected.size > 0 ? <span role="status" className="gr-filters__selected"><StatusBadge tone="info">{geral.selected.size === 1 ? '1 selecionado' : `${geral.selected.size} selecionados`}</StatusBadge></span> : null}
-        {commands}
-        <Button variant="secondary" size={size} icon={<Link2 size={16} />} aria-label="Compartilhar link" title="Compartilhar link" onClick={() => { void shareLink() }} />
-        <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title={status ?? 'Atualizar'} loading={loading && rows.length > 0} onClick={reload} />
+        {selecting ? selectionBar : (
+          <>
+            <SearchBox className="gr-filters__search" size={size} aria-label="Buscar serviços" placeholder="Buscar por ID, trajeto, cliente…" value={searchText} onChange={setSearchText} onSearch={(value) => { if (value.trim() !== query) setQuery(value.trim()) }} debounce={300} loading={loading && query !== ''} />
+            <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title={status ?? 'Atualizar'} loading={loading && rows.length > 0} onClick={reload} />
+          </>
+        )}
         {shortcuts}
+        {selecting ? null : createButton}
       </ViewBar>
       </div>
       <Stack gap="4" className="gr-body">
