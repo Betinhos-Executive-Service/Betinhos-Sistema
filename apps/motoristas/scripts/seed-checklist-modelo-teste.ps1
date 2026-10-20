@@ -51,37 +51,66 @@ $itens = @(
   @{ nome = "Observa$([char]0x00E7)$([char]0x00F5)es"; tipo = $texto; obrigatorio = $false; opcoes = ""; instrucao = "O que mais a opera$([char]0x00E7)$([char]0x00E3)o precisa saber." }
 )
 
+function Count-Itens($ModeloId) { return @((Read-Dv "new_checklistmodeloitems?`$select=new_checklistmodeloitemid&`$filter=_new_modelo_value eq $ModeloId and statecode eq 0").value).Count }
+# Troca o padrao sem deixar o DEV pior: o modelo novo so vira padrao depois de completo; se marcar o novo falhar, o antigo e restaurado.
+function Promover-Padrao($NovoId, $Antigos) {
+  $desmarcados = @()
+  try {
+    foreach ($padrao in $Antigos) {
+      Patch-Dv "new_checklistmodelos($($padrao.new_checklistmodeloid))" @{ new_padraoquinzenal = $false }
+      $desmarcados += $padrao
+      Write-Output "Padrao anterior '$($padrao.new_name)' desmarcado (continua ativo)."
+    }
+    Patch-Dv "new_checklistmodelos($NovoId)" @{ new_padraoquinzenal = $true }
+  } catch {
+    $erro = $_
+    foreach ($padrao in $desmarcados) {
+      try { Patch-Dv "new_checklistmodelos($($padrao.new_checklistmodeloid))" @{ new_padraoquinzenal = $true }; Write-Output "Padrao anterior '$($padrao.new_name)' restaurado." }
+      catch { Write-Warning "ATENCAO: nao foi possivel restaurar o padrao '$($padrao.new_name)' ($($padrao.new_checklistmodeloid)). Marque-o pela Gestao de Checklists." }
+    }
+    throw $erro
+  }
+}
+
 $padroes = @((Read-Dv "new_checklistmodelos?`$select=new_checklistmodeloid,new_name&`$filter=new_padraoquinzenal eq true and new_ativo eq true and statecode eq 0").value)
-$existentes = @((Read-Dv "new_checklistmodelos?`$select=new_checklistmodeloid,new_name&`$filter=new_name eq '$($nome.Replace("'", "''"))'").value)
+$existentes = @((Read-Dv "new_checklistmodelos?`$select=new_checklistmodeloid,new_name,new_padraoquinzenal&`$filter=new_name eq '$($nome.Replace("'", "''"))'").value)
 if ($existentes.Count -gt 1) { throw "Modelo '$nome' duplicado." }
 if ($existentes.Count -eq 1) {
   $id = $existentes[0].new_checklistmodeloid
-  $n = @((Read-Dv "new_checklistmodeloitems?`$select=new_checklistmodeloitemid&`$filter=_new_modelo_value eq $id and statecode eq 0").value).Count
+  $n = Count-Itens $id
+  if ($n -ne $itens.Count) { throw "Modelo '$nome' incompleto: $n de $($itens.Count) itens ativos. Confira ou ajuste pela Tela Gestao de Checklists antes de repetir o seed." }
+  $outros = @($padroes | Where-Object { $_.new_checklistmodeloid -ne $id })
+  $jaPadrao = ($existentes[0].new_padraoquinzenal -eq $true)
   Write-Output "Modelo '$nome' ja existe ($n itens). Padroes ativos: $($padroes.Count)."
+  if ($jaPadrao -or -not $SubstituirPadrao) { return }
+  if (-not $Apply) {
+    foreach ($padrao in $outros) { Write-Output "DRY RUN: desmarcaria o padrao atual '$($padrao.new_name)' ($($padrao.new_checklistmodeloid)); ele continuaria ativo." }
+    Write-Output "DRY RUN: marcaria o modelo existente '$nome' como padrao da rotina quinzenal."
+    return
+  }
+  Promover-Padrao $id $outros
+  Write-Output "Modelo '$nome' ($id) marcado como padrao quinzenal."
   return
 }
 if ($padroes.Count -gt 0 -and -not $SubstituirPadrao) { throw "Ja existe modelo padrao ativo: $($padroes[0].new_name). Use -SubstituirPadrao ou ajuste pela Tela Gestao de Checklists." }
 if (-not $Apply) {
-  foreach ($padrao in $padroes) { Write-Output "DRY RUN: desmarcaria o padrao atual '$($padrao.new_name)' ($($padrao.new_checklistmodeloid)); ele continuaria ativo." }
-  Write-Output "DRY RUN: criaria '$nome' com $($itens.Count) itens e o marcaria como padrao da rotina quinzenal (15 dias)."
+  Write-Output "DRY RUN: criaria '$nome' com $($itens.Count) itens, ainda nao padrao; so depois de conferir os itens o marcaria como padrao da rotina quinzenal (15 dias)."
+  foreach ($padrao in $padroes) { Write-Output "DRY RUN: nesse momento desmarcaria o padrao atual '$($padrao.new_name)' ($($padrao.new_checklistmodeloid)); ele continuaria ativo e seria restaurado se a troca falhasse." }
   return
 }
 
-# O schema novo (new_opcoesproblema e a opcao OK / Nao OK) precisa existir antes de mexer no padrao atual.
+# O schema novo (new_opcoesproblema e a opcao OK / Nao OK) precisa existir antes de criar qualquer coisa.
 $coluna = @((Read-Dv "EntityDefinitions(LogicalName='new_checklistmodeloitem')/Attributes?`$select=LogicalName&`$filter=LogicalName eq 'new_opcoesproblema'").value)
 if ($coluna.Count -ne 1) { throw "Coluna new_opcoesproblema ausente no DEV. Rode provision-checklists.ps1 -Apply antes." }
 $opcaoOkNok = @((Read-Dv "EntityDefinitions(LogicalName='new_checklistmodeloitem')/Attributes(LogicalName='new_tipo')/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?`$select=LogicalName&`$expand=OptionSet(`$select=Options)").OptionSet.Options | Where-Object { [int]$_.Value -eq $okNok })
 if ($opcaoOkNok.Count -ne 1) { throw "Opcao 100000003 (OK / Nao OK) ausente em new_tipo. Rode provision-checklists.ps1 -Apply antes." }
-foreach ($padrao in $padroes) {
-  Patch-Dv "new_checklistmodelos($($padrao.new_checklistmodeloid))" @{ new_padraoquinzenal = $false }
-  Write-Output "Padrao anterior '$($padrao.new_name)' desmarcado (continua ativo)."
-}
 
+# 1) Cria o modelo fora do padrao e os itens; o padrao atual nao e tocado ate o novo estar completo.
 $modelo = Post-Dv "new_checklistmodelos" @{
   new_name = $nome
   new_descricao = "Vistoria r$([char]0x00E1)pida: 4 fotos externas, 9 itens OK / N$([char]0x00E3)o OK e observa$([char]0x00E7)$([char]0x00F5)es."
   new_ativo = $true
-  new_padraoquinzenal = $true
+  new_padraoquinzenal = $false
   new_periodicidadedias = 15
 }
 $id = $modelo.new_checklistmodeloid
@@ -99,6 +128,9 @@ foreach ($item in $itens) {
     "new_Modelo@odata.bind" = "/new_checklistmodelos($id)"
   } | Out-Null
 }
-$criados = @((Read-Dv "new_checklistmodeloitems?`$select=new_name,new_ordem&`$filter=_new_modelo_value eq $id&`$orderby=new_ordem").value)
-if ($criados.Count -ne $itens.Count) { throw "Esperados $($itens.Count) itens, encontrados $($criados.Count)." }
-Write-Output "Modelo '$nome' criado ($id) com $($criados.Count) itens e marcado como padrao quinzenal."
+$criados = Count-Itens $id
+if ($criados -ne $itens.Count) { throw "Modelo '$nome' ($id) criado fora do padrao com $criados de $($itens.Count) itens; padrao atual intacto. Repita o seed apos conferir pela Gestao de Checklists." }
+
+# 2) So agora troca o padrao.
+Promover-Padrao $id $padroes
+Write-Output "Modelo '$nome' criado ($id) com $criados itens e marcado como padrao quinzenal."
