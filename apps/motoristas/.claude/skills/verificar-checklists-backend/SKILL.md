@@ -5,7 +5,7 @@ description: "Verifica o backend do checklist de vistoria de veículo: plugin Ch
 # Verificar backend do checklist de vistoria
 
 ## Cobre
-- Código: `plugins/DriverRecordSharing/ChecklistCommandPlugin.cs`, `plugins/DriverRecordSharing/ChecklistAnswers.cs`, testes em `plugins/DriverRecordSharing.Tests/ChecklistCommandPluginTests.cs`.
+- Código: `plugins/DriverRecordSharing/ChecklistCommandPlugin.cs`, `plugins/DriverRecordSharing/ChecklistFactory.cs` (criação e atribuição, compartilhada com a troca), `plugins/DriverRecordSharing/ChecklistAnswers.cs`, testes em `plugins/DriverRecordSharing.Tests/ChecklistCommandPluginTests.cs` (com o fake em `ChecklistFakeService.cs`).
 - Scripts: `scripts/provision-checklists.ps1`, `scripts/provision-checklist-flows.ps1`, `scripts/grant-checklists-role.ps1`, `scripts/smoke-checklists-dev.ps1`, bloco de checklists em `scripts/push-dev.ps1`, lista de tabelas em `scripts/schema-index.cjs`.
 - Custom APIs: `new_SolicitarChecklistVeiculo`, `new_ProcessarChecklistsVeiculos`, `new_ReatribuirChecklistVeiculo`, `new_ConcluirChecklistVeiculo`, `new_CancelarChecklistVeiculo`, `new_ReenviarPushChecklist`.
 - Plano: `docs/superpowers/plans/2026-10-19-checklist-vistoria-veiculo.md`.
