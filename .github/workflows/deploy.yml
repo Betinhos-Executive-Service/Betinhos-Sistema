@@ -1,32 +1,37 @@
 name: Deploy
 
-# Cada branch publica no seu ambiente: dev -> DEV, test -> TEST, prod -> PROD.
-# URL, tenant, client id e secret vêm do environment do GitHub com o mesmo nome da branch.
+# Só DEV (decisão do Renan, 20/10/2026): push na branch dev publica a tela do Sistema Betinhos no DEV.
+# TEST e PROD não são publicados por aqui; o job managed antigo está no histórico do git (antes do PR "deploy só DEV").
+# Feito para gastar poucos minutos de CI (repo privado, runner Windows conta em dobro):
+#  - só roda quando muda código do app; documentação, skills e scripts do plantão não disparam;
+#  - não repete o CI (typecheck e testes já passaram no PR que entrou na main);
+#  - instala só o pacote do shell e suas dependências;
+#  - um push novo cancela o deploy anterior; limite de 15 min.
 on:
   push:
-    branches: [dev, test, prod]
+    branches: [dev]
+    paths:
+      - 'apps/shell/**'
+      - 'packages/dataverse/**'
+      - 'packages/deploy/push-dev.ps1'
+      - 'packages/deploy/bump-version.mjs'
+      - 'packages/deploy/inline-webresource.mjs'
+      - 'packages/deploy/loader.template.html'
+      - 'pnpm-lock.yaml'
+  workflow_dispatch:
 
 concurrency:
-  group: deploy-${{ github.ref_name }}
-  cancel-in-progress: false
+  group: deploy-dev
+  cancel-in-progress: true
 
 env:
   BUILD_NUMBER: ${{ github.run_number }}
-  SOLUTION: AppBetinhos
-  RESOURCE_NAME: cr40f_SistemaBetinhos.html
-  LOADER_NAME: cr40f_SistemaBetinhosLoader.html
-  DISPLAY_NAME: Sistema Betinhos
 
 jobs:
-  ci:
-    uses: ./.github/workflows/ci.yml
-
-  # DEV é não gerenciado e é onde schema e flows são editados; a branch só publica a tela.
-  # O caminho inverso (DEV -> repo) é o workflow "Sincronizar solução do DEV".
+  # DEV é não gerenciado e é onde schema e flows são editados; aqui só a tela é publicada.
   dev:
-    if: github.ref_name == 'dev'
-    needs: ci
     runs-on: windows-latest
+    timeout-minutes: 15
     environment: dev
     env:
       DV_ENVIRONMENT_URL: ${{ vars.DV_ENVIRONMENT_URL }}
@@ -46,48 +51,10 @@ jobs:
           # (ui e tokens) lista este repo em Package settings → Manage Actions access (Read).
           registry-url: https://npm.pkg.github.com
           scope: '@betinhos-executive-service'
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --filter @betinhos/shell...
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: pnpm push
-
-  # TEST e PROD recebem a solução inteira como managed: tela, schema, flows e plugins.
-  managed:
-    if: github.ref_name != 'dev'
-    needs: ci
-    runs-on: ubuntu-latest
-    environment: ${{ github.ref_name }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-          # @betinhos/ui vem do GitHub Packages (repo design-system-betinhos). O GITHUB_TOKEN lê porque cada pacote
-          # (ui e tokens) lista este repo em Package settings → Manage Actions access (Read).
-          registry-url: https://npm.pkg.github.com
-          scope: '@betinhos-executive-service'
-      - run: pnpm install --frozen-lockfile
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: pnpm build
-      - name: Injeta o build na solução
-        run: node packages/deploy/inject-solution.mjs apps/shell "solution/$SOLUTION" "$RESOURCE_NAME" "$LOADER_NAME" "$DISPLAY_NAME"
-      - name: Instala o Power Platform CLI
-        run: dotnet tool install --global Microsoft.PowerApps.CLI.Tool
-      - name: Empacota como managed
-        run: |
-          mkdir -p out
-          pac solution pack --zipfile "out/${SOLUTION}_managed.zip" --folder "solution/$SOLUTION" --packagetype Managed
-      - name: Importa em ${{ github.ref_name }}
-        env:
-          DV_ENVIRONMENT_URL: ${{ vars.DV_ENVIRONMENT_URL }}
-          DV_TENANT_ID: ${{ vars.DV_TENANT_ID }}
-          DV_CLIENT_ID: ${{ vars.DV_CLIENT_ID }}
-          DV_CLIENT_SECRET: ${{ secrets.DV_CLIENT_SECRET }}
-        run: |
-          pac auth create --environment "$DV_ENVIRONMENT_URL" --tenant "$DV_TENANT_ID" --applicationId "$DV_CLIENT_ID" --clientSecret "$DV_CLIENT_SECRET"
-          pac solution import --path "out/${SOLUTION}_managed.zip" --activate-plugins --async --max-async-wait-time 90
       - name: Versão publicada
-        run: echo "Publicado em ${{ github.ref_name }} - v$(node -p "require('./apps/shell/package.json').version")" >> "$GITHUB_STEP_SUMMARY"
+        shell: bash
+        run: echo "Publicado no DEV - v$(node -p "require('./apps/shell/package.json').version")" >> "$GITHUB_STEP_SUMMARY"
