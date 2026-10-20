@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, CircleAlert, LoaderCircle, RefreshCw } from 'lucide-react'
 import { Alert, BuildBadge, Button, Skeleton, useToast } from '@betinhos/ui'
+import { logAppError } from '@betinhos/ui/error-logger'
 import {
   addDays, aplicarPendencias, clonarPendencias, descontarSalvas, planSave, recordKey, semPendencias, semanaDe, semanaLabel, toKey, totalPendencias,
   type Compromisso, type Dados, type Pendencias, type Situacao,
@@ -35,7 +36,10 @@ export function App() {
     setLoading(true)
     setError(null)
     try { setDados(await source.load(target)) }
-    catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+    catch (reason) {
+      void logAppError(reason, { action: 'carregar-escala', phase: 'load', component: 'App' })
+      setError(reason instanceof Error ? reason.message : String(reason))
+    }
     finally { setLoading(false) }
   }, [source])
 
@@ -70,10 +74,12 @@ export function App() {
       setDados(novos)
       setPend((p) => descontarSalvas(p, lote, base, falha ? ops.slice(0, feitas) : undefined))
     } catch (reason) {
+      void logAppError(reason, { action: 'recarregar-apos-salvar', phase: 'load', component: 'App' })
       setPend((p) => descontarSalvas(p, lote, base, ops.slice(0, feitas)))
       setError(reason instanceof Error ? reason.message : String(reason))
     }
     if (falha) {
+      void logAppError(falha, { action: 'salvar-escala', phase: 'submit', component: 'App' })
       setSalvarErro(true)
       toast({ tone: 'danger', message: `Não foi possível salvar. ${falha instanceof Error ? falha.message : ''}`.trim() })
     } else setSalvoEm(horaAgora())

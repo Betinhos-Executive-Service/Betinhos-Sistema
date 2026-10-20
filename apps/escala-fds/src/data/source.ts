@@ -1,3 +1,4 @@
+import { logDataverseFailure } from '@betinhos/ui/error-logger'
 import { cleanId, createClient, createMetadata, getHostXrm, isLocalHost, type Row } from '@betinhos/dataverse'
 import {
   MOTIVO_VALUE, SITUACAO_VALUE, addDays, motivoFromValue, semanaDe, situacaoFromValue, toKey, toLocal,
@@ -62,10 +63,24 @@ export function compromissoPayload(c: Compromisso, funcionarioSet: string, nome:
   }
 }
 
+/** fetch da Web API que registra no log compartilhado as respostas de erro e as falhas de rede. */
+export const loggedFetch: typeof fetch = async (input, init) => {
+  const method = init?.method ?? 'GET'
+  const path = String(input instanceof Request ? input.url : input)
+  try {
+    const response = await fetch(input, init)
+    if (!response.ok) void logDataverseFailure({ method, path, status: response.status, body: await response.clone().json().catch(() => null) })
+    return response
+  } catch (error) {
+    void logDataverseFailure({ method, path, error })
+    throw error
+  }
+}
+
 function createDataverseSource(): Source {
   const hostXrm = getHostXrm()
   const clientUrl = (hostXrm?.Utility?.getGlobalContext().getClientUrl() ?? location.origin).replace(/\/+$/, '')
-  const client = createClient(clientUrl)
+  const client = createClient(clientUrl, loggedFetch)
   const metadata = createMetadata(client)
   let sets: Promise<Record<keyof typeof ENTITIES, string>> | null = null
   const entitySets = () => (sets ??= metadata.entities(Object.values(ENTITIES)).then((info) => {
