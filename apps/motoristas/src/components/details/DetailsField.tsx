@@ -31,16 +31,22 @@ function normalizePhoneDigits(phone: string) {
   return digits.length === 10 || digits.length === 11 ? `55${digits}` : digits;
 }
 
+const WHATSAPP_LINK_PATTERN = /^https:\/\/wa\.me\/(\d+)/i;
+
 function ContactActions({
   phone,
-  onClose
+  onClose,
+  title = "Contato do motorista",
+  whatsappUrl: customWhatsappUrl
 }: {
   phone: string;
   onClose: () => void;
+  title?: string;
+  whatsappUrl?: string;
 }) {
   const digits = normalizePhoneDigits(phone);
   const callUrl = `tel:${digits}`;
-  const whatsappUrl = `https://wa.me/${digits}`;
+  const whatsappUrl = customWhatsappUrl || `https://wa.me/${digits}`;
   const handleCall = () => {
     openExternalUrl(callUrl);
     onClose();
@@ -72,7 +78,7 @@ function ContactActions({
   return createPortal(
     <div className="contact-choice-overlay" role="dialog" aria-modal="true" aria-label="Escolher contato" onClick={onClose}>
       <div className="contact-choice-dialog" onClick={(event) => event.stopPropagation()}>
-        <div className="contact-choice-title">Contato do motorista</div>
+        <div className="contact-choice-title">{title}</div>
         <div className="contact-choice-phone">{phone}</div>
         <div className="contact-choice-actions">
           <button type="button" onClick={handleCall}>Ligar</button>
@@ -129,6 +135,7 @@ export function DetailsField({ field }: { field: DetailField }) {
   const photoUrls = isPhotoPreview ? extractMaintenancePhotoUrls(value) : [];
   const [fitsInline, setFitsInline] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
+  const [htmlContact, setHtmlContact] = useState<{ phone: string; whatsappUrl: string } | null>(null);
   const hasExplicitBreak = /\n|<br\s*\/?>/i.test(value);
   const setValueRef = (element: HTMLElement | null) => {
     valueRef.current = element;
@@ -189,6 +196,20 @@ export function DetailsField({ field }: { field: DetailField }) {
           {parseSafeDetailHtml(value).map((part, index) => {
             if (part.type === "break") return <br key={`break-${index}`} />;
             if (part.type === "link") {
+              // Telefone de passageiro vem como link do WhatsApp; oferece também a opção Ligar.
+              const whatsappMatch = part.href.match(WHATSAPP_LINK_PATTERN);
+              if (whatsappMatch) {
+                return (
+                  <button
+                    key={`${part.href}-${index}`}
+                    className="detail-inline-link detail-contact-link"
+                    type="button"
+                    onClick={() => setHtmlContact({ phone: /\d/.test(part.text) ? part.text : whatsappMatch[1], whatsappUrl: part.href })}
+                  >
+                    {part.text}
+                  </button>
+                );
+              }
               return (
                 <button key={`${part.href}-${index}`} className="detail-inline-link" type="button" onClick={() => openExternalUrl(part.href)}>
                   {part.text}
@@ -198,6 +219,14 @@ export function DetailsField({ field }: { field: DetailField }) {
             if (part.type === "flag") return <LanguageFlag key={`flag-${index}`} code={part.code} />;
             return <span key={`text-${index}`}>{part.value}</span>;
           })}
+          {htmlContact ? (
+            <ContactActions
+              phone={htmlContact.phone}
+              whatsappUrl={htmlContact.whatsappUrl}
+              title="Contato do passageiro"
+              onClose={() => setHtmlContact(null)}
+            />
+          ) : null}
         </div>
       ) : field.contact?.phone ? (
         <>

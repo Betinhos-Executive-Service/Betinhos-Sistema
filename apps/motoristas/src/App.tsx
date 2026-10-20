@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   findFirstPendingServiceDetail,
+  getInitialChecklistId,
   getInitialComunicadoId,
   getInitialDetail,
   getInitialParams,
@@ -11,6 +12,8 @@ import {
   loadStore,
   STORAGE_KEY
 } from "./app/bootstrap";
+import { useHardwareBackGuard } from "./app/backGuard";
+import { BuildStamp } from "./components/layout/BuildStamp";
 import {
   getServiceTaskBackScreen,
   hasReceiveProofs,
@@ -88,6 +91,8 @@ import { IDEA_STATUS, type Idea, type IdeaDraft } from "./lib/ideas";
 import { APP_CONNECTION_LOST_MESSAGE, APP_OPERATION_ERROR_MESSAGE, reportAppError, type AppErrorNotice } from "./lib/appErrorLogger";
 import { isComunicadoPending, isMockComunicados, loadDriverComunicado, loadDriverComunicados, type ComunicadoDestinatario } from "./lib/comunicados";
 import type { ComunicadosLoadStatus } from "./screens/ComunicadosScreen";
+import { isChecklistPending, isMockChecklists, loadDriverChecklist, loadDriverChecklists, type ChecklistVeiculo } from "./lib/checklists";
+import type { ChecklistsLoadStatus } from "./screens/ChecklistsScreen";
 import { clearMediaDraft, loadMediaDraft, saveMediaDraft, touchMediaDraft } from "./lib/mediaDraftStore";
 import { describeExpenseSubmission, normalizeStoredExpenseSubmissions, type ExpenseSubmission, type ExpenseUploadRow } from "./lib/expenseUploadState";
 import { resumeExpenseSubmission, type ExpenseSubmissionProgress } from "./lib/expenseSubmission";
@@ -130,6 +135,7 @@ import { LocalToast, type ToastState, type ToastTone } from "./components/common
 import { LoadingOverlay, type LoadingOverlayState } from "./components/common/LoadingOverlay";
 import { CollisionScreen } from "./screens/CollisionScreen";
 import { ComunicadosScreen } from "./screens/ComunicadosScreen";
+import { ChecklistsScreen } from "./screens/ChecklistsScreen";
 import { ButtonPreviewScreen } from "./screens/ButtonPreviewScreen";
 import { CollisionStartScreen } from "./screens/CollisionStartScreen";
 import { DetailsScreen } from "./screens/DetailsScreen";
@@ -484,6 +490,11 @@ function App() {
   // Tela de origem ao abrir um comunicado direto (ex.: aba Serviços), para o Voltar retornar a ela.
   const [comunicadoOrigin, setComunicadoOrigin] = useState<"servicos" | "">("");
   const pendingComunicadoDeepLinkRef = useRef(getInitialComunicadoId());
+  const [checklists, setChecklists] = useState<ChecklistVeiculo[]>([]);
+  const [checklistsStatus, setChecklistsStatus] = useState<ChecklistsLoadStatus>(() => isMockChecklists() || hasDataverseRuntime() ? "loading" : "ready");
+  const [selectedChecklistId, setSelectedChecklistId] = useState("");
+  const [checklistOrigin, setChecklistOrigin] = useState<"servicos" | "">("");
+  const pendingChecklistDeepLinkRef = useRef(getInitialChecklistId());
   const pendingServiceDeepLinkRef = useRef(getInitialParams());
   // true quando o deep link de serviço já abriu a tela; o fluxo pós-carga não deve sobrescrever a navegação.
   const serviceDeepLinkHandledRef = useRef(false);
@@ -873,6 +884,50 @@ function App() {
     }
   }, []);
 
+  // Checklists usam o mesmo motorista logado dos comunicados.
+  const reloadChecklists = useCallback(async () => {
+    try {
+      setChecklists(await loadDriverChecklists(comunicadosDriverIdRef.current));
+      setChecklistsStatus("ready");
+    } catch (error) {
+      setChecklistsStatus((current) => current === "ready" ? current : "error");
+      throw error;
+    }
+  }, []);
+
+  // Deep link do push de checklist: abre o checklist apontado sem esperar a agenda.
+  useEffect(() => {
+    const deepLinkId = pendingChecklistDeepLinkRef.current;
+    if (!deepLinkId || isButtonPreviewMode || isReceiptPreviewMode) return;
+    if (!hasDataverseRuntime() && !isMockChecklists()) return;
+    let alive = true;
+    loadDriverChecklist(deepLinkId)
+      .then((item) => {
+        if (!alive || pendingChecklistDeepLinkRef.current !== deepLinkId) return;
+        pendingChecklistDeepLinkRef.current = "";
+        setDataLoadingState(null);
+        if (!item) {
+          setScreen("checklists");
+          setToast("Este checklist não está mais com você.", "warning");
+          return;
+        }
+        setChecklists((current) => current.some((row) => row.id === item.id) ? current : [item, ...current]);
+        setSelectedChecklistId(item.id);
+        setScreen("checklists");
+      })
+      .catch((error) => {
+        reportAppError(error, { severity: "warning", source: "app", action: "loadDriverChecklist", phase: "deep-link" });
+      });
+    return () => { alive = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!isMockChecklists()) return;
+    reloadChecklists().catch((error) => {
+      reportAppError(error, { severity: "warning", source: "app", action: "loadMockChecklists" });
+    });
+  }, []);
+
   // Deep link do push: busca só esse destinatário em paralelo com a agenda e abre o comunicado
   // assim que ele chega, sem esperar loadRemoteStore nem a lista completa. A lista completa, ao
   // chegar, substitui o item provisório; se esta busca falhar, o efeito abaixo segue como fallback.
@@ -968,6 +1023,9 @@ function App() {
         reloadComunicados().catch((error) => {
           reportAppError(error, { severity: "warning", source: "app", action: "loadDriverComunicados", phase: "initial" });
           setToast("Não foi possível carregar comunicados. Atualize o aplicativo.", "warning");
+        });
+        reloadChecklists().catch((error) => {
+          reportAppError(error, { severity: "warning", source: "app", action: "loadDriverChecklists", phase: "initial" });
         });
         setStore((current) => ({
           ...current,
@@ -1197,9 +1255,11 @@ function App() {
     previousScreenRef.current = screen;
   }, [screen]);
 
+  useHardwareBackGuard(screen, hashRoutingActive);
+
   useEffect(() => {
     if (!hashRoutingActive) return;
-    const hashDetail = screen === "reciboPersonalizado" ? receiptDetail : selectedDetail;
+    const hashDetail = screen ==="reciboPersonalizado" ? receiptDetail : selectedDetail;
     const nextHash = buildHashRoute(screen, hashDetail ? { id: hashDetail.id, type: hashDetail.type } : null);
     if (window.location.hash === nextHash) return;
     window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}${nextHash}`);
@@ -1376,6 +1436,7 @@ function App() {
           </div>
         </div>
       ) : null}
+      <BuildStamp />
     </>
   );
 
@@ -1477,6 +1538,14 @@ function App() {
         } catch (error) {
           reportAppError(error, { severity: "warning", source: "app", action: "loadDriverComunicados", phase: "refresh" });
           if (!silent) setToast("Não foi possível atualizar comunicados. Tente novamente.", "warning");
+        }
+        // Não recarrega com o formulário do checklist aberto: o motorista pode estar enviando fotos.
+        if (screen !== "checklists" || !selectedChecklistId) {
+          try {
+            await reloadChecklists();
+          } catch (error) {
+            reportAppError(error, { severity: "warning", source: "app", action: "loadDriverChecklists", phase: "refresh" });
+          }
         }
         if (detailToRefresh) {
           const refreshedDetail =
@@ -1928,6 +1997,12 @@ function App() {
     }
     if (screenName === "personalReceipt" || screenName === "reciboPersonalizado" || screenName === "gerarReciboPersonalizado") {
       openPersonalReceiptFromHome();
+      return;
+    }
+    if (screenName === "checklists") {
+      setChecklistOrigin("");
+      setSelectedChecklistId("");
+      setScreen("checklists");
       return;
     }
     if (screenName === "servicos" || screenName === "comunicados" || screenName === "historico" || screenName === "solicitarManutencao" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro") {
@@ -3528,6 +3603,8 @@ function App() {
         items={store.agenda}
         pendingComunicados={comunicados.filter(isComunicadoPending)}
         onOpenComunicado={(id) => { setSelectedComunicadoId(id); setComunicadoOrigin("servicos"); setScreen("comunicados"); }}
+        pendingChecklists={checklists.filter(isChecklistPending)}
+        onOpenChecklist={(id) => { setSelectedChecklistId(id); setChecklistOrigin("servicos"); setScreen("checklists"); }}
         onHome={() => setScreen("inicio")}
         onRefresh={refreshLocal}
         completingDetailKey={completingDetailKey}
@@ -3569,6 +3646,20 @@ function App() {
     );
   }
 
+  if (screen === "checklists") {
+    return show(
+      <ChecklistsScreen
+        items={checklists}
+        selectedId={selectedChecklistId}
+        onSelectedIdChange={setSelectedChecklistId}
+        onBack={() => { setChecklistOrigin(""); setScreen("inicio"); }}
+        onCloseDetail={checklistOrigin === "servicos" ? () => { setSelectedChecklistId(""); setChecklistOrigin(""); setScreen("servicos"); } : undefined}
+        onReload={reloadChecklists}
+        loadStatus={checklistsStatus}
+      />
+    );
+  }
+
   return show(
     <InitialScreen
       onNavigate={navigateFromInitial}
@@ -3580,6 +3671,7 @@ function App() {
       isThirdParty={isThirdPartyDriver(driverContext?.funcionario)}
       services={store.agenda}
       pendingComunicados={comunicados.filter(isComunicadoPending).length}
+      pendingChecklists={checklists.filter(isChecklistPending).length}
       driverName={driverContext?.fullName}
       showLocalReset={isLocalhostRuntime && !remoteMode}
       onResetLocalData={resetLocalData}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import betinhosLogo from "../../Logo Betinhos B.png";
+import betinhosLogo from "../assets/images/logo-betinhos-b-500.png";
 import carCrashIcon from "../assets/icons/car-crash-svgrepo-com.svg";
 import carIcon from "../assets/icons/car.svg";
 import historyIcon from "../assets/icons/clock.svg";
@@ -33,6 +33,15 @@ const baseModules = [
     detail: "Avisos da operação",
     action: "Ver comunicados",
     icon: "comunicados",
+    tone: "neutral",
+    disabled: false,
+  },
+  {
+    id: "checklists",
+    label: "Checklist",
+    detail: "Vistoria do veículo",
+    action: "Abrir",
+    icon: "checklist",
     tone: "neutral",
     disabled: false,
   },
@@ -78,6 +87,7 @@ const ideasModule = {
 
 const screenAliases: Record<string, string[]> = {
   comunicados: ["comunicados"],
+  checklists: ["checklists"],
   services: ["servicos", "services", "Services", "serviços"],
   history: ["historico", "history", "History", "histórico"],
   maintenancePhoto: ["maintenancePhoto", "maintenance", "MaintenancePhoto", "manutencao", "manutenção"],
@@ -90,6 +100,7 @@ const screenAliases: Record<string, string[]> = {
 
 const moduleHandlers: Record<string, string[]> = {
   comunicados: [],
+  checklists: [],
   services: [
     "onServices",
     "onService",
@@ -203,21 +214,13 @@ type InitialScreenProps = {
   proximoServicoEm?: string | Date | null;
   services?: AgendaItem[];
   pendingComunicados?: number;
+  pendingChecklists?: number;
   canGeneratePersonalReceipt?: boolean;
   isThirdParty?: boolean;
   showLocalReset?: boolean;
   onResetLocalData?: () => void;
   [key: string]: unknown;
 };
-
-type BuildInfo = {
-  version?: string;
-  builtAtLabel?: string;
-};
-
-function getBuildInfo() {
-  return ((window as Window & { __APP_BUILD_INFO?: BuildInfo }).__APP_BUILD_INFO ?? {}) as BuildInfo;
-}
 
 function getFirstName(name?: string) {
   return name?.trim().split(/\s+/)[0] || "Renan";
@@ -332,6 +335,11 @@ function ModuleIcon({ name }: { name: string }) {
     return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4V5Zm3 4h10M7 12h7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" /></svg>;
   }
 
+  if (name === "checklist") {
+    // Lucide clipboard-check.
+    return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1" fill="none" stroke="currentColor" strokeWidth="1.8" /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2m1 10 2 2 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" /></svg>;
+  }
+
   if (name === "history") {
     return <img src={historyIcon} alt="" />;
   }
@@ -395,7 +403,6 @@ export function InitialScreen(props: InitialScreenProps) {
     ).concat([ideasModule]),
     [props.canGeneratePersonalReceipt]
   );
-  const buildInfo = useMemo(() => getBuildInfo(), []);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
@@ -469,6 +476,7 @@ export function InitialScreen(props: InitialScreenProps) {
                 {module.detail}
                 {module.id === "services" && agendaCount > 0 ? <span className="concept-inline-count"> • {agendaCount}</span> : null}
                 {module.id === "comunicados" && (props.pendingComunicados ?? 0) > 0 ? <span className="concept-inline-count"> • {props.pendingComunicados} pendente{props.pendingComunicados === 1 ? "" : "s"}</span> : null}
+                {module.id === "checklists" && (props.pendingChecklists ?? 0) > 0 ? <span className="concept-inline-count"> • {props.pendingChecklists} pendente{props.pendingChecklists === 1 ? "" : "s"}</span> : null}
               </small>
             </span>
             <span className="concept-module-action">{module.action}</span>
@@ -477,9 +485,6 @@ export function InitialScreen(props: InitialScreenProps) {
       </section>
 
       <footer className="concept-footer">
-        <span>
-          Versão {buildInfo.version ?? "local"} {buildInfo.builtAtLabel ? `- Build ${buildInfo.builtAtLabel}` : ""}
-        </span>
         {props.showLocalReset && props.onResetLocalData ? (
           <button type="button" className="local-reset" onClick={props.onResetLocalData}>
             Resetar dados locais

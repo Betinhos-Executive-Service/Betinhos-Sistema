@@ -6,7 +6,7 @@ O PROD (`orgf261ae8e`) recebe mudanças **somente pela solução gerenciada AppB
 
 - **Uma solução dona por componente.** Tudo do App Motoristas fica na AppBetinhos. Não crie outra solução com componentes que já estão nela; uma gerenciada importada por cima sombreia a AppBetinhos.
 - **Scripts de publicação só alteram o DEV.** `scripts/lib/assert-dev-environment.ps1` bloqueia `deploy-webresource`, `provision-*`, registro de plugin, papéis e segurança de campo fora do DEV. Exceção consciente, só em emergência: `BETINHOS_ALLOW_DIRECT_PROD=1`. Depois, leve a mesma mudança ao DEV e remova a camada Active.
-- **Ordem:** develop -> main -> `npm run push` (DEV, pela main) -> `scripts/deploy-prod.ps1 -Apply`.
+- **Ordem:** PR -> main -> `npm run push` (DEV, pela main) -> `scripts/deploy-prod.ps1 -Apply`.
 
 ## Comandos
 

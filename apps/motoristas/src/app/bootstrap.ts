@@ -68,6 +68,12 @@ export function getInitialComunicadoId(search = window.location.search) {
   return COMUNICADO_ID_PATTERN.test(value) ? value.replace(/[{}]/g, "").toLowerCase() : "";
 }
 
+// Deep link do checklist de vistoria: ?checklistId=<id> ou ?data=checklistId%3D<id> (push via form OnLoad).
+export function getInitialChecklistId(search = window.location.search) {
+  const value = readLaunchParam(search, "checklistId").trim();
+  return COMUNICADO_ID_PATTERN.test(value) ? value.replace(/[{}]/g, "").toLowerCase() : "";
+}
+
 export function getVoucherDraftKey(detail: DetailData) {
   return `${detail.type}:${detail.id}`;
 }

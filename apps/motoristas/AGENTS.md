@@ -17,7 +17,7 @@ Before any Codex file or code change, query the existing `graphify-out/graph.jso
 
 ## Build, Test, and Development Commands
 
-- `npm run dev` starts the local dev wrapper.
+- `npm run dev` starts the local dev wrapper on the port reserved for this checkout in `~/.codex/dev-ports.json` (or `PORT`). If the port is held by this checkout's dev server it restarts it; if another service holds it, it fails with PID and command (no fallback port).
 - `npm test` runs all tests with Node's built-in test runner and TypeScript stripping.
 - `npx tsc --noEmit --noUnusedLocals --noUnusedParameters` runs the strict type gate.
 - `npm run build` builds the single-file webresource into `dist/`.
@@ -40,6 +40,12 @@ Tests use `node --test` and live in `tests/*.test.ts`. Name tests after protecte
 Recent history uses concise imperative messages, often with `feat:`, `fix:`, or `perf:`. Keep commits scoped, for example `fix: preserva selecoes ao voltar da camera`.
 
 Pull requests should include the user-facing change, validation commands, Dataverse/Flow impact, and screenshots for UI changes. Call out generated `dist/` or `public/screens/` updates.
+
+### Branches (since 2026-10-19)
+
+- `main` is the only long-lived branch and the GitHub default. Work in short-lived branches (worktrees) and open PRs against `main`; there is no `develop` (removed on 2026-10-19 after it diverged from `main`).
+- Publish DEV (`npm run push`) from an up-to-date `main`. PROD only through `scripts/deploy-prod.ps1`.
+- Before opening a PR, merge the latest `origin/main` into the branch. The DriverRecordSharing plugin assembly is shared by every front, so publishing from a stale branch drops other fronts' plugin types from DEV.
 
 ## Security & Configuration Tips
 

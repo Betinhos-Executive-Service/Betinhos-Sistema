@@ -4,6 +4,7 @@ import { SystemIcon } from "../components/icons/SystemIcon";
 import { AppShell } from "../components/layout/AppShell";
 import { FormMenu } from "../components/navigation/FormMenu";
 import { reportAppError } from "../lib/appErrorLogger";
+import { describeCameraError } from "../lib/cameraErrors";
 import { describeStreamSize, getDocumentStreamConstraints, getDocumentTrackConstraints, LIVE_PHOTO_JPEG_QUALITY } from "../lib/cameraConstraints";
 import { setTorch, stopStreamTracks, supportsTorch } from "../lib/cameraTorch";
 import {
@@ -294,7 +295,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
 
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error("Este dispositivo nao liberou camera direta no navegador.");
+        throw new Error("Este dispositivo não liberou a câmera direta no navegador.");
       }
 
       let stream: MediaStream;
@@ -345,9 +346,11 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
         action: "start-live-camera",
         component: "MediaCaptureScreen",
         screen: "TelaCameraMidia",
-        payload: { mode, useLiveCamera }
+        payload: { mode, useLiveCamera },
+        // A própria tela explica o problema e oferece "Tentar de novo"; o aviso global duplicaria em inglês.
+        notifyUser: false
       });
-      setCameraError(error instanceof Error ? error.message : "Nao foi possivel abrir a camera.");
+      setCameraError(describeCameraError(error));
       return false;
     } finally {
       if (cameraRequestSequenceRef.current === requestSequence) {
@@ -370,7 +373,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
 
   const openNativeVideoCamera = () => {
     if (!onCaptureVideo) {
-      setCameraError("Video indisponivel nesta tela.");
+      setCameraError("Vídeo indisponível nesta tela.");
       return;
     }
     if (useLiveRecording) {
@@ -408,7 +411,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
     const video = videoRef.current;
     const stream = streamRef.current;
     if ((!video && !stream) || !ready || processing || recording) {
-      setCameraError("Abra a camera para tirar a foto.");
+      setCameraError("Abra a câmera para tirar a foto.");
       return;
     }
 
@@ -441,7 +444,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
         }
       }
       if (!photoDataUrl && video) photoDataUrl = await captureVideoFrameDataUrlAsync(video);
-      if (!photoDataUrl) throw new Error("Nao foi possivel capturar a foto.");
+      if (!photoDataUrl) throw new Error("Não foi possível capturar a foto.");
       onCapture(photoDataUrl);
     } catch (error) {
       reportAppError(error, {
@@ -451,7 +454,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
         component: "MediaCaptureScreen",
         screen: "TelaCameraMidia"
       });
-      setCameraError(error instanceof Error ? error.message : "Nao foi possivel capturar a foto.");
+      setCameraError(error instanceof Error ? error.message : "Não foi possível capturar a foto.");
     } finally {
       setCapturingPhoto(false);
       setProcessing(false);
@@ -461,7 +464,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
   const startLiveRecording = async () => {
     let stream = streamRef.current;
     if (!onCaptureVideo) {
-      setCameraError("Video indisponivel nesta tela.");
+      setCameraError("Vídeo indisponível nesta tela.");
       return;
     }
     if (!useLiveRecording) {
@@ -472,12 +475,12 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
       const started = await startLiveCamera();
       stream = streamRef.current;
       if (!started || !stream) {
-        setCameraError("Nao foi possivel abrir a camera para gravar.");
+        setCameraError("Não foi possível abrir a câmera para gravar.");
         return;
       }
     }
     if (typeof MediaRecorder === "undefined") {
-      setCameraError("Este dispositivo nao liberou gravacao direta no navegador.");
+      setCameraError("Este dispositivo não liberou gravação direta no navegador.");
       return;
     }
 
@@ -503,7 +506,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
       recorder.onerror = () => {
         setRecording(false);
         setProcessing(false);
-        setCameraError("Falha durante a gravacao do video.");
+        setCameraError("Falha durante a gravação do vídeo.");
       };
       recorder.onstop = async () => {
         const chunks = recordedChunksRef.current;
@@ -511,7 +514,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
         setRecording(false);
         let previewUrl = "";
         try {
-          if (!chunks.length) throw new Error("Nenhum dado de video capturado.");
+          if (!chunks.length) throw new Error("Nenhum dado de vídeo capturado.");
           const blob = new Blob(chunks, { type: recorder.mimeType || "video/webm" });
           previewUrl = URL.createObjectURL(blob);
           onCaptureVideo({
@@ -528,7 +531,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
             component: "MediaCaptureScreen",
             screen: "TelaCameraMidia"
           });
-          setCameraError(error instanceof Error ? error.message : "Nao foi possivel preparar o video.");
+          setCameraError(error instanceof Error ? error.message : "Não foi possível preparar o vídeo.");
         } finally {
           if (previewUrl) revokeObjectPreviewUrl(previewUrl);
           recorderRef.current = null;
@@ -549,7 +552,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
       });
       setRecording(false);
       setProcessing(false);
-      setCameraError(error instanceof Error ? error.message : "Nao foi possivel iniciar a gravacao.");
+      setCameraError(error instanceof Error ? error.message : "Não foi possível iniciar a gravação.");
     }
   };
 
@@ -568,7 +571,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
     setProcessing(true);
 
     if (!isFreshNativeCapture(file, captureRequestedAtRef.current)) {
-      setCameraError("Use a camera para registrar agora. Arquivos antigos da galeria nao sao aceitos.");
+      setCameraError("Use a câmera para registrar agora. Arquivos antigos da galeria não são aceitos.");
       event.target.value = "";
       setProcessing(false);
       return;
@@ -576,7 +579,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
 
     if (isVideoFile(file)) {
       if (!onCaptureVideo) {
-        setCameraError("Video indisponivel nesta tela.");
+        setCameraError("Vídeo indisponível nesta tela.");
         event.target.value = "";
         setProcessing(false);
         return;
@@ -597,7 +600,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
           screen: "TelaCameraMidia",
           payload: { fileName: file.name, fileType: file.type }
         });
-        setCameraError(error instanceof Error ? error.message : "Nao foi possivel preparar o video.");
+        setCameraError(error instanceof Error ? error.message : "Não foi possível preparar o vídeo.");
       } finally {
         event.target.value = "";
         setProcessing(false);
@@ -617,7 +620,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
         screen: "TelaCameraMidia",
         payload: { fileName: file.name, fileType: file.type }
       });
-      setCameraError(error instanceof Error ? error.message : "Nao foi possivel preparar a foto.");
+      setCameraError(error instanceof Error ? error.message : "Não foi possível preparar a foto.");
     } finally {
       event.target.value = "";
       setProcessing(false);
@@ -707,36 +710,40 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
 
               {!useLiveRecording ? (
                 <div className="camera-start-panel native-camera-panel">
-                  <strong>Camera do dispositivo</strong>
+                  <strong>Câmera do dispositivo</strong>
                   <span>{nativeCaptureMode === "environment" ? "Traseira preferencial" : "Frontal preferencial"}</span>
                   <button onClick={openNativePhotoCamera} disabled={processing}>Tirar foto</button>
                   {onCaptureVideo ? (
-                    <button className="native-camera-link" onClick={openNativeVideoCamera} disabled={processing}>Gravar video</button>
+                    <button className="native-camera-link" onClick={openNativeVideoCamera} disabled={processing}>Gravar vídeo</button>
                   ) : null}
                 </div>
               ) : null}
 
               {useLivePreview && !cameraError && !ready && !starting ? (
                 <div className="camera-start-panel native-camera-panel">
-                  <strong>Camera ao vivo</strong>
+                  <strong>Câmera ao vivo</strong>
                   <span>A captura acontece direto na tela para manter qualidade e bloquear galeria.</span>
-                  <button onClick={() => void startLiveCamera()} disabled={processing}>Abrir camera</button>
+                  <button onClick={() => void startLiveCamera()} disabled={processing}>Abrir câmera</button>
                 </div>
               ) : null}
 
-              {processing ? <div className="camera-loading camera-processing">{capturingPhoto ? "Capturando foto..." : "Preparando midia..."}</div> : null}
+              {processing ? <div className="camera-loading camera-processing">{capturingPhoto ? "Capturando foto..." : "Preparando mídia..."}</div> : null}
               {starting ? (
                 <div className="camera-loading camera-permission-loading" aria-live="polite">
-                  <span>Abrindo camera...</span>
-                  {showSupportMessage ? <span>Camera nao respondeu. Fale com o suporte de TI da Betinhos.</span> : null}
+                  <span>Abrindo câmera...</span>
+                  {showSupportMessage ? <span>A câmera não respondeu. Fale com o suporte de TI da Betinhos.</span> : null}
                 </div>
               ) : null}
 
               {cameraError ? (
-                <div className="camera-error">
-                  <strong>Camera indisponivel</strong>
+                <div className="camera-error" role="alert">
+                  <strong>Câmera indisponível</strong>
                   <span>{cameraError}</span>
-                  <small>{useLiveRecording ? "Permita acesso a camera para capturar agora." : "Toque em tirar foto ou gravar video para abrir a camera do dispositivo."}</small>
+                  {useLivePreview ? (
+                    <button type="button" className="camera-error-retry" onClick={() => void startLiveCamera()} disabled={starting}>Tentar de novo</button>
+                  ) : (
+                    <small>Toque em tirar foto ou gravar vídeo para abrir a câmera do dispositivo.</small>
+                  )}
                 </div>
               ) : null}
             </div>
@@ -769,7 +776,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
                   <button
                     className={`photo-record camera-secondary-action ${recording ? "is-recording" : ""}`}
                     onClick={useLiveRecording ? (recording ? stopLiveRecording : startLiveRecording) : openNativeVideoCamera}
-                    aria-label={recording ? "Parar gravacao" : "Gravar video"}
+                    aria-label={recording ? "Parar gravação" : "Gravar vídeo"}
                     disabled={processing || starting || (useLivePreview && !ready && !recording)}
                   >
                     <SystemIcon name="video" />
@@ -791,7 +798,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
               </button>
 
               <div className="camera-side-action camera-side-action-right">
-                <button className="photo-switch camera-secondary-action" onClick={switchCamera} aria-label="Mudar camera" disabled={processing || recording || starting}>
+                <button className="photo-switch camera-secondary-action" onClick={switchCamera} aria-label="Mudar câmera" disabled={processing || recording || starting}>
                   <SystemIcon name="sync" />
                 </button>
               </div>

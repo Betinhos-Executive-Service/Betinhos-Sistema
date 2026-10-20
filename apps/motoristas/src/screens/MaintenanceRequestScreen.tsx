@@ -46,11 +46,12 @@ type MaintenanceRequestScreenProps = {
   vehiclesLoading?: boolean;
 };
 
+// O subtítulo explica o critério para quem nunca escolheu a gravidade antes.
 const severityOptions = [
-  { value: 1, label: "Baixa" },
-  { value: 2, label: "Media" },
-  { value: 3, label: "Alta" },
-  { value: 4, label: "Urgente" }
+  { value: 1, label: "Baixa", subtitle: "Pode esperar a próxima revisão" },
+  { value: 2, label: "Média", subtitle: "Resolver nesta semana" },
+  { value: 3, label: "Alta", subtitle: "Resolver hoje" },
+  { value: 4, label: "Urgente", subtitle: "O carro não deve rodar" }
 ] as const;
 
 function parseKm(value: string) {
@@ -91,7 +92,7 @@ export function MaintenanceRequestScreen({
     [vehicles]
   );
   const gravityOptions = useMemo(
-    () => severityOptions.map((option) => ({ value: String(option.value), label: option.label })),
+    () => severityOptions.map((option) => ({ value: String(option.value), label: option.label, subtitle: option.subtitle })),
     []
   );
 

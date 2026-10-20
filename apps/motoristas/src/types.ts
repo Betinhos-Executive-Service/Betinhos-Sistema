@@ -2,6 +2,7 @@ export type Screen =
   | "inicio"
   | "servicos"
   | "comunicados"
+  | "checklists"
   | "historico"
   | "detalhes"
   | "detalhesHistorico"

@@ -1,0 +1,32 @@
+/* Checklist de vistoria do veículo. Reaproveita o formulário da colisão e a lista de comunicados;
+   aqui ficam só os acréscimos, com valores do Design System Betinhos. */
+.checklist-form { gap: 12px; }
+.checklist-summary { flex-wrap: wrap; }
+.checklist-summary small { flex-basis: 100%; color: #fff; font-size: 12px; font-weight: 600; line-height: 1.42; }
+.checklist-instruction { margin: 2px 0 0; color: #64748b; font-size: 12px; font-weight: 500; line-height: 1.42; }
+.checklist-field-instruction { margin: -4px 0 8px; }
+.checklist-photo-item:focus { outline: 0; }
+.checklist-photo-item:focus-visible { border-color: #6c91e8; box-shadow: 0 0 0 3px rgba(33, 89, 210, .11); }
+.checklist-number { display: flex; align-items: center; gap: 8px; }
+.checklist-number input { flex: 1 1 auto; min-width: 0; font-variant-numeric: tabular-nums; }
+.checklist-unit { flex: 0 0 auto; min-width: 28px; color: #64748b; font-size: 13px; font-weight: 700; }
+.checklist-loading { margin: 0; padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f7f9fc; color: #64748b; font-size: 13px; }
+.checklist-sr-status { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.checklist-notice { margin: 8px 0 0; padding: 10px 12px; border: 1px solid #147a4b; border-radius: 10px; background: #eaf8f1; color: #147a4b; font-size: 13px; font-weight: 700; }
+
+/* Checklist enviado: respostas em blocos neutros. */
+.comunicado-detail-meta[data-checklist-state="concluido"] span { background: #eaf8f1; color: #147a4b; }
+.checklist-answers { display: grid; gap: 8px; margin: 14px 0 0; }
+.checklist-answers > div { min-width: 0; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fcfcfb; }
+.checklist-answers dt { color: #64748b; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.checklist-answers dd { margin: 2px 0 0; color: #0f172a; font-size: 14px; font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; }
+.checklist-answer-links { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.checklist-answer-links a { display: inline-flex; align-items: center; min-height: 44px; color: #2159d2; font-weight: 700; }
+
+/* Destaque em Serviços e na lista: mesmo par semântico do comunicado (atenção = pendente, sucesso = enviado). */
+.services-panel .checklist-service-item { margin-bottom: 12px; }
+.services-panel .checklist-service-item[data-checklist-state="pendente"] .agenda-label { background: #fff7df !important; color: #856000 !important; }
+.services-panel .checklist-service-item[data-checklist-state="concluido"] .agenda-card { background: #fcfcfb !important; box-shadow: none !important; }
+.services-panel .checklist-service-item[data-checklist-state="concluido"] .agenda-label { background: #eaf8f1 !important; color: #147a4b !important; }
+.services-panel .checklist-service-item[data-checklist-state="concluido"] .agenda-time strong,
+.services-panel .checklist-service-item[data-checklist-state="concluido"] .agenda-trajectory strong { color: #64748b !important; }
