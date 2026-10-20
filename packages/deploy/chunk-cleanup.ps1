@@ -43,7 +43,8 @@ function Remove-ObsoleteChunks([string] $ApiBaseUrl, [hashtable] $Headers, [stri
   while ($url) {
     $page = Invoke-RestMethod -Method Get -Uri $url -Headers ($Headers + @{ Prefer = "odata.maxpagesize=500" })
     $all += @($page.value)
-    $url = $page.'@odata.nextLink'
+    # StrictMode do push-dev: a ultima pagina nao traz @odata.nextLink.
+    $url = if ($page.PSObject.Properties['@odata.nextLink']) { $page.'@odata.nextLink' } else { $null }
   }
   $obsolete = @($all | Where-Object { $_.name.StartsWith($ChunkPrefix, [StringComparison]::Ordinal) -and $_.name -match ('/' + $script:ChunkFilePattern + '$') -and -not $keepSet.ContainsKey($_.name) })
   Write-Host "[chunks] $($all.Count) no ambiente, $($keepSet.Count) mantidos, $($obsolete.Count) obsoletos"
