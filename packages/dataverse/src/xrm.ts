@@ -1,5 +1,5 @@
 import type { DataverseClient, Row } from './client'
-import { cleanId } from './client'
+import { cleanId, DataverseError } from './client'
 import { createMetadata } from './metadata'
 
 type RecordRef = { entityType: string; id: string }
@@ -10,6 +10,12 @@ export type XrmWebApi = {
   createRecord: (entity: string, data: Row) => Promise<RecordRef>
   updateRecord: (entity: string, id: string, data: Row) => Promise<RecordRef>
   deleteRecord: (entity: string, id: string) => Promise<RecordRef>
+  /** Ações sem vínculo (Custom API), no mesmo contrato de `Xrm.WebApi.online.execute`. */
+  online?: { execute: (request: ExecuteRequest) => Promise<Response> }
+}
+
+export type ExecuteRequest = Record<string, unknown> & {
+  getMetadata: () => { boundParameter: null | string; operationType: number; operationName: string; parameterTypes: Record<string, unknown> }
 }
 
 export type XrmHost = {
@@ -65,6 +71,20 @@ export function createXrmShim(client: DataverseClient, clientUrl: string): XrmHo
         await client.remove(await set(entity), id)
         return { entityType: entity, id: cleanId(id) }
       },
+      online: {
+        // Só ações sem vínculo: as telas em iframe (ex.: Gestão de Checklists) chamam Custom APIs assim.
+        async execute(request) {
+          const { boundParameter, operationName, parameterTypes } = request.getMetadata()
+          if (boundParameter) return errorResponse(400, `Ação vinculada não suportada fora do model-driven: ${operationName}.`)
+          const body = Object.fromEntries(Object.keys(parameterTypes).map((key) => [key, request[key]]))
+          try {
+            const result = await client.request<unknown>(operationName, { method: 'POST', body: JSON.stringify(body) })
+            return new Response(result === undefined ? null : JSON.stringify(result), { status: result === undefined ? 204 : 200, headers: { 'Content-Type': 'application/json' } })
+          } catch (error) {
+            return errorResponse(error instanceof DataverseError ? error.status : 500, error instanceof Error ? error.message : String(error))
+          }
+        },
+      },
     },
     // Scripts de comando do model-driven (ex.: gerador de recibo) usam estes avisos simples.
     Navigation: {
@@ -76,4 +96,8 @@ export function createXrmShim(client: DataverseClient, clientUrl: string): XrmHo
       closeProgressIndicator: () => { /* sem indicador fora do model-driven */ },
     },
   }
+}
+
+function errorResponse(status: number, message: string) {
+  return new Response(JSON.stringify({ error: { message } }), { status, headers: { 'Content-Type': 'application/json' } })
 }

@@ -3,6 +3,7 @@ import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { Button, EmptyState, PageHeader, Skeleton, Stack } from '@betinhos/ui'
 import type { Host } from '../host'
 import { findItem, type MenuItem } from '../nav/menu'
+import { isChunkLoadError, reportarErro } from './erros'
 
 type PageId = Extract<MenuItem, { kind: 'page' }>['page']
 type Agente = NonNullable<Extract<MenuItem, { kind: 'page' }>['agente']>
@@ -42,10 +43,7 @@ function fetchPage(page: PageId) {
   return promise
 }
 
-/** Erro do navegador ao baixar um chunk (Chrome, Firefox e Safari), e não erro do código da tela. */
-export function isChunkLoadError(error: unknown) {
-  return error instanceof TypeError && /dynamically imported module|importing a module script failed/i.test(error.message)
-}
+export { isChunkLoadError }
 
 /** Indireção para os testes observarem o reload. */
 export const navegador = { recarregar: () => { window.location.reload() } }
@@ -148,6 +146,7 @@ type BoundaryProps = { title: string; children: ReactNode }
 export class RouteErrorBoundary extends Component<BoundaryProps, { error: Error | null }> {
   state = { error: null as Error | null }
   static getDerivedStateFromError(error: Error) { return { error } }
+  componentDidCatch(error: Error) { reportarErro(error, `tela ${this.props.title}`) }
   render() {
     if (!this.state.error) return this.props.children
     return (
