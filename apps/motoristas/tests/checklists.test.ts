@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   buildChecklistRespostasJson,
   CHECKLIST_ESTADO,
+  CHECKLIST_ORIGEM,
+  checklistCardTexto,
   CHECKLIST_MAX_PROBLEMAS,
   CHECKLIST_PROBLEMAS_PADRAO,
   checklistPhotoItems,
@@ -274,4 +276,30 @@ test("progresso só conta Não OK com foto e problema", () => {
   assert.equal(done({ valores: { pneus: "nok" }, problemas: { pneus: ["Murcho"] } }), 0);
   assert.equal(done({ valores: { pneus: "nok" }, fotos: { pneus: [foto] } }), 0);
   assert.equal(done({ valores: { pneus: "nok" }, fotos: { pneus: [foto] }, problemas: { pneus: ["Murcho"] } }), 1);
+});
+
+test("mapChecklist lê entregue por e horário da troca", () => {
+  const item = mapChecklist({
+    new_checklistveiculoid: "c1", new_origem: 100000002, new_estado: 100000001,
+    "_new_veiculo_value@OData.Community.Display.V1.FormattedValue": "ABC1D23",
+    _new_entreguepor_value: "f9", "_new_entreguepor_value@OData.Community.Display.V1.FormattedValue": "Carlos Andrade",
+    new_trocadetectadaem: "2026-10-20T15:00:00Z"
+  });
+  assert.equal(item.origem, CHECKLIST_ORIGEM.troca);
+  assert.equal(item.entreguePorNome, "Carlos Andrade");
+  assert.equal(item.trocaDetectadaEm, "2026-10-20T15:00:00Z");
+  const antigo = mapChecklist({ new_checklistveiculoid: "c2", new_origem: 100000000, new_estado: 100000001 });
+  assert.equal(antigo.entreguePorNome, "");
+  assert.equal(antigo.trocaDetectadaEm, null);
+});
+
+test("texto do card por origem", () => {
+  const base = mapChecklist({ new_checklistveiculoid: "c", new_estado: 100000001, "_new_veiculo_value@OData.Community.Display.V1.FormattedValue": "ABC1D23" });
+  assert.deepEqual(checklistCardTexto({ ...base, origem: CHECKLIST_ORIGEM.troca, entreguePorNome: "Carlos Andrade" }),
+    { label: "RECEBIMENTO DO CARRO", descricao: "Veículo ABC1D23 · entregue por Carlos Andrade" });
+  assert.deepEqual(checklistCardTexto({ ...base, origem: CHECKLIST_ORIGEM.troca, entreguePorNome: "" }),
+    { label: "RECEBIMENTO DO CARRO", descricao: "Veículo ABC1D23 · entregue por: não identificado" });
+  assert.equal(checklistCardTexto({ ...base, origem: CHECKLIST_ORIGEM.manual }).label, "SOLICITADO PELA OPERAÇÃO");
+  assert.equal(checklistCardTexto({ ...base, origem: CHECKLIST_ORIGEM.quinzenal }).label, "VISTORIA QUINZENAL");
+  assert.equal(checklistCardTexto({ ...base, estado: CHECKLIST_ESTADO.concluido, origem: CHECKLIST_ORIGEM.troca }).label, "CHECKLIST ENVIADO");
 });

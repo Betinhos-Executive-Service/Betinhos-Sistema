@@ -1,5 +1,5 @@
 import { AgendaCard } from "../services/AgendaCard";
-import { CHECKLIST_ORIGEM, isChecklistPending, type ChecklistVeiculo } from "../../lib/checklists";
+import { checklistCardTexto, isChecklistPending, type ChecklistVeiculo } from "../../lib/checklists";
 
 type Props = {
   item: ChecklistVeiculo;
@@ -16,9 +16,7 @@ function formatShortDate(value: string | null) {
 // Mesmo card da agenda (como o de comunicado): o checklist aparece em Serviços enquanto pendente.
 export function ChecklistAgendaCard({ item, onOpen }: Props) {
   const pending = isChecklistPending(item);
-  const label = pending
-    ? item.origem === CHECKLIST_ORIGEM.manual ? "SOLICITADO PELA OPERAÇÃO" : "VISTORIA QUINZENAL"
-    : "CHECKLIST ENVIADO";
+  const { label, descricao } = checklistCardTexto(item);
   const when = pending ? formatShortDate(item.solicitadoEm) : formatShortDate(item.concluidoEm);
 
   return (
@@ -29,7 +27,7 @@ export function ChecklistAgendaCard({ item, onOpen }: Props) {
           tipo: "SERVICO",
           time: when,
           label,
-          description: item.placa ? `Veículo ${item.placa}` : "Vistoria do veículo"
+          description: descricao
         }}
         bodyLabel="Checklist"
         onOpen={() => onOpen(item.id)}

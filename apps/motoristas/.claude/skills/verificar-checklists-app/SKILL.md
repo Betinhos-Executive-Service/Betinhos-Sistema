@@ -6,20 +6,20 @@ description: "Verifica a tela do checklist de vistoria no App Motoristas: tile d
 
 ## Cobre
 - Código: `src/lib/checklists.ts`, `src/screens/ChecklistsScreen.tsx`, `src/components/checklists/ChecklistAgendaCard.tsx`, `src/components/checklists/ChecklistOkNokField.tsx`, `src/checklists.css`, `uploadChecklistPhotoRemote` em `src/lib/dataverse.ts`, ligação em `src/App.tsx`, `src/screens/InitialScreen.tsx`, `src/screens/ServicesScreen.tsx`, `src/app/navigation.ts`, `src/app/bootstrap.ts` (`getInitialChecklistId`).
-- Testes: `tests/checklists.test.ts`.
+- Testes: `tests/checklists.test.ts` (inclui `mapChecklist` com `new_entreguepor`/`new_trocadetectadaem` e `checklistCardTexto`).
 - Rotas: `#inicio` (tile Checklist), `#servicos` (seção "Checklist do veículo"), `#checklists`.
 
 ## Preparar ambiente
 - Worktree sem `node_modules`: crie uma junção para o `node_modules` do checkout principal (mesmas dependências) — `New-Item -ItemType Junction -Path node_modules -Target "<checkout principal>\node_modules"`.
 - Gates: `npm test` e `node node_modules/typescript/bin/tsc --noEmit --noUnusedLocals --noUnusedParameters`.
-- Servidor: `.claude/launch.json` (local, ignorado) com `node scripts/dev-server.cjs` e `PORT=44961` (reservada em `C:\Users\mendo\.codex\dev-ports.json`). `preview_start` → `http://localhost:44961`. Em localhost o checklist roda em mock: 1 pendente (ABC1D23, KM 45210; 9 itens, o último é "Pneus", OK / Não OK com Murcho, Careca, Furado, Outro) e 1 enviado. O mock é em memória: recarregar volta ao pendente; o rascunho fica no IndexedDB (`app-motoristas-media-drafts`, chave `checklist:<id>`).
+- Servidor: `.claude/launch.json` (local, ignorado) com `node scripts/dev-server.cjs` e `PORT=44961` (reservada em `C:\Users\mendo\.codex\dev-ports.json`). `preview_start` → `http://localhost:44961`. Em localhost o checklist roda em mock: 1 pendente de troca (origem Troca, entregue por Carlos Andrade; ABC1D23, KM 45210; 9 itens, o último é "Pneus", OK / Não OK com Murcho, Careca, Furado, Outro) e 1 enviado. O mock é em memória: recarregar volta ao pendente; o rascunho fica no IndexedDB (`app-motoristas-media-drafts`, chave `checklist:<id>`).
 - O dev server reescreve `dist/`; ao terminar, `git checkout -- dist/index.html dist/webresource-app-motoristas.html` (não commitar build local).
 - No DEV autenticado, o modelo padrão é o "Vistoria rápida" do seed (`seed-checklist-modelo-teste.ps1 -SubstituirPadrao`, área `verificar-checklists-backend`): 14 itens, 4 fotos, 9 OK / Não OK com opções próprias (Pneus: Murcho, Careca, Furado, Outro; Estepe: Faltando, Estepe murcho, Outro...) e Observações. A "Quilometragem" e o "Combustível" numéricos só existem no mock local.
 - Viewport: preset `mobile` (375×812); volte a `desktop` no fim.
 
 ## Roteiro
 1. Início → tile "Checklist" mostra "Vistoria do veículo • 1 pendente".
-2. Serviços → seção "Checklist do veículo" com card "VISTORIA QUINZENAL · Veículo ABC1D23"; tocar abre o formulário; a seta Voltar retorna a Serviços.
+2. Serviços → seção "Checklist do veículo" com card "RECEBIMENTO DO CARRO · Veículo ABC1D23 · entregue por Carlos Andrade" (a descrição quebra em 2 linhas a 375 px, sem corte nem rolagem horizontal; sem entregador, mostre "entregue por: não identificado": troque temporariamente `entreguePorNome` do pendente do mock para "" e reverta; quinzenal/manual: "VISTORIA QUINZENAL"/"SOLICITADO PELA OPERAÇÃO", cobertos por `checklistCardTexto` em teste); tocar abre o formulário; a seta Voltar retorna a Serviços.
 3. Formulário: resumo "1 de 9 itens preenchidos · progresso salvo neste aparelho"; Quilometragem já vem 45210.
 4. Fotos: a câmera ao vivo é bloqueada no painel. Use o input nativo do `MediaCaptureScreen`: após tocar em `button[aria-label="Tirar foto: <item>"]`, preencha `input[type=file]` via `DataTransfer` com um JPEG gerado em canvas e dispare `change`. Prévia "A foto está legível?" → Confirmar. A miniatura deve ter no máximo 1600 px no maior lado.
 5. "Enviar checklist" incompleto → "Revise N itens destacados.", rola até o primeiro e mostra "Tire a foto para continuar.".
