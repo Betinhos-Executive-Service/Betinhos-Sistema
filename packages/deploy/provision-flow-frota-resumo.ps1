@@ -93,7 +93,7 @@ foreach ($schema in 'new_URLSistemaBetinhos', 'new_EmailAdminAvisos') {
 }
 
 # 5. Definição do flow com os tokens trocados.
-$raw = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'flowsrota-pendencias-semanal.json'), [Text.Encoding]::UTF8)
+$raw = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'flows\frota-pendencias-semanal.json'), [Text.Encoding]::UTF8)
 $raw = $raw.Replace('__REMETENTE__', $Remetente)
 if ($raw -match '__[A-Z_]+__') { throw "Token não substituído na definição do flow: $($Matches[0])" }
 $definition = $raw | ConvertFrom-Json
