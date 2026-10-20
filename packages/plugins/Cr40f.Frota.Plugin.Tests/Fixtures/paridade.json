@@ -1,0 +1,54 @@
+{
+  "hoje": "2026-10-20",
+  "agora": "2026-10-20T12:00:00Z",
+  "veiculos": [
+    { "id": "v1", "placa": "ABC1A11", "status": 202410001, "categoria": 100000000, "hodometro": 52000, "hodometroEm": "2026-10-20T06:00:00Z" },
+    { "id": "v2", "placa": "ABC2B22", "status": 202410001, "categoria": 100000000, "hodometro": 30000, "hodometroEm": "2026-10-18T11:00:00Z" },
+    { "id": "v3", "placa": "ABC3C33", "status": 202410001, "categoria": 100000000, "hodometro": null, "hodometroEm": null },
+    { "id": "v4", "placa": "ABC4D44", "status": 202410001, "categoria": 100000001, "hodometro": null, "hodometroEm": null },
+    { "id": "v5", "placa": "ABC5E55", "status": 202410000, "categoria": 100000000, "hodometro": 90000, "hodometroEm": "2026-09-01T12:00:00Z" }
+  ],
+  "itens": [
+    { "id": "i-oleo", "nome": "Troca de óleo", "servico": 100000000, "intervaloKm": 10000, "intervaloMeses": 12, "avisoKm": 1000, "avisoDias": 30, "ativo": true },
+    { "id": "i-pneu", "nome": "Troca de pneu", "servico": 100000012, "intervaloKm": 40000, "intervaloMeses": null, "avisoKm": 1000, "avisoDias": 30, "ativo": true },
+    { "id": "i-inativo", "nome": "Item inativo", "servico": 100000001, "intervaloKm": 1, "intervaloMeses": 1, "avisoKm": 1000, "avisoDias": 30, "ativo": false }
+  ],
+  "baselines": [
+    { "veiculoId": "v1", "itemId": "i-oleo", "km": 41000, "data": "2026-01-10" },
+    { "veiculoId": "v1", "itemId": "i-pneu", "km": 13000, "data": null },
+    { "veiculoId": "v2", "itemId": "i-oleo", "km": 25000, "data": "2025-11-05" },
+    { "veiculoId": "v3", "itemId": "i-oleo", "km": null, "data": "2026-06-01" }
+  ],
+  "manutencoes": [
+    { "id": "r1", "descricao": "Freio", "status": 202410002, "grau": 1, "agendarPara": null, "dataManutencao": "2026-07-01", "criadoEm": "2026-06-30", "km": null, "valor": 100, "estabelecimento": "Oficina A", "veiculoId": "v3", "veiculoLabel": "ABC3C33", "servicos": [100000007] },
+    { "id": "r2", "descricao": "Freio de novo", "status": 202410002, "grau": 1, "agendarPara": null, "dataManutencao": "2026-09-01", "criadoEm": "2026-08-30", "km": null, "valor": 200, "estabelecimento": "Oficina A", "veiculoId": "v3", "veiculoLabel": "ABC3C33", "servicos": [100000007] },
+    { "id": "r3", "descricao": "Freio de novo", "status": 202410002, "grau": 1, "agendarPara": null, "dataManutencao": "2026-10-10", "criadoEm": "2026-10-09", "km": null, "valor": 300, "estabelecimento": "Oficina B", "veiculoId": "v3", "veiculoLabel": "ABC3C33", "servicos": [100000007] },
+    { "id": "x1", "descricao": "Freio cancelado", "status": 100000001, "grau": 1, "agendarPara": null, "dataManutencao": null, "criadoEm": "2026-10-12", "km": null, "valor": null, "estabelecimento": null, "veiculoId": "v3", "veiculoLabel": "ABC3C33", "servicos": [100000007] },
+    { "id": "l1", "descricao": "Filtro", "status": 202410002, "grau": 1, "agendarPara": null, "dataManutencao": "2025-11-01", "criadoEm": "2025-11-01", "km": null, "valor": null, "estabelecimento": null, "veiculoId": "v4", "veiculoLabel": "ABC4D44", "servicos": [100000002] },
+    { "id": "l2", "descricao": "Filtro", "status": 202410002, "grau": 1, "agendarPara": null, "dataManutencao": "2026-01-15", "criadoEm": "2026-01-15", "km": null, "valor": null, "estabelecimento": null, "veiculoId": "v4", "veiculoLabel": "ABC4D44", "servicos": [100000002] },
+    { "id": "l3", "descricao": "Filtro", "status": 202410002, "grau": 1, "agendarPara": null, "dataManutencao": "2026-03-20", "criadoEm": "2026-03-20", "km": null, "valor": null, "estabelecimento": null, "veiculoId": "v4", "veiculoLabel": "ABC4D44", "servicos": [100000002] },
+    { "id": "l4", "descricao": "Filtro", "status": 202410002, "grau": 1, "agendarPara": null, "dataManutencao": "2026-05-30", "criadoEm": "2026-05-30", "km": null, "valor": null, "estabelecimento": null, "veiculoId": "v4", "veiculoLabel": "ABC4D44", "servicos": [100000002] },
+    { "id": "l5", "descricao": "Filtro", "status": 202410002, "grau": 1, "agendarPara": null, "dataManutencao": "2026-09-01", "criadoEm": "2026-09-01", "km": null, "valor": null, "estabelecimento": null, "veiculoId": "v4", "veiculoLabel": "ABC4D44", "servicos": [100000002] },
+    { "id": "c1", "descricao": "Revisão", "status": 202410002, "grau": 1, "agendarPara": null, "dataManutencao": "2026-10-01", "criadoEm": "2026-10-01", "km": null, "valor": 400, "estabelecimento": null, "veiculoId": "v1", "veiculoLabel": "ABC1A11", "servicos": [] },
+    { "id": "c2", "descricao": "Revisão", "status": 202410002, "grau": 1, "agendarPara": null, "dataManutencao": "2026-09-15", "criadoEm": "2026-09-15", "km": null, "valor": 450, "estabelecimento": null, "veiculoId": "v2", "veiculoLabel": "ABC2B22", "servicos": [] },
+    { "id": "c4", "descricao": "Motor", "status": 202410002, "grau": 1, "agendarPara": null, "dataManutencao": "2026-10-05", "criadoEm": "2026-10-05", "km": null, "valor": 2000, "estabelecimento": null, "veiculoId": "v4", "veiculoLabel": "ABC4D44", "servicos": [] },
+    { "id": "p1", "descricao": "Barulho no motor", "status": 0, "grau": 3, "agendarPara": null, "dataManutencao": null, "criadoEm": "2026-10-17", "km": null, "valor": null, "estabelecimento": null, "veiculoId": "v1", "veiculoLabel": "ABC1A11", "servicos": [] },
+    { "id": "p2", "descricao": "Luz do freio", "status": 202410001, "grau": 4, "agendarPara": null, "dataManutencao": null, "criadoEm": "2026-10-14", "km": null, "valor": null, "estabelecimento": null, "veiculoId": "v2", "veiculoLabel": "ABC2B22", "servicos": [] },
+    { "id": "p3", "descricao": "Média antiga", "status": 0, "grau": 2, "agendarPara": null, "dataManutencao": null, "criadoEm": "2026-09-01", "km": null, "valor": null, "estabelecimento": null, "veiculoId": "v2", "veiculoLabel": "ABC2B22", "servicos": [] },
+    { "id": "p4", "descricao": "Urgente recente", "status": 0, "grau": 4, "agendarPara": null, "dataManutencao": null, "criadoEm": "2026-10-19", "km": null, "valor": null, "estabelecimento": null, "veiculoId": "v1", "veiculoLabel": "ABC1A11", "servicos": [] },
+    { "id": "a1", "descricao": "Alinhamento", "status": 202410005, "grau": 2, "agendarPara": "2026-10-15", "dataManutencao": null, "criadoEm": "2026-10-01", "km": null, "valor": null, "estabelecimento": null, "veiculoId": "v2", "veiculoLabel": "ABC2B22", "servicos": [] },
+    { "id": "a2", "descricao": "Agendada futura", "status": 202410001, "grau": 2, "agendarPara": "2026-10-25", "dataManutencao": null, "criadoEm": "2026-10-01", "km": null, "valor": null, "estabelecimento": null, "veiculoId": "v2", "veiculoLabel": "ABC2B22", "servicos": [] }
+  ],
+  "esperado": [
+    "agendada|a1",
+    "custo|custo:v4",
+    "hodometro|hod:v2",
+    "preventiva|v1:i-oleo",
+    "preventiva|v1:i-pneu",
+    "preventiva|v2:i-oleo",
+    "prioridade|p1",
+    "prioridade|p2",
+    "reincidencia|reinc:v3:100000007",
+    "reincidencia|reinc:v4:100000002"
+  ]
+}

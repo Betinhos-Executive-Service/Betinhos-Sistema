@@ -1,11 +1,11 @@
 ---
 name: verificar-plugins
-description: "Verifica os plugins C# do Dataverse (Cr40f.Financeiro.Plugin, incluindo ValorOpPlugin, e Cr40f.Documentos.Plugin) e seus registradores. Use após mudar packages/plugins/** ou quando pedirem para testar plugin, valor da OP ou sincronização financeira."
+description: "Verifica os plugins C# do Dataverse (Cr40f.Financeiro.Plugin, incluindo ValorOpPlugin, Cr40f.Documentos.Plugin e Cr40f.Frota.Plugin) e seus registradores. Use após mudar packages/plugins/** ou quando pedirem para testar plugin, valor da OP ou sincronização financeira."
 ---
 # Verificar plugins do Dataverse
 
 ## Cobre
-- Código: `packages/plugins/Cr40f.Financeiro.Plugin/**`, `packages/plugins/Cr40f.Documentos.Plugin/**`, registradores em `packages/plugins/tools/**`, scripts `packages/plugins/scripts/*.ps1`.
+- Código: `packages/plugins/Cr40f.Financeiro.Plugin/**`, `packages/plugins/Cr40f.Documentos.Plugin/**`, `packages/plugins/Cr40f.Frota.Plugin/**`, registradores em `packages/plugins/tools/**`, scripts `packages/plugins/scripts/*.ps1`.
 - Comportamento: valor da OP (`cr40f_financeiro.cr40f_valor`) = soma de `new_valortotal` das composições das reservas (`reserva.new_composicaodepreco`), a mesma soma do `SyncEngine`; sincronização financeira (pagantes → OP → reservas).
 
 ## Preparar ambiente
@@ -19,6 +19,12 @@ description: "Verifica os plugins C# do Dataverse (Cr40f.Financeiro.Plugin, incl
 4. Publicar no DEV (só da `main`, checkout principal): `pnpm push:plugin:financeiro:dev` → steps `Cr40f.ValorOp: …` criados/reconciliados e "plugin publicado com sucesso".
 5. Carga inicial no DEV: mesmo comando do passo 3 com `--recalcularValorOp` → `K gravadas`; repetir `--simularValorOp` → `0 mudariam`.
 6. Comportamento: no Sistema Betinhos (DEV) › Ordens de Pagamento, o valor de cada OP aparece sem o título "Soma dos serviços" (agora vem de `cr40f_valor`); alterar um campo de origem (ex.: `new_valorpedagios`) de uma composição de teste — `new_valortotal` é calculada e não aceita escrita — ligada a uma reserva com OP e conferir a OP atualizada na hora.
+
+## Frota (Custom API `cr40f_FrotaPendencias`)
+1. `dotnet test packages/plugins/Cr40f.Frota.Plugin.Tests` → "Com falha: 0" (5 em 20/10/2026). Chave em `%USERPROFILE%\.codex\keys\Cr40f.Frota.Plugin.snk` (o script de push cria se faltar).
+2. Paridade com o shell: `Fixtures/paridade.json` é lido também por `apps/shell/src/pages/frota/domain/paridade.test.ts` (`npx vitest run src/pages/frota/domain/paridade` em `apps/shell`). Mudou regra ou limiar (`alertas.ts` `LIMIARES` ↔ `Modelo.cs` `Limiares`)? Atualize os dois lados e o `esperado` do fixture. `Catalogo.cs` é gerado de `manutencaoCatalogo.json` (teste `Catalogo_igual_ao_json_do_shell`).
+3. Publicar no DEV (só da `main`, checkout principal): `pnpm push:plugin:frota:dev`.
+4. Testar no DEV (só leitura): `dotnet run --project packages/plugins/tools/Cr40f.Frota.Registrar -- --environmentUrl https://org23b93544.crm2.dynamics.com/ --testar` → JSON `{hoje,total,pendencias}`; os totais por tipo batem com a aba Pendências do shell no DEV (prioridade, reincidência, preventiva, custo, hodômetro; "agendada" só as vencidas).
 
 ## Casos de borda
 - Reserva sem composição conta 0 (como o `SyncEngine`); OP sem reserva fica sem valor (null).
