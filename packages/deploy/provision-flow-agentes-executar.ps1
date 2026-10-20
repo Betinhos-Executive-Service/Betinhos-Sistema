@@ -522,7 +522,7 @@ $ramoFrota = Ramo (@(Agente 'frota' 'fro') + @(
   (Passo 'Dados_frota' (Compor "@json(outputs('Pendencias_frota')?['body/PendenciasJson'])")),
   (Passo 'Obrigatorios_frota' ([ordered]@{ type = 'Query'; runAfter = $null; inputs = [ordered]@{ from = "@outputs('Dados_frota')?['pendencias']"; where = "@contains(createArray('prioridade', 'reincidencia', 'custo'), item()?['tipo'])" } })),
   (Passo 'Ids_obrigatorios' (Selecionar "@body('Obrigatorios_frota')" "@toLower(if(equals(item()?['tipo'], 'prioridade'), coalesce(item()?['manutencaoId'], ''), coalesce(item()?['veiculoId'], '')))")),
-  (Passo 'Definir_obrigatorios' (DefinirVar 'Obrigatorios' "@union(body('Ids_obrigatorios'), createArray())")),
+  (Passo 'Definir_obrigatorios' (DefinirVar 'Obrigatorios' "@union(body('Ids_obrigatorios'), body('Ids_obrigatorios'))")),
   (Passo 'Contexto_fro' (DefinirVar 'Contexto' ([ordered]@{ hoje = "@{outputs('Hoje')}"; pendencias = "@outputs('Dados_frota')?['pendencias']" })))
 ))
 
@@ -596,6 +596,8 @@ function Conferir($lido) {
     'OS_concluidas expande os recibos ativos e não há lista Recibos separada' = $cases.Financeiro.actions.OS_concluidas.inputs.parameters.'$expand' -ceq $expandRecibos -and -not ($cases.Financeiro.actions.PSObject.Properties.Name -contains 'Recibos') -and -not ($cases.Financeiro.actions.PSObject.Properties.Name -contains 'Ids_com_recibo')
     'temRecibo pelo $expand de OS_concluidas' = $cases.Financeiro.actions.OS_contexto.inputs.select.temRecibo -ceq "@greater(length(coalesce(item()?['$navRecibos'], createArray())), 0)"
     'nenhum $select com CPF, RG, conta, telefone, e-mail ou endereço' = ($camposSensiveis.Count -eq 0) -and ($todosSelects.Count -eq 0)
+    # createArray() sem argumentos derruba a ação no Power Automate (InvalidTemplate); union consigo mesma deduplica.
+    'Definir_obrigatorios deduplica sem createArray() vazio' = $cases.Frota.actions.Definir_obrigatorios.inputs.value -ceq "@union(body('Ids_obrigatorios'), body('Ids_obrigatorios'))"
     'Marcar_processando dentro do escopo' = $null -ne $a.Marcar_processando -and -not ($lido.actions.PSObject.Properties.Name -contains 'Marcar_processando')
   }
   $falhas = @($checks.Keys | Where-Object { -not $checks[$_] })
