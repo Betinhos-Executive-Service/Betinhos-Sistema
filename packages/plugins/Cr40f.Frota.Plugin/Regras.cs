@@ -14,6 +14,7 @@ public static class Regras
 {
     private static readonly CultureInfo PtBr = new("pt-BR");
     private static readonly int[] Anuladas = { Codigos.Cancelado, Codigos.Reprovado };
+    public static readonly string[] Ordem = { "prioridade", "reincidencia", "preventiva", "agendada", "custo", "hodometro" };
     private static readonly int[] EmAndamento = { Codigos.Solicitado, Codigos.Aprovado, Codigos.Programado };
 
     public static Resultado Avaliar(DadosFrota dados, string hoje, DateTime agoraUtc)
@@ -31,7 +32,9 @@ public static class Regras
         lista.AddRange(Preventivas(dados, hoje));
         lista.AddRange(CustoForaDaCurva(dados.Veiculos, dados.Manutencoes, hoje));
         lista.AddRange(HodometrosAtrasados(dados.Veiculos, agoraUtc));
-        return new Resultado { Hoje = hoje, Total = lista.Count, Pendencias = lista };
+        // Ordem do e-mail e do agente: o que pede decisão primeiro (OrderBy é estável, mantém a ordem dentro do tipo).
+        var ordenada = lista.OrderBy(p => Array.IndexOf(Ordem, p.Tipo)).ToList();
+        return new Resultado { Hoje = hoje, Total = ordenada.Count, Pendencias = ordenada };
     }
 
     public static int? PrioridadeParada(Manutencao m, string hoje)

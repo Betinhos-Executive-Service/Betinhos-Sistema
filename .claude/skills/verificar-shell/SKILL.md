@@ -35,6 +35,7 @@ Não passam pelo `pnpm push`; cada script grava o clientdata direto no DEV (com 
 - Antes de criar dado de teste, ver os gatilhos de flows ativos na tabela (ex.: Recibo Automático em `cr40f_statusdorecibo`, RD Station em `cr40f_bancodedados`) para não disparar envios por engano.
 - `overriddencreatedon` sem hora vira 00:00 UTC (dia anterior em Brasília); use `AAAA-MM-DDT15:00:00Z`.
 - Scripts `.ps1` com acentos precisam de BOM UTF-8 (PowerShell 5.1).
+- Frota | Resumo semanal (`provision-flow-frota-resumo.ps1 -Remetente <noreply>`, só da main, depois de `pnpm push:plugin:frota:dev`): cria a coluna `new_notificacoesfrota` e o flow (quarta 08:00). Rodar o shell no DEV só depois da coluna existir (o cadastro de funcionário seleciona a coluna). Teste: marcar "Notificações de frota" no próprio cadastro (Funcionários › ficha › Detalhes), disparar o gatilho `Toda_quarta_8h` → e-mail "Frota | N pendências | dd/mm/aaaa" com os mesmos itens da aba Pendências (tipos proativos). Sem pendências, não envia.
 
 ## Casos de borda
 - Mock (`pnpm dev`): telas de WebResource mostram "Esta tela abre dentro do Dataverse".

@@ -31,7 +31,7 @@ function person(id: string, nome: string, apelido: string, extra: Partial<Funcio
     values: {
       cr40f_nomecompleto: nome, new_apelido: apelido, cr40f_status: 0, cr40f_funcao: 202410000, cr40f_nomedaempresa: 202410000, cr40f_tipodevinculo: 0,
       cr40f_telefonecorporativo: '+55 12 99000-0000', cr40f_datadeadmissao: '2022-03-01', cr40f_validadedacnh: offset(400), cr40f_datadoaso: addMonths(offset(200), -12),
-      new_notificacoesmotoristas: true, new_notificacoesoperacionais: false, new_notificacoesfinanceiras: false, cr40f_gerarrecibopersonalizado: false,
+      new_notificacoesmotoristas: true, new_notificacoesoperacionais: false, new_notificacoesfinanceiras: false, new_notificacoesfrota: false, cr40f_gerarrecibopersonalizado: false,
       ...extra,
     },
     veiculo,
