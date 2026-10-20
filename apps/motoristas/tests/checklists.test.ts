@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildChecklistRespostasJson,
   CHECKLIST_ESTADO,
+  CHECKLIST_MAX_PROBLEMAS,
   CHECKLIST_PROBLEMAS_PADRAO,
   checklistPhotoItems,
   concluirChecklist,
@@ -208,6 +209,15 @@ test("validação do okNok: escolha, foto e problema", () => {
   assert.equal(validateChecklistDraft([item], draftWith({ valores: { pneus: "nok" }, fotos: { pneus: [{ id: "f", dataUrl: "d" }] } }))[item.chave], "Escolha o problema.");
   assert.deepEqual(validateChecklistDraft([item], draftWith({ valores: { pneus: "nok" }, fotos: { pneus: [{ id: "f", dataUrl: "d" }] }, problemas: { pneus: ["Murcho"] } })), {});
   assert.deepEqual(validateChecklistDraft([item], draftWith({ valores: { pneus: "ok" } })), {});
+});
+
+test("validação do okNok recusa mais de 10 problemas", () => {
+  const opcoes = Array.from({ length: 12 }, (_, index) => `Problema ${index + 1}`);
+  const item = okNokItem({ opcoesProblema: opcoes });
+  const base = { valores: { pneus: "nok" }, fotos: { pneus: [{ id: "f", dataUrl: "d" }] } };
+  assert.equal(CHECKLIST_MAX_PROBLEMAS, 10);
+  assert.equal(validateChecklistDraft([item], draftWith({ ...base, problemas: { pneus: opcoes.slice(0, 11) } }))[item.chave], "Escolha até 10 problemas.");
+  assert.deepEqual(validateChecklistDraft([item], draftWith({ ...base, problemas: { pneus: opcoes.slice(0, 10) } })), {});
 });
 
 test("voltar para OK limpa problemas, observação e fotos do item", () => {

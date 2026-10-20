@@ -8,6 +8,8 @@ export const CHECKLIST_ORIGEM = { quinzenal: 100000000, manual: 100000001 } as c
 export const CHECKLIST_MAX_FOTOS_POR_ITEM = 5;
 export const CHECKLIST_MAX_TEXTO = 2000;
 export const CHECKLIST_MAX_OBSERVACAO = 500;
+// O plugin recusa mais de 10 problemas por resposta (um item pode ter até 12 opções).
+export const CHECKLIST_MAX_PROBLEMAS = 10;
 export const CHECKLIST_PROBLEMAS_PADRAO = ["Arranhado", "Amassado", "Trincado", "Quebrado", "Faltando", "Sujo", "Outro"] as const;
 
 export type ChecklistItemTipo = "foto" | "numero" | "texto" | "okNok";
@@ -199,6 +201,7 @@ export function validateChecklistDraft(itens: ChecklistItem[], draft: ChecklistD
         if (fotos.length === 0) errors[item.chave] = "Tire a foto do problema.";
         else if (fotos.length > CHECKLIST_MAX_FOTOS_POR_ITEM) errors[item.chave] = `Envie até ${CHECKLIST_MAX_FOTOS_POR_ITEM} fotos.`;
         else if (!(draft.problemas?.[item.chave] ?? []).length) errors[item.chave] = "Escolha o problema.";
+        else if (new Set(draft.problemas?.[item.chave]).size > CHECKLIST_MAX_PROBLEMAS) errors[item.chave] = `Escolha até ${CHECKLIST_MAX_PROBLEMAS} problemas.`;
         else if ((draft.observacoes?.[item.chave] ?? "").trim().length > CHECKLIST_MAX_OBSERVACAO) errors[item.chave] = `Use até ${CHECKLIST_MAX_OBSERVACAO} caracteres.`;
       }
     } else {

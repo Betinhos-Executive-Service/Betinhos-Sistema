@@ -7,6 +7,7 @@ import { PhotoAddButton } from "../components/common/PhotoAddButton";
 import { FormMenu } from "../components/navigation/FormMenu";
 import { ServicesMenu } from "../components/navigation/ServicesMenu";
 import { ChecklistAgendaCard } from "../components/checklists/ChecklistAgendaCard";
+import { ChecklistOkNokField } from "../components/checklists/ChecklistOkNokField";
 import { MediaCaptureScreen } from "./MediaCaptureScreen";
 import { MaintenancePhotoPreviewScreen } from "./MaintenancePhotoPreviewScreen";
 import { clearMediaDraft, loadMediaDraft, saveMediaDraft } from "../lib/mediaDraftStore";
@@ -16,9 +17,11 @@ import {
   CHECKLIST_MAX_FOTOS_POR_ITEM,
   CHECKLIST_MAX_TEXTO,
   checklistDraftKey,
+  checklistPhotoItems,
   concluirChecklist,
   countChecklistProgress,
   createChecklistDraft,
+  setChecklistOkNok,
   isChecklistPending,
   isMockChecklists,
   uploadChecklistPhotoMock,
@@ -26,6 +29,7 @@ import {
   type ChecklistDraft,
   type ChecklistFotoEnviada,
   type ChecklistItem,
+  type ChecklistResposta,
   type ChecklistVeiculo
 } from "../lib/checklists";
 
@@ -79,6 +83,12 @@ function formatNumber(value: string, unidade: string) {
   if (!value || !Number.isFinite(number)) return value || "—";
   return `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(number)}${unidade ? ` ${unidade}` : ""}`;
 }
+
+// No checklist enviado, os itens Não OK aparecem primeiro; o resto mantém a ordem do modelo.
+const orderChecklistAnswers = (answers: ChecklistResposta[]) => [
+  ...answers.filter((answer) => answer.tipo === "okNok" && answer.valor === "nok"),
+  ...answers.filter((answer) => !(answer.tipo === "okNok" && answer.valor === "nok"))
+];
 
 const newPhotoId = () => globalThis.crypto?.randomUUID?.() ?? `foto-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const itemDomId = (chave: string) => `checklist-item-${chave}`;
@@ -206,9 +216,9 @@ export function ChecklistsScreen({ items, loadStatus = "ready", selectedId, onSe
     let concluded = false;
     try {
       // Envio foto a foto; o link de cada uma fica no rascunho, então uma nova tentativa continua de onde parou.
-      const queue = selected.itens.flatMap((item) => item.tipo === "foto"
-        ? (working.fotos[item.chave] ?? []).map((photo, index) => ({ item, photo, order: index + 1 }))
-        : []);
+      // Fotos puras e fotos do Não OK sobem pela mesma fila.
+      const queue = checklistPhotoItems(selected.itens, working)
+        .flatMap((item) => (working.fotos[item.chave] ?? []).map((photo, index) => ({ item, photo, order: index + 1 })));
       const missing = queue.filter(({ photo }) => !working.enviadas?.[photo.id]);
       for (let index = 0; index < missing.length; index += 1) {
         const { item, photo, order } = missing[index];
@@ -314,7 +324,25 @@ export function ChecklistsScreen({ items, loadStatus = "ready", selectedId, onSe
                   <small>{progressCount.done} de {progressCount.total} itens preenchidos · progresso salvo neste aparelho</small>
                 </div>
                 {pageError ? <div className="form-error-summary" role="alert">{pageError}</div> : null}
-                {!draft ? <p className="checklist-loading" role="status">Carregando checklist…</p> : selected.itens.map((item) => (
+                {!draft ? <p className="checklist-loading" role="status">Carregando checklist…</p> : selected.itens.map((item) => item.tipo === "okNok" ? (
+                  <ChecklistOkNokField
+                    key={item.chave}
+                    item={item}
+                    draft={draft}
+                    domId={itemDomId(item.chave)}
+                    error={errors[item.chave]}
+                    disabled={locked}
+                    onChoose={(valor) => { updateDraft((current) => setChecklistOkNok(current, item.chave, valor)); clearError(item.chave); }}
+                    onToggleProblem={(problema) => { updateDraft((current) => {
+                      const atual = current.problemas?.[item.chave] ?? [];
+                      const next = atual.includes(problema) ? atual.filter((entry) => entry !== problema) : [...atual, problema];
+                      return { ...current, problemas: { ...(current.problemas ?? {}), [item.chave]: next } };
+                    }); clearError(item.chave); }}
+                    onObservation={(texto) => updateDraft((current) => ({ ...current, observacoes: { ...(current.observacoes ?? {}), [item.chave]: texto } }))}
+                    onAddPhoto={() => setCapturingChave(item.chave)}
+                    onOpenPhoto={(photoId, dataUrl) => setPhotoView({ chave: item.chave, dataUrl, photoId })}
+                  />
+                ) : (
                   <ChecklistField
                     key={item.chave}
                     item={item}
@@ -360,13 +388,26 @@ export function ChecklistsScreen({ items, loadStatus = "ready", selectedId, onSe
               </div>
               <h2 className="comunicado-detail-title">{selected.placa ? `Veículo ${selected.placa}` : "Vistoria do veículo"}</h2>
               <dl className="checklist-answers">
-                {(selected.respostas.length ? selected.respostas : selected.itens.map((item) => ({ chave: item.chave, rotulo: item.rotulo, tipo: item.tipo, valor: "", fotos: [] }))).map((answer) => {
+                {orderChecklistAnswers(selected.respostas.length ? selected.respostas : selected.itens.map((item) => ({ chave: item.chave, rotulo: item.rotulo, tipo: item.tipo, valor: "", problemas: [], observacao: "", fotos: [] }))).map((answer) => {
                   const item = selected.itens.find((entry) => entry.chave === answer.chave);
+                  const isNok = answer.tipo === "okNok" && answer.valor === "nok";
                   return (
-                    <div key={answer.chave}>
+                    <div key={answer.chave} className={isNok ? "is-nok" : undefined}>
                       <dt>{answer.rotulo}</dt>
                       <dd>
-                        {answer.tipo === "foto" ? (answer.fotos.length ? (
+                        {answer.tipo === "okNok" ? (isNok ? (
+                          <span className="checklist-answer-nok">
+                            <span className="checklist-answer-badge">Não OK</span>
+                            {answer.problemas.length ? <span>{answer.problemas.join(" · ")}</span> : null}
+                            {answer.observacao ? <span className="checklist-answer-note">{answer.observacao}</span> : null}
+                            {answer.fotos.length ? (
+                              <span className="checklist-answer-links">
+                                {answer.fotos.map((foto, index) => <a key={foto.link} href={foto.link} target="_blank" rel="noreferrer">Ver foto {index + 1}</a>)}
+                              </span>
+                            ) : null}
+                          </span>
+                        ) : answer.valor === "ok" ? "OK" : "—")
+                        : answer.tipo === "foto" ? (answer.fotos.length ? (
                           <span className="checklist-answer-links">
                             {answer.fotos.map((foto, index) => <a key={foto.link} href={foto.link} target="_blank" rel="noreferrer">Ver foto {index + 1}</a>)}
                           </span>
