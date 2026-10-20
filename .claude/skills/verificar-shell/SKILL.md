@@ -21,7 +21,9 @@ description: "Verifica o shell React do Sistema Betinhos (apps/shell) e o pacote
 5. Geral: `#/geral?novo=1` abre "Criar serviço" (iframe do Formulário Geral) e o parâmetro some da URL; selo "Alterada" tem `title` com a dica.
 6. WebResource embutido: `document.querySelector('iframe').src` termina em `?host=shell`.
 7. Menu de visões em tela baixa: viewport 900x300 (ou celular deitado), abrir `.bt-viewbar__trigger` → `.bt-menu__panel` tem `max-height` inline, `overflow-y: auto` e o último item ("Salvar como…") fica alcançável rolando o painel, sem passar da tela (@betinhos/ui ≥ 1.10.1).
-8. Console sem erros em cada tela.
+8. Frota → "Checklists de Veículos" (`#/new_gestaochecklistsveiculos`): o iframe carrega a Gestão de Checklists com a lista de veículos. Por URL direta o Xrm é o mínimo do shell; ação de Custom API (ex.: "Solicitar") precisa de `parent.Xrm.WebApi.online.execute` (`typeof parent.Xrm.WebApi.online.execute === 'function'` dentro do iframe) e mostra o erro do servidor quando falha.
+9. Console sem erros em cada tela.
+10. Captura de erros (`apps/shell/src/app/erros.ts`, tabela `cr40f_errodosistema` de `packages/deploy/provision-erros-schema.ps1`): no DEV, no console da página do shell rode `setTimeout(() => { throw new Error('teste plantao ' + Date.now()) })` → em até 5 s existe registro novo em `cr40f_errodosistemas` com `cr40f_situacao = 100000000`, `cr40f_origem = 100000000`, a mesma mensagem com prefixo `[window.onerror]`, `cr40f_versao` igual ao rodapé e `cr40f_assinatura` de 16 hex. Repetir o mesmo erro na mesma carga não cria segundo registro. Apague os registros de teste depois. Em `pnpm dev` (mock) nada é gravado.
 
 ## Flows do Power Automate (`packages/deploy/provision-flow-*.ps1`)
 Não passam pelo `pnpm push`; cada script grava o clientdata direto no DEV (com backup em `flows/backup/`).
@@ -42,3 +44,5 @@ Não passam pelo `pnpm push`; cada script grava o clientdata direto no DEV (com 
 
 ## Limites
 - Publicação só da `main`, no checkout principal (`pnpm push`), nunca de worktree. PROD só com aprovação.
+- Flows sem `-SomenteValidar` (ex.: `provision-flow-aniversariantes.ps1`): provisionar com destinatário só do usuário, disparar o gatilho e conferir as ações; depois reprovisionar com os destinatários reais.
+- Limpeza de chunks (`packages/deploy/chunk-cleanup.ps1`, chamada pelo `push-dev.ps1`): simular antes com `. .\chunk-cleanup.ps1`, `Get-PublishedChunkNames` (deve bater com `apps/shell/dist/webresource-assets.json`) e `Remove-ObsoleteChunks ... -DryRun`. Depois do `pnpm push` real, conferir no log `[chunks] ... mantidos, ... obsoletos` e que o shell abre todas as páginas no DEV (nenhum 404 em `/WebResources/cr40f_SistemaBetinhos/assets/`).

@@ -65,7 +65,8 @@ if (-not (Test-Path -LiteralPath $resourcePath)) { throw "WebResource nao encont
 $targets = @()
 # Code splitting: os chunks JS (dist/webresource-assets.json, gerado pelo inline-webresource) entram antes do HTML.
 # Nome com hash: chunk com o mesmo conteudo do ambiente nao e reenviado (Publish-WebResource compara o base64).
-# Chunks de builds anteriores ficam no ambiente: aba aberta com o build antigo ainda os encontra.
+# Depois de publicar, apaga os chunks que nao sao do build novo nem do build que estava publicado
+# (chunk-cleanup.ps1): a aba aberta com a versao anterior ainda os encontra, e o lixo nao acumula.
 $resourceHtml = [IO.File]::ReadAllText($resourcePath, [Text.Encoding]::UTF8)
 $chunkManifestPath = Join-Path $appRoot "dist\webresource-assets.json"
 $chunkNames = @()
@@ -179,6 +180,13 @@ function Publish-WebResource([string] $Name, [string] $Display, [string] $Path, 
   return @{ Id = $id; Name = $Name; Type = $Type; Content = $content; ComponentUri = $componentUri }
 }
 
+$previousChunks = @()
+if ($chunkNames.Count) {
+  . (Join-Path $PSScriptRoot "chunk-cleanup.ps1")
+  $previousChunks = @(Get-PublishedChunkNames $apiBaseUrl $headers $ResourceName $chunkPrefix)
+  Write-Step "build publicado antes deste push: $($previousChunks.Count) chunks"
+}
+
 $resources = @($targets | ForEach-Object { Publish-WebResource $_.Name $_.Display $_.Path $_.Type })
 $publishXml = "<importexportxml><webresources>" + (($resources | ForEach-Object { "<webresource>$($_.Id)</webresource>" }) -join "") + "</webresources></importexportxml>"
 Write-Step "publicando WebResources"
@@ -188,6 +196,11 @@ foreach ($r in $resources) {
   $published = Invoke-RestMethod -Method Get -Uri "$apiBaseUrl/webresourceset($($r.Id))?`$select=name,content,webresourcetype" -Headers $headers
   if ($published.name -ne $r.Name -or $published.webresourcetype -ne $r.Type -or $published.content -ne $r.Content) { throw "Validacao pos-publicacao falhou em $($r.Name)." }
   if (@((Invoke-RestMethod -Method Get -Uri $r.ComponentUri -Headers $headers).value).Count -eq 0) { throw "$($r.Name) nao esta na solucao $solutionUniqueName apos a publicacao." }
+}
+
+if ($chunkNames.Count) {
+  Write-Step "removendo chunks de builds antigos"
+  Remove-ObsoleteChunks $apiBaseUrl $headers $chunkPrefix ($chunkNames + $previousChunks) | Out-Null
 }
 
 $builtVersion = (Get-Content -Raw (Join-Path $appRoot "package.json") | ConvertFrom-Json).version
