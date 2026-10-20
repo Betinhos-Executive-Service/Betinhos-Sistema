@@ -1,6 +1,6 @@
 # Frota proativa — Agente Frota (design)
 
-Data: 20/10/2026 · Status: rascunho para aprovação do Renan
+Data: 20/10/2026 · Status: implementado na branch claude/fleet-proactive-automation-c06c54 (20/10/2026)
 
 ## Objetivo
 A gestão de frota deixa de depender de alguém abrir a tela: o sistema avisa sozinho o que precisa de decisão.
@@ -25,7 +25,7 @@ A gestão de frota deixa de depender de alguém abrir a tela: o sistema avisa so
 | R2 | Reincidência | mesmo serviço (`new_servicosmanutencao`) no mesmo veículo ≥ 3 vezes em 120 dias, ou ≥ 5 no total em 12 meses | "Já é a Nª vez. Investigar causa raiz?" com histórico e custo acumulado |
 | R3 | Prioridade alta parada | grau alto/urgente em Solicitado há > 2 dias ou Aprovado sem agendamento há > 5 dias | Aprovar / agendar |
 | R4 | Hodômetro desatualizado | `cr40f_hodometroem` > 48 h | Conferir Infleet (protege R1) |
-| R5 | Custo fora da curva | custo de manutenção 90 dias > 1,5× a mediana da frota por km | Avaliar troca/venda do veículo |
+| R5 | Custo fora da curva | custo de manutenção realizada em 90 dias > 1,5× a mediana dos veículos com custo (mínimo 3; valor absoluto, não por km) | Avaliar troca/venda do veículo |
 | R6 | Programado vencido | Programado com `cr40f_agendarpara` no passado e não Realizado | Confirmar se foi feito |
 
 Dedup: a mesma regra + veículo + item não gera nova proposta enquanto houver uma aberta, ou descartada há menos de 7 dias.
@@ -37,3 +37,9 @@ WhatsApp/Teams; tabela de pneus (posição, sulco); integração de abasteciment
 - Testes unitários das regras R1–R6 com fixtures (incluindo a reincidência da 5ª vez).
 - Execução manual do agente Frota no DEV gerando propostas reais; e-mail recebido.
 - Página Assistentes mostrando o agente Frota (ux-audit Rápido).
+
+## Notas de implementação (20/10/2026)
+- Limiares fixos em código (`alertas.ts` `LIMIARES` e `Modelo.cs` `Limiares`), não em variável de ambiente; o fixture de paridade trava divergência.
+- Coluna de destinatários: `new_notificacoesfrota` (mesmo prefixo das outras "Notificações").
+- Prioridade parada conta dias desde a criação da manutenção (não há data de aprovação).
+- Agente Frota agendado às quartas 07:00 no flow "Flow Agentes | Agendado" (um gatilho só por flow).
