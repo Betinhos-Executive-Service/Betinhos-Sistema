@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { chunk, createClient, createMetadata, createXrmShim, formatted } from './index'
+import { chunk, createClient, createMetadata, createXrmShim, formatted, reportingFetch } from './index'
 
 function json(body: unknown, init: ResponseInit = {}) {
   return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' }, ...init })
@@ -136,5 +136,34 @@ describe('metadata attributes', () => {
     expect((await meta.entity('cr40f_reservadeveculos')).objectTypeCode).toBe(10580)
     expect(fetchMock.mock.calls[0][0]).toContain('ObjectTypeCode')
     expect((await meta.entity('cr40f_outra')).objectTypeCode).toBeNull()
+  })
+})
+
+describe('reportingFetch', () => {
+  it('avisa erro HTTP com status e corpo, ignora 404 e devolve a resposta intacta', async () => {
+    const report = vi.fn()
+    const base = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(json({ error: { code: '0x1', message: 'falhou' } }, { status: 500 }))
+      .mockResolvedValueOnce(json({}, { status: 404 }))
+      .mockResolvedValueOnce(json({ value: [] }))
+    const wrapped = reportingFetch(report, base)
+    const response = await wrapped('https://org/api/data/v9.2/contacts', { method: 'post' })
+    expect(response.status).toBe(500)
+    expect(await response.json()).toEqual({ error: { code: '0x1', message: 'falhou' } })
+    await wrapped('https://org/api/data/v9.2/contacts(1)')
+    await wrapped('https://org/api/data/v9.2/contacts')
+    expect(report).toHaveBeenCalledTimes(1)
+    expect(report).toHaveBeenCalledWith({ method: 'POST', path: 'https://org/api/data/v9.2/contacts', status: 500, body: { error: { code: '0x1', message: 'falhou' } } })
+  })
+
+  it('avisa falha de rede e repassa o erro; cancelamento não é falha', async () => {
+    const report = vi.fn()
+    const rede = new TypeError('Failed to fetch')
+    const base = vi.fn<typeof fetch>().mockRejectedValueOnce(rede).mockRejectedValueOnce(new DOMException('cancelado', 'AbortError'))
+    const wrapped = reportingFetch(report, base)
+    await expect(wrapped('https://org/api/data/v9.2/WhoAmI')).rejects.toBe(rede)
+    await expect(wrapped('https://org/api/data/v9.2/WhoAmI')).rejects.toThrow('cancelado')
+    expect(report).toHaveBeenCalledTimes(1)
+    expect(report).toHaveBeenCalledWith({ method: 'GET', path: 'https://org/api/data/v9.2/WhoAmI', error: rede })
   })
 })
