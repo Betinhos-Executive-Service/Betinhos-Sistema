@@ -34,7 +34,9 @@ description: "Verifica a tela do checklist de vistoria no App Motoristas: tile d
     - Recarregar mantém Não OK + chips (rascunho no IndexedDB).
     - Enviar completo → "Enviando foto N de 6" (5 fotos puras + a do Não OK: a fila usa `checklistPhotoItems`).
     - Enviado: Pneus é o primeiro bloco, borda rosada, selo "Não OK", problemas separados por " · ", observação e "Ver foto 1". No enviado antigo do mock, Pneus mostra "OK" em texto neutro, na ordem do modelo.
-    - Mais de 10 problemas → "Escolha até 10 problemas." (teste; o mock tem só 4 opções).
+    - Mais de 10 problemas: marcar o 11º chip é recusado (`toggleChecklistProblema`): o chip fica sem marcar e "Escolha até 10 problemas." aparece sob o item na hora; desmarcar libera e o aviso some. O mock tem só 4 opções: para provar no navegador, aumente temporariamente `opcoesProblema` de "Pneus" em `mockItens` (src/lib/checklists.ts) para 12 e reverta depois.
+    - Contador "N de M itens": Não OK só conta com foto e problema; Não OK sozinho (ou só com chips, sem foto) não sobe o "1 de 9". OK conta.
+    - O servidor local responde em `http://127.0.0.1:<porta>` (em `localhost` o painel pode cair em outro servidor via IPv6 e mostrar "not found"). Worktree novo: o primeiro build do dev server leva alguns segundos.
 11. axe-core (cdnjs 4.10.2) no formulário e na lista → 0 Critical/Serious (o `page-has-heading-one` moderado é padrão do app inteiro).
 
 ## Casos de borda

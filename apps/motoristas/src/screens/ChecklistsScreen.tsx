@@ -25,6 +25,7 @@ import {
   isChecklistPending,
   isMockChecklists,
   uploadChecklistPhotoMock,
+  toggleChecklistProblema,
   validateChecklistDraft,
   type ChecklistDraft,
   type ChecklistFotoEnviada,
@@ -333,11 +334,12 @@ export function ChecklistsScreen({ items, loadStatus = "ready", selectedId, onSe
                     error={errors[item.chave]}
                     disabled={locked}
                     onChoose={(valor) => { updateDraft((current) => setChecklistOkNok(current, item.chave, valor)); clearError(item.chave); }}
-                    onToggleProblem={(problema) => { updateDraft((current) => {
-                      const atual = current.problemas?.[item.chave] ?? [];
-                      const next = atual.includes(problema) ? atual.filter((entry) => entry !== problema) : [...atual, problema];
-                      return { ...current, problemas: { ...(current.problemas ?? {}), [item.chave]: next } };
-                    }); clearError(item.chave); }}
+                    onToggleProblem={(problema) => {
+                      const { erro } = toggleChecklistProblema(draft, item.chave, problema);
+                      if (erro) { setErrors((current) => ({ ...current, [item.chave]: erro })); return; }
+                      updateDraft((current) => toggleChecklistProblema(current, item.chave, problema).draft);
+                      clearError(item.chave);
+                    }}
                     onObservation={(texto) => updateDraft((current) => ({ ...current, observacoes: { ...(current.observacoes ?? {}), [item.chave]: texto } }))}
                     onAddPhoto={() => setCapturingChave(item.chave)}
                     onOpenPhoto={(photoId, dataUrl) => setPhotoView({ chave: item.chave, dataUrl, photoId })}

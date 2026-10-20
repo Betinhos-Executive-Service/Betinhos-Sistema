@@ -45,7 +45,8 @@ description: "Verifica o backend do checklist de vistoria de veículo: plugin Ch
 - Reatribuição para o mesmo motorista não repete push; troca de motorista troca dono e marca push pendente.
 - Conclusão: outro usuário recusado; foto obrigatória ausente, link sem https e número inválido recusados; repetição não duplica fotos.
 - Checklist concluído não aceita edição nem exclusão; aberto aceita.
-- Item OK / Não OK (choice 100000003, código `okNok`): vazio obrigatório recusado ("Escolha OK ou Não OK"); Não OK exige foto, ao menos um problema e problema da lista do item (`new_opcoesproblema`, padrão Arranhado...Outro); OK descarta fotos, problemas e observação enviados; `new_temproblema` e `new_qtdproblemas` gravados na conclusão.
+- Item OK / Não OK (choice 100000003, código `okNok`): vazio obrigatório recusado ("Escolha OK ou Não OK"); Não OK exige foto, ao menos um problema e problema da lista do item (`new_opcoesproblema`, padrão Arranhado...Outro); OK descarta fotos, problemas e observação enviados; `new_temproblema` e `new_qtdproblemas` gravados na conclusão. Problemas repetidos (ex.: ["Murcho","Murcho"]) são deduplicados (ordinal, ordem preservada) antes do limite de 10 e da checagem das opções, e gravados sem duplicata; 10 distintos + 1 repetido passa.
+- Testes do plugin precisam de `plugins/DriverRecordSharing/DriverRecordSharing.snk` (ignorado pelo git): em worktree novo copie do checkout principal ou rode `generate-strong-name-key.ps1`, senão `dotnet test` falha com "Strong-name key not found".
 
 ## Evidência obrigatória
 - TRX dos testes do checklist e resumo da suíte completa.

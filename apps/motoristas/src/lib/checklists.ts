@@ -212,11 +212,24 @@ export function validateChecklistDraft(itens: ChecklistItem[], draft: ChecklistD
   return errors;
 }
 
+// Marca ou desmarca um problema do Não OK. Desmarcar é sempre livre; marcar além do limite é recusado e devolve o aviso.
+export function toggleChecklistProblema(draft: ChecklistDraft, chave: string, problema: string): { draft: ChecklistDraft; erro?: string } {
+  const atual = draft.problemas?.[chave] ?? [];
+  if (!atual.includes(problema) && atual.length >= CHECKLIST_MAX_PROBLEMAS) return { draft, erro: `Escolha até ${CHECKLIST_MAX_PROBLEMAS} problemas.` };
+  const next = atual.includes(problema) ? atual.filter((entry) => entry !== problema) : [...atual, problema];
+  return { draft: { ...draft, problemas: { ...(draft.problemas ?? {}), [chave]: next } } };
+}
+
+// Não OK só conta como preenchido com ao menos uma foto e um problema.
+const isChecklistItemDone = (item: ChecklistItem, draft: ChecklistDraft) => {
+  if (item.tipo === "foto") return (draft.fotos[item.chave] ?? []).length > 0;
+  const valor = (draft.valores[item.chave] ?? "").trim();
+  if (item.tipo === "okNok" && valor === "nok") return (draft.fotos[item.chave] ?? []).length > 0 && (draft.problemas?.[item.chave] ?? []).length > 0;
+  return Boolean(valor);
+};
+
 export function countChecklistProgress(itens: ChecklistItem[], draft: ChecklistDraft) {
-  const done = itens.filter((item) => item.tipo === "foto"
-    ? (draft.fotos[item.chave] ?? []).length > 0
-    : Boolean((draft.valores[item.chave] ?? "").trim())).length;
-  return { done, total: itens.length };
+  return { done: itens.filter((item) => isChecklistItemDone(item, draft)).length, total: itens.length };
 }
 
 // Mesmo formato que ChecklistAnswers.Validate espera: [{ chave, valor, fotos: [{ link, caminho, nomeArquivo }] }].

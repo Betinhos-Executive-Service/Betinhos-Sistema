@@ -16,6 +16,7 @@ import {
   normalizeChecklistNumber,
   parseChecklistItems,
   setChecklistOkNok,
+  toggleChecklistProblema,
   validateChecklistDraft,
   type ChecklistDraft,
   type ChecklistItem,
@@ -247,4 +248,30 @@ test("payload do okNok não repete problemas e o ok vai sem extras", () => {
 
 test("progresso conta okNok respondido", () => {
   assert.deepEqual(countChecklistProgress([okNokItem()], draftWith({ valores: { pneus: "ok" } })), { done: 1, total: 1 });
+});
+
+test("marcar o 11º problema é recusado com aviso e desmarcar continua livre", () => {
+  const opcoes = Array.from({ length: 12 }, (_, index) => `Problema ${index + 1}`);
+  const cheio = draftWith({ valores: { pneus: "nok" }, problemas: { pneus: opcoes.slice(0, 10) } });
+  const recusado = toggleChecklistProblema(cheio, "pneus", opcoes[10]);
+  assert.equal(recusado.erro, "Escolha até 10 problemas.");
+  assert.deepEqual(recusado.draft.problemas?.pneus, opcoes.slice(0, 10));
+  const livre = toggleChecklistProblema(cheio, "pneus", opcoes[0]);
+  assert.equal(livre.erro, undefined);
+  assert.deepEqual(livre.draft.problemas?.pneus, opcoes.slice(1, 10));
+  const nono = toggleChecklistProblema(draftWith({ problemas: { pneus: opcoes.slice(0, 9) } }), "pneus", opcoes[9]);
+  assert.equal(nono.erro, undefined);
+  assert.equal(nono.draft.problemas?.pneus?.length, 10);
+});
+
+test("progresso só conta Não OK com foto e problema", () => {
+  const item = okNokItem();
+  const foto = { id: "f", dataUrl: "d" };
+  const done = (parts: Partial<ChecklistDraft>) => countChecklistProgress([item], draftWith(parts)).done;
+  assert.equal(done({}), 0);
+  assert.equal(done({ valores: { pneus: "ok" } }), 1);
+  assert.equal(done({ valores: { pneus: "nok" } }), 0);
+  assert.equal(done({ valores: { pneus: "nok" }, problemas: { pneus: ["Murcho"] } }), 0);
+  assert.equal(done({ valores: { pneus: "nok" }, fotos: { pneus: [foto] } }), 0);
+  assert.equal(done({ valores: { pneus: "nok" }, fotos: { pneus: [foto] }, problemas: { pneus: ["Murcho"] } }), 1);
 });
