@@ -24,9 +24,6 @@ concurrency:
   group: deploy-dev
   cancel-in-progress: true
 
-env:
-  BUILD_NUMBER: ${{ github.run_number }}
-
 jobs:
   # DEV é não gerenciado e é onde schema e flows são editados; aqui só a tela é publicada.
   dev:

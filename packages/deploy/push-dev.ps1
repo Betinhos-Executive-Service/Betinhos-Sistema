@@ -4,7 +4,8 @@ param(
   [Parameter(Mandatory = $true)] [string] $DisplayName,
   [string] $LoaderName = "",
   [string] $TenantId = "organizations",
-  [switch] $DeviceCode
+  [switch] $DeviceCode,
+  [switch] $Build
 )
 
 # Publica o WebResource (dist/webresource.html) e o carregador opcional no Dataverse DEV,
@@ -16,6 +17,7 @@ if ($PSVersionTable.PSEdition -eq "Core") {
   $arguments = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $PSCommandPath, "-AppDir", $AppDir, "-ResourceName", $ResourceName, "-DisplayName", $DisplayName, "-TenantId", $TenantId)
   if ($LoaderName) { $arguments += @("-LoaderName", $LoaderName) }
   if ($DeviceCode) { $arguments += "-DeviceCode" }
+  if ($Build) { $arguments += "-Build" }
   & $windowsPowerShell @arguments
   exit $LASTEXITCODE
 }
@@ -59,56 +61,6 @@ $solutionUniqueName = Get-Setting "DV_SOLUTION"
 if ([string]::IsNullOrWhiteSpace($solutionUniqueName)) { throw "DV_SOLUTION ausente no .env." }
 
 $apiBaseUrl = "$environmentBaseUrl/api/data/v9.2"
-$resourcePath = Join-Path $appRoot "dist\webresource.html"
-if (-not (Test-Path -LiteralPath $resourcePath)) { throw "WebResource nao encontrado: $resourcePath. Rode o build antes." }
-
-$targets = @()
-# Code splitting: os chunks JS (dist/webresource-assets.json, gerado pelo inline-webresource) entram antes do HTML.
-# Nome com hash: chunk com o mesmo conteudo do ambiente nao e reenviado (Publish-WebResource compara o base64).
-# Depois de publicar, apaga os chunks que nao sao do build novo nem do build que estava publicado
-# (chunk-cleanup.ps1): a aba aberta com a versao anterior ainda os encontra, e o lixo nao acumula.
-$resourceHtml = [IO.File]::ReadAllText($resourcePath, [Text.Encoding]::UTF8)
-$chunkManifestPath = Join-Path $appRoot "dist\webresource-assets.json"
-$chunkNames = @()
-if (Test-Path -LiteralPath $chunkManifestPath) {
-  $chunkPrefix = ($ResourceName -replace '\.html$', '') + "/assets/"
-  # Em variavel: no PowerShell 5.1 o ConvertFrom-Json devolve o array inteiro como um item so do pipeline.
-  $chunkList = [IO.File]::ReadAllText($chunkManifestPath, [Text.Encoding]::UTF8) | ConvertFrom-Json
-  foreach ($chunk in $chunkList) {
-    if (-not $chunk.name.StartsWith($chunkPrefix, [StringComparison]::Ordinal)) { throw "Chunk $($chunk.name) fora do prefixo $chunkPrefix. Deploy abortado." }
-    if ($chunk.name -notmatch '^[A-Za-z0-9_]+(/[A-Za-z0-9.]+)+\.js$') { throw "Nome de chunk invalido para WebResource: $($chunk.name)." }
-    $chunkPath = Join-Path $appRoot ("dist\" + $chunk.file.Replace("/", "\"))
-    if (-not (Test-Path -LiteralPath $chunkPath)) { throw "Chunk ausente no build: $chunkPath. Deploy abortado." }
-    $chunkNames += $chunk.name
-    $targets += @{ Name = $chunk.name; Display = "$DisplayName - $($chunk.file)"; Path = $chunkPath; Type = 3 }
-  }
-  if ($chunkNames.Count -eq 0) { throw "webresource-assets.json sem chunks. Rode o build de novo." }
-}
-# Vale com ou sem manifesto: script externo citado no HTML precisa ser publicado junto.
-foreach ($reference in [regex]::Matches($resourceHtml, '<script[^>]+src="/WebResources/([^"]+\.js)"|<link[^>]+href="/WebResources/([^"]+\.js)"')) {
-  $referenced = @($reference.Groups[1].Value, $reference.Groups[2].Value) | Where-Object { $_ } | Select-Object -First 1
-  if ($chunkNames -notcontains $referenced) { throw "webresource.html referencia /WebResources/$referenced, que nao esta em webresource-assets.json. Rode o build de novo." }
-}
-$targets += @{ Name = $ResourceName; Display = $DisplayName; Path = $resourcePath; Type = 1 }
-if ($LoaderName) {
-  $template = [IO.File]::ReadAllText((Join-Path $PSScriptRoot "loader.template.html"), [Text.Encoding]::UTF8)
-  $loaderPath = Join-Path $appRoot "dist\loader.html"
-  $loaderHtml = $template.Replace("{{RESOURCE}}", $ResourceName).Replace("{{TITLE}}", $DisplayName)
-  [IO.File]::WriteAllText($loaderPath, $loaderHtml, (New-Object Text.UTF8Encoding($false)))
-  $targets += @{ Name = $LoaderName; Display = "$DisplayName (carregador)"; Path = $loaderPath; Type = 1 }
-}
-
-# Arquivos de apoio (icones, manifesto do app instalavel): o nome do arquivo e o nome do WebResource.
-# Tipos do Dataverse: 3 = Script (nao ha tipo JSON; o manifesto vai como Script), 5 = PNG, 10 = ICO, 11 = SVG.
-$assetTypes = @{ ".webmanifest" = 3; ".js" = 3; ".png" = 5; ".ico" = 10; ".svg" = 11 }
-$assetsDir = Join-Path $appRoot "dist\WebResources"
-if (Test-Path -LiteralPath $assetsDir) {
-  foreach ($asset in Get-ChildItem -LiteralPath $assetsDir -File) {
-    $extension = $asset.Extension.ToLowerInvariant()
-    if (-not $assetTypes.ContainsKey($extension)) { throw "Tipo de arquivo sem mapeamento de WebResource: $($asset.Name)" }
-    $targets += @{ Name = $asset.Name; Display = "$DisplayName - $($asset.BaseName)"; Path = $asset.FullName; Type = $assetTypes[$extension] }
-  }
-}
 
 Write-Step "autenticacao em $environmentHost"
 $clientSecret = Get-Setting "DV_CLIENT_SECRET"
@@ -149,7 +101,71 @@ if ($solutions.Count -ne 1) { throw "Solucao $solutionUniqueName nao encontrada 
 if ($solutions[0].ismanaged) { throw "Solucao $solutionUniqueName esta gerenciada neste ambiente. Deploy abortado." }
 $solutionId = $solutions[0].solutionid
 
-function Publish-WebResource([string] $Name, [string] $Display, [string] $Path, [int] $Type) {
+# -Build: compila aqui, depois de autenticar, para a versao partir da que ja esta no DEV (publicada pelo CI ou localmente).
+# Sem isso o CI, que nao commita o package.json, e o push local numeram cada um pelo repo e a versao retrocede.
+if ($Build) {
+  $publishedDescription = @((Invoke-RestMethod -Method Get -Uri "$apiBaseUrl/webresourceset?`$select=description&`$filter=name eq '$(Escape-OData $ResourceName)'" -Headers $headers).value | ForEach-Object { $_.description })
+  $env:PUBLISHED_VERSION = if ($publishedDescription.Count -eq 1 -and $publishedDescription[0] -match '^v(\d+\.\d+\.\d+)') { $Matches[1] } else { "" }
+  Write-Step "versao publicada no DEV: $(if ($env:PUBLISHED_VERSION) { "v$env:PUBLISHED_VERSION" } else { 'desconhecida' })"
+  Push-Location $appRoot
+  try { & pnpm build; if ($LASTEXITCODE -ne 0) { throw "pnpm build falhou ($LASTEXITCODE)." } }
+  finally { Pop-Location; Remove-Item Env:PUBLISHED_VERSION -ErrorAction SilentlyContinue }
+}
+
+$resourcePath = Join-Path $appRoot "dist\webresource.html"
+if (-not (Test-Path -LiteralPath $resourcePath)) { throw "WebResource nao encontrado: $resourcePath. Rode o build antes." }
+
+$targets = @()
+# Code splitting: os chunks JS (dist/webresource-assets.json, gerado pelo inline-webresource) entram antes do HTML.
+# Nome com hash: chunk com o mesmo conteudo do ambiente nao e reenviado (Publish-WebResource compara o base64).
+# Depois de publicar, apaga os chunks que nao sao do build novo nem do build que estava publicado
+# (chunk-cleanup.ps1): a aba aberta com a versao anterior ainda os encontra, e o lixo nao acumula.
+$resourceHtml = [IO.File]::ReadAllText($resourcePath, [Text.Encoding]::UTF8)
+$chunkManifestPath = Join-Path $appRoot "dist\webresource-assets.json"
+$chunkNames = @()
+if (Test-Path -LiteralPath $chunkManifestPath) {
+  $chunkPrefix = ($ResourceName -replace '\.html$', '') + "/assets/"
+  # Em variavel: no PowerShell 5.1 o ConvertFrom-Json devolve o array inteiro como um item so do pipeline.
+  $chunkList = [IO.File]::ReadAllText($chunkManifestPath, [Text.Encoding]::UTF8) | ConvertFrom-Json
+  foreach ($chunk in $chunkList) {
+    if (-not $chunk.name.StartsWith($chunkPrefix, [StringComparison]::Ordinal)) { throw "Chunk $($chunk.name) fora do prefixo $chunkPrefix. Deploy abortado." }
+    if ($chunk.name -notmatch '^[A-Za-z0-9_]+(/[A-Za-z0-9.]+)+\.js$') { throw "Nome de chunk invalido para WebResource: $($chunk.name)." }
+    $chunkPath = Join-Path $appRoot ("dist\" + $chunk.file.Replace("/", "\"))
+    if (-not (Test-Path -LiteralPath $chunkPath)) { throw "Chunk ausente no build: $chunkPath. Deploy abortado." }
+    $chunkNames += $chunk.name
+    $targets += @{ Name = $chunk.name; Display = "$DisplayName - $($chunk.file)"; Path = $chunkPath; Type = 3 }
+  }
+  if ($chunkNames.Count -eq 0) { throw "webresource-assets.json sem chunks. Rode o build de novo." }
+}
+# Vale com ou sem manifesto: script externo citado no HTML precisa ser publicado junto.
+foreach ($reference in [regex]::Matches($resourceHtml, '<script[^>]+src="/WebResources/([^"]+\.js)"|<link[^>]+href="/WebResources/([^"]+\.js)"')) {
+  $referenced = @($reference.Groups[1].Value, $reference.Groups[2].Value) | Where-Object { $_ } | Select-Object -First 1
+  if ($chunkNames -notcontains $referenced) { throw "webresource.html referencia /WebResources/$referenced, que nao esta em webresource-assets.json. Rode o build de novo." }
+}
+# A descricao do HTML guarda a versao publicada: o proximo push -Build parte dela.
+$builtVersion = (Get-Content -Raw (Join-Path $appRoot "package.json") | ConvertFrom-Json).version
+$targets += @{ Name = $ResourceName; Display = $DisplayName; Path = $resourcePath; Type = 1; Description = "v$builtVersion" }
+if ($LoaderName) {
+  $template = [IO.File]::ReadAllText((Join-Path $PSScriptRoot "loader.template.html"), [Text.Encoding]::UTF8)
+  $loaderPath = Join-Path $appRoot "dist\loader.html"
+  $loaderHtml = $template.Replace("{{RESOURCE}}", $ResourceName).Replace("{{TITLE}}", $DisplayName)
+  [IO.File]::WriteAllText($loaderPath, $loaderHtml, (New-Object Text.UTF8Encoding($false)))
+  $targets += @{ Name = $LoaderName; Display = "$DisplayName (carregador)"; Path = $loaderPath; Type = 1 }
+}
+
+# Arquivos de apoio (icones, manifesto do app instalavel): o nome do arquivo e o nome do WebResource.
+# Tipos do Dataverse: 3 = Script (nao ha tipo JSON; o manifesto vai como Script), 5 = PNG, 10 = ICO, 11 = SVG.
+$assetTypes = @{ ".webmanifest" = 3; ".js" = 3; ".png" = 5; ".ico" = 10; ".svg" = 11 }
+$assetsDir = Join-Path $appRoot "dist\WebResources"
+if (Test-Path -LiteralPath $assetsDir) {
+  foreach ($asset in Get-ChildItem -LiteralPath $assetsDir -File) {
+    $extension = $asset.Extension.ToLowerInvariant()
+    if (-not $assetTypes.ContainsKey($extension)) { throw "Tipo de arquivo sem mapeamento de WebResource: $($asset.Name)" }
+    $targets += @{ Name = $asset.Name; Display = "$DisplayName - $($asset.BaseName)"; Path = $asset.FullName; Type = $assetTypes[$extension] }
+  }
+}
+
+function Publish-WebResource([string] $Name, [string] $Display, [string] $Path, [int] $Type, [string] $Description) {
   $escapedName = Escape-OData $Name
   $lookupUri = "$apiBaseUrl/webresourceset?`$select=webresourceid,name,webresourcetype,content&`$filter=name eq '$escapedName'"
   $found = @((Invoke-RestMethod -Method Get -Uri $lookupUri -Headers $headers).value)
@@ -157,7 +173,9 @@ function Publish-WebResource([string] $Name, [string] $Display, [string] $Path, 
   $content = [Convert]::ToBase64String([IO.File]::ReadAllBytes($Path))
   if ($found.Count -eq 0) {
     Write-Step "criando $Name na solucao $solutionUniqueName"
-    $body = @{ name = $Name; displayname = $Display; webresourcetype = $Type; content = $content; isenabledformobileclient = $true } | ConvertTo-Json -Depth 4
+    $fields = @{ name = $Name; displayname = $Display; webresourcetype = $Type; content = $content; isenabledformobileclient = $true }
+    if ($Description) { $fields.description = $Description }
+    $body = $fields | ConvertTo-Json -Depth 4
     Invoke-RestMethod -Method Post -Uri "$apiBaseUrl/webresourceset" -Headers $headers -ContentType "application/json; charset=utf-8" -Body $body | Out-Null
     $id = @((Invoke-RestMethod -Method Get -Uri $lookupUri -Headers $headers).value)[0].webresourceid
   }
@@ -167,7 +185,9 @@ function Publish-WebResource([string] $Name, [string] $Display, [string] $Path, 
     if ($found[0].content -eq $content) { Write-Step "$Name sem mudanca" }
     else {
       Write-Step "atualizando $Name"
-      $body = @{ displayname = $Display; content = $content; isenabledformobileclient = $true } | ConvertTo-Json -Depth 4
+      $fields = @{ displayname = $Display; content = $content; isenabledformobileclient = $true }
+      if ($Description) { $fields.description = $Description }
+      $body = $fields | ConvertTo-Json -Depth 4
       Invoke-RestMethod -Method Patch -Uri "$apiBaseUrl/webresourceset($id)" -Headers $headers -ContentType "application/json; charset=utf-8" -Body $body | Out-Null
     }
   }
@@ -187,7 +207,7 @@ if ($chunkNames.Count) {
   Write-Step "build publicado antes deste push: $($previousChunks.Count) chunks"
 }
 
-$resources = @($targets | ForEach-Object { Publish-WebResource $_.Name $_.Display $_.Path $_.Type })
+$resources = @($targets | ForEach-Object { Publish-WebResource $_.Name $_.Display $_.Path $_.Type $_['Description'] })
 $publishXml = "<importexportxml><webresources>" + (($resources | ForEach-Object { "<webresource>$($_.Id)</webresource>" }) -join "") + "</webresources></importexportxml>"
 Write-Step "publicando WebResources"
 Invoke-RestMethod -Method Post -Uri "$apiBaseUrl/PublishXml" -Headers $headers -ContentType "application/json; charset=utf-8" -Body (@{ ParameterXml = $publishXml } | ConvertTo-Json) | Out-Null
@@ -203,7 +223,6 @@ if ($chunkNames.Count) {
   Remove-ObsoleteChunks $apiBaseUrl $headers $chunkPrefix ($chunkNames + $previousChunks) | Out-Null
 }
 
-$builtVersion = (Get-Content -Raw (Join-Path $appRoot "package.json") | ConvertFrom-Json).version
 $openName = $ResourceName
 if ($LoaderName) { $openName = $LoaderName }
 Write-Host "PUSH CONCLUIDO: v$builtVersion - $(($resources | ForEach-Object { $_.Name }) -join ', ') validados em $solutionUniqueName"
