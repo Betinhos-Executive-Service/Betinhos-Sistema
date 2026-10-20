@@ -7,11 +7,11 @@ description: "Verifica o preparo da VM cloud do Claude Code do App Motoristas (s
 ## Cobre
 - Código: `scripts/cloud-setup.sh`, `scripts/testa-cloud-setup.sh`, `.claude/hooks/session-start.sh`, `.claude/settings.json` (hook `SessionStart`, `startup|resume`, timeout 600 s), `package-lock.json`, `.gitattributes` (`*.sh` em LF).
 - O hook só age com `CLAUDE_CODE_REMOTE=true`, grava o PATH do Node no `$CLAUDE_ENV_FILE` (o shell da sessão não lê `~/.bashrc`) e nunca bloqueia a sessão: falha vira o resumo `[cloud-setup] FALHOU ...` no contexto.
-- Resultado: VM Linux limpa com Node 24, `npm ci` pelo `package-lock.json` (não pnpm), Chromium reaproveitado da imagem (`$PLAYWRIGHT_BROWSERS_PATH`, build 1194 = `playwright@1.56.1`) ou instalado fora dela (falha só gera AVISO), `tsc` estrito e `npm test` passando, sem depender de token.
+- Resultado: VM Linux limpa com Node 24, `npm ci` pelo `package-lock.json` (não pnpm), Chromium reaproveitado da imagem (`$PLAYWRIGHT_BROWSERS_PATH`, build 1194 = `playwright@1.56.1`) ou instalado fora dela (falha só gera AVISO), `tsc` estrito e `npm test` passando. Exige `NODE_AUTH_TOKEN` (read:packages) para o `@betinhos-executive-service/ui` do GitHub Packages; sem ele para com `ERRO: defina NODE_AUTH_TOKEN`, sem gravar `~/.npmrc` (o `.npmrc` do repo lê a variável).
 
 ## Preparar ambiente
 - Linux limpo que simula a VM. Nesta máquina (Windows): WSL `Ubuntu` como root, em pasta e HOME descartáveis (`/root/sb-motoristas`, `/root/sbhome-motoristas`). Outras sessões usam o mesmo WSL com sufixos próprios; não use `/root/sb`.
-- Não precisa de token (o projeto não usa GitHub Packages).
+- Token: `export NODE_AUTH_TOKEN=$(gh auth token)` e `export WSLENV=NODE_AUTH_TOKEN/u` antes do `wsl.exe` (o script aborta sem ele). Nunca grave o token em arquivo.
 
 ## Roteiro
 1. `bash -n scripts/cloud-setup.sh && bash -n scripts/testa-cloud-setup.sh` → sem saída de erro.
@@ -25,7 +25,8 @@ description: "Verifica o preparo da VM cloud do Claude Code do App Motoristas (s
    wsl.exe -d Ubuntu -u root bash /mnt/c/Users/mendo/AppData/Local/Temp/testa-motoristas.sh /mnt/c/Users/mendo/AppData/Local/Temp/repo-motoristas.tar
    ```
    (`/tmp` do Git Bash = `C:\Users\mendo\AppData\Local\Temp`.) Esperado:
-   - `run1 (limpa, sem token) exit=0 | [cloud-setup] Pronto. ...`
+   - `run0 (sem token) exit=1 | 1 aviso de token`
+   - `run1 (limpa, com token) exit=0 | [cloud-setup] Pronto. ...`
    - `run2 (2a execucao) exit=0 | [cloud-setup] Pronto. ... | reinstalou Node: 0` (idempotente)
    - `run3 (Chromium da imagem) exit=0 | 1 reaproveitamento, 0 downloads` (simula a VM real, que já traz Chromium em `$PLAYWRIGHT_BROWSERS_PATH` e bloqueia o CDN)
    - `testes: ℹ pass N ℹ fail 0`

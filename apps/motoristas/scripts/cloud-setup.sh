@@ -5,7 +5,8 @@
 # (modo mock em localhost) no Chromium headless. Idempotente.
 #
 # Adaptado do modelo genérico: o repo tem dois lockfiles e o oficial é o package-lock.json (npm,
-# atualizado a cada build); o pnpm-lock.yaml está defasado. Não precisa de NODE_AUTH_TOKEN (sem GitHub Packages).
+# atualizado a cada build); o pnpm-lock.yaml está defasado. Exige NODE_AUTH_TOKEN (token GitHub com read:packages)
+# nas variáveis do ambiente cloud: o logger de erros vem de @betinhos-executive-service/ui no GitHub Packages.
 # Nunca coloque credenciais do Dataverse aqui: a VM não publica nada (ver CLAUDE.md, "Ambiente cloud").
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -38,7 +39,11 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   echo "export PATH=\"$(dirname "$(command -v node)"):\$PATH\"" >> "$CLAUDE_ENV_FILE"
 fi
 
-# 2. Dependências pelo lockfile oficial (npm)
+# 2. Dependências pelo lockfile oficial (npm). O .npmrc do repo lê o token de NODE_AUTH_TOKEN.
+if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+  echo "[cloud-setup] ERRO: defina NODE_AUTH_TOKEN (token GitHub com read:packages) nas variáveis do ambiente cloud." >&2
+  exit 1
+fi
 npm ci --no-audit --no-fund
 
 # 3. Navegador headless para as skills verificar-<area> (screenshots da UI em modo mock).
