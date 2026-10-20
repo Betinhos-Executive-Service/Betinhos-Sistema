@@ -1,6 +1,7 @@
 .memsearch/
 .worktrees/
-.claude/
+.claude/*
+!.claude/skills/
 *.tsbuildinfo
 node_modules/
 dist/
@@ -9,3 +10,4 @@ dist/
 *.log
 !.env.example
 out/
+.verificacao/
