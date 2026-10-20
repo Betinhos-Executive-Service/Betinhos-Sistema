@@ -38,11 +38,11 @@ describe('queries', () => {
     expect(parsePage({ value: [], '@Microsoft.Dynamics.CRM.totalrecordcount': -1 }).total).toBeNull()
   })
   it('busca de lookup e releitura da linha', () => {
-    expect(searchPath('cr40f_funcionarioses', 'cr40f_funcionariosid', 'cr40f_nomecompleto', "jo'ao")).toBe("cr40f_funcionarioses?$select=cr40f_funcionariosid,cr40f_nomecompleto&$filter=statecode%20eq%200%20and%20startswith(cr40f_nomecompleto%2C'jo''ao')&$orderby=cr40f_nomecompleto%20asc&$top=25")
+    expect(searchPath('cr40f_funcionarioses', 'cr40f_funcionariosid', 'cr40f_nomecompleto', "jo'ao")).toBe("cr40f_funcionarioses?$select=cr40f_funcionariosid,cr40f_nomecompleto&$filter=statecode%20eq%200%20and%20contains(cr40f_nomecompleto%2C'jo''ao')&$orderby=cr40f_nomecompleto%20asc&$top=25")
     const filter = (q: string) => decodeURIComponent(/\$filter=([^&]*)/.exec(searchPath('s', 'id', 'nome', q))?.[1] ?? '')
-    expect(filter('  Sil ')).toBe("statecode eq 0 and startswith(nome,'Sil')")
-    expect(filter('50%_[x]')).toBe("statecode eq 0 and startswith(nome,'50[%][_][[]x]')")
-    expect(filter("-'João")).toBe("statecode eq 0 and startswith(nome,'João')")
+    expect(filter('  Lima ')).toBe("statecode eq 0 and contains(nome,'Lima')")
+    expect(filter('50%_[x]')).toBe("statecode eq 0 and contains(nome,'50[%][_][[]x]')")
+    expect(filter("d'água")).toBe("statecode eq 0 and contains(nome,'d''água')")
     expect(filter('  ')).toBe('statecode eq 0')
     expect(searchPath('s', 'id', 'nome', 'a')).toContain('$top=25')
     expect(reloadPath('cr40f_reservadeveculoses', '{ABC}', ['cr40f_id', '_cr40f_motorista_value', 'a_1.new_valortotal'])).toBe('cr40f_reservadeveculoses(abc)?$select=cr40f_reservadeveculosid,cr40f_id,_cr40f_motorista_value,statecode')
@@ -216,20 +216,20 @@ describe('source Dataverse', () => {
     const { host } = fakeHost({ request: () => { throw new DOMException('cancelado', 'AbortError') } })
     expect(await createSource(host).count({ fetchxml: '<fetch><entity name="cr40f_reservadeveculos" /></fetch>', query: '', quickFind: [] })).toBeNull()
   })
-  it('busca do mock segue o FetchXML real: prefixo no ID, contém no trajeto', async () => {
+  it('busca do mock segue o FetchXML real: termo em qualquer parte', async () => {
     const source = createSource({ mode: 'mock' }, { latency: 0 })
     const fetchxml = (await source.views()).find((v) => v.padrao)!.fetchxml
     const quickFind = await source.quickFind()
     const ask = async (query: string) => (await source.page({ fetchxml, page: 1, cookie: null, sort: null, query, quickFind })).rows
     expect((await ask('Unique')).every((r) => String(r.cr40f_trajeto).includes('Unique'))).toBe(true)
     expect((await ask('Unique')).length).toBeGreaterThan(0)
-    // "1013" acha a OS-1013 pelo número; "S-1013" (meio do código) não acha mais nada.
+    // Meio do código e do trajeto também acham.
     expect((await ask('1013')).map((r) => r.cr40f_id)).toContain('OS-1013')
-    expect(await ask('S-1013')).toEqual([])
-    expect((await ask('os-1013')).map((r) => r.cr40f_id)).toEqual(['OS-1013'])
-    // Lookup do mock por prefixo, como o startswith real.
-    expect((await source.search('cr40f_motorista', 'car')).map((o) => o.nome)).toEqual(['Carlos Lima'])
-    expect(await source.search('cr40f_motorista', 'lima')).toEqual([])
+    expect((await ask('S-1013')).map((r) => r.cr40f_id)).toEqual(['OS-1013'])
+    expect((await ask('fasano')).every((r) => String(r.cr40f_trajeto).includes('Fasano'))).toBe(true)
+    // Lookup do mock com o termo em qualquer parte, como o contains real.
+    expect((await source.search('cr40f_motorista', 'lima')).map((o) => o.nome)).toEqual(['Carlos Lima'])
+    expect(await source.search('cr40f_motorista', 'zzz')).toEqual([])
   })
   it('count pede a agregação por FetchXML e devolve o número; erro vira null', async () => {
     const { host, request } = fakeHost({ request: () => ({ value: [{ total: 1234 }] }) })

@@ -240,7 +240,7 @@ export function applyMockFetch(rows: Row[], fetchxml: string, { page, pageSize, 
   const entity = Array.from(doc.documentElement.children).find((c) => c.tagName === 'entity')
   if (!entity || doc.getElementsByTagName('parsererror').length) throw new Error('FetchXML da visão inválido.')
   const roots = Array.from(entity.children).filter((c) => c.tagName === 'filter')
-  // Mesmas condições que o FetchXML real leva (prefixo ou contém por campo).
+  // Mesmas condições que o FetchXML real leva.
   const search = searchConditions(query, quickFind)
 
   const filtered = rows.filter((row) =>

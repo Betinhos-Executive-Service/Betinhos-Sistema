@@ -22,7 +22,7 @@ export function applySort(doc: Document, entity: Element, sort: NonNullable<Sort
   ;(link ?? entity).appendChild(order)
 }
 
-/** Busca por palavra-chave: filtro OR com `like` nos campos de localização rápida (prefixo ou contém, ver `searchConditions`). */
+/** Busca por palavra-chave: filtro OR com `like '%termo%'` nos campos de localização rápida (ver `searchConditions`). */
 function injectSearch(doc: Document, entity: Element, query: string, quickFind: string[]) {
   const conditions = searchConditions(query, quickFind)
   if (!conditions.length) return

@@ -407,9 +407,9 @@ describe('useGeral: rolagem infinita', () => {
     act(() => result.current.setQuery('V'))
     await waitFor(() => expect(result.current.query).toBe('V'))
     await waitFor(() => expect(result.current.loading).toBe(false))
-    // Prefixo em todos os campos: só trajetos que começam com "V" (VCP → Alphaville), não os que têm "v" no meio.
-    expect(result.current.rows.length).toBeGreaterThan(0)
-    expect(result.current.rows.every((r) => String(r.cr40f_trajeto).startsWith('V'))).toBe(true)
+    // Abrangente: "v" em qualquer parte (VCP → Alphaville, Aeroporto de Viracopos, Hotel Tivoli…).
+    expect(result.current.pageError).toBeNull()
+    expect(result.current.rows.some((r) => !String(r.cr40f_trajeto).startsWith('V') && /v/i.test(String(r.cr40f_trajeto)))).toBe(true)
   })
 
   it('erro de rede no meio da rolagem mantém as linhas, para de pedir e retoma ao tentar de novo', async () => {

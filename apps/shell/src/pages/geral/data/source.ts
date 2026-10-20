@@ -205,8 +205,7 @@ function createMockSource({ latency = 1 }: SourceOptions = {}): Source {
       await wait(150)
       const fold = (v: string) => v.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
       const q = fold(text.trim())
-      // Prefixo, como o `startswith` de `searchPath`.
-      return (MOCK_LOOKUPS[attribute] ?? []).filter((o) => fold(o.nome).startsWith(q))
+      return (MOCK_LOOKUPS[attribute] ?? []).filter((o) => fold(o.nome).includes(q))
     },
     async reload(id, _keys) {
       await wait(100)

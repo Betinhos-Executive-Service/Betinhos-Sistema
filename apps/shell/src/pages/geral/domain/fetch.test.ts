@@ -56,7 +56,7 @@ describe('buildFetch', () => {
     expect(doc.querySelector('link-entity > order')?.getAttribute('attribute')).toBe('new_valortotal')
   })
 
-  it('busca vira filtro OR com like: prefixo no ID, contém no trajeto', () => {
+  it('busca vira filtro OR com like em qualquer parte de cada campo', () => {
     const doc = parse(buildFetch(AGENDA, { ...base, query: "OS-19 d'água", quickFind: ['cr40f_id', 'cr40f_trajeto'] }))
     const filters = doc.querySelectorAll('entity > filter')
     expect(filters.length).toBe(2)
@@ -65,7 +65,7 @@ describe('buildFetch', () => {
     const conditions = Array.from(or.querySelectorAll('condition'))
     expect(conditions.map((c) => c.getAttribute('attribute'))).toEqual(['cr40f_id', 'cr40f_trajeto'])
     expect(conditions[0].getAttribute('operator')).toBe('like')
-    expect(conditions[0].getAttribute('value')).toBe("OS-19 d'água%")
+    expect(conditions[0].getAttribute('value')).toBe("%OS-19 d'água%")
     expect(conditions[1].getAttribute('value')).toBe("%OS-19 d'água%")
   })
 
@@ -109,7 +109,7 @@ describe('buildCountFetch', () => {
     const doc = count("OS-19 d'água", ['cr40f_id', 'cr40f_trajeto'])
     const filters = doc.querySelectorAll('entity > filter')
     expect(filters.length).toBe(2)
-    expect(Array.from(filters[1].querySelectorAll('condition')).map((c) => c.getAttribute('value'))).toEqual(["OS-19 d'água%", "%OS-19 d'água%"])
+    expect(Array.from(filters[1].querySelectorAll('condition')).map((c) => c.getAttribute('value'))).toEqual(["%OS-19 d'água%", "%OS-19 d'água%"])
     expect(count('   ', ['cr40f_id']).querySelectorAll('entity > filter').length).toBe(1)
   })
 
