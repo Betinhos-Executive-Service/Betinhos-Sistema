@@ -13,6 +13,7 @@ description: "Verifica o workflow Deploy do GitHub Actions que publica a tela do
 3. Execução real (publica a `main` atual no DEV; só com ok do Renan na primeira vez): `gh workflow run deploy.yml --ref dev`, depois `gh run watch <id> --exit-status` → sucesso; no resumo da execução "Publicado no DEV - vX.Y.Z".
 4. DEV mostra a mesma versão: rodapé de `https://org23b93544.crm2.dynamics.com/WebResources/cr40f_SistemaBetinhos.html` (force o cache, ver verificar-shell) = vX.Y.Z do passo 3, maior que a anterior.
 5. Custo: duração do job no resumo da execução (referência: alguns minutos; acima de 15 é cancelado).
+6. Versão nunca retrocede (`packages/deploy/bump-version.mjs` + `push-dev.ps1 -Build`): `node --test packages/deploy/bump-version.test.mjs` → 5 passam. No log do job: `[push-dev] versao publicada no DEV: vA` seguido de `Build vB` com B > A; no DEV, a descrição de `cr40f_SistemaBetinhos.html` = `vB` (`webresourceset?$select=description`). Um `pnpm push` local logo depois deve publicar vB+1, não voltar ao número do repo. Primeira execução após esta mudança mostra "desconhecida" (descrição ainda vazia).
 
 ## Evidência obrigatória
 - Saída do passo 1 e, quando executado, link/id da execução e a versão do rodapé.
