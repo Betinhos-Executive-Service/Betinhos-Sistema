@@ -32,6 +32,25 @@ async function readError(response: Response) {
   return `HTTP ${response.status}`
 }
 
+export type FetchFailure = { method: string; path: string; status?: number; body?: unknown; error?: unknown }
+
+/** `fetch` que avisa `report` das respostas de erro (exceto 404, tratado pelas telas) e das falhas de rede; a resposta segue igual. */
+export function reportingFetch(report: (failure: FetchFailure) => void, fetchImpl: typeof fetch = (...args) => fetch(...args)): typeof fetch {
+  return async (input, init) => {
+    const method = (init?.method ?? 'GET').toUpperCase()
+    const path = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+    let response: Response
+    try {
+      response = await fetchImpl(input, init)
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) report({ method, path, error })
+      throw error
+    }
+    if (!response.ok && response.status !== 404) report({ method, path, status: response.status, body: await response.clone().json().catch(() => null) })
+    return response
+  }
+}
+
 export function createClient(clientUrl: string, fetchImpl: typeof fetch = (...args) => fetch(...args)): DataverseClient {
   const apiUrl = `${clientUrl.replace(/\/+$/, '')}/api/data/v9.2`
 
