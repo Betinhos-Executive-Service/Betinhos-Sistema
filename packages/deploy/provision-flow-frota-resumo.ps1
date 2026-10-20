@@ -37,9 +37,14 @@ $solution = @((Dv GET "solutions?`$select=solutionid&`$filter=uniquename eq '$so
 if ($solution.Count -ne 1) { throw 'Solução AppBetinhos ausente ou ambígua.' }
 $solutionId = $solution[0].solutionid
 
-function Include([string] $id, [int] $type) {
+function Include([string] $id, [int] $type, [string] $tabela = '') {
   $filter = "solutioncomponents?`$select=solutioncomponentid&`$filter=_solutionid_value eq $solutionId and componenttype eq $type and objectid eq $id"
   if (@((Dv GET $filter).value).Count) { return }
+  if ($tabela) {
+    # Tabela já na solução com todos os subcomponentes: a coluna vai junto e o Dataverse não grava linha própria para ela.
+    $tabelaId = (Dv GET "EntityDefinitions(LogicalName='$tabela')?`$select=MetadataId").MetadataId
+    if (@((Dv GET "solutioncomponents?`$select=solutioncomponentid&`$filter=_solutionid_value eq $solutionId and componenttype eq 1 and objectid eq $tabelaId and rootcomponentbehavior eq 0").value).Count) { return }
+  }
   Dv POST AddSolutionComponent @{ ComponentId = $id; ComponentType = $type; SolutionUniqueName = $solutionName; AddRequiredComponents = $false } | Out-Null
   if (-not @((Dv GET $filter).value).Count) { throw "Componente $type/$id não entrou na $solutionName." }
 }
@@ -62,7 +67,7 @@ if (-not $atributo.Count) {
   $atributo = @((Dv GET "EntityDefinitions(LogicalName='cr40f_funcionarios')/Attributes?`$select=MetadataId&`$filter=LogicalName eq '$coluna'").value)
   Dv POST PublishXml @{ ParameterXml = '<importexportxml><entities><entity>cr40f_funcionarios</entity></entities></importexportxml>' } | Out-Null
 }
-Include $atributo[0].MetadataId 2
+Include $atributo[0].MetadataId 2 'cr40f_funcionarios'
 
 # 3. Connection references (Dataverse e Office 365 Outlook).
 $refs = @((Dv GET "connectionreferences?`$select=connectionreferencelogicalname,connectorid&`$filter=statecode eq 0").value)
