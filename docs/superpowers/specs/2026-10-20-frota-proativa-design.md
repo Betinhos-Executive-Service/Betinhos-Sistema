@@ -13,10 +13,10 @@ A gestão de frota deixa de depender de alguém abrir a tela: o sistema avisa so
 - Pneu: **pelo plano preventivo** (km/data da última troca). Sem tabela de pneus na v1.
 
 ## Arquitetura (reutiliza o que existe)
-- Novo agente **Frota** no framework de agentes (`cr40f_agente` nova opção; `packages/agentes-ia/src/frota.ts`; case no Switch de `provision-flow-agentes-executar.ps1`; agendamento em `provision-flow-agentes-agendado.ps1`, 07:00 dias úteis).
-- Regras puras em `packages/agentes-ia/src/frota-regras.ts` (testadas com vitest), reaproveitando `apps/shell/src/pages/frota/domain/preventiva.ts` e `timeline.ts`. O flow monta o contexto com as consultas fixas; as regras rodam antes da IA e cada alerta vira um "achado" obrigatório no contexto. A IA não pode omitir achados (validação em `validar.ts`).
+- Novo agente **Frota** no framework de agentes (`cr40f_agente` nova opção; `packages/agentes-ia/src/frota.ts`; case no Switch de `provision-flow-agentes-executar.ps1`; agendamento em `provision-flow-agentes-agendado.ps1`, quarta 07:30, antes do e-mail).
+- Regras: Custom API C# `cr40f_FrotaPendencias` (`packages/plugins/Cr40f.Frota.Plugin`) e espelho TS em `apps/shell/src/pages/frota/domain/pendencias.ts`, com fixtures comuns. O agente recebe a saída da Custom API como achados obrigatórios; a IA não pode omitir achados (validação em `validar.ts`).
 - E-mail: flow "Frota | Resumo semanal", quarta 08:00, chama a Custom API; sem pendências não envia.
-- Custo: 1 execução agendada por dia (~22 ações/mês) mais as ações internas do flow; dentro do teto de 10.000 ações/mês.
+- Custo: 2 execuções por semana (agente + e-mail), desprezível frente ao teto de 10.000 ações/mês.
 
 ## Regras v1 (limiares configuráveis em variável de ambiente `new_FrotaLimiares` JSON)
 | # | Regra | Gatilho padrão | Proposta |
