@@ -107,8 +107,8 @@ test("wrapper grava pelo pacote compartilhado, avisa o usuário e redige e-mail 
     await settle();
     const record = created[1];
     assert.equal(record.new_appname, "App Motoristas");
-    assert.equal(record.new_appversion, "2.1.999");
-    assert.equal(record.new_builtat, "19/10/2026, 21:00");
+    assert.equal(record.new_appversion, "v2.1.999");
+    assert.equal(record.new_builtat, "19/10/2026 21:00");
     assert.equal(record.new_useremail, "pessoa.ficticia1@betinhos.com.br");
     assert.equal(record.new_errorcode, "0x80040220");
     assert.equal(record.new_action, "assinarComunicado");

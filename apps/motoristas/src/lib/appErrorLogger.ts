@@ -5,19 +5,13 @@ import {
   normalizeError as normalizeLoggedError,
   pendingErrorLogs
 } from "@betinhos-executive-service/ui/error-logger.js";
+import { formatBuildStamp, getBuildInfo } from "./buildStamp.ts";
 
 // Wrapper do App Motoristas sobre o logger compartilhado (@betinhos-executive-service/ui/error-logger).
 // O pacote grava em new_appmotoristaslog e cuida de fila, retry, dedupe e usuário. Aqui ficam o que é só
 // do app: aviso ao usuário (evento appmotoristas:error), captura de console.error e redação de e-mail/telefone.
 
-type BuildInfo = {
-  version?: string;
-  builtAt?: string;
-  builtAtLabel?: string;
-};
-
 type WindowWithRuntime = Window & {
-  __APP_BUILD_INFO?: BuildInfo;
   __APP_ERROR_LOGGER_INSTALLED?: boolean;
   __APP_REPORT_ERROR?: (error: unknown, context?: AppErrorLogContext) => void;
 };
@@ -147,12 +141,13 @@ function ensureConfigured() {
   if (configured) return;
   configured = true;
   migrateLegacyQueue();
-  const build = getWindowRuntime()?.__APP_BUILD_INFO ?? {};
+  // Mesmo carimbo da tela: "v2.1.732" e "19/10/2026 22:13".
+  const build = getBuildInfo();
   try {
     installErrorLogger({
       appName: APP_NAME,
-      appVersion: build.version ?? "",
-      builtAt: build.builtAtLabel ?? build.builtAt ?? ""
+      appVersion: build.version ? formatBuildStamp({ version: build.version }) : "",
+      builtAt: (build.builtAtLabel ?? "").replace(",", "").replace(/\s+/g, " ").trim()
     })();
   } catch { /* o logger nunca derruba o app */ }
 }
