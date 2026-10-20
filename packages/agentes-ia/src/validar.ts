@@ -6,7 +6,8 @@ export const MAX_PROPOSTAS = 20
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** Travas técnicas da resposta. O flow replica as mesmas regras e mensagens (Task 7). */
-export function analisarMensagem(msg: MensagemApi, agente: Agente): Resultado {
+/** `obrigatorios`: ids de registroAlvo que precisam ter proposta (Agente Frota: prioridade, reincidência e custo). */
+export function analisarMensagem(msg: MensagemApi, agente: Agente, obrigatorios: string[] = []): Resultado {
   if (msg.stop_reason !== 'end_turn') return { ok: false, erro: `Resposta incompleta (stop_reason: ${msg.stop_reason}).` }
   const texto = msg.content.find((b) => b.type === 'text')?.text ?? ''
   let r: RespostaIA
@@ -22,5 +23,8 @@ export function analisarMensagem(msg: MensagemApi, agente: Agente): Resultado {
     if (!p.registroAlvo || !GUID.test(p.registroAlvo.id ?? '')) return { ok: false, erro: `registroAlvo.id não é GUID: ${p.registroAlvo?.id}.` }
     if (p.acao !== null && !acoes.includes(p.acao.tipo)) return { ok: false, erro: `Ação fora do agente ${agente}: ${p.acao.tipo}.` }
   }
+  const alvos = new Set(r.propostas.map((p) => p.registroAlvo.id.toLowerCase()))
+  const faltando = obrigatorios.filter((id) => !alvos.has(id.toLowerCase()))
+  if (faltando.length) return { ok: false, erro: `Pendências obrigatórias sem proposta: ${faltando.join(', ')}.` }
   return { ok: true, resposta: r }
 }

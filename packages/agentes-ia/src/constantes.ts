@@ -1,5 +1,6 @@
 import { PREFIXO_USUARIO } from './comum.ts'
 import { SYSTEM_FINANCEIRO } from './financeiro.ts'
+import { SYSTEM_FROTA } from './frota.ts'
 import { SYSTEM_LOGISTICA } from './logistica.ts'
 import { SYSTEM_PESSOAS } from './pessoas.ts'
 import { RESPOSTA_SCHEMA } from './schema.ts'
@@ -16,6 +17,7 @@ export function constantesDoFlow() {
       financeiro: { systemPrompt: SYSTEM_FINANCEIRO, tipos: [...TIPOS_POR_AGENTE.financeiro], acoes: [...ACOES_POR_AGENTE.financeiro] },
       logistica: { systemPrompt: SYSTEM_LOGISTICA, tipos: [...TIPOS_POR_AGENTE.logistica], acoes: [...ACOES_POR_AGENTE.logistica] },
       pessoas: { systemPrompt: SYSTEM_PESSOAS, tipos: [...TIPOS_POR_AGENTE.pessoas], acoes: [...ACOES_POR_AGENTE.pessoas] },
+      frota: { systemPrompt: SYSTEM_FROTA, tipos: [...TIPOS_POR_AGENTE.frota], acoes: [...ACOES_POR_AGENTE.frota] },
     },
   }
 }
