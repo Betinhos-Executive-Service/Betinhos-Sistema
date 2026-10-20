@@ -1,16 +1,21 @@
 import { cleanId, type Row } from '@betinhos/dataverse'
+import { normalizeSearch } from '@betinhos/ui'
 import type { Host } from '../../../host'
+import { mockProgressive, mockSearch } from '../../../app/mockVolume'
 import type { ChoiceSet, Contato, Pagante, ServicoOp } from '../domain/types'
 import type { KV } from '../domain/filters'
 import { withFallback } from '../domain/choices'
 import { MOCK_CHOICES, MOCK_CONTATOS, createMockPagantes, mockServicos } from './mock'
-import { ENTITIES, loadContatos, loadPagantes, loadServicos, opFilter, periodFilter, type EntitySets } from './queries'
+import { ENTITIES, loadContatos, loadPagantes, loadServicos, opFilter, periodFilter, searchPagantes, type EntitySets } from './queries'
 import { abrirGeradorDeRecibo } from './recibo'
 
 /** Tudo que a tela precisa do mundo externo; Dataverse em produção, memória no pnpm dev. */
 export type Source = {
   mock: boolean
-  load: (since: Date | null) => Promise<Pagante[]>
+  /** Pagantes do período; `onFirstPage` recebe a primeira página antes (lista grande). */
+  load: (since: Date | null, onFirstPage?: (list: Pagante[]) => void) => Promise<Pagante[]>
+  /** Até 50 pagantes do período que batem com a busca (usada enquanto a lista não carregou inteira). */
+  search: (since: Date | null, query: string) => Promise<Pagante[]>
   choices: () => Promise<ChoiceSet>
   contatos: (pessoaIds: string[]) => Promise<Map<string, Contato>>
   /** Todos os pagantes ativos da OP (o rateio completo, sem limite de período). */
@@ -46,7 +51,8 @@ function createMockSource(): Source {
   const rows = createMockPagantes(now)
   return {
     mock: true,
-    async load(since) { await wait(350); return rows.filter((p) => !since || (p.criadoEm && p.criadoEm >= since)).map((p) => ({ ...p })) },
+    load: (since, onFirstPage) => mockProgressive(rows.filter((p) => !since || (p.criadoEm && p.criadoEm >= since)).map((p) => ({ ...p })), onFirstPage),
+    search: (since, q) => { const t = normalizeSearch(q); return mockSearch(rows, (p) => (!since || (p.criadoEm != null && p.criadoEm >= since)) && normalizeSearch(p.codigo).startsWith(t)) },
     choices: async () => MOCK_CHOICES,
     async contatos(ids) { await wait(150); return new Map(ids.flatMap((id) => (MOCK_CONTATOS.has(id) ? [[id, MOCK_CONTATOS.get(id)!] as const] : []))) },
     async rateio(opId) { await wait(250); return rows.filter((p) => p.opId === opId).map((p) => ({ ...p })) },
@@ -79,7 +85,8 @@ export function createSource(host: Host): Source {
 
   return {
     mock: false,
-    load: async (since) => loadPagantes(host.client, (await entitySets()).pagante, periodFilter(since)),
+    load: async (since, onFirstPage) => loadPagantes(host.client, (await entitySets()).pagante, periodFilter(since), onFirstPage),
+    search: async (since, q) => searchPagantes(host.client, (await entitySets()).pagante, periodFilter(since), q),
     // Rótulo é acessório: metadata fora do ar cai nos rótulos conhecidos em vez de travar a lista.
     async choices() {
       const [status, forma, recibo] = await Promise.all(

@@ -16,11 +16,11 @@ const rows = linhasDaTabela
 afterEach(cleanup)
 
 describe('Registros', () => {
-  it('lista e filtra pela busca', () => {
+  it('lista e filtra pela busca (depois da pausa na digitação)', async () => {
     render(<Registros kinds={['manutencao']} data={data} source={source} onOpen={() => {}} onReload={() => {}} />)
     expect(rows()).toHaveLength(2)
     fireEvent.change(screen.getByPlaceholderText(/Buscar/), { target: { value: 'bruno' } })
-    expect(rows()).toHaveLength(1)
+    await waitFor(() => expect(rows()).toHaveLength(1))
   })
 
   it('link antigo com status e período abre filtrado e passa a usar f=', async () => {

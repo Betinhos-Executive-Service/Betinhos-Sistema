@@ -1,3 +1,4 @@
+import { FIRST_PAGE, withFirstPage } from '../../../app/pagedLoad'
 import { toDateOnly } from './dates'
 import { buildPatch, dateBehaviorsPath, toDateBehaviors, type DateBehavior, type DateBehaviorsResponse, type PatchContext } from './patch'
 import { ENTITY_SET, FIELDS, TABLE, VEICULO_TABLE } from './schema'
@@ -114,9 +115,15 @@ export function createXrmSource(xrm: XrmHost): DataSource {
     mode: 'xrm',
     envLabel: getDataverseEnvironmentLabel(clientUrl),
 
-    async list() {
-      const rows = await retrieveAll(TABLE, `?$select=${LIST_SELECT.join(',')}&$filter=statecode eq 0&$orderby=cr40f_nomecompleto asc`)
-      const { dateBehaviors } = await loadPatchContext().catch(() => ({ dateBehaviors: {} as Record<string, DateBehavior> }))
+    async list(onFirstPage) {
+      const options = `?$select=${LIST_SELECT.join(',')}&$filter=statecode eq 0&$orderby=cr40f_nomecompleto asc`
+      const behaviors = loadPatchContext().then((context) => context.dateBehaviors, () => ({} as Record<string, DateBehavior>))
+      // A primeira página (100) vai à parte, em paralelo: o nextLink exige o mesmo tamanho de página da carga completa.
+      const first = async () => {
+        const [page, dateBehaviors] = await Promise.all([api.retrieveMultipleRecords(TABLE, options, FIRST_PAGE), behaviors])
+        return page.entities.map((row) => mapRow(row, dateBehaviors))
+      }
+      const [rows, dateBehaviors] = await withFirstPage(Promise.all([retrieveAll(TABLE, options), behaviors]), first, onFirstPage)
       return rows.map((row) => mapRow(row, dateBehaviors))
     },
 
@@ -229,7 +236,8 @@ export function createXrmSource(xrm: XrmHost): DataSource {
 
     async searchVeiculos(query): Promise<Lookup[]> {
       const term = odataString(query.trim())
-      const filter = term ? `&$filter=statecode eq 0 and (contains(cr40f_placa,'${term}') or contains(cr40f_modelo,'${term}'))` : '&$filter=statecode eq 0'
+      // Placa e modelo pelo começo (usa índice); "abc" acha ABC1D23, "cor" acha Corolla.
+      const filter = term ? `&$filter=statecode eq 0 and (startswith(cr40f_placa,'${term}') or startswith(cr40f_modelo,'${term}'))` : '&$filter=statecode eq 0'
       const page = await api.retrieveMultipleRecords(VEICULO_TABLE, `?$select=cr40f_veiculosid,cr40f_placa,cr40f_modelo&$orderby=cr40f_placa asc&$top=25${filter}`)
       return page.entities.map((row) => ({
         id: cleanId(String(row.cr40f_veiculosid)),

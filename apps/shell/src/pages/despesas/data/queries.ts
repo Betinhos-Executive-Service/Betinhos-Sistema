@@ -1,4 +1,5 @@
 import { cleanId, formatted, type Row } from '@betinhos/dataverse'
+import { andFilter, odataSearchFilter } from '../../../app/pagedLoad'
 import { safeUrl } from '../../pagantes/domain/messages'
 import type { AnaliseIA } from '../domain/ia'
 import type { Anexo, Despesa } from '../domain/types'
@@ -20,9 +21,12 @@ const SELECT = [
   'cr40f_iaestabelecimentolido', 'cr40f_iaconfianca', 'cr40f_iamodelo', 'cr40f_iadataanalise', 'createdon', 'modifiedon', '_createdby_value', '_modifiedby_value', ...LOOKUPS,
 ]
 
+/** Busca no servidor: protocolo pelo começo; nome da despesa e estabelecimento em qualquer posição. */
+export const despesasSearchFilter = (query: string) => odataSearchFilter(query, { startsWith: ['cr40f_protocolo'], contains: ['cr40f_nome', 'cr40f_estabelecimento'] })
+
 /** Despesas ativas com data do gasto a partir de `since` (null = todas), mais recentes primeiro. */
-export function despesasPath(entitySet: string, since: Date | null) {
-  const filter = since ? `statecode eq 0 and cr40f_datagasto ge ${since.toISOString()}` : 'statecode eq 0'
+export function despesasPath(entitySet: string, since: Date | null, search: string | null = null) {
+  const filter = andFilter(since ? `statecode eq 0 and cr40f_datagasto ge ${since.toISOString()}` : 'statecode eq 0', search)
   return `${entitySet}?$select=${SELECT.join(',')}&$filter=${encodeURIComponent(filter)}&$orderby=${encodeURIComponent('cr40f_datagasto desc')}`
 }
 

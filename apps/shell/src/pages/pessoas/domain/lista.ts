@@ -57,11 +57,14 @@ export function readPessoa(p: Pessoa, key: string, dupIds: Set<string>): unknown
   }
 }
 
-/** Busca por palavra-chave (não fica na visão): nome, cliente, celular, e-mail, departamento e cargo. */
+/** Texto em que a busca procura (não fica na visão): nome, cliente, celular, e-mail, departamento e cargo. */
+export const pessoaKeywordText = (p: Pessoa, cargo: string) => [p.nome, p.cliente, p.telefone, p.telefone.replace(/\D/g, ''), p.email, p.departamento, cargo].filter(Boolean).join(' ')
+
+/** Busca por palavra-chave: todas as palavras aparecem no texto da pessoa. */
 export function matchesKeyword(p: Pessoa, query: string, cargo: string) {
   const words = normalizeSearch(query).split(/\s+/).filter(Boolean)
   if (!words.length) return true
-  const text = normalizeSearch([p.nome, p.cliente, p.telefone, p.telefone.replace(/\D/g, ''), p.email, p.departamento, cargo].filter(Boolean).join(' '))
+  const text = normalizeSearch(pessoaKeywordText(p, cargo))
   return words.every((w) => text.includes(w))
 }
 

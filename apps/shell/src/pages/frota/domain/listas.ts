@@ -73,9 +73,14 @@ export function readVeiculo(l: LinhaVeiculo, key: string): unknown {
   }
 }
 
+// Texto da busca em minúsculas, calculado uma vez por linha (não a cada tecla).
+const textoVeiculo = new WeakMap<LinhaVeiculo, string[]>()
 export const matchesVeiculoKeyword = (l: LinhaVeiculo, query: string) => {
   const termo = query.trim().toLowerCase()
-  return !termo || [l.veiculo.placa, l.veiculo.marca, l.veiculo.modelo, l.motorista].some((valor) => valor?.toLowerCase().includes(termo))
+  if (!termo) return true
+  let valores = textoVeiculo.get(l)
+  if (!valores) textoVeiculo.set(l, valores = [l.veiculo.placa, l.veiculo.marca, l.veiculo.modelo, l.motorista].filter(Boolean).map((valor) => valor!.toLowerCase()))
+  return valores.some((valor) => valor.includes(termo))
 }
 
 export function sortVeiculos(list: LinhaVeiculo[], sort: ViewSort | null) {
@@ -151,9 +156,13 @@ export function readRegistro(l: Linha, key: string): unknown {
   }
 }
 
+const textoRegistro = new WeakMap<Linha, string[]>()
 export const matchesRegistroKeyword = (l: Linha, query: string) => {
   const termo = query.trim().toLowerCase()
-  return !termo || [l.titulo, l.veiculo?.label, l.pessoa?.label].some((valor) => valor?.toLowerCase().includes(termo))
+  if (!termo) return true
+  let valores = textoRegistro.get(l)
+  if (!valores) textoRegistro.set(l, valores = [l.titulo, l.veiculo?.label, l.pessoa?.label].filter(Boolean).map((valor) => valor!.toLowerCase()))
+  return valores.some((valor) => valor.includes(termo))
 }
 
 export function sortRegistros(list: Linha[], kind: Kind, sort: ViewSort | null) {

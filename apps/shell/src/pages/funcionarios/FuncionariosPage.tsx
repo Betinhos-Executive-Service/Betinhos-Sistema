@@ -1,9 +1,14 @@
-import { Alert, Button, EmptyState, SearchBox, ToastProvider, ViewBar, matchesFilters } from '@betinhos/ui'
+import { Alert, Button, EmptyState, SearchBox, ToastProvider, ViewBar } from '@betinhos/ui'
 import { Cake, CloudOff, IdCard, Plus, RefreshCw, SearchX, Stethoscope } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
+import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { listCache } from '../../app/listCache'
+import { useDebouncedText } from '../../app/search'
+import { filterRows } from '../../app/filterRows'
 import { useListView } from '../../app/useListView'
+import { useProgressiveData } from '../../app/useProgressiveData'
 import { useQueryFilters, useQueryId, useQueryTexto } from '../../nav/queryState'
 import type { AlertKind } from './data/alerts'
 import { todaySP } from './data/dates'
@@ -33,6 +38,7 @@ const CHIPS: { kind: AlertKind; label: string; icon: typeof IdCard }[] = [
 const ALERTAS: readonly AlertKind[] = ['cnh', 'aso', 'aniversario']
 const LEGACY_KEYS = ['status', 'funcao', 'empresa', 'vinculo'] as const
 const MOCK_HOST: Host = { mode: 'mock' }
+const NENHUM: Funcionario[] = []
 
 export function FuncionariosPage({ host }: { host: Host }) {
   const [state] = useState(() => {
@@ -52,9 +58,13 @@ export function FuncionariosPage({ host }: { host: Host }) {
 
 /** Página com a fonte já resolvida; exportada para os testes. A rota do shell ocupa o hash, então a ficha aberta fica no estado. */
 export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataSource; docs?: DocsSource | null; host?: Host }) {
-  const [rows, setRows] = useState<Funcionario[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Primeira página antes do resto e cache por sessão: voltar à tela dentro do TTL não recarrega.
+  const load = useCallback((partial: (rows: Funcionario[]) => void) => source.list(partial), [source])
+  const carga = useProgressiveData<Funcionario[]>({ cache: listCache(source), key: 'funcionarios', load })
+  const rows = carga.data ?? NENHUM
+  const { loading, error, mutate } = carga
+  const pending = !carga.complete && loading
+  const reload = carga.reload
   // Celular: filtros próprios na URL (#/funcionarios?q=…&funcao=…); sem filtro na abertura, entram os últimos usados neste navegador.
   const mobile = useIsMobile()
   // A semente (últimos filtros deste navegador) só vale no celular: no desktop ela viraria um link antigo e trocaria a visão.
@@ -65,24 +75,14 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   const setSelection = (next: Selection) => setFichaId(next.mode === 'closed' ? null : next.mode === 'new' ? 'novo' : next.id)
   const today = todaySP()
 
-  const reload = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      setRows(await source.list())
-    } catch (reason) {
-      setError(errorMessage(reason))
-    } finally {
-      setLoading(false)
-    }
-  }, [source])
-
-  useEffect(() => { void reload() }, [reload])
   useEffect(() => { if (mobile) saveFilters(filters) }, [mobile, filters])
 
+  // A busca filtra 200 ms depois da última tecla (celular e desktop); o texto de cada colaborador já vem normalizado.
+  const buscaCelular = useDebouncedText(filters.search)
+  const filtrosCelular = useMemo(() => ({ ...filters, search: buscaCelular }), [filters, buscaCelular])
   const views = useMemo(() => withAlertas(rows, today), [rows, today])
-  const base = useMemo(() => applyBaseFilters(views, filters), [views, filters])
-  const visible = useMemo(() => applyFilters(views, filters), [views, filters])
+  const base = useMemo(() => applyBaseFilters(views, filtrosCelular), [views, filtrosCelular])
+  const visible = useMemo(() => applyFilters(views, filtrosCelular), [views, filtrosCelular])
   const counts = useMemo(() => countAlertas(base), [base])
 
   // Desktop: visões, colunas e filtros do Design System (§10.9.1/§10.9.2); a Visão padrão esconde os desligados.
@@ -101,17 +101,20 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
     legacy: mobile ? undefined : { keys: LEGACY_KEYS, read: (q) => fromLegacyFilters(funcionariosQuery.ler(q)) },
   })
   const [busca, setBusca] = useQueryTexto('q')
+  const termo = useDebouncedText(busca)
   const [alertaUrl, setAlerta] = useQueryTexto('alerta')
   const alerta = ALERTAS.find((kind) => kind === alertaUrl) ?? null
-  const desktopBase = useMemo(
-    () => views.filter((row) => matchesFilters(row, lista.filters, FUNCIONARIO_FIELDS, readFuncionario) && matchesKeyword(row, busca)),
-    [views, lista.filters, busca],
-  )
+  const desktopFiltrados = useMemo(() => filterRows(views, lista.filters, FUNCIONARIO_FIELDS, readFuncionario), [views, lista.filters])
+  const desktopBase = useMemo(() => desktopFiltrados.filter((row) => matchesKeyword(row, termo)), [desktopFiltrados, termo])
   const desktopCounts = useMemo(() => countAlertas(desktopBase), [desktopBase])
   const desktopVisible = useMemo<FuncionarioView[]>(
     () => sortFuncionarios(desktopBase.filter((row) => matchesAlerta(row, alerta)), lista.view.config.sort),
     [desktopBase, alerta, lista.view.config.sort],
   )
+  // Rolagem infinita (sem paginação visível): trocar filtro, busca, alerta ou ordenação volta ao primeiro lote.
+  const lazyKey = useMemo(() => JSON.stringify({ f: lista.filters, termo, alerta, sort: lista.view.config.sort }), [lista.filters, termo, alerta, lista.view.config.sort])
+  const desktopSlice = useLazySlice(desktopVisible, lazyKey)
+  const mobileSlice = useLazySlice(visible, JSON.stringify(filtrosCelular))
   const clearDesktop = () => { lista.clearFilters(); setBusca(''); setAlerta('') }
 
   const update = (patch: Partial<Filters>) => setFilters({ ...filters, ...patch })
@@ -119,12 +122,12 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   const onSaved = useCallback(async (id: string, created: boolean) => {
     try {
       const fresh = await source.get(id)
-      setRows((current) => (created ? [...current, fresh] : current.map((row) => (row.id === id ? fresh : row))))
+      mutate((current) => (created ? [...current, fresh] : current.map((row) => (row.id === id ? fresh : row))))
     } catch {
       void reload()
     }
     if (created) setSelection({ mode: 'open', id })
-  }, [source, reload])
+  }, [source, reload, mutate])
 
   const ativos = views.filter((row) => row.values.cr40f_status === 0).length
   const ficha = selection.mode !== 'closed' && (
@@ -137,6 +140,8 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
         <MobileHome
           views={views}
           visible={visible}
+          shown={mobileSlice.slice}
+          footer={<LazyFooter loaded={mobileSlice.slice.length} more={mobileSlice.more} onLoadMore={mobileSlice.loadMore} pending={pending} />}
           counts={counts}
           filters={filters}
           update={update}
@@ -177,18 +182,28 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
       </div>
 
       <main className="content">
+        {error && rows.length ? (
+          <Alert tone="danger" title={carga.complete ? 'A última atualização falhou' : 'A carga parou no meio'} action={<Button variant="secondary" onClick={() => void reload()}>Tentar de novo</Button>}>
+            {error} {carga.complete ? 'A lista mostra os dados da carga anterior.' : 'A lista mostra só os colaboradores que chegaram.'}
+          </Alert>
+        ) : null}
         {error && !rows.length ? (
           <EmptyState className="surface" tone="danger" icon={<CloudOff />} title="Não foi possível carregar os colaboradores." action={<Button variant="secondary" icon={<RefreshCw size={16} />} onClick={() => void reload()}>Tentar de novo</Button>}>{error}</EmptyState>
         ) : (
+          <>
           <FuncionarioTable
-            rows={desktopVisible}
+            rows={desktopSlice.slice}
             loading={loading && !rows.length}
             onOpen={(id) => setSelection({ mode: 'open', id })}
             view={{ config: view.config, onChange: view.setConfig }}
             quickFilters={quickFilters}
-            footer={<span className="toolbar-count">{desktopVisible.length} de {views.length} · {ativos} ativos</span>}
-            empty={<EmptyState align="start" icon={<SearchX />} title="Nenhum colaborador encontrado para estes filtros." action={<Button variant="secondary" onClick={clearDesktop}>Limpar filtros</Button>}>Revise a busca ou limpe os filtros para ver a lista completa.</EmptyState>}
+            footer={<span className="toolbar-count">{desktopVisible.length} de {views.length} · {ativos} ativos{pending ? ' · carregando o restante…' : ''}</span>}
+            empty={pending
+              ? <EmptyState align="start" icon={<SearchX />} title="Procurando no restante da lista…" />
+              : <EmptyState align="start" icon={<SearchX />} title="Nenhum colaborador encontrado para estes filtros." action={<Button variant="secondary" onClick={clearDesktop}>Limpar filtros</Button>}>Revise a busca ou limpe os filtros para ver a lista completa.</EmptyState>}
           />
+          <LazyFooter loaded={desktopSlice.slice.length} more={desktopSlice.more} onLoadMore={desktopSlice.loadMore} pending={pending} />
+          </>
         )}
       </main>
 

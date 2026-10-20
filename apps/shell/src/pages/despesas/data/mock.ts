@@ -1,6 +1,7 @@
 import { IA_DECISAO, IA_STATUS, IA_VAZIA, type AnaliseIA } from '../domain/ia'
 import { ANEXO, FINANCEIRO, OPERACIONAL } from '../domain/status'
 import { mimeDoArquivo } from '../domain/arquivo'
+import { mockVolume } from '../../../app/mockVolume'
 import type { Anexo, Arquivo, Despesa } from '../domain/types'
 
 const CATEGORIAS = [['cat-1', 'Combustível'], ['cat-2', 'Pedágio'], ['cat-3', 'Estacionamento'], ['cat-4', 'Alimentação'], ['cat-5', 'Hospedagem'], ['cat-6', 'Lavagem']] as const
@@ -26,13 +27,13 @@ function mockIA(i: number, valor: number, data: Date): AnaliseIA {
 
 const LOCAIS = ['Posto Shell Faria Lima', 'Ecovias Imigrantes', 'Estapar GRU T3', 'Restaurante Frango Assado', 'Hotel Ibis Campinas', 'Lava Rápido Itaim']
 
-/** ~30 despesas de exemplo do `pnpm dev`, cobrindo todos os status e alertas. */
-export function createMockDespesas(now: Date): Despesa[] {
-  return Array.from({ length: 30 }, (_, i): Despesa => {
+/** ~30 despesas de exemplo do `pnpm dev`, cobrindo todos os status e alertas; `?volume=N` acrescenta N (últimos 2 anos). */
+export function createMockDespesas(now: Date, extra = mockVolume()): Despesa[] {
+  return Array.from({ length: 30 + extra }, (_, i): Despesa => {
     const n = i + 1
     const c = i % CATEGORIAS.length
     const data = new Date(now)
-    data.setDate(data.getDate() - i * 4)
+    data.setDate(data.getDate() - (i < 30 ? i * 4 : Math.floor(i / 7) % 730))
     data.setHours(8 + (i % 10), 20, 0, 0)
     const [motoristaId, motorista] = MOTORISTAS[i % MOTORISTAS.length]
     const [veiculoId, veiculo] = VEICULOS[i % VEICULOS.length]

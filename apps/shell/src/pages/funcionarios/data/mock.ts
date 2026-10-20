@@ -1,3 +1,4 @@
+import { mockProgressive, mockVolume } from '../../../app/mockVolume'
 import { addMonths, todaySP } from './dates'
 import { buildPatch, type PatchContext } from './patch'
 import type { DataSource } from './source'
@@ -51,6 +52,10 @@ const ROWS0: Funcionario[] = [
   person('m7', 'Helena Simulada Costa', 'Helena', { cr40f_funcao: 202410001, cr40f_nomedaempresa: 202410001, cr40f_tipodevinculo: 1 }),
   person('m8', 'Igor Fake Moreira', 'Igor', { cr40f_datadoaso: addMonths(offset(20), -12) }, veiculos[2]),
 ]
+/** `?volume=N` do pnpm dev: N colaboradores a mais (desempenho com listas grandes). */
+const volume = (total: number) => Array.from({ length: total }, (_, i) => person(`mv${i + 1}`, `Colaborador Exemplo ${i + 1}`, `Colab ${i + 1}`, {
+  cr40f_status: i % 9 === 0 ? 2 : 0, cr40f_funcao: i % 4 ? 202410000 : 202410001, cr40f_validadedacnh: offset((i % 500) - 30), cr40f_numerodocpf: `${String(100_000_000 + i).slice(0, 9)}-${String(i % 100).padStart(2, '0')}`,
+}))
 const PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
 const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString()
 const NOTES0: Record<string, Anotacao[]> = {
@@ -99,7 +104,7 @@ const documentos: DocumentStore = {
 
 export function createMockSource(): DataSource {
   // Cada fonte começa do zero (testes e recarga da página não herdam alterações).
-  rows = structuredClone(ROWS0)
+  rows = [...structuredClone(ROWS0), ...volume(mockVolume())]
   notes = structuredClone(NOTES0)
   docs = structuredClone(DOCS0)
   blobs.clear()
@@ -107,7 +112,7 @@ export function createMockSource(): DataSource {
   return {
     mode: 'mock',
     envLabel: 'MOCK',
-    list: () => delay(rows),
+    list: (onFirstPage) => mockProgressive(structuredClone(rows), onFirstPage, 150),
     get: (id) => {
       const row = rows.find((item) => item.id === id)
       return row ? delay(row) : Promise.reject(new Error('Colaborador não encontrado nos dados de exemplo.'))

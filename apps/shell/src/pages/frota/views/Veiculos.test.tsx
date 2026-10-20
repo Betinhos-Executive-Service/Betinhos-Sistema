@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MANUT, VEICULO } from '../data/schema'
 import { createMockSource } from '../data/mock'
@@ -24,7 +24,7 @@ const data: FrotaData = {
 afterEach(cleanup)
 
 describe('Veiculos', () => {
-  it('mostra quem está com o carro pela posse aberta, com "Na base" e fallback no cadastro', () => {
+  it('mostra quem está com o carro pela posse aberta, com "Na base" e fallback no cadastro', async () => {
     const comPosses: FrotaData = {
       ...data,
       veiculos: [base, { ...base, id: 'v2', placa: 'TST2B22', motorista: { id: 'f9', label: 'Cadastro antigo' } }, { ...base, id: 'v3', placa: 'TST3C33' }],
@@ -39,8 +39,8 @@ describe('Veiculos', () => {
     expect(screen.queryByText('Cadastro antigo')).toBeNull()
     expect(screen.getByText('Ana')).toBeTruthy()
     fireEvent.change(screen.getByLabelText('Buscar veículo'), { target: { value: 'base centro' } })
+    await waitFor(() => expect(screen.queryByText('TST1A11')).toBeNull())
     expect(screen.getByText('TST2B22')).toBeTruthy()
-    expect(screen.queryByText('TST1A11')).toBeNull()
   })
 
   it('abre filtrada em Ativo', () => {
