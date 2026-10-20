@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { mapInfracao, mapMultaUso, parseMulti } from '../data/queries'
 import { createMockInfracoes, createMockMultas } from '../data/mock'
-import { EMPTY_FILTERS, filterInfracoes } from './filters'
+import { emptyFilters, matchesFilters, readFilters, type TableFilters } from '@betinhos/ui'
+import { EMPTY_FILTERS } from './filters'
+import { INFRACAO_DEFAULT_FILTERS, INFRACAO_FIELDS, builtinViews, fromLegacyFilters, matchesKeyword, readInfracao, sortInfracoes } from './lista'
 import { buildPayload, emptyForm, isDirty, parseValor, toForm, validateForm, withGravidade } from './form'
 import { resumoUso, usoIndex } from './uso'
 
@@ -23,21 +25,33 @@ describe('mapeamento', () => {
 })
 
 describe('filtros', () => {
-  const comUso = new Set(usoIndex(createMockMultas()).keys())
-  it('padrão mostra só ativas', () => {
-    expect(filterInfracoes(list, EMPTY_FILTERS, comUso).some((i) => !i.ativo)).toBe(false)
-    expect(filterInfracoes(list, { ...EMPTY_FILTERS, situacao: 'inativas' }, comUso).map((i) => i.codigo)).toEqual(['5169'])
+  const uso = usoIndex(createMockMultas())
+  const multas = (id: string) => uso.get(id)?.length ?? 0
+  const apply = (filters: TableFilters) => list.filter((i) => matchesFilters(i, readFilters(filters, INFRACAO_FIELDS), INFRACAO_FIELDS, (row, key) => readInfracao(row, key, multas)))
+  const codigos = (filters: TableFilters) => apply(filters).map((i) => i.codigo)
+  const legacy = (patch: Partial<typeof EMPTY_FILTERS>) => fromLegacyFilters({ ...EMPTY_FILTERS, ...patch })
+  const view = (id: string) => (JSON.parse(builtinViews().find((v) => v.id === id)!.config) as { filters: TableFilters }).filters
+
+  it('Visão padrão mostra só ativas; prontas cobrem inativas, todas e com multas', () => {
+    expect(apply(INFRACAO_DEFAULT_FILTERS).some((i) => !i.ativo)).toBe(false)
+    expect(codigos(view('inativas'))).toEqual(['5169'])
+    expect(apply(view('todas')).length).toBe(list.length)
+    expect(apply(view('com-multas')).every((i) => i.ativo && multas(i.id) > 0)).toBe(true)
+    expect(apply(emptyFilters()).length).toBe(list.length)
   })
   it('busca sem acento e por código com hífen', () => {
-    expect(filterInfracoes(list, { ...EMPTY_FILTERS, query: 'semaforo' }, comUso).map((i) => i.codigo)).toEqual(['5746'])
-    expect(filterInfracoes(list, { ...EMPTY_FILTERS, query: '745-5' }, comUso).map((i) => i.codigo)).toEqual(['7455'])
+    expect(list.filter((i) => matchesKeyword(i, 'semaforo')).map((i) => i.codigo)).toEqual(['5746'])
+    expect(list.filter((i) => matchesKeyword(i, '745-5')).map((i) => i.codigo)).toEqual(['7455'])
   })
-  it('competência multi e gravidade', () => {
-    const r = filterInfracoes(list, { ...EMPTY_FILTERS, competencia: 202410002, gravidade: [3] }, comUso).map((i) => i.codigo)
-    expect(r).toEqual(['5010', '6050'])
+  it('links antigos: competência multi e gravidade; situação e só com multas', () => {
+    expect(codigos(legacy({ competencia: 202410002, gravidade: [3] }))).toEqual(['5010', '6050'])
+    expect(codigos(legacy({ situacao: 'inativas' }))).toEqual(['5169'])
+    expect(apply(legacy({ situacao: 'todas' })).length).toBe(list.length)
+    expect(apply(legacy({ comMultas: true })).every((i) => multas(i.id) > 0)).toBe(true)
   })
-  it('só com multas', () => {
-    expect(filterInfracoes(list, { ...EMPTY_FILTERS, comMultas: true }, comUso).every((i) => comUso.has(i.id))).toBe(true)
+  it('ordena pelo código como número', () => {
+    const nums = sortInfracoes(list, { key: 'infracao', dir: 'asc' }, multas).map((i) => Number(i.codigo.replace(/\D/g, '')))
+    expect(nums).toEqual([...nums].sort((x, y) => x - y))
   })
 })
 

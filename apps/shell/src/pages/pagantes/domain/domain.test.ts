@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createMockPagantes, MOCK_CHOICES, MOCK_CONTATOS } from '../data/mock'
-import { BUILTIN_VIEWS, EMPTY_FILTERS, VIEWS_KEY, filterPagantes, hasFilters, loadViews, matchView, newView, parseStoredFilters, periodoStart, saveViews, total, viewFilters, type Filters, type KV } from './filters'
+import { matchesFilters, readFilters, type TableFilters } from '@betinhos/ui'
+import { EMPTY_FILTERS, VIEWS_KEY, loadViews, parseStoredFilters, periodoStart, total, type KV } from './filters'
+import { builtinViews, fromLegacyFilters, legacyViewConfig, matchesKeyword, paganteFields, readPagante, sortPagantes } from './lista'
 import { linkToShare, safeUrl, whatsappText, whatsappUrl } from './messages'
 import { FALLBACK_CHOICES, withFallback } from './choices'
 import { reciboBloqueado } from '../components/Dialogs'
@@ -43,9 +45,14 @@ describe('status', () => {
   })
 })
 
+const fields = paganteFields(MOCK_CHOICES)
+const apply = (filters: TableFilters) => list.filter((p) => matchesFilters(p, readFilters(filters, fields), fields, readPagante)).map((p) => p.codigo).sort()
+const viewFilters = (id: string) => (JSON.parse(builtinViews(MOCK_CHOICES).find((v) => v.id === id)!.config) as { filters: TableFilters }).filters
+const legacy = (patch: Partial<typeof EMPTY_FILTERS>) => fromLegacyFilters({ ...EMPTY_FILTERS, ...patch }, MOCK_CHOICES)
+
 describe('filtros', () => {
   it('busca sem acento por nome, PAG, OP, telefone e cliente', () => {
-    const q = (query: string) => filterPagantes(list, { ...EMPTY_FILTERS, query }, MOCK_CONTATOS).map((p) => p.codigo)
+    const q = (query: string) => list.filter((p) => matchesKeyword(p, query, MOCK_CONTATOS.get(p.pessoaId))).map((p) => p.codigo)
     expect(q('mariana')).toContain('PAG-1201')
     expect(q('pag-1203')).toEqual(['PAG-1203'])
     expect(q('op-402')).toEqual(['PAG-1203'])
@@ -53,11 +60,12 @@ describe('filtros', () => {
     expect(q('lumen')).toContain('PAG-1205')
   })
 
-  it('combina status, recibo e falhas', () => {
-    const pagosSemRecibo = filterPagantes(list, viewFilters(BUILTIN_VIEWS.find((v) => v.id === 'pagos-sem-recibo')!), MOCK_CONTATOS)
-    expect(pagosSemRecibo.map((p) => p.codigo).sort()).toEqual(['PAG-1205', 'PAG-1206'])
-    const falhas = filterPagantes(list, { ...EMPTY_FILTERS, falhas: true }, MOCK_CONTATOS)
-    expect(falhas.map((p) => p.codigo).sort()).toEqual(['PAG-1204', 'PAG-1205', 'PAG-1210'])
+  it('combina status, recibo e falhas (visões prontas e filtros antigos)', () => {
+    expect(apply(viewFilters('pagos-sem-recibo'))).toEqual(['PAG-1205', 'PAG-1206'])
+    expect(apply(viewFilters('falhas'))).toEqual(['PAG-1204', 'PAG-1205', 'PAG-1210'])
+    expect(apply(legacy({ falhas: true }))).toEqual(['PAG-1204', 'PAG-1205', 'PAG-1210'])
+    expect(apply(legacy({ status: [STATUS.pago, STATUS.autorizado], recibo: 'nao-enviado' }))).toEqual(['PAG-1205', 'PAG-1206'])
+    expect(builtinViews(MOCK_CHOICES).map((v) => v.name)).toEqual(['A receber', 'Pagos sem recibo enviado', 'Com falha de envio'])
   })
 
   it('período conta dias para trás desde a meia-noite; "tudo" não limita', () => {
@@ -67,33 +75,19 @@ describe('filtros', () => {
     expect(start.getHours()).toBe(0)
   })
 
-  it('soma os valores e reconhece filtros ativos', () => {
+  it('soma os valores e ordena por valor', () => {
     expect(total([byCode('PAG-1201'), byCode('PAG-1202')])).toBe(2500)
-    expect(hasFilters(EMPTY_FILTERS)).toBe(false)
-    expect(hasFilters({ ...EMPTY_FILTERS, periodo: 'all' })).toBe(true)
+    const valores = sortPagantes(list, { key: 'valor', dir: 'desc' }, MOCK_CHOICES).map((p) => p.valor ?? -1)
+    expect(valores).toEqual([...valores].sort((a, b) => b - a))
   })
 })
 
-describe('visões salvas', () => {
-  it('salva, recarrega e reconhece a visão pelos filtros (ignorando a busca)', () => {
-    const kv = memory()
-    const view = newView('  Pix pendentes ', { ...EMPTY_FILTERS, query: 'x', forma: 202410002, status: [STATUS.pendente] }, 1)
-    saveViews(kv, { views: [view], last: view.id })
-    const loaded = loadViews(kv)
-    expect(loaded.last).toBe(view.id)
-    expect(loaded.views[0]).toMatchObject({ nome: 'Pix pendentes' })
-    expect(loaded.views[0].builtin).toBeFalsy()
-    const atual: Filters = { ...EMPTY_FILTERS, query: 'outra', forma: 202410002, status: [STATUS.pendente] }
-    expect(matchView([...BUILTIN_VIEWS, ...loaded.views], atual)?.id).toBe(view.id)
-    expect(matchView(BUILTIN_VIEWS, EMPTY_FILTERS)?.id).toBe('todos')
-  })
-
-  it('a visão escolhida vence outra com os mesmos filtros', () => {
-    const minha = newView('Meus pendentes', viewFilters(BUILTIN_VIEWS.find((v) => v.id === 'a-receber')!), 2)
-    const todas = [...BUILTIN_VIEWS, minha]
-    expect(matchView(todas, minha.filters)?.id).toBe('a-receber')
-    expect(matchView(todas, minha.filters, minha.id)?.id).toBe(minha.id)
-    expect(matchView(todas, EMPTY_FILTERS, minha.id)?.id).toBe('todos')
+describe('visões salvas no navegador (importação)', () => {
+  it('converte para o formato novo sem o período', () => {
+    const config = JSON.parse(legacyViewConfig({ status: [STATUS.pendente], forma: 202410002, recibo: null, falhas: true }, MOCK_CHOICES))
+    expect(config.filters.quick.status).toMatchObject({ op: 'in', values: [{ value: String(STATUS.pendente) }] })
+    expect(config.filters.quick.forma).toMatchObject({ op: 'in', values: [{ value: '202410002' }] })
+    expect(config.filters.advanced.items).toEqual([expect.objectContaining({ field: 'falha', op: 'yes' })])
   })
 
   it('descarta visões com campos adulterados em vez de quebrar a tela', () => {
@@ -111,12 +105,10 @@ describe('visões salvas', () => {
         { id: 'v5', nome: '   ', filters: {} },
         null, 42,
       ],
-      last: 7,
     }))
     const loaded = loadViews(kv)
     expect(loaded.views.map((v) => v.id)).toEqual(['v-ok', 'v1'])
     expect(loaded.views[1].filters.status).toEqual([])
-    expect(loaded.last).toBeNull()
     expect(parseStoredFilters({})).toEqual({ periodo: '90', status: [], forma: null, recibo: null, falhas: false })
     expect(parseStoredFilters(null)).toBeNull()
   })
@@ -124,10 +116,9 @@ describe('visões salvas', () => {
   it('ignora conteúdo corrompido e armazenamento que falha', () => {
     const kv = memory()
     kv.setItem(VIEWS_KEY, '{nada')
-    expect(loadViews(kv)).toEqual({ views: [], last: null })
+    expect(loadViews(kv)).toEqual({ views: [] })
     const broken: KV = { getItem: () => { throw new Error('bloqueado') }, setItem: () => { throw new Error('bloqueado') }, removeItem: () => undefined }
-    expect(loadViews(broken)).toEqual({ views: [], last: null })
-    expect(() => saveViews(broken, { views: [], last: null })).not.toThrow()
+    expect(loadViews(broken)).toEqual({ views: [] })
   })
 })
 

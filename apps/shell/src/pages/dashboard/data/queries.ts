@@ -1,4 +1,8 @@
 import { formatted, type Row } from '@betinhos/dataverse'
+import type { ManutencaoPrev, VeiculoPrev } from '../../frota/domain/preventiva'
+import { lerMulti } from '../../frota/domain/manutencaoCatalogo'
+import { AVISO_PADRAO } from '../../frota/data/schema'
+import type { Baseline, ItemPlano, Ref } from '../../frota/data/types'
 import { CP_CONCLUIDA, CP_PENDENTE, SEM_CLIENTE, SEM_MOTORISTA, VEICULO_PROPRIO, VEICULO_TERCEIRO } from '../domain/codes'
 import { normL } from '../domain/format'
 import { DIA_MS, dayKey, inicioMs } from '../domain/periodo'
@@ -12,6 +16,7 @@ export const ENTITIES = {
   telemetria: 'new_telemetriadiariainfleet', evento: 'new_eventoinfleet', viagem: 'new_viageminfleet',
   pagante: 'cr40f_pagantes', despesa: 'cr40f_despesaoperacional', categoriaDespesa: 'cr40f_categoriadespesaoperacional',
   formaPagamentoDespesa: 'cr40f_formapagamentodespesa', anexoDespesa: 'cr40f_anexodespesaoperacional',
+  itemPlano: 'cr40f_itemplanopreventivo', baseline: 'cr40f_baselinepreventiva',
 } as const
 export type EntitySets = Record<keyof typeof ENTITIES, string>
 
@@ -55,8 +60,17 @@ export const multasPath = (set: string, desde: string, ate: string, comInfracao 
 export const ocorrenciasPath = (set: string, desde: string, ate: string) => `${set}?$select=cr40f_dataocorrencia&$filter=${janelaDataHora('cr40f_dataocorrencia', desde, ate)}`
 export const funcionariosPath = (set: string) =>
   `${set}?$select=cr40f_funcionariosid,cr40f_nomecompleto,cr40f_status,cr40f_validadedacnh,cr40f_funcao,new_apelido,cr40f_nomedaempresa`
-export const veiculosPath = (set: string) =>
-  `${set}?$select=cr40f_veiculosid,cr40f_statusdoveiculo,new_categoriadoveiculo,cr40f_placa,cr40f_marca,cr40f_modelo,cr40f_blindado,cr40f_anodefabricacao`
+/** `comHodometro = false` é a consulta de ambientes onde as colunas de hodômetro ainda não existem. */
+export const veiculosPath = (set: string, comHodometro = true) =>
+  `${set}?$select=cr40f_veiculosid,cr40f_statusdoveiculo,new_categoriadoveiculo,cr40f_placa,cr40f_marca,cr40f_modelo,cr40f_blindado,cr40f_anodefabricacao${comHodometro ? ',cr40f_hodometro,cr40f_hodometroem' : ''}`
+
+/** Plano preventivo ativo (aba Plano preventivo da Frota). */
+export const itensPlanoPath = (set: string) =>
+  `${set}?$select=cr40f_itemplanopreventivoid,cr40f_name,cr40f_servico,cr40f_intervalokm,cr40f_intervalomeses,cr40f_avisokm,cr40f_avisodias&$filter=statecode eq 0`
+export const baselinesPath = (set: string) => `${set}?$select=cr40f_baselinepreventivaid,_cr40f_veiculo_value,_cr40f_item_value,cr40f_km,cr40f_data`
+/** Manutenções Realizado, Solicitado, Aprovado e Programado, sem janela de datas: a preventiva precisa do histórico todo. */
+export const manutencoesPreventivaPath = (set: string) =>
+  `${set}?$select=cr40f_manutencoesid,cr40f_status,cr40f_datamanutencao,createdon,cr40f_kmatual,_cr40f_placa_carro_value,new_servicosmanutencao&$filter=statecode eq 0 and (cr40f_status eq 202410002 or cr40f_status eq 0 or cr40f_status eq 202410001 or cr40f_status eq 202410005)`
 
 /** Telemetria diária do Infleet: `new_data` é DateOnly, então o filtro usa a data pura, sem hora. */
 export const telemetriaPath = (set: string, desde: string, ate: string) =>
@@ -277,3 +291,27 @@ export function mapDespesa(row: Row, ctx: ContextoDespesa): Despesa {
     descricao: str(row.cr40f_nome) || 'Despesa sem título',
   }
 }
+
+/* Preventivas: mesmos campos dos mappers da Frota, mantidos aqui para o Dashboard não depender da camada de dados de outra página. */
+const textoOuNull = (v: unknown) => (typeof v === 'string' && v ? v : null)
+const refDe = (row: Row, field: string): Ref | null => { const id = lower(row[field]); return id ? { id, label: rotulo(row, field) } : null }
+
+/** Veículo da preventiva a partir da mesma linha do cadastro de veículos (status e categoria crus, hodômetro do Infleet). */
+export const mapVeiculoPrev = (row: Row): VeiculoPrev => ({
+  id: lower(row.cr40f_veiculosid), placa: str(row.cr40f_placa), status: num(row.cr40f_statusdoveiculo), categoria: num(row.new_categoriadoveiculo),
+  hodometro: num(row.cr40f_hodometro), hodometroEm: textoOuNull(row.cr40f_hodometroem),
+})
+export const mapManutencaoPrev = (row: Row): ManutencaoPrev => ({
+  id: lower(row.cr40f_manutencoesid), status: num(row.cr40f_status), dataManutencao: textoOuNull(row.cr40f_datamanutencao), criadoEm: str(row.createdon),
+  km: num(row.cr40f_kmatual), veiculo: refDe(row, '_cr40f_placa_carro_value'), servicos: lerMulti(row.new_servicosmanutencao),
+})
+/** A consulta só traz itens ativos (`statecode eq 0`); sem aviso cadastrado, vale o padrão da Frota. */
+export const mapItemPlanoDash = (row: Row): ItemPlano => ({
+  id: lower(row.cr40f_itemplanopreventivoid), nome: str(row.cr40f_name), servico: num(row.cr40f_servico),
+  intervaloKm: num(row.cr40f_intervalokm), intervaloMeses: num(row.cr40f_intervalomeses),
+  avisoKm: num(row.cr40f_avisokm) ?? AVISO_PADRAO.km, avisoDias: num(row.cr40f_avisodias) ?? AVISO_PADRAO.dias, ativo: row.statecode == null || row.statecode === 0,
+})
+export const mapBaselineDash = (row: Row): Baseline => ({
+  id: lower(row.cr40f_baselinepreventivaid), veiculo: refDe(row, '_cr40f_veiculo_value'), item: refDe(row, '_cr40f_item_value'),
+  km: num(row.cr40f_km), data: textoOuNull(row.cr40f_data),
+})

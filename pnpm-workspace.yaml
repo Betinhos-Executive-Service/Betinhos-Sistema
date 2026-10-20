@@ -3,6 +3,6 @@ packages:
   - packages/*
 allowBuilds:
   esbuild: true
+# Pacotes do nosso Design System entram assim que publicados (a espera vale só para terceiros).
 minimumReleaseAgeExclude:
-  - '@betinhos-executive-service/tokens@1.11.0'
-  - '@betinhos-executive-service/ui@1.11.0'
+  - '@betinhos-executive-service/*'

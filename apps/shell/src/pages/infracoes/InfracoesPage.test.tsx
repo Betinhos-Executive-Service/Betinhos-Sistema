@@ -62,4 +62,13 @@ describe('Infrações de trânsito', () => {
     expect(await screen.findByText('Infração 5746 inativada.')).toBeTruthy()
     expect(within(ficha).getByRole('button', { name: 'Reativar' })).toBeTruthy()
   })
+
+  it('link antigo com situacao=inativas abre filtrado e passa a usar f=', async () => {
+    window.location.hash = '#/infracoes?situacao=inativas'
+    render(<InfracoesPage host={{ mode: 'mock' }} />)
+    await row('5169')
+    await waitFor(() => expect(screen.queryAllByText('5746')).toHaveLength(0))
+    await waitFor(() => expect(window.location.hash).toMatch(/[?&]f=/))
+    expect(window.location.hash).not.toMatch(/situacao=/)
+  })
 })

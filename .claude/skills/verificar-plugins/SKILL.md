@@ -1,0 +1,33 @@
+---
+name: verificar-plugins
+description: "Verifica os plugins C# do Dataverse (Cr40f.Financeiro.Plugin, incluindo ValorOpPlugin, e Cr40f.Documentos.Plugin) e seus registradores. Use após mudar packages/plugins/** ou quando pedirem para testar plugin, valor da OP ou sincronização financeira."
+---
+# Verificar plugins do Dataverse
+
+## Cobre
+- Código: `packages/plugins/Cr40f.Financeiro.Plugin/**`, `packages/plugins/Cr40f.Documentos.Plugin/**`, registradores em `packages/plugins/tools/**`, scripts `packages/plugins/scripts/*.ps1`.
+- Comportamento: valor da OP (`cr40f_financeiro.cr40f_valor`) = soma de `new_valortotal` das composições das reservas (`reserva.new_composicaodepreco`), a mesma soma do `SyncEngine`; sincronização financeira (pagantes → OP → reservas).
+
+## Preparar ambiente
+- .NET SDK 8+ (`dotnet --list-sdks`); chave de assinatura em `%USERPROFILE%\.codex\keys\Cr40f.Financeiro.Plugin.snk`.
+- DEV: `https://org23b93544.crm2.dynamics.com/`. Token em cache do registrador (`%TEMP%\Betinhos\Dataverse\financeiro.msalcache.bin`); na primeira vez abre login no navegador — quem entra é o Renan.
+
+## Roteiro
+1. `dotnet test packages/plugins/Cr40f.Financeiro.Plugin.Tests/Cr40f.Financeiro.Plugin.Tests.csproj` → "Com falha: 0" (34 testes em 19/10/2026, 7 de `ValorOpTests`).
+2. `dotnet build packages/plugins/tools/Cr40f.Financeiro.Registrar/Cr40f.Financeiro.Registrar.csproj` → "0 Erro(s)".
+3. Simulação no DEV (só leitura): `dotnet run --project packages/plugins/tools/Cr40f.Financeiro.Registrar/Cr40f.Financeiro.Registrar.csproj -- --environmentUrl https://org23b93544.crm2.dynamics.com/ --simularValorOp` → linha `valor da OP: N OPs, M com reservas, K mudariam, 0 gravadas (simulação)`.
+4. Publicar no DEV (só da `main`, checkout principal): `pnpm push:plugin:financeiro:dev` → steps `Cr40f.ValorOp: …` criados/reconciliados e "plugin publicado com sucesso".
+5. Carga inicial no DEV: mesmo comando do passo 3 com `--recalcularValorOp` → `K gravadas`; repetir `--simularValorOp` → `0 mudariam`.
+6. Comportamento: no Sistema Betinhos (DEV) › Ordens de Pagamento, o valor de cada OP aparece sem o título "Soma dos serviços" (agora vem de `cr40f_valor`); alterar um campo de origem (ex.: `new_valorpedagios`) de uma composição de teste — `new_valortotal` é calculada e não aceita escrita — ligada a uma reserva com OP e conferir a OP atualizada na hora.
+
+## Casos de borda
+- Reserva sem composição conta 0 (como o `SyncEngine`); OP sem reserva fica sem valor (null).
+- Excluir composição: o step pré-Delete guarda as OPs (o vínculo some antes do pós-Delete).
+- Mover reserva de OP: a imagem `pre` recalcula a OP antiga e a nova.
+
+## Evidência obrigatória
+- Saída do `dotnet test`, linha da simulação antes/depois da carga e print da lista de OPs no DEV.
+
+## Limites
+- PROD só com aprovação explícita (carga inicial grava em todas as OPs).
+- Fluxos do Power Automate que escutam alteração de OP podem disparar quando `cr40f_valor` muda: conferir no DEV antes do PROD.

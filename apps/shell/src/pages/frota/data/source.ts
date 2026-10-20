@@ -3,7 +3,7 @@ import type { FrotaData, Kind, TableKey } from './types'
 
 export type LoadResult = { data: FrotaData; errors: Partial<Record<TableKey, string>> }
 
-export const EMPTY_DATA: FrotaData = { veiculos: [], manutencoes: [], multas: [], infracoes: [], colisoes: [], posses: [] }
+export const EMPTY_DATA: FrotaData = { veiculos: [], manutencoes: [], multas: [], infracoes: [], colisoes: [], posses: [], planoPreventivo: [], baselines: [], despesasCombustivel: [], telemetriaKm: [] }
 
 /** Classificação atual da manutenção no servidor (para acompanhar o flow do JEV sem recarregar tudo). */
 export type Classificacao = { servicos: number[]; categorias: number[]; origem: number | null; confianca: number | null }
@@ -18,6 +18,8 @@ export class FlowIncertoError extends Error {
     this.name = 'FlowIncertoError'
   }
 }
+
+export type ItemPlanoInput = { nome: string; servico: number; intervaloKm: number | null; intervaloMeses: number | null; avisoKm: number; avisoDias: number }
 
 export interface DataSource {
   mode: 'xrm' | 'mock'
@@ -42,4 +44,10 @@ export interface DataSource {
   fotoVeiculo(id: string): Promise<Blob | null>
   /** Envia uma nova foto principal para o SharePoint. */
   enviarFotoVeiculo(id: string, file: File): Promise<void>
+  /** Cria o item do plano preventivo (sem id) ou atualiza (com id). */
+  salvarItemPlano(input: ItemPlanoInput, id?: string): Promise<void>
+  /** Ativa (statecode 0 / statuscode 1) ou inativa (statecode 1 / statuscode 2) o item do plano. */
+  inativarItemPlano(id: string, ativo: boolean): Promise<void>
+  /** Upsert da última execução conhecida por (veículo, item). */
+  salvarBaseline(veiculoId: string, itemId: string, km: number | null, data: string | null): Promise<void>
 }

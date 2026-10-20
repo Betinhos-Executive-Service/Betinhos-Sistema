@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Host } from '../../../host'
 import { fetchPath, mapViews, parseCount, parsePage, reloadPath, searchPath } from './queries'
 import { applyMockFetch, createMockRows, createMockViews, MOCK_ATTRIBUTES, MOCK_ROW_COUNT } from './mock'
-import { injectFilters, type FilterSet } from '../domain/filters'
+import type { FilterSet } from '../domain/filters'
+import { fromLegacy, geralFilterFields, injectTableFilters } from '../domain/tableFilters'
 import { PAGE_SIZE } from '../domain/types'
 import { createSource } from './source'
 
@@ -258,7 +259,7 @@ describe('mock: filtros por coluna', () => {
   const rows = createMockRows(now)
   const agenda = createMockViews()[0].fetchxml
   const runAt = (at: Date, base: typeof rows, filters: FilterSet, extra: { query?: string; quickFind?: string[] } = {}) =>
-    applyMockFetch(base, injectFilters(agenda, filters, MOCK_ATTRIBUTES), { page: 1, pageSize: 1000, sort: null, query: extra.query ?? '', quickFind: extra.quickFind ?? [], now: at })
+    applyMockFetch(base, injectTableFilters(agenda, fromLegacy(filters, MOCK_ATTRIBUTES), geralFilterFields(MOCK_ATTRIBUTES)), { page: 1, pageSize: 1000, sort: null, query: extra.query ?? '', quickFind: extra.quickFind ?? [], now: at })
   const run = (filters: FilterSet) => runAt(now, rows, filters).rows
   type R = (typeof rows)[number]
   const day = (r: R) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(String(r.cr40f_dataehorriodesada)))
