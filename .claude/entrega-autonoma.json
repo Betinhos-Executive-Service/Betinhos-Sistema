@@ -1,0 +1,28 @@
+{
+  "autoMerge": true,
+  "decididoPor": "Renan, 20/10/2026 (episódio 7): merge automático só de PR de baixo risco",
+  "baixoRisco": {
+    "maxArquivos": 3,
+    "maxLinhasAlteradas": 80,
+    "proibido": [
+      "packages/deploy/**",
+      "packages/plugins/**",
+      "packages/dataverse/**",
+      "**/package.json",
+      "pnpm-lock.yaml",
+      ".github/**",
+      ".claude/**",
+      "scripts/**",
+      "**/financeiro/**",
+      "**/pagantes/**",
+      "**/ops/**"
+    ],
+    "exige": [
+      "três aprovações (implementador, Sonnet, Fable) no mesmo SHA",
+      "verificação registrada (hook) e CI verde",
+      "seção Qualidade no PR (qualidade-antes-do-pr)",
+      "nenhum cenário marcado 'não verificado' que dependa de dado real"
+    ]
+  },
+  "publicacao": "manual: merge na main não publica; pnpm push continua com o Renan"
+}
