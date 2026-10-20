@@ -42,6 +42,7 @@ description: "Verifica o backend do checklist de vistoria de veículo: plugin Ch
 - Reatribuição para o mesmo motorista não repete push; troca de motorista troca dono e marca push pendente.
 - Conclusão: outro usuário recusado; foto obrigatória ausente, link sem https e número inválido recusados; repetição não duplica fotos.
 - Checklist concluído não aceita edição nem exclusão; aberto aceita.
+- Item OK / Não OK (choice 100000003, código `okNok`): vazio obrigatório recusado ("Escolha OK ou Não OK"); Não OK exige foto, ao menos um problema e problema da lista do item (`new_opcoesproblema`, padrão Arranhado...Outro); OK descarta fotos, problemas e observação enviados; `new_temproblema` e `new_qtdproblemas` gravados na conclusão.
 
 ## Evidência obrigatória
 - TRX dos testes do checklist e resumo da suíte completa.
