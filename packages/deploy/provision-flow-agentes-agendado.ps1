@@ -1,7 +1,7 @@
 ﻿# Somente DEV. Cria (ou atualiza) o flow "Flow Agentes | Agendado" na solução AppBetinhos e o ativa.
 #
 # Recorrência às 07:00 (America/Sao_Paulo) de segunda a sexta: cria uma cr40f_agenteexecucao Financeiro e uma Pessoas,
-# origem Agendado, status Pendente. O flow "Flow Agentes | Executar" processa cada uma. Logística não entra (roda ao abrir a tela).
+# origem Agendado, status Pendente; às quartas, também uma Frota (antes do e-mail "Frota | Resumo semanal" das 08:00). O flow "Flow Agentes | Executar" processa cada uma. Logística não entra (roda ao abrir a tela).
 # Sem segredo e sem chamada HTTP: só duas ações CreateRecord no Dataverse.
 #
 # Antes de alterar o flow existente, salva o clientdata em packages/deploy/flows/backup/. Para reverter:
@@ -119,6 +119,21 @@ $definitionText = @'
         "parameters": { "entityName": "cr40f_agenteexecucaos", "item/cr40f_agenteexecucaonome": "Pessoas @{outputs('Hoje')} (agendado)", "item/cr40f_agente": 100000002, "item/cr40f_origem": 100000000, "item/cr40f_status": 100000000 },
         "authentication": "@parameters('$authentication')"
       }
+    },
+    "Quarta_feira": {
+      "type": "If", "runAfter": { "Criar_pessoas": ["Succeeded", "Failed"] },
+      "expression": { "and": [ { "equals": [ "@dayOfWeek(convertTimeZone(utcNow(), 'UTC', 'E. South America Standard Time'))", 3 ] } ] },
+      "actions": {
+        "Criar_frota": {
+          "type": "OpenApiConnection", "runAfter": {},
+          "inputs": {
+            "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps", "connectionName": "shared_commondataserviceforapps", "operationId": "CreateRecord" },
+            "parameters": { "entityName": "cr40f_agenteexecucaos", "item/cr40f_agenteexecucaonome": "Frota @{outputs('Hoje')} (agendado)", "item/cr40f_agente": 100000003, "item/cr40f_origem": 100000000, "item/cr40f_status": 100000000 },
+            "authentication": "@parameters('$authentication')"
+          }
+        }
+      },
+      "else": { "actions": {} }
     }
   },
   "outputs": {}
@@ -134,6 +149,8 @@ function Conferir($lido) {
   $r = $t.recurrence
   $fin = $lido.actions.Criar_financeiro.inputs.parameters
   $pes = $lido.actions.Criar_pessoas.inputs.parameters
+  $qua = $lido.actions.Quarta_feira
+  $fro = $qua.actions.Criar_frota.inputs.parameters
   $checks = [ordered]@{
     'gatilho Recurrence semanal, intervalo 1' = $t.type -eq 'Recurrence' -and $r.frequency -eq 'Week' -and $r.interval -eq 1
     'fuso E. South America Standard Time' = $r.timeZone -ceq 'E. South America Standard Time'
@@ -142,6 +159,7 @@ function Conferir($lido) {
     'Criar_financeiro: CreateRecord em cr40f_agenteexecucaos, agente 100000000, origem 100000000, status 100000000' = $lido.actions.Criar_financeiro.inputs.host.operationId -eq 'CreateRecord' -and $fin.entityName -ceq 'cr40f_agenteexecucaos' -and $fin.'item/cr40f_agente' -eq 100000000 -and $fin.'item/cr40f_origem' -eq 100000000 -and $fin.'item/cr40f_status' -eq 100000000
     'Criar_pessoas: CreateRecord em cr40f_agenteexecucaos, agente 100000002, origem 100000000, status 100000000' = $lido.actions.Criar_pessoas.inputs.host.operationId -eq 'CreateRecord' -and $pes.entityName -ceq 'cr40f_agenteexecucaos' -and $pes.'item/cr40f_agente' -eq 100000002 -and $pes.'item/cr40f_origem' -eq 100000000 -and $pes.'item/cr40f_status' -eq 100000000
     'Criar_pessoas roda após Criar_financeiro (Succeeded, Failed)' = (@($lido.actions.Criar_pessoas.runAfter.Criar_financeiro) -join ',') -eq 'Succeeded,Failed'
+    'Criar_frota só às quartas (dayOfWeek 3), agente 100000003, após Criar_pessoas' = $qua.type -eq 'If' -and $qua.expression.and[0].equals[1] -eq 3 -and $fro.'item/cr40f_agente' -eq 100000003 -and $fro.'item/cr40f_origem' -eq 100000000 -and $fro.'item/cr40f_status' -eq 100000000 -and (@($qua.runAfter.Criar_pessoas) -join ',') -eq 'Succeeded,Failed'
     'nomes com a data de hoje' = $fin.'item/cr40f_agenteexecucaonome' -ceq "Financeiro @{outputs('Hoje')} (agendado)" -and $pes.'item/cr40f_agenteexecucaonome' -ceq "Pessoas @{outputs('Hoje')} (agendado)"
   }
   $falhas = @($checks.Keys | Where-Object { -not $checks[$_] })
@@ -176,7 +194,7 @@ if ($flows.Count) {
     Apply $flows[0] $clientData
   } else { Write-Host '[agentes-agendado] definição já atualizada; nada a gravar.' }
 } else {
-  Dv POST workflows @{ name = $flowName; category = 5; type = 1; primaryentity = 'none'; clientdata = $clientData; description = 'Todo dia útil às 07:00 (America/Sao_Paulo) cria uma execução Financeiro e uma Pessoas (origem Agendado, status Pendente) para o flow Executar processar.' } | Out-Null
+  Dv POST workflows @{ name = $flowName; category = 5; type = 1; primaryentity = 'none'; clientdata = $clientData; description = 'Todo dia útil às 07:00 (America/Sao_Paulo) cria uma execução Financeiro e uma Pessoas (e às quartas uma Frota), origem Agendado, status Pendente, para o flow Executar processar.' } | Out-Null
   $flowId = @(FlowRows)[0].workflowid
 }
 Include $flowId 29

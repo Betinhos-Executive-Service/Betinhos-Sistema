@@ -1,15 +1,21 @@
 import { daysBetween } from '../data/dates'
 import { COLISAO, MANUT, MULTA } from '../data/schema'
 import type { FrotaData, Kind, Ref } from '../data/types'
+import { custoForaDaCurva, hodometrosAtrasados, prioridadeParada, reincidencias, type Ocorrencia } from './alertas'
 import { calcularPreventivas, type EstadoPreventiva, type Preventiva } from './preventiva'
 
-export type PendenciaTipo = 'aprovar' | 'preventiva' | 'programar' | 'agendada' | 'notificar' | 'indicar' | 'colisao'
+export type PendenciaTipo = 'prioridade' | 'reincidencia' | 'aprovar' | 'preventiva' | 'programar' | 'agendada' | 'notificar' | 'indicar' | 'colisao' | 'hodometro' | 'custo'
 export type CriterioPreventiva = 'km' | 'data'
 /** `estado` e `criterio` só existem na preventiva (null nos outros tipos); `criterio` é a regra que decide o badge. */
-export type Pendencia = { tipo: PendenciaTipo; kind: Kind | 'preventiva'; id: string; titulo: string; veiculo: Ref | null; veiculoId: string | null; pessoa: Ref | null; prazo: string | null; dias: number | null; faltamKm: number | null; peso: number; estado: EstadoPreventiva | null; criterio: CriterioPreventiva | null }
+/** `detalhe` e `ocorrencias` só nas regras proativas (reincidência, custo, hodômetro, prioridade). */
+export type Pendencia = { detalhe?: string; ocorrencias?: Ocorrencia[]; tipo: PendenciaTipo; kind: Kind | 'preventiva' | 'veiculo'; id: string; titulo: string; veiculo: Ref | null; veiculoId: string | null; pessoa: Ref | null; prazo: string | null; dias: number | null; faltamKm: number | null; peso: number; estado: EstadoPreventiva | null; criterio: CriterioPreventiva | null }
 
-export const PENDENCIA_ORDEM: PendenciaTipo[] = ['aprovar', 'preventiva', 'programar', 'agendada', 'notificar', 'indicar', 'colisao']
+export const PENDENCIA_ORDEM: PendenciaTipo[] = ['prioridade', 'reincidencia', 'aprovar', 'preventiva', 'programar', 'agendada', 'notificar', 'indicar', 'colisao', 'custo', 'hodometro']
 export const PENDENCIA_LABEL: Record<PendenciaTipo, string> = {
+  prioridade: 'Manutenções de prioridade Alta ou Urgente paradas (solicitadas há mais de 2 dias ou aprovadas sem data há mais de 5)',
+  reincidencia: 'Mesmo serviço repetido no mesmo veículo (3 vezes em 120 dias ou 5 em 12 meses): vale investigar a causa raiz',
+  custo: 'Veículos com custo de manutenção nos últimos 90 dias acima de 1,5× a mediana da frota',
+  hodometro: 'Hodômetro sem atualização do Infleet há mais de 48 horas: preventivas por km podem estar erradas',
   aprovar: 'Manutenções aguardando aprovação',
   preventiva: 'Preventivas vencidas ou a vencer (plano da frota)',
   programar: 'Manutenções aprovadas sem data',
@@ -42,11 +48,17 @@ function pesoPreventiva(p: Pick<Preventiva, 'estado' | 'faltamKm' | 'faltamDias'
   return Math.min(p.faltamDias ?? Infinity, p.faltamKm ?? Infinity)
 }
 
-export function buildPendencias(data: Pick<FrotaData, 'manutencoes' | 'multas' | 'colisoes' | 'veiculos' | 'planoPreventivo' | 'baselines'>, today: string): Pendencia[] {
+export function buildPendencias(data: Pick<FrotaData, 'manutencoes' | 'multas' | 'colisoes' | 'veiculos' | 'planoPreventivo' | 'baselines'>, today: string, agora = new Date()): Pendencia[] {
   const result: Pendencia[] = []
 
   for (const item of data.manutencoes) {
     const base = { kind: 'manutencao' as const, id: item.id, titulo: item.descricao, veiculo: item.veiculo, pessoa: item.solicitante, veiculoId: item.veiculo?.id ?? null, faltamKm: null, ...SEM_PREVENTIVA }
+    const parada = prioridadeParada(item, today)
+    if (parada !== null) {
+      // Substitui aprovar/programar para não listar a mesma manutenção duas vezes.
+      result.push({ ...base, tipo: 'prioridade', prazo: null, dias: null, peso: -(item.grau ?? 0) * 1000 - parada, detalhe: `${item.status === MANUT.SOLICITADO ? 'Aguardando aprovação' : 'Aprovada sem data'} há ${parada} dias` })
+      continue
+    }
     if (item.status === MANUT.SOLICITADO) result.push({ ...base, tipo: 'aprovar', prazo: null, dias: null, peso: -(item.grau ?? 0) })
     if (item.status === MANUT.APROVADO && !item.agendarPara) result.push({ ...base, tipo: 'programar', prazo: null, dias: null, peso: -(item.grau ?? 0) })
     if ((item.status === MANUT.APROVADO || item.status === MANUT.PROGRAMADO) && item.agendarPara) {
@@ -78,6 +90,19 @@ export function buildPendencias(data: Pick<FrotaData, 'manutencoes' | 'multas' |
       veiculo: p.veiculo, veiculoId: p.veiculo.id, pessoa: null, prazo: p.dataProxima, dias: p.faltamDias, faltamKm: p.faltamKm,
       peso: pesoPreventiva(p), estado: p.estado, criterio: criterioPreventiva(p),
     })
+  }
+
+  const semPrazo = { pessoa: null, prazo: null, dias: null, faltamKm: null, ...SEM_PREVENTIVA }
+  for (const r of reincidencias(data.manutencoes, today)) {
+    const custo = r.custo ? ` · ${r.custo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} gastos` : ''
+    result.push({ ...semPrazo, tipo: 'reincidencia', kind: 'veiculo', id: `reinc:${r.veiculo.id}:${r.servico}`, titulo: `${r.vezes}ª vez: ${r.servicoLabel}`, veiculo: r.veiculo, veiculoId: r.veiculo.id, peso: -r.vezes, detalhe: `${r.vezes} vezes em ${r.janelaDias === 365 ? '12 meses' : `${r.janelaDias} dias`}${custo}. Dá para resolver a causa raiz?`, ocorrencias: r.ocorrencias })
+  }
+  for (const c of custoForaDaCurva(data.veiculos, data.manutencoes, today)) {
+    const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+    result.push({ ...semPrazo, tipo: 'custo', kind: 'veiculo', id: `custo:${c.veiculo.id}`, titulo: `Custo alto: ${c.veiculo.placa}`, veiculo: { id: c.veiculo.id, label: c.veiculo.placa }, veiculoId: c.veiculo.id, peso: -c.custo, detalhe: `${brl(c.custo)} em 90 dias (mediana da frota ${brl(c.mediana)}). Avaliar troca ou venda?` })
+  }
+  for (const h of hodometrosAtrasados(data.veiculos, agora)) {
+    result.push({ ...semPrazo, tipo: 'hodometro', kind: 'veiculo', id: `hod:${h.veiculo.id}`, titulo: `Hodômetro parado: ${h.veiculo.placa}`, veiculo: { id: h.veiculo.id, label: h.veiculo.placa }, veiculoId: h.veiculo.id, peso: -h.horas, detalhe: `Última leitura do Infleet há ${h.horas >= 72 ? `${Math.floor(h.horas / 24)} dias` : `${h.horas} h`}` })
   }
 
   return result

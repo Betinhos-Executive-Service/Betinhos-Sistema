@@ -59,6 +59,12 @@
 .frota-pend__texto span { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
 .frota-pend__texto strong, .frota-pend__texto span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .frota-pend__seta { flex: none; color: var(--bt-color-text-secondary); }
+.frota-pend__texto .frota-pend__detalhe { white-space: normal; color: var(--bt-color-text-primary); }
+.frota-pend__ocorrencias { padding: 0 var(--bt-space-4) var(--bt-space-2-5) 57px; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.frota-pend__ocorrencias summary { cursor: pointer; color: var(--bt-color-action); }
+.frota-pend__ocorrencias li + li { border-top: 0; }
+.frota-pend__ocorrencias button { padding: var(--bt-space-1) 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+@media (hover: hover) and (pointer: fine) { .frota-pend__ocorrencias button:hover { color: var(--bt-color-text-primary); text-decoration: underline; } }
 @media (max-width: 560px) {
   .frota-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .frota-chip { flex: none; }

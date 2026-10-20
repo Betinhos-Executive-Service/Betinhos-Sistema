@@ -67,12 +67,13 @@ function Lookup([string] $nomeRelacao, [string] $de, [string] $para, [string] $s
   Dv POST RelationshipDefinitions $body | Out-Null
 }
 
-$TIPOS = @('SemRecibo', 'OPPendenteAntiga', 'RepasseAguardando', 'MargemNegativa', 'OSSemCobranca', 'ServicoSemMotorista', 'ServicoSemVeiculo', 'ConflitoHorario', 'MotoristaSemVeiculoAtual', 'CNHVencendo', 'ASOVencendo', 'DocumentoVencido', 'Aniversario', 'MultaSemMotorista', 'ComunicadoSugerido')
+$TIPOS = @('SemRecibo', 'OPPendenteAntiga', 'RepasseAguardando', 'MargemNegativa', 'OSSemCobranca', 'ServicoSemMotorista', 'ServicoSemVeiculo', 'ConflitoHorario', 'MotoristaSemVeiculoAtual', 'CNHVencendo', 'ASOVencendo', 'DocumentoVencido', 'Aniversario', 'MultaSemMotorista', 'ComunicadoSugerido', 'FrotaPrioridade', 'FrotaReincidencia', 'FrotaPreventiva', 'FrotaAgendadaVencida', 'FrotaCustoAlto', 'FrotaHodometro')
+$AGENTES = @('Financeiro', 'Logística', 'Pessoas', 'Frota')
 
 Tabela 'cr40f_agenteexecucao' 'Execução de agente' 'Execuções de agente' 'Uma rodada do assistente de departamento (Claude): contexto, resposta e custo.'
 $exec = 'cr40f_agenteexecucao'
 foreach ($c in @(
-  (Choice 'cr40f_Agente' 'Agente' @('Financeiro', 'Logística', 'Pessoas')),
+  (Choice 'cr40f_Agente' 'Agente' $AGENTES),
   (Choice 'cr40f_Origem' 'Origem' @('Agendado', 'Manual')),
   (Texto 'cr40f_Pergunta' 'Pergunta' 2000),
   (Choice 'cr40f_Status' 'Status' @('Pendente', 'Processando', 'Concluída', 'Erro')),
@@ -101,6 +102,19 @@ foreach ($c in @(
 )) { Coluna $prop $c }
 Lookup 'cr40f_agenteexecucao_agenteproposta_execucao' $prop $exec 'cr40f_Execucao' 'Execução'
 Lookup 'cr40f_systemuser_agenteproposta_decididopor' $prop 'systemuser' 'cr40f_DecididoPor' 'Decidido por'
+
+# Choice já criado em versão anterior: acrescenta as opções novas (Agente Frota) com o valor fixo 100000000 + índice.
+function GarantirOpcoes([string] $entidade, [string] $coluna, [string[]] $nomes) {
+  $atuais = @((Dv GET "EntityDefinitions(LogicalName='$entidade')/Attributes(LogicalName='$coluna')/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?`$select=LogicalName&`$expand=OptionSet(`$select=Options)").OptionSet.Options | ForEach-Object { $_.Value })
+  for ($i = 0; $i -lt $nomes.Count; $i++) {
+    $valor = 100000000 + $i
+    if ($atuais -contains $valor) { continue }
+    Dv POST InsertOptionValue @{ EntityLogicalName = $entidade; AttributeLogicalName = $coluna; Value = $valor; Label = (Label $nomes[$i]); SolutionUniqueName = $solutionName } | Out-Null
+    Write-Host "[agentes-schema] $entidade.$coluna ganhou $valor ($($nomes[$i]))"
+  }
+}
+GarantirOpcoes $exec 'cr40f_agente' $AGENTES
+GarantirOpcoes $prop 'cr40f_tipo' $TIPOS
 
 Dv POST PublishXml @{ ParameterXml = "<importexportxml><entities><entity>$exec</entity><entity>$prop</entity></entities></importexportxml>" } | Out-Null
 

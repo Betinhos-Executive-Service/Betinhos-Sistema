@@ -81,6 +81,7 @@ export const FIELDS: FieldDef[] = [
   { key: 'new_notificacoesmotoristas', label: 'Notificações de motoristas', kind: 'bool', group: 'detalhes' },
   { key: 'new_notificacoesoperacionais', label: 'Notificações operacionais', kind: 'bool', group: 'detalhes' },
   { key: 'new_notificacoesfinanceiras', label: 'Notificações financeiras', kind: 'bool', group: 'detalhes' },
+  { key: 'new_notificacoesfrota', label: 'Notificações de frota', kind: 'bool', group: 'detalhes', hint: 'Recebe o resumo semanal de pendências da frota (quarta, 08:00).' },
   { key: 'cr40f_gerarrecibopersonalizado', label: 'Gerar recibo personalizado', kind: 'bool', group: 'detalhes' },
   { key: 'cr40f_identificadordocolaborador', label: 'ID SharePoint', kind: 'text', group: 'detalhes', readonly: true },
   { key: 'new_infleetdriverid', label: 'ID InFleet', kind: 'text', group: 'detalhes', readonly: true },

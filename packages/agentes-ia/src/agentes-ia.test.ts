@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ACOES_POR_AGENTE, RESPOSTA_SCHEMA, TIPOS_POR_AGENTE, analisarMensagem } from './index.ts'
+import { ACOES_POR_AGENTE, RESPOSTA_SCHEMA, TIPOS_POR_AGENTE, TODOS_OS_TIPOS, analisarMensagem, montarContextoFrota, obrigatoriosFrota } from './index.ts'
 
 const msg = (corpo: unknown, stop = 'end_turn') => ({ stop_reason: stop, model: 'claude-opus-5-5', content: [{ type: 'thinking', thinking: '' }, { type: 'text', text: JSON.stringify(corpo) }] })
 const proposta = { tipo: 'SemRecibo', titulo: 'OS 1234 sem recibo', justificativa: 'Concluída há 12 dias.', prioridade: 'alta', registroAlvo: { entidade: 'cr40f_reservadeveculos', id: '11111111-1111-1111-1111-111111111111' }, acao: { tipo: 'CriarPendencia', campos: { titulo: 'Emitir recibo da OS 1234' } } }
@@ -14,7 +14,7 @@ describe('schema', () => {
   it('lista todos os tipos e ações no enum', () => {
     const tipos = Object.values(TIPOS_POR_AGENTE).flat()
     expect(RESPOSTA_SCHEMA.properties.propostas.items.properties.tipo.enum).toEqual(tipos)
-    expect(tipos).toHaveLength(15)
+    expect(tipos).toHaveLength(21)
     expect([...new Set(Object.values(ACOES_POR_AGENTE).flat())]).toEqual(['CriarPendencia', 'AtribuirMotorista', 'AtribuirVeiculo', 'CriarComunicadoRascunho'])
   })
 })
@@ -131,13 +131,38 @@ describe('pessoas', () => {
 import { constantesDoFlow } from './constantes.ts'
 
 describe('constantes do flow', () => {
-  it('reúne modelo, schema e os três agentes, sem @ (o Logic Apps leria como expressão)', () => {
+  it('reúne modelo, schema e os quatro agentes, sem @ (o Logic Apps leria como expressão)', () => {
     const c = constantesDoFlow()
     expect(c.modelo).toBe('claude-opus-5-5')
     expect(c.maxTokens).toBe(8000)
     expect(c.effort).toBe('medium')
-    expect(Object.keys(c.agentes)).toEqual(['financeiro', 'logistica', 'pessoas'])
+    expect(Object.keys(c.agentes)).toEqual(['financeiro', 'logistica', 'pessoas', 'frota'])
     expect(c.agentes.logistica.acoes).toEqual(['AtribuirMotorista', 'AtribuirVeiculo'])
     expect(JSON.stringify(c)).not.toContain('@')
+  })
+})
+
+describe('Agente Frota', () => {
+  const v = '11111111-1111-1111-1111-111111111111'
+  const m = '22222222-2222-2222-2222-222222222222'
+  const ctx = montarContextoFrota(JSON.stringify({ hoje: '2026-10-21', total: 3, pendencias: [
+    { tipo: 'prioridade', id: m, veiculoId: v, placa: 'ABC1A11', titulo: 'Freio', detalhe: 'Aguardando aprovação há 3 dias', manutencaoId: m },
+    { tipo: 'reincidencia', id: `reinc:${v}:100000007`, veiculoId: v, placa: 'ABC1A11', titulo: '3ª vez: Pastilhas de freio', detalhe: '3 vezes em 120 dias', manutencaoId: null },
+    { tipo: 'hodometro', id: `hod:${v}`, veiculoId: v, placa: 'ABC1A11', titulo: 'Hodômetro parado', detalhe: 'há 3 dias', manutencaoId: null },
+  ] }))
+  const proposta = (tipo: string, alvo: string) => ({ tipo, titulo: 't', justificativa: 'j', prioridade: 'alta', registroAlvo: { entidade: 'x', id: alvo }, acao: { tipo: 'CriarPendencia', campos: { titulo: 't', descricao: 'd', conteudo: null, motoristaId: null, veiculoId: null } } })
+
+  it('obrigatórios: manutenção da prioridade e veículo da reincidência, sem o hodômetro', () => {
+    expect(obrigatoriosFrota(ctx)).toEqual([m, v])
+  })
+  it('recusa resposta que omite pendência obrigatória e aceita a completa', () => {
+    const so = { resumo: 'r', propostas: [proposta('FrotaPrioridade', m)] }
+    expect(analisarMensagem(msg(so), 'frota', obrigatoriosFrota(ctx))).toEqual({ ok: false, erro: `Pendências obrigatórias sem proposta: ${v}.` })
+    const completa = { resumo: 'r', propostas: [proposta('FrotaPrioridade', m), proposta('FrotaReincidencia', v)] }
+    expect(analisarMensagem(msg(completa), 'frota', obrigatoriosFrota(ctx)).ok).toBe(true)
+  })
+  it('tipos da frota entram no fim da ordem do choice cr40f_tipo', () => {
+    expect(TODOS_OS_TIPOS.slice(-6)).toEqual(['FrotaPrioridade', 'FrotaReincidencia', 'FrotaPreventiva', 'FrotaAgendadaVencida', 'FrotaCustoAlto', 'FrotaHodometro'])
+    expect(TODOS_OS_TIPOS.indexOf('FrotaPrioridade')).toBe(15)
   })
 })
