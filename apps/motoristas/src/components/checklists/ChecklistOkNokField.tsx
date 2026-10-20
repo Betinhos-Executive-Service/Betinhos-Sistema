@@ -67,7 +67,7 @@ export function ChecklistOkNokField({ item, draft, domId, error, disabled, onCho
       ) : null}
       <FieldError error={error} id={errorId} />
       {confirmOk ? (
-        <ConfirmDialog title="Marcar como OK?" message="As fotos e os problemas deste item serão descartados." confirmLabel="Marcar OK" cancelLabel="Continuar editando" onCancel={() => setConfirmOk(false)} onConfirm={() => { setConfirmOk(false); onChoose("ok"); }} />
+        <ConfirmDialog title="Marcar como OK?" message="As fotos, os problemas e a observação deste item serão descartados." confirmLabel="Marcar OK" cancelLabel="Continuar editando" onCancel={() => setConfirmOk(false)} onConfirm={() => { setConfirmOk(false); onChoose("ok"); }} />
       ) : null}
     </section>
   );

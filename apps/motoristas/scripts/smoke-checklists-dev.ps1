@@ -45,7 +45,8 @@ Write-Output "Trava de edicao do checklist ativa no DEV"
 if ($ChecklistId) {
   $id = [guid]::Parse($ChecklistId).ToString("D")
   $antes = Invoke-RestMethod -Method Get -Uri "$api/new_checklistveiculos($id)?`$select=new_estado,new_itensjson" -Headers $headers
-  $itens = @(ConvertFrom-Json $antes.new_itensjson)
+  $parsed = ConvertFrom-Json $antes.new_itensjson
+  $itens = @($parsed | ForEach-Object { $_ })
   $fotoTeste = @{ link = "https://example.com/smoke-checklist.jpg"; caminho = "Checklists/smoke"; nomeArquivo = "smoke.jpg" }
   $okNokItens = @($itens | Where-Object { $_.tipo -eq "okNok" })
   $respostas = @()

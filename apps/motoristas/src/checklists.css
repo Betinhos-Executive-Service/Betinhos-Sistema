@@ -35,7 +35,7 @@
    seleção azul #2159d2/#edf3ff só no problema escolhido; campos neutros em #fcfcfb. */
 .checklist-oknok:focus { outline: 0; }
 .checklist-oknok:focus-visible { border-color: #6c91e8; box-shadow: 0 0 0 3px rgba(33, 89, 210, .11); }
-.checklist-oknok.is-ok { border-color: rgba(20, 122, 75, .28); }
+.checklist-oknok.is-ok { border-color: #147a4b; }
 .checklist-oknok-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .checklist-oknok-choice button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fcfcfb; color: #0f172a; font: 700 14px/1 "Manrope", "Segoe UI", sans-serif; cursor: pointer; transition: transform 140ms cubic-bezier(.23, 1, .32, 1), background-color 160ms ease, border-color 160ms ease, color 160ms ease; }
 .checklist-oknok-choice button svg { width: 18px; height: 18px; flex: 0 0 auto; }
