@@ -6,6 +6,7 @@
 - Nunca publique a partir de branch de feature, de correção ou de worktree (`.claude/worktrees/*`). Se a branch atual não for `main`, pare e informe; o caminho é abrir PR, fazer o merge e publicar da `main`.
 - Após publicar, commite o bump como `build: Sistema Betinhos vX.Y.Z publicado no DEV a partir da main` direto na `main`.
 - Nunca dispare dois `pnpm push` em paralelo.
+- Exceção automática (decisão do Renan, 20/10/2026): depois de um merge automático de baixo risco (`.claude/entrega-autonoma.json`), o plantão publica no DEV levando a `main` para a branch `dev` (`git push origin origin/main:refs/heads/dev`, só avanço rápido, nunca force). Isso dispara o workflow "Deploy" (job `dev`, conta de serviço do environment `dev` do GitHub). Nunca `pnpm push` fora do checkout principal. Pelo CI, a versão de build é a do repo + o número da execução.
 
 ## Ambiente cloud (sessões cloud do Claude Code)
 

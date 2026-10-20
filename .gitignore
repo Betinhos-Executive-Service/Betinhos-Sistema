@@ -6,6 +6,7 @@
 !.claude/skills/
 !.claude/hooks/
 !.claude/settings.json
+!.claude/entrega-autonoma.json
 *.tsbuildinfo
 node_modules/
 dist/
