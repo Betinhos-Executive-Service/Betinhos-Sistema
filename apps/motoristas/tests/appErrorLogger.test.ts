@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { APP_CONNECTION_LOST_MESSAGE, APP_OPERATION_ERROR_MESSAGE, flushAppErrorLogQueue, reportAppError, redactSensitiveLogValue } from "../src/lib/appErrorLogger.ts";
+import { APP_CONNECTION_LOST_MESSAGE, APP_OPERATION_ERROR_MESSAGE, installGlobalAppErrorLogger, reportAppError, redactSensitiveLogValue, type AppErrorNotice } from "../src/lib/appErrorLogger.ts";
 
 test("mensagem de erro operacional orienta fechar e reabrir o aplicativo", () => {
   assert.match(APP_OPERATION_ERROR_MESSAGE, /Feche e reabra o aplicativo/);
@@ -45,74 +45,106 @@ test("redactSensitiveLogValue preserva codigos operacionais de oito e nove digit
   assert.equal(redactSensitiveLogValue("OT 202410001 e código 12345678"), "OT 202410001 e código 12345678");
 });
 
-test("logger conserva erros internos, contexto e fila concorrente sem depender do armazenamento", async () => {
+test("wrapper grava pelo pacote compartilhado, avisa o usuário e redige e-mail e telefone", async () => {
   const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
   const previousStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const previousFetch = globalThis.fetch;
+  const previousConsoleError = console.error;
   const created: Record<string, unknown>[] = [];
-  const writes = new Map<string, string>();
-  let unavailable = true;
-  let storageUnavailable = true;
-  let releaseFirst: (() => void) | undefined;
-  let blockFirst = false;
-  const runtime = {
-    navigator: { onLine: true },
-    setTimeout: () => 1,
-    Xrm: { WebApi: { createRecord: async (table: string, record: Record<string, unknown>) => {
+  const notices: AppErrorNotice[] = [];
+  const listeners = new Map<string, ((event: Event) => void)[]>();
+  const storage = new Map<string, string>([
+    ["app-motoristas-error-log-queue-v1", JSON.stringify([{ new_name: "pendente da fila antiga", new_appname: "App Motoristas" }])]
+  ]);
+  const xrm = {
+    Utility: { getGlobalContext: () => ({ getClientUrl: () => "https://org.example.crm2.dynamics.com", userSettings: { userId: "{ABC}", userName: "Motorista" } }) },
+    WebApi: { createRecord: async (table: string, record: Record<string, unknown>) => {
       assert.equal(table, "new_appmotoristaslog");
-      if (unavailable) throw new Error("Acesso negado ao criar log.");
-      if (blockFirst) {
-        blockFirst = false;
-        await new Promise<void>((resolve) => { releaseFirst = resolve; });
-      }
       created.push(record);
       return { id: String(created.length) };
-    } } }
+    } }
   };
+  const runtime: Record<string, unknown> = {
+    navigator: { onLine: true, userAgent: "test" },
+    location: { href: "https://org.example.crm2.dynamics.com/WebResources/app.html" },
+    __APP_BUILD_INFO: { version: "2.1.999", builtAtLabel: "19/10/2026, 21:00" },
+    Xrm: xrm,
+    addEventListener: (type: string, listener: (event: Event) => void) => listeners.set(type, [...(listeners.get(type) ?? []), listener]),
+    removeEventListener: (type: string, listener: (event: Event) => void) => listeners.set(type, (listeners.get(type) ?? []).filter((item) => item !== listener)),
+    dispatchEvent: (event: Event) => {
+      if (event.type === "appmotoristas:error") notices.push((event as CustomEvent<AppErrorNotice>).detail);
+      return true;
+    },
+    setInterval: () => 1,
+    clearInterval: () => undefined,
+    setTimeout: () => 1
+  };
+  runtime.parent = runtime;
   const settle = async () => { for (let index = 0; index < 12; index++) await new Promise<void>((resolve) => setImmediate(resolve)); };
   Object.defineProperty(globalThis, "window", { configurable: true, value: runtime });
   Object.defineProperty(globalThis, "localStorage", { configurable: true, value: {
-    getItem: (key: string) => writes.get(key) ?? null,
-    setItem: (key: string, value: string) => {
-      if (storageUnavailable) throw new Error("QuotaExceededError");
-      writes.set(key, value);
-    }
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => { storage.set(key, value); },
+    removeItem: (key: string) => { storage.delete(key); }
   } });
+  globalThis.fetch = (async (url: string) => ({
+    ok: true,
+    json: async () => (String(url).includes("systemusers") ? { fullname: "Motorista Teste", internalemailaddress: "pessoa.ficticia1@betinhos.com.br", domainname: "pessoa.ficticia1@betinhos.com.br" } : {})
+  })) as unknown as typeof fetch;
+  console.error = () => undefined;
   try {
+    installGlobalAppErrorLogger();
+    await settle();
+    assert.equal(storage.has("app-motoristas-error-log-queue-v1"), false, "Fila antiga migra para a do pacote.");
+    assert.equal(created[0]?.new_name, "pendente da fila antiga");
+    assert.ok(listeners.get("error")?.length === 1, "Só o listener do wrapper fica ativo.");
+
     const internal = Object.assign(new Error("Falha interna em tabela"), { code: "0x80040220" });
-    reportAppError(Object.assign(new Error("Falha na operação"), { cause: internal }), {
+    reportAppError(Object.assign(new Error("Falha para pessoa.ficticia5@betinhos.com.br no 11 90000-0010"), { cause: internal }), {
       action: "assinarComunicado", phase: "execute", screen: "Comunicados", detailId: "recipient-1",
-      payload: { authorization: "Bearer sensitive", observacaoLength: 12 }, notifyUser: false
+      payload: { authorization: "Bearer sensitive", telefone: "11900000010", observacaoLength: 12 }
     });
     await settle();
-    // Mais de 50 eventos devem sobreviver à falha de localStorage.
-    for (let index = 0; index < 55; index++) reportAppError(new Error(`Erro ${index}`), { notifyUser: false });
+    const record = created[1];
+    assert.equal(record.new_appname, "App Motoristas");
+    assert.equal(record.new_appversion, "2.1.999");
+    assert.equal(record.new_builtat, "19/10/2026, 21:00");
+    assert.equal(record.new_useremail, "pessoa.ficticia1@betinhos.com.br");
+    assert.equal(record.new_errorcode, "0x80040220");
+    assert.equal(record.new_action, "assinarComunicado");
+    assert.equal(record.new_screen, "Comunicados");
+    assert.equal(record.new_detailid, "recipient-1");
+    assert.equal(record.new_message, "Falha para [redacted-email] no [redacted-phone]");
+    assert.equal(String(record.new_stack).includes("pessoa.ficticia5@betinhos.com.br"), false);
+    const payload = JSON.parse(String(record.new_payloadjson));
+    assert.equal(payload.payload.authorization, "[redacted]");
+    assert.equal(payload.payload.telefone, "[redacted]");
+    assert.equal(payload.payload.observacaoLength, 12);
+    assert.match(JSON.stringify(payload.error), /Falha interna em tabela/);
+    assert.equal(notices.length, 1);
+    assert.equal(notices[0].userMessage, "Falha para [redacted-email] no [redacted-phone] Código: 0x80040220");
+
+    reportAppError(new Error("Silencioso"), { notifyUser: false });
     await settle();
-    unavailable = false;
-    blockFirst = true;
-    const flushing = flushAppErrorLogQueue();
+    assert.equal(notices.length, 1, "notifyUser: false não avisa o usuário.");
+    assert.equal(created[2].new_message, "Silencioso");
+
+    console.error("[AppMotoristas:Log] interno");
+    console.error("Falha no console", { telefone: "11900000010" });
     await settle();
-    assert.ok(releaseFirst);
-    storageUnavailable = false;
-    reportAppError(new Error("Chegou durante o reenvio"), { notifyUser: false });
+    assert.equal(created.length, 4, "console.error marcado pelo app não é gravado.");
+    assert.equal(created[3].new_source, "console.error");
+    assert.equal(created[3].new_message, "Falha no console {\"telefone\":\"[redacted]\"}");
+
+    runtime.Xrm = undefined;
+    runtime.parent = undefined;
+    reportAppError(new Error("Modo mock"));
     await settle();
-    assert.equal(JSON.parse(writes.get("app-motoristas-error-log-queue-v1") ?? "[]").length, 57);
-    releaseFirst();
-    await flushing;
-    await flushAppErrorLogQueue();
-    assert.equal(created.length, 57);
-    assert.equal(created[0].new_errorcode, "0x80040220");
-    assert.equal(created[0].new_action, "assinarComunicado");
-    assert.equal(created[0].new_detailid, "recipient-1");
-    assert.match(String(created[0].new_rawjson), /Falha interna em tabela/);
-    const diagnostic = JSON.parse(String(created[0].new_payloadjson));
-    assert.ok(diagnostic.eventId);
-    assert.equal(diagnostic.occurredAt, created[0].new_occurredat);
-    assert.ok(diagnostic.delivery.attempts >= 1);
-    assert.equal(diagnostic.payload.authorization, "[redacted]");
-    assert.equal(created[56].new_message, "Chegou durante o reenvio");
-    await flushAppErrorLogQueue();
-    assert.equal(created.length, 57, "Não reenviar registros já confirmados.");
+    assert.equal(created.length, 4, "Sem Xrm (mock) nada é gravado.");
+    assert.equal(notices.at(-1)?.message, "Modo mock", "O aviso ao usuário continua no modo mock.");
   } finally {
+    console.error = previousConsoleError;
+    globalThis.fetch = previousFetch;
     if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
     else Reflect.deleteProperty(globalThis, "window");
     if (previousStorage) Object.defineProperty(globalThis, "localStorage", previousStorage);

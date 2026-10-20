@@ -9,7 +9,7 @@ description: "Verificação base do App Motoristas: testes Node, TypeScript estr
 - Áreas com skill própria (rode as duas): gastos → `verificar-gastos`.
 
 ## Preparar ambiente
-- Node instalado; dependências do repositório principal (`App Motoristas/node_modules`) resolvem também nos worktrees.
+- Node instalado; dependências do repositório principal (`App Motoristas/node_modules`) resolvem também nos worktrees. Se faltar `@betinhos-executive-service/ui` (GitHub Packages): `NODE_AUTH_TOKEN=$(gh auth token) npm install` (o `.npmrc` do repo usa a variável; nunca grave o token).
 - Dev server: `PORT=<porta livre> node scripts/dev-server.cjs` → `http://127.0.0.1:<porta>/`. Ele reescreve `dist/`; use `git checkout -- dist` antes do commit se não for publicar.
 
 ## Roteiro
@@ -18,6 +18,11 @@ description: "Verificação base do App Motoristas: testes Node, TypeScript estr
 3. Dev server sobe e imprime `[dev] build atualizado` (build single-file sem erro).
 4. Navegador interno em `/?dev=preview` → a lista de demos aparece (Botões, Tela inicial, Serviços, Gastos...). Abra a tela afetada pela mudança e interaja com o controle alterado.
 5. `read_console_messages` com `onlyErrors: true` → sem erros.
+
+## Logger de erros (`src/lib/appErrorLogger.ts` → pacote `@betinhos-executive-service/ui/error-logger.js`)
+- `tests/appErrorLogger.test.ts` cobre gravação via pacote, versão de build, redação de e-mail/telefone, aviso `appmotoristas:error`, `console.error` e modo mock.
+- Prévia local (mock): no console da página, `window.__APP_REPORT_ERROR(new Error('teste x@y.com'),{action:'verificacao'})` → toast com `[redacted-email]`; `setTimeout(()=>{throw new Error('teste')})` → pop-up crítico "Processo não foi concluído". `localStorage['betinhos-error-log-queue-v1:App Motoristas']` continua vazio (mock não grava).
+- DEV autenticado (só com a trava `~/.claude/locks/dataverse-dev.lock`): publique só o WebResource (`scripts/deploy-webresource.ps1 -EnvironmentUrl https://org23b93544.crm2.dynamics.com/ -WebResourceName new_app-motoristas-v2 -SolutionUniqueName AppBetinhos`), force um erro no app aberto, confira a linha em `new_appmotoristaslogs` (`new_appname` = App Motoristas, `new_appversion` = versão do build, `new_useremail`) e apague a linha de teste.
 
 ## Casos de borda
 - Viewport 390×844 e desktop; landscape baixo quando a tela tiver modo compacto.
