@@ -5,7 +5,9 @@ import {
   addDays, aplicarPendencias, clonarPendencias, descontarSalvas, planSave, semPendencias, toKey, totalPendencias, weekendLabel, weekendOf,
   type Compromisso, type Dados, type Padrao, type Pendencias, type Situacao,
 } from './domain/escala'
+import { logAppError } from '@betinhos/ui/error-logger'
 import { createSource, janelaPara, type Janela } from './data/source'
+import { definirAbaDoLog } from './errorLog'
 import { EscalaTab } from './components/EscalaTab'
 import { AgendaTab } from './components/AgendaTab'
 import { PadroesTab } from './components/PadroesTab'
@@ -32,6 +34,7 @@ export function App() {
   const [salvoEm, setSalvoEm] = useState<string | null>(null)
   const [pend, setPend] = useState<Pendencias>(semPendencias)
   const [aba, setAba] = useState<Aba>('escala')
+  useEffect(() => definirAbaDoLog(aba), [aba])
   const [formInicial, setFormInicial] = useState<FormInicial | null>(null)
   const total = totalPendencias(pend)
 
@@ -43,7 +46,10 @@ export function App() {
     setLoading(true)
     setError(null)
     try { setDados(await source.load(target)) }
-    catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+    catch (reason) {
+      void logAppError(reason, { action: 'carregar-escala', phase: 'load', component: 'App' })
+      setError(reason instanceof Error ? reason.message : String(reason))
+    }
     finally { setLoading(false) }
   }, [source])
 
@@ -82,6 +88,7 @@ export function App() {
       setError(reason instanceof Error ? reason.message : String(reason))
     }
     if (falha) {
+      void logAppError(falha, { action: 'salvar-escala', phase: 'submit', component: 'App' })
       setSalvarErro(true)
       toast({ tone: 'danger', message: `Não foi possível salvar. ${falha instanceof Error ? falha.message : ''}`.trim() })
     } else setSalvoEm(horaAgora())
