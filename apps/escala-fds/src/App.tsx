@@ -1,31 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, CircleAlert, LoaderCircle, RefreshCw } from 'lucide-react'
-import { Alert, BuildBadge, Button, Skeleton, Tabs, useToast } from '@betinhos/ui'
-import {
-  addDays, aplicarPendencias, clonarPendencias, descontarSalvas, planSave, semPendencias, toKey, totalPendencias, weekendLabel, weekendOf,
-  type Compromisso, type Dados, type Padrao, type Pendencias, type Situacao,
-} from './domain/escala'
+import { Alert, BuildBadge, Button, Skeleton, useToast } from '@betinhos/ui'
 import { logAppError } from '@betinhos/ui/error-logger'
+import {
+  addDays, aplicarPendencias, clonarPendencias, descontarSalvas, planSave, recordKey, semPendencias, semanaDe, semanaLabel, toKey, totalPendencias,
+  type Compromisso, type Dados, type Pendencias, type Situacao,
+} from './domain/escala'
 import { createSource, janelaPara, type Janela } from './data/source'
-import { definirAbaDoLog } from './errorLog'
-import { EscalaTab } from './components/EscalaTab'
-import { AgendaTab } from './components/AgendaTab'
-import { PadroesTab } from './components/PadroesTab'
-import type { FormInicial } from './components/CompromissoForm'
-
-type Aba = 'escala' | 'agenda' | 'padroes'
+import { EscalaLista } from './components/EscalaLista'
 
 /** Espera após a última alteração antes de gravar, para juntar toques seguidos num lote só. */
 const AUTOSAVE_MS = 700
 
-const precisaRecarregar = (janela: Janela, sabado: string) => janelaPara(sabado).inicio !== janela.inicio || addDays(sabado, 7) > janela.fim
 const horaAgora = () => new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }).format(new Date())
 
 export function App() {
   const source = useMemo(createSource, [])
   const toast = useToast()
-  const [sabado, setSabado] = useState(() => weekendOf(new Date()))
-  const [janela, setJanela] = useState(() => janelaPara(weekendOf(new Date())))
+  const [segunda, setSegunda] = useState(() => semanaDe(new Date()))
+  const janela = useMemo(() => janelaPara(segunda), [segunda])
   const [dados, setDados] = useState<Dados | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -33,9 +26,6 @@ export function App() {
   const [salvarErro, setSalvarErro] = useState(false)
   const [salvoEm, setSalvoEm] = useState<string | null>(null)
   const [pend, setPend] = useState<Pendencias>(semPendencias)
-  const [aba, setAba] = useState<Aba>('escala')
-  useEffect(() => definirAbaDoLog(aba), [aba])
-  const [formInicial, setFormInicial] = useState<FormInicial | null>(null)
   const total = totalPendencias(pend)
 
   // O salvamento roda fora do ciclo de render: lê sempre o estado mais recente.
@@ -84,6 +74,7 @@ export function App() {
       setDados(novos)
       setPend((p) => descontarSalvas(p, lote, base, falha ? ops.slice(0, feitas) : undefined))
     } catch (reason) {
+      void logAppError(reason, { action: 'recarregar-apos-salvar', phase: 'load', component: 'App' })
       setPend((p) => descontarSalvas(p, lote, base, ops.slice(0, feitas)))
       setError(reason instanceof Error ? reason.message : String(reason))
     }
@@ -102,83 +93,60 @@ export function App() {
     return () => clearTimeout(timer)
   }, [pend, total, saving, salvarErro, salvar])
 
-  const irPara = (proximo: string) => {
-    setSabado(proximo)
-    if (precisaRecarregar(janela, proximo)) setJanela(janelaPara(proximo))
-  }
-
   const view = useMemo(() => (dados ? aplicarPendencias(dados, pend) : null), [dados, pend])
 
   const update = (fn: (p: Pendencias) => void) => {
     setSalvarErro(false) // Nova alteração tenta gravar de novo, junto com o que falhou.
     setPend((current) => { const next = clonarPendencias(current); fn(next); return next })
   }
-  const setExcecao = (key: string, situacao: Situacao | null) => update((p) => {
-    const salva = dados?.excecoes.find((e) => `${e.motoristaId}|${e.data}` === key)
-    if ((salva?.situacao ?? null) === situacao) p.excecoes.delete(key)
-    else p.excecoes.set(key, situacao)
+  const marcar = (motoristaId: string, data: string, situacao: Situacao | null) => update((p) => {
+    const key = recordKey(motoristaId, data)
+    const salva = dados?.marcacoes.find((m) => recordKey(m.motoristaId, m.data) === key)
+    if ((salva?.situacao ?? null) === situacao) p.marcacoes.delete(key)
+    else p.marcacoes.set(key, situacao)
   })
-  const setPadrao = (motoristaId: string, padrao: Padrao) => update((p) => {
-    const salvo = dados?.motoristas.find((m) => m.id === motoristaId)?.padrao
-    if (salvo && salvo.sab === padrao.sab && salvo.dom === padrao.dom) p.padroes.delete(motoristaId)
-    else p.padroes.set(motoristaId, padrao)
-  })
-  const addCompromisso = (c: Compromisso) => update((p) => { p.novos.push(c) })
-  const removeCompromisso = (c: Compromisso) => update((p) => {
+  const addAusencias = (lista: Compromisso[]) => update((p) => { p.novos.push(...lista) })
+  const removeAusencia = (c: Compromisso) => update((p) => {
     if (c.id) p.excluidos.add(c.id)
     else p.novos = p.novos.filter((n) => n !== c)
   })
-  const novoCompromisso = (inicial: FormInicial) => { setFormInicial(inicial); setAba('agenda') }
 
   const hoje = toKey(new Date())
+  // Trocar de semana só com tudo gravado: o plano de gravação compara com os dados da semana carregada.
+  const travado = loading || dirty
 
   return (
     <div className="escala">
       <header className="escala__head">
         <div className="escala__week">
-          <Button variant="secondary" size="compact" aria-label="Fim de semana anterior" icon={<ChevronLeft size={16} />} onClick={() => irPara(addDays(sabado, -7))} />
+          <Button variant="secondary" size="compact" aria-label="Semana anterior" icon={<ChevronLeft size={16} />} disabled={travado} onClick={() => setSegunda(addDays(segunda, -7))} />
           <div className="escala__week-label">
-            <span className="escala__eyebrow">{sabado === weekendOf(new Date()) ? 'Este fim de semana' : 'Fim de semana'}</span>
-            <strong>{weekendLabel(sabado)}</strong>
+            <span className="escala__eyebrow">{segunda === semanaDe(new Date()) ? 'Esta semana' : 'Semana'}</span>
+            <strong>{semanaLabel(segunda)}</strong>
           </div>
-          <Button variant="secondary" size="compact" aria-label="Próximo fim de semana" icon={<ChevronRight size={16} />} onClick={() => irPara(addDays(sabado, 7))} />
+          <Button variant="secondary" size="compact" aria-label="Próxima semana" icon={<ChevronRight size={16} />} disabled={travado} onClick={() => setSegunda(addDays(segunda, 7))} />
         </div>
         <div className="escala__head-end">
           <span className={salvarErro ? 'escala__save is-error' : 'escala__save'} aria-live="polite">
             {salvarErro ? (
-              <><CircleAlert size={14} aria-hidden="true" />Não salvo<Button variant="ghost" size="compact" onClick={() => setSalvarErro(false)}>Tentar de novo</Button></>
+              <><CircleAlert size={14} aria-hidden="true" />Não salvo<Button variant="ghost" size="compact" onClick={() => setSalvarErro(false)}>Tentar de novo</Button><Button variant="ghost" size="compact" onClick={() => { setPend(semPendencias()); setSalvarErro(false); void load(janela) }}>Descartar alterações</Button></>
             ) : dirty ? (
               <><LoaderCircle size={14} className="escala__spin" aria-hidden="true" />Salvando…</>
             ) : salvoEm ? (
               <><Check size={14} aria-hidden="true" />Salvo às {salvoEm}</>
             ) : null}
           </span>
-          <Button variant="ghost" size="compact" icon={<RefreshCw size={16} />} onClick={() => void load(janela)} disabled={loading || dirty}>Atualizar</Button>
+          <Button variant="ghost" size="compact" icon={<RefreshCw size={16} />} onClick={() => void load(janela)} disabled={travado}>Atualizar</Button>
         </div>
       </header>
-
-      <Tabs<Aba>
-        aria-label="Seções da escala"
-        value={aba}
-        onChange={setAba}
-        tabs={[
-          { value: 'escala', label: 'Escala' },
-          { value: 'agenda', label: 'Agenda' },
-          { value: 'padroes', label: 'Padrões' },
-        ]}
-      />
 
       <main className="escala__body" aria-busy={loading}>
         {error ? (
           <Alert tone="danger" title="Não foi possível carregar a escala." action={<Button size="compact" variant="secondary" onClick={() => void load(janela)}>Tentar de novo</Button>}>{error}</Alert>
-        ) : !view ? (
-          <div className="escala__skeleton">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} height={56} />)}</div>
-        ) : aba === 'escala' ? (
-          <EscalaTab sabado={sabado} view={view} onExcecao={setExcecao} onNovoCompromisso={novoCompromisso} />
-        ) : aba === 'agenda' ? (
-          <AgendaTab hoje={hoje} sabado={sabado} view={view} formInicial={formInicial} onFormClose={() => setFormInicial(null)} onAdd={addCompromisso} onRemove={removeCompromisso} />
+        ) : !view || loading ? (
+          <div className="escala__skeleton">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} height={88} />)}</div>
         ) : (
-          <PadroesTab view={view} onPadrao={setPadrao} />
+          <EscalaLista hoje={hoje} segunda={segunda} view={view} onMarcar={marcar} onAddAusencias={addAusencias} onRemoveAusencia={removeAusencia} />
         )}
       </main>
 
