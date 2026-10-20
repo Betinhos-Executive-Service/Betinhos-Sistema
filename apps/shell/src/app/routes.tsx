@@ -3,6 +3,7 @@ import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { Button, EmptyState, PageHeader, Skeleton, Stack } from '@betinhos/ui'
 import type { Host } from '../host'
 import { findItem, type MenuItem } from '../nav/menu'
+import { logAppError } from '@betinhos/ui/error-logger'
 import { isChunkLoadError, reportarErro } from './erros'
 
 type PageId = Extract<MenuItem, { kind: 'page' }>['page']
@@ -146,7 +147,10 @@ type BoundaryProps = { title: string; children: ReactNode }
 export class RouteErrorBoundary extends Component<BoundaryProps, { error: Error | null }> {
   state = { error: null as Error | null }
   static getDerivedStateFromError(error: Error) { return { error } }
-  componentDidCatch(error: Error) { reportarErro(error, `tela ${this.props.title}`) }
+  componentDidCatch(error: Error) {
+    reportarErro(error, `tela ${this.props.title}`)
+    void logAppError(error, { action: 'renderizar-tela', phase: 'render', component: 'RouteErrorBoundary', screen: this.props.title })
+  }
   render() {
     if (!this.state.error) return this.props.children
     return (

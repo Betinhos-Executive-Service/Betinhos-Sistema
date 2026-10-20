@@ -1,4 +1,5 @@
-import { createClient, createMetadata, createXrmShim, getHostXrm, isLocalHost, type DataverseClient } from '@betinhos/dataverse'
+import { createClient, createMetadata, createXrmShim, getHostXrm, isLocalHost, reportingFetch, type DataverseClient } from '@betinhos/dataverse'
+import { logFalhaDataverse } from './app/errorLog'
 
 /** App model-driven que ainda atende as listas e formulários nativos. */
 const MODEL_DRIVEN_APP = 'cr40f_ModelDrivenBetinhos'
@@ -26,7 +27,7 @@ export function createHost(): Host {
 
   const hostXrm = getHostXrm()
   const clientUrl = (hostXrm?.Utility?.getGlobalContext().getClientUrl() ?? location.origin).replace(/\/+$/, '')
-  const client = createClient(clientUrl)
+  const client = createClient(clientUrl, reportingFetch(logFalhaDataverse))
 
   // As telas legadas em iframe chamam `parent.Xrm`: repassa o Xrm do model-driven
   // ou, por URL direta, um Xrm mínimo sobre a Web API.

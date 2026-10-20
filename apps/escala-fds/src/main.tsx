@@ -4,6 +4,9 @@ import { ToastProvider } from '@betinhos/ui'
 import '@betinhos/ui/styles.css'
 import './styles.css'
 import { App } from './App'
+import { instalarLogDeErros } from './errorLog'
+
+instalarLogDeErros()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

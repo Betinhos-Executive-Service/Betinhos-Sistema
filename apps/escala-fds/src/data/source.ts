@@ -1,4 +1,5 @@
-import { cleanId, createClient, createMetadata, getHostXrm, isLocalHost, type Row } from '@betinhos/dataverse'
+import { cleanId, createClient, createMetadata, getHostXrm, isLocalHost, reportingFetch, type Row } from '@betinhos/dataverse'
+import { logFalhaDataverse } from '../errorLog'
 import {
   MOTIVO_VALUE, SITUACAO_VALUE, addDays, motivoFromValue, situacaoFromValue, toKey, toLocal, weekendOf,
   type Compromisso, type Dados, type Excecao, type Motorista, type Operacao, type Situacao,
@@ -71,7 +72,7 @@ export function compromissoPayload(c: Compromisso, funcionarioSet: string, nome:
 function createDataverseSource(): Source {
   const hostXrm = getHostXrm()
   const clientUrl = (hostXrm?.Utility?.getGlobalContext().getClientUrl() ?? location.origin).replace(/\/+$/, '')
-  const client = createClient(clientUrl)
+  const client = createClient(clientUrl, reportingFetch(logFalhaDataverse))
   const metadata = createMetadata(client)
   let sets: Promise<Record<keyof typeof ENTITIES, string>> | null = null
   const entitySets = () => (sets ??= metadata.entities(Object.values(ENTITIES)).then((info) => {
