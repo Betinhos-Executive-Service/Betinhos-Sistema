@@ -14,7 +14,7 @@ const build = (parts: { manutencoes?: Manutencao[]; multas?: Multa[]; colisoes?:
 
 describe('buildPendencias', () => {
   it('ordena aprovações por grau, do mais urgente para o menos', () => {
-    const result = build({ manutencoes: [manut('a', { grau: 1 }), manut('b', { grau: 4 }), manut('c', { grau: 3 })] })
+    const result = build({ manutencoes: [manut('a', { grau: 1 }), manut('b', { grau: 4, criadoEm: '2026-10-01T12:00:00Z' }), manut('c', { grau: 3, criadoEm: '2026-10-01T12:00:00Z' })] })
     expect(result.map((item) => [item.tipo, item.id])).toEqual([['aprovar', 'b'], ['aprovar', 'c'], ['aprovar', 'a']])
   })
 

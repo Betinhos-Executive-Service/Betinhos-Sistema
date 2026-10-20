@@ -4,7 +4,7 @@ import type { Agente, Execucao, Proposta, TipoAcao } from '../domain/types'
 
 export const ENTITY_EXECUCAO = 'cr40f_agenteexecucao'
 export const ENTITY_PROPOSTA = 'cr40f_agenteproposta'
-export const AGENTE_VALOR: Record<Agente, number> = { financeiro: 100000000, logistica: 100000001, pessoas: 100000002 }
+export const AGENTE_VALOR: Record<Agente, number> = { financeiro: 100000000, logistica: 100000001, pessoas: 100000002, frota: 100000003 }
 
 const SELECT_EXEC = ['cr40f_agenteexecucaoid', 'cr40f_agenteexecucaonome', 'cr40f_agente', 'cr40f_origem', 'cr40f_pergunta', 'cr40f_status', 'cr40f_erro', 'cr40f_resumo', 'cr40f_modelo', 'cr40f_tokensentrada', 'cr40f_tokenssaida', 'createdon']
 const SELECT_PROP = ['cr40f_agentepropostaid', '_cr40f_execucao_value', 'cr40f_tipo', 'cr40f_titulo', 'cr40f_justificativa', 'cr40f_prioridade', 'cr40f_entidadealvo', 'cr40f_idalvo', 'cr40f_acao', 'cr40f_decisao', 'cr40f_motivodescarte', '_cr40f_decididopor_value', 'cr40f_decididoem']

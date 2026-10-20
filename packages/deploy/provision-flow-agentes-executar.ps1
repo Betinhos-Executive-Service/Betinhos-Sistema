@@ -2,8 +2,8 @@
 # de ambiente new_AnthropicApiKey (já existente, criada pelo flow de despesas) e ativa o flow.
 #
 # O flow roda quando uma cr40f_agenteexecucao é criada com status Pendente: marca Processando, confere o limite diário
-# por agente, monta o contexto do departamento (Financeiro, Logística ou Pessoas) no formato de
-# packages/agentes-ia/src/{financeiro,logistica,pessoas}.ts, chama a API do Claude com saída estruturada, aplica as travas
+# por agente, monta o contexto do departamento (Financeiro, Logística, Pessoas ou Frota) no formato de
+# packages/agentes-ia/src/{financeiro,logistica,pessoas,frota}.ts (Frota usa a Custom API cr40f_FrotaPendencias), chama a API do Claude com saída estruturada, aplica as travas
 # de packages/agentes-ia/src/validar.ts e só então cria as cr40f_agenteproposta e grava Concluída. Qualquer falha no
 # escopo grava cr40f_status = Erro e o motivo em cr40f_erro, sem propostas parciais.
 #
@@ -112,7 +112,7 @@ if ($constantesText.Contains('@')) { throw 'constantes.json contém @; escape an
 AssertSemMojibake $constantesText 'constantes.json'
 $const = $constantesText | ConvertFrom-Json
 foreach ($campo in 'modelo', 'maxTokens', 'effort', 'prefixoUsuario', 'schema', 'agentes') { if ($null -eq $const.$campo) { throw "constantes.json sem $campo." } }
-foreach ($ag in 'financeiro', 'logistica', 'pessoas') {
+foreach ($ag in 'financeiro', 'logistica', 'pessoas', 'frota') {
   foreach ($campo in 'systemPrompt', 'tipos', 'acoes') { if ($null -eq $const.agentes.$ag.$campo) { throw "constantes.json sem agentes.$ag.$campo." } }
 }
 # O prefixo vira literal dentro de concat('...'): aspas simples quebrariam a expressão.
@@ -165,8 +165,9 @@ $definitionText = @'
     "Iniciar_system": { "type": "InitializeVariable", "runAfter": { "Iniciar_contexto": ["Succeeded"] }, "inputs": { "variables": [ { "name": "System_prompt", "type": "string", "value": "" } ] } },
     "Iniciar_tipos": { "type": "InitializeVariable", "runAfter": { "Iniciar_system": ["Succeeded"] }, "inputs": { "variables": [ { "name": "Tipos_validos", "type": "array", "value": [] } ] } },
     "Iniciar_acoes": { "type": "InitializeVariable", "runAfter": { "Iniciar_tipos": ["Succeeded"] }, "inputs": { "variables": [ { "name": "Acoes_validas", "type": "array", "value": [] } ] } },
+    "Iniciar_obrigatorios": { "type": "InitializeVariable", "runAfter": { "Iniciar_acoes": ["Succeeded"] }, "inputs": { "variables": [ { "name": "Obrigatorios", "type": "array", "value": [] } ] } },
     "Escopo_execucao": {
-      "type": "Scope", "runAfter": { "Iniciar_acoes": ["Succeeded"] },
+      "type": "Scope", "runAfter": { "Iniciar_obrigatorios": ["Succeeded"] },
       "actions": {
         "Marcar_processando": {
           "type": "OpenApiConnection", "runAfter": {},
@@ -201,7 +202,8 @@ $definitionText = @'
           "cases": {
             "Financeiro": { "case": 100000000, "actions": "__RAMO_FINANCEIRO__" },
             "Logistica": { "case": 100000001, "actions": "__RAMO_LOGISTICA__" },
-            "Pessoas": { "case": 100000002, "actions": "__RAMO_PESSOAS__" }
+            "Pessoas": { "case": 100000002, "actions": "__RAMO_PESSOAS__" },
+            "Frota": { "case": 100000003, "actions": "__RAMO_FROTA__" }
           },
           "default": {
             "actions": {
@@ -309,7 +311,18 @@ $definitionText = @'
           },
           "else": { "actions": {} }
         },
-        "Mapa_tipos": { "type": "Compose", "runAfter": { "Com_alvo_invalido": ["Succeeded"] }, "inputs": "__MAPA_TIPOS__" },
+        "Alvos_propostos": { "type": "Select", "runAfter": { "Com_alvo_invalido": ["Succeeded"] }, "inputs": { "from": "@outputs('Resposta')?['propostas']", "select": "@toLower(coalesce(item()?['registroAlvo']?['id'], ''))" } },
+        "Obrigatorios_faltando": { "type": "Query", "runAfter": { "Alvos_propostos": ["Succeeded"] }, "inputs": { "from": "@variables('Obrigatorios')", "where": "@not(contains(body('Alvos_propostos'), item()))" } },
+        "Com_obrigatorio_faltando": {
+          "type": "If", "runAfter": { "Obrigatorios_faltando": ["Succeeded"] },
+          "expression": { "and": [ { "equals": [ "@empty(body('Obrigatorios_faltando'))", false ] } ] },
+          "actions": {
+            "Motivo_obrigatorio": { "type": "SetVariable", "runAfter": {}, "inputs": { "name": "Motivo_erro", "value": "Pendências obrigatórias sem proposta: @{join(body('Obrigatorios_faltando'), ', ')}." } },
+            "Falhar_obrigatorio": { "type": "Compose", "runAfter": { "Motivo_obrigatorio": ["Succeeded"] }, "inputs": "@int(variables('Motivo_erro'))" }
+          },
+          "else": { "actions": {} }
+        },
+        "Mapa_tipos": { "type": "Compose", "runAfter": { "Com_obrigatorio_faltando": ["Succeeded"] }, "inputs": "__MAPA_TIPOS__" },
         "Mapa_prioridade": { "type": "Compose", "runAfter": { "Mapa_tipos": ["Succeeded"] }, "inputs": { "alta": 100000000, "media": 100000001, "baixa": 100000002 } },
         "Criar_propostas": {
           "type": "Foreach", "runAfter": { "Mapa_prioridade": ["Succeeded"] }, "foreach": "@outputs('Resposta')?['propostas']",
@@ -499,9 +512,23 @@ $ramoPessoas = Ramo (@(Agente 'pessoas' 'pes') + @(
   (Passo 'Contexto_pes' (DefinirVar 'Contexto' ([ordered]@{ hoje = "@{outputs('Hoje')}"; funcionarios = "@body('Funcionarios_contexto')"; documentos = "@body('Documentos_contexto')"; multas = "@body('Multas_contexto')"; comunicados = "@body('Comunicados_contexto')" })))
 ))
 
-# Mapa tipo -> valor do choice cr40f_tipo (100000000 + índice na ordem financeiro, logística, pessoas; igual à Task 6).
+# Frota: as regras rodam na Custom API cr40f_FrotaPendencias (mesmo cálculo da aba Pendências do shell). Prioridade,
+# reincidência e custo viram registroAlvo obrigatório (Obrigatorios), conferido depois da resposta da IA.
+$ramoFrota = Ramo (@(Agente 'frota' 'fro') + @(
+  (Passo 'Pendencias_frota' ([ordered]@{
+    type = 'OpenApiConnection'; runAfter = $null
+    inputs = [ordered]@{ host = [ordered]@{ apiId = $dvApi; connectionName = 'shared_commondataserviceforapps'; operationId = 'PerformUnboundAction' }; parameters = [ordered]@{ actionName = 'cr40f_FrotaPendencias' }; authentication = "@parameters('`$authentication')" }
+  })),
+  (Passo 'Dados_frota' (Compor "@json(outputs('Pendencias_frota')?['body/PendenciasJson'])")),
+  (Passo 'Obrigatorios_frota' ([ordered]@{ type = 'Query'; runAfter = $null; inputs = [ordered]@{ from = "@outputs('Dados_frota')?['pendencias']"; where = "@contains(createArray('prioridade', 'reincidencia', 'custo'), item()?['tipo'])" } })),
+  (Passo 'Ids_obrigatorios' (Selecionar "@body('Obrigatorios_frota')" "@toLower(if(equals(item()?['tipo'], 'prioridade'), coalesce(item()?['manutencaoId'], ''), coalesce(item()?['veiculoId'], '')))")),
+  (Passo 'Definir_obrigatorios' (DefinirVar 'Obrigatorios' "@union(body('Ids_obrigatorios'), createArray())")),
+  (Passo 'Contexto_fro' (DefinirVar 'Contexto' ([ordered]@{ hoje = "@{outputs('Hoje')}"; pendencias = "@outputs('Dados_frota')?['pendencias']" })))
+))
+
+# Mapa tipo -> valor do choice cr40f_tipo (100000000 + índice na ordem financeiro, logística, pessoas, frota; igual à Task 6).
 $mapaTipos = [ordered]@{}; $i = 0
-foreach ($t in @($const.agentes.financeiro.tipos) + @($const.agentes.logistica.tipos) + @($const.agentes.pessoas.tipos)) { $mapaTipos[$t] = 100000000 + $i++ }
+foreach ($t in @($const.agentes.financeiro.tipos) + @($const.agentes.logistica.tipos) + @($const.agentes.pessoas.tipos) + @($const.agentes.frota.tipos)) { $mapaTipos[$t] = 100000000 + $i++ }
 # O prefixo termina em quebra de linha: dentro do concat('...') ela vira decodeUriComponent('%0A').
 $prefixoExpr = $const.prefixoUsuario.Replace("`n", "' , decodeUriComponent('%0A'), '")
 $definitionText = $definitionText.Replace('__PARAM_KEY__', $paramKey).Replace('__ENV_VAR__', $envVarName).Replace('__TRIGGER_FILTER__', $triggerFilter).Replace('__LIMITE_DIARIO__', "$LIMITE_DIARIO").Replace('__PREFIXO__', $prefixoExpr)
@@ -510,6 +537,7 @@ $escopo = $definition.actions.Escopo_execucao.actions
 $escopo.Por_agente.cases.Financeiro.actions = $ramoFinanceiro
 $escopo.Por_agente.cases.Logistica.actions = $ramoLogistica
 $escopo.Por_agente.cases.Pessoas.actions = $ramoPessoas
+$escopo.Por_agente.cases.Frota.actions = $ramoFrota
 # Constantes entram como valores JSON (sem concatenação de texto), então aspas e quebras de linha ficam escapadas pelo serializador.
 $escopo.Mapa_tipos.inputs = [pscustomobject]$mapaTipos
 $body = $escopo.Chamar_Claude.inputs.body
@@ -538,9 +566,9 @@ function Conferir($lido) {
   $selectsOk = @($listas | Where-Object { -not ($_.acao -and $_.acao.inputs.host.operationId -eq 'ListRecords' -and $_.acao.inputs.parameters.'$top' -eq 150 -and ($_.acao.inputs.parameters.'$select' -ceq $sel[$_.nome])) }).Count -eq 0
   $camposSensiveis = @($listas | ForEach-Object { $_.acao.inputs.parameters.'$select'.Split(',') } | Where-Object { $_ -match 'cpf|rg$|telefone|phone|email|e-mail|endere|conta' })
   $todosSelects = @(($lido | ConvertTo-Json -Depth 90 -Compress) | Select-String -Pattern '"\$select":"([^"]*)"' -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Groups[1].Value.Split(',') } | Where-Object { $_ -match 'cpf|telefone|email|endere' })
-  $promptsOk = ($cases.Financeiro.actions.Definir_system_fin.inputs.value -ceq $const.agentes.financeiro.systemPrompt) -and ($cases.Logistica.actions.Definir_system_log.inputs.value -ceq $const.agentes.logistica.systemPrompt) -and ($cases.Pessoas.actions.Definir_system_pes.inputs.value -ceq $const.agentes.pessoas.systemPrompt)
+  $promptsOk = ($cases.Financeiro.actions.Definir_system_fin.inputs.value -ceq $const.agentes.financeiro.systemPrompt) -and ($cases.Logistica.actions.Definir_system_log.inputs.value -ceq $const.agentes.logistica.systemPrompt) -and ($cases.Pessoas.actions.Definir_system_pes.inputs.value -ceq $const.agentes.pessoas.systemPrompt) -and ($cases.Frota.actions.Definir_system_fro.inputs.value -ceq $const.agentes.frota.systemPrompt)
   $listasAgenteOk = $true
-  foreach ($par in @(@('Financeiro', 'fin', 'financeiro'), @('Logistica', 'log', 'logistica'), @('Pessoas', 'pes', 'pessoas'))) {
+  foreach ($par in @(@('Financeiro', 'fin', 'financeiro'), @('Logistica', 'log', 'logistica'), @('Pessoas', 'pes', 'pessoas'), @('Frota', 'fro', 'frota'))) {
     $acts = $cases.($par[0]).actions
     if (((@($acts."Definir_tipos_$($par[1])".inputs.value) -join ',') -cne (@($const.agentes.($par[2]).tipos) -join ',')) -or ((@($acts."Definir_acoes_$($par[1])".inputs.value) -join ',') -cne (@($const.agentes.($par[2]).acoes) -join ','))) { $listasAgenteOk = $false }
   }
@@ -558,11 +586,11 @@ function Conferir($lido) {
     'Texto_usuario com prefixo e decodeUriComponent' = $a.Texto_usuario.inputs.Contains("concat('$prefixoExpr', string(variables('Contexto')))")
     'Definir_system_* com o texto exato dos prompts' = $promptsOk
     'Definir_tipos_*/Definir_acoes_* iguais às constantes' = $listasAgenteOk
-    'Mapa_tipos com 15 chaves' = @($a.Mapa_tipos.inputs.PSObject.Properties).Count -eq 15
+    'Mapa_tipos com 21 chaves' = @($a.Mapa_tipos.inputs.PSObject.Properties).Count -eq 21
     'Limite diário de 20' = $a.Limite_diario.expression.and[0].greaterOrEquals[1] -eq $LIMITE_DIARIO -and $a.Limite_diario.actions.Motivo_limite.inputs.value -ceq "Limite diário de $LIMITE_DIARIO execuções deste agente atingido."
     'Tratar_erro após Failed/TimedOut' = (@($erro.runAfter.Escopo_execucao) -join ',') -eq 'Failed,TimedOut'
     'Tratar_erro grava Erro (100000003)' = $erro.actions.Gravar_erro.inputs.parameters.'item/cr40f_status' -eq 100000003
-    'Criar_propostas depois de Mapa_prioridade (após todas as travas)' = (@($a.Criar_propostas.runAfter.Mapa_prioridade) -join ',') -eq 'Succeeded' -and (@($a.Mapa_tipos.runAfter.Com_alvo_invalido) -join ',') -eq 'Succeeded'
+    'Criar_propostas depois de Mapa_prioridade (após todas as travas)' = (@($a.Criar_propostas.runAfter.Mapa_prioridade) -join ',') -eq 'Succeeded' -and (@($a.Mapa_tipos.runAfter.Com_obrigatorio_faltando) -join ',') -eq 'Succeeded' -and (@($a.Alvos_propostos.runAfter.Com_alvo_invalido) -join ',') -eq 'Succeeded'
     'Criar_proposta vincula cr40f_Execucao' = $a.Criar_propostas.actions.Criar_proposta.inputs.parameters.'item/cr40f_Execucao@odata.bind' -ceq "@concat('/cr40f_agenteexecucaos(', triggerOutputs()?['body/cr40f_agenteexecucaoid'], ')')"
     'ListRecords dos ramos com $top 150 e $select exatos' = $selectsOk
     'OS_concluidas expande os recibos ativos e não há lista Recibos separada' = $cases.Financeiro.actions.OS_concluidas.inputs.parameters.'$expand' -ceq $expandRecibos -and -not ($cases.Financeiro.actions.PSObject.Properties.Name -contains 'Recibos') -and -not ($cases.Financeiro.actions.PSObject.Properties.Name -contains 'Ids_com_recibo')
@@ -604,7 +632,7 @@ if ($flows.Count) {
     Apply $flows[0] $clientData
   } else { Write-Host '[agentes-executar] definição já atualizada; nada a gravar.' }
 } else {
-  Dv POST workflows @{ name = $flowName; category = 5; type = 1; primaryentity = 'none'; clientdata = $clientData; description = 'Executa o assistente de departamento (Financeiro, Logística, Pessoas) com a API do Claude quando uma cr40f_agenteexecucao é criada como Pendente; grava as propostas ou Erro com o motivo.' } | Out-Null
+  Dv POST workflows @{ name = $flowName; category = 5; type = 1; primaryentity = 'none'; clientdata = $clientData; description = 'Executa o assistente de departamento (Financeiro, Logística, Pessoas, Frota) com a API do Claude quando uma cr40f_agenteexecucao é criada como Pendente; grava as propostas ou Erro com o motivo.' } | Out-Null
   $flowId = @(FlowRows)[0].workflowid
 }
 Include $flowId 29

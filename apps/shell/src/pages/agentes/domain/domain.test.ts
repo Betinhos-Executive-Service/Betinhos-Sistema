@@ -35,8 +35,8 @@ describe('ações', () => {
 })
 
 describe('agentes', () => {
-  it('tem três agentes com rótulo e grupo', () => {
-    expect(AGENTES.map((a) => a.id)).toEqual(['financeiro', 'logistica', 'pessoas'])
+  it('tem quatro agentes com rótulo e grupo', () => {
+    expect(AGENTES.map((a) => a.id)).toEqual(['financeiro', 'logistica', 'pessoas', 'frota'])
     expect(agentePorId('logistica')?.rodaAoAbrirAposMin).toBe(30)
     expect(agentePorId('financeiro')?.rodaAoAbrirAposMin).toBeNull()
   })

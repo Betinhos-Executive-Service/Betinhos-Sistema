@@ -2,7 +2,7 @@
 export type Origem = 'agendado' | 'manual' | 'ao_abrir'
 export const ORIGEM_ROTULO: Record<Origem, string> = { agendado: 'Agendado', manual: 'Manual', ao_abrir: 'Ao abrir' }
 
-export type Agente = 'financeiro' | 'logistica' | 'pessoas'
+export type Agente = 'financeiro' | 'logistica' | 'pessoas' | 'frota'
 export type StatusExecucao = 'pendente' | 'processando' | 'concluida' | 'erro'
 export type Prioridade = 'alta' | 'media' | 'baixa'
 export type Decisao = 'pendente' | 'aprovada' | 'descartada'

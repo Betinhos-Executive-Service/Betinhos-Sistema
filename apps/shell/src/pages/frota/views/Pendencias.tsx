@@ -1,4 +1,4 @@
-import { CalendarClock, Car, CheckCircle2, ChevronRight, CircleAlert, FileWarning, Gauge, ListTodo, Wrench } from 'lucide-react'
+import { CalendarClock, Car, CircleDollarSign, Repeat, Siren, CheckCircle2, ChevronRight, CircleAlert, FileWarning, Gauge, ListTodo, Wrench } from 'lucide-react'
 import { useMemo } from 'react'
 import { Alert, EmptyState, MetricCard, StatusBadge, Surface } from '@betinhos/ui'
 import { useQueryTexto } from '../../../nav/queryState'
@@ -8,6 +8,10 @@ import type { FrotaData, Kind } from '../data/types'
 import { buildPendencias, PENDENCIA_LABEL, PENDENCIA_ORDEM, type Pendencia, type PendenciaTipo } from '../domain/pendencias'
 
 const CURTO: Record<PendenciaTipo, string> = {
+  prioridade: 'Prioridade alta parada',
+  reincidencia: 'Manutenção reincidente',
+  custo: 'Custo fora da curva',
+  hodometro: 'Hodômetro desatualizado',
   aprovar: 'Aprovar manutenção',
   preventiva: 'Preventiva do plano',
   programar: 'Programar manutenção',
@@ -17,7 +21,9 @@ const CURTO: Record<PendenciaTipo, string> = {
   colisao: 'Colisão em aberto',
 }
 
-const ICONE: Record<Kind | 'preventiva', typeof Wrench> = { manutencao: Wrench, preventiva: Gauge, multa: FileWarning, colisao: Car }
+const ICONE: Record<Kind | 'preventiva' | 'veiculo', typeof Wrench> = { manutencao: Wrench, preventiva: Gauge, multa: FileWarning, colisao: Car, veiculo: Car }
+const ICONE_TIPO: Partial<Record<PendenciaTipo, typeof Wrench>> = { prioridade: Siren, reincidencia: Repeat, custo: CircleDollarSign }
+const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 type Urgencia = 'atrasado' | 'hoje' | 'breve'
 
@@ -54,7 +60,7 @@ function Badge({ item }: { item: Pendencia }) {
 
 const TABELAS_PREVENTIVA = ['planoPreventivo', 'baselines', 'veiculos'] as const
 
-export function Pendencias({ data, errors = {}, today, onOpen, onOpenVeiculo }: { data: FrotaData; errors?: LoadResult['errors']; today: string; onOpen: (kind: Kind, id: string) => void; onOpenVeiculo: (id: string, secao: 'preventivas') => void }) {
+export function Pendencias({ data, errors = {}, today, onOpen, onOpenVeiculo }: { data: FrotaData; errors?: LoadResult['errors']; today: string; onOpen: (kind: Kind, id: string) => void; onOpenVeiculo: (id: string, secao?: 'preventivas') => void }) {
   // Sem plano, baselines ou veículos as preventivas não são calculadas; as demais pendências seguem.
   const erroPreventiva = TABELAS_PREVENTIVA.map((key) => errors[key]).find(Boolean) ?? null
   const itens = useMemo(
@@ -102,19 +108,32 @@ export function Pendencias({ data, errors = {}, today, onOpen, onOpenVeiculo }: 
             </header>
             <ul>
               {grupo.map((item) => {
-                const Icone = ICONE[item.kind]
+                const Icone = ICONE_TIPO[item.tipo] ?? ICONE[item.kind]
                 const nivel = urgencia(item)
                 return (
                   <li key={`${item.kind}-${item.id}`}>
-                    <button type="button" className="frota-pend__item" data-urgencia={nivel ?? undefined} onClick={() => { if (item.kind === 'preventiva') { if (item.veiculoId) onOpenVeiculo(item.veiculoId, 'preventivas') } else onOpen(item.kind, item.id) }}>
+                    <button type="button" className="frota-pend__item" data-urgencia={nivel ?? undefined} onClick={() => { if (item.kind === 'preventiva' || item.kind === 'veiculo') { if (item.veiculoId) onOpenVeiculo(item.veiculoId, item.kind === 'preventiva' ? 'preventivas' : undefined) } else onOpen(item.kind, item.id) }}>
                       <span className="frota-pend__icone" aria-hidden><Icone size={16} /></span>
                       <span className="frota-pend__texto">
                         <strong>{item.titulo}</strong>
                         <span>{[item.veiculo?.label, item.pessoa?.label].filter(Boolean).join(' · ') || 'Sem veículo informado'}</span>
+                        {item.detalhe ? <span className="frota-pend__detalhe">{item.detalhe}</span> : null}
                       </span>
                       <Badge item={item} />
                       <ChevronRight size={16} className="frota-pend__seta" aria-hidden />
                     </button>
+                    {item.ocorrencias?.length ? (
+                      <details className="frota-pend__ocorrencias">
+                        <summary>Ver as {item.ocorrencias.length} ocorrências</summary>
+                        <ul>
+                          {item.ocorrencias.map((o) => (
+                            <li key={o.id}>
+                              <button type="button" onClick={() => onOpen('manutencao', o.id)}>{formatBR(o.dia)} · {o.estabelecimento ?? 'Oficina não informada'} · {o.valor ? brl(o.valor) : 'sem valor'}</button>
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    ) : null}
                   </li>
                 )
               })}
