@@ -1,14 +1,14 @@
 ---
 name: verificar-checklists-backend
-description: "Verifica o backend do checklist de vistoria de veículo: plugin ChecklistCommandPlugin, validação de respostas, script de schema/Custom APIs, papel e smoke em DEV. Use após mudar plugins/DriverRecordSharing/Checklist*, scripts/*checklists* ou o trecho de checklists do push-dev.ps1."
+description: "Verifica o backend do checklist de vistoria de veículo: plugins ChecklistCommandPlugin e HandoverChecklistPlugin (troca detectada pela Infleet), validação de respostas, script de schema/Custom APIs, papel e smoke em DEV. Use após mudar plugins/DriverRecordSharing/Checklist*, HandoverChecklistPlugin.cs, VehicleHandover.cs, scripts/*checklists* ou o trecho de checklists do push-dev.ps1."
 ---
 # Verificar backend do checklist de vistoria
 
 ## Cobre
-- Código: `plugins/DriverRecordSharing/ChecklistCommandPlugin.cs`, `plugins/DriverRecordSharing/ChecklistFactory.cs` (criação e atribuição, compartilhada com a troca), `plugins/DriverRecordSharing/ChecklistAnswers.cs`, testes em `plugins/DriverRecordSharing.Tests/ChecklistCommandPluginTests.cs` (com o fake em `ChecklistFakeService.cs`).
+- Código: `plugins/DriverRecordSharing/ChecklistCommandPlugin.cs`, `plugins/DriverRecordSharing/ChecklistFactory.cs` (criação e atribuição, compartilhada com a troca), `plugins/DriverRecordSharing/ChecklistAnswers.cs`, `plugins/DriverRecordSharing/HandoverChecklistPlugin.cs` (step assíncrono no Update de `cr40f_funcionarios.cr40f_veiculoatual`), `plugins/DriverRecordSharing/VehicleHandover.cs` (regras da troca) e `PreviousDriver` em `InfleetGateway.cs`; testes em `plugins/DriverRecordSharing.Tests/ChecklistCommandPluginTests.cs`, `HandoverChecklistPluginTests.cs` e `VehicleHandoverTests.cs` (com o fake em `ChecklistFakeService.cs`).
 - Scripts: `scripts/provision-checklists.ps1`, `scripts/provision-checklist-flows.ps1`, `scripts/grant-checklists-role.ps1`, `scripts/smoke-checklists-dev.ps1`, bloco de checklists em `scripts/push-dev.ps1`, lista de tabelas em `scripts/schema-index.cjs`.
 - Custom APIs: `new_SolicitarChecklistVeiculo`, `new_ProcessarChecklistsVeiculos`, `new_ReatribuirChecklistVeiculo`, `new_ConcluirChecklistVeiculo`, `new_CancelarChecklistVeiculo`, `new_ReenviarPushChecklist`.
-- Plano: `docs/superpowers/plans/2026-10-19-checklist-vistoria-veiculo.md`.
+- Planos: `docs/superpowers/plans/2026-10-19-checklist-vistoria-veiculo.md` e `docs/superpowers/plans/2026-10-20-checklist-troca-infleet.md` (troca).
 
 ## Preparar ambiente
 - Chave de assinatura do plugin: o build exige `plugins/DriverRecordSharing/DriverRecordSharing.snk` (gitignored). Em worktree, copie do checkout principal: `cp "<checkout principal>/plugins/DriverRecordSharing/DriverRecordSharing.snk" plugins/DriverRecordSharing/`.
@@ -17,7 +17,7 @@ description: "Verifica o backend do checklist de vistoria de veículo: plugin Ch
 
 ## Roteiro
 1. Testes do checklist:
-   `cd plugins/DriverRecordSharing.Tests && dotnet test --filter "FullyQualifiedName~ChecklistCommandPluginTests" --logger "trx;LogFileName=checklist.trx" --results-directory <pasta de evidência>`
+   `cd plugins/DriverRecordSharing.Tests && dotnet test --filter "FullyQualifiedName~ChecklistCommandPluginTests|FullyQualifiedName~Handover" --logger "trx;LogFileName=checklist.trx" --results-directory <pasta de evidência>`
    → `Com falha: 0`; o TRX tem todos os `outcome="Passed"`.
 2. Suíte inteira do plugin (protege comunicados/trocas): `dotnet test -v q` → `Com falha: 0`.
 3. Sintaxe dos scripts: `[System.Management.Automation.Language.Parser]::ParseFile` em cada `.ps1` acima → 0 erros; `node --check scripts/schema-index.cjs` → sem saída.
@@ -46,6 +46,12 @@ description: "Verifica o backend do checklist de vistoria de veículo: plugin Ch
 - Conclusão: outro usuário recusado; foto obrigatória ausente, link sem https e número inválido recusados; repetição não duplica fotos.
 - Checklist concluído não aceita edição nem exclusão; aberto aceita.
 - Item OK / Não OK (choice 100000003, código `okNok`): vazio obrigatório recusado ("Escolha OK ou Não OK"); Não OK exige foto, ao menos um problema e problema da lista do item (`new_opcoesproblema`, padrão Arranhado...Outro); OK descarta fotos, problemas e observação enviados; `new_temproblema` e `new_qtdproblemas` gravados na conclusão. Problemas repetidos (ex.: ["Murcho","Murcho"]) são deduplicados (ordinal, ordem preservada) antes do limite de 10 e da checagem das opções, e gravados sem duplicata; 10 distintos + 1 repetido passa.
+- Troca (HandoverChecklistPlugin.Handle devolve `criado:{id}` ou `ignorado:{motivo}`): só cria quando o Target traz `cr40f_veiculoatual` preenchido, diferente da pré-imagem `pre`, com `new_origemveiculoatual = 100000000` (Infleet), e o veículo é próprio (`new_categoriadoveiculo = 100000000`), ativo (`statecode = 0`) e `cr40f_statusdoveiculo = 202410001`. Terceiro, inativo, origem Motorista/Operação, veículo vazio ou o mesmo → `ignorado:` sem consultar a Infleet.
+- Troca: checklist com origem `100000002`, `new_motorista`/dono = quem recebeu, `new_entreguepor` = funcionário único ativo com o `new_infleetdriverid` do entregador, `new_trocadetectadaem` = `new_veiculoatualdesde` do Target, chave `{veiculo}:T:{recebedor}:{yyyyMMddHHmm}`, push pendente.
+- Troca: entregador não identificado, sem funcionário correspondente, Infleet fora (`InfleetUnavailableException`) ou sem token → cria com `new_entreguepor` vazio. Infleet com eventos só do recebedor → `ignorado:mesmo-motorista`.
+- Troca: repetida em menos de 2 h para o mesmo veículo e recebedor → `ignorado:troca-recente`; depois de 2 h cria de novo. Checklists abertos do veículo são cancelados com "Substituído pelo checklist da troca" e `new_canceladoem`; os de outros veículos não mudam.
+- Troca: recebedor sem e-mail Microsoft, sem usuário ativo ou com dois usuários ativos → "Aguardando motorista" com `new_erroatribuicao`. `AssignDriver` com o checklist já Pendente para o mesmo motorista devolve false e não repete push; checklist encerrado não é atribuído.
+- Troca: na rotina diária e no "Reatribuir", checklist de troca com motorista definido não passa para quem está com o carro; troca nunca atribuída segue a regra normal; troca concluída conta como vistoria recente na rotina.
 - Testes do plugin precisam de `plugins/DriverRecordSharing/DriverRecordSharing.snk` (ignorado pelo git): em worktree novo copie do checkout principal ou rode `generate-strong-name-key.ps1`, senão `dotnet test` falha com "Strong-name key not found".
 
 ## Evidência obrigatória
