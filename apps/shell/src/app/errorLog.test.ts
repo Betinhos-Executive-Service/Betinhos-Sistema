@@ -3,10 +3,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { logAppError, resetErrorLoggerForTests } from '@betinhos/ui/error-logger'
 import { instalarLogDeErros, logFalhaDataverse } from './errorLog'
 
-type JanelaXrm = Window & { Xrm?: unknown }
+/** O teste injeta um Xrm mínimo; o tipo global (XrmHost) exige a Web API inteira. */
+const janela = window as unknown as { Xrm?: unknown }
 
 afterEach(() => {
-  delete (window as JanelaXrm).Xrm
+  delete janela.Xrm
   resetErrorLoggerForTests()
   localStorage.clear()
   vi.unstubAllGlobals()
@@ -23,7 +24,7 @@ describe('log de erros compartilhado (new_appmotoristaslog)', () => {
 
   it('com o shim do shell (userSettings vazio) grava app, versão e usuário via WhoAmI', async () => {
     const createRecord = vi.fn().mockResolvedValue({ id: '1' })
-    ;(window as JanelaXrm).Xrm = { Utility: { getGlobalContext: () => ({ getClientUrl: () => 'https://org.crm2.dynamics.com' }) }, WebApi: { createRecord } }
+    janela.Xrm = { Utility: { getGlobalContext: () => ({ getClientUrl: () => 'https://org.crm2.dynamics.com' }) }, WebApi: { createRecord } }
     vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith('/WhoAmI')
       ? { UserId: '11111111-1111-1111-1111-111111111111' }
       : { internalemailaddress: 'pessoa@betinhos.com.br', fullname: 'Pessoa', domainname: 'pessoa@betinhos.com.br' }), { status: 200 })))
@@ -36,7 +37,7 @@ describe('log de erros compartilhado (new_appmotoristaslog)', () => {
 
   it('não registra falha da própria tabela de log (evita laço)', async () => {
     const createRecord = vi.fn().mockResolvedValue({ id: '1' })
-    ;(window as JanelaXrm).Xrm = { Utility: { getGlobalContext: () => ({ getClientUrl: () => 'https://org.crm2.dynamics.com', userSettings: { userId: '{11111111-1111-1111-1111-111111111111}' } }) }, WebApi: { createRecord } }
+    janela.Xrm = { Utility: { getGlobalContext: () => ({ getClientUrl: () => 'https://org.crm2.dynamics.com', userSettings: { userId: '{11111111-1111-1111-1111-111111111111}' } }) }, WebApi: { createRecord } }
     vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200 })))
     logFalhaDataverse({ method: 'POST', path: 'https://org.crm2.dynamics.com/api/data/v9.2/new_appmotoristaslogs', status: 500 })
     await new Promise((resolve) => setTimeout(resolve, 0))
