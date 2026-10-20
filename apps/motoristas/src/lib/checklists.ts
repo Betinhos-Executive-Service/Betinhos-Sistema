@@ -7,8 +7,12 @@ export const CHECKLIST_ESTADO = { aguardandoMotorista: 100000000, pendente: 1000
 export const CHECKLIST_ORIGEM = { quinzenal: 100000000, manual: 100000001 } as const;
 export const CHECKLIST_MAX_FOTOS_POR_ITEM = 5;
 export const CHECKLIST_MAX_TEXTO = 2000;
+export const CHECKLIST_MAX_OBSERVACAO = 500;
+// O plugin recusa mais de 10 problemas por resposta (um item pode ter até 12 opções).
+export const CHECKLIST_MAX_PROBLEMAS = 10;
+export const CHECKLIST_PROBLEMAS_PADRAO = ["Arranhado", "Amassado", "Trincado", "Quebrado", "Faltando", "Sujo", "Outro"] as const;
 
-export type ChecklistItemTipo = "foto" | "numero" | "texto";
+export type ChecklistItemTipo = "foto" | "numero" | "texto" | "okNok";
 
 export type ChecklistItem = {
   chave: string;
@@ -18,6 +22,7 @@ export type ChecklistItem = {
   tipo: ChecklistItemTipo;
   obrigatorio: boolean;
   unidade: string;
+  opcoesProblema: string[];
 };
 
 export type ChecklistFotoEnviada = { link: string; caminho: string; nomeArquivo: string };
@@ -27,6 +32,8 @@ export type ChecklistResposta = {
   rotulo: string;
   tipo: ChecklistItemTipo;
   valor: string;
+  problemas: string[];
+  observacao: string;
   fotos: ChecklistFotoEnviada[];
 };
 
@@ -52,6 +59,8 @@ export type ChecklistDraft = {
   checklistId: string;
   valores: Record<string, string>;
   fotos: Record<string, ChecklistFotoRascunho[]>;
+  problemas?: Record<string, string[]>;
+  observacoes?: Record<string, string>;
   // Fotos já salvas no OneDrive (por id da foto do rascunho): repetir o envio não sobe de novo.
   enviadas?: Record<string, ChecklistFotoEnviada>;
   updatedAt: string;
@@ -72,20 +81,24 @@ function asArray(value: unknown): unknown[] {
   }
 }
 
-const asTipo = (value: unknown): ChecklistItemTipo => value === "foto" || value === "numero" ? value : "texto";
+const asTipo = (value: unknown): ChecklistItemTipo => value === "foto" || value === "numero" || value === "okNok" ? value : "texto";
+const asStrings = (value: unknown) => asArray(value).map((entry) => String(entry ?? "").trim()).filter(Boolean);
 
 export function parseChecklistItems(value: unknown): ChecklistItem[] {
   return asArray(value)
     .map((raw) => {
       const row = (raw ?? {}) as Record<string, unknown>;
+      const tipo = asTipo(row.tipo);
+      const opcoes = asStrings(row.opcoesProblema);
       return {
         chave: String(row.chave ?? ""),
         ordem: Number(row.ordem ?? 0) || 0,
         rotulo: String(row.rotulo ?? ""),
         instrucao: String(row.instrucao ?? ""),
-        tipo: asTipo(row.tipo),
+        tipo,
         obrigatorio: row.obrigatorio === true,
-        unidade: String(row.unidade ?? "")
+        unidade: String(row.unidade ?? ""),
+        opcoesProblema: tipo === "okNok" ? (opcoes.length ? opcoes : [...CHECKLIST_PROBLEMAS_PADRAO]) : []
       };
     })
     .filter((item) => item.chave && item.rotulo)
@@ -100,6 +113,8 @@ export function parseChecklistRespostas(value: unknown): ChecklistResposta[] {
       rotulo: String(row.rotulo ?? ""),
       tipo: asTipo(row.tipo),
       valor: String(row.valor ?? ""),
+      problemas: asStrings(row.problemas),
+      observacao: String(row.observacao ?? ""),
       fotos: asArray(row.fotos).map((foto) => {
         const item = (foto ?? {}) as Record<string, unknown>;
         return { link: String(item.link ?? ""), caminho: String(item.caminho ?? ""), nomeArquivo: String(item.nomeArquivo ?? "") };
@@ -153,6 +168,21 @@ export function createChecklistDraft(checklist: ChecklistVeiculo): ChecklistDraf
   return { checklistId: checklist.id, valores, fotos: {}, updatedAt: new Date().toISOString() };
 }
 
+export function setChecklistOkNok(draft: ChecklistDraft, chave: string, valor: "ok" | "nok"): ChecklistDraft {
+  const next: ChecklistDraft = { ...draft, valores: { ...draft.valores, [chave]: valor }, updatedAt: new Date().toISOString() };
+  if (valor === "nok") return next;
+  return {
+    ...next,
+    fotos: { ...draft.fotos, [chave]: [] },
+    problemas: { ...(draft.problemas ?? {}), [chave]: [] },
+    observacoes: { ...(draft.observacoes ?? {}), [chave]: "" }
+  };
+}
+
+// Itens cujas fotos entram na fila de envio: fotos puras e okNok marcado como Não OK.
+export const checklistPhotoItems = (itens: ChecklistItem[], draft: ChecklistDraft) =>
+  itens.filter((item) => item.tipo === "foto" || (item.tipo === "okNok" && draft.valores[item.chave] === "nok"));
+
 export function validateChecklistDraft(itens: ChecklistItem[], draft: ChecklistDraft) {
   const errors: Record<string, string> = {};
   for (const item of itens) {
@@ -165,6 +195,15 @@ export function validateChecklistDraft(itens: ChecklistItem[], draft: ChecklistD
       const normalized = normalizeChecklistNumber(valor);
       if (normalized === null) errors[item.chave] = `Informe só números. Ex.: ${/^km$/i.test(item.unidade.trim()) ? "45210" : "75"}.`;
       else if (item.obrigatorio && !normalized) errors[item.chave] = "Preencha este campo.";
+    } else if (item.tipo === "okNok") {
+      if (valor !== "ok" && valor !== "nok") { if (item.obrigatorio) errors[item.chave] = "Escolha OK ou Não OK."; }
+      else if (valor === "nok") {
+        if (fotos.length === 0) errors[item.chave] = "Tire a foto do problema.";
+        else if (fotos.length > CHECKLIST_MAX_FOTOS_POR_ITEM) errors[item.chave] = `Envie até ${CHECKLIST_MAX_FOTOS_POR_ITEM} fotos.`;
+        else if (!(draft.problemas?.[item.chave] ?? []).length) errors[item.chave] = "Escolha o problema.";
+        else if (new Set(draft.problemas?.[item.chave]).size > CHECKLIST_MAX_PROBLEMAS) errors[item.chave] = `Escolha até ${CHECKLIST_MAX_PROBLEMAS} problemas.`;
+        else if ((draft.observacoes?.[item.chave] ?? "").trim().length > CHECKLIST_MAX_OBSERVACAO) errors[item.chave] = `Use até ${CHECKLIST_MAX_OBSERVACAO} caracteres.`;
+      }
     } else {
       if (valor.trim().length > CHECKLIST_MAX_TEXTO) errors[item.chave] = `Use até ${CHECKLIST_MAX_TEXTO} caracteres.`;
       else if (item.obrigatorio && !valor.trim()) errors[item.chave] = "Preencha este campo.";
@@ -184,6 +223,16 @@ export function countChecklistProgress(itens: ChecklistItem[], draft: ChecklistD
 export function buildChecklistRespostasJson(itens: ChecklistItem[], draft: ChecklistDraft, uploaded: Record<string, ChecklistFotoEnviada[]>) {
   return JSON.stringify(itens.map((item) => {
     if (item.tipo === "foto") return { chave: item.chave, fotos: uploaded[item.chave] ?? [] };
+    if (item.tipo === "okNok") {
+      const escolha = draft.valores[item.chave] ?? "";
+      if (escolha !== "nok") return { chave: item.chave, valor: escolha };
+      return {
+        chave: item.chave, valor: escolha,
+        problemas: [...new Set(draft.problemas?.[item.chave] ?? [])],
+        observacao: (draft.observacoes?.[item.chave] ?? "").trim(),
+        fotos: uploaded[item.chave] ?? []
+      };
+    }
     const valor = draft.valores[item.chave] ?? "";
     return { chave: item.chave, valor: item.tipo === "numero" ? normalizeChecklistNumber(valor) ?? "" : valor.trim() };
   }));
@@ -193,14 +242,15 @@ export function buildChecklistRespostasJson(itens: ChecklistItem[], draft: Check
 
 const MOCK_DRIVER_ID = "11111111-1111-4111-8111-111111111111";
 const mockItens = (): ChecklistItem[] => [
-  { chave: "a0000000-0000-4000-8000-000000000001", ordem: 1, rotulo: "Frente do veículo", instrucao: "Enquadre o carro inteiro, com a placa legível.", tipo: "foto", obrigatorio: true, unidade: "" },
-  { chave: "a0000000-0000-4000-8000-000000000002", ordem: 2, rotulo: "Traseira do veículo", instrucao: "Enquadre o carro inteiro, com a placa legível.", tipo: "foto", obrigatorio: true, unidade: "" },
-  { chave: "a0000000-0000-4000-8000-000000000003", ordem: 3, rotulo: "Lateral esquerda", instrucao: "", tipo: "foto", obrigatorio: true, unidade: "" },
-  { chave: "a0000000-0000-4000-8000-000000000004", ordem: 4, rotulo: "Lateral direita", instrucao: "", tipo: "foto", obrigatorio: true, unidade: "" },
-  { chave: "a0000000-0000-4000-8000-000000000005", ordem: 5, rotulo: "Painel ligado", instrucao: "Mostre o hodômetro e o nível de combustível.", tipo: "foto", obrigatorio: true, unidade: "" },
-  { chave: "a0000000-0000-4000-8000-000000000006", ordem: 6, rotulo: "Quilometragem", instrucao: "Confira o número do painel.", tipo: "numero", obrigatorio: true, unidade: "km" },
-  { chave: "a0000000-0000-4000-8000-000000000007", ordem: 7, rotulo: "Combustível", instrucao: "Nível aproximado do tanque.", tipo: "numero", obrigatorio: false, unidade: "%" },
-  { chave: "a0000000-0000-4000-8000-000000000008", ordem: 8, rotulo: "Observações", instrucao: "Avarias, limpeza, itens faltando ou o que mais a operação precisa saber.", tipo: "texto", obrigatorio: false, unidade: "" }
+  { chave: "a0000000-0000-4000-8000-000000000001", ordem: 1, rotulo: "Frente do veículo", instrucao: "Enquadre o carro inteiro, com a placa legível.", tipo: "foto", obrigatorio: true, unidade: "", opcoesProblema: [] },
+  { chave: "a0000000-0000-4000-8000-000000000002", ordem: 2, rotulo: "Traseira do veículo", instrucao: "Enquadre o carro inteiro, com a placa legível.", tipo: "foto", obrigatorio: true, unidade: "", opcoesProblema: [] },
+  { chave: "a0000000-0000-4000-8000-000000000003", ordem: 3, rotulo: "Lateral esquerda", instrucao: "", tipo: "foto", obrigatorio: true, unidade: "", opcoesProblema: [] },
+  { chave: "a0000000-0000-4000-8000-000000000004", ordem: 4, rotulo: "Lateral direita", instrucao: "", tipo: "foto", obrigatorio: true, unidade: "", opcoesProblema: [] },
+  { chave: "a0000000-0000-4000-8000-000000000005", ordem: 5, rotulo: "Painel ligado", instrucao: "Mostre o hodômetro e o nível de combustível.", tipo: "foto", obrigatorio: true, unidade: "", opcoesProblema: [] },
+  { chave: "a0000000-0000-4000-8000-000000000006", ordem: 6, rotulo: "Quilometragem", instrucao: "Confira o número do painel.", tipo: "numero", obrigatorio: true, unidade: "km", opcoesProblema: [] },
+  { chave: "a0000000-0000-4000-8000-000000000007", ordem: 7, rotulo: "Combustível", instrucao: "Nível aproximado do tanque.", tipo: "numero", obrigatorio: false, unidade: "%", opcoesProblema: [] },
+  { chave: "a0000000-0000-4000-8000-000000000008", ordem: 8, rotulo: "Observações", instrucao: "Avarias, limpeza, itens faltando ou o que mais a operação precisa saber.", tipo: "texto", obrigatorio: false, unidade: "", opcoesProblema: [] },
+  { chave: "a0000000-0000-4000-8000-000000000009", ordem: 9, rotulo: "Pneus", instrucao: "Confira calibragem e desgaste.", tipo: "okNok", obrigatorio: true, unidade: "", opcoesProblema: ["Murcho", "Careca", "Furado", "Outro"] }
 ];
 
 let localMock: ChecklistVeiculo[] | null = null;
@@ -220,7 +270,8 @@ function getLocalMock() {
       estado: CHECKLIST_ESTADO.concluido, origem: CHECKLIST_ORIGEM.quinzenal, solicitadoEm: iso(15), concluidoEm: iso(14), odometro: 44100, itens,
       respostas: itens.map((item) => ({
         chave: item.chave, rotulo: item.rotulo, tipo: item.tipo,
-        valor: item.tipo === "numero" ? (item.unidade === "km" ? "44102" : "75") : item.tipo === "texto" ? "Sem avarias." : "",
+        valor: item.tipo === "numero" ? (item.unidade === "km" ? "44102" : "75") : item.tipo === "texto" ? "Sem avarias." : item.tipo === "okNok" ? "ok" : "",
+        problemas: [], observacao: "",
         fotos: item.tipo === "foto" ? [{ link: "https://example.com/mock-foto.jpg", caminho: "Checklists/mock", nomeArquivo: `${item.rotulo}.jpg` }] : []
       }))
     }
@@ -295,10 +346,10 @@ export async function concluirChecklist(id: string, respostasJson: string) {
     const row = getLocalMock().find((item) => item.id === cleanId);
     if (!row) throw new Error("Checklist não encontrado.");
     if (row.estado === CHECKLIST_ESTADO.concluido) return;
-    const respostas = (JSON.parse(respostasJson) as { chave: string; valor?: string; fotos?: ChecklistFotoEnviada[] }[]);
+    const respostas = (JSON.parse(respostasJson) as { chave: string; valor?: string; problemas?: string[]; observacao?: string; fotos?: ChecklistFotoEnviada[] }[]);
     row.respostas = row.itens.map((item) => {
       const answer = respostas.find((entry) => entry.chave === item.chave);
-      return { chave: item.chave, rotulo: item.rotulo, tipo: item.tipo, valor: answer?.valor ?? "", fotos: answer?.fotos ?? [] };
+      return { chave: item.chave, rotulo: item.rotulo, tipo: item.tipo, valor: answer?.valor ?? "", problemas: answer?.problemas ?? [], observacao: answer?.observacao ?? "", fotos: answer?.fotos ?? [] };
     });
     row.estado = CHECKLIST_ESTADO.concluido;
     row.concluidoEm = new Date().toISOString();

@@ -3,6 +3,9 @@ import test from "node:test";
 import {
   buildChecklistRespostasJson,
   CHECKLIST_ESTADO,
+  CHECKLIST_MAX_PROBLEMAS,
+  CHECKLIST_PROBLEMAS_PADRAO,
+  checklistPhotoItems,
   concluirChecklist,
   countChecklistProgress,
   createChecklistDraft,
@@ -11,17 +14,20 @@ import {
   loadDriverChecklists,
   mapChecklist,
   normalizeChecklistNumber,
+  parseChecklistItems,
+  setChecklistOkNok,
   validateChecklistDraft,
+  type ChecklistDraft,
   type ChecklistItem,
   type ChecklistVeiculo
 } from "../src/lib/checklists.ts";
 
 const driverId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const itens: ChecklistItem[] = [
-  { chave: "k-foto", ordem: 1, rotulo: "Frente", instrucao: "", tipo: "foto", obrigatorio: true, unidade: "" },
-  { chave: "k-km", ordem: 2, rotulo: "Quilometragem", instrucao: "", tipo: "numero", obrigatorio: true, unidade: "km" },
-  { chave: "k-comb", ordem: 3, rotulo: "Combustível", instrucao: "", tipo: "numero", obrigatorio: false, unidade: "%" },
-  { chave: "k-obs", ordem: 4, rotulo: "Observações", instrucao: "", tipo: "texto", obrigatorio: false, unidade: "" }
+  { chave: "k-foto", ordem: 1, rotulo: "Frente", instrucao: "", tipo: "foto", obrigatorio: true, unidade: "", opcoesProblema: [] },
+  { chave: "k-km", ordem: 2, rotulo: "Quilometragem", instrucao: "", tipo: "numero", obrigatorio: true, unidade: "km", opcoesProblema: [] },
+  { chave: "k-comb", ordem: 3, rotulo: "Combustível", instrucao: "", tipo: "numero", obrigatorio: false, unidade: "%", opcoesProblema: [] },
+  { chave: "k-obs", ordem: 4, rotulo: "Observações", instrucao: "", tipo: "texto", obrigatorio: false, unidade: "", opcoesProblema: [] }
 ];
 
 function checklist(overrides: Partial<ChecklistVeiculo> = {}): ChecklistVeiculo {
@@ -174,4 +180,71 @@ test("mock local: conclui o pendente e mantém o histórico", async () => {
     assert.equal(after?.estado, CHECKLIST_ESTADO.concluido);
     assert.equal(after?.respostas.find((row) => row.tipo === "numero" && row.rotulo === "Quilometragem")?.valor, "45210");
   });
+});
+
+const okNokItem = (overrides: Partial<ChecklistItem> = {}): ChecklistItem => ({
+  chave: "pneus", ordem: 1, rotulo: "Pneus", instrucao: "", tipo: "okNok", obrigatorio: true, unidade: "",
+  opcoesProblema: ["Murcho", "Careca"], ...overrides
+});
+const draftWith = (parts: Partial<ChecklistDraft>): ChecklistDraft => ({ checklistId: "c", valores: {}, fotos: {}, updatedAt: "", ...parts });
+
+test("parse do item okNok usa a lista do item ou a padrão", () => {
+  const [comLista, semLista] = parseChecklistItems(JSON.stringify([
+    { chave: "a", ordem: 1, rotulo: "Pneus", tipo: "okNok", opcoesProblema: ["Murcho"] },
+    { chave: "b", ordem: 2, rotulo: "Limpeza", tipo: "okNok" }
+  ]));
+  assert.deepEqual(comLista.opcoesProblema, ["Murcho"]);
+  assert.deepEqual(semLista.opcoesProblema, [...CHECKLIST_PROBLEMAS_PADRAO]);
+});
+
+test("parse mantém opcoesProblema vazia nos tipos antigos", () => {
+  const [item] = parseChecklistItems(JSON.stringify([{ chave: "a", ordem: 1, rotulo: "Frente", tipo: "foto", opcoesProblema: ["X"] }]));
+  assert.deepEqual(item.opcoesProblema, []);
+});
+
+test("validação do okNok: escolha, foto e problema", () => {
+  const item = okNokItem();
+  assert.equal(validateChecklistDraft([item], draftWith({}))[item.chave], "Escolha OK ou Não OK.");
+  assert.equal(validateChecklistDraft([item], draftWith({ valores: { pneus: "nok" } }))[item.chave], "Tire a foto do problema.");
+  assert.equal(validateChecklistDraft([item], draftWith({ valores: { pneus: "nok" }, fotos: { pneus: [{ id: "f", dataUrl: "d" }] } }))[item.chave], "Escolha o problema.");
+  assert.deepEqual(validateChecklistDraft([item], draftWith({ valores: { pneus: "nok" }, fotos: { pneus: [{ id: "f", dataUrl: "d" }] }, problemas: { pneus: ["Murcho"] } })), {});
+  assert.deepEqual(validateChecklistDraft([item], draftWith({ valores: { pneus: "ok" } })), {});
+});
+
+test("validação do okNok recusa mais de 10 problemas", () => {
+  const opcoes = Array.from({ length: 12 }, (_, index) => `Problema ${index + 1}`);
+  const item = okNokItem({ opcoesProblema: opcoes });
+  const base = { valores: { pneus: "nok" }, fotos: { pneus: [{ id: "f", dataUrl: "d" }] } };
+  assert.equal(CHECKLIST_MAX_PROBLEMAS, 10);
+  assert.equal(validateChecklistDraft([item], draftWith({ ...base, problemas: { pneus: opcoes.slice(0, 11) } }))[item.chave], "Escolha até 10 problemas.");
+  assert.deepEqual(validateChecklistDraft([item], draftWith({ ...base, problemas: { pneus: opcoes.slice(0, 10) } })), {});
+});
+
+test("voltar para OK limpa problemas, observação e fotos do item", () => {
+  const draft = draftWith({ valores: { pneus: "nok" }, fotos: { pneus: [{ id: "f", dataUrl: "d" }] }, problemas: { pneus: ["Murcho"] }, observacoes: { pneus: "x" } });
+  const next = setChecklistOkNok(draft, "pneus", "ok");
+  assert.equal(next.valores.pneus, "ok");
+  assert.deepEqual(next.fotos.pneus ?? [], []);
+  assert.deepEqual(next.problemas?.pneus ?? [], []);
+  assert.equal(next.observacoes?.pneus ?? "", "");
+});
+
+test("payload e fila de fotos do okNok", () => {
+  const item = okNokItem();
+  const draft = draftWith({ valores: { pneus: "nok" }, fotos: { pneus: [{ id: "f", dataUrl: "d" }] }, problemas: { pneus: ["Murcho"] }, observacoes: { pneus: " dianteiro " } });
+  assert.deepEqual(checklistPhotoItems([item], draft).map((entry) => entry.chave), ["pneus"]);
+  assert.deepEqual(checklistPhotoItems([item], { ...draft, valores: { pneus: "ok" } }), []);
+  const [resposta] = JSON.parse(buildChecklistRespostasJson([item], draft, { pneus: [{ link: "https://x/p", caminho: "c", nomeArquivo: "p.jpg" }] }));
+  assert.deepEqual(resposta, { chave: "pneus", valor: "nok", problemas: ["Murcho"], observacao: "dianteiro", fotos: [{ link: "https://x/p", caminho: "c", nomeArquivo: "p.jpg" }] });
+});
+
+test("payload do okNok não repete problemas e o ok vai sem extras", () => {
+  const item = okNokItem();
+  const nok = draftWith({ valores: { pneus: "nok" }, problemas: { pneus: ["Murcho", "Murcho", "Careca"] } });
+  assert.deepEqual(JSON.parse(buildChecklistRespostasJson([item], nok, {}))[0].problemas, ["Murcho", "Careca"]);
+  assert.deepEqual(JSON.parse(buildChecklistRespostasJson([item], draftWith({ valores: { pneus: "ok" } }), {}))[0], { chave: "pneus", valor: "ok" });
+});
+
+test("progresso conta okNok respondido", () => {
+  assert.deepEqual(countChecklistProgress([okNokItem()], draftWith({ valores: { pneus: "ok" } })), { done: 1, total: 1 });
 });

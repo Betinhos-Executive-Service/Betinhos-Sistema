@@ -30,3 +30,36 @@
 .services-panel .checklist-service-item[data-checklist-state="concluido"] .agenda-label { background: #eaf8f1 !important; color: #147a4b !important; }
 .services-panel .checklist-service-item[data-checklist-state="concluido"] .agenda-time strong,
 .services-panel .checklist-service-item[data-checklist-state="concluido"] .agenda-trajectory strong { color: #64748b !important; }
+
+/* Item OK / Não OK. Valores do Design System: sucesso #147a4b/#eaf8f1, erro #c12f45/#fff0f3 (texto #9f2940),
+   seleção azul #2159d2/#edf3ff só no problema escolhido; campos neutros em #fcfcfb. */
+.checklist-oknok:focus { outline: 0; }
+.checklist-oknok:focus-visible { border-color: #6c91e8; box-shadow: 0 0 0 3px rgba(33, 89, 210, .11); }
+.checklist-oknok.is-ok { border-color: #147a4b; }
+.checklist-oknok-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.checklist-oknok-choice button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fcfcfb; color: #0f172a; font: 700 14px/1 "Manrope", "Segoe UI", sans-serif; cursor: pointer; transition: transform 140ms cubic-bezier(.23, 1, .32, 1), background-color 160ms ease, border-color 160ms ease, color 160ms ease; }
+.checklist-oknok-choice button svg { width: 18px; height: 18px; flex: 0 0 auto; }
+.checklist-oknok-choice button:active:not(:disabled) { transform: scale(.97); }
+.checklist-oknok-choice .is-ok[aria-pressed="true"] { border-color: #147a4b; background: #eaf8f1; color: #147a4b; }
+.checklist-oknok-choice .is-nok[aria-pressed="true"] { border-color: #c12f45; background: #fff0f3; color: #9f2940; }
+.checklist-oknok-detail { display: grid; gap: 10px; }
+.checklist-oknok-label { margin: 0; color: #64748b; font-size: 12px; font-weight: 800; }
+.checklist-oknok-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.checklist-oknok-chips button { min-height: 44px; padding: 0 14px; border: 1px solid #e2e8f0; border-radius: 999px; background: #fcfcfb; color: #0f172a; font: 600 13px/1 "Manrope", "Segoe UI", sans-serif; cursor: pointer; transition: transform 140ms cubic-bezier(.23, 1, .32, 1), background-color 160ms ease, border-color 160ms ease, color 160ms ease; }
+.checklist-oknok-chips button:active:not(:disabled) { transform: scale(.97); }
+.checklist-oknok-chips button[aria-pressed="true"] { border-color: #2159d2; background: #edf3ff; color: #2159d2; font-weight: 800; }
+.checklist-oknok-choice button:focus-visible,
+.checklist-oknok-chips button:focus-visible { outline: 0; border-color: #6c91e8; box-shadow: 0 0 0 3px rgba(33, 89, 210, .11); }
+.checklist-oknok-choice button:disabled,
+.checklist-oknok-chips button:disabled { opacity: .55; cursor: not-allowed; }
+.checklist-oknok-note { width: 100%; min-height: 64px; }
+@media (hover: hover) and (pointer: fine) {
+  .checklist-oknok-choice button:not(:disabled):not([aria-pressed="true"]):hover,
+  .checklist-oknok-chips button:not(:disabled):not([aria-pressed="true"]):hover { border-color: #c7d2e2; background: #f7f9fc; }
+}
+
+/* Checklist enviado: Não OK no topo, com selo e problemas. */
+.checklist-answers > div.is-nok { border-color: #f2c2cc; }
+.checklist-answer-nok { display: grid; justify-items: start; gap: 4px; }
+.checklist-answer-badge { display: inline-flex; align-items: center; min-height: 24px; padding: 0 8px; border-radius: 999px; background: #fff0f3; color: #9f2940; font-size: 11px; font-weight: 800; }
+.checklist-answer-note { color: #475569; font-weight: 500; }
