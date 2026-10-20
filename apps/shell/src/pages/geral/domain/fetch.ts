@@ -1,3 +1,4 @@
+import { searchConditions } from './search'
 import { ID_ATTRIBUTE, type Sort } from './types'
 
 type BuildOptions = { page: number; pageSize: number; cookie: string | null; sort: Sort; query: string; quickFind: string[] }
@@ -21,23 +22,26 @@ export function applySort(doc: Document, entity: Element, sort: NonNullable<Sort
   ;(link ?? entity).appendChild(order)
 }
 
-/** Busca por palavra-chave: filtro OR com `like` em cada campo de localização rápida. */
+/** Busca por palavra-chave: filtro OR com `like` nos campos de localização rápida (prefixo ou contém, ver `searchConditions`). */
 function injectSearch(doc: Document, entity: Element, query: string, quickFind: string[]) {
-  const text = query.trim()
-  if (!text || !quickFind.length) return
+  const conditions = searchConditions(query, quickFind)
+  if (!conditions.length) return
   const filter = doc.createElement('filter')
   filter.setAttribute('type', 'or')
-  for (const attribute of quickFind) {
+  for (const { attribute, value } of conditions) {
     const condition = doc.createElement('condition')
     condition.setAttribute('attribute', attribute)
     condition.setAttribute('operator', 'like')
-    condition.setAttribute('value', `%${text}%`)
+    condition.setAttribute('value', value)
     filter.appendChild(condition)
   }
   entity.appendChild(filter)
 }
 
-/** FetchXML da visão com paginação, ordenação da coluna e busca por palavra-chave injetadas; o resto fica intacto. */
+/**
+ * FetchXML da visão com paginação, ordenação da coluna e busca por palavra-chave injetadas; o resto fica intacto.
+ * Não pede `returntotalrecordcount`: o total custaria uma contagem no servidor a cada página. Ele vem à parte (`buildCountFetch`).
+ */
 export function buildFetch(fetchxml: string, { page, pageSize, cookie, sort, query, quickFind }: BuildOptions) {
   const { doc, root, entity } = parse(fetchxml)
 
@@ -45,7 +49,6 @@ export function buildFetch(fetchxml: string, { page, pageSize, cookie, sort, que
   root.setAttribute('count', String(pageSize))
   root.setAttribute('page', String(page))
   if (cookie) root.setAttribute('paging-cookie', cookie)
-  root.setAttribute('returntotalrecordcount', 'true')
 
   // Os comandos Desativar/Ativar dependem do estado da linha: toda visão precisa trazê-lo.
   // `all-attributes` já inclui o estado; misturar os dois é inválido.

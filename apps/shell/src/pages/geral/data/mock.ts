@@ -1,5 +1,6 @@
 import type { ChoiceOption, Row } from '@betinhos/dataverse'
 import { formatDateTime, formatMoney, TZ } from '../domain/format'
+import { searchConditions } from '../domain/search'
 import { ENTITY, ID_ATTRIBUTE, type AttributeInfo, type AttributeMap, type LookupBind, type LookupOption, type Page, type Sort, type View } from '../domain/types'
 
 const F = '@OData.Community.Display.V1.FormattedValue'
@@ -239,11 +240,12 @@ export function applyMockFetch(rows: Row[], fetchxml: string, { page, pageSize, 
   const entity = Array.from(doc.documentElement.children).find((c) => c.tagName === 'entity')
   if (!entity || doc.getElementsByTagName('parsererror').length) throw new Error('FetchXML da visão inválido.')
   const roots = Array.from(entity.children).filter((c) => c.tagName === 'filter')
-  const text = query.trim()
+  // Mesmas condições que o FetchXML real leva (prefixo ou contém por campo).
+  const search = searchConditions(query, quickFind)
 
   const filtered = rows.filter((row) =>
     roots.every((root) => filter(root, row, now) !== false)
-    && (!text || !quickFind.length || quickFind.some((attribute) => likeMatches(row, attribute, `%${text}%`))))
+    && (!search.length || search.some(({ attribute, value }) => likeMatches(row, attribute, value))))
 
   const order = Array.from(entity.children).find((c) => c.tagName === 'order')
   const orderAttribute = order?.getAttribute('attribute')

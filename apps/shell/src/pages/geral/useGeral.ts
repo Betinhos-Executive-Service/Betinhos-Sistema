@@ -14,6 +14,8 @@ import { ENTITY, ID_ATTRIBUTE, type AttributeInfo, type AttributeMap, type CellK
 const message = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 export const cellKey = (id: string, attribute: string) => `${id}|${attribute}`
 const FORMATTED = '@OData.Community.Display.V1.FormattedValue'
+/** Com busca, a contagem espera esta pausa: quem ainda refina o termo troca a consulta antes e a contagem nem sai. */
+export const COUNT_DELAY_MS = 1000
 
 /** Falha de gravação, com o que o aviso precisa dizer (a célula guarda só a mensagem). */
 export type SaveFailure = { id: string; serviceName: string; label: string; message: string }
@@ -139,6 +141,9 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   const settleTimers = useRef(new Map<string, number>())
   /** Cada primeira página ou releitura invalida as respostas que ainda estão a caminho. */
   const pageToken = useRef(0)
+  /** Requisições do contexto atual (páginas e contagem): trocar de contexto cancela as antigas no navegador. O token continua decidindo o que vale. */
+  const requests = useRef<AbortController | null>(null)
+  const countTimer = useRef(0)
   const onSaveFail = useRef(options.onSaveFail)
   onSaveFail.current = options.onSaveFail
   const onStateChange = useRef(options.onStateChange)
@@ -159,6 +164,15 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     const pending = settleTimers.current
     return () => { pending.forEach((t) => window.clearTimeout(t)); pending.clear() }
   }, [])
+
+  /** Novo contexto de consulta: cancela páginas e contagem do anterior e devolve o sinal do novo. */
+  const renewRequests = useCallback(() => {
+    requests.current?.abort()
+    window.clearTimeout(countTimer.current)
+    requests.current = typeof AbortController === 'undefined' ? null : new AbortController()
+    return requests.current?.signal
+  }, [])
+  useEffect(() => () => { requests.current?.abort(); window.clearTimeout(countTimer.current) }, [])
 
   const enterView = useCallback((next: View) => {
     setView(next)
@@ -208,21 +222,34 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     return () => { alive = false }
   }, [source, view])
 
-  /** Total da visão: o da própria resposta quando vem; senão pergunta à contagem, sem travar a lista. */
+  /**
+   * Total da visão sem travar a lista: o da própria resposta quando vem; sem mais páginas, o rodapé usa as linhas
+   * carregadas; senão uma contagem agregada à parte (segunda consulta), que sai depois da lista e é cancelada se o
+   * contexto mudar. Com busca ela ainda espera `COUNT_DELAY_MS`, para não contar termos que o usuário está refinando.
+   */
   const resolveTotal = useCallback((result: Page, token: number) => {
+    window.clearTimeout(countTimer.current)
     if (result.total != null && result.total >= 0) { setTotal(result.total); return }
+    if (!result.more) { setTotal(null); return }
     const { fetchxml, query: text, quickFind: fields } = context.current
     if (!fetchxml) return
-    void source.count({ fetchxml, query: text, quickFind: fields }).then(
-      (count) => { if (token === pageToken.current && count != null) setTotal(count) },
-      () => { /* sem contagem: o rodapé mostra só o que já carregou */ },
-    )
+    const signal = requests.current?.signal
+    const run = () => {
+      if (token !== pageToken.current) return
+      void source.count({ fetchxml, query: text, quickFind: fields, signal }).then(
+        (count) => { if (token === pageToken.current && count != null) setTotal(count) },
+        () => { /* sem contagem: o rodapé mostra só o que já carregou */ },
+      )
+    }
+    if (text.trim()) countTimer.current = window.setTimeout(run, COUNT_DELAY_MS)
+    else run()
   }, [source])
 
   // Efeito 3: primeira página. Trocar visão, ordem ou busca recomeça do zero; o token descarta respostas antigas.
   useEffect(() => {
     if (!view || !effectiveFetch) return
     const token = ++pageToken.current
+    const signal = renewRequests()
     rowsRef.current = []
     setRowsState([])
     cookieRef.current = null
@@ -236,7 +263,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     setPageError(null)
     setLoadingFlag(true)
     if (filtersPending) return
-    source.page({ fetchxml: effectiveFetch, page: 1, cookie: null, sort, query, quickFind }).then(
+    source.page({ fetchxml: effectiveFetch, page: 1, cookie: null, sort, query, quickFind, signal }).then(
       (result) => {
         if (token !== pageToken.current) return
         rowsRef.current = result.rows
@@ -254,16 +281,16 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
         setLoadingFlag(false)
       },
     )
-  }, [source, view, effectiveFetch, filtersPending, sort, query, quickFind, resolveTotal, setLoadingFlag, setLoadingMoreFlag, setLoadErrorValue, setMoreValue])
+  }, [source, view, effectiveFetch, filtersPending, sort, query, quickFind, resolveTotal, renewRequests, setLoadingFlag, setLoadingMoreFlag, setLoadErrorValue, setMoreValue])
 
-  /** Pede a próxima página e acrescenta só as linhas que ainda não estão na lista. */
+  /** Pede a próxima página (rolagem infinita: o sentinela no fim da lista chama) e acrescenta só as linhas que ainda não estão na lista. */
   const loadMore = useCallback(() => {
     const { fetchxml, sort: order, query: text, quickFind: fields } = context.current
     if (!fetchxml || loadingRef.current || loadingMoreRef.current || !moreRef.current || loadErrorRef.current) return
     const token = pageToken.current
     const previous = cookieRef.current
     setLoadingMoreFlag(true)
-    source.page({ fetchxml, page: pagesRef.current + 1, cookie: previous, sort: order, query: text, quickFind: fields }).then(
+    source.page({ fetchxml, page: pagesRef.current + 1, cookie: previous, sort: order, query: text, quickFind: fields, signal: requests.current?.signal }).then(
       (result) => {
         if (token !== pageToken.current) return
         setLoadingMoreFlag(false)
@@ -295,6 +322,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     const { fetchxml, sort: order, query: text, quickFind: fields } = context.current
     if (!fetchxml) return
     const token = ++pageToken.current
+    const signal = renewRequests()
     const target = Math.max(1, pagesRef.current)
     setLoadingFlag(true)
     setLoadingMoreFlag(false)
@@ -309,7 +337,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
         let loaded = 0
         let first: Page | null = null
         for (let n = 1; n <= target; n += 1) {
-          const result: Page = await source.page({ fetchxml, page: n, cookie, sort: order, query: text, quickFind: fields })
+          const result: Page = await source.page({ fetchxml, page: n, cookie, sort: order, query: text, quickFind: fields, signal })
           if (token !== pageToken.current) return
           first ??= result
           for (const row of result.rows) {
@@ -336,7 +364,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
         setLoadingFlag(false)
       }
     })()
-  }, [source, resolveTotal, setLoadingFlag, setLoadingMoreFlag, setLoadErrorValue, setMoreValue])
+  }, [source, resolveTotal, renewRequests, setLoadingFlag, setLoadingMoreFlag, setLoadErrorValue, setMoreValue])
 
   const selectView = useCallback((id: string) => {
     const next = views.find((v) => v.id === id)

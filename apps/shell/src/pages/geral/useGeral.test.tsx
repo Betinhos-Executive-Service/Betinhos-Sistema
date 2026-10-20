@@ -5,7 +5,7 @@ import { MOCK_ROW_COUNT } from './data/mock'
 import { createSource, type Source } from './data/source'
 import { SAVED_VISIBLE_MS } from './domain/edit'
 import { emptyFilters, type FilterCondition } from '@betinhos/ui'
-import { useGeral } from './useGeral'
+import { COUNT_DELAY_MS, useGeral } from './useGeral'
 
 // O mock sem latência (`latency: 0`); com a suíte inteira em paralelo a máquina fica lenta.
 configure({ asyncUtilTimeout: 8000 })
@@ -318,6 +318,139 @@ describe('useGeral: rolagem infinita', () => {
     expect(count).toHaveBeenCalledTimes(1)
   })
 
+  it('sem mais páginas não pede contagem', async () => {
+    const base = createSource({ mode: 'mock' }, { latency: 0 })
+    const count = vi.fn(base.count)
+    const { result } = renderHook(() => useGeral({ ...base, count }))
+    await waitFor(() => expect(result.current.rows.length).toBe(100))
+    act(() => result.current.setQuery('Unique'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    await waitFor(() => expect(result.current.query).toBe('Unique'))
+    await waitFor(() => expect(result.current.more).toBe(false))
+    await sleep(COUNT_DELAY_MS + 100)
+    // A contagem da visão sem busca (que tinha mais páginas) saiu; a da busca de uma página só, não.
+    expect(count.mock.calls.map((call) => call[0].query)).toEqual([''])
+    expect(result.current.total).toBeNull()
+  })
+
+  it('com busca a contagem espera a pausa, sai uma vez e não roda para termos superados', async () => {
+    const base = createSource({ mode: 'mock' }, { latency: 0 })
+    const count = vi.fn(async (_req: Parameters<Source['count']>[0]) => 999)
+    const { result } = renderHook(() => useGeral({ ...base, count }))
+    await waitFor(() => expect(result.current.rows.length).toBe(100))
+    await waitFor(() => expect(count).toHaveBeenCalledTimes(1))
+    // "G" (trajetos GRU, cliente Grupo…) passa de uma página: com busca, a contagem fica para depois da pausa.
+    act(() => result.current.setQuery('G'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    await waitFor(() => expect(result.current.more).toBe(true))
+    act(() => result.current.setQuery('GR'))
+    await waitFor(() => expect(result.current.query).toBe('GR'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.more).toBe(true)
+    expect(count).toHaveBeenCalledTimes(1)
+    expect(result.current.total).toBeNull()
+    await waitFor(() => expect(count).toHaveBeenCalledTimes(2), { timeout: COUNT_DELAY_MS * 3 })
+    expect(count.mock.calls[1][0].query).toBe('GR')
+    await waitFor(() => expect(result.current.total).toBe(999))
+    await sleep(COUNT_DELAY_MS + 100)
+    expect(count).toHaveBeenCalledTimes(2)
+  })
+
+  it('digitar rápido: respostas fora de ordem de buscas antigas são descartadas e canceladas', async () => {
+    const base = createSource({ mode: 'mock' }, { latency: 0 })
+    const gates = new Map<string, () => void>()
+    const signals = new Map<string, AbortSignal | undefined>()
+    const page = vi.fn(async (req: Parameters<Source['page']>[0]) => {
+      signals.set(req.query, req.signal)
+      // "Hot" e "Hote" demoram; "Hotel Fasano" responde na hora.
+      if (req.query === 'Hot' || req.query === 'Hote') await new Promise<void>((resolve) => gates.set(req.query, resolve))
+      return base.page(req)
+    })
+    const { result } = await open({ ...base, page })
+    act(() => result.current.setQuery('Hot'))
+    await waitFor(() => expect(gates.has('Hot')).toBe(true))
+    act(() => result.current.setQuery('Hote'))
+    await waitFor(() => expect(gates.has('Hote')).toBe(true))
+    act(() => result.current.setQuery('Hotel Fasano'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    const fasano = result.current.rows.map(idOf)
+    expect(fasano.length).toBeGreaterThan(0)
+    expect(result.current.rows.every((r) => String(r.cr40f_trajeto).includes('Hotel Fasano'))).toBe(true)
+    expect(signals.get('Hot')?.aborted).toBe(true)
+    expect(signals.get('Hote')?.aborted).toBe(true)
+    expect(signals.get('Hotel Fasano')?.aborted).toBe(false)
+    // As antigas chegam depois, fora de ordem: nada muda.
+    await act(async () => { gates.get('Hote')!(); gates.get('Hot')!(); await sleep(20) })
+    expect(result.current.rows.map(idOf)).toEqual(fasano)
+    expect(result.current.query).toBe('Hotel Fasano')
+  })
+
+  it('busca vazia volta à lista padrão da visão', async () => {
+    const { result } = await open(createSource({ mode: 'mock' }, { latency: 0 }))
+    const padrao = result.current.rows.map(idOf)
+    act(() => result.current.setQuery('os-1013'))
+    await waitFor(() => expect(result.current.rows.map((r) => r.cr40f_id)).toEqual(['OS-1013']))
+    expect(result.current.more).toBe(false)
+    act(() => result.current.setQuery(''))
+    await waitFor(() => expect(result.current.rows.length).toBe(100))
+    expect(result.current.rows.map(idOf)).toEqual(padrao)
+    expect(result.current.more).toBe(true)
+  })
+
+  it('termo de 1 caractere e termo com aspas/acentos não quebram a busca', async () => {
+    const { result } = await open(createSource({ mode: 'mock' }, { latency: 0 }))
+    act(() => result.current.setQuery("d'água \"x\" ç"))
+    await waitFor(() => expect(result.current.query).toBe("d'água \"x\" ç"))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.pageError).toBeNull()
+    expect(result.current.rows).toEqual([])
+    act(() => result.current.setQuery('V'))
+    await waitFor(() => expect(result.current.query).toBe('V'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    // Prefixo em todos os campos: só trajetos que começam com "V" (VCP → Alphaville), não os que têm "v" no meio.
+    expect(result.current.rows.length).toBeGreaterThan(0)
+    expect(result.current.rows.every((r) => String(r.cr40f_trajeto).startsWith('V'))).toBe(true)
+  })
+
+  it('erro de rede no meio da rolagem mantém as linhas, para de pedir e retoma ao tentar de novo', async () => {
+    const base = createSource({ mode: 'mock' }, { latency: 0 })
+    let offline = true
+    const page = vi.fn(async (req: Parameters<Source['page']>[0]) => {
+      if (req.page > 1 && offline) throw new TypeError('Failed to fetch')
+      return base.page(req)
+    })
+    const { result } = await open({ ...base, page })
+    act(() => result.current.loadMore())
+    await waitFor(() => expect(result.current.loadError).toBe('Failed to fetch'))
+    expect(result.current.rows.length).toBe(100)
+    expect(result.current.more).toBe(true)
+    const calls = page.mock.calls.length
+    act(() => result.current.loadMore())
+    expect(page.mock.calls.length).toBe(calls)
+    offline = false
+    act(() => result.current.retryLoadMore())
+    await waitFor(() => expect(result.current.rows.length).toBe(200))
+    expect(result.current.loadError).toBeNull()
+  })
+
+  it('página seguinte que chega depois de trocar a busca é descartada', async () => {
+    const base = createSource({ mode: 'mock' }, { latency: 0 })
+    let release: () => void = () => {}
+    const page = vi.fn(async (req: Parameters<Source['page']>[0]) => {
+      if (req.page === 2) await new Promise<void>((resolve) => { release = resolve })
+      return base.page(req)
+    })
+    const { result } = await open({ ...base, page })
+    act(() => result.current.loadMore())
+    await waitFor(() => expect(result.current.loadingMore).toBe(true))
+    act(() => result.current.setQuery('os-1013'))
+    await waitFor(() => expect(result.current.rows.map((r) => r.cr40f_id)).toEqual(['OS-1013']))
+    await act(async () => { release(); await sleep(20) })
+    expect(result.current.rows.map((r) => r.cr40f_id)).toEqual(['OS-1013'])
+    expect(result.current.pagesLoaded).toBe(1)
+    expect(result.current.loadingMore).toBe(false)
+  })
+
   describe('filtros e estado da URL', () => {
     const CANCELADO = 202410002
     const status: FilterCondition = { type: 'condition', id: 'rapido-cr40f_status', field: 'cr40f_status', op: 'in', values: [{ value: String(CANCELADO), label: 'Cancelado' }] }
@@ -336,7 +469,9 @@ describe('useGeral: rolagem infinita', () => {
       expect(result.current.rows.length).toBeGreaterThan(0)
       expect(result.current.rows.every((r) => r.cr40f_status === CANCELADO)).toBe(true)
       expect(result.current.selected.size).toBe(0)
-      expect(result.current.total).toBe(result.current.rows.length)
+      // Uma página só: sem contagem à parte, o rodapé usa as linhas carregadas.
+      expect(result.current.more).toBe(false)
+      expect(result.current.total).toBeNull()
       act(() => result.current.clearFilters())
       await waitFor(() => expect(result.current.rows.length).toBe(100))
       expect(result.current.filters).toEqual(emptyFilters())
