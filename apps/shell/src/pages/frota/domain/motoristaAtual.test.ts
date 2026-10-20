@@ -7,7 +7,7 @@ const bruno: Ref = { id: 'f2', label: 'Bruno' }
 const base: Ref = { id: 'b1', label: 'Base Centro' }
 const v1: Ref = { id: 'v1', label: 'ABC1D23' }
 
-const veiculo = (motorista: Ref | null): Veiculo => ({ id: 'v1', placa: 'ABC1D23', marca: null, modelo: null, cor: null, anoModelo: null, status: null, categoria: null, motorista })
+const veiculo = (motorista: Ref | null): Veiculo => ({ id: 'v1', placa: 'ABC1D23', marca: null, modelo: null, cor: null, anoModelo: null, status: null, categoria: null, motorista, hodometro: null, hodometroEm: null })
 const posse = (id: string, extra: Partial<Posse>): Posse => ({ id, inicio: '2026-09-01T12:00:00Z', fim: null, veiculo: v1, motorista: null, localBase: null, ...extra })
 const atual = (cadastro: Ref | null, posses: Posse[]) => motoristaAtual(veiculo(cadastro), possesAbertas(posses))
 

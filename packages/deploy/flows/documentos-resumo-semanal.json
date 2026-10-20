@@ -1,0 +1,159 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$authentication": { "defaultValue": {}, "type": "SecureObject" },
+    "$connections": { "defaultValue": {}, "type": "Object" },
+    "URL do Sistema Betinhos (new_URLSistemaBetinhos)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": { "schemaName": "new_URLSistemaBetinhos", "description": "Endereço do Sistema Betinhos usado nos links dos e-mails." }
+    },
+    "E-mail do administrador dos avisos (new_EmailAdminAvisos)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": { "schemaName": "new_EmailAdminAvisos", "description": "Recebe o aviso quando o resumo semanal falha." }
+    }
+  },
+  "triggers": {
+    "Toda_segunda_7h": {
+      "type": "Recurrence",
+      "recurrence": {
+        "frequency": "Week",
+        "interval": 1,
+        "timeZone": "E. South America Standard Time",
+        "startTime": "2026-10-19T07:00:00",
+        "schedule": { "weekDays": ["Monday"], "hours": ["7"], "minutes": [0] }
+      }
+    }
+  },
+  "actions": {
+    "Try": {
+      "type": "Scope",
+      "runAfter": {},
+      "actions": {
+        "Resumo": {
+          "type": "OpenApiConnection",
+          "runAfter": {},
+          "inputs": {
+            "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps", "connectionName": "shared_commondataserviceforapps", "operationId": "PerformUnboundAction" },
+            "parameters": { "actionName": "cr40f_DocumentosResumoSemanal" },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Dados": {
+          "type": "Compose",
+          "runAfter": { "Resumo": ["Succeeded"] },
+          "inputs": "@json(outputs('Resumo')?['body/ResumoJson'])"
+        },
+        "Semana": {
+          "type": "Compose",
+          "runAfter": { "Dados": ["Succeeded"] },
+          "inputs": "@formatDateTime(outputs('Dados')?['hoje'], 'dd/MM/yyyy')"
+        },
+        "Por_categoria": {
+          "type": "Foreach",
+          "foreach": "@outputs('Dados')?['categorias']",
+          "runAfter": { "Semana": ["Succeeded"] },
+          "runtimeConfiguration": { "concurrency": { "repetitions": 1 } },
+          "actions": {
+            "Rotulo": {
+              "type": "Compose",
+              "runAfter": {},
+              "inputs": "@if(equals(items('Por_categoria')?['categoria'], 'frota'), 'Frota', 'Pessoas')"
+            },
+            "Destinatarios": {
+              "type": "OpenApiConnection",
+              "runAfter": { "Rotulo": ["Succeeded"] },
+              "inputs": {
+                "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps", "connectionName": "shared_commondataserviceforapps", "operationId": "ListRecords" },
+                "parameters": {
+                  "entityName": "__SET_DESTINATARIOS__",
+                  "$select": "cr40f_avisodestinatarioid",
+                  "$filter": "statecode eq 0 and cr40f_categoria eq @{if(equals(items('Por_categoria')?['categoria'], 'frota'), 100000001, 100000000)}",
+                  "$expand": "cr40f_Funcionario($select=cr40f_emailbetinhos)"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Linhas": {
+              "type": "Select",
+              "runAfter": { "Destinatarios": ["Succeeded"] },
+              "inputs": {
+                "from": "@items('Por_categoria')?['urgentes']",
+                "select": "@concat('<tr><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB\">', coalesce(item()?['dono'], ''), '</td><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB\">', coalesce(item()?['detalhe'], ''), '</td><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB\">', coalesce(item()?['tipo'], ''), '</td><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB\">', if(empty(item()?['validade']), '—', formatDateTime(coalesce(item()?['validade'], '1900-01-01'), 'dd/MM/yyyy')), '</td><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB\">', if(equals(item()?['estado'], 'faltando'), if(greater(coalesce(item()?['quantidade'], 1), 1), concat('Faltando (', string(coalesce(item()?['quantidade'], 1)), ')'), 'Faltando'), if(equals(item()?['estado'], 'vencido'), concat('Vencido há ', string(mul(-1, coalesce(item()?['dias'], 0))), if(equals(coalesce(item()?['dias'], 0), -1), ' dia', ' dias')), if(equals(coalesce(item()?['dias'], 0), 0), 'Vence hoje', concat('Vence em ', string(coalesce(item()?['dias'], 0)), if(equals(coalesce(item()?['dias'], 0), 1), ' dia', ' dias'))))), '</td></tr>')"
+              }
+            },
+            "Corpo": {
+              "type": "Compose",
+              "runAfter": { "Linhas": ["Succeeded"] },
+              "inputs": "@concat('<div style=\"font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1F2937\">', '<p>Resumo de documentos de <b>', outputs('Rotulo'), '</b> na semana de ', outputs('Semana'), '.</p>', if(equals(add(add(add(add(int(items('Por_categoria')?['contagens']?['vencido']), int(items('Por_categoria')?['contagens']?['vence7'])), int(items('Por_categoria')?['contagens']?['vence30'])), int(items('Por_categoria')?['contagens']?['vence60'])), int(items('Por_categoria')?['contagens']?['faltando'])), 0), '<p>Nenhuma pendência nesta semana.</p>', concat('<table style=\"border-collapse:collapse;margin:8px 0 16px\">', '<tr><td style=\"padding:3px 16px 3px 0\">Vencidos</td><td><b>', string(items('Por_categoria')?['contagens']?['vencido']), '</b></td></tr>', '<tr><td style=\"padding:3px 16px 3px 0\">Vencem em até 7 dias</td><td><b>', string(items('Por_categoria')?['contagens']?['vence7']), '</b></td></tr>', '<tr><td style=\"padding:3px 16px 3px 0\">Vencem em 8 a 30 dias</td><td><b>', string(items('Por_categoria')?['contagens']?['vence30']), '</b></td></tr>', '<tr><td style=\"padding:3px 16px 3px 0\">Vencem em 31 a 60 dias</td><td><b>', string(items('Por_categoria')?['contagens']?['vence60']), '</b></td></tr>', '<tr><td style=\"padding:3px 16px 3px 0\">Faltando</td><td><b>', string(items('Por_categoria')?['contagens']?['faltando']), '</b></td></tr>', '</table>', if(equals(length(body('Linhas')), 0), '', concat('<table style=\"border-collapse:collapse\"><tr><th align=\"left\" style=\"padding:6px 10px;border-bottom:2px solid #D1D5DB\">Nome</th><th align=\"left\" style=\"padding:6px 10px;border-bottom:2px solid #D1D5DB\">Detalhe</th><th align=\"left\" style=\"padding:6px 10px;border-bottom:2px solid #D1D5DB\">Documentos</th><th align=\"left\" style=\"padding:6px 10px;border-bottom:2px solid #D1D5DB\">Validade</th><th align=\"left\" style=\"padding:6px 10px;border-bottom:2px solid #D1D5DB\">Situação</th></tr>', join(body('Linhas'), ''), '</table>')))), '<p style=\"margin-top:16px\"><a href=\"', parameters('URL do Sistema Betinhos (new_URLSistemaBetinhos)'), '#/documentos?aba=', items('Por_categoria')?['categoria'], '\">Abrir a central de documentos</a></p></div>')"
+            },
+            "Enviar": {
+              "type": "Foreach",
+              "foreach": "@outputs('Destinatarios')?['body/value']",
+              "runAfter": { "Corpo": ["Succeeded"] },
+              "actions": {
+                "Tem_email": {
+                  "type": "If",
+                  "runAfter": {},
+                  "expression": { "and": [ { "not": { "equals": [ "@trim(coalesce(items('Enviar')?['cr40f_Funcionario']?['cr40f_emailbetinhos'], ''))", "" ] } } ] },
+                  "actions": {
+                    "E_mail": {
+                      "type": "OpenApiConnection",
+                      "runAfter": {},
+                      "inputs": {
+                        "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365", "connectionName": "shared_office365", "operationId": "SendEmailV2" },
+                        "parameters": {
+                          "emailMessage/From": "__REMETENTE__",
+                          "emailMessage/To": "@{trim(items('Enviar')?['cr40f_Funcionario']?['cr40f_emailbetinhos'])}",
+                          "emailMessage/Subject": "Documentos | @{outputs('Rotulo')} | semana de @{outputs('Semana')}",
+                          "emailMessage/Body": "@{outputs('Corpo')}",
+                          "emailMessage/Importance": "Normal"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    }
+                  },
+                  "else": { "actions": {} }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Catch": {
+      "type": "Scope",
+      "runAfter": { "Try": ["Failed", "TimedOut"] },
+      "actions": {
+        "Falhas": {
+          "type": "Query",
+          "runAfter": {},
+          "inputs": { "from": "@result('Try')", "where": "@not(equals(item()?['status'], 'Succeeded'))" }
+        },
+        "Avisar_admin": {
+          "type": "OpenApiConnection",
+          "runAfter": { "Falhas": ["Succeeded"] },
+          "inputs": {
+            "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365", "connectionName": "shared_office365", "operationId": "SendEmailV2" },
+            "parameters": {
+              "emailMessage/From": "__REMETENTE__",
+              "emailMessage/To": "@{parameters('E-mail do administrador dos avisos (new_EmailAdminAvisos)')}",
+              "emailMessage/Subject": "Documentos | Resumo semanal falhou",
+              "emailMessage/Body": "@{concat('<p>O resumo semanal de documentos falhou na execução ', workflow()?['run']?['name'], '.</p><p>Etapas com problema:</p><pre>', string(body('Falhas')), '</pre>')}",
+              "emailMessage/Importance": "High"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Marcar_falha": {
+          "type": "Terminate",
+          "runAfter": { "Avisar_admin": ["Succeeded", "Failed"] },
+          "inputs": { "runStatus": "Failed", "runError": { "code": "ResumoSemanalFalhou", "message": "O resumo semanal falhou; o administrador foi avisado." } }
+        }
+      }
+    }
+  },
+  "outputs": {}
+}

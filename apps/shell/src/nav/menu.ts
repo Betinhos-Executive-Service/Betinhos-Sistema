@@ -10,7 +10,7 @@ export type MenuItem =
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
-  | { kind: 'page'; id: string; label: string; page: 'componentes' | 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' }
+  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados'; agente?: 'financeiro' | 'logistica' | 'pessoas' }
 
 export type MenuGroup = { id: string; label: string; items: MenuItem[] }
 
@@ -30,9 +30,11 @@ export const MENU: MenuGroup[] = [
       { kind: 'page', id: 'geral', label: 'Geral', page: 'geral' },
       { kind: 'page', id: 'dashboard', label: 'Dashboard', page: 'dashboard' },
       { kind: 'page', id: 'operacional', label: 'Resumo Operacional', page: 'operacional' },
+      { kind: 'page', id: 'assistente-logistica', label: 'Assistente', page: 'agentes', agente: 'logistica' },
       wr('Funções Operacionais', 'new_telafuncoesoperacionais'),
       table('cr40f_trocasdecarro'),
       table('new_possedeveiculo'),
+      { kind: 'page', id: 'comunicados', label: 'Comunicados', page: 'comunicados' },
       wr('Gestão de Qualidade', 'new_gestao_erros_operacionais.html'),
       { kind: 'external', id: 'infleet', label: 'Infleet', url: 'https://app.infleet.com.br/monitoring' },
       wr('Planner', 'new_TelaPlanner.html'),
@@ -42,19 +44,20 @@ export const MENU: MenuGroup[] = [
     id: 'financeiro',
     label: 'Financeiro',
     items: [
-      table('cr40f_composicaodeprecos'),
+      wr('Composição de Preço', 'new_TelaComposicaoPreco.html'),
       { kind: 'page', id: 'ops', label: 'Ordens de Pagamento', page: 'ops' },
       { kind: 'page', id: 'pagantes', label: 'Pagantes', page: 'pagantes' },
+      { kind: 'page', id: 'pendencias', label: 'Pendências', page: 'pendencias' },
+      { kind: 'page', id: 'assistente-financeiro', label: 'Assistente', page: 'agentes', agente: 'financeiro' },
       table('cr40f_recibos_v2'),
-      table('cr40f_pedidodecotacao'),
       wr('Pagamento de Fornecedores', 'cr40f_TelaPagamentoFornecedores.html'),
-      wr('Fluxo de Caixa', 'cr40f_TelaFluxoDeCaixa.html'),
+      { kind: 'page', id: 'despesas-operacionais', label: 'Despesas (App Motoristas)', page: 'despesas' },
     ],
   },
   {
     id: 'frota',
     label: 'Frota',
-    items: [{ kind: 'page', id: 'frota', label: 'Painel da Frota', page: 'frota' }, table('cr40f_manutencoes'), table('cr40f_multas'), table('cr40f_colisao_v2')],
+    items: [{ kind: 'page', id: 'frota', label: 'Painel da Frota', page: 'frota' }, wr('Checklists de Veículos', 'new_gestaochecklistsveiculos'), table('cr40f_manutencoes'), table('cr40f_multas'), table('cr40f_colisao_v2')],
   },
   {
     id: 'cadastros',
@@ -64,9 +67,10 @@ export const MENU: MenuGroup[] = [
       table('cr40f_clientes1', 'Clientes'),
       table('cr40f_veiculos'),
       { kind: 'page', id: 'funcionarios', label: 'Funcionários', page: 'funcionarios' },
+      { kind: 'page', id: 'documentos', label: 'Documentos', page: 'documentos' },
+      { kind: 'page', id: 'assistente-pessoas', label: 'Assistente', page: 'agentes', agente: 'pessoas' },
       { kind: 'page', id: 'curriculos', label: 'Currículos', page: 'curriculos' },
       { kind: 'page', id: 'infracoes', label: 'Infrações de trânsito', page: 'infracoes' },
-      table('new_marketing'),
     ],
   },
   {
@@ -81,19 +85,18 @@ export const MENU: MenuGroup[] = [
       table('new_appmotoristaslog'),
       table('cr40f_anexodespesaoperacional'),
       table('cr40f_categoriadespesaoperacional'),
-      { kind: 'page', id: 'despesas-operacionais', label: 'Despesas (App Motoristas)', page: 'despesas' },
       table('cr40f_formapagamentodespesa'),
       table('cr40f_anexocolisao_v2'),
       table('cr40f_anexorecebimento_v2'),
       { kind: 'unavailable', id: 'custom-page-funcoes-operacionais', label: 'Funções Operacionais (página personalizada)', reason: 'Esta página personalizada só abre pelo menu do app model-driven.' },
-      wr('Comunicados', 'cr40f_GerenciarComunicados.html'),
-      wr('Composição de Preço', 'new_TelaComposicaoPreco.html'),
+      // Substituído por #/comunicados (Operacional); fica aqui enquanto houver uso.
+      wr('Comunicados (antigo)', 'cr40f_GerenciarComunicados.html'),
+      table('cr40f_pedidodecotacao'),
+      wr('Fluxo de Caixa', 'cr40f_TelaFluxoDeCaixa.html'),
+      table('cr40f_composicaodeprecos'),
+      table('new_marketing'),
     ],
   },
-  // Referência para quem desenvolve: só existe no `pnpm dev`, nunca no build publicado.
-  ...(import.meta.env.DEV
-    ? [{ id: 'design-system', label: 'Design System', items: [{ kind: 'page', id: 'componentes', label: 'Componentes', page: 'componentes' }] } satisfies MenuGroup]
-    : []),
 ]
 
 export const ALL_ITEMS = MENU.flatMap((group) => group.items)

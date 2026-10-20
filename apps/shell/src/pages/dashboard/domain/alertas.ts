@@ -1,14 +1,15 @@
 import { CAT_ITEM_SERVICO, CORTE_SEM_CLIENTE, CORTE_SEM_MOTORISTA, CORTE_SEM_VEICULO, MULTA_NOTIFICAR, SEM_CLIENTE, STATUS_SEM_MOTORISTA } from './codes'
 import { dec, int, stL } from './format'
 import { DIA_MS } from './periodo'
+import { JANELA_DIAS } from '../../documentos/domain/vencimento'
 import { alertaScore, type ResultadoScore } from './score'
 import type { AlertaItem, Conjunto, Funcionario, Manutencao, Multa, Ocorrencia, Reserva, Veiculo } from './types'
 
 export type Secundarios = { manutencoes: Manutencao[]; multas: Multa[]; ocorrencias: Ocorrencia[]; funcionarios: Funcionario[]; veiculos: Veiculo[]; indisponiveis: Conjunto[] }
 
-/** `cnhWarn`: só status "ativo" e validade preenchida até 90 dias (sem validade não conta, como no código legado). */
+/** `cnhWarn`: só status "ativo" e validade preenchida até a janela única de documentos (60 dias; sem validade não conta, como no código legado). */
 export const cnhEmAtencao = (funcionarios: Funcionario[], nowMs: number) =>
-  funcionarios.filter((f) => stL(f.statusLabel) === 'ativo' && Number.isFinite(f.cnhMs) && (f.cnhMs - nowMs) / DIA_MS <= 90)
+  funcionarios.filter((f) => stL(f.statusLabel) === 'ativo' && Number.isFinite(f.cnhMs) && (f.cnhMs - nowMs) / DIA_MS <= JANELA_DIAS)
 export const multasPendentes = (multas: Multa[]) => multas.filter((m) => m.status === MULTA_NOTIFICAR)
 const pctMultas = (multas: Multa[]) => (multas.length ? ((multasPendentes(multas).length / multas.length) * 100).toFixed(0) : '0')
 const indisponivel = (id: string, rotulo: string): AlertaItem => ({ id, valor: '—', rotulo, status: 's/dado', tom: 'neutral' })

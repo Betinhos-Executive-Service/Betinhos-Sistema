@@ -1,3 +1,5 @@
+import type { EntradaPreventiva } from '../../frota/domain/preventiva'
+
 /** Reserva já enriquecida (equivale aos campos `_*` do `enrichReservas` do legado). */
 export type Reserva = {
   id: string
@@ -93,7 +95,7 @@ export type Despesa = {
 }
 export type CategoriaDespesa = { id: string; nome: string; grupoDre: string }
 export type FormaPagamento = { id: string; nome: string }
-export type Conjunto = 'manutencoes' | 'multas' | 'ocorrencias' | 'funcionarios' | 'veiculos' | 'viagens' | 'eventos' | 'telemetria' | 'pagantes' | 'despesas'
+export type Conjunto = 'manutencoes' | 'multas' | 'ocorrencias' | 'funcionarios' | 'veiculos' | 'viagens' | 'eventos' | 'telemetria' | 'pagantes' | 'despesas' | 'preventivas'
 export type Dados = {
   reservas: Reserva[]
   manutencoes: Manutencao[]
@@ -109,6 +111,11 @@ export type Dados = {
   despesas: Despesa[]
   categoriasDespesa: CategoriaDespesa[]
   formasPagamento: FormaPagamento[]
+  /**
+   * Entrada do domínio de preventivas da Frota (veículos do cadastro, manutenções sem janela, plano e baselines);
+   * vazia com `preventivas` em `indisponiveis` quando qualquer uma das 4 consultas falha.
+   */
+  preventivas: EntradaPreventiva
   /** Conjuntos secundários que falharam: os cards deles mostram s/dado. */
   indisponiveis: Conjunto[]
   /**

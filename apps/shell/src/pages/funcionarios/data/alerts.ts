@@ -1,3 +1,4 @@
+import { JANELA_DIAS } from '../../documentos/domain/vencimento'
 import { addMonths, daysBetween, formatBR, nextBirthday } from './dates'
 
 export type AlertKind = 'cnh' | 'aso' | 'aniversario'
@@ -14,7 +15,7 @@ export type Alerta = {
 /** Periodicidade do ASO em meses. Assumido anual; confirmar com o RH. */
 export const ASO_VALIDADE_MESES = 12
 export const DIAS_CRITICO = 30
-export const DIAS_ATENCAO = 60
+export const DIAS_ATENCAO = JANELA_DIAS
 export const DIAS_ANIVERSARIO = 7
 
 type AlertSource = {
@@ -22,6 +23,14 @@ type AlertSource = {
   validadeCnh: string | null
   dataAso: string | null
   aniversario: string | null
+}
+
+/** Rótulo para as colunas CNH e ASO, que já dizem o documento: cabe na célula sem cortar a data. O completo fica na dica. */
+export function rotuloCurto(alerta: Alerta) {
+  if (alerta.kind !== 'cnh' && alerta.kind !== 'aso') return alerta.label
+  if (alerta.level === 'vencido') return `Venceu ${formatBR(alerta.date)}`
+  const semDocumento = alerta.label.replace(/^(CNH|ASO) /, '')
+  return semDocumento.charAt(0).toUpperCase() + semDocumento.slice(1)
 }
 
 function vencimento(kind: 'cnh' | 'aso', date: string, today: string): Alerta | null {

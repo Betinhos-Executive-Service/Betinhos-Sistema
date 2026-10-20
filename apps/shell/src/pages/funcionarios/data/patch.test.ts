@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { formatPhone, isValidCpf } from './format'
-import { buildPatch, draftFrom, emptyDraft, validateDraft, type PatchContext } from './patch'
+import { buildPatch, changedKeys, draftFrom, emptyDraft, validateDraft, type PatchContext } from './patch'
 import type { Funcionario } from './types'
 
 const context: PatchContext = { veiculoNav: 'cr40f_VeiculoAtual', veiculoSet: 'cr40f_veiculoses', dateBehaviors: { cr40f_validadedacnh: 'UserLocal', cr40f_datadoaso: 'TimeZoneIndependent' } }
@@ -28,13 +28,23 @@ describe('buildPatch', () => {
     expect(buildPatch(original, draft, context)).toEqual({ cr40f_VeiculoAtual: null })
   })
 
-  it('grava data UserLocal como meia-noite de São Paulo e limpa texto vazio', () => {
+  it('limpa texto vazio e converte data editável', () => {
+    const draft = draftFrom(original)
+    draft.values.cr40f_datadeadmissao = '2026-09-15'
+    draft.values.cr40f_telefonepessoal = ''
+    expect(buildPatch(original, draft, context)).toEqual({ cr40f_datadeadmissao: '2026-09-15', cr40f_telefonepessoal: null })
+  })
+
+  it('não envia Validade da CNH nem Data do ASO ao editar (mantidos pelo módulo Documentos)', () => {
     const draft = draftFrom(original)
     draft.values.cr40f_validadedacnh = '2027-02-01'
-    draft.values.cr40f_telefonepessoal = ''
-    expect(buildPatch(original, draft, context)).toEqual({ cr40f_validadedacnh: '2027-02-01T03:00:00Z', cr40f_telefonepessoal: null })
     draft.values.cr40f_datadoaso = '2026-09-15'
-    expect(buildPatch(original, draft, context)).toMatchObject({ cr40f_datadoaso: '2026-09-15T00:00:00Z' })
+    draft.values.cr40f_telefonepessoal = '+55 12 98888-1111'
+    expect(changedKeys(original, draft)).toEqual(['cr40f_telefonepessoal'])
+    const payload = buildPatch(original, draft, context)
+    expect(payload).toEqual({ cr40f_telefonepessoal: '+55 12 98888-1111' })
+    expect(payload).not.toHaveProperty('cr40f_validadedacnh')
+    expect(payload).not.toHaveProperty('cr40f_datadoaso')
   })
 
   it('na criação não envia lookup vazio', () => {

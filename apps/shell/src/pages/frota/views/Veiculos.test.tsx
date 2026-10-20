@@ -5,12 +5,11 @@ import { MANUT, VEICULO } from '../data/schema'
 import { createMockSource } from '../data/mock'
 import { EMPTY_DATA } from '../data/source'
 import type { FrotaData, Veiculo } from '../data/types'
-import { escolher } from '../testUtils'
 import { Veiculos } from './Veiculos'
 
 const source = createMockSource()
 
-const base: Veiculo = { id: 'v1', placa: 'TST1A11', marca: 'Toyota', modelo: 'Corolla', cor: null, anoModelo: null, status: VEICULO.ATIVO, categoria: null, motorista: { id: 'f1', label: 'Ana' } }
+const base: Veiculo = { id: 'v1', placa: 'TST1A11', marca: 'Toyota', modelo: 'Corolla', cor: null, anoModelo: null, status: VEICULO.ATIVO, categoria: null, motorista: { id: 'f1', label: 'Ana' }, hodometro: null, hodometroEm: null }
 const data: FrotaData = {
   ...EMPTY_DATA,
   veiculos: [
@@ -50,12 +49,12 @@ describe('Veiculos', () => {
     expect(screen.queryByText('TST4D44')).toBeNull()
   })
 
-  it('mostra veículo sem status com o selo no filtro "Sem status"', () => {
+  it('link antigo com status=sem mostra o veículo sem status, com o selo', async () => {
+    window.location.hash = '#/frota?aba=veiculos&status=sem'
     render(<Veiculos data={data} today="2026-10-02" source={source} onOpenVeiculo={() => {}} />)
-    escolher('Status do veículo', 'Sem status')
-    expect(screen.getByText('TST4D44')).toBeTruthy()
+    expect(await screen.findByText('TST4D44')).toBeTruthy()
     expect(screen.queryByText('TST1A11')).toBeNull()
-    expect(document.querySelector('[role="row"] .bt-badge')?.textContent).toBe('Sem status')
+    expect(document.querySelector('.bt-table__row .bt-badge')?.textContent).toBe('Sem status')
   })
 
   it('mostra "sem valor" e nunca R$ 0,00 para manutenção realizada sem valor', () => {

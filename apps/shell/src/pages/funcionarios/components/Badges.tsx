@@ -15,11 +15,12 @@ const ALERT_ICON = { cnh: IdCard, aso: Stethoscope, aniversario: Cake }
 // Cinco estados do Design System: vencido e crítico em danger, atenção em warning, aniversário em info.
 const ALERT_TONE: Record<AlertLevel, StatusTone> = { vencido: 'danger', critico: 'danger', atencao: 'warning', info: 'info' }
 
-export function AlertBadge({ alerta, compact = false }: { alerta: Alerta; compact?: boolean }) {
+/** `text`: rótulo visível mais curto (ex.: em coluna estreita); a dica e o leitor de tela continuam com o rótulo completo. */
+export function AlertBadge({ alerta, compact = false, text }: { alerta: Alerta; compact?: boolean; text?: string }) {
   const Icon = alerta.level === 'vencido' ? AlertTriangle : ALERT_ICON[alerta.kind]
   return (
     <DsStatusBadge tone={ALERT_TONE[alerta.level]} icon={<Icon />} title={alerta.label}>
-      {compact ? <span className="sr-only">{alerta.label}</span> : alerta.label}
+      {compact ? <span className="sr-only">{alerta.label}</span> : text && text !== alerta.label ? <><span aria-hidden="true">{text}</span><span className="sr-only">{alerta.label}</span></> : alerta.label}
     </DsStatusBadge>
   )
 }

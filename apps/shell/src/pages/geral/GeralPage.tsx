@@ -1,25 +1,19 @@
-import { useCallback, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
-import { Alert, Button, EmptyState, Menu, StatusBadge, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
-import { Archive, ArchiveRestore, Bug, CalendarDays, ChevronDown, ClipboardList, Copy, FilePlus2, Link2, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Send, ShieldCheck, Ticket, X } from 'lucide-react'
+import { Alert, Button, EmptyState, Menu, SearchBox, Stack, StatusBadge, ToastProvider, ViewBar, readFilters, useShellHeader, useToast, type FilterGroup, type FilterOption } from '@betinhos/ui'
+import { Archive, ArchiveRestore, Bug, CalendarDays, ChevronDown, ClipboardList, Copy, FilePlus2, LayoutGrid, Link2, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Send, ShieldCheck, Table2, Ticket, X } from 'lucide-react'
 import type { Host } from '../../host'
-import { PageLayout } from '../../app/PageLayout'
 import { useMedia } from '../operacional/useMedia'
-import { hrefFor, queryFromHash } from '../../nav/useHashRoute'
+import { hrefFor, patchHashQuery, queryFromHash, readHashQuery } from '../../nav/useHashRoute'
 import { createSource } from './data/source'
 import { Cell } from './components/Cell'
 import { GeralCards } from './components/GeralCards'
 import { GeralSheet } from './components/GeralSheet'
 import { GeralTable } from './components/GeralTable'
-import { CopyDialog, DispararDialog, GerarOpDialog, MockFormDialog, StateDialog, type DispararRequest, type OpRequest, type StateRequest } from './components/Dialogs'
+import { CopyDialog, DispararDialog, GerarOpDialog, LinkDialog, MockFormDialog, StateDialog, type DispararRequest, type LinkRequest, type OpRequest, type StateRequest } from './components/Dialogs'
 import { ContagemDrawer, shiftDay, todayIso } from './components/ContagemDrawer'
 import { EscalaFdsDrawer } from './components/EscalaFdsDrawer'
-import { FilterChips } from './components/FilterChips'
-import { FilterDialog } from './components/FilterEditor'
-import { FiltersDrawer } from './components/FiltersDrawer'
 import { LoadMore, LoadSentinel, statusText } from './components/LoadMore'
-import { GeralToolbar } from './components/GeralToolbar'
-import { ViewMenu } from './components/ViewMenu'
 import { AuditoriaOverlay } from './components/AuditoriaOverlay'
 import { LINK_FALHA, gerarLinkBlock } from './domain/link'
 import { VoucherOverlay } from './components/VoucherOverlay'
@@ -27,13 +21,12 @@ import { FormOverlay } from './components/FormOverlay'
 import { copyText } from './domain/copy'
 import { loadViewMode, saveViewMode, type ViewMode } from './domain/viewMode'
 import { splitOp } from './domain/commands'
-import { isEmptyFilter, type Filter } from './domain/filters'
-import { filterKindOf } from './domain/filterKind'
 import { applyColumnPrefs, loadColumnPrefs, saveColumnPrefs, type ColumnPrefs } from './domain/columns'
 import { buildLayout, buildViewFetch } from './domain/views'
 import { ID_ATTRIBUTE, type CellStatus, type Column } from './domain/types'
 import { readUrlState, writeUrlState, type UrlState } from './domain/urlState'
 import { cellKey, useGeral, type SaveFailure } from './useGeral'
+import { useGeralViewState } from './useGeralViewState'
 import './geral.css'
 
 export function GeralPage({ host }: { host: Host }) {
@@ -100,27 +93,22 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const [dispBusy, setDispBusy] = useState(false)
   const [escalaOpen, setEscalaOpen] = useState(false)
   const [contagemOpen, setContagemOpen] = useState(false)
-  // Filtro por coluna: `editingFilter` é o atributo no diálogo "Filtrar …"; o painel "Editar filtros" lista todos.
-  const [editingFilter, setEditingFilter] = useState<string | null>(null)
-  const [filtersOpen, setFiltersOpen] = useState(false)
-  const { filters, setFilter, clearFilters } = geral
-  // Ao fechar o diálogo de filtro (aplicar ou cancelar) o foco volta ao ▾ da coluna; o diálogo nativo devolveria ao item de menu já desmontado.
-  const closeFilter = useCallback(() => {
-    const label = editingFilter ? attributes?.get(editingFilter)?.label || editingFilter : null
-    setEditingFilter(null)
-    if (label) window.setTimeout(() => Array.from(document.querySelectorAll<HTMLElement>('.gr-head__menu')).find((el) => el.getAttribute('aria-label') === `Opções da coluna ${label}`)?.focus(), 0)
-  }, [editingFilter, attributes])
+  // Filtros do Design System (§10.9.2): rápidos por coluna e avançado E/OU; valem os que casam com os campos da metadata.
+  const { filters, setFilters, setQuickFilter, filterFields } = geral
+  const valid = useMemo(() => readFilters(filters, filterFields), [filters, filterFields])
+  const filteredKeys = useMemo(() => {
+    const keys = new Set(Object.keys(valid.quick))
+    const walk = (group: FilterGroup) => group.items.forEach((item) => (item.type === 'group' ? walk(item) : keys.add(item.field)))
+    walk(valid.advanced)
+    return [...keys]
+  }, [valid])
   const contagemDay = useMemo(() => {
-    const f = filters.cr40f_dataehorriodesada
-    if (f?.kind === 'date') {
-      if (f.op === 'today') return todayIso()
-      if (f.op === 'tomorrow') return shiftDay(todayIso(), 1)
-      if (f.op === 'range' && f.from && /^\d{4}-\d{2}-\d{2}/.test(f.from)) return f.from.slice(0, 10)
-    }
+    const f = valid.quick.cr40f_dataehorriodesada
+    if (f?.op === 'today') return todayIso()
+    if (f?.op === 'tomorrow') return shiftDay(todayIso(), 1)
+    if (f?.op === 'between' && typeof f.value === 'string') return f.value.slice(0, 10)
     return todayIso()
-  }, [filters])
-  const filtersCount = useMemo(() => Object.values(filters).filter((f) => !isEmptyFilter(f)).length, [filters])
-  const applyFilters = useCallback((drafts: Record<string, Filter | null>) => { for (const [attribute, filter] of Object.entries(drafts)) setFilter(attribute, filter) }, [setFilter])
+  }, [valid])
   const hideColumn = useCallback((key: string) => {
     const base = prefs ?? { hidden: [], order: geral.columns.map((c) => c.key) }
     setPrefs({ ...base, hidden: base.hidden.includes(key) ? base.hidden : [...base.hidden, key] })
@@ -146,42 +134,34 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const viewPayload = useCallback(async () => {
     if (!view) throw new Error('Nenhuma visão aberta.')
     if (geral.filtersIgnored) throw new Error('Os filtros não puderam ser aplicados porque os campos não carregaram. Atualize e tente de novo.')
-    const fetchxml = buildViewFetch(view.fetchxml, geral.filters, geral.sort, attributes ?? new Map())
+    const fetchxml = buildViewFetch(view.fetchxml, geral.filters, geral.sort, geral.filterFields)
     const layoutxml = buildLayout(visibleColumns, prefs?.widths, await source.objectTypeCode())
     return { fetchxml, layoutxml }
-  }, [view, geral.filtersIgnored, geral.filters, geral.sort, attributes, visibleColumns, prefs, source])
-  const attemptAction = useCallback(async (action: () => Promise<void>, success: string, failure: string) => {
-    try {
-      await action()
-      toast({ tone: 'success', message: success })
-      return true
-    } catch (reason) {
-      toast({ tone: 'danger', message: `${failure}: ${reason instanceof Error ? reason.message : String(reason)}` })
-      return false
-    }
-  }, [toast])
-  const saveViewAs = useCallback((name: string) => attemptAction(async () => {
-    const created = await source.createView({ name, ...(await viewPayload()) })
-    await reloadViews(created.id)
-  }, `Visão “${name}” criada.`, 'Não foi possível criar a visão'), [attemptAction, source, viewPayload, reloadViews])
-  const saveView = useCallback(() => attemptAction(async () => {
+  }, [view, geral.filtersIgnored, geral.filters, geral.sort, geral.filterFields, visibleColumns, prefs, source])
+  const createView = useCallback(async (name: string) => (await source.createView({ name, ...(await viewPayload()) })).id, [source, viewPayload])
+  const updateView = useCallback(async () => {
     if (!view) return
     await source.updateView(view.id, await viewPayload())
     // A visão agora carrega as colunas e larguras: as preferências locais já não têm o que acrescentar.
     setPrefs(null)
     await reloadViews()
-  }, 'Visão atualizada.', 'Não foi possível salvar a visão'), [attemptAction, view, source, viewPayload, setPrefs, reloadViews])
-  const renameView = useCallback((name: string) => attemptAction(async () => {
+  }, [view, source, viewPayload, setPrefs, reloadViews])
+  const renameView = useCallback(async (name: string) => {
     if (!view) return
     await source.renameView(view.id, name)
     await reloadViews()
-  }, 'Visão renomeada.', 'Não foi possível renomear a visão'), [attemptAction, view, source, reloadViews])
-  const deleteView = useCallback(() => attemptAction(async () => {
+  }, [view, source, reloadViews])
+  const deleteView = useCallback(async () => {
     if (!view) return
     await source.deleteView(view.id)
     saveColumnPrefs(source.kv, view.id, null)
     await reloadViews()
-  }, 'Visão excluída.', 'Não foi possível excluir a visão'), [attemptAction, view, source, reloadViews])
+  }, [view, source, reloadViews])
+  const { state: viewState, columnDefs } = useGeralViewState({
+    views: geral.views, view, viewsError: geral.viewsError, columns: geral.columns, attributes, prefs, setPrefs,
+    sort: geral.sort, setSort: geral.setSort, filters, setFilters, selectView, reloadViews,
+    createView, updateView, renameView, deleteView, kv: source.kv,
+  })
   const shareLink = useCallback(async () => {
     try {
       if (!navigator.clipboard?.writeText) throw new Error('Área de transferência indisponível.')
@@ -202,6 +182,15 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       toast({ tone: 'danger', message: reason instanceof Error ? reason.message : String(reason) })
     }
   }, [source, refresh, toast])
+
+  // `#/geral?novo=1` (atalho "Novo serviço" da Página Inicial): abre a criação uma vez e tira o parâmetro do link.
+  const novoTratado = useRef(false)
+  useEffect(() => {
+    if (novoTratado.current || readHashQuery().get('novo') !== '1') return
+    novoTratado.current = true
+    patchHashQuery({ novo: null })
+    void openForm('create')
+  }, [openForm])
 
   const selectedIds = useMemo(() => Array.from(geral.selected), [geral.selected])
   const rowOf = useCallback((id: string) => rows.find((r) => String(r[ID_ATTRIBUTE]) === id), [rows])
@@ -265,22 +254,21 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     const row = selectedIds.length === 1 ? rowOf(selectedIds[0]) : undefined
     return gerarLinkBlock(row ? [row] : [], selectedIds.length)
   }, [selectedIds, rowOf])
+  const [linkRequest, setLinkRequest] = useState<LinkRequest | null>(null)
   const gerarLink = useCallback(async () => {
     if (linkBlock) return
+    const id = selectedIds[0]
+    const codigo = rowOf(id)?.cr40f_id
+    const base = { codigo: typeof codigo === 'string' && codigo ? codigo : id }
+    setLinkRequest({ ...base, loading: true })
     try {
-      const result = await source.gerarLink(selectedIds[0])
-      if (!result.ok || !result.link) { toast({ tone: 'danger', message: result.erro || LINK_FALHA }); return }
-      try {
-        if (!navigator.clipboard?.writeText) throw new Error('Área de transferência indisponível.')
-        await navigator.clipboard.writeText(result.link)
-        toast({ tone: 'success', message: 'Link gerado e copiado.' })
-      } catch {
-        toast({ tone: 'info', message: `Link gerado, mas não foi possível copiar: ${result.link}` })
-      }
+      const result = await source.gerarLink(id)
+      if (!result.ok || !result.link) setLinkRequest({ ...base, loading: false, erro: result.erro || LINK_FALHA })
+      else setLinkRequest({ ...base, loading: false, link: result.link, expiraEm: result.expiraEm })
     } catch (reason) {
-      toast({ tone: 'danger', message: reason instanceof Error ? reason.message : LINK_FALHA })
+      setLinkRequest({ ...base, loading: false, erro: reason instanceof Error ? reason.message : LINK_FALHA })
     }
-  }, [linkBlock, source, selectedIds, toast])
+  }, [linkBlock, source, selectedIds, rowOf])
 
   const labelOf = useCallback((id: string) => { const name = rowOf(id)?.cr40f_id; return typeof name === 'string' && name ? name : id }, [rowOf])
 
@@ -372,10 +360,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       <Button variant="ghost" size="touch" icon={<X size={16} />} onClick={clearSelection}>Limpar seleção</Button>
     </>
   )
-  const noneTitle = 'Selecione ao menos um serviço.'
   const oneTitle = 'Selecione exatamente um serviço.'
-  const noneId = useId()
-  const oneId = useId()
   // aria-disabled (não disabled): o botão continua focável, o leitor de tela lê o motivo e o clique não faz nada.
   const blocked = (reason: string, describedBy: string) => ({
     className: 'gr-btn--blocked',
@@ -384,53 +369,57 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     title: reason,
     onClick: (event: MouseEvent<HTMLButtonElement>) => event.preventDefault(),
   })
-  const none = selectedIds.length === 0
   // Rótulo de item de menu com o motivo embaixo quando o item está inerte.
   const hint = (label: string, reason: string | null) => (reason ? <span className="gr-menu__hint" title={reason}>{label}<small>{reason}</small></span> : label)
-  const createButton = <Button size={mobile ? 'touch' : 'compact'} icon={<Plus size={16} />} onClick={() => { void openForm('create') }}>Criar serviço</Button>
-  // Desktop: Criar, Editar e Desativar/Ativar ficam na barra (a posição não pula); os demais comandos de seleção vivem no menu "Ações".
-  // Sem seleção servível, botões e itens ficam inertes, com o motivo.
-  const commands = mobile ? createButton : (
-    <>
-      {createButton}
-      {selectedIds.length === 1
-        ? <Button variant="action" size="compact" icon={<Pencil size={16} />} onClick={() => { void openForm('edit', selectedIds[0]) }}>Editar</Button>
-        : <Button variant="action" size="compact" icon={<Pencil size={16} />} {...blocked(oneTitle, oneId)}>Editar</Button>}
+  // Todos os comandos da linha têm o mesmo tamanho da barra do DS (40 px no desktop, 44 px no celular): nada de misturar compacto com padrão.
+  const size = mobile ? 'touch' : 'default'
+  const createButton = <Button size={size} icon={<Plus size={16} />} onClick={() => { void openForm('create') }}>Criar serviço</Button>
+  // Desktop com linhas marcadas: a linha de comando vira a barra da seleção (como no model-driven). Sem seleção, os comandos
+  // que dependem dela não aparecem; a única ação primária da página é "Criar serviço", a última à direita (DS §10.9.1).
+  const selecting = !mobile && selectedIds.length > 0
+  const selectedLabel = selectedIds.length === 1 ? '1 selecionado' : `${selectedIds.length} selecionados`
+  const selectionBar = (
+    <div className="gr-selection" role="group" aria-label="Comandos da seleção">
+      <Button variant="ghost" size={size} icon={<X size={16} />} aria-label="Limpar seleção" title="Limpar seleção" onClick={clearSelection} />
+      <span role="status" className="gr-filters__selected"><StatusBadge tone="info">{selectedLabel}</StatusBadge></span>
+      {selectedIds.length === 1 ? <Button variant="action" size={size} icon={<Pencil size={16} />} onClick={() => { void openForm('edit', selectedIds[0]) }}>Editar</Button> : null}
+      {selectedState === 1
+        ? <Button variant="action" size={size} icon={<ArchiveRestore size={16} />} onClick={() => askState(true)}>Ativar</Button>
+        : selectedState === 0
+          ? <Button variant="danger" size={size} icon={<Archive size={16} />} onClick={() => askState(false)}>Desativar</Button>
+          : <>
+            <Button variant="danger" size={size} icon={<Archive size={16} />} {...blocked(mixedTitle, mixedId)}>Desativar</Button>
+            <Button variant="action" size={size} icon={<ArchiveRestore size={16} />} {...blocked(mixedTitle, mixedId)}>Ativar</Button>
+            <span id={mixedId} className="gr-sr">{mixedTitle}</span>
+          </>}
       <Menu
         align="start"
-        trigger={(props) => <Button {...props} variant="action" size="compact" icon={<ChevronDown size={16} />} aria-label={none ? 'Ações' : `Ações (${selectedIds.length})`}>Ações{none ? null : <span className="gr-filters__count">{selectedIds.length}</span>}</Button>}
+        trigger={(props) => <Button {...props} variant="action" size={size} icon={<ChevronDown size={16} />} aria-label={`Ações (${selectedIds.length})`}>Ações</Button>}
         actions={[
-          { id: 'voucher', label: hint('Gerar Voucher', none ? noneTitle : null), icon: <Ticket size={16} />, disabled: none, onSelect: openVoucher },
-          { id: 'copiar', label: hint('Copiar Serviços', none ? noneTitle : null), icon: <Copy size={16} />, disabled: none, onSelect: () => { void copySelected() } },
-          { id: 'op', label: hint('Gerar OP', none ? noneTitle : null), icon: <FilePlus2 size={16} />, disabled: none, onSelect: askOp },
-          { id: 'link', label: hint('Gerar link', none ? noneTitle : linkBlock), icon: <Link2 size={16} />, disabled: none || linkBlock != null, onSelect: () => { void gerarLink() } },
-          { id: 'disparar', label: hint('Disparar', none ? noneTitle : null), icon: <Send size={16} />, disabled: none, onSelect: () => setDispRequest({ ids: selectedIds }) },
+          { id: 'voucher', label: 'Gerar Voucher', icon: <Ticket size={16} />, onSelect: openVoucher },
+          { id: 'copiar', label: 'Copiar Serviços', icon: <Copy size={16} />, onSelect: () => { void copySelected() } },
+          { id: 'op', label: 'Gerar OP', icon: <FilePlus2 size={16} />, onSelect: askOp },
+          { id: 'link', label: hint('Gerar link', linkBlock), icon: <Link2 size={16} />, disabled: linkBlock != null, onSelect: () => { void gerarLink() } },
+          { id: 'disparar', label: 'Disparar', icon: <Send size={16} />, onSelect: () => setDispRequest({ ids: selectedIds }) },
         ]}
       />
-      {none
-        ? <Button variant="danger" size="compact" icon={<Archive size={16} />} {...blocked(noneTitle, noneId)}>Desativar</Button>
-        : selectedState === 1
-          ? <Button variant="action" size="compact" icon={<ArchiveRestore size={16} />} onClick={() => askState(true)}>Ativar</Button>
-          : selectedState === 0
-            ? <Button variant="danger" size="compact" icon={<Archive size={16} />} onClick={() => askState(false)}>Desativar</Button>
-            : <>
-              <Button variant="danger" size="compact" icon={<Archive size={16} />} {...blocked(mixedTitle, mixedId)}>Desativar</Button>
-              <Button variant="action" size="compact" icon={<ArchiveRestore size={16} />} {...blocked(mixedTitle, mixedId)}>Ativar</Button>
-            </>}
-      <span id={oneId} className="gr-sr">{oneTitle}</span>
-      <span id={noneId} className="gr-sr">{noneTitle}</span>
-      <span id={mixedId} className="gr-sr">{mixedTitle}</span>
-    </>
+    </div>
   )
+  // "⋮" (Mais ações): o que é raro sai da linha. Modo de exibição, link da tela e os atalhos para outras telas.
   const shortcuts = (
     <Menu
-      trigger={(props) => <Button {...props} variant="secondary" size={mobile ? 'touch' : 'compact'} icon={<MoreVertical size={16} />} aria-label="Mais ações" />}
+      trigger={(props) => <Button {...props} variant="secondary" size={size} icon={<MoreVertical size={16} />} aria-label="Mais ações" />}
       actions={[
-        { id: 'funcoes', label: 'Funções Operacionais', icon: <ClipboardList size={16} />, onSelect: () => { location.hash = hrefFor('new_telafuncoesoperacionais') } },
-        { id: 'escala', label: 'Escala FDS', icon: <CalendarDays size={16} />, onSelect: () => setEscalaOpen(true) },
-        { id: 'auditoria', label: 'Auditoria', icon: <ShieldCheck size={16} />, onSelect: () => { void openAuditoria() } },
-        { id: 'erro', label: selectedIds.length === 1 ? 'Registrar Erro' : <span className="gr-menu__hint" title={oneTitle}>Registrar Erro<small>{oneTitle}</small></span>, icon: <Bug size={16} />, disabled: selectedIds.length !== 1, onSelect: () => { void registrarErro() } },
-        { id: 'contagem', label: 'Contagem de Serviços', icon: <ListChecks size={16} />, onSelect: () => setContagemOpen(true) },
+        ...(mobile ? [] : [
+          { id: 'tabela', label: 'Ver como tabela', icon: <Table2 size={16} />, group: 'Mostrar como', selected: mode === 'tabela', onSelect: () => changeMode('tabela') },
+          { id: 'cards', label: 'Ver como cards', icon: <LayoutGrid size={16} />, group: 'Mostrar como', selected: mode === 'cards', onSelect: () => changeMode('cards') },
+        ]),
+        { id: 'compartilhar', label: 'Compartilhar link', icon: <Link2 size={16} />, group: '', onSelect: () => { void shareLink() } },
+        { id: 'funcoes', label: 'Funções Operacionais', icon: <ClipboardList size={16} />, group: 'Atalhos', onSelect: () => { location.hash = hrefFor('new_telafuncoesoperacionais') } },
+        { id: 'escala', label: 'Escala FDS', icon: <CalendarDays size={16} />, group: 'Atalhos', onSelect: () => setEscalaOpen(true) },
+        { id: 'auditoria', label: 'Auditoria', icon: <ShieldCheck size={16} />, group: 'Atalhos', onSelect: () => { void openAuditoria() } },
+        { id: 'erro', label: hint('Registrar Erro', selectedIds.length === 1 ? null : oneTitle), icon: <Bug size={16} />, group: 'Atalhos', disabled: selectedIds.length !== 1, onSelect: () => { void registrarErro() } },
+        { id: 'contagem', label: 'Contagem de Serviços', icon: <ListChecks size={16} />, group: 'Atalhos', onSelect: () => setContagemOpen(true) },
       ]}
     />
   )
@@ -447,6 +436,11 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   }, [selectOnly, selectRange, toggle])
   // Callbacks estáveis: a célula passa o próprio id/coluna, então só a que mudou de status ou de linha renderiza de novo.
   const searchLookup = useCallback((attribute: string, text: string) => source.search(attribute, text), [source])
+  const searchFilter = useCallback(async (field: { key: string }, text: string): Promise<FilterOption[]> =>
+    (await source.search(field.key, text)).map((o) => ({ value: o.id, label: o.nome })), [source])
+  // Busca por palavra-chave: o texto fica local; a busca de verdade sai depois da pausa.
+  const [searchText, setSearchText] = useState(query)
+  useEffect(() => setSearchText(query), [query])
   const renderCell = useCallback((row: Row, column: Column): ReactNode => {
     const id = String(row[ID_ATTRIBUTE])
     return (
@@ -521,9 +515,9 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               sort={geral.sort}
               defaultSort={geral.defaultOrder}
               onSort={geral.setSort}
-              filters={filters}
-              onEditFilter={setEditingFilter}
-              onClearFilter={(attribute) => setFilter(attribute, null)}
+              filteredKeys={filteredKeys}
+              quick={{ fields: filterFields, value: valid.quick, onChange: setQuickFilter, search: searchFilter }}
+              onClearFilter={(attribute) => setQuickFilter(attribute, null)}
               onHide={hideColumn}
               selected={geral.selected}
               onToggle={geral.toggle}
@@ -541,51 +535,30 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     )
   }
 
+  const notApplied = geral.filtersIgnored ? [...Object.keys(filters.quick), ...filters.advanced.items.map((i) => i.id)] : undefined
+
   return (
-    <PageLayout
-      eyebrow="Operacional"
-      title="Geral"
-      meta={<span className="gr-meta">{status != null ? <span>{status}</span> : null}{source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}</span>}
-      className="gr-page"
-      bodyClassName="gr-body"
-      actions={<Button variant="secondary" icon={<RefreshCw size={16} />} loading={loading && rows.length > 0} onClick={reload}>Atualizar</Button>}
-      toolbar={
-        <GeralToolbar
-          views={geral.views}
-          view={view}
-          onSelectView={selectView}
-          viewMenu={<ViewMenu view={view} mobile={mobile} onSaveAs={saveViewAs} onSave={saveView} onRename={renameView} onDelete={deleteView} onShare={() => { void shareLink() }} />}
-          query={query}
-          onQuery={setQuery}
-          searching={loading && query !== ''}
-          columns={geral.columns}
-          attributes={attributes}
-          prefs={prefs}
-          onPrefs={setPrefs}
-          selectedCount={mobile ? 0 : geral.selected.size}
-          filtersCount={filtersCount}
-          onOpenFilters={() => setFiltersOpen(true)}
-          filtersUnavailable={geral.attributesError != null}
-          mobile={mobile}
-          mode={mobile ? undefined : mode}
-          onMode={changeMode}
-          commands={commands}
-          shortcuts={shortcuts}
-        />
-      }
-    >
-      <FilterChips ignored={geral.filtersIgnored} filters={filters} attributes={attributes} mobile={mobile} onEdit={setEditingFilter} onRemove={(attribute) => setFilter(attribute, null)} onClearAll={clearFilters} />
+    <div className="page gr-page">
+      {/* A linha de comando da lista (DS §10.9.1): visão, colunas, filtros, busca e comandos. */}
+      <div role="toolbar" aria-label="Comandos de serviços" className={selecting ? 'gr-commandline is-selecting' : 'gr-commandline'}>
+      <ViewBar
+        view={viewState}
+        columns={columnDefs}
+        filters={{ fields: filterFields, search: searchFilter, notApplied }}
+      >
+        {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
+        {selecting ? selectionBar : (
+          <>
+            <SearchBox className="gr-filters__search" size={size} aria-label="Buscar serviços" placeholder="Buscar por ID, trajeto, cliente…" value={searchText} onChange={setSearchText} onSearch={(value) => { if (value.trim() !== query) setQuery(value.trim()) }} debounce={300} loading={loading && query !== ''} />
+            <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title={status ?? 'Atualizar'} loading={loading && rows.length > 0} onClick={reload} />
+          </>
+        )}
+        {shortcuts}
+        {selecting ? null : createButton}
+      </ViewBar>
+      </div>
+      <Stack gap="4" className="gr-body">
       {body}
-      <FilterDialog
-        attribute={editingFilter}
-        info={editingFilter ? attributes?.get(editingFilter) : undefined}
-        kind={editingFilter ? filterKindOf(editingFilter, attributes?.get(editingFilter)) : null}
-        value={editingFilter ? filters[editingFilter] ?? null : null}
-        search={searchLookup}
-        onApply={setFilter}
-        onClose={closeFilter}
-      />
-      <FiltersDrawer open={filtersOpen} onClose={() => setFiltersOpen(false)} filters={filters} attributes={attributes} columns={geral.columns} search={searchLookup} onApply={applyFilters} onClearAll={clearFilters} unavailable={geral.attributesError != null} loading={attributes == null && geral.attributesError == null} />
       {mobile && geral.selected.size > 0 ? (
         <div className="gr-selbar" role="group" aria-label="Ações sobre os selecionados">
           <span role="status" className="gr-selbar__count">{geral.selected.size === 1 ? '1 selecionado' : `${geral.selected.size} selecionados`}</span>
@@ -606,6 +579,9 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         />
       ) : null}
       <CopyDialog open={copy.open} loading={copy.loading} text={copy.text} onClose={closeCopy} onCopied={() => { closeCopy(); toast({ tone: 'success', message: 'Serviços copiados.' }) }} />
+      <LinkDialog request={linkRequest} onClose={() => setLinkRequest(null)}
+        onCopied={(what) => toast({ tone: 'success', message: what === 'link' ? 'Link copiado.' : 'Mensagem copiada.' })}
+        onCopyFailed={(reason) => toast({ tone: 'danger', message: `Não foi possível copiar. ${reason instanceof Error ? reason.message : ''}`.trim() })} />
       <StateDialog request={stateRequest} busy={stateBusy} onClose={() => setStateRequest(null)} onConfirm={() => { void confirmState() }} />
       <MockFormDialog open={mockForm} onClose={() => setMockForm(false)} />
       <ContagemDrawer open={contagemOpen} onClose={() => setContagemOpen(false)} source={source} initialDay={contagemDay} kv={source.kv} mobile={mobile} />
@@ -615,6 +591,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       {auditoriaUrl ? <AuditoriaOverlay url={auditoriaUrl} onClose={() => setAuditoriaUrl(null)} /> : null}
       {voucherUrl ? <VoucherOverlay url={voucherUrl} onClose={() => setVoucherUrl(null)} /> : null}
       {formUrl ? <FormOverlay url={formUrl} onClose={() => { setFormUrl(null); refresh() }} /> : null}
-    </PageLayout>
+      </Stack>
+    </div>
   )
 }

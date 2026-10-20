@@ -1,0 +1,2 @@
+# Scripts shell rodam em Linux (VM cloud, WSL): sempre LF.
+*.sh text eol=lf

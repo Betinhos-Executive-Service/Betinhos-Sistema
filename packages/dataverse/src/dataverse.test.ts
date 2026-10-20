@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { chunk, createClient, createMetadata, createXrmShim, formatted } from './index'
+import { chunk, createClient, createMetadata, createXrmShim, formatted, reportingFetch } from './index'
 
 function json(body: unknown, init: ResponseInit = {}) {
   return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' }, ...init })
@@ -64,6 +64,21 @@ describe('xrm shim', () => {
     expect(fetchMock.mock.calls.filter(([url]) => url.includes('EntityDefinitions'))).toHaveLength(1)
     expect(xrm.Utility!.getGlobalContext().getClientUrl()).toBe('https://org.example')
   })
+
+  it('executa Custom API sem vínculo por POST e devolve o erro do servidor como Response', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(json({ error: { message: 'Veículo sem motorista.' } }, { status: 400 }))
+    const xrm = createXrmShim(createClient('https://org.example', fetchMock as unknown as typeof fetch), 'https://org.example')
+    const request = (operationName: string) => ({ new_VeiculoId: 'abc', getMetadata: () => ({ boundParameter: null, operationType: 0, operationName, parameterTypes: { new_VeiculoId: {} } }) })
+    const ok = await xrm.WebApi!.online!.execute(request('new_SolicitarChecklistVeiculo'))
+    expect(ok.ok).toBe(true)
+    expect(fetchMock.mock.calls[0][0]).toBe('https://org.example/api/data/v9.2/new_SolicitarChecklistVeiculo')
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ new_VeiculoId: 'abc' })
+    const failed = await xrm.WebApi!.online!.execute(request('new_SolicitarChecklistVeiculo'))
+    expect(failed.status).toBe(400)
+    expect((await failed.json()).error.message).toContain('Veículo sem motorista.')
+  })
 })
 
 describe('metadata.choices', () => {
@@ -121,5 +136,34 @@ describe('metadata attributes', () => {
     expect((await meta.entity('cr40f_reservadeveculos')).objectTypeCode).toBe(10580)
     expect(fetchMock.mock.calls[0][0]).toContain('ObjectTypeCode')
     expect((await meta.entity('cr40f_outra')).objectTypeCode).toBeNull()
+  })
+})
+
+describe('reportingFetch', () => {
+  it('avisa erro HTTP com status e corpo, ignora 404 e devolve a resposta intacta', async () => {
+    const report = vi.fn()
+    const base = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(json({ error: { code: '0x1', message: 'falhou' } }, { status: 500 }))
+      .mockResolvedValueOnce(json({}, { status: 404 }))
+      .mockResolvedValueOnce(json({ value: [] }))
+    const wrapped = reportingFetch(report, base)
+    const response = await wrapped('https://org/api/data/v9.2/contacts', { method: 'post' })
+    expect(response.status).toBe(500)
+    expect(await response.json()).toEqual({ error: { code: '0x1', message: 'falhou' } })
+    await wrapped('https://org/api/data/v9.2/contacts(1)')
+    await wrapped('https://org/api/data/v9.2/contacts')
+    expect(report).toHaveBeenCalledTimes(1)
+    expect(report).toHaveBeenCalledWith({ method: 'POST', path: 'https://org/api/data/v9.2/contacts', status: 500, body: { error: { code: '0x1', message: 'falhou' } } })
+  })
+
+  it('avisa falha de rede e repassa o erro; cancelamento não é falha', async () => {
+    const report = vi.fn()
+    const rede = new TypeError('Failed to fetch')
+    const base = vi.fn<typeof fetch>().mockRejectedValueOnce(rede).mockRejectedValueOnce(new DOMException('cancelado', 'AbortError'))
+    const wrapped = reportingFetch(report, base)
+    await expect(wrapped('https://org/api/data/v9.2/WhoAmI')).rejects.toBe(rede)
+    await expect(wrapped('https://org/api/data/v9.2/WhoAmI')).rejects.toThrow('cancelado')
+    expect(report).toHaveBeenCalledTimes(1)
+    expect(report).toHaveBeenCalledWith({ method: 'GET', path: 'https://org/api/data/v9.2/WhoAmI', error: rede })
   })
 })

@@ -1,0 +1,14 @@
+[
+  {
+    "id": "fin-os-sem-recibo",
+    "agente": "financeiro",
+    "pergunta": null,
+    "esperado": ["SemRecibo"],
+    "contexto": {
+      "hoje": "2026-10-14",
+      "osConcluidas": [{ "id": "11111111-1111-1111-1111-111111111111", "codigo": "OS-10", "saida": "2026-09-20T13:00:00Z", "faturamento": 202410005, "valorAReceber": 500, "temOP": true, "temRecibo": false, "cliente": "Embraer" }],
+      "ops": [],
+      "pagamentosTerceiro": []
+    }
+  }
+]

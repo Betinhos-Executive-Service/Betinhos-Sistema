@@ -1,38 +1,14 @@
-import { useEffect, useRef, type RefObject } from 'react'
+import type { RefObject } from 'react'
 import { Alert, Button, Spinner } from '@betinhos/ui'
+import { LoadSentinel } from '../../../app/LazyList'
+
+export { LoadSentinel }
 
 /** "100 de 220 serviços" (com total), "100+ serviços" (sem total, ainda há mais) ou "220 serviços" (tudo carregado). */
 export function statusText(loaded: number, total: number | null, more: boolean): string {
   const count = (n: number) => `${n} ${n === 1 ? 'serviço' : 'serviços'}`
   if (!more) return count(total ?? loaded)
   return total != null ? `${loaded} de ${total} serviços` : `${loaded}+ serviços`
-}
-
-type SentinelProps = {
-  /** Contêiner de rolagem (desktop); `null` = a janela (cards no celular). */
-  root: RefObject<HTMLElement | null> | null
-  /** Só existe sentinela quando há mais linhas e nada está carregando nem em erro. */
-  active: boolean
-  /** Linhas carregadas: ao mudar, o observador é recriado e avalia de novo se o sentinela ainda está perto da tela. */
-  loaded: number
-  onLoadMore: () => void
-}
-
-/** Marca depois da última linha: ao chegar a 800 px da tela pede a próxima página. Sem `IntersectionObserver`, o botão do rodapé cobre. */
-export function LoadSentinel({ root, active, loaded, onLoadMore }: SentinelProps) {
-  const node = useRef<HTMLDivElement>(null)
-  const callback = useRef(onLoadMore)
-  callback.current = onLoadMore
-  useEffect(() => {
-    const target = node.current
-    if (!active || !target || typeof IntersectionObserver === 'undefined') return
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) callback.current()
-    }, { root: root?.current ?? null, rootMargin: '800px 0px' })
-    observer.observe(target)
-    return () => observer.disconnect()
-  }, [active, loaded, root])
-  return active ? <div ref={node} className="gr-sentinel" aria-hidden="true" /> : null
 }
 
 type Props = {
