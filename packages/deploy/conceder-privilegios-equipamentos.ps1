@@ -1,12 +1,12 @@
 ﻿param(
   [switch] $Apply,
   [switch] $DeviceCode,
-  # Papeis que recebem nas tabelas de equipamentos o mesmo acesso que ja tem em cr40f_funcionarios. A lista padrao segue a convencao
-  # do repo (a mesma de Documentos); o AVISO do script aponta os demais papeis que acessam cr40f_funcionarios (decisao 9 do spec).
-  [string[]] $Roles = @("Acesso-Betinhos-Canvas", "Acesso-Betinhos-MDA", "DEV - Usuário")
+  # Papeis que recebem nas tabelas de equipamentos o mesmo acesso que ja tem em cr40f_funcionarios. Padrao: so MDA e DEV - Usuario
+  # (decisao do Renan, 21/10/2026; o Canvas fica de fora). O AVISO do script aponta os demais papeis que acessam cr40f_funcionarios.
+  [string[]] $Roles = @("Acesso-Betinhos-MDA", "DEV - Usuário")
 )
 
-# Copia, para cr40f_tipoequipamento e cr40f_equipamento, os privilegios (e a profundidade) que cada papel listado tem em cr40f_funcionarios.
+# Copia, para cr40f_tipoequipamento, cr40f_equipamento e cr40f_fotoequipamento, os privilegios (e a profundidade) que cada papel listado tem em cr40f_funcionarios.
 # Spec de equipamentos, decisao 9: as tabelas novas recebem os mesmos privilegios dos papeis que hoje acessam cr40f_funcionarios.
 # Sem -Apply roda em DRY RUN. Idempotente: AddPrivilegesRole define a profundidade; repetir nao duplica.
 # Arquivo salvo com BOM: o Windows PowerShell 5.1 precisa dele para ler os nomes acentuados.
@@ -94,7 +94,8 @@ function Get-Rows([string] $EntitySet, [string] $Select, [string] $Filter = "") 
   return @((Invoke-Dataverse "GET" $path).value)
 }
 
-$tabelas = @("cr40f_tipoequipamento", "cr40f_equipamento")
+# Fotos: o mesmo acesso das outras duas (Create/Append em foto e AppendTo em equipamento para enviar; Delete para excluir).
+$tabelas = @("cr40f_tipoequipamento", "cr40f_equipamento", "cr40f_fotoequipamento")
 $profundidade = @{ 1 = "Basic"; 2 = "Local"; 4 = "Deep"; 8 = "Global" }
 
 # Privilegios de cr40f_funcionarios, indexados pelo prefixo (prvRead, prvWrite...).
@@ -140,7 +141,7 @@ foreach ($nome in $Roles) {
     }
   }
   if ($concessoes.Count -eq 0) { Write-Step "$nome nao tem privilegio em cr40f_funcionarios; nada a conceder"; continue }
-  # Tabelas UserOwned: leitura abaixo de Global esconde os registros de outros donos (os tipos semeados ficam com quem rodou o provision).
+  # Tabelas UserOwned: leitura abaixo de Global esconde os registros de outros donos (os tipos semeados ficam com quem rodou o provision; as fotos, com quem enviou).
   foreach ($c in @($concessoes | Where-Object { $_.PrivilegeName -like "prvRead*" -and $_.Depth -ne "Global" })) { Write-Step "AVISO: $nome recebe $($c.PrivilegeName) com profundidade $($c.Depth); usuarios desse papel nao verao itens/tipos de outros donos (o spec espera Global)." }
   $resumo = ($concessoes | ForEach-Object { "$($_.PrivilegeName)=$($_.Depth)" }) -join ", "
   if (-not $Apply) { Write-Step "DRY RUN $nome receberia: $resumo"; continue }
