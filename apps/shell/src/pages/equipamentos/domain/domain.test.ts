@@ -5,6 +5,8 @@ import { STATUS, statusLabel, statusTone } from './choices'
 import { opcoesAtivas, validateTipo } from './cadastros'
 import { applyForm, diffForm, emptyEquipamento, emptyForm, hasChanges, isDirty, serieRepetida, toForm, validateForm, withResponsavel, withStatus } from './form'
 import type { Equipamento, Pessoa, TipoEquipamento } from './types'
+import { mapEquipamento, mapPessoa, mapTipo, responsavelRefPath, toPayload } from '../data/queries'
+import { createMockEquipamentos, createMockPessoas, createMockTipos } from '../data/mock'
 
 const S = (v: number) => String(v)
 const tipos: TipoEquipamento[] = [{ id: 't1', nome: 'Notebook', ativo: true }, { id: 't2', nome: 'Pager', ativo: false }, { id: 't3', nome: 'Mouse', ativo: true }]
@@ -192,5 +194,40 @@ describe('lista', () => {
   })
   it('ordena por descrição', () => {
     expect(sortEquipamentos(list, { key: 'equipamento', dir: 'asc' }).map((e) => e.id)).toEqual(['e3', 'e1', 'e2'])
+  })
+})
+
+describe('dados', () => {
+  const F = '@OData.Community.Display.V1.FormattedValue'
+  const sets = { equipamento: 'cr40f_equipamentos', tipo: 'cr40f_tipoequipamentos', funcionario: 'cr40f_funcionarioses' }
+
+  it('mapeia equipamento com rótulos formatados e data só dia', () => {
+    const e = mapEquipamento({
+      cr40f_equipamentoid: 'E1', cr40f_name: 'Notebook', _cr40f_tipo_value: 'T1', [`_cr40f_tipo_value${F}`]: 'Notebook', cr40f_status: 100000000,
+      _cr40f_responsavel_value: 'P1', [`_cr40f_responsavel_value${F}`]: 'Bruna', cr40f_datacompra: '2026-01-10', cr40f_valorcompra: 3499.9, cr40f_numeroserie: 'null',
+    })
+    expect(e).toMatchObject({ id: 'e1', tipoId: 't1', tipoNome: 'Notebook', responsavelId: 'p1', responsavelNome: 'Bruna', dataCompra: '2026-01-10', valorCompra: 3499.9, numeroSerie: '' })
+  })
+  it('sem lookups vira null', () => {
+    expect(mapEquipamento({ cr40f_equipamentoid: 'E2', cr40f_name: 'Mouse' })).toMatchObject({ tipoId: null, responsavelId: null, dataCompra: null })
+  })
+  it('tipo e pessoa leem o estado', () => {
+    expect(mapTipo({ cr40f_tipoequipamentoid: 'T1', cr40f_name: 'Pager', statecode: 1 })).toEqual({ id: 't1', nome: 'Pager', ativo: false })
+    expect(mapPessoa({ cr40f_funcionariosid: 'P1', cr40f_nomecompleto: 'Bruna', statecode: 0 })).toEqual({ id: 'p1', nome: 'Bruna', ativo: true })
+  })
+  it('payload liga lookups por @odata.bind e não manda responsável limpo', () => {
+    expect(toPayload({ campos: { cr40f_name: 'X' }, tipoId: 't1', responsavelId: 'p1' }, sets)).toEqual({
+      cr40f_name: 'X', 'cr40f_Tipo@odata.bind': '/cr40f_tipoequipamentos(t1)', 'cr40f_Responsavel@odata.bind': '/cr40f_funcionarioses(p1)',
+    })
+    expect(toPayload({ campos: {}, responsavelId: null }, sets)).toEqual({})
+    expect(responsavelRefPath('cr40f_equipamentos', '{E1}')).toBe('cr40f_equipamentos(e1)/cr40f_Responsavel/$ref')
+  })
+  it('mock cobre baixado, sem responsável e responsável inativo', () => {
+    const list = createMockEquipamentos()
+    const pessoas = createMockPessoas()
+    expect(list.some((e) => e.status === STATUS.baixado)).toBe(true)
+    expect(list.some((e) => !e.responsavelId && e.status !== STATUS.baixado)).toBe(true)
+    expect(list.some((e) => pessoas.find((p) => p.id === e.responsavelId)?.ativo === false)).toBe(true)
+    expect(createMockTipos().some((t) => !t.ativo)).toBe(true)
   })
 })
