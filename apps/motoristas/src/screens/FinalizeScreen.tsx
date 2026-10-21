@@ -4,6 +4,7 @@ import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { FieldError, MoneyInputField, SelectField, TextAreaField } from "../components/common/FormFields";
 import { PhotoAddButton } from "../components/common/PhotoAddButton";
 import { AppShell } from "../components/layout/AppShell";
+import { useCameraScroll } from "../app/cameraScroll";
 import { FormMenu } from "../components/navigation/FormMenu";
 import { isExchangeOutsideWindow, type ExchangeWindowCheck } from "../lib/dataverse";
 import { matchesExpenseCitySearch, type ExpenseReferenceData } from "../lib/expenses";
@@ -185,7 +186,8 @@ function MaintenancePhotoGrid({
   required?: boolean;
   isSubmitting: boolean;
   allowMultiple?: boolean;
-  onPreview: (kind: MaintenancePhotoKind) => void;
+  /** `anchor` identifica a grade para a rolagem voltar a ela depois da câmera. */
+  onPreview: (kind: MaintenancePhotoKind, anchor: string) => void;
 }) {
   const invoiceItems = Object.entries(photos)
     .filter(([kind, dataUrl]) => kind.startsWith("NOTAFISCAL") && Boolean(dataUrl))
@@ -204,7 +206,7 @@ function MaintenancePhotoGrid({
     : (kinds.find((kind) => !photos[kind]) ?? kinds[kinds.length - 1]);
 
   return (
-    <div className={`finalize-input-block maintenance-photo-block ${isInvalid ? "is-invalid" : ""}`}>
+    <div className={`finalize-input-block maintenance-photo-block ${isInvalid ? "is-invalid" : ""}`} data-scroll-anchor={kinds[0]}>
       <label className="form-field-label">
         <span>{label}</span>
         {required ? <span className="form-field-required" aria-hidden="true">*</span> : null}
@@ -216,7 +218,7 @@ function MaintenancePhotoGrid({
             type="button"
             className="maintenance-photo-thumb"
             disabled={isSubmitting}
-            onClick={() => onPreview(photo.kind)}
+            onClick={() => onPreview(photo.kind, kinds[0])}
             aria-label={`Ver ${label} ${index + 1}`}
           >
             {photo.dataUrl.startsWith("data:video/") ? (
@@ -229,7 +231,7 @@ function MaintenancePhotoGrid({
             )}
           </button>
         ))}
-        <PhotoAddButton disabled={isSubmitting} onClick={() => onPreview(nextEmptyKind)} ariaLabel={`Adicionar ${label}`} />
+        <PhotoAddButton disabled={isSubmitting} onClick={() => onPreview(nextEmptyKind, kinds[0])} ariaLabel={`Adicionar ${label}`} />
       </div>
     </div>
   );
@@ -261,6 +263,7 @@ function MaintenanceFinalize({
   submitState: ActionButtonState;
 }) {
   const isSubmitting = submitState !== "idle";
+  const cameraScroll = useCameraScroll(`finalizar:${detail.id}`);
   const serviceDoneRef = useRef<HTMLTextAreaElement | null>(null);
   const valueRef = useRef<HTMLInputElement | null>(null);
   const paymentRef = useRef<HTMLButtonElement | null>(null);
@@ -338,12 +341,18 @@ function MaintenanceFinalize({
     onDone(fields);
   };
 
+  const previewPhoto = (kind: MaintenancePhotoKind, anchor: string) => {
+    if (isSubmitting) return;
+    cameraScroll.remember(anchor);
+    onPreviewMaintenancePhoto(kind);
+  };
+
   const errorCount = Object.values(errors).filter(Boolean).length;
 
   return (
     <article className="finalize-card">
       <div className="finalize-title">{detail.id}</div>
-      <div className="finalize-scroll">
+      <div className="finalize-scroll" ref={cameraScroll.ref}>
         <div className="finalize-form maintenance">
           {errorCount ? <div className="form-error-summary">Revise {errorCount} campo(s) destacado(s).</div> : null}
 
@@ -442,9 +451,7 @@ function MaintenanceFinalize({
             required
             isSubmitting={isSubmitting}
             allowMultiple
-            onPreview={(kind) => {
-              if (!isSubmitting) onPreviewMaintenancePhoto(kind);
-            }}
+            onPreview={previewPhoto}
           />
           <FieldError error={errors.invoicePhoto} />
 
@@ -455,9 +462,7 @@ function MaintenanceFinalize({
             isInvalid={Boolean(errors.maintenancePhoto)}
             required
             isSubmitting={isSubmitting}
-            onPreview={(kind) => {
-              if (!isSubmitting) onPreviewMaintenancePhoto(kind);
-            }}
+            onPreview={previewPhoto}
           />
           <FieldError error={errors.maintenancePhoto} />
 

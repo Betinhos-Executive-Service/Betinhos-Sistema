@@ -23,6 +23,9 @@ description: "Verifica os formulários avulsos do App Motoristas: Gastos, Solici
 5. Em qualquer campo de texto/valor, `input.labels[0]` é o rótulo visível (ligado por `htmlFor`); o erro fica em `aria-describedby`.
 6. Seletor com valor: o "×" de limpar é um botão separado do gatilho (32×32) e "Nenhuma opção encontrada." aparece fora do `listbox`.
 
+## Rolagem ao voltar da câmera
+- Gastos, Solicitar manutenção e Colisões usam `useCameraScroll` (`src/app/cameraScroll.ts`) no `.finalize-scroll`, com `data-scroll-anchor` no bloco de fotos (Colisões: um por tipo de foto e `extra` nas complementares). Roteiro e armadilhas do painel em `verificar-servicos` (seção "Rolagem ao voltar da câmera"): `node scripts/qa/verify-camera-scroll.cjs .verificacao/camera-scroll depois`.
+
 ## Casos de borda
 - Valor com milhar: "1.250" vira "1250"; mais de 2 casas é cortado (`tests/currencyInput.test.ts`).
 - KM "58.230 km" é aceito e enviado como 58230.

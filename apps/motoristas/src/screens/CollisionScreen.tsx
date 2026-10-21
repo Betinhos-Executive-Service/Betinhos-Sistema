@@ -3,6 +3,7 @@ import { ActionBar, ActionButton, type ActionButtonState } from "../components/c
 import { FieldError, FormField, SelectField, TextAreaField, TextInputControl, TextInputField } from "../components/common/FormFields";
 import { PhotoAddButton } from "../components/common/PhotoAddButton";
 import { AppShell } from "../components/layout/AppShell";
+import { useCameraScroll } from "../app/cameraScroll";
 import { FormMenu } from "../components/navigation/FormMenu";
 import {
   buildCollisionWhatsAppMessage,
@@ -58,6 +59,7 @@ export function CollisionScreen({
   driverName
 }: CollisionScreenProps) {
   const isSubmitting = submitState !== "idle";
+  const cameraScroll = useCameraScroll("colisoes");
   const vehicleRef = useRef<HTMLButtonElement | null>(null);
   const localRef = useRef<HTMLInputElement | null>(null);
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
@@ -120,6 +122,7 @@ export function CollisionScreen({
 
   const addPhoto = (kind: CollisionPhotoKind) => {
     clearError(kind);
+    cameraScroll.remember(kind);
     onAddPhoto(kind);
   };
 
@@ -130,7 +133,7 @@ export function CollisionScreen({
       <FormMenu title="Registrar colisão" onBack={isSubmitting ? undefined : onBack} />
       <section className="main-panel maintenance-request-main">
         <article className="finalize-card maintenance-request-card collision-card">
-          <div className="finalize-scroll">
+          <div className="finalize-scroll" ref={cameraScroll.ref}>
             <div className="finalize-form maintenance maintenance-request-form collision-form">
               <div className="collision-summary">
                 <span>Tipo</span>
@@ -330,6 +333,7 @@ export function CollisionScreen({
                     return (
                       <section
                         key={requiredPhoto.kind}
+                        data-scroll-anchor={requiredPhoto.kind}
                         className={`collision-evidence-group ${errors[requiredPhoto.kind] ? "is-invalid" : ""} ${isComplete ? "is-complete" : ""}`}
                       >
                         <div className="collision-evidence-group-head">
@@ -345,7 +349,7 @@ export function CollisionScreen({
                               className="collision-evidence-thumb"
                               key={photo.id}
                               disabled={isSubmitting}
-                              onClick={() => onPreviewPhoto(photo.id)}
+                              onClick={() => { cameraScroll.remember(requiredPhoto.kind); onPreviewPhoto(photo.id); }}
                               aria-label={`Ver ${requiredPhoto.label} ${index + 1}`}
                             >
                               {isCollisionVideo(photo) ? (
@@ -376,7 +380,7 @@ export function CollisionScreen({
                   })}
                 </div>
 
-                <section className="collision-evidence-group collision-evidence-group--optional">
+                <section className="collision-evidence-group collision-evidence-group--optional" data-scroll-anchor="extra">
                   <div className="collision-evidence-group-head">
                     <div>
                       <strong>Complementares</strong>
@@ -390,7 +394,7 @@ export function CollisionScreen({
                         className={`collision-evidence-thumb ${isCollisionVideo(photo) ? "collision-video-thumb" : ""}`}
                         key={photo.id}
                         disabled={isSubmitting}
-                        onClick={() => onPreviewPhoto(photo.id)}
+                        onClick={() => { cameraScroll.remember("extra"); onPreviewPhoto(photo.id); }}
                         aria-label={`Ver complementar ${index + 1}`}
                       >
                         {isCollisionVideo(photo) ? (
