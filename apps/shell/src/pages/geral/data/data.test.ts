@@ -171,6 +171,34 @@ describe('source Dataverse', () => {
     expect(await source.objectTypeCode()).toBe(10580)
   })
 
+  it('quickFind aquece a metadata da busca; a página busca choice pelo rótulo e lookup pelos IDs do nome, numa resolução só', async () => {
+    const quickFindXml = '<fetch><entity name="cr40f_reservadeveculos"><filter isquickfindfields="1">'
+      + ['cr40f_status', 'cr40f_receber', 'cr40f_motorista'].map((a) => `<condition attribute="${a}" operator="like" value="{0}" />`).join('')
+      + '</filter></entity></fetch>'
+    const { host, request } = fakeHost({
+      getAll: async () => [{ fetchxml: quickFindXml }],
+      request: (path) => (path.startsWith('cr40f_funcionarioss?') ? { value: [{ cr40f_funcionariosid: '{AAA}' }] } : { value: [] }),
+    })
+    const entity = vi.spyOn(host.metadata, 'entity')
+    const source = createSource(host)
+    const quickFind = await source.quickFind()
+    expect(quickFind).toEqual(['cr40f_status', 'cr40f_receber', 'cr40f_motorista'])
+    await vi.waitFor(() => expect(entity).toHaveBeenCalledWith('cr40f_funcionarios'))
+
+    const view = '<fetch><entity name="cr40f_reservadeveculos"><attribute name="cr40f_id" /></entity></fetch>'
+    await source.page({ fetchxml: view, page: 1, cookie: null, sort: null, query: 'confirm', quickFind })
+    await source.count({ fetchxml: view, query: 'confirm', quickFind })
+    const fetches = request.mock.calls.map(([path]) => decodeURIComponent(path)).filter((path) => path.includes('?fetchXml='))
+    expect(fetches).toHaveLength(2)
+    for (const xml of fetches) {
+      expect(xml).toContain('<condition attribute="cr40f_status" operator="in"><value>1</value></condition>')
+      expect(xml).toContain('<condition attribute="cr40f_motorista" operator="in"><value>aaa</value></condition>')
+      expect(xml).not.toContain('operator="like"')
+    }
+    // Página e contagem do mesmo termo reaproveitam a resolução dos IDs.
+    expect(request.mock.calls.filter(([path]) => path.startsWith('cr40f_funcionarioss?'))).toHaveLength(1)
+  })
+
   it('mock: cria, atualiza, renomeia e exclui visões pessoais em memória', async () => {
     const source = createSource({ mode: 'mock' }, { latency: 0 })
     const created = await source.createView({ name: 'Minha', fetchxml: '<fetch/>', layoutxml: '<grid/>' })
