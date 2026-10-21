@@ -159,6 +159,27 @@ describe('lista', () => {
   it('visão padrão esconde baixados', () => {
     expect(apply(EQUIPAMENTO_DEFAULT_FILTERS)).toEqual(['e1', 'e2'])
   })
+  it('na visão padrão, o Status rápido traz os baixados de volta', () => {
+    const { status, ...semStatus } = EQUIPAMENTO_DEFAULT_FILTERS.quick
+    expect(status).toMatchObject({ id: 'rapido-status', field: 'status', op: 'in' })
+    const soBaixados = { type: 'condition' as const, id: 'rapido-status', field: 'status', op: 'in' as const, values: [{ value: S(STATUS.baixado), label: 'Baixado' }] }
+    expect(apply({ ...EQUIPAMENTO_DEFAULT_FILTERS, quick: { ...EQUIPAMENTO_DEFAULT_FILTERS.quick, status: soBaixados } })).toEqual(['e3'])
+    expect(apply({ ...EQUIPAMENTO_DEFAULT_FILTERS, quick: semStatus })).toEqual(['e1', 'e2', 'e3'])
+  })
+  it('filtro de tipo e responsável marca inativos', () => {
+    expect(fields.find((f) => f.key === 'tipo')!.options).toEqual([{ value: 't3', label: 'Mouse' }, { value: 't1', label: 'Notebook' }, { value: 't2', label: 'Pager (inativo)' }])
+    expect(fields.find((f) => f.key === 'responsavel')!.options).toEqual([{ value: 'p1', label: 'Bruna Lima' }, { value: 'p2', label: 'Fabio Nunes (inativo)' }])
+  })
+  it('Compra filtra pela data; o valor é campo do avançado', () => {
+    const e = item({ dataCompra: '2026-03-10', valorCompra: 3499.9 })
+    expect(readEquipamento(e, 'compra')).toBe('2026-03-10')
+    expect(readEquipamento(e, 'valorCompra')).toBe(3499.9)
+    expect(fields.find((f) => f.key === 'compra')).toMatchObject({ kind: 'date' })
+    expect(fields.find((f) => f.key === 'valorCompra')).toMatchObject({ kind: 'number', money: true, advancedOnly: true })
+    const desde = (value: string): TableFilters => ({ quick: { compra: { type: 'condition', id: 'rapido-compra', field: 'compra', op: 'after', value } }, advanced: { type: 'group', id: 'raiz', logic: 'and', items: [] } })
+    const comDatas = [item({ dataCompra: '2026-03-10' }), item({ id: 'e2', dataCompra: '2025-01-05' })]
+    expect(comDatas.filter((x) => matchesFilters(x, readFilters(desde('2026-01-01'), fields), fields, readEquipamento)).map((x) => x.id)).toEqual(['e1'])
+  })
   it('visões prontas: sem responsável e baixados', () => {
     expect(apply(view('sem-responsavel'))).toEqual(['e2'])
     expect(apply(view('baixados'))).toEqual(['e3'])

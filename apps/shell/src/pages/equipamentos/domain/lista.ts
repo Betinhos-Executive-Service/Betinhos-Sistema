@@ -23,18 +23,24 @@ export const EQUIPAMENTO_COLUMNS: ViewColumnDef[] = [
 
 const SIM_NAO: FilterOption[] = [{ value: '1', label: 'Sim' }, { value: '0', label: 'Não' }]
 
-/** Campos de filtro; tipo e responsável vêm dos cadastros carregados. */
+const STATUS_FILTER: FilterOption[] = STATUS_OPTIONS.map((o) => ({ value: String(o.value), label: o.label }))
+
+/** Opções de filtro de um cadastro: todos (itens antigos podem apontar para inativos), inativos marcados. */
+const cadastroOptions = (list: { id: string; nome: string; ativo: boolean }[]): FilterOption[] =>
+  [...list].sort(byNome).map((x) => ({ value: x.id, label: x.ativo ? x.nome : `${x.nome} (inativo)` }))
+
+/** Campos de filtro; tipo e responsável vêm dos cadastros carregados. A coluna Compra filtra pela data. */
 export function equipamentoFields(tipos: TipoEquipamento[], pessoas: Pessoa[]): FilterField[] {
   return [
     { key: 'equipamento', label: 'Equipamento', kind: 'text' },
-    { key: 'tipo', label: 'Tipo', kind: 'choice', options: [...tipos].sort(byNome).map((t) => ({ value: t.id, label: t.nome })) },
+    { key: 'tipo', label: 'Tipo', kind: 'choice', options: cadastroOptions(tipos) },
     { key: 'marcaModelo', label: 'Marca/modelo', kind: 'text' },
     { key: 'serie', label: 'Nº de série', kind: 'text' },
-    { key: 'responsavel', label: 'Responsável', kind: 'choice', options: [...pessoas].sort(byNome).map((p) => ({ value: p.id, label: p.nome })) },
-    { key: 'status', label: 'Status', kind: 'choice', options: STATUS_OPTIONS.map((o) => ({ value: String(o.value), label: o.label })) },
-    { key: 'compra', label: 'Valor de compra', kind: 'number', money: true },
+    { key: 'responsavel', label: 'Responsável', kind: 'choice', options: cadastroOptions(pessoas) },
+    { key: 'status', label: 'Status', kind: 'choice', options: STATUS_FILTER },
+    { key: 'compra', label: 'Data de compra', kind: 'date' },
+    { key: 'valorCompra', label: 'Valor de compra', kind: 'number', money: true, advancedOnly: true },
     { key: 'comResponsavel', label: 'Com responsável', kind: 'bool', options: SIM_NAO, advancedOnly: true },
-    { key: 'baixado', label: 'Baixado', kind: 'bool', options: SIM_NAO, advancedOnly: true },
   ]
 }
 
@@ -46,9 +52,9 @@ export function readEquipamento(e: Equipamento, key: string): unknown {
     case 'serie': return e.numeroSerie
     case 'responsavel': return e.responsavelId
     case 'status': return e.status == null ? null : String(e.status)
-    case 'compra': return e.valorCompra
+    case 'compra': return e.dataCompra
+    case 'valorCompra': return e.valorCompra
     case 'comResponsavel': return Boolean(e.responsavelId)
-    case 'baixado': return e.status === STATUS.baixado
     default: return null
   }
 }
@@ -77,11 +83,16 @@ export function sortEquipamentos(list: Equipamento[], sort: ViewSort | null) {
   }, sort.dir)
 }
 
-const flag = (field: string, yes: boolean): FilterCondition => ({ type: 'condition', id: `${field}-${yes ? 'yes' : 'no'}`, field, op: yes ? 'yes' : 'no' })
-const advanced = (items: FilterCondition[]): TableFilters => ({ ...emptyFilters(), advanced: { ...emptyFilters().advanced, items } })
+/** Filtro rápido de Status no mesmo formato que o seletor da barra gera (`rapido-status`, `in`). */
+const quickStatus = (values: number[]): FilterCondition =>
+  ({ type: 'condition', id: 'rapido-status', field: 'status', op: 'in', values: STATUS_FILTER.filter((o) => values.includes(Number(o.value))) })
+const NAO_BAIXADOS = STATUS_OPTIONS.map((o) => o.value).filter((v) => v !== STATUS.baixado)
+const semResponsavel: FilterCondition = { type: 'condition', id: 'comResponsavel-no', field: 'comResponsavel', op: 'no' }
+const withQuick = (quick: FilterCondition[], advanced: FilterCondition[] = []): TableFilters =>
+  ({ ...emptyFilters(), quick: Object.fromEntries(quick.map((c) => [c.field, c])), advanced: { ...emptyFilters().advanced, items: advanced } })
 
-/** A Visão padrão: tudo menos os baixados. */
-export const EQUIPAMENTO_DEFAULT_FILTERS = advanced([flag('baixado', false)])
+/** A Visão padrão: Status rápido com tudo menos Baixado; mudar o Status na barra traz os baixados de volta. */
+export const EQUIPAMENTO_DEFAULT_FILTERS = withQuick([quickStatus(NAO_BAIXADOS)])
 
 const configWith = (filters: TableFilters): ViewConfig => ({
   v: CONFIG_VERSION,
@@ -95,7 +106,7 @@ export function builtinViews(): StoredView[] {
   const view = (id: string, name: string, ordem: number, filters: TableFilters): StoredView => ({ id, name, publica: true, mine: false, ordem, config: JSON.stringify(configWith(filters)) })
   return [
     view('todos', 'Todos, inclusive baixados', 1, emptyFilters()),
-    view('sem-responsavel', 'Sem responsável', 2, advanced([flag('baixado', false), flag('comResponsavel', false)])),
-    view('baixados', 'Baixados', 3, advanced([flag('baixado', true)])),
+    view('sem-responsavel', 'Sem responsável', 2, withQuick([quickStatus(NAO_BAIXADOS)], [semResponsavel])),
+    view('baixados', 'Baixados', 3, withQuick([quickStatus([STATUS.baixado])])),
   ]
 }
