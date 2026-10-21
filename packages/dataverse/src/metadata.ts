@@ -69,13 +69,13 @@ export function createMetadata(client: DataverseClient) {
 
   const choiceCache = new Map<string, Promise<ChoiceOption[]>>()
 
-  /** Opções reais de uma coluna choice (nunca valores fixos no código), com cache por cliente. */
-  function choices(entityName: string, attribute: string) {
+  /** Opções reais de uma coluna choice (nunca valores fixos no código), com cache por cliente. `type` (Picklist, State ou Status) define o cast da metadata. */
+  function choices(entityName: string, attribute: string, type: 'Picklist' | 'State' | 'Status' = 'Picklist') {
     const key = `${entityName}.${attribute}`
     let options = choiceCache.get(key)
     if (!options) {
       const path = `EntityDefinitions(LogicalName='${odataString(entityName)}')/Attributes(LogicalName='${odataString(attribute)}')`
-        + '/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?$select=LogicalName&$expand=OptionSet($select=Options)'
+        + `/Microsoft.Dynamics.CRM.${type}AttributeMetadata?$select=LogicalName&$expand=OptionSet($select=Options)`
       options = client.request<PicklistDefinition>(path).then((definition) => (definition.OptionSet?.Options ?? []).map((option) => ({
         value: option.Value,
         label: option.Label?.UserLocalizedLabel?.Label || String(option.Value),

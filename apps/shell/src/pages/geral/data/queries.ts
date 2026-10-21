@@ -52,6 +52,10 @@ export function searchPath(set: string, idAttribute: string, nameAttribute: stri
   return `${set}?$select=${idAttribute},${nameAttribute}&$filter=${encodeURIComponent(filter)}&$orderby=${encodeURIComponent(`${nameAttribute} asc`)}&$top=25`
 }
 
+/** IDs dos registros com o termo em qualquer parte do nome primário, para a busca por palavra-chave achar o lookup pelo nome. Sem filtro de estado: serviço antigo aponta para cliente inativo. */
+export const lookupIdsPath = (set: string, idAttribute: string, nameAttribute: string, query: string, top: number) =>
+  `${set}?$select=${idAttribute}&$filter=${encodeURIComponent(`contains(${nameAttribute},'${odataString(escapeLike(query.trim()))}')`)}&$top=${top}`
+
 /** Releitura da linha com as colunas da visão (lookups ficam como `_x_value`, único formato aceito no `$select`; colunas de link ficam de fora). */
 export function reloadPath(set: string, id: string, keys: string[]) {
   const select = new Set([ID_ATTRIBUTE])
