@@ -5,11 +5,12 @@ import type { KV } from '../domain/columns'
 import { auditoriaData, dayWindow, programarPatch, type Motorista } from '../domain/commands'
 import { COPY_SELECT } from '../domain/copy'
 import { buildCountFetch, buildFetch, quickFindAttributes } from '../domain/fetch'
+import { buildSearch, searchKind, type SearchCondition, type SearchField } from '../domain/search'
 import { parseLinkJson, type LinkResult } from '../domain/link'
 import { formatDateTime, formatMoney } from '../domain/format'
 import { ENTITY, ID_ATTRIBUTE, PAGE_SIZE, type AttributeInfo, type AttributeMap, type LookupBind, type LookupOption, type Page, type Sort, type View } from '../domain/types'
 import { MOCK_ATTRIBUTES, MOCK_BINDS, MOCK_LOOKUPS, applyMockFetch, createMockRows, createMockViews } from './mock'
-import { contagemPath, copyPath, envVarDefaultPath, envVarPath, motoristasPath, fetchPath, mapViews, parseCount, parsePage, quickFindPath, relationshipPath, reloadPath, searchPath, viewsPaths, type FetchResponse } from './queries'
+import { contagemPath, copyPath, envVarDefaultPath, envVarPath, motoristasPath, fetchPath, lookupIdsPath, mapViews, parseCount, parsePage, quickFindPath, relationshipPath, reloadPath, searchPath, viewsPaths, type FetchResponse } from './queries'
 
 export const FORM_WEBRESOURCE = 'new_formulario_geral.html'
 export const VOUCHER_WEBRESOURCE = 'cr40f_VoucherConfirmacao.html'
@@ -88,6 +89,7 @@ export const MOCK_OBJECT_TYPE_CODE = 10580
 
 const BLOCKED_ID = 'OS-1013'
 const BIND_SUFFIX = '@odata.bind'
+const LOOKUP_IDS = 10
 
 /** Opções do mock. `latency` multiplica as esperas simuladas (1 = as de `pnpm dev`; 0 = resposta imediata, para testes). */
 export type SourceOptions = { latency?: number }
@@ -268,6 +270,49 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
     return new Map(infos.map((info) => [info.logicalName, info]))
   }
 
+  /** IDs por tabela alvo; 10 por tabela mantém a URL do FetchXML abaixo do limite mesmo com termo curto. */
+  const lookupIds = async (target: string, term: string) => {
+    const info = await host.metadata.entity(target)
+    if (!info.primaryName) return []
+    const idAttribute = `${target}id`
+    const body = await host.client.request<{ value: Row[] }>(lookupIdsPath(info.entitySetName, idAttribute, info.primaryName, term, LOOKUP_IDS))
+    return body.value.map((r) => cleanId(String(r[idAttribute] ?? ''))).filter(Boolean)
+  }
+
+  /**
+   * Condições da busca por tipo de coluna (ver `domain/search.ts`). Só o último termo fica guardado: a página, a contagem e
+   * as próximas páginas reaproveitam; termo novo (ou o mesmo depois de outro) resolve os lookups de novo.
+   */
+  let lastSearch: { key: string; found: Promise<SearchCondition[]> } | null = null
+  const resolveSearch = (query: string, quickFind: string[]) => {
+    const term = query.trim()
+    if (!term || !quickFind.length) return Promise.resolve([])
+    const key = [term, ...quickFind].join('\n')
+    if (lastSearch?.key === key) return lastSearch.found
+    const found = (async () => {
+      const meta = await attributes(ENTITY)
+      const fields = (await Promise.all(quickFind.map(async (attribute): Promise<SearchField | null> => {
+        const info = meta.get(attribute)
+        const kind = searchKind(info?.type)
+        if (!info || !kind) return null
+        if (kind === 'text') return { attribute, kind }
+        if (kind === 'lookup') return { attribute, kind, targets: info.targets }
+        // Estado e status não trazem opções em `attributes`: vêm da metadata do próprio tipo.
+        const options = info.type === 'State' || info.type === 'Status'
+          ? await host.metadata.choices(ENTITY, attribute, info.type).catch(() => [])
+          : info.options
+        return { attribute, kind, options }
+      }))).filter((field) => field !== null)
+      const targets = [...new Set(fields.flatMap((field) => (field.kind === 'lookup' ? field.targets : [])))]
+      // Alvo que falhar (sem permissão, por exemplo) só deixa de buscar por aquele lookup.
+      const ids = new Map(await Promise.all(targets.map(async (target) => [target, await lookupIds(target, term).catch(() => [] as string[])] as const)))
+      return buildSearch(term, fields, (target) => ids.get(target) ?? [])
+    })()
+    lastSearch = { key, found }
+    found.catch(() => { if (lastSearch?.found === found) lastSearch = null })
+    return found
+  }
+
   const binds = new Map<string, Promise<LookupBind>>()
   const lookupBind = (attribute: string) => {
     let bind = binds.get(attribute)
@@ -317,12 +362,13 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
     },
     attributes,
     async page(req) {
-      const fetchxml = buildFetch(req.fetchxml, { page: req.page, pageSize: PAGE_SIZE, cookie: req.cookie, sort: req.sort, query: req.query, quickFind: req.quickFind })
+      const search = await resolveSearch(req.query, req.quickFind)
+      const fetchxml = buildFetch(req.fetchxml, { page: req.page, pageSize: PAGE_SIZE, cookie: req.cookie, sort: req.sort, search })
       return parsePage(await host.client.request<FetchResponse>(fetchPath(await entitySet(), fetchxml), { signal: req.signal }))
     },
     async count(req) {
       try {
-        const fetchxml = buildCountFetch(req.fetchxml, { query: req.query, quickFind: req.quickFind })
+        const fetchxml = buildCountFetch(req.fetchxml, { search: await resolveSearch(req.query, req.quickFind) })
         return parseCount(await host.client.request<{ value: Row[] }>(fetchPath(await entitySet(), fetchxml), { signal: req.signal }))
       } catch { return null }
     },
