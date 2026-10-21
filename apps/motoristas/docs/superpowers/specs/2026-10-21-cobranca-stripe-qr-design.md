@@ -124,9 +124,9 @@ Não dá para verificar na nuvem: os Flows reais, o Dataverse DEV e o Apple Pay 
 
 ## Pendências
 
-- **USD numa conta brasileira:** não está confirmado se uma conta Stripe do Brasil pode cobrar em USD. Teste: rodar `stripe-teste.ps1 -Moeda usd` com a chave de teste.
-  - **Se aceitar:** falta definir de onde vem a cotação para converter o valor a receber, que está em BRL. As opções são uma cotação fixa cadastrada, a cotação do dia de uma API ou o motorista digitar o valor em USD com um limite.
-  - **Se recusar:** cobrar em BRL e ligar o Adaptive Pricing do Checkout, que mostra ao turista o valor na moeda do cartão dele, se estiver disponível para conta brasileira. Nesse caso, a escolha de moeda some do app.
+- **USD:** confirmado em 21/10/2026 no modo teste. A conta brasileira criou e recebeu uma sessão em USD (US$ 30, cartão de teste 4242).
+- **Cotação:** falta definir de onde vem a cotação para converter o valor a receber, que está em BRL. As opções são uma cotação fixa cadastrada, a cotação do dia de uma API ou o motorista digitar o valor em USD com um limite.
+- **`payment_method_types`:** o Stripe recusa esse parâmetro na Checkout Session. Os meios de pagamento vêm do painel (Settings → Payment methods) ou de `payment_method_configuration`.
 
 ## Fora do escopo
 
