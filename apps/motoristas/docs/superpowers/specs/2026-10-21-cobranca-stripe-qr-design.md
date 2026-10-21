@@ -1,6 +1,6 @@
 # Cobrança por QR code (Stripe Checkout) — plano de integração
 
-Status: rascunho para aprovação. Nada implementado.
+Status: perguntas de negócio respondidas em 21/10/2026; falta só confirmar USD (ver "Pendências"). Nada implementado. Conta Stripe em ativação: por enquanto tudo roda em modo teste.
 Data: 21/10/2026.
 
 ## Objetivo
@@ -32,10 +32,13 @@ App (ReceiveScreen)                Servidor (Power Automate)                Stri
 O servidor segue o padrão já usado no app: Flows HTTP com a URL vinda de variável de ambiente (`FLOW_URLS` em `src/lib/dataverse.ts`, chamados por `runHttpFlow`).
 
 **1. Criar cobrança** (nova variável de ambiente `new_FlowURLCriarCobrancaStripe`)
-- A entrada é apenas `{ reservaId }`. O valor **não vem do app**: o Flow lê o "valor a receber" da reserva no Dataverse.
+- A entrada é `{ reservaId, valor, moeda }`.
+- O Flow confere no Dataverse se o motorista tem a função liberada no cadastro. Sem permissão, recusa a cobrança.
+- O Flow lê o "valor a receber" da reserva e recusa um `valor` maior que ele, já descontando o que foi pago antes por QR. Valor menor é aceito, para quando parte já foi paga de outra forma.
+- `moeda` é `brl` ou `usd`; ver "Pendências".
 - Se a reserva já tiver uma sessão aberta e não vencida, o Flow devolve essa mesma sessão. Isso evita cobrar duas vezes.
 - Chama `POST /v1/checkout/sessions` com:
-  - `mode=payment`, `currency=brl` e um item "Serviço {nº reserva}".
+  - `mode=payment`, `currency` igual à moeda escolhida e um item "Serviço {nº reserva}".
   - `client_reference_id={reservaId}` e `metadata[reserva_id]`.
   - `expires_at` em agora + 30 min, que é o mínimo permitido pelo Stripe.
   - `locale=auto`, para a página abrir no idioma do turista.
@@ -61,7 +64,8 @@ O servidor segue o padrão já usado no app: Flows HTTP com a URL vinda de vari�
 
 ### App (`src/`)
 
-- **`ReceiveScreen.tsx`:** novo botão secundário "Cobrar por QR code", que aparece quando existe valor a receber.
+- **`ReceiveScreen.tsx`:** novo botão secundário "Cobrar por QR code". Ele só aparece quando existe valor a receber **e** o motorista está liberado no cadastro.
+- **Antes de gerar o QR:** o motorista confere o valor, que já vem preenchido com o valor a receber. Ele pode diminuir o valor, mas não aumentar, e escolhe BRL ou USD.
 - **Nova tela ou sheet `QrChargeScreen`:**
   - Mostra o QR code em tela cheia e com brilho alto, junto com o valor e o tempo restante.
   - Mostra o estado: "Aguardando pagamento", "Pago" ou "Expirou, gerar outro".
@@ -73,6 +77,8 @@ O servidor segue o padrão já usado no app: Flows HTTP com a URL vinda de vari�
 - **Modo mock (localhost):** sessão falsa que passa a "paga" depois de 5 s, para permitir testar a UI sem o Stripe.
 
 ### Dataverse
+
+**Permissão por motorista:** novo campo Sim/Não em `cr40f_funcionarios`, `cr40f_podecobrarqrcode` ("Pode cobrar por QR code"), com padrão Não. O nome lógico final deve ser confirmado na criação. O app lê o campo junto com o cadastro do motorista para mostrar ou esconder o botão, e o Flow confere o mesmo campo no servidor. Esconder o botão sozinho não basta, porque a URL do Flow pode ser chamada direto.
 
 A proposta é criar uma tabela filha, **`cr40f_cobrancastripe`**, com:
 - lookup para a reserva;
@@ -96,6 +102,10 @@ Os nomes lógicos do "valor a receber" e do e-mail do passageiro precisam ser co
 | Dois toques em "Cobrar" | Uma única sessão (reaproveitada e protegida pela chave de idempotência) |
 | A sessão expira (30 min) | "Expirou, gerar outro", e o QR antigo não aceita mais pagamento |
 | O motorista cancela | A sessão é expirada no Stripe e o link não aceita pagamento |
+| Motorista sem a permissão | O botão não aparece, e uma chamada direta ao Flow é recusada |
+| Valor maior que o valor a receber | O app bloqueia e o Flow também recusa |
+| Valor menor (pagamento parcial) | O QR é gerado com o valor menor; o saldo continua a receber |
+| Cobrança em USD | Sessão criada em USD, ou erro claro se a conta brasileira não aceitar (ver "Pendências") |
 | O valor da reserva muda depois de gerado o QR | A sessão aberta é expirada e uma nova é gerada com o valor atual |
 | Webhook forjado com id inexistente ou não pago | Nada é gravado |
 | Sem internet no celular do motorista | Erro claro e o fluxo da foto do comprovante continua disponível |
@@ -103,14 +113,20 @@ Os nomes lógicos do "valor a receber" e do e-mail do passageiro precisam ser co
 
 Não dá para verificar na nuvem: os Flows reais, o Dataverse DEV e o Apple Pay ou Google Pay em aparelho. Esses testes são feitos localmente, com chave de teste.
 
-## Perguntas de negócio
+## Decisões de negócio (21/10/2026)
 
-1. Todos os motoristas podem gerar QR, ou só alguns?
-2. O valor é sempre o "valor a receber" da reserva? O motorista pode somar extras (pedágio, espera) ou gorjeta?
-3. Cobrar sempre em BRL? O Checkout pode mostrar o valor convertido para a moeda do turista (Adaptive Pricing), e é preciso confirmar se isso existe para conta brasileira.
-4. O Stripe deve mandar o recibo por e-mail ao cliente automaticamente?
-5. Quem pode fazer reembolso? A proposta é que seja só o financeiro, pelo painel do Stripe.
-6. A conta Stripe já está ativada para modo live, com CNPJ e conta bancária?
+1. **Quem cobra:** só os motoristas liberados pelo campo novo em `cr40f_funcionarios`.
+2. **Valor:** no máximo o valor a receber. Valores menores são permitidos, e extras ou gorjeta não.
+3. **Moeda:** BRL ou USD, à escolha do motorista.
+4. **Recibo por e-mail:** sim. Ligar em Stripe → Settings → Customer emails → "Successful payments". No modo teste o Stripe não envia o e-mail automaticamente; dá para reenviar pelo painel.
+5. **Reembolso:** só o financeiro, pelo painel do Stripe.
+6. **Conta:** em ativação. Implementar e testar em modo teste; o live entra quando a ativação terminar.
+
+## Pendências
+
+- **USD numa conta brasileira:** não está confirmado se uma conta Stripe do Brasil pode cobrar em USD. Teste: rodar `stripe-teste.ps1 -Moeda usd` com a chave de teste.
+  - **Se aceitar:** falta definir de onde vem a cotação para converter o valor a receber, que está em BRL. As opções são uma cotação fixa cadastrada, a cotação do dia de uma API ou o motorista digitar o valor em USD com um limite.
+  - **Se recusar:** cobrar em BRL e ligar o Adaptive Pricing do Checkout, que mostra ao turista o valor na moeda do cartão dele, se estiver disponível para conta brasileira. Nesse caso, a escolha de moeda some do app.
 
 ## Fora do escopo
 
