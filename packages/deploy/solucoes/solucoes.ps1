@@ -168,3 +168,26 @@ function Get-StepsSemConfigSegura($Dv, [string[]] $Nomes) {
   }
   return $faltando
 }
+
+# Contagem EXATA de registros de uma tabela ($Entidade: LogicalName, EntitySetName, PrimaryIdAttribute).
+# FetchXML agregado; so o erro de limite de agregacao do Dataverse (50.000: AggregateQueryRecordLimit / 0x8004E023) cai na
+# contagem paginada de ids, que tambem e exata. Qualquer outro erro (401/403, 429, 5xx, timeout) sobe com a tabela e o corpo
+# da resposta: contagem aproximada escondida desligaria a deteccao de perda do comparar-fotos. Devolve @{ Total; Paginada }.
+function Get-ContagemRegistros($Dv, $Entidade) {
+  $nome = [string] $Entidade.LogicalName
+  $fetch = "<fetch aggregate='true'><entity name='$nome'><attribute name='$($Entidade.PrimaryIdAttribute)' alias='n' aggregate='count'/></entity></fetch>"
+  try { $resposta = Invoke-RestMethod -Method Get -Uri "$($Dv.Api)/$($Entidade.EntitySetName)?fetchXml=$([uri]::EscapeDataString($fetch))" -Headers $Dv.Headers }
+  catch {
+    $corpo = if ($_.ErrorDetails) { [string] $_.ErrorDetails.Message } else { "" }
+    if ("$($_.Exception.Message) $corpo" -notmatch 'AggregateQueryRecordLimit|0x8004E023') { throw "Contagem de $nome falhou: $($_.Exception.Message) $corpo" }
+    try { return @{ Total = @(Read-DvAll $Dv "$($Entidade.EntitySetName)?`$select=$($Entidade.PrimaryIdAttribute)").Count; Paginada = $true } }
+    catch {
+      $corpoPaginada = if ($_.ErrorDetails) { [string] $_.ErrorDetails.Message } else { "" }
+      throw "Contagem paginada de $nome falhou: $($_.Exception.Message) $corpoPaginada"
+    }
+  }
+  # A analise fica fora do try: resposta fora do formato tambem falha alto.
+  $linhas = @(if ($resposta -and $resposta.PSObject.Properties['value']) { $resposta.value })
+  if ($linhas.Count -ne 1 -or -not $linhas[0].PSObject.Properties['n']) { throw "Contagem de $nome voltou num formato inesperado: $(ConvertTo-Json -InputObject $resposta -Depth 4 -Compress)" }
+  return @{ Total = [int] $linhas[0].n; Paginada = $false }
+}

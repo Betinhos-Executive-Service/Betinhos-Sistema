@@ -37,16 +37,13 @@ function Get-Sha256($Texto) {
 
 $foto = [ordered]@{ ambiente = $dv.Url; quando = (Get-Date).ToString("s"); registros = [ordered]@{}; aproximados = @(); fluxos = @{}; steps = @{}; variaveis = @{}; componentes = @{}; versoes = @{} }
 
-# Registros: contagem exata por FetchXML; acima do limite de agregacao (50.000) usa a contagem do snapshot e marca como aproximada.
+# Registros: contagem exata por FetchXML; acima do limite de agregacao (50.000) conta paginando os ids (tambem exata).
+# Qualquer outro erro de contagem interrompe a foto: nao existe contagem aproximada. `aproximados` fica na foto, vazio.
+$paginadas = @()
 foreach ($e in @(Read-DvAll $dv "EntityDefinitions?`$select=LogicalName,EntitySetName,PrimaryIdAttribute,IsCustomEntity,IsIntersect" | Where-Object { $_.IsCustomEntity -and -not $_.IsIntersect -and $_.LogicalName -match '^(cr40f|new)_' } | Sort-Object LogicalName)) {
-  $fetch = "<fetch aggregate='true'><entity name='$($e.LogicalName)'><attribute name='$($e.PrimaryIdAttribute)' alias='n' aggregate='count'/></entity></fetch>"
-  try { $foto.registros[$e.LogicalName] = [int] (Invoke-RestMethod -Method Get -Uri "$($dv.Api)/$($e.EntitySetName)?fetchXml=$([uri]::EscapeDataString($fetch))" -Headers $dv.Headers).value[0].n }
-  catch {
-    Write-Step "contagem exata falhou em $($e.LogicalName), usando a aproximada: $($_.Exception.Message)"
-    $r = Invoke-RestMethod -Method Get -Uri "$($dv.Api)/RetrieveTotalRecordCount(EntityNames=@p)?@p=$([uri]::EscapeDataString('["' + $e.LogicalName + '"]'))" -Headers $dv.Headers
-    $foto.registros[$e.LogicalName] = [int] $r.EntityRecordCountCollection.Values[0]
-    $foto.aproximados += $e.LogicalName
-  }
+  $contagem = Get-ContagemRegistros $dv $e
+  $foto.registros[$e.LogicalName] = $contagem.Total
+  if ($contagem.Paginada) { $paginadas += $e.LogicalName; Write-Step "$($e.LogicalName): acima do limite de agregacao, contado por paginacao ($($contagem.Total))" }
 }
 
 # Componentes por solucao (so as solucoes que existem neste ambiente).
@@ -94,4 +91,4 @@ if ($am.Count) {
 $pasta = Split-Path -Parent $Saida
 if ($pasta -and -not (Test-Path -LiteralPath $pasta)) { New-Item -ItemType Directory -Path $pasta | Out-Null }
 Write-JsonFile $Saida $foto
-Write-Step ("foto gravada em {0}: {1} tabelas, {2} fluxos, {3} steps, {4} variaveis, {5} componentes" -f $Saida, $foto.registros.Count, $foto.fluxos.Count, $foto.steps.Count, $foto.variaveis.Count, $foto.componentes.Count)
+Write-Step ("foto gravada em {0}: {1} tabelas ({6} contadas por paginacao), {2} fluxos, {3} steps, {4} variaveis, {5} componentes" -f $Saida, $foto.registros.Count, $foto.fluxos.Count, $foto.steps.Count, $foto.variaveis.Count, $foto.componentes.Count, $paginadas.Count)

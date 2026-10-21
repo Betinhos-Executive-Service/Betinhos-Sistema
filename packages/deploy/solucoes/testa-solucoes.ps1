@@ -11,6 +11,8 @@ function Invoke-RestMethod {
   $script:chamadas += [pscustomobject]@{ Method = $Method; Uri = $Uri; Body = $Body }
   $r = $script:respostas[0]
   $script:respostas = @($script:respostas | Select-Object -Skip 1)
+  # Erro simulado: Exception ou ErrorRecord (este leva o corpo da resposta em ErrorDetails, como o Invoke-RestMethod real).
+  if ($r -is [Exception] -or $r -is [Management.Automation.ErrorRecord]) { throw $r }
   return $r
 }
 $dv = @{ Api = 'https://x/api/data/v9.2'; Url = 'https://x'; Host = 'x'; Headers = @{} }
@@ -86,5 +88,49 @@ Novo-Zip "$tmp\h2.zip" @(@('WebResources/x', 'B'), @('customizations.xml', 'A'),
 Novo-Zip "$tmp\h3.zip" @(@('solution.xml', '<v>1</v>'), @('customizations.xml', 'A'), @('WebResources/x', 'C'))
 Confere ((Get-HashDoPacote "$tmp\h1.zip") -eq (Get-HashDoPacote "$tmp\h2.zip")) 'hash ignora versao e ordem'
 Confere ((Get-HashDoPacote "$tmp\h1.zip") -ne (Get-HashDoPacote "$tmp\h3.zip")) 'hash muda com o conteudo'
+
+# Get-ContagemRegistros: FetchXML exato; so o limite de agregacao cai na contagem paginada (exata); o resto falha alto
+function Novo-Erro([string] $Mensagem, [string] $Corpo) {
+  $er = New-Object Management.Automation.ErrorRecord (New-Object Exception $Mensagem), 'http', 'NotSpecified', $null
+  if ($Corpo) { $er.ErrorDetails = New-Object Management.Automation.ErrorDetails $Corpo }
+  return $er
+}
+function Falha-Com([scriptblock] $Bloco) { try { & $Bloco | Out-Null; return $null } catch { return "$($_.Exception.Message)" } }
+$ent = [pscustomobject]@{ LogicalName = 'cr40f_x'; EntitySetName = 'cr40f_xs'; PrimaryIdAttribute = 'cr40f_xid' }
+
+$script:respostas = @([pscustomobject]@{ value = @([pscustomobject]@{ n = 42 }) }); $script:chamadas = @()
+$c = Get-ContagemRegistros $dv $ent
+$fx = [uri]::UnescapeDataString($script:chamadas[0].Uri)
+Confere ($c.Total -eq 42 -and $c.Total -is [int] -and -not $c.Paginada -and $script:chamadas.Count -eq 1) 'contagem: resposta normal devolve o numero'
+Confere ($fx -like 'https://x/api/data/v9.2/cr40f_xs?fetchXml=*' -and $fx -like "*<entity name='cr40f_x'>*" -and $fx -like "*<attribute name='cr40f_xid' alias='n' aggregate='count'/>*") 'contagem: FetchXML agregado na tabela certa'
+$script:respostas = @([pscustomobject]@{ value = @([pscustomobject]@{ n = 0 }) })
+Confere ((Get-ContagemRegistros $dv $ent).Total -eq 0) 'contagem: tabela vazia devolve 0'
+
+$script:respostas = @((Novo-Erro 'AggregateQueryRecordLimit exceeded. Cannot perform this operation.' ''), [pscustomobject]@{ value = @(1..5000); '@odata.nextLink' = 'https://x/n' }, [pscustomobject]@{ value = @(1..1234) }); $script:chamadas = @()
+$c = Get-ContagemRegistros $dv $ent
+Confere ($c.Total -eq 6234 -and $c.Paginada -and $script:chamadas.Count -eq 3 -and $script:chamadas[1].Uri -eq 'https://x/api/data/v9.2/cr40f_xs?$select=cr40f_xid' -and $script:chamadas[2].Uri -eq 'https://x/n') 'contagem: limite de agregacao (mensagem) conta paginando os ids, exato'
+$script:respostas = @((Novo-Erro 'O servidor remoto retornou um erro: (400) Solicitacao Incorreta.' '{"error":{"code":"0x8004E023","message":"The maximum record limit is exceeded."}}'), [pscustomobject]@{ value = @(1..7) }); $script:chamadas = @()
+$c = Get-ContagemRegistros $dv $ent
+Confere ($c.Total -eq 7 -and $c.Paginada -and $script:chamadas.Count -eq 2) 'contagem: limite de agregacao (codigo 0x8004E023 no corpo) tambem pagina'
+
+$script:respostas = @((Novo-Erro 'O servidor remoto retornou um erro: (403) Proibido.' '{"error":{"code":"0x80040220","message":"Principal user is missing prvReadcr40f_x privilege"}}'), [pscustomobject]@{ value = @(1..7) }); $script:chamadas = @()
+$msg = Falha-Com { Get-ContagemRegistros $dv $ent }
+Confere ($msg -like '*cr40f_x*' -and $msg -like '*(403)*' -and $msg -like '*prvReadcr40f_x*' -and $script:chamadas.Count -eq 1) 'contagem: 403 falha com tabela e corpo, sem cair na paginacao'
+foreach ($ruim in @((Novo-Erro 'O servidor remoto retornou um erro: (429) Muitas solicitacoes.' '{"error":{"message":"Number of requests exceeded the limit"}}'), (Novo-Erro 'O servidor remoto retornou um erro: (503) Servico indisponivel.' ''), (New-Object Exception 'A operacao atingiu o tempo limite'))) {
+  $script:respostas = @($ruim, [pscustomobject]@{ value = @(1..7) }); $script:chamadas = @()
+  $msg = Falha-Com { Get-ContagemRegistros $dv $ent }
+  $rotulo = if ($ruim -is [Management.Automation.ErrorRecord]) { $ruim.Exception.Message } else { $ruim.Message }
+  Confere ($msg -like 'Contagem de cr40f_x falhou:*' -and $script:chamadas.Count -eq 1) "contagem: erro '$rotulo' falha alto, sem paginar"
+}
+
+foreach ($forma in @([pscustomobject]@{ foo = 1 }, [pscustomobject]@{ value = @() }, [pscustomobject]@{ value = @([pscustomobject]@{ x = 1 }) }, [pscustomobject]@{ value = @([pscustomobject]@{ n = 1 }, [pscustomobject]@{ n = 2 }) }, $null)) {
+  $script:respostas = @($forma); $script:chamadas = @()
+  $msg = Falha-Com { Get-ContagemRegistros $dv $ent }
+  Confere ($msg -like 'Contagem de cr40f_x voltou num formato inesperado*') "contagem: resposta fora do formato falha alto ($(if ($null -eq $forma) { 'nula' } else { ConvertTo-Json -InputObject $forma -Depth 3 -Compress }))"
+}
+
+$script:respostas = @((Novo-Erro 'AggregateQueryRecordLimit exceeded.' ''), (Novo-Erro 'O servidor remoto retornou um erro: (500) Erro interno.' '{"error":{"message":"boom"}}')); $script:chamadas = @()
+$msg = Falha-Com { Get-ContagemRegistros $dv $ent }
+Confere ($msg -like 'Contagem paginada de cr40f_x falhou:*' -and $msg -like '*boom*') 'contagem: erro durante a paginacao falha alto com tabela e corpo'
 
 if ($falhas) { throw "$falhas teste(s) falharam" }
