@@ -3,6 +3,7 @@ import { ActionBar, ActionButton, type ActionButtonState } from "../components/c
 import { FormField, MoneyInputField, SelectField, TextAreaField, TextInputField } from "../components/common/FormFields";
 import { PhotoAddButton } from "../components/common/PhotoAddButton";
 import { AppShell } from "../components/layout/AppShell";
+import { useCameraScroll } from "../app/cameraScroll";
 import { FormMenu } from "../components/navigation/FormMenu";
 import {
   findExpenseCategory,
@@ -89,6 +90,7 @@ export function ExpenseScreen({
   quickReadFilled = {}
 }: ExpenseScreenProps) {
   const isSubmitting = submitState !== "idle";
+  const cameraScroll = useCameraScroll("gastos");
   const quickReadClass = (key: keyof ExpenseDraft) =>
     isQuickReadFieldHighlighted(draft, quickReadFilled, key) ? "finalize-input-block is-quick-read-filled" : undefined;
   const categoryRef = useRef<HTMLButtonElement | null>(null);
@@ -168,6 +170,7 @@ export function ExpenseScreen({
 
   const addPhoto = () => {
     clearError("photos");
+    cameraScroll.remember("comprovantes");
     onAddPhoto();
   };
 
@@ -184,7 +187,7 @@ export function ExpenseScreen({
       <FormMenu title="Registrar gasto" onBack={isSubmitting ? undefined : onBack} />
       <section className="main-panel maintenance-request-main">
         <article className="finalize-card maintenance-request-card">
-          <div className="finalize-scroll">
+          <div className="finalize-scroll" ref={cameraScroll.ref}>
             {uploads.length ? (
               <section className="expense-uploads" aria-label="Envios pendentes">
                 <p className="expense-uploads-title">Envios pendentes</p>
@@ -382,7 +385,7 @@ export function ExpenseScreen({
               />
 
               <FormField label="Comprovantes" error={errors.photos} required>
-                <div ref={photosRef} tabIndex={-1}>
+                <div ref={photosRef} tabIndex={-1} data-scroll-anchor="comprovantes">
                   <div className="maintenance-photo-grid">
                     {photos.map((photo, index) => (
                       <button
@@ -390,7 +393,7 @@ export function ExpenseScreen({
                         className="maintenance-photo-thumb"
                         key={photo.id}
                         disabled={isSubmitting}
-                        onClick={() => onPreviewPhoto(photo.id)}
+                        onClick={() => { cameraScroll.remember("comprovantes"); onPreviewPhoto(photo.id); }}
                         aria-label={`Ver comprovante ${index + 1}`}
                       >
                         {isVideo(photo) ? (

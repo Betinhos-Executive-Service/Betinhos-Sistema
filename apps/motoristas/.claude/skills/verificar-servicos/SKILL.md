@@ -5,7 +5,7 @@ description: "Verifica o fluxo principal do motorista no App Motoristas: Início
 # Verificar fluxo de serviços
 
 ## Cobre
-- Código: `src/App.tsx`, `src/app/**` (navegação, `backGuard.ts`), `src/components/**`, `src/data/mockData.ts`, `src/styles.css`, telas `Initial`, `Services`, `Details`, `History*`, `Receive`, `Finalize`, `Voucher`, `Signature`, `LocalCancel`, `MediaCapture`, `MaintenancePhotoPreview`.
+- Código: `src/App.tsx`, `src/app/**` (navegação, `backGuard.ts`, `cameraScroll.ts`), `src/components/**`, `src/data/mockData.ts`, `src/styles.css`, telas `Initial`, `Services`, `Details`, `History*`, `Receive`, `Finalize`, `Voucher`, `Signature`, `LocalCancel`, `MediaCapture`, `MaintenancePhotoPreview`.
 - Rotas (hash): `#inicio`, `#servicos`, `#detalhes?serviceId=…&type=…`, `#receber`, `#foto-receber`, `#preview-foto-receber`, `#finalizar`, `#voucher`, `#assinatura`, `#cancelado-local`, `#historico`.
 
 ## Preparar ambiente
@@ -32,6 +32,11 @@ Usa Chrome headless com user agent Android (ativa a câmera ao vivo) e câmera s
 9. `#finalizar?serviceId=76&type=MANUTENCAO` → sem ícone de apagar até haver foto; "VALOR (R$)" ignora letras ("1.250,9abc" → "1250,90"); com foto, o ícone "Apagar fotos" pede "Apagar 1 foto?" e mantém os textos.
 10. `#cancelado-local?serviceId=10241&type=SERVICO` → "Limpar texto" desabilitado vazio; com texto pede "Apagar o texto?". "Cliquei errado" volta ao detalhe.
 11. `#historico` → busca "zzz inexistente" mostra `Nenhum serviço encontrado para "zzz inexistente".`
+
+## Rolagem ao voltar da câmera (todos os formulários com foto)
+- `src/app/cameraScroll.ts` (`useCameraScroll(chave)`): o `ref` vai no `.finalize-scroll` (o contêiner que rola; o `window` não rola) e `remember(ancora)` é chamado antes de abrir a câmera ou a prévia. Na volta, a posição é restaurada quando a altura estabiliza (quadro de animação com reserva por timer) e o bloco `data-scroll-anchor` da foto é trazido com o critério de `block: "nearest"`. Se o formulário aparecer por um instante e sair antes de terminar (checklist: câmera → formulário → prévia), a posição volta para a memória. Testes puros em `tests/cameraScroll.test.ts`.
+- Roteiro: `node scripts/qa/verify-camera-scroll.cjs .verificacao/camera-scroll depois` com o dev server no ar (`APP_MOTORISTAS_URL`, padrão `http://127.0.0.1:45127`). Mede, em 375×812, checklist, gastos, solicitar manutenção (4 fotos antes para rolar), colisões, receber (9 fotos antes) e finalizar manutenção: `antesDaCamera` e `depoisDaCamera` iguais (ou poucos px a mais para mostrar a miniatura nova) e "miniatura visível". Antes da correção todos voltavam a 0.
+- No navegador interno, as trocas de tela (câmera, prévia) só avançam com o painel em foco: intercale `computer screenshot`/`wait` entre os passos (`browser_batch`) e use o input nativo (`input[type=file][accept="image/*"]` + `DataTransfer` com `new File`, que tem data atual; arquivo antigo é recusado com "Arquivos antigos da galeria não são aceitos").
 
 ## Casos de borda
 - Fila: finalizar fora de ordem mostra "Conclua os itens anteriores da fila antes de prosseguir." (modo remoto).
