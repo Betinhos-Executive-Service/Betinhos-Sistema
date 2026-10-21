@@ -29,6 +29,7 @@ description: "Verifica os formulários avulsos do App Motoristas: Gastos, Solici
 ## Casos de borda
 - Valor com milhar: "1.250" vira "1250"; mais de 2 casas é cortado (`tests/currencyInput.test.ts`).
 - KM "58.230 km" é aceito e enviado como 58230.
+- Campo de texto padrão (`.finalize-input-block textarea`, Gastos "Observações" e Manutenção "Descrição"): fundo #fcfcfb, borda rgba(0,26,61,.07), raio 12 px, padding 9px 11px, 600 16px/20px Manrope, placeholder rgba(0,14,35,.42); foco atual = anel navy `0 0 0 2px rgba(0,26,61,.12)` (não é o azul #6c91e8 do Design System). `TextAreaControl` só põe a classe `.form-control-textarea` (tipografia); o resto vem do contêiner, então um textarea fora de `.finalize-input-block` precisa de estilo próprio (ex.: `.checklist-oknok-note`, ver `verificar-checklists-app`). Medir com `getComputedStyle` depois de focar por clique real (`find` + ref).
 
 ## Evidência obrigatória
 - axe sem Critical/Serious em `#gastos`, `#recibo-personalizado`, `#manutencao`, `#registro-colisao` (o `.build-stamp` é excluído: baixo contraste proposital e `aria-hidden`).
