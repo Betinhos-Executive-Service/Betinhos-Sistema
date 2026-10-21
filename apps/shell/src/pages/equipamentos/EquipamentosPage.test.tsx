@@ -52,6 +52,24 @@ describe('Equipamentos', () => {
     expect(within(row).getByText(/^12\/03\/2025 · R\$\s5\.899,90$/)).toBeTruthy()
   })
 
+  it('clicar na linha grava ?ver=<id>; Novo equipamento grava ?novo=1', async () => {
+    render(<EquipamentosPage host={{ mode: 'mock' }} />)
+    const row = await rowOf('Notebook reserva')
+    fireEvent.click(within(row).getByText('TP-E14-778'))
+    await waitFor(() => expect(window.location.hash).toContain('ver=eeeeeeee-0000-4000-8000-000000000002'))
+    fireEvent.click(screen.getByRole('button', { name: 'Novo equipamento' }))
+    await waitFor(() => expect(window.location.hash).toContain('novo=1'))
+    expect(window.location.hash).not.toContain('ver=')
+  })
+
+  it('Marca/modelo nasce oculta; o modelo aparece sob a descrição', async () => {
+    render(<EquipamentosPage host={{ mode: 'mock' }} />)
+    const row = await rowOf('Notebook do Financeiro')
+    expect(within(row).getByText('Dell Latitude 5440')).toBeTruthy()
+    expect(screen.queryByRole('columnheader', { name: /Marca\/modelo/ })).toBeNull()
+    expect(screen.getByRole('columnheader', { name: /Status/ })).toBeTruthy()
+  })
+
   it('busca sem resultado mostra o estado de filtro vazio', async () => {
     window.location.hash = '#/equipamentos?q=xyzinexistente'
     render(<EquipamentosPage host={{ mode: 'mock' }} />)

@@ -84,7 +84,7 @@ function Equipamentos({ host }: { host: Host }) {
       <div role="toolbar" aria-label="Comandos de equipamentos">
         <ViewBar view={view} columns={EQUIPAMENTO_COLUMNS} filters={{ fields }}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-          <SearchBox className="eq-search" value={query} onChange={setQuery} placeholder="Buscar por descrição, série ou responsável" aria-label="Buscar equipamentos" />
+          <SearchBox className="eq-search" value={query} onChange={setQuery} placeholder="Buscar por descrição, modelo, série ou responsável" aria-label="Buscar equipamentos" />
           {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />}
           <Button icon={<Plus size={16} />} disabled={!data.loaded} onClick={novo}>Novo equipamento</Button>
         </ViewBar>
