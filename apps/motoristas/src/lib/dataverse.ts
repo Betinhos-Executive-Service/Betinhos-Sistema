@@ -29,8 +29,8 @@ import { createRemoteReadBatch } from "./remoteReadBatch.ts";
 import { buildCurrentVehiclePatch } from "./myVehicle.ts";
 import { buildIdeaRecord, normalizeIdeaRecord, validateIdeaDraft, type Idea, type IdeaDraft } from "./ideas.ts";
 import { decideExpenseUploadMode, type ExpenseUploadMode } from "./expenseUploadMode.ts";
-import { parseQrChargeResponse, type QrChargePayer } from "./qrCharge.ts";
-import { createMockQrCharge, updateMockQrCharge } from "./qrChargeMock.ts";
+import { parseQrChargeResponse, parseQrChargeSummary, type QrChargePayer } from "./qrCharge.ts";
+import { createMockQrCharge, getMockQrChargeSummary, updateMockQrCharge } from "./qrChargeMock.ts";
 
 type XrmLike = {
   Utility?: {
@@ -3659,13 +3659,20 @@ async function runQrChargeCommand(command: Record<string, unknown>) {
 
 // Cria a cobrança no Stripe, sempre em reais; o plugin confere de novo permissão, reserva e saldo.
 export async function createQrChargeRemote(request: QrChargeRequest) {
-  if (shouldUseLocalFrontendFallback()) return createMockQrCharge(request.valorCentavos);
+  if (shouldUseLocalFrontendFallback()) return createMockQrCharge(request);
   return parseQrChargeResponse(await runQrChargeCommand({ acao: "criar", ...request, reservaId: cleanGuid(request.reservaId) }));
 }
 
 export async function updateQrChargeRemote(sessionId: string, acao: "consultar" | "cancelar") {
   if (shouldUseLocalFrontendFallback()) return updateMockQrCharge(sessionId, acao);
   return parseQrChargeResponse(await runQrChargeCommand({ acao, sessionId }));
+}
+
+// Quanto já entrou por QR no serviço, o saldo e a cobrança aberta: reidrata o Recebimento depois de recarregar.
+// receivableCents só alimenta o mock; no Dataverse o plugin lê o valor a receber da própria reserva.
+export async function getQrChargeSummaryRemote(reservaId: string, receivableCents: number) {
+  if (shouldUseLocalFrontendFallback()) return getMockQrChargeSummary(reservaId, receivableCents);
+  return parseQrChargeSummary(await runQrChargeCommand({ acao: "resumo", reservaId: cleanGuid(reservaId) }));
 }
 
 class HttpFlowError extends Error {

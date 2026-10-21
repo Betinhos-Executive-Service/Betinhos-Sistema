@@ -173,3 +173,123 @@ export function parseQrChargeResponse(raw: unknown): QrCharge {
     recusa: status === "aguardando" ? String(data.recusa ?? "").trim() : ""
   };
 }
+
+// ---------- resumo (reidratação depois de recarregar) ----------
+
+// Cobrança aberta devolvida pelo resumo: vem com pagante e idioma para o painel do passageiro sair igual.
+export type QrChargeOpen = { charge: QrCharge; pagante: QrChargePayer; idioma: ReceiptLanguage };
+
+export type QrChargeSummary = {
+  recebivelCentavos: number;
+  pagoCentavos: number;
+  // Valor a receber menos o pago e o que está em processamento; teto do QR novo.
+  saldoCentavos: number;
+  ultimaPaga: (QrCharge & { pagoEm: string; paganteNome: string }) | null;
+  aberta: QrChargeOpen | null;
+};
+
+const LANGUAGES: readonly string[] = Object.values(RECEIPT_LANGUAGE);
+
+function nonNegativeInteger(value: unknown, label: string) {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) throw new Error(`Resumo da cobrança sem ${label}.`);
+  return value;
+}
+
+// Valida a resposta da ação "resumo" do plugin.
+export function parseQrChargeSummary(raw: unknown): QrChargeSummary {
+  const data = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  if (typeof data.erro === "string" && data.erro) throw new Error(data.erro);
+  const paid = data.ultimaPaga && typeof data.ultimaPaga === "object" ? (data.ultimaPaga as Record<string, unknown>) : null;
+  const open = data.aberta && typeof data.aberta === "object" ? (data.aberta as Record<string, unknown>) : null;
+  const openCharge = open ? parseQrChargeResponse(open) : null;
+  const idioma = String(open?.idioma ?? "");
+  return {
+    recebivelCentavos: nonNegativeInteger(data.recebivelCentavos, "valor a receber"),
+    pagoCentavos: nonNegativeInteger(data.pagoCentavos, "valor pago"),
+    saldoCentavos: nonNegativeInteger(data.saldoCentavos, "saldo"),
+    ultimaPaga: paid
+      ? { ...parseQrChargeResponse({ ...paid, status: "pago" }), pagoEm: String(paid.pagoEm ?? ""), paganteNome: String(paid.paganteNome ?? "") }
+      : null,
+    // Só vale retomar o que ainda está aguardando; o resto o app trata pelo pago/saldo.
+    aberta: openCharge?.status === "aguardando"
+      ? {
+          charge: openCharge,
+          pagante: { nome: String(open?.paganteNome ?? ""), email: String(open?.paganteEmail ?? "") },
+          idioma: LANGUAGES.includes(idioma) ? (idioma as ReceiptLanguage) : RECEIPT_LANGUAGE.portuguese
+        }
+      : null
+  };
+}
+
+export type QrChargeReceiveState = {
+  receivableCents: number;
+  paidCents: number;
+  balanceCents: number;
+  // Pago no valor total: dispensa a foto do comprovante.
+  covers: boolean;
+  open: QrChargeOpen | null;
+};
+
+// Junta o resumo do plugin com o que foi pago nesta sessão do app (o resumo pode estar sendo revalidado).
+export function getQrChargeReceiveState(receivableCents: number, summary: QrChargeSummary | undefined, localPaidCents = 0): QrChargeReceiveState {
+  const receivable = summary ? summary.recebivelCentavos : receivableCents;
+  const paidCents = Math.max(summary?.pagoCentavos ?? 0, localPaidCents);
+  const balanceCents = Math.max(0, Math.min(summary ? summary.saldoCentavos : receivable, receivable - paidCents));
+  const covers = receivable > 0 && paidCents >= receivable;
+  return { receivableCents: receivable, paidCents, balanceCents, covers, open: covers ? null : summary?.aberta ?? null };
+}
+
+// "dd/mm/aaaa HH:mm" no fuso de São Paulo, para a confirmação do pagamento.
+export function formatQrChargeDateTime(date: Date) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23"
+    }).formatToParts(date).map((part) => [part.type, part.value])
+  );
+  return `${parts.day}/${parts.month}/${parts.year} ${parts.hour}:${parts.minute}`;
+}
+
+// ---------- formulário passo a passo ----------
+
+export const QR_CHARGE_STEPS = ["valor", "pagante", "email", "idioma", "revisao"] as const;
+export type QrChargeStep = (typeof QR_CHARGE_STEPS)[number];
+
+export type QrChargeDraft = {
+  amountText: string;
+  // Nome de uma das opções ou "" para "Outra pessoa".
+  payerChoice: string;
+  otherPayerName: string;
+  email: string;
+  idioma: ReceiptLanguage;
+};
+
+export function getQrChargeDraftPayer(draft: QrChargeDraft): QrChargePayer {
+  return { nome: (draft.payerChoice || draft.otherPayerName).trim(), email: draft.email.trim() };
+}
+
+// Mensagem do passo ou "" quando dá para avançar.
+export function validateQrChargeStep(step: QrChargeStep, draft: QrChargeDraft, maxCents: number): string {
+  if (step === "valor") return validateQrChargeAmount(parseAmountToCents(draft.amountText), maxCents);
+  if (step === "pagante") return validateQrChargePayer(getQrChargeDraftPayer(draft)).nome ?? "";
+  if (step === "email") return validateQrChargePayer({ nome: "-", email: draft.email }).email ?? "";
+  if (step === "revisao") {
+    return QR_CHARGE_STEPS.slice(0, -1).map((item) => validateQrChargeStep(item, draft, maxCents)).find(Boolean) ?? "";
+  }
+  return "";
+}
+
+// Primeiro passo com erro, para a revisão levar o motorista direto a ele.
+export function getFirstInvalidQrChargeStep(draft: QrChargeDraft, maxCents: number): QrChargeStep | null {
+  return QR_CHARGE_STEPS.slice(0, -1).find((step) => validateQrChargeStep(step, draft, maxCents)) ?? null;
+}
+
+export function getQrChargeStepProgress(step: QrChargeStep) {
+  const index = QR_CHARGE_STEPS.indexOf(step);
+  return { number: index + 1, total: QR_CHARGE_STEPS.length, label: `${index + 1} de ${QR_CHARGE_STEPS.length}` };
+}

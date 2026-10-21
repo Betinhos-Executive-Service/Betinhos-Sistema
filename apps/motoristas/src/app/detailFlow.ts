@@ -58,3 +58,10 @@ export function hasUploadedReceiveProofs(
   const proofCount = receiveProofs[detail.id]?.length ?? 0;
   return proofCount > 0 && receiveUploadedCounts[detail.id] === proofCount;
 }
+
+// Depois de um QR pago: no valor total segue a mesma rota do FINALIZAR do Recebimento (voucher ou finalizar);
+// em parte volta ao Recebimento para a foto do restante.
+export function getScreenAfterQrPayment(detail: DetailData, coversReceivable: boolean): Screen {
+  if (!coversReceivable) return "receber";
+  return shouldRouteServiceToVoucher(detail) ? "voucher" : "finalizar";
+}

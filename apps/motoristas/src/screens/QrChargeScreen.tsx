@@ -1,7 +1,7 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import qrcode from "qrcode-generator";
 import { ActionBar, ActionButton } from "../components/common/ActionButton";
-import { MoneyInputField, SelectField, TextInputField } from "../components/common/FormFields";
+import { MoneyInputField, TextInputField } from "../components/common/FormFields";
 import { SystemIcon } from "../components/icons/SystemIcon";
 import { AppShell } from "../components/layout/AppShell";
 import { FormMenu } from "../components/navigation/FormMenu";
@@ -9,27 +9,55 @@ import { formatCurrencyInputOnBlur } from "../lib/currencyInput";
 import {
   formatCountdown,
   formatQrChargeAmount,
+  formatQrChargeDateTime,
+  getFirstInvalidQrChargeStep,
+  getQrChargeDraftPayer,
   getQrChargePayerOptions,
+  getQrChargeStepProgress,
   getRemainingSeconds,
   parseAmountToCents,
   QR_CHARGE_PASSENGER_COPY,
-  validateQrChargeAmount,
-  validateQrChargePayer,
+  QR_CHARGE_STEPS,
+  validateQrChargeStep,
   type QrCharge,
-  type QrChargePayer
+  type QrChargeDraft,
+  type QrChargeOpen,
+  type QrChargePayer,
+  type QrChargeStep
 } from "../lib/qrCharge";
-import { RECEIPT_LANGUAGE, RECEIPT_LANGUAGE_OPTIONS, normalizeReceiptLanguage, type ReceiptLanguage } from "../lib/receiptLanguage";
+import { RECEIPT_LANGUAGE, type ReceiptLanguage } from "../lib/receiptLanguage";
 import type { DetailData } from "../types";
 
 const POLL_INTERVAL_MS = 3000;
 const QR_QUIET_ZONE = 4;
-const OTHER_PAYER = "__outra_pessoa__";
+
+const STEP_TITLES: Record<QrChargeStep, string> = {
+  valor: "Valor da cobrança",
+  pagante: "Quem vai pagar",
+  email: "E-mail para o recibo",
+  idioma: "Idioma do passageiro",
+  revisao: "Confira e gere o QR code"
+};
+
+// Nome do idioma nele mesmo, para o passageiro reconhecer; o motorista lê a tradução embaixo.
+const LANGUAGE_CHOICES: { value: ReceiptLanguage; label: string; hint: string }[] = [
+  { value: RECEIPT_LANGUAGE.portuguese, label: "Português", hint: "Passageiro brasileiro" },
+  { value: RECEIPT_LANGUAGE.english, label: "English", hint: "Inglês" },
+  { value: RECEIPT_LANGUAGE.spanish, label: "Español", hint: "Espanhol" }
+];
+
+const languageLabel = (idioma: ReceiptLanguage) => LANGUAGE_CHOICES.find((choice) => choice.value === idioma)?.label ?? idioma;
 
 type QrChargeScreenProps = {
   detail: DetailData;
+  // Saldo a cobrar por QR (valor a receber menos o que já entrou).
   maxCents: number;
+  // Cobrança aberta devolvida pelo resumo: a tela já abre no QR dela.
+  resume?: QrChargeOpen | null;
   onBack: () => void;
+  // Uma vez, quando o Stripe confirma; a navegação fica com onContinue.
   onPaid: (charge: QrCharge) => void;
+  onContinue: (charge: QrCharge) => void;
   createCharge: (valorCentavos: number, pagante: QrChargePayer, idioma: ReceiptLanguage) => Promise<QrCharge>;
   updateCharge: (sessionId: string, acao: "consultar" | "cancelar") => Promise<QrCharge>;
 };
@@ -77,34 +105,80 @@ function Countdown({ expiraEm }: { expiraEm: string }) {
   return <span className="qr-charge-countdown">{formatCountdown(getRemainingSeconds(expiraEm, now))}</span>;
 }
 
-export function QrChargeScreen({ detail, maxCents, onBack, onPaid, createCharge, updateCharge }: QrChargeScreenProps) {
-  const [amountText, setAmountText] = useState(() => formatCurrencyInputOnBlur((maxCents / 100).toFixed(2)));
-  const [amountError, setAmountError] = useState("");
+function draftFromResume(resume: QrChargeOpen, optionNames: string[]): QrChargeDraft {
+  const known = optionNames.includes(resume.pagante.nome);
+  return {
+    amountText: formatCurrencyInputOnBlur((resume.charge.valorCentavos / 100).toFixed(2)),
+    payerChoice: known ? resume.pagante.nome : "",
+    otherPayerName: known ? "" : resume.pagante.nome,
+    email: resume.pagante.email,
+    idioma: resume.idioma
+  };
+}
+
+export function QrChargeScreen({ detail, maxCents, resume, onBack, onPaid, onContinue, createCharge, updateCharge }: QrChargeScreenProps) {
   const payerOptions = useMemo(() => getQrChargePayerOptions(detail), [detail]);
-  const [payerChoice, setPayerChoice] = useState(() => payerOptions[0]?.nome ?? OTHER_PAYER);
-  const [otherPayerName, setOtherPayerName] = useState("");
-  const [email, setEmail] = useState("");
-  const [idioma, setIdioma] = useState<ReceiptLanguage>(() => payerOptions[0]?.idioma ?? RECEIPT_LANGUAGE.portuguese);
-  const [payerErrors, setPayerErrors] = useState<Partial<Record<keyof QrChargePayer, string>>>({});
-  const [charge, setCharge] = useState<QrCharge | null>(null);
+  const [draft, setDraft] = useState<QrChargeDraft>(() =>
+    resume
+      ? draftFromResume(resume, payerOptions.map((option) => option.nome))
+      : {
+          amountText: formatCurrencyInputOnBlur((maxCents / 100).toFixed(2)),
+          payerChoice: payerOptions[0]?.nome ?? "",
+          otherPayerName: "",
+          email: "",
+          idioma: payerOptions[0]?.idioma ?? RECEIPT_LANGUAGE.portuguese
+        }
+  );
+  const [step, setStep] = useState<QrChargeStep>(resume ? "revisao" : "valor");
+  // Editando a partir da revisão: confirmar o passo volta direto para ela.
+  const [fromReview, setFromReview] = useState(false);
+  const [stepError, setStepError] = useState("");
+  const [charge, setCharge] = useState<QrCharge | null>(resume?.charge ?? null);
+  // Pagante e idioma da cobrança em andamento (o rascunho pode mudar depois para gerar outro QR).
+  const [chargePayer, setChargePayer] = useState<QrChargePayer>(resume?.pagante ?? { nome: "", email: "" });
+  const [chargeIdioma, setChargeIdioma] = useState<ReceiptLanguage>(resume?.idioma ?? RECEIPT_LANGUAGE.portuguese);
+  const [paidAt, setPaidAt] = useState<Date | null>(null);
   const [timedOut, setTimedOut] = useState(false);
   const [busy, setBusy] = useState<"" | "creating" | "cancelling">("");
   const [error, setError] = useState("");
-  const amountRef = useRef<HTMLInputElement | null>(null);
-  const payerNameRef = useRef<HTMLInputElement | null>(null);
-  const emailRef = useRef<HTMLInputElement | null>(null);
+  const fieldRef = useRef<HTMLInputElement | null>(null);
+  const focusTargetRef = useRef<HTMLElement | null>(null);
+  const headingRef = useRef<HTMLHeadingElement | null>(null);
+  const continueRef = useRef<HTMLButtonElement | null>(null);
+  const paidNotifiedRef = useRef(false);
+  const onPaidRef = useRef(onPaid);
+  onPaidRef.current = onPaid;
 
   const paid = charge?.status === "pago";
   const expired = charge?.status === "expirado" || (charge?.status === "aguardando" && timedOut);
   const open = charge?.status === "aguardando" && !timedOut;
   const openSessionId = open ? charge.sessionId : "";
   const openExpiraEm = open ? charge.expiraEm : "";
+  const progress = getQrChargeStepProgress(step);
+  const isOtherPayer = !draft.payerChoice;
 
   const applyUpdate = (next: QrCharge) => {
     setCharge(next);
-    // O motorista pode estar olhando para o passageiro: a vibração avisa que caiu.
-    if (next.status === "pago") navigator.vibrate?.([120, 80, 120]);
+    if (next.status === "pago" && !paidNotifiedRef.current) {
+      paidNotifiedRef.current = true;
+      setPaidAt(new Date());
+      // O motorista pode estar olhando para o passageiro: a vibração avisa que caiu.
+      navigator.vibrate?.([120, 80, 120]);
+      onPaidRef.current(next);
+    }
   };
+
+  // Foco no campo (ou na opção escolhida) de cada passo; na revisão, no título.
+  useEffect(() => {
+    if (charge) return;
+    const target = fieldRef.current ?? focusTargetRef.current ?? headingRef.current;
+    target?.focus({ preventScroll: false });
+  }, [step, isOtherPayer, charge]);
+
+  // Confirmação: o foco vai para o "Continuar", que é a única ação.
+  useEffect(() => {
+    if (paid) continueRef.current?.focus();
+  }, [paid]);
 
   useEffect(() => {
     if (!openExpiraEm) return;
@@ -119,7 +193,7 @@ export function QrChargeScreen({ detail, maxCents, onBack, onPaid, createCharge,
     let stopped = false;
     let timer = 0;
     const poll = async () => {
-      // Tela apagada ou app em segundo plano: não gasta execução do Flow; volta a consultar ao reabrir.
+      // Tela apagada ou app em segundo plano: não gasta chamada; volta a consultar ao reabrir.
       if (document.hidden) {
         timer = window.setTimeout(poll, POLL_INTERVAL_MS);
         return;
@@ -137,27 +211,84 @@ export function QrChargeScreen({ detail, maxCents, onBack, onPaid, createCharge,
       stopped = true;
       window.clearTimeout(timer);
     };
+    // applyUpdate só usa setters e refs.
   }, [openSessionId, updateCharge]);
 
+  const updateDraft = (patch: Partial<QrChargeDraft>) => {
+    setDraft((current) => ({ ...current, ...patch }));
+    setStepError("");
+  };
+
+  const goTo = (next: QrChargeStep, editing = false) => {
+    setStepError("");
+    setError("");
+    setFromReview(editing);
+    setStep(next);
+  };
+
+  // Valida o passo e avança; se veio da revisão, volta para ela.
+  const advance = (current: QrChargeStep = step, nextDraft: QrChargeDraft = draft) => {
+    const message = validateQrChargeStep(current, nextDraft, maxCents);
+    if (message) {
+      setStepError(message);
+      (fieldRef.current ?? focusTargetRef.current)?.focus();
+      return;
+    }
+    const index = QR_CHARGE_STEPS.indexOf(current);
+    goTo(fromReview ? "revisao" : QR_CHARGE_STEPS[Math.min(index + 1, QR_CHARGE_STEPS.length - 1)]);
+  };
+
+  const back = () => {
+    const index = QR_CHARGE_STEPS.indexOf(step);
+    if (index <= 0) {
+      onBack();
+      return;
+    }
+    goTo(QR_CHARGE_STEPS[index - 1]);
+  };
+
+  const handleEnter = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Enter" || !(event.target instanceof HTMLInputElement)) return;
+    event.preventDefault();
+    advance();
+  };
+
+  const choosePayer = (nome: string) => {
+    const option = payerOptions.find((item) => item.nome === nome);
+    const next = { ...draft, payerChoice: nome, idioma: option?.idioma ?? draft.idioma };
+    setDraft(next);
+    setStepError("");
+    if (nome) advance("pagante", next);
+  };
+
+  const chooseLanguage = (idioma: ReceiptLanguage) => {
+    const next = { ...draft, idioma };
+    setDraft(next);
+    advance("idioma", next);
+  };
+
+  const skipEmail = () => {
+    const next = { ...draft, email: "" };
+    setDraft(next);
+    advance("email", next);
+  };
+
   const generate = async () => {
-    const cents = parseAmountToCents(amountText);
-    const validation = validateQrChargeAmount(cents, maxCents);
-    const pagante = { nome: (payerChoice === OTHER_PAYER ? otherPayerName : payerChoice).trim(), email: email.trim() };
-    const errors = validateQrChargePayer(pagante);
-    setAmountError(validation);
-    setPayerErrors(errors);
-    if (validation) {
-      amountRef.current?.focus();
+    const invalidStep = getFirstInvalidQrChargeStep(draft, maxCents);
+    if (invalidStep) {
+      goTo(invalidStep, true);
+      setStepError(validateQrChargeStep(invalidStep, draft, maxCents));
       return;
     }
-    if (Object.keys(errors).length) {
-      (errors.nome ? payerNameRef : emailRef).current?.focus();
-      return;
-    }
+    const pagante = getQrChargeDraftPayer(draft);
     setBusy("creating");
     setError("");
     try {
-      setCharge(await createCharge(cents, pagante, idioma));
+      const created = await createCharge(parseAmountToCents(draft.amountText), pagante, draft.idioma);
+      setChargePayer(pagante);
+      setChargeIdioma(draft.idioma);
+      setTimedOut(false);
+      applyUpdate(created);
     } catch (createError) {
       setError(errorMessage(createError));
     } finally {
@@ -178,108 +309,262 @@ export function QrChargeScreen({ detail, maxCents, onBack, onPaid, createCharge,
     }
   };
 
+  // Outro QR: volta à revisão com os dados preenchidos.
   const startOver = () => {
     setCharge(null);
     setTimedOut(false);
     setError("");
+    goTo("revisao");
   };
 
   const chargeLabel = charge ? formatQrChargeAmount(charge.valorCentavos) : "";
-  const passengerCopy = QR_CHARGE_PASSENGER_COPY[idioma];
+  const passengerCopy = QR_CHARGE_PASSENGER_COPY[chargeIdioma];
+  const draftPayer = getQrChargeDraftPayer(draft);
+  const disabled = Boolean(busy);
+
+  const renderStep = () => {
+    if (step === "valor") {
+      return (
+        <MoneyInputField
+          ref={fieldRef}
+          id="qr-charge-amount"
+          label="Valor"
+          autoComplete="off"
+          enterKeyHint="next"
+          value={draft.amountText}
+          disabled={disabled}
+          error={stepError}
+          hint={`Até ${formatQrChargeAmount(maxCents)}, o que falta receber. Pode diminuir. Cartão estrangeiro paga em reais e o banco do passageiro converte.`}
+          onChange={(event) => updateDraft({ amountText: event.target.value })}
+        />
+      );
+    }
+    if (step === "pagante") {
+      return (
+        <>
+          {payerOptions.length ? (
+            <div className="qr-charge-choices" role="group" aria-labelledby="qr-charge-step-title">
+              {payerOptions.map((option) => {
+                const selected = draft.payerChoice === option.nome;
+                return (
+                  <button
+                    key={option.nome}
+                    type="button"
+                    className="qr-charge-choice"
+                    aria-pressed={selected}
+                    disabled={disabled}
+                    ref={selected ? (element) => { focusTargetRef.current = element; } : undefined}
+                    onClick={() => choosePayer(option.nome)}
+                  >
+                    <span className="qr-charge-choice-text">
+                      <strong>{option.nome}</strong>
+                      <span>{option.origem}</span>
+                    </span>
+                    <span className="qr-charge-choice-mark" aria-hidden="true">{selected ? <SystemIcon name="check" /> : null}</span>
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                className="qr-charge-choice"
+                aria-pressed={isOtherPayer}
+                aria-expanded={isOtherPayer}
+                disabled={disabled}
+                onClick={() => choosePayer("")}
+              >
+                <span className="qr-charge-choice-text">
+                  <strong>Outra pessoa</strong>
+                  <span>Digitar o nome</span>
+                </span>
+                <span className="qr-charge-choice-mark" aria-hidden="true">{isOtherPayer ? <SystemIcon name="check" /> : null}</span>
+              </button>
+            </div>
+          ) : null}
+          {isOtherPayer ? (
+            <TextInputField
+              ref={fieldRef}
+              label="Nome de quem vai pagar"
+              required
+              autoComplete="off"
+              enterKeyHint="next"
+              value={draft.otherPayerName}
+              disabled={disabled}
+              error={stepError}
+              onChange={(event) => updateDraft({ otherPayerName: event.target.value })}
+            />
+          ) : stepError ? (
+            <p className="field-error" role="alert">{stepError}</p>
+          ) : null}
+        </>
+      );
+    }
+    if (step === "email") {
+      return (
+        <TextInputField
+          ref={fieldRef}
+          label="E-mail"
+          type="email"
+          inputMode="email"
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          enterKeyHint="next"
+          value={draft.email}
+          disabled={disabled}
+          error={stepError}
+          hint="Confirme com o passageiro. O Stripe envia o recibo para este e-mail. Se ele não quiser recibo, toque em Pular."
+          onChange={(event) => updateDraft({ email: event.target.value })}
+        />
+      );
+    }
+    if (step === "idioma") {
+      return (
+        <>
+          <p className="qr-charge-step-hint">A tela do QR code e a página de pagamento aparecem neste idioma.</p>
+          <div className="qr-charge-choices" role="group" aria-labelledby="qr-charge-step-title">
+            {LANGUAGE_CHOICES.map((choice) => {
+              const selected = draft.idioma === choice.value;
+              return (
+                <button
+                  key={choice.value}
+                  type="button"
+                  className="qr-charge-choice"
+                  aria-pressed={selected}
+                  disabled={disabled}
+                  lang={choice.value}
+                  ref={selected ? (element) => { focusTargetRef.current = element; } : undefined}
+                  onClick={() => chooseLanguage(choice.value)}
+                >
+                  <span className="qr-charge-choice-text">
+                    <strong>{choice.label}</strong>
+                    <span lang="pt-BR">{choice.hint}</span>
+                  </span>
+                  <span className="qr-charge-choice-mark" aria-hidden="true">{selected ? <SystemIcon name="check" /> : null}</span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      );
+    }
+    const rows: { step: QrChargeStep; label: string; value: string }[] = [
+      { step: "valor", label: "Valor", value: formatQrChargeAmount(parseAmountToCents(draft.amountText)) },
+      { step: "pagante", label: "Quem vai pagar", value: draftPayer.nome || "Não informado" },
+      { step: "email", label: "E-mail para o recibo", value: draftPayer.email || "Sem e-mail" },
+      { step: "idioma", label: "Idioma do passageiro", value: languageLabel(draft.idioma) }
+    ];
+    return (
+      <ul className="qr-charge-review">
+        {rows.map((row) => (
+          <li key={row.step}>
+            <button type="button" className="qr-charge-review-row" disabled={disabled} onClick={() => goTo(row.step, true)} aria-label={`${row.label}: ${row.value}. Alterar`}>
+              <span className="qr-charge-review-text">
+                <span>{row.label}</span>
+                <strong>{row.value}</strong>
+              </span>
+              <span className="qr-charge-review-edit" aria-hidden="true">Alterar</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    );
+  };
+
+  const renderActions = () => {
+    if (!charge) {
+      const primaryLabel = step === "valor" ? "Confirmar" : step === "revisao" ? "Gerar QR code" : "Continuar";
+      return (
+        <>
+          <ActionButton className="finalize-secondary" label="Voltar" disabled={disabled} onClick={back} />
+          {step === "email" ? <ActionButton className="finalize-secondary" label="Pular" disabled={disabled} onClick={skipEmail} /> : null}
+          <ActionButton
+            className="finalize-primary"
+            variant="primary"
+            idleLabel={primaryLabel}
+            loadingLabel="Gerando"
+            state={busy === "creating" ? "loading" : "idle"}
+            onClick={step === "revisao" ? generate : () => advance()}
+          />
+        </>
+      );
+    }
+    if (paid) {
+      return <ActionButton buttonRef={continueRef} className="finalize-primary" variant="primary" label="Continuar" onClick={() => onContinue(charge)} />;
+    }
+    if (open) {
+      return (
+        <ActionButton
+          className="finalize-secondary"
+          label="Cancelar cobrança"
+          loadingLabel="Cancelando"
+          state={busy === "cancelling" ? "loading" : "idle"}
+          onClick={cancel}
+        />
+      );
+    }
+    return (
+      <>
+        <ActionButton className="finalize-secondary" label="Voltar" onClick={onBack} />
+        <ActionButton className="finalize-primary" variant="primary" label="Gerar outro QR code" onClick={startOver} />
+      </>
+    );
+  };
 
   return (
     <AppShell screenLabel="TelaCobrancaQr">
-      <FormMenu title="Cobrar por QR code" onBack={busy ? undefined : onBack} />
+      <FormMenu title="Cobrar por QR code" onBack={busy ? undefined : charge ? onBack : back} />
       <section className="main-panel maintenance-request-main">
         <article className="finalize-card maintenance-request-card qr-charge-card">
           <div className="finalize-title">Recebimento - {detail.id}</div>
           <div className="finalize-scroll">
             {!charge ? (
-              <div className="finalize-form maintenance qr-charge-form">
-                <MoneyInputField
-                  ref={amountRef}
-                  id="qr-charge-amount"
-                  label="Valor da cobrança"
-                  autoComplete="off"
-                  value={amountText}
-                  disabled={Boolean(busy)}
-                  error={amountError}
-                  hint={`Até ${formatQrChargeAmount(maxCents)}, o valor a receber. Cartão estrangeiro paga em reais; o banco do passageiro converte.`}
-                  onChange={(event) => {
-                    setAmountText(event.target.value);
-                    setAmountError("");
-                  }}
-                />
-                {payerOptions.length ? (
-                  <SelectField
-                    label="Quem vai pagar"
-                    required
-                    value={payerChoice}
-                    disabled={Boolean(busy)}
-                    options={[
-                      ...payerOptions.map((option) => ({ value: option.nome, label: `${option.nome} · ${option.origem}` })),
-                      { value: OTHER_PAYER, label: "Outra pessoa" }
-                    ]}
-                    placeholder="Escolha quem vai pagar"
-                    ariaLabel="Selecionar quem vai pagar"
-                    onChange={(value) => {
-                      setPayerChoice(value);
-                      setPayerErrors((current) => ({ ...current, nome: undefined }));
-                      setIdioma(payerOptions.find((option) => option.nome === value)?.idioma ?? RECEIPT_LANGUAGE.portuguese);
-                    }}
-                  />
-                ) : null}
-                {payerChoice === OTHER_PAYER ? (
-                  <TextInputField
-                    ref={payerNameRef}
-                    label={payerOptions.length ? "Nome de quem vai pagar" : "Quem vai pagar"}
-                    required
-                    autoComplete="off"
-                    value={otherPayerName}
-                    disabled={Boolean(busy)}
-                    error={payerErrors.nome}
-                    onChange={(event) => {
-                      setOtherPayerName(event.target.value);
-                      setPayerErrors((current) => ({ ...current, nome: undefined }));
-                    }}
-                  />
-                ) : null}
-                <TextInputField
-                  ref={emailRef}
-                  label="E-mail para o recibo"
-                  type="email"
-                  inputMode="email"
-                  autoComplete="off"
-                  value={email}
-                  disabled={Boolean(busy)}
-                  error={payerErrors.email}
-                  hint="Confirme com o passageiro. O Stripe envia o recibo para este e-mail."
-                  onChange={(event) => {
-                    setEmail(event.target.value);
-                    setPayerErrors((current) => ({ ...current, email: undefined }));
-                  }}
-                />
-                <SelectField
-                  label="Idioma do passageiro"
-                  value={idioma}
-                  disabled={Boolean(busy)}
-                  options={RECEIPT_LANGUAGE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
-                  placeholder="Selecionar idioma"
-                  ariaLabel="Selecionar idioma do passageiro"
-                  hint="A tela do QR e a página de pagamento aparecem neste idioma."
-                  onChange={(value) => setIdioma(normalizeReceiptLanguage(value))}
-                />
+              <div className="finalize-form maintenance qr-charge-form" onKeyDown={handleEnter}>
+                <div className="qr-charge-progress">
+                  <p className="qr-charge-progress-label" aria-live="polite">
+                    Passo {progress.label}
+                  </p>
+                  <ol className="qr-charge-progress-bar" aria-hidden="true">
+                    {QR_CHARGE_STEPS.map((item, index) => (
+                      <li key={item} className={index < progress.number ? "is-done" : ""} />
+                    ))}
+                  </ol>
+                </div>
+                <h2 id="qr-charge-step-title" className="qr-charge-step-title" ref={headingRef} tabIndex={-1}>
+                  {STEP_TITLES[step]}
+                </h2>
+                {renderStep()}
+              </div>
+            ) : paid ? (
+              <div className="qr-charge-confirmed" role="status">
+                <span className="qr-charge-confirmed-mark" aria-hidden="true">
+                  <svg viewBox="0 0 52 52">
+                    <path d="M15 27.5l7.5 7.5L38 18.5" />
+                  </svg>
+                </span>
+                <h2>Pagamento confirmado</h2>
+                <strong className="qr-charge-confirmed-amount">{chargeLabel}</strong>
+                <dl className="qr-charge-confirmed-details">
+                  {chargePayer.nome ? (
+                    <div>
+                      <dt>Pago por</dt>
+                      <dd>{chargePayer.nome}</dd>
+                    </div>
+                  ) : null}
+                  <div>
+                    <dt>Horário</dt>
+                    <dd>{formatQrChargeDateTime(paidAt ?? new Date())}</dd>
+                  </div>
+                  {chargePayer.email ? (
+                    <div>
+                      <dt>Recibo</dt>
+                      <dd>Enviado para {chargePayer.email}</dd>
+                    </div>
+                  ) : null}
+                </dl>
               </div>
             ) : (
               <div className="qr-charge-result">
-                {paid ? (
-                  <div className="qr-charge-paid" role="status">
-                    <span className="qr-charge-paid-mark" aria-hidden="true"><SystemIcon name="check" /></span>
-                    <strong>Pagamento confirmado</strong>
-                    <span className="qr-charge-paid-amount">{chargeLabel}</span>
-                    <p>O Stripe confirmou o pagamento.</p>
-                  </div>
-                ) : open ? null : (
+                {open ? null : (
                   <div className="qr-charge-amount">
                     <span className="form-field-label">Valor da cobrança</span>
                     <strong>{chargeLabel}</strong>
@@ -292,12 +577,12 @@ export function QrChargeScreen({ detail, maxCents, onBack, onPaid, createCharge,
                       <span className="qr-charge-waiting-dot" aria-hidden="true" />
                       Aguardando pagamento.
                     </p>
-                    <div className="qr-charge-passenger" lang={idioma}>
+                    <div className="qr-charge-passenger" lang={chargeIdioma}>
                       <strong>{passengerCopy.title}</strong>
                       <span className="qr-charge-passenger-amount" lang="pt-BR">{chargeLabel}</span>
                       <QrCodeSvg value={charge.url} />
                       <p>{passengerCopy.body}</p>
-                      {email.trim() ? <p>{passengerCopy.receipt}</p> : null}
+                      {chargePayer.email ? <p>{passengerCopy.receipt}</p> : null}
                     </div>
                     {charge.recusa ? (
                       <p className="qr-charge-alert is-danger" role="alert">
@@ -322,36 +607,7 @@ export function QrChargeScreen({ detail, maxCents, onBack, onPaid, createCharge,
             {error ? <p className="qr-charge-alert is-danger" role="alert">{error}</p> : null}
           </div>
 
-          <ActionBar className="finalize-actions qr-charge-actions">
-            {!charge ? (
-              <>
-                <ActionButton className="finalize-secondary" label="Voltar" disabled={Boolean(busy)} onClick={onBack} />
-                <ActionButton
-                  className="finalize-primary"
-                  variant="primary"
-                  idleLabel="Gerar QR code"
-                  loadingLabel="Gerando"
-                  state={busy === "creating" ? "loading" : "idle"}
-                  onClick={generate}
-                />
-              </>
-            ) : paid ? (
-              <ActionButton className="finalize-primary" variant="primary" label="Continuar" onClick={() => onPaid(charge)} />
-            ) : open ? (
-              <ActionButton
-                className="finalize-secondary"
-                label="Cancelar cobrança"
-                loadingLabel="Cancelando"
-                state={busy === "cancelling" ? "loading" : "idle"}
-                onClick={cancel}
-              />
-            ) : (
-              <>
-                <ActionButton className="finalize-secondary" label="Voltar" onClick={onBack} />
-                <ActionButton className="finalize-primary" variant="primary" label="Gerar outro QR code" onClick={startOver} />
-              </>
-            )}
-          </ActionBar>
+          <ActionBar className={`finalize-actions qr-charge-actions${step === "email" && !charge ? " has-three" : ""}`}>{renderActions()}</ActionBar>
         </article>
       </section>
     </AppShell>
