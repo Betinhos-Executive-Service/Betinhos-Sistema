@@ -116,7 +116,7 @@ test("etapa Receber some só com comprovante enviado ou QR pago no total", () =>
   assert.equal(isReceiveStepPending({ ...service, type: "TROCA" }, base), false);
 });
 
-test("opções de pagante: passageiros com idioma pela bandeira, solicitante e cliente, sem repetir", () => {
+test("opções de pagante: passageiros com idioma pela bandeira e solicitante, sem cliente e sem repetir", () => {
   const service = {
     ...detail(),
     fields: [
@@ -130,8 +130,7 @@ test("opções de pagante: passageiros com idioma pela bandeira, solicitante e c
   } as DetailData;
   assert.deepEqual(getQrChargePayerOptions(service), [
     { nome: "John Smith", origem: "Passageiro", idioma: "en-US" },
-    { nome: "Ana López", origem: "Passageiro", idioma: "es-ES" },
-    { nome: "Tenaris", origem: "Cliente", idioma: null }
+    { nome: "Ana López", origem: "Passageiro", idioma: "es-ES" }
   ]);
   assert.deepEqual(getQrChargePayerOptions(detail()), []);
 });

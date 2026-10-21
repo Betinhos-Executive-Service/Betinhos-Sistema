@@ -136,7 +136,7 @@ App (celular do motorista)              Power Automate                       Str
 | Serviço sem valor a receber | Sem botão | OK no mock |
 | Valor acima do valor a receber | Bloqueio com "O valor não pode passar de R$ …" | OK no mock e nos testes |
 | QR gerado | Faixa "Aguardando pagamento", painel do passageiro no idioma escolhido (título, valor em R$, QR, instrução) e contagem de 30 min | OK no mock |
-| Quem vai pagar | Lista com passageiros (idioma pela bandeira), solicitante e cliente + "Outra pessoa" | OK no mock e nos testes |
+| Quem vai pagar | Lista com passageiros (idioma pela bandeira) e solicitante + "Outra pessoa"; o cliente (empresa) não entra | OK no mock e nos testes |
 | E-mail inválido | "Confira o e-mail." e foco no campo | OK no mock e nos testes |
 | Cartão recusado | Motivo na tela e QR continua valendo | OK no mock (`?mockRecusa=1`) |
 | Pagamento confirmado | Painel verde "Pagamento confirmado" e vibração | OK no mock (vibração só em aparelho) |

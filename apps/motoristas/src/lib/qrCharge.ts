@@ -41,14 +41,13 @@ function nameFromLine(text: string) {
   return /\p{L}/u.test(name) ? name : "";
 }
 
-// Passageiros (com idioma pela bandeira), solicitante e cliente da reserva, sem repetir nomes.
+// Paga o passageiro (idioma pela bandeira) ou o solicitante; o cliente (empresa) não paga no carro.
 export function getQrChargePayerOptions(detail: DetailData): QrChargePayerOption[] {
   const fromField = (label: string, origem: string) =>
     getDetailLines(detail, label).map((line) => ({ nome: nameFromLine(line.text), origem, idioma: FLAG_LANGUAGE[line.flag] ?? null }));
   const candidates = [
     ...fromField("Passageiros e Telefones de Contato", "Passageiro"),
-    ...fromField("Solicitante", "Solicitante").slice(0, 1),
-    ...fromField("Cliente", "Cliente").slice(0, 1)
+    ...fromField("Solicitante", "Solicitante").slice(0, 1)
   ];
   const seen = new Set<string>();
   return candidates.filter((option) => {
