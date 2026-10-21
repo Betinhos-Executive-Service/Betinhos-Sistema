@@ -1,5 +1,7 @@
 # Segmentação da AppBetinhos em 4 soluções (brief)
 
+> Substituído pelo design aprovado `2026-10-21-segmentacao-appbetinhos-design.md`, que traz as respostas do Renan. A recontagem mostrou 119 scripts, não 128.
+
 ## Objetivo
 Trocar a solução única AppBetinhos por 4 soluções gerenciadas (Core, Automação, Interface, Motoristas). Assim, uma mudança de tela ou de fluxo chega ao PROD importando só a parte que mudou, em minutos, sem reimportar as 95 tabelas e reativar os 117 processos, e sem perder nenhum registro, fluxo ou configuração no PROD.
 
