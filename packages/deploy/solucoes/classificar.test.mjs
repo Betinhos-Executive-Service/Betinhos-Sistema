@@ -1,9 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { lerJson } from './arquivo.mjs'
 import { chaveTipo, classificar, validarRegras } from './classificar.mjs'
 
-const regras = JSON.parse(await readFile(new URL('./regras.json', import.meta.url), 'utf8'))
+const regras = await lerJson(new URL('./regras.json', import.meta.url))
 const c = (tipo, extra = {}) => ({ id: `id-${tipo}-${extra.nome ?? ''}`, tipo, entidade: null, nome: '', app: null, bpf: false, comportamento: 0, ...extra })
 const solucaoDe = (comp) => classificar([comp], regras).atribuicoes[0]?.solucao
 

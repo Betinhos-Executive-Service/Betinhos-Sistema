@@ -19,19 +19,12 @@ export const CATEGORIAS_LIGADAS_NO_TRAVADO = [2, 4]
 // (exceto regra de negócio e BPF) e step novo ou alterado que fica habilitado também são perda, porque podem mandar e-mail,
 // WhatsApp ou link de pagamento a clientes reais. Fluxo sem categoria na foto conta como fluxo que manda para fora.
 export function compararFotos(antes, depois, { travado = false } = {}) {
-  const d = {
-    registrosCairam: [], registrosMudaram: [], tabelasSumiram: [],
-    fluxosSumiram: [], fluxosMudaramEstado: [], fluxosDesligados: [], fluxosLigadosNoTravado: [],
-    stepsSumiram: [], stepsMudaramEstado: [], stepsDesativados: [], stepsPerderamSeguro: [], stepsHabilitadosNoTravado: [],
-    variaveisSumiram: [], variaveisMudaram: [],
-    componentesSumiram: [], donosMudaram: [], versoes: [],
-  }
-  const aproximados = new Set([...(antes.aproximados ?? []), ...(depois.aproximados ?? [])])
+  const d = Object.fromEntries([...PERDA, ...INFORMATIVO].map((lista) => [lista, []]))
   for (const [tabela, n] of Object.entries(antes.registros)) {
     if (!(tabela in depois.registros)) d.tabelasSumiram.push(tabela)
     else if (depois.registros[tabela] !== n) {
       const item = { tabela, antes: n, depois: depois.registros[tabela] }
-      if (item.depois < n && !aproximados.has(tabela)) d.registrosCairam.push(item)
+      if (item.depois < n) d.registrosCairam.push(item)
       else d.registrosMudaram.push(item)
     }
   }

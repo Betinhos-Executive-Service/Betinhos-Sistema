@@ -51,10 +51,8 @@ foreach ($s in @($classe.semRegra)) { Write-Warning "SEM REGRA tipo $($s.tipo) e
 $idsAtribuidos = @{}
 foreach ($a in @($classe.atribuicoes)) { $idsAtribuidos[[string] $a.id] = $true }
 $empacotados = @{}
-foreach ($r in @(Read-DvAll $dv "pluginassemblies?`$select=pluginassemblyid,_packageid_value&`$filter=_packageid_value ne null")) {
-  $pacote = ([string] $r._packageid_value).ToLowerInvariant()
-  if ($idsAtribuidos.ContainsKey($pacote)) { $empacotados[([string] $r.pluginassemblyid).ToLowerInvariant()] = $pacote }
-}
+$pacoteDoAssembly = Get-PacoteDosAssemblies $dv
+foreach ($asm in $pacoteDoAssembly.Keys) { if ($idsAtribuidos.ContainsKey($pacoteDoAssembly[$asm])) { $empacotados[$asm] = $pacoteDoAssembly[$asm] } }
 $atribuicoes = @($classe.atribuicoes | Where-Object { -not $empacotados.ContainsKey([string] $_.id) })
 $caixa = @($componentes | Where-Object { -not $empacotados.ContainsKey([string] $_.id) } | ForEach-Object { [string] $_.id })
 foreach ($c in @($componentes | Where-Object { $empacotados.ContainsKey([string] $_.id) })) { Write-Step "assembly empacotado (carregado pelo pacote $($empacotados[[string] $c.id])): '$($c.nome)' ($($c.id))" }
@@ -63,13 +61,12 @@ $donoEsperado = @{}
 foreach ($a in $atribuicoes) { $donoEsperado[[string] $a.id] = [string] $a.solucao }
 $tiposProibidos = @($regras.proibidos.PSObject.Properties.Name | Where-Object { $_ -match '^\d+$' } | ForEach-Object { [int] $_ })
 
-# Linhas (id minusculo e tipo) de cada uma das 4 solucoes.
 function Get-LinhasPorSolucao {
   $mapa = @{}
   foreach ($sol in $script:Solucoes) {
     $id = Get-SolucaoId $dv $sol
     $linhas = @()
-    if ($id) { $linhas = @(Read-DvAll $dv "solutioncomponents?`$select=objectid,componenttype&`$filter=_solutionid_value eq $id" | ForEach-Object { @{ id = ([string] $_.objectid).ToLowerInvariant(); tipo = [int] $_.componenttype } }) }
+    if ($id) { $linhas = @(Get-LinhasDaSolucao $dv $id) }
     $mapa[$sol] = $linhas
   }
   return $mapa
@@ -79,17 +76,6 @@ function Get-IdsPorSolucao($Linhas) {
   $mapa = @{}
   foreach ($sol in $script:Solucoes) { $mapa[$sol] = @($Linhas[$sol] | ForEach-Object { $_.id }) }
   return $mapa
-}
-
-# Mensagem completa do Dataverse (Invoke-RestMethod no PS 5.1 esconde o corpo do erro).
-function Get-ErroDv($Err) {
-  $msg = [string] $Err.Exception.Message
-  if ($Err.ErrorDetails -and $Err.ErrorDetails.Message) { return "$msg | $($Err.ErrorDetails.Message)" }
-  $resp = $Err.Exception.PSObject.Properties["Response"]
-  if ($resp -and $resp.Value) {
-    try { $reader = New-Object IO.StreamReader($resp.Value.GetResponseStream()); $msg = "$msg | $($reader.ReadToEnd())" } catch { }
-  }
-  return $msg
 }
 
 $linhas = Get-LinhasPorSolucao
@@ -102,12 +88,11 @@ if (-not $SomenteConferir) {
   foreach ($g in ($faltam | Group-Object solucao)) { Write-Step "  $($g.Name): $($g.Count)" }
   if (@($classe.semRegra).Count -or @($classe.proibidos).Count) { throw "Ha componentes sem regra ou proibidos (avisos acima). Ajuste regras.json ou a caixa de entrada antes de distribuir." }
   if (-not $Aplicar) { Write-Step "DRY RUN: use -Aplicar para criar as solucoes que faltam e distribuir."; return }
-  $publisher = [string] (Read-DvAll $dv "solutions?`$select=_publisherid_value&`$filter=solutionid eq $caixaId")[0]._publisherid_value
+  $publisher = [string] @(Read-DvAll $dv "solutions?`$select=_publisherid_value&`$filter=solutionid eq $caixaId")[0]._publisherid_value
   foreach ($sol in $script:Solucoes) { if (New-SolucaoSeFaltar $dv $sol $publisher) { Write-Step "criada $sol" } }
   $total = 0
   $tiposComErro = @{}
   for ($passo = 1; $passo -le 3; $passo++) {
-    $faltam = @($atribuicoes | Where-Object { @($porSolucao[$_.solucao]) -notcontains $_.id })
     $n = 0
     foreach ($a in $faltam) {
       if ($tiposComErro.ContainsKey([int] $a.tipo)) { continue }
@@ -147,8 +132,8 @@ if (-not $SomenteConferir) {
     }
     $linhas = Get-LinhasPorSolucao
     $porSolucao = Get-IdsPorSolucao $linhas
-    $restam = @($atribuicoes | Where-Object { @($porSolucao[$_.solucao]) -notcontains $_.id })
-    if ($restam.Count -eq 0) { break }
+    $faltam = @($atribuicoes | Where-Object { @($porSolucao[$_.solucao]) -notcontains $_.id })
+    if ($faltam.Count -eq 0) { break }
   }
   Write-Step "distribuidos: $total"
 }

@@ -24,6 +24,20 @@ function Get-TiposPorEntidade($Dv) {
   return $map
 }
 
+# Linhas (id minusculo e tipo) de uma solucao.
+function Get-LinhasDaSolucao($Dv, [string] $SolucaoId) {
+  Read-DvAll $Dv "solutioncomponents?`$select=objectid,componenttype&`$filter=_solutionid_value eq $SolucaoId" | ForEach-Object { @{ id = ([string] $_.objectid).ToLowerInvariant(); tipo = [int] $_.componenttype } }
+}
+
+# Assembly dentro de pacote de plug-in -> pacote que o carrega (ids em minusculo).
+function Get-PacoteDosAssemblies($Dv) {
+  $map = @{}
+  foreach ($r in @(Read-DvAll $Dv "pluginassemblies?`$select=pluginassemblyid,_packageid_value&`$filter=_packageid_value ne null")) {
+    $map[([string] $r.pluginassemblyid).ToLowerInvariant()] = ([string] $r._packageid_value).ToLowerInvariant()
+  }
+  return $map
+}
+
 function Get-Mapa($Dv, [string] $Set, [string] $Chave, [string] $Valor) {
   $map = @{}
   foreach ($r in Read-DvAll $Dv "$Set`?`$select=$Chave,$Valor") { $map[([string] $r.$Chave).ToLowerInvariant()] = [string] $r.$Valor }
@@ -69,12 +83,11 @@ function Get-ComponentesDaSolucao($Dv, [string] $SolucaoId, [hashtable] $TiposPo
   foreach ($r in Read-DvAll $Dv "msdyn_solutioncomponentsummaries?`$select=msdyn_objectid,msdyn_name&`$filter=msdyn_solutionid eq $SolucaoId") {
     $resumo[([string] $r.msdyn_objectid).ToLowerInvariant()] = [string] $r.msdyn_name
   }
-  $lista = @()
   foreach ($c in Read-DvAll $Dv "solutioncomponents?`$select=objectid,componenttype,rootcomponentbehavior&`$filter=_solutionid_value eq $SolucaoId") {
     $id = ([string] $c.objectid).ToLowerInvariant()
     $tipo = [int] $c.componenttype
     $nome = if ($nomes.ContainsKey($tipo) -and $nomes[$tipo].ContainsKey($id)) { $nomes[$tipo][$id] } elseif ($resumo.ContainsKey($id)) { $resumo[$id] } else { "" }
-    $lista += @{
+    @{
       id = $id; tipo = $tipo; nome = $nome; comportamento = [int] $c.rootcomponentbehavior
       entidade = if ($tipo -ge 10000) { $TiposPorEntidade[$tipo] } else { $null }
       app = if ($paiDoApp.ContainsKey($id)) { $paiDoApp[$id] } else { $null }
@@ -82,7 +95,6 @@ function Get-ComponentesDaSolucao($Dv, [string] $SolucaoId, [hashtable] $TiposPo
       categoria = if ($tipo -eq 29 -and $categorias.ContainsKey($id)) { $categorias[$id] } else { $null }
     }
   }
-  return $lista
 }
 
 function Add-ComponenteNaSolucao($Dv, $Componente, [string] $Solucao) {
@@ -117,24 +129,22 @@ function Get-ExcedentesDasSolucoes($Linhas, [hashtable] $DonoEsperado, [string[]
   foreach ($sol in $Ordem) { if ($script:Solucoes -notcontains $sol) { throw "Get-ExcedentesDasSolucoes so aceita as 4 solucoes novas; recebi '$sol'." } }
   $primeira = @{}
   foreach ($sol in $Ordem) { foreach ($l in @($Linhas[$sol])) { if (-not $primeira.ContainsKey($l.id)) { $primeira[$l.id] = $sol } } }
-  $lista = @()
   foreach ($sol in $Ordem) {
     foreach ($l in @($Linhas[$sol])) {
       $motivo = $null
       if ($TiposProibidos -contains $l.tipo) { $motivo = "tipo proibido (valor de variavel nao viaja)" }
       elseif ($DonoEsperado.ContainsKey($l.id)) { if ($DonoEsperado[$l.id] -ne $sol) { $motivo = "pertence a $($DonoEsperado[$l.id])" } }
       elseif ($primeira[$l.id] -ne $sol) { $motivo = "fora da caixa, ja esta em $($primeira[$l.id])" }
-      if ($motivo) { $lista += @{ solucao = $sol; id = $l.id; tipo = $l.tipo; motivo = $motivo } }
+      if ($motivo) { @{ solucao = $sol; id = $l.id; tipo = $l.tipo; motivo = $motivo } }
     }
   }
-  return $lista
 }
 
 function New-SolucaoSeFaltar($Dv, [string] $UniqueName, [string] $PublisherId) {
   Assert-HostDev $Dv "Criar solucao"
   if (Get-SolucaoId $Dv $UniqueName) { return $false }
   $body = @{ uniquename = $UniqueName; friendlyname = $UniqueName; version = "1.0.0.0"; "publisherid@odata.bind" = "/publishers($PublisherId)" }
-  Invoke-RestMethod -Method Post -Uri "$($Dv.Api)/solutions" -Headers $Dv.Headers -Body (ConvertTo-Json -InputObject $body) -ContentType "application/json; charset=utf-8" | Out-Null
+  Invoke-DvAction $Dv "solutions" $body | Out-Null
   return $true
 }
 
@@ -179,6 +189,12 @@ function Resolve-TabelaPaiDasDependencias($Dv, $Dependencias) {
   }
 }
 
+function Get-Sha256Hex([byte[]] $Bytes) {
+  $sha = [Security.Cryptography.SHA256]::Create()
+  try { return -join ($sha.ComputeHash($Bytes) | ForEach-Object { $_.ToString("x2") }) }
+  finally { $sha.Dispose() }
+}
+
 # Hash do conteudo do pacote, sem solution.xml (versao) nem [Content_Types].xml: igual se nada mudou.
 function Get-HashDoPacote([string] $ZipPath) {
   Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -191,8 +207,7 @@ function Get-HashDoPacote([string] $ZipPath) {
       $s = $e.Open()
       try { $s.CopyTo($buffer) } finally { $s.Dispose() }
     }
-    $sha = [Security.Cryptography.SHA256]::Create()
-    return -join ($sha.ComputeHash($buffer.ToArray()) | ForEach-Object { $_.ToString("x2") })
+    return Get-Sha256Hex ($buffer.ToArray())
   }
   finally { $zip.Dispose() }
 }
@@ -284,13 +299,10 @@ function Get-ContagemRegistros($Dv, $Entidade) {
   $fetch = "<fetch aggregate='true'><entity name='$nome'><attribute name='$($Entidade.PrimaryIdAttribute)' alias='n' aggregate='count'/></entity></fetch>"
   try { $resposta = Invoke-RestMethod -Method Get -Uri "$($Dv.Api)/$($Entidade.EntitySetName)?fetchXml=$([uri]::EscapeDataString($fetch))" -Headers $Dv.Headers }
   catch {
-    $corpo = if ($_.ErrorDetails) { [string] $_.ErrorDetails.Message } else { "" }
-    if ("$($_.Exception.Message) $corpo" -notmatch 'AggregateQueryRecordLimit|0x8004E023') { throw "Contagem de $nome falhou: $($_.Exception.Message) $corpo" }
+    $erro = Get-ErroDv $_
+    if ($erro -notmatch 'AggregateQueryRecordLimit|0x8004E023') { throw "Contagem de $nome falhou: $erro" }
     try { return @{ Total = @(Read-DvAll $Dv "$($Entidade.EntitySetName)?`$select=$($Entidade.PrimaryIdAttribute)").Count; Paginada = $true } }
-    catch {
-      $corpoPaginada = if ($_.ErrorDetails) { [string] $_.ErrorDetails.Message } else { "" }
-      throw "Contagem paginada de $nome falhou: $($_.Exception.Message) $corpoPaginada"
-    }
+    catch { throw "Contagem paginada de $nome falhou: $(Get-ErroDv $_)" }
   }
   # A analise fica fora do try: resposta fora do formato tambem falha alto.
   $linhas = @(if ($resposta -and $resposta.PSObject.Properties['value']) { $resposta.value })

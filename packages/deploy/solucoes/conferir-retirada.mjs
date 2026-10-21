@@ -1,4 +1,3 @@
-import { fileURLToPath } from 'node:url'
 import { lerJson, rodandoComoCli } from './arquivo.mjs'
 
 // Soluções que saem na retirada (desinstalação no TEST e no PROD).
@@ -6,7 +5,7 @@ export const CAIXAS = ['AppBetinhos', 'gerarpagantes']
 const ASSEMBLY = 91
 
 // Barreira antes do ponto sem volta. Numa foto tirada depois dos 4 imports:
-// - soNaCaixa: componente cujos donos rastreados são só AppBetinhos e/ou gerarpagantes. A desinstalação apagaria esse
+// - soNaCaixa: componente cujos donos rastreados são só AppBetinhos e/ou gerarpagantes (ou nenhum). A desinstalação apagaria esse
 //   componente (o comparador de fotos não vê, porque nada mudou ainda). Única liberação: assembly (91) dentro de pacote
 //   de plug-in cujo pacote está na solução dos pacotes (regras.porTipo.pluginpackage): quem carrega o assembly é o pacote.
 // - emDuasNovas: componente em mais de uma das 4.
@@ -25,7 +24,7 @@ export function conferirRetirada(foto, regras) {
     const tipo = foto.tipos[id] ?? null
     const nasNovas = donos.filter((s) => novas.has(s))
     if (nasNovas.length > 1) emDuasNovas.push({ id, tipo, solucoes: nasNovas })
-    if (!donos.length || !donos.every((s) => CAIXAS.includes(s))) continue
+    if (!donos.every((s) => CAIXAS.includes(s))) continue
     const pacote = tipo === ASSEMBLY ? foto.pacotes[id] : undefined
     if (pacote && (componentes[pacote] ?? []).includes(solucaoDosPacotes)) peloPacote.push({ id, pacote })
     else soNaCaixa.push({ id, tipo, solucoes: donos })
@@ -39,7 +38,7 @@ export function retiradaOk(r) {
 
 // CLI: node conferir-retirada.mjs <foto.json> -> código 1 se a retirada apagaria algo ou se há componente em duas das 4.
 if (rodandoComoCli(import.meta.url)) {
-  const regras = await lerJson(fileURLToPath(new URL('./regras.json', import.meta.url)))
+  const regras = await lerJson(new URL('./regras.json', import.meta.url))
   const r = conferirRetirada(await lerJson(process.argv[2]), regras)
   process.stdout.write(JSON.stringify(r, null, 2))
   process.exitCode = retiradaOk(r) ? 0 : 1

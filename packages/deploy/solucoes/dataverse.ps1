@@ -41,6 +41,17 @@ function Read-DvAll($Dv, [string] $Path) {
   return $items
 }
 
+# Mensagem completa do Dataverse (Invoke-RestMethod no PS 5.1 esconde o corpo do erro).
+function Get-ErroDv($Err) {
+  $msg = [string] $Err.Exception.Message
+  if ($Err.ErrorDetails -and $Err.ErrorDetails.Message) { return "$msg | $($Err.ErrorDetails.Message)" }
+  $resp = $Err.Exception.PSObject.Properties["Response"]
+  if ($resp -and $resp.Value) {
+    try { $reader = New-Object IO.StreamReader($resp.Value.GetResponseStream()); $msg = "$msg | $($reader.ReadToEnd())" } catch { }
+  }
+  return $msg
+}
+
 function Invoke-DvAction($Dv, [string] $Name, $Body) {
   return Invoke-RestMethod -Method Post -Uri "$($Dv.Api)/$Name" -Headers $Dv.Headers -Body (ConvertTo-Json -InputObject $Body -Depth 12) -ContentType "application/json; charset=utf-8"
 }

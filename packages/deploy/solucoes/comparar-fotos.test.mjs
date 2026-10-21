@@ -25,10 +25,6 @@ test('tabela que sumiu é perda', () => {
   assert.deepEqual(d.tabelasSumiram, ['cr40f_b'])
   assert.equal(temPerda(d), true)
 })
-test('contagem aproximada não acusa queda', () => {
-  const d = compararFotos(foto({ aproximados: ['cr40f_a'] }), foto({ aproximados: ['cr40f_a'], registros: { cr40f_a: 9, cr40f_b: 5 } }))
-  assert.deepEqual(d.registrosCairam, [])
-})
 test('fluxo desligado é perda', () => assert.equal(temPerda(compararFotos(foto(), foto({ fluxos: { f1: { nome: 'Fluxo 1', estado: 0 } } }))), true))
 test('fluxo ligado pelo import não é perda', () => {
   const d = compararFotos(foto({ fluxos: { f1: { nome: 'Fluxo 1', estado: 0 } } }), foto())

@@ -29,12 +29,12 @@ Set-StrictMode -Version Latest
 $regras = Read-JsonFile (Join-Path $PSScriptRoot "regras.json")
 $dv = Connect-Dataverse $EnvironmentUrl $null
 
+$prefixoProprio = '^(cr40f|new)_'
+
 # Valor ausente (ou nulo) nao tem hash: a variavel sem valor fica null na foto.
 function Get-Sha256($Texto) {
   if ($null -eq $Texto) { return $null }
-  $sha = [Security.Cryptography.SHA256]::Create()
-  try { return -join ($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes([string] $Texto)) | ForEach-Object { $_.ToString("x2") }) }
-  finally { $sha.Dispose() }
+  return Get-Sha256Hex ([Text.Encoding]::UTF8.GetBytes([string] $Texto))
 }
 
 $foto = [ordered]@{
@@ -43,9 +43,10 @@ $foto = [ordered]@{
 }
 
 # Registros: contagem exata por FetchXML; acima do limite de agregacao (50.000) conta paginando os ids (tambem exata).
-# Qualquer outro erro de contagem interrompe a foto: nao existe contagem aproximada. `aproximados` fica na foto, vazio.
+# Qualquer outro erro de contagem interrompe a foto: nao existe contagem aproximada. `aproximados` fica vazio, so pelo formato da foto
+# (o comparar-fotos nao o le: queda de registros e sempre perda).
 $paginadas = @()
-foreach ($e in @(Read-DvAll $dv "EntityDefinitions?`$select=LogicalName,EntitySetName,PrimaryIdAttribute,IsCustomEntity,IsIntersect" | Where-Object { $_.IsCustomEntity -and -not $_.IsIntersect -and $_.LogicalName -match '^(cr40f|new)_' } | Sort-Object LogicalName)) {
+foreach ($e in @(Read-DvAll $dv "EntityDefinitions?`$select=LogicalName,EntitySetName,PrimaryIdAttribute,IsCustomEntity,IsIntersect" | Where-Object { $_.IsCustomEntity -and -not $_.IsIntersect -and $_.LogicalName -match $prefixoProprio } | Sort-Object LogicalName)) {
   $contagem = Get-ContagemRegistros $dv $e
   $foto.registros[$e.LogicalName] = $contagem.Total
   if ($contagem.Paginada) { $paginadas += $e.LogicalName; Write-Step "$($e.LogicalName): acima do limite de agregacao, contado por paginacao ($($contagem.Total))" }
@@ -56,20 +57,17 @@ $fluxoIds = @{}; $stepIds = @{}; $ausentes = @()
 foreach ($sol in $alvos) {
   $id = Get-SolucaoId $dv $sol
   if (-not $id) { $ausentes += $sol; continue }
-  foreach ($c in @(Read-DvAll $dv "solutioncomponents?`$select=objectid,componenttype&`$filter=_solutionid_value eq $id")) {
-    $oid = ([string] $c.objectid).ToLowerInvariant()
-    if (-not $foto.componentes.ContainsKey($oid)) { $foto.componentes[$oid] = @() }
-    if ($foto.componentes[$oid] -notcontains $sol) { $foto.componentes[$oid] += $sol }
-    $foto.tipos[$oid] = [int] $c.componenttype
-    if ([int] $c.componenttype -eq 29) { $fluxoIds[$oid] = $true }
-    if ([int] $c.componenttype -eq 92) { $stepIds[$oid] = $true }
+  foreach ($l in @(Get-LinhasDaSolucao $dv $id)) {
+    if (-not $foto.componentes.ContainsKey($l.id)) { $foto.componentes[$l.id] = @() }
+    if ($foto.componentes[$l.id] -notcontains $sol) { $foto.componentes[$l.id] += $sol }
+    $foto.tipos[$l.id] = $l.tipo
+    if ($l.tipo -eq 29) { $fluxoIds[$l.id] = $true }
+    if ($l.tipo -eq 92) { $stepIds[$l.id] = $true }
   }
 }
 if ($ausentes.Count) { Write-Step "solucoes que nao existem neste ambiente: $($ausentes -join ', ')" }
 # Assembly dentro de pacote de plug-in: quem o carrega e o pacote (conferir-retirada.mjs usa isso).
-foreach ($r in @(Read-DvAll $dv "pluginassemblies?`$select=pluginassemblyid,_packageid_value&`$filter=_packageid_value ne null")) {
-  $foto.pacotes[([string] $r.pluginassemblyid).ToLowerInvariant()] = ([string] $r._packageid_value).ToLowerInvariant()
-}
+$foto.pacotes = Get-PacoteDosAssemblies $dv
 # estado = statecode bruto (fluxo: 1 ativado; step: 0 habilitado); categoria do workflow (2 regra de negocio, 4 BPF, 5 fluxo
 # de nuvem...). O comparador decide o que e perda.
 foreach ($w in @(Read-DvAll $dv "workflows?`$select=workflowid,name,statecode,category&`$filter=type eq 1")) {
@@ -88,7 +86,7 @@ Assert-CoberturaDaFoto $foto $fluxoIds $stepIds
 # Os steps sensiveis de regras.json, pelo nome, a parte das solucoes: existe e tem configuracao segura.
 $foto.stepsSeguros = Get-SituacaoStepsSeguros $dv @($regras.stepsSeguros)
 foreach ($v in @(Read-DvAll $dv "environmentvariabledefinitions?`$select=schemaname&`$expand=environmentvariabledefinition_environmentvariablevalue(`$select=value)")) {
-  if ([string] $v.schemaname -notmatch '^(cr40f|new)_') { continue }
+  if ([string] $v.schemaname -notmatch $prefixoProprio) { continue }
   $valores = @($v.environmentvariabledefinition_environmentvariablevalue)
   $foto.variaveis[[string] $v.schemaname] = if ($valores.Count) { Get-Sha256 $valores[0].value } else { $null }
 }

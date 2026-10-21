@@ -1,9 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { lerJson } from './arquivo.mjs'
 import { conferirRetirada, retiradaOk } from './conferir-retirada.mjs'
 
-const regras = JSON.parse(await readFile(new URL('./regras.json', import.meta.url), 'utf8'))
+const regras = await lerJson(new URL('./regras.json', import.meta.url))
 const foto = (componentes, tipos = {}, pacotes = {}) => ({ componentes, tipos, pacotes })
 
 test('componente na AppBetinhos e numa das 4 pode sair', () => {
@@ -40,6 +40,11 @@ test('assembly sem pacote reprova', () => {
 test('a liberação vale só para assembly: outro tipo com pacote registrado reprova', () => {
   const r = conferirRetirada(foto({ x: ['AppBetinhos'], pkg: ['BetinhosAutomacao'] }, { x: 61, pkg: 10090 }, { x: 'pkg' }), regras)
   assert.deepEqual(r.soNaCaixa.map((x) => x.id), ['x'])
+})
+test('componente sem nenhum dono na foto reprova', () => {
+  const r = conferirRetirada(foto({ x: [] }, { x: 61 }), regras)
+  assert.deepEqual(r.soNaCaixa, [{ id: 'x', tipo: 61, solucoes: [] }])
+  assert.equal(retiradaOk(r), false)
 })
 test('componente sem tipo na foto aparece com tipo null', () => {
   const r = conferirRetirada(foto({ x: ['AppBetinhos'] }), regras)
