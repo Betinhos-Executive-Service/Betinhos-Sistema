@@ -27,7 +27,7 @@ const S = (v: number) => String(v)
 const decimal = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 export function emptyEquipamento(id: string): Equipamento {
-  return { id, descricao: '', tipoId: null, tipoNome: '', marcaModelo: '', numeroSerie: '', status: STATUS.disponivel, responsavelId: null, responsavelNome: '', dataCompra: null, valorCompra: null, observacoes: '', modificadoEm: null }
+  return { id, descricao: '', tipoId: null, tipoNome: '', marcaModelo: '', numeroSerie: '', status: STATUS.disponivel, responsavelId: null, responsavelNome: '', dataCompra: null, valorCompra: null, observacoes: '', modificadoEm: null, capa: null }
 }
 
 export function emptyForm(): EquipamentoForm {

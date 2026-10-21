@@ -15,6 +15,8 @@ export type Equipamento = {
   valorCompra: number | null
   observacoes: string
   modificadoEm: Date | null
+  /** Miniatura da foto de capa (data URL); null = sem foto, a lista mostra o ícone do tipo. */
+  capa: string | null
 }
 
 /** Cadastro de tipos (`cr40f_tipoequipamento`); inativo some dos seletores. */
