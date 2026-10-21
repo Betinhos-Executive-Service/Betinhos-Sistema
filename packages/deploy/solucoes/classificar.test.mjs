@@ -13,6 +13,8 @@ test('tipo acima de 10000 usa a entidade', () => assert.equal(chaveTipo({ tipo: 
 test('tabela vai para o Core', () => assert.equal(solucaoDe(c(1, { nome: 'cr40f_reservadeveculos' })), 'BetinhosCore'))
 test('tabela de BPF vai para a Automação', () => assert.equal(solucaoDe(c(1, { bpf: true })), 'BetinhosAutomacao'))
 test('fluxo vai para a Automação', () => assert.equal(solucaoDe(c(29)), 'BetinhosAutomacao'))
+test('regra de negócio (categoria 2) vai para o Core, junto com a tabela', () => assert.equal(solucaoDe(c(29, { categoria: 2, nome: 'Regra de negocio' })), 'BetinhosCore'))
+test('fluxo moderno (categoria 5) continua na Automação', () => assert.equal(solucaoDe(c(29, { categoria: 5, nome: 'Fluxo' })), 'BetinhosAutomacao'))
 test('Custom API e parâmetros vão para a Automação', () => {
   assert.equal(solucaoDe(c(10036, { entidade: 'customapi' })), 'BetinhosAutomacao')
   assert.equal(solucaoDe(c(10037, { entidade: 'customapirequestparameter' })), 'BetinhosAutomacao')
@@ -70,6 +72,9 @@ test('valor de permitidas fora de solucoes falha e nomeia o valor', () => {
 test('exceção sem exatamente uma condição falha e nomeia o tipo', () => {
   assert.throws(() => validarRegras({ ...regras, excecoes: [{ tipo: '61', solucao: 'BetinhosMotoristas' }] }), /tipo 61/)
   assert.throws(() => validarRegras({ ...regras, excecoes: [{ tipo: '1', nomes: ['x'], bpf: true, solucao: 'BetinhosAutomacao' }] }), /tipo 1/)
+})
+test('exceção por categoria junto com outra condição falha e nomeia o tipo', () => {
+  assert.throws(() => validarRegras({ ...regras, excecoes: [{ tipo: '29', categoria: 2, nomes: ['x'], solucao: 'BetinhosCore' }] }), /tipo 29/)
 })
 test('exceção com tipo fora de porTipo falha e nomeia o tipo', () => {
   assert.throws(() => validarRegras({ ...regras, excecoes: [{ tipo: '999', nomes: ['x'], solucao: 'BetinhosCore' }] }), /999/)

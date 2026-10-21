@@ -52,7 +52,8 @@
     { "tipo": "dvtablesearchentity", "app": "new_AppMotoristasv2", "solucao": "BetinhosMotoristas" },
     { "tipo": "dvtablesearch", "app": "cr40f_ModelDrivenBetinhos", "solucao": "BetinhosInterface" },
     { "tipo": "dvtablesearchentity", "app": "cr40f_ModelDrivenBetinhos", "solucao": "BetinhosInterface" },
-    { "tipo": "1", "bpf": true, "solucao": "BetinhosAutomacao" }
+    { "tipo": "1", "bpf": true, "solucao": "BetinhosAutomacao" },
+    { "tipo": "29", "categoria": 2, "solucao": "BetinhosCore" }
   ],
   "proibidos": {
     "381": "Valor de variavel de ambiente nao viaja em solucao: remova da AppBetinhos (RemoveSolutionComponent) e mantenha o valor em cada ambiente."

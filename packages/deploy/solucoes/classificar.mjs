@@ -12,8 +12,8 @@ export function validarRegras(regras) {
   const desconhecidas = usadas.filter((s) => !conhecidas.has(s))
   if (desconhecidas.length) throw new Error(`Solucao desconhecida em regras.json: ${[...new Set(desconhecidas)].join(', ')}`)
   for (const e of regras.excecoes) {
-    const condicoes = ['nomes', 'app', 'bpf'].filter((k) => e[k] !== undefined)
-    if (condicoes.length !== 1) throw new Error(`Excecao do tipo ${e.tipo} precisa de exatamente uma condicao entre nomes, app e bpf`)
+    const condicoes = ['nomes', 'app', 'bpf', 'categoria'].filter((k) => e[k] !== undefined)
+    if (condicoes.length !== 1) throw new Error(`Excecao do tipo ${e.tipo} precisa de exatamente uma condicao entre nomes, app, bpf e categoria`)
     if (!Object.hasOwn(regras.porTipo, e.tipo)) throw new Error(`Excecao aponta para o tipo ${e.tipo}, que nao existe em porTipo`)
   }
 }
@@ -22,6 +22,7 @@ function casa(excecao, c) {
   if (excecao.nomes) return excecao.nomes.includes(c.nome)
   if (excecao.app) return excecao.app === c.app
   if (excecao.bpf) return c.bpf === true
+  if (excecao.categoria !== undefined) return c.categoria === excecao.categoria
   return false
 }
 

@@ -53,6 +53,9 @@ function Get-ComponentesDaSolucao($Dv, [string] $SolucaoId, [hashtable] $TiposPo
     $pai = ([string] $r._dvtablesearch_value).ToLowerInvariant()
     if ($appPorBusca.ContainsKey($pai)) { $paiDoApp[([string] $r.dvtablesearchentityid).ToLowerInvariant()] = $appPorBusca[$pai] }
   }
+  # Workflows (tipo 29): category 2 = regra de negocio (acompanha a tabela no Core), 5 = fluxo moderno, 4 = BPF etc.
+  $categorias = @{}
+  foreach ($r in Read-DvAll $Dv "workflows?`$select=workflowid,category") { $categorias[([string] $r.workflowid).ToLowerInvariant()] = [int] $r.category }
   $bpf = @{}
   foreach ($e in Read-DvAll $Dv "EntityDefinitions?`$select=MetadataId,IsBPFEntity") { if ($e.IsBPFEntity) { $bpf[([string] $e.MetadataId).ToLowerInvariant()] = $true } }
   $resumo = @{}
@@ -69,6 +72,7 @@ function Get-ComponentesDaSolucao($Dv, [string] $SolucaoId, [hashtable] $TiposPo
       entidade = if ($tipo -ge 10000) { $TiposPorEntidade[$tipo] } else { $null }
       app = if ($paiDoApp.ContainsKey($id)) { $paiDoApp[$id] } else { $null }
       bpf = ($tipo -eq 1 -and $bpf.ContainsKey($id))
+      categoria = if ($tipo -eq 29 -and $categorias.ContainsKey($id)) { $categorias[$id] } else { $null }
     }
   }
   return $lista
@@ -84,6 +88,8 @@ function Add-ComponenteNaSolucao($Dv, $Componente, [string] $Solucao) {
 # Tira o componente de UMA solucao nao gerenciada (o componente em si nao e apagado).
 # Na Web API o parametro SolutionComponent leva o objectid do componente em solutioncomponentid (nao o id da linha de solutioncomponents).
 function Remove-ComponenteDaSolucao($Dv, [string] $ComponentId, [int] $Tipo, [string] $Solucao) {
+  # Nunca remover da caixa de entrada (AppBetinhos) nem de solucao de fora das 4: o alvo e sempre uma das 4 novas.
+  if ($script:Solucoes -notcontains $Solucao) { throw "Remover componente so e permitido nas solucoes $($script:Solucoes -join ', '); recebi '$Solucao'." }
   $solucaoId = Get-SolucaoId $Dv $Solucao
   if (-not $solucaoId) { throw "Solucao $Solucao nao encontrada." }
   $linhas = @(Read-DvAll $Dv "solutioncomponents?`$select=solutioncomponentid&`$filter=_solutionid_value eq $solucaoId and objectid eq $ComponentId and componenttype eq $Tipo")
@@ -92,6 +98,27 @@ function Remove-ComponenteDaSolucao($Dv, [string] $ComponentId, [int] $Tipo, [st
     SolutionComponent = @{ "@odata.type" = "Microsoft.Dynamics.CRM.solutioncomponent"; solutioncomponentid = $ComponentId }
     ComponentType = $Tipo; SolutionUniqueName = $Solucao
   } | Out-Null
+}
+
+# Decisao pura (sem API): o que remover das 4 solucoes depois de AddSolutionComponent arrastar componentes.
+# $Linhas: solucao -> @(@{ id; tipo }); $DonoEsperado: id -> solucao dona (so o que esta na caixa); $Ordem: as 4 da camada mais baixa para a mais alta;
+# $TiposProibidos: tipos que nunca ficam em solucao (valor de variavel, 381). Devolve @{ solucao; id; tipo; motivo }.
+# So olha as solucoes de $Ordem, que precisam ser as 4: a caixa de entrada nunca e candidata a remocao.
+function Get-ExcedentesDasSolucoes($Linhas, [hashtable] $DonoEsperado, [string[]] $Ordem, [int[]] $TiposProibidos) {
+  foreach ($sol in $Ordem) { if ($script:Solucoes -notcontains $sol) { throw "Get-ExcedentesDasSolucoes so aceita as 4 solucoes novas; recebi '$sol'." } }
+  $primeira = @{}
+  foreach ($sol in $Ordem) { foreach ($l in @($Linhas[$sol])) { if (-not $primeira.ContainsKey($l.id)) { $primeira[$l.id] = $sol } } }
+  $lista = @()
+  foreach ($sol in $Ordem) {
+    foreach ($l in @($Linhas[$sol])) {
+      $motivo = $null
+      if ($TiposProibidos -contains $l.tipo) { $motivo = "tipo proibido (valor de variavel nao viaja)" }
+      elseif ($DonoEsperado.ContainsKey($l.id)) { if ($DonoEsperado[$l.id] -ne $sol) { $motivo = "pertence a $($DonoEsperado[$l.id])" } }
+      elseif ($primeira[$l.id] -ne $sol) { $motivo = "fora da caixa, ja esta em $($primeira[$l.id])" }
+      if ($motivo) { $lista += @{ solucao = $sol; id = $l.id; tipo = $l.tipo; motivo = $motivo } }
+    }
+  }
+  return $lista
 }
 
 function New-SolucaoSeFaltar($Dv, [string] $UniqueName, [string] $PublisherId) {

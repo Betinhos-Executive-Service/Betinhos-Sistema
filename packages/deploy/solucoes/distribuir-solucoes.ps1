@@ -81,23 +81,6 @@ function Get-IdsPorSolucao($Linhas) {
   return $mapa
 }
 
-# O que esta numa solucao e nao deveria: tipo proibido, dono diferente, ou (fora da caixa) copia numa camada acima da primeira que o tem.
-function Get-Excedentes($Linhas) {
-  $primeira = @{}
-  foreach ($sol in $regras.solucoes) { foreach ($l in $Linhas[$sol]) { if (-not $primeira.ContainsKey($l.id)) { $primeira[$l.id] = $sol } } }
-  $lista = @()
-  foreach ($sol in $regras.solucoes) {
-    foreach ($l in $Linhas[$sol]) {
-      $motivo = $null
-      if ($tiposProibidos -contains $l.tipo) { $motivo = "tipo proibido (valor de variavel nao viaja)" }
-      elseif ($donoEsperado.ContainsKey($l.id)) { if ($donoEsperado[$l.id] -ne $sol) { $motivo = "pertence a $($donoEsperado[$l.id])" } }
-      elseif ($primeira[$l.id] -ne $sol) { $motivo = "fora da caixa, ja esta em $($primeira[$l.id])" }
-      if ($motivo) { $lista += @{ solucao = $sol; id = $l.id; tipo = $l.tipo; motivo = $motivo } }
-    }
-  }
-  return $lista
-}
-
 # Mensagem completa do Dataverse (Invoke-RestMethod no PS 5.1 esconde o corpo do erro).
 function Get-ErroDv($Err) {
   $msg = [string] $Err.Exception.Message
@@ -149,7 +132,7 @@ if (-not $SomenteConferir) {
     $total += $n
     Write-Step "passo ${passo}: adicionados $n de $($faltam.Count)"
     $linhas = Get-LinhasPorSolucao
-    $excedentes = @(Get-Excedentes $linhas)
+    $excedentes = @(Get-ExcedentesDasSolucoes $linhas $donoEsperado $regras.solucoes $tiposProibidos)
     Write-Step "passo ${passo}: excedentes a remover (arrastados por AddSolutionComponent): $($excedentes.Count)"
     foreach ($g in ($excedentes | Group-Object { "$($_.solucao) tipo $($_.tipo)" })) { Write-Step "  $($g.Name): $($g.Count)" }
     foreach ($e in $excedentes) {
@@ -176,7 +159,7 @@ foreach ($sol in $script:Solucoes) {
   if (Get-SolucaoId $dv $sol) { $lista = @(Get-DependenciasAusentes $dv $sol) }
   $ausentes[$sol] = $lista
 }
-$excedentesFinais = @(Get-Excedentes $linhas)
+$excedentesFinais = @(Get-ExcedentesDasSolucoes $linhas $donoEsperado $regras.solucoes $tiposProibidos)
 $valoresNasSolucoes = @($excedentesFinais | Where-Object { $tiposProibidos -contains $_.tipo })
 Write-JsonFile (Join-Path $tmp "conferir.json") @{
   caixa = $caixa; porSolucao = $porSolucao

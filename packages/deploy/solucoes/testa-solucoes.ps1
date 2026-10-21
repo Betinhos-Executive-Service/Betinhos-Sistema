@@ -43,6 +43,36 @@ $falhouSemLinha = $false
 try { Remove-ComponenteDaSolucao $dv 'abc' 381 'BetinhosCore' } catch { $falhouSemLinha = ($_.Exception.Message -like '*achei 0*') }
 Confere ($falhouSemLinha -and $script:chamadas.Count -eq 2) 'remover sem linha na solucao falha sem chamar a acao'
 
+# Remove-ComponenteDaSolucao recusa a caixa de entrada e qualquer solucao fora das 4, sem chamar a API
+$script:respostas = @(); $script:chamadas = @()
+$recusou = $false
+try { Remove-ComponenteDaSolucao $dv 'abc' 381 'AppBetinhos' } catch { $recusou = ($_.Exception.Message -like '*AppBetinhos*') }
+Confere ($recusou -and $script:chamadas.Count -eq 0) 'remover da AppBetinhos e recusado antes de chamar a API'
+$recusou = $false
+try { Remove-ComponenteDaSolucao $dv 'abc' 381 'Default' } catch { $recusou = $true }
+Confere ($recusou -and $script:chamadas.Count -eq 0) 'remover de solucao fora das 4 e recusado'
+
+# Get-ExcedentesDasSolucoes: decisao pura do que remover depois que AddSolutionComponent arrasta componentes
+$ordem = @('BetinhosCore', 'BetinhosAutomacao', 'BetinhosInterface', 'BetinhosMotoristas')
+$linhasExc = @{
+  BetinhosCore       = @(@{ id = 'a'; tipo = 1 }, @{ id = 'v'; tipo = 381 }, @{ id = 'x'; tipo = 10161 }, @{ id = 'm'; tipo = 29 })
+  BetinhosAutomacao  = @(@{ id = 'f'; tipo = 29 }, @{ id = 'm'; tipo = 29 })
+  BetinhosInterface  = @(@{ id = 'a'; tipo = 1 }, @{ id = 'x'; tipo = 10161 }, @{ id = 'y'; tipo = 10161 })
+  BetinhosMotoristas = @(@{ id = 'y'; tipo = 10161 })
+  AppBetinhos        = @(@{ id = 'a'; tipo = 1 }, @{ id = 'z'; tipo = 61 }, @{ id = 'v'; tipo = 381 })
+}
+$donoExc = @{ a = 'BetinhosCore'; f = 'BetinhosAutomacao'; m = 'BetinhosCore' }
+$exc = @(Get-ExcedentesDasSolucoes $linhasExc $donoExc $ordem @(381))
+function Marcado([string] $Solucao, [string] $Id) { return (@($exc | Where-Object { $_.solucao -eq $Solucao -and $_.id -eq $Id }).Count -eq 1) }
+Confere (-not (Marcado 'BetinhosCore' 'a') -and -not (Marcado 'BetinhosAutomacao' 'f')) 'dono mantem o componente'
+Confere ((Marcado 'BetinhosInterface' 'a') -and (Marcado 'BetinhosAutomacao' 'm') -and -not (Marcado 'BetinhosCore' 'm')) 'quem nao e dono e marcado para remover'
+Confere ((Marcado 'BetinhosCore' 'v') -and (@($exc | Where-Object { $_.id -eq 'v' })[0].motivo -like '*proibido*')) 'valor de variavel (381) e marcado mesmo sem dono'
+Confere ((Marcado 'BetinhosInterface' 'x') -and -not (Marcado 'BetinhosCore' 'x') -and (Marcado 'BetinhosMotoristas' 'y') -and -not (Marcado 'BetinhosInterface' 'y')) 'copia fora da caixa mantem a camada mais baixa'
+Confere (@($exc | Where-Object { $_.solucao -eq 'AppBetinhos' }).Count -eq 0 -and $exc.Count -eq 5) 'AppBetinhos nunca e candidata a remocao'
+$recusou = $false
+try { Get-ExcedentesDasSolucoes $linhasExc $donoExc @('BetinhosCore', 'AppBetinhos') @(381) | Out-Null } catch { $recusou = ($_.Exception.Message -like '*AppBetinhos*') }
+Confere $recusou 'ordem com a AppBetinhos e recusada'
+
 # Get-HashDoPacote: ignora solution.xml e a ordem das entradas; muda quando o conteudo muda
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 function Novo-Zip([string] $Caminho, [object[]] $Entradas) {
