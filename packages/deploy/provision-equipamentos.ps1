@@ -141,6 +141,19 @@ function Ensure-AttributeOn([string] $Entity, [hashtable] $Payload) {
   }
   Add-SolutionComponent $id 2 "$Entity.$logical"
 }
+# O Dataverse ignora MaxLength e RequiredLevel do atributo primario no POST da tabela (nasce com 850 e opcional):
+# acerta depois por PUT da metadata completa, como Ensure-LookupRequired. Vale para tabela nova e ja existente.
+function Ensure-NameAttribute([string] $Entity, [int] $Max, [string] $Required) {
+  $attr = Invoke-Dataverse "GET" "EntityDefinitions(LogicalName='$Entity')/Attributes(LogicalName='cr40f_name')/Microsoft.Dynamics.CRM.StringAttributeMetadata"
+  if ($attr.MaxLength -eq $Max -and $attr.RequiredLevel.Value -eq $Required) { return }
+  if (-not $Apply) { Write-Step "DRY RUN mudaria $Entity.cr40f_name de MaxLength $($attr.MaxLength)/$($attr.RequiredLevel.Value) para $Max/$Required"; return }
+  foreach ($name in @($attr.PSObject.Properties | Where-Object { $_.Name -like "@odata.*" } | ForEach-Object { $_.Name })) { $attr.PSObject.Properties.Remove($name) }
+  $attr | Add-Member -NotePropertyName "@odata.type" -NotePropertyValue "Microsoft.Dynamics.CRM.StringAttributeMetadata" -Force
+  $attr.MaxLength = $Max
+  $attr.RequiredLevel.Value = $Required
+  Invoke-Dataverse "PUT" "EntityDefinitions(LogicalName='$Entity')/Attributes(LogicalName='cr40f_name')" $attr -ExtraHeaders @{ "MSCRM.MergeLabels" = "true" } | Out-Null
+  Write-Step "cr40f_name de $Entity com MaxLength $Max e RequiredLevel $Required"
+}
 # Coluna primaria cr40f_name: tamanho, obrigatoriedade e rotulo por tabela (spec secao 4: tipo 100, equipamento 200, obrigatoria).
 function Ensure-Table([string] $Logical, [string] $Schema, [string] $Display, [string] $Plural, [string] $Description, [int] $NameMax = 850, [string] $NameRequired = "None", [string] $NameDisplay = "Nome", [string] $NameDescription = "Nome exibido") {
   $id = Get-EntityId $Logical
@@ -154,7 +167,10 @@ function Ensure-Table([string] $Logical, [string] $Schema, [string] $Display, [s
     $id = Get-EntityId $Logical
   }
   elseif (-not $id) { Write-Step "DRY RUN criaria a tabela $Logical" }
-  if ($id) { Add-SolutionComponent $id 1 "tabela $Logical" -IncludeSubcomponents }
+  if ($id) {
+    Ensure-NameAttribute $Logical $NameMax $NameRequired
+    Add-SolutionComponent $id 1 "tabela $Logical" -IncludeSubcomponents
+  }
   return $id
 }
 $relPath = "RelationshipDefinitions/Microsoft.Dynamics.CRM.OneToManyRelationshipMetadata"
@@ -236,8 +252,8 @@ if ($Apply) {
   }
   foreach ($e in @($tipo, $equip)) {
     $tamanhoEsperado = if ($e -eq $tipo) { 100 } else { 200 }
-    $tamanho = (Invoke-Dataverse "GET" "EntityDefinitions(LogicalName='$e')/Attributes(LogicalName='cr40f_name')/Microsoft.Dynamics.CRM.StringAttributeMetadata?`$select=MaxLength").MaxLength
-    if ($tamanho -ne $tamanhoEsperado) { Write-Step "AVISO: $e.cr40f_name tem MaxLength $tamanho (esperado $tamanhoEsperado); ajuste no maker portal." }
+    $nome = Invoke-Dataverse "GET" "EntityDefinitions(LogicalName='$e')/Attributes(LogicalName='cr40f_name')/Microsoft.Dynamics.CRM.StringAttributeMetadata?`$select=MaxLength,RequiredLevel"
+    if ($nome.MaxLength -ne $tamanhoEsperado -or $nome.RequiredLevel.Value -ne "ApplicationRequired") { throw "$e.cr40f_name ficou com MaxLength $($nome.MaxLength)/$($nome.RequiredLevel.Value) (esperado $tamanhoEsperado/ApplicationRequired)." }
   }
   # O shell depende destes dois detalhes; coluna criada antes por outro caminho pode ter vindo diferente.
   $attrBase = "EntityDefinitions(LogicalName='$equip')/Attributes"
