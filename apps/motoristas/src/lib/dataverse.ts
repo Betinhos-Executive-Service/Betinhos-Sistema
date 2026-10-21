@@ -3658,20 +3658,22 @@ async function runQrChargeCommand(command: Record<string, unknown>) {
 }
 
 // Cria a cobrança no Stripe, sempre em reais; o plugin confere de novo permissão, reserva e saldo.
+// A cobrança por QR só é simulada em localhost, nunca no fallback sem Xrm.WebApi: um "pago" de mentira no celular
+// seria pior que nenhum. Sem Xrm no Dynamics, a Custom API falha e o motorista vê o erro.
 export async function createQrChargeRemote(request: QrChargeRequest) {
-  if (shouldUseLocalFrontendFallback()) return createMockQrCharge(request);
+  if (isLocalhostRuntime()) return createMockQrCharge(request);
   return parseQrChargeResponse(await runQrChargeCommand({ acao: "criar", ...request, reservaId: cleanGuid(request.reservaId) }));
 }
 
 export async function updateQrChargeRemote(sessionId: string, acao: "consultar" | "cancelar") {
-  if (shouldUseLocalFrontendFallback()) return updateMockQrCharge(sessionId, acao);
+  if (isLocalhostRuntime()) return updateMockQrCharge(sessionId, acao);
   return parseQrChargeResponse(await runQrChargeCommand({ acao, sessionId }));
 }
 
 // Quanto já entrou por QR no serviço, o saldo e a cobrança aberta: reidrata o Recebimento depois de recarregar.
 // receivableCents só alimenta o mock; no Dataverse o plugin lê o valor a receber da própria reserva.
 export async function getQrChargeSummaryRemote(reservaId: string, receivableCents: number) {
-  if (shouldUseLocalFrontendFallback()) return getMockQrChargeSummary(reservaId, receivableCents);
+  if (isLocalhostRuntime()) return getMockQrChargeSummary(reservaId, receivableCents);
   return parseQrChargeSummary(await runQrChargeCommand({ acao: "resumo", reservaId: cleanGuid(reservaId) }));
 }
 

@@ -3,13 +3,15 @@ import type { ReceiptLanguage } from "./receiptLanguage.ts";
 
 /**
  * Cobrança por QR simulada para a visualização local (fora do Dynamics): vira "pago" 5 s depois de criada
- * (ou ?mockPagaEm=<segundos>). Com ?mockRecusa=1 na URL, as consultas antes disso mostram um cartão recusado.
+ * (ou ?mockPagaEm=<segundos>). Com ?mockRecusa=1 na URL, as consultas antes disso mostram um cartão recusado;
+ * ?mockExpira=<segundos> encurta o prazo do QR e ?mockOffline=<n> faz as n primeiras consultas falharem como sem rede.
  * Fica no sessionStorage para o "resumo" reconhecer o pagamento depois de recarregar a página.
  */
 type MockEntry = { reservaId: string; charge: QrCharge; paidAt: number; pagante: QrChargePayer; idioma: ReceiptLanguage; pagoEm: string };
 
 const STORAGE_KEY = "betinhos.qrChargeMock.v1";
 let memory: Record<string, MockEntry> | null = null;
+let offlineFailuresLeft = 0;
 
 function load(): Record<string, MockEntry> {
   if (memory) return memory;
@@ -54,12 +56,14 @@ export function createMockQrCharge(
   const charges = load();
   const sessionId = `cs_test_mock_${now.toString(36)}${Object.keys(charges).length + 1}`;
   const delaySeconds = Number(param("mockPagaEm", search) ?? 5);
+  const expiresInSeconds = Number(param("mockExpira", search)) || 30 * 60;
+  offlineFailuresLeft = Number(param("mockOffline", search)) || 0;
   const charge: QrCharge = {
     sessionId,
     url: `https://checkout.stripe.com/c/pay/${sessionId}`,
     status: "aguardando",
     valorCentavos: request.valorCentavos,
-    expiraEm: new Date(now + 30 * 60 * 1000).toISOString(),
+    expiraEm: new Date(now + expiresInSeconds * 1000).toISOString(),
     recusa: ""
   };
   // Como o plugin: um QR aberto por reserva.
@@ -82,6 +86,10 @@ export function createMockQrCharge(
 export function updateMockQrCharge(sessionId: string, acao: "consultar" | "cancelar", search = globalThis.location?.search ?? "", now = Date.now()): QrCharge {
   const entry = load()[sessionId];
   if (!entry) throw new Error("Cobrança não encontrada.");
+  if (acao === "consultar" && offlineFailuresLeft > 0) {
+    offlineFailuresLeft -= 1;
+    throw new Error("Failed to fetch");
+  }
   settle(entry, now);
   if (entry.charge.status === "aguardando") {
     if (acao === "cancelar") entry.charge = { ...entry.charge, status: "cancelado" };

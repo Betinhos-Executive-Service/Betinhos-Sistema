@@ -148,6 +148,10 @@ export function formatCountdown(seconds: number) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
+// Erro de negócio que o plugin devolve como {erro} para o motorista ler (sem permissão, pagamento em processamento...).
+// Diferente de falha de rede: a tela mostra a mensagem em vez de contar como "sem conexão".
+export class QrChargeRefusal extends Error {}
+
 // Valida a resposta do plugin antes de virar QR: só aceita página de pagamento do Stripe.
 export function parseQrChargeResponse(raw: unknown): QrCharge {
   const data = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
@@ -156,7 +160,7 @@ export function parseQrChargeResponse(raw: unknown): QrCharge {
   const status = String(data.status ?? "");
   const valorCentavos = data.valorCentavos;
 
-  if (typeof data.erro === "string" && data.erro) throw new Error(data.erro);
+  if (typeof data.erro === "string" && data.erro) throw new QrChargeRefusal(data.erro);
   if (!sessionId) throw new Error("Cobrança sem identificação do Stripe.");
   if (!isQrChargeStatus(status)) throw new Error("Status de cobrança desconhecido.");
   if (typeof valorCentavos !== "number" || !Number.isInteger(valorCentavos) || valorCentavos <= 0) throw new Error("Cobrança sem valor.");
@@ -198,7 +202,7 @@ function nonNegativeInteger(value: unknown, label: string) {
 // Valida a resposta da ação "resumo" do plugin.
 export function parseQrChargeSummary(raw: unknown): QrChargeSummary {
   const data = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  if (typeof data.erro === "string" && data.erro) throw new Error(data.erro);
+  if (typeof data.erro === "string" && data.erro) throw new QrChargeRefusal(data.erro);
   const paid = data.ultimaPaga && typeof data.ultimaPaga === "object" ? (data.ultimaPaga as Record<string, unknown>) : null;
   const open = data.aberta && typeof data.aberta === "object" ? (data.aberta as Record<string, unknown>) : null;
   const openCharge = open ? parseQrChargeResponse(open) : null;

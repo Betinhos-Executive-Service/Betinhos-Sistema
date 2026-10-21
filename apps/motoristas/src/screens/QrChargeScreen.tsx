@@ -18,6 +18,7 @@ import {
   getRemainingSeconds,
   parseAmountToCents,
   QR_CHARGE_PASSENGER_COPY,
+  QrChargeRefusal,
   QR_CHARGE_STEPS,
   validateQrChargeStep,
   type QrCharge,
@@ -30,6 +31,14 @@ import { RECEIPT_LANGUAGE, type ReceiptLanguage } from "../lib/receiptLanguage";
 import type { DetailData } from "../types";
 
 const POLL_INTERVAL_MS = 3000;
+// Três consultas seguidas sem resposta (~9 s): o motorista precisa saber que o app não está conferindo.
+const OFFLINE_AFTER_FAILURES = 3;
+// Quem encerra o QR é o Stripe (expires_at). Passados 2 min do prazo sem o plugin responder, nada mais pode ser pago:
+// a tela para de consultar e orienta; um pagamento feito antes aparece em Recebimento quando a conexão voltar.
+const EXPIRY_GRACE_MS = 2 * 60 * 1000;
+// Consulta pendurada (rede móvel) conta como falha, senão o polling trava sem aviso.
+const POLL_TIMEOUT_MS = 10 * 1000;
+const TIME_FORMAT = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 const QR_QUIET_ZONE = 4;
 
 // Avançar entra pela direita, Voltar pela esquerda; a saída é mais curta que a entrada.
@@ -105,13 +114,21 @@ const QrCodeSvg = memo(function QrCodeSvg({ value }: { value: string }) {
 });
 
 // Só o texto da contagem re-renderiza a cada segundo.
+// A contagem é orientação: quem decide que o QR venceu é o Stripe, via plugin, nunca o relógio do celular.
 function Countdown({ expiraEm }: { expiraEm: string }) {
   const [now, setNow] = useState(() => Date.now());
+  const seconds = getRemainingSeconds(expiraEm, now);
+  const counting = seconds > 0;
   useEffect(() => {
+    if (!counting) return;
     const tick = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(tick);
-  }, []);
-  return <span className="qr-charge-countdown">{formatCountdown(getRemainingSeconds(expiraEm, now))}</span>;
+  }, [counting]);
+  return counting ? (
+    <>Expira em <span className="qr-charge-countdown">{formatCountdown(seconds)}</span>.</>
+  ) : (
+    <>Prazo encerrando; conferindo com o Stripe.</>
+  );
 }
 
 function draftFromResume(resume: QrChargeOpen, optionNames: string[]): QrChargeDraft {
@@ -147,9 +164,16 @@ export function QrChargeScreen({ detail, maxCents, resume, onBack, onPaid, onCon
   const [chargePayer, setChargePayer] = useState<QrChargePayer>(resume?.pagante ?? { nome: "", email: "" });
   const [chargeIdioma, setChargeIdioma] = useState<ReceiptLanguage>(resume?.idioma ?? RECEIPT_LANGUAGE.portuguese);
   const [paidAt, setPaidAt] = useState<Date | null>(null);
-  const [timedOut, setTimedOut] = useState(false);
+  // Prazo do Stripe vencido há mais de EXPIRY_GRACE_MS sem o plugin responder.
+  const [graceOver, setGraceOver] = useState(false);
+  // Consultas seguidas sem resposta e a hora da última que respondeu: base do aviso de "sem conexão".
+  const [failures, setFailures] = useState(0);
+  const lastCheckedAt = useRef(Date.now());
   const [busy, setBusy] = useState<"" | "creating" | "cancelling">("");
   const [error, setError] = useState("");
+  // Recusa do plugin durante a consulta (ex.: pagamento em processamento); separada de `error` para não apagar
+  // a mensagem de gerar/cancelar a cada rodada.
+  const [pollError, setPollError] = useState("");
   const fieldRef = useRef<HTMLInputElement | null>(null);
   const focusTargetRef = useRef<HTMLElement | null>(null);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
@@ -169,10 +193,11 @@ export function QrChargeScreen({ detail, maxCents, resume, onBack, onPaid, onCon
   onPaidRef.current = onPaid;
 
   const paid = charge?.status === "pago";
-  const expired = charge?.status === "expirado" || (charge?.status === "aguardando" && timedOut);
-  const open = charge?.status === "aguardando" && !timedOut;
+  const expired = charge?.status === "expirado" || (charge?.status === "aguardando" && graceOver);
+  const open = charge?.status === "aguardando" && !graceOver;
   const openSessionId = open ? charge.sessionId : "";
   const openExpiraEm = open ? charge.expiraEm : "";
+  const offline = open && failures >= OFFLINE_AFTER_FAILURES;
   const progress = getQrChargeStepProgress(step);
   const isOtherPayer = !draft.payerChoice;
 
@@ -204,34 +229,58 @@ export function QrChargeScreen({ detail, maxCents, resume, onBack, onPaid, onCon
 
   useEffect(() => {
     if (!openExpiraEm) return;
-    const timer = window.setTimeout(() => setTimedOut(true), getRemainingSeconds(openExpiraEm) * 1000);
+    const timer = window.setTimeout(() => setGraceOver(true), getRemainingSeconds(openExpiraEm) * 1000 + EXPIRY_GRACE_MS);
     return () => window.clearTimeout(timer);
   }, [openExpiraEm]);
 
   useEffect(() => {
     if (!openSessionId) return;
     // Uma consulta por vez: a próxima só é agendada quando a anterior volta.
-    // Resposta que chega depois de cancelar ou sair da tela é descartada.
+    // Resposta que chega depois de cancelar ou sair da tela, ou de outra sessão, é descartada.
+    // Continua até o plugin dizer pago, expirado ou cancelado: o relógio do celular não encerra a cobrança.
     let stopped = false;
+    let running = false;
     let timer = 0;
     const poll = async () => {
-      // Tela apagada ou app em segundo plano: não gasta chamada; volta a consultar ao reabrir.
-      if (document.hidden) {
-        timer = window.setTimeout(poll, POLL_INTERVAL_MS);
-        return;
-      }
+      window.clearTimeout(timer);
+      // Tela apagada ou app em segundo plano: para de consultar; o visibilitychange retoma na hora ao reabrir.
+      if (stopped || running || document.hidden) return;
+      running = true;
+      const answered = () => {
+        lastCheckedAt.current = Date.now();
+        setFailures(0);
+      };
       try {
-        const next = await updateCharge(openSessionId, "consultar");
-        if (!stopped) applyUpdate(next);
-      } catch {
-        // Falha de rede não interrompe a cobrança; a próxima rodada tenta de novo.
+        const next = await Promise.race([
+          updateCharge(openSessionId, "consultar"),
+          new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("timeout")), POLL_TIMEOUT_MS))
+        ]);
+        if (!stopped && next.sessionId === openSessionId) {
+          applyUpdate(next);
+          answered();
+          setPollError("");
+        }
+      } catch (failure) {
+        if (stopped) return;
+        // Recusa do plugin (ex.: pagamento em processamento no banco) é resposta: vira mensagem para o motorista.
+        // Falha de rede não interrompe a cobrança: a próxima rodada tenta de novo e o aviso conta as falhas.
+        if (failure instanceof QrChargeRefusal) {
+          answered();
+          setPollError(failure.message);
+        } else setFailures((count) => count + 1);
       }
+      running = false;
       if (!stopped) timer = window.setTimeout(poll, POLL_INTERVAL_MS);
     };
+    const pollNow = () => void poll();
+    document.addEventListener("visibilitychange", pollNow);
+    window.addEventListener("online", pollNow);
     timer = window.setTimeout(poll, POLL_INTERVAL_MS);
     return () => {
       stopped = true;
       window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", pollNow);
+      window.removeEventListener("online", pollNow);
     };
     // applyUpdate só usa setters e refs.
   }, [openSessionId, updateCharge]);
@@ -306,7 +355,6 @@ export function QrChargeScreen({ detail, maxCents, resume, onBack, onPaid, onCon
       const created = await createCharge(parseAmountToCents(draft.amountText), pagante, draft.idioma);
       setChargePayer(pagante);
       setChargeIdioma(draft.idioma);
-      setTimedOut(false);
       applyUpdate(created);
     } catch (createError) {
       setError(errorMessage(createError));
@@ -331,8 +379,10 @@ export function QrChargeScreen({ detail, maxCents, resume, onBack, onPaid, onCon
   // Outro QR: volta à revisão com os dados preenchidos.
   const startOver = () => {
     setCharge(null);
-    setTimedOut(false);
+    setGraceOver(false);
+    setFailures(0);
     setError("");
+    setPollError("");
     goTo("revisao");
   };
 
@@ -622,14 +672,24 @@ export function QrChargeScreen({ detail, maxCents, resume, onBack, onPaid, onCon
                         Pagamento recusado: {charge.recusa} Peça outro cartão; o mesmo QR code continua valendo.
                       </p>
                     ) : null}
+                    {pollError ? <p className="qr-charge-alert is-danger" role="alert">{pollError}</p> : null}
+                    {offline ? (
+                      <p className="qr-charge-alert is-warning" role="alert">
+                        Sem conexão: o app não consegue conferir o pagamento desde {TIME_FORMAT.format(lastCheckedAt.current)}. O QR code continua
+                        valendo; ao voltar o sinal, a confirmação aparece aqui ou em Recebimento.
+                      </p>
+                    ) : null}
                     <p className="qr-charge-help">
-                      O passageiro lê o QR code com a câmera do celular. Expira em <Countdown expiraEm={charge.expiraEm} />.
+                      O passageiro lê o QR code com a câmera do celular. <Countdown expiraEm={charge.expiraEm} />
                     </p>
                   </>
                 ) : null}
 
                 {expired ? (
-                  <p className="qr-charge-alert is-warning" role="status">O QR code expirou e não aceita mais pagamento. Gere outro para cobrar.</p>
+                  <p className="qr-charge-alert is-warning" role="status">
+                    O QR code expirou e não aceita mais pagamento. Gere outro para cobrar.
+                    {charge.status === "aguardando" ? " Se o passageiro chegou a pagar antes do prazo, a confirmação aparece em Recebimento." : ""}
+                  </p>
                 ) : null}
                 {charge.status === "cancelado" ? (
                   <p className="qr-charge-alert is-neutral" role="status">Cobrança cancelada. O QR code não aceita mais pagamento.</p>
