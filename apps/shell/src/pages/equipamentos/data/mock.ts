@@ -1,5 +1,6 @@
 import { STATUS } from '../domain/choices'
 import { emptyEquipamento } from '../domain/form'
+import type { Foto } from '../domain/fotos'
 import type { Equipamento, Pessoa, TipoEquipamento } from '../domain/types'
 
 const id = (n: number) => `eeeeeeee-0000-4000-8000-${String(n).padStart(12, '0')}`
@@ -48,5 +49,22 @@ export function createMockEquipamentos(): Equipamento[] {
     make(7, 'Celular plantão', 'Celular', 'Samsung A15', 'A15-90011', STATUS.emUso, 'm6', '2025-01-15', 1099),
     make(8, 'Impressora antiga', 'Impressora', 'HP LaserJet 1102w', 'HP1102-01', STATUS.baixado, null, '2019-08-01', 899),
     make(9, 'Pager da portaria', 'Pager', 'Motorola LX2', 'LX2-0042', STATUS.disponivel, null),
+  ]
+}
+
+/** Imagem de exemplo (SVG) para o `pnpm dev`: fundo liso, um retângulo e o nome; não depende de arquivo. */
+function imagemExemplo(texto: string, fundo: string, frente: string) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480"><rect width="640" height="480" fill="${fundo}"/><rect x="170" y="120" width="300" height="190" rx="14" fill="${frente}"/><rect x="130" y="320" width="380" height="22" rx="8" fill="${frente}"/><text x="320" y="410" font-family="sans-serif" font-size="30" text-anchor="middle" fill="#1f2937">${texto}</text></svg>`
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+}
+
+/** Fotos de exemplo: Notebook do Financeiro com duas (capa a primeira) e Maquininha Carlos com uma. */
+export function createMockFotos(): Foto[] {
+  const foto = (n: number, equipamento: number, nome: string, capa: boolean, dia: string, imagem: string): Foto =>
+    ({ id: `ffffffff-0000-4000-8000-${String(n).padStart(12, '0')}`, equipamentoId: id(equipamento), nome, capa, criadoEm: new Date(`${dia}T12:00:00Z`), miniatura: imagem, url: imagem })
+  return [
+    foto(1, 1, 'notebook-frente.jpg', true, '2026-10-02', imagemExemplo('Notebook — frente', '#dbeafe', '#64748b')),
+    foto(2, 1, 'notebook-etiqueta.jpg', false, '2026-10-03', imagemExemplo('Notebook — etiqueta', '#e0e7ff', '#94a3b8')),
+    foto(3, 5, 'maquininha.jpg', true, '2026-10-04', imagemExemplo('Máquina de cartão', '#dcfce7', '#475569')),
   ]
 }

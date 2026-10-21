@@ -1,6 +1,8 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { StatusBadge, Table, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
+import { CreditCard, Headphones, Keyboard, Laptop, Monitor, Mouse, Package, PcCase, Printer, Smartphone, Tablet, type LucideIcon } from 'lucide-react'
 import { openFromRow } from '../../pagantes/components/PagantesList'
+import { iconeTipo, type IconeTipo } from '../domain/cadastros'
 import { statusLabel, statusTone } from '../domain/choices'
 import type { Equipamento } from '../domain/types'
 
@@ -12,11 +14,31 @@ export const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currenc
 export const fmtData = (iso: string | null) => (iso ? iso.split('-').reverse().join('/') : '')
 const fmtCompra = (e: Equipamento) => [fmtData(e.dataCompra), e.valorCompra == null ? '' : money.format(e.valorCompra)].filter(Boolean).join(' · ') || '—'
 
+const ICONE: Record<IconeTipo, LucideIcon> = {
+  notebook: Laptop, desktop: PcCase, monitor: Monitor, mouse: Mouse, teclado: Keyboard, headset: Headphones,
+  celular: Smartphone, tablet: Tablet, cartao: CreditCard, impressora: Printer, outro: Package,
+}
+
+/** Miniatura da capa; sem foto (ou se a imagem não carregar), o ícone do tipo. Decorativa: o nome vem ao lado. */
+export function Miniatura({ e, size = 'compact' }: { e: Equipamento; size?: 'compact' | 'card' }) {
+  const [quebrada, setQuebrada] = useState<string | null>(null)
+  const Icone = ICONE[iconeTipo(e.tipoNome)]
+  const foto = e.capa && quebrada !== e.capa ? e.capa : null
+  return (
+    <span className={`eq-thumb eq-thumb--${size}${foto ? ' eq-thumb--foto' : ''}`} aria-hidden="true">
+      {foto ? <img src={foto} alt="" onError={() => setQuebrada(foto)} /> : <Icone size={size === 'card' ? 22 : 16} />}
+    </span>
+  )
+}
+
 function OpenName({ e, onOpen }: { e: Equipamento; onOpen: (id: string) => void }) {
   return (
-    <button type="button" className="eq-open" onClick={() => onOpen(e.id)}>
-      <strong>{e.descricao || 'Sem descrição'}</strong>
-    </button>
+    <span className="eq-name">
+      <Miniatura e={e} />
+      <button type="button" className="eq-open" onClick={() => onOpen(e.id)}>
+        <strong>{e.descricao || 'Sem descrição'}</strong>
+      </button>
+    </span>
   )
 }
 
@@ -57,8 +79,11 @@ export function EquipamentosCards({ list, inativos, onOpen }: Props) {
       {list.map((e) => (
         <li key={e.id} className="eq-card">
           <button type="button" className="eq-card__open" onClick={() => onOpen(e.id)}>
-            <strong className="eq-card__name">{e.descricao || 'Sem descrição'}</strong>
-            <span className="eq-card__meta">{[e.tipoNome, e.marcaModelo, e.numeroSerie && `Série ${e.numeroSerie}`].filter(Boolean).join(' · ')}</span>
+            <Miniatura e={e} size="card" />
+            <span className="eq-card__text">
+              <strong className="eq-card__name">{e.descricao || 'Sem descrição'}</strong>
+              <span className="eq-card__meta">{[e.tipoNome, e.marcaModelo, e.numeroSerie && `Série ${e.numeroSerie}`].filter(Boolean).join(' · ')}</span>
+            </span>
           </button>
           <div className="eq-card__foot"><Responsavel e={e} inativos={inativos} /><StatusSelo e={e} /></div>
         </li>

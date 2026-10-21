@@ -1,12 +1,15 @@
 import { cleanId, formatted, type DataverseClient, type Row } from '@betinhos/dataverse'
 import { FUNC_DESLIGADO } from '../../documentos/domain/codes'
 import type { Changes } from '../domain/form'
+import type { Foto } from '../domain/fotos'
 import type { Equipamento, Pessoa, TipoEquipamento } from '../domain/types'
 
 export const ENTITIES = { equipamento: 'cr40f_equipamento', tipo: 'cr40f_tipoequipamento', funcionario: 'cr40f_funcionarios' } as const
 export type EntitySets = Record<keyof typeof ENTITIES, string>
+/** Fotos ficam fora de ENTITIES: sem a tabela (antes do provision) a lista funciona e só a seção Fotos mostra o erro. */
+export const FOTO_ENTITY = 'cr40f_fotoequipamento'
 /** Propriedades de navegação dos lookups (SchemaName criado por provision-equipamentos.ps1). */
-export const NAV = { tipo: 'cr40f_Tipo', responsavel: 'cr40f_Responsavel' } as const
+export const NAV = { tipo: 'cr40f_Tipo', responsavel: 'cr40f_Responsavel', fotoEquipamento: 'cr40f_Equipamento' } as const
 
 const SELECT = [
   'cr40f_equipamentoid', 'cr40f_name', '_cr40f_tipo_value', 'cr40f_marcamodelo', 'cr40f_numeroserie', 'cr40f_status',
@@ -33,7 +36,7 @@ export function mapEquipamento(row: Row): Equipamento {
     marcaModelo: text(row.cr40f_marcamodelo), numeroSerie: text(row.cr40f_numeroserie), status: num(row.cr40f_status),
     responsavelId: lookupId('_cr40f_responsavel_value'), responsavelNome: lookupName('_cr40f_responsavel_value'),
     dataCompra: text(row.cr40f_datacompra).slice(0, 10) || null, valorCompra: num(row.cr40f_valorcompra),
-    observacoes: text(row.cr40f_observacoes), modificadoEm: date(row.modifiedon),
+    observacoes: text(row.cr40f_observacoes), modificadoEm: date(row.modifiedon), capa: null,
   }
 }
 
@@ -58,6 +61,46 @@ export const responsavelRefPath = (set: string, id: string) => `${set}(${cleanId
 
 /** Inativar/reativar tipo mexe só no estado; o statuscode acompanha (Ativo 1, Inativo 2). */
 export const estadoPayload = (ativo: boolean): Row => ({ statecode: ativo ? 0 : 1, statuscode: ativo ? 1 : 2 })
+
+/**
+ * Fotos (`cr40f_fotoequipamento`). O `$select` da coluna de imagem devolve a miniatura em base64 (144 px, JPEG);
+ * a grande vem de `…/cr40f_imagem/$value?size=full` (CanStoreFullImage), com o id da imagem contra o cache.
+ */
+const FOTO_SELECT = ['cr40f_fotoequipamentoid', 'cr40f_name', '_cr40f_equipamento_value', 'cr40f_capa', 'cr40f_imagem', 'cr40f_imagemid', 'createdon']
+const miniatura = (v: unknown) => (typeof v === 'string' && v ? `data:image/jpeg;base64,${v}` : null)
+
+export const fotosPath = (set: string, equipamentoId: string) =>
+  `${set}?$select=${FOTO_SELECT.join(',')}&$filter=${encodeURIComponent(`_cr40f_equipamento_value eq ${cleanId(equipamentoId)}`)}${order('createdon')}`
+export const fotoPath = (set: string, id: string) => `${set}(${cleanId(id)})?$select=${FOTO_SELECT.join(',')}`
+/** Só as capas, para a miniatura da lista (as demais fotos só no drawer). Mais antiga primeiro: com duas marcadas, vale a primeira. */
+export const capasPath = (set: string) =>
+  `${set}?$select=_cr40f_equipamento_value,cr40f_imagem,createdon&$filter=${encodeURIComponent('cr40f_capa eq true')}${order('createdon')}`
+
+export function mapFoto(row: Row, apiUrl: string, set: string): Foto {
+  const id = cleanId(str(row.cr40f_fotoequipamentoid))
+  const imagemId = str(row.cr40f_imagemid)
+  return {
+    id, equipamentoId: row._cr40f_equipamento_value ? cleanId(str(row._cr40f_equipamento_value)) : '', nome: text(row.cr40f_name) || 'Foto',
+    capa: row.cr40f_capa === true, criadoEm: date(row.createdon), miniatura: miniatura(row.cr40f_imagem),
+    url: imagemId ? `${apiUrl}/${set}(${id})/cr40f_imagem/$value?size=full&v=${cleanId(imagemId)}` : null,
+  }
+}
+
+/** Primeira capa de cada item (as linhas vêm da mais antiga para a mais nova). */
+export function mapCapas(rows: Row[]): Map<string, string> {
+  const out = new Map<string, string>()
+  for (const row of rows) {
+    const id = row._cr40f_equipamento_value ? cleanId(str(row._cr40f_equipamento_value)) : ''
+    const thumb = miniatura(row.cr40f_imagem)
+    if (id && thumb && !out.has(id)) out.set(id, thumb)
+  }
+  return out
+}
+
+/** Criação com a imagem no mesmo POST (só a imagem primária aceita isso): sem registro de foto vazio se o envio falhar. */
+export const fotoPayload = (equipamentosSet: string, equipamentoId: string, nome: string, capa: boolean, base64: string): Row => ({
+  cr40f_name: nome, cr40f_capa: capa, cr40f_imagem: base64, [`${NAV.fotoEquipamento}@odata.bind`]: `/${equipamentosSet}(${cleanId(equipamentoId)})`,
+})
 
 export async function loadAll(client: DataverseClient, sets: EntitySets) {
   const [equipamentos, tipos, pessoas] = await Promise.all([

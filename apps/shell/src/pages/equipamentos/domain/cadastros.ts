@@ -23,3 +23,14 @@ export function opcoesAtivas<T extends { id: string; nome: string; ativo: boolea
     .sort(byNome)
     .map((x) => ({ value: x.id, label: x.ativo ? x.nome : `${x.nome} (inativo)` }))
 }
+
+export type IconeTipo = 'notebook' | 'desktop' | 'monitor' | 'mouse' | 'teclado' | 'headset' | 'celular' | 'tablet' | 'cartao' | 'impressora' | 'outro'
+const ICONES: [RegExp, IconeTipo][] = [
+  [/notebook|laptop/, 'notebook'], [/desktop|computador|cpu/, 'desktop'], [/monitor|tela/, 'monitor'], [/mouse/, 'mouse'], [/teclado/, 'teclado'],
+  [/headset|fone/, 'headset'], [/celular|smartphone/, 'celular'], [/tablet/, 'tablet'], [/cartao|maquininha|pos\b/, 'cartao'], [/impressora/, 'impressora'],
+]
+/** Ícone do item sem foto, pelo nome do tipo (os tipos são editáveis: sem correspondência, ícone genérico). */
+export function iconeTipo(nome: string): IconeTipo {
+  const key = normalize(nome)
+  return ICONES.find(([re]) => re.test(key))?.[1] ?? 'outro'
+}
