@@ -3,6 +3,8 @@
 .eq-muted { margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
 .eq-badges { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1); }
 .eq-search { flex: 1 1 260px; min-width: 200px; max-width: 360px; }
+/* Tipos e Novo equipamento quebram de linha juntos na ViewBar. */
+.eq-acoes { display: inline-flex; flex: 0 0 auto; align-items: center; gap: var(--bt-space-2); }
 
 .eq-open { display: grid; gap: var(--bt-space-0-5); min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
 .eq-open strong { font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); }
@@ -37,7 +39,8 @@
 .eq-tipos { display: grid; gap: var(--bt-space-3); }
 .eq-tipos__form { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--bt-space-2); }
 .eq-tipos__form > .bt-field { flex: 1 1 200px; min-width: 0; }
-/* Botões alinhados ao controle (o rótulo do campo fica acima); o erro abaixo não desloca o botão. */
+/* Botões alinhados ao controle (o rótulo do campo fica acima); o erro abaixo não desloca o botão.
+   O margin-top acompanha a altura do rótulo do Field do DS (.bt-field__label: 12px × 1.42 + gap 1-5): mudou lá, ajuste aqui. */
 .eq-tipos__form > .bt-button { margin-top: calc(var(--bt-font-size-12) * 1.42 + var(--bt-space-1-5)); }
 .eq-tipos__list { display: grid; margin: 0; padding: 0; list-style: none; border-top: var(--bt-border-width-default) solid var(--bt-color-border); }
 .eq-tipos__item { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1) var(--bt-space-2); min-height: var(--bt-control-height-touch); padding: var(--bt-space-1) 0 var(--bt-space-1) var(--bt-space-2); border-bottom: var(--bt-border-width-default) solid var(--bt-color-border); }

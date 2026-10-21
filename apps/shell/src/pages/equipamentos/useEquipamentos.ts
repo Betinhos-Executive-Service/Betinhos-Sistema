@@ -32,17 +32,27 @@ export function useEquipamentos(source: Source) {
 
   useEffect(() => { void reload() }, [reload])
 
-  const upsert = useCallback((e: Equipamento) => setState((s) => ({
-    ...s,
-    equipamentos: (s.equipamentos.some((x) => x.id === e.id) ? s.equipamentos.map((x) => (x.id === e.id ? e : x)) : [...s.equipamentos, e]).sort(byDescricao),
-  })), [])
+  // Gravação local vence uma recarga que já estava em voo (a resposta dela pode ser anterior ao que foi salvo):
+  // o token muda, a resposta antiga é descartada e o indicador de carga para.
+  const upsert = useCallback((e: Equipamento) => {
+    token.current += 1
+    setState((s) => ({
+      ...s,
+      loading: false,
+      equipamentos: (s.equipamentos.some((x) => x.id === e.id) ? s.equipamentos.map((x) => (x.id === e.id ? e : x)) : [...s.equipamentos, e]).sort(byDescricao),
+    }))
+  }, [])
 
   /** Renomear o tipo também atualiza o nome nos itens. */
-  const upsertTipo = useCallback((t: TipoEquipamento) => setState((s) => ({
-    ...s,
-    tipos: (s.tipos.some((x) => x.id === t.id) ? s.tipos.map((x) => (x.id === t.id ? t : x)) : [...s.tipos, t]).sort(byNome),
-    equipamentos: s.equipamentos.map((e) => (e.tipoId === t.id ? { ...e, tipoNome: t.nome } : e)),
-  })), [])
+  const upsertTipo = useCallback((t: TipoEquipamento) => {
+    token.current += 1
+    setState((s) => ({
+      ...s,
+      loading: false,
+      tipos: (s.tipos.some((x) => x.id === t.id) ? s.tipos.map((x) => (x.id === t.id ? t : x)) : [...s.tipos, t]).sort(byNome),
+      equipamentos: s.equipamentos.map((e) => (e.tipoId === t.id ? { ...e, tipoNome: t.nome } : e)),
+    }))
+  }, [])
 
   return { ...state, reload, upsert, upsertTipo }
 }
