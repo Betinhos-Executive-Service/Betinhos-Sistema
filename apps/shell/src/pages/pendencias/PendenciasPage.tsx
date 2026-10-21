@@ -116,7 +116,7 @@ function Pendencias({ host }: Props) {
         {mobile
           ? (visible.length ? <PendenciasCards list={slice} onOpen={setSelectedId} {...acoes} /> : <div className="surface">{empty}</div>)
           : <PendenciasTable list={slice} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig }} quickFilters={quickFilters} footer={footer} empty={empty} {...acoes} />}
-        {more ? <LazyFooter loaded={slice.length} total={visible.length} more onLoadMore={loadMore} noun={['pendência', 'pendências']} touch={mobile} /> : null}
+        {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )
   }

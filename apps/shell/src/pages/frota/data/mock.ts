@@ -1,3 +1,4 @@
+import { mockVolume } from '../../../app/mockVolume'
 import { CAMPO, lerMulti, ORIGEM } from '../domain/manutencaoCatalogo'
 import { addMonths, todaySP } from './dates'
 import { COLISAO, MANUT, MULTA, STATUS_FIELD, VEICULO } from './schema'
@@ -37,6 +38,11 @@ function telemetria(veiculoId: string, dias: number, km: number): TelemetriaKm[]
   return Array.from({ length: dias }, (_, index) => ({ dia: offset(-(index + 1)), veiculoId, km }))
 }
 
+/** `?volume=N` do pnpm dev: N manutenções realizadas a mais (lista grande sem criar pendências). */
+const volumeManutencoes = (total: number, v1: Ref, v2: Ref) => Array.from({ length: total }, (_, i) => manut(`mv${i + 1}`, i % 2 ? v2 : v1, {
+  status: MANUT.REALIZADO, descricao: `Manutenção de exemplo ${i + 1}`, dataManutencao: iso(-(30 + (i % 700))), criadoEm: iso(-(32 + (i % 700))), valor: 150 + (i % 40) * 22.5, estabelecimento: 'Oficina Volume',
+}))
+
 function seed(): FrotaData {
   return {
     veiculos: [
@@ -55,6 +61,7 @@ function seed(): FrotaData {
       manut('m4c', v1, { status: MANUT.REALIZADO, dataManutencao: iso(-25), valor: 720, estabelecimento: 'Freios Exemplo', descricao: 'Freio voltou a fazer ruído (fictício)', criadoEm: iso(-27), servicos: [100000007], categorias: [100000001], origemClassificacao: ORIGEM.MANUAL }),
       manut('m5', v2, { status: MANUT.REALIZADO, dataManutencao: iso(-100), valor: 1250, tipo: 100000001, criadoEm: iso(-110) }),
       manut('m6', v2, { status: MANUT.REALIZADO, dataManutencao: iso(-70), tipo: 2, criadoEm: iso(-72) }),
+      ...volumeManutencoes(mockVolume(), v1, v2),
     ],
     multas: [
       multa('u1', {}),

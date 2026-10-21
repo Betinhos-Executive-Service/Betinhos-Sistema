@@ -73,11 +73,14 @@ export function readDespesa(d: Despesa, key: string): unknown {
   }
 }
 
+/** Texto em que a busca por palavra-chave procura (não fica na visão). */
+export const despesaKeywordText = (d: Despesa) => [d.nome, d.estabelecimento, d.motorista, d.categoria, d.forma, d.reserva, d.veiculo, d.protocolo, d.cidade].filter(Boolean).join(' ')
+
 /** Busca por palavra-chave (não fica na visão). */
 export function matchesKeyword(d: Despesa, query: string) {
   const words = normalizeSearch(query).split(/\s+/).filter(Boolean)
   if (!words.length) return true
-  const text = normalizeSearch([d.nome, d.estabelecimento, d.motorista, d.categoria, d.forma, d.reserva, d.veiculo, d.protocolo, d.cidade].filter(Boolean).join(' '))
+  const text = normalizeSearch(despesaKeywordText(d))
   return words.every((w) => text.includes(w))
 }
 

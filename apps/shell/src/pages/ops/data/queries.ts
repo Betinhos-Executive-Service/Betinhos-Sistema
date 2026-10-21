@@ -1,4 +1,5 @@
 import { chunk, cleanId, formatted, type DataverseClient, type Row } from '@betinhos/dataverse'
+import { andFilter, odataSearchFilter } from '../../../app/pagedLoad'
 import type { Op } from '../domain/types'
 
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -6,19 +7,24 @@ const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 /**
  * Valor de cada OP pela composição de preços dos serviços, na mesma regra do detalhe (`loadServicos` + `totalOp`):
  * soma as composições ativas de cada serviço; a OP fica null se não tem serviço ou se algum serviço não tem composição.
- * Duas consultas por bloco de 15 OPs (reservas e composições, filtradas pela OP do serviço).
+ * Duas consultas por bloco de 15 OPs (reservas e composições, filtradas pela OP do serviço), 4 blocos por vez.
  */
 export async function loadValoresServicos(client: DataverseClient, sets: { reserva: string; composicao: string }, opIds: string[]) {
   const ids = [...new Set(opIds.map((id) => cleanId(id)).filter((id) => GUID.test(id)))]
   const servicosPorOp = new Map<string, string[]>()
   const valorPorServico = new Map<string, number>()
-  for (const part of chunk(ids, 15)) {
+  const bloco = async (part: string[]) => {
     const porOp = part.map((id) => `_cr40f_financeiro_value eq ${id}`).join(' or ')
     const porServico = part.map((id) => `cr40f_ServicoRelacionadoGeral/_cr40f_financeiro_value eq ${id}`).join(' or ')
-    const [reservas, composicoes] = await Promise.all([
+    return Promise.all([
       client.getAll(`${sets.reserva}?$select=cr40f_reservadeveculosid,_cr40f_financeiro_value&$filter=${encodeURIComponent(porOp)}`),
       client.getAll(`${sets.composicao}?$select=new_valortotal,_cr40f_servicorelacionadogeral_value&$filter=${encodeURIComponent(`statecode eq 0 and (${porServico})`)}`),
     ])
+  }
+  // Blocos em ondas de 4: com centenas de OPs a soma não espera bloco por bloco, sem estourar o limite do Dataverse.
+  const respostas: [Row[], Row[]][] = []
+  for (const wave of chunk(chunk(ids, 15), 4)) respostas.push(...await Promise.all(wave.map(bloco)))
+  for (const [reservas, composicoes] of respostas) {
     for (const r of reservas) {
       const op = cleanId(String(r._cr40f_financeiro_value ?? '')).toLowerCase()
       const servico = cleanId(String(r.cr40f_reservadeveculosid ?? '')).toLowerCase()
@@ -46,8 +52,11 @@ const SELECT = [
   'cr40f_datado1servico', 'cr40f_datadoultimoservico', 'cr40f_idioma', 'createdon', 'modifiedon', '_createdby_value',
 ]
 
-export function opsPath(entitySet: string, since: Date | null) {
-  const filter = since ? `statecode eq 0 and createdon ge ${since.toISOString()}` : 'statecode eq 0'
+/** Busca no servidor: número da OP pelo começo; cliente e passageiros (textos montados por flow) em qualquer posição. */
+export const opsSearchFilter = (query: string) => odataSearchFilter(query, { startsWith: ['cr40f_idfinanceiro'], contains: ['new_clientedaop', 'new_passageirosdaop'] })
+
+export function opsPath(entitySet: string, since: Date | null, search: string | null = null) {
+  const filter = andFilter(since ? `statecode eq 0 and createdon ge ${since.toISOString()}` : 'statecode eq 0', search)
   return `${entitySet}?$select=${SELECT.join(',')}&$filter=${encodeURIComponent(filter)}&$orderby=${encodeURIComponent('createdon desc')}`
 }
 

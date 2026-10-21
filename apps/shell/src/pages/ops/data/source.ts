@@ -1,10 +1,13 @@
+import { normalizeSearch } from '@betinhos/ui'
 import type { Host } from '../../../host'
+import { getAllWithFirstPage, searchRows } from '../../../app/pagedLoad'
+import { mockProgressive, mockSearch } from '../../../app/mockVolume'
 import { createSource as createPagantesSource, browserKV, type Source as PagantesSource } from '../../pagantes/data/source'
 import type { KV } from '../../pagantes/domain/filters'
 import { OP_STATUS, withOpFallback } from '../domain/status'
 import type { Op, OpChoices } from '../domain/types'
 import { createMockOps } from './mock'
-import { ENTITY_OP, loadValoresServicos, mapOp, opsPath } from './queries'
+import { ENTITY_OP, loadValoresServicos, mapOp, opsPath, opsSearchFilter } from './queries'
 
 const ENTITY_RESERVA = 'cr40f_reservadeveculos'
 const ENTITY_COMPOSICAO = 'cr40f_composicaodeprecos'
@@ -12,7 +15,13 @@ const ENTITY_COMPOSICAO = 'cr40f_composicaodeprecos'
 /** Tudo que a tela precisa do mundo externo. Rateio, serviços e contatos vêm do Source de Pagantes. */
 export type Source = {
   mock: boolean
-  load: (since: Date | null) => Promise<Op[]>
+  /**
+   * OPs do período. `onPartial` mostra antes o que já chegou: a primeira página e depois a lista toda ainda sem o
+   * valor dos serviços (a soma vem por último).
+   */
+  load: (since: Date | null, onPartial?: (list: Op[]) => void) => Promise<Op[]>
+  /** Até 50 OPs do período que batem com a busca (usada enquanto a lista não carregou inteira). */
+  search: (since: Date | null, query: string) => Promise<Op[]>
   choices: () => Promise<OpChoices>
   cancel: (id: string) => Promise<void>
   pagantes: Pick<PagantesSource, 'rateio' | 'servicos' | 'contatos' | 'choices' | 'gerarPagantesUrl'>
@@ -25,7 +34,11 @@ function createMockSource(host: Host): Source {
   const rows = createMockOps(new Date())
   return {
     mock: true,
-    async load(since) { await wait(350); return rows.filter((op) => !since || (op.criadoEm && op.criadoEm >= since)).map((op) => ({ ...op })) },
+    load: (since, onPartial) => mockProgressive(rows.filter((op) => !since || (op.criadoEm && op.criadoEm >= since)).map((op) => ({ ...op })), onPartial),
+    search: (since, q) => {
+      const t = normalizeSearch(q)
+      return mockSearch(rows, (op) => (!since || (op.criadoEm != null && op.criadoEm >= since)) && normalizeSearch(`${op.codigo} ${op.cliente} ${op.passageiros}`).includes(t))
+    },
     choices: async () => withOpFallback({}),
     async cancel(id) {
       await wait(400)
@@ -50,9 +63,10 @@ export function createSource(host: Host): Source {
 
   return {
     mock: false,
-    async load(since) {
-      const ops = (await host.client.getAll(opsPath(await entitySet(), since))).map(mapOp)
+    async load(since, onPartial) {
+      const ops = (await getAllWithFirstPage(host.client, opsPath(await entitySet(), since), onPartial && ((rows) => onPartial(rows.map(mapOp))))).map(mapOp)
       // O valor vem dos serviços; se essa parte falhar, a lista abre do mesmo jeito (valor "—").
+      onPartial?.(ops)
       try {
         const info = await host.metadata.entities([ENTITY_RESERVA, ENTITY_COMPOSICAO])
         const reserva = info.get(ENTITY_RESERVA)?.entitySetName
@@ -63,6 +77,10 @@ export function createSource(host: Host): Source {
       } catch {
         return ops
       }
+    },
+    async search(since, q) {
+      const filter = opsSearchFilter(q)
+      return filter ? (await searchRows(host.client, opsPath(await entitySet(), since, filter))).map(mapOp) : []
     },
     // Rótulo é acessório: metadata fora do ar cai nos rótulos conhecidos.
     async choices() {

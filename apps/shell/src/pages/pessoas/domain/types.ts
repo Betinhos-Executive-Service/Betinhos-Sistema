@@ -33,4 +33,5 @@ export type Cliente = { id: string; nome: string }
 export type Papel = 'Solicitante' | 'Passageiro'
 export type ServicoPessoa = { id: string; codigo: string; data: Date | null; destino: string; status: string; tipo: string; papeis: Papel[] }
 export type PagantePessoa = { id: string; codigo: string; op: string; valor: number | null; status: string; criadoEm: Date | null }
-export type Historico = { servicos: ServicoPessoa[]; pagantes: PagantePessoa[] }
+/** `limitado`: a pessoa tem mais serviços do que a ficha lê (os mais recentes vieram; total e primeiro ficam "mais de"). */
+export type Historico = { servicos: ServicoPessoa[]; pagantes: PagantePessoa[]; limitado?: boolean }

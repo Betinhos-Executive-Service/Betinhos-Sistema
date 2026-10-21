@@ -57,10 +57,13 @@ export function readOp(op: Op, key: string): unknown {
 }
 
 /** Busca por palavra-chave (não fica na visão): OP, cliente, passageiros e trajetos. */
+/** Texto em que a busca procura: número, cliente, passageiros e trajetos. */
+export const opKeywordText = (op: Op) => [op.codigo, op.cliente, op.passageiros, op.trajetos].filter(Boolean).join(' ')
+
 export function matchesKeyword(op: Op, query: string) {
   const words = normalizeSearch(query).split(/\s+/).filter(Boolean)
   if (!words.length) return true
-  const text = normalizeSearch([op.codigo, op.cliente, op.passageiros, op.trajetos].filter(Boolean).join(' '))
+  const text = normalizeSearch(opKeywordText(op))
   return words.every((w) => text.includes(w))
 }
 

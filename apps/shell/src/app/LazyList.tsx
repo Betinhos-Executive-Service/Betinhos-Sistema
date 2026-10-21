@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { Button } from '@betinhos/ui'
 import './lazy.css'
 
 export const LAZY_BATCH = 50
@@ -45,25 +44,25 @@ export function LoadSentinel({ root, active, loaded, onLoadMore }: SentinelProps
 
 type FooterProps = {
   loaded: number
-  total: number
   more: boolean
   onLoadMore: () => void
-  /** Singular e plural do item: `['pessoa', 'pessoas']`. */
-  noun: [string, string]
-  /** Celular: botão com 44 px. */
-  touch?: boolean
+  /** A carga completa ainda está chegando do servidor: o fim da lista avisa em vez de parecer o fim. */
+  pending?: boolean
 }
 
-/** Sentinela + rodapé "50 de 220 pessoas" com "Carregar mais"; rolagem na janela. */
-export function LazyFooter({ loaded, total, more, onLoadMore, noun, touch = false }: FooterProps) {
-  const count = (n: number) => `${n} ${n === 1 ? noun[0] : noun[1]}`
+/**
+ * Fim da lista com rolagem infinita na janela. Sem paginação visível (decisão do Renan, 20/10/2026): nada de botão
+ * "Carregar mais" nem contador de lote; só o aviso discreto enquanto o resto da lista chega do servidor.
+ */
+export function LazyFooter({ loaded, more, onLoadMore, pending = false }: FooterProps) {
+  // Sem `IntersectionObserver` (navegador muito antigo) não há como saber da rolagem: revela o resto aos poucos.
+  useEffect(() => {
+    if (more && typeof IntersectionObserver === 'undefined') onLoadMore()
+  }, [more, loaded, onLoadMore])
   return (
     <>
       <LoadSentinel root={null} active={more} loaded={loaded} onLoadMore={onLoadMore} />
-      <div className="lazy-footer" role="status">
-        <span>{more ? `${loaded} de ${total} ${noun[1]}` : count(total)}</span>
-        {more ? <Button variant="ghost" size={touch ? 'touch' : 'compact'} onClick={onLoadMore}>Carregar mais</Button> : null}
-      </div>
+      {pending && !more ? <div className="lazy-footer" role="status"><span className="lazy-footer__spin" aria-hidden="true" />Carregando o restante da lista…</div> : null}
     </>
   )
 }

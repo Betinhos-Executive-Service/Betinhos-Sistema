@@ -1,3 +1,4 @@
+import { mockVolume } from '../../../app/mockVolume'
 import type { ChoiceSet, Contato, Pagante, ServicoOp } from '../domain/types'
 import { ETAPA, GERACAO_RECIBO, RECIBO, STATUS } from '../domain/status'
 import { FALLBACK_CHOICES } from '../domain/choices'
@@ -15,7 +16,7 @@ const PESSOAS: (Contato & { id: string })[] = [
 const days = (now: Date, n: number, h = 10) => { const d = new Date(now); d.setDate(d.getDate() - n); d.setHours(h, 15, 0, 0); return d }
 
 /** Dados de exemplo do `pnpm dev`: cobre todos os status e as falhas de envio. */
-export function createMockPagantes(now: Date): Pagante[] {
+export function createMockPagantes(now: Date, extra = mockVolume()): Pagante[] {
   const make = (n: number, pessoa: number, op: number, valor: number, forma: number, status: number, extra: Partial<Pagante> = {}): Pagante => ({
     id: `mock-pag-${n}`, codigo: `PAG-${1200 + n}`,
     pessoaId: PESSOAS[pessoa].id, pessoa: PESSOAS[pessoa].nome,
@@ -28,6 +29,11 @@ export function createMockPagantes(now: Date): Pagante[] {
     reciboGeracao: { status: null, erro: '' }, pagoEm: null,
     ...extra,
   })
+  // `?volume=N` do pnpm dev: N pagantes a mais, ligados às OPs de volume (mesmos índices) e espalhados por 2 anos.
+  const status = [STATUS.pendente, STATUS.pago, STATUS.autorizado, STATUS.expirado]
+  const volume = Array.from({ length: extra }, (_, i) => make(1000 + i, i % PESSOAS.length, 100 + i, 200 + (i % 41) * 37.5, [202410000, 202410001, 202410002][i % 3], status[i % 4], {
+    codigo: `PAG-${5000 + i}`, op: `OP-${2000 + i}`, criadoEm: days(now, Math.floor(i / 8) % 730), alteradoEm: days(now, Math.floor(i / 8) % 730),
+  }))
   return [
     make(1, 0, 1, 1250, 202410002, STATUS.pendente, { ultimoLembrete: days(now, 1, 9) }),
     make(2, 1, 1, 1250, 202410000, STATUS.pago, { recibo: RECIBO.enviado, linkRecibo: 'https://onedrive.exemplo/recibo-2.pdf', alteradoEm: days(now, 2) }),
@@ -43,6 +49,7 @@ export function createMockPagantes(now: Date): Pagante[] {
     make(40, 1, 11, 1500, 202410002, STATUS.pendente),
     // Casos reais de DEV: pagante antigo sem pessoa e sem OP; pendente com recibo emitido e sem link Cielo.
     make(12, 0, 0, 640, 202410001, STATUS.pendente, { pessoaId: '', pessoa: '', opId: '', op: '', linkPagamento: '', recibo: RECIBO.enviado, linkRecibo: 'https://onedrive.exemplo/recibo-12.pdf', link: { status: ETAPA.naoAplicavel, erro: '' }, email: { status: ETAPA.naoAplicavel, erro: '', enviadoEm: null } }),
+    ...volume,
   ]
 }
 

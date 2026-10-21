@@ -1,4 +1,5 @@
 import { DataverseError, chunk, cleanId, formatted, type DataverseClient, type Row } from '@betinhos/dataverse'
+import { andFilter, getAllWithFirstPage, odataSearchFilter, searchRows } from '../../../app/pagedLoad'
 import type { Contato, Pagante, ServicoOp } from '../domain/types'
 
 export const ENTITIES = { pagante: 'cr40f_pagantes', pessoa: 'cr40f_bancodedados', reserva: 'cr40f_reservadeveculos', composicao: 'cr40f_composicaodeprecos' } as const
@@ -67,13 +68,32 @@ export function mapPagante(row: Row): Pagante {
   }
 }
 
-/** Tenta com as colunas de envio; se o ambiente não as tem, repete só com as básicas. */
-export async function loadPagantes(client: DataverseClient, entitySet: string, filter: string) {
+/**
+ * Tenta com as colunas de envio; se o ambiente não as tem, repete só com as básicas.
+ * `onFirstPage` mostra a primeira página antes do resto (lista do período).
+ */
+export async function loadPagantes(client: DataverseClient, entitySet: string, filter: string, onFirstPage?: (list: Pagante[]) => void) {
+  const first = onFirstPage && ((rows: Row[]) => onFirstPage(rows.map(mapPagante)))
   try {
-    return (await client.getAll(pagantesPath(entitySet, filter, 'full'))).map(mapPagante)
+    return (await getAllWithFirstPage(client, pagantesPath(entitySet, filter, 'full'), first)).map(mapPagante)
   } catch (error) {
     if (!(error instanceof DataverseError) || !SAFE_MODE_ERROR.test(error.message)) throw error
-    return (await client.getAll(pagantesPath(entitySet, filter, 'safe'))).map(mapPagante)
+    return (await getAllWithFirstPage(client, pagantesPath(entitySet, filter, 'safe'), first)).map(mapPagante)
+  }
+}
+
+/** Busca no servidor pelo começo do código (PAG-…); nomes e contatos aparecem quando o período chega inteiro. */
+export const pagantesSearchFilter = (query: string) => odataSearchFilter(query, { startsWith: ['cr40f_id'] })
+
+/** Até 50 pagantes do período cujo código começa com o texto. */
+export async function searchPagantes(client: DataverseClient, entitySet: string, base: string, query: string) {
+  const filter = pagantesSearchFilter(query)
+  if (!filter) return []
+  try {
+    return (await searchRows(client, pagantesPath(entitySet, andFilter(base, filter), 'full'))).map(mapPagante)
+  } catch (error) {
+    if (!(error instanceof DataverseError) || !SAFE_MODE_ERROR.test(error.message)) throw error
+    return (await searchRows(client, pagantesPath(entitySet, andFilter(base, filter), 'safe'))).map(mapPagante)
   }
 }
 

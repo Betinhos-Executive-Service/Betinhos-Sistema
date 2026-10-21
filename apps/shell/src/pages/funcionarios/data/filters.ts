@@ -44,10 +44,20 @@ export function withAlertas(rows: Funcionario[], today: string): FuncionarioView
   }))
 }
 
-function searchable(row: Funcionario) {
-  const v = row.values
-  const text = [v.cr40f_nomecompleto, v.new_apelido, v.cr40f_numerodocpf, v.cr40f_telefonecorporativo, v.cr40f_telefonepessoal, row.veiculo?.label].filter(Boolean).join(' ')
-  return { text: normalizeSearch(text), digits: digitsOnly(text) }
+// Texto da busca por colaborador, calculado uma vez por registro (não a cada tecla). Registro salvo chega com
+// `values` novo, então a chave do cache muda junto.
+const searchCache = new WeakMap<object, { text: string; digits: string }>()
+
+/** Nome, apelido, CPF, telefones e placa, normalizados, e só os dígitos (para CPF e telefone). */
+export function searchable(row: Funcionario) {
+  let cached = searchCache.get(row.values)
+  if (!cached) {
+    const v = row.values
+    const text = [v.cr40f_nomecompleto, v.new_apelido, v.cr40f_numerodocpf, v.cr40f_telefonecorporativo, v.cr40f_telefonepessoal, row.veiculo?.label].filter(Boolean).join(' ')
+    cached = { text: normalizeSearch(text), digits: digitsOnly(text) }
+    searchCache.set(row.values, cached)
+  }
+  return cached
 }
 
 function sortValue(row: FuncionarioView, key: SortKey): string {

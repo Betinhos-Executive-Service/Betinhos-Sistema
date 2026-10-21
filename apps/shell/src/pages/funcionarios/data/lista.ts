@@ -2,7 +2,7 @@ import { CONFIG_VERSION, emptyFilters, type FilterCondition, type FilterField, t
 import { sortRows } from '../../../app/listSort'
 import { ASO_VALIDADE_MESES, type AlertKind } from './alerts'
 import { addMonths } from './dates'
-import type { Filters } from './filters'
+import { searchable, type Filters } from './filters'
 import { digitsOnly, normalizeSearch } from './format'
 import { EMPRESA, FUNCAO, STATUS, VINCULO, optionLabel, type Option } from './schema'
 import type { FuncionarioView } from './types'
@@ -71,10 +71,9 @@ export function readFuncionario(row: FuncionarioView, key: string): unknown {
 export function matchesKeyword(row: FuncionarioView, search: string) {
   const term = normalizeSearch(search.trim())
   if (!term) return true
-  const v = row.values
-  const text = [v.cr40f_nomecompleto, v.new_apelido, v.cr40f_numerodocpf, v.cr40f_telefonecorporativo, v.cr40f_telefonepessoal, row.veiculo?.label].filter(Boolean).join(' ')
+  const { text, digits } = searchable(row)
   const termDigits = digitsOnly(search)
-  return normalizeSearch(text).includes(term) || (termDigits.length >= 3 && digitsOnly(text).includes(termDigits))
+  return text.includes(term) || (termDigits.length >= 3 && digits.includes(termDigits))
 }
 
 export const matchesAlerta = (row: FuncionarioView, alerta: AlertKind | null) => !alerta || row.alertas.some((a) => a.kind === alerta)

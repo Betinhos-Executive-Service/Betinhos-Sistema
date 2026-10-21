@@ -25,7 +25,8 @@ export function validarAnexo(file: File, limites: LimitesAnexo) {
 export interface DataSource {
   mode: 'xrm' | 'mock'
   envLabel: string
-  list(): Promise<Funcionario[]>
+  /** Colaboradores ativos; `onFirstPage` recebe a primeira página antes do resto. */
+  list(onFirstPage?: (rows: Funcionario[]) => void): Promise<Funcionario[]>
   get(id: string): Promise<Funcionario>
   /** Grava só o diff. Retorna o id (novo ou existente). */
   save(original: Funcionario | null, draft: Draft): Promise<string>

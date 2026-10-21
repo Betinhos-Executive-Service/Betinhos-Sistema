@@ -1,7 +1,7 @@
 import { Button, EmptyState, PageHeader, SearchBox } from '@betinhos/ui'
 import { Cake, Check, ChevronRight, CloudOff, IdCard, Plus, RefreshCw, SearchX, SlidersHorizontal, Stethoscope } from 'lucide-react'
 import { useQueryBandeira } from '../../../nav/queryState'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import type { AlertKind } from '../data/alerts'
 import type { Filters, SortKey } from '../data/filters'
 import { EMPRESA, FUNCAO, STATUS, VINCULO, optionLabel, type Option } from '../data/schema'
@@ -11,6 +11,10 @@ import { AlertBadge, Avatar, EnvBadge, StatusBadge } from './Badges'
 type Props = {
   views: FuncionarioView[]
   visible: FuncionarioView[]
+  /** Parte de `visible` já na tela (rolagem infinita); sem ela, todos. */
+  shown?: FuncionarioView[]
+  /** Fim da lista (sentinela da rolagem infinita). */
+  footer?: ReactNode
   counts: Record<AlertKind, number>
   filters: Filters
   update: (patch: Partial<Filters>) => void
@@ -44,7 +48,7 @@ function filtrosExtras(filters: Filters) {
 }
 
 export function MobileHome(props: Props) {
-  const { views, visible, counts, filters, update, reset, ativos, loading, error, envLabel, onReload, onOpen, onNew } = props
+  const { views, visible, shown = visible, footer, counts, filters, update, reset, ativos, loading, error, envLabel, onReload, onOpen, onNew } = props
   // A folha de filtros aberta vive na URL (`filtros=1`).
   const [sheet, setSheet] = useQueryBandeira('filtros')
   const extras = filtrosExtras(filters)
@@ -92,7 +96,7 @@ export function MobileHome(props: Props) {
           </div>
         ) : (
           <ul className="m-list">
-            {visible.map((row) => {
+            {shown.map((row) => {
               const nome = String(row.values.cr40f_nomecompleto ?? '') || 'Sem nome'
               const sub = [optionLabel(FUNCAO, row.values.cr40f_funcao), row.values.new_apelido ? String(row.values.new_apelido) : '', row.veiculo?.label.split(' · ')[0] ?? ''].filter(Boolean).join(' · ')
               return (
@@ -111,6 +115,7 @@ export function MobileHome(props: Props) {
             })}
           </ul>
         )}
+        {footer}
       </main>
 
       <Button size="touch" className="m-fab" icon={<Plus size={20} />} onClick={onNew}>Novo</Button>

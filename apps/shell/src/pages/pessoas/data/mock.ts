@@ -1,3 +1,4 @@
+import { mockVolume } from '../../../app/mockVolume'
 import { CLASSIFICACAO, IDIOMA, STATUS } from '../domain/choices'
 import type { Cliente, Historico, Pessoa } from '../domain/types'
 
@@ -19,8 +20,27 @@ function pessoa(n: number, nome: string, cliente: number | null, extra: Partial<
   }
 }
 
-/** Dados de exemplo do `pnpm dev`: inclui duplicados por celular, e-mail e nome+cliente. */
-export function createMockPessoas(): Pessoa[] {
+// Ids de cadastros novos no mock: contínuos entre aberturas da tela (o cache da lista guarda os já criados).
+let seq = 100_000
+export const nextMockId = () => id(++seq)
+
+const NOMES = ['Ana', 'Bruno', 'Carla', 'Diego', 'Elisa', 'Fábio', 'Gabriela', 'Hugo', 'Isabela', 'João', 'Larissa', 'Marcelo', 'Natália', 'Otávio', 'Paula', 'Rafael']
+const SOBRENOMES = ['Almeida', 'Barbosa', 'Cardoso', 'Duarte', 'Esteves', 'Ferraz', 'Gomes', 'Holanda', 'Ibrahim', 'Jardim', 'Lacerda', 'Moraes', 'Nogueira', 'Orsini', 'Pacheco', 'Quintela']
+
+/** Pessoas geradas para o `?volume=` do pnpm dev (desempenho com milhares de registros). */
+function volume(total: number): Pessoa[] {
+  return Array.from({ length: total }, (_, i) => {
+    const nome = `${NOMES[i % NOMES.length]} ${SOBRENOMES[Math.floor(i / NOMES.length) % SOBRENOMES.length]} ${i + 1}`
+    return pessoa(1000 + i, nome, i % 3, { telefone: `(11) 9${String(10_000_000 + i).slice(0, 4)}-${String(i).padStart(4, '0').slice(-4)}`, email: `pessoa${i + 1}@exemplo.com.br`, ultimoServico: i % 4 ? '' : '2026-09-15' })
+  })
+}
+
+/** Dados de exemplo do `pnpm dev`: inclui duplicados por celular, e-mail e nome+cliente; `?volume=N` acrescenta N. */
+export function createMockPessoas(extra = mockVolume()): Pessoa[] {
+  return [...base(), ...volume(extra)]
+}
+
+function base(): Pessoa[] {
   return [
     pessoa(1, 'Mariana Albuquerque', 0, { telefone: '(11) 99812-4410', email: 'mariana@exemplo.com.br', cargo: 202410003, departamento: 'Diretoria', preferencias: 'Água sem gás, ar em 21 °C.', ultimoServico: '2026-10-05' }),
     pessoa(2, 'Ricardo Menezes', 0, { telefone: '(21) 98765-1200', email: 'ricardo@exemplo.com.br', classificacao: CLASSIFICACAO.solicitante, cargo: 202410004 }),

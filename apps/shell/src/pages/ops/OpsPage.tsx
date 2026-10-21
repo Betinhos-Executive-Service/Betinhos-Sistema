@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, EmptyState, SearchBox, Select, StatusBadge, ToastProvider, ViewBar, matchesFilters, useShellHeader, useToast } from '@betinhos/ui'
+import { Alert, Button, EmptyState, SearchBox, Select, StatusBadge, ToastProvider, ViewBar, useShellHeader, useToast } from '@betinhos/ui'
 import { CalendarCheck, FileStack, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { listCache } from '../../app/listCache'
+import { keywordIndex, searchWords, useDebouncedText, useMergedById, useServerSearch } from '../../app/search'
+import { filterRows } from '../../app/filterRows'
 import { useListView } from '../../app/useListView'
 import { useQueryId, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
@@ -10,7 +13,7 @@ import { GerarPagantesFrame } from '../pagantes/components/Dialogs'
 import { formatMoney } from '../pagantes/domain/messages'
 import { createSource } from './data/source'
 import { EMPTY_FILTERS, PERIODOS, VIEWS_KEY, loadViews, periodoStart, total, type Periodo } from './domain/filters'
-import { OP_COLUMNS, OP_SORT, TELA, builtinViews, fromLegacyFilters, legacyViewConfig, matchesKeyword, opFields, readOp, sortOps } from './domain/lista'
+import { OP_COLUMNS, OP_SORT, TELA, builtinViews, fromLegacyFilters, legacyViewConfig, opFields, opKeywordText, readOp, sortOps } from './domain/lista'
 import { opsQuery } from './domain/query'
 import type { Op } from './domain/types'
 import { useOps } from './useOps'
@@ -41,7 +44,7 @@ function Ops({ host }: { host: Host }) {
   const [periodoUrl, setPeriodo] = useQueryTexto('periodo', EMPTY_FILTERS.periodo)
   const periodo = isPeriodo(periodoUrl) ? periodoUrl : EMPTY_FILTERS.periodo
   const since = useMemo(() => periodoStart(periodo, new Date()), [periodo])
-  const ops = useOps(source, since)
+  const ops = useOps(source, since, listCache(host))
   const choices = ops.choices
   const fields = useMemo(() => (choices ? opFields(choices) : []), [choices])
 
@@ -62,19 +65,30 @@ function Ops({ host }: { host: Host }) {
     },
   })
 
-  // Busca, OP aberta e Gerar Pagantes continuam na URL; os filtros vão em `f=` (useListView).
+  // Busca, OP aberta e Gerar Pagantes continuam na URL; os filtros vão em `f=` (useListView). A lista filtra 200 ms
+  // depois da última tecla; enquanto o período não chegou inteiro, a busca também vai ao servidor.
   const [query, setQuery] = useQueryTexto('q')
+  const q = useDebouncedText(query)
+  const searchOps = useCallback((text: string) => source.search(since, text), [source, since])
+  const found = useServerSearch({ query: q, enabled: Boolean(choices) && !ops.complete, search: searchOps })
+  const list = useMergedById(ops.list, found)
+  // Ordena e filtra uma vez por lista/visão; a cada busca só confere o texto já normalizado de cada linha.
+  const sorted = useMemo(() => (choices ? sortOps(list, view.config.sort, choices) : list), [list, choices, view.config.sort])
+  const filtered = useMemo(() => filterRows(sorted, filters, fields, readOp), [sorted, filters, fields])
+  const index = useMemo(() => keywordIndex<Op>(opKeywordText), [])
   const visible = useMemo(() => {
     if (!choices) return []
-    return sortOps(ops.list.filter((op) => matchesFilters(op, filters, fields, readOp) && matchesKeyword(op, query)), view.config.sort, choices)
-  }, [ops.list, filters, fields, query, choices, view.config.sort])
-  // Lazy loading de renderização: trocar filtro, busca ou ordenação volta ao primeiro lote; recarregar a lista não.
-  const lazyKey = useMemo(() => ({ filters, query, sort: view.config.sort }), [filters, query, view.config.sort])
+    const words = searchWords(q)
+    return words.length ? filtered.filter((op) => index.matches(op, words)) : filtered
+  }, [filtered, index, q, choices])
+  // Rolagem infinita: trocar filtro, busca ou ordenação volta ao primeiro lote; a lista crescer (carga em segundo
+  // plano) ou recarregar não. A chave é texto para não mudar quando só a identidade dos filtros muda.
+  const lazyKey = useMemo(() => JSON.stringify({ filters, q, sort: view.config.sort }), [filters, q, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
   const clearAll = () => { clearFilters(); setQuery('') }
 
   const [selectedId, setSelectedId] = useQueryId('abrir')
-  const current = selectedId ? ops.list.find((op) => op.id === selectedId) ?? null : null
+  const current = selectedId ? list.find((op) => op.id === selectedId) ?? null : null
   const [cancelRequest, setCancelRequest] = useState<Op | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   // O Gerar Pagantes aberto (por cima da tela) também vive na URL: `gerar=<id da OP>`.
@@ -130,17 +144,21 @@ function Ops({ host }: { host: Host }) {
     body = <Alert tone="danger" title="Não foi possível carregar as ordens de pagamento" action={<Button variant="secondary" onClick={() => void ops.reload()}>Tentar de novo</Button>}>{ops.error}</Alert>
   } else if (!ops.choices) {
     body = <OpsTable list={[]} choices={{ status: [], idioma: [] }} onOpen={() => undefined} loading />
-  } else if (!ops.loading && !ops.list.length) {
+  } else if (ops.complete && !ops.loading && !ops.list.length) {
     body = <EmptyState className="surface" align="start" icon={<FileStack size={36} />} title="Nenhuma OP neste período">As OPs nascem pelo botão Gerar OP nas reservas. Amplie o período para ver as mais antigas.</EmptyState>
   } else {
-    const footer = <span className="pg-num">{visible.length} {visible.length === 1 ? 'OP' : 'OPs'} · {formatMoney(total(visible))}</span>
-    const empty = <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhuma OP com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
+    // O total só vale com o período inteiro e os valores dos serviços: até lá, o rodapé avisa que ainda soma.
+    const pending = !ops.complete && ops.loading
+    const footer = <span className="pg-num">{visible.length} {visible.length === 1 ? 'OP' : 'OPs'} · {pending ? 'somando valores…' : formatMoney(total(visible))}</span>
+    const empty = pending
+      ? <EmptyState align="start" icon={<SearchX size={36} />} title="Procurando no restante do período…" />
+      : <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhuma OP com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
     body = (
       <>
         {mobile
           ? (visible.length ? <OpsCards list={slice} choices={ops.choices} onOpen={setSelectedId} /> : <div className="surface">{empty}</div>)
           : <OpsTable list={slice} choices={ops.choices} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig }} quickFilters={quickFilters} footer={footer} empty={empty} />}
-        {more ? <LazyFooter loaded={slice.length} total={visible.length} more onLoadMore={loadMore} noun={['OP', 'OPs']} touch={mobile} /> : null}
+        <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} pending={pending} />
       </>
     )
   }
@@ -156,7 +174,11 @@ function Ops({ host }: { host: Host }) {
           {mobile ? null : <Button icon={<CalendarCheck size={16} />} onClick={abrirFechar}>Fechar mês</Button>}
         </ViewBar>
       </div>
-      {ops.error && ops.choices ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{ops.error} A lista mostra os dados da carga anterior.</Alert> : null}
+      {ops.error && ops.choices ? (
+        <Alert tone="danger" title={ops.complete ? 'A última atualização falhou' : 'A carga parou no meio'} action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>
+          {ops.error} {ops.complete ? 'A lista mostra os dados da carga anterior.' : 'A lista mostra só as OPs que chegaram; busca, filtros e total valem para elas.'}
+        </Alert>
+      ) : null}
       {body}
       {ops.choices ? (
         <OpDrawer op={current} onClose={() => setSelectedId(null)} choices={ops.choices} source={source} version={version}

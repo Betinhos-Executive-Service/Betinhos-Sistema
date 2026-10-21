@@ -1,7 +1,10 @@
 import { Plus } from 'lucide-react'
 import { useMemo } from 'react'
-import { Button, EmptyState, SearchBox, SegmentedControl, Table, TableTitle, ViewBar, matchesFilters } from '@betinhos/ui'
+import { Button, EmptyState, SearchBox, SegmentedControl, Table, TableTitle, ViewBar } from '@betinhos/ui'
 import type { Host } from '../../../host'
+import { LazyFooter, useLazySlice } from '../../../app/LazyList'
+import { useDebouncedText } from '../../../app/search'
+import { filterRows } from '../../../app/filterRows'
 import { useListView } from '../../../app/useListView'
 import { lerOpcao, useQueryTexto } from '../../../nav/queryState'
 import { patchHashQuery, useHashQuery } from '../../../nav/useHashRoute'
@@ -38,6 +41,8 @@ export function Registros(props: Props) {
 function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload }: Props & { kind: Kind }) {
   const notify = useNotify()
   const [busca, setBusca] = useQueryTexto('q')
+  // A lista filtra 200 ms depois da última tecla.
+  const termo = useDebouncedText(busca)
 
   const todas = useMemo(() => linhas(kind, data), [kind, data])
   const opcoesRefs = useMemo(() => ({ veiculos: opcoes(todas.map((linha) => linha.veiculo)), pessoas: opcoes(todas.map((linha) => linha.pessoa)) }), [todas])
@@ -57,9 +62,12 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload }
   })
 
   const visiveis = useMemo(
-    () => sortRegistros(todas.filter((linha) => matchesFilters(linha, filters, fields, readRegistro) && matchesRegistroKeyword(linha, busca)), kind, view.config.sort),
-    [todas, filters, fields, busca, kind, view.config.sort],
+    () => sortRegistros(filterRows(todas, filters, fields, readRegistro).filter((linha) => matchesRegistroKeyword(linha, termo)), kind, view.config.sort),
+    [todas, filters, fields, termo, kind, view.config.sort],
   )
+  // Rolagem infinita (sem paginação visível): trocar filtro, busca ou ordenação volta ao primeiro lote.
+  const lazyKey = useMemo(() => JSON.stringify({ filters, termo, sort: view.config.sort }), [filters, termo, view.config.sort])
+  const { slice, more, loadMore } = useLazySlice(visiveis, lazyKey)
 
   function trocar(next: Kind) {
     patchHashQuery({ tipo: next === kinds[0] ? null : next, f: null })
@@ -85,7 +93,7 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload }
         </ViewBar>
       </div>
       <Table<Linha>
-        rows={visiveis}
+        rows={slice}
         rowKey={(linha) => linha.id}
         onRowClick={(linha) => onOpen(linha.kind, linha.id)}
         view={{ config: view.config, onChange: view.setConfig }}
@@ -101,6 +109,7 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload }
           { key: 'status', header: 'Status', label: 'Status', sortable: true, defaultWidth: 160, width: 'minmax(110px, .8fr)', cell: (linha) => <StatusBadge kind={linha.kind} value={linha.status} /> },
         ]}
       />
+      <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} />
     </div>
   )
 }

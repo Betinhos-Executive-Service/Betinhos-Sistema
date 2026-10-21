@@ -30,6 +30,8 @@ const ORDER: Record<TableKey, string> = {
   telemetriaKm: 'new_data desc',
 }
 
+const PAGE_SIZE = 5000
+
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const FLOWS: Record<FlowId, { envVar: string; body: (id: string) => Record<string, string>; timeoutMs: number; nome: string }> = {
@@ -70,10 +72,11 @@ export function createXrmSource(xrm: XrmHost): DataSource {
   async function retrieveAll(key: TableKey, filter = 'statecode eq 0', select: readonly string[] = SELECT[key]) {
     const options = `?$select=${select.join(',')}&$filter=${filter}&$orderby=${ORDER[key]}`
     const rows: Row[] = []
-    let page = await api.retrieveMultipleRecords(TABLE[key], options, 500)
+    // Páginas de 5.000 (o máximo): tabelas grandes (manutenções) chegam em poucas idas ao servidor, não dezenas.
+    let page = await api.retrieveMultipleRecords(TABLE[key], options, PAGE_SIZE)
     rows.push(...page.entities)
     while (page.nextLink) {
-      page = await api.retrieveMultipleRecords(TABLE[key], page.nextLink.slice(page.nextLink.indexOf('?')), 500)
+      page = await api.retrieveMultipleRecords(TABLE[key], page.nextLink.slice(page.nextLink.indexOf('?')), PAGE_SIZE)
       rows.push(...page.entities)
     }
     return rows

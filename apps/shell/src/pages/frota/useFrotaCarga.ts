@@ -1,28 +1,21 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback } from 'react'
+import { listCache } from '../../app/listCache'
+import { useProgressiveData } from '../../app/useProgressiveData'
 import type { DataSource, LoadResult } from './data/source'
-import { errorMessage } from './data/xrm'
 import { liberarFlows } from './domain/transitions'
 
-/** Carga das tabelas da Frota (a mesma da tela Frota e da ficha do veículo aberta em outra tela). Carrega ao montar. */
+/**
+ * Carga das tabelas da Frota (a mesma da tela Frota e da ficha do veículo aberta em outra tela), em cache por sessão:
+ * voltar à tela dentro do TTL não recarrega; vencida, mostra e revalida em segundo plano.
+ */
 export function useFrotaCarga(source: DataSource) {
-  const [result, setResult] = useState<LoadResult | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [fatal, setFatal] = useState<string | null>(null)
-
-  const reload = useCallback(async () => {
-    setLoading(true)
-    setFatal(null)
-    try {
-      setResult(await source.load())
-      liberarFlows()
-    } catch (reason) {
-      setFatal(errorMessage(reason))
-    } finally {
-      setLoading(false)
-    }
+  const load = useCallback(async () => {
+    const result = await source.load()
+    liberarFlows()
+    return result
   }, [source])
-
-  useEffect(() => { void reload() }, [reload])
-
-  return { result, setResult, loading, fatal, reload }
+  const { data, loading, error, reload, mutate } = useProgressiveData<LoadResult>({ cache: listCache(source), key: 'frota', load })
+  /** Ajuste local (ex.: classificação de uma manutenção) na tela e no cache, sem recarregar tudo. */
+  const setResult = useCallback((fn: (prev: LoadResult | null) => LoadResult | null) => mutate((prev) => fn(prev) ?? prev), [mutate])
+  return { result: data, setResult, loading, fatal: error, reload }
 }
