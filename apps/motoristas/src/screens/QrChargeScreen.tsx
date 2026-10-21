@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { AnimatePresence, motion, useReducedMotion, type Variants } from "motion/react";
 import qrcode from "qrcode-generator";
 import { ActionBar, ActionButton } from "../components/common/ActionButton";
 import { MoneyInputField, TextInputField } from "../components/common/FormFields";
@@ -30,6 +31,14 @@ import type { DetailData } from "../types";
 
 const POLL_INTERVAL_MS = 3000;
 const QR_QUIET_ZONE = 4;
+
+// Avançar entra pela direita, Voltar pela esquerda; a saída é mais curta que a entrada.
+const STEP_VARIANTS: Variants = {
+  enter: (direction: number) => ({ opacity: 0, x: direction * 24 }),
+  center: { opacity: 1, x: 0 },
+  exit: (direction: number) => ({ opacity: 0, x: direction * -24, transition: { duration: 0.16, ease: [0.4, 0, 1, 1] } })
+};
+const STEP_TRANSITION = { duration: 0.24, ease: [0.23, 1, 0.32, 1] } as const;
 
 const STEP_TITLES: Record<QrChargeStep, string> = {
   valor: "Valor da cobrança",
@@ -144,6 +153,16 @@ export function QrChargeScreen({ detail, maxCents, resume, onBack, onPaid, onCon
   const fieldRef = useRef<HTMLInputElement | null>(null);
   const focusTargetRef = useRef<HTMLElement | null>(null);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
+  const reduceMotion = useReducedMotion();
+  // Direção da última troca de passo (1 avança, -1 volta), para a animação.
+  const stepIndex = QR_CHARGE_STEPS.indexOf(step);
+  const lastStepIndexRef = useRef(stepIndex);
+  const stepDirectionRef = useRef(1);
+  if (stepIndex !== lastStepIndexRef.current) {
+    stepDirectionRef.current = stepIndex > lastStepIndexRef.current ? 1 : -1;
+    lastStepIndexRef.current = stepIndex;
+  }
+  const stepDirection = reduceMotion ? 0 : stepDirectionRef.current;
   const continueRef = useRef<HTMLButtonElement | null>(null);
   const paidNotifiedRef = useRef(false);
   const onPaidRef = useRef(onPaid);
@@ -169,11 +188,14 @@ export function QrChargeScreen({ detail, maxCents, resume, onBack, onPaid, onCon
   };
 
   // Foco no campo (ou na opção escolhida) de cada passo; na revisão, no título.
-  useEffect(() => {
-    if (charge) return;
+  // Na troca de passo quem chama é o fim da animação de entrada, quando o passo novo já está na tela.
+  const focusStep = () => {
     const target = fieldRef.current ?? focusTargetRef.current ?? headingRef.current;
     target?.focus({ preventScroll: false });
-  }, [step, isOtherPayer, charge]);
+  };
+  useEffect(() => {
+    if (!charge) focusStep();
+  }, [isOtherPayer, charge]);
 
   // Confirmação: o foco vai para o "Continuar", que é a única ação.
   useEffect(() => {
@@ -526,10 +548,24 @@ export function QrChargeScreen({ detail, maxCents, resume, onBack, onPaid, onCon
                     ))}
                   </ol>
                 </div>
-                <h2 id="qr-charge-step-title" className="qr-charge-step-title" ref={headingRef} tabIndex={-1}>
-                  {STEP_TITLES[step]}
-                </h2>
-                {renderStep()}
+                <AnimatePresence mode="wait" initial={false} custom={stepDirection}>
+                  <motion.div
+                    key={step}
+                    className="qr-charge-step"
+                    custom={stepDirection}
+                    variants={STEP_VARIANTS}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={reduceMotion ? { duration: 0 } : STEP_TRANSITION}
+                    onAnimationComplete={(definition) => { if (definition === "center") focusStep(); }}
+                  >
+                    <h2 id="qr-charge-step-title" className="qr-charge-step-title" ref={headingRef} tabIndex={-1}>
+                      {STEP_TITLES[step]}
+                    </h2>
+                    {renderStep()}
+                  </motion.div>
+                </AnimatePresence>
               </div>
             ) : paid ? (
               <div className="qr-charge-confirmed" role="status">
