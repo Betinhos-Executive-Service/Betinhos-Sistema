@@ -24,9 +24,11 @@ function Get-TiposPorEntidade($Dv) {
   return $map
 }
 
-# Linhas (id minusculo e tipo) de uma solucao.
+# Linhas de uma solucao: id minusculo, tipo e comportamento (rootcomponentbehavior; 0 = com subcomponentes).
 function Get-LinhasDaSolucao($Dv, [string] $SolucaoId) {
-  Read-DvAll $Dv "solutioncomponents?`$select=objectid,componenttype&`$filter=_solutionid_value eq $SolucaoId" | ForEach-Object { @{ id = ([string] $_.objectid).ToLowerInvariant(); tipo = [int] $_.componenttype } }
+  Read-DvAll $Dv "solutioncomponents?`$select=objectid,componenttype,rootcomponentbehavior&`$filter=_solutionid_value eq $SolucaoId" | ForEach-Object {
+    @{ id = ([string] $_.objectid).ToLowerInvariant(); tipo = [int] $_.componenttype; comportamento = [int] $_.rootcomponentbehavior }
+  }
 }
 
 # Assembly dentro de pacote de plug-in -> pacote que o carrega (ids em minusculo).
@@ -83,12 +85,12 @@ function Get-ComponentesDaSolucao($Dv, [string] $SolucaoId, [hashtable] $TiposPo
   foreach ($r in Read-DvAll $Dv "msdyn_solutioncomponentsummaries?`$select=msdyn_objectid,msdyn_name&`$filter=msdyn_solutionid eq $SolucaoId") {
     $resumo[([string] $r.msdyn_objectid).ToLowerInvariant()] = [string] $r.msdyn_name
   }
-  foreach ($c in Read-DvAll $Dv "solutioncomponents?`$select=objectid,componenttype,rootcomponentbehavior&`$filter=_solutionid_value eq $SolucaoId") {
-    $id = ([string] $c.objectid).ToLowerInvariant()
-    $tipo = [int] $c.componenttype
+  foreach ($l in @(Get-LinhasDaSolucao $Dv $SolucaoId)) {
+    $id = $l.id
+    $tipo = $l.tipo
     $nome = if ($nomes.ContainsKey($tipo) -and $nomes[$tipo].ContainsKey($id)) { $nomes[$tipo][$id] } elseif ($resumo.ContainsKey($id)) { $resumo[$id] } else { "" }
     @{
-      id = $id; tipo = $tipo; nome = $nome; comportamento = [int] $c.rootcomponentbehavior
+      id = $id; tipo = $tipo; nome = $nome; comportamento = $l.comportamento
       entidade = if ($tipo -ge 10000) { $TiposPorEntidade[$tipo] } else { $null }
       app = if ($paiDoApp.ContainsKey($id)) { $paiDoApp[$id] } else { $null }
       bpf = ($tipo -eq 1 -and $bpf.ContainsKey($id))

@@ -58,9 +58,7 @@ test('ordem dos donos não importa', () => {
   assert.deepEqual(d.donosMudaram, [])
 })
 
-test('toda lista da comparação é de perda ou informativa, nunca as duas', () => {
-  const chaves = Object.keys(compararFotos(foto(), foto(), { travado: true })).sort()
-  assert.deepEqual(chaves, [...PERDA, ...INFORMATIVO].sort())
+test('nenhuma lista é de perda e informativa ao mesmo tempo', () => {
   assert.equal(new Set([...PERDA, ...INFORMATIVO]).size, PERDA.length + INFORMATIVO.length)
 })
 

@@ -50,7 +50,7 @@ test('componente sem tipo na foto aparece com tipo null', () => {
   const r = conferirRetirada(foto({ x: ['AppBetinhos'] }), regras)
   assert.deepEqual(r.soNaCaixa, [{ id: 'x', tipo: null, solucoes: ['AppBetinhos'] }])
 })
-test('foto sem componentes falha', () => assert.throws(() => conferirRetirada(foto({}), regras), /0 componentes|nao tem componentes/))
+test('foto sem componentes falha', () => assert.throws(() => conferirRetirada(foto({}), regras), /nao tem componentes/))
 test('foto antiga, sem tipos ou pacotes, falha', () => {
   assert.throws(() => conferirRetirada({ componentes: { a: ['BetinhosCore'] }, pacotes: {} }, regras), /foto antiga/)
   assert.throws(() => conferirRetirada({ componentes: { a: ['BetinhosCore'] }, tipos: {} }, regras), /foto antiga/)

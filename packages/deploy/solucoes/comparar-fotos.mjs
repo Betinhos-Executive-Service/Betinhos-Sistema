@@ -32,16 +32,18 @@ export function compararFotos(antes, depois, { travado = false } = {}) {
     const g = depois.fluxos[id]
     if (!g) d.fluxosSumiram.push({ id, nome: f.nome })
     else if (g.estado !== f.estado) {
-      d.fluxosMudaramEstado.push({ id, nome: f.nome, antes: f.estado, depois: g.estado })
-      if (f.estado === 1 && g.estado !== 1) d.fluxosDesligados.push({ id, nome: f.nome, antes: f.estado, depois: g.estado })
+      const item = { id, nome: f.nome, antes: f.estado, depois: g.estado }
+      d.fluxosMudaramEstado.push(item)
+      if (f.estado === 1) d.fluxosDesligados.push(item)
     }
   }
   for (const [id, s] of Object.entries(antes.steps)) {
     const t = depois.steps[id]
     if (!t) { d.stepsSumiram.push({ id, nome: s.nome }); continue }
     if (t.estado !== s.estado) {
-      d.stepsMudaramEstado.push({ id, nome: s.nome, antes: s.estado, depois: t.estado })
-      if (s.estado === 0 && t.estado !== 0) d.stepsDesativados.push({ id, nome: s.nome, antes: s.estado, depois: t.estado })
+      const item = { id, nome: s.nome, antes: s.estado, depois: t.estado }
+      d.stepsMudaramEstado.push(item)
+      if (s.estado === 0) d.stepsDesativados.push(item)
     }
     if (s.seguro && !t.seguro) d.stepsPerderamSeguro.push({ id, nome: s.nome })
   }
