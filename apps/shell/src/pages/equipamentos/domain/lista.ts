@@ -29,6 +29,20 @@ const STATUS_FILTER: FilterOption[] = STATUS_OPTIONS.map((o) => ({ value: String
 const cadastroOptions = (list: { id: string; nome: string; ativo: boolean }[]): FilterOption[] =>
   [...list].sort(byNome).map((x) => ({ value: x.id, label: x.ativo ? x.nome : `${x.nome} (inativo)` }))
 
+/**
+ * Pessoas para o filtro de Responsável: só quem tem algum item (o cadastro de funcionários tem centenas).
+ * Responsável fora do cadastro carregado entra pelo nome gravado no item.
+ */
+export function pessoasResponsaveis(equipamentos: Equipamento[], pessoas: Pessoa[]): Pessoa[] {
+  const porId = new Map(pessoas.map((p) => [p.id, p]))
+  const out = new Map<string, Pessoa>()
+  for (const e of equipamentos) {
+    if (!e.responsavelId || out.has(e.responsavelId)) continue
+    out.set(e.responsavelId, porId.get(e.responsavelId) ?? { id: e.responsavelId, nome: e.responsavelNome || 'Funcionário', ativo: true })
+  }
+  return [...out.values()].sort(byNome)
+}
+
 /** Campos de filtro; tipo e responsável vêm dos cadastros carregados. A coluna Compra filtra pela data. */
 export function equipamentoFields(tipos: TipoEquipamento[], pessoas: Pessoa[]): FilterField[] {
   return [

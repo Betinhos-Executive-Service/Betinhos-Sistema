@@ -1,0 +1,42 @@
+/* Equipamentos: lista, cards, formulário e tipos. Só tokens do Design System. */
+.eq-num { font-variant-numeric: tabular-nums; }
+.eq-muted { margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.eq-badges { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1); }
+.eq-search { flex: 1 1 260px; min-width: 200px; max-width: 360px; }
+
+.eq-open { display: grid; gap: var(--bt-space-0-5); min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
+.eq-open strong { font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); }
+.eq-open span { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.eq-open:focus-visible, .eq-card__open:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+
+/* Linha e cartão inteiros abrem o item (clique delegado ao botão da descrição). */
+.eq-table .bt-table__row:not(.bt-table__row--loading), .eq-card { cursor: pointer; }
+@media (hover: hover) and (pointer: fine) {
+  .eq-table .bt-table__row:not(.bt-table__row--loading):hover, .eq-card:hover { background-color: var(--bt-color-surface-soft); }
+  .eq-open:hover strong { color: var(--bt-color-action); }
+}
+
+.eq-cards { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
+.eq-card { border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
+.eq-card__open { display: grid; gap: var(--bt-space-1); width: 100%; min-height: var(--bt-control-height-touch); padding: var(--bt-space-3) var(--bt-space-3) var(--bt-space-2); border: 0; border-radius: inherit; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform var(--bt-duration-fast) var(--bt-ease-out); }
+.eq-card__open:active { transform: scale(0.97); }
+.eq-card__name { font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); }
+.eq-card__meta { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); overflow-wrap: anywhere; }
+.eq-card__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--bt-space-2); padding: 0 var(--bt-space-3) var(--bt-space-3); }
+
+/* Formulário (Tarefa 5) */
+.eq-form { display: grid; gap: var(--bt-space-4); }
+.eq-form__section { display: grid; gap: var(--bt-space-3); margin: 0; padding: 0; border: 0; min-width: 0; }
+.eq-form__legend { margin: 0; padding: 0; font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); letter-spacing: 0.08em; text-transform: uppercase; color: var(--bt-color-text-secondary); }
+.eq-form__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--bt-space-3); }
+.eq-form__wide { grid-column: 1 / -1; }
+/* O corpo do Drawer do DS não declara container-type: a quebra é pela largura da tela. */
+@media (max-width: 520px) { .eq-form__grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Tipos (Tarefa 6) */
+.eq-tipos { display: grid; gap: var(--bt-space-4); }
+.eq-tipos__add { display: flex; align-items: flex-end; gap: var(--bt-space-2); }
+.eq-tipos__add > :first-child { flex: 1 1 auto; }
+.eq-tipos__list { display: grid; gap: var(--bt-space-1); margin: 0; padding: 0; list-style: none; }
+.eq-tipos__item { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); min-height: var(--bt-control-height-touch); padding: var(--bt-space-1) var(--bt-space-2); border-bottom: var(--bt-border-width-default) solid var(--bt-color-border); }
+.eq-tipos__name { flex: 1 1 160px; min-width: 0; font-size: var(--bt-font-size-13); }

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { matchesFilters, readFilters, type TableFilters } from '@betinhos/ui'
-import { EQUIPAMENTO_DEFAULT_FILTERS, builtinViews, equipamentoFields, matchesKeyword, readEquipamento, sortEquipamentos } from './lista'
+import { EQUIPAMENTO_DEFAULT_FILTERS, builtinViews, equipamentoFields, matchesKeyword, pessoasResponsaveis, readEquipamento, sortEquipamentos } from './lista'
 import { STATUS, statusLabel, statusTone } from './choices'
 import { opcoesAtivas, validateTipo } from './cadastros'
 import { applyForm, diffForm, emptyEquipamento, emptyForm, hasChanges, isDirty, serieRepetida, toForm, validateForm, withResponsavel, withStatus } from './form'
@@ -173,6 +173,17 @@ describe('lista', () => {
   it('filtro de tipo e responsável marca inativos', () => {
     expect(fields.find((f) => f.key === 'tipo')!.options).toEqual([{ value: 't3', label: 'Mouse' }, { value: 't1', label: 'Notebook' }, { value: 't2', label: 'Pager (inativo)' }])
     expect(fields.find((f) => f.key === 'responsavel')!.options).toEqual([{ value: 'p1', label: 'Bruna Lima' }, { value: 'p2', label: 'Fabio Nunes (inativo)' }])
+  })
+  it('opções de Responsável: só quem tem item, inativo marcado, id sem cadastro pelo nome do item', () => {
+    const todas: Pessoa[] = [...pessoas, { id: 'p3', nome: 'Sem Item Algum', ativo: true }]
+    const itens = [item(), item({ id: 'e2', responsavelId: 'p2', responsavelNome: 'Fabio Nunes' }), item({ id: 'e3', responsavelId: 'p9', responsavelNome: 'Fora do Cadastro' }), item({ id: 'e4', responsavelId: null, responsavelNome: '' })]
+    expect(pessoasResponsaveis(itens, todas)).toEqual([
+      { id: 'p1', nome: 'Bruna Lima', ativo: true },
+      { id: 'p2', nome: 'Fabio Nunes', ativo: false },
+      { id: 'p9', nome: 'Fora do Cadastro', ativo: true },
+    ])
+    expect(equipamentoFields(tipos, pessoasResponsaveis(itens, todas)).find((f) => f.key === 'responsavel')!.options!.map((o) => o.label))
+      .toEqual(['Bruna Lima', 'Fabio Nunes (inativo)', 'Fora do Cadastro'])
   })
   it('Compra filtra pela data; o valor é campo do avançado', () => {
     const e = item({ dataCompra: '2026-03-10', valorCompra: 3499.9 })
