@@ -3410,7 +3410,7 @@ function App() {
           setScreen("receber");
         }}
         createCharge={(valorCentavos, pagante, idioma) =>
-          createQrChargeRemote({ reservaId: selectedDetail.dataverse?.id ?? selectedDetail.id, motoristaId: driverContext?.id ?? "", valorCentavos, pagante, idioma })
+          createQrChargeRemote({ reservaId: selectedDetail.dataverse?.id ?? selectedDetail.id, valorCentavos, pagante, idioma })
         }
         updateCharge={updateQrChargeRemote}
       />

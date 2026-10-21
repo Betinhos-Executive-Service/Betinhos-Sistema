@@ -86,7 +86,7 @@ export const QR_CHARGE_PASSENGER_COPY: Record<ReceiptLanguage, { title: string; 
   }
 };
 
-// Cobrança por QR code (Stripe Checkout), sempre em reais. O Flow cria a sessão no
+// Cobrança por QR code (Stripe Checkout), sempre em reais. O plugin (Custom API new_CobrancaQR) cria a sessão no
 // Stripe e devolve este contrato; valores em centavos para não depender de float.
 export type QrChargeStatus = "aguardando" | "pago" | "expirado" | "cancelado";
 
@@ -124,8 +124,12 @@ export function qrChargeCoversReceivable(charge: QrCharge | undefined, detail: D
   return charge?.status === "pago" && charge.valorCentavos >= getReceivableCents(detail);
 }
 
+const QR_CHARGE_MINIMUM_CENTS = 50;
+
 export function validateQrChargeAmount(cents: number, maxCents: number) {
   if (cents <= 0) return "Informe o valor da cobrança.";
+  // Mínimo do Stripe para BRL; abaixo disso a sessão nem é criada.
+  if (cents < QR_CHARGE_MINIMUM_CENTS) return `O valor mínimo é ${formatQrChargeAmount(QR_CHARGE_MINIMUM_CENTS)}.`;
   if (cents > maxCents) return `O valor não pode passar de ${formatQrChargeAmount(maxCents)}.`;
   return "";
 }
@@ -144,7 +148,7 @@ export function formatCountdown(seconds: number) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-// Valida a resposta do Flow antes de virar QR: só aceita página de pagamento do Stripe.
+// Valida a resposta do plugin antes de virar QR: só aceita página de pagamento do Stripe.
 export function parseQrChargeResponse(raw: unknown): QrCharge {
   const data = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const sessionId = String(data.sessionId ?? "");

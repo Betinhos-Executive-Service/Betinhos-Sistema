@@ -1,6 +1,6 @@
 # Cobrança por QR code (Stripe Checkout)
 
-Status em 21/10/2026: a parte do app está implementada e testada em modo mock. Os Flows, o schema e o webhook ainda precisam ser criados no Dataverse DEV (ver "Ordem de implantação"). A conta Stripe está em ativação, então por enquanto tudo roda em modo teste.
+Status em 21/10/2026: o app está implementado e testado em modo mock; o plugin `QrChargePlugin` (Custom API `new_CobrancaQR`) e o provisionamento estão prontos e testados localmente, mas ainda não foram publicados no DEV (ver "Ordem de implantação"). O schema já existe no DEV. A conta Stripe está em ativação, então por enquanto tudo roda em modo teste.
 
 ## Objetivo
 
@@ -33,20 +33,25 @@ O motorista não tem acesso à conta Stripe e não depende de NFC.
 ## Arquitetura
 
 ```
-App (celular do motorista)              Power Automate                       Stripe
+App (celular do motorista)            Dataverse (plugin; chave na config. segura)       Stripe
   Recebimento → "Cobrar por QR code"
-  QrChargeScreen ──{reservaId,motoristaId,valorCentavos}──▶ Flow Cobrança QR ──▶ POST /v1/checkout/sessions
-  desenha o QR (local) ◀──────── contrato de cobrança ──────┘
-  a cada 3 s ──{sessionId, acao}──▶ Flow Status Cobrança QR ──▶ GET  /v1/checkout/sessions/{id}
-                                                            └──▶ POST /v1/checkout/sessions/{id}/expire (cancelar)
-                                    Webhook (completed/expired) ─▶ busca a sessão de novo e grava no Dataverse
+  QrChargeScreen ──{acao:criar}──────▶ Custom API new_CobrancaQR ──▶ POST /v1/checkout/sessions
+  desenha o QR (local) ◀── contrato ──┘   (QrChargePlugin)
+  a cada 3 s ──{acao:consultar}──────▶ new_CobrancaQR ──▶ GET  /v1/checkout/sessions/{id}
+  cancelar   ──{acao:cancelar}───────▶ new_CobrancaQR ──▶ POST /v1/checkout/sessions/{id}/expire
+  Webhook Stripe ─▶ Flow Webhook Stripe | Cobrança QR ──{acao:sincronizar}──▶ new_CobrancaQR ──▶ GET de novo
 ```
+
+- **Por que plugin e não Flow:** motoristas conseguem ler variáveis de ambiente e definições de Flow, então a chave do Stripe não pode ficar lá. Ela fica na **configuração segura do step** do plugin, que só administrador lê (mesmo padrão do token da Infleet).
+- **Quem é o motorista:** o plugin usa o funcionário do usuário que chama (e-mail Microsoft → `cr40f_funcionarios`); o app não manda `motoristaId`.
+- **Gravação:** o plugin grava `cr40f_cobrancastripe` com o serviço do sistema; o motorista não precisa de privilégio na tabela. O dono é conferido pelo lookup `cr40f_motorista`.
+- **Código:** `plugins/DriverRecordSharing/QrChargePlugin.cs` (plugin e regras com Dataverse), `QrChargeRules.cs` (saldo, status, formulário e JSON do Stripe) e `StripeCheckoutGateway.cs` (HTTP, `Stripe-Version: 2024-06-20`). Testes em `plugins/DriverRecordSharing.Tests/QrChargePluginTests.cs`.
 
 ## App (implementado)
 
-- **Biblioteca `src/lib/qrCharge.ts`:** permissão, valor a receber em centavos, limite do valor, contagem regressiva e validação da resposta do Flow. A biblioteca só aceita link `https://checkout.stripe.com/` para virar QR. Os testes ficam em `tests/qrCharge.test.ts`.
+- **Biblioteca `src/lib/qrCharge.ts`:** permissão, valor a receber em centavos, limite do valor, contagem regressiva e validação da resposta do plugin. A biblioteca só aceita link `https://checkout.stripe.com/` para virar QR. Os testes ficam em `tests/qrCharge.test.ts`.
 - **`src/lib/dataverse.ts`:**
-  - `createQrChargeRemote` e `updateQrChargeRemote`, com URLs em `new_FlowURLCobrancaQR` e `new_FlowURLCobrancaQRStatus`.
+  - `createQrChargeRemote` e `updateQrChargeRemote` chamam a Custom API `new_CobrancaQR` pela Web API (`new_Command` → `new_Result`).
   - Modo mock em localhost: a cobrança vira paga 5 s depois. Com `?mockRecusa=1`, o mock simula um cartão recusado antes.
   - O cadastro do motorista passa a ler `cr40f_podecobrarqrcode`. Se a coluna ainda não existir no ambiente, o login continua funcionando e a cobrança fica desligada.
 - **`ReceiveScreen`:**
@@ -61,12 +66,14 @@ App (celular do motorista)              Power Automate                       Str
   - Enquanto o pagamento não entra, uma faixa amarela diz "Aguardando pagamento."
   - Cartão recusado mostra o motivo e avisa que o mesmo QR continua valendo.
   - Quando o Stripe confirma, a tela vira o painel verde "Pagamento confirmado" e o celular vibra.
-  - A confirmação só vem do Flow lendo `payment_status=paid` no Stripe; nada do lado do passageiro marca como pago.
+  - A confirmação só vem do plugin lendo `payment_status=paid` no Stripe; nada do lado do passageiro marca como pago.
 - **Navegação:** a rota é `#cobranca-qr`. Se a página recarregar, volta ao Recebimento, porque a sessão do QR fica só na memória.
 
-## Contrato dos Flows
+## Contrato da Custom API `new_CobrancaQR`
 
-**Resposta comum aos dois Flows** (HTTP 200), validada por `parseQrChargeResponse`:
+Entrada `new_Command` (texto JSON com `acao`), saída `new_Result` (texto JSON).
+
+**Resposta comum** (validada por `parseQrChargeResponse`):
 
 ```json
 {
@@ -81,38 +88,43 @@ App (celular do motorista)              Power Automate                       Str
 
 - **Valores:** em centavos inteiros e sempre em BRL.
 - **`recusa`:** é o `payment_intent.last_payment_error.message` da última tentativa; vazio se nenhuma falhou.
-- **Erro de negócio** (sem permissão, valor acima do saldo, reserva de outro motorista): volta HTTP 200 com `{ "erro": "mensagem" }`. O app mostra o texto como veio, então escreva para o motorista ler.
+- **Erro de negócio** (sem permissão, valor acima do saldo, reserva de outro motorista, Stripe fora do ar): volta `{ "erro": "mensagem" }`, não exceção. O app mostra o texto como veio, então é escrito para o motorista ler. Falha do Stripe nunca leva a chave nem o corpo da resposta; o rastreamento do plugin guarda só status e código.
 
-**1. Flow Cobrança QR (`new_FlowURLCobrancaQR`)** — entrada `{ reservaId, motoristaId, valorCentavos, pagante: { nome, email }, idioma }`. `idioma` é `pt-BR`, `en-US` ou `es-ES`; `email` pode vir vazio.
-1. **Permissão:** o funcionário `motoristaId` precisa ter `cr40f_podecobrarqrcode` = Sim. Se não tiver: `{ erro: "Você não está liberado para cobrar por QR code." }`.
-2. **Reserva:** `_cr40f_motorista_value` precisa ser igual a `motoristaId`.
-3. **Saldo:** `cr40f_valor_a_receber` menos as cobranças `pago` da reserva. Um `valorCentavos` acima do saldo é recusado com `erro`.
-4. **Sessão já aberta:** se houver cobrança `aguardando`, não vencida e com o mesmo valor, devolva essa mesma. Assim, dois toques não criam duas cobranças.
-5. **Criar a sessão:** `POST https://api.stripe.com/v1/checkout/sessions`, em form-urlencoded, com `Authorization: Bearer <chave restrita>` e `Idempotency-Key: reserva-<id>-<n>`.
-   - Parâmetros:
-     - `mode=payment`, `expires_at` = agora + 30 min (o mínimo do Stripe) e `locale` pelo idioma: `pt-BR` → `pt-BR`, `en-US` → `en`, `es-ES` → `es`.
-     - `line_items[0][price_data][currency]=brl`, `[unit_amount]=<valorCentavos>` e `[product_data][name]=Serviço <nº>`, com `line_items[0][quantity]=1`.
-     - `client_reference_id=<reservaId>`, `metadata[reserva_id]`, `metadata[motorista_id]` e `metadata[pagante_nome]`.
-     - `success_url` apontando para a página de agradecimento da Betinhos.
-     - `customer_email=<pagante.email>` quando vier preenchido: o passageiro não precisa digitar e-mail na página e o recibo do Stripe vai para ele.
-   - **Não** envie `payment_method_types`: o Stripe recusa esse parâmetro. Os meios de pagamento vêm do painel: Cards, Apple Pay e Google Pay ligados; Pix e Boleto desligados.
-6. **Registrar:** crie a linha em `cr40f_cobrancastripe` com status `aguardando`, nome e e-mail do pagante e idioma, e responda no contrato acima.
+**`criar`** — `{ acao: "criar", reservaId, valorCentavos, pagante: { nome, email }, idioma }`. `idioma` é `pt-BR`, `en-US` ou `es-ES`; `email` pode vir vazio.
+1. **Motorista:** o funcionário do usuário que chama. Precisa ter `cr40f_podecobrarqrcode` = Sim; se não: "Você não está liberado para cobrar por QR code.".
+2. **Reserva:** `_cr40f_motorista_value` precisa ser esse funcionário; se não: "Este serviço não está com você.".
+3. **Sessão já aberta:** cobrança `aguardando`, não vencida, do mesmo motorista e com o mesmo valor é consultada no Stripe e devolvida (se já estiver paga, também). Dois toques não criam duas cobranças.
+4. **Um QR aberto por reserva:** as outras cobranças `aguardando` não vencidas da reserva são expiradas no Stripe e viram `cancelado`; se ao expirar o Stripe disser que já foi paga, grava `pago`. Sem isso, um QR de R$ 500 aberto mais um novo de R$ 300 somariam R$ 800 pagáveis.
+   - **Saldo:** `cr40f_valor_a_receber` menos as cobranças `pago` e as em processamento (pagamento assíncrono). Valor `<= 0`, abaixo de R$ 0,50 (mínimo do Stripe em BRL) ou acima do saldo é recusado.
+5. **Criar a sessão:** `POST https://api.stripe.com/v1/checkout/sessions`, form-urlencoded, `Authorization: Bearer <chave>` e `Idempotency-Key: reserva-<id>-<n>-<valor>-<expira>` (n = tentativa da reserva).
+   - `mode=payment`; `expires_at` = minuto atual + 32 min (30 min do mínimo do Stripe + folga de relógio e latência; arredondar ao minuto deixa o toque duplo idêntico para a idempotência); `locale`: `pt-BR` → `pt-BR`, `en-US` → `en`, `es-ES` → `es`.
+   - `line_items[0][price_data][currency]=brl`, `[unit_amount]=<valorCentavos>`, `[product_data][name]=Serviço <cr40f_id>` e `line_items[0][quantity]=1`.
+   - `client_reference_id=<reservaId>`, `metadata[reserva_id]`, `metadata[motorista_id]` e `metadata[pagante_nome]`.
+   - `success_url`: padrão `https://betinhos.com.br`; muda com `successUrl` na configuração (segura ou não segura) do step.
+   - `customer_email=<pagante.email>` só quando vier preenchido.
+   - **Não** envia `payment_method_types`: o Stripe recusa esse parâmetro. Os meios vêm do painel: Cards, Apple Pay e Google Pay ligados; Pix e Boleto desligados.
+6. **Registrar:** cria a linha em `cr40f_cobrancastripe` com status `aguardando` e responde no contrato. Se a linha da mesma sessão já existir (toque duplo concorrente devolve a mesma sessão pela idempotência), devolve a existente sem gravar outra; consultas toleram linha duplicada e usam a mais antiga.
 
-**2. Flow Status Cobrança QR (`new_FlowURLCobrancaQRStatus`)** — entrada `{ sessionId, acao: "consultar" | "cancelar" }`. O app chama a cada 3 s enquanto o QR está na tela, então a meta de resposta é menos de 2 s.
-- **`cancelar`:** `POST /v1/checkout/sessions/{id}/expire`. Se a sessão já estiver paga, devolva `pago`: o dinheiro entrou e o motorista precisa saber.
-- **`consultar`:** `GET /v1/checkout/sessions/{id}?expand[]=payment_intent.latest_charge.balance_transaction`.
-  - `payment_status=paid` → `pago`; `status=expired` → `expirado`; qualquer outro → `aguardando`.
-  - Ao virar `pago`, grave a tarifa, o valor líquido, o país do cartão, a bandeira, a carteira digital e a data do pagamento.
+**`consultar`** — `{ acao: "consultar", sessionId }`. Só o motorista dono da cobrança. O app chama a cada 3 s; a meta é menos de 2 s.
+- `GET /v1/checkout/sessions/{id}?expand[]=payment_intent.latest_charge.balance_transaction`.
+- `payment_status=paid` ou `no_payment_required` → `pago`; `status=expired` → `expirado`; qualquer outro → `aguardando`.
+- **Pagamento assíncrono** (`status=complete` com `payment_status=unpaid`): continua `aguardando` no registro, mas a sessão já não tem link; o motorista recebe o aviso "O pagamento está em processamento no banco do passageiro. Aguarde a confirmação." (como `erro`, porque o app só aceita `aguardando` com link do Stripe). `cancelado` local continua `cancelado`, salvo se o Stripe disser que pagou; `pago` nunca volta atrás.
+- Ao virar `pago`, grava tarifa, valor líquido, país do cartão, bandeira, carteira digital, PaymentIntent e data do pagamento.
 
-**3. Webhook** (`checkout.session.completed` e `checkout.session.expired`)
-- Leia só o `id` do evento e repita o "consultar".
-- O Power Automate não valida a assinatura HMAC de forma nativa. Por isso, o conteúdo do evento nunca é usado direto, e um webhook forjado não marca pagamento.
-- O webhook garante o registro mesmo se o motorista fechar o app antes do pagamento cair.
+**`cancelar`** — `{ acao: "cancelar", sessionId }`. Só o dono. Se a sessão já estiver paga, devolve `pago` (e grava): o dinheiro entrou e o motorista precisa saber. Pagamento em processamento é recusado com aviso e não vira `cancelado`. Senão, `POST /v1/checkout/sessions/{id}/expire` e status `cancelado`.
+
+**`sincronizar`** — `{ acao: "sincronizar", sessionId }`. Para o webhook: qualquer chamador autenticado; mesmo efeito do `consultar`, sem conferir o dono, porque só espelha o estado do Stripe. Responde só `{ "ok": true }`, sem dados da cobrança. Falha técnica do Stripe (rede, 5xx, 429, chave) vira exceção, para o Flow responder 500 e o Stripe reenviar; erro de negócio (sessão de outro ambiente) volta `{ "erro" }` e o Flow responde 200.
+
+**Webhook** — Flow "Flow Webhook Stripe | Cobrança QR" (`scripts/cobranca-qr-webhook-flow.cjs`), eventos `checkout.session.completed`, `checkout.session.expired`, `checkout.session.async_payment_succeeded` e `checkout.session.async_payment_failed`.
+- Gatilho HTTP; lê só `data.object.id` e chama `new_CobrancaQR` com `sincronizar` (Dataverse PerformUnboundAction). Responde 200; 500 se a chamada falhar, para o Stripe tentar de novo.
+- O Power Automate não valida a assinatura HMAC. Por isso o conteúdo do evento nunca é usado direto, e um webhook forjado não marca pagamento.
+- Garante o registro mesmo se o motorista fechar o app antes do pagamento cair.
 
 **Chave da API**
-- Use uma *Restricted key* com escrita em Checkout Sessions e leitura em PaymentIntents, Charges e Balance transactions.
-- Guarde a chave como variável de ambiente do tipo Secret (Key Vault). Ela nunca vai para o webresource nem para o Git.
-- Use uma chave de teste para DEV e outra live para PROD.
+- *Restricted key* com escrita em Checkout Sessions e leitura em PaymentIntents, Charges e Balance transactions.
+- Fica na configuração segura do step do `QrChargePlugin` (`{"chave":"rk_test_..."}`). Nunca vai para o webresource, Flow, variável de ambiente nem Git.
+- DEV: o provisionador lê `%USERPROFILE%\.betinhos\stripe-dev.env` (`STRIPE_SECRET_KEY=...`, fora do repositório; chave live é recusada). Sem o arquivo, ele avisa e não mexe na configuração segura.
+- A configuração segura não viaja na solução: o PROD precisa da chave live gravada no step de lá.
 
 ## Dataverse
 
@@ -123,10 +135,12 @@ App (celular do motorista)              Power Automate                       Str
 
 ## Ordem de implantação (DEV)
 
-1. Rode os dois scripts de schema no console do model-driven app.
+1. Schema: já criado no DEV (`scripts/create-cobranca-stripe-table.console.js` e `scripts/add-funcionario-cobranca-qr-permission.console.js`).
 2. No Stripe (modo teste), confira em Payment methods: Cards, Apple Pay e Google Pay ligados; Pix e Boleto desligados. Crie a Restricted key.
-3. Crie os dois Flows e o webhook, e coloque as URLs em `new_FlowURLCobrancaQR` e `new_FlowURLCobrancaQRStatus`.
-4. Marque "Pode cobrar por QR code" num motorista de teste e publique o webresource com `npm run push`, a partir da `main` atualizada.
+3. Grave a chave em `%USERPROFILE%\.betinhos\stripe-dev.env` com a linha `STRIPE_SECRET_KEY=rk_test_...`.
+4. `npm run push` a partir da `main` atualizada: publica o plugin e roda `scripts/provision-cobranca-qr.ps1` (Custom API, step com a chave, Flow do webhook ativo, tudo na AppBetinhos) antes do webresource. O script imprime a URL do webhook.
+5. No Stripe: Developers → Webhooks → Add endpoint com essa URL e os eventos `checkout.session.completed`, `checkout.session.expired`, `checkout.session.async_payment_succeeded` e `checkout.session.async_payment_failed`.
+6. Marque "Pode cobrar por QR code" num motorista de teste.
 
 ## Verificação
 
@@ -144,10 +158,10 @@ App (celular do motorista)              Power Automate                       Str
 | Pago em parte | "Envie o comprovante do restante" e foto obrigatória | OK no mock |
 | Cancelar cobrança | "Cobrança cancelada" e o QR não aceita mais pagamento | OK no mock |
 | Recarregar a página no QR | Volta ao Recebimento | OK no mock |
-| Motorista sem permissão chamando o Flow direto | `erro` do Flow | Pendente (Flow) |
-| Cartão de teste `4242 4242 4242 4242` | "Pago" em até ~5 s e tarifa gravada | Pendente (Flow) |
-| 3DS `4000 0025 0000 3155` | Pago depois da autenticação | Pendente (Flow) |
-| App fechado antes do pagamento | O webhook grava | Pendente (Flow) |
+| Motorista sem permissão chamando a Custom API direto | `erro` do plugin | OK nos testes do plugin; pendente no DEV |
+| Cartão de teste `4242 4242 4242 4242` | "Pago" em até ~5 s e tarifa gravada | Pendente (DEV) |
+| 3DS `4000 0025 0000 3155` | Pago depois da autenticação | Pendente (DEV) |
+| App fechado antes do pagamento | O webhook grava | Pendente (DEV) |
 | Apple Pay ou Google Pay em aparelho real | Um toque | Pendente (aparelho) |
 
 ## Fora do escopo
