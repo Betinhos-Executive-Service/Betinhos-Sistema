@@ -154,6 +154,21 @@ function Ensure-NameAttribute([string] $Entity, [int] $Max, [string] $Required) 
   Invoke-Dataverse "PUT" "EntityDefinitions(LogicalName='$Entity')/Attributes(LogicalName='cr40f_name')" $attr -ExtraHeaders @{ "MSCRM.MergeLabels" = "true" } | Out-Null
   Write-Step "cr40f_name de $Entity com MaxLength $Max e RequiredLevel $Required"
 }
+# O Dataverse tambem ignora CanStoreFullImage (e pode ignorar MaxSizeInKB/IsPrimaryImage) no POST da coluna de imagem;
+# a doc permite mudar os tres depois da criacao: acerta por PUT da metadata completa, no molde do Ensure-NameAttribute.
+function Ensure-ImageAttribute([string] $Entity, [string] $Logical, [int] $MaxKB) {
+  $attr = Invoke-Dataverse "GET" "EntityDefinitions(LogicalName='$Entity')/Attributes(LogicalName='$Logical')/Microsoft.Dynamics.CRM.ImageAttributeMetadata"
+  if ($attr.CanStoreFullImage -eq $true -and $attr.MaxSizeInKB -eq $MaxKB -and $attr.IsPrimaryImage -eq $true) { return }
+  $de = "CanStoreFullImage $($attr.CanStoreFullImage)/MaxSizeInKB $($attr.MaxSizeInKB)/IsPrimaryImage $($attr.IsPrimaryImage)"
+  if (-not $Apply) { Write-Step "DRY RUN mudaria $Entity.$Logical de $de para CanStoreFullImage True/MaxSizeInKB $MaxKB/IsPrimaryImage True"; return }
+  foreach ($name in @($attr.PSObject.Properties | Where-Object { $_.Name -like "@odata.*" } | ForEach-Object { $_.Name })) { $attr.PSObject.Properties.Remove($name) }
+  $attr | Add-Member -NotePropertyName "@odata.type" -NotePropertyValue "Microsoft.Dynamics.CRM.ImageAttributeMetadata" -Force
+  $attr.CanStoreFullImage = $true
+  $attr.MaxSizeInKB = $MaxKB
+  $attr.IsPrimaryImage = $true
+  Invoke-Dataverse "PUT" "EntityDefinitions(LogicalName='$Entity')/Attributes(LogicalName='$Logical')" $attr -ExtraHeaders @{ "MSCRM.MergeLabels" = "true" } | Out-Null
+  Write-Step "$Entity.$Logical de $de para CanStoreFullImage True/MaxSizeInKB $MaxKB/IsPrimaryImage True"
+}
 # Coluna primaria cr40f_name: tamanho, obrigatoriedade e rotulo por tabela (spec secao 4: tipo 100, equipamento 200, obrigatoria).
 function Ensure-Table([string] $Logical, [string] $Schema, [string] $Display, [string] $Plural, [string] $Description, [int] $NameMax = 850, [string] $NameRequired = "None", [string] $NameDisplay = "Nome", [string] $NameDescription = "Nome exibido") {
   $id = Get-EntityId $Logical
@@ -247,6 +262,7 @@ Ensure-Lookup $relResponsavel "cr40f_funcionarios" $equip "cr40f_Responsavel" "R
 # Tabela de fotos ainda nao existe no dry run: as colunas so podem ser conferidas depois de criada.
 if ($fotoId) {
   Ensure-AttributeOn $foto (ImagePrimary "cr40f_Imagem" "Imagem" "Foto do equipamento (miniatura e imagem grande)")
+  if (Get-AttributeId $foto "cr40f_imagem") { Ensure-ImageAttribute $foto "cr40f_imagem" 10240 }
   Ensure-AttributeOn $foto (YesNo "cr40f_Capa" "Capa" "Foto exibida na lista de equipamentos; uma por item, mantida pelo shell")
   # Excluir o equipamento apaga as fotos dele (Cascade); a foto nao existe sem o item.
   Ensure-Lookup $relFoto $equip $foto "cr40f_Equipamento" "Equipamento" "Equipamento da foto" "Cascade" "ApplicationRequired"
