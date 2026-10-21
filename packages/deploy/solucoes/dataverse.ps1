@@ -49,4 +49,15 @@ function Write-JsonFile([string] $Path, $Value) {
   [IO.File]::WriteAllText($Path, (ConvertTo-Json -InputObject $Value -Depth 12), (New-Object Text.UTF8Encoding $false))
 }
 
+# Arquivo de saida pronto para ser gravado: caminho absoluto pelo $PWD (o .NET resolveria pelo diretorio do processo), sem o
+# arquivo antigo (uma execucao que falhar nao deixa o velho passando por novo) e com a pasta criada. Devolve o caminho absoluto.
+function Initialize-ArquivoDeSaida([string] $Caminho) {
+  $absoluto = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Caminho)
+  if (Test-Path -LiteralPath $absoluto -PathType Container) { throw "$absoluto e uma pasta, nao um arquivo." }
+  if (Test-Path -LiteralPath $absoluto) { Remove-Item -LiteralPath $absoluto -Force -ErrorAction Stop }
+  $pasta = Split-Path -Parent $absoluto
+  if ($pasta -and -not (Test-Path -LiteralPath $pasta)) { New-Item -ItemType Directory -Path $pasta -ErrorAction Stop | Out-Null }
+  return $absoluto
+}
+
 function Read-JsonFile([string] $Path) { return ([IO.File]::ReadAllText($Path, [Text.Encoding]::UTF8) | ConvertFrom-Json) }

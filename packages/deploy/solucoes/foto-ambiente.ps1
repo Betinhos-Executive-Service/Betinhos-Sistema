@@ -5,14 +5,17 @@ param(
 )
 
 # Somente leitura (so GET, em qualquer ambiente). Grava em JSON o estado que a migracao nao pode perder: registros por
-# tabela, fluxos, steps, configuracao segura, hash dos valores de variaveis, solucoes de cada componente e versoes servidas.
+# tabela, fluxos (com categoria), steps, configuracao segura, hash dos valores de variaveis, solucoes e tipo de cada
+# componente, pacote de cada assembly, situacao dos steps sensiveis de regras.json e versoes servidas.
 # Nunca grava o valor de variavel, so o hash SHA-256. Ids sempre em minusculo.
 # -Solucoes aceita lista separada por virgula ("A,B"): com -File o PowerShell entrega uma string so.
 # A lista vai para $alvos antes do dot-source: solucoes.ps1 atribui $script:Solucoes (as 4 novas) e esconderia o parametro.
 # Mensagens sem acento: o Windows PowerShell 5.1 le .ps1 sem BOM como ANSI.
 
-# .NET resolve caminho relativo pelo diretorio do processo, nao pelo $PWD: resolve antes de qualquer uso.
-$Saida = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Saida)
+$ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "dataverse.ps1")
+# Caminho absoluto pelo $PWD, foto anterior apagada ja aqui (se esta execucao falhar, nao sobra foto velha) e pasta criada.
+$Saida = Initialize-ArquivoDeSaida $Saida
 $alvos = @($Solucoes | ForEach-Object { $_ -split "," } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 
 if ($PSVersionTable.PSEdition -eq "Core") {
@@ -21,10 +24,9 @@ if ($PSVersionTable.PSEdition -eq "Core") {
   exit $LASTEXITCODE
 }
 
-$ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
-. (Join-Path $PSScriptRoot "dataverse.ps1")
 . (Join-Path $PSScriptRoot "solucoes.ps1")
+$regras = Read-JsonFile (Join-Path $PSScriptRoot "regras.json")
 $dv = Connect-Dataverse $EnvironmentUrl $null
 
 # Valor ausente (ou nulo) nao tem hash: a variavel sem valor fica null na foto.
@@ -35,7 +37,10 @@ function Get-Sha256($Texto) {
   finally { $sha.Dispose() }
 }
 
-$foto = [ordered]@{ ambiente = $dv.Url; quando = (Get-Date).ToString("s"); registros = [ordered]@{}; aproximados = @(); fluxos = @{}; steps = @{}; variaveis = @{}; componentes = @{}; versoes = @{} }
+$foto = [ordered]@{
+  ambiente = $dv.Url; quando = (Get-Date).ToString("s"); registros = [ordered]@{}; aproximados = @(); fluxos = @{}; steps = @{}
+  variaveis = @{}; componentes = @{}; tipos = @{}; pacotes = @{}; stepsSeguros = $null; versoes = @{}
+}
 
 # Registros: contagem exata por FetchXML; acima do limite de agregacao (50.000) conta paginando os ids (tambem exata).
 # Qualquer outro erro de contagem interrompe a foto: nao existe contagem aproximada. `aproximados` fica na foto, vazio.
@@ -46,23 +51,30 @@ foreach ($e in @(Read-DvAll $dv "EntityDefinitions?`$select=LogicalName,EntitySe
   if ($contagem.Paginada) { $paginadas += $e.LogicalName; Write-Step "$($e.LogicalName): acima do limite de agregacao, contado por paginacao ($($contagem.Total))" }
 }
 
-# Componentes por solucao (so as solucoes que existem neste ambiente).
-$fluxoIds = @{}; $stepIds = @{}
+# Componentes por solucao (so as solucoes que existem neste ambiente), com o tipo de cada um.
+$fluxoIds = @{}; $stepIds = @{}; $ausentes = @()
 foreach ($sol in $alvos) {
   $id = Get-SolucaoId $dv $sol
-  if (-not $id) { continue }
+  if (-not $id) { $ausentes += $sol; continue }
   foreach ($c in @(Read-DvAll $dv "solutioncomponents?`$select=objectid,componenttype&`$filter=_solutionid_value eq $id")) {
     $oid = ([string] $c.objectid).ToLowerInvariant()
     if (-not $foto.componentes.ContainsKey($oid)) { $foto.componentes[$oid] = @() }
     if ($foto.componentes[$oid] -notcontains $sol) { $foto.componentes[$oid] += $sol }
+    $foto.tipos[$oid] = [int] $c.componenttype
     if ([int] $c.componenttype -eq 29) { $fluxoIds[$oid] = $true }
     if ([int] $c.componenttype -eq 92) { $stepIds[$oid] = $true }
   }
 }
-# estado = statecode bruto (fluxo: 1 ativado; step: 0 habilitado). O comparador decide o que e perda.
-foreach ($w in @(Read-DvAll $dv "workflows?`$select=workflowid,name,statecode&`$filter=type eq 1")) {
+if ($ausentes.Count) { Write-Step "solucoes que nao existem neste ambiente: $($ausentes -join ', ')" }
+# Assembly dentro de pacote de plug-in: quem o carrega e o pacote (conferir-retirada.mjs usa isso).
+foreach ($r in @(Read-DvAll $dv "pluginassemblies?`$select=pluginassemblyid,_packageid_value&`$filter=_packageid_value ne null")) {
+  $foto.pacotes[([string] $r.pluginassemblyid).ToLowerInvariant()] = ([string] $r._packageid_value).ToLowerInvariant()
+}
+# estado = statecode bruto (fluxo: 1 ativado; step: 0 habilitado); categoria do workflow (2 regra de negocio, 4 BPF, 5 fluxo
+# de nuvem...). O comparador decide o que e perda.
+foreach ($w in @(Read-DvAll $dv "workflows?`$select=workflowid,name,statecode,category&`$filter=type eq 1")) {
   $oid = ([string] $w.workflowid).ToLowerInvariant()
-  if ($fluxoIds.ContainsKey($oid)) { $foto.fluxos[$oid] = @{ nome = [string] $w.name; estado = [int] $w.statecode } }
+  if ($fluxoIds.ContainsKey($oid)) { $foto.fluxos[$oid] = @{ nome = [string] $w.name; estado = [int] $w.statecode; categoria = [int] $w.category } }
 }
 # "seguro" = o step tem configuracao segura; o comparador acusa perda quando um step que tinha deixa de ter.
 foreach ($s in @(Read-DvAll $dv "sdkmessageprocessingsteps?`$select=sdkmessageprocessingstepid,name,statecode,_sdkmessageprocessingstepsecureconfigid_value&`$filter=customizationlevel eq 1")) {
@@ -71,6 +83,10 @@ foreach ($s in @(Read-DvAll $dv "sdkmessageprocessingsteps?`$select=sdkmessagepr
     $foto.steps[$oid] = @{ nome = [string] $s.name; estado = [int] $s.statecode; seguro = [bool] $s._sdkmessageprocessingstepsecureconfigid_value }
   }
 }
+# Cada fluxo e step das solucoes precisa ter estado na foto, e a foto precisa ter componentes; senao a foto para aqui.
+Assert-CoberturaDaFoto $foto $fluxoIds $stepIds
+# Os steps sensiveis de regras.json, pelo nome, a parte das solucoes: existe e tem configuracao segura.
+$foto.stepsSeguros = Get-SituacaoStepsSeguros $dv @($regras.stepsSeguros)
 foreach ($v in @(Read-DvAll $dv "environmentvariabledefinitions?`$select=schemaname&`$expand=environmentvariabledefinition_environmentvariablevalue(`$select=value)")) {
   if ([string] $v.schemaname -notmatch '^(cr40f|new)_') { continue }
   $valores = @($v.environmentvariabledefinition_environmentvariablevalue)
@@ -88,7 +104,6 @@ if ($am.Count) {
   $foto.versoes["appMotoristas"] = if ($m.Success) { $m.Groups[1].Value } else { [regex]::Match($js, '\d+\.\d+\.\d+(?=["''])').Value }
 }
 
-$pasta = Split-Path -Parent $Saida
-if ($pasta -and -not (Test-Path -LiteralPath $pasta)) { New-Item -ItemType Directory -Path $pasta | Out-Null }
 Write-JsonFile $Saida $foto
-Write-Step ("foto gravada em {0}: {1} tabelas ({6} contadas por paginacao), {2} fluxos, {3} steps, {4} variaveis, {5} componentes" -f $Saida, $foto.registros.Count, $foto.fluxos.Count, $foto.steps.Count, $foto.variaveis.Count, $foto.componentes.Count, $paginadas.Count)
+$semSeguro = @($foto.stepsSeguros.Keys | Where-Object { -not $foto.stepsSeguros[$_].seguro })
+Write-Step ("foto gravada em {0}: {1} tabelas ({6} contadas por paginacao), {2} fluxos, {3} steps, {4} variaveis, {5} componentes; steps sensiveis sem configuracao segura: {7}" -f $Saida, $foto.registros.Count, $foto.fluxos.Count, $foto.steps.Count, $foto.variaveis.Count, $foto.componentes.Count, $paginadas.Count, $semSeguro.Count)

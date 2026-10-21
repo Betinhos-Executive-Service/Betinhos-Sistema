@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { compararFotos, temPerda } from './comparar-fotos.mjs'
+import { INFORMATIVO, PERDA, compararFotos, temPerda } from './comparar-fotos.mjs'
 
 const foto = (extra = {}) => ({
   ambiente: 'x', quando: 't', aproximados: [],
@@ -60,4 +60,68 @@ test('componente sem nenhum dono é perda', () => assert.equal(temPerda(comparar
 test('ordem dos donos não importa', () => {
   const d = compararFotos(foto({ componentes: { c1: ['B', 'A'] } }), foto({ componentes: { c1: ['A', 'B'] } }))
   assert.deepEqual(d.donosMudaram, [])
+})
+
+test('toda lista da comparação é de perda ou informativa, nunca as duas', () => {
+  const chaves = Object.keys(compararFotos(foto(), foto(), { travado: true })).sort()
+  assert.deepEqual(chaves, [...PERDA, ...INFORMATIVO].sort())
+  assert.equal(new Set([...PERDA, ...INFORMATIVO]).size, PERDA.length + INFORMATIVO.length)
+})
+
+// Um cenário por lista de perda: só ela fica não vazia e, sozinha, já torna temPerda verdadeiro.
+const travadoAntes = { fluxos: { f1: { nome: 'Fluxo 1', estado: 0, categoria: 5 } }, steps: { s1: { nome: 'Step 1', estado: 1, seguro: true } } }
+const cenarios = {
+  registrosCairam: [foto(), foto({ registros: { cr40f_a: 9, cr40f_b: 5 } })],
+  tabelasSumiram: [foto(), foto({ registros: { cr40f_a: 10 } })],
+  fluxosSumiram: [foto(), foto({ fluxos: {} })],
+  fluxosDesligados: [foto(), foto({ fluxos: { f1: { nome: 'Fluxo 1', estado: 0 } } })],
+  stepsSumiram: [foto(), foto({ steps: {} })],
+  stepsDesativados: [foto(), foto({ steps: { s1: { nome: 'Step 1', estado: 1, seguro: true } } })],
+  stepsPerderamSeguro: [foto(), foto({ steps: { s1: { nome: 'Step 1', estado: 0, seguro: false } } })],
+  variaveisSumiram: [foto(), foto({ variaveis: {} })],
+  variaveisMudaram: [foto(), foto({ variaveis: { new_X: 'h2' } })],
+  componentesSumiram: [foto(), foto({ componentes: {} })],
+  fluxosLigadosNoTravado: [foto(travadoAntes), foto({ ...travadoAntes, fluxos: { f1: { nome: 'Fluxo 1', estado: 1, categoria: 5 } } }), { travado: true }],
+  stepsHabilitadosNoTravado: [foto(travadoAntes), foto({ ...travadoAntes, steps: { ...travadoAntes.steps, s2: { nome: 'Step novo', estado: 0, seguro: false } } }), { travado: true }],
+}
+test('toda lista de perda tem cenário', () => assert.deepEqual(Object.keys(cenarios).sort(), [...PERDA].sort()))
+for (const lista of PERDA) {
+  test(`só ${lista} já é perda`, () => {
+    const [antes, depois, opcoes] = cenarios[lista]
+    const d = compararFotos(antes, depois, opcoes)
+    assert.ok(d[lista].length > 0, `${lista} vazia`)
+    assert.deepEqual(PERDA.filter((outra) => outra !== lista && d[outra].length), [])
+    assert.equal(temPerda(d), true)
+  })
+}
+
+test('sem --travado, fluxo e step ligados pelo import não são perda', () => {
+  const [antes, depois] = cenarios.fluxosLigadosNoTravado
+  assert.equal(temPerda(compararFotos(antes, depois)), false)
+  const [antesS, depoisS] = cenarios.stepsHabilitadosNoTravado
+  assert.equal(temPerda(compararFotos(antesS, depoisS)), false)
+})
+test('travado: fluxo novo que chega ligado é perda', () => {
+  const d = compararFotos(foto(travadoAntes), foto({ ...travadoAntes, fluxos: { ...travadoAntes.fluxos, f2: { nome: 'Fluxo novo', estado: 1, categoria: 5 } } }), { travado: true })
+  assert.deepEqual(d.fluxosLigadosNoTravado, [{ id: 'f2', nome: 'Fluxo novo', categoria: 5, antes: null }])
+})
+test('travado: fluxo que já estava ligado antes não é acusado de novo', () => {
+  const d = compararFotos(foto(), foto(), { travado: true })
+  assert.deepEqual(d.fluxosLigadosNoTravado, [])
+})
+test('travado: regra de negócio e BPF novos ligados não são perda', () => {
+  const d = compararFotos(foto(travadoAntes), foto({ ...travadoAntes, fluxos: { ...travadoAntes.fluxos, r: { nome: 'Regra', estado: 1, categoria: 2 }, b: { nome: 'BPF', estado: 1, categoria: 4 } } }), { travado: true })
+  assert.deepEqual(d.fluxosLigadosNoTravado, [])
+})
+test('travado: fluxo ligado sem categoria na foto é perda', () => {
+  const d = compararFotos(foto(travadoAntes), foto({ ...travadoAntes, fluxos: { f1: { nome: 'Fluxo 1', estado: 1 } } }), { travado: true })
+  assert.deepEqual(d.fluxosLigadosNoTravado, [{ id: 'f1', nome: 'Fluxo 1', categoria: null, antes: 0 }])
+})
+test('travado: step que já estava habilitado antes não é acusado', () => {
+  const d = compararFotos(foto(), foto(), { travado: true })
+  assert.deepEqual(d.stepsHabilitadosNoTravado, [])
+})
+test('travado: step desabilitado que volta habilitado é perda', () => {
+  const d = compararFotos(foto(travadoAntes), foto({ ...travadoAntes, steps: { s1: { nome: 'Step 1', estado: 0, seguro: true } } }), { travado: true })
+  assert.deepEqual(d.stepsHabilitadosNoTravado, [{ id: 's1', nome: 'Step 1', antes: 1 }])
 })

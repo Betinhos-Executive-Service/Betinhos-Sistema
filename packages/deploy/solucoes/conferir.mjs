@@ -21,15 +21,27 @@ export function conferirCobertura({ caixa, porSolucao, atribuicoes }) {
   }
 }
 
-// Dependência ausente que pertence a outra das 4 só é aceita se a camada permitir (nunca para cima).
+// Solução Active do Dataverse: base de todo componente próprio (não gerenciado) do ambiente.
+export const SOLUCAO_ACTIVE = 'fd140aae-4df4-11dd-bd17-0019b9312238'
+
+// Dependência ausente de uma das 4. O dono é o do próprio requerido ou, para subcomponente (atributo, formulário, visão...),
+// o da tabela pai (`pai`).
+// - Dono em outra das 4: só é aceita se a camada permitir (nunca para cima).
+// - Sem dono nas 4 e componente próprio (base Active, ou base desconhecida): falta incluir numa das 4 ("fora das 4"); o import
+//   em outro ambiente falharia ou levaria o componente só pela caixa de entrada.
+// - Sem dono nas 4 e base em outra solução (sistema ou gerenciada): vem do ambiente e é ignorada.
 export function conferirDependencias({ ausentes, porSolucao, permitidas }) {
   const donos = donosPorId(porSolucao)
   const violacoes = []
   for (const [solucao, deps] of Object.entries(ausentes)) {
     for (const d of deps) {
-      const dono = donos.get(d.requerido)?.[0]
-      if (dono && dono !== solucao && !permitidas[solucao].includes(dono)) {
-        violacoes.push({ solucao, requerido: d.requerido, tipo: d.tipo, donoDoRequerido: dono })
+      const dono = donos.get(d.requerido)?.[0] ?? (d.pai ? donos.get(d.pai)?.[0] : undefined)
+      const proprio = !d.base || String(d.base).toLowerCase() === SOLUCAO_ACTIVE
+      const item = { solucao, requerido: d.requerido, tipo: d.tipo, pai: d.pai ?? null, dependente: d.dependente ?? null, tipoDependente: d.tipoDependente ?? null }
+      if (dono) {
+        if (dono !== solucao && !permitidas[solucao].includes(dono)) violacoes.push({ ...item, motivo: 'para cima', donoDoRequerido: dono })
+      } else if (proprio) {
+        violacoes.push({ ...item, motivo: 'fora das 4', donoDoRequerido: null })
       }
     }
   }

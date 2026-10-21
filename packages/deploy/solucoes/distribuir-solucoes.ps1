@@ -167,7 +167,9 @@ Write-JsonFile (Join-Path $tmp "conferir.json") @{
 }
 $relatorio = (node (Join-Path $PSScriptRoot "conferir.mjs") (Join-Path $tmp "conferir.json")) | ConvertFrom-Json
 $codigo = $LASTEXITCODE
-Write-Step ("conferencia: sem dono {0}; em duas {1}; fora do lugar {2}; dependencias para cima {3}" -f @($relatorio.cobertura.semDono).Count, @($relatorio.cobertura.emDuas).Count, @($relatorio.cobertura.foraDoLugar).Count, @($relatorio.violacoes).Count)
+$violacoes = @($relatorio.violacoes)
+Write-Step ("conferencia: sem dono {0}; em duas {1}; fora do lugar {2}; dependencias para cima {3}; dependencias fora das 4 {4}" -f @($relatorio.cobertura.semDono).Count, @($relatorio.cobertura.emDuas).Count, @($relatorio.cobertura.foraDoLugar).Count, @($violacoes | Where-Object { $_.motivo -eq "para cima" }).Count, @($violacoes | Where-Object { $_.motivo -eq "fora das 4" }).Count)
+foreach ($v in $violacoes) { Write-Warning ("DEPENDENCIA {0}: {1} precisa do tipo {2} {3} (pai {4}; dono {5}), exigido pelo tipo {6} {7}" -f $v.motivo, $v.solucao, $v.tipo, $v.requerido, $v.pai, $v.donoDoRequerido, $v.tipoDependente, $v.dependente) }
 Write-Step ("valores de variavel dentro das 4 solucoes: {0}; excedentes fora da caixa: {1}; assemblies empacotados: {2}" -f $valoresNasSolucoes.Count, ($excedentesFinais.Count - $valoresNasSolucoes.Count), $empacotados.Count)
 Write-JsonFile (Join-Path $tmp "relatorio.json") $relatorio
 Write-JsonFile (Join-Path $tmp "excedentes.json") $excedentesFinais

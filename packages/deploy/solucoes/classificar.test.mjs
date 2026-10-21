@@ -79,3 +79,30 @@ test('exceção por categoria junto com outra condição falha e nomeia o tipo',
 test('exceção com tipo fora de porTipo falha e nomeia o tipo', () => {
   assert.throws(() => validarRegras({ ...regras, excecoes: [{ tipo: '999', nomes: ['x'], solucao: 'BetinhosCore' }] }), /999/)
 })
+
+// Cobertura de regras.json (spec, Verificação item 1): toda chave de porTipo, toda exceção e todo proibido.
+const componenteDaChave = (chave, extra = {}) => (/^\d+$/.test(chave) ? c(Number(chave), extra) : c(10000, { entidade: chave, ...extra }))
+test('toda chave de porTipo sem exceção vai para a solução do tipo', () => {
+  for (const [chave, solucao] of Object.entries(regras.porTipo)) assert.equal(solucaoDe(componenteDaChave(chave)), solucao, `porTipo ${chave}`)
+})
+test('toda exceção de regras.json leva à solução dela', () => {
+  for (const e of regras.excecoes) {
+    const casos = e.nomes ? e.nomes.map((nome) => ({ nome })) : e.app ? [{ app: e.app }] : e.bpf ? [{ bpf: true }] : [{ categoria: e.categoria }]
+    for (const extra of casos) assert.equal(solucaoDe(componenteDaChave(e.tipo, extra)), e.solucao, `excecao ${e.tipo} ${JSON.stringify(extra)}`)
+  }
+})
+test('todo tipo proibido de regras.json é recusado', () => {
+  for (const chave of Object.keys(regras.proibidos)) {
+    const r = classificar([componenteDaChave(chave)], regras)
+    assert.equal(r.proibidos.length, 1, `proibido ${chave}`)
+    assert.equal(r.atribuicoes.length, 0)
+  }
+})
+test('dependências permitidas são as da spec', () => {
+  assert.deepEqual(regras.permitidas, {
+    BetinhosCore: [],
+    BetinhosAutomacao: ['BetinhosCore'],
+    BetinhosInterface: ['BetinhosCore', 'BetinhosAutomacao'],
+    BetinhosMotoristas: ['BetinhosCore', 'BetinhosAutomacao'],
+  })
+})

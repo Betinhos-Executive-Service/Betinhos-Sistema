@@ -50,3 +50,46 @@ test('CLI chamada por junction sem perda sai com código 0', () => {
   const r = rodarPeloJunction({ cr40f_a: 10 }, { cr40f_a: 10 })
   assert.equal(r.status, 0, r.stderr)
 })
+
+// CLI direta, com arquivos temporários: o JSON escrito aqui é o que o PowerShell gravaria.
+function rodarCli(script, argumentos, arquivos) {
+  const tmp = mkdtempSync(join(tmpdir(), 'cli-solucoes-'))
+  try {
+    const caminhos = Object.fromEntries(Object.entries(arquivos).map(([nome, conteudo]) => {
+      const caminho = join(tmp, nome)
+      writeFileSync(caminho, JSON.stringify(conteudo))
+      return [nome, caminho]
+    }))
+    return spawnSync(process.execPath, [join(solucoes, script), ...argumentos.map((a) => caminhos[a] ?? a)], { encoding: 'utf8' })
+  } finally {
+    rmSync(tmp, { recursive: true, force: true })
+  }
+}
+
+test('comparar-fotos --travado: fluxo ligado pelo import sai com código 1; sem a opção, 0', () => {
+  const antes = { ...foto({}), fluxos: { f: { nome: 'F', estado: 0, categoria: 5 } } }
+  const depois = { ...foto({}), fluxos: { f: { nome: 'F', estado: 1, categoria: 5 } } }
+  const travado = rodarCli('comparar-fotos.mjs', ['--travado', 'a.json', 'b.json'], { 'a.json': antes, 'b.json': depois })
+  assert.equal(travado.status, 1, travado.stderr)
+  assert.match(travado.stdout, /"fluxosLigadosNoTravado": \[\s*\{/)
+  const livre = rodarCli('comparar-fotos.mjs', ['a.json', 'b.json'], { 'a.json': antes, 'b.json': depois })
+  assert.equal(livre.status, 0, livre.stderr)
+})
+
+test('comparar-fotos sem as duas fotos falha', () => {
+  const r = rodarCli('comparar-fotos.mjs', ['--travado', 'a.json'], { 'a.json': foto({}) })
+  assert.notEqual(r.status, 0)
+})
+
+test('conferir-retirada: componente só na AppBetinhos sai com 1; tudo nas 4 sai com 0', () => {
+  const ruim = rodarCli('conferir-retirada.mjs', ['f.json'], { 'f.json': { componentes: { v: ['AppBetinhos'] }, tipos: { v: 381 }, pacotes: {} } })
+  assert.equal(ruim.status, 1, ruim.stderr)
+  assert.match(ruim.stdout, /"soNaCaixa"/)
+  const bom = rodarCli('conferir-retirada.mjs', ['f.json'], { 'f.json': { componentes: { t: ['AppBetinhos', 'BetinhosCore'] }, tipos: { t: 1 }, pacotes: {} } })
+  assert.equal(bom.status, 0, bom.stderr)
+})
+
+test('conferir-retirada: foto vazia não passa', () => {
+  const r = rodarCli('conferir-retirada.mjs', ['f.json'], { 'f.json': { componentes: {}, tipos: {}, pacotes: {} } })
+  assert.notEqual(r.status, 0)
+})
