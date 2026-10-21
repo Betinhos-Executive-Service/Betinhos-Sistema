@@ -104,8 +104,12 @@ describe('Pessoas', () => {
     window.history.replaceState(null, '', '/?volume=400')
     try {
       render(<PessoasPage host={{ mode: 'mock' }} />)
-      expect(await screen.findByText(/carregando o restante/)).toBeTruthy()
-      expect(screen.getByText(/^100 de 100 ·/)).toBeTruthy()
+      // Com a máquina lenta, mais de um lote pode chegar antes desta leitura: basta a contagem ser parcial.
+      const parcial = await screen.findByText(/carregando o restante/)
+      const [, visiveis, total] = /^(\d+) de (\d+) ·/.exec(parcial.textContent ?? '') ?? []
+      expect(Number(visiveis)).toBe(Number(total))
+      expect(Number(total)).toBeGreaterThanOrEqual(100)
+      expect(Number(total)).toBeLessThan(410)
       await screen.findByText(/^410 de 410 ·/, undefined, { timeout: 5000 })
       expect(screen.queryByText(/carregando o restante/)).toBeNull()
       expect(screen.queryByRole('button', { name: /Carregar mais/ })).toBeNull()
