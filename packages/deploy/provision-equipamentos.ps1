@@ -3,7 +3,7 @@
   [switch] $DeviceCode
 )
 
-# Provisiona as tabelas de equipamentos (cr40f_tipoequipamento, cr40f_equipamento) no Dataverse DEV e inclui na solucao do .env.
+# Provisiona as tabelas de equipamentos (cr40f_tipoequipamento, cr40f_equipamento, cr40f_fotoequipamento) no Dataverse DEV e inclui na solucao do .env.
 # Idempotente: cria so o que falta e semeia os tipos por nome. Sem -Apply roda em DRY RUN. Configuracao vem do .env da raiz do monorepo.
 # Privilegios ficam em conceder-privilegios-equipamentos.ps1 (rodar depois deste, com -Apply).
 # Arquivo salvo com BOM: o Windows PowerShell 5.1 precisa dele para ler os rotulos acentuados.
@@ -206,6 +206,16 @@ function Ensure-Lookup([string] $Relationship, [string] $Referenced, [string] $R
   }
 }
 
+function YesNo([string] $Schema, [string] $Display, [string] $Description) {
+  @{ "@odata.type" = "Microsoft.Dynamics.CRM.BooleanAttributeMetadata"; SchemaName = $Schema; DisplayName = Label $Display; Description = Label $Description; DefaultValue = $false
+     OptionSet = @{ TrueOption = @{ Value = 1; Label = Label "Sim" }; FalseOption = @{ Value = 0; Label = Label "Não" } } }
+}
+# Coluna de imagem das fotos: primaria (so a imagem primaria aceita o base64 no POST que cria o registro, como o shell envia),
+# guarda a imagem grande (o shell abre $value?size=full) e aceita ate 10 MB (o shell limita a 5 MB, como a foto do funcionario).
+function ImagePrimary([string] $Schema, [string] $Display, [string] $Description) {
+  @{ "@odata.type" = "Microsoft.Dynamics.CRM.ImageAttributeMetadata"; SchemaName = $Schema; DisplayName = Label $Display; Description = Label $Description; IsPrimaryImage = $true; CanStoreFullImage = $true; MaxSizeInKB = 10240 }
+}
+
 # Moeda (BRL da organizacao), nunca negativa (spec secao 4.2).
 function Money([string] $Schema, [string] $Display, [string] $Description) {
   @{ "@odata.type" = "Microsoft.Dynamics.CRM.MoneyAttributeMetadata"; SchemaName = $Schema; DisplayName = Label $Display; Description = Label $Description; MinValue = 0; MaxValue = 1000000000; Precision = 2; PrecisionSource = 2 }
@@ -213,10 +223,13 @@ function Money([string] $Schema, [string] $Display, [string] $Description) {
 
 if (-not (Get-EntityId "cr40f_funcionarios")) { throw "Tabela cr40f_funcionarios nao existe neste ambiente." }
 
-$tipo = "cr40f_tipoequipamento"; $equip = "cr40f_equipamento"
+$tipo = "cr40f_tipoequipamento"; $equip = "cr40f_equipamento"; $foto = "cr40f_fotoequipamento"
 $relTipo = "cr40f_tipoequipamento_cr40f_equipamento_tipo"; $relResponsavel = "cr40f_funcionarios_cr40f_equipamento_responsavel"
+$relFoto = "cr40f_equipamento_cr40f_fotoequipamento_equipamento"
 $tipoId = Ensure-Table $tipo "cr40f_TipoEquipamento" "Tipo de equipamento" "Tipos de equipamento" "Catálogo de tipos (Notebook, Monitor, Máquina de cartão…)" 100 "ApplicationRequired"
 $equipId = Ensure-Table $equip "cr40f_Equipamento" "Equipamento" "Equipamentos" "Equipamento da empresa e o funcionário com ele agora." 200 "ApplicationRequired" "Descrição" "Descrição curta do item"
+# Fotos do equipamento (spec de fotos): varias por item, como os anexos do Planner; cr40f_name guarda o nome do arquivo.
+$fotoId = Ensure-Table $foto "cr40f_FotoEquipamento" "Foto de equipamento" "Fotos de equipamento" "Fotos do equipamento; a marcada como capa aparece na lista." 200 "ApplicationRequired" "Nome do arquivo" "Nome do arquivo da foto"
 if (-not $Apply -and (-not $tipoId -or -not $equipId)) { Write-Step "DRY RUN OK; use -Apply"; exit 0 }
 
 # Status: valores espelham apps/shell/src/pages/equipamentos/domain/choices.ts (100000000 Em uso, 100000001 Disponivel, 100000002 Em manutencao, 100000003 Baixado).
@@ -231,26 +244,36 @@ Ensure-AttributeOn $equip @{ "@odata.type" = "Microsoft.Dynamics.CRM.MemoAttribu
 # Excluir tipo ou funcionario nao apaga o equipamento: o lookup fica vazio (spec secao 4.2).
 Ensure-Lookup $relTipo $tipo $equip "cr40f_Tipo" "Tipo" "Tipo do equipamento" "RemoveLink" "ApplicationRequired"
 Ensure-Lookup $relResponsavel "cr40f_funcionarios" $equip "cr40f_Responsavel" "Responsável" "Funcionário com o item agora; vazio = escritório/estoque" "RemoveLink"
+# Tabela de fotos ainda nao existe no dry run: as colunas so podem ser conferidas depois de criada.
+if ($fotoId) {
+  Ensure-AttributeOn $foto (ImagePrimary "cr40f_Imagem" "Imagem" "Foto do equipamento (miniatura e imagem grande)")
+  Ensure-AttributeOn $foto (YesNo "cr40f_Capa" "Capa" "Foto exibida na lista de equipamentos; uma por item, mantida pelo shell")
+  # Excluir o equipamento apaga as fotos dele (Cascade); a foto nao existe sem o item.
+  Ensure-Lookup $relFoto $equip $foto "cr40f_Equipamento" "Equipamento" "Equipamento da foto" "Cascade" "ApplicationRequired"
+}
+else { Write-Step "DRY RUN criaria em $foto as colunas cr40f_imagem (imagem primaria, 10 MB, imagem grande) e cr40f_capa (Sim/Nao) e o lookup cr40f_equipamento (Cascade)" }
 
 if ($Apply) {
-  Invoke-Dataverse "POST" "PublishXml" @{ ParameterXml = "<importexportxml><entities><entity>$tipo</entity><entity>$equip</entity></entities></importexportxml>" } | Out-Null
+  Invoke-Dataverse "POST" "PublishXml" @{ ParameterXml = "<importexportxml><entities><entity>$tipo</entity><entity>$equip</entity><entity>$foto</entity></entities></importexportxml>" } | Out-Null
   $esperado = @{
     $tipo = @("cr40f_name")
     $equip = @("cr40f_name", "cr40f_marcamodelo", "cr40f_numeroserie", "cr40f_status", "cr40f_datacompra", "cr40f_valorcompra", "cr40f_observacoes", "cr40f_tipo", "cr40f_responsavel")
+    $foto = @("cr40f_name", "cr40f_imagem", "cr40f_capa", "cr40f_equipamento")
   }
   $missing = @(); foreach ($e in $esperado.Keys) { $missing += @($esperado[$e] | Where-Object { -not (Get-AttributeId $e $_) } | ForEach-Object { "$e.$_" }) }
   if ($missing.Count) { throw "Colunas ausentes apos a publicacao: $($missing -join ', ')" }
-  foreach ($t in @($tipoId, $equipId)) {
+  foreach ($t in @($tipoId, $equipId, $fotoId)) {
     if (@(Get-Rows "solutioncomponents" "solutioncomponentid" "_solutionid_value eq $solutionId and objectid eq $t and componenttype eq 1").Count -eq 0) { throw "Tabela $t nao esta na solucao $SolutionUniqueName." }
   }
   # Excluir tipo ou funcionario so limpa o lookup (spec secao 4.2); relacionamento criado antes por outro caminho pode ter vindo diferente.
-  foreach ($rel in @($relTipo, $relResponsavel)) {
-    $relRows = @(Get-Rows $relPath "MetadataId" "SchemaName eq '$rel'")
-    if ($relRows.Count -ne 1) { throw "Relacionamento $rel nao encontrado apos a publicacao." }
+  # Fotos: excluir o equipamento apaga as fotos (Cascade).
+  foreach ($rel in @(@($relTipo, "RemoveLink"), @($relResponsavel, "RemoveLink"), @($relFoto, "Cascade"))) {
+    $relRows = @(Get-Rows $relPath "MetadataId" "SchemaName eq '$($rel[0])'")
+    if ($relRows.Count -ne 1) { throw "Relacionamento $($rel[0]) nao encontrado apos a publicacao." }
     $exclusao = (Invoke-Dataverse "GET" "RelationshipDefinitions($($relRows[0].MetadataId))/Microsoft.Dynamics.CRM.OneToManyRelationshipMetadata").CascadeConfiguration.Delete
-    if ($exclusao -ne "RemoveLink") { throw "Relacionamento $rel esta com exclusao $exclusao; o spec exige RemoveLink." }
+    if ($exclusao -ne $rel[1]) { throw "Relacionamento $($rel[0]) esta com exclusao $exclusao; o spec exige $($rel[1])." }
   }
-  foreach ($e in @($tipo, $equip)) {
+  foreach ($e in @($tipo, $equip, $foto)) {
     $tamanhoEsperado = if ($e -eq $tipo) { 100 } else { 200 }
     $nome = Invoke-Dataverse "GET" "EntityDefinitions(LogicalName='$e')/Attributes(LogicalName='cr40f_name')/Microsoft.Dynamics.CRM.StringAttributeMetadata?`$select=MaxLength,RequiredLevel"
     if ($nome.MaxLength -ne $tamanhoEsperado -or $nome.RequiredLevel.Value -ne "ApplicationRequired") { throw "$e.cr40f_name ficou com MaxLength $($nome.MaxLength)/$($nome.RequiredLevel.Value) (esperado $tamanhoEsperado/ApplicationRequired)." }
@@ -261,6 +284,12 @@ if ($Apply) {
   if ($comportamento -ne "DateOnly") { throw "$equip.cr40f_datacompra esta com comportamento $comportamento; o shell espera DateOnly." }
   $padrao = (Invoke-Dataverse "GET" "$attrBase(LogicalName='cr40f_status')/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?`$select=DefaultFormValue").DefaultFormValue
   if ($padrao -ne $statusDisponivel) { Write-Step "AVISO: $equip.cr40f_status tem padrao $padrao (esperado $statusDisponivel Disponivel); ajuste no maker portal." }
+  # O shell cria a foto com a imagem no mesmo POST (exige imagem primaria) e abre a grande por $value?size=full (exige CanStoreFullImage).
+  $imagem = Invoke-Dataverse "GET" "EntityDefinitions(LogicalName='$foto')/Attributes(LogicalName='cr40f_imagem')/Microsoft.Dynamics.CRM.ImageAttributeMetadata?`$select=CanStoreFullImage,MaxSizeInKB"
+  if (-not $imagem.CanStoreFullImage) { throw "$foto.cr40f_imagem nao guarda a imagem grande (CanStoreFullImage); o shell abre a foto por `$value?size=full." }
+  if ($imagem.MaxSizeInKB -ne 10240) { throw "$foto.cr40f_imagem esta com MaxSizeInKB $($imagem.MaxSizeInKB) (esperado 10240)." }
+  $primaria = (Invoke-Dataverse "GET" "EntityDefinitions(LogicalName='$foto')?`$select=PrimaryImageAttribute").PrimaryImageAttribute
+  if ($primaria -ne "cr40f_imagem") { throw "$foto tem imagem primaria '$primaria' (esperado cr40f_imagem); sem isso o Dataverse recusa a imagem no POST de criacao." }
 
   $set = (Invoke-Dataverse "GET" "EntityDefinitions(LogicalName='$tipo')?`$select=EntitySetName").EntitySetName
   foreach ($nome in @("Notebook", "Desktop", "Monitor", "Mouse", "Teclado", "Headset", "Celular", "Tablet", "Máquina de cartão", "Impressora", "Outro")) {
