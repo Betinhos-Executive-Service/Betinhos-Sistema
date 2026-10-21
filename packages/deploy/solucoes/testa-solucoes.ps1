@@ -19,6 +19,7 @@ $dv = @{ Api = 'https://x/api/data/v9.2'; Url = 'https://org23b93544.crm2.dynami
 $dvTest = @{ Api = 'https://t/api/data/v9.2'; Url = 'https://appbetinhostest.crm2.dynamics.com'; Host = 'appbetinhostest.crm2.dynamics.com'; Headers = @{} }
 $falhas = 0
 function Confere([bool] $ok, [string] $nome) { if ($ok) { Write-Host "ok    $nome" } else { Write-Host "FALHA $nome"; $script:falhas++ } }
+function Falha-Com([scriptblock] $Bloco) { try { & $Bloco | Out-Null; return $null } catch { return "$($_.Exception.Message)" } }
 
 # Read-DvAll: uma pagina sem nextLink e duas paginas com nextLink
 $script:respostas = @([pscustomobject]@{ value = @(1, 2) })
@@ -42,18 +43,12 @@ Remove-ComponenteDaSolucao $dv 'abc' 381 'BetinhosCore'
 $b = $script:chamadas[2].Body | ConvertFrom-Json
 Confere ($script:chamadas[2].Uri -like '*/RemoveSolutionComponent' -and $b.SolutionComponent.solutioncomponentid -eq 'abc' -and $b.ComponentType -eq 381 -and $b.SolutionUniqueName -eq 'BetinhosCore') 'remover usa o objectid, o tipo e a solucao'
 $script:respostas = @([pscustomobject]@{ value = @([pscustomobject]@{ solutionid = 'sid' }) }, [pscustomobject]@{ value = @() }); $script:chamadas = @()
-$falhouSemLinha = $false
-try { Remove-ComponenteDaSolucao $dv 'abc' 381 'BetinhosCore' } catch { $falhouSemLinha = ($_.Exception.Message -like '*achei 0*') }
-Confere ($falhouSemLinha -and $script:chamadas.Count -eq 2) 'remover sem linha na solucao falha sem chamar a acao'
+Confere ((Falha-Com { Remove-ComponenteDaSolucao $dv 'abc' 381 'BetinhosCore' }) -like '*achei 0*' -and $script:chamadas.Count -eq 2) 'remover sem linha na solucao falha sem chamar a acao'
 
 # Remove-ComponenteDaSolucao recusa a caixa de entrada e qualquer solucao fora das 4, sem chamar a API
 $script:respostas = @(); $script:chamadas = @()
-$recusou = $false
-try { Remove-ComponenteDaSolucao $dv 'abc' 381 'AppBetinhos' } catch { $recusou = ($_.Exception.Message -like '*AppBetinhos*') }
-Confere ($recusou -and $script:chamadas.Count -eq 0) 'remover da AppBetinhos e recusado antes de chamar a API'
-$recusou = $false
-try { Remove-ComponenteDaSolucao $dv 'abc' 381 'Default' } catch { $recusou = $true }
-Confere ($recusou -and $script:chamadas.Count -eq 0) 'remover de solucao fora das 4 e recusado'
+Confere ((Falha-Com { Remove-ComponenteDaSolucao $dv 'abc' 381 'AppBetinhos' }) -like '*AppBetinhos*' -and $script:chamadas.Count -eq 0) 'remover da AppBetinhos e recusado antes de chamar a API'
+Confere ($null -ne (Falha-Com { Remove-ComponenteDaSolucao $dv 'abc' 381 'Default' }) -and $script:chamadas.Count -eq 0) 'remover de solucao fora das 4 e recusado'
 
 # Get-ExcedentesDasSolucoes: decisao pura do que remover depois que AddSolutionComponent arrasta componentes
 $ordem = @('BetinhosCore', 'BetinhosAutomacao', 'BetinhosInterface', 'BetinhosMotoristas')
@@ -72,9 +67,7 @@ Confere ((Marcado 'BetinhosInterface' 'a') -and (Marcado 'BetinhosAutomacao' 'm'
 Confere ((Marcado 'BetinhosCore' 'v') -and (@($exc | Where-Object { $_.id -eq 'v' })[0].motivo -like '*proibido*')) 'valor de variavel (381) e marcado mesmo sem dono'
 Confere ((Marcado 'BetinhosInterface' 'x') -and -not (Marcado 'BetinhosCore' 'x') -and (Marcado 'BetinhosMotoristas' 'y') -and -not (Marcado 'BetinhosInterface' 'y')) 'copia fora da caixa mantem a camada mais baixa'
 Confere (@($exc | Where-Object { $_.solucao -eq 'AppBetinhos' }).Count -eq 0 -and $exc.Count -eq 5) 'AppBetinhos nunca e candidata a remocao'
-$recusou = $false
-try { Get-ExcedentesDasSolucoes $linhasExc $donoExc @('BetinhosCore', 'AppBetinhos') @(381) | Out-Null } catch { $recusou = ($_.Exception.Message -like '*AppBetinhos*') }
-Confere $recusou 'ordem com a AppBetinhos e recusada'
+Confere ((Falha-Com { Get-ExcedentesDasSolucoes $linhasExc $donoExc @('BetinhosCore', 'AppBetinhos') @(381) }) -like '*AppBetinhos*') 'ordem com a AppBetinhos e recusada'
 
 # Get-HashDoPacote: ignora solution.xml e a ordem das entradas; muda quando o conteudo muda
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -96,7 +89,6 @@ function Novo-Erro([string] $Mensagem, [string] $Corpo) {
   if ($Corpo) { $er.ErrorDetails = New-Object Management.Automation.ErrorDetails $Corpo }
   return $er
 }
-function Falha-Com([scriptblock] $Bloco) { try { & $Bloco | Out-Null; return $null } catch { return "$($_.Exception.Message)" } }
 $ent = [pscustomobject]@{ LogicalName = 'cr40f_x'; EntitySetName = 'cr40f_xs'; PrimaryIdAttribute = 'cr40f_xid' }
 
 $script:respostas = @([pscustomobject]@{ value = @([pscustomobject]@{ n = 42 }) }); $script:chamadas = @()

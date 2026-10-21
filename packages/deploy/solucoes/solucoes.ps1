@@ -46,7 +46,8 @@ function Get-Mapa($Dv, [string] $Set, [string] $Chave, [string] $Valor) {
   return $map
 }
 
-# Componentes raiz da solucao, com o que o classificador precisa: nome, entidade (tipos >= 10000), app pai e se e tabela de BPF.
+# Componentes raiz da solucao, com o que o classificador precisa: nome, entidade (tipos >= 10000), app pai, se e tabela de BPF
+# e a categoria do workflow (tipo 29).
 function Get-ComponentesDaSolucao($Dv, [string] $SolucaoId, [hashtable] $TiposPorEntidade) {
   $nomes = @{
     61  = Get-Mapa $Dv "webresourceset" "webresourceid" "name"

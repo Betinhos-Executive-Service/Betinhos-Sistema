@@ -81,7 +81,6 @@ foreach ($s in @(Read-DvAll $dv "sdkmessageprocessingsteps?`$select=sdkmessagepr
     $foto.steps[$oid] = @{ nome = [string] $s.name; estado = [int] $s.statecode; seguro = [bool] $s._sdkmessageprocessingstepsecureconfigid_value }
   }
 }
-# Cada fluxo e step das solucoes precisa ter estado na foto, e a foto precisa ter componentes; senao a foto para aqui.
 Assert-CoberturaDaFoto $foto $fluxoIds $stepIds
 # Os steps sensiveis de regras.json, pelo nome, a parte das solucoes: existe e tem configuracao segura.
 $foto.stepsSeguros = Get-SituacaoStepsSeguros $dv @($regras.stepsSeguros)
