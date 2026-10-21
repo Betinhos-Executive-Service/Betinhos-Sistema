@@ -1,7 +1,7 @@
 {
   "name": "@betinhos/shell",
   "private": true,
-  "version": "0.0.54",
+  "version": "0.0.56",
   "type": "module",
   "scripts": {
     "dev": "node ../../packages/deploy/dev-restart.mjs 36472 .",
