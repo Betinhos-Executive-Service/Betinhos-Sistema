@@ -12,6 +12,7 @@ import {
   getQrChargePayerOptions,
   parseQrChargeResponse,
   QR_CHARGE_PASSENGER_COPY,
+  QrChargeRefusal,
   qrChargeCoversReceivable,
   validateQrChargeAmount,
   validateQrChargePayer
@@ -83,6 +84,9 @@ test("QR só é gerado para página de pagamento do Stripe", () => {
 
 test("resposta incompleta ou com erro do plugin é recusada com a mensagem certa", () => {
   assert.throws(() => parseQrChargeResponse({ erro: "Você não está liberado para cobrar por QR code." }), /não está liberado/);
+  // Erro de negócio do plugin tem tipo próprio: a tela mostra a mensagem em vez de contar como falha de rede.
+  assert.throws(() => parseQrChargeResponse({ erro: "O pagamento está em processamento no banco do passageiro." }), QrChargeRefusal);
+  assert.equal(new Error("Failed to fetch") instanceof QrChargeRefusal, false);
   assert.throws(() => parseQrChargeResponse({ ...validResponse, sessionId: "" }), /identificação/);
   assert.throws(() => parseQrChargeResponse({ ...validResponse, status: "talvez" }), /Status/);
   assert.throws(() => parseQrChargeResponse({ ...validResponse, valorCentavos: 150.5 }), /sem valor/);
