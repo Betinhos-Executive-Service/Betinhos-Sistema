@@ -284,6 +284,27 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
    * as próximas páginas reaproveitam; termo novo (ou o mesmo depois de outro) resolve os lookups de novo.
    */
   let lastSearch: { key: string; found: Promise<SearchCondition[]> } | null = null
+
+  /** Campos da localização rápida com o tipo de busca; choices de estado e status vêm da metadata do próprio tipo (com cache). */
+  const searchFields = async (meta: AttributeMap, quickFind: string[]) =>
+    (await Promise.all(quickFind.map(async (attribute): Promise<SearchField | null> => {
+      const info = meta.get(attribute)
+      const kind = searchKind(info?.type)
+      if (!info || !kind) return null
+      if (kind === 'text') return { attribute, kind }
+      if (kind === 'lookup') return { attribute, kind, targets: info.targets }
+      const options = info.type === 'State' || info.type === 'Status'
+        ? await host.metadata.choices(ENTITY, attribute, info.type).catch(() => [])
+        : info.options
+      return { attribute, kind, options }
+    }))).filter((field) => field !== null)
+
+  const searchTargets = (meta: AttributeMap, quickFind: string[]) =>
+    [...new Set(quickFind.flatMap((attribute) => {
+      const info = meta.get(attribute)
+      return info && searchKind(info.type) === 'lookup' ? info.targets : []
+    }))]
+
   const resolveSearch = (query: string, quickFind: string[]) => {
     const term = query.trim()
     if (!term || !quickFind.length) return Promise.resolve([])
@@ -291,26 +312,25 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
     if (lastSearch?.key === key) return lastSearch.found
     const found = (async () => {
       const meta = await attributes(ENTITY)
-      const fields = (await Promise.all(quickFind.map(async (attribute): Promise<SearchField | null> => {
-        const info = meta.get(attribute)
-        const kind = searchKind(info?.type)
-        if (!info || !kind) return null
-        if (kind === 'text') return { attribute, kind }
-        if (kind === 'lookup') return { attribute, kind, targets: info.targets }
-        // Estado e status não trazem opções em `attributes`: vêm da metadata do próprio tipo.
-        const options = info.type === 'State' || info.type === 'Status'
-          ? await host.metadata.choices(ENTITY, attribute, info.type).catch(() => [])
-          : info.options
-        return { attribute, kind, options }
-      }))).filter((field) => field !== null)
-      const targets = [...new Set(fields.flatMap((field) => (field.kind === 'lookup' ? field.targets : [])))]
-      // Alvo que falhar (sem permissão, por exemplo) só deixa de buscar por aquele lookup.
-      const ids = new Map(await Promise.all(targets.map(async (target) => [target, await lookupIds(target, term).catch(() => [] as string[])] as const)))
-      return buildSearch(term, fields, (target) => ids.get(target) ?? [])
+      // Choices e IDs dos lookups em paralelo; alvo que falhar (sem permissão, por exemplo) só deixa de buscar por aquele lookup.
+      const [fields, ids] = await Promise.all([
+        searchFields(meta, quickFind),
+        Promise.all(searchTargets(meta, quickFind).map(async (target) => [target, await lookupIds(target, term).catch(() => [] as string[])] as const)),
+      ])
+      const byTarget = new Map(ids)
+      return buildSearch(term, fields, (target) => byTarget.get(target) ?? [])
     })()
     lastSearch = { key, found }
     found.catch(() => { if (lastSearch?.found === found) lastSearch = null })
     return found
+  }
+
+  /** Aquece a metadata da busca (choices de estado/status e tabelas dos lookups) para a 1ª busca não esperar por ela (DEV: ~7 s a frio). */
+  const warmSearch = (quickFind: string[]) => {
+    if (!quickFind.length) return
+    void attributes(ENTITY)
+      .then((meta) => Promise.all([searchFields(meta, quickFind), ...searchTargets(meta, quickFind).map((target) => host.metadata.entity(target))]))
+      .catch(() => {})
   }
 
   const binds = new Map<string, Promise<LookupBind>>()
@@ -357,7 +377,9 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
     async quickFind() {
       try {
         const [first] = await host.client.getAll(quickFindPath())
-        return typeof first?.fetchxml === 'string' ? quickFindAttributes(first.fetchxml) : []
+        const fields = typeof first?.fetchxml === 'string' ? quickFindAttributes(first.fetchxml) : []
+        warmSearch(fields)
+        return fields
       } catch { return [] }
     },
     attributes,
