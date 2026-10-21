@@ -53,6 +53,15 @@ export function withStatus(f: EquipamentoForm, status: string): EquipamentoForm 
   return { ...f, status, responsavelId: status === S(STATUS.baixado) ? '' : f.responsavelId }
 }
 
+/** `aaaa-mm-dd` que existe no calendário (rejeita 2026-13-45, 2026-02-30). */
+function dataValida(s: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+  if (!m) return false
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])]
+  const dt = new Date(Date.UTC(y, mo - 1, d))
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d
+}
+
 export function validateForm(f: EquipamentoForm): FormErrors {
   const e: FormErrors = {}
   if (!f.descricao.trim()) e.descricao = 'Informe a descrição.'
@@ -60,7 +69,7 @@ export function validateForm(f: EquipamentoForm): FormErrors {
   if (!f.status) e.status = 'Escolha o status.'
   else if (f.status === S(STATUS.baixado) && f.responsavelId) e.responsavelId = 'Item baixado não fica com responsável.'
   if (Number.isNaN(parseValor(f.valorCompra))) e.valorCompra = 'Valor inválido. Use o formato 1.467,35.'
-  if (f.dataCompra && !/^\d{4}-\d{2}-\d{2}$/.test(f.dataCompra)) e.dataCompra = 'Data inválida.'
+  if (f.dataCompra && !dataValida(f.dataCompra)) e.dataCompra = 'Data inválida.'
   for (const [key, max] of Object.entries(MAX_LENGTH) as [keyof typeof MAX_LENGTH, number][]) {
     if (!e[key] && f[key].trim().length > max) e[key] = `No máximo ${max} caracteres.`
   }
@@ -69,7 +78,10 @@ export function validateForm(f: EquipamentoForm): FormErrors {
 
 const serieKey = (s: string) => normalize(s).replace(/[\s.\-/]/g, '')
 
-/** Outro item com o mesmo número de série (aviso; não bloqueia). */
+/**
+ * Outro item com o mesmo número de série (aviso; não bloqueia).
+ * Compara ignorando caixa, acento, espaço, traço, ponto e barra (`DL5440-001` = `dl5440.001`).
+ */
 export function serieRepetida(f: EquipamentoForm, list: Equipamento[], selfId: string | null): Equipamento | null {
   const key = serieKey(f.numeroSerie)
   if (!key) return null
@@ -89,8 +101,9 @@ function columnValue(k: ColumnKey, f: EquipamentoForm): unknown {
 export function diffForm(base: EquipamentoForm | null, f: EquipamentoForm): Changes {
   const campos: Row = {}
   for (const k of Object.keys(COLUMNS) as ColumnKey[]) {
-    if (base && base[k] === f[k]) continue
     const v = columnValue(k, f)
+    // Compara o valor que vai para a coluna, não o texto cru: '3.499,90' e '3499,9' não geram PATCH.
+    if (base && Object.is(columnValue(k, base), v)) continue
     if (base || v != null) campos[COLUMNS[k]] = v
   }
   const out: Changes = { campos }
@@ -103,13 +116,19 @@ export const hasChanges = (c: Changes) => Object.keys(c.campos).length > 0 || c.
 
 export const isDirty = (a: EquipamentoForm, b: EquipamentoForm) => (Object.keys(a) as FormKey[]).some((k) => a[k] !== b[k])
 
+/** Nome do lookup: da lista; se o id não mudou e não está na lista, mantém o nome que o item já tinha. */
+function nomeLookup(id: string, list: { id: string; nome: string }[], atualId: string | null, atualNome: string): string {
+  if (!id) return ''
+  return list.find((x) => x.id === id)?.nome ?? (id === atualId ? atualNome : '')
+}
+
 /** Aplica o formulário salvo ao item da lista (UI sem recarregar). */
 export function applyForm(e: Equipamento, f: EquipamentoForm, tipos: TipoEquipamento[], pessoas: Pessoa[]): Equipamento {
   return {
     ...e,
-    descricao: f.descricao.trim(), tipoId: f.tipoId || null, tipoNome: tipos.find((t) => t.id === f.tipoId)?.nome ?? '',
+    descricao: f.descricao.trim(), tipoId: f.tipoId || null, tipoNome: nomeLookup(f.tipoId, tipos, e.tipoId, e.tipoNome),
     marcaModelo: f.marcaModelo.trim(), numeroSerie: f.numeroSerie.trim(), status: f.status ? Number(f.status) : null,
-    responsavelId: f.responsavelId || null, responsavelNome: pessoas.find((p) => p.id === f.responsavelId)?.nome ?? '',
+    responsavelId: f.responsavelId || null, responsavelNome: nomeLookup(f.responsavelId, pessoas, e.responsavelId, e.responsavelNome),
     dataCompra: f.dataCompra || null, valorCompra: parseValor(f.valorCompra), observacoes: f.observacoes.trim(), modificadoEm: new Date(),
   }
 }
