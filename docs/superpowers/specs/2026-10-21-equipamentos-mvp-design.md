@@ -109,9 +109,9 @@ Primitivas de `@betinhos/ui` e tokens do Design System (`DESIGN_SYSTEM.md`, `des
 
 ```
 apps/shell/src/pages/equipamentos/
-  domain/   types.ts, status.ts (regras 4.3), lista.ts (busca/filtros), form.ts (validação, série repetida)
+  domain/   types.ts, choices.ts (status), cadastros.ts (tipos), lista.ts (busca/filtros/visões), form.ts (regras 4.3, validação, série repetida)
   data/     queries.ts (nomes lógicos, mappers), source.ts (Dataverse | mock), mock.ts
-  components/ EquipamentosList.tsx, EquipamentoDrawer.tsx, TiposDrawer.tsx
+  components/ EquipamentosList.tsx, EquipamentoForm.tsx, EquipamentoDrawer.tsx, TiposDrawer.tsx
   EquipamentosPage.tsx, useEquipamentos.ts, equipamentos.css
 ```
 

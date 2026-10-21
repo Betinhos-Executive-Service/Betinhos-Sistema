@@ -15,6 +15,8 @@ export type FormErrors = Partial<Record<FormKey, string>>
 export type Changes = { campos: Row; tipoId?: string; responsavelId?: string | null }
 
 export const MAX_LENGTH = { descricao: 200, marcaModelo: 200, numeroSerie: 100, observacoes: 2000 } as const
+/** MaxValue de cr40f_valorcompra em provision-equipamentos.ps1. */
+export const MAX_VALOR = 1_000_000_000
 const COLUMNS = {
   descricao: 'cr40f_name', marcaModelo: 'cr40f_marcamodelo', numeroSerie: 'cr40f_numeroserie', status: 'cr40f_status',
   dataCompra: 'cr40f_datacompra', valorCompra: 'cr40f_valorcompra', observacoes: 'cr40f_observacoes',
@@ -68,7 +70,9 @@ export function validateForm(f: EquipamentoForm): FormErrors {
   if (!f.tipoId) e.tipoId = 'Escolha o tipo.'
   if (!f.status) e.status = 'Escolha o status.'
   else if (f.status === S(STATUS.baixado) && f.responsavelId) e.responsavelId = 'Item baixado não fica com responsável.'
-  if (Number.isNaN(parseValor(f.valorCompra))) e.valorCompra = 'Valor inválido. Use o formato 1.467,35.'
+  const valor = parseValor(f.valorCompra)
+  if (Number.isNaN(valor)) e.valorCompra = 'Valor inválido. Use o formato 1.467,35.'
+  else if (valor != null && valor > MAX_VALOR) e.valorCompra = 'No máximo R$ 1.000.000.000,00.'
   if (f.dataCompra && !dataValida(f.dataCompra)) e.dataCompra = 'Data inválida.'
   for (const [key, max] of Object.entries(MAX_LENGTH) as [keyof typeof MAX_LENGTH, number][]) {
     if (!e[key] && f[key].trim().length > max) e[key] = `No máximo ${max} caracteres.`

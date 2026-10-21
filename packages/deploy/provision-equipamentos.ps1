@@ -123,21 +123,11 @@ function Picklist([string] $Schema, [string] $Display, [string] $Description, [s
   if ($null -ne $Default) { $payload.DefaultFormValue = [int] $Default }
   return $payload
 }
-function MultiPicklist([string] $Schema, [string] $Display, [string] $Description, [string[]] $Labels) {
-  $options = @()
-  for ($i = 0; $i -lt $Labels.Count; $i++) { $options += @{ Value = 100000000 + $i; Label = Label $Labels[$i] } }
-  return @{ "@odata.type" = "Microsoft.Dynamics.CRM.MultiSelectPicklistAttributeMetadata"; SchemaName = $Schema; DisplayName = Label $Display; Description = Label $Description; RequiredLevel = @{ Value = "None" }
-    OptionSet = @{ "@odata.type" = "Microsoft.Dynamics.CRM.OptionSetMetadata"; IsGlobal = $false; OptionSetType = "Picklist"; Options = $options } }
-}
 function Text([string] $Schema, [string] $Display, [string] $Description, [int] $Max) {
   @{ "@odata.type" = "Microsoft.Dynamics.CRM.StringAttributeMetadata"; SchemaName = $Schema; DisplayName = Label $Display; Description = Label $Description; MaxLength = $Max; FormatName = @{ Value = "Text" } }
 }
 function DateOnly([string] $Schema, [string] $Display, [string] $Description) {
   @{ "@odata.type" = "Microsoft.Dynamics.CRM.DateTimeAttributeMetadata"; SchemaName = $Schema; DisplayName = Label $Display; Description = Label $Description; Format = "DateOnly"; DateTimeBehavior = @{ Value = "DateOnly" } }
-}
-function YesNo([string] $Schema, [string] $Display, [string] $Description) {
-  @{ "@odata.type" = "Microsoft.Dynamics.CRM.BooleanAttributeMetadata"; SchemaName = $Schema; DisplayName = Label $Display; Description = Label $Description; DefaultValue = $false
-     OptionSet = @{ TrueOption = @{ Value = 1; Label = Label "Sim" }; FalseOption = @{ Value = 0; Label = Label "Não" } } }
 }
 function Ensure-AttributeOn([string] $Entity, [hashtable] $Payload) {
   $logical = $Payload.SchemaName.ToLowerInvariant()

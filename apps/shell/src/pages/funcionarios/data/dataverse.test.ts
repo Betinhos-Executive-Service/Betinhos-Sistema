@@ -29,7 +29,7 @@ describe('createXrmSource().equipamentos', () => {
     ])
     const [entity, options] = retrieveMultipleRecords.mock.calls[0] as unknown as [string, string]
     expect(entity).toBe('cr40f_equipamento')
-    expect(options).toContain(`$filter=_cr40f_responsavel_value eq ${GUID} and cr40f_status ne 100000003`)
+    expect(options).toContain(`$filter=_cr40f_responsavel_value eq ${GUID} and (cr40f_status ne 100000003 or cr40f_status eq null)`)
     expect(options).toContain('$select=cr40f_equipamentoid,cr40f_name,_cr40f_tipo_value,cr40f_numeroserie,cr40f_status')
   })
 
