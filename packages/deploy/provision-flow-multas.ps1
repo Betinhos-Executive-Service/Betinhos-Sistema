@@ -1,14 +1,15 @@
-﻿# Somente DEV. Aplica as correções de flows/notificar-condutor-multas.ps1 no "Flow  Notificar Condutor Multas" (autos no
-# SharePoint BetinhosGestoInterna, em Funcionarios/DEV/<id>/Multas, AUTO_2 na pasta certa, multa sem motorista, e-mail de
-# erro sem '..br' e resposta 500). O flow continua ativo.
+﻿# Somente DEV. Aplica as correções de flows/multas.ps1 no "Flow  Notificar Condutor Multas" e no "Flow Gerar Contrato"
+# (arquivos no SharePoint BetinhosGestoInterna, em Funcionarios/DEV/<id>/Multas; e-mail de erro sem '..br' e resposta
+# 500). Os flows continuam ativos.
 #
-# Antes de gravar, salva o clientdata em packages/deploy/flows/backup/. Para reverter:
-#   powershell -File packages/deploy/provision-flow-notificar-condutor-multas.ps1 -Restaurar <arquivo de backup>
+# Antes de gravar, salva o clientdata em packages/deploy/flows/backup/. Para reverter um deles:
+#   powershell -File packages/deploy/provision-flow-multas.ps1 -Restaurar <arquivo de backup>
 # Para conferir sem gravar (checkFlowErrors do Power Automate):
-#   powershell -File packages/deploy/provision-flow-notificar-condutor-multas.ps1 -SomenteValidar
+#   powershell -File packages/deploy/provision-flow-multas.ps1 -SomenteValidar
 # Requer `az login` com acesso ao DEV.
-# Para testar sem avisar a equipe, mande a notificação só para um endereço e depois rode de novo sem o parâmetro:
-#   powershell -File packages/deploy/provision-flow-notificar-condutor-multas.ps1 -EmailPara noreply@betinhos.onmicrosoft.com
+# Para testar sem avisar a equipe, mande a notificação só para um endereço; depois restaure o backup original do Notificar
+# e rode de novo sem o parâmetro (o destinatário só é trocado quando ele é passado):
+#   powershell -File packages/deploy/provision-flow-multas.ps1 -EmailPara noreply@betinhos.onmicrosoft.com
 param([string] $Restaurar = '', [switch] $SomenteValidar, [string] $EmailPara = '')
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $ErrorActionPreference = 'Stop'
@@ -17,14 +18,14 @@ $environmentUrl = 'https://org23b93544.crm2.dynamics.com'
 $environmentId = '25a2ab78-cf07-ee41-a124-457aa2c29aea'
 $backupDir = Join-Path $PSScriptRoot 'flows/backup'
 if (([Uri]$environmentUrl).Host -ne 'org23b93544.crm2.dynamics.com') { throw 'Somente DEV.' }
-. (Join-Path $PSScriptRoot 'flows/notificar-condutor-multas.ps1')
+. (Join-Path $PSScriptRoot 'flows/multas.ps1')
 
 $dvToken = & az account get-access-token --resource "$environmentUrl/" --query accessToken -o tsv
 if ($LASTEXITCODE -ne 0 -or -not $dvToken) { throw 'Token do Dataverse DEV indisponível (rode az login).' }
 $headers = @{ Authorization = "Bearer $dvToken"; Accept = 'application/json'; 'OData-Version' = '4.0'; 'OData-MaxVersion' = '4.0' }
 
 function Dv([string] $Method, [string] $Path, $Body = $null) {
-  Write-Host "[notificar-condutor] $Method $($Path.Split('?')[0])"
+  Write-Host "[multas] $Method $($Path.Split('?')[0])"
   $params = @{ Method = $Method; Uri = "$environmentUrl/api/data/v9.2/$Path"; Headers = $headers; TimeoutSec = 60 }
   if ($null -ne $Body) {
     $params.Body = [Text.Encoding]::UTF8.GetBytes(($Body | ConvertTo-Json -Depth 90 -Compress))
@@ -50,7 +51,7 @@ function Backup($row, [string] $prefixo) {
   $file = Join-Path $backupDir ("$prefixo-$stamp.json")
   if (Test-Path $file) { throw "Backup $file já existe; rode de novo em instantes." }
   [IO.File]::WriteAllText($file, $row.clientdata, (New-Object Text.UTF8Encoding $false))
-  Write-Host "[notificar-condutor] backup: $file"
+  Write-Host "[multas] backup: $file"
 }
 function Apply($row, [string] $clientData) {
   AssertSemMojibake $clientData 'clientdata a gravar'
@@ -78,29 +79,35 @@ function CheckFlowErrors($row, $cd) {
   if ($erros.Trim() -ne '[]') { throw 'A definição montada tem erros.' }
 }
 
-$prefixo = 'Flow-Notificar-Condutor-Multas'
-$row = GetFlow $script:NotificarFlowName
+function ReadBackup([string] $path) { return [IO.File]::ReadAllText((Resolve-Path $path), [Text.Encoding]::UTF8).TrimStart([char]0xFEFF) }
 
-if ($Restaurar) {
-  if (-not (Split-Path $Restaurar -Leaf).StartsWith("$prefixo-")) { throw 'O arquivo não é um backup deste flow.' }
-  $text = [IO.File]::ReadAllText((Resolve-Path $Restaurar), [Text.Encoding]::UTF8).TrimStart([char]0xFEFF)
-  Backup $row $prefixo
-  Apply $row $text
-  Write-Output "DEV: flow restaurado de $Restaurar."
-  return
+$flows = @(
+  [pscustomobject]@{ Nome = $script:NotificarFlowName; Prefixo = 'Flow-Notificar-Condutor-Multas'; Corrigir = { param($cd) Corrigir-NotificarCondutor $cd 'Funcionarios/DEV' $EmailPara }; Conferir = { param($cd) Conferir-NotificarCondutor $cd 'Funcionarios/DEV' $EmailPara } },
+  [pscustomobject]@{ Nome = $script:ContratoFlowName; Prefixo = 'Flow-Gerar-Contrato'; Corrigir = { param($cd) Corrigir-GerarContrato $cd 'Funcionarios/DEV' }; Conferir = { param($cd) Conferir-GerarContrato $cd 'Funcionarios/DEV' } }
+)
+
+foreach ($f in $flows) {
+  $row = GetFlow $f.Nome
+  if ($Restaurar) {
+    if (-not (Split-Path $Restaurar -Leaf).StartsWith("$($f.Prefixo)-")) { continue }
+    Backup $row $f.Prefixo | Out-Null
+    Apply $row (ReadBackup $Restaurar)
+    Write-Output "DEV: '$($f.Nome)' restaurado de $Restaurar."
+    return
+  }
+  $cd = $row.clientdata | ConvertFrom-Json
+  & $f.Corrigir $cd
+  $novo = $cd | ConvertTo-Json -Depth 90 -Compress
+  # Ida e volta pelo JSON para comparar no mesmo formato.
+  $atual = ($row.clientdata | ConvertFrom-Json) | ConvertTo-Json -Depth 90 -Compress
+  CheckFlowErrors $row $cd
+  & $f.Conferir $cd
+  if ($atual -eq $novo) { Write-Output "DEV: '$($f.Nome)' já corrigido."; continue }
+  if ($SomenteValidar) { Write-Output "DEV: '$($f.Nome)' com correção válida; nada gravado."; continue }
+  Backup $row $f.Prefixo | Out-Null
+  Apply $row $novo
+  $lido = GetFlow $f.Nome
+  & $f.Conferir ($lido.clientdata | ConvertFrom-Json)
+  Write-Output "DEV: '$($f.Nome)' corrigido; statecode=$($lido.statecode)."
 }
-
-$cd = $row.clientdata | ConvertFrom-Json
-Corrigir-NotificarCondutor $cd 'Funcionarios/DEV' $EmailPara
-$novo = $cd | ConvertTo-Json -Depth 90 -Compress
-# Ida e volta pelo JSON para comparar no mesmo formato.
-$atual = ($row.clientdata | ConvertFrom-Json) | ConvertTo-Json -Depth 90 -Compress
-CheckFlowErrors $row $cd
-Conferir-NotificarCondutor $cd 'Funcionarios/DEV' $EmailPara
-if ($atual -eq $novo) { Write-Output 'DEV: flow já corrigido.'; return }
-if ($SomenteValidar) { Write-Output 'DEV: correção válida; nada gravado.'; return }
-Backup $row $prefixo
-Apply $row $novo
-$lido = GetFlow $script:NotificarFlowName
-Conferir-NotificarCondutor ($lido.clientdata | ConvertFrom-Json) 'Funcionarios/DEV' $EmailPara
-Write-Output "DEV: flow corrigido; statecode=$($lido.statecode)."
+if ($Restaurar) { throw 'O arquivo não é um backup destes flows.' }
