@@ -34,6 +34,13 @@ it('Documentos é rota React em Cadastros, logo após Funcionários', () => {
   expect(ids.indexOf('documentos')).toBe(ids.indexOf('funcionarios') + 1)
 })
 
+it('Equipamentos é rota React em Cadastros, logo após Infrações', () => {
+  expect(findItem('equipamentos')?.group.id).toBe('cadastros')
+  expect(findItem('equipamentos')?.item).toMatchObject({ kind: 'page', page: 'equipamentos', label: 'Equipamentos' })
+  const ids = findItem('equipamentos')!.group.items.map((item) => item.id)
+  expect(ids.indexOf('equipamentos')).toBe(ids.indexOf('infracoes') + 1)
+})
+
 it('Geral é rota React do shell no lugar da lista nativa de reservas', () => {
   expect(findItem('geral')?.item).toMatchObject({ kind: 'page', page: 'geral', label: 'Geral' })
   expect(findItem('geral')?.group.id).toBe('operacional')

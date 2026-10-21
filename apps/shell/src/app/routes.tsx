@@ -28,6 +28,7 @@ export const PAGE_LOADERS: Record<PageId, () => Promise<ComponentType<PageProps>
   infracoes: () => import('../pages/infracoes/InfracoesPage').then((m) => m.InfracoesPage),
   despesas: () => import('../pages/despesas/DespesasPage').then((m) => m.DespesasPage),
   documentos: () => import('../pages/documentos/DocumentosPage').then((m) => m.DocumentosPage),
+  equipamentos: () => import('../pages/equipamentos/EquipamentosPage').then((m) => m.EquipamentosPage),
   comunicados: () => import('../pages/comunicados/ComunicadosPage').then((m) => m.ComunicadosPage),
   agentes: () => import('../pages/agentes/AgentesPage').then((m) => m.AgentesPage),
 }
