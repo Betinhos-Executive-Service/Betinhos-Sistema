@@ -18,8 +18,8 @@ description: "Verifica a tela do checklist de vistoria no App Motoristas: tile d
 - Viewport: preset `mobile` (375×812); volte a `desktop` no fim.
 
 ## Roteiro
-1. Início → tile "Checklist" mostra "Vistoria do veículo • 1 pendente".
-2. Serviços → seção "Checklist do veículo" com card "RECEBIMENTO DO CARRO · Veículo ABC1D23 · entregue por Carlos Andrade" (a descrição quebra em 2 linhas a 375 px, sem corte nem rolagem horizontal; sem entregador, mostre "entregue por: não identificado": troque temporariamente `entreguePorNome` do pendente do mock para "" e reverta; quinzenal/manual: "VISTORIA QUINZENAL"/"SOLICITADO PELA OPERAÇÃO", cobertos por `checklistCardTexto` em teste); tocar abre o formulário; a seta Voltar retorna a Serviços.
+1. Início → tile "Checklist" mostra "Vistoria do veículo • 1 pendente" (`span.concept-inline-count`, mesmo componente e texto do tile Comunicados: "• 1 pendente" / "• 2 pendentes"; contagem `checklists.filter(isChecklistPending).length` em App.tsx).
+2. Serviços → seção "Checklist do veículo" com o aviso compacto (`ChecklistAgendaCard variant="compact"` → `button.notice-compact[data-tone="atencao"]`): ícone de prancheta em fundo âmbar, selo "RECEBIMENTO DO CARRO", título "Veículo ABC1D23 · entregue por Carlos Andrade" numa linha com reticências, data "21/10" e chevron. Altura 56 px a 375 px (antes 164 px). Sem entregador, mostre "entregue por: não identificado": troque temporariamente `entreguePorNome` do pendente do mock para "" e reverta; quinzenal/manual: "VISTORIA QUINZENAL"/"SOLICITADO PELA OPERAÇÃO", cobertos por `checklistCardTexto` em teste. Tocar (ou Tab + Enter, foco com borda #6c91e8 e anel azul de 3 px) abre o formulário; a seta Voltar retorna a Serviços. Na tela Checklist (`#checklists`) a lista continua com o card grande (`.checklist-service-item`, 164 px), e é lá que os roteiros clicam `.agenda-hit`.
 3. Formulário: resumo "1 de 9 itens preenchidos · progresso salvo neste aparelho"; Quilometragem já vem 45210.
 4. Fotos: a câmera ao vivo é bloqueada no painel. Use o input nativo do `MediaCaptureScreen`: após tocar em `button[aria-label="Tirar foto: <item>"]`, preencha `input[type=file]` via `DataTransfer` com um JPEG gerado em canvas e dispare `change`. Prévia "A foto está legível?" → Confirmar. A miniatura deve ter no máximo 1600 px no maior lado.
 5. "Enviar checklist" incompleto → "Revise N itens destacados.", rola até o primeiro e mostra "Tire a foto para continuar.".
@@ -29,6 +29,7 @@ description: "Verifica a tela do checklist de vistoria no App Motoristas: tile d
 9. Abra o enviado → 45.218 km, 75 %, observação e "Ver foto 1" em cada item de foto. O IndexedDB não tem mais `checklist:<id>`. No Início o selo "pendente" sumiu.
 10. OK / Não OK (item "Pneus", fim do formulário):
     - Tocar "Não OK" abre "Qual o problema?", chips, "Tirar foto" e "Observação (opcional)". Enviar sem foto → "Tire a foto do problema." sob o item (o `section` ganha `aria-describedby` para o erro).
+    - Campo "Observação (opcional)" (`.checklist-oknok-note`, fora do `.finalize-input-block`, estilo em `src/checklists.css`): em repouso igual às "Observações" do formulário e aos campos de Gastos (fundo #fcfcfb, borda rgba(0,26,61,.07), raio 12 px, padding 9px 11px, 600 16px Manrope, placeholder rgba(0,14,35,.42), 76 px de altura mínima, resize vertical). Com foco por clique real (`find` + ref; `el.focus()` via JS não ativa `:focus` com o painel sem foco), borda #6c91e8 + anel `0 0 0 3px rgba(33,89,210,.11)` e nenhum outline âmbar do sistema. Digitar mantém o texto.
     - Foto: `button[aria-label="Tirar foto do problema: Pneus"]` + o mesmo input nativo do passo 4. Com foto e sem chip → "Escolha o problema.". Escolher chip limpa o erro.
     - Com foto, chip ou observação, tocar "OK" abre "Marcar como OK?" com foco em "Continuar editando". Esc e toque fora fecham sem perder nada; "Marcar OK" zera fotos, chips e observação. Sem dado registrado, OK troca direto.
     - Recarregar mantém Não OK + chips (rascunho no IndexedDB).
@@ -52,4 +53,5 @@ description: "Verifica a tela do checklist de vistoria no App Motoristas: tile d
 
 ## Limites
 - No painel do navegador, clique por coordenada às vezes não chega ao `.agenda-hit` dos cards; use `find`/`read_page` (ref) ou `document.querySelector(".agenda-hit").click()`. Screenshots podem expirar com o painel oculto: repita.
+- Com o painel oculto, a troca de tela (`.screen-motion`) e as transições CSS param no meio até um screenshot forçar o desenho: se o DOM ainda mostra a tela anterior ou uma cor "antiga", tire um screenshot e meça de novo.
 - Câmera ao vivo, upload ao OneDrive e Custom API real só no DEV autenticado (celular); o roteiro local cobre o mock.

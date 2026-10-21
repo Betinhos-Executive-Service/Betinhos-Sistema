@@ -32,6 +32,7 @@ Usa Chrome headless com user agent Android (ativa a câmera ao vivo) e câmera s
 9. `#finalizar?serviceId=76&type=MANUTENCAO` → sem ícone de apagar até haver foto; "VALOR (R$)" ignora letras ("1.250,9abc" → "1250,90"); com foto, o ícone "Apagar fotos" pede "Apagar 1 foto?" e mantém os textos.
 10. `#cancelado-local?serviceId=10241&type=SERVICO` → "Limpar texto" desabilitado vazio; com texto pede "Apagar o texto?". "Cliquei errado" volta ao detalhe.
 11. `#historico` → busca "zzz inexistente" mostra `Nenhum serviço encontrado para "zzz inexistente".`
+12. Topo de Serviços (mock): "Comunicados pendentes" (2) e "Checklist do veículo" (1) como avisos compactos `button.notice-compact`, 56 px cada, superfície #fcfcfb sem sombra (não parecem card de serviço); o primeiro card de serviço começa perto de y=322 (antes y=647). Medir: `[...document.querySelectorAll('.notice-compact')].map(e=>e.getBoundingClientRect().height)`. Os avisos não têm `.agenda-card`/`.agenda-hit`: `document.querySelector(".agenda-card .agenda-hit")` em Serviços já cai no primeiro serviço. Detalhes do aviso em `verificar-comunicados` e `verificar-checklists-app`.
 
 ## Cobrança por QR code (Stripe, modo mock)
 Spec: `docs/superpowers/specs/2026-10-21-cobranca-stripe-qr-design.md`. Em localhost o botão aparece sempre; o mock (`src/lib/qrChargeMock.ts`) marca pago 5 s depois de gerar.

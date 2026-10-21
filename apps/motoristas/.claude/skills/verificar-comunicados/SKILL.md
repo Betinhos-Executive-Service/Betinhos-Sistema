@@ -20,6 +20,8 @@ description: "Verifica o módulo Comunicados do App Motoristas: lista de pendent
 2. Abrir "[Mock] Ciência obrigatória" → "Assinar ciência" sem desenhar → "Desenhe sua assinatura antes de confirmar." aparece logo abaixo do quadro de assinatura (não no topo).
 3. Desenhar no quadro (`.comunicado-signature-pad`) → a mensagem some → "Assinar ciência" → "Ciência registrada" com "Assinado por" e data.
 4. "Voltar" → a lista mostra "Já cientes" com o item "Ciência assinada".
+5. Na lista `#comunicados` os itens usam o card grande (`.comunicado-service-item`, 142 px a 375 px). Em `#servicos` os mesmos pendentes aparecem como aviso compacto (`ComunicadoAgendaCard variant="compact"` → `button.notice-compact`, componente `src/components/common/CompactNoticeCard.tsx`): 56 px, ícone de balão no tom do status (`data-tone`: assinatura = atencao âmbar, informativo = info azul, concluído = sucesso verde), selo "NOVO · ASSINATURA OBRIGATÓRIA"/"NOVO · INFORMATIVO", título numa linha, data dd/mm e chevron. Toque ou Tab + Enter abre o detalhe; "Voltar" retorna a Serviços com os avisos. Títulos das seções em 11 px, cor #536174 (contraste ≥ 4,5:1 sobre o fundo #f0f0f0 do painel; #64748b falhava no axe com 4,17:1).
+6. Entrada dos avisos: `comunicado-form-enter` 220 ms com atraso 0/40/80 ms, só em `prefers-reduced-motion: no-preference`; fill-mode `backwards` para o `:active` (`scale(.99)`) continuar valendo depois da entrada.
 
 ## Casos de borda
 - "Limpar assinatura" zera o desenho.

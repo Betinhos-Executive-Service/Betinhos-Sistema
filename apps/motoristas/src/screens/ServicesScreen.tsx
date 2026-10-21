@@ -49,7 +49,7 @@ export function ServicesScreen({ items, onHome, onRefresh, completingDetailKey =
           <section className="comunicado-service-notices" aria-label="Comunicados pendentes">
             <h2>Comunicados pendentes</h2>
             {pendingComunicados.map((item) => (
-              <ComunicadoAgendaCard key={item.id} item={item} onOpen={(id) => onOpenComunicado?.(id)} />
+              <ComunicadoAgendaCard key={item.id} item={item} variant="compact" onOpen={(id) => onOpenComunicado?.(id)} />
             ))}
           </section>
         ) : null}
@@ -57,7 +57,7 @@ export function ServicesScreen({ items, onHome, onRefresh, completingDetailKey =
           <section className="comunicado-service-notices" aria-label="Checklists pendentes">
             <h2>Checklist do veículo</h2>
             {pendingChecklists.map((item) => (
-              <ChecklistAgendaCard key={item.id} item={item} onOpen={(id) => onOpenChecklist?.(id)} />
+              <ChecklistAgendaCard key={item.id} item={item} variant="compact" onOpen={(id) => onOpenChecklist?.(id)} />
             ))}
           </section>
         ) : null}
