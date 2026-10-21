@@ -35,12 +35,12 @@ describe('statusText', () => {
 })
 
 describe('LoadMore', () => {
-  it('mostra o texto de estado e o botão Carregar mais, que pede a próxima página', () => {
-    const onLoadMore = vi.fn()
-    render(<LoadMore {...base} onLoadMore={onLoadMore} />)
+  it('mostra o texto de estado sem paginação visível: nenhum botão, só o sentinela da rolagem', () => {
+    const { container } = render(<LoadMore {...base} />)
     expect(screen.getByRole('status').textContent).toContain('100 de 220 serviços')
-    fireEvent.click(screen.getByRole('button', { name: 'Carregar mais' }))
-    expect(onLoadMore).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button')).toBeNull()
+    expect(screen.queryByText(/Carregar mais$/)).toBeNull()
+    expect(container.querySelector('.gr-sentinel')).not.toBeNull()
   })
 
   it('durante a carga mostra Carregando mais… e esconde o botão', () => {
@@ -68,16 +68,17 @@ describe('LoadMore', () => {
     expect(onRetry).toHaveBeenCalledTimes(1)
   })
 
-  it('no celular os botões usam o tamanho de toque', () => {
-    render(<LoadMore {...base} touch />)
-    expect(screen.getByRole('button', { name: 'Carregar mais' }).classList.contains('bt-button--touch')).toBe(true)
+  it('no celular o botão de nova tentativa usa o tamanho de toque', () => {
+    render(<LoadMore {...base} error="Falha de rede" touch />)
+    expect(screen.getByRole('button', { name: 'Tentar novamente' }).classList.contains('bt-button--touch')).toBe(true)
   })
 
-  it('sem IntersectionObserver o botão continua disponível e não há erro', () => {
+  it('sem IntersectionObserver não quebra nem pede páginas sozinho', () => {
     vi.stubGlobal('IntersectionObserver', undefined)
-    const { container } = render(<LoadMore {...base} />)
+    const onLoadMore = vi.fn()
+    const { container } = render(<LoadMore {...base} onLoadMore={onLoadMore} />)
     expect(container.querySelector('.gr-sentinel')).not.toBeNull()
-    expect(screen.getByRole('button', { name: 'Carregar mais' })).toBeTruthy()
+    expect(onLoadMore).not.toHaveBeenCalled()
   })
 
   it('o sentinela observa com margem de 800 px e carrega ao intersectar', () => {

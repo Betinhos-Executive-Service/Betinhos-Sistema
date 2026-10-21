@@ -24,11 +24,14 @@ type Props = {
   onRetry: () => void
   /** `false` quando o sentinela vive dentro do contêiner de rolagem (tabela), fora do rodapé. */
   sentinel?: boolean
-  /** Celular: botões com 44 px. */
+  /** Celular: botão de nova tentativa com 44 px. */
   touch?: boolean
 }
 
-/** Rodapé de estado da lista: quantas linhas há, carregando, "Carregar mais", fim da lista ou erro com nova tentativa. */
+/**
+ * Rodapé de estado da lista: quantas linhas há, carregando, fim da lista ou erro com nova tentativa.
+ * Não há paginação visível: a próxima página vem pelo sentinela (rolagem infinita), nunca por botão.
+ */
 export function LoadMore({ root, more, loading, loadingMore, error, loaded, total, onLoadMore, onRetry, sentinel = true, touch = false }: Props) {
   const size = touch ? 'touch' : 'compact'
   const idle = more && !loading && !loadingMore && !error
@@ -39,7 +42,6 @@ export function LoadMore({ root, more, loading, loadingMore, error, loaded, tota
         <span>{loading && loaded === 0 ? 'Carregando…' : loaded === 0 && !more ? 'Nenhum serviço' : statusText(loaded, total, more)}</span>
         <div className="gr-loadmore__right">
           {loadingMore ? <><Spinner size={16} label="Carregando mais serviços" /><span>Carregando mais…</span></> : null}
-          {idle ? <Button variant="ghost" size={size} onClick={onLoadMore}>Carregar mais</Button> : null}
           {!more && !loading && loaded > 0 ? <span>Fim da lista</span> : null}
           {error ? <Alert tone="danger" className="gr-loadmore__error" action={<Button variant="secondary" size={size} onClick={onRetry}>Tentar novamente</Button>}>{error}</Alert> : null}
         </div>

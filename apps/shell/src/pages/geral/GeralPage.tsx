@@ -14,6 +14,7 @@ import { CopyDialog, DispararDialog, GerarOpDialog, LinkDialog, MockFormDialog, 
 import { ContagemDrawer, shiftDay, todayIso } from './components/ContagemDrawer'
 import { EscalaFdsDrawer } from './components/EscalaFdsDrawer'
 import { LoadMore, LoadSentinel, statusText } from './components/LoadMore'
+import { debounceSearch } from './components/useLookupSearch'
 import { AuditoriaOverlay } from './components/AuditoriaOverlay'
 import { LINK_FALHA, gerarLinkBlock } from './domain/link'
 import { VoucherOverlay } from './components/VoucherOverlay'
@@ -436,8 +437,12 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   }, [selectOnly, selectRange, toggle])
   // Callbacks estáveis: a célula passa o próprio id/coluna, então só a que mudou de status ou de linha renderiza de novo.
   const searchLookup = useCallback((attribute: string, text: string) => source.search(attribute, text), [source])
-  const searchFilter = useCallback(async (field: { key: string }, text: string): Promise<FilterOption[]> =>
+  // Os filtros do @betinhos/ui descartam respostas antigas, mas consultam a cada tecla: aqui ganham a pausa na digitação.
+  // Um por editor (painel de filtros e filtro rápido da coluna), para um não cancelar a busca do outro.
+  const filterOptions = useCallback(async (field: { key: string }, text: string): Promise<FilterOption[]> =>
     (await source.search(field.key, text)).map((o) => ({ value: o.id, label: o.nome })), [source])
+  const searchFilter = useMemo(() => debounceSearch(filterOptions), [filterOptions])
+  const searchQuickFilter = useMemo(() => debounceSearch(filterOptions), [filterOptions])
   // Busca por palavra-chave: o texto fica local; a busca de verdade sai depois da pausa.
   const [searchText, setSearchText] = useState(query)
   useEffect(() => setSearchText(query), [query])
@@ -516,7 +521,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               defaultSort={geral.defaultOrder}
               onSort={geral.setSort}
               filteredKeys={filteredKeys}
-              quick={{ fields: filterFields, value: valid.quick, onChange: setQuickFilter, search: searchFilter }}
+              quick={{ fields: filterFields, value: valid.quick, onChange: setQuickFilter, search: searchQuickFilter }}
               onClearFilter={(attribute) => setQuickFilter(attribute, null)}
               onHide={hideColumn}
               selected={geral.selected}

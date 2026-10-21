@@ -24,13 +24,13 @@ describe('buildFetch', () => {
     expect(parse(buildFetch(buildFetch(AGENDA, base), base)).querySelectorAll('entity > attribute[name="statecode"]').length).toBe(1)
   })
 
-  it('troca paginação, pede total e preserva filtro, ordem e link-entity', () => {
+  it('troca paginação, não pede total (contagem à parte) e preserva filtro, ordem e link-entity', () => {
     const doc = parse(buildFetch(AGENDA, base))
     const fetch = doc.documentElement
     expect(fetch.getAttribute('count')).toBe('50')
     expect(fetch.getAttribute('page')).toBe('1')
     expect(fetch.getAttribute('paging-cookie')).toBeNull()
-    expect(fetch.getAttribute('returntotalrecordcount')).toBe('true')
+    expect(fetch.hasAttribute('returntotalrecordcount')).toBe(false)
     expect(doc.querySelectorAll('entity > filter > condition').length).toBe(1)
     expect(doc.querySelector('entity > order')?.getAttribute('attribute')).toBe('cr40f_dataehorriodesada')
     expect(doc.querySelector('link-entity')?.getAttribute('alias')).toBe('a_2b63')
@@ -56,7 +56,7 @@ describe('buildFetch', () => {
     expect(doc.querySelector('link-entity > order')?.getAttribute('attribute')).toBe('new_valortotal')
   })
 
-  it('busca vira filtro OR com like nos campos de localização rápida', () => {
+  it('busca vira filtro OR com like em qualquer parte de cada campo', () => {
     const doc = parse(buildFetch(AGENDA, { ...base, query: "OS-19 d'água", quickFind: ['cr40f_id', 'cr40f_trajeto'] }))
     const filters = doc.querySelectorAll('entity > filter')
     expect(filters.length).toBe(2)
@@ -66,6 +66,7 @@ describe('buildFetch', () => {
     expect(conditions.map((c) => c.getAttribute('attribute'))).toEqual(['cr40f_id', 'cr40f_trajeto'])
     expect(conditions[0].getAttribute('operator')).toBe('like')
     expect(conditions[0].getAttribute('value')).toBe("%OS-19 d'água%")
+    expect(conditions[1].getAttribute('value')).toBe("%OS-19 d'água%")
   })
 
   it('busca vazia ou sem campos não acrescenta filtro', () => {

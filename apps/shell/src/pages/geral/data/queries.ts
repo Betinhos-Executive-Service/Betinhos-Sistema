@@ -1,4 +1,5 @@
 import { cleanId, odataString, type Row } from '@betinhos/dataverse'
+import { escapeLike } from '../domain/search'
 import { ENTITY, ID_ATTRIBUTE, type Page, type View } from '../domain/types'
 
 export const RESERVA_FILTER = `returnedtypecode eq '${ENTITY}' and statecode eq 0`
@@ -44,9 +45,10 @@ export function parseCount(body: { value: Row[] }): number | null {
   return typeof total === 'number' && total >= 0 ? total : null
 }
 
+/** Opções de lookup com o termo em qualquer parte do nome. Curingas digitados (`%`, `_`, `[`) valem como texto; aspas são dobradas por `odataString`. */
 export function searchPath(set: string, idAttribute: string, nameAttribute: string, query: string) {
   const q = query.trim()
-  const filter = q ? `statecode eq 0 and contains(${nameAttribute},'${odataString(q)}')` : 'statecode eq 0'
+  const filter = q ? `statecode eq 0 and contains(${nameAttribute},'${odataString(escapeLike(q))}')` : 'statecode eq 0'
   return `${set}?$select=${idAttribute},${nameAttribute}&$filter=${encodeURIComponent(filter)}&$orderby=${encodeURIComponent(`${nameAttribute} asc`)}&$top=25`
 }
 
