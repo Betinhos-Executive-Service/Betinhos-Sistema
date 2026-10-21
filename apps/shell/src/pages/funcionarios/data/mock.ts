@@ -1,4 +1,6 @@
 import { mockProgressive, mockVolume } from '../../../app/mockVolume'
+import { createMockEquipamentos } from '../../equipamentos/data/mock'
+import { STATUS } from '../../equipamentos/domain/choices'
 import { addMonths, todaySP } from './dates'
 import { buildPatch, type PatchContext } from './patch'
 import type { DataSource } from './source'
@@ -137,6 +139,11 @@ export function createMockSource(): DataSource {
     },
     multas: (id) => delay(id === 'm1' ? [{ id: 'x1', titulo: 'Excesso de velocidade', status: 'Indicada', dataHora: new Date().toISOString(), placa: 'ABC1D23', local: 'Rod. Dutra km 150' }] : []),
     posses: (id) => delay(id === 'm1' ? [{ id: 'p1', veiculo: 'ABC1D23', inicio: '2026-01-10T09:00:00Z', fim: null }, { id: 'p2', veiculo: 'EFG4H56', inicio: '2025-05-01T09:00:00Z', fim: '2026-01-10T08:00:00Z' }] : []),
+    // Mesmos itens de #/equipamentos (m1 tem a maquininha; m6, desligado, o celular de plantão); baixado fica de fora.
+    equipamentos: (id) => delay(createMockEquipamentos()
+      .filter((item) => item.responsavelId === id && item.status !== STATUS.baixado)
+      .map((item) => ({ id: item.id, descricao: item.descricao, tipo: item.tipoNome, numeroSerie: item.numeroSerie, status: item.status }))
+      .sort((a, b) => a.descricao.localeCompare(b.descricao, 'pt-BR'))),
     anotacoes: (id) => delay(notes[id] ?? []),
     async addAnotacao(id, nota) {
       const anexos: SpAnexo[] = []

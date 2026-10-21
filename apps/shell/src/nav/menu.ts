@@ -10,7 +10,7 @@ export type MenuItem =
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
-  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota' }
+  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota' }
 
 export type MenuGroup = { id: string; label: string; items: MenuItem[] }
 
@@ -71,6 +71,7 @@ export const MENU: MenuGroup[] = [
       { kind: 'page', id: 'assistente-pessoas', label: 'Assistente', page: 'agentes', agente: 'pessoas' },
       { kind: 'page', id: 'curriculos', label: 'Currículos', page: 'curriculos' },
       { kind: 'page', id: 'infracoes', label: 'Infrações de trânsito', page: 'infracoes' },
+      { kind: 'page', id: 'equipamentos', label: 'Equipamentos', page: 'equipamentos' },
     ],
   },
   {

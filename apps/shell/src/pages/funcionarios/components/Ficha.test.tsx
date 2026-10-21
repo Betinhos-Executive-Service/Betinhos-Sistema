@@ -13,13 +13,14 @@ const record: Funcionario = {
   veiculo: null, fotoThumb: null, fotoUrl: null, assinaturaUrl: null, loginsesenhas: null, modifiedon: null,
 }
 
-function fakeSource(save: DataSource['save']): DataSource {
+function fakeSource(save: DataSource['save'], extra: Partial<DataSource> = {}): DataSource {
   return {
     mode: 'mock', envLabel: 'TEST',
     list: async () => [record], get: async () => structuredClone(record), save,
-    uploadImage: async () => {}, saveLogins: async () => {}, multas: async () => [], posses: async () => [], anotacoes: async () => [], addAnotacao: async () => {}, updateAnotacao: async () => {}, deleteAnotacao: async () => {}, limitesAnexo: async () => ({ maxBytes: 5e6, bloqueadas: [] }), anexo: async () => ({ nome: 'a', blob: new Blob() }),
+    uploadImage: async () => {}, saveLogins: async () => {}, multas: async () => [], posses: async () => [], equipamentos: async () => [], anotacoes: async () => [], addAnotacao: async () => {}, updateAnotacao: async () => {}, deleteAnotacao: async () => {}, limitesAnexo: async () => ({ maxBytes: 5e6, bloqueadas: [] }), anexo: async () => ({ nome: 'a', blob: new Blob() }),
     documentos: { pasta: () => '', listar: async () => [], enviar: async () => { throw new Error('n/a') }, abrir: async () => ({ nome: '', blob: new Blob() }), excluir: async () => {} },
     searchVeiculos: async () => [], openForm: () => {},
+    ...extra,
   }
 }
 
@@ -108,5 +109,54 @@ describe('Ficha', () => {
     const painel = await screen.findByRole('dialog', { name: 'Renovar CNH' })
     fireEvent.keyDown(painel, { key: 'Escape' })
     expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('aba Equipamentos fica entre Veículos e Anotações, lista o que está com o funcionário e abre o item', async () => {
+    const equipamentos = vi.fn(async () => [
+      { id: 'e1', descricao: 'Notebook do Financeiro', tipo: 'Notebook', numeroSerie: 'DL5440-001', status: 100000000 },
+      { id: 'e2', descricao: 'Mouse sem fio', tipo: 'Mouse', numeroSerie: '', status: 100000002 },
+    ])
+    await renderFicha(fakeSource(vi.fn(async () => 'f1'), { equipamentos }))
+    const abas = screen.getAllByRole('tab').map((tab) => tab.textContent)
+    expect(abas.slice(abas.indexOf('Veículos'), abas.indexOf('Veículos') + 3)).toEqual(['Veículos', 'Equipamentos', 'Anotações'])
+    fireEvent.click(screen.getByRole('tab', { name: 'Equipamentos' }))
+    expect(await screen.findByText('Notebook do Financeiro')).toBeTruthy()
+    expect(screen.getByText('Notebook · Série DL5440-001')).toBeTruthy()
+    expect(screen.getByText('Mouse')).toBeTruthy()
+    expect(screen.getByText('Em uso')).toBeTruthy()
+    expect(screen.getByText('Em manutenção')).toBeTruthy()
+    // Um link por item (a descrição); a seta é só alvo de toque, fora da árvore de acessibilidade e do Tab.
+    expect(screen.getAllByRole('link').map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+      ['Notebook do Financeiro', '#/equipamentos?ver=e1'],
+      ['Mouse sem fio', '#/equipamentos?ver=e2'],
+    ])
+    expect(screen.getByRole('link', { name: 'Abrir equipamento Notebook do Financeiro' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Salvar/ })).toBeNull()
+    expect(equipamentos).toHaveBeenCalledWith('f1')
+  })
+
+  it('aba Equipamentos vazia explica', async () => {
+    await renderFicha(fakeSource(vi.fn(async () => 'f1')))
+    fireEvent.click(screen.getByRole('tab', { name: 'Equipamentos' }))
+    expect(await screen.findByText('Nenhum equipamento com este funcionário.')).toBeTruthy()
+  })
+
+  it('aba Equipamentos com erro de carga (ex.: tabela ausente) mostra o erro só dentro da aba', async () => {
+    const equipamentos = vi.fn(async () => { throw new Error('Tabela cr40f_equipamento não encontrada na metadata.') })
+    await renderFicha(fakeSource(vi.fn(async () => 'f1'), { equipamentos }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Equipamentos' }))
+    expect(await screen.findByText('Não foi possível carregar.')).toBeTruthy()
+    expect(screen.getByText('Tabela cr40f_equipamento não encontrada na metadata')).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: 'Dados' }))
+    expect(await screen.findByDisplayValue('Ana Souza')).toBeTruthy()
+  })
+
+  it('funcionário novo não abre a aba Equipamentos', async () => {
+    const equipamentos = vi.fn(async () => [])
+    render(<ToastProvider><Ficha source={fakeSource(vi.fn(async () => 'f1'), { equipamentos })} id={null} onClose={() => {}} onSaved={() => {}} /></ToastProvider>)
+    const aba = screen.getByRole('tab', { name: 'Equipamentos' })
+    expect(aba.hasAttribute('disabled') || aba.getAttribute('aria-disabled') === 'true').toBe(true)
+    fireEvent.click(aba)
+    expect(equipamentos).not.toHaveBeenCalled()
   })
 })
