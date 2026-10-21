@@ -12,7 +12,8 @@ export function validateTipo(nome: string, tipos: TipoEquipamento[], selfId: str
   if (t.length > MAX_TIPO) return `No máximo ${MAX_TIPO} caracteres.`
   const key = normalize(t)
   const dup = tipos.find((o) => o.id !== selfId && normalize(o.nome.trim()) === key)
-  return dup ? `Já existe o tipo ${dup.nome}.` : null
+  if (!dup) return null
+  return dup.ativo ? `Já existe o tipo ${dup.nome}.` : `Já existe o tipo ${dup.nome} (inativo). Reative-o na lista.`
 }
 
 /** Opções de seletor: ativos, mais o valor atual do item mesmo se inativo. */

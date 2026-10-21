@@ -349,6 +349,28 @@ describe('Equipamentos', () => {
     expect(within(pager).getByText('1 item')).toBeTruthy()
     expect(within(linhas[5]).getByText('2 itens')).toBeTruthy()
     expect(within(linhas[0]).queryByText('Inativo')).toBeNull()
+
+    // Repetido de um tipo inativo aponta a reativação.
+    const novo = drawer.querySelector('input[name="novoTipo"]') as HTMLInputElement
+    fireEvent.change(novo, { target: { value: 'PAGER' } })
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Adicionar' }))
+    expect(await within(drawer).findByText('Já existe o tipo Pager (inativo). Reative-o na lista.')).toBeTruthy()
+  })
+
+  it('com renomeação por salvar, as outras linhas não abrem outra renomeação', async () => {
+    render(<EquipamentosPage host={{ mode: 'mock' }} />)
+    await openButton('Notebook reserva')
+    fireEvent.click(screen.getByRole('button', { name: 'Tipos' }))
+    const drawer = await screen.findByRole('dialog', { name: 'Tipos de equipamento' })
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Renomear tipo Monitor' }))
+    const outro = within(drawer).getByRole('button', { name: 'Renomear tipo Mouse' }) as HTMLButtonElement
+    expect(outro.disabled).toBe(false)
+    const nome = drawer.querySelector('input[name="renomearTipo"]') as HTMLInputElement
+    fireEvent.change(nome, { target: { value: 'Monitor LCD' } })
+    expect(outro.disabled).toBe(true)
+    expect((within(drawer).getByRole('button', { name: 'Inativar tipo Mouse' }) as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Cancelar renomeação' }))
+    await waitFor(() => expect((within(drawer).getByRole('button', { name: 'Renomear tipo Mouse' }) as HTMLButtonElement).disabled).toBe(false))
   })
 
   it('tipo renomeado aparece nos itens; inativado some do seletor e fica marcado no item', async () => {

@@ -39,7 +39,8 @@ export function TiposDrawer({ open, onClose, tipos, uso, source, onSaved }: Prop
   const listRef = useRef<HTMLUListElement>(null)
 
   const original = edit ? tipos.find((t) => t.id === edit.id)?.nome ?? '' : ''
-  const dirty = novo.trim() !== '' || (edit != null && edit.nome.trim() !== original)
+  const editSujo = edit != null && edit.nome.trim() !== original
+  const dirty = novo.trim() !== '' || editSujo
   const lista = [...tipos].sort(ordem)
 
   // O foco segue a ação: campo com erro, campo de renomear aberto ou o botão da linha depois de salvar/inativar.
@@ -157,8 +158,10 @@ export function TiposDrawer({ open, onClose, tipos, uso, source, onSaved }: Prop
                     </span>
                     <span className="eq-muted eq-num">{itens(uso.get(t.id) ?? 0)}</span>
                     <span className="eq-tipos__actions">
-                      <Button variant="ghost" icon={<Pencil size={16} />} data-acao="renomear" aria-label={`Renomear tipo ${t.nome}`} title="Renomear"
-                        disabled={busy != null} onClick={() => { setErroEdit(null); setEdit({ id: t.id, nome: t.nome }) }} />
+                      {/* Com outra renomeação por salvar, trocar de linha perderia o texto sem aviso: salve ou cancele antes. */}
+                      <Button variant="ghost" icon={<Pencil size={16} />} data-acao="renomear" aria-label={`Renomear tipo ${t.nome}`}
+                        title={editSujo ? 'Salve ou cancele a renomeação em andamento' : 'Renomear'}
+                        disabled={busy != null || editSujo} onClick={() => { setErroEdit(null); setEdit({ id: t.id, nome: t.nome }) }} />
                       <Button variant="ghost" icon={t.ativo ? <Archive size={16} /> : <ArchiveRestore size={16} />} data-acao="toggle"
                         aria-label={`${t.ativo ? 'Inativar' : 'Reativar'} tipo ${t.nome}`} title={t.ativo ? 'Inativar' : 'Reativar'}
                         loading={busy?.acao === 'toggle' && busy.id === t.id} disabled={busy != null} onClick={() => toggle(t)} />

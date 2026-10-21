@@ -138,6 +138,10 @@ describe('cadastros', () => {
     expect(validateTipo('Notebook', tipos, 't1')).toBeNull()
     expect(validateTipo('Webcam', tipos, null)).toBeNull()
   })
+  it('tipo repetido inativo pede para reativar', () => {
+    expect(validateTipo(' pager ', tipos, null)).toBe('Já existe o tipo Pager (inativo). Reative-o na lista.')
+    expect(validateTipo('Pager', tipos, 't2')).toBeNull()
+  })
   it('tipo ignora acento e limita o tamanho', () => {
     const comAcento: TipoEquipamento[] = [{ id: 't9', nome: 'Máquina de cartão', ativo: true }]
     expect(validateTipo('maquina de cartao', comAcento, null)).toBe('Já existe o tipo Máquina de cartão.')
