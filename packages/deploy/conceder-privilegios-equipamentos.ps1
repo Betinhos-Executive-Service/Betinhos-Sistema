@@ -1,9 +1,9 @@
 ﻿param(
   [switch] $Apply,
   [switch] $DeviceCode,
-  # Papeis que recebem nas tabelas de equipamentos o mesmo acesso que ja tem em cr40f_funcionarios. A lista padrao segue a convencao
-  # do repo (a mesma de Documentos); o AVISO do script aponta os demais papeis que acessam cr40f_funcionarios (decisao 9 do spec).
-  [string[]] $Roles = @("Acesso-Betinhos-Canvas", "Acesso-Betinhos-MDA", "DEV - Usuário")
+  # Papeis que recebem nas tabelas de equipamentos o mesmo acesso que ja tem em cr40f_funcionarios. Padrao: so MDA e DEV - Usuario
+  # (decisao do Renan, 21/10/2026; o Canvas fica de fora). O AVISO do script aponta os demais papeis que acessam cr40f_funcionarios.
+  [string[]] $Roles = @("Acesso-Betinhos-MDA", "DEV - Usuário")
 )
 
 # Copia, para cr40f_tipoequipamento, cr40f_equipamento e cr40f_fotoequipamento, os privilegios (e a profundidade) que cada papel listado tem em cr40f_funcionarios.
