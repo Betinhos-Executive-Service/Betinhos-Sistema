@@ -1,0 +1,60 @@
+import { cleanId, formatted, type DataverseClient, type Row } from '@betinhos/dataverse'
+import type { Changes } from '../domain/form'
+import type { Equipamento, Pessoa, TipoEquipamento } from '../domain/types'
+
+export const ENTITIES = { equipamento: 'cr40f_equipamento', tipo: 'cr40f_tipoequipamento', funcionario: 'cr40f_funcionarios' } as const
+export type EntitySets = Record<keyof typeof ENTITIES, string>
+/** Propriedades de navegação dos lookups (SchemaName criado por provision-equipamentos.ps1). */
+export const NAV = { tipo: 'cr40f_Tipo', responsavel: 'cr40f_Responsavel' } as const
+
+const SELECT = [
+  'cr40f_equipamentoid', 'cr40f_name', '_cr40f_tipo_value', 'cr40f_marcamodelo', 'cr40f_numeroserie', 'cr40f_status',
+  '_cr40f_responsavel_value', 'cr40f_datacompra', 'cr40f_valorcompra', 'cr40f_observacoes', 'modifiedon',
+]
+
+const str = (v: unknown) => (typeof v === 'string' ? v : '')
+const text = (v: unknown) => { const t = str(v).trim(); return /^(null|undefined)$/i.test(t) ? '' : t }
+const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+const date = (v: unknown) => { if (typeof v !== 'string' || !v) return null; const d = new Date(v); return Number.isNaN(d.getTime()) ? null : d }
+const order = (column: string) => `&$orderby=${encodeURIComponent(`${column} asc`)}`
+
+export const equipamentosPath = (set: string) => `${set}?$select=${SELECT.join(',')}${order('cr40f_name')}`
+export const tiposPath = (set: string) => `${set}?$select=cr40f_tipoequipamentoid,cr40f_name,statecode${order('cr40f_name')}`
+/** Ativos e inativos: o item de um funcionário desligado continua mostrando o nome, com selo. */
+export const pessoasPath = (set: string) => `${set}?$select=cr40f_funcionariosid,cr40f_nomecompleto,statecode${order('cr40f_nomecompleto')}`
+
+export function mapEquipamento(row: Row): Equipamento {
+  const lookupId = (k: string) => (row[k] ? cleanId(str(row[k])) : null)
+  const lookupName = (k: string) => (row[k] ? formatted(row, k) : '')
+  return {
+    id: cleanId(str(row.cr40f_equipamentoid)), descricao: text(row.cr40f_name),
+    tipoId: lookupId('_cr40f_tipo_value'), tipoNome: lookupName('_cr40f_tipo_value'),
+    marcaModelo: text(row.cr40f_marcamodelo), numeroSerie: text(row.cr40f_numeroserie), status: num(row.cr40f_status),
+    responsavelId: lookupId('_cr40f_responsavel_value'), responsavelNome: lookupName('_cr40f_responsavel_value'),
+    dataCompra: text(row.cr40f_datacompra).slice(0, 10) || null, valorCompra: num(row.cr40f_valorcompra),
+    observacoes: text(row.cr40f_observacoes), modificadoEm: date(row.modifiedon),
+  }
+}
+
+export const mapTipo = (row: Row): TipoEquipamento => ({ id: cleanId(str(row.cr40f_tipoequipamentoid)), nome: text(row.cr40f_name), ativo: row.statecode !== 1 })
+export const mapPessoa = (row: Row): Pessoa => ({ id: cleanId(str(row.cr40f_funcionariosid)), nome: text(row.cr40f_nomecompleto), ativo: row.statecode !== 1 })
+
+/** Lookups novos por @odata.bind; limpar o responsável é DELETE no $ref (`responsavelRefPath`), nunca bind null. */
+export function toPayload(c: Changes, sets: EntitySets): Row {
+  const p: Row = { ...c.campos }
+  if (c.tipoId) p[`${NAV.tipo}@odata.bind`] = `/${sets.tipo}(${cleanId(c.tipoId)})`
+  if (c.responsavelId) p[`${NAV.responsavel}@odata.bind`] = `/${sets.funcionario}(${cleanId(c.responsavelId)})`
+  return p
+}
+
+export const responsavelRefPath = (set: string, id: string) => `${set}(${cleanId(id)})/${NAV.responsavel}/$ref`
+
+/** Inativar/reativar tipo mexe só no estado; o statuscode acompanha (Ativo 1, Inativo 2). */
+export const estadoPayload = (ativo: boolean): Row => ({ statecode: ativo ? 0 : 1, statuscode: ativo ? 1 : 2 })
+
+export async function loadAll(client: DataverseClient, sets: EntitySets) {
+  const [equipamentos, tipos, pessoas] = await Promise.all([
+    client.getAll(equipamentosPath(sets.equipamento)), client.getAll(tiposPath(sets.tipo)), client.getAll(pessoasPath(sets.funcionario)),
+  ])
+  return { equipamentos: equipamentos.map(mapEquipamento), tipos: tipos.map(mapTipo), pessoas: pessoas.map(mapPessoa) }
+}
