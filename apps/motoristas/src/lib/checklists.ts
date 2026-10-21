@@ -71,6 +71,13 @@ export type ChecklistDraft = {
 const GUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const cleanGuid = (value: string) => value.replace(/[{}]/g, "").toLowerCase();
 export const isMockChecklists = () => ["localhost", "127.0.0.1"].includes(window.location?.hostname ?? "");
+// Só no mock: `?mockChecklistFalha=foto` derruba um envio de foto sim, outro não (testa a retomada);
+// `?mockChecklistFalha=registro` derruba o registro final.
+export function mockChecklistFailure(search = globalThis.window?.location?.search ?? "") {
+  const value = new URLSearchParams(search).get("mockChecklistFalha");
+  return value === "foto" || value === "registro" ? value : "";
+}
+let mockPhotoUploads = 0;
 export const checklistDraftKey = (checklistId: string) => `checklist:${cleanGuid(checklistId)}`;
 
 function asArray(value: unknown): unknown[] {
@@ -370,6 +377,7 @@ export async function concluirChecklist(id: string, respostasJson: string) {
   const cleanId = cleanGuid(id);
   if (isMockChecklists()) {
     await delay(400);
+    if (mockChecklistFailure() === "registro") throw new Error("Sem conexão para registrar o checklist.");
     const row = getLocalMock().find((item) => item.id === cleanId);
     if (!row) throw new Error("Checklist não encontrado.");
     if (row.estado === CHECKLIST_ESTADO.concluido) return;
@@ -387,5 +395,7 @@ export async function concluirChecklist(id: string, respostasJson: string) {
 
 export async function uploadChecklistPhotoMock(fileName: string): Promise<ChecklistFotoEnviada> {
   await delay(250);
+  mockPhotoUploads += 1;
+  if (mockChecklistFailure() === "foto" && mockPhotoUploads % 2 === 0) throw new Error("Sem conexão para enviar a foto.");
   return { link: `https://example.com/mock/${encodeURIComponent(fileName)}`, caminho: "Checklists/DEV/mock", nomeArquivo: fileName };
 }

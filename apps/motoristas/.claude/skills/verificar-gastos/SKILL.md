@@ -5,7 +5,7 @@ description: "Verifica a tela Registrar gasto: validação, carregamento do envi
 # Verificar gastos
 
 ## Cobre
-- Código: `src/screens/ExpenseScreen.tsx`, `src/components/common/ExpenseSendOverlay.tsx`, `src/lib/expenseSubmission.ts`, `src/lib/expenseUploadState.ts`, `src/lib/expenses*.ts`, trecho de gastos em `src/App.tsx` (`submitExpenseAsync`, `runExpenseSubmission`, worker de segundo plano, `handleExpenseUploadAction`), estilos `.expense-uploads*` e `.expense-send-*` em `src/styles.css`.
+- Código: `src/screens/ExpenseScreen.tsx`, `src/components/common/ExpenseSendOverlay.tsx` (só monta as etapas do gasto), `src/components/common/SendStepsOverlay.tsx` (carregamento genérico em etapas, também usado pelo checklist), `src/lib/expenseSubmission.ts`, `src/lib/expenseUploadState.ts`, `src/lib/expenses*.ts`, trecho de gastos em `src/App.tsx` (`submitExpenseAsync`, `runExpenseSubmission`, worker de segundo plano, `handleExpenseUploadAction`), estilos `.expense-uploads*` e `.expense-send-*` em `src/styles.css`.
 - Testes: `tests/expenseUpload.test.ts`, `tests/expenses.test.ts`.
 - Fluxo esperado no DEV: tocar em REGISTRAR → carregamento bloqueante só até as fotos serem aceitas (HTTP 202 do Flow) → "Gasto enviado" → Início. O processamento no OneDrive segue em segundo plano sem mensagem; só problemas aparecem (toast e "Envios pendentes").
 - PROD usa o envio síncrono antigo (`usesAsyncExpenseUpload()` só é verdadeiro na URL do DEV).
@@ -44,8 +44,10 @@ new MutationObserver(snap).observe(document.body, { subtree: true, childList: tr
 Depois de uns 5 s: `window.__seen`.
 
 Observação: `scroll_to` dentro da prévia rola o palco na horizontal e corta a borda esquerda do print; é da moldura da prévia, não da tela.
+7. Mudou `SendStepsOverlay` ou `ExpenseSendOverlay`? Prove que o gasto continua idêntico: compare o HTML do overlay antigo (`git show <base>:src/components/common/ExpenseSendOverlay.tsx`, salvo em `.verificacao/`) com o novo em todos os estados (`saving`/`uploading`/`done`/`error`, 0, 1 e N fotos) com `react-dom/server` `renderToStaticMarkup`, empacotando com `npx esbuild <entrada>.tsx --bundle --platform=node --jsx=automatic --loader:.svg=dataurl`. Esperado: 0 diferenças. Em 21/10/2026: 9 estados, 0 diferenças; sequência do passo 5 igual antes e depois.
 
 ## Casos de borda
+- O texto da etapa pendente (`.expense-send-step.is-pending`, `#94a3b8` sobre `#fcfcfb`) é apontado pelo axe como `color-contrast` serious enquanto aparece (só na fase `saving` do gasto). É o visual aprovado; mudar exige decisão do Renan porque altera o gasto.
 - Sem conexão no envio: `runExpenseSubmission` retorna `false` → overlay `is-error` "Sem conexão agora" com botão "Entendi" (volta ao Início); o gasto fica no diário e o worker tenta de novo a cada 30 s e no evento `online`. Coberto por código; na prévia não há simulação de erro.
 - Falha confirmada do Flow: o worker refaz até 2 vezes sozinho; depois disso aparece um toast e o item "Tentar de novo" em Envios pendentes.
 - Comprovante não confirmado pelo servidor (linha ainda pendente): depois de 120 s o worker encerra a tentativa (`cancelUnclaimed`) e ela vira falha confirmada.
