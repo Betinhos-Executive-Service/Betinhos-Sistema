@@ -19,7 +19,7 @@ Fora do escopo: PDF e outros anexos (só imagens), edição ou rotação de imag
 7. Clicar na miniatura abre a foto grande (`$value?size=full`); se ela não carregar, mostra a miniatura com aviso.
 8. Excluir pede confirmação ("Excluir foto?"). Excluir o equipamento (só pelo maker portal; o shell não exclui) apaga as fotos (Cascade).
 9. Drawer, overlay, "Descartar alterações?" e versão do build continuam como estão.
-10. Privilégios: a tabela nova entra no `conceder-privilegios-equipamentos.ps1` com as outras duas; pela decisão do Renan, só os papéis Acesso-Betinhos-MDA e DEV - Usuário (`-Roles`).
+10. Privilégios: a tabela nova entra no `conceder-privilegios-equipamentos.ps1` com as outras duas; pela decisão do Renan, só os papéis Acesso-Betinhos-MDA e DEV - Usuário (padrão de `-Roles` no script).
 
 ## 3. Dados (Dataverse DEV)
 
