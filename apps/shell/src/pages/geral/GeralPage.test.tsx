@@ -672,26 +672,35 @@ describe('Geral: espaço e densidade', () => {
 
   // Com 200+ linhas, consultas por papel (getByRole) percorrem milhares de nós no jsdom: aqui só consultas baratas.
   const rowCount = () => document.querySelectorAll('.gr-grid [role="row"]').length - 1
-  const loadMoreButton = () => screen.getByText('Carregar mais').closest('button') as HTMLButtonElement
+  /** Rolar até o fim: o sentinela entra na área do observador (espera o observador da página atual existir). */
+  const scrollToEnd = async () => {
+    await waitFor(() => expect(FakeObserver.instances.some((o) => !o.closed)).toBe(true))
+    await act(async () => { FakeObserver.trigger([{ isIntersecting: true }]) })
+  }
 
-  it('Carregar mais acumula 100, 200 e 220 linhas e termina em Fim da lista', async () => {
+  it('rolar até o fim acumula 100, 200 e 220 linhas sem botão e para no Fim da lista', async () => {
+    vi.stubGlobal('IntersectionObserver', FakeObserver)
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
     expect(rowCount()).toBe(100)
-    fireEvent.click(loadMoreButton())
+    expect(screen.queryByText(/Carregar mais$/)).toBeNull()
+    await scrollToEnd()
     await screen.findAllByText(`200 de ${MOCK_ROW_COUNT} serviços`)
     expect(rowCount()).toBe(200)
-    fireEvent.click(loadMoreButton())
+    await scrollToEnd()
     await screen.findAllByText(`${MOCK_ROW_COUNT} serviços`)
     expect(rowCount()).toBe(MOCK_ROW_COUNT)
     expect(screen.getByText('Fim da lista')).toBeTruthy()
-    expect(screen.queryByText('Carregar mais')).toBeNull()
+    // Fim dos dados: sem sentinela, ninguém pede mais.
+    expect(FakeObserver.instances.every((o) => o.closed)).toBe(true)
+    expect(document.querySelector('.gr-sentinel')).toBeNull()
   }, 90_000)
 
-  it('ordenar depois de carregar mais volta ao topo com 100 linhas', async () => {
+  it('ordenar depois de rolar volta ao topo com 100 linhas', async () => {
+    vi.stubGlobal('IntersectionObserver', FakeObserver)
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
-    fireEvent.click(loadMoreButton())
+    await scrollToEnd()
     await screen.findAllByText(`200 de ${MOCK_ROW_COUNT} serviços`)
     await columnMenu(/^Trajeto$/, 'Ordenar A→Z')
     await screen.findAllByText(PAGE1)
@@ -722,13 +731,13 @@ describe('Geral: espaço e densidade', () => {
     expect(screen.getByText('100 selecionados')).toBeTruthy()
   }, 90_000)
 
-  it('no celular os cards usam a janela como raiz e o botão Carregar mais tem 44 px', async () => {
+  it('no celular os cards usam a janela como raiz e carregam mais ao rolar, sem botão', async () => {
     vi.stubGlobal('IntersectionObserver', FakeObserver)
     vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('max-width: 820px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
     expect(document.querySelectorAll('.gr-cards > li')).toHaveLength(100)
-    expect(loadMoreButton().classList.contains('bt-button--touch')).toBe(true)
+    expect(screen.queryByText(/Carregar mais$/)).toBeNull()
     // O efeito que cria o observador roda depois da pintura: espera ele existir.
     await waitFor(() => expect(FakeObserver.instances.filter((o) => !o.closed).length).toBe(1))
     expect(FakeObserver.instances.filter((o) => !o.closed)[0].options?.root === null).toBe(true)

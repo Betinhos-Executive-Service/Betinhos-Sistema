@@ -39,6 +39,12 @@ describe('queries', () => {
   })
   it('busca de lookup e releitura da linha', () => {
     expect(searchPath('cr40f_funcionarioses', 'cr40f_funcionariosid', 'cr40f_nomecompleto', "jo'ao")).toBe("cr40f_funcionarioses?$select=cr40f_funcionariosid,cr40f_nomecompleto&$filter=statecode%20eq%200%20and%20contains(cr40f_nomecompleto%2C'jo''ao')&$orderby=cr40f_nomecompleto%20asc&$top=25")
+    const filter = (q: string) => decodeURIComponent(/\$filter=([^&]*)/.exec(searchPath('s', 'id', 'nome', q))?.[1] ?? '')
+    expect(filter('  Lima ')).toBe("statecode eq 0 and contains(nome,'Lima')")
+    expect(filter('50%_[x]')).toBe("statecode eq 0 and contains(nome,'50[%][_][[]x]')")
+    expect(filter("d'água")).toBe("statecode eq 0 and contains(nome,'d''água')")
+    expect(filter('  ')).toBe('statecode eq 0')
+    expect(searchPath('s', 'id', 'nome', 'a')).toContain('$top=25')
     expect(reloadPath('cr40f_reservadeveculoses', '{ABC}', ['cr40f_id', '_cr40f_motorista_value', 'a_1.new_valortotal'])).toBe('cr40f_reservadeveculoses(abc)?$select=cr40f_reservadeveculosid,cr40f_id,_cr40f_motorista_value,statecode')
   })
 })
@@ -77,7 +83,10 @@ describe('mock', () => {
     const sem = views.find((v) => v.nome.includes('Sem motorista'))!
     const filtrado = await source.count({ fetchxml: sem.fetchxml, query: '', quickFind: [] })
     const pagina = await source.page({ fetchxml: sem.fetchxml, page: 1, cookie: null, sort: null, query: '', quickFind: [] })
-    expect(filtrado).toBe(pagina.total)
+    // Como no Dataverse, a página não traz total: ele vem só da contagem.
+    expect(pagina.total).toBeNull()
+    expect(pagina.more).toBe(false)
+    expect(filtrado).toBe(pagina.rows.length)
     expect(filtrado).toBeLessThan(MOCK_ROW_COUNT)
   })
   it('source mock grava e relê', async () => {
@@ -108,7 +117,7 @@ describe('mock — contrato da tela', () => {
     const source = createSource({ mode: 'mock' })
     const views = await source.views()
     const semMotorista = await source.page({ fetchxml: views[2].fetchxml, page: 1, cookie: null, sort: null, query: '', quickFind: [] })
-    expect(semMotorista.total).toBe(createMockRows(new Date()).filter((r) => r._cr40f_motorista_value == null).length)
+    expect(semMotorista.rows.length).toBe(createMockRows(new Date()).filter((r) => r._cr40f_motorista_value == null).length)
     expect(semMotorista.rows.length).toBeLessThanOrEqual(50)
     expect(semMotorista.rows.every((r) => r._cr40f_motorista_value == null)).toBe(true)
     const id = String(semMotorista.rows[0].cr40f_reservadeveculosid)
@@ -192,6 +201,35 @@ describe('source Dataverse', () => {
     expect(url).toContain('cr40f_reservadeveculoses?fetchXml=')
     expect(url).toContain('count="100"')
     expect(url).toContain('page="2"')
+  })
+  it('page e count repassam o sinal de cancelamento ao cliente', async () => {
+    const { host, request } = fakeHost({ request: () => ({ value: [{ total: 3 }] }) })
+    const source = createSource(host)
+    const controller = new AbortController()
+    const fetchxml = '<fetch><entity name="cr40f_reservadeveculos" /></fetch>'
+    await source.page({ fetchxml, page: 1, cookie: null, sort: null, query: 'x', quickFind: ['cr40f_id'], signal: controller.signal })
+    await source.count({ fetchxml, query: 'x', quickFind: ['cr40f_id'], signal: controller.signal })
+    expect(request.mock.calls.map((call) => call[1]?.signal)).toEqual([controller.signal, controller.signal])
+    expect(decodeURIComponent(String(request.mock.calls[0][0]))).not.toContain('returntotalrecordcount')
+  })
+  it('count cancelado vira null, sem erro', async () => {
+    const { host } = fakeHost({ request: () => { throw new DOMException('cancelado', 'AbortError') } })
+    expect(await createSource(host).count({ fetchxml: '<fetch><entity name="cr40f_reservadeveculos" /></fetch>', query: '', quickFind: [] })).toBeNull()
+  })
+  it('busca do mock segue o FetchXML real: termo em qualquer parte', async () => {
+    const source = createSource({ mode: 'mock' }, { latency: 0 })
+    const fetchxml = (await source.views()).find((v) => v.padrao)!.fetchxml
+    const quickFind = await source.quickFind()
+    const ask = async (query: string) => (await source.page({ fetchxml, page: 1, cookie: null, sort: null, query, quickFind })).rows
+    expect((await ask('Unique')).every((r) => String(r.cr40f_trajeto).includes('Unique'))).toBe(true)
+    expect((await ask('Unique')).length).toBeGreaterThan(0)
+    // Meio do código e do trajeto também acham.
+    expect((await ask('1013')).map((r) => r.cr40f_id)).toContain('OS-1013')
+    expect((await ask('S-1013')).map((r) => r.cr40f_id)).toEqual(['OS-1013'])
+    expect((await ask('fasano')).every((r) => String(r.cr40f_trajeto).includes('Fasano'))).toBe(true)
+    // Lookup do mock com o termo em qualquer parte, como o contains real.
+    expect((await source.search('cr40f_motorista', 'lima')).map((o) => o.nome)).toEqual(['Carlos Lima'])
+    expect(await source.search('cr40f_motorista', 'zzz')).toEqual([])
   })
   it('count pede a agregação por FetchXML e devolve o número; erro vira null', async () => {
     const { host, request } = fakeHost({ request: () => ({ value: [{ total: 1234 }] }) })

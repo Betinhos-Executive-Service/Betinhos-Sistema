@@ -39,3 +39,16 @@ export function useLookupSearch(search: (text: string) => Promise<LookupOption[]
 
   return { found, searching, onSearch, reset }
 }
+
+/**
+ * Para buscas cujo componente (filtros do `@betinhos/ui`) já descarta respostas antigas, mas consulta a cada tecla:
+ * cada chamada espera a pausa na digitação; a que for superada antes disso devolve `[]` sem ir ao servidor.
+ */
+export function debounceSearch<A extends unknown[], T>(search: (...args: A) => Promise<T[]>, delay = SEARCH_DELAY_MS) {
+  let latest = 0
+  return (...args: A): Promise<T[]> => {
+    const id = ++latest
+    return new Promise<void>((resolve) => { setTimeout(resolve, delay) })
+      .then(() => (id === latest ? search(...args) : []))
+  }
+}

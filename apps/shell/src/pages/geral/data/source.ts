@@ -18,8 +18,9 @@ export const AUDITORIA_WEBRESOURCE = 'new_betinhos_AuditoriaViewer'
 export const ERRO_OPERACIONAL_WEBRESOURCE = 'new_gestao_erros_operacionais.html'
 export const FUNCIONARIOS_ENTITY = 'cr40f_funcionarios'
 
-export type PageRequest = { fetchxml: string; page: number; cookie: string | null; sort: Sort; query: string; quickFind: string[] }
-export type CountRequest = { fetchxml: string; query: string; quickFind: string[] }
+/** `signal` cancela a requisição quando a tela troca de contexto (visão, busca, ordem): libera a conexão para a consulta nova. */
+export type PageRequest = { fetchxml: string; page: number; cookie: string | null; sort: Sort; query: string; quickFind: string[]; signal?: AbortSignal }
+export type CountRequest = { fetchxml: string; query: string; quickFind: string[]; signal?: AbortSignal }
 
 /** Tudo que a tela precisa do mundo externo; Dataverse em produção, memória no pnpm dev. */
 export type Source = {
@@ -34,8 +35,9 @@ export type Source = {
   deleteView(id: string): Promise<void>
   quickFind(): Promise<string[]>
   attributes(entity: string): Promise<AttributeMap>
+  /** Uma página; `total` só vem quando sai de graça (mock e Dataverse não contam junto com a página). */
   page(req: PageRequest): Promise<Page>
-  /** Total de linhas da visão (com a busca); `null` quando a contagem falha. */
+  /** Total de linhas da visão (com a busca), numa consulta agregada à parte; `null` quando a contagem falha ou é cancelada. */
   count(req: CountRequest): Promise<number | null>
   update(id: string, patch: Row): Promise<void>
   clearLookup(id: string, attribute: string): Promise<void>
@@ -166,7 +168,8 @@ function createMockSource({ latency = 1 }: SourceOptions = {}): Source {
     async page(req) {
       await wait(300)
       const page = applyMockFetch(rows, req.fetchxml, { ...req, pageSize: PAGE_SIZE, now: new Date() })
-      return { ...page, rows: page.rows.map((r) => ({ ...r })) }
+      // Como no Dataverse (sem `returntotalrecordcount`), o total não vem com a página: a tela pede a contagem à parte.
+      return { ...page, rows: page.rows.map((r) => ({ ...r })), total: null }
     },
     async count(req) {
       await wait(150)
@@ -315,12 +318,12 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
     attributes,
     async page(req) {
       const fetchxml = buildFetch(req.fetchxml, { page: req.page, pageSize: PAGE_SIZE, cookie: req.cookie, sort: req.sort, query: req.query, quickFind: req.quickFind })
-      return parsePage(await host.client.request<FetchResponse>(fetchPath(await entitySet(), fetchxml)))
+      return parsePage(await host.client.request<FetchResponse>(fetchPath(await entitySet(), fetchxml), { signal: req.signal }))
     },
     async count(req) {
       try {
         const fetchxml = buildCountFetch(req.fetchxml, { query: req.query, quickFind: req.quickFind })
-        return parseCount(await host.client.request<{ value: Row[] }>(fetchPath(await entitySet(), fetchxml)))
+        return parseCount(await host.client.request<{ value: Row[] }>(fetchPath(await entitySet(), fetchxml), { signal: req.signal }))
       } catch { return null }
     },
     update: async (id, patch) => host.client.update(await entitySet(), id, patch),
