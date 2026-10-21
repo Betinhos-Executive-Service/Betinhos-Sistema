@@ -10,15 +10,18 @@ import type { Equipamento, Pessoa, TipoEquipamento } from './types'
 export const TELA = 'equipamentos'
 export const EQUIPAMENTO_SORT: ViewSort = { key: 'equipamento', dir: 'asc' }
 
-/** Colunas na ordem padrão; a primeira (Equipamento) é fixa. */
+/**
+ * Colunas na ordem padrão; a primeira (Equipamento) é fixa. Marca/modelo nasce oculta: já é o subtítulo da
+ * descrição, e sem ela as colunas cabem em 1366 px sem rolagem; o seletor de colunas a exibe.
+ */
 export const EQUIPAMENTO_COLUMNS: ViewColumnDef[] = [
   { key: 'equipamento', label: 'Equipamento' },
   { key: 'tipo', label: 'Tipo' },
-  { key: 'marcaModelo', label: 'Marca/modelo' },
-  { key: 'serie', label: 'Nº de série' },
   { key: 'responsavel', label: 'Responsável' },
   { key: 'status', label: 'Status' },
+  { key: 'serie', label: 'Nº de série' },
   { key: 'compra', label: 'Compra' },
+  { key: 'marcaModelo', label: 'Marca/modelo', defaultHidden: true },
 ]
 
 const SIM_NAO: FilterOption[] = [{ value: '1', label: 'Sim' }, { value: '0', label: 'Não' }]
@@ -110,7 +113,7 @@ export const EQUIPAMENTO_DEFAULT_FILTERS = withQuick([quickStatus(NAO_BAIXADOS)]
 
 const configWith = (filters: TableFilters): ViewConfig => ({
   v: CONFIG_VERSION,
-  columns: EQUIPAMENTO_COLUMNS.map((c) => ({ key: c.key, visible: true })),
+  columns: EQUIPAMENTO_COLUMNS.map((c) => ({ key: c.key, visible: !c.defaultHidden })),
   sort: EQUIPAMENTO_SORT,
   filters: filters as unknown as Record<string, unknown>,
 })
