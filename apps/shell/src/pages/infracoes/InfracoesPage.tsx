@@ -83,7 +83,7 @@ function Infracoes({ host }: { host: Host }) {
   }
 
   return (
-    <div className="page if-page">
+    <div className="page page--full if-page">
       <div role="toolbar" aria-label="Comandos de infrações">
         <ViewBar view={view} columns={INFRACAO_COLUMNS} filters={{ fields: INFRACAO_FIELDS }}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}

@@ -164,7 +164,7 @@ function Ops({ host }: { host: Host }) {
   }
 
   return (
-    <div className="page op-page">
+    <div className="page page--full op-page">
       <div role="toolbar" aria-label="Comandos de ordens de pagamento">
         <ViewBar view={view} columns={OP_COLUMNS} filters={choices ? { fields } : undefined}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}

@@ -543,7 +543,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const notApplied = geral.filtersIgnored ? [...Object.keys(filters.quick), ...filters.advanced.items.map((i) => i.id)] : undefined
 
   return (
-    <div className="page gr-page">
+    <div className="page page--full gr-page">
       {/* A linha de comando da lista (DS §10.9.1): visão, colunas, filtros, busca e comandos. */}
       <div role="toolbar" aria-label="Comandos de serviços" className={selecting ? 'gr-commandline is-selecting' : 'gr-commandline'}>
       <ViewBar
