@@ -91,11 +91,11 @@ describe('Equipamentos', () => {
     expect(window.location.hash).not.toContain('ver=')
   })
 
-  it('Marca/modelo nasce oculta; o modelo aparece sob a descrição', async () => {
+  it('Marca/modelo aparece em coluna própria', async () => {
     render(<EquipamentosPage host={{ mode: 'mock' }} />)
     const row = await rowOf('Notebook do Financeiro')
-    expect(within(row).getByText('Dell Latitude 5440')).toBeTruthy()
-    expect(screen.queryByRole('columnheader', { name: /Marca\/modelo/ })).toBeNull()
+    expect(within(row).getAllByText('Dell Latitude 5440')).toHaveLength(1)
+    expect(screen.getByRole('columnheader', { name: /Marca\/modelo/ })).toBeTruthy()
     expect(screen.getByRole('columnheader', { name: /Status/ })).toBeTruthy()
   })
 

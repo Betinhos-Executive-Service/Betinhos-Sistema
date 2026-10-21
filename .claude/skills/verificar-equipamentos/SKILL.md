@@ -25,7 +25,7 @@ description: "Verifica o módulo de Equipamentos do shell (#/equipamentos, aba E
 ## Roteiro em mock (navegador)
 Com `pnpm dev` rodando em `apps/shell` (na VM cloud, em grupo próprio: `setsid pnpm dev > log 2>&1 &`, e no fim `kill -TERM -<PGID>`; nunca `pkill -f vite`):
 `node .claude/skills/verificar-equipamentos/fluxo-mock.cjs <pasta-dos-prints> [desktop|mobile|ambos]` (Playwright + Chromium headless de `/opt/node-tools` e `/opt/pw-browsers`; fora da VM, `PLAYWRIGHT_MODULE` e `CHROMIUM`). Desktop 1366×800 e celular 375×800; uma linha ✅/❌ por passo e prints `<viewport>-NN-<passo>.png`.
-1. Lista carrega com "Dados de exemplo", versão do build no canto (`v0.0.NN · data`), sem rolagem horizontal da página em 1366 px; colunas Equipamento, Tipo, Responsável, Status, Nº de série, Compra (Marca/modelo oculta, aparece sob a descrição).
+1. Lista carrega com "Dados de exemplo", versão do build no canto (`v0.0.NN · data`), sem rolagem horizontal da página em 1366 px; colunas Equipamento, Tipo, Marca/modelo, Responsável, Status, Nº de série, Compra, todas à vista.
 2. Novo equipamento "Webcam sala de reunião", tipo Outro → nasce Disponível, toast "… cadastrado.", item na lista.
 3. Atribuir responsável → status vira Em uso; trocar responsável → linha com o novo nome.
 4. Status Baixado → Responsável limpo e desabilitado ("Item baixado não fica com responsável."); depois de salvar o item sai da Visão padrão e aparece na visão "Baixados" com "Sem responsável".
@@ -51,7 +51,7 @@ Só na `main` do checkout principal (`Sistema Betinhos`), com `git pull`. Nunca 
    Apague os itens de teste depois. Informar ao Renan a versão publicada.
 
 ## Casos de borda
-- Funcionário inativo = desligado (`cr40f_status` 1) ou registro inativo (`statecode` 1); Afastado conta como ativo (a confirmar com o Renan). Inativo continua no item com selo, fora do seletor.
+- Funcionário inativo = desligado (`cr40f_status` 1) ou registro inativo (`statecode` 1); Afastado conta como ativo e pode receber equipamento (confirmado pelo Renan, 21/10/2026). Inativo continua no item com selo, fora do seletor.
 - Item Baixado com responsável gravado fora do shell: o campo fica habilitado só para limpar.
 - Número de série repetido avisa (com a descrição do outro item) e não bloqueia.
 - `?ver=` inexistente: aviso "Equipamento não encontrado" e "Voltar à lista".

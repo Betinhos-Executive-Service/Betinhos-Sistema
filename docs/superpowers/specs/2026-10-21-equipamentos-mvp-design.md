@@ -81,8 +81,8 @@ Primitivas de `@betinhos/ui` e tokens do Design System (`DESIGN_SYSTEM.md`, `des
 - Filtros rápidos por coluna (padrão do DS): Equipamento, Tipo, Responsável (só quem tem algum item), Status, Nº de série, Compra (pela data). Só no filtro avançado: Valor de compra e "Com responsável".
 - Visão padrão ("Equipamentos em uso e disponíveis") esconde Baixados pelo filtro rápido de Status (Em uso, Disponível, Em manutenção); escolher Baixado nesse filtro os traz de volta.
 - Visões prontas: "Todos, inclusive baixados", **"Sem responsável"** (Com responsável = Não, fora os baixados) e "Baixados".
-- Colunas, nesta ordem: Equipamento (descrição, com a marca/modelo embaixo), Tipo, Responsável (selo "Inativo" se o funcionário estiver inativo), Status (selo com texto), Nº de série, Compra (`dd/mm/aaaa · R$ 0,00`). Marca/modelo é coluna oculta por padrão (assim a tabela cabe em 1366 px sem rolar); o seletor de colunas a exibe.
-- Funcionário inativo = desligado (`cr40f_status` 1) ou registro inativo (`statecode` 1); Afastado conta como ativo (a confirmar com o Renan).
+- Colunas, nesta ordem: Equipamento (descrição), Tipo, Marca/modelo, Responsável (selo "Inativo" se o funcionário estiver inativo), Status (selo com texto), Nº de série, Compra (`dd/mm/aaaa · R$ 0,00`). Todas à vista e cabendo em 1366 px sem rolar (decisão do Renan, 21/10/2026).
+- Funcionário inativo = desligado (`cr40f_status` 1) ou registro inativo (`statecode` 1); Afastado conta como ativo e pode receber equipamento (confirmado pelo Renan, 21/10/2026).
 - Estados: carregando, vazio ("Nenhum equipamento cadastrado." com ação Novo equipamento), sem resultado de filtro, erro (seção 7).
 
 ### 5.2 Drawer de cadastro/edição
