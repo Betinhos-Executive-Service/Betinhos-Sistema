@@ -79,6 +79,35 @@ describe('xrm shim', () => {
     expect(failed.status).toBe(400)
     expect((await failed.json()).error.message).toContain('Veículo sem motorista.')
   })
+
+  it('executeMultiple manda os Updates num changeset de $batch e rejeita se o changeset falhar', async () => {
+    // Como no DEV: changeset com falha devolve o status do erro no $batch inteiro, com o JSON dentro do multipart.
+    const multipart = (text: string, status = 200) => new Response(text, { status, headers: { 'Content-Type': 'multipart/mixed; boundary=batchresponse_x' } })
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('EntityDefinitions')) return json({ LogicalName: 'new_checklistmodelo', EntitySetName: 'new_checklistmodelos' })
+      return fetchMock.mock.calls.filter(([u]) => u.endsWith('$batch')).length === 1
+        ? multipart('--batchresponse_x\r\nHTTP/1.1 204 No Content\r\n\r\n--x\r\nHTTP/1.1 204 No Content\r\n')
+        : multipart('--batchresponse_x\r\nHTTP/1.1 404 Not Found\r\nContent-Type: application/json\r\n\r\n{"error":{"code":"0x80040217","message":"Entity \'new_ChecklistModelo\' With Id = bbb Does Not Exist"}}\r\n', 404)
+    })
+    const xrm = createXrmShim(createClient('https://org.example', fetchMock as unknown as typeof fetch), 'https://org.example')
+    const update = (id: string, payload: Record<string, unknown>) => ({ etn: 'new_checklistmodelo', id, payload, getMetadata: () => ({ boundParameter: null, operationType: 2, operationName: 'Update', parameterTypes: {} }) })
+    const changeset = [update('{AAA}', { new_padraoquinzenal: false }), update('bbb', { new_padraoquinzenal: true })]
+
+    const responses = await xrm.WebApi!.online!.executeMultiple!([changeset])
+    expect(responses.map((r) => r.status)).toEqual([204, 204])
+    const [url, init] = fetchMock.mock.calls.find(([u]) => u.endsWith('$batch'))! as unknown as [string, RequestInit & { headers: Record<string, string> }]
+    expect(url).toBe('https://org.example/api/data/v9.2/$batch')
+    const boundary = /boundary=(\S+)/.exec(init.headers['Content-Type'])![1]
+    const body = String(init.body)
+    expect(body.startsWith(`--${boundary}\r\nContent-Type: multipart/mixed; boundary=changeset_`)).toBe(true)
+    expect(body).toContain('PATCH https://org.example/api/data/v9.2/new_checklistmodelos(aaa) HTTP/1.1\r\nContent-Type: application/json\r\nIf-Match: *\r\n\r\n{"new_padraoquinzenal":false}')
+    expect(body).toContain('Content-ID: 2\r\n\r\nPATCH https://org.example/api/data/v9.2/new_checklistmodelos(bbb) HTTP/1.1')
+    expect(body.endsWith(`--${boundary}--\r\n`)).toBe(true)
+
+    await expect(xrm.WebApi!.online!.executeMultiple!([changeset])).rejects.toMatchObject({ message: "Entity 'new_ChecklistModelo' With Id = bbb Does Not Exist", status: 404 })
+    const create = { ...update('ccc', {}), getMetadata: () => ({ boundParameter: null, operationType: 2, operationName: 'Create', parameterTypes: {} }) }
+    await expect(xrm.WebApi!.online!.executeMultiple!([[create]])).rejects.toThrow('só aceita Update: Create')
+  })
 })
 
 describe('metadata.choices', () => {

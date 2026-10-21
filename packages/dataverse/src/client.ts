@@ -24,12 +24,16 @@ export function cleanId(value: string) {
   return value.replace(/[{}]/g, '').toLowerCase()
 }
 
+/** Mensagem de erro do Dataverse num corpo JSON ou dentro da resposta multipart de um $batch. */
+export function dataverseErrorMessage(text: string) {
+  try { return (JSON.parse(text) as { error?: { message?: string } }).error?.message } catch { /* multipart ou texto */ }
+  const message = /"message":\s*"((?:[^"\\]|\\.)*)"/.exec(text)?.[1]
+  if (message === undefined) return undefined
+  try { return JSON.parse(`"${message}"`) as string } catch { return message }
+}
+
 async function readError(response: Response) {
-  try {
-    const body = (await response.json()) as { error?: { message?: string } }
-    if (body.error?.message) return body.error.message
-  } catch { /* corpo não é JSON */ }
-  return `HTTP ${response.status}`
+  return dataverseErrorMessage(await response.text().catch(() => '')) || `HTTP ${response.status}`
 }
 
 export type FetchFailure = { method: string; path: string; status?: number; body?: unknown; error?: unknown }
@@ -77,6 +81,8 @@ export function createClient(clientUrl: string, fetchImpl: typeof fetch = (...ar
   async function request<T>(path: string, init?: RequestOptions) {
     const response = await send(path, init)
     if (response.status === 204) return undefined as T
+    // A resposta de $batch é multipart; quem chama faz o parse do texto.
+    if (/^multipart\//i.test(response.headers.get('Content-Type') ?? '')) return (await response.text()) as T
     return (await response.json()) as T
   }
 
