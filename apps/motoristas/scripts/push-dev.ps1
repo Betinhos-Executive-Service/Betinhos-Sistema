@@ -137,13 +137,6 @@ Copy-Item -Path "plugins\DriverRecordSharing.Tests\bin\Release\net462\*" -Destin
 dotnet vstest (Join-Path $pluginTestDir "DriverRecordSharing.Tests.dll")
 if ($LASTEXITCODE -ne 0) { throw "Testes do plugin falharam." }
 
-Write-Step "publish webresource in $solutionUniqueName"
-& (Join-Path $PSScriptRoot "deploy-webresource.ps1") `
-  -EnvironmentUrl $environmentUrl `
-  -WebResourceName "new_app-motoristas-v2" `
-  -SolutionUniqueName $solutionUniqueName `
-  -DeviceCode:$DeviceCode
-
 if ($IncludeOperacionais) {
   Write-Step "publish Tela Funcoes Operacionais"
   & (Join-Path $operationsRoot "scripts\deploy-webresource.ps1") `
@@ -221,6 +214,17 @@ Write-Step "publish exchange lifecycle command resources"
   -EnvironmentUrl $environmentUrl `
   -SolutionUniqueName $solutionUniqueName `
   -Apply `
+  -DeviceCode:$DeviceCode
+
+# O webresource do App vai por ultimo: ele pede no $select colunas criadas pelo plugin e pelos
+# provisionamentos acima (ex.: provision-checklists). Publicado antes, a consulta devolveria 400;
+# se algum provisionamento falhar, o script para aqui e o app antigo continua no ar.
+# O deploy refaz o build (com bump de versao), entao a versao exibida e a publicada sao a mesma.
+Write-Step "publish webresource in $solutionUniqueName"
+& (Join-Path $PSScriptRoot "deploy-webresource.ps1") `
+  -EnvironmentUrl $environmentUrl `
+  -WebResourceName "new_app-motoristas-v2" `
+  -SolutionUniqueName $solutionUniqueName `
   -DeviceCode:$DeviceCode
 
 $finalBackupPath = Join-Path $backupDir ("$solutionUniqueName-final-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".zip")

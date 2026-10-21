@@ -4,7 +4,7 @@ import { DATAVERSE, retrieveMultiple, retrieveOne } from "./dataverse.ts";
 // (plugins/DriverRecordSharing/ChecklistAnswers.cs): itens copiados do modelo e respostas em JSON.
 
 export const CHECKLIST_ESTADO = { aguardandoMotorista: 100000000, pendente: 100000001, concluido: 100000002, cancelado: 100000003 } as const;
-export const CHECKLIST_ORIGEM = { quinzenal: 100000000, manual: 100000001 } as const;
+export const CHECKLIST_ORIGEM = { quinzenal: 100000000, manual: 100000001, troca: 100000002 } as const;
 export const CHECKLIST_MAX_FOTOS_POR_ITEM = 5;
 export const CHECKLIST_MAX_TEXTO = 2000;
 export const CHECKLIST_MAX_OBSERVACAO = 500;
@@ -45,6 +45,8 @@ export type ChecklistVeiculo = {
   placa: string;
   estado: number;
   origem: number;
+  entreguePorNome: string;
+  trocaDetectadaEm: string | null;
   solicitadoEm: string;
   concluidoEm: string | null;
   odometro: number | null;
@@ -134,6 +136,8 @@ export function mapChecklist(row: Record<string, unknown>): ChecklistVeiculo {
     placa: String(row["_new_veiculo_value@OData.Community.Display.V1.FormattedValue"] ?? ""),
     estado: Number(row.new_estado),
     origem: Number(row.new_origem),
+    entreguePorNome: String(row["_new_entreguepor_value@OData.Community.Display.V1.FormattedValue"] ?? ""),
+    trocaDetectadaEm: row.new_trocadetectadaem ? String(row.new_trocadetectadaem) : null,
     solicitadoEm: String(row.new_solicitadoem ?? row.createdon ?? ""),
     concluidoEm: row.new_concluidoem ? String(row.new_concluidoem) : null,
     odometro: Number.isFinite(odometro) ? odometro : null,
@@ -143,6 +147,16 @@ export function mapChecklist(row: Record<string, unknown>): ChecklistVeiculo {
 }
 
 export const isChecklistPending = (item: ChecklistVeiculo) => item.estado === CHECKLIST_ESTADO.pendente;
+
+// Texto do card na agenda (Serviços). A troca diz de quem o carro veio.
+export function checklistCardTexto(item: ChecklistVeiculo) {
+  const placa = item.placa ? `Veículo ${item.placa}` : "Vistoria do veículo";
+  if (!isChecklistPending(item)) return { label: "CHECKLIST ENVIADO", descricao: placa };
+  if (item.origem === CHECKLIST_ORIGEM.troca) {
+    return { label: "RECEBIMENTO DO CARRO", descricao: `${placa} · ${item.entreguePorNome ? `entregue por ${item.entreguePorNome}` : "entregue por: não identificado"}` };
+  }
+  return { label: item.origem === CHECKLIST_ORIGEM.manual ? "SOLICITADO PELA OPERAÇÃO" : "VISTORIA QUINZENAL", descricao: placa };
+}
 
 // Aceita "45210", "45.210" (milhar), "45210,5" e "12.5". Retorna "" quando vazio e null quando inválido.
 export function normalizeChecklistNumber(input: string): string | null {
@@ -276,11 +290,11 @@ function getLocalMock() {
   localMock = [
     {
       id: "c0000000-0000-4000-8000-000000000001", nome: "Checklist ABC1D23 - quinzenal", motoristaId: MOCK_DRIVER_ID, veiculoId: "v1", placa: "ABC1D23",
-      estado: CHECKLIST_ESTADO.pendente, origem: CHECKLIST_ORIGEM.quinzenal, solicitadoEm: iso(0), concluidoEm: null, odometro: 45210, itens, respostas: []
+      estado: CHECKLIST_ESTADO.pendente, origem: CHECKLIST_ORIGEM.troca, entreguePorNome: "Carlos Andrade", trocaDetectadaEm: iso(0), solicitadoEm: iso(0), concluidoEm: null, odometro: 45210, itens, respostas: []
     },
     {
       id: "c0000000-0000-4000-8000-000000000002", nome: "Checklist ABC1D23 - anterior", motoristaId: MOCK_DRIVER_ID, veiculoId: "v1", placa: "ABC1D23",
-      estado: CHECKLIST_ESTADO.concluido, origem: CHECKLIST_ORIGEM.quinzenal, solicitadoEm: iso(15), concluidoEm: iso(14), odometro: 44100, itens,
+      estado: CHECKLIST_ESTADO.concluido, origem: CHECKLIST_ORIGEM.quinzenal, entreguePorNome: "", trocaDetectadaEm: null, solicitadoEm: iso(15), concluidoEm: iso(14), odometro: 44100, itens,
       respostas: itens.map((item) => ({
         chave: item.chave, rotulo: item.rotulo, tipo: item.tipo,
         valor: item.tipo === "numero" ? (item.unidade === "km" ? "44102" : "75") : item.tipo === "texto" ? "Sem avarias." : item.tipo === "okNok" ? "ok" : "",
@@ -297,7 +311,7 @@ const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 // ---------- Leitura ----------
 
-const CHECKLIST_SELECT = "$select=new_checklistveiculoid,new_name,_new_motorista_value,_new_veiculo_value,new_estado,new_origem,new_solicitadoem,new_concluidoem,new_odometroinfleet,new_itensjson,new_respostasjson,createdon";
+const CHECKLIST_SELECT = "$select=new_checklistveiculoid,new_name,_new_motorista_value,_new_veiculo_value,new_estado,new_origem,_new_entreguepor_value,new_trocadetectadaem,new_solicitadoem,new_concluidoem,new_odometroinfleet,new_itensjson,new_respostasjson,createdon";
 
 export async function loadDriverChecklists(motoristaId: string): Promise<ChecklistVeiculo[]> {
   if (isMockChecklists()) { await delay(150); return clone(getLocalMock()); }
