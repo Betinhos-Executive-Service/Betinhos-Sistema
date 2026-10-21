@@ -1,0 +1,39 @@
+import { describe, expect, it, vi } from 'vitest'
+import { createXrmSource } from './dataverse'
+import type { XrmHost } from './xrm'
+
+const FORMATTED = '@OData.Community.Display.V1.FormattedValue'
+const GUID = '3f2504e0-4f89-11d3-9a0c-0305e82c3301'
+
+function sourceWith(rows: Record<string, unknown>[]) {
+  const retrieveMultipleRecords = vi.fn(async () => ({ entities: rows }))
+  const xrm: XrmHost = {
+    WebApi: { retrieveMultipleRecords, retrieveRecord: vi.fn(), createRecord: vi.fn(), updateRecord: vi.fn(), deleteRecord: vi.fn() },
+    Utility: { getGlobalContext: () => ({ getClientUrl: () => 'https://org23b93544.crm2.dynamics.com' }) },
+  }
+  return { source: createXrmSource(xrm), retrieveMultipleRecords }
+}
+
+describe('createXrmSource().equipamentos', () => {
+  it('filtra pelo responsável, deixa os baixados de fora e lê o nome do tipo pela anotação do lookup', async () => {
+    const { source, retrieveMultipleRecords } = sourceWith([{
+      cr40f_equipamentoid: '{AAAAAAAA-0000-4000-8000-000000000001}', cr40f_name: 'Notebook do Financeiro',
+      _cr40f_tipo_value: 'x', [`_cr40f_tipo_value${FORMATTED}`]: 'Notebook', cr40f_numeroserie: 'DL5440-001', cr40f_status: 100000000,
+    }, { cr40f_equipamentoid: 'aaaaaaaa-0000-4000-8000-000000000002', cr40f_name: 'Sem tipo', cr40f_numeroserie: null, cr40f_status: null }])
+    const itens = await source.equipamentos(`{${GUID.toUpperCase()}}`)
+    expect(itens).toEqual([
+      { id: 'aaaaaaaa-0000-4000-8000-000000000001', descricao: 'Notebook do Financeiro', tipo: 'Notebook', numeroSerie: 'DL5440-001', status: 100000000 },
+      { id: 'aaaaaaaa-0000-4000-8000-000000000002', descricao: 'Sem tipo', tipo: '', numeroSerie: '', status: null },
+    ])
+    const [entity, options] = retrieveMultipleRecords.mock.calls[0] as unknown as [string, string]
+    expect(entity).toBe('cr40f_equipamento')
+    expect(options).toContain(`$filter=_cr40f_responsavel_value eq ${GUID} and cr40f_status ne 100000003`)
+    expect(options).toContain('$select=cr40f_equipamentoid,cr40f_name,_cr40f_tipo_value,cr40f_numeroserie,cr40f_status')
+  })
+
+  it('recusa id que não é GUID, sem consultar o Dataverse', async () => {
+    const { source, retrieveMultipleRecords } = sourceWith([])
+    await expect(source.equipamentos(`${GUID} or cr40f_status eq 100000003`)).rejects.toThrow('Id de funcionário inválido.')
+    expect(retrieveMultipleRecords).not.toHaveBeenCalled()
+  })
+})

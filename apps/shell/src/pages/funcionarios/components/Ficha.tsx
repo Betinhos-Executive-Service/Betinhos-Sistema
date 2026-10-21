@@ -17,17 +17,18 @@ import { AnotacoesTab } from './Anotacoes'
 import { DocumentosArquivos } from './DocumentosArquivos'
 import { Checklist } from '../../documentos/components/Checklist'
 import type { DocsSource } from '../../documentos/data/source'
-import { MultasTab, VeiculosTab } from './RelatedTabs'
+import { EquipamentosTab, MultasTab, VeiculosTab } from './RelatedTabs'
 import { SecretText } from './SecretText'
 import { useNotify } from './Toasts'
 import { VeiculoPicker } from './VeiculoPicker'
 
-type Tab = 'dados' | 'documentos' | 'multas' | 'veiculos' | 'anotacoes'
+type Tab = 'dados' | 'documentos' | 'multas' | 'veiculos' | 'equipamentos' | 'anotacoes'
 const TABS: { key: Tab; label: string }[] = [
   { key: 'dados', label: 'Dados' },
   { key: 'documentos', label: 'Documentos' },
   { key: 'multas', label: 'Multas' },
   { key: 'veiculos', label: 'Veículos' },
+  { key: 'equipamentos', label: 'Equipamentos' },
   { key: 'anotacoes', label: 'Anotações' },
 ]
 const GROUPS: FieldGroup[] = ['pessoais', 'vinculo', 'contato', 'detalhes']
@@ -231,6 +232,7 @@ export function Ficha({ source, docs, id, onClose, onSaved }: Props) {
 
           {original && tab === 'multas' && <MultasTab source={source} id={original.id} />}
           {original && tab === 'veiculos' && <VeiculosTab source={source} id={original.id} />}
+          {original && tab === 'equipamentos' && <EquipamentosTab source={source} id={original.id} />}
           {original && tab === 'anotacoes' && <AnotacoesTab source={source} id={original.id} />}
         </div>
 

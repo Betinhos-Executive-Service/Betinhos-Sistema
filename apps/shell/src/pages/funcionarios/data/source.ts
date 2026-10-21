@@ -1,4 +1,4 @@
-import type { Anotacao, Documento, Draft, Funcionario, ImageField, Lookup, Multa, Posse } from './types'
+import type { Anotacao, Documento, Draft, EquipamentoResumo, Funcionario, ImageField, Lookup, Multa, Posse } from './types'
 
 /** Documentos do colaborador no SharePoint (flows HTTP do AppBetinhos). */
 export interface DocumentStore {
@@ -35,6 +35,8 @@ export interface DataSource {
   saveLogins(id: string, html: string | null): Promise<void>
   multas(id: string): Promise<Multa[]>
   posses(id: string): Promise<Posse[]>
+  /** Equipamentos com o funcionário, exceto os baixados. */
+  equipamentos(id: string): Promise<EquipamentoResumo[]>
   anotacoes(id: string): Promise<Anotacao[]>
   addAnotacao(id: string, nota: NovaAnotacao): Promise<void>
   /** Grava título e HTML já montado (texto + links de anexo do SharePoint). */
