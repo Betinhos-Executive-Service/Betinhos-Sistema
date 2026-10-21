@@ -75,7 +75,7 @@ if ($SimularTroca) {
   $veiculo = [guid]::Parse($VeiculoId).ToString("D")
   $antes = (Get-Date).ToUniversalTime()
   $patch = @{
-    "cr40f_veiculoatual@odata.bind" = "/cr40f_veiculoses($veiculo)"
+    "cr40f_VeiculoAtual@odata.bind" = "/cr40f_veiculoses($veiculo)"
     new_veiculoatualdesde = $antes.ToString("yyyy-MM-ddTHH:mm:ssZ")
     new_origemveiculoatual = 100000000
   }
