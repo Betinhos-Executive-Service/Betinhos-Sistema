@@ -114,7 +114,7 @@ function Get-AttributeId([string] $Entity, [string] $LogicalName) {
   return $null
 }
 
-# $Default: valor que o formulario e a criacao sem o campo assumem (DefaultFormValue); $null = sem padrao.
+# $Default: valor padrao do choice (DefaultFormValue, usado pelo formulario); $null = sem padrao.
 function Picklist([string] $Schema, [string] $Display, [string] $Description, [string[]] $Labels, [string] $Required = "None", [object] $Default = $null) {
   $options = @()
   for ($i = 0; $i -lt $Labels.Count; $i++) { $options += @{ Value = 100000000 + $i; Label = Label $Labels[$i] } }
@@ -208,6 +208,7 @@ function Money([string] $Schema, [string] $Display, [string] $Description) {
 if (-not (Get-EntityId "cr40f_funcionarios")) { throw "Tabela cr40f_funcionarios nao existe neste ambiente." }
 
 $tipo = "cr40f_tipoequipamento"; $equip = "cr40f_equipamento"
+$relTipo = "cr40f_tipoequipamento_cr40f_equipamento_tipo"; $relResponsavel = "cr40f_funcionarios_cr40f_equipamento_responsavel"
 $tipoId = Ensure-Table $tipo "cr40f_TipoEquipamento" "Tipo de equipamento" "Tipos de equipamento" "Catálogo de tipos (Notebook, Monitor, Máquina de cartão…)" 100 "ApplicationRequired"
 $equipId = Ensure-Table $equip "cr40f_Equipamento" "Equipamento" "Equipamentos" "Equipamento da empresa e o funcionário com ele agora." 200 "ApplicationRequired" "Descrição" "Descrição curta do item"
 if (-not $Apply -and (-not $tipoId -or -not $equipId)) { Write-Step "DRY RUN OK; use -Apply"; exit 0 }
@@ -222,8 +223,8 @@ Ensure-AttributeOn $equip (DateOnly "cr40f_DataCompra" "Data de compra" "Quando 
 Ensure-AttributeOn $equip (Money "cr40f_ValorCompra" "Valor de compra" "Valor pago pelo item")
 Ensure-AttributeOn $equip @{ "@odata.type" = "Microsoft.Dynamics.CRM.MemoAttributeMetadata"; SchemaName = "cr40f_Observacoes"; DisplayName = Label "Observações"; Description = Label "Acessórios e estado do item"; MaxLength = 2000; Format = "TextArea" }
 # Excluir tipo ou funcionario nao apaga o equipamento: o lookup fica vazio (spec secao 4.2).
-Ensure-Lookup "cr40f_tipoequipamento_cr40f_equipamento_tipo" $tipo $equip "cr40f_Tipo" "Tipo" "Tipo do equipamento" "RemoveLink" "ApplicationRequired"
-Ensure-Lookup "cr40f_funcionarios_cr40f_equipamento_responsavel" "cr40f_funcionarios" $equip "cr40f_Responsavel" "Responsável" "Funcionário com o item agora; vazio = escritório/estoque" "RemoveLink"
+Ensure-Lookup $relTipo $tipo $equip "cr40f_Tipo" "Tipo" "Tipo do equipamento" "RemoveLink" "ApplicationRequired"
+Ensure-Lookup $relResponsavel "cr40f_funcionarios" $equip "cr40f_Responsavel" "Responsável" "Funcionário com o item agora; vazio = escritório/estoque" "RemoveLink"
 
 if ($Apply) {
   Invoke-Dataverse "POST" "PublishXml" @{ ParameterXml = "<importexportxml><entities><entity>$tipo</entity><entity>$equip</entity></entities></importexportxml>" } | Out-Null
@@ -235,6 +236,18 @@ if ($Apply) {
   if ($missing.Count) { throw "Colunas ausentes apos a publicacao: $($missing -join ', ')" }
   foreach ($t in @($tipoId, $equipId)) {
     if (@(Get-Rows "solutioncomponents" "solutioncomponentid" "_solutionid_value eq $solutionId and objectid eq $t and componenttype eq 1").Count -eq 0) { throw "Tabela $t nao esta na solucao $SolutionUniqueName." }
+  }
+  # Excluir tipo ou funcionario so limpa o lookup (spec secao 4.2); relacionamento criado antes por outro caminho pode ter vindo diferente.
+  foreach ($rel in @($relTipo, $relResponsavel)) {
+    $relRows = @(Get-Rows $relPath "MetadataId" "SchemaName eq '$rel'")
+    if ($relRows.Count -ne 1) { throw "Relacionamento $rel nao encontrado apos a publicacao." }
+    $exclusao = (Invoke-Dataverse "GET" "RelationshipDefinitions($($relRows[0].MetadataId))/Microsoft.Dynamics.CRM.OneToManyRelationshipMetadata").CascadeConfiguration.Delete
+    if ($exclusao -ne "RemoveLink") { throw "Relacionamento $rel esta com exclusao $exclusao; o spec exige RemoveLink." }
+  }
+  foreach ($e in @($tipo, $equip)) {
+    $tamanhoEsperado = if ($e -eq $tipo) { 100 } else { 200 }
+    $tamanho = (Invoke-Dataverse "GET" "EntityDefinitions(LogicalName='$e')/Attributes(LogicalName='cr40f_name')/Microsoft.Dynamics.CRM.StringAttributeMetadata?`$select=MaxLength").MaxLength
+    if ($tamanho -ne $tamanhoEsperado) { Write-Step "AVISO: $e.cr40f_name tem MaxLength $tamanho (esperado $tamanhoEsperado); ajuste no maker portal." }
   }
   # O shell depende destes dois detalhes; coluna criada antes por outro caminho pode ter vindo diferente.
   $attrBase = "EntityDefinitions(LogicalName='$equip')/Attributes"
