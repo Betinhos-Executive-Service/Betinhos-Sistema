@@ -16,7 +16,6 @@ function OpenName({ e, onOpen }: { e: Equipamento; onOpen: (id: string) => void 
   return (
     <button type="button" className="eq-open" onClick={() => onOpen(e.id)}>
       <strong>{e.descricao || 'Sem descrição'}</strong>
-      {e.marcaModelo ? <span>{e.marcaModelo}</span> : null}
     </button>
   )
 }
@@ -37,14 +36,13 @@ function Responsavel({ e, inativos }: { e: Equipamento; inativos: Set<string> })
 
 export function EquipamentosTable({ list, inativos, onOpen, loading, view, quickFilters, footer, empty }: TableProps) {
   const columns: TableColumn<Equipamento>[] = [
-    { key: 'equipamento', header: 'Equipamento', label: 'Equipamento', sortable: true, defaultWidth: 230, width: 'minmax(200px, 2fr)', cell: (e) => <OpenName e={e} onOpen={onOpen} /> },
-    { key: 'tipo', header: 'Tipo', label: 'Tipo', sortable: true, defaultWidth: 120, width: 'minmax(100px, .8fr)', cell: (e) => e.tipoNome || '—' },
-    { key: 'responsavel', header: 'Responsável', label: 'Responsável', sortable: true, defaultWidth: 190, width: 'minmax(140px, 1.2fr)', cell: (e) => <Responsavel e={e} inativos={inativos} /> },
-    { key: 'status', header: 'Status', label: 'Status', sortable: true, defaultWidth: 160, width: 'minmax(120px, .9fr)', cell: (e) => <StatusSelo e={e} /> },
-    { key: 'serie', header: 'Nº de série', label: 'Nº de série', sortable: true, defaultWidth: 110, width: 'minmax(100px, .8fr)', hideBelow: 'compact', cell: (e) => <span className="eq-num">{e.numeroSerie || '—'}</span> },
-    { key: 'compra', header: 'Compra', label: 'Compra', sortable: true, defaultWidth: 160, width: 'minmax(140px, 1fr)', hideBelow: 'compact', cell: (e) => <span className="eq-num">{fmtCompra(e)}</span> },
-    // Oculta por padrão (o modelo já é o subtítulo da descrição); exibível pelo seletor de colunas.
-    { key: 'marcaModelo', header: 'Marca/modelo', label: 'Marca/modelo', sortable: true, defaultWidth: 160, width: 'minmax(120px, 1fr)', hideBelow: 'compact', defaultHidden: true, cell: (e) => e.marcaModelo || '—' },
+    { key: 'equipamento', header: 'Equipamento', label: 'Equipamento', sortable: true, defaultWidth: 170, width: 'minmax(160px, 2fr)', cell: (e) => <OpenName e={e} onOpen={onOpen} /> },
+    { key: 'tipo', header: 'Tipo', label: 'Tipo', sortable: true, defaultWidth: 100, width: 'minmax(100px, .8fr)', cell: (e) => e.tipoNome || '—' },
+    { key: 'marcaModelo', header: 'Marca/modelo', label: 'Marca/modelo', sortable: true, defaultWidth: 130, width: 'minmax(120px, 1fr)', hideBelow: 'compact', cell: (e) => e.marcaModelo || '—' },
+    { key: 'responsavel', header: 'Responsável', label: 'Responsável', sortable: true, defaultWidth: 160, width: 'minmax(140px, 1.2fr)', cell: (e) => <Responsavel e={e} inativos={inativos} /> },
+    { key: 'status', header: 'Status', label: 'Status', sortable: true, defaultWidth: 150, width: 'minmax(120px, .9fr)', cell: (e) => <StatusSelo e={e} /> },
+    { key: 'serie', header: 'Nº de série', label: 'Nº de série', sortable: true, defaultWidth: 100, width: 'minmax(100px, .8fr)', hideBelow: 'compact', cell: (e) => <span className="eq-num">{e.numeroSerie || '—'}</span> },
+    { key: 'compra', header: 'Compra', label: 'Compra', sortable: true, defaultWidth: 150, width: 'minmax(140px, 1fr)', hideBelow: 'compact', cell: (e) => <span className="eq-num">{fmtCompra(e)}</span> },
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.eq-open')}>

@@ -11,17 +11,17 @@ export const TELA = 'equipamentos'
 export const EQUIPAMENTO_SORT: ViewSort = { key: 'equipamento', dir: 'asc' }
 
 /**
- * Colunas na ordem padrão; a primeira (Equipamento) é fixa. Marca/modelo nasce oculta: já é o subtítulo da
- * descrição, e sem ela as colunas cabem em 1366 px sem rolagem; o seletor de colunas a exibe.
+ * Colunas na ordem padrão; a primeira (Equipamento) é fixa. Responsável e Status vêm antes de Nº de série e
+ * Compra para continuarem à vista em 1366 px (a tabela rola só no fim).
  */
 export const EQUIPAMENTO_COLUMNS: ViewColumnDef[] = [
   { key: 'equipamento', label: 'Equipamento' },
   { key: 'tipo', label: 'Tipo' },
+  { key: 'marcaModelo', label: 'Marca/modelo' },
   { key: 'responsavel', label: 'Responsável' },
   { key: 'status', label: 'Status' },
   { key: 'serie', label: 'Nº de série' },
   { key: 'compra', label: 'Compra' },
-  { key: 'marcaModelo', label: 'Marca/modelo', defaultHidden: true },
 ]
 
 const SIM_NAO: FilterOption[] = [{ value: '1', label: 'Sim' }, { value: '0', label: 'Não' }]

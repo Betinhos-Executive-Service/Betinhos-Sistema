@@ -201,11 +201,10 @@ describe('lista', () => {
     const comDatas = [item({ dataCompra: '2026-03-10' }), item({ id: 'e2', dataCompra: '2025-01-05' })]
     expect(comDatas.filter((x) => matchesFilters(x, readFilters(desde('2026-01-01'), fields), fields, readEquipamento)).map((x) => x.id)).toEqual(['e1'])
   })
-  it('visões prontas mantêm Marca/modelo oculta como na Visão padrão', () => {
+  it('visões prontas mostram todas as colunas, com Marca/modelo à vista', () => {
     for (const v of builtinViews()) {
       const cols = JSON.parse(v.config).columns as { key: string; visible: boolean }[]
-      expect(cols.find((c) => c.key === 'marcaModelo')).toEqual({ key: 'marcaModelo', visible: false })
-      expect(cols.filter((c) => c.visible).map((c) => c.key)).toEqual(['equipamento', 'tipo', 'responsavel', 'status', 'serie', 'compra'])
+      expect(cols.filter((c) => c.visible).map((c) => c.key)).toEqual(['equipamento', 'tipo', 'marcaModelo', 'responsavel', 'status', 'serie', 'compra'])
     }
   })
   it('visões prontas: sem responsável e baixados', () => {
