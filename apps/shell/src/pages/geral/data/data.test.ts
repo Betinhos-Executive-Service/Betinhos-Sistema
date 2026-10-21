@@ -179,7 +179,7 @@ describe('source Dataverse', () => {
       getAll: async () => [{ fetchxml: quickFindXml }],
       request: (path) => (path.startsWith('cr40f_funcionarioss?') ? { value: [{ cr40f_funcionariosid: '{AAA}' }] } : { value: [] }),
     })
-    const entity = vi.spyOn(host.metadata, 'entity')
+    const entity = vi.spyOn((host as Extract<Host, { mode: 'dataverse' }>).metadata, 'entity')
     const source = createSource(host)
     const quickFind = await source.quickFind()
     expect(quickFind).toEqual(['cr40f_status', 'cr40f_receber', 'cr40f_motorista'])
