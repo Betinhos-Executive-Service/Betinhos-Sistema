@@ -52,6 +52,8 @@ test("valor da cobrança aceita menor ou igual ao valor a receber", () => {
   assert.equal(validateQrChargeAmount(9000, 15000), "");
   assert.match(validateQrChargeAmount(15001, 15000), /não pode passar de R\$ 150,00/);
   assert.match(validateQrChargeAmount(0, 15000), /Informe o valor/);
+  assert.equal(validateQrChargeAmount(49, 15000), "O valor mínimo é R$ 0,50.");
+  assert.equal(validateQrChargeAmount(50, 15000), "");
 });
 
 test("valor aparece em reais no padrão pt-BR", () => {
@@ -67,7 +69,7 @@ test("contagem regressiva não fica negativa", () => {
   assert.equal(formatCountdown(5), "00:05");
 });
 
-test("resposta válida do Flow vira cobrança", () => {
+test("resposta válida do plugin vira cobrança", () => {
   const charge = parseQrChargeResponse(validResponse);
   assert.equal(charge.valorCentavos, 15000);
   assert.equal(charge.status, "aguardando");
@@ -79,7 +81,7 @@ test("QR só é gerado para página de pagamento do Stripe", () => {
   assert.throws(() => parseQrChargeResponse({ ...validResponse, url: "http://checkout.stripe.com/x" }), /Link de pagamento inválido/);
 });
 
-test("resposta incompleta ou com erro do Flow é recusada com a mensagem certa", () => {
+test("resposta incompleta ou com erro do plugin é recusada com a mensagem certa", () => {
   assert.throws(() => parseQrChargeResponse({ erro: "Você não está liberado para cobrar por QR code." }), /não está liberado/);
   assert.throws(() => parseQrChargeResponse({ ...validResponse, sessionId: "" }), /identificação/);
   assert.throws(() => parseQrChargeResponse({ ...validResponse, status: "talvez" }), /Status/);

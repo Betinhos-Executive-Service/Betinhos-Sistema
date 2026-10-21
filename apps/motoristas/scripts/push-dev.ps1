@@ -186,6 +186,15 @@ Write-Step "provision checklists de vistoria: metadata, Custom APIs e travas in 
   -DeviceCode:$DeviceCode
 if (-not $?) { throw "Provisionamento de checklists falhou." }
 
+# Sem %USERPROFILE%\.betinhos\stripe-dev.env o provisionador so avisa e mantem a chave atual do step.
+Write-Step "provision cobranca por QR (Custom API, chave do Stripe e webhook) in DEV"
+& (Join-Path $PSScriptRoot "provision-cobranca-qr.ps1") `
+  -EnvironmentUrl $environmentUrl `
+  -SolutionUniqueName $solutionUniqueName `
+  -Apply `
+  -DeviceCode:$DeviceCode
+if (-not $?) { throw "Provisionamento da cobranca por QR falhou." }
+
 Write-Step "publish push redirect (forms OnLoad -> App Motoristas)"
 & (Join-Path $PSScriptRoot "provision-push-redirect.ps1") `
   -EnvironmentUrl $environmentUrl `

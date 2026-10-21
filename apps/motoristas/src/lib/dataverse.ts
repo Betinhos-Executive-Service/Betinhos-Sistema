@@ -261,9 +261,7 @@ const FLOW_URLS = {
   gerarVoucher: "VITE_FLOW_GERAR_VOUCHER_URL",
   salvarFotosManutencao: "VITE_FLOW_SALVAR_FOTOS_MANUTENCAO_URL",
   enviarReciboCliente: "VITE_FLOW_ENVIAR_RECIBO_CLIENTE_URL",
-  quickRead: "VITE_FLOW_LEITURA_RAPIDA_URL",
-  cobrancaQr: "VITE_FLOW_COBRANCA_QR_URL",
-  cobrancaQrStatus: "VITE_FLOW_COBRANCA_QR_STATUS_URL"
+  quickRead: "VITE_FLOW_LEITURA_RAPIDA_URL"
 } as const;
 
 const DEV_DATAVERSE_URL = "https://org23b93544.crm2.dynamics.com/";
@@ -273,9 +271,7 @@ const FLOW_DATAVERSE_ENVIRONMENT_VARIABLES: Record<string, string | undefined> =
   [FLOW_URLS.gerarVoucher]: "new_FlowURLFlowGerarVoucherAppMotoristasv2",
   [FLOW_URLS.salvarFotosManutencao]: "new_FlowURLFlowSalvarArquivosOnedrive",
   [FLOW_URLS.enviarReciboCliente]: "new_FlowURLFlowEnviarReciboCliente",
-  [FLOW_URLS.quickRead]: "new_FlowURLDespesaLeituraRapida",
-  [FLOW_URLS.cobrancaQr]: "new_FlowURLCobrancaQR",
-  [FLOW_URLS.cobrancaQrStatus]: "new_FlowURLCobrancaQRStatus"
+  [FLOW_URLS.quickRead]: "new_FlowURLDespesaLeituraRapida"
 };
 
 const GERAL_SELECT =
@@ -3636,24 +3632,40 @@ export async function readReceiptQuick(imagemBase64: string, categorias: string[
   }
 }
 
+// Sem motoristaId: o plugin usa o funcionário do usuário logado, então ninguém cobra em nome de outro.
 export type QrChargeRequest = {
   reservaId: string;
-  motoristaId: string;
   valorCentavos: number;
   pagante: QrChargePayer;
-  // O Flow converte para o locale do Stripe: pt-BR → pt-BR, en-US → en, es-ES → es.
+  // O plugin converte para o locale do Stripe: pt-BR → pt-BR, en-US → en, es-ES → es.
   idioma: ReceiptLanguage;
 };
 
-// Cria a cobrança no Stripe pelo Flow, sempre em reais; o Flow confere de novo o limite do valor a receber.
+// Custom API new_CobrancaQR: a chave do Stripe fica na configuração segura do step, fora do alcance do motorista.
+async function runQrChargeCommand(command: Record<string, unknown>) {
+  const response = await fetch(`${getClientUrl()}/api/data/v9.2/new_CobrancaQR`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ new_Command: JSON.stringify(command) })
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    let message = `Cobrança por QR indisponível (HTTP ${response.status}).`;
+    try { message = JSON.parse(text)?.error?.message || message; } catch { /* Resposta sem JSON. */ }
+    throw new Error(message);
+  }
+  return JSON.parse(String(JSON.parse(text)?.new_Result ?? "{}"));
+}
+
+// Cria a cobrança no Stripe, sempre em reais; o plugin confere de novo permissão, reserva e saldo.
 export async function createQrChargeRemote(request: QrChargeRequest) {
   if (shouldUseLocalFrontendFallback()) return createMockQrCharge(request.valorCentavos);
-  return parseQrChargeResponse(await runHttpFlow(FLOW_URLS.cobrancaQr, request));
+  return parseQrChargeResponse(await runQrChargeCommand({ acao: "criar", ...request, reservaId: cleanGuid(request.reservaId) }));
 }
 
 export async function updateQrChargeRemote(sessionId: string, acao: "consultar" | "cancelar") {
   if (shouldUseLocalFrontendFallback()) return updateMockQrCharge(sessionId, acao);
-  return parseQrChargeResponse(await runHttpFlow(FLOW_URLS.cobrancaQrStatus, { sessionId, acao }));
+  return parseQrChargeResponse(await runQrChargeCommand({ acao, sessionId }));
 }
 
 class HttpFlowError extends Error {
