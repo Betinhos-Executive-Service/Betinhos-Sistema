@@ -263,7 +263,7 @@ function MaintenanceFinalize({
   submitState: ActionButtonState;
 }) {
   const isSubmitting = submitState !== "idle";
-  const cameraScroll = useCameraScroll("finalizar");
+  const cameraScroll = useCameraScroll(`finalizar:${detail.id}`);
   const serviceDoneRef = useRef<HTMLTextAreaElement | null>(null);
   const valueRef = useRef<HTMLInputElement | null>(null);
   const paymentRef = useRef<HTMLButtonElement | null>(null);

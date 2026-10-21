@@ -17,6 +17,8 @@ type Props = {
   actions: SendOverlayAction[];
   /** Etapa atual para leitor de tela (ex.: "Enviando foto 2 de 5"); a descrição visível é fixa. */
   liveText?: string;
+  /** Leva o foco para dentro do diálogo ao abrir e ao voltar do erro para o envio (o gasto não usa). */
+  focusOnOpen?: boolean;
 };
 
 function StepRow({ label, status }: SendStep) {
@@ -33,16 +35,18 @@ function StepRow({ label, status }: SendStep) {
 
 // Carregamento bloqueante de envio em etapas (gasto, checklist): cobre o formulário,
 // mostra cada etapa real, a barra de progresso, o sucesso e o erro com as saídas possíveis.
-export function SendStepsOverlay({ status, phaseClass = status, titleId, title, description, progress, steps, actions, liveText }: Props) {
+export function SendStepsOverlay({ status, phaseClass = status, titleId, title, description, progress, steps, actions, liveText, focusOnOpen = false }: Props) {
   const firstActionRef = useRef<HTMLButtonElement | null>(null);
+  const cardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (status === "error") firstActionRef.current?.focus();
-  }, [status]);
+    else if (focusOnOpen && !cardRef.current?.contains(document.activeElement)) cardRef.current?.focus();
+  }, [status, focusOnOpen]);
 
   return (
     <div className="expense-send-overlay">
-      <div className={`expense-send-card is-${phaseClass}`} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-busy={status === "busy"}>
+      <div ref={cardRef} tabIndex={focusOnOpen ? -1 : undefined} className={`expense-send-card is-${phaseClass}`} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-busy={status === "busy"}>
         <div className="expense-send-hero" aria-hidden="true">
           {status === "done" ? <SystemIcon name="check" /> : status === "error" ? <SystemIcon name="warning" /> : <span className="expense-send-spinner is-large" />}
         </div>

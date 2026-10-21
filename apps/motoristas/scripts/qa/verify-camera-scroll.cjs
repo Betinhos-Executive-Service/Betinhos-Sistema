@@ -26,10 +26,12 @@ const FLOWS = [
   const page = await context.newPage();
   const issues = [];
   page.on("console", (message) => { if (message.type() === "error" && !(message.location().url || "").endsWith("/favicon.ico")) issues.push(message.text().slice(0, 160)); });
-  const photo = path.join(OUT, "foto-teste.jpg");
+  // Foto do tamanho de uma câmera de celular (FOTO=LxA, padrão 4000x3000): a redução leva tempo de verdade.
+  const [photoWidth, photoHeight] = (process.env.FOTO || "4000x3000").split("x").map(Number);
+  const photo = path.join(OUT, `foto-${photoWidth}x${photoHeight}.jpg`);
   if (!fs.existsSync(photo)) {
     await page.goto("about:blank");
-    const data = await page.evaluate(() => { const c = document.createElement("canvas"); c.width = 800; c.height = 600; const x = c.getContext("2d"); x.fillStyle = "#2159d2"; x.fillRect(0, 0, 800, 600); x.fillStyle = "#fff"; x.fillRect(120, 120, 300, 200); return c.toDataURL("image/jpeg", 0.8).split(",")[1]; });
+    const data = await page.evaluate(([w, h]) => { const c = document.createElement("canvas"); c.width = w; c.height = h; const x = c.getContext("2d"); for (let top = 0; top < h; top += 25) for (let left = 0; left < w; left += 25) { x.fillStyle = `hsl(${(left * 7 + top * 3) % 360} 60% ${35 + ((left + top) % 40)}%)`; x.fillRect(left, top, 25, 25); } return c.toDataURL("image/jpeg", 0.92).split(",")[1]; }, [photoWidth, photoHeight]);
     fs.writeFileSync(photo, Buffer.from(data, "base64"));
   }
   const scroller = () => page.evaluate(() => { const s = [...document.querySelectorAll(".finalize-scroll")].pop(); return s ? { top: Math.round(s.scrollTop), max: s.scrollHeight - s.clientHeight } : null; });

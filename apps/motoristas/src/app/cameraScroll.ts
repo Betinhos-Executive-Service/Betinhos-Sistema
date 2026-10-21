@@ -1,10 +1,10 @@
-import { useCallback, useRef } from "react";
+import { useMemo } from "react";
 
 // Ao abrir a câmera (ou a prévia da foto), o formulário sai da tela e o contêiner que rola é
 // desmontado. Este módulo guarda a rolagem antes de sair e a devolve quando o formulário volta,
 // levando o bloco da foto recém-tirada para a área visível sem mexer no resto.
 
-type ScrollSnapshot = { top: number; anchor: string; savedAt: number };
+export type ScrollSnapshot = { top: number; anchor: string; savedAt: number };
 
 export const SCROLL_SNAPSHOT_TTL_MS = 15 * 60_000;
 const SCROLL_ANCHOR_ATTR = "data-scroll-anchor";
@@ -63,11 +63,33 @@ export function isLayoutSettled(stableFrames: number, elapsedMs: number) {
   return stableFrames >= STABLE_FRAMES || elapsedMs >= RESTORE_TIMEOUT_MS;
 }
 
-const memory = createScrollMemory();
+const sharedMemory = createScrollMemory();
+type ScrollMemory = ReturnType<typeof createScrollMemory>;
 
-function scrollToAnchor(container: HTMLElement, anchor: string) {
+// Só o que a restauração usa do contêiner; nos testes entra um objeto falso.
+export type ScrollContainer = Pick<HTMLElement, "scrollTop" | "scrollHeight" | "clientHeight" | "getBoundingClientRect" | "addEventListener" | "removeEventListener"> & {
+  querySelectorAll(selector: string): ArrayLike<Pick<Element, "getAttribute" | "getBoundingClientRect">>;
+};
+
+export type FrameScheduler = {
+  now(): number;
+  frame(callback: () => void): number;
+  cancelFrame(id: number): void;
+  timer(callback: () => void, ms: number): number;
+  clearTimer(id: number): void;
+};
+
+const browserScheduler: FrameScheduler = {
+  now: () => performance.now(),
+  frame: (callback) => window.requestAnimationFrame(callback),
+  cancelFrame: (id) => window.cancelAnimationFrame(id),
+  timer: (callback, ms) => window.setTimeout(callback, ms),
+  clearTimer: (id) => window.clearTimeout(id)
+};
+
+function scrollToAnchor(container: ScrollContainer, anchor: string) {
   if (!anchor) return;
-  const target = [...container.querySelectorAll<HTMLElement>(`[${SCROLL_ANCHOR_ATTR}]`)]
+  const target = Array.from(container.querySelectorAll(`[${SCROLL_ANCHOR_ATTR}]`))
     .find((element) => element.getAttribute(SCROLL_ANCHOR_ATTR) === anchor);
   if (!target) return;
   const containerRect = container.getBoundingClientRect();
@@ -81,9 +103,10 @@ function scrollToAnchor(container: HTMLElement, anchor: string) {
   });
 }
 
-// Retorna o cancelamento; ele responde se a restauração ainda estava pendente.
-function restoreScroll(container: HTMLElement, snapshot: ScrollSnapshot) {
-  const started = performance.now();
+// Aplica a posição na hora e reaplica a cada quadro até a altura estabilizar; depois mostra a âncora.
+// Retorna o cancelamento, que responde se a restauração ainda estava pendente.
+export function restoreScroll(container: ScrollContainer, snapshot: ScrollSnapshot, scheduler: FrameScheduler = browserScheduler) {
+  const started = scheduler.now();
   let frame = 0;
   let timer = 0;
   let lastHeight = -1;
@@ -91,8 +114,8 @@ function restoreScroll(container: HTMLElement, snapshot: ScrollSnapshot) {
   let pending = true;
   const stop = () => {
     pending = false;
-    window.cancelAnimationFrame(frame);
-    window.clearTimeout(timer);
+    scheduler.cancelFrame(frame);
+    scheduler.clearTimer(timer);
     for (const type of USER_SCROLL_EVENTS) container.removeEventListener(type, stop);
   };
   // Se o motorista começar a rolar, a restauração para e não briga com o dedo dele.
@@ -103,26 +126,25 @@ function restoreScroll(container: HTMLElement, snapshot: ScrollSnapshot) {
     const run = () => {
       if (ran) return;
       ran = true;
-      window.cancelAnimationFrame(frame);
-      window.clearTimeout(timer);
+      scheduler.cancelFrame(frame);
+      scheduler.clearTimer(timer);
       tick();
     };
-    frame = window.requestAnimationFrame(run);
-    timer = window.setTimeout(run, 32);
+    frame = scheduler.frame(run);
+    timer = scheduler.timer(run, 32);
   };
   const tick = () => {
     container.scrollTop = snapshot.top;
     const height = container.scrollHeight;
     stableFrames = height === lastHeight ? stableFrames + 1 : 0;
     lastHeight = height;
-    if (isLayoutSettled(stableFrames, performance.now() - started)) {
+    if (isLayoutSettled(stableFrames, scheduler.now() - started)) {
       scrollToAnchor(container, snapshot.anchor);
       stop();
       return;
     }
     schedule();
   };
-  // A primeira aplicação é imediata: o conteúdo já montado costuma ter a altura final.
   container.scrollTop = snapshot.top;
   schedule();
   return () => {
@@ -132,29 +154,31 @@ function restoreScroll(container: HTMLElement, snapshot: ScrollSnapshot) {
   };
 }
 
+// Liga um formulário (chave) ao contêiner que rola. `attach` é o ref do contêiner.
+// Se o formulário sair da tela antes de a restauração terminar, a posição volta para a memória.
+export function createCameraScroll(key: string, memory: ScrollMemory = sharedMemory, restore: typeof restoreScroll = restoreScroll) {
+  let element: ScrollContainer | null = null;
+  let active: { cancel: () => boolean; snapshot: ScrollSnapshot } | null = null;
+  return {
+    attach(next: ScrollContainer | null) {
+      const previous = active;
+      active = null;
+      if (previous?.cancel()) memory.put(key, previous.snapshot);
+      element = next;
+      if (!next) return;
+      const snapshot = memory.take(key);
+      if (snapshot) active = { cancel: restore(next, snapshot), snapshot };
+    },
+    remember(anchor = "") {
+      if (element) memory.save(key, element.scrollTop, anchor);
+    }
+  };
+}
+
 // Uso: `const cameraScroll = useCameraScroll("gastos")`, `ref={cameraScroll.ref}` no contêiner que rola
 // (.finalize-scroll) e `cameraScroll.remember("fotos")` logo antes de abrir a câmera ou a prévia.
 // O bloco da foto recebe `data-scroll-anchor="fotos"`.
 export function useCameraScroll(key: string) {
-  const elementRef = useRef<HTMLElement | null>(null);
-  const restoreRef = useRef<{ cancel: () => boolean; snapshot: ScrollSnapshot } | null>(null);
-
-  const ref = useCallback((element: HTMLElement | null) => {
-    // O formulário pode aparecer por um instante entre a câmera e a prévia; se sair antes de
-    // terminar, a posição volta para a memória e vale na próxima montagem.
-    const previous = restoreRef.current;
-    restoreRef.current = null;
-    if (previous?.cancel()) memory.put(key, previous.snapshot);
-    elementRef.current = element;
-    if (!element) return;
-    const snapshot = memory.take(key);
-    if (snapshot) restoreRef.current = { cancel: restoreScroll(element, snapshot), snapshot };
-  }, [key]);
-
-  const remember = useCallback((anchor = "") => {
-    const element = elementRef.current;
-    if (element) memory.save(key, element.scrollTop, anchor);
-  }, [key]);
-
-  return { ref, remember };
+  const binding = useMemo(() => createCameraScroll(key), [key]);
+  return { ref: binding.attach, remember: binding.remember };
 }

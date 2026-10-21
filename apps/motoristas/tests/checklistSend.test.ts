@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CHECKLIST_SEND_ERROR_FALLBACK, describeChecklistSend } from "../src/lib/checklistSend.ts";
+import { CHECKLIST_SEND_ERROR_FALLBACK, describeChecklistSend, holdChecklistSend } from "../src/lib/checklistSend.ts";
 import { mockChecklistFailure } from "../src/lib/checklists.ts";
 
 test("envio do checklist mostra a foto atual de M e o registro pendente", () => {
@@ -50,4 +50,29 @@ test("falha simulada do checklist só aceita foto ou registro", () => {
   assert.equal(mockChecklistFailure("?x=1&mockChecklistFalha=registro"), "registro");
   assert.equal(mockChecklistFailure("?mockChecklistFalha=tudo"), "");
   assert.equal(mockChecklistFailure(""), "");
+});
+
+test("envio do mesmo checklist espera o anterior terminar (tela desmontada e montada de novo)", async () => {
+  const order: string[] = [];
+  const first = holdChecklistSend("c1");
+  assert.equal(await first.previous, false, "primeiro envio não espera ninguém");
+  const second = holdChecklistSend("c1");
+  const waited = second.previous.then((hadPrevious) => { order.push(`segundo começa (${hadPrevious})`); });
+  await Promise.resolve();
+  order.push("primeiro termina");
+  first.done();
+  await waited;
+  assert.deepEqual(order, ["primeiro termina", "segundo começa (true)"]);
+  second.done();
+  const third = holdChecklistSend("c1");
+  assert.equal(await third.previous, false, "depois de terminar, a fila fica vazia");
+  third.done();
+});
+
+test("envios de checklists diferentes não se bloqueiam", async () => {
+  const a = holdChecklistSend("a");
+  const b = holdChecklistSend("b");
+  assert.equal(await b.previous, false);
+  a.done();
+  b.done();
 });

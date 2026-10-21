@@ -48,3 +48,20 @@ export function describeChecklistSend(state: ChecklistSendState) {
     statusText
   };
 }
+
+// Um envio por checklist por vez, mesmo se a tela for desmontada e montada de novo no meio dele.
+const checklistSends = new Map<string, Promise<void>>();
+export function holdChecklistSend(checklistId: string) {
+  const previous = checklistSends.get(checklistId);
+  let finish = () => {};
+  const current = new Promise<void>((resolve) => { finish = resolve; });
+  checklistSends.set(checklistId, current);
+  return {
+    /** true quando havia outro envio deste checklist e ele já terminou. */
+    previous: previous ? previous.then(() => true) : Promise.resolve(false),
+    done() {
+      finish();
+      if (checklistSends.get(checklistId) === current) checklistSends.delete(checklistId);
+    }
+  };
+}

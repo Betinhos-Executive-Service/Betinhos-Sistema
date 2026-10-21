@@ -44,7 +44,7 @@ export function ReceiveScreen({
   submitState = "idle"
 }: ReceiveScreenProps) {
   const isSubmitting = submitState !== "idle";
-  const cameraScroll = useCameraScroll("receber");
+  const cameraScroll = useCameraScroll(`receber:${detail.id}`);
   const photosRef = useRef<HTMLDivElement | null>(null);
   const [photosError, setPhotosError] = useState("");
   // O motorista precisa ver quanto e como cobrar sem voltar ao detalhe.

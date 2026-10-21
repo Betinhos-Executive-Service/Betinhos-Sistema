@@ -53,9 +53,13 @@ fs.mkdirSync(OUT, { recursive: true });
   });
   await page.getByRole("button", { name: "Enviar checklist" }).click();
   await page.waitForTimeout(450);
+  const opened = await page.evaluate(() => {
+    const overlay = document.querySelector(".expense-send-overlay");
+    return { focoNoDialogo: Boolean(document.activeElement?.closest(".expense-send-card")), overlayNoBody: overlay?.parentElement === document.body, foraDoScreenMotion: !overlay?.closest(".screen-motion") };
+  });
   await page.screenshot({ path: path.join(OUT, `${LABEL}-${MODE}-1-enviando.png`) });
 
-  const log = [];
+  const log = [`ao abrir: ${JSON.stringify(opened)}`];
   if (MODE === "sucesso") {
     await page.waitForSelector(".expense-send-card.is-done", { timeout: 15000 }).then(() => page.screenshot({ path: path.join(OUT, `${LABEL}-${MODE}-2-sucesso.png`) })).catch(() => log.push("sem estado de sucesso"));
     await page.waitForTimeout(2500);
@@ -81,6 +85,7 @@ fs.mkdirSync(OUT, { recursive: true });
         await page.waitForTimeout(400);
         const state = await page.evaluate(() => ({ overlay: !!document.querySelector(".expense-send-card"), thumbs: document.querySelectorAll(".checklist-form .collision-evidence-thumb img").length, editable: !document.querySelector(".checklist-form textarea")?.disabled }));
         log.push(`Voltar e revisar: ${JSON.stringify(state)}`);
+        log.push(`foco depois de Voltar e revisar: ${await page.evaluate(() => document.activeElement?.textContent?.trim())}`);
         await page.screenshot({ path: path.join(OUT, `${LABEL}-${MODE}-3-revisar.png`) });
         if (MODE === "registro") break;
         await page.getByRole("button", { name: "Enviar checklist" }).click();

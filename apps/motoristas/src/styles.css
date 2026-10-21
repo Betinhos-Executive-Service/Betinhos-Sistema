@@ -12956,6 +12956,11 @@ select,
   animation: expense-send-enter 220ms cubic-bezier(.23, 1, .32, 1) both;
 }
 
+/* O cartão recebe foco ao abrir (checklist) só para o leitor de tela entrar no diálogo; não é controle. */
+.expense-send-card:focus {
+  outline: none;
+}
+
 .expense-send-hero {
   display: grid;
   place-items: center;
