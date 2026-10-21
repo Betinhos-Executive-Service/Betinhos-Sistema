@@ -1,6 +1,6 @@
 # Cobrança por QR code (Stripe Checkout)
 
-Status em 21/10/2026: o app está implementado e testado em modo mock; o plugin `QrChargePlugin` (Custom API `new_CobrancaQR`) e o provisionamento estão prontos e testados localmente, mas ainda não foram publicados no DEV (ver "Ordem de implantação"). O schema já existe no DEV. A conta Stripe está em ativação, então por enquanto tudo roda em modo teste.
+Status em 21/10/2026: o app está implementado e testado em modo mock (inclui a ação `resumo` e o formulário passo a passo); o plugin `QrChargePlugin` (Custom API `new_CobrancaQR`) e o provisionamento estão prontos e testados localmente, mas ainda não foram publicados no DEV (ver "Ordem de implantação"). O schema já existe no DEV. A conta Stripe está em ativação, então por enquanto tudo roda em modo teste.
 
 ## Objetivo
 
@@ -55,19 +55,27 @@ App (celular do motorista)            Dataverse (plugin; chave na config. segura
   - Modo mock em localhost: a cobrança vira paga 5 s depois. Com `?mockRecusa=1`, o mock simula um cartão recusado antes.
   - O cadastro do motorista passa a ler `cr40f_podecobrarqrcode`. Se a coluna ainda não existir no ambiente, o login continua funcionando e a cobrança fica desligada.
 - **`ReceiveScreen`:**
-  - Botão "Cobrar por QR code" só para motorista liberado e serviço com valor a receber.
-  - Depois do pagamento, mostra "Pago por QR code".
-  - Pago no valor total, o comprovante vira opcional e o FINALIZAR segue sem foto. Pago em parte, a foto do restante continua obrigatória.
-- **`QrChargeScreen`:**
-  - O valor vem preenchido; um valor acima do limite é bloqueado com mensagem.
-  - O QR é desenhado no app (`qrcode-generator`), sem mandar o link a nenhum serviço externo.
-  - Mostra a contagem de 30 min e tem o botão "Cancelar cobrança"; expirado ou cancelado, oferece "Gerar outro QR code".
+  - Botão "Cobrar por QR code" para motorista liberado com saldo a receber; vira "Retomar cobrança" quando há cobrança aberta. Enquanto o resumo carrega, o botão mostra "Conferindo cobranças" e o resto da tela continua usável.
+  - Pago no valor total: "Pago por QR code: R$ X. O comprovante é opcional." e o FINALIZAR segue sem foto.
+  - Pago em parte: "Pago por QR: R$ X. Envie o comprovante do restante (R$ Y)."; a foto continua obrigatória e um QR novo fica limitado ao saldo.
+  - Falha do resumo: aviso discreto "Não deu para conferir as cobranças por QR deste serviço agora." e o fluxo segue como antes (foto obrigatória).
+- **Reidratação (correção do OS-1939 no DEV, 21/10/2026):** o pago não vive mais só na memória. Ao abrir o Recebimento (tela `receber` e as variantes em `finalizar`/`voucher`) de um serviço com valor a receber, o app chama a ação `resumo` uma vez por serviço (cache por `detail.id`, revalidado ao voltar da tela de QR), só para motorista liberado ou que já cobrou nesta sessão. `getQrChargeReceiveState` junta o resumo com o pago da sessão: pago ≥ valor a receber dispensa a foto; parcial pede o restante; `aberta` vira "Retomar cobrança".
+- **`QrChargeScreen` — formulário passo a passo (um campo por tela, "Passo N de 5" com barra e região `aria-live`, foco automático, Enter avança, "Voltar" em cada passo sem perder o preenchido):**
+  1. Valor: pré-preenchido com o saldo; pode diminuir; mínimo R$ 0,50; "Confirmar".
+  2. Quem vai pagar: passageiros e solicitante como opções grandes (tocar já avança) e "Outra pessoa", que abre o campo de nome; sem opções, o passo já mostra o campo.
+  3. E-mail para o recibo: teclado de e-mail, validação, "Pular" ao lado de "Continuar".
+  4. Idioma do passageiro: Português / English / Español, pré-selecionado pela bandeira do pagante; explica que a tela do QR e a página de pagamento aparecem nesse idioma.
+  5. Revisão: valor, pagante, e-mail (ou "Sem e-mail") e idioma; cada item volta ao passo dele e, ao confirmar, volta direto à revisão. "Gerar QR code".
+  - Regras puras em `src/lib/qrCharge.ts` (`validateQrChargeStep`, `getFirstInvalidQrChargeStep`, `getQrChargeStepProgress`), testadas em `tests/qrChargeSummary.test.ts`.
+  - O QR é desenhado no app (`qrcode-generator`), sem mandar o link a nenhum serviço externo. Contagem de 30 min, "Cancelar cobrança"; expirado ou cancelado, "Gerar outro QR code" volta à revisão com os dados.
 - **Confirmação em tempo real:**
   - Enquanto o pagamento não entra, uma faixa amarela diz "Aguardando pagamento."
   - Cartão recusado mostra o motivo e avisa que o mesmo QR continua valendo.
-  - Quando o Stripe confirma, a tela vira o painel verde "Pagamento confirmado" e o celular vibra.
+  - Quando o Stripe confirma: check grande com animação curta (sem animação com `prefers-reduced-motion`), "Pagamento confirmado", valor em destaque, quem pagou, horário (dd/mm/aaaa HH:mm, America/Sao_Paulo) e "Enviado para <e-mail>" quando houver. O celular vibra. Não avança sozinho: o motorista toca "Continuar".
+  - "Continuar" com pagamento no valor total vai direto para a próxima etapa do serviço (mesma rota do FINALIZAR do Recebimento: voucher para clientes de voucher, senão finalizar; respeita a fila). Pago em parte, volta ao Recebimento pedindo a foto do restante (`getScreenAfterQrPayment`).
   - A confirmação só vem do plugin lendo `payment_status=paid` no Stripe; nada do lado do passageiro marca como pago.
-- **Navegação:** a rota é `#cobranca-qr`. Se a página recarregar, volta ao Recebimento, porque a sessão do QR fica só na memória.
+- **Navegação:** a rota é `#cobranca-qr`. Se a página recarregar, volta ao Recebimento; o resumo devolve o pago e a cobrança aberta.
+- **Mock (localhost):** `src/lib/qrChargeMock.ts` guarda as cobranças no `sessionStorage` (recarregar mantém), paga 5 s depois de gerar (`?mockPagaEm=<s>` muda) e responde o `resumo` com o mesmo contrato.
 
 ## Contrato da Custom API `new_CobrancaQR`
 
@@ -96,6 +104,7 @@ Entrada `new_Command` (texto JSON com `acao`), saída `new_Result` (texto JSON).
 3. **Sessão já aberta:** cobrança `aguardando`, não vencida, do mesmo motorista e com o mesmo valor é consultada no Stripe e devolvida (se já estiver paga, também). Dois toques não criam duas cobranças.
 4. **Um QR aberto por reserva:** as outras cobranças `aguardando` não vencidas da reserva são expiradas no Stripe e viram `cancelado`; se ao expirar o Stripe disser que já foi paga, grava `pago`. Sem isso, um QR de R$ 500 aberto mais um novo de R$ 300 somariam R$ 800 pagáveis.
    - **Saldo:** `cr40f_valor_a_receber` menos as cobranças `pago` e as em processamento (pagamento assíncrono). Valor `<= 0`, abaixo de R$ 0,50 (mínimo do Stripe em BRL) ou acima do saldo é recusado.
+   - Já pago no total (inclusive descoberto ao expirar a aberta): "Este serviço já foi pago por QR code." Serviço sem valor a receber continua com "Este serviço não tem valor a receber por QR code.".
 5. **Criar a sessão:** `POST https://api.stripe.com/v1/checkout/sessions`, form-urlencoded, `Authorization: Bearer <chave>` e `Idempotency-Key: reserva-<id>-<n>-<valor>-<expira>` (n = tentativa da reserva).
    - `mode=payment`; `expires_at` = minuto atual + 32 min (30 min do mínimo do Stripe + folga de relógio e latência; arredondar ao minuto deixa o toque duplo idêntico para a idempotência); `locale`: `pt-BR` → `pt-BR`, `en-US` → `en`, `es-ES` → `es`.
    - `line_items[0][price_data][currency]=brl`, `[unit_amount]=<valorCentavos>`, `[product_data][name]=Serviço <cr40f_id>` e `line_items[0][quantity]=1`.
@@ -104,6 +113,14 @@ Entrada `new_Command` (texto JSON com `acao`), saída `new_Result` (texto JSON).
    - `customer_email=<pagante.email>` só quando vier preenchido.
    - **Não** envia `payment_method_types`: o Stripe recusa esse parâmetro. Os meios vêm do painel: Cards, Apple Pay e Google Pay ligados; Pix e Boleto desligados.
 6. **Registrar:** cria a linha em `cr40f_cobrancastripe` com status `aguardando` e responde no contrato. Se a linha da mesma sessão já existir (toque duplo concorrente devolve a mesma sessão pela idempotência), devolve a existente sem gravar outra; consultas toleram linha duplicada e usam a mais antiga.
+
+**`resumo`** — `{ acao: "resumo", reservaId }`. Só o motorista dono da reserva (mesma conferência do `criar`), mas **sem** exigir `cr40f_podecobrarqrcode`: quem perdeu a permissão depois de cobrar não pode voltar a ter de mandar foto.
+- Resposta: `{ recebivelCentavos, pagoCentavos, saldoCentavos, ultimaPaga, aberta }`.
+  - `pagoCentavos`: soma das cobranças `pago` da reserva.
+  - `saldoCentavos`: valor a receber menos o pago e o que está em processamento (pagamento assíncrono); nunca negativo.
+  - `ultimaPaga`: contrato da última paga (`url` vazio) com `pagoEm` e `paganteNome`, ou `null`.
+  - `aberta`: contrato da cobrança `aguardando` não vencida **do motorista que chama**, com `paganteNome`, `paganteEmail` e `idioma`, ou `null`.
+- As cobranças `aguardando` não vencidas são reconsultadas no Stripe, como no reaproveitamento do `criar`; se o Stripe disser que pagou, grava `pago` e conta no total. Stripe fora do ar não derruba o resumo: o pago já gravado continua valendo e só não oferece retomar.
 
 **`consultar`** — `{ acao: "consultar", sessionId }`. Só o motorista dono da cobrança. O app chama a cada 3 s; a meta é menos de 2 s.
 - `GET /v1/checkout/sessions/{id}?expand[]=payment_intent.latest_charge.balance_transaction`.
@@ -150,14 +167,19 @@ Entrada `new_Command` (texto JSON com `acao`), saída `new_Result` (texto JSON).
 | Serviço sem valor a receber | Sem botão | OK no mock |
 | Valor acima do valor a receber | Bloqueio com "O valor não pode passar de R$ …" | OK no mock e nos testes |
 | QR gerado | Faixa "Aguardando pagamento", painel do passageiro no idioma escolhido (título, valor em R$, QR, instrução) e contagem de 30 min | OK no mock |
-| Quem vai pagar | Lista com passageiros (idioma pela bandeira) e solicitante + "Outra pessoa"; o cliente (empresa) não entra | OK no mock e nos testes |
+| Quem vai pagar | Opções grandes com passageiros (idioma pela bandeira) e solicitante + "Outra pessoa"; o cliente (empresa) não entra | OK no mock e nos testes |
+| Passo a passo | "Passo N de 5", foco no campo, Enter avança, Voltar preserva os dados, "Pular" no e-mail, revisão com "Alterar" por item | OK no mock (`scripts/qa/verify-qr-charge.cjs`) e nos testes |
 | E-mail inválido | "Confira o e-mail." e foco no campo | OK no mock e nos testes |
 | Cartão recusado | Motivo na tela e QR continua valendo | OK no mock (`?mockRecusa=1`) |
-| Pagamento confirmado | Painel verde "Pagamento confirmado" e vibração | OK no mock (vibração só em aparelho) |
-| Pago no total | FINALIZAR segue sem foto | OK no mock |
-| Pago em parte | "Envie o comprovante do restante" e foto obrigatória | OK no mock |
+| Pagamento confirmado | Check animado, valor, pagante, horário, "Enviado para <e-mail>" e vibração; não avança sozinho | OK no mock (vibração só em aparelho) |
+| Pago no total | "Continuar" vai direto para `#finalizar` (ou voucher) | OK no mock |
+| Pago em parte | "Continuar" volta ao Recebimento: "Envie o comprovante do restante (R$ Y)", foto obrigatória e QR novo limitado ao saldo | OK no mock |
+| Recarregar depois de pago | Recebimento reconhece o pago pelo `resumo` e não pede foto | OK no mock; pendente no DEV (OS-1939) |
+| Cobrança aberta ao voltar | "Retomar cobrança" abre o mesmo QR e o polling continua | OK no mock (`?mockPagaEm=9`) |
+| QR novo em serviço já pago | "Este serviço já foi pago por QR code." | OK nos testes do plugin; pendente no DEV |
 | Cancelar cobrança | "Cobrança cancelada" e o QR não aceita mais pagamento | OK no mock |
 | Recarregar a página no QR | Volta ao Recebimento | OK no mock |
+| Resumo indisponível | Aviso discreto e fluxo normal com foto | OK nos testes (lógica); não forçado no mock |
 | Motorista sem permissão chamando a Custom API direto | `erro` do plugin | OK nos testes do plugin; pendente no DEV |
 | Cartão de teste `4242 4242 4242 4242` | "Pago" em até ~5 s e tarifa gravada | Pendente (DEV) |
 | 3DS `4000 0025 0000 3155` | Pago depois da autenticação | Pendente (DEV) |
@@ -169,4 +191,4 @@ Entrada `new_Command` (texto JSON com `acao`), saída `new_Result` (texto JSON).
 - Reembolso pelo app.
 - Pix e outras moedas.
 - Conciliação contábil automática.
-- Segunda cobrança por QR na mesma reserva depois de um pagamento parcial; o restante segue por foto.
+- Mais de um QR aberto ao mesmo tempo na mesma reserva (o plugin expira o anterior). Depois de um pagamento parcial, o app permite outro QR limitado ao saldo, mas a foto do restante continua obrigatória até o total ser pago.

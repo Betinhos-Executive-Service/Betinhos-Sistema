@@ -5,9 +5,24 @@ import { PhotoAddButton } from "../components/common/PhotoAddButton";
 import { AppShell } from "../components/layout/AppShell";
 import { useCameraScroll } from "../app/cameraScroll";
 import { FormMenu } from "../components/navigation/FormMenu";
+import { SystemIcon } from "../components/icons/SystemIcon";
 import type { DetailData } from "../types";
 import type { ExpensePhoto } from "../lib/expenses";
-import { formatQrChargeAmount, type QrCharge } from "../lib/qrCharge";
+import { formatQrChargeAmount } from "../lib/qrCharge";
+
+// Estado da cobrança por QR no Recebimento, reidratado pelo resumo do plugin.
+export type ReceiveQrCharge = {
+  paidCents: number;
+  // O que falta receber depois do QR (o próximo QR fica limitado a isto).
+  balanceCents: number;
+  // Resumo carregando: a tela segue usável, só o botão do QR espera.
+  loading: boolean;
+  failed: boolean;
+  // Há uma cobrança aberta: o botão vira "Retomar cobrança".
+  resumable: boolean;
+  // Presente só para motorista liberado com saldo, ou com cobrança aberta para retomar.
+  onOpen?: () => void;
+};
 
 type ReceiveScreenProps = {
   detail: DetailData;
@@ -19,9 +34,7 @@ type ReceiveScreenProps = {
   onGeneratePersonalReceipt?: () => void;
   canGeneratePersonalReceipt?: boolean;
   submitState?: ActionButtonState;
-  // Presente só para motorista liberado no cadastro e serviço com valor a receber.
-  onOpenQrCharge?: () => void;
-  qrChargePaid?: QrCharge;
+  qrCharge?: ReceiveQrCharge;
   // QR pago no valor total: a foto do comprovante vira opcional.
   proofWaived?: boolean;
 };
@@ -48,8 +61,7 @@ export function ReceiveScreen({
   onGeneratePersonalReceipt,
   canGeneratePersonalReceipt = false,
   submitState = "idle",
-  onOpenQrCharge,
-  qrChargePaid,
+  qrCharge,
   proofWaived = false
 }: ReceiveScreenProps) {
   const isSubmitting = submitState !== "idle";
@@ -98,13 +110,31 @@ export function ReceiveScreen({
                 </div>
               ) : null}
 
-              {qrChargePaid ? (
-                <p className="qr-charge-alert is-success" role="status">
-                  Pago por QR code: {formatQrChargeAmount(qrChargePaid.valorCentavos)}.{" "}
-                  {proofWaived ? "O comprovante é opcional." : "Envie o comprovante do restante."}
+              {qrCharge?.paidCents ? (
+                <p className="qr-charge-alert qr-charge-alert-icon is-success" role="status">
+                  <SystemIcon name="check" />
+                  <span>
+                    {proofWaived
+                      ? `Pago por QR code: ${formatQrChargeAmount(qrCharge.paidCents)}. O comprovante é opcional.`
+                      : `Pago por QR: ${formatQrChargeAmount(qrCharge.paidCents)}. Envie o comprovante do restante (${formatQrChargeAmount(qrCharge.balanceCents)}).`}
+                  </span>
                 </p>
-              ) : onOpenQrCharge ? (
-                <ActionButton className="finalize-secondary receive-qr-charge" label="Cobrar por QR code" disabled={isSubmitting} onClick={onOpenQrCharge} />
+              ) : null}
+              {qrCharge?.onOpen && !proofWaived ? (
+                <ActionButton
+                  className="finalize-secondary receive-qr-charge"
+                  label={qrCharge.resumable ? "Retomar cobrança" : "Cobrar por QR code"}
+                  loadingLabel="Conferindo cobranças"
+                  state={qrCharge.loading ? "loading" : "idle"}
+                  disabled={isSubmitting}
+                  onClick={qrCharge.onOpen}
+                />
+              ) : null}
+              {qrCharge?.failed ? (
+                <p className="qr-charge-note" role="status">
+                  <SystemIcon name="warning" />
+                  <span>Não deu para conferir as cobranças por QR deste serviço agora.</span>
+                </p>
               ) : null}
 
               <div ref={photosRef} className={`finalize-input-block ${photosError ? "is-invalid" : ""}`} tabIndex={-1} data-scroll-anchor="comprovantes">

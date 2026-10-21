@@ -15,6 +15,7 @@ import {
 import { useHardwareBackGuard } from "./app/backGuard";
 import { BuildStamp } from "./components/layout/BuildStamp";
 import {
+  getScreenAfterQrPayment,
   getServiceTaskBackScreen,
   hasUploadedReceiveProofs,
   isReceiveStepPending,
@@ -71,8 +72,8 @@ import {
   type MaintenanceRequestVehicleOption
 } from "./lib/dataverse";
 import { readReceiptQuick } from "./lib/dataverse";
-import { createQrChargeRemote, updateQrChargeRemote } from "./lib/dataverse";
-import { getReceivableCents, qrChargeCoversReceivable, type QrCharge } from "./lib/qrCharge";
+import { createQrChargeRemote, getQrChargeSummaryRemote, updateQrChargeRemote } from "./lib/dataverse";
+import { getQrChargeReceiveState, getReceivableCents, type QrChargeSummary } from "./lib/qrCharge";
 import { QrChargeScreen } from "./screens/QrChargeScreen";
 import {
   INITIAL_QUICK_READ,
@@ -671,8 +672,13 @@ function App() {
   const [expensePhotoIsVideo, setExpensePhotoIsVideo] = useState(false);
   const [expensePreviewPhotoId, setExpensePreviewPhotoId] = useState("");
   const [receiveProofs, setReceiveProofs] = useState<Record<string, ExpensePhoto[]>>(() => loadFinalizeDraftAssets().receiveProofs);
-  // Cobrança paga por QR em cada serviço; o registro definitivo fica no Dataverse (cr40f_cobrancastripe).
-  const [qrChargesPaid, setQrChargesPaid] = useState<Record<string, QrCharge>>({});
+  // Cobranças pagas por QR nesta sessão (serviço → sessão do Stripe → centavos). O registro definitivo fica no
+  // Dataverse (cr40f_cobrancastripe) e volta pelo resumo do plugin, que sobrevive a recarregar a página.
+  const [qrChargesPaid, setQrChargesPaid] = useState<Record<string, Record<string, number>>>({});
+  const [qrChargeSummaries, setQrChargeSummaries] = useState<
+    Record<string, { status: "loading" | "ready" | "error"; summary?: QrChargeSummary; stale?: boolean }>
+  >({});
+  const qrChargeSummaryInFlightRef = useRef(new Set<string>());
   const [receiveUploadedCounts, setReceiveUploadedCounts] = useState<Record<string, number>>({});
   const [receivePhotoDraft, setReceivePhotoDraft] = useState("");
   const [receivePhotoPreviewUrl, setReceivePhotoPreviewUrl] = useState("");
@@ -1255,16 +1261,61 @@ function App() {
     isTrueLike(driverContext?.funcionario?.cr40f_gerarrecibopersonalizado) ||
     isLocalhostRuntime;
   const canChargeByQr = isTrueLike(driverContext?.funcionario?.cr40f_podecobrarqrcode) || isLocalhostRuntime;
-  const getQrChargeOpener = (detail: DetailData) =>
-    canChargeByQr && getReceivableCents(detail) > 0 ? () => setScreen("cobrancaQr") : undefined;
-  const qrChargeCovers = (detail: DetailData) => qrChargeCoversReceivable(qrChargesPaid[detail.id], detail);
+  const sumQrChargesPaid = (paid: Record<string, number> | undefined) => Object.values(paid ?? {}).reduce((total, cents) => total + cents, 0);
+  const qrChargeState = (detail: DetailData, localPaid = qrChargesPaid[detail.id]) =>
+    getQrChargeReceiveState(getReceivableCents(detail), qrChargeSummaries[detail.id]?.summary, sumQrChargesPaid(localPaid));
+  const qrChargeCovers = (detail: DetailData) => qrChargeState(detail).covers;
+  // Resumo só para quem pode cobrar ou já cobrou nesta sessão: os demais nem chamam a Custom API.
+  const shouldLoadQrChargeSummary = (detail: DetailData) =>
+    detail.type === "SERVICO" && getReceivableCents(detail) > 0 && (canChargeByQr || sumQrChargesPaid(qrChargesPaid[detail.id]) > 0);
   const receiveStepPending = (detail: DetailData) =>
     isReceiveStepPending(detail, { receiveProofs, receiveUploadedCounts, remoteMode, proofWaived: qrChargeCovers(detail) });
-  const getQrChargeProps = (detail: DetailData) => ({
-    onOpenQrCharge: getQrChargeOpener(detail),
-    qrChargePaid: qrChargesPaid[detail.id],
-    proofWaived: qrChargeCovers(detail)
-  });
+  const getQrChargeProps = (detail: DetailData) => {
+    const entry = qrChargeSummaries[detail.id];
+    const state = qrChargeState(detail);
+    const canOpen = state.receivableCents > 0 && ((canChargeByQr && state.balanceCents > 0) || Boolean(state.open));
+    return {
+      qrCharge: {
+        paidCents: state.paidCents,
+        balanceCents: state.balanceCents,
+        // Só a primeira carga segura o botão; a revalidação usa o resumo anterior.
+        loading: entry?.status === "loading" && !entry.summary,
+        failed: entry?.status === "error",
+        resumable: Boolean(state.open),
+        onOpen: canOpen ? () => setScreen("cobrancaQr") : undefined
+      },
+      proofWaived: state.covers
+    };
+  };
+  const invalidateQrChargeSummary = (detailId: string) =>
+    setQrChargeSummaries((current) => (current[detailId] ? { ...current, [detailId]: { ...current[detailId], stale: true } } : current));
+
+  // Recebimento aberto (tela própria ou dentro de finalizar/voucher): consulta o resumo uma vez por serviço.
+  const receiveScreenDetail =
+    selectedDetail && (screen === "receber" || ((screen === "finalizar" || screen === "voucher") && receiveStepPending(selectedDetail)))
+      ? selectedDetail
+      : null;
+  const qrChargeSummaryRequest = receiveScreenDetail && shouldLoadQrChargeSummary(receiveScreenDetail) ? receiveScreenDetail : null;
+  const qrChargeSummaryEntry = qrChargeSummaryRequest ? qrChargeSummaries[qrChargeSummaryRequest.id] : undefined;
+  const qrChargeSummaryNeeded = Boolean(qrChargeSummaryRequest && (!qrChargeSummaryEntry || qrChargeSummaryEntry.stale));
+  useEffect(() => {
+    const detail = qrChargeSummaryRequest;
+    if (!detail || !qrChargeSummaryNeeded) return;
+    const detailId = detail.id;
+    const inFlight = qrChargeSummaryInFlightRef.current;
+    if (inFlight.has(detailId)) return;
+    inFlight.add(detailId);
+    setQrChargeSummaries((current) => ({ ...current, [detailId]: { ...current[detailId], status: "loading", stale: false } }));
+    getQrChargeSummaryRemote(detail.dataverse?.id ?? detail.id, getReceivableCents(detail))
+      .then((summary) => setQrChargeSummaries((current) => ({ ...current, [detailId]: { status: "ready", summary } })))
+      .catch((error) => {
+        // Sem resumo o fluxo segue como antes (foto obrigatória); a tela mostra um aviso discreto.
+        logAppError(error, "qrChargeSummary", detail.type);
+        setQrChargeSummaries((current) => ({ ...current, [detailId]: { ...current[detailId], status: "error" } }));
+      })
+      .finally(() => inFlight.delete(detailId));
+    // A requisição depende só do serviço e de precisar (re)carregar.
+  }, [qrChargeSummaryRequest?.id, qrChargeSummaryNeeded]);
 
   useEffect(() => {
     previousScreenRef.current = screen;
@@ -3399,15 +3450,27 @@ function App() {
   }
 
   if (screen === "cobrancaQr" && selectedDetail) {
+    const qrState = qrChargeState(selectedDetail);
     return show(
       <QrChargeScreen
         key={selectedDetail.id}
         detail={selectedDetail}
-        maxCents={getReceivableCents(selectedDetail)}
-        onBack={() => setScreen("receber")}
-        onPaid={(charge) => {
-          setQrChargesPaid((current) => ({ ...current, [selectedDetail.id]: charge }));
+        maxCents={qrState.balanceCents}
+        resume={qrState.open}
+        onBack={() => {
+          invalidateQrChargeSummary(selectedDetail.id);
           setScreen("receber");
+        }}
+        onPaid={(charge) =>
+          setQrChargesPaid((current) => ({ ...current, [selectedDetail.id]: { ...current[selectedDetail.id], [charge.sessionId]: charge.valorCentavos } }))
+        }
+        onContinue={(charge) => {
+          // O estado do onPaid pode não ter chegado neste clique: soma a cobrança confirmada aqui.
+          const covers = qrChargeState(selectedDetail, { ...qrChargesPaid[selectedDetail.id], [charge.sessionId]: charge.valorCentavos }).covers;
+          invalidateQrChargeSummary(selectedDetail.id);
+          // Pago no total: segue para a próxima etapa do serviço sem passar de novo pelo comprovante.
+          if (covers && blockIfNotFirstPending(selectedDetail)) return;
+          setScreen(getScreenAfterQrPayment(selectedDetail, covers));
         }}
         createCharge={(valorCentavos, pagante, idioma) =>
           createQrChargeRemote({ reservaId: selectedDetail.dataverse?.id ?? selectedDetail.id, valorCentavos, pagante, idioma })

@@ -13330,9 +13330,289 @@ select,
 
 .qr-charge-actions { justify-content: flex-end; }
 
+/* Formulário passo a passo da cobrança por QR. */
+.qr-charge-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.qr-charge-progress-label {
+  margin: 0;
+  color: #64748b;
+  font: 700 13px/1.3 "Manrope", Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.qr-charge-progress-bar {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+
+.qr-charge-progress-bar li {
+  height: 4px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  transition: background-color 160ms cubic-bezier(.23, 1, .32, 1);
+}
+
+.qr-charge-progress-bar li.is-done { background: #2159d2; }
+
+.qr-charge-step-title {
+  margin: 4px 0 0;
+  color: #0f172a;
+  font: 800 20px/1.25 "Manrope", Arial, sans-serif;
+}
+
+.qr-charge-step-title:focus { outline: none; }
+
+.qr-charge-step-hint {
+  margin: 0;
+  color: #475569;
+  font: 600 14px/1.45 "Manrope", Arial, sans-serif;
+}
+
+.qr-charge-form .money-input-field input { font-size: 1.4rem; font-weight: 800; }
+
+.qr-charge-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.qr-charge-choice,
+.qr-charge-review-row {
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fcfcfb;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  font-family: "Manrope", Arial, sans-serif;
+  cursor: pointer;
+  transition: transform 140ms cubic-bezier(.23, 1, .32, 1), border-color 140ms ease, background-color 140ms ease;
+}
+
+.qr-charge-choice:active,
+.qr-charge-review-row:active { transform: scale(.97); }
+
+.qr-charge-choice:focus-visible,
+.qr-charge-review-row:focus-visible {
+  outline: none;
+  border-color: #6c91e8;
+  box-shadow: 0 0 0 3px rgba(33, 89, 210, .11);
+}
+
+.qr-charge-choice[aria-pressed="true"] {
+  border-color: #2159d2;
+  background: #edf3ff;
+}
+
+.qr-charge-choice:disabled,
+.qr-charge-review-row:disabled { cursor: default; opacity: .6; }
+
+.qr-charge-choice-text,
+.qr-charge-review-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.qr-charge-choice-text strong,
+.qr-charge-review-text strong {
+  font: 800 16px/1.3 "Manrope", Arial, sans-serif;
+  overflow-wrap: anywhere;
+}
+
+.qr-charge-choice-text span,
+.qr-charge-review-text span {
+  color: #64748b;
+  font: 600 13px/1.3 "Manrope", Arial, sans-serif;
+}
+
+.qr-charge-choice-mark {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+}
+
+.qr-charge-choice[aria-pressed="true"] .qr-charge-choice-mark {
+  border-color: #2159d2;
+  background: #2159d2;
+}
+
+.qr-charge-choice-mark svg { width: 14px; height: 14px; }
+
+.qr-charge-review {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.qr-charge-review-edit {
+  flex: 0 0 auto;
+  color: #2159d2;
+  font: 800 14px/1 "Manrope", Arial, sans-serif;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .qr-charge-choice:hover:not(:disabled),
+  .qr-charge-review-row:hover:not(:disabled) { border-color: #c7d2e2; }
+}
+
+.qr-charge-actions.has-three { gap: 7px; }
+
+/* Confirmação do pagamento. */
+.qr-charge-confirmed {
+  width: 100%;
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  color: #0f172a;
+}
+
+.qr-charge-confirmed-mark {
+  width: 88px;
+  height: 88px;
+  margin-bottom: 4px;
+  border-radius: 50%;
+  background: #eaf8f1;
+  display: grid;
+  place-items: center;
+  animation: qr-charge-confirmed-pop 260ms cubic-bezier(.23, 1, .32, 1) both;
+}
+
+.qr-charge-confirmed-mark svg {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #147a4b;
+}
+
+.qr-charge-confirmed-mark path {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 36;
+  stroke-dashoffset: 0;
+  animation: qr-charge-confirmed-draw 300ms cubic-bezier(.23, 1, .32, 1) 140ms both;
+}
+
+@keyframes qr-charge-confirmed-pop {
+  from { opacity: 0; transform: scale(.95); }
+}
+
+@keyframes qr-charge-confirmed-draw {
+  from { stroke-dashoffset: 36; }
+}
+
+.qr-charge-confirmed h2 {
+  margin: 0;
+  color: #147a4b;
+  font: 800 22px/1.2 "Manrope", Arial, sans-serif;
+}
+
+.qr-charge-confirmed-amount {
+  color: #0f172a;
+  font: 800 2rem/1.1 "Manrope", Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.qr-charge-confirmed-details {
+  width: 100%;
+  margin: 12px 0 0;
+  padding: 4px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  text-align: left;
+}
+
+.qr-charge-confirmed-details div {
+  padding: 12px 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.qr-charge-confirmed-details div + div { border-top: 1px solid #e2e8f0; }
+
+.qr-charge-confirmed-details dt {
+  flex: 0 0 auto;
+  color: #64748b;
+  font: 600 14px/1.35 "Manrope", Arial, sans-serif;
+}
+
+.qr-charge-confirmed-details dd {
+  min-width: 0;
+  margin: 0;
+  color: #0f172a;
+  font: 700 14px/1.35 "Manrope", Arial, sans-serif;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+/* Status no Recebimento: texto + ícone. */
+.qr-charge-alert-icon {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.qr-charge-alert-icon svg,
+.qr-charge-note svg {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+}
+
+.qr-charge-alert-icon.is-success svg { color: #147a4b; }
+
+.qr-charge-note {
+  margin: 0;
+  color: #64748b;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font: 600 13px/1.4 "Manrope", Arial, sans-serif;
+}
+
+.qr-charge-note svg { flex-basis: 16px; width: 16px; height: 16px; color: #856000; }
+
 @media (prefers-reduced-motion: reduce) {
   .qr-charge-paid,
-  .qr-charge-waiting-dot {
+  .qr-charge-waiting-dot,
+  .qr-charge-confirmed-mark,
+  .qr-charge-confirmed-mark path {
     animation: none;
   }
+
+  .qr-charge-choice,
+  .qr-charge-review-row,
+  .qr-charge-progress-bar li { transition: none; }
 }
