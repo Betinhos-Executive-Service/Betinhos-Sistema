@@ -113,9 +113,11 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
     check("Voltar e avançar preserva o e-mail digitado", (await main(page).getByLabel(/^E-mail/).inputValue()) === "x@mail");
     await main(page).getByLabel(/^E-mail/).fill("john@mail.com");
     await h.click("Continuar");
-    check("Passo 4 de 5: idioma com Português/English/Español", /Passo 4 de 5/.test(await h.text()) && /English/.test(await h.text()) && /Español/.test(await h.text()) && /página de pagamento/.test(await h.text()));
+    check("Passo 4 de 5: idioma com Português/English/Español", /Passo 4 de 5/.test(await h.text()) && /English/.test(await h.text()) && /Español/.test(await h.text()) && /do pagamento/.test(await h.text()));
     await h.shot("04-passo4-idioma");
     await h.click(/English/);
+    check("Escolher idioma não avança sozinho", /Passo 4 de 5/.test(await h.text()));
+    await h.click("Continuar");
     const review = await h.text();
     check("Revisão: valor, pagante, e-mail e idioma", /Passo 5 de 5/.test(review) && /R\$\s380,00/.test(review) && /John Smith/.test(review) && /john@mail\.com/.test(review) && /English/.test(review), review.replace(/\s+/g, " ").slice(0, 200));
     await h.shot("05-passo5-revisao");
@@ -165,7 +167,9 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
     check("Pagante da lista já vem marcado", (await firstOption.getAttribute("aria-pressed")) === "true", firstName);
     await firstOption.click();
     await page.waitForTimeout(450);
-    check("Tocar no pagante avança para o e-mail", /Passo 3 de 5/.test(await h.text()));
+    check("Tocar no pagante não avança sozinho", /Passo 2 de 5/.test(await h.text()));
+    await h.click("Continuar");
+    check("Continuar leva ao e-mail", /Passo 3 de 5/.test(await h.text()));
     await h.click("Pular");
     await h.click("Continuar");
     const review = await h.text();

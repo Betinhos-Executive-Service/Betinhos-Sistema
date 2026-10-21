@@ -41,7 +41,7 @@ const STEP_TITLES: Record<QrChargeStep, string> = {
 
 // Nome do idioma nele mesmo, para o passageiro reconhecer; o motorista lê a tradução embaixo.
 const LANGUAGE_CHOICES: { value: ReceiptLanguage; label: string; hint: string }[] = [
-  { value: RECEIPT_LANGUAGE.portuguese, label: "Português", hint: "Passageiro brasileiro" },
+  { value: RECEIPT_LANGUAGE.portuguese, label: "Português", hint: "Português" },
   { value: RECEIPT_LANGUAGE.english, label: "English", hint: "Inglês" },
   { value: RECEIPT_LANGUAGE.spanish, label: "Español", hint: "Espanhol" }
 ];
@@ -258,13 +258,10 @@ export function QrChargeScreen({ detail, maxCents, resume, onBack, onPaid, onCon
     const next = { ...draft, payerChoice: nome, idioma: option?.idioma ?? draft.idioma };
     setDraft(next);
     setStepError("");
-    if (nome) advance("pagante", next);
   };
 
   const chooseLanguage = (idioma: ReceiptLanguage) => {
-    const next = { ...draft, idioma };
-    setDraft(next);
-    advance("idioma", next);
+    setDraft({ ...draft, idioma });
   };
 
   const skipEmail = () => {
@@ -328,13 +325,13 @@ export function QrChargeScreen({ detail, maxCents, resume, onBack, onPaid, onCon
         <MoneyInputField
           ref={fieldRef}
           id="qr-charge-amount"
-          label="Valor"
+          aria-label={STEP_TITLES.valor}
           autoComplete="off"
           enterKeyHint="next"
           value={draft.amountText}
           disabled={disabled}
           error={stepError}
-          hint={`Até ${formatQrChargeAmount(maxCents)}, o que falta receber. Pode diminuir. Cartão estrangeiro paga em reais e o banco do passageiro converte.`}
+          hint={`Máximo ${formatQrChargeAmount(maxCents)}`}
           onChange={(event) => updateDraft({ amountText: event.target.value })}
         />
       );
@@ -402,7 +399,7 @@ export function QrChargeScreen({ detail, maxCents, resume, onBack, onPaid, onCon
       return (
         <TextInputField
           ref={fieldRef}
-          label="E-mail"
+          aria-label={STEP_TITLES.email}
           type="email"
           inputMode="email"
           autoComplete="off"
@@ -412,7 +409,7 @@ export function QrChargeScreen({ detail, maxCents, resume, onBack, onPaid, onCon
           value={draft.email}
           disabled={disabled}
           error={stepError}
-          hint="Confirme com o passageiro. O Stripe envia o recibo para este e-mail. Se ele não quiser recibo, toque em Pular."
+          hint="Opcional. O recibo vai para este e-mail."
           onChange={(event) => updateDraft({ email: event.target.value })}
         />
       );
@@ -420,7 +417,7 @@ export function QrChargeScreen({ detail, maxCents, resume, onBack, onPaid, onCon
     if (step === "idioma") {
       return (
         <>
-          <p className="qr-charge-step-hint">A tela do QR code e a página de pagamento aparecem neste idioma.</p>
+          <p className="qr-charge-step-hint">Idioma do QR code e do pagamento.</p>
           <div className="qr-charge-choices" role="group" aria-labelledby="qr-charge-step-title">
             {LANGUAGE_CHOICES.map((choice) => {
               const selected = draft.idioma === choice.value;
@@ -437,7 +434,7 @@ export function QrChargeScreen({ detail, maxCents, resume, onBack, onPaid, onCon
                 >
                   <span className="qr-charge-choice-text">
                     <strong>{choice.label}</strong>
-                    <span lang="pt-BR">{choice.hint}</span>
+                    {choice.hint !== choice.label ? <span lang="pt-BR">{choice.hint}</span> : null}
                   </span>
                   <span className="qr-charge-choice-mark" aria-hidden="true">{selected ? <SystemIcon name="check" /> : null}</span>
                 </button>
