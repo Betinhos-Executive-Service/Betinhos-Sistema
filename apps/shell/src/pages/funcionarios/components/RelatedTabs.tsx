@@ -1,6 +1,7 @@
 import { Alert, Button, buttonClassName, EmptyState, Spinner, StatusBadge } from '@betinhos/ui'
-import { ExternalLink, Inbox } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { ChevronRight, ExternalLink, Inbox } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { hrefFor } from '../../../nav/useHashRoute'
 import { statusLabel, statusTone } from '../../equipamentos/domain/choices'
 import type { DataSource } from '../data/source'
 import type { EquipamentoResumo, Multa, Posse } from '../data/types'
@@ -11,11 +12,18 @@ const fmt = (value: string | null) => (value ? dateTime.format(new Date(value)) 
 
 export function useLoad<T>(load: () => Promise<T>) {
   const [state, setState] = useState<{ data?: T; error?: string; loading: boolean }>({ loading: true })
+  // Só a carga mais recente vale: troca de `load` (outro funcionário), recarga e desmontagem descartam as anteriores.
+  const atual = useRef(0)
   const reload = useCallback(() => {
+    const vez = ++atual.current
+    const vale = () => vez === atual.current
     setState((current) => ({ ...current, loading: true }))
-    load().then((data) => setState({ data, loading: false }), (error) => setState({ error: errorMessage(error), loading: false }))
+    load().then((data) => { if (vale()) setState({ data, loading: false }) }, (error) => { if (vale()) setState({ error: errorMessage(error), loading: false }) })
   }, [load])
-  useEffect(reload, [reload])
+  useEffect(() => {
+    reload()
+    return () => { atual.current += 1 }
+  }, [reload])
   return { ...state, reload }
 }
 
@@ -66,7 +74,7 @@ export function VeiculosTab({ source, id }: { source: DataSource; id: string }) 
   )
 }
 
-/** Só leitura: o cadastro e a troca de responsável ficam em #/equipamentos (link abre o item). */
+/** Só leitura: o cadastro e a troca de responsável ficam em #/equipamentos (a descrição abre o item). */
 export function EquipamentosTab({ source, id }: { source: DataSource; id: string }) {
   const load = useCallback(() => source.equipamentos(id), [source, id])
   const { data, loading, error } = useLoad<EquipamentoResumo[]>(load)
@@ -74,16 +82,21 @@ export function EquipamentosTab({ source, id }: { source: DataSource; id: string
     <div className="related">
       <Status loading={loading} error={error} empty={!data?.length} emptyText="Nenhum equipamento com este funcionário." />
       <ul className="cards">
-        {data?.map((item) => (
-          <li key={item.id} className="card">
-            <div className="card-main">
-              <strong>{item.descricao || 'Sem descrição'}</strong>
-              <span className="muted">{[item.tipo, item.numeroSerie && `Série ${item.numeroSerie}`].filter(Boolean).join(' · ') || '—'}</span>
-            </div>
-            <StatusBadge tone={statusTone(item.status)}>{statusLabel(item.status)}</StatusBadge>
-            <a className={buttonClassName({ variant: 'ghost', size: 'compact', iconOnly: true })} href={`#/equipamentos?ver=${encodeURIComponent(item.id)}`} aria-label={`Abrir equipamento ${item.descricao || 'sem descrição'}`}><ExternalLink size={16} aria-hidden /></a>
-          </li>
-        ))}
+        {data?.map((item) => {
+          const href = hrefFor('equipamentos', { ver: item.id })
+          const descricao = item.descricao || 'Sem descrição'
+          return (
+            <li key={item.id} className="card">
+              <div className="card-main">
+                <a className="link" href={href} aria-label={`Abrir equipamento ${descricao}`}>{descricao}</a>
+                <span className="muted">{[item.tipo, item.numeroSerie && `Série ${item.numeroSerie}`].filter(Boolean).join(' · ') || '—'}</span>
+              </div>
+              <StatusBadge tone={statusTone(item.status)}>{statusLabel(item.status)}</StatusBadge>
+              {/* Alvo de toque extra para o mesmo item; o link acessível é a descrição. */}
+              <a className={buttonClassName({ variant: 'ghost', size: 'compact', iconOnly: true })} href={href} tabIndex={-1} aria-hidden="true"><ChevronRight size={16} aria-hidden /></a>
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

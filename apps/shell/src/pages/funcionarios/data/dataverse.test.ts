@@ -1,18 +1,20 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createXrmSource } from './dataverse'
 import type { XrmHost } from './xrm'
 
 const FORMATTED = '@OData.Community.Display.V1.FormattedValue'
 const GUID = '3f2504e0-4f89-11d3-9a0c-0305e82c3301'
 
-function sourceWith(rows: Record<string, unknown>[]) {
-  const retrieveMultipleRecords = vi.fn(async () => ({ entities: rows }))
+function sourceWith(rows: Record<string, unknown>[] | Error) {
+  const retrieveMultipleRecords = vi.fn(async () => { if (rows instanceof Error) throw rows; return { entities: rows } })
   const xrm: XrmHost = {
     WebApi: { retrieveMultipleRecords, retrieveRecord: vi.fn(), createRecord: vi.fn(), updateRecord: vi.fn(), deleteRecord: vi.fn() },
     Utility: { getGlobalContext: () => ({ getClientUrl: () => 'https://org23b93544.crm2.dynamics.com' }) },
   }
   return { source: createXrmSource(xrm), retrieveMultipleRecords }
 }
+
+afterEach(() => { vi.unstubAllGlobals() })
 
 describe('createXrmSource().equipamentos', () => {
   it('filtra pelo responsável, deixa os baixados de fora e lê o nome do tipo pela anotação do lookup', async () => {
@@ -35,5 +37,21 @@ describe('createXrmSource().equipamentos', () => {
     const { source, retrieveMultipleRecords } = sourceWith([])
     await expect(source.equipamentos(`${GUID} or cr40f_status eq 100000003`)).rejects.toThrow('Id de funcionário inválido.')
     expect(retrieveMultipleRecords).not.toHaveBeenCalled()
+  })
+
+  it('tabela ausente no ambiente vira a mensagem padrão do shell', async () => {
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ value: [] }), { status: 200 }))
+    vi.stubGlobal('fetch', fetch)
+    const { source } = sourceWith(new Error("The entity with a name = 'cr40f_equipamento' was not found in the MetadataCache."))
+    await expect(source.equipamentos(GUID)).rejects.toThrow('Tabela cr40f_equipamento não encontrada na metadata.')
+    expect(String((fetch.mock.calls[0] as unknown as [string])[0])).toContain("EntityDefinitions?$select=LogicalName&$filter=LogicalName eq 'cr40f_equipamento'")
+  })
+
+  it('com a tabela existente (ou metadata indisponível) relança o erro original', async () => {
+    const original = new Error('Permissão negada.')
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ value: [{ LogicalName: 'cr40f_equipamento' }] }), { status: 200 })))
+    await expect(sourceWith(original).source.equipamentos(GUID)).rejects.toBe(original)
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 500 })))
+    await expect(sourceWith(original).source.equipamentos(GUID)).rejects.toBe(original)
   })
 })
