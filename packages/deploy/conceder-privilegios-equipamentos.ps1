@@ -3,7 +3,9 @@
   [switch] $DeviceCode,
   # Papeis que recebem nas tabelas de equipamentos o mesmo acesso que ja tem em cr40f_funcionarios. Padrao: so MDA e DEV - Usuario
   # (decisao do Renan, 21/10/2026; o Canvas fica de fora). O AVISO do script aponta os demais papeis que acessam cr40f_funcionarios.
-  [string[]] $Roles = @("Acesso-Betinhos-MDA", "DEV - Usuário")
+  [string[]] $Roles = @("Acesso-Betinhos-MDA", "DEV - Usuário"),
+  # Papeis raiz dos quais tirar TODOS os privilegios das tabelas de equipamentos (ex.: Acesso-Betinhos-Canvas, que recebeu acesso numa execucao antiga).
+  [string[]] $RemoverDe = @()
 )
 
 # Copia, para cr40f_tipoequipamento, cr40f_equipamento e cr40f_fotoequipamento, os privilegios (e a profundidade) que cada papel listado tem em cr40f_funcionarios.
@@ -97,6 +99,8 @@ function Get-Rows([string] $EntitySet, [string] $Select, [string] $Filter = "") 
 # Fotos: o mesmo acesso das outras duas (Create/Append em foto e AppendTo em equipamento para enviar; Delete para excluir).
 $tabelas = @("cr40f_tipoequipamento", "cr40f_equipamento", "cr40f_fotoequipamento")
 $profundidade = @{ 1 = "Basic"; 2 = "Local"; 4 = "Deep"; 8 = "Global" }
+$conflito = @($RemoverDe | Where-Object { $Roles -contains $_ })
+if ($conflito.Count) { throw "Papel em -Roles e -RemoverDe ao mesmo tempo: $($conflito -join ', '). Tire-o de um dos dois." }
 
 # Privilegios de cr40f_funcionarios, indexados pelo prefixo (prvRead, prvWrite...).
 $origem = @{}
@@ -154,5 +158,21 @@ foreach ($nome in $Roles) {
     if ($linha.Count -ne 1 -or $profundidade[[int]$linha[0].privilegedepthmask] -ne $c.Depth) { throw "$nome ficou com $($c.PrivilegeName) fora da profundidade esperada ($($c.Depth))." }
   }
   Write-Step "$nome concedido: $resumo"
+}
+
+# Remocao: so os privilegios das tabelas de equipamentos que o papel tiver (RemovePrivilegeRole, um por vez).
+$nomePorId = @{}; foreach ($k in $destino.Keys) { $nomePorId[[string]$destino[$k]] = $k }
+foreach ($nome in $RemoverDe) {
+  $papeis = @(Get-Rows "roles" "roleid,name" "name eq '$(Escape-OData $nome)' and _parentroleid_value eq null")
+  if ($papeis.Count -ne 1) { throw "Papel '$nome' nao encontrado (ou ambiguo) na unidade raiz: $($papeis.Count)." }
+  $papel = $papeis[0]
+  $tem = @(@(Get-Rows "roleprivilegescollection" "privilegeid" "roleid eq $($papel.roleid)") | Where-Object { $nomePorId.ContainsKey([string]$_.privilegeid) })
+  if ($tem.Count -eq 0) { Write-Step "$nome nao tem privilegio nas tabelas de equipamentos; nada a remover"; continue }
+  $resumo = ($tem | ForEach-Object { $nomePorId[[string]$_.privilegeid] }) -join ", "
+  if (-not $Apply) { Write-Step "DRY RUN $nome perderia: $resumo"; continue }
+  foreach ($rp in $tem) { Invoke-Dataverse "POST" "roles($($papel.roleid))/Microsoft.Dynamics.CRM.RemovePrivilegeRole" @{ PrivilegeId = $rp.privilegeid } | Out-Null }
+  $sobra = @(@(Get-Rows "roleprivilegescollection" "privilegeid" "roleid eq $($papel.roleid)") | Where-Object { $nomePorId.ContainsKey([string]$_.privilegeid) })
+  if ($sobra.Count) { throw "$nome ainda tem $($sobra.Count) privilegio(s) de equipamentos depois da remocao." }
+  Write-Step "$nome removido: $resumo"
 }
 Write-Step $(if ($Apply) { "PRIVILEGIOS OK" } else { "DRY RUN OK; use -Apply" })
