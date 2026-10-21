@@ -1,6 +1,9 @@
 import { useMemo } from 'react'
-import { Button, EmptyState, SearchBox, StatusBadge, Table, TableTitle, ViewBar, matchesFilters } from '@betinhos/ui'
+import { Button, EmptyState, SearchBox, StatusBadge, Table, TableTitle, ViewBar } from '@betinhos/ui'
 import type { Host } from '../../../host'
+import { LazyFooter, useLazySlice } from '../../../app/LazyList'
+import { useDebouncedText } from '../../../app/search'
+import { filterRows } from '../../../app/filterRows'
 import { useListView } from '../../../app/useListView'
 import { useQueryTexto } from '../../../nav/queryState'
 import { FotoVeiculo } from '../components/FotoVeiculo'
@@ -29,6 +32,8 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo 
     legacy: { keys: ['status'], read: veiculoLegacy },
   })
   const [busca, setBusca] = useQueryTexto('q')
+  // A lista filtra 200 ms depois da última tecla.
+  const termo = useDebouncedText(busca)
 
   const linhas = useMemo<LinhaVeiculo[]>(() => {
     const periodo = ultimos12Meses(today)
@@ -43,9 +48,12 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo 
   }, [data, today])
 
   const visiveis = useMemo(
-    () => sortVeiculos(linhas.filter((linha) => matchesFilters(linha, filters, VEICULO_FIELDS, readVeiculo) && matchesVeiculoKeyword(linha, busca)), view.config.sort),
-    [linhas, filters, busca, view.config.sort],
+    () => sortVeiculos(filterRows(linhas, filters, VEICULO_FIELDS, readVeiculo).filter((linha) => matchesVeiculoKeyword(linha, termo)), view.config.sort),
+    [linhas, filters, termo, view.config.sort],
   )
+  // Rolagem infinita (sem paginação visível): trocar filtro, busca ou ordenação volta ao primeiro lote.
+  const lazyKey = useMemo(() => JSON.stringify({ filters, termo, sort: view.config.sort }), [filters, termo, view.config.sort])
+  const { slice, more, loadMore } = useLazySlice(visiveis, lazyKey)
 
   return (
     <div className="frota-lista">
@@ -55,7 +63,7 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo 
         </ViewBar>
       </div>
       <Table<LinhaVeiculo>
-        rows={visiveis}
+        rows={slice}
         rowKey={(linha) => linha.veiculo.id}
         onRowClick={(linha) => onOpenVeiculo(linha.veiculo.id)}
         view={{ config: view.config, onChange: view.setConfig }}
@@ -77,6 +85,7 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo 
           ) },
         ]}
       />
+      <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} />
     </div>
   )
 }

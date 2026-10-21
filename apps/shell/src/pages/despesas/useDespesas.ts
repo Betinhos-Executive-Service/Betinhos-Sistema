@@ -1,30 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback } from 'react'
+import type { ListCache } from '../../app/listCache'
+import { useProgressiveData } from '../../app/useProgressiveData'
 import type { Source } from './data/source'
 import type { Despesa, DespesaChoices } from './domain/types'
 
-type State = { list: Despesa[]; choices: DespesaChoices | null; loading: boolean; error: string | null }
-const message = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
+type Data = { list: Despesa[]; choices: DespesaChoices }
+const EMPTY: Despesa[] = []
 
-/** Carga por período; a recarga mais recente vence. */
-export function useDespesas(source: Source, since: Date | null) {
-  const [state, setState] = useState<State>({ list: [], choices: null, loading: true, error: null })
-  const token = useRef(0)
+/** Carga por período com a primeira página antes e cache por período; a recarga mais recente vence. */
+export function useDespesas(source: Source, since: Date | null, cache: ListCache) {
   const sinceKey = since?.getTime() ?? null
-
-  const reload = useCallback(async () => {
-    const current = ++token.current
-    setState((s) => ({ ...s, loading: true, error: null }))
-    try {
-      const [list, choices] = await Promise.all([source.load(sinceKey == null ? null : new Date(sinceKey)), source.choices()])
-      if (current !== token.current) return
-      setState({ list, choices, loading: false, error: null })
-    } catch (reason) {
-      if (current !== token.current) return
-      setState((s) => ({ ...s, loading: false, error: message(reason) }))
-    }
+  const load = useCallback(async (partial: (data: Data) => void) => {
+    const choices = source.choices()
+    const list = await source.load(sinceKey == null ? null : new Date(sinceKey), (first) => { choices.then((c) => partial({ list: first, choices: c }), () => undefined) })
+    return { list, choices: await choices }
   }, [source, sinceKey])
-
-  useEffect(() => { void reload() }, [reload])
-
-  return { ...state, reload }
+  const { data, complete, loading, error, reload } = useProgressiveData<Data>({ cache, key: `despesas:${sinceKey ?? 'all'}`, group: 'despesas:', load })
+  return { list: data?.list ?? EMPTY, choices: data?.choices ?? null, complete, loading, error, reload }
 }

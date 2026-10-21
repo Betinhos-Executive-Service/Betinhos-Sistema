@@ -16,10 +16,15 @@ export function VeiculoPicker({ source, value, changed, onChange }: Props) {
 
   useEffect(() => {
     if (!open) return
+    // Resposta de uma busca antiga (a pessoa continuou digitando) chega depois e é descartada.
+    let cancelled = false
     const timer = setTimeout(() => {
-      source.searchVeiculos(query).then((result) => { setOptions(result); setError(null) }, (reason) => setError(errorMessage(reason)))
+      source.searchVeiculos(query).then(
+        (result) => { if (!cancelled) { setOptions(result); setError(null) } },
+        (reason) => { if (!cancelled) setError(errorMessage(reason)) },
+      )
     }, 250)
-    return () => clearTimeout(timer)
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [open, query, source])
 
   return (

@@ -62,10 +62,14 @@ export function readPagante(p: Pagante, key: string): unknown {
 }
 
 /** Busca por palavra-chave (não fica na visão): nome, PAG, OP e o contato da pessoa (telefone, e-mail, cliente). */
+/** Texto em que a busca procura: pagante, PAG, OP e o contato da pessoa (nome, telefone, e-mail, cliente). */
+export const paganteKeywordText = (p: Pagante, contato: Contato | undefined) =>
+  [p.pessoa, p.codigo, p.op, contato?.nome, contato?.telefone, contato?.telefone.replace(/\D/g, ''), contato?.email, contato?.cliente].filter(Boolean).join(' ')
+
 export function matchesKeyword(p: Pagante, query: string, contato: Contato | undefined) {
   const words = normalizeSearch(query).split(/\s+/).filter(Boolean)
   if (!words.length) return true
-  const text = normalizeSearch([p.pessoa, p.codigo, p.op, contato?.nome, contato?.telefone, contato?.telefone.replace(/\D/g, ''), contato?.email, contato?.cliente].filter(Boolean).join(' '))
+  const text = normalizeSearch(paganteKeywordText(p, contato))
   return words.every((w) => text.includes(w))
 }
 

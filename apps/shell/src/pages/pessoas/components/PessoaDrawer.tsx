@@ -50,6 +50,8 @@ function useHistorico(source: Source, id: string | null) {
 function Ficha({ p, choices, dups, source, onOpen }: { p: Pessoa; choices: ChoiceSet; dups: DuplicateHit[]; source: Source; onOpen: (id: string) => void }) {
   const hist = useHistorico(source, p.id)
   const r = hist && !('error' in hist) ? resumo(hist.servicos) : null
+  // Pessoa com histórico longo: a ficha lê só os serviços mais recentes, então total e primeiro ficam "mais de".
+  const limitado = Boolean(hist && !('error' in hist) && hist.limitado)
   return (
     <div className="ps-ficha">
       <div className="ps-ficha__hero">
@@ -89,7 +91,7 @@ function Ficha({ p, choices, dups, source, onOpen }: { p: Pessoa; choices: Choic
         {p.endereco ? <p className="ps-ficha__text"><strong>Endereço de saída:</strong> {p.endereco}</p> : null}
       </Section>
 
-      <Section title="Serviços" aside={r ? <span className="ps-muted ps-num">{r.total} no total · {r.ultimos90} nos últimos 90 dias</span> : null}>
+      <Section title="Serviços" aside={r ? <span className="ps-muted ps-num">{limitado ? `Mais de ${r.total}` : r.total} no total · {r.ultimos90} nos últimos 90 dias</span> : null}>
         {hist == null ? <div className="ps-ficha__loading" role="status" aria-label="Carregando histórico"><Skeleton height={18} /><Skeleton height={18} /><Skeleton height={18} /></div>
           : 'error' in hist ? <Alert tone="danger" title="Não foi possível carregar o histórico">{hist.error}</Alert>
           : (
@@ -97,7 +99,7 @@ function Ficha({ p, choices, dups, source, onOpen }: { p: Pessoa; choices: Choic
               <dl className="ps-ficha__grid">
                 <Item name="Próximo">{r?.proximo ? fmtDateTime(r.proximo) : ''}</Item>
                 <Item name="Último">{r?.ultimo ? fmtDateTime(r.ultimo) : ''}</Item>
-                <Item name="Primeiro">{r?.primeiro ? fmtDateTime(r.primeiro) : ''}</Item>
+                <Item name="Primeiro">{r?.primeiro ? `${limitado ? 'Antes de ' : ''}${fmtDateTime(r.primeiro)}` : ''}</Item>
               </dl>
               {hist.servicos.length ? (
                 <ul className="ps-rows">

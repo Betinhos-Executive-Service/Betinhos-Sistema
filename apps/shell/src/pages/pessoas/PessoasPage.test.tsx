@@ -2,6 +2,7 @@
 import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PessoasPage } from './PessoasPage'
+import type { Host } from '../../host'
 import { STATUS } from './domain/choices'
 
 // O mock simula latência; com a suíte inteira em paralelo a máquina fica lenta.
@@ -70,5 +71,48 @@ describe('Pessoas', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cadastrar pessoa' }))
     expect(await screen.findByText('Ana Beatriz Lima cadastrado.')).toBeTruthy()
     expect(await screen.findByRole('dialog', { name: 'Ana Beatriz Lima' })).toBeTruthy()
+  })
+
+  it('voltar à lista usa o cache: aparece na hora, sem esqueleto nem nova carga', async () => {
+    const host: Host = { mode: 'mock' }
+    const first = render(<PessoasPage host={host} />)
+    await row('John Carter')
+    first.unmount()
+    render(<PessoasPage host={host} />)
+    // Sem `await`: a lista vem do cache no primeiro render.
+    expect(screen.getAllByText('John Carter').length).toBeGreaterThan(0)
+    expect(screen.queryByText(/carregando o restante/)).toBeNull()
+  })
+
+  it('edição aparece ao voltar para a lista (cache atualizado e marcado para revalidar)', async () => {
+    const host: Host = { mode: 'mock' }
+    const first = render(<PessoasPage host={host} />)
+    fireEvent.click(within(await row('John Carter')).getByRole('button', { name: /^John Carter/ }))
+    const ficha = await screen.findByRole('dialog', { name: 'John Carter' })
+    fireEvent.click(within(ficha).getByRole('button', { name: 'Editar cadastro' }))
+    await screen.findByRole('button', { name: 'Salvar alterações' })
+    fireEvent.change(document.querySelector('input[name="departamento"]') as HTMLInputElement, { target: { value: 'Compras' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(await screen.findByText('Cadastro de John Carter salvo.')).toBeTruthy()
+    first.unmount()
+    window.location.hash = '#/pessoas'
+    render(<PessoasPage host={host} />)
+    expect(screen.getAllByText(/Compras/).length).toBeGreaterThan(0)
+  })
+
+  it('lista grande: primeira página logo, o resto em segundo plano e rolagem sem botão de paginação', async () => {
+    window.history.replaceState(null, '', '/?volume=400')
+    try {
+      render(<PessoasPage host={{ mode: 'mock' }} />)
+      expect(await screen.findByText(/carregando o restante/)).toBeTruthy()
+      expect(screen.getByText(/^100 de 100 ·/)).toBeTruthy()
+      await screen.findByText(/^410 de 410 ·/, undefined, { timeout: 5000 })
+      expect(screen.queryByText(/carregando o restante/)).toBeNull()
+      expect(screen.queryByRole('button', { name: /Carregar mais/ })).toBeNull()
+      // Sem IntersectionObserver no jsdom, o rodapé revela os lotes sozinho; com ele, revelaria ao rolar.
+      await waitFor(() => expect(document.querySelectorAll('.bt-table__row').length).toBe(410))
+    } finally {
+      window.history.replaceState(null, '', '/')
+    }
   })
 })

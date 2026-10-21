@@ -1,14 +1,17 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { Alert, Button, EmptyState, SearchBox, Select, StatusBadge, ToastProvider, ViewBar, matchesFilters, useShellHeader, useToast } from '@betinhos/ui'
+import { Alert, Button, EmptyState, SearchBox, Select, StatusBadge, ToastProvider, ViewBar, useShellHeader, useToast } from '@betinhos/ui'
 import { RefreshCw, SearchX, WalletCards } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { listCache } from '../../app/listCache'
+import { keywordIndex, searchWords, useDebouncedText, useMergedById, useServerSearch } from '../../app/search'
+import { filterRows } from '../../app/filterRows'
 import { useListView } from '../../app/useListView'
 import { useQueryId, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
 import { EMPTY_FILTERS, PERIODOS, VIEWS_KEY, loadViews, periodoStart, total, type Periodo } from './domain/filters'
-import { PAGANTE_COLUMNS, PAGANTE_SORT, TELA, builtinViews, fromLegacyFilters, legacyViewConfig, matchesKeyword, paganteFields, readPagante, sortPagantes } from './domain/lista'
+import { PAGANTE_COLUMNS, PAGANTE_SORT, TELA, builtinViews, fromLegacyFilters, legacyViewConfig, paganteFields, paganteKeywordText, readPagante, sortPagantes } from './domain/lista'
 import { formatMoney } from './domain/messages'
 import { pagantesQuery } from './domain/query'
 import { applyPatch, statusPatch } from './domain/status'
@@ -37,7 +40,7 @@ function Pagantes({ host }: { host: Host }) {
   const [periodoUrl, setPeriodo] = useQueryTexto('periodo', EMPTY_FILTERS.periodo)
   const periodo = isPeriodo(periodoUrl) ? periodoUrl : EMPTY_FILTERS.periodo
   const since = useMemo(() => periodoStart(periodo, new Date()), [periodo])
-  const pg = usePagantes(source, since)
+  const pg = usePagantes(source, since, listCache(host))
   const choices = pg.choices
   const fields = useMemo(() => (choices ? paganteFields(choices) : []), [choices])
 
@@ -58,22 +61,32 @@ function Pagantes({ host }: { host: Host }) {
     },
   })
 
-  // Busca, ficha aberta e Gerar Pagantes continuam na URL; os filtros vão em `f=` (useListView).
+  // Busca, ficha aberta e Gerar Pagantes continuam na URL; os filtros vão em `f=` (useListView). A lista filtra 200 ms
+  // depois da última tecla; enquanto o período não chegou inteiro, a busca por código também vai ao servidor.
   const [query, setQuery] = useQueryTexto('q')
+  const q = useDebouncedText(query)
+  const searchPagantes = useCallback((text: string) => source.search(since, text), [source, since])
+  const found = useServerSearch({ query: q, enabled: Boolean(choices) && !pg.listComplete, search: searchPagantes })
+  const list = useMergedById(pg.list, found)
+  // Ordena e filtra uma vez por lista/visão; a cada busca só confere o texto já normalizado de cada linha.
+  const sorted = useMemo(() => (choices ? sortPagantes(list, view.config.sort, choices) : list), [list, choices, view.config.sort])
+  const filtered = useMemo(() => filterRows(sorted, filters, fields, readPagante), [sorted, filters, fields])
+  const index = useMemo(() => keywordIndex<Pagante>((p) => paganteKeywordText(p, pg.contatos.get(p.pessoaId))), [pg.contatos])
   const visible = useMemo(() => {
     if (!choices) return []
-    const list = pg.list.filter((p) => matchesFilters(p, filters, fields, readPagante) && matchesKeyword(p, query, pg.contatos.get(p.pessoaId)))
-    return sortPagantes(list, view.config.sort, choices)
-  }, [pg.list, pg.contatos, filters, fields, query, choices, view.config.sort])
-  // Lazy loading de renderização: trocar filtro, busca ou ordenação volta ao primeiro lote; recarregar a lista não.
-  const lazyKey = useMemo(() => ({ filters, query, sort: view.config.sort }), [filters, query, view.config.sort])
+    const words = searchWords(q)
+    return words.length ? filtered.filter((p) => index.matches(p, words)) : filtered
+  }, [filtered, index, q, choices])
+  // Rolagem infinita: trocar filtro, busca ou ordenação volta ao primeiro lote; a lista crescer (carga em segundo
+  // plano) ou recarregar não. A chave é texto para não mudar quando só a identidade dos filtros muda.
+  const lazyKey = useMemo(() => JSON.stringify({ filters, q, sort: view.config.sort }), [filters, q, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
   const clearAll = () => { clearFilters(); setQuery('') }
 
   const [selectedId, setSelectedId] = useQueryId('abrir')
   // A ficha pode vir do rateio (pagante fora da lista carregada): guarda a cópia dela para continuar aberta.
   const [selectedCopy, setSelectedCopy] = useState<Pagante | null>(null)
-  const current = selectedId ? pg.list.find((p) => p.id === selectedId) ?? (selectedCopy?.id === selectedId ? selectedCopy : null) : null
+  const current = selectedId ? list.find((p) => p.id === selectedId) ?? (selectedCopy?.id === selectedId ? selectedCopy : null) : null
   const setSelected = (p: Pagante | null) => { setSelectedCopy(p); setSelectedId(p?.id ?? null) }
   const [statusRequest, setStatusRequest] = useState<StatusRequest>(null)
   // O Gerar Pagantes aberto (por cima da tela) também vive na URL: `gerar=<id da OP>`.
@@ -140,18 +153,22 @@ function Pagantes({ host }: { host: Host }) {
     body = <Alert tone="danger" title="Não foi possível carregar os pagantes" action={<Button variant="secondary" onClick={() => void pg.reload()}>Tentar de novo</Button>}>{pg.error}</Alert>
   } else if (!pg.choices) {
     body = <PagantesTable list={[]} choices={{ status: [], forma: [], recibo: [] }} contatos={pg.contatos} onOpen={() => undefined} loading />
-  } else if (!pg.loading && !pg.list.length) {
+  } else if (pg.listComplete && !pg.loading && !pg.list.length) {
     body = <EmptyState className="surface" align="start" icon={<WalletCards size={36} />} title="Nenhum pagante neste período">Os pagantes são criados no Gerar Pagantes, a partir de uma Ordem de Pagamento. Amplie o período para ver os mais antigos.</EmptyState>
   } else {
     const open = (id: string) => setSelected(visible.find((p) => p.id === id) ?? null)
-    const footer = <span className="pg-num">{visible.length} {visible.length === 1 ? 'pagante' : 'pagantes'} · {formatMoney(total(visible))}</span>
-    const empty = <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum pagante com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
+    // O total só vale com o período inteiro: até lá, o rodapé avisa que ainda soma.
+    const pending = !pg.listComplete && pg.loading
+    const footer = <span className="pg-num">{visible.length} {visible.length === 1 ? 'pagante' : 'pagantes'} · {pending ? 'somando valores…' : formatMoney(total(visible))}</span>
+    const empty = pending
+      ? <EmptyState align="start" icon={<SearchX size={36} />} title="Procurando no restante do período…" />
+      : <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum pagante com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
     body = (
       <>
         {mobile
           ? (visible.length ? <PagantesCards list={slice} choices={pg.choices} contatos={pg.contatos} onOpen={open} /> : <div className="surface">{empty}</div>)
           : <PagantesTable list={slice} choices={pg.choices} contatos={pg.contatos} onOpen={open} view={{ config: view.config, onChange: view.setConfig }} quickFilters={quickFilters} footer={footer} empty={empty} />}
-        {more ? <LazyFooter loaded={slice.length} total={visible.length} more onLoadMore={loadMore} noun={['pagante', 'pagantes']} touch={mobile} /> : null}
+        <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} pending={pending} />
       </>
     )
   }
@@ -166,7 +183,11 @@ function Pagantes({ host }: { host: Host }) {
           {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={pg.loading && Boolean(choices)} onClick={refresh} />}
         </ViewBar>
       </div>
-      {pg.error && pg.choices ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{pg.error} A lista mostra os dados da carga anterior.</Alert> : null}
+      {pg.error && pg.choices ? (
+        <Alert tone="danger" title={pg.listComplete ? 'A última atualização falhou' : 'A carga parou no meio'} action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>
+          {pg.error} {pg.listComplete ? 'A lista mostra os dados da carga anterior.' : 'A lista mostra só os pagantes que chegaram; busca, filtros e total valem para eles.'}
+        </Alert>
+      ) : null}
       {pg.contatosError && pg.choices ? <Alert tone="warning" title="Contatos não carregados">{pg.contatosError} Busca por telefone e WhatsApp ficam indisponíveis até atualizar.</Alert> : null}
       {body}
       {pg.choices ? (

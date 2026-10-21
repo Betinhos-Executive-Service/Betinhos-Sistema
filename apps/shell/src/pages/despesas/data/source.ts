@@ -1,16 +1,22 @@
+import { normalizeSearch } from '@betinhos/ui'
 import type { Host } from '../../../host'
+import { getAllWithFirstPage, searchRows } from '../../../app/pagedLoad'
+import { mockProgressive, mockSearch } from '../../../app/mockVolume'
 import { browserKV } from '../../pagantes/data/source'
 import type { KV } from '../../pagantes/domain/filters'
 import { withFallback } from '../domain/status'
 import type { Anexo, Arquivo, Despesa, DespesaChoices } from '../domain/types'
 import { createArquivos } from './arquivo'
 import { createMockAnexos, createMockArquivo, createMockDespesas } from './mock'
-import { ENTITY_ANEXO, ENTITY_DESPESA, anexosPath, despesasPath, mapAnexo, mapDespesa } from './queries'
+import { ENTITY_ANEXO, ENTITY_DESPESA, anexosPath, despesasPath, despesasSearchFilter, mapAnexo, mapDespesa } from './queries'
 
 /** Tudo que a tela precisa do mundo externo. Só leitura: a tela não grava nada. */
 export type Source = {
   mock: boolean
-  load: (since: Date | null) => Promise<Despesa[]>
+  /** Despesas do período; `onFirstPage` recebe a primeira página antes (lista grande). */
+  load: (since: Date | null, onFirstPage?: (list: Despesa[]) => void) => Promise<Despesa[]>
+  /** Até 50 despesas do período que batem com a busca (usada enquanto a lista não carregou inteira). */
+  search: (since: Date | null, query: string) => Promise<Despesa[]>
   anexos: (despesaId: string) => Promise<Anexo[]>
   /** Conteúdo do comprovante para a prévia (imagem ou PDF). */
   arquivo: (anexo: Anexo) => Promise<Arquivo>
@@ -26,7 +32,11 @@ function createMockSource(): Source {
   const rows = createMockDespesas(new Date())
   return {
     mock: true,
-    async load(since) { await wait(300); return rows.filter((d) => !since || (d.data && d.data >= since)).map((d) => ({ ...d })) },
+    load: (since, onFirstPage) => mockProgressive(rows.filter((d) => !since || (d.data && d.data >= since)).map((d) => ({ ...d })), onFirstPage, 300),
+    search: (since, q) => {
+      const t = normalizeSearch(q)
+      return mockSearch(rows, (d) => (!since || (d.data != null && d.data >= since)) && normalizeSearch(`${d.protocolo} ${d.nome} ${d.estabelecimento}`).includes(t))
+    },
     async anexos(id) { await wait(250); const d = rows.find((x) => x.id === id); return d ? createMockAnexos(d) : [] },
     async arquivo(anexo) { await wait(300); return createMockArquivo(anexo) },
     choices: async () => withFallback({}),
@@ -52,7 +62,11 @@ export function createSource(host: Host): Source {
 
   return {
     mock: false,
-    load: async (since) => (await host.client.getAll(despesasPath(await entitySet(ENTITY_DESPESA), since))).map(mapDespesa),
+    load: async (since, onFirstPage) => (await getAllWithFirstPage(host.client, despesasPath(await entitySet(ENTITY_DESPESA), since), onFirstPage && ((rows) => onFirstPage(rows.map(mapDespesa))))).map(mapDespesa),
+    async search(since, q) {
+      const filter = despesasSearchFilter(q)
+      return filter ? (await searchRows(host.client, despesasPath(await entitySet(ENTITY_DESPESA), since, filter))).map(mapDespesa) : []
+    },
     anexos: async (id) => (await host.client.getAll(anexosPath(await entitySet(ENTITY_ANEXO), id))).map(mapAnexo),
     arquivo: createArquivos(host.client),
     // Rótulo é acessório: metadata fora do ar cai nos rótulos conhecidos.

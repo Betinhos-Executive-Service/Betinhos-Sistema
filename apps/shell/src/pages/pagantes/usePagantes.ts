@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import type { Row } from '@betinhos/dataverse'
+import type { ListCache } from '../../app/listCache'
+import { useProgressiveData } from '../../app/useProgressiveData'
 import type { Source } from './data/source'
 import { applyPatch } from './domain/status'
 import type { ChoiceSet, Contato, Pagante } from './domain/types'
 
-type State = { list: Pagante[]; choices: ChoiceSet | null; loading: boolean; error: string | null }
 const message = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
 /**
@@ -22,36 +23,44 @@ export function reconcile(list: Pagante[], confirmed: Map<string, { at: number; 
   })
 }
 
-/** Carga por período, contatos em segundo plano e mudança de status otimista com rollback. */
-export function usePagantes(source: Source, since: Date | null) {
-  const [state, setState] = useState<State>({ list: [], choices: null, loading: true, error: null })
-  const [contatos, setContatos] = useState(() => new Map<string, Contato>())
-  const [contatosError, setContatosError] = useState<string | null>(null)
+type Data = {
+  list: Pagante[]
+  choices: ChoiceSet
+  /** O período chegou inteiro (os contatos podem ainda estar carregando). */
+  listComplete: boolean
+  contatos: Map<string, Contato>
+  contatosError: string | null
+}
+const EMPTY_LIST: Pagante[] = []
+const EMPTY_CONTATOS = new Map<string, Contato>()
+
+/**
+ * Carga por período com a primeira página antes, contatos em segundo plano (falha só avisa), cache por período e
+ * mudança de status otimista com rollback.
+ */
+export function usePagantes(source: Source, since: Date | null, cache: ListCache) {
   const [overrides, setOverrides] = useState(() => new Map<string, Partial<Pagante>>())
-  const token = useRef(0)
   // Gravações confirmadas: uma recarga iniciada antes delas não pode trazer o status antigo de volta.
   const confirmed = useRef(new Map<string, { at: number; patch: Partial<Pagante> }>())
   const sinceKey = since?.getTime() ?? null
 
-  const reload = useCallback(async () => {
-    const current = ++token.current
-    setState((s) => ({ ...s, loading: true, error: null }))
+  const load = useCallback(async (partial: (data: Data) => void) => {
+    const choicesP = source.choices()
+    const first = await source.load(sinceKey == null ? null : new Date(sinceKey), (rows) => {
+      choicesP.then((choices) => partial({ list: reconcile(rows, confirmed.current), choices, listComplete: false, contatos: EMPTY_CONTATOS, contatosError: null }), () => undefined)
+    })
+    const choices = await choicesP
+    const list = reconcile(first, confirmed.current)
+    partial({ list, choices, listComplete: true, contatos: EMPTY_CONTATOS, contatosError: null })
+    // Contato só enriquece busca e WhatsApp: falha aqui avisa, mas não bloqueia a lista.
     try {
-      const [list, choices] = await Promise.all([source.load(sinceKey == null ? null : new Date(sinceKey)), source.choices()])
-      if (current !== token.current) return
-      setState({ list: reconcile(list, confirmed.current), choices, loading: false, error: null })
-      // Contato só enriquece busca e WhatsApp: falha aqui avisa, mas não bloqueia a lista.
-      source.contatos(list.map((p) => p.pessoaId)).then(
-        (map) => { if (current === token.current) { setContatos(map); setContatosError(null) } },
-        (reason) => { if (current === token.current) setContatosError(message(reason)) },
-      )
+      return { list, choices, listComplete: true, contatos: await source.contatos(list.map((p) => p.pessoaId)), contatosError: null }
     } catch (reason) {
-      if (current !== token.current) return
-      setState((s) => ({ ...s, loading: false, error: message(reason) }))
+      return { list, choices, listComplete: true, contatos: EMPTY_CONTATOS, contatosError: message(reason) }
     }
   }, [source, sinceKey])
-
-  useEffect(() => { void reload() }, [reload])
+  const key = `pagantes:${sinceKey ?? 'all'}`
+  const { data, key: dataKey, complete, loading, error, reload, mutate } = useProgressiveData<Data>({ cache, key, group: 'pagantes:', load })
 
   const update = useCallback(async (id: string, payload: Row) => {
     const patch = applyPatch(payload)
@@ -59,15 +68,21 @@ export function usePagantes(source: Source, since: Date | null) {
     try {
       await source.update(id, payload)
       confirmed.current.set(id, { at: Date.now(), patch })
-      setState((s) => ({ ...s, list: s.list.map((p) => (p.id === id ? { ...p, ...patch } : p)) }))
+      mutate((d) => ({ ...d, list: d.list.map((p) => (p.id === id ? { ...p, ...patch } : p)) }))
     } finally {
       setOverrides((map) => { const next = new Map(map); next.delete(id); return next })
     }
-  }, [source])
+  }, [source, mutate])
 
+  const base = data?.list ?? EMPTY_LIST
   const list = useMemo(
-    () => (overrides.size ? state.list.map((p) => (overrides.has(p.id) ? { ...p, ...overrides.get(p.id) } : p)) : state.list),
-    [state.list, overrides],
+    () => (overrides.size ? base.map((p) => (overrides.has(p.id) ? { ...p, ...overrides.get(p.id) } : p)) : base),
+    [base, overrides],
   )
-  return { ...state, list, contatos, contatosError, reload, update }
+  return {
+    list, choices: data?.choices ?? null, loading, error, reload, update,
+    /** Período inteiro na tela: totais e filtros valem para todos (`complete` inclui os contatos). */
+    listComplete: complete || (dataKey === key && Boolean(data?.listComplete)),
+    contatos: data?.contatos ?? EMPTY_CONTATOS, contatosError: data?.contatosError ?? null,
+  }
 }
