@@ -13187,3 +13187,152 @@ select,
     transition: none;
   }
 }
+
+/* Cobrança por QR code (Stripe). Valores do Betinhos Design System (design-tokens.json). */
+.qr-charge-help,
+.qr-charge-form .field-hint {
+  margin: 0;
+  color: #64748b;
+  font: 600 13px/1.4 "Manrope", Arial, sans-serif;
+}
+
+.qr-charge-result {
+  width: 100%;
+  padding: 8px 8px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.qr-charge-amount {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.qr-charge-amount strong,
+.qr-charge-paid-amount,
+.qr-charge-passenger-amount {
+  color: #0f172a;
+  font: 800 1.6rem/1.1 "Manrope", Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.qr-charge-code {
+  width: min(100%, 300px);
+  height: auto;
+  aspect-ratio: 1;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+/* Painel virado para o passageiro: título, valor, QR e instrução no idioma dele. */
+.qr-charge-passenger {
+  width: 100%;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #0f172a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.qr-charge-passenger strong { font: 800 18px/1.25 "Manrope", Arial, sans-serif; }
+.qr-charge-passenger p { margin: 0; color: #475569; font: 600 14px/1.45 "Manrope", Arial, sans-serif; }
+
+.qr-charge-passenger .qr-charge-code { border: 0; }
+
+.qr-charge-waiting {
+  width: 100%;
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: #fff7df;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 800 15px/1.35 "Manrope", Arial, sans-serif;
+}
+
+.qr-charge-waiting-dot {
+  flex: 0 0 10px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #856000;
+  animation: qr-charge-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes qr-charge-pulse {
+  50% { opacity: .35; }
+}
+
+.qr-charge-countdown { font-weight: 800; font-variant-numeric: tabular-nums; }
+
+.qr-charge-paid {
+  width: 100%;
+  padding: 24px 16px;
+  border-radius: 12px;
+  background: #eaf8f1;
+  color: #0f172a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  animation: qr-charge-paid-enter 220ms cubic-bezier(.23, 1, .32, 1) both;
+}
+
+.qr-charge-paid strong { font: 800 20px/1.2 "Manrope", Arial, sans-serif; }
+.qr-charge-paid p { margin: 0; font: 700 15px/1.35 "Manrope", Arial, sans-serif; }
+
+.qr-charge-paid-mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #147a4b;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+}
+
+.qr-charge-paid-mark svg { width: 28px; height: 28px; }
+
+@keyframes qr-charge-paid-enter {
+  from { opacity: 0; transform: scale(.96); }
+}
+
+.qr-charge-alert {
+  width: 100%;
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 10px;
+  color: #0f172a;
+  font: 600 13px/1.4 "Manrope", Arial, sans-serif;
+}
+
+.qr-charge-alert.is-success { background: #eaf8f1; }
+.qr-charge-alert.is-warning { background: #fff7df; }
+.qr-charge-alert.is-danger { background: #fff0f3; }
+.qr-charge-alert.is-neutral { background: #e2e8f0; }
+
+.receive-qr-charge {
+  width: 100%;
+  min-height: 44px;
+}
+
+.qr-charge-actions { justify-content: flex-end; }
+
+@media (prefers-reduced-motion: reduce) {
+  .qr-charge-paid,
+  .qr-charge-waiting-dot {
+    animation: none;
+  }
+}
