@@ -33,6 +33,18 @@ Usa Chrome headless com user agent Android (ativa a câmera ao vivo) e câmera s
 10. `#cancelado-local?serviceId=10241&type=SERVICO` → "Limpar texto" desabilitado vazio; com texto pede "Apagar o texto?". "Cliquei errado" volta ao detalhe.
 11. `#historico` → busca "zzz inexistente" mostra `Nenhum serviço encontrado para "zzz inexistente".`
 
+## Cobrança por QR code (Stripe, modo mock)
+Spec: `docs/superpowers/specs/2026-10-21-cobranca-stripe-qr-design.md`. Em localhost o botão aparece sempre; o mock (`src/lib/qrChargeMock.ts`) marca pago 5 s depois de gerar.
+1. `#receber?serviceId=10240&type=SERVICO` → botão "Cobrar por QR code" (some em serviço com valor a receber R$ 0,00, ex.: 10241).
+2. Tocar → `#cobranca-qr`, campo "Valor da cobrança" já com `380,00`. Digitar 500 → "Gerar QR code" mostra "O valor não pode passar de R$ 380,00."
+3. Valor 380 → QR (SVG `.qr-charge-code`), faixa "Aguardando pagamento. Não libere o passageiro ainda." e "Expira em 29:5x".
+4. Com `?mockRecusa=1` antes do hash: aparece "Pagamento recusado: …" e o QR continua; ~5 s depois vira "Pagamento confirmado … Pode liberar o passageiro".
+5. "Continuar" → Recebimento mostra "Pago por QR code: R$ 380,00. O comprovante é opcional." e FINALIZAR vai para `#finalizar` sem foto. Com valor menor (ex.: 200) a foto continua obrigatória ("Envie o comprovante do restante").
+6. "Cancelar cobrança" logo após gerar → "Cobrança cancelada…" e não vira pago depois.
+7. Recarregar em `#cobranca-qr` volta ao Recebimento.
+- Cliques por script (javascript_tool) não contam como gesto: o console mostra "Blocked call to navigator.vibrate" — esperado; em toque real vibra.
+- Lógica pura coberta por `tests/qrCharge.test.ts` (inclui `isReceiveStepPending`). Flows, Stripe real e Apple/Google Pay não são verificáveis no mock.
+
 ## Casos de borda
 - Fila: finalizar fora de ordem mostra "Conclua os itens anteriores da fila antes de prosseguir." (modo remoto).
 - Câmera negada, ocupada (NotReadableError) e ausente têm mensagens próprias (`src/lib/cameraErrors.ts`, coberto por `tests/cameraErrors.test.ts`).

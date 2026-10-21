@@ -17,6 +17,7 @@ const SCREEN_HASH_PATHS: Record<Screen, string> = {
   detalhes: "detalhes",
   detalhesHistorico: "detalhes-historico",
   receber: "receber",
+  cobrancaQr: "cobranca-qr",
   reciboPersonalizado: "recibo-personalizado",
   voucher: "voucher",
   assinatura: "assinatura",
@@ -59,6 +60,7 @@ const SCREEN_HASH_ALIASES: Record<string, Screen> = {
   "history-details": "detalhesHistorico",
   receber: "receber",
   receive: "receber",
+  "cobranca-qr": "cobrancaQr",
   "recibo-personalizado": "reciboPersonalizado",
   recibopersonalizado: "reciboPersonalizado",
   personalreceipt: "reciboPersonalizado",
@@ -110,6 +112,7 @@ const HASH_ROUTE_DETAIL_SCREENS = new Set<Screen>([
   "detalhes",
   "detalhesHistorico",
   "receber",
+  "cobrancaQr",
   "voucher",
   "assinatura",
   "finalizar",
@@ -120,6 +123,8 @@ const HASH_ROUTE_DETAIL_SCREENS = new Set<Screen>([
 
 const HASH_ROUTE_RESTORE_SCREEN: Partial<Record<Screen, Screen>> = {
   previewFotoReceber: "receber",
+  // A sessão do QR vive só na memória; ao recarregar, o motorista gera de novo.
+  cobrancaQr: "receber",
   previewFotoGasto: "gastos",
   previewFotoColisao: "colisoes",
   previewFotoSolicitacaoManutencao: "solicitarManutencao",
@@ -196,6 +201,7 @@ const SCREEN_DEPTH: Record<Screen, number> = {
   detalhes: 2,
   detalhesHistorico: 2,
   receber: 3,
+  cobrancaQr: 4,
   reciboPersonalizado: 4,
   voucher: 3,
   finalizar: 3,

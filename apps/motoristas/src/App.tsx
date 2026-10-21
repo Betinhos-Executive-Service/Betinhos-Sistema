@@ -16,9 +16,8 @@ import { useHardwareBackGuard } from "./app/backGuard";
 import { BuildStamp } from "./components/layout/BuildStamp";
 import {
   getServiceTaskBackScreen,
-  hasReceiveProofs,
   hasUploadedReceiveProofs,
-  shouldRequireReceiveStep,
+  isReceiveStepPending,
   shouldRouteServiceToVoucher
 } from "./app/detailFlow";
 import {
@@ -72,6 +71,9 @@ import {
   type MaintenanceRequestVehicleOption
 } from "./lib/dataverse";
 import { readReceiptQuick } from "./lib/dataverse";
+import { createQrChargeRemote, updateQrChargeRemote } from "./lib/dataverse";
+import { getReceivableCents, qrChargeCoversReceivable, type QrCharge } from "./lib/qrCharge";
+import { QrChargeScreen } from "./screens/QrChargeScreen";
 import {
   INITIAL_QUICK_READ,
   QUICK_READ_FILL_STEP_MS,
@@ -669,6 +671,8 @@ function App() {
   const [expensePhotoIsVideo, setExpensePhotoIsVideo] = useState(false);
   const [expensePreviewPhotoId, setExpensePreviewPhotoId] = useState("");
   const [receiveProofs, setReceiveProofs] = useState<Record<string, ExpensePhoto[]>>(() => loadFinalizeDraftAssets().receiveProofs);
+  // Cobrança paga por QR em cada serviço; o registro definitivo fica no Dataverse (cr40f_cobrancastripe).
+  const [qrChargesPaid, setQrChargesPaid] = useState<Record<string, QrCharge>>({});
   const [receiveUploadedCounts, setReceiveUploadedCounts] = useState<Record<string, number>>({});
   const [receivePhotoDraft, setReceivePhotoDraft] = useState("");
   const [receivePhotoPreviewUrl, setReceivePhotoPreviewUrl] = useState("");
@@ -1250,6 +1254,17 @@ function App() {
   const canGeneratePersonalReceipt =
     isTrueLike(driverContext?.funcionario?.cr40f_gerarrecibopersonalizado) ||
     isLocalhostRuntime;
+  const canChargeByQr = isTrueLike(driverContext?.funcionario?.cr40f_podecobrarqrcode) || isLocalhostRuntime;
+  const getQrChargeOpener = (detail: DetailData) =>
+    canChargeByQr && getReceivableCents(detail) > 0 ? () => setScreen("cobrancaQr") : undefined;
+  const qrChargeCovers = (detail: DetailData) => qrChargeCoversReceivable(qrChargesPaid[detail.id], detail);
+  const receiveStepPending = (detail: DetailData) =>
+    isReceiveStepPending(detail, { receiveProofs, receiveUploadedCounts, remoteMode, proofWaived: qrChargeCovers(detail) });
+  const getQrChargeProps = (detail: DetailData) => ({
+    onOpenQrCharge: getQrChargeOpener(detail),
+    qrChargePaid: qrChargesPaid[detail.id],
+    proofWaived: qrChargeCovers(detail)
+  });
 
   useEffect(() => {
     previousScreenRef.current = screen;
@@ -2805,7 +2820,7 @@ function App() {
     if (!selectedDetail || remoteOperation) return;
     const detailToContinue = selectedDetail;
     const photos = receiveProofs[detailToContinue.id] ?? [];
-    if (!photos.length) return;
+    if (!photos.length && !qrChargeCovers(detailToContinue)) return;
     if (blockIfNotFirstPending(detailToContinue)) return;
 
     const goNext = () => {
@@ -2813,7 +2828,8 @@ function App() {
       setScreen(shouldRouteServiceToVoucher(detailToContinue) ? "voucher" : "finalizar");
     };
 
-    if (hasUploadedReceiveProofs(detailToContinue, receiveProofs, receiveUploadedCounts) || !remoteMode) {
+    // Sem foto só chega aqui com o QR pago no total: não há o que enviar.
+    if (!photos.length || hasUploadedReceiveProofs(detailToContinue, receiveProofs, receiveUploadedCounts) || !remoteMode) {
       goNext();
       return;
     }
@@ -2884,10 +2900,7 @@ function App() {
   const openVoucherFlow = () => {
     if (!selectedDetail) return;
     if (blockIfNotFirstPending(selectedDetail)) return;
-    if (
-      shouldRequireReceiveStep(selectedDetail) &&
-      (!hasReceiveProofs(selectedDetail, receiveProofs) || (remoteMode && !hasUploadedReceiveProofs(selectedDetail, receiveProofs, receiveUploadedCounts)))
-    ) {
+    if (receiveStepPending(selectedDetail)) {
       setScreen("receber");
       return;
     }
@@ -2901,10 +2914,7 @@ function App() {
       setServiceObservationDrafts((current) => ({ ...current, [getDetailDraftKey(selectedDetail)]: serviceObservation }));
     }
     if (blockIfNotFirstPending(detailForFlow)) return;
-    if (
-      shouldRequireReceiveStep(detailForFlow) &&
-      (!hasReceiveProofs(detailForFlow, receiveProofs) || (remoteMode && !hasUploadedReceiveProofs(detailForFlow, receiveProofs, receiveUploadedCounts)))
-    ) {
+    if (receiveStepPending(detailForFlow)) {
       setScreen("receber");
       return;
     }
@@ -3383,6 +3393,25 @@ function App() {
         onGeneratePersonalReceipt={openPersonalReceipt}
         canGeneratePersonalReceipt={canGeneratePersonalReceipt}
         submitState={remoteOperation?.phase ?? "idle"}
+        {...getQrChargeProps(selectedDetail)}
+      />
+    );
+  }
+
+  if (screen === "cobrancaQr" && selectedDetail) {
+    return show(
+      <QrChargeScreen
+        detail={selectedDetail}
+        maxCents={getReceivableCents(selectedDetail)}
+        onBack={() => setScreen("receber")}
+        onPaid={(charge) => {
+          setQrChargesPaid((current) => ({ ...current, [selectedDetail.id]: charge }));
+          setScreen("receber");
+        }}
+        createCharge={(valorCentavos) =>
+          createQrChargeRemote({ reservaId: selectedDetail.dataverse?.id ?? selectedDetail.id, motoristaId: driverContext?.id ?? "", valorCentavos })
+        }
+        updateCharge={updateQrChargeRemote}
       />
     );
   }
@@ -3456,10 +3485,7 @@ function App() {
   }
 
   if (screen === "finalizar" && selectedDetail) {
-    if (
-      shouldRequireReceiveStep(selectedDetail) &&
-      (!hasReceiveProofs(selectedDetail, receiveProofs) || (remoteMode && !hasUploadedReceiveProofs(selectedDetail, receiveProofs, receiveUploadedCounts)))
-    ) {
+    if (receiveStepPending(selectedDetail)) {
       return show(
         <ReceiveScreen
           detail={selectedDetail}
@@ -3471,6 +3497,7 @@ function App() {
           onGeneratePersonalReceipt={openPersonalReceipt}
           canGeneratePersonalReceipt={canGeneratePersonalReceipt}
           submitState={remoteOperation?.phase ?? "idle"}
+          {...getQrChargeProps(selectedDetail)}
         />
       );
     }
@@ -3527,10 +3554,7 @@ function App() {
   }
 
   if (screen === "voucher" && selectedDetail) {
-    if (
-      shouldRequireReceiveStep(selectedDetail) &&
-      (!hasReceiveProofs(selectedDetail, receiveProofs) || (remoteMode && !hasUploadedReceiveProofs(selectedDetail, receiveProofs, receiveUploadedCounts)))
-    ) {
+    if (receiveStepPending(selectedDetail)) {
       return show(
         <ReceiveScreen
           detail={selectedDetail}
@@ -3542,6 +3566,7 @@ function App() {
           onGeneratePersonalReceipt={openPersonalReceipt}
           canGeneratePersonalReceipt={canGeneratePersonalReceipt}
           submitState={remoteOperation?.phase ?? "idle"}
+          {...getQrChargeProps(selectedDetail)}
         />
       );
     }

@@ -32,6 +32,24 @@ export function hasReceiveProofs(detail: DetailData, receiveProofs: Record<strin
   return (receiveProofs[detail.id]?.length ?? 0) > 0;
 }
 
+type ReceiveProofState = {
+  receiveProofs: Record<string, ExpensePhoto[]>;
+  receiveUploadedCounts: Record<string, number>;
+  remoteMode: boolean;
+  // Comprovante dispensado (ex.: cobrança por QR paga no valor total).
+  proofWaived: boolean;
+};
+
+// O serviço ainda precisa passar pela tela Receber antes de finalizar ou abrir o voucher.
+export function isReceiveStepPending(detail: DetailData, state: ReceiveProofState) {
+  return (
+    shouldRequireReceiveStep(detail) &&
+    !state.proofWaived &&
+    (!hasReceiveProofs(detail, state.receiveProofs) ||
+      (state.remoteMode && !hasUploadedReceiveProofs(detail, state.receiveProofs, state.receiveUploadedCounts)))
+  );
+}
+
 export function hasUploadedReceiveProofs(
   detail: DetailData,
   receiveProofs: Record<string, ExpensePhoto[]>,

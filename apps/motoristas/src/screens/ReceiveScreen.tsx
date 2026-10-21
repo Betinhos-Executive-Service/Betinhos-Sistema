@@ -6,6 +6,7 @@ import { AppShell } from "../components/layout/AppShell";
 import { FormMenu } from "../components/navigation/FormMenu";
 import type { DetailData } from "../types";
 import type { ExpensePhoto } from "../lib/expenses";
+import { formatQrChargeAmount, type QrCharge } from "../lib/qrCharge";
 
 type ReceiveScreenProps = {
   detail: DetailData;
@@ -17,6 +18,11 @@ type ReceiveScreenProps = {
   onGeneratePersonalReceipt?: () => void;
   canGeneratePersonalReceipt?: boolean;
   submitState?: ActionButtonState;
+  // Presente só para motorista liberado no cadastro e serviço com valor a receber.
+  onOpenQrCharge?: () => void;
+  qrChargePaid?: QrCharge;
+  // QR pago no valor total: a foto do comprovante vira opcional.
+  proofWaived?: boolean;
 };
 
 const normalizeLabel = (label: string) =>
@@ -40,7 +46,10 @@ export function ReceiveScreen({
   onContinue,
   onGeneratePersonalReceipt,
   canGeneratePersonalReceipt = false,
-  submitState = "idle"
+  submitState = "idle",
+  onOpenQrCharge,
+  qrChargePaid,
+  proofWaived = false
 }: ReceiveScreenProps) {
   const isSubmitting = submitState !== "idle";
   const photosRef = useRef<HTMLDivElement | null>(null);
@@ -57,7 +66,7 @@ export function ReceiveScreen({
 
   const continueFlow = () => {
     if (isSubmitting) return;
-    if (photos.length === 0) {
+    if (photos.length === 0 && !proofWaived) {
       setPhotosError("Adicione ao menos um comprovante para continuar.");
       focusInvalidField(photosRef.current);
       return;
@@ -86,10 +95,19 @@ export function ReceiveScreen({
                 </div>
               ) : null}
 
+              {qrChargePaid ? (
+                <p className="qr-charge-alert is-success" role="status">
+                  Pago por QR code: {formatQrChargeAmount(qrChargePaid.valorCentavos)}.{" "}
+                  {proofWaived ? "O comprovante é opcional." : "Envie o comprovante do restante."}
+                </p>
+              ) : onOpenQrCharge ? (
+                <ActionButton className="finalize-secondary receive-qr-charge" label="Cobrar por QR code" disabled={isSubmitting} onClick={onOpenQrCharge} />
+              ) : null}
+
               <div ref={photosRef} className={`finalize-input-block ${photosError ? "is-invalid" : ""}`} tabIndex={-1}>
                 <label className="form-field-label">
                   <span>Comprovante(s) de pagamento</span>
-                  <span className="form-field-required" aria-hidden="true">*</span>
+                  {proofWaived ? null : <span className="form-field-required" aria-hidden="true">*</span>}
                 </label>
                 <div className="maintenance-photo-grid">
                   {photos.map((photo, index) => (

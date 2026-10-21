@@ -29,6 +29,8 @@ import { createRemoteReadBatch } from "./remoteReadBatch.ts";
 import { buildCurrentVehiclePatch } from "./myVehicle.ts";
 import { buildIdeaRecord, normalizeIdeaRecord, validateIdeaDraft, type Idea, type IdeaDraft } from "./ideas.ts";
 import { decideExpenseUploadMode, type ExpenseUploadMode } from "./expenseUploadMode.ts";
+import { parseQrChargeResponse } from "./qrCharge.ts";
+import { createMockQrCharge, updateMockQrCharge } from "./qrChargeMock.ts";
 
 type XrmLike = {
   Utility?: {
@@ -258,7 +260,9 @@ const FLOW_URLS = {
   gerarVoucher: "VITE_FLOW_GERAR_VOUCHER_URL",
   salvarFotosManutencao: "VITE_FLOW_SALVAR_FOTOS_MANUTENCAO_URL",
   enviarReciboCliente: "VITE_FLOW_ENVIAR_RECIBO_CLIENTE_URL",
-  quickRead: "VITE_FLOW_LEITURA_RAPIDA_URL"
+  quickRead: "VITE_FLOW_LEITURA_RAPIDA_URL",
+  cobrancaQr: "VITE_FLOW_COBRANCA_QR_URL",
+  cobrancaQrStatus: "VITE_FLOW_COBRANCA_QR_STATUS_URL"
 } as const;
 
 const DEV_DATAVERSE_URL = "https://org23b93544.crm2.dynamics.com/";
@@ -268,7 +272,9 @@ const FLOW_DATAVERSE_ENVIRONMENT_VARIABLES: Record<string, string | undefined> =
   [FLOW_URLS.gerarVoucher]: "new_FlowURLFlowGerarVoucherAppMotoristasv2",
   [FLOW_URLS.salvarFotosManutencao]: "new_FlowURLFlowSalvarArquivosOnedrive",
   [FLOW_URLS.enviarReciboCliente]: "new_FlowURLFlowEnviarReciboCliente",
-  [FLOW_URLS.quickRead]: "new_FlowURLDespesaLeituraRapida"
+  [FLOW_URLS.quickRead]: "new_FlowURLDespesaLeituraRapida",
+  [FLOW_URLS.cobrancaQr]: "new_FlowURLCobrancaQR",
+  [FLOW_URLS.cobrancaQrStatus]: "new_FlowURLCobrancaQRStatus"
 };
 
 const GERAL_SELECT =
@@ -584,6 +590,8 @@ async function getCurrentUserEmail() {
   return email;
 }
 
+let qrPermissionColumnMissing = false;
+
 export async function getDriverContext(): Promise<DriverContext> {
   const email = await getCurrentUserEmail();
   if (!email && shouldUseLocalFrontendFallback()) {
@@ -597,6 +605,7 @@ export async function getDriverContext(): Promise<DriverContext> {
         cr40f_nomecompleto: "Localhost",
         cr40f_emailmicrosoft: "",
         cr40f_gerarrecibopersonalizado: true,
+        cr40f_podecobrarqrcode: true,
         // Teste local do "Meu carro": abra com ?mockTerceiro=1.
         ...(new URLSearchParams(window.location.search).get("mockTerceiro") === "1" ? { cr40f_tipodevinculo: 1 } : {})
       }
@@ -604,10 +613,18 @@ export async function getDriverContext(): Promise<DriverContext> {
   }
   if (!email) throw new Error("Email Microsoft do usuario atual nao foi encontrado no Dataverse.");
 
-  const result = await retrieveMultiple(
-    DATAVERSE.funcionarios,
-    `$select=cr40f_funcionariosid,cr40f_nomecompleto,cr40f_emailmicrosoft,_cr40f_veiculoatual_value,cr40f_tipodevinculo,cr40f_gerarrecibopersonalizado&$filter=cr40f_status eq 0 and cr40f_emailmicrosoft eq '${escapeODataText(email)}'&$top=2`
-  );
+  const driverQuery = (extraColumns: string) =>
+    `$select=cr40f_funcionariosid,cr40f_nomecompleto,cr40f_emailmicrosoft,_cr40f_veiculoatual_value,cr40f_tipodevinculo,cr40f_gerarrecibopersonalizado${extraColumns}&$filter=cr40f_status eq 0 and cr40f_emailmicrosoft eq '${escapeODataText(email)}'&$top=2`;
+  // A coluna da cobrança por QR pode ainda não existir no ambiente; sem ela o login não pode cair.
+  // Guarda a falha para não repetir a consulta inválida em cada chamada da sessão.
+  const result = await retrieveMultiple(DATAVERSE.funcionarios, driverQuery(qrPermissionColumnMissing ? "" : ",cr40f_podecobrarqrcode")).catch((error: unknown) => {
+    // Xrm.WebApi rejeita com objeto { message }, não com Error.
+    const message = String((error as { message?: unknown } | null)?.message ?? error);
+    if (qrPermissionColumnMissing || !message.includes("cr40f_podecobrarqrcode")) throw error;
+    qrPermissionColumnMissing = true;
+    dataverseWarn("Coluna cr40f_podecobrarqrcode ausente; cobrança por QR desativada.");
+    return retrieveMultiple(DATAVERSE.funcionarios, driverQuery(""));
+  });
   if (result.entities.length > 1) {
     throw new Error("Mais de um funcionario ativo usa o mesmo Email Microsoft. Corrija o cadastro antes de continuar.");
   }
@@ -3616,6 +3633,23 @@ export async function readReceiptQuick(imagemBase64: string, categorias: string[
   } finally {
     window.clearTimeout(timer);
   }
+}
+
+export type QrChargeRequest = {
+  reservaId: string;
+  motoristaId: string;
+  valorCentavos: number;
+};
+
+// Cria a cobrança no Stripe pelo Flow, sempre em reais; o Flow confere de novo o limite do valor a receber.
+export async function createQrChargeRemote(request: QrChargeRequest) {
+  if (shouldUseLocalFrontendFallback()) return createMockQrCharge(request.valorCentavos);
+  return parseQrChargeResponse(await runHttpFlow(FLOW_URLS.cobrancaQr, request));
+}
+
+export async function updateQrChargeRemote(sessionId: string, acao: "consultar" | "cancelar") {
+  if (shouldUseLocalFrontendFallback()) return updateMockQrCharge(sessionId, acao);
+  return parseQrChargeResponse(await runHttpFlow(FLOW_URLS.cobrancaQrStatus, { sessionId, acao }));
 }
 
 class HttpFlowError extends Error {

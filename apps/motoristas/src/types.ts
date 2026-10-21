@@ -7,6 +7,7 @@ export type Screen =
   | "detalhes"
   | "detalhesHistorico"
   | "receber"
+  | "cobrancaQr"
   | "reciboPersonalizado"
   | "voucher"
   | "assinatura"
