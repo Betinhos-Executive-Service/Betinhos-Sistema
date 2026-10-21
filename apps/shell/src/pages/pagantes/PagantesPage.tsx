@@ -174,7 +174,7 @@ function Pagantes({ host }: { host: Host }) {
   }
 
   return (
-    <div className="page pg-page">
+    <div className="page page--full pg-page">
       <div role="toolbar" aria-label="Comandos de pagantes">
         <ViewBar view={view} columns={PAGANTE_COLUMNS} filters={choices ? { fields } : undefined}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}

@@ -115,7 +115,7 @@ function Pessoas({ host }: { host: Host }) {
   }
 
   return (
-    <div className="page ps-page">
+    <div className="page page--full ps-page">
       <div role="toolbar" aria-label="Comandos de pessoas">
         <ViewBar view={view} columns={PESSOA_COLUMNS} filters={choices ? { fields } : undefined}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
