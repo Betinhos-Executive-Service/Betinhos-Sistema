@@ -1,11 +1,14 @@
 ﻿# Cria (ou atualiza) no DEV o flow HTTP "Flow - Consultar Arquivo OneDrive" e a variável de ambiente
 # new_URLFlowConsultarArquivoOneDrive, na solução AppBetinhos. Usado pela prévia dos comprovantes de
-# Despesas operacionais: recebe o id do item do OneDrive (cr40f_driveitemid) ou, nos comprovantes antigos
-# que só têm o link de compartilhamento (cr40f_sharelink), o link; devolve o conteúdo em base64, no mesmo
-# formato do "Flow - Consultar Arquivos Sharepoint" do Planner. Só lê arquivos dentro de /Despesas/.
+# Despesas operacionais e do checklist de vistoria: recebe o id do item do OneDrive (cr40f_driveitemid) ou,
+# nos arquivos que só têm o link de compartilhamento (cr40f_sharelink de comprovantes antigos; link das fotos do
+# checklist, gravadas pelo App Motoristas), o link; devolve o conteúdo em base64, no mesmo formato do
+# "Flow - Consultar Arquivos Sharepoint" do Planner. Só lê arquivos dentro de /Despesas/ (comprovantes) ou de
+# /Checklists/ (fotos do checklist: Checklists/[DEV/]<placa>/<data> <id>, gravadas pelo "Flow Salvar Arquivos
+# Onedrive" na raiz do OneDrive do noreply, sem pasta raiz extra). Qualquer outra pasta recebe 403.
 # Comprovantes novos (gravados no SharePoint do site BetinhosGestoInterna) chegam com origem = 'sharepoint' e
 # id = ItemId da biblioteca "Documentos Compartilhados": o ramo ViaSharePoint lê as propriedades do item
-# (GetFileItem), confere a pasta Despesas e devolve o conteúdo (GetFileContent). Sem origem, o ramo OneDrive
+# (GetFileItem), confere a pasta (Despesas ou Checklists) e devolve o conteúdo (GetFileContent). Sem origem, o ramo OneDrive
 # de sempre (id b!… ou link) segue igual, no else.
 # Idempotente. Antes de alterar um flow existente, salva o clientdata em packages/deploy/flows/backup/. Para reverter:
 #   powershell -File packages/deploy/provision-flow-consultar-onedrive.ps1 -Restaurar <arquivo de backup>
@@ -54,12 +57,14 @@ function Backup($row) {
   [IO.File]::WriteAllText($file, $row.clientdata, (New-Object Text.UTF8Encoding $false))
   Write-Host "[consultar-onedrive] backup: $file"
 }
-function Apply($row, [string] $clientData) {
+function Apply($row, [string] $clientData, [string] $description = '') {
   AssertSemMojibake $clientData 'clientdata a gravar'
   $id = $row.workflowid
   if ($row.statecode -eq 1) { Dv PATCH "workflows($id)" @{ statecode = 0 } | Out-Null }
   # Mesmo que a gravação falhe, o flow volta a ficar ativo (com a definição anterior) e o erro sobe.
-  try { Dv PATCH "workflows($id)" @{ clientdata = $clientData } | Out-Null }
+  $campos = @{ clientdata = $clientData }
+  if ($description) { AssertSemMojibake $description 'descrição a gravar'; $campos.description = $description }
+  try { Dv PATCH "workflows($id)" $campos | Out-Null }
   finally {
     Dv PATCH "workflows($id)" @{ statecode = 1 } | Out-Null
     $after = Dv GET "workflows($id)?`$select=statecode"
@@ -133,7 +138,10 @@ $definitionText = @'
         "DentroDeDespesasSP": {
           "type": "If", "runAfter": { "PropriedadesSP": ["Succeeded"] },
           "expression": { "and": [
-            { "contains": [ "@toLower(concat('/', string(body('PropriedadesSP')?['{Path}'])))", "/despesas/" ] },
+            { "or": [
+              { "contains": [ "@toLower(concat('/', string(body('PropriedadesSP')?['{Path}'])))", "/despesas/" ] },
+              { "contains": [ "@toLower(concat('/', string(body('PropriedadesSP')?['{Path}'])))", "/checklists/" ] }
+            ] },
             { "not": { "equals": [ "@body('PropriedadesSP')?['{IsFolder}']", true ] } }
           ] },
           "actions": {
@@ -157,7 +165,7 @@ $definitionText = @'
             }
           },
           "else": { "actions": {
-            "ForaDaPastaSP": { "type": "Response", "kind": "Http", "inputs": { "statusCode": 403, "body": { "sucesso": false, "erro": "Este arquivo não é um comprovante de despesa." } } }
+            "ForaDaPastaSP": { "type": "Response", "kind": "Http", "inputs": { "statusCode": 403, "body": { "sucesso": false, "erro": "Este arquivo não está numa pasta liberada para prévia." } } }
           } }
         },
         "FalhaSP": {
@@ -213,7 +221,10 @@ $definitionText = @'
           },
           "DentroDeDespesas": {
             "type": "If", "runAfter": { "Metadados": ["Succeeded"] },
-            "expression": { "and": [ { "startsWith": [ "@toLower(string(body('Metadados')?['Path']))", "/despesas/" ] } ] },
+            "expression": { "or": [
+              { "startsWith": [ "@toLower(string(body('Metadados')?['Path']))", "/despesas/" ] },
+              { "startsWith": [ "@toLower(string(body('Metadados')?['Path']))", "/checklists/" ] }
+            ] },
             "actions": {
               "Conteudo": {
                 "type": "OpenApiConnection", "runAfter": {}, "limit": { "timeout": "PT40S" },
@@ -235,7 +246,7 @@ $definitionText = @'
               }
             },
             "else": { "actions": {
-              "ForaDaPasta": { "type": "Response", "kind": "Http", "inputs": { "statusCode": 403, "body": { "sucesso": false, "erro": "Este arquivo não é um comprovante de despesa." } } }
+              "ForaDaPasta": { "type": "Response", "kind": "Http", "inputs": { "statusCode": 403, "body": { "sucesso": false, "erro": "Este arquivo não está numa pasta liberada para prévia." } } }
             } }
           },
           "Falha": {
@@ -257,17 +268,19 @@ $definition = $definitionText.Replace('__SITE_URL__', $siteUrl).Replace('__LIBRA
 AssertSemMojibake ($definition | ConvertTo-Json -Depth 90 -Compress) 'definição do script'
 $clientData = @{ properties = @{ definition = $definition; connectionReferences = @{ shared_onedriveforbusiness = $onedrive; shared_sharepointonline = $sharepoint } }; schemaVersion = '1.0.0.0' } | ConvertTo-Json -Depth 90 -Compress
 
-$flows = @((Dv GET "workflows?`$select=workflowid,statecode,clientdata&`$filter=name eq '$flowName' and category eq 5").value)
+$flowDescription = 'Lê um arquivo do OneDrive do noreply (comprovantes em /Despesas e fotos do checklist de vistoria em /Checklists) e devolve base64 para a prévia do Sistema Betinhos.'
+$flows = @((Dv GET "workflows?`$select=workflowid,statecode,clientdata,description&`$filter=name eq '$flowName' and category eq 5").value)
 if ($flows.Count -gt 1) { throw 'Flow duplicado no DEV.' }
 if ($flows.Count) {
   $flowId = $flows[0].workflowid
   AssertSemMojibake $flows[0].clientdata 'clientdata atual'
-  if ($flows[0].clientdata -ne $clientData) {
+  # A descrição só muda com o flow desligado, então segue junto da definição no mesmo Apply.
+  if ($flows[0].clientdata -ne $clientData -or $flows[0].description -ne $flowDescription) {
     Backup $flows[0]
-    Apply $flows[0] $clientData
+    Apply $flows[0] $clientData $flowDescription
   }
 } else {
-  Dv POST workflows @{ name = $flowName; category = 5; type = 1; primaryentity = 'none'; clientdata = $clientData; description = 'Lê um comprovante de despesa no OneDrive (pasta /Despesas) e devolve base64 para a prévia do Sistema Betinhos.' } | Out-Null
+  Dv POST workflows @{ name = $flowName; category = 5; type = 1; primaryentity = 'none'; clientdata = $clientData; description = $flowDescription } | Out-Null
   $flowId = @((Dv GET "workflows?`$select=workflowid&`$filter=name eq '$flowName' and category eq 5").value)[0].workflowid
 }
 Include $flowId 29
