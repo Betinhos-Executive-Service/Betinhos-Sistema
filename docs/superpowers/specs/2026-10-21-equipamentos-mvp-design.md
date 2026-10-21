@@ -30,12 +30,12 @@ Fora do escopo: histórico de entregas e devoluções, termo de responsabilidade
 6. Regras de coerência entre status e responsável são sugestões do shell, editáveis pelo usuário (seção 4.3).
 7. Número de série repetido gera aviso, não bloqueia (item pode ter sido recadastrado).
 8. Edição simultânea: vale a última gravação.
-9. Privilégios: as tabelas novas recebem os mesmos privilégios das funções de segurança que hoje acessam `cr40f_funcionarios`.
+9. Privilégios: as tabelas novas recebem os mesmos privilégios das funções de segurança que hoje acessam `cr40f_funcionarios` (script próprio, seção 6).
 10. Entrega no DEV. PROD fica para depois do congelamento do checklist, junto com o restante pela AppBetinhos.
 
 ## 4. Dados (Dataverse DEV)
 
-Criado por `packages/deploy/provision-equipamentos.ps1`, no molde de `provision-documentos.ps1`. Prefixo `cr40f_`, escopo organização, rótulos em pt-BR (1046).
+Criado por `packages/deploy/provision-equipamentos.ps1`, no molde de `provision-documentos.ps1`. Prefixo `cr40f_`, rótulos em pt-BR (1046). Tabelas **UserOwned** (o `Ensure-Table` do molde só cria assim; Documentos também é UserOwned): quem vê o quê depende da profundidade dos privilégios, copiada de `cr40f_funcionarios` (seção 6).
 
 ### 4.1 `cr40f_tipoequipamento` (nova)
 
@@ -77,10 +77,12 @@ Primitivas de `@betinhos/ui` e tokens do Design System (`DESIGN_SYSTEM.md`, `des
 
 - Cabeçalho: título, botões **Novo equipamento** e **Tipos**.
 - Lista via `useListView`: tabela no desktop, cards no celular.
-- Busca: descrição, marca/modelo, número de série, nome do responsável.
-- Filtros rápidos: Tipo, Status, Responsável, "Sem responsável".
-- Visão padrão esconde Baixados; o filtro de Status os traz de volta.
-- Colunas: Descrição, Tipo, Marca/modelo, Nº de série, Responsável (selo "Inativo" se o funcionário estiver inativo), Status (selo com texto), Compra (`dd/mm/aaaa · R$ 0,00`).
+- Busca: descrição, tipo, marca/modelo, número de série, nome do responsável.
+- Filtros rápidos por coluna (padrão do DS): Equipamento, Tipo, Responsável (só quem tem algum item), Status, Nº de série, Compra (pela data). Só no filtro avançado: Valor de compra e "Com responsável".
+- Visão padrão ("Equipamentos em uso e disponíveis") esconde Baixados pelo filtro rápido de Status (Em uso, Disponível, Em manutenção); escolher Baixado nesse filtro os traz de volta.
+- Visões prontas: "Todos, inclusive baixados", **"Sem responsável"** (Com responsável = Não, fora os baixados) e "Baixados".
+- Colunas, nesta ordem: Equipamento (descrição, com a marca/modelo embaixo), Tipo, Responsável (selo "Inativo" se o funcionário estiver inativo), Status (selo com texto), Nº de série, Compra (`dd/mm/aaaa · R$ 0,00`). Marca/modelo é coluna oculta por padrão (assim a tabela cabe em 1366 px sem rolar); o seletor de colunas a exibe.
+- Funcionário inativo = desligado (`cr40f_status` 1) ou registro inativo (`statecode` 1); Afastado conta como ativo (a confirmar com o Renan).
 - Estados: carregando, vazio ("Nenhum equipamento cadastrado." com ação Novo equipamento), sem resultado de filtro, erro (seção 7).
 
 ### 5.2 Drawer de cadastro/edição
@@ -89,7 +91,7 @@ Primitivas de `@betinhos/ui` e tokens do Design System (`DESIGN_SYSTEM.md`, `des
 - Tipo por seletor entre tipos ativos (o atual continua exibido se estiver inativo).
 - Salvar e Cancelar; sem Excluir.
 - Fecha por X, Esc ou clique no overlay. Com alteração não salva: confirmação "Descartar alterações?" com "Continuar editando" e "Descartar". Durante o salvamento não fecha.
-- Abertura direta por `#/equipamentos?id=<guid>`; id inexistente mostra aviso e mantém a lista.
+- Abertura direta por `#/equipamentos?ver=<guid>` (convenção `useQueryAlvo` do shell); id inexistente mostra aviso e "Voltar à lista".
 
 ### 5.3 Drawer de Tipos
 
@@ -100,7 +102,7 @@ Primitivas de `@betinhos/ui` e tokens do Design System (`DESIGN_SYSTEM.md`, `des
 
 - Nova aba entre Veículos e Anotações, só leitura, desabilitada em funcionário novo (como as demais relacionadas).
 - Lista os equipamentos com `cr40f_responsavel` = funcionário, exceto Baixados: descrição, tipo, nº de série, status.
-- Cada linha abre `#/equipamentos?id=<guid>`.
+- Cada linha abre `#/equipamentos?ver=<guid>`.
 - Vazio: "Nenhum equipamento com este funcionário."
 
 ## 6. Código e publicação
@@ -115,7 +117,9 @@ apps/shell/src/pages/equipamentos/
 
 Alterados: `nav/menu.ts` (item e tipo `page`), `app/routes.tsx` (rota lazy), `pages/funcionarios/components/RelatedTabs.tsx` + `Ficha.tsx` (aba) e a fonte de dados da ficha (consulta de equipamentos por funcionário).
 
-Schema: `packages/deploy/provision-equipamentos.ps1` cria tabelas, colunas, relacionamentos, semente de tipos e privilégios; inclui tudo na solução do `.env` e falha explicitamente se faltar permissão ou dependência. Só DEV.
+Schema: `packages/deploy/provision-equipamentos.ps1` cria tabelas, colunas, relacionamentos e semente de tipos; inclui tudo na solução do `.env` e falha explicitamente se faltar permissão ou dependência. Só DEV.
+
+Privilégios: script separado, `packages/deploy/conceder-privilegios-equipamentos.ps1` (rodar depois do provision), copia para as duas tabelas os privilégios e a profundidade que cada papel tem em `cr40f_funcionarios`. Papéis padrão (`-Roles`, convenção do repo, a mesma de Documentos): Acesso-Betinhos-Canvas, Acesso-Betinhos-MDA e DEV - Usuário. Os demais papéis que acessam `cr40f_funcionarios` e ficaram fora geram AVISO, sem concessão; entram com `-Roles` se for o caso.
 
 Publicação: PR → merge na `main` → `pnpm push` no checkout principal (regra do `CLAUDE.md`).
 
@@ -124,7 +128,7 @@ Publicação: PR → merge na `main` → `pnpm push` no checkout principal (regr
 | Situação | Comportamento |
 | --- | --- |
 | Falha ao carregar lista ou tipos | Alerta com a mensagem e botão "Tentar de novo"; versão do build visível |
-| Tabela ausente na metadata | Mensagem "Tabela cr40f_equipamento não encontrada." (ou a de tipo); sem cair em mock |
+| Tabela ausente na metadata | Mensagem padrão do shell "Tabela cr40f_equipamento não encontrada na metadata." (ou a de tipo); na ficha, só dentro da aba Equipamentos; sem cair em mock |
 | Falha ao salvar | Drawer continua aberto com os valores digitados e mostra a mensagem do Dataverse |
 | Validação | Descrição, tipo e status obrigatórios; valor ≥ 0; mensagens junto ao campo |
 | Série repetida | Aviso não bloqueante com a descrição do outro item |
@@ -134,7 +138,7 @@ Publicação: PR → merge na `main` → `pnpm push` no checkout principal (regr
 
 1. Vitest: `domain/` (regras 4.3, busca e filtros, validação, série repetida) e componentes (salvar, descartar alterações, overlay durante salvamento, aba na ficha). `pnpm typecheck` e `pnpm test` verdes.
 2. Navegador, `pnpm dev` em mock: `ux-audit` Rápido e Fluxo — cadastrar item, atribuir responsável, trocar responsável, baixar, filtrar "Sem responsável", gerenciar tipos, abrir item pela ficha. Desktop e 375 px.
-3. DEV: `provision-equipamentos.ps1` em dry run (confirma que as tabelas não existem), depois `-Apply`; conferir metadata (nomes lógicos, tipos, lookups) e pertencimento à solução. Após `pnpm push` da `main`, teste autenticado no DEV com um item real.
-4. Criar a skill `.claude/skills/verificar-equipamentos/` (via `verificacao-criar`).
+3. DEV: `provision-equipamentos.ps1` em dry run (confirma que as tabelas não existem), depois `-Apply`; conferir metadata (nomes lógicos, tipos, lookups) e pertencimento à solução. Em seguida `conceder-privilegios-equipamentos.ps1` em dry run (`prvRead*` Global) e `-Apply`. Após `pnpm push` da `main`, teste autenticado no DEV com um item real.
+4. Skill `.claude/skills/verificar-equipamentos/` (roteiro em mock `fluxo-mock.cjs` e verificação no DEV).
 
-Casos de borda a cobrir: funcionário desligado com item atribuído; tipo inativado com itens; item sem número de série; valor de compra vazio; `?id=` inexistente; lista vazia; Baixado com responsável (formulário impede).
+Casos de borda a cobrir: funcionário desligado com item atribuído; tipo inativado com itens; item sem número de série; valor de compra vazio; `?ver=` inexistente; lista vazia; Baixado com responsável (formulário impede).

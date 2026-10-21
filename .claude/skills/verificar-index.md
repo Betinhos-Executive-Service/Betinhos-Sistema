@@ -4,4 +4,5 @@
 - verificar-ambiente-cloud | scripts/cloud-setup.sh, scripts/testa-cloud-setup.sh, .claude/hooks/session-start.sh, .claude/settings.json, .gitignore (.claude/), .npmrc | Hook SessionStart que prepara a VM cloud do Claude Code (Node 24, pnpm, deps, Chromium, typecheck)
 - verificar-plantao | scripts/plantao/**, packages/deploy/criar-identidade-plantao.ps1 | Coletor e mascaramento do plantão de erros, identidade só-leitura
 - verificar-deploy-dev | .github/workflows/deploy.yml, packages/deploy/bump-version.mjs, packages/deploy/push-dev.ps1 | Workflow Deploy: push em dev publica a tela no DEV (só DEV, barato)
+- verificar-equipamentos | apps/shell/src/pages/equipamentos/**, apps/shell/src/pages/funcionarios/** (aba Equipamentos), packages/deploy/provision-equipamentos.ps1, packages/deploy/conceder-privilegios-equipamentos.ps1 | Testes e fluxo em mock de #/equipamentos (desktop e 375 px, roteiro Playwright), aba na ficha, schema e privilégios no DEV
 <!-- Sem roteiro ainda: apps/escala-fds/**, packages/despesas-ia/** -->
