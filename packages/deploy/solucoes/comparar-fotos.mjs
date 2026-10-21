@@ -1,14 +1,15 @@
-import { pathToFileURL } from 'node:url'
-import { lerJson } from './arquivo.mjs'
+import { lerJson, rodandoComoCli } from './arquivo.mjs'
 
 const ordenado = (lista) => [...lista].sort()
 
-// Diferenças entre duas fotos do mesmo ambiente. Perda = algo que existia e sumiu, caiu ou mudou de valor.
+// Diferenças entre duas fotos do mesmo ambiente. Perda = algo que existia e sumiu, caiu, perdeu a configuração
+// segura ou foi desligado. Ligar um fluxo ou habilitar um step aparece nas listas informativas, mas não é perda
+// (a spec diz que fluxos ligados continuam ligados).
 export function compararFotos(antes, depois) {
   const d = {
     registrosCairam: [], registrosMudaram: [], tabelasSumiram: [],
-    fluxosSumiram: [], fluxosMudaramEstado: [],
-    stepsSumiram: [], stepsMudaramEstado: [], stepsPerderamSeguro: [],
+    fluxosSumiram: [], fluxosMudaramEstado: [], fluxosDesligados: [],
+    stepsSumiram: [], stepsMudaramEstado: [], stepsDesativados: [], stepsPerderamSeguro: [],
     variaveisSumiram: [], variaveisMudaram: [],
     componentesSumiram: [], donosMudaram: [], versoes: [],
   }
@@ -24,12 +25,18 @@ export function compararFotos(antes, depois) {
   for (const [id, f] of Object.entries(antes.fluxos)) {
     const g = depois.fluxos[id]
     if (!g) d.fluxosSumiram.push({ id, nome: f.nome })
-    else if (g.estado !== f.estado) d.fluxosMudaramEstado.push({ id, nome: f.nome, antes: f.estado, depois: g.estado })
+    else if (g.estado !== f.estado) {
+      d.fluxosMudaramEstado.push({ id, nome: f.nome, antes: f.estado, depois: g.estado })
+      if (f.estado === 1 && g.estado !== 1) d.fluxosDesligados.push({ id, nome: f.nome, antes: f.estado, depois: g.estado })
+    }
   }
   for (const [id, s] of Object.entries(antes.steps)) {
     const t = depois.steps[id]
     if (!t) { d.stepsSumiram.push({ id, nome: s.nome }); continue }
-    if (t.estado !== s.estado) d.stepsMudaramEstado.push({ id, nome: s.nome, antes: s.estado, depois: t.estado })
+    if (t.estado !== s.estado) {
+      d.stepsMudaramEstado.push({ id, nome: s.nome, antes: s.estado, depois: t.estado })
+      if (s.estado === 0 && t.estado !== 0) d.stepsDesativados.push({ id, nome: s.nome, antes: s.estado, depois: t.estado })
+    }
     if (s.seguro && !t.seguro) d.stepsPerderamSeguro.push({ id, nome: s.nome })
   }
   for (const [nome, hash] of Object.entries(antes.variaveis)) {
@@ -48,11 +55,11 @@ export function compararFotos(antes, depois) {
 }
 
 export function temPerda(d) {
-  return [d.registrosCairam, d.tabelasSumiram, d.fluxosSumiram, d.fluxosMudaramEstado, d.stepsSumiram, d.stepsMudaramEstado,
+  return [d.registrosCairam, d.tabelasSumiram, d.fluxosSumiram, d.fluxosDesligados, d.stepsSumiram, d.stepsDesativados,
     d.stepsPerderamSeguro, d.variaveisSumiram, d.variaveisMudaram, d.componentesSumiram].some((lista) => lista.length > 0)
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (rodandoComoCli(import.meta.url)) {
   const d = compararFotos(await lerJson(process.argv[2]), await lerJson(process.argv[3]))
   process.stdout.write(JSON.stringify(d, null, 2))
   process.exitCode = temPerda(d) ? 1 : 0

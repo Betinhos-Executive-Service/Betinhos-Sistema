@@ -30,10 +30,25 @@ test('contagem aproximada não acusa queda', () => {
   assert.deepEqual(d.registrosCairam, [])
 })
 test('fluxo desligado é perda', () => assert.equal(temPerda(compararFotos(foto(), foto({ fluxos: { f1: { nome: 'Fluxo 1', estado: 0 } } }))), true))
+test('fluxo ligado pelo import não é perda', () => {
+  const d = compararFotos(foto({ fluxos: { f1: { nome: 'Fluxo 1', estado: 0 } } }), foto())
+  assert.deepEqual(d.fluxosMudaramEstado, [{ id: 'f1', nome: 'Fluxo 1', antes: 0, depois: 1 }])
+  assert.equal(temPerda(d), false)
+})
 test('step sem configuração segura é perda', () => {
   const d = compararFotos(foto(), foto({ steps: { s1: { nome: 'Step 1', estado: 0, seguro: false } } }))
   assert.deepEqual(d.stepsPerderamSeguro, [{ id: 's1', nome: 'Step 1' }])
   assert.equal(temPerda(d), true)
+})
+test('step desativado é perda', () => {
+  const d = compararFotos(foto(), foto({ steps: { s1: { nome: 'Step 1', estado: 1, seguro: true } } }))
+  assert.deepEqual(d.stepsDesativados, [{ id: 's1', nome: 'Step 1', antes: 0, depois: 1 }])
+  assert.equal(temPerda(d), true)
+})
+test('step habilitado não é perda', () => {
+  const d = compararFotos(foto({ steps: { s1: { nome: 'Step 1', estado: 1, seguro: true } } }), foto())
+  assert.deepEqual(d.stepsMudaramEstado, [{ id: 's1', nome: 'Step 1', antes: 1, depois: 0 }])
+  assert.equal(temPerda(d), false)
 })
 test('variável com valor diferente é perda', () => assert.equal(temPerda(compararFotos(foto(), foto({ variaveis: { new_X: 'h2' } }))), true))
 test('troca de dono não é perda, mas aparece', () => {

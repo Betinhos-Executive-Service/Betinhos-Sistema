@@ -1,5 +1,4 @@
-import { pathToFileURL } from 'node:url'
-import { lerJson } from './arquivo.mjs'
+import { lerJson, rodandoComoCli } from './arquivo.mjs'
 
 function donosPorId(porSolucao) {
   const donos = new Map()
@@ -41,7 +40,7 @@ export function conferenciaOk(cobertura, violacoes) {
   return !cobertura.semDono.length && !cobertura.emDuas.length && !cobertura.foraDoLugar.length && !violacoes.length
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (rodandoComoCli(import.meta.url)) {
   const entrada = await lerJson(process.argv[2])
   const cobertura = conferirCobertura(entrada)
   const violacoes = conferirDependencias(entrada)

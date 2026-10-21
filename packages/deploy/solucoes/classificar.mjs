@@ -1,5 +1,4 @@
-import { pathToFileURL } from 'node:url'
-import { lerJson } from './arquivo.mjs'
+import { lerJson, rodandoComoCli } from './arquivo.mjs'
 
 // Decide a solução de cada componente da caixa de entrada (AppBetinhos no DEV).
 // Tipos < 10000 são fixos no Dataverse; os >= 10000 mudam por ambiente e chegam pelo nome da entidade.
@@ -44,7 +43,7 @@ export function classificar(componentes, regras) {
   return { atribuicoes, semRegra, proibidos }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (rodandoComoCli(import.meta.url)) {
   const [componentesPath, regrasPath] = process.argv.slice(2)
   const regras = await lerJson(regrasPath)
   validarRegras(regras)
