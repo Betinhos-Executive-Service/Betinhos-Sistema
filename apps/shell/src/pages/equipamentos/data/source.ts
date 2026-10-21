@@ -23,14 +23,17 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 function createMockSource(): Source {
   let seq = 100
   const nextId = (prefix: string) => { seq += 1; return `${prefix}-0000-4000-8000-${String(seq).padStart(12, '0')}` }
+  const equipamentos = new Set(createMockEquipamentos().map((e) => e.id))
+  const tipos = new Set(createMockTipos().map((t) => t.id))
+  const exists = (ids: Set<string>, id: string, what: string) => { if (!ids.has(cleanId(id))) throw new Error(`${what} não encontrado.`) }
   return {
     mock: true,
     async load() { await wait(300); return { equipamentos: createMockEquipamentos(), tipos: createMockTipos(), pessoas: createMockPessoas() } },
-    async create() { await wait(400); return nextId('eeeeeeee') },
-    async update() { await wait(400) },
-    async createTipo() { await wait(300); return nextId('dddddddd') },
-    async renameTipo() { await wait(300) },
-    async setTipoAtivo() { await wait(300) },
+    async create() { await wait(400); const id = nextId('eeeeeeee'); equipamentos.add(id); return id },
+    async update(id) { await wait(400); exists(equipamentos, id, 'Equipamento') },
+    async createTipo() { await wait(300); const id = nextId('dddddddd'); tipos.add(id); return id },
+    async renameTipo(id) { await wait(300); exists(tipos, id, 'Tipo') },
+    async setTipoAtivo(id) { await wait(300); exists(tipos, id, 'Tipo') },
   }
 }
 
@@ -52,10 +55,12 @@ export function createSource(host: Host): Source {
     create: async (c) => { const s = await entitySets(); return cleanId(await host.client.create(s.equipamento, toPayload(c, s))) },
     async update(id, c) {
       const s = await entitySets()
+      // Limpar lookup: DELETE na referência, nunca `@odata.bind: null` (padrão de operacional/data/mutations.ts).
+      // Vem ANTES do PATCH: se o PATCH falhar depois, o item fica sem responsável com o status antigo;
+      // na ordem inversa, uma falha no DELETE deixaria "Baixado com responsável".
+      if (c.responsavelId === null) await host.client.request(responsavelRefPath(s.equipamento, id), { method: 'DELETE' })
       const payload = toPayload(c, s)
       if (Object.keys(payload).length) await host.client.update(s.equipamento, id, payload)
-      // Limpar lookup: DELETE na referência, nunca `@odata.bind: null` (padrão de operacional/data/mutations.ts).
-      if (c.responsavelId === null) await host.client.request(responsavelRefPath(s.equipamento, id), { method: 'DELETE' })
     },
     createTipo: async (nome) => cleanId(await host.client.create((await entitySets()).tipo, { cr40f_name: nome.trim() })),
     renameTipo: async (id, nome) => host.client.update((await entitySets()).tipo, id, { cr40f_name: nome.trim() }),
