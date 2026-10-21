@@ -33,6 +33,16 @@ $script:respostas = @($null); $script:chamadas = @()
 Add-ComponenteNaSolucao $dv @{ id = 'def'; tipo = 1; comportamento = 1 } 'BetinhosCore'
 Confere (($script:chamadas[0].Body | ConvertFrom-Json).DoNotIncludeSubcomponents -eq $true) 'tabela sem subcomponentes'
 
+# Remove-ComponenteDaSolucao: a Web API recebe o objectid do componente em SolutionComponent.solutioncomponentid
+$script:respostas = @([pscustomobject]@{ value = @([pscustomobject]@{ solutionid = 'sid' }) }, [pscustomobject]@{ value = @([pscustomobject]@{ solutioncomponentid = 'linha' }) }, [pscustomobject]@{}); $script:chamadas = @()
+Remove-ComponenteDaSolucao $dv 'abc' 381 'BetinhosCore'
+$b = $script:chamadas[2].Body | ConvertFrom-Json
+Confere ($script:chamadas[2].Uri -like '*/RemoveSolutionComponent' -and $b.SolutionComponent.solutioncomponentid -eq 'abc' -and $b.ComponentType -eq 381 -and $b.SolutionUniqueName -eq 'BetinhosCore') 'remover usa o objectid, o tipo e a solucao'
+$script:respostas = @([pscustomobject]@{ value = @([pscustomobject]@{ solutionid = 'sid' }) }, [pscustomobject]@{ value = @() }); $script:chamadas = @()
+$falhouSemLinha = $false
+try { Remove-ComponenteDaSolucao $dv 'abc' 381 'BetinhosCore' } catch { $falhouSemLinha = ($_.Exception.Message -like '*achei 0*') }
+Confere ($falhouSemLinha -and $script:chamadas.Count -eq 2) 'remover sem linha na solucao falha sem chamar a acao'
+
 # Get-HashDoPacote: ignora solution.xml e a ordem das entradas; muda quando o conteudo muda
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 function Novo-Zip([string] $Caminho, [object[]] $Entradas) {

@@ -19,6 +19,18 @@ test('Custom API e parâmetros vão para a Automação', () => {
 })
 test('WebResource comum vai para a Interface', () => assert.equal(solucaoDe(c(61, { nome: 'cr40f_SistemaBetinhos.html' })), 'BetinhosInterface'))
 test('WebResource do app de motoristas vai para Motoristas', () => assert.equal(solucaoDe(c(61, { nome: 'new_app-motoristas-v2' })), 'BetinhosMotoristas'))
+test('biblioteca de comandos do ribbon de tabela vai para o Core, não para a Interface', () => {
+  assert.equal(solucaoDe(c(61, { nome: 'new_troca_operacional_commands' })), 'BetinhosCore')
+  assert.equal(solucaoDe(c(61, { nome: 'new_model_driven_formulario_geral_command.js' })), 'BetinhosCore')
+})
+test('ícone de tabela do Core vai para o Core', () => {
+  for (const nome of ['new_moneyreceivesvgrepocom', 'new_judgesvgrepocom', 'cr40f_megaphonesvgrepocom']) assert.equal(solucaoDe(c(61, { nome })), 'BetinhosCore', nome)
+})
+test('biblioteca de formulário de tabela usada pelo app de motoristas vai para o Core', () => {
+  assert.equal(solucaoDe(c(61, { nome: 'new_appmotoristas_push_redirect.js' })), 'BetinhosCore')
+  assert.equal(solucaoDe(c(61, { nome: 'new_comunicadodestinatario_redirect.js' })), 'BetinhosMotoristas')
+})
+test('logo usado pelos dois apps (Interface e Motoristas) vai para o Core', () => assert.equal(solucaoDe(c(61, { nome: 'cr40f_LogoBetinhosB' })), 'BetinhosCore'))
 test('app e sitemap de motoristas vão para Motoristas', () => {
   assert.equal(solucaoDe(c(80, { nome: 'new_AppMotoristasv2' })), 'BetinhosMotoristas')
   assert.equal(solucaoDe(c(62, { nome: 'new_AppMotoristasv2' })), 'BetinhosMotoristas')
@@ -27,6 +39,16 @@ test('app e sitemap de motoristas vão para Motoristas', () => {
 test('configuração de app segue o app pai', () => {
   assert.equal(solucaoDe(c(10091, { entidade: 'appsetting', app: 'new_AppMotoristasv2' })), 'BetinhosMotoristas')
   assert.equal(solucaoDe(c(10091, { entidade: 'appsetting', app: 'cr40f_ModelDrivenBetinhos' })), 'BetinhosInterface')
+})
+test('busca do Dataverse segue o app: o dvtablesearch só existe numa solução junto com o app', () => {
+  assert.equal(solucaoDe(c(10159, { entidade: 'dvtablesearch', nome: 'M365_Primary_model_new_AppMotoristasv2', app: 'new_AppMotoristasv2' })), 'BetinhosMotoristas')
+  assert.equal(solucaoDe(c(10159, { entidade: 'dvtablesearch', nome: 'M365_Primary_model_cr40f_ModelDrivenBetinhos', app: 'cr40f_ModelDrivenBetinhos' })), 'BetinhosInterface')
+  assert.equal(solucaoDe(c(10159, { entidade: 'dvtablesearch', nome: 'outra', app: null })), 'BetinhosCore')
+})
+test('entidades da busca do Dataverse seguem o app do dvtablesearch pai', () => {
+  assert.equal(solucaoDe(c(10161, { entidade: 'dvtablesearchentity', app: 'new_AppMotoristasv2' })), 'BetinhosMotoristas')
+  assert.equal(solucaoDe(c(10161, { entidade: 'dvtablesearchentity', app: 'cr40f_ModelDrivenBetinhos' })), 'BetinhosInterface')
+  assert.equal(solucaoDe(c(10161, { entidade: 'dvtablesearchentity', app: null })), 'BetinhosCore')
 })
 test('servidor MCP vai para Motoristas', () => assert.equal(solucaoDe(c(10288, { entidade: 'mcpserver' })), 'BetinhosMotoristas'))
 test('valor de variável é proibido', () => {

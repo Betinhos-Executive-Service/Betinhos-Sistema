@@ -38,12 +38,20 @@
     "mcpserver": "BetinhosMotoristas"
   },
   "excecoes": [
-    { "tipo": "61", "nomes": ["new_app-motoristas-v2", "new_appmotoristas_push_redirect.js", "new_comunicadodestinatario_redirect.js"], "solucao": "BetinhosMotoristas" },
+    { "tipo": "61", "nomes": ["new_app-motoristas-v2", "new_comunicadodestinatario_redirect.js"], "solucao": "BetinhosMotoristas" },
+    { "tipo": "61", "nomes": ["new_troca_operacional_commands", "new_model_driven_formulario_geral_command.js"], "solucao": "BetinhosCore" },
+    { "tipo": "61", "nomes": ["new_moneyreceivesvgrepocom", "new_judgesvgrepocom", "cr40f_megaphonesvgrepocom"], "solucao": "BetinhosCore" },
+    { "tipo": "61", "nomes": ["new_appmotoristas_push_redirect.js"], "solucao": "BetinhosCore" },
+    { "tipo": "61", "nomes": ["cr40f_LogoBetinhosB"], "solucao": "BetinhosCore" },
     { "tipo": "80", "nomes": ["new_AppMotoristasv2"], "solucao": "BetinhosMotoristas" },
     { "tipo": "62", "nomes": ["new_AppMotoristasv2"], "solucao": "BetinhosMotoristas" },
     { "tipo": "300", "nomes": ["new_appbetinhosmotoristas_8fcab"], "solucao": "BetinhosMotoristas" },
     { "tipo": "appsetting", "app": "new_AppMotoristasv2", "solucao": "BetinhosMotoristas" },
     { "tipo": "appelement", "app": "new_AppMotoristasv2", "solucao": "BetinhosMotoristas" },
+    { "tipo": "dvtablesearch", "app": "new_AppMotoristasv2", "solucao": "BetinhosMotoristas" },
+    { "tipo": "dvtablesearchentity", "app": "new_AppMotoristasv2", "solucao": "BetinhosMotoristas" },
+    { "tipo": "dvtablesearch", "app": "cr40f_ModelDrivenBetinhos", "solucao": "BetinhosInterface" },
+    { "tipo": "dvtablesearchentity", "app": "cr40f_ModelDrivenBetinhos", "solucao": "BetinhosInterface" },
     { "tipo": "1", "bpf": true, "solucao": "BetinhosAutomacao" }
   ],
   "proibidos": {

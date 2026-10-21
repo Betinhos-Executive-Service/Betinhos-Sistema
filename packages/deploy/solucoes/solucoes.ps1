@@ -39,6 +39,20 @@ function Get-ComponentesDaSolucao($Dv, [string] $SolucaoId, [hashtable] $TiposPo
       if ($pai) { $paiDoApp[([string] $r.($par[1])).ToLowerInvariant()] = $apps[$pai.ToLowerInvariant()] }
     }
   }
+  # Busca do Dataverse: o dvtablesearch se chama M365_Primary_model_<app> e so existe numa solucao junto com o app;
+  # as dvtablesearchentity seguem o dvtablesearch pai. Por isso herdam o app, como as configuracoes e elementos de app.
+  $appPorBusca = @{}
+  foreach ($r in Read-DvAll $Dv "dvtablesearchs?`$select=dvtablesearchid,name") {
+    if (([string] $r.name) -match '^M365_Primary_model_(.+)$' -and $apps.ContainsValue($Matches[1])) {
+      $idBusca = ([string] $r.dvtablesearchid).ToLowerInvariant()
+      $appPorBusca[$idBusca] = $Matches[1]
+      $paiDoApp[$idBusca] = $Matches[1]
+    }
+  }
+  foreach ($r in Read-DvAll $Dv "dvtablesearchentities?`$select=dvtablesearchentityid,_dvtablesearch_value") {
+    $pai = ([string] $r._dvtablesearch_value).ToLowerInvariant()
+    if ($appPorBusca.ContainsKey($pai)) { $paiDoApp[([string] $r.dvtablesearchentityid).ToLowerInvariant()] = $appPorBusca[$pai] }
+  }
   $bpf = @{}
   foreach ($e in Read-DvAll $Dv "EntityDefinitions?`$select=MetadataId,IsBPFEntity") { if ($e.IsBPFEntity) { $bpf[([string] $e.MetadataId).ToLowerInvariant()] = $true } }
   $resumo = @{}
@@ -64,6 +78,19 @@ function Add-ComponenteNaSolucao($Dv, $Componente, [string] $Solucao) {
   Invoke-DvAction $Dv "AddSolutionComponent" @{
     ComponentId = $Componente.id; ComponentType = [int] $Componente.tipo; SolutionUniqueName = $Solucao
     AddRequiredComponents = $false; DoNotIncludeSubcomponents = ([int] $Componente.comportamento -ne 0); IncludedComponentSettingsValues = $null
+  } | Out-Null
+}
+
+# Tira o componente de UMA solucao nao gerenciada (o componente em si nao e apagado).
+# Na Web API o parametro SolutionComponent leva o objectid do componente em solutioncomponentid (nao o id da linha de solutioncomponents).
+function Remove-ComponenteDaSolucao($Dv, [string] $ComponentId, [int] $Tipo, [string] $Solucao) {
+  $solucaoId = Get-SolucaoId $Dv $Solucao
+  if (-not $solucaoId) { throw "Solucao $Solucao nao encontrada." }
+  $linhas = @(Read-DvAll $Dv "solutioncomponents?`$select=solutioncomponentid&`$filter=_solutionid_value eq $solucaoId and objectid eq $ComponentId and componenttype eq $Tipo")
+  if ($linhas.Count -ne 1) { throw "Esperava 1 linha de solutioncomponents para $ComponentId (tipo $Tipo) em $Solucao, achei $($linhas.Count)." }
+  Invoke-DvAction $Dv "RemoveSolutionComponent" @{
+    SolutionComponent = @{ "@odata.type" = "Microsoft.Dynamics.CRM.solutioncomponent"; solutioncomponentid = $ComponentId }
+    ComponentType = $Tipo; SolutionUniqueName = $Solucao
   } | Out-Null
 }
 

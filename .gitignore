@@ -20,3 +20,4 @@ packages/plugins/**/bin/
 packages/plugins/**/obj/
 packages/agentes-ia/.local/
 .verificacao/
+backup/
