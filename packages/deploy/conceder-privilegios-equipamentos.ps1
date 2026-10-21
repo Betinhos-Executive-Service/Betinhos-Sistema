@@ -140,6 +140,8 @@ foreach ($nome in $Roles) {
     }
   }
   if ($concessoes.Count -eq 0) { Write-Step "$nome nao tem privilegio em cr40f_funcionarios; nada a conceder"; continue }
+  # Tabelas UserOwned: leitura abaixo de Global esconde os registros de outros donos (os tipos semeados ficam com quem rodou o provision).
+  foreach ($c in @($concessoes | Where-Object { $_.PrivilegeName -like "prvRead*" -and $_.Depth -ne "Global" })) { Write-Step "AVISO: $nome recebe $($c.PrivilegeName) com profundidade $($c.Depth); usuarios desse papel nao verao itens/tipos de outros donos (o spec espera Global)." }
   $resumo = ($concessoes | ForEach-Object { "$($_.PrivilegeName)=$($_.Depth)" }) -join ", "
   if (-not $Apply) { Write-Step "DRY RUN $nome receberia: $resumo"; continue }
   Invoke-Dataverse "POST" "roles($($papel.roleid))/Microsoft.Dynamics.CRM.AddPrivilegesRole" @{ Privileges = $concessoes } | Out-Null

@@ -184,9 +184,10 @@ export function createXrmSource(xrm: XrmHost): DataSource {
     },
 
     async equipamentos(id): Promise<EquipamentoResumo[]> {
-      // A aba mostra só o que está com a pessoa: baixado fica de fora.
+      // A aba mostra só o que está com a pessoa: baixado fica de fora. `ne` no Dataverse não traz nulos:
+      // item sem status (gravado fora do shell) entra explicitamente, como no mock.
       const tabela = EQUIPAMENTO_ENTITIES.equipamento
-      const filter = `_cr40f_responsavel_value eq ${guid(id, 'funcionário')} and cr40f_status ne ${STATUS.baixado}`
+      const filter = `_cr40f_responsavel_value eq ${guid(id, 'funcionário')} and (cr40f_status ne ${STATUS.baixado} or cr40f_status eq null)`
       let rows: Row[]
       try {
         rows = await retrieveAll(tabela, `?$select=cr40f_equipamentoid,cr40f_name,_cr40f_tipo_value,cr40f_numeroserie,cr40f_status&$filter=${filter}&$orderby=cr40f_name asc`)

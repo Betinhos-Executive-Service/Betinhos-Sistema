@@ -52,6 +52,8 @@ describe('validação', () => {
     const base = { ...emptyForm(), descricao: 'X', tipoId: 't1' }
     expect(validateForm({ ...base, valorCompra: '-10' }).valorCompra).toBe('Valor inválido. Use o formato 1.467,35.')
     expect(validateForm({ ...base, valorCompra: '3.499,90' })).toEqual({})
+    expect(validateForm({ ...base, valorCompra: '1.000.000.000,00' })).toEqual({})
+    expect(validateForm({ ...base, valorCompra: '1.000.000.000,01' }).valorCompra).toBe('No máximo R$ 1.000.000.000,00.')
   })
   it('Baixado com responsável é erro', () => {
     expect(validateForm({ ...emptyForm(), descricao: 'X', tipoId: 't1', status: S(STATUS.baixado), responsavelId: 'p1' }).responsavelId).toBe('Item baixado não fica com responsável.')

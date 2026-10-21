@@ -50,7 +50,9 @@ function Equipamentos({ host }: { host: Host }) {
     return sortEquipamentos(list, view.config.sort)
   }, [data.equipamentos, filters, fields, query, view.config.sort])
   // Lazy loading de renderização: trocar filtro, busca ou ordenação volta ao primeiro lote; recarregar a lista não.
-  const lazyKey = useMemo(() => ({ filters, query, sort: view.config.sort }), [filters, query, view.config.sort])
+  // Chave por conteúdo: `fields` depende dos itens (filtro de Responsável), então salvar ou recarregar gera outro
+  // objeto `filters` com o mesmo conteúdo, e uma chave por referência voltaria ao primeiro lote a cada gravação.
+  const lazyKey = useMemo(() => JSON.stringify({ filters, query, sort: view.config.sort }), [filters, query, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
   const clearAll = () => { clearFilters(); setQuery('') }
   const [tiposOpen, setTiposOpen] = useState(false)
