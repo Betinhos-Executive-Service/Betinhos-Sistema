@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { buildCountFetch, buildFetch, defaultSort, linkEntities, quickFindAttributes } from './fetch'
+import { searchConditions } from './search'
 
 const AGENDA = `<fetch version="1.0" output-format="xml-platform" mapping="logical" distinct="false" count="25" page="3" paging-cookie="x" returntotalrecordcount="false">
 <entity name="cr40f_reservadeveculos"><attribute name="cr40f_id" /><attribute name="cr40f_status" /><attribute name="cr40f_dataehorriodesada" />
@@ -15,7 +16,7 @@ const QUICK = `<fetch><entity name="cr40f_reservadeveculos"><attribute name="cr4
 </entity></fetch>`
 
 const parse = (xml: string) => new DOMParser().parseFromString(xml, 'text/xml')
-const base = { page: 1, pageSize: 50, cookie: null, sort: null, query: '', quickFind: [] as string[] }
+const base = { page: 1, pageSize: 50, cookie: null, sort: null, search: [] }
 
 describe('buildFetch', () => {
   it('garante statecode entre os atributos da raiz', () => {
@@ -57,7 +58,7 @@ describe('buildFetch', () => {
   })
 
   it('busca vira filtro OR com like em qualquer parte de cada campo', () => {
-    const doc = parse(buildFetch(AGENDA, { ...base, query: "OS-19 d'água", quickFind: ['cr40f_id', 'cr40f_trajeto'] }))
+    const doc = parse(buildFetch(AGENDA, { ...base, search: searchConditions("OS-19 d'água", ['cr40f_id', 'cr40f_trajeto']) }))
     const filters = doc.querySelectorAll('entity > filter')
     expect(filters.length).toBe(2)
     const or = filters[1]
@@ -70,8 +71,8 @@ describe('buildFetch', () => {
   })
 
   it('busca vazia ou sem campos não acrescenta filtro', () => {
-    expect(parse(buildFetch(AGENDA, { ...base, query: '   ', quickFind: ['cr40f_id'] })).querySelectorAll('entity > filter').length).toBe(1)
-    expect(parse(buildFetch(AGENDA, { ...base, query: 'x', quickFind: [] })).querySelectorAll('entity > filter').length).toBe(1)
+    expect(parse(buildFetch(AGENDA, { ...base, search: searchConditions('   ', ['cr40f_id']) })).querySelectorAll('entity > filter').length).toBe(1)
+    expect(parse(buildFetch(AGENDA, { ...base, search: searchConditions('x', []) })).querySelectorAll('entity > filter').length).toBe(1)
   })
 
   it('FetchXML inválido lança erro legível', () => {
@@ -80,7 +81,7 @@ describe('buildFetch', () => {
 })
 
 describe('buildCountFetch', () => {
-  const count = (query = '', quickFind: string[] = []) => parse(buildCountFetch(AGENDA, { query, quickFind }))
+  const count = (query = '', quickFind: string[] = []) => parse(buildCountFetch(AGENDA, { search: searchConditions(query, quickFind) }))
 
   it('vira agregação de contagem: sem paginação, ordem e atributos da visão', () => {
     const doc = count()
@@ -115,8 +116,8 @@ describe('buildCountFetch', () => {
 
   it('remove order de link-entity e FetchXML inválido lança erro legível', () => {
     const withLinkOrder = AGENDA.replace('<attribute name="new_valortotal" />', '<attribute name="new_valortotal" /><order attribute="new_valortotal" />')
-    expect(parse(buildCountFetch(withLinkOrder, { query: '', quickFind: [] })).querySelectorAll('order').length).toBe(0)
-    expect(() => buildCountFetch('<fetch><entity>', { query: '', quickFind: [] })).toThrow('FetchXML da visão inválido.')
+    expect(parse(buildCountFetch(withLinkOrder, { search: searchConditions('', []) })).querySelectorAll('order').length).toBe(0)
+    expect(() => buildCountFetch('<fetch><entity>', { search: searchConditions('', []) })).toThrow('FetchXML da visão inválido.')
   })
 })
 

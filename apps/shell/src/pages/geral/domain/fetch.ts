@@ -1,7 +1,7 @@
-import { searchConditions } from './search'
+import type { SearchCondition } from './search'
 import { ID_ATTRIBUTE, type Sort } from './types'
 
-type BuildOptions = { page: number; pageSize: number; cookie: string | null; sort: Sort; query: string; quickFind: string[] }
+type BuildOptions = { page: number; pageSize: number; cookie: string | null; sort: Sort; search: SearchCondition[] }
 
 export function parse(fetchxml: string) {
   const doc = new DOMParser().parseFromString(fetchxml, 'text/xml')
@@ -22,17 +22,21 @@ export function applySort(doc: Document, entity: Element, sort: NonNullable<Sort
   ;(link ?? entity).appendChild(order)
 }
 
-/** Busca por palavra-chave: filtro OR com `like '%termo%'` nos campos de localização rápida (ver `searchConditions`). */
-function injectSearch(doc: Document, entity: Element, query: string, quickFind: string[]) {
-  const conditions = searchConditions(query, quickFind)
-  if (!conditions.length) return
+/** Busca por palavra-chave: filtro OR com as condições de `buildSearch` (`like` em texto, `in` em choice e lookup). */
+function injectSearch(doc: Document, entity: Element, search: SearchCondition[]) {
+  if (!search.length) return
   const filter = doc.createElement('filter')
   filter.setAttribute('type', 'or')
-  for (const { attribute, value } of conditions) {
+  for (const item of search) {
     const condition = doc.createElement('condition')
-    condition.setAttribute('attribute', attribute)
-    condition.setAttribute('operator', 'like')
-    condition.setAttribute('value', value)
+    condition.setAttribute('attribute', item.attribute)
+    condition.setAttribute('operator', item.operator)
+    if (item.operator === 'like') condition.setAttribute('value', item.value)
+    else for (const text of item.values) {
+      const value = doc.createElement('value')
+      value.textContent = text
+      condition.appendChild(value)
+    }
     filter.appendChild(condition)
   }
   entity.appendChild(filter)
@@ -42,7 +46,7 @@ function injectSearch(doc: Document, entity: Element, query: string, quickFind: 
  * FetchXML da visão com paginação, ordenação da coluna e busca por palavra-chave injetadas; o resto fica intacto.
  * Não pede `returntotalrecordcount`: o total custaria uma contagem no servidor a cada página. Ele vem à parte (`buildCountFetch`).
  */
-export function buildFetch(fetchxml: string, { page, pageSize, cookie, sort, query, quickFind }: BuildOptions) {
+export function buildFetch(fetchxml: string, { page, pageSize, cookie, sort, search }: BuildOptions) {
   const { doc, root, entity } = parse(fetchxml)
 
   for (const name of ['count', 'page', 'paging-cookie', 'returntotalrecordcount']) root.removeAttribute(name)
@@ -61,13 +65,13 @@ export function buildFetch(fetchxml: string, { page, pageSize, cookie, sort, que
 
   if (sort) applySort(doc, entity, sort)
 
-  injectSearch(doc, entity, query, quickFind)
+  injectSearch(doc, entity, search)
 
   return new XMLSerializer().serializeToString(doc)
 }
 
 /** FetchXML da visão convertido em contagem total (`aggregate`): sem paginação, ordem nem atributos; filtros, links e busca ficam. */
-export function buildCountFetch(fetchxml: string, { query, quickFind }: { query: string; quickFind: string[] }) {
+export function buildCountFetch(fetchxml: string, { search }: { search: SearchCondition[] }) {
   const { doc, root, entity } = parse(fetchxml)
 
   for (const name of ['count', 'page', 'paging-cookie', 'returntotalrecordcount', 'distinct']) root.removeAttribute(name)
@@ -80,7 +84,7 @@ export function buildCountFetch(fetchxml: string, { query, quickFind }: { query:
   total.setAttribute('aggregate', 'count')
   entity.insertBefore(total, entity.firstChild)
 
-  injectSearch(doc, entity, query, quickFind)
+  injectSearch(doc, entity, search)
   return new XMLSerializer().serializeToString(doc)
 }
 
