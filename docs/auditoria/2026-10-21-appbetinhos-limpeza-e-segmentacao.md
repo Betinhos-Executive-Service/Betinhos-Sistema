@@ -142,7 +142,29 @@ Formulários e visões ficam na `Interface` como subcomponentes das tabelas (sem
 - Com o seu ok: cada exclusão no DEV (irreversível), refazer o TEST como cópia do PROD (sobrescreve o TEST) e qualquer import no PROD.
 - Esforço estimado: 1 a 2 dias de trabalho, mais a janela do PROD.
 
-## 6. Ordem recomendada
+## 6. Execução da limpeza no DEV (21/10/2026)
+
+Duas sessões executaram a seção 2.1 no DEV, com ok do Renan: esta e a de auditoria (relatório `docs/auditoria-solucao-appbetinhos-2026-10-21.md`, branch `claude/appbetinhos-cleanup-refactor-d5b3e5`). Backups locais em `Sistema Betinhos/.audit/backups/2026-10-21-limpeza-appbetinhos/`: export não gerenciado das 10:26, registros das tabelas excluídas, DLL do GerarPagantes v1, XAML das regras e logs de cada bloco.
+
+Excluído por esta sessão:
+- pilha Operations AI: 8 Custom APIs `cr40f_AI*`, pacote `cr40f_Betinhos.OperationsAI`, tabelas `cr40f_contextooperacionalia` (6 registros de teste) e `cr40f_decisaooperacionalia`, fluxo "Flow IA - Expirar Contextos Operacionais", variáveis `cr40f_OperationsAI*` e função "Assistente Operações IA";
+- tabela `cr40f_tiposervicoplanner` (9 registros de catálogo no DEV, 0 no PROD) e, com ela, o lookup `cr40f_tiposervicoplanner` em Pedido de Cotação (0 pedidos preenchidos);
+- 3 regras de negócio rascunho da Geral;
+- `new_temabetinhos` (cópia do `new_temabetinhos2`).
+
+Excluído pela sessão de auditoria: `cr40f_registrodeviagem`, `cr40f_filaagendamentoclaude`, o BPF "STATUS DA MANUTENÇÃO" com `cr40f_statusdamanutencao`, o assembly GerarPagantes v1, 36 recursos da Web da lista 2.1, os fluxos "Planner | Notificação por e-mail - Teste", "Flow Gerar Pagantes HTTP" e "Flow Salvar Fotos Manutenção | App Motoristas v2", duas variáveis e 7 soluções-contêiner.
+
+Correções desta lista:
+- o canvas "Página 1" (`cr40f_pgina1_8cac9`) fica: está no mapa do site do app "App Betinhos v2";
+- `Tela_Script_GerarPagantes.js` fica até o repo Tela Gerar Pagantes parar de publicar os dois nomes;
+- `new_teladespesasoperacionais` fica: a spec de 09/10 a manteve no menu (cartões/Pluggy), embora a tabela `cr40f_despesa` não exista;
+- `accessChecker_openDialog.js` é da Microsoft e só saiu da AppBetinhos.
+
+Antes e depois (export da AppBetinhos no DEV, já com o que outras frentes mudaram no dia): 101 → 95 tabelas, 218 → 178 recursos da Web, 124 → 117 processos, 35 → 27 Custom APIs, 41 → 37 variáveis, 10 → 9 funções; ZIP de 25,0 para 24,0 MB. O export das 11:27 saiu sem erro de dependência.
+
+**Pré-requisito antes do próximo import no PROD:** as 8 Custom APIs `cr40f_AI*V2` não gerenciadas, criadas direto no PROD em 14/08, dependem do pacote `cr40f_Betinhos.OperationsAI`. Se não forem excluídas antes, o stage-and-upgrade falha ao remover o pacote.
+
+## 7. Ordem recomendada
 
 1. Limpeza de alta confiança no DEV (2.1), com a sua confirmação da lista.
 2. Decisão sobre a lista de média confiança (2.2).
