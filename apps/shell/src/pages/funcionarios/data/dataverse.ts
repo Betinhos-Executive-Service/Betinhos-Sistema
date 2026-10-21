@@ -5,7 +5,9 @@ import { ENTITY_SET, FIELDS, TABLE, VEICULO_TABLE } from './schema'
 import { createSharePointDocs, nomeComData } from './sharepoint'
 import { buildNoteHtml, type SpAnexo } from './notes'
 import { ANEXOS_SUBPASTA, base64ToBlob, fileToBase64, LIMITES_PADRAO, type DataSource, type LimitesAnexo } from './source'
-import type { Anotacao, Draft, FieldValue, Funcionario, ImageField, Lookup, Multa, Posse } from './types'
+import { STATUS } from '../../equipamentos/domain/choices'
+import { ENTITIES as EQUIPAMENTO_ENTITIES } from '../../equipamentos/data/queries'
+import type { Anotacao, Draft, EquipamentoResumo, FieldValue, Funcionario, ImageField, Lookup, Multa, Posse } from './types'
 import type { XrmHost, XrmWebApi } from './xrm'
 
 const FORMATTED = '@OData.Community.Display.V1.FormattedValue'
@@ -16,6 +18,15 @@ type Row = Record<string, unknown>
 
 function cleanId(value: string) {
   return value.replace(/[{}]/g, '').toLowerCase()
+}
+
+const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+/** GUID limpo para entrar num `$filter`; qualquer outra coisa é recusada (sem injeção de OData). */
+function guid(value: string, what: string) {
+  const id = cleanId(value.trim())
+  if (!GUID.test(id)) throw new Error(`Id de ${what} inválido.`)
+  return id
 }
 
 function odataString(value: string) {
@@ -169,6 +180,19 @@ export function createXrmSource(xrm: XrmHost): DataSource {
         veiculo: String(row[`_new_veiculo_value${FORMATTED}`] ?? 'Veículo'),
         inicio: typeof row.new_iniciodaposse === 'string' ? row.new_iniciodaposse : null,
         fim: typeof row.new_fimdaposse === 'string' ? row.new_fimdaposse : null,
+      }))
+    },
+
+    async equipamentos(id): Promise<EquipamentoResumo[]> {
+      // A aba mostra só o que está com a pessoa: baixado fica de fora. Tabela ausente no ambiente rejeita aqui e a aba mostra o erro.
+      const filter = `_cr40f_responsavel_value eq ${guid(id, 'funcionário')} and cr40f_status ne ${STATUS.baixado}`
+      const rows = await retrieveAll(EQUIPAMENTO_ENTITIES.equipamento, `?$select=cr40f_equipamentoid,cr40f_name,_cr40f_tipo_value,cr40f_numeroserie,cr40f_status&$filter=${filter}&$orderby=cr40f_name asc`)
+      return rows.map((row) => ({
+        id: cleanId(String(row.cr40f_equipamentoid)),
+        descricao: typeof row.cr40f_name === 'string' ? row.cr40f_name : '',
+        tipo: typeof row[`_cr40f_tipo_value${FORMATTED}`] === 'string' ? String(row[`_cr40f_tipo_value${FORMATTED}`]) : '',
+        numeroSerie: typeof row.cr40f_numeroserie === 'string' ? row.cr40f_numeroserie : '',
+        status: typeof row.cr40f_status === 'number' ? row.cr40f_status : null,
       }))
     },
 

@@ -1,8 +1,9 @@
-import { Alert, Button, EmptyState, Spinner, StatusBadge } from '@betinhos/ui'
+import { Alert, Button, buttonClassName, EmptyState, Spinner, StatusBadge } from '@betinhos/ui'
 import { ExternalLink, Inbox } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import { statusLabel, statusTone } from '../../equipamentos/domain/choices'
 import type { DataSource } from '../data/source'
-import type { Multa, Posse } from '../data/types'
+import type { EquipamentoResumo, Multa, Posse } from '../data/types'
 import { errorMessage } from '../data/xrm'
 
 const dateTime = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' })
@@ -61,6 +62,29 @@ export function VeiculosTab({ source, id }: { source: DataSource; id: string }) 
           </li>
         ))}
       </ol>
+    </div>
+  )
+}
+
+/** Só leitura: o cadastro e a troca de responsável ficam em #/equipamentos (link abre o item). */
+export function EquipamentosTab({ source, id }: { source: DataSource; id: string }) {
+  const load = useCallback(() => source.equipamentos(id), [source, id])
+  const { data, loading, error } = useLoad<EquipamentoResumo[]>(load)
+  return (
+    <div className="related">
+      <Status loading={loading} error={error} empty={!data?.length} emptyText="Nenhum equipamento com este funcionário." />
+      <ul className="cards">
+        {data?.map((item) => (
+          <li key={item.id} className="card">
+            <div className="card-main">
+              <strong>{item.descricao || 'Sem descrição'}</strong>
+              <span className="muted">{[item.tipo, item.numeroSerie && `Série ${item.numeroSerie}`].filter(Boolean).join(' · ') || '—'}</span>
+            </div>
+            <StatusBadge tone={statusTone(item.status)}>{statusLabel(item.status)}</StatusBadge>
+            <a className={buttonClassName({ variant: 'ghost', size: 'compact', iconOnly: true })} href={`#/equipamentos?ver=${encodeURIComponent(item.id)}`} aria-label={`Abrir equipamento ${item.descricao || 'sem descrição'}`}><ExternalLink size={16} aria-hidden /></a>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
