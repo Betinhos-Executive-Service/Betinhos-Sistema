@@ -34,9 +34,15 @@
 @media (max-width: 520px) { .eq-form__grid { grid-template-columns: minmax(0, 1fr); } }
 
 /* Tipos (Tarefa 6) */
-.eq-tipos { display: grid; gap: var(--bt-space-4); }
-.eq-tipos__add { display: flex; align-items: flex-end; gap: var(--bt-space-2); }
-.eq-tipos__add > :first-child { flex: 1 1 auto; }
-.eq-tipos__list { display: grid; gap: var(--bt-space-1); margin: 0; padding: 0; list-style: none; }
-.eq-tipos__item { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); min-height: var(--bt-control-height-touch); padding: var(--bt-space-1) var(--bt-space-2); border-bottom: var(--bt-border-width-default) solid var(--bt-color-border); }
-.eq-tipos__name { flex: 1 1 160px; min-width: 0; font-size: var(--bt-font-size-13); }
+.eq-tipos { display: grid; gap: var(--bt-space-3); }
+.eq-tipos__form { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--bt-space-2); }
+.eq-tipos__form > .bt-field { flex: 1 1 200px; min-width: 0; }
+/* Botões alinhados ao controle (o rótulo do campo fica acima); o erro abaixo não desloca o botão. */
+.eq-tipos__form > .bt-button { margin-top: calc(var(--bt-font-size-12) * 1.42 + var(--bt-space-1-5)); }
+.eq-tipos__list { display: grid; margin: 0; padding: 0; list-style: none; border-top: var(--bt-border-width-default) solid var(--bt-color-border); }
+.eq-tipos__item { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1) var(--bt-space-2); min-height: var(--bt-control-height-touch); padding: var(--bt-space-1) 0 var(--bt-space-1) var(--bt-space-2); border-bottom: var(--bt-border-width-default) solid var(--bt-color-border); }
+.eq-tipos__label { display: inline-flex; flex: 1 1 140px; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1) var(--bt-space-2); min-width: 0; }
+.eq-tipos__name { min-width: 0; font-size: var(--bt-font-size-13); overflow-wrap: anywhere; }
+.eq-tipos__actions { display: inline-flex; flex: 0 0 auto; align-items: center; gap: var(--bt-space-1); }
+/* Renomear: campo na linha inteira e ações abaixo, em qualquer largura. */
+.eq-tipos__rename { display: grid; flex: 1 1 100%; gap: var(--bt-space-2); padding: var(--bt-space-2) var(--bt-space-2) var(--bt-space-2) 0; }
