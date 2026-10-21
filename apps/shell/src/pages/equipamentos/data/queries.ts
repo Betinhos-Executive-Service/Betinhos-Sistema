@@ -1,4 +1,5 @@
 import { cleanId, formatted, type DataverseClient, type Row } from '@betinhos/dataverse'
+import { FUNC_DESLIGADO } from '../../documentos/domain/codes'
 import type { Changes } from '../domain/form'
 import type { Equipamento, Pessoa, TipoEquipamento } from '../domain/types'
 
@@ -21,7 +22,7 @@ const order = (column: string) => `&$orderby=${encodeURIComponent(`${column} asc
 export const equipamentosPath = (set: string) => `${set}?$select=${SELECT.join(',')}${order('cr40f_name')}`
 export const tiposPath = (set: string) => `${set}?$select=cr40f_tipoequipamentoid,cr40f_name,statecode${order('cr40f_name')}`
 /** Ativos e inativos: o item de um funcionário desligado continua mostrando o nome, com selo. */
-export const pessoasPath = (set: string) => `${set}?$select=cr40f_funcionariosid,cr40f_nomecompleto,statecode${order('cr40f_nomecompleto')}`
+export const pessoasPath = (set: string) => `${set}?$select=cr40f_funcionariosid,cr40f_nomecompleto,cr40f_status,statecode${order('cr40f_nomecompleto')}`
 
 export function mapEquipamento(row: Row): Equipamento {
   const lookupId = (k: string) => (row[k] ? cleanId(str(row[k])) : null)
@@ -37,7 +38,13 @@ export function mapEquipamento(row: Row): Equipamento {
 }
 
 export const mapTipo = (row: Row): TipoEquipamento => ({ id: cleanId(str(row.cr40f_tipoequipamentoid)), nome: text(row.cr40f_name), ativo: row.statecode !== 1 })
-export const mapPessoa = (row: Row): Pessoa => ({ id: cleanId(str(row.cr40f_funcionariosid)), nome: text(row.cr40f_nomecompleto), ativo: row.statecode !== 1 })
+/**
+ * Inativo = registro inativo (statecode 1) ou desligado (`cr40f_status` 1; o desligamento não mexe no statecode).
+ * Afastado (2) continua ativo, como em Documentos.
+ */
+export const mapPessoa = (row: Row): Pessoa => ({
+  id: cleanId(str(row.cr40f_funcionariosid)), nome: text(row.cr40f_nomecompleto), ativo: row.statecode !== 1 && row.cr40f_status !== FUNC_DESLIGADO,
+})
 
 /** Lookups novos por @odata.bind; limpar o responsável é DELETE no $ref (`responsavelRefPath`), nunca bind null. */
 export function toPayload(c: Changes, sets: EntitySets): Row {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { matchesFilters, readFilters, type TableFilters } from '@betinhos/ui'
 import { EQUIPAMENTO_DEFAULT_FILTERS, builtinViews, equipamentoFields, matchesKeyword, readEquipamento, sortEquipamentos } from './lista'
 import { STATUS, statusLabel, statusTone } from './choices'
@@ -7,6 +7,8 @@ import { applyForm, diffForm, emptyEquipamento, emptyForm, hasChanges, isDirty, 
 import type { Equipamento, Pessoa, TipoEquipamento } from './types'
 import { mapEquipamento, mapPessoa, mapTipo, responsavelRefPath, toPayload } from '../data/queries'
 import { createMockEquipamentos, createMockPessoas, createMockTipos } from '../data/mock'
+import { createSource } from '../data/source'
+import type { Host } from '../../../host'
 
 const S = (v: number) => String(v)
 const tipos: TipoEquipamento[] = [{ id: 't1', nome: 'Notebook', ativo: true }, { id: 't2', nome: 'Pager', ativo: false }, { id: 't3', nome: 'Mouse', ativo: true }]
@@ -215,6 +217,12 @@ describe('dados', () => {
     expect(mapTipo({ cr40f_tipoequipamentoid: 'T1', cr40f_name: 'Pager', statecode: 1 })).toEqual({ id: 't1', nome: 'Pager', ativo: false })
     expect(mapPessoa({ cr40f_funcionariosid: 'P1', cr40f_nomecompleto: 'Bruna', statecode: 0 })).toEqual({ id: 'p1', nome: 'Bruna', ativo: true })
   })
+  it('pessoa desligada (cr40f_status 1) é inativa mesmo com statecode 0; afastada continua ativa', () => {
+    const pessoa = (statecode: number, cr40f_status: number) => mapPessoa({ cr40f_funcionariosid: 'P1', cr40f_nomecompleto: 'Bruna', statecode, cr40f_status }).ativo
+    expect(pessoa(0, 1)).toBe(false)
+    expect(pessoa(0, 2)).toBe(true)
+    expect(pessoa(1, 0)).toBe(false)
+  })
   it('payload liga lookups por @odata.bind e não manda responsável limpo', () => {
     expect(toPayload({ campos: { cr40f_name: 'X' }, tipoId: 't1', responsavelId: 'p1' }, sets)).toEqual({
       cr40f_name: 'X', 'cr40f_Tipo@odata.bind': '/cr40f_tipoequipamentos(t1)', 'cr40f_Responsavel@odata.bind': '/cr40f_funcionarioses(p1)',
@@ -229,5 +237,24 @@ describe('dados', () => {
     expect(list.some((e) => !e.responsavelId && e.status !== STATUS.baixado)).toBe(true)
     expect(list.some((e) => pessoas.find((p) => p.id === e.responsavelId)?.ativo === false)).toBe(true)
     expect(createMockTipos().some((t) => !t.ativo)).toBe(true)
+    const inativos = new Set(createMockTipos().filter((t) => !t.ativo).map((t) => t.id))
+    expect(list.some((e) => e.tipoId != null && inativos.has(e.tipoId))).toBe(true)
+    expect(list.find((e) => e.descricao === 'Celular plantão')?.responsavelNome).toBe('Gustavo Amostra Pires')
+  })
+  it('update limpa o responsável (DELETE no $ref) antes do PATCH', async () => {
+    const calls: string[] = []
+    const client = {
+      request: vi.fn(async (path: string, init?: { method?: string }) => { calls.push(`${init?.method ?? 'GET'} ${path}`) }),
+      update: vi.fn(async (set: string, id: string) => { calls.push(`PATCH ${set}(${id})`) }),
+    }
+    const metadata = { entities: async () => new Map(Object.entries({ cr40f_equipamento: 'cr40f_equipamentos', cr40f_tipoequipamento: 'cr40f_tipoequipamentos', cr40f_funcionarios: 'cr40f_funcionarioses' }).map(([k, v]) => [k, { entitySetName: v }])) }
+    const source = createSource({ mode: 'dataverse', client, metadata } as unknown as Host)
+    await source.update('e1', { campos: { cr40f_status: STATUS.baixado }, responsavelId: null })
+    expect(calls).toEqual(['DELETE cr40f_equipamentos(e1)/cr40f_Responsavel/$ref', 'PATCH cr40f_equipamentos(e1)'])
+  })
+  it('mock recusa atualizar item inexistente', async () => {
+    const source = createSource({ mode: 'mock' })
+    await expect(source.update('nao-existe', { campos: {} })).rejects.toThrow('Equipamento não encontrado.')
+    await expect(source.update(createMockEquipamentos()[0].id, { campos: {} })).resolves.toBeUndefined()
   })
 })
