@@ -13357,10 +13357,22 @@ select,
   height: 4px;
   border-radius: 999px;
   background: #e2e8f0;
-  transition: background-color 160ms cubic-bezier(.23, 1, .32, 1);
+  overflow: hidden;
 }
 
-.qr-charge-progress-bar li.is-done { background: #2159d2; }
+/* O segmento enche da esquerda para a direita (só transform, sem repintar a largura). */
+.qr-charge-progress-bar li::after {
+  content: "";
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2159d2;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 260ms cubic-bezier(.23, 1, .32, 1);
+}
+
+.qr-charge-progress-bar li.is-done::after { transform: scaleX(1); }
 
 .qr-charge-step-title {
   margin: 4px 0 0;
@@ -13377,6 +13389,14 @@ select,
 }
 
 .qr-charge-form .money-input-field input { font-size: 1.4rem; font-weight: 800; }
+
+/* Bloco animado de cada passo: mantém o espaçamento do formulário entre título e conteúdo. */
+.qr-charge-step {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
 
 .qr-charge-choices {
   display: flex;
@@ -13458,7 +13478,38 @@ select,
   background: #2159d2;
 }
 
-.qr-charge-choice-mark svg { width: 14px; height: 14px; }
+.qr-charge-choice-mark svg {
+  width: 14px;
+  height: 14px;
+  animation: qr-charge-mark-in 160ms cubic-bezier(.23, 1, .32, 1) both;
+}
+
+@keyframes qr-charge-mark-in {
+  from { opacity: 0; transform: scale(.6); }
+}
+
+.qr-charge-choice-mark { transition: background-color 150ms ease, border-color 150ms ease; }
+
+.qr-charge-passenger .qr-charge-code { animation: qr-charge-code-in 220ms cubic-bezier(.23, 1, .32, 1) both; }
+
+@keyframes qr-charge-code-in {
+  from { opacity: 0; transform: scale(.97); }
+}
+
+/* Confirmação: depois do check, entram o título, o valor e os detalhes em sequência curta. */
+.qr-charge-confirmed > h2,
+.qr-charge-confirmed-amount,
+.qr-charge-confirmed-details {
+  animation: qr-charge-confirmed-rise 240ms cubic-bezier(.23, 1, .32, 1) both;
+}
+
+.qr-charge-confirmed > h2 { animation-delay: 120ms; }
+.qr-charge-confirmed-amount { animation-delay: 170ms; }
+.qr-charge-confirmed-details { animation-delay: 220ms; }
+
+@keyframes qr-charge-confirmed-rise {
+  from { opacity: 0; transform: translateY(6px); }
+}
 
 .qr-charge-review {
   margin: 0;
@@ -13608,9 +13659,17 @@ select,
   .qr-charge-paid,
   .qr-charge-waiting-dot,
   .qr-charge-confirmed-mark,
-  .qr-charge-confirmed-mark path {
+  .qr-charge-confirmed-mark path,
+  .qr-charge-choice-mark svg,
+  .qr-charge-passenger .qr-charge-code,
+  .qr-charge-confirmed > h2,
+  .qr-charge-confirmed-amount,
+  .qr-charge-confirmed-details {
     animation: none;
   }
+
+  .qr-charge-progress-bar li::after,
+  .qr-charge-choice-mark { transition: none; }
 
   .qr-charge-choice,
   .qr-charge-review-row,
