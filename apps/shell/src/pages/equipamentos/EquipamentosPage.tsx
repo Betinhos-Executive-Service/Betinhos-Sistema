@@ -1,6 +1,6 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, matchesFilters, useShellHeader } from '@betinhos/ui'
-import { Laptop, Plus, RefreshCw, SearchX } from 'lucide-react'
+import { Laptop, Plus, RefreshCw, SearchX, Tags } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
 import { useListView } from '../../app/useListView'
@@ -12,6 +12,7 @@ import { EQUIPAMENTO_COLUMNS, EQUIPAMENTO_DEFAULT_FILTERS, EQUIPAMENTO_SORT, TEL
 import { useEquipamentos } from './useEquipamentos'
 import { EquipamentosCards, EquipamentosTable } from './components/EquipamentosList'
 import { EquipamentoDrawer } from './components/EquipamentoDrawer'
+import { TiposDrawer } from './components/TiposDrawer'
 import './equipamentos.css'
 
 export function EquipamentosPage({ host }: { host: Host }) {
@@ -52,6 +53,12 @@ function Equipamentos({ host }: { host: Host }) {
   const lazyKey = useMemo(() => ({ filters, query, sort: view.config.sort }), [filters, query, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
   const clearAll = () => { clearFilters(); setQuery('') }
+  const [tiposOpen, setTiposOpen] = useState(false)
+  const usoTipos = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const e of data.equipamentos) if (e.tipoId) m.set(e.tipoId, (m.get(e.tipoId) ?? 0) + 1)
+    return m
+  }, [data.equipamentos])
   const semResponsavel = useMemo(() => data.equipamentos.filter((e) => !e.responsavelId && e.status !== STATUS.baixado).length, [data.equipamentos])
 
   const refresh = useCallback(() => { void data.reload() }, [data.reload])
@@ -87,12 +94,15 @@ function Equipamentos({ host }: { host: Host }) {
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="eq-search" value={query} onChange={setQuery} placeholder="Buscar por descrição, modelo, série ou responsável" aria-label="Buscar equipamentos" />
           {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />}
+          <Button variant="secondary" icon={<Tags size={16} />} disabled={!data.loaded} onClick={() => setTiposOpen(true)}>Tipos</Button>
           <Button icon={<Plus size={16} />} disabled={!data.loaded} onClick={novo}>Novo equipamento</Button>
         </ViewBar>
       </div>
       {data.error && data.loaded ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{data.error} A lista mostra os dados da carga anterior.</Alert> : null}
       {body}
       {data.loaded ? <EquipamentoDrawer target={target} onTarget={setTarget} list={data.equipamentos} tipos={data.tipos} pessoas={data.pessoas} source={source} onSaved={data.upsert} /> : null}
+      {/* Renomear reflete nos itens (upsertTipo); inativar tira o tipo dos seletores, mas o item o mantém marcado "(inativo)". */}
+      {data.loaded ? <TiposDrawer open={tiposOpen} onClose={() => setTiposOpen(false)} tipos={data.tipos} uso={usoTipos} source={source} onSaved={data.upsertTipo} /> : null}
     </div>
   )
 }

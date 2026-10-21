@@ -291,4 +291,138 @@ describe('Equipamentos', () => {
     expect(await screen.findByText('Equipamento Impressora antiga salvo.')).toBeTruthy()
     expect(update).toHaveBeenCalledWith('eeeeeeee-0000-4000-8000-000000000008', expect.objectContaining({ responsavelId: null }))
   })
+
+  it('gerencia tipos: adiciona, bloqueia repetido, renomeia e inativa', async () => {
+    render(<EquipamentosPage host={{ mode: 'mock' }} />)
+    await openButton('Notebook reserva')
+    fireEvent.click(screen.getByRole('button', { name: 'Tipos' }))
+    const drawer = await screen.findByRole('dialog', { name: 'Tipos de equipamento' })
+    const novo = drawer.querySelector('input[name="novoTipo"]') as HTMLInputElement
+
+    fireEvent.change(novo, { target: { value: 'Webcam' } })
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Adicionar' }))
+    expect(await screen.findByText('Tipo Webcam adicionado.')).toBeTruthy()
+    await waitFor(() => expect(novo.value).toBe(''))
+    expect(within(drawer).getByRole('button', { name: 'Renomear tipo Webcam' })).toBeTruthy()
+
+    // Repetido sem diferenciar caixa e acento: erro junto ao campo, foco nele e nada gravado.
+    fireEvent.change(novo, { target: { value: 'maquina de CARTAO' } })
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Adicionar' }))
+    expect(await within(drawer).findByText('Já existe o tipo Máquina de cartão.')).toBeTruthy()
+    expect(novo.getAttribute('aria-invalid')).toBe('true')
+    await waitFor(() => expect(document.activeElement).toBe(novo))
+    fireEvent.change(novo, { target: { value: '' } })
+    expect(within(drawer).queryByText('Já existe o tipo Máquina de cartão.')).toBeNull()
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Adicionar' }))
+    expect(await within(drawer).findByText('Informe o nome do tipo.')).toBeTruthy()
+
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Renomear tipo Monitor' }))
+    const nome = drawer.querySelector('input[name="renomearTipo"]') as HTMLInputElement
+    await waitFor(() => expect(document.activeElement).toBe(nome))
+    fireEvent.change(nome, { target: { value: 'notebook' } })
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Salvar nome' }))
+    expect(await within(drawer).findByText('Já existe o tipo Notebook.')).toBeTruthy()
+    fireEvent.change(nome, { target: { value: 'Monitor LCD' } })
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Salvar nome' }))
+    expect(await screen.findByText('Tipo Monitor LCD salvo.')).toBeTruthy()
+    await waitFor(() => expect(document.activeElement).toBe(within(drawer).getByRole('button', { name: 'Renomear tipo Monitor LCD' })))
+
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Inativar tipo Mouse' }))
+    expect(await screen.findByText('Tipo Mouse inativado.')).toBeTruthy()
+    const reativar = within(drawer).getByRole('button', { name: 'Reativar tipo Mouse' })
+    await waitFor(() => expect(document.activeElement).toBe(reativar))
+    fireEvent.click(reativar)
+    expect(await screen.findByText('Tipo Mouse reativado.')).toBeTruthy()
+    expect(within(drawer).getByRole('button', { name: 'Inativar tipo Mouse' })).toBeTruthy()
+  })
+
+  it('lista de tipos: ativos primeiro, inativos marcados e quantos itens usam cada um', async () => {
+    render(<EquipamentosPage host={{ mode: 'mock' }} />)
+    await openButton('Notebook reserva')
+    fireEvent.click(screen.getByRole('button', { name: 'Tipos' }))
+    const drawer = await screen.findByRole('dialog', { name: 'Tipos de equipamento' })
+    const linhas = [...drawer.querySelectorAll('.eq-tipos__item')] as HTMLElement[]
+    const nomes = linhas.map((li) => li.querySelector('.eq-tipos__name')?.textContent)
+    expect(nomes).toEqual(['Celular', 'Impressora', 'Máquina de cartão', 'Monitor', 'Mouse', 'Notebook', 'Outro', 'Teclado', 'Pager'])
+    const pager = linhas.at(-1)!
+    expect(within(pager).getByText('Inativo')).toBeTruthy()
+    expect(within(pager).getByText('1 item')).toBeTruthy()
+    expect(within(linhas[5]).getByText('2 itens')).toBeTruthy()
+    expect(within(linhas[0]).queryByText('Inativo')).toBeNull()
+  })
+
+  it('tipo renomeado aparece nos itens; inativado some do seletor e fica marcado no item', async () => {
+    render(<EquipamentosPage host={{ mode: 'mock' }} />)
+    await openButton('Notebook reserva')
+    fireEvent.click(screen.getByRole('button', { name: 'Tipos' }))
+    const drawer = await screen.findByRole('dialog', { name: 'Tipos de equipamento' })
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Renomear tipo Mouse' }))
+    fireEvent.change(drawer.querySelector('input[name="renomearTipo"]') as HTMLInputElement, { target: { value: 'Mouse óptico' } })
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Salvar nome' }))
+    expect(await screen.findByText('Tipo Mouse óptico salvo.')).toBeTruthy()
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Inativar tipo Mouse óptico' }))
+    expect(await screen.findByText('Tipo Mouse óptico inativado.')).toBeTruthy()
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Fechar painel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Tipos de equipamento' })).toBeNull())
+
+    const row = await rowOf('Mouse sem fio')
+    expect(within(row).getByText('Mouse óptico')).toBeTruthy()
+    fireEvent.click(await openButton('Mouse sem fio'))
+    const item = await screen.findByRole('dialog', { name: 'Mouse sem fio' })
+    await waitFor(() => expect(within(item).getByRole('combobox', { name: /^Tipo/ }).textContent).toBe('Mouse óptico (inativo)'))
+    fireEvent.click(within(item).getByRole('button', { name: 'Fechar painel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Mouse sem fio' })).toBeNull())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Novo equipamento' }))
+    const novo = await screen.findByRole('dialog', { name: 'Novo equipamento' })
+    const tipos = await opcoes(novo, /^Tipo/)
+    expect(tipos).toContain('Notebook')
+    expect(tipos.some((t) => t.startsWith('Mouse'))).toBe(false)
+  })
+
+  it('falha do Dataverse nos tipos mantém o que foi digitado e mostra a mensagem', async () => {
+    stubSource({
+      createTipo: vi.fn(async () => { throw new Error('Privilégio insuficiente (prvCreatecr40f_tipoequipamento).') }),
+      renameTipo: vi.fn(async () => { throw new Error('Privilégio insuficiente (prvWritecr40f_tipoequipamento).') }),
+    })
+    render(<EquipamentosPage host={{ mode: 'mock' }} />)
+    await openButton('Notebook reserva')
+    fireEvent.click(screen.getByRole('button', { name: 'Tipos' }))
+    const drawer = await screen.findByRole('dialog', { name: 'Tipos de equipamento' })
+    const novo = drawer.querySelector('input[name="novoTipo"]') as HTMLInputElement
+    fireEvent.change(novo, { target: { value: 'Webcam' } })
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Adicionar' }))
+    expect(await screen.findByText(/Não foi possível adicionar o tipo\. .*prvCreatecr40f_tipoequipamento/)).toBeTruthy()
+    expect(novo.value).toBe('Webcam')
+    expect(within(drawer).queryByRole('button', { name: 'Renomear tipo Webcam' })).toBeNull()
+    await waitFor(() => expect((within(drawer).getByRole('button', { name: 'Adicionar' }) as HTMLButtonElement).disabled).toBe(false))
+
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Renomear tipo Monitor' }))
+    const nome = drawer.querySelector('input[name="renomearTipo"]') as HTMLInputElement
+    fireEvent.change(nome, { target: { value: 'Monitor LCD' } })
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Salvar nome' }))
+    expect(await screen.findByText(/Não foi possível renomear o tipo\. .*prvWritecr40f_tipoequipamento/)).toBeTruthy()
+    expect((drawer.querySelector('input[name="renomearTipo"]') as HTMLInputElement).value).toBe('Monitor LCD')
+    expect(within(drawer).queryByRole('button', { name: 'Renomear tipo Monitor LCD' })).toBeNull()
+  })
+
+  it('fechar os tipos com nome não salvo pede confirmação', async () => {
+    render(<EquipamentosPage host={{ mode: 'mock' }} />)
+    await openButton('Notebook reserva')
+    fireEvent.click(screen.getByRole('button', { name: 'Tipos' }))
+    const drawer = await screen.findByRole('dialog', { name: 'Tipos de equipamento' })
+    const novo = drawer.querySelector('input[name="novoTipo"]') as HTMLInputElement
+    fireEvent.change(novo, { target: { value: 'Webcam' } })
+    fireEvent(drawer, new Event('cancel', { cancelable: true }))
+    const confirm = await screen.findByRole('dialog', { name: 'Descartar alterações?' })
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Continuar editando' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Descartar alterações?' })).toBeNull())
+    expect(novo.value).toBe('Webcam')
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Fechar painel' }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Descartar alterações?' })).getByRole('button', { name: 'Descartar' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Tipos de equipamento' })).toBeNull())
+    fireEvent.click(screen.getByRole('button', { name: 'Tipos' }))
+    const again = await screen.findByRole('dialog', { name: 'Tipos de equipamento' })
+    expect((again.querySelector('input[name="novoTipo"]') as HTMLInputElement).value).toBe('')
+  })
 })
