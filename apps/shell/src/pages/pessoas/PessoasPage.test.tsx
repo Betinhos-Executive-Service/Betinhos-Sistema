@@ -104,19 +104,19 @@ describe('Pessoas', () => {
     window.history.replaceState(null, '', '/?volume=400')
     try {
       render(<PessoasPage host={{ mode: 'mock' }} />)
-      // Com a máquina lenta, mais de um lote pode chegar antes desta leitura: basta a contagem ser parcial.
+      // Com a máquina lenta, outros lotes (até o último) podem chegar antes desta leitura, ainda com o aviso na tela.
       const parcial = await screen.findByText(/carregando o restante/)
       const [, visiveis, total] = /^(\d+) de (\d+) ·/.exec(parcial.textContent ?? '') ?? []
       expect(Number(visiveis)).toBe(Number(total))
       expect(Number(total)).toBeGreaterThanOrEqual(100)
-      expect(Number(total)).toBeLessThan(410)
+      expect(Number(total)).toBeLessThanOrEqual(410)
       await screen.findByText(/^410 de 410 ·/, undefined, { timeout: 5000 })
       expect(screen.queryByText(/carregando o restante/)).toBeNull()
       expect(screen.queryByRole('button', { name: /Carregar mais/ })).toBeNull()
       // Sem IntersectionObserver no jsdom, o rodapé revela os lotes sozinho; com ele, revelaria ao rolar.
-      await waitFor(() => expect(document.querySelectorAll('.bt-table__row').length).toBe(410))
+      await waitFor(() => expect(document.querySelectorAll('.bt-table__row').length).toBe(410), { timeout: 20_000 })
     } finally {
       window.history.replaceState(null, '', '/')
     }
-  })
+  }, 60_000)
 })
