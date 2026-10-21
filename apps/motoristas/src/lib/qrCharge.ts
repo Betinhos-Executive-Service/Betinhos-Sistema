@@ -1,5 +1,91 @@
 import type { DetailData } from "../types.ts";
 import { sanitizeCurrencyInput } from "./currencyInput.ts";
+import { parseSafeDetailHtml } from "./detailHtml.ts";
+import { RECEIPT_LANGUAGE, type ReceiptLanguage } from "./receiptLanguage.ts";
+
+// Quem paga: o nome e o e-mail vão para a sessão do Stripe (recibo por e-mail) e para o registro da cobrança.
+export type QrChargePayer = { nome: string; email: string };
+
+export type QrChargePayerOption = { nome: string; origem: string; idioma: ReceiptLanguage | null };
+
+// Bandeira do passageiro (data-flag do detalhe, ver buildLanguageFlagHtml) → idioma do texto e da página do Stripe.
+const FLAG_LANGUAGE: Record<string, ReceiptLanguage> = {
+  BR: RECEIPT_LANGUAGE.portuguese,
+  US: RECEIPT_LANGUAGE.english,
+  ES: RECEIPT_LANGUAGE.spanish
+};
+
+type DetailLine = { text: string; flag: string };
+
+// Uma linha por pessoa: texto (sem o link do telefone) e a bandeira de idioma, se houver.
+// Aceita o HTML do detalhe e o texto livre da reserva (quebras de linha).
+function getDetailLines(detail: DetailData, label: string): DetailLine[] {
+  const lines: DetailLine[] = [{ text: "", flag: "" }];
+  const current = () => lines[lines.length - 1];
+  for (const part of parseSafeDetailHtml(detail.fields.find((field) => field.label === label)?.value ?? "")) {
+    if (part.type === "break") lines.push({ text: "", flag: "" });
+    else if (part.type === "flag") current().flag = part.code;
+    else if (part.type === "text") {
+      part.value.split("\n").forEach((piece, index) => {
+        if (index) lines.push({ text: "", flag: "" });
+        current().text += piece;
+      });
+    }
+  }
+  return lines;
+}
+
+// "Nome - telefone" ou texto livre com o telefone no fim: fica só o nome; linha sem letras não é pessoa.
+function nameFromLine(text: string) {
+  const name = (text.split(" - ")[0] ?? "").replace(/\s*[-–:]?\s*\+?\(?\d[\d\s().-]{6,}$/, "").trim();
+  return /\p{L}/u.test(name) ? name : "";
+}
+
+// Passageiros (com idioma pela bandeira), solicitante e cliente da reserva, sem repetir nomes.
+export function getQrChargePayerOptions(detail: DetailData): QrChargePayerOption[] {
+  const fromField = (label: string, origem: string) =>
+    getDetailLines(detail, label).map((line) => ({ nome: nameFromLine(line.text), origem, idioma: FLAG_LANGUAGE[line.flag] ?? null }));
+  const candidates = [
+    ...fromField("Passageiros e Telefones de Contato", "Passageiro"),
+    ...fromField("Solicitante", "Solicitante").slice(0, 1),
+    ...fromField("Cliente", "Cliente").slice(0, 1)
+  ];
+  const seen = new Set<string>();
+  return candidates.filter((option) => {
+    const key = option.nome.toLowerCase();
+    if (!option.nome || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function validateQrChargePayer(payer: QrChargePayer) {
+  const errors: Partial<Record<keyof QrChargePayer, string>> = {};
+  const email = payer.email.trim();
+  if (!payer.nome.trim()) errors.nome = "Informe quem vai pagar.";
+  if (email && !EMAIL_PATTERN.test(email)) errors.email = "Confira o e-mail.";
+  return errors;
+}
+
+export const QR_CHARGE_PASSENGER_COPY: Record<ReceiptLanguage, { title: string; body: string; receipt: string }> = {
+  "pt-BR": {
+    title: "Pagamento do seu serviço",
+    body: "Aponte a câmera do seu celular para o QR code e pague com cartão, Apple Pay ou Google Pay.",
+    receipt: "O recibo será enviado para o seu e-mail."
+  },
+  "en-US": {
+    title: "Payment for your service",
+    body: "Point your phone camera at the QR code and pay by card, Apple Pay or Google Pay. The amount is charged in Brazilian reais (BRL).",
+    receipt: "The receipt will be sent to your email."
+  },
+  "es-ES": {
+    title: "Pago de su servicio",
+    body: "Apunte la cámara de su celular al código QR y pague con tarjeta, Apple Pay o Google Pay. El valor se cobra en reales brasileños (BRL).",
+    receipt: "El recibo se enviará a su correo electrónico."
+  }
+};
 
 // Cobrança por QR code (Stripe Checkout), sempre em reais. O Flow cria a sessão no
 // Stripe e devolve este contrato; valores em centavos para não depender de float.

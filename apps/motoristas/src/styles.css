@@ -13187,7 +13187,8 @@ select,
 }
 
 .qr-charge-amount strong,
-.qr-charge-paid-amount {
+.qr-charge-paid-amount,
+.qr-charge-passenger-amount {
   color: #0f172a;
   font: 800 1.6rem/1.1 "Manrope", Arial, sans-serif;
   font-variant-numeric: tabular-nums;
@@ -13200,6 +13201,26 @@ select,
   border: 1px solid #e2e8f0;
   border-radius: 12px;
 }
+
+/* Painel virado para o passageiro: título, valor, QR e instrução no idioma dele. */
+.qr-charge-passenger {
+  width: 100%;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #0f172a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.qr-charge-passenger strong { font: 800 18px/1.25 "Manrope", Arial, sans-serif; }
+.qr-charge-passenger p { margin: 0; color: #475569; font: 600 14px/1.45 "Manrope", Arial, sans-serif; }
+
+.qr-charge-passenger .qr-charge-code { border: 0; }
 
 .qr-charge-waiting {
   width: 100%;

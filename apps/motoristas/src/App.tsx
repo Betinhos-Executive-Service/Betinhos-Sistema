@@ -3401,6 +3401,7 @@ function App() {
   if (screen === "cobrancaQr" && selectedDetail) {
     return show(
       <QrChargeScreen
+        key={selectedDetail.id}
         detail={selectedDetail}
         maxCents={getReceivableCents(selectedDetail)}
         onBack={() => setScreen("receber")}
@@ -3408,8 +3409,8 @@ function App() {
           setQrChargesPaid((current) => ({ ...current, [selectedDetail.id]: charge }));
           setScreen("receber");
         }}
-        createCharge={(valorCentavos) =>
-          createQrChargeRemote({ reservaId: selectedDetail.dataverse?.id ?? selectedDetail.id, motoristaId: driverContext?.id ?? "", valorCentavos })
+        createCharge={(valorCentavos, pagante, idioma) =>
+          createQrChargeRemote({ reservaId: selectedDetail.dataverse?.id ?? selectedDetail.id, motoristaId: driverContext?.id ?? "", valorCentavos, pagante, idioma })
         }
         updateCharge={updateQrChargeRemote}
       />

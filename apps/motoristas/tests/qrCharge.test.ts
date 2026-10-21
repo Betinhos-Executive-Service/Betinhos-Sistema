@@ -9,10 +9,14 @@ import {
   getReceivableCents,
   getRemainingSeconds,
   parseAmountToCents,
+  getQrChargePayerOptions,
   parseQrChargeResponse,
+  QR_CHARGE_PASSENGER_COPY,
   qrChargeCoversReceivable,
-  validateQrChargeAmount
+  validateQrChargeAmount,
+  validateQrChargePayer
 } from "../src/lib/qrCharge.ts";
+import { RECEIPT_LANGUAGE_OPTIONS } from "../src/lib/receiptLanguage.ts";
 
 const detail = (record?: Record<string, unknown>, valorCampo = ""): DetailData => ({
   type: "SERVICO",
@@ -110,6 +114,48 @@ test("etapa Receber some só com comprovante enviado ou QR pago no total", () =>
   assert.equal(isReceiveStepPending(service, { ...base, receiveProofs: { [service.id]: [photo] } }), true);
   assert.equal(isReceiveStepPending(service, { ...base, receiveProofs: { [service.id]: [photo] }, receiveUploadedCounts: { [service.id]: 1 } }), false);
   assert.equal(isReceiveStepPending({ ...service, type: "TROCA" }, base), false);
+});
+
+test("opções de pagante: passageiros com idioma pela bandeira, solicitante e cliente, sem repetir", () => {
+  const service = {
+    ...detail(),
+    fields: [
+      {
+        label: "Passageiros e Telefones de Contato",
+        value: '<span><span data-flag="US"></span>John Smith - <a href="https://wa.me/1555">+1 555</a></span><br><span><span data-flag="ES"></span>Ana López - <span style="color:#8a8a8a">Sem telefone</span></span>'
+      },
+      { label: "Solicitante", value: 'John Smith - <a href="https://wa.me/1555">+1 555</a>' },
+      { label: "Cliente", value: "Tenaris" }
+    ]
+  } as DetailData;
+  assert.deepEqual(getQrChargePayerOptions(service), [
+    { nome: "John Smith", origem: "Passageiro", idioma: "en-US" },
+    { nome: "Ana López", origem: "Passageiro", idioma: "es-ES" },
+    { nome: "Tenaris", origem: "Cliente", idioma: null }
+  ]);
+  assert.deepEqual(getQrChargePayerOptions(detail()), []);
+});
+
+test("texto livre da reserva: telefone sai do nome e linha sem nome é ignorada", () => {
+  const service = {
+    ...detail(),
+    fields: [{ label: "Passageiros e Telefones de Contato", value: "Maria Souza 11 90000-0001\n+55 11 90000-0014\nPedro: (21) 3333-4444" }]
+  } as DetailData;
+  assert.deepEqual(getQrChargePayerOptions(service).map((option) => option.nome), ["Maria Souza", "Pedro"]);
+});
+
+test("pagante exige nome; e-mail é opcional mas validado", () => {
+  assert.deepEqual(validateQrChargePayer({ nome: "John", email: "" }), {});
+  assert.deepEqual(validateQrChargePayer({ nome: "John", email: "john@mail.com" }), {});
+  assert.equal(validateQrChargePayer({ nome: " ", email: "" }).nome, "Informe quem vai pagar.");
+  assert.equal(validateQrChargePayer({ nome: "John", email: "john@mail" }).email, "Confira o e-mail.");
+});
+
+test("texto do passageiro existe nos três idiomas do recibo", () => {
+  for (const option of RECEIPT_LANGUAGE_OPTIONS) {
+    assert.ok(QR_CHARGE_PASSENGER_COPY[option.value].title);
+    assert.ok(QR_CHARGE_PASSENGER_COPY[option.value].body);
+  }
 });
 
 test("cobrança já paga não exige link", () => {

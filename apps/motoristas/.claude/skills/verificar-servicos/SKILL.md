@@ -36,9 +36,9 @@ Usa Chrome headless com user agent Android (ativa a câmera ao vivo) e câmera s
 ## Cobrança por QR code (Stripe, modo mock)
 Spec: `docs/superpowers/specs/2026-10-21-cobranca-stripe-qr-design.md`. Em localhost o botão aparece sempre; o mock (`src/lib/qrChargeMock.ts`) marca pago 5 s depois de gerar.
 1. `#receber?serviceId=10240&type=SERVICO` → botão "Cobrar por QR code" (some em serviço com valor a receber R$ 0,00, ex.: 10241).
-2. Tocar → `#cobranca-qr`, campo "Valor da cobrança" já com `380,00`. Digitar 500 → "Gerar QR code" mostra "O valor não pode passar de R$ 380,00."
-3. Valor 380 → QR (SVG `.qr-charge-code`), faixa "Aguardando pagamento. Não libere o passageiro ainda." e "Expira em 29:5x".
-4. Com `?mockRecusa=1` antes do hash: aparece "Pagamento recusado: …" e o QR continua; ~5 s depois vira "Pagamento confirmado … Pode liberar o passageiro".
+2. Tocar → `#cobranca-qr`, campo "Valor da cobrança" já com `380,00`, "Quem vai pagar" com o 1º passageiro ("Henrique Tavares · Passageiro"), "E-mail para o recibo" vazio e "Idioma do passageiro" (bandeira do passageiro ou Português). Digitar 500 → "O valor não pode passar de R$ 380,00."; e-mail `x@mail` → "Confira o e-mail."; "Outra pessoa" sem nome → "Informe quem vai pagar."
+3. Valor 380, idioma Inglês e e-mail válido → faixa "Aguardando pagamento.", painel `.qr-charge-passenger` com "Payment for your service", R$ 380,00, QR (SVG `.qr-charge-code`), instrução em inglês e "The receipt will be sent to your email."; "Expira em 29:5x".
+4. Com `?mockRecusa=1` antes do hash: aparece "Pagamento recusado: …" e o QR continua; ~5 s depois vira "Pagamento confirmado … O Stripe confirmou o pagamento.".
 5. "Continuar" → Recebimento mostra "Pago por QR code: R$ 380,00. O comprovante é opcional." e FINALIZAR vai para `#finalizar` sem foto. Com valor menor (ex.: 200) a foto continua obrigatória ("Envie o comprovante do restante").
 6. "Cancelar cobrança" logo após gerar → "Cobrança cancelada…" e não vira pago depois.
 7. Recarregar em `#cobranca-qr` volta ao Recebimento.

@@ -6,7 +6,8 @@ Status em 21/10/2026: a parte do app está implementada e testada em modo mock. 
 
 Quando a maquininha não funcionar, ou quando o passageiro estrangeiro não conseguir pagar nela, o motorista gera pelo App Motoristas um QR code de pagamento.
 - O passageiro lê o QR no próprio celular e paga com Apple Pay, Google Pay ou cartão, inclusive internacional.
-- O motorista vê **no celular dele, em tempo real**, se o pagamento foi confirmado, para só então liberar o passageiro.
+- O motorista vê **no celular dele, em tempo real**, se o pagamento foi confirmado.
+- Antes do QR, o motorista informa **quem vai pagar**, o **e-mail para o recibo** e o **idioma do passageiro**; o QR aparece com uma explicação para o passageiro nesse idioma.
 - A cobrança paga substitui a foto do comprovante.
 
 O motorista não tem acesso à conta Stripe e não depende de NFC.
@@ -57,9 +58,9 @@ App (celular do motorista)              Power Automate                       Str
   - O QR é desenhado no app (`qrcode-generator`), sem mandar o link a nenhum serviço externo.
   - Mostra a contagem de 30 min e tem o botão "Cancelar cobrança"; expirado ou cancelado, oferece "Gerar outro QR code".
 - **Confirmação em tempo real:**
-  - Enquanto o pagamento não entra, uma faixa amarela diz "Aguardando pagamento. Não libere o passageiro ainda."
+  - Enquanto o pagamento não entra, uma faixa amarela diz "Aguardando pagamento."
   - Cartão recusado mostra o motivo e avisa que o mesmo QR continua valendo.
-  - Quando o Stripe confirma, a tela vira o painel verde "Pagamento confirmado · Pode liberar o passageiro" e o celular vibra.
+  - Quando o Stripe confirma, a tela vira o painel verde "Pagamento confirmado" e o celular vibra.
   - A confirmação só vem do Flow lendo `payment_status=paid` no Stripe; nada do lado do passageiro marca como pago.
 - **Navegação:** a rota é `#cobranca-qr`. Se a página recarregar, volta ao Recebimento, porque a sessão do QR fica só na memória.
 
@@ -82,20 +83,20 @@ App (celular do motorista)              Power Automate                       Str
 - **`recusa`:** é o `payment_intent.last_payment_error.message` da última tentativa; vazio se nenhuma falhou.
 - **Erro de negócio** (sem permissão, valor acima do saldo, reserva de outro motorista): volta HTTP 200 com `{ "erro": "mensagem" }`. O app mostra o texto como veio, então escreva para o motorista ler.
 
-**1. Flow Cobrança QR (`new_FlowURLCobrancaQR`)** — entrada `{ reservaId, motoristaId, valorCentavos }`.
+**1. Flow Cobrança QR (`new_FlowURLCobrancaQR`)** — entrada `{ reservaId, motoristaId, valorCentavos, pagante: { nome, email }, idioma }`. `idioma` é `pt-BR`, `en-US` ou `es-ES`; `email` pode vir vazio.
 1. **Permissão:** o funcionário `motoristaId` precisa ter `cr40f_podecobrarqrcode` = Sim. Se não tiver: `{ erro: "Você não está liberado para cobrar por QR code." }`.
 2. **Reserva:** `_cr40f_motorista_value` precisa ser igual a `motoristaId`.
 3. **Saldo:** `cr40f_valor_a_receber` menos as cobranças `pago` da reserva. Um `valorCentavos` acima do saldo é recusado com `erro`.
 4. **Sessão já aberta:** se houver cobrança `aguardando`, não vencida e com o mesmo valor, devolva essa mesma. Assim, dois toques não criam duas cobranças.
 5. **Criar a sessão:** `POST https://api.stripe.com/v1/checkout/sessions`, em form-urlencoded, com `Authorization: Bearer <chave restrita>` e `Idempotency-Key: reserva-<id>-<n>`.
    - Parâmetros:
-     - `mode=payment`, `locale=auto` e `expires_at` = agora + 30 min (o mínimo do Stripe).
+     - `mode=payment`, `expires_at` = agora + 30 min (o mínimo do Stripe) e `locale` pelo idioma: `pt-BR` → `pt-BR`, `en-US` → `en`, `es-ES` → `es`.
      - `line_items[0][price_data][currency]=brl`, `[unit_amount]=<valorCentavos>` e `[product_data][name]=Serviço <nº>`, com `line_items[0][quantity]=1`.
-     - `client_reference_id=<reservaId>`, `metadata[reserva_id]` e `metadata[motorista_id]`.
+     - `client_reference_id=<reservaId>`, `metadata[reserva_id]`, `metadata[motorista_id]` e `metadata[pagante_nome]`.
      - `success_url` apontando para a página de agradecimento da Betinhos.
-     - Opcional: `customer_email` com o e-mail do passageiro.
+     - `customer_email=<pagante.email>` quando vier preenchido: o passageiro não precisa digitar e-mail na página e o recibo do Stripe vai para ele.
    - **Não** envie `payment_method_types`: o Stripe recusa esse parâmetro. Os meios de pagamento vêm do painel: Cards, Apple Pay e Google Pay ligados; Pix e Boleto desligados.
-6. **Registrar:** crie a linha em `cr40f_cobrancastripe` com status `aguardando` e responda no contrato acima.
+6. **Registrar:** crie a linha em `cr40f_cobrancastripe` com status `aguardando`, nome e e-mail do pagante e idioma, e responda no contrato acima.
 
 **2. Flow Status Cobrança QR (`new_FlowURLCobrancaQRStatus`)** — entrada `{ sessionId, acao: "consultar" | "cancelar" }`. O app chama a cada 3 s enquanto o QR está na tela, então a meta de resposta é menos de 2 s.
 - **`cancelar`:** `POST /v1/checkout/sessions/{id}/expire`. Se a sessão já estiver paga, devolva `pago`: o dinheiro entrou e o motorista precisa saber.
@@ -117,7 +118,7 @@ App (celular do motorista)              Power Automate                       Str
 
 - **Permissão:** coluna Sim/Não `cr40f_podecobrarqrcode` ("Pode cobrar por QR code") em `cr40f_funcionarios`, com padrão Não. O script é `scripts/add-funcionario-cobranca-qr-permission.console.js`.
 - **Histórico:** tabela `cr40f_cobrancastripe`, criada por `scripts/create-cobranca-stripe-table.console.js`. Guarda uma linha por tentativa.
-  - Colunas: sessão, status, valor (R$), PaymentIntent, tarifa, valor líquido, país do cartão, bandeira, carteira, expira em e pago em.
+  - Colunas: sessão, status, valor (R$), pagante (nome e e-mail), idioma, PaymentIntent, tarifa, valor líquido, país do cartão, bandeira, carteira, expira em e pago em.
   - Lookups: reserva e motorista.
 
 ## Ordem de implantação (DEV)
@@ -134,9 +135,11 @@ App (celular do motorista)              Power Automate                       Str
 | Motorista liberado, serviço com valor a receber | Botão "Cobrar por QR code" no Recebimento | OK no mock |
 | Serviço sem valor a receber | Sem botão | OK no mock |
 | Valor acima do valor a receber | Bloqueio com "O valor não pode passar de R$ …" | OK no mock e nos testes |
-| QR gerado | QR, valor, faixa "Não libere o passageiro ainda" e contagem de 30 min | OK no mock |
+| QR gerado | Faixa "Aguardando pagamento", painel do passageiro no idioma escolhido (título, valor em R$, QR, instrução) e contagem de 30 min | OK no mock |
+| Quem vai pagar | Lista com passageiros (idioma pela bandeira), solicitante e cliente + "Outra pessoa" | OK no mock e nos testes |
+| E-mail inválido | "Confira o e-mail." e foco no campo | OK no mock e nos testes |
 | Cartão recusado | Motivo na tela e QR continua valendo | OK no mock (`?mockRecusa=1`) |
-| Pagamento confirmado | Painel verde "Pode liberar o passageiro" e vibração | OK no mock (vibração só em aparelho) |
+| Pagamento confirmado | Painel verde "Pagamento confirmado" e vibração | OK no mock (vibração só em aparelho) |
 | Pago no total | FINALIZAR segue sem foto | OK no mock |
 | Pago em parte | "Envie o comprovante do restante" e foto obrigatória | OK no mock |
 | Cancelar cobrança | "Cobrança cancelada" e o QR não aceita mais pagamento | OK no mock |

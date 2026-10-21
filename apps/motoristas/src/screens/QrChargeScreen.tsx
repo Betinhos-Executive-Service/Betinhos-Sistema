@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import qrcode from "qrcode-generator";
 import { ActionBar, ActionButton } from "../components/common/ActionButton";
-import { MoneyInputField } from "../components/common/FormFields";
+import { MoneyInputField, SelectField, TextInputField } from "../components/common/FormFields";
 import { SystemIcon } from "../components/icons/SystemIcon";
 import { AppShell } from "../components/layout/AppShell";
 import { FormMenu } from "../components/navigation/FormMenu";
@@ -9,22 +9,28 @@ import { formatCurrencyInputOnBlur } from "../lib/currencyInput";
 import {
   formatCountdown,
   formatQrChargeAmount,
+  getQrChargePayerOptions,
   getRemainingSeconds,
   parseAmountToCents,
+  QR_CHARGE_PASSENGER_COPY,
   validateQrChargeAmount,
-  type QrCharge
+  validateQrChargePayer,
+  type QrCharge,
+  type QrChargePayer
 } from "../lib/qrCharge";
+import { RECEIPT_LANGUAGE, RECEIPT_LANGUAGE_OPTIONS, normalizeReceiptLanguage, type ReceiptLanguage } from "../lib/receiptLanguage";
 import type { DetailData } from "../types";
 
 const POLL_INTERVAL_MS = 3000;
 const QR_QUIET_ZONE = 4;
+const OTHER_PAYER = "__outra_pessoa__";
 
 type QrChargeScreenProps = {
   detail: DetailData;
   maxCents: number;
   onBack: () => void;
   onPaid: (charge: QrCharge) => void;
-  createCharge: (valorCentavos: number) => Promise<QrCharge>;
+  createCharge: (valorCentavos: number, pagante: QrChargePayer, idioma: ReceiptLanguage) => Promise<QrCharge>;
   updateCharge: (sessionId: string, acao: "consultar" | "cancelar") => Promise<QrCharge>;
 };
 
@@ -74,11 +80,19 @@ function Countdown({ expiraEm }: { expiraEm: string }) {
 export function QrChargeScreen({ detail, maxCents, onBack, onPaid, createCharge, updateCharge }: QrChargeScreenProps) {
   const [amountText, setAmountText] = useState(() => formatCurrencyInputOnBlur((maxCents / 100).toFixed(2)));
   const [amountError, setAmountError] = useState("");
+  const payerOptions = useMemo(() => getQrChargePayerOptions(detail), [detail]);
+  const [payerChoice, setPayerChoice] = useState(() => payerOptions[0]?.nome ?? OTHER_PAYER);
+  const [otherPayerName, setOtherPayerName] = useState("");
+  const [email, setEmail] = useState("");
+  const [idioma, setIdioma] = useState<ReceiptLanguage>(() => payerOptions[0]?.idioma ?? RECEIPT_LANGUAGE.portuguese);
+  const [payerErrors, setPayerErrors] = useState<Partial<Record<keyof QrChargePayer, string>>>({});
   const [charge, setCharge] = useState<QrCharge | null>(null);
   const [timedOut, setTimedOut] = useState(false);
   const [busy, setBusy] = useState<"" | "creating" | "cancelling">("");
   const [error, setError] = useState("");
   const amountRef = useRef<HTMLInputElement | null>(null);
+  const payerNameRef = useRef<HTMLInputElement | null>(null);
+  const emailRef = useRef<HTMLInputElement | null>(null);
 
   const paid = charge?.status === "pago";
   const expired = charge?.status === "expirado" || (charge?.status === "aguardando" && timedOut);
@@ -128,15 +142,22 @@ export function QrChargeScreen({ detail, maxCents, onBack, onPaid, createCharge,
   const generate = async () => {
     const cents = parseAmountToCents(amountText);
     const validation = validateQrChargeAmount(cents, maxCents);
+    const pagante = { nome: (payerChoice === OTHER_PAYER ? otherPayerName : payerChoice).trim(), email: email.trim() };
+    const errors = validateQrChargePayer(pagante);
     setAmountError(validation);
+    setPayerErrors(errors);
     if (validation) {
       amountRef.current?.focus();
+      return;
+    }
+    if (Object.keys(errors).length) {
+      (errors.nome ? payerNameRef : emailRef).current?.focus();
       return;
     }
     setBusy("creating");
     setError("");
     try {
-      setCharge(await createCharge(cents));
+      setCharge(await createCharge(cents, pagante, idioma));
     } catch (createError) {
       setError(errorMessage(createError));
     } finally {
@@ -164,6 +185,7 @@ export function QrChargeScreen({ detail, maxCents, onBack, onPaid, createCharge,
   };
 
   const chargeLabel = charge ? formatQrChargeAmount(charge.valorCentavos) : "";
+  const passengerCopy = QR_CHARGE_PASSENGER_COPY[idioma];
 
   return (
     <AppShell screenLabel="TelaCobrancaQr">
@@ -188,6 +210,65 @@ export function QrChargeScreen({ detail, maxCents, onBack, onPaid, createCharge,
                     setAmountError("");
                   }}
                 />
+                {payerOptions.length ? (
+                  <SelectField
+                    label="Quem vai pagar"
+                    required
+                    value={payerChoice}
+                    disabled={Boolean(busy)}
+                    options={[
+                      ...payerOptions.map((option) => ({ value: option.nome, label: `${option.nome} · ${option.origem}` })),
+                      { value: OTHER_PAYER, label: "Outra pessoa" }
+                    ]}
+                    placeholder="Escolha quem vai pagar"
+                    ariaLabel="Selecionar quem vai pagar"
+                    onChange={(value) => {
+                      setPayerChoice(value);
+                      setPayerErrors((current) => ({ ...current, nome: undefined }));
+                      setIdioma(payerOptions.find((option) => option.nome === value)?.idioma ?? RECEIPT_LANGUAGE.portuguese);
+                    }}
+                  />
+                ) : null}
+                {payerChoice === OTHER_PAYER ? (
+                  <TextInputField
+                    ref={payerNameRef}
+                    label={payerOptions.length ? "Nome de quem vai pagar" : "Quem vai pagar"}
+                    required
+                    autoComplete="off"
+                    value={otherPayerName}
+                    disabled={Boolean(busy)}
+                    error={payerErrors.nome}
+                    onChange={(event) => {
+                      setOtherPayerName(event.target.value);
+                      setPayerErrors((current) => ({ ...current, nome: undefined }));
+                    }}
+                  />
+                ) : null}
+                <TextInputField
+                  ref={emailRef}
+                  label="E-mail para o recibo"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="off"
+                  value={email}
+                  disabled={Boolean(busy)}
+                  error={payerErrors.email}
+                  hint="Confirme com o passageiro. O Stripe envia o recibo para este e-mail."
+                  onChange={(event) => {
+                    setEmail(event.target.value);
+                    setPayerErrors((current) => ({ ...current, email: undefined }));
+                  }}
+                />
+                <SelectField
+                  label="Idioma do passageiro"
+                  value={idioma}
+                  disabled={Boolean(busy)}
+                  options={RECEIPT_LANGUAGE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+                  placeholder="Selecionar idioma"
+                  ariaLabel="Selecionar idioma do passageiro"
+                  hint="A tela do QR e a página de pagamento aparecem neste idioma."
+                  onChange={(value) => setIdioma(normalizeReceiptLanguage(value))}
+                />
               </div>
             ) : (
               <div className="qr-charge-result">
@@ -196,9 +277,9 @@ export function QrChargeScreen({ detail, maxCents, onBack, onPaid, createCharge,
                     <span className="qr-charge-paid-mark" aria-hidden="true"><SystemIcon name="check" /></span>
                     <strong>Pagamento confirmado</strong>
                     <span className="qr-charge-paid-amount">{chargeLabel}</span>
-                    <p>O Stripe confirmou o pagamento. Pode liberar o passageiro.</p>
+                    <p>O Stripe confirmou o pagamento.</p>
                   </div>
-                ) : (
+                ) : open ? null : (
                   <div className="qr-charge-amount">
                     <span className="form-field-label">Valor da cobrança</span>
                     <strong>{chargeLabel}</strong>
@@ -209,9 +290,15 @@ export function QrChargeScreen({ detail, maxCents, onBack, onPaid, createCharge,
                   <>
                     <p className="qr-charge-waiting" role="status">
                       <span className="qr-charge-waiting-dot" aria-hidden="true" />
-                      Aguardando pagamento. Não libere o passageiro ainda.
+                      Aguardando pagamento.
                     </p>
-                    <QrCodeSvg value={charge.url} />
+                    <div className="qr-charge-passenger" lang={idioma}>
+                      <strong>{passengerCopy.title}</strong>
+                      <span className="qr-charge-passenger-amount" lang="pt-BR">{chargeLabel}</span>
+                      <QrCodeSvg value={charge.url} />
+                      <p>{passengerCopy.body}</p>
+                      {email.trim() ? <p>{passengerCopy.receipt}</p> : null}
+                    </div>
                     {charge.recusa ? (
                       <p className="qr-charge-alert is-danger" role="alert">
                         Pagamento recusado: {charge.recusa} Peça outro cartão; o mesmo QR code continua valendo.

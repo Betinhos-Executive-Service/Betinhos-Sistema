@@ -14,7 +14,7 @@ import {
   type ExpenseReferenceData
 } from "./expenses.ts";
 import type { PersonalReceiptModel } from "./personalReceipt";
-import { normalizeReceiptLanguage, RECEIPT_LANGUAGE } from "./receiptLanguage.ts";
+import { normalizeReceiptLanguage, RECEIPT_LANGUAGE, type ReceiptLanguage } from "./receiptLanguage.ts";
 
 import { getFieldValue } from "./fieldLookup.ts";
 import {
@@ -29,7 +29,7 @@ import { createRemoteReadBatch } from "./remoteReadBatch.ts";
 import { buildCurrentVehiclePatch } from "./myVehicle.ts";
 import { buildIdeaRecord, normalizeIdeaRecord, validateIdeaDraft, type Idea, type IdeaDraft } from "./ideas.ts";
 import { decideExpenseUploadMode, type ExpenseUploadMode } from "./expenseUploadMode.ts";
-import { parseQrChargeResponse } from "./qrCharge.ts";
+import { parseQrChargeResponse, type QrChargePayer } from "./qrCharge.ts";
 import { createMockQrCharge, updateMockQrCharge } from "./qrChargeMock.ts";
 
 type XrmLike = {
@@ -3078,7 +3078,7 @@ async function buildPassengersHtml(geralId: string, serviceDate: Date | null, dr
         ? `<a href="https://wa.me/${phone}?text=${encodeURIComponent(message)}" target="_blank" rel="noopener noreferrer">${phoneText}</a>`
         : `<span style="color:#8a8a8a">${phoneText}</span>`;
       const flagHtml = buildLanguageFlagHtml(getPassengerLanguageCode(passenger));
-      return `<span>${flagHtml}${escapeHtml(name)}${name && phoneRaw ? " - " : ""}${phoneHtml}</span>`;
+      return `<span>${flagHtml}${escapeHtml(name)}${name ? " - " : ""}${phoneHtml}</span>`;
     })
   );
 
@@ -3639,6 +3639,9 @@ export type QrChargeRequest = {
   reservaId: string;
   motoristaId: string;
   valorCentavos: number;
+  pagante: QrChargePayer;
+  // O Flow converte para o locale do Stripe: pt-BR → pt-BR, en-US → en, es-ES → es.
+  idioma: ReceiptLanguage;
 };
 
 // Cria a cobrança no Stripe pelo Flow, sempre em reais; o Flow confere de novo o limite do valor a receber.
