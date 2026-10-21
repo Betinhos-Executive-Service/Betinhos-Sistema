@@ -1,7 +1,8 @@
 ﻿param(
   [switch] $Apply,
   [switch] $DeviceCode,
-  # Papeis que recebem nas tabelas de equipamentos o mesmo acesso que ja tem em cr40f_funcionarios (decisao do Renan em 21/10/2026).
+  # Papeis que recebem nas tabelas de equipamentos o mesmo acesso que ja tem em cr40f_funcionarios. A lista padrao segue a convencao
+  # do repo (a mesma de Documentos); o AVISO do script aponta os demais papeis que acessam cr40f_funcionarios (decisao 9 do spec).
   [string[]] $Roles = @("Acesso-Betinhos-Canvas", "Acesso-Betinhos-MDA", "DEV - Usuário")
 )
 
@@ -104,6 +105,18 @@ foreach ($p in @(Get-Rows "privileges" "privilegeid,name" "endswith(name,'cr40f_
 }
 if ($origem.Count -eq 0) { throw "Privilegios de cr40f_funcionarios nao encontrados." }
 
+# Decisao 9 do spec: papeis raiz que acessam cr40f_funcionarios e ficaram fora de -Roles so geram AVISO (nada e concedido a eles).
+$papeisOrigem = @{}
+foreach ($privId in @($origem.Keys)) {
+  foreach ($rp in @(Get-Rows "roleprivilegescollection" "roleid" "privilegeid eq $privId")) { $papeisOrigem[[string]$rp.roleid] = $true }
+}
+$foraDaLista = @()
+foreach ($roleId in @($papeisOrigem.Keys)) {
+  $role = @(Get-Rows "roles" "name" "roleid eq $roleId and _parentroleid_value eq null")
+  if ($role.Count -eq 1 -and $Roles -notcontains $role[0].name) { $foraDaLista += $role[0].name }
+}
+foreach ($nome in @($foraDaLista | Sort-Object -Unique)) { Write-Step "AVISO: o papel '$nome' acessa cr40f_funcionarios e nao esta em -Roles; inclua-o em -Roles se ele deve acessar equipamentos (decisao 9 do spec)." }
+
 # Privilegios das tabelas novas, por nome (prvReadcr40f_equipamento...).
 $destino = @{}
 foreach ($t in $tabelas) {
@@ -130,8 +143,13 @@ foreach ($nome in $Roles) {
   $resumo = ($concessoes | ForEach-Object { "$($_.PrivilegeName)=$($_.Depth)" }) -join ", "
   if (-not $Apply) { Write-Step "DRY RUN $nome receberia: $resumo"; continue }
   Invoke-Dataverse "POST" "roles($($papel.roleid))/Microsoft.Dynamics.CRM.AddPrivilegesRole" @{ Privileges = $concessoes } | Out-Null
-  $atual = @(Get-Rows "roleprivilegescollection" "privilegeid" "roleid eq $($papel.roleid)") | Where-Object { $destino.Values -contains $_.privilegeid }
-  if (@($atual).Count -lt $concessoes.Count) { throw "$nome ficou com $(@($atual).Count) de $($concessoes.Count) privilegios esperados." }
+  $atual = @(@(Get-Rows "roleprivilegescollection" "privilegeid,privilegedepthmask" "roleid eq $($papel.roleid)") | Where-Object { $destino.Values -contains $_.privilegeid })
+  if ($atual.Count -lt $concessoes.Count) { throw "$nome ficou com $($atual.Count) de $($concessoes.Count) privilegios esperados." }
+  # Confere tambem a profundidade de cada privilegio concedido.
+  foreach ($c in $concessoes) {
+    $linha = @($atual | Where-Object { [string]$_.privilegeid -eq [string]$c.PrivilegeId })
+    if ($linha.Count -ne 1 -or $profundidade[[int]$linha[0].privilegedepthmask] -ne $c.Depth) { throw "$nome ficou com $($c.PrivilegeName) fora da profundidade esperada ($($c.Depth))." }
+  }
   Write-Step "$nome concedido: $resumo"
 }
 Write-Step $(if ($Apply) { "PRIVILEGIOS OK" } else { "DRY RUN OK; use -Apply" })
