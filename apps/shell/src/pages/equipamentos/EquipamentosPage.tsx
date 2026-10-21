@@ -11,6 +11,7 @@ import { STATUS } from './domain/choices'
 import { EQUIPAMENTO_COLUMNS, EQUIPAMENTO_DEFAULT_FILTERS, EQUIPAMENTO_SORT, TELA, builtinViews, equipamentoFields, matchesKeyword, pessoasResponsaveis, readEquipamento, sortEquipamentos } from './domain/lista'
 import { useEquipamentos } from './useEquipamentos'
 import { EquipamentosCards, EquipamentosTable } from './components/EquipamentosList'
+import { EquipamentoDrawer } from './components/EquipamentoDrawer'
 import './equipamentos.css'
 
 export function EquipamentosPage({ host }: { host: Host }) {
@@ -39,8 +40,8 @@ function Equipamentos({ host }: { host: Host }) {
     builtins: builtinViews,
   })
   const [query, setQuery] = useQueryTexto('q')
-  // Link direto `?ver=<guid>` e `?novo=1`; o drawer entra na Tarefa 5.
-  const [, setTarget] = useQueryAlvo()
+  // Link direto `?ver=<guid>` (ou `?editar=`) e `?novo=1` abrem o drawer de cadastro/edição.
+  const [target, setTarget] = useQueryAlvo()
 
   const inativos = useMemo(() => new Set(data.pessoas.filter((p) => !p.ativo).map((p) => p.id)), [data.pessoas])
   const visible = useMemo(() => {
@@ -91,6 +92,7 @@ function Equipamentos({ host }: { host: Host }) {
       </div>
       {data.error && data.loaded ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{data.error} A lista mostra os dados da carga anterior.</Alert> : null}
       {body}
+      {data.loaded ? <EquipamentoDrawer target={target} onTarget={setTarget} list={data.equipamentos} tipos={data.tipos} pessoas={data.pessoas} source={source} onSaved={data.upsert} /> : null}
     </div>
   )
 }
