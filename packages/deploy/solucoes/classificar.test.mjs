@@ -42,3 +42,13 @@ test('tipo sem regra não é adivinhado', () => {
 test('regra que aponta para solução desconhecida falha', () => {
   assert.throws(() => validarRegras({ ...regras, porTipo: { ...regras.porTipo, '61': 'Outra' } }), /Outra/)
 })
+test('valor de permitidas fora de solucoes falha e nomeia o valor', () => {
+  assert.throws(() => validarRegras({ ...regras, permitidas: { ...regras.permitidas, BetinhosCore: ['BetinhosCoer'] } }), /BetinhosCoer/)
+})
+test('exceção sem exatamente uma condição falha e nomeia o tipo', () => {
+  assert.throws(() => validarRegras({ ...regras, excecoes: [{ tipo: '61', solucao: 'BetinhosMotoristas' }] }), /tipo 61/)
+  assert.throws(() => validarRegras({ ...regras, excecoes: [{ tipo: '1', nomes: ['x'], bpf: true, solucao: 'BetinhosAutomacao' }] }), /tipo 1/)
+})
+test('exceção com tipo fora de porTipo falha e nomeia o tipo', () => {
+  assert.throws(() => validarRegras({ ...regras, excecoes: [{ tipo: '999', nomes: ['x'], solucao: 'BetinhosCore' }] }), /999/)
+})

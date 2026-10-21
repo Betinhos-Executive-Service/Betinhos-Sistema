@@ -9,9 +9,14 @@ export function chaveTipo(c) {
 
 export function validarRegras(regras) {
   const conhecidas = new Set(regras.solucoes)
-  const usadas = [...Object.values(regras.porTipo), ...regras.excecoes.map((e) => e.solucao), ...Object.keys(regras.permitidas)]
+  const usadas = [...Object.values(regras.porTipo), ...regras.excecoes.map((e) => e.solucao), ...Object.keys(regras.permitidas), ...Object.values(regras.permitidas).flat()]
   const desconhecidas = usadas.filter((s) => !conhecidas.has(s))
   if (desconhecidas.length) throw new Error(`Solucao desconhecida em regras.json: ${[...new Set(desconhecidas)].join(', ')}`)
+  for (const e of regras.excecoes) {
+    const condicoes = ['nomes', 'app', 'bpf'].filter((k) => e[k] !== undefined)
+    if (condicoes.length !== 1) throw new Error(`Excecao do tipo ${e.tipo} precisa de exatamente uma condicao entre nomes, app e bpf`)
+    if (!Object.hasOwn(regras.porTipo, e.tipo)) throw new Error(`Excecao aponta para o tipo ${e.tipo}, que nao existe em porTipo`)
+  }
 }
 
 function casa(excecao, c) {
