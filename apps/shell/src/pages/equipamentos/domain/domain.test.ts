@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { matchesFilters, readFilters, type TableFilters } from '@betinhos/ui'
+import { EQUIPAMENTO_DEFAULT_FILTERS, builtinViews, equipamentoFields, matchesKeyword, readEquipamento, sortEquipamentos } from './lista'
 import { STATUS, statusLabel, statusTone } from './choices'
 import { opcoesAtivas, validateTipo } from './cadastros'
 import { applyForm, diffForm, emptyEquipamento, emptyForm, hasChanges, isDirty, serieRepetida, toForm, validateForm, withResponsavel, withStatus } from './form'
@@ -141,5 +143,33 @@ describe('cadastros', () => {
   it('opções mostram ativos e o atual inativo marcado', () => {
     expect(opcoesAtivas(tipos, null).map((o) => o.label)).toEqual(['Mouse', 'Notebook'])
     expect(opcoesAtivas(tipos, 't2').map((o) => o.label)).toEqual(['Mouse', 'Notebook', 'Pager (inativo)'])
+  })
+})
+
+describe('lista', () => {
+  const list = [
+    item(),
+    item({ id: 'e2', descricao: 'Notebook reserva', responsavelId: null, responsavelNome: '', status: STATUS.disponivel, numeroSerie: '' }),
+    item({ id: 'e3', descricao: 'Impressora antiga', tipoNome: 'Impressora', numeroSerie: 'HP-M404-77', responsavelId: null, responsavelNome: '', status: STATUS.baixado }),
+  ]
+  const fields = equipamentoFields(tipos, pessoas)
+  const apply = (filters: TableFilters) => list.filter((e) => matchesFilters(e, readFilters(filters, fields), fields, readEquipamento)).map((e) => e.id)
+  const view = (id: string) => JSON.parse(builtinViews().find((v) => v.id === id)!.config).filters as TableFilters
+
+  it('visão padrão esconde baixados', () => {
+    expect(apply(EQUIPAMENTO_DEFAULT_FILTERS)).toEqual(['e1', 'e2'])
+  })
+  it('visões prontas: sem responsável e baixados', () => {
+    expect(apply(view('sem-responsavel'))).toEqual(['e2'])
+    expect(apply(view('baixados'))).toEqual(['e3'])
+    expect(apply(view('todos'))).toEqual(['e1', 'e2', 'e3'])
+  })
+  it('busca por responsável, série e tipo sem acento', () => {
+    expect(list.filter((e) => matchesKeyword(e, 'bruna')).map((e) => e.id)).toEqual(['e1'])
+    expect(list.filter((e) => matchesKeyword(e, 'dl5440')).map((e) => e.id)).toEqual(['e1'])
+    expect(list.filter((e) => matchesKeyword(e, 'impressora')).map((e) => e.id)).toEqual(['e3'])
+  })
+  it('ordena por descrição', () => {
+    expect(sortEquipamentos(list, { key: 'equipamento', dir: 'asc' }).map((e) => e.id)).toEqual(['e3', 'e1', 'e2'])
   })
 })
