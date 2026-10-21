@@ -5,6 +5,7 @@ import type { Source } from '../data/source'
 import { applyForm, diffForm, emptyEquipamento, emptyForm, hasChanges, isDirty, serieRepetida, toForm, validateForm, type EquipamentoForm as FormValues, type FormErrors } from '../domain/form'
 import type { Equipamento, Pessoa, TipoEquipamento } from '../domain/types'
 import { EquipamentoForm } from './EquipamentoForm'
+import { FotosSecao } from './FotosSecao'
 
 export type DrawerTarget = { mode: 'view' | 'edit'; id: string } | { mode: 'create' } | null
 
@@ -16,12 +17,14 @@ type Props = {
   pessoas: Pessoa[]
   source: Source
   onSaved: (e: Equipamento) => void
+  /** Miniatura da capa na lista quando as fotos mudam. */
+  onCapa: (equipamentoId: string, miniatura: string | null) => void
 }
 
 const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
 /** Cadastro e edição no mesmo drawer; fechar com alteração pede confirmação; salvando não fecha. */
-export function EquipamentoDrawer({ target, onTarget, list, tipos, pessoas, source, onSaved }: Props) {
+export function EquipamentoDrawer({ target, onTarget, list, tipos, pessoas, source, onSaved, onCapa }: Props) {
   const toast = useToast()
   const formId = useId()
   const creating = target?.mode === 'create'
@@ -36,6 +39,7 @@ export function EquipamentoDrawer({ target, onTarget, list, tipos, pessoas, sour
   const [errors, setErrors] = useState<FormErrors>({})
   const [saving, setSaving] = useState(false)
   const [pendingExit, setPendingExit] = useState(false)
+  const [enviandoFotos, setEnviandoFotos] = useState(false)
   const focusError = useRef(false)
 
   // Prepara o formulário só ao abrir outro item ou o cadastro (não a cada atualização da lista).
@@ -68,12 +72,15 @@ export function EquipamentoDrawer({ target, onTarget, list, tipos, pessoas, sour
 
   function close() {
     if (saving) return
+    // Fechar no meio do envio perderia as fotos que ainda estão na fila.
+    if (enviandoFotos) { toast({ tone: 'info', message: 'Aguarde o envio das fotos terminar.' }); return }
     if (dirty) { setPendingExit(true); return }
     onTarget(null)
   }
 
   async function save() {
     if (saving) return
+    if (enviandoFotos) { toast({ tone: 'info', message: 'Aguarde o envio das fotos terminar para salvar.' }); return }
     const found = validateForm(form)
     focusError.current = Object.keys(found).length > 0
     setErrors(found)
@@ -120,6 +127,8 @@ export function EquipamentoDrawer({ target, onTarget, list, tipos, pessoas, sour
             <EquipamentoForm formId={formId} form={form} errors={errors} onChange={setForm} onSubmit={() => void save()} disabled={saving}
               tipos={tipos} pessoas={pessoas} tipoAtual={current?.tipoId ?? null} responsavelAtual={current?.responsavelId ?? null} repetido={repetido} />
           ) : null}
+        {/* Fotos gravam na hora, à parte do Salvar; no cadastro novo ficam desabilitadas até o primeiro salvamento. */}
+        {open && !missing ? <FotosSecao equipamentoId={creating ? null : current?.id ?? null} source={source} onCapa={onCapa} onEnviando={setEnviandoFotos} /> : null}
       </Drawer>
       <Dialog open={pendingExit} onClose={() => setPendingExit(false)} title="Descartar alterações?"
         actions={<>
