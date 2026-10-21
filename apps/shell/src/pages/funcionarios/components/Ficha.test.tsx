@@ -125,8 +125,12 @@ describe('Ficha', () => {
     expect(screen.getByText('Mouse')).toBeTruthy()
     expect(screen.getByText('Em uso')).toBeTruthy()
     expect(screen.getByText('Em manutenção')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Abrir equipamento Notebook do Financeiro' }).getAttribute('href')).toBe('#/equipamentos?ver=e1')
-    expect(screen.getByRole('link', { name: 'Abrir equipamento Mouse sem fio' }).getAttribute('href')).toBe('#/equipamentos?ver=e2')
+    // Um link por item (a descrição); a seta é só alvo de toque, fora da árvore de acessibilidade e do Tab.
+    expect(screen.getAllByRole('link').map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+      ['Notebook do Financeiro', '#/equipamentos?ver=e1'],
+      ['Mouse sem fio', '#/equipamentos?ver=e2'],
+    ])
+    expect(screen.getByRole('link', { name: 'Abrir equipamento Notebook do Financeiro' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /Salvar/ })).toBeNull()
     expect(equipamentos).toHaveBeenCalledWith('f1')
   })

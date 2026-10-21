@@ -184,9 +184,19 @@ export function createXrmSource(xrm: XrmHost): DataSource {
     },
 
     async equipamentos(id): Promise<EquipamentoResumo[]> {
-      // A aba mostra só o que está com a pessoa: baixado fica de fora. Tabela ausente no ambiente rejeita aqui e a aba mostra o erro.
+      // A aba mostra só o que está com a pessoa: baixado fica de fora.
+      const tabela = EQUIPAMENTO_ENTITIES.equipamento
       const filter = `_cr40f_responsavel_value eq ${guid(id, 'funcionário')} and cr40f_status ne ${STATUS.baixado}`
-      const rows = await retrieveAll(EQUIPAMENTO_ENTITIES.equipamento, `?$select=cr40f_equipamentoid,cr40f_name,_cr40f_tipo_value,cr40f_numeroserie,cr40f_status&$filter=${filter}&$orderby=cr40f_name asc`)
+      let rows: Row[]
+      try {
+        rows = await retrieveAll(tabela, `?$select=cr40f_equipamentoid,cr40f_name,_cr40f_tipo_value,cr40f_numeroserie,cr40f_status&$filter=${filter}&$orderby=cr40f_name asc`)
+      } catch (error) {
+        // Ambiente sem o schema de Equipamentos: mensagem padrão do shell em vez do erro bruto do Dataverse.
+        // Se a metadata não responder, vale o erro original.
+        const meta = await getJson<{ value: unknown[] }>(`EntityDefinitions?$select=LogicalName&$filter=LogicalName eq '${tabela}'`).catch(() => null)
+        if (meta && Array.isArray(meta.value) && meta.value.length === 0) throw new Error(`Tabela ${tabela} não encontrada na metadata.`)
+        throw error
+      }
       return rows.map((row) => ({
         id: cleanId(String(row.cr40f_equipamentoid)),
         descricao: typeof row.cr40f_name === 'string' ? row.cr40f_name : '',
