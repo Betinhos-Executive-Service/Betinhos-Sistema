@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildActiveFleetQuery,
   buildAutomaticServiceVehiclePatch,
   buildMaintenanceRequestAssignedVehiclesQuery,
   buildExchangeDisplay,
@@ -159,6 +160,19 @@ test("consulta de veiculos para colisoes filtra apenas ativos sem restringir cat
   assert.equal(params.get("$filter")?.includes("new_categoriadoveiculo"), false);
   assert.equal(params.get("$orderby"), "cr40f_placa asc");
   assert.equal(params.get("$top"), "200");
+});
+
+test("frota para o motorista escolher o carro traz so ativos Proprio ou Aluguel, sem terceiros", () => {
+  const params = new URLSearchParams(buildActiveFleetQuery());
+
+  assert.equal(
+    params.get("$filter"),
+    "statecode eq 0 and cr40f_statusdoveiculo eq 202410001 and (new_categoriadoveiculo eq 100000000 or new_categoriadoveiculo eq 100000002)"
+  );
+  assert.equal(params.get("$filter")?.includes("100000001"), false);
+  assert.equal(params.get("$select"), "cr40f_veiculosid,cr40f_placa,cr40f_modelo,cr40f_cor");
+  assert.equal(params.get("$orderby"), "cr40f_modelo asc,cr40f_placa asc");
+  assert.equal(params.get("$top"), "300");
 });
 
 test("fallback de veiculos da manutencao busca veiculo atual ou atribuido ao motorista", () => {

@@ -5,7 +5,7 @@ description: "Verifica o fluxo principal do motorista no App Motoristas: Início
 # Verificar fluxo de serviços
 
 ## Cobre
-- Código: `src/App.tsx`, `src/app/**` (navegação, `backGuard.ts`), `src/components/**`, `src/data/mockData.ts`, `src/styles.css`, telas `Initial`, `Services`, `Details`, `History*`, `Receive`, `Finalize`, `Voucher`, `Signature`, `LocalCancel`, `MediaCapture`, `MaintenancePhotoPreview`.
+- Código: `src/App.tsx`, `src/app/**` (navegação, `backGuard.ts`, `cameraScroll.ts`), `src/components/**`, `src/data/mockData.ts`, `src/styles.css`, telas `Initial`, `Services`, `Details`, `History*`, `Receive`, `Finalize`, `Voucher`, `Signature`, `LocalCancel`, `MediaCapture`, `MaintenancePhotoPreview`.
 - Rotas (hash): `#inicio`, `#servicos`, `#detalhes?serviceId=…&type=…`, `#receber`, `#foto-receber`, `#preview-foto-receber`, `#finalizar`, `#voucher`, `#assinatura`, `#cancelado-local`, `#historico`.
 
 ## Preparar ambiente
@@ -44,6 +44,11 @@ Spec: `docs/superpowers/specs/2026-10-21-cobranca-stripe-qr-design.md`. Em local
 7. Recarregar em `#cobranca-qr` volta ao Recebimento.
 - Cliques por script (javascript_tool) não contam como gesto: o console mostra "Blocked call to navigator.vibrate" — esperado; em toque real vibra.
 - Lógica pura coberta por `tests/qrCharge.test.ts` (inclui `isReceiveStepPending`). Flows, Stripe real e Apple/Google Pay não são verificáveis no mock.
+
+## Rolagem ao voltar da câmera (todos os formulários com foto)
+- `src/app/cameraScroll.ts` (`useCameraScroll(chave)`): o `ref` vai no `.finalize-scroll` (o contêiner que rola; o `window` não rola) e `remember(ancora)` é chamado antes de abrir a câmera ou a prévia. Na volta, a posição é restaurada quando a altura estabiliza (quadro de animação com reserva por timer) e o bloco `data-scroll-anchor` da foto é trazido com o critério de `block: "nearest"`. Se o formulário aparecer por um instante e sair antes de terminar, a posição volta para a memória; mesmo assim, a câmera deve ficar na tela até a foto estar pronta para a prévia (o checklist só fecha a câmera depois de reduzir a foto), senão a restauração pode terminar no formulário relâmpago e a posição se perde. Chaves: `gastos`, `colisoes`, `solicitarManutencao`, `receber:<id>`, `finalizar:<id>`, `checklist:<id>`. A restauração (`restoreScroll`) e a ligação ao formulário (`createCameraScroll`) aceitam contêiner e quadros falsos e têm teste próprio. Testes puros em `tests/cameraScroll.test.ts`.
+- Roteiro: `node scripts/qa/verify-camera-scroll.cjs .verificacao/camera-scroll depois` com o dev server no ar (`APP_MOTORISTAS_URL`, padrão `http://127.0.0.1:45127`). A foto de teste é 4000×3000 (cerca de 2,3 MB, `FOTO=LxA` muda), para a redução levar tempo de verdade. Mede, em 375×812, checklist, gastos, solicitar manutenção (4 fotos antes para rolar), colisões, receber (9 fotos antes) e finalizar manutenção: `antesDaCamera` e `depoisDaCamera` iguais (ou poucos px a mais para mostrar a miniatura nova) e "miniatura visível". Antes da correção todos voltavam a 0.
+- No navegador interno, as trocas de tela (câmera, prévia) só avançam com o painel em foco: intercale `computer screenshot`/`wait` entre os passos (`browser_batch`) e use o input nativo (`input[type=file][accept="image/*"]` + `DataTransfer` com `new File`, que tem data atual; arquivo antigo é recusado com "Arquivos antigos da galeria não são aceitos").
 
 ## Casos de borda
 - Fila: finalizar fora de ordem mostra "Conclua os itens anteriores da fila antes de prosseguir." (modo remoto).

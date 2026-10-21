@@ -30,7 +30,7 @@ export function ChecklistOkNokField({ item, draft, domId, error, disabled, onCho
   const hasNokData = fotos.length > 0 || problemas.length > 0 || observacao.trim().length > 0;
   const chooseOk = () => (valor === "nok" && hasNokData ? setConfirmOk(true) : onChoose("ok"));
   return (
-    <section id={domId} tabIndex={-1} className={`collision-evidence-group checklist-oknok ${error ? "is-invalid" : ""} ${valor ? `is-${valor}` : ""}`} aria-describedby={error ? errorId : undefined}>
+    <section id={domId} tabIndex={-1} data-scroll-anchor={item.chave} className={`collision-evidence-group checklist-oknok ${error ? "is-invalid" : ""} ${valor ? `is-${valor}` : ""}`} aria-describedby={error ? errorId : undefined}>
       <div className="collision-evidence-group-head">
         <div>
           <strong>{item.rotulo}{item.obrigatorio ? <span className="form-field-required" aria-hidden="true"> *</span> : null}</strong>

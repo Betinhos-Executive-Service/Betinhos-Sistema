@@ -5,8 +5,8 @@ description: "Verifica a tela do checklist de vistoria no App Motoristas: tile d
 # Verificar checklist no App Motoristas
 
 ## Cobre
-- Código: `src/lib/checklists.ts`, `src/screens/ChecklistsScreen.tsx`, `src/components/checklists/ChecklistAgendaCard.tsx`, `src/components/checklists/ChecklistOkNokField.tsx`, `src/checklists.css`, `uploadChecklistPhotoRemote` em `src/lib/dataverse.ts`, ligação em `src/App.tsx`, `src/screens/InitialScreen.tsx`, `src/screens/ServicesScreen.tsx`, `src/app/navigation.ts`, `src/app/bootstrap.ts` (`getInitialChecklistId`).
-- Testes: `tests/checklists.test.ts` (inclui `mapChecklist` com `new_entreguepor`/`new_trocadetectadaem` e `checklistCardTexto`).
+- Código: `src/lib/checklists.ts`, `src/lib/checklistSend.ts` (etapas do carregamento), `src/components/common/SendStepsOverlay.tsx`, `src/app/cameraScroll.ts`, `src/screens/ChecklistsScreen.tsx`, `src/components/checklists/ChecklistAgendaCard.tsx`, `src/components/checklists/ChecklistOkNokField.tsx`, `src/checklists.css`, `uploadChecklistPhotoRemote` em `src/lib/dataverse.ts`, ligação em `src/App.tsx`, `src/screens/InitialScreen.tsx`, `src/screens/ServicesScreen.tsx`, `src/app/navigation.ts`, `src/app/bootstrap.ts` (`getInitialChecklistId`).
+- Testes: `tests/checklistSend.test.ts`, `tests/cameraScroll.test.ts`, `tests/checklists.test.ts` (inclui `mapChecklist` com `new_entreguepor`/`new_trocadetectadaem` e `checklistCardTexto`).
 - Rotas: `#inicio` (tile Checklist), `#servicos` (seção "Checklist do veículo"), `#checklists`.
 
 ## Preparar ambiente
@@ -25,7 +25,7 @@ description: "Verifica a tela do checklist de vistoria no App Motoristas: tile d
 5. "Enviar checklist" incompleto → "Revise N itens destacados.", rola até o primeiro e mostra "Tire a foto para continuar.".
 6. Recarregue a página, volte pelo tile e reabra: fotos e valores continuam.
 7. Digite "45.218" no KM, "meio tanque" em Combustível e uma observação com acentos; enviar → só Combustível fica inválido com "Informe só números. Ex.: 75.".
-8. Corrija para 75 e envie → o botão mostra "Enviando foto N de 5" sem mudar de largura; Voltar fica travado; depois aparece "Checklist enviado. Obrigado pela vistoria." e "Para fazer 0".
+8. Corrija para 75 e envie → abre o carregamento em etapas (mesmo padrão do gasto, `SendStepsOverlay`): "Enviando checklist", etapa "Enviando foto N de M" (M conta todas as fotos; numa nova tentativa começa nas já enviadas) e "Registrar checklist" pendente, barra `scaleX((1+enviadas)/(M+2))`; depois "Registrando checklist", "Checklist enviado / Obrigado pela vistoria." por ~1,1 s (a lista atualiza em paralelo) e volta para a lista com "Checklist enviado. Obrigado pela vistoria." e "Para fazer 0". O carregamento é renderizado por portal em `document.body` (fora do `.screen-motion`, ao lado do AppShell nos dois ramos, para não remontar); ao abrir, o foco vai para o cartão; no erro, para "Tentar de novo"; depois de "Voltar e revisar", para "Enviar checklist". O leitor de tela ouve a etapa pelo `liveText` do `SendStepsOverlay` (`span.expense-send-sr[aria-live]`); o botão mostra só "Enviando checklist". Durante o carregamento o `section.main-panel` do formulário fica `inert` e o Voltar do celular não navega (o diálogo recebe Esc e ignora, igual ao gasto). Roteiro automatizado: `node scripts/qa/verify-checklist-send.cjs .verificacao/checklist-send sucesso` (e `REDUCED=1` para `prefers-reduced-motion`: sem animação de entrada, barra sem transição).
 9. Abra o enviado → 45.218 km, 75 %, observação e "Ver foto 1" em cada item de foto. O IndexedDB não tem mais `checklist:<id>`. No Início o selo "pendente" sumiu.
 10. OK / Não OK (item "Pneus", fim do formulário):
     - Tocar "Não OK" abre "Qual o problema?", chips, "Tirar foto" e "Observação (opcional)". Enviar sem foto → "Tire a foto do problema." sob o item (o `section` ganha `aria-describedby` para o erro).
@@ -38,8 +38,11 @@ description: "Verifica a tela do checklist de vistoria no App Motoristas: tile d
     - Contador "N de M itens": Não OK só conta com foto e problema; Não OK sozinho (ou só com chips, sem foto) não sobe o "1 de 9". OK conta.
     - O servidor local responde em `http://127.0.0.1:<porta>` (em `localhost` o painel pode cair em outro servidor via IPv6 e mostrar "not found"). Worktree novo: o primeiro build do dev server leva alguns segundos.
 11. axe-core (cdnjs 4.10.2) no formulário e na lista → 0 Critical/Serious (o `page-has-heading-one` moderado é padrão do app inteiro).
+12. Erro forçado no mock: `?mockChecklistFalha=foto` derruba um envio de foto sim, outro não (prova a retomada); `?mockChecklistFalha=registro` derruba o registro final (`mockChecklistFailure` em `src/lib/checklists.ts`). Esperado: "Checklist não enviado" com a causa + "Seu progresso e as fotos já enviadas continuam salvos neste aparelho.", foco em "Tentar de novo"; "Tentar de novo" continua da foto que falhou; "Voltar e revisar" fecha e devolve o formulário editável com as miniaturas; recarregar e enviar sem o parâmetro pula as fotos já enviadas ("9 fotos enviadas" direto). `node scripts/qa/verify-checklist-send.cjs .verificacao/checklist-send foto` e `... registro`.
+13. Rolagem ao voltar da câmera: role até o meio, "Tirar foto: Lateral esquerda", confirme → o formulário volta na mesma posição com a miniatura nova visível; abrir uma foto existente e voltar também preserva. Detalhes em `verificar-servicos` ("Rolagem ao voltar da câmera").
 
 ## Casos de borda
+- Tela desmontada no meio do envio: o loop para depois de cada `await` (`aliveRef`), sem setState nem navegação; o link de cada foto é gravado no rascunho antes de qualquer outra coisa. Uma nova instância que enviar o mesmo checklist espera a anterior (`holdChecklistSend`, testado) e relê os links do rascunho, então nenhuma foto sobe duas vezes.
 - JSON de itens/respostas inválido vira lista vazia (teste).
 - Motorista sem id não consulta o Dataverse (teste).
 - Erro da Custom API mostra a mensagem do plugin e mantém o rascunho; fotos já enviadas não são reenviadas (links guardados em `enviadas`).

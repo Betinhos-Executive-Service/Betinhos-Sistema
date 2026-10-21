@@ -3,6 +3,7 @@ import invoiceReceiptIcon from "../assets/icons/invoice-receipt.svg";
 import { ActionBar, ActionButton, type ActionButtonState } from "../components/common/ActionButton";
 import { PhotoAddButton } from "../components/common/PhotoAddButton";
 import { AppShell } from "../components/layout/AppShell";
+import { useCameraScroll } from "../app/cameraScroll";
 import { FormMenu } from "../components/navigation/FormMenu";
 import type { DetailData } from "../types";
 import type { ExpensePhoto } from "../lib/expenses";
@@ -52,6 +53,7 @@ export function ReceiveScreen({
   proofWaived = false
 }: ReceiveScreenProps) {
   const isSubmitting = submitState !== "idle";
+  const cameraScroll = useCameraScroll(`receber:${detail.id}`);
   const photosRef = useRef<HTMLDivElement | null>(null);
   const [photosError, setPhotosError] = useState("");
   // O motorista precisa ver quanto e como cobrar sem voltar ao detalhe.
@@ -61,6 +63,7 @@ export function ReceiveScreen({
 
   const addPhoto = () => {
     setPhotosError("");
+    cameraScroll.remember("comprovantes");
     onAddPhoto();
   };
 
@@ -85,7 +88,7 @@ export function ReceiveScreen({
       <section className="main-panel maintenance-request-main">
         <article className="finalize-card maintenance-request-card receive-card">
           <div className="finalize-title">Recebimento - {detail.id}</div>
-          <div className="finalize-scroll">
+          <div className="finalize-scroll" ref={cameraScroll.ref}>
             <div className="finalize-form maintenance maintenance-request-form expense-form receive-form">
               {amountToReceive ? (
                 <div className="finalize-input-block receive-amount">
@@ -104,7 +107,7 @@ export function ReceiveScreen({
                 <ActionButton className="finalize-secondary receive-qr-charge" label="Cobrar por QR code" disabled={isSubmitting} onClick={onOpenQrCharge} />
               ) : null}
 
-              <div ref={photosRef} className={`finalize-input-block ${photosError ? "is-invalid" : ""}`} tabIndex={-1}>
+              <div ref={photosRef} className={`finalize-input-block ${photosError ? "is-invalid" : ""}`} tabIndex={-1} data-scroll-anchor="comprovantes">
                 <label className="form-field-label">
                   <span>Comprovante(s) de pagamento</span>
                   {proofWaived ? null : <span className="form-field-required" aria-hidden="true">*</span>}
@@ -116,7 +119,7 @@ export function ReceiveScreen({
                       className="maintenance-photo-thumb"
                       key={photo.id}
                       disabled={isSubmitting}
-                      onClick={() => onPreviewPhoto(photo.id)}
+                      onClick={() => { cameraScroll.remember("comprovantes"); onPreviewPhoto(photo.id); }}
                       aria-label={`Ver comprovante ${index + 1}`}
                     >
                       {isVideo(photo) ? (

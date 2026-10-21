@@ -3,6 +3,7 @@ import { ActionBar, ActionButton, type ActionButtonState } from "../components/c
 import { FormField, SelectField, TextAreaField, TextInputField } from "../components/common/FormFields";
 import { PhotoAddButton } from "../components/common/PhotoAddButton";
 import { AppShell } from "../components/layout/AppShell";
+import { useCameraScroll } from "../app/cameraScroll";
 import { FormMenu } from "../components/navigation/FormMenu";
 import type { MaintenanceRequestVehicleOption } from "../lib/dataverse";
 
@@ -77,6 +78,7 @@ export function MaintenanceRequestScreen({
   vehiclesLoading = false
 }: MaintenanceRequestScreenProps) {
   const isSubmitting = submitState !== "idle";
+  const cameraScroll = useCameraScroll("solicitarManutencao");
   const vehicleRef = useRef<HTMLButtonElement | null>(null);
   const kmRef = useRef<HTMLInputElement | null>(null);
   const severityRef = useRef<HTMLButtonElement | null>(null);
@@ -137,6 +139,7 @@ export function MaintenanceRequestScreen({
 
   const addPhoto = () => {
     clearError("photos");
+    cameraScroll.remember("fotos");
     onAddPhoto();
   };
 
@@ -148,7 +151,7 @@ export function MaintenanceRequestScreen({
       <FormMenu title="Solicitar manutenção" onBack={isSubmitting ? undefined : onBack} />
       <section className="main-panel maintenance-request-main">
         <article className="finalize-card maintenance-request-card">
-          <div className="finalize-scroll">
+          <div className="finalize-scroll" ref={cameraScroll.ref}>
             <div className="finalize-form maintenance maintenance-request-form">
               {errorCount ? <div className="form-error-summary">Revise {errorCount} campo(s) destacado(s).</div> : null}
 
@@ -213,14 +216,14 @@ export function MaintenanceRequestScreen({
               />
 
               <FormField label="Fotos" error={errors.photos} required>
-                <div className="maintenance-photo-grid">
+                <div className="maintenance-photo-grid" data-scroll-anchor="fotos">
                   {photos.map((photo, index) => (
                     <button
                       type="button"
                       className="maintenance-photo-thumb"
                       key={photo.id}
                       disabled={isSubmitting}
-                      onClick={() => onPreviewPhoto(photo.id)}
+                      onClick={() => { cameraScroll.remember("fotos"); onPreviewPhoto(photo.id); }}
                       aria-label={`Ver foto ${index + 1}`}
                     >
                       {isVideo(photo) ? (

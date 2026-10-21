@@ -12956,6 +12956,11 @@ select,
   animation: expense-send-enter 220ms cubic-bezier(.23, 1, .32, 1) both;
 }
 
+/* O cartão recebe foco ao abrir (checklist) só para o leitor de tela entrar no diálogo; não é controle. */
+.expense-send-card:focus {
+  outline: none;
+}
+
 .expense-send-hero {
   display: grid;
   place-items: center;
@@ -13119,9 +13124,30 @@ select,
   box-shadow: 0 0 0 4px #6c91e8;
 }
 
+/* Segunda saída do erro (ex.: checklist "Voltar e revisar"): botão secundário do DS. */
+.expense-send-close + .expense-send-close {
+  margin-top: 8px;
+}
+
+.expense-send-close.is-secondary {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #001a3d;
+}
+
+.expense-send-close.is-secondary:focus-visible {
+  outline: 0;
+  border-color: #6c91e8;
+  box-shadow: 0 0 0 3px rgba(33, 89, 210, .11);
+}
+
 @media (hover: hover) and (pointer: fine) {
   .expense-send-close:hover {
     background: #0b2d5a;
+  }
+
+  .expense-send-close.is-secondary:hover {
+    background: #fcfcfb;
   }
 }
 
