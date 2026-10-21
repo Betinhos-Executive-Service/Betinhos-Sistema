@@ -82,6 +82,9 @@ Novo-Zip "$tmp\h2.zip" @(@('WebResources/x', 'B'), @('customizations.xml', 'A'),
 Novo-Zip "$tmp\h3.zip" @(@('solution.xml', '<v>1</v>'), @('customizations.xml', 'A'), @('WebResources/x', 'C'))
 Confere ((Get-HashDoPacote "$tmp\h1.zip") -eq (Get-HashDoPacote "$tmp\h2.zip")) 'hash ignora versao e ordem'
 Confere ((Get-HashDoPacote "$tmp\h1.zip") -ne (Get-HashDoPacote "$tmp\h3.zip")) 'hash muda com o conteudo'
+Novo-Zip "$tmp\h4.zip" @(, @('a', 'bX'))
+Novo-Zip "$tmp\h5.zip" @(, @('ab', 'X'))
+Confere ((Get-HashDoPacote "$tmp\h4.zip") -ne (Get-HashDoPacote "$tmp\h5.zip")) 'hash separa o nome da entrada do conteudo'
 
 # Get-ContagemRegistros: FetchXML exato; so o limite de agregacao cai na contagem paginada (exata); o resto falha alto
 function Novo-Erro([string] $Mensagem, [string] $Corpo) {
@@ -152,6 +155,11 @@ Confere ((Dep 'a1').pai -eq 't1' -and $script:chamadas[1].Uri -like '*EntityDefi
 Confere ((Dep 'a2').pai -eq 't2' -and (Dep 'f1').pai -eq 't2' -and $script:chamadas[2].Uri -like '*systemforms*formid eq f1*') 'dependencias: atributo e formulario sem pai resolvidos pela metadata'
 Confere ($null -eq (Dep 'r1').pai -and $null -eq (Dep 'x1').pai -and $null -eq (Dep 'a9').pai -and (Dep 'x1').base -eq 'fd140aad-4df4-11dd-bd17-0019b9312238') 'dependencias: relacionamento sem pai e atributo desconhecido ficam sem pai'
 Confere ($script:chamadas.Count -eq 3) 'dependencias: metadata das tabelas lida uma vez so'
+$script:respostas = @([pscustomobject]@{ value = @((Nova-Dep 'A2' 2 $zero $active)) }); $script:chamadas = @()
+$deps = @(Get-DependenciasAusentes $dv 'BetinhosInterface')
+Confere ($deps[0].pai -eq 't2' -and $script:chamadas.Count -eq 1) 'dependencias: metadata reaproveitada entre solucoes do mesmo ambiente'
+# Cache zerado: com ele cheio, ler a metadata sem precisar passaria despercebido.
+$script:MetadataPorHost = @{}
 $script:respostas = @([pscustomobject]@{ value = @((Nova-Dep 'T9' 1 $zero $active)) }); $script:chamadas = @()
 $deps = @(Get-DependenciasAusentes $dv 'BetinhosCore')
 Confere ($deps.Count -eq 1 -and $script:chamadas.Count -eq 1) 'dependencias: sem subcomponente sem pai, nao le a metadata'

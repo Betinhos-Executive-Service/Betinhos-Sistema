@@ -68,7 +68,7 @@ export function compararFotos(antes, depois, { travado = false } = {}) {
     if (!novos || !novos.length) d.componentesSumiram.push(id)
     else if (ordenado(novos).join() !== ordenado(donos).join()) d.donosMudaram.push({ id, antes: donos, depois: novos })
   }
-  for (const item of Object.keys(antes.versoes)) {
+  for (const item of new Set([...Object.keys(antes.versoes), ...Object.keys(depois.versoes)])) {
     if (antes.versoes[item] !== depois.versoes[item]) d.versoes.push({ item, antes: antes.versoes[item], depois: depois.versoes[item] })
   }
   return d

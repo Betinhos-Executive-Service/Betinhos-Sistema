@@ -76,6 +76,10 @@ test('exceção sem exatamente uma condição falha e nomeia o tipo', () => {
 test('exceção por categoria junto com outra condição falha e nomeia o tipo', () => {
   assert.throws(() => validarRegras({ ...regras, excecoes: [{ tipo: '29', categoria: 2, nomes: ['x'], solucao: 'BetinhosCore' }] }), /tipo 29/)
 })
+test('exceção com tipo numérico ou bpf diferente de true falha (nunca casaria)', () => {
+  assert.throws(() => validarRegras({ ...regras, excecoes: [{ tipo: 61, nomes: ['x'], solucao: 'BetinhosCore' }] }), /texto/)
+  assert.throws(() => validarRegras({ ...regras, excecoes: [{ tipo: '1', bpf: false, solucao: 'BetinhosAutomacao' }] }), /bpf: true/)
+})
 test('exceção com tipo fora de porTipo falha e nomeia o tipo', () => {
   assert.throws(() => validarRegras({ ...regras, excecoes: [{ tipo: '999', nomes: ['x'], solucao: 'BetinhosCore' }] }), /999/)
 })

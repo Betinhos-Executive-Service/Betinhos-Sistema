@@ -170,25 +170,27 @@ function Get-DependenciasAusentes($Dv, [string] $Solucao) {
 # O Dataverse informa a tabela pai em requiredcomponentparentid, mas para alguns atributos (2), visoes (26) e formularios (60)
 # vem vazio: esses sao resolvidos pela metadata (a lista de tabelas so e lida se algum precisar). Relacionamento (10) ou outro
 # subcomponente sem pai fica sem pai e, sendo componente proprio, a conferencia acusa: nao adivinhar.
+# A metadata (todas as tabelas com todos os atributos) e grande: lida uma vez por ambiente e reaproveitada entre as solucoes.
+$script:MetadataPorHost = @{}
 function Resolve-TabelaPaiDasDependencias($Dv, $Dependencias) {
-  $tabelas = $null
-  $atributos = $null
   foreach ($d in @($Dependencias)) {
     if ($d.pai -or @(2, 26, 60) -notcontains $d.tipo) { continue }
-    if ($null -eq $tabelas) {
+    if (-not $script:MetadataPorHost.ContainsKey($Dv.Host)) {
       $tabelas = @{}
       $atributos = @{}
-      foreach ($e in @(Read-DvAll $Dv "EntityDefinitions?`$select=LogicalName,MetadataId&`$expand=Attributes(`$select=LogicalName)")) {
+      foreach ($e in @(Read-DvAll $Dv "EntityDefinitions?`$select=LogicalName,MetadataId&`$expand=Attributes(`$select=LogicalName,MetadataId)")) {
         $idTabela = ([string] $e.MetadataId).ToLowerInvariant()
         $tabelas[[string] $e.LogicalName] = $idTabela
         foreach ($a in @($e.Attributes)) { $atributos[([string] $a.MetadataId).ToLowerInvariant()] = $idTabela }
       }
+      $script:MetadataPorHost[$Dv.Host] = @{ Tabelas = $tabelas; Atributos = $atributos }
     }
+    $meta = $script:MetadataPorHost[$Dv.Host]
     $logico = $null
-    if ($d.tipo -eq 2) { if ($atributos.ContainsKey($d.requerido)) { $d.pai = $atributos[$d.requerido] } }
+    if ($d.tipo -eq 2) { if ($meta.Atributos.ContainsKey($d.requerido)) { $d.pai = $meta.Atributos[$d.requerido] } }
     elseif ($d.tipo -eq 26) { $logico = @(Read-DvAll $Dv "savedqueries?`$select=returnedtypecode&`$filter=savedqueryid eq $($d.requerido)" | ForEach-Object { [string] $_.returnedtypecode }) }
     else { $logico = @(Read-DvAll $Dv "systemforms?`$select=objecttypecode&`$filter=formid eq $($d.requerido)" | ForEach-Object { [string] $_.objecttypecode }) }
-    if ($logico -and $logico.Count -eq 1 -and $tabelas.ContainsKey($logico[0])) { $d.pai = $tabelas[$logico[0]] }
+    if ($logico -and $logico.Count -eq 1 -and $meta.Tabelas.ContainsKey($logico[0])) { $d.pai = $meta.Tabelas[$logico[0]] }
   }
 }
 
@@ -204,11 +206,13 @@ function Get-HashDoPacote([string] $ZipPath) {
   $zip = [IO.Compression.ZipFile]::OpenRead($ZipPath)
   try {
     $buffer = New-Object IO.MemoryStream
+    # Uma linha "nome<TAB>hash do conteudo" por entrada: sem fronteira entre nome e conteudo, entradas diferentes colidiriam.
     foreach ($e in ($zip.Entries | Where-Object { @("solution.xml", "[Content_Types].xml") -notcontains $_.FullName } | Sort-Object FullName)) {
-      $nome = [Text.Encoding]::UTF8.GetBytes($e.FullName)
-      $buffer.Write($nome, 0, $nome.Length)
+      $conteudo = New-Object IO.MemoryStream
       $s = $e.Open()
-      try { $s.CopyTo($buffer) } finally { $s.Dispose() }
+      try { $s.CopyTo($conteudo) } finally { $s.Dispose() }
+      $linha = [Text.Encoding]::UTF8.GetBytes("$($e.FullName)`t$(Get-Sha256Hex ($conteudo.ToArray()))`n")
+      $buffer.Write($linha, 0, $linha.Length)
     }
     return Get-Sha256Hex ($buffer.ToArray())
   }

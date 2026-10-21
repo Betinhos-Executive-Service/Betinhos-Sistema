@@ -12,6 +12,9 @@ export function validarRegras(regras) {
   const desconhecidas = usadas.filter((s) => !conhecidas.has(s))
   if (desconhecidas.length) throw new Error(`Solucao desconhecida em regras.json: ${[...new Set(desconhecidas)].join(', ')}`)
   for (const e of regras.excecoes) {
+    // classificar compara e.tipo === chaveTipo(c), que é texto: tipo numérico nunca casaria. bpf só tem sentido como true.
+    if (typeof e.tipo !== 'string') throw new Error(`Excecao do tipo ${e.tipo} precisa do tipo em texto (ex.: "61")`)
+    if (e.bpf !== undefined && e.bpf !== true) throw new Error(`Excecao do tipo ${e.tipo} so aceita bpf: true`)
     const condicoes = ['nomes', 'app', 'bpf', 'categoria'].filter((k) => e[k] !== undefined)
     if (condicoes.length !== 1) throw new Error(`Excecao do tipo ${e.tipo} precisa de exatamente uma condicao entre nomes, app, bpf e categoria`)
     if (!Object.hasOwn(regras.porTipo, e.tipo)) throw new Error(`Excecao aponta para o tipo ${e.tipo}, que nao existe em porTipo`)

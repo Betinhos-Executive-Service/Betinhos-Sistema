@@ -78,12 +78,19 @@ function Get-IdsPorSolucao($Linhas) {
   return $mapa
 }
 
+# Atribuicoes que ainda nao estao na solucao dona (consulta por chave, nao por -notcontains em lista).
+function Get-Faltam($PorSolucao) {
+  $presentes = @{}
+  foreach ($sol in $PorSolucao.Keys) { foreach ($id in $PorSolucao[$sol]) { $presentes["$sol|$id"] = $true } }
+  return @($atribuicoes | Where-Object { -not $presentes.ContainsKey("$($_.solucao)|$($_.id)") })
+}
+
 $linhas = Get-LinhasPorSolucao
 $porSolucao = Get-IdsPorSolucao $linhas
 $falhas = @()
 
 if (-not $SomenteConferir) {
-  $faltam = @($atribuicoes | Where-Object { @($porSolucao[$_.solucao]) -notcontains $_.id })
+  $faltam = @(Get-Faltam $porSolucao)
   Write-Step "componentes na caixa de entrada: $($componentes.Count); empacotados: $($empacotados.Count); a distribuir: $($faltam.Count)"
   foreach ($g in ($faltam | Group-Object solucao)) { Write-Step "  $($g.Name): $($g.Count)" }
   if (@($classe.semRegra).Count -or @($classe.proibidos).Count) { throw "Ha componentes sem regra ou proibidos (avisos acima). Ajuste regras.json ou a caixa de entrada antes de distribuir." }
@@ -132,7 +139,7 @@ if (-not $SomenteConferir) {
     }
     $linhas = Get-LinhasPorSolucao
     $porSolucao = Get-IdsPorSolucao $linhas
-    $faltam = @($atribuicoes | Where-Object { @($porSolucao[$_.solucao]) -notcontains $_.id })
+    $faltam = @(Get-Faltam $porSolucao)
     if ($faltam.Count -eq 0) { break }
   }
   Write-Step "distribuidos: $total"

@@ -58,6 +58,10 @@ test('ordem dos donos não importa', () => {
   assert.deepEqual(d.donosMudaram, [])
 })
 
+test('item de versão que só existe depois aparece em versoes', () => {
+  const d = compararFotos(foto(), foto({ versoes: { sistemaBetinhos: 'v0.0.43', telaOperacional: 'v0.0.9' } }))
+  assert.deepEqual(d.versoes, [{ item: 'telaOperacional', antes: undefined, depois: 'v0.0.9' }])
+})
 test('nenhuma lista é de perda e informativa ao mesmo tempo', () => {
   assert.equal(new Set([...PERDA, ...INFORMATIVO]).size, PERDA.length + INFORMATIVO.length)
 })
