@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { cleanId } from '@betinhos/dataverse'
 import { Alert, Button, Dialog, Drawer, useToast } from '@betinhos/ui'
 import type { Source } from '../data/source'
 import { applyForm, diffForm, emptyEquipamento, emptyForm, hasChanges, isDirty, serieRepetida, toForm, validateForm, type EquipamentoForm as FormValues, type FormErrors } from '../domain/form'
@@ -24,7 +25,9 @@ export function EquipamentoDrawer({ target, onTarget, list, tipos, pessoas, sour
   const toast = useToast()
   const formId = useId()
   const creating = target?.mode === 'create'
-  const current = target && target.mode !== 'create' ? list.find((e) => e.id === target.id) ?? null : null
+  // Link colado pode trazer o GUID em maiúsculas ou com chaves.
+  const targetId = target && target.mode !== 'create' ? cleanId(target.id) : null
+  const current = targetId ? list.find((e) => cleanId(e.id) === targetId) ?? null : null
   const key = target == null ? null : target.mode === 'create' ? 'create' : current ? `item:${current.id}` : null
 
   const [ready, setReady] = useState<string | null>(null)
@@ -45,11 +48,18 @@ export function EquipamentoDrawer({ target, onTarget, list, tipos, pessoas, sour
     setReady(key)
   }, [key])
 
+  const field = (selector: string) => document.getElementById(formId)?.querySelector<HTMLElement>(selector) ?? null
+
+  // Cadastro novo começa pela Descrição (o Drawer põe o foco no X ao abrir).
+  useEffect(() => {
+    if (ready === 'create') field('[name="descricao"]')?.focus()
+  }, [ready])
+
   // Depois de validar, leva o foco ao primeiro campo com erro (o Select só ganha aria-invalid na renderização seguinte).
   useEffect(() => {
     if (!focusError.current) return
     focusError.current = false
-    document.querySelector<HTMLElement>('.eq-form [aria-invalid="true"]')?.focus()
+    field('[aria-invalid="true"]')?.focus()
   }, [errors])
 
   const open = key != null && ready === key
@@ -74,13 +84,13 @@ export function EquipamentoDrawer({ target, onTarget, list, tipos, pessoas, sour
         const id = await source.create(diffForm(null, form))
         const saved = applyForm(emptyEquipamento(id), form, tipos, pessoas)
         onSaved(saved)
-        toast({ tone: 'success', message: `${saved.descricao} cadastrado.` })
+        toast({ tone: 'success', message: `Equipamento ${saved.descricao} cadastrado.` })
       } else if (current) {
         const changes = diffForm(base, form)
         if (hasChanges(changes)) await source.update(current.id, changes)
         const saved = applyForm(current, form, tipos, pessoas)
         onSaved(saved)
-        toast({ tone: 'success', message: `${saved.descricao} salvo.` })
+        toast({ tone: 'success', message: `Equipamento ${saved.descricao} salvo.` })
       }
       setBase(form)
       onTarget(null)

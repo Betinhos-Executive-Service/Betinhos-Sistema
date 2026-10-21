@@ -59,9 +59,10 @@ export function EquipamentoForm({ formId, form, errors, onChange, onSubmit, disa
             <Select name="status" options={STATUS_SELECT} searchable={false} clearable={false} disabled={disabled} value={form.status || null}
               onChange={(v) => onChange(withStatus(form, v ?? ''))} placeholder="Selecionar" />
           </Field>
-          <Field label="Responsável" error={errors.responsavelId} disabled={baixado}
-            hint={baixado ? 'Item baixado não fica com responsável.' : 'Vazio = item no escritório ou no estoque.'}>
-            <Select name="responsavelId" options={opcoesAtivas(pessoas, responsavelAtual)} clearable disabled={disabled || baixado} value={form.responsavelId || null}
+          <Field label="Responsável" error={errors.responsavelId} disabled={baixado && !form.responsavelId}
+            hint={baixado ? (form.responsavelId ? 'Item baixado não fica com responsável: limpe o campo.' : 'Item baixado não fica com responsável.') : 'Vazio = item no escritório ou no estoque.'}>
+            {/* Baixado já com responsável (gravado fora do shell) fica habilitado para o usuário poder limpar. */}
+            <Select name="responsavelId" options={opcoesAtivas(pessoas, responsavelAtual)} clearable disabled={disabled || (baixado && !form.responsavelId)} value={form.responsavelId || null}
               onChange={(v) => onChange(withResponsavel(form, v ?? ''))} placeholder="Sem responsável" searchPlaceholder="Buscar funcionário" emptyText="Nenhum funcionário ativo com esse nome." />
           </Field>
         </div>
@@ -75,11 +76,11 @@ export function EquipamentoForm({ formId, form, errors, onChange, onSubmit, disa
           <Field label="Valor de compra (R$)" error={errors.valorCompra}>
             <Input name="valorCompra" inputMode="decimal" placeholder="3.499,90" value={form.valorCompra} disabled={disabled} onChange={(e) => set('valorCompra', e.target.value)} />
           </Field>
-          <Field label="Observações" error={errors.observacoes} className="eq-form__wide" hint="Acessórios e estado do item. Não anote senhas aqui.">
-            <Textarea name="observacoes" rows={3} value={form.observacoes} maxLength={MAX_LENGTH.observacoes} disabled={disabled} onChange={(e) => set('observacoes', e.target.value)} />
-          </Field>
         </div>
       </fieldset>
+      <Field label="Observações" error={errors.observacoes} hint="Acessórios que acompanham, estado do item e outras anotações. Não anote senhas aqui.">
+        <Textarea name="observacoes" rows={3} value={form.observacoes} maxLength={MAX_LENGTH.observacoes} disabled={disabled} onChange={(e) => set('observacoes', e.target.value)} />
+      </Field>
     </form>
   )
 }

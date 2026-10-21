@@ -2,6 +2,7 @@
 import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as sourceModule from './data/source'
+import { createMockEquipamentos, createMockPessoas, createMockTipos } from './data/mock'
 import { EquipamentosPage } from './EquipamentosPage'
 
 // O mock simula latência; com a suíte inteira em paralelo a máquina fica lenta.
@@ -133,7 +134,7 @@ describe('Equipamentos', () => {
     await screen.findByRole('dialog', { name: 'Notebook reserva' })
     fireEvent.change(field('marcaModelo'), { target: { value: 'Lenovo ThinkPad E16' } })
     fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
-    expect(await screen.findByText('Notebook reserva salvo.')).toBeTruthy()
+    expect(await screen.findByText('Equipamento Notebook reserva salvo.')).toBeTruthy()
     await waitFor(() => expect(screen.getByText('Lenovo ThinkPad E16')).toBeTruthy())
     expect(window.location.hash).not.toContain('ver=')
   })
@@ -143,7 +144,7 @@ describe('Equipamentos', () => {
     fireEvent.change(field('numeroSerie'), { target: { value: 'dl5440 001' } })
     expect(await within(dialog).findByText(/Já usado em Notebook do Financeiro/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
-    expect(await screen.findByText('Notebook reserva salvo.')).toBeTruthy()
+    expect(await screen.findByText('Equipamento Notebook reserva salvo.')).toBeTruthy()
   })
 
   it('cadastro exige tipo e pede confirmação ao fechar com alterações', async () => {
@@ -151,6 +152,7 @@ describe('Equipamentos', () => {
     await openButton('Notebook reserva')
     fireEvent.click(screen.getByRole('button', { name: 'Novo equipamento' }))
     await screen.findByRole('dialog', { name: 'Novo equipamento' })
+    await waitFor(() => expect(document.activeElement).toBe(field('descricao')))
     fireEvent.change(field('descricao'), { target: { value: 'Webcam sala' } })
     fireEvent.click(screen.getByRole('button', { name: 'Cadastrar equipamento' }))
     expect(await screen.findByText('Escolha o tipo.')).toBeTruthy()
@@ -184,7 +186,7 @@ describe('Equipamentos', () => {
     fireEvent.change(field('descricao'), { target: { value: 'Webcam sala' } })
     await escolher(dialog, /^Tipo/, 'Outro')
     fireEvent.click(screen.getByRole('button', { name: 'Cadastrar equipamento' }))
-    expect(await screen.findByText('Webcam sala cadastrado.')).toBeTruthy()
+    expect(await screen.findByText('Equipamento Webcam sala cadastrado.')).toBeTruthy()
     await openButton('Webcam sala')
   })
 
@@ -230,7 +232,7 @@ describe('Equipamentos', () => {
     expect(screen.getByRole('dialog', { name: 'Notebook reserva' })).toBeTruthy()
     expect((within(dialog).getByRole('button', { name: 'Cancelar' }) as HTMLButtonElement).disabled).toBe(true)
     finish()
-    expect(await screen.findByText('Notebook reserva salvo.')).toBeTruthy()
+    expect(await screen.findByText('Equipamento Notebook reserva salvo.')).toBeTruthy()
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Notebook reserva' })).toBeNull())
   })
 
@@ -260,5 +262,33 @@ describe('Equipamentos', () => {
     render(<EquipamentosPage host={{ mode: 'mock' }} />)
     await screen.findByRole('dialog', { name: 'Notebook do Financeiro' })
     await waitFor(() => expect(field('numeroSerie').value).toBe('DL5440-001'))
+  })
+
+  it('link com GUID em maiúsculas e com chaves abre o item', async () => {
+    window.location.hash = '#/equipamentos?ver={EEEEEEEE-0000-4000-8000-000000000001}'
+    render(<EquipamentosPage host={{ mode: 'mock' }} />)
+    await screen.findByRole('dialog', { name: 'Notebook do Financeiro' })
+    await waitFor(() => expect(field('numeroSerie').value).toBe('DL5440-001'))
+    expect(screen.queryByText('Equipamento não encontrado')).toBeNull()
+  })
+
+  it('item baixado que já chega com responsável deixa limpar e salvar', async () => {
+    const equipamentos = createMockEquipamentos().map((e) => (e.descricao === 'Impressora antiga' ? { ...e, responsavelId: 'm3', responsavelNome: 'Diego Exemplo Rocha' } : e))
+    const update = vi.fn(async () => undefined)
+    stubSource({ load: async () => ({ equipamentos, tipos: createMockTipos(), pessoas: createMockPessoas() }), update })
+    window.location.hash = '#/equipamentos?ver=eeeeeeee-0000-4000-8000-000000000008'
+    render(<EquipamentosPage host={{ mode: 'mock' }} />)
+    const dialog = await screen.findByRole('dialog', { name: 'Impressora antiga' })
+    const resp = await within(dialog).findByRole('combobox', { name: 'Responsável' }) as HTMLButtonElement
+    expect(resp.disabled).toBe(false)
+    expect(resp.textContent).toBe('Diego Exemplo Rocha')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Salvar alterações' }))
+    expect(await within(dialog).findByText('Item baixado não fica com responsável.')).toBeTruthy()
+    expect(update).not.toHaveBeenCalled()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Limpar seleção' }))
+    await waitFor(() => expect(resp.disabled).toBe(true))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Salvar alterações' }))
+    expect(await screen.findByText('Equipamento Impressora antiga salvo.')).toBeTruthy()
+    expect(update).toHaveBeenCalledWith('eeeeeeee-0000-4000-8000-000000000008', expect.objectContaining({ responsavelId: null }))
   })
 })
