@@ -40,6 +40,23 @@ function Get-SolutionVersion([string] $Url) {
   if ($rows.Count -ne 1) { throw "Solucao $SolutionUniqueName ausente em $Url." }
   return [version]$rows[0].version
 }
+# A solucao nao leva configuracao segura: um import que recria o step deixa o plugin sem token
+# (AppBetinhos 1.0.0.265, 15/10/2026: 196 falhas seguidas do flow do carro atual).
+$secureSteps = [ordered]@{
+  "Sincronizar veiculo atual pela Infleet" = "provision-current-vehicle.ps1"
+  "Gerar link de acompanhamento" = "provision-current-vehicle.ps1 -LinkApiUrl <url do Worker>"
+  "Revogar link de acompanhamento ao sair de Programado" = "provision-current-vehicle.ps1 -LinkApiUrl <url do Worker>"
+  "Resolver veiculo do servico pela Infleet" = "provision-infleet-vehicle.ps1"
+}
+# Devolve os steps sem configuracao segura (so leitura; nunca le o conteudo da configuracao).
+function Get-StepsWithoutSecureConfig([string] $Url) {
+  $missing = @()
+  foreach ($name in $secureSteps.Keys) {
+    $rows = @((Read-Dv $Url "sdkmessageprocessingsteps?`$select=_sdkmessageprocessingstepsecureconfigid_value&`$filter=name eq '$name'").value)
+    if ($rows.Count -ne 1 -or -not $rows[0]._sdkmessageprocessingstepsecureconfigid_value) { $missing += "$name ($($rows.Count) step(s)) -> $($secureSteps[$name])" }
+  }
+  return $missing
+}
 function Select-PacProfile([string] $Url) {
   $targetHost = ([Uri]$Url).Host.ToLowerInvariant()
   $line = @(pac auth list | Where-Object { $_ -match [regex]::Escape($targetHost) }) | Select-Object -First 1
@@ -66,6 +83,7 @@ $prodSolution = Get-SolutionVersion $ProdUrl
 $prodServed = Get-ServedAppVersion $ProdUrl
 $next = [version]::new($devSolution.Major, $devSolution.Minor, $devSolution.Build, $devSolution.Revision + 1)
 Write-Step "app: DEV $devServed / PROD $prodServed; solucao: DEV $devSolution / PROD $prodSolution -> $next"
+foreach ($line in (Get-StepsWithoutSecureConfig $ProdUrl)) { Write-Warning "PROD ja esta sem configuracao segura: $line" }
 if (-not $Apply) { Write-Step "DRY RUN: use -Apply para exportar $next do DEV e importar no PROD."; return }
 
 # 2. Versao, export e conferencia do ZIP
@@ -102,5 +120,9 @@ $audit = & (Join-Path $PSScriptRoot "audit-prod-layers.ps1") -EnvironmentUrl $Pr
 if ($prodSolutionAfter -ne $next) { throw "PROD continua na solucao $prodSolutionAfter." }
 if ($prodServedAfter -ne $appVersion) {
   throw "PROD serve o app $prodServedAfter, nao ${appVersion}: ha camada acima da $SolutionUniqueName no web resource (veja o CSV de camadas)."
+}
+$withoutSecret = @(Get-StepsWithoutSecureConfig $ProdUrl)
+if ($withoutSecret.Count) {
+  throw "Import deixou step(s) sem configuracao segura no PROD; o plugin falha ate repor o token. Rode cada script com -EnvironmentUrl $ProdUrl -Apply e BETINHOS_ALLOW_DIRECT_PROD=1:`n  $($withoutSecret -join "`n  ")"
 }
 Write-Step "PROD publicado: solucao $next, app $appVersion"
