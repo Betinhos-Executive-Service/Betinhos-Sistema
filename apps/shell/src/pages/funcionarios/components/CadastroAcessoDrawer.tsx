@@ -27,13 +27,12 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
   const [prefixoEditado, setPrefixoEditado] = useState(false)
   const [estado, setEstado] = useState<Estado>({ fase: 'form' })
   const [discarding, setDiscarding] = useState(false)
-  const [ultimo, setUltimo] = useState<CadastroInput | null>(null)
   const panel = useRef<HTMLElement>(null)
 
   useEffect(() => { panel.current?.focus() }, [])
   useEffect(() => { if (!prefixoEditado) setPrefixo(prefixoDeNome(nome)) }, [nome, prefixoEditado])
 
-  const touched = estado.fase === 'form' && (nome !== (inicial?.nomeCompleto ?? '') || celular !== (inicial?.celular ?? '') || emailPessoal !== '')
+  const touched = (estado.fase === 'form' || estado.fase === 'erro') && (nome !== (inicial?.nomeCompleto ?? '') || celular !== (inicial?.celular ?? '') || emailPessoal !== '')
   const criando = estado.fase === 'criando'
   const input = useMemo<CadastroInput>(() => ({ nomeCompleto: nome.trim(), celular: celular.trim(), emailPessoal: emailPessoal.trim() || undefined, prefixoEmail: prefixo.trim() || undefined, tipoVinculo: vinculo, funcionarioId: inicial?.funcionarioId }), [nome, celular, emailPessoal, prefixo, vinculo, inicial])
 
@@ -44,7 +43,6 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
   }
 
   async function criar(dados: CadastroInput) {
-    setUltimo(dados)
     setEstado({ fase: 'criando' })
     try {
       const r = await acesso.cadastrar(dados)
@@ -109,7 +107,7 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
             </div>
           ) : (
             <div className="cluster">
-              {estado.fase === 'erro' && ultimo && <Button variant="secondary" onClick={() => void criar(ultimo)}>Tentar de novo</Button>}
+              {estado.fase === 'erro' && <Button variant="secondary" onClick={() => void criar(input)}>Tentar de novo</Button>}
               <Button type="submit" form="acesso-form" loading={criando} disabled={!nome.trim() || !celular.trim()}>Criar acesso</Button>
             </div>
           )}
