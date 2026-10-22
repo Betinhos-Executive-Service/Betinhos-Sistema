@@ -348,6 +348,7 @@
   /* Drawer Cadastrar acesso ao App Motoristas */
   .drawer--acesso { width: min(var(--bt-layout-drawer-width), 96vw); }
   .drawer--acesso form { display: grid; gap: var(--bt-space-3); }
+  .acesso-bloco .acesso-estado { clear: both; display: flex; flex-wrap: wrap; gap: var(--bt-space-3); align-items: baseline; margin-bottom: var(--bt-space-2); }
   .acesso-previa { margin: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); }
   .acesso-resultado { display: grid; gap: var(--bt-space-4); }
   .acesso-credenciais { display: grid; grid-template-columns: max-content 1fr; gap: var(--bt-space-2) var(--bt-space-4); align-items: center; margin: 0; }
