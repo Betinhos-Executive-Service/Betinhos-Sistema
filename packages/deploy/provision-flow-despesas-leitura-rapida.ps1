@@ -8,7 +8,7 @@
 #
 # Constantes (modelo, max_tokens, effort, thinking, system prompt, texto do usuário, limite de base64) vêm de
 # packages/despesas-ia/dist/constantes-leitura-rapida.json. Gere antes: pnpm --filter @betinhos/despesas-ia constantes
-# A chave da API fica só na variável new_AnthropicApiKey (valor atual no DEV); este script nunca lê nem imprime o valor.
+# A chave da API fica na variável new_AnthropicKeyDespesasLeitura (valor padrão, colado pelo Renan); este script nunca lê nem imprime o valor.
 # A URL do gatilho (assinada, sig=) é gravada na variável sem ser impressa; o log mostra só o host.
 #
 # Antes de alterar o flow existente, salva o clientdata em packages/deploy/flows/backup/. Para reverter:
@@ -24,8 +24,8 @@ $environmentUrl = 'https://org23b93544.crm2.dynamics.com'
 $environmentId = '25a2ab78-cf07-ee41-a124-457aa2c29aea'
 $solutionName = 'AppBetinhos'
 $flowName = 'Flow Despesas | Leitura rápida'
-$keyVarName = 'new_AnthropicApiKey'
-$paramKey = "Anthropic API Key ($keyVarName)"
+$keyVarName = 'new_AnthropicKeyDespesasLeitura'
+$paramKey = "Anthropic Key - Despesas Leitura Rápida ($keyVarName)"
 $urlVarName = 'new_FlowURLDespesaLeituraRapida'
 $urlVarDisplay = 'Flow URL Despesa Leitura Rápida'
 $constantesPath = Join-Path $PSScriptRoot '../despesas-ia/dist/constantes-leitura-rapida.json'
@@ -298,11 +298,17 @@ if ($Restaurar) {
   return
 }
 
-# Chave da API: confere a definição e a existência de valor sem trazer o valor.
+# Chave da API: cria a definição se faltar e confere que há valor (padrão ou atual) sem trazer o valor.
 $keyDefs = @((Dv GET "environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq '$keyVarName'").value)
-if ($keyDefs.Count -ne 1) { throw "Variável $keyVarName ausente no DEV." }
+if (-not $keyDefs.Count) {
+  Dv POST environmentvariabledefinitions @{ schemaname = $keyVarName; displayname = 'Anthropic Key - Despesas Leitura Rápida'; type = 100000000; description = 'Chave da API do Claude (workspace Despesas Leitura) usada pelo Flow Despesas | Leitura rápida. Chave no valor padrão.' } | Out-Null
+  $keyDefs = @((Dv GET "environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq '$keyVarName'").value)
+}
+if ($keyDefs.Count -ne 1) { throw "Variável $keyVarName ausente ou duplicada no DEV." }
 $keyId = $keyDefs[0].environmentvariabledefinitionid
-if (-not @((Dv GET "environmentvariablevalues?`$select=environmentvariablevalueid&`$filter=_environmentvariabledefinitionid_value eq $keyId").value).Count) { throw "Variável $keyVarName sem valor atual no DEV; o flow não ativaria." }
+Include $keyId 380
+$keyPadrao = [bool]@((Dv GET "environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq '$keyVarName' and defaultvalue ne null").value).Count
+if (-not $keyPadrao -and -not @((Dv GET "environmentvariablevalues?`$select=environmentvariablevalueid&`$filter=_environmentvariabledefinitionid_value eq $keyId").value).Count) { throw "Variável $keyVarName sem valor no DEV; cole a chave no valor padrão (Soluções > $solutionName > Variáveis de ambiente) e rode de novo." }
 
 $flows = @(FlowRows)
 if ($flows.Count -gt 1) { throw 'Flow duplicado no DEV.' }
