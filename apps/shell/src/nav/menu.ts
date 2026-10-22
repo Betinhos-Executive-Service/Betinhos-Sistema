@@ -10,7 +10,10 @@ export type MenuItem =
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
-  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota' }
+  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba }
+
+/** Visões da Frota: cada uma é um item do menu, todas na mesma tela (`page: 'frota'`). */
+export type FrotaAba = 'pendencias' | 'veiculos' | 'manutencoes' | 'multas' | 'colisoes' | 'indicadores' | 'plano'
 
 export type MenuGroup = { id: string; label: string; items: MenuItem[] }
 
@@ -57,7 +60,18 @@ export const MENU: MenuGroup[] = [
   {
     id: 'frota',
     label: 'Frota',
-    items: [{ kind: 'page', id: 'frota', label: 'Painel da Frota', page: 'frota' }, { kind: 'page', id: 'assistente-frota', label: 'Assistente', page: 'agentes', agente: 'frota' }, wr('Checklists de Veículos', 'new_gestaochecklistsveiculos'), table('cr40f_manutencoes'), table('cr40f_multas'), table('cr40f_colisao_v2')],
+    items: [
+      // `frota` continua sendo a rota das Pendências: links antigos `#/frota?ficha=…` seguem abrindo.
+      { kind: 'page', id: 'frota', label: 'Pendências', page: 'frota', aba: 'pendencias' },
+      { kind: 'page', id: 'frota-veiculos', label: 'Veículos', page: 'frota', aba: 'veiculos' },
+      { kind: 'page', id: 'frota-manutencoes', label: 'Manutenções', page: 'frota', aba: 'manutencoes' },
+      { kind: 'page', id: 'frota-multas', label: 'Multas', page: 'frota', aba: 'multas' },
+      { kind: 'page', id: 'frota-colisoes', label: 'Colisões', page: 'frota', aba: 'colisoes' },
+      { kind: 'page', id: 'frota-indicadores', label: 'Indicadores', page: 'frota', aba: 'indicadores' },
+      { kind: 'page', id: 'frota-plano', label: 'Plano preventivo', page: 'frota', aba: 'plano' },
+      { kind: 'page', id: 'assistente-frota', label: 'Assistente', page: 'agentes', agente: 'frota' },
+      wr('Checklists de Veículos', 'new_gestaochecklistsveiculos'),
+    ],
   },
   {
     id: 'cadastros',
@@ -70,7 +84,6 @@ export const MENU: MenuGroup[] = [
       { kind: 'page', id: 'documentos', label: 'Documentos', page: 'documentos' },
       { kind: 'page', id: 'assistente-pessoas', label: 'Assistente', page: 'agentes', agente: 'pessoas' },
       { kind: 'page', id: 'curriculos', label: 'Currículos', page: 'curriculos' },
-      { kind: 'page', id: 'infracoes', label: 'Infrações de trânsito', page: 'infracoes' },
       { kind: 'page', id: 'equipamentos', label: 'Equipamentos', page: 'equipamentos' },
     ],
   },
@@ -103,6 +116,21 @@ export const MENU: MenuGroup[] = [
 export const ALL_ITEMS = MENU.flatMap((group) => group.items)
 export const ENTITY_NAMES = ALL_ITEMS.flatMap((item) => (item.kind === 'entity' ? [item.entity] : []))
 export const DEFAULT_ITEM = MENU[0].items[0]
+
+/** Itens do menu que viraram visão da Frota: `#/frota?aba=x` → `#/frota-x`; `#/infracoes` → aba Infrações de Multas. */
+export function rotaAtualizada(id: string, query: URLSearchParams): { id: string; query: URLSearchParams } | null {
+  if (id === 'infracoes') return { id: 'frota-multas', query: new URLSearchParams([...query, ['sub', 'infracoes']]) }
+  const aba = id === 'frota' ? query.get('aba') : null
+  if (!aba) return null
+  const rest = new URLSearchParams(query)
+  rest.delete('aba')
+  if (aba === 'ocorrencias') {
+    const colisao = rest.get('tipo') === 'colisao'
+    rest.delete('tipo')
+    return { id: colisao ? 'frota-colisoes' : 'frota-multas', query: rest }
+  }
+  return findItem(`frota-${aba}`) ? { id: `frota-${aba}`, query: rest } : { id: 'frota', query: rest }
+}
 
 export function findItem(id: string) {
   for (const group of MENU) {

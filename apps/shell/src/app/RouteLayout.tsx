@@ -49,9 +49,10 @@ export function RouteLayout({ host, group, item, label }: Props) {
   if (item.kind === 'page') {
     // Cada tela é um chunk próprio; enquanto ele chega, o cabeçalho da página já aparece com Skeleton.
     return (
-      <RouteErrorBoundary key={item.id} title={label}>
+      // As visões da Frota compartilham a montagem: trocar de item no menu não recarrega as tabelas.
+      <RouteErrorBoundary key={item.aba ? item.page : item.id} title={label}>
         <Suspense fallback={<PageFallback title={label} />}>
-          <LazyPage page={item.page} host={host} agente={item.agente} />
+          <LazyPage page={item.page} host={host} agente={item.agente} aba={item.aba} />
         </Suspense>
       </RouteErrorBoundary>
     )

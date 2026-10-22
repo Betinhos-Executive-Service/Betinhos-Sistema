@@ -120,7 +120,7 @@ async function waitText(page, re, timeout = 15000) { await page.getByText(re).fi
   await page.screenshot({ path: `${OUT}/09-funcionarios.png` })
 
   t0 = Date.now()
-  await page.goto(`${BASE}?volume=5000#/frota?aba=manutencoes`)
+  await page.goto(`${BASE}?volume=5000#/frota-manutencoes`)
   await page.locator('.bt-table__row').first().waitFor({ timeout: 30000 })
   log(`[frota] manutenções: primeira linha em ${Date.now() - t0} ms; linhas no DOM: ${await rows(page)}; rodapé: "${await footer(page)}"`)
   await scrollDown(page, 3)
@@ -129,7 +129,7 @@ async function waitText(page, re, timeout = 15000) { await page.getByText(re).fi
   await page.evaluate(() => { location.hash = '#/pessoas' })
   await page.locator('.bt-table__row').first().waitFor({ timeout: 20000 })
   t0 = Date.now()
-  await page.evaluate(() => { location.hash = '#/frota?aba=manutencoes' })
+  await page.evaluate(() => { location.hash = '#/frota-manutencoes' })
   await page.locator('.bt-table__row').first().waitFor({ timeout: 30000 })
   log(`[frota] voltar à Frota (cache): linhas em ${Date.now() - t0} ms`)
 
