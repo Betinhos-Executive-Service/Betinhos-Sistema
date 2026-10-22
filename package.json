@@ -13,6 +13,7 @@
     "typecheck": "pnpm --filter @betinhos/shell typecheck",
     "push:plugin:financeiro:dev": "powershell -NoProfile -ExecutionPolicy Bypass -File packages/plugins/scripts/push-financeiro-plugin.ps1 -EnvironmentUrl https://org23b93544.crm2.dynamics.com -EnvironmentName dev",
     "push:plugin:documentos:dev": "powershell -NoProfile -ExecutionPolicy Bypass -File packages/plugins/scripts/push-documentos-plugin.ps1 -EnvironmentUrl https://org23b93544.crm2.dynamics.com -EnvironmentName dev",
-    "push:plugin:frota:dev": "powershell -NoProfile -ExecutionPolicy Bypass -File packages/plugins/scripts/push-frota-plugin.ps1 -EnvironmentUrl https://org23b93544.crm2.dynamics.com -EnvironmentName dev"
+    "push:plugin:frota:dev": "powershell -NoProfile -ExecutionPolicy Bypass -File packages/plugins/scripts/push-frota-plugin.ps1 -EnvironmentUrl https://org23b93544.crm2.dynamics.com -EnvironmentName dev",
+    "push:plugin:acesso:dev": "powershell -NoProfile -ExecutionPolicy Bypass -File packages/plugins/scripts/push-acesso-plugin.ps1 -EnvironmentUrl https://org23b93544.crm2.dynamics.com -EnvironmentName dev"
   }
 }
