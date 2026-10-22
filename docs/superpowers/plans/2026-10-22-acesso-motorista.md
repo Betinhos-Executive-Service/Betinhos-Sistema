@@ -39,7 +39,7 @@ Plugin (`packages/plugins/`):
 - `Cr40f.Acesso.Plugin/EncerrarAcessoHandler.cs` — orquestração do encerramento.
 - `Cr40f.Acesso.Plugin/CadastrarAcessoMotoristaPlugin.cs`, `EncerrarAcessoMotoristaPlugin.cs` — `IPlugin` finos.
 - `Cr40f.Acesso.Plugin.Tests/` — xunit: `AcessoRulesTests.cs`, `AcessoConfigTests.cs`, `FakeGraphGateway.cs`, `FakeService.cs`, `CadastrarAcessoHandlerTests.cs`, `EncerrarAcessoHandlerTests.cs`.
-- `tools/Cr40f.Acesso.Registrar/` — registra assembly, tipos, Custom APIs (sem `plugintypeid`), parâmetros e steps stage 30 com configuração não segura.
+- `tools/Cr40f.Acesso.Registrar/` — registra assembly, tipos, Custom APIs (sem `plugintypeid`), parâmetros e steps PostOperation (stage 40) com configuração não segura.
 - `scripts/push-acesso-plugin.ps1` — testes, build, registro (`pnpm push:plugin:acesso:dev`).
 
 Deploy (`packages/deploy/`):
@@ -1501,7 +1501,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: nomes `Cr40f.Acesso.Plugin.CadastrarAcessoMotoristaPlugin`, `Cr40f.Acesso.Plugin.EncerrarAcessoMotoristaPlugin`, mensagens `cr40f_CadastrarAcessoMotorista` e `cr40f_EncerrarAcessoMotorista`, parâmetros das Tarefas 5 e 6.
-- Produces: steps nomeados `Cr40f.Acesso: cadastrar acesso` e `Cr40f.Acesso: encerrar acesso` (stage 30, mode 0) com `configuration` (não segura) vinda de `--config <json>`; a configuração segura é gravada pela Tarefa 8.
+- Produces: steps nomeados `Cr40f.Acesso: cadastrar acesso` e `Cr40f.Acesso: encerrar acesso` (stage 40, mode 0) com `configuration` (não segura) vinda de `--config <json>`; a configuração segura é gravada pela Tarefa 8.
 
 Diferença em relação ao registrador da Frota: aqui a Custom API é criada **sem** `plugintypeid` e a execução vem do **step** (é o step que carrega as configurações). `allowedcustomprocessingsteptype` = 2 (Sync e Async) para permitir o step.
 
@@ -1564,7 +1564,7 @@ static Guid EnsureCustomApi(ServiceClient service, string uniqueName, string dis
 }
 ```
 
-`EnsureApiStep` (step síncrono stage 30 na mensagem da Custom API, preservando a configuração segura já existente):
+`EnsureApiStep` (step síncrono PostOperation (stage 40) na mensagem da Custom API, preservando a configuração segura já existente):
 ```csharp
 static void EnsureApiStep(ServiceClient service, Guid pluginTypeId, string messageName, string name, string config, string solution)
 {
@@ -1618,7 +1618,7 @@ git add packages/plugins/tools/Cr40f.Acesso.Registrar packages/plugins/scripts/p
 git commit -m "build(acesso): registrador e script de push do plugin de acesso
 
 Cr40f.Acesso.Registrar cria as Custom APIs cr40f_CadastrarAcessoMotorista e
-cr40f_EncerrarAcessoMotorista sem plugintype e registra os steps síncronos (stage 30)
+cr40f_EncerrarAcessoMotorista sem plugintype e registra os steps síncronos PostOperation (stage 40)
 com a configuração não segura lida do .env. pnpm push:plugin:acesso:dev roda testes,
 build, registro e publicação no DEV.
 
