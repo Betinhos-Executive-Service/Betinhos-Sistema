@@ -1,7 +1,7 @@
 import { Copy, Download, Send } from 'lucide-react'
 import { useCallback, useEffect, useId, useState } from 'react'
-import { Alert, Button, ChoiceGroup, Field, Input, Radio, StatusBadge, Switch } from '@betinhos/ui'
-import { addMonths, todaySP } from '../data/dates'
+import { Alert, Button, ChoiceGroup, Dialog, Field, Input, Radio, StatusBadge, Switch } from '@betinhos/ui'
+import { addMonths, diaSP, formatBR, todaySP } from '../data/dates'
 import { brl } from '../data/format'
 import { MULTA_CAMPO } from '../data/schema'
 import type { DataSource } from '../data/source'
@@ -10,12 +10,10 @@ import { errorMessage } from '../data/xrm'
 import { calcularParcelas, validarAcordo, type Acordo, type FormaPagamento } from '../domain/termoMulta'
 import { useNotify } from './Toasts'
 
-const SP = 'America/Sao_Paulo'
-const diaMes = (iso: string) => new Intl.DateTimeFormat('pt-BR', { timeZone: SP, day: '2-digit', month: '2-digit' }).format(new Date(iso))
-const dataHora = (iso: string) => {
-  const parts = Object.fromEntries(new Intl.DateTimeFormat('pt-BR', { timeZone: SP, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(iso)).map((p) => [p.type, p.value]))
-  return `${parts.day}/${parts.month}/${parts.year} às ${parts.hour}:${parts.minute}`
-}
+const diaMes = (iso: string) => formatBR(diaSP(iso)).slice(0, 5)
+/** Horário de São Paulo (UTC-3, sem horário de verão), como em transitions.ts. */
+const horaSP = (iso: string) => new Date(new Date(iso).getTime() - 3 * 3600_000).toISOString().slice(11, 16)
+const dataHora = (iso: string) => `${formatBR(diaSP(iso))} às ${horaSP(iso)}`
 const competenciaBR = (dia: string) => `${dia.slice(5, 7)}/${dia.slice(0, 4)}`
 const mesAtual = () => `${todaySP().slice(0, 7)}-01`
 
@@ -42,17 +40,19 @@ export function TermoMultaPanel({ source, multa, valorCatalogo, onChanged }: { s
   const [valorGuia, setValorGuia] = useState(valorInicial === null ? '' : String(valorInicial))
   const [recurso, setRecurso] = useState(multa.recursoPendente)
   const [ocupado, setOcupado] = useState(false)
+  const [valorSalvo, setValorSalvo] = useState(multa.valorGuia)
+  const [confirmarCancelamento, setConfirmarCancelamento] = useState<string | null>(null)
 
+  const motoristaId = multa.motorista?.id ?? null
   const carregar = useCallback(async () => {
     setErroCarga(null)
-    try {
-      const [lista, aditivo] = await Promise.all([source.listarTermos(multa.id), multa.motorista ? source.temAditivo(multa.motorista.id) : Promise.resolve(false)])
-      setTermos(lista)
-      setTemAditivo(aditivo)
-    } catch (reason) {
-      setErroCarga(errorMessage(reason))
-    }
-  }, [source, multa.id, multa.motorista])
+    // allSettled: falha ao ler o aditivo não esconde os termos (e vice-versa).
+    const [lista, aditivo] = await Promise.allSettled([source.listarTermos(multa.id), motoristaId ? source.temAditivo(motoristaId) : Promise.resolve(false)])
+    if (lista.status === 'fulfilled') setTermos(lista.value)
+    else setErroCarga(errorMessage(lista.reason))
+    if (aditivo.status === 'fulfilled') setTemAditivo(aditivo.value)
+    else { setTemAditivo(false); notify('error', `Não foi possível conferir o aditivo: ${errorMessage(aditivo.reason)}`) }
+  }, [source, multa.id, motoristaId, notify])
 
   useEffect(() => { void carregar() }, [carregar])
 
@@ -77,12 +77,16 @@ export function TermoMultaPanel({ source, multa, valorCatalogo, onChanged }: { s
 
   async function alternarRecurso(valor: boolean) {
     setRecurso(valor)
-    if (!(await salvarMulta({ [MULTA_CAMPO.recursoPendente]: valor }))) setRecurso(!valor)
+    if (await salvarMulta({ [MULTA_CAMPO.recursoPendente]: valor })) onChanged()
+    else setRecurso(!valor)
   }
 
   async function salvarValor() {
-    if (!Number.isFinite(valorTotal) || valorGuia.trim() === '' || valorTotal === multa.valorGuia) return
-    await salvarMulta({ [MULTA_CAMPO.valorGuia]: valorTotal })
+    if (!Number.isFinite(valorTotal) || valorGuia.trim() === '' || valorTotal === valorSalvo) return
+    if (await salvarMulta({ [MULTA_CAMPO.valorGuia]: valorTotal })) {
+      setValorSalvo(valorTotal)
+      onChanged()
+    }
   }
 
   async function enviar() {
@@ -102,6 +106,7 @@ export function TermoMultaPanel({ source, multa, valorCatalogo, onChanged }: { s
   }
 
   async function cancelar(termoId: string) {
+    setConfirmarCancelamento(null)
     setOcupado(true)
     try {
       await source.cancelarTermoMulta(termoId)
@@ -148,7 +153,7 @@ export function TermoMultaPanel({ source, multa, valorCatalogo, onChanged }: { s
           {atual.status === 'pendente' && (
             <div className="frota-termo__linha">
               <span>{atual.enviadoEm ? `Aguardando assinatura desde ${diaMes(atual.enviadoEm)}` : 'Aguardando assinatura'}</span>
-              <Button variant="secondary" size="compact" disabled={ocupado} onClick={() => void cancelar(atual.id)}>Cancelar envio</Button>
+              <Button variant="secondary" size="compact" disabled={ocupado} onClick={() => setConfirmarCancelamento(atual.id)}>Cancelar envio</Button>
             </div>
           )}
           {atual.status === 'assinado' && (
@@ -202,6 +207,16 @@ export function TermoMultaPanel({ source, multa, valorCatalogo, onChanged }: { s
           )}
         </div>
       </div>
+
+      <Dialog
+        open={confirmarCancelamento !== null}
+        onClose={() => setConfirmarCancelamento(null)}
+        tone="danger"
+        title="Cancelar o termo enviado ao motorista?"
+        actions={<><Button variant="secondary" onClick={() => setConfirmarCancelamento(null)}>Voltar</Button><Button variant="danger" onClick={() => confirmarCancelamento && void cancelar(confirmarCancelamento)}>Cancelar termo</Button></>}
+      >
+        O motorista deixa de ver o termo para assinar. Para cobrar a multa, prepare um novo termo.
+      </Dialog>
     </div>
   )
 }
