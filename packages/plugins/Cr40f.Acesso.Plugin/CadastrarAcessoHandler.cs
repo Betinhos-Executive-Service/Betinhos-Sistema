@@ -36,7 +36,7 @@ public sealed class CadastrarAcessoHandler
                 }
                 else
                 {
-                    var prefixo = AcessoRules.PrefixoEmail(string.IsNullOrWhiteSpace(entrada.PrefixoEmail) ? entrada.NomeCompleto : entrada.PrefixoEmail);
+                    var prefixo = string.IsNullOrWhiteSpace(entrada.PrefixoEmail) ? AcessoRules.PrefixoEmail(entrada.NomeCompleto) : AcessoRules.PrefixoInformado(entrada.PrefixoEmail);
                     if (prefixo.Length == 0) throw new AcessoException("NOME_INVALIDO", "Não foi possível gerar o e-mail a partir do nome.");
                     // Com FuncionarioId a regra é estrita (sem casar nome): não vincula conta de outra pessoa ao funcionário informado.
                     Func<string, bool> ocupado = ex is null

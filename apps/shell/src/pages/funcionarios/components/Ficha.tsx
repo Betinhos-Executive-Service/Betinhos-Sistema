@@ -41,11 +41,13 @@ type Props = {
   id: string | null
   onClose: () => void
   onSaved: (id: string, created: boolean) => void
+  /** Muda quando algo fora da ficha alterou o registro (ex.: cadastro de acesso); força a releitura. */
+  versao?: number
   acesso?: AcessoSource | null
   onCadastrarAcesso?: (inicial: AcessoInicial) => void
 }
 
-export function Ficha({ source, docs, id, onClose, onSaved, acesso, onCadastrarAcesso }: Props) {
+export function Ficha({ source, docs, id, onClose, onSaved, versao, acesso, onCadastrarAcesso }: Props) {
   const notify = useNotify()
   const [original, setOriginal] = useState<Funcionario | null>(null)
   const [draft, setDraft] = useState<Draft>(emptyDraft)
@@ -79,7 +81,7 @@ export function Ficha({ source, docs, id, onClose, onSaved, acesso, onCadastrarA
       (reason) => { if (alive) { setLoadError(errorMessage(reason)); setLoading(false) } },
     )
     return () => { alive = false }
-  }, [id, source])
+  }, [id, source, versao])
 
   useEffect(() => { panel.current?.focus() }, [id])
 

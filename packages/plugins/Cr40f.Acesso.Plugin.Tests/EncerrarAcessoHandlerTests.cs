@@ -45,6 +45,18 @@ public sealed class EncerrarAcessoHandlerTests
     }
 
     [Fact]
+    public void Reexecucao_apos_falha_na_conta_termina_o_encerramento()
+    {
+        ComFuncionario(); ComUsuarioCompleto();
+        _graph.FalharEm = "DefinirAtivo";
+        Assert.Throws<AcessoException>(() => Handler().Executar(_id, "Ana"));
+        _graph.FalharEm = null;
+        Handler().Executar(_id, "Ana");
+        Assert.False(_graph.Usuarios["ana.lima@betinhos.com.br"].Ativo);
+        Assert.DoesNotContain(("g", "u1"), _graph.Membros);
+    }
+
+    [Fact]
     public void Confirmacao_errada_nao_toca_em_nada()
     {
         ComFuncionario(); ComUsuarioCompleto();

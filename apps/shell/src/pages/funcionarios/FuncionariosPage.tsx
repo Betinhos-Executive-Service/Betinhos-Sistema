@@ -132,16 +132,19 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   }, [source, reload, mutate])
 
   const [acessoAberto, setAcessoAberto] = useState<{ inicial?: AcessoInicial } | null>(null)
+  // A ficha aberta no mesmo funcionário não recarrega só com setSelection: a versão força a releitura.
+  const [fichaVersao, setFichaVersao] = useState(0)
   const acesso = useMemo(() => createAcessoSource(host), [host])
   const onAcessoCadastrado = useCallback((id: string) => {
     setAcessoAberto(null)
     void onSaved(id, !rows.some((row) => row.id === id))
     setSelection({ mode: 'open', id })
+    setFichaVersao((v) => v + 1)
   }, [onSaved, rows])
 
   const ativos = views.filter((row) => row.values.cr40f_status === 0).length
   const ficha = selection.mode !== 'closed' && (
-    <Ficha source={source} docs={docs} id={selection.mode === 'open' ? selection.id : null} onClose={() => setSelection({ mode: 'closed' })} onSaved={onSaved} acesso={acesso} onCadastrarAcesso={(inicial) => setAcessoAberto({ inicial })} />
+    <Ficha source={source} docs={docs} id={selection.mode === 'open' ? selection.id : null} onClose={() => setSelection({ mode: 'closed' })} onSaved={onSaved} versao={fichaVersao} acesso={acesso} onCadastrarAcesso={(inicial) => setAcessoAberto({ inicial })} />
   )
 
   if (mobile) {
