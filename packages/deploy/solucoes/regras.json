@@ -8,8 +8,6 @@
   },
   "porTipo": {
     "1": "BetinhosCore",
-    "2": "BetinhosCore",
-    "10": "BetinhosCore",
     "9": "BetinhosCore",
     "20": "BetinhosCore",
     "70": "BetinhosCore",
@@ -55,7 +53,6 @@
     { "tipo": "dvtablesearchentity", "app": "new_AppMotoristasv2", "solucao": "BetinhosMotoristas" },
     { "tipo": "dvtablesearch", "app": "cr40f_ModelDrivenBetinhos", "solucao": "BetinhosInterface" },
     { "tipo": "dvtablesearchentity", "app": "cr40f_ModelDrivenBetinhos", "solucao": "BetinhosInterface" },
-    { "tipo": "1", "nomes": ["new_termomulta", "new_parcelamultafolha", "new_textotermomulta"], "solucao": "BetinhosMotoristas" },
     { "tipo": "1", "bpf": true, "solucao": "BetinhosAutomacao" },
     { "tipo": "29", "categoria": 2, "solucao": "BetinhosCore" }
   ],
