@@ -31,8 +31,10 @@ export async function executeCustomApi(operationName: string, parameters: Custom
     });
   } catch (error) {
     // Xrm e o WebApi por fetch rejeitam com { message } já vindo do servidor.
+    // Copia code/errorCode/message do erro original para quem já tratava esses campos (Comunicados).
     const message = customApiErrorMessage(error, "Falha ao registrar ação.");
-    throw Object.assign(new Error(message), { serverMessage: message, operationName, cause: error });
+    const original = error && typeof error === "object" ? { ...(error as Record<string, unknown>) } : {};
+    throw Object.assign(new Error(message), original, { message, serverMessage: message, operationName, cause: error });
   }
   if (!response.ok) {
     // Guarda a resposta técnica no erro; o logger aplica a ocultação de dados sensíveis.

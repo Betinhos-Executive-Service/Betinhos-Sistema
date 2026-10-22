@@ -6,10 +6,13 @@ export const TERMO_STATUS = { pendente: 100000000, assinado: 100000001, contesta
 export const FORMA_PAGAMENTO = { guia: 100000000, folha: 100000001 } as const;
 // Texto exato do plugin TermoMultaCommandPlugin (SemAditivo): leva para a tela "procure o escritório".
 export const SEM_ADITIVO_MENSAGEM = "O motorista ainda não tem o aditivo de assinatura eletrônica registrado.";
+// O servidor pode embrulhar o texto (prefixo/sufixo); basta o trecho característico.
+export const isSemAditivo = (message: string) => message.includes("aditivo de assinatura eletrônica");
 export const GPS_PRECISAO_AVISO_M = 200;
 export const SELFIE_MAX_LADO = 1280;
 export const SELFIE_JPEG_QUALIDADE = 0.8;
-const SELFIE_MAX_BYTES = 1572864;
+// O plugin recusa base64 acima de 2.000.000 caracteres e JPEG acima de 1,5 MB; o cliente fica abaixo com folga.
+export const SELFIE_MAX_BASE64 = 1_900_000;
 
 export type TermoMulta = {
   id: string;
@@ -118,8 +121,8 @@ export function descreverGpsErro(error: { code?: number } | null | undefined) {
 
 // ---------------- Selfie ----------------
 
-export function selfieDimensions(width: number, height: number) {
-  const scale = Math.min(1, SELFIE_MAX_LADO / Math.max(width, height));
+export function selfieDimensions(width: number, height: number, maxLado = SELFIE_MAX_LADO) {
+  const scale = Math.min(1, maxLado / Math.max(width, height));
   return { width: Math.round(width * scale), height: Math.round(height * scale) };
 }
 
@@ -139,20 +142,26 @@ async function blobToBase64(blob: Blob) {
   return btoa(binary);
 }
 
-/** Quadro atual do vídeo em JPEG base64 (sem "data:"), no máximo 1280 px e 1,5 MB. */
+/**
+ * Quadro atual do vídeo em JPEG base64 (sem "data:"), no máximo 1280 px. Se o base64 passar de 1.900.000 caracteres,
+ * baixa a qualidade (0,8 → 0,6) e depois a dimensão, até caber no limite do plugin.
+ */
 export async function capturarSelfieJpeg(video: Pick<HTMLVideoElement, "videoWidth" | "videoHeight">, createCanvas: () => CanvasLike = defaultCanvas) {
   if (!video.videoWidth || !video.videoHeight) throw new Error("A câmera ainda não está pronta. Tente de novo.");
-  const { width, height } = selfieDimensions(video.videoWidth, video.videoHeight);
   const canvas = createCanvas();
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Não foi possível gerar a foto.");
-  context.drawImage(video, 0, 0, width, height);
-  for (const quality of [SELFIE_JPEG_QUALIDADE, 0.6]) {
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
-    if (!blob) throw new Error("Não foi possível gerar a foto.");
-    if (blob.size <= SELFIE_MAX_BYTES) return blobToBase64(blob);
+  for (const maxLado of [SELFIE_MAX_LADO, 1024, 800, 640]) {
+    const { width, height } = selfieDimensions(video.videoWidth, video.videoHeight, maxLado);
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Não foi possível gerar a foto.");
+    context.drawImage(video, 0, 0, width, height);
+    for (const quality of maxLado === SELFIE_MAX_LADO ? [SELFIE_JPEG_QUALIDADE, 0.6] : [0.6]) {
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+      if (!blob) throw new Error("Não foi possível gerar a foto.");
+      if (Math.ceil(blob.size / 3) * 4 > SELFIE_MAX_BASE64) continue;
+      return blobToBase64(blob);
+    }
   }
   throw new Error("A selfie ficou grande demais. Tire de novo.");
 }
@@ -198,7 +207,7 @@ export function termoFlowReducer(state: TermoFlow, action: TermoFlowAction): Ter
     case "motivo": return { ...state, motivo: action.value };
     case "submit": return { ...state, enviando: true, erro: "" };
     // Mantém selfie, GPS e assinatura: o motorista corrige e reenvia sem refazer os passos.
-    case "error": return { ...state, enviando: false, erro: action.message, step: action.message === SEM_ADITIVO_MENSAGEM ? "semAditivo" : state.step };
+    case "error": return { ...state, enviando: false, erro: action.message, step: isSemAditivo(action.message) ? "semAditivo" : state.step };
     case "signed": return { ...state, enviando: false, step: "sucesso", assinadoEm: action.assinadoEm };
     case "contested": return { ...state, enviando: false, step: "contestado" };
     case "reset": return initialTermoFlow();

@@ -18,7 +18,15 @@ export function SelfieCapture({ value, onChange }: Props) {
     let ativo = true;
     setErro("");
     setPronta(false);
-    navigator.mediaDevices?.getUserMedia({ video: getDocumentStreamConstraints("user"), audio: false })
+    let pedido: Promise<MediaStream>;
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error("getUserMedia indisponível");
+      pedido = navigator.mediaDevices.getUserMedia({ video: getDocumentStreamConstraints("user"), audio: false });
+    } catch (error) {
+      setErro(describeCameraError(error));
+      return;
+    }
+    pedido
       .then(async (media) => {
         if (!ativo) { media.getTracks().forEach((track) => track.stop()); return; }
         stream = media;
@@ -29,7 +37,6 @@ export function SelfieCapture({ value, onChange }: Props) {
         setPronta(true);
       })
       .catch((error) => { if (ativo) setErro(describeCameraError(error)); });
-    if (!navigator.mediaDevices?.getUserMedia) setErro(describeCameraError(null));
     return () => {
       ativo = false;
       stream?.getTracks().forEach((track) => track.stop());

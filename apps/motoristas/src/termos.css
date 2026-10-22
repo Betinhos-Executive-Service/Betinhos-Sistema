@@ -6,7 +6,7 @@
 .termo-flow-scroll { flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden; padding:4px 4px 16px; -webkit-overflow-scrolling:touch; }
 .termo-step { display:grid; gap:12px; min-width:0; }
 .termo-step-header { display:grid; gap:4px; }
-.termo-step-header .termo-text-button { justify-self:start; padding:4px 0; }
+.termo-step-header h2:focus,.termo-result h2:focus { outline:0; }
 .termo-step-header h2 { margin:0; color:#001a3d; font-size:1.25rem; font-weight:800; line-height:1.25; }
 .termo-step-count { color:#64748b; font-size:.75rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
 .termo-help { margin:0; color:#475569; font-size:.9rem; line-height:1.5; }
@@ -35,9 +35,9 @@
 .termo-evidencias .is-wide { grid-column:1 / -1; }
 .termo-evidencias dt { color:#64748b; font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; }
 .termo-evidencias dd { margin:2px 0 0; font-size:.92rem; line-height:1.4; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
-.termo-acordo { display:grid; gap:4px; padding:12px 14px; border:1px solid #c7d2e2; border-left:3px solid #2159d2; border-radius:12px; background:#edf3ff; }
-.termo-acordo span { color:#285db5; font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
-.termo-acordo strong { color:#001a3d; font-size:1rem; line-height:1.4; }
+.termo-acordo { display:grid; gap:4px; padding:12px 14px; border:1px solid #e2e8f0; border-radius:12px; background:#fcfcfb; }
+.termo-acordo span { color:#64748b; font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+.termo-acordo strong { color:#001a3d; font-size:1.0625rem; font-weight:800; line-height:1.4; }
 .termo-texto { max-height:40dvh; overflow-y:auto; padding:12px 14px; border:1px solid #e2e8f0; border-radius:12px; background:#fcfcfb; }
 .termo-texto p { margin:0; color:#172033; font-size:.92rem; line-height:1.6; white-space:pre-wrap; overflow-wrap:anywhere; }
 .termo-texto small { display:block; margin-top:8px; color:#64748b; font-size:.75rem; }
@@ -75,14 +75,14 @@
 .termo-check path { stroke-dasharray:40; stroke-dashoffset:0; }
 
 /* Botão principal fixo no rodapé: uma decisão por passo. */
-.termo-footer { flex:0 0 auto; display:grid; gap:4px; width:100%; padding:10px 4px max(10px, env(safe-area-inset-bottom)); border-top:1px solid #e2e8f0; background:#f0f0f0; }
+.termo-footer { flex:0 0 auto; display:grid; gap:4px; width:100%; padding:10px 4px max(10px, env(safe-area-inset-bottom)); border-top:1px solid #e2e8f0; background:#ffffff; }
 .termo-primary { display:inline-flex; align-items:center; justify-content:center; gap:8px; width:100%; min-height:48px; padding:0 16px; border:0; border-radius:10px; background:#001a3d; color:#fff; font:inherit; font-size:1rem; font-weight:800; cursor:pointer; transition:transform 160ms cubic-bezier(.23,1,.32,1), background-color 160ms ease; }
 .termo-primary:disabled { opacity:.55; cursor:not-allowed; }
 .termo-primary[aria-busy="true"] { cursor:wait; }
 @media (hover:hover) and (pointer:fine) { .termo-primary:not(:disabled):hover { background:#0b2d5a; } }
-.termo-text-button { padding:6px 0; border:0; background:none; color:#2159d2; font:inherit; font-size:.88rem; font-weight:800; cursor:pointer; }
+.termo-text-button { min-height:44px; padding:0 4px; border:0; background:none; color:#2159d2; font:inherit; font-size:.88rem; font-weight:800; cursor:pointer; }
 .termo-text-button:disabled { opacity:.55; }
-.termo-footer-secondary { justify-self:center; min-height:40px; }
+.termo-footer-secondary { justify-self:center; }
 .termo-spinner { width:16px; height:16px; border:2px solid rgba(255,255,255,.35); border-top-color:#fff; border-radius:50%; animation:termo-spin 800ms linear infinite; }
 
 .termo-row:active,.termo-primary:not(:disabled):active,.termo-capture:not(:disabled):active { transform:scale(.97); }

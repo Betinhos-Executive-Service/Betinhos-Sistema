@@ -36,17 +36,19 @@ export function TermosMultaScreen({ items, loadStatus, onBack, onReload }: Props
 
   return (
     <AppShell screenLabel="Multas">
-      <ServicesMenu
-        title={selected ? "Termo de multa" : "Multas para assinar"}
-        eyebrow={isMockTermos() ? "Operação · Mock local" : "Operação"}
-        homeLabel="Voltar"
-        homeIcon="arrowLeft"
-        onHome={selected ? close : onBack}
-        onRefresh={refresh}
-      />
       {selected ? (
-        <TermoMultaDetalheScreen key={selectedId} termo={selected} onDone={close} />
+        // O detalhe desenha o próprio cabeçalho: o Voltar dele volta uma etapa do fluxo.
+        <TermoMultaDetalheScreen key={selectedId} termo={selected} onDone={close} onRefresh={refresh} />
       ) : (
+        <>
+        <ServicesMenu
+          title="Multas para assinar"
+          eyebrow={isMockTermos() ? "Operação · Mock local" : "Operação"}
+          homeLabel="Voltar"
+          homeIcon="arrowLeft"
+          onHome={onBack}
+          onRefresh={refresh}
+        />
         <section className="termo-screen" aria-label="Multas para assinar">
           {error ? <p className="termo-alert" data-tone="erro" role="alert">{error}</p> : null}
           {loadStatus === "loading" && !items.length ? (
@@ -81,6 +83,7 @@ export function TermosMultaScreen({ items, loadStatus, onBack, onReload }: Props
             <p className="termo-empty">Nenhum termo pendente.</p>
           )}
         </section>
+        </>
       )}
     </AppShell>
   );

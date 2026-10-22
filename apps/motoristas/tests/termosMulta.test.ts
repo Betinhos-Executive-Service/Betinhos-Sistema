@@ -123,3 +123,42 @@ test("acordo e evidências seguem o contrato do plugin", () => {
   assert.equal(ev.infracao, "745-5 - Excesso de velocidade");
   assert.equal(ev.infleetIndisponivel, true);
 });
+
+test("selfie comprime qualidade e depois dimensão até o base64 caber em 1.900.000 caracteres", async () => {
+  const tries: [number, number, number][] = [];
+  const canvas: any = {
+    width: 0, height: 0,
+    getContext: () => ({ drawImage: () => undefined }),
+    // Tamanho simulado proporcional à área e à qualidade: 1280x960 em 0.8 passa do limite.
+    toBlob(cb: (blob: Blob) => void, type: string, quality: number) {
+      tries.push([this.width, this.height, quality]);
+      const size = Math.round(this.width * this.height * quality * 3);
+      const bytes = new Uint8Array(size); bytes[0] = 0xff; bytes[1] = 0xd8;
+      cb(new Blob([bytes], { type }));
+    }
+  };
+  const base64 = await capturarSelfieJpeg({ videoWidth: 1920, videoHeight: 1440 } as never, () => canvas);
+  assert.ok(base64.length <= 1_900_000, `base64 com ${base64.length}`);
+  assert.deepEqual(tries[0], [1280, 960, 0.8]);
+  assert.deepEqual(tries[1], [1280, 960, 0.6]);
+  assert.ok(tries.at(-1)![0] < 1280, "reduz a dimensão depois da qualidade");
+});
+
+test("sem aditivo é detectado mesmo com prefixo e sufixo na mensagem", () => {
+  const ready = { ...initialTermoFlow(), step: "assinatura" as const, selfie: "abc", strokes, gps: { latitude: 1, longitude: 2, precisao: 10 } };
+  const failed = termoFlowReducer(ready, { type: "error", message: `Erro: ${SEM_ADITIVO_MENSAGEM} (código 0x80040265)` });
+  assert.equal(failed.step, "semAditivo");
+});
+
+test("erro rejeitado pelo Xrm mantém code, errorCode e message originais", async () => {
+  const previousWindow = (globalThis as any).window;
+  const windowMock: any = { Xrm: { WebApi: { online: { execute: async () => { throw { message: "Falha X", code: 2147746581, errorCode: "0x80040265" }; } } } } };
+  windowMock.parent = windowMock;
+  (globalThis as any).window = windowMock;
+  try {
+    await assert.rejects(executeCustomApi("new_AbrirComunicadoMotorista", { new_DestinatarioId: termoId }), (error: any) =>
+      error instanceof Error && error.message === "Falha X" && error.code === 2147746581 && error.errorCode === "0x80040265" && error.serverMessage === "Falha X");
+  } finally {
+    (globalThis as any).window = previousWindow;
+  }
+});

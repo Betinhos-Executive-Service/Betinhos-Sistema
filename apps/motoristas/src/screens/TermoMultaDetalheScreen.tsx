@@ -1,8 +1,9 @@
-import { useMemo, useReducer, useRef } from "react";
+import { useEffect, useMemo, useReducer, useRef } from "react";
 import { reportAppError } from "../lib/appErrorLogger";
 import { customApiErrorMessage } from "../lib/customApi";
 import { SignaturePad } from "../components/comunicados/SignaturePad";
 import { SelfieCapture } from "../components/termos/SelfieCapture";
+import { ServicesMenu } from "../components/navigation/ServicesMenu";
 import {
   assinarTermo,
   baixarPdf,
@@ -15,6 +16,7 @@ import {
   formatDataHora,
   GPS_PRECISAO_AVISO_M,
   initialTermoFlow,
+  isMockTermos,
   parseEvidencias,
   termoFlowReducer,
   validarMotivo,
@@ -22,7 +24,7 @@ import {
   type TermoStep
 } from "../lib/termosMulta";
 
-type Props = { termo: TermoMulta; onDone: () => void };
+type Props = { termo: TermoMulta; onDone: () => void; onRefresh: () => void | Promise<void> };
 
 const STEP_TITLE: Partial<Record<TermoStep, string>> = {
   selfie: "Tire uma selfie",
@@ -41,13 +43,21 @@ function SuccessCheck() {
   );
 }
 
-export function TermoMultaDetalheScreen({ termo, onDone }: Props) {
+export function TermoMultaDetalheScreen({ termo, onDone, onRefresh }: Props) {
   const [flow, dispatch] = useReducer(termoFlowReducer, undefined, initialTermoFlow);
   const flowRef = useRef(flow);
   flowRef.current = flow;
   const evidencias = useMemo(() => parseEvidencias(termo.evidenciasJson), [termo.evidenciasJson]);
   const acordo = descreverAcordo(termo);
   const stepIndex = SIGN_STEPS.indexOf(flow.step);
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
+  const firstRender = useRef(true);
+
+  // Troca de passo: o foco vai para o título do passo (leitor de tela anuncia onde o motorista está).
+  useEffect(() => {
+    if (firstRender.current) { firstRender.current = false; return; }
+    titleRef.current?.focus();
+  }, [flow.step]);
 
   const pedirGps = () => {
     if (!navigator.geolocation) { dispatch({ type: "gpsErro", message: descreverGpsErro(null) }); return; }
@@ -136,14 +146,22 @@ export function TermoMultaDetalheScreen({ termo, onDone }: Props) {
   };
 
   return (
-    <div className="termo-flow">
+    <>
+    <ServicesMenu
+      title="Termo de multa"
+      eyebrow={isMockTermos() ? "Operação · Mock local" : "Operação"}
+      homeLabel="Voltar"
+      homeIcon="arrowLeft"
+      onHome={back}
+      onRefresh={onRefresh}
+    />
+    <div className="termo-flow" aria-busy={flow.enviando || undefined}>
       <div className="termo-flow-scroll">
         <div className="termo-step" key={flow.step}>
           {STEP_TITLE[flow.step] ? (
             <header className="termo-step-header">
-              <button type="button" className="termo-text-button" onClick={back} disabled={flow.enviando}>‹ Voltar</button>
               {stepIndex >= 0 ? <span className="termo-step-count">Passo {stepIndex + 1} de 3</span> : null}
-              <h2>{STEP_TITLE[flow.step]}</h2>
+              <h2 ref={titleRef} tabIndex={-1}>{STEP_TITLE[flow.step]}</h2>
             </header>
           ) : null}
 
@@ -232,7 +250,7 @@ export function TermoMultaDetalheScreen({ termo, onDone }: Props) {
           {flow.step === "sucesso" ? (
             <section className="termo-result" role="status">
               <SuccessCheck />
-              <h2>{flow.assinadoEm ? `Termo assinado em ${formatDataHora(flow.assinadoEm)}` : "Termo assinado"}</h2>
+              <h2 ref={titleRef} tabIndex={-1}>{flow.assinadoEm ? `Termo assinado em ${formatDataHora(flow.assinadoEm)}` : "Termo assinado"}</h2>
               <p>A cópia também vai para o seu e-mail.</p>
               <button type="button" className="termo-text-button" onClick={onDone}>Voltar para multas</button>
             </section>
@@ -241,14 +259,14 @@ export function TermoMultaDetalheScreen({ termo, onDone }: Props) {
           {flow.step === "contestado" ? (
             <section className="termo-result" role="status">
               <SuccessCheck />
-              <h2>Sua contestação foi registrada.</h2>
+              <h2 ref={titleRef} tabIndex={-1}>Sua contestação foi registrada.</h2>
               <p>O gestor de frota vai entrar em contato.</p>
             </section>
           ) : null}
 
           {flow.step === "semAditivo" ? (
             <section className="termo-result" role="alert">
-              <h2>Procure o escritório</h2>
+              <h2 ref={titleRef} tabIndex={-1}>Procure o escritório</h2>
               <p>Para assinar pelo app, procure o escritório e assine o aditivo de assinatura eletrônica.</p>
               <small className="termo-server-msg">{flow.erro}</small>
             </section>
@@ -257,5 +275,6 @@ export function TermoMultaDetalheScreen({ termo, onDone }: Props) {
       </div>
       <footer className="termo-footer">{footer}</footer>
     </div>
+    </>
   );
 }
