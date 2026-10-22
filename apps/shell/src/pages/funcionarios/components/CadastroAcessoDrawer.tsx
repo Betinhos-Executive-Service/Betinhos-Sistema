@@ -1,20 +1,25 @@
 import { Alert, Button, buttonClassName, Dialog, Field, Input } from '@betinhos/ui'
 import { Copy, ExternalLink, MessageCircle, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { type AcessoSource, type CadastroInput, type CadastroResultado, type Etapa, parseAcessoError, mensagemWhatsApp, whatsappComMensagem } from '../data/acesso'
+import { useEffect, useRef, useState } from 'react'
+import { type AcessoInicial, type AcessoSource, type CadastroInput, type CadastroResultado, type Etapa, parseAcessoError, mensagemWhatsApp, whatsappComMensagem } from '../data/acesso'
+import { normalizeSearch } from '../data/format'
 import { VINCULO } from '../data/schema'
 import { useNotify } from './Toasts'
 
-type Props = { acesso: AcessoSource; inicial?: { funcionarioId: string; nomeCompleto: string; celular: string }; onClose: () => void; onCadastrado: (funcionarioId: string) => void }
-type Estado = { fase: 'form' } | { fase: 'criando' } | { fase: 'resultado'; r: CadastroResultado } | { fase: 'erro'; codigo: string; mensagem: string; etapas: Etapa[] }
+type Props = { acesso: AcessoSource; inicial?: AcessoInicial; onClose: () => void; onCadastrado: (funcionarioId: string) => void }
+type Estado = { fase: 'form' } | { fase: 'criando' } | { fase: 'resultado'; r: CadastroResultado } | { fase: 'erro'; mensagem: string; etapas: Etapa[] }
 
 const DOMINIO = 'betinhos.com.br'
 const ROTULO: Record<Etapa['estado'], string> = { feita: '✓', pulada: '–', erro: '✕' }
 
 /** primeiro.ultimo sem acentos; igual a AcessoRules.PrefixoEmail do plugin (só prévia: o plugin recalcula). */
 export function prefixoDeNome(nome: string) {
-  const p = nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().split(/\s+/).map((w) => w.replace(/[^a-z0-9-]/g, '')).filter(Boolean)
+  const p = normalizeSearch(nome).trim().split(/\s+/).map((w) => w.replace(/[^a-z0-9-]/g, '')).filter(Boolean)
   return p.length === 0 ? '' : p.length === 1 ? p[0] : `${p[0]}.${p[p.length - 1]}`
+}
+
+function ListaEtapas({ etapas }: { etapas: Etapa[] }) {
+  return <ul className="acesso-etapas">{etapas.map((e) => <li key={e.etapa} data-estado={e.estado}><span aria-hidden>{ROTULO[e.estado]}</span> {e.etapa}: {e.detalhe}</li>)}</ul>
 }
 
 export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }: Props) {
@@ -23,19 +28,19 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
   const [celular, setCelular] = useState(inicial?.celular ?? '')
   const [emailPessoal, setEmailPessoal] = useState('')
   const [vinculo, setVinculo] = useState<0 | 1>(1)
-  const [prefixo, setPrefixo] = useState(prefixoDeNome(inicial?.nomeCompleto ?? ''))
-  const [prefixoEditado, setPrefixoEditado] = useState(false)
+  const [prefixoManual, setPrefixoManual] = useState<string | null>(null)
   const [estado, setEstado] = useState<Estado>({ fase: 'form' })
   const [discarding, setDiscarding] = useState(false)
   const [fechandoResultado, setFechandoResultado] = useState(false)
   const panel = useRef<HTMLElement>(null)
 
   useEffect(() => { panel.current?.focus() }, [])
-  useEffect(() => { if (!prefixoEditado) setPrefixo(prefixoDeNome(nome)) }, [nome, prefixoEditado])
 
   const touched = (estado.fase === 'form' || estado.fase === 'erro') && (nome !== (inicial?.nomeCompleto ?? '') || celular !== (inicial?.celular ?? '') || emailPessoal !== '')
   const criando = estado.fase === 'criando'
-  const input = useMemo<CadastroInput>(() => ({ nomeCompleto: nome.trim(), celular: celular.trim(), emailPessoal: emailPessoal.trim() || undefined, prefixoEmail: prefixo.trim() || undefined, tipoVinculo: vinculo, funcionarioId: inicial?.funcionarioId }), [nome, celular, emailPessoal, prefixo, vinculo, inicial])
+  const prefixo = prefixoManual ?? prefixoDeNome(nome)
+  const input: CadastroInput = { nomeCompleto: nome.trim(), celular: celular.trim(), emailPessoal: emailPessoal.trim() || undefined, prefixoEmail: prefixo.trim() || undefined, tipoVinculo: vinculo, funcionarioId: inicial?.funcionarioId }
+  const waHref = estado.fase === 'resultado' ? whatsappComMensagem(celular, mensagemWhatsApp({ nome, emailMicrosoft: estado.r.emailMicrosoft, senhaTemporaria: estado.r.senhaTemporaria, linkApp: estado.r.linkApp })) : null
 
   function requestClose() {
     if (criando) return
@@ -52,7 +57,7 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
       setEstado({ fase: 'resultado', r })
     } catch (reason) {
       const erro = parseAcessoError(reason)
-      setEstado({ fase: 'erro', codigo: erro.codigo, mensagem: erro.message, etapas: erro.etapas })
+      setEstado({ fase: 'erro', mensagem: erro.message, etapas: erro.etapas })
     }
   }
 
@@ -79,13 +84,13 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
                 </select>
               </Field>
               <Field label="E-mail Microsoft" hint={`Será ${prefixo || '…'}@${DOMINIO}. Se já existir, o sistema acrescenta um número.`}>
-                <Input value={prefixo} onChange={(e) => { setPrefixoEditado(true); setPrefixo(e.target.value) }} suffix={`@${DOMINIO}`} disabled={criando} />
+                <Input value={prefixo} onChange={(e) => setPrefixoManual(e.target.value)} suffix={`@${DOMINIO}`} disabled={criando} />
               </Field>
               <p className="acesso-previa" aria-live="polite">{prefixo ? `${prefixo}@${DOMINIO}` : ''}</p>
               {estado.fase === 'erro' && (
                 <Alert tone="danger" title="Não foi possível concluir">
                   {estado.mensagem}
-                  {estado.etapas.length > 0 && <ul className="acesso-etapas">{estado.etapas.map((e) => <li key={e.etapa} data-estado={e.estado}><span aria-hidden>{ROTULO[e.estado]}</span> {e.etapa}: {e.detalhe}</li>)}</ul>}
+                  {estado.etapas.length > 0 && <ListaEtapas etapas={estado.etapas} />}
                 </Alert>
               )}
             </form>
@@ -98,14 +103,14 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
                 <dt>Senha temporária</dt><dd><code>{estado.r.senhaTemporaria || '(conta já existia; senha não alterada)'}</code> {estado.r.senhaTemporaria && <Button variant="secondary" size="compact" icon={<Copy size={14} />} aria-label="Copiar senha" onClick={() => copiar(estado.r.senhaTemporaria)} />}</dd>
                 <dt>Link do app</dt><dd><a href={estado.r.linkApp} target="_blank" rel="noopener noreferrer">{estado.r.linkApp}</a></dd>
               </dl>
-              <ul className="acesso-etapas">{estado.r.etapas.map((e) => <li key={e.etapa} data-estado={e.estado}><span aria-hidden>{ROTULO[e.estado]}</span> {e.etapa}: {e.detalhe}</li>)}</ul>
+              <ListaEtapas etapas={estado.r.etapas} />
             </div>
           )}
         </div>
         <footer className="drawer-foot drawer-foot--active">
           {estado.fase === 'resultado' ? (
             <div className="cluster">
-              {(() => { const href = whatsappComMensagem(celular, mensagemWhatsApp({ nome, emailMicrosoft: estado.r.emailMicrosoft, senhaTemporaria: estado.r.senhaTemporaria, linkApp: estado.r.linkApp })); return href ? <a className={buttonClassName({ variant: 'primary' })} href={href} target="_blank" rel="noopener noreferrer"><MessageCircle size={16} aria-hidden /> Enviar no WhatsApp</a> : null })()}
+              {waHref && <a className={buttonClassName({ variant: 'primary' })} href={waHref} target="_blank" rel="noopener noreferrer"><MessageCircle size={16} aria-hidden /> Enviar no WhatsApp</a>}
               <Button variant="secondary" icon={<ExternalLink size={16} />} onClick={() => onCadastrado(estado.r.funcionarioId)}>Abrir ficha</Button>
             </div>
           ) : (

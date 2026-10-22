@@ -1,9 +1,11 @@
 import type { Host } from '../../../host'
 import { whatsappHref } from '../../operacional/domain/phone'
 import { createAcessoMock } from './acessoMock'
+import { errorMessage } from './xrm'
 
 export type Etapa = { etapa: string; estado: 'feita' | 'pulada' | 'erro'; detalhe: string }
 export type CadastroInput = { nomeCompleto: string; celular: string; emailPessoal?: string; prefixoEmail?: string; tipoVinculo: 0 | 1; funcionarioId?: string }
+export type AcessoInicial = { funcionarioId: string; nomeCompleto: string; celular: string }
 export type CadastroResultado = { emailMicrosoft: string; senhaTemporaria: string; funcionarioId: string; linkApp: string; etapas: Etapa[] }
 
 export interface AcessoSource {
@@ -32,9 +34,9 @@ export class AcessoError extends Error {
 /** Mensagens do plugin chegam como "CODIGO: texto | etapas=[...]" (às vezes embrulhadas pelo Dataverse). */
 export function parseAcessoError(error: unknown): AcessoError {
   if (error instanceof AcessoError) return error
-  const raw = error instanceof Error ? error.message : String(error)
+  const raw = errorMessage(error)
   const m = /([A-Z_]{4,}): ([^|]*)/.exec(raw)
-  if (!m) return new AcessoError('DESCONHECIDO', raw.replace(/\.+$/, ''), [])
+  if (!m) return new AcessoError('DESCONHECIDO', raw, [])
   const inicio = raw.indexOf('| etapas=', m.index)
   const json = inicio < 0 ? null : primeiroArray(raw, inicio + '| etapas='.length)
   return new AcessoError(m[1], MENSAGENS[m[1]] ?? m[2].trim(), json ? parseEtapas(json) : [])

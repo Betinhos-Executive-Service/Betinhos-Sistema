@@ -15,7 +15,7 @@ import { FieldInput } from './FieldInput'
 import { ImageDrop } from './ImageDrop'
 import { AnotacoesTab } from './Anotacoes'
 import { AcessoApp } from './AcessoApp'
-import type { AcessoSource } from '../data/acesso'
+import type { AcessoInicial, AcessoSource } from '../data/acesso'
 import { DocumentosArquivos } from './DocumentosArquivos'
 import { Checklist } from '../../documentos/components/Checklist'
 import type { DocsSource } from '../../documentos/data/source'
@@ -42,7 +42,7 @@ type Props = {
   onClose: () => void
   onSaved: (id: string, created: boolean) => void
   acesso?: AcessoSource | null
-  onCadastrarAcesso?: (inicial: { funcionarioId: string; nomeCompleto: string; celular: string }) => void
+  onCadastrarAcesso?: (inicial: AcessoInicial) => void
 }
 
 export function Ficha({ source, docs, id, onClose, onSaved, acesso, onCadastrarAcesso }: Props) {

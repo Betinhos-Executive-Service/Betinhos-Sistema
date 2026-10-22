@@ -15,10 +15,10 @@ public sealed class GraphGateway : IGraphGateway
     private readonly AcessoConfig _cfg;
     /// <summary>Um cliente por processo do sandbox: evita handshake TLS e esgotar sockets a cada execução.</summary>
     internal static readonly HttpClient Compartilhado = new();
-    private readonly Lazy<HttpClient> _http;
+    private readonly HttpClient _http;
     private string? _token;
 
-    public GraphGateway(AcessoConfig cfg, Func<HttpClient> http) { _cfg = cfg; _http = new Lazy<HttpClient>(http); }
+    public GraphGateway(AcessoConfig cfg, HttpClient http) { _cfg = cfg; _http = http; }
 
     public GraphUsuario? UsuarioPorUpn(string upn)
     {
@@ -88,7 +88,7 @@ public sealed class GraphGateway : IGraphGateway
         {
             ["grant_type"] = "client_credentials", ["client_id"] = _cfg.ClientId, ["client_secret"] = _cfg.ClientSecret, ["scope"] = "https://graph.microsoft.com/.default",
         });
-        var resp = _http.Value.PostAsync("https://login.microsoftonline.com/" + _cfg.TenantId + "/oauth2/v2.0/token", corpo).Result;
+        var resp = _http.PostAsync("https://login.microsoftonline.com/" + _cfg.TenantId + "/oauth2/v2.0/token", corpo).Result;
         if (!resp.IsSuccessStatusCode) throw new AcessoException("GRAPH_INDISPONIVEL", ((int)resp.StatusCode) + " ao obter token do Graph");
         _token = (string)JsonLeve.Ler(resp.Content.ReadAsStringAsync().Result)["access_token"]!;
         return _token;
@@ -100,7 +100,7 @@ public sealed class GraphGateway : IGraphGateway
         using var req = new HttpRequestMessage(metodo, Base + rota);
         req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Token());
         if (corpoJson is not null) req.Content = new StringContent(corpoJson, Encoding.UTF8, "application/json");
-        using var resp = _http.Value.SendAsync(req).Result;
+        using var resp = _http.SendAsync(req).Result;
         if (aceitar404 && resp.StatusCode == HttpStatusCode.NotFound) return null;
         if (!resp.IsSuccessStatusCode) throw new AcessoException("GRAPH_INDISPONIVEL", ((int)resp.StatusCode) + " em " + metodo.Method + " " + rota.Split('?')[0]);
         return resp.Content.ReadAsStringAsync().Result;
