@@ -16,6 +16,8 @@ export type Transition = {
   flow?: FlowId
   /** Dado que o registro precisa ter antes da ação (mesma exigência do botão nativo). */
   requires?: Requisito
+  /** Campos fixos gravados junto com o status. */
+  set?: Record<string, unknown>
 }
 
 export type RegistroStatus = { id: string; status: number | null; temVeiculo: boolean; temMotorista: boolean }
@@ -35,7 +37,7 @@ const concluir: Transition = {
 const cancelarManutencao: Transition = { id: 'cancelar', to: MANUT.CANCELADO, label: 'Cancelar manutenção', fields: [], danger: true }
 const cancelarColisao: Transition = { id: 'cancelar', to: COLISAO.CANCELADO, label: 'Cancelar colisão', fields: [], danger: true }
 const desfechosMulta: Transition[] = [
-  { id: 'recurso', to: MULTA.RECURSO, label: 'Entrar com recurso', fields: [] },
+  { id: 'recurso', to: MULTA.RECURSO, label: 'Entrar com recurso', fields: [], set: { new_recursopendente: true } },
   { id: 'descontado', to: MULTA.DESCONTADO, label: 'Marcar como descontado', fields: [] },
   { id: 'pago', to: MULTA.PAGO, label: 'Marcar como pago', fields: [] },
 ]
@@ -93,7 +95,7 @@ export function validate(transition: Transition, values: Record<string, string>)
 
 /** Campos que a tela grava. Em transição com Flow o status fica de fora: quem grava é o Flow. */
 export function buildPatch(kind: Kind, transition: Transition, values: Record<string, string>, ctx: { now: Date; dateBehaviors: Record<string, DateBehavior> }) {
-  const patch: Record<string, unknown> = transition.flow ? {} : { [STATUS_FIELD[kind]]: transition.to }
+  const patch: Record<string, unknown> = transition.flow ? {} : { [STATUS_FIELD[kind]]: transition.to, ...transition.set }
   for (const field of transition.fields) {
     const raw = (values[field.key] ?? '').trim()
     if (!raw) continue

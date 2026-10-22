@@ -5,7 +5,7 @@ import { contarPor, custoPor, custoPorMes, custoVeiculo, multasPorMotorista, tem
 
 const periodo = { de: '2026-08-01', ate: '2026-10-02' }
 const manut = (id: string, extra: Partial<Manutencao>): Manutencao => ({ id, codigo: id, descricao: id, status: MANUT.REALIZADO, grau: 1, tipo: 1, agendarPara: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: { id: 'v1', label: 'ABC1D23' }, solicitante: null, criadoEm: '2026-08-10T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra })
-const multa = (id: string, extra: Partial<Multa>): Multa => ({ id, titulo: id, status: 202410000, dataHora: '2026-09-10T12:00:00Z', local: null, dataParaIndicar: null, indicado: false, dataAviso: null, dataIndicacao: null, veiculo: null, motorista: { id: 'f1', label: 'Ana' }, infracaoId: null, criadoEm: '2026-09-11T12:00:00Z', ...extra })
+const multa = (id: string, extra: Partial<Multa>): Multa => ({ id, titulo: id, status: 202410000, dataHora: '2026-09-10T12:00:00Z', local: null, dataParaIndicar: null, indicado: false, dataAviso: null, dataIndicacao: null, veiculo: null, motorista: { id: 'f1', label: 'Ana' }, infracaoId: null, criadoEm: '2026-09-11T12:00:00Z', valorGuia: null, recursoPendente: false, termoVigente: null, ...extra })
 const infracoes: Infracao[] = [{ id: 'i1', codigo: '7455', descricao: null, gravidade: 1, pontos: 4, valor: 130.16 }]
 
 const manutencoes = [

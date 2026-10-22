@@ -33,6 +33,12 @@ export const KIND_LABEL: Record<Kind, string> = { manutencao: 'Manutenção', mu
 
 export const MANUT = { SOLICITADO: 0, APROVADO: 202410001, PROGRAMADO: 202410005, REALIZADO: 202410002, REPROVADO: 100000002, CANCELADO: 100000001 } as const
 export const MULTA = { NOTIFICAR: 202410000, INDICADA: 202410001, RECURSO: 202410002, DESCONTADO: 202410003, NOTIFICADO: 202410004, FINALIZADO: 202410005, PAGO: 202410006 } as const
+/** Termo de multa (Task A1): choices de new_termomulta. */
+export const TERMO_TABLE = 'new_termomulta'
+export const TERMO_STATUS = { pendente: 100000000, assinado: 100000001, contestado: 100000002, expirado: 100000003, cancelado: 100000004 } as const
+export const TERMO_STATUS_DE: Record<number, keyof typeof TERMO_STATUS> = Object.fromEntries(Object.entries(TERMO_STATUS).map(([k, v]) => [v, k])) as Record<number, keyof typeof TERMO_STATUS>
+export const FORMA_PAGAMENTO = { guia: 100000000, folha: 100000001 } as const
+export const MULTA_CAMPO = { valorGuia: 'new_valorguia', recursoPendente: 'new_recursopendente' } as const
 export const COLISAO = { ENVIADO: 100000000, ANALISE: 100000001, RESOLVIDO: 100000002, CANCELADO: 100000003 } as const
 export const VEICULO = { VENDIDO: 202410000, ATIVO: 202410001 } as const
 
