@@ -1,71 +1,42 @@
 using System;
 using System.Linq;
+using System.Threading;
 using Microsoft.Xrm.Sdk;
-using Microsoft.Crm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Query;
 
 namespace Cr40f.Acesso.Plugin;
 
 /// <summary>
-/// systemuser do Dataverse ligado à conta do Entra. Precisa existir antes de gravar cr40f_emailmicrosoft:
-/// o plugin DriverRecordSharing do App Motoristas exige um systemuser ativo com aquele e-mail.
+/// systemuser do Dataverse ligado à conta do Entra. Precisa existir habilitado e licenciado antes de gravar
+/// cr40f_emailmicrosoft: o DriverRecordSharing do App Motoristas compartilha registros com ele.
+/// Só a sincronização oficial do Power Platform (addUser) gera um usuário licenciado; Create pelo SDK nasce desabilitado.
 /// </summary>
 public sealed class UsuarioDataverseRepository
 {
+    public const int Tentativas = 6;
+    internal static readonly TimeSpan Intervalo = TimeSpan.FromSeconds(5);   // 6 consultas em ~25 s, dentro do limite de 2 min do plugin
     private readonly IOrganizationService _svc;
-    public UsuarioDataverseRepository(IOrganizationService svc) { _svc = svc; }
+    private readonly Action<TimeSpan> _esperar;
 
-    /// <summary>true se criou; false se já existia ativo. Desativado → ACESSO_ENCERRADO (R10).</summary>
-    public bool Garantir(Guid objectId, string upn, string nomeCompleto)
+    public UsuarioDataverseRepository(IOrganizationService svc, Action<TimeSpan>? esperar = null) { _svc = svc; _esperar = esperar ?? Thread.Sleep; }
+
+    /// <summary>true se existe habilitado e licenciado (islicensed sem valor conta como licenciado).</summary>
+    public bool Pronto(Guid objectId)
     {
-        var consulta = new QueryExpression("systemuser") { ColumnSet = new ColumnSet("systemuserid", "isdisabled", "domainname", "internalemailaddress"), TopCount = 1 };
+        var consulta = new QueryExpression("systemuser") { ColumnSet = new ColumnSet("systemuserid", "isdisabled", "islicensed"), TopCount = 1 };
         consulta.Criteria.AddCondition("azureactivedirectoryobjectid", ConditionOperator.Equal, objectId);
-        var existente = _svc.RetrieveMultiple(consulta).Entities.FirstOrDefault();
-        if (existente is not null)
-        {
-            if (existente.GetAttributeValue<bool>("isdisabled")) throw new AcessoException("ACESSO_ENCERRADO", "Acesso encerrado antes. Peça à TI para reativar a conta no Entra.");
-            return false;
-        }
-
-        var partes = nomeCompleto.Trim().Split(new[] { ' ' }, 2, StringSplitOptions.RemoveEmptyEntries);
-        var usuario = new Entity("systemuser")
-        {
-            ["azureactivedirectoryobjectid"] = objectId,
-            ["domainname"] = upn,
-            ["internalemailaddress"] = upn,
-            ["firstname"] = partes[0],
-            ["lastname"] = partes.Length > 1 ? partes[1].Trim() : partes[0],
-            ["businessunitid"] = new EntityReference("businessunit", UnidadeRaiz()),
-        };
-        // Logo depois de licenciar, o Dataverse pode recusar a conta; a nova tentativa é idempotente.
-        Guid id;
-        try { id = _svc.Create(usuario); }
-        catch (Exception) { throw new AcessoException("USUARIO_DATAVERSE_PENDENTE", "A conta foi criada, mas o Dataverse ainda não a reconhece. Tente de novo em alguns minutos."); }
-
-        // O Dataverse completa o registro a partir do Entra e pode sobrescrever o e-mail ou deixar a conta desabilitada
-        // até a licença sincronizar; o DriverRecordSharing procura internalemailaddress + isdisabled=false.
-        var criado = _svc.Retrieve("systemuser", id, new ColumnSet("isdisabled", "internalemailaddress", "domainname"));
-        var emailGravado = criado.GetAttributeValue<string>("internalemailaddress");
-        if (!string.Equals(emailGravado, upn, StringComparison.OrdinalIgnoreCase))
-            _svc.Update(new Entity("systemuser", id) { ["internalemailaddress"] = upn });
-        // Criado por código, o systemuser nasce desabilitado (o admin center habilita na hora); habilita aqui.
-        var desabilitado = criado.GetAttributeValue<bool>("isdisabled");
-        if (desabilitado)
-        {
-            _svc.Execute(new SetStateRequest { EntityMoniker = new EntityReference("systemuser", id), State = new OptionSetValue(0), Status = new OptionSetValue(-1) });
-            desabilitado = _svc.Retrieve("systemuser", id, new ColumnSet("isdisabled")).GetAttributeValue<bool>("isdisabled");
-        }
-        Estado = "isdisabled=" + desabilitado + "; email=" + (string.IsNullOrEmpty(emailGravado) ? "(vazio)" : emailGravado) + "; domainname=" + criado.GetAttributeValue<string>("domainname");
-        return true;
+        var u = _svc.RetrieveMultiple(consulta).Entities.FirstOrDefault();
+        return u is not null && !u.GetAttributeValue<bool>("isdisabled") && (u.GetAttributeValue<bool?>("islicensed") ?? true);
     }
 
-    /// <summary>Estado do systemuser recém-criado, para diagnóstico na lista de etapas.</summary>
-    public string Estado { get; private set; } = "";
-
-    private Guid UnidadeRaiz()
+    /// <summary>Consulta de novo com esperas curtas: a sincronização do Power Platform leva alguns segundos.</summary>
+    public bool AguardarPronto(Guid objectId)
     {
-        var consulta = new QueryExpression("businessunit") { ColumnSet = new ColumnSet("businessunitid"), TopCount = 1 };
-        consulta.Criteria.AddCondition("parentbusinessunitid", ConditionOperator.Null);
-        return _svc.RetrieveMultiple(consulta).Entities.First().Id;
+        for (var i = 0; i < Tentativas; i++)
+        {
+            if (i > 0) _esperar(Intervalo);
+            if (Pronto(objectId)) return true;
+        }
+        return false;
     }
 }

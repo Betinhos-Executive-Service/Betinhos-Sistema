@@ -7,7 +7,7 @@ namespace Cr40f.Acesso.Plugin.Tests;
 
 public sealed class EncerrarAcessoHandlerTests
 {
-    private static readonly AcessoConfig Cfg = AcessoConfig.Parse("{\"tenantId\":\"t\",\"clientId\":\"c\",\"licenseSkuId\":\"sku\",\"groupId\":\"g\",\"appUrl\":\"u\"}", "{\"clientSecret\":\"s\"}");
+    private static readonly AcessoConfig Cfg = AcessoConfig.Parse("{\"tenantId\":\"t\",\"clientId\":\"c\",\"licenseSkuId\":\"sku\",\"groupId\":\"g\",\"appUrl\":\"u\",\"environmentId\":\"env\"}", "{\"clientSecret\":\"s\"}");
     private readonly FakeGraphGateway _graph = new();
     private readonly FakeService _svc = new();
     private readonly Guid _id = Guid.NewGuid();

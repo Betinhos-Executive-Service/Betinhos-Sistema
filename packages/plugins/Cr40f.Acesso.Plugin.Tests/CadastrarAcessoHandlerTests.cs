@@ -9,17 +9,18 @@ namespace Cr40f.Acesso.Plugin.Tests;
 
 public sealed class CadastrarAcessoHandlerTests
 {
-    private static readonly AcessoConfig Cfg = AcessoConfig.Parse("{\"tenantId\":\"t\",\"clientId\":\"c\",\"licenseSkuId\":\"sku\",\"groupId\":\"g\",\"appUrl\":\"https://app\"}", "{\"clientSecret\":\"s\"}");
+    private static readonly AcessoConfig Cfg = AcessoConfig.Parse("{\"tenantId\":\"t\",\"clientId\":\"c\",\"licenseSkuId\":\"sku\",\"groupId\":\"g\",\"appUrl\":\"https://app\",\"environmentId\":\"env\"}", "{\"clientSecret\":\"s\"}");
     private readonly FakeGraphGateway _graph = new();
+    private readonly FakePowerPlatformGateway _pp;
     private readonly FakeService _svc = new();
     private readonly List<string> _trace = new();
 
     private static readonly Guid RaizId = Guid.NewGuid();
-    public CadastrarAcessoHandlerTests() => _svc.Com(new Entity("businessunit", RaizId) { ["name"] = "betinhos" });
+    public CadastrarAcessoHandlerTests() { _svc.Com(new Entity("businessunit", RaizId) { ["name"] = "betinhos" }); _pp = new FakePowerPlatformGateway(_svc); }
 
-    private CadastrarAcessoHandler Handler() => new(_graph, new FuncionarioRepository(_svc), new UsuarioDataverseRepository(_svc), Cfg, new Random(1), _trace.Add);
+    private CadastrarAcessoHandler Handler() => new(_graph, new FuncionarioRepository(_svc), new UsuarioDataverseRepository(_svc, _ => { }), _pp, Cfg, new Random(1), _trace.Add);
     private List<Entity> Funcionarios => _svc.Criados.Where(e => e.LogicalName == "cr40f_funcionarios").ToList();
-    private List<Entity> SystemUsers => _svc.Criados.Where(e => e.LogicalName == "systemuser").ToList();
+    private List<Entity> SystemUsers => _svc.RetrieveMultiple(new Microsoft.Xrm.Sdk.Query.QueryExpression("systemuser")).Entities.ToList();
     private static CadastroEntrada Entrada() => new() { NomeCompleto = "João da Silva Ávila", Celular = "(12) 99123-4567" };
 
     [Fact]
@@ -228,46 +229,45 @@ public sealed class CadastrarAcessoHandlerTests
         Assert.Equal(ordem.OrderBy(i => i), ordem);
     }
 
-    [Fact]
-    public void Systemuser_ausente_e_criado_com_object_id_nomes_e_unidade_raiz()
-    {
-        var saida = Handler().Executar(Entrada());
-        var su = Assert.Single(SystemUsers);
-        Assert.Equal(Guid.Parse(saida.UsuarioEntraId), su["azureactivedirectoryobjectid"]);
-        Assert.Equal("joao.avila@betinhos.onmicrosoft.com", su["domainname"]);
-        Assert.Equal("joao.avila@betinhos.onmicrosoft.com", su["internalemailaddress"]);
-        Assert.Equal("João", su["firstname"]);
-        Assert.Equal("da Silva Ávila", su["lastname"]);
-        Assert.Equal(RaizId, ((EntityReference)su["businessunitid"]).Id);
-        Assert.Contains("\"etapa\":\"systemuser\",\"estado\":\"feita\"", saida.Etapas.ToJson());
-    }
+    private static Guid ObjectIdDe(string upn) => Guid.Parse(FakeGraphGateway.IdDe(upn));
+    private const string Upn = "joao.avila@betinhos.onmicrosoft.com";
 
     [Fact]
-    public void Systemuser_existente_e_pulado()
+    public void Systemuser_ausente_e_sincronizado_pelo_Power_Platform()
     {
-        var upn = "joao.avila@betinhos.onmicrosoft.com";
-        _svc.Com(new Entity("systemuser", Guid.NewGuid()) { ["azureactivedirectoryobjectid"] = Guid.Parse(FakeGraphGateway.IdDe(upn)), ["isdisabled"] = false });
         var saida = Handler().Executar(Entrada());
-        Assert.Empty(SystemUsers);
-        Assert.Contains("\"etapa\":\"systemuser\",\"estado\":\"pulada\"", saida.Etapas.ToJson());
+        Assert.Equal(Guid.Parse(saida.UsuarioEntraId), Assert.Single(_pp.Sincronizados));
+        Assert.Equal(ObjectIdDe(Upn), Assert.Single(SystemUsers)["azureactivedirectoryobjectid"]);
+        Assert.DoesNotContain(_svc.Criados, e => e.LogicalName == "systemuser");
+        Assert.Contains("\"etapa\":\"systemuser\",\"estado\":\"feita\",\"detalhe\":\"sincronizado pelo Power Platform\"", saida.Etapas.ToJson());
         Assert.Single(Funcionarios);
     }
 
     [Fact]
-    public void Systemuser_desativado_lanca_ACESSO_ENCERRADO_sem_tocar_funcionario()
+    public void Systemuser_existente_habilitado_e_licenciado_e_pulado_sem_addUser()
     {
-        var upn = "joao.avila@betinhos.onmicrosoft.com";
-        _svc.Com(new Entity("systemuser", Guid.NewGuid()) { ["azureactivedirectoryobjectid"] = Guid.Parse(FakeGraphGateway.IdDe(upn)), ["isdisabled"] = true });
-        var erro = Assert.Throws<AcessoException>(() => Handler().Executar(Entrada()));
-        Assert.Equal("ACESSO_ENCERRADO", erro.Codigo);
-        Assert.Contains("Peça à TI para reativar a conta no Entra.", erro.Message);
-        Assert.Empty(Funcionarios);
+        _svc.Com(new Entity("systemuser", Guid.NewGuid()) { ["azureactivedirectoryobjectid"] = ObjectIdDe(Upn), ["isdisabled"] = false, ["islicensed"] = true });
+        var saida = Handler().Executar(Entrada());
+        Assert.Empty(_pp.Sincronizados);
+        Assert.Contains("\"etapa\":\"systemuser\",\"estado\":\"pulada\"", saida.Etapas.ToJson());
+        Assert.Single(Funcionarios);
+    }
+
+    [Theory]
+    [InlineData(true, true)]    // desabilitado
+    [InlineData(false, false)]  // sem licença
+    public void Systemuser_desabilitado_ou_sem_licenca_com_Entra_ativo_e_ressincronizado(bool desabilitado, bool licenciado)
+    {
+        _svc.Com(new Entity("systemuser", Guid.NewGuid()) { ["azureactivedirectoryobjectid"] = ObjectIdDe(Upn), ["isdisabled"] = desabilitado, ["islicensed"] = licenciado });
+        var saida = Handler().Executar(Entrada());
+        Assert.Equal(ObjectIdDe(Upn), Assert.Single(_pp.Sincronizados));
+        Assert.Contains("\"etapa\":\"systemuser\",\"estado\":\"feita\"", saida.Etapas.ToJson());
     }
 
     [Fact]
-    public void Falha_ao_criar_systemuser_vira_USUARIO_DATAVERSE_PENDENTE_com_etapas()
+    public void Systemuser_ainda_ausente_apos_addUser_vira_USUARIO_DATAVERSE_PENDENTE_com_etapas()
     {
-        _svc.FalharCriacaoEm = "systemuser";
+        _pp.CriarSystemuser = false;
         var erro = Assert.Throws<AcessoException>(() => Handler().Executar(Entrada()));
         Assert.Equal("USUARIO_DATAVERSE_PENDENTE", erro.Codigo);
         Assert.Contains("ainda não a reconhece", erro.Message);
@@ -275,12 +275,23 @@ public sealed class CadastrarAcessoHandlerTests
         Assert.Contains("\"etapa\":\"grupo\",\"estado\":\"feita\"", etapas);
         Assert.Contains("\"etapa\":\"systemuser\",\"estado\":\"erro\"", etapas);
         Assert.Empty(Funcionarios);
+        Assert.Equal(1 + UsuarioDataverseRepository.Tentativas, _svc.Consultas.Count(c => c.EntityName == "systemuser"));
 
-        _svc.FalharCriacaoEm = null;   // retry idempotente: conclui sem recriar a conta
+        _pp.CriarSystemuser = true;   // retry idempotente: conclui sem recriar a conta do Entra
         _graph.Chamadas.Clear();
         Handler().Executar(Entrada());
         Assert.DoesNotContain("CriarUsuario", _graph.Chamadas);
         Assert.Single(SystemUsers);
         Assert.Single(Funcionarios);
+    }
+
+    [Fact]
+    public void Falha_do_addUser_para_antes_do_funcionario()
+    {
+        _pp.Falhar = true;
+        var erro = Assert.Throws<AcessoException>(() => Handler().Executar(Entrada()));
+        Assert.Equal("GRAPH_INDISPONIVEL", erro.Codigo);
+        Assert.Contains("\"etapa\":\"systemuser\",\"estado\":\"erro\"", (string)erro.Data["Etapas"]!);
+        Assert.Empty(Funcionarios);
     }
 }

@@ -11,6 +11,8 @@ public sealed class AcessoConfig
     public string LicenseSkuId { get; private set; } = "";
     public string GroupId { get; private set; } = "";
     public string AppUrl { get; private set; } = "";
+    /// <summary>Id do ambiente do Power Platform, usado no addUser que sincroniza o systemuser.</summary>
+    public string EnvironmentId { get; private set; } = "";
     public string Dominio { get; private set; } = "betinhos.onmicrosoft.com";
 
     public static AcessoConfig Parse(string? unsecure, string? secure)
@@ -26,6 +28,7 @@ public sealed class AcessoConfig
             LicenseSkuId = Obrigatorio(u, "licenseSkuId"),
             GroupId = Obrigatorio(u, "groupId"),
             AppUrl = Obrigatorio(u, "appUrl"),
+            EnvironmentId = Obrigatorio(u, "environmentId"),
             ClientSecret = Obrigatorio(s, "clientSecret"),
         };
         if (u.TryGetValue("dominio", out var dominio) && dominio is string d && d.Length > 0) cfg.Dominio = d;

@@ -10,7 +10,7 @@ description: "Verifica o acesso de motoristas ao App Motoristas: drawer Cadastra
 - Spec: `docs/superpowers/specs/2026-10-22-acesso-motorista-design.md`; guia do Entra em `docs/acesso-motorista-entra.md`.
 
 ## Testes e tipos
-1. `dotnet test packages/plugins/Cr40f.Acesso.Plugin.Tests/Cr40f.Acesso.Plugin.Tests.csproj` → "Com falha: 0" (68 em 22/10/2026).
+1. `dotnet test packages/plugins/Cr40f.Acesso.Plugin.Tests/Cr40f.Acesso.Plugin.Tests.csproj` → "Com falha: 0" (80 em 22/10/2026, com `PowerPlatformGatewayTests` e os casos de `systemuser` via addUser).
 2. `dotnet build packages/plugins/tools/Cr40f.Acesso.Registrar/Cr40f.Acesso.Registrar.csproj` → "0 Erro(s)".
 3. Em `apps/shell`: `npx vitest run src/pages/funcionarios` (91 em 18 arquivos em 22/10/2026) e `npx tsc --noEmit` sem erros. `pnpm --filter` estoura o tempo nesta máquina; sob carga, um teste pode cair por timeout (ex.: `Anotacoes.test.tsx`, `MobileHome.test.tsx`): rode de novo uma vez e registre.
 
@@ -25,9 +25,9 @@ Sem Dataverse e sem Graph; o mock (`createAcessoMock`) guarda e-mails em memóri
 7. Console sem `console.error`; versão do build no canto.
 
 ## Verificação no DEV (depois do merge e da publicação)
-Pré-requisitos do Renan: app registration no Entra com `User.ReadWrite.All`, `GroupMember.ReadWrite.All`, `Organization.Read.All` (guia em `docs/acesso-motorista-entra.md`), grupo de motoristas, SKU da licença e o `.env` com os segredos. Só da `main` no checkout principal: `packages/deploy/provision-acesso.ps1` (dry run, depois `-Apply`) e `packages/plugins/scripts/push-acesso-plugin.ps1`; nunca em worktree, sessão cloud ou PROD.
+Pré-requisitos do Renan: app registration no Entra com `User.ReadWrite.All`, `GroupMember.ReadWrite.All`, `Organization.Read.All` (guia em `docs/acesso-motorista-entra.md`), grupo de motoristas, SKU da licença, o app registrado como app de gerenciamento do Power Platform (`pac admin application register --application-id <ACESSO_CLIENT_ID>`) e o `.env` com `ACESSO_ENVIRONMENT_ID` (DEV `25a2ab78-cf07-ee41-a124-457aa2c29aea`; vira `environmentId` na configuração não segura do step). Só da `main` no checkout principal: `packages/deploy/provision-acesso.ps1` (dry run, depois `-Apply`) e `packages/plugins/scripts/push-acesso-plugin.ps1`; nunca em worktree, sessão cloud ou PROD.
 1. Shell no DEV (`#/funcionarios`), usuário com a função "Acesso - Gestão de Motoristas" ou administrador: cadastrar um terceiro de teste (ex.: "Teste Acesso Motorista", celular real do Renan).
-2. Conferir no Entra: usuário `teste.motorista@betinhos.onmicrosoft.com` criado, licença do SKU configurado atribuída, membro do grupo de motoristas, celular em `mobilePhone`; no Dataverse, `systemuser` ativo com o mesmo `azureactivedirectoryobjectid` (etapa `systemuser` feita ou pulada) e linha em `cr40f_funcionarios` com `cr40f_emailmicrosoft`, função motorista, status Ativo e vínculo escolhido.
+2. Conferir no Entra: usuário `teste.motorista@betinhos.onmicrosoft.com` criado, licença do SKU configurado atribuída, membro do grupo de motoristas, celular em `mobilePhone`; no Dataverse, `systemuser` com o mesmo `azureactivedirectoryobjectid`, `isdisabled=false` e `islicensed=true` (etapa `systemuser` "sincronizado pelo Power Platform" ou pulada "já existe no Dataverse"); no trace, nenhum erro "has not been assigned any License" do `DriverRecordSharing` e linha em `cr40f_funcionarios` com `cr40f_emailmicrosoft`, função motorista, status Ativo e vínculo escolhido.
 3. "Enviar no WhatsApp" abre `wa.me` com a mensagem; no celular, abrir a URL direta `https://org23b93544.crm2.dynamics.com/WebResources/new_app-motoristas-v2`, entrar com e-mail e senha temporária e trocar a senha (aguardar até 5 min de replicação se der erro de acesso).
 4. Encerrar pela ficha com dupla confirmação → no Entra a conta fica desativada (`accountEnabled=false`), sem a licença e fora do grupo; em `cr40f_funcionarios` status Desligado (`cr40f_status` = 1) e data de demissão de hoje (só se estava vazia). Nada é excluído.
 5. Repetir o encerramento depois de forçar falha (ex.: tirar permissão do app temporariamente) → a nova tentativa termina o que faltou (o grupo sai por último).
@@ -35,8 +35,9 @@ Pré-requisitos do Renan: app registration no Entra com `User.ReadWrite.All`, `G
 ## Limitações conhecidas
 - Autorização confere funções atribuídas direto ao usuário: função herdada por equipe não autoriza (SEM_PERMISSAO).
 - A senha temporária só aparece no resultado do cadastro; nunca é recuperável. Conta que já existia volta sem senha (linha omitida no WhatsApp).
-- Conta desativada no Entra ou systemuser desativado no Dataverse → ACESSO_ENCERRADO; só a TI reativa.
-- Dataverse recusando o systemuser logo após licenciar → USUARIO_DATAVERSE_PENDENTE com etapas; tentar de novo em alguns minutos conclui sem recriar a conta.
+- Conta desativada no Entra → ACESSO_ENCERRADO; só a TI reativa. systemuser desabilitado ou sem licença com o Entra ativo é ressincronizado pelo `addUser`.
+- systemuser criado pelo SDK nasce desabilitado e sem licença (diagnóstico DEV 22/10/2026), por isso o plugin não cria mais `systemuser` por `Create`; só o `addUser` do Power Platform.
+- systemuser ainda ausente depois do `addUser` (~25 s de consultas) → USUARIO_DATAVERSE_PENDENTE com etapas; tentar de novo em alguns minutos conclui sem recriar a conta. `addUser` com 401/403 → GRAPH_INDISPONIVEL ("403 no addUser do Power Platform"): falta registrar o app como app de gerenciamento.
 - Encerrar só mexe em contas que estão no grupo de motoristas (R11); conta fora do grupo tem as etapas puladas e o funcionário é apenas inativado.
 
 ## Estado
