@@ -6,7 +6,9 @@
   # Papel dos motoristas no App Motoristas v2 (o mesmo de scripts/grant-checklists-role.ps1 daquele repo).
   [string] $MotoristaRole = "Acesso-Motoristas",
   # Membros do perfil de campo (domainname). Vazio = so o usuario do token (teste), ate existir equipe de frota/DP.
-  [string[]] $MembrosPerfil = @()
+  [string[]] $MembrosPerfil = @(),
+  # Equipes (nome) associadas ao perfil de campo, ex.: gestao de frota e DP quando existirem.
+  [string[]] $EquipesPerfil = @()
 )
 
 # Task A2 do termo de multa: privilegios das 3 tabelas e column security de selfie/latitude/longitude.
@@ -105,6 +107,10 @@ $privs = @{}
 foreach ($t in $tabelas) {
   foreach ($p in @(Get-Rows "privileges" "privilegeid,name" "endswith(name,'$t')")) { $privs[$p.name] = $p.privilegeid }
 }
+# Lookups termo->multa e termo->motorista exigem AppendTo nas tabelas de destino.
+foreach ($nomePriv in @("prvAppendTocr40f_multas", "prvAppendTocr40f_funcionarios")) {
+  foreach ($p in @(Get-Rows "privileges" "privilegeid,name" "name eq '$nomePriv'")) { $privs[$p.name] = $p.privilegeid }
+}
 
 function Get-Papel([string] $Nome) {
   $papeis = @(Get-Rows "roles" "roleid,name,_businessunitid_value" "name eq '$(Escape-OData $Nome)' and _parentroleid_value eq null")
@@ -144,6 +150,8 @@ function Grant-Role([string] $Nome, [hashtable] $Pedido) {
 $gestao = @{}
 foreach ($t in $tabelas) { foreach ($acao in @("prvRead", "prvCreate", "prvWrite", "prvAppend", "prvAppendTo")) { $gestao["$acao$t"] = "Global" } }
 $gestao["prvDeletenew_textotermomulta"] = "Global"
+$gestao["prvAppendTocr40f_multas"] = "Global"
+$gestao["prvAppendTocr40f_funcionarios"] = "Global"
 foreach ($nome in $GestaoRoles) { Grant-Role $nome $gestao }
 
 # Motorista: nenhum Write/Create/Delete. Avisa (sem remover) se o papel ja tiver algo alem de Read nessas tabelas.
@@ -151,19 +159,26 @@ Grant-Role $MotoristaRole @{ "prvReadnew_termomulta" = "Basic"; "prvReadnew_parc
 $nomePorId = @{}; foreach ($k in $privs.Keys) { $nomePorId[[string]$privs[$k]] = $k }
 foreach ($id in @((Get-Profundidades (Get-Papel $MotoristaRole).roleid).Keys)) {
   $n = $nomePorId[$id]
-  if ($n -and $n -notlike "prvRead*") { Write-Step "AVISO: $MotoristaRole tem $n; o spec diz so Read (nada foi removido)." }
+  if ($n -and $n -like "*new_*" -and $n -notlike "prvRead*") { Write-Step "AVISO: $MotoristaRole tem $n; o spec diz so Read (nada foi removido)." }
 }
 
 # Column security: perfil "Termo de multa - leitura" so com leitura; quem grava as 3 colunas e o plugin.
 $perfilNome = "Termo de multa - leitura"
 $colunas = @("new_selfie", "new_latitude", "new_longitude")
-$perfis = @(Get-Rows "fieldsecurityprofiles" "fieldsecurityprofileid" "name eq '$(Escape-OData $perfilNome)'")
+$perfilDescricao = "Leitura de selfie e localização do termo de multa (gestão de frota e DP)."
+$perfis = @(Get-Rows "fieldsecurityprofiles" "fieldsecurityprofileid,description" "name eq '$(Escape-OData $perfilNome)'")
 if ($perfis.Count -gt 1) { throw "Perfil '$perfilNome' duplicado." }
 $perfilId = $null
-if ($perfis.Count -eq 1) { $perfilId = $perfis[0].fieldsecurityprofileid; Write-Step "perfil '$perfilNome' ja existe" }
+if ($perfis.Count -eq 1) {
+  $perfilId = $perfis[0].fieldsecurityprofileid; Write-Step "perfil '$perfilNome' ja existe"
+  if ($perfis[0].description -cne $perfilDescricao) {
+    if (-not $Apply) { Write-Step "DRY RUN corrigiria a descricao do perfil" }
+    else { Invoke-Dataverse "PATCH" "fieldsecurityprofiles($perfilId)" @{ description = $perfilDescricao } | Out-Null; Write-Step "descricao do perfil corrigida" }
+  }
+}
 elseif (-not $Apply) { Write-Step "DRY RUN criaria o perfil '$perfilNome'" }
 else {
-  $r = Invoke-Dataverse "POST" "fieldsecurityprofiles" @{ name = $perfilNome; description = "Leitura de selfie e localizacao do termo de multa (gestao de frota e DP)." } @{ Prefer = "return=representation" }
+  $r = Invoke-Dataverse "POST" "fieldsecurityprofiles" @{ name = $perfilNome; description = $perfilDescricao } @{ Prefer = "return=representation" }
   $perfilId = $r.fieldsecurityprofileid
   Write-Step "perfil '$perfilNome' criado"
 }
@@ -190,6 +205,7 @@ if ($alterouMetadata) {
 if ($perfilId) {
   foreach ($col in $colunas) {
     $fp = @(Get-Rows "fieldpermissions" "fieldpermissionid,canread" "_fieldsecurityprofileid_value eq $perfilId and entityname eq 'new_termomulta' and attributelogicalname eq '$col'")
+    if ($fp.Count -gt 1) { throw "Perfil tem $($fp.Count) permissoes de campo para $col; corrija manualmente." }
     if ($fp.Count -eq 1 -and $fp[0].canread -eq 4) { Write-Step "leitura em $col ja concedida"; continue }
     if (-not $Apply) { Write-Step "DRY RUN daria leitura em $col"; continue }
     if ($fp.Count -eq 1) { Invoke-Dataverse "PATCH" "fieldpermissions($($fp[0].fieldpermissionid))" @{ canread = 4 } | Out-Null }
@@ -203,9 +219,19 @@ if ($perfilId) {
       if ($u.Count -ne 1) { throw "Usuario '$m' nao encontrado." }
       $ids += [string]$u[0].systemuserid
     }
-  } else {
+  } elseif ($EquipesPerfil.Count -eq 0) {
     $ids += [string](Invoke-Dataverse "GET" "WhoAmI").UserId
-    Write-Step "AVISO: sem equipe de frota/DP no DEV; o unico membro do perfil e o usuario do token (teste)"
+    Write-Step "ATENCAO: perfil sem membros reais (gestão/DP); o unico membro e o usuario do token (teste)"
+  }
+  $equipesAtuais = @(@((Invoke-Dataverse "GET" "fieldsecurityprofiles($perfilId)/teamprofiles_association?`$select=teamid").value) | ForEach-Object { [string]$_.teamid })
+  foreach ($e in $EquipesPerfil) {
+    $t = @(Get-Rows "teams" "teamid" "name eq '$(Escape-OData $e)'")
+    if ($t.Count -ne 1) { throw "Equipe '$e' nao encontrada (ou ambigua): $($t.Count)." }
+    $tid = [string]$t[0].teamid
+    if ($equipesAtuais -contains $tid) { Write-Step "equipe '$e' ja e membro do perfil"; continue }
+    if (-not $Apply) { Write-Step "DRY RUN incluiria a equipe '$e' no perfil"; continue }
+    Invoke-Dataverse "POST" "fieldsecurityprofiles($perfilId)/teamprofiles_association/`$ref" @{ "@odata.id" = "$script:baseUrl/api/data/v9.2/teams($tid)" } | Out-Null
+    Write-Step "equipe '$e' incluida no perfil"
   }
   $atuais = @(@((Invoke-Dataverse "GET" "fieldsecurityprofiles($perfilId)/systemuserprofiles_association?`$select=systemuserid").value) | ForEach-Object { [string]$_.systemuserid })
   foreach ($id in $ids) {
