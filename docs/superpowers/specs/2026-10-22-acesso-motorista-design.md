@@ -19,7 +19,7 @@ Fora do escopo: link por serviço sem login (descartado), convidado B2B com e-ma
 - Licença atual atribuída aos motoristas: Power Apps Developer (decisão do Renan; ressalva registrada: é plano de desenvolvimento, não de uso produtivo). O SKU fica configurável.
 - Tela Funcionários: `apps/shell/src/pages/funcionarios/` (`FuncionariosPage.tsx`, `components/Ficha.tsx`, `FieldInput.tsx`, `data/schema.ts` com `FUNCAO` 202410000 = Motorista e `VINCULO` 0 = Colaborador / 1 = Terceiro, `data/mock.ts`, `data/dataverse.ts`). WhatsApp: `whatsappHref` em `pages/operacional/domain/phone`.
 - Plugins do repo: `packages/plugins/Cr40f.{Financeiro,Documentos,Frota}.Plugin` (+ `.Tests`), um `IPlugin` por Custom API, registrados por `packages/plugins/scripts/push-<area>-plugin.ps1` (`pnpm push:plugin:<area>:dev`). Nenhum usa configuração segura ainda; o molde com secure config é o `App Motoristas/plugins/DriverRecordSharing` (`GenerateTrackingLinkPlugin`, `HandoverChecklistPlugin`) e a checagem `Get-StepsWithoutSecureConfig` em `App Motoristas/scripts/deploy-prod.ps1`.
-- Verificação paralela em andamento (sessão própria): prova de que o app funciona 100% pela URL no navegador, com paridade ao Power Apps Mobile. O resultado não muda este desenho; muda só o texto do link enviado ao motorista.
+- Verificação concluída em 22/10/2026: o app funciona pela URL direta `https://org23b93544.crm2.dynamics.com/WebResources/new_app-motoristas-v2` no Chrome Android com o roteiro completo (receber, foto, assinatura, QR, gasto, voucher, troca, Voltar, rotação, modo avião, atalho na tela inicial). Correções no PR #61 do App Motoristas. Única diferença para o Power Apps Mobile: push. iPhone ainda não testado.
 
 ## 3. Decisões
 
