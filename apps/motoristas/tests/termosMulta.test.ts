@@ -64,6 +64,14 @@ test("payload de assinarTermo leva GPS e dispositivo e não leva data/hora", () 
   assert.ok(!JSON.stringify(params).match(/assinadoem|data|hora|T\d\d:\d\d/i));
 });
 
+test("payload de assinarTermo arredonda lat/long para 6 casas como número", () => {
+  const params = buildAssinarParams(termoId, { selfieJpegBase64: "/9j/2Q==", strokes, gps: { latitude: -23.56789049, longitude: -46.12345678, precisao: 12 }, dispositivo: "" });
+  assert.equal(params.new_Latitude, -23.56789);
+  assert.equal(params.new_Longitude, -46.123457);
+  assert.equal(typeof params.new_Latitude, "number");
+  assert.equal(typeof params.new_Longitude, "number");
+});
+
 test("erro da API mostra a mensagem do servidor e preserva selfie e assinatura", () => {
   const ready = { ...initialTermoFlow(), step: "assinatura" as const, selfie: "abc", strokes, gps: { latitude: 1, longitude: 2, precisao: 10 } };
   const sending = termoFlowReducer(ready, { type: "submit" });

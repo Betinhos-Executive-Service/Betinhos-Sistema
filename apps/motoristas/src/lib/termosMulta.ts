@@ -293,8 +293,8 @@ export function buildAssinarParams(id: string, dados: AssinaturaDados) {
     new_AssinaturaJson: JSON.stringify(dados.strokes)
   };
   if (dados.gps) {
-    params.new_Latitude = Number(dados.gps.latitude.toFixed(7));
-    params.new_Longitude = Number(dados.gps.longitude.toFixed(7));
+    params.new_Latitude = Number(dados.gps.latitude.toFixed(6));
+    params.new_Longitude = Number(dados.gps.longitude.toFixed(6));
     params.new_PrecisaoGps = Math.round(dados.gps.precisao * 100) / 100;
   }
   if (dados.dispositivo) params.new_Dispositivo = dados.dispositivo.slice(0, 500);
