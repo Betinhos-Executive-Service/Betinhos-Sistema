@@ -6,6 +6,7 @@ import {
   getInitialComunicadoId,
   getInitialDetail,
   getInitialParams,
+  getInitialTermoMultaId,
   getVoucherDraftKey,
   initialStore,
   isSameDetail,
@@ -464,7 +465,7 @@ function App() {
   const initialDetailRef = useRef<DetailData | null>(initialHashRouteRef.current ? initialHashDetail : getInitialDetail(store));
   const initialScreen = initialHashRouteRef.current
     ? getInitialScreenFromHashRoute(initialHashRouteRef.current, initialHashDetail)
-    : (initialDetailRef.current ? "detalhes" : "inicio");
+    : (initialDetailRef.current ? "detalhes" : getInitialTermoMultaId() ? "multas" : "inicio");
   const [screen, setScreen] = useState<Screen>(initialScreen);
   const previousScreenRef = useRef<Screen>(initialScreen);
   const lastMediaScreenRef = useRef<Screen>(initialScreen);

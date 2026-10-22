@@ -74,6 +74,13 @@ export function getInitialChecklistId(search = window.location.search) {
   return COMUNICADO_ID_PATTERN.test(value) ? value.replace(/[{}]/g, "").toLowerCase() : "";
 }
 
+// Deep link do push do termo de multa: ?termoMultaId=<id> ou ?data=termoMultaId%3D<id> (push via form OnLoad).
+// O App abre na tela Multas (rota #multas), que lista os termos pendentes do motorista.
+export function getInitialTermoMultaId(search = window.location.search) {
+  const value = readLaunchParam(search, "termoMultaId").trim();
+  return COMUNICADO_ID_PATTERN.test(value) ? value.replace(/[{}]/g, "").toLowerCase() : "";
+}
+
 export function getVoucherDraftKey(detail: DetailData) {
   return `${detail.type}:${detail.id}`;
 }
