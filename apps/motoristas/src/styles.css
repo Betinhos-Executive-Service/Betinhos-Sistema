@@ -12571,21 +12571,6 @@ select,
   margin-bottom: -12px !important;
 }
 
-/* Voucher: atalho para preencher o horário inicial com o horário agendado (toque consciente). */
-.voucher-time-shortcut {
-  min-height: 36px;
-  margin-top: 8px;
-  padding: 6px 12px;
-  border: 1px solid rgba(0, 26, 61, 0.14);
-  border-radius: 999px;
-  background: #ffffff;
-  color: #001a3d;
-  font-family: "Manrope", Arial, sans-serif;
-  font-size: 0.82rem;
-  font-weight: 800;
-  cursor: pointer;
-}
-
 /* Carimbo de versão: canto inferior direito, discreto, não captura toque nem foco. */
 .build-stamp {
   position: fixed;

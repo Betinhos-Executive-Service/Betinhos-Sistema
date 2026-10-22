@@ -28,7 +28,7 @@ Usa Chrome headless com user agent Android (ativa a câmera ao vivo) e câmera s
 5. "+" com câmera negada → "Câmera indisponível" + texto em português com "Permitir" e botão "Tentar de novo"; nenhum aviso "Permission denied". Libere a câmera e toque "Tentar de novo" → preview ao vivo.
 6. Tirar foto → "Confirmar" → miniatura "Ver comprovante 1". Abrir → "Apagar foto" → diálogo "Apagar foto?" com foco em Cancelar; Esc e toque fora fecham.
 7. "FINALIZAR" com observação já escrita no detalhe → título "Confira sua observação", botões "Enviar sem observação" e "Confirmar".
-8. `#voucher?serviceId=10241&type=SERVICO` → "Usar 14:30 (agendado)" preenche o horário; "Limpar formulário" fica desabilitado sem dados e, com dados, pede "Limpar o voucher?". Pedágio "12,5" vira "12,50" ao sair do campo.
+8. `#voucher?serviceId=10241&type=SERVICO` → Horário Inicial sem atalho "Usar … (agendado)"; "Limpar formulário" fica desabilitado sem dados e, com dados, pede "Limpar o voucher?". Pedágio "12,5" vira "12,50" ao sair do campo.
 9. `#finalizar?serviceId=76&type=MANUTENCAO` → sem ícone de apagar até haver foto; "VALOR (R$)" ignora letras ("1.250,9abc" → "1250,90"); com foto, o ícone "Apagar fotos" pede "Apagar 1 foto?" e mantém os textos.
 10. `#cancelado-local?serviceId=10241&type=SERVICO` → "Limpar texto" desabilitado vazio; com texto pede "Apagar o texto?". "Cliquei errado" volta ao detalhe.
 11. `#historico` → busca "zzz inexistente" mostra `Nenhum serviço encontrado para "zzz inexistente".`
