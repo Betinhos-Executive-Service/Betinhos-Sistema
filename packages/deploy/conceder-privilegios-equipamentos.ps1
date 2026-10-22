@@ -170,7 +170,8 @@ foreach ($nome in $RemoverDe) {
   if ($tem.Count -eq 0) { Write-Step "$nome nao tem privilegio nas tabelas de equipamentos; nada a remover"; continue }
   $resumo = ($tem | ForEach-Object { $nomePorId[[string]$_.privilegeid] }) -join ", "
   if (-not $Apply) { Write-Step "DRY RUN $nome perderia: $resumo"; continue }
-  foreach ($rp in $tem) { Invoke-Dataverse "POST" "roles($($papel.roleid))/Microsoft.Dynamics.CRM.RemovePrivilegeRole" @{ PrivilegeId = $rp.privilegeid } | Out-Null }
+  # Na Web API o parametro e "Privilege" (referencia a entidade privilege), nao "PrivilegeId" do SDK; com PrivilegeId o Dataverse responde 400.
+  foreach ($rp in $tem) { Invoke-Dataverse "POST" "roles($($papel.roleid))/Microsoft.Dynamics.CRM.RemovePrivilegeRole" @{ Privilege = @{ "@odata.type" = "Microsoft.Dynamics.CRM.privilege"; privilegeid = $rp.privilegeid } } | Out-Null }
   $sobra = @(@(Get-Rows "roleprivilegescollection" "privilegeid" "roleid eq $($papel.roleid)") | Where-Object { $nomePorId.ContainsKey([string]$_.privilegeid) })
   if ($sobra.Count) { throw "$nome ainda tem $($sobra.Count) privilegio(s) de equipamentos depois da remocao." }
   Write-Step "$nome removido: $resumo"
