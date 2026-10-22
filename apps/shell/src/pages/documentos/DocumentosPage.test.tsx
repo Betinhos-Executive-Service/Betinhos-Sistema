@@ -76,6 +76,16 @@ describe('Central de documentos', () => {
     expect(await screen.findByRole('dialog', { name: 'Renovar CNH' })).toBeTruthy()
   })
 
+  it('salvar a renovação fecha o drawer e avisa que salvou', async () => {
+    render(<DocumentosPage host={{ mode: 'mock' }} />)
+    fireEvent.click(within(await linhaDe(/Bruna/, /CNH/)).getByRole('button', { name: 'Renovar' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Renovar CNH' })
+    fireEvent.change(within(dialog).getByLabelText(/^Validade/), { target: { value: '2031-10-20' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Salvar documento' }))
+    expect(await screen.findByText('Documento salvo')).toBeTruthy()
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Renovar CNH' })).toBeNull())
+  })
+
   it('clique em qualquer ponto da linha abre o mesmo drawer; Abrir ficha não abre a renovação', async () => {
     render(<DocumentosPage host={{ mode: 'mock' }} />)
     const linha = await linhaDe(/Bruna/, /CNH/)

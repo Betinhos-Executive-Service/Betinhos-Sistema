@@ -14,7 +14,6 @@ const TOM: Record<EstadoItem, StatusTone> = {
 export function StatusDoc({ estado, dias }: { estado: EstadoItem; dias: number | null }) {
   const prazo = rotuloPrazo(dias)
   let texto = ESTADO_LABEL[estado]
-  if (estado === 'vencido' && prazo) texto = `Vencido · ${prazo}`
-  else if ((estado === 'vence7' || estado === 'vence30' || estado === 'vence60') && prazo) texto = prazo.charAt(0).toUpperCase() + prazo.slice(1)
+  if ((estado === 'vencido' || estado === 'vence7' || estado === 'vence30' || estado === 'vence60') && prazo) texto = prazo.charAt(0).toUpperCase() + prazo.slice(1)
   return <StatusBadge tone={TOM[estado]} dot>{texto}</StatusBadge>
 }
