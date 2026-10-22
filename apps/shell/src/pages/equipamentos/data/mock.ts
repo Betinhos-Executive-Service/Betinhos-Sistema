@@ -52,19 +52,30 @@ export function createMockEquipamentos(): Equipamento[] {
   ]
 }
 
+/** O mock grava as fotos como no DEV: `Equipamentos/DEV/<id>/<arquivo>`. */
+export const MOCK_ENV = 'DEV'
+
 /** Imagem de exemplo (SVG) para o `pnpm dev`: fundo liso, um retângulo e o nome; não depende de arquivo. */
-function imagemExemplo(texto: string, fundo: string, frente: string) {
+function imagemExemplo(nome: string, texto: string, fundo: string, frente: string) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480"><rect width="640" height="480" fill="${fundo}"/><rect x="170" y="120" width="300" height="190" rx="14" fill="${frente}"/><rect x="130" y="320" width="380" height="22" rx="8" fill="${frente}"/><text x="320" y="410" font-family="sans-serif" font-size="30" text-anchor="middle" fill="#1f2937">${texto}</text></svg>`
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+  return new File([svg], nome, { type: 'image/svg+xml' })
 }
 
-/** Fotos de exemplo: Notebook do Financeiro com duas (capa a primeira) e Maquininha Carlos com uma. */
-export function createMockFotos(): Foto[] {
-  const foto = (n: number, equipamento: number, nome: string, capa: boolean, dia: string, imagem: string): Foto =>
-    ({ id: `ffffffff-0000-4000-8000-${String(n).padStart(12, '0')}`, equipamentoId: id(equipamento), nome, capa, criadoEm: new Date(`${dia}T12:00:00Z`), miniatura: imagem, url: imagem })
-  return [
-    foto(1, 1, 'notebook-frente.jpg', true, '2026-10-02', imagemExemplo('Notebook — frente', '#dbeafe', '#64748b')),
-    foto(2, 1, 'notebook-etiqueta.jpg', false, '2026-10-03', imagemExemplo('Notebook — etiqueta', '#e0e7ff', '#94a3b8')),
-    foto(3, 5, 'maquininha.jpg', true, '2026-10-04', imagemExemplo('Máquina de cartão', '#dcfce7', '#475569')),
+/**
+ * Fotos de exemplo: Notebook do Financeiro com duas (capa a primeira) e Maquininha Carlos com uma.
+ * `arquivos` faz o papel do SharePoint (caminho → imagem).
+ */
+export function createMockFotos(): { fotos: Foto[]; arquivos: Map<string, Blob> } {
+  const arquivos = new Map<string, Blob>()
+  const foto = (n: number, equipamento: number, nome: string, capa: boolean, dia: string, texto: string, fundo: string, frente: string): Foto => {
+    const caminho = `Equipamentos/${MOCK_ENV}/${id(equipamento)}/${nome}`
+    arquivos.set(caminho, imagemExemplo(nome, texto, fundo, frente))
+    return { id: `ffffffff-0000-4000-8000-${String(n).padStart(12, '0')}`, equipamentoId: id(equipamento), nome, capa, criadoEm: new Date(`${dia}T12:00:00Z`), caminho }
+  }
+  const fotos = [
+    foto(1, 1, 'notebook-frente.jpg', true, '2026-10-02', 'Notebook — frente', '#dbeafe', '#64748b'),
+    foto(2, 1, 'notebook-etiqueta.jpg', false, '2026-10-03', 'Notebook — etiqueta', '#e0e7ff', '#94a3b8'),
+    foto(3, 5, 'maquininha.jpg', true, '2026-10-04', 'Máquina de cartão', '#dcfce7', '#475569'),
   ]
+  return { fotos, arquivos }
 }

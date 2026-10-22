@@ -15,9 +15,14 @@ type FlowKey = keyof typeof FLOW_VARS
 export const DOC_MAX_BYTES = 10 * 1024 * 1024
 export const DOC_ROOT = 'Funcionarios'
 
-/** Pasta estável por colaborador (id não muda quando o nome muda). DEV fica separado. */
-export function pastaFuncionario(id: string, envLabel: string, root = DOC_ROOT) {
+/** Pasta estável por registro (id não muda quando o nome muda) dentro da pasta-raiz do módulo. DEV fica separado. */
+export function pastaRegistro(root: string, id: string, envLabel: string) {
   return `${root}/${envLabel === 'DEV' ? 'DEV/' : ''}${id}`
+}
+
+/** Pasta do colaborador (`Funcionarios/<id>`); outros módulos passam a própria raiz. */
+export function pastaFuncionario(id: string, envLabel: string, root = DOC_ROOT) {
+  return pastaRegistro(root, id, envLabel)
 }
 
 /** O flow Salvar recusa "/", "\" e "..". Mantém a extensão e limita o tamanho. */
@@ -73,8 +78,14 @@ function toDocumento(item: Record<string, unknown>): Documento {
   }
 }
 
-/** `root` é a pasta-raiz do módulo na biblioteca (Funcionarios, Curriculos…). */
-export function createSharePointDocs(api: XrmWebApi, envLabel: string, root = DOC_ROOT) {
+/** Só o que o store lê do Dataverse (as URLs dos flows); o Xrm.WebApi serve, e quem usa o DataverseClient adapta. */
+export type EnvVarApi = Pick<XrmWebApi, 'retrieveMultipleRecords'>
+
+/**
+ * `root` é a pasta-raiz do módulo na biblioteca (Funcionarios, Curriculos, Equipamentos…);
+ * `origem` vai nos metadados do arquivo salvo.
+ */
+export function createSharePointDocs(api: EnvVarApi, envLabel: string, root = DOC_ROOT, origem = 'TELA_FUNCIONARIOS') {
   const urls = new Map<FlowKey, Promise<string>>()
 
   async function readEnvVar(schemaName: string) {
@@ -98,10 +109,10 @@ export function createSharePointDocs(api: XrmWebApi, envLabel: string, root = DO
   }
 
   return {
-    pasta: (id: string) => pastaFuncionario(id, envLabel, root),
+    pasta: (id: string) => pastaRegistro(root, id, envLabel),
 
     async listar(id: string, subpasta?: string): Promise<Documento[]> {
-      const pasta = pastaFuncionario(id, envLabel, root)
+      const pasta = pastaRegistro(root, id, envLabel)
       const result = await callFlow(await flowUrl('listar'), { caminhoCompleto: subpasta ? `${pasta}/${subpasta}` : pasta })
       const itens = Array.isArray(result.arquivos) ? (result.arquivos as Record<string, unknown>[]) : []
       return itens.map(toDocumento).sort((a, b) => String(b.modificadoEm).localeCompare(String(a.modificadoEm)))
@@ -109,11 +120,11 @@ export function createSharePointDocs(api: XrmWebApi, envLabel: string, root = DO
 
     async enviar(id: string, file: File, nome: string, subpasta?: string): Promise<Documento> {
       const result = await callFlow(await flowUrl('salvar'), {
-        caminhoCompleto: subpasta ? `${pastaFuncionario(id, envLabel, root)}/${subpasta}` : pastaFuncionario(id, envLabel, root),
+        caminhoCompleto: subpasta ? `${pastaRegistro(root, id, envLabel)}/${subpasta}` : pastaRegistro(root, id, envLabel),
         nomeArquivo: nome,
         conteudoBase64: await fileToBase64(file),
         mimeType: file.type || 'application/octet-stream',
-        metadados: { tarefaId: id, origem: 'TELA_FUNCIONARIOS' },
+        metadados: { tarefaId: id, origem },
       })
       return { ...toDocumento(result), nome, tamanho: Number(result.tamanho) || file.size, modificadoEm: new Date().toISOString(), mimeType: file.type || null }
     },

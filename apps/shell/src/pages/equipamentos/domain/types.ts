@@ -15,7 +15,7 @@ export type Equipamento = {
   valorCompra: number | null
   observacoes: string
   modificadoEm: Date | null
-  /** Miniatura da foto de capa (data URL); null = sem foto, a lista mostra o ícone do tipo. */
+  /** Caminho no SharePoint da foto de capa; null = sem foto, a lista mostra o ícone do tipo. */
   capa: string | null
 }
 
