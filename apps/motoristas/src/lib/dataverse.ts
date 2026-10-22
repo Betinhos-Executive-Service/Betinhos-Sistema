@@ -220,6 +220,7 @@ export const DATAVERSE = {
   comunicados: "new_comunicadomotoristas",
   comunicadoDestinatarios: "new_comunicadodestinatarios",
   checklistVeiculos: "new_checklistveiculos",
+  termosMulta: "new_termomultas",
   systemusers: "systemusers"
 } as const;
 
@@ -252,6 +253,7 @@ const ENTITY_SET_TO_ENTITY_NAME: Record<string, string> = {
   [DATAVERSE.comunicados]: "new_comunicadomotorista",
   [DATAVERSE.comunicadoDestinatarios]: "new_comunicadodestinatario",
   [DATAVERSE.checklistVeiculos]: "new_checklistveiculo",
+  [DATAVERSE.termosMulta]: "new_termomulta",
   [DATAVERSE.systemusers]: "systemuser",
   environmentvariabledefinitions: "environmentvariabledefinition",
   environmentvariablevalues: "environmentvariablevalue"

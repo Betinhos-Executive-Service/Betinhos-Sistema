@@ -46,6 +46,15 @@ const baseModules = [
     disabled: false,
   },
   {
+    id: "multas",
+    label: "Multas",
+    detail: "Termos para assinar",
+    action: "Abrir",
+    icon: "multas",
+    tone: "neutral",
+    disabled: false,
+  },
+  {
     id: "maintenancePhoto",
     label: "Manutenção",
     detail: "Solicitar reparo",
@@ -88,6 +97,7 @@ const ideasModule = {
 const screenAliases: Record<string, string[]> = {
   comunicados: ["comunicados"],
   checklists: ["checklists"],
+  multas: ["multas"],
   services: ["servicos", "services", "Services", "serviços"],
   history: ["historico", "history", "History", "histórico"],
   maintenancePhoto: ["maintenancePhoto", "maintenance", "MaintenancePhoto", "manutencao", "manutenção"],
@@ -101,6 +111,7 @@ const screenAliases: Record<string, string[]> = {
 const moduleHandlers: Record<string, string[]> = {
   comunicados: [],
   checklists: [],
+  multas: [],
   services: [
     "onServices",
     "onService",
@@ -215,6 +226,7 @@ type InitialScreenProps = {
   services?: AgendaItem[];
   pendingComunicados?: number;
   pendingChecklists?: number;
+  pendingMultas?: number;
   canGeneratePersonalReceipt?: boolean;
   isThirdParty?: boolean;
   showLocalReset?: boolean;
@@ -333,6 +345,11 @@ function ModuleIcon({ name }: { name: string }) {
 
   if (name === "comunicados") {
     return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4V5Zm3 4h10M7 12h7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" /></svg>;
+  }
+
+  if (name === "multas") {
+    // Lucide file-pen: documento para assinar.
+    return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.5 22H18a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v9.5M14 2v5h5M13.4 12.6a2 2 0 1 1 2.8 2.8L10 21.6 6 22l.4-4 7-5.4Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" /></svg>;
   }
 
   if (name === "checklist") {
@@ -476,6 +493,7 @@ export function InitialScreen(props: InitialScreenProps) {
                 {module.detail}
                 {module.id === "services" && agendaCount > 0 ? <span className="concept-inline-count"> • {agendaCount}</span> : null}
                 {module.id === "comunicados" && (props.pendingComunicados ?? 0) > 0 ? <span className="concept-inline-count"> • {props.pendingComunicados} pendente{props.pendingComunicados === 1 ? "" : "s"}</span> : null}
+                {module.id === "multas" && (props.pendingMultas ?? 0) > 0 ? <span className="concept-inline-count"> • {props.pendingMultas} pendente{props.pendingMultas === 1 ? "" : "s"}</span> : null}
                 {module.id === "checklists" && (props.pendingChecklists ?? 0) > 0 ? <span className="concept-inline-count"> • {props.pendingChecklists} pendente{props.pendingChecklists === 1 ? "" : "s"}</span> : null}
               </small>
             </span>

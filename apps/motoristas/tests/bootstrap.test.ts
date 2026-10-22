@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { filterAgendaGalleryItems, shouldShowAgendaItemInGallery } from "../src/app/agendaVisibility.ts";
-import { findFirstPendingDetail, findFirstPendingServiceDetail, getInitialComunicadoId } from "../src/app/bootstrap.ts";
+import { findFirstPendingDetail, findFirstPendingServiceDetail, getInitialComunicadoId, getInitialTermoMultaId } from "../src/app/bootstrap.ts";
 import type { AgendaItem } from "../src/types.ts";
 
 const firstDetail = {
@@ -102,4 +102,12 @@ test("deep link do push lê servicoId e tipo dentro de data=", async () => {
   assert.deepEqual(getInitialParams("?servicoId=direto&tipo=TROCA&data=servicoId%3Doutro"), { serviceId: "direto", type: "TROCA" });
   assert.deepEqual(getInitialParams(""), { serviceId: "", type: "" });
   assert.equal(getInitialComunicadoId("?data=comunicadoId%3D3F2504E0-4F89-11D3-9A0C-0305E82C3301"), "3f2504e0-4f89-11d3-9a0c-0305e82c3301");
+});
+
+test("deep link do termo de multa aceita termoMultaId direto ou dentro de data", () => {
+  const id = "3f2504e0-4f89-11d3-9a0c-0305e82c3301";
+  assert.equal(getInitialTermoMultaId(`?termoMultaId={${id.toUpperCase()}}`), id);
+  assert.equal(getInitialTermoMultaId(`?data=${encodeURIComponent(`termoMultaId=${id}`)}`), id);
+  assert.equal(getInitialTermoMultaId("?termoMultaId=abc"), "");
+  assert.equal(getInitialTermoMultaId(""), "");
 });

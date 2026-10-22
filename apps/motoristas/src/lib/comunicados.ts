@@ -1,3 +1,4 @@
+import { executeCustomApi } from "./customApi.ts";
 import { createOne, DATAVERSE, deleteOne, retrieveMultiple, retrieveOne, updateOne } from "./dataverse.ts";
 
 export const COMUNICADO_TIPO = { informativo: 100000000, ciencia: 100000001 } as const;
@@ -396,8 +397,6 @@ export async function deleteDraft(item: Comunicado) {
   await deleteOne(DATAVERSE.comunicados, item.id);
 }
 
-type XrmApi = { WebApi?: { online?: { execute?: (request: Record<string, unknown>) => Promise<Response> } } };
-
 export async function executeComunicadoAction(operationName: string, parameters: Record<string, string>) {
   if (isMockComunicados()) {
     if (operationName === "new_DispararComunicadoMotorista") { await mockRequest(`/comunicados/${parameters.new_ComunicadoId}/dispatch`, {}); return; }
@@ -407,35 +406,7 @@ export async function executeComunicadoAction(operationName: string, parameters:
     } : {});
     return;
   }
-  let xrm: XrmApi | undefined;
-  try { xrm = (window.parent as Window & { Xrm?: XrmApi }).Xrm; } catch { /* Parent may be cross-origin. */ }
-  xrm ??= (window as Window & { Xrm?: XrmApi }).Xrm;
-  const online = xrm?.WebApi?.online;
-  // O Xrm depende do `this`; extrair o método solto quebra com "reading '_execute'".
-  const execute = online?.execute?.bind(online);
-  if (!execute) throw new Error("Abra o web resource no Power Apps para registrar esta ação.");
-  const parameterTypes = Object.fromEntries(Object.keys(parameters).map((key) => [key, {
-    // Com "Edm.Guid" o Xrm serializa a string como 'undefined'; o servidor converte o texto para Guid.
-    typeName: "Edm.String",
-    structuralProperty: 1
-  }]));
-  const response = await execute({
-    ...parameters,
-    getMetadata: () => ({ boundParameter: null, operationType: 0, operationName, parameterTypes })
-  });
-  if (!response.ok) {
-    // Guarda a resposta técnica no erro; o logger aplica a ocultação de dados sensíveis.
-    const responseBody = await response.text().catch(() => "Resposta indisponível.");
-    let responseDetail: unknown = responseBody.slice(0, 4000);
-    try { responseDetail = JSON.parse(responseBody); } catch { /* Response may be plain text. */ }
-    throw Object.assign(new Error(`Falha ao registrar ação (${response.status}).`), {
-      code: response.status,
-      operationName,
-      statusText: response.statusText,
-      requestId: response.headers.get("x-ms-service-request-id") ?? response.headers.get("REQ_ID") ?? "",
-      responseBody: responseDetail
-    });
-  }
+  await executeCustomApi(operationName, parameters);
 }
 
 export const abrirComunicado = (id: string) => executeComunicadoAction("new_AbrirComunicadoMotorista", { new_DestinatarioId: cleanGuid(id) });
