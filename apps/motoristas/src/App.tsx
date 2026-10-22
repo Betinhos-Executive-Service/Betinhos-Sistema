@@ -75,6 +75,7 @@ import { readReceiptQuick, isStandaloneWebResourceRuntime } from "./lib/datavers
 import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "./lib/fetchWebApi";
 import { createQrChargeRemote, getQrChargeSummaryRemote, updateQrChargeRemote } from "./lib/dataverse";
 import { getQrChargeReceiveState, getReceivableCents, type QrChargeSummary } from "./lib/qrCharge";
+import { quickReadValueCents } from "./lib/receiveProofCheck";
 import { QrChargeScreen } from "./screens/QrChargeScreen";
 import {
   INITIAL_QUICK_READ,
@@ -1282,7 +1283,9 @@ function App() {
     const canOpen = state.receivableCents > 0 && ((canChargeByQr && state.balanceCents > 0) || Boolean(state.open));
     return {
       qrCharge: {
+        receivableCents: state.receivableCents,
         paidCents: state.paidCents,
+        paidByName: entry?.summary?.ultimaPaga?.paganteNome.trim() ?? "",
         balanceCents: state.balanceCents,
         // Só a primeira carga segura o botão; a revalidação usa o resumo anterior.
         loading: entry?.status === "loading" && !entry.summary,
@@ -1290,7 +1293,8 @@ function App() {
         resumable: Boolean(state.open),
         onOpen: canOpen ? () => setScreen("cobrancaQr") : undefined
       },
-      proofWaived: state.covers
+      proofWaived: state.covers,
+      checkProof: remoteMode || getQuickReadMockMode() ? checkReceiveProof : undefined
     };
   };
   const invalidateQrChargeSummary = (detailId: string) =>
@@ -2631,6 +2635,20 @@ function App() {
     setExpenseQuickReadFilling(false);
     setExpenseQuickReadFilled({});
   }
+
+  // Conferência do comprovante de recebimento pela mesma leitura rápida dos gastos: só o valor importa.
+  const checkReceiveProof = async (photo: ExpensePhoto) => {
+    const mockMode = remoteMode ? null : getQuickReadMockMode();
+    const { outcome, referenceData } = await runQuickReadPipeline({
+      referenceData: expenseReferenceData,
+      isReferenceReady: mockMode ? (data) => data.categories.length > 0 && data.paymentMethods.length > 0 : hasRemoteReferenceData,
+      loadReferenceData: mockMode ? async () => DEFAULT_EXPENSE_REFERENCE_DATA : loadExpenseReferenceDataRemote,
+      prepareImage: () => downscaleForQuickRead(photo.dataUrl),
+      read: mockMode ? (_base64, categorias, formas, timeoutMs) => readReceiptQuickMock(mockMode, categorias, formas, timeoutMs) : readReceiptQuick
+    });
+    if (referenceData && referenceData !== expenseReferenceData) setExpenseReferenceData(referenceData);
+    return quickReadValueCents(outcome);
+  };
 
   const runExpenseQuickRead = async (dataUrl: string) => {
     const mockMode = remoteMode ? null : getQuickReadMockMode();

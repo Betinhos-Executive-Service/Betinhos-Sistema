@@ -143,7 +143,7 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
     // Recarregar: o resumo (mock no sessionStorage) continua reconhecendo o pagamento.
     await h.open("", "receber?serviceId=10240&type=SERVICO", 1800);
     const after = await h.text();
-    check("Recarregar: Recebimento reconhece o pago pelo resumo", /Pago por QR code: R\$\s380,00\. O comprovante é opcional\./.test(after) && !(await h.button("Cobrar por QR code").count()), after.replace(/\s+/g, " ").slice(0, 200));
+    check("Recarregar: Recebimento reconhece o pago pelo resumo", /Já pago por QR[\s\S]*R\$\s380,00[\s\S]*Tudo recebido[\s\S]*Comprovante opcional/.test(after) && !(await h.button("Cobrar por QR code").count()), after.replace(/\s+/g, " ").slice(0, 200));
     await h.shot("09-recarregado-pago");
 
     await h.open("", "receber?serviceId=10241&type=SERVICO");
@@ -191,7 +191,7 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
     check("Retomado: confirmação sem recibo quando não houve e-mail", confirmed && !/Enviado para/.test(await h.text()));
     await h.click("Continuar", 1400);
     const partial = await h.text();
-    check("Pago parcial: Continuar volta ao Recebimento pedindo o restante", (await h.hash()).startsWith("#receber") && /Pago por QR: R\$\s200,00\. Envie o comprovante do restante \(R\$\s180,00\)\./.test(partial), partial.replace(/\s+/g, " ").slice(0, 200));
+    check("Pago parcial: Continuar volta ao Recebimento pedindo o restante", (await h.hash()).startsWith("#receber") && /Já pago por QR[\s\S]*R\$\s200,00[\s\S]*Falta receber\s+R\$\s180,00[\s\S]*Envie o comprovante do restante \(R\$\s180,00\)\./.test(partial), partial.replace(/\s+/g, " ").slice(0, 200));
     await h.shot("11-parcial");
     await h.click("FINALIZAR", 600);
     check("Parcial: FINALIZAR sem foto pede comprovante", /Adicione ao menos um comprovante/.test(await h.text()));
