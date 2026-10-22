@@ -11,6 +11,8 @@ export type Funcionario = {
   fotoUrl: string | null
   assinaturaUrl: string | null
   loginsesenhas: string | null
+  /** Aditivo de assinatura eletrônica (coluna de arquivo); só vem no `get`. */
+  aditivo?: { nome: string; url: string } | null
   modifiedon: string | null
 }
 
