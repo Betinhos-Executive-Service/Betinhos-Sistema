@@ -65,7 +65,7 @@ export function validateImage(file: File) {
 export const ADITIVO_MAX_BYTES = 10 * 1024 * 1024
 
 export function validateAditivo(file: File) {
-  const pdf = file.type === 'application/pdf' || (file.type === '' && /\.pdf$/i.test(file.name))
+  const pdf = file.type === 'application/pdf' || ((file.type === '' || file.type === 'application/octet-stream') && /\.pdf$/i.test(file.name))
   if (!pdf) return 'Envie o aditivo em PDF.'
   if (file.size > ADITIVO_MAX_BYTES) return 'O aditivo deve ter até 10 MB.'
   if (file.size === 0) return 'O arquivo está vazio.'

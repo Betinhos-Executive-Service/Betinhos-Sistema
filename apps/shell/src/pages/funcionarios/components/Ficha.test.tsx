@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { useState } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DataSource } from '../data/source'
@@ -175,7 +176,8 @@ describe('Ficha', () => {
 
     it('sem data não mostra o selo', async () => {
       await renderFicha(fakeSource(vi.fn(async () => 'f1')))
-      expect(screen.queryByText(/^Aditivo assinado em d/)).toBeNull()
+      const cabecalho = document.querySelector('.drawer-head') as HTMLElement
+      expect(within(cabecalho).queryByText(/Aditivo assinado em/)).toBeNull()
     })
 
     it('salvar com data e PDF grava a data e envia o arquivo', async () => {
@@ -221,6 +223,34 @@ describe('Ficha', () => {
       fireEvent.change(screen.getByLabelText('Arquivo do aditivo (PDF)'), { target: { files: [pdf()] } })
       await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Salvar/ })) })
       expect(await screen.findByText(/Aditivo não enviado: Sem permissão\./)).toBeTruthy()
+      expect(save).toHaveBeenCalledTimes(1)
+      expect(screen.getByText(/aditivo\.pdf · será enviado ao salvar/)).toBeTruthy()
+    })
+
+    it('aceita application/octet-stream quando a extensão é .pdf', async () => {
+      const uploadAditivo = vi.fn(async () => {})
+      await renderFicha(fakeSource(vi.fn(async () => 'f1'), { uploadAditivo }))
+      fireEvent.change(screen.getByLabelText('Arquivo do aditivo (PDF)'), { target: { files: [new File(['%PDF'], 'scan.PDF', { type: 'application/octet-stream' })] } })
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Salvar/ })) })
+      await waitFor(() => expect(uploadAditivo).toHaveBeenCalledTimes(1))
+    })
+
+    it('criar novo com PDF e upload falhando mantém o PDF pendente depois da troca de id', async () => {
+      const novo: Funcionario = { ...record, id: 'novo1' }
+      const save = vi.fn(async () => 'novo1')
+      const uploadAditivo = vi.fn(async () => { throw new Error('Sem permissão.') })
+      const source = fakeSource(save, { uploadAditivo, get: async () => structuredClone(novo) })
+      function Pai() {
+        const [id, setId] = useState<string | null>(null)
+        return <ToastProvider><Ficha source={source} id={id} onClose={() => {}} onSaved={(savedId) => setId(savedId)} /></ToastProvider>
+      }
+      render(<Pai />)
+      fireEvent.change(screen.getByLabelText(/Nome completo/), { target: { value: 'Ana Souza' } })
+      fireEvent.change(screen.getByLabelText(/Apelido/), { target: { value: 'Ana' } })
+      fireEvent.change(screen.getByLabelText('Arquivo do aditivo (PDF)'), { target: { files: [pdf()] } })
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Criar colaborador/ })) })
+      expect(await screen.findByText(/Aditivo não enviado: Sem permissão\./)).toBeTruthy()
+      expect(await screen.findByText(/aditivo\.pdf · será enviado ao salvar/)).toBeTruthy()
     })
   })
 })

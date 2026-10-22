@@ -55,6 +55,8 @@ export function Ficha({ source, docs, id, onClose, onSaved }: Props) {
   const [secao, setTab] = useQueryTexto('secao', 'dados')
   const tab: Tab = !id ? 'dados' : TABS.find((item) => item.key === secao)?.key ?? 'dados'
   const idAnterior = useRef(id)
+  // Id do colaborador recém-criado cujo PDF não subiu: a troca de id vinda do próprio save não zera o arquivo pendente.
+  const manterAditivoDe = useRef<string | null>(null)
   const [discarding, setDiscarding] = useState(false)
   const panel = useRef<HTMLElement>(null)
   const mobile = useIsMobile()
@@ -63,7 +65,8 @@ export function Ficha({ source, docs, id, onClose, onSaved }: Props) {
     // Trocar de colaborador volta para Dados; na abertura da ficha vale a seção da URL.
     if (idAnterior.current !== id) { idAnterior.current = id; setTab('dados') }
     setErrors({})
-    setAditivoArquivo(null)
+    if (id && manterAditivoDe.current === id) manterAditivoDe.current = null
+    else setAditivoArquivo(null)
     if (!id) {
       setOriginal(null)
       setDraft(emptyDraft())
@@ -125,6 +128,7 @@ export function Ficha({ source, docs, id, onClose, onSaved }: Props) {
           setAditivoArquivo(null)
         } catch (reason) {
           aditivoOk = false
+          if (isNew) manterAditivoDe.current = savedId
           notify('error', `Aditivo não enviado: ${errorMessage(reason)}. Os demais dados foram salvos; o PDF continua na tela.`)
         }
       }
