@@ -55,7 +55,7 @@ describe('Frota', () => {
     source.load = vi.fn(async () => ({ data: { ...EMPTY_DATA, veiculos: [{ id: 'v1', placa: 'TST1A11', marca: null, modelo: null, cor: null, anoModelo: null, status: VEICULO.ATIVO, categoria: null, motorista: null, hodometro: null, hodometroEm: null }] }, errors: {} }))
     history.replaceState(null, '', '#/frota-veiculos?q=TST')
     renderFrota(source, 'veiculos')
-    expect(screen.getByRole('heading', { level: 1, name: 'Veículos' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull() // lista: sem PageHeader (DS §11.2)
     expect(screen.queryByRole('tablist')).toBeNull()
     fireEvent.click(await screen.findByText('TST1A11'))
     expect(await screen.findByRole('dialog', { name: 'TST1A11' })).toBeTruthy()
@@ -72,7 +72,7 @@ describe('Frota', () => {
     expect(await screen.findByRole('button', { name: 'Nova infração' }, { timeout: 15_000 })).toBeTruthy()
     cleanup()
     renderFrota(source, 'colisoes')
-    expect(screen.getByRole('heading', { level: 1, name: 'Colisões' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull() // lista: sem PageHeader (DS §11.2)
     expect(screen.queryByRole('tablist')).toBeNull()
   })
 

@@ -40,6 +40,8 @@ const TABS: { id: Tab; label: string; tables: TableKey[] }[] = [
   { id: 'plano', label: 'Plano preventivo', tables: ['planoPreventivo'] },
 ]
 type SubMultas = 'multas' | 'infracoes'
+/** Páginas de lista não usam `PageHeader` (DS §11.2): o seletor de visão faz o papel de título. */
+const LISTAS: readonly Tab[] = ['veiculos', 'manutencoes', 'multas', 'colisoes']
 
 const KINDS: readonly Kind[] = ['manutencao', 'multa', 'colisao']
 /** Parâmetros dos filtros e gavetas das listas; trocar Multas ↔ Infrações apaga todos, para o filtro de uma não vazar para a outra. */
@@ -96,7 +98,7 @@ export function Frota({ source, docs, host, aba = 'pendencias' }: { source: Data
   const refreshButton = useMemo(() => (
     <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Recarregar a frota" loading={loading} onClick={() => void reload()} />
   ), [loading, reload])
-  useShellHeader({ actions: refreshButton })
+  useShellHeader({ title: tab.label, actions: refreshButton })
 
   let body
   if (loading && !result) body = <Carregando />
@@ -113,13 +115,8 @@ export function Frota({ source, docs, host, aba = 'pendencias' }: { source: Data
     </ViewGate>
   )
 
-  return (
-    <PageLayout
-      className="frota-page"
-      eyebrow="Frota"
-      title={tab.label}
-      meta={<StatusBadge tone={source.mode === 'mock' ? 'neutral' : 'info'} dot>{source.mode === 'mock' ? 'Dados de exemplo' : `Ambiente ${source.envLabel}`}</StatusBadge>}
-    >
+  const conteudo = (
+    <>
       <div className="frota">
         {route.tab === 'multas' ? (
           <Tabs aria-label="Multas e infrações" tabs={[{ value: 'multas', label: 'Multas' }, { value: 'infracoes', label: 'Infrações' }]} value={route.sub} onChange={abrirSub}>
@@ -130,6 +127,17 @@ export function Frota({ source, docs, host, aba = 'pendencias' }: { source: Data
 
       {result && !fatal && route.veiculo && !registro ? <FichaVeiculo errors={errors} source={source} docs={docs} id={route.veiculo} secao={route.secao} data={data} today={today} onClose={() => patchHashQuery({ ficha: null, secao: null, fde: null, fate: null })} onOpen={onOpen} onReload={onReload} /> : null}
       {registro ? <RegistroDrawer key={`${registro.kind}-${registro.id}`} source={source} kind={registro.kind} id={registro.id} data={data} onClose={() => setRegistro(null)} onChanged={onReload} onClassificado={aplicarClassificacao} onOpenVeiculo={onOpenVeiculo} /> : null}
+    </>
+  )
+  if (LISTAS.includes(route.tab)) return <div className="page page--full frota-page">{conteudo}</div>
+  return (
+    <PageLayout
+      className="frota-page"
+      eyebrow="Frota"
+      title={tab.label}
+      meta={<StatusBadge tone={source.mode === 'mock' ? 'neutral' : 'info'} dot>{source.mode === 'mock' ? 'Dados de exemplo' : `Ambiente ${source.envLabel}`}</StatusBadge>}
+    >
+      {conteudo}
     </PageLayout>
   )
 }
