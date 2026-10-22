@@ -75,3 +75,7 @@ Outros:
 - Comando do pac que lê ou escreve num ambiente só por `Invoke-Pac <url>` (ou `Export-SolucaoGerenciada`): o perfil ativo do pac é global à máquina e nunca decide o alvo. Nunca `pac auth select` antes de import, delete, online-version ou export.
 - A AppBetinhos do DEV continua sendo a caixa de entrada: componentes novos podem ser criados ou incluídos nela a qualquer momento. Rode a conferência de novo antes de cada exportação das 4 soluções; um resultado antigo não vale.
 - A conferência cobre dono e dependências dos componentes; não prova que as soluções gerenciadas importam em outro ambiente.
+
+## Camadas Active (TEST)
+
+`packages/deploy/solucoes/remover-camadas-active.ps1 -EnvironmentUrl <url>` lista os componentes da AppBetinhos com camada Active no topo (WebResource, Workflow, PluginAssembly, SdkMessageProcessingStep, SystemForm, AppModule, SiteMap); com `-Aplicar` guarda o JSON de cada camada e chama `RemoveActiveCustomization` (`LogicalName` + `Id`). Recusa o PROD. Prova: rodar de novo sem `-Aplicar` e ver `0 componentes`. Ensaio de 22/10/2026: 76 removidas no TEST, 0 falhas (`docs/auditoria/ensaio-segmentacao-2026-10-22.md`).
