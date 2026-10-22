@@ -250,6 +250,36 @@ foreach ($nome in $Roles) {
   Grant $papeis[0] @{ prvCreate = "Basic"; prvRead = "Global"; prvWrite = "Basic"; prvDelete = "Basic"; prvAppend = "Basic"; prvAppendTo = "Basic" }
 }
 
+# Visao de sistema "Parcelas de multa previstas" (lista do DP na folha): status Prevista, por competencia crescente.
+# Usada pela grade nativa de new_parcelamultafolha (menu Frota > Parcelas de multa). Idempotente: cria ou alinha a definicao.
+$parcelaTabela = "new_parcelamultafolha"
+$parcelaMeta = @((Invoke-Dataverse "GET" "EntityDefinitions?`$select=MetadataId,ObjectTypeCode&`$filter=LogicalName eq '$parcelaTabela'").value)
+if ($parcelaMeta.Count -ne 1) { Write-Step "tabela $parcelaTabela ausente: rode provision-termo-multa.ps1 antes; visao de parcelas ignorada" }
+else {
+  $visaoNome = "Parcelas de multa previstas"
+  $codigo = $parcelaMeta[0].ObjectTypeCode
+  $fetchXml = "<fetch version=""1.0"" mapping=""logical"" distinct=""false""><entity name=""$parcelaTabela""><attribute name=""new_motorista"" /><attribute name=""new_competencia"" /><attribute name=""new_numero"" /><attribute name=""new_valor"" /><attribute name=""new_status"" /><attribute name=""new_termo"" /><attribute name=""new_parcelamultafolhaid"" /><order attribute=""new_competencia"" descending=""false"" /><filter type=""and""><condition attribute=""new_status"" operator=""eq"" value=""100000000"" /></filter></entity></fetch>"
+  $layoutXml = "<grid name=""resultset"" object=""$codigo"" jump=""new_motorista"" select=""1"" icon=""1"" preview=""1""><row name=""result"" id=""new_parcelamultafolhaid""><cell name=""new_motorista"" width=""200"" /><cell name=""new_competencia"" width=""110"" /><cell name=""new_numero"" width=""80"" /><cell name=""new_valor"" width=""110"" /><cell name=""new_status"" width=""110"" /><cell name=""new_termo"" width=""200"" /></row></grid>"
+  $existentes = @(Get-Rows "savedqueries" "savedqueryid" "returnedtypecode eq '$parcelaTabela' and name eq '$(Escape-OData $visaoNome)' and querytype eq 0")
+  if ($existentes.Count -gt 1) { throw "Visao '$visaoNome' ambigua: $($existentes.Count)." }
+  if (-not $Apply) { Write-Step "DRY RUN $(if ($existentes.Count) { 'alinharia' } else { 'criaria' }) a visao '$visaoNome' (status Prevista, ordem por competencia crescente)" }
+  else {
+    $corpo = @{ name = $visaoNome; description = "Parcelas de desconto em folha ainda não descontadas, da competência mais antiga para a mais recente."; fetchxml = $fetchXml; layoutxml = $layoutXml }
+    if ($existentes.Count -eq 0) {
+      Invoke-Dataverse "POST" "savedqueries" ($corpo + @{ returnedtypecode = $parcelaTabela; querytype = 0 }) | Out-Null
+      Write-Step "visao criada '$visaoNome'"
+      $existentes = @(Get-Rows "savedqueries" "savedqueryid" "returnedtypecode eq '$parcelaTabela' and name eq '$(Escape-OData $visaoNome)' and querytype eq 0")
+    }
+    else { Invoke-Dataverse "PATCH" "savedqueries($($existentes[0].savedqueryid))" $corpo | Out-Null; Write-Step "visao alinhada '$visaoNome'" }
+    # Tabela na solucao com todos os subcomponentes (rootcomponentbehavior 0) ja leva as visoes dela; senao inclui a visao avulsa.
+    $tabelaInclusiva = @(Get-Rows "solutioncomponents" "solutioncomponentid" "_solutionid_value eq $solutionId and objectid eq $($parcelaMeta[0].MetadataId) and componenttype eq 1 and rootcomponentbehavior eq 0").Count -gt 0
+    if (-not $tabelaInclusiva) { Add-SolutionComponent $existentes[0].savedqueryid 26 "visao $visaoNome" }
+    Invoke-Dataverse "POST" "PublishXml" @{ ParameterXml = "<importexportxml><entities><entity>$parcelaTabela</entity></entities></importexportxml>" } | Out-Null
+    if (-not $tabelaInclusiva -and @(Get-Rows "solutioncomponents" "solutioncomponentid" "_solutionid_value eq $solutionId and objectid eq $($existentes[0].savedqueryid) and componenttype eq 26").Count -eq 0) { throw "Visao '$visaoNome' nao esta na solucao $SolutionUniqueName." }
+    Write-Step "VISAO OK: '$visaoNome' publicada e na solucao $SolutionUniqueName$(if ($tabelaInclusiva) { ' (via tabela com todos os subcomponentes)' })"
+  }
+}
+
 if ($Apply) {
   $missing = @(@("cr40f_name", "cr40f_tela", "cr40f_publica", "cr40f_configuracao", "cr40f_ordem") | Where-Object { -not (Get-AttributeId $visao $_) })
   if ($missing.Count) { throw "Colunas ausentes apos a publicacao: $($missing -join ', ')" }
