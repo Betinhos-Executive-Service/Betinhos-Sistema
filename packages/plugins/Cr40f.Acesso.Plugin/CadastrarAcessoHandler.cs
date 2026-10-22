@@ -25,21 +25,28 @@ public sealed class CadastrarAcessoHandler
             var celular = AcessoRules.NormalizarCelular(entrada.Celular) ?? throw new AcessoException("CELULAR_INVALIDO", "Informe um celular brasileiro com DDD (11 dígitos).");
             etapas.Feita("validacao", "ok");
 
-            var existente = entrada.FuncionarioId is Guid fid ? _repo.PorId(fid) ?? throw new AcessoException("FUNCIONARIO_NAO_ENCONTRADO", "Funcionário não encontrado.") : null;
-            string email;
-            if (existente?.EmailMicrosoft is { Length: > 0 } ja) { email = ja.ToLowerInvariant(); etapas.Pulada("email", "funcionário já tinha e-mail Microsoft"); }
-            else
+            var (existente, email, dono) = Etapa(etapas, "email", () =>
             {
-                var prefixo = AcessoRules.PrefixoEmail(string.IsNullOrWhiteSpace(entrada.PrefixoEmail) ? entrada.NomeCompleto : entrada.PrefixoEmail);
-                if (prefixo.Length == 0) throw new AcessoException("NOME_INVALIDO", "Não foi possível gerar o e-mail a partir do nome.");
-                email = AcessoRules.EmailComSufixo(prefixo, _cfg.Dominio, upn => EmUsoPorOutraPessoa(upn, entrada.NomeCompleto));
-                etapas.Feita("email", email);
-            }
+                var ex = entrada.FuncionarioId is Guid fid ? _repo.PorId(fid) ?? throw new AcessoException("FUNCIONARIO_NAO_ENCONTRADO", "Funcionário não encontrado.") : null;
+                string em;
+                if (ex?.EmailMicrosoft is { Length: > 0 } ja) { em = ja.ToLowerInvariant(); etapas.Pulada("email", "funcionário já tinha e-mail Microsoft"); }
+                else
+                {
+                    var prefixo = AcessoRules.PrefixoEmail(string.IsNullOrWhiteSpace(entrada.PrefixoEmail) ? entrada.NomeCompleto : entrada.PrefixoEmail);
+                    if (prefixo.Length == 0) throw new AcessoException("NOME_INVALIDO", "Não foi possível gerar o e-mail a partir do nome.");
+                    // Com FuncionarioId a regra é estrita (sem casar nome): não vincula conta de outra pessoa ao funcionário informado.
+                    Func<string, bool> ocupado = ex is null
+                        ? upn => EmUsoPorOutraPessoa(upn, entrada.NomeCompleto)
+                        : upn => _repo.PorEmail(upn) is { } d && d.Id != ex.Id || _graph.UsuarioPorUpn(upn) is not null;
+                    em = AcessoRules.EmailComSufixo(prefixo, _cfg.Dominio, ocupado);
+                    etapas.Feita("email", em);
+                }
+                var dn = _repo.PorEmail(em);
+                if (dn is not null && ex is not null && dn.Id != ex.Id)
+                    throw new AcessoException("EMAIL_EM_USO_POR_OUTRO_FUNCIONARIO", "O e-mail " + em + " já pertence a " + dn.Nome + ".");
+                return (ex, em, dn);
+            });
             saida.EmailMicrosoft = email;
-
-            var dono = _repo.PorEmail(email);
-            if (dono is not null && existente is not null && dono.Id != existente.Id)
-                throw new AcessoException("EMAIL_EM_USO_POR_OUTRO_FUNCIONARIO", "O e-mail " + email + " já pertence a " + dono.Nome + ".");
 
             var usuario = Etapa(etapas, "usuario", () =>
             {
