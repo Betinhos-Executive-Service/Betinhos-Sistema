@@ -60,7 +60,7 @@ export function hintCustoTotal(indisponiveis: EntradaCusto['indisponiveis']): st
 }
 
 export function Indicadores({ data, errors, today }: { data: FrotaData; errors: LoadResult['errors']; today: string }) {
-  // Período na URL (#/frota?aba=indicadores&de=…&ate=…); sem datas, valem os últimos 12 meses.
+  // Período na URL (#/frota-indicadores?de=…&ate=…); sem datas, valem os últimos 12 meses.
   const padrao = useMemo(() => ultimos12Meses(today), [today])
   const [periodo, setPeriodo] = useQueryPeriodo('de', 'ate', padrao)
   const [ordem, setOrdem] = useState<Ordem>('total')
