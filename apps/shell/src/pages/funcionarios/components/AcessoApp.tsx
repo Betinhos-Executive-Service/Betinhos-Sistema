@@ -39,7 +39,7 @@ export function AcessoApp({ funcionario, acesso, onCadastrar, onEncerrado }: Pro
         {email && <code>{email}</code>}
       </div>
       {!semPermissao && estado === 'sem' && <Button variant="secondary" size="compact" icon={<KeyRound size={16} />} onClick={onCadastrar}>Cadastrar acesso</Button>}
-      {!semPermissao && estado === 'ativo' && status === 0 && <Button variant="secondary" size="compact" icon={<UserX size={16} />} onClick={() => setAberto(true)}>Encerrar acesso</Button>}
+      {!semPermissao && estado === 'ativo' && <Button variant="secondary" size="compact" icon={<UserX size={16} />} onClick={() => setAberto(true)}>Encerrar acesso</Button>}
       {etapas && <ul className="acesso-etapas">{etapas.map((e) => <li key={e.etapa} data-estado={e.estado}>{e.etapa}: {e.detalhe}</li>)}</ul>}
       {semPermissao && <Alert tone="warning">Você não tem permissão para gerir acessos.</Alert>}
       <EncerrarAcessoDialog open={aberto} nome={nome} onCancel={() => setAberto(false)} onConfirmar={encerrar} />

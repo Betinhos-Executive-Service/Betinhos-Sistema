@@ -22,6 +22,7 @@ export const MENSAGENS: Record<string, string> = {
   FUNCIONARIO_NAO_ENCONTRADO: 'Funcionário não encontrado.',
   FUNCIONARIO_SEM_EMAIL: 'Este funcionário não tem e-mail Microsoft; não há acesso a encerrar.',
   CONFIRMACAO_INVALIDA: 'O nome digitado não confere.',
+  ACESSO_ENCERRADO: 'Acesso encerrado antes. Peça à TI para reativar a conta no Entra.',
 }
 
 export class AcessoError extends Error {
@@ -32,11 +33,28 @@ export class AcessoError extends Error {
 export function parseAcessoError(error: unknown): AcessoError {
   if (error instanceof AcessoError) return error
   const raw = error instanceof Error ? error.message : String(error)
-  const m = /([A-Z_]{4,}): ([^|]*)(?:\| etapas=(\[.*\]))?/s.exec(raw)
+  const m = /([A-Z_]{4,}): ([^|]*)/.exec(raw)
   if (!m) return new AcessoError('DESCONHECIDO', raw.replace(/\.+$/, ''), [])
   let etapas: Etapa[] = []
-  try { etapas = m[3] ? (JSON.parse(m[3]) as Etapa[]) : [] } catch { etapas = [] }
+  const inicio = raw.indexOf('| etapas=', m.index)
+  const json = inicio < 0 ? null : primeiroArray(raw, inicio + '| etapas='.length)
+  try { etapas = json ? (JSON.parse(json) as Etapa[]) : [] } catch { etapas = [] }
   return new AcessoError(m[1], MENSAGENS[m[1]] ?? m[2].trim(), etapas)
+}
+
+/** Primeiro array JSON balanceado a partir de `de` (ignora colchetes dentro de strings); o Dataverse anexa texto depois. */
+function primeiroArray(texto: string, de: number): string | null {
+  if (texto[de] !== '[') return null
+  let nivel = 0
+  let emString = false
+  for (let i = de; i < texto.length; i++) {
+    const c = texto[i]
+    if (emString) { if (c === '\\') i++; else if (c === '"') emString = false; continue }
+    if (c === '"') emString = true
+    else if (c === '[') nivel++
+    else if (c === ']' && --nivel === 0) return texto.slice(de, i + 1)
+  }
+  return null
 }
 
 export function mensagemWhatsApp(r: { nome: string; emailMicrosoft: string; senhaTemporaria: string; linkApp: string }) {

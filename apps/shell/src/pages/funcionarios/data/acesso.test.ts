@@ -67,4 +67,15 @@ describe('acesso', () => {
     await src.encerrar('F1', 'Ana')
     expect(calls[1]).toEqual({ path: 'cr40f_EncerrarAcessoMotorista', body: { FuncionarioId: 'F1', Confirmacao: 'Ana' } })
   })
+
+  it('parseAcessoError lê só o primeiro array de etapas mesmo com texto e colchetes do Dataverse depois', () => {
+    const msg = 'GRAPH_INDISPONIVEL: falha | etapas=[{"etapa":"usuario","estado":"feita","detalhe":"criado [ok]"},{"etapa":"licenca","estado":"erro","detalhe":"503"}]\r\n[Cr40f.Acesso.Plugin: Cr40f.Acesso.Plugin.CadastrarAcessoMotoristaPlugin]\r\n[abc: Cr40f.Acesso: cadastrar acesso]'
+    const erro = parseAcessoError(new Error(msg))
+    expect(erro.codigo).toBe('GRAPH_INDISPONIVEL')
+    expect(erro.etapas).toEqual([{ etapa: 'usuario', estado: 'feita', detalhe: 'criado [ok]' }, { etapa: 'licenca', estado: 'erro', detalhe: '503' }])
+  })
+
+  it('ACESSO_ENCERRADO tem mensagem própria', () => {
+    expect(parseAcessoError(new Error('ACESSO_ENCERRADO: x | etapas=[]')).message).toBe('Acesso encerrado antes. Peça à TI para reativar a conta no Entra.')
+  })
 })

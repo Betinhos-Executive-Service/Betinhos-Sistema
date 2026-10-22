@@ -27,6 +27,7 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
   const [prefixoEditado, setPrefixoEditado] = useState(false)
   const [estado, setEstado] = useState<Estado>({ fase: 'form' })
   const [discarding, setDiscarding] = useState(false)
+  const [fechandoResultado, setFechandoResultado] = useState(false)
   const panel = useRef<HTMLElement>(null)
 
   useEffect(() => { panel.current?.focus() }, [])
@@ -38,6 +39,8 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
 
   function requestClose() {
     if (criando) return
+    // R13: a senha temporária só aparece aqui; fechar por fora, Esc ou X pede confirmação.
+    if (estado.fase === 'resultado') { setFechandoResultado(true); return }
     if (touched) { setDiscarding(true); return }
     onClose()
   }
@@ -58,8 +61,8 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
   }
 
   return (
-    <div className="drawer-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !discarding) requestClose() }}>
-      <aside ref={panel} className="drawer drawer--acesso" role="dialog" aria-modal="true" aria-labelledby="acesso-title" tabIndex={-1} onKeyDown={(event) => { if (event.key === 'Escape' && !discarding) requestClose() }}>
+    <div className="drawer-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !discarding && !fechandoResultado) requestClose() }}>
+      <aside ref={panel} className="drawer drawer--acesso" role="dialog" aria-modal="true" aria-labelledby="acesso-title" tabIndex={-1} onKeyDown={(event) => { if (event.key === 'Escape' && !discarding && !fechandoResultado) requestClose() }}>
         <header className="drawer-head">
           <div className="drawer-title"><h2 id="acesso-title">Cadastrar acesso ao App Motoristas</h2></div>
           <Button variant="secondary" icon={<X size={18} />} aria-label="Fechar" onClick={requestClose} disabled={criando} />
@@ -115,6 +118,9 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
       </aside>
       <Dialog open={discarding} onClose={() => setDiscarding(false)} title="Descartar alterações?" actions={<><Button variant="secondary" onClick={() => setDiscarding(false)}>Continuar editando</Button><Button variant="danger" onClick={() => { setDiscarding(false); onClose() }}>Descartar</Button></>}>
         Os dados digitados ainda não foram enviados.
+      </Dialog>
+      <Dialog open={fechandoResultado} onClose={() => setFechandoResultado(false)} title="Fechar sem enviar?" actions={<><Button variant="secondary" onClick={() => setFechandoResultado(false)}>Voltar</Button><Button variant="danger" onClick={() => { setFechandoResultado(false); onClose() }}>Fechar</Button></>}>
+        A senha temporária não aparece de novo.
       </Dialog>
     </div>
   )

@@ -103,4 +103,33 @@ describe('CadastroAcessoDrawer', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Criar acesso/ })) })
     expect(cadastrar.mock.calls[0][0]).toMatchObject({ funcionarioId: 'f1', nomeCompleto: 'Ana Lima' })
   })
+
+  it('no resultado, fechar por fora, Esc ou X pede confirmação; Abrir ficha fecha direto', async () => {
+    const { onClose, onCadastrado } = renderDrawer(src(async () => ok))
+    fireEvent.change(screen.getByLabelText(/Nome completo/), { target: { value: 'Ana Lima' } })
+    fireEvent.change(screen.getByLabelText(/Celular/), { target: { value: '12991234567' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Criar acesso/ })) })
+    await screen.findByText('Kx7#mQ2vR9pL4w')
+
+    fireEvent.mouseDown(document.querySelector('.drawer-backdrop')!)
+    expect(await screen.findByText('Fechar sem enviar?')).toBeTruthy()
+    expect(screen.getByText('A senha temporária não aparece de novo.')).toBeTruthy()
+    expect(onClose).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: /^Voltar$/ }))
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByText('Kx7#mQ2vR9pL4w')).toBeTruthy()
+
+    fireEvent.keyDown(screen.getByRole('dialog', { name: /Cadastrar acesso/ }), { key: 'Escape' })
+    expect(await screen.findByText('Fechar sem enviar?')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /^Voltar$/ }))
+
+    fireEvent.click(screen.getAllByRole('button', { name: /^Fechar$/ })[0])
+    expect(await screen.findByText('Fechar sem enviar?')).toBeTruthy()
+    const confirmar = screen.getAllByRole('button', { name: /^Fechar$/ }).at(-1)!
+    fireEvent.click(confirmar)
+    expect(onClose).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('button', { name: /Abrir ficha/ }))
+    expect(onCadastrado).toHaveBeenCalledWith('f9')
+  })
 })
