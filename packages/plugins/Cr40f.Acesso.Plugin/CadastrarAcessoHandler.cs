@@ -1,7 +1,5 @@
 using System;
-using System.Globalization;
 using System.Linq;
-using System.Text;
 
 namespace Cr40f.Acesso.Plugin;
 
@@ -25,7 +23,7 @@ public sealed class CadastrarAcessoHandler
             var celular = AcessoRules.NormalizarCelular(entrada.Celular) ?? throw new AcessoException("CELULAR_INVALIDO", "Informe um celular brasileiro com DDD (11 dígitos).");
             etapas.Feita("validacao", "ok");
 
-            var (existente, email, dono) = Etapa(etapas, "email", () =>
+            var (existente, email, dono) = etapas.Executar("email", () =>
             {
                 var ex = entrada.FuncionarioId is Guid fid ? _repo.PorId(fid) ?? throw new AcessoException("FUNCIONARIO_NAO_ENCONTRADO", "Funcionário não encontrado.") : null;
                 string em;
@@ -54,7 +52,7 @@ public sealed class CadastrarAcessoHandler
             });
             saida.EmailMicrosoft = email;
 
-            var usuario = Etapa(etapas, "usuario", () =>
+            var usuario = etapas.Executar("usuario", () =>
             {
                 var u = _graph.UsuarioPorUpn(email);
                 if (u is not null)
@@ -69,19 +67,19 @@ public sealed class CadastrarAcessoHandler
             });
             saida.UsuarioEntraId = usuario.Id;
 
-            Etapa(etapas, "licenca", () =>
+            etapas.Executar("licenca", () =>
             {
-                if (usuario.SkuIds.Any(s => string.Equals(s, _cfg.LicenseSkuId, StringComparison.OrdinalIgnoreCase))) { etapas.Pulada("licenca", "já atribuída"); return 0; }
-                _graph.AtribuirLicenca(usuario.Id, _cfg.LicenseSkuId); etapas.Feita("licenca", "atribuída"); return 0;
+                if (AcessoRules.TemLicenca(usuario, _cfg.LicenseSkuId)) { etapas.Pulada("licenca", "já atribuída"); return; }
+                _graph.AtribuirLicenca(usuario.Id, _cfg.LicenseSkuId); etapas.Feita("licenca", "atribuída");
             });
 
-            Etapa(etapas, "grupo", () =>
+            etapas.Executar("grupo", () =>
             {
-                if (_graph.EhMembro(_cfg.GroupId, usuario.Id)) { etapas.Pulada("grupo", "já era membro"); return 0; }
-                _graph.AdicionarAoGrupo(_cfg.GroupId, usuario.Id); etapas.Feita("grupo", "adicionado"); return 0;
+                if (_graph.EhMembro(_cfg.GroupId, usuario.Id)) { etapas.Pulada("grupo", "já era membro"); return; }
+                _graph.AdicionarAoGrupo(_cfg.GroupId, usuario.Id); etapas.Feita("grupo", "adicionado");
             });
 
-            saida.FuncionarioId = Etapa(etapas, "funcionario", () =>
+            saida.FuncionarioId = etapas.Executar("funcionario", () =>
             {
                 if (existente is not null) { _repo.VincularEmail(existente.Id, email, celular); etapas.Feita("funcionario", "e-mail vinculado"); return existente.Id; }
                 if (dono is not null) { etapas.Pulada("funcionario", "já cadastrado"); return dono.Id; }
@@ -104,12 +102,12 @@ public sealed class CadastrarAcessoHandler
     /// </summary>
     private bool EmUsoPorOutraPessoa(string upn, string nome)
     {
-        var alvo = NomeNormalizado(nome);
+        var alvo = AcessoRules.NomeComparavel(nome);
         var usuario = _graph.UsuarioPorUpn(upn);
         if (usuario is { Ativo: false }) return true;   // R10: conta desativada conta como ocupada, mesmo homônimo exato
         var dono = _repo.PorEmail(upn);
-        if (dono is not null) return NomeNormalizado(dono.Nome) != alvo;
-        return usuario is not null && NomeNormalizado(usuario.DisplayName) != alvo;
+        if (dono is not null) return AcessoRules.NomeComparavel(dono.Nome) != alvo;
+        return usuario is not null && AcessoRules.NomeComparavel(usuario.DisplayName) != alvo;
     }
 
     /// <summary>E-mail pessoal com forma básica (algo@dominio.tld, sem espaços); inválido é ignorado.</summary>
@@ -121,20 +119,5 @@ public sealed class CadastrarAcessoHandler
         var dominio = e.Substring(arroba + 1);
         var ponto = dominio.LastIndexOf('.');
         return ponto > 0 && ponto < dominio.Length - 1 ? e : null;
-    }
-
-    private static string NomeNormalizado(string? nome)
-    {
-        var semAcento = new StringBuilder();
-        foreach (var c in (nome ?? "").Normalize(NormalizationForm.FormD))
-            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark) semAcento.Append(c);
-        return string.Join(" ", semAcento.ToString().ToLowerInvariant().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
-    }
-
-    private static T Etapa<T>(Etapas etapas, string nome, Func<T> acao)
-    {
-        try { return acao(); }
-        catch (AcessoException erro) { etapas.Erro(nome, erro.Message); throw; }
-        catch (Exception erro) { etapas.Erro(nome, erro.Message); throw new AcessoException("GRAPH_INDISPONIVEL", "Falha em " + nome + ": " + erro.Message); }
     }
 }

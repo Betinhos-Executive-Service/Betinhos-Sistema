@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -9,6 +10,16 @@ public sealed class Etapas
     public void Feita(string etapa, string detalhe) => _itens.Add((etapa, "feita", detalhe));
     public void Pulada(string etapa, string motivo) => _itens.Add((etapa, "pulada", motivo));
     public void Erro(string etapa, string mensagem) => _itens.Add((etapa, "erro", mensagem));
+    /// <summary>Roda a etapa; falha vira erro registrado e, se não for de negócio, GRAPH_INDISPONIVEL.</summary>
+    public T Executar<T>(string nome, Func<T> acao)
+    {
+        try { return acao(); }
+        catch (AcessoException erro) { Erro(nome, erro.Message); throw; }
+        catch (Exception erro) { Erro(nome, erro.Message); throw new AcessoException("GRAPH_INDISPONIVEL", "Falha em " + nome + ": " + erro.Message); }
+    }
+
+    public void Executar(string nome, Action acao) => Executar(nome, () => { acao(); return true; });
+
     public string ToJson()
     {
         var sb = new StringBuilder("[");
