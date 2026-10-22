@@ -5,7 +5,7 @@ namespace Cr40f.Acesso.Plugin.Tests;
 
 public sealed class AcessoConfigTests
 {
-    private const string Unsecure = "{\"tenantId\":\"t\",\"clientId\":\"c\",\"licenseSkuId\":\"sku\",\"groupId\":\"g\",\"appUrl\":\"https://x/main.aspx\",\"dominio\":\"exemplo.com\"}";
+    private const string Unsecure = "{\"tenantId\":\"t\",\"clientId\":\"c\",\"licenseSkuId\":\"sku\",\"groupId\":\"g\",\"appUrl\":\"https://x/main.aspx\",\"environmentId\":\"env\",\"dominio\":\"exemplo.com\"}";
 
     [Fact]
     public void Parse_le_as_duas_configuracoes()
@@ -23,6 +23,14 @@ public sealed class AcessoConfigTests
         var erro = Assert.Throws<AcessoException>(() => AcessoConfig.Parse(Unsecure, ""));
         Assert.Equal("CONFIG_AUSENTE", erro.Codigo);
         Assert.StartsWith("CONFIG_AUSENTE: ", erro.Message);
+    }
+
+    [Fact]
+    public void Parse_sem_environmentId_lanca_CONFIG_AUSENTE()
+    {
+        var erro = Assert.Throws<AcessoException>(() => AcessoConfig.Parse(Unsecure.Replace(",\"environmentId\":\"env\"", ""), "{\"clientSecret\":\"s\"}"));
+        Assert.Equal("CONFIG_AUSENTE", erro.Codigo);
+        Assert.Contains("environmentId", erro.Message);
     }
 
     [Fact]
