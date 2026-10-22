@@ -15,7 +15,7 @@
 - Prefixo Dataverse `cr40f_`; rótulos pt-BR (1046). Solução `appbetinhos` (`DV_SOLUTION` do `.env`).
 - Só DEV: `https://org23b93544.crm2.dynamics.com`. Scripts bloqueiam PROD (`DV_BLOCKED_HOSTS` + checagem no código). `pnpm push` só da `main` no checkout principal; nunca de worktree.
 - Segredo do Graph só na configuração segura do step. Nunca em Flow, `.env` versionado, trace, log ou teste. Senha temporária nunca gravada nem logada.
-- E-mail Microsoft: `primeiro.ultimo@betinhos.com.br` (minúsculo, sem acentos, sufixo numérico a partir de 2 quando repetido). Domínio e licença vêm da configuração não segura do step: `{"tenantId","clientId","licenseSkuId","groupId","appUrl","dominio"}`. Link do app = `appUrl` = `https://org23b93544.crm2.dynamics.com/main.aspx?appid=6ea74912-a85e-f111-a825-70a8a5a96ab6&pagetype=webresource&webresourceName=new_app-motoristas-v2` no DEV (a URL direta `/WebResources/...` cai em mock silencioso).
+- E-mail Microsoft: `primeiro.ultimo@betinhos.com.br` (minúsculo, sem acentos, sufixo numérico a partir de 2 quando repetido). Domínio e licença vêm da configuração não segura do step: `{"tenantId","clientId","licenseSkuId","groupId","appUrl","dominio"}`. Link do app = `appUrl` = `https://org23b93544.crm2.dynamics.com/WebResources/new_app-motoristas-v2` no DEV. A URL direta funciona sem o Power Apps Mobile, em tela cheia e instalável na tela inicial, desde o PR #61 do App Motoristas (DEV 2.1.758, verificado no Chrome Android em 22/10/2026; iPhone pendente). Depende desse PR estar na `main` do App Motoristas antes da publicação.
 - Autorização: só quem tem a função **Acesso - Gestão de Motoristas** ou **Administrador do Sistema** (`System Administrator`) executa as APIs; o plugin confere.
 - Encerrar nunca exclui: remove do grupo, remove licença, `accountEnabled=false`, `cr40f_status` = 2 (inativo), `cr40f_datadedemissao` = hoje se vazia.
 - Design System: tema claro, sem gradiente, `#FCFCFB` em campos; azul só em foco/ação. Preservar DOM/IDs/handlers da Ficha existente.
@@ -1722,7 +1722,7 @@ ACESSO_TENANT_ID=<tenant>
 ACESSO_CLIENT_ID=<client id>
 ACESSO_LICENSE_SKU_ID=<sku id>
 ACESSO_GROUP_ID=<object id do grupo>
-ACESSO_APP_URL=https://org23b93544.crm2.dynamics.com/main.aspx?appid=6ea74912-a85e-f111-a825-70a8a5a96ab6&pagetype=webresource&webresourceName=new_app-motoristas-v2
+ACESSO_APP_URL=https://org23b93544.crm2.dynamics.com/WebResources/new_app-motoristas-v2
 
 ## 5. Ordem de publicação (da `main`, checkout principal)
 1. `pnpm push:plugin:acesso:dev`
@@ -2536,7 +2536,7 @@ Atribuir a função "Acesso - Gestão de Motoristas" ao usuário de teste da ope
 
 - [ ] **Step 5: Skill de verificação**
 
-`.claude/skills/verificar-acesso-motorista/SKILL.md` no molde de `verificar-equipamentos`: como subir (`pnpm dev`, mock: nomes "Erro Graph" e "Sem Licenca" simulam falhas; `m1` tem acesso ativo, `m7` não tem), como verificar no DEV (roteiro acima, queries, o que olhar no Entra), limitações (funções herdadas por equipe não autorizam; senha nunca é recuperável; URL direta do webresource cai em mock silencioso, use `main.aspx`), e evidências com data. Adicione a linha em `verificar-index.md`. Rode `verificacao-manter`.
+`.claude/skills/verificar-acesso-motorista/SKILL.md` no molde de `verificar-equipamentos`: como subir (`pnpm dev`, mock: nomes "Erro Graph" e "Sem Licenca" simulam falhas; `m1` tem acesso ativo, `m7` não tem), como verificar no DEV (roteiro acima, queries, o que olhar no Entra), limitações (funções herdadas por equipe não autorizam; senha nunca é recuperável; a URL direta só funciona com o PR #61 do App Motoristas publicado; antes dele cai em mock), e evidências com data. Adicione a linha em `verificar-index.md`. Rode `verificacao-manter`.
 
 - [ ] **Step 6: Commit final**
 
