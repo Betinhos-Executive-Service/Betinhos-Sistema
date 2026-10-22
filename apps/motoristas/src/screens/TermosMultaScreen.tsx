@@ -15,7 +15,6 @@ type Props = {
 };
 
 export function TermosMultaScreen({ items, loadStatus, onBack, onReload }: Props) {
-  const [selectedId, setSelectedId] = useState("");
   // Guarda o termo aberto: depois de assinar ele sai da lista de pendentes, mas a tela de sucesso continua.
   const [selected, setSelected] = useState<TermoMulta | null>(null);
   const [error, setError] = useState("");
@@ -31,14 +30,14 @@ export function TermosMultaScreen({ items, loadStatus, onBack, onReload }: Props
 
   useEffect(() => { void refresh(); }, []);
 
-  const open = (termo: TermoMulta) => { setSelectedId(termo.id); setSelected(termo); };
-  const close = () => { setSelectedId(""); setSelected(null); void refresh(); };
+  const open = (termo: TermoMulta) => setSelected(termo);
+  const close = () => { setSelected(null); void refresh(); };
 
   return (
     <AppShell screenLabel="Multas">
       {selected ? (
         // O detalhe desenha o próprio cabeçalho: o Voltar dele volta uma etapa do fluxo.
-        <TermoMultaDetalheScreen key={selectedId} termo={selected} onDone={close} onRefresh={refresh} />
+        <TermoMultaDetalheScreen key={selected.id} termo={selected} onDone={close} onRefresh={refresh} />
       ) : (
         <>
         <ServicesMenu

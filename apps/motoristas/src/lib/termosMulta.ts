@@ -54,13 +54,16 @@ export function mapTermo(row: Record<string, unknown>): TermoMulta {
   };
 }
 
-export const formatBrl = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value).replace(/ /g, " ");
+const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const DATA_HORA = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+
+export const formatBrl = (value: number) => BRL.format(value).replace(/ /g, " ");
 
 export function formatDataHora(value: string | null) {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }).format(date).replace(",", "");
+  return DATA_HORA.format(date).replace(",", "");
 }
 
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -88,8 +91,14 @@ export type Evidencias = {
 };
 
 // Formato gravado pelo plugin em new_evidenciasjson: { multa, infracao, infleet: {erro} | {viagens[]} }.
+type EvidenciasJson = {
+  multa?: { placa?: unknown; dataHora?: unknown; local?: unknown; valorGuia?: unknown };
+  infracao?: { codigo?: string; descricao?: string; valor?: unknown };
+  infleet?: { erro?: unknown; viagens?: { inicio?: unknown; fim?: unknown }[] };
+};
+
 export function parseEvidencias(json: string): Evidencias {
-  let data: Record<string, any> = {};
+  let data: EvidenciasJson = {};
   try { data = JSON.parse(json || "{}") ?? {}; } catch { data = {}; }
   const multa = data.multa ?? {};
   const infracao = data.infracao;
@@ -102,7 +111,7 @@ export function parseEvidencias(json: string): Evidencias {
     infracao: infracao ? [infracao.codigo, infracao.descricao].filter(Boolean).join(" - ") : "",
     valor: valor == null || !Number.isFinite(Number(valor)) ? null : Number(valor),
     infleetIndisponivel: Boolean(infleet.erro) || !Array.isArray(infleet.viagens),
-    viagens: Array.isArray(infleet.viagens) ? infleet.viagens.map((v: Record<string, unknown>) => ({ inicio: String(v.inicio ?? ""), fim: String(v.fim ?? "") })) : []
+    viagens: Array.isArray(infleet.viagens) ? infleet.viagens.map((v) => ({ inicio: String(v.inicio ?? ""), fim: String(v.fim ?? "") })) : []
   };
 }
 
@@ -129,7 +138,7 @@ export function selfieDimensions(width: number, height: number, maxLado = SELFIE
 type CanvasLike = {
   width: number;
   height: number;
-  getContext: (kind: "2d") => { drawImage: (...args: any[]) => void } | null;
+  getContext: (kind: "2d") => { drawImage: (...args: unknown[]) => void } | null;
   toBlob: (cb: (blob: Blob | null) => void, type: string, quality: number) => void;
 };
 
@@ -149,12 +158,12 @@ async function blobToBase64(blob: Blob) {
 export async function capturarSelfieJpeg(video: Pick<HTMLVideoElement, "videoWidth" | "videoHeight">, createCanvas: () => CanvasLike = defaultCanvas) {
   if (!video.videoWidth || !video.videoHeight) throw new Error("A câmera ainda não está pronta. Tente de novo.");
   const canvas = createCanvas();
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Não foi possível gerar a foto.");
   for (const maxLado of [SELFIE_MAX_LADO, 1024, 800, 640]) {
     const { width, height } = selfieDimensions(video.videoWidth, video.videoHeight, maxLado);
     canvas.width = width;
     canvas.height = height;
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("Não foi possível gerar a foto.");
     context.drawImage(video, 0, 0, width, height);
     for (const quality of maxLado === SELFIE_MAX_LADO ? [SELFIE_JPEG_QUALIDADE, 0.6] : [0.6]) {
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));

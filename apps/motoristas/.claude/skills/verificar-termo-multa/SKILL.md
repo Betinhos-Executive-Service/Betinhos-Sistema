@@ -29,6 +29,14 @@ Esperado: zero falhas. `TermoMultaCommandPluginTests` usa relógio injetado (`ne
 5. Assinar como quem não é o motorista → "Este termo não é seu." A assinatura real só dá para testar com um usuário motorista; sem ele, fica coberta pelos testes unitários.
 6. Limpeza: desligue o step "Termo de multa - bloquear exclusao fora de Pendente" (`statecode=1,statuscode=2`), apague os termos, religue (`statecode=0,statuscode=1`) num `finally`, depois apague multa e funcionário.
 
+## 4. Tela Multas no app (mock local)
+1. `npm run dev` e abra `http://127.0.0.1:<porta>/#/multas` (porta no log do dev server). Cabeçalho "Operação · Mock local".
+2. Lista: RTB4F21 (R$ 195,23) e QPA2B11 (R$ 130,16), ambos "Aguardando sua assinatura", data no formato `dd/mm/aaaa HH:mm` em America/Sao_Paulo. `?mockTermos=vazio` → "Nenhum termo pendente.".
+3. Toque em RTB4F21 → detalhe com placa, infração, valor, viagem Infleet e acordo "Desconto em folha em 3x de R$ 65,08 — nov/26, dez/26, jan/27". QPA2B11 mostra Infleet indisponível.
+4. "Assinar" → "Passo 1 de 3 · Tire uma selfie". Sem câmera (navegador interno/headless) aparece a mensagem de câmera bloqueada com "Tentar de novo"; o fluxo de selfie, assinatura e GPS só se completa no celular.
+5. Erros simulados: `?mockTermoErro=aditivo` (tela sem aditivo) e `?mockTermoErro=dono` ("Este termo não é seu.").
+6. Console sem erros. Testes de domínio: `tests/termosMulta.test.ts` (`npm test`).
+
 ## Armadilhas
 - No pre-operation de Update o Target traz `modifiedon`, `modifiedby`, `modifiedonbehalfby` e `timezoneruleversionnumber`; a trava ignora essas colunas (lista `PlatformColumns`). O trace `TermoMulta trava ...` lista as colunas recebidas (`plugintracelogs`).
 - Sem token (arquivo `Skill Agendamento\infleet-mcp\.env` ausente no `-Apply`) o InFleet grava `{"erro":"Token da Infleet não configurado."}` e o envio segue.

@@ -18,15 +18,11 @@ export function SelfieCapture({ value, onChange }: Props) {
     let ativo = true;
     setErro("");
     setPronta(false);
-    let pedido: Promise<MediaStream>;
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) throw new Error("getUserMedia indisponível");
-      pedido = navigator.mediaDevices.getUserMedia({ video: getDocumentStreamConstraints("user"), audio: false });
-    } catch (error) {
-      setErro(describeCameraError(error));
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setErro(describeCameraError(new Error("getUserMedia indisponível")));
       return;
     }
-    pedido
+    navigator.mediaDevices.getUserMedia({ video: getDocumentStreamConstraints("user"), audio: false })
       .then(async (media) => {
         if (!ativo) { media.getTracks().forEach((track) => track.stop()); return; }
         stream = media;
