@@ -271,12 +271,17 @@ else {
       $existentes = @(Get-Rows "savedqueries" "savedqueryid" "returnedtypecode eq '$parcelaTabela' and name eq '$(Escape-OData $visaoNome)' and querytype eq 0")
     }
     else { Invoke-Dataverse "PATCH" "savedqueries($($existentes[0].savedqueryid))" $corpo | Out-Null; Write-Step "visao alinhada '$visaoNome'" }
+    # Visao publica padrao so desta tabela (nova, sem outros consumidores): a grade nativa abre direto nela. Nao mexe em outras tabelas.
+    Invoke-Dataverse "PATCH" "savedqueries($($existentes[0].savedqueryid))" @{ isdefault = $true } | Out-Null
+    foreach ($outra in @(Get-Rows "savedqueries" "savedqueryid" "returnedtypecode eq '$parcelaTabela' and querytype eq 0 and isdefault eq true" | Where-Object { $_.savedqueryid -ne $existentes[0].savedqueryid })) { Invoke-Dataverse "PATCH" "savedqueries($($outra.savedqueryid))" @{ isdefault = $false } | Out-Null }
+    $padroes = @(Get-Rows "savedqueries" "savedqueryid" "returnedtypecode eq '$parcelaTabela' and querytype eq 0 and isdefault eq true")
+    if ($padroes.Count -ne 1 -or $padroes[0].savedqueryid -ne $existentes[0].savedqueryid) { throw "Visao '$visaoNome' nao ficou como unica visao padrao de $parcelaTabela." }
     # Tabela na solucao com todos os subcomponentes (rootcomponentbehavior 0) ja leva as visoes dela; senao inclui a visao avulsa.
     $tabelaInclusiva = @(Get-Rows "solutioncomponents" "solutioncomponentid" "_solutionid_value eq $solutionId and objectid eq $($parcelaMeta[0].MetadataId) and componenttype eq 1 and rootcomponentbehavior eq 0").Count -gt 0
     if (-not $tabelaInclusiva) { Add-SolutionComponent $existentes[0].savedqueryid 26 "visao $visaoNome" }
     Invoke-Dataverse "POST" "PublishXml" @{ ParameterXml = "<importexportxml><entities><entity>$parcelaTabela</entity></entities></importexportxml>" } | Out-Null
     if (-not $tabelaInclusiva -and @(Get-Rows "solutioncomponents" "solutioncomponentid" "_solutionid_value eq $solutionId and objectid eq $($existentes[0].savedqueryid) and componenttype eq 26").Count -eq 0) { throw "Visao '$visaoNome' nao esta na solucao $SolutionUniqueName." }
-    Write-Step "VISAO OK: '$visaoNome' publicada e na solucao $SolutionUniqueName$(if ($tabelaInclusiva) { ' (via tabela com todos os subcomponentes)' })"
+    Write-Step "VISAO OK: '$visaoNome' publicada, padrao da tabela e na solucao $SolutionUniqueName$(if ($tabelaInclusiva) { ' (via tabela com todos os subcomponentes)' })"
   }
 }
 
