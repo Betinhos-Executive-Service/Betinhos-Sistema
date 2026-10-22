@@ -123,4 +123,30 @@ public sealed class CadastrarAcessoHandlerTests
         _graph.Usuarios["joao.avila@betinhos.com.br"] = new GraphUsuario { Id = "outro", Upn = "joao.avila@betinhos.com.br", DisplayName = "João Pedro Ávila", Ativo = true };
         Assert.Equal("joao.avila2@betinhos.com.br", Handler().Executar(Entrada()).EmailMicrosoft);
     }
+
+    [Fact]
+    public void FuncionarioId_nao_reaproveita_email_de_homonimo()
+    {
+        var id = Guid.NewGuid();
+        _svc.Com(new Entity("cr40f_funcionarios", id) { ["cr40f_nomecompleto"] = "João da Silva Ávila", ["cr40f_status"] = new OptionSetValue(0) });
+        _svc.Com(new Entity("cr40f_funcionarios", Guid.NewGuid()) { ["cr40f_nomecompleto"] = "joao  da silva avila", ["cr40f_emailmicrosoft"] = "joao.avila@betinhos.com.br", ["cr40f_status"] = new OptionSetValue(0) });
+        var e = Entrada(); e.FuncionarioId = id;
+        var saida = Handler().Executar(e);
+        Assert.Equal("joao.avila2@betinhos.com.br", saida.EmailMicrosoft);
+        Assert.Equal(id, saida.FuncionarioId);
+    }
+
+    [Fact]
+    public void FuncionarioId_nao_vincula_usuario_entra_orfao_de_mesmo_nome()
+    {
+        var id = Guid.NewGuid();
+        _svc.Com(new Entity("cr40f_funcionarios", id) { ["cr40f_nomecompleto"] = "João da Silva Ávila", ["cr40f_status"] = new OptionSetValue(0) });
+        _graph.Usuarios["joao.avila@betinhos.com.br"] = new GraphUsuario { Id = "orfao", Upn = "joao.avila@betinhos.com.br", DisplayName = "João da Silva Ávila", Ativo = true };
+        var e = Entrada(); e.FuncionarioId = id;
+        var saida = Handler().Executar(e);
+        Assert.Equal("joao.avila2@betinhos.com.br", saida.EmailMicrosoft);
+        Assert.Equal("id-joao.avila2@betinhos.com.br", saida.UsuarioEntraId);
+        Assert.Contains("CriarUsuario", _graph.Chamadas);
+        Assert.Empty(_graph.Usuarios["joao.avila@betinhos.com.br"].SkuIds);
+    }
 }
