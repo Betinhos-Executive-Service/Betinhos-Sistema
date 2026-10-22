@@ -271,7 +271,7 @@ describe('dados', () => {
       update: vi.fn(async (set: string, id: string) => { calls.push(`PATCH ${set}(${id})`) }),
     }
     const metadata = { entities: async () => new Map(Object.entries({ cr40f_equipamento: 'cr40f_equipamentos', cr40f_tipoequipamento: 'cr40f_tipoequipamentos', cr40f_funcionarios: 'cr40f_funcionarioses' }).map(([k, v]) => [k, { entitySetName: v }])) }
-    const source = createSource({ mode: 'dataverse', client, metadata } as unknown as Host)
+    const source = createSource({ mode: 'dataverse', clientUrl: 'https://org23b93544.crm2.dynamics.com', client, metadata } as unknown as Host)
     await source.update('e1', { campos: { cr40f_status: STATUS.baixado }, responsavelId: null })
     expect(calls).toEqual(['DELETE cr40f_equipamentos(e1)/cr40f_Responsavel/$ref', 'PATCH cr40f_equipamentos(e1)'])
   })

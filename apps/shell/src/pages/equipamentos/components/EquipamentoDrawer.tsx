@@ -17,8 +17,8 @@ type Props = {
   pessoas: Pessoa[]
   source: Source
   onSaved: (e: Equipamento) => void
-  /** Miniatura da capa na lista quando as fotos mudam. */
-  onCapa: (equipamentoId: string, miniatura: string | null) => void
+  /** Caminho da capa na lista quando as fotos mudam. */
+  onCapa: (equipamentoId: string, caminho: string | null) => void
 }
 
 const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))

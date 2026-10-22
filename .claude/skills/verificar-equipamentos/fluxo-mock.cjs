@@ -221,6 +221,15 @@ async function run(nome) {
   const fecharDrawer = async (dlg) => { await page.keyboard.press('Escape'); await dlg.waitFor({ state: 'hidden' }) }
   const verSecao = (dlg) => dlg.locator('.eq-fotos').scrollIntoViewIfNeeded()
 
+  await passo('Fotos: capa da lista baixada do SharePoint (mock) só na linha visível, como blob URL', async () => {
+    await thumbLinha('Notebook do Financeiro').waitFor({ timeout: 10000 })
+    const src = await thumbLinha('Notebook do Financeiro').getAttribute('src')
+    if (!/^blob:/.test(src)) throw new Error(`capa não veio como blob: ${src.slice(0, 30)}`)
+    const quebradas = await page.locator('.eq-thumb img').evaluateAll((imgs) => imgs.filter((i) => i.complete && i.naturalWidth === 0).length)
+    if (quebradas) throw new Error(`${quebradas} miniatura(s) quebrada(s)`)
+    return `Notebook do Financeiro com ${src.slice(0, 20)}…; nenhuma imagem quebrada`
+  })
+
   await passo('Fotos: Ctrl+V de imagem → miniatura na seção, vira capa e aparece na lista', async () => {
     img.png = (await page.screenshot({ clip: { x: 0, y: 0, width: 320, height: 240 } })).toString('base64')
     img.png2 = (await page.screenshot({ clip: { x: 0, y: 200, width: 300, height: 300 } })).toString('base64')
@@ -302,6 +311,7 @@ async function run(nome) {
 
   await passo('Fotos: "Definir como capa" na 2ª → só ela é capa e a lista troca a miniatura', async () => {
     const dlg = drawer('Monitor 24" recepção')
+    const antes = await thumbLinha('Monitor 24" recepção').getAttribute('src').catch(() => '')
     await dlg.getByRole('button', { name: 'Definir 2-lado.jpg como capa' }).click()
     await dlg.locator('.eq-foto--capa', { hasText: '2-lado.jpg' }).waitFor()
     const capa = await capaAtual(dlg)
@@ -310,8 +320,8 @@ async function run(nome) {
     const f = await shot('fotos-capa-2')
     await fecharDrawer(dlg)
     const src = await thumbLinha('Monitor 24" recepção').getAttribute('src')
-    if (!/^data:image\/jpeg/.test(src)) throw new Error(`miniatura da lista não é a JPEG: ${src.slice(0, 30)}`)
-    return `só 2-lado.jpg marcada; lista com a miniatura JPEG; ${f}`
+    if (!/^blob:/.test(src) || src === antes) throw new Error(`miniatura da lista não trocou: ${antes} → ${src}`)
+    return `só 2-lado.jpg marcada; lista trocou a miniatura (${antes} → ${src}); ${f}`
   })
 
   await passo('Fotos: excluir a capa → a mais antiga restante vira capa; excluir todas → ícone do tipo', async () => {
