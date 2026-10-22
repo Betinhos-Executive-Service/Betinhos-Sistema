@@ -24,7 +24,7 @@ Fora do escopo: link por serviço sem login (descartado), convidado B2B com e-ma
 ## 3. Decisões
 
 1. Backend em plugin C# (Custom APIs), não em Flow: o segredo do Graph fica na configuração segura do step, legível só por administrador.
-2. E-mail Microsoft gerado: `primeiro.ultimo@betinhos.com.br`, minúsculo, sem acentos; se já existir, sufixo numérico (`primeiro.ultimo2`). A tela mostra a prévia antes de confirmar e permite editar o prefixo.
+2. E-mail Microsoft gerado: `primeiro.ultimo@betinhos.onmicrosoft.com`, minúsculo, sem acentos; se já existir, sufixo numérico (`primeiro.ultimo2`). A tela mostra a prévia antes de confirmar e permite editar o prefixo.
 3. Senha temporária gerada pelo plugin (12+ caracteres, letras, números e símbolo), com troca obrigatória no primeiro login. Nunca gravada no Dataverse nem no trace; aparece uma vez na tela.
 4. Licença: SKU vem do unsecure config do step (`{"licenseSkuId":"...","groupId":"...","appUrl":"..."}`), para trocar de Developer para outro plano sem recompilar.
 5. Idempotência: cada passo consulta antes de agir (usuário existe? licença atribuída? membro do grupo? funcionário com esse e-mail?). Reexecutar completa o que faltou.
@@ -50,7 +50,7 @@ Fora do escopo: link por serviço sem login (descartado), convidado B2B com e-ma
 ### 4.2 Plugin `packages/plugins/Cr40f.Acesso.Plugin` (+ `.Tests`)
 
 - `CadastrarAcessoMotoristaPlugin` e `EncerrarAcessoMotoristaPlugin`: só orquestram. Construtor `(string unsecureConfig, string secureConfig)`.
-- `AcessoConfig`: parse do unsecure (`licenseSkuId`, `groupId`, `appUrl`, `dominio` padrão `betinhos.com.br`) e do secure (`tenantId`, `clientId`, `clientSecret`). Falta → `CONFIG_AUSENTE`.
+- `AcessoConfig`: parse do unsecure (`licenseSkuId`, `groupId`, `appUrl`, `dominio` padrão `betinhos.onmicrosoft.com`) e do secure (`tenantId`, `clientId`, `clientSecret`). Falta → `CONFIG_AUSENTE`.
 - `AcessoRules` (puro, sem Dataverse/HTTP): normalização do nome e geração do prefixo de e-mail, sufixo numérico, validação do celular, geração de senha, ordem das etapas e decisão "pular/fazer" por etapa a partir do estado lido. Tudo testado em `AcessoRulesTests`.
 - `GraphGateway` (interface `IGraphGateway` + implementação HTTP com `HttpClient`, token client credentials em cache por execução): `UsuarioPorEmail`, `CriarUsuario`, `DefinirAccountEnabled`, `LicencasDoUsuario`, `AtribuirLicenca`, `RemoverLicenca`, `EhMembro`, `AdicionarAoGrupo`, `RemoverDoGrupo`, `SkusDisponiveis`. Testes com gateway fake (`FakeGraphGateway`) cobrindo cada etapa pulada/feita/erro.
 - `FuncionarioRepository`: busca por id, por `cr40f_emailmicrosoft`, por celular; cria/atualiza com o serviço do sistema (`CreateOrganizationService(null)`) para não exigir privilégio de escrita direta do chamador em campos sensíveis. O chamador precisa do privilégio da Custom API.
@@ -68,7 +68,7 @@ Fora do escopo: link por serviço sem login (descartado), convidado B2B com e-ma
 
 ## 5. Fluxo de dados
 
-Cadastrar: tela valida → `cr40f_CadastrarAcessoMotorista` → plugin lê config → gera e-mail (consulta Graph e `cr40f_funcionarios` para sufixo) → cria/obtém usuário Entra (senha nova só quando cria) → atribui licença se faltar → adiciona ao grupo se faltar → cria/atualiza funcionário → devolve credenciais + etapas. Usuário já existente e ativo sem `FuncionarioId` com o mesmo e-mail em outro funcionário → `EMAIL_EM_USO_POR_OUTRO_FUNCIONARIO` (não sobrescreve).
+Cadastrar: tela valida → `cr40f_CadastrarAcessoMotorista` → plugin lê config → gera e-mail (consulta Graph e `cr40f_funcionarios` para sufixo) → cria/obtém usuário Entra (senha nova só quando cria) → atribui licença se faltar → adiciona ao grupo se faltar → garante o `systemuser` no Dataverse (busca por `azureactivedirectoryobjectid`; se faltar, cria com UPN em `domainname`/`internalemailaddress`, nome e unidade de negócio raiz; desativado → `ACESSO_ENCERRADO`; Dataverse recusando enquanto a licença propaga → `USUARIO_DATAVERSE_PENDENTE`, retry idempotente) → cria/atualiza funcionário → devolve credenciais + etapas. Usuário já existente e ativo sem `FuncionarioId` com o mesmo e-mail em outro funcionário → `EMAIL_EM_USO_POR_OUTRO_FUNCIONARIO` (não sobrescreve).
 
 Encerrar: tela confirma duas vezes → `cr40f_EncerrarAcessoMotorista` → plugin confere nome → remove do grupo, remove licença, desabilita conta, inativa funcionário → etapas.
 
@@ -93,3 +93,6 @@ Falha parcial: o plugin não desfaz o que já fez (criar usuário e falhar na li
 - Sincronização Entra → Dataverse pode levar alguns minutos no primeiro login; a mensagem do WhatsApp avisa "se der erro de acesso, tente de novo em 5 minutos".
 - Sem licença disponível no SKU: `SEM_LICENCA_DISPONIVEL` com a contagem de `SkusDisponiveis`.
 - Segredo do Graph: só na secure config; nunca em Flow, variável de ambiente ou repo.
+
+
+Nota (22/10/2026, primeiro teste no DEV): o `systemuser` precisa existir antes de gravar `cr40f_emailmicrosoft`, porque o `DriverRecordSharing` do App Motoristas (DriverResolver StrictForGrant) exige um systemuser ativo com esse e-mail. Conta nova do Entra só ganha systemuser no primeiro login ou na sincronização do grupo, por isso a etapa `systemuser` roda entre `grupo` e `funcionario`.

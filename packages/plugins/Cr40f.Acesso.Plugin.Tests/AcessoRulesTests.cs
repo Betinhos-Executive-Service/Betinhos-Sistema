@@ -17,13 +17,13 @@ public sealed class AcessoRulesTests
 
     [Fact]
     public void EmailComSufixo_devolve_sem_sufixo_quando_livre()
-        => Assert.Equal("joao.avila@betinhos.com.br", AcessoRules.EmailComSufixo("joao.avila", "betinhos.com.br", _ => false));
+        => Assert.Equal("joao.avila@betinhos.onmicrosoft.com", AcessoRules.EmailComSufixo("joao.avila", "betinhos.onmicrosoft.com", _ => false));
 
     [Fact]
     public void EmailComSufixo_incrementa_a_partir_de_2()
     {
-        var ocupados = new HashSet<string> { "joao.avila@betinhos.com.br", "joao.avila2@betinhos.com.br" };
-        Assert.Equal("joao.avila3@betinhos.com.br", AcessoRules.EmailComSufixo("joao.avila", "betinhos.com.br", ocupados.Contains));
+        var ocupados = new HashSet<string> { "joao.avila@betinhos.onmicrosoft.com", "joao.avila2@betinhos.onmicrosoft.com" };
+        Assert.Equal("joao.avila3@betinhos.onmicrosoft.com", AcessoRules.EmailComSufixo("joao.avila", "betinhos.onmicrosoft.com", ocupados.Contains));
     }
 
     [Theory]

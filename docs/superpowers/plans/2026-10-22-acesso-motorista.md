@@ -15,7 +15,7 @@
 - Prefixo Dataverse `cr40f_`; rótulos pt-BR (1046). Solução `appbetinhos` (`DV_SOLUTION` do `.env`).
 - Só DEV: `https://org23b93544.crm2.dynamics.com`. Scripts bloqueiam PROD (`DV_BLOCKED_HOSTS` + checagem no código). `pnpm push` só da `main` no checkout principal; nunca de worktree.
 - Segredo do Graph só na configuração segura do step. Nunca em Flow, `.env` versionado, trace, log ou teste. Senha temporária nunca gravada nem logada.
-- E-mail Microsoft: `primeiro.ultimo@betinhos.com.br` (minúsculo, sem acentos, sufixo numérico a partir de 2 quando repetido). Domínio e licença vêm da configuração não segura do step: `{"tenantId","clientId","licenseSkuId","groupId","appUrl","dominio"}`. Link do app = `appUrl` = `https://org23b93544.crm2.dynamics.com/WebResources/new_app-motoristas-v2` no DEV. A URL direta funciona sem o Power Apps Mobile, em tela cheia e instalável na tela inicial, desde o PR #61 do App Motoristas (DEV 2.1.758, verificado no Chrome Android em 22/10/2026; iPhone pendente). Depende desse PR estar na `main` do App Motoristas antes da publicação.
+- E-mail Microsoft: `primeiro.ultimo@betinhos.onmicrosoft.com` (minúsculo, sem acentos, sufixo numérico a partir de 2 quando repetido). Domínio e licença vêm da configuração não segura do step: `{"tenantId","clientId","licenseSkuId","groupId","appUrl","dominio"}`. Link do app = `appUrl` = `https://org23b93544.crm2.dynamics.com/WebResources/new_app-motoristas-v2` no DEV. A URL direta funciona sem o Power Apps Mobile, em tela cheia e instalável na tela inicial, desde o PR #61 do App Motoristas (DEV 2.1.758, verificado no Chrome Android em 22/10/2026; iPhone pendente). Depende desse PR estar na `main` do App Motoristas antes da publicação.
 - Autorização: só quem tem a função **Acesso - Gestão de Motoristas** ou **Administrador do Sistema** (`System Administrator`) executa as APIs; o plugin confere.
 - Encerrar nunca exclui: remove do grupo, remove licença, `accountEnabled=false`, `cr40f_status` = 2 (inativo), `cr40f_datadedemissao` = hoje se vazia.
 - Design System: tema claro, sem gradiente, `#FCFCFB` em campos; azul só em foco/ação. Preservar DOM/IDs/handlers da Ficha existente.
@@ -128,13 +128,13 @@ public sealed class AcessoRulesTests
 
     [Fact]
     public void EmailComSufixo_devolve_sem_sufixo_quando_livre()
-        => Assert.Equal("joao.avila@betinhos.com.br", AcessoRules.EmailComSufixo("joao.avila", "betinhos.com.br", _ => false));
+        => Assert.Equal("joao.avila@betinhos.onmicrosoft.com", AcessoRules.EmailComSufixo("joao.avila", "betinhos.onmicrosoft.com", _ => false));
 
     [Fact]
     public void EmailComSufixo_incrementa_a_partir_de_2()
     {
-        var ocupados = new HashSet<string> { "joao.avila@betinhos.com.br", "joao.avila2@betinhos.com.br" };
-        Assert.Equal("joao.avila3@betinhos.com.br", AcessoRules.EmailComSufixo("joao.avila", "betinhos.com.br", ocupados.Contains));
+        var ocupados = new HashSet<string> { "joao.avila@betinhos.onmicrosoft.com", "joao.avila2@betinhos.onmicrosoft.com" };
+        Assert.Equal("joao.avila3@betinhos.onmicrosoft.com", AcessoRules.EmailComSufixo("joao.avila", "betinhos.onmicrosoft.com", ocupados.Contains));
     }
 
     [Theory]
@@ -292,7 +292,7 @@ namespace Cr40f.Acesso.Plugin.Tests;
 
 public sealed class AcessoConfigTests
 {
-    private const string Unsecure = "{\"tenantId\":\"t\",\"clientId\":\"c\",\"licenseSkuId\":\"sku\",\"groupId\":\"g\",\"appUrl\":\"https://x/main.aspx\",\"dominio\":\"betinhos.com.br\"}";
+    private const string Unsecure = "{\"tenantId\":\"t\",\"clientId\":\"c\",\"licenseSkuId\":\"sku\",\"groupId\":\"g\",\"appUrl\":\"https://x/main.aspx\",\"dominio\":\"betinhos.onmicrosoft.com\"}";
 
     [Fact]
     public void Parse_le_as_duas_configuracoes()
@@ -300,7 +300,7 @@ public sealed class AcessoConfigTests
         var cfg = AcessoConfig.Parse(Unsecure, "{\"clientSecret\":\"s3gr3d0\"}");
         Assert.Equal("t", cfg.TenantId);
         Assert.Equal("s3gr3d0", cfg.ClientSecret);
-        Assert.Equal("betinhos.com.br", cfg.Dominio);
+        Assert.Equal("betinhos.onmicrosoft.com", cfg.Dominio);
         Assert.Equal("https://x/main.aspx", cfg.AppUrl);
     }
 
@@ -314,7 +314,7 @@ public sealed class AcessoConfigTests
 
     [Fact]
     public void Parse_sem_dominio_usa_padrao()
-        => Assert.Equal("betinhos.com.br", AcessoConfig.Parse(Unsecure.Replace(",\"dominio\":\"betinhos.com.br\"", ""), "{\"clientSecret\":\"s\"}").Dominio);
+        => Assert.Equal("betinhos.onmicrosoft.com", AcessoConfig.Parse(Unsecure.Replace(",\"dominio\":\"betinhos.onmicrosoft.com\"", ""), "{\"clientSecret\":\"s\"}").Dominio);
 
     [Fact]
     public void Etapas_serializa_em_ordem()
@@ -463,7 +463,7 @@ public sealed class AcessoConfig
     public string LicenseSkuId { get; private set; } = "";
     public string GroupId { get; private set; } = "";
     public string AppUrl { get; private set; } = "";
-    public string Dominio { get; private set; } = "betinhos.com.br";
+    public string Dominio { get; private set; } = "betinhos.onmicrosoft.com";
 
     public static AcessoConfig Parse(string? unsecure, string? secure)
     {
@@ -844,16 +844,16 @@ public sealed class FuncionarioRepositoryTests
     public void PorEmail_ignora_maiusculas_e_devolve_null_quando_nao_ha()
     {
         var id = Guid.NewGuid();
-        var repo = new FuncionarioRepository(new FakeService().Com(Func(id, "Ana Lima", "ana.lima@betinhos.com.br")));
-        Assert.Equal(id, repo.PorEmail("Ana.Lima@betinhos.com.br")!.Id);
-        Assert.Null(repo.PorEmail("x@betinhos.com.br"));
+        var repo = new FuncionarioRepository(new FakeService().Com(Func(id, "Ana Lima", "ana.lima@betinhos.onmicrosoft.com")));
+        Assert.Equal(id, repo.PorEmail("Ana.Lima@betinhos.onmicrosoft.com")!.Id);
+        Assert.Null(repo.PorEmail("x@betinhos.onmicrosoft.com"));
     }
 
     [Fact]
     public void Criar_grava_motorista_ativo_com_vinculo()
     {
         var svc = new FakeService();
-        var id = new FuncionarioRepository(svc).Criar("Ana Lima", "ana.lima@betinhos.com.br", "+5512999999999", 1);
+        var id = new FuncionarioRepository(svc).Criar("Ana Lima", "ana.lima@betinhos.onmicrosoft.com", "+5512999999999", 1);
         var e = svc.Criados[0];
         Assert.Equal(id, e.Id);
         Assert.Equal(202410000, e.GetAttributeValue<OptionSetValue>("cr40f_funcao").Value);
@@ -1067,11 +1067,11 @@ public sealed class CadastrarAcessoHandlerTests
     public void Caminho_feliz_cria_usuario_licenca_grupo_e_funcionario()
     {
         var saida = Handler().Executar(Entrada());
-        Assert.Equal("joao.avila@betinhos.com.br", saida.EmailMicrosoft);
+        Assert.Equal("joao.avila@betinhos.onmicrosoft.com", saida.EmailMicrosoft);
         Assert.Equal(14, saida.SenhaTemporaria.Length);
         Assert.Equal("https://app", saida.LinkApp);
         Assert.Contains("sku", _graph.Usuarios[saida.EmailMicrosoft].SkuIds);
-        Assert.Contains(("g", "id-joao.avila@betinhos.com.br"), _graph.Membros);
+        Assert.Contains(("g", "id-joao.avila@betinhos.onmicrosoft.com"), _graph.Membros);
         Assert.Single(_svc.Criados);
         Assert.Equal("+5512991234567", _svc.Criados[0]["cr40f_telefonecorporativo"]);
         Assert.Contains("\"etapa\":\"usuario\",\"estado\":\"feita\"", saida.Etapas.ToJson());
@@ -1096,9 +1096,9 @@ public sealed class CadastrarAcessoHandlerTests
     [Fact]
     public void Sufixo_quando_upn_ja_existe_para_outra_pessoa()
     {
-        _graph.Usuarios["joao.avila@betinhos.com.br"] = new GraphUsuario { Id = "outro", Upn = "joao.avila@betinhos.com.br", Ativo = true };
-        _svc.Com(new Entity("cr40f_funcionarios", Guid.NewGuid()) { ["cr40f_nomecompleto"] = "João Ávila", ["cr40f_emailmicrosoft"] = "joao.avila@betinhos.com.br", ["cr40f_status"] = new OptionSetValue(0) });
-        Assert.Equal("joao.avila2@betinhos.com.br", Handler().Executar(Entrada()).EmailMicrosoft);
+        _graph.Usuarios["joao.avila@betinhos.onmicrosoft.com"] = new GraphUsuario { Id = "outro", Upn = "joao.avila@betinhos.onmicrosoft.com", Ativo = true };
+        _svc.Com(new Entity("cr40f_funcionarios", Guid.NewGuid()) { ["cr40f_nomecompleto"] = "João Ávila", ["cr40f_emailmicrosoft"] = "joao.avila@betinhos.onmicrosoft.com", ["cr40f_status"] = new OptionSetValue(0) });
+        Assert.Equal("joao.avila2@betinhos.onmicrosoft.com", Handler().Executar(Entrada()).EmailMicrosoft);
     }
 
     [Fact]
@@ -1110,7 +1110,7 @@ public sealed class CadastrarAcessoHandlerTests
         var saida = Handler().Executar(e);
         Assert.Equal(id, saida.FuncionarioId);
         Assert.Empty(_svc.Criados);
-        Assert.Equal("joao.avila@betinhos.com.br", _svc.Atualizados[0]["cr40f_emailmicrosoft"]);
+        Assert.Equal("joao.avila@betinhos.onmicrosoft.com", _svc.Atualizados[0]["cr40f_emailmicrosoft"]);
     }
 
     [Fact]
@@ -1147,7 +1147,7 @@ public sealed class CadastrarAcessoHandlerTests
     public void PrefixoEmail_informado_vence_o_gerado()
     {
         var e = Entrada(); e.PrefixoEmail = "Joãozinho Ávila";
-        Assert.Equal("joaozinho.avila@betinhos.com.br", Handler().Executar(e).EmailMicrosoft);
+        Assert.Equal("joaozinho.avila@betinhos.onmicrosoft.com", Handler().Executar(e).EmailMicrosoft);
     }
 }
 ```
@@ -1357,10 +1357,10 @@ public sealed class EncerrarAcessoHandlerTests
     private readonly Guid _id = Guid.NewGuid();
 
     private EncerrarAcessoHandler Handler() => new(_graph, new FuncionarioRepository(_svc), Cfg, () => new DateTime(2026, 10, 22, 12, 0, 0, DateTimeKind.Utc), _ => { });
-    private void ComFuncionario(string? email = "ana.lima@betinhos.com.br") => _svc.Com(new Entity("cr40f_funcionarios", _id) { ["cr40f_nomecompleto"] = "Ana Lima", ["cr40f_emailmicrosoft"] = email, ["cr40f_status"] = new OptionSetValue(0) });
+    private void ComFuncionario(string? email = "ana.lima@betinhos.onmicrosoft.com") => _svc.Com(new Entity("cr40f_funcionarios", _id) { ["cr40f_nomecompleto"] = "Ana Lima", ["cr40f_emailmicrosoft"] = email, ["cr40f_status"] = new OptionSetValue(0) });
     private void ComUsuarioCompleto()
     {
-        var u = new GraphUsuario { Id = "u1", Upn = "ana.lima@betinhos.com.br", Ativo = true }; u.SkuIds.Add("sku");
+        var u = new GraphUsuario { Id = "u1", Upn = "ana.lima@betinhos.onmicrosoft.com", Ativo = true }; u.SkuIds.Add("sku");
         _graph.Usuarios[u.Upn] = u; _graph.Membros.Add(("g", "u1"));
     }
 
@@ -1372,7 +1372,7 @@ public sealed class EncerrarAcessoHandlerTests
         Assert.Contains("\"etapa\":\"grupo\",\"estado\":\"feita\"", etapas);
         Assert.Contains("\"etapa\":\"licenca\",\"estado\":\"feita\"", etapas);
         Assert.Contains("\"etapa\":\"conta\",\"estado\":\"feita\"", etapas);
-        Assert.False(_graph.Usuarios["ana.lima@betinhos.com.br"].Ativo);
+        Assert.False(_graph.Usuarios["ana.lima@betinhos.onmicrosoft.com"].Ativo);
         Assert.Equal(1, _svc.Atualizados[0].GetAttributeValue<OptionSetValue>("cr40f_status").Value);
     }
 
@@ -1594,7 +1594,7 @@ A `sdkmessage` da Custom API só existe depois de criada a API; o registrador cr
 $dotEnv = @{}; $envPath = Join-Path $root '.env'
 if (Test-Path $envPath) { foreach ($line in [IO.File]::ReadAllLines($envPath)) { if ($line -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$') { $dotEnv[$Matches[1]] = $Matches[2].Trim('"') } } }
 foreach ($k in 'ACESSO_TENANT_ID','ACESSO_CLIENT_ID','ACESSO_LICENSE_SKU_ID','ACESSO_GROUP_ID','ACESSO_APP_URL') { if (-not $dotEnv[$k]) { throw "$k ausente no .env (configuração não segura do plugin de acesso)." } }
-$config = @{ tenantId = $dotEnv.ACESSO_TENANT_ID; clientId = $dotEnv.ACESSO_CLIENT_ID; licenseSkuId = $dotEnv.ACESSO_LICENSE_SKU_ID; groupId = $dotEnv.ACESSO_GROUP_ID; appUrl = $dotEnv.ACESSO_APP_URL; dominio = 'betinhos.com.br' } | ConvertTo-Json -Compress
+$config = @{ tenantId = $dotEnv.ACESSO_TENANT_ID; clientId = $dotEnv.ACESSO_CLIENT_ID; licenseSkuId = $dotEnv.ACESSO_LICENSE_SKU_ID; groupId = $dotEnv.ACESSO_GROUP_ID; appUrl = $dotEnv.ACESSO_APP_URL; dominio = 'betinhos.onmicrosoft.com' } | ConvertTo-Json -Compress
 & $dotnet.Source run --project $registrar -- --environmentUrl $EnvironmentUrl --dllPath $dllPath --solutionUniqueName $SolutionUniqueName --config $config --publish
 ```
 Adicione em `.env.example` (se existir; senão crie a seção no `README` do deploy) as cinco chaves `ACESSO_*` com valores vazios e o comentário "sem segredo: o clientSecret é digitado em provision-acesso.ps1".
@@ -1793,10 +1793,10 @@ describe('acesso', () => {
   })
 
   it('mensagemWhatsApp tem link, e-mail, senha e instrução de troca, sem introdução', () => {
-    const texto = mensagemWhatsApp({ nome: 'João da Silva', emailMicrosoft: 'joao.silva@betinhos.com.br', senhaTemporaria: 'Abc#12345678xy', linkApp: 'https://app' })
+    const texto = mensagemWhatsApp({ nome: 'João da Silva', emailMicrosoft: 'joao.silva@betinhos.onmicrosoft.com', senhaTemporaria: 'Abc#12345678xy', linkApp: 'https://app' })
     expect(texto.startsWith('*Acesso ao App Motoristas*')).toBe(true)
     expect(texto).toContain('https://app')
-    expect(texto).toContain('joao.silva@betinhos.com.br')
+    expect(texto).toContain('joao.silva@betinhos.onmicrosoft.com')
     expect(texto).toContain('Abc#12345678xy')
     expect(texto).toContain('troque a senha')
     expect(texto).toContain('5 minutos')
@@ -1810,11 +1810,11 @@ describe('acesso', () => {
   it('mock cadastra, aplica sufixo quando repete e simula erro pelo nome', async () => {
     const src = createAcessoSource({ mode: 'mock' })
     const a = await src.cadastrar({ nomeCompleto: 'Ana Lima', celular: '12991234567', tipoVinculo: 1 })
-    expect(a.emailMicrosoft).toBe('ana.lima@betinhos.com.br')
+    expect(a.emailMicrosoft).toBe('ana.lima@betinhos.onmicrosoft.com')
     expect(a.senhaTemporaria).toHaveLength(14)
     expect(a.etapas.map((e) => e.estado)).toContain('feita')
     const b = await src.cadastrar({ nomeCompleto: 'Ana Lima', celular: '12991234567', tipoVinculo: 1 })
-    expect(b.emailMicrosoft).toBe('ana.lima2@betinhos.com.br')
+    expect(b.emailMicrosoft).toBe('ana.lima2@betinhos.onmicrosoft.com')
     await expect(src.cadastrar({ nomeCompleto: 'Erro Graph', celular: '12991234567', tipoVinculo: 1 })).rejects.toMatchObject({ codigo: 'GRAPH_INDISPONIVEL' })
     await expect(src.cadastrar({ nomeCompleto: 'Sem Licenca', celular: '12991234567', tipoVinculo: 1 })).rejects.toMatchObject({ codigo: 'SEM_LICENCA_DISPONIVEL' })
   })
@@ -1942,7 +1942,7 @@ import { AcessoError, MENSAGENS } from './acesso'
 
 const delay = <T,>(value: T, ms = 400) => new Promise<T>((resolve) => setTimeout(() => resolve(value), ms))
 const semAcentos = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
-const MOCK_FUNCIONARIOS: Record<string, { nome: string; email: string | null }> = { m1: { nome: 'Carlos Alberto Teste', email: 'carlos.teste@betinhos.com.br' }, m7: { nome: 'Helena Simulada Costa', email: null } }
+const MOCK_FUNCIONARIOS: Record<string, { nome: string; email: string | null }> = { m1: { nome: 'Carlos Alberto Teste', email: 'carlos.teste@betinhos.onmicrosoft.com' }, m7: { nome: 'Helena Simulada Costa', email: null } }
 
 /** Simulação em memória: nome com "Erro Graph" falha depois de criar o usuário; "Sem Licenca" falha antes. */
 export function createAcessoMock(): AcessoSource {
@@ -1954,8 +1954,8 @@ export function createAcessoMock(): AcessoSource {
       if (input.celular.replace(/\D/g, '').length !== 11) throw new AcessoError('CELULAR_INVALIDO', MENSAGENS.CELULAR_INVALIDO, [])
       if (/sem licenca/i.test(semAcentos(input.nomeCompleto))) throw new AcessoError('SEM_LICENCA_DISPONIVEL', MENSAGENS.SEM_LICENCA_DISPONIVEL, [{ etapa: 'validacao', estado: 'feita', detalhe: 'ok' }, { etapa: 'usuario', estado: 'erro', detalhe: 'sem licença' }])
       const prefixo = input.prefixoEmail ? semAcentos(input.prefixoEmail).replace(/\s+/g, '.') : `${palavras[0]}.${palavras[palavras.length - 1]}`
-      let email = `${prefixo}@betinhos.com.br`
-      for (let n = 2; emails.has(email); n++) email = `${prefixo}${n}@betinhos.com.br`
+      let email = `${prefixo}@betinhos.onmicrosoft.com`
+      for (let n = 2; emails.has(email); n++) email = `${prefixo}${n}@betinhos.onmicrosoft.com`
       if (/erro graph/i.test(input.nomeCompleto)) {
         throw new AcessoError('GRAPH_INDISPONIVEL', MENSAGENS.GRAPH_INDISPONIVEL, [{ etapa: 'validacao', estado: 'feita', detalhe: 'ok' }, { etapa: 'email', estado: 'feita', detalhe: email }, { etapa: 'usuario', estado: 'feita', detalhe: 'criado' }, { etapa: 'licenca', estado: 'erro', detalhe: '503 em POST assignLicense' }])
       }
@@ -1967,7 +1967,7 @@ export function createAcessoMock(): AcessoSource {
       return delay(resultado)
     },
     async encerrar(funcionarioId, confirmacao) {
-      const f = MOCK_FUNCIONARIOS[funcionarioId] ?? { nome: 'Funcionário Mock', email: 'x@betinhos.com.br' }
+      const f = MOCK_FUNCIONARIOS[funcionarioId] ?? { nome: 'Funcionário Mock', email: 'x@betinhos.onmicrosoft.com' }
       if (!f.email) throw new AcessoError('FUNCIONARIO_SEM_EMAIL', MENSAGENS.FUNCIONARIO_SEM_EMAIL, [])
       if (semAcentos(confirmacao.trim()) !== semAcentos(f.nome.split(/\s+/)[0])) throw new AcessoError('CONFIRMACAO_INVALIDA', MENSAGENS.CONFIRMACAO_INVALIDA, [])
       const etapas: Etapa[] = [{ etapa: 'confirmacao', estado: 'feita', detalhe: 'ok' }, { etapa: 'grupo', estado: 'feita', detalhe: 'removido' }, { etapa: 'licenca', estado: 'feita', detalhe: 'removida' }, { etapa: 'conta', estado: 'feita', detalhe: 'desativada' }, { etapa: 'funcionario', estado: 'feita', detalhe: 'inativado' }]
@@ -2020,7 +2020,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AcessoError, type AcessoSource } from '../data/acesso'
 import { CadastroAcessoDrawer } from './CadastroAcessoDrawer'
 
-const ok = { emailMicrosoft: 'ana.lima@betinhos.com.br', senhaTemporaria: 'Kx7#mQ2vR9pL4w', funcionarioId: 'f9', linkApp: 'https://app', etapas: [{ etapa: 'usuario', estado: 'feita' as const, detalhe: 'criado' }] }
+const ok = { emailMicrosoft: 'ana.lima@betinhos.onmicrosoft.com', senhaTemporaria: 'Kx7#mQ2vR9pL4w', funcionarioId: 'f9', linkApp: 'https://app', etapas: [{ etapa: 'usuario', estado: 'feita' as const, detalhe: 'criado' }] }
 function src(cadastrar: AcessoSource['cadastrar']): AcessoSource { return { cadastrar, encerrar: async () => [] } }
 function renderDrawer(source: AcessoSource, props: Partial<Parameters<typeof CadastroAcessoDrawer>[0]> = {}) {
   const onClose = vi.fn(); const onCadastrado = vi.fn()
@@ -2034,7 +2034,7 @@ describe('CadastroAcessoDrawer', () => {
     renderDrawer(src(async () => ok))
     fireEvent.change(screen.getByLabelText(/Nome completo/), { target: { value: 'João da Silva Ávila' } })
     expect(screen.getByLabelText(/E-mail Microsoft/)).toHaveValue('joao.avila')
-    expect(screen.getByText('joao.avila@betinhos.com.br')).toBeInTheDocument()
+    expect(screen.getByText('joao.avila@betinhos.onmicrosoft.com')).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText(/E-mail Microsoft/), { target: { value: 'joao.silva' } })
     fireEvent.change(screen.getByLabelText(/Nome completo/), { target: { value: 'João da Silva Prado' } })
     expect(screen.getByLabelText(/E-mail Microsoft/)).toHaveValue('joao.silva')
@@ -2112,7 +2112,7 @@ import { useNotify } from './Toasts'
 type Props = { acesso: AcessoSource; inicial?: { funcionarioId: string; nomeCompleto: string; celular: string }; onClose: () => void; onCadastrado: (funcionarioId: string) => void }
 type Estado = { fase: 'form' } | { fase: 'criando' } | { fase: 'resultado'; r: CadastroResultado } | { fase: 'erro'; codigo: string; mensagem: string; etapas: Etapa[] }
 
-const DOMINIO = 'betinhos.com.br'
+const DOMINIO = 'betinhos.onmicrosoft.com'
 const ROTULO: Record<Etapa['estado'], string> = { feita: '✓', pulada: '–', erro: '✕' }
 
 /** primeiro.ultimo sem acentos; igual a AcessoRules.PrefixoEmail do plugin (só prévia: o plugin recalcula). */
@@ -2332,7 +2332,7 @@ describe('EncerrarAcessoDialog', () => {
 ```tsx
 it('mostra o estado do acesso e encerra pela ficha', async () => {
   const encerrar = vi.fn(async () => [{ etapa: 'funcionario', estado: 'feita' as const, detalhe: 'inativado' }])
-  const comEmail = { ...record, values: { ...record.values, cr40f_emailmicrosoft: 'ana.souza@betinhos.com.br' } }
+  const comEmail = { ...record, values: { ...record.values, cr40f_emailmicrosoft: 'ana.souza@betinhos.onmicrosoft.com' } }
   const source = fakeSource(async () => 'f1', { get: async () => structuredClone(comEmail) })
   render(<ToastProvider><Ficha source={source} id="f1" onClose={() => {}} onSaved={() => {}} acesso={{ cadastrar: async () => { throw new Error('n/a') }, encerrar }} /></ToastProvider>)
   await screen.findByText('Acesso ativo')
@@ -2524,8 +2524,8 @@ Atribuir a função "Acesso - Gestão de Motoristas" ao usuário de teste da ope
 
 - [ ] **Step 4: Roteiro de verificação no DEV (evidências na skill)**
 
-1. Tela Funcionários → Cadastrar acesso → nome "Teste Acesso Betinhos", celular do Renan, vínculo Terceiro → resultado com e-mail `teste.betinhos@betinhos.com.br`, senha e etapas todas `feita`. Screenshot.
-2. Entra: usuário existe, licença atribuída, membro do grupo de teste. `cr40f_funcionarios` novo com `cr40f_emailmicrosoft`, função Motorista, vínculo Terceiro. Query MCP DEV: `SELECT cr40f_nomecompleto, cr40f_emailmicrosoft, cr40f_status FROM cr40f_funcionarios WHERE cr40f_emailmicrosoft = 'teste.betinhos@betinhos.com.br'`.
+1. Tela Funcionários → Cadastrar acesso → nome "Teste Acesso Betinhos", celular do Renan, vínculo Terceiro → resultado com e-mail `teste.betinhos@betinhos.onmicrosoft.com`, senha e etapas todas `feita`. Screenshot.
+2. Entra: usuário existe, licença atribuída, membro do grupo de teste. `cr40f_funcionarios` novo com `cr40f_emailmicrosoft`, função Motorista, vínculo Terceiro. Query MCP DEV: `SELECT cr40f_nomecompleto, cr40f_emailmicrosoft, cr40f_status FROM cr40f_funcionarios WHERE cr40f_emailmicrosoft = 'teste.betinhos@betinhos.onmicrosoft.com'`.
 3. "Enviar no WhatsApp" abre o `wa.me` com a mensagem completa (não enviar para terceiros reais).
 4. Celular: abrir o link no navegador, logar com a conta nova, trocar a senha, ver a tela inicial do App Motoristas com o nome. (Depende do resultado da sessão "Verificar App Motoristas v2 pela URL no navegador"; se ela apontar bloqueios, registrar aqui.)
 5. Clicar "Cadastrar acesso" de novo para o mesmo nome → e-mail com sufixo `2`? **Não**: com `FuncionarioId` pela ficha deve reaproveitar o e-mail e marcar `usuario` como `pulada`. Pelo cabeçalho (sem id) gera `teste.betinhos2@...` — comportamento esperado; registrar.

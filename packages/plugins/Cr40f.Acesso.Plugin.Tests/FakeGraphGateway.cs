@@ -6,6 +6,8 @@ namespace Cr40f.Acesso.Plugin.Tests;
 
 public sealed class FakeGraphGateway : IGraphGateway
 {
+    /// <summary>Id determinístico em formato Guid, como o object id do Entra.</summary>
+    public static string IdDe(string upn) => new System.Guid(System.Security.Cryptography.MD5.Create().ComputeHash(System.Text.Encoding.UTF8.GetBytes(upn))).ToString();
     public readonly Dictionary<string, GraphUsuario> Usuarios = new();
     public readonly HashSet<(string Grupo, string Usuario)> Membros = new();
     public readonly List<string> Chamadas = new();
@@ -19,7 +21,7 @@ public sealed class FakeGraphGateway : IGraphGateway
     public GraphUsuario CriarUsuario(string upn, string nome, string senha, string? celular, string? emailPessoal = null)
     {
         Registrar("CriarUsuario"); UltimoEmailPessoal = emailPessoal;
-        var u = new GraphUsuario { Id = "id-" + upn, Upn = upn, DisplayName = nome, Ativo = true };
+        var u = new GraphUsuario { Id = IdDe(upn), Upn = upn, DisplayName = nome, Ativo = true };
         Usuarios[upn] = u; return u;
     }
     public void DefinirAtivo(string id, bool ativo) { Registrar("DefinirAtivo"); Usuarios.Values.Single(u => u.Id == id).Ativo = ativo; }

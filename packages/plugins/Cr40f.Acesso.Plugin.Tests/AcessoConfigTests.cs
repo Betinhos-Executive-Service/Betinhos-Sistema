@@ -5,7 +5,7 @@ namespace Cr40f.Acesso.Plugin.Tests;
 
 public sealed class AcessoConfigTests
 {
-    private const string Unsecure = "{\"tenantId\":\"t\",\"clientId\":\"c\",\"licenseSkuId\":\"sku\",\"groupId\":\"g\",\"appUrl\":\"https://x/main.aspx\",\"dominio\":\"betinhos.com.br\"}";
+    private const string Unsecure = "{\"tenantId\":\"t\",\"clientId\":\"c\",\"licenseSkuId\":\"sku\",\"groupId\":\"g\",\"appUrl\":\"https://x/main.aspx\",\"dominio\":\"exemplo.com\"}";
 
     [Fact]
     public void Parse_le_as_duas_configuracoes()
@@ -13,7 +13,7 @@ public sealed class AcessoConfigTests
         var cfg = AcessoConfig.Parse(Unsecure, "{\"clientSecret\":\"s3gr3d0\"}");
         Assert.Equal("t", cfg.TenantId);
         Assert.Equal("s3gr3d0", cfg.ClientSecret);
-        Assert.Equal("betinhos.com.br", cfg.Dominio);
+        Assert.Equal("exemplo.com", cfg.Dominio);
         Assert.Equal("https://x/main.aspx", cfg.AppUrl);
     }
 
@@ -27,7 +27,7 @@ public sealed class AcessoConfigTests
 
     [Fact]
     public void Parse_sem_dominio_usa_padrao()
-        => Assert.Equal("betinhos.com.br", AcessoConfig.Parse(Unsecure.Replace(",\"dominio\":\"betinhos.com.br\"", ""), "{\"clientSecret\":\"s\"}").Dominio);
+        => Assert.Equal("betinhos.onmicrosoft.com", AcessoConfig.Parse(Unsecure.Replace(",\"dominio\":\"exemplo.com\"", ""), "{\"clientSecret\":\"s\"}").Dominio);
 
     [Fact]
     public void Etapas_serializa_em_ordem()

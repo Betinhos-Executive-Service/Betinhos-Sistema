@@ -9,9 +9,9 @@ public sealed class CadastroSaida { public string EmailMicrosoft = ""; public st
 /// <summary>Cadastro idempotente: cada etapa confere o estado antes de agir. Falha relança com as etapas em Data["Etapas"].</summary>
 public sealed class CadastrarAcessoHandler
 {
-    private readonly IGraphGateway _graph; private readonly FuncionarioRepository _repo; private readonly AcessoConfig _cfg; private readonly Random _rng; private readonly Action<string> _trace;
-    public CadastrarAcessoHandler(IGraphGateway graph, FuncionarioRepository repo, AcessoConfig cfg, Random rng, Action<string> trace)
-    { _graph = graph; _repo = repo; _cfg = cfg; _rng = rng; _trace = trace; }
+    private readonly IGraphGateway _graph; private readonly FuncionarioRepository _repo; private readonly UsuarioDataverseRepository _usuarios; private readonly AcessoConfig _cfg; private readonly Random _rng; private readonly Action<string> _trace;
+    public CadastrarAcessoHandler(IGraphGateway graph, FuncionarioRepository repo, UsuarioDataverseRepository usuarios, AcessoConfig cfg, Random rng, Action<string> trace)
+    { _graph = graph; _repo = repo; _usuarios = usuarios; _cfg = cfg; _rng = rng; _trace = trace; }
 
     public CadastroSaida Executar(CadastroEntrada entrada)
     {
@@ -77,6 +77,13 @@ public sealed class CadastrarAcessoHandler
             {
                 if (_graph.EhMembro(_cfg.GroupId, usuario.Id)) { etapas.Pulada("grupo", "já era membro"); return; }
                 _graph.AdicionarAoGrupo(_cfg.GroupId, usuario.Id); etapas.Feita("grupo", "adicionado");
+            });
+
+            // Antes do funcionário: gravar cr40f_emailmicrosoft dispara o DriverRecordSharing, que exige o systemuser.
+            etapas.Executar("systemuser", () =>
+            {
+                if (_usuarios.Garantir(Guid.Parse(usuario.Id), email, entrada.NomeCompleto)) etapas.Feita("systemuser", "criado no Dataverse");
+                else etapas.Pulada("systemuser", "já existe no Dataverse");
             });
 
             saida.FuncionarioId = etapas.Executar("funcionario", () =>
