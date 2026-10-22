@@ -140,6 +140,8 @@ import { LocalToast, type ToastState, type ToastTone } from "./components/common
 import { LoadingOverlay, type LoadingOverlayState } from "./components/common/LoadingOverlay";
 import { CollisionScreen } from "./screens/CollisionScreen";
 import { ComunicadosScreen } from "./screens/ComunicadosScreen";
+import { TermosMultaScreen, type TermosLoadStatus } from "./screens/TermosMultaScreen";
+import { isMockTermos, listarTermosPendentes, type TermoMulta } from "./lib/termosMulta";
 import { ChecklistsScreen } from "./screens/ChecklistsScreen";
 import { ButtonPreviewScreen } from "./screens/ButtonPreviewScreen";
 import { CollisionStartScreen } from "./screens/CollisionStartScreen";
@@ -895,6 +897,23 @@ function App() {
       throw error;
     }
   }, []);
+
+  // Termos de multa pendentes: mesmo motorista logado; alimentam a tela Multas e o contador da Home.
+  const [termosMulta, setTermosMulta] = useState<TermoMulta[]>([]);
+  const [termosStatus, setTermosStatus] = useState<TermosLoadStatus>("loading");
+  const reloadTermosMulta = useCallback(async () => {
+    try {
+      setTermosMulta(await listarTermosPendentes(comunicadosDriverIdRef.current));
+      setTermosStatus("ready");
+    } catch (error) {
+      setTermosStatus((current) => current === "ready" ? current : "error");
+      throw error;
+    }
+  }, []);
+  useEffect(() => {
+    if (!isMockTermos() && !driverContext?.id) return;
+    reloadTermosMulta().catch((error) => reportAppError(error, { severity: "warning", source: "app", action: "listarTermosPendentes", notifyUser: false }));
+  }, [driverContext?.id]);
 
   // Checklists usam o mesmo motorista logado dos comunicados.
   const reloadChecklists = useCallback(async () => {
@@ -2086,7 +2105,7 @@ function App() {
       setScreen("checklists");
       return;
     }
-    if (screenName === "servicos" || screenName === "comunicados" || screenName === "historico" || screenName === "solicitarManutencao" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro") {
+    if (screenName === "servicos" || screenName === "comunicados" || screenName === "historico" || screenName === "solicitarManutencao" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro" || screenName === "multas") {
       setComunicadoOrigin("");
       setScreen(screenName);
     }
@@ -3764,6 +3783,12 @@ function App() {
     );
   }
 
+  if (screen === "multas") {
+    return show(
+      <TermosMultaScreen items={termosMulta} loadStatus={termosStatus} onBack={() => setScreen("inicio")} onReload={reloadTermosMulta} />
+    );
+  }
+
   if (screen === "checklists") {
     return show(
       <ChecklistsScreen
@@ -3790,6 +3815,7 @@ function App() {
       services={store.agenda}
       pendingComunicados={comunicados.filter(isComunicadoPending).length}
       pendingChecklists={checklists.filter(isChecklistPending).length}
+      pendingMultas={termosMulta.length}
       driverName={driverContext?.fullName}
       showLocalReset={isLocalhostRuntime && !remoteMode}
       onResetLocalData={resetLocalData}

@@ -1,0 +1,101 @@
+/* Multas (termo de multa com assinatura eletrônica). Tokens do Design System Betinhos: tema claro, sem gradiente,
+   #FCFCFB em listas/campos neutros, azul só em foco/ação/status. Motion: 160 ms ease-out, transform/opacity. */
+.termo-screen,.termo-flow { width:100%; max-width:760px; flex:1 1 auto; min-height:0; color:#0f172a; }
+.termo-screen { overflow-y:auto; padding:4px 4px max(24px, env(safe-area-inset-bottom)); }
+.termo-flow { display:flex; flex-direction:column; }
+.termo-flow-scroll { flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden; padding:4px 4px 16px; -webkit-overflow-scrolling:touch; }
+.termo-step { display:grid; gap:12px; min-width:0; }
+.termo-step-header { display:grid; gap:4px; }
+.termo-step-header .termo-text-button { justify-self:start; padding:4px 0; }
+.termo-step-header h2 { margin:0; color:#001a3d; font-size:1.25rem; font-weight:800; line-height:1.25; }
+.termo-step-count { color:#64748b; font-size:.75rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+.termo-help { margin:0; color:#475569; font-size:.9rem; line-height:1.5; }
+
+.termo-list { display:grid; gap:8px; margin:0; padding:0; list-style:none; }
+.termo-row { width:100%; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; min-height:76px; padding:12px 14px; border:1px solid #e2e8f0; border-radius:12px; background:#fcfcfb; color:#0f172a; font:inherit; text-align:left; cursor:pointer; transition:transform 160ms cubic-bezier(.23,1,.32,1), border-color 160ms ease; }
+.termo-row-main,.termo-row-side { display:grid; gap:4px; min-width:0; }
+.termo-row-side { justify-items:end; text-align:right; }
+.termo-row-main strong { font-size:1rem; font-weight:800; letter-spacing:.02em; }
+.termo-row-main span { color:#475569; font-size:.85rem; line-height:1.35; overflow-wrap:anywhere; }
+.termo-row-main small { color:#64748b; font-size:.75rem; font-weight:700; font-variant-numeric:tabular-nums; }
+.termo-row-side strong { font-size:.95rem; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.termo-row:focus-visible,.termo-primary:focus-visible,.termo-text-button:focus-visible,.termo-capture:focus-visible,.termo-texto:focus-visible { outline:0; border-color:#6c91e8; box-shadow:0 0 0 3px rgba(33,89,210,.11); }
+@media (hover:hover) and (pointer:fine) { .termo-row:hover { border-color:#c7d2e2; } }
+
+.termo-badge { display:inline-flex; align-items:center; min-height:22px; padding:0 8px; border-radius:999px; font-size:.6875rem; font-weight:800; white-space:nowrap; }
+.termo-badge[data-tone="atencao"] { background:#fff7df; color:#856000; }
+.termo-empty { margin:8px 0; padding:22px 16px; border:1px dashed #e2e8f0; border-radius:12px; background:#fcfcfb; color:#64748b; text-align:center; }
+.termo-skeleton { display:grid; gap:8px; }
+.termo-skeleton span { height:76px; border-radius:12px; background:#f7f9fc; }
+
+.termo-card { display:grid; gap:12px; padding:14px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; box-shadow:0 8px 24px rgba(0,26,61,.045); }
+.termo-card .termo-badge { justify-self:start; }
+.termo-evidencias { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 12px; margin:0; }
+.termo-evidencias div { min-width:0; }
+.termo-evidencias .is-wide { grid-column:1 / -1; }
+.termo-evidencias dt { color:#64748b; font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; }
+.termo-evidencias dd { margin:2px 0 0; font-size:.92rem; line-height:1.4; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
+.termo-acordo { display:grid; gap:4px; padding:12px 14px; border:1px solid #c7d2e2; border-left:3px solid #2159d2; border-radius:12px; background:#edf3ff; }
+.termo-acordo span { color:#285db5; font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+.termo-acordo strong { color:#001a3d; font-size:1rem; line-height:1.4; }
+.termo-texto { max-height:40dvh; overflow-y:auto; padding:12px 14px; border:1px solid #e2e8f0; border-radius:12px; background:#fcfcfb; }
+.termo-texto p { margin:0; color:#172033; font-size:.92rem; line-height:1.6; white-space:pre-wrap; overflow-wrap:anywhere; }
+.termo-texto small { display:block; margin-top:8px; color:#64748b; font-size:.75rem; }
+
+.termo-alert { margin:0; padding:10px 12px; border-radius:10px; font-size:.88rem; font-weight:700; line-height:1.45; }
+.termo-alert p { margin:0; }
+.termo-alert .termo-text-button { margin-top:6px; }
+.termo-alert[data-tone="erro"] { background:#fff0f3; color:#9f2940; }
+.termo-alert[data-tone="atencao"] { background:#fff7df; color:#856000; }
+.termo-alert[data-tone="sucesso"] { background:#eaf8f1; color:#147a4b; }
+.termo-alert[data-tone="info"] { background:#edf3ff; color:#285db5; }
+
+.termo-selfie { display:grid; gap:10px; justify-items:center; }
+.termo-selfie-frame { width:min(100%, 320px); aspect-ratio:3 / 4; border-radius:12px; overflow:hidden; background:#f7f9fc; border:1px solid #e2e8f0; object-fit:cover; }
+.termo-selfie-frame video { width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
+.termo-capture { min-height:44px; padding:0 18px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; color:#0b2d5a; font:inherit; font-weight:800; cursor:pointer; transition:transform 160ms cubic-bezier(.23,1,.32,1); }
+.termo-capture:disabled { opacity:.55; cursor:wait; }
+
+.termo-signature .comunicado-signature-pad { height:180px; background:#fcfcfb; }
+.termo-field { display:grid; gap:6px; }
+.termo-field label { color:#475569; font-size:.8rem; font-weight:800; }
+.termo-field label span { font-weight:600; }
+.termo-field textarea { width:100%; min-height:140px; padding:10px 12px; border:1px solid #e2e8f0; border-radius:10px; background:#fcfcfb; color:#0f172a; font:inherit; resize:vertical; }
+.termo-field textarea:focus { outline:0; border-color:#6c91e8; box-shadow:0 0 0 3px rgba(33,89,210,.11); }
+.termo-field textarea[aria-invalid="true"] { border-color:#f2c2cc; }
+.termo-field small { color:#64748b; font-size:.75rem; }
+.termo-field small.is-error { color:#a32840; font-weight:700; }
+
+.termo-result { display:grid; justify-items:center; gap:8px; padding:28px 12px; text-align:center; }
+.termo-result h2 { margin:4px 0 0; color:#001a3d; font-size:1.2rem; line-height:1.3; }
+.termo-result p { margin:0; color:#475569; line-height:1.5; }
+.termo-server-msg { color:#64748b; font-size:.75rem; }
+.termo-check { width:56px; height:56px; fill:none; stroke:#147a4b; stroke-width:3; stroke-linecap:round; stroke-linejoin:round; }
+.termo-check circle { fill:#eaf8f1; stroke:none; }
+.termo-check path { stroke-dasharray:40; stroke-dashoffset:0; }
+
+/* Botão principal fixo no rodapé: uma decisão por passo. */
+.termo-footer { flex:0 0 auto; display:grid; gap:4px; width:100%; padding:10px 4px max(10px, env(safe-area-inset-bottom)); border-top:1px solid #e2e8f0; background:#f0f0f0; }
+.termo-primary { display:inline-flex; align-items:center; justify-content:center; gap:8px; width:100%; min-height:48px; padding:0 16px; border:0; border-radius:10px; background:#001a3d; color:#fff; font:inherit; font-size:1rem; font-weight:800; cursor:pointer; transition:transform 160ms cubic-bezier(.23,1,.32,1), background-color 160ms ease; }
+.termo-primary:disabled { opacity:.55; cursor:not-allowed; }
+.termo-primary[aria-busy="true"] { cursor:wait; }
+@media (hover:hover) and (pointer:fine) { .termo-primary:not(:disabled):hover { background:#0b2d5a; } }
+.termo-text-button { padding:6px 0; border:0; background:none; color:#2159d2; font:inherit; font-size:.88rem; font-weight:800; cursor:pointer; }
+.termo-text-button:disabled { opacity:.55; }
+.termo-footer-secondary { justify-self:center; min-height:40px; }
+.termo-spinner { width:16px; height:16px; border:2px solid rgba(255,255,255,.35); border-top-color:#fff; border-radius:50%; animation:termo-spin 800ms linear infinite; }
+
+.termo-row:active,.termo-primary:not(:disabled):active,.termo-capture:not(:disabled):active { transform:scale(.97); }
+
+@keyframes termo-spin { to { transform:rotate(360deg); } }
+@keyframes termo-step-enter { from { opacity:0; transform:translateX(12px); } }
+@keyframes termo-check-draw { from { stroke-dashoffset:40; } }
+@media (prefers-reduced-motion:no-preference) {
+  .termo-step { animation:termo-step-enter 160ms cubic-bezier(.23,1,.32,1) backwards; }
+  .termo-check path { animation:termo-check-draw 300ms cubic-bezier(.23,1,.32,1) 80ms backwards; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .termo-row,.termo-primary,.termo-capture { transition:none; }
+  .termo-row:active,.termo-primary:not(:disabled):active,.termo-capture:not(:disabled):active { transform:none; }
+  .termo-spinner { animation-duration:1600ms; }
+}
