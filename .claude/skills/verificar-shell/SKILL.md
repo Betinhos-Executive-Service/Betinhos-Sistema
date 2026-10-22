@@ -49,6 +49,7 @@ Não passam pelo `pnpm push`; cada script grava o clientdata direto no DEV (com 
 ## Casos de borda
 - Listas (`app/useProgressiveData.ts`, `app/listCache.ts`): cópia em cache por 90 s por `host` (Funcionários e Frota por fonte, uma por `host`); gravação marca a cópia como vencida e descarta as dos outros períodos. Revalidação de lista já completa não encolhe para a primeira página. Trocar o período mostra a lista anterior até a nova chegar, com o total "somando valores…".
 - Mock (`pnpm dev`): telas de WebResource mostram "Esta tela abre dentro do Dataverse".
+- Funcionários › ficha › seção "Assinatura eletrônica" (aditivo): data `new_aditivoassinaturaem` + PDF (`new_aditivoassinatura`, 10 MB, só PDF). O arquivo é gravado por PATCH em `cr40f_funcionarioses(id)/new_aditivoassinatura` (`octet-stream` + `x-ms-file-name`) e sobe junto com Salvar; selo "Aditivo assinado em dd/mm/aaaa" no cabeçalho e link "Baixar". Prova em mock (`#/funcionarios?ficha=m1`, 1280 e 375 px): preencher data + escolher PDF, ver "será enviado ao salvar", salvar, ver selo e link; arquivo que não é PDF mostra "Envie o aditivo em PDF.". No DEV (coluna criada pelo provisionamento do plano): baixar o PDF pelo link e conferir que a coluna `new_aditivoassinatura` ficou preenchida.
 - Funcionários no celular usa cartões (rótulo de alerta completo); a coluna curta "Venceu dd/mm/aaaa" é só no desktop.
 
 ## Evidência obrigatória

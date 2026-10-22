@@ -133,6 +133,11 @@ export function createMockSource(): DataSource {
       rows = rows.map((row) => (row.id === id ? { ...row, ...(field === 'cr40f_foto' ? { fotoThumb: url, fotoUrl: url } : { assinaturaUrl: url }) } : row))
       await delay(null)
     },
+    async uploadAditivo(id, file) {
+      const url = URL.createObjectURL(file)
+      rows = rows.map((row) => (row.id === id ? { ...row, aditivo: { nome: file.name, url } } : row))
+      await delay(null)
+    },
     async saveLogins(id, html) {
       rows = rows.map((row) => (row.id === id ? { ...row, loginsesenhas: html } : row))
       await delay(null)

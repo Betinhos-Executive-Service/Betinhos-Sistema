@@ -12,7 +12,7 @@ import type { XrmHost, XrmWebApi } from './xrm'
 
 const FORMATTED = '@OData.Community.Display.V1.FormattedValue'
 const LIST_SELECT = [...FIELDS.map((field) => field.key), '_cr40f_veiculoatual_value', 'cr40f_foto', 'cr40f_fotoid', 'cr40f_assinaturaid', 'modifiedon']
-const DETAIL_SELECT = [...LIST_SELECT, 'cr40f_loginsesenhas']
+const DETAIL_SELECT = [...LIST_SELECT, 'cr40f_loginsesenhas', 'new_aditivoassinatura', 'new_aditivoassinatura_name']
 
 type Row = Record<string, unknown>
 
@@ -103,6 +103,7 @@ export function createXrmSource(xrm: XrmHost): DataSource {
       fotoThumb: typeof row.cr40f_foto === 'string' && row.cr40f_foto ? `data:image/jpeg;base64,${row.cr40f_foto}` : null,
       fotoUrl: imageUrl(id, 'cr40f_foto', row.cr40f_fotoid),
       assinaturaUrl: imageUrl(id, 'cr40f_assinatura', row.cr40f_assinaturaid),
+      aditivo: row.new_aditivoassinatura ? { nome: String(row.new_aditivoassinatura_name || 'aditivo.pdf'), url: `${apiUrl}/${ENTITY_SET}(${id})/new_aditivoassinatura/$value` } : null,
       loginsesenhas: typeof row.cr40f_loginsesenhas === 'string' ? row.cr40f_loginsesenhas : null,
       modifiedon: typeof row.modifiedon === 'string' ? row.modifiedon : null,
     }
@@ -155,6 +156,21 @@ export function createXrmSource(xrm: XrmHost): DataSource {
 
     async uploadImage(id: string, field: ImageField, file: File) {
       await api.updateRecord(TABLE, id, { [field]: await fileToBase64(file) })
+    },
+
+    /** Coluna de arquivo: PATCH com o binário e o nome em `x-ms-file-name` (até 128 MB numa só requisição; o limite do aditivo é 10 MB). */
+    async uploadAditivo(id: string, file: File) {
+      const response = await fetch(`${apiUrl}/${ENTITY_SET}(${guid(id, 'funcionário')})/new_aditivoassinatura`, {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/octet-stream', 'x-ms-file-name': encodeURIComponent(file.name), 'OData-Version': '4.0', 'OData-MaxVersion': '4.0' },
+        body: file,
+      })
+      if (!response.ok) {
+        let detalhe = ''
+        try { detalhe = ((await response.json()) as { error?: { message?: string } }).error?.message ?? '' } catch { /* corpo vazio */ }
+        throw new Error(detalhe || `Envio recusado pelo Dataverse (${response.status}).`)
+      }
     },
 
     async saveLogins(id, html) {
