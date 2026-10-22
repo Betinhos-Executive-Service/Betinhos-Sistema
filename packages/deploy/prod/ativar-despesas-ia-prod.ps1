@@ -1,6 +1,6 @@
 ﻿# Somente PROD. Ativa "Flow Despesas | Análise IA" e "Flow Despesas | Leitura rápida".
-# Pré-requisito: new_AnthropicApiKey com valor atual no PROD (o Renan preenche no maker portal; este script só conta,
-# nunca lê o valor). Não altera definição de flow.
+# Pré-requisito: new_AnthropicKeyDespesasAnalise e new_AnthropicKeyDespesasLeitura com valor no PROD (o valor padrão vem
+# com a solução; este script só confere, nunca lê o valor). Não altera definição de flow.
 # Para desligar: -Desativar (volta os dois flows para Rascunho).
 param([switch] $Desativar)
 . "$PSScriptRoot/_prod.ps1"
@@ -12,8 +12,11 @@ if ($Desativar) {
   return
 }
 
-$key = EnvVarValueCount 'new_AnthropicApiKey'
-if ($key.Count -ne 1) { throw "new_AnthropicApiKey com $($key.Count) valor(es) atual(is) no PROD; preencha o Valor atual antes de ativar." }
+foreach ($v in 'new_AnthropicKeyDespesasAnalise', 'new_AnthropicKeyDespesasLeitura') {
+  $key = EnvVarValueCount $v
+  $padrao = @((Dv GET "environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq '$v' and defaultvalue ne null").value).Count
+  if (-not $padrao -and $key.Count -ne 1) { throw "$v sem valor padrão nem valor atual no PROD; importe a solução com a chave antes de ativar." }
+}
 
 foreach ($n in $flowsIa) {
   $f = GetFlow $n

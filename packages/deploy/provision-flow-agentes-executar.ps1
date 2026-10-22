@@ -1,5 +1,5 @@
 ﻿# Somente DEV. Cria (ou atualiza) o flow "Flow Agentes | Executar" na solução AppBetinhos, inclui a definição da variável
-# de ambiente new_AnthropicApiKey (já existente, criada pelo flow de despesas) e ativa o flow.
+# de ambiente new_AnthropicKeyAgentes (cria se faltar) e ativa o flow.
 #
 # O flow roda quando uma cr40f_agenteexecucao é criada com status Pendente: marca Processando, confere o limite diário
 # por agente, monta o contexto do departamento (Financeiro, Logística, Pessoas ou Frota) no formato de
@@ -9,7 +9,7 @@
 #
 # Constantes (modelo, max_tokens, effort, prompts, tipos, ações, prefixo e schema) vêm de
 # packages/agentes-ia/dist/constantes.json. Gere antes: pnpm --filter @betinhos/agentes-ia constantes
-# O valor da chave (new_AnthropicApiKey) fica só no ambiente; este script nunca cria nem lê o valor.
+# A chave (new_AnthropicKeyAgentes) vai no valor padrão, preenchido pelo Renan no maker portal; este script nunca grava nem lê o valor.
 #
 # Antes de alterar o flow existente, salva o clientdata em packages/deploy/flows/backup/. Para reverter:
 #   powershell -File packages/deploy/provision-flow-agentes-executar.ps1 -Restaurar <arquivo de backup>
@@ -28,8 +28,8 @@ $environmentUrl = 'https://org23b93544.crm2.dynamics.com'
 $environmentId = '25a2ab78-cf07-ee41-a124-457aa2c29aea'
 $solutionName = 'AppBetinhos'
 $flowName = 'Flow Agentes | Executar'
-$envVarName = 'new_AnthropicApiKey'
-$envVarDisplay = 'Anthropic API Key'
+$envVarName = 'new_AnthropicKeyAgentes'
+$envVarDisplay = 'Anthropic Key - Agentes'
 $paramKey = "$envVarDisplay ($envVarName)"
 $dataverseFlow = 'Flow Comprovantes Despesas Assincrono | App Motoristas'   # fonte da connection reference do Dataverse
 $constantesPath = Join-Path $PSScriptRoot '../agentes-ia/dist/constantes.json'
@@ -118,17 +118,20 @@ foreach ($ag in 'financeiro', 'logistica', 'pessoas', 'frota') {
 # O prefixo vira literal dentro de concat('...'): aspas simples quebrariam a expressão.
 if ($const.prefixoUsuario.Contains("'")) { throw 'prefixoUsuario contém aspa simples; revise a substituição de __PREFIXO__.' }
 
-# Variável da chave: já existe no DEV (flow de despesas). Só inclui a definição na solução e confere que há valor no ambiente.
+# Variável da chave: o script cria só a definição (String). O Renan cola a chave no valor padrão.
 $envDefs = @((Dv GET "environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq '$envVarName'").value)
-if ($envDefs.Count -ne 1) { throw "Variável $envVarName ausente ou duplicada no DEV (rode antes provision-flow-despesas-ia.ps1)." }
-# Valor padrão faz parte da definição e iria no export da solução. Confere pelo filtro, sem trazer o valor.
-$temPadrao = [bool]@((Dv GET "environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq '$envVarName' and defaultvalue ne null").value).Count
-if ($temPadrao -and -not $SomenteValidar) { throw "A variável $envVarName tem valor padrão; ele iria no export da solução. Mova a chave para o valor atual (fora da $solutionName) e apague o valor padrão." }
-if ($temPadrao) { Write-Warning "$envVarName tem valor padrão (iria no export)." }
+if (-not $envDefs.Count) {
+  Dv POST environmentvariabledefinitions @{ schemaname = $envVarName; displayname = $envVarDisplay; type = 100000000; description = 'Chave da API do Claude (workspace Agentes) usada pelo flow Agentes | Executar. Chave no valor padrão.' } | Out-Null
+  $envDefs = @((Dv GET "environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq '$envVarName'").value)
+}
+if ($envDefs.Count -ne 1) { throw "Variável $envVarName ausente ou duplicada no DEV." }
 Include $envDefs[0].environmentvariabledefinitionid 380
-# O Power Automate só ativa o flow quando a variável tem valor no ambiente. Sem valor, o flow fica gravado e desligado.
+# A chave fica no valor padrão (vai com a solução e vale em todos os ambientes); valor atual, se houver, tem precedência.
+# O Power Automate só ativa o flow quando a variável tem valor. Sem nenhum dos dois, o flow fica gravado e desligado.
+# Confere pelos filtros, sem trazer o valor.
 $envId = $envDefs[0].environmentvariabledefinitionid
-$temValor = [bool]@((Dv GET "environmentvariablevalues?`$select=environmentvariablevalueid&`$filter=_environmentvariabledefinitionid_value eq $envId").value).Count
+$temPadrao = [bool]@((Dv GET "environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq '$envVarName' and defaultvalue ne null").value).Count
+$temValor = $temPadrao -or [bool]@((Dv GET "environmentvariablevalues?`$select=environmentvariablevalueid&`$filter=_environmentvariabledefinitionid_value eq $envId").value).Count
 
 # Connection reference do Dataverse, a mesma do flow de comprovantes. Este flow não usa SharePoint.
 $dvSource = @((Dv GET "workflows?`$select=clientdata&`$filter=name eq '$dataverseFlow' and category eq 5").value)
@@ -628,7 +631,7 @@ if ($flows.Count) {
   AssertSemMojibake $flows[0].clientdata 'clientdata atual'
   $atual = ($flows[0].clientdata | ConvertFrom-Json) | ConvertTo-Json -Depth 90 -Compress
   $novo = ($clientData | ConvertFrom-Json) | ConvertTo-Json -Depth 90 -Compress
-  if ($atual -ne $novo -and -not $temValor) { throw "A definição mudou, mas o Power Automate só aceita gravar este flow quando $envVarName tiver valor no DEV. Preencha o valor e rode de novo (use -SomenteValidar para conferir a definição antes)." }
+  if ($atual -ne $novo -and -not $temValor) { throw "A definição mudou, mas o Power Automate só aceita gravar este flow quando $envVarName tiver valor. Preencha o valor padrão e rode de novo (use -SomenteValidar para conferir a definição antes)." }
   if ($atual -ne $novo) {
     Backup $flows[0]
     Apply $flows[0] $clientData
@@ -648,7 +651,7 @@ AssertSemMojibake $row.clientdata 'clientdata gravado'
 Conferir (($row.clientdata | ConvertFrom-Json).properties.definition)
 if (-not @((Dv GET "solutioncomponents?`$select=solutioncomponentid&`$filter=_solutionid_value eq $solutionId and componenttype eq 29 and objectid eq $flowId").value).Count) { throw 'Flow fora da AppBetinhos.' }
 if (-not $temValor) {
-  Write-Output "DEV: '$flowName' gravado e DESLIGADO ($flowId), na $solutionName. Preencha o valor de $envVarName no DEV (Soluções > $solutionName > Variáveis de ambiente) e rode este script de novo para ativar."
+  Write-Output "DEV: '$flowName' gravado e DESLIGADO ($flowId), na $solutionName. Preencha o valor padrão de $envVarName (Soluções > $solutionName > Variáveis de ambiente) e rode este script de novo para ativar."
   return
 }
-Write-Output "DEV: '$flowName' ativo ($flowId), na $solutionName; $envVarName na solução, sem valor padrão."
+Write-Output "DEV: '$flowName' ativo ($flowId), na $solutionName; $envVarName na solução."
