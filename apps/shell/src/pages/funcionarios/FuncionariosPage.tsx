@@ -1,5 +1,5 @@
 import { Alert, Button, EmptyState, SearchBox, ToastProvider, ViewBar } from '@betinhos/ui'
-import { Cake, CloudOff, IdCard, Plus, RefreshCw, SearchX, Stethoscope } from 'lucide-react'
+import { Cake, CloudOff, IdCard, KeyRound, Plus, RefreshCw, SearchX, Stethoscope } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
@@ -14,6 +14,7 @@ import type { AlertKind } from './data/alerts'
 import { todaySP } from './data/dates'
 import { applyBaseFilters, applyFilters, countAlertas, DEFAULT_FILTERS, loadFilters, saveFilters, withAlertas, type Filters } from './data/filters'
 import { FUNCIONARIO_COLUMNS, FUNCIONARIO_DEFAULT_FILTERS, FUNCIONARIO_FIELDS, FUNCIONARIO_SORT, TELA, builtinViews, fromLegacyFilters, matchesAlerta, matchesKeyword, readFuncionario, sortFuncionarios } from './data/lista'
+import { createAcessoSource } from './data/acesso'
 import { createFuncionariosSource } from './data/hostSource'
 import { funcionariosQuery } from './data/query'
 import type { DataSource } from './data/source'
@@ -21,6 +22,7 @@ import type { Funcionario, FuncionarioView } from './data/types'
 import { errorMessage } from './data/xrm'
 import { createDocsSource, type DocsSource } from '../documentos/data/source'
 import { EnvBadge } from './components/Badges'
+import { CadastroAcessoDrawer } from './components/CadastroAcessoDrawer'
 import { Ficha } from './components/Ficha'
 import { MobileHome } from './components/MobileHome'
 import { useIsMobile } from './lib/useMediaQuery'
@@ -129,6 +131,14 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
     if (created) setSelection({ mode: 'open', id })
   }, [source, reload, mutate])
 
+  const [acessoAberto, setAcessoAberto] = useState<{ aberto: boolean; inicial?: { funcionarioId: string; nomeCompleto: string; celular: string } }>({ aberto: false })
+  const acesso = useMemo(() => createAcessoSource(host), [host])
+  const onAcessoCadastrado = useCallback((id: string) => {
+    setAcessoAberto({ aberto: false })
+    void onSaved(id, !rows.some((row) => row.id === id))
+    setSelection({ mode: 'open', id })
+  }, [onSaved, rows])
+
   const ativos = views.filter((row) => row.values.cr40f_status === 0).length
   const ficha = selection.mode !== 'closed' && (
     <Ficha source={source} docs={docs} id={selection.mode === 'open' ? selection.id : null} onClose={() => setSelection({ mode: 'closed' })} onSaved={onSaved} />
@@ -177,6 +187,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
             ))}
           </div>
           <Button variant="secondary" icon={<RefreshCw size={16} className={loading ? 'spin' : ''} />} aria-label="Recarregar lista" title="Recarregar" onClick={() => void reload()} disabled={loading} />
+          <Button variant="secondary" icon={<KeyRound size={16} />} onClick={() => setAcessoAberto({ aberto: true })}>Cadastrar acesso</Button>
           <Button icon={<Plus size={16} />} onClick={() => setSelection({ mode: 'new' })}>Novo</Button>
         </ViewBar>
       </div>
@@ -208,6 +219,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
       </main>
 
       {ficha}
+      {acessoAberto.aberto && <CadastroAcessoDrawer acesso={acesso} inicial={acessoAberto.inicial} onClose={() => setAcessoAberto({ aberto: false })} onCadastrado={onAcessoCadastrado} />}
     </div>
     </div>
   )
