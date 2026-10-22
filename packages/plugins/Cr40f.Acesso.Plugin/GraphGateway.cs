@@ -24,12 +24,13 @@ public sealed class GraphGateway : IGraphGateway
         return resp is null ? null : LerUsuario(JsonLeve.Ler(resp));
     }
 
-    public GraphUsuario CriarUsuario(string upn, string nome, string senhaTemporaria, string? celular)
+    public GraphUsuario CriarUsuario(string upn, string nome, string senhaTemporaria, string? celular, string? emailPessoal = null)
     {
         var mailNickname = upn.Split('@')[0];
         var corpo = "{\"accountEnabled\":true,\"displayName\":" + JsonLeve.Texto(nome) + ",\"mailNickname\":" + JsonLeve.Texto(mailNickname)
             + ",\"userPrincipalName\":" + JsonLeve.Texto(upn) + ",\"usageLocation\":\"BR\",\"preferredLanguage\":\"pt-BR\""
             + (celular is null ? "" : ",\"mobilePhone\":" + JsonLeve.Texto(celular))
+            + (emailPessoal is null ? "" : ",\"otherMails\":[" + JsonLeve.Texto(emailPessoal) + "]")
             + ",\"passwordProfile\":{\"forceChangePasswordNextSignIn\":true,\"password\":" + JsonLeve.Texto(senhaTemporaria) + "}}";
         return LerUsuario(JsonLeve.Ler(Enviar(HttpMethod.Post, "/users", corpo)!));
     }
@@ -57,11 +58,11 @@ public sealed class GraphGateway : IGraphGateway
         var lista = (List<object?>)JsonLeve.Ler(Enviar(HttpMethod.Get, "/subscribedSkus", null)!)["value"]!;
         foreach (var sku in lista.Cast<Dictionary<string, object?>>())
         {
-            if ((string?)sku["skuId"] != skuId) continue;
+            if (!string.Equals((string?)sku["skuId"], skuId, StringComparison.OrdinalIgnoreCase)) continue;
             var habilitadas = Convert.ToInt32(((Dictionary<string, object?>)sku["prepaidUnits"]!)["enabled"], CultureInfo.InvariantCulture);
             return habilitadas - Convert.ToInt32(sku["consumedUnits"], CultureInfo.InvariantCulture);
         }
-        return 0;
+        throw new AcessoException("CONFIG_AUSENTE", "SKU de licença não existe no tenant: " + skuId + ".");
     }
 
     private static GraphUsuario LerUsuario(Dictionary<string, object?> j)

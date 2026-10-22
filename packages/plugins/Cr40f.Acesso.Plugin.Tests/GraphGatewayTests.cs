@@ -65,4 +65,44 @@ public sealed class GraphGatewayTests
             : Json("{\"value\":[{\"skuId\":\"sku\",\"consumedUnits\":3,\"prepaidUnits\":{\"enabled\":10}}]}");
         Assert.Equal(7, new GraphGateway(Cfg(), () => new HttpClient(h)).LicencasLivres("sku"));
     }
+
+    private static Handler ComSkus()
+    {
+        var h = new Handler();
+        h.Responder = r => r.RequestUri!.AbsolutePath.Contains("/token") ? Json("{\"access_token\":\"tok\"}")
+            : Json("{\"value\":[{\"skuId\":\"ABC-sku\",\"consumedUnits\":3,\"prepaidUnits\":{\"enabled\":10}}]}");
+        return h;
+    }
+
+    [Fact]
+    public void LicencasLivres_ignora_caixa_do_sku()
+        => Assert.Equal(7, new GraphGateway(Cfg(), () => new HttpClient(ComSkus())).LicencasLivres("abc-SKU"));
+
+    [Fact]
+    public void LicencasLivres_sku_inexistente_lanca_CONFIG_AUSENTE()
+    {
+        var erro = Assert.Throws<AcessoException>(() => new GraphGateway(Cfg(), () => new HttpClient(ComSkus())).LicencasLivres("outro"));
+        Assert.Equal("CONFIG_AUSENTE", erro.Codigo);
+        Assert.Contains("SKU de licença não existe no tenant", erro.Message);
+    }
+
+    private static string CorpoCriar(string? emailPessoal)
+    {
+        var h = new Handler(); string? corpo = null;
+        h.Responder = r =>
+        {
+            if (r.RequestUri!.AbsolutePath.Contains("/token")) return Json("{\"access_token\":\"tok\"}");
+            corpo = r.Content!.ReadAsStringAsync().Result;
+            return Json("{\"id\":\"1\",\"userPrincipalName\":\"x@b.com\",\"displayName\":\"X Y\",\"accountEnabled\":true,\"assignedLicenses\":[]}");
+        };
+        new GraphGateway(Cfg(), () => new HttpClient(h)).CriarUsuario("x@b.com", "X Y", "Senha#123456", null, emailPessoal);
+        return corpo!;
+    }
+
+    [Fact]
+    public void CriarUsuario_envia_otherMails_quando_ha_email_pessoal()
+    {
+        Assert.Contains("\"otherMails\":[\"x@gmail.com\"]", CorpoCriar("x@gmail.com"));
+        Assert.DoesNotContain("otherMails", CorpoCriar(null));
+    }
 }

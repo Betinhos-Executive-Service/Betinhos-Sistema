@@ -7,7 +7,7 @@ public sealed class GraphUsuario { public string Id = ""; public string Upn = ""
 public interface IGraphGateway
 {
     GraphUsuario? UsuarioPorUpn(string upn);               // null quando não existe
-    GraphUsuario CriarUsuario(string upn, string nome, string senhaTemporaria, string? celular);
+    GraphUsuario CriarUsuario(string upn, string nome, string senhaTemporaria, string? celular, string? emailPessoal = null);   // emailPessoal vira otherMails
     void DefinirAtivo(string usuarioId, bool ativo);
     void AtribuirLicenca(string usuarioId, string skuId);
     void RemoverLicenca(string usuarioId, string skuId);

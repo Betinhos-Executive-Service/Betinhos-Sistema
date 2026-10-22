@@ -48,4 +48,15 @@ public sealed class AcessoConfigTests
         Assert.Equal("a", item["skuId"]);
         Assert.Equal("2", System.Convert.ToString(obj["n"], System.Globalization.CultureInfo.InvariantCulture));
     }
+
+    [Theory]
+    [InlineData("{\"tenantId\":\"t\",", "{\"clientSecret\":\"s\"}")]
+    [InlineData(Unsecure, "{\"clientSecret\":\"segredo-vazado")]
+    public void Parse_json_malformado_lanca_CONFIG_AUSENTE_sem_texto_original(string unsecure, string secure)
+    {
+        var erro = Assert.Throws<AcessoException>(() => AcessoConfig.Parse(unsecure, secure));
+        Assert.Equal("CONFIG_AUSENTE", erro.Codigo);
+        Assert.DoesNotContain("segredo", erro.Message);
+        Assert.Null(erro.InnerException);
+    }
 }

@@ -149,4 +149,60 @@ public sealed class CadastrarAcessoHandlerTests
         Assert.Contains("CriarUsuario", _graph.Chamadas);
         Assert.Empty(_graph.Usuarios["joao.avila@betinhos.com.br"].SkuIds);
     }
+
+    [Fact]
+    public void Sem_FuncionarioId_upn_desativado_conta_como_ocupado_mesmo_homonimo_exato()
+    {
+        _graph.Usuarios["joao.avila@betinhos.com.br"] = new GraphUsuario { Id = "velho", Upn = "joao.avila@betinhos.com.br", DisplayName = "João da Silva Ávila", Ativo = false };
+        var saida = Handler().Executar(Entrada());
+        Assert.Equal("joao.avila2@betinhos.com.br", saida.EmailMicrosoft);
+        Assert.DoesNotContain("DefinirAtivo", _graph.Chamadas);
+        Assert.False(_graph.Usuarios["joao.avila@betinhos.com.br"].Ativo);
+    }
+
+    [Fact]
+    public void Sem_FuncionarioId_dono_homonimo_com_conta_desativada_gera_sufixo()
+    {
+        _svc.Com(new Entity("cr40f_funcionarios", Guid.NewGuid()) { ["cr40f_nomecompleto"] = "João da Silva Ávila", ["cr40f_emailmicrosoft"] = "joao.avila@betinhos.com.br", ["cr40f_status"] = new OptionSetValue(1) });
+        _graph.Usuarios["joao.avila@betinhos.com.br"] = new GraphUsuario { Id = "velho", Upn = "joao.avila@betinhos.com.br", DisplayName = "João da Silva Ávila", Ativo = false };
+        Assert.Equal("joao.avila2@betinhos.com.br", Handler().Executar(Entrada()).EmailMicrosoft);
+        Assert.DoesNotContain("DefinirAtivo", _graph.Chamadas);
+    }
+
+    [Fact]
+    public void FuncionarioId_com_email_de_conta_desativada_lanca_ACESSO_ENCERRADO_sem_escrever()
+    {
+        var id = Guid.NewGuid();
+        _svc.Com(new Entity("cr40f_funcionarios", id) { ["cr40f_nomecompleto"] = "João da Silva Ávila", ["cr40f_emailmicrosoft"] = "joao.avila@betinhos.com.br", ["cr40f_status"] = new OptionSetValue(1) });
+        _graph.Usuarios["joao.avila@betinhos.com.br"] = new GraphUsuario { Id = "velho", Upn = "joao.avila@betinhos.com.br", DisplayName = "João da Silva Ávila", Ativo = false };
+        var e = Entrada(); e.FuncionarioId = id;
+        var erro = Assert.Throws<AcessoException>(() => Handler().Executar(e));
+        Assert.Equal("ACESSO_ENCERRADO", erro.Codigo);
+        Assert.Contains("Peça à TI para reativar a conta no Entra.", erro.Message);
+        Assert.DoesNotContain("DefinirAtivo", _graph.Chamadas); Assert.DoesNotContain("AtribuirLicenca", _graph.Chamadas); Assert.DoesNotContain("AdicionarAoGrupo", _graph.Chamadas);
+        Assert.Empty(_svc.Atualizados); Assert.Empty(_svc.Criados);
+    }
+
+    [Fact]
+    public void Sku_com_caixa_diferente_conta_como_ja_atribuida()
+    {
+        var u = new GraphUsuario { Id = "u1", Upn = "joao.avila@betinhos.com.br", DisplayName = "João da Silva Ávila", Ativo = true }; u.SkuIds.Add("SKU");
+        _graph.Usuarios[u.Upn] = u;
+        Handler().Executar(Entrada());
+        Assert.DoesNotContain("AtribuirLicenca", _graph.Chamadas);
+    }
+
+    [Theory]
+    [InlineData("joao@gmail.com", "joao@gmail.com")]
+    [InlineData("  joao@gmail.com ", "joao@gmail.com")]
+    [InlineData("joao-gmail.com", null)]
+    [InlineData("joao@gmail", null)]
+    [InlineData("jo ao@gmail.com", null)]
+    [InlineData(null, null)]
+    public void EmailPessoal_valido_vai_para_otherMails(string? informado, string? esperado)
+    {
+        var e = Entrada(); e.EmailPessoal = informado;
+        Handler().Executar(e);
+        Assert.Equal(esperado, _graph.UltimoEmailPessoal);
+    }
 }
