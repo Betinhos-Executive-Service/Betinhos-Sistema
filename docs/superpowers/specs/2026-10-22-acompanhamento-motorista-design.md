@@ -127,5 +127,6 @@ A Custom API `new_GerarLinkAcompanhamento` passa a enviar no `POST /api/links`:
 
 ## Pendências para o plano
 
-- Onde está o código da Custom API `new_GerarLinkAcompanhamento` (plugin) e as colunas de paradas da reserva: confirmar na metadata do DEV (MCP Dataverse_DEV não conectou nesta sessão).
+- A Custom API `new_GerarLinkAcompanhamento` fica no repo `App Motoristas` (`plugins/DriverRecordSharing/GenerateTrackingLinkPlugin.cs`, publicação por `scripts/push-dev.ps1`). Ou seja, a mudança envolve 3 repos: Worker, App Motoristas (plugin) e Sistema Betinhos (Flow do "Concluído").
+- Colunas de paradas da reserva: confirmar na metadata do DEV (o MCP Dataverse_DEV não conectou nesta sessão).
 - Limite de tamanho do payload da Custom API com duas fotos (alternativa: o Worker baixa as fotos por um endpoint autenticado).
