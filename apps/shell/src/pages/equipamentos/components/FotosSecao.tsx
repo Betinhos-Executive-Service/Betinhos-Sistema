@@ -1,15 +1,16 @@
-import { useCallback, useEffect, useId, useRef, useState, type HTMLAttributes, type SyntheticEvent } from 'react'
+import { useCallback, useContext, useEffect, useId, useRef, useState, type HTMLAttributes, type SyntheticEvent } from 'react'
 import { Alert, Button, Dialog, Progress, StatusBadge, useToast } from '@betinhos/ui'
-import { ImageOff, ImagePlus, Star, Trash2, X } from 'lucide-react'
+import { ImageOff, ImagePlus, LoaderCircle, Star, Trash2, X } from 'lucide-react'
 import type { Source } from '../data/source'
-import { ajustesAoExcluir, ajustesCapa, aplicarAjustes, arquivosColados, editavel, miniaturaDaCapa, nasceCapa, nomeFoto, ordenarFotos, validarFoto, type AjusteCapa, type Foto } from '../domain/fotos'
+import { ImagensContext, useImagemFoto } from './ImagemFoto'
+import { ajustesAoExcluir, ajustesCapa, aplicarAjustes, arquivosColados, caminhoDaCapa, editavel, nasceCapa, nomeArquivoFoto, nomeFoto, ordenarFotos, validarFoto, type AjusteCapa, type Foto } from '../domain/fotos'
 
 type Props = {
   /** Item salvo; null = cadastro novo (fotos só depois do primeiro salvamento). */
   equipamentoId: string | null
   source: Source
-  /** Miniatura da capa para a lista (null = sem capa, volta ao ícone do tipo). */
-  onCapa: (equipamentoId: string, miniatura: string | null) => void
+  /** Caminho da capa para a lista (null = sem capa, volta ao ícone do tipo). */
+  onCapa: (equipamentoId: string, caminho: string | null) => void
   /** Avisa o drawer enquanto há envio na fila (o drawer não fecha no meio). */
   onEnviando: (enviando: boolean) => void
 }
@@ -28,6 +29,7 @@ const AJUDA = 'Cole com Ctrl+V, arraste as imagens ou use Adicionar fotos. PNG, 
  */
 export function FotosSecao({ equipamentoId, source, onCapa, onEnviando }: Props) {
   const toast = useToast()
+  const imagens = useContext(ImagensContext)
   const tituloId = useId()
   const input = useRef<HTMLInputElement>(null)
   const [fotos, setFotos] = useState<Foto[] | null>(null)
@@ -51,7 +53,7 @@ export function FotosSecao({ equipamentoId, source, onCapa, onEnviando }: Props)
     if (itemRef.current !== id) return
     fotosRef.current = ordenarFotos(fn(fotosRef.current))
     setFotos(fotosRef.current)
-    onCapa(id, miniaturaDaCapa(fotosRef.current))
+    onCapa(id, caminhoDaCapa(fotosRef.current))
   }, [onCapa])
 
   const carregar = useCallback(async (id: string) => {
@@ -62,8 +64,8 @@ export function FotosSecao({ equipamentoId, source, onCapa, onEnviando }: Props)
       if (itemRef.current !== id) return
       fotosRef.current = list
       setFotos(list)
-      // Acerta a miniatura da lista com o que está gravado (outra pessoa pode ter mexido nas fotos).
-      onCapa(id, miniaturaDaCapa(list))
+      // Acerta a capa da lista com o que está gravado (outra pessoa pode ter mexido nas fotos).
+      onCapa(id, caminhoDaCapa(list))
     } catch (reason) {
       if (itemRef.current === id) setErroCarga(reasonText(reason))
     }
@@ -96,10 +98,12 @@ export function FotosSecao({ equipamentoId, source, onCapa, onEnviando }: Props)
     try {
       while (fila.current.length && itemRef.current === id) {
         const file = fila.current.shift()!
-        const nome = nomeFoto(file)
+        const nome = nomeArquivoFoto(file, fotosRef.current.map((f) => f.nome))
         setProgresso((p) => p && { ...p, atual: nome })
         try {
           const nova = await source.addFoto(id, file, nome, nasceCapa(fotosRef.current))
+          // A foto recém-enviada aparece do próprio arquivo, sem baixar de volta do SharePoint.
+          imagens?.guardar(nova.caminho, file)
           atualizar(id, (list) => [...list, nova])
         } catch (reason) {
           if (itemRef.current === id) setErros((e) => [...e, `${nome}: não foi enviada. ${reasonText(reason)}`])
@@ -206,7 +210,8 @@ export function FotosSecao({ equipamentoId, source, onCapa, onEnviando }: Props)
     setOcupado(foto.id)
     try {
       const ajustes = ajustesAoExcluir(fotosRef.current, foto.id)
-      await source.deleteFoto(foto.id)
+      await source.deleteFoto(foto)
+      imagens?.esquecer(foto.caminho)
       await gravarAjustes(id, ajustes, (list) => list.filter((f) => f.id !== foto.id))
       toast({ tone: 'success', message: `Foto ${foto.nome} excluída.` })
     } catch (reason) {
@@ -230,9 +235,7 @@ export function FotosSecao({ equipamentoId, source, onCapa, onEnviando }: Props)
       <ul className="eq-fotos__grade" aria-label="Fotos do equipamento">
         {fotos.map((f) => (
           <li key={f.id} className={`eq-foto${f.capa ? ' eq-foto--capa' : ''}`}>
-            <button type="button" className="eq-foto__ver" aria-label={`Ver ${f.nome}`} onClick={() => setVendo(f)}>
-              {f.miniatura ? <img src={f.miniatura} alt="" /> : <ImageOff size={24} aria-hidden="true" />}
-            </button>
+            <FotoMiniatura foto={f} onVer={() => setVendo(f)} />
             <div className="eq-foto__pe">
               <span className="eq-foto__nome" title={f.nome}>{f.nome}</span>
               <span className="eq-foto__acoes">
@@ -280,18 +283,34 @@ export function FotosSecao({ equipamentoId, source, onCapa, onEnviando }: Props)
   )
 }
 
-/** Foto grande (`size=full`); se não carregar, mostra a miniatura com aviso. Fecha por X, Esc ou fundo. */
+/** Miniatura no drawer: baixada do SharePoint quando aparece na tela; carregando, um indicador; sem imagem, o ícone. */
+function FotoMiniatura({ foto, onVer }: { foto: Foto; onVer: () => void }) {
+  const ref = useRef<HTMLButtonElement>(null)
+  const src = useImagemFoto(foto.caminho || null, ref)
+  const [quebrada, setQuebrada] = useState(false)
+  useEffect(() => { setQuebrada(false) }, [src])
+  return (
+    <button ref={ref} type="button" className="eq-foto__ver" aria-label={`Ver ${foto.nome}`} aria-busy={src === undefined || undefined} onClick={onVer}>
+      {src && !quebrada ? <img src={src} alt="" onError={() => setQuebrada(true)} />
+        : src === undefined ? <LoaderCircle size={20} className="eq-foto__carregando" aria-hidden="true" />
+        : <ImageOff size={24} aria-hidden="true" />}
+    </button>
+  )
+}
+
+/** Foto grande: a mesma imagem baixada para a miniatura (cache por caminho). Fecha por X, Esc ou fundo. */
 function FotoViewer({ foto, onClose }: { foto: Foto | null; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null)
-  const [falhou, setFalhou] = useState(false)
-  useEffect(() => { setFalhou(false) }, [foto?.id])
+  const src = useImagemFoto(foto?.caminho || null)
+  const [quebrada, setQuebrada] = useState(false)
+  useEffect(() => { setQuebrada(false) }, [src])
   useEffect(() => {
     const dialog = ref.current
     if (!dialog) return
     if (foto && !dialog.open) dialog.showModal?.()
     if (!foto && dialog.open) dialog.close?.()
   }, [foto])
-  const src = foto ? (falhou || !foto.url ? foto.miniatura : foto.url) : null
+  const falhou = src === null || quebrada
   return (
     <dialog ref={ref} className="eq-viewer" aria-label={foto?.nome ?? 'Foto'} onCancel={(event) => { event.preventDefault(); onClose() }}
       onClick={(event) => { if (event.target === event.currentTarget) onClose() }}>
@@ -303,9 +322,11 @@ function FotoViewer({ foto, onClose }: { foto: Foto | null; onClose: () => void 
             <Button variant="ghost" size="compact" icon={<X size={18} />} aria-label="Fechar foto" onClick={onClose} />
           </header>
           <div className="eq-viewer__corpo">
-            {src ? <img src={src} alt={foto.nome} onError={() => setFalhou(true)} /> : <ImageOff size={32} aria-hidden="true" />}
+            {src && !quebrada ? <img src={src} alt={foto.nome} onError={() => setQuebrada(true)} />
+              : falhou ? <ImageOff size={32} aria-hidden="true" />
+              : <p className="eq-muted" role="status">Carregando foto…</p>}
           </div>
-          {falhou && foto.miniatura ? <p className="eq-muted">A imagem grande não carregou; mostrando a miniatura.</p> : null}
+          {falhou ? <p className="eq-muted">A foto não carregou do SharePoint.</p> : null}
         </div>
       ) : null}
     </dialog>

@@ -54,7 +54,7 @@ export function useEquipamentos(source: Source) {
     }))
   }, [])
 
-  /** Miniatura da capa na lista depois de enviar, trocar ou excluir foto no drawer (null = volta ao ícone do tipo). */
+  /** Capa (caminho no SharePoint) na lista depois de enviar, trocar ou excluir foto no drawer (null = volta ao ícone do tipo). */
   const setCapa = useCallback((equipamentoId: string, capa: string | null) => {
     token.current += 1
     setState((s) => ({ ...s, loading: false, equipamentos: s.equipamentos.map((e) => (e.id === equipamentoId ? { ...e, capa } : e)) }))

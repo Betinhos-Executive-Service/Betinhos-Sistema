@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from 'vitest'
-import { ajustesAoExcluir, ajustesCapa, aplicarAjustes, arquivosColados, capaEfetiva, editavel, miniaturaDaCapa, nasceCapa, nomeFoto, ordenarFotos, validarFoto, type Foto } from './fotos'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ajustesAoExcluir, ajustesCapa, aplicarAjustes, arquivosColados, caminhoDaCapa, capaEfetiva, editavel, nasceCapa, nomeArquivoFoto, nomeFoto, ordenarFotos, validarFoto, type Foto } from './fotos'
 import { iconeTipo } from './cadastros'
 import { capasPath, fotoPayload, fotosPath, mapCapas, mapFoto } from '../data/queries'
-import { createSource } from '../data/source'
+import { createCacheImagens } from '../data/imagens'
+import { createSource, documentoDaFoto } from '../data/source'
 import type { Host } from '../../../host'
 
 const foto = (id: string, dia: number, capa = false, over: Partial<Foto> = {}): Foto =>
-  ({ id, equipamentoId: 'e1', nome: `${id}.jpg`, capa, criadoEm: new Date(Date.UTC(2026, 9, dia)), miniatura: `data:${id}`, url: null, ...over })
+  ({ id, equipamentoId: 'e1', nome: `${id}.jpg`, capa, criadoEm: new Date(Date.UTC(2026, 9, dia)), caminho: `Equipamentos/DEV/e1/${id}.jpg`, ...over })
 const arquivo = (nome: string, type: string, size = 10) => {
   const f = new File(['x'], nome, { type })
   Object.defineProperty(f, 'size', { value: size })
@@ -57,10 +58,10 @@ describe('capa das fotos', () => {
     expect(ajustesAoExcluir([foto('a', 1), foto('b', 2), foto('c', 3)], 'c')).toEqual([{ id: 'a', capa: true }])
   })
 
-  it('miniatura da lista: só a capa marcada; sem marcada, ícone do tipo (null)', () => {
-    expect(miniaturaDaCapa([foto('a', 1), foto('b', 2, true)])).toBe('data:b')
-    expect(miniaturaDaCapa([foto('a', 1)])).toBeNull()
-    expect(miniaturaDaCapa([])).toBeNull()
+  it('capa da lista: o caminho da capa marcada; sem marcada, ícone do tipo (null)', () => {
+    expect(caminhoDaCapa([foto('a', 1), foto('b', 2, true)])).toBe('Equipamentos/DEV/e1/b.jpg')
+    expect(caminhoDaCapa([foto('a', 1)])).toBeNull()
+    expect(caminhoDaCapa([])).toBeNull()
   })
 })
 
@@ -79,6 +80,13 @@ describe('arquivos de foto', () => {
     expect(nomeFoto(arquivo('image.png', 'image/png'), quando)).toBe('Foto colada 2026-10-21 09h05m07s.png')
     expect(nomeFoto(arquivo('', 'image/jpeg'), quando)).toBe('Foto colada 2026-10-21 09h05m07s.jpg')
     expect(nomeFoto(arquivo(`${'a'.repeat(250)}.png`, 'image/png'), quando)).toHaveLength(200)
+  })
+
+  it('nome no SharePoint: sem caracteres que o flow recusa e sem sobrescrever outra foto do item', () => {
+    const quando = new Date(2026, 9, 21, 9, 5, 7)
+    expect(nomeArquivoFoto(arquivo('frente/verso.jpg', 'image/jpeg'), [], quando)).toBe('frente_verso.jpg')
+    expect(nomeArquivoFoto(arquivo('a.png', 'image/png'), ['A.png', 'a (2).png'], quando)).toBe('a (3).png')
+    expect(nomeArquivoFoto(arquivo('image.png', 'image/png'), [], quando)).toBe('Foto colada 2026-10-21 09h05m07s.png')
   })
 
   const clipboard = (items: { kind: string; type: string; file?: File }[], types: string[]) =>
@@ -117,85 +125,178 @@ describe('ícone do tipo sem foto', () => {
 })
 
 describe('fotos no Dataverse', () => {
-  const api = 'https://org.crm2.dynamics.com/api/data/v9.2'
-  it('mapeia a linha: miniatura em base64, imagem grande por $value?size=full com o id da imagem', () => {
+  it('mapeia a linha: nome, capa, data e o caminho do arquivo no SharePoint (sem imagem)', () => {
     const f = mapFoto({
       cr40f_fotoequipamentoid: '{AAAA-1}', cr40f_name: 'frente.jpg', _cr40f_equipamento_value: 'E1', cr40f_capa: true,
-      cr40f_imagem: 'QUJD', cr40f_imagemid: 'IMG-9', createdon: '2026-10-21T12:00:00Z',
-    }, api, 'cr40f_fotoequipamentos')
-    expect(f).toMatchObject({ id: 'aaaa-1', equipamentoId: 'e1', nome: 'frente.jpg', capa: true, miniatura: 'data:image/jpeg;base64,QUJD' })
-    expect(f.url).toBe(`${api}/cr40f_fotoequipamentos(aaaa-1)/cr40f_imagem/$value?size=full&v=img-9`)
-    expect(f.criadoEm?.toISOString()).toBe('2026-10-21T12:00:00.000Z')
-  })
-
-  it('sem imagem: sem miniatura nem url; sem nome, "Foto"', () => {
-    expect(mapFoto({ cr40f_fotoequipamentoid: 'x', cr40f_imagem: null, cr40f_imagemid: null }, api, 's')).toMatchObject({ nome: 'Foto', capa: false, miniatura: null, url: null })
-  })
-
-  it('consultas: fotos do item por data; capas só as marcadas', () => {
-    expect(decodeURIComponent(fotosPath('s', '{E1}'))).toContain('$filter=_cr40f_equipamento_value eq e1&$orderby=createdon asc')
-    expect(decodeURIComponent(capasPath('s'))).toContain('$filter=cr40f_capa eq true&$orderby=createdon asc')
-  })
-
-  it('capas: a primeira marcada de cada item vale (mais antiga), sem imagem é ignorada', () => {
-    const capas = mapCapas([
-      { _cr40f_equipamento_value: 'E1', cr40f_imagem: 'AAA' },
-      { _cr40f_equipamento_value: 'e1', cr40f_imagem: 'BBB' },
-      { _cr40f_equipamento_value: 'e2', cr40f_imagem: null },
-    ])
-    expect([...capas]).toEqual([['e1', 'data:image/jpeg;base64,AAA']])
-  })
-
-  it('criação: imagem em base64 no mesmo POST e lookup por @odata.bind', () => {
-    expect(fotoPayload('cr40f_equipamentos', '{E1}', 'a.png', true, 'QUJD')).toEqual({
-      cr40f_name: 'a.png', cr40f_capa: true, cr40f_imagem: 'QUJD', 'cr40f_Equipamento@odata.bind': '/cr40f_equipamentos(e1)',
+      cr40f_caminho: '/Documentos Compartilhados/Equipamentos/DEV/e1/frente.jpg', createdon: '2026-10-21T12:00:00Z',
     })
+    expect(f).toEqual({ id: 'aaaa-1', equipamentoId: 'e1', nome: 'frente.jpg', capa: true, caminho: '/Documentos Compartilhados/Equipamentos/DEV/e1/frente.jpg', criadoEm: new Date('2026-10-21T12:00:00Z') })
+  })
+
+  it('sem nome: "Foto"; sem caminho: vazio', () => {
+    expect(mapFoto({ cr40f_fotoequipamentoid: 'x', cr40f_caminho: null })).toMatchObject({ nome: 'Foto', capa: false, caminho: '' })
+  })
+
+  it('consultas: fotos do item por data; capas só as marcadas; nenhuma pede imagem ao Dataverse', () => {
+    expect(decodeURIComponent(fotosPath('s', '{E1}'))).toContain('$filter=_cr40f_equipamento_value eq e1&$orderby=createdon asc')
+    expect(decodeURIComponent(capasPath('s'))).toContain('$select=_cr40f_equipamento_value,cr40f_caminho,createdon&$filter=cr40f_capa eq true&$orderby=createdon asc')
+    expect(fotosPath('s', 'e1') + capasPath('s')).not.toContain('imagem')
+  })
+
+  it('capas: a primeira marcada de cada item vale (mais antiga), sem caminho é ignorada', () => {
+    const capas = mapCapas([
+      { _cr40f_equipamento_value: 'E1', cr40f_caminho: 'p/a.jpg' },
+      { _cr40f_equipamento_value: 'e1', cr40f_caminho: 'p/b.jpg' },
+      { _cr40f_equipamento_value: 'e2', cr40f_caminho: null },
+    ])
+    expect([...capas]).toEqual([['e1', 'p/a.jpg']])
+  })
+
+  it('registro: nome, capa, caminho e lookup por @odata.bind', () => {
+    expect(fotoPayload('cr40f_equipamentos', '{E1}', 'a.png', true, 'Equipamentos/DEV/e1/a.png')).toEqual({
+      cr40f_name: 'a.png', cr40f_capa: true, cr40f_caminho: 'Equipamentos/DEV/e1/a.png', 'cr40f_Equipamento@odata.bind': '/cr40f_equipamentos(e1)',
+    })
+  })
+
+  it('caminho com "/" vai como caminho para os flows; sem "/", como id do arquivo', () => {
+    expect(documentoDaFoto('Equipamentos/DEV/e1/a.JPG')).toMatchObject({ id: '', caminho: 'Equipamentos/DEV/e1/a.JPG', nome: 'a.JPG', mimeType: 'image/jpeg' })
+    expect(documentoDaFoto('01ABCDEF', 'b.png')).toMatchObject({ id: '01ABCDEF', caminho: '', nome: 'b.png', mimeType: 'image/png' })
   })
 })
 
-describe('fonte do Dataverse (fotos)', () => {
+describe('fonte do Dataverse (fotos no SharePoint)', () => {
+  afterEach(() => vi.unstubAllGlobals())
   const SETS: Record<string, string> = { cr40f_equipamento: 'cr40f_equipamentos', cr40f_tipoequipamento: 'cr40f_tipoequipamentos', cr40f_funcionarios: 'cr40f_funcionarioses', cr40f_fotoequipamento: 'cr40f_fotoequipamentos' }
-  /** Host simulado; `semFotos` tira a tabela de fotos da metadata (ambiente antes do provision). */
+  const FLOWS: Record<string, string> = {
+    new_URLFlowsalvararquivosSharePoint: 'https://flow/salvar', new_URLFlowConsultarArquivosSharePoint: 'https://flow/consultar',
+    new_URLFlowExcluirArquivoSharePoint: 'https://flow/excluir', new_URLFlowListarArquivosSharePoint: 'https://flow/listar',
+  }
+  /** Variáveis de ambiente com as URLs dos flows, lidas pelo client (como o store de Funcionários lê pelo Xrm). */
+  const envGetAll = async (path: string) => {
+    if (path.startsWith('environmentvariabledefinitions')) {
+      const nome = /schemaname eq '([^']+)'/.exec(path)?.[1] ?? ''
+      return FLOWS[nome] ? [{ environmentvariabledefinitionid: nome, defaultvalue: FLOWS[nome] }] : []
+    }
+    if (path.startsWith('environmentvariablevalues')) return []
+    return null
+  }
+  /** Host simulado no DEV; `semFotos` tira a tabela de fotos da metadata (ambiente antes do provision). */
   function host(client: Record<string, unknown>, semFotos = false) {
     const metadata = { entities: async (names: string[]) => new Map(names.filter((n) => !(semFotos && n === 'cr40f_fotoequipamento')).map((n) => [n, { entitySetName: SETS[n] }])) }
-    return { mode: 'dataverse', client: { apiUrl: 'https://org/api/data/v9.2', ...client }, metadata } as unknown as Host
+    const getAll = client.getAll as ((p: string) => Promise<unknown[]>) | undefined
+    return { mode: 'dataverse', clientUrl: 'https://org23b93544.crm2.dynamics.com', client: { apiUrl: 'https://org/api/data/v9.2', ...client, getAll: async (p: string) => (await envGetAll(p)) ?? (getAll ? getAll(p) : []) }, metadata } as unknown as Host
   }
+  /** fetch dos flows: responde por URL e guarda as chamadas. */
+  function flows(respostas: Partial<Record<string, (body: Record<string, unknown>) => unknown>>) {
+    const chamadas: { flow: string; body: Record<string, unknown> }[] = []
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const flow = url.split('/').pop()!
+      const body = JSON.parse(String(init?.body ?? '{}'))
+      chamadas.push({ flow, body })
+      const r = respostas[flow]
+      const json = r ? r(body) : { sucesso: true }
+      return new Response(JSON.stringify(json), { status: (json as { sucesso?: boolean }).sucesso ? 200 : 400 })
+    }))
+    return chamadas
+  }
+  const png = () => new File(['oi'], 'a.png', { type: 'image/png' })
 
-  it('envia a foto num POST só, com a imagem em base64, e relê a miniatura', async () => {
+  it('envia o arquivo pelo flow Salvar na pasta Equipamentos/DEV/<id> e depois cria o registro com o caminho', async () => {
+    const chamadas = flows({ salvar: (b) => ({ sucesso: true, id: 'F1', caminhoSharePoint: `/Documentos Compartilhados/${b.caminhoCompleto}/${b.nomeArquivo}` }) })
     const create = vi.fn(async () => 'ABC')
-    const request = vi.fn(async (_path: string) => ({ cr40f_fotoequipamentoid: 'abc', cr40f_name: 'a.png', _cr40f_equipamento_value: 'e1', cr40f_capa: true, cr40f_imagem: 'TUlO', cr40f_imagemid: 'i1', createdon: '2026-10-21T12:00:00Z' }))
-    const source = createSource(host({ create, request }))
-    const f = await source.addFoto('E1', new File(['oi'], 'a.png', { type: 'image/png' }), 'a.png', true)
-    expect(create).toHaveBeenCalledWith('cr40f_fotoequipamentos', { cr40f_name: 'a.png', cr40f_capa: true, cr40f_imagem: btoa('oi'), 'cr40f_Equipamento@odata.bind': '/cr40f_equipamentos(e1)' })
-    expect(request.mock.calls[0][0]).toMatch(/^cr40f_fotoequipamentos\(abc\)\?\$select=/)
-    expect(f).toMatchObject({ id: 'abc', miniatura: 'data:image/jpeg;base64,TUlO', capa: true })
+    const f = await createSource(host({ create })).addFoto('{E1}', png(), 'a.png', true)
+    expect(chamadas.map((c) => c.flow)).toEqual(['salvar'])
+    expect(chamadas[0].body).toMatchObject({ caminhoCompleto: 'Equipamentos/DEV/e1', nomeArquivo: 'a.png', conteudoBase64: btoa('oi'), mimeType: 'image/png', metadados: { tarefaId: 'e1', origem: 'TELA_EQUIPAMENTOS' } })
+    const caminho = '/Documentos Compartilhados/Equipamentos/DEV/e1/a.png'
+    expect(create).toHaveBeenCalledWith('cr40f_fotoequipamentos', { cr40f_name: 'a.png', cr40f_capa: true, cr40f_caminho: caminho, 'cr40f_Equipamento@odata.bind': '/cr40f_equipamentos(e1)' })
+    expect(f).toMatchObject({ id: 'abc', equipamentoId: 'e1', nome: 'a.png', capa: true, caminho })
   })
 
-  it('foto gravada com releitura que falha entra sem miniatura (não diz que não foi enviada)', async () => {
-    const source = createSource(host({ create: async () => 'abc', request: async () => { throw new Error('rede') } }))
-    await expect(source.addFoto('e1', new File(['oi'], 'a.png', { type: 'image/png' }), 'a.png', false)).resolves.toMatchObject({ id: 'abc', nome: 'a.png', miniatura: null, url: null })
+  it('flow Salvar sem caminho: guarda o id do arquivo', async () => {
+    flows({ salvar: () => ({ sucesso: true, id: '01XYZ' }) })
+    const create = vi.fn(async () => 'abc')
+    await createSource(host({ create })).addFoto('e1', png(), 'a.png', false)
+    expect(create).toHaveBeenCalledWith('cr40f_fotoequipamentos', expect.objectContaining({ cr40f_caminho: '01XYZ' }))
   })
 
-  it('capa: PATCH só em cr40f_capa; excluir: DELETE da foto', async () => {
-    const update = vi.fn(async () => undefined)
+  it('falha no flow Salvar: erro do flow e nenhum registro criado', async () => {
+    flows({ salvar: () => ({ sucesso: false, erro: 'Pasta sem permissão.' }) })
+    const create = vi.fn(async () => 'abc')
+    await expect(createSource(host({ create })).addFoto('e1', png(), 'a.png', true)).rejects.toThrow('Pasta sem permissão.')
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  it('falha no registro: o arquivo enviado é excluído e vale o erro do Dataverse', async () => {
+    const chamadas = flows({ salvar: () => ({ sucesso: true, id: 'F1', caminhoSharePoint: 'Equipamentos/DEV/e1/a.png' }) })
+    const create = vi.fn(async () => { throw new Error('Sem privilégio prvCreate.') })
+    await expect(createSource(host({ create })).addFoto('e1', png(), 'a.png', true)).rejects.toThrow('Sem privilégio prvCreate.')
+    expect(chamadas.map((c) => c.flow)).toEqual(['salvar', 'excluir'])
+    expect(chamadas[1].body).toMatchObject({ id: 'F1', fileLocator: 'F1', caminhoSharePoint: 'Equipamentos/DEV/e1/a.png', nomeArquivo: 'a.png', tarefaId: 'e1' })
+  })
+
+  it('excluir: apaga o arquivo e depois o registro; falha no arquivo mantém o registro', async () => {
+    const chamadas = flows({})
     const remove = vi.fn(async () => undefined)
-    const source = createSource(host({ update, remove }))
-    await source.setFotoCapa('f1', true)
-    await source.deleteFoto('f2')
-    expect(update).toHaveBeenCalledWith('cr40f_fotoequipamentos', 'f1', { cr40f_capa: true })
+    const source = createSource(host({ remove }))
+    await source.deleteFoto(foto('f2', 1, false, { caminho: 'Equipamentos/DEV/e1/f2.jpg' }))
+    expect(chamadas).toEqual([{ flow: 'excluir', body: expect.objectContaining({ caminhoSharePoint: 'Equipamentos/DEV/e1/f2.jpg', nomeArquivo: 'f2.jpg', tarefaId: 'e1' }) }])
     expect(remove).toHaveBeenCalledWith('cr40f_fotoequipamentos', 'f2')
+    flows({ excluir: () => ({ sucesso: false, erro: 'Arquivo bloqueado.' }) })
+    remove.mockClear()
+    await expect(source.deleteFoto(foto('f3', 1))).rejects.toThrow('Arquivo bloqueado.')
+    expect(remove).not.toHaveBeenCalled()
   })
 
-  it('lista com as capas; sem a tabela de fotos, carrega sem capas e só as fotos do item dão erro', async () => {
+  it('capa: PATCH só em cr40f_capa', async () => {
+    const update = vi.fn(async () => undefined)
+    await createSource(host({ update })).setFotoCapa('f1', true)
+    expect(update).toHaveBeenCalledWith('cr40f_fotoequipamentos', 'f1', { cr40f_capa: true })
+  })
+
+  it('baixar: flow Consultar com o caminho devolve a imagem', async () => {
+    const chamadas = flows({ consultar: () => ({ sucesso: true, conteudoBase64: btoa('PNG'), mimeType: 'image/png' }) })
+    const blob = await createSource(host({})).baixarFoto('Equipamentos/DEV/e1/a.png')
+    expect(chamadas[0]).toEqual({ flow: 'consultar', body: expect.objectContaining({ caminhoSharePoint: 'Equipamentos/DEV/e1/a.png', nomeArquivo: 'a.png' }) })
+    expect(blob.type).toBe('image/png')
+    expect(blob.size).toBe(3)
+  })
+
+  it('lista com o caminho das capas; sem a tabela de fotos, carrega sem capas e só as fotos do item dão erro', async () => {
     const linhas: Record<string, unknown[]> = {
       cr40f_equipamentos: [{ cr40f_equipamentoid: 'e1', cr40f_name: 'Notebook' }, { cr40f_equipamentoid: 'e2', cr40f_name: 'Mouse' }],
-      cr40f_fotoequipamentos: [{ _cr40f_equipamento_value: 'e1', cr40f_imagem: 'QQ==' }],
+      cr40f_fotoequipamentos: [{ _cr40f_equipamento_value: 'e1', cr40f_caminho: 'Equipamentos/DEV/e1/a.png' }],
     }
     const getAll = async (path: string) => linhas[path.split('?')[0]] ?? []
     const com = await createSource(host({ getAll })).load()
-    expect(com.equipamentos.map((e) => [e.id, e.capa])).toEqual([['e1', 'data:image/jpeg;base64,QQ=='], ['e2', null]])
+    expect(com.equipamentos.map((e) => [e.id, e.capa])).toEqual([['e1', 'Equipamentos/DEV/e1/a.png'], ['e2', null]])
     const semTabela = createSource(host({ getAll }, true))
     expect((await semTabela.load()).equipamentos.map((e) => e.capa)).toEqual([null, null])
     await expect(semTabela.fotos('e1')).rejects.toThrow('Tabela cr40f_fotoequipamento não encontrada na metadata.')
+  })
+})
+
+describe('cache das imagens', () => {
+  afterEach(() => vi.unstubAllGlobals())
+  it('baixa cada caminho uma vez, guarda falhas, usa o arquivo enviado e revoga ao liberar', async () => {
+    let n = 0
+    const criar = vi.fn(() => `blob:${++n}`)
+    const revogar = vi.fn()
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: criar, revokeObjectURL: revogar }))
+    const baixar = vi.fn(async (c: string) => { if (c === 'ruim') throw new Error('404'); return new Blob(['x']) })
+    const cache = createCacheImagens(baixar)
+    expect(cache.estado('a')).toBeUndefined()
+    const [u1, u2] = await Promise.all([cache.pedir('a'), cache.pedir('a')])
+    expect([u1, u2, cache.estado('a')]).toEqual(['blob:1', 'blob:1', 'blob:1'])
+    await cache.pedir('a')
+    expect(await cache.pedir('ruim')).toBeNull()
+    await cache.pedir('ruim')
+    expect(baixar.mock.calls.map((c) => c[0])).toEqual(['a', 'ruim'])
+    cache.guardar('novo', new Blob(['y']))
+    expect(cache.estado('novo')).toBe('blob:2')
+    cache.esquecer('novo')
+    expect(revogar).toHaveBeenCalledWith('blob:2')
+    cache.liberar()
+    expect(revogar).toHaveBeenCalledWith('blob:1')
+    expect(cache.estado('a')).toBeUndefined()
   })
 })

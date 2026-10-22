@@ -10,6 +10,9 @@ vi.setConfig({ testTimeout: 30_000 })
 
 beforeEach(() => {
   window.location.hash = '#/equipamentos'
+  // jsdom não tem blob URL: a URL leva o nome do arquivo (as imagens de exemplo do mock são File com o nome da foto).
+  URL.createObjectURL = (b: Blob) => `blob:${b instanceof File ? b.name : 'imagem'}`
+  URL.revokeObjectURL = () => undefined
   vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
 })
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
@@ -67,7 +70,9 @@ describe('Fotos do equipamento', () => {
     await waitFor(() => expect(nomesDasFotos(dialog)).toEqual(['notebook-frente.jpg', 'notebook-etiqueta.jpg']))
     expect(capas(dialog)).toEqual(['notebook-frente.jpg'])
     expect(within(secao(dialog)).getByText('Capa')).toBeTruthy()
-    expect((await thumbDaLinha('Notebook do Financeiro'))?.getAttribute('src')).toContain('frente')
+    await waitFor(async () => expect((await thumbDaLinha('Notebook do Financeiro'))?.getAttribute('src')).toBe('blob:notebook-frente.jpg'))
+    // Miniaturas do drawer vêm do SharePoint (flow Consultar) sob demanda, pelo mesmo cache.
+    await waitFor(() => expect(within(secao(dialog)).getByRole('button', { name: 'Ver notebook-etiqueta.jpg' }).querySelector('img')?.getAttribute('src')).toBe('blob:notebook-etiqueta.jpg'))
     // Sem foto: ícone do tipo, sem <img> (nada de imagem quebrada).
     expect(await thumbDaLinha('Notebook reserva')).toBeNull()
   })
@@ -84,7 +89,7 @@ describe('Fotos do equipamento', () => {
     expect(addFoto.mock.calls[0][2]).toMatch(/^Foto colada \d{4}-\d{2}-\d{2} \d{2}h\d{2}m\d{2}s\.png$/)
     expect(addFoto.mock.calls[0][3]).toBe(true)
     expect(capas(dialog)).toHaveLength(1)
-    await waitFor(async () => expect((await thumbDaLinha('Notebook reserva'))?.getAttribute('src')).toMatch(/^data:image\/png/))
+    await waitFor(async () => expect((await thumbDaLinha('Notebook reserva'))?.getAttribute('src')).toBe('blob:image.png'))
   })
 
   it('colar texto num campo do formulário não cria foto', async () => {
@@ -154,6 +159,18 @@ describe('Fotos do equipamento', () => {
     expect(screen.getByRole('dialog', { name: 'Notebook do Financeiro' })).toBeTruthy()
   })
 
+  it('excluir passa a foto inteira à fonte (arquivo no SharePoint e registro)', async () => {
+    const real = sourceModule.createSource
+    const deleteFoto = vi.fn<sourceModule.Source['deleteFoto']>()
+    vi.spyOn(sourceModule, 'createSource').mockImplementation((host) => { const s = real(host); deleteFoto.mockImplementation(s.deleteFoto); return { ...s, deleteFoto } })
+    const dialog = await abrir('Maquininha Carlos')
+    await waitFor(() => expect(nomesDasFotos(dialog)).toEqual(['maquininha.jpg']))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Excluir maquininha.jpg' }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Excluir foto?' })).getByRole('button', { name: 'Excluir' }))
+    await waitFor(() => expect(within(dialog).getByText(/Nenhuma foto ainda/)).toBeTruthy())
+    expect(deleteFoto.mock.calls[0][0]).toMatchObject({ nome: 'maquininha.jpg', caminho: 'Equipamentos/DEV/eeeeeeee-0000-4000-8000-000000000005/maquininha.jpg' })
+  })
+
   it('cancelar a exclusão não apaga nada', async () => {
     const dialog = await abrir('Maquininha Carlos')
     await waitFor(() => expect(nomesDasFotos(dialog)).toEqual(['maquininha.jpg']))
@@ -181,7 +198,7 @@ describe('Fotos do equipamento', () => {
     await waitFor(() => expect(nomesDasFotos(dialog)).toHaveLength(2))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Ver notebook-etiqueta.jpg' }))
     const viewer = await screen.findByRole('dialog', { name: 'notebook-etiqueta.jpg' })
-    expect(within(viewer).getByRole('img', { name: 'notebook-etiqueta.jpg' })).toBeTruthy()
+    expect(await within(viewer).findByRole('img', { name: 'notebook-etiqueta.jpg' })).toBeTruthy()
     fireEvent(viewer, new Event('cancel', { cancelable: true }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'notebook-etiqueta.jpg' })).toBeNull())
     expect(screen.getByRole('dialog', { name: 'Notebook do Financeiro' })).toBeTruthy()
@@ -226,6 +243,7 @@ describe('Fotos do equipamento', () => {
     soltar(secao(dialog), [imagem('a.png'), imagem('b.png'), imagem('c.png')])
     await waitFor(() => expect(nomesDasFotos(dialog)).toEqual(['a.png', 'c.png']), { timeout: 10_000 })
     expect(within(dialog).getByText('b.png: não foi enviada. Sem permissão.')).toBeTruthy()
+    expect(within(dialog).getByText('Uma foto não foi enviada')).toBeTruthy()
     expect(capas(dialog)).toEqual(['a.png'])
   })
 })
