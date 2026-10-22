@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, matchesFilters, useShellHeader } from '@betinhos/ui'
 import { Laptop, Plus, RefreshCw, SearchX, Tags } from 'lucide-react'
 import type { Host } from '../../host'
@@ -6,7 +6,9 @@ import { LazyFooter, useLazySlice } from '../../app/LazyList'
 import { useListView } from '../../app/useListView'
 import { useQueryAlvo, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
+import { createCacheImagens } from './data/imagens'
 import { createSource } from './data/source'
+import { ImagensContext } from './components/ImagemFoto'
 import { STATUS } from './domain/choices'
 import { EQUIPAMENTO_COLUMNS, EQUIPAMENTO_DEFAULT_FILTERS, EQUIPAMENTO_SORT, TELA, builtinViews, equipamentoFields, matchesKeyword, pessoasResponsaveis, readEquipamento, sortEquipamentos } from './domain/lista'
 import { useEquipamentos } from './useEquipamentos'
@@ -21,6 +23,9 @@ export function EquipamentosPage({ host }: { host: Host }) {
 
 function Equipamentos({ host }: { host: Host }) {
   const source = useMemo(() => createSource(host), [host])
+  // Fotos do SharePoint baixadas nesta visita (lista e drawer); as blob URLs são revogadas ao sair da página.
+  const imagens = useMemo(() => createCacheImagens(source.baixarFoto), [source])
+  useEffect(() => () => imagens.liberar(), [imagens])
   const mobile = useMedia('(max-width: 820px)')
   const data = useEquipamentos(source)
   // O filtro de Responsável lista só quem tem item (o cadastro de funcionários tem centenas); campos memorizados
@@ -90,6 +95,7 @@ function Equipamentos({ host }: { host: Host }) {
   }
 
   return (
+    <ImagensContext.Provider value={imagens}>
     <div className="page eq-page">
       <div role="toolbar" aria-label="Comandos de equipamentos">
         <ViewBar view={view} columns={EQUIPAMENTO_COLUMNS} filters={{ fields }}>
@@ -108,5 +114,6 @@ function Equipamentos({ host }: { host: Host }) {
       {/* Renomear reflete nos itens (upsertTipo); inativar tira o tipo dos seletores, mas o item o mantém marcado "(inativo)". */}
       {data.loaded ? <TiposDrawer open={tiposOpen} onClose={() => setTiposOpen(false)} tipos={data.tipos} uso={usoTipos} source={source} onSaved={data.upsertTipo} /> : null}
     </div>
+    </ImagensContext.Provider>
   )
 }

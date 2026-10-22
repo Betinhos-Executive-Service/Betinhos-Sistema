@@ -64,9 +64,6 @@
 .gr-table .gr-cell--select .bt-choice { gap: 0; min-height: 0; align-items: center; }
 .gr-table .gr-cell--select .bt-choice__control { margin-top: 0; }
 .gr-table .gr-cell--select .bt-choice__text { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.gr-head__sort { display: inline-flex; align-items: center; gap: var(--bt-space-1); min-width: 0; max-width: 100%; min-height: 32px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
-.gr-head__sort:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border); border-radius: var(--bt-radius-xs); }
-.gr-head__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gr-open { padding: 0; border: 0; background: transparent; color: var(--bt-color-brand); font: inherit; font-weight: var(--bt-font-weight-extrabold); text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
 .gr-open:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
 .gr-open:active { transform: scale(.97); }
@@ -118,7 +115,8 @@
 
 /* Desktop: a grade ocupa a altura da janela e rola por dentro; a página não rola. O celular segue com a rolagem normal (cards). */
 @media (min-width: 821px) {
-  .page.gr-page { height: 100dvh; display: flex; flex-direction: column; padding-top: var(--bt-space-3); padding-bottom: var(--bt-space-3); overflow-x: hidden; overflow-y: auto; }
+  /* Padding e espaçamentos padrão das listas (`.page`: 22/26/32 px; barra de comandos com 12 px até a tabela). */
+  .page.gr-page { height: 100dvh; display: flex; flex-direction: column; overflow-x: hidden; overflow-y: auto; }
   .gr-page .bt-page-toolbar__start, .gr-page .bt-page-toolbar__end { gap: var(--bt-space-3); }
   .gr-page .bt-table__footer { padding: 0; min-height: 40px; }
   .gr-page .page__header { margin-bottom: var(--bt-space-2); }
@@ -129,9 +127,6 @@
   /* Sem linhas, a grade encolhe ao cabeçalho e o estado vazio vem logo abaixo, em vez de uma área em branco com barra de rolagem. */
   .gr-table--empty .gr-grid { flex: 0 0 auto; overflow: hidden; }
   .gr-table--empty .gr-empty { flex: 1; }
-  /* Barra de comandos compacta: uma linha de 40 px, sem a margem da barra do DS; o espaço até a tabela vem do gap do corpo. */
-  .gr-commandline .bt-viewbar { margin-bottom: 0; }
-  .gr-page .gr-body { --bt-gap: var(--bt-space-2); }
   .gr-chips { padding-bottom: 0; }
   /* Modo Cards no desktop: mesma altura da tabela; a grade rola por dentro. */
   .gr-cardsview { display: flex; flex-direction: column; flex: 1; min-height: 240px; min-width: 0; }
@@ -188,35 +183,17 @@
   .gr-cell__lock { transition: none; }
 }
 
-/* Cabeçalho: ordenar + menu da coluna (▾ no hover/foco; sempre visível, com ponto de ação, quando filtrada). */
+/* Cabeçalho: título como gatilho do menu da coluna (`ColumnMenu` do DS: ▾ no hover/foco; sempre visível, com ponto, quando filtrada). */
 .gr-head { display: flex; align-items: center; gap: var(--bt-space-1); min-width: 0; width: 100%; }
 /* O gatilho do menu vem envolto no `.bt-menu` do DS (inline-flex): precisa encolher como item do flex para o rótulo truncar com reticências em vez de vazar sobre a coluna vizinha. */
 .gr-head > .bt-menu { display: flex; flex: 0 1 auto; min-width: 0; max-width: 100%; }
-.gr-head__sort { flex: 0 1 auto; }
-/* O título é o gatilho do menu (como no model-driven): o ▾ só aparece no hover, no foco, com o menu aberto ou com filtro. */
-.gr-head__chevron { position: relative; display: inline-grid; place-items: center; flex: 0 0 auto; width: 18px; height: 18px; color: var(--bt-color-text-secondary); opacity: 0; }
-.gr-head__sort:focus-visible .gr-head__chevron, .gr-head__sort[aria-expanded="true"] .gr-head__chevron, .gr-head__sort.is-filtered .gr-head__chevron { opacity: 1; }
-.gr-head__sort.is-filtered .gr-head__chevron { color: var(--bt-color-action); }
-.gr-head__dot { position: absolute; top: -1px; right: -1px; width: 6px; height: 6px; border-radius: var(--bt-radius-full); background-color: var(--bt-color-action); }
-@media (hover: none), (pointer: coarse) { .gr-head__chevron { opacity: 1; } }
-/* Painel de filtro da coluna, ancorado ao título (top layer, como o menu do DS). */
-.gr-colfilter { position: fixed; inset: auto; z-index: var(--bt-z-index-popover); width: min(300px, calc(100vw - 16px)); margin: 0; padding: var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); color: var(--bt-color-text-primary); box-shadow: var(--bt-shadow-popover); font-family: var(--bt-font-family-sans); }
-.gr-colfilter__title { margin-bottom: var(--bt-space-2); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-primary); }
-.gr-colfilter__active { margin: 0 0 var(--bt-space-2); font-size: var(--bt-font-size-12); color: var(--bt-color-action); font-weight: var(--bt-font-weight-semibold); }
-.gr-colfilter__controls { display: grid; gap: var(--bt-space-2); }
-.gr-colfilter__controls .bt-control, .gr-colfilter__controls .bt-filters__pair { width: 100%; }
-.gr-colfilter__hint { margin: var(--bt-space-1) 0 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
-.gr-colfilter__actions { display: flex; justify-content: flex-end; gap: var(--bt-space-2); margin-top: var(--bt-space-3); }
-/* A barra do DS ainda oferece o botão da linha de filtro rápido; a Geral não usa essa linha. */
-.gr-commandline .bt-viewbar [aria-label="Filtro rápido"] { display: none; }
 /* Em tela larga os comandos cabem numa linha: sem quebra, a busca encolhe antes de o "⋮" cair para uma segunda linha. */
 @media (min-width: 1400px) {
   .gr-commandline .bt-viewbar__end { flex-wrap: nowrap; min-width: 0; }
   .gr-commandline .gr-filters__search { flex: 1 1 160px; min-width: 120px; }
 }
 @media (hover: hover) and (pointer: fine) {
-  .bt-table__cell:hover .gr-head__chevron { opacity: 1; }
-  .gr-head__sort:hover .gr-head__chevron { color: var(--bt-color-action); }
+  .gr-table .bt-table__cell:hover .bt-colhead__chevron { opacity: 1; }
 }
 
 /* Botão Filtros e contagem. */

@@ -227,3 +227,5 @@ $openName = $ResourceName
 if ($LoaderName) { $openName = $LoaderName }
 Write-Host "PUSH CONCLUIDO: v$builtVersion - $(($resources | ForEach-Object { $_.Name }) -join ', ') validados em $solutionUniqueName"
 Write-Host "URL: $environmentBaseUrl/WebResources/$openName"
+
+& (Join-Path $PSScriptRoot "solucoes\distribuir-apos-push.ps1") -EnvironmentUrl $environmentBaseUrl -CaixaDeEntrada $solutionUniqueName

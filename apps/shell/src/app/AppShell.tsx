@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   AlertTriangle, Banknote, BookUser, Calculator, Calendar, Camera, Car, CarFront, ClipboardCheck, ClipboardList, Clock, Coins, Contact, Database, Download,
-  FileText, FileWarning, FolderCheck, FolderCog, Home, KeyRound, Landmark, Laptop, LayoutDashboard, List, Mail, Megaphone, MapPin, Paperclip, Receipt, ReceiptText, Route,
-  ScrollText, Shield, Shuffle, Tag, TrendingUp, Users, Wallet, Wrench,
+  FileText, FileWarning, FolderCheck, FolderCog, Gauge, Home, Hourglass, IdCard, KeyRound, Landmark, Laptop, LayoutDashboard, List, Mail, Megaphone, MapPin, Paperclip, Receipt, ReceiptText, Route,
+  ScrollText, Shield, Shuffle, Sparkles, Tag, TrendingUp, Users, Wallet, Wrench,
 } from 'lucide-react'
 import { AppShell as Shell, type NavGroup } from '@betinhos/ui'
 import { MENU, itemLabel, type MenuGroup } from '../nav/menu'
@@ -24,7 +24,7 @@ type Props = {
   children: ReactNode
 }
 
-const GROUP_ICONS: Record<string, ReactNode> = {
+export const GROUP_ICONS: Record<string, ReactNode> = {
   inicio: <Home />,
   operacional: <Route />,
   financeiro: <Wallet />,
@@ -33,8 +33,16 @@ const GROUP_ICONS: Record<string, ReactNode> = {
   'back-end': <FolderCog />,
 }
 
-// Um ícone por tela (id do sitemap); sem entrada, o item fica só com o rótulo.
-const ITEM_ICONS: Record<string, ReactNode> = {
+// Um ícone por tela (id do sitemap). Todo item novo do menu precisa de ícone próprio,
+// coerente com a tela e distinto dos vizinhos (regra do Design System).
+export const ITEM_ICONS: Record<string, ReactNode> = {
+  frota: <Gauge />,
+  pendencias: <Hourglass />,
+  funcionarios: <IdCard />,
+  'assistente-logistica': <Sparkles />,
+  'assistente-financeiro': <Sparkles />,
+  'assistente-frota': <Sparkles />,
+  'assistente-pessoas': <Sparkles />,
   cr40f_homebetinhos: <Home />,
   geral: <Calendar />,
   cr40f_reservadeveculos: <Calendar />,

@@ -131,9 +131,6 @@ export function useGeralViewState(o: Options): { state: TableViewState; columnDe
     remove: deleteView,
     publish: async () => { throw new Error('As visões da Geral não são publicadas por aqui.') },
     reload: () => reloadViews(),
-    // A Geral filtra pelo menu do título da coluna (painel ancorado), não pela linha sob o cabeçalho.
-    quickRow: false,
-    setQuickRow: () => undefined,
   }
   return { state, columnDefs }
 }
