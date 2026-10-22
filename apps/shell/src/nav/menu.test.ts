@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { ALL_ITEMS, findItem, itemLabel } from './menu'
+import { ALL_ITEMS, ENTITY_NAMES, MENU, findItem, itemLabel, rotaAtualizada } from './menu'
 
 it('não repete ids de rota', () => {
   const ids = ALL_ITEMS.map((item) => item.id)
@@ -24,7 +24,7 @@ it('usa rótulo do sitemap, depois metadata, depois nome lógico', () => {
   const labels = new Map([['cr40f_recibos_v2', 'Recibos']])
   expect(itemLabel(findItem('cr40f_clientes1')!.item, labels)).toBe('Clientes')
   expect(itemLabel(findItem('cr40f_recibos_v2')!.item, labels)).toBe('Recibos')
-  expect(itemLabel(findItem('cr40f_multas')!.item, labels)).toBe('cr40f_multas')
+  expect(itemLabel(findItem('cr40f_trocasdecarro')!.item, labels)).toBe('cr40f_trocasdecarro')
 })
 
 it('Documentos é rota React em Cadastros, logo após Funcionários', () => {
@@ -34,11 +34,29 @@ it('Documentos é rota React em Cadastros, logo após Funcionários', () => {
   expect(ids.indexOf('documentos')).toBe(ids.indexOf('funcionarios') + 1)
 })
 
-it('Equipamentos é rota React em Cadastros, logo após Infrações', () => {
+it('Equipamentos é rota React em Cadastros', () => {
   expect(findItem('equipamentos')?.group.id).toBe('cadastros')
   expect(findItem('equipamentos')?.item).toMatchObject({ kind: 'page', page: 'equipamentos', label: 'Equipamentos' })
-  const ids = findItem('equipamentos')!.group.items.map((item) => item.id)
-  expect(ids.indexOf('equipamentos')).toBe(ids.indexOf('infracoes') + 1)
+})
+
+it('Frota tem um item por visão, sem as tabelas legadas nem Infrações solta', () => {
+  const frota = MENU.find((group) => group.id === 'frota')!
+  expect(frota.items.map((item) => item.label)).toEqual(['Pendências', 'Veículos', 'Manutenções', 'Multas', 'Colisões', 'Indicadores', 'Plano preventivo', 'Assistente', 'Checklists de Veículos'])
+  expect(ENTITY_NAMES).not.toContain('cr40f_manutencoes')
+  expect(ENTITY_NAMES).not.toContain('cr40f_multas')
+  expect(ENTITY_NAMES).not.toContain('cr40f_colisao_v2')
+  expect(findItem('infracoes')).toBeNull()
+})
+
+it('links antigos da Frota e de Infrações vão para a visão nova', () => {
+  const ir = (id: string, q: string) => { const r = rotaAtualizada(id, new URLSearchParams(q)); return r && `${r.id}?${r.query}` }
+  expect(ir('frota', 'aba=veiculos&q=TST')).toBe('frota-veiculos?q=TST')
+  expect(ir('frota', 'aba=ocorrencias')).toBe('frota-multas?')
+  expect(ir('frota', 'aba=ocorrencias&tipo=colisao')).toBe('frota-colisoes?')
+  expect(ir('frota', 'aba=pendencias&ficha=v1')).toBe('frota?ficha=v1')
+  expect(ir('infracoes', 'ver=i1')).toBe('frota-multas?ver=i1&sub=infracoes')
+  expect(ir('frota', 'ficha=v1')).toBeNull()
+  expect(ir('geral', 'aba=x')).toBeNull()
 })
 
 it('Geral é rota React do shell no lugar da lista nativa de reservas', () => {

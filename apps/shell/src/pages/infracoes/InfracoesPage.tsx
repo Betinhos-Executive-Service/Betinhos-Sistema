@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, type ReactNode } from 'react'
 import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, matchesFilters, useShellHeader } from '@betinhos/ui'
 import { FileWarning, Plus, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
@@ -22,7 +22,8 @@ export function InfracoesPage({ host }: { host: Host }) {
 /** Parâmetros da barra antiga na URL; links com eles abrem com os filtros equivalentes. `q` continua. */
 const LEGACY_KEYS = ['gravidade', 'competencia', 'responsabilidade', 'situacao', 'multas'] as const
 
-function Infracoes({ host }: { host: Host }) {
+/** `embutido`: aba Infrações dentro de Multas na Frota, que já tem página, cabeçalho e toasts próprios. */
+export function Infracoes({ host, embutido = false }: { host: Host; embutido?: boolean }) {
   const source = useMemo(() => createSource(host), [host])
   const mobile = useMedia('(max-width: 820px)')
   const data = useInfracoes(source)
@@ -59,7 +60,6 @@ function Infracoes({ host }: { host: Host }) {
 
   const refresh = useCallback(() => { void data.reload() }, [data.reload])
   const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar infrações" onClick={refresh} />, [refresh])
-  useShellHeader({ title: 'Infrações de trânsito', actions: headerActions })
 
   let body
   if (data.error && !data.loaded) {
@@ -83,10 +83,11 @@ function Infracoes({ host }: { host: Host }) {
   }
 
   return (
-    <div className="page page--full if-page">
+    <div className={embutido ? 'if-page' : 'page page--full if-page'}>
+      {embutido ? null : <CabecalhoShell actions={headerActions} />}
       <div role="toolbar" aria-label="Comandos de infrações">
         <ViewBar view={view} columns={INFRACAO_COLUMNS} filters={{ fields: INFRACAO_FIELDS }}>
-          {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
+          {source.mock && !embutido ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="if-filters__search" value={query} onChange={setQuery} placeholder="Buscar por código, descrição ou artigo" aria-label="Buscar infrações" />
           {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />}
           <Button icon={<Plus size={16} />} disabled={!data.loaded} onClick={() => setTarget({ mode: 'create' })}>Nova infração</Button>
@@ -98,4 +99,10 @@ function Infracoes({ host }: { host: Host }) {
       {data.loaded ? <InfracaoDrawer target={target} onTarget={setTarget} list={data.list} uso={uso} usoState={usoState} source={source} onSaved={data.upsert} /> : null}
     </div>
   )
+}
+
+/** Só a página solta registra o cabeçalho do celular; embutida, quem registra é a Frota. */
+function CabecalhoShell({ actions }: { actions: ReactNode }) {
+  useShellHeader({ title: 'Infrações de trânsito', actions })
+  return null
 }

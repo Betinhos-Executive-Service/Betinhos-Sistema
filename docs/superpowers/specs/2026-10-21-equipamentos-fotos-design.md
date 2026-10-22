@@ -10,7 +10,7 @@ Fora do escopo: PDF e outros anexos (só imagens), edição ou rotação de imag
 
 ## 2. Decisões
 
-1. Só imagens: PNG, JPG, GIF ou BMP até 5 MB (os tipos que a coluna de imagem do Dataverse aceita; mesmo limite da foto do funcionário). Arquivo inválido mostra a mensagem e não é enviado.
+1. Só imagens: PNG, JPG, GIF ou BMP até 5 MB (mesmos tipos e limite da foto do funcionário). Arquivo inválido mostra a mensagem e não é enviado.
 2. Fotos tiradas pela TI e pelo celular: "Adicionar fotos" usa `<input type=file accept="image/*" multiple>`, que no celular abre câmera ou galeria.
 3. Três jeitos de adicionar com o drawer do item aberto: Ctrl+V de imagem (como na ficha do veículo), arrastar vários arquivos e o botão. Texto colado num campo do formulário continua indo para o campo.
 4. Envio uma a uma, na ordem recebida, com barra de progresso. Uma falha não para as demais.
@@ -28,13 +28,13 @@ Tabela `cr40f_fotoequipamento` (UserOwned), criada por `packages/deploy/provisio
 | Coluna | Tipo | Regra |
 | --- | --- | --- |
 | `cr40f_name` | Texto (primária, 200) | obrigatório; nome do arquivo (imagem colada: "Foto colada aaaa-mm-dd HHhMMmSSs.png") |
-| `cr40f_imagem` | Imagem | primária da tabela (`IsPrimaryImage`: só a primária aceita a imagem no POST que cria o registro), `CanStoreFullImage`, `MaxSizeInKB` 10240 |
+| `cr40f_caminho` | Texto (400) | caminho (ou id) do arquivo no SharePoint, devolvido pelo flow Salvar. A imagem não fica no Dataverse (revisão de 22/10/2026, decisão do Renan); a coluna `cr40f_imagem` criada antes no DEV não é usada e só sai com a confirmação dele |
 | `cr40f_equipamento` | Lookup → `cr40f_equipamento` | obrigatório; exclusão **Cascade** |
 | `cr40f_capa` | Sim/Não | padrão Não; uma por item, mantida pelo shell |
 
-Leitura: o `$select` de `cr40f_imagem` devolve a miniatura (144 px, JPEG, base64); a grande vem de `…/cr40f_fotoequipamentos(<id>)/cr40f_imagem/$value?size=full&v=<cr40f_imagemid>`. A lista busca só as capas (`cr40f_capa eq true`); as fotos do item, só no drawer. Sem a tabela (antes do provision), a lista carrega sem miniaturas e só a seção Fotos mostra "Tabela cr40f_fotoequipamento não encontrada na metadata.".
+Arquivos: no SharePoint, biblioteca "Documentos Compartilhados", pasta `Equipamentos/<id>` (no DEV `Equipamentos/DEV/<id>`), pelos mesmos flows de Funcionários (`new_URLFlowsalvararquivosSharePoint`, `…Consultar…`, `…Excluir…`), com o store generalizado de `funcionarios/data/sharepoint.ts`. Leitura: a lista busca só o caminho das capas (`cr40f_capa eq true`) e baixa a imagem pelo flow Consultar só nas linhas visíveis (IntersectionObserver), com cache em memória por caminho (blob URL, revogado ao sair da página); enquanto carrega ou se falhar, o ícone do tipo. No drawer, miniaturas e foto grande vêm do mesmo cache, sob demanda. Sem a tabela (antes do provision), a lista carrega sem miniaturas e só a seção Fotos mostra "Tabela cr40f_fotoequipamento não encontrada na metadata.".
 
-Envio: POST com `cr40f_name`, `cr40f_capa`, `cr40f_imagem` (base64) e `cr40f_Equipamento@odata.bind`, depois GET da foto para a miniatura e a data. Capa: PATCH `cr40f_capa`, a nova antes da antiga (falha no meio deixa duas capas, nunca nenhuma; a lista mostra a mais antiga). Exclusão: DELETE da foto e, se era a capa, PATCH na mais antiga restante.
+Envio: primeiro o arquivo pelo flow Salvar; depois POST com `cr40f_name`, `cr40f_capa`, `cr40f_caminho` e `cr40f_Equipamento@odata.bind`. Se o POST falhar, o arquivo enviado é excluído pelo flow Excluir e a tela mostra o erro do Dataverse. Capa: PATCH `cr40f_capa`, a nova antes da antiga (falha no meio deixa duas capas, nunca nenhuma; a lista mostra a mais antiga). Exclusão: flow Excluir do arquivo, depois DELETE do registro (falha no arquivo mantém a foto no item) e, se era a capa, PATCH na mais antiga restante.
 
 ## 4. Telas
 

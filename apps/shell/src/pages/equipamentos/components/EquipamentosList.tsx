@@ -1,10 +1,11 @@
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { StatusBadge, Table, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
 import { CreditCard, Headphones, Keyboard, Laptop, Monitor, Mouse, Package, PcCase, Printer, Smartphone, Tablet, type LucideIcon } from 'lucide-react'
 import { openFromRow } from '../../pagantes/components/PagantesList'
 import { iconeTipo, type IconeTipo } from '../domain/cadastros'
 import { statusLabel, statusTone } from '../domain/choices'
 import type { Equipamento } from '../domain/types'
+import { useImagemFoto } from './ImagemFoto'
 
 type Props = { list: Equipamento[]; inativos: Set<string>; onOpen: (id: string) => void; loading?: boolean }
 type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; footer?: ReactNode; empty?: ReactNode }
@@ -19,13 +20,18 @@ const ICONE: Record<IconeTipo, LucideIcon> = {
   celular: Smartphone, tablet: Tablet, cartao: CreditCard, impressora: Printer, outro: Package,
 }
 
-/** Miniatura da capa; sem foto (ou se a imagem não carregar), o ícone do tipo. Decorativa: o nome vem ao lado. */
+/**
+ * Miniatura da capa, baixada do SharePoint só quando a linha aparece na tela (cache por caminho na página);
+ * enquanto carrega, sem foto ou se falhar, o ícone do tipo. Decorativa: o nome vem ao lado.
+ */
 export function Miniatura({ e, size = 'compact' }: { e: Equipamento; size?: 'compact' | 'card' }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const src = useImagemFoto(e.capa, ref)
   const [quebrada, setQuebrada] = useState<string | null>(null)
   const Icone = ICONE[iconeTipo(e.tipoNome)]
-  const foto = e.capa && quebrada !== e.capa ? e.capa : null
+  const foto = src && quebrada !== src ? src : null
   return (
-    <span className={`eq-thumb eq-thumb--${size}${foto ? ' eq-thumb--foto' : ''}`} aria-hidden="true">
+    <span ref={ref} className={`eq-thumb eq-thumb--${size}${foto ? ' eq-thumb--foto' : ''}`} aria-hidden="true">
       {foto ? <img src={foto} alt="" onError={() => setQuebrada(foto)} /> : <Icone size={size === 'card' ? 22 : 16} />}
     </span>
   )

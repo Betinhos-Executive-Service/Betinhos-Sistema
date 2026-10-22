@@ -1,6 +1,10 @@
+import { sanitizeFileName, uniqueName } from '../../funcionarios/data/sharepoint'
 import { IMAGE_TYPES, validateImage } from '../../funcionarios/data/source'
 
-/** Foto de um equipamento (`cr40f_fotoequipamento`), como os anexos do Planner; uma por item é a capa. */
+/**
+ * Foto de um equipamento: o arquivo fica no SharePoint (`Equipamentos/<id>`, como os documentos de Funcionários) e o
+ * registro `cr40f_fotoequipamento` guarda só o nome, o caminho e a marcação de capa; uma por item é a capa.
+ */
 export type Foto = {
   id: string
   equipamentoId: string
@@ -8,13 +12,11 @@ export type Foto = {
   nome: string
   capa: boolean
   criadoEm: Date | null
-  /** Miniatura (data URL); null se o Dataverse não devolveu imagem. */
-  miniatura: string | null
-  /** Imagem grande (`$value?size=full`); null = só a miniatura. */
-  url: string | null
+  /** Caminho (ou id) do arquivo no SharePoint (`cr40f_caminho`); a imagem é baixada pelo flow Consultar, sob demanda. */
+  caminho: string
 }
 
-/** Mesmos tipos e limite da foto do funcionário (PNG, JPG, GIF ou BMP até 5 MB; o Dataverse só aceita esses). */
+/** Mesmos tipos e limite da foto do funcionário (PNG, JPG, GIF ou BMP até 5 MB). */
 export const FOTO_TYPES = IMAGE_TYPES
 export const validarFoto = (file: File) => validateImage(file)
 
@@ -27,6 +29,10 @@ export function nomeFoto(file: File, agora = new Date()): string {
   const p = (n: number) => String(n).padStart(2, '0')
   return `Foto colada ${agora.getFullYear()}-${p(agora.getMonth() + 1)}-${p(agora.getDate())} ${p(agora.getHours())}h${p(agora.getMinutes())}m${p(agora.getSeconds())}s.${ext}`
 }
+
+/** Nome do arquivo no SharePoint: sem os caracteres que o flow Salvar recusa e sem sobrescrever outra foto do item. */
+export const nomeArquivoFoto = (file: File, existentes: Iterable<string>, agora = new Date()) =>
+  uniqueName(sanitizeFileName(nomeFoto(file, agora)), existentes)
 
 const tempo = (f: Foto) => f.criadoEm?.getTime() ?? Number.MAX_SAFE_INTEGER
 
@@ -44,8 +50,8 @@ export function capaEfetiva(fotos: Foto[]): Foto | null {
   return ordem.find((f) => f.capa) ?? ordem[0] ?? null
 }
 
-/** Miniatura que a lista mostra: a da capa marcada mais antiga, como a consulta de capas do Dataverse; null = ícone do tipo. */
-export const miniaturaDaCapa = (fotos: Foto[]) => capaEfetiva(fotos.filter((f) => f.capa))?.miniatura ?? null
+/** Caminho da imagem que a lista mostra: o da capa marcada mais antiga, como a consulta de capas do Dataverse; null = ícone do tipo. */
+export const caminhoDaCapa = (fotos: Foto[]) => capaEfetiva(fotos.filter((f) => f.capa))?.caminho ?? null
 
 /** A primeira foto do item vira capa. */
 export const nasceCapa = (fotos: Foto[]) => fotos.length === 0
