@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Microsoft.Xrm.Sdk;
+using Microsoft.Crm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Query;
 
 namespace Cr40f.Acesso.Plugin;
@@ -47,7 +48,14 @@ public sealed class UsuarioDataverseRepository
         var emailGravado = criado.GetAttributeValue<string>("internalemailaddress");
         if (!string.Equals(emailGravado, upn, StringComparison.OrdinalIgnoreCase))
             _svc.Update(new Entity("systemuser", id) { ["internalemailaddress"] = upn });
-        Estado = "isdisabled=" + criado.GetAttributeValue<bool>("isdisabled") + "; email=" + (string.IsNullOrEmpty(emailGravado) ? "(vazio)" : emailGravado) + "; domainname=" + criado.GetAttributeValue<string>("domainname");
+        // Criado por código, o systemuser nasce desabilitado (o admin center habilita na hora); habilita aqui.
+        var desabilitado = criado.GetAttributeValue<bool>("isdisabled");
+        if (desabilitado)
+        {
+            _svc.Execute(new SetStateRequest { EntityMoniker = new EntityReference("systemuser", id), State = new OptionSetValue(0), Status = new OptionSetValue(-1) });
+            desabilitado = _svc.Retrieve("systemuser", id, new ColumnSet("isdisabled")).GetAttributeValue<bool>("isdisabled");
+        }
+        Estado = "isdisabled=" + desabilitado + "; email=" + (string.IsNullOrEmpty(emailGravado) ? "(vazio)" : emailGravado) + "; domainname=" + criado.GetAttributeValue<string>("domainname");
         return true;
     }
 
