@@ -48,7 +48,10 @@ svg {
 
 .screen {
   width: 100vw;
+  /* No Chrome Android 100vh inclui a barra de endereço e empurra a barra de ações
+     para fora da área visível; dvh acompanha a altura visível (fallback acima). */
   height: 100vh;
+  height: 100dvh;
   background: rgb(255, 255, 255);
 }
 

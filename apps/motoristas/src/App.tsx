@@ -71,7 +71,8 @@ import {
   type DriverContext,
   type MaintenanceRequestVehicleOption
 } from "./lib/dataverse";
-import { readReceiptQuick } from "./lib/dataverse";
+import { readReceiptQuick, isStandaloneWebResourceRuntime } from "./lib/dataverse";
+import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "./lib/fetchWebApi";
 import { createQrChargeRemote, getQrChargeSummaryRemote, updateQrChargeRemote } from "./lib/dataverse";
 import { getQrChargeReceiveState, getReceivableCents, type QrChargeSummary } from "./lib/qrCharge";
 import { QrChargeScreen } from "./screens/QrChargeScreen";
@@ -1205,9 +1206,14 @@ function App() {
   useEffect(() => {
     const showConnectionLostPopup = () => setCriticalErrorState(APP_CONNECTION_LOST_MESSAGE);
 
+    const showSessionExpiredPopup = () => setCriticalErrorState(SESSION_EXPIRED_MESSAGE);
     if (navigator.onLine === false) showConnectionLostPopup();
     window.addEventListener("offline", showConnectionLostPopup);
-    return () => window.removeEventListener("offline", showConnectionLostPopup);
+    window.addEventListener(SESSION_EXPIRED_EVENT, showSessionExpiredPopup);
+    return () => {
+      window.removeEventListener("offline", showConnectionLostPopup);
+      window.removeEventListener(SESSION_EXPIRED_EVENT, showSessionExpiredPopup);
+    };
   }, []);
 
   useEffect(() => {
@@ -1321,7 +1327,8 @@ function App() {
     previousScreenRef.current = screen;
   }, [screen]);
 
-  useHardwareBackGuard(screen, hashRoutingActive);
+  // Na URL direta do web resource o gesto Voltar do celular sairia do app.
+  useHardwareBackGuard(screen, hashRoutingActive || isStandaloneWebResourceRuntime());
 
   useEffect(() => {
     if (!hashRoutingActive) return;
@@ -1497,7 +1504,11 @@ function App() {
             <h2 id="critical-error-title">Processo não foi concluído</h2>
             <p>{criticalError}</p>
             <div className="critical-error-actions">
-              <button type="button" onClick={() => setCriticalError("")}>Entendi</button>
+              {criticalError === SESSION_EXPIRED_MESSAGE ? (
+                <button type="button" onClick={() => window.location.reload()}>Entrar de novo</button>
+              ) : (
+                <button type="button" onClick={() => setCriticalError("")}>Entendi</button>
+              )}
             </div>
           </div>
         </div>

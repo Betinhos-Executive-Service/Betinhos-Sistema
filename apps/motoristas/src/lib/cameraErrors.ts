@@ -5,7 +5,7 @@ export function describeCameraError(error: unknown) {
     : "";
 
   if (name === "NotAllowedError" || name === "SecurityError" || name === "PermissionDeniedError") {
-    return "O celular bloqueou a câmera para o app. Toque em Permitir quando ele perguntar ou libere em Ajustes › Apps › Power Apps › Permissões › Câmera e toque em Tentar de novo.";
+    return "O celular bloqueou a câmera para o app. Toque em Permitir quando ele perguntar ou libere em Ajustes › Apps › (Power Apps ou o navegador, Chrome/Safari) › Permissões › Câmera e toque em Tentar de novo.";
   }
   if (name === "NotFoundError" || name === "OverconstrainedError" || name === "DevicesNotFoundError") {
     return "Nenhuma câmera foi encontrada neste aparelho.";
