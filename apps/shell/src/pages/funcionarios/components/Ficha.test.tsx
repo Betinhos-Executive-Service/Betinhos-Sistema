@@ -159,4 +159,24 @@ describe('Ficha', () => {
     fireEvent.click(aba)
     expect(equipamentos).not.toHaveBeenCalled()
   })
+  it('mostra o estado do acesso e encerra pela ficha', async () => {
+    const encerrar = vi.fn(async () => [{ etapa: 'funcionario', estado: 'feita' as const, detalhe: 'inativado' }])
+    const comEmail = { ...record, values: { ...record.values, cr40f_emailmicrosoft: 'ana.souza@betinhos.com.br' } }
+    const source = fakeSource(async () => 'f1', { get: async () => structuredClone(comEmail) })
+    render(<ToastProvider><Ficha source={source} id="f1" onClose={() => {}} onSaved={() => {}} acesso={{ cadastrar: async () => { throw new Error('n/a') }, encerrar }} /></ToastProvider>)
+    await screen.findByText('Acesso ativo')
+    fireEvent.click(screen.getByRole('button', { name: /^Encerrar acesso$/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Continuar/ }))
+    fireEvent.change(screen.getByLabelText(/primeiro nome/i), { target: { value: 'Ana' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^Encerrar agora$/ })) })
+    await waitFor(() => expect(encerrar).toHaveBeenCalledWith('f1', 'Ana'))
+  })
+
+  it('sem e-mail oferece cadastrar acesso', async () => {
+    const onCadastrarAcesso = vi.fn()
+    render(<ToastProvider><Ficha source={fakeSource(async () => 'f1')} id="f1" onClose={() => {}} onSaved={() => {}} acesso={{ cadastrar: async () => { throw new Error('n/a') }, encerrar: async () => [] }} onCadastrarAcesso={onCadastrarAcesso} /></ToastProvider>)
+    await screen.findByText('Sem acesso ao app')
+    fireEvent.click(screen.getByRole('button', { name: /Cadastrar acesso/ }))
+    expect(onCadastrarAcesso).toHaveBeenCalledWith({ funcionarioId: 'f1', nomeCompleto: 'Ana Souza', celular: '' })
+  })
 })
