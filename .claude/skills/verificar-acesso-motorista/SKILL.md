@@ -16,18 +16,18 @@ description: "Verifica o acesso de motoristas ao App Motoristas: drawer Cadastra
 
 ## Roteiro em mock (`pnpm dev`, porta 36472)
 Sem Dataverse e sem Graph; o mock (`createAcessoMock`) guarda e-mails em memória até recarregar. Se a porta estiver ocupada por outra sessão, rode `npx vite --port <livre> --strictPort` em `apps/shell` e encerre o processo no fim.
-1. `#/funcionarios` → botão "Cadastrar acesso" (topo) abre o drawer. Digitar "Ana Lúcia Lima" → prévia "ana.lima@betinhos.com.br" (prefixo derivado do nome, sem acento). Editar o prefixo à mão deixa de seguir o nome.
-2. Celular `12999990000` → "Criar acesso" → resultado com e-mail, senha temporária, link `https://org23b93544.crm2.dynamics.com/WebResources/new_app-motoristas-v2`, etapas ✓ (validacao, email, usuario, licenca, grupo, funcionario) e "Enviar no WhatsApp" com `href` `https://wa.me/5512999990000?text=...` contendo link, e-mail e senha.
+1. `#/funcionarios` → botão "Cadastrar acesso" (topo) abre o drawer. Digitar "Ana Lúcia Lima" → prévia "ana.lima@betinhos.onmicrosoft.com" (prefixo derivado do nome, sem acento). Editar o prefixo à mão deixa de seguir o nome.
+2. Celular `12999990000` → "Criar acesso" → resultado com e-mail, senha temporária, link `https://org23b93544.crm2.dynamics.com/WebResources/new_app-motoristas-v2`, etapas ✓ (validacao, email, usuario, licenca, grupo, systemuser, funcionario) e "Enviar no WhatsApp" com `href` `https://wa.me/5512999990000?text=...` contendo link, e-mail e senha.
 3. Fechar o resultado (X, Esc ou clique fora) → "Fechar sem enviar?" (a senha não reaparece). Com o formulário alterado (inclusive só prefixo ou vínculo) → "Descartar alterações?".
 4. Falhas simuladas pelo nome: contém "Erro Graph" → erro GRAPH_INDISPONIVEL com etapas feitas até `usuario` e `licenca` em erro, e "Tentar de novo"; contém "Sem Licenca" → SEM_LICENCA_DISPONIVEL. Nome de uma palavra → NOME_INVALIDO; celular sem 11 dígitos → CELULAR_INVALIDO.
-5. Ficha de Carlos Alberto Teste (`m1`, `?ficha=m1`): bloco "Acesso ao app" (aba Dados, no fim) mostra "Acesso ativo" e `carlos.teste@betinhos.com.br`. "Encerrar acesso" → 1ª tela com o que acontece → "Continuar" → digitar "carlos" (sem diferenciar acento e maiúsculas) habilita "Encerrar agora" → toast "Acesso encerrado." e etapas na ordem confirmacao, licenca, conta, grupo, funcionario. Nome errado → erro no campo (CONFIRMACAO_INVALIDA). Limitação do mock: a ficha continua "Acesso ativo" (o mock de funcionários não muda o status).
+5. Ficha de Carlos Alberto Teste (`m1`, `?ficha=m1`): bloco "Acesso ao app" (aba Dados, no fim) mostra "Acesso ativo" e `carlos.teste@betinhos.onmicrosoft.com`. "Encerrar acesso" → 1ª tela com o que acontece → "Continuar" → digitar "carlos" (sem diferenciar acento e maiúsculas) habilita "Encerrar agora" → toast "Acesso encerrado." e etapas na ordem confirmacao, licenca, conta, grupo, funcionario. Nome errado → erro no campo (CONFIRMACAO_INVALIDA). Limitação do mock: a ficha continua "Acesso ativo" (o mock de funcionários não muda o status).
 6. Ficha de Helena Simulada Costa (`m7`): "Sem acesso ao app" e botão "Cadastrar acesso", que abre o drawer já com nome e celular dela; ao concluir, "Abrir ficha" relê o registro (prop `versao`).
 7. Console sem `console.error`; versão do build no canto.
 
 ## Verificação no DEV (depois do merge e da publicação)
 Pré-requisitos do Renan: app registration no Entra com `User.ReadWrite.All`, `GroupMember.ReadWrite.All`, `Organization.Read.All` (guia em `docs/acesso-motorista-entra.md`), grupo de motoristas, SKU da licença e o `.env` com os segredos. Só da `main` no checkout principal: `packages/deploy/provision-acesso.ps1` (dry run, depois `-Apply`) e `packages/plugins/scripts/push-acesso-plugin.ps1`; nunca em worktree, sessão cloud ou PROD.
 1. Shell no DEV (`#/funcionarios`), usuário com a função "Acesso - Gestão de Motoristas" ou administrador: cadastrar um terceiro de teste (ex.: "Teste Acesso Motorista", celular real do Renan).
-2. Conferir no Entra: usuário `teste.motorista@betinhos.com.br` criado, licença do SKU configurado atribuída, membro do grupo de motoristas, celular em `mobilePhone`; no Dataverse, linha em `cr40f_funcionarios` com `cr40f_emailmicrosoft`, função motorista, status Ativo e vínculo escolhido.
+2. Conferir no Entra: usuário `teste.motorista@betinhos.onmicrosoft.com` criado, licença do SKU configurado atribuída, membro do grupo de motoristas, celular em `mobilePhone`; no Dataverse, `systemuser` ativo com o mesmo `azureactivedirectoryobjectid` (etapa `systemuser` feita ou pulada) e linha em `cr40f_funcionarios` com `cr40f_emailmicrosoft`, função motorista, status Ativo e vínculo escolhido.
 3. "Enviar no WhatsApp" abre `wa.me` com a mensagem; no celular, abrir a URL direta `https://org23b93544.crm2.dynamics.com/WebResources/new_app-motoristas-v2`, entrar com e-mail e senha temporária e trocar a senha (aguardar até 5 min de replicação se der erro de acesso).
 4. Encerrar pela ficha com dupla confirmação → no Entra a conta fica desativada (`accountEnabled=false`), sem a licença e fora do grupo; em `cr40f_funcionarios` status Desligado (`cr40f_status` = 1) e data de demissão de hoje (só se estava vazia). Nada é excluído.
 5. Repetir o encerramento depois de forçar falha (ex.: tirar permissão do app temporariamente) → a nova tentativa termina o que faltou (o grupo sai por último).
@@ -35,7 +35,8 @@ Pré-requisitos do Renan: app registration no Entra com `User.ReadWrite.All`, `G
 ## Limitações conhecidas
 - Autorização confere funções atribuídas direto ao usuário: função herdada por equipe não autoriza (SEM_PERMISSAO).
 - A senha temporária só aparece no resultado do cadastro; nunca é recuperável. Conta que já existia volta sem senha (linha omitida no WhatsApp).
-- Conta desativada no Entra → ACESSO_ENCERRADO; só a TI reativa.
+- Conta desativada no Entra ou systemuser desativado no Dataverse → ACESSO_ENCERRADO; só a TI reativa.
+- Dataverse recusando o systemuser logo após licenciar → USUARIO_DATAVERSE_PENDENTE com etapas; tentar de novo em alguns minutos conclui sem recriar a conta.
 - Encerrar só mexe em contas que estão no grupo de motoristas (R11); conta fora do grupo tem as etapas puladas e o funcionário é apenas inativado.
 
 ## Estado

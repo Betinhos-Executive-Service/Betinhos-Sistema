@@ -45,7 +45,7 @@ function person(id: string, nome: string, apelido: string, extra: Partial<Funcio
 }
 
 const ROWS0: Funcionario[] = [
-  person('m1', 'Carlos Alberto Teste', 'Carlão', { cr40f_validadedacnh: offset(-5), cr40f_numerodocpf: '529.982.247-25', cr40f_emailmicrosoft: 'carlos.teste@betinhos.com.br' }, veiculos[0]),
+  person('m1', 'Carlos Alberto Teste', 'Carlão', { cr40f_validadedacnh: offset(-5), cr40f_numerodocpf: '529.982.247-25', cr40f_emailmicrosoft: 'carlos.teste@betinhos.onmicrosoft.com' }, veiculos[0]),
   person('m2', 'Bruna Ficticia Lima', 'Bruna', { cr40f_validadedacnh: offset(12) }, veiculos[1]),
   person('m3', 'Diego Exemplo Rocha', 'Diego', { cr40f_validadedacnh: offset(45), cr40f_datadeaniversario: birthdayIn(0) }),
   person('m4', 'Elaine Mock Duarte', 'Elaine', { cr40f_funcao: 202410001, cr40f_datadoaso: addMonths(offset(-10), -12), cr40f_validadedacnh: null }),

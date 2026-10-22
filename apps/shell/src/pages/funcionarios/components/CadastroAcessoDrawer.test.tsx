@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AcessoError, type AcessoSource } from '../data/acesso'
 import { CadastroAcessoDrawer } from './CadastroAcessoDrawer'
 
-const ok = { emailMicrosoft: 'ana.lima@betinhos.com.br', senhaTemporaria: 'Kx7#mQ2vR9pL4w', funcionarioId: 'f9', linkApp: 'https://app', etapas: [{ etapa: 'usuario', estado: 'feita' as const, detalhe: 'criado' }] }
+const ok = { emailMicrosoft: 'ana.lima@betinhos.onmicrosoft.com', senhaTemporaria: 'Kx7#mQ2vR9pL4w', funcionarioId: 'f9', linkApp: 'https://app', etapas: [{ etapa: 'usuario', estado: 'feita' as const, detalhe: 'criado' }] }
 function src(cadastrar: AcessoSource['cadastrar']): AcessoSource { return { cadastrar, encerrar: async () => [] } }
 function renderDrawer(source: AcessoSource, props: Partial<Parameters<typeof CadastroAcessoDrawer>[0]> = {}) {
   const onClose = vi.fn(); const onCadastrado = vi.fn()
@@ -19,7 +19,7 @@ describe('CadastroAcessoDrawer', () => {
     renderDrawer(src(async () => ok))
     fireEvent.change(screen.getByLabelText(/Nome completo/), { target: { value: 'João da Silva Ávila' } })
     expect((screen.getByLabelText(/E-mail Microsoft/) as HTMLInputElement).value).toBe('joao.avila')
-    expect(screen.getByText('joao.avila@betinhos.com.br')).toBeTruthy()
+    expect(screen.getByText('joao.avila@betinhos.onmicrosoft.com')).toBeTruthy()
     fireEvent.change(screen.getByLabelText(/E-mail Microsoft/), { target: { value: 'joao.silva' } })
     fireEvent.change(screen.getByLabelText(/Nome completo/), { target: { value: 'João da Silva Prado' } })
     expect((screen.getByLabelText(/E-mail Microsoft/) as HTMLInputElement).value).toBe('joao.silva')
