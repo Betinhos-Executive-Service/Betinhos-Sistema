@@ -27,7 +27,8 @@ public sealed class FakeService : IOrganizationService
     /// <summary>Nome da tabela cujo Create deve falhar (simula usuário que o Dataverse ainda não aceita).</summary>
     public string? FalharCriacaoEm { get; set; }
 
-    public Guid Create(Entity entity) { if (entity.LogicalName == FalharCriacaoEm) throw new InvalidOperationException("Create recusado em " + entity.LogicalName);  if (entity.Id == Guid.Empty) entity.Id = Guid.NewGuid(); Com(entity); Criados.Add(entity); return entity.Id; }
+    public Action<Entity>? AoCriar { get; set; }
+    public Guid Create(Entity entity) { AoCriar?.Invoke(entity); if (entity.LogicalName == FalharCriacaoEm) throw new InvalidOperationException("Create recusado em " + entity.LogicalName);  if (entity.Id == Guid.Empty) entity.Id = Guid.NewGuid(); Com(entity); Criados.Add(entity); return entity.Id; }
     public void Update(Entity entity) { Atualizados.Add(entity); var alvo = _tabelas[entity.LogicalName].Single(e => e.Id == entity.Id); foreach (var kv in entity.Attributes) alvo[kv.Key] = kv.Value; }
     public Entity Retrieve(string entityName, Guid id, ColumnSet columnSet) => _tabelas[entityName].Single(e => e.Id == id);
 
