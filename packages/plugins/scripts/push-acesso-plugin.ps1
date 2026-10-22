@@ -50,7 +50,7 @@ Write-Step "DLL assinada com public key token $token"
 $dotEnv = @{}; $envPath = Join-Path $root '.env'
 if (Test-Path $envPath) { foreach ($line in [IO.File]::ReadAllLines($envPath)) { if ($line -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$') { $dotEnv[$Matches[1]] = $Matches[2].Trim('"') } } }
 foreach ($k in 'ACESSO_TENANT_ID','ACESSO_CLIENT_ID','ACESSO_LICENSE_SKU_ID','ACESSO_GROUP_ID','ACESSO_APP_URL') { if (-not $dotEnv[$k]) { throw "$k ausente no .env (configuracao nao segura do plugin de acesso)." } }
-$config = @{ tenantId = $dotEnv.ACESSO_TENANT_ID; clientId = $dotEnv.ACESSO_CLIENT_ID; licenseSkuId = $dotEnv.ACESSO_LICENSE_SKU_ID; groupId = $dotEnv.ACESSO_GROUP_ID; appUrl = $dotEnv.ACESSO_APP_URL; dominio = $(if ($dotEnv.ACESSO_DOMINIO) { $dotEnv.ACESSO_DOMINIO } else { 'betinhos.onmicrosoft.com' }) } | ConvertTo-Json -Compress
+$config = @{ tenantId = $dotEnv.ACESSO_TENANT_ID; clientId = $dotEnv.ACESSO_CLIENT_ID; licenseSkuId = $dotEnv.ACESSO_LICENSE_SKU_ID; groupId = $dotEnv.ACESSO_GROUP_ID; appUrl = $dotEnv.ACESSO_APP_URL; dominio = $(if ($dotEnv['ACESSO_DOMINIO']) { $dotEnv['ACESSO_DOMINIO'] } else { 'betinhos.onmicrosoft.com' }) } | ConvertTo-Json -Compress
 
 # Windows PowerShell 5.1 remove aspas duplas de argumentos nativos: escapa para o JSON chegar integro.
 $configArg = $config -replace '"', '\"'

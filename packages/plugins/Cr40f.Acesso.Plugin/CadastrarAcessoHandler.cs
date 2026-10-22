@@ -82,7 +82,7 @@ public sealed class CadastrarAcessoHandler
             // Antes do funcionário: gravar cr40f_emailmicrosoft dispara o DriverRecordSharing, que exige o systemuser.
             etapas.Executar("systemuser", () =>
             {
-                if (_usuarios.Garantir(Guid.Parse(usuario.Id), email, entrada.NomeCompleto)) etapas.Feita("systemuser", "criado no Dataverse");
+                if (_usuarios.Garantir(Guid.Parse(usuario.Id), email, entrada.NomeCompleto)) etapas.Feita("systemuser", "criado no Dataverse (" + _usuarios.Estado + ")");
                 else etapas.Pulada("systemuser", "já existe no Dataverse");
             });
 
