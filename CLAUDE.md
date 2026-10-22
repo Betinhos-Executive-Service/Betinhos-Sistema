@@ -6,6 +6,7 @@
 - Nunca publique a partir de branch de feature, de correção ou de worktree (`.claude/worktrees/*`). Se a branch atual não for `main`, pare e informe; o caminho é abrir PR, fazer o merge e publicar da `main`.
 - Após publicar, commite o bump como `build: Sistema Betinhos vX.Y.Z publicado no DEV a partir da main` direto na `main`.
 - Nunca dispare dois `pnpm push` em paralelo.
+- No fim de todo `pnpm push` (local ou CI), `packages/deploy/solucoes/distribuir-apos-push.ps1` distribui nas 4 soluções (`BetinhosCore`, `BetinhosAutomacao`, `BetinhosInterface`, `BetinhosMotoristas`) o que entrou na AppBetinhos do DEV e confere. Ele nunca derruba o push; se a conferência não zerar, mostra "ATENCAO" e o export para TEST/PROD fica barrado até corrigir (skill `verificar-solucoes`). Tipo de componente novo pede regra em `packages/deploy/solucoes/regras.json`.
 - Exceção automática (decisão do Renan, 20/10/2026): depois de um merge automático de baixo risco (`.claude/entrega-autonoma.json`), o plantão publica no DEV levando a `main` para a branch `dev` (`git push origin origin/main:refs/heads/dev`, só avanço rápido, nunca force). Isso dispara o workflow "Deploy" (job `dev`, conta de serviço do environment `dev` do GitHub). Nunca `pnpm push` fora do checkout principal. A versão de build parte da maior entre a do repo e a já publicada no DEV (descrição do `cr40f_SistemaBetinhos.html`, lida pelo `push-dev.ps1 -Build`), então CI e `pnpm push` local nunca fazem a versão retroceder.
 
 ## Ambiente cloud (sessões cloud do Claude Code)

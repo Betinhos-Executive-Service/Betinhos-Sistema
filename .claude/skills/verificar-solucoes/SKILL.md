@@ -5,7 +5,7 @@ description: "Verifica as ferramentas de segmentação da AppBetinhos em 4 solu�
 # Verificar segmentação da AppBetinhos (soluções)
 
 ## Cobre
-- Código: `packages/deploy/solucoes/**` (`classificar.mjs`, `conferir.mjs`, `comparar-fotos.mjs`, `conferir-retirada.mjs`, `arquivo.mjs`, `regras.json`, `dataverse.ps1`, `solucoes.ps1` com `Invoke-Pac`/`Assert-PacAmbiente`/`Export-SolucaoGerenciada`, `distribuir-solucoes.ps1`, `foto-ambiente.ps1`, `testa-solucoes.ps1`) e o script `test` de `packages/deploy/package.json`.
+- Código: `packages/deploy/solucoes/**` (`classificar.mjs`, `conferir.mjs`, `comparar-fotos.mjs`, `conferir-retirada.mjs`, `arquivo.mjs`, `regras.json`, `dataverse.ps1`, `solucoes.ps1` com `Invoke-Pac`/`Assert-PacAmbiente`/`Export-SolucaoGerenciada`, `distribuir-solucoes.ps1`, `foto-ambiente.ps1`, `testa-solucoes.ps1`, `distribuir-apos-push.ps1` com `testa-distribuir-apos-push.ps1`, chamado no fim do `push-dev.ps1`) e o script `test` de `packages/deploy/package.json`.
 - Ambiente: só o DEV (`org23b93544.crm2.dynamics.com`). Todos os passos do roteiro são somente leitura. O `-Aplicar` do distribuidor escreve no DEV e só entra como correção, com ok do usuário (ver "Casos de borda").
 
 ## Preparar ambiente
@@ -16,6 +16,7 @@ description: "Verifica as ferramentas de segmentação da AppBetinhos em 4 solu�
 ## Roteiro
 1. Testes Node: `pnpm --filter @betinhos/deploy test` → código 0 e `fail 0` (a suíte inclui `classificar`, `conferir`, `comparar-fotos`, `conferir-retirada` e `cli`, além dos testes de `flows/`).
 2. Testes PowerShell com respostas simuladas e `pac` simulado (não toca no Dataverse nem no pac real): `powershell -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/testa-solucoes.ps1` → código 0 e nenhuma linha começando por `FALHA`. Cobre as escritas recusadas fora do DEV, a tabela pai das dependências, `Assert-PacAmbiente`/`Invoke-Pac`, `Export-SolucaoGerenciada` (ZIP antigo, ZIP ausente, versão, UniqueName, Managed), a cobertura da foto e o arquivo de saída.
+   - Distribuição automática do push: `powershell -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/testa-distribuir-apos-push.ps1` → 4 linhas `ok`, código 0 (o push nunca falha; "ATENCAO" só quando a distribuição não zera; mutex liberado).
    - Para provar o helper do pac contra o pac real (somente leitura), no PowerShell 5.1: `. packages/deploy/solucoes/dataverse.ps1; . packages/deploy/solucoes/solucoes.ps1; Assert-PacAmbiente https://org23b93544.crm2.dynamics.com` → sem erro.
 3. Conferência no DEV: `powershell -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/distribuir-solucoes.ps1 -SomenteConferir` → código 0 e as DUAS linhas abaixo (confira as duas: o código de saída vira 1 por causa de qualquer uma delas):
    - `[solucoes] conferencia: sem dono 0; em duas 0; fora do lugar 0; dependencias para cima 0; dependencias fora das 4 0`
