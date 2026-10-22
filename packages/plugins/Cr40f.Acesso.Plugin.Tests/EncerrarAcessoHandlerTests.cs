@@ -67,4 +67,45 @@ public sealed class EncerrarAcessoHandlerTests
         Assert.Contains("\"etapa\":\"conta\",\"estado\":\"pulada\"", etapas);
         Assert.Contains("\"etapa\":\"funcionario\",\"estado\":\"feita\"", etapas);
     }
+
+    [Fact]
+    public void Usuario_fora_do_grupo_nao_perde_conta_nem_licenca_mas_funcionario_e_inativado()
+    {
+        ComFuncionario(); ComUsuarioCompleto(); _graph.Membros.Clear();
+        var etapas = Handler().Executar(_id, "Ana").ToJson();
+        foreach (var e in new[] { "grupo", "licenca", "conta" })
+            Assert.Contains("\"etapa\":\"" + e + "\",\"estado\":\"pulada\",\"detalhe\":\"conta fora do grupo de motoristas\"", etapas);
+        Assert.True(_graph.Usuarios["ana.lima@betinhos.com.br"].Ativo);
+        Assert.Contains("sku", _graph.Usuarios["ana.lima@betinhos.com.br"].SkuIds);
+        Assert.DoesNotContain("DefinirAtivo", _graph.Chamadas); Assert.DoesNotContain("RemoverLicenca", _graph.Chamadas);
+        Assert.Equal(1, _svc.Atualizados[0].GetAttributeValue<OptionSetValue>("cr40f_status").Value);
+    }
+
+    [Fact]
+    public void Sku_com_caixa_diferente_e_removido()
+    {
+        ComFuncionario(); ComUsuarioCompleto();
+        var u = _graph.Usuarios["ana.lima@betinhos.com.br"]; u.SkuIds.Clear(); u.SkuIds.Add("SKU");
+        Assert.Contains("\"etapa\":\"licenca\",\"estado\":\"feita\"", Handler().Executar(_id, "Ana").ToJson());
+        Assert.Contains("RemoverLicenca", _graph.Chamadas);
+    }
+
+    [Theory]
+    [InlineData("", "")]
+    [InlineData("   ", "  ")]
+    public void Confirmacao_vazia_com_nome_vazio_nao_toca_em_nada(string nome, string confirmacao)
+    {
+        _svc.Com(new Entity("cr40f_funcionarios", _id) { ["cr40f_nomecompleto"] = nome, ["cr40f_emailmicrosoft"] = "ana.lima@betinhos.com.br", ["cr40f_status"] = new OptionSetValue(0) });
+        ComUsuarioCompleto();
+        Assert.Equal("CONFIRMACAO_INVALIDA", Assert.Throws<AcessoException>(() => Handler().Executar(_id, confirmacao)).Codigo);
+        Assert.Empty(_graph.Chamadas); Assert.Empty(_svc.Atualizados);
+    }
+
+    [Fact]
+    public void Confirmacao_vazia_falha_mesmo_com_nome()
+    {
+        ComFuncionario(); ComUsuarioCompleto();
+        Assert.Equal("CONFIRMACAO_INVALIDA", Assert.Throws<AcessoException>(() => Handler().Executar(_id, " ")).Codigo);
+        Assert.Empty(_graph.Chamadas);
+    }
 }

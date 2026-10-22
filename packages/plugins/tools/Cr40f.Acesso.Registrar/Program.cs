@@ -35,9 +35,9 @@ EnsureSolutionComponent(service, assemblyId, solutionUniqueName, PluginAssemblyC
 var tipoCadastrar = UpsertPluginType(service, assemblyId, TipoCadastrar);
 var tipoEncerrar = UpsertPluginType(service, assemblyId, TipoEncerrar);
 
-// Tipos de parametro/resposta: 8 = Integer, 10 = String, 12 = Guid.
+// Tipos de parametro/resposta (customapirequestparameter.type): 7 = Integer, 10 = String, 12 = Guid (8 seria Money).
 EnsureCustomApi(service, ApiCadastrar, "Acesso | Cadastrar acesso de motorista", "Cria conta Microsoft, licenca, grupo e funcionario; devolve credenciais e etapas.", solutionUniqueName,
-    requestParams: new[] { ("NomeCompleto", 10, false), ("Celular", 10, false), ("EmailPessoal", 10, true), ("PrefixoEmail", 10, true), ("TipoVinculo", 8, true), ("FuncionarioId", 12, true) },
+    requestParams: new[] { ("NomeCompleto", 10, false), ("Celular", 10, false), ("EmailPessoal", 10, true), ("PrefixoEmail", 10, true), ("TipoVinculo", 7, true), ("FuncionarioId", 12, true) },
     responseProps: new[] { ("EmailMicrosoft", 10), ("SenhaTemporaria", 10), ("FuncionarioId", 10), ("UsuarioEntraId", 10), ("LinkApp", 10), ("Etapas", 10) });
 EnsureCustomApi(service, ApiEncerrar, "Acesso | Encerrar acesso de motorista", "Remove grupo, licenca e conta no Entra e inativa o funcionario.", solutionUniqueName,
     requestParams: new[] { ("FuncionarioId", 12, false), ("Confirmacao", 10, false) },

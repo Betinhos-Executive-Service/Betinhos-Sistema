@@ -29,7 +29,13 @@ public sealed class CadastrarAcessoHandler
             {
                 var ex = entrada.FuncionarioId is Guid fid ? _repo.PorId(fid) ?? throw new AcessoException("FUNCIONARIO_NAO_ENCONTRADO", "Funcionário não encontrado.") : null;
                 string em;
-                if (ex?.EmailMicrosoft is { Length: > 0 } ja) { em = ja.ToLowerInvariant(); etapas.Pulada("email", "funcionário já tinha e-mail Microsoft"); }
+                if (ex?.EmailMicrosoft is { Length: > 0 } ja)
+                {
+                    em = ja.ToLowerInvariant();
+                    // R10: conta desativada nunca é reativada aqui; a TI decide.
+                    if (_graph.UsuarioPorUpn(em) is { Ativo: false }) throw new AcessoException("ACESSO_ENCERRADO", "Acesso encerrado antes. Peça à TI para reativar a conta no Entra.");
+                    etapas.Pulada("email", "funcionário já tinha e-mail Microsoft");
+                }
                 else
                 {
                     var prefixo = AcessoRules.PrefixoEmail(string.IsNullOrWhiteSpace(entrada.PrefixoEmail) ? entrada.NomeCompleto : entrada.PrefixoEmail);
@@ -51,17 +57,21 @@ public sealed class CadastrarAcessoHandler
             var usuario = Etapa(etapas, "usuario", () =>
             {
                 var u = _graph.UsuarioPorUpn(email);
-                if (u is not null) { etapas.Pulada("usuario", u.Ativo ? "já existia; senha não alterada" : "já existia (desativado); senha não alterada"); if (!u.Ativo) _graph.DefinirAtivo(u.Id, true); return u; }
+                if (u is not null)
+                {
+                    if (!u.Ativo) throw new AcessoException("ACESSO_ENCERRADO", "Acesso encerrado antes. Peça à TI para reativar a conta no Entra.");
+                    etapas.Pulada("usuario", "já existia; senha não alterada"); return u;
+                }
                 if (_graph.LicencasLivres(_cfg.LicenseSkuId) <= 0) throw new AcessoException("SEM_LICENCA_DISPONIVEL", "Não há licença livre no plano configurado.");
                 saida.SenhaTemporaria = AcessoRules.GerarSenha(_rng);
-                u = _graph.CriarUsuario(email, entrada.NomeCompleto.Trim(), saida.SenhaTemporaria, celular);
+                u = _graph.CriarUsuario(email, entrada.NomeCompleto.Trim(), saida.SenhaTemporaria, celular, EmailValido(entrada.EmailPessoal));
                 etapas.Feita("usuario", "criado"); return u;
             });
             saida.UsuarioEntraId = usuario.Id;
 
             Etapa(etapas, "licenca", () =>
             {
-                if (usuario.SkuIds.Contains(_cfg.LicenseSkuId)) { etapas.Pulada("licenca", "já atribuída"); return 0; }
+                if (usuario.SkuIds.Any(s => string.Equals(s, _cfg.LicenseSkuId, StringComparison.OrdinalIgnoreCase))) { etapas.Pulada("licenca", "já atribuída"); return 0; }
                 _graph.AtribuirLicenca(usuario.Id, _cfg.LicenseSkuId); etapas.Feita("licenca", "atribuída"); return 0;
             });
 
@@ -95,10 +105,22 @@ public sealed class CadastrarAcessoHandler
     private bool EmUsoPorOutraPessoa(string upn, string nome)
     {
         var alvo = NomeNormalizado(nome);
+        var usuario = _graph.UsuarioPorUpn(upn);
+        if (usuario is { Ativo: false }) return true;   // R10: conta desativada conta como ocupada, mesmo homônimo exato
         var dono = _repo.PorEmail(upn);
         if (dono is not null) return NomeNormalizado(dono.Nome) != alvo;
-        var usuario = _graph.UsuarioPorUpn(upn);
         return usuario is not null && NomeNormalizado(usuario.DisplayName) != alvo;
+    }
+
+    /// <summary>E-mail pessoal com forma básica (algo@dominio.tld, sem espaços); inválido é ignorado.</summary>
+    internal static string? EmailValido(string? email)
+    {
+        var e = (email ?? "").Trim();
+        var arroba = e.IndexOf('@');
+        if (arroba <= 0 || arroba != e.LastIndexOf('@') || e.Any(char.IsWhiteSpace)) return null;
+        var dominio = e.Substring(arroba + 1);
+        var ponto = dominio.LastIndexOf('.');
+        return ponto > 0 && ponto < dominio.Length - 1 ? e : null;
     }
 
     private static string NomeNormalizado(string? nome)

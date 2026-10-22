@@ -15,9 +15,10 @@ public sealed class FakeGraphGateway : IGraphGateway
     private void Registrar(string metodo) { Chamadas.Add(metodo); if (FalharEm == metodo) throw new AcessoException("GRAPH_INDISPONIVEL", "503 em " + metodo); }
 
     public GraphUsuario? UsuarioPorUpn(string upn) { Registrar("UsuarioPorUpn"); return Usuarios.TryGetValue(upn, out var u) ? u : null; }
-    public GraphUsuario CriarUsuario(string upn, string nome, string senha, string? celular)
+    public string? UltimoEmailPessoal;
+    public GraphUsuario CriarUsuario(string upn, string nome, string senha, string? celular, string? emailPessoal = null)
     {
-        Registrar("CriarUsuario");
+        Registrar("CriarUsuario"); UltimoEmailPessoal = emailPessoal;
         var u = new GraphUsuario { Id = "id-" + upn, Upn = upn, DisplayName = nome, Ativo = true };
         Usuarios[upn] = u; return u;
     }

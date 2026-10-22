@@ -17,8 +17,8 @@ public sealed class AcessoConfig
     {
         if (string.IsNullOrWhiteSpace(unsecure)) throw new AcessoException("CONFIG_AUSENTE", "O step do plugin está sem a configuração não segura.");
         if (string.IsNullOrWhiteSpace(secure)) throw new AcessoException("CONFIG_AUSENTE", "O step do plugin está sem a configuração segura (clientSecret). Rode provision-acesso.ps1.");
-        var u = JsonLeve.Ler(unsecure!);
-        var s = JsonLeve.Ler(secure!);
+        var u = LerSemVazar(unsecure!, "não segura");
+        var s = LerSemVazar(secure!, "segura");
         var cfg = new AcessoConfig
         {
             TenantId = Obrigatorio(u, "tenantId"),
@@ -30,6 +30,13 @@ public sealed class AcessoConfig
         };
         if (u.TryGetValue("dominio", out var dominio) && dominio is string d && d.Length > 0) cfg.Dominio = d;
         return cfg;
+    }
+
+    // A mensagem original do parser pode trazer trecho do JSON (e do segredo); não propaga.
+    private static Dictionary<string, object?> LerSemVazar(string json, string qual)
+    {
+        try { return JsonLeve.Ler(json); }
+        catch { throw new AcessoException("CONFIG_AUSENTE", "A configuração " + qual + " do step não é um JSON válido."); }
     }
 
     private static string Obrigatorio(Dictionary<string, object?> dic, string chave)
