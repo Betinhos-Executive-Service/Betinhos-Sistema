@@ -46,3 +46,11 @@ it('Geral é rota React do shell no lugar da lista nativa de reservas', () => {
   expect(findItem('geral')?.group.id).toBe('operacional')
   expect(findItem('cr40f_reservadeveculos')).toBeNull()
 })
+
+it('Parcelas de multa é tabela em Frota, logo após Multas, para o DP', () => {
+  const found = findItem('new_parcelamultafolha')
+  expect(found?.group.id).toBe('frota')
+  expect(found?.item).toMatchObject({ kind: 'entity', entity: 'new_parcelamultafolha', label: 'Parcelas de multa' })
+  const ids = found!.group.items.map((item) => item.id)
+  expect(ids.indexOf('new_parcelamultafolha')).toBe(ids.indexOf('cr40f_multas') + 1)
+})
