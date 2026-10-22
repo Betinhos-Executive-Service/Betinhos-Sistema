@@ -30,7 +30,7 @@ public sealed class GraphGatewayTests
         h.Responder = r => r.RequestUri!.AbsolutePath.Contains("/token") ? Json("{\"access_token\":\"tok\"}")
             : r.RequestUri.AbsolutePath.EndsWith("/users/x%40b.com") ? Json("", HttpStatusCode.NotFound)
             : Json("{\"id\":\"1\",\"userPrincipalName\":\"y@b.com\",\"displayName\":\"Y Z\",\"accountEnabled\":true,\"assignedLicenses\":[{\"skuId\":\"sku\"}]}");
-        var g = new GraphGateway(Cfg(), () => new HttpClient(h));
+        var g = new GraphGateway(Cfg(), new HttpClient(h));
         Assert.Null(g.UsuarioPorUpn("x@b.com"));
         var u = g.UsuarioPorUpn("y@b.com")!;
         Assert.Equal("1", u.Id); Assert.True(u.Ativo); Assert.Contains("sku", u.SkuIds);
@@ -49,7 +49,7 @@ public sealed class GraphGatewayTests
             corpo = r.Content!.ReadAsStringAsync().Result;
             return Json("", HttpStatusCode.ServiceUnavailable);
         };
-        var g = new GraphGateway(Cfg(), () => new HttpClient(h));
+        var g = new GraphGateway(Cfg(), new HttpClient(h));
         var erro = Assert.Throws<AcessoException>(() => g.CriarUsuario("x@b.com", "X Y", "Senha#123456", "+5512999999999"));
         Assert.Contains("\"forceChangePasswordNextSignIn\":true", corpo);
         Assert.Contains("\"password\":\"Senha#123456\"", corpo);
@@ -63,7 +63,7 @@ public sealed class GraphGatewayTests
         var h = new Handler();
         h.Responder = r => r.RequestUri!.AbsolutePath.Contains("/token") ? Json("{\"access_token\":\"tok\"}")
             : Json("{\"value\":[{\"skuId\":\"sku\",\"consumedUnits\":3,\"prepaidUnits\":{\"enabled\":10}}]}");
-        Assert.Equal(7, new GraphGateway(Cfg(), () => new HttpClient(h)).LicencasLivres("sku"));
+        Assert.Equal(7, new GraphGateway(Cfg(), new HttpClient(h)).LicencasLivres("sku"));
     }
 
     private static Handler ComSkus()
@@ -76,12 +76,12 @@ public sealed class GraphGatewayTests
 
     [Fact]
     public void LicencasLivres_ignora_caixa_do_sku()
-        => Assert.Equal(7, new GraphGateway(Cfg(), () => new HttpClient(ComSkus())).LicencasLivres("abc-SKU"));
+        => Assert.Equal(7, new GraphGateway(Cfg(), new HttpClient(ComSkus())).LicencasLivres("abc-SKU"));
 
     [Fact]
     public void LicencasLivres_sku_inexistente_lanca_CONFIG_AUSENTE()
     {
-        var erro = Assert.Throws<AcessoException>(() => new GraphGateway(Cfg(), () => new HttpClient(ComSkus())).LicencasLivres("outro"));
+        var erro = Assert.Throws<AcessoException>(() => new GraphGateway(Cfg(), new HttpClient(ComSkus())).LicencasLivres("outro"));
         Assert.Equal("CONFIG_AUSENTE", erro.Codigo);
         Assert.Contains("SKU de licença não existe no tenant", erro.Message);
     }
@@ -95,7 +95,7 @@ public sealed class GraphGatewayTests
             corpo = r.Content!.ReadAsStringAsync().Result;
             return Json("{\"id\":\"1\",\"userPrincipalName\":\"x@b.com\",\"displayName\":\"X Y\",\"accountEnabled\":true,\"assignedLicenses\":[]}");
         };
-        new GraphGateway(Cfg(), () => new HttpClient(h)).CriarUsuario("x@b.com", "X Y", "Senha#123456", null, emailPessoal);
+        new GraphGateway(Cfg(), new HttpClient(h)).CriarUsuario("x@b.com", "X Y", "Senha#123456", null, emailPessoal);
         return corpo!;
     }
 
