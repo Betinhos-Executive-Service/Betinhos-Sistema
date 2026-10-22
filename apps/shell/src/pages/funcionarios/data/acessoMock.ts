@@ -22,7 +22,8 @@ export function createAcessoMock(): AcessoSource {
       }
       emails.add(email)
       const resultado: CadastroResultado = {
-        emailMicrosoft: email, senhaTemporaria: 'Kx7#mQ2vR9pL4w', funcionarioId: input.funcionarioId ?? `m${Date.now()}`, linkApp: 'https://org23b93544.crm2.dynamics.com/WebResources/new_app-motoristas-v2',
+        emailMicrosoft: email, senhaTemporaria: 'Kx7#mQ2vR9pL4w', // Atalho do mock: sem funcionarioId, devolve 'm7' (Helena, linha existente no mock de funcionários) para "Abrir ficha" abrir um registro real.
+        funcionarioId: input.funcionarioId ?? 'm7', linkApp: 'https://org23b93544.crm2.dynamics.com/WebResources/new_app-motoristas-v2',
         etapas: [{ etapa: 'validacao', estado: 'feita', detalhe: 'ok' }, { etapa: 'email', estado: 'feita', detalhe: email }, { etapa: 'usuario', estado: 'feita', detalhe: 'criado' }, { etapa: 'licenca', estado: 'feita', detalhe: 'atribuída' }, { etapa: 'grupo', estado: 'feita', detalhe: 'adicionado' }, { etapa: 'funcionario', estado: 'feita', detalhe: input.funcionarioId ? 'e-mail vinculado' : 'criado' }],
       }
       return delay(resultado)

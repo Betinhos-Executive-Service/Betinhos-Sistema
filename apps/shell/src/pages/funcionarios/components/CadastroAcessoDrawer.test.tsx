@@ -58,6 +58,31 @@ describe('CadastroAcessoDrawer', () => {
     expect(cadastrar.mock.calls[1][0]).toEqual(cadastrar.mock.calls[0][0])
   })
 
+  it('tentar de novo envia os valores atuais dos campos', async () => {
+    const erro = new AcessoError('GRAPH_INDISPONIVEL', 'O Microsoft 365 não respondeu.', [])
+    const cadastrar = vi.fn().mockRejectedValueOnce(erro).mockResolvedValueOnce(ok)
+    renderDrawer(src(cadastrar))
+    fireEvent.change(screen.getByLabelText(/Nome completo/), { target: { value: 'Ana Lima' } })
+    fireEvent.change(screen.getByLabelText(/Celular/), { target: { value: '12991234567' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Criar acesso/ })) })
+    await screen.findByRole('alert')
+    fireEvent.change(screen.getByLabelText(/Celular/), { target: { value: '12988887777' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Tentar de novo/ })) })
+    await screen.findByText('Kx7#mQ2vR9pL4w')
+    expect(cadastrar.mock.calls[1][0]).toMatchObject({ nomeCompleto: 'Ana Lima', celular: '12988887777' })
+  })
+
+  it('no estado de erro, Esc pede confirmação de descarte', async () => {
+    const { onClose } = renderDrawer(src(async () => { throw new AcessoError('GRAPH_INDISPONIVEL', 'O Microsoft 365 não respondeu.', []) }))
+    fireEvent.change(screen.getByLabelText(/Nome completo/), { target: { value: 'Ana Lima' } })
+    fireEvent.change(screen.getByLabelText(/Celular/), { target: { value: '12991234567' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Criar acesso/ })) })
+    await screen.findByRole('alert')
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
+    expect(screen.getByText('Descartar alterações?')).toBeTruthy()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
   it('fechar com dado digitado pede confirmação; durante a criação não fecha', async () => {
     let resolver: (v: typeof ok) => void = () => {}
     const { onClose } = renderDrawer(src(() => new Promise((r) => { resolver = r })))
