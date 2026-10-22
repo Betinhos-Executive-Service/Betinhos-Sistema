@@ -92,14 +92,6 @@ function TimeSelects({
   );
 }
 
-// Horário agendado arredondado para a grade de 5 minutos dos seletores (ex.: "01/07/2026 14:32" -> 14:30).
-function getScheduledVoucherTime(dateValue = "") {
-  const match = dateValue.match(/(\d{2}):(\d{2})/);
-  if (!match) return null;
-  const minute = String(Math.floor(Number(match[2]) / 5) * 5).padStart(2, "0");
-  return { hour: match[1], minute };
-}
-
 function splitTime(value = "") {
   const [hour = "", minute = ""] = value.split(":");
   return { hour, minute };
@@ -182,7 +174,6 @@ export function VoucherScreen({
   const clientName = detail.fields.find((field) => field.label === "Cliente")?.value ?? "";
   const showSignature = /tenn?aris/i.test(clientName);
   const dateField = detail.fields.find((field) => /data|hora|hor\u00e1rio|janela/i.test(field.label));
-  const scheduledTime = getScheduledVoucherTime(dateField?.value);
   const draftRef = useRef(readVoucherDraft(detail, initialDraft));
   const startHourRef = useRef<HTMLButtonElement | null>(null);
   const startMinuteRef = useRef<HTMLButtonElement | null>(null);
@@ -408,20 +399,6 @@ export function VoucherScreen({
                       emitDraft({ "Horário Inicial": startHour && value ? `${startHour}:${value}` : "" });
                     }}
                   />
-                  {scheduledTime && !startHour && !startMinute ? (
-                    <button
-                      type="button"
-                      className="voucher-time-shortcut"
-                      onClick={() => {
-                        setStartHour(scheduledTime.hour);
-                        setStartMinute(scheduledTime.minute);
-                        clearError("startTime");
-                        emitDraft({ "Horário Inicial": `${scheduledTime.hour}:${scheduledTime.minute}` });
-                      }}
-                    >
-                      Usar {scheduledTime.hour}:{scheduledTime.minute} (agendado)
-                    </button>
-                  ) : null}
                 </VoucherInputRow>
               </VoucherSection>
 

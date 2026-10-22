@@ -180,14 +180,11 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
     check("Finalizar: confirma a observação já escrita", /Confira sua observação/i.test(finalizeText) && /Enviar sem observação/.test(finalizeText));
     await shot("servicos-finalizar");
 
-    // Voucher: atalho do horário agendado, rótulos, formatação e limpar com confirmação.
+    // Voucher: sem atalho de horário agendado (removido em 22/10/2026), rótulos, formatação e limpar com confirmação.
     await open("voucher?serviceId=10241&type=SERVICO");
-    const shortcut = main().locator(".voucher-time-shortcut");
-    check("Voucher: atalho 'Usar 14:30 (agendado)'", /Usar 14:30 \(agendado\)/.test((await shortcut.count()) ? await shortcut.innerText() : ""));
+    check("Voucher: sem atalho 'Usar … (agendado)'", (await main().locator(".voucher-time-shortcut").count()) === 0 && !/\(agendado\)/.test(await main().innerText()));
     check("Voucher: Limpar formulário desabilitado sem dados", await main().getByRole("button", { name: "Limpar formulário" }).isDisabled());
-    await shortcut.click();
-    await page.waitForTimeout(300);
-    check("Voucher: atalho preenche 'Horário inicial: hora'", /14/.test(await main().getByRole("button", { name: "Horário inicial: hora" }).innerText()));
+    check("Voucher: 'Horário inicial: hora' começa vazio", /Hora/.test(await main().getByRole("button", { name: "Horário inicial: hora" }).innerText()));
     const toll = main().locator('input[placeholder="R$ 0,00"]').first();
     await toll.fill("12,5");
     await toll.blur();
