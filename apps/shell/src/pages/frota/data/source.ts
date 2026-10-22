@@ -51,7 +51,7 @@ export interface DataSource {
   inativarItemPlano(id: string, ativo: boolean): Promise<void>
   /** Upsert da última execução conhecida por (veículo, item). */
   salvarBaseline(veiculoId: string, itemId: string, km: number | null, data: string | null): Promise<void>
-  /** Funcionário tem o aditivo de assinatura eletrônica (new_aditivoassinaturaem preenchido). */
+  /** Funcionário tem o aditivo de assinatura eletrônica (data em new_aditivoassinaturaem e PDF em new_aditivoassinatura). */
   temAditivo(funcionarioId: string): Promise<boolean>
   /** Termos da multa, do mais recente ao mais antigo. */
   listarTermos(multaId: string): Promise<TermoMulta[]>

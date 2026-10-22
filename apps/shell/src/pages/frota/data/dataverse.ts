@@ -346,8 +346,10 @@ export function createXrmSource(xrm: XrmHost): DataSource {
 
     async temAditivo(funcionarioId: string) {
       const id = guid(funcionarioId)
-      const row = await api.retrieveRecord('cr40f_funcionarios', id, '?$select=new_aditivoassinaturaem')
-      return typeof row.new_aditivoassinaturaem === 'string' && row.new_aditivoassinaturaem !== ''
+      const row = await api.retrieveRecord('cr40f_funcionarios', id, '?$select=new_aditivoassinaturaem,new_aditivoassinatura_name')
+      // Exige a data e o PDF: data sem arquivo não prova o aditivo assinado.
+      const preenchido = (v: unknown) => typeof v === 'string' && v !== ''
+      return preenchido(row.new_aditivoassinaturaem) && preenchido(row.new_aditivoassinatura_name)
     },
 
     async listarTermos(multaId: string) {

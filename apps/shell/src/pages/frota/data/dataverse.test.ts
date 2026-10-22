@@ -488,6 +488,20 @@ describe('termo de multa (Custom APIs)', () => {
     await expect(createXrmSource(host().xrm).cancelarTermoMulta(TERMO_ID)).rejects.toThrow('Termo já assinado.')
   })
 
+  it('temAditivo exige a data e o arquivo do aditivo', async () => {
+    const F = 'cccccccc-1111-2222-3333-444444444444'
+    const casos: [Record<string, unknown>, boolean][] = [
+      [{ new_aditivoassinaturaem: '2026-10-15', new_aditivoassinatura_name: 'aditivo.pdf' }, true],
+      [{ new_aditivoassinaturaem: '2026-10-15', new_aditivoassinatura_name: null }, false],
+      [{ new_aditivoassinaturaem: null, new_aditivoassinatura_name: 'aditivo.pdf' }, false],
+    ]
+    for (const [row, esperado] of casos) {
+      const retrieveRecord = vi.fn(async () => row)
+      await expect(createXrmSource(host({ retrieveRecord }).xrm).temAditivo(F)).resolves.toBe(esperado)
+      expect(retrieveRecord).toHaveBeenCalledWith('cr40f_funcionarios', F, '?$select=new_aditivoassinaturaem,new_aditivoassinatura_name')
+    }
+  })
+
   it('temAditivo valida o GUID', async () => {
     await expect(createXrmSource(host().xrm).temAditivo('x')).rejects.toThrow('Identificador inválido')
   })
