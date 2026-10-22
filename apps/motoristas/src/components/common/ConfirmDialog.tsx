@@ -9,10 +9,12 @@ type ConfirmDialogProps = {
   cancelLabel?: string;
   onCancel: () => void;
   onConfirm: () => void;
+  // Padrão destrutivo (lixeira, botão vermelho); "confirm" serve para perguntas sem exclusão.
+  tone?: "danger" | "confirm";
 };
 
 // Diálogo destrutivo padrão: fecha com Cancelar, Esc ou toque fora; foco inicial em Cancelar.
-export function ConfirmDialog({ title, message, confirmLabel, cancelLabel = "Cancelar", onCancel, onConfirm }: ConfirmDialogProps) {
+export function ConfirmDialog({ title, message, confirmLabel, cancelLabel = "Cancelar", onCancel, onConfirm, tone = "danger" }: ConfirmDialogProps) {
   const titleId = useId();
   const cancelRef = useRef<HTMLButtonElement>(null);
   const onCancelRef = useRef(onCancel);
@@ -31,13 +33,17 @@ export function ConfirmDialog({ title, message, confirmLabel, cancelLabel = "Can
     <div className="maintenance-delete-overlay" role="dialog" aria-modal="true" aria-labelledby={titleId} onClick={onCancel}>
       <div className="maintenance-delete-dialog" onClick={(event) => event.stopPropagation()}>
         <div className="maintenance-delete-icon" aria-hidden="true">
-          <SystemIcon name="trash" />
+          <SystemIcon name={tone === "danger" ? "trash" : "warning"} />
         </div>
         <div id={titleId} className="maintenance-delete-title">{title}</div>
         <p>{message}</p>
         <div className="maintenance-delete-actions">
           <ActionButton buttonRef={cancelRef} className="maintenance-delete-cancel" label={cancelLabel} onClick={onCancel} />
-          <ActionButton className="maintenance-delete-confirm" variant="danger" label={confirmLabel} icon={<SystemIcon name="trash" />} onClick={onConfirm} />
+          {tone === "danger" ? (
+            <ActionButton className="maintenance-delete-confirm" variant="danger" label={confirmLabel} icon={<SystemIcon name="trash" />} onClick={onConfirm} />
+          ) : (
+            <ActionButton className="maintenance-delete-confirm" variant="primary" label={confirmLabel} onClick={onConfirm} />
+          )}
         </div>
       </div>
     </div>

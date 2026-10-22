@@ -11,7 +11,7 @@ description: "Verifica a camada de domínio e integração do App Motoristas: re
 - `npm ci` (lockfile `package-lock.json`). Node 24.
 
 ## Roteiro
-1. `npm test` → `ℹ fail 0` (246 testes em 21/10/2026; o número só deve crescer).
+1. `npm test` → `ℹ fail 0` (304 testes em 22/10/2026; o número só deve crescer).
 2. `npx tsc --noEmit --noUnusedLocals --noUnusedParameters` → sem saída e exit 0.
 3. Mudou payload do Dataverse (`src/lib/dataverse.ts`)? Confira nomes lógicos na metadata real do DEV (MCP `Dataverse_DEV`, somente leitura) antes de concluir. Ex.: `cr40f_observacoes` do recibo recebe "-" quando vazio.
 4. Mudou o build (`scripts/build-react-singlefile.cjs`)? `npm run build` gera `dist/webresource-app-motoristas.html` com `window.__APP_BUILD_INFO` e sobe o PATCH; confira o carimbo `v… · dd/mm/aaaa HH:mm` na Início (ver `verificar-servicos`). Não versione `dist/` de builds de teste.
@@ -22,6 +22,7 @@ description: "Verifica a camada de domínio e integração do App Motoristas: re
 - `formatBuildStamp`: com e sem data de build (`tests/buildStamp.test.ts`).
 - Frota da escolha do carro (`buildActiveFleetQuery`): só ativos Próprio (`100000000`) ou Aluguel (`100000002`), nunca Terceiro (`100000001`) (`tests/dataverse.test.ts`). Prova real: rode a query OData gerada em DEV e PROD (somente leitura) e conte por categoria; em 21/10/2026 deu DEV 15 (14 Próprio, 1 Aluguel) e PROD 20 (16 Próprio, 4 Aluguel).
 - Logger de erros (`src/lib/appErrorLogger.ts` sobre `@betinhos-executive-service/ui/error-logger.js`): `tests/appErrorLogger.test.ts` cobre gravação via pacote, carimbo `v…`/`dd/mm/aaaa HH:mm`, redação de e-mail/telefone, aviso `appmotoristas:error`, `console.error`, fila antiga e modo mock. Prova no DEV: ver `verificar-app-geral`.
+- Conferência do comprovante (`src/lib/receiveProofCheck.ts`): estado do quadro, valor lido em centavos e soma das leituras contra o que falta (`tests/receiveProofCheck.test.ts`).
 - CSS com chaves balanceadas (`tests/stylesSyntax.test.ts`): o esbuild só avisa e engole as regras seguintes; acontece em resolução de merge de `src/styles.css`.
 
 ## Evidência obrigatória

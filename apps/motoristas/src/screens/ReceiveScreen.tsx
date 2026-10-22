@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import invoiceReceiptIcon from "../assets/icons/invoice-receipt.svg";
 import { ActionBar, ActionButton, type ActionButtonState } from "../components/common/ActionButton";
 import { PhotoAddButton } from "../components/common/PhotoAddButton";
@@ -8,11 +8,16 @@ import { FormMenu } from "../components/navigation/FormMenu";
 import { SystemIcon } from "../components/icons/SystemIcon";
 import type { DetailData } from "../types";
 import type { ExpensePhoto } from "../lib/expenses";
-import { formatQrChargeAmount } from "../lib/qrCharge";
+import { ConfirmDialog } from "../components/common/ConfirmDialog";
+import { formatQrChargeAmount, getReceivableCents } from "../lib/qrCharge";
+import { getReceiveSummaryState, proofsCoverBalance } from "../lib/receiveProofCheck";
 
 // Estado da cobrança por QR no Recebimento, reidratado pelo resumo do plugin.
 export type ReceiveQrCharge = {
+  receivableCents: number;
   paidCents: number;
+  // Nome de quem pagou o último QR (sem horário), para o motorista saber quem já pagou.
+  paidByName: string;
   // O que falta receber depois do QR (o próximo QR fica limitado a isto).
   balanceCents: number;
   // Resumo carregando: a tela segue usável, só o botão do QR espera.
@@ -37,6 +42,8 @@ type ReceiveScreenProps = {
   qrCharge?: ReceiveQrCharge;
   // QR pago no valor total: a foto do comprovante vira opcional.
   proofWaived?: boolean;
+  // Leitura por IA do comprovante: devolve o valor lido em centavos ou null. Só confere, nunca bloqueia.
+  checkProof?: (photo: ExpensePhoto) => Promise<number | null>;
 };
 
 const normalizeLabel = (label: string) =>
@@ -62,16 +69,34 @@ export function ReceiveScreen({
   canGeneratePersonalReceipt = false,
   submitState = "idle",
   qrCharge,
-  proofWaived = false
+  proofWaived = false,
+  checkProof
 }: ReceiveScreenProps) {
   const isSubmitting = submitState !== "idle";
   const cameraScroll = useCameraScroll(`receber:${detail.id}`);
   const photosRef = useRef<HTMLDivElement | null>(null);
   const [photosError, setPhotosError] = useState("");
-  // O motorista precisa ver quanto e como cobrar sem voltar ao detalhe.
-  const amountToReceive = getFieldValue(detail, "valorareceber");
+  // O motorista precisa ver quanto e como cobrar sem voltar ao detalhe. O valor vem do registro
+  // (cr40f_valor_a_receber); no Dataverse não existe campo com o rótulo "Valor a receber".
+  const totalCents = qrCharge?.receivableCents || getReceivableCents(detail);
+  const paidCents = qrCharge?.paidCents ?? 0;
+  const balanceCents = qrCharge ? qrCharge.balanceCents : totalCents;
+  const summaryState = getReceiveSummaryState(totalCents, paidCents);
+  const [checking, setChecking] = useState(false);
+  const [confirmBalance, setConfirmBalance] = useState(false);
+  const proofReadsRef = useRef(new Map<string, Promise<number | null>>());
+  const shouldCheckProof = Boolean(checkProof) && !proofWaived && balanceCents > 0;
   const operationNote = getFieldValue(detail, "obsdeoperacao");
   const isVideo = (photo: ExpensePhoto) => photo.mediaType === "video" || Boolean(photo.rawBlob) || photo.dataUrl.startsWith("data:video/");
+
+  // Lê cada foto assim que entra, para o FINALIZAR não esperar a IA do zero.
+  useEffect(() => {
+    if (!shouldCheckProof || !checkProof) return;
+    for (const photo of photos) {
+      if (isVideo(photo) || proofReadsRef.current.has(photo.id)) continue;
+      proofReadsRef.current.set(photo.id, checkProof(photo).catch(() => null));
+    }
+  }, [photos, shouldCheckProof]);
 
   const addPhoto = () => {
     setPhotosError("");
@@ -86,7 +111,17 @@ export function ReceiveScreen({
       focusInvalidField(photosRef.current);
       return;
     }
-    onContinue();
+    if (!shouldCheckProof || checking) {
+      if (!checking) onContinue();
+      return;
+    }
+    const reads = photos.filter((photo) => !isVideo(photo)).map((photo) => proofReadsRef.current.get(photo.id) ?? Promise.resolve(null));
+    setChecking(true);
+    void Promise.all(reads).then((cents) => {
+      setChecking(false);
+      if (proofsCoverBalance(cents, balanceCents)) onContinue();
+      else setConfirmBalance(true);
+    });
   };
 
   const generatePersonalReceipt = () => {
@@ -102,24 +137,48 @@ export function ReceiveScreen({
           <div className="finalize-title">Recebimento - {detail.id}</div>
           <div className="finalize-scroll" ref={cameraScroll.ref}>
             <div className="finalize-form maintenance maintenance-request-form expense-form receive-form">
-              {amountToReceive ? (
+              {summaryState === "aReceber" ? (
                 <div className="finalize-input-block receive-amount">
                   <span className="form-field-label">Valor a receber</span>
-                  <strong>{amountToReceive}</strong>
+                  <strong>{formatQrChargeAmount(totalCents)}</strong>
                   {operationNote ? <p>{operationNote}</p> : null}
                 </div>
               ) : null}
 
-              {qrCharge?.paidCents ? (
-                <p className="qr-charge-alert qr-charge-alert-icon is-success" role="status">
-                  <SystemIcon name="check" />
-                  <span>
-                    {proofWaived
-                      ? `Pago por QR code: ${formatQrChargeAmount(qrCharge.paidCents)}. O comprovante é opcional.`
-                      : `Pago por QR: ${formatQrChargeAmount(qrCharge.paidCents)}. Envie o comprovante do restante (${formatQrChargeAmount(qrCharge.balanceCents)}).`}
-                  </span>
+              {summaryState === "parcial" || summaryState === "quitado" ? (
+                <div className="finalize-input-block receive-summary" data-state={summaryState}>
+                  <div className="receive-summary-row">
+                    <span>Total do serviço</span>
+                    <strong>{formatQrChargeAmount(totalCents)}</strong>
+                  </div>
+                  <div className="receive-summary-row">
+                    <span>
+                      Já pago por QR
+                      {qrCharge?.paidByName ? <small>{qrCharge.paidByName}</small> : null}
+                    </span>
+                    <strong>{formatQrChargeAmount(paidCents)}</strong>
+                  </div>
+                  {summaryState === "parcial" ? (
+                    <div className="receive-summary-row is-balance">
+                      <span>Falta receber</span>
+                      <strong>{formatQrChargeAmount(balanceCents)}</strong>
+                    </div>
+                  ) : (
+                    <div className="receive-summary-row is-paid" role="status">
+                      <span><SystemIcon name="check" /> Tudo recebido</span>
+                      <strong>Comprovante opcional</strong>
+                    </div>
+                  )}
+                  {operationNote ? <p>{operationNote}</p> : null}
+                </div>
+              ) : null}
+              {summaryState === "parcial" && !proofWaived ? (
+                <p className="qr-charge-alert qr-charge-alert-icon is-warning" role="status">
+                  <SystemIcon name="warning" />
+                  <span>Envie o comprovante do restante ({formatQrChargeAmount(balanceCents)}).</span>
                 </p>
               ) : null}
+
               {qrCharge?.onOpen && !proofWaived ? (
                 <ActionButton
                   className="finalize-secondary receive-qr-charge"
@@ -180,10 +239,32 @@ export function ReceiveScreen({
                 icon={<img src={invoiceReceiptIcon} alt="" />}
               />
             ) : null}
-            <ActionButton className="finalize-primary receive-primary" variant="primary" idleLabel="FINALIZAR" loadingLabel="ENVIANDO" successLabel="ENVIADO" state={submitState} onClick={continueFlow} />
+            <ActionButton
+              className="finalize-primary receive-primary"
+              variant="primary"
+              idleLabel="FINALIZAR"
+              loadingLabel={checking ? "CONFERINDO" : "ENVIANDO"}
+              successLabel="ENVIADO"
+              state={checking ? "loading" : submitState}
+              onClick={continueFlow}
+            />
           </ActionBar>
         </article>
       </section>
+      {confirmBalance ? (
+        <ConfirmDialog
+          tone="confirm"
+          title={`Você recebeu os ${formatQrChargeAmount(balanceCents)} que faltavam?`}
+          message="Não conseguimos confirmar esse valor na foto do comprovante."
+          confirmLabel="Sim, recebi tudo"
+          cancelLabel="Ainda não"
+          onCancel={() => setConfirmBalance(false)}
+          onConfirm={() => {
+            setConfirmBalance(false);
+            onContinue();
+          }}
+        />
+      ) : null}
     </AppShell>
   );
 }

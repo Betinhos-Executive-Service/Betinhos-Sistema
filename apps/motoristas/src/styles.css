@@ -12553,6 +12553,70 @@ select,
   line-height: 1.35;
 }
 
+/* Receber: quadro total / já pago / falta receber, em linguagem simples. */
+.receive-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 4px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fcfcfb;
+}
+
+.receive-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  color: #536174;
+  font: 600 0.92rem/1.3 "Manrope", Arial, sans-serif;
+}
+
+.receive-summary-row + .receive-summary-row { border-top: 1px solid #e2e8f0; }
+
+.receive-summary-row span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.receive-summary-row small {
+  color: #0f172a;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.receive-summary-row strong {
+  color: #0f172a;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.receive-summary-row.is-balance span,
+.receive-summary-row.is-balance strong { color: #000e23; }
+.receive-summary-row.is-balance strong { font-size: 1.45rem; }
+
+.receive-summary-row.is-paid span {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  color: #147a4b;
+  font-weight: 800;
+}
+
+.receive-summary-row.is-paid svg { width: 18px; height: 18px; }
+.receive-summary-row.is-paid strong { color: #536174; font-weight: 600; }
+
+.receive-summary p {
+  margin: 0;
+  padding: 0 0 10px;
+  color: #536174;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 /* Alvos de toque: mínimo de 44px para uso com uma mão. Links em texto ganham área
    vertical com padding + margem negativa, sem mudar o espaçamento visual. */
 .details-menu .details-back,

@@ -1,5 +1,6 @@
 /**
  * Leitura rápida simulada para a visualização local (fora do Dynamics), ativada só com ?mockLeitura=<modo> na URL.
+ * Com ?mockLeituraValor=<reais> o modo ok devolve esse valor (conferência do comprovante de recebimento).
  * Modos: ok (2,5 s), lento (11 s, mostra o aviso de demora), ilegivel, falha e timeout (nunca responde).
  */
 export type QuickReadMockMode = "ok" | "lento" | "ilegivel" | "falha" | "timeout";
@@ -27,7 +28,7 @@ export async function readReceiptQuickMock(mode: QuickReadMockMode, categorias: 
     ok: true,
     leitura: {
       legivel: true,
-      valor: 51.9,
+      valor: Number(new URLSearchParams(globalThis.location?.search ?? "").get("mockLeituraValor")) || 51.9,
       data: "2026-10-10",
       hora: "18:28",
       estabelecimento: "Burger King",
