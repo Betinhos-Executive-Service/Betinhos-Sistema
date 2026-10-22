@@ -31,6 +31,7 @@ import { buildIdeaRecord, normalizeIdeaRecord, validateIdeaDraft, type Idea, typ
 import { decideExpenseUploadMode, type ExpenseUploadMode } from "./expenseUploadMode.ts";
 import { parseQrChargeResponse, parseQrChargeSummary, type QrChargePayer } from "./qrCharge.ts";
 import { createMockQrCharge, getMockQrChargeSummary, updateMockQrCharge } from "./qrChargeMock.ts";
+import { createFetchWebApi } from "./fetchWebApi.ts";
 
 type XrmLike = {
   Utility?: {
@@ -297,8 +298,54 @@ function isLocalhostRuntime() {
   return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
 }
 
+// Mock só em localhost. Fora dele, sem Xrm.WebApi o app abre pela URL direta do
+// web resource (sem model-driven) e usa o WebApi sobre fetch com o cookie da sessão.
 function shouldUseLocalFrontendFallback() {
-  return isLocalhostRuntime() || !getWindowXrm()?.WebApi;
+  return isLocalhostRuntime();
+}
+
+export function isDataverseHostRuntime() {
+  if (typeof window === "undefined") return false;
+  return /\.dynamics\.com$/i.test(window.location.hostname);
+}
+
+// Aberto pela URL direta: janela de topo (ou parent sem Xrm) no host do Dataverse.
+export function isStandaloneWebResourceRuntime() {
+  if (!isDataverseHostRuntime()) return false;
+  const current = window as Window & { Xrm?: XrmLike };
+  if (current.Xrm?.WebApi) return false;
+  try {
+    return !(window.parent as Window & { Xrm?: XrmLike })?.Xrm?.WebApi;
+  } catch {
+    return true;
+  }
+}
+
+let fetchRuntime: XrmLike | null = null;
+let whoAmIUserId = "";
+
+function getFetchRuntime(): XrmLike {
+  if (!fetchRuntime) {
+    const clientUrl = window.location.origin;
+    const entitySetByName = Object.fromEntries(Object.entries(ENTITY_SET_TO_ENTITY_NAME).map(([set, name]) => [name, set]));
+    fetchRuntime = {
+      Utility: { getGlobalContext: () => ({ userSettings: { userId: whoAmIUserId }, getClientUrl: () => clientUrl }) },
+      WebApi: createFetchWebApi(clientUrl, entitySetByName)
+    };
+    dataverseLog("Xrm.WebApi ausente: usando WebApi por fetch na URL direta do web resource.", { clientUrl });
+  }
+  return fetchRuntime;
+}
+
+async function fetchWhoAmIUserId() {
+  if (whoAmIUserId) return whoAmIUserId;
+  const response = await fetch(`${window.location.origin}/api/data/v9.2/WhoAmI`, {
+    headers: { Accept: "application/json", "OData-MaxVersion": "4.0", "OData-Version": "4.0" },
+    credentials: "same-origin"
+  });
+  if (!response.ok) throw new Error(`WhoAmI falhou (HTTP ${response.status}).`);
+  whoAmIUserId = cleanGuid(String(((await response.json()) as { UserId?: string }).UserId ?? ""));
+  return whoAmIUserId;
 }
 const flowUrlCache = new Map<string, string>();
 
@@ -362,6 +409,7 @@ function getWindowXrm(): XrmLike | null {
       }
       return parentWindow.Xrm;
     }
+    if (isDataverseHostRuntime()) return getFetchRuntime();
     const logKey = `missing:${Boolean(current.Xrm)}:${Boolean(parentWindow?.Xrm)}`;
     if (lastRuntimeLogKey !== logKey) {
       lastRuntimeLogKey = logKey;
@@ -373,6 +421,7 @@ function getWindowXrm(): XrmLike | null {
     return null;
   } catch (error) {
     dataverseWarn("Falha ao acessar window.parent.Xrm. Usando apenas window.Xrm.", error);
+    if (!current.Xrm?.WebApi && isDataverseHostRuntime()) return getFetchRuntime();
     if (current.Xrm?.WebApi) {
       const clientUrl = current.Xrm.Utility?.getGlobalContext?.().getClientUrl?.() ?? "";
       const logKey = `current-parent-error:${clientUrl}`;
@@ -398,7 +447,7 @@ export function hasDataverseRuntime() {
 
 function getWebApi() {
   const api = getWindowXrm()?.WebApi;
-  if (!api) throw new Error("Dataverse runtime indisponivel. Abra o app como web resource em Model-driven/Power Apps.");
+  if (!api) throw new Error("Dataverse indisponivel. Abra o app pelo link do Dataverse (WebResources/new_app-motoristas-v2) ou pelo Power Apps.");
   return api;
 }
 
@@ -578,7 +627,8 @@ async function getCurrentUserEmail() {
     return "";
   }
   const xrm = getWindowXrm();
-  const userId = cleanGuid(xrm?.Utility?.getGlobalContext?.().userSettings?.userId ?? "");
+  let userId = cleanGuid(xrm?.Utility?.getGlobalContext?.().userSettings?.userId ?? "");
+  if (!userId && isDataverseHostRuntime()) userId = await fetchWhoAmIUserId();
   dataverseLog("Usuario atual detectado.", { userId });
   if (!userId) return "";
   const systemUser = await retrieveOne(DATAVERSE.systemusers, userId, "$select=internalemailaddress,fullname");
