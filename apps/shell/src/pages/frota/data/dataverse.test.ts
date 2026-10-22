@@ -438,3 +438,57 @@ describe('runFlow', () => {
     }
   })
 })
+
+describe('termo de multa (Custom APIs)', () => {
+  const MULTA_ID = '{AAAAAAAA-1111-2222-3333-444444444444}'
+  const TERMO_ID = '{BBBBBBBB-1111-2222-3333-444444444444}'
+  const resposta = (ok: boolean, status: number, body: unknown) => vi.fn(async (_url: string, _init?: RequestInit) => ({ ok, status, json: async () => body }))
+  const corpo = (fetchMock: ReturnType<typeof resposta>) => JSON.parse(String(fetchMock.mock.calls[0][1]?.body))
+
+  it('enviarTermoMulta: folha manda 100000001, Guid limpo e competência em DateTime', async () => {
+    const fetchMock = resposta(true, 200, { new_TermoId: '{CCCCCCCC-1111-2222-3333-444444444444}' })
+    vi.stubGlobal('fetch', fetchMock)
+    const id = await createXrmSource(host().xrm).enviarTermoMulta(MULTA_ID, { forma: 'folha', parcelas: 3, valorTotal: 300.01, primeiraCompetencia: '2026-11-01' })
+    expect(id).toBe('cccccccc-1111-2222-3333-444444444444')
+    expect(fetchMock.mock.calls[0][0]).toBe('https://org23b93544.crm2.dynamics.com/api/data/v9.2/new_EnviarTermoMulta')
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('POST')
+    expect(corpo(fetchMock)).toEqual({ new_MultaId: 'aaaaaaaa-1111-2222-3333-444444444444', new_FormaPagamento: 100000001, new_Parcelas: 3, new_ValorTotal: 300.01, new_PrimeiraCompetencia: '2026-11-01T00:00:00Z' })
+  })
+
+  it('enviarTermoMulta: guia manda 100000000', async () => {
+    const fetchMock = resposta(true, 200, { new_TermoId: 'cccccccc-1111-2222-3333-444444444444' })
+    vi.stubGlobal('fetch', fetchMock)
+    await createXrmSource(host().xrm).enviarTermoMulta(MULTA_ID, { forma: 'guia', parcelas: 1, valorTotal: 130.16, primeiraCompetencia: '2026-10-01' })
+    expect(corpo(fetchMock).new_FormaPagamento).toBe(100000000)
+  })
+
+  it('enviarTermoMulta: repassa error.message do servidor', async () => {
+    vi.stubGlobal('fetch', resposta(false, 400, { error: { message: 'Motorista sem aditivo.' } }))
+    await expect(createXrmSource(host().xrm).enviarTermoMulta(MULTA_ID, { forma: 'guia', parcelas: 1, valorTotal: 10, primeiraCompetencia: '2026-10-01' })).rejects.toThrow('Motorista sem aditivo.')
+  })
+
+  it('enviarTermoMulta: sem new_TermoId na resposta é erro', async () => {
+    vi.stubGlobal('fetch', resposta(true, 200, {}))
+    await expect(createXrmSource(host().xrm).enviarTermoMulta(MULTA_ID, { forma: 'guia', parcelas: 1, valorTotal: 10, primeiraCompetencia: '2026-10-01' })).rejects.toThrow(/não devolveu o termo/)
+  })
+
+  it('cancelarTermoMulta: POST em new_CancelarTermoMulta com Guid limpo, sem PATCH', async () => {
+    const fetchMock = resposta(true, 204, {})
+    vi.stubGlobal('fetch', fetchMock)
+    const { xrm, WebApi } = host()
+    await createXrmSource(xrm).cancelarTermoMulta(TERMO_ID)
+    expect(fetchMock.mock.calls[0][0]).toBe('https://org23b93544.crm2.dynamics.com/api/data/v9.2/new_CancelarTermoMulta')
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('POST')
+    expect(corpo(fetchMock)).toEqual({ new_TermoId: 'bbbbbbbb-1111-2222-3333-444444444444' })
+    expect(WebApi.updateRecord).not.toHaveBeenCalled()
+  })
+
+  it('cancelarTermoMulta: repassa error.message do servidor', async () => {
+    vi.stubGlobal('fetch', resposta(false, 400, { error: { message: 'Termo já assinado.' } }))
+    await expect(createXrmSource(host().xrm).cancelarTermoMulta(TERMO_ID)).rejects.toThrow('Termo já assinado.')
+  })
+
+  it('temAditivo valida o GUID', async () => {
+    await expect(createXrmSource(host().xrm).temAditivo('x')).rejects.toThrow('Identificador inválido')
+  })
+})

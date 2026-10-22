@@ -214,6 +214,8 @@ export function createMockSource(): DataSource {
       if (!item) throw new Error('Registro não encontrado no mock.')
       const lista = termos.get(multaId) ?? []
       if (lista.some((termo) => termo.status === 'pendente')) throw new Error('Já existe um termo pendente para esta multa.')
+      if (!item.motorista || !comAditivo.has(item.motorista.id)) throw new Error('O motorista ainda não tem o aditivo de assinatura eletrônica registrado.')
+      if (acordo.forma === 'folha' && item.recursoPendente) throw new Error('Há recurso pendente: o desconto só pode ser acordado depois do resultado.')
       const agora = new Date().toISOString()
       const termo: TermoMulta = { id: `t${multaId}-${lista.length + 1}`, status: 'pendente', forma: acordo.forma, parcelas: acordo.parcelas, valorTotal: acordo.valorTotal, primeiraCompetencia: acordo.primeiraCompetencia, enviadoEm: agora, assinadoEm: null, hashPdf: null, motivoContestacao: null, criadoEm: agora }
       termos.set(multaId, [termo, ...lista])
@@ -222,7 +224,13 @@ export function createMockSource(): DataSource {
     },
     async cancelarTermoMulta(termoId) {
       await delay()
-      for (const lista of termos.values()) for (const termo of lista) if (termo.id === termoId) termo.status = 'cancelado'
+      for (const [multaId, lista] of termos) for (const termo of lista) {
+        if (termo.id !== termoId) continue
+        if (termo.status !== 'pendente') throw new Error('Só termo pendente pode ser cancelado.')
+        termo.status = 'cancelado'
+        const item = data.multas.find((row) => row.id === multaId)
+        if (item?.termoVigente?.id === termoId) item.termoVigente = null
+      }
     },
     async baixarPdfTermo() {
       throw new Error('Mock: não há PDF fictício.')

@@ -71,12 +71,54 @@ describe('TermoMultaPanel', () => {
     expect(source.enviarTermoMulta).toHaveBeenCalledWith('u1', { forma: 'guia', parcelas: 1, valorTotal: 300.01, primeiraCompetencia: `${todaySP().slice(0, 7)}-01` })
   })
 
+  it('valor vazio bloqueia o envio com a mensagem do validarAcordo', async () => {
+    await montar(fake(), { ...multa, valorGuia: null }, null)
+    fireEvent.click(screen.getByRole('button', { name: 'Preparar termo' }))
+    expect(screen.getByText('Informe um valor maior que zero.')).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Enviar termo' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('valor 0 também bloqueia o envio', async () => {
+    await montar(fake(), { ...multa, valorGuia: 0 }, null)
+    fireEvent.click(screen.getByRole('button', { name: 'Preparar termo' }))
+    expect(screen.getByText('Informe um valor maior que zero.')).toBeTruthy()
+  })
+
+  it('salvar o valor da guia avisa a tela e não regrava no próximo blur', async () => {
+    const source = fake()
+    const { onChanged } = await montar(source)
+    const campo = screen.getByLabelText(/Valor da guia/)
+    fireEvent.change(campo, { target: { value: '150' } })
+    await act(async () => { fireEvent.blur(campo) })
+    await act(async () => { fireEvent.blur(campo) })
+    expect(source.update).toHaveBeenCalledTimes(1)
+    expect(source.update).toHaveBeenCalledWith('multa', 'u1', { new_valorguia: 150 })
+    expect(onChanged).toHaveBeenCalled()
+  })
+
+  it('recurso pendente + folha bloqueia o envio', async () => {
+    await montar(fake(), { ...multa, recursoPendente: true })
+    fireEvent.click(screen.getByRole('button', { name: 'Preparar termo' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Desconto em folha' }))
+    expect(screen.getByText(/Há recurso pendente/)).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Enviar termo' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('falha ao ler o aditivo não esconde os termos', async () => {
+    await montar(fake({ temAditivo: vi.fn(async () => { throw new Error('sem acesso') }), listarTermos: vi.fn(async () => [termo({})]) }))
+    expect(screen.getByText('Aguardando assinatura desde 20/10')).toBeTruthy()
+  })
+
   it('termo Pendente: aguardando assinatura desde dd/mm e Cancelar envio', async () => {
     const source = fake({ listarTermos: vi.fn(async () => [termo({})]) })
     await montar(source)
     expect(screen.getByText('Aguardando assinatura desde 20/10')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Preparar termo' })).toBeNull()
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Cancelar envio' })) })
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar envio' }))
+    expect(source.cancelarTermoMulta).not.toHaveBeenCalled()
+    expect(screen.getByText('Cancelar o termo enviado ao motorista?')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Voltar' })).toBeTruthy()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Cancelar termo' })) })
     expect(source.cancelarTermoMulta).toHaveBeenCalledWith('t1')
   })
 
