@@ -1,12 +1,10 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from 'react'
 import type { Row } from '@betinhos/dataverse'
-import { Checkbox, type TableQuickFilters } from '@betinhos/ui'
+import { COLUMN_FILTER_EVENT, Checkbox, ColumnFilter, ColumnMenu, type TableQuickFilters } from '@betinhos/ui'
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import { cellKind } from '../domain/cells'
 import { columnLabel, rowKey } from '../domain/layout'
 import { filterKindOf } from '../domain/filterKind'
-import { ColumnFilter } from './ColumnFilter'
-import { ColumnMenu } from './ColumnMenu'
 import { formatCell } from '../domain/format'
 import { sameSort } from '../domain/sort'
 import { ID_ATTRIBUTE, type AttributeMap, type Column, type Sort } from '../domain/types'
@@ -66,15 +64,26 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
   const pressing = useRef(false)
   // Coluna com o painel de filtro aberto (chave) e o cabeçalho que o ancora.
   const [filterAt, setFilterAt] = useState<string | null>(null)
-  const filterAnchor = filterAt ? Array.from(root.current?.querySelectorAll<HTMLElement>('.gr-head__sort') ?? []).find((b) => b.dataset.col === filterAt) ?? null : null
+  const filterAnchor = filterAt ? Array.from(root.current?.querySelectorAll<HTMLElement>('.bt-colhead') ?? []).find((b) => b.dataset.col === filterAt) ?? null : null
   const filterColumn = filterAt ? columns.find((c) => c.key === filterAt) : undefined
   const filterField = filterColumn && !filterColumn.alias ? quick?.fields.find((f) => f.key === filterColumn.attribute && !f.advancedOnly) : undefined
   const closeFilter = useCallback(() => setFilterAt(null), [])
+  // O chip de filtro ativo (ViewBar) pede para reabrir o painel "Filtrar por" da coluna: o evento chega no gatilho do título.
+  useEffect(() => {
+    const el = root.current
+    if (!el) return
+    const open = (event: Event) => {
+      const key = (event.target as HTMLElement).closest<HTMLElement>('.bt-colhead')?.dataset.col
+      if (key && columns.some((c) => c.key === key)) { event.preventDefault(); setFilterAt(key) }
+    }
+    el.addEventListener(COLUMN_FILTER_EVENT, open)
+    return () => el.removeEventListener(COLUMN_FILTER_EVENT, open)
+  }, [columns])
   useEffect(() => {
     const key = refocus.current
     if (!key) return
     refocus.current = null
-    const buttons = root.current?.querySelectorAll<HTMLElement>('.gr-head__sort')
+    const buttons = root.current?.querySelectorAll<HTMLElement>('.bt-colhead')
     buttons?.forEach((b) => { if (b.dataset.col === key) b.focus() })
   }, [columns])
   const widthOf = (c: Column) => live[c.key] ?? c.width
