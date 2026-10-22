@@ -122,7 +122,7 @@ function Tipos({ source, data, onChanged, edicao, setEdicao, saving, setSaving, 
                   <strong className="doc-item__nome">{t.nome}</strong>
                   <Button size="compact" variant="ghost" onClick={() => abrir(t.id, doTipo(t))}>Editar</Button>
                 </div>
-                <p className="doc-muted">{t.codigo} · {t.temValidade ? (t.validadePadraoMeses ? `vence em ${t.validadePadraoMeses} meses` : 'validade digitada') : 'sem validade'}{t.obrigatorioPara.length ? ` · obrigatório: ${t.obrigatorioPara.map((x) => OBRIG_LABEL[x]).join(', ')}` : ''}</p>
+                <p className="doc-muted">{t.temValidade ? (t.validadePadraoMeses ? `Vence em ${t.validadePadraoMeses} meses` : 'Validade digitada') : 'Sem validade'}{t.obrigatorioPara.length ? ` · obrigatório: ${t.obrigatorioPara.map((x) => OBRIG_LABEL[x]).join(', ')}` : ''}</p>
               </li>
             ))}
           </ul>
@@ -150,7 +150,7 @@ function Destinatarios({ source, data, onChanged }: { source: DocsSource; data: 
 
   return (
     <div className="doc-form">
-      <p className="doc-muted">Quem recebe os avisos de vencimento por e-mail. O endereço usado é o e-mail Betinhos do funcionário.</p>
+      <p className="doc-muted">Quem recebe por e-mail o resumo semanal (segunda, 07:00) com os documentos vencidos, a vencer em até 60 dias e faltando. O endereço usado é o e-mail Betinhos do funcionário.</p>
       {CATEGORIAS.map((c) => {
         const atuais = data.destinatarios.filter((d) => d.categoria === c.value)
         const opcoes = funcionarios.filter((f) => !atuais.some((a) => a.funcionarioId === f.id)).map((f) => ({ value: f.id, label: f.nome }))
