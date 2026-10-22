@@ -50,7 +50,14 @@ public sealed class FakeService : IOrganizationService
     }
 
     public void Delete(string entityName, Guid id) => throw new NotSupportedException();
-    public OrganizationResponse Execute(OrganizationRequest request) => throw new NotSupportedException();
+    public List<OrganizationRequest> Executados { get; } = new();
+    public OrganizationResponse Execute(OrganizationRequest request)
+    {
+        Executados.Add(request);
+        if (request is Microsoft.Crm.Sdk.Messages.SetStateRequest set && set.EntityMoniker.LogicalName == "systemuser")
+            _tabelas["systemuser"].Single(e => e.Id == set.EntityMoniker.Id)["isdisabled"] = set.State.Value != 0;
+        return new OrganizationResponse();
+    }
     public void Associate(string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities) => throw new NotSupportedException();
     public void Disassociate(string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities) => throw new NotSupportedException();
 }

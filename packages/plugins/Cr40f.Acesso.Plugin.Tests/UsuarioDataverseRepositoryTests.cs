@@ -30,4 +30,15 @@ public sealed class UsuarioDataverseRepositoryTests
         Assert.Contains("email=(vazio)", repo.Estado);
         Assert.Equal("ana.lima@betinhos.onmicrosoft.com", Assert.Single(svc.Atualizados)["internalemailaddress"]);
     }
+
+    [Fact]
+    public void Garantir_habilita_o_systemuser_que_o_Dataverse_cria_desabilitado()
+    {
+        var svc = ComUnidadeRaiz();
+        svc.AoCriar = e => { if (e.LogicalName == "systemuser") e["isdisabled"] = true; };
+        var repo = new UsuarioDataverseRepository(svc);
+        repo.Garantir(Guid.NewGuid(), "ana.lima@betinhos.onmicrosoft.com", "Ana Lima");
+        Assert.IsType<Microsoft.Crm.Sdk.Messages.SetStateRequest>(Assert.Single(svc.Executados));
+        Assert.Contains("isdisabled=False", repo.Estado);
+    }
 }
