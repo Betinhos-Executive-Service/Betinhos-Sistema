@@ -37,10 +37,22 @@ public sealed class UsuarioDataverseRepository
             ["businessunitid"] = new EntityReference("businessunit", UnidadeRaiz()),
         };
         // Logo depois de licenciar, o Dataverse pode recusar a conta; a nova tentativa é idempotente.
-        try { _svc.Create(usuario); }
+        Guid id;
+        try { id = _svc.Create(usuario); }
         catch (Exception) { throw new AcessoException("USUARIO_DATAVERSE_PENDENTE", "A conta foi criada, mas o Dataverse ainda não a reconhece. Tente de novo em alguns minutos."); }
+
+        // O Dataverse completa o registro a partir do Entra e pode sobrescrever o e-mail ou deixar a conta desabilitada
+        // até a licença sincronizar; o DriverRecordSharing procura internalemailaddress + isdisabled=false.
+        var criado = _svc.Retrieve("systemuser", id, new ColumnSet("isdisabled", "internalemailaddress", "domainname"));
+        var emailGravado = criado.GetAttributeValue<string>("internalemailaddress");
+        if (!string.Equals(emailGravado, upn, StringComparison.OrdinalIgnoreCase))
+            _svc.Update(new Entity("systemuser", id) { ["internalemailaddress"] = upn });
+        Estado = "isdisabled=" + criado.GetAttributeValue<bool>("isdisabled") + "; email=" + (string.IsNullOrEmpty(emailGravado) ? "(vazio)" : emailGravado) + "; domainname=" + criado.GetAttributeValue<string>("domainname");
         return true;
     }
+
+    /// <summary>Estado do systemuser recém-criado, para diagnóstico na lista de etapas.</summary>
+    public string Estado { get; private set; } = "";
 
     private Guid UnidadeRaiz()
     {
