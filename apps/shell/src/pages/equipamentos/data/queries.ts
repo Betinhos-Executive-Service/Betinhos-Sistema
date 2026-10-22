@@ -63,43 +63,39 @@ export const responsavelRefPath = (set: string, id: string) => `${set}(${cleanId
 export const estadoPayload = (ativo: boolean): Row => ({ statecode: ativo ? 0 : 1, statuscode: ativo ? 1 : 2 })
 
 /**
- * Fotos (`cr40f_fotoequipamento`). O `$select` da coluna de imagem devolve a miniatura em base64 (144 px, JPEG);
- * a grande vem de `…/cr40f_imagem/$value?size=full` (CanStoreFullImage), com o id da imagem contra o cache.
+ * Fotos (`cr40f_fotoequipamento`): o registro guarda só o nome, o caminho do arquivo no SharePoint e a capa.
+ * A imagem não passa pelo Dataverse; a tela baixa pelo flow Consultar só o que aparece.
  */
-const FOTO_SELECT = ['cr40f_fotoequipamentoid', 'cr40f_name', '_cr40f_equipamento_value', 'cr40f_capa', 'cr40f_imagem', 'cr40f_imagemid', 'createdon']
-const miniatura = (v: unknown) => (typeof v === 'string' && v ? `data:image/jpeg;base64,${v}` : null)
+export const FOTO_MAX_CAMINHO = 400
+const FOTO_SELECT = ['cr40f_fotoequipamentoid', 'cr40f_name', '_cr40f_equipamento_value', 'cr40f_capa', 'cr40f_caminho', 'createdon']
 
 export const fotosPath = (set: string, equipamentoId: string) =>
   `${set}?$select=${FOTO_SELECT.join(',')}&$filter=${encodeURIComponent(`_cr40f_equipamento_value eq ${cleanId(equipamentoId)}`)}${order('createdon')}`
-export const fotoPath = (set: string, id: string) => `${set}(${cleanId(id)})?$select=${FOTO_SELECT.join(',')}`
 /** Só as capas, para a miniatura da lista (as demais fotos só no drawer). Mais antiga primeiro: com duas marcadas, vale a primeira. */
 export const capasPath = (set: string) =>
-  `${set}?$select=_cr40f_equipamento_value,cr40f_imagem,createdon&$filter=${encodeURIComponent('cr40f_capa eq true')}${order('createdon')}`
+  `${set}?$select=_cr40f_equipamento_value,cr40f_caminho,createdon&$filter=${encodeURIComponent('cr40f_capa eq true')}${order('createdon')}`
 
-export function mapFoto(row: Row, apiUrl: string, set: string): Foto {
-  const id = cleanId(str(row.cr40f_fotoequipamentoid))
-  const imagemId = str(row.cr40f_imagemid)
+export function mapFoto(row: Row): Foto {
   return {
-    id, equipamentoId: row._cr40f_equipamento_value ? cleanId(str(row._cr40f_equipamento_value)) : '', nome: text(row.cr40f_name) || 'Foto',
-    capa: row.cr40f_capa === true, criadoEm: date(row.createdon), miniatura: miniatura(row.cr40f_imagem),
-    url: imagemId ? `${apiUrl}/${set}(${id})/cr40f_imagem/$value?size=full&v=${cleanId(imagemId)}` : null,
+    id: cleanId(str(row.cr40f_fotoequipamentoid)), equipamentoId: row._cr40f_equipamento_value ? cleanId(str(row._cr40f_equipamento_value)) : '',
+    nome: text(row.cr40f_name) || 'Foto', capa: row.cr40f_capa === true, criadoEm: date(row.createdon), caminho: text(row.cr40f_caminho),
   }
 }
 
-/** Primeira capa de cada item (as linhas vêm da mais antiga para a mais nova). */
+/** Caminho da primeira capa de cada item (as linhas vêm da mais antiga para a mais nova); capa sem caminho é ignorada. */
 export function mapCapas(rows: Row[]): Map<string, string> {
   const out = new Map<string, string>()
   for (const row of rows) {
     const id = row._cr40f_equipamento_value ? cleanId(str(row._cr40f_equipamento_value)) : ''
-    const thumb = miniatura(row.cr40f_imagem)
-    if (id && thumb && !out.has(id)) out.set(id, thumb)
+    const caminho = text(row.cr40f_caminho)
+    if (id && caminho && !out.has(id)) out.set(id, caminho)
   }
   return out
 }
 
-/** Criação com a imagem no mesmo POST (só a imagem primária aceita isso): sem registro de foto vazio se o envio falhar. */
-export const fotoPayload = (equipamentosSet: string, equipamentoId: string, nome: string, capa: boolean, base64: string): Row => ({
-  cr40f_name: nome, cr40f_capa: capa, cr40f_imagem: base64, [`${NAV.fotoEquipamento}@odata.bind`]: `/${equipamentosSet}(${cleanId(equipamentoId)})`,
+/** Registro da foto já enviada ao SharePoint: nome, caminho do arquivo, capa e o item por @odata.bind. */
+export const fotoPayload = (equipamentosSet: string, equipamentoId: string, nome: string, capa: boolean, caminho: string): Row => ({
+  cr40f_name: nome, cr40f_capa: capa, cr40f_caminho: caminho, [`${NAV.fotoEquipamento}@odata.bind`]: `/${equipamentosSet}(${cleanId(equipamentoId)})`,
 })
 
 export async function loadAll(client: DataverseClient, sets: EntitySets) {
