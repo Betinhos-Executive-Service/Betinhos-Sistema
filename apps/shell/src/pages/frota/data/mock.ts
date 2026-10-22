@@ -2,8 +2,9 @@ import { mockVolume } from '../../../app/mockVolume'
 import { CAMPO, lerMulti, ORIGEM } from '../domain/manutencaoCatalogo'
 import { addMonths, todaySP } from './dates'
 import { COLISAO, MANUT, MULTA, STATUS_FIELD, VEICULO } from './schema'
+import type { Acordo } from '../domain/termoMulta'
 import type { DataSource, FlowId } from './source'
-import type { Colisao, DespesaCombustivel, FrotaData, ItemPlano, Kind, Manutencao, Multa, Ref, TelemetriaKm } from './types'
+import type { Colisao, DespesaCombustivel, FrotaData, ItemPlano, Kind, Manutencao, Multa, Ref, TelemetriaKm, TermoMulta } from './types'
 
 // Dados fictícios só para `pnpm dev` em localhost. Nunca usados dentro do Dataverse.
 function offset(days: number) {
@@ -22,7 +23,7 @@ function manut(id: string, veiculo: Ref, extra: Partial<Manutencao>): Manutencao
   return { id, codigo: id.toUpperCase(), descricao: `Manutenção fictícia ${id}`, status: MANUT.SOLICITADO, grau: 2, tipo: 1, agendarPara: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: 50000, veiculo, solicitante: ana, criadoEm: iso(-3), servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra }
 }
 function multa(id: string, extra: Partial<Multa>): Multa {
-  return { id, titulo: `AIT fictício ${id}`, status: MULTA.NOTIFICAR, dataHora: iso(-20), local: 'Av. de Teste, 100', dataParaIndicar: offset(5), indicado: false, dataAviso: null, dataIndicacao: null, veiculo: v1, motorista: bruno, infracaoId: 'i1', criadoEm: iso(-10), ...extra }
+  return { id, titulo: `AIT fictício ${id}`, status: MULTA.NOTIFICAR, dataHora: iso(-20), local: 'Av. de Teste, 100', dataParaIndicar: offset(5), indicado: false, dataAviso: null, dataIndicacao: null, veiculo: v1, motorista: bruno, infracaoId: 'i1', criadoEm: iso(-10), valorGuia: null, recursoPendente: false, termoVigente: null, ...extra }
 }
 function colisao(id: string, status: number): Colisao {
   return { id, titulo: `Colisão fictícia ${id}`, status, tipo: 100000001, dataHora: iso(-6), local: 'Rua de Teste, 50', descricao: 'Batida leve na traseira.', houveTerceiro: true, veiculo: v2, motorista: ana, criadoEm: iso(-6) }
@@ -97,7 +98,7 @@ function seed(): FrotaData {
 const COLLECTION: Record<Kind, 'manutencoes' | 'multas' | 'colisoes'> = { manutencao: 'manutencoes', multa: 'multas', colisao: 'colisoes' }
 const FIELD_TO_PROP: Record<string, string> = {
   cr40f_agendarpara: 'agendarPara', cr40f_datamanutencao: 'dataManutencao', cr40f_valor: 'valor', cr40f_estabelecimento: 'estabelecimento', cr40f_servicorealizado: 'servicoRealizado', cr40f_comentariosdoaprovador: 'comentarioAprovador',
-  cr40f_datadeavisoaocondutor: 'dataAviso', cr40f_datadeindicacao: 'dataIndicacao', cr40f_indicado: 'indicado',
+  cr40f_datadeavisoaocondutor: 'dataAviso', cr40f_datadeindicacao: 'dataIndicacao', cr40f_indicado: 'indicado', new_valorguia: 'valorGuia', new_recursopendente: 'recursoPendente',
   [CAMPO.origem]: 'origemClassificacao', [CAMPO.confianca]: 'confiancaIa', [CAMPO.descricao]: 'descricao',
 }
 
@@ -106,6 +107,9 @@ const MULTI_TO_PROP: Record<string, string> = { [CAMPO.servicos]: 'servicos', [C
 export function createMockSource(): DataSource {
   const data = seed()
   const fotos = new Map<string, Blob>()
+  // Só a Ana (fictícia) tem o aditivo de assinatura eletrônica.
+  const comAditivo = new Set([ana.id])
+  const termos = new Map<string, TermoMulta[]>()
   const find = (kind: Kind, id: string) => (data[COLLECTION[kind]] as { id: string; status: number | null }[]).find((item) => item.id === id)
   const delay = () => new Promise((resolve) => setTimeout(resolve, 250))
 
@@ -196,6 +200,32 @@ export function createMockSource(): DataSource {
       else if (flow === 'notificarCondutor') { record.status = MULTA.NOTIFICADO; record.dataAviso = todaySP() }
       else record.status = MULTA.INDICADA
       return { message: 'Mock: Flow simulado.', shareUrl: flow === 'gerarContrato' ? 'https://example.invalid/contrato-ficticio.pdf' : null }
+    },
+    async temAditivo(funcionarioId) {
+      return comAditivo.has(funcionarioId)
+    },
+    async listarTermos(multaId) {
+      await delay()
+      return structuredClone(termos.get(multaId) ?? [])
+    },
+    async enviarTermoMulta(multaId: string, acordo: Acordo) {
+      await delay()
+      const item = data.multas.find((row) => row.id === multaId)
+      if (!item) throw new Error('Registro não encontrado no mock.')
+      const lista = termos.get(multaId) ?? []
+      if (lista.some((termo) => termo.status === 'pendente')) throw new Error('Já existe um termo pendente para esta multa.')
+      const agora = new Date().toISOString()
+      const termo: TermoMulta = { id: `t${multaId}-${lista.length + 1}`, status: 'pendente', forma: acordo.forma, parcelas: acordo.parcelas, valorTotal: acordo.valorTotal, primeiraCompetencia: acordo.primeiraCompetencia, enviadoEm: agora, assinadoEm: null, hashPdf: null, motivoContestacao: null, criadoEm: agora }
+      termos.set(multaId, [termo, ...lista])
+      item.termoVigente = { id: termo.id, label: termo.id }
+      return termo.id
+    },
+    async cancelarTermoMulta(termoId) {
+      await delay()
+      for (const lista of termos.values()) for (const termo of lista) if (termo.id === termoId) termo.status = 'cancelado'
+    },
+    async baixarPdfTermo() {
+      throw new Error('Mock: não há PDF fictício.')
     },
   }
 }

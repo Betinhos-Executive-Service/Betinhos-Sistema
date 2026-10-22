@@ -103,6 +103,7 @@ describe('buildPatch', () => {
 
   it('programar grava a data conforme o comportamento da coluna', () => {
     expect(buildPatch('manutencao', pick('manutencao', MANUT.APROVADO, 'programar'), { cr40f_agendarpara: '2026-10-09' }, ctx)).toEqual({ cr40f_status: MANUT.PROGRAMADO, cr40f_agendarpara: '2026-10-09' })
+    expect(buildPatch('multa', pick('multa', MULTA.INDICADA, 'recurso'), {}, ctx)).toEqual({ cr40f_status: MULTA.RECURSO, new_recursopendente: true })
     expect(buildPatch('manutencao', pick('manutencao', MANUT.APROVADO, 'programar'), { cr40f_agendarpara: '2026-10-09' }, { now: ctx.now, dateBehaviors: { cr40f_agendarpara: 'UserLocal' } })).toEqual({ cr40f_status: MANUT.PROGRAMADO, cr40f_agendarpara: '2026-10-09T03:00:00Z' })
   })
 
@@ -136,7 +137,7 @@ describe('applyTransition', () => {
       prepareFlow: vi.fn(async () => {}),
       runFlow: vi.fn(async (): Promise<FlowResult> => ({ message: 'OM reservada.', shareUrl: null })),
       openForm: async () => {},
-      classificacao: async () => ({ servicos: [], categorias: [], origem: null, confianca: null }), classificarAgora: async () => { throw new Error("indisponível") }, fotoVeiculo: async () => null, enviarFotoVeiculo: async () => {}, salvarItemPlano: async () => {}, inativarItemPlano: async () => {}, salvarBaseline: async () => {},
+      classificacao: async () => ({ servicos: [], categorias: [], origem: null, confianca: null }), classificarAgora: async () => { throw new Error("indisponível") }, fotoVeiculo: async () => null, enviarFotoVeiculo: async () => {}, salvarItemPlano: async () => {}, inativarItemPlano: async () => {}, salvarBaseline: async () => {}, temAditivo: async () => false, listarTermos: async () => [], enviarTermoMulta: async () => 't1', cancelarTermoMulta: async () => {}, baixarPdfTermo: async () => {},
     } satisfies DataSource
   }
 
@@ -250,7 +251,7 @@ describe('Flow já em andamento', () => {
       prepareFlow: vi.fn(async () => {}),
       runFlow: vi.fn(async (): Promise<FlowResult> => ({ message: null, shareUrl: null })),
       openForm: async () => {},
-      classificacao: async () => ({ servicos: [], categorias: [], origem: null, confianca: null }), classificarAgora: async () => { throw new Error("indisponível") }, fotoVeiculo: async () => null, enviarFotoVeiculo: async () => {}, salvarItemPlano: async () => {}, inativarItemPlano: async () => {}, salvarBaseline: async () => {},
+      classificacao: async () => ({ servicos: [], categorias: [], origem: null, confianca: null }), classificarAgora: async () => { throw new Error("indisponível") }, fotoVeiculo: async () => null, enviarFotoVeiculo: async () => {}, salvarItemPlano: async () => {}, inativarItemPlano: async () => {}, salvarBaseline: async () => {}, temAditivo: async () => false, listarTermos: async () => [], enviarTermoMulta: async () => 't1', cancelarTermoMulta: async () => {}, baixarPdfTermo: async () => {},
     } satisfies DataSource
   }
   const aprovar = (source: DataSource, id = 'r1') => applyTransition(source, 'manutencao', registro(MANUT.SOLICITADO, { id }), pick('manutencao', MANUT.SOLICITADO, 'aprovar'), dados)

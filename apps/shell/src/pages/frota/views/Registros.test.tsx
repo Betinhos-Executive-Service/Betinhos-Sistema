@@ -51,7 +51,7 @@ describe('Registros', () => {
     expect(onReload).not.toHaveBeenCalled()
   })
 
-  const multa = (id: string, veiculo: string): Multa => ({ id, titulo: `Multa ${id}`, status: null, dataHora: '2026-09-10T12:00:00Z', local: null, dataParaIndicar: null, indicado: false, dataAviso: null, dataIndicacao: null, veiculo: { id: veiculo, label: veiculo.toUpperCase() }, motorista: { id: 'm1', label: 'Maria' }, infracaoId: null, criadoEm: '2026-09-10T12:00:00Z' })
+  const multa = (id: string, veiculo: string): Multa => ({ id, titulo: `Multa ${id}`, status: null, dataHora: '2026-09-10T12:00:00Z', local: null, dataParaIndicar: null, indicado: false, dataAviso: null, dataIndicacao: null, veiculo: { id: veiculo, label: veiculo.toUpperCase() }, motorista: { id: 'm1', label: 'Maria' }, infracaoId: null, criadoEm: '2026-09-10T12:00:00Z', valorGuia: null, recursoPendente: false, termoVigente: null })
   const colisao = (id: string, veiculo: string): Colisao => ({ id, titulo: `Colisão ${id}`, status: null, tipo: null, dataHora: '2026-09-11T12:00:00Z', local: null, descricao: null, houveTerceiro: false, veiculo: { id: veiculo, label: veiculo.toUpperCase() }, motorista: { id: 'm1', label: 'Maria' }, criadoEm: '2026-09-11T12:00:00Z' })
 
   it('ao trocar entre multas e colisões, o filtro de veículo não passa para o outro tipo', async () => {

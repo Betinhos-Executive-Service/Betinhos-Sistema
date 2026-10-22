@@ -1,7 +1,8 @@
 import { CAMPO, lerMulti } from '../domain/manutencaoCatalogo'
 import { addMonths, todaySP, type DateBehavior } from './dates'
-import { cleanId, mapBaseline, mapColisao, mapDespesaCombustivel, mapInfracao, mapItemPlano, mapManutencao, mapMulta, mapPosse, mapTelemetriaKm, mapVeiculo, SELECT, SELECT_VEICULOS_SEM_HODOMETRO } from './mappers'
-import { BASELINE, CATEGORIA_DESPESA_TABLE, ENTITY_SET, ITEM_PLANO, KIND_TABLE, STATUS_FIELD, TABLE } from './schema'
+import { cleanId, mapBaseline, mapColisao, mapDespesaCombustivel, mapInfracao, mapItemPlano, mapManutencao, mapMulta, mapPosse, mapTelemetriaKm, mapTermoMulta, mapVeiculo, SELECT, SELECT_TERMO, SELECT_VEICULOS_SEM_HODOMETRO } from './mappers'
+import { BASELINE, CATEGORIA_DESPESA_TABLE, ENTITY_SET, FORMA_PAGAMENTO, ITEM_PLANO, KIND_TABLE, STATUS_FIELD, TABLE, TERMO_STATUS, TERMO_TABLE } from './schema'
+import type { Acordo } from '../domain/termoMulta'
 import { base64ToBlob, callSpFlow, escolherPrincipal, FOTO_MAX_BYTES, fileToBase64, nomeFoto, pastaFotoVeiculo, SP_VARS, toArquivo, type SpKey } from './sharepoint'
 import { EMPTY_DATA, FlowIncertoError, type DataSource, type FlowId, type FlowResult, type ItemPlanoInput, type LoadResult } from './source'
 import type { DespesaCombustivel, FrotaData, Kind, TableKey, TelemetriaKm } from './types'
@@ -314,6 +315,51 @@ export function createXrmSource(xrm: XrmHost): DataSource {
         [BASELINE.item]: `/${ENTITY_SET.planoPreventivo}(${i})`,
         ...valores,
       })
+    },
+
+    async temAditivo(funcionarioId: string) {
+      const row = await api.retrieveRecord('cr40f_funcionarios', cleanId(funcionarioId), '?$select=new_aditivoassinaturaem')
+      return typeof row.new_aditivoassinaturaem === 'string' && row.new_aditivoassinaturaem !== ''
+    },
+
+    async listarTermos(multaId: string) {
+      if (!GUID.test(multaId)) throw new Error('Identificador inválido')
+      const result = await api.retrieveMultipleRecords(TERMO_TABLE, `?$select=${SELECT_TERMO.join(',')}&$filter=_new_multa_value eq ${cleanId(multaId)}&$orderby=createdon desc`)
+      return result.entities.map(mapTermoMulta)
+    },
+
+    async enviarTermoMulta(multaId: string, acordo: Acordo) {
+      if (!GUID.test(multaId)) throw new Error('Identificador inválido')
+      const response = await fetch(`${apiUrl}/new_EnviarTermoMulta`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json; charset=utf-8', 'OData-Version': '4.0', 'OData-MaxVersion': '4.0' },
+        body: JSON.stringify({
+          new_MultaId: cleanId(multaId),
+          new_FormaPagamento: FORMA_PAGAMENTO[acordo.forma],
+          new_Parcelas: acordo.parcelas,
+          new_ValorTotal: acordo.valorTotal,
+          new_PrimeiraCompetencia: acordo.primeiraCompetencia,
+        }),
+      })
+      let payload: Record<string, unknown> = {}
+      try { payload = (await response.json()) as Record<string, unknown> } catch { /* corpo vazio */ }
+      if (!response.ok) {
+        const erro = payload.error as { message?: unknown } | undefined
+        throw new Error(typeof erro?.message === 'string' && erro.message ? erro.message : `Não foi possível enviar o termo (${response.status})`)
+      }
+      const termoId = payload.new_TermoId
+      if (typeof termoId !== 'string' || !termoId) throw new Error('O envio não devolveu o termo criado. Recarregue antes de tentar de novo')
+      return cleanId(termoId)
+    },
+
+    async cancelarTermoMulta(termoId: string) {
+      await api.updateRecord(TERMO_TABLE, cleanId(termoId), { new_status: TERMO_STATUS.cancelado })
+    },
+
+    async baixarPdfTermo(termoId: string) {
+      if (!GUID.test(termoId)) throw new Error('Identificador inválido')
+      window.open(`${apiUrl}/new_termomultas(${cleanId(termoId)})/new_pdf/$value`, '_blank', 'noopener')
     },
   }
 }
