@@ -15,6 +15,13 @@
 ## 3. SKU da licença
 `Get-MgSubscribedSku | Select SkuPartNumber, SkuId` (PowerShell com `Microsoft.Graph`) ou Entra → Cobrança → Licenças. Use o `SkuId` do plano escolhido (hoje `POWERAPPS_DEV`, "Power Apps for Developer"). Ressalva registrada no spec: esse plano é de desenvolvimento; trocar o SKU é só editar o `.env` e rodar `pnpm push:plugin:acesso:dev`.
 
+## 3b. Registrar o app como app de gerenciamento do Power Platform (uma vez por tenant)
+O plugin cria o `systemuser` pelo `addUser` da API de administração do Power Platform, o mesmo que o "Adicionar usuário" do Power Platform admin center faz. Só essa sincronização oficial deixa o usuário habilitado e licenciado; `Create` de `systemuser` pelo SDK nasce desabilitado e, mesmo habilitado depois, fica `IsLicensed=False`, e o `DriverRecordSharing` do App Motoristas recusa compartilhar com ele (diagnóstico no DEV em 22/10/2026). Para chamar essa API com client credentials, o app registration precisa estar registrado como app de gerenciamento:
+```
+pac admin application register --application-id <ACESSO_CLIENT_ID>
+```
+Alternativa: `New-PowerAppManagementApp -ApplicationId <ACESSO_CLIENT_ID>` (módulo `Microsoft.PowerApps.Administration.PowerShell`, com `Add-PowerAppsAccount` de um administrador). Sem esse registro o `addUser` devolve 401/403 e o cadastro para em `systemuser` com `GRAPH_INDISPONIVEL`.
+
 ## 4. `.env` da raiz (não versionado)
 ```
 ACESSO_TENANT_ID=<tenant>
@@ -22,7 +29,9 @@ ACESSO_CLIENT_ID=<client id>
 ACESSO_LICENSE_SKU_ID=<sku id>
 ACESSO_GROUP_ID=<object id do grupo>
 ACESSO_APP_URL=https://org23b93544.crm2.dynamics.com/WebResources/new_app-motoristas-v2
+ACESSO_ENVIRONMENT_ID=25a2ab78-cf07-ee41-a124-457aa2c29aea
 ```
+`ACESSO_ENVIRONMENT_ID` é o id do ambiente no Power Platform (o valor acima é o DEV); o plugin o usa no `addUser`.
 O `ACESSO_APP_URL` é o link direto do App Motoristas no DEV e exige o App Motoristas ≥ 2.1.760 (PR #61) publicado no DEV.
 
 O `clientSecret` não vai no `.env`: o script de provisão pede a digitação (entrada oculta) e o grava só na configuração segura dos steps.

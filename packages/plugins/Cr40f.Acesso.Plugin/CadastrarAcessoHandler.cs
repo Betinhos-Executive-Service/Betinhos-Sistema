@@ -9,9 +9,9 @@ public sealed class CadastroSaida { public string EmailMicrosoft = ""; public st
 /// <summary>Cadastro idempotente: cada etapa confere o estado antes de agir. Falha relança com as etapas em Data["Etapas"].</summary>
 public sealed class CadastrarAcessoHandler
 {
-    private readonly IGraphGateway _graph; private readonly FuncionarioRepository _repo; private readonly UsuarioDataverseRepository _usuarios; private readonly AcessoConfig _cfg; private readonly Random _rng; private readonly Action<string> _trace;
-    public CadastrarAcessoHandler(IGraphGateway graph, FuncionarioRepository repo, UsuarioDataverseRepository usuarios, AcessoConfig cfg, Random rng, Action<string> trace)
-    { _graph = graph; _repo = repo; _usuarios = usuarios; _cfg = cfg; _rng = rng; _trace = trace; }
+    private readonly IGraphGateway _graph; private readonly FuncionarioRepository _repo; private readonly UsuarioDataverseRepository _usuarios; private readonly IPowerPlatformGateway _pp; private readonly AcessoConfig _cfg; private readonly Random _rng; private readonly Action<string> _trace;
+    public CadastrarAcessoHandler(IGraphGateway graph, FuncionarioRepository repo, UsuarioDataverseRepository usuarios, IPowerPlatformGateway pp, AcessoConfig cfg, Random rng, Action<string> trace)
+    { _graph = graph; _repo = repo; _usuarios = usuarios; _pp = pp; _cfg = cfg; _rng = rng; _trace = trace; }
 
     public CadastroSaida Executar(CadastroEntrada entrada)
     {
@@ -82,8 +82,13 @@ public sealed class CadastrarAcessoHandler
             // Antes do funcionário: gravar cr40f_emailmicrosoft dispara o DriverRecordSharing, que exige o systemuser.
             etapas.Executar("systemuser", () =>
             {
-                if (_usuarios.Garantir(Guid.Parse(usuario.Id), email, entrada.NomeCompleto)) etapas.Feita("systemuser", "criado no Dataverse (" + _usuarios.Estado + ")");
-                else etapas.Pulada("systemuser", "já existe no Dataverse");
+                // A conta do Entra já está ativa aqui (desativada parou em "usuario" com ACESSO_ENCERRADO). systemuser ausente,
+                // desabilitado ou sem licença é ressincronizado pelo addUser do Power Platform (Create pelo SDK nasce sem licença).
+                var objectId = Guid.Parse(usuario.Id);
+                if (_usuarios.Pronto(objectId)) { etapas.Pulada("systemuser", "já existe no Dataverse"); return; }
+                _pp.SincronizarUsuario(objectId);
+                if (!_usuarios.AguardarPronto(objectId)) throw new AcessoException("USUARIO_DATAVERSE_PENDENTE", "A conta foi criada, mas o Dataverse ainda não a reconhece. Tente de novo em alguns minutos.");
+                etapas.Feita("systemuser", "sincronizado pelo Power Platform");
             });
 
             saida.FuncionarioId = etapas.Executar("funcionario", () =>

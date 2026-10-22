@@ -19,7 +19,7 @@ public sealed class GraphGatewayTests
         { Pedidos.Add(request); return Task.FromResult(Responder(request)); }
     }
 
-    private static AcessoConfig Cfg() => AcessoConfig.Parse("{\"tenantId\":\"t\",\"clientId\":\"c\",\"licenseSkuId\":\"sku\",\"groupId\":\"g\",\"appUrl\":\"u\"}", "{\"clientSecret\":\"s\"}");
+    private static AcessoConfig Cfg() => AcessoConfig.Parse("{\"tenantId\":\"t\",\"clientId\":\"c\",\"licenseSkuId\":\"sku\",\"groupId\":\"g\",\"appUrl\":\"u\",\"environmentId\":\"env\"}", "{\"clientSecret\":\"s\"}");
 
     private static HttpResponseMessage Json(string body, HttpStatusCode status = HttpStatusCode.OK) => new(status) { Content = new StringContent(body) };
 
