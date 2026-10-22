@@ -11,7 +11,7 @@ public sealed class AcessoConfig
     public string LicenseSkuId { get; private set; } = "";
     public string GroupId { get; private set; } = "";
     public string AppUrl { get; private set; } = "";
-    public string Dominio { get; private set; } = "betinhos.com.br";
+    public string Dominio { get; private set; } = "betinhos.onmicrosoft.com";
 
     public static AcessoConfig Parse(string? unsecure, string? secure)
     {
