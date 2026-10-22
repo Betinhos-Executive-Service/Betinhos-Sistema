@@ -5,7 +5,7 @@ using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Query;
 
 // Registra o plugin de acesso de motoristas, as Custom APIs (sem plugintype) e os steps
-// sincronos (stage 30) que carregam a configuracao nao segura. A configuracao segura e gravada por outro script.
+// sincronos PostOperation (stage 40; o Dataverse nao aceita step customizado no stage 30 de Custom API) que carregam a configuracao nao segura. A configuracao segura e gravada por outro script.
 var options = Arguments.Parse(args);
 var environmentUrl = options.Require("environmentUrl");
 var dllPath = options.Require("dllPath");
@@ -128,14 +128,14 @@ static void EnsureApiStep(ServiceClient service, Guid pluginTypeId, string messa
     var message = FindSingleOrNone(service, "sdkmessage", ("name", messageName)) ?? throw new InvalidOperationException($"sdkmessage {messageName} nao encontrada (publique a Custom API antes).");
     if (FindSingleOrNone(service, "sdkmessageprocessingstep", ("name", name)) is { } existing)
     {
-        service.Update(new Entity("sdkmessageprocessingstep", existing.Id) { ["configuration"] = config, ["stage"] = new OptionSetValue(30), ["mode"] = new OptionSetValue(0), ["eventhandler"] = Ref("plugintype", pluginTypeId) });
+        service.Update(new Entity("sdkmessageprocessingstep", existing.Id) { ["configuration"] = config, ["stage"] = new OptionSetValue(40), ["mode"] = new OptionSetValue(0), ["eventhandler"] = Ref("plugintype", pluginTypeId) });
         EnsureSolutionComponent(service, existing.Id, solution, 92);
         Log($"step reconciliado: {name}");
         return;
     }
     var stepId = service.Create(new Entity("sdkmessageprocessingstep")
     {
-        ["name"] = name, ["mode"] = new OptionSetValue(0), ["stage"] = new OptionSetValue(30), ["rank"] = 1, ["supporteddeployment"] = new OptionSetValue(0),
+        ["name"] = name, ["mode"] = new OptionSetValue(0), ["stage"] = new OptionSetValue(40), ["rank"] = 1, ["supporteddeployment"] = new OptionSetValue(0),
         ["sdkmessageid"] = Ref("sdkmessage", message.Id), ["eventhandler"] = Ref("plugintype", pluginTypeId), ["configuration"] = config, ["asyncautodelete"] = false,
     });
     EnsureSolutionComponent(service, stepId, solution, 92);
