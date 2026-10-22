@@ -1,6 +1,5 @@
 using System;
 using System.Net;
-using System.Net.Http;
 using Microsoft.Xrm.Sdk;
 
 namespace Cr40f.Acesso.Plugin;
