@@ -24,10 +24,10 @@ describe('acesso', () => {
   })
 
   it('mensagemWhatsApp tem link, e-mail, senha e instrução de troca, sem introdução', () => {
-    const texto = mensagemWhatsApp({ nome: 'João da Silva', emailMicrosoft: 'joao.silva@betinhos.com.br', senhaTemporaria: 'Abc#12345678xy', linkApp: 'https://app' })
+    const texto = mensagemWhatsApp({ nome: 'João da Silva', emailMicrosoft: 'joao.silva@betinhos.onmicrosoft.com', senhaTemporaria: 'Abc#12345678xy', linkApp: 'https://app' })
     expect(texto.startsWith('*Acesso ao App Motoristas*')).toBe(true)
     expect(texto).toContain('https://app')
-    expect(texto).toContain('joao.silva@betinhos.com.br')
+    expect(texto).toContain('joao.silva@betinhos.onmicrosoft.com')
     expect(texto).toContain('Abc#12345678xy')
     expect(texto).toContain('troque a senha')
     expect(texto).toContain('5 minutos')
@@ -41,11 +41,11 @@ describe('acesso', () => {
   it('mock cadastra, aplica sufixo quando repete e simula erro pelo nome', async () => {
     const src = createAcessoSource({ mode: 'mock' })
     const a = await src.cadastrar({ nomeCompleto: 'Ana Lima', celular: '12991234567', tipoVinculo: 1 })
-    expect(a.emailMicrosoft).toBe('ana.lima@betinhos.com.br')
+    expect(a.emailMicrosoft).toBe('ana.lima@betinhos.onmicrosoft.com')
     expect(a.senhaTemporaria).toHaveLength(14)
     expect(a.etapas.map((e) => e.estado)).toContain('feita')
     const b = await src.cadastrar({ nomeCompleto: 'Ana Lima', celular: '12991234567', tipoVinculo: 1 })
-    expect(b.emailMicrosoft).toBe('ana.lima2@betinhos.com.br')
+    expect(b.emailMicrosoft).toBe('ana.lima2@betinhos.onmicrosoft.com')
     await expect(src.cadastrar({ nomeCompleto: 'Erro Graph', celular: '12991234567', tipoVinculo: 1 })).rejects.toMatchObject({ codigo: 'GRAPH_INDISPONIVEL' })
     await expect(src.cadastrar({ nomeCompleto: 'Sem Licenca', celular: '12991234567', tipoVinculo: 1 })).rejects.toMatchObject({ codigo: 'SEM_LICENCA_DISPONIVEL' })
   })

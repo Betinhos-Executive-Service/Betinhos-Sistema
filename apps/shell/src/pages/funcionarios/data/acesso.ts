@@ -25,6 +25,7 @@ export const MENSAGENS: Record<string, string> = {
   FUNCIONARIO_SEM_EMAIL: 'Este funcionário não tem e-mail Microsoft; não há acesso a encerrar.',
   CONFIRMACAO_INVALIDA: 'O nome digitado não confere.',
   ACESSO_ENCERRADO: 'Acesso encerrado antes. Peça à TI para reativar a conta no Entra.',
+  USUARIO_DATAVERSE_PENDENTE: 'A conta foi criada, mas o Dataverse ainda não a reconhece. Tente de novo em alguns minutos.',
 }
 
 export class AcessoError extends Error {
