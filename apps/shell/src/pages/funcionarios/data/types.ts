@@ -37,6 +37,16 @@ export type Posse = {
   fim: string | null
 }
 
+/** Equipamento com o funcionário (aba da ficha; o cadastro fica em #/equipamentos). */
+export type EquipamentoResumo = {
+  id: string
+  descricao: string
+  tipo: string
+  numeroSerie: string
+  /** Valor do choice `cr40f_status` (rótulo e tom vêm de equipamentos/domain/choices). */
+  status: number | null
+}
+
 export type Anotacao = {
   id: string
   titulo: string

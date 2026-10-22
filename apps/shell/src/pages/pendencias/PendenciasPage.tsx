@@ -122,7 +122,7 @@ function Pendencias({ host }: Props) {
   }
 
   return (
-    <div className="page pd-page">
+    <div className="page page--full pd-page">
       <div role="toolbar" aria-label="Comandos de pendências">
         <ViewBar view={view} columns={PENDENCIA_COLUMNS} filters={{ fields: PENDENCIA_FIELDS }}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}

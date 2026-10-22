@@ -12,6 +12,15 @@
 /* Página do shell */
 .page { max-width: var(--bt-layout-content-max); margin: 0 auto; padding: 22px 26px var(--bt-space-8); }
 .page__header { margin-bottom: var(--bt-space-3); }
+/* Lista que usa a largura toda do conteúdo, sem o limite de 1500 px. */
+.page--full { max-width: none; }
+
+/* Linha de comando das listas (ViewBar): o seletor de visão não cresce e os comandos ocupam o resto da linha. No desktop
+   eles nunca descem para baixo do título: quebram dentro do próprio grupo, com o título na altura da primeira linha.
+   (Regra a levar para o @betinhos/ui; aqui até o pacote publicar.) */
+.bt-viewbar { align-items: flex-start; }
+.bt-viewbar__start { flex: 0 1 auto; }
+.bt-viewbar__end { flex: 1 1 0; min-width: 0; }
 
 .surface { background-color: var(--bt-surface-background); border: var(--bt-border-width-default) solid var(--bt-surface-border); border-radius: var(--bt-surface-radius); box-shadow: var(--bt-surface-shadow); }
 
@@ -23,4 +32,6 @@
 
 @media (max-width: 820px) {
   .page { padding: var(--bt-space-4) var(--bt-space-4) var(--bt-space-8); }
+  /* No celular os comandos vão para a linha de baixo do título, na largura toda. */
+  .bt-viewbar__end { flex-basis: auto; }
 }
