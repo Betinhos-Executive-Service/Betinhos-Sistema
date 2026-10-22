@@ -74,8 +74,8 @@ Fora disso, **modo simples**: só o carro no mapa e o cartão de motorista e ve�
 ### 5. Dataverse manda no "Concluído"
 
 - Novo endpoint `POST /api/links/<id>/concluir` (mesmo Bearer). Marca `concluidoEm` e `concluidoPor: "dataverse"` no KV e encurta o TTL para 2 h. A página mostra "Serviço concluído" e para de pedir posição.
-- Quem chama: Flow no Dataverse DEV disparado quando o status da reserva (`cr40f_reservadeveculos`) vira Concluído e a reserva tem link ativo. O id do link sai do link gravado na reserva (`linkAcompanhamento`).
-- Cancelado no Dataverse: chama o `DELETE` já existente.
+- Quem chama: o `RevokeTrackingLinkPlugin` que já existe no App Motoristas (Update de `cr40f_status`, assíncrono). Em Concluído ele passa a chamar `/concluir` em vez de `DELETE`. Não precisa de Flow novo.
+- Cancelado no Dataverse: continua no `DELETE` já existente.
 
 ### 6. Motorista e veículo no link
 
@@ -127,6 +127,6 @@ A Custom API `new_GerarLinkAcompanhamento` passa a enviar no `POST /api/links`:
 
 ## Pendências para o plano
 
-- A Custom API `new_GerarLinkAcompanhamento` fica no repo `App Motoristas` (`plugins/DriverRecordSharing/GenerateTrackingLinkPlugin.cs`, publicação por `scripts/push-dev.ps1`). Ou seja, a mudança envolve 3 repos: Worker, App Motoristas (plugin) e Sistema Betinhos (Flow do "Concluído").
+- A Custom API `new_GerarLinkAcompanhamento` fica no repo `App Motoristas` (`plugins/DriverRecordSharing/GenerateTrackingLinkPlugin.cs`, publicação por `scripts/push-dev.ps1`). Ou seja, o código muda em 2 repos: Worker e App Motoristas.
 - Colunas de paradas da reserva: confirmar na metadata do DEV (o MCP Dataverse_DEV não conectou nesta sessão).
 - Limite de tamanho do payload da Custom API com duas fotos (alternativa: o Worker baixa as fotos por um endpoint autenticado).
