@@ -79,7 +79,6 @@ export const MENU: MenuGroup[] = [
     items: [
       { kind: 'page', id: 'pessoas', label: 'Pessoas', page: 'pessoas' },
       table('cr40f_clientes1', 'Clientes'),
-      table('cr40f_veiculos'),
       { kind: 'page', id: 'funcionarios', label: 'Funcionários', page: 'funcionarios' },
       { kind: 'page', id: 'documentos', label: 'Documentos', page: 'documentos' },
       { kind: 'page', id: 'assistente-pessoas', label: 'Assistente', page: 'agentes', agente: 'pessoas' },
