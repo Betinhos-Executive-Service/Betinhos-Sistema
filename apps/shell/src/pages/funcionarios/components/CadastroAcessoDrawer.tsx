@@ -36,7 +36,7 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
 
   useEffect(() => { panel.current?.focus() }, [])
 
-  const touched = (estado.fase === 'form' || estado.fase === 'erro') && (nome !== (inicial?.nomeCompleto ?? '') || celular !== (inicial?.celular ?? '') || emailPessoal !== '')
+  const touched = (estado.fase === 'form' || estado.fase === 'erro') && (nome !== (inicial?.nomeCompleto ?? '') || celular !== (inicial?.celular ?? '') || emailPessoal !== '' || prefixoManual !== null || vinculo !== 1)
   const criando = estado.fase === 'criando'
   const prefixo = prefixoManual ?? prefixoDeNome(nome)
   const input: CadastroInput = { nomeCompleto: nome.trim(), celular: celular.trim(), emailPessoal: emailPessoal.trim() || undefined, prefixoEmail: prefixo.trim() || undefined, tipoVinculo: vinculo, funcionarioId: inicial?.funcionarioId }

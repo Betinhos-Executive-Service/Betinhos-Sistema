@@ -20,10 +20,14 @@ public static class AcessoRules
 
     public static string PrefixoEmail(string? nome)
     {
-        var palavras = Palavras(nome).Select(SemAcentos).Where(p => p.Length > 0).ToArray();
+        var palavras = Partes(nome, @"\s+");
         if (palavras.Length == 0) return "";
         return palavras.Length == 1 ? palavras[0] : palavras[0] + "." + palavras[palavras.Length - 1];
     }
+
+    /// <summary>Prefixo digitado na tela: pontos e espaços separam as partes, todas mantidas (ana.lima continua ana.lima).</summary>
+    public static string PrefixoInformado(string? prefixo)
+        => string.Join(".", Partes(prefixo, @"[\s.]+"));
 
     public static string EmailComSufixo(string prefixo, string dominio, Func<string, bool> existe)
     {
@@ -51,6 +55,9 @@ public static class AcessoRules
     }
 
     private static char Sorteio(string alfabeto, Random rng) => alfabeto[rng.Next(alfabeto.Length)];
+
+    private static string[] Partes(string? texto, string separador)
+        => Regex.Split((texto ?? "").Trim(), separador).Select(SemAcentos).Where(p => p.Length > 0).ToArray();
 
     private static string[] Palavras(string? nome) => Regex.Split((nome ?? "").Trim(), @"\s+").Where(p => p.Length > 0).ToArray();
 

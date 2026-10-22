@@ -104,6 +104,13 @@ public sealed class CadastrarAcessoHandlerTests
     }
 
     [Fact]
+    public void PrefixoEmail_da_tela_com_ponto_mantem_o_ponto()
+    {
+        var e = Entrada(); e.PrefixoEmail = "joao.avila";
+        Assert.Equal("joao.avila@betinhos.com.br", Handler().Executar(e).EmailMicrosoft);
+    }
+
+    [Fact]
     public void Reexecucao_apos_falha_na_licenca_reaproveita_o_email_sem_sufixo()
     {
         _graph.FalharEm = "AtribuirLicenca";

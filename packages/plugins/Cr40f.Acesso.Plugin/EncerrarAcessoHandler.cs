@@ -30,9 +30,10 @@ public sealed class EncerrarAcessoHandler
                 if (!membro) { foreach (var nome in new[] { "grupo", "licenca", "conta" }) etapas.Pulada(nome, "conta fora do grupo de motoristas"); }
                 else
                 {
-                    etapas.Executar("grupo", () => { _graph.RemoverDoGrupo(_cfg.GroupId, u.Id); etapas.Feita("grupo", "removido"); });
+                    // Grupo por último: é o marcador do R11; sair dele antes deixaria licença e conta ativas se uma etapa falhasse e a tela tentasse de novo.
                     etapas.Executar("licenca", () => { if (AcessoRules.TemLicenca(u, _cfg.LicenseSkuId)) { _graph.RemoverLicenca(u.Id, _cfg.LicenseSkuId); etapas.Feita("licenca", "removida"); } else etapas.Pulada("licenca", "não tinha"); });
                     etapas.Executar("conta", () => { if (u.Ativo) { _graph.DefinirAtivo(u.Id, false); etapas.Feita("conta", "desativada"); } else etapas.Pulada("conta", "já desativada"); });
+                    etapas.Executar("grupo", () => { _graph.RemoverDoGrupo(_cfg.GroupId, u.Id); etapas.Feita("grupo", "removido"); });
                 }
             }
             etapas.Executar("funcionario", () => { if (f.Status != FuncionarioRepository.StatusInativo) { _repo.Inativar(f.Id, _utcNow()); etapas.Feita("funcionario", "inativado"); } else etapas.Pulada("funcionario", "já inativo"); });
