@@ -78,7 +78,7 @@ afterEach(() => {
 })
 
 const dataRows = () => screen.getAllByRole('row', { hidden: true })
-const colFilter = () => document.querySelector<HTMLElement>('.gr-colfilter')
+const colFilter = () => document.querySelector<HTMLElement>('.bt-colfilter')
 /** Painel "Filtrar por" da coluna (usa `popover`, que o jsdom deixa como display:none: o nome acessível sai vazio, então localiza pela classe). */
 async function openColumnFilter(name: RegExp, label: string) {
   await columnMenu(name, 'Filtrar por…')
@@ -759,8 +759,8 @@ describe('Geral: espaço e densidade', () => {
       expect(button.classList.contains('bt-button--touch')).toBe(false)
     }
     expect(within(toolbar).getByRole('button', { name: 'Colunas' })).toBeTruthy()
-    // A Geral filtra pelo título da coluna: o botão da linha de filtro rápido da barra do DS fica desligado (e escondido no CSS).
-    expect(within(toolbar).getByRole('button', { name: 'Filtro rápido' }).getAttribute('aria-pressed')).toBe('false')
+    // O filtro por coluna mora no menu do título (DS 1.13): a barra não tem mais o botão "Filtro rápido".
+    expect(within(toolbar).queryByRole('button', { name: 'Filtro rápido' })).toBeNull()
   })
 
   it('no celular a barra usa tamanho de toque (44 px), nunca o compacto de 32 px', async () => {
@@ -1012,7 +1012,7 @@ describe('Geral: redimensionar e reordenar colunas', () => {
     expect(window.localStorage.getItem(LS)).toContain('widths')
     const names = () => Array.from(document.querySelectorAll('.bt-table__head [role=columnheader]')).slice(1).map((h) => h.getAttribute('title'))
     const second = names()[1]
-    const button = () => Array.from(document.querySelectorAll<HTMLElement>('.gr-head__sort')).find((b) => b.textContent === second) as HTMLElement
+    const button = () => Array.from(document.querySelectorAll<HTMLElement>('.bt-colhead')).find((b) => b.textContent === second) as HTMLElement
     button().focus()
     fireEvent.keyDown(button(), { key: 'ArrowRight', altKey: true })
     await waitFor(() => expect(document.activeElement).toBe(button()))
