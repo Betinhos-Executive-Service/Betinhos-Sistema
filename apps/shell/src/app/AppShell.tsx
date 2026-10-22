@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   AlertTriangle, Banknote, BookUser, Calculator, Calendar, Camera, Car, CarFront, ClipboardCheck, ClipboardList, Clock, Coins, Contact, Database, Download,
-  FileText, FileWarning, FolderCheck, FolderCog, Gauge, Home, Hourglass, IdCard, KeyRound, Landmark, Laptop, LayoutDashboard, List, Mail, Megaphone, MapPin, Paperclip, Receipt, ReceiptText, Route,
+  FileText, FolderCheck, FolderCog, Gauge, Home, Hourglass, IdCard, KeyRound, Landmark, Laptop, LayoutDashboard, List, Mail, Megaphone, MapPin, Paperclip, Receipt, ReceiptText, Route,
   ScrollText, Shield, Shuffle, Sparkles, Tag, TrendingUp, Users, Wallet, Wrench,
 } from 'lucide-react'
 import { AppShell as Shell, type NavGroup } from '@betinhos/ui'
@@ -36,7 +36,13 @@ export const GROUP_ICONS: Record<string, ReactNode> = {
 // Um ícone por tela (id do sitemap). Todo item novo do menu precisa de ícone próprio,
 // coerente com a tela e distinto dos vizinhos (regra do Design System).
 export const ITEM_ICONS: Record<string, ReactNode> = {
-  frota: <Gauge />,
+  frota: <ClipboardList />,
+  'frota-veiculos': <CarFront />,
+  'frota-manutencoes': <Wrench />,
+  'frota-multas': <AlertTriangle />,
+  'frota-colisoes': <Camera />,
+  'frota-indicadores': <Gauge />,
+  'frota-plano': <Clock />,
   pendencias: <Hourglass />,
   funcionarios: <IdCard />,
   'assistente-logistica': <Sparkles />,
@@ -63,9 +69,6 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   cr40f_pedidodecotacao: <Mail />,
   cr40f_telapagamentofornecedores: <Banknote />,
   cr40f_telafluxodecaixa: <TrendingUp />,
-  cr40f_manutencoes: <Wrench />,
-  cr40f_multas: <AlertTriangle />,
-  cr40f_colisao_v2: <Camera />,
   pessoas: <Contact />,
   documentos: <FolderCheck />,
   cr40f_clientes1: <Landmark />,
@@ -73,7 +76,6 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   cr40f_funcionarios: <BookUser />,
   new_curriculo: <ScrollText />,
   curriculos: <ScrollText />,
-  infracoes: <FileWarning />,
   equipamentos: <Laptop />,
   new_marketing: <Megaphone />,
   cr40f_servicosporpassageiro: <List />,
