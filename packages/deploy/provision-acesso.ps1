@@ -116,13 +116,13 @@ foreach ($name in $StepNames) {
 }
 if ($Apply) {
   $secure = Read-Host -AsSecureString "clientSecret do app registration do Graph"
-  $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
-  try { $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr) }
-  finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
-  $secure.Dispose()
-  if ([string]::IsNullOrWhiteSpace($plain)) { throw "clientSecret vazio." }
-  $json = (@{ clientSecret = $plain } | ConvertTo-Json -Compress)
+  $bstr = [IntPtr]::Zero; $plain = $null; $json = $null
+  # O try abre logo apos o Read-Host: segredo vazio, falha no ConvertTo-Json ou na gravacao sempre limpam a memoria.
   try {
+    $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+    $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+    if ([string]::IsNullOrWhiteSpace($plain)) { throw "clientSecret vazio." }
+    $json = (@{ clientSecret = $plain } | ConvertTo-Json -Compress)
     foreach ($name in $StepNames) {
       $step = $steps[$name]
       $secureId = Get-Prop $step $SecureCol
@@ -135,7 +135,11 @@ if ($Apply) {
       Write-Step "configuracao segura gravada em '$name'"
     }
   }
-  finally { $plain = $null; $json = $null; $secure = $null }
+  finally {
+    if ($bstr -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+    if ($secure) { $secure.Dispose() }
+    $bstr = [IntPtr]::Zero; $plain = $null; $json = $null; $secure = $null
+  }
 } else { Write-Step "DRY RUN: $($steps.Count) steps encontrados; use -Apply para gravar o clientSecret" }
 
 # 3. Checagem final: nenhum step sem configuracao segura
