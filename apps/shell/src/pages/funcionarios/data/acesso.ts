@@ -1,5 +1,5 @@
 import type { Host } from '../../../host'
-import { phoneDigits } from '../../operacional/domain/phone'
+import { whatsappHref } from '../../operacional/domain/phone'
 import { createAcessoMock } from './acessoMock'
 
 export type Etapa = { etapa: string; estado: 'feita' | 'pulada' | 'erro'; detalhe: string }
@@ -35,11 +35,9 @@ export function parseAcessoError(error: unknown): AcessoError {
   const raw = error instanceof Error ? error.message : String(error)
   const m = /([A-Z_]{4,}): ([^|]*)/.exec(raw)
   if (!m) return new AcessoError('DESCONHECIDO', raw.replace(/\.+$/, ''), [])
-  let etapas: Etapa[] = []
   const inicio = raw.indexOf('| etapas=', m.index)
   const json = inicio < 0 ? null : primeiroArray(raw, inicio + '| etapas='.length)
-  try { etapas = json ? (JSON.parse(json) as Etapa[]) : [] } catch { etapas = [] }
-  return new AcessoError(m[1], MENSAGENS[m[1]] ?? m[2].trim(), etapas)
+  return new AcessoError(m[1], MENSAGENS[m[1]] ?? m[2].trim(), json ? parseEtapas(json) : [])
 }
 
 /** Primeiro array JSON balanceado a partir de `de` (ignora colchetes dentro de strings); o Dataverse anexa texto depois. */
@@ -74,8 +72,12 @@ export function mensagemWhatsApp(r: { nome: string; emailMicrosoft: string; senh
 }
 
 export function whatsappComMensagem(celular: string, texto: string) {
-  const digits = phoneDigits(celular)
-  return digits ? `https://wa.me/${digits}?text=${encodeURIComponent(texto)}` : null
+  const href = whatsappHref(celular)
+  return href ? `${href}?text=${encodeURIComponent(texto)}` : null
+}
+
+function parseEtapas(json: string): Etapa[] {
+  try { return JSON.parse(json) as Etapa[] } catch { return [] }
 }
 
 type Resposta = { EmailMicrosoft: string; SenhaTemporaria: string; FuncionarioId: string; LinkApp: string; Etapas: string }
@@ -86,7 +88,6 @@ export function createAcessoSource(host: Host): AcessoSource {
   const chamar = async <T,>(nome: string, body: Record<string, unknown>) => {
     try { return await client.request<T>(nome, { method: 'POST', body: JSON.stringify(body) }) } catch (error) { throw parseAcessoError(error) }
   }
-  const etapas = (json: string): Etapa[] => { try { return JSON.parse(json) as Etapa[] } catch { return [] } }
   return {
     async cadastrar(input) {
       const body: Record<string, unknown> = { NomeCompleto: input.nomeCompleto, Celular: input.celular, TipoVinculo: input.tipoVinculo }
@@ -94,11 +95,11 @@ export function createAcessoSource(host: Host): AcessoSource {
       if (input.prefixoEmail) body.PrefixoEmail = input.prefixoEmail
       if (input.funcionarioId) body.FuncionarioId = input.funcionarioId
       const r = await chamar<Resposta>('cr40f_CadastrarAcessoMotorista', body)
-      return { emailMicrosoft: r.EmailMicrosoft, senhaTemporaria: r.SenhaTemporaria, funcionarioId: r.FuncionarioId, linkApp: r.LinkApp, etapas: etapas(r.Etapas) }
+      return { emailMicrosoft: r.EmailMicrosoft, senhaTemporaria: r.SenhaTemporaria, funcionarioId: r.FuncionarioId, linkApp: r.LinkApp, etapas: parseEtapas(r.Etapas) }
     },
     async encerrar(funcionarioId, confirmacao) {
       const r = await chamar<{ Etapas: string }>('cr40f_EncerrarAcessoMotorista', { FuncionarioId: funcionarioId, Confirmacao: confirmacao })
-      return etapas(r.Etapas)
+      return parseEtapas(r.Etapas)
     },
   }
 }

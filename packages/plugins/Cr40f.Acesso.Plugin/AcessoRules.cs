@@ -54,6 +54,17 @@ public static class AcessoRules
 
     private static string[] Palavras(string? nome) => Regex.Split((nome ?? "").Trim(), @"\s+").Where(p => p.Length > 0).ToArray();
 
+    /// <summary>Minúsculas, sem acentos e com espaços simples: compara nomes de pessoas.</summary>
+    public static string NomeComparavel(string? nome)
+    {
+        var sb = new StringBuilder();
+        foreach (var c in (nome ?? "").Normalize(NormalizationForm.FormD))
+            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark) sb.Append(char.ToLowerInvariant(c));
+        return string.Join(" ", Palavras(sb.ToString()));
+    }
+
+    public static bool TemLicenca(GraphUsuario u, string skuId) => u.SkuIds.Any(s => string.Equals(s, skuId, StringComparison.OrdinalIgnoreCase));
+
     private static string SemAcentos(string texto)
     {
         var decomposto = texto.Normalize(NormalizationForm.FormD);

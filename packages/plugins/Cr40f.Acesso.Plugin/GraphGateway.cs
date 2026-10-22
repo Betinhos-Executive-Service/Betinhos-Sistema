@@ -13,6 +13,8 @@ public sealed class GraphGateway : IGraphGateway
 {
     private const string Base = "https://graph.microsoft.com/v1.0";
     private readonly AcessoConfig _cfg;
+    /// <summary>Um cliente por processo do sandbox: evita handshake TLS e esgotar sockets a cada execução.</summary>
+    internal static readonly HttpClient Compartilhado = new();
     private readonly Lazy<HttpClient> _http;
     private string? _token;
 

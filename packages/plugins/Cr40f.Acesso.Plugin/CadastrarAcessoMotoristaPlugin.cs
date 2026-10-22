@@ -32,7 +32,7 @@ public sealed class CadastrarAcessoMotoristaPlugin : IPlugin
                 TipoVinculo = context.InputParameters.Contains("TipoVinculo") && context.InputParameters["TipoVinculo"] is int tv ? tv : 1,
                 FuncionarioId = context.InputParameters.Contains("FuncionarioId") && context.InputParameters["FuncionarioId"] is Guid g && g != Guid.Empty ? g : null,
             };
-            var handler = new CadastrarAcessoHandler(new GraphGateway(cfg, () => new HttpClient()), new FuncionarioRepository(sistema), cfg, RandomSeguro(), m => tracing.Trace("{0}: {1}", Mensagem, m));
+            var handler = new CadastrarAcessoHandler(new GraphGateway(cfg, () => GraphGateway.Compartilhado), new FuncionarioRepository(sistema), cfg, RandomSeguro(), m => tracing.Trace("{0}: {1}", Mensagem, m));
             var saida = handler.Executar(entrada);
             context.OutputParameters["EmailMicrosoft"] = saida.EmailMicrosoft;
             context.OutputParameters["SenhaTemporaria"] = saida.SenhaTemporaria;

@@ -1,8 +1,8 @@
 import type { AcessoSource, CadastroResultado, Etapa } from './acesso'
 import { AcessoError, MENSAGENS } from './acesso'
+import { normalizeSearch as semAcentos } from './format'
 
 const delay = <T,>(value: T, ms = 400) => new Promise<T>((resolve) => setTimeout(() => resolve(value), ms))
-const semAcentos = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const MOCK_FUNCIONARIOS: Record<string, { nome: string; email: string | null }> = { m1: { nome: 'Carlos Alberto Teste', email: 'carlos.teste@betinhos.com.br' }, m7: { nome: 'Helena Simulada Costa', email: null } }
 
 /** Simulação em memória: nome com "Erro Graph" falha depois de criar o usuário; "Sem Licenca" falha antes. */

@@ -1,9 +1,10 @@
 import { Alert, Button, Dialog, Field, Input } from '@betinhos/ui'
 import { useEffect, useState } from 'react'
 import { parseAcessoError } from '../data/acesso'
+import { normalizeSearch } from '../data/format'
 
 type Props = { open: boolean; nome: string; onCancel: () => void; onConfirmar: (confirmacao: string) => Promise<void> }
-const simples = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase()
+const simples = (s: string) => normalizeSearch(s.trim())
 
 /** Dupla confirmação: aviso do que acontece e, depois, digitar o primeiro nome. */
 export function EncerrarAcessoDialog({ open, nome, onCancel, onConfirmar }: Props) {
