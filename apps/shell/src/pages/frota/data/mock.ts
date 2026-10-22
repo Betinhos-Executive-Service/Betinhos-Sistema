@@ -107,8 +107,9 @@ const MULTI_TO_PROP: Record<string, string> = { [CAMPO.servicos]: 'servicos', [C
 export function createMockSource(): DataSource {
   const data = seed()
   const fotos = new Map<string, Blob>()
-  // Só a Ana (fictícia) tem o aditivo de assinatura eletrônica.
-  const comAditivo = new Set([ana.id])
+  // Aditivo exige data e PDF, como no Dataverse. Só a Ana (fictícia) tem os dois; o Bruno tem a data sem o PDF.
+  const aditivos = new Map<string, { data: string | null; arquivo: string | null }>([[ana.id, { data: '2026-10-15', arquivo: 'aditivo.pdf' }], [bruno.id, { data: '2026-10-15', arquivo: null }]])
+  const temAditivo = (id: string) => { const a = aditivos.get(id); return !!a?.data && !!a.arquivo }
   const termos = new Map<string, TermoMulta[]>()
   const find = (kind: Kind, id: string) => (data[COLLECTION[kind]] as { id: string; status: number | null }[]).find((item) => item.id === id)
   const delay = () => new Promise((resolve) => setTimeout(resolve, 250))
@@ -202,7 +203,7 @@ export function createMockSource(): DataSource {
       return { message: 'Mock: Flow simulado.', shareUrl: flow === 'gerarContrato' ? 'https://example.invalid/contrato-ficticio.pdf' : null }
     },
     async temAditivo(funcionarioId) {
-      return comAditivo.has(funcionarioId)
+      return temAditivo(funcionarioId)
     },
     async listarTermos(multaId) {
       await delay()
@@ -214,7 +215,7 @@ export function createMockSource(): DataSource {
       if (!item) throw new Error('Registro não encontrado no mock.')
       const lista = termos.get(multaId) ?? []
       if (lista.some((termo) => termo.status === 'pendente')) throw new Error('Já existe um termo pendente para esta multa.')
-      if (!item.motorista || !comAditivo.has(item.motorista.id)) throw new Error('O motorista ainda não tem o aditivo de assinatura eletrônica registrado.')
+      if (!item.motorista || !temAditivo(item.motorista.id)) throw new Error('O motorista ainda não tem o aditivo de assinatura eletrônica registrado.')
       if (acordo.forma === 'folha' && item.recursoPendente) throw new Error('Há recurso pendente: o desconto só pode ser acordado depois do resultado.')
       const agora = new Date().toISOString()
       const termo: TermoMulta = { id: `t${multaId}-${lista.length + 1}`, status: 'pendente', forma: acordo.forma, parcelas: acordo.parcelas, valorTotal: acordo.valorTotal, primeiraCompetencia: acordo.primeiraCompetencia, enviadoEm: agora, assinadoEm: null, hashPdf: null, motivoContestacao: null, criadoEm: agora }

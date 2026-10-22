@@ -8,10 +8,15 @@
   # Membros do perfil de campo (domainname). Vazio = so o usuario do token (teste), ate existir equipe de frota/DP.
   [string[]] $MembrosPerfil = @(),
   # Equipes (nome) associadas ao perfil de campo, ex.: gestao de frota e DP quando existirem.
-  [string[]] $EquipesPerfil = @()
+  [string[]] $EquipesPerfil = @(),
+  # Connection reference Dataverse do flow "Termo de multa | Cópia ao motorista" (provision-flow-termo-multa.ps1):
+  # o dono precisa ler new_pdf, entao entra no perfil se nao for administrador do sistema.
+  [string] $ReferenciaDataverse = 'new_sharedcommondataserviceforapps_5696d'
 )
 
-# Task A2 do termo de multa: privilegios das 3 tabelas e column security de selfie/latitude/longitude.
+# Task A2 do termo de multa: privilegios das 3 tabelas e column security de selfie/latitude/longitude/pdf/hashpdf.
+# new_pdf e new_hashpdf seguras: upload e DeleteFile da coluna de arquivo nao passam pelo Update do plugin,
+# entao so a column security impede trocar o PDF assinado (o plugin roda como SYSTEM e continua gravando).
 # Gestao: Read/Create/Write/Append/AppendTo Global nas 3 tabelas; Delete so em new_textotermomulta (a trava real e o plugin).
 # Motorista: so Read Basic em new_termomulta e new_parcelamultafolha; o acesso aos registros vem do compartilhamento feito pelo plugin.
 # Nunca reduz profundidade existente nem remove privilegio. Sem -Apply roda em DRY RUN. Idempotente.
@@ -164,8 +169,8 @@ foreach ($id in @((Get-Profundidades (Get-Papel $MotoristaRole).roleid).Keys)) {
 
 # Column security: perfil "Termo de multa - leitura" so com leitura; quem grava as 3 colunas e o plugin.
 $perfilNome = "Termo de multa - leitura"
-$colunas = @("new_selfie", "new_latitude", "new_longitude")
-$perfilDescricao = "Leitura de selfie e localização do termo de multa (gestão de frota e DP)."
+$colunas = @("new_selfie", "new_latitude", "new_longitude", "new_pdf", "new_hashpdf")
+$perfilDescricao = "Leitura de selfie, localização e PDF assinado do termo de multa (gestão de frota e DP). Ninguém grava por fora do plugin."
 $perfis = @(Get-Rows "fieldsecurityprofiles" "fieldsecurityprofileid,description" "name eq '$(Escape-OData $perfilNome)'")
 if ($perfis.Count -gt 1) { throw "Perfil '$perfilNome' duplicado." }
 $perfilId = $null
@@ -204,11 +209,11 @@ if ($alterouMetadata) {
 
 if ($perfilId) {
   foreach ($col in $colunas) {
-    $fp = @(Get-Rows "fieldpermissions" "fieldpermissionid,canread" "_fieldsecurityprofileid_value eq $perfilId and entityname eq 'new_termomulta' and attributelogicalname eq '$col'")
+    $fp = @(Get-Rows "fieldpermissions" "fieldpermissionid,canread,cancreate,canupdate" "_fieldsecurityprofileid_value eq $perfilId and entityname eq 'new_termomulta' and attributelogicalname eq '$col'")
     if ($fp.Count -gt 1) { throw "Perfil tem $($fp.Count) permissoes de campo para $col; corrija manualmente." }
-    if ($fp.Count -eq 1 -and $fp[0].canread -eq 4) { Write-Step "leitura em $col ja concedida"; continue }
-    if (-not $Apply) { Write-Step "DRY RUN daria leitura em $col"; continue }
-    if ($fp.Count -eq 1) { Invoke-Dataverse "PATCH" "fieldpermissions($($fp[0].fieldpermissionid))" @{ canread = 4 } | Out-Null }
+    if ($fp.Count -eq 1 -and $fp[0].canread -eq 4 -and $fp[0].cancreate -eq 0 -and $fp[0].canupdate -eq 0) { Write-Step "so leitura em $col ja concedida"; continue }
+    if (-not $Apply) { Write-Step "DRY RUN daria so leitura em $col"; continue }
+    if ($fp.Count -eq 1) { Invoke-Dataverse "PATCH" "fieldpermissions($($fp[0].fieldpermissionid))" @{ canread = 4; cancreate = 0; canupdate = 0 } | Out-Null }
     else { Invoke-Dataverse "POST" "fieldpermissions" @{ "fieldsecurityprofileid@odata.bind" = "/fieldsecurityprofiles($perfilId)"; entityname = "new_termomulta"; attributelogicalname = $col; canread = 4; cancreate = 0; canupdate = 0 } | Out-Null }
     Write-Step "leitura em $col concedida ao perfil"
   }
@@ -223,6 +228,14 @@ if ($perfilId) {
     $ids += [string](Invoke-Dataverse "GET" "WhoAmI").UserId
     Write-Step "ATENCAO: perfil sem membros reais (gestão/DP); o unico membro e o usuario do token (teste)"
   }
+  # Dono da connection reference do flow de copia: precisa ler new_pdf. Administrador do sistema ignora column security.
+  $refs = @(Get-Rows "connectionreferences" "_ownerid_value" "connectionreferencelogicalname eq '$(Escape-OData $ReferenciaDataverse)'")
+  if ($refs.Count -ne 1) { throw "Connection reference '$ReferenciaDataverse' nao encontrada." }
+  $donoRef = [string]$refs[0]._ownerid_value
+  $papeisDono = @(@((Invoke-Dataverse "GET" "systemusers($donoRef)/systemuserroles_association?`$select=name").value) | ForEach-Object { $_.name })
+  if ($papeisDono -contains "Administrador do Sistema" -or $papeisDono -contains "System Administrator") {
+    Write-Step "dono da connection reference ($donoRef) e administrador do sistema: le new_pdf sem o perfil"
+  } elseif ($ids -notcontains $donoRef) { $ids += $donoRef; Write-Step "dono da connection reference ($donoRef) entra no perfil para ler new_pdf" }
   $equipesAtuais = @(@((Invoke-Dataverse "GET" "fieldsecurityprofiles($perfilId)/teamprofiles_association?`$select=teamid").value) | ForEach-Object { [string]$_.teamid })
   foreach ($e in $EquipesPerfil) {
     $t = @(Get-Rows "teams" "teamid" "name eq '$(Escape-OData $e)'")
