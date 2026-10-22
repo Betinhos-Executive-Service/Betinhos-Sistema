@@ -81,7 +81,7 @@ foreach ($par in @(@($ReferenciaDataverse, 'shared_commondataserviceforapps'), @
 }
 $customApi = 'new_ExpirarTermoMulta'
 $temCustomApi = @((Dv GET "customapis?`$select=customapiid&`$filter=uniquename eq '$customApi'").value).Count -eq 1
-Write-Step "Custom API $customApi no DEV: $(if ($temCustomApi) { 'presente' } else { 'AUSENTE (Task B2); o flow de expiração fica desligado' })"
+Write-Step "Custom API $customApi no DEV: $(if ($temCustomApi) { 'presente' } else { 'AUSENTE (Task B2); o flow de expiração mantém o estado atual (desligado se criado agora)' })"
 
 $dv = '/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps'
 $outlook = '/providers/Microsoft.PowerApps/apis/shared_office365'
@@ -242,10 +242,13 @@ function Include([string] $id) {
   if (-not @((Dv GET $filter).value).Count) { throw "Flow $id não entrou na $solutionName." }
 }
 
+# $ligado = $true liga o flow; $false mantém o estado anterior (desligado só quando o flow é criado agora).
 function Ensure-Flow([string] $nome, [string] $descricao, [string] $clientData, [bool] $ligado) {
   $flows = @((Dv GET "workflows?`$select=workflowid,statecode,clientdata&`$filter=name eq '$nome' and category eq 5").value)
   if ($flows.Count -gt 1) { throw "Flow '$nome' duplicado no DEV." }
-  if (-not $Apply) { Write-Output "DRY RUN: '$nome' seria $(if ($flows.Count) { 'atualizado' } else { 'criado' }) $(if ($ligado) { 'LIGADO' } else { 'DESLIGADO (rascunho)' })."; return }
+  $anterior = if ($flows.Count) { [int]$flows[0].statecode } else { 0 }
+  $alvo = if ($ligado) { 1 } else { $anterior }
+  if (-not $Apply) { Write-Output "DRY RUN: '$nome' seria $(if ($flows.Count) { 'atualizado' } else { 'criado' }) $(if ($alvo -eq 1) { 'LIGADO' } else { 'DESLIGADO (rascunho)' })."; return }
   if ($flows.Count) {
     $flowId = $flows[0].workflowid
     $norm = { param($o) ($o | ConvertTo-Json -Depth 90 -Compress | ConvertFrom-Json | ConvertTo-Json -Depth 90 -Compress) }
@@ -262,15 +265,14 @@ function Ensure-Flow([string] $nome, [string] $descricao, [string] $clientData, 
     Write-Output "'$nome': criado ($flowId)."
   }
   Include $flowId
-  $alvo = if ($ligado) { 1 } else { 0 }
   $atual = (Dv GET "workflows($flowId)?`$select=statecode").statecode
   if ($atual -ne $alvo) { Dv PATCH "workflows($flowId)" @{ statecode = $alvo } | Out-Null; $atual = (Dv GET "workflows($flowId)?`$select=statecode").statecode }
   if ($atual -ne $alvo) { throw "'$nome' não ficou com statecode $alvo. Confira as conexões no Power Automate." }
-  Write-Output "DEV: '$nome' $(if ($ligado) { 'LIGADO' } else { 'DESLIGADO (rascunho)' }) na $solutionName."
+  Write-Output "DEV: '$nome' $(if ($alvo -eq 1) { 'LIGADO' } else { 'DESLIGADO (rascunho)' }) na $solutionName."
 }
 
 Ensure-Flow 'Termo de multa | Cópia ao motorista' 'Quando o termo de multa fica Assinado, envia a cópia em PDF ao motorista por e-mail e registra new_copiaenviadaem/new_copiacanal. Falha no e-mail não altera o termo.' (ClientData $copia @('shared_commondataserviceforapps', 'shared_office365')) $true
 # Decisão do controlador (22/10/2026): expiração só pela Custom API new_ExpirarTermoMulta (respeita a trava do plugin),
-# nunca por update direto do status. Até a Task B2 publicar a Custom API, o flow fica criado e DESLIGADO.
-Ensure-Flow 'Termo de multa | Expirar pendentes' 'Todo dia às 07:00 expira, pela Custom API new_ExpirarTermoMulta, os termos Pendentes enviados há mais de 15 dias. Criado desligado até a Custom API existir (Task B2).' (ClientData $expirar @('shared_commondataserviceforapps')) $false
-if (-not $temCustomApi) { Write-Output "ATENÇÃO: '$customApi' ainda não existe no DEV. Depois da Task B2, ligue 'Termo de multa | Expirar pendentes' no Power Automate." }
+# nunca por update direto do status. Nasce DESLIGADO; com a Custom API no DEV o script o liga; sem ela, mantém o estado atual.
+Ensure-Flow 'Termo de multa | Expirar pendentes' 'Todo dia às 07:00 expira, pela Custom API new_ExpirarTermoMulta, os termos Pendentes enviados há mais de 15 dias. Criado desligado; o script liga quando a Custom API existir (Task B2).' (ClientData $expirar @('shared_commondataserviceforapps')) $temCustomApi
+if (-not $temCustomApi) { Write-Output "ATENÇÃO: '$customApi' ainda não existe no DEV. Depois da Task B2, rode este script de novo para ligar 'Termo de multa | Expirar pendentes'." }
