@@ -18,6 +18,7 @@ import {
   normalizeChecklistNumber,
   parseChecklistItems,
   setChecklistOkNok,
+  setChecklistValor,
   toggleChecklistProblema,
   validateChecklistDraft,
   type ChecklistDraft,
@@ -95,6 +96,24 @@ test("rascunho sugere o KM do hodômetro só no item em km", () => {
   assert.equal(draft.valores["k-km"], "45210");
   assert.equal(draft.valores["k-comb"], undefined);
   assert.equal(createChecklistDraft(checklist({ odometro: null })).valores["k-km"], undefined);
+});
+
+test("KM sugerido não conta no progresso até o motorista mexer, mas vale no envio", () => {
+  const draft = createChecklistDraft(checklist());
+  assert.deepEqual(draft.sugeridos, ["k-km"]);
+  assert.deepEqual(countChecklistProgress(itens, draft), { done: 0, total: 4 });
+  assert.equal(validateChecklistDraft(itens, draft)["k-km"], undefined);
+  assert.equal(JSON.parse(buildChecklistRespostasJson([itens[1]], draft, {}))[0].valor, "45210");
+
+  const edited = setChecklistValor(draft, "k-km", "45300");
+  assert.deepEqual(edited.sugeridos, []);
+  assert.equal(edited.valores["k-km"], "45300");
+  assert.deepEqual(countChecklistProgress(itens, edited), { done: 1, total: 4 });
+
+  // Rascunho antigo (sem sugeridos) salvo no aparelho continua contando o valor.
+  const legacy: ChecklistDraft = { checklistId: "c1", valores: { "k-km": "45210" }, fotos: {}, updatedAt: "2026-10-19T09:00:00Z" };
+  assert.deepEqual(countChecklistProgress(itens, legacy), { done: 1, total: 4 });
+  assert.deepEqual(countChecklistProgress(itens, createChecklistDraft(checklist({ odometro: null }))), { done: 0, total: 4 });
 });
 
 test("validação exige foto e campos obrigatórios, sem reprovar opcionais", () => {
