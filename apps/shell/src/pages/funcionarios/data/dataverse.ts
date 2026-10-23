@@ -285,6 +285,13 @@ export function createXrmSource(xrm: XrmHost): DataSource {
 
     documentos,
 
+    async usuarioDoApp(email) {
+      const filtro = `internalemailaddress eq '${odataString(email.trim().toLowerCase())}'`
+      const page = await api.retrieveMultipleRecords('systemuser', `?$select=systemuserid,isdisabled&$filter=${filtro}&$top=1`)
+      const row = page.entities[0]
+      return row ? { id: cleanId(String(row.systemuserid)), ativo: row.isdisabled !== true } : null
+    },
+
     async searchVeiculos(query): Promise<Lookup[]> {
       const term = odataString(query.trim())
       // Placa e modelo pelo começo (usa índice); "abc" acha ABC1D23, "cor" acha Corolla.

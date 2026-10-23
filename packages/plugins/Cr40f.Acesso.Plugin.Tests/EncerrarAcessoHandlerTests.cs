@@ -12,7 +12,7 @@ public sealed class EncerrarAcessoHandlerTests
     private readonly FakeService _svc = new();
     private readonly Guid _id = Guid.NewGuid();
 
-    private EncerrarAcessoHandler Handler() => new(_graph, new FuncionarioRepository(_svc), Cfg, () => new DateTime(2026, 10, 22, 12, 0, 0, DateTimeKind.Utc), _ => { });
+    private EncerrarAcessoHandler Handler() => new(_graph, new FuncionarioRepository(_svc), Cfg, _ => { });
     private void ComFuncionario(string? email = "ana.lima@betinhos.onmicrosoft.com") => _svc.Com(new Entity("cr40f_funcionarios", _id) { ["cr40f_nomecompleto"] = "Ana Lima", ["cr40f_emailmicrosoft"] = email, ["cr40f_status"] = new OptionSetValue(0) });
     private void ComUsuarioCompleto()
     {
@@ -21,7 +21,7 @@ public sealed class EncerrarAcessoHandlerTests
     }
 
     [Fact]
-    public void Encerra_tudo_e_inativa()
+    public void Encerra_tudo_sem_mexer_no_funcionario()
     {
         ComFuncionario(); ComUsuarioCompleto();
         var etapas = Handler().Executar(_id, "ANA").ToJson();
@@ -29,7 +29,8 @@ public sealed class EncerrarAcessoHandlerTests
         Assert.Contains("\"etapa\":\"licenca\",\"estado\":\"feita\"", etapas);
         Assert.Contains("\"etapa\":\"conta\",\"estado\":\"feita\"", etapas);
         Assert.False(_graph.Usuarios["ana.lima@betinhos.onmicrosoft.com"].Ativo);
-        Assert.Equal(1, _svc.Atualizados[0].GetAttributeValue<OptionSetValue>("cr40f_status").Value);
+        Assert.DoesNotContain(_svc.Atualizados, e => e.LogicalName == "cr40f_funcionarios");
+        Assert.DoesNotContain("\"etapa\":\"funcionario\"", etapas);
     }
 
     [Fact]
@@ -41,7 +42,7 @@ public sealed class EncerrarAcessoHandlerTests
         Assert.Contains("\"etapa\":\"grupo\",\"estado\":\"pulada\"", etapas);
         Assert.Contains("\"etapa\":\"licenca\",\"estado\":\"pulada\"", etapas);
         Assert.Contains("\"etapa\":\"conta\",\"estado\":\"pulada\"", etapas);
-        Assert.Contains("\"etapa\":\"funcionario\",\"estado\":\"pulada\"", etapas);
+        Assert.Empty(_svc.Atualizados);
     }
 
     [Fact]
@@ -72,16 +73,16 @@ public sealed class EncerrarAcessoHandlerTests
     }
 
     [Fact]
-    public void Usuario_inexistente_no_entra_so_inativa_o_funcionario()
+    public void Usuario_inexistente_no_entra_pula_tudo_e_nao_toca_no_funcionario()
     {
         ComFuncionario();
         var etapas = Handler().Executar(_id, "Ana").ToJson();
         Assert.Contains("\"etapa\":\"conta\",\"estado\":\"pulada\"", etapas);
-        Assert.Contains("\"etapa\":\"funcionario\",\"estado\":\"feita\"", etapas);
+        Assert.Empty(_svc.Atualizados);
     }
 
     [Fact]
-    public void Usuario_fora_do_grupo_nao_perde_conta_nem_licenca_mas_funcionario_e_inativado()
+    public void Usuario_fora_do_grupo_nao_perde_conta_nem_licenca()
     {
         ComFuncionario(); ComUsuarioCompleto(); _graph.Membros.Clear();
         var etapas = Handler().Executar(_id, "Ana").ToJson();
@@ -90,7 +91,7 @@ public sealed class EncerrarAcessoHandlerTests
         Assert.True(_graph.Usuarios["ana.lima@betinhos.onmicrosoft.com"].Ativo);
         Assert.Contains("sku", _graph.Usuarios["ana.lima@betinhos.onmicrosoft.com"].SkuIds);
         Assert.DoesNotContain("DefinirAtivo", _graph.Chamadas); Assert.DoesNotContain("RemoverLicenca", _graph.Chamadas);
-        Assert.Equal(1, _svc.Atualizados[0].GetAttributeValue<OptionSetValue>("cr40f_status").Value);
+        Assert.Empty(_svc.Atualizados);
     }
 
     [Fact]
