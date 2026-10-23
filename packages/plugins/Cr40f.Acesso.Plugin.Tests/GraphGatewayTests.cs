@@ -51,7 +51,7 @@ public sealed class GraphGatewayTests
         };
         var g = new GraphGateway(Cfg(), new HttpClient(h));
         var erro = Assert.Throws<AcessoException>(() => g.CriarUsuario("x@b.com", "X Y", "Senha#123456", "+5512999999999"));
-        Assert.Contains("\"forceChangePasswordNextSignIn\":true", corpo);
+        Assert.Contains("\"forceChangePasswordNextSignIn\":false", corpo);
         Assert.Contains("\"password\":\"Senha#123456\"", corpo);
         Assert.Equal("GRAPH_INDISPONIVEL", erro.Codigo);
         Assert.DoesNotContain("Senha#123456", erro.Message);

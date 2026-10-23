@@ -67,9 +67,9 @@ export function mensagemWhatsApp(r: { nome: string; emailMicrosoft: string; senh
     '',
     `• Link: ${r.linkApp}`,
     `• E-mail: ${r.emailMicrosoft}`,
-    ...(r.senhaTemporaria ? [`• Senha temporária: ${r.senhaTemporaria}`] : []),
+    ...(r.senhaTemporaria ? [`• Senha: ${r.senhaTemporaria}`] : []),
     '',
-    'Abra o link no navegador do celular, entre com o e-mail e troque a senha no primeiro acesso.',
+    'Abra o link no navegador do celular e entre com o e-mail e a senha acima.',
     'Se der erro de acesso, aguarde 5 minutos e tente de novo.',
   ].join('\n')
 }
