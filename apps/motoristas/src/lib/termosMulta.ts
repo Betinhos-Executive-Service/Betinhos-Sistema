@@ -2,14 +2,14 @@ import { executeCustomApi } from "./customApi.ts";
 import { cleanGuid, validateSignature, type SignatureStrokes } from "./comunicados.ts";
 import { DATAVERSE, retrieveMultiple, retrieveOne } from "./dataverse.ts";
 
-export const TERMO_STATUS = { pendente: 100000000, assinado: 100000001, contestado: 100000002 } as const;
+export const TERMO_STATUS = { pendente: 100000000, assinado: 100000001, contestado: 100000002, expirado: 100000003 } as const;
 export const FORMA_PAGAMENTO = { guia: 100000000, folha: 100000001 } as const;
 // Texto exato do plugin TermoMultaCommandPlugin (SemAditivo): leva para a tela "procure o escritório".
 export const SEM_ADITIVO_MENSAGEM = "O motorista ainda não tem o aditivo de assinatura eletrônica registrado.";
 // O servidor pode embrulhar o texto (prefixo/sufixo); basta o trecho característico.
 export const isSemAditivo = (message: string) => message.includes("aditivo de assinatura eletrônica");
 // Recusas do plugin que não mudam tentando de novo: levam a uma tela final, sem "Tentar de novo".
-export const isErroDefinitivo = (message: string) => /não é seu|não está mais pendente/.test(message);
+export const isErroDefinitivo = (message: string) => /não é seu|não está mais pendente|cadastro está duplicado/.test(message);
 export const PRAZO_ASSINATURA_DIAS = 7;
 export const GPS_PRECISAO_AVISO_M = 200;
 export const SELFIE_MAX_LADO = 1280;
@@ -80,12 +80,24 @@ export function prazoAssinatura(enviadoEm: string) {
   return DIA_MES.format(new Date(date.getTime() + PRAZO_ASSINATURA_DIAS * 86_400_000));
 }
 
-/** Pendentes primeiro; Concluídos são os assinados e contestados (cancelados e expirados não aparecem ao motorista). */
+/** Pendentes primeiro; Concluídos são assinados, contestados e expirados (cancelados não aparecem ao motorista). */
 export function separarTermos(items: TermoMulta[]) {
   return {
     pendentes: items.filter((t) => t.status === TERMO_STATUS.pendente),
-    concluidos: items.filter((t) => t.status === TERMO_STATUS.assinado || t.status === TERMO_STATUS.contestado)
+    concluidos: items.filter((t) => t.status === TERMO_STATUS.assinado || t.status === TERMO_STATUS.contestado || t.status === TERMO_STATUS.expirado)
   };
+}
+
+export type AbaTermos = "pendentes" | "concluidos";
+const ABAS: AbaTermos[] = ["pendentes", "concluidos"];
+/** Navegação por teclado no tablist (roving tabindex); null quando a tecla não muda de aba. */
+export function proximaAba(atual: AbaTermos, key: string): AbaTermos | null {
+  const i = ABAS.indexOf(atual);
+  if (key === "ArrowRight") return ABAS[(i + 1) % ABAS.length];
+  if (key === "ArrowLeft") return ABAS[(i - 1 + ABAS.length) % ABAS.length];
+  if (key === "Home") return ABAS[0];
+  if (key === "End") return ABAS[ABAS.length - 1];
+  return null;
 }
 
 /** Texto do banner da Home, com o prazo mais próximo; null sem pendências. */
@@ -302,6 +314,12 @@ function getMockTermos() {
       new_motivocontestacao: "Eu estava de folga nesse dia; o carro ficou na garagem.",
       new_textotermo: "[Mock] Termo contestado.",
       new_evidenciasjson: JSON.stringify({ multa: { placa: "FHK7C30", dataHora: "2026-09-10T08:00:00Z", local: "Av. Brasil, 500", valorGuia: 88.38 }, infracao: { codigo: "554-1", descricao: "Estacionar na faixa", valor: 88.38 }, infleet: { viagens: [] } })
+    },
+    {
+      new_termomultaid: "88888888-8888-4888-8888-888888888888", new_name: "TM-GKD2E19-20260901", new_status: TERMO_STATUS.expirado,
+      new_formapagamento: FORMA_PAGAMENTO.guia, new_parcelas: 1, new_valortotal: 104.12, new_valorparcela: 104.12, new_primeiracompetencia: "2026-10-01",
+      new_versaotexto: "v1", new_enviadoem: "2026-09-01T12:00:00Z", new_textotermo: "[Mock] Termo expirado.",
+      new_evidenciasjson: JSON.stringify({ multa: { placa: "GKD2E19", dataHora: "2026-08-20T18:30:00Z", local: "Marginal Pinheiros", valorGuia: 104.12 }, infracao: { codigo: "596-7", descricao: "Avançar sinal", valor: 104.12 }, infleet: { viagens: [] } })
     }
   ];
   return mockTermos;
@@ -309,16 +327,16 @@ function getMockTermos() {
 
 const mockDelay = () => new Promise((resolve) => setTimeout(resolve, 600));
 
-/** Termos do motorista que ele ainda vê: pendentes, assinados e contestados. */
+/** Termos do motorista que ele ainda vê: pendentes, assinados, contestados e expirados. */
 export async function listarTermosMotorista(motoristaId: string): Promise<TermoMulta[]> {
   if (isMockTermos()) {
     if (mockParam("mockTermos") === "vazio") return [];
-    return getMockTermos().map(mapTermo).filter((t) => t.status <= TERMO_STATUS.contestado);
+    return getMockTermos().map(mapTermo).filter((t) => t.status <= TERMO_STATUS.expirado);
   }
   const id = cleanGuid(motoristaId);
   if (!GUID_PATTERN.test(id)) throw new Error("Motorista não identificado para carregar termos de multa.");
   // Filtra pelo motorista logado: quem tem leitura ampla (admin) veria os termos de todos.
-  const result = await retrieveMultiple(DATAVERSE.termosMulta, `${TERMO_SELECT}&$filter=new_status le ${TERMO_STATUS.contestado} and _new_motorista_value eq ${id}&$orderby=new_enviadoem desc`);
+  const result = await retrieveMultiple(DATAVERSE.termosMulta, `${TERMO_SELECT}&$filter=new_status le ${TERMO_STATUS.expirado} and _new_motorista_value eq ${id}&$orderby=new_enviadoem desc`);
   return result.entities.map((row) => mapTermo(row as Record<string, unknown>));
 }
 
@@ -416,6 +434,8 @@ export type AbrirPdfEnv = {
   canShare?: (data: { files: File[] }) => boolean;
   download?: (blob: Blob, nome: string) => void;
   onFalha?: (metodo: "xrm" | "share" | "download", error: unknown) => void;
+  /** Dentro do WebView do Power Apps o download por <a download> some em silêncio: não conta como sucesso. */
+  powerApps?: boolean;
 };
 
 function pdfBlob(base64: string) {
@@ -433,7 +453,7 @@ export async function abrirPdf(pdf: PdfTermo, env: AbrirPdfEnv = navegadorPdfEnv
   const blob = pdfBlob(pdf.base64);
   if (env.xrmOpenFile) {
     try {
-      await env.xrmOpenFile({ fileContent: pdf.base64, fileName: pdf.nome, fileSize: blob.size, mimeType: "application/pdf" }, { openMode: 2 });
+      await env.xrmOpenFile({ fileContent: pdf.base64, fileName: pdf.nome, fileSize: blob.size, mimeType: "application/pdf" }, { openMode: 1 });
       return "xrm";
     } catch (error) { env.onFalha?.("xrm", error); }
   }
@@ -449,6 +469,11 @@ export async function abrirPdf(pdf: PdfTermo, env: AbrirPdfEnv = navegadorPdfEnv
         env.onFalha?.("share", error);
       }
     }
+  }
+  if (env.powerApps) {
+    const error = new Error("Este aparelho não abriu o PDF no Power Apps. Atualize o app Power Apps ou peça a cópia ao gestor de frota.");
+    env.onFalha?.("download", error);
+    throw error;
   }
   if (env.download) {
     try {
@@ -479,6 +504,7 @@ export function navegadorPdfEnv(onFalha?: AbrirPdfEnv["onFalha"]): AbrirPdfEnv {
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 30000);
     },
-    onFalha
+    onFalha,
+    powerApps: Boolean(xrm) || /PowerApps|Dynamics/i.test(navigator.userAgent)
   };
 }

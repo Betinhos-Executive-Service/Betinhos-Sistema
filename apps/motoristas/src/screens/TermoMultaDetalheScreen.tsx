@@ -95,9 +95,9 @@ export function TermoMultaDetalheScreen({ termo, onDone, onRefresh }: Props) {
     try {
       dispatch({ type: "go", step: (await consultarAditivo()) ? "selfie" : "semAditivo" });
     } catch (error) {
-      // Falha na consulta não bloqueia: o plugin confere o aditivo de novo na assinatura.
+      // Sem a resposta não segue para a selfie: mostra o erro e "Tentar de novo" (cadastro duplicado vai para a tela final).
       reportAppError(error, { severity: "warning", source: "termosMulta", action: "consultarAditivo", screen: "Multas", detailId: termo.id, detailType: "TERMO_MULTA", notifyUser: false });
-      dispatch({ type: "go", step: "selfie" });
+      dispatch({ type: "error", message: customApiErrorMessage(error, "Não foi possível conferir seu cadastro. Verifique a internet e tente de novo.") });
     } finally {
       setChecandoAditivo(false);
     }
@@ -161,7 +161,7 @@ export function TermoMultaDetalheScreen({ termo, onDone, onRefresh }: Props) {
         return (
           <>
             <button type="button" className="termo-primary" disabled={checandoAditivo} aria-busy={checandoAditivo || undefined} onClick={() => void iniciarAssinatura()}>
-              {checandoAditivo ? <><span className="termo-spinner" aria-hidden="true" />Verificando</> : "Assinar"}
+              {checandoAditivo ? <><span className="termo-spinner" aria-hidden="true" />Verificando</> : flow.erro ? "Tentar de novo" : "Assinar"}
             </button>
             <button type="button" className="termo-text-button termo-footer-secondary" disabled={checandoAditivo} onClick={() => dispatch({ type: "go", step: "contestar" })}>Não concordo</button>
           </>
@@ -216,6 +216,8 @@ export function TermoMultaDetalheScreen({ termo, onDone, onRefresh }: Props) {
             <>
               {pendente ? (
                 <p className="termo-prazo" role="note"><strong>Assine ou conteste até {prazo}.</strong> Depois disso o termo expira e o gestor de frota fala com você.</p>
+              ) : termo.status === TERMO_STATUS.expirado ? (
+                <p className="termo-alert" data-tone="neutro" role="note">Expirado: fale com o gestor de frota.</p>
               ) : termo.status === TERMO_STATUS.contestado ? (
                 <div className="termo-alert" data-tone="neutro" role="note">
                   <p>{CONTESTADO_TEXTO}</p>

@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { reportAppError } from "../lib/appErrorLogger";
 import { AppShell } from "../components/layout/AppShell";
 import { ServicesMenu } from "../components/navigation/ServicesMenu";
 import { TermoMultaDetalheScreen } from "./TermoMultaDetalheScreen";
-import { formatBrl, formatDataHora, isMockTermos, parseEvidencias, prazoAssinatura, separarTermos, TERMO_STATUS, type TermoMulta } from "../lib/termosMulta";
+import { formatBrl, formatDataHora, isMockTermos, parseEvidencias, prazoAssinatura, proximaAba, separarTermos, TERMO_STATUS, type AbaTermos, type TermoMulta } from "../lib/termosMulta";
 
 export type TermosLoadStatus = "loading" | "ready" | "error";
 
@@ -14,18 +14,26 @@ type Props = {
   onReload: () => Promise<void>;
 };
 
-type Aba = "pendentes" | "concluidos";
 
 function situacaoTermo(termo: TermoMulta) {
   if (termo.status === TERMO_STATUS.pendente) return { tone: "atencao", texto: `Assine até ${prazoAssinatura(termo.enviadoEm)}` };
   if (termo.status === TERMO_STATUS.contestado) return { tone: "neutro", texto: "Contestado" };
+  if (termo.status === TERMO_STATUS.expirado) return { tone: "neutro", texto: "Expirado: fale com o gestor de frota" };
   return { tone: "sucesso", texto: termo.assinadoEm ? `Assinado em ${formatDataHora(termo.assinadoEm).slice(0, 10)}` : "Assinado" };
 }
 
 export function TermosMultaScreen({ items, loadStatus, onBack, onReload }: Props) {
   // Guarda o termo aberto: depois de assinar ele muda de aba, mas a tela de sucesso continua.
   const [selected, setSelected] = useState<TermoMulta | null>(null);
-  const [aba, setAba] = useState<Aba>("pendentes");
+  const [aba, setAba] = useState<AbaTermos>("pendentes");
+  const tabRefs = useRef<Partial<Record<AbaTermos, HTMLButtonElement | null>>>({});
+  const onTabKey = (event: KeyboardEvent) => {
+    const next = proximaAba(aba, event.key);
+    if (!next) return;
+    event.preventDefault();
+    setAba(next);
+    tabRefs.current[next]?.focus();
+  };
   const [error, setError] = useState("");
   const { pendentes, concluidos } = separarTermos(items);
   const lista = aba === "pendentes" ? pendentes : concluidos;
@@ -59,9 +67,9 @@ export function TermosMultaScreen({ items, loadStatus, onBack, onReload }: Props
           onRefresh={refresh}
         />
         <section className="termo-screen" aria-label="Multas">
-          <div className="termo-tabs" role="tablist" aria-label="Situação das multas">
+          <div className="termo-tabs" role="tablist" aria-label="Situação das multas" onKeyDown={onTabKey}>
             {([["pendentes", "Pendentes", pendentes.length], ["concluidos", "Concluídos", concluidos.length]] as const).map(([id, label, count]) => (
-              <button key={id} type="button" role="tab" id={`termo-tab-${id}`} aria-selected={aba === id} aria-controls="termo-tabpanel" className="termo-tab" onClick={() => setAba(id)}>
+              <button key={id} ref={(el) => { tabRefs.current[id] = el; }} type="button" role="tab" id={`termo-tab-${id}`} tabIndex={aba === id ? 0 : -1} aria-selected={aba === id} aria-controls="termo-tabpanel" className="termo-tab" onClick={() => setAba(id)}>
                 {label}{count ? <span className="termo-tab-count">{count}</span> : null}
               </button>
             ))}
@@ -98,7 +106,7 @@ export function TermosMultaScreen({ items, loadStatus, onBack, onReload }: Props
                 })}
               </ul>
             ) : (
-              <p className="termo-empty">{aba === "pendentes" ? "Nenhuma multa para assinar." : "Nenhum termo assinado ou contestado ainda."}</p>
+              <p className="termo-empty">{aba === "pendentes" ? "Nenhuma multa para assinar." : "Nenhum termo assinado, contestado ou expirado ainda."}</p>
             )}
           </div>
         </section>

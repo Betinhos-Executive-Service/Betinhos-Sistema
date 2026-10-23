@@ -6,6 +6,7 @@ import {
   isErroDefinitivo,
   mapTermo,
   prazoAssinatura,
+  proximaAba,
   resumoPendentes,
   separarTermos,
   termoFlowReducer,
@@ -21,11 +22,11 @@ test("prazo de assinatura é o envio + 7 dias em dd/mm de São Paulo", () => {
   assert.equal(prazoAssinatura(""), "");
 });
 
-test("separa pendentes de concluídos (assinados e contestados) e ignora cancelados/expirados", () => {
-  const items = [row("a", TERMO_STATUS.pendente, "2026-10-22T12:00:00Z"), row("b", TERMO_STATUS.assinado, "2026-10-01T12:00:00Z"), row("c", TERMO_STATUS.contestado, "2026-10-02T12:00:00Z"), row("d", 100000004, "2026-10-03T12:00:00Z")];
+test("separa pendentes de concluídos (assinados, contestados e expirados) e oculta cancelados", () => {
+  const items = [row("a", TERMO_STATUS.pendente, "2026-10-22T12:00:00Z"), row("b", TERMO_STATUS.assinado, "2026-10-01T12:00:00Z"), row("c", TERMO_STATUS.contestado, "2026-10-02T12:00:00Z"), row("d", 100000004, "2026-10-03T12:00:00Z"), row("e", TERMO_STATUS.expirado, "2026-09-03T12:00:00Z")];
   const { pendentes, concluidos } = separarTermos(items);
   assert.deepEqual(pendentes.map((t) => t.id), ["a"]);
-  assert.deepEqual(concluidos.map((t) => t.id), ["b", "c"]);
+  assert.deepEqual(concluidos.map((t) => t.id), ["b", "c", "e"]);
 });
 
 test("banner da Home: contagem e o prazo mais próximo", () => {
@@ -58,6 +59,7 @@ test("PDF abre pelo Xrm.Navigation.openFile quando existe", async () => {
   assert.equal(calls[0][0].mimeType, "application/pdf");
   assert.equal(calls[0][0].fileContent, pdf.base64);
   assert.equal(calls[0][0].fileSize, 10);
+  assert.deepEqual(calls[0][1], { openMode: 1 });
 });
 
 test("PDF cai para compartilhar e depois para download, registrando cada falha", async () => {
@@ -92,4 +94,25 @@ test("compartilhamento cancelado pelo motorista não vira erro nem download", as
   });
   assert.equal(metodo, "share");
   assert.equal(baixou, false);
+});
+
+test("só download no WebView do Power Apps vira orientação e log, não sucesso", async () => {
+  const falhas: string[] = [];
+  let baixou = false;
+  await assert.rejects(abrirPdf(pdf, { powerApps: true, download: () => { baixou = true; }, onFalha: (m) => falhas.push(m) }), /Power Apps/);
+  assert.equal(baixou, false);
+  assert.deepEqual(falhas, ["download"]);
+});
+
+test("cadastro duplicado é erro definitivo", () => {
+  assert.equal(isErroDefinitivo("Seu cadastro está duplicado. Procure o escritório."), true);
+});
+
+test("abas navegam por setas, Home e End", () => {
+  assert.equal(proximaAba("pendentes", "ArrowRight"), "concluidos");
+  assert.equal(proximaAba("concluidos", "ArrowRight"), "pendentes");
+  assert.equal(proximaAba("pendentes", "ArrowLeft"), "concluidos");
+  assert.equal(proximaAba("concluidos", "Home"), "pendentes");
+  assert.equal(proximaAba("pendentes", "End"), "concluidos");
+  assert.equal(proximaAba("pendentes", "Enter"), null);
 });
