@@ -75,4 +75,24 @@ describe('Registros', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Limpar filtros' })[0])
     await waitFor(() => expect(rows()).toHaveLength(2))
   })
+
+  it('sem o resumo dos termos (falha na leitura), a lista avisa discretamente', async () => {
+    window.location.hash = '#/frota-multas'
+    const semResumo: FrotaData = { ...EMPTY_DATA, multas: [{ ...multa('m1', 'v1'), termo: undefined }, { ...multa('m2', 'v1'), termo: null }] }
+    render(<Registros kinds={['multa']} data={semResumo} source={source} onOpen={() => {}} onReload={() => {}} />)
+    expect(await screen.findByText(/Coluna Termo indisponível/)).toBeTruthy()
+    cleanup()
+    const comResumo: FrotaData = { ...EMPTY_DATA, multas: [{ ...multa('m2', 'v1'), termo: null }] }
+    render(<Registros kinds={['multa']} data={comResumo} source={source} onOpen={() => {}} onReload={() => {}} />)
+    await waitFor(() => expect(rows()).toHaveLength(1))
+    expect(screen.queryByText(/Coluna Termo indisponível/)).toBeNull()
+  })
+
+  it('multas mostram a coluna Termo com o rótulo do último termo', async () => {
+    window.location.hash = '#/frota-multas'
+    const comTermo: FrotaData = { ...EMPTY_DATA, multas: [{ ...multa('m1', 'v1'), termo: { status: 'pendente', enviadoEm: '2026-10-20T13:00:00Z' } }, { ...multa('m2', 'v1'), termo: { status: 'contestado', enviadoEm: null } }] }
+    render(<Registros kinds={['multa']} data={comTermo} source={source} onOpen={() => {}} onReload={() => {}} />)
+    expect(await screen.findByText('Pendente · expira 27/10')).toBeTruthy()
+    expect(screen.getByText('Contestado')).toBeTruthy()
+  })
 })

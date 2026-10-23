@@ -42,13 +42,15 @@ type Props = {
   id: string | null
   onClose: () => void
   onSaved: (id: string, created: boolean) => void
+  /** Chamado só quando o salvar da ficha enviou o PDF do aditivo com sucesso (ex.: voltar para a multa que pediu o aditivo). */
+  onAditivoSalvo?: () => void
   /** Muda quando algo fora da ficha alterou o registro (ex.: cadastro de acesso); força a releitura. */
   versao?: number
   acesso?: AcessoSource | null
   onCadastrarAcesso?: (inicial: AcessoInicial) => void
 }
 
-export function Ficha({ source, docs, id, onClose, onSaved, versao, acesso, onCadastrarAcesso }: Props) {
+export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, versao, acesso, onCadastrarAcesso }: Props) {
   const notify = useNotify()
   const [original, setOriginal] = useState<Funcionario | null>(null)
   const [draft, setDraft] = useState<Draft>(emptyDraft)
@@ -128,6 +130,7 @@ export function Ficha({ source, docs, id, onClose, onSaved, versao, acesso, onCa
     try {
       const savedId = await source.save(original, draft)
       let aditivoOk = true
+      const enviouAditivo = aditivoArquivo !== null
       if (aditivoArquivo) {
         try {
           await source.uploadAditivo(savedId, aditivoArquivo)
@@ -143,6 +146,7 @@ export function Ficha({ source, docs, id, onClose, onSaved, versao, acesso, onCa
       setDraft(draftFrom(fresh))
       if (aditivoOk) notify('success', isNew ? 'Colaborador criado.' : 'Alterações salvas.')
       onSaved(savedId, isNew)
+      if (enviouAditivo && aditivoOk) onAditivoSalvo?.()
     } catch (reason) {
       notify('error', `Não salvou: ${errorMessage(reason)}. Suas alterações continuam na tela.`)
     } finally {

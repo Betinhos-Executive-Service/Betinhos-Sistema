@@ -204,6 +204,26 @@ describe('Ficha', () => {
       await waitFor(() => expect(uploadAditivo).toHaveBeenCalledTimes(1))
     })
 
+    it('aditivo salvo avisa onAditivoSalvo (volta para a multa); salvar sem aditivo ou com falha no upload não avisa', async () => {
+      const onAditivoSalvo = vi.fn()
+      const ok = fakeSource(vi.fn(async () => 'f1'))
+      render(<ToastProvider><Ficha source={ok} id="f1" onClose={() => {}} onSaved={() => {}} onAditivoSalvo={onAditivoSalvo} /></ToastProvider>)
+      await screen.findByDisplayValue('Ana Souza')
+      fireEvent.change(screen.getByLabelText(/Apelido/), { target: { value: 'Aninha' } })
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Salvar/ })) })
+      expect(onAditivoSalvo).not.toHaveBeenCalled()
+      fireEvent.change(screen.getByLabelText('Arquivo do aditivo (PDF)'), { target: { files: [pdf()] } })
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Salvar/ })) })
+      await waitFor(() => expect(onAditivoSalvo).toHaveBeenCalledTimes(1))
+      cleanup()
+      const falha = vi.fn()
+      render(<ToastProvider><Ficha source={fakeSource(vi.fn(async () => 'f1'), { uploadAditivo: async () => { throw new Error('rede') } })} id="f1" onClose={() => {}} onSaved={() => {}} onAditivoSalvo={falha} /></ToastProvider>)
+      await screen.findByDisplayValue('Ana Souza')
+      fireEvent.change(screen.getByLabelText('Arquivo do aditivo (PDF)'), { target: { files: [pdf()] } })
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Salvar/ })) })
+      expect(falha).not.toHaveBeenCalled()
+    })
+
     it('recusa arquivo que não é PDF e acima de 10 MB', async () => {
       const uploadAditivo = vi.fn(async () => {})
       await renderFicha(fakeSource(vi.fn(async () => 'f1'), { uploadAditivo }))
