@@ -498,39 +498,16 @@
                                               "authentication": "@parameters('$authentication')"
                                             }
                                           },
-                                          "Criar_link_compartilhamento": {
-                                            "type": "OpenApiConnection",
+                                          "Guardar_link_foto": {
+                                            "type": "SetVariable",
                                             "runAfter": {
                                               "Criar_arquivo": [
                                                 "Succeeded"
                                               ]
                                             },
                                             "inputs": {
-                                              "host": {
-                                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
-                                                "connectionName": "shared_sharepointonline",
-                                                "operationId": "CreateSharingLink"
-                                              },
-                                              "parameters": {
-                                                "dataset": "__SITE_URL__",
-                                                "table": "__LIBRARY_ID__",
-                                                "id": "@body('Criar_arquivo')?['ItemId']",
-                                                "permission/type": "view",
-                                                "permission/scope": "organization"
-                                              },
-                                              "authentication": "@parameters('$authentication')"
-                                            }
-                                          },
-                                          "Guardar_link_foto": {
-                                            "type": "SetVariable",
-                                            "runAfter": {
-                                              "Criar_link_compartilhamento": [
-                                                "Succeeded"
-                                              ]
-                                            },
-                                            "inputs": {
                                               "name": "linkFoto",
-                                              "value": "@{body('Criar_link_compartilhamento')?['link']?['webUrl']}"
+                                              "value": "@{concat('https://', uriHost('__SITE_URL__'), '/:i:/r', uriPath('__SITE_URL__'), replace(uriComponent(body('Criar_arquivo')?['Path']), '%2F', '/'))}"
                                             }
                                           }
                                         },
