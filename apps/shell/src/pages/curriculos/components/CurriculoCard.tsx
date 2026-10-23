@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from 'react'
-import { Button, Menu } from '@betinhos/ui'
-import { EllipsisVertical } from 'lucide-react'
+import { Button, Menu, useContextMenu, type MenuAction } from '@betinhos/ui'
+import { EllipsisVertical, ExternalLink } from 'lucide-react'
 import type { ChoiceSet, Curriculo } from '../domain/types'
 import { choiceLabel, type Stage } from '../domain/funnel'
 import { daysAgo } from '../domain/text'
@@ -34,8 +34,11 @@ export function CurriculoCard({ c, stage, stages, choices, now, onOpen, onMove, 
 
   const place = [c.cidade, c.estado].filter(Boolean).join('/')
   const cnh = choiceLabel(choices.cnh, c.cnh)
+  const moves: MenuAction[] = stages.filter((s) => s.value !== stage.value).map((s) => ({ id: String(s.value), label: `Mover para ${s.short}`, onSelect: () => onMove(c, s) }))
+  // Clique direito no card (DS §10.9.3): Abrir e as mesmas mudanças de etapa do ⋯.
+  const context = useContextMenu()
   return (
-    <article ref={ref} className="cv-card" {...(drag ? drag.bind(c.id, stage.value) : {})}>
+    <article ref={ref} className="cv-card" {...(drag ? drag.bind(c.id, stage.value) : {})} onContextMenu={(event) => { context.onContextMenu(event, [{ id: 'abrir', label: 'Abrir', icon: <ExternalLink size={16} />, onSelect: () => onOpen(c.id) }, ...moves]) }}>
       <button type="button" className="cv-card__open" onClick={() => onOpen(c.id)}>
         <span className="cv-card__name">{c.nome || 'Sem nome'}</span>
         <span className="cv-card__role">{c.cargo || 'Cargo não informado'}</span>
@@ -50,9 +53,10 @@ export function CurriculoCard({ c, stage, stages, choices, now, onOpen, onMove, 
       <div className="cv-card__menu" data-no-drag>
         <Menu
           trigger={(props) => <Button variant="ghost" size="compact" icon={<EllipsisVertical size={16} />} aria-label={`Mover ${c.nome} para outra etapa`} {...props} />}
-          actions={stages.filter((s) => s.value !== stage.value).map((s) => ({ id: String(s.value), label: `Mover para ${s.short}`, onSelect: () => onMove(c, s) }))}
+          actions={moves}
         />
       </div>
+      {context.menu}
     </article>
   )
 }

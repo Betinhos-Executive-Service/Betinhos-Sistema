@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
-import { Alert, Button, EmptyState, Menu, SearchBox, Stack, StatusBadge, ToastProvider, ViewBar, readFilters, useShellHeader, useToast, type FilterGroup, type FilterOption } from '@betinhos/ui'
+import { Alert, Button, ContextMenu, EmptyState, Menu, SearchBox, Stack, StatusBadge, ToastProvider, ViewBar, readFilters, useShellHeader, useToast, wantsNativeMenu, type FilterGroup, type FilterOption, type MenuAction } from '@betinhos/ui'
 import { Archive, ArchiveRestore, Bug, CalendarDays, ChevronDown, ClipboardList, Copy, FilePlus2, LayoutGrid, Link2, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Send, ShieldCheck, Table2, Ticket, X } from 'lucide-react'
 import type { Host } from '../../host'
 import { useMedia } from '../operacional/useMedia'
@@ -378,6 +378,23 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   // Desktop com linhas marcadas: a linha de comando vira a barra da seleção (como no model-driven). Sem seleção, os comandos
   // que dependem dela não aparecem; a única ação primária da página é "Criar serviço", a última à direita (DS §10.9.1).
   const selecting = !mobile && selectedIds.length > 0
+  // Ações em lote do botão "Ações"; o clique direito na linha usa as mesmas, com Editar, Ativar/Desativar e Registrar Erro.
+  const bulkActions: MenuAction[] = [
+    { id: 'voucher', label: 'Gerar Voucher', icon: <Ticket size={16} />, onSelect: openVoucher },
+    { id: 'copiar', label: 'Copiar Serviços', icon: <Copy size={16} />, onSelect: () => { void copySelected() } },
+    { id: 'op', label: 'Gerar OP', icon: <FilePlus2 size={16} />, onSelect: askOp },
+    { id: 'link', label: hint('Gerar link', linkBlock), icon: <Link2 size={16} />, disabled: linkBlock != null, onSelect: () => { void gerarLink() } },
+    { id: 'disparar', label: 'Disparar', icon: <Send size={16} />, onSelect: () => setDispRequest({ ids: selectedIds }) },
+  ]
+  const one = selectedIds.length === 1
+  const contextActions: MenuAction[] = [
+    { id: 'editar', label: hint('Editar', one ? null : oneTitle), icon: <Pencil size={16} />, disabled: !one, onSelect: () => { void openForm('edit', selectedIds[0]) } },
+    ...bulkActions,
+    selectedState === 1
+      ? { id: 'ativar', label: 'Ativar', icon: <ArchiveRestore size={16} />, group: '', onSelect: () => askState(true) }
+      : { id: 'desativar', label: hint('Desativar', selectedState === 0 ? null : mixedTitle), icon: <Archive size={16} />, tone: 'danger' as const, group: '', disabled: selectedState !== 0, onSelect: () => askState(false) },
+    { id: 'erro', label: hint('Registrar Erro', one ? null : oneTitle), icon: <Bug size={16} />, group: '', disabled: !one, onSelect: () => { void registrarErro() } },
+  ]
   const selectedLabel = selectedIds.length === 1 ? '1 selecionado' : `${selectedIds.length} selecionados`
   const selectionBar = (
     <div className="gr-selection" role="group" aria-label="Comandos da seleção">
@@ -396,13 +413,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       <Menu
         align="start"
         trigger={(props) => <Button {...props} variant="action" size={size} icon={<ChevronDown size={16} />} aria-label={`Ações (${selectedIds.length})`}>Ações</Button>}
-        actions={[
-          { id: 'voucher', label: 'Gerar Voucher', icon: <Ticket size={16} />, onSelect: openVoucher },
-          { id: 'copiar', label: 'Copiar Serviços', icon: <Copy size={16} />, onSelect: () => { void copySelected() } },
-          { id: 'op', label: 'Gerar OP', icon: <FilePlus2 size={16} />, onSelect: askOp },
-          { id: 'link', label: hint('Gerar link', linkBlock), icon: <Link2 size={16} />, disabled: linkBlock != null, onSelect: () => { void gerarLink() } },
-          { id: 'disparar', label: 'Disparar', icon: <Send size={16} />, onSelect: () => setDispRequest({ ids: selectedIds }) },
-        ]}
+        actions={bulkActions}
       />
     </div>
   )
@@ -430,6 +441,15 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
 
   const { save, resetCell, cells, selectOnly, selectRange, toggle } = geral
   const selectForEdit = useCallback((id: string) => selectOnly(id, true), [selectOnly])
+  // Clique direito (DS §10.9.3): linha fora da seleção vira a seleção; Ctrl/⌘, campos e célula em edição ficam com o menu do navegador.
+  const [contextAt, setContextAt] = useState<{ x: number; y: number } | null>(null)
+  const closeContext = useCallback(() => setContextAt(null), [])
+  const openContext = useCallback((id: string, event: MouseEvent<HTMLElement>) => {
+    if (wantsNativeMenu(event) || (event.target as Element).closest('.gr-cell--editing')) return
+    event.preventDefault()
+    if (!geral.selected.has(id)) selectOnly(id)
+    setContextAt({ x: event.clientX, y: event.clientY })
+  }, [geral.selected, selectOnly])
   const selectRow = useCallback((id: string, mode: 'only' | 'toggle' | 'range') => {
     if (mode === 'range') selectRange(id)
     else if (mode === 'toggle') toggle(id)
@@ -502,6 +522,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
                 onToggle={geral.toggle}
                 onOpen={(id) => { void openForm('edit', id) }}
                 onEdit={setEditId}
+                onCardContextMenu={mobile ? undefined : openContext}
                 footer={rows.length > 0 || loadError ? <LoadMore root={mobile ? null : cardsScrollRef} {...loadMoreProps} /> : null}
               />
               </div>
@@ -527,6 +548,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               selected={geral.selected}
               onToggle={geral.toggle}
               onSelectRow={selectRow}
+              onRowContextMenu={openContext}
               onToggleAll={geral.toggleAll}
               onOpen={(id) => { void openForm('edit', id) }}
               renderCell={renderCell}
@@ -593,6 +615,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       <EscalaFdsDrawer url={source.escalaFdsUrl()} open={escalaOpen} onClose={() => setEscalaOpen(false)} />
       <GerarOpDialog request={opRequest} busy={opBusy} error={opError} onClose={() => setOpRequest(null)} onConfirm={() => { void confirmOp() }} />
       <DispararDialog request={dispRequest} busy={dispBusy} onClose={() => setDispRequest(null)} onConfirm={() => { void confirmDisparar() }} />
+      <ContextMenu at={contextAt} actions={contextActions} onClose={closeContext} />
       {auditoriaUrl ? <AuditoriaOverlay url={auditoriaUrl} onClose={() => setAuditoriaUrl(null)} /> : null}
       {voucherUrl ? <VoucherOverlay url={voucherUrl} onClose={() => setVoucherUrl(null)} /> : null}
       {formUrl ? <FormOverlay url={formUrl} onClose={() => { setFormUrl(null); refresh() }} /> : null}

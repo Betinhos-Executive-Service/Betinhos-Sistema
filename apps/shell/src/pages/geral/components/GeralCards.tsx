@@ -18,6 +18,8 @@ type Props = {
   onOpen: (id: string) => void
   /** Abre a sheet de edição dos campos. */
   onEdit: (id: string) => void
+  /** Clique direito no card: menu de contexto com as ações da seleção (DS §10.9.3). */
+  onCardContextMenu?: (id: string, event: MouseEvent<HTMLElement>) => void
   /** Depois da lista: o sentinela e o rodapé de estado da rolagem infinita. */
   footer?: ReactNode
   /** Desktop: cards em grade responsiva. */
@@ -29,7 +31,7 @@ const STATUS = 'cr40f_status'
 const DATA = 'cr40f_dataehorriodesada'
 
 /** Lista de serviços no celular: um card por linha com o essencial e o botão que abre a edição por campo. */
-export function GeralCards({ rows, columns, attributes, loading, selected, onToggle, onOpen, onEdit, footer, grid = false }: Props) {
+export function GeralCards({ rows, columns, attributes, loading, selected, onToggle, onOpen, onEdit, onCardContextMenu, footer, grid = false }: Props) {
   const find = (attribute: string) => columns.find((c) => !c.alias && c.attribute === attribute)
   const has = {
     status: find(STATUS), data: find(DATA), cliente: find('cr40f_cliente'), motorista: find('cr40f_motorista'), trajeto: find('cr40f_trajeto'),
@@ -55,7 +57,7 @@ export function GeralCards({ rows, columns, attributes, loading, selected, onTog
           // Só decide "sem motorista" com a metadata carregada: antes dela o lookup nem tem chave conhecida.
           const motoristaKey = has.motorista && attributes ? rowKey(has.motorista, attributes.get(has.motorista.key)) : null
           return (
-            <li key={id} className={selected.has(id) ? 'gr-card is-selected' : 'gr-card'} onClick={(event: MouseEvent<HTMLLIElement>) => { if (!(event.target as HTMLElement).closest('button, input, a, label')) onToggle(id) }}>
+            <li key={id} className={selected.has(id) ? 'gr-card is-selected' : 'gr-card'} onClick={(event: MouseEvent<HTMLLIElement>) => { if (!(event.target as HTMLElement).closest('button, input, a, label')) onToggle(id) }} onContextMenu={onCardContextMenu ? (event) => onCardContextMenu(id, event) : undefined}>
               <div className="gr-card__head">
                 <span className="gr-card__check">
                   <Checkbox label={<span className="gr-sr">Selecionar serviço {name}</span>} checked={selected.has(id)} onChange={() => onToggle(id)} />

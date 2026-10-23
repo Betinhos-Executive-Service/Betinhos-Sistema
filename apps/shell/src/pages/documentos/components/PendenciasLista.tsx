@@ -1,6 +1,6 @@
 import type { MouseEvent } from 'react'
-import { Button, Table, type TableColumn } from '@betinhos/ui'
-import { Car, IdCard } from 'lucide-react'
+import { Button, Table, type MenuAction, type TableColumn } from '@betinhos/ui'
+import { Car, FilePlus2, IdCard } from 'lucide-react'
 import { formatBR } from '../../funcionarios/data/dates'
 import type { Pendencia } from '../domain/types'
 import { StatusDoc } from './StatusDoc'
@@ -40,6 +40,11 @@ export function PendenciasLista({ lista, mobile, onRenovar, onAbrirFicha }: Prop
     const p = chave ? lista.find((x) => x.chave === chave) : undefined
     if (p) onRenovar(p)
   }
+  // Clique direito na linha (DS §10.9.3): as mesmas ações da coluna.
+  const rowActions = (p: Pendencia): MenuAction[] => [
+    { id: 'renovar', label: p.doc ? 'Renovar' : 'Adicionar', icon: <FilePlus2 size={16} />, onSelect: () => onRenovar(p) },
+    { id: 'ficha', label: 'Abrir ficha', icon: p.dono.categoria === 'pessoas' ? <IdCard size={16} /> : <Car size={16} />, onSelect: () => onAbrirFicha(p) },
+  ]
   const columns: TableColumn<Pendencia>[] = [
     { key: 'dono', header: 'Cadastro', cell: (p) => <span className="doc-dono" data-chave={p.chave}><strong>{p.dono.nome}</strong><span>{p.dono.detalhe}</span></span> },
     { key: 'tipo', header: 'Documento', cell: (p) => p.tipo.nome },
@@ -47,5 +52,5 @@ export function PendenciasLista({ lista, mobile, onRenovar, onAbrirFicha }: Prop
     { key: 'estado', header: 'Situação', cell: (p) => <StatusDoc estado={p.estado} dias={p.dias} /> },
     { key: 'acoes', header: '', cell: acoes, align: 'end' },
   ]
-  return <Table className="doc-table doc-table--clicavel" columns={columns} rows={lista} rowKey={(p) => p.chave} onClick={aoClicar} />
+  return <Table className="doc-table doc-table--clicavel" columns={columns} rows={lista} rowKey={(p) => p.chave} rowActions={rowActions} onClick={aoClicar} />
 }
