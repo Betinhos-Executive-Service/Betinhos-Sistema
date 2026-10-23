@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
 import { Alert, Button, EmptyState, Menu, SearchBox, Stack, StatusBadge, ToastProvider, ViewBar, readFilters, useShellHeader, useToast, type FilterGroup, type FilterOption } from '@betinhos/ui'
-import { Archive, ArchiveRestore, Bug, CalendarDays, ChevronDown, ClipboardList, Copy, FilePlus2, LayoutGrid, Link2, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Send, ShieldCheck, Table2, Ticket, X } from 'lucide-react'
+import { Archive, ArchiveRestore, Bug, CalendarDays, ChevronDown, ClipboardList, Copy, FilePlus2, LayoutGrid, Link2, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Send, ShieldCheck, Table2, Ticket, UserPlus, X } from 'lucide-react'
 import type { Host } from '../../host'
 import { useMedia } from '../operacional/useMedia'
 import { hrefFor, patchHashQuery, queryFromHash, readHashQuery } from '../../nav/useHashRoute'
@@ -17,6 +17,8 @@ import { LoadMore, LoadSentinel, statusText } from './components/LoadMore'
 import { debounceSearch } from './components/useLookupSearch'
 import { AuditoriaOverlay } from './components/AuditoriaOverlay'
 import { LINK_FALHA, gerarLinkBlock } from './domain/link'
+import { LINK_CADASTRO_FALHA, linkCadastroBlock } from './domain/linkCadastro'
+import { LinkCadastroDrawer, type LinkCadastroRequest } from './components/LinkCadastroDrawer'
 import { VoucherOverlay } from './components/VoucherOverlay'
 import { FormOverlay } from './components/FormOverlay'
 import { copyText } from './domain/copy'
@@ -271,6 +273,26 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     }
   }, [linkBlock, source, selectedIds, rowOf])
 
+  const cadastroBlock = useMemo(() => {
+    const row = selectedIds.length === 1 ? rowOf(selectedIds[0]) : undefined
+    return linkCadastroBlock(row ? [row] : [], selectedIds.length)
+  }, [selectedIds, rowOf])
+  const [cadastroRequest, setCadastroRequest] = useState<LinkCadastroRequest | null>(null)
+  const gerarLinkCadastro = useCallback(async () => {
+    if (cadastroBlock) return
+    const id = selectedIds[0]
+    const codigo = rowOf(id)?.cr40f_id
+    const base = { codigo: typeof codigo === 'string' && codigo ? codigo : id }
+    setCadastroRequest({ ...base, loading: true })
+    try {
+      const result = await source.gerarLinkCadastro(id)
+      if (!result.ok || !result.link) setCadastroRequest({ ...base, loading: false, erro: result.erro || LINK_CADASTRO_FALHA })
+      else setCadastroRequest({ ...base, loading: false, link: result.link, expiraEm: result.expiraEm, passageiros: result.passageiros })
+    } catch (reason) {
+      setCadastroRequest({ ...base, loading: false, erro: reason instanceof Error ? reason.message : LINK_CADASTRO_FALHA })
+    }
+  }, [cadastroBlock, source, selectedIds, rowOf])
+
   const labelOf = useCallback((id: string) => { const name = rowOf(id)?.cr40f_id; return typeof name === 'string' && name ? name : id }, [rowOf])
 
   const askOp = useCallback(() => {
@@ -401,6 +423,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           { id: 'copiar', label: 'Copiar Serviços', icon: <Copy size={16} />, onSelect: () => { void copySelected() } },
           { id: 'op', label: 'Gerar OP', icon: <FilePlus2 size={16} />, onSelect: askOp },
           { id: 'link', label: hint('Gerar link', linkBlock), icon: <Link2 size={16} />, disabled: linkBlock != null, onSelect: () => { void gerarLink() } },
+          { id: 'cadastro', label: hint('Link de cadastro', cadastroBlock), icon: <UserPlus size={16} />, disabled: cadastroBlock != null, onSelect: () => { void gerarLinkCadastro() } },
           { id: 'disparar', label: 'Disparar', icon: <Send size={16} />, onSelect: () => setDispRequest({ ids: selectedIds }) },
         ]}
       />
@@ -586,6 +609,9 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       <CopyDialog open={copy.open} loading={copy.loading} text={copy.text} onClose={closeCopy} onCopied={() => { closeCopy(); toast({ tone: 'success', message: 'Serviços copiados.' }) }} />
       <LinkDialog request={linkRequest} onClose={() => setLinkRequest(null)}
         onCopied={(what) => toast({ tone: 'success', message: what === 'link' ? 'Link copiado.' : 'Mensagem copiada.' })}
+        onCopyFailed={(reason) => toast({ tone: 'danger', message: `Não foi possível copiar. ${reason instanceof Error ? reason.message : ''}`.trim() })} />
+      <LinkCadastroDrawer request={cadastroRequest} mobile={mobile} onClose={() => setCadastroRequest(null)}
+        onCopied={() => toast({ tone: 'success', message: 'Link copiado.' })}
         onCopyFailed={(reason) => toast({ tone: 'danger', message: `Não foi possível copiar. ${reason instanceof Error ? reason.message : ''}`.trim() })} />
       <StateDialog request={stateRequest} busy={stateBusy} onClose={() => setStateRequest(null)} onConfirm={() => { void confirmState() }} />
       <MockFormDialog open={mockForm} onClose={() => setMockForm(false)} />

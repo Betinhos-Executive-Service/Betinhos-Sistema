@@ -30,5 +30,13 @@ public sealed class FakeGraphGateway : IGraphGateway
     public bool EhMembro(string g, string id) { Registrar("EhMembro"); return Membros.Contains((g, id)); }
     public void AdicionarAoGrupo(string g, string id) { Registrar("AdicionarAoGrupo"); Membros.Add((g, id)); }
     public void RemoverDoGrupo(string g, string id) { Registrar("RemoverDoGrupo"); Membros.Remove((g, id)); }
+    public readonly List<string> Senhas = new();
+    public bool SemPermissaoSenha;
+    public void RedefinirSenha(string id, string senha)
+    {
+        Registrar("RedefinirSenha");
+        if (SemPermissaoSenha) throw new AcessoException("SEM_PERMISSAO_SENHA", "Falta a permissão User-PasswordProfile.ReadWrite.All no app do Graph.");
+        Senhas.Add(senha);
+    }
     public int LicencasLivres(string sku) { Registrar("LicencasLivres"); return Livres; }
 }

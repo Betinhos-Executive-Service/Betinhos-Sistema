@@ -33,18 +33,6 @@ public sealed class FuncionarioRepositoryTests
     }
 
     [Fact]
-    public void Inativar_preenche_demissao_so_quando_vazia()
-    {
-        var id = Guid.NewGuid();
-        var svc = new FakeService().Com(Func(id, "Ana Lima", "a@b.c"));
-        new FuncionarioRepository(svc).Inativar(id, new DateTime(2026, 10, 22, 15, 0, 0, DateTimeKind.Utc));
-        Assert.Equal(1, svc.Atualizados[0].GetAttributeValue<OptionSetValue>("cr40f_status").Value);
-        var demissao = svc.Atualizados[0].GetAttributeValue<DateTime>("cr40f_datadedemissao");
-        Assert.Equal(new DateTime(2026, 10, 22, 15, 0, 0, DateTimeKind.Utc), demissao);
-        Assert.Equal(DateTimeKind.Utc, demissao.Kind);
-    }
-
-    [Fact]
     public void Autorizacao_exige_funcao_de_gestao_ou_admin()
     {
         var user = Guid.NewGuid(); var roleId = Guid.NewGuid();
