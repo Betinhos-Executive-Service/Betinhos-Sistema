@@ -1,35 +1,23 @@
-import { Alert, Button } from '@betinhos/ui'
-import { KeyRound, RotateCcw, UserX } from 'lucide-react'
+import { Alert, Button, StatusBadge as DsStatusBadge } from '@betinhos/ui'
+import { KeyRound, RefreshCw, RotateCcw, UserX } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { type AcessoSource, type Etapa, parseAcessoError } from '../data/acesso'
+import { type AcessoSource, type Etapa, type Fluxo, liberacaoPendente, parseAcessoError } from '../data/acesso'
 import type { UsuarioApp } from '../data/source'
 import type { Funcionario } from '../data/types'
-import { ListaEtapas } from './CadastroAcessoDrawer'
+import { ListaEtapas, ProgressoAcesso } from './AcessoProgresso'
 import { EncerrarAcessoDialog } from './EncerrarAcessoDialog'
 import { ReativarAcessoDialog } from './ReativarAcessoDialog'
 import { useNotify } from './Toasts'
 
-type Props = { funcionario: Funcionario; acesso: AcessoSource; usuarioDoApp: (email: string) => Promise<UsuarioApp | null>; onCadastrar: () => void }
-type EstadoConta = 'verificando' | 'ativo' | 'encerrado' | 'falha'
-
-const TITULO: Record<EstadoConta | 'sem', string> = { sem: 'Sem acesso ao app', verificando: 'Conferindo acesso…', ativo: 'Acesso ativo', encerrado: 'Acesso encerrado', falha: 'Não foi possível conferir o acesso' }
+export type EstadoConta = 'verificando' | 'ativo' | 'encerrado' | 'liberando' | 'falha'
+export type EstadoAcesso = EstadoConta | 'sem'
 
 /**
- * Bloco "Acesso ao app" na aba Dados. O estado vem do usuário do Dataverse (systemuser) ligado ao e-mail Microsoft,
- * nunca do status do funcionário: dar ou tirar acesso não tem relação com admissão ou demissão.
+ * Estado do acesso pelo systemuser ligado ao e-mail Microsoft (nunca pelo status do funcionário).
+ * Sem systemuser conta como encerrado: "Reativar acesso" refaz o addUser.
  */
-export function AcessoApp({ funcionario, acesso, usuarioDoApp, onCadastrar }: Props) {
-  const notify = useNotify()
-  const [encerrando, setEncerrando] = useState(false)
-  const [reativando, setReativando] = useState(false)
-  const [semPermissao, setSemPermissao] = useState(false)
-  const [etapas, setEtapas] = useState<Etapa[] | null>(null)
-  const [faltouSenha, setFaltouSenha] = useState(false)
+export function useContaApp(email: string, usuarioDoApp: (email: string) => Promise<UsuarioApp | null>) {
   const [conta, setConta] = useState<EstadoConta>('verificando')
-  const email = String(funcionario.values.cr40f_emailmicrosoft ?? '')
-  const nome = String(funcionario.values.cr40f_nomecompleto ?? '')
-  const celular = String(funcionario.values.cr40f_telefonecorporativo ?? '')
-
   useEffect(() => {
     if (!email) return
     let vivo = true
@@ -37,17 +25,60 @@ export function AcessoApp({ funcionario, acesso, usuarioDoApp, onCadastrar }: Pr
     usuarioDoApp(email).then((u) => { if (vivo) setConta(u?.ativo ? 'ativo' : 'encerrado') }, () => { if (vivo) setConta('falha') })
     return () => { vivo = false }
   }, [email, usuarioDoApp])
+  return [conta, setConta] as const
+}
 
-  const estado = !email ? 'sem' : conta
+const SELO: Partial<Record<EstadoAcesso, { tone: 'success' | 'neutral' | 'info'; texto: string }>> = {
+  ativo: { tone: 'success', texto: 'App ativo' }, encerrado: { tone: 'neutral', texto: 'App encerrado' }, liberando: { tone: 'info', texto: 'Liberando' },
+}
+
+/** Selo do cabeçalho da ficha; nada quando não há acesso ou ainda está conferindo. */
+export function SeloApp({ estado }: { estado: EstadoAcesso }) {
+  const selo = SELO[estado]
+  return selo ? <DsStatusBadge tone={selo.tone} dot>{selo.texto}</DsStatusBadge> : null
+}
+
+const TITULO: Record<EstadoAcesso, string> = {
+  sem: 'Sem acesso ao app', verificando: 'Conferindo acesso…', ativo: 'Acesso ativo', encerrado: 'Acesso encerrado',
+  liberando: 'Liberando no app', falha: 'Não foi possível conferir o acesso',
+}
+const RESUMO: Record<Fluxo, string> = { cadastro: 'Liberação concluída.', encerrar: 'Acesso encerrado. A ficha não mudou.', reativar: 'Acesso reativado.' }
+
+type Props = {
+  funcionario: Funcionario
+  acesso: AcessoSource
+  estado: EstadoAcesso
+  setConta: (conta: EstadoConta) => void
+  /** E-mail criado cuja liberação ficou pendente (ainda não gravado na ficha). */
+  emailPendente?: string
+  onCadastrar: () => void
+  /** A ficha mudou no Dataverse (ex.: e-mail vinculado ao concluir a liberação). */
+  onAtualizado: () => void
+}
+
+/** Bloco "Acesso ao app" da aba Acesso: cadastrar, concluir liberação, encerrar e reativar. */
+export function AcessoApp({ funcionario, acesso, estado, setConta, emailPendente, onCadastrar, onAtualizado }: Props) {
+  const notify = useNotify()
+  const [encerrando, setEncerrando] = useState(false)
+  const [reativando, setReativando] = useState(false)
+  const [concluindo, setConcluindo] = useState(false)
+  const [semPermissao, setSemPermissao] = useState(false)
+  const [ultimo, setUltimo] = useState<{ fluxo: Fluxo; etapas: Etapa[]; erro?: string } | null>(null)
+  const [faltouSenha, setFaltouSenha] = useState(false)
+  const email = String(funcionario.values.cr40f_emailmicrosoft ?? '') || emailPendente || ''
+  const nome = String(funcionario.values.cr40f_nomecompleto ?? '')
+  const celular = String(funcionario.values.cr40f_telefonecorporativo ?? '')
+
+  function semPermissaoDeGerir() { setSemPermissao(true); notify('error', 'Você não tem permissão para gerir acessos.') }
 
   async function encerrar(confirmacao: string) {
     try {
-      const resultado = await acesso.encerrar(funcionario.id, confirmacao)
+      const etapas = await acesso.encerrar(funcionario.id, confirmacao)
       // O Dataverse sincroniza o systemuser depois; o bloco segue o resultado da API.
-      setEtapas(resultado); setEncerrando(false); setConta('encerrado'); notify('success', 'Acesso encerrado.')
+      setUltimo({ fluxo: 'encerrar', etapas }); setEncerrando(false); setConta('encerrado'); notify('success', 'Acesso encerrado.')
     } catch (reason) {
       const erro = parseAcessoError(reason)
-      if (erro.codigo === 'SEM_PERMISSAO') { setSemPermissao(true); setEncerrando(false); notify('error', 'Você não tem permissão para gerir acessos.'); return }
+      if (erro.codigo === 'SEM_PERMISSAO') { setEncerrando(false); semPermissaoDeGerir(); return }
       throw erro
     }
   }
@@ -55,28 +86,59 @@ export function AcessoApp({ funcionario, acesso, usuarioDoApp, onCadastrar }: Pr
   async function reativar() {
     try { return await acesso.reativar(funcionario.id) } catch (reason) {
       const erro = parseAcessoError(reason)
-      if (erro.codigo === 'SEM_PERMISSAO') { setSemPermissao(true); setReativando(false); notify('error', 'Você não tem permissão para gerir acessos.') }
+      if (erro.codigo === 'SEM_PERMISSAO') { setReativando(false); semPermissaoDeGerir() }
       // A senha é a última etapa do plugin: sem permissão para ela, a conta já voltou e o bloco mostra ativo.
-      if (erro.codigo === 'SEM_PERMISSAO_SENHA') { setConta('ativo'); setEtapas(erro.etapas); setFaltouSenha(true) }
+      if (erro.codigo === 'SEM_PERMISSAO_SENHA') { setConta('ativo'); setUltimo({ fluxo: 'reativar', etapas: erro.etapas }); setFaltouSenha(true) }
       throw erro
     }
   }
 
+  /** Reexecuta o cadastro com o mesmo e-mail: idempotente, só termina o que faltou (systemuser e vínculo na ficha). */
+  async function concluirLiberacao() {
+    setConcluindo(true); setUltimo(null)
+    try {
+      const r = await acesso.cadastrar({
+        funcionarioId: funcionario.id, nomeCompleto: nome, celular, prefixoEmail: email.split('@')[0],
+        tipoVinculo: funcionario.values.cr40f_tipodevinculo === 0 ? 0 : 1,
+      })
+      setUltimo({ fluxo: 'cadastro', etapas: r.etapas })
+      if (liberacaoPendente(r.etapas)) return   // o resumo diz "Ainda liberando"; nova tentativa em instantes
+      // Após reativar, o e-mail da ficha não muda e useContaApp não reconsulta: o bloco sai de "liberando" aqui.
+      setConta('ativo'); notify('success', 'Liberação concluída.'); onAtualizado()
+    } catch (reason) {
+      const erro = parseAcessoError(reason)
+      if (erro.codigo === 'SEM_PERMISSAO') { semPermissaoDeGerir(); return }
+      setUltimo({ fluxo: 'cadastro', etapas: erro.etapas, erro: erro.message })
+    } finally { setConcluindo(false) }
+  }
+
+  const pode = !semPermissao && !concluindo
   return (
-    <fieldset className="group acesso-bloco" onKeyDown={(event) => { if (event.key === 'Escape' && (event.target as HTMLElement).closest('dialog')) event.stopPropagation() }}>
-      <legend>Acesso ao app</legend>
+    <section className="group acesso-bloco" aria-labelledby="acesso-bloco-titulo" onKeyDown={(event) => { if (event.key === 'Escape' && (event.target as HTMLElement).closest('dialog')) event.stopPropagation() }}>
+      <h3 id="acesso-bloco-titulo" className="acesso-bloco__titulo">Acesso ao app</h3>
       <div className="acesso-estado" data-estado={estado}>
         <strong>{TITULO[estado]}</strong>
-        {email && <code>{email}</code>}
+        <SeloApp estado={estado} />
       </div>
-      {!semPermissao && estado === 'sem' && <Button variant="secondary" size="compact" icon={<KeyRound size={16} />} onClick={onCadastrar}>Cadastrar acesso</Button>}
-      {!semPermissao && estado === 'ativo' && <Button variant="secondary" size="compact" icon={<UserX size={16} />} onClick={() => setEncerrando(true)}>Encerrar acesso</Button>}
-      {!semPermissao && (estado === 'encerrado' || (estado === 'ativo' && faltouSenha)) && <Button variant="secondary" size="compact" icon={<RotateCcw size={16} />} onClick={() => setReativando(true)}>Reativar acesso</Button>}
-      {etapas && <ListaEtapas etapas={etapas} />}
+      <dl className="acesso-email">
+        <dt>E-mail Microsoft</dt>
+        <dd>{email ? <code>{email}</code> : <span className="muted">Ainda não criado</span>}</dd>
+      </dl>
+      {estado === 'liberando' && !concluindo && <p className="acesso-dica">A conta existe e o app libera em instantes. Se o motorista não conseguir entrar, use "Concluir liberação".</p>}
+      {concluindo && <ProgressoAcesso fluxo="cadastro" />}
+      <div className="cluster">
+        {pode && estado === 'sem' && <Button variant="secondary" size="compact" icon={<KeyRound size={16} />} onClick={onCadastrar}>Cadastrar acesso</Button>}
+        {pode && estado === 'liberando' && <Button size="compact" icon={<RefreshCw size={16} />} onClick={() => void concluirLiberacao()}>Concluir liberação</Button>}
+        {pode && estado === 'ativo' && <Button variant="secondary" size="compact" icon={<UserX size={16} />} onClick={() => setEncerrando(true)}>Encerrar acesso</Button>}
+        {pode && (estado === 'encerrado' || (estado === 'ativo' && faltouSenha)) && <Button variant="secondary" size="compact" icon={<RotateCcw size={16} />} onClick={() => setReativando(true)}>Reativar acesso</Button>}
+      </div>
+      {ultimo && (ultimo.erro
+        ? <Alert tone="danger" title="Não foi possível concluir a liberação">{ultimo.erro} Use "Concluir liberação" de novo em instantes.<ListaEtapas etapas={ultimo.etapas} fluxo={ultimo.fluxo} /></Alert>
+        : <div className="acesso-resumo" role="status"><p>{liberacaoPendente(ultimo.etapas) ? 'Ainda liberando no Dataverse. Tente de novo em 1 minuto.' : faltouSenha && ultimo.fluxo === 'reativar' ? 'Conta reativada sem senha nova.' : RESUMO[ultimo.fluxo]}</p><ListaEtapas etapas={ultimo.etapas} fluxo={ultimo.fluxo} /></div>)}
       {semPermissao && <Alert tone="warning">Você não tem permissão para gerir acessos.</Alert>}
       <EncerrarAcessoDialog open={encerrando} nome={nome} onCancel={() => setEncerrando(false)} onConfirmar={encerrar} />
       <ReativarAcessoDialog open={reativando} nome={nome} celular={celular} onCancel={() => setReativando(false)} onReativar={reativar}
-        onReativado={(r) => { setConta('ativo'); setEtapas(r.etapas); setFaltouSenha(false) }} />
-    </fieldset>
+        onReativado={(r) => { setConta(liberacaoPendente(r.etapas) ? 'liberando' : 'ativo'); setUltimo({ fluxo: 'reativar', etapas: r.etapas }); setFaltouSenha(false) }} />
+    </section>
   )
 }

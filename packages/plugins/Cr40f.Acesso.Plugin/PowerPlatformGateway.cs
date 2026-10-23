@@ -17,8 +17,8 @@ public interface IPowerPlatformGateway
 public sealed class PowerPlatformGateway : IPowerPlatformGateway
 {
     private const string Base = "https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments/";
-    public const int MaxConsultas = 8;
-    internal static readonly TimeSpan Intervalo = TimeSpan.FromSeconds(5);   // acompanha o 202 por até ~40 s
+    public const int MaxConsultas = 5;
+    internal static readonly TimeSpan Intervalo = TimeSpan.FromSeconds(2);   // acompanha o 202 por até ~10 s; a consulta ao systemuser cobre o resto
     private readonly AcessoConfig _cfg;
     private readonly HttpClient _http;
     private readonly Action<TimeSpan> _esperar;

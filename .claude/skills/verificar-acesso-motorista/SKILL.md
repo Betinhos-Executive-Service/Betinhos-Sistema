@@ -39,7 +39,7 @@ Pré-requisitos do Renan: app registration no Entra com `User.ReadWrite.All`, `G
 - A senha temporária só aparece no resultado do cadastro; nunca é recuperável. Conta que já existia volta sem senha (linha omitida no WhatsApp).
 - Cadastrar com conta desativada no Entra → ACESSO_ENCERRADO; o caminho é "Reativar acesso" na ficha. systemuser desabilitado ou sem licença com o Entra ativo é ressincronizado pelo `addUser`.
 - systemuser criado pelo SDK nasce desabilitado e sem licença (diagnóstico DEV 22/10/2026), por isso o plugin não cria mais `systemuser` por `Create`; só o `addUser` do Power Platform.
-- systemuser ainda ausente depois do `addUser` (~25 s de consultas) → USUARIO_DATAVERSE_PENDENTE com etapas; tentar de novo em alguns minutos conclui sem recriar a conta. `addUser` com 401/403 → GRAPH_INDISPONIVEL ("403 no addUser do Power Platform"): falta registrar o app como app de gerenciamento.
+- systemuser ainda ausente depois do `addUser` (~10 s acompanhando o 202 + 8 consultas em ~14 s) → etapa `systemuser` "pendente", sem erro: o cadastro cria o funcionário sem `cr40f_emailmicrosoft` (ou não grava o e-mail no existente) e devolve a senha; a reativação segue para a senha. O e-mail só é gravado numa nova execução ("Concluir liberação" na ficha, ou "Cadastrar acesso" de novo, que reaproveita o motorista ativo homônimo sem e-mail) — até lá o DriverRecordSharing não compartilha nada. `addUser` com 401/403 → GRAPH_INDISPONIVEL ("403 no addUser do Power Platform"): falta registrar o app como app de gerenciamento.
 - Encerrar só mexe em contas que estão no grupo de motoristas (R11); conta fora do grupo tem as etapas puladas e nada muda.
 
 ## Estado

@@ -1,25 +1,22 @@
 import { Alert, Button, buttonClassName, Dialog, Field, Input } from '@betinhos/ui'
 import { Copy, ExternalLink, MessageCircle, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { type AcessoInicial, type AcessoSource, type CadastroInput, type CadastroResultado, type Etapa, parseAcessoError, mensagemWhatsApp, whatsappComMensagem } from '../data/acesso'
+import { type AcessoInicial, type AcessoSource, type CadastroInput, type CadastroResultado, type Etapa, liberacaoPendente, MSG_PENDENTE, parseAcessoError, mensagemWhatsApp, whatsappComMensagem } from '../data/acesso'
+import { ListaEtapas, ProgressoAcesso } from './AcessoProgresso'
 import { normalizeSearch } from '../data/format'
 import { VINCULO } from '../data/schema'
 import { useNotify } from './Toasts'
 
-type Props = { acesso: AcessoSource; inicial?: AcessoInicial; onClose: () => void; onCadastrado: (funcionarioId: string) => void }
+/** `emailPendente`: e-mail criado cuja liberação no Dataverse ainda não terminou (a ficha oferece "Concluir liberação"). */
+type Props = { acesso: AcessoSource; inicial?: AcessoInicial; onClose: () => void; onCadastrado: (funcionarioId: string, emailPendente?: string) => void }
 type Estado = { fase: 'form' } | { fase: 'criando' } | { fase: 'resultado'; r: CadastroResultado } | { fase: 'erro'; mensagem: string; etapas: Etapa[] }
 
 const DOMINIO = 'betinhos.onmicrosoft.com'
-const ROTULO: Record<Etapa['estado'], string> = { feita: '✓', pulada: '–', erro: '✕' }
 
 /** primeiro.ultimo sem acentos; igual a AcessoRules.PrefixoEmail do plugin (só prévia: o plugin recalcula). */
 export function prefixoDeNome(nome: string) {
   const p = normalizeSearch(nome).trim().split(/\s+/).map((w) => w.replace(/[^a-z0-9-]/g, '')).filter(Boolean)
   return p.length === 0 ? '' : p.length === 1 ? p[0] : `${p[0]}.${p[p.length - 1]}`
-}
-
-export function ListaEtapas({ etapas }: { etapas: Etapa[] }) {
-  return <ul className="acesso-etapas">{etapas.map((e) => <li key={e.etapa} data-estado={e.estado}><span aria-hidden>{ROTULO[e.estado]}</span> {e.etapa}: {e.detalhe}</li>)}</ul>
 }
 
 /** Copia para a área de transferência com aviso de sucesso ou falha. */
@@ -35,9 +32,9 @@ export function CredenciaisAcesso({ r, semSenha }: { r: { emailMicrosoft: string
   const copiar = useCopiar()
   return (
     <dl className="acesso-credenciais">
-      <dt>E-mail</dt><dd><code>{r.emailMicrosoft}</code> <Button variant="secondary" size="compact" icon={<Copy size={14} />} aria-label="Copiar e-mail" onClick={() => copiar(r.emailMicrosoft)} /></dd>
-      <dt>Senha</dt><dd><code>{r.senhaTemporaria || semSenha}</code> {r.senhaTemporaria && <Button variant="secondary" size="compact" icon={<Copy size={14} />} aria-label="Copiar senha" onClick={() => copiar(r.senhaTemporaria)} />}</dd>
-      <dt>Link do app</dt><dd><a href={r.linkApp} target="_blank" rel="noopener noreferrer">{r.linkApp}</a></dd>
+      <div className="acesso-credencial"><dt>E-mail</dt><dd><code>{r.emailMicrosoft}</code> <Button variant="secondary" size="compact" icon={<Copy size={14} />} aria-label="Copiar e-mail" onClick={() => copiar(r.emailMicrosoft)}>Copiar</Button></dd></div>
+      <div className="acesso-credencial"><dt>Senha</dt><dd>{r.senhaTemporaria ? <code>{r.senhaTemporaria}</code> : <span className="muted">{semSenha}</span>} {r.senhaTemporaria && <Button variant="secondary" size="compact" icon={<Copy size={14} />} aria-label="Copiar senha" onClick={() => copiar(r.senhaTemporaria)}>Copiar</Button>}</dd></div>
+      <div className="acesso-credencial acesso-credencial--link"><dt>Link do app</dt><dd><a href={r.linkApp} target="_blank" rel="noopener noreferrer">{r.linkApp}</a></dd></div>
     </dl>
   )
 }
@@ -111,19 +108,22 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
                 <Input value={prefixo} onChange={(e) => setPrefixoManual(e.target.value)} suffix={`@${DOMINIO}`} disabled={criando} />
               </Field>
               <p className="acesso-previa" aria-live="polite">{prefixo ? `${prefixo}@${DOMINIO}` : ''}</p>
+              {criando && <ProgressoAcesso fluxo="cadastro" />}
               {estado.fase === 'erro' && (
                 <Alert tone="danger" title="Não foi possível concluir">
-                  {estado.mensagem}
-                  {estado.etapas.length > 0 && <ListaEtapas etapas={estado.etapas} />}
+                  {estado.mensagem}{estado.etapas.length > 0 && ' O que já foi feito fica guardado; "Tentar de novo" continua de onde parou.'}
+                  <ListaEtapas etapas={estado.etapas} fluxo="cadastro" />
                 </Alert>
               )}
             </form>
           )}
           {estado.fase === 'resultado' && (
             <div className="acesso-resultado">
-              <Alert tone="success" title="Acesso criado">A senha aparece só agora. Envie para o motorista antes de fechar.</Alert>
-              <CredenciaisAcesso r={estado.r} semSenha="(conta já existia; senha não alterada)" />
-              <ListaEtapas etapas={estado.r.etapas} />
+              {liberacaoPendente(estado.r.etapas)
+                ? <Alert tone="info" title="Acesso criado, liberando no app">{MSG_PENDENTE}</Alert>
+                : <Alert tone="success" title="Acesso criado">{estado.r.senhaTemporaria ? 'A senha aparece só agora. Envie para o motorista antes de fechar.' : 'A conta já existia; a senha anterior continua valendo.'}</Alert>}
+              <CredenciaisAcesso r={estado.r} semSenha="Conta já existia; senha não alterada" />
+              <ListaEtapas etapas={estado.r.etapas} fluxo="cadastro" />
             </div>
           )}
         </div>
@@ -131,7 +131,7 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
           {estado.fase === 'resultado' ? (
             <div className="cluster">
               {waHref && <a className={buttonClassName({ variant: 'primary' })} href={waHref} target="_blank" rel="noopener noreferrer"><MessageCircle size={16} aria-hidden /> Enviar no WhatsApp</a>}
-              <Button variant="secondary" icon={<ExternalLink size={16} />} onClick={() => onCadastrado(estado.r.funcionarioId)}>Abrir ficha</Button>
+              <Button variant="secondary" icon={<ExternalLink size={16} />} onClick={() => onCadastrado(estado.r.funcionarioId, liberacaoPendente(estado.r.etapas) ? estado.r.emailMicrosoft : undefined)}>Abrir ficha</Button>
             </div>
           ) : (
             <div className="cluster">

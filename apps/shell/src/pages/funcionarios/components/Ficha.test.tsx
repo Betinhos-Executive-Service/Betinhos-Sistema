@@ -260,10 +260,13 @@ describe('Ficha', () => {
   const acessoFake = (extra: Partial<AcessoSource> = {}): AcessoSource => ({ cadastrar: naoUsar, encerrar: async () => [], reativar: naoUsar, ...extra })
   const comUsuario = (ativo: boolean | null, extra: Partial<DataSource> = {}) => fakeSource(async () => 'f1', { get: async () => structuredClone(comEmail), usuarioDoApp: async () => (ativo === null ? null : { id: 'su1', ativo }), ...extra })
 
+  const abrirAcesso = async () => { fireEvent.click(await screen.findByRole('tab', { name: 'Acesso' }, { timeout: 5000 })) }
+
   it('estado do acesso vem do systemuser, não do status do funcionário', async () => {
     const usuarioDoApp = vi.fn(async () => ({ id: 'su1', ativo: true }))
     const desligado = { ...comEmail, values: { ...comEmail.values, cr40f_status: 1 } }
     render(<ToastProvider><Ficha source={fakeSource(async () => 'f1', { get: async () => structuredClone(desligado), usuarioDoApp })} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake()} /></ToastProvider>)
+    await abrirAcesso()
     await screen.findByText('Acesso ativo', undefined, { timeout: 5000 })
     expect(usuarioDoApp).toHaveBeenCalledWith('ana.souza@betinhos.onmicrosoft.com')
     expect(screen.getByRole('button', { name: /^Encerrar acesso$/ })).toBeTruthy()
@@ -271,6 +274,7 @@ describe('Ficha', () => {
 
   it.each([[false, 'desabilitado'], [null, 'ausente']] as const)('systemuser %s (%s) mostra acesso encerrado com Reativar', async (ativo, _caso) => {
     render(<ToastProvider><Ficha source={comUsuario(ativo)} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake()} /></ToastProvider>)
+    await abrirAcesso()
     await screen.findByText('Acesso encerrado', undefined, { timeout: 5000 })
     expect(screen.getByRole('button', { name: /^Reativar acesso$/ })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /^Encerrar acesso$/ })).toBeNull()
@@ -281,6 +285,7 @@ describe('Ficha', () => {
     const save = vi.fn(async () => 'f1')
     const get = vi.fn(async () => structuredClone(comEmail))
     render(<ToastProvider><Ficha source={fakeSource(save, { get, usuarioDoApp: async () => ({ id: 'su1', ativo: true }) })} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake({ encerrar })} /></ToastProvider>)
+    await abrirAcesso()
     await screen.findByText('Acesso ativo', undefined, { timeout: 5000 })
     fireEvent.click(screen.getByRole('button', { name: /^Encerrar acesso$/ }))
     expect(screen.getByText(/status e demissão ficam como estão/)).toBeTruthy()
@@ -297,6 +302,7 @@ describe('Ficha', () => {
   it('reativa com confirmação, mostra a senha nova e o link do WhatsApp, e pede confirmação ao fechar', async () => {
     const reativar = vi.fn(async () => ({ emailMicrosoft: 'ana.souza@betinhos.onmicrosoft.com', senhaTemporaria: 'Nova#1234567xy', linkApp: 'https://app', etapas: [{ etapa: 'senha', estado: 'feita' as const, detalhe: 'redefinida' }] }))
     render(<ToastProvider><Ficha source={comUsuario(false)} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake({ reativar })} /></ToastProvider>)
+    await abrirAcesso()
     await screen.findByText('Acesso encerrado', undefined, { timeout: 5000 })
     fireEvent.click(screen.getByRole('button', { name: /^Reativar acesso$/ }))
     expect(screen.getByText('Reativar acesso de Ana Souza?')).toBeTruthy()
@@ -317,21 +323,50 @@ describe('Ficha', () => {
   it('reativar sem permissão de senha mostra o erro e as etapas, e o bloco passa a ativo quando a conta voltou', async () => {
     const reativar = vi.fn(async () => { throw new Error('SEM_PERMISSAO_SENHA: x | etapas=[{"etapa":"conta","estado":"feita","detalhe":"reativada"},{"etapa":"senha","estado":"erro","detalhe":"403"}]') })
     render(<ToastProvider><Ficha source={comUsuario(false)} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake({ reativar })} /></ToastProvider>)
+    await abrirAcesso()
     await screen.findByText('Acesso encerrado', undefined, { timeout: 5000 })
     fireEvent.click(screen.getByRole('button', { name: /^Reativar acesso$/ }))
     const dialogo = document.querySelector('dialog[open]') as HTMLElement
     await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: /^Reativar acesso$/ })) })
     expect(await screen.findByText(/User-PasswordProfile\.ReadWrite\.All/)).toBeTruthy()
-    expect(within(dialogo).getByText(/senha: 403/)).toBeTruthy()
+    expect(within(dialogo).getByText('Gerando a senha nova')).toBeTruthy()
     expect(within(dialogo).getByText('Conta reativada sem senha nova')).toBeTruthy()
     expect(screen.getByText('Acesso ativo')).toBeTruthy()
     // Faltou só a senha: Reativar segue disponível para gerar a senha depois de conceder a permissão.
     expect(screen.getAllByRole('button', { name: /^Reativar acesso$/ }).length).toBeGreaterThan(0)
   })
 
+  it('selo do cabeçalho: App ativo, App encerrado e Liberando com Concluir liberação', async () => {
+    render(<ToastProvider><Ficha source={comUsuario(true)} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake()} /></ToastProvider>)
+    expect(await screen.findByText('App ativo', undefined, { timeout: 5000 })).toBeTruthy()
+    cleanup()
+    render(<ToastProvider><Ficha source={comUsuario(false)} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake()} /></ToastProvider>)
+    expect(await screen.findByText('App encerrado', undefined, { timeout: 5000 })).toBeTruthy()
+    cleanup()
+    const cadastrar = vi.fn(async () => ({ emailMicrosoft: 'ana.souza@betinhos.onmicrosoft.com', senhaTemporaria: '', funcionarioId: 'f1', linkApp: 'l', etapas: [{ etapa: 'funcionario', estado: 'feita' as const, detalhe: 'e-mail vinculado' }] }))
+    const onLiberacaoConcluida = vi.fn()
+    render(<ToastProvider><Ficha source={fakeSource(async () => 'f1')} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake({ cadastrar })} emailPendente="ana.souza@betinhos.onmicrosoft.com" onLiberacaoConcluida={onLiberacaoConcluida} /></ToastProvider>)
+    expect(await screen.findByText('Liberando', undefined, { timeout: 5000 })).toBeTruthy()
+    await abrirAcesso()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Concluir liberação/ })) })
+    expect(cadastrar).toHaveBeenCalledWith(expect.objectContaining({ funcionarioId: 'f1', prefixoEmail: 'ana.souza' }))
+    await waitFor(() => expect(onLiberacaoConcluida).toHaveBeenCalledWith('f1'))
+  })
+
+  it('aba Acesso reúne e-mail Microsoft, logins e assinatura; Dados não mostra o e-mail', async () => {
+    render(<ToastProvider><Ficha source={comUsuario(true)} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake()} /></ToastProvider>)
+    await screen.findByText('App ativo', undefined, { timeout: 5000 })
+    expect(screen.queryByLabelText(/E-mail Microsoft/)).toBeNull()
+    await abrirAcesso()
+    expect(screen.getByText('ana.souza@betinhos.onmicrosoft.com')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Logins e senhas' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Assinatura eletrônica' })).toBeTruthy()
+  })
+
   it('sem e-mail oferece cadastrar acesso', async () => {
     const onCadastrarAcesso = vi.fn()
     render(<ToastProvider><Ficha source={fakeSource(async () => 'f1')} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake()} onCadastrarAcesso={onCadastrarAcesso} /></ToastProvider>)
+    await abrirAcesso()
     await screen.findByText('Sem acesso ao app')
     fireEvent.click(screen.getByRole('button', { name: /Cadastrar acesso/ }))
     expect(onCadastrarAcesso).toHaveBeenCalledWith({ funcionarioId: 'f1', nomeCompleto: 'Ana Souza', celular: '' })

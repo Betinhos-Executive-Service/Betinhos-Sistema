@@ -37,7 +37,7 @@ public sealed class FakeService : IOrganizationService
         var expressao = (QueryExpression)query;
         Consultas.Add(expressao);
         var linhas = (_tabelas.TryGetValue(expressao.EntityName, out var lista) ? lista : new List<Entity>())
-            .Where(e => expressao.Criteria.Conditions.All(c => c.Operator != ConditionOperator.Equal || Equals(Valor(e, c.AttributeName, expressao.EntityName), c.Values[0])))
+            .Where(e => expressao.Criteria.Conditions.All(c => c.Operator == ConditionOperator.Null ? Valor(e, c.AttributeName, expressao.EntityName) is null : c.Operator != ConditionOperator.Equal || Equals(Valor(e, c.AttributeName, expressao.EntityName), c.Values[0])))
             .ToList();
         return new EntityCollection(linhas) { MoreRecords = false };
     }

@@ -3,7 +3,8 @@ import { whatsappHref } from '../../operacional/domain/phone'
 import { createAcessoMock } from './acessoMock'
 import { errorMessage } from './xrm'
 
-export type Etapa = { etapa: string; estado: 'feita' | 'pulada' | 'erro'; detalhe: string }
+export type Etapa = { etapa: string; estado: 'feita' | 'pulada' | 'pendente' | 'erro'; detalhe: string }
+export type Fluxo = 'cadastro' | 'reativar' | 'encerrar'
 export type CadastroInput = { nomeCompleto: string; celular: string; emailPessoal?: string; prefixoEmail?: string; tipoVinculo: 0 | 1; funcionarioId?: string }
 export type AcessoInicial = { funcionarioId: string; nomeCompleto: string; celular: string }
 export type CadastroResultado = { emailMicrosoft: string; senhaTemporaria: string; funcionarioId: string; linkApp: string; etapas: Etapa[] }
@@ -32,6 +33,20 @@ export const MENSAGENS: Record<string, string> = {
   SEM_PERMISSAO_SENHA: 'Falta a permissão User-PasswordProfile.ReadWrite.All no app do Graph.',
   USUARIO_DATAVERSE_PENDENTE: 'A conta foi criada, mas o Dataverse ainda não a reconhece. Tente de novo em alguns minutos.',
 }
+
+/** Rótulos humanos por fluxo; etapas fora do mapa (validação, confirmação) não aparecem para o usuário. */
+export const ETAPAS: Record<Fluxo, Record<string, string>> = {
+  cadastro: { usuario: 'Criando a conta', licenca: 'Liberando a licença', grupo: 'Incluindo no grupo de motoristas', systemuser: 'Liberando no Dataverse', funcionario: 'Vinculando à ficha' },
+  reativar: { usuario: 'Encontrando a conta', conta: 'Desbloqueando a conta', licenca: 'Liberando a licença', grupo: 'Incluindo no grupo de motoristas', systemuser: 'Liberando no Dataverse', senha: 'Gerando a senha nova' },
+  encerrar: { licenca: 'Removendo a licença', conta: 'Bloqueando a conta Microsoft', grupo: 'Tirando do grupo de motoristas' },
+}
+
+export const ESTADO_ETAPA: Record<Etapa['estado'], string> = { feita: 'feito', pulada: 'já estava pronto', pendente: 'em andamento', erro: 'não concluído' }
+
+/** O systemuser não ficou pronto a tempo: o acesso existe e o Dataverse libera em instantes. */
+export const liberacaoPendente = (etapas: Etapa[]) => etapas.some((e) => e.etapa === 'systemuser' && e.estado === 'pendente')
+
+export const MSG_PENDENTE = "Acesso criado. O app libera em instantes — se o motorista não conseguir entrar, use 'Concluir liberação' na ficha."
 
 export class AcessoError extends Error {
   constructor(public codigo: string, message: string, public etapas: Etapa[]) { super(message); this.name = 'AcessoError' }

@@ -38,7 +38,7 @@ describe('CadastroAcessoDrawer', () => {
     expect(decodeURIComponent(wa.getAttribute('href')!)).toContain('Kx7#mQ2vR9pL4w')
     expect(screen.getByText(/aparece só agora/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /Abrir ficha/ }))
-    expect(onCadastrado).toHaveBeenCalledWith('f9')
+    expect(onCadastrado).toHaveBeenCalledWith('f9', undefined)
   })
 
   it('erro parcial mostra etapas e permite tentar de novo com o mesmo input', async () => {
@@ -50,8 +50,8 @@ describe('CadastroAcessoDrawer', () => {
     fireEvent.change(screen.getByLabelText(/Celular/), { target: { value: '12991234567' } })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Criar acesso/ })) })
     await screen.findByRole('alert')
-    expect(screen.getByText(/usuario/)).toBeTruthy()
-    expect(screen.getByText(/licenca/)).toBeTruthy()
+    expect(screen.getByText('Criando a conta')).toBeTruthy()
+    expect(screen.getByText('Liberando a licença')).toBeTruthy()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Tentar de novo/ })) })
     await screen.findByText('Kx7#mQ2vR9pL4w')
     expect(cadastrar).toHaveBeenCalledTimes(2)
@@ -130,6 +130,19 @@ describe('CadastroAcessoDrawer', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
 
     fireEvent.click(screen.getByRole('button', { name: /Abrir ficha/ }))
-    expect(onCadastrado).toHaveBeenCalledWith('f9')
+    expect(onCadastrado).toHaveBeenCalledWith('f9', undefined)
+  })
+
+  it('liberação pendente: mostra a mensagem e devolve o e-mail para a ficha concluir', async () => {
+    const pendente = { ...ok, etapas: [{ etapa: 'systemuser', estado: 'pendente' as const, detalhe: 'o Dataverse libera em instantes' }] }
+    const onCadastrado = vi.fn()
+    render(<ToastProvider><CadastroAcessoDrawer acesso={{ cadastrar: async () => pendente, encerrar: async () => [], reativar: async () => { throw new Error('n/a') } }} onClose={() => {}} onCadastrado={onCadastrado} /></ToastProvider>)
+    fireEvent.change(screen.getByLabelText(/Nome completo/), { target: { value: 'Ana Lima' } })
+    fireEvent.change(screen.getByLabelText(/Celular/), { target: { value: '12991234567' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Criar acesso/ })) })
+    expect(await screen.findByText(/O app libera em instantes/)).toBeTruthy()
+    expect(screen.getByText('Liberando no Dataverse')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /Abrir ficha/ }))
+    expect(onCadastrado).toHaveBeenCalledWith('f9', 'ana.lima@betinhos.onmicrosoft.com')
   })
 })
