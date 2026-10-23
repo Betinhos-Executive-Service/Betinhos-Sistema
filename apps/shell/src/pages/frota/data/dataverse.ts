@@ -1,6 +1,6 @@
 import { CAMPO, lerMulti } from '../domain/manutencaoCatalogo'
 import { addMonths, todaySP, type DateBehavior } from './dates'
-import { cleanId, mapBaseline, mapColisao, mapDespesaCombustivel, mapInfracao, mapItemPlano, mapManutencao, mapMulta, mapPosse, mapTelemetriaKm, mapTermoMulta, mapVeiculo, SELECT, SELECT_TERMO, SELECT_VEICULOS_SEM_HODOMETRO } from './mappers'
+import { cleanId, mapBaseline, mapColisao, mapDespesaCombustivel, mapInfracao, mapItemPlano, mapManutencao, mapMulta, mapPosse, mapParcelaTermo, mapTelemetriaKm, mapTermoMulta, mapVeiculo, resumirTermos, SELECT, SELECT_PARCELA, SELECT_RESUMO_TERMO, SELECT_TERMO, SELECT_VEICULOS_SEM_HODOMETRO } from './mappers'
 import { BASELINE, CATEGORIA_DESPESA_TABLE, ENTITY_SET, FORMA_PAGAMENTO, ITEM_PLANO, KIND_TABLE, STATUS_FIELD, TABLE, TERMO_TABLE } from './schema'
 import type { Acordo } from '../domain/termoMulta'
 import { base64ToBlob, callSpFlow, escolherPrincipal, FOTO_MAX_BYTES, fileToBase64, nomeFoto, pastaFotoVeiculo, SP_VARS, toArquivo, type SpKey } from './sharepoint'
@@ -140,6 +140,22 @@ export function createXrmSource(xrm: XrmHost): DataSource {
     return url
   }
 
+  /** Último termo de cada multa para a coluna Termo. Falha aqui não derruba a lista de multas: devolve null e a lista avisa. */
+  async function resumoTermos() {
+    try {
+      const rows: Row[] = []
+      let page = await api.retrieveMultipleRecords(TERMO_TABLE, `?$select=${SELECT_RESUMO_TERMO.join(',')}&$filter=_new_multa_value ne null&$orderby=createdon desc`, PAGE_SIZE)
+      rows.push(...page.entities)
+      while (page.nextLink) {
+        page = await api.retrieveMultipleRecords(TERMO_TABLE, page.nextLink.slice(page.nextLink.indexOf('?')), PAGE_SIZE)
+        rows.push(...page.entities)
+      }
+      return resumirTermos(rows)
+    } catch {
+      return null
+    }
+  }
+
   const loaders:{ [K in TableKey]: () => Promise<FrotaData[K]> } = {
     veiculos: async () => {
       try {
@@ -155,8 +171,8 @@ export function createXrmSource(xrm: XrmHost): DataSource {
       return rows.map((row) => mapManutencao(row, behaviors))
     },
     multas: async () => {
-      const [rows, behaviors] = await Promise.all([retrieveAll('multas'), loadBehaviors(TABLE.multas)])
-      return rows.map((row) => mapMulta(row, behaviors))
+      const [rows, behaviors, termos] = await Promise.all([retrieveAll('multas'), loadBehaviors(TABLE.multas), resumoTermos()])
+      return rows.map((row) => { const multa = mapMulta(row, behaviors); return { ...multa, termo: termos ? termos.get(multa.id) ?? null : undefined } })
     },
     infracoes: async () => (await retrieveAll('infracoes')).map(mapInfracao),
     colisoes: async () => (await retrieveAll('colisoes')).map(mapColisao),
@@ -374,8 +390,21 @@ export function createXrmSource(xrm: XrmHost): DataSource {
       await customApi('new_CancelarTermoMulta', { new_TermoId: guid(termoId) }, 'Não foi possível cancelar o termo')
     },
 
+    async lembrarTermoMulta(termoId: string) {
+      await customApi('new_LembrarTermoMulta', { new_TermoId: guid(termoId) }, 'Não foi possível lembrar o motorista')
+    },
+
     async baixarPdfTermo(termoId: string) {
-      window.open(`${apiUrl}/new_termomultas(${guid(termoId)})/new_pdf/$value`, '_blank', 'noopener')
+      const payload = await customApi('new_BaixarPdfTermoMulta', { new_TermoId: guid(termoId) }, 'Não foi possível baixar o PDF')
+      const base64 = typeof payload.new_PdfBase64 === 'string' ? payload.new_PdfBase64 : ''
+      if (!base64) throw new Error('O servidor não devolveu o PDF do termo')
+      const nome = typeof payload.new_NomeArquivo === 'string' && payload.new_NomeArquivo ? payload.new_NomeArquivo : 'termo-de-multa.pdf'
+      return { nome, blob: base64ToBlob(base64, 'application/pdf') }
+    },
+
+    async listarParcelasTermo(termoId: string) {
+      const result = await api.retrieveMultipleRecords('new_parcelamultafolha', `?$select=${SELECT_PARCELA.join(',')}&$filter=_new_termo_value eq ${guid(termoId)}&$orderby=new_numero asc`)
+      return result.entities.map(mapParcelaTermo)
     },
   }
 }
