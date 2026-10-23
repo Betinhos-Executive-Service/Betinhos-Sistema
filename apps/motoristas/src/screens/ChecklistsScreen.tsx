@@ -26,6 +26,7 @@ import {
   countChecklistProgress,
   createChecklistDraft,
   setChecklistOkNok,
+  setChecklistValor,
   isChecklistPending,
   isMockChecklists,
   uploadChecklistPhotoMock,
@@ -439,7 +440,7 @@ export function ChecklistsScreen({ items, loadStatus = "ready", selectedId, onSe
                     draft={draft}
                     error={errors[item.chave]}
                     disabled={locked}
-                    onValue={(value) => { updateDraft((current) => ({ ...current, valores: { ...current.valores, [item.chave]: value } })); clearError(item.chave); }}
+                    onValue={(value) => { updateDraft((current) => setChecklistValor(current, item.chave, value)); clearError(item.chave); }}
                     onAddPhoto={() => openCamera(item.chave)}
                     onOpenPhoto={(photoId, dataUrl) => openPhoto(item.chave, photoId, dataUrl)}
                   />

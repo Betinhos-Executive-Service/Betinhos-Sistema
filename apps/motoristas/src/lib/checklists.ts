@@ -65,6 +65,8 @@ export type ChecklistDraft = {
   observacoes?: Record<string, string>;
   // Fotos já salvas no OneDrive (por id da foto do rascunho): repetir o envio não sobe de novo.
   enviadas?: Record<string, ChecklistFotoEnviada>;
+  // Chaves pré-preenchidas pelo app (ex.: KM da Infleet): válidas para envio, mas só contam no progresso depois que o motorista mexer.
+  sugeridos?: string[];
   updatedAt: string;
 };
 
@@ -182,11 +184,23 @@ const isOdometerItem = (item: ChecklistItem) => item.tipo === "numero" && /^km$/
 
 export function createChecklistDraft(checklist: ChecklistVeiculo): ChecklistDraft {
   const valores: Record<string, string> = {};
+  const sugeridos: string[] = [];
   // Hodômetro sincronizado da Infleet sugere o KM; o motorista confere e corrige.
   if (checklist.odometro != null) {
-    for (const item of checklist.itens) if (isOdometerItem(item)) valores[item.chave] = String(Math.round(checklist.odometro));
+    for (const item of checklist.itens) {
+      if (!isOdometerItem(item)) continue;
+      valores[item.chave] = String(Math.round(checklist.odometro));
+      sugeridos.push(item.chave);
+    }
   }
-  return { checklistId: checklist.id, valores, fotos: {}, updatedAt: new Date().toISOString() };
+  return { checklistId: checklist.id, valores, fotos: {}, sugeridos, updatedAt: new Date().toISOString() };
+}
+
+// Valor digitado pelo motorista: deixa de ser sugestão e passa a contar no progresso.
+export function setChecklistValor(draft: ChecklistDraft, chave: string, valor: string): ChecklistDraft {
+  const next: ChecklistDraft = { ...draft, valores: { ...draft.valores, [chave]: valor }, updatedAt: new Date().toISOString() };
+  if (draft.sugeridos?.includes(chave)) next.sugeridos = draft.sugeridos.filter((key) => key !== chave);
+  return next;
 }
 
 export function setChecklistOkNok(draft: ChecklistDraft, chave: string, valor: "ok" | "nok"): ChecklistDraft {
@@ -243,6 +257,7 @@ export function toggleChecklistProblema(draft: ChecklistDraft, chave: string, pr
 
 // Não OK só conta como preenchido com ao menos uma foto e um problema.
 const isChecklistItemDone = (item: ChecklistItem, draft: ChecklistDraft) => {
+  if (draft.sugeridos?.includes(item.chave)) return false;
   if (item.tipo === "foto") return (draft.fotos[item.chave] ?? []).length > 0;
   const valor = (draft.valores[item.chave] ?? "").trim();
   if (item.tipo === "okNok" && valor === "nok") return (draft.fotos[item.chave] ?? []).length > 0 && (draft.problemas?.[item.chave] ?? []).length > 0;
