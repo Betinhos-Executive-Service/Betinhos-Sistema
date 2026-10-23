@@ -41,12 +41,21 @@ export const ETAPAS: Record<Fluxo, Record<string, string>> = {
   encerrar: { licenca: 'Removendo a licença', conta: 'Bloqueando a conta Microsoft', grupo: 'Tirando do grupo de motoristas' },
 }
 
-export const ESTADO_ETAPA: Record<Etapa['estado'], string> = { feita: 'feito', pulada: 'já estava pronto', pendente: 'em andamento', erro: 'não concluído' }
+/** Resumo depois de concluído: particípio ("Licença removida"); o gerúndio fica só no progresso. */
+export const ETAPAS_FEITAS: Record<Fluxo, Record<string, string>> = {
+  cadastro: { usuario: 'Conta criada', licenca: 'Licença liberada', grupo: 'Incluído no grupo de motoristas', systemuser: 'Liberado no Dataverse', funcionario: 'Vinculado à ficha' },
+  reativar: { usuario: 'Conta encontrada', conta: 'Conta desbloqueada', licenca: 'Licença liberada', grupo: 'Incluído no grupo de motoristas', systemuser: 'Liberado no Dataverse', senha: 'Senha nova gerada' },
+  encerrar: { licenca: 'Licença removida', conta: 'Conta bloqueada', grupo: 'Retirado do grupo de motoristas' },
+}
+
+export const ESTADO_ETAPA: Record<Etapa['estado'], string> = { feita: '', pulada: 'já estava pronto', pendente: 'em andamento', erro: 'não concluído' }
 
 /** O systemuser não ficou pronto a tempo: o acesso existe e o Dataverse libera em instantes. */
 export const liberacaoPendente = (etapas: Etapa[]) => etapas.some((e) => e.etapa === 'systemuser' && e.estado === 'pendente')
 
-export const MSG_PENDENTE = "Acesso criado. O app libera em instantes — se o motorista não conseguir entrar, use 'Concluir liberação' na ficha."
+export const MSG_PENDENTE = "Conta criada. O Dataverse ainda está liberando o acesso; isto conclui sozinho em alguns minutos. Se fechar antes, use 'Concluir liberação' na ficha ou cadastre de novo com os mesmos dados."
+/** As tentativas automáticas acabaram (~3 min) sem o Dataverse liberar. */
+export const MSG_PENDENTE_DEMORADA = "Conta criada. O Dataverse está demorando para liberar o acesso. Abra a ficha e use 'Concluir liberação' em alguns minutos."
 
 export class AcessoError extends Error {
   constructor(public codigo: string, message: string, public etapas: Etapa[]) { super(message); this.name = 'AcessoError' }
