@@ -314,15 +314,19 @@ describe('Ficha', () => {
     expect(await screen.findByText('Fechar sem enviar?')).toBeTruthy()
   })
 
-  it('reativar sem permissão de senha mostra o erro e as etapas', async () => {
-    const reativar = vi.fn(async () => { throw new Error('SEM_PERMISSAO_SENHA: x | etapas=[{"etapa":"senha","estado":"erro","detalhe":"403"}]') })
+  it('reativar sem permissão de senha mostra o erro e as etapas, e o bloco passa a ativo quando a conta voltou', async () => {
+    const reativar = vi.fn(async () => { throw new Error('SEM_PERMISSAO_SENHA: x | etapas=[{"etapa":"conta","estado":"feita","detalhe":"reativada"},{"etapa":"senha","estado":"erro","detalhe":"403"}]') })
     render(<ToastProvider><Ficha source={comUsuario(false)} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake({ reativar })} /></ToastProvider>)
     await screen.findByText('Acesso encerrado', undefined, { timeout: 5000 })
     fireEvent.click(screen.getByRole('button', { name: /^Reativar acesso$/ }))
     const dialogo = document.querySelector('dialog[open]') as HTMLElement
     await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: /^Reativar acesso$/ })) })
     expect(await screen.findByText(/User-PasswordProfile\.ReadWrite\.All/)).toBeTruthy()
-    expect(screen.getByText(/senha: 403/)).toBeTruthy()
+    expect(within(dialogo).getByText(/senha: 403/)).toBeTruthy()
+    expect(within(dialogo).getByText('Conta reativada sem senha nova')).toBeTruthy()
+    expect(screen.getByText('Acesso ativo')).toBeTruthy()
+    // Faltou só a senha: Reativar segue disponível para gerar a senha depois de conceder a permissão.
+    expect(screen.getAllByRole('button', { name: /^Reativar acesso$/ }).length).toBeGreaterThan(0)
   })
 
   it('sem e-mail oferece cadastrar acesso', async () => {

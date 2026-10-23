@@ -5,7 +5,7 @@ namespace Cr40f.Acesso.Plugin;
 public sealed class ReativacaoSaida { public string EmailMicrosoft = ""; public string SenhaTemporaria = ""; public string LinkApp = ""; public Etapas Etapas = new(); }
 
 /// <summary>
-/// Reativa o acesso ao app de quem já teve conta: conta ativa, senha nova, licença, grupo e systemuser.
+/// Reativa o acesso ao app de quem já teve conta: conta ativa, licença, grupo, systemuser e, por último, senha nova.
 /// Idempotente (pula o que já está feito), exceto a senha, redefinida a cada execução. Não mexe no cadastro do funcionário.
 /// </summary>
 public sealed class ReativarAcessoHandler
@@ -34,19 +34,6 @@ public sealed class ReativarAcessoHandler
                 _graph.DefinirAtivo(u.Id, true); u.Ativo = true; etapas.Feita("conta", "reativada");
             });
 
-            // Sem a permissão de senha as outras etapas seguem; o erro volta no fim, com elas registradas.
-            AcessoException? semPermissaoSenha = null;
-            try
-            {
-                etapas.Executar("senha", () =>
-                {
-                    var senha = AcessoRules.GerarSenha(_rng);
-                    _graph.RedefinirSenha(u.Id, senha);
-                    saida.SenhaTemporaria = senha; etapas.Feita("senha", "redefinida");
-                });
-            }
-            catch (AcessoException erro) when (erro.Codigo == "SEM_PERMISSAO_SENHA") { semPermissaoSenha = erro; }
-
             etapas.Executar("licenca", () =>
             {
                 if (AcessoRules.TemLicenca(u, _cfg.LicenseSkuId)) { etapas.Pulada("licenca", "já atribuída"); return; }
@@ -62,7 +49,13 @@ public sealed class ReativarAcessoHandler
 
             CadastrarAcessoHandler.GarantirSystemuser(etapas, _usuarios, _pp, u.Id);
 
-            if (semPermissaoSenha is not null) throw semPermissaoSenha;
+            // Senha por último: uma falha antes não deixa senha nova que ninguém viu; sem permissão (403) o resto já ficou feito.
+            etapas.Executar("senha", () =>
+            {
+                var senha = AcessoRules.GerarSenha(_rng);
+                _graph.RedefinirSenha(u.Id, senha);
+                saida.SenhaTemporaria = senha; etapas.Feita("senha", "redefinida");
+            });
             _trace("acesso reativado para " + email);
             return saida;
         }

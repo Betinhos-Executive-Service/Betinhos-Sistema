@@ -5,7 +5,7 @@ import { type Etapa, type ReativacaoResultado, mensagemWhatsApp, parseAcessoErro
 import { CredenciaisAcesso, FecharSemEnviarDialog, ListaEtapas } from './CadastroAcessoDrawer'
 
 type Props = { open: boolean; nome: string; celular: string; onCancel: () => void; onReativar: () => Promise<ReativacaoResultado>; onReativado: (r: ReativacaoResultado) => void }
-type Estado = { fase: 'confirmar' } | { fase: 'enviando' } | { fase: 'erro'; mensagem: string; etapas: Etapa[] } | { fase: 'resultado'; r: ReativacaoResultado }
+type Estado = { fase: 'confirmar' } | { fase: 'enviando' } | { fase: 'erro'; codigo: string; mensagem: string; etapas: Etapa[] } | { fase: 'resultado'; r: ReativacaoResultado }
 
 /** Confirmação e, depois, a senha nova com envio pelo WhatsApp (a senha só aparece aqui). */
 export function ReativarAcessoDialog({ open, nome, celular, onCancel, onReativar, onReativado }: Props) {
@@ -24,7 +24,7 @@ export function ReativarAcessoDialog({ open, nome, celular, onCancel, onReativar
       setEstado({ fase: 'resultado', r }); onReativado(r)
     } catch (reason) {
       const erro = parseAcessoError(reason)
-      setEstado({ fase: 'erro', mensagem: erro.message, etapas: erro.etapas })
+      setEstado({ fase: 'erro', codigo: erro.codigo, mensagem: erro.message, etapas: erro.etapas })
     }
   }
 
@@ -54,7 +54,7 @@ export function ReativarAcessoDialog({ open, nome, celular, onCancel, onReativar
               <li>O cadastro do funcionário não muda.</li>
             </ul>
             {estado.fase === 'erro' && (
-              <Alert tone="danger" title="Não foi possível reativar">
+              <Alert {...(estado.codigo === 'SEM_PERMISSAO_SENHA' ? { tone: 'warning', title: 'Conta reativada sem senha nova' } : { tone: 'danger', title: 'Não foi possível reativar' })}>
                 {estado.mensagem}
                 {estado.etapas.length > 0 && <ListaEtapas etapas={estado.etapas} />}
               </Alert>

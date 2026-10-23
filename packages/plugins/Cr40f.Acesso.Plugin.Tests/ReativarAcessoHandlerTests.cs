@@ -27,7 +27,7 @@ public sealed class ReativarAcessoHandlerTests
     private static string Etapa(string nome, string estado) => "\"etapa\":\"" + nome + "\",\"estado\":\"" + estado + "\"";
 
     [Fact]
-    public void Caminho_feliz_reativa_conta_senha_licenca_grupo_e_systemuser()
+    public void Caminho_feliz_reativa_conta_licenca_grupo_systemuser_e_senha()
     {
         ComFuncionario(); ComContaEncerrada();
         var saida = Handler().Executar(_id);
@@ -104,6 +104,9 @@ public sealed class ReativarAcessoHandlerTests
         Assert.Equal("SEM_LICENCA_DISPONIVEL", erro.Codigo);
         Assert.Contains(Etapa("licenca", "erro"), (string)erro.Data["Etapas"]!);
         Assert.DoesNotContain("AtribuirLicenca", _graph.Chamadas);
+        // Senha por último: falha antes não deixa senha nova que ninguém viu.
+        Assert.DoesNotContain("RedefinirSenha", _graph.Chamadas);
+        Assert.Empty(_graph.Senhas);
     }
 
     [Fact]

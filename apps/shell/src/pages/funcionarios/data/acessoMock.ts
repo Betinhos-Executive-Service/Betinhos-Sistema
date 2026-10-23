@@ -40,7 +40,7 @@ export function createAcessoMock(): AcessoSource {
       if (!f.email) throw new AcessoError('FUNCIONARIO_SEM_EMAIL', MENSAGENS.FUNCIONARIO_SEM_EMAIL, [])
       const resultado: ReativacaoResultado = {
         emailMicrosoft: f.email, senhaTemporaria: 'Rz4!tW8nQ2kM6p', linkApp: 'https://org23b93544.crm2.dynamics.com/WebResources/new_app-motoristas-v2',
-        etapas: [{ etapa: 'usuario', estado: 'feita', detalhe: 'encontrado' }, { etapa: 'conta', estado: 'feita', detalhe: 'reativada' }, { etapa: 'senha', estado: 'feita', detalhe: 'redefinida' }, { etapa: 'licenca', estado: 'feita', detalhe: 'atribuída' }, { etapa: 'grupo', estado: 'feita', detalhe: 'adicionado' }, { etapa: 'systemuser', estado: 'feita', detalhe: 'sincronizado pelo Power Platform' }],
+        etapas: [{ etapa: 'usuario', estado: 'feita', detalhe: 'encontrado' }, { etapa: 'conta', estado: 'feita', detalhe: 'reativada' }, { etapa: 'licenca', estado: 'feita', detalhe: 'atribuída' }, { etapa: 'grupo', estado: 'feita', detalhe: 'adicionado' }, { etapa: 'systemuser', estado: 'feita', detalhe: 'sincronizado pelo Power Platform' }, { etapa: 'senha', estado: 'feita', detalhe: 'redefinida' }],
       }
       return delay(resultado)
     },
