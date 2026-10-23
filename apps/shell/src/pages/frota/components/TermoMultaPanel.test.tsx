@@ -146,6 +146,18 @@ describe('TermoMultaPanel', () => {
     expect((screen.getByLabelText(/Valor da guia/) as HTMLInputElement).value).toBe('195.23')
   })
 
+  it('recurso marcado fora do painel (transição "Entrar com recurso") atualiza o switch e bloqueia a folha', async () => {
+    const source = fake()
+    const props = { source, valorCatalogo: 195.23, onChanged: vi.fn() }
+    let view!: ReturnType<typeof render>
+    await act(async () => { view = render(<ToastProvider><TermoMultaPanel {...props} multa={multa} /></ToastProvider>) })
+    await act(async () => { view.rerender(<ToastProvider><TermoMultaPanel {...props} multa={{ ...multa, recursoPendente: true }} /></ToastProvider>) })
+    expect((screen.getByRole('switch', { name: /^Recurso pendente/ }) as HTMLInputElement).checked).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Preparar termo' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Desconto em folha' }))
+    expect(screen.getByText(/Há recurso pendente/)).toBeTruthy()
+  })
+
   it('recurso pendente grava na multa', async () => {
     const source = fake()
     await montar(source)

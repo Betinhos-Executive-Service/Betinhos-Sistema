@@ -349,8 +349,22 @@
   .m-back:active { transform: scale(.97); }
   .m-back:focus-visible { box-shadow: 0 0 0 2px var(--bt-focus-border); }
 
+  /* Drawer Cadastrar acesso ao App Motoristas */
+  .drawer--acesso { width: min(var(--bt-layout-drawer-width), 96vw); }
+  .drawer--acesso form { display: grid; gap: var(--bt-space-3); }
+  .acesso-bloco .acesso-estado { clear: both; display: flex; flex-wrap: wrap; gap: var(--bt-space-3); align-items: baseline; margin-bottom: var(--bt-space-2); }
+  .acesso-previa { margin: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); }
+  .acesso-resultado { display: grid; gap: var(--bt-space-4); }
+  .acesso-credenciais { display: grid; grid-template-columns: max-content 1fr; gap: var(--bt-space-2) var(--bt-space-4); align-items: center; margin: 0; }
+  .acesso-credenciais dt { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); }
+  .acesso-credenciais dd { display: flex; align-items: center; gap: var(--bt-space-2); margin: 0; min-width: 0; color: var(--bt-color-text-primary); word-break: break-all; }
+  .acesso-etapas { display: grid; gap: var(--bt-space-1); list-style: none; padding: 0; margin: var(--bt-space-2) 0 0; font-size: var(--bt-font-size-13); }
+  .acesso-etapas li[data-estado='erro'] { color: var(--bt-color-danger); }
+  .acesso-etapas li[data-estado='pulada'] { color: var(--bt-color-text-secondary); }
+
   @media (max-width: 820px) {
     .drawer-backdrop { background-color: var(--bt-color-surface); }
+    .drawer--acesso { width: 100vw; }
     .drawer { grid-template-rows: auto auto auto minmax(0, 1fr) auto; width: 100vw; height: 100dvh; box-shadow: none; animation: func-push-in 260ms var(--bt-ease-drawer) both; }
     .drawer-head { padding: var(--bt-space-1) var(--bt-space-4) var(--bt-space-3); gap: var(--bt-space-3); }
     .drawer-title h2 { white-space: normal; }

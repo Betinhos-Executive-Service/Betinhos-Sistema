@@ -15,6 +15,8 @@ import { AditivoAssinatura } from './AditivoAssinatura'
 import { FieldInput } from './FieldInput'
 import { ImageDrop } from './ImageDrop'
 import { AnotacoesTab } from './Anotacoes'
+import { AcessoApp } from './AcessoApp'
+import type { AcessoInicial, AcessoSource } from '../data/acesso'
 import { DocumentosArquivos } from './DocumentosArquivos'
 import { Checklist } from '../../documentos/components/Checklist'
 import type { DocsSource } from '../../documentos/data/source'
@@ -40,9 +42,13 @@ type Props = {
   id: string | null
   onClose: () => void
   onSaved: (id: string, created: boolean) => void
+  /** Muda quando algo fora da ficha alterou o registro (ex.: cadastro de acesso); força a releitura. */
+  versao?: number
+  acesso?: AcessoSource | null
+  onCadastrarAcesso?: (inicial: AcessoInicial) => void
 }
 
-export function Ficha({ source, docs, id, onClose, onSaved }: Props) {
+export function Ficha({ source, docs, id, onClose, onSaved, versao, acesso, onCadastrarAcesso }: Props) {
   const notify = useNotify()
   const [original, setOriginal] = useState<Funcionario | null>(null)
   const [draft, setDraft] = useState<Draft>(emptyDraft)
@@ -81,7 +87,7 @@ export function Ficha({ source, docs, id, onClose, onSaved }: Props) {
       (reason) => { if (alive) { setLoadError(errorMessage(reason)); setLoading(false) } },
     )
     return () => { alive = false }
-  }, [id, source])
+  }, [id, source, versao])
 
   useEffect(() => { panel.current?.focus() }, [id])
 
@@ -184,7 +190,8 @@ export function Ficha({ source, docs, id, onClose, onSaved }: Props) {
               {original && <StatusBadge value={original.values.cr40f_status} />}
               {original && <span className="muted">{optionLabel(FUNCAO, original.values.cr40f_funcao)}</span>}
               {alertas.map((alerta) => <AlertBadge key={alerta.kind} alerta={alerta} />)}
-              {typeof original?.values.new_aditivoassinaturaem === 'string' && original.values.new_aditivoassinaturaem && <AditivoBadge text={`Aditivo assinado em ${formatBR(original.values.new_aditivoassinaturaem)}`} />}
+              {/* Mesma regra do termo de multa (frota temAditivo): só vale com a data e o PDF. */}
+              {typeof original?.values.new_aditivoassinaturaem === 'string' && original.values.new_aditivoassinaturaem && original.aditivo && <AditivoBadge text={`Aditivo assinado em ${formatBR(original.values.new_aditivoassinaturaem)}`} />}
             </div>
           </div>
           {!mobile && (
@@ -228,6 +235,14 @@ export function Ficha({ source, docs, id, onClose, onSaved }: Props) {
                   </div>
                 </fieldset>
               ))}
+              {original && acesso && (
+                <AcessoApp
+                  funcionario={original}
+                  acesso={acesso}
+                  onCadastrar={() => onCadastrarAcesso?.({ funcionarioId: original.id, nomeCompleto: String(original.values.cr40f_nomecompleto ?? ''), celular: String(original.values.cr40f_telefonecorporativo ?? '') })}
+                  onEncerrado={() => { void source.get(original.id).then((fresh) => { setOriginal(fresh); setDraft(draftFrom(fresh)); onSaved(fresh.id, false) }).catch(() => notify('error', 'Acesso encerrado, mas a ficha não recarregou. Reabra a ficha.')) }}
+                />
+              )}
             </form>
           )}
 

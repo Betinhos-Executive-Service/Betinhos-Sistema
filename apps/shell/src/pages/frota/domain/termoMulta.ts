@@ -8,7 +8,7 @@ export type ContextoAcordo = { temAditivo: boolean; recursoPendente: boolean; te
 const COMPETENCIA = /^\d{4}-(0[1-9]|1[0-2])-01$/
 
 /** Reais em centavos inteiros; toFixed evita o erro de ponto flutuante (1,005 * 100 = 100.49999...). */
-const emCentavos = (valor: number) => Math.round(Number((valor * 100).toFixed(2)))
+export const emCentavos = (valor: number) => Math.round(Number((valor * 100).toFixed(2)))
 const parcelasValidas = (n: number) => Number.isInteger(n) && n >= 1 && n <= 3
 
 /** Parcelas do desconto em folha, em centavos inteiros: a sobra vai para as primeiras e a soma fecha exata. Guia não parcela; acordo de folha inválido lança erro. */

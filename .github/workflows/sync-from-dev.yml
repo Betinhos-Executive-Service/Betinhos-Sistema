@@ -41,6 +41,12 @@ jobs:
       - name: Remove valores atuais de variáveis de ambiente
         # Valor atual pertence a cada ambiente; o do DEV não pode seguir para TEST/PROD.
         run: find "solution/$SOLUTION" -name environmentvariablevalues.json -delete
+      - name: Remove chaves da Anthropic do valor padrão
+        # As chaves de IA ficam no valor padrão para valer em todos os ambientes; o export para TEST/PROD sai direto
+        # do DEV (solucoes.ps1), então a cópia do repo não precisa delas. A varredura abaixo falha se sobrar alguma.
+        run: |
+          find "solution/$SOLUTION" -ipath '*anthropic*' -name environmentvariabledefinition.xml \
+            -exec sed -i -E 's#<defaultvalue>[^<]*</defaultvalue>##' {} +
       - name: Varredura de segredos
         run: node packages/deploy/scan-secrets.mjs solution
       - name: Abre PR para dev
