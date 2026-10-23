@@ -5,6 +5,7 @@ import type { Kind, Veiculo } from '../data/types'
 import type { custoVeiculo } from './indicadores'
 import type { Linha } from './linhas'
 import { CATEGORIAS_MANUT } from './manutencaoCatalogo'
+import { TERMO_ROTULO } from './termoMulta'
 
 /**
  * Listas da Frota no padrão do Design System (§10.9.1 e §10.9.2): Veículos e os registros de cada tipo (manutenções,
@@ -127,9 +128,13 @@ export const registroColumns = (kind: Kind): ViewColumnDef[] => [
   { key: 'data', label: 'Data' },
   { key: 'veiculo', label: 'Veículo' },
   { key: 'pessoa', label: PESSOA[kind] },
+  // Termo logo depois do motorista: é o que o gestor procura na lista de multas e fica visível sem rolar em 1280 px.
+  ...(kind === 'multa' ? [{ key: 'termo', label: 'Termo' }] : []),
   { key: 'extra', label: EXTRA[kind] },
   { key: 'status', label: 'Status' },
 ]
+
+const TERMO_OPCOES: FilterOption[] = Object.entries(TERMO_ROTULO).map(([value, label]) => ({ value, label }))
 
 export function registroFields(kind: Kind, opcoes: { veiculos: FilterOption[]; pessoas: FilterOption[] }): FilterField[] {
   return [
@@ -139,6 +144,7 @@ export function registroFields(kind: Kind, opcoes: { veiculos: FilterOption[]; p
     { key: 'pessoa', label: PESSOA[kind], kind: 'choice', options: opcoes.pessoas },
     { key: 'extra', label: EXTRA[kind], kind: 'text' },
     { key: 'status', label: 'Status', kind: 'choice', options: options(STATUS_OPTIONS[kind]) },
+    ...(kind === 'multa' ? [{ key: 'termo', label: 'Termo', kind: 'choice' as const, options: TERMO_OPCOES }] : []),
     ...(kind === 'manutencao' ? [{ key: 'categoria', label: 'Categoria', kind: 'choice' as const, options: options(CATEGORIAS_MANUT), advancedOnly: true }] : []),
   ]
 }
@@ -152,6 +158,7 @@ export function readRegistro(l: Linha, key: string): unknown {
     case 'extra': return l.extra
     case 'status': return l.status == null ? null : String(l.status)
     case 'categoria': return l.categorias.map(String)
+    case 'termo': return l.termoStatus
     default: return null
   }
 }
@@ -174,6 +181,7 @@ export function sortRegistros(list: Linha[], kind: Kind, sort: ViewSort | null) 
       case 'veiculo': return l.veiculo?.label
       case 'pessoa': return l.pessoa?.label
       case 'status': return l.status == null ? null : label(STATUS_OPTIONS[kind], l.status)
+      case 'termo': return l.termo || null
       default: return null
     }
   }, sort.dir)
@@ -214,6 +222,7 @@ export function registroBuiltins(kind: Kind): StoredView[] {
   const view = builtin(registroColumns(kind), REGISTRO_SORT)
   const status = (values: number[]) => withQuick([quick('status', 'in', pick(STATUS_OPTIONS[kind], values))])
   if (kind === 'manutencao') return [view('abertas', 'Em aberto', 1, status([MANUT.SOLICITADO, MANUT.APROVADO, MANUT.PROGRAMADO]))]
-  if (kind === 'multa') return [view('notificar', 'A notificar', 1, status([MULTA.NOTIFICAR]))]
+  const termo = (valor: keyof typeof TERMO_ROTULO) => withQuick([quick('termo', 'in', TERMO_OPCOES.filter((o) => o.value === valor))])
+  if (kind === 'multa') return [view('notificar', 'A notificar', 1, status([MULTA.NOTIFICAR])), view('termos-pendentes', 'Termos pendentes', 2, termo('pendente')), view('contestados', 'Contestados', 3, termo('contestado'))]
   return [view('andamento', 'Em andamento', 1, status([COLISAO.ENVIADO, COLISAO.ANALISE]))]
 }
