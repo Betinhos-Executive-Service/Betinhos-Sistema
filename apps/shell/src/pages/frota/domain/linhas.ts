@@ -4,7 +4,7 @@ import { GRAU, label } from '../data/schema'
 import type { FrotaData, Kind, Ref, TermoStatus } from '../data/types'
 import { rotuloTermo } from './termoMulta'
 
-export type Linha = { kind: Kind; id: string; titulo: string; veiculo: Ref | null; pessoa: Ref | null; status: number | null; dia: string | null; extra: string; categorias: number[]; termo: string; termoStatus: TermoStatus | null }
+export type Linha = { kind: Kind; id: string; titulo: string; veiculo: Ref | null; pessoa: Ref | null; status: number | null; dia: string | null; extra: string; categorias: number[]; termo: string; termoStatus: TermoStatus | null; termoIndisponivel?: boolean }
 
 export function linhas(kind: Kind, data: FrotaData): Linha[] {
   const infracoes = new Map(data.infracoes.map((item) => [item.id, item]))
@@ -12,7 +12,7 @@ export function linhas(kind: Kind, data: FrotaData): Linha[] {
     kind === 'manutencao'
       ? data.manutencoes.map((item) => ({ kind, id: item.id, titulo: item.descricao, veiculo: item.veiculo, pessoa: item.solicitante, status: item.status, dia: diaSP(item.dataManutencao ?? item.criadoEm), extra: item.valor !== null ? brl(item.valor) : label(GRAU, item.grau), categorias: item.categorias, termo: '', termoStatus: null }))
       : kind === 'multa'
-        ? data.multas.map((item) => ({ kind, id: item.id, titulo: item.titulo, veiculo: item.veiculo, pessoa: item.motorista, status: item.status, dia: diaSP(item.dataHora ?? item.criadoEm), extra: valorMulta(item.valorGuia, item.infracaoId ? infracoes.get(item.infracaoId)?.valor ?? null : null, item.infracaoId), categorias: [], termo: rotuloTermo(item.termo), termoStatus: item.termo?.status ?? null }))
+        ? data.multas.map((item) => ({ kind, id: item.id, titulo: item.titulo, veiculo: item.veiculo, pessoa: item.motorista, status: item.status, dia: diaSP(item.dataHora ?? item.criadoEm), extra: valorMulta(item.valorGuia, item.infracaoId ? infracoes.get(item.infracaoId)?.valor ?? null : null, item.infracaoId), categorias: [], termo: rotuloTermo(item.termo), termoStatus: item.termo?.status ?? null, termoIndisponivel: item.termo === undefined }))
         : data.colisoes.map((item) => ({ kind, id: item.id, titulo: item.titulo, veiculo: item.veiculo, pessoa: item.motorista, status: item.status, dia: diaSP(item.dataHora ?? item.criadoEm), extra: item.houveTerceiro ? 'Com terceiro' : 'Sem terceiro', categorias: [], termo: '', termoStatus: null }))
   return result.sort((a, b) => (b.dia ?? '').localeCompare(a.dia ?? ''))
 }

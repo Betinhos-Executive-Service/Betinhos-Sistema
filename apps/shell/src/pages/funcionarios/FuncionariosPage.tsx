@@ -132,8 +132,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
       void reload()
     }
     if (created) setSelection({ mode: 'open', id })
-    else if (voltar) location.hash = voltar
-  }, [source, reload, mutate, voltar])
+  }, [source, reload, mutate])
 
   const [acessoAberto, setAcessoAberto] = useState<{ inicial?: AcessoInicial } | null>(null)
   // A ficha aberta no mesmo funcionário não recarrega só com setSelection: a versão força a releitura.
@@ -148,7 +147,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
 
   const ativos = views.filter((row) => row.values.cr40f_status === 0).length
   const ficha = selection.mode !== 'closed' && (
-    <Ficha source={source} docs={docs} id={selection.mode === 'open' ? selection.id : null} onClose={() => { if (voltar) location.hash = voltar; else setSelection({ mode: 'closed' }) }} onSaved={onSaved} versao={fichaVersao} acesso={acesso} onCadastrarAcesso={(inicial) => setAcessoAberto({ inicial })} />
+    <Ficha source={source} docs={docs} id={selection.mode === 'open' ? selection.id : null} onClose={() => { if (voltar) location.hash = voltar; else setSelection({ mode: 'closed' }) }} onSaved={onSaved} onAditivoSalvo={voltar ? () => { location.hash = voltar } : undefined} versao={fichaVersao} acesso={acesso} onCadastrarAcesso={(inicial) => setAcessoAberto({ inicial })} />
   )
 
   if (mobile) {

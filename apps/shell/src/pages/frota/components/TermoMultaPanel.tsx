@@ -47,6 +47,19 @@ function salvarArquivo(blob: Blob, nome: string) {
   setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
+/** true até o instante `ate`; reavalia pelo relógio (timer) e ao voltar o foco para a janela. */
+function useLiberadoEm(ate: number | null) {
+  const [agora, setAgora] = useState(() => Date.now())
+  useEffect(() => {
+    if (ate === null) return
+    const atualizar = () => setAgora(Date.now())
+    const timer = window.setTimeout(atualizar, Math.max(0, ate - Date.now()) + 1000)
+    window.addEventListener('focus', atualizar)
+    return () => { window.clearTimeout(timer); window.removeEventListener('focus', atualizar) }
+  }, [ate, agora])
+  return ate !== null && ate > agora
+}
+
 /** Abre a ficha do funcionário no shell; ao salvar, a ficha volta para esta multa (`voltar`). */
 function abrirFichaFuncionario(id: string) {
   const voltar = location.hash || '#/frota-multas'
@@ -137,11 +150,11 @@ export function TermoMultaPanel({ source, multa, valorCatalogo, onChanged }: { s
   }
 
   async function enviar() {
-    setConfirmarEnvio(false)
     if (impedimento || ocupado) return
     setOcupado(true)
     try {
       await source.enviarTermoMulta(multa.id, acordo)
+      setConfirmarEnvio(false)
       notify('success', 'Termo enviado ao motorista.')
       setAberto(false)
       onChanged()
@@ -204,7 +217,7 @@ export function TermoMultaPanel({ source, multa, valorCatalogo, onChanged }: { s
 
   const nomeMotorista = multa.motorista?.label ?? ''
   const proximoLembrete = atual?.ultimoLembreteEm ? Date.parse(atual.ultimoLembreteEm) + UM_DIA_MS : null
-  const lembreteBloqueado = proximoLembrete !== null && proximoLembrete > Date.now()
+  const lembreteBloqueado = useLiberadoEm(proximoLembrete)
 
   return (
     <div className="frota-termo" data-termo-status={atual?.status ?? 'nenhum'}>
@@ -307,9 +320,9 @@ export function TermoMultaPanel({ source, multa, valorCatalogo, onChanged }: { s
 
       <Dialog
         open={confirmarEnvio}
-        onClose={() => setConfirmarEnvio(false)}
+        onClose={() => { if (!ocupado) setConfirmarEnvio(false) }}
         title="Enviar o termo ao motorista?"
-        actions={<><Button variant="secondary" onClick={() => setConfirmarEnvio(false)}>Voltar</Button><Button icon={<Send size={16} />} onClick={() => void enviar()}>Enviar</Button></>}
+        actions={<><Button variant="secondary" disabled={ocupado} onClick={() => setConfirmarEnvio(false)}>Voltar</Button><Button icon={<Send size={16} />} loading={ocupado} disabled={ocupado} onClick={() => void enviar()}>Enviar</Button></>}
       >
         {confirmarEnvio && !impedimento ? `${resumoAcordo(nomeMotorista, acordo)} O motorista recebe um aviso no app e tem ${PRAZO_TERMO_DIAS} dias para assinar ou contestar.` : null}
       </Dialog>

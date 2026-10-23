@@ -356,7 +356,7 @@
                             "Succeeded"
                           ]
                         },
-                        "inputs": "@if(not(empty(outputs('Link')?['_cr40f_passageiro_value'])), intersection(createArray(toLower(outputs('Link')?['_cr40f_passageiro_value'])), if(greater(length(body('Filtrar_filhos')), 0), body('Filtrar_filhos'), body('Filtrar_lookups'))), union(if(greater(length(body('Filtrar_filhos')), 0), body('Filtrar_filhos'), body('Filtrar_lookups')), createArray()))"
+                        "inputs": "@if(not(empty(outputs('Link')?['_cr40f_passageiro_value'])), intersection(createArray(toLower(outputs('Link')?['_cr40f_passageiro_value'])), if(greater(length(body('Filtrar_filhos')), 0), body('Filtrar_filhos'), body('Filtrar_lookups'))), union(if(greater(length(body('Filtrar_filhos')), 0), body('Filtrar_filhos'), body('Filtrar_lookups')), if(greater(length(body('Filtrar_filhos')), 0), body('Filtrar_filhos'), body('Filtrar_lookups'))))"
                       },
                       "Por_operacao": {
                         "type": "Switch",
