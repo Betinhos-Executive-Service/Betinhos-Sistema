@@ -110,7 +110,15 @@ export function createMockSource(): DataSource {
   // Aditivo exige data e PDF, como no Dataverse. Só a Ana (fictícia) tem os dois; o Bruno tem a data sem o PDF.
   const aditivos = new Map<string, { data: string | null; arquivo: string | null }>([[ana.id, { data: '2026-10-15', arquivo: 'aditivo.pdf' }], [bruno.id, { data: '2026-10-15', arquivo: null }]])
   const temAditivo = (id: string) => { const a = aditivos.get(id); return !!a?.data && !!a.arquivo }
-  const termos = new Map<string, TermoMulta[]>()
+  const termo = (id: string, extra: Partial<TermoMulta>): TermoMulta => ({ id, status: 'pendente', forma: 'folha', parcelas: 3, valorTotal: 293.47, primeiraCompetencia: addMonths(`${todaySP().slice(0, 7)}-01`, 1), enviadoEm: iso(-4), assinadoEm: null, hashPdf: null, motivoContestacao: null, ultimoLembreteEm: null, criadoEm: iso(-4), ...extra })
+  // Termos fictícios: u2 pendente (Ana), u3 assinado com parcelas, u4 contestado.
+  const termos = new Map<string, TermoMulta[]>([
+    ['u2', [termo('tu2-1', { forma: 'guia', parcelas: 1, valorTotal: 195.23, enviadoEm: iso(-4), ultimoLembreteEm: iso(-2) })]],
+    ['u3', [termo('tu3-1', { status: 'assinado', enviadoEm: iso(-30), assinadoEm: iso(-28), hashPdf: '9f2c1a7be04d3f6a8c1e5b2d7f9a0c3e4b6d8f1a2c3e5b7d9f0a1c2e3b4d5f6a' })]],
+    ['u4', [termo('tu4-1', { status: 'contestado', forma: 'guia', parcelas: 1, valorTotal: 130.16, enviadoEm: iso(-6), motivoContestacao: 'Eu estava de folga nesse dia (fictício).' })]],
+  ])
+  const parcelas = new Map([['tu3-1', [0, 1, 2].map((i) => ({ numero: i + 1, competencia: addMonths(`${todaySP().slice(0, 7)}-01`, i - 1), valor: i === 0 ? 97.83 : 97.82, status: i === 0 ? 'Descontada' : 'Prevista' }))]])
+  const comTermo = (multas: Multa[]) => multas.map((m) => { const t = termos.get(m.id)?.[0]; return { ...m, termo: t?.status ? { status: t.status, enviadoEm: t.enviadoEm } : null } })
   const find = (kind: Kind, id: string) => (data[COLLECTION[kind]] as { id: string; status: number | null }[]).find((item) => item.id === id)
   const delay = () => new Promise((resolve) => setTimeout(resolve, 250))
 
@@ -119,7 +127,8 @@ export function createMockSource(): DataSource {
     envLabel: 'MOCK',
     async load() {
       await delay()
-      return { data: structuredClone(data), errors: {} }
+      const copia = structuredClone(data)
+      return { data: { ...copia, multas: comTermo(copia.multas) }, errors: {} }
     },
     async currentStatus(kind, id) {
       return find(kind, id)?.status ?? null
@@ -218,7 +227,7 @@ export function createMockSource(): DataSource {
       if (!item.motorista || !temAditivo(item.motorista.id)) throw new Error('O motorista ainda não tem o aditivo de assinatura eletrônica registrado.')
       if (acordo.forma === 'folha' && item.recursoPendente) throw new Error('Há recurso pendente: o desconto só pode ser acordado depois do resultado.')
       const agora = new Date().toISOString()
-      const termo: TermoMulta = { id: `t${multaId}-${lista.length + 1}`, status: 'pendente', forma: acordo.forma, parcelas: acordo.parcelas, valorTotal: acordo.valorTotal, primeiraCompetencia: acordo.primeiraCompetencia, enviadoEm: agora, assinadoEm: null, hashPdf: null, motivoContestacao: null, criadoEm: agora }
+      const termo: TermoMulta = { id: `t${multaId}-${lista.length + 1}`, status: 'pendente', forma: acordo.forma, parcelas: acordo.parcelas, valorTotal: acordo.valorTotal, primeiraCompetencia: acordo.primeiraCompetencia, enviadoEm: agora, assinadoEm: null, hashPdf: null, motivoContestacao: null, ultimoLembreteEm: null, criadoEm: agora }
       termos.set(multaId, [termo, ...lista])
       item.termoVigente = { id: termo.id, label: termo.id }
       return termo.id
@@ -235,8 +244,20 @@ export function createMockSource(): DataSource {
       }
       throw new Error('Termo não encontrado no mock.')
     },
-    async baixarPdfTermo() {
-      throw new Error('Mock: não há PDF fictício.')
+    async lembrarTermoMulta(termoId) {
+      await delay()
+      const alvo = [...termos.values()].flat().find((t) => t.id === termoId)
+      if (!alvo || alvo.status !== 'pendente') throw new Error('Só termo pendente pode receber lembrete.')
+      if (alvo.ultimoLembreteEm && Date.now() - Date.parse(alvo.ultimoLembreteEm) < 24 * 3600 * 1000) throw new Error('Já foi enviado um lembrete nas últimas 24 horas.')
+      alvo.ultimoLembreteEm = new Date().toISOString()
+    },
+    async baixarPdfTermo(termoId) {
+      await delay()
+      return { nome: `Termo-${termoId}.pdf`, blob: new Blob(['%PDF-1.4 fictício'], { type: 'application/pdf' }) }
+    },
+    async listarParcelasTermo(termoId) {
+      await delay()
+      return structuredClone(parcelas.get(termoId) ?? [])
     },
   }
 }

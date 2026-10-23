@@ -7,6 +7,7 @@ import { COPY_SELECT } from '../domain/copy'
 import { buildCountFetch, buildFetch, quickFindAttributes } from '../domain/fetch'
 import { buildSearch, searchKind, type SearchCondition, type SearchField } from '../domain/search'
 import { parseLinkJson, type LinkResult } from '../domain/link'
+import { parseLinkCadastroJson, type LinkCadastroResult } from '../domain/linkCadastro'
 import { formatDateTime, formatMoney } from '../domain/format'
 import { ENTITY, ID_ATTRIBUTE, PAGE_SIZE, type AttributeInfo, type AttributeMap, type LookupBind, type LookupOption, type Page, type Sort, type View } from '../domain/types'
 import { MOCK_ATTRIBUTES, MOCK_BINDS, MOCK_LOOKUPS, applyMockFetch, createMockRows, createMockViews } from './mock'
@@ -55,6 +56,8 @@ export type Source = {
   openVoucher(ids: string[]): string | null
   /** Gera o link de acompanhamento (Custom API `new_GerarLinkAcompanhamento`). */
   gerarLink(reservaId: string): Promise<LinkResult>
+  /** Gera o link de cadastro de passageiros (Custom API `new_GerarLinkCadastro`). */
+  gerarLinkCadastro(reservaId: string, passageiroId?: string): Promise<LinkCadastroResult>
   escalaFdsUrl(): string | null
   /** URL do fluxo (variável de ambiente: valor atual, depois padrão); `null` quando não configurada. */
   flowUrl(schema: string): Promise<string | null>
@@ -225,6 +228,16 @@ function createMockSource({ latency = 1 }: SourceOptions = {}): Source {
     async gerarLink() {
       await wait(300)
       return { ok: true, link: 'https://acompanhe.mock/abc123', expiraEm: new Date(Date.now() + 86_400_000).toISOString() }
+    },
+    async gerarLinkCadastro() {
+      await wait(300)
+      return {
+        ok: true, link: 'https://cadastro.mock/c/abc123', expiraEm: new Date(Date.now() + 2 * 86_400_000).toISOString(),
+        passageiros: [
+          { id: 'p1', nome: 'Ana Souza', foto: 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#D9DEE7"/><text x="20" y="25" font-size="14" text-anchor="middle" fill="#3A4150">AS</text></svg>'), telefone: '(11) 98888-7777', email: 'ana@exemplo.com' },
+          { id: 'p2', nome: 'Bruno Lima', foto: null, telefone: null, email: null },
+        ],
+      }
     },
     escalaFdsUrl: () => null,
     flowUrl: async () => 'https://flow.mock/op',
@@ -439,6 +452,12 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
     async gerarLink(reservaId) {
       const r = await host.client.request<{ new_LinkJson?: string }>('new_GerarLinkAcompanhamento', { method: 'POST', body: JSON.stringify({ new_ReservaId: cleanId(reservaId) }) })
       return parseLinkJson(r?.new_LinkJson)
+    },
+    async gerarLinkCadastro(reservaId, passageiroId) {
+      const body: Record<string, string> = { new_ReservaId: cleanId(reservaId) }
+      if (passageiroId) body.new_PassageiroId = cleanId(passageiroId)
+      const r = await host.client.request<{ new_LinkJson?: string }>('new_GerarLinkCadastro', { method: 'POST', body: JSON.stringify(body) })
+      return parseLinkCadastroJson(r?.new_LinkJson)
     },
     escalaFdsUrl: () => `${host.clientUrl}/WebResources/${ESCALA_FDS_WEBRESOURCE}`,
     async flowUrl(schema) {
