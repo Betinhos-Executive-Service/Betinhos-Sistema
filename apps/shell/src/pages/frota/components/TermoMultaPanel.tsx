@@ -7,7 +7,7 @@ import { MULTA_CAMPO } from '../data/schema'
 import type { DataSource } from '../data/source'
 import type { Multa, ParcelaTermo, TermoMulta } from '../data/types'
 import { errorMessage } from '../data/xrm'
-import { calcularParcelas, emCentavos, expiraEm, TERMO_ROTULO, TERMO_TOM, validarAcordo, type Acordo, type FormaPagamento } from '../domain/termoMulta'
+import { calcularParcelas, emCentavos, expiraEm, PRAZO_TERMO_DIAS, TERMO_ROTULO, TERMO_TOM, validarAcordo, type Acordo, type FormaPagamento } from '../domain/termoMulta'
 import { useNotify } from './Toasts'
 
 const diaMes = (iso: string) => formatBR(diaSP(iso)).slice(0, 5)
@@ -208,12 +208,12 @@ export function TermoMultaPanel({ source, multa, valorCatalogo, onChanged }: { s
 
   return (
     <div className="frota-termo" data-termo-status={atual?.status ?? 'nenhum'}>
-      {multa.motorista ? (
+      {multa.motorista && (
         <div className="frota-termo__motorista">
           <span>Motorista: {nomeMotorista}</span>
           {temAditivo !== null && <StatusBadge tone={temAditivo ? 'success' : 'warning'}>{temAditivo ? 'Aditivo ✓' : 'Aditivo ✗'}</StatusBadge>}
         </div>
-      ) : <Alert tone="warning">Indique o motorista da multa antes de preparar o termo.</Alert>}
+      )}
       {multa.motorista && temAditivo === false && !bloqueado && (
         <Alert
           tone="warning"
@@ -311,7 +311,7 @@ export function TermoMultaPanel({ source, multa, valorCatalogo, onChanged }: { s
         title="Enviar o termo ao motorista?"
         actions={<><Button variant="secondary" onClick={() => setConfirmarEnvio(false)}>Voltar</Button><Button icon={<Send size={16} />} onClick={() => void enviar()}>Enviar</Button></>}
       >
-        {confirmarEnvio && !impedimento ? `${resumoAcordo(nomeMotorista, acordo)} O motorista recebe um aviso no app e tem 7 dias para assinar ou contestar.` : null}
+        {confirmarEnvio && !impedimento ? `${resumoAcordo(nomeMotorista, acordo)} O motorista recebe um aviso no app e tem ${PRAZO_TERMO_DIAS} dias para assinar ou contestar.` : null}
       </Dialog>
 
       <Dialog
