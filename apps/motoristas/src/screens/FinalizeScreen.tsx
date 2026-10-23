@@ -2,10 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ActionBar, ActionButton, type ActionButtonState } from "../components/common/ActionButton";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { FieldError, MoneyInputField, SelectField, TextAreaField } from "../components/common/FormFields";
+import { DitadoField } from "../components/common/DitadoButton";
 import { PhotoAddButton } from "../components/common/PhotoAddButton";
 import { AppShell } from "../components/layout/AppShell";
 import { useCameraScroll } from "../app/cameraScroll";
 import { FormMenu } from "../components/navigation/FormMenu";
+import { appendDitado } from "../lib/useDitado";
 import { isExchangeOutsideWindow, type ExchangeWindowCheck } from "../lib/dataverse";
 import { matchesExpenseCitySearch, type ExpenseReferenceData } from "../lib/expenses";
 import { buildWhatsAppUrl, openExternalUrl } from "../lib/localWorkflow";
@@ -116,7 +118,9 @@ function ServiceFinalize({ detail, onDone, submitState, initialObservation = "" 
       <div className="finalize-title">{hasObservation ? "Confira sua observação" : "Digite abaixo sua observação"}</div>
       <div className="finalize-scroll">
         <div className="finalize-form">
-          <TextAreaBlock label="Observação do serviço" value={obs} onChange={setObs} />
+          <DitadoField stopWhen={submitState !== "idle"} onFinal={(text) => setObs((current) => appendDitado(current, text))}>
+            <TextAreaBlock label="Observação do serviço" value={obs} onChange={setObs} />
+          </DitadoField>
         </div>
       </div>
       <FinalizeActions
