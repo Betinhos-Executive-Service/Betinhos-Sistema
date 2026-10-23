@@ -113,7 +113,7 @@ describe('CadastroAcessoDrawer', () => {
 
     fireEvent.mouseDown(document.querySelector('.drawer-backdrop')!)
     expect(await screen.findByText('Fechar sem enviar?')).toBeTruthy()
-    expect(screen.getByText('A senha temporária não aparece de novo.')).toBeTruthy()
+    expect(screen.getByText('A senha não aparece de novo.')).toBeTruthy()
     expect(onClose).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: /^Voltar$/ }))
     expect(onClose).not.toHaveBeenCalled()

@@ -29,7 +29,7 @@ describe('acesso', () => {
     expect(texto).toContain('https://app')
     expect(texto).toContain('joao.silva@betinhos.onmicrosoft.com')
     expect(texto).toContain('Abc#12345678xy')
-    expect(texto).toContain('troque a senha')
+    expect(texto).toContain('entre com o e-mail e a senha')
     expect(texto).toContain('5 minutos')
   })
 
