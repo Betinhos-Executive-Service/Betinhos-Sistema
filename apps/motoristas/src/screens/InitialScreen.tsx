@@ -227,6 +227,8 @@ type InitialScreenProps = {
   pendingComunicados?: number;
   pendingChecklists?: number;
   pendingMultas?: number;
+  /** "Você tem N multas para assinar · prazo até dd/mm"; null sem pendências. */
+  multasBanner?: string | null;
   canGeneratePersonalReceipt?: boolean;
   isThirdParty?: boolean;
   showLocalReset?: boolean;
@@ -473,6 +475,13 @@ export function InitialScreen(props: InitialScreenProps) {
           <small>{nextService?.item?.description ?? "Abrir agenda"}</small>
         </button>
       )}
+
+      {props.multasBanner ? (
+        <button className="concept-multas-banner" type="button" onClick={() => navigateTo("multas")}>
+          <span>{props.multasBanner}</span>
+          <strong>Ver multas</strong>
+        </button>
+      ) : null}
 
       <section className="concept-module-grid" aria-label="Módulos do aplicativo">
         {modules.map((module) => (

@@ -143,7 +143,7 @@ import { getVisibleLoadingOverlay } from "./app/overlayLayering";
 import { CollisionScreen } from "./screens/CollisionScreen";
 import { ComunicadosScreen } from "./screens/ComunicadosScreen";
 import { TermosMultaScreen, type TermosLoadStatus } from "./screens/TermosMultaScreen";
-import { isMockTermos, listarTermosPendentes, type TermoMulta } from "./lib/termosMulta";
+import { isMockTermos, listarTermosMotorista, resumoPendentes, separarTermos, type TermoMulta } from "./lib/termosMulta";
 import { ChecklistsScreen } from "./screens/ChecklistsScreen";
 import { ButtonPreviewScreen } from "./screens/ButtonPreviewScreen";
 import { CollisionStartScreen } from "./screens/CollisionStartScreen";
@@ -905,7 +905,7 @@ function App() {
   const [termosStatus, setTermosStatus] = useState<TermosLoadStatus>("loading");
   const reloadTermosMulta = useCallback(async () => {
     try {
-      setTermosMulta(await listarTermosPendentes(comunicadosDriverIdRef.current));
+      setTermosMulta(await listarTermosMotorista(comunicadosDriverIdRef.current));
       setTermosStatus("ready");
     } catch (error) {
       setTermosStatus((current) => current === "ready" ? current : "error");
@@ -914,7 +914,7 @@ function App() {
   }, []);
   useEffect(() => {
     if (!isMockTermos() && !driverContext?.id) return;
-    reloadTermosMulta().catch((error) => reportAppError(error, { severity: "warning", source: "app", action: "listarTermosPendentes", notifyUser: false }));
+    reloadTermosMulta().catch((error) => reportAppError(error, { severity: "warning", source: "app", action: "listarTermosMotorista", notifyUser: false }));
   }, [driverContext?.id]);
 
   // Checklists usam o mesmo motorista logado dos comunicados.
@@ -3818,7 +3818,8 @@ function App() {
       services={store.agenda}
       pendingComunicados={comunicados.filter(isComunicadoPending).length}
       pendingChecklists={checklists.filter(isChecklistPending).length}
-      pendingMultas={termosMulta.length}
+      pendingMultas={separarTermos(termosMulta).pendentes.length}
+      multasBanner={resumoPendentes(termosMulta)}
       driverName={driverContext?.fullName}
       showLocalReset={isLocalhostRuntime && !remoteMode}
       onResetLocalData={resetLocalData}

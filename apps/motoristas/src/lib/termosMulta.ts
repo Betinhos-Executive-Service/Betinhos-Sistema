@@ -8,6 +8,9 @@ export const FORMA_PAGAMENTO = { guia: 100000000, folha: 100000001 } as const;
 export const SEM_ADITIVO_MENSAGEM = "O motorista ainda não tem o aditivo de assinatura eletrônica registrado.";
 // O servidor pode embrulhar o texto (prefixo/sufixo); basta o trecho característico.
 export const isSemAditivo = (message: string) => message.includes("aditivo de assinatura eletrônica");
+// Recusas do plugin que não mudam tentando de novo: levam a uma tela final, sem "Tentar de novo".
+export const isErroDefinitivo = (message: string) => /não é seu|não está mais pendente/.test(message);
+export const PRAZO_ASSINATURA_DIAS = 7;
 export const GPS_PRECISAO_AVISO_M = 200;
 export const SELFIE_MAX_LADO = 1280;
 export const SELFIE_JPEG_QUALIDADE = 0.8;
@@ -29,11 +32,12 @@ export type TermoMulta = {
   enviadoEm: string;
   assinadoEm: string | null;
   hashPdf: string;
+  motivoContestacao: string;
 };
 
 export type Gps = { latitude: number; longitude: number; precisao: number };
 
-const TERMO_SELECT = "$select=new_termomultaid,new_name,new_status,new_textotermo,new_versaotexto,new_evidenciasjson,new_formapagamento,new_parcelas,new_valortotal,new_valorparcela,new_primeiracompetencia,new_enviadoem,new_assinadoem,new_hashpdf";
+const TERMO_SELECT = "$select=new_termomultaid,new_name,new_status,new_textotermo,new_versaotexto,new_evidenciasjson,new_formapagamento,new_parcelas,new_valortotal,new_valorparcela,new_primeiracompetencia,new_enviadoem,new_assinadoem,new_hashpdf,new_motivocontestacao";
 
 export function mapTermo(row: Record<string, unknown>): TermoMulta {
   return {
@@ -50,7 +54,8 @@ export function mapTermo(row: Record<string, unknown>): TermoMulta {
     primeiraCompetencia: String(row.new_primeiracompetencia ?? ""),
     enviadoEm: String(row.new_enviadoem ?? ""),
     assinadoEm: row.new_assinadoem ? String(row.new_assinadoem) : null,
-    hashPdf: String(row.new_hashpdf ?? "")
+    hashPdf: String(row.new_hashpdf ?? ""),
+    motivoContestacao: String(row.new_motivocontestacao ?? "")
   };
 }
 
@@ -64,6 +69,32 @@ export function formatDataHora(value: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return DATA_HORA.format(date).replace(",", "");
+}
+
+const DIA_MES = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
+
+/** Prazo para assinar (envio + 7 dias), em dd/mm de São Paulo; o plugin expira depois disso. */
+export function prazoAssinatura(enviadoEm: string) {
+  const date = new Date(enviadoEm);
+  if (!enviadoEm || Number.isNaN(date.getTime())) return "";
+  return DIA_MES.format(new Date(date.getTime() + PRAZO_ASSINATURA_DIAS * 86_400_000));
+}
+
+/** Pendentes primeiro; Concluídos são os assinados e contestados (cancelados e expirados não aparecem ao motorista). */
+export function separarTermos(items: TermoMulta[]) {
+  return {
+    pendentes: items.filter((t) => t.status === TERMO_STATUS.pendente),
+    concluidos: items.filter((t) => t.status === TERMO_STATUS.assinado || t.status === TERMO_STATUS.contestado)
+  };
+}
+
+/** Texto do banner da Home, com o prazo mais próximo; null sem pendências. */
+export function resumoPendentes(items: TermoMulta[]) {
+  const pendentes = separarTermos(items).pendentes.filter((t) => prazoAssinatura(t.enviadoEm));
+  if (!pendentes.length) return null;
+  const primeiro = pendentes.reduce((a, b) => (new Date(b.enviadoEm) < new Date(a.enviadoEm) ? b : a));
+  const n = pendentes.length;
+  return `Você tem ${n} multa${n === 1 ? "" : "s"} para assinar · prazo até ${prazoAssinatura(primeiro.enviadoEm)}`;
 }
 
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -177,7 +208,7 @@ export async function capturarSelfieJpeg(video: Pick<HTMLVideoElement, "videoWid
 
 // ---------------- Fluxo da tela ----------------
 
-export type TermoStep = "detalhe" | "selfie" | "local" | "assinatura" | "sucesso" | "semAditivo" | "contestar" | "contestado";
+export type TermoStep = "detalhe" | "selfie" | "local" | "assinatura" | "sucesso" | "semAditivo" | "encerrado" | "contestar" | "contestado";
 
 export type TermoFlow = {
   step: TermoStep;
@@ -216,7 +247,7 @@ export function termoFlowReducer(state: TermoFlow, action: TermoFlowAction): Ter
     case "motivo": return { ...state, motivo: action.value };
     case "submit": return { ...state, enviando: true, erro: "" };
     // Mantém selfie, GPS e assinatura: o motorista corrige e reenvia sem refazer os passos.
-    case "error": return { ...state, enviando: false, erro: action.message, step: isSemAditivo(action.message) ? "semAditivo" : state.step };
+    case "error": return { ...state, enviando: false, erro: action.message, step: isSemAditivo(action.message) ? "semAditivo" : isErroDefinitivo(action.message) ? "encerrado" : state.step };
     case "signed": return { ...state, enviando: false, step: "sucesso", assinadoEm: action.assinadoEm };
     case "contested": return { ...state, enviando: false, step: "contestado" };
     case "reset": return initialTermoFlow();
@@ -263,6 +294,14 @@ function getMockTermos() {
       new_versaotexto: "v1", new_enviadoem: "2026-10-22T12:05:00Z",
       new_textotermo: "[Mock] Eu, Renan, reconheço que conduzia o veículo de placa QPA2B11 e que pagarei a guia da multa.",
       new_evidenciasjson: JSON.stringify({ multa: { placa: "QPA2B11", dataHora: "2026-09-18T20:10:00Z", local: "Rod. Ayrton Senna, km 22", valorGuia: 130.16 }, infracao: { codigo: "518-5", descricao: "Estacionar em local proibido", valor: 130.16 }, infleet: { erro: "Veículo QPA2B11 não encontrado no InFleet." } })
+    },
+    {
+      new_termomultaid: "77777777-7777-4777-8777-777777777777", new_name: "TM-FHK7C30-20260915", new_status: TERMO_STATUS.contestado,
+      new_formapagamento: FORMA_PAGAMENTO.folha, new_parcelas: 2, new_valortotal: 88.38, new_valorparcela: 44.19, new_primeiracompetencia: "2026-10-01",
+      new_versaotexto: "v1", new_enviadoem: "2026-09-15T12:00:00Z", new_assinadoem: "2026-09-16T10:20:00Z",
+      new_motivocontestacao: "Eu estava de folga nesse dia; o carro ficou na garagem.",
+      new_textotermo: "[Mock] Termo contestado.",
+      new_evidenciasjson: JSON.stringify({ multa: { placa: "FHK7C30", dataHora: "2026-09-10T08:00:00Z", local: "Av. Brasil, 500", valorGuia: 88.38 }, infracao: { codigo: "554-1", descricao: "Estacionar na faixa", valor: 88.38 }, infleet: { viagens: [] } })
     }
   ];
   return mockTermos;
@@ -270,15 +309,16 @@ function getMockTermos() {
 
 const mockDelay = () => new Promise((resolve) => setTimeout(resolve, 600));
 
-export async function listarTermosPendentes(motoristaId: string): Promise<TermoMulta[]> {
+/** Termos do motorista que ele ainda vê: pendentes, assinados e contestados. */
+export async function listarTermosMotorista(motoristaId: string): Promise<TermoMulta[]> {
   if (isMockTermos()) {
     if (mockParam("mockTermos") === "vazio") return [];
-    return getMockTermos().filter((row) => row.new_status === TERMO_STATUS.pendente).map(mapTermo);
+    return getMockTermos().map(mapTermo).filter((t) => t.status <= TERMO_STATUS.contestado);
   }
   const id = cleanGuid(motoristaId);
   if (!GUID_PATTERN.test(id)) throw new Error("Motorista não identificado para carregar termos de multa.");
   // Filtra pelo motorista logado: quem tem leitura ampla (admin) veria os termos de todos.
-  const result = await retrieveMultiple(DATAVERSE.termosMulta, `${TERMO_SELECT}&$filter=new_status eq ${TERMO_STATUS.pendente} and _new_motorista_value eq ${id}&$orderby=new_enviadoem desc`);
+  const result = await retrieveMultiple(DATAVERSE.termosMulta, `${TERMO_SELECT}&$filter=new_status le ${TERMO_STATUS.contestado} and _new_motorista_value eq ${id}&$orderby=new_enviadoem desc`);
   return result.entities.map((row) => mapTermo(row as Record<string, unknown>));
 }
 
@@ -343,9 +383,102 @@ export async function contestarTermo(id: string, motivo: string) {
   await executeCustomApi("new_ContestarTermoMulta", { new_TermoId: cleanGuid(id), new_Motivo: motivo.trim() });
 }
 
-export async function baixarPdf(id: string): Promise<Blob> {
-  if (isMockTermos()) return new Blob(["%PDF-1.4\n% termo de multa (mock)\n"], { type: "application/pdf" });
-  const response = await fetch(`/api/data/v9.2/${DATAVERSE.termosMulta}(${cleanGuid(id)})/new_pdf/$value`, { credentials: "same-origin" });
-  if (!response.ok) throw new Error(`Não foi possível baixar o PDF (${response.status}).`);
-  return response.blob();
+export type PdfTermo = { base64: string; nome: string };
+
+/** O PDF tem segurança de campo: o motorista recebe o arquivo pela Custom API, que confere o dono. */
+export async function baixarPdf(id: string): Promise<PdfTermo> {
+  if (isMockTermos()) {
+    await mockDelay();
+    if (mockParam("mockTermoErro") === "pdf") throw new Error("Este termo não é seu.");
+    const row = getMockTermos().find((item) => item.new_termomultaid === cleanGuid(id));
+    return { base64: btoa("%PDF-1.4\n% termo de multa (mock)\n"), nome: `${String(row?.new_name ?? "termo-multa")}.pdf` };
+  }
+  const result = await executeCustomApi("new_BaixarPdfTermoMulta", { new_TermoId: cleanGuid(id) });
+  const base64 = String(result.new_PdfBase64 ?? "");
+  if (!base64) throw new Error("O PDF do termo veio vazio.");
+  return { base64, nome: String(result.new_NomeArquivo || "termo-multa.pdf") };
+}
+
+/** Confere o aditivo antes da selfie. O motorista não lê o próprio cadastro: a API devolve só um booleano. */
+export async function consultarAditivo(): Promise<boolean> {
+  if (isMockTermos()) {
+    await mockDelay();
+    return mockParam("mockTermoErro") !== "aditivo";
+  }
+  const result = await executeCustomApi("new_ConsultarAditivoMotorista", {});
+  return result.new_TemAditivo === true || result.new_TemAditivo === "true";
+}
+
+type XrmOpenFile = (file: { fileContent: string; fileName: string; fileSize: number; mimeType: string }, options?: { openMode: number }) => Promise<unknown> | unknown;
+export type AbrirPdfEnv = {
+  xrmOpenFile?: XrmOpenFile;
+  share?: (data: { files: File[]; title?: string }) => Promise<void>;
+  canShare?: (data: { files: File[] }) => boolean;
+  download?: (blob: Blob, nome: string) => void;
+  onFalha?: (metodo: "xrm" | "share" | "download", error: unknown) => void;
+};
+
+function pdfBlob(base64: string) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: "application/pdf" });
+}
+
+/**
+ * Abre o PDF no WebView do Power Apps, que ignora <a download> com blob: em silêncio.
+ * Ordem: visualizador nativo (Xrm.Navigation.openFile) → compartilhar → download. Se nada funcionar, lança erro.
+ */
+export async function abrirPdf(pdf: PdfTermo, env: AbrirPdfEnv = navegadorPdfEnv()): Promise<"xrm" | "share" | "download"> {
+  const blob = pdfBlob(pdf.base64);
+  if (env.xrmOpenFile) {
+    try {
+      await env.xrmOpenFile({ fileContent: pdf.base64, fileName: pdf.nome, fileSize: blob.size, mimeType: "application/pdf" }, { openMode: 2 });
+      return "xrm";
+    } catch (error) { env.onFalha?.("xrm", error); }
+  }
+  if (env.share && typeof File === "function") {
+    const file = new File([blob], pdf.nome, { type: "application/pdf" });
+    if (!env.canShare || env.canShare({ files: [file] })) {
+      try {
+        await env.share({ files: [file], title: pdf.nome });
+        return "share";
+      } catch (error) {
+        // Cancelar a folha de compartilhar é escolha do motorista, não falha.
+        if ((error as { name?: string })?.name === "AbortError") return "share";
+        env.onFalha?.("share", error);
+      }
+    }
+  }
+  if (env.download) {
+    try {
+      env.download(blob, pdf.nome);
+      return "download";
+    } catch (error) { env.onFalha?.("download", error); }
+  }
+  throw new Error("Não foi possível abrir o PDF neste aparelho. Peça a cópia ao gestor de frota.");
+}
+
+/** Ambiente real: Xrm do Power Apps (pai ou próprio), Web Share e link de download como último recurso. */
+export function navegadorPdfEnv(onFalha?: AbrirPdfEnv["onFalha"]): AbrirPdfEnv {
+  type XrmNav = { Navigation?: { openFile?: XrmOpenFile } };
+  let xrm: XrmNav | undefined;
+  try { xrm = (window.parent as Window & { Xrm?: XrmNav }).Xrm; } catch { /* Parent pode ser de outra origem. */ }
+  xrm ??= (window as Window & { Xrm?: XrmNav }).Xrm;
+  const navigation = xrm?.Navigation;
+  const nav = navigator as Navigator & { share?: AbrirPdfEnv["share"]; canShare?: AbrirPdfEnv["canShare"] };
+  return {
+    xrmOpenFile: navigation?.openFile ? (file, options) => navigation.openFile!(file, options) : undefined,
+    share: typeof nav.share === "function" ? nav.share.bind(nav) : undefined,
+    canShare: typeof nav.canShare === "function" ? nav.canShare.bind(nav) : undefined,
+    download: (blob, nome) => {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = nome;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+    },
+    onFalha
+  };
 }

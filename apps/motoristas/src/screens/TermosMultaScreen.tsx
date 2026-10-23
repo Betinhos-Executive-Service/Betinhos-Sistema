@@ -3,7 +3,7 @@ import { reportAppError } from "../lib/appErrorLogger";
 import { AppShell } from "../components/layout/AppShell";
 import { ServicesMenu } from "../components/navigation/ServicesMenu";
 import { TermoMultaDetalheScreen } from "./TermoMultaDetalheScreen";
-import { formatBrl, formatDataHora, isMockTermos, parseEvidencias, type TermoMulta } from "../lib/termosMulta";
+import { formatBrl, formatDataHora, isMockTermos, parseEvidencias, prazoAssinatura, separarTermos, TERMO_STATUS, type TermoMulta } from "../lib/termosMulta";
 
 export type TermosLoadStatus = "loading" | "ready" | "error";
 
@@ -14,10 +14,21 @@ type Props = {
   onReload: () => Promise<void>;
 };
 
+type Aba = "pendentes" | "concluidos";
+
+function situacaoTermo(termo: TermoMulta) {
+  if (termo.status === TERMO_STATUS.pendente) return { tone: "atencao", texto: `Assine até ${prazoAssinatura(termo.enviadoEm)}` };
+  if (termo.status === TERMO_STATUS.contestado) return { tone: "neutro", texto: "Contestado" };
+  return { tone: "sucesso", texto: termo.assinadoEm ? `Assinado em ${formatDataHora(termo.assinadoEm).slice(0, 10)}` : "Assinado" };
+}
+
 export function TermosMultaScreen({ items, loadStatus, onBack, onReload }: Props) {
-  // Guarda o termo aberto: depois de assinar ele sai da lista de pendentes, mas a tela de sucesso continua.
+  // Guarda o termo aberto: depois de assinar ele muda de aba, mas a tela de sucesso continua.
   const [selected, setSelected] = useState<TermoMulta | null>(null);
+  const [aba, setAba] = useState<Aba>("pendentes");
   const [error, setError] = useState("");
+  const { pendentes, concluidos } = separarTermos(items);
+  const lista = aba === "pendentes" ? pendentes : concluidos;
 
   const refresh = async () => {
     setError("");
@@ -30,7 +41,6 @@ export function TermosMultaScreen({ items, loadStatus, onBack, onReload }: Props
 
   useEffect(() => { void refresh(); }, []);
 
-  const open = (termo: TermoMulta) => setSelected(termo);
   const close = () => { setSelected(null); void refresh(); };
 
   return (
@@ -41,46 +51,56 @@ export function TermosMultaScreen({ items, loadStatus, onBack, onReload }: Props
       ) : (
         <>
         <ServicesMenu
-          title="Multas para assinar"
+          title="Multas"
           eyebrow={isMockTermos() ? "Operação · Mock local" : "Operação"}
           homeLabel="Voltar"
           homeIcon="arrowLeft"
           onHome={onBack}
           onRefresh={refresh}
         />
-        <section className="termo-screen" aria-label="Multas para assinar">
-          {error ? <p className="termo-alert" data-tone="erro" role="alert">{error}</p> : null}
-          {loadStatus === "loading" && !items.length ? (
-            <div className="termo-skeleton" role="status" aria-busy="true" aria-label="Carregando multas"><span /><span /></div>
-          ) : loadStatus === "error" && !items.length ? (
-            <div className="termo-alert" data-tone="erro" role="alert">
-              <p>Não foi possível carregar as multas.</p>
-              <button type="button" className="termo-text-button" onClick={() => void refresh()}>Tentar de novo</button>
-            </div>
-          ) : items.length ? (
-            <ul className="termo-list">
-              {items.map((termo) => {
-                const ev = parseEvidencias(termo.evidenciasJson);
-                return (
-                  <li key={termo.id}>
-                    <button type="button" className="termo-row" onClick={() => open(termo)}>
-                      <span className="termo-row-main">
-                        <strong>{ev.placa || termo.nome}</strong>
-                        <span>{ev.infracao || "Infração não informada"}</span>
-                        <small>{formatDataHora(ev.dataHora)}</small>
-                      </span>
-                      <span className="termo-row-side">
-                        <strong>{formatBrl(termo.valorTotal)}</strong>
-                        <span className="termo-badge" data-tone="atencao">Aguardando sua assinatura</span>
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="termo-empty">Nenhum termo pendente.</p>
-          )}
+        <section className="termo-screen" aria-label="Multas">
+          <div className="termo-tabs" role="tablist" aria-label="Situação das multas">
+            {([["pendentes", "Pendentes", pendentes.length], ["concluidos", "Concluídos", concluidos.length]] as const).map(([id, label, count]) => (
+              <button key={id} type="button" role="tab" id={`termo-tab-${id}`} aria-selected={aba === id} aria-controls="termo-tabpanel" className="termo-tab" onClick={() => setAba(id)}>
+                {label}{count ? <span className="termo-tab-count">{count}</span> : null}
+              </button>
+            ))}
+          </div>
+          <div id="termo-tabpanel" role="tabpanel" aria-labelledby={`termo-tab-${aba}`} className="termo-tabpanel" key={aba}>
+            {error ? <p className="termo-alert" data-tone="erro" role="alert">{error}</p> : null}
+            {loadStatus === "loading" && !items.length ? (
+              <div className="termo-skeleton" role="status" aria-busy="true" aria-label="Carregando multas"><span /><span /></div>
+            ) : loadStatus === "error" && !items.length ? (
+              <div className="termo-alert" data-tone="erro" role="alert">
+                <p>Não foi possível carregar as multas.</p>
+                <button type="button" className="termo-text-button" onClick={() => void refresh()}>Tentar de novo</button>
+              </div>
+            ) : lista.length ? (
+              <ul className="termo-list">
+                {lista.map((termo) => {
+                  const ev = parseEvidencias(termo.evidenciasJson);
+                  const sit = situacaoTermo(termo);
+                  return (
+                    <li key={termo.id}>
+                      <button type="button" className="termo-row" onClick={() => setSelected(termo)}>
+                        <span className="termo-row-main">
+                          <strong>{ev.placa || termo.nome}</strong>
+                          <span>{ev.infracao || "Infração não informada"}</span>
+                          <small>{formatDataHora(ev.dataHora)}</small>
+                        </span>
+                        <span className="termo-row-side">
+                          <strong>{formatBrl(termo.valorTotal)}</strong>
+                          <span className="termo-badge" data-tone={sit.tone}>{sit.texto}</span>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="termo-empty">{aba === "pendentes" ? "Nenhuma multa para assinar." : "Nenhum termo assinado ou contestado ainda."}</p>
+            )}
+          </div>
         </section>
         </>
       )}
