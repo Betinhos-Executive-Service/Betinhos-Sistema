@@ -78,14 +78,15 @@ test('salvar: passageiro fora do escopo 404, limite de 30 envios 429', () => {
   assert.equal(todas.get('Status_erro_429').inputs.value, 429)
 })
 
-test('foto vira <passageiroId>.jpg no SharePoint com link somente leitura', () => {
+test('foto vira <passageiroId>.jpg no SharePoint com link de caminho (/:i:/r/), sem compartilhamento', () => {
   const criar = todas.get('Criar_arquivo')
   assert.equal(criar.inputs.host.operationId, 'CreateFile')
   assert.match(criar.inputs.parameters.name, /passageiroId.*\.jpg$/)
   assert.equal(criar.inputs.parameters.folderPath, '__FOLDER_PATH__')
-  const link = todas.get('Criar_link_compartilhamento')
-  assert.equal(link.inputs.host.operationId, 'CreateSharingLink')
-  assert.equal(link.inputs.parameters['permission/type'], 'view')
+  assert.equal(op('CreateSharingLink').length, 0, 'sem link de compartilhamento')
+  const guardar = todas.get('Guardar_link_foto')
+  assert.deepEqual(guardar.runAfter, { Criar_arquivo: ['Succeeded'] })
+  assert.equal(guardar.inputs.value, "@{concat('https://', uriHost('__SITE_URL__'), '/:i:/r', uriPath('__SITE_URL__'), replace(uriComponent(body('Criar_arquivo')?['Path']), '%2F', '/'))}")
 })
 
 test('PATCH do passageiro só com os campos enviados e registro do envio', () => {
@@ -100,7 +101,7 @@ test('PATCH do passageiro só com os campos enviados e registro do envio', () =>
 })
 
 test('tokens do script presentes e nenhum dado de ambiente no repo', () => {
-  for (const t of ['__SET_LINKS__', '__SET_PASSAGEIROS__', '__SET_SERVICOS__', '__SET_RESERVAS__', '__SITE_URL__', '__LIBRARY_ID__', '__FOLDER_PATH__']) assert.ok(raw.includes(t), t)
+  for (const t of ['__SET_LINKS__', '__SET_PASSAGEIROS__', '__SET_SERVICOS__', '__SET_RESERVAS__', '__SITE_URL__', '__FOLDER_PATH__']) assert.ok(raw.includes(t), t)
   assert.doesNotMatch(raw, /@betinhos\.|dynamics\.com|sharepoint\.com|onmicrosoft/i)
 })
 

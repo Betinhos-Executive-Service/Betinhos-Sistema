@@ -3,6 +3,7 @@ import { createMockEquipamentos } from '../../equipamentos/data/mock'
 import { STATUS } from '../../equipamentos/domain/choices'
 import { addMonths, todaySP } from './dates'
 import { buildPatch, type PatchContext } from './patch'
+import { semApp } from './semApp'
 import type { DataSource } from './source'
 import { buildNoteHtml, textToNoteHtml, type SpAnexo } from './notes'
 import { nomeComData, pastaFuncionario } from './sharepoint'
@@ -53,7 +54,11 @@ const ROWS0: Funcionario[] = [
   person('m6', 'Gustavo Amostra Pires', 'Gus', { cr40f_status: 1, cr40f_datadedemissao: offset(-90), cr40f_validadedacnh: offset(-30) }),
   person('m7', 'Helena Simulada Costa', 'Helena', { cr40f_funcao: 202410001, cr40f_nomedaempresa: 202410001, cr40f_tipodevinculo: 1 }),
   person('m8', 'Igor Fake Moreira', 'Igor', { cr40f_datadoaso: addMonths(offset(20), -12) }, veiculos[2]),
+  // Acesso ao app encerrado (systemuser desabilitado), mas segue ativo no cadastro: exercita "Reativar acesso".
+  person('m9', 'Joana Encerrada Teste', 'Joana', { cr40f_emailmicrosoft: 'joana.teste@betinhos.onmicrosoft.com', cr40f_telefonecorporativo: '+5512991234567' }),
 ]
+/** systemuser por e-mail no mock: Carlos ativo, Joana desabilitada (acesso encerrado). */
+const USUARIOS_APP: Record<string, boolean> = { 'carlos.teste@betinhos.onmicrosoft.com': true, 'joana.teste@betinhos.onmicrosoft.com': false }
 /** `?volume=N` do pnpm dev: N colaboradores a mais (desempenho com listas grandes). */
 const volume = (total: number) => Array.from({ length: total }, (_, i) => person(`mv${i + 1}`, `Colaborador Exemplo ${i + 1}`, `Colab ${i + 1}`, {
   cr40f_status: i % 9 === 0 ? 2 : 0, cr40f_funcao: i % 4 ? 202410000 : 202410001, cr40f_validadedacnh: offset((i % 500) - 30), cr40f_numerodocpf: `${String(100_000_000 + i).slice(0, 9)}-${String(i % 100).padStart(2, '0')}`,
@@ -104,6 +109,9 @@ const documentos: DocumentStore = {
   },
 }
 
+const ATIVOS_APP = new Set(Object.keys(USUARIOS_APP).filter((email) => USUARIOS_APP[email]))
+const comSelo = (row: Funcionario): Funcionario => ({ ...row, semApp: semApp(row.values, ATIVOS_APP) })
+
 export function createMockSource(): DataSource {
   // Cada fonte começa do zero (testes e recarga da página não herdam alterações).
   rows = [...structuredClone(ROWS0), ...volume(mockVolume())]
@@ -114,10 +122,10 @@ export function createMockSource(): DataSource {
   return {
     mode: 'mock',
     envLabel: 'MOCK',
-    list: (onFirstPage) => mockProgressive(structuredClone(rows), onFirstPage, 150),
+    list: (onFirstPage) => mockProgressive(structuredClone(rows).map(comSelo), onFirstPage, 150),
     get: (id) => {
       const row = rows.find((item) => item.id === id)
-      return row ? delay(row) : Promise.reject(new Error('Colaborador não encontrado nos dados de exemplo.'))
+      return row ? delay(comSelo(row)) : Promise.reject(new Error('Colaborador não encontrado nos dados de exemplo.'))
     },
     async save(original, draft) {
       const payload = buildPatch(original, draft, context)
@@ -174,6 +182,7 @@ export function createMockSource(): DataSource {
       return blob ? { nome: (blob as File).name ?? 'anexo', blob } : { nome: 'toxicologico-2026.txt', blob: new Blob(['Arquivo fictício do modo mock.'], { type: 'text/plain' }) }
     },
     documentos,
+    usuarioDoApp: (email) => delay(email.toLowerCase() in USUARIOS_APP ? { id: `su-${email}`, ativo: USUARIOS_APP[email.toLowerCase()] } : null),
     searchVeiculos: (query) => delay(veiculos.filter((item) => item.label.toLowerCase().includes(query.toLowerCase()))),
     openForm: (entityName, id) => console.info('[mock] openForm', entityName, id),
   }

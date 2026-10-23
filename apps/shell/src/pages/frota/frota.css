@@ -141,3 +141,10 @@
 .frota-termo__previa li { display: flex; justify-content: space-between; gap: var(--bt-space-3); }
 @media (max-width: 560px) { .frota-termo__dados { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .frota-termo__expande { transition: none; } }
+/* Termo v2: motorista e aditivo na primeira linha do painel (G1); toasts embaixo no celular, perto do polegar (G6). */
+.frota-termo__motorista { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-primary); }
+@media (max-width: 560px) {
+  .bt-toast-region { top: auto; bottom: calc(var(--bt-space-4) + env(safe-area-inset-bottom, 0px)); }
+  .bt-toast { animation-name: frota-toast-in-baixo; }
+}
+@keyframes frota-toast-in-baixo { from { opacity: 0; transform: translateY(10px); } }

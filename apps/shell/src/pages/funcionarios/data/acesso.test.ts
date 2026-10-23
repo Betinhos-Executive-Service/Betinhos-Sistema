@@ -54,18 +54,31 @@ describe('acesso', () => {
     const src = createAcessoSource({ mode: 'mock' })
     await expect(src.encerrar('m1', 'Errado')).rejects.toMatchObject({ codigo: 'CONFIRMACAO_INVALIDA' })
     const etapas = await src.encerrar('m1', 'Carlos')
-    expect(etapas.find((e) => e.etapa === 'funcionario')?.estado).toBe('feita')
+    expect(etapas.find((e) => e.etapa === 'conta')?.estado).toBe('feita')
+    // Encerrar mexe só no acesso: não há etapa de funcionário (status/demissão).
+    expect(etapas.some((e) => e.etapa === 'funcionario')).toBe(false)
+  })
+
+  it('mock reativa a funcionária com acesso encerrado e devolve senha nova', async () => {
+    const src = createAcessoSource({ mode: 'mock' })
+    const r = await src.reativar('m9')
+    expect(r.emailMicrosoft).toBe('joana.teste@betinhos.onmicrosoft.com')
+    expect(r.senhaTemporaria).toHaveLength(14)
+    expect(r.etapas.find((e) => e.etapa === 'senha')?.estado).toBe('feita')
+    await expect(src.reativar('m7')).rejects.toMatchObject({ codigo: 'FUNCIONARIO_SEM_EMAIL' })
   })
 
   it('dataverse chama as Custom APIs com os nomes de parâmetro do plugin', async () => {
     const calls: { path: string; body: unknown }[] = []
-    const client = { request: async (path: string, init: { body: string }) => { calls.push({ path, body: JSON.parse(init.body) }); return path.includes('Cadastrar') ? { EmailMicrosoft: 'a@b', SenhaTemporaria: 's', FuncionarioId: 'f', LinkApp: 'l', Etapas: '[]' } : { Etapas: '[{"etapa":"conta","estado":"feita","detalhe":""}]' } } }
+    const client = { request: async (path: string, init: { body: string }) => { calls.push({ path, body: JSON.parse(init.body) }); return path.includes('Cadastrar') || path.includes('Reativar') ? { EmailMicrosoft: 'a@b', SenhaTemporaria: 's', FuncionarioId: 'f', LinkApp: 'l', Etapas: '[]' } : { Etapas: '[{"etapa":"conta","estado":"feita","detalhe":""}]' } } }
     const src = createAcessoSource({ mode: 'dataverse', client } as never)
     const r = await src.cadastrar({ nomeCompleto: 'A B', celular: '12991234567', tipoVinculo: 1, funcionarioId: 'F1' })
     expect(calls[0]).toEqual({ path: 'cr40f_CadastrarAcessoMotorista', body: { NomeCompleto: 'A B', Celular: '12991234567', TipoVinculo: 1, FuncionarioId: 'F1' } })
     expect(r).toEqual({ emailMicrosoft: 'a@b', senhaTemporaria: 's', funcionarioId: 'f', linkApp: 'l', etapas: [] })
     await src.encerrar('F1', 'Ana')
     expect(calls[1]).toEqual({ path: 'cr40f_EncerrarAcessoMotorista', body: { FuncionarioId: 'F1', Confirmacao: 'Ana' } })
+    expect(await src.reativar('F1')).toEqual({ emailMicrosoft: 'a@b', senhaTemporaria: 's', linkApp: 'l', etapas: [] })
+    expect(calls[2]).toEqual({ path: 'cr40f_ReativarAcessoMotorista', body: { FuncionarioId: 'F1' } })
   })
 
   it('parseAcessoError lê só o primeiro array de etapas mesmo com texto e colchetes do Dataverse depois', () => {
@@ -75,7 +88,9 @@ describe('acesso', () => {
     expect(erro.etapas).toEqual([{ etapa: 'usuario', estado: 'feita', detalhe: 'criado [ok]' }, { etapa: 'licenca', estado: 'erro', detalhe: '503' }])
   })
 
-  it('ACESSO_ENCERRADO tem mensagem própria', () => {
-    expect(parseAcessoError(new Error('ACESSO_ENCERRADO: x | etapas=[]')).message).toBe('Acesso encerrado antes. Peça à TI para reativar a conta no Entra.')
+  it('ACESSO_ENCERRADO aponta para Reativar; CONTA_NAO_EXISTE e SEM_PERMISSAO_SENHA têm mensagem própria', () => {
+    expect(parseAcessoError(new Error('ACESSO_ENCERRADO: x | etapas=[]')).message).toBe('Acesso encerrado antes. Use "Reativar acesso" na ficha do funcionário.')
+    expect(parseAcessoError(new Error('CONTA_NAO_EXISTE: x')).message).toBe('A conta Microsoft não existe mais; cadastre o acesso de novo.')
+    expect(parseAcessoError(new Error('SEM_PERMISSAO_SENHA: x')).message).toBe('Falta a permissão User-PasswordProfile.ReadWrite.All no app do Graph.')
   })
 })

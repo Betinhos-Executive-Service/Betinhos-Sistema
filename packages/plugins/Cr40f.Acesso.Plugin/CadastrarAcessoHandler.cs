@@ -9,6 +9,7 @@ public sealed class CadastroSaida { public string EmailMicrosoft = ""; public st
 /// <summary>Cadastro idempotente: cada etapa confere o estado antes de agir. Falha relança com as etapas em Data["Etapas"].</summary>
 public sealed class CadastrarAcessoHandler
 {
+    internal const string MsgEncerrado = "Acesso encerrado antes. Use \"Reativar acesso\" na ficha do funcionário.";
     private readonly IGraphGateway _graph; private readonly FuncionarioRepository _repo; private readonly UsuarioDataverseRepository _usuarios; private readonly IPowerPlatformGateway _pp; private readonly AcessoConfig _cfg; private readonly Random _rng; private readonly Action<string> _trace;
     public CadastrarAcessoHandler(IGraphGateway graph, FuncionarioRepository repo, UsuarioDataverseRepository usuarios, IPowerPlatformGateway pp, AcessoConfig cfg, Random rng, Action<string> trace)
     { _graph = graph; _repo = repo; _usuarios = usuarios; _pp = pp; _cfg = cfg; _rng = rng; _trace = trace; }
@@ -30,8 +31,8 @@ public sealed class CadastrarAcessoHandler
                 if (ex?.EmailMicrosoft is { Length: > 0 } ja)
                 {
                     em = ja.ToLowerInvariant();
-                    // R10: conta desativada nunca é reativada aqui; a TI decide.
-                    if (_graph.UsuarioPorUpn(em) is { Ativo: false }) throw new AcessoException("ACESSO_ENCERRADO", "Acesso encerrado antes. Peça à TI para reativar a conta no Entra.");
+                    // R10: conta desativada nunca é reativada pelo cadastro; o caminho é "Reativar acesso".
+                    if (_graph.UsuarioPorUpn(em) is { Ativo: false }) throw new AcessoException("ACESSO_ENCERRADO", CadastrarAcessoHandler.MsgEncerrado);
                     etapas.Pulada("email", "funcionário já tinha e-mail Microsoft");
                 }
                 else
@@ -57,7 +58,7 @@ public sealed class CadastrarAcessoHandler
                 var u = _graph.UsuarioPorUpn(email);
                 if (u is not null)
                 {
-                    if (!u.Ativo) throw new AcessoException("ACESSO_ENCERRADO", "Acesso encerrado antes. Peça à TI para reativar a conta no Entra.");
+                    if (!u.Ativo) throw new AcessoException("ACESSO_ENCERRADO", CadastrarAcessoHandler.MsgEncerrado);
                     etapas.Pulada("usuario", "já existia; senha não alterada"); return u;
                 }
                 if (_graph.LicencasLivres(_cfg.LicenseSkuId) <= 0) throw new AcessoException("SEM_LICENCA_DISPONIVEL", "Não há licença livre no plano configurado.");
@@ -80,16 +81,8 @@ public sealed class CadastrarAcessoHandler
             });
 
             // Antes do funcionário: gravar cr40f_emailmicrosoft dispara o DriverRecordSharing, que exige o systemuser.
-            etapas.Executar("systemuser", () =>
-            {
-                // A conta do Entra já está ativa aqui (desativada parou em "usuario" com ACESSO_ENCERRADO). systemuser ausente,
-                // desabilitado ou sem licença é ressincronizado pelo addUser do Power Platform (Create pelo SDK nasce sem licença).
-                var objectId = Guid.Parse(usuario.Id);
-                if (_usuarios.Pronto(objectId)) { etapas.Pulada("systemuser", "já existe no Dataverse"); return; }
-                _pp.SincronizarUsuario(objectId);
-                if (!_usuarios.AguardarPronto(objectId)) throw new AcessoException("USUARIO_DATAVERSE_PENDENTE", "A conta foi criada, mas o Dataverse ainda não a reconhece. Tente de novo em alguns minutos.");
-                etapas.Feita("systemuser", "sincronizado pelo Power Platform");
-            });
+            // A conta do Entra já está ativa aqui (desativada parou em "usuario" com ACESSO_ENCERRADO).
+            GarantirSystemuser(etapas, _usuarios, _pp, usuario.Id);
 
             saida.FuncionarioId = etapas.Executar("funcionario", () =>
             {
@@ -107,6 +100,17 @@ public sealed class CadastrarAcessoHandler
             throw;
         }
     }
+
+    /// <summary>systemuser ausente, desabilitado ou sem licença é ressincronizado pelo addUser do Power Platform (Create pelo SDK nasce sem licença).</summary>
+    internal static void GarantirSystemuser(Etapas etapas, UsuarioDataverseRepository usuarios, IPowerPlatformGateway pp, string usuarioEntraId)
+        => etapas.Executar("systemuser", () =>
+        {
+            var objectId = Guid.Parse(usuarioEntraId);
+            if (usuarios.Pronto(objectId)) { etapas.Pulada("systemuser", "já existe no Dataverse"); return; }
+            pp.SincronizarUsuario(objectId);
+            if (!usuarios.AguardarPronto(objectId)) throw new AcessoException("USUARIO_DATAVERSE_PENDENTE", "A conta foi criada, mas o Dataverse ainda não a reconhece. Tente de novo em alguns minutos.");
+            etapas.Feita("systemuser", "sincronizado pelo Power Platform");
+        });
 
     /// <summary>
     /// O e-mail só conta como ocupado se pertence a outra pessoa. Reaproveita (idempotência) quando o funcionário dono

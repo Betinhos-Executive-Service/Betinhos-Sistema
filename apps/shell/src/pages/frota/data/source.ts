@@ -1,6 +1,6 @@
 import type { DateBehavior } from './dates'
 import type { Acordo } from '../domain/termoMulta'
-import type { FrotaData, Kind, TableKey, TermoMulta } from './types'
+import type { FrotaData, Kind, ParcelaTermo, TableKey, TermoMulta } from './types'
 
 export type LoadResult = { data: FrotaData; errors: Partial<Record<TableKey, string>> }
 
@@ -59,6 +59,10 @@ export interface DataSource {
   enviarTermoMulta(multaId: string, acordo: Acordo): Promise<string>
   /** Cancela o envio de um termo ainda Pendente. */
   cancelarTermoMulta(termoId: string): Promise<void>
-  /** Abre o PDF do termo assinado. */
-  baixarPdfTermo(termoId: string): Promise<void>
+  /** Custom API new_LembrarTermoMulta: reenvia o push ao motorista (1 por 24 h; a recusa vem com a mensagem do servidor). */
+  lembrarTermoMulta(termoId: string): Promise<void>
+  /** Custom API new_BaixarPdfTermoMulta: PDF do termo assinado (base64 do servidor convertido em Blob). */
+  baixarPdfTermo(termoId: string): Promise<{ nome: string; blob: Blob }>
+  /** Parcelas de desconto em folha do termo, na ordem. */
+  listarParcelasTermo(termoId: string): Promise<ParcelaTermo[]>
 }

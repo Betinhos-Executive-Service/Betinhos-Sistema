@@ -7,7 +7,8 @@ Data: 22/10/2026 · Aprovado por Renan (brainstorm desta data).
 Colocar um motorista novo (fixo ou terceiro esporádico) para usar o App Motoristas em poucos minutos, sem a operação ter que criar e-mail no Microsoft 365, atribuir licença, entrar no Entra e colocar no grupo à mão. O motorista abre o app pela URL no navegador do celular; não precisa instalar o Power Apps Mobile.
 
 - Botão **Cadastrar acesso** na Tela Funcionários: nome, celular e e-mail pessoal (opcional) → conta Microsoft, licença, grupo, funcionário e credenciais prontas para mandar no WhatsApp.
-- Botão **Encerrar acesso** na ficha de qualquer funcionário com conta: remove do grupo, tira a licença, bloqueia o login, inativa o funcionário. Com dupla confirmação.
+- Botão **Encerrar acesso** na ficha de qualquer funcionário com acesso ativo: remove do grupo, tira a licença e bloqueia o login. Não mexe no cadastro do funcionário. Com dupla confirmação.
+- Botão **Reativar acesso** na ficha de quem teve o acesso encerrado: desbloqueia a conta, gera senha nova, devolve licença, grupo e usuário do Dataverse.
 - Vale para todos os funcionários (colaborador ou terceiro), não só para terceiros.
 
 Fora do escopo: link por serviço sem login (descartado), convidado B2B com e-mail próprio (descartado), envio automático de WhatsApp (hoje só há links `wa.me`), MFA (o tenant não exige), autocadastro pelo próprio motorista, publicação no PROD (segue o congelamento do checklist).
@@ -29,7 +30,9 @@ Fora do escopo: link por serviço sem login (descartado), convidado B2B com e-ma
 4. Licença: SKU vem do unsecure config do step (`{"licenseSkuId":"...","groupId":"...","appUrl":"..."}`), para trocar de Developer para outro plano sem recompilar.
 5. Idempotência: cada passo consulta antes de agir (usuário existe? licença atribuída? membro do grupo? funcionário com esse e-mail?). Reexecutar completa o que faltou.
 6. Vínculo com `cr40f_funcionarios`: se vier `funcionarioId`, o plugin só preenche `cr40f_emailmicrosoft` (e celular se vazio); senão cria o registro com `cr40f_funcao` Motorista, `cr40f_tipodevinculo` informado na tela (padrão Terceiro), `cr40f_status` ativo. O backfill de compartilhamento é do `DriverRecordSharing`, já existente.
-7. Encerrar acesso nunca exclui nada: remove do grupo, remove a licença, `accountEnabled=false` no Entra, `cr40f_status` = Desligado (1; o choice é 0 Ativo, 2 Afastado, 1 Desligado) e `cr40f_datadedemissao` = hoje se vazia. O e-mail Microsoft fica no funcionário para histórico.
+7. Dar ou tirar acesso não tem relação com admissão, demissão ou desligamento (decisão do Renan, 23/10/2026). Encerrar acesso nunca exclui nada e só mexe no acesso: remove a licença, `accountEnabled=false` no Entra e remove do grupo. `cr40f_status` e `cr40f_datadedemissao` não mudam. O e-mail Microsoft fica no funcionário. O cadastro também não muda o status de funcionário existente (só grava `cr40f_emailmicrosoft` e o celular se vazio).
+7a. Reativar acesso (`cr40f_ReativarAcessoMotorista`, 23/10/2026): para quem tem `cr40f_emailmicrosoft` e conta no Entra. Reativa a conta se desativada, atribui licença e grupo se faltarem, garante o systemuser como no cadastro e, por último, redefine a senha (nova a cada execução, sem troca obrigatória, via `PATCH /users/{id}` com `passwordProfile`, permissão `User-PasswordProfile.ReadWrite.All`; por último para que uma falha antes não deixe senha nova que ninguém viu). Idempotente no resto. Conta inexistente → `CONTA_NAO_EXISTE`; 403 na senha → as outras etapas já terminaram e volta `SEM_PERMISSAO_SENHA` (a ficha passa a "Acesso ativo" com o aviso). O cadastro com conta desativada continua em `ACESSO_ENCERRADO`, com mensagem apontando para "Reativar acesso".
+7b. Estado do bloco "Acesso ao app" vem do systemuser do Dataverse cujo `internalemailaddress` é o `cr40f_emailmicrosoft`, nunca de `cr40f_status`: sem e-mail → "Sem acesso ao app" (Cadastrar); systemuser habilitado → "Acesso ativo" (Encerrar); desabilitado ou ausente → "Acesso encerrado" (Reativar). Logo depois de encerrar ou reativar a tela usa o resultado da API, porque o Dataverse sincroniza o systemuser depois.
 8. Dupla confirmação no encerramento: (1) diálogo "Encerrar acesso de <nome>?" com o que vai acontecer; (2) campo onde o usuário digita o primeiro nome do funcionário e botão "Encerrar acesso" habilitado só com o nome igual. Durante a chamada o overlay não fecha.
 9. Quem pode: função de segurança nova **Acesso - Gestão de Motoristas**, com privilégio nas duas Custom APIs (`cr40f_` privilégio próprio por API) e leitura/escrita em `cr40f_funcionarios`. Administrador do Sistema também pode. A tela não consulta privilégios antes: tenta a chamada e trata 403 (ver 4.3).
 10. Entrega no DEV. PROD depois do congelamento do checklist, junto com a AppBetinhos.
@@ -47,6 +50,11 @@ Fora do escopo: link por serviço sem login (descartado), convidado B2B com e-ma
 - Entrada: `FuncionarioId` (guid, obrigatório), `Confirmacao` (string: primeiro nome digitado; o plugin confere de novo).
 - Saída: `Etapas` (JSON). Erros: `FUNCIONARIO_SEM_EMAIL`, `CONFIRMACAO_INVALIDA`, `GRAPH_INDISPONIVEL`.
 
+**`cr40f_ReativarAcessoMotorista`**
+- Entrada: `FuncionarioId` (guid, obrigatório).
+- Saída: `EmailMicrosoft`, `SenhaTemporaria` ("Senha" na tela), `LinkApp`, `Etapas` (usuario, conta, senha, licenca, grupo, systemuser).
+- Erros: `FUNCIONARIO_SEM_EMAIL`, `CONTA_NAO_EXISTE`, `SEM_PERMISSAO_SENHA`, `SEM_LICENCA_DISPONIVEL`, `USUARIO_DATAVERSE_PENDENTE`, `GRAPH_INDISPONIVEL`.
+
 ### 4.2 Plugin `packages/plugins/Cr40f.Acesso.Plugin` (+ `.Tests`)
 
 - `CadastrarAcessoMotoristaPlugin` e `EncerrarAcessoMotoristaPlugin`: só orquestram. Construtor `(string unsecureConfig, string secureConfig)`.
@@ -55,12 +63,13 @@ Fora do escopo: link por serviço sem login (descartado), convidado B2B com e-ma
 - `GraphGateway` (interface `IGraphGateway` + implementação HTTP com `HttpClient`, token client credentials em cache por execução): `UsuarioPorEmail`, `CriarUsuario`, `DefinirAccountEnabled`, `LicencasDoUsuario`, `AtribuirLicenca`, `RemoverLicenca`, `EhMembro`, `AdicionarAoGrupo`, `RemoverDoGrupo`, `SkusDisponiveis`. Testes com gateway fake (`FakeGraphGateway`) cobrindo cada etapa pulada/feita/erro.
 - `FuncionarioRepository`: busca por id, por `cr40f_emailmicrosoft`, por celular; cria/atualiza com o serviço do sistema (`CreateOrganizationService(null)`) para não exigir privilégio de escrita direta do chamador em campos sensíveis. O chamador precisa do privilégio da Custom API.
 - Trace: nunca registra senha nem segredo; registra e-mail e etapas.
-- Permissões do app registration no Entra (criado pelo Renan, passo a passo em `docs/acesso-motorista-entra.md`): `User.ReadWrite.All` (criar, desabilitar e `assignLicense`), `GroupMember.ReadWrite.All` (grupo) e `Organization.Read.All` (SKUs disponíveis), com consentimento de administrador. O secret é digitado no script de provisão (seção 6), nunca versionado.
+- Permissões do app registration no Entra (criado pelo Renan, passo a passo em `docs/acesso-motorista-entra.md`): `User.ReadWrite.All` (criar, desabilitar e `assignLicense`), `GroupMember.ReadWrite.All` (grupo), `Organization.Read.All` (SKUs disponíveis) e `User-PasswordProfile.ReadWrite.All` (senha na reativação), com consentimento de administrador. O secret é digitado no script de provisão (seção 6), nunca versionado.
 
 ### 4.3 Tela (shell React, `apps/shell/src/pages/funcionarios/`)
 
 - `components/CadastroAcessoDrawer.tsx`: aberto por "Cadastrar acesso" (cabeçalho da lista: cria funcionário novo) ou pela ficha de um funcionário sem `cr40f_emailmicrosoft` (preenche nome e celular, envia `FuncionarioId`). Campos: nome, celular, e-mail pessoal, vínculo (Colaborador/Terceiro, padrão Terceiro), prévia do e-mail Microsoft editável no prefixo. Estados: preenchendo → criando (overlay não fecha; botão desabilitado) → resultado → erro. Resultado: e-mail, senha com "copiar" e aviso "aparece só agora", botão "Enviar no WhatsApp" (`whatsappHref(celular, mensagem)`), "Abrir ficha". Erro: código traduzido, lista de etapas feitas, "Tentar de novo" (idempotente). Fechar com dado digitado e não enviado → "Descartar alterações?".
-- `components/EncerrarAcessoDialog.tsx`: duas etapas (decisão 8). Depois do sucesso, a ficha mostra "Acesso encerrado" (derivado de `cr40f_status` = Desligado + e-mail presente; Afastado conta como ativo).
+- `components/EncerrarAcessoDialog.tsx`: duas etapas (decisão 8). Depois do sucesso, o bloco mostra "Acesso encerrado" e "Reativar acesso" (decisão 7b).
+- `components/ReativarAcessoDialog.tsx`: "Reativar acesso de <nome>?" com o que acontece → resultado com e-mail, senha nova (copiar, "aparece só agora"), link e "Enviar no WhatsApp" (reusa `CredenciaisAcesso`, `ListaEtapas` e `FecharSemEnviarDialog` do drawer). Fechar com a senha na tela pede confirmação (R13).
 - Ficha: na aba Dados, bloco "Acesso ao app": e-mail Microsoft, estado (sem acesso / ativo / encerrado) e o botão correspondente. 403 na chamada → toast "Você não tem permissão para gerir acessos" e o botão some na sessão.
 - Mensagem do WhatsApp (pt-BR, sem introdução): link do app, e-mail, senha definitiva (sem troca no primeiro acesso, decisão de 23/10/2026), "abra pelo navegador do celular e, se quiser, adicione à tela inicial".
 - `data/acesso.ts`: `cadastrarAcesso(input)` / `encerrarAcesso(input)` chamando `Xrm.WebApi.online.execute`; mock em `data/mock.ts` com um caso feliz, um e-mail em uso e um `GRAPH_INDISPONIVEL` (controlado pelo nome digitado, p.ex. "Erro Graph").
@@ -70,7 +79,9 @@ Fora do escopo: link por serviço sem login (descartado), convidado B2B com e-ma
 
 Cadastrar: tela valida → `cr40f_CadastrarAcessoMotorista` → plugin lê config → gera e-mail (consulta Graph e `cr40f_funcionarios` para sufixo) → cria/obtém usuário Entra (senha nova só quando cria) → atribui licença se faltar → adiciona ao grupo se faltar → garante o `systemuser` no Dataverse (busca por `azureactivedirectoryobjectid`; habilitado e licenciado → pulada; ausente, desabilitado ou sem licença com a conta do Entra ativa → `addUser` do Power Platform admin API com o object id, acompanha o 202 pelo `Location` por até ~40 s e consulta o systemuser de novo por até ~25 s; ainda ausente → `USUARIO_DATAVERSE_PENDENTE`, retry idempotente; `addUser` recusado → `GRAPH_INDISPONIVEL`) → cria/atualiza funcionário → devolve credenciais + etapas. Usuário já existente e ativo sem `FuncionarioId` com o mesmo e-mail em outro funcionário → `EMAIL_EM_USO_POR_OUTRO_FUNCIONARIO` (não sobrescreve).
 
-Encerrar: tela confirma duas vezes → `cr40f_EncerrarAcessoMotorista` → plugin confere nome → remove do grupo, remove licença, desabilita conta, inativa funcionário → etapas.
+Encerrar: tela confirma duas vezes → `cr40f_EncerrarAcessoMotorista` → plugin confere nome → remove licença, desabilita conta, remove do grupo → etapas (funcionário intocado).
+
+Reativar: tela confirma → `cr40f_ReativarAcessoMotorista` → conta ativa → licença e grupo se faltarem → systemuser → senha nova → credenciais + etapas.
 
 Falha parcial: o plugin não desfaz o que já fez (criar usuário e falhar na licença é recuperável por nova chamada); a saída `Etapas` diz o que ficou.
 

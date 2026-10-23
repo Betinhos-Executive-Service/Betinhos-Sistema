@@ -1,9 +1,9 @@
-import type { AcessoSource, CadastroResultado, Etapa } from './acesso'
+import type { AcessoSource, CadastroResultado, Etapa, ReativacaoResultado } from './acesso'
 import { AcessoError, MENSAGENS } from './acesso'
 import { normalizeSearch as semAcentos } from './format'
 
 const delay = <T,>(value: T, ms = 400) => new Promise<T>((resolve) => setTimeout(() => resolve(value), ms))
-const MOCK_FUNCIONARIOS: Record<string, { nome: string; email: string | null }> = { m1: { nome: 'Carlos Alberto Teste', email: 'carlos.teste@betinhos.onmicrosoft.com' }, m7: { nome: 'Helena Simulada Costa', email: null } }
+const MOCK_FUNCIONARIOS: Record<string, { nome: string; email: string | null }> = { m1: { nome: 'Carlos Alberto Teste', email: 'carlos.teste@betinhos.onmicrosoft.com' }, m7: { nome: 'Helena Simulada Costa', email: null }, m9: { nome: 'Joana Encerrada Teste', email: 'joana.teste@betinhos.onmicrosoft.com' } }
 
 /** Simulação em memória: nome com "Erro Graph" falha depois de criar o usuário; "Sem Licenca" falha antes. */
 export function createAcessoMock(): AcessoSource {
@@ -32,8 +32,17 @@ export function createAcessoMock(): AcessoSource {
       const f = MOCK_FUNCIONARIOS[funcionarioId] ?? { nome: 'Funcionário Mock', email: 'x@betinhos.onmicrosoft.com' }
       if (!f.email) throw new AcessoError('FUNCIONARIO_SEM_EMAIL', MENSAGENS.FUNCIONARIO_SEM_EMAIL, [])
       if (semAcentos(confirmacao.trim()) !== semAcentos(f.nome.split(/\s+/)[0])) throw new AcessoError('CONFIRMACAO_INVALIDA', MENSAGENS.CONFIRMACAO_INVALIDA, [])
-      const etapas: Etapa[] = [{ etapa: 'confirmacao', estado: 'feita', detalhe: 'ok' }, { etapa: 'licenca', estado: 'feita', detalhe: 'removida' }, { etapa: 'conta', estado: 'feita', detalhe: 'desativada' }, { etapa: 'grupo', estado: 'feita', detalhe: 'removido' }, { etapa: 'funcionario', estado: 'feita', detalhe: 'inativado' }]
+      const etapas: Etapa[] = [{ etapa: 'confirmacao', estado: 'feita', detalhe: 'ok' }, { etapa: 'licenca', estado: 'feita', detalhe: 'removida' }, { etapa: 'conta', estado: 'feita', detalhe: 'desativada' }, { etapa: 'bloqueio', estado: 'feita', detalhe: 'bloqueado no Dataverse' }, { etapa: 'grupo', estado: 'feita', detalhe: 'removido' }]
       return delay(etapas)
+    },
+    async reativar(funcionarioId) {
+      const f = MOCK_FUNCIONARIOS[funcionarioId] ?? { nome: 'Funcionário Mock', email: 'x@betinhos.onmicrosoft.com' }
+      if (!f.email) throw new AcessoError('FUNCIONARIO_SEM_EMAIL', MENSAGENS.FUNCIONARIO_SEM_EMAIL, [])
+      const resultado: ReativacaoResultado = {
+        emailMicrosoft: f.email, senhaTemporaria: 'Rz4!tW8nQ2kM6p', linkApp: 'https://org23b93544.crm2.dynamics.com/WebResources/new_app-motoristas-v2',
+        etapas: [{ etapa: 'usuario', estado: 'feita', detalhe: 'encontrado' }, { etapa: 'conta', estado: 'feita', detalhe: 'reativada' }, { etapa: 'licenca', estado: 'feita', detalhe: 'atribuída' }, { etapa: 'grupo', estado: 'feita', detalhe: 'adicionado' }, { etapa: 'systemuser', estado: 'feita', detalhe: 'sincronizado pelo Power Platform' }, { etapa: 'senha', estado: 'feita', detalhe: 'redefinida' }],
+      }
+      return delay(resultado)
     },
   }
 }

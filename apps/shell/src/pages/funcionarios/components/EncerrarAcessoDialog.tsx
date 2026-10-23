@@ -33,7 +33,7 @@ export function EncerrarAcessoDialog({ open, nome, onCancel, onConfirmar }: Prop
         <ul>
           <li>Sai do grupo de motoristas e perde a licença.</li>
           <li>A conta Microsoft é bloqueada (não excluída).</li>
-          <li>O funcionário fica inativo com a data de hoje como demissão.</li>
+          <li>O cadastro do funcionário não muda (status e demissão ficam como estão).</li>
           <li>Nenhum registro é excluído.</li>
         </ul>
       ) : (
