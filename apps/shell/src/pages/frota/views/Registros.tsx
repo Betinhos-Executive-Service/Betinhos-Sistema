@@ -1,6 +1,6 @@
 import { Plus } from 'lucide-react'
 import { useMemo } from 'react'
-import { Button, EmptyState, SearchBox, SegmentedControl, Table, TableTitle, ViewBar } from '@betinhos/ui'
+import { Button, EmptyState, SearchBox, SegmentedControl, StatusBadge as Badge, Table, TableTitle, ViewBar } from '@betinhos/ui'
 import type { Host } from '../../../host'
 import { LazyFooter, useLazySlice } from '../../../app/LazyList'
 import { useDebouncedText } from '../../../app/search'
@@ -18,6 +18,7 @@ import { errorMessage } from '../data/xrm'
 import { linhas, type Linha } from '../domain/linhas'
 import { EXTRA, PESSOA, REGISTRO_SORT, matchesRegistroKeyword, readRegistro, registroBuiltins, registroColumns, registroFields, registroLegacy, sortRegistros, telaRegistros } from '../domain/listas'
 import { CATEGORIAS_MANUT } from '../domain/manutencaoCatalogo'
+import { TERMO_TOM } from '../domain/termoMulta'
 
 const PLURAL: Record<Kind, string> = { manutencao: 'Manutenções', multa: 'Multas', colisao: 'Colisões' }
 const LEGACY_KEYS = ['status', 'veiculo', 'pessoa', 'categoria', 'de', 'ate'] as const
@@ -107,6 +108,7 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload }
           { key: 'pessoa', header: PESSOA[kind], label: PESSOA[kind], sortable: true, defaultWidth: 190, hideBelow: 'mobile', cell: (linha) => linha.pessoa?.label || '—' },
           { key: 'extra', header: EXTRA[kind], label: EXTRA[kind], defaultWidth: 160, hideBelow: 'compact', cell: (linha) => <span className="frota-nowrap">{linha.extra}</span> },
           { key: 'status', header: 'Status', label: 'Status', sortable: true, defaultWidth: 160, width: 'minmax(110px, .8fr)', cell: (linha) => <StatusBadge kind={linha.kind} value={linha.status} /> },
+          ...(kind === 'multa' ? [{ key: 'termo', header: 'Termo', label: 'Termo', sortable: true, defaultWidth: 180, width: 'minmax(120px, .9fr)', hideBelow: 'compact' as const, cell: (linha: Linha) => (linha.termoStatus ? <Badge tone={TERMO_TOM[linha.termoStatus]}>{linha.termo}</Badge> : <span className="frota-muted">—</span>) }] : []),
         ]}
       />
       <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} />

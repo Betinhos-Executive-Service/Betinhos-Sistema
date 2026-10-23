@@ -10,6 +10,8 @@ import { filterRows } from '../../app/filterRows'
 import { useListView } from '../../app/useListView'
 import { useProgressiveData } from '../../app/useProgressiveData'
 import { useQueryFilters, useQueryId, useQueryTexto } from '../../nav/queryState'
+import { useHashQuery } from '../../nav/useHashRoute'
+import { destinoDeVolta } from './lib/voltar'
 import type { AlertKind } from './data/alerts'
 import { todaySP } from './data/dates'
 import { applyBaseFilters, applyFilters, countAlertas, DEFAULT_FILTERS, loadFilters, saveFilters, withAlertas, type Filters } from './data/filters'
@@ -75,6 +77,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   const [fichaId, setFichaId] = useQueryId('ficha')
   const selection: Selection = fichaId === null ? { mode: 'closed' } : fichaId === 'novo' ? { mode: 'new' } : { mode: 'open', id: fichaId }
   const setSelection = (next: Selection) => setFichaId(next.mode === 'closed' ? null : next.mode === 'new' ? 'novo' : next.id)
+  const voltar = destinoDeVolta(useHashQuery())
   const today = todaySP()
 
   useEffect(() => { if (mobile) saveFilters(filters) }, [mobile, filters])
@@ -129,7 +132,8 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
       void reload()
     }
     if (created) setSelection({ mode: 'open', id })
-  }, [source, reload, mutate])
+    else if (voltar) location.hash = voltar
+  }, [source, reload, mutate, voltar])
 
   const [acessoAberto, setAcessoAberto] = useState<{ inicial?: AcessoInicial } | null>(null)
   // A ficha aberta no mesmo funcionário não recarrega só com setSelection: a versão força a releitura.
@@ -144,7 +148,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
 
   const ativos = views.filter((row) => row.values.cr40f_status === 0).length
   const ficha = selection.mode !== 'closed' && (
-    <Ficha source={source} docs={docs} id={selection.mode === 'open' ? selection.id : null} onClose={() => setSelection({ mode: 'closed' })} onSaved={onSaved} versao={fichaVersao} acesso={acesso} onCadastrarAcesso={(inicial) => setAcessoAberto({ inicial })} />
+    <Ficha source={source} docs={docs} id={selection.mode === 'open' ? selection.id : null} onClose={() => { if (voltar) location.hash = voltar; else setSelection({ mode: 'closed' }) }} onSaved={onSaved} versao={fichaVersao} acesso={acesso} onCadastrarAcesso={(inicial) => setAcessoAberto({ inicial })} />
   )
 
   if (mobile) {

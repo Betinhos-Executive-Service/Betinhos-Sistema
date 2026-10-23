@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calcularParcelas, validarAcordo, type Acordo } from './termoMulta'
+import { calcularParcelas, expiraEm, rotuloTermo, validarAcordo, type Acordo } from './termoMulta'
 
 const folha: Acordo = { forma: 'folha', parcelas: 3, valorTotal: 195.23, primeiraCompetencia: '2026-11-01' }
 const ctxOk = { temAditivo: true, recursoPendente: false, temMotorista: true, termoPendente: false }
@@ -83,5 +83,22 @@ describe('validarAcordo', () => {
     expect(validarAcordo(ruim, { ...ctxOk, recursoPendente: true })).toBe(MSG.parcelas)
     expect(validarAcordo({ ...ruim, parcelas: 3 }, { ...ctxOk, recursoPendente: true })).toBe(MSG.competencia)
     expect(validarAcordo({ ...ruim, parcelas: 3, primeiraCompetencia: '2026-11-01' }, { ...ctxOk, recursoPendente: true })).toBe(MSG.valor)
+  })
+})
+
+describe('prazo e rótulo do termo (v2)', () => {
+  it('expira 7 dias depois do envio, no dia de São Paulo', () => {
+    expect(expiraEm('2026-10-20T13:00:00Z')).toBe('2026-10-27')
+    expect(expiraEm('2026-10-21T01:30:00Z')).toBe('2026-10-27')
+    expect(expiraEm(null)).toBeNull()
+  })
+  it('rótulo da coluna Termo', () => {
+    expect(rotuloTermo({ status: 'pendente', enviadoEm: '2026-10-20T13:00:00Z' })).toBe('Pendente · expira 27/10')
+    expect(rotuloTermo({ status: 'pendente', enviadoEm: null })).toBe('Pendente')
+    expect(rotuloTermo({ status: 'assinado', enviadoEm: null })).toBe('Assinado')
+    expect(rotuloTermo({ status: 'contestado', enviadoEm: null })).toBe('Contestado')
+    expect(rotuloTermo({ status: 'expirado', enviadoEm: null })).toBe('Expirado')
+    expect(rotuloTermo({ status: 'cancelado', enviadoEm: null })).toBe('Cancelado')
+    expect(rotuloTermo(null)).toBe('')
   })
 })

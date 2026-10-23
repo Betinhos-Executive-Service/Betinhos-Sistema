@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { brl } from '../data/format'
 import { MANUT } from '../data/schema'
 import { EMPTY_DATA } from '../data/source'
 import type { FrotaData } from '../data/types'
 import { toCsv } from './csv'
 import { linhas } from './linhas'
+import { readRegistro, registroBuiltins, registroColumns } from './listas'
 import { buildTimeline } from './timeline'
 
 const v1 = { id: 'v1', label: 'ABC1D23' }
@@ -26,6 +28,33 @@ describe('buildTimeline', () => {
 describe('linhas', () => {
   it('monta as linhas de manutenção da mais recente para a mais antiga', () => {
     expect(linhas('manutencao', data).map((item) => [item.id, item.dia, item.extra])).toEqual([['m2', '2026-10-01', 'Alta'], ['m1', '2026-09-20', 'R$ 200,00']])
+  })
+})
+
+describe('termo na lista de multas (v2)', () => {
+  const multa = data.multas[0]
+  const comTermo: FrotaData = {
+    ...data,
+    infracoes: [{ id: 'i1', codigo: '7455', descricao: null, gravidade: null, pontos: null, valor: 130.16 }],
+    multas: [
+      { ...multa, id: 'u1', termo: { status: 'pendente', enviadoEm: '2026-10-20T13:00:00Z' }, valorGuia: 88.38, infracaoId: 'i1' },
+      { ...multa, id: 'u2', termo: { status: 'contestado', enviadoEm: null }, infracaoId: 'i1' },
+      { ...multa, id: 'u3', termo: null, infracaoId: null },
+    ],
+  }
+  it('coluna Termo com rótulo e valor da guia antes do catálogo', () => {
+    const [u1, u2, u3] = linhas('multa', comTermo).sort((a, b) => a.id.localeCompare(b.id))
+    expect([u1.termo, u2.termo, u3.termo]).toEqual(['Pendente · expira 27/10', 'Contestado', ''])
+    expect([u1.extra, u2.extra]).toEqual([brl(88.38), brl(130.16)])
+    expect(readRegistro(u1, 'termo')).toBe('pendente')
+    expect(readRegistro(u3, 'termo')).toBeNull()
+  })
+  it('só multas têm a coluna Termo e as visões Termos pendentes e Contestados', () => {
+    expect(registroColumns('multa').map((c) => c.key)).toContain('termo')
+    expect(registroColumns('manutencao').map((c) => c.key)).not.toContain('termo')
+    expect(registroBuiltins('multa').map((v) => v.name)).toEqual(['A notificar', 'Termos pendentes', 'Contestados'])
+    const filtros = JSON.parse(registroBuiltins('multa')[1].config).filters.quick.termo
+    expect(filtros.values.map((v: { value: string }) => v.value)).toEqual(['pendente'])
   })
 })
 
