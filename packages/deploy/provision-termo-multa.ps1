@@ -268,6 +268,8 @@ if ($termoId) {
   Ensure-AttributeOn $termo (DateTimeLocal "new_UltimoLembreteEm" "Último lembrete em" "Quando o último lembrete de assinatura foi enviado ao motorista")
   Ensure-AttributeOn $termo (Text "new_CopiaCanal" "Canal da cópia" "Canal usado para enviar a cópia" 50)
   Ensure-Lookup "new_cr40f_multas_new_termomulta_multa" $multas $termo "new_Multa" "Multa" "Multa a que o termo se refere" "RemoveLink"
+  # Quem enviou o termo (gravado pelo plugin no envio); o createdby é SYSTEM porque o plugin cria o termo como sistema.
+  Ensure-Lookup "new_systemuser_new_termomulta_enviadopor" "systemuser" $termo "new_EnviadoPor" "Enviado por" "Usuário que enviou o termo ao motorista" "RemoveLink"
   Ensure-Lookup "new_cr40f_funcionarios_new_termomulta_motorista" $func $termo "new_Motorista" "Motorista" "Motorista que assina o termo" "RemoveLink"
 }
 if ($parcelaId) {
@@ -321,7 +323,7 @@ foreach ($seed in @(@(100000000, "Termo", $placeholderTermo), @(100000001, "Adit
 
 # Conferencia final.
 $esperado = @{
-  $termo = @("new_name", "new_multa", "new_motorista", "new_status", "new_formapagamento", "new_parcelas", "new_valortotal", "new_valorparcela", "new_primeiracompetencia", "new_versaotexto", "new_textotermo", "new_evidenciasjson", "new_selfie", "new_assinaturajson", "new_assinatura", "new_latitude", "new_longitude", "new_precisaogps", "new_dispositivo", "new_enviadoem", "new_assinadoem", "new_motivocontestacao", "new_pdf", "new_hashpdf", "new_copiaenviadaem", "new_copiacanal", "new_ultimolembreteem")
+  $termo = @("new_name", "new_multa", "new_motorista", "new_status", "new_formapagamento", "new_parcelas", "new_valortotal", "new_valorparcela", "new_primeiracompetencia", "new_versaotexto", "new_textotermo", "new_evidenciasjson", "new_selfie", "new_assinaturajson", "new_assinatura", "new_latitude", "new_longitude", "new_precisaogps", "new_dispositivo", "new_enviadoem", "new_assinadoem", "new_motivocontestacao", "new_pdf", "new_hashpdf", "new_copiaenviadaem", "new_copiacanal", "new_ultimolembreteem", "new_enviadopor")
   $parcela = @("new_name", "new_termo", "new_motorista", "new_numero", "new_competencia", "new_valor", "new_status")
   $texto = @("new_name", "new_versao", "new_texto", "new_tipo", "new_vigente")
   $func = @("new_aditivoassinaturaem", "new_aditivoassinatura")

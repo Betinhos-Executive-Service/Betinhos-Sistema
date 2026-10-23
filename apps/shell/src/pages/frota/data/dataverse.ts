@@ -140,11 +140,11 @@ export function createXrmSource(xrm: XrmHost): DataSource {
     return url
   }
 
-  /** Último termo de cada multa para a coluna Termo. Falha aqui não derruba a lista de multas: a coluna fica vazia. */
+  /** Último termo de cada multa para a coluna Termo. Falha aqui não derruba a lista de multas: devolve null e a lista avisa. */
   async function resumoTermos() {
     try {
       const rows: Row[] = []
-      let page = await api.retrieveMultipleRecords(TERMO_TABLE, `?$select=${SELECT_RESUMO_TERMO.join(',')}&$orderby=createdon desc`, PAGE_SIZE)
+      let page = await api.retrieveMultipleRecords(TERMO_TABLE, `?$select=${SELECT_RESUMO_TERMO.join(',')}&$filter=_new_multa_value ne null&$orderby=createdon desc`, PAGE_SIZE)
       rows.push(...page.entities)
       while (page.nextLink) {
         page = await api.retrieveMultipleRecords(TERMO_TABLE, page.nextLink.slice(page.nextLink.indexOf('?')), PAGE_SIZE)
@@ -152,7 +152,7 @@ export function createXrmSource(xrm: XrmHost): DataSource {
       }
       return resumirTermos(rows)
     } catch {
-      return resumirTermos([])
+      return null
     }
   }
 
@@ -172,7 +172,7 @@ export function createXrmSource(xrm: XrmHost): DataSource {
     },
     multas: async () => {
       const [rows, behaviors, termos] = await Promise.all([retrieveAll('multas'), loadBehaviors(TABLE.multas), resumoTermos()])
-      return rows.map((row) => { const multa = mapMulta(row, behaviors); return { ...multa, termo: termos.get(multa.id) ?? null } })
+      return rows.map((row) => { const multa = mapMulta(row, behaviors); return { ...multa, termo: termos ? termos.get(multa.id) ?? null : undefined } })
     },
     infracoes: async () => (await retrieveAll('infracoes')).map(mapInfracao),
     colisoes: async () => (await retrieveAll('colisoes')).map(mapColisao),

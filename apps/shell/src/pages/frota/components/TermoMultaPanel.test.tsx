@@ -220,6 +220,34 @@ describe('TermoMultaPanel', () => {
     expect(screen.getByText(/Próximo lembrete a partir de/)).toBeTruthy()
   })
 
+  it('G4: o botão volta a habilitar quando passam as 24 h, sem novo render vindo de fora', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const quase = new Date(Date.now() - (24 * 3600 - 30) * 1000).toISOString()
+      await montar(fake({ listarTermos: vi.fn(async () => [termo({ ultimoLembreteEm: quase })]) }))
+      expect((screen.getByRole('button', { name: 'Lembrar motorista' }) as HTMLButtonElement).disabled).toBe(true)
+      await act(async () => { vi.advanceTimersByTime(61_000) })
+      expect((screen.getByRole('button', { name: 'Lembrar motorista' }) as HTMLButtonElement).disabled).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('G3: enquanto envia, o Enviar do diálogo fica ocupado', async () => {
+    let soltar!: () => void
+    const source = fake({ enviarTermoMulta: vi.fn(() => new Promise<string>((ok) => { soltar = () => ok('t9') })) })
+    await montar(source)
+    fireEvent.click(screen.getByRole('button', { name: 'Preparar termo' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar termo' }))
+    const enviar = within(screen.getByRole('dialog')).getByRole('button', { name: /Enviar/ })
+    await act(async () => { fireEvent.click(enviar) })
+    expect(source.enviarTermoMulta).toHaveBeenCalledTimes(1)
+    expect((within(screen.getByRole('dialog')).getByRole('button', { name: /Enviar/ }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(enviar)
+    expect(source.enviarTermoMulta).toHaveBeenCalledTimes(1)
+    await act(async () => { soltar() })
+  })
+
   it('G6: valor da guia fica travado com termo pendente', async () => {
     await montar(fake({ listarTermos: vi.fn(async () => [termo({})]) }))
     expect((screen.getByLabelText(/Valor da guia/) as HTMLInputElement).disabled).toBe(true)
