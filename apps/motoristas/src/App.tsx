@@ -139,6 +139,7 @@ import {
 } from "./lib/localWorkflow";
 import { LocalToast, type ToastState, type ToastTone } from "./components/common/LocalToast";
 import { LoadingOverlay, type LoadingOverlayState } from "./components/common/LoadingOverlay";
+import { getVisibleLoadingOverlay } from "./app/overlayLayering";
 import { CollisionScreen } from "./screens/CollisionScreen";
 import { ComunicadosScreen } from "./screens/ComunicadosScreen";
 import { TermosMultaScreen, type TermosLoadStatus } from "./screens/TermosMultaScreen";
@@ -1203,6 +1204,7 @@ function App() {
       })
       .catch((error) => {
         if (!alive) return;
+        setDataLoadingState(null);
         reportAppError(error, {
           severity: "critical",
           source: "app",
@@ -1509,7 +1511,7 @@ function App() {
         </motion.div>
       </AnimatePresence>
       <LocalToast toast={dataLoading ? null : toast} onDismiss={() => setToastState(null)} />
-      <LoadingOverlay loading={dataLoading} />
+      <LoadingOverlay loading={getVisibleLoadingOverlay(dataLoading, criticalError)} />
       {remoteOperation ? <FlowProgressOverlay operation={remoteOperation} /> : null}
       {expenseSend ? <ExpenseSendOverlay state={expenseSend} onClose={closeExpenseSendError} /> : null}
       {vehicleChoiceRequest ? (
