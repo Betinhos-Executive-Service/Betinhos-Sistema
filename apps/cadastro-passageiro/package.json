@@ -1,0 +1,16 @@
+{
+  "name": "@betinhos/cadastro-passageiro",
+  "version": "0.0.2",
+  "private": true,
+  "type": "module",
+  "description": "Link público de cadastro do passageiro (foto, telefone e e-mail) — Cloudflare Worker + flow HTTP",
+  "scripts": {
+    "dev": "node scripts/dev-restart.mjs 52418 .",
+    "push": "node scripts/bump-version.mjs && wrangler deploy",
+    "test": "node --test \"test/*.test.mjs\"",
+    "check": "node --check src/worker.mjs && node --check src/api.mjs && node --check public/app.js"
+  },
+  "devDependencies": {
+    "wrangler": "^4.147.0"
+  }
+}

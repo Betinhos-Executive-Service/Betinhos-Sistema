@@ -20,4 +20,10 @@ description: "Verifica o link público de cadastro do passageiro: tabela cr40f_l
 6. `provision-flow-cadastro-passageiro.ps1 -SiteUrl … -BibliotecaId … -Pasta …` (DRY RUN, depois `-Apply`). Chamar o gatilho com `{op:"ler",hash}` → 200; hash inexistente → 404; forçar `cr40f_expiraem` no passado → 410; `salvar` com foto → arquivo `<passageiroId>.jpg` no SharePoint e `new_linkdafoto` preenchido.
 
 ## Não verificável sem DEV
-Escrita no SharePoint, link de compartilhamento (política do tenant) e sobrescrita de arquivo com o mesmo nome.
+Dados reais do Dataverse e escrita no SharePoint (a sobrescrita foi confirmada no DEV em 23/10/2026).
+
+## Página pública (`apps/cadastro-passageiro`, Worker Cloudflare)
+1. `node --test apps/cadastro-passageiro/test/api.test.mjs` → `fail 0` (13 em 23/10/2026).
+2. `cd apps/cadastro-passageiro && npx wrangler deploy --dry-run` → bindings `RATE_LIMITER` e `ASSETS`, sem publicar.
+3. `pnpm dev` (porta 52418, `MODO_LOCAL=1` ativa o mock) → abrir `http://127.0.0.1:52418/#t=` + 43 caracteres `A` em 375 px. Esperado: nome acima de uma foto de 168 px que é o próprio botão; e-mail `abc` bloqueia com "Confira o e-mail"; foto (injetar arquivo no `.foto-input` via DataTransfer) vira prévia; Salvar → "Dados salvos. Obrigado!"; console sem erros.
+4. Deploy (só da `main`, checkout principal): `pnpm --filter @betinhos/cadastro-passageiro push` com o `wrangler` logado na conta Betinhos (OAuth) e o secret `FLOW_URL` = URL do gatilho do flow "Cadastro do passageiro | Link".
