@@ -33,7 +33,7 @@ public sealed class GraphGateway : IGraphGateway
             + ",\"userPrincipalName\":" + JsonLeve.Texto(upn) + ",\"usageLocation\":\"BR\",\"preferredLanguage\":\"pt-BR\""
             + (celular is null ? "" : ",\"mobilePhone\":" + JsonLeve.Texto(celular))
             + (emailPessoal is null ? "" : ",\"otherMails\":[" + JsonLeve.Texto(emailPessoal) + "]")
-            + ",\"passwordProfile\":{\"forceChangePasswordNextSignIn\":true,\"password\":" + JsonLeve.Texto(senhaTemporaria) + "}}";
+            + ",\"passwordProfile\":{\"forceChangePasswordNextSignIn\":false,\"password\":" + JsonLeve.Texto(senhaTemporaria) + "}}";
         return LerUsuario(JsonLeve.Ler(Enviar(HttpMethod.Post, "/users", corpo)!));
     }
 
