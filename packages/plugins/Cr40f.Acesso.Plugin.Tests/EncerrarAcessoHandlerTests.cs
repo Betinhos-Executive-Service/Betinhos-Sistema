@@ -12,12 +12,13 @@ public sealed class EncerrarAcessoHandlerTests
     private readonly FakeService _svc = new();
     private readonly Guid _id = Guid.NewGuid();
 
-    private EncerrarAcessoHandler Handler() => new(_graph, new FuncionarioRepository(_svc), Cfg, _ => { });
+    private EncerrarAcessoHandler Handler() => new(_graph, new FuncionarioRepository(_svc), new UsuarioDataverseRepository(_svc, _ => { }), Cfg, _ => { });
+    private Entity ComSystemuser(bool desabilitado = false) { var s = new Entity("systemuser", Guid.NewGuid()) { ["azureactivedirectoryobjectid"] = Guid.Parse("00000000-0000-0000-0000-0000000000a1"), ["isdisabled"] = desabilitado, ["islicensed"] = true }; _svc.Com(s); return s; }
     private void ComFuncionario(string? email = "ana.lima@betinhos.onmicrosoft.com") => _svc.Com(new Entity("cr40f_funcionarios", _id) { ["cr40f_nomecompleto"] = "Ana Lima", ["cr40f_emailmicrosoft"] = email, ["cr40f_status"] = new OptionSetValue(0) });
     private void ComUsuarioCompleto()
     {
-        var u = new GraphUsuario { Id = "u1", Upn = "ana.lima@betinhos.onmicrosoft.com", Ativo = true }; u.SkuIds.Add("sku");
-        _graph.Usuarios[u.Upn] = u; _graph.Membros.Add(("g", "u1"));
+        var u = new GraphUsuario { Id = "00000000-0000-0000-0000-0000000000a1", Upn = "ana.lima@betinhos.onmicrosoft.com", Ativo = true }; u.SkuIds.Add("sku");
+        _graph.Usuarios[u.Upn] = u; _graph.Membros.Add(("g", u.Id));
     }
 
     [Fact]
@@ -54,7 +55,7 @@ public sealed class EncerrarAcessoHandlerTests
         _graph.FalharEm = null;
         Handler().Executar(_id, "Ana");
         Assert.False(_graph.Usuarios["ana.lima@betinhos.onmicrosoft.com"].Ativo);
-        Assert.DoesNotContain(("g", "u1"), _graph.Membros);
+        Assert.DoesNotContain(("g", "00000000-0000-0000-0000-0000000000a1"), _graph.Membros);
     }
 
     [Fact]
@@ -120,5 +121,36 @@ public sealed class EncerrarAcessoHandlerTests
         ComFuncionario(); ComUsuarioCompleto();
         Assert.Equal("CONFIRMACAO_INVALIDA", Assert.Throws<AcessoException>(() => Handler().Executar(_id, " ")).Codigo);
         Assert.Empty(_graph.Chamadas);
+    }
+
+    [Fact]
+    public void Bloqueia_systemuser_na_hora_sem_mexer_no_funcionario()
+    {
+        ComFuncionario(); ComUsuarioCompleto(); var s = ComSystemuser();
+        var etapas = Handler().Executar(_id, "Ana").ToJson();
+        Assert.Contains("\"etapa\":\"bloqueio\",\"estado\":\"feita\",\"detalhe\":\"bloqueado no Dataverse\"", etapas);
+        Assert.True(s.GetAttributeValue<bool>("isdisabled"));
+        var req = Assert.IsType<Microsoft.Crm.Sdk.Messages.SetStateRequest>(Assert.Single(_svc.Executados));
+        Assert.Equal(new EntityReference("systemuser", s.Id), req.EntityMoniker);
+        Assert.Equal(1, req.State.Value); Assert.Equal(-1, req.Status.Value);
+        Assert.DoesNotContain(_svc.Atualizados, e => e.LogicalName == "cr40f_funcionarios");
+    }
+
+    [Fact]
+    public void Systemuser_ja_bloqueado_ou_ausente_pula_bloqueio()
+    {
+        ComFuncionario(); ComUsuarioCompleto();
+        Assert.Contains("\"etapa\":\"bloqueio\",\"estado\":\"pulada\",\"detalhe\":\"sem usuário no Dataverse\"", Handler().Executar(_id, "Ana").ToJson());
+        ComSystemuser(desabilitado: true); _graph.Membros.Add(("g", "00000000-0000-0000-0000-0000000000a1"));
+        Assert.Contains("\"etapa\":\"bloqueio\",\"estado\":\"pulada\",\"detalhe\":\"já bloqueado\"", Handler().Executar(_id, "Ana").ToJson());
+        Assert.Empty(_svc.Executados);
+    }
+
+    [Fact]
+    public void Fora_do_grupo_nao_bloqueia_systemuser()
+    {
+        ComFuncionario(); ComUsuarioCompleto(); _graph.Membros.Clear(); var s = ComSystemuser();
+        Assert.Contains("\"etapa\":\"bloqueio\",\"estado\":\"pulada\",\"detalhe\":\"conta fora do grupo de motoristas\"", Handler().Executar(_id, "Ana").ToJson());
+        Assert.False(s.GetAttributeValue<bool>("isdisabled")); Assert.Empty(_svc.Executados);
     }
 }

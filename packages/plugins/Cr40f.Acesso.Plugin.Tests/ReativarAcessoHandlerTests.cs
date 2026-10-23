@@ -120,4 +120,16 @@ public sealed class ReativarAcessoHandlerTests
         Assert.Contains(Etapa("conta", "pulada"), json);
         Assert.Empty(_pp.Sincronizados);
     }
+
+    [Fact]
+    public void Systemuser_bloqueado_pelo_encerrar_e_ressincronizado_e_termina_habilitado()
+    {
+        ComFuncionario(); ComContaEncerrada();
+        var s = new Entity("systemuser", Guid.NewGuid()) { ["azureactivedirectoryobjectid"] = Guid.Parse(UsuarioId), ["isdisabled"] = true, ["islicensed"] = true };
+        _svc.Com(s);
+        var json = Handler().Executar(_id).Etapas.ToJson();
+        Assert.Contains(Etapa("systemuser", "feita"), json);
+        Assert.Equal(Guid.Parse(UsuarioId), Assert.Single(_pp.Sincronizados));
+        Assert.False(s.GetAttributeValue<bool>("isdisabled")); Assert.True(s.GetAttributeValue<bool>("islicensed"));
+    }
 }
