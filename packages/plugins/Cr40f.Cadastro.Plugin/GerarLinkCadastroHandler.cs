@@ -18,7 +18,7 @@ public static class StatusLink
 /// <summary>Gera o link público de cadastro: valida escopo, revoga links anteriores e grava só o hash do token.</summary>
 public sealed class GerarLinkCadastroHandler
 {
-    public const string BaseLink = "https://cadastro.betinhos.com.br/#t=";
+    public const string BaseLink = "https://cadastro-passageiro.betinhosexecutiveservice.workers.dev/#t=";
     public static readonly TimeSpan Validade = TimeSpan.FromHours(36);
     // Choices de cr40f_reservadeveculos.cr40f_status (metadata DEV 08/10/2026): Cancelado, Cancelado com Ressalvas.
     public static readonly int[] StatusCancelado = { 202410002, 202410010 };
