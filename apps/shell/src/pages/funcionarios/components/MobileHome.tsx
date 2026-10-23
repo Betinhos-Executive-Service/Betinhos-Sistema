@@ -6,7 +6,7 @@ import type { AlertKind } from '../data/alerts'
 import type { Filters, SortKey } from '../data/filters'
 import { EMPRESA, FUNCAO, STATUS, VINCULO, optionLabel, type Option } from '../data/schema'
 import type { FuncionarioView } from '../data/types'
-import { AlertBadge, Avatar, EnvBadge, StatusBadge } from './Badges'
+import { AlertBadge, Avatar, EnvBadge, SemAppBadge, StatusBadge } from './Badges'
 
 type Props = {
   views: FuncionarioView[]
@@ -106,7 +106,7 @@ export function MobileHome(props: Props) {
                     <span className="m-row-main">
                       <span className="m-row-top"><strong>{nome}</strong><StatusBadge value={row.values.cr40f_status} /></span>
                       <span className="m-row-sub">{sub}</span>
-                      {row.alertas.length > 0 && <span className="m-row-alerts">{row.alertas.map((alerta) => <AlertBadge key={alerta.kind} alerta={alerta} />)}</span>}
+                      {(row.alertas.length > 0 || row.semApp) && <span className="m-row-alerts">{row.alertas.map((alerta) => <AlertBadge key={alerta.kind} alerta={alerta} />)}{row.semApp && <SemAppBadge />}</span>}
                     </span>
                     <ChevronRight size={18} className="m-row-chevron" aria-hidden />
                   </button>
