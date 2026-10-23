@@ -128,9 +128,10 @@ export const registroColumns = (kind: Kind): ViewColumnDef[] => [
   { key: 'data', label: 'Data' },
   { key: 'veiculo', label: 'Veículo' },
   { key: 'pessoa', label: PESSOA[kind] },
+  // Termo logo depois do motorista: é o que o gestor procura na lista de multas e fica visível sem rolar em 1280 px.
+  ...(kind === 'multa' ? [{ key: 'termo', label: 'Termo' }] : []),
   { key: 'extra', label: EXTRA[kind] },
   { key: 'status', label: 'Status' },
-  ...(kind === 'multa' ? [{ key: 'termo', label: 'Termo' }] : []),
 ]
 
 const TERMO_OPCOES: FilterOption[] = Object.entries(TERMO_ROTULO).map(([value, label]) => ({ value, label }))

@@ -106,9 +106,9 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload }
           { key: 'data', header: 'Data', label: 'Data', sortable: true, defaultWidth: 120, width: 'minmax(92px, .6fr)', cell: (linha) => <span className="frota-nowrap">{formatBR(linha.dia)}</span> },
           { key: 'veiculo', header: 'Veículo', label: 'Veículo', sortable: true, defaultWidth: 120, width: 'minmax(90px, .7fr)', hideBelow: 'mobile', cell: (linha) => <span className="frota-nowrap">{linha.veiculo?.label || '—'}</span> },
           { key: 'pessoa', header: PESSOA[kind], label: PESSOA[kind], sortable: true, defaultWidth: 190, hideBelow: 'mobile', cell: (linha) => linha.pessoa?.label || '—' },
+          ...(kind === 'multa' ? [{ key: 'termo', header: 'Termo', label: 'Termo', sortable: true, defaultWidth: 180, width: 'minmax(120px, .9fr)', hideBelow: 'compact' as const, cell: (linha: Linha) => (linha.termoStatus ? <Badge tone={TERMO_TOM[linha.termoStatus]}>{linha.termo}</Badge> : <span className="frota-muted">—</span>) }] : []),
           { key: 'extra', header: EXTRA[kind], label: EXTRA[kind], defaultWidth: 160, hideBelow: 'compact', cell: (linha) => <span className="frota-nowrap">{linha.extra}</span> },
           { key: 'status', header: 'Status', label: 'Status', sortable: true, defaultWidth: 160, width: 'minmax(110px, .8fr)', cell: (linha) => <StatusBadge kind={linha.kind} value={linha.status} /> },
-          ...(kind === 'multa' ? [{ key: 'termo', header: 'Termo', label: 'Termo', sortable: true, defaultWidth: 180, width: 'minmax(120px, .9fr)', hideBelow: 'compact' as const, cell: (linha: Linha) => (linha.termoStatus ? <Badge tone={TERMO_TOM[linha.termoStatus]}>{linha.termo}</Badge> : <span className="frota-muted">—</span>) }] : []),
         ]}
       />
       <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} />
