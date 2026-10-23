@@ -10,7 +10,9 @@ param(
   [Parameter(Mandatory = $true)][ValidateSet('DEV', 'PROD')][string] $Ambiente,
   [switch] $Apply,
   [switch] $ConfirmarProd,
-  [int] $Limite = 0
+  [int] $Limite = 0,
+  # Login por código (navegador em qualquer dispositivo): o WAM falha em terminal sem janela.
+  [switch] $DeviceCode
 )
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $ErrorActionPreference = 'Stop'
@@ -21,7 +23,8 @@ $entitySet = 'cr40f_bancodedadoses'
 $idCol = 'cr40f_bancodedadosid'
 $linkCol = 'new_linkdafoto'
 $sitePath = 'betinhos.sharepoint.com:/sites/BetinhosGestoInterna'
-$libraryName = 'Documentos Compartilhados'
+# Biblioteca "Documentos Compartilhados" pelo id da lista (o nome no Graph varia com o idioma: Documents/Documentos).
+$libraryListId = '0e524da8-15af-47ff-9b34-7116ac32763f'
 $folder = "Passageiros/Fotos/$Ambiente"
 $chunk = 4MB
 $backupDir = Join-Path $PSScriptRoot 'flows/backup'
@@ -90,11 +93,9 @@ Write-Host "[fotos] $Ambiente`: $($registros.Count) com foto no OneDrive; proces
 if (-not $alvo.Count) { Write-Output 'Nada a migrar.'; return }
 
 Import-Module Microsoft.Graph.Authentication
-Connect-MgGraph -Scopes Files.Read.All, Sites.ReadWrite.All -NoWelcome
+if ($DeviceCode) { Connect-MgGraph -Scopes Files.Read.All, Sites.ReadWrite.All -NoWelcome -UseDeviceCode } else { Connect-MgGraph -Scopes Files.Read.All, Sites.ReadWrite.All -NoWelcome }
 $site = Invoke-MgGraphRequest -Method GET -Uri "https://graph.microsoft.com/v1.0/sites/$sitePath`?`$select=id"
-$drives = @((Invoke-MgGraphRequest -Method GET -Uri "https://graph.microsoft.com/v1.0/sites/$($site.id)/drives?`$select=id,name").value | Where-Object { $_.name -eq $libraryName })
-if ($drives.Count -ne 1) { throw "Biblioteca '$libraryName' não encontrada (ou duplicada) no site." }
-$driveId = $drives[0].id
+$driveId = (Invoke-MgGraphRequest -Method GET -Uri "https://graph.microsoft.com/v1.0/sites/$($site.id)/lists/$libraryListId/drive?`$select=id").id
 
 New-Item -ItemType Directory -Force $backupDir | Out-Null
 $stamp = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, 'E. South America Standard Time').ToString('yyyyMMdd-HHmmss')
