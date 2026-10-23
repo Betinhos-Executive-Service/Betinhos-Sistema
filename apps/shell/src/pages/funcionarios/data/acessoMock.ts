@@ -2,10 +2,11 @@ import type { AcessoSource, CadastroResultado, Etapa, ReativacaoResultado } from
 import { AcessoError, MENSAGENS } from './acesso'
 import { normalizeSearch as semAcentos } from './format'
 
-const delay = <T,>(value: T, ms = 400) => new Promise<T>((resolve) => setTimeout(() => resolve(value), ms))
+// 1,2 s: o bastante para ver o progresso no mock.
+const delay = <T,>(value: T, ms = 1200) => new Promise<T>((resolve) => setTimeout(() => resolve(value), ms))
 const MOCK_FUNCIONARIOS: Record<string, { nome: string; email: string | null }> = { m1: { nome: 'Carlos Alberto Teste', email: 'carlos.teste@betinhos.onmicrosoft.com' }, m7: { nome: 'Helena Simulada Costa', email: null }, m9: { nome: 'Joana Encerrada Teste', email: 'joana.teste@betinhos.onmicrosoft.com' } }
 
-/** Simulação em memória: nome com "Erro Graph" falha depois de criar o usuário; "Sem Licenca" falha antes. */
+/** Simulação em memória: nome com "Erro Graph" falha depois de criar o usuário; "Sem Licenca" falha antes; "Liberando" fica com a liberação pendente. */
 export function createAcessoMock(): AcessoSource {
   const emails = new Set<string>()
   return {
@@ -21,10 +22,11 @@ export function createAcessoMock(): AcessoSource {
         throw new AcessoError('GRAPH_INDISPONIVEL', MENSAGENS.GRAPH_INDISPONIVEL, [{ etapa: 'validacao', estado: 'feita', detalhe: 'ok' }, { etapa: 'email', estado: 'feita', detalhe: email }, { etapa: 'usuario', estado: 'feita', detalhe: 'criado' }, { etapa: 'licenca', estado: 'erro', detalhe: '503 em POST assignLicense' }])
       }
       emails.add(email)
+      const pendente = /liberando/i.test(input.nomeCompleto)
       const resultado: CadastroResultado = {
         emailMicrosoft: email, senhaTemporaria: 'Kx7#mQ2vR9pL4w', // Atalho do mock: sem funcionarioId, devolve 'm7' (Helena, linha existente no mock de funcionários) para "Abrir ficha" abrir um registro real.
         funcionarioId: input.funcionarioId ?? 'm7', linkApp: 'https://org23b93544.crm2.dynamics.com/WebResources/new_app-motoristas-v2',
-        etapas: [{ etapa: 'validacao', estado: 'feita', detalhe: 'ok' }, { etapa: 'email', estado: 'feita', detalhe: email }, { etapa: 'usuario', estado: 'feita', detalhe: 'criado' }, { etapa: 'licenca', estado: 'feita', detalhe: 'atribuída' }, { etapa: 'grupo', estado: 'feita', detalhe: 'adicionado' }, { etapa: 'systemuser', estado: 'feita', detalhe: 'criado no Dataverse' }, { etapa: 'funcionario', estado: 'feita', detalhe: input.funcionarioId ? 'e-mail vinculado' : 'criado' }],
+        etapas: [{ etapa: 'validacao', estado: 'feita', detalhe: 'ok' }, { etapa: 'email', estado: 'feita', detalhe: email }, { etapa: 'usuario', estado: 'feita', detalhe: 'criado' }, { etapa: 'licenca', estado: 'feita', detalhe: 'atribuída' }, { etapa: 'grupo', estado: 'feita', detalhe: 'adicionado' }, pendente ? { etapa: 'systemuser', estado: 'pendente', detalhe: 'o Dataverse libera em instantes' } : { etapa: 'systemuser', estado: 'feita', detalhe: 'criado no Dataverse' }, { etapa: 'funcionario', estado: pendente ? 'pendente' : 'feita', detalhe: input.funcionarioId ? 'e-mail vinculado' : 'criado' }],
       }
       return delay(resultado)
     },
