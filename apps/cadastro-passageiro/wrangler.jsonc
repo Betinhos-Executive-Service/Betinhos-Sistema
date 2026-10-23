@@ -4,7 +4,6 @@
   "compatibility_date": "2026-09-01",
   "account_id": "a26e65df1496d9808e12a495bc47cd80",
   "workers_dev": true,
-  "routes": [{ "pattern": "cadastro.betinhos.com.br", "custom_domain": true }],
   // Página e /api passam pelo Worker (cabeçalhos de segurança); o resto vem de ./public
   "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": true },
   // 20 requisições por IP a cada 60 s. Sem o binding (ex.: dev local antigo), o Worker não bloqueia.
