@@ -2,7 +2,7 @@
 
 ## 1. App registration do Graph (uma vez por tenant)
 1. Entra admin center → Aplicativos → Registros de aplicativo → Novo registro: nome `Betinhos - Acesso Motoristas`, conta única (este tenant), sem redirect URI.
-2. Permissões de API → Adicionar → Microsoft Graph → Permissões de aplicativo: `User.ReadWrite.All`, `GroupMember.ReadWrite.All`, `Organization.Read.All`. Clique em "Conceder consentimento de administrador".
+2. Permissões de API → Adicionar → Microsoft Graph → Permissões de aplicativo: `User.ReadWrite.All`, `GroupMember.ReadWrite.All`, `Organization.Read.All` e `User-PasswordProfile.ReadWrite.All` (redefinir a senha em "Reativar acesso"; sem ela a reativação termina as outras etapas e falha com `SEM_PERMISSAO_SENHA`). Clique em "Conceder consentimento de administrador".
 3. Certificados e segredos → Novo segredo do cliente (validade 12 meses). Copie o **valor** agora; ele só aparece uma vez.
 4. Anote `Application (client) ID` e `Directory (tenant) ID`.
 5. Para `assignLicense`, o app precisa também estar fora de políticas de acesso condicional que bloqueiem fluxos sem usuário (padrão: não há).

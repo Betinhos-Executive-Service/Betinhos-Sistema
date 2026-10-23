@@ -53,7 +53,7 @@ public sealed class CadastrarAcessoMotoristaPlugin : IPlugin
     }
 
     /// <summary>Semente criptográfica: new Random() sozinho é previsível para senha.</summary>
-    private static Random RandomSeguro()
+    internal static Random RandomSeguro()
     {
         var bytes = new byte[4];
         using (var rng = RandomNumberGenerator.Create()) rng.GetBytes(bytes);

@@ -53,7 +53,11 @@ const ROWS0: Funcionario[] = [
   person('m6', 'Gustavo Amostra Pires', 'Gus', { cr40f_status: 1, cr40f_datadedemissao: offset(-90), cr40f_validadedacnh: offset(-30) }),
   person('m7', 'Helena Simulada Costa', 'Helena', { cr40f_funcao: 202410001, cr40f_nomedaempresa: 202410001, cr40f_tipodevinculo: 1 }),
   person('m8', 'Igor Fake Moreira', 'Igor', { cr40f_datadoaso: addMonths(offset(20), -12) }, veiculos[2]),
+  // Acesso ao app encerrado (systemuser desabilitado), mas segue ativo no cadastro: exercita "Reativar acesso".
+  person('m9', 'Joana Encerrada Teste', 'Joana', { cr40f_emailmicrosoft: 'joana.teste@betinhos.onmicrosoft.com', cr40f_telefonecorporativo: '+5512991234567' }),
 ]
+/** systemuser por e-mail no mock: Carlos ativo, Joana desabilitada (acesso encerrado). */
+const USUARIOS_APP: Record<string, boolean> = { 'carlos.teste@betinhos.onmicrosoft.com': true, 'joana.teste@betinhos.onmicrosoft.com': false }
 /** `?volume=N` do pnpm dev: N colaboradores a mais (desempenho com listas grandes). */
 const volume = (total: number) => Array.from({ length: total }, (_, i) => person(`mv${i + 1}`, `Colaborador Exemplo ${i + 1}`, `Colab ${i + 1}`, {
   cr40f_status: i % 9 === 0 ? 2 : 0, cr40f_funcao: i % 4 ? 202410000 : 202410001, cr40f_validadedacnh: offset((i % 500) - 30), cr40f_numerodocpf: `${String(100_000_000 + i).slice(0, 9)}-${String(i % 100).padStart(2, '0')}`,
@@ -174,6 +178,7 @@ export function createMockSource(): DataSource {
       return blob ? { nome: (blob as File).name ?? 'anexo', blob } : { nome: 'toxicologico-2026.txt', blob: new Blob(['Arquivo fictício do modo mock.'], { type: 'text/plain' }) }
     },
     documentos,
+    usuarioDoApp: (email) => delay(email.toLowerCase() in USUARIOS_APP ? { id: `su-${email}`, ativo: USUARIOS_APP[email.toLowerCase()] } : null),
     searchVeiculos: (query) => delay(veiculos.filter((item) => item.label.toLowerCase().includes(query.toLowerCase()))),
     openForm: (entityName, id) => console.info('[mock] openForm', entityName, id),
   }

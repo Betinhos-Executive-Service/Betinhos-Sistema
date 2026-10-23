@@ -22,6 +22,9 @@ export function validarAnexo(file: File, limites: LimitesAnexo) {
   return null
 }
 
+/** Usuário do Dataverse (systemuser) ligado ao e-mail Microsoft: é ele que diz se o acesso ao app está ativo. */
+export type UsuarioApp = { id: string; ativo: boolean }
+
 export interface DataSource {
   mode: 'xrm' | 'mock'
   envLabel: string
@@ -49,6 +52,8 @@ export interface DataSource {
   /** Baixa o anexo de uma anotação (documentbody em base64). */
   anexo(annotationId: string): Promise<{ nome: string; blob: Blob }>
   documentos: DocumentStore
+  /** systemuser cujo internalemailaddress é o e-mail; null se não existe. */
+  usuarioDoApp(email: string): Promise<UsuarioApp | null>
   searchVeiculos(query: string): Promise<Lookup[]>
   openForm(entityName: string, id?: string): void
 }

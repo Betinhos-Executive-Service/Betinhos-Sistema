@@ -4,9 +4,9 @@ namespace Cr40f.Acesso.Plugin;
 
 public sealed class EncerrarAcessoHandler
 {
-    private readonly IGraphGateway _graph; private readonly FuncionarioRepository _repo; private readonly AcessoConfig _cfg; private readonly Func<DateTime> _utcNow; private readonly Action<string> _trace;
-    public EncerrarAcessoHandler(IGraphGateway graph, FuncionarioRepository repo, AcessoConfig cfg, Func<DateTime> utcNow, Action<string> trace)
-    { _graph = graph; _repo = repo; _cfg = cfg; _utcNow = utcNow; _trace = trace; }
+    private readonly IGraphGateway _graph; private readonly FuncionarioRepository _repo; private readonly AcessoConfig _cfg; private readonly Action<string> _trace;
+    public EncerrarAcessoHandler(IGraphGateway graph, FuncionarioRepository repo, AcessoConfig cfg, Action<string> trace)
+    { _graph = graph; _repo = repo; _cfg = cfg; _trace = trace; }
 
     public Etapas Executar(Guid funcionarioId, string confirmacao)
     {
@@ -36,7 +36,7 @@ public sealed class EncerrarAcessoHandler
                     etapas.Executar("grupo", () => { _graph.RemoverDoGrupo(_cfg.GroupId, u.Id); etapas.Feita("grupo", "removido"); });
                 }
             }
-            etapas.Executar("funcionario", () => { if (f.Status != FuncionarioRepository.StatusInativo) { _repo.Inativar(f.Id, _utcNow()); etapas.Feita("funcionario", "inativado"); } else etapas.Pulada("funcionario", "já inativo"); });
+            // Só acesso ao app: status e demissão do funcionário são do RH e não mudam aqui (decisão de 23/10/2026).
             _trace("acesso encerrado para " + email);
             return etapas;
         }
