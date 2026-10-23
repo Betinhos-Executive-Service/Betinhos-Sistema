@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Alert, Button, StatusBadge } from '@betinhos/ui'
-import { diaSP, formatBR } from '../data/dates'
+import { diaSP, formatBR, horaSP } from '../data/dates'
 import { PROPRIO, VEICULO } from '../data/schema'
 import type { DataSource, LoadResult } from '../data/source'
 import type { FrotaData, ItemPlano, Kind, Veiculo } from '../data/types'
@@ -8,7 +8,6 @@ import { ESTADO_LABEL, ESTADO_TONE, kmAtualDe, preventivasDoVeiculo, type Preven
 import { BaselineDrawer } from './BaselineDrawer'
 
 const km = (n: number) => `${n.toLocaleString('pt-BR')} km`
-const horaSP = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
 
 function linhaHodometro(veiculo: Veiculo, manutencoes: FrotaData['manutencoes']): string {
   if (veiculo.hodometro !== null) {

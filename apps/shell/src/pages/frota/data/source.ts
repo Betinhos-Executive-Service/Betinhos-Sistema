@@ -1,5 +1,6 @@
 import type { DateBehavior } from './dates'
-import type { FrotaData, Kind, TableKey } from './types'
+import type { Acordo } from '../domain/termoMulta'
+import type { FrotaData, Kind, TableKey, TermoMulta } from './types'
 
 export type LoadResult = { data: FrotaData; errors: Partial<Record<TableKey, string>> }
 
@@ -50,4 +51,14 @@ export interface DataSource {
   inativarItemPlano(id: string, ativo: boolean): Promise<void>
   /** Upsert da última execução conhecida por (veículo, item). */
   salvarBaseline(veiculoId: string, itemId: string, km: number | null, data: string | null): Promise<void>
+  /** Funcionário tem o aditivo de assinatura eletrônica (data em new_aditivoassinaturaem e PDF em new_aditivoassinatura). */
+  temAditivo(funcionarioId: string): Promise<boolean>
+  /** Termos da multa, do mais recente ao mais antigo. */
+  listarTermos(multaId: string): Promise<TermoMulta[]>
+  /** Custom API new_EnviarTermoMulta: cria o termo Pendente e devolve o id. */
+  enviarTermoMulta(multaId: string, acordo: Acordo): Promise<string>
+  /** Cancela o envio de um termo ainda Pendente. */
+  cancelarTermoMulta(termoId: string): Promise<void>
+  /** Abre o PDF do termo assinado. */
+  baixarPdfTermo(termoId: string): Promise<void>
 }

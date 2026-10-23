@@ -40,6 +40,7 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   'frota-veiculos': <CarFront />,
   'frota-manutencoes': <Wrench />,
   'frota-multas': <AlertTriangle />,
+  new_parcelamultafolha: <ReceiptText />,
   'frota-colisoes': <Camera />,
   'frota-indicadores': <Gauge />,
   'frota-plano': <Clock />,

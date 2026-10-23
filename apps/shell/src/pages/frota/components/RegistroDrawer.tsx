@@ -9,6 +9,7 @@ import type { FrotaData, Kind, Ref } from '../data/types'
 import { errorMessage } from '../data/xrm'
 import { ClassificacaoManutencao } from './ClassificacaoManutencao'
 import { StatusPanel } from './StatusPanel'
+import { TermoMultaPanel } from './TermoMultaPanel'
 import { useNotify } from './Toasts'
 import { StatusBadge } from './Ui'
 
@@ -50,6 +51,8 @@ export function RegistroDrawer({ source, kind, id, data, onClose, onChanged, onC
   const notify = useNotify()
   const registro = detalhe(kind, id, data)
   const manutencao = kind === 'manutencao' ? data.manutencoes.find((row) => row.id === id) : undefined
+  const multa = kind === 'multa' ? data.multas.find((row) => row.id === id) : undefined
+  const valorCatalogo = multa?.infracaoId ? data.infracoes.find((row) => row.id === multa.infracaoId)?.valor ?? null : null
   useEffect(() => { setShareUrl(null) }, [kind, id])
 
   async function abrirFormulario() {
@@ -99,6 +102,12 @@ export function RegistroDrawer({ source, kind, id, data, onClose, onChanged, onC
             <section className="frota-group" aria-labelledby={`${id}-classif`}>
               <h3 id={`${id}-classif`} className="frota-group__title">Serviços e categorias</h3>
               <ClassificacaoManutencao key={`${id}-${manutencao.servicos.join(',')}-${manutencao.origemClassificacao}`} source={source} item={manutencao} onClassificado={(c) => (onClassificado ? onClassificado(id, c) : onChanged())} />
+            </section>
+          )}
+          {multa && (
+            <section className="frota-group" aria-labelledby={`${id}-termo`}>
+              <h3 id={`${id}-termo`} className="frota-group__title">Termo de acordo</h3>
+              <TermoMultaPanel key={id} source={source} multa={multa} valorCatalogo={valorCatalogo} onChanged={onChanged} />
             </section>
           )}
           <section className="frota-group" aria-labelledby={`${id}-dados`}>

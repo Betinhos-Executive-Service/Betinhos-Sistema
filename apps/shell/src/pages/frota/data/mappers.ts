@@ -1,7 +1,7 @@
 import { lerMulti } from '../domain/manutencaoCatalogo'
 import { diaSP, toDateOnly, type DateBehavior } from './dates'
-import { AVISO_PADRAO } from './schema'
-import type { Baseline, Colisao, DespesaCombustivel, Infracao, ItemPlano, Manutencao, Multa, Posse, Ref, TelemetriaKm, Veiculo } from './types'
+import { AVISO_PADRAO, FORMA_PAGAMENTO, TERMO_STATUS_DE } from './schema'
+import type { Baseline, Colisao, DespesaCombustivel, Infracao, ItemPlano, Manutencao, Multa, Posse, Ref, TelemetriaKm, TermoMulta, Veiculo } from './types'
 
 export const FORMATTED = '@OData.Community.Display.V1.FormattedValue'
 
@@ -11,7 +11,7 @@ type Behaviors = Record<string, DateBehavior>
 export const SELECT = {
   veiculos: ['cr40f_veiculosid', 'cr40f_placa', 'cr40f_marca', 'cr40f_modelo', 'cr40f_cor', 'cr40f_anodemodelo', 'cr40f_statusdoveiculo', 'new_categoriadoveiculo', '_cr40f_motoristaatual_value', 'cr40f_hodometro', 'cr40f_hodometroem'],
   manutencoes: ['cr40f_manutencoesid', 'cr40f_id', 'cr40f_descricao', 'cr40f_status', 'cr40f_graudamanutencao', 'cr40f_tipodoreparo', 'cr40f_agendarpara', 'cr40f_datamanutencao', 'cr40f_valor', 'cr40f_estabelecimento', 'cr40f_servicorealizado', 'cr40f_comentariosdoaprovador', 'cr40f_kmatual', '_cr40f_placa_carro_value', '_cr40f_solicitado_por_value', 'createdon', 'new_servicosmanutencao', 'new_categoriasmanutencao', 'new_classificacaoorigem', 'new_confiancaia'],
-  multas: ['cr40f_multasid', 'cr40f_novacoluna', 'cr40f_status', 'cr40f_dataehorario', 'cr40f_localdainfracao', 'cr40f_dataparaindicar', 'cr40f_indicado', 'cr40f_datadeavisoaocondutor', 'cr40f_datadeindicacao', '_cr40f_placa_value', '_cr40f_motorista_value', '_cr40f_codigodainfracao_value', 'createdon'],
+  multas: ['cr40f_multasid', 'cr40f_novacoluna', 'cr40f_status', 'cr40f_dataehorario', 'cr40f_localdainfracao', 'cr40f_dataparaindicar', 'cr40f_indicado', 'cr40f_datadeavisoaocondutor', 'cr40f_datadeindicacao', '_cr40f_placa_value', '_cr40f_motorista_value', '_cr40f_codigodainfracao_value', 'createdon', 'new_valorguia', 'new_recursopendente', '_new_termovigente_value'],
   infracoes: ['cr40f_infracaodetransitoid', 'cr40f_codigodainfracao', 'cr40f_descricaodainfracao', 'cr40f_gravidadedainfracao', 'cr40f_pontosnacnh', 'cr40f_valordamulta'],
   colisoes: ['cr40f_colisao_v2id', 'cr40f_name', 'cr40f_datahora', 'cr40f_local', 'cr40f_descricao', 'cr40f_statusoperacional', 'cr40f_tipoocorrencia', 'cr40f_houveterceiro', '_cr40f_veiculo_value', '_cr40f_motorista_value', 'createdon'],
   posses: ['new_possedeveiculoid', 'new_iniciodaposse', 'new_fimdaposse', '_new_veiculo_value', '_new_motorista_value', '_new_localdebase_value'],
@@ -91,6 +91,29 @@ export function mapMulta(row: Row, behaviors: Behaviors = {}): Multa {
     veiculo: ref(row, '_cr40f_placa_value'),
     motorista: ref(row, '_cr40f_motorista_value'),
     infracaoId: ref(row, '_cr40f_codigodainfracao_value')?.id ?? null,
+    criadoEm: String(row.createdon ?? ''),
+    valorGuia: num(row.new_valorguia),
+    recursoPendente: row.new_recursopendente === true,
+    termoVigente: ref(row, '_new_termovigente_value'),
+  }
+}
+
+export const SELECT_TERMO = ['new_termomultaid', 'new_status', 'new_formapagamento', 'new_parcelas', 'new_valortotal', 'new_primeiracompetencia', 'new_enviadoem', 'new_assinadoem', 'new_hashpdf', 'new_motivocontestacao', 'createdon'] as const
+
+export function mapTermoMulta(row: Row): TermoMulta {
+  const status = num(row.new_status)
+  const forma = num(row.new_formapagamento)
+  return {
+    id: cleanId(row.new_termomultaid),
+    status: status === null ? null : TERMO_STATUS_DE[status] ?? null,
+    forma: forma === FORMA_PAGAMENTO.guia ? 'guia' : forma === FORMA_PAGAMENTO.folha ? 'folha' : null,
+    parcelas: num(row.new_parcelas),
+    valorTotal: num(row.new_valortotal),
+    primeiraCompetencia: str(row.new_primeiracompetencia)?.slice(0, 10) ?? null,
+    enviadoEm: str(row.new_enviadoem),
+    assinadoEm: str(row.new_assinadoem),
+    hashPdf: str(row.new_hashpdf),
+    motivoContestacao: str(row.new_motivocontestacao),
     criadoEm: String(row.createdon ?? ''),
   }
 }

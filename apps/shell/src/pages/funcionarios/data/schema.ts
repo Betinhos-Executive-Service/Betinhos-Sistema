@@ -33,7 +33,7 @@ export const MULTA_STATUS: Option[] = [
 ]
 
 export type FieldKind = 'text' | 'textarea' | 'cpf' | 'phone' | 'email' | 'url' | 'date' | 'choice' | 'bool'
-export type FieldGroup = 'pessoais' | 'vinculo' | 'contato' | 'detalhes'
+export type FieldGroup = 'pessoais' | 'vinculo' | 'contato' | 'detalhes' | 'assinatura'
 
 export type FieldDef = {
   key: string
@@ -84,6 +84,7 @@ export const FIELDS: FieldDef[] = [
   { key: 'new_notificacoesfrota', label: 'Notificações de frota', kind: 'bool', group: 'detalhes', hint: 'Recebe o resumo semanal de pendências da frota (quarta, 08:00).' },
   { key: 'cr40f_gerarrecibopersonalizado', label: 'Gerar recibo personalizado', kind: 'bool', group: 'detalhes' },
   { key: 'cr40f_identificadordocolaborador', label: 'ID SharePoint', kind: 'text', group: 'detalhes', readonly: true },
+  { key: 'new_aditivoassinaturaem', label: 'Aditivo assinado em', kind: 'date', group: 'assinatura' },
   { key: 'new_infleetdriverid', label: 'ID InFleet', kind: 'text', group: 'detalhes', readonly: true },
 ]
 
@@ -92,6 +93,7 @@ export const GROUP_LABELS: Record<FieldGroup, string> = {
   vinculo: 'Vínculo',
   contato: 'Contato',
   detalhes: 'Detalhes',
+  assinatura: 'Assinatura eletrônica',
 }
 
 export const BOOL_REQUIRED_DEFAULTS = {

@@ -126,3 +126,18 @@
 .frota-page .frota-kpis { gap: var(--bt-space-2); }
 .frota-page .frota-pend__item { min-height: 44px; padding-block: var(--bt-space-1-5); }
 .frota-page .frota-pend__head { padding-block: var(--bt-space-2); }
+
+/* Termo de acordo da multa */
+.frota-termo { display: grid; gap: var(--bt-space-3); }
+.frota-termo__dados { display: grid; gap: var(--bt-space-3); grid-template-columns: minmax(0, 220px) minmax(0, 1fr); align-items: end; }
+.frota-termo__atual { display: grid; gap: var(--bt-space-2); padding: var(--bt-space-3); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); font-size: var(--bt-font-size-13); }
+.frota-termo__linha { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); }
+.frota-termo__hash { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--bt-font-size-12); }
+.frota-termo__expande { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 180ms var(--bt-ease-out), opacity 180ms var(--bt-ease-out); }
+.frota-termo__expande[data-aberto] { grid-template-rows: 1fr; opacity: 1; }
+.frota-termo__conteudo { min-height: 0; overflow: hidden; }
+.frota-termo__form { display: grid; gap: var(--bt-space-3); padding: var(--bt-space-3); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); }
+.frota-termo__previa { display: grid; gap: var(--bt-space-1); margin: 0; padding: var(--bt-space-2) var(--bt-space-3); list-style: none; border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); font-size: var(--bt-font-size-13); }
+.frota-termo__previa li { display: flex; justify-content: space-between; gap: var(--bt-space-3); }
+@media (max-width: 560px) { .frota-termo__dados { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .frota-termo__expande { transition: none; } }
