@@ -5,7 +5,8 @@ import { reportAppError } from "../../lib/appErrorLogger";
 
 type ServicesMenuProps = {
   onHome: () => void;
-  onRefresh: () => void | Promise<void>;
+  /** Sem onRefresh o botão fica invisível (mantém o lugar no layout), por exemplo durante a assinatura. */
+  onRefresh?: () => void | Promise<void>;
   title?: string;
   eyebrow?: string;
   homeLabel?: string;
@@ -16,7 +17,7 @@ export function ServicesMenu({ onHome, onRefresh, title = "Seus Serviços", eyeb
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const refresh = async () => {
-    if (isRefreshing) return;
+    if (isRefreshing || !onRefresh) return;
     setIsRefreshing(true);
     window.dispatchEvent(new CustomEvent("betinhos:refresh-visual", { detail: { phase: "start" } }));
     try {
@@ -59,6 +60,10 @@ export function ServicesMenu({ onHome, onRefresh, title = "Seus Serviços", eyeb
             className="services-nav-button services-nav-button--refresh"
             aria-label="Atualizar"
             onClick={refresh}
+            disabled={!onRefresh}
+            aria-hidden={onRefresh ? undefined : true}
+            tabIndex={onRefresh ? undefined : -1}
+            style={onRefresh ? undefined : { visibility: "hidden" }}
             whileTap={{ scale: 0.94 }}
             transition={{ type: "spring", stiffness: 520, damping: 34 }}
           >

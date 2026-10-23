@@ -72,12 +72,12 @@ test("payload de assinarTermo arredonda lat/long para 6 casas como número", () 
   assert.equal(typeof params.new_Longitude, "number");
 });
 
-test("erro da API mostra a mensagem do servidor e preserva selfie e assinatura", () => {
+test("falha transitória da API mostra a mensagem e preserva selfie e assinatura", () => {
   const ready = { ...initialTermoFlow(), step: "assinatura" as const, selfie: "abc", strokes, gps: { latitude: 1, longitude: 2, precisao: 10 } };
   const sending = termoFlowReducer(ready, { type: "submit" });
-  const failed = termoFlowReducer(sending, { type: "error", message: "Este termo não é seu." });
+  const failed = termoFlowReducer(sending, { type: "error", message: "Falha ao registrar ação (503)." });
   assert.equal(failed.step, "assinatura");
-  assert.equal(failed.erro, "Este termo não é seu.");
+  assert.equal(failed.erro, "Falha ao registrar ação (503).");
   assert.equal(failed.selfie, "abc");
   assert.deepEqual(failed.strokes, strokes);
   assert.equal(failed.enviando, false);
