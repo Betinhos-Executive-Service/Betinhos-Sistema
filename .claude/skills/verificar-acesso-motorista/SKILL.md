@@ -12,7 +12,7 @@ description: "Verifica o acesso de motoristas ao App Motoristas: drawer Cadastra
 ## Testes e tipos
 1. `dotnet test packages/plugins/Cr40f.Acesso.Plugin.Tests/Cr40f.Acesso.Plugin.Tests.csproj` → "Com falha: 0" (87 em 23/10/2026, com `ReativarAcessoHandlerTests` e o PATCH de senha em `GraphGatewayTests`).
 2. `dotnet build packages/plugins/tools/Cr40f.Acesso.Registrar/Cr40f.Acesso.Registrar.csproj` → "0 Erro(s)".
-3. Em `apps/shell`: `npx vitest run src/pages/funcionarios` (107 em 18 arquivos em 23/10/2026) e `npx tsc --noEmit` sem erros. `pnpm --filter` estoura o tempo nesta máquina; sob carga, um teste pode cair por timeout (ex.: `Anotacoes.test.tsx`, `MobileHome.test.tsx`): rode de novo uma vez e registre.
+3. Em `apps/shell`: `npx vitest run src/pages/funcionarios` (113 em 19 arquivos em 23/10/2026) e `npx tsc --noEmit` sem erros. `pnpm --filter` estoura o tempo nesta máquina; sob carga, um teste pode cair por timeout (ex.: `Anotacoes.test.tsx`, `MobileHome.test.tsx`): rode de novo uma vez e registre.
 
 ## Roteiro em mock (`pnpm dev`, porta 36472)
 Sem Dataverse e sem Graph; o mock (`createAcessoMock`) guarda e-mails em memória até recarregar. Se a porta estiver ocupada por outra sessão, rode `npx vite --port <livre> --strictPort` em `apps/shell` e encerre o processo no fim.
@@ -39,8 +39,10 @@ Pré-requisitos do Renan: app registration no Entra com `User.ReadWrite.All`, `G
 - A senha temporária só aparece no resultado do cadastro; nunca é recuperável. Conta que já existia volta sem senha (linha omitida no WhatsApp).
 - Cadastrar com conta desativada no Entra → ACESSO_ENCERRADO; o caminho é "Reativar acesso" na ficha. systemuser desabilitado ou sem licença com o Entra ativo é ressincronizado pelo `addUser`.
 - systemuser criado pelo SDK nasce desabilitado e sem licença (diagnóstico DEV 22/10/2026), por isso o plugin não cria mais `systemuser` por `Create`; só o `addUser` do Power Platform.
-- systemuser ainda ausente depois do `addUser` (~10 s acompanhando o 202 + 8 consultas em ~14 s) → etapa `systemuser` "pendente", sem erro: o cadastro cria o funcionário sem `cr40f_emailmicrosoft` (ou não grava o e-mail no existente) e devolve a senha; a reativação segue para a senha. O e-mail só é gravado numa nova execução ("Concluir liberação" na ficha, ou "Cadastrar acesso" de novo, que reaproveita o motorista ativo homônimo sem e-mail) — até lá o DriverRecordSharing não compartilha nada. `addUser` com 401/403 → GRAPH_INDISPONIVEL ("403 no addUser do Power Platform"): falta registrar o app como app de gerenciamento.
+- systemuser ainda ausente depois do `addUser` (~10 s acompanhando o 202 + 8 consultas em ~14 s) → etapa `systemuser` "pendente", sem erro: o cadastro cria o funcionário sem `cr40f_emailmicrosoft` (ou não grava o e-mail no existente) e devolve a senha; a reativação segue para a senha. O e-mail só é gravado numa nova execução: a tela tenta sozinha a cada 15 s por ~3 min enquanto o drawer ou a ficha mostram "Liberando" (`useRetentativa`), e há também ("Concluir liberação" na ficha, ou "Cadastrar acesso" de novo, que reaproveita o motorista ativo homônimo sem e-mail) — até lá o DriverRecordSharing não compartilha nada. `addUser` com 401/403 → GRAPH_INDISPONIVEL ("403 no addUser do Power Platform"): falta registrar o app como app de gerenciamento.
 - Encerrar só mexe em contas que estão no grupo de motoristas (R11); conta fora do grupo tem as etapas puladas e nada muda.
 
 ## Estado
 DEV não verificado ainda (22/10/2026): depende de app registration, grupo e `.env` do Renan. Mock e testes verificados em 22/10/2026.
+
+- Mock da liberação pendente: no drawer da lista (desktop), nome com "Liberando" (ex.: "Teste Liberando Silva") volta pendente na 1ª chamada; a retentativa automática após 15 s conclui e o painel vira "Acesso criado e liberado" com as etapas no particípio.

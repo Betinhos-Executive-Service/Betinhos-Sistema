@@ -324,6 +324,24 @@ public sealed class CadastrarAcessoHandlerTests
     }
 
     [Fact]
+    public void Reexecucao_com_mesmo_nome_e_prefixo_personalizado_reusa_a_mesma_conta()
+    {
+        _pp.CriarSystemuser = false;
+        var e1 = Entrada(); e1.PrefixoEmail = "jsilva";
+        var primeira = Handler().Executar(e1);
+        _pp.CriarSystemuser = true;
+        _graph.Chamadas.Clear();
+        var e2 = Entrada(); e2.PrefixoEmail = "jsilva";
+        var segunda = Handler().Executar(e2);
+        Assert.Equal("jsilva@betinhos.onmicrosoft.com", segunda.EmailMicrosoft);
+        Assert.Equal(primeira.EmailMicrosoft, segunda.EmailMicrosoft);
+        Assert.DoesNotContain("CriarUsuario", _graph.Chamadas);
+        Assert.Single(_graph.Usuarios);
+        Assert.Single(Funcionarios);
+        Assert.Equal("jsilva@betinhos.onmicrosoft.com", Funcionarios[0]["cr40f_emailmicrosoft"]);
+    }
+
+    [Fact]
     public void Com_funcionarioId_conta_de_outro_nome_continua_ocupada()
     {
         _graph.Usuarios["joao.avila@betinhos.onmicrosoft.com"] = new GraphUsuario { Id = "outro", Upn = "joao.avila@betinhos.onmicrosoft.com", DisplayName = "João Ávila Outro", Ativo = true };

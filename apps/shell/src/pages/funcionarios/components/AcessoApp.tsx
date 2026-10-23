@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { type AcessoSource, type Etapa, type Fluxo, liberacaoPendente, parseAcessoError } from '../data/acesso'
 import type { UsuarioApp } from '../data/source'
 import type { Funcionario } from '../data/types'
-import { ListaEtapas, ProgressoAcesso } from './AcessoProgresso'
+import { ListaEtapas, ProgressoAcesso, useRetentativa } from './AcessoProgresso'
 import { EncerrarAcessoDialog } from './EncerrarAcessoDialog'
 import { ReativarAcessoDialog } from './ReativarAcessoDialog'
 import { useNotify } from './Toasts'
@@ -94,17 +94,27 @@ export function AcessoApp({ funcionario, acesso, estado, setConta, emailPendente
   }
 
   /** Reexecuta o cadastro com o mesmo e-mail: idempotente, só termina o que faltou (systemuser e vínculo na ficha). */
+  const reexecutarCadastro = () => acesso.cadastrar({
+    funcionarioId: funcionario.id, nomeCompleto: nome, celular, prefixoEmail: email.split('@')[0],
+    tipoVinculo: funcionario.values.cr40f_tipodevinculo === 0 ? 0 : 1,
+  })
+
+  // Após reativar, o e-mail da ficha não muda e useContaApp não reconsulta: o bloco sai de "liberando" aqui.
+  function liberado(etapas: Etapa[]) { setUltimo({ fluxo: 'cadastro', etapas }); setConta('ativo'); notify('success', 'Liberação concluída.'); onAtualizado() }
+
+  // Em segundo plano enquanto a ficha mostra "Liberando"; o botão continua para quem não quer esperar.
+  const esgotou = useRetentativa(estado === 'liberando' && !concluindo, async () => {
+    const r = await reexecutarCadastro()
+    return liberacaoPendente(r.etapas) ? undefined : r.etapas
+  }, liberado)
+  const textoPendente = esgotou ? 'O Dataverse está demorando para liberar. Use "Concluir liberação" para tentar de novo.' : 'Ainda liberando no Dataverse. Conclui sozinho em alguns minutos.'
+
   async function concluirLiberacao() {
     setConcluindo(true); setUltimo(null)
     try {
-      const r = await acesso.cadastrar({
-        funcionarioId: funcionario.id, nomeCompleto: nome, celular, prefixoEmail: email.split('@')[0],
-        tipoVinculo: funcionario.values.cr40f_tipodevinculo === 0 ? 0 : 1,
-      })
-      setUltimo({ fluxo: 'cadastro', etapas: r.etapas })
-      if (liberacaoPendente(r.etapas)) return   // o resumo diz "Ainda liberando"; nova tentativa em instantes
-      // Após reativar, o e-mail da ficha não muda e useContaApp não reconsulta: o bloco sai de "liberando" aqui.
-      setConta('ativo'); notify('success', 'Liberação concluída.'); onAtualizado()
+      const r = await reexecutarCadastro()
+      if (liberacaoPendente(r.etapas)) { setUltimo({ fluxo: 'cadastro', etapas: r.etapas }); return }   // o resumo diz "Ainda liberando"
+      liberado(r.etapas)
     } catch (reason) {
       const erro = parseAcessoError(reason)
       if (erro.codigo === 'SEM_PERMISSAO') { semPermissaoDeGerir(); return }
@@ -124,7 +134,7 @@ export function AcessoApp({ funcionario, acesso, estado, setConta, emailPendente
         <dt>E-mail Microsoft</dt>
         <dd>{email ? <code>{email}</code> : <span className="muted">Ainda não criado</span>}</dd>
       </dl>
-      {estado === 'liberando' && !concluindo && <p className="acesso-dica">A conta existe e o app libera em instantes. Se o motorista não conseguir entrar, use "Concluir liberação".</p>}
+      {estado === 'liberando' && !concluindo && <p className="acesso-dica">{esgotou ? `A conta existe. ${textoPendente}` : 'A conta existe; o Dataverse ainda está liberando e isto conclui sozinho em alguns minutos. Para tentar agora, use "Concluir liberação".'}</p>}
       {concluindo && <ProgressoAcesso fluxo="cadastro" />}
       <div className="cluster">
         {pode && estado === 'sem' && <Button variant="secondary" size="compact" icon={<KeyRound size={16} />} onClick={onCadastrar}>Cadastrar acesso</Button>}
@@ -134,7 +144,7 @@ export function AcessoApp({ funcionario, acesso, estado, setConta, emailPendente
       </div>
       {ultimo && (ultimo.erro
         ? <Alert tone="danger" title="Não foi possível concluir a liberação">{ultimo.erro} Use "Concluir liberação" de novo em instantes.<ListaEtapas etapas={ultimo.etapas} fluxo={ultimo.fluxo} /></Alert>
-        : <div className="acesso-resumo" role="status"><p>{liberacaoPendente(ultimo.etapas) ? 'Ainda liberando no Dataverse. Tente de novo em 1 minuto.' : faltouSenha && ultimo.fluxo === 'reativar' ? 'Conta reativada sem senha nova.' : RESUMO[ultimo.fluxo]}</p><ListaEtapas etapas={ultimo.etapas} fluxo={ultimo.fluxo} /></div>)}
+        : <div className="acesso-resumo" role="status"><p>{liberacaoPendente(ultimo.etapas) ? textoPendente : faltouSenha && ultimo.fluxo === 'reativar' ? 'Conta reativada sem senha nova.' : RESUMO[ultimo.fluxo]}</p><ListaEtapas etapas={ultimo.etapas} fluxo={ultimo.fluxo} /></div>)}
       {semPermissao && <Alert tone="warning">Você não tem permissão para gerir acessos.</Alert>}
       <EncerrarAcessoDialog open={encerrando} nome={nome} onCancel={() => setEncerrando(false)} onConfirmar={encerrar} />
       <ReativarAcessoDialog open={reativando} nome={nome} celular={celular} onCancel={() => setReativando(false)} onReativar={reativar}
