@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { type AcessoSource, type Etapa, parseAcessoError } from '../data/acesso'
 import type { UsuarioApp } from '../data/source'
 import type { Funcionario } from '../data/types'
+import { ListaEtapas } from './CadastroAcessoDrawer'
 import { EncerrarAcessoDialog } from './EncerrarAcessoDialog'
 import { ReativarAcessoDialog } from './ReativarAcessoDialog'
 import { useNotify } from './Toasts'
@@ -23,6 +24,7 @@ export function AcessoApp({ funcionario, acesso, usuarioDoApp, onCadastrar }: Pr
   const [reativando, setReativando] = useState(false)
   const [semPermissao, setSemPermissao] = useState(false)
   const [etapas, setEtapas] = useState<Etapa[] | null>(null)
+  const [faltouSenha, setFaltouSenha] = useState(false)
   const [conta, setConta] = useState<EstadoConta>('verificando')
   const email = String(funcionario.values.cr40f_emailmicrosoft ?? '')
   const nome = String(funcionario.values.cr40f_nomecompleto ?? '')
@@ -54,6 +56,8 @@ export function AcessoApp({ funcionario, acesso, usuarioDoApp, onCadastrar }: Pr
     try { return await acesso.reativar(funcionario.id) } catch (reason) {
       const erro = parseAcessoError(reason)
       if (erro.codigo === 'SEM_PERMISSAO') { setSemPermissao(true); setReativando(false); notify('error', 'Você não tem permissão para gerir acessos.') }
+      // A senha é a última etapa do plugin: sem permissão para ela, a conta já voltou e o bloco mostra ativo.
+      if (erro.codigo === 'SEM_PERMISSAO_SENHA') { setConta('ativo'); setEtapas(erro.etapas); setFaltouSenha(true) }
       throw erro
     }
   }
@@ -67,12 +71,12 @@ export function AcessoApp({ funcionario, acesso, usuarioDoApp, onCadastrar }: Pr
       </div>
       {!semPermissao && estado === 'sem' && <Button variant="secondary" size="compact" icon={<KeyRound size={16} />} onClick={onCadastrar}>Cadastrar acesso</Button>}
       {!semPermissao && estado === 'ativo' && <Button variant="secondary" size="compact" icon={<UserX size={16} />} onClick={() => setEncerrando(true)}>Encerrar acesso</Button>}
-      {!semPermissao && estado === 'encerrado' && <Button variant="secondary" size="compact" icon={<RotateCcw size={16} />} onClick={() => setReativando(true)}>Reativar acesso</Button>}
-      {etapas && <ul className="acesso-etapas">{etapas.map((e) => <li key={e.etapa} data-estado={e.estado}>{e.etapa}: {e.detalhe}</li>)}</ul>}
+      {!semPermissao && (estado === 'encerrado' || (estado === 'ativo' && faltouSenha)) && <Button variant="secondary" size="compact" icon={<RotateCcw size={16} />} onClick={() => setReativando(true)}>Reativar acesso</Button>}
+      {etapas && <ListaEtapas etapas={etapas} />}
       {semPermissao && <Alert tone="warning">Você não tem permissão para gerir acessos.</Alert>}
       <EncerrarAcessoDialog open={encerrando} nome={nome} onCancel={() => setEncerrando(false)} onConfirmar={encerrar} />
       <ReativarAcessoDialog open={reativando} nome={nome} celular={celular} onCancel={() => setReativando(false)} onReativar={reativar}
-        onReativado={(r) => { setConta('ativo'); setEtapas(r.etapas) }} />
+        onReativado={(r) => { setConta('ativo'); setEtapas(r.etapas); setFaltouSenha(false) }} />
     </fieldset>
   )
 }

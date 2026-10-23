@@ -23,7 +23,7 @@ export function ListaEtapas({ etapas }: { etapas: Etapa[] }) {
 }
 
 /** Copia para a área de transferência com aviso de sucesso ou falha. */
-export function useCopiar() {
+function useCopiar() {
   const notify = useNotify()
   return async (texto: string) => {
     try { await navigator.clipboard.writeText(texto); notify('success', 'Copiado.') } catch { notify('error', 'Não foi possível copiar. Selecione e copie manualmente.') }
