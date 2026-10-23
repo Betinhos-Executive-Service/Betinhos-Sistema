@@ -14,6 +14,8 @@ export type Funcionario = {
   /** Aditivo de assinatura eletrônica (coluna de arquivo); só vem no `get`. */
   aditivo?: { nome: string; url: string } | null
   modifiedon: string | null
+  /** Motorista sem acesso ao app (selo "Sem app" na lista); ausente quando não foi possível consultar. */
+  semApp?: boolean
 }
 
 export type FuncionarioView = Funcionario & { alertas: Alerta[] }

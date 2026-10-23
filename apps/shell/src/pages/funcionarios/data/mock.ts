@@ -3,6 +3,7 @@ import { createMockEquipamentos } from '../../equipamentos/data/mock'
 import { STATUS } from '../../equipamentos/domain/choices'
 import { addMonths, todaySP } from './dates'
 import { buildPatch, type PatchContext } from './patch'
+import { semApp } from './semApp'
 import type { DataSource } from './source'
 import { buildNoteHtml, textToNoteHtml, type SpAnexo } from './notes'
 import { nomeComData, pastaFuncionario } from './sharepoint'
@@ -108,6 +109,8 @@ const documentos: DocumentStore = {
   },
 }
 
+const ATIVOS_APP = new Set(Object.keys(USUARIOS_APP).filter((email) => USUARIOS_APP[email]))
+
 export function createMockSource(): DataSource {
   // Cada fonte começa do zero (testes e recarga da página não herdam alterações).
   rows = [...structuredClone(ROWS0), ...volume(mockVolume())]
@@ -118,10 +121,10 @@ export function createMockSource(): DataSource {
   return {
     mode: 'mock',
     envLabel: 'MOCK',
-    list: (onFirstPage) => mockProgressive(structuredClone(rows), onFirstPage, 150),
+    list: (onFirstPage) => mockProgressive(structuredClone(rows).map((row) => ({ ...row, semApp: semApp(row.values, ATIVOS_APP) })), onFirstPage, 150),
     get: (id) => {
       const row = rows.find((item) => item.id === id)
-      return row ? delay(row) : Promise.reject(new Error('Colaborador não encontrado nos dados de exemplo.'))
+      return row ? delay({ ...row, semApp: semApp(row.values, ATIVOS_APP) }) : Promise.reject(new Error('Colaborador não encontrado nos dados de exemplo.'))
     },
     async save(original, draft) {
       const payload = buildPatch(original, draft, context)
