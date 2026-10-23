@@ -1,6 +1,6 @@
 {
   "name": "@betinhos/cadastro-passageiro",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "type": "module",
   "description": "Link público de cadastro do passageiro (foto, telefone e e-mail) — Cloudflare Worker + flow HTTP",
