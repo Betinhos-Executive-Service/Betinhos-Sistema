@@ -40,6 +40,11 @@ public sealed class GraphGateway : IGraphGateway
     public void DefinirAtivo(string usuarioId, bool ativo)
         => Enviar(new HttpMethod("PATCH"), "/users/" + usuarioId, "{\"accountEnabled\":" + (ativo ? "true" : "false") + "}");
 
+    /// <summary>Exige a permissão de aplicativo User-PasswordProfile.ReadWrite.All; sem ela o Graph responde 403.</summary>
+    public void RedefinirSenha(string usuarioId, string senha)
+        => Enviar(new HttpMethod("PATCH"), "/users/" + usuarioId, "{\"passwordProfile\":{\"forceChangePasswordNextSignIn\":false,\"password\":" + JsonLeve.Texto(senha) + "}}",
+            erro403: new AcessoException("SEM_PERMISSAO_SENHA", "Falta a permissão User-PasswordProfile.ReadWrite.All no app do Graph."));
+
     public void AtribuirLicenca(string usuarioId, string skuId)
         => Enviar(HttpMethod.Post, "/users/" + usuarioId + "/assignLicense", "{\"addLicenses\":[{\"skuId\":" + JsonLeve.Texto(skuId) + ",\"disabledPlans\":[]}],\"removeLicenses\":[]}");
 
@@ -95,13 +100,14 @@ public sealed class GraphGateway : IGraphGateway
     }
 
     /// <summary>Devolve o corpo da resposta; null em 404 quando aceitar404. Nunca inclui o corpo enviado na exceção.</summary>
-    private string? Enviar(HttpMethod metodo, string rota, string? corpoJson, bool aceitar404 = false)
+    private string? Enviar(HttpMethod metodo, string rota, string? corpoJson, bool aceitar404 = false, AcessoException? erro403 = null)
     {
         using var req = new HttpRequestMessage(metodo, Base + rota);
         req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Token());
         if (corpoJson is not null) req.Content = new StringContent(corpoJson, Encoding.UTF8, "application/json");
         using var resp = _http.SendAsync(req).GetAwaiter().GetResult();
         if (aceitar404 && resp.StatusCode == HttpStatusCode.NotFound) return null;
+        if (erro403 is not null && resp.StatusCode == HttpStatusCode.Forbidden) throw erro403;
         if (!resp.IsSuccessStatusCode) throw new AcessoException("GRAPH_INDISPONIVEL", ((int)resp.StatusCode) + " em " + metodo.Method + " " + rota.Split('?')[0]);
         return resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
     }

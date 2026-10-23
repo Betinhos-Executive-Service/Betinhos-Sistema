@@ -14,5 +14,6 @@ public interface IGraphGateway
     bool EhMembro(string grupoId, string usuarioId);
     void AdicionarAoGrupo(string grupoId, string usuarioId);
     void RemoverDoGrupo(string grupoId, string usuarioId);
+    void RedefinirSenha(string usuarioId, string senha);   // sem troca obrigatória; 403 vira SEM_PERMISSAO_SENHA
     int LicencasLivres(string skuId);                       // prepaidUnits.enabled - consumedUnits
 }

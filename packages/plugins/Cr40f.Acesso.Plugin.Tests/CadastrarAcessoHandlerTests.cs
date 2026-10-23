@@ -192,7 +192,7 @@ public sealed class CadastrarAcessoHandlerTests
         var e = Entrada(); e.FuncionarioId = id;
         var erro = Assert.Throws<AcessoException>(() => Handler().Executar(e));
         Assert.Equal("ACESSO_ENCERRADO", erro.Codigo);
-        Assert.Contains("Peça à TI para reativar a conta no Entra.", erro.Message);
+        Assert.Contains("Use \"Reativar acesso\" na ficha", erro.Message);
         Assert.DoesNotContain("DefinirAtivo", _graph.Chamadas); Assert.DoesNotContain("AtribuirLicenca", _graph.Chamadas); Assert.DoesNotContain("AdicionarAoGrupo", _graph.Chamadas);
         Assert.Empty(_svc.Atualizados); Assert.Empty(Funcionarios);
     }
