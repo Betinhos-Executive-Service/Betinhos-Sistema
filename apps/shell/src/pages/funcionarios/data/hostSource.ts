@@ -21,7 +21,7 @@ export function createFuncionariosSource(host: Host): DataSource {
     source = createXrmSource(xrm)
   }
   // Gravação em qualquer lugar (lista ou ficha aberta em Documentos) faz a lista revalidar na próxima abertura.
-  const wrapped = staleOnWrite(source, 'funcionarios', ['save', 'uploadImage', 'saveLogins'])
+  const wrapped = staleOnWrite(source, 'funcionarios', ['save', 'uploadImage', 'uploadAditivo', 'saveLogins'])
   porHost.set(host, wrapped)
   return wrapped
 }

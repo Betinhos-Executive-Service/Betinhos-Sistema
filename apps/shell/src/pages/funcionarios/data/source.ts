@@ -31,6 +31,8 @@ export interface DataSource {
   /** Grava só o diff. Retorna o id (novo ou existente). */
   save(original: Funcionario | null, draft: Draft): Promise<string>
   uploadImage(id: string, field: ImageField, file: File): Promise<void>
+  /** Envia o PDF do aditivo de assinatura eletrônica para a coluna de arquivo `new_aditivoassinatura`. */
+  uploadAditivo(id: string, file: File): Promise<void>
   /** Grava "Logins e senhas" (HTML rich text ou null). */
   saveLogins(id: string, html: string | null): Promise<void>
   multas(id: string): Promise<Multa[]>
@@ -57,6 +59,16 @@ export const IMAGE_MAX_BYTES = 5 * 1024 * 1024
 export function validateImage(file: File) {
   if (!IMAGE_TYPES.includes(file.type)) return 'Use PNG, JPG, GIF ou BMP.'
   if (file.size > IMAGE_MAX_BYTES) return 'A imagem deve ter até 5 MB.'
+  return null
+}
+
+export const ADITIVO_MAX_BYTES = 10 * 1024 * 1024
+
+export function validateAditivo(file: File) {
+  const pdf = file.type === 'application/pdf' || ((file.type === '' || file.type === 'application/octet-stream') && /\.pdf$/i.test(file.name))
+  if (!pdf) return 'Envie o aditivo em PDF.'
+  if (file.size > ADITIVO_MAX_BYTES) return 'O aditivo deve ter até 10 MB.'
+  if (file.size === 0) return 'O arquivo está vazio.'
   return null
 }
 

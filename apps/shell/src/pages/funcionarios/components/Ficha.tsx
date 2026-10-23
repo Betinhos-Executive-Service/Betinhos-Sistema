@@ -4,13 +4,14 @@ import { useQueryTexto } from '../../../nav/queryState'
 import { useIsMobile } from '../lib/useMediaQuery'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { computeAlertas } from '../data/alerts'
-import { todaySP } from '../data/dates'
+import { formatBR, todaySP } from '../data/dates'
 import { changedKeys, draftFrom, emptyDraft, validateDraft } from '../data/patch'
 import { FIELDS, FUNCAO, GROUP_LABELS, optionLabel, TABLE, type FieldGroup } from '../data/schema'
 import type { DataSource } from '../data/source'
 import type { Draft, Funcionario, ImageField } from '../data/types'
 import { errorMessage } from '../data/xrm'
-import { AlertBadge, Avatar, StatusBadge } from './Badges'
+import { AditivoBadge, AlertBadge, Avatar, StatusBadge } from './Badges'
+import { AditivoAssinatura } from './AditivoAssinatura'
 import { FieldInput } from './FieldInput'
 import { ImageDrop } from './ImageDrop'
 import { AnotacoesTab } from './Anotacoes'
@@ -33,7 +34,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'equipamentos', label: 'Equipamentos' },
   { key: 'anotacoes', label: 'Anotações' },
 ]
-const GROUPS: FieldGroup[] = ['pessoais', 'vinculo', 'contato', 'detalhes']
+const GROUPS: FieldGroup[] = ['pessoais', 'vinculo', 'contato', 'detalhes', 'assinatura']
 
 type Props = {
   source: DataSource
@@ -54,11 +55,14 @@ export function Ficha({ source, docs, id, onClose, onSaved, versao, acesso, onCa
   const [loadError, setLoadError] = useState<string | null>(null)
   const [loading, setLoading] = useState(Boolean(id))
   const [saving, setSaving] = useState(false)
+  const [aditivoArquivo, setAditivoArquivo] = useState<File | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
   // A seção aberta vive na URL (`secao=documentos`); "Dados" é o padrão. Colaborador novo só tem a seção Dados.
   const [secao, setTab] = useQueryTexto('secao', 'dados')
   const tab: Tab = !id ? 'dados' : TABS.find((item) => item.key === secao)?.key ?? 'dados'
   const idAnterior = useRef(id)
+  // Id do colaborador recém-criado cujo PDF não subiu: a troca de id vinda do próprio save não zera o arquivo pendente.
+  const manterAditivoDe = useRef<string | null>(null)
   const [discarding, setDiscarding] = useState(false)
   const panel = useRef<HTMLElement>(null)
   const mobile = useIsMobile()
@@ -67,6 +71,8 @@ export function Ficha({ source, docs, id, onClose, onSaved, versao, acesso, onCa
     // Trocar de colaborador volta para Dados; na abertura da ficha vale a seção da URL.
     if (idAnterior.current !== id) { idAnterior.current = id; setTab('dados') }
     setErrors({})
+    if (id && manterAditivoDe.current === id) manterAditivoDe.current = null
+    else setAditivoArquivo(null)
     if (!id) {
       setOriginal(null)
       setDraft(emptyDraft())
@@ -87,7 +93,8 @@ export function Ficha({ source, docs, id, onClose, onSaved, versao, acesso, onCa
 
   const dirty = useMemo(() => changedKeys(original, draft), [original, draft])
   const baseline = useMemo(() => JSON.stringify(original ? draftFrom(original) : emptyDraft()), [original])
-  const touched = JSON.stringify(draft) !== baseline
+  const touched = JSON.stringify(draft) !== baseline || aditivoArquivo !== null
+  const pendentes = dirty.length + (aditivoArquivo ? 1 : 0)
   const isNew = !id
   const nome = String(draft.values.cr40f_nomecompleto ?? '') || (isNew ? 'Novo colaborador' : '')
   const alertas = original ? computeAlertas({
@@ -120,10 +127,21 @@ export function Ficha({ source, docs, id, onClose, onSaved, versao, acesso, onCa
     setSaving(true)
     try {
       const savedId = await source.save(original, draft)
+      let aditivoOk = true
+      if (aditivoArquivo) {
+        try {
+          await source.uploadAditivo(savedId, aditivoArquivo)
+          setAditivoArquivo(null)
+        } catch (reason) {
+          aditivoOk = false
+          if (isNew) manterAditivoDe.current = savedId
+          notify('error', `Aditivo não enviado: ${errorMessage(reason)}. Os demais dados foram salvos; o PDF continua na tela.`)
+        }
+      }
       const fresh = await source.get(savedId)
       setOriginal(fresh)
       setDraft(draftFrom(fresh))
-      notify('success', isNew ? 'Colaborador criado.' : 'Alterações salvas.')
+      if (aditivoOk) notify('success', isNew ? 'Colaborador criado.' : 'Alterações salvas.')
       onSaved(savedId, isNew)
     } catch (reason) {
       notify('error', `Não salvou: ${errorMessage(reason)}. Suas alterações continuam na tela.`)
@@ -172,6 +190,8 @@ export function Ficha({ source, docs, id, onClose, onSaved, versao, acesso, onCa
               {original && <StatusBadge value={original.values.cr40f_status} />}
               {original && <span className="muted">{optionLabel(FUNCAO, original.values.cr40f_funcao)}</span>}
               {alertas.map((alerta) => <AlertBadge key={alerta.kind} alerta={alerta} />)}
+              {/* Mesma regra do termo de multa (frota temAditivo): só vale com a data e o PDF. */}
+              {typeof original?.values.new_aditivoassinaturaem === 'string' && original.values.new_aditivoassinaturaem && original.aditivo && <AditivoBadge text={`Aditivo assinado em ${formatBR(original.values.new_aditivoassinaturaem)}`} />}
             </div>
           </div>
           {!mobile && (
@@ -206,6 +226,9 @@ export function Ficha({ source, docs, id, onClose, onSaved, versao, acesso, onCa
                         onChange={(value) => setValue(field.key, value)}
                       />
                     ))}
+                    {group === 'assinatura' && (
+                      <AditivoAssinatura atual={original?.aditivo ?? null} pendente={aditivoArquivo} disabled={saving} onPick={setAditivoArquivo} />
+                    )}
                     {group === 'vinculo' && (
                       <VeiculoPicker source={source} value={draft.veiculo} changed={!isNew && dirty.includes('cr40f_veiculoatual')} onChange={(veiculo) => setDraft((current) => ({ ...current, veiculo }))} />
                     )}
@@ -251,15 +274,15 @@ export function Ficha({ source, docs, id, onClose, onSaved, versao, acesso, onCa
         </div>
 
         {tab === 'dados' && !loading && !loadError && (
-          <footer className={`drawer-foot${dirty.length || isNew ? ' drawer-foot--active' : ''}`}>
-            <span className="drawer-foot-status">{isNew ? 'Preencha os obrigatórios (*)' : dirty.length ? `${dirty.length} alteração(ões) não salva(s)` : 'Sem alterações'}</span>
+          <footer className={`drawer-foot${pendentes || isNew ? ' drawer-foot--active' : ''}`}>
+            <span className="drawer-foot-status">{isNew ? 'Preencha os obrigatórios (*)' : pendentes ? `${pendentes} alteração(ões) não salva(s)` : 'Sem alterações'}</span>
             <div className="cluster">
               {!isNew && (
-                <Button variant="secondary" icon={<Undo2 size={16} />} disabled={!dirty.length || saving} onClick={() => { if (original) { setDraft(draftFrom(original)); setErrors({}) } }}>
+                <Button variant="secondary" icon={<Undo2 size={16} />} disabled={!pendentes || saving} onClick={() => { if (original) { setDraft(draftFrom(original)); setErrors({}); setAditivoArquivo(null) } }}>
                   Desfazer
                 </Button>
               )}
-              <Button type="submit" form="ficha-form" icon={<Save size={16} />} loading={saving} disabled={!isNew && !dirty.length}>
+              <Button type="submit" form="ficha-form" icon={<Save size={16} />} loading={saving} disabled={!isNew && !pendentes}>
                 {isNew ? 'Criar colaborador' : 'Salvar'}
               </Button>
             </div>

@@ -134,6 +134,10 @@
   /* ============ Documentos ============ */
   .docs { display: grid; gap: var(--bt-space-3); }
   .docs > .bt-button { justify-self: start; }
+  .aditivo { display: grid; gap: var(--bt-space-2); }
+  .aditivo-link, .aditivo-remover { color: var(--bt-color-action); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-semibold); }
+  .aditivo-remover { padding: 0; border: 0; background: none; cursor: pointer; text-decoration: underline; }
+  .aditivo-pendente { font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }
   .files, .secret, .image-field { padding: var(--bt-space-4); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background-color: var(--bt-color-surface); }
   .images { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--bt-space-3); }
   @container (max-width: 560px) { .images { grid-template-columns: 1fr; } }

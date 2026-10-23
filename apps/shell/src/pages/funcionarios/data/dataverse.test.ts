@@ -55,3 +55,34 @@ describe('createXrmSource().equipamentos', () => {
     await expect(sourceWith(original).source.equipamentos(GUID)).rejects.toBe(original)
   })
 })
+
+describe('createXrmSource().uploadAditivo', () => {
+  it('envia o PDF em PATCH na coluna de arquivo com o nome do arquivo', async () => {
+    const fetch = vi.fn(async () => new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetch)
+    const { source } = sourceWith([])
+    const file = new File(['%PDF'], 'aditivo ação.pdf', { type: 'application/pdf' })
+    await source.uploadAditivo(`{${GUID.toUpperCase()}}`, file)
+    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe(`https://org23b93544.crm2.dynamics.com/api/data/v9.2/cr40f_funcionarioses(${GUID})/new_aditivoassinatura`)
+    expect(init.method).toBe('PATCH')
+    const headers = init.headers as Record<string, string>
+    expect(headers['Content-Type']).toBe('application/octet-stream')
+    expect(headers['x-ms-file-name']).toBe(encodeURIComponent('aditivo ação.pdf'))
+    expect(init.body).toBe(file)
+  })
+
+  it('erro do Dataverse vira exceção com a mensagem', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: { message: 'Arquivo grande demais.' } }), { status: 400 })))
+    const { source } = sourceWith([])
+    await expect(source.uploadAditivo(GUID, new File(['x'], 'a.pdf'))).rejects.toThrow('Arquivo grande demais.')
+  })
+
+  it('recusa id que não é GUID', async () => {
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    const { source } = sourceWith([])
+    await expect(source.uploadAditivo('x/../y', new File(['x'], 'a.pdf'))).rejects.toThrow('Id de funcionário inválido.')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+})

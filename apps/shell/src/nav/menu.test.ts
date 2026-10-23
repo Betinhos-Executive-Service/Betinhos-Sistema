@@ -41,7 +41,7 @@ it('Equipamentos é rota React em Cadastros', () => {
 
 it('Frota tem um item por visão, sem as tabelas legadas nem Infrações solta', () => {
   const frota = MENU.find((group) => group.id === 'frota')!
-  expect(frota.items.map((item) => item.label)).toEqual(['Pendências', 'Veículos', 'Manutenções', 'Multas', 'Colisões', 'Indicadores', 'Plano preventivo', 'Assistente', 'Checklists de Veículos'])
+  expect(frota.items.map((item) => item.label)).toEqual(['Pendências', 'Veículos', 'Manutenções', 'Multas', 'Parcelas de multa', 'Colisões', 'Indicadores', 'Plano preventivo', 'Assistente', 'Checklists de Veículos'])
   expect(ENTITY_NAMES).not.toContain('cr40f_manutencoes')
   expect(ENTITY_NAMES).not.toContain('cr40f_multas')
   expect(ENTITY_NAMES).not.toContain('cr40f_colisao_v2')
@@ -63,4 +63,12 @@ it('Geral é rota React do shell no lugar da lista nativa de reservas', () => {
   expect(findItem('geral')?.item).toMatchObject({ kind: 'page', page: 'geral', label: 'Geral' })
   expect(findItem('geral')?.group.id).toBe('operacional')
   expect(findItem('cr40f_reservadeveculos')).toBeNull()
+})
+
+it('Parcelas de multa é tabela em Frota, logo após Multas, para o DP', () => {
+  const found = findItem('new_parcelamultafolha')
+  expect(found?.group.id).toBe('frota')
+  expect(found?.item).toMatchObject({ kind: 'entity', entity: 'new_parcelamultafolha', label: 'Parcelas de multa' })
+  const ids = found!.group.items.map((item) => item.id)
+  expect(ids.indexOf('new_parcelamultafolha')).toBe(ids.indexOf('frota-multas') + 1)
 })

@@ -8,7 +8,7 @@ import type { XrmHost } from './xrm'
 
 // Uma fonte por sessão (`host`): a carga fica em cache entre a tela Frota e a ficha do veículo em Documentos.
 const porHost = new WeakMap<Host, DataSource>()
-const GRAVACOES = ['update', 'runFlow', 'salvarItemPlano', 'inativarItemPlano', 'salvarBaseline', 'openForm'] as const
+const GRAVACOES = ['update', 'runFlow', 'salvarItemPlano', 'inativarItemPlano', 'salvarBaseline', 'openForm', 'enviarTermoMulta', 'cancelarTermoMulta'] as const
 
 /** Dados fictícios no `pnpm dev`; no Dataverse, o Xrm do model-driven ou o mínimo que o shell montou. */
 export function createFrotaSource(host: Host): DataSource {

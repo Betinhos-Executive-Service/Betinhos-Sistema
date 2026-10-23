@@ -66,6 +66,7 @@ export const MENU: MenuGroup[] = [
       { kind: 'page', id: 'frota-veiculos', label: 'Veículos', page: 'frota', aba: 'veiculos' },
       { kind: 'page', id: 'frota-manutencoes', label: 'Manutenções', page: 'frota', aba: 'manutencoes' },
       { kind: 'page', id: 'frota-multas', label: 'Multas', page: 'frota', aba: 'multas' },
+      table('new_parcelamultafolha', 'Parcelas de multa'),
       { kind: 'page', id: 'frota-colisoes', label: 'Colisões', page: 'frota', aba: 'colisoes' },
       { kind: 'page', id: 'frota-indicadores', label: 'Indicadores', page: 'frota', aba: 'indicadores' },
       { kind: 'page', id: 'frota-plano', label: 'Plano preventivo', page: 'frota', aba: 'plano' },

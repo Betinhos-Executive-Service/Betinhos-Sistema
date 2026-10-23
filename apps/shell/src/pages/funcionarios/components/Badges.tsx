@@ -1,5 +1,5 @@
 import { StatusBadge as DsStatusBadge, type StatusTone } from '@betinhos/ui'
-import { AlertTriangle, Cake, IdCard, Stethoscope } from 'lucide-react'
+import { AlertTriangle, Cake, FileSignature, IdCard, Stethoscope } from 'lucide-react'
 import type { Alerta, AlertLevel } from '../data/alerts'
 import { initials } from '../data/format'
 
@@ -23,6 +23,11 @@ export function AlertBadge({ alerta, compact = false, text }: { alerta: Alerta; 
       {compact ? <span className="sr-only">{alerta.label}</span> : text && text !== alerta.label ? <><span aria-hidden="true">{text}</span><span className="sr-only">{alerta.label}</span></> : alerta.label}
     </DsStatusBadge>
   )
+}
+
+/** Selo de aditivo de assinatura eletrônica registrado (sucesso, com ícone; não depende só da cor). */
+export function AditivoBadge({ text }: { text: string }) {
+  return <DsStatusBadge tone="success" icon={<FileSignature />}>{text}</DsStatusBadge>
 }
 
 /** Avatar do Design System (`bt-avatar`) com foto ou iniciais, no tamanho pedido. */

@@ -22,7 +22,7 @@ function fakeSource(mode: DataSource['mode'], envLabel: string): DataSource {
     runFlow: async () => ({ message: null, shareUrl: null }),
     salvarItemPlano: async () => {},
     inativarItemPlano: async () => {},
-    salvarBaseline: async () => {},
+    salvarBaseline: async () => {}, temAditivo: async () => false, listarTermos: async () => [], enviarTermoMulta: async () => 't1', cancelarTermoMulta: async () => {}, baixarPdfTermo: async () => {},
   }
 }
 

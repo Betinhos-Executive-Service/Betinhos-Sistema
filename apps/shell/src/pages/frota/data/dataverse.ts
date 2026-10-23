@@ -1,7 +1,8 @@
 import { CAMPO, lerMulti } from '../domain/manutencaoCatalogo'
 import { addMonths, todaySP, type DateBehavior } from './dates'
-import { cleanId, mapBaseline, mapColisao, mapDespesaCombustivel, mapInfracao, mapItemPlano, mapManutencao, mapMulta, mapPosse, mapTelemetriaKm, mapVeiculo, SELECT, SELECT_VEICULOS_SEM_HODOMETRO } from './mappers'
-import { BASELINE, CATEGORIA_DESPESA_TABLE, ENTITY_SET, ITEM_PLANO, KIND_TABLE, STATUS_FIELD, TABLE } from './schema'
+import { cleanId, mapBaseline, mapColisao, mapDespesaCombustivel, mapInfracao, mapItemPlano, mapManutencao, mapMulta, mapPosse, mapTelemetriaKm, mapTermoMulta, mapVeiculo, SELECT, SELECT_TERMO, SELECT_VEICULOS_SEM_HODOMETRO } from './mappers'
+import { BASELINE, CATEGORIA_DESPESA_TABLE, ENTITY_SET, FORMA_PAGAMENTO, ITEM_PLANO, KIND_TABLE, STATUS_FIELD, TABLE, TERMO_TABLE } from './schema'
+import type { Acordo } from '../domain/termoMulta'
 import { base64ToBlob, callSpFlow, escolherPrincipal, FOTO_MAX_BYTES, fileToBase64, nomeFoto, pastaFotoVeiculo, SP_VARS, toArquivo, type SpKey } from './sharepoint'
 import { EMPTY_DATA, FlowIncertoError, type DataSource, type FlowId, type FlowResult, type ItemPlanoInput, type LoadResult } from './source'
 import type { DespesaCombustivel, FrotaData, Kind, TableKey, TelemetriaKm } from './types'
@@ -50,6 +51,33 @@ export function createXrmSource(xrm: XrmHost): DataSource {
   const behaviorCache = new Map<string, Promise<Behaviors>>()
   // A URL do Flow tem assinatura: fica só aqui, em memória, e nunca sai em mensagem, log ou retorno.
   const flowUrls = new Map<FlowId, string>()
+
+  /** Guid sem chaves e minúsculo; rejeita o que não for Guid. */
+  function guid(value: string) {
+    const id = cleanId(value)
+    if (!GUID.test(id)) throw new Error('Identificador inválido')
+    return id
+  }
+
+  /** Chama uma Custom API não vinculada; erro do servidor sai com a mensagem do Dataverse. */
+  async function customApi(nome: string, body: Record<string, unknown>, falha: string): Promise<Record<string, unknown>> {
+    const response = await fetch(`${apiUrl}/${nome}`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json; charset=utf-8', 'OData-Version': '4.0', 'OData-MaxVersion': '4.0' },
+      body: JSON.stringify(body),
+    })
+    let payload: Record<string, unknown> = {}
+    try {
+      const parsed: unknown = await response.json()
+      if (parsed && typeof parsed === 'object') payload = parsed as Record<string, unknown>
+    } catch { /* 204 ou corpo vazio */ }
+    if (!response.ok) {
+      const erro = payload.error as { message?: unknown } | undefined
+      throw new Error(typeof erro?.message === 'string' && erro.message ? erro.message : `${falha} (${response.status})`)
+    }
+    return payload
+  }
 
   async function getJson<T>(path: string): Promise<T> {
     const response = await fetch(`${apiUrl}/${path}`, { credentials: 'same-origin', headers: { Accept: 'application/json', 'OData-Version': '4.0', 'OData-MaxVersion': '4.0' } })
@@ -314,6 +342,40 @@ export function createXrmSource(xrm: XrmHost): DataSource {
         [BASELINE.item]: `/${ENTITY_SET.planoPreventivo}(${i})`,
         ...valores,
       })
+    },
+
+    async temAditivo(funcionarioId: string) {
+      const id = guid(funcionarioId)
+      const row = await api.retrieveRecord('cr40f_funcionarios', id, '?$select=new_aditivoassinaturaem,new_aditivoassinatura_name')
+      // Exige a data e o PDF: data sem arquivo não prova o aditivo assinado.
+      const preenchido = (v: unknown) => typeof v === 'string' && v !== ''
+      return preenchido(row.new_aditivoassinaturaem) && preenchido(row.new_aditivoassinatura_name)
+    },
+
+    async listarTermos(multaId: string) {
+      const result = await api.retrieveMultipleRecords(TERMO_TABLE, `?$select=${SELECT_TERMO.join(',')}&$filter=_new_multa_value eq ${guid(multaId)}&$orderby=createdon desc`)
+      return result.entities.map(mapTermoMulta)
+    },
+
+    async enviarTermoMulta(multaId: string, acordo: Acordo) {
+      const payload = await customApi('new_EnviarTermoMulta', {
+        new_MultaId: guid(multaId),
+        new_FormaPagamento: FORMA_PAGAMENTO[acordo.forma],
+        new_Parcelas: acordo.parcelas,
+        new_ValorTotal: acordo.valorTotal,
+        new_PrimeiraCompetencia: `${acordo.primeiraCompetencia}T00:00:00Z`,
+      }, 'Não foi possível enviar o termo')
+      const termoId = payload.new_TermoId
+      if (typeof termoId !== 'string' || !termoId) throw new Error('O envio não devolveu o termo criado. Recarregue antes de tentar de novo')
+      return cleanId(termoId)
+    },
+
+    async cancelarTermoMulta(termoId: string) {
+      await customApi('new_CancelarTermoMulta', { new_TermoId: guid(termoId) }, 'Não foi possível cancelar o termo')
+    },
+
+    async baixarPdfTermo(termoId: string) {
+      window.open(`${apiUrl}/new_termomultas(${guid(termoId)})/new_pdf/$value`, '_blank', 'noopener')
     },
   }
 }
