@@ -1,0 +1,844 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$authentication": {
+      "defaultValue": {},
+      "type": "SecureObject"
+    },
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    }
+  },
+  "triggers": {
+    "manual": {
+      "type": "Request",
+      "kind": "Http",
+      "inputs": {
+        "method": "POST",
+        "triggerAuthenticationType": "All",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "op": {
+              "type": "string"
+            },
+            "hash": {
+              "type": "string"
+            },
+            "passageiroId": {
+              "type": "string"
+            },
+            "fotoBase64": {
+              "type": "string"
+            },
+            "telefone": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "actions": {
+    "Iniciar_status": {
+      "type": "InitializeVariable",
+      "runAfter": {},
+      "inputs": {
+        "variables": [
+          {
+            "name": "httpStatus",
+            "type": "integer",
+            "value": 500
+          }
+        ]
+      }
+    },
+    "Iniciar_corpo": {
+      "type": "InitializeVariable",
+      "runAfter": {
+        "Iniciar_status": [
+          "Succeeded"
+        ]
+      },
+      "inputs": {
+        "variables": [
+          {
+            "name": "corpo",
+            "type": "object",
+            "value": {
+              "ok": false,
+              "codigo": "erro_interno"
+            }
+          }
+        ]
+      }
+    },
+    "Iniciar_passageiros": {
+      "type": "InitializeVariable",
+      "runAfter": {
+        "Iniciar_corpo": [
+          "Succeeded"
+        ]
+      },
+      "inputs": {
+        "variables": [
+          {
+            "name": "passageiros",
+            "type": "array",
+            "value": []
+          }
+        ]
+      }
+    },
+    "Iniciar_link_foto": {
+      "type": "InitializeVariable",
+      "runAfter": {
+        "Iniciar_passageiros": [
+          "Succeeded"
+        ]
+      },
+      "inputs": {
+        "variables": [
+          {
+            "name": "linkFoto",
+            "type": "string",
+            "value": ""
+          }
+        ]
+      }
+    },
+    "Try": {
+      "type": "Scope",
+      "runAfter": {
+        "Iniciar_link_foto": [
+          "Succeeded"
+        ]
+      },
+      "actions": {
+        "Entrada_valida": {
+          "type": "If",
+          "runAfter": {},
+          "expression": {
+            "equals": [
+              "@and(equals(length(toLower(trim(coalesce(triggerBody()?['hash'], '')))), 64), not(contains(toLower(trim(coalesce(triggerBody()?['hash'], ''))), '''')), or(equals(toLower(trim(coalesce(triggerBody()?['op'], ''))), 'ler'), and(equals(toLower(trim(coalesce(triggerBody()?['op'], ''))), 'salvar'), equals(length(toLower(trim(coalesce(triggerBody()?['passageiroId'], '')))), 36), not(contains(toLower(trim(coalesce(triggerBody()?['passageiroId'], ''))), '''')), or(not(empty(coalesce(triggerBody()?['fotoBase64'], ''))), not(empty(trim(coalesce(triggerBody()?['telefone'], '')))), not(empty(trim(coalesce(triggerBody()?['email'], ''))))), lessOrEquals(length(coalesce(triggerBody()?['fotoBase64'], '')), 10000000), lessOrEquals(length(trim(coalesce(triggerBody()?['telefone'], ''))), 30), lessOrEquals(length(trim(coalesce(triggerBody()?['email'], ''))), 100), or(empty(trim(coalesce(triggerBody()?['email'], ''))), and(contains(trim(coalesce(triggerBody()?['email'], '')), '@'), not(contains(trim(coalesce(triggerBody()?['email'], '')), ' ')), greater(lastIndexOf(trim(coalesce(triggerBody()?['email'], '')), '.'), add(indexOf(trim(coalesce(triggerBody()?['email'], '')), '@'), 1)))))))",
+              true
+            ]
+          },
+          "actions": {
+            "Buscar_link": {
+              "type": "OpenApiConnection",
+              "runAfter": {},
+              "inputs": {
+                "host": {
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "ListRecords"
+                },
+                "parameters": {
+                  "entityName": "__SET_LINKS__",
+                  "$select": "cr40f_linkcadastroid,cr40f_expiraem,cr40f_status,cr40f_envios,_cr40f_reserva_value,_cr40f_passageiro_value",
+                  "$filter": "cr40f_tokenhash eq '@{toLower(trim(coalesce(triggerBody()?['hash'], '')))}'",
+                  "$top": 1
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Existe": {
+              "type": "If",
+              "runAfter": {
+                "Buscar_link": [
+                  "Succeeded"
+                ]
+              },
+              "expression": {
+                "greater": [
+                  "@length(body('Buscar_link')?['value'])",
+                  0
+                ]
+              },
+              "actions": {
+                "Link": {
+                  "type": "Compose",
+                  "runAfter": {},
+                  "inputs": "@first(body('Buscar_link')?['value'])"
+                },
+                "Vencido_ou_revogado": {
+                  "type": "If",
+                  "runAfter": {
+                    "Link": [
+                      "Succeeded"
+                    ]
+                  },
+                  "expression": {
+                    "or": [
+                      {
+                        "less": [
+                          "@ticks(coalesce(outputs('Link')?['cr40f_expiraem'], '1900-01-01T00:00:00Z'))",
+                          "@ticks(utcNow())"
+                        ]
+                      },
+                      {
+                        "equals": [
+                          "@outputs('Link')?['cr40f_status']",
+                          3
+                        ]
+                      },
+                      {
+                        "equals": [
+                          "@outputs('Link')?['cr40f_status']",
+                          4
+                        ]
+                      }
+                    ]
+                  },
+                  "actions": {
+                    "Marcar_expirado": {
+                      "type": "If",
+                      "runAfter": {},
+                      "expression": {
+                        "and": [
+                          {
+                            "not": {
+                              "equals": [
+                                "@outputs('Link')?['cr40f_status']",
+                                3
+                              ]
+                            }
+                          },
+                          {
+                            "not": {
+                              "equals": [
+                                "@outputs('Link')?['cr40f_status']",
+                                4
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      "actions": {
+                        "Gravar_expirado": {
+                          "type": "OpenApiConnection",
+                          "runAfter": {},
+                          "inputs": {
+                            "host": {
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                              "connectionName": "shared_commondataserviceforapps",
+                              "operationId": "UpdateRecord"
+                            },
+                            "parameters": {
+                              "entityName": "__SET_LINKS__",
+                              "recordId": "@outputs('Link')?['cr40f_linkcadastroid']",
+                              "item": {
+                                "cr40f_status": 3
+                              }
+                            },
+                            "authentication": "@parameters('$authentication')"
+                          }
+                        }
+                      },
+                      "else": {
+                        "actions": {}
+                      }
+                    },
+                    "Status_erro_410": {
+                      "type": "SetVariable",
+                      "runAfter": {
+                        "Marcar_expirado": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "name": "httpStatus",
+                        "value": 410
+                      }
+                    },
+                    "Corpo_erro_410": {
+                      "type": "SetVariable",
+                      "runAfter": {
+                        "Status_erro_410": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "name": "corpo",
+                        "value": {
+                          "ok": false,
+                          "codigo": "link_expirado"
+                        }
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {
+                      "Listar_filhos": {
+                        "type": "OpenApiConnection",
+                        "runAfter": {},
+                        "inputs": {
+                          "host": {
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                            "connectionName": "shared_commondataserviceforapps",
+                            "operationId": "ListRecords"
+                          },
+                          "parameters": {
+                            "entityName": "__SET_SERVICOS__",
+                            "$select": "_cr40f_bancodedados_value",
+                            "$filter": "_cr40f_geral_value eq @{outputs('Link')?['_cr40f_reserva_value']}",
+                            "$top": 20
+                          },
+                          "authentication": "@parameters('$authentication')"
+                        }
+                      },
+                      "Ids_filhos": {
+                        "type": "Select",
+                        "runAfter": {
+                          "Listar_filhos": [
+                            "Succeeded"
+                          ]
+                        },
+                        "inputs": {
+                          "from": "@body('Listar_filhos')?['value']",
+                          "select": "@toLower(coalesce(item()?['_cr40f_bancodedados_value'], ''))"
+                        }
+                      },
+                      "Filtrar_filhos": {
+                        "type": "Query",
+                        "runAfter": {
+                          "Ids_filhos": [
+                            "Succeeded"
+                          ]
+                        },
+                        "inputs": {
+                          "from": "@body('Ids_filhos')",
+                          "where": "@not(empty(item()))"
+                        }
+                      },
+                      "Obter_reserva": {
+                        "type": "OpenApiConnection",
+                        "runAfter": {},
+                        "inputs": {
+                          "host": {
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                            "connectionName": "shared_commondataserviceforapps",
+                            "operationId": "GetItem"
+                          },
+                          "parameters": {
+                            "entityName": "__SET_RESERVAS__",
+                            "recordId": "@outputs('Link')?['_cr40f_reserva_value']",
+                            "$select": "cr40f_dataehorriodesada,_cr40f_passageiro1_value,_cr40f_passageiro2_value,_cr40f_passageiro3_value,_cr40f_passageiro4_value"
+                          },
+                          "authentication": "@parameters('$authentication')"
+                        }
+                      },
+                      "Filtrar_lookups": {
+                        "type": "Query",
+                        "runAfter": {
+                          "Obter_reserva": [
+                            "Succeeded"
+                          ]
+                        },
+                        "inputs": {
+                          "from": "@createArray(toLower(coalesce(body('Obter_reserva')?['_cr40f_passageiro1_value'], '')), toLower(coalesce(body('Obter_reserva')?['_cr40f_passageiro2_value'], '')), toLower(coalesce(body('Obter_reserva')?['_cr40f_passageiro3_value'], '')), toLower(coalesce(body('Obter_reserva')?['_cr40f_passageiro4_value'], '')))",
+                          "where": "@not(empty(item()))"
+                        }
+                      },
+                      "Escopo": {
+                        "type": "Compose",
+                        "runAfter": {
+                          "Filtrar_filhos": [
+                            "Succeeded"
+                          ],
+                          "Filtrar_lookups": [
+                            "Succeeded"
+                          ]
+                        },
+                        "inputs": "@if(not(empty(outputs('Link')?['_cr40f_passageiro_value'])), intersection(createArray(toLower(outputs('Link')?['_cr40f_passageiro_value'])), if(greater(length(body('Filtrar_filhos')), 0), body('Filtrar_filhos'), body('Filtrar_lookups'))), union(if(greater(length(body('Filtrar_filhos')), 0), body('Filtrar_filhos'), body('Filtrar_lookups')), createArray()))"
+                      },
+                      "Por_operacao": {
+                        "type": "Switch",
+                        "runAfter": {
+                          "Escopo": [
+                            "Succeeded"
+                          ]
+                        },
+                        "expression": "@toLower(trim(coalesce(triggerBody()?['op'], '')))",
+                        "cases": {
+                          "Ler": {
+                            "case": "ler",
+                            "actions": {
+                              "Por_passageiro": {
+                                "type": "Foreach",
+                                "foreach": "@outputs('Escopo')",
+                                "runAfter": {},
+                                "runtimeConfiguration": {
+                                  "concurrency": {
+                                    "repetitions": 1
+                                  }
+                                },
+                                "actions": {
+                                  "Obter_passageiro": {
+                                    "type": "OpenApiConnection",
+                                    "runAfter": {},
+                                    "inputs": {
+                                      "host": {
+                                        "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                                        "connectionName": "shared_commondataserviceforapps",
+                                        "operationId": "GetItem"
+                                      },
+                                      "parameters": {
+                                        "entityName": "__SET_PASSAGEIROS__",
+                                        "recordId": "@items('Por_passageiro')",
+                                        "$select": "cr40f_nomedopassageiro,new_linkdafoto"
+                                      },
+                                      "authentication": "@parameters('$authentication')"
+                                    }
+                                  },
+                                  "Incluir_passageiro": {
+                                    "type": "AppendToArrayVariable",
+                                    "runAfter": {
+                                      "Obter_passageiro": [
+                                        "Succeeded"
+                                      ]
+                                    },
+                                    "inputs": {
+                                      "name": "passageiros",
+                                      "value": {
+                                        "id": "@{items('Por_passageiro')}",
+                                        "primeiroNome": "@first(split(trim(coalesce(body('Obter_passageiro')?['cr40f_nomedopassageiro'], '')), ' '))",
+                                        "temFoto": "@not(empty(body('Obter_passageiro')?['new_linkdafoto']))"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "Status_ler": {
+                                "type": "SetVariable",
+                                "runAfter": {
+                                  "Por_passageiro": [
+                                    "Succeeded"
+                                  ]
+                                },
+                                "inputs": {
+                                  "name": "httpStatus",
+                                  "value": 200
+                                }
+                              },
+                              "Corpo_ler": {
+                                "type": "SetVariable",
+                                "runAfter": {
+                                  "Status_ler": [
+                                    "Succeeded"
+                                  ]
+                                },
+                                "inputs": {
+                                  "name": "corpo",
+                                  "value": {
+                                    "ok": true,
+                                    "dataServico": "@body('Obter_reserva')?['cr40f_dataehorriodesada']",
+                                    "passageiros": "@variables('passageiros')"
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "Salvar": {
+                            "case": "salvar",
+                            "actions": {
+                              "No_escopo": {
+                                "type": "If",
+                                "runAfter": {},
+                                "expression": {
+                                  "equals": [
+                                    "@contains(outputs('Escopo'), toLower(trim(coalesce(triggerBody()?['passageiroId'], ''))))",
+                                    true
+                                  ]
+                                },
+                                "actions": {
+                                  "Dentro_do_limite": {
+                                    "type": "If",
+                                    "runAfter": {},
+                                    "expression": {
+                                      "less": [
+                                        "@coalesce(outputs('Link')?['cr40f_envios'], 0)",
+                                        30
+                                      ]
+                                    },
+                                    "actions": {
+                                      "Tem_foto": {
+                                        "type": "If",
+                                        "runAfter": {},
+                                        "expression": {
+                                          "not": {
+                                            "equals": [
+                                              "@empty(coalesce(triggerBody()?['fotoBase64'], ''))",
+                                              true
+                                            ]
+                                          }
+                                        },
+                                        "actions": {
+                                          "Criar_arquivo": {
+                                            "type": "OpenApiConnection",
+                                            "runAfter": {},
+                                            "inputs": {
+                                              "host": {
+                                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                                                "connectionName": "shared_sharepointonline",
+                                                "operationId": "CreateFile"
+                                              },
+                                              "parameters": {
+                                                "dataset": "__SITE_URL__",
+                                                "folderPath": "__FOLDER_PATH__",
+                                                "name": "@{toLower(trim(coalesce(triggerBody()?['passageiroId'], '')))}.jpg",
+                                                "body": "@base64ToBinary(coalesce(triggerBody()?['fotoBase64'], ''))"
+                                              },
+                                              "authentication": "@parameters('$authentication')"
+                                            }
+                                          },
+                                          "Criar_link_compartilhamento": {
+                                            "type": "OpenApiConnection",
+                                            "runAfter": {
+                                              "Criar_arquivo": [
+                                                "Succeeded"
+                                              ]
+                                            },
+                                            "inputs": {
+                                              "host": {
+                                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                                                "connectionName": "shared_sharepointonline",
+                                                "operationId": "CreateSharingLink"
+                                              },
+                                              "parameters": {
+                                                "dataset": "__SITE_URL__",
+                                                "table": "__LIBRARY_ID__",
+                                                "id": "@body('Criar_arquivo')?['ItemId']",
+                                                "permission/type": "view",
+                                                "permission/scope": "organization"
+                                              },
+                                              "authentication": "@parameters('$authentication')"
+                                            }
+                                          },
+                                          "Guardar_link_foto": {
+                                            "type": "SetVariable",
+                                            "runAfter": {
+                                              "Criar_link_compartilhamento": [
+                                                "Succeeded"
+                                              ]
+                                            },
+                                            "inputs": {
+                                              "name": "linkFoto",
+                                              "value": "@{body('Criar_link_compartilhamento')?['link']?['webUrl']}"
+                                            }
+                                          }
+                                        },
+                                        "else": {
+                                          "actions": {}
+                                        }
+                                      },
+                                      "Patch_foto": {
+                                        "type": "Compose",
+                                        "runAfter": {
+                                          "Tem_foto": [
+                                            "Succeeded"
+                                          ]
+                                        },
+                                        "inputs": "@if(empty(variables('linkFoto')), json('{}'), setProperty(json('{}'), 'new_linkdafoto', variables('linkFoto')))"
+                                      },
+                                      "Patch_telefone": {
+                                        "type": "Compose",
+                                        "runAfter": {
+                                          "Patch_foto": [
+                                            "Succeeded"
+                                          ]
+                                        },
+                                        "inputs": "@if(empty(trim(coalesce(triggerBody()?['telefone'], ''))), outputs('Patch_foto'), setProperty(outputs('Patch_foto'), 'cr40f_telefone', trim(coalesce(triggerBody()?['telefone'], ''))))"
+                                      },
+                                      "Patch_email": {
+                                        "type": "Compose",
+                                        "runAfter": {
+                                          "Patch_telefone": [
+                                            "Succeeded"
+                                          ]
+                                        },
+                                        "inputs": "@if(empty(trim(coalesce(triggerBody()?['email'], ''))), outputs('Patch_telefone'), setProperty(outputs('Patch_telefone'), 'cr40f_email', trim(coalesce(triggerBody()?['email'], ''))))"
+                                      },
+                                      "Atualizar_passageiro": {
+                                        "type": "OpenApiConnection",
+                                        "runAfter": {
+                                          "Patch_email": [
+                                            "Succeeded"
+                                          ]
+                                        },
+                                        "inputs": {
+                                          "host": {
+                                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                                            "connectionName": "shared_commondataserviceforapps",
+                                            "operationId": "UpdateRecord"
+                                          },
+                                          "parameters": {
+                                            "entityName": "__SET_PASSAGEIROS__",
+                                            "recordId": "@{toLower(trim(coalesce(triggerBody()?['passageiroId'], '')))}",
+                                            "item": "@outputs('Patch_email')"
+                                          },
+                                          "authentication": "@parameters('$authentication')"
+                                        }
+                                      },
+                                      "Registrar_envio": {
+                                        "type": "OpenApiConnection",
+                                        "runAfter": {
+                                          "Atualizar_passageiro": [
+                                            "Succeeded"
+                                          ]
+                                        },
+                                        "inputs": {
+                                          "host": {
+                                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                                            "connectionName": "shared_commondataserviceforapps",
+                                            "operationId": "UpdateRecord"
+                                          },
+                                          "parameters": {
+                                            "entityName": "__SET_LINKS__",
+                                            "recordId": "@outputs('Link')?['cr40f_linkcadastroid']",
+                                            "item": {
+                                              "cr40f_envios": "@add(coalesce(outputs('Link')?['cr40f_envios'], 0), 1)",
+                                              "cr40f_status": 2,
+                                              "cr40f_ultimouso": "@utcNow()"
+                                            }
+                                          },
+                                          "authentication": "@parameters('$authentication')"
+                                        }
+                                      },
+                                      "Status_salvar": {
+                                        "type": "SetVariable",
+                                        "runAfter": {
+                                          "Registrar_envio": [
+                                            "Succeeded"
+                                          ]
+                                        },
+                                        "inputs": {
+                                          "name": "httpStatus",
+                                          "value": 200
+                                        }
+                                      },
+                                      "Corpo_salvar": {
+                                        "type": "SetVariable",
+                                        "runAfter": {
+                                          "Status_salvar": [
+                                            "Succeeded"
+                                          ]
+                                        },
+                                        "inputs": {
+                                          "name": "corpo",
+                                          "value": {
+                                            "ok": true
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "else": {
+                                      "actions": {
+                                        "Status_erro_429": {
+                                          "type": "SetVariable",
+                                          "runAfter": {},
+                                          "inputs": {
+                                            "name": "httpStatus",
+                                            "value": 429
+                                          }
+                                        },
+                                        "Corpo_erro_429": {
+                                          "type": "SetVariable",
+                                          "runAfter": {
+                                            "Status_erro_429": [
+                                              "Succeeded"
+                                            ]
+                                          },
+                                          "inputs": {
+                                            "name": "corpo",
+                                            "value": {
+                                              "ok": false,
+                                              "codigo": "limite_envios"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
+                                "else": {
+                                  "actions": {
+                                    "Status_erro_404_passageiro": {
+                                      "type": "SetVariable",
+                                      "runAfter": {},
+                                      "inputs": {
+                                        "name": "httpStatus",
+                                        "value": 404
+                                      }
+                                    },
+                                    "Corpo_erro_404_passageiro": {
+                                      "type": "SetVariable",
+                                      "runAfter": {
+                                        "Status_erro_404_passageiro": [
+                                          "Succeeded"
+                                        ]
+                                      },
+                                      "inputs": {
+                                        "name": "corpo",
+                                        "value": {
+                                          "ok": false,
+                                          "codigo": "nao_encontrado"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "default": {
+                          "actions": {
+                            "Status_erro_op": {
+                              "type": "SetVariable",
+                              "runAfter": {},
+                              "inputs": {
+                                "name": "httpStatus",
+                                "value": 400
+                              }
+                            },
+                            "Corpo_erro_op": {
+                              "type": "SetVariable",
+                              "runAfter": {
+                                "Status_erro_op": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "inputs": {
+                                "name": "corpo",
+                                "value": {
+                                  "ok": false,
+                                  "codigo": "requisicao_invalida"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "else": {
+                "actions": {
+                  "Status_erro_404_link": {
+                    "type": "SetVariable",
+                    "runAfter": {},
+                    "inputs": {
+                      "name": "httpStatus",
+                      "value": 404
+                    }
+                  },
+                  "Corpo_erro_404_link": {
+                    "type": "SetVariable",
+                    "runAfter": {
+                      "Status_erro_404_link": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": {
+                      "name": "corpo",
+                      "value": {
+                        "ok": false,
+                        "codigo": "nao_encontrado"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "actions": {
+              "Status_erro_400": {
+                "type": "SetVariable",
+                "runAfter": {},
+                "inputs": {
+                  "name": "httpStatus",
+                  "value": 400
+                }
+              },
+              "Corpo_erro_400": {
+                "type": "SetVariable",
+                "runAfter": {
+                  "Status_erro_400": [
+                    "Succeeded"
+                  ]
+                },
+                "inputs": {
+                  "name": "corpo",
+                  "value": {
+                    "ok": false,
+                    "codigo": "requisicao_invalida"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Catch": {
+      "type": "Scope",
+      "runAfter": {
+        "Try": [
+          "Failed",
+          "TimedOut"
+        ]
+      },
+      "actions": {
+        "Status_500": {
+          "type": "SetVariable",
+          "runAfter": {},
+          "inputs": {
+            "name": "httpStatus",
+            "value": 500
+          }
+        },
+        "Corpo_500": {
+          "type": "SetVariable",
+          "runAfter": {
+            "Status_500": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "name": "corpo",
+            "value": {
+              "ok": false,
+              "codigo": "erro_interno"
+            }
+          }
+        }
+      }
+    },
+    "Responder": {
+      "type": "Response",
+      "kind": "Http",
+      "runAfter": {
+        "Catch": [
+          "Succeeded",
+          "Skipped"
+        ]
+      },
+      "inputs": {
+        "statusCode": "@variables('httpStatus')",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "@variables('corpo')"
+      }
+    }
+  }
+}
