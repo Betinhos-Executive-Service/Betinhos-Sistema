@@ -25,7 +25,7 @@ Fora do escopo: link por serviço sem login (descartado), convidado B2B com e-ma
 
 1. Backend em plugin C# (Custom APIs), não em Flow: o segredo do Graph fica na configuração segura do step, legível só por administrador.
 2. E-mail Microsoft gerado: `primeiro.ultimo@betinhos.onmicrosoft.com`, minúsculo, sem acentos; se já existir, sufixo numérico (`primeiro.ultimo2`). A tela mostra a prévia antes de confirmar e permite editar o prefixo.
-3. Senha temporária gerada pelo plugin (12+ caracteres, letras, números e símbolo), com troca obrigatória no primeiro login. Nunca gravada no Dataverse nem no trace; aparece uma vez na tela.
+3. Senha gerada pelo plugin (12+ caracteres, letras, números e símbolo), definitiva: sem troca obrigatória no primeiro login (decisão do Renan, 23/10/2026). Nunca gravada no Dataverse nem no trace; aparece uma vez na tela.
 4. Licença: SKU vem do unsecure config do step (`{"licenseSkuId":"...","groupId":"...","appUrl":"..."}`), para trocar de Developer para outro plano sem recompilar.
 5. Idempotência: cada passo consulta antes de agir (usuário existe? licença atribuída? membro do grupo? funcionário com esse e-mail?). Reexecutar completa o que faltou.
 6. Vínculo com `cr40f_funcionarios`: se vier `funcionarioId`, o plugin só preenche `cr40f_emailmicrosoft` (e celular se vazio); senão cria o registro com `cr40f_funcao` Motorista, `cr40f_tipodevinculo` informado na tela (padrão Terceiro), `cr40f_status` ativo. O backfill de compartilhamento é do `DriverRecordSharing`, já existente.
@@ -62,7 +62,7 @@ Fora do escopo: link por serviço sem login (descartado), convidado B2B com e-ma
 - `components/CadastroAcessoDrawer.tsx`: aberto por "Cadastrar acesso" (cabeçalho da lista: cria funcionário novo) ou pela ficha de um funcionário sem `cr40f_emailmicrosoft` (preenche nome e celular, envia `FuncionarioId`). Campos: nome, celular, e-mail pessoal, vínculo (Colaborador/Terceiro, padrão Terceiro), prévia do e-mail Microsoft editável no prefixo. Estados: preenchendo → criando (overlay não fecha; botão desabilitado) → resultado → erro. Resultado: e-mail, senha com "copiar" e aviso "aparece só agora", botão "Enviar no WhatsApp" (`whatsappHref(celular, mensagem)`), "Abrir ficha". Erro: código traduzido, lista de etapas feitas, "Tentar de novo" (idempotente). Fechar com dado digitado e não enviado → "Descartar alterações?".
 - `components/EncerrarAcessoDialog.tsx`: duas etapas (decisão 8). Depois do sucesso, a ficha mostra "Acesso encerrado" (derivado de `cr40f_status` = Desligado + e-mail presente; Afastado conta como ativo).
 - Ficha: na aba Dados, bloco "Acesso ao app": e-mail Microsoft, estado (sem acesso / ativo / encerrado) e o botão correspondente. 403 na chamada → toast "Você não tem permissão para gerir acessos" e o botão some na sessão.
-- Mensagem do WhatsApp (pt-BR, sem introdução): link do app, e-mail, senha temporária, "troque a senha no primeiro acesso", "abra pelo navegador do celular e, se quiser, adicione à tela inicial".
+- Mensagem do WhatsApp (pt-BR, sem introdução): link do app, e-mail, senha definitiva (sem troca no primeiro acesso, decisão de 23/10/2026), "abra pelo navegador do celular e, se quiser, adicione à tela inicial".
 - `data/acesso.ts`: `cadastrarAcesso(input)` / `encerrarAcesso(input)` chamando `Xrm.WebApi.online.execute`; mock em `data/mock.ts` com um caso feliz, um e-mail em uso e um `GRAPH_INDISPONIVEL` (controlado pelo nome digitado, p.ex. "Erro Graph").
 - Design System: `#FCFCFB` nos campos, azul só em foco/ação, sem gradiente; segue `FieldInput`/`Ficha` existentes.
 

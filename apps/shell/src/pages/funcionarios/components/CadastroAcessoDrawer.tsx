@@ -100,7 +100,7 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
               <Alert tone="success" title="Acesso criado">A senha aparece só agora. Envie para o motorista antes de fechar.</Alert>
               <dl className="acesso-credenciais">
                 <dt>E-mail</dt><dd><code>{estado.r.emailMicrosoft}</code> <Button variant="secondary" size="compact" icon={<Copy size={14} />} aria-label="Copiar e-mail" onClick={() => copiar(estado.r.emailMicrosoft)} /></dd>
-                <dt>Senha temporária</dt><dd><code>{estado.r.senhaTemporaria || '(conta já existia; senha não alterada)'}</code> {estado.r.senhaTemporaria && <Button variant="secondary" size="compact" icon={<Copy size={14} />} aria-label="Copiar senha" onClick={() => copiar(estado.r.senhaTemporaria)} />}</dd>
+                <dt>Senha</dt><dd><code>{estado.r.senhaTemporaria || '(conta já existia; senha não alterada)'}</code> {estado.r.senhaTemporaria && <Button variant="secondary" size="compact" icon={<Copy size={14} />} aria-label="Copiar senha" onClick={() => copiar(estado.r.senhaTemporaria)} />}</dd>
                 <dt>Link do app</dt><dd><a href={estado.r.linkApp} target="_blank" rel="noopener noreferrer">{estado.r.linkApp}</a></dd>
               </dl>
               <ListaEtapas etapas={estado.r.etapas} />
@@ -125,7 +125,7 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
         Os dados digitados ainda não foram enviados.
       </Dialog>
       <Dialog open={fechandoResultado} onClose={() => setFechandoResultado(false)} title="Fechar sem enviar?" actions={<><Button variant="secondary" onClick={() => setFechandoResultado(false)}>Voltar</Button><Button variant="danger" onClick={() => { setFechandoResultado(false); onClose() }}>Fechar</Button></>}>
-        A senha temporária não aparece de novo.
+        A senha não aparece de novo.
       </Dialog>
     </div>
   )
