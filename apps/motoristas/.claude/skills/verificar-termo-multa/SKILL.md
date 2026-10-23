@@ -40,3 +40,4 @@ Esperado: zero falhas. `TermoMultaCommandPluginTests` usa relógio injetado (`ne
 ## Armadilhas
 - No pre-operation de Update o Target traz `modifiedon`, `modifiedby`, `modifiedonbehalfby` e `timezoneruleversionnumber`; a trava ignora essas colunas (lista `PlatformColumns`). O trace `TermoMulta trava ...` lista as colunas recebidas (`plugintracelogs`).
 - Sem token (arquivo `Skill Agendamento\infleet-mcp\.env` ausente no `-Apply`) o InFleet grava `{"erro":"Token da Infleet não configurado."}` e o envio segue.
+- IDs de bloco do upload do PDF (`UploadBlock`) precisam ser base64 de tamanho fixo e sem `+`, `/` ou `=` (`TermoMultaCommandPlugin.BlockId`); base64 de GUID dá 400 `InvalidQueryParameterValue` no Azure Blob e a assinatura falha com "Falha ao processar termo de multa.".
