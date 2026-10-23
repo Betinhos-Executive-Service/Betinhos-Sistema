@@ -111,3 +111,7 @@ test('toda ação citada em expressões existe e nomes não se repetem', () => {
   assert.equal(total, todas.size, "nome de ação repetido")
   assert.ok(op('UpdateRecord').length >= 3)
 })
+
+test('nenhuma função de expressão é chamada sem argumentos (createArray() quebra o flow)', () => {
+  assert.doesNotMatch(raw, /createArray\(\)/)
+})
