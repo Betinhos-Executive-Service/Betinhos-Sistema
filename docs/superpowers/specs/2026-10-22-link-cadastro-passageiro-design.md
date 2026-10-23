@@ -15,7 +15,7 @@ A operação gera, no Formulário Geral, um link público para a solicitante pre
 | Envio automático | Fora de escopo agora (pode vir no futuro). O envio é manual: copiar ou compartilhar |
 | Abrangência | Qualquer tipo de serviço |
 | LGPD/aceite | Sem tela de aceite |
-| Hospedagem | Página estática + flow HTTP |
+| Hospedagem | Página estática no Cloudflare Pages + Worker + flow HTTP |
 
 ## Escopo
 
@@ -37,9 +37,8 @@ A operação gera, no Formulário Geral, um link público para a solicitante pre
 
 ## Riscos e mitigação
 
-- **URL do flow com assinatura SAS exposta na página estática**: a autorização real é o token; o flow rejeita tudo sem token válido e não ativo. Limite de tamanho do payload (foto ≤ 3 MB após compressão) e de 30 envios por token.
+- **Hospedagem: Cloudflare (decisão 22/10/2026)**. Cloudflare Pages para a página e um Worker na mesma origem (`/api/*`). O Worker guarda como secret a URL do flow (assinatura SAS); assim, a assinatura nunca chega ao navegador. Ele também aplica limite de taxa por IP e por token, valida o tamanho do payload (foto ≤ 3 MB após compressão, até 30 envios por token) e repassa a requisição ao flow. Domínio sugerido: `cadastro.betinhos.com.br`, se o DNS do domínio estiver no Cloudflare; caso contrário, `*.pages.dev`. É o primeiro uso do Cloudflare no repo, e o deploy usa `wrangler` com a conta e o token da Betinhos.
 - **Acesso à foto pelo motorista**: a URL do SharePoint exige permissão. Confirmar se o App Motoristas exibe via link de compartilhamento ou via proxy; decidir no plano.
-- **Hospedagem estática**: ainda falta definir o domínio (sugestão: Azure Static Web Apps ou GitHub Pages em subdomínio `cadastro.betinhos.com.br`).
 
 ## Verificação
 
