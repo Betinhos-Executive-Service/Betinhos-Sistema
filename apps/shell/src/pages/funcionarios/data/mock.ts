@@ -110,6 +110,7 @@ const documentos: DocumentStore = {
 }
 
 const ATIVOS_APP = new Set(Object.keys(USUARIOS_APP).filter((email) => USUARIOS_APP[email]))
+const comSelo = (row: Funcionario): Funcionario => ({ ...row, semApp: semApp(row.values, ATIVOS_APP) })
 
 export function createMockSource(): DataSource {
   // Cada fonte começa do zero (testes e recarga da página não herdam alterações).
@@ -121,10 +122,10 @@ export function createMockSource(): DataSource {
   return {
     mode: 'mock',
     envLabel: 'MOCK',
-    list: (onFirstPage) => mockProgressive(structuredClone(rows).map((row) => ({ ...row, semApp: semApp(row.values, ATIVOS_APP) })), onFirstPage, 150),
+    list: (onFirstPage) => mockProgressive(structuredClone(rows).map(comSelo), onFirstPage, 150),
     get: (id) => {
       const row = rows.find((item) => item.id === id)
-      return row ? delay({ ...row, semApp: semApp(row.values, ATIVOS_APP) }) : Promise.reject(new Error('Colaborador não encontrado nos dados de exemplo.'))
+      return row ? delay(comSelo(row)) : Promise.reject(new Error('Colaborador não encontrado nos dados de exemplo.'))
     },
     async save(original, draft) {
       const payload = buildPatch(original, draft, context)

@@ -244,6 +244,7 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
                   funcionario={original}
                   acesso={acesso}
                   usuarioDoApp={source.usuarioDoApp}
+                  onAlterado={() => onSaved(original.id, false)}
                   onCadastrar={() => onCadastrarAcesso?.({ funcionarioId: original.id, nomeCompleto: String(original.values.cr40f_nomecompleto ?? ''), celular: String(original.values.cr40f_telefonecorporativo ?? '') })}
                 />
               )}
