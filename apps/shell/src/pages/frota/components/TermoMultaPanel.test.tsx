@@ -228,6 +228,7 @@ describe('TermoMultaPanel', () => {
       expect((screen.getByRole('button', { name: 'Lembrar motorista' }) as HTMLButtonElement).disabled).toBe(true)
       await act(async () => { vi.advanceTimersByTime(61_000) })
       expect((screen.getByRole('button', { name: 'Lembrar motorista' }) as HTMLButtonElement).disabled).toBe(false)
+      expect(vi.getTimerCount()).toBe(0)
     } finally {
       vi.useRealTimers()
     }

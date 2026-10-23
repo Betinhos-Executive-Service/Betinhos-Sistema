@@ -51,12 +51,13 @@ function salvarArquivo(blob: Blob, nome: string) {
 function useLiberadoEm(ate: number | null) {
   const [agora, setAgora] = useState(() => Date.now())
   useEffect(() => {
-    if (ate === null) return
+    // Já liberado: nenhum timer (senão o efeito se reagendaria para sempre).
+    if (ate === null || ate <= Date.now()) return
     const atualizar = () => setAgora(Date.now())
-    const timer = window.setTimeout(atualizar, Math.max(0, ate - Date.now()) + 1000)
+    const timer = window.setTimeout(atualizar, ate - Date.now())
     window.addEventListener('focus', atualizar)
     return () => { window.clearTimeout(timer); window.removeEventListener('focus', atualizar) }
-  }, [ate, agora])
+  }, [ate])
   return ate !== null && ate > agora
 }
 
