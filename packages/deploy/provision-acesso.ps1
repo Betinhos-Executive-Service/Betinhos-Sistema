@@ -96,7 +96,7 @@ function Get-Prop([object] $Row, [string] $Name) {
 }
 
 $FuncaoNome = "Acesso - Gestão de Motoristas"
-$StepNames = @("Cr40f.Acesso: cadastrar acesso", "Cr40f.Acesso: encerrar acesso")
+$StepNames = @("Cr40f.Acesso: cadastrar acesso", "Cr40f.Acesso: encerrar acesso", "Cr40f.Acesso: reativar acesso")
 $SecureCol = "_sdkmessageprocessingstepsecureconfigid_value"
 
 # 1. Funcao de seguranca (na unidade de negocios raiz)

@@ -6,7 +6,7 @@ import { AcessoError, type AcessoSource } from '../data/acesso'
 import { CadastroAcessoDrawer } from './CadastroAcessoDrawer'
 
 const ok = { emailMicrosoft: 'ana.lima@betinhos.onmicrosoft.com', senhaTemporaria: 'Kx7#mQ2vR9pL4w', funcionarioId: 'f9', linkApp: 'https://app', etapas: [{ etapa: 'usuario', estado: 'feita' as const, detalhe: 'criado' }] }
-function src(cadastrar: AcessoSource['cadastrar']): AcessoSource { return { cadastrar, encerrar: async () => [] } }
+function src(cadastrar: AcessoSource['cadastrar']): AcessoSource { return { cadastrar, encerrar: async () => [], reativar: async () => { throw new Error('n/a') } } }
 function renderDrawer(source: AcessoSource, props: Partial<Parameters<typeof CadastroAcessoDrawer>[0]> = {}) {
   const onClose = vi.fn(); const onCadastrado = vi.fn()
   render(<ToastProvider><CadastroAcessoDrawer acesso={source} onClose={onClose} onCadastrado={onCadastrado} {...props} /></ToastProvider>)

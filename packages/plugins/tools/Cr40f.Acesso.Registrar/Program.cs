@@ -18,6 +18,8 @@ const string TipoCadastrar = "Cr40f.Acesso.Plugin.CadastrarAcessoMotoristaPlugin
 const string TipoEncerrar = "Cr40f.Acesso.Plugin.EncerrarAcessoMotoristaPlugin";
 const string ApiCadastrar = "cr40f_CadastrarAcessoMotorista";
 const string ApiEncerrar = "cr40f_EncerrarAcessoMotorista";
+const string TipoReativar = "Cr40f.Acesso.Plugin.ReativarAcessoMotoristaPlugin";
+const string ApiReativar = "cr40f_ReativarAcessoMotorista";
 const int PluginAssemblyComponentType = 91;
 
 Log("autenticando no Dataverse");
@@ -34,16 +36,21 @@ var assemblyId = UpsertAssembly(service, assemblyInfo, Convert.ToBase64String(Fi
 EnsureSolutionComponent(service, assemblyId, solutionUniqueName, PluginAssemblyComponentType);
 var tipoCadastrar = UpsertPluginType(service, assemblyId, TipoCadastrar);
 var tipoEncerrar = UpsertPluginType(service, assemblyId, TipoEncerrar);
+var tipoReativar = UpsertPluginType(service, assemblyId, TipoReativar);
 
 // Tipos de parametro/resposta (customapirequestparameter.type): 7 = Integer, 10 = String, 12 = Guid (8 seria Money).
 EnsureCustomApi(service, ApiCadastrar, "Acesso | Cadastrar acesso de motorista", "Cria conta Microsoft, licenca, grupo e funcionario; devolve credenciais e etapas.", solutionUniqueName,
     requestParams: new[] { ("NomeCompleto", 10, false), ("Celular", 10, false), ("EmailPessoal", 10, true), ("PrefixoEmail", 10, true), ("TipoVinculo", 7, true), ("FuncionarioId", 12, true) },
     responseProps: new[] { ("EmailMicrosoft", 10), ("SenhaTemporaria", 10), ("FuncionarioId", 10), ("UsuarioEntraId", 10), ("LinkApp", 10), ("Etapas", 10) });
-EnsureCustomApi(service, ApiEncerrar, "Acesso | Encerrar acesso de motorista", "Remove grupo, licenca e conta no Entra e inativa o funcionario.", solutionUniqueName,
+EnsureCustomApi(service, ApiEncerrar, "Acesso | Encerrar acesso de motorista", "Remove grupo, licenca e conta no Entra; nao altera o cadastro do funcionario.", solutionUniqueName,
     requestParams: new[] { ("FuncionarioId", 12, false), ("Confirmacao", 10, false) },
     responseProps: new[] { ("Etapas", 10) });
+EnsureCustomApi(service, ApiReativar, "Acesso | Reativar acesso de motorista", "Reativa a conta no Entra, redefine a senha e devolve licenca, grupo e usuario do Dataverse.", solutionUniqueName,
+    requestParams: new[] { ("FuncionarioId", 12, false) },
+    responseProps: new[] { ("EmailMicrosoft", 10), ("SenhaTemporaria", 10), ("LinkApp", 10), ("Etapas", 10) });
 EnsureApiStep(service, tipoCadastrar, ApiCadastrar, "Cr40f.Acesso: cadastrar acesso", config, solutionUniqueName);
 EnsureApiStep(service, tipoEncerrar, ApiEncerrar, "Cr40f.Acesso: encerrar acesso", config, solutionUniqueName);
+EnsureApiStep(service, tipoReativar, ApiReativar, "Cr40f.Acesso: reativar acesso", config, solutionUniqueName);
 
 if (publish)
 {
