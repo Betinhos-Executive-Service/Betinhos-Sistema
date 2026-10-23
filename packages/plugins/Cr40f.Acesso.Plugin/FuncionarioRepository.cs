@@ -5,7 +5,7 @@ using Microsoft.Xrm.Sdk.Query;
 
 namespace Cr40f.Acesso.Plugin;
 
-public sealed class FuncionarioRegistro { public Guid Id; public string Nome = ""; public string? EmailMicrosoft; public string? Celular; public int Status; public bool TemDemissao; }
+public sealed class FuncionarioRegistro { public Guid Id; public string Nome = ""; public string? EmailMicrosoft; public string? Celular; }
 
 public sealed class FuncionarioRepository
 {
@@ -13,8 +13,7 @@ public sealed class FuncionarioRepository
     public const string ColunaCelular = "cr40f_telefonecorporativo";
     public const int FuncaoMotorista = 202410000;
     public const int StatusAtivo = 0;
-    public const int StatusInativo = 1; // Desligado
-    private static readonly ColumnSet Colunas = new("cr40f_nomecompleto", "cr40f_emailmicrosoft", ColunaCelular, "cr40f_status", "cr40f_datadedemissao");
+    private static readonly ColumnSet Colunas = new("cr40f_nomecompleto", "cr40f_emailmicrosoft", ColunaCelular);
     private readonly IOrganizationService _service;
     public FuncionarioRepository(IOrganizationService service) { _service = service; }
 
@@ -46,23 +45,11 @@ public sealed class FuncionarioRepository
         _service.Update(e);
     }
 
-    public void Inativar(Guid id, DateTime hojeUtc)
-    {
-        var atual = PorId(id) ?? throw new AcessoException("FUNCIONARIO_NAO_ENCONTRADO", "Funcionário " + id + " não existe.");
-        var e = new Entity(Tabela, id) { ["cr40f_status"] = new OptionSetValue(StatusInativo) };
-        // Coluna "somente data" com comportamento local do usuário: meia-noite UTC aparece como o dia anterior no Brasil.
-        // Grava o dia de Brasília (sem horário de verão desde 2019) ao meio-dia de lá, 15h UTC.
-        if (!atual.TemDemissao) e["cr40f_datadedemissao"] = DateTime.SpecifyKind(hojeUtc.AddHours(-3).Date.AddHours(15), DateTimeKind.Utc);
-        _service.Update(e);
-    }
-
     private static FuncionarioRegistro Mapear(Entity e) => new()
     {
         Id = e.Id,
         Nome = e.GetAttributeValue<string>("cr40f_nomecompleto") ?? "",
         EmailMicrosoft = e.GetAttributeValue<string>("cr40f_emailmicrosoft"),
         Celular = e.GetAttributeValue<string>(ColunaCelular),
-        Status = e.GetAttributeValue<OptionSetValue>("cr40f_status")?.Value ?? StatusAtivo,
-        TemDemissao = e.Contains("cr40f_datadedemissao") && e["cr40f_datadedemissao"] != null,
     };
 }

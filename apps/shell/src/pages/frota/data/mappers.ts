@@ -1,7 +1,7 @@
 import { lerMulti } from '../domain/manutencaoCatalogo'
 import { diaSP, toDateOnly, type DateBehavior } from './dates'
 import { AVISO_PADRAO, FORMA_PAGAMENTO, TERMO_STATUS_DE } from './schema'
-import type { Baseline, Colisao, DespesaCombustivel, Infracao, ItemPlano, Manutencao, Multa, Posse, Ref, TelemetriaKm, TermoMulta, Veiculo } from './types'
+import type { Baseline, Colisao, DespesaCombustivel, Infracao, ItemPlano, Manutencao, Multa, ParcelaTermo, Posse, Ref, ResumoTermo, TelemetriaKm, TermoMulta, Veiculo } from './types'
 
 export const FORMATTED = '@OData.Community.Display.V1.FormattedValue'
 
@@ -98,7 +98,7 @@ export function mapMulta(row: Row, behaviors: Behaviors = {}): Multa {
   }
 }
 
-export const SELECT_TERMO = ['new_termomultaid', 'new_status', 'new_formapagamento', 'new_parcelas', 'new_valortotal', 'new_primeiracompetencia', 'new_enviadoem', 'new_assinadoem', 'new_hashpdf', 'new_motivocontestacao', 'createdon'] as const
+export const SELECT_TERMO = ['new_termomultaid', 'new_status', 'new_formapagamento', 'new_parcelas', 'new_valortotal', 'new_primeiracompetencia', 'new_enviadoem', 'new_assinadoem', 'new_hashpdf', 'new_motivocontestacao', 'new_ultimolembreteem', 'createdon'] as const
 
 export function mapTermoMulta(row: Row): TermoMulta {
   const status = num(row.new_status)
@@ -114,6 +114,7 @@ export function mapTermoMulta(row: Row): TermoMulta {
     assinadoEm: str(row.new_assinadoem),
     hashPdf: str(row.new_hashpdf),
     motivoContestacao: str(row.new_motivocontestacao),
+    ultimoLembreteEm: str(row.new_ultimolembreteem),
     criadoEm: String(row.createdon ?? ''),
   }
 }
@@ -200,4 +201,30 @@ export function mapTelemetriaKm(row: Row): TelemetriaKm | null {
   const dia = str(row.new_data)
   if (!veiculo || !dia || typeof km !== 'number' || !Number.isFinite(km)) return null
   return { dia, veiculoId: veiculo.id, km }
+}
+
+export const SELECT_RESUMO_TERMO = ['_new_multa_value', 'new_status', 'new_enviadoem', 'createdon'] as const
+
+/** Último termo de cada multa (linhas já ordenadas do mais recente ao mais antigo). */
+export function resumirTermos(rows: Row[]): Map<string, ResumoTermo> {
+  const mapa = new Map<string, ResumoTermo>()
+  for (const row of rows) {
+    const multa = str(row._new_multa_value)
+    const status = num(row.new_status)
+    const chave = status === null ? undefined : TERMO_STATUS_DE[status]
+    if (!multa || !chave || mapa.has(cleanId(multa))) continue
+    mapa.set(cleanId(multa), { status: chave, enviadoEm: str(row.new_enviadoem) })
+  }
+  return mapa
+}
+
+export const SELECT_PARCELA = ['new_numero', 'new_competencia', 'new_valor', 'new_status'] as const
+
+export function mapParcelaTermo(row: Row): ParcelaTermo {
+  return {
+    numero: num(row.new_numero) ?? 0,
+    competencia: str(row.new_competencia)?.slice(0, 10) ?? '',
+    valor: num(row.new_valor),
+    status: str(row['new_status@OData.Community.Display.V1.FormattedValue']),
+  }
 }

@@ -54,6 +54,9 @@ public sealed class FakeService : IOrganizationService
     public OrganizationResponse Execute(OrganizationRequest request)
     {
         Executados.Add(request);
+        // SetState de systemuser: estado 1 = desabilitado.
+        if (request is Microsoft.Crm.Sdk.Messages.SetStateRequest { EntityMoniker.LogicalName: "systemuser" } estado)
+            _tabelas["systemuser"].Single(e => e.Id == estado.EntityMoniker.Id)["isdisabled"] = estado.State.Value == 1;
         return new OrganizationResponse();
     }
     public void Associate(string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities) => throw new NotSupportedException();

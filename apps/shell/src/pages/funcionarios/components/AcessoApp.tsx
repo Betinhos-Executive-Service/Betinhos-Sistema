@@ -1,32 +1,67 @@
 import { Alert, Button } from '@betinhos/ui'
-import { KeyRound, UserX } from 'lucide-react'
-import { useState } from 'react'
+import { KeyRound, RotateCcw, UserX } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { type AcessoSource, type Etapa, parseAcessoError } from '../data/acesso'
+import type { UsuarioApp } from '../data/source'
 import type { Funcionario } from '../data/types'
+import { ListaEtapas } from './CadastroAcessoDrawer'
 import { EncerrarAcessoDialog } from './EncerrarAcessoDialog'
+import { ReativarAcessoDialog } from './ReativarAcessoDialog'
 import { useNotify } from './Toasts'
 
-type Props = { funcionario: Funcionario; acesso: AcessoSource; onCadastrar: () => void; onEncerrado: () => void }
+type Props = {
+  funcionario: Funcionario; acesso: AcessoSource; usuarioDoApp: (email: string) => Promise<UsuarioApp | null>; onCadastrar: () => void
+  /** Acesso encerrado ou reativado: a lista relê a linha para o selo "Sem app" acompanhar. */
+  onAlterado?: () => void
+}
+type EstadoConta = 'verificando' | 'ativo' | 'encerrado' | 'falha'
 
-/** Bloco "Acesso ao app" na aba Dados: estado derivado do e-mail Microsoft e do status. */
-export function AcessoApp({ funcionario, acesso, onCadastrar, onEncerrado }: Props) {
+const TITULO: Record<EstadoConta | 'sem', string> = { sem: 'Sem acesso ao app', verificando: 'Conferindo acesso…', ativo: 'Acesso ativo', encerrado: 'Acesso encerrado', falha: 'Não foi possível conferir o acesso' }
+
+/**
+ * Bloco "Acesso ao app" na aba Dados. O estado vem do usuário do Dataverse (systemuser) ligado ao e-mail Microsoft,
+ * nunca do status do funcionário: dar ou tirar acesso não tem relação com admissão ou demissão.
+ */
+export function AcessoApp({ funcionario, acesso, usuarioDoApp, onCadastrar, onAlterado }: Props) {
   const notify = useNotify()
-  const [aberto, setAberto] = useState(false)
+  const [encerrando, setEncerrando] = useState(false)
+  const [reativando, setReativando] = useState(false)
   const [semPermissao, setSemPermissao] = useState(false)
   const [etapas, setEtapas] = useState<Etapa[] | null>(null)
+  const [faltouSenha, setFaltouSenha] = useState(false)
+  const [conta, setConta] = useState<EstadoConta>('verificando')
   const email = String(funcionario.values.cr40f_emailmicrosoft ?? '')
-  // Status: 0 Ativo, 2 Afastado (conta como ativo), 1 Desligado.
-  const status = Number(funcionario.values.cr40f_status)
   const nome = String(funcionario.values.cr40f_nomecompleto ?? '')
-  const estado = !email ? 'sem' : status === 1 ? 'encerrado' : 'ativo'
+  const celular = String(funcionario.values.cr40f_telefonecorporativo ?? '')
+
+  useEffect(() => {
+    if (!email) return
+    let vivo = true
+    setConta('verificando')
+    usuarioDoApp(email).then((u) => { if (vivo) setConta(u?.ativo ? 'ativo' : 'encerrado') }, () => { if (vivo) setConta('falha') })
+    return () => { vivo = false }
+  }, [email, usuarioDoApp])
+
+  const estado = !email ? 'sem' : conta
 
   async function encerrar(confirmacao: string) {
     try {
       const resultado = await acesso.encerrar(funcionario.id, confirmacao)
-      setEtapas(resultado); setAberto(false); notify('success', 'Acesso encerrado.'); onEncerrado()
+      // O plugin já bloqueia o systemuser; o bloco segue o resultado da API e a lista relê a linha.
+      setEtapas(resultado); setEncerrando(false); setConta('encerrado'); notify('success', 'Acesso encerrado.'); onAlterado?.()
     } catch (reason) {
       const erro = parseAcessoError(reason)
-      if (erro.codigo === 'SEM_PERMISSAO') { setSemPermissao(true); setAberto(false); notify('error', 'Você não tem permissão para gerir acessos.'); return }
+      if (erro.codigo === 'SEM_PERMISSAO') { setSemPermissao(true); setEncerrando(false); notify('error', 'Você não tem permissão para gerir acessos.'); return }
+      throw erro
+    }
+  }
+
+  async function reativar() {
+    try { return await acesso.reativar(funcionario.id) } catch (reason) {
+      const erro = parseAcessoError(reason)
+      if (erro.codigo === 'SEM_PERMISSAO') { setSemPermissao(true); setReativando(false); notify('error', 'Você não tem permissão para gerir acessos.') }
+      // A senha é a última etapa do plugin: sem permissão para ela, a conta já voltou e o bloco mostra ativo.
+      if (erro.codigo === 'SEM_PERMISSAO_SENHA') { setConta('ativo'); setEtapas(erro.etapas); setFaltouSenha(true); onAlterado?.() }
       throw erro
     }
   }
@@ -35,14 +70,17 @@ export function AcessoApp({ funcionario, acesso, onCadastrar, onEncerrado }: Pro
     <fieldset className="group acesso-bloco" onKeyDown={(event) => { if (event.key === 'Escape' && (event.target as HTMLElement).closest('dialog')) event.stopPropagation() }}>
       <legend>Acesso ao app</legend>
       <div className="acesso-estado" data-estado={estado}>
-        <strong>{estado === 'sem' ? 'Sem acesso ao app' : estado === 'ativo' ? 'Acesso ativo' : 'Acesso encerrado'}</strong>
+        <strong>{TITULO[estado]}</strong>
         {email && <code>{email}</code>}
       </div>
       {!semPermissao && estado === 'sem' && <Button variant="secondary" size="compact" icon={<KeyRound size={16} />} onClick={onCadastrar}>Cadastrar acesso</Button>}
-      {!semPermissao && estado === 'ativo' && <Button variant="secondary" size="compact" icon={<UserX size={16} />} onClick={() => setAberto(true)}>Encerrar acesso</Button>}
-      {etapas && <ul className="acesso-etapas">{etapas.map((e) => <li key={e.etapa} data-estado={e.estado}>{e.etapa}: {e.detalhe}</li>)}</ul>}
+      {!semPermissao && estado === 'ativo' && <Button variant="secondary" size="compact" icon={<UserX size={16} />} onClick={() => setEncerrando(true)}>Encerrar acesso</Button>}
+      {!semPermissao && (estado === 'encerrado' || (estado === 'ativo' && faltouSenha)) && <Button variant="secondary" size="compact" icon={<RotateCcw size={16} />} onClick={() => setReativando(true)}>Reativar acesso</Button>}
+      {etapas && <ListaEtapas etapas={etapas} />}
       {semPermissao && <Alert tone="warning">Você não tem permissão para gerir acessos.</Alert>}
-      <EncerrarAcessoDialog open={aberto} nome={nome} onCancel={() => setAberto(false)} onConfirmar={encerrar} />
+      <EncerrarAcessoDialog open={encerrando} nome={nome} onCancel={() => setEncerrando(false)} onConfirmar={encerrar} />
+      <ReativarAcessoDialog open={reativando} nome={nome} celular={celular} onCancel={() => setReativando(false)} onReativar={reativar}
+        onReativado={(r) => { setConta('ativo'); setEtapas(r.etapas); setFaltouSenha(false); onAlterado?.() }} />
     </fieldset>
   )
 }

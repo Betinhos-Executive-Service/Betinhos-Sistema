@@ -27,7 +27,7 @@ public sealed class EncerrarAcessoMotoristaPlugin : IPlugin
             if (!(context.InputParameters.Contains("FuncionarioId") && context.InputParameters["FuncionarioId"] is Guid id && id != Guid.Empty))
                 throw new AcessoException("FUNCIONARIO_NAO_ENCONTRADO", "Informe o funcionário.");
             var confirmacao = context.InputParameters.Contains("Confirmacao") && context.InputParameters["Confirmacao"] is string c ? c : "";
-            var handler = new EncerrarAcessoHandler(new GraphGateway(cfg, GraphGateway.Compartilhado), new FuncionarioRepository(sistema), cfg, () => DateTime.UtcNow, m => tracing.Trace("{0}: {1}", Mensagem, m));
+            var handler = new EncerrarAcessoHandler(new GraphGateway(cfg, GraphGateway.Compartilhado), new FuncionarioRepository(sistema), new UsuarioDataverseRepository(sistema), cfg, m => tracing.Trace("{0}: {1}", Mensagem, m));
             context.OutputParameters["Etapas"] = handler.Executar(id, confirmacao).ToJson();
         }
         catch (AcessoException erro)

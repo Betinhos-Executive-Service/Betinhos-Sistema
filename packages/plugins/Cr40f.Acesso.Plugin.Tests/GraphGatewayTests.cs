@@ -58,6 +58,30 @@ public sealed class GraphGatewayTests
     }
 
     [Fact]
+    public void RedefinirSenha_envia_patch_sem_troca_obrigatoria_e_403_vira_SEM_PERMISSAO_SENHA()
+    {
+        var h = new Handler();
+        string? corpo = null; string? metodo = null; string? rota = null;
+        var status = HttpStatusCode.NoContent;
+        h.Responder = r =>
+        {
+            if (r.RequestUri!.AbsolutePath.Contains("/token")) return Json("{\"access_token\":\"tok\"}");
+            corpo = r.Content!.ReadAsStringAsync().Result; metodo = r.Method.Method; rota = r.RequestUri.AbsolutePath;
+            return Json("", status);
+        };
+        var g = new GraphGateway(Cfg(), new HttpClient(h));
+        g.RedefinirSenha("u1", "Nova#123456");
+        Assert.Equal("PATCH", metodo); Assert.Equal("/v1.0/users/u1", rota);
+        Assert.Equal("{\"passwordProfile\":{\"forceChangePasswordNextSignIn\":false,\"password\":\"Nova#123456\"}}", corpo);
+        status = HttpStatusCode.Forbidden;
+        var erro = Assert.Throws<AcessoException>(() => g.RedefinirSenha("u1", "Nova#123456"));
+        Assert.Equal("SEM_PERMISSAO_SENHA", erro.Codigo);
+        Assert.DoesNotContain("Nova#123456", erro.Message);
+        status = HttpStatusCode.ServiceUnavailable;
+        Assert.Equal("GRAPH_INDISPONIVEL", Assert.Throws<AcessoException>(() => g.RedefinirSenha("u1", "x")).Codigo);
+    }
+
+    [Fact]
     public void LicencasLivres_subtrai_consumidas()
     {
         var h = new Handler();

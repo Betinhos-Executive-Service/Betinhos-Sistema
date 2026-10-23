@@ -38,6 +38,27 @@ describe('createXrmSource', () => {
     expect(result.errors).toEqual({ multas: 'Sem privilégio de leitura' })
   })
 
+  it('resumo dos termos: só termos com multa; falha marca a coluna Termo como indisponível sem derrubar as multas', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ value: [] }) })))
+    const multas = { entities: [{ cr40f_multasid: 'U1', cr40f_novacoluna: 'AIT 1' }] }
+    const ok = vi.fn(async (entity: string, _options?: string) => {
+      if (entity === 'cr40f_multas') return multas
+      if (entity === 'new_termomulta') return { entities: [{ _new_multa_value: 'U1', new_status: 100000000, new_enviadoem: '2026-10-20T13:00:00Z' }] }
+      return { entities: [] }
+    })
+    const bom = await createXrmSource(host({ retrieveMultipleRecords: ok }).xrm).load()
+    expect(ok.mock.calls.find((c) => c[0] === 'new_termomulta')?.[1]).toContain('_new_multa_value ne null')
+    expect(bom.data.multas[0].termo).toEqual({ status: 'pendente', enviadoEm: '2026-10-20T13:00:00Z' })
+    const falha = vi.fn(async (entity: string) => {
+      if (entity === 'cr40f_multas') return multas
+      if (entity === 'new_termomulta') throw new Error('Sem privilégio')
+      return { entities: [] }
+    })
+    const ruim = await createXrmSource(host({ retrieveMultipleRecords: falha }).xrm).load()
+    expect(ruim.data.multas).toHaveLength(1)
+    expect(ruim.data.multas[0].termo).toBeUndefined()
+  })
+
   it('sem as colunas de hodômetro, carrega os veículos de novo sem elas', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ value: [] }) })))
     let tentativas = 0

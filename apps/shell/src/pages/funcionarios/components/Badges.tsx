@@ -30,6 +30,11 @@ export function AditivoBadge({ text }: { text: string }) {
   return <DsStatusBadge tone="success" icon={<FileSignature />}>{text}</DsStatusBadge>
 }
 
+/** Motorista sem acesso ao app (sem e-mail Microsoft ou usuário habilitado): selo neutro e discreto. */
+export function SemAppBadge() {
+  return <DsStatusBadge tone="neutral" title="Motorista sem acesso ao app">Sem app</DsStatusBadge>
+}
+
 /** Avatar do Design System (`bt-avatar`) com foto ou iniciais, no tamanho pedido. */
 export function Avatar({ name, src, size = 36 }: { name: string; src: string | null; size?: number }) {
   return (

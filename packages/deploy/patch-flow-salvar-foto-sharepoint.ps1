@@ -1,9 +1,12 @@
 ﻿# Troca, no "Flow Salvar Foto BD - Onedrive" (usado pelo Formulário Geral, uploadPassengerPhoto), a gravação da foto
 # do passageiro no OneDrive do noreply ("/Banco de Dados/<Nome> - <Cliente>.<ext>") pela gravação no SharePoint
 # (site BetinhosGestoInterna, biblioteca "Documentos Compartilhados", pasta Passageiros/Fotos/<DEV|PROD>, nome
-# <passengerId minúsculo>.<ext>, sobrescreve) e o link do OneDrive (CreateShareLinkV2) pelo link do SharePoint
-# (CreateSharingLink, view, organization). Gatilho, contrato da resposta (webUrl, driveItemId, fileName, uploadedAt)
-# e o catch (e-mail + Terminate) não mudam. Sem -Apply só mostra o que mudaria (DRY RUN).
+# <passengerId minúsculo>.<ext>, sobrescreve). Não cria link de compartilhamento: remove o CreateShareLinkV2 (OneDrive)
+# ou o CreateSharingLink (SharePoint, versão anterior deste patch) e devolve em webUrl a URL com caminho
+# https://<tenant>.sharepoint.com/:i:/r/sites/BetinhosGestoInterna/Documentos%20Compartilhados/Passageiros/Fotos/<amb>/<id>.<ext>,
+# que o Formulário Geral converte em preview/download. Parte do estado original (OneDrive) ou do intermediário
+# (SharePoint + CreateSharingLink); já no formato final, não faz nada. Gatilho, contrato da resposta
+# (webUrl, driveItemId, fileName, uploadedAt) e o catch (e-mail + Terminate) não mudam. Sem -Apply é DRY RUN.
 #
 # Antes de alterar, salva o clientdata atual em packages/deploy/flows/backup/. Para reverter:
 #   powershell -File packages/deploy/patch-flow-salvar-foto-sharepoint.ps1 -Ambiente DEV -Apply -Restaurar <arquivo>
@@ -103,15 +106,19 @@ if ($Restaurar) {
 $clientData = $flow.clientdata | ConvertFrom-Json
 $scope = $clientData.properties.definition.actions.Scope.actions
 $names = @($scope.PSObject.Properties.Name)
-foreach ($n in 'PastaDestino', 'FileName', 'Create_file', 'Create_share_link', 'Response') {
+foreach ($n in 'PastaDestino', 'FileName', 'Create_file', 'Response') {
   if ($names -notcontains $n) { throw "O flow não está no formato esperado: ação '$n' ausente no Scope." }
 }
-if ($scope.Create_file.inputs.host.apiId -like '*shared_sharepointonline') {
-  Write-Output "${Ambiente}: '$flowName' já grava no SharePoint; nada a alterar."
+$temLink = $names -contains 'Create_share_link'
+$jaSharePoint = $scope.Create_file.inputs.host.apiId -like '*shared_sharepointonline'
+if ($jaSharePoint -and -not $temLink) {
+  Write-Output "${Ambiente}: '$flowName' já grava no SharePoint e devolve a URL com caminho; nada a alterar."
   return
 }
-if ($scope.Create_file.inputs.host.operationId -ne 'CreateFile' -or $scope.Create_share_link.inputs.host.operationId -ne 'CreateShareLinkV2') {
-  throw 'O flow não está no formato esperado (CreateFile + CreateShareLinkV2 do OneDrive).'
+$opLink = if ($temLink) { $scope.Create_share_link.inputs.host.operationId } else { '' }
+$esperado = if ($jaSharePoint) { 'CreateSharingLink' } else { 'CreateShareLinkV2' }
+if ($scope.Create_file.inputs.host.operationId -ne 'CreateFile' -or $opLink -ne $esperado) {
+  throw "O flow não está no formato esperado (CreateFile + $esperado); link atual: '$opLink'."
 }
 
 # Connection reference do SharePoint: DEV fixa; PROD pela usada no flow ativo de referência.
@@ -144,6 +151,7 @@ Write-Output "  FileName antes : $($scope.FileName.inputs)"
 Write-Output "  FileName depois: $fileExpr"
 Resumo 'Create_file antes        ' $scope.Create_file
 Resumo 'Create_share_link antes  ' $scope.Create_share_link
+Write-Output "  Response.body.webUrl antes: $($scope.Response.inputs.body.webUrl)"
 
 $scope.PastaDestino.inputs = $folder
 $scope.FileName.inputs = $fileExpr
@@ -158,27 +166,29 @@ $scope.Create_file.inputs = [pscustomobject]@{
   authentication = "@parameters('`$authentication')"
   retryPolicy = $retry
 }
-$scope.Create_share_link.inputs = [pscustomobject]@{
-  host = & $host_ 'CreateSharingLink'
-  parameters = [pscustomobject]@{
-    dataset = $siteUrl
-    table = $libraryId
-    id = "@body('Create_file')?['ItemId']"
-    'permission/type' = 'view'
-    'permission/scope' = 'organization'
+# Remove o link de compartilhamento; quem rodava depois dele passa a rodar depois do que o antecedia (Create_file).
+$depoisDoLink = $scope.Create_share_link.runAfter
+$scope.PSObject.Properties.Remove('Create_share_link')
+foreach ($a in $scope.PSObject.Properties) {
+  if ($a.Value.PSObject.Properties.Name -notcontains 'runAfter') { continue }
+  $ra = $a.Value.runAfter
+  if ($ra -and ($ra.PSObject.Properties.Name -contains 'Create_share_link')) {
+    $ra.PSObject.Properties.Remove('Create_share_link')
+    foreach ($d in $depoisDoLink.PSObject.Properties) { $ra | Add-Member -NotePropertyName $d.Name -NotePropertyValue $d.Value -Force }
   }
-  authentication = "@parameters('`$authentication')"
-  retryPolicy = $retry
 }
+# CreateFile devolve Path = "/Documentos Compartilhados/Passageiros/Fotos/<amb>/<id>.<ext>" (igual ao caminho na URL).
+$webUrlExpr = "@{concat('https://', uriHost('$siteUrl'), '/:i:/r', uriPath('$siteUrl'), replace(uriComponent(body('Create_file')?['Path']), '%2F', '/'))}"
 $scope.Response.inputs.body = [pscustomobject]@{
-  webUrl = "@{body('Create_share_link')?['link']?['webUrl']}"
+  webUrl = $webUrlExpr
   driveItemId = "@{body('Create_file')?['ItemId']}"
   fileName = "@{body('Create_file')?['Name']}"
   uploadedAt = '@{utcNow()}'
 }
 Resumo 'Create_file depois       ' $scope.Create_file
-Resumo 'Create_share_link depois ' $scope.Create_share_link
-Write-Output '  Response.body: webUrl = link.webUrl do SharePoint; driveItemId = ItemId; fileName = Name; uploadedAt = utcNow()'
+Write-Output '  Create_share_link: removida (sem link de compartilhamento)'
+Write-Output "  Response.body.webUrl depois: $webUrlExpr"
+Write-Output "  Response.runAfter depois: $($scope.Response.PSObject.Properties['runAfter'].Value | ConvertTo-Json -Compress)"
 
 $refs = $clientData.properties.connectionReferences
 if (-not ($refs.PSObject.Properties.Name -contains 'shared_sharepointonline')) {
@@ -202,5 +212,5 @@ Backup $flow
 Save $flow ($clientData | ConvertTo-Json -Depth 90 -Compress)
 
 $check = ((Flow).clientdata | ConvertFrom-Json).properties.definition.actions.Scope.actions
-if ($check.Create_file.inputs.host.connectionName -ne 'shared_sharepointonline' -or $check.Create_share_link.inputs.host.operationId -ne 'CreateSharingLink') { throw 'A definição gravada não confere. Restaure com -Restaurar.' }
+if ($check.Create_file.inputs.host.connectionName -ne 'shared_sharepointonline' -or ($check.PSObject.Properties.Name -contains 'Create_share_link') -or $check.Response.inputs.body.webUrl -notmatch '/:i:/r') { throw 'A definição gravada não confere. Restaure com -Restaurar.' }
 Write-Output "${Ambiente}: '$flowName' ativo, gravando em $folder/<passengerId>.<ext> no SharePoint."
