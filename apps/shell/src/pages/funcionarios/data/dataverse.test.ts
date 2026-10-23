@@ -86,3 +86,42 @@ describe('createXrmSource().uploadAditivo', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 })
+
+describe('createXrmSource().list: selo Sem app', () => {
+  it('uma consulta de systemusers habilitados marca só motoristas sem acesso', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('sem metadata') }))
+    const retrieveMultipleRecords = vi.fn(async (entity: string, _options?: string) => ({
+      entities: entity === 'systemuser'
+        ? [{ internalemailaddress: 'Ana@Betinhos.com.br' }]
+        : [
+            { cr40f_funcionariosid: 'a', cr40f_funcao: 202410000, cr40f_emailmicrosoft: 'ana@betinhos.com.br' },
+            { cr40f_funcionariosid: 'b', cr40f_funcao: 202410000, cr40f_emailmicrosoft: 'bia@betinhos.com.br' },
+            { cr40f_funcionariosid: 'c', cr40f_funcao: 202410000, cr40f_emailmicrosoft: null },
+            { cr40f_funcionariosid: 'd', cr40f_funcao: 202410001, cr40f_emailmicrosoft: null },
+          ],
+    }))
+    const xrm: XrmHost = {
+      WebApi: { retrieveMultipleRecords, retrieveRecord: vi.fn(), createRecord: vi.fn(), updateRecord: vi.fn(), deleteRecord: vi.fn() },
+      Utility: { getGlobalContext: () => ({ getClientUrl: () => 'https://org23b93544.crm2.dynamics.com' }) },
+    }
+    const rows = await createXrmSource(xrm).list()
+    expect(rows.map((row) => row.semApp)).toEqual([false, true, true, false])
+    const usuarios = retrieveMultipleRecords.mock.calls.filter(([entity]) => entity === 'systemuser')
+    expect(usuarios).toHaveLength(1)
+    expect(usuarios[0][1]).toBe('?$select=internalemailaddress&$filter=isdisabled eq false and accessmode eq 0')
+  })
+
+  it('falha na consulta de systemusers deixa a lista sem selo', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('sem metadata') }))
+    const retrieveMultipleRecords = vi.fn(async (entity: string, _options?: string) => {
+      if (entity === 'systemuser') throw new Error('403')
+      return { entities: [{ cr40f_funcionariosid: 'a', cr40f_funcao: 202410000, cr40f_emailmicrosoft: null }] }
+    })
+    const xrm: XrmHost = {
+      WebApi: { retrieveMultipleRecords, retrieveRecord: vi.fn(), createRecord: vi.fn(), updateRecord: vi.fn(), deleteRecord: vi.fn() },
+      Utility: { getGlobalContext: () => ({ getClientUrl: () => 'https://org23b93544.crm2.dynamics.com' }) },
+    }
+    const [row] = await createXrmSource(xrm).list()
+    expect(row.semApp).toBeUndefined()
+  })
+})

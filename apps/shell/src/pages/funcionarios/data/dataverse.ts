@@ -1,4 +1,5 @@
 import { FIRST_PAGE, withFirstPage } from '../../../app/pagedLoad'
+import { emailMicrosoft, FUNCAO_MOTORISTA, semApp } from './semApp'
 import { toDateOnly } from './dates'
 import { buildPatch, dateBehaviorsPath, toDateBehaviors, type DateBehavior, type DateBehaviorsResponse, type PatchContext } from './patch'
 import { ENTITY_SET, FIELDS, TABLE, VEICULO_TABLE } from './schema'
@@ -121,6 +122,21 @@ export function createXrmSource(xrm: XrmHost): DataSource {
     return rows
   }
 
+  async function usuarioDoApp(email: string) {
+    const filtro = `internalemailaddress eq '${odataString(email.trim().toLowerCase())}'`
+    const page = await api.retrieveMultipleRecords('systemuser', `?$select=systemuserid,isdisabled&$filter=${filtro}&$top=1`)
+    const row = page.entities[0]
+    return row ? { id: cleanId(String(row.systemuserid)), ativo: row.isdisabled !== true } : null
+  }
+
+  /** O selo da linha que a ficha devolve à lista depois de salvar: uma consulta só para motorista com e-mail. */
+  async function semAppDe(f: Funcionario) {
+    const email = emailMicrosoft(f.values)
+    if (f.values.cr40f_funcao !== FUNCAO_MOTORISTA) return false
+    if (!email) return true
+    return usuarioDoApp(email).then((u) => !u?.ativo, () => undefined)
+  }
+
   const documentos = createSharePointDocs(api, getDataverseEnvironmentLabel(clientUrl))
 
   return {
@@ -131,17 +147,23 @@ export function createXrmSource(xrm: XrmHost): DataSource {
       const options = `?$select=${LIST_SELECT.join(',')}&$filter=statecode eq 0&$orderby=cr40f_nomecompleto asc`
       const behaviors = loadPatchContext().then((context) => context.dateBehaviors, () => ({} as Record<string, DateBehavior>))
       // A primeira página (100) vai à parte, em paralelo: o nextLink exige o mesmo tamanho de página da carga completa.
+      // Uma consulta paginada dos systemusers habilitados para o selo "Sem app"; se falhar, a lista sai sem o selo.
+      const ativos = retrieveAll('systemuser', '?$select=internalemailaddress&$filter=isdisabled eq false and accessmode eq 0')
+        .then((users) => new Set(users.map((u) => String(u.internalemailaddress ?? '').toLowerCase())), () => null)
+      const mapList = (rows: Row[], dateBehaviors: Record<string, DateBehavior>, emails: Set<string> | null) =>
+        rows.map((row) => { const f = mapRow(row, dateBehaviors); return emails ? { ...f, semApp: semApp(f.values, emails) } : f })
       const first = async () => {
-        const [page, dateBehaviors] = await Promise.all([api.retrieveMultipleRecords(TABLE, options, FIRST_PAGE), behaviors])
-        return page.entities.map((row) => mapRow(row, dateBehaviors))
+        const [page, dateBehaviors, emails] = await Promise.all([api.retrieveMultipleRecords(TABLE, options, FIRST_PAGE), behaviors, ativos])
+        return mapList(page.entities, dateBehaviors, emails)
       }
-      const [rows, dateBehaviors] = await withFirstPage(Promise.all([retrieveAll(TABLE, options), behaviors]), first, onFirstPage)
-      return rows.map((row) => mapRow(row, dateBehaviors))
+      const [rows, dateBehaviors, emails] = await withFirstPage(Promise.all([retrieveAll(TABLE, options), behaviors, ativos]), first, onFirstPage)
+      return mapList(rows, dateBehaviors, emails)
     },
 
     async get(id) {
       const [row, context] = await Promise.all([api.retrieveRecord(TABLE, id, `?$select=${DETAIL_SELECT.join(',')}`), loadPatchContext().catch(() => ({ dateBehaviors: {} as Record<string, DateBehavior> }))])
-      return mapRow(row, context.dateBehaviors)
+      const f = mapRow(row, context.dateBehaviors)
+      return { ...f, semApp: await semAppDe(f) }
     },
 
     async save(original: Funcionario | null, draft: Draft) {
@@ -285,12 +307,7 @@ export function createXrmSource(xrm: XrmHost): DataSource {
 
     documentos,
 
-    async usuarioDoApp(email) {
-      const filtro = `internalemailaddress eq '${odataString(email.trim().toLowerCase())}'`
-      const page = await api.retrieveMultipleRecords('systemuser', `?$select=systemuserid,isdisabled&$filter=${filtro}&$top=1`)
-      const row = page.entities[0]
-      return row ? { id: cleanId(String(row.systemuserid)), ativo: row.isdisabled !== true } : null
-    },
+    usuarioDoApp,
 
     async searchVeiculos(query): Promise<Lookup[]> {
       const term = odataString(query.trim())
