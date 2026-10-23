@@ -34,7 +34,7 @@ public class GerarLinkCadastroHandlerTests
     {
         Basico();
         var json = Handler().Executar(_reserva.ToString(), null);
-        Assert.StartsWith("{\"ok\":true,\"link\":\"https://cadastro.betinhos.com.br/#t=" + Token + "\"", json);
+        Assert.StartsWith("{\"ok\":true,\"link\":\"https://cadastro-passageiro.betinhosexecutiveservice.workers.dev/#t=" + Token + "\"", json);
         Assert.True(json.IndexOf(_ana.ToString()) < json.IndexOf(_bia.ToString()));
         Assert.Contains("\"email\":\"ana@x.com\"", json);
         Assert.Contains("\"foto\":null", json);
