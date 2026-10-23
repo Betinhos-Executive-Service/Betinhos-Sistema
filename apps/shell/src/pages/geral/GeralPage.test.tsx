@@ -373,6 +373,31 @@ describe('Geral', () => {
     }
   })
 
+  it('clique direito: na seleção age sobre ela; fora dela troca a seleção; Ctrl mantém o menu do navegador', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findAllByText(PAGE1)
+    const rows = dataRows()
+    fireEvent.click(within(rows[1]).getByRole('checkbox'))
+    fireEvent.click(within(rows[2]).getByRole('checkbox'))
+    // Linha já selecionada: o menu vale para os 2, e Editar (exige um) fica desabilitado.
+    expect(fireEvent.contextMenu(rows[2], { clientX: 40, clientY: 40 })).toBe(false)
+    const editar = await screen.findByRole('menuitem', { name: /^Editar/, hidden: true })
+    expect((editar as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByText('2 selecionados')).toBeTruthy()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copiar Serviços', hidden: true }))
+    expect(await screen.findByRole('dialog', { name: 'Copiar serviços' })).toBeTruthy()
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Copiar serviços' })).getAllByRole('button', { name: 'Fechar' }).at(-1) as HTMLElement)
+    // Linha fora da seleção: vira a única selecionada e Editar se habilita.
+    fireEvent.contextMenu(rows[3], { clientX: 40, clientY: 80 })
+    await waitFor(() => expect(screen.getByText('1 selecionado')).toBeTruthy())
+    expect((screen.getByRole('menuitem', { name: 'Editar', hidden: true }) as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.keyDown(screen.getByRole('menu', { hidden: true }), { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('menu', { hidden: true })).toBeNull())
+    // Ctrl + clique direito: o navegador abre o próprio menu.
+    expect(fireEvent.contextMenu(rows[4], { ctrlKey: true })).toBe(true)
+    expect(screen.queryByRole('menu', { hidden: true })).toBeNull()
+  })
+
   it('com 1 selecionado, Editar abre o formulário e Gerar Voucher avisa que só roda no Dataverse', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)

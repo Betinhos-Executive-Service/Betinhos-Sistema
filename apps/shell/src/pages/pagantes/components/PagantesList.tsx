@@ -1,5 +1,6 @@
 import type { MouseEvent, ReactNode } from 'react'
-import { Table, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
+import { Table, type MenuAction, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
+import { ExternalLink } from 'lucide-react'
 import { formatDate, formatMoney } from '../domain/messages'
 import { hasFalha, label, statusTone } from '../domain/status'
 import type { ChoiceSet, Contato, Pagante } from '../domain/types'
@@ -23,6 +24,11 @@ function OpenName({ p, onOpen }: { p: Pagante; onOpen: (id: string) => void }) {
  * Clique em qualquer ponto da linha (ou do cartão) abre a ficha. O teclado continua no botão do
  * nome; WhatsApp, copiar e outros controles da linha mantêm a própria ação; seleção de texto não abre.
  */
+/** Clique direito na linha (DS §10.9.3): "Abrir" o registro, o mesmo que clicar no nome. */
+export const openRowActions = (onOpen: (id: string) => void) => (row: { id: string }): MenuAction[] => [
+  { id: 'abrir', label: 'Abrir', icon: <ExternalLink size={16} />, onSelect: () => onOpen(row.id) },
+]
+
 export function openFromRow(event: MouseEvent<HTMLElement>, rowSelector: string, openSelector: string) {
   const target = event.target as HTMLElement
   if (target.closest('a, button, input, select, textarea, label, [role="menu"], [role="menuitem"]')) return
@@ -49,7 +55,7 @@ export function PagantesTable({ list, choices, contatos, onOpen, loading, view, 
   ]
   return (
     <div className="pg-table-wrap" onClick={(event) => openFromRow(event, '.bt-table__row', '.pg-open')}>
-      <Table className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} severity={severity} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <Table className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} rowActions={openRowActions(onOpen)} severity={severity} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }
