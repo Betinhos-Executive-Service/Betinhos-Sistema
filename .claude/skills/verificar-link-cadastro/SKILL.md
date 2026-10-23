@@ -8,16 +8,17 @@ description: "Verifica o link público de cadastro do passageiro: tabela cr40f_l
 - `packages/plugins/Cr40f.Cadastro.Plugin/**`, `Cr40f.Cadastro.Plugin.Tests/**`, `tools/Cr40f.Cadastro.Registrar/**` e `scripts/push-cadastro-plugin.ps1`.
 - `packages/deploy/provision-link-cadastro.ps1`, `provision-flow-cadastro-passageiro.ps1` e `flows/cadastro-passageiro-link.{json,test.mjs}`.
 - Regras: validade de 36 h; só o SHA-256 (hex minúsculo, UTF-8) do token é gravado; gerar revoga os links ativos do mesmo escopo; serviço cancelado (202410002/202410010) não gera link. No flow, o escopo do link por passageiro é cruzado com os passageiros atuais do serviço; respostas 200/400/404/410/429/500 com corpo genérico.
+- Link da foto (`new_linkdafoto`): sempre URL com caminho, `https://betinhos.sharepoint.com/:i:/r/sites/BetinhosGestoInterna/Documentos%20Compartilhados/Passageiros/Fotos/<DEV|PROD>/<id>.<ext>`, montada do `Path` devolvido pelo CreateFile (`replace(uriComponent(Path), '%2F', '/')`). Nunca link de compartilhamento (`/:i:/s/<token>`, CreateSharingLink): o Formulário Geral (`passengerPhotoPathUrl`) só exibe `/:x:/r/`. Vale também para o "Flow Salvar Foto BD" (`patch-flow-salvar-foto-sharepoint.ps1`, idempotente) e para os registros antigos (`regravar-links-fotos.ps1 -Ambiente DEV|PROD`, DRY RUN sem `-Apply`; exige login no Graph).
 
 ## Roteiro local
 1. `dotnet test packages/plugins/Cr40f.Cadastro.Plugin.Tests` → "Com falha: 0" (13 testes em 22/10/2026).
-2. `pnpm --filter ./packages/deploy test` (ou `npm test` em `packages/deploy`) → `fail 0` (126 em 22/10/2026, sendo 11 do flow).
+2. `pnpm --filter ./packages/deploy test` (ou `npm test` em `packages/deploy`) → `fail 0` (127 em 23/10/2026); o teste do flow exige zero CreateSharingLink e o link com `/:i:/r`.
 3. Sintaxe dos .ps1: `powershell.exe -NoProfile -Command "$e=$null;[void][System.Management.Automation.Language.Parser]::ParseFile('<arquivo>',[ref]$null,[ref]$e);$e.Count"` → `0`.
 
 ## Roteiro no DEV (só da `main`, no checkout principal)
 4. `powershell.exe -File packages/deploy/provision-link-cadastro.ps1` (DRY RUN) e depois com `-Apply` → a conferência final lista colunas, a chave do hash e a tabela na solução.
 5. `packages/plugins/scripts/push-cadastro-plugin.ps1` → Custom API registrada. Para testar: rodar o registrador com `--testar <reservaId>` → `ok:true`, token oculto; isso cria um link real e revoga os anteriores.
-6. `provision-flow-cadastro-passageiro.ps1 -SiteUrl … -BibliotecaId … -Pasta …` (DRY RUN, depois `-Apply`). Chamar o gatilho com `{op:"ler",hash}` → 200; hash inexistente → 404; forçar `cr40f_expiraem` no passado → 410; `salvar` com foto → arquivo `<passageiroId>.jpg` no SharePoint e `new_linkdafoto` preenchido.
+6. `provision-flow-cadastro-passageiro.ps1 -SiteUrl … -BibliotecaId … -Pasta …` (DRY RUN, depois `-Apply`). Chamar o gatilho com `{op:"ler",hash}` → 200; hash inexistente → 404; forçar `cr40f_expiraem` no passado → 410; `salvar` com foto → arquivo `<passageiroId>.jpg` no SharePoint e `new_linkdafoto` preenchido com `/:i:/r/sites/...` (abrir no Formulário Geral e ver a foto).
 
 ## Não verificável sem DEV
 Dados reais do Dataverse e escrita no SharePoint (a sobrescrita foi confirmada no DEV em 23/10/2026).
