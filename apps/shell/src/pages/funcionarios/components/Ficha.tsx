@@ -239,8 +239,8 @@ export function Ficha({ source, docs, id, onClose, onSaved, versao, acesso, onCa
                 <AcessoApp
                   funcionario={original}
                   acesso={acesso}
+                  usuarioDoApp={source.usuarioDoApp}
                   onCadastrar={() => onCadastrarAcesso?.({ funcionarioId: original.id, nomeCompleto: String(original.values.cr40f_nomecompleto ?? ''), celular: String(original.values.cr40f_telefonecorporativo ?? '') })}
-                  onEncerrado={() => { void source.get(original.id).then((fresh) => { setOriginal(fresh); setDraft(draftFrom(fresh)); onSaved(fresh.id, false) }).catch(() => notify('error', 'Acesso encerrado, mas a ficha não recarregou. Reabra a ficha.')) }}
                 />
               )}
             </form>

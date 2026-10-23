@@ -7,10 +7,13 @@ export type Etapa = { etapa: string; estado: 'feita' | 'pulada' | 'erro'; detalh
 export type CadastroInput = { nomeCompleto: string; celular: string; emailPessoal?: string; prefixoEmail?: string; tipoVinculo: 0 | 1; funcionarioId?: string }
 export type AcessoInicial = { funcionarioId: string; nomeCompleto: string; celular: string }
 export type CadastroResultado = { emailMicrosoft: string; senhaTemporaria: string; funcionarioId: string; linkApp: string; etapas: Etapa[] }
+/** Reativação: a senha é sempre nova (a anterior foi descartada ao encerrar). */
+export type ReativacaoResultado = { emailMicrosoft: string; senhaTemporaria: string; linkApp: string; etapas: Etapa[] }
 
 export interface AcessoSource {
   cadastrar(input: CadastroInput): Promise<CadastroResultado>
   encerrar(funcionarioId: string, confirmacao: string): Promise<Etapa[]>
+  reativar(funcionarioId: string): Promise<ReativacaoResultado>
 }
 
 export const MENSAGENS: Record<string, string> = {
@@ -22,9 +25,11 @@ export const MENSAGENS: Record<string, string> = {
   CONFIG_AUSENTE: 'O plugin de acesso está sem configuração. Avise a TI.',
   SEM_PERMISSAO: 'Você não tem permissão para gerir acessos.',
   FUNCIONARIO_NAO_ENCONTRADO: 'Funcionário não encontrado.',
-  FUNCIONARIO_SEM_EMAIL: 'Este funcionário não tem e-mail Microsoft; não há acesso a encerrar.',
+  FUNCIONARIO_SEM_EMAIL: 'Este funcionário não tem e-mail Microsoft; use "Cadastrar acesso".',
   CONFIRMACAO_INVALIDA: 'O nome digitado não confere.',
-  ACESSO_ENCERRADO: 'Acesso encerrado antes. Peça à TI para reativar a conta no Entra.',
+  ACESSO_ENCERRADO: 'Acesso encerrado antes. Use "Reativar acesso" na ficha do funcionário.',
+  CONTA_NAO_EXISTE: 'A conta Microsoft não existe mais; cadastre o acesso de novo.',
+  SEM_PERMISSAO_SENHA: 'Falta a permissão User-PasswordProfile.ReadWrite.All no app do Graph.',
   USUARIO_DATAVERSE_PENDENTE: 'A conta foi criada, mas o Dataverse ainda não a reconhece. Tente de novo em alguns minutos.',
 }
 
@@ -103,6 +108,10 @@ export function createAcessoSource(host: Host): AcessoSource {
     async encerrar(funcionarioId, confirmacao) {
       const r = await chamar<{ Etapas: string }>('cr40f_EncerrarAcessoMotorista', { FuncionarioId: funcionarioId, Confirmacao: confirmacao })
       return parseEtapas(r.Etapas)
+    },
+    async reativar(funcionarioId) {
+      const r = await chamar<Resposta>('cr40f_ReativarAcessoMotorista', { FuncionarioId: funcionarioId })
+      return { emailMicrosoft: r.EmailMicrosoft, senhaTemporaria: r.SenhaTemporaria, linkApp: r.LinkApp, etapas: parseEtapas(r.Etapas) }
     },
   }
 }

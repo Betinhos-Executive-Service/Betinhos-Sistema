@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DataSource } from '../data/source'
+import type { AcessoSource } from '../data/acesso'
 import { createMockDocsSource } from '../../documentos/data/source'
 import type { Funcionario } from '../data/types'
 import { Ficha } from './Ficha'
@@ -20,7 +21,7 @@ function fakeSource(save: DataSource['save'], extra: Partial<DataSource> = {}): 
     list: async () => [record], get: async () => structuredClone(record), save,
     uploadImage: async () => {}, uploadAditivo: async () => {}, saveLogins: async () => {}, multas: async () => [], posses: async () => [], equipamentos: async () => [], anotacoes: async () => [], addAnotacao: async () => {}, updateAnotacao: async () => {}, deleteAnotacao: async () => {}, limitesAnexo: async () => ({ maxBytes: 5e6, bloqueadas: [] }), anexo: async () => ({ nome: 'a', blob: new Blob() }),
     documentos: { pasta: () => '', listar: async () => [], enviar: async () => { throw new Error('n/a') }, abrir: async () => ({ nome: '', blob: new Blob() }), excluir: async () => {} },
-    searchVeiculos: async () => [], openForm: () => {},
+    usuarioDoApp: async () => null, searchVeiculos: async () => [], openForm: () => {},
     ...extra,
   }
 }
@@ -254,44 +255,81 @@ describe('Ficha', () => {
     })
   })
 
-  it('mostra o estado do acesso e encerra pela ficha', async () => {
-    const encerrar = vi.fn(async () => [{ etapa: 'funcionario', estado: 'feita' as const, detalhe: 'inativado' }])
-    const comEmail = { ...record, values: { ...record.values, cr40f_emailmicrosoft: 'ana.souza@betinhos.onmicrosoft.com' } }
-    const source = fakeSource(async () => 'f1', { get: async () => structuredClone(comEmail) })
-    render(<ToastProvider><Ficha source={source} id="f1" onClose={() => {}} onSaved={() => {}} acesso={{ cadastrar: async () => { throw new Error('n/a') }, encerrar }} /></ToastProvider>)
-    await screen.findByText('Acesso ativo')
+  const comEmail = { ...record, values: { ...record.values, cr40f_emailmicrosoft: 'ana.souza@betinhos.onmicrosoft.com', cr40f_telefonecorporativo: '+5512991234567' } }
+  const naoUsar = async () => { throw new Error('n/a') }
+  const acessoFake = (extra: Partial<AcessoSource> = {}): AcessoSource => ({ cadastrar: naoUsar, encerrar: async () => [], reativar: naoUsar, ...extra })
+  const comUsuario = (ativo: boolean | null, extra: Partial<DataSource> = {}) => fakeSource(async () => 'f1', { get: async () => structuredClone(comEmail), usuarioDoApp: async () => (ativo === null ? null : { id: 'su1', ativo }), ...extra })
+
+  it('estado do acesso vem do systemuser, não do status do funcionário', async () => {
+    const usuarioDoApp = vi.fn(async () => ({ id: 'su1', ativo: true }))
+    const desligado = { ...comEmail, values: { ...comEmail.values, cr40f_status: 1 } }
+    render(<ToastProvider><Ficha source={fakeSource(async () => 'f1', { get: async () => structuredClone(desligado), usuarioDoApp })} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake()} /></ToastProvider>)
+    await screen.findByText('Acesso ativo', undefined, { timeout: 5000 })
+    expect(usuarioDoApp).toHaveBeenCalledWith('ana.souza@betinhos.onmicrosoft.com')
+    expect(screen.getByRole('button', { name: /^Encerrar acesso$/ })).toBeTruthy()
+  })
+
+  it.each([[false, 'desabilitado'], [null, 'ausente']] as const)('systemuser %s (%s) mostra acesso encerrado com Reativar', async (ativo, _caso) => {
+    render(<ToastProvider><Ficha source={comUsuario(ativo)} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake()} /></ToastProvider>)
+    await screen.findByText('Acesso encerrado', undefined, { timeout: 5000 })
+    expect(screen.getByRole('button', { name: /^Reativar acesso$/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^Encerrar acesso$/ })).toBeNull()
+  })
+
+  it('encerra pela ficha sem recarregar nem salvar o funcionário e passa a oferecer Reativar', async () => {
+    const encerrar = vi.fn(async () => [{ etapa: 'conta', estado: 'feita' as const, detalhe: 'desativada' }])
+    const save = vi.fn(async () => 'f1')
+    const get = vi.fn(async () => structuredClone(comEmail))
+    render(<ToastProvider><Ficha source={fakeSource(save, { get, usuarioDoApp: async () => ({ id: 'su1', ativo: true }) })} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake({ encerrar })} /></ToastProvider>)
+    await screen.findByText('Acesso ativo', undefined, { timeout: 5000 })
     fireEvent.click(screen.getByRole('button', { name: /^Encerrar acesso$/ }))
+    expect(screen.getByText(/status e demissão ficam como estão/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /Continuar/ }))
     fireEvent.change(screen.getByLabelText(/primeiro nome/i), { target: { value: 'Ana' } })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^Encerrar agora$/ })) })
     await waitFor(() => expect(encerrar).toHaveBeenCalledWith('f1', 'Ana'))
+    expect(await screen.findByText('Acesso encerrado')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^Reativar acesso$/ })).toBeTruthy()
+    expect(save).not.toHaveBeenCalled()
+    expect(get).toHaveBeenCalledTimes(1)
+  })
+
+  it('reativa com confirmação, mostra a senha nova e o link do WhatsApp, e pede confirmação ao fechar', async () => {
+    const reativar = vi.fn(async () => ({ emailMicrosoft: 'ana.souza@betinhos.onmicrosoft.com', senhaTemporaria: 'Nova#1234567xy', linkApp: 'https://app', etapas: [{ etapa: 'senha', estado: 'feita' as const, detalhe: 'redefinida' }] }))
+    render(<ToastProvider><Ficha source={comUsuario(false)} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake({ reativar })} /></ToastProvider>)
+    await screen.findByText('Acesso encerrado', undefined, { timeout: 5000 })
+    fireEvent.click(screen.getByRole('button', { name: /^Reativar acesso$/ }))
+    expect(screen.getByText('Reativar acesso de Ana Souza?')).toBeTruthy()
+    expect(reativar).not.toHaveBeenCalled()
+    const dialogo = document.querySelector('dialog[open]') as HTMLElement
+    await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: /^Reativar acesso$/ })) })
+    expect(reativar).toHaveBeenCalledWith('f1')
+    expect(await screen.findByText('Nova#1234567xy')).toBeTruthy()
+    expect(screen.getByText(/aparece só agora/)).toBeTruthy()
+    const wa = screen.getByRole('link', { name: /Enviar no WhatsApp/ }) as HTMLAnchorElement
+    expect(wa.href).toContain('wa.me/5512991234567')
+    expect(decodeURIComponent(wa.href)).toContain('Nova#1234567xy')
+    expect(screen.getByText('Acesso ativo')).toBeTruthy()
+    fireEvent.click(within(dialogo).getAllByRole('button', { name: /^Fechar$/ }).find((b) => b.textContent === 'Fechar')!)
+    expect(await screen.findByText('Fechar sem enviar?')).toBeTruthy()
+  })
+
+  it('reativar sem permissão de senha mostra o erro e as etapas', async () => {
+    const reativar = vi.fn(async () => { throw new Error('SEM_PERMISSAO_SENHA: x | etapas=[{"etapa":"senha","estado":"erro","detalhe":"403"}]') })
+    render(<ToastProvider><Ficha source={comUsuario(false)} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake({ reativar })} /></ToastProvider>)
+    await screen.findByText('Acesso encerrado', undefined, { timeout: 5000 })
+    fireEvent.click(screen.getByRole('button', { name: /^Reativar acesso$/ }))
+    const dialogo = document.querySelector('dialog[open]') as HTMLElement
+    await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: /^Reativar acesso$/ })) })
+    expect(await screen.findByText(/User-PasswordProfile\.ReadWrite\.All/)).toBeTruthy()
+    expect(screen.getByText(/senha: 403/)).toBeTruthy()
   })
 
   it('sem e-mail oferece cadastrar acesso', async () => {
     const onCadastrarAcesso = vi.fn()
-    render(<ToastProvider><Ficha source={fakeSource(async () => 'f1')} id="f1" onClose={() => {}} onSaved={() => {}} acesso={{ cadastrar: async () => { throw new Error('n/a') }, encerrar: async () => [] }} onCadastrarAcesso={onCadastrarAcesso} /></ToastProvider>)
+    render(<ToastProvider><Ficha source={fakeSource(async () => 'f1')} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake()} onCadastrarAcesso={onCadastrarAcesso} /></ToastProvider>)
     await screen.findByText('Sem acesso ao app')
     fireEvent.click(screen.getByRole('button', { name: /Cadastrar acesso/ }))
     expect(onCadastrarAcesso).toHaveBeenCalledWith({ funcionarioId: 'f1', nomeCompleto: 'Ana Souza', celular: '' })
-  })
-
-  it('funcionário afastado (status 2) com e-mail pode ter o acesso encerrado', async () => {
-    const afastado = { ...record, values: { ...record.values, cr40f_status: 2, cr40f_emailmicrosoft: 'ana.souza@betinhos.onmicrosoft.com' } }
-    render(<ToastProvider><Ficha source={fakeSource(async () => 'f1', { get: async () => structuredClone(afastado) })} id="f1" onClose={() => {}} onSaved={() => {}} acesso={{ cadastrar: async () => { throw new Error('n/a') }, encerrar: async () => [] }} /></ToastProvider>)
-    await screen.findByText('Acesso ativo')
-    expect(screen.getByRole('button', { name: /^Encerrar acesso$/ })).toBeTruthy()
-  })
-
-  it('encerrou mas a recarga da ficha falhou: avisa sem rejeição solta', async () => {
-    const comEmail = { ...record, values: { ...record.values, cr40f_emailmicrosoft: 'ana.souza@betinhos.onmicrosoft.com' } }
-    let chamadas = 0
-    const get = vi.fn(async () => { chamadas += 1; if (chamadas > 1) throw new Error('rede'); return structuredClone(comEmail) })
-    render(<ToastProvider><Ficha source={fakeSource(async () => 'f1', { get })} id="f1" onClose={() => {}} onSaved={() => {}} acesso={{ cadastrar: async () => { throw new Error('n/a') }, encerrar: async () => [] }} /></ToastProvider>)
-    await screen.findByText('Acesso ativo')
-    fireEvent.click(screen.getByRole('button', { name: /^Encerrar acesso$/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Continuar/ }))
-    fireEvent.change(screen.getByLabelText(/primeiro nome/i), { target: { value: 'Ana' } })
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^Encerrar agora$/ })) })
-    expect(await screen.findByText('Acesso encerrado, mas a ficha não recarregou. Reabra a ficha.')).toBeTruthy()
   })
 })

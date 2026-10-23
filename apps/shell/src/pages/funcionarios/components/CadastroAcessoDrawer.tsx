@@ -18,12 +18,40 @@ export function prefixoDeNome(nome: string) {
   return p.length === 0 ? '' : p.length === 1 ? p[0] : `${p[0]}.${p[p.length - 1]}`
 }
 
-function ListaEtapas({ etapas }: { etapas: Etapa[] }) {
+export function ListaEtapas({ etapas }: { etapas: Etapa[] }) {
   return <ul className="acesso-etapas">{etapas.map((e) => <li key={e.etapa} data-estado={e.estado}><span aria-hidden>{ROTULO[e.estado]}</span> {e.etapa}: {e.detalhe}</li>)}</ul>
 }
 
-export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }: Props) {
+/** Copia para a área de transferência com aviso de sucesso ou falha. */
+export function useCopiar() {
   const notify = useNotify()
+  return async (texto: string) => {
+    try { await navigator.clipboard.writeText(texto); notify('success', 'Copiado.') } catch { notify('error', 'Não foi possível copiar. Selecione e copie manualmente.') }
+  }
+}
+
+/** E-mail, senha e link com botões de copiar; usado no cadastro e na reativação. */
+export function CredenciaisAcesso({ r, semSenha }: { r: { emailMicrosoft: string; senhaTemporaria: string; linkApp: string }; semSenha: string }) {
+  const copiar = useCopiar()
+  return (
+    <dl className="acesso-credenciais">
+      <dt>E-mail</dt><dd><code>{r.emailMicrosoft}</code> <Button variant="secondary" size="compact" icon={<Copy size={14} />} aria-label="Copiar e-mail" onClick={() => copiar(r.emailMicrosoft)} /></dd>
+      <dt>Senha</dt><dd><code>{r.senhaTemporaria || semSenha}</code> {r.senhaTemporaria && <Button variant="secondary" size="compact" icon={<Copy size={14} />} aria-label="Copiar senha" onClick={() => copiar(r.senhaTemporaria)} />}</dd>
+      <dt>Link do app</dt><dd><a href={r.linkApp} target="_blank" rel="noopener noreferrer">{r.linkApp}</a></dd>
+    </dl>
+  )
+}
+
+/** R13: a senha só aparece uma vez; fechar sem enviar pede confirmação. */
+export function FecharSemEnviarDialog({ open, onVoltar, onFechar }: { open: boolean; onVoltar: () => void; onFechar: () => void }) {
+  return (
+    <Dialog open={open} onClose={onVoltar} title="Fechar sem enviar?" actions={<><Button variant="secondary" onClick={onVoltar}>Voltar</Button><Button variant="danger" onClick={onFechar}>Fechar</Button></>}>
+      A senha não aparece de novo.
+    </Dialog>
+  )
+}
+
+export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }: Props) {
   const [nome, setNome] = useState(inicial?.nomeCompleto ?? '')
   const [celular, setCelular] = useState(inicial?.celular ?? '')
   const [emailPessoal, setEmailPessoal] = useState('')
@@ -61,10 +89,6 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
     }
   }
 
-  async function copiar(texto: string) {
-    try { await navigator.clipboard.writeText(texto); notify('success', 'Copiado.') } catch { notify('error', 'Não foi possível copiar. Selecione e copie manualmente.') }
-  }
-
   return (
     <div className="drawer-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !discarding && !fechandoResultado) requestClose() }}>
       <aside ref={panel} className="drawer drawer--acesso" role="dialog" aria-modal="true" aria-labelledby="acesso-title" tabIndex={-1} onKeyDown={(event) => { if (event.key === 'Escape' && !discarding && !fechandoResultado) requestClose() }}>
@@ -98,11 +122,7 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
           {estado.fase === 'resultado' && (
             <div className="acesso-resultado">
               <Alert tone="success" title="Acesso criado">A senha aparece só agora. Envie para o motorista antes de fechar.</Alert>
-              <dl className="acesso-credenciais">
-                <dt>E-mail</dt><dd><code>{estado.r.emailMicrosoft}</code> <Button variant="secondary" size="compact" icon={<Copy size={14} />} aria-label="Copiar e-mail" onClick={() => copiar(estado.r.emailMicrosoft)} /></dd>
-                <dt>Senha</dt><dd><code>{estado.r.senhaTemporaria || '(conta já existia; senha não alterada)'}</code> {estado.r.senhaTemporaria && <Button variant="secondary" size="compact" icon={<Copy size={14} />} aria-label="Copiar senha" onClick={() => copiar(estado.r.senhaTemporaria)} />}</dd>
-                <dt>Link do app</dt><dd><a href={estado.r.linkApp} target="_blank" rel="noopener noreferrer">{estado.r.linkApp}</a></dd>
-              </dl>
+              <CredenciaisAcesso r={estado.r} semSenha="(conta já existia; senha não alterada)" />
               <ListaEtapas etapas={estado.r.etapas} />
             </div>
           )}
@@ -124,9 +144,7 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
       <Dialog open={discarding} onClose={() => setDiscarding(false)} title="Descartar alterações?" actions={<><Button variant="secondary" onClick={() => setDiscarding(false)}>Continuar editando</Button><Button variant="danger" onClick={() => { setDiscarding(false); onClose() }}>Descartar</Button></>}>
         Os dados digitados ainda não foram enviados.
       </Dialog>
-      <Dialog open={fechandoResultado} onClose={() => setFechandoResultado(false)} title="Fechar sem enviar?" actions={<><Button variant="secondary" onClick={() => setFechandoResultado(false)}>Voltar</Button><Button variant="danger" onClick={() => { setFechandoResultado(false); onClose() }}>Fechar</Button></>}>
-        A senha não aparece de novo.
-      </Dialog>
+      <FecharSemEnviarDialog open={fechandoResultado} onVoltar={() => setFechandoResultado(false)} onFechar={() => { setFechandoResultado(false); onClose() }} />
     </div>
   )
 }
