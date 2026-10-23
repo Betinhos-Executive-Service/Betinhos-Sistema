@@ -108,7 +108,7 @@ describe('createXrmSource().list: selo Sem app', () => {
     expect(rows.map((row) => row.semApp)).toEqual([false, true, true, false])
     const usuarios = retrieveMultipleRecords.mock.calls.filter(([entity]) => entity === 'systemuser')
     expect(usuarios).toHaveLength(1)
-    expect(usuarios[0][1]).toBe('?$select=internalemailaddress&$filter=isdisabled eq false and accessmode eq 0')
+    expect(usuarios[0][1]).toBe('?$select=internalemailaddress&$filter=isdisabled eq false')
   })
 
   it('falha na consulta de systemusers deixa a lista sem selo', async () => {

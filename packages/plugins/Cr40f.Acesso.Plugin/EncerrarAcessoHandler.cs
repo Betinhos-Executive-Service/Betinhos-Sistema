@@ -8,6 +8,8 @@ public sealed class EncerrarAcessoHandler
     public EncerrarAcessoHandler(IGraphGateway graph, FuncionarioRepository repo, UsuarioDataverseRepository usuarios, AcessoConfig cfg, Action<string> trace)
     { _graph = graph; _repo = repo; _usuarios = usuarios; _cfg = cfg; _trace = trace; }
 
+    private static readonly string[] EtapasDeConta = { "grupo", "licenca", "conta", "bloqueio" };
+
     public Etapas Executar(Guid funcionarioId, string confirmacao)
     {
         var etapas = new Etapas();
@@ -21,13 +23,13 @@ public sealed class EncerrarAcessoHandler
 
             var email = f.EmailMicrosoft!.ToLowerInvariant();
             var u = _graph.UsuarioPorUpn(email);
-            if (u is null) { foreach (var nome in new[] { "grupo", "licenca", "conta", "bloqueio" }) etapas.Pulada(nome, "usuário não existe no Entra"); }
+            if (u is null) { foreach (var nome in EtapasDeConta) etapas.Pulada(nome, "usuário não existe no Entra"); }
             else
             {
                 // R11: só mexe na conta se ela é do grupo de motoristas; evita bloquear conta de outra pessoa apontada na ficha.
                 var membro = false;
                 etapas.Executar("grupo", () => { membro = _graph.EhMembro(_cfg.GroupId, u.Id); });
-                if (!membro) { foreach (var nome in new[] { "grupo", "licenca", "conta", "bloqueio" }) etapas.Pulada(nome, "conta fora do grupo de motoristas"); }
+                if (!membro) { foreach (var nome in EtapasDeConta) etapas.Pulada(nome, "conta fora do grupo de motoristas"); }
                 else
                 {
                     // Grupo por último: é o marcador do R11; sair dele antes deixaria licença e conta ativas se uma etapa falhasse e a tela tentasse de novo.

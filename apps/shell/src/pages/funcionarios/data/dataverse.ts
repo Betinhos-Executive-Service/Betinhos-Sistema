@@ -131,8 +131,8 @@ export function createXrmSource(xrm: XrmHost): DataSource {
 
   /** O selo da linha que a ficha devolve à lista depois de salvar: uma consulta só para motorista com e-mail. */
   async function semAppDe(f: Funcionario) {
-    const email = emailMicrosoft(f.values)
     if (f.values.cr40f_funcao !== FUNCAO_MOTORISTA) return false
+    const email = emailMicrosoft(f.values)
     if (!email) return true
     return usuarioDoApp(email).then((u) => !u?.ativo, () => undefined)
   }
@@ -148,7 +148,7 @@ export function createXrmSource(xrm: XrmHost): DataSource {
       const behaviors = loadPatchContext().then((context) => context.dateBehaviors, () => ({} as Record<string, DateBehavior>))
       // A primeira página (100) vai à parte, em paralelo: o nextLink exige o mesmo tamanho de página da carga completa.
       // Uma consulta paginada dos systemusers habilitados para o selo "Sem app"; se falhar, a lista sai sem o selo.
-      const ativos = retrieveAll('systemuser', '?$select=internalemailaddress&$filter=isdisabled eq false and accessmode eq 0')
+      const ativos = retrieveAll('systemuser', '?$select=internalemailaddress&$filter=isdisabled eq false')
         .then((users) => new Set(users.map((u) => String(u.internalemailaddress ?? '').toLowerCase())), () => null)
       const mapList = (rows: Row[], dateBehaviors: Record<string, DateBehavior>, emails: Set<string> | null) =>
         rows.map((row) => { const f = mapRow(row, dateBehaviors); return emails ? { ...f, semApp: semApp(f.values, emails) } : f })

@@ -9,7 +9,11 @@ import { EncerrarAcessoDialog } from './EncerrarAcessoDialog'
 import { ReativarAcessoDialog } from './ReativarAcessoDialog'
 import { useNotify } from './Toasts'
 
-type Props = { funcionario: Funcionario; acesso: AcessoSource; usuarioDoApp: (email: string) => Promise<UsuarioApp | null>; onCadastrar: () => void }
+type Props = {
+  funcionario: Funcionario; acesso: AcessoSource; usuarioDoApp: (email: string) => Promise<UsuarioApp | null>; onCadastrar: () => void
+  /** Acesso encerrado ou reativado: a lista relê a linha para o selo "Sem app" acompanhar. */
+  onAlterado?: () => void
+}
 type EstadoConta = 'verificando' | 'ativo' | 'encerrado' | 'falha'
 
 const TITULO: Record<EstadoConta | 'sem', string> = { sem: 'Sem acesso ao app', verificando: 'Conferindo acesso…', ativo: 'Acesso ativo', encerrado: 'Acesso encerrado', falha: 'Não foi possível conferir o acesso' }
@@ -18,7 +22,7 @@ const TITULO: Record<EstadoConta | 'sem', string> = { sem: 'Sem acesso ao app', 
  * Bloco "Acesso ao app" na aba Dados. O estado vem do usuário do Dataverse (systemuser) ligado ao e-mail Microsoft,
  * nunca do status do funcionário: dar ou tirar acesso não tem relação com admissão ou demissão.
  */
-export function AcessoApp({ funcionario, acesso, usuarioDoApp, onCadastrar }: Props) {
+export function AcessoApp({ funcionario, acesso, usuarioDoApp, onCadastrar, onAlterado }: Props) {
   const notify = useNotify()
   const [encerrando, setEncerrando] = useState(false)
   const [reativando, setReativando] = useState(false)
@@ -43,8 +47,8 @@ export function AcessoApp({ funcionario, acesso, usuarioDoApp, onCadastrar }: Pr
   async function encerrar(confirmacao: string) {
     try {
       const resultado = await acesso.encerrar(funcionario.id, confirmacao)
-      // O Dataverse sincroniza o systemuser depois; o bloco segue o resultado da API.
-      setEtapas(resultado); setEncerrando(false); setConta('encerrado'); notify('success', 'Acesso encerrado.')
+      // O plugin já bloqueia o systemuser; o bloco segue o resultado da API e a lista relê a linha.
+      setEtapas(resultado); setEncerrando(false); setConta('encerrado'); notify('success', 'Acesso encerrado.'); onAlterado?.()
     } catch (reason) {
       const erro = parseAcessoError(reason)
       if (erro.codigo === 'SEM_PERMISSAO') { setSemPermissao(true); setEncerrando(false); notify('error', 'Você não tem permissão para gerir acessos.'); return }
@@ -57,7 +61,7 @@ export function AcessoApp({ funcionario, acesso, usuarioDoApp, onCadastrar }: Pr
       const erro = parseAcessoError(reason)
       if (erro.codigo === 'SEM_PERMISSAO') { setSemPermissao(true); setReativando(false); notify('error', 'Você não tem permissão para gerir acessos.') }
       // A senha é a última etapa do plugin: sem permissão para ela, a conta já voltou e o bloco mostra ativo.
-      if (erro.codigo === 'SEM_PERMISSAO_SENHA') { setConta('ativo'); setEtapas(erro.etapas); setFaltouSenha(true) }
+      if (erro.codigo === 'SEM_PERMISSAO_SENHA') { setConta('ativo'); setEtapas(erro.etapas); setFaltouSenha(true); onAlterado?.() }
       throw erro
     }
   }
@@ -76,7 +80,7 @@ export function AcessoApp({ funcionario, acesso, usuarioDoApp, onCadastrar }: Pr
       {semPermissao && <Alert tone="warning">Você não tem permissão para gerir acessos.</Alert>}
       <EncerrarAcessoDialog open={encerrando} nome={nome} onCancel={() => setEncerrando(false)} onConfirmar={encerrar} />
       <ReativarAcessoDialog open={reativando} nome={nome} celular={celular} onCancel={() => setReativando(false)} onReativar={reativar}
-        onReativado={(r) => { setConta('ativo'); setEtapas(r.etapas); setFaltouSenha(false) }} />
+        onReativado={(r) => { setConta('ativo'); setEtapas(r.etapas); setFaltouSenha(false); onAlterado?.() }} />
     </fieldset>
   )
 }
