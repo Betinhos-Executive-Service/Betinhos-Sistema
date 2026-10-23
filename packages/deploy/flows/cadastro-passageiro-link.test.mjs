@@ -1,0 +1,113 @@
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+
+const raw = readFileSync(new URL('./cadastro-passageiro-link.json', import.meta.url), 'utf8')
+const flow = JSON.parse(raw)
+
+const todas = new Map()
+let total = 0
+const percorrer = (acoes) => {
+  for (const [nome, acao] of Object.entries(acoes ?? {})) {
+    todas.set(nome, acao); total++
+    percorrer(acao.actions)
+    percorrer(acao.else?.actions)
+    percorrer(acao.default?.actions)
+    for (const c of Object.values(acao.cases ?? {})) percorrer(c.actions)
+  }
+}
+percorrer(flow.actions)
+const porTipo = (tipo) => [...todas.values()].filter((a) => a.type === tipo)
+const op = (id) => [...todas.values()].filter((a) => a.inputs?.host?.operationId === id)
+
+test('gatilho HTTP POST com JSON e só o hash do token', () => {
+  const gatilho = flow.triggers.manual
+  assert.equal(gatilho.type, 'Request')
+  assert.equal(gatilho.kind, 'Http')
+  assert.equal(gatilho.inputs.method, 'POST')
+  assert.deepEqual(Object.keys(gatilho.inputs.schema.properties).sort(), ['email', 'fotoBase64', 'hash', 'op', 'passageiroId', 'telefone'])
+})
+
+test('o token puro nunca é usado; o link é buscado por cr40f_tokenhash', () => {
+  assert.doesNotMatch(raw, /\['token'\]|"token"/)
+  const busca = todas.get('Buscar_link')
+  assert.equal(busca.inputs.host.operationId, 'ListRecords')
+  assert.match(busca.inputs.parameters.$filter, /^cr40f_tokenhash eq '@\{toLower\(trim\(coalesce\(triggerBody\(\)\?\['hash'\]/)
+  assert.equal(busca.inputs.parameters.$top, 1)
+})
+
+test('operações ler e salvar no Switch; outra op dá 400', () => {
+  const sw = todas.get('Por_operacao')
+  assert.equal(sw.type, 'Switch')
+  assert.deepEqual(Object.values(sw.cases).map((c) => c.case).sort(), ['ler', 'salvar'])
+})
+
+test('códigos de resposta previstos e corpo de erro genérico', () => {
+  const status = new Set(porTipo('SetVariable').filter((a) => a.inputs.name === 'httpStatus').map((a) => a.inputs.value))
+  assert.deepEqual([...status].sort(), [200, 400, 404, 410, 429, 500])
+  for (const a of porTipo('SetVariable').filter((x) => x.inputs.name === 'corpo' && x.inputs.value.ok === false)) {
+    assert.deepEqual(Object.keys(a.inputs.value).sort(), ['codigo', 'ok'])
+  }
+  const responder = flow.actions.Responder
+  assert.equal(responder.type, 'Response')
+  assert.equal(responder.inputs.statusCode, "@variables('httpStatus')")
+  assert.deepEqual(responder.runAfter, { Catch: ['Succeeded', 'Skipped'] })
+  assert.deepEqual(flow.actions.Catch.runAfter, { Try: ['Failed', 'TimedOut'] })
+})
+
+test('link vencido ou revogado responde 410 e marca Expirado (3)', () => {
+  const venc = todas.get('Vencido_ou_revogado')
+  const expr = JSON.stringify(venc.expression)
+  assert.match(expr, /cr40f_expiraem/)
+  assert.match(expr, /utcNow/)
+  assert.equal(todas.get('Gravar_expirado').inputs.parameters.item.cr40f_status, 3)
+  assert.equal(todas.get('Status_erro_410').inputs.value, 410)
+})
+
+test('escopo: passageiro do link, filhos por _cr40f_geral_value, fallback passageiro1..4', () => {
+  assert.match(todas.get('Listar_filhos').inputs.parameters.$filter, /^_cr40f_geral_value eq /)
+  assert.equal(todas.get('Listar_filhos').inputs.parameters.$select, '_cr40f_bancodedados_value')
+  for (const n of [1, 2, 3, 4]) assert.match(todas.get('Obter_reserva').inputs.parameters.$select, new RegExp(`_cr40f_passageiro${n}_value`))
+  assert.match(todas.get('Escopo').inputs, /_cr40f_passageiro_value/)
+})
+
+test('salvar: passageiro fora do escopo 404, limite de 30 envios 429', () => {
+  assert.match(JSON.stringify(todas.get('No_escopo').expression), /contains\(outputs\('Escopo'\)/)
+  assert.deepEqual(todas.get('Dentro_do_limite').expression.less[1], 30)
+  assert.equal(todas.get('Status_erro_404_passageiro').inputs.value, 404)
+  assert.equal(todas.get('Status_erro_429').inputs.value, 429)
+})
+
+test('foto vira <passageiroId>.jpg no SharePoint com link somente leitura', () => {
+  const criar = todas.get('Criar_arquivo')
+  assert.equal(criar.inputs.host.operationId, 'CreateFile')
+  assert.match(criar.inputs.parameters.name, /passageiroId.*\.jpg$/)
+  assert.equal(criar.inputs.parameters.folderPath, '__FOLDER_PATH__')
+  const link = todas.get('Criar_link_compartilhamento')
+  assert.equal(link.inputs.host.operationId, 'CreateSharingLink')
+  assert.equal(link.inputs.parameters['permission/type'], 'view')
+})
+
+test('PATCH do passageiro só com os campos enviados e registro do envio', () => {
+  assert.match(todas.get('Patch_foto').inputs, /new_linkdafoto/)
+  assert.match(todas.get('Patch_telefone').inputs, /cr40f_telefone/)
+  assert.match(todas.get('Patch_email').inputs, /cr40f_email/)
+  assert.equal(todas.get('Atualizar_passageiro').inputs.parameters.item, "@outputs('Patch_email')")
+  const reg = todas.get('Registrar_envio').inputs.parameters.item
+  assert.equal(reg.cr40f_status, 2)
+  assert.match(reg.cr40f_envios, /add\(/)
+  assert.equal(reg.cr40f_ultimouso, '@utcNow()')
+})
+
+test('tokens do script presentes e nenhum dado de ambiente no repo', () => {
+  for (const t of ['__SET_LINKS__', '__SET_PASSAGEIROS__', '__SET_SERVICOS__', '__SET_RESERVAS__', '__SITE_URL__', '__LIBRARY_ID__', '__FOLDER_PATH__']) assert.ok(raw.includes(t), t)
+  assert.doesNotMatch(raw, /@betinhos\.|dynamics\.com|sharepoint\.com|onmicrosoft/i)
+})
+
+test('toda ação citada em expressões existe e nomes não se repetem', () => {
+  for (const [, nome] of raw.matchAll(/(?:outputs|body|items|result)\('([^']+)'\)/g)) {
+    assert.ok(todas.has(nome), `ação inexistente: ${nome}`)
+  }
+  assert.equal(total, todas.size, "nome de ação repetido")
+  assert.ok(op('UpdateRecord').length >= 3)
+})
