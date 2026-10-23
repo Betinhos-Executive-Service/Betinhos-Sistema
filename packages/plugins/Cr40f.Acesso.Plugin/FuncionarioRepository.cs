@@ -50,7 +50,9 @@ public sealed class FuncionarioRepository
     {
         var atual = PorId(id) ?? throw new AcessoException("FUNCIONARIO_NAO_ENCONTRADO", "Funcionário " + id + " não existe.");
         var e = new Entity(Tabela, id) { ["cr40f_status"] = new OptionSetValue(StatusInativo) };
-        if (!atual.TemDemissao) e["cr40f_datadedemissao"] = hojeUtc.AddHours(-3).Date; // Brasília, sem horário de verão desde 2019
+        // Coluna "somente data" com comportamento local do usuário: meia-noite UTC aparece como o dia anterior no Brasil.
+        // Grava o dia de Brasília (sem horário de verão desde 2019) ao meio-dia de lá, 15h UTC.
+        if (!atual.TemDemissao) e["cr40f_datadedemissao"] = DateTime.SpecifyKind(hojeUtc.AddHours(-3).Date.AddHours(15), DateTimeKind.Utc);
         _service.Update(e);
     }
 
