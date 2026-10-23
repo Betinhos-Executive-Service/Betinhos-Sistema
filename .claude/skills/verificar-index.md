@@ -1,9 +1,10 @@
 # Índice de verificação — Sistema Betinhos
-- verificar-shell | apps/shell/**, packages/dataverse/**, packages/deploy/**, packages/agentes-ia/** | Typecheck, testes e telas do shell no DEV (listas, OPs, Geral, WebResources com host=shell)
+- verificar-shell | apps/shell/**, packages/dataverse/**, packages/deploy/**, packages/agentes-ia/**, .github/workflows/sync-from-dev.yml | Typecheck, testes e telas do shell no DEV (listas, OPs, Geral, WebResources com host=shell)
 - verificar-plugins | packages/plugins/** | Testes dos plugins C# (Financeiro, Documentos, Frota), paridade da frota com o shell, simulação do valor da OP, publicação no DEV
 - verificar-ambiente-cloud | scripts/cloud-setup.sh, scripts/testa-cloud-setup.sh, .claude/hooks/session-start.sh, .claude/settings.json, .gitignore (.claude/), .npmrc | Hook SessionStart que prepara a VM cloud do Claude Code (Node 24, pnpm, deps, Chromium, typecheck)
 - verificar-plantao | scripts/plantao/**, packages/deploy/criar-identidade-plantao.ps1 | Coletor e mascaramento do plantão de erros, identidade só-leitura
 - verificar-deploy-dev | .github/workflows/deploy.yml, packages/deploy/bump-version.mjs, packages/deploy/push-dev.ps1 | Workflow Deploy: push em dev publica a tela no DEV (só DEV, barato)
 - verificar-solucoes | packages/deploy/solucoes/** | Segmentação da AppBetinhos em 4 soluções: testes Node e PowerShell, conferência de dono/dependências e fotos do DEV sem perda (só DEV)
 - verificar-equipamentos | apps/shell/src/pages/equipamentos/**, apps/shell/src/pages/funcionarios/** (aba Equipamentos), packages/deploy/provision-equipamentos.ps1, packages/deploy/conceder-privilegios-equipamentos.ps1 | Testes e fluxo em mock de #/equipamentos (desktop e 375 px, roteiro Playwright), aba na ficha, schema e privilégios no DEV
+- verificar-acesso-motorista | apps/shell/src/pages/funcionarios/** (acesso: data/acesso*.ts, CadastroAcessoDrawer, AcessoApp, EncerrarAcessoDialog), packages/plugins/Cr40f.Acesso.Plugin*/**, packages/plugins/tools/Cr40f.Acesso.Registrar/**, packages/plugins/scripts/push-acesso-plugin.ps1, packages/deploy/provision-acesso.ps1 | Cadastro e encerramento do acesso ao App Motoristas: testes do plugin, fluxo em mock (Erro Graph, Sem Licenca, m1 Carlos ativo, m7 Helena sem acesso) e roteiro no DEV com Entra
 <!-- Sem roteiro ainda: apps/escala-fds/**, packages/despesas-ia/** -->

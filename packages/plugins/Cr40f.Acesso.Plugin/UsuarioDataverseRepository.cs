@@ -1,0 +1,42 @@
+using System;
+using System.Linq;
+using System.Threading;
+using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Query;
+
+namespace Cr40f.Acesso.Plugin;
+
+/// <summary>
+/// systemuser do Dataverse ligado à conta do Entra. Precisa existir habilitado e licenciado antes de gravar
+/// cr40f_emailmicrosoft: o DriverRecordSharing do App Motoristas compartilha registros com ele.
+/// Só a sincronização oficial do Power Platform (addUser) gera um usuário licenciado; Create pelo SDK nasce desabilitado.
+/// </summary>
+public sealed class UsuarioDataverseRepository
+{
+    public const int Tentativas = 6;
+    internal static readonly TimeSpan Intervalo = TimeSpan.FromSeconds(5);   // 6 consultas em ~25 s, dentro do limite de 2 min do plugin
+    private readonly IOrganizationService _svc;
+    private readonly Action<TimeSpan> _esperar;
+
+    public UsuarioDataverseRepository(IOrganizationService svc, Action<TimeSpan>? esperar = null) { _svc = svc; _esperar = esperar ?? Thread.Sleep; }
+
+    /// <summary>true se existe habilitado e licenciado (islicensed sem valor conta como licenciado).</summary>
+    public bool Pronto(Guid objectId)
+    {
+        var consulta = new QueryExpression("systemuser") { ColumnSet = new ColumnSet("systemuserid", "isdisabled", "islicensed"), TopCount = 1 };
+        consulta.Criteria.AddCondition("azureactivedirectoryobjectid", ConditionOperator.Equal, objectId);
+        var u = _svc.RetrieveMultiple(consulta).Entities.FirstOrDefault();
+        return u is not null && !u.GetAttributeValue<bool>("isdisabled") && (u.GetAttributeValue<bool?>("islicensed") ?? true);
+    }
+
+    /// <summary>Consulta de novo com esperas curtas: a sincronização do Power Platform leva alguns segundos.</summary>
+    public bool AguardarPronto(Guid objectId)
+    {
+        for (var i = 0; i < Tentativas; i++)
+        {
+            if (i > 0) _esperar(Intervalo);
+            if (Pronto(objectId)) return true;
+        }
+        return false;
+    }
+}

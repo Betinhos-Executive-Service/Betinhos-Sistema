@@ -8,11 +8,11 @@ import { usePrefetchOnIntent } from './routes'
 configure({ asyncUtilTimeout: 8000 })
 vi.setConfig({ testTimeout: 30_000 })
 
-const infracoesCarregada = vi.fn()
+const equipamentosCarregada = vi.fn()
 vi.mock('../pages/despesas/DespesasPage', () => ({ DespesasPage: () => <p>Tela de despesas</p> }))
-vi.mock('../pages/infracoes/InfracoesPage', () => {
-  infracoesCarregada()
-  return { InfracoesPage: () => <p>Tela de infrações</p> }
+vi.mock('../pages/equipamentos/EquipamentosPage', () => {
+  equipamentosCarregada()
+  return { EquipamentosPage: () => <p>Tela de equipamentos</p> }
 })
 
 beforeEach(() => {
@@ -38,12 +38,12 @@ describe('rotas sob demanda', () => {
   it('passar o mouse num link do menu baixa a tela antes do clique', async () => {
     function Menu() {
       usePrefetchOnIntent()
-      return <a href="#/infracoes">Infrações</a>
+      return <a href="#/equipamentos">Equipamentos</a>
     }
     render(<Menu />)
-    expect(infracoesCarregada).not.toHaveBeenCalled()
-    fireEvent.pointerOver(screen.getByText('Infrações'))
-    await vi.waitFor(() => expect(infracoesCarregada).toHaveBeenCalledTimes(1))
+    expect(equipamentosCarregada).not.toHaveBeenCalled()
+    fireEvent.pointerOver(screen.getByText('Equipamentos'))
+    await vi.waitFor(() => expect(equipamentosCarregada).toHaveBeenCalledTimes(1))
   })
 })
 

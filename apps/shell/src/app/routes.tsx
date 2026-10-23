@@ -8,7 +8,8 @@ import { isChunkLoadError, reportarErro } from './erros'
 
 type PageId = Extract<MenuItem, { kind: 'page' }>['page']
 type Agente = NonNullable<Extract<MenuItem, { kind: 'page' }>['agente']>
-type PageProps = { host: Host; agente?: Agente }
+type FrotaAba = NonNullable<Extract<MenuItem, { kind: 'page' }>['aba']>
+type PageProps = { host: Host; agente?: Agente; aba?: FrotaAba }
 
 /**
  * Um chunk por tela: só a rota aberta é baixada e avaliada na carga (Recharts fica no chunk do Dashboard).
@@ -109,9 +110,9 @@ const lazyFor = (page: PageId) => {
   return component
 }
 
-export function LazyPage({ page, host, agente }: { page: PageId; host: Host; agente?: Agente }) {
+export function LazyPage({ page, host, agente, aba }: { page: PageId; host: Host; agente?: Agente; aba?: FrotaAba }) {
   const Page = lazyFor(page)
-  return <Page host={host} agente={agente} />
+  return <Page host={host} agente={agente} aba={aba} />
 }
 
 /**

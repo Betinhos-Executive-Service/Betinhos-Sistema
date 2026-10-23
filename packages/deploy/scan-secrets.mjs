@@ -10,12 +10,13 @@ const blocking = [
   ['client_secret com valor', /client_secret"?\s*[:=]\s*"?[A-Za-z0-9~._\-+/]{12,}/i],
   ['token Bearer', /Bearer [A-Za-z0-9\-_.]{20,}/],
   ['chave sk-', /\bsk-[A-Za-z0-9]{20,}/],
+  ['chave da Anthropic', /\bsk-ant-[A-Za-z0-9_-]{20,}/],
 ]
 const warning = [
   ['URL assinada (sig=)', /sig=[A-Za-z0-9%_\-]{20,}/],
   ['chave Google', /AIza[0-9A-Za-z\-_]{30,}/],
 ]
-const secretVariable = /secret|password|senha|apikey|token/i
+const secretVariable = /secret|password|senha|apikey|anthropickey|token/i
 
 async function* walk(dir) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {

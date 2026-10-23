@@ -1,5 +1,5 @@
 import { toDataverseDate, type DateBehavior } from '../data/dates'
-import { COLISAO, MANUT, MULTA, STATUS_FIELD } from '../data/schema'
+import { COLISAO, MANUT, MULTA, MULTA_CAMPO, STATUS_FIELD } from '../data/schema'
 import { FlowIncertoError, type DataSource, type FlowId, type FlowResult } from '../data/source'
 import type { Kind } from '../data/types'
 
@@ -37,7 +37,7 @@ const concluir: Transition = {
 const cancelarManutencao: Transition = { id: 'cancelar', to: MANUT.CANCELADO, label: 'Cancelar manutenção', fields: [], danger: true }
 const cancelarColisao: Transition = { id: 'cancelar', to: COLISAO.CANCELADO, label: 'Cancelar colisão', fields: [], danger: true }
 const desfechosMulta: Transition[] = [
-  { id: 'recurso', to: MULTA.RECURSO, label: 'Entrar com recurso', fields: [], set: { new_recursopendente: true } },
+  { id: 'recurso', to: MULTA.RECURSO, label: 'Entrar com recurso', fields: [], set: { [MULTA_CAMPO.recursoPendente]: true } },
   { id: 'descontado', to: MULTA.DESCONTADO, label: 'Marcar como descontado', fields: [] },
   { id: 'pago', to: MULTA.PAGO, label: 'Marcar como pago', fields: [] },
 ]

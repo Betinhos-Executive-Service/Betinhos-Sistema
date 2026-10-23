@@ -1,24 +1,23 @@
 import { Copy, Download, Send } from 'lucide-react'
 import { useCallback, useEffect, useId, useState } from 'react'
 import { Alert, Button, ChoiceGroup, Dialog, Field, Input, Radio, StatusBadge, Switch } from '@betinhos/ui'
-import { addMonths, diaSP, formatBR, todaySP } from '../data/dates'
+import { addMonths, diaSP, formatBR, horaSP, todaySP } from '../data/dates'
 import { brl } from '../data/format'
 import { MULTA_CAMPO } from '../data/schema'
 import type { DataSource } from '../data/source'
 import type { Multa, TermoMulta, TermoStatus } from '../data/types'
 import { errorMessage } from '../data/xrm'
-import { calcularParcelas, validarAcordo, type Acordo, type FormaPagamento } from '../domain/termoMulta'
+import { calcularParcelas, emCentavos, validarAcordo, type Acordo, type FormaPagamento } from '../domain/termoMulta'
 import { useNotify } from './Toasts'
 
 const diaMes = (iso: string) => formatBR(diaSP(iso)).slice(0, 5)
-/** Horário de São Paulo (UTC-3, sem horário de verão), como em transitions.ts. */
-const horaSP = (iso: string) => new Date(new Date(iso).getTime() - 3 * 3600_000).toISOString().slice(11, 16)
 const dataHora = (iso: string) => `${formatBR(diaSP(iso))} às ${horaSP(iso)}`
 const competenciaBR = (dia: string) => `${dia.slice(5, 7)}/${dia.slice(0, 4)}`
 const mesAtual = () => `${todaySP().slice(0, 7)}-01`
 
-const STATUS_LABEL: Record<TermoStatus, [string, 'warning' | 'success' | 'danger' | 'neutral']> = {
-  pendente: ['Pendente', 'warning'], assinado: ['Assinado', 'success'], contestado: ['Contestado', 'danger'], expirado: ['Expirado', 'neutral'], cancelado: ['Cancelado', 'neutral'],
+const STATUS_LABEL: Record<TermoStatus, { rotulo: string; tom: 'warning' | 'success' | 'danger' | 'neutral' }> = {
+  pendente: { rotulo: 'Pendente', tom: 'warning' }, assinado: { rotulo: 'Assinado', tom: 'success' }, contestado: { rotulo: 'Contestado', tom: 'danger' },
+  expirado: { rotulo: 'Expirado', tom: 'neutral' }, cancelado: { rotulo: 'Cancelado', tom: 'neutral' },
 }
 
 /** Termo que ainda vale para a multa: o pendente ou o assinado; senão o último (contestado/expirado/cancelado), só para histórico. */
@@ -55,10 +54,14 @@ export function TermoMultaPanel({ source, multa, valorCatalogo, onChanged }: { s
   }, [source, multa.id, motoristaId, notify])
 
   useEffect(() => { void carregar() }, [carregar])
+  // "Entrar com recurso" (StatusPanel, no mesmo drawer) grava o campo e recarrega a multa: o switch acompanha.
+  useEffect(() => { setRecurso(multa.recursoPendente) }, [multa.recursoPendente])
 
   const atual = termos ? termoAtual(termos) : null
   const bloqueado = atual?.status === 'pendente' || atual?.status === 'assinado'
-  const valorTotal = Number(valorGuia.replace(',', '.'))
+  const formAberto = aberto && !bloqueado
+  // Em centavos, com a mesma regra da prévia: o total enviado fecha com a soma das parcelas.
+  const valorTotal = emCentavos(Number(valorGuia.replace(',', '.'))) / 100
   const acordo: Acordo = forma === 'guia'
     ? { forma, parcelas: 1, valorTotal, primeiraCompetencia: mesAtual() }
     : { forma, parcelas, valorTotal, primeiraCompetencia: competenciaFolha }
@@ -82,7 +85,7 @@ export function TermoMultaPanel({ source, multa, valorCatalogo, onChanged }: { s
   }
 
   async function salvarValor() {
-    if (!Number.isFinite(valorTotal) || valorGuia.trim() === '' || valorTotal === valorSalvo) return
+    if (!Number.isFinite(valorTotal) || valorTotal < 0 || valorGuia.trim() === '' || valorTotal === valorSalvo) return
     if (await salvarMulta({ [MULTA_CAMPO.valorGuia]: valorTotal })) {
       setValorSalvo(valorTotal)
       onChanged()
@@ -96,8 +99,8 @@ export function TermoMultaPanel({ source, multa, valorCatalogo, onChanged }: { s
       await source.enviarTermoMulta(multa.id, acordo)
       notify('success', 'Termo enviado ao motorista.')
       setAberto(false)
-      await carregar()
       onChanged()
+      await carregar()
     } catch (reason) {
       notify('error', errorMessage(reason))
     } finally {
@@ -111,8 +114,8 @@ export function TermoMultaPanel({ source, multa, valorCatalogo, onChanged }: { s
     try {
       await source.cancelarTermoMulta(termoId)
       notify('success', 'Envio cancelado.')
-      await carregar()
       onChanged()
+      await carregar()
     } catch (reason) {
       notify('error', errorMessage(reason))
     } finally {
@@ -147,7 +150,7 @@ export function TermoMultaPanel({ source, multa, valorCatalogo, onChanged }: { s
       {atual?.status && (
         <div className="frota-termo__atual">
           <div className="frota-termo__linha">
-            <StatusBadge tone={STATUS_LABEL[atual.status][1]}>{STATUS_LABEL[atual.status][0]}</StatusBadge>
+            <StatusBadge tone={STATUS_LABEL[atual.status].tom}>{STATUS_LABEL[atual.status].rotulo}</StatusBadge>
             {atual.forma && <span className="frota-muted">{atual.forma === 'guia' ? 'Paga a guia' : `Desconto em folha · ${atual.parcelas ?? 1}x`} · {brl(atual.valorTotal)}</span>}
           </div>
           {atual.status === 'pendente' && (
@@ -177,9 +180,9 @@ export function TermoMultaPanel({ source, multa, valorCatalogo, onChanged }: { s
         <div><Button variant="secondary" onClick={() => setAberto(true)}>Preparar termo</Button></div>
       )}
 
-      <div className="frota-termo__expande" data-aberto={aberto && !bloqueado ? '' : undefined} aria-hidden={!(aberto && !bloqueado)}>
+      <div className="frota-termo__expande" data-aberto={formAberto ? '' : undefined} aria-hidden={!formAberto}>
         <div className="frota-termo__conteudo">
-          {aberto && !bloqueado && (
+          {formAberto && (
             <div className="frota-termo__form">
               <ChoiceGroup label="Forma de pagamento" inline>
                 <Radio name={`${ids}-forma`} label="Paga a guia" checked={forma === 'guia'} onChange={() => setForma('guia')} />

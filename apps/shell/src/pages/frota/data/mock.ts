@@ -231,7 +231,9 @@ export function createMockSource(): DataSource {
         termo.status = 'cancelado'
         const item = data.multas.find((row) => row.id === multaId)
         if (item?.termoVigente?.id === termoId) item.termoVigente = null
+        return
       }
+      throw new Error('Termo não encontrado no mock.')
     },
     async baixarPdfTermo() {
       throw new Error('Mock: não há PDF fictício.')

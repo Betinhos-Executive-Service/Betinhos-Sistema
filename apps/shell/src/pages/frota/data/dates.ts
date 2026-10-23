@@ -1,6 +1,13 @@
 const TIME_ZONE = 'America/Sao_Paulo'
 const isoDayFormat = new Intl.DateTimeFormat('en-CA', { timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' })
 
+const horaFormat = new Intl.DateTimeFormat('pt-BR', { timeZone: TIME_ZONE, hour: '2-digit', minute: '2-digit' })
+
+/** Hora (HH:mm) de um instante no fuso de São Paulo. */
+export function horaSP(iso: string) {
+  return horaFormat.format(new Date(iso))
+}
+
 /** Data de hoje (YYYY-MM-DD) no fuso de São Paulo. */
 export function todaySP(now = new Date()) {
   return isoDayFormat.format(now)
