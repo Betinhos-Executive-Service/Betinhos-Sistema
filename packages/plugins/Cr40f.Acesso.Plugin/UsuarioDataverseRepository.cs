@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading;
+using Microsoft.Crm.Sdk.Messages;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -23,11 +24,22 @@ public sealed class UsuarioDataverseRepository
     /// <summary>true se existe habilitado e licenciado (islicensed sem valor conta como licenciado).</summary>
     public bool Pronto(Guid objectId)
     {
-        var consulta = new QueryExpression("systemuser") { ColumnSet = new ColumnSet("systemuserid", "isdisabled", "islicensed"), TopCount = 1 };
-        consulta.Criteria.AddCondition("azureactivedirectoryobjectid", ConditionOperator.Equal, objectId);
-        var u = _svc.RetrieveMultiple(consulta).Entities.FirstOrDefault();
+        var u = PorObjectId(objectId);
         return u is not null && !u.GetAttributeValue<bool>("isdisabled") && (u.GetAttributeValue<bool?>("islicensed") ?? true);
     }
+
+    public Entity? PorObjectId(Guid objectId)
+    {
+        var consulta = new QueryExpression("systemuser") { ColumnSet = new ColumnSet("systemuserid", "isdisabled", "islicensed"), TopCount = 1 };
+        consulta.Criteria.AddCondition("azureactivedirectoryobjectid", ConditionOperator.Equal, objectId);
+        return _svc.RetrieveMultiple(consulta).Entities.FirstOrDefault();
+    }
+
+    /// <summary>Desabilita o systemuser (estado 1, status padrão).</summary>
+    public void Bloquear(Guid systemuserId) => _svc.Execute(new SetStateRequest
+    {
+        EntityMoniker = new EntityReference("systemuser", systemuserId), State = new OptionSetValue(1), Status = new OptionSetValue(-1),
+    });
 
     /// <summary>Consulta de novo com esperas curtas: a sincronização do Power Platform leva alguns segundos.</summary>
     public bool AguardarPronto(Guid objectId)

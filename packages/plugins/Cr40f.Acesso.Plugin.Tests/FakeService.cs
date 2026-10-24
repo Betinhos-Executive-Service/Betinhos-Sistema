@@ -51,9 +51,15 @@ public sealed class FakeService : IOrganizationService
 
     public void Delete(string entityName, Guid id) => throw new NotSupportedException();
     public List<OrganizationRequest> Executados { get; } = new();
+    /// <summary>Execute falha (simula SetState recusado pelo Dataverse).</summary>
+    public bool FalharExecute { get; set; }
     public OrganizationResponse Execute(OrganizationRequest request)
     {
         Executados.Add(request);
+        if (FalharExecute) throw new InvalidOperationException("Execute recusado: " + request.RequestName);
+        // SetState de systemuser: estado 1 = desabilitado.
+        if (request is Microsoft.Crm.Sdk.Messages.SetStateRequest { EntityMoniker.LogicalName: "systemuser" } estado)
+            _tabelas["systemuser"].Single(e => e.Id == estado.EntityMoniker.Id)["isdisabled"] = estado.State.Value == 1;
         return new OrganizationResponse();
     }
     public void Associate(string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities) => throw new NotSupportedException();

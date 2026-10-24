@@ -7,6 +7,7 @@ import type { AcessoSource } from '../data/acesso'
 import { createMockDocsSource } from '../../documentos/data/source'
 import type { Funcionario } from '../data/types'
 import { Ficha } from './Ficha'
+import { RETENTATIVA_MS } from './AcessoProgresso'
 import { ToastProvider } from '@betinhos/ui'
 
 const record: Funcionario = {
@@ -371,6 +372,41 @@ describe('Ficha', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Concluir liberação/ })) })
     expect(cadastrar).toHaveBeenCalledWith(expect.objectContaining({ funcionarioId: 'f1', prefixoEmail: 'ana.souza' }))
     await waitFor(() => expect(onLiberacaoConcluida).toHaveBeenCalledWith('f1'))
+  })
+
+  it('liberação pendente conclui sozinha na ficha e trava "Concluir liberação" enquanto a tentativa automática está em andamento', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      let soltar: (v: unknown) => void = () => {}
+      const resposta = { emailMicrosoft: 'ana.souza@betinhos.onmicrosoft.com', senhaTemporaria: '', funcionarioId: 'f1', linkApp: 'l', etapas: [{ etapa: 'systemuser', estado: 'feita' as const, detalhe: 'ok' }] }
+      const cadastrar = vi.fn(() => new Promise((r) => { soltar = r }).then(() => resposta))
+      const onLiberacaoConcluida = vi.fn()
+      render(<ToastProvider><Ficha source={fakeSource(async () => 'f1')} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake({ cadastrar })} emailPendente="ana.souza@betinhos.onmicrosoft.com" onLiberacaoConcluida={onLiberacaoConcluida} /></ToastProvider>)
+      await abrirAcesso()
+      await act(async () => { await vi.advanceTimersByTimeAsync(RETENTATIVA_MS) })
+      expect(cadastrar).toHaveBeenCalledTimes(1)
+      const botao = screen.getByRole('button', { name: /Concluir liberação/ }) as HTMLButtonElement
+      expect(botao.disabled).toBe(true)
+      fireEvent.click(botao)
+      expect(cadastrar).toHaveBeenCalledTimes(1)
+      await act(async () => { soltar(undefined) })
+      await waitFor(() => expect(onLiberacaoConcluida).toHaveBeenCalledWith('f1'))
+      expect(cadastrar).toHaveBeenCalledTimes(1)
+    } finally { vi.useRealTimers() }
+  })
+
+  it('erro permanente para a retentativa automática na hora e mostra a mensagem', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const cadastrar = vi.fn(async () => { throw new Error('SEM_LICENCA_DISPONIVEL: sem licença | etapas=[]') })
+      render(<ToastProvider><Ficha source={fakeSource(async () => 'f1')} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake({ cadastrar })} emailPendente="ana.souza@betinhos.onmicrosoft.com" /></ToastProvider>)
+      await abrirAcesso()
+      await act(async () => { await vi.advanceTimersByTimeAsync(RETENTATIVA_MS) })
+      expect(await screen.findByText('Não foi possível concluir a liberação')).toBeTruthy()
+      await act(async () => { await vi.advanceTimersByTimeAsync(RETENTATIVA_MS * 3) })
+      expect(cadastrar).toHaveBeenCalledTimes(1)
+      expect(screen.queryByText(/de novo em instantes/)).toBeNull()
+    } finally { vi.useRealTimers() }
   })
 
   it('aba Acesso reúne e-mail Microsoft, logins e assinatura; Dados não mostra o e-mail', async () => {

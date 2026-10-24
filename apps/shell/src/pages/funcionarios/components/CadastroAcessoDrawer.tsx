@@ -1,7 +1,7 @@
 import { Alert, Button, buttonClassName, Dialog, Field, Input } from '@betinhos/ui'
 import { Copy, ExternalLink, MessageCircle, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { type AcessoInicial, type AcessoSource, type CadastroInput, type CadastroResultado, type Etapa, liberacaoPendente, MSG_PENDENTE, MSG_PENDENTE_DEMORADA, parseAcessoError, mensagemWhatsApp, whatsappComMensagem } from '../data/acesso'
+import { type AcessoInicial, type AcessoSource, type CadastroInput, type CadastroResultado, type Etapa, ERROS_PERMANENTES, liberacaoPendente, MSG_PENDENTE, MSG_PENDENTE_DEMORADA, parseAcessoError, mensagemWhatsApp, whatsappComMensagem } from '../data/acesso'
 import { ListaEtapas, ProgressoAcesso, useRetentativa } from './AcessoProgresso'
 import { normalizeSearch } from '../data/format'
 import { VINCULO } from '../data/schema'
@@ -32,7 +32,7 @@ export function CredenciaisAcesso({ r, semSenha }: { r: { emailMicrosoft: string
   const copiar = useCopiar()
   return (
     <dl className="acesso-credenciais">
-      <div className="acesso-credencial"><dt>E-mail</dt><dd><code>{r.emailMicrosoft}</code> <Button variant="secondary" size="compact" icon={<Copy size={14} />} aria-label="Copiar e-mail" onClick={() => copiar(r.emailMicrosoft)}>Copiar</Button></dd></div>
+      <div className="acesso-credencial"><dt>E-mail</dt><dd><code className="acesso-credencial__email" title={r.emailMicrosoft}>{r.emailMicrosoft}</code> <Button variant="secondary" size="compact" icon={<Copy size={14} />} aria-label="Copiar e-mail" onClick={() => copiar(r.emailMicrosoft)}>Copiar</Button></dd></div>
       <div className="acesso-credencial"><dt>Senha</dt><dd>{r.senhaTemporaria ? <code>{r.senhaTemporaria}</code> : <span className="muted">{semSenha}</span>} {r.senhaTemporaria && <Button variant="secondary" size="compact" icon={<Copy size={14} />} aria-label="Copiar senha" onClick={() => copiar(r.senhaTemporaria)}>Copiar</Button>}</dd></div>
       <div className="acesso-credencial acesso-credencial--link"><dt>Link do app</dt><dd><a href={r.linkApp} target="_blank" rel="noopener noreferrer">{r.linkApp}</a></dd></div>
     </dl>
@@ -69,12 +69,18 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
 
   const pendente = estado.fase === 'resultado' && liberacaoPendente(estado.r.etapas)
   // Liberação pendente: tenta concluir sozinho (mesmo e-mail e ficha; a senha da primeira resposta continua valendo).
-  const esgotou = useRetentativa(pendente, async () => {
+  const [erroRetentativa, setErroRetentativa] = useState('')
+  const { esgotou } = useRetentativa(pendente, async () => {
     if (estado.fase !== 'resultado') return undefined
     const { funcionarioId, emailMicrosoft } = estado.r
     const r = await acesso.cadastrar({ ...input, funcionarioId, prefixoEmail: emailMicrosoft.split('@')[0] })
     return liberacaoPendente(r.etapas) ? undefined : r.etapas
-  }, (etapas) => setEstado((e) => (e.fase === 'resultado' ? { fase: 'resultado', r: { ...e.r, etapas } } : e)))
+  }, (etapas) => setEstado((e) => (e.fase === 'resultado' ? { fase: 'resultado', r: { ...e.r, etapas } } : e)), (reason) => {
+    const erro = parseAcessoError(reason)
+    if (!ERROS_PERMANENTES.has(erro.codigo)) return false
+    setErroRetentativa(erro.message)
+    return true
+  })
 
   function requestClose() {
     if (criando) return
@@ -129,7 +135,9 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
           {estado.fase === 'resultado' && (
             <div className="acesso-resultado">
               {pendente
-                ? <Alert tone="info" title="Conta criada, liberando no Dataverse">{esgotou ? MSG_PENDENTE_DEMORADA : MSG_PENDENTE}</Alert>
+                ? erroRetentativa
+                  ? <Alert tone="danger" title="Conta criada, mas a liberação parou">{erroRetentativa}</Alert>
+                  : <Alert tone="info" title="Conta criada, liberando no Dataverse">{esgotou ? MSG_PENDENTE_DEMORADA : MSG_PENDENTE}</Alert>
                 : <Alert tone="success" title="Acesso criado e liberado">{estado.r.senhaTemporaria ? 'A senha aparece só agora. Envie para o motorista antes de fechar.' : 'A conta já existia; a senha anterior continua valendo.'}</Alert>}
               <CredenciaisAcesso r={estado.r} semSenha="Conta já existia; senha não alterada" />
               <ListaEtapas etapas={estado.r.etapas} fluxo="cadastro" />

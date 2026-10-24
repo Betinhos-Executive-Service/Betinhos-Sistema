@@ -5,7 +5,7 @@ import { addMonths, formatBR } from '../data/dates'
 import { contato } from '../data/lista'
 import { FUNCAO, optionLabel } from '../data/schema'
 import type { FuncionarioView } from '../data/types'
-import { AlertBadge, Avatar, StatusBadge } from './Badges'
+import { AlertBadge, Avatar, SemAppBadge, StatusBadge } from './Badges'
 
 type Props = {
   rows: FuncionarioView[]
@@ -37,7 +37,7 @@ export function FuncionarioTable({ rows, onOpen, loading, view, quickFilters, fo
         )
       },
     },
-    { key: 'funcao', header: 'Função', label: 'Função', sortable: true, defaultWidth: 150, cell: (row) => optionLabel(FUNCAO, row.values.cr40f_funcao) },
+    { key: 'funcao', header: 'Função', label: 'Função', sortable: true, defaultWidth: 150, cell: (row) => <span className="nowrap">{optionLabel(FUNCAO, row.values.cr40f_funcao)}{row.semApp && <> <SemAppBadge /></>}</span> },
     { key: 'status', header: 'Status', label: 'Status', sortable: true, defaultWidth: 130, cell: (row) => <StatusBadge value={row.values.cr40f_status} /> },
     { key: 'contato', header: 'Contato', label: 'Contato', sortable: true, defaultWidth: 160, cell: (row) => <span className="nowrap">{contato(row) || '—'}</span> },
     { key: 'veiculo', header: 'Veículo atual', label: 'Veículo atual', sortable: true, defaultWidth: 140, cell: (row) => row.veiculo?.label ?? muted },
