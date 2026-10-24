@@ -360,6 +360,8 @@
   .acesso-credenciais dt { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); }
   .acesso-credenciais dd { display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-2); margin: 0; min-width: 0; color: var(--bt-color-text-primary); word-break: break-all; }
   .acesso-credencial:not(.acesso-credencial--link) code { font-size: var(--bt-font-size-17); font-weight: 600; }
+  /* E-mail numa linha só (reticências no fim); o botão Copiar leva o valor inteiro. */
+  .acesso-credencial__email { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; word-break: normal; }
   .acesso-credencial--link { padding-block: var(--bt-space-2); }
   .acesso-etapas { display: grid; gap: var(--bt-space-1); list-style: none; padding: 0; margin: var(--bt-space-2) 0 0; font-size: var(--bt-font-size-13); }
   .acesso-etapas li[data-estado='erro'] { color: var(--bt-color-danger); }

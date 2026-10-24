@@ -27,13 +27,15 @@ const RETENTATIVAS = 12   // ~3 min
 
 /**
  * Enquanto `ativo`, chama `tentar` a cada 15 s (até ~3 min); um resultado definido para as tentativas e vai para `concluir`.
+ * Erro para as tentativas quando `parar(erro)` devolve true (erro permanente); os demais contam como "ainda não".
  * Resposta que chega depois de `ativo` mudar ou do componente sair da tela (outra ficha, clique manual) é descartada.
- * Conclui sozinho a liberação pendente no Dataverse (a chamada é idempotente). Devolve true quando as tentativas acabaram sem concluir.
+ * Devolve `esgotou` (tentativas acabaram sem concluir) e `tentando` (chamada em andamento, para travar o clique manual).
  */
-export function useRetentativa<T>(ativo: boolean, tentar: () => Promise<T | undefined>, concluir: (resultado: T) => void) {
-  const ref = useRef({ tentar, concluir })
-  ref.current = { tentar, concluir }
+export function useRetentativa<T>(ativo: boolean, tentar: () => Promise<T | undefined>, concluir: (resultado: T) => void, parar: (erro: unknown) => boolean) {
+  const ref = useRef({ tentar, concluir, parar })
+  ref.current = { tentar, concluir, parar }
   const [esgotou, setEsgotou] = useState(false)
+  const [tentando, setTentando] = useState(false)
   useEffect(() => {
     if (!ativo) return
     let feitas = 0
@@ -41,16 +43,20 @@ export function useRetentativa<T>(ativo: boolean, tentar: () => Promise<T | unde
     let cancelado = false
     const timer = window.setInterval(async () => {
       if (ocupado) return
-      ocupado = true
-      const resultado = await ref.current.tentar().catch(() => undefined)
+      ocupado = true; setTentando(true)
+      let resultado: T | undefined
+      let parou = false
+      try { resultado = await ref.current.tentar() } catch (erro) { if (!cancelado) parou = ref.current.parar(erro) }
       ocupado = false
       if (cancelado) return
-      if (resultado !== undefined) { window.clearInterval(timer); ref.current.concluir(resultado) }
+      setTentando(false)
+      if (parou) window.clearInterval(timer)
+      else if (resultado !== undefined) { window.clearInterval(timer); ref.current.concluir(resultado) }
       else if (++feitas >= RETENTATIVAS) { window.clearInterval(timer); setEsgotou(true) }
     }, RETENTATIVA_MS)
-    return () => { cancelado = true; window.clearInterval(timer); setEsgotou(false) }
+    return () => { cancelado = true; window.clearInterval(timer); setEsgotou(false); setTentando(false) }
   }, [ativo])
-  return esgotou
+  return { esgotou, tentando }
 }
 
 /**

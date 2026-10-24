@@ -164,4 +164,20 @@ describe('CadastroAcessoDrawer', () => {
       expect(screen.getByText('Kx7#mQ2vR9pL4w')).toBeTruthy()   // a senha da primeira resposta continua na tela
     } finally { vi.useRealTimers() }
   })
+
+  it('erro permanente na retentativa automática para as tentativas e mostra a mensagem', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const pendente = { ...ok, etapas: [{ etapa: 'systemuser', estado: 'pendente' as const, detalhe: 'x' }] }
+      const cadastrar = vi.fn().mockResolvedValueOnce(pendente).mockRejectedValue(new Error('CONFIG_AUSENTE: falta config | etapas=[]'))
+      render(<ToastProvider><CadastroAcessoDrawer acesso={{ cadastrar, encerrar: async () => [], reativar: async () => { throw new Error('n/a') } }} onClose={() => {}} onCadastrado={() => {}} /></ToastProvider>)
+      fireEvent.change(screen.getByLabelText(/Nome completo/), { target: { value: 'Ana Lima' } })
+      fireEvent.change(screen.getByLabelText(/Celular/), { target: { value: '12991234567' } })
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Criar acesso/ })) })
+      await screen.findByText(/conclui sozinho em alguns minutos/)
+      await act(async () => { await vi.advanceTimersByTimeAsync(RETENTATIVA_MS * 3) })
+      expect(cadastrar).toHaveBeenCalledTimes(2)
+      expect(screen.getByText('Conta criada, mas a liberação parou')).toBeTruthy()
+    } finally { vi.useRealTimers() }
+  })
 })

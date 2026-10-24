@@ -1,7 +1,7 @@
 import { Alert, Button, StatusBadge as DsStatusBadge } from '@betinhos/ui'
 import { KeyRound, RefreshCw, RotateCcw, UserX } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { type AcessoSource, type Etapa, type Fluxo, liberacaoPendente, parseAcessoError } from '../data/acesso'
+import { type AcessoSource, ERROS_PERMANENTES, type Etapa, type Fluxo, liberacaoPendente, parseAcessoError } from '../data/acesso'
 import type { UsuarioApp } from '../data/source'
 import type { Funcionario } from '../data/types'
 import { ListaEtapas, ProgressoAcesso, useRetentativa } from './AcessoProgresso'
@@ -54,16 +54,18 @@ type Props = {
   onCadastrar: () => void
   /** A ficha mudou no Dataverse (ex.: e-mail vinculado ao concluir a liberação). */
   onAtualizado: () => void
+  /** Acesso encerrado ou reativado: a lista relê a linha para o selo "Sem app" acompanhar. */
+  onAlterado?: () => void
 }
 
 /** Bloco "Acesso ao app" da aba Acesso: cadastrar, concluir liberação, encerrar e reativar. */
-export function AcessoApp({ funcionario, acesso, estado, setConta, emailPendente, onCadastrar, onAtualizado }: Props) {
+export function AcessoApp({ funcionario, acesso, estado, setConta, emailPendente, onCadastrar, onAtualizado, onAlterado }: Props) {
   const notify = useNotify()
   const [encerrando, setEncerrando] = useState(false)
   const [reativando, setReativando] = useState(false)
   const [concluindo, setConcluindo] = useState(false)
   const [semPermissao, setSemPermissao] = useState(false)
-  const [ultimo, setUltimo] = useState<{ fluxo: Fluxo; etapas: Etapa[]; erro?: string } | null>(null)
+  const [ultimo, setUltimo] = useState<{ fluxo: Fluxo; etapas: Etapa[]; erro?: string; permanente?: boolean } | null>(null)
   const [faltouSenha, setFaltouSenha] = useState(false)
   const email = String(funcionario.values.cr40f_emailmicrosoft ?? '') || emailPendente || ''
   const nome = String(funcionario.values.cr40f_nomecompleto ?? '')
@@ -74,8 +76,8 @@ export function AcessoApp({ funcionario, acesso, estado, setConta, emailPendente
   async function encerrar(confirmacao: string) {
     try {
       const etapas = await acesso.encerrar(funcionario.id, confirmacao)
-      // O Dataverse sincroniza o systemuser depois; o bloco segue o resultado da API.
-      setUltimo({ fluxo: 'encerrar', etapas }); setEncerrando(false); setConta('encerrado'); notify('success', 'Acesso encerrado.')
+      // O plugin já bloqueia o systemuser; o bloco segue o resultado da API e a lista relê a linha.
+      setUltimo({ fluxo: 'encerrar', etapas }); setEncerrando(false); setConta('encerrado'); notify('success', 'Acesso encerrado.'); onAlterado?.()
     } catch (reason) {
       const erro = parseAcessoError(reason)
       if (erro.codigo === 'SEM_PERMISSAO') { setEncerrando(false); semPermissaoDeGerir(); return }
@@ -88,7 +90,7 @@ export function AcessoApp({ funcionario, acesso, estado, setConta, emailPendente
       const erro = parseAcessoError(reason)
       if (erro.codigo === 'SEM_PERMISSAO') { setReativando(false); semPermissaoDeGerir() }
       // A senha é a última etapa do plugin: sem permissão para ela, a conta já voltou e o bloco mostra ativo.
-      if (erro.codigo === 'SEM_PERMISSAO_SENHA') { setConta('ativo'); setUltimo({ fluxo: 'reativar', etapas: erro.etapas }); setFaltouSenha(true) }
+      if (erro.codigo === 'SEM_PERMISSAO_SENHA') { setConta('ativo'); setUltimo({ fluxo: 'reativar', etapas: erro.etapas }); setFaltouSenha(true); onAlterado?.() }
       throw erro
     }
   }
@@ -103,11 +105,21 @@ export function AcessoApp({ funcionario, acesso, estado, setConta, emailPendente
   function liberado(etapas: Etapa[]) { setUltimo({ fluxo: 'cadastro', etapas }); setConta('ativo'); notify('success', 'Liberação concluída.'); onAtualizado() }
 
   // Em segundo plano enquanto a ficha mostra "Liberando"; o botão continua para quem não quer esperar.
-  const esgotou = useRetentativa(estado === 'liberando' && !concluindo, async () => {
+  const { esgotou, tentando } = useRetentativa(estado === 'liberando' && !concluindo, async () => {
     const r = await reexecutarCadastro()
     return liberacaoPendente(r.etapas) ? undefined : r.etapas
-  }, liberado)
+  }, liberado, (reason) => falhou(reason, true))
   const textoPendente = esgotou ? 'O Dataverse está demorando para liberar. Use "Concluir liberação" para tentar de novo.' : 'Ainda liberando no Dataverse. Conclui sozinho em alguns minutos.'
+
+  /** Mostra o erro da liberação; na retentativa automática (`soPermanente`), erros passageiros ficam calados. Devolve se é permanente. */
+  function falhou(reason: unknown, soPermanente = false) {
+    const erro = parseAcessoError(reason)
+    const permanente = ERROS_PERMANENTES.has(erro.codigo)
+    if (soPermanente && !permanente) return false
+    if (erro.codigo === 'SEM_PERMISSAO') semPermissaoDeGerir()
+    else setUltimo({ fluxo: 'cadastro', etapas: erro.etapas, erro: erro.message, permanente })
+    return permanente
+  }
 
   async function concluirLiberacao() {
     setConcluindo(true); setUltimo(null)
@@ -116,9 +128,7 @@ export function AcessoApp({ funcionario, acesso, estado, setConta, emailPendente
       if (liberacaoPendente(r.etapas)) { setUltimo({ fluxo: 'cadastro', etapas: r.etapas }); return }   // o resumo diz "Ainda liberando"
       liberado(r.etapas)
     } catch (reason) {
-      const erro = parseAcessoError(reason)
-      if (erro.codigo === 'SEM_PERMISSAO') { semPermissaoDeGerir(); return }
-      setUltimo({ fluxo: 'cadastro', etapas: erro.etapas, erro: erro.message })
+      falhou(reason)
     } finally { setConcluindo(false) }
   }
 
@@ -138,17 +148,17 @@ export function AcessoApp({ funcionario, acesso, estado, setConta, emailPendente
       {concluindo && <ProgressoAcesso fluxo="cadastro" />}
       <div className="cluster">
         {pode && estado === 'sem' && <Button variant="secondary" size="compact" icon={<KeyRound size={16} />} onClick={onCadastrar}>Cadastrar acesso</Button>}
-        {pode && estado === 'liberando' && <Button size="compact" icon={<RefreshCw size={16} />} onClick={() => void concluirLiberacao()}>Concluir liberação</Button>}
+        {pode && estado === 'liberando' && <Button size="compact" icon={<RefreshCw size={16} />} disabled={tentando} onClick={() => void concluirLiberacao()}>Concluir liberação</Button>}
         {pode && estado === 'ativo' && <Button variant="secondary" size="compact" icon={<UserX size={16} />} onClick={() => setEncerrando(true)}>Encerrar acesso</Button>}
         {pode && (estado === 'encerrado' || (estado === 'ativo' && faltouSenha)) && <Button variant="secondary" size="compact" icon={<RotateCcw size={16} />} onClick={() => setReativando(true)}>Reativar acesso</Button>}
       </div>
       {ultimo && (ultimo.erro
-        ? <Alert tone="danger" title="Não foi possível concluir a liberação">{ultimo.erro} Use "Concluir liberação" de novo em instantes.<ListaEtapas etapas={ultimo.etapas} fluxo={ultimo.fluxo} /></Alert>
+        ? <Alert tone="danger" title="Não foi possível concluir a liberação">{ultimo.erro}{!ultimo.permanente && ' Use "Concluir liberação" de novo em instantes.'}<ListaEtapas etapas={ultimo.etapas} fluxo={ultimo.fluxo} /></Alert>
         : <div className="acesso-resumo" role="status"><p>{liberacaoPendente(ultimo.etapas) ? textoPendente : faltouSenha && ultimo.fluxo === 'reativar' ? 'Conta reativada sem senha nova.' : RESUMO[ultimo.fluxo]}</p><ListaEtapas etapas={ultimo.etapas} fluxo={ultimo.fluxo} /></div>)}
       {semPermissao && <Alert tone="warning">Você não tem permissão para gerir acessos.</Alert>}
       <EncerrarAcessoDialog open={encerrando} nome={nome} onCancel={() => setEncerrando(false)} onConfirmar={encerrar} />
       <ReativarAcessoDialog open={reativando} nome={nome} celular={celular} onCancel={() => setReativando(false)} onReativar={reativar}
-        onReativado={(r) => { setConta(liberacaoPendente(r.etapas) ? 'liberando' : 'ativo'); setUltimo({ fluxo: 'reativar', etapas: r.etapas }); setFaltouSenha(false) }} />
+        onReativado={(r) => { setConta(liberacaoPendente(r.etapas) ? 'liberando' : 'ativo'); setUltimo({ fluxo: 'reativar', etapas: r.etapas }); setFaltouSenha(false); onAlterado?.() }} />
     </section>
   )
 }

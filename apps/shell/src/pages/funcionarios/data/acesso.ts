@@ -38,14 +38,14 @@ export const MENSAGENS: Record<string, string> = {
 export const ETAPAS: Record<Fluxo, Record<string, string>> = {
   cadastro: { usuario: 'Criando a conta', licenca: 'Liberando a licença', grupo: 'Incluindo no grupo de motoristas', systemuser: 'Liberando no Dataverse', funcionario: 'Vinculando à ficha' },
   reativar: { usuario: 'Encontrando a conta', conta: 'Desbloqueando a conta', licenca: 'Liberando a licença', grupo: 'Incluindo no grupo de motoristas', systemuser: 'Liberando no Dataverse', senha: 'Gerando a senha nova' },
-  encerrar: { licenca: 'Removendo a licença', conta: 'Bloqueando a conta Microsoft', grupo: 'Tirando do grupo de motoristas' },
+  encerrar: { licenca: 'Removendo a licença', conta: 'Bloqueando a conta Microsoft', grupo: 'Tirando do grupo de motoristas', bloqueio: 'Bloqueando no Dataverse' },
 }
 
 /** Resumo depois de concluído: particípio ("Licença removida"); o gerúndio fica só no progresso. */
 export const ETAPAS_FEITAS: Record<Fluxo, Record<string, string>> = {
   cadastro: { usuario: 'Conta criada', licenca: 'Licença liberada', grupo: 'Incluído no grupo de motoristas', systemuser: 'Liberado no Dataverse', funcionario: 'Vinculado à ficha' },
   reativar: { usuario: 'Conta encontrada', conta: 'Conta desbloqueada', licenca: 'Licença liberada', grupo: 'Incluído no grupo de motoristas', systemuser: 'Liberado no Dataverse', senha: 'Senha nova gerada' },
-  encerrar: { licenca: 'Licença removida', conta: 'Conta bloqueada', grupo: 'Retirado do grupo de motoristas' },
+  encerrar: { licenca: 'Licença removida', conta: 'Conta bloqueada', grupo: 'Retirado do grupo de motoristas', bloqueio: 'Bloqueado no Dataverse' },
 }
 
 export const ESTADO_ETAPA: Record<Etapa['estado'], string> = { feita: '', pulada: 'já estava pronto', pendente: 'em andamento', erro: 'não concluído' }
@@ -56,6 +56,9 @@ export const liberacaoPendente = (etapas: Etapa[]) => etapas.some((e) => e.etapa
 export const MSG_PENDENTE = "Conta criada. O Dataverse ainda está liberando o acesso; isto conclui sozinho em alguns minutos. Se fechar antes, use 'Concluir liberação' na ficha ou cadastre de novo com os mesmos dados."
 /** As tentativas automáticas acabaram (~3 min) sem o Dataverse liberar. */
 export const MSG_PENDENTE_DEMORADA = "Conta criada. O Dataverse está demorando para liberar o acesso. Abra a ficha e use 'Concluir liberação' em alguns minutos."
+
+/** Erros que nova tentativa não resolve: a retentativa automática para e mostra a mensagem. */
+export const ERROS_PERMANENTES = new Set(['SEM_PERMISSAO', 'SEM_PERMISSAO_SENHA', 'CONFIG_AUSENTE', 'CONTA_NAO_EXISTE', 'ACESSO_ENCERRADO', 'SEM_LICENCA_DISPONIVEL'])
 
 export class AcessoError extends Error {
   constructor(public codigo: string, message: string, public etapas: Etapa[]) { super(message); this.name = 'AcessoError' }
