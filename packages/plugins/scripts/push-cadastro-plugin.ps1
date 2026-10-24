@@ -7,7 +7,11 @@ param(
   [ValidateSet('dev', 'prod')]
   [string] $EnvironmentName,
 
-  [string] $SolutionUniqueName = 'appbetinhos'
+  [string] $SolutionUniqueName = 'appbetinhos',
+
+  # URL do gatilho HTTP do "Flow - Consultar Arquivos Sharepoint" (configuracao segura do step de new_ObterFotoPassageiro).
+  # Opcional: sem ela (e sem $env:CADASTRO_FOTO_FLOW_URL), a configuracao segura ja gravada no step e mantida. Nunca versionar.
+  [string] $FotoFlowUrl = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -47,7 +51,10 @@ $token = [BitConverter]::ToString([Reflection.AssemblyName]::GetAssemblyName($dl
 if ([string]::IsNullOrWhiteSpace($token)) { throw "DLL gerada sem assinatura: $dllPath" }
 Write-Step "DLL assinada com public key token $token"
 
-Write-Step 'registrando assembly e Custom API e publicando'
+Write-Step 'registrando assembly e Custom APIs e publicando'
+# Passa a URL ao registrador por variavel de ambiente do processo (nao aparece na linha de comando nem no log).
+if ($FotoFlowUrl) { $env:CADASTRO_FOTO_FLOW_URL = $FotoFlowUrl }
+if ($env:CADASTRO_FOTO_FLOW_URL) { Write-Step 'URL do flow de foto recebida (oculta); sera gravada na configuracao segura' }
 & $dotnet.Source run --project $registrar -- --environmentUrl $EnvironmentUrl --dllPath $dllPath --solutionUniqueName $SolutionUniqueName --publish
 if ($LASTEXITCODE -ne 0) { throw "Falha ao registrar plugin. Codigo: $LASTEXITCODE" }
 
