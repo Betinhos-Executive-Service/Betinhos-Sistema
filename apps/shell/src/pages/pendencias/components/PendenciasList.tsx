@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
-import { Button, StatusBadge, Table, type StatusTone, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
+import { Button, StatusBadge, Table, type StatusTone, type MenuAction, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
 import { CalendarCheck, ExternalLink, Split, Wrench } from 'lucide-react'
-import { openFromRow } from '../../pagantes/components/PagantesList'
+import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
 import { formatDate, formatMoney } from '../../pagantes/domain/messages'
 import { TIPO_LABEL, type Pendencia, type TipoPendencia } from '../domain/types'
 
@@ -30,16 +30,34 @@ export function TipoBadge({ p }: { p: Pendencia }) {
 export const titulo = (p: Pendencia) => p.opCodigo || p.reservaCodigos[0] || 'Sem código'
 export const servicosTexto = (n: number) => (n === 1 ? '1 serviço' : `${n} serviços`)
 
+type Acao = { id: string; label: string; icon: typeof Wrench; run: () => void }
+
 /** Ação conforme o tipo: Corrigir (1 e 3), Fechar mês (4), Rateio (5), Abrir OP ou Ver serviço (2). */
-export function AcaoPendencia({ p, onCorrigir, onAbrirOp, onVerServico, onRateio, onFecharMes }: Acoes & { p: Pendencia }) {
-  if (p.corrigivel) return <Button size="compact" variant="secondary" icon={<Wrench size={14} />} onClick={() => onCorrigir(p)}>Corrigir</Button>
-  if (p.tipo === 'mensal-sem-op') return <Button size="compact" variant="secondary" icon={<CalendarCheck size={14} />} onClick={() => onFecharMes(p)}>Fechar mês</Button>
-  if (p.tipo === 'rateio-nao-fecha' && p.opId) return <Button size="compact" variant="secondary" icon={<Split size={14} />} onClick={() => onRateio(p)}>Rateio</Button>
+function acaoDe(p: Pendencia, { onCorrigir, onAbrirOp, onVerServico, onRateio, onFecharMes }: Acoes): Acao | null {
+  if (p.corrigivel) return { id: 'corrigir', label: 'Corrigir', icon: Wrench, run: () => onCorrigir(p) }
+  if (p.tipo === 'mensal-sem-op') return { id: 'fechar-mes', label: 'Fechar mês', icon: CalendarCheck, run: () => onFecharMes(p) }
+  if (p.tipo === 'rateio-nao-fecha' && p.opId) return { id: 'rateio', label: 'Rateio', icon: Split, run: () => onRateio(p) }
   const opId = p.opId
-  if (opId) return <Button size="compact" variant="secondary" icon={<ExternalLink size={14} />} onClick={() => onAbrirOp(opId)}>Abrir OP</Button>
+  if (opId) return { id: 'abrir-op', label: 'Abrir OP', icon: ExternalLink, run: () => onAbrirOp(opId) }
   const reservaId = p.reservaIds[0]
-  if (reservaId) return <Button size="compact" variant="secondary" icon={<ExternalLink size={14} />} onClick={() => onVerServico(reservaId)}>Ver serviço</Button>
+  if (reservaId) return { id: 'ver-servico', label: 'Ver serviço', icon: ExternalLink, run: () => onVerServico(reservaId) }
   return null
+}
+
+export function AcaoPendencia({ p, ...acoes }: Acoes & { p: Pendencia }) {
+  const acao = acaoDe(p, acoes)
+  if (!acao) return null
+  const Icon = acao.icon
+  return <Button size="compact" variant="secondary" icon={<Icon size={14} />} onClick={acao.run}>{acao.label}</Button>
+}
+
+/** Clique direito na linha (DS §10.9.3): "Abrir" e a mesma ação da coluna Ação. */
+const pendenciaActions = (onOpen: (id: string) => void, acoes: Acoes) => (p: Pendencia): MenuAction[] => {
+  const acao = acaoDe(p, acoes)
+  const abrir = openRowActions(onOpen)(p)
+  if (!acao) return abrir
+  const Icon = acao.icon
+  return [...abrir, { id: acao.id, label: acao.label, icon: <Icon size={16} />, onSelect: acao.run }]
 }
 
 function OpenName({ p, onOpen }: { p: Pendencia; onOpen: (id: string) => void }) {
@@ -63,7 +81,7 @@ export function PendenciasTable({ list, onOpen, loading, view, quickFilters, foo
   ]
   return (
     <div className="pg-table-wrap" onClick={(event) => openFromRow(event, '.bt-table__row', '.pg-open')}>
-      <Table className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <Table className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} rowActions={pendenciaActions(onOpen, acoes)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { StatusBadge, Table, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
 import { CreditCard, Headphones, Keyboard, Laptop, Monitor, Mouse, Package, PcCase, Printer, Smartphone, Tablet, type LucideIcon } from 'lucide-react'
-import { openFromRow } from '../../pagantes/components/PagantesList'
+import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
 import { iconeTipo, type IconeTipo } from '../domain/cadastros'
 import { statusLabel, statusTone } from '../domain/choices'
 import type { Equipamento } from '../domain/types'
@@ -74,7 +74,7 @@ export function EquipamentosTable({ list, inativos, onOpen, loading, view, quick
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.eq-open')}>
-      <Table className="eq-table" columns={columns} rows={list} rowKey={(e) => e.id} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <Table className="eq-table" columns={columns} rows={list} rowKey={(e) => e.id} rowActions={openRowActions(onOpen)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }
