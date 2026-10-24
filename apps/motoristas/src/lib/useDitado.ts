@@ -57,6 +57,22 @@ export function appendDitado(current: string, fragment: string): string {
   return /\s$/.test(current) ? `${current}${piece}` : `${current} ${piece}`;
 }
 
+const colapsar = (text: string) => text.replace(/\s+/g, " ").trim();
+
+/**
+ * No Android, com continuous + interimResults, cada resultado final é CUMULATIVO (a frase
+ * inteira até ali) e pode vir repetido; no desktop cada final é um trecho novo. Devolve só
+ * a parte ainda não gravada de `text`, dado o último final emitido na sessão.
+ */
+export function ditadoNovo(text: string, ultimoFinal: string): string {
+  const atual = colapsar(text);
+  if (!ultimoFinal) return atual;
+  const norm = atual.toLowerCase();
+  if (norm === ultimoFinal) return "";
+  if (norm.startsWith(ultimoFinal) && norm[ultimoFinal.length] === " ") return atual.slice(ultimoFinal.length).trim();
+  return atual;
+}
+
 /** Controlador sem React: isolado para ser testado com um SpeechRecognition falso. */
 export function createDitado(
   Ctor: DitadoCtor,
@@ -64,6 +80,8 @@ export function createDitado(
 ) {
   let rec: DitadoRecognition | null = null;
   let state: DitadoState = DITADO_IDLE;
+  let ultimoFinal = "";
+  let indicesFinais = new Map<number, string>();
   const set = (patch: Partial<DitadoState>) => {
     state = { ...state, ...patch };
     handlers.onState(state);
@@ -72,6 +90,8 @@ export function createDitado(
   function start() {
     if (rec) return;
     const r = new Ctor();
+    ultimoFinal = "";
+    indicesFinais = new Map();
     r.lang = "pt-BR";
     r.continuous = true;
     r.interimResults = true;
@@ -80,10 +100,19 @@ export function createDitado(
       for (let i = event.resultIndex; i < event.results.length; i += 1) {
         const result = event.results[i];
         const transcript = result[0]?.transcript ?? "";
-        if (result.isFinal) handlers.onFinal(transcript);
-        else interim += transcript;
+        if (result.isFinal) {
+          const norm = colapsar(transcript).toLowerCase();
+          if (indicesFinais.get(i) === norm) continue;
+          indicesFinais.set(i, norm);
+          const novo = ditadoNovo(transcript, ultimoFinal);
+          if (!novo) continue;
+          ultimoFinal = norm;
+          handlers.onFinal(novo);
+        } else {
+          interim += transcript;
+        }
       }
-      set({ interim: interim.trim() });
+      set({ interim: ditadoNovo(interim, ultimoFinal) });
     };
     r.onerror = (event) => {
       const message = ditadoErrorMessage(event.error);

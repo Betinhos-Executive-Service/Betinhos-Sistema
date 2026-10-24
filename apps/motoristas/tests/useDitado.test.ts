@@ -104,3 +104,65 @@ test("sem suporte: construtor ausente (botão não aparece)", () => {
   assert.equal(getDitadoCtor(null), null);
   assert.equal(getDitadoCtor({ webkitSpeechRecognition: FakeRecognition }), FakeRecognition);
 });
+
+function gravado(emit: (rec: FakeRecognition, ctrlFinals: string[]) => void) {
+  const { ctrl, finals, get } = setup();
+  ctrl.start();
+  emit(FakeRecognition.last!, finals);
+  return { finals, get, texto: finals.reduce((acc, t) => appendDitado(acc, t), "") };
+}
+
+test("Android: finais cumulativos, repetidos e sempre com resultIndex 0 não repetem texto", () => {
+  const { texto } = gravado((rec) => {
+    rec.emit([["então", true]]);
+    rec.emit([["então", true]]);
+    rec.emit([["então deu", true]]);
+    rec.emit([["então deu", true]]);
+    rec.emit([["então deu tudo certo", true]]);
+    rec.emit([["então deu tudo certo o serviço aqui", true]]);
+    rec.emit([["Então deu tudo certo o serviço aqui eu acabei utilizando", true]]);
+    rec.emit([["então deu tudo certo o serviço aqui eu acabei utilizando", true]]);
+  });
+  assert.equal(texto, "então deu tudo certo o serviço aqui eu acabei utilizando");
+});
+
+test("Android: provisório mostra só o que ainda não foi gravado", () => {
+  const { get } = gravado((rec) => {
+    rec.emit([["então deu", true]]);
+    rec.emit([["então deu", true], ["tudo certo", false]]);
+  });
+  assert.equal(get().interim, "tudo certo");
+  const mesmo = gravado((rec) => {
+    rec.emit([["então deu", true]]);
+    rec.emit([["então deu tudo", false]]);
+  });
+  assert.equal(mesmo.get().interim, "tudo");
+});
+
+test("Android: final repetido no mesmo índice é ignorado", () => {
+  const { finals } = gravado((rec) => {
+    rec.emit([["oi tudo bem", true]]);
+    rec.emit([["oi tudo bem", true]], 0);
+    rec.emit([["oi tudo bem", true]], 0);
+  });
+  assert.deepEqual(finals, ["oi tudo bem"]);
+});
+
+test("desktop: finais por trecho continuam entrando inteiros", () => {
+  const { texto } = gravado((rec) => {
+    rec.emit([["então deu tudo certo", true]], 0);
+    rec.emit([["então deu tudo certo", true], ["o serviço aqui", true]], 1);
+    rec.emit([["então deu tudo certo", true], ["o serviço aqui", true], ["eu acabei utilizando", true]], 2);
+  });
+  assert.equal(texto, "então deu tudo certo o serviço aqui eu acabei utilizando");
+});
+
+test("nova sessão de escuta zera o último final", () => {
+  const { ctrl, finals } = setup();
+  ctrl.start();
+  FakeRecognition.last!.emit([["bom dia", true]]);
+  ctrl.stop();
+  ctrl.start();
+  FakeRecognition.last!.emit([["bom dia", true]]);
+  assert.deepEqual(finals, ["bom dia", "bom dia"]);
+});
