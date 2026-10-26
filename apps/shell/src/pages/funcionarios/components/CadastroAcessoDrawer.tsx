@@ -1,5 +1,5 @@
 import { Alert, Button, buttonClassName, Dialog, Field, Input } from '@betinhos/ui'
-import { Copy, ExternalLink, MessageCircle, X } from 'lucide-react'
+import { AtSign, BriefcaseBusiness, ChevronDown, Copy, ExternalLink, IdCard, Mail, MessageCircle, Smartphone, User, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { type AcessoInicial, type AcessoSource, type CadastroInput, type CadastroResultado, type Etapa, ERROS_PERMANENTES, liberacaoPendente, MSG_PENDENTE, MSG_PENDENTE_DEMORADA, parseAcessoError, mensagemWhatsApp, whatsappComMensagem } from '../data/acesso'
 import { ListaEtapas, ProgressoAcesso, useRetentativa } from './AcessoProgresso'
@@ -144,17 +144,21 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
         <div className="drawer-body">
           {estado.fase !== 'resultado' && (
             <form id="acesso-form" onSubmit={(event) => { event.preventDefault(); void enviar() }}>
-              <Field label="Nome completo" required><Input value={nome} onChange={(e) => editar(setNome, e.target.value)} disabled={criando || Boolean(inicial)} autoComplete="off" /></Field>
-              <Field label="Celular" required hint="Com DDD. Recebe o link e a senha no WhatsApp."><Input inputMode="tel" value={celular} onChange={(e) => editar(setCelular, e.target.value)} disabled={criando} /></Field>
-              {!inicial && <Field label="CPF" hint="Opcional. Ajuda a achar cadastro duplicado." error={cpfErro}><Input inputMode="numeric" value={cpf} onChange={(e) => editar(setCpf, formatCpf(e.target.value))} disabled={criando} autoComplete="off" /></Field>}
-              <Field label="E-mail pessoal" hint="Opcional, para recuperação de senha."><Input type="email" value={emailPessoal} onChange={(e) => setEmailPessoal(e.target.value)} disabled={criando} /></Field>
+              <Field label="Nome completo" required><Input prefix={<User size={16} aria-hidden />} value={nome} onChange={(e) => editar(setNome, e.target.value)} disabled={criando || Boolean(inicial)} autoComplete="off" /></Field>
+              <Field label="Celular" required hint="Com DDD. Recebe o link e a senha no WhatsApp."><Input prefix={<Smartphone size={16} aria-hidden />} inputMode="tel" value={celular} onChange={(e) => editar(setCelular, e.target.value)} disabled={criando} /></Field>
+              {!inicial && <Field label="CPF" hint="Opcional. Ajuda a achar cadastro duplicado." error={cpfErro}><Input prefix={<IdCard size={16} aria-hidden />} inputMode="numeric" value={cpf} onChange={(e) => editar(setCpf, formatCpf(e.target.value))} disabled={criando} autoComplete="off" /></Field>}
+              <Field label="E-mail pessoal" hint="Opcional, para recuperação de senha."><Input prefix={<Mail size={16} aria-hidden />} type="email" value={emailPessoal} onChange={(e) => setEmailPessoal(e.target.value)} disabled={criando} /></Field>
               <Field label="Vínculo">
-                <select className="bt-control__input" id="acesso-vinculo" value={vinculo} onChange={(e) => setVinculo(Number(e.target.value) as 0 | 1)} disabled={criando}>
-                  {VINCULO.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+                <div className="bt-control bt-control--input acesso-select">
+                  <span className="bt-control__affix"><BriefcaseBusiness size={16} aria-hidden /></span>
+                  <select className="bt-control__input" id="acesso-vinculo" value={vinculo} onChange={(e) => setVinculo(Number(e.target.value) as 0 | 1)} disabled={criando}>
+                    {VINCULO.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                  <span className="bt-control__affix acesso-select__caret"><ChevronDown size={16} aria-hidden /></span>
+                </div>
               </Field>
-              <Field label="E-mail Microsoft" hint={`Será ${prefixo || '…'}@${DOMINIO}. Se já existir, o sistema acrescenta um número.`}>
-                <Input value={prefixo} onChange={(e) => setPrefixoManual(e.target.value)} suffix={`@${DOMINIO}`} disabled={criando} />
+              <Field label="E-mail Microsoft" hint="Se já existir, o sistema acrescenta um número.">
+                <Input prefix={<AtSign size={16} aria-hidden />} value={prefixo} onChange={(e) => setPrefixoManual(e.target.value)} suffix={`@${DOMINIO}`} disabled={criando} />
               </Field>
               <p className="acesso-previa" aria-live="polite">{prefixo ? `${prefixo}@${DOMINIO}` : ''}</p>
               {estado.fase === 'conferindo' && <p className="acesso-previa" role="status">Conferindo cadastros parecidos…</p>}
