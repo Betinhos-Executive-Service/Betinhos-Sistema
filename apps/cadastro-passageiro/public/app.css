@@ -78,7 +78,8 @@ h1 { font-size: 20px; line-height: 25px; margin: 0; color: var(--navy-900); font
 .foto.nova { border: 2px solid var(--blue-600); }
 .foto:active { transform: scale(.97); }
 .foto:focus-within { outline: 2px solid var(--blue-600); outline-offset: 2px; }
-.foto img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+/* Absoluta: no grid, height:100% virava auto e foto em retrato vazava para fora da área do input */
+.foto img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 .foto-vazia { display: flex; }
 .foto-vazia svg { width: 28px; height: 28px; }
 .foto-acao {
