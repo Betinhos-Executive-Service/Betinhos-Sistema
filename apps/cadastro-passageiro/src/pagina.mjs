@@ -10,13 +10,14 @@ export function paginaHtml() {
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
 <title>Cadastro do passageiro · Betinhos</title>
-<link rel="icon" href="/logo-betinhos.png">
+<link rel="icon" href="/logo-b.png">
+<link rel="preload" href="/manrope.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/app.css">
 </head>
 <body>
-<header class="topo"><img src="/logo-betinhos.png" alt="Betinhos Executive Service" class="logo"></header>
+<header class="topo"><img src="/logo-b.png" alt="Betinhos Executive Service" class="logo" width="36" height="36"></header>
 <main id="app">
-  <section class="estado" role="status"><div class="spinner" aria-hidden="true"></div><p>Carregando os passageiros…</p></section>
+  <p class="sr-only" role="status">Carregando os passageiros…</p>
 </main>
 <div class="versao" aria-hidden="true">${VERSAO}</div>
 <script type="module" src="/app.js"></script>
