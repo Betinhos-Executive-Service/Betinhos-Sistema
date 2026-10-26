@@ -376,7 +376,7 @@
                                 "runAfter": {},
                                 "runtimeConfiguration": {
                                   "concurrency": {
-                                    "repetitions": 1
+                                    "repetitions": 20
                                   }
                                 },
                                 "actions": {
@@ -397,67 +397,11 @@
                                       "authentication": "@parameters('$authentication')"
                                     }
                                   },
-                                  "Caminho_foto": {
-                                    "type": "Compose",
-                                    "runAfter": {
-                                      "Obter_passageiro": [
-                                        "Succeeded"
-                                      ]
-                                    },
-                                    "inputs": "@if(and(startsWith(coalesce(body('Obter_passageiro')?['new_linkdafoto'], ''), concat('https://', uriHost('__SITE_URL__'), '/:i:/r', uriPath('__SITE_URL__'), '/Documentos%20Compartilhados/Passageiros/Fotos/')), not(contains(decodeUriComponent(coalesce(body('Obter_passageiro')?['new_linkdafoto'], '')), '..'))), concat('/', decodeUriComponent(substring(coalesce(body('Obter_passageiro')?['new_linkdafoto'], ''), sub(length(concat('https://', uriHost('__SITE_URL__'), '/:i:/r', uriPath('__SITE_URL__'), '/Documentos%20Compartilhados/Passageiros/Fotos/')), length('Documentos%20Compartilhados/Passageiros/Fotos/'))))), '')"
-                                  },
-                                  "Tem_foto_lida": {
-                                    "type": "If",
-                                    "runAfter": {
-                                      "Caminho_foto": [
-                                        "Succeeded"
-                                      ]
-                                    },
-                                    "expression": {
-                                      "not": {
-                                        "equals": [
-                                          "@empty(outputs('Caminho_foto'))",
-                                          true
-                                        ]
-                                      }
-                                    },
-                                    "actions": {
-                                      "Ler_foto": {
-                                        "type": "OpenApiConnection",
-                                        "runAfter": {},
-                                        "inputs": {
-                                          "host": {
-                                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
-                                            "connectionName": "shared_sharepointonline",
-                                            "operationId": "GetFileContentByPath"
-                                          },
-                                          "parameters": {
-                                            "dataset": "__SITE_URL__",
-                                            "path": "@outputs('Caminho_foto')",
-                                            "inferContentType": true
-                                          },
-                                          "authentication": "@parameters('$authentication')"
-                                        },
-                                        "retryPolicy": {
-                                          "type": "none"
-                                        },
-                                        "limit": {
-                                          "timeout": "PT20S"
-                                        }
-                                      }
-                                    },
-                                    "else": {
-                                      "actions": {}
-                                    }
-                                  },
                                   "Incluir_passageiro": {
                                     "type": "AppendToArrayVariable",
                                     "runAfter": {
-                                      "Tem_foto_lida": [
-                                        "Succeeded",
-                                        "Failed",
-                                        "Skipped",
-                                        "TimedOut"
+                                      "Obter_passageiro": [
+                                        "Succeeded"
                                       ]
                                     },
                                     "inputs": {
@@ -466,7 +410,7 @@
                                         "id": "@{items('Por_passageiro')}",
                                         "primeiroNome": "@first(split(trim(coalesce(body('Obter_passageiro')?['cr40f_nomedopassageiro'], '')), ' '))",
                                         "temFoto": "@not(empty(body('Obter_passageiro')?['new_linkdafoto']))",
-                                        "foto": "@if(equals(coalesce(actions('Ler_foto')?['status'], ''), 'Succeeded'), setProperty(setProperty(json('{}'), 'mimeType', coalesce(outputs('Ler_foto')?['headers']?['Content-Type'], 'image/jpeg')), 'base64', base64(body('Ler_foto'))), null)",
+                                        "foto": null,
                                         "temTelefone": "@not(empty(trim(coalesce(body('Obter_passageiro')?['cr40f_telefone'], ''))))",
                                         "telefoneMascarado": "@if(less(length(replace(replace(replace(replace(replace(trim(coalesce(body('Obter_passageiro')?['cr40f_telefone'], '')), ' ', ''), '-', ''), '(', ''), ')', ''), '+', '')), 8), if(empty(trim(coalesce(body('Obter_passageiro')?['cr40f_telefone'], ''))), '', '••••'), if(and(startsWith(replace(replace(replace(replace(replace(trim(coalesce(body('Obter_passageiro')?['cr40f_telefone'], '')), ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), '55'), greaterOrEquals(length(replace(replace(replace(replace(replace(trim(coalesce(body('Obter_passageiro')?['cr40f_telefone'], '')), ' ', ''), '-', ''), '(', ''), ')', ''), '+', '')), 12)), concat('(', substring(replace(replace(replace(replace(replace(trim(coalesce(body('Obter_passageiro')?['cr40f_telefone'], '')), ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), 2, 2), ') •••••-', substring(replace(replace(replace(replace(replace(trim(coalesce(body('Obter_passageiro')?['cr40f_telefone'], '')), ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), sub(length(replace(replace(replace(replace(replace(trim(coalesce(body('Obter_passageiro')?['cr40f_telefone'], '')), ' ', ''), '-', ''), '(', ''), ')', ''), '+', '')), 4), 4)), if(and(not(startsWith(trim(coalesce(body('Obter_passageiro')?['cr40f_telefone'], '')), '+')), lessOrEquals(length(replace(replace(replace(replace(replace(trim(coalesce(body('Obter_passageiro')?['cr40f_telefone'], '')), ' ', ''), '-', ''), '(', ''), ')', ''), '+', '')), 11)), concat('(', substring(replace(replace(replace(replace(replace(trim(coalesce(body('Obter_passageiro')?['cr40f_telefone'], '')), ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), 0, 2), ') •••••-', substring(replace(replace(replace(replace(replace(trim(coalesce(body('Obter_passageiro')?['cr40f_telefone'], '')), ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), sub(length(replace(replace(replace(replace(replace(trim(coalesce(body('Obter_passageiro')?['cr40f_telefone'], '')), ' ', ''), '-', ''), '(', ''), ')', ''), '+', '')), 4), 4)), concat('+••• ', substring(replace(replace(replace(replace(replace(trim(coalesce(body('Obter_passageiro')?['cr40f_telefone'], '')), ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), sub(length(replace(replace(replace(replace(replace(trim(coalesce(body('Obter_passageiro')?['cr40f_telefone'], '')), ' ', ''), '-', ''), '(', ''), ')', ''), '+', '')), 4), 4)))))",
                                         "temEmail": "@not(empty(trim(coalesce(body('Obter_passageiro')?['cr40f_email'], ''))))",
@@ -719,6 +663,150 @@
                                       "type": "SetVariable",
                                       "runAfter": {
                                         "Status_erro_404_passageiro": [
+                                          "Succeeded"
+                                        ]
+                                      },
+                                      "inputs": {
+                                        "name": "corpo",
+                                        "value": {
+                                          "ok": false,
+                                          "codigo": "nao_encontrado"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "Foto": {
+                            "case": "foto",
+                            "actions": {
+                              "No_escopo_foto": {
+                                "type": "If",
+                                "runAfter": {},
+                                "expression": {
+                                  "equals": [
+                                    "@contains(outputs('Escopo'), toLower(trim(coalesce(triggerBody()?['passageiroId'], ''))))",
+                                    true
+                                  ]
+                                },
+                                "actions": {
+                                  "Obter_passageiro_foto": {
+                                    "type": "OpenApiConnection",
+                                    "runAfter": {},
+                                    "inputs": {
+                                      "host": {
+                                        "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                                        "connectionName": "shared_commondataserviceforapps",
+                                        "operationId": "GetItem"
+                                      },
+                                      "parameters": {
+                                        "entityName": "__SET_PASSAGEIROS__",
+                                        "recordId": "@toLower(trim(coalesce(triggerBody()?['passageiroId'], '')))",
+                                        "$select": "new_linkdafoto"
+                                      },
+                                      "authentication": "@parameters('$authentication')"
+                                    }
+                                  },
+                                  "Caminho_foto": {
+                                    "type": "Compose",
+                                    "runAfter": {
+                                      "Obter_passageiro_foto": [
+                                        "Succeeded"
+                                      ]
+                                    },
+                                    "inputs": "@if(and(startsWith(coalesce(body('Obter_passageiro_foto')?['new_linkdafoto'], ''), concat('https://', uriHost('__SITE_URL__'), '/:i:/r', uriPath('__SITE_URL__'), '/Documentos%20Compartilhados/Passageiros/Fotos/')), not(contains(decodeUriComponent(coalesce(body('Obter_passageiro_foto')?['new_linkdafoto'], '')), '..'))), concat('/', decodeUriComponent(substring(coalesce(body('Obter_passageiro_foto')?['new_linkdafoto'], ''), sub(length(concat('https://', uriHost('__SITE_URL__'), '/:i:/r', uriPath('__SITE_URL__'), '/Documentos%20Compartilhados/Passageiros/Fotos/')), length('Documentos%20Compartilhados/Passageiros/Fotos/'))))), '')"
+                                  },
+                                  "Tem_foto_lida": {
+                                    "type": "If",
+                                    "runAfter": {
+                                      "Caminho_foto": [
+                                        "Succeeded"
+                                      ]
+                                    },
+                                    "expression": {
+                                      "not": {
+                                        "equals": [
+                                          "@empty(outputs('Caminho_foto'))",
+                                          true
+                                        ]
+                                      }
+                                    },
+                                    "actions": {
+                                      "Ler_foto": {
+                                        "type": "OpenApiConnection",
+                                        "runAfter": {},
+                                        "inputs": {
+                                          "host": {
+                                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                                            "connectionName": "shared_sharepointonline",
+                                            "operationId": "GetFileContentByPath"
+                                          },
+                                          "parameters": {
+                                            "dataset": "__SITE_URL__",
+                                            "path": "@outputs('Caminho_foto')",
+                                            "inferContentType": true
+                                          },
+                                          "authentication": "@parameters('$authentication')"
+                                        },
+                                        "retryPolicy": {
+                                          "type": "none"
+                                        },
+                                        "limit": {
+                                          "timeout": "PT20S"
+                                        }
+                                      }
+                                    },
+                                    "else": {
+                                      "actions": {}
+                                    }
+                                  },
+                                  "Status_foto": {
+                                    "type": "SetVariable",
+                                    "runAfter": {
+                                      "Tem_foto_lida": [
+                                        "Succeeded",
+                                        "Failed",
+                                        "Skipped",
+                                        "TimedOut"
+                                      ]
+                                    },
+                                    "inputs": {
+                                      "name": "httpStatus",
+                                      "value": 200
+                                    }
+                                  },
+                                  "Corpo_foto": {
+                                    "type": "SetVariable",
+                                    "runAfter": {
+                                      "Status_foto": [
+                                        "Succeeded"
+                                      ]
+                                    },
+                                    "inputs": {
+                                      "name": "corpo",
+                                      "value": {
+                                        "ok": true,
+                                        "foto": "@if(equals(coalesce(actions('Ler_foto')?['status'], ''), 'Succeeded'), setProperty(setProperty(json('{}'), 'mimeType', coalesce(outputs('Ler_foto')?['headers']?['Content-Type'], 'image/jpeg')), 'base64', base64(body('Ler_foto'))), null)"
+                                      }
+                                    }
+                                  }
+                                },
+                                "else": {
+                                  "actions": {
+                                    "Status_erro_404_foto": {
+                                      "type": "SetVariable",
+                                      "runAfter": {},
+                                      "inputs": {
+                                        "name": "httpStatus",
+                                        "value": 404
+                                      }
+                                    },
+                                    "Corpo_erro_404_foto": {
+                                      "type": "SetVariable",
+                                      "runAfter": {
+                                        "Status_erro_404_foto": [
                                           "Succeeded"
                                         ]
                                       },
