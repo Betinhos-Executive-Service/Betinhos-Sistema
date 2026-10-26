@@ -77,3 +77,14 @@ export function richTextToPlain(html: string | null | undefined) {
   const doc = new DOMParser().parseFromString(html.replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|li)>/gi, '\n'), 'text/html')
   return (doc.body.textContent ?? '').replace(/\n{3,}/g, '\n\n').trim()
 }
+
+/** Exibição "(12) 90000i74"; aceita com ou sem +55 e formata enquanto digita. */
+export function formatCelular(value: string) {
+  let d = digitsOnly(value)
+  if (d.startsWith('55') && d.length >= 12) d = d.slice(2)
+  d = d.slice(0, 11)
+  if (d.length <= 2) return d && `(${d}`
+  const n = d.slice(2)
+  const split = n.length === 9 ? 5 : 4
+  return n.length >= 8 ? `(${d.slice(0, 2)}) ${n.slice(0, split)}-${n.slice(split)}` : `(${d.slice(0, 2)}) ${n}`
+}
