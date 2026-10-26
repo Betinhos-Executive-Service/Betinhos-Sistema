@@ -73,6 +73,14 @@ function renderLista({ passageiros, dataServico }) {
   );
 }
 
+// Foto atual devolvida pelo "ler": só imagem em base64, vira data: URL (a CSP já permite data:).
+function fotoAtual(foto) {
+  const b64 = typeof foto?.base64 === "string" ? foto.base64 : "";
+  if (!b64 || !/^[A-Za-z0-9+/=]+$/.test(b64)) return "";
+  const tipo = /^image\/(jpeg|png|webp|gif)$/i.test(foto.mimeType || "") ? foto.mimeType.toLowerCase() : "image/jpeg";
+  return `data:${tipo};base64,${b64}`;
+}
+
 function cardPassageiro(p) {
   const id = p.id;
   const nome = String(p.primeiroNome || "Passageiro");
@@ -84,7 +92,9 @@ function cardPassageiro(p) {
   const fotoInput = el("input", { class: "foto-input", type: "file", accept: "image/*", id: `foto-${id}` });
   const fotoLegenda = el("span", { class: "foto-legenda" }, textoFoto());
   const fotoBtn = el("label", { class: "foto", for: `foto-${id}` }, avatar, fotoLegenda);
-  if (p.temFoto) avatar.append(el("span", { class: "foto-tem" }, "Foto já enviada"));
+  const atual = fotoAtual(p.foto);
+  if (atual) avatar.replaceChildren(el("img", { src: atual, alt: `Foto atual de ${nome}` }), el("span", { class: "foto-tem" }, "Foto atual"));
+  else if (p.temFoto) avatar.append(el("span", { class: "foto-tem" }, "Foto já enviada"));
   const fotoMsg = el("p", { class: "aviso erro", hidden: true, role: "alert" });
 
   const tel = el("input", { type: "tel", inputmode: "tel", autocomplete: "tel", id: `tel-${id}`, placeholder: "(11) 98765-4321 ou +1 …" });

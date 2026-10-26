@@ -12,7 +12,8 @@ description: "Verifica o link público de cadastro do passageiro: tabela cr40f_l
 
 ## Roteiro local
 1. `dotnet test packages/plugins/Cr40f.Cadastro.Plugin.Tests` → "Com falha: 0" (34 testes em 24/10/2026: 13 do link + 21 da foto).
-2. `pnpm --filter ./packages/deploy test` (ou `npm test` em `packages/deploy`) → `fail 0` (127 em 23/10/2026); o teste do flow exige zero CreateSharingLink e o link com `/:i:/r`.
+2. `pnpm --filter ./packages/deploy test` (ou `npm test` em `packages/deploy`) → `fail 0` (128 em 26/10/2026); o teste do flow exige zero CreateSharingLink e o link com `/:i:/r`.
+   - Foto atual no "ler" (26/10/2026): em `Por_passageiro`, `Caminho_foto` só aceita `new_linkdafoto` que começa com `https://<host do site>/:i:/r/sites/BetinhosGestoInterna/Documentos%20Compartilhados/Passageiros/Fotos/` e sem `..`; vira `/Documentos Compartilhados/Passageiros/Fotos/...` decodificado. `Tem_foto_lida` → `Ler_foto` (`GetFileContentByPath`, dataset `__SITE_URL__`, sem retry, timeout 20 s). `Incluir_passageiro` roda após `Tem_foto_lida` em Succeeded/Failed/Skipped/TimedOut, então falha de leitura não derruba o "ler": o passageiro vem com `temFoto` e `foto: null`. Com sucesso, `foto = {mimeType, base64}`.
 3. Sintaxe dos .ps1: `powershell.exe -NoProfile -Command "$e=$null;[void][System.Management.Automation.Language.Parser]::ParseFile('<arquivo>',[ref]$null,[ref]$e);$e.Count"` → `0`.
 
 ## Roteiro no DEV (só da `main`, no checkout principal)
@@ -28,12 +29,12 @@ description: "Verifica o link público de cadastro do passageiro: tabela cr40f_l
 - DEV: `dotnet run --project packages/plugins/tools/Cr40f.Cadastro.Registrar -- --environmentUrl https://org23b93544.crm2.dynamics.com --testarFoto <reservaId> --passageiroId <id>` → como usuário que não é o motorista: `ok:false`. Como o motorista (App Motoristas, serviço Programado, passageiro com foto): `ok:true`, `mimeType image/*`. Mudar o status para Em Execução (202410006) → `ok:false` na chamada seguinte. Trace em Plug-in Trace Log mostra o motivo.
 
 ## Não verificável sem DEV
-Dados reais do Dataverse e escrita no SharePoint (a sobrescrita foi confirmada no DEV em 23/10/2026).
+Dados reais do Dataverse e escrita no SharePoint (a sobrescrita foi confirmada no DEV em 23/10/2026). Leitura da foto atual pelo flow no DEV: chamar `{op:"ler",hash}` de um link cujo passageiro tem foto → `passageiros[i].foto.base64` preenchido; renomear o arquivo no SharePoint → mesmo 200, com `foto: null`.
 
 ## Página pública (`apps/cadastro-passageiro`, Worker Cloudflare)
-1. `node --test apps/cadastro-passageiro/test/api.test.mjs` → `fail 0` (13 em 23/10/2026).
+1. `node --test apps/cadastro-passageiro/test/api.test.mjs` → `fail 0` (14 em 26/10/2026; inclui repasse de `foto` com ~3 MB de base64).
 2. `cd apps/cadastro-passageiro && npx wrangler deploy --dry-run` → bindings `RATE_LIMITER` e `ASSETS`, sem publicar.
-3. `pnpm dev` (porta 52418, `MODO_LOCAL=1` ativa o mock) → abrir `http://127.0.0.1:52418/#t=` + 43 caracteres `A` em 375 px. Esperado: nome acima de uma foto de 168 px que é o próprio botão; e-mail `abc` bloqueia com "Confira o e-mail"; foto (injetar arquivo no `.foto-input` via DataTransfer) vira prévia; Salvar → "Dados salvos. Obrigado!"; console sem erros.
+3. `pnpm dev` (porta 52418, `MODO_LOCAL=1` ativa o mock) → abrir `http://127.0.0.1:52418/#t=` + 43 caracteres `A` em 375 px. Esperado: Mariana (mock com `foto`) mostra a imagem na `.foto-area` com o selo "Foto atual" e a legenda "Trocar foto" (`naturalWidth` 96); Carlos mostra a câmera e "Adicionar foto"; nome acima de uma foto de 168 px que é o próprio botão; e-mail `abc` bloqueia com "Confira o e-mail"; foto (injetar arquivo no `.foto-input` via DataTransfer) vira prévia; Salvar → "Dados salvos. Obrigado!"; console sem erros.
 4. Deploy (só da `main`, checkout principal): `pnpm --filter @betinhos/cadastro-passageiro push` com o `wrangler` logado na conta Betinhos (OAuth) e o secret `FLOW_URL` = URL do gatilho do flow "Cadastro do passageiro | Link".
 
 ## Lista Geral do shell (`apps/shell/src/pages/geral`)

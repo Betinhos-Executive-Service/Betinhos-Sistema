@@ -397,11 +397,67 @@
                                       "authentication": "@parameters('$authentication')"
                                     }
                                   },
-                                  "Incluir_passageiro": {
-                                    "type": "AppendToArrayVariable",
+                                  "Caminho_foto": {
+                                    "type": "Compose",
                                     "runAfter": {
                                       "Obter_passageiro": [
                                         "Succeeded"
+                                      ]
+                                    },
+                                    "inputs": "@if(and(startsWith(coalesce(body('Obter_passageiro')?['new_linkdafoto'], ''), concat('https://', uriHost('__SITE_URL__'), '/:i:/r', uriPath('__SITE_URL__'), '/Documentos%20Compartilhados/Passageiros/Fotos/')), not(contains(decodeUriComponent(coalesce(body('Obter_passageiro')?['new_linkdafoto'], '')), '..'))), concat('/', decodeUriComponent(substring(coalesce(body('Obter_passageiro')?['new_linkdafoto'], ''), sub(length(concat('https://', uriHost('__SITE_URL__'), '/:i:/r', uriPath('__SITE_URL__'), '/Documentos%20Compartilhados/Passageiros/Fotos/')), length('Documentos%20Compartilhados/Passageiros/Fotos/'))))), '')"
+                                  },
+                                  "Tem_foto_lida": {
+                                    "type": "If",
+                                    "runAfter": {
+                                      "Caminho_foto": [
+                                        "Succeeded"
+                                      ]
+                                    },
+                                    "expression": {
+                                      "not": {
+                                        "equals": [
+                                          "@empty(outputs('Caminho_foto'))",
+                                          true
+                                        ]
+                                      }
+                                    },
+                                    "actions": {
+                                      "Ler_foto": {
+                                        "type": "OpenApiConnection",
+                                        "runAfter": {},
+                                        "inputs": {
+                                          "host": {
+                                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                                            "connectionName": "shared_sharepointonline",
+                                            "operationId": "GetFileContentByPath"
+                                          },
+                                          "parameters": {
+                                            "dataset": "__SITE_URL__",
+                                            "path": "@outputs('Caminho_foto')",
+                                            "inferContentType": true
+                                          },
+                                          "authentication": "@parameters('$authentication')"
+                                        },
+                                        "retryPolicy": {
+                                          "type": "none"
+                                        },
+                                        "limit": {
+                                          "timeout": "PT20S"
+                                        }
+                                      }
+                                    },
+                                    "else": {
+                                      "actions": {}
+                                    }
+                                  },
+                                  "Incluir_passageiro": {
+                                    "type": "AppendToArrayVariable",
+                                    "runAfter": {
+                                      "Tem_foto_lida": [
+                                        "Succeeded",
+                                        "Failed",
+                                        "Skipped",
+                                        "TimedOut"
                                       ]
                                     },
                                     "inputs": {
@@ -409,7 +465,8 @@
                                       "value": {
                                         "id": "@{items('Por_passageiro')}",
                                         "primeiroNome": "@first(split(trim(coalesce(body('Obter_passageiro')?['cr40f_nomedopassageiro'], '')), ' '))",
-                                        "temFoto": "@not(empty(body('Obter_passageiro')?['new_linkdafoto']))"
+                                        "temFoto": "@not(empty(body('Obter_passageiro')?['new_linkdafoto']))",
+                                        "foto": "@if(equals(coalesce(actions('Ler_foto')?['status'], ''), 'Succeeded'), setProperty(setProperty(json('{}'), 'mimeType', coalesce(outputs('Ler_foto')?['headers']?['Content-Type'], 'image/jpeg')), 'base64', base64(body('Ler_foto'))), null)"
                                       }
                                     }
                                   }
