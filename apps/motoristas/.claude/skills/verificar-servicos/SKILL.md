@@ -21,7 +21,7 @@ Usa Chrome headless com user agent Android (ativa a câmera ao vivo) e câmera s
 ## Roteiro manual (navegador interno, viewport mobile 375×812)
 1. Início → canto inferior direito mostra `v<versão> · dd/mm/aaaa HH:mm` (`.build-stamp`, sem capturar toque).
 2. Toque em "Serviços" → card "Base Betinhos -> Aeroporto de Guarulhos" → detalhe `#10240`.
-   - Botões Voltar/Copiar têm 44×44; telefone do passageiro abre "Contato do passageiro" com Ligar e WhatsApp; Esc fecha.
+   - Botões Voltar/Copiar têm 44×44; passageiros com dados (`detail.passengers`) aparecem em linhas com atalhos Ligar/WhatsApp e ficha (seção abaixo); telefone em HTML legado abre "Contato do passageiro" com Ligar e WhatsApp; Esc fecha.
    - A pílula "Mais detalhes abaixo" aparece e some após o primeiro scroll.
 3. Voltar do navegador/celular (`history.back()`): detalhe → Serviços → Início, sem sair do app.
 4. Detalhe → "Receber": a tela mostra "Valor a receber R$ 380,00" e a orientação de cobrança.
@@ -33,6 +33,13 @@ Usa Chrome headless com user agent Android (ativa a câmera ao vivo) e câmera s
 10. `#cancelado-local?serviceId=10241&type=SERVICO` → "Limpar texto" desabilitado vazio; com texto pede "Apagar o texto?". "Cliquei errado" volta ao detalhe.
 11. `#historico` → busca "zzz inexistente" mostra `Nenhum serviço encontrado para "zzz inexistente".`
 12. Topo de Serviços (mock): "Comunicados pendentes" (2) e "Checklist do veículo" (1) como avisos compactos `button.notice-compact`, 56 px cada, superfície #fcfcfb sem sombra (não parecem card de serviço); o primeiro card de serviço começa perto de y=322 (antes y=647). Medir: `[...document.querySelectorAll('.notice-compact')].map(e=>e.getBoundingClientRect().height)`. Os avisos não têm `.agenda-card`/`.agenda-hit`: `document.querySelector(".agenda-card .agenda-hit")` em Serviços já cai no primeiro serviço. Detalhes do aviso em `verificar-comunicados` e `verificar-checklists-app`.
+
+## Passageiros no detalhe (lista com foto e ficha, 26/10/2026)
+`src/components/details/PassengerContacts.tsx` substitui a antiga faixa de avatares do topo (`PassengerAvatars`). Só aparece quando `detail.passengers` vem preenchido; senão a seção "Passageiros e Telefones de Contato" continua no HTML antigo (`DetailsField`).
+- `#detalhes?serviceId=10241&type=SERVICO` (Programado no mock; apague `app-motoristas-local-v1` do localStorage se o mock salvo atrapalhar), 375×812: nenhum `.passenger-avatars`; seção com 2 `.passenger-row`: Ana Paula (foto de retrato em canvas, `naturalWidth` 320) e Roberto (inicial "R"); cada linha com bandeira SVG do idioma ao lado do nome (`aria-label` "Idioma: …"; `languageFlagCode` em `src/lib/passengerContact.ts`, SVGs em `LanguageFlag.tsx`; DEV só tem Português/Inglês/Espanhol), telefone e botões 44×44 Ligar/WhatsApp; `document.documentElement.scrollWidth - innerWidth` = 0.
+- Tocar na linha abre `.passenger-sheet` (sheet de baixo): foto grande ou inicial 120 px, bandeira + nome, Telefone, botões "Ligar" e "WhatsApp". Fecha com X, Esc e toque fora.
+- Regra da foto e privacidade em `src/lib/passengerPhoto.ts` (só Programado, `new_ObterFotoPassageiro`, 2 chamadas simultâneas, blob URL revogado no `dispose`). Links em `src/lib/passengerContact.ts` (WhatsApp com mensagem vindo do Dataverse tem prioridade). Testes: `tests/passengerContact.test.ts`, `tests/passengerPhoto.test.ts`.
+- `cr40f_bancodedados` não tem campo de nacionalidade (metadata DEV 26/10/2026: só `cr40f_idioma`); a ficha mostra o Idioma. Foto real só no DEV com serviço Programado.
 
 ## Cobrança por QR code (Stripe, modo mock)
 Spec: `docs/superpowers/specs/2026-10-21-cobranca-stripe-qr-design.md`. Em localhost o botão aparece sempre; o mock (`src/lib/qrChargeMock.ts`) paga 5 s depois de gerar (`?mockPagaEm=<s>` muda), simula recusa com `?mockRecusa=1` e guarda as cobranças no `sessionStorage` (recarregar mantém o pago para o `resumo`).

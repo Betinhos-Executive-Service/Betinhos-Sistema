@@ -66,6 +66,12 @@ export type DetailField = {
 export type DetailPassenger = {
   id: string;
   name: string;
+  /** Telefone como cadastrado (cr40f_telefone). */
+  phone?: string;
+  /** Link do WhatsApp com a mensagem pronta, igual ao da seção de passageiros. */
+  whatsappUrl?: string;
+  /** Idioma (cr40f_idioma); a tabela não tem campo de nacionalidade. */
+  language?: string;
 };
 
 export type DetailData = {

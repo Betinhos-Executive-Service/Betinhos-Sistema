@@ -56,3 +56,9 @@ test("store memoriza por (reserva, passageiro), limita a 2 simultâneas e revoga
     assert.equal(revoked.length, 3);
   } finally { URL.revokeObjectURL = original; }
 });
+
+test("mock só devolve foto para o primeiro passageiro", async () => {
+  const { fetchFotoJsonMock } = await import("../src/lib/passengerPhoto.ts");
+  assert.ok(parseFotoJson(await fetchFotoJsonMock("r1", "mock-pax-1")));
+  assert.equal(parseFotoJson(await fetchFotoJsonMock("r1", "mock-pax-2")), null);
+});
