@@ -2976,6 +2976,51 @@ svg {
   background: rgb(0, 14, 35);
 }
 
+.observation-review {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgb(252, 252, 251);
+  color: rgb(0, 14, 35);
+  font-family: "Manrope", sans-serif;
+}
+
+.observation-review-hint {
+  margin: 0 0 10px;
+  color: rgb(70, 84, 105);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.observation-review-topics {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 22px;
+  overflow-wrap: anywhere;
+}
+
+.finalize-actions.observation-review-actions {
+  width: min(100%, 560px);
+  height: auto;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.observation-review-actions button {
+  flex: 1 1 calc(50% - 4px);
+  min-height: 48px;
+}
+
+.observation-review-actions .finalize-primary {
+  flex-basis: 100%;
+  order: -1;
+}
+
 .maintenance-actions {
   width: min(50%, 320px);
   align-self: center;

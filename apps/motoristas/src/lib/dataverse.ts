@@ -32,6 +32,7 @@ import { decideExpenseUploadMode, type ExpenseUploadMode } from "./expenseUpload
 import { parseQrChargeResponse, parseQrChargeSummary, type QrChargePayer } from "./qrCharge.ts";
 import { createMockQrCharge, getMockQrChargeSummary, updateMockQrCharge } from "./qrChargeMock.ts";
 import { createFetchWebApi } from "./fetchWebApi.ts";
+import { mockOrganizeObservation } from "./observacaoOrganizada.ts";
 
 type XrmLike = {
   Utility?: {
@@ -4020,6 +4021,37 @@ export async function resolveServiceVehicleRemote(serviceDataverseId: string): P
     dataverseWarn("Resolvedor de veiculo da Infleet indisponivel.", { message: error instanceof Error ? error.message : String(error) });
     return unavailableResolution("erro-ao-consultar");
   }
+}
+
+// Custom API new_OrganizarObservacao: devolve o JSON cru ({ ok, topicos, ... }). Sem Xrm usa o mock local.
+export async function organizeObservationRemote(text: string): Promise<string> {
+  if (!hasDataverseRuntime()) return mockOrganizeObservation(text);
+  const online = getWebApi().online;
+  // O Xrm depende do `this`; extrair o método solto quebra com "reading '_execute'".
+  const execute = online?.execute?.bind(online);
+  if (!execute) throw new Error("api-indisponivel");
+  const response = (await execute({
+    new_Texto: text,
+    getMetadata: () => ({
+      boundParameter: null,
+      operationType: 0,
+      operationName: "new_OrganizarObservacao",
+      parameterTypes: { new_Texto: { typeName: "Edm.String", structuralProperty: 1 } }
+    })
+  })) as Response;
+  if (!response.ok) {
+    dataverseWarn("Organizador de observacao respondeu com erro.", { status: response.status });
+    throw new Error(`erro-http-${response.status}`);
+  }
+  const body = await response.json();
+  const result = String(body?.new_ResultadoJson ?? "");
+  try {
+    const parsed = JSON.parse(result);
+    dataverseLog("Observacao organizada.", { ok: parsed?.ok, motivo: parsed?.motivo, ms: parsed?.ms, topicos: parsed?.topicos?.length ?? 0 });
+  } catch {
+    dataverseWarn("Organizador de observacao devolveu JSON invalido.");
+  }
+  return result;
 }
 
 export async function finalizeServiceRemote(payload: FinalizePayload) {
