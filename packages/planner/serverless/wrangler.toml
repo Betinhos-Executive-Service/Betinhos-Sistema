@@ -1,0 +1,10 @@
+name = "betinhos-planner-triage"
+main = "triage-worker.js"
+compatibility_date = "2026-09-11"
+
+[vars]
+DEEPSEEK_MODEL = "deepseek-flash"
+
+# Configure secrets outside Git:
+# wrangler secret put DEEPSEEK_API_KEY
+# wrangler secret put TRIAGE_TOKEN
