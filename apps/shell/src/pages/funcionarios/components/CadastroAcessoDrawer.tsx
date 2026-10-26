@@ -1,25 +1,22 @@
 import { Alert, Button, buttonClassName, Dialog, Field, Input } from '@betinhos/ui'
 import { Copy, ExternalLink, MessageCircle, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { type AcessoInicial, type AcessoSource, type CadastroInput, type CadastroResultado, type Etapa, parseAcessoError, mensagemWhatsApp, whatsappComMensagem } from '../data/acesso'
+import { type AcessoInicial, type AcessoSource, type CadastroInput, type CadastroResultado, type Etapa, ERROS_PERMANENTES, liberacaoPendente, MSG_PENDENTE, MSG_PENDENTE_DEMORADA, parseAcessoError, mensagemWhatsApp, whatsappComMensagem } from '../data/acesso'
+import { ListaEtapas, ProgressoAcesso, useRetentativa } from './AcessoProgresso'
 import { normalizeSearch } from '../data/format'
 import { VINCULO } from '../data/schema'
 import { useNotify } from './Toasts'
 
-type Props = { acesso: AcessoSource; inicial?: AcessoInicial; onClose: () => void; onCadastrado: (funcionarioId: string) => void }
+/** `emailPendente`: e-mail criado cuja liberação no Dataverse ainda não terminou (a ficha oferece "Concluir liberação"). */
+type Props = { acesso: AcessoSource; inicial?: AcessoInicial; onClose: () => void; onCadastrado: (funcionarioId: string, emailPendente?: string) => void }
 type Estado = { fase: 'form' } | { fase: 'criando' } | { fase: 'resultado'; r: CadastroResultado } | { fase: 'erro'; mensagem: string; etapas: Etapa[] }
 
 const DOMINIO = 'betinhos.onmicrosoft.com'
-const ROTULO: Record<Etapa['estado'], string> = { feita: '✓', pulada: '–', erro: '✕' }
 
 /** primeiro.ultimo sem acentos; igual a AcessoRules.PrefixoEmail do plugin (só prévia: o plugin recalcula). */
 export function prefixoDeNome(nome: string) {
   const p = normalizeSearch(nome).trim().split(/\s+/).map((w) => w.replace(/[^a-z0-9-]/g, '')).filter(Boolean)
   return p.length === 0 ? '' : p.length === 1 ? p[0] : `${p[0]}.${p[p.length - 1]}`
-}
-
-export function ListaEtapas({ etapas }: { etapas: Etapa[] }) {
-  return <ul className="acesso-etapas">{etapas.map((e) => <li key={e.etapa} data-estado={e.estado}><span aria-hidden>{ROTULO[e.estado]}</span> {e.etapa}: {e.detalhe}</li>)}</ul>
 }
 
 /** Copia para a área de transferência com aviso de sucesso ou falha. */
@@ -35,9 +32,9 @@ export function CredenciaisAcesso({ r, semSenha }: { r: { emailMicrosoft: string
   const copiar = useCopiar()
   return (
     <dl className="acesso-credenciais">
-      <dt>E-mail</dt><dd><code>{r.emailMicrosoft}</code> <Button variant="secondary" size="compact" icon={<Copy size={14} />} aria-label="Copiar e-mail" onClick={() => copiar(r.emailMicrosoft)} /></dd>
-      <dt>Senha</dt><dd><code>{r.senhaTemporaria || semSenha}</code> {r.senhaTemporaria && <Button variant="secondary" size="compact" icon={<Copy size={14} />} aria-label="Copiar senha" onClick={() => copiar(r.senhaTemporaria)} />}</dd>
-      <dt>Link do app</dt><dd><a href={r.linkApp} target="_blank" rel="noopener noreferrer">{r.linkApp}</a></dd>
+      <div className="acesso-credencial"><dt>E-mail</dt><dd><code className="acesso-credencial__email" title={r.emailMicrosoft}>{r.emailMicrosoft}</code> <Button variant="secondary" size="compact" icon={<Copy size={14} />} aria-label="Copiar e-mail" onClick={() => copiar(r.emailMicrosoft)}>Copiar</Button></dd></div>
+      <div className="acesso-credencial"><dt>Senha</dt><dd>{r.senhaTemporaria ? <code>{r.senhaTemporaria}</code> : <span className="muted">{semSenha}</span>} {r.senhaTemporaria && <Button variant="secondary" size="compact" icon={<Copy size={14} />} aria-label="Copiar senha" onClick={() => copiar(r.senhaTemporaria)}>Copiar</Button>}</dd></div>
+      <div className="acesso-credencial acesso-credencial--link"><dt>Link do app</dt><dd><a href={r.linkApp} target="_blank" rel="noopener noreferrer">{r.linkApp}</a></dd></div>
     </dl>
   )
 }
@@ -69,6 +66,21 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
   const prefixo = prefixoManual ?? prefixoDeNome(nome)
   const input: CadastroInput = { nomeCompleto: nome.trim(), celular: celular.trim(), emailPessoal: emailPessoal.trim() || undefined, prefixoEmail: prefixo.trim() || undefined, tipoVinculo: vinculo, funcionarioId: inicial?.funcionarioId }
   const waHref = estado.fase === 'resultado' ? whatsappComMensagem(celular, mensagemWhatsApp({ nome, emailMicrosoft: estado.r.emailMicrosoft, senhaTemporaria: estado.r.senhaTemporaria, linkApp: estado.r.linkApp })) : null
+
+  const pendente = estado.fase === 'resultado' && liberacaoPendente(estado.r.etapas)
+  // Liberação pendente: tenta concluir sozinho (mesmo e-mail e ficha; a senha da primeira resposta continua valendo).
+  const [erroRetentativa, setErroRetentativa] = useState('')
+  const { esgotou } = useRetentativa(pendente, async () => {
+    if (estado.fase !== 'resultado') return undefined
+    const { funcionarioId, emailMicrosoft } = estado.r
+    const r = await acesso.cadastrar({ ...input, funcionarioId, prefixoEmail: emailMicrosoft.split('@')[0] })
+    return liberacaoPendente(r.etapas) ? undefined : r.etapas
+  }, (etapas) => setEstado((e) => (e.fase === 'resultado' ? { fase: 'resultado', r: { ...e.r, etapas } } : e)), (reason) => {
+    const erro = parseAcessoError(reason)
+    if (!ERROS_PERMANENTES.has(erro.codigo)) return false
+    setErroRetentativa(erro.message)
+    return true
+  })
 
   function requestClose() {
     if (criando) return
@@ -111,19 +123,24 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
                 <Input value={prefixo} onChange={(e) => setPrefixoManual(e.target.value)} suffix={`@${DOMINIO}`} disabled={criando} />
               </Field>
               <p className="acesso-previa" aria-live="polite">{prefixo ? `${prefixo}@${DOMINIO}` : ''}</p>
+              {criando && <ProgressoAcesso fluxo="cadastro" />}
               {estado.fase === 'erro' && (
                 <Alert tone="danger" title="Não foi possível concluir">
-                  {estado.mensagem}
-                  {estado.etapas.length > 0 && <ListaEtapas etapas={estado.etapas} />}
+                  {estado.mensagem}{estado.etapas.length > 0 && ' O que já foi feito fica guardado; "Tentar de novo" continua de onde parou.'}
+                  <ListaEtapas etapas={estado.etapas} fluxo="cadastro" />
                 </Alert>
               )}
             </form>
           )}
           {estado.fase === 'resultado' && (
             <div className="acesso-resultado">
-              <Alert tone="success" title="Acesso criado">A senha aparece só agora. Envie para o motorista antes de fechar.</Alert>
-              <CredenciaisAcesso r={estado.r} semSenha="(conta já existia; senha não alterada)" />
-              <ListaEtapas etapas={estado.r.etapas} />
+              {pendente
+                ? erroRetentativa
+                  ? <Alert tone="danger" title="Conta criada, mas a liberação parou">{erroRetentativa}</Alert>
+                  : <Alert tone="info" title="Conta criada, liberando no Dataverse">{esgotou ? MSG_PENDENTE_DEMORADA : MSG_PENDENTE}</Alert>
+                : <Alert tone="success" title="Acesso criado e liberado">{estado.r.senhaTemporaria ? 'A senha aparece só agora. Envie para o motorista antes de fechar.' : 'A conta já existia; a senha anterior continua valendo.'}</Alert>}
+              <CredenciaisAcesso r={estado.r} semSenha="Conta já existia; senha não alterada" />
+              <ListaEtapas etapas={estado.r.etapas} fluxo="cadastro" />
             </div>
           )}
         </div>
@@ -131,7 +148,7 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
           {estado.fase === 'resultado' ? (
             <div className="cluster">
               {waHref && <a className={buttonClassName({ variant: 'primary' })} href={waHref} target="_blank" rel="noopener noreferrer"><MessageCircle size={16} aria-hidden /> Enviar no WhatsApp</a>}
-              <Button variant="secondary" icon={<ExternalLink size={16} />} onClick={() => onCadastrado(estado.r.funcionarioId)}>Abrir ficha</Button>
+              <Button variant="secondary" icon={<ExternalLink size={16} />} onClick={() => onCadastrado(estado.r.funcionarioId, pendente ? estado.r.emailMicrosoft : undefined)}>Abrir ficha</Button>
             </div>
           ) : (
             <div className="cluster">

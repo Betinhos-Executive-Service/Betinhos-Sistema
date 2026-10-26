@@ -14,8 +14,8 @@ namespace Cr40f.Acesso.Plugin;
 /// </summary>
 public sealed class UsuarioDataverseRepository
 {
-    public const int Tentativas = 6;
-    internal static readonly TimeSpan Intervalo = TimeSpan.FromSeconds(5);   // 6 consultas em ~25 s, dentro do limite de 2 min do plugin
+    public const int Tentativas = 8;
+    internal static readonly TimeSpan Intervalo = TimeSpan.FromSeconds(2);   // 8 consultas em ~14 s; passou disso, a etapa fica pendente (não falha)
     private readonly IOrganizationService _svc;
     private readonly Action<TimeSpan> _esperar;
 

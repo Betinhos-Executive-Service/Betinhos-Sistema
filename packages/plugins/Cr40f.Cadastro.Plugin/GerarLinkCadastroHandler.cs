@@ -59,7 +59,7 @@ public sealed class GerarLinkCadastroHandler
         var status = reserva.GetAttributeValue<OptionSetValue>("cr40f_status")?.Value;
         if (status is int s && StatusCancelado.Contains(s)) return Erro("Serviço cancelado não aceita link de cadastro.");
 
-        var ids = IdsPassageiros(reserva);
+        var ids = PassageirosDoServico.Ids(_sistema, reserva);
         if (ids.Count == 0) return Erro("Este serviço não tem passageiros.");
         if (passageiroId is Guid alvo)
         {
@@ -105,20 +105,6 @@ public sealed class GerarLinkCadastroHandler
               .Append('}');
         }
         return sb.Append("]}").ToString();
-    }
-
-    /// <summary>Filhos cr40f_servicosporpassageiro (por cr40f_ordemdeselecao); sem filhos, lookups passageiro1..4. Sem duplicatas.</summary>
-    private List<Guid> IdsPassageiros(Entity reserva)
-    {
-        var q = new QueryExpression("cr40f_servicosporpassageiro") { ColumnSet = new ColumnSet("cr40f_bancodedados", "cr40f_ordemdeselecao") };
-        q.Criteria.AddCondition("cr40f_geral", ConditionOperator.Equal, reserva.Id);
-        q.AddOrder("cr40f_ordemdeselecao", OrderType.Ascending);
-        var filhos = _sistema.RetrieveMultiple(q).Entities
-            .OrderBy(e => e.GetAttributeValue<int?>("cr40f_ordemdeselecao") ?? int.MaxValue)
-            .Select(e => e.GetAttributeValue<EntityReference>("cr40f_bancodedados")?.Id)
-            .ToList();
-        var origem = filhos.Count > 0 ? filhos : Enumerable.Range(1, 4).Select(n => reserva.GetAttributeValue<EntityReference>("cr40f_passageiro" + n)?.Id).ToList();
-        return origem.Where(id => id is Guid g && g != Guid.Empty).Select(id => id!.Value).Distinct().ToList();
     }
 
     private void RevogarAnteriores(Guid reservaId, Guid? passageiroId)

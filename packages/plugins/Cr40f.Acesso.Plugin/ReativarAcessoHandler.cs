@@ -18,6 +18,7 @@ public sealed class ReativarAcessoHandler
     {
         var saida = new ReativacaoSaida { LinkApp = _cfg.AppUrl };
         var etapas = saida.Etapas;
+        etapas.Trace = _trace;
         try
         {
             var f = _repo.PorId(funcionarioId) ?? throw new AcessoException("FUNCIONARIO_NAO_ENCONTRADO", "Funcionário não encontrado.");
@@ -47,6 +48,7 @@ public sealed class ReativarAcessoHandler
                 _graph.AdicionarAoGrupo(_cfg.GroupId, u.Id); etapas.Feita("grupo", "adicionado");
             });
 
+            // Pendente não impede a senha: o Dataverse libera sozinho e o cadastro do funcionário não muda aqui.
             CadastrarAcessoHandler.GarantirSystemuser(etapas, _usuarios, _pp, u.Id);
 
             // Senha por último: uma falha antes não deixa senha nova que ninguém viu; sem permissão (403) o resto já ficou feito.

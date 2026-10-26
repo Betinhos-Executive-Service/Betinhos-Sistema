@@ -15,7 +15,7 @@ import { AditivoAssinatura } from './AditivoAssinatura'
 import { FieldInput } from './FieldInput'
 import { ImageDrop } from './ImageDrop'
 import { AnotacoesTab } from './Anotacoes'
-import { AcessoApp } from './AcessoApp'
+import { AcessoApp, type EstadoAcesso, SeloApp, useContaApp } from './AcessoApp'
 import type { AcessoInicial, AcessoSource } from '../data/acesso'
 import { DocumentosArquivos } from './DocumentosArquivos'
 import { Checklist } from '../../documentos/components/Checklist'
@@ -25,10 +25,11 @@ import { SecretText } from './SecretText'
 import { useNotify } from './Toasts'
 import { VeiculoPicker } from './VeiculoPicker'
 
-type Tab = 'dados' | 'documentos' | 'multas' | 'veiculos' | 'equipamentos' | 'anotacoes'
+type Tab = 'dados' | 'documentos' | 'acesso' | 'multas' | 'veiculos' | 'equipamentos' | 'anotacoes'
 const TABS: { key: Tab; label: string }[] = [
   { key: 'dados', label: 'Dados' },
   { key: 'documentos', label: 'Documentos' },
+  { key: 'acesso', label: 'Acesso' },
   { key: 'multas', label: 'Multas' },
   { key: 'veiculos', label: 'Veículos' },
   { key: 'equipamentos', label: 'Equipamentos' },
@@ -48,9 +49,12 @@ type Props = {
   versao?: number
   acesso?: AcessoSource | null
   onCadastrarAcesso?: (inicial: AcessoInicial) => void
+  /** E-mail criado pelo cadastro cuja liberação no Dataverse ficou pendente (ainda não gravado na ficha). */
+  emailPendente?: string
+  onLiberacaoConcluida?: (id: string) => void
 }
 
-export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, versao, acesso, onCadastrarAcesso }: Props) {
+export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, versao, acesso, onCadastrarAcesso, emailPendente, onLiberacaoConcluida }: Props) {
   const notify = useNotify()
   const [original, setOriginal] = useState<Funcionario | null>(null)
   const [draft, setDraft] = useState<Draft>(emptyDraft)
@@ -92,6 +96,23 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
   }, [id, source, versao])
 
   useEffect(() => { panel.current?.focus() }, [id])
+
+  const emailFicha = String(original?.values.cr40f_emailmicrosoft ?? '')
+  // Sem o módulo de acesso (ex.: ficha aberta pela Central de Documentos) não consulta o usuário do app.
+  const [conta, setConta] = useContaApp(acesso ? emailFicha : '', source.usuarioDoApp)
+  const estadoAcesso: EstadoAcesso = emailFicha ? conta : emailPendente ? 'liberando' : 'sem'
+
+  async function recarregarAposLiberacao() {
+    if (!original) return
+    try {
+      const fresh = await source.get(original.id)
+      // Só o e-mail vem do plugin: edições não salvas da aba Dados continuam no rascunho.
+      setOriginal(fresh); setDraft((d) => ({ ...d, values: { ...d.values, cr40f_emailmicrosoft: fresh.values.cr40f_emailmicrosoft } }))
+      onLiberacaoConcluida?.(original.id)
+    } catch (reason) {
+      notify('error', `Liberação concluída, mas a ficha não recarregou: ${errorMessage(reason)}.`)
+    }
+  }
 
   const dirty = useMemo(() => changedKeys(original, draft), [original, draft])
   const baseline = useMemo(() => JSON.stringify(original ? draftFrom(original) : emptyDraft()), [original])
@@ -192,6 +213,7 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
             <h2 id="ficha-title">{nome}</h2>
             <div className="cluster">
               {original && <StatusBadge value={original.values.cr40f_status} />}
+              {original && acesso && <SeloApp estado={estadoAcesso} />}
               {original && <span className="muted">{optionLabel(FUNCAO, original.values.cr40f_funcao)}</span>}
               {alertas.map((alerta) => <AlertBadge key={alerta.kind} alerta={alerta} />)}
               {/* Mesma regra do termo de multa (frota temAditivo): só vale com a data e o PDF. */}
@@ -220,7 +242,7 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
                 <fieldset key={group} className="group">
                   <legend>{GROUP_LABELS[group]}</legend>
                   <div className="fields">
-                    {FIELDS.filter((field) => field.group === group && !(isNew && field.readonly)).map((field) => (
+                    {FIELDS.filter((field) => field.group === group && !(isNew && field.readonly) && !(acesso && field.key === 'cr40f_emailmicrosoft')).map((field) => (
                       <FieldInput
                         key={field.key}
                         field={field}
@@ -239,15 +261,6 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
                   </div>
                 </fieldset>
               ))}
-              {original && acesso && (
-                <AcessoApp
-                  funcionario={original}
-                  acesso={acesso}
-                  usuarioDoApp={source.usuarioDoApp}
-                  onAlterado={() => onSaved(original.id, false)}
-                  onCadastrar={() => onCadastrarAcesso?.({ funcionarioId: original.id, nomeCompleto: String(original.values.cr40f_nomecompleto ?? ''), celular: String(original.values.cr40f_telefonecorporativo ?? '') })}
-                />
-              )}
             </form>
           )}
 
@@ -263,12 +276,36 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
               <DocumentosArquivos source={source} id={original.id} />
               <div className="images">
                 <ImageDrop label="Foto" src={original.fotoUrl} onUpload={(file) => upload('cr40f_foto', file)} />
-                <ImageDrop label="Assinatura" src={original.assinaturaUrl} onUpload={(file) => upload('cr40f_assinatura', file)} />
               </div>
               {link
                 ? <a className={buttonClassName({ variant: 'secondary' })} href={link} target="_blank" rel="noopener noreferrer"><FolderOpen size={16} aria-hidden /> Pasta antiga no OneDrive</a>
                 : null}
-              <SecretText html={original.loginsesenhas} onSave={async (html) => { await source.saveLogins(original.id, html); setOriginal(await source.get(original.id)) }} />
+            </div>
+          )}
+
+          {!loading && original && tab === 'acesso' && (
+            <div className="acesso-aba">
+              {acesso && (
+                <AcessoApp
+                  funcionario={original}
+                  acesso={acesso}
+                  estado={estadoAcesso}
+                  setConta={setConta}
+                  emailPendente={emailPendente}
+                  onAtualizado={() => void recarregarAposLiberacao()}
+                  onAlterado={() => onSaved(original.id, false)}
+                  onCadastrar={() => onCadastrarAcesso?.({ funcionarioId: original.id, nomeCompleto: String(original.values.cr40f_nomecompleto ?? ''), celular: String(original.values.cr40f_telefonecorporativo ?? '') })}
+                />
+              )}
+              <section className="group">
+                <SecretText html={original.loginsesenhas} onSave={async (html) => { await source.saveLogins(original.id, html); setOriginal(await source.get(original.id)) }} />
+              </section>
+              <section className="group" aria-labelledby="acesso-assinatura-titulo">
+                <h3 id="acesso-assinatura-titulo" className="acesso-bloco__titulo">Assinatura eletrônica</h3>
+                <div className="images">
+                  <ImageDrop label="Assinatura" src={original.assinaturaUrl} onUpload={(file) => upload('cr40f_assinatura', file)} />
+                </div>
+              </section>
             </div>
           )}
 
