@@ -303,8 +303,8 @@ export const Cell = memo(function Cell({ row, column, info, status, onSave, onRe
       onDoubleClick={() => { if (!editingRef.current && canEdit) begin() }}
       onBlur={onBlur}
     >
-      {!editing && isProtegido(row, column) ? <ProtecaoLock id={id} attribute={column.attribute} label={label} atual={text} info={info} /> : null}
       {editing ? <div className="gr-cell__editor">{control}</div> : value}
+      {!editing && isProtegido(row, column) ? <ProtecaoLock id={id} attribute={column.attribute} label={label} atual={text} info={info} /> : null}
       {!editing && status.kind === 'saving' ? <span className="gr-cell__mark"><Spinner size={12} label="Gravando" /></span> : null}
       {!editing && status.kind === 'saved' ? <span className="gr-cell__mark" role="img" aria-label="Salvo"><Check size={14} aria-hidden="true" /></span> : null}
       {message ? (
