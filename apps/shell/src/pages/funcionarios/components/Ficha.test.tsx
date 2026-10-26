@@ -20,7 +20,7 @@ function fakeSource(save: DataSource['save'], extra: Partial<DataSource> = {}): 
   return {
     mode: 'mock', envLabel: 'TEST',
     list: async () => [record], get: async () => structuredClone(record), save,
-    uploadImage: async () => {}, uploadAditivo: async () => {}, saveLogins: async () => {}, multas: async () => [], posses: async () => [], equipamentos: async () => [], anotacoes: async () => [], addAnotacao: async () => {}, updateAnotacao: async () => {}, deleteAnotacao: async () => {}, limitesAnexo: async () => ({ maxBytes: 5e6, bloqueadas: [] }), anexo: async () => ({ nome: 'a', blob: new Blob() }),
+    uploadImage: async () => {}, removeImage: async () => {}, uploadAditivo: async () => {}, saveLogins: async () => {}, multas: async () => [], posses: async () => [], equipamentos: async () => [], anotacoes: async () => [], addAnotacao: async () => {}, updateAnotacao: async () => {}, deleteAnotacao: async () => {}, limitesAnexo: async () => ({ maxBytes: 5e6, bloqueadas: [] }), anexo: async () => ({ nome: 'a', blob: new Blob() }),
     documentos: { pasta: () => '', listar: async () => [], enviar: async () => { throw new Error('n/a') }, abrir: async () => ({ nome: '', blob: new Blob() }), excluir: async () => {} },
     usuarioDoApp: async () => null, searchVeiculos: async () => [], openForm: () => {},
     ...extra,

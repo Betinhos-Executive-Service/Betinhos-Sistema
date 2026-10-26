@@ -13,6 +13,7 @@ import { errorMessage } from '../data/xrm'
 import { AditivoBadge, AlertBadge, Avatar, StatusBadge } from './Badges'
 import { AditivoAssinatura } from './AditivoAssinatura'
 import { FieldInput } from './FieldInput'
+import { FotoPerfil } from './FotoPerfil'
 import { ImageDrop } from './ImageDrop'
 import { AnotacoesTab } from './Anotacoes'
 import { AcessoApp, type EstadoAcesso, SeloApp, useContaApp } from './AcessoApp'
@@ -188,6 +189,18 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
     }
   }
 
+  async function removerImagem(field: ImageField) {
+    if (!original) return
+    try {
+      await source.removeImage(original.id, field)
+      setOriginal(await source.get(original.id))
+      notify('success', 'Foto removida.')
+      onSaved(original.id, false)
+    } catch (reason) {
+      notify('error', `Foto não removida: ${errorMessage(reason)}`)
+    }
+  }
+
   const link = typeof draft.values.cr40f_linkparadocumentos === 'string' ? draft.values.cr40f_linkparadocumentos : ''
 
   return (
@@ -208,7 +221,9 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
           </div>
         )}
         <header className="drawer-head">
-          <Avatar name={nome} src={original?.fotoUrl ?? original?.fotoThumb ?? null} size={mobile ? 64 : 56} />
+          {original
+            ? <FotoPerfil name={nome} src={original.fotoUrl ?? original.fotoThumb} size={mobile ? 64 : 56} onUpload={(file) => upload('cr40f_foto', file)} onRemove={() => removerImagem('cr40f_foto')} />
+            : <Avatar name={nome} src={null} size={mobile ? 64 : 56} />}
           <div className="drawer-title">
             <h2 id="ficha-title">{nome}</h2>
             <div className="cluster">
@@ -274,9 +289,6 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
               ) : null}
               {docs ? <h3 className="doc-checklist__title">Outros arquivos</h3> : null}
               <DocumentosArquivos source={source} id={original.id} />
-              <div className="images">
-                <ImageDrop label="Foto" src={original.fotoUrl} onUpload={(file) => upload('cr40f_foto', file)} />
-              </div>
               {link
                 ? <a className={buttonClassName({ variant: 'secondary' })} href={link} target="_blank" rel="noopener noreferrer"><FolderOpen size={16} aria-hidden /> Pasta antiga no OneDrive</a>
                 : null}

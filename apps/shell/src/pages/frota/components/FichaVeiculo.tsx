@@ -1,6 +1,6 @@
-import { Check, Copy, ExternalLink, ImageUp } from 'lucide-react'
-import { Alert, Button, Drawer, EmptyState, StatusBadge } from '@betinhos/ui'
-import { useEffect, useMemo, useRef, useState, type DragEvent, type SyntheticEvent } from 'react'
+import { Camera, Check, Copy, Eye, ExternalLink, ImageUp } from 'lucide-react'
+import { Alert, Button, Dialog, Drawer, EmptyState, Menu, StatusBadge } from '@betinhos/ui'
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { useQueryPeriodo } from '../../../nav/queryState'
 import { formatBR } from '../data/dates'
 import { NAO_INFORMADO } from '../data/format'
@@ -13,7 +13,10 @@ import { motoristaAtual, possesAbertas, rotuloMotoristaAtual } from '../domain/m
 import { buildTimeline } from '../domain/timeline'
 import { buildPromptImagem, faltasPrompt } from '../domain/promptImagem'
 import { CustoTotal } from './CustoTotal'
-import { FotoVeiculo, invalidarFoto } from './FotoVeiculo'
+import { ContemEsc } from '../../../app/ContemEsc'
+import { FotoAmpliada } from '../../../app/FotoAmpliada'
+import { FOTO_MAX_BYTES } from '../data/sharepoint'
+import { FotoVeiculo, invalidarFoto, useFotoVeiculo } from './FotoVeiculo'
 import { Preventivas } from './Preventivas'
 import { useNotify } from './Toasts'
 import { Checklist } from '../../documentos/components/Checklist'
@@ -24,8 +27,6 @@ const TABELAS_TIMELINE: { key: 'manutencoes' | 'multas' | 'colisoes' | 'posses';
 ]
 
 const TIPOS_FOTO = ['image/png', 'image/jpeg', 'image/webp']
-/** `onCancel` não está nos tipos de <div>, mas o React o repassa pela árvore; espalhado para o TS aceitar. */
-const pararCancel = { onCancel: (event: SyntheticEvent) => event.stopPropagation() }
 
 export function FichaVeiculo({ source, docs, id, data, errors, today, secao = null, onClose, onOpen, onReload }: { source: DataSource; docs?: DocsSource | null; id: string; errors: LoadResult['errors']; data: FrotaData; today: string; secao?: 'preventivas' | null; onClose: () => void; onOpen: (kind: Kind, id: string) => void; onReload: () => void }) {
   const notify = useNotify()
@@ -53,8 +54,20 @@ export function FichaVeiculo({ source, docs, id, data, errors, today, secao = nu
     }
   }
 
-  async function enviarFoto(file: File | undefined) {
+  // Arrastar, colar ou escolher um arquivo nunca troca direto: a foto nova aparece para confirmar.
+  const [pendente, setPendente] = useState<{ file: File; url: string } | null>(null)
+  const [vendo, setVendo] = useState(false)
+  const foto = useFotoVeiculo(source, id, Boolean(veiculo))
+  useEffect(() => () => { if (pendente) URL.revokeObjectURL(pendente.url) }, [pendente])
+  function propor(file: File | undefined) {
     if (!file) return
+    if (!TIPOS_FOTO.includes(file.type)) { notify('error', 'Use uma imagem PNG, JPG ou WEBP.'); return }
+    if (file.size > FOTO_MAX_BYTES) { notify('error', 'A imagem passa de 10 MB.'); return }
+    if (!enviando) setPendente({ file, url: URL.createObjectURL(file) })
+  }
+
+  async function enviarFoto(file: File) {
+    setPendente(null)
     setEnviando(true)
     try {
       await source.enviarFotoVeiculo(id, file)
@@ -64,13 +77,12 @@ export function FichaVeiculo({ source, docs, id, data, errors, today, secao = nu
       notify('error', errorMessage(reason))
     } finally {
       setEnviando(false)
-      if (arquivo.current) arquivo.current.value = ''
     }
   }
 
-  // Igual ao Auto Prime: com a ficha aberta, Ctrl+V de uma imagem já envia a foto principal.
-  const enviarRef = useRef(enviarFoto)
-  enviarRef.current = enviarFoto
+  // Igual ao Auto Prime: com a ficha aberta, Ctrl+V de uma imagem propõe a troca da foto principal.
+  const proporRef = useRef(propor)
+  proporRef.current = propor
   useEffect(() => {
     if (!veiculo) return
     const onPaste = (event: ClipboardEvent) => {
@@ -80,19 +92,17 @@ export function FichaVeiculo({ source, docs, id, data, errors, today, secao = nu
         .find((item): item is File => Boolean(item))
       if (!file) return
       event.preventDefault()
-      if (!enviando) void enviarRef.current(file)
+      proporRef.current(file)
     }
     window.addEventListener('paste', onPaste)
     return () => window.removeEventListener('paste', onPaste)
-  }, [veiculo, enviando])
+  }, [veiculo])
 
   const [arrastando, setArrastando] = useState(false)
   const soltarFoto = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
     setArrastando(false)
-    const file = Array.from(event.dataTransfer.files).find((item) => TIPOS_FOTO.includes(item.type))
-    if (!file) { notify('error', 'Use uma imagem PNG, JPG ou WEBP.'); return }
-    if (!enviando) void enviarFoto(file)
+    propor(Array.from(event.dataTransfer.files).find((item) => TIPOS_FOTO.includes(item.type)) ?? event.dataTransfer.files[0])
   }
 
   async function abrirCadastro() {
@@ -110,6 +120,11 @@ export function FichaVeiculo({ source, docs, id, data, errors, today, secao = nu
   useEffect(() => {
     if (secao === 'preventivas' && temVeiculo) document.getElementById(`${id}-preventivas`)?.scrollIntoView?.({ block: 'start' })
   }, [secao, id, temVeiculo])
+
+  const rosto = <>
+    <FotoVeiculo source={source} id={id} size="hero" alt="" />
+    <span className="frota-foto-botao__veu" aria-hidden>{foto.url ? <Camera size={20} /> : <ImageUp size={20} />}</span>
+  </>
 
   const erro = (nome: string, mensagem: string) => <Alert key={nome} tone="danger">Não foi possível carregar {nome}: {mensagem}</Alert>
 
@@ -132,22 +147,46 @@ export function FichaVeiculo({ source, docs, id, data, errors, today, secao = nu
             className="frota-foto-drop"
             data-ativo={arrastando || undefined}
             onDragOver={(event) => { if (Array.from(event.dataTransfer.types).includes('Files')) { event.preventDefault(); setArrastando(true) } }}
-            onDragLeave={() => setArrastando(false)}
+            onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setArrastando(false) }}
             onDrop={soltarFoto}
           >
-            <FotoVeiculo source={source} id={id} size="hero" alt={`Foto do veículo ${veiculo.placa}`} />
-            {(arrastando || enviando) && <span className="frota-foto-drop__aviso" role="status">{enviando ? 'Enviando foto…' : 'Solte para trocar a foto principal'}</span>}
+            {foto.url ? (
+              <Menu
+                align="start"
+                trigger={(props) => (
+                  <button type="button" {...props} className="frota-foto-botao" disabled={enviando} aria-label={`Foto do veículo ${veiculo.placa}: ver ou trocar`}>{rosto}</button>
+                )}
+                actions={[
+                  { id: 'ver', label: 'Ver foto', icon: <Eye size={16} />, onSelect: () => setVendo(true) },
+                  { id: 'trocar', label: 'Trocar foto', icon: <ImageUp size={16} />, onSelect: () => arquivo.current?.click() },
+                ]}
+              />
+            ) : (
+              <button type="button" className="frota-foto-botao" disabled={enviando || foto.loading} aria-label={`Adicionar foto do veículo ${veiculo.placa}`} onClick={() => arquivo.current?.click()}>{rosto}</button>
+            )}
+            {(arrastando || enviando) && <span className="frota-foto-drop__aviso" role="status">{enviando ? 'Enviando foto…' : 'Solte para escolher a nova foto'}</span>}
+            <input ref={arquivo} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(event) => { propor(event.target.files?.[0]); event.target.value = '' }} />
           </div>
-          <p className="frota-muted frota-foto-dica">Cole uma imagem (Ctrl+V) ou arraste para cá para trocar a foto principal.</p>
+          <p className="frota-muted frota-foto-dica">Clique na foto para ver ou trocar. Também dá para arrastar ou colar (Ctrl+V) uma imagem.</p>
           <div className="frota-cluster">
             <Button variant="secondary" icon={copiado ? <Check size={16} /> : <Copy size={16} />} onClick={() => void copiarPrompt()} disabled={faltas.length > 0} title={faltas.length > 0 ? `Falta: ${faltas.join(', ')}` : 'Copia o prompt para gerar a foto padronizada'}>
               {copiado ? 'Prompt copiado' : 'Copiar prompt da imagem'}
             </Button>
-            <Button variant="secondary" icon={<ImageUp size={16} />} loading={enviando} onClick={() => arquivo.current?.click()}>
-              {enviando ? 'Enviando…' : 'Enviar foto principal'}
-            </Button>
-            <input ref={arquivo} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(event) => void enviarFoto(event.target.files?.[0])} />
           </div>
+          <ContemEsc>
+          {vendo && foto.url ? <FotoAmpliada src={foto.url} alt={`Foto do veículo ${veiculo.placa}`} legenda={[veiculo.placa, veiculo.marca, veiculo.modelo].filter(Boolean).join(' · ')} onClose={() => setVendo(false)} /> : null}
+          <Dialog
+            open={pendente !== null}
+            onClose={() => setPendente(null)}
+            title={foto.url ? 'Trocar a foto principal por esta?' : 'Usar esta foto?'}
+            actions={<>
+              <Button variant="secondary" onClick={() => setPendente(null)}>Cancelar</Button>
+              <Button onClick={() => { if (pendente) void enviarFoto(pendente.file) }}>Usar foto</Button>
+            </>}
+          >
+            {pendente ? <img className="frota-foto-previa" src={pendente.url} alt="Nova foto do veículo" /> : null}
+          </Dialog>
+          </ContemEsc>
           {faltas.length > 0 && <p className="frota-muted">Para copiar o prompt, falta: {faltas.join(', ')}.</p>}
           <section className="frota-group" aria-labelledby={`${id}-dados`}>
             <h3 id={`${id}-dados`} className="frota-group__title">Dados</h3>
@@ -162,11 +201,10 @@ export function FichaVeiculo({ source, docs, id, data, errors, today, secao = nu
           {docs ? (
             <section className="frota-group" aria-labelledby={`${id}-docs`}>
               <h3 id={`${id}-docs`} className="frota-group__title">Documentos</h3>
-              {/* Diálogos do checklist (excluir, renovar) são <dialog> dentro deste Drawer: o "cancel" (Esc) deles sobe pela árvore do
-                  React e fecharia a ficha inteira; aqui ele para. */}
-              <div style={{ display: 'contents' }} {...pararCancel}>
+              {/* Diálogos do checklist (excluir, renovar) são <dialog> dentro deste Drawer. */}
+              <ContemEsc>
                 <Checklist source={docs} donoId={id} titulo="" />
-              </div>
+              </ContemEsc>
             </section>
           ) : null}
           <section className="frota-group" aria-labelledby={`${id}-custo`}>
