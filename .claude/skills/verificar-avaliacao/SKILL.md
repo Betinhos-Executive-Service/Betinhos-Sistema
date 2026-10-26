@@ -5,7 +5,7 @@ description: "Verifica o lado Dataverse da avaliação do link de acompanhamento
 # Verificar avaliação do serviço (Dataverse)
 
 ## Cobre
-- `packages/deploy/provision-avaliacao-schema.ps1`: tabela `cr40f_avaliacaoservico` (set `cr40f_avaliacaoservicos`), colunas `cr40f_name` (200, obrigatório), `cr40f_nota` (1–5, obrigatório), `cr40f_comentario`, `cr40f_classificacao` (100000000 Elogio, 100000001 Sugestão, 100000002 Reclamação, 100000003 Sem comentário), `cr40f_linkid`, `cr40f_avaliadoem`, lookups `cr40f_reserva`, `cr40f_motorista`, `cr40f_veiculo`, `cr40f_boaideia`, `cr40f_errooperacional` (todos RemoveLink) e chave alternativa `cr40f_linkid_unico`.
+- `packages/deploy/provision-avaliacao-schema.ps1`: tabela `cr40f_avaliacaoservico` (set `cr40f_avaliacaoservicos`), colunas `cr40f_name` (200, obrigatório), `cr40f_nota` (1–5, obrigatório), `cr40f_comentario`, `cr40f_classificacao` (100000000 Elogio, 100000001 Sugestão, 100000002 Reclamação, 100000003 Sem comentário), `cr40f_linkid`, `cr40f_avaliadoem`, lookups `cr40f_reserva`, `cr40f_motorista`, `cr40f_veiculo`, `cr40f_boaideia`, `cr40f_errooperacional` (todos RemoveLink) e chave alternativa `cr40f_linkidunico`.
 - `packages/deploy/provision-flow-avaliacao.ps1`: flow `Link | Registrar avaliação`, gatilho `{ linkId, titulo, nota, comentario, classificacao, avaliadoEm }`.
   O flow acha a reserva por `new_linkacompanhamento` terminando em `/<linkId>` e pega dela `cr40f_id`, `_cr40f_motorista_value` e o veículo (`new_veiculoreal`, senão `cr40f_veiculo`).
 - `packages/deploy/solucoes/regras.json`: regra `"14"` (chave alternativa) → BetinhosCore.
