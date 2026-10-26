@@ -13841,10 +13841,18 @@ select,
 .concept-pending-dot { width: 8px; height: 8px; border-radius: 50%; background: #2159d2; }
 .concept-pending-chevron { color: #6b7788; font-size: 1.2rem; line-height: 1; }
 
+/* A grade ocupa a sobra da tela: linhas de no mínimo 84px, até 132px em aparelhos altos; o ícone acompanha a altura do bloco (cqh). */
+.concept-shell { display: flex; flex-direction: column; }
+.concept-shell > * { flex-shrink: 0; }
+
 .concept-tile-grid {
   display: grid;
+  flex: 1 0 0;
+  min-height: calc(3 * 84px + 2 * 8px);
+  max-height: calc(3 * 132px + 2 * 12px);
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  grid-auto-rows: minmax(84px, 1fr);
+  gap: clamp(8px, 1.4dvh, 12px);
 }
 
 .concept-tile {
@@ -13852,33 +13860,35 @@ select,
   justify-items: center;
   align-content: center;
   gap: 6px;
-  min-height: 84px;
-  padding: 10px 4px;
-  border: 1px solid rgba(0, 14, 35, 0.08);
-  border-radius: 16px;
+  padding: 8px 4px;
+  container-type: size;
+  border: 1px solid rgba(0, 14, 35, 0.1);
+  border-radius: 18px;
   color: #000e23;
   background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 14, 35, 0.06), 0 6px 16px rgba(0, 14, 35, 0.07);
   font: inherit;
   cursor: pointer;
-  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 180ms ease;
 }
 
-.concept-tile:active { transform: scale(0.96); }
+.concept-tile:active { transform: scale(0.96); box-shadow: 0 1px 2px rgba(0, 14, 35, 0.06); }
 .concept-tile:disabled { cursor: not-allowed; opacity: 0.48; }
 .concept-tile:focus-visible, .concept-pending-row:focus-visible { outline: 0; box-shadow: 0 0 0 3px rgba(33, 89, 210, 0.22); }
 
 .concept-tile-icon {
   position: relative;
   display: grid;
-  width: 40px;
-  height: 40px;
+  width: clamp(34px, 42cqh, 56px);
+  height: clamp(34px, 42cqh, 56px);
   place-items: center;
-  border-radius: 12px;
-  background: #fcfcfb;
+  border-radius: 14px;
+  color: #001a3d;
+  background: rgba(0, 26, 61, 0.06);
 }
 
-.concept-tile-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-.concept-tile-icon img { width: 22px; height: 22px; object-fit: contain; }
+.concept-tile-icon svg { width: clamp(20px, 22cqh, 28px); height: clamp(20px, 22cqh, 28px); fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.concept-tile-icon img { width: clamp(20px, 22cqh, 28px); height: clamp(20px, 22cqh, 28px); object-fit: contain; }
 
 .concept-tile-badge {
   position: absolute;
@@ -13897,7 +13907,7 @@ select,
 }
 
 .concept-tile-label {
-  font-size: clamp(0.72rem, 3.4vw, 0.8rem);
+  font-size: clamp(0.72rem, min(3.4vw, 1.9dvh), 0.9rem);
   font-weight: 800;
   line-height: 1.2;
   text-align: center;
