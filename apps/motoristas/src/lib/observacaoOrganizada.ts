@@ -58,22 +58,45 @@ export function summaryFinalValue(summary: SummaryState) {
   return summary.status === "ready" ? buildOrganizedObservation(summary.topicos, summary.from) : summary.from;
 }
 
-export type TopicKind = "atraso" | "espera" | "pedagio" | "combustivel" | "passageiro" | "ocorrencia" | "outros";
+export type TopicKind =
+  | "atraso" | "espera" | "pedagio" | "combustivel" | "ocorrencia" | "passageiro" | "local" | "rota"
+  | "cafe" | "refeicao" | "pagamento" | "veiculo" | "aeroporto" | "bagagem" | "documento" | "contato"
+  | "limpeza" | "clima" | "elogio" | "reclamacao" | "cancelamento" | "seguranca" | "hospedagem"
+  | "concluido" | "outros";
 
+// A ordem importa: a primeira regra que casar vence (específicas antes de genéricas).
 const TOPIC_RULES: Array<[TopicKind, RegExp]> = [
   ["atraso", /\batras/],
-  ["espera", /\besper|aguard/],
+  ["espera", /\besper|aguard|\bfila\b/],
   ["pedagio", /pedagio|estacionamento|estacionei|\bvaga\b/],
   ["combustivel", /combustivel|abastec|gasolina|etanol|diesel|tanque/],
   ["ocorrencia", /ocorrencia|acidente|batida|multa|pneu|policia|problema|avaria|quebr/],
+  ["cancelamento", /cancel|no.?show|nao compareceu|desist/],
+  ["seguranca", /seguranca|assalto|roubo|perigo|blitz/],
+  ["cafe", /cafe|lanche|biscoito|agua\b/],
+  ["refeicao", /almoc|jantar|refeicao|restaurante|comida/],
+  ["pagamento", /pagamento|pagou|dinheiro|troco|reembols|cartao|pix|gorjeta/],
+  ["bagagem", /bagagem|mala\b|malas|volume/],
+  ["documento", /documento|nota fiscal|recibo|voucher|assinatura|comprovante/],
+  ["contato", /telefone|ligou|ligacao|whatsapp|mensagem|contato/],
+  ["limpeza", /limpeza|lavag|higien|sujo|cheiro/],
+  ["clima", /chuva|tempestade|neblina|calor|alagament/],
+  ["aeroporto", /aeroporto|voo|desembarque|embarque|guarulhos|congonhas|viracopos/],
+  ["hospedagem", /hotel|hospedag|pousada|check.?in/],
+  ["veiculo", /veiculo|carro|van\b|ar.?condicionado|manutencao|oleo|revisao/],
   ["passageiro", /passageir|cliente|executivo/],
+  ["reclamacao", /reclam|insatisf|desagrad|queixa|grosser/],
+  ["elogio", /elogi|agradec|gostou|satisfeit|parabeniz/],
+  ["rota", /rodoanel|rodovia|estrada|transito|trajeto|rota\b|desvio|congestion|marginal|dutra|bandeirantes|anchieta/],
+  ["concluido", /tudo (certo|bem|ok|tranquil)|sem (problema|intercorrenc)|deu certo|concluid|finalizad|sucesso/],
+  ["local", /\bem [a-z]|\bna cidade|\bno local|\bchegou|\bchegada|\bsaida|\bdestino|\borigem|enderec|bairro/],
   ["outros", /^outros?\b/]
 ];
 
-/** Tipo do tópico por palavra-chave; null quando nada casa (sem ícone). */
-export function topicKind(topic: string): TopicKind | null {
+/** Tipo do tópico por palavra-chave; sem correspondência cai em "outros", então todo tópico tem ícone. */
+export function topicKind(topic: string): TopicKind {
   const text = topic.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  return TOPIC_RULES.find(([, rule]) => rule.test(text))?.[0] ?? null;
+  return TOPIC_RULES.find(([, rule]) => rule.test(text))?.[0] ?? "outros";
 }
 
 // Modo local (sem Xrm): uma frase por tópico, para navegar e conferir a tela.

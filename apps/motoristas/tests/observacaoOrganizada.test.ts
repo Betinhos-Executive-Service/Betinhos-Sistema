@@ -56,7 +56,11 @@ test("ícone por tipo do tópico, sem ícone quando não casa", () => {
   assert.equal(topicKind("Abasteci o carro."), "combustivel");
   assert.equal(topicKind("Pneu furou na marginal."), "ocorrencia");
   assert.equal(topicKind("Passageiro elogiou o serviço."), "passageiro");
-  assert.equal(topicKind("Tudo tranquilo."), null);
+  assert.equal(topicKind("Tudo tranquilo."), "concluido");
+  assert.equal(topicKind("Em Itabatã, tudo deu certo no local."), "concluido");
+  assert.equal(topicKind("Menção a um cafezinho e à Aline, sem detalhes adicionais no texto."), "cafe");
+  assert.equal(topicKind("Passageiro passou pelo Rodoanel."), "passageiro");
+  assert.equal(topicKind("Frase sem nenhuma palavra conhecida."), "outros");
 });
 
 test("confirmar grava tópicos e texto original no formato combinado", () => {

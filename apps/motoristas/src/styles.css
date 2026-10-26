@@ -3021,10 +3021,6 @@ svg {
   justify-content: center;
 }
 
-.observation-topic-icon.is-empty {
-  background: transparent;
-}
-
 .observation-topic-icon svg {
   width: 18px;
   height: 18px;
