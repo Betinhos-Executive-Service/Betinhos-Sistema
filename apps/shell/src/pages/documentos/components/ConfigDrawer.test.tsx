@@ -126,6 +126,29 @@ describe('ConfigDrawer', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
+  it('inativa um tipo depois de confirmar', async () => {
+    const { dialog, data, source, onChanged } = await montar()
+    const tipo = data.tipos[0]
+    const item = within(dialog).getByRole('listitem', { name: tipo.nome })
+    fireEvent.click(within(item).getByRole('button', { name: 'Inativar' }))
+    const confirmar = await screen.findByRole('dialog', { name: `Inativar ${tipo.nome}?` })
+    fireEvent.click(within(confirmar).getByRole('button', { name: 'Inativar' }))
+    await waitFor(() => expect(onChanged).toHaveBeenCalled())
+    expect((await source.carregar()).tipos.find((t) => t.id === tipo.id)?.ativo).toBe(false)
+  })
+
+  it('excluir fica bloqueado para tipo com documento e apaga tipo sem documento', async () => {
+    const { dialog, data, source, onChanged } = await montar()
+    const comDoc = data.tipos.find((t) => data.docs.some((d) => d.tipoId === t.id))!
+    const semDoc = data.tipos.find((t) => !data.docs.some((d) => d.tipoId === t.id))!
+    expect(within(dialog).getByRole('button', { name: `Excluir ${comDoc.nome}` })).toHaveProperty('disabled', true)
+    fireEvent.click(within(dialog).getByRole('button', { name: `Excluir ${semDoc.nome}` }))
+    const confirmar = await screen.findByRole('dialog', { name: `Excluir ${semDoc.nome}?` })
+    fireEvent.click(within(confirmar).getByRole('button', { name: 'Excluir' }))
+    await waitFor(() => expect(onChanged).toHaveBeenCalled())
+    expect((await source.carregar()).tipos.some((t) => t.id === semDoc.id)).toBe(false)
+  })
+
   it('adiciona e remove destinatário da categoria', async () => {
     const { dialog, source } = await montar()
     fireEvent.click(within(dialog).getByRole('tab', { name: 'Destinatários' }))

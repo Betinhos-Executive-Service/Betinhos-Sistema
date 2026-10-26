@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from 'react'
-import { Alert, Button, Checkbox, Dialog, Drawer, Field, Input, Select, Switch, Tabs, useToast } from '@betinhos/ui'
-import { Plus, Trash2 } from 'lucide-react'
+import { Alert, Button, Checkbox, Dialog, Drawer, Field, Input, Select, StatusBadge, Switch, Tabs, useToast } from '@betinhos/ui'
+import { Pencil, Plus, Power, RotateCcw, Trash2 } from 'lucide-react'
 import type { DocsSource } from '../data/source'
 import type { TipoInput } from '../data/queries'
 import { OBRIG_DA_CATEGORIA, OBRIG_LABEL } from '../domain/codes'
@@ -11,6 +11,8 @@ type Props = { source: DocsSource; data: DocsData; onClose: () => void; onChange
 type Aba = 'tipos' | 'destinatarios'
 /** Tipo em edição: `inicial` é o que abriu o formulário e serve para detectar alteração não salva. */
 type Edicao = { id?: string; inicial: TipoInput; form: TipoInput }
+/** Ação destrutiva aguardando confirmação na lista de tipos. */
+type Acao = { tipo: TipoDoc; tipoAcao: 'inativar' | 'excluir' }
 
 const CATEGORIAS: { value: Categoria; label: string }[] = [{ value: 'pessoas', label: 'Pessoas' }, { value: 'frota', label: 'Frota' }]
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e))
@@ -65,7 +67,14 @@ function Tipos({ source, data, onChanged, edicao, setEdicao, saving, setSaving, 
   const toast = useToast()
   const formId = useId()
   const [erro, setErro] = useState<string | null>(null)
-  const porCategoria = (c: Categoria) => data.tipos.filter((t) => t.categoria === c).sort((a, b) => a.ordem - b.ordem)
+  const [acao, setAcao] = useState<Acao | null>(null)
+  /** Ativos primeiro, cada grupo na ordem configurada. */
+  const porCategoria = (c: Categoria) => data.tipos.filter((t) => t.categoria === c).sort((a, b) => Number(b.ativo) - Number(a.ativo) || a.ordem - b.ordem)
+  const usos = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const d of data.docs) m.set(d.tipoId, (m.get(d.tipoId) ?? 0) + 1)
+    return m
+  }, [data.docs])
 
   const abrir = (id: string | undefined, form: TipoInput) => { setErro(null); setEdicao({ id, inicial: form, form }) }
   const set = (patch: Partial<TipoInput>) => setEdicao((e) => (e ? { ...e, form: { ...e.form, ...patch } } : e))
@@ -110,27 +119,76 @@ function Tipos({ source, data, onChanged, edicao, setEdicao, saving, setSaving, 
     )
   }
 
+  const executar = async () => {
+    if (!acao || saving) return
+    const { tipo, tipoAcao } = acao
+    setSaving(true)
+    try {
+      if (tipoAcao === 'excluir') await source.excluirTipo(tipo.id)
+      else await source.ativarTipo(tipo.id, false)
+      toast({ tone: 'success', message: tipoAcao === 'excluir' ? 'Tipo excluído' : 'Tipo inativado' }); setAcao(null); onChanged()
+    } catch (e) { toast({ tone: 'danger', message: `Não foi possível ${tipoAcao}: ${msg(e)}` }) } finally { setSaving(false) }
+  }
+  const reativar = async (t: TipoDoc) => {
+    setSaving(true)
+    try { await source.ativarTipo(t.id, true); toast({ tone: 'success', message: 'Tipo reativado' }); onChanged() }
+    catch (e) { toast({ tone: 'danger', message: `Não foi possível reativar: ${msg(e)}` }) } finally { setSaving(false) }
+  }
+
   return (
     <div className="doc-form">
-      {CATEGORIAS.map((c) => (
-        <section key={c.value} className="doc-checklist">
-          <h3 className="doc-checklist__title">{c.label}</h3>
-          <ul className="doc-checklist__list">
-            {porCategoria(c.value).map((t) => (
-              <li key={t.id} className="doc-item" aria-label={t.nome}>
-                <div className="doc-item__head">
-                  <strong className="doc-item__nome">{t.nome}</strong>
-                  <Button size="compact" variant="ghost" onClick={() => abrir(t.id, doTipo(t))}>Editar</Button>
-                </div>
-                <p className="doc-muted">{t.temValidade ? (t.validadePadraoMeses ? `Vence em ${t.validadePadraoMeses} meses` : 'Validade digitada') : 'Sem validade'}{t.obrigatorioPara.length ? ` · obrigatório: ${t.obrigatorioPara.map((x) => OBRIG_LABEL[x]).join(', ')}` : ''}</p>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-      <div className="doc-acoes">
-        <Button icon={<Plus size={16} />} onClick={() => abrir(undefined, novoTipo('pessoas', Math.max(0, ...data.tipos.map((t) => t.ordem)) + 1))}>Novo tipo</Button>
+      <div className="doc-config__topo">
+        <p className="doc-muted">Inativo some do checklist, das pendências e do resumo semanal; os documentos já enviados continuam guardados. Só dá para excluir tipo sem documento.</p>
+        <Button icon={<Plus size={16} />} disabled={saving} onClick={() => abrir(undefined, novoTipo('pessoas', Math.max(0, ...data.tipos.map((t) => t.ordem)) + 1))}>Novo tipo</Button>
       </div>
+      {CATEGORIAS.map((c) => {
+        const tipos = porCategoria(c.value)
+        return (
+          <section key={c.value} className="doc-checklist">
+            <h3 className="doc-checklist__title">{c.label} · {tipos.filter((t) => t.ativo).length} ativos</h3>
+            <ul className="doc-checklist__list">
+              {tipos.map((t) => {
+                const qtd = usos.get(t.id) ?? 0
+                return (
+                  <li key={t.id} className={`doc-item doc-tipo${t.ativo ? '' : ' doc-tipo--inativo'}`} aria-label={t.nome}>
+                    <div className="doc-item__head">
+                      <span className="doc-item__estado">
+                        <strong className="doc-item__nome">{t.nome}</strong>
+                        <code className="doc-tipo__codigo">{t.codigo}</code>
+                        {t.ativo ? null : <StatusBadge tone="neutral">Inativo</StatusBadge>}
+                      </span>
+                      <span className="doc-item__acoes">
+                        <Button size="compact" variant="ghost" icon={<Pencil size={14} />} disabled={saving} onClick={() => abrir(t.id, doTipo(t))}>Editar</Button>
+                        {t.ativo
+                          ? <Button size="compact" variant="ghost" icon={<Power size={14} />} disabled={saving} onClick={() => setAcao({ tipo: t, tipoAcao: 'inativar' })}>Inativar</Button>
+                          : <Button size="compact" variant="ghost" icon={<RotateCcw size={14} />} disabled={saving} onClick={() => void reativar(t)}>Reativar</Button>}
+                        <Button size="compact" variant="ghost" icon={<Trash2 size={14} />} disabled={saving || qtd > 0}
+                          title={qtd > 0 ? 'Tem documento emitido: use Inativar' : undefined} aria-label={`Excluir ${t.nome}`}
+                          onClick={() => setAcao({ tipo: t, tipoAcao: 'excluir' })} />
+                      </span>
+                    </div>
+                    <p className="doc-muted">
+                      {t.temValidade ? (t.validadePadraoMeses ? `Vence em ${t.validadePadraoMeses} meses` : 'Validade digitada') : 'Sem validade'}
+                      {` · ${qtd === 1 ? '1 documento' : `${qtd} documentos`}`}
+                      {t.obrigatorioPara.length ? ` · obrigatório: ${t.obrigatorioPara.map((x) => OBRIG_LABEL[x]).join(', ')}` : ''}
+                    </p>
+                  </li>
+                )
+              })}
+              {tipos.length ? null : <li className="doc-muted">Nenhum tipo de {c.label}.</li>}
+            </ul>
+          </section>
+        )
+      })}
+      <Dialog open={acao != null} onClose={() => { if (!saving) setAcao(null) }} title={acao?.tipoAcao === 'excluir' ? `Excluir ${acao.tipo.nome}?` : `Inativar ${acao?.tipo.nome ?? ''}?`}
+        actions={<>
+          <Button variant="secondary" disabled={saving} onClick={() => setAcao(null)}>Cancelar</Button>
+          <Button variant="danger" loading={saving} onClick={() => void executar()}>{acao?.tipoAcao === 'excluir' ? 'Excluir' : 'Inativar'}</Button>
+        </>}>
+        {acao?.tipoAcao === 'excluir'
+          ? 'O tipo é apagado de vez. Não dá para desfazer.'
+          : 'Ele deixa de aparecer no checklist, nas pendências e no resumo semanal. Os documentos já enviados ficam guardados e dá para reativar depois.'}
+      </Dialog>
     </div>
   )
 }
