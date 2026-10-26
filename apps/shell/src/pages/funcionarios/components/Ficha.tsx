@@ -222,7 +222,7 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
         )}
         <header className="drawer-head">
           {original
-            ? <FotoPerfil name={nome} src={original.fotoUrl ?? original.fotoThumb} size={mobile ? 64 : 56} onUpload={(file) => upload('cr40f_foto', file)} onRemove={() => removerImagem('cr40f_foto')} />
+            ? <FotoPerfil name={nome} src={original.fotoUrl} fallback={original.fotoThumb} size={mobile ? 64 : 56} onUpload={(file) => upload('cr40f_foto', file)} onRemove={() => removerImagem('cr40f_foto')} />
             : <Avatar name={nome} src={null} size={mobile ? 64 : 56} />}
           <div className="drawer-title">
             <h2 id="ficha-title">{nome}</h2>
