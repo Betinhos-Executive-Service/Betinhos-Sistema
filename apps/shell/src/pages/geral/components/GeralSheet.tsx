@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Row } from '@betinhos/dataverse'
 import { Button, Dialog, Field, Input, Select, Sheet, Switch, Textarea } from '@betinhos/ui'
-import { cellKind, MOTORISTA_TITLE } from '../domain/cells'
+import { cellKind, MOTORISTA_TITLE, readonlyHint } from '../domain/cells'
 import type { EditValue } from '../domain/edit'
 import { decideChoice, decideCommit, draftOf, lookupOptions, type PickedOption } from '../domain/editing'
 import { formatCell } from '../domain/format'
@@ -164,10 +164,12 @@ export function GeralSheet({ row, columns, attributes, cellStatus, open, onClose
             if (!column.alias && column.attribute === 'cr40f_id') return null
             const info = attributes?.get(column.key)
             if (cellKind(column, info) === 'readonly') {
+              const hint = readonlyHint(column)
               return (
                 <p key={column.key} className="gr-sheet__line">
                   <span>{columnLabel(column, info)}</span>
                   <strong>{formatCell('readonly', row, rowKey(column, info))}</strong>
+                  {hint ? <small className="gr-sheet__hint">{hint}</small> : null}
                 </p>
               )
             }

@@ -7,6 +7,15 @@ export const READONLY: ReadonlySet<string> = new Set([
   'cr40f_passageirosetelefonedecontato', 'cr40f_endereodesada', 'cr40f_perfildopassageiro', 'new_linkdovoucher', 'statecode', 'statuscode',
 ])
 
+/** Onde editar o que a célula só mostra. Passageiros: o plugin DriverRecordSharing monta o texto a partir dos vínculos e do cadastro. */
+const READONLY_HINTS: Record<string, string> = {
+  cr40f_passageirosetelefonedecontato: 'Edite pelos passageiros da OS.',
+}
+
+export function readonlyHint(column: Column): string | null {
+  return column.alias ? null : READONLY_HINTS[column.attribute] ?? null
+}
+
 /** Aviso do editor de motorista: a troca dispara avisos e a atribuição automática de veículo no Dataverse. */
 export const MOTORISTA_TITLE = 'Trocar o motorista dispara os avisos e a atribuição automática de veículo.'
 

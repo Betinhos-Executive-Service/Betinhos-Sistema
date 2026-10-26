@@ -2,7 +2,7 @@ import { memo, useEffect, useId, useRef, useState, type FocusEvent, type Keyboar
 import type { Row } from '@betinhos/dataverse'
 import { Button, Input, Select, Spinner, StatusBadge, Switch, Textarea, Tooltip, type SelectOption } from '@betinhos/ui'
 import { AlertTriangle, Check, Lock } from 'lucide-react'
-import { cellKind, MOTORISTA_TITLE, statusTone } from '../domain/cells'
+import { cellKind, MOTORISTA_TITLE, readonlyHint, statusTone } from '../domain/cells'
 import type { EditValue } from '../domain/edit'
 import { decideChoice, decideCommit, draftOf, lookupOptions, sameId, type PickedOption } from '../domain/editing'
 import { formatCell } from '../domain/format'
@@ -78,6 +78,7 @@ export const Cell = memo(function Cell({ row, column, info, status, onSave, onRe
   const text = formatCell(kind, row, key)
   const label = columnLabel(column, info)
   const canEdit = editable && kind !== 'readonly' && kind !== 'boolean'
+  const hint = kind === 'readonly' ? readonlyHint(column) : null
 
   const rootRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -282,7 +283,7 @@ export const Cell = memo(function Cell({ row, column, info, status, onSave, onRe
     )
   } else if (badge) value = <StatusBadge tone={statusTone(column.attribute, rawStatus)}>{text}</StatusBadge>
   else if (href && column.attribute === 'new_linkdovoucher') value = <a className="gr-cell__value" href={href} target="_blank" rel="noreferrer" title={text}>{text}</a>
-  else value = <span className="gr-cell__value" title={text}>{text}</span>
+  else value = <span className="gr-cell__value" title={hint ? `${text}\n${hint}` : text}>{text}</span>
 
   const classes = ['bt-table__cell', 'gr-cell', `gr-cell--${kind}`, canEdit && 'gr-cell--editable', editing && 'gr-cell--editing', `is-${state}`].filter(Boolean).join(' ')
 
@@ -310,7 +311,7 @@ export const Cell = memo(function Cell({ row, column, info, status, onSave, onRe
         </>
       ) : null}
       {!editing && status.kind === 'error' ? <Button variant="ghost" size="compact" onClick={retry}>Tentar de novo</Button> : null}
-      {kind === 'readonly' && editable && !message ? <span className="gr-cell__mark gr-cell__lock" role="img" aria-label="Somente leitura"><Lock size={12} aria-hidden="true" /></span> : null}
+      {kind === 'readonly' && editable && !message ? <span className="gr-cell__mark gr-cell__lock" role="img" aria-label={hint ? `Somente leitura. ${hint}` : 'Somente leitura'}><Lock size={12} aria-hidden="true" /></span> : null}
     </div>
   )
 })
