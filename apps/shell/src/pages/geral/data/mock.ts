@@ -1,5 +1,6 @@
 import type { ChoiceOption, Row } from '@betinhos/dataverse'
 import { formatDateTime, formatMoney, TZ } from '../domain/format'
+import { CAMPOS_PROTEGIDOS, SNAPSHOT_TENARIS, camposProtegidos, type Protecao } from '../domain/protecao'
 import { searchConditions } from '../domain/search'
 import { ENTITY, ID_ATTRIBUTE, type AttributeInfo, type AttributeMap, type LookupBind, type LookupOption, type Page, type Sort, type View } from '../domain/types'
 
@@ -49,12 +50,15 @@ export const MOCK_ATTRIBUTES: AttributeMap = new Map([
   info('cr40f_cotao', 'Money', 'Cotação'),
   info('cr40f_receber', 'Boolean', 'Receber', { options: SIM_NAO }),
   info('cr40f_observaointerna', 'Memo', 'Observação interna'),
+  // Atualizável na metadata, como no DEV: a trava vem de READONLY (o plugin DriverRecordSharing monta o texto).
+  info('cr40f_passageirosetelefonedecontato', 'Memo', 'Passageiros e telefone de contato'),
   info('createdon', 'DateTime', 'Criado em', { updatable: false }),
 ])
 
 const AGENDA_COLS = [
   'cr40f_id', 'cr40f_status', 'cr40f_statusdefaturamento', 'cr40f_dataehorriodesada', 'cr40f_motorista', 'cr40f_veiculo',
   'cr40f_tipodeveiculo', 'cr40f_cliente', 'cr40f_trajeto', 'cr40f_cotao', 'cr40f_receber', 'cr40f_observaointerna',
+  'cr40f_passageirosetelefonedecontato',
 ]
 const HOJE_COLS = ['cr40f_id', 'cr40f_dataehorriodesada', 'cr40f_status', 'cr40f_motorista', 'cr40f_veiculo', 'cr40f_cliente', 'cr40f_trajeto', 'cr40f_cotao']
 const SEM_MOTORISTA_COLS = ['cr40f_id', 'cr40f_dataehorriodesada', 'cr40f_status', 'cr40f_cliente', 'cr40f_solicitante', 'cr40f_trajeto', 'cr40f_tipodeveiculo', 'cr40f_cotao']
@@ -71,6 +75,14 @@ export function createMockViews(): View[] {
     { id: 'mock-hoje', nome: 'Hoje', grupo: 'sistema', padrao: false, fetchxml: fetch(HOJE_COLS, '<condition attribute="cr40f_dataehorriodesada" operator="today" />'), layoutxml: layout(HOJE_COLS) },
     { id: 'mock-sem-motorista', nome: 'Sem motorista', grupo: 'sistema', padrao: false, fetchxml: fetch(SEM_MOTORISTA_COLS, '<condition attribute="cr40f_motorista" operator="null" />'), layoutxml: layout(SEM_MOTORISTA_COLS) },
   ]
+}
+
+/** Texto no formato do plugin: vazio (OS sem vínculos), um passageiro ou vários (`;\r\n` entre eles, ` / ` entre telefones). */
+const paxText = (i: number) => {
+  const one = (n: number) => `Passageiro ${n} (11) 9${String(10000000 + n * 137).slice(0, 8)}`
+  if (i % 5 === 0) return null
+  if (i % 5 === 1) return [`${one(i + 1)} / (11) 3456-7890`, one(i + 2), `${one(i + 3)} / (21) 99876-5432`].join(';\r\n')
+  return one(i + 1)
 }
 
 const TRAJETOS = ['GRU → Hotel Unique', 'Hotel Fasano → CGH', 'Escritório Faria Lima → GRU', 'VCP → Alphaville', 'Residência → Evento Jockey', 'GRU → Hotel Tivoli', 'Santos → Aeroporto de Viracopos']
@@ -104,7 +116,7 @@ export function createMockRows(now: Date): Row[] {
       cr40f_receber: i % 3 !== 0,
       [`cr40f_receber${F}`]: i % 3 !== 0 ? 'Sim' : 'Não',
       cr40f_observaointerna: i % 4 === 0 ? 'Confirmar placa do veículo com o motorista.' : null,
-      cr40f_passageirosetelefonedecontato: `Passageiro ${i + 1} (11) 9${String(10000000 + i * 137).slice(0, 8)}`,
+      cr40f_passageirosetelefonedecontato: paxText(i),
       cr40f_endereodesada: 'Av. Brigadeiro Faria Lima, 1000',
       cr40f_destino: 'Aeroporto de Guarulhos',
       cr40f_obsdeoperao: null,
@@ -130,9 +142,27 @@ export function createMockRows(now: Date): Row[] {
     lookup('cr40f_solicitante', i * 3)
     // OS-1004 já tem OP gerada: cobre o caso "com OP" do comando Gerar OP.
     if (i === 4) row._cr40f_financeiro_value = 'cccccccc-0001-4000-8000-000000000004'
+    // A cada 6 serviços, um veio da Tenaris e teve trajeto e status editados (passageiros também consta, como no PROD, e fica de fora da trava).
+    if (i % 6 === 1) {
+      row[CAMPOS_PROTEGIDOS] = 'cr40f_trajeto, cr40f_status,cr40f_passageirosetelefonedecontato,cr40f_inexistente'
+      row[SNAPSHOT_TENARIS] = JSON.stringify({ cr40f_trajeto: 'São Paulo / Pindamonhangaba / São Paulo / Taubaté - Sem Espera', cr40f_status: '202410001' })
+    }
     rows.push(row)
   }
   return rows
+}
+
+/**
+ * Histórico do popover de campo protegido: OS-1007 simula perfil sem acesso à auditoria, OS-1013 auditoria sem a troca;
+ * as demais trazem a troca do valor da Tenaris para o atual, por Keila em 23/10 16:27 (São Paulo).
+ */
+export function mockProtecao(row: Row): Protecao {
+  const snapshot = row[SNAPSHOT_TENARIS] ?? null
+  if (row.cr40f_id === 'OS-1007') return { audits: 'sem-permissao', snapshot }
+  if (row.cr40f_id === 'OS-1013') return { audits: [], snapshot }
+  const fonte = typeof snapshot === 'string' ? (JSON.parse(snapshot) as Record<string, string>) : {}
+  const changedAttributes = [...camposProtegidos(row[CAMPOS_PROTEGIDOS])].map((logicalName) => ({ logicalName, oldValue: fonte[logicalName] ?? '', newValue: String(row[logicalName] ?? '') }))
+  return { audits: [{ changedata: JSON.stringify({ changedAttributes }), createdon: '2026-10-23T19:27:00Z', _userid_value: 'u-keila', [`_userid_value${F}`]: 'Keila, Deborah' }], snapshot }
 }
 
 export type MockFetchOptions = { page: number; pageSize: number; sort: Sort; query: string; quickFind: string[]; now: Date }

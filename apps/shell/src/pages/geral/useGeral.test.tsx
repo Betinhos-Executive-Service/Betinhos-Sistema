@@ -53,6 +53,21 @@ describe('useGeral', () => {
     expect(result.current.rows.find((r) => r.cr40f_id === 'OS-1013')?.cr40f_trajeto).toBe(antes)
   })
 
+  it('passageiros e telefone de contato nunca vão no PATCH (o plugin monta o texto)', async () => {
+    const source = createSource({ mode: 'mock' }, { latency: 0 })
+    const update = vi.spyOn(source, 'update')
+    const { result } = renderHook(() => useGeral(source))
+    await waitFor(() => expect(result.current.rows.length).toBe(100))
+    const row = result.current.rows[1]
+    const id = idOf(row)
+    const pax = result.current.columns.find((c) => c.attribute === 'cr40f_passageirosetelefonedecontato')!
+    let ok = true
+    await act(async () => { ok = await result.current.save(id, pax, 'Editado à mão') })
+    expect(ok).toBe(false)
+    expect(update).not.toHaveBeenCalled()
+    expect(result.current.rows[1].cr40f_passageirosetelefonedecontato).toBe(row.cr40f_passageirosetelefonedecontato)
+  })
+
   it('validação barra antes do servidor', async () => {
     const { result } = renderHook(() => useGeral(createSource({ mode: 'mock' }, { latency: 0 })))
     await waitFor(() => expect(result.current.rows.length).toBe(100))
