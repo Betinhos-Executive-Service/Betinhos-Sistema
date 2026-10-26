@@ -1,9 +1,9 @@
-import { Alert, Button, buttonClassName, Dialog, Field, Input } from '@betinhos/ui'
-import { AtSign, BriefcaseBusiness, ChevronDown, Copy, ExternalLink, IdCard, Mail, MessageCircle, Smartphone, User, X } from 'lucide-react'
+import { Alert, Button, buttonClassName, Dialog, Field, Input, SegmentedControl } from '@betinhos/ui'
+import { AtSign, Building2, Copy, ExternalLink, Handshake, IdCard, Mail, MessageCircle, Smartphone, User, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { type AcessoInicial, type AcessoSource, type CadastroInput, type CadastroResultado, type Etapa, ERROS_PERMANENTES, liberacaoPendente, MSG_PENDENTE, MSG_PENDENTE_DEMORADA, parseAcessoError, mensagemWhatsApp, whatsappComMensagem } from '../data/acesso'
 import { ListaEtapas, ProgressoAcesso, useRetentativa } from './AcessoProgresso'
-import { digitsOnly, formatCpf, isValidCpf, normalizeSearch } from '../data/format'
+import { digitsOnly, formatCelular, formatCpf, isValidCpf, normalizeSearch } from '../data/format'
 import type { FuncionarioParecido } from '../data/parecidos'
 import { ParecidosDialog } from './ParecidosDialog'
 import { VINCULO } from '../data/schema'
@@ -16,6 +16,10 @@ type Escolha = { funcionarioId?: string; criarNovo?: boolean }
 type Estado = { fase: 'form' } | { fase: 'conferindo' } | { fase: 'criando' } | { fase: 'resultado'; r: CadastroResultado } | { fase: 'erro'; mensagem: string; etapas: Etapa[] }
 
 const DOMINIO = 'betinhos.onmicrosoft.com'
+/** Na ordem de VINCULO: Colaborador, Terceiro. */
+const VINCULO_ICONES = [Building2, Handshake]
+const VINCULO_OPCOES = VINCULO.map((o, i) => { const Icone = VINCULO_ICONES[i]; return { value: String(o.value), label: <span className="acesso-opcao"><Icone size={16} aria-hidden />{o.label}</span> } })
+const opcional = (label: string) => <>{label} <span className="acesso-opcional">(opcional)</span></>
 
 /** primeiro.ultimo sem acentos; igual a AcessoRules.PrefixoEmail do plugin (só prévia: o plugin recalcula). */
 export function prefixoDeNome(nome: string) {
@@ -72,6 +76,8 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
   const criando = estado.fase === 'criando' || estado.fase === 'conferindo'
   const cpfErro = cpf && !isValidCpf(cpf) ? 'CPF inválido.' : undefined
   const prefixo = prefixoManual ?? prefixoDeNome(nome)
+  // Igual a AcessoRules.NomeValido do plugin: sem sobrenome ele recusa com NOME_INVALIDO.
+  const nomeErro = nome.trim() && !/\s/.test(nome.trim()) ? (inicial ? 'Inclua o sobrenome na ficha antes de criar o acesso.' : 'Informe nome e sobrenome.') : undefined
   const input: CadastroInput = { nomeCompleto: nome.trim(), celular: celular.trim(), emailPessoal: emailPessoal.trim() || undefined, prefixoEmail: prefixo.trim() || undefined, tipoVinculo: vinculo, funcionarioId: inicial?.funcionarioId ?? escolha?.funcionarioId, cpf: digitsOnly(cpf) || undefined, criarNovo: escolha?.criarNovo }
   const waHref = estado.fase === 'resultado' ? whatsappComMensagem(celular, mensagemWhatsApp({ nome, emailMicrosoft: estado.r.emailMicrosoft, senhaTemporaria: estado.r.senhaTemporaria, linkApp: estado.r.linkApp })) : null
 
@@ -144,23 +150,27 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
         <div className="drawer-body">
           {estado.fase !== 'resultado' && (
             <form id="acesso-form" onSubmit={(event) => { event.preventDefault(); void enviar() }}>
-              <Field label="Nome completo" required><Input prefix={<User size={16} aria-hidden />} value={nome} onChange={(e) => editar(setNome, e.target.value)} disabled={criando || Boolean(inicial)} autoComplete="off" /></Field>
-              <Field label="Celular" required hint="Com DDD. Recebe o link e a senha no WhatsApp."><Input prefix={<Smartphone size={16} aria-hidden />} inputMode="tel" value={celular} onChange={(e) => editar(setCelular, e.target.value)} disabled={criando} /></Field>
-              {!inicial && <Field label="CPF" hint="Opcional. Ajuda a achar cadastro duplicado." error={cpfErro}><Input prefix={<IdCard size={16} aria-hidden />} inputMode="numeric" value={cpf} onChange={(e) => editar(setCpf, formatCpf(e.target.value))} disabled={criando} autoComplete="off" /></Field>}
-              <Field label="E-mail pessoal" hint="Opcional, para recuperação de senha."><Input prefix={<Mail size={16} aria-hidden />} type="email" value={emailPessoal} onChange={(e) => setEmailPessoal(e.target.value)} disabled={criando} /></Field>
-              <Field label="Vínculo">
-                <div className="bt-control bt-control--input acesso-select">
-                  <span className="bt-control__affix"><BriefcaseBusiness size={16} aria-hidden /></span>
-                  <select className="bt-control__input" id="acesso-vinculo" value={vinculo} onChange={(e) => setVinculo(Number(e.target.value) as 0 | 1)} disabled={criando}>
-                    {VINCULO.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                  <span className="bt-control__affix acesso-select__caret"><ChevronDown size={16} aria-hidden /></span>
+              <section className="acesso-secao" aria-labelledby="acesso-secao-motorista">
+                <h3 id="acesso-secao-motorista" className="acesso-secao__titulo">Motorista</h3>
+                {inicial
+                  ? <div className="acesso-info"><span className="acesso-info__label">Nome completo</span><span className="acesso-info__valor">{nome}</span><span className="acesso-info__nota">da ficha do funcionário</span>{nomeErro && <span className="acesso-info__erro" role="alert">{nomeErro}</span>}</div>
+                  : <Field label="Nome completo" required error={nomeErro}><Input prefix={<User size={16} aria-hidden />} value={nome} onChange={(e) => editar(setNome, e.target.value)} disabled={criando} autoComplete="off" /></Field>}
+                <Field label="Celular" required hint="Com DDD. Recebe o link e a senha no WhatsApp."><Input prefix={<Smartphone size={16} aria-hidden />} inputMode="tel" placeholder="(12) 99999-9999" value={formatCelular(celular)} onChange={(e) => editar(setCelular, digitsOnly(e.target.value))} disabled={criando} /></Field>
+                {!inicial && <Field label={opcional('CPF')} hint="Ajuda a achar cadastro duplicado." error={cpfErro}><Input prefix={<IdCard size={16} aria-hidden />} inputMode="numeric" value={cpf} onChange={(e) => editar(setCpf, formatCpf(e.target.value))} disabled={criando} autoComplete="off" /></Field>}
+                <Field label={opcional('E-mail pessoal')} hint="Para recuperar a senha."><Input prefix={<Mail size={16} aria-hidden />} type="email" value={emailPessoal} onChange={(e) => setEmailPessoal(e.target.value)} disabled={criando} /></Field>
+              </section>
+              <section className="acesso-secao" aria-labelledby="acesso-secao-acesso">
+                <h3 id="acesso-secao-acesso" className="acesso-secao__titulo">Acesso</h3>
+                <div className="acesso-campo">
+                  <span className="bt-field__label" aria-hidden>Vínculo</span>
+                  <SegmentedControl<string> aria-label="Vínculo" fullWidth value={String(vinculo)} onChange={(v) => { if (!criando) setVinculo(Number(v) as 0 | 1) }} options={VINCULO_OPCOES} />
                 </div>
-              </Field>
-              <Field label="E-mail Microsoft" hint="Se já existir, o sistema acrescenta um número.">
-                <Input prefix={<AtSign size={16} aria-hidden />} value={prefixo} onChange={(e) => setPrefixoManual(e.target.value)} suffix={`@${DOMINIO}`} disabled={criando} />
-              </Field>
-              <p className="acesso-previa" aria-live="polite">{prefixo ? `${prefixo}@${DOMINIO}` : ''}</p>
+                <Field label="E-mail Microsoft" hint="Se já existir, o sistema acrescenta um número.">
+                  <Input prefix={<AtSign size={16} aria-hidden />} value={prefixo} onChange={(e) => setPrefixoManual(e.target.value)} suffix={`@${DOMINIO}`} disabled={criando} />
+                </Field>
+                <p className="acesso-previa" aria-live="polite">E-mail Microsoft: {prefixo ? <strong>{`${prefixo}@${DOMINIO}`}</strong> : '…'}</p>
+              </section>
+              {estado.fase === 'form' && <p className="acesso-efeito">Ao criar: cria a conta Microsoft, libera a licença, inclui no grupo de motoristas e gera a senha.</p>}
               {estado.fase === 'conferindo' && <p className="acesso-previa" role="status">Conferindo cadastros parecidos…</p>}
               {estado.fase === 'criando' && <ProgressoAcesso fluxo="cadastro" />}
               {estado.fase === 'erro' && (
@@ -190,9 +200,10 @@ export function CadastroAcessoDrawer({ acesso, inicial, onClose, onCadastrado }:
               <Button variant="secondary" icon={<ExternalLink size={16} />} onClick={() => onCadastrado(estado.r.funcionarioId, pendente ? estado.r.emailMicrosoft : undefined)}>Abrir ficha</Button>
             </div>
           ) : (
-            <div className="cluster">
+            <div className="cluster acesso-acoes">
+              <Button variant="secondary" onClick={requestClose} disabled={criando}>Cancelar</Button>
               {estado.fase === 'erro' && <Button variant="secondary" onClick={() => void enviar()}>Tentar de novo</Button>}
-              <Button type="submit" form="acesso-form" loading={criando} disabled={!nome.trim() || !celular.trim() || Boolean(cpfErro)}>Criar acesso</Button>
+              <Button type="submit" form="acesso-form" loading={criando} disabled={!nome.trim() || !celular.trim() || Boolean(cpfErro || nomeErro)}>Criar acesso</Button>
             </div>
           )}
         </footer>
