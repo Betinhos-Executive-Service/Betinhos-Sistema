@@ -17,7 +17,7 @@ export function paginaHtml() {
 <body>
 <header class="topo"><img src="/logo-betinhos.png" alt="Betinhos Executive Service" class="logo"></header>
 <main id="app">
-  <section class="estado" role="status"><div class="spinner" aria-hidden="true"></div><p>Carregando os passageiros…</p></section>
+  <p class="sr-only" role="status">Carregando os passageiros…</p>
 </main>
 <div class="versao" aria-hidden="true">${VERSAO}</div>
 <script type="module" src="/app.js"></script>
