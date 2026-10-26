@@ -12,6 +12,8 @@ const EMAILS_PERMITIDOS = new Set(['financeiro', 'noreply', 'ana', 'bia', 'joao'
 const DOMINIOS = /@(betinhos\.com\.br|gmail\.com|hotmail\.com|outlook\.com|yahoo\.com(?:\.br)?)\b/i
 const IGNORAR = /(^|\/)(pnpm-lock\.yaml|package-lock\.json)$|\.(png|jpe?g|gif|ico|webp|woff2?|ttf|pdf|zip|xlsx)$/i
 const BACKUP = /^packages\/deploy\/flows\/backup\//
+// O teste da trava traz exemplos fictícios de propósito.
+const PROPRIO_TESTE = 'scripts/dados-pessoais.test.mjs'
 
 export function cpfValido(digits) {
   if (!/^\d{11}$/.test(digits) || /^(\d)\1{10}$/.test(digits)) return false
@@ -45,7 +47,7 @@ export function verificar(arquivos, ler) {
   const saida = []
   for (const arquivo of arquivos) {
     if (BACKUP.test(arquivo)) { saida.push(`${arquivo}: backup de flow versionado (fica só na máquina; está no .gitignore)`); continue }
-    if (IGNORAR.test(arquivo)) continue
+    if (IGNORAR.test(arquivo) || arquivo === PROPRIO_TESTE) continue
     let texto
     try { texto = ler(arquivo) } catch { continue }
     for (const a of achadosNoTexto(texto)) saida.push(`${arquivo}:${a.linha}: ${a.tipo} ${a.valor}`)

@@ -19,10 +19,10 @@ test('e-mail: caixas funcionais e nomes de teste passam; pessoa real e provedor 
   assert.deepEqual(tipos, ['fu***al@betinhos.com.br', 'Ca***es@gmail.com'])
 })
 
-test('backup de flow versionado é achado sem ler o arquivo; lock e binário são ignorados', () => {
+test('backup de flow versionado é achado sem ler o arquivo; lock, binário e o próprio teste são ignorados', () => {
   const lidos = []
   const saida = verificar(
-    ['packages/deploy/flows/backup/Flow-X.json', 'pnpm-lock.yaml', 'a.png', 'src/ok.ts'],
+    ['packages/deploy/flows/backup/Flow-X.json', 'pnpm-lock.yaml', 'a.png', 'scripts/dados-pessoais.test.mjs', 'src/ok.ts'],
     (f) => { lidos.push(f); return 'nada aqui' },
   )
   assert.equal(saida.length, 1)
