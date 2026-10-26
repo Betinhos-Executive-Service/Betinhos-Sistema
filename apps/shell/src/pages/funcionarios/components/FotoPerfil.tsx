@@ -1,6 +1,7 @@
 import { Button, Dialog, Menu, Spinner } from '@betinhos/ui'
-import { Camera, Eye, ImageUp, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { Camera, Eye, ImageUp, Trash2, ZoomIn, ZoomOut } from 'lucide-react'
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type PointerEvent } from 'react'
+import { FotoAmpliada } from '../../../app/FotoAmpliada'
 import { IMAGE_TYPES, validateImage } from '../data/source'
 import { initials } from '../data/format'
 
@@ -104,7 +105,7 @@ export function FotoPerfil({ name, src, size, onUpload, onRemove }: Props) {
         {error}
       </Dialog>
 
-      {viewing && src ? <Ampliada name={name} src={src} onClose={() => setViewing(false)} /> : null}
+      {viewing && src ? <FotoAmpliada src={src} alt={`Foto de ${name}`} legenda={name} onClose={() => setViewing(false)} /> : null}
 
       <Dialog
         open={removing}
@@ -121,21 +122,6 @@ export function FotoPerfil({ name, src, size, onUpload, onRemove }: Props) {
 
       {pending ? <Recorte key={pending.url} url={pending.url} title={pending.dropped && src ? 'Trocar a foto por esta?' : 'Ajustar a foto'} onCancel={() => setPending(null)} onConfirm={(blob) => void confirm(blob)} /> : null}
     </span>
-  )
-}
-
-/** Foto em tamanho grande, só a imagem e o nome; fecha por Esc, X ou clique fora. */
-function Ampliada({ name, src, onClose }: { name: string; src: string; onClose: () => void }) {
-  const ref = useRef<HTMLDialogElement>(null)
-  useEffect(() => { ref.current?.showModal() }, [])
-  return (
-    <dialog ref={ref} className="foto-perfil__lightbox" aria-label={`Foto de ${name}`} onCancel={(event) => { event.preventDefault(); onClose() }} onClick={(event) => { if (event.target === event.currentTarget) onClose() }}>
-      <figure>
-        <img src={src} alt={`Foto de ${name}`} />
-        <figcaption>{name}</figcaption>
-      </figure>
-      <button type="button" className="foto-perfil__fechar" aria-label="Fechar" onClick={onClose}><X size={18} aria-hidden /></button>
-    </dialog>
   )
 }
 
