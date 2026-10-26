@@ -3035,10 +3035,16 @@ svg {
   stroke-linejoin: round;
 }
 
-.observation-review-warning,
-
 .observation-review-warning {
   width: 100%;
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
   padding: 12px 14px;
   border-radius: 12px;
   background: #fcfcfb;
@@ -3052,13 +3058,9 @@ svg {
   height: 18px;
 }
 
-
-
-
-
-
-
-
+.observation-review-warning svg {
+  margin-top: 1px;
+}
 
 
 
