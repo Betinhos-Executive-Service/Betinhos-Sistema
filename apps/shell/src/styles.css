@@ -2,6 +2,9 @@
 
 #root { height: 100%; }
 
+/* Véu sobre foto (hover, recorte, foto ampliada): o navy da marca na opacidade de fundo do DS. */
+:root { --shell-veu: color-mix(in srgb, var(--bt-color-brand) calc(var(--bt-opacity-backdrop) * 100%), transparent); }
+
 /* Marca na sidebar: a logo B em imagem fica sem a caixa branca por trás, só o símbolo sobre o navy.
    (Regra a levar para o @betinhos/ui; aqui até o pacote publicar.) */
 .bt-shell__logo:has(> img), .bt-shell__rail-brand:has(> img) { background-color: transparent; }
@@ -38,7 +41,7 @@
 
 /* Foto ampliada (app/FotoAmpliada.tsx): só a imagem e a legenda sobre o fundo escurecido. */
 .foto-ampliada { position: fixed; inset: 0; margin: auto; padding: 0; border: 0; background: transparent; overflow: visible; }
-.foto-ampliada::backdrop { background-color: color-mix(in srgb, var(--bt-color-brand) calc(var(--bt-opacity-backdrop) * 100%), transparent); }
+.foto-ampliada::backdrop { background-color: var(--shell-veu); }
 .foto-ampliada figure { display: grid; gap: var(--bt-space-2-5); justify-items: center; margin: 0; transition: opacity var(--bt-duration-normal) var(--bt-ease-out), transform var(--bt-duration-normal) var(--bt-ease-out); @starting-style { opacity: 0; transform: scale(0.96); } }
 .foto-ampliada img { display: block; max-width: min(720px, 90vw); max-height: 76vh; min-width: min(320px, 90vw); border-radius: var(--bt-radius-lg); object-fit: contain; background-color: var(--bt-color-surface); }
 .foto-ampliada figcaption { font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-white); }

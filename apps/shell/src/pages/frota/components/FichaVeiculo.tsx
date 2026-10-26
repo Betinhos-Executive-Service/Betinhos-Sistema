@@ -1,6 +1,6 @@
 import { Camera, Check, Copy, Eye, ExternalLink, ImageUp } from 'lucide-react'
 import { Alert, Button, Dialog, Drawer, EmptyState, Menu, StatusBadge } from '@betinhos/ui'
-import { useEffect, useMemo, useRef, useState, type DragEvent, type SyntheticEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { useQueryPeriodo } from '../../../nav/queryState'
 import { formatBR } from '../data/dates'
 import { NAO_INFORMADO } from '../data/format'
@@ -13,7 +13,9 @@ import { motoristaAtual, possesAbertas, rotuloMotoristaAtual } from '../domain/m
 import { buildTimeline } from '../domain/timeline'
 import { buildPromptImagem, faltasPrompt } from '../domain/promptImagem'
 import { CustoTotal } from './CustoTotal'
+import { ContemEsc } from '../../../app/ContemEsc'
 import { FotoAmpliada } from '../../../app/FotoAmpliada'
+import { FOTO_MAX_BYTES } from '../data/sharepoint'
 import { FotoVeiculo, invalidarFoto, useFotoVeiculo } from './FotoVeiculo'
 import { Preventivas } from './Preventivas'
 import { useNotify } from './Toasts'
@@ -25,8 +27,6 @@ const TABELAS_TIMELINE: { key: 'manutencoes' | 'multas' | 'colisoes' | 'posses';
 ]
 
 const TIPOS_FOTO = ['image/png', 'image/jpeg', 'image/webp']
-/** `onCancel` não está nos tipos de <div>, mas o React o repassa pela árvore; espalhado para o TS aceitar. */
-const pararCancel = { onCancel: (event: SyntheticEvent) => event.stopPropagation() }
 
 export function FichaVeiculo({ source, docs, id, data, errors, today, secao = null, onClose, onOpen, onReload }: { source: DataSource; docs?: DocsSource | null; id: string; errors: LoadResult['errors']; data: FrotaData; today: string; secao?: 'preventivas' | null; onClose: () => void; onOpen: (kind: Kind, id: string) => void; onReload: () => void }) {
   const notify = useNotify()
@@ -62,6 +62,7 @@ export function FichaVeiculo({ source, docs, id, data, errors, today, secao = nu
   function propor(file: File | undefined) {
     if (!file) return
     if (!TIPOS_FOTO.includes(file.type)) { notify('error', 'Use uma imagem PNG, JPG ou WEBP.'); return }
+    if (file.size > FOTO_MAX_BYTES) { notify('error', 'A imagem passa de 10 MB.'); return }
     if (!enviando) setPendente({ file, url: URL.createObjectURL(file) })
   }
 
@@ -120,6 +121,11 @@ export function FichaVeiculo({ source, docs, id, data, errors, today, secao = nu
     if (secao === 'preventivas' && temVeiculo) document.getElementById(`${id}-preventivas`)?.scrollIntoView?.({ block: 'start' })
   }, [secao, id, temVeiculo])
 
+  const rosto = <>
+    <FotoVeiculo source={source} id={id} size="hero" alt="" />
+    <span className="frota-foto-botao__veu" aria-hidden>{foto.url ? <Camera size={20} /> : <ImageUp size={20} />}</span>
+  </>
+
   const erro = (nome: string, mensagem: string) => <Alert key={nome} tone="danger">Não foi possível carregar {nome}: {mensagem}</Alert>
 
   return (
@@ -148,10 +154,7 @@ export function FichaVeiculo({ source, docs, id, data, errors, today, secao = nu
               <Menu
                 align="start"
                 trigger={(props) => (
-                  <button type="button" {...props} className="frota-foto-botao" disabled={enviando} aria-label={`Foto do veículo ${veiculo.placa}: ver ou trocar`}>
-                    <FotoVeiculo source={source} id={id} size="hero" alt="" />
-                    <span className="frota-foto-botao__veu" aria-hidden><Camera size={20} /></span>
-                  </button>
+                  <button type="button" {...props} className="frota-foto-botao" disabled={enviando} aria-label={`Foto do veículo ${veiculo.placa}: ver ou trocar`}>{rosto}</button>
                 )}
                 actions={[
                   { id: 'ver', label: 'Ver foto', icon: <Eye size={16} />, onSelect: () => setVendo(true) },
@@ -159,10 +162,7 @@ export function FichaVeiculo({ source, docs, id, data, errors, today, secao = nu
                 ]}
               />
             ) : (
-              <button type="button" className="frota-foto-botao" disabled={enviando || foto.loading} aria-label={`Adicionar foto do veículo ${veiculo.placa}`} onClick={() => arquivo.current?.click()}>
-                <FotoVeiculo source={source} id={id} size="hero" alt="" />
-                <span className="frota-foto-botao__veu" aria-hidden><ImageUp size={20} /></span>
-              </button>
+              <button type="button" className="frota-foto-botao" disabled={enviando || foto.loading} aria-label={`Adicionar foto do veículo ${veiculo.placa}`} onClick={() => arquivo.current?.click()}>{rosto}</button>
             )}
             {(arrastando || enviando) && <span className="frota-foto-drop__aviso" role="status">{enviando ? 'Enviando foto…' : 'Solte para escolher a nova foto'}</span>}
             <input ref={arquivo} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(event) => { propor(event.target.files?.[0]); event.target.value = '' }} />
@@ -173,8 +173,8 @@ export function FichaVeiculo({ source, docs, id, data, errors, today, secao = nu
               {copiado ? 'Prompt copiado' : 'Copiar prompt da imagem'}
             </Button>
           </div>
+          <ContemEsc>
           {vendo && foto.url ? <FotoAmpliada src={foto.url} alt={`Foto do veículo ${veiculo.placa}`} legenda={[veiculo.placa, veiculo.marca, veiculo.modelo].filter(Boolean).join(' · ')} onClose={() => setVendo(false)} /> : null}
-          <div style={{ display: 'contents' }} {...pararCancel}>
           <Dialog
             open={pendente !== null}
             onClose={() => setPendente(null)}
@@ -186,7 +186,7 @@ export function FichaVeiculo({ source, docs, id, data, errors, today, secao = nu
           >
             {pendente ? <img className="frota-foto-previa" src={pendente.url} alt="Nova foto do veículo" /> : null}
           </Dialog>
-          </div>
+          </ContemEsc>
           {faltas.length > 0 && <p className="frota-muted">Para copiar o prompt, falta: {faltas.join(', ')}.</p>}
           <section className="frota-group" aria-labelledby={`${id}-dados`}>
             <h3 id={`${id}-dados`} className="frota-group__title">Dados</h3>
@@ -201,11 +201,10 @@ export function FichaVeiculo({ source, docs, id, data, errors, today, secao = nu
           {docs ? (
             <section className="frota-group" aria-labelledby={`${id}-docs`}>
               <h3 id={`${id}-docs`} className="frota-group__title">Documentos</h3>
-              {/* Diálogos do checklist (excluir, renovar) são <dialog> dentro deste Drawer: o "cancel" (Esc) deles sobe pela árvore do
-                  React e fecharia a ficha inteira; aqui ele para. */}
-              <div style={{ display: 'contents' }} {...pararCancel}>
+              {/* Diálogos do checklist (excluir, renovar) são <dialog> dentro deste Drawer. */}
+              <ContemEsc>
                 <Checklist source={docs} donoId={id} titulo="" />
-              </div>
+              </ContemEsc>
             </section>
           ) : null}
           <section className="frota-group" aria-labelledby={`${id}-custo`}>

@@ -1,8 +1,9 @@
 import { Button, Dialog, Menu, Spinner } from '@betinhos/ui'
 import { Camera, Eye, ImageUp, Trash2, ZoomIn, ZoomOut } from 'lucide-react'
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type PointerEvent } from 'react'
+import { ContemEsc } from '../../../app/ContemEsc'
 import { FotoAmpliada } from '../../../app/FotoAmpliada'
-import { IMAGE_TYPES, validateImage } from '../data/source'
+import { IMAGE_TYPES } from '../data/source'
 import { initials } from '../data/format'
 
 type Props = {
@@ -14,6 +15,8 @@ type Props = {
   onRemove: () => Promise<void>
 }
 
+// Só o tipo importa: o recorte sempre gera um JPEG de 512 px, então foto grande de celular também serve.
+const TIPOS = [...IMAGE_TYPES, 'image/webp']
 const STAGE = 240
 const OUTPUT = 512
 
@@ -40,7 +43,7 @@ export function FotoPerfil({ name, src, size, onUpload, onRemove }: Props) {
 
   function pick(file: File | undefined, dropped: boolean) {
     if (!file) return
-    const problem = validateImage(file)
+    const problem = TIPOS.includes(file.type) ? null : 'Use PNG, JPG, WEBP, GIF ou BMP.'
     setError(problem)
     if (problem) return
     setPending({ file, url: URL.createObjectURL(file), dropped })
@@ -82,8 +85,8 @@ export function FotoPerfil({ name, src, size, onUpload, onRemove }: Props) {
   const className = `bt-avatar foto-perfil${over ? ' foto-perfil--over' : ''}${busy ? ' foto-perfil--busy' : ''}`
 
   return (
-    // Esc dentro do menu ou dos diálogos fecha só eles, não o drawer.
-    <span className="foto-perfil__box" {...dropProps} onKeyDown={(event: KeyboardEvent) => { if (event.key === 'Escape' && (event.target as HTMLElement).closest('dialog, [role=menu]')) event.stopPropagation() }}>
+    <ContemEsc>
+    <span className="foto-perfil__box" {...dropProps}>
       {shown ? (
         <Menu
           align="start"
@@ -99,7 +102,7 @@ export function FotoPerfil({ name, src, size, onUpload, onRemove }: Props) {
       ) : (
         <button type="button" className={className} style={style} disabled={busy} aria-label={`Adicionar foto de ${name}`} title="Clique ou arraste uma imagem" onClick={() => input.current?.click()}>{face}</button>
       )}
-      <input ref={input} type="file" accept={IMAGE_TYPES.join(',')} hidden onChange={(event) => { pick(event.target.files?.[0], false); event.target.value = '' }} />
+      <input ref={input} type="file" accept={TIPOS.join(',')} hidden onChange={(event) => { pick(event.target.files?.[0], false); event.target.value = '' }} />
 
       <Dialog open={error !== null} tone="danger" onClose={() => setError(null)} title="Imagem não aceita" actions={<Button onClick={() => setError(null)}>Entendi</Button>}>
         {error}
@@ -122,6 +125,7 @@ export function FotoPerfil({ name, src, size, onUpload, onRemove }: Props) {
 
       {pending ? <Recorte key={pending.url} url={pending.url} title={pending.dropped && src ? 'Trocar a foto por esta?' : 'Ajustar a foto'} onCancel={() => setPending(null)} onConfirm={(blob) => void confirm(blob)} /> : null}
     </span>
+    </ContemEsc>
   )
 }
 
