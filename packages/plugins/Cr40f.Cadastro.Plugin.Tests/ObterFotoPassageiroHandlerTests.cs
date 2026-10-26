@@ -113,6 +113,7 @@ public class ObterFotoPassageiroHandlerTests
     [InlineData("https://evil.com/:i:/r/sites/BetinhosGestoInterna/Documentos%20Compartilhados/x.jpg")]
     [InlineData("https://betinhos.sharepoint.com/:i:/r/sites/BetinhosGestoInterna/Documentos%20Compartilhados/Passageiros/%2E%2E/%2E%2E/Privado/x.jpg")]
     [InlineData("https://betinhos.sharepoint.com/:i:/r/sites/BetinhosGestoInterna/Documentos%20Compartilhados/")]
+    [InlineData("https://betinhos.sharepoint.com/:i:/r/sites/BetinhosGestoInterna/Documentos%20Compartilhados/Financeiro/Contratos/x.jpg")]
     public void UrlForaDaBiblioteca_Nega(string link)
     {
         Cenario(link: link);
