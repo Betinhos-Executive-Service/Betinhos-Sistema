@@ -3,7 +3,7 @@
 # (Worker acompanhar-motorista); quem grava é o flow "Link | Registrar avaliação" (provision-flow-avaliacao.ps1),
 # pela conexão do noreply. O app não grava nesta tabela, por isso não há privilégios a conceder aqui.
 # Valores do choice cr40f_classificacao: 100000000 Elogio, 100000001 Sugestão, 100000002 Reclamação, 100000003 Sem comentário.
-# Chave alternativa cr40f_linkid_unico em cr40f_linkid: uma avaliação por link, mesmo com dois envios simultâneos.
+# Chave alternativa cr40f_linkidunico em cr40f_linkid: uma avaliação por link, mesmo com dois envios simultâneos.
 # A tabela entra na AppBetinhos com subcomponentes (colunas, lookups e chave vão junto, como as demais tabelas);
 # o distribuidor das 4 soluções leva o tipo 1 ao BetinhosCore e, se a chave aparecer como linha própria (tipo 14), também
 # (regra "14" em solucoes/regras.json).
@@ -144,7 +144,7 @@ foreach ($l in $LOOKUPS) {
 
 # Chave alternativa em cr40f_linkid: dois envios simultâneos do mesmo link não geram duas avaliações (o segundo POST
 # recebe conflito e o flow responde duplicada). O índice é criado de forma assíncrona; a conferência espera ficar Active.
-$chave = 'cr40f_linkid_unico'
+$chave = 'cr40f_linkidunico'
 $temChave = $false
 if ($tabela) { $temChave = @(Rows "EntityDefinitions(LogicalName='$entidade')/Keys?`$select=LogicalName&`$filter=LogicalName eq '$chave'").Count -eq 1 }
 if ($temChave) { Write-Step "chave alternativa $chave já existe" }
