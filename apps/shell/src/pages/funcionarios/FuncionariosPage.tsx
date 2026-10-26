@@ -135,11 +135,13 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   }, [source, reload, mutate])
 
   const [acessoAberto, setAcessoAberto] = useState<{ inicial?: AcessoInicial } | null>(null)
+  const [liberacoesPendentes, setLiberacoesPendentes] = useState<Record<string, string>>({})
   // A ficha aberta no mesmo funcionário não recarrega só com setSelection: a versão força a releitura.
   const [fichaVersao, setFichaVersao] = useState(0)
   const acesso = useMemo(() => createAcessoSource(host), [host])
-  const onAcessoCadastrado = useCallback((id: string) => {
+  const onAcessoCadastrado = useCallback((id: string, emailPendente?: string) => {
     setAcessoAberto(null)
+    setLiberacoesPendentes(({ [id]: _, ...resto }) => (emailPendente ? { ...resto, [id]: emailPendente } : resto))
     void onSaved(id, !rows.some((row) => row.id === id))
     setSelection({ mode: 'open', id })
     setFichaVersao((v) => v + 1)
@@ -147,8 +149,13 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
 
   const ativos = views.filter((row) => row.values.cr40f_status === 0).length
   const ficha = selection.mode !== 'closed' && (
-    <Ficha source={source} docs={docs} id={selection.mode === 'open' ? selection.id : null} onClose={() => { if (voltar) location.hash = voltar; else setSelection({ mode: 'closed' }) }} onSaved={onSaved} onAditivoSalvo={voltar ? () => { location.hash = voltar } : undefined} versao={fichaVersao} acesso={acesso} onCadastrarAcesso={(inicial) => setAcessoAberto({ inicial })} />
+    <Ficha source={source} docs={docs} id={selection.mode === 'open' ? selection.id : null} onClose={() => { if (voltar) location.hash = voltar; else setSelection({ mode: 'closed' }) }} onSaved={onSaved} onAditivoSalvo={voltar ? () => { location.hash = voltar } : undefined} versao={fichaVersao} acesso={acesso} onCadastrarAcesso={(inicial) => setAcessoAberto({ inicial })}
+      emailPendente={selection.mode === 'open' ? liberacoesPendentes[selection.id] : undefined}
+      onLiberacaoConcluida={(id) => { setLiberacoesPendentes(({ [id]: _, ...resto }) => resto); void onSaved(id, false) }} />
   )
+
+  // No celular também: "Cadastrar acesso" da ficha abre este drawer.
+  const acessoDrawer = acessoAberto && <CadastroAcessoDrawer acesso={acesso} inicial={acessoAberto.inicial} onClose={() => setAcessoAberto(null)} onCadastrado={onAcessoCadastrado} />
 
   if (mobile) {
     return (
@@ -171,6 +178,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
           onNew={() => setSelection({ mode: 'new' })}
         />
         {ficha}
+        {acessoDrawer}
       </div>
     )
   }
@@ -225,7 +233,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
       </main>
 
       {ficha}
-      {acessoAberto && <CadastroAcessoDrawer acesso={acesso} inicial={acessoAberto.inicial} onClose={() => setAcessoAberto(null)} onCadastrado={onAcessoCadastrado} />}
+      {acessoDrawer}
     </div>
     </div>
   )

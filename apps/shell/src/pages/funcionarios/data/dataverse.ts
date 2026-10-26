@@ -148,13 +148,14 @@ export function createXrmSource(xrm: XrmHost): DataSource {
       const behaviors = loadPatchContext().then((context) => context.dateBehaviors, () => ({} as Record<string, DateBehavior>))
       // A primeira página (100) vai à parte, em paralelo: o nextLink exige o mesmo tamanho de página da carga completa.
       // Uma consulta paginada dos systemusers habilitados para o selo "Sem app"; se falhar, a lista sai sem o selo.
+      // A primeira página não espera por ela (o selo chega com a carga completa), senão a página rápida perde o sentido.
       const ativos = retrieveAll('systemuser', '?$select=internalemailaddress&$filter=isdisabled eq false')
         .then((users) => new Set(users.map((u) => String(u.internalemailaddress ?? '').toLowerCase())), () => null)
       const mapList = (rows: Row[], dateBehaviors: Record<string, DateBehavior>, emails: Set<string> | null) =>
         rows.map((row) => { const f = mapRow(row, dateBehaviors); return emails ? { ...f, semApp: semApp(f.values, emails) } : f })
       const first = async () => {
-        const [page, dateBehaviors, emails] = await Promise.all([api.retrieveMultipleRecords(TABLE, options, FIRST_PAGE), behaviors, ativos])
-        return mapList(page.entities, dateBehaviors, emails)
+        const [page, dateBehaviors] = await Promise.all([api.retrieveMultipleRecords(TABLE, options, FIRST_PAGE), behaviors])
+        return mapList(page.entities, dateBehaviors, null)
       }
       const [rows, dateBehaviors, emails] = await withFirstPage(Promise.all([retrieveAll(TABLE, options), behaviors, ativos]), first, onFirstPage)
       return mapList(rows, dateBehaviors, emails)

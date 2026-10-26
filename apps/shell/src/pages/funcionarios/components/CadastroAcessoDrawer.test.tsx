@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { ToastProvider } from '@betinhos/ui'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AcessoError, type AcessoSource } from '../data/acesso'
+import { RETENTATIVA_MS } from './AcessoProgresso'
 import { CadastroAcessoDrawer } from './CadastroAcessoDrawer'
 
 const ok = { emailMicrosoft: 'ana.lima@betinhos.onmicrosoft.com', senhaTemporaria: 'Kx7#mQ2vR9pL4w', funcionarioId: 'f9', linkApp: 'https://app', etapas: [{ etapa: 'usuario', estado: 'feita' as const, detalhe: 'criado' }] }
@@ -38,7 +39,7 @@ describe('CadastroAcessoDrawer', () => {
     expect(decodeURIComponent(wa.getAttribute('href')!)).toContain('Kx7#mQ2vR9pL4w')
     expect(screen.getByText(/aparece só agora/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /Abrir ficha/ }))
-    expect(onCadastrado).toHaveBeenCalledWith('f9')
+    expect(onCadastrado).toHaveBeenCalledWith('f9', undefined)
   })
 
   it('erro parcial mostra etapas e permite tentar de novo com o mesmo input', async () => {
@@ -50,8 +51,8 @@ describe('CadastroAcessoDrawer', () => {
     fireEvent.change(screen.getByLabelText(/Celular/), { target: { value: '12991234567' } })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Criar acesso/ })) })
     await screen.findByRole('alert')
-    expect(screen.getByText(/usuario/)).toBeTruthy()
-    expect(screen.getByText(/licenca/)).toBeTruthy()
+    expect(screen.getByText('Conta criada')).toBeTruthy()
+    expect(screen.getByText('Liberando a licença')).toBeTruthy()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Tentar de novo/ })) })
     await screen.findByText('Kx7#mQ2vR9pL4w')
     expect(cadastrar).toHaveBeenCalledTimes(2)
@@ -130,6 +131,53 @@ describe('CadastroAcessoDrawer', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
 
     fireEvent.click(screen.getByRole('button', { name: /Abrir ficha/ }))
-    expect(onCadastrado).toHaveBeenCalledWith('f9')
+    expect(onCadastrado).toHaveBeenCalledWith('f9', undefined)
+  })
+
+  it('liberação pendente: mostra a mensagem e devolve o e-mail para a ficha concluir', async () => {
+    const pendente = { ...ok, etapas: [{ etapa: 'systemuser', estado: 'pendente' as const, detalhe: 'o Dataverse libera em instantes' }] }
+    const onCadastrado = vi.fn()
+    render(<ToastProvider><CadastroAcessoDrawer acesso={{ cadastrar: async () => pendente, encerrar: async () => [], reativar: async () => { throw new Error('n/a') } }} onClose={() => {}} onCadastrado={onCadastrado} /></ToastProvider>)
+    fireEvent.change(screen.getByLabelText(/Nome completo/), { target: { value: 'Ana Lima' } })
+    fireEvent.change(screen.getByLabelText(/Celular/), { target: { value: '12991234567' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Criar acesso/ })) })
+    expect(await screen.findByText(/conclui sozinho em alguns minutos/)).toBeTruthy()
+    expect(screen.getByText('Liberando no Dataverse')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /Abrir ficha/ }))
+    expect(onCadastrado).toHaveBeenCalledWith('f9', 'ana.lima@betinhos.onmicrosoft.com')
+  })
+
+  it('liberação pendente conclui sozinha em segundo plano com a mesma ficha e o mesmo e-mail', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const pendente = { ...ok, etapas: [{ etapa: 'systemuser', estado: 'pendente' as const, detalhe: 'x' }] }
+      const liberado = { ...ok, senhaTemporaria: '', etapas: [{ etapa: 'systemuser', estado: 'feita' as const, detalhe: 'x' }] }
+      const cadastrar = vi.fn().mockResolvedValueOnce(pendente).mockResolvedValueOnce(liberado)
+      render(<ToastProvider><CadastroAcessoDrawer acesso={{ cadastrar, encerrar: async () => [], reativar: async () => { throw new Error('n/a') } }} onClose={() => {}} onCadastrado={() => {}} /></ToastProvider>)
+      fireEvent.change(screen.getByLabelText(/Nome completo/), { target: { value: 'Ana Lima' } })
+      fireEvent.change(screen.getByLabelText(/Celular/), { target: { value: '12991234567' } })
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Criar acesso/ })) })
+      await screen.findByText(/conclui sozinho em alguns minutos/)
+      await act(async () => { await vi.advanceTimersByTimeAsync(RETENTATIVA_MS) })
+      expect(cadastrar).toHaveBeenLastCalledWith(expect.objectContaining({ funcionarioId: 'f9', prefixoEmail: 'ana.lima' }))
+      expect(await screen.findByText('Liberado no Dataverse')).toBeTruthy()
+      expect(screen.getByText('Kx7#mQ2vR9pL4w')).toBeTruthy()   // a senha da primeira resposta continua na tela
+    } finally { vi.useRealTimers() }
+  })
+
+  it('erro permanente na retentativa automática para as tentativas e mostra a mensagem', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const pendente = { ...ok, etapas: [{ etapa: 'systemuser', estado: 'pendente' as const, detalhe: 'x' }] }
+      const cadastrar = vi.fn().mockResolvedValueOnce(pendente).mockRejectedValue(new Error('CONFIG_AUSENTE: falta config | etapas=[]'))
+      render(<ToastProvider><CadastroAcessoDrawer acesso={{ cadastrar, encerrar: async () => [], reativar: async () => { throw new Error('n/a') } }} onClose={() => {}} onCadastrado={() => {}} /></ToastProvider>)
+      fireEvent.change(screen.getByLabelText(/Nome completo/), { target: { value: 'Ana Lima' } })
+      fireEvent.change(screen.getByLabelText(/Celular/), { target: { value: '12991234567' } })
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Criar acesso/ })) })
+      await screen.findByText(/conclui sozinho em alguns minutos/)
+      await act(async () => { await vi.advanceTimersByTimeAsync(RETENTATIVA_MS * 3) })
+      expect(cadastrar).toHaveBeenCalledTimes(2)
+      expect(screen.getByText('Conta criada, mas a liberação parou')).toBeTruthy()
+    } finally { vi.useRealTimers() }
   })
 })
