@@ -9,7 +9,7 @@ import { useListView } from '../../app/useListView'
 import { useProgressiveData } from '../../app/useProgressiveData'
 import { useQueryAlvo, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
-import { createSource } from './data/source'
+import { ENTITY, createSource } from './data/source'
 import { CLIENTE_COLUMNS, TELA, builtinViews, clienteFields, clienteKeywordText, readCliente, sortClientes } from './domain/lista'
 import type { Cliente } from './domain/types'
 import { ClientesCards, ClientesTable } from './components/ClientesList'
@@ -21,6 +21,7 @@ export function ClientesPage({ host }: { host: Host }) {
 }
 
 const EMPTY: Cliente[] = []
+const byId = (c: Cliente) => c.id
 
 function Clientes({ host }: { host: Host }) {
   const source = useMemo(() => createSource(host), [host])
@@ -36,15 +37,17 @@ function Clientes({ host }: { host: Host }) {
   const q = useDebouncedText(query)
   const fields = useMemo(() => clienteFields(list), [list])
 
-  const { view, filters: valid, quickFilters, clearFilters } = useListView({
+  const ids = useMemo(() => list.map((c) => c.id), [list])
+  const { view, filters: valid, quickFilters, clearFilters, fields: allFields, extra } = useListView({
     host, defaultName: 'Todos os clientes', tela: TELA, columns: CLIENTE_COLUMNS, defaultSort: { key: 'nome', dir: 'asc' }, fields, ready, builtins: builtinViews,
+    extra: { entity: ENTITY, ids },
   })
 
   const sorted = useMemo(() => {
     const sort = view.config.sort
-    return sort ? sortClientes(list, sort.key, sort.dir) : list
-  }, [list, view.config.sort])
-  const filtered = useMemo(() => filterRows(sorted, valid, fields, readCliente), [sorted, valid, fields])
+    return extra.sort(sort ? sortClientes(list, sort.key, sort.dir) : list, sort, byId)
+  }, [list, view.config.sort, extra])
+  const filtered = useMemo(() => filterRows(sorted, valid, allFields, extra.read(readCliente, byId)), [sorted, valid, allFields, extra])
   const index = useMemo(() => keywordIndex<Cliente>(clienteKeywordText), [])
   const visible = useMemo(() => {
     const words = searchWords(q)
@@ -70,13 +73,13 @@ function Clientes({ host }: { host: Host }) {
     const empty = <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum cliente com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
     body = mobile
       ? (visible.length ? <ClientesCards list={visible} onOpen={open} /> : <div className="surface">{empty}</div>)
-      : <ClientesTable list={visible} onOpen={open} view={{ config: view.config, onChange: view.setConfig }} quickFilters={quickFilters} footer={footer} empty={empty} />
+      : <ClientesTable list={visible} onOpen={open} view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />
   }
 
   return (
     <div className="page page--full cl-page">
       <div role="toolbar" aria-label="Comandos de clientes">
-        <ViewBar view={view} columns={CLIENTE_COLUMNS} filters={ready ? { fields } : undefined}>
+        <ViewBar view={view} columns={CLIENTE_COLUMNS} catalog={extra.catalog} filters={ready ? { fields: allFields } : undefined}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="cl-search" value={query} onChange={setQuery} placeholder="Buscar por nome, registro ou endereço" aria-label="Buscar clientes" />
           {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={cs.loading && ready} onClick={refresh} />}

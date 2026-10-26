@@ -44,8 +44,9 @@ function Pagantes({ host }: { host: Host }) {
   const choices = pg.choices
   const fields = useMemo(() => (choices ? paganteFields(choices) : []), [choices])
 
-  const { view, filters, quickFilters, clearFilters } = useListView({
+  const { view, filters, quickFilters, clearFilters, fields: allFields, extra } = useListView({
     host,
+    extra: { entity: 'cr40f_pagantes', ids: pg.list.map((p) => p.id) },
     defaultName: 'Todos os pagantes',
     tela: TELA,
     columns: PAGANTE_COLUMNS,
@@ -69,8 +70,8 @@ function Pagantes({ host }: { host: Host }) {
   const found = useServerSearch({ query: q, enabled: Boolean(choices) && !pg.listComplete, search: searchPagantes })
   const list = useMergedById(pg.list, found)
   // Ordena e filtra uma vez por lista/visão; a cada busca só confere o texto já normalizado de cada linha.
-  const sorted = useMemo(() => (choices ? sortPagantes(list, view.config.sort, choices) : list), [list, choices, view.config.sort])
-  const filtered = useMemo(() => filterRows(sorted, filters, fields, readPagante), [sorted, filters, fields])
+  const sorted = useMemo(() => extra.sort(choices ? sortPagantes(list, view.config.sort, choices) : list, view.config.sort, (p) => p.id), [list, choices, view.config.sort, extra])
+  const filtered = useMemo(() => filterRows(sorted, filters, allFields, extra.read(readPagante, (p) => p.id)), [sorted, filters, allFields, extra])
   const index = useMemo(() => keywordIndex<Pagante>((p) => paganteKeywordText(p, pg.contatos.get(p.pessoaId))), [pg.contatos])
   const visible = useMemo(() => {
     if (!choices) return []
@@ -167,7 +168,7 @@ function Pagantes({ host }: { host: Host }) {
       <>
         {mobile
           ? (visible.length ? <PagantesCards list={slice} choices={pg.choices} contatos={pg.contatos} onOpen={open} /> : <div className="surface">{empty}</div>)
-          : <PagantesTable list={slice} choices={pg.choices} contatos={pg.contatos} onOpen={open} view={{ config: view.config, onChange: view.setConfig }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+          : <PagantesTable list={slice} choices={pg.choices} contatos={pg.contatos} onOpen={open} view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
         <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} pending={pending} />
       </>
     )
@@ -176,7 +177,7 @@ function Pagantes({ host }: { host: Host }) {
   return (
     <div className="page page--full pg-page">
       <div role="toolbar" aria-label="Comandos de pagantes">
-        <ViewBar view={view} columns={PAGANTE_COLUMNS} filters={choices ? { fields } : undefined}>
+        <ViewBar view={view} columns={PAGANTE_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="pg-filters__search" value={query} onChange={setQuery} placeholder="Buscar por pagante, PAG, OP, telefone ou e-mail" aria-label="Buscar pagantes" />
           <Select className="pg-filters__select" aria-label="Período de criação" searchable={false} clearable={false} options={PERIODOS} value={periodo} onChange={(v) => setPeriodo(v ?? EMPTY_FILTERS.periodo)} />

@@ -48,8 +48,9 @@ function Pessoas({ host }: { host: Host }) {
   const clientes = useMemo(() => clienteOptions(list), [list])
   const fields = useMemo(() => (choices ? pessoaFields(choices, clientes) : []), [choices, clientes])
 
-  const { view, filters: valid, quickFilters, clearFilters } = useListView({
+  const { view, filters: valid, quickFilters, clearFilters, fields: allFields, extra } = useListView({
     host,
+    extra: { entity: 'cr40f_bancodedados', ids: list.map((p) => p.id) },
     defaultName: 'Todas as pessoas',
     tela: TELA,
     columns: PESSOA_COLUMNS,
@@ -68,11 +69,11 @@ function Pessoas({ host }: { host: Host }) {
   // Ordena e filtra uma vez por lista/visão; a cada busca só confere o texto já normalizado de cada linha.
   const sorted = useMemo(() => {
     const sort = view.config.sort
-    return choices && sort ? sortPessoas(list, sort.key, sort.dir, choices) : list
+    return extra.sort(choices && sort ? sortPessoas(list, sort.key, sort.dir, choices) : list, sort, (p) => p.id)
   }, [list, choices, view.config.sort])
   const filtered = useMemo(() => {
     const read = (p: Pessoa, key: string) => readPessoa(p, key, dupIds)
-    return filterRows(sorted, valid, fields, read)
+    return filterRows(sorted, valid, allFields, extra.read(read, (p) => p.id))
   }, [sorted, valid, fields, dupIds])
   const index = useMemo(() => keywordIndex<Pessoa>((p) => pessoaKeywordText(p, choices ? label(choices.cargo, p.cargo) : '')), [choices])
   const visible = useMemo(() => {
@@ -108,7 +109,7 @@ function Pessoas({ host }: { host: Host }) {
       <>
         {mobile
           ? (visible.length ? <PessoasCards list={slice} choices={choices} dups={dups} onOpen={open} /> : <div className="surface">{empty}</div>)
-          : <PessoasTable list={slice} choices={choices} dups={dups} onOpen={open} view={{ config: view.config, onChange: view.setConfig }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+          : <PessoasTable list={slice} choices={choices} dups={dups} onOpen={open} view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
         <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} pending={pending} />
       </>
     )
@@ -117,7 +118,7 @@ function Pessoas({ host }: { host: Host }) {
   return (
     <div className="page page--full ps-page">
       <div role="toolbar" aria-label="Comandos de pessoas">
-        <ViewBar view={view} columns={PESSOA_COLUMNS} filters={choices ? { fields } : undefined}>
+        <ViewBar view={view} columns={PESSOA_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="ps-filters__search" value={query} onChange={setQuery} placeholder="Buscar por nome, cliente, celular ou e-mail" aria-label="Buscar pessoas" />
           {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={ps.loading && Boolean(choices)} onClick={refresh} />}
