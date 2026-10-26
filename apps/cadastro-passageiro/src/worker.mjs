@@ -28,6 +28,9 @@ export default {
       }));
     }
     const asset = env.ASSETS ? await env.ASSETS.fetch(request) : new Response("Não encontrado", { status: 404 });
-    return comSeguranca(asset);
+    const resp = comSeguranca(asset);
+    // Arquivo pedido com ?v=<versão> (app.css, app.js) não muda nessa URL: cache de 1 ano no navegador.
+    if (resp.ok && url.searchParams.has("v")) resp.headers.set("Cache-Control", "public, max-age=31536000, immutable");
+    return resp;
   },
 };
