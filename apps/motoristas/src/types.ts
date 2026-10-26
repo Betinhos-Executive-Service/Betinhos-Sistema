@@ -63,12 +63,19 @@ export type DetailField = {
   };
 };
 
+export type DetailPassenger = {
+  id: string;
+  name: string;
+};
+
 export type DetailData = {
   type: Exclude<AgendaType, "HEADER">;
   id: string;
   title: string;
   fields: DetailField[];
   actions: DetailAction[];
+  /** Passageiros (cr40f_bancodedados) do serviço, na ordem de seleção; base do avatar com foto. */
+  passengers?: DetailPassenger[];
   dataverse?: {
     entitySetName: string;
     id: string;

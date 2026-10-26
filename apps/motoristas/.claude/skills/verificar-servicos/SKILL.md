@@ -86,3 +86,9 @@ Tela "Enviar comprovante" (`src/screens/ReceiveScreen.tsx`, lógica pura em `src
 - Gravação real no Dataverse/Flow, upload ao SharePoint e envio de voucher só em DEV autenticado (`npm run push`), nunca em PROD.
 - O Voltar físico do Android dentro do Power Apps precisa ser conferido no aparelho; o headless só prova o comportamento do histórico do navegador.
 - Abrir discador/WhatsApp (`tel:`/`wa.me`) não é exercitado; o roteiro para no diálogo de escolha.
+
+## Foto do passageiro no detalhe (26/10/2026)
+- Código: `src/lib/passengerPhoto.ts`, `src/components/details/PassengerAvatars.tsx`; teste `tests/passengerPhoto.test.ts`.
+- A foto só é pedida com o serviço Programado (`cr40f_status` 202410005), pela Custom API `new_ObterFotoPassageiro` (`executeCustomApi`, `{new_ReservaId, new_PassageiroId}` → `new_FotoJson`). Se a API negar, falhar ou devolver JSON inválido, aparece só a inicial, sem mensagem de erro. A imagem fica em memória como blob URL, revogada ao sair da tela; são no máximo 2 chamadas simultâneas.
+- Mock (375 px): o serviço 10241 mostra a foto da Ana e o "R" do Roberto; tocar no avatar amplia a foto, e X, Esc ou toque fora fecham. Se a agenda mock antiga aparecer, apague `app-motoristas-local-v1` do localStorage.
+- DEV: entre como o motorista de um serviço Programado com passageiro com foto e veja a foto. Mude o status para Em Execução e reabra: só a inicial.
