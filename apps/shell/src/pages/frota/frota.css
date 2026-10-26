@@ -148,3 +148,13 @@
   .bt-toast { animation-name: frota-toast-in-baixo; }
 }
 @keyframes frota-toast-in-baixo { from { opacity: 0; transform: translateY(10px); } }
+/* Foto principal clicável: abre Ver/Trocar; arrastar ou colar pede confirmação antes de enviar. */
+.frota-foto-botao { position: relative; display: block; width: 100%; padding: 0; border: 0; border-radius: var(--bt-radius-sm); background: none; cursor: pointer; overflow: hidden; transition: transform var(--bt-duration-fast) var(--bt-ease-out); }
+.frota-foto-botao:active:not(:disabled) { transform: scale(0.99); }
+.frota-foto-botao:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bt-color-surface), 0 0 0 4px var(--bt-color-action); }
+.frota-foto-botao__veu { position: absolute; inset: 0; display: grid; place-items: center; color: var(--bt-color-white); background-color: var(--shell-veu); opacity: 0; transition: opacity var(--bt-duration-fast) ease; }
+@media (hover: hover) and (pointer: fine) { .frota-foto-botao:hover .frota-foto-botao__veu { opacity: 1; } }
+.frota-foto-botao:focus-visible .frota-foto-botao__veu { opacity: 1; }
+.frota-foto-drop .bt-menu { display: block; }
+.frota-foto-previa { display: block; width: 100%; max-height: 260px; margin-top: var(--bt-space-2); border-radius: var(--bt-radius-md); object-fit: contain; background-color: var(--bt-color-surface-neutral); }
+@media (prefers-reduced-motion: reduce) { .frota-foto-botao { transition: none; } }
