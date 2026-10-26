@@ -53,7 +53,7 @@ Fora do escopo: link por serviço sem login (descartado), convidado B2B com e-ma
 **`cr40f_ReativarAcessoMotorista`**
 - Entrada: `FuncionarioId` (guid, obrigatório).
 - Saída: `EmailMicrosoft`, `SenhaTemporaria` ("Senha" na tela), `LinkApp`, `Etapas` (usuario, conta, senha, licenca, grupo, systemuser).
-- Erros: `FUNCIONARIO_SEM_EMAIL`, `CONTA_NAO_EXISTE`, `SEM_PERMISSAO_SENHA`, `SEM_LICENCA_DISPONIVEL`, `USUARIO_DATAVERSE_PENDENTE`, `GRAPH_INDISPONIVEL`.
+- Erros: `FUNCIONARIO_SEM_EMAIL`, `CONTA_NAO_EXISTE`, `SEM_PERMISSAO_SENHA`, `SEM_LICENCA_DISPONIVEL`, `GRAPH_INDISPONIVEL`. O 400 do `addUser` logo após atribuir a licença (ainda propagando) não é erro: a etapa `systemuser` fica pendente e conclui numa nova execução (DEV, 26/10/2026).
 
 ### 4.2 Plugin `packages/plugins/Cr40f.Acesso.Plugin` (+ `.Tests`)
 

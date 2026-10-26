@@ -365,6 +365,29 @@ public sealed class CadastrarAcessoHandlerTests
     }
 
     [Fact]
+    public void AddUser_400_logo_apos_a_licenca_fica_pendente_e_nao_falha()
+    {
+        _pp.LicencaPropagando = true;
+        var saida = Handler().Executar(Entrada());
+        var json = saida.Etapas.ToJson();
+        Assert.Contains("\"etapa\":\"systemuser\",\"estado\":\"pendente\"", json);
+        Assert.Contains("\"etapa\":\"funcionario\",\"estado\":\"pendente\"", json);
+        Assert.False(string.IsNullOrEmpty(saida.SenhaTemporaria));
+    }
+
+    [Fact]
+    public void Depois_do_400_nova_execucao_conclui_o_vinculo_na_mesma_conta()
+    {
+        _pp.LicencaPropagando = true;
+        var primeira = Handler().Executar(Entrada());
+        _pp.LicencaPropagando = false;
+        var segunda = Handler().Executar(Entrada());
+        Assert.Equal(primeira.EmailMicrosoft, segunda.EmailMicrosoft);
+        Assert.Contains("\"etapa\":\"funcionario\",\"estado\":\"feita\"", segunda.Etapas.ToJson());
+        Assert.Single(Funcionarios);
+    }
+
+    [Fact]
     public void Falha_do_addUser_para_antes_do_funcionario()
     {
         _pp.Falhar = true;
