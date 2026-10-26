@@ -170,6 +170,8 @@
 .gr-sheet__line strong { font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-primary); white-space: pre-line; }
 /* Campo protegido da sincronização da Tenaris: cadeado discreto; azul só no foco. */
 .gr-protecao { flex: 0 0 auto; display: inline-flex; }
+/* Na célula o escudo fica no canto direito, também quando o valor é um selo de status (que não ocupa a largura). */
+.gr-cell > .gr-protecao { margin-left: auto; }
 .gr-protecao__trigger { display: inline-grid; place-items: center; width: 20px; height: 20px; margin: -4px 0; padding: 0; border: 0; border-radius: var(--bt-radius-sm); background: transparent; color: var(--bt-color-text-secondary); cursor: pointer; }
 .gr-protecao__trigger:hover, .gr-protecao__trigger[aria-expanded="true"] { background-color: var(--bt-color-surface-soft); color: var(--bt-color-text-primary); }
 .gr-protecao__trigger:focus-visible { outline: 0; box-shadow: var(--bt-focus-ring); color: var(--bt-color-action); }
