@@ -31,11 +31,35 @@ public sealed class FuncionarioRepository
         return _service.RetrieveMultiple(q).Entities.Select(Mapear).FirstOrDefault();
     }
 
-    public Guid Criar(string nome, string email, string celular, int tipoVinculo) => _service.Create(new Entity(Tabela)
+    /// <summary>
+    /// Funcionário sem e-mail Microsoft com o mesmo nome: sobra de cadastro que ficou com a liberação pendente.
+    /// Só motorista ativo (o que Criar grava): homônimo desligado ou de outra função não é reaproveitado.
+    /// </summary>
+    public FuncionarioRegistro? SemEmailPorNome(string nome)
     {
-        ["cr40f_nomecompleto"] = nome.Trim(), ["cr40f_emailmicrosoft"] = email, [ColunaCelular] = celular,
-        ["cr40f_funcao"] = new OptionSetValue(FuncaoMotorista), ["cr40f_status"] = new OptionSetValue(StatusAtivo), ["cr40f_tipodevinculo"] = new OptionSetValue(tipoVinculo),
-    });
+        var q = new QueryExpression(Tabela) { ColumnSet = Colunas, TopCount = 2 };
+        q.Criteria.AddCondition("cr40f_nomecompleto", ConditionOperator.Equal, nome.Trim().ToLowerInvariant());   // Equal do Dataverse ignora caixa
+        q.Criteria.AddCondition("cr40f_emailmicrosoft", ConditionOperator.Null);
+        q.Criteria.AddCondition("cr40f_funcao", ConditionOperator.Equal, FuncaoMotorista);
+        q.Criteria.AddCondition("cr40f_status", ConditionOperator.Equal, StatusAtivo);
+        var achados = _service.RetrieveMultiple(q).Entities.Select(Mapear).ToList();
+        return achados.Count == 1 ? achados[0] : null;   // homônimos ambíguos: não adivinha
+    }
+
+    /// <summary>email null: liberação do systemuser pendente; o e-mail é gravado quando o Dataverse liberar.</summary>
+    public Guid Criar(string nome, string? email, string celular, int tipoVinculo)
+    {
+        var e = new Entity(Tabela)
+        {
+            ["cr40f_nomecompleto"] = nome.Trim(), [ColunaCelular] = celular,
+            ["cr40f_funcao"] = new OptionSetValue(FuncaoMotorista), ["cr40f_status"] = new OptionSetValue(StatusAtivo), ["cr40f_tipodevinculo"] = new OptionSetValue(tipoVinculo),
+        };
+        if (email is not null) e["cr40f_emailmicrosoft"] = email;
+        return _service.Create(e);
+    }
+
+    /// <summary>Liberação pendente: grava só o celular (sem e-mail, não dispara o DriverRecordSharing) para "Concluir liberação" na ficha ter um celular válido.</summary>
+    public void CompletarCelular(Guid id, string celular) => _service.Update(new Entity(Tabela, id) { [ColunaCelular] = celular });
 
     public void VincularEmail(Guid id, string email, string? celularSeVazio)
     {

@@ -37,7 +37,7 @@ public sealed class FakeService : IOrganizationService
         var expressao = (QueryExpression)query;
         Consultas.Add(expressao);
         var linhas = (_tabelas.TryGetValue(expressao.EntityName, out var lista) ? lista : new List<Entity>())
-            .Where(e => expressao.Criteria.Conditions.All(c => c.Operator != ConditionOperator.Equal || Equals(Valor(e, c.AttributeName, expressao.EntityName), c.Values[0])))
+            .Where(e => expressao.Criteria.Conditions.All(c => c.Operator == ConditionOperator.Null ? Valor(e, c.AttributeName, expressao.EntityName) is null : c.Operator != ConditionOperator.Equal || Equals(Valor(e, c.AttributeName, expressao.EntityName), c.Values[0])))
             .ToList();
         return new EntityCollection(linhas) { MoreRecords = false };
     }
@@ -51,9 +51,12 @@ public sealed class FakeService : IOrganizationService
 
     public void Delete(string entityName, Guid id) => throw new NotSupportedException();
     public List<OrganizationRequest> Executados { get; } = new();
+    /// <summary>Execute falha (simula SetState recusado pelo Dataverse).</summary>
+    public bool FalharExecute { get; set; }
     public OrganizationResponse Execute(OrganizationRequest request)
     {
         Executados.Add(request);
+        if (FalharExecute) throw new InvalidOperationException("Execute recusado: " + request.RequestName);
         // SetState de systemuser: estado 1 = desabilitado.
         if (request is Microsoft.Crm.Sdk.Messages.SetStateRequest { EntityMoniker.LogicalName: "systemuser" } estado)
             _tabelas["systemuser"].Single(e => e.Id == estado.EntityMoniker.Id)["isdisabled"] = estado.State.Value == 1;

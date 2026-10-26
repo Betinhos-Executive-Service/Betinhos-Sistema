@@ -74,7 +74,7 @@ export const FIELDS: FieldDef[] = [
   { key: 'cr40f_telefonepessoal', label: 'Telefone pessoal', kind: 'phone', group: 'contato' },
   { key: 'cr40f_telefonedeemergencia', label: 'Telefone de emergência', kind: 'phone', group: 'contato' },
   { key: 'cr40f_emailbetinhos', label: 'E-mail Betinhos', kind: 'email', group: 'contato' },
-  { key: 'cr40f_emailmicrosoft', label: 'E-mail Microsoft', kind: 'email', group: 'contato' },
+  { key: 'cr40f_emailmicrosoft', label: 'E-mail Microsoft', kind: 'email', group: 'contato', readonly: true },   // só o plugin de acesso grava; fora da aba Dados
 
   { key: 'cr40f_linkparadocumentos', label: 'Link para documentos', kind: 'url', group: 'detalhes' },
   { key: 'cr40f_folderid', label: 'Folder ID', kind: 'text', group: 'detalhes' },
