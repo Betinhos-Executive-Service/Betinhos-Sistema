@@ -57,13 +57,23 @@ function mostrarErroGeral(status, tentar) {
 }
 
 async function carregar() {
-  app.replaceChildren(el("section", { class: "estado", role: "status" },
-    el("div", { class: "spinner", "aria-hidden": "true" }), el("p", {}, "Carregando os passageiros…")));
+  app.replaceChildren(esqueleto());
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return mostrarErroGeral(410);
   let resp;
   try { resp = await chamar("/api/ler", {}); } catch { return mostrarErroGeral(0, carregar); }
   if (resp.status !== 200 || !Array.isArray(resp.dados?.passageiros)) return mostrarErroGeral(resp.status, carregar);
   renderLista(resp.dados);
+}
+
+// Esqueleto com a forma da lista (cabeçalho + 3 cards) enquanto o "ler" responde.
+function esqueleto() {
+  const bloco = (cls) => el("span", { class: `sk ${cls}` });
+  const card = () => el("div", { class: "card sk-card" },
+    el("div", { class: "card-topo" }, bloco("sk-foto"), el("div", { class: "card-id" }, bloco("sk-nome"), bloco("sk-badge"))),
+    el("div", { class: "sk-dados" }, bloco("sk-linha"), bloco("sk-linha")));
+  return el("div", { class: "esqueleto", role: "status", "aria-label": "Carregando os passageiros" },
+    el("div", { class: "cabecalho" }, el("div", { class: "card-id" }, bloco("sk-titulo"), bloco("sk-data"))),
+    el("div", { class: "lista" }, card(), card(), card()));
 }
 
 function formatarData(iso) {
@@ -125,6 +135,7 @@ function cardPassageiro(p, aoSalvar) {
   const st = {
     foto: null, fotoUrl: fotoAtual(p.foto), tel: "", mail: "",
     editTel: !p.temTelefone, editMail: !p.temEmail, msg: null, salvando: false, erros: {},
+    preparando: false, recem: new Set(),
   };
   const card = el("section", { class: "card", "aria-labelledby": `nome-${id}` });
   const fotoInput = el("input", { class: "foto-input", type: "file", accept: "image/*", id: `foto-${id}` });
@@ -134,16 +145,17 @@ function cardPassageiro(p, aoSalvar) {
     const arq = fotoInput.files?.[0];
     fotoInput.value = "";
     if (!arq) return;
-    st.msg = { tipo: "info", texto: "Preparando a foto…" };
+    st.msg = null;
+    st.preparando = true;
     render();
     try {
       st.foto = await comprimirFoto(arq);
       st.fotoUrl = `data:image/jpeg;base64,${st.foto}`;
-      st.msg = null;
     } catch (e) {
       st.foto = null;
       st.msg = { tipo: "erro", texto: e.message || "Não foi possível abrir a foto. Tente outra." };
     }
+    st.preparando = false;
     render(`foto-${id}`);
   });
 
@@ -156,7 +168,9 @@ function cardPassageiro(p, aoSalvar) {
   function atualizarBotao() {
     if (!botao) return;
     const pend = pendentes();
-    botao.textContent = st.salvando ? "Salvando…" : pend.length ? `Salvar ${listaNatural(pend)}` : "Salvar";
+    if (st.salvando) botao.replaceChildren(el("span", { class: "spinner pequeno", "aria-hidden": "true" }), "Salvando…");
+    else botao.textContent = pend.length ? `Salvar ${listaNatural(pend)}` : "Salvar";
+    botao.classList.toggle("pronto", pend.length > 0);
   }
 
   function campoTexto(tipo) {
@@ -181,6 +195,18 @@ function cardPassageiro(p, aoSalvar) {
       atualizarBotao();
     });
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); salvar(); } });
+    // Ao sair do campo: confirma o valor válido (borda verde) ou avisa o erro já, sem esperar o Salvar.
+    input.addEventListener("blur", () => {
+      const v = input.value.trim();
+      const ok = v && (ehTel ? telefoneValido(v) : emailValido(v));
+      input.classList.toggle("valido", Boolean(ok));
+      if (v && !ok) {
+        st.erros[tipo] = ehTel ? "Confira o telefone: inclua o DDD." : "Confira o e-mail, ex.: nome@empresa.com.br.";
+        input.setAttribute("aria-invalid", "true");
+        msg.className = "msg-campo erro";
+        msg.textContent = st.erros[tipo];
+      }
+    });
     return el("label", { class: "campo", for: iid }, el("span", { class: "sr-only" }, `${ehTel ? "Telefone" : "E-mail"} de ${nome}`), input, msg);
   }
 
@@ -198,7 +224,7 @@ function cardPassageiro(p, aoSalvar) {
         onclick: () => { st[chave] = false; st[tipo] = ""; delete st.erros[tipo]; render(); },
       }, "Cancelar");
     }
-    return el("li", { class: `item ${tem ? "tem" : "falta"}` },
+    return el("li", { class: `item ${tem ? "tem" : "falta"}${st.recem.has(tipo) ? " recem" : ""}` },
       el("div", { class: "item-linha" },
         el("span", { class: "item-rotulo" }, rotulo),
         editando ? null : el("span", { class: "item-valor" }, valor),
@@ -211,15 +237,16 @@ function cardPassageiro(p, aoSalvar) {
     const temFotoAgora = Boolean(st.foto) || p.temFoto;
     // O toque cai direto no <input type=file> transparente sobre a foto: sem <label for> nem pointer-events:none,
     // que no celular (iOS Safari) não abriam a câmera/galeria.
-    const fotoBtn = el("div", { class: `foto${st.fotoUrl ? " com-foto" : ""}${st.foto ? " nova" : ""}` },
+    const fotoBtn = el("div", { class: `foto${st.fotoUrl ? " com-foto" : ""}${st.foto ? " nova" : ""}${st.preparando ? " preparando" : ""}${st.recem.has("foto") ? " recem" : ""}`, "aria-busy": st.preparando ? "true" : null },
       st.fotoUrl ? el("img", { src: st.fotoUrl, alt: "" }) : el("span", { class: "foto-vazia", html: ICONE.camera }),
       el("span", { class: "foto-acao", "aria-hidden": "true", html: ICONE.camera }),
+      st.preparando ? el("span", { class: "foto-carregando", "aria-hidden": "true" }, el("span", { class: "spinner pequeno" })) : null,
       fotoInput);
     fotoInput.setAttribute("aria-label", `${temFotoAgora ? "Trocar" : "Adicionar"} foto de ${nome}`);
 
     const valorTel = p.temTelefone ? (p.telefoneMascarado || "Cadastrado") : "Faltando";
     const valorMail = p.temEmail ? (p.emailMascarado || "Cadastrado") : "Faltando";
-    const legendaFoto = st.foto ? "Foto nova, falta salvar" : temFotoAgora ? "Toque na foto para trocar" : "Toque para adicionar a foto";
+    const legendaFoto = st.preparando ? "Preparando a foto…" : st.foto ? "Foto nova, falta salvar" : temFotoAgora ? "Toque na foto para trocar" : "Toque para adicionar a foto";
 
     const precisaBotao = st.salvando || pendentes().length > 0 || st.editTel || st.editMail || !p.temFoto || st.msg?.tipo === "erro";
     botao = precisaBotao
@@ -227,6 +254,7 @@ function cardPassageiro(p, aoSalvar) {
       : null;
     atualizarBotao();
 
+    card.classList.toggle("completo", completo(p));
     card.replaceChildren(...[
       el("div", { class: "card-topo" },
         fotoBtn,
@@ -268,12 +296,13 @@ function cardPassageiro(p, aoSalvar) {
     }
     const itens = pendentes();
     st.salvando = true;
-    st.msg = { tipo: "info", texto: `Salvando ${listaNatural(itens)}…` };
+    st.msg = null;
     render();
     let resp;
     try { resp = await chamar("/api/salvar", corpo); } catch { resp = { status: 0 }; }
     st.salvando = false;
     if (resp.status === 200) {
+      st.recem = new Set([corpo.fotoBase64 && "foto", corpo.telefone && "tel", corpo.email && "mail"].filter(Boolean));
       if (corpo.fotoBase64) { p.temFoto = true; st.foto = null; }
       if (corpo.telefone) { p.temTelefone = true; p.telefoneMascarado = telefoneOculto(corpo.telefone); st.tel = ""; st.editTel = false; }
       if (corpo.email) { p.temEmail = true; p.emailMascarado = emailOculto(corpo.email); st.mail = ""; st.editMail = false; }
@@ -294,6 +323,8 @@ function cardPassageiro(p, aoSalvar) {
     render(`msg-${id}`);
   }
 
+  // O destaque de "acabou de salvar" vale só para a renderização seguinte ao sucesso.
+  card.addEventListener("animationend", (e) => { if (e.animationName === "destaque") st.recem.clear(); });
   render();
   return card;
 }

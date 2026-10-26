@@ -120,6 +120,43 @@ input[aria-invalid=true] { border-color: var(--err); }
 .msg-campo:empty { display: none; }
 .msg-campo.erro { color: var(--err); font-weight: 700; }
 
+/* Esqueleto do carregamento: blocos neutros pulsando (sem gradiente) */
+.sk { display: block; background: var(--line); border-radius: var(--r-sm); animation: pulsa 1.2s ease-in-out infinite; }
+.sk-card { pointer-events: none; }
+.sk-foto { width: 88px; height: 88px; border-radius: var(--r-lg); flex: none; }
+.sk-nome { width: 120px; height: 18px; }
+.sk-badge { width: 72px; height: 18px; border-radius: var(--r-full); }
+.sk-titulo { width: 140px; height: 22px; }
+.sk-data { width: 200px; height: 14px; }
+.sk-dados { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--neutral); }
+.sk-linha { height: 16px; }
+.sk-linha + .sk-linha { width: 70%; }
+.esqueleto { display: grid; gap: 16px; }
+@media (min-width: 900px) { .sk-foto { width: 104px; height: 104px; } }
+@keyframes pulsa { 50% { opacity: .45; } }
+
+/* Entrada da lista: cards em cascata curta */
+.lista > .card:not(.sk-card) { animation: entra .28s var(--ease-out) both; }
+.lista > .card:nth-child(2) { animation-delay: 50ms; }
+.lista > .card:nth-child(3) { animation-delay: 100ms; }
+.lista > .card:nth-child(n+4) { animation-delay: 150ms; }
+.card { transition: border-color .2s var(--ease-out); }
+.card.completo { border-color: color-mix(in srgb, var(--ok) 35%, var(--line)); }
+
+/* Destaque do que acabou de ser salvo */
+.item.recem .item-valor, .foto.recem { animation: destaque 1.2s var(--ease-out); }
+.item.recem .item-valor { border-radius: var(--r-sm); }
+@keyframes destaque { 0%, 30% { background-color: var(--ok-bg); box-shadow: 0 0 0 4px var(--ok-bg); } 100% { background-color: transparent; box-shadow: 0 0 0 4px transparent; } }
+.badge { transition: background-color .2s var(--ease-out), color .2s var(--ease-out); }
+
+/* Foto sendo preparada */
+.foto-carregando { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(255, 255, 255, .72); border-radius: inherit; z-index: 3; }
+.foto.preparando .foto-input { pointer-events: none; }
+.foto.nova img { animation: entra .22s var(--ease-out); }
+
+/* Campo validado ao sair */
+input.valido { border-color: var(--ok); }
+
 /* Botões */
 .btn {
   height: 44px; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--white); color: var(--ink-900);
@@ -130,7 +167,9 @@ input[aria-invalid=true] { border-color: var(--err); }
 .btn:focus-visible { outline: 2px solid var(--blue-600); outline-offset: 2px; }
 .btn.primario { background: var(--navy-900); border-color: var(--navy-900); color: var(--white); }
 @media (hover: hover) and (pointer: fine) { .btn.primario:hover { background: var(--navy-800); } }
-.btn:disabled { opacity: .55; cursor: not-allowed; }
+.btn:disabled { opacity: .7; cursor: progress; }
+.spinner.pequeno { width: 16px; height: 16px; border-width: 2px; border-color: rgba(255, 255, 255, .35); border-top-color: var(--white); animation-duration: .6s; }
+.foto-carregando .spinner.pequeno { border-color: var(--line); border-top-color: var(--blue-600); }
 
 /* Mensagem por passageiro */
 .aviso { display: flex; gap: 8px; align-items: flex-start; border-radius: var(--r-md); padding: 10px 12px; font-size: 13px; line-height: 20px; font-weight: 600; outline: none; animation: entra .2s var(--ease-out); }
