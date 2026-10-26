@@ -1,0 +1,39 @@
+/* Clientes: lista, ficha e formulário. Só tokens do Design System. */
+.cl-num { font-variant-numeric: tabular-nums; }
+.cl-ellipsis { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-search { flex: 1 1 260px; min-width: 200px; max-width: 360px; }
+
+.cl-open { display: grid; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
+.cl-open strong { overflow: hidden; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); text-overflow: ellipsis; white-space: nowrap; }
+.cl-open:focus-visible, .cl-card__open:focus-visible, .cl-link:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+
+/* Linha e cartão inteiros abrem a ficha (clique delegado ao botão do nome). */
+.cl-table .bt-table__row:not(.bt-table__row--loading), .cl-card { cursor: pointer; }
+@media (hover: hover) and (pointer: fine) {
+  .cl-table .bt-table__row:not(.bt-table__row--loading):hover, .cl-card:hover { background-color: var(--bt-color-surface-soft); }
+  .cl-open:hover strong { color: var(--bt-color-action); }
+}
+
+.cl-cards { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
+.cl-card { border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
+.cl-card__open { display: grid; gap: var(--bt-space-1); width: 100%; min-height: var(--bt-control-height-touch); padding: var(--bt-space-3); border: 0; border-radius: inherit; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform var(--bt-duration-fast) var(--bt-ease-out); }
+.cl-card__open:active { transform: scale(0.97); }
+.cl-card__name { font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); overflow-wrap: anywhere; }
+.cl-card__meta { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); overflow-wrap: anywhere; }
+
+/* Ficha */
+.cl-ficha { display: grid; gap: var(--bt-space-4); }
+.cl-ficha__block { padding: var(--bt-space-3-5); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background-color: var(--bt-color-surface); }
+.cl-ficha__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--bt-space-2) var(--bt-space-4); margin: 0; }
+.cl-ficha__wide { grid-column: 1 / -1; }
+.cl-ficha__item { display: grid; gap: var(--bt-space-0-5); min-width: 0; }
+.cl-ficha__item dt { font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-secondary); }
+.cl-ficha__item dd { margin: 0; font-size: var(--bt-font-size-13); color: var(--bt-color-text-primary); overflow-wrap: anywhere; }
+.cl-link { display: inline-flex; align-items: center; gap: var(--bt-space-1-5); justify-self: start; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-action); border-radius: var(--bt-radius-xs); }
+
+.cl-form { display: grid; gap: var(--bt-space-3); }
+
+@media (max-width: 560px) {
+  .cl-ficha__grid { grid-template-columns: minmax(0, 1fr); }
+  .cl-search { flex: 1 1 100%; max-width: none; }
+}

@@ -10,7 +10,7 @@ export type MenuItem =
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
-  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba }
+  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos' | 'clientes'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba }
 
 /** Visões da Frota: cada uma é um item do menu, todas na mesma tela (`page: 'frota'`). */
 export type FrotaAba = 'pendencias' | 'veiculos' | 'manutencoes' | 'multas' | 'colisoes' | 'indicadores' | 'plano'
@@ -66,7 +66,6 @@ export const MENU: MenuGroup[] = [
       { kind: 'page', id: 'frota-veiculos', label: 'Veículos', page: 'frota', aba: 'veiculos' },
       { kind: 'page', id: 'frota-manutencoes', label: 'Manutenções', page: 'frota', aba: 'manutencoes' },
       { kind: 'page', id: 'frota-multas', label: 'Multas', page: 'frota', aba: 'multas' },
-      table('new_parcelamultafolha', 'Parcelas de multa'),
       { kind: 'page', id: 'frota-colisoes', label: 'Colisões', page: 'frota', aba: 'colisoes' },
       { kind: 'page', id: 'frota-indicadores', label: 'Indicadores', page: 'frota', aba: 'indicadores' },
       { kind: 'page', id: 'frota-plano', label: 'Plano preventivo', page: 'frota', aba: 'plano' },
@@ -79,7 +78,7 @@ export const MENU: MenuGroup[] = [
     label: 'Cadastros',
     items: [
       { kind: 'page', id: 'pessoas', label: 'Pessoas', page: 'pessoas' },
-      table('cr40f_clientes1', 'Clientes'),
+      { kind: 'page', id: 'clientes', label: 'Clientes', page: 'clientes' },
       { kind: 'page', id: 'funcionarios', label: 'Funcionários', page: 'funcionarios' },
       { kind: 'page', id: 'documentos', label: 'Documentos', page: 'documentos' },
       { kind: 'page', id: 'assistente-pessoas', label: 'Assistente', page: 'agentes', agente: 'pessoas' },
@@ -119,6 +118,8 @@ export const DEFAULT_ITEM = MENU[0].items[0]
 
 /** Itens do menu que viraram visão da Frota: `#/frota?aba=x` → `#/frota-x`; `#/infracoes` → aba Infrações de Multas. */
 export function rotaAtualizada(id: string, query: URLSearchParams): { id: string; query: URLSearchParams } | null {
+  // A tabela nativa de clientes virou a tela React; links antigos seguem abrindo.
+  if (id === 'cr40f_clientes1') return { id: 'clientes', query }
   if (id === 'infracoes') return { id: 'frota-multas', query: new URLSearchParams([...query, ['sub', 'infracoes']]) }
   const aba = id === 'frota' ? query.get('aba') : null
   if (!aba) return null
