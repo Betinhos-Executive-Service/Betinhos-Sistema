@@ -6,12 +6,8 @@ export const ORGANIZE_TIMEOUT_MS = 12000;
 const MAX_TOPICS = 8;
 const MAX_TOPIC_LENGTH = 140;
 
-// Conferência: tópicos somente leitura + texto original editável.
-// summarizedFrom guarda o texto que gerou os tópicos; se o original mudou, é preciso atualizar o resumo.
-export type ReviewStatus = "ready" | "updating" | "failed";
-export type ReviewState = { original: string; summarizedFrom: string; topicos: string[]; status: ReviewStatus };
-
-export type ObservationReview = { kind: "direct"; value: string } | ({ kind: "review" } & ReviewState);
+// Resumo na própria tela: "from" guarda o texto que gerou o resumo; se o texto mudar, o resumo some.
+export type SummaryState = { from: string; topicos: string[]; status: "ready" | "failed" };
 
 export type OrganizeObservation = (text: string) => Promise<string>;
 
@@ -46,30 +42,20 @@ async function summarize(original: string, organize: OrganizeObservation, timeou
   }
 }
 
-export async function prepareObservationReview(text: string, organize: OrganizeObservation, timeoutMs = ORGANIZE_TIMEOUT_MS): Promise<ObservationReview> {
-  const original = text.trim();
-  if (!original) return { kind: "direct", value: NO_OBSERVATION };
-  const topicos = await summarize(original, organize, timeoutMs);
-  return { kind: "review", original, summarizedFrom: original, topicos, status: topicos.length ? "ready" : "failed" };
+export async function generateSummary(text: string, organize: OrganizeObservation, timeoutMs = ORGANIZE_TIMEOUT_MS): Promise<SummaryState> {
+  const from = text.trim();
+  const topicos = from ? await summarize(from, organize, timeoutMs) : [];
+  return { from, topicos, status: topicos.length ? "ready" : "failed" };
 }
 
-export function isReviewStale(state: ReviewState) {
-  return state.status !== "failed" && state.original.trim() !== state.summarizedFrom;
+/** Resumo válido para o texto atual; qualquer alteração depois de gerado volta à etapa "Gerar resumo". */
+export function activeSummary(summary: SummaryState | null, text: string): SummaryState | null {
+  return summary && summary.from !== "" && summary.from === text.trim() ? summary : null;
 }
 
-export function canFinalizeReview(state: ReviewState) {
-  return state.status !== "updating" && state.original.trim() !== "" && !isReviewStale(state);
-}
-
-// Único caso sem resumo: a IA falhou; aí grava só o texto original.
-export function reviewFinalValue(state: ReviewState) {
-  return state.status === "failed" ? state.original.trim() : buildOrganizedObservation(state.topicos, state.original);
-}
-
-export async function refreshReview(state: ReviewState, organize: OrganizeObservation, timeoutMs = ORGANIZE_TIMEOUT_MS): Promise<ReviewState> {
-  const original = state.original.trim();
-  const topicos = await summarize(original, organize, timeoutMs);
-  return topicos.length ? { original: state.original, summarizedFrom: original, topicos, status: "ready" } : { ...state, status: "failed" };
+/** Com resumo: tópicos + texto original. Falha da IA ("Enviar sem resumo"): só o texto original. */
+export function summaryFinalValue(summary: SummaryState) {
+  return summary.status === "ready" ? buildOrganizedObservation(summary.topicos, summary.from) : summary.from;
 }
 
 export type TopicKind = "atraso" | "espera" | "pedagio" | "combustivel" | "passageiro" | "ocorrencia" | "outros";

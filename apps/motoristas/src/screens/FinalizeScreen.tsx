@@ -11,15 +11,13 @@ import { FormMenu } from "../components/navigation/FormMenu";
 import { appendDitado } from "../lib/useDitado";
 import { isExchangeOutsideWindow, organizeObservationRemote, type ExchangeWindowCheck } from "../lib/dataverse";
 import {
-  canFinalizeReview,
-  isReviewStale,
+  activeSummary,
+  generateSummary,
   NO_OBSERVATION,
-  prepareObservationReview,
-  refreshReview,
-  reviewFinalValue,
+  summaryFinalValue,
   topicKind,
   type OrganizeObservation,
-  type ReviewState,
+  type SummaryState,
   type TopicKind
 } from "../lib/observacaoOrganizada";
 import { matchesExpenseCitySearch, type ExpenseReferenceData } from "../lib/expenses";
@@ -61,7 +59,7 @@ function focusInvalidField(element: HTMLElement | null) {
   }, 40);
 }
 
-function FinalizeActions({ onNone, onConfirm, submitState, noneLabel = "Não tenho", confirmLoadingLabel }: { onNone: () => void; onConfirm: () => void; submitState: ActionButtonState; noneLabel?: string; confirmLoadingLabel?: string }) {
+function FinalizeActions({ onNone, onConfirm, submitState, noneLabel = "Não tenho", confirmLabel = "Confirmar", confirmDisabled = false, confirmLoadingLabel }: { onNone: () => void; onConfirm: () => void; submitState: ActionButtonState; noneLabel?: string; confirmLabel?: string; confirmDisabled?: boolean; confirmLoadingLabel?: string }) {
   const [activeAction, setActiveAction] = useState<"none" | "confirm" | "">("");
 
   useEffect(() => {
@@ -83,8 +81,9 @@ function FinalizeActions({ onNone, onConfirm, submitState, noneLabel = "Não ten
       />
       <ActionButton
         className="finalize-primary"
-        idleLabel="Confirmar"
+        idleLabel={confirmLabel}
         loadingLabel={confirmLoadingLabel}
+        disabled={confirmDisabled}
         state={submitState}
         active={activeAction === "confirm"}
         variant="primary"
@@ -138,92 +137,26 @@ function TopicIcon({ topic }: { topic: string }) {
   );
 }
 
-function ObservationReview({
-  review,
-  submitState,
-  onChangeOriginal,
-  onRefresh,
-  onFinalize
-}: {
-  review: ReviewState;
-  submitState: ActionButtonState;
-  onChangeOriginal: (text: string) => void;
-  onRefresh: () => void;
-  onFinalize: () => void;
-}) {
-  const stale = isReviewStale(review);
-  const updating = review.status === "updating";
-  const failed = review.status === "failed";
-  const canFinalize = canFinalizeReview(review);
-  const busy = submitState !== "idle";
-  // Depois de uma falha, o motorista pode tentar de novo se mudar o texto.
-  const showRefresh = (stale || (failed && review.original.trim() !== review.summarizedFrom)) && review.original.trim() !== "";
-
+function ObservationSummary({ summary }: { summary: SummaryState }) {
+  if (summary.status === "failed") {
+    return (
+      <p className="observation-review-warning" role="alert">
+        <SystemIcon name="warning" />
+        Não foi possível resumir agora
+      </p>
+    );
+  }
   return (
-    <article className="finalize-card">
-      <div className="finalize-title">Confira o resumo do serviço</div>
-      <div className="finalize-scroll">
-        <div className="finalize-form observation-review-form">
-          {failed ? (
-            <p className="observation-review-warning" role="alert">
-              <SystemIcon name="warning" />
-              Não foi possível resumir agora. Você pode finalizar com o texto que falou.
-            </p>
-          ) : (
-            <section className={`observation-review shadow${stale || updating ? " is-stale" : ""}`} aria-label="Resumo do serviço">
-              <ul className="observation-review-topics">
-                {review.topicos.map((topic, index) => (
-                  <li key={`${index}-${topic}`}>
-                    <TopicIcon topic={topic} />
-                    <span>{topic}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-          <section className="observation-original" aria-label="O que você falou">
-            <div className="observation-original-head">
-              <span className="observation-original-title">O que você falou</span>
-              <span className="observation-original-hint">Toque para corrigir</span>
-            </div>
-            <DitadoField stopWhen={busy || updating} onFinal={(text) => onChangeOriginal(appendDitado(review.original, text))}>
-              <textarea
-                className="observation-original-input"
-                aria-label="O que você falou. Toque para corrigir"
-                rows={4}
-                value={review.original}
-                disabled={busy || updating}
-                onChange={(event) => onChangeOriginal(event.target.value)}
-              />
-            </DitadoField>
-            {showRefresh || updating ? (
-              <ActionButton
-                className="observation-refresh"
-                variant="secondary"
-                idleLabel="Atualizar resumo"
-                loadingLabel="Atualizando resumo…"
-                state={updating ? "loading" : "idle"}
-                disabled={busy}
-                onClick={onRefresh}
-              />
-            ) : null}
-          </section>
-        </div>
-      </div>
-      <div className="observation-review-footer">
-        {!canFinalize && !busy ? <p className="observation-review-blocked">Atualize o resumo antes de finalizar</p> : null}
-        <ActionBar className="finalize-actions observation-review-actions">
-          <ActionButton
-            className="finalize-primary"
-            idleLabel="Está certo, finalizar"
-            state={submitState}
-            variant="primary"
-            disabled={!canFinalize}
-            onClick={onFinalize}
-          />
-        </ActionBar>
-      </div>
-    </article>
+    <section className="observation-review shadow" aria-label="Resumo do serviço">
+      <ul className="observation-review-topics">
+        {summary.topicos.map((topic, index) => (
+          <li key={`${index}-${topic}`}>
+            <TopicIcon topic={topic} />
+            <span>{topic}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -241,60 +174,46 @@ function ServiceFinalize({
   organizeObservation: OrganizeObservation;
 }) {
   const [obs, setObs] = useState(initialObservation);
-  const [organizing, setOrganizing] = useState(false);
-  const [review, setReview] = useState<ReviewState | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [summaryState, setSummaryState] = useState<SummaryState | null>(null);
 
   useEffect(() => {
     setObs(initialObservation);
-    setReview(null);
+    setSummaryState(null);
   }, [detail.id, initialObservation]);
 
-  // Se o motorista já escreveu no detalhe, a tela confirma o texto em vez de perguntar de novo.
+  // Etapa 1: sem resumo para o texto atual (digitar ou ditar depois do resumo volta para cá).
+  const summary = activeSummary(summaryState, obs);
   const hasObservation = obs.trim() !== "";
   const finish = (value: string) => onDone({ "Observação Final": value });
 
-  const confirm = async () => {
-    setOrganizing(true);
-    const prepared = await prepareObservationReview(obs, organizeObservation);
-    setOrganizing(false);
-    if (prepared.kind === "direct") finish(prepared.value);
-    else setReview({ original: prepared.original, summarizedFrom: prepared.summarizedFrom, topicos: prepared.topicos, status: prepared.status });
+  const generate = async () => {
+    setGenerating(true);
+    setSummaryState(await generateSummary(obs, organizeObservation));
+    setGenerating(false);
   };
 
-  const refresh = async (current: ReviewState) => {
-    setReview({ ...current, status: "updating" });
-    const next = await refreshReview(current, organizeObservation);
-    setReview((latest) => (latest && latest.original === current.original ? next : latest));
-  };
-
-  if (review) {
-    return (
-      <ObservationReview
-        review={review}
-        submitState={submitState}
-        onChangeOriginal={(text) => setReview((current) => (current ? { ...current, original: text } : current))}
-        onRefresh={() => void refresh(review)}
-        onFinalize={() => finish(reviewFinalValue(review))}
-      />
-    );
-  }
+  const confirmLabel = !summary ? "Gerar resumo" : summary.status === "ready" ? "Confirmar" : "Enviar sem resumo";
 
   return (
     <article className="finalize-card">
-      <div className="finalize-title">{hasObservation ? "Confira sua observação" : "Digite abaixo sua observação"}</div>
+      <div className="finalize-title">{summary?.status === "ready" ? "Confira o resumo do serviço" : hasObservation ? "Confira sua observação" : "Digite abaixo sua observação"}</div>
       <div className="finalize-scroll">
-        <div className="finalize-form">
-          <DitadoField stopWhen={submitState !== "idle" || organizing} onFinal={(text) => setObs((current) => appendDitado(current, text))}>
+        <div className="finalize-form observation-review-form">
+          {summary ? <ObservationSummary summary={summary} /> : null}
+          <DitadoField stopWhen={submitState !== "idle" || generating} onFinal={(text) => setObs((current) => appendDitado(current, text))}>
             <TextAreaBlock label="Observação do serviço" value={obs} onChange={setObs} />
           </DitadoField>
         </div>
       </div>
       <FinalizeActions
-        noneLabel={hasObservation ? "Enviar sem observação" : "Não tenho"}
+        noneLabel="Não tenho observação"
+        confirmLabel={confirmLabel}
+        confirmDisabled={!hasObservation || generating}
         onNone={() => finish(NO_OBSERVATION)}
-        onConfirm={() => void confirm()}
-        submitState={organizing ? "loading" : submitState}
-        confirmLoadingLabel={organizing ? "Organizando…" : undefined}
+        onConfirm={() => (summary ? finish(summaryFinalValue(summary)) : void generate())}
+        submitState={generating ? "loading" : submitState}
+        confirmLoadingLabel={generating ? "Gerando resumo…" : undefined}
       />
     </article>
   );

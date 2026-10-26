@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { formatDitadoTimer, useDitado } from "../../lib/useDitado";
+import { Mic, MicOff } from "lucide-react";
 import { SystemIcon } from "../icons/SystemIcon";
 
 type DitadoButtonProps = {
@@ -60,7 +61,7 @@ export function DitadoField({ onFinal, stopWhen = false, className = "", childre
               aria-pressed={listening}
               onClick={toggle}
             >
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm-6 8a6 6 0 0 0 12 0M12 17v4M8 21h8" /></svg>
+              {listening ? <MicOff aria-hidden="true" /> : <Mic aria-hidden="true" />}
             </button>
           </div>
         </div>
