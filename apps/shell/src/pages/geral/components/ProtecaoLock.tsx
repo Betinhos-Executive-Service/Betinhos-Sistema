@@ -1,11 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type SyntheticEvent } from 'react'
-import { Lock } from 'lucide-react'
+import { ShieldCheck } from 'lucide-react'
 import { Spinner } from '@betinhos/ui'
 import { formatDateTime } from '../domain/format'
 import { AUDIT_LIMIT, textoDoValor, ultimaAlteracao, valorDaTenaris, type Protecao } from '../domain/protecao'
 import type { AttributeInfo } from '../domain/types'
 
-/** Busca (com cache por OS) o histórico do popover; `null` fora da Geral: o cadeado não aparece. */
+/** Busca (com cache por OS) o histórico do popover; `null` fora da Geral: o escudo não aparece. */
 export const ProtecaoContext = createContext<((id: string) => Promise<Protecao>) | null>(null)
 
 const HOVER_OPEN_MS = 200
@@ -15,7 +15,7 @@ const GAP = 6
 type State = { kind: 'loading' } | { kind: 'ok'; data: Protecao } | { kind: 'error'; message: string }
 type Props = { id: string; attribute: string; label: string; atual: string; info: AttributeInfo | undefined }
 
-// O cadeado vive dentro da célula e da linha: clique, duplo clique e teclas não podem selecionar nem abrir edição.
+// O escudo vive dentro da célula e da linha: clique, duplo clique e teclas não podem selecionar nem abrir edição.
 const stop = (event: SyntheticEvent) => event.stopPropagation()
 
 /** Cadeado do campo travado contra a sincronização da Tenaris; hover (mouse) ou clique/toque abre o histórico. */
@@ -104,19 +104,19 @@ export function ProtecaoLock({ id, attribute, label, atual, info }: Props) {
         ref={buttonRef}
         type="button"
         className="gr-protecao__trigger"
-        aria-label={`${label}: campo protegido da sincronização da Tenaris. Ver histórico`}
+        aria-label={`${label}: editável, protegido da sincronização da Tenaris. Ver histórico`}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         onClick={toggle}
         onPointerEnter={hoverIn}
         onPointerLeave={hoverOut}
       >
-        <Lock size={12} aria-hidden="true" />
+        <ShieldCheck size={13} aria-hidden="true" />
       </button>
       {open ? (
         <div ref={panelRef} id={panelId} className="gr-protecao__panel" popover="manual" role="dialog" aria-label={`Histórico de ${label}`} onPointerEnter={hoverIn} onPointerLeave={hoverOut}>
-          <p className="gr-protecao__title"><Lock size={12} aria-hidden="true" /> Campo protegido</p>
-          <p className="gr-protecao__note">Editado manualmente: a sincronização da Tenaris não sobrescreve mais este campo.</p>
+          <p className="gr-protecao__title"><ShieldCheck size={13} aria-hidden="true" /> Protegido da Tenaris</p>
+          <p className="gr-protecao__note">Você pode editar. Como já foi alterado à mão, a sincronização da Tenaris não sobrescreve mais este campo.</p>
           <dl className="gr-protecao__list">
             <div><dt>Valor atual</dt><dd>{atual}</dd></div>
             <Historico state={state} attribute={attribute} info={info} />
@@ -148,7 +148,7 @@ function Historico({ state, attribute, info }: { state: State; attribute: string
       ) : (
         <Status>{audits.length >= AUDIT_LIMIT ? `A alteração é anterior às últimas ${AUDIT_LIMIT} mudanças auditadas desta OS.` : 'Nenhuma alteração deste campo na auditoria.'}</Status>
       )}
-      {fonte != null ? <div><dt>A Tenaris manda hoje</dt><dd>{textoDoValor(fonte, info)}</dd></div> : null}
+      {fonte != null ? <div><dt>Valor da Tenaris (não aplicado)</dt><dd>{textoDoValor(fonte, info)}</dd></div> : null}
     </>
   )
 }

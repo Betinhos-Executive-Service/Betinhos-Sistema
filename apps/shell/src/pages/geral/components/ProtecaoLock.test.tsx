@@ -22,7 +22,7 @@ function setup(load: ((id: string) => Promise<Protecao>) | null = vi.fn(async ()
       <ProtecaoLock id="os-1" attribute="cr40f_status" label="Status" atual="Concluído" info={STATUS} />
     </ProtecaoContext.Provider>,
   )
-  return { load, trigger: screen.queryByRole('button', { name: /Status: campo protegido/ }) }
+  return { load, trigger: screen.queryByRole('button', { name: /Status: editável, protegido/ }) }
 }
 
 // O painel usa `popover`; o jsdom não o mostra (sem showPopover), por isso `hidden: true`.
@@ -30,7 +30,7 @@ function setup(load: ((id: string) => Promise<Protecao>) | null = vi.fn(async ()
 const dialog = (label = 'Status') => document.querySelector<HTMLElement>(`[role="dialog"][aria-label="Histórico de ${label}"]`)
 
 describe('ProtecaoLock', () => {
-  it('fora da Geral (sem provider) não mostra o cadeado', () => {
+  it('fora da Geral (sem provider) não mostra o escudo', () => {
     expect(setup(null).trigger).toBeNull()
   })
 
@@ -43,12 +43,12 @@ describe('ProtecaoLock', () => {
     expect(dialog()!.textContent).toContain('Buscando histórico')
     await act(async () => resolve(COM_HISTORICO))
     const text = dialog()!.textContent!
-    for (const part of ['Valor atualConcluído', 'AntesConfirmado', 'Alterado em23/10/2026 16:27', 'PorKeila, Deborah', 'A Tenaris manda hojeConfirmado']) expect(text).toContain(part)
+    for (const part of ['Valor atualConcluído', 'AntesConfirmado', 'Alterado em23/10/2026 16:27', 'PorKeila, Deborah', 'Valor da Tenaris (não aplicado)Confirmado']) expect(text).toContain(part)
     expect(load).toHaveBeenCalledTimes(1)
     expect(load).toHaveBeenCalledWith('os-1')
   })
 
-  it('Esc fecha e devolve o foco ao cadeado; clique fora fecha', async () => {
+  it('Esc fecha e devolve o foco ao escudo; clique fora fecha', async () => {
     const { trigger } = setup()
     trigger!.focus()
     fireEvent.click(trigger!)
@@ -83,7 +83,7 @@ describe('ProtecaoLock', () => {
         <div onClick={onRowClick} onDoubleClick={onRowClick}><ProtecaoLock id="os-2" attribute="cr40f_status" label="Status 2" atual="Concluído" info={STATUS} /></div>
       </ProtecaoContext.Provider>,
     )
-    const trigger = screen.getByRole('button', { name: /Status 2: campo protegido/ })
+    const trigger = screen.getByRole('button', { name: /Status 2: editável, protegido/ })
     fireEvent.click(trigger)
     fireEvent.doubleClick(trigger)
     fireEvent.pointerLeave(trigger, { pointerType: 'mouse' })
@@ -99,7 +99,7 @@ describe('ProtecaoLock', () => {
     const text = dialog()!.textContent!
     expect(text).toContain('Seu perfil não tem acesso à auditoria')
     expect(text).toContain('Valor atualConcluído')
-    expect(text).toContain('A Tenaris manda hojeConfirmado')
+    expect(text).toContain('Valor da Tenaris (não aplicado)Confirmado')
     expect(text).not.toContain('Alterado em')
   })
 
@@ -108,7 +108,7 @@ describe('ProtecaoLock', () => {
     fireEvent.click(trigger!)
     await act(async () => undefined)
     expect(dialog()!.textContent).toContain('Nenhuma alteração deste campo na auditoria.')
-    expect(dialog()!.textContent).not.toContain('Tenaris manda')
+    expect(dialog()!.textContent).not.toContain('Valor da Tenaris')
   })
 
   it('histórico cortado no limite não afirma que não houve alteração', async () => {
