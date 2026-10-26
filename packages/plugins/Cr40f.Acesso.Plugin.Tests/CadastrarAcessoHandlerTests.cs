@@ -43,7 +43,8 @@ public sealed class CadastrarAcessoHandlerTests
     {
         var primeira = Handler().Executar(Entrada());
         _graph.Chamadas.Clear();
-        var segunda = Handler().Executar(Entrada());
+        var reexecucao = Entrada(); reexecucao.FuncionarioId = primeira.FuncionarioId;
+        var segunda = Handler().Executar(reexecucao);
         Assert.Equal(primeira.EmailMicrosoft, segunda.EmailMicrosoft);
         Assert.Equal("", segunda.SenhaTemporaria);
         Assert.DoesNotContain("CriarUsuario", _graph.Chamadas);
@@ -175,11 +176,12 @@ public sealed class CadastrarAcessoHandlerTests
     }
 
     [Fact]
-    public void Sem_FuncionarioId_dono_homonimo_com_conta_desativada_gera_sufixo()
+    public void CriarNovo_dono_homonimo_com_conta_desativada_gera_sufixo()
     {
         _svc.Com(new Entity("cr40f_funcionarios", Guid.NewGuid()) { ["cr40f_nomecompleto"] = "João da Silva Ávila", ["cr40f_emailmicrosoft"] = "joao.avila@betinhos.onmicrosoft.com", ["cr40f_status"] = new OptionSetValue(1) });
         _graph.Usuarios["joao.avila@betinhos.onmicrosoft.com"] = new GraphUsuario { Id = "velho", Upn = "joao.avila@betinhos.onmicrosoft.com", DisplayName = "João da Silva Ávila", Ativo = false };
-        Assert.Equal("joao.avila2@betinhos.onmicrosoft.com", Handler().Executar(Entrada()).EmailMicrosoft);
+        var e = Entrada(); e.CriarNovo = true;
+        Assert.Equal("joao.avila2@betinhos.onmicrosoft.com", Handler().Executar(e).EmailMicrosoft);
         Assert.DoesNotContain("DefinirAtivo", _graph.Chamadas);
     }
 
@@ -312,28 +314,82 @@ public sealed class CadastrarAcessoHandlerTests
     }
 
     [Fact]
-    public void Reexecucao_sem_funcionarioId_conclui_no_mesmo_funcionario()
+    public void Reexecucao_pendente_sem_funcionarioId_para_em_HOMONIMO_sem_tocar_o_Entra()
     {
         _pp.CriarSystemuser = false;
         Handler().Executar(Entrada());
-        _pp.CriarSystemuser = true;
         _graph.Chamadas.Clear();
-        Handler().Executar(Entrada());
-        Assert.DoesNotContain("CriarUsuario", _graph.Chamadas);
-        Assert.Single(SystemUsers);
+        var erro = Assert.Throws<AcessoException>(() => Handler().Executar(Entrada()));
+        Assert.Equal("HOMONIMO_ENCONTRADO", erro.Codigo);
+        Assert.Empty(_graph.Chamadas);
         Assert.Single(Funcionarios);
-        Assert.Equal("joao.avila@betinhos.onmicrosoft.com", Funcionarios[0]["cr40f_emailmicrosoft"]);
+    }
+
+    [Theory]
+    [InlineData("joao  DA silva avila", null, null)]          // nome normalizado (acentos, caixa, espaços)
+    [InlineData("Maria Souza", "+55 12 99123-4567", null)]    // mesmo celular, outro nome
+    [InlineData("Maria Souza", null, "529.982.247-25")]       // mesmo CPF informado
+    public void Sem_funcionarioId_parecido_de_qualquer_funcao_ou_status_lanca_HOMONIMO_antes_do_Entra(string nome, string? celular, string? cpf)
+    {
+        _svc.Com(new Entity("cr40f_funcionarios", Guid.NewGuid()) { ["cr40f_nomecompleto"] = nome, ["cr40f_telefonepessoal"] = celular!, ["cr40f_numerodocpf"] = cpf!, ["cr40f_funcao"] = new OptionSetValue(202410001), ["cr40f_status"] = new OptionSetValue(1) });
+        var e = Entrada(); e.Cpf = "52998224725";
+        var erro = Assert.Throws<AcessoException>(() => Handler().Executar(e));
+        Assert.Equal("HOMONIMO_ENCONTRADO", erro.Codigo);
+        Assert.EndsWith("Já existe funcionário parecido; confirme na tela se é a mesma pessoa.", erro.Message);
+        Assert.Empty(_graph.Chamadas);
+        Assert.Empty(Funcionarios);
     }
 
     [Fact]
-    public void Sem_funcionarioId_homonimo_desligado_sem_email_nao_e_reaproveitado()
+    public void Ficha_escolhida_por_celular_com_outro_nome_retentativa_reaproveita_a_conta()
+    {
+        _pp.CriarSystemuser = false;
+        var fid = Guid.NewGuid();
+        _svc.Com(new Entity("cr40f_funcionarios", fid) { ["cr40f_nomecompleto"] = "Maria Souza", ["cr40f_telefonecorporativo"] = "+5512991234567" });
+        var e = new CadastroEntrada { NomeCompleto = "Maria S Oliveira", Celular = "12991234567", FuncionarioId = fid };
+        var primeira = Handler().Executar(e);
+        _pp.CriarSystemuser = true;
+        _graph.Chamadas.Clear();
+        e.PrefixoEmail = primeira.EmailMicrosoft.Split('@')[0];
+        Assert.Equal(primeira.EmailMicrosoft, Handler().Executar(e).EmailMicrosoft);
+        Assert.DoesNotContain("CriarUsuario", _graph.Chamadas);
+    }
+
+    [Fact]
+    public void Cpf_so_conta_quando_informado()
+    {
+        _svc.Com(new Entity("cr40f_funcionarios", Guid.NewGuid()) { ["cr40f_nomecompleto"] = "Maria Souza", ["cr40f_numerodocpf"] = "529.982.247-25" });
+        Handler().Executar(Entrada());
+        Assert.Single(Funcionarios);
+    }
+
+    [Fact]
+    public void CriarNovo_com_homonimo_cria_outra_ficha_e_nao_usa_o_email_dele()
     {
         var antigo = Guid.NewGuid();
-        _svc.Com(new Entity("cr40f_funcionarios", antigo) { ["cr40f_nomecompleto"] = "João da Silva Ávila", ["cr40f_funcao"] = new OptionSetValue(FuncionarioRepository.FuncaoMotorista), ["cr40f_status"] = new OptionSetValue(1) });
-        var saida = Handler().Executar(Entrada());
+        _svc.Com(new Entity("cr40f_funcionarios", antigo) { ["cr40f_nomecompleto"] = "João da Silva Ávila", ["cr40f_emailmicrosoft"] = "joao.avila@betinhos.onmicrosoft.com", ["cr40f_status"] = new OptionSetValue(0) });
+        _graph.Usuarios["joao.avila@betinhos.onmicrosoft.com"] = new GraphUsuario { Id = "dele", Upn = "joao.avila@betinhos.onmicrosoft.com", DisplayName = "João da Silva Ávila", Ativo = true };
+        var e = Entrada(); e.CriarNovo = true;
+        var saida = Handler().Executar(e);
+        Assert.Equal("joao.avila2@betinhos.onmicrosoft.com", saida.EmailMicrosoft);
         Assert.NotEqual(antigo, saida.FuncionarioId);
-        Assert.Equal(saida.FuncionarioId, Assert.Single(Funcionarios).Id);   // criou um novo; o antigo não foi tocado
+        Assert.Equal(saida.FuncionarioId, Assert.Single(Funcionarios).Id);
         Assert.Empty(_svc.Atualizados);
+    }
+
+    [Fact]
+    public void CriarNovo_retomado_apos_falha_reaproveita_a_conta_criada_sem_ficha()
+    {
+        _svc.Com(new Entity("cr40f_funcionarios", Guid.NewGuid()) { ["cr40f_nomecompleto"] = "João da Silva Ávila", ["cr40f_status"] = new OptionSetValue(1) });
+        var e = Entrada(); e.CriarNovo = true;
+        _graph.FalharEm = "AtribuirLicenca";
+        Assert.Throws<AcessoException>(() => Handler().Executar(e));
+        _graph.FalharEm = null;
+        _graph.Chamadas.Clear();
+        var saida = Handler().Executar(e);
+        Assert.Equal("joao.avila@betinhos.onmicrosoft.com", saida.EmailMicrosoft);
+        Assert.DoesNotContain("CriarUsuario", _graph.Chamadas);
+        Assert.Single(Funcionarios);
     }
 
     [Fact]
@@ -344,7 +400,7 @@ public sealed class CadastrarAcessoHandlerTests
         var primeira = Handler().Executar(e1);
         _pp.CriarSystemuser = true;
         _graph.Chamadas.Clear();
-        var e2 = Entrada(); e2.PrefixoEmail = "jsilva";
+        var e2 = Entrada(); e2.PrefixoEmail = "jsilva"; e2.FuncionarioId = primeira.FuncionarioId;
         var segunda = Handler().Executar(e2);
         Assert.Equal("jsilva@betinhos.onmicrosoft.com", segunda.EmailMicrosoft);
         Assert.Equal(primeira.EmailMicrosoft, segunda.EmailMicrosoft);
@@ -381,7 +437,8 @@ public sealed class CadastrarAcessoHandlerTests
         _pp.LicencaPropagando = true;
         var primeira = Handler().Executar(Entrada());
         _pp.LicencaPropagando = false;
-        var segunda = Handler().Executar(Entrada());
+        var reexecucao = Entrada(); reexecucao.FuncionarioId = primeira.FuncionarioId;
+        var segunda = Handler().Executar(reexecucao);
         Assert.Equal(primeira.EmailMicrosoft, segunda.EmailMicrosoft);
         Assert.Contains("\"etapa\":\"funcionario\",\"estado\":\"feita\"", segunda.Etapas.ToJson());
         Assert.Single(Funcionarios);

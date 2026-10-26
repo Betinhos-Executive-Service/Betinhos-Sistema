@@ -11,6 +11,8 @@ public sealed class FuncionarioRepository
 {
     public const string Tabela = "cr40f_funcionarios";
     public const string ColunaCelular = "cr40f_telefonecorporativo";
+    public const string ColunaCelularPessoal = "cr40f_telefonepessoal";
+    public const string ColunaCpf = "cr40f_numerodocpf";
     public const int FuncaoMotorista = 202410000;
     public const int StatusAtivo = 0;
     private static readonly ColumnSet Colunas = new("cr40f_nomecompleto", "cr40f_emailmicrosoft", ColunaCelular);
@@ -32,18 +34,25 @@ public sealed class FuncionarioRepository
     }
 
     /// <summary>
-    /// Funcionário sem e-mail Microsoft com o mesmo nome: sobra de cadastro que ficou com a liberação pendente.
-    /// Só motorista ativo (o que Criar grava): homônimo desligado ou de outra função não é reaproveitado.
+    /// Funcionários de qualquer função e status com o mesmo nome (sem acentos, caixa e espaços extras), o mesmo celular
+    /// (corporativo ou pessoal) ou o mesmo CPF, quando informado. A comparação é feita aqui porque o Dataverse não ignora acentos.
     /// </summary>
-    public FuncionarioRegistro? SemEmailPorNome(string nome)
+    public bool TemParecido(string nome, string celular, string? cpf)
     {
-        var q = new QueryExpression(Tabela) { ColumnSet = Colunas, TopCount = 2 };
-        q.Criteria.AddCondition("cr40f_nomecompleto", ConditionOperator.Equal, nome.Trim().ToLowerInvariant());   // Equal do Dataverse ignora caixa
-        q.Criteria.AddCondition("cr40f_emailmicrosoft", ConditionOperator.Null);
-        q.Criteria.AddCondition("cr40f_funcao", ConditionOperator.Equal, FuncaoMotorista);
-        q.Criteria.AddCondition("cr40f_status", ConditionOperator.Equal, StatusAtivo);
-        var achados = _service.RetrieveMultiple(q).Entities.Select(Mapear).ToList();
-        return achados.Count == 1 ? achados[0] : null;   // homônimos ambíguos: não adivinha
+        var alvoNome = AcessoRules.NomeComparavel(nome);
+        var alvoCelular = AcessoRules.NormalizarCelular(celular);
+        var alvoCpf = AcessoRules.SoDigitos(cpf);
+        var q = new QueryExpression(Tabela) { ColumnSet = new ColumnSet("cr40f_nomecompleto", ColunaCelular, ColunaCelularPessoal, ColunaCpf), PageInfo = new PagingInfo { Count = 5000, PageNumber = 1 } };
+        while (true)
+        {
+            var pagina = _service.RetrieveMultiple(q);
+            if (pagina.Entities.Any(e =>
+                AcessoRules.NomeComparavel(e.GetAttributeValue<string>("cr40f_nomecompleto")) == alvoNome
+                || alvoCelular is not null && (AcessoRules.NormalizarCelular(e.GetAttributeValue<string>(ColunaCelular)) == alvoCelular || AcessoRules.NormalizarCelular(e.GetAttributeValue<string>(ColunaCelularPessoal)) == alvoCelular)
+                || alvoCpf.Length == 11 && AcessoRules.SoDigitos(e.GetAttributeValue<string>(ColunaCpf)) == alvoCpf)) return true;
+            if (!pagina.MoreRecords) return false;
+            q.PageInfo.PageNumber++; q.PageInfo.PagingCookie = pagina.PagingCookie;
+        }
     }
 
     /// <summary>email null: liberação do systemuser pendente; o e-mail é gravado quando o Dataverse liberar.</summary>
