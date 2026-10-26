@@ -13,72 +13,56 @@ const baseModules = [
     id: "services",
     label: "Serviços",
     detail: "Corridas de hoje",
-    action: "Abrir agora",
     icon: "services",
-    tone: "primary",
     disabled: false,
   },
   {
     id: "history",
     label: "Histórico",
     detail: "Serviços finalizados",
-    action: "Ver histórico",
     icon: "history",
-    tone: "neutral",
     disabled: false,
   },
   {
     id: "comunicados",
     label: "Comunicados",
     detail: "Avisos da operação",
-    action: "Ver comunicados",
     icon: "comunicados",
-    tone: "neutral",
     disabled: false,
   },
   {
     id: "checklists",
     label: "Checklist",
     detail: "Vistoria do veículo",
-    action: "Abrir",
     icon: "checklist",
-    tone: "neutral",
     disabled: false,
   },
   {
     id: "multas",
     label: "Multas",
     detail: "Termos para assinar",
-    action: "Abrir",
     icon: "multas",
-    tone: "neutral",
     disabled: false,
   },
   {
     id: "maintenancePhoto",
     label: "Manutenção",
     detail: "Solicitar reparo",
-    action: "Abrir",
     icon: "maintenance",
-    tone: "neutral",
     disabled: false,
   },
   {
     id: "expenses",
     label: "Gastos",
     detail: "Registrar despesas",
-    action: "Abrir",
     icon: "expenses",
-    tone: "neutral",
     disabled: false,
   },
   {
     id: "collisions",
     label: "Colis\u00f5es",
     detail: "Registro de colis\u00f5es",
-    action: "Abrir",
     icon: "collisions",
-    tone: "neutral",
     disabled: false,
   }
 ];
@@ -88,9 +72,7 @@ const ideasModule = {
   id: "ideas",
   label: "Boas ideias",
   detail: "Sugerir melhorias",
-  action: "Abrir",
   icon: "ideas",
-  tone: "neutral",
   disabled: false,
 };
 
@@ -397,6 +379,8 @@ function ModuleIcon({ name }: { name: string }) {
   );
 }
 
+const plural = (n: number) => (n === 1 ? "" : "s");
+
 export function InitialScreen(props: InitialScreenProps) {
   const shellRef = useRef<HTMLElement | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -412,9 +396,7 @@ export function InitialScreen(props: InitialScreenProps) {
             id: "personalReceipt",
             label: "Recibo personalizado",
             detail: "Gerar recibo sob demanda",
-            action: "Abrir",
             icon: "receipt",
-            tone: "neutral",
             disabled: false
           }
         ]
@@ -430,10 +412,11 @@ export function InitialScreen(props: InitialScreenProps) {
     multas: props.pendingMultas ?? 0,
     checklists: props.pendingChecklists ?? 0,
   };
+  const { checklists, multas, comunicados } = pendingCounts;
   const pendencias = [
-    pendingCounts.checklists > 0 && { id: "checklists", text: `${pendingCounts.checklists} checklist${pendingCounts.checklists === 1 ? "" : "s"} pendente${pendingCounts.checklists === 1 ? "" : "s"}` },
-    (props.multasBanner || pendingCounts.multas > 0) && { id: "multas", text: props.multasBanner ?? `${pendingCounts.multas} multa${pendingCounts.multas === 1 ? "" : "s"} para assinar` },
-    pendingCounts.comunicados > 0 && { id: "comunicados", text: `${pendingCounts.comunicados} comunicado${pendingCounts.comunicados === 1 ? "" : "s"} para ler` },
+    checklists > 0 && { id: "checklists", text: `${checklists} checklist${plural(checklists)} pendente${plural(checklists)}` },
+    (props.multasBanner || multas > 0) && { id: "multas", text: props.multasBanner || `${multas} multa${plural(multas)} para assinar` },
+    comunicados > 0 && { id: "comunicados", text: `${comunicados} comunicado${plural(comunicados)} para ler` },
   ].filter((item): item is { id: string; text: string } => Boolean(item));
 
   useEffect(() => {
@@ -526,7 +509,7 @@ export function InitialScreen(props: InitialScreenProps) {
               type="button"
               disabled={module.disabled}
               aria-disabled={module.disabled}
-              aria-label={count > 0 ? `${module.label}, ${count} pendente${count === 1 ? "" : "s"}` : module.label}
+              aria-label={count > 0 ? `${module.label}, ${count} pendente${plural(count)}` : module.label}
               onClick={() => navigateTo(module.id)}
             >
               <span className="concept-tile-icon" aria-hidden="true">

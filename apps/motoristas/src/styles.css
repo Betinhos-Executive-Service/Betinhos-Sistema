@@ -5446,12 +5446,6 @@ button:disabled {
   font-weight: 800;
 }
 
-.concept-module-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-}
-
 .concept-module-card {
   display: flex;
   min-height: 86px;
@@ -5487,11 +5481,6 @@ button:disabled {
   border-color: #001a3d;
   background: #001a3d;
   box-shadow: 0 12px 28px rgba(0, 26, 61, 0.22);
-}
-
-.concept-module-card--warning {
-  border-color: rgba(133, 67, 36, 0.18);
-  background: #fffaf7;
 }
 
 .concept-module-meta {
@@ -5551,18 +5540,6 @@ button:disabled {
   color: rgba(255, 255, 255, 0.72);
 }
 
-.concept-module-action {
-  display: none;
-  flex: 0 0 auto;
-  color: #001a3d;
-  font-size: 0.76rem;
-  font-weight: 850;
-}
-
-.concept-module-card--primary .concept-module-action {
-  color: #ffffff;
-}
-
 .concept-inline-count {
   color: inherit;
   font-weight: 850;
@@ -5585,11 +5562,6 @@ button:disabled {
 .concept-module-card--primary::after {
   color: #001a3d;
   background: #ffffff;
-}
-
-.concept-module-card--warning::after {
-  color: #733819;
-  background: #fff0e8;
 }
 
 .concept-footer {
@@ -5631,10 +5603,6 @@ button:disabled {
   .concept-shell {
     max-width: 460px;
     margin: 0 auto;
-  }
-
-  .concept-module-action {
-    display: inline-flex;
   }
 }
 
