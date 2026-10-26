@@ -62,6 +62,14 @@ test("ler ok: manda só o hash ao flow e repassa o corpo", async () => {
   assert.equal(r.headers.get("Cache-Control"), "no-store");
 });
 
+test("ler repassa a foto atual (base64 grande) sem filtrar", async () => {
+  const foto = { mimeType: "image/jpeg", base64: "A".repeat(3 * 1024 * 1024) };
+  const f = flowFalso(200, { passageiros: [{ id: PID, primeiroNome: "Ana", temFoto: true, foto }] });
+  const r = await chamar(req("/api/ler", { token: TOKEN }), f);
+  assert.equal(r.status, 200);
+  assert.deepEqual((await r.json()).passageiros[0].foto, foto);
+});
+
 test("410 do flow é repassado sem detalhes internos", async () => {
   const f = flowFalso(410, { error: { message: "segredo interno" } });
   const r = await chamar(req("/api/ler", { token: TOKEN }), f);
