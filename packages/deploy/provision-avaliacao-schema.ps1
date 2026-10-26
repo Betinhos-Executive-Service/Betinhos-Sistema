@@ -183,7 +183,8 @@ for ($i = 0; $i -lt $CLASSIFICACOES.Count; $i++) {
 }
 $status = ''
 for ($i = 1; $i -le 20; $i++) {
-  $status = (Dv GET "EntityDefinitions(LogicalName='$entidade')/Keys(LogicalName='$chave')?`$select=EntityKeyIndexStatus").EntityKeyIndexStatus
+  # A Web API não aceita Keys(LogicalName='...'); busca pela coleção filtrada.
+  $status = "$(@(Rows "EntityDefinitions(LogicalName='$entidade')/Keys?`$select=LogicalName,EntityKeyIndexStatus&`$filter=LogicalName eq '$chave'") | Select-Object -First 1 -ExpandProperty EntityKeyIndexStatus)"
   if ($status -in 'Active', 'Failed') { break }
   Start-Sleep -Seconds 15
 }
