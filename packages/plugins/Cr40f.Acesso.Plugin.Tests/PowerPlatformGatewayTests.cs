@@ -65,6 +65,15 @@ public sealed class PowerPlatformGatewayTests
     }
 
     [Fact]
+    public void AddUser_400_vira_pendente_porque_a_licenca_ainda_propaga()
+    {
+        var h = new Handler { Responder = _ => new HttpResponseMessage(HttpStatusCode.BadRequest) { Content = new StringContent("{\"error\":\"user not licensed\"}") } };
+        var erro = Assert.Throws<AcessoException>(() => Gateway(h).SincronizarUsuario(ObjectId));
+        Assert.Equal("USUARIO_DATAVERSE_PENDENTE", erro.Codigo);
+        Assert.DoesNotContain("not licensed", erro.Message);
+    }
+
+    [Fact]
     public void AddUser_403_vira_GRAPH_INDISPONIVEL_sem_vazar_corpo_nem_segredo()
     {
         var h = new Handler { Responder = _ => new HttpResponseMessage(HttpStatusCode.Forbidden) { Content = new StringContent("{\"error\":\"app nao registrado tok s3gr3d0\"}") } };

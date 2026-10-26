@@ -27,6 +27,18 @@ public sealed class ReativarAcessoHandlerTests
     private static string Etapa(string nome, string estado) => "\"etapa\":\"" + nome + "\",\"estado\":\"" + estado + "\"";
 
     [Fact]
+    public void AddUser_400_logo_apos_a_licenca_fica_pendente_e_ainda_entrega_senha()
+    {
+        ComFuncionario(); ComContaEncerrada();
+        _pp.LicencaPropagando = true;
+        var saida = Handler().Executar(_id);
+        var json = saida.Etapas.ToJson();
+        Assert.Contains(Etapa("systemuser", "pendente"), json);
+        Assert.Contains(Etapa("senha", "feita"), json);
+        Assert.Equal(14, saida.SenhaTemporaria.Length);
+    }
+
+    [Fact]
     public void Systemuser_atrasado_fica_pendente_e_ainda_entrega_senha_sem_mexer_no_funcionario()
     {
         ComFuncionario(); ComContaEncerrada();

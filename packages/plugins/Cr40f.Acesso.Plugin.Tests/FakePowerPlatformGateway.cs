@@ -15,11 +15,14 @@ public sealed class FakePowerPlatformGateway : IPowerPlatformGateway
     public List<Guid> Sincronizados { get; } = new();
     public bool CriarSystemuser { get; set; } = true;
     public bool Falhar { get; set; }
+    /// <summary>Simula o 400 do addUser logo após atribuir a licença (ainda propagando).</summary>
+    public bool LicencaPropagando { get; set; }
 
     public void SincronizarUsuario(Guid objectId)
     {
         Sincronizados.Add(objectId);
         if (Falhar) throw new AcessoException("GRAPH_INDISPONIVEL", "403 no addUser do Power Platform");
+        if (LicencaPropagando) throw new AcessoException("USUARIO_DATAVERSE_PENDENTE", "400 no addUser do Power Platform");
         if (!CriarSystemuser) return;
         var consulta = new QueryExpression("systemuser");
         consulta.Criteria.AddCondition("azureactivedirectoryobjectid", ConditionOperator.Equal, objectId);

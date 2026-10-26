@@ -43,6 +43,9 @@ public sealed class PowerPlatformGateway : IPowerPlatformGateway
         req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
         if (corpoJson is not null) req.Content = new StringContent(corpoJson, Encoding.UTF8, "application/json");
         using var resp = _http.SendAsync(req).GetAwaiter().GetResult();
+        // 400 logo após atribuir a licença: o Power Platform ainda não a enxerga. Passageiro; a nova tentativa conclui.
+        if (resp.StatusCode == HttpStatusCode.BadRequest)
+            throw new AcessoException("USUARIO_DATAVERSE_PENDENTE", "400 no addUser do Power Platform");
         if (resp.StatusCode != HttpStatusCode.OK && resp.StatusCode != HttpStatusCode.Accepted)
             throw new AcessoException("GRAPH_INDISPONIVEL", ((int)resp.StatusCode) + " no addUser do Power Platform");
         return (resp.StatusCode, resp.Headers.Location?.ToString());
