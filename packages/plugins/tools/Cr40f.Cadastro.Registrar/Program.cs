@@ -198,7 +198,7 @@ static void EnsureFotoApi(ServiceClient service, Guid pluginTypeId, string solut
                 ["uniquename"] = FotoApiName,
                 ["name"] = FotoApiName,
                 ["displayname"] = "Cadastro | Obter foto do passageiro",
-                ["description"] = "Foto do passageiro para o motorista do serviço Programado. {ok, mimeType, conteudoBase64} ou {ok:false, motivo}.",
+                ["description"] = "Foto do passageiro para o motorista do servico Programado; devolve a imagem em base64 ou motivo indisponivel.",
                 ["bindingtype"] = new OptionSetValue(0),
                 ["isfunction"] = false,
                 ["isprivate"] = false,

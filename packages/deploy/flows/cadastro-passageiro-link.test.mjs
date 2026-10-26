@@ -89,6 +89,23 @@ test('foto vira <passageiroId>.jpg no SharePoint com link de caminho (/:i:/r/), 
   assert.equal(guardar.inputs.value, "@{concat('https://', uriHost('__SITE_URL__'), '/:i:/r', uriPath('__SITE_URL__'), replace(uriComponent(body('Criar_arquivo')?['Path']), '%2F', '/'))}")
 })
 
+test('ler: foto atual só da pasta Passageiros/Fotos, lida por caminho e sem derrubar o ler', () => {
+  const caminho = todas.get('Caminho_foto').inputs
+  assert.ok(caminho.startsWith("@if(and(startsWith(coalesce(body('Obter_passageiro')?['new_linkdafoto']"))
+  assert.ok(caminho.includes("'/Documentos%20Compartilhados/Passageiros/Fotos/'"), 'restrito à pasta de fotos')
+  assert.ok(caminho.includes("contains(decodeUriComponent("), 'recusa ..')
+  const ler = todas.get('Ler_foto')
+  assert.equal(ler.inputs.host.operationId, 'GetFileContentByPath')
+  assert.equal(ler.inputs.parameters.dataset, '__SITE_URL__')
+  assert.equal(ler.inputs.parameters.path, "@outputs('Caminho_foto')")
+  assert.equal(todas.get('Tem_foto_lida').expression.not.equals[0], "@empty(outputs('Caminho_foto'))")
+  const incluir = todas.get('Incluir_passageiro')
+  assert.deepEqual(incluir.runAfter, { Tem_foto_lida: ['Succeeded', 'Failed', 'Skipped', 'TimedOut'] })
+  assert.match(incluir.inputs.value.temFoto, /new_linkdafoto/)
+  assert.ok(incluir.inputs.value.foto.startsWith("@if(equals(coalesce(actions('Ler_foto')?['status'], ''), 'Succeeded')"))
+  assert.ok(incluir.inputs.value.foto.includes("base64(body('Ler_foto'))"))
+})
+
 test('PATCH do passageiro só com os campos enviados e registro do envio', () => {
   assert.match(todas.get('Patch_foto').inputs, /new_linkdafoto/)
   assert.match(todas.get('Patch_telefone').inputs, /cr40f_telefone/)
