@@ -1,6 +1,9 @@
 // HTML da página. O token fica no fragmento (#t=) e é lido só pelo app.js no navegador.
 import { VERSAO } from "./version.mjs";
 
+// ?v= muda a cada build: o Worker serve esses arquivos com cache longo (immutable).
+const V = encodeURIComponent(VERSAO);
+
 export function paginaHtml() {
   return `<!doctype html>
 <html lang="pt-BR">
@@ -12,7 +15,9 @@ export function paginaHtml() {
 <title>Cadastro do passageiro · Betinhos</title>
 <link rel="icon" href="/logo-b.png">
 <link rel="preload" href="/manrope.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/app.css">
+<link rel="modulepreload" href="/app.js?v=${V}">
+<link rel="modulepreload" href="/validacao.mjs">
+<link rel="stylesheet" href="/app.css?v=${V}">
 </head>
 <body>
 <header class="topo"><img src="/logo-b.png" alt="Betinhos Executive Service" class="logo" width="36" height="36"></header>
@@ -20,7 +25,7 @@ export function paginaHtml() {
   <p class="sr-only" role="status">Carregando os passageiros…</p>
 </main>
 <div class="versao" aria-hidden="true">${VERSAO}</div>
-<script type="module" src="/app.js"></script>
+<script type="module" src="/app.js?v=${V}"></script>
 </body>
 </html>`;
 }

@@ -3,7 +3,7 @@ import { emailOculto, emailValido, mascararTelefone, telefoneOculto, telefonePar
 
 const app = document.getElementById("app");
 const token = new URLSearchParams(location.hash.slice(1)).get("t") || "";
-const LADO_MAX = 1600;
+const LADO_MAX = 1280;
 const BYTES_MAX = 3 * 1024 * 1024;
 
 const svg = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
@@ -141,22 +141,29 @@ function cardPassageiro(p, aoSalvar) {
   const fotoInput = el("input", { class: "foto-input", type: "file", accept: "image/*", id: `foto-${id}` });
   let botao = null;
 
+  // Só limpa o input depois de ler o arquivo: no Android (content://) o File pode ficar ilegível se o input
+  // for zerado antes. A prévia aparece na hora pelo object URL; a compressão roda em seguida, com tempo limite.
   fotoInput.addEventListener("change", async () => {
     const arq = fotoInput.files?.[0];
-    fotoInput.value = "";
     if (!arq) return;
+    const anterior = st.fotoUrl;
+    const previa = URL.createObjectURL(arq);
     st.msg = null;
     st.preparando = true;
+    st.fotoUrl = previa;
     render();
     try {
-      st.foto = await comprimirFoto(arq);
+      st.foto = await comTempoLimite(comprimirFoto(arq), 20000, "A foto demorou demais para abrir. Tente outra ou tire uma nova.");
       st.fotoUrl = `data:image/jpeg;base64,${st.foto}`;
     } catch (e) {
-      st.foto = null;
-      st.msg = { tipo: "erro", texto: e.message || "Não foi possível abrir a foto. Tente outra." };
+      st.fotoUrl = anterior;
+      st.msg = { tipo: "erro", texto: e?.message || "Não foi possível abrir a foto. Tente outra." };
+    } finally {
+      URL.revokeObjectURL(previa);
+      fotoInput.value = "";
+      st.preparando = false;
+      render(`foto-${id}`);
     }
-    st.preparando = false;
-    render(`foto-${id}`);
   });
 
   const pendentes = () => [
@@ -344,7 +351,21 @@ async function decodificar(arq) {
   }
 }
 
-// Redimensiona para lado maior ≤ 1600 px, JPEG 0,8 e reduz a qualidade até caber em 3 MB. Retorna base64 sem prefixo.
+const comTempoLimite = (promessa, ms, texto) =>
+  Promise.race([promessa, new Promise((_, rej) => setTimeout(() => rej(new Error(texto)), ms))]);
+
+// toBlob é assíncrono (não trava a tela como toDataURL) e o base64 sai do FileReader.
+function jpegBase64(canvas, q) {
+  return new Promise((ok, falha) => canvas.toBlob((blob) => {
+    if (!blob) return falha(new Error("Não foi possível preparar a foto. Tente outra."));
+    const r = new FileReader();
+    r.onload = () => ok(String(r.result).split(",")[1]);
+    r.onerror = () => falha(r.error);
+    r.readAsDataURL(blob);
+  }, "image/jpeg", q));
+}
+
+// Redimensiona para lado maior ≤ 1280 px, JPEG 0,8 e reduz a qualidade até caber em 3 MB. Retorna base64 sem prefixo.
 async function comprimirFoto(arq) {
   let fonte;
   try { fonte = await decodificar(arq); } catch {
@@ -364,7 +385,7 @@ async function comprimirFoto(arq) {
   ctx.drawImage(fonte, 0, 0, canvas.width, canvas.height);
   fonte.close?.();
   for (let q = 0.8; q >= 0.3; q -= 0.1) {
-    const b64 = canvas.toDataURL("image/jpeg", q).split(",")[1];
+    const b64 = await jpegBase64(canvas, q);
     if (b64.length * 0.75 <= BYTES_MAX) return b64;
   }
   throw new Error("A foto ficou grande demais. Tente outra.");
