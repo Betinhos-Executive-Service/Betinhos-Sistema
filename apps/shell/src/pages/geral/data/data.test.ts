@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
 import type { Host } from '../../../host'
-import { fetchPath, mapViews, parseCount, parsePage, reloadPath, searchPath } from './queries'
+import { auditPath, fetchPath, mapViews, parseCount, parsePage, reloadPath, searchPath } from './queries'
 import { applyMockFetch, createMockRows, createMockViews, MOCK_ATTRIBUTES, MOCK_ROW_COUNT } from './mock'
 import type { FilterSet } from '../domain/filters'
 import { fromLegacy, geralFilterFields, injectTableFilters } from '../domain/tableFilters'
@@ -45,7 +45,8 @@ describe('queries', () => {
     expect(filter("d'água")).toBe("statecode eq 0 and contains(nome,'d''água')")
     expect(filter('  ')).toBe('statecode eq 0')
     expect(searchPath('s', 'id', 'nome', 'a')).toContain('$top=25')
-    expect(reloadPath('cr40f_reservadeveculoses', '{ABC}', ['cr40f_id', '_cr40f_motorista_value', 'a_1.new_valortotal'])).toBe('cr40f_reservadeveculoses(abc)?$select=cr40f_reservadeveculosid,cr40f_id,_cr40f_motorista_value,statecode')
+    expect(reloadPath('cr40f_reservadeveculoses', '{ABC}', ['cr40f_id', '_cr40f_motorista_value', 'a_1.new_valortotal'])).toBe('cr40f_reservadeveculoses(abc)?$select=cr40f_reservadeveculosid,cr40f_id,_cr40f_motorista_value,statecode,new_camposprotegidos')
+    expect(auditPath('{ABC}')).toBe('audits?$select=changedata,createdon,_userid_value&$filter=_objectid_value%20eq%20abc%20and%20operation%20eq%202&$orderby=createdon desc&$top=250')
   })
 })
 

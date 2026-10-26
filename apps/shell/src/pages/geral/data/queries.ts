@@ -1,6 +1,7 @@
 import { cleanId, odataString, type Row } from '@betinhos/dataverse'
 import { escapeLike } from '../domain/search'
 import { ENTITY, ID_ATTRIBUTE, type Page, type View } from '../domain/types'
+import { AUDIT_LIMIT, CAMPOS_PROTEGIDOS } from '../domain/protecao'
 
 export const RESERVA_FILTER = `returnedtypecode eq '${ENTITY}' and statecode eq 0`
 
@@ -64,8 +65,13 @@ export function reloadPath(set: string, id: string, keys: string[]) {
     select.add(key)
   }
   select.add('statecode')
+  select.add(CAMPOS_PROTEGIDOS)
   return `${set}(${cleanId(id)})?$select=${Array.from(select).join(',')}`
 }
+
+/** Atualizações auditadas da OS, da mais nova para a mais antiga; o popover do campo protegido procura nelas a última troca do campo. */
+export const auditPath = (id: string) =>
+  `audits?$select=changedata,createdon,_userid_value&$filter=${encodeURIComponent(`_objectid_value eq ${cleanId(id)} and operation eq 2`)}&$orderby=createdon desc&$top=${AUDIT_LIMIT}`
 
 export const relationshipPath = (attribute: string) =>
   `EntityDefinitions(LogicalName='${ENTITY}')/ManyToOneRelationships?$select=ReferencingEntityNavigationPropertyName,ReferencedEntity&$filter=${encodeURIComponent(`ReferencingAttribute eq '${odataString(attribute)}'`)}`

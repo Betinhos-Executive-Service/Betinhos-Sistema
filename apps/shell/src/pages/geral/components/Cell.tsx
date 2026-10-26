@@ -3,6 +3,8 @@ import type { Row } from '@betinhos/dataverse'
 import { Button, Input, Select, Spinner, StatusBadge, Switch, Textarea, Tooltip, type SelectOption } from '@betinhos/ui'
 import { AlertTriangle, Check, Lock } from 'lucide-react'
 import { cellKind, MOTORISTA_TITLE, readonlyHint, statusTone } from '../domain/cells'
+import { isProtegido } from '../domain/protecao'
+import { ProtecaoLock } from './ProtecaoLock'
 import type { EditValue } from '../domain/edit'
 import { decideChoice, decideCommit, draftOf, lookupOptions, sameId, type PickedOption } from '../domain/editing'
 import { formatCell } from '../domain/format'
@@ -301,6 +303,7 @@ export const Cell = memo(function Cell({ row, column, info, status, onSave, onRe
       onDoubleClick={() => { if (!editingRef.current && canEdit) begin() }}
       onBlur={onBlur}
     >
+      {!editing && isProtegido(row, column) ? <ProtecaoLock id={id} attribute={column.attribute} label={label} atual={text} info={info} /> : null}
       {editing ? <div className="gr-cell__editor">{control}</div> : value}
       {!editing && status.kind === 'saving' ? <span className="gr-cell__mark"><Spinner size={12} label="Gravando" /></span> : null}
       {!editing && status.kind === 'saved' ? <span className="gr-cell__mark" role="img" aria-label="Salvo"><Check size={14} aria-hidden="true" /></span> : null}
