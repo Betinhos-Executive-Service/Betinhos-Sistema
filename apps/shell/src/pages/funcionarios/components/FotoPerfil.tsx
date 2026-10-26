@@ -9,6 +9,8 @@ import { initials } from '../data/format'
 type Props = {
   name: string
   src: string | null
+  /** Usada quando `src` não carrega (ex.: a imagem cheia pela API exige token que o <img> não envia). */
+  fallback?: string | null
   size: number
   /** Recebe a foto já recortada (JPEG quadrado). Deve tratar o próprio erro (toast) e não lançar. */
   onUpload: (file: File) => Promise<void>
@@ -24,9 +26,9 @@ const OUTPUT = 512
  * Foto de perfil no cabeçalho do drawer: clicar abre Ver/Trocar/Remover; arrastar uma imagem
  * sobre o círculo não troca direto, abre o recorte para confirmar.
  */
-export function FotoPerfil({ name, src, size, onUpload, onRemove }: Props) {
+export function FotoPerfil({ name, src, fallback = null, size, onUpload, onRemove }: Props) {
   const input = useRef<HTMLInputElement>(null)
-  const [broken, setBroken] = useState(false)
+  const [falhas, setFalhas] = useState<string[]>([])
   const [over, setOver] = useState(false)
   const [viewing, setViewing] = useState(false)
   const [removing, setRemoving] = useState(false)
@@ -35,11 +37,12 @@ export function FotoPerfil({ name, src, size, onUpload, onRemove }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => setBroken(false), [src])
+  useEffect(() => setFalhas([]), [src, fallback])
   useEffect(() => () => { if (pending) URL.revokeObjectURL(pending.url) }, [pending])
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview) }, [preview])
 
-  const shown = preview ?? (src && !broken ? src : null)
+  const foto = [src, fallback].find((url): url is string => Boolean(url) && !falhas.includes(url!)) ?? null
+  const shown = preview ?? foto
 
   function pick(file: File | undefined, dropped: boolean) {
     if (!file) return
@@ -77,7 +80,7 @@ export function FotoPerfil({ name, src, size, onUpload, onRemove }: Props) {
 
   const face = (
     <>
-      {shown ? <img src={shown} alt="" onError={() => { if (!preview) setBroken(true) }} /> : <span className="foto-perfil__iniciais">{initials(name)}</span>}
+      {shown ? <img src={shown} alt="" onError={() => { if (!preview && foto) setFalhas((atual) => [...atual, foto]) }} /> : <span className="foto-perfil__iniciais">{initials(name)}</span>}
       <span className="foto-perfil__veu" aria-hidden>{busy ? <Spinner size={18} label="Enviando foto" /> : over ? <ImageUp size={20} /> : <Camera size={18} />}</span>
     </>
   )
@@ -108,7 +111,7 @@ export function FotoPerfil({ name, src, size, onUpload, onRemove }: Props) {
         {error}
       </Dialog>
 
-      {viewing && src ? <FotoAmpliada src={src} alt={`Foto de ${name}`} legenda={name} onClose={() => setViewing(false)} /> : null}
+      {viewing && foto ? <FotoAmpliada src={foto} alt={`Foto de ${name}`} legenda={name} onClose={() => setViewing(false)} /> : null}
 
       <Dialog
         open={removing}
