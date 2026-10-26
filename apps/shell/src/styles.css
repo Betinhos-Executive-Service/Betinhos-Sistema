@@ -2,6 +2,10 @@
 
 #root { height: 100%; }
 
+/* A área de rolagem vira o bloco de contenção: spans absolutos (ex.: .sr-only nas células da tabela)
+   não escapam do recorte e não esticam o documento, que rolava por trás da ficha aberta. */
+.bt-shell__main { position: relative; }
+
 /* Véu sobre foto (hover, recorte, foto ampliada): o navy da marca na opacidade de fundo do DS. */
 :root { --shell-veu: color-mix(in srgb, var(--bt-color-brand) calc(var(--bt-opacity-backdrop) * 100%), transparent); }
 
