@@ -423,6 +423,19 @@ export function InitialScreen(props: InitialScreenProps) {
     [props.canGeneratePersonalReceipt]
   );
 
+  const servicesModule = modules.find((module) => module.id === "services");
+  const gridModules = modules.filter((module) => module.id !== "services");
+  const pendingCounts: Record<string, number> = {
+    comunicados: props.pendingComunicados ?? 0,
+    multas: props.pendingMultas ?? 0,
+    checklists: props.pendingChecklists ?? 0,
+  };
+  const pendencias = [
+    pendingCounts.checklists > 0 && { id: "checklists", text: `${pendingCounts.checklists} checklist${pendingCounts.checklists === 1 ? "" : "s"} pendente${pendingCounts.checklists === 1 ? "" : "s"}` },
+    (props.multasBanner || pendingCounts.multas > 0) && { id: "multas", text: props.multasBanner ?? `${pendingCounts.multas} multa${pendingCounts.multas === 1 ? "" : "s"} para assinar` },
+    pendingCounts.comunicados > 0 && { id: "comunicados", text: `${pendingCounts.comunicados} comunicado${pendingCounts.comunicados === 1 ? "" : "s"} para ler` },
+  ].filter((item): item is { id: string; text: string } => Boolean(item));
+
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
     return () => window.clearInterval(timer);
@@ -476,39 +489,53 @@ export function InitialScreen(props: InitialScreenProps) {
         </button>
       )}
 
-      {props.multasBanner ? (
-        <button className="concept-multas-banner" type="button" onClick={() => navigateTo("multas")}>
-          <span>{props.multasBanner}</span>
-          <strong>Ver multas</strong>
+      {servicesModule && (
+        <button className="concept-module-card concept-module-card--primary" type="button" onClick={() => navigateTo("services")}>
+          <span className="concept-module-meta" aria-hidden="true">
+            <ModuleIcon name={servicesModule.icon} />
+          </span>
+          <span className="concept-module-text">
+            <strong>{servicesModule.label}</strong>
+            <small>
+              {servicesModule.detail}
+              {agendaCount > 0 ? <span className="concept-inline-count"> • {agendaCount}</span> : null}
+            </small>
+          </span>
         </button>
-      ) : null}
+      )}
 
-      <section className="concept-module-grid" aria-label="Módulos do aplicativo">
-        {modules.map((module) => (
-          <button
-            className={`concept-module-card concept-module-card--${module.tone}`}
-            key={module.id}
-            type="button"
-            disabled={module.disabled}
-            aria-disabled={module.disabled}
-            onClick={() => navigateTo(module.id)}
-          >
-            <span className="concept-module-meta" aria-hidden="true">
-              <ModuleIcon name={module.icon} />
-            </span>
-            <span className="concept-module-text">
-              <strong>{module.label}</strong>
-              <small>
-                {module.detail}
-                {module.id === "services" && agendaCount > 0 ? <span className="concept-inline-count"> • {agendaCount}</span> : null}
-                {module.id === "comunicados" && (props.pendingComunicados ?? 0) > 0 ? <span className="concept-inline-count"> • {props.pendingComunicados} pendente{props.pendingComunicados === 1 ? "" : "s"}</span> : null}
-                {module.id === "multas" && (props.pendingMultas ?? 0) > 0 ? <span className="concept-inline-count"> • {props.pendingMultas} pendente{props.pendingMultas === 1 ? "" : "s"}</span> : null}
-                {module.id === "checklists" && (props.pendingChecklists ?? 0) > 0 ? <span className="concept-inline-count"> • {props.pendingChecklists} pendente{props.pendingChecklists === 1 ? "" : "s"}</span> : null}
-              </small>
-            </span>
-            <span className="concept-module-action">{module.action}</span>
-          </button>
-        ))}
+      {pendencias.length > 0 && (
+        <section className="concept-pending" aria-label="Pendências">
+          {pendencias.map((item) => (
+            <button className="concept-pending-row" key={item.id} type="button" onClick={() => navigateTo(item.id)}>
+              <span>{item.text}</span>
+              <strong>Abrir</strong>
+            </button>
+          ))}
+        </section>
+      )}
+
+      <section className="concept-tile-grid" aria-label="Módulos do aplicativo">
+        {gridModules.map((module) => {
+          const count = pendingCounts[module.id] ?? 0;
+          return (
+            <button
+              className="concept-tile"
+              key={module.id}
+              type="button"
+              disabled={module.disabled}
+              aria-disabled={module.disabled}
+              aria-label={count > 0 ? `${module.label}, ${count} pendente${count === 1 ? "" : "s"}` : module.label}
+              onClick={() => navigateTo(module.id)}
+            >
+              <span className="concept-tile-icon" aria-hidden="true">
+                <ModuleIcon name={module.icon} />
+                {count > 0 ? <span className="concept-tile-badge">{count > 9 ? "9+" : count}</span> : null}
+              </span>
+              <span className="concept-tile-label">{module.label}</span>
+            </button>
+          );
+        })}
       </section>
 
       <footer className="concept-footer">

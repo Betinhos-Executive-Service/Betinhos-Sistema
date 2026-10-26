@@ -13791,3 +13791,99 @@ select,
 .ditado-error {
   color: #9f2f2d;
 }
+
+/* Menu inicial compacto: pendências no topo e grade 3 colunas */
+.concept-shell > .concept-module-card--primary { width: 100%; margin-bottom: 12px; }
+
+.concept-pending { display: grid; gap: 6px; margin-bottom: 12px; }
+
+.concept-pending-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid #f3dc9a;
+  border-radius: 14px;
+  color: #5c4300;
+  background: #fff7df;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.concept-pending-row strong { color: #856000; font-weight: 800; white-space: nowrap; }
+.concept-pending-row:active { transform: scale(0.98); }
+
+.concept-tile-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.concept-tile {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 6px;
+  min-height: 84px;
+  padding: 10px 4px;
+  border: 1px solid rgba(0, 14, 35, 0.08);
+  border-radius: 16px;
+  color: #000e23;
+  background: #ffffff;
+  font: inherit;
+  cursor: pointer;
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.concept-tile:active { transform: scale(0.96); }
+.concept-tile:disabled { cursor: not-allowed; opacity: 0.48; }
+.concept-tile:focus-visible, .concept-pending-row:focus-visible { outline: 0; box-shadow: 0 0 0 3px rgba(33, 89, 210, 0.22); }
+
+.concept-tile-icon {
+  position: relative;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 12px;
+  background: #fcfcfb;
+}
+
+.concept-tile-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.concept-tile-icon img { width: 22px; height: 22px; object-fit: contain; }
+
+.concept-tile-badge {
+  position: absolute;
+  top: -5px;
+  right: -7px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  color: #ffffff;
+  background: #2159d2;
+  font-size: 0.68rem;
+  font-weight: 850;
+  line-height: 18px;
+  text-align: center;
+}
+
+.concept-tile-label {
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .concept-tile, .concept-pending-row { transition: none; }
+}
