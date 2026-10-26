@@ -1,4 +1,4 @@
-import type { AgendaItem, DetailAction, DetailData, Tile } from "../types";
+import type { AgendaItem, DetailAction, DetailData, DetailPassenger, Tile } from "../types";
 
 export const tiles: Tile[] = [
   { label: "Visualizar Serviços", variant: "active", icon: "cars", target: "servicos" },
@@ -19,6 +19,10 @@ const TROCA_ENTITY_SET = "cr40f_trocasdecarros";
 const MANUTENCAO_ENTITY_SET = "cr40f_manutencoeses";
 
 type ServiceOptions = {
+  /** Mock da foto: id terminado em "-1" devolve foto, os demais "indisponivel" (lib/passengerPhoto). */
+  passengers?: DetailPassenger[];
+  /** cr40f_status; 202410005 = Programado (único que pede foto). */
+  status?: number;
   itemId: string;
   id: string;
   time: string;
@@ -127,12 +131,14 @@ function serviceDetail(options: ServiceOptions): DetailData {
     title: "Detalhes do Serviço",
     actions: options.actions,
     fields,
+    ...(options.passengers ? { passengers: options.passengers } : {}),
     dataverse: {
       entitySetName: GERAL_ENTITY_SET,
       id: options.id,
       record: {
         cr40f_dataehorriodesada: parseBrazilianDateTime(options.departureAt),
         cr40f_receber: options.receive === "Sim",
+        cr40f_status: options.status ?? null,
         cr40f_cotao: options.amountValue,
         cr40f_trajeto: options.route,
         cr40f_obsdeoperao: options.operationNotes,
@@ -267,6 +273,11 @@ export const agendaMock: AgendaItem[] = [
   serviceItem({
     itemId: "srv-10241",
     id: "10241",
+    status: 202410005,
+    passengers: [
+      { id: "mock-pax-10241-1", name: "Ana Paula Martins" },
+      { id: "mock-pax-10241-2", name: "Roberto Almeida" }
+    ],
     time: "HOJE 14:30",
     description: "Hotel Fasano São Paulo -> Aeroporto de Congonhas",
     priority: 1,

@@ -1,4 +1,4 @@
-import type { AgendaItem, DetailAction, DetailData, DetailField, MaintenancePhotoKind } from "../types";
+import type { AgendaItem, DetailAction, DetailData, DetailField, DetailPassenger, MaintenancePhotoKind } from "../types";
 import { ATTACHMENT_STATUS, type ExpenseSubmission, type ExpenseUploadItem, type ExpenseUploadRow } from "./expenseUploadState.ts";
 
 import type { CollisionLookupNavigationNames, CollisionPhotoKind } from "./collisions";
@@ -3097,8 +3097,8 @@ export function buildLanguageFlagHtml(code: string) {
   return code ? `<span data-flag="${code}"></span>` : "";
 }
 
-async function buildPassengersHtml(geralId: string, serviceDate: Date | null, driverName: string, readMultiple = retrieveMultiple, readOne = retrieveOne) {
-  if (!geralId) return "";
+async function buildPassengersHtml(geralId: string, serviceDate: Date | null, driverName: string, readMultiple = retrieveMultiple, readOne = retrieveOne): Promise<{ html: string; passengers: DetailPassenger[] }> {
+  if (!geralId) return { html: "", passengers: [] };
   const rows = await readMultiple(
     DATAVERSE.servicosPorPassageiro,
     [
@@ -3108,7 +3108,7 @@ async function buildPassengersHtml(geralId: string, serviceDate: Date | null, dr
       "$top=20"
     ].join("&")
   );
-  if (!rows.entities.length) return "";
+  if (!rows.entities.length) return { html: "", passengers: [] };
 
   const passengers = await Promise.all(
     rows.entities.map(async (row) => {
@@ -3128,11 +3128,12 @@ async function buildPassengersHtml(geralId: string, serviceDate: Date | null, dr
         ? `<a href="https://wa.me/${phone}?text=${encodeURIComponent(message)}" target="_blank" rel="noopener noreferrer">${phoneText}</a>`
         : `<span style="color:#8a8a8a">${phoneText}</span>`;
       const flagHtml = buildLanguageFlagHtml(getPassengerLanguageCode(passenger));
-      return `<span>${flagHtml}${escapeHtml(name)}${name ? " - " : ""}${phoneHtml}</span>`;
+      return { id: passengerId, name, html: `<span>${flagHtml}${escapeHtml(name)}${name ? " - " : ""}${phoneHtml}</span>` };
     })
   );
 
-  return passengers.filter(Boolean).join("<br>");
+  const valid = passengers.filter((item): item is NonNullable<typeof item> => Boolean(item));
+  return { html: valid.map((item) => item.html).join("<br>"), passengers: valid.map(({ id, name }) => ({ id, name })) };
 }
 
 async function buildSolicitanteHtml(record: DataverseRecord, serviceDate: Date | null, driverName: string, readOne = retrieveOne) {
@@ -3209,7 +3210,7 @@ function serviceActions(record: DataverseRecord): DetailAction[] {
   return /tenn?aris/i.test(cliente) ? ["cancel", "voucher"] : ["cancel", "finalizar"];
 }
 
-function mapGeralService(record: DataverseRecord, passengerHtml = "", solicitanteHtml = ""): AgendaItem {
+function mapGeralService(record: DataverseRecord, passengerHtml = "", solicitanteHtml = "", passengers: DetailPassenger[] = []): AgendaItem {
   const date = toDate(record.cr40f_dataehorriodesada);
   const id = getGeralId(record);
   const businessId = getBusinessId(record, id);
@@ -3225,6 +3226,7 @@ function mapGeralService(record: DataverseRecord, passengerHtml = "", solicitant
     title: "Detalhes do Serviço",
     actions: serviceActions(record),
     fields: buildFields(record, passengerHtml, solicitanteHtml),
+    ...(passengers.length ? { passengers } : {}),
     dataverse: { entitySetName: DATAVERSE.geral, id, record }
   };
 
@@ -3244,14 +3246,15 @@ function mapGeralService(record: DataverseRecord, passengerHtml = "", solicitant
 async function mapGeralServiceWithPassengers(record: DataverseRecord, driver: DriverContext, readMultiple = retrieveMultiple, readOne = retrieveOne) {
   const serviceId = getGeralId(record);
   let passengerHtml = "";
+  let passengers: DetailPassenger[] = [];
   let solicitanteHtml = "";
   try {
-    passengerHtml = await buildPassengersHtml(serviceId, toDate(record.cr40f_dataehorriodesada), driver.fullName, readMultiple, readOne);
+    ({ html: passengerHtml, passengers } = await buildPassengersHtml(serviceId, toDate(record.cr40f_dataehorriodesada), driver.fullName, readMultiple, readOne));
   } catch (error) {
     dataverseWarn("Falha ao enriquecer passageiros. Usando Pax - VIEW do Geral.", { serviceId, error });
   }
   solicitanteHtml = await buildSolicitanteHtml(record, toDate(record.cr40f_dataehorriodesada), driver.fullName, readOne);
-  return mapGeralService(record, passengerHtml || "", solicitanteHtml);
+  return mapGeralService(record, passengerHtml || "", solicitanteHtml, passengers);
 }
 
 function buildMaintenanceFields(geral: DataverseRecord, maintenance: DataverseRecord): DetailField[] {

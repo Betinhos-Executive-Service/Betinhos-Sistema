@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import type { DetailAction, DetailData } from "../types";
 import { DetailActionButton } from "../components/details/DetailActionButton";
 import { DetailsField } from "../components/details/DetailsField";
+import { PassengerAvatars } from "../components/details/PassengerAvatars";
 import { QuestionsBox } from "../components/details/QuestionsBox";
 import { TextAreaField } from "../components/common/FormFields";
 import { PullToRefresh } from "../components/common/PullToRefresh";
@@ -271,6 +272,7 @@ export function DetailsScreen({
               onScroll={updateScrollHint}
             >
               <div className="details-fields details-fields-v1">
+                <PassengerAvatars detail={detail} />
                 {visibleFields.map((field) => (
                   <DetailsField key={field.label} field={field} />
                 ))}
