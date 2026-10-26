@@ -257,7 +257,7 @@ const MOCK_TABLES: Record<string, ExtraTable> = {
 }
 const MOCK_TEXT: Record<string, string[]> = {
   fullname: ['Renan Mendonça', 'Paula Andrade', 'Equipe Operação'],
-  internalemailaddress: ['operacao@betinhos.com.br', 'financeiro@betinhos.com.br', 'frota@betinhos.com.br'],
+  internalemailaddress: ['usuario1@example.com', 'usuario2@example.com', 'usuario3@example.com'],
   cr40f_nomedocliente: ['Tenaris', 'Grupo Atlântico', 'Lumen Consultoria', 'Particular'],
   cr40f_registro: ['SJCampos', 'Pinda', 'Guará'],
   cr40f_nome: ['Ana Souza', 'Bruno Lima', 'Carla Dias'],
