@@ -3,6 +3,8 @@ name: CI
 on:
   pull_request:
   workflow_call:
+  # Rodar à mão (Actions › CI › Run workflow) para conferir a main sem abrir PR.
+  workflow_dispatch:
 
 jobs:
   check:
