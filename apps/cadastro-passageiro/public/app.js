@@ -1,12 +1,20 @@
 // Página do link de cadastro. Vanilla JS; o token vem do fragmento #t= e só vai ao /api no corpo.
-import { emailValido, mascararTelefone, telefoneParaEnvio, telefoneValido } from "./validacao.mjs";
+import { emailOculto, emailValido, mascararTelefone, telefoneOculto, telefoneParaEnvio, telefoneValido } from "./validacao.mjs";
 
 const app = document.getElementById("app");
 const token = new URLSearchParams(location.hash.slice(1)).get("t") || "";
 const LADO_MAX = 1600;
 const BYTES_MAX = 3 * 1024 * 1024;
+const AJUDA_TEL = "Com DDD. Fora do Brasil, comece com +.";
 
-const ICONE_CAMERA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>';
+const svg = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const ICONE = {
+  camera: svg('<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>'),
+  ok: svg('<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>'),
+  falta: svg('<circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>'),
+  relogio: svg('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>'),
+  link: svg('<path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/>'),
+};
 
 function el(tag, attrs = {}, ...filhos) {
   const n = document.createElement(tag);
@@ -16,12 +24,14 @@ function el(tag, attrs = {}, ...filhos) {
     else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
     else if (v !== false && v != null) n.setAttribute(k, v === true ? "" : v);
   }
-  for (const f of filhos) if (f != null) n.append(f);
+  for (const f of filhos) if (f != null && f !== false) n.append(f);
   return n;
 }
 
-function estado(titulo, texto, extra) {
-  app.replaceChildren(el("section", { class: "estado" }, el("h1", {}, titulo), el("p", {}, texto), extra));
+function estado(icone, titulo, texto, extra) {
+  app.replaceChildren(el("section", { class: "estado", role: "status" },
+    icone ? el("span", { class: `estado-icone ${icone}`, html: ICONE[icone] }) : null,
+    el("h1", {}, titulo), el("p", {}, texto), extra));
 }
 
 async function chamar(caminho, corpo) {
@@ -37,17 +47,19 @@ async function chamar(caminho, corpo) {
 
 function mostrarErroGeral(status, tentar) {
   if (status === 404 || status === 410 || status === 400) {
-    estado("Link indisponível", "Este link expirou ou não é mais válido. Peça um novo à Betinhos.");
+    estado("link", "Este link não vale mais",
+      "Por segurança, o link de cadastro expira em 36 horas ou quando um novo é gerado. Peça um novo à equipe Betinhos pelo mesmo canal em que recebeu este.");
   } else if (status === 429) {
-    estado("Muitas tentativas", "Muitas tentativas, aguarde alguns minutos e tente de novo.");
+    estado("relogio", "Muitas tentativas seguidas", "Aguarde alguns minutos e abra o link de novo.");
   } else {
-    estado("Não foi possível carregar", "Verifique sua conexão e tente de novo.",
+    estado("falta", "Não conseguimos carregar", "Confira sua conexão e tente de novo.",
       el("button", { class: "btn primario", type: "button", onclick: tentar }, "Tentar de novo"));
   }
 }
 
 async function carregar() {
-  app.replaceChildren(el("section", { class: "estado" }, el("div", { class: "spinner", "aria-hidden": "true" }), el("p", {}, "Carregando…")));
+  app.replaceChildren(el("section", { class: "estado", role: "status" },
+    el("div", { class: "spinner", "aria-hidden": "true" }), el("p", {}, "Carregando os passageiros…")));
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return mostrarErroGeral(410);
   let resp;
   try { resp = await chamar("/api/ler", {}); } catch { return mostrarErroGeral(0, carregar); }
@@ -58,18 +70,48 @@ async function carregar() {
 function formatarData(iso) {
   const d = iso ? new Date(iso) : null;
   if (!d || isNaN(d)) return "";
-  return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" }).format(d);
+  const f = (o) => new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", ...o }).format(d);
+  const dia = f({ weekday: "long", day: "numeric", month: "long" });
+  return `${dia.charAt(0).toUpperCase()}${dia.slice(1)}, às ${f({ hour: "2-digit", minute: "2-digit" })}`;
 }
 
+const completo = (p) => Boolean(p.temFoto && p.temTelefone && p.temEmail);
+
+function statusDe(p) {
+  if (completo(p)) return { tipo: "ok", texto: "Completo" };
+  const faltaContato = !(p.temTelefone && p.temEmail);
+  if (!p.temFoto && faltaContato) return { tipo: "atencao", texto: "Faltam foto e contato" };
+  return { tipo: "atencao", texto: p.temFoto ? "Falta contato" : "Falta foto" };
+}
+
+const listaNatural = (itens) => (itens.length > 1 ? `${itens.slice(0, -1).join(", ")} e ${itens.at(-1)}` : itens[0] || "");
+const maiuscula = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+
 function renderLista({ passageiros, dataServico }) {
-  if (!passageiros.length) return estado("Nada para preencher", "Este link não tem passageiros no momento. Fale com a Betinhos.");
+  if (!passageiros.length) return estado("falta", "Nenhum passageiro neste link", "Fale com a equipe Betinhos para conferir o serviço.");
   const data = formatarData(dataServico);
   const um = passageiros.length === 1;
+  const progresso = el("div", { class: "progresso", role: "status" });
+  const atualizarProgresso = () => {
+    const feitos = passageiros.filter(completo).length;
+    progresso.replaceChildren(
+      feitos === passageiros.length
+        ? el("div", { class: "final" }, el("span", { class: "final-icone", html: ICONE.ok }),
+          el("div", {}, el("p", { class: "final-titulo" }, "Tudo pronto. Obrigado!"),
+            el("p", {}, `O motorista já tem o que precisa para receber ${um ? "o passageiro" : "cada passageiro"}. Se algo mudar, toque em Alterar.`)))
+        : el("p", { class: "progresso-texto" }, um ? "Falta completar o cadastro" : `${feitos} de ${passageiros.length} passageiros completos`),
+      um ? null : el("div", { class: "barra", "aria-hidden": "true" }, ...passageiros.map((p) => el("span", { class: completo(p) ? "feito" : "" }))),
+    );
+  };
+  atualizarProgresso();
   app.replaceChildren(
-    el("h1", {}, um ? "Cadastro do passageiro" : "Cadastro dos passageiros"),
-    el("p", { class: "intro" },
-      `Com a foto, o motorista reconhece ${um ? "o passageiro" : "cada passageiro"} na chegada${data ? ` em ${data}` : ""}.`),
-    ...passageiros.map(cardPassageiro),
+    el("header", { class: "cabecalho" },
+      el("p", { class: "eyebrow" }, "Cadastro para o serviço"),
+      el("h1", {}, um ? "Dados do passageiro" : "Dados dos passageiros"),
+      data ? el("p", { class: "quando" }, data) : null,
+      el("p", { class: "intro" }, "Com a foto, o motorista reconhece quem vai receber. Telefone e e-mail servem para falar com o passageiro no dia."),
+      progresso),
+    ...passageiros.map((p) => cardPassageiro(p, atualizarProgresso)),
   );
 }
 
@@ -81,104 +123,189 @@ function fotoAtual(foto) {
   return `data:${tipo};base64,${b64}`;
 }
 
-function cardPassageiro(p) {
+// Um item por passageiro: status, foto (é o próprio botão) e checklist Foto/Telefone/E-mail.
+// Campo já cadastrado aparece mascarado com "Alterar"; vazio aparece como campo para preencher.
+function cardPassageiro(p, aoSalvar) {
   const id = p.id;
   const nome = String(p.primeiroNome || "Passageiro");
-  const st = { foto: null };
-
-  // A foto é o próprio botão: área grande para tocar, com a prévia no lugar.
-  const textoFoto = () => (st.foto || p.temFoto ? "Trocar foto" : "Adicionar foto");
-  const avatar = el("span", { class: "foto-area", "aria-hidden": "true", html: ICONE_CAMERA });
+  const st = {
+    foto: null, fotoUrl: fotoAtual(p.foto), tel: "", mail: "",
+    editTel: !p.temTelefone, editMail: !p.temEmail, msg: null, salvando: false, erros: {},
+  };
+  const card = el("section", { class: "card", "aria-labelledby": `nome-${id}` });
   const fotoInput = el("input", { class: "foto-input", type: "file", accept: "image/*", id: `foto-${id}` });
-  const fotoLegenda = el("span", { class: "foto-legenda" }, textoFoto());
-  const fotoBtn = el("label", { class: "foto", for: `foto-${id}` }, avatar, fotoLegenda);
-  const atual = fotoAtual(p.foto);
-  if (atual) avatar.replaceChildren(el("img", { src: atual, alt: `Foto atual de ${nome}` }), el("span", { class: "foto-tem" }, "Foto atual"));
-  else if (p.temFoto) avatar.append(el("span", { class: "foto-tem" }, "Foto já enviada"));
-  const fotoMsg = el("p", { class: "aviso erro", hidden: true, role: "alert" });
-
-  const tel = el("input", { type: "tel", inputmode: "tel", autocomplete: "tel", id: `tel-${id}`, placeholder: "(11) 98765-4321 ou +1 …" });
-  const telMsg = el("span", { class: "msg-campo", id: `tel-msg-${id}` });
-  const mail = el("input", { type: "email", inputmode: "email", autocomplete: "email", id: `mail-${id}`, placeholder: "nome@empresa.com.br" });
-  const mailMsg = el("span", { class: "msg-campo", id: `mail-msg-${id}` });
-  tel.setAttribute("aria-describedby", telMsg.id);
-  mail.setAttribute("aria-describedby", mailMsg.id);
-
-  const salvar = el("button", { class: "btn primario", type: "button" }, "Salvar");
-  const status = el("p", { class: "aviso", hidden: true, role: "status" });
-
-  function aviso(n, tipo, texto) {
-    n.className = `aviso ${tipo}`;
-    n.textContent = texto;
-    n.hidden = !texto;
-  }
-
-  tel.addEventListener("input", () => {
-    tel.value = mascararTelefone(tel.value);
-    tel.removeAttribute("aria-invalid");
-    telMsg.textContent = "";
-  });
-  mail.addEventListener("input", () => { mail.removeAttribute("aria-invalid"); mailMsg.textContent = ""; });
+  let botao = null;
 
   fotoInput.addEventListener("change", async () => {
     const arq = fotoInput.files?.[0];
     fotoInput.value = "";
     if (!arq) return;
-    aviso(fotoMsg, "erro", "");
-    fotoLegenda.textContent = "Preparando foto…";
+    st.msg = { tipo: "info", texto: "Preparando a foto…" };
+    render();
     try {
       st.foto = await comprimirFoto(arq);
-      avatar.replaceChildren(el("img", { src: `data:image/jpeg;base64,${st.foto}`, alt: "" }));
-      fotoLegenda.textContent = textoFoto();
+      st.fotoUrl = `data:image/jpeg;base64,${st.foto}`;
+      st.msg = null;
     } catch (e) {
       st.foto = null;
-      fotoLegenda.textContent = textoFoto();
-      aviso(fotoMsg, "erro", e.message || "Não foi possível abrir a foto. Tente outra.");
+      st.msg = { tipo: "erro", texto: e.message || "Não foi possível abrir a foto. Tente outra." };
     }
+    render(`foto-${id}`);
   });
 
-  salvar.addEventListener("click", async () => {
-    const corpo = { passageiroId: id };
-    let ok = true;
-    if (tel.value.trim()) {
-      if (telefoneValido(tel.value)) corpo.telefone = telefoneParaEnvio(tel.value);
-      else { ok = false; tel.setAttribute("aria-invalid", "true"); telMsg.textContent = "Telefone com DDD, ex.: (11) 98765-4321 ou +1 555 123 4567."; }
+  const pendentes = () => [
+    st.foto && "foto",
+    st.editTel && st.tel.trim() && "telefone",
+    st.editMail && st.mail.trim() && "e-mail",
+  ].filter(Boolean);
+
+  function atualizarBotao() {
+    if (!botao) return;
+    const pend = pendentes();
+    botao.textContent = st.salvando ? "Salvando…" : pend.length ? `Salvar ${listaNatural(pend)}` : "Salvar";
+  }
+
+  function campoTexto(tipo) {
+    const ehTel = tipo === "tel";
+    const iid = `${tipo}-${id}`;
+    const msgId = `${iid}-msg`;
+    const input = el("input", ehTel
+      ? { type: "tel", inputmode: "tel", autocomplete: "tel", id: iid, placeholder: "(11) 98765-4321", "aria-describedby": msgId }
+      : { type: "email", inputmode: "email", autocomplete: "email", id: iid, placeholder: "nome@empresa.com.br", "aria-describedby": msgId });
+    input.value = ehTel ? st.tel : st.mail;
+    const erroTxt = st.erros[tipo];
+    if (erroTxt) input.setAttribute("aria-invalid", "true");
+    const ajuda = ehTel ? AJUDA_TEL : "";
+    const msg = el("span", { class: erroTxt ? "msg-campo erro" : "msg-campo", id: msgId }, erroTxt || ajuda);
+    input.addEventListener("input", () => {
+      if (ehTel) { input.value = mascararTelefone(input.value); st.tel = input.value; } else st.mail = input.value;
+      if (st.erros[tipo]) {
+        delete st.erros[tipo];
+        input.removeAttribute("aria-invalid");
+        msg.className = "msg-campo";
+        msg.textContent = ajuda;
+      }
+      atualizarBotao();
+    });
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); salvar(); } });
+    return el("label", { class: "campo", for: iid }, el("span", { class: "sr-only" }, `${ehTel ? "Telefone" : "E-mail"} de ${nome}`), input, msg);
+  }
+
+  function linha({ rotulo, tem, valor, chave, tipo }) {
+    const editando = chave && st[chave];
+    let acao = null;
+    if (chave && tem && !editando) {
+      acao = el("button", {
+        class: "btn-texto", type: "button", "aria-label": `Alterar ${rotulo.toLowerCase()} de ${nome}`,
+        onclick: () => { st[chave] = true; st.msg = null; render(`${tipo}-${id}`); },
+      }, "Alterar");
+    } else if (chave && tem && editando) {
+      acao = el("button", {
+        class: "btn-texto", type: "button", "aria-label": `Manter ${rotulo.toLowerCase()} atual de ${nome}`,
+        onclick: () => { st[chave] = false; st[tipo] = ""; delete st.erros[tipo]; render(); },
+      }, "Cancelar");
     }
-    if (mail.value.trim()) {
-      if (emailValido(mail.value)) corpo.email = mail.value.trim();
-      else { ok = false; mail.setAttribute("aria-invalid", "true"); mailMsg.textContent = "Confira o e-mail, ex.: nome@empresa.com.br."; }
+    return el("li", { class: `item ${tem ? "tem" : "falta"}` },
+      el("span", { class: "item-icone", html: tem ? ICONE.ok : ICONE.falta }),
+      el("div", { class: "item-corpo" },
+        el("div", { class: "item-linha" },
+          el("span", { class: "item-rotulo" }, rotulo),
+          el("span", { class: "item-valor" }, valor),
+          acao),
+        editando ? campoTexto(tipo) : null));
+  }
+
+  function render(focar) {
+    const s = statusDe(p);
+    const temFotoAgora = Boolean(st.foto) || p.temFoto;
+    const area = el("span", { class: "foto-area", "aria-hidden": "true" });
+    if (st.fotoUrl) area.append(el("img", { src: st.fotoUrl, alt: "" }));
+    else area.innerHTML = ICONE.camera;
+    if (st.foto) area.append(el("span", { class: "foto-selo novo" }, "Nova foto"));
+    else if (st.fotoUrl) area.append(el("span", { class: "foto-selo" }, "Foto atual"));
+    fotoInput.setAttribute("aria-label", `${temFotoAgora ? "Trocar" : "Adicionar"} foto de ${nome}`);
+    const fotoBtn = el("label", { class: "foto", for: fotoInput.id },
+      area, el("span", { class: "foto-legenda" }, temFotoAgora ? "Trocar foto" : "Adicionar foto"));
+
+    const valorTel = p.temTelefone ? (p.telefoneMascarado || "Cadastrado") : "Faltando";
+    const valorMail = p.temEmail ? (p.emailMascarado || "Cadastrado") : "Faltando";
+    const valorFoto = st.foto ? "Nova, falta salvar" : p.temFoto ? "Cadastrada" : "Faltando";
+
+    const precisaBotao = st.salvando || pendentes().length > 0 || st.editTel || st.editMail || !p.temFoto || st.msg?.tipo === "erro";
+    botao = precisaBotao
+      ? el("button", { class: "btn primario", type: "button", onclick: salvar, "aria-busy": st.salvando ? "true" : null, disabled: st.salvando })
+      : null;
+    atualizarBotao();
+
+    card.replaceChildren(...[
+      el("div", { class: "card-topo" },
+        el("h2", { class: "nome", id: `nome-${id}` }, nome),
+        el("span", { class: `badge ${s.tipo}` }, el("span", { class: "badge-icone", html: s.tipo === "ok" ? ICONE.ok : ICONE.falta }), s.texto)),
+      el("div", { class: "card-corpo" },
+        el("div", { class: "card-foto" }, fotoInput, fotoBtn),
+        el("ul", { class: "checklist", "aria-label": `Dados de ${nome}` },
+          linha({ rotulo: "Foto", tem: temFotoAgora, valor: valorFoto }),
+          linha({ rotulo: "Telefone", tem: p.temTelefone, valor: valorTel, chave: "editTel", tipo: "tel" }),
+          linha({ rotulo: "E-mail", tem: p.temEmail, valor: valorMail, chave: "editMail", tipo: "mail" }))),
+      botao,
+      el("p", { class: `aviso ${st.msg?.tipo || ""}`, role: st.msg?.tipo === "erro" ? "alert" : "status", tabindex: "-1", id: `msg-${id}`, hidden: !st.msg },
+        st.msg ? el("span", { class: "aviso-icone", html: st.msg.tipo === "ok" ? ICONE.ok : ICONE.falta }) : null,
+        st.msg?.texto || ""),
+    ].filter(Boolean));
+    if (focar) card.querySelector(`#${CSS.escape(focar)}`)?.focus();
+  }
+
+  async function salvar() {
+    if (st.salvando) return;
+    const corpo = { passageiroId: id };
+    st.erros = {};
+    if (st.editTel && st.tel.trim()) {
+      if (telefoneValido(st.tel)) corpo.telefone = telefoneParaEnvio(st.tel);
+      else st.erros.tel = "Confira o telefone: inclua o DDD, ex.: (11) 98765-4321.";
+    }
+    if (st.editMail && st.mail.trim()) {
+      if (emailValido(st.mail)) corpo.email = st.mail.trim();
+      else st.erros.mail = "Confira o e-mail, ex.: nome@empresa.com.br.";
     }
     if (st.foto) corpo.fotoBase64 = st.foto;
-    if (!ok) return aviso(status, "erro", "");
-    if (Object.keys(corpo).length === 1) return aviso(status, "atencao", "Preencha a foto, o telefone ou o e-mail antes de salvar.");
-
-    salvar.disabled = true;
-    salvar.textContent = "Salvando…";
-    aviso(status, "ok", "");
+    if (st.erros.tel || st.erros.mail) {
+      st.msg = { tipo: "erro", texto: "Corrija o campo destacado e salve de novo." };
+      return render(st.erros.tel ? `tel-${id}` : `mail-${id}`);
+    }
+    if (Object.keys(corpo).length === 1) {
+      st.msg = { tipo: "atencao", texto: "Nada novo para salvar. Preencha a foto, o telefone ou o e-mail que estão faltando." };
+      return render(`msg-${id}`);
+    }
+    const itens = pendentes();
+    st.salvando = true;
+    st.msg = { tipo: "info", texto: `Salvando ${listaNatural(itens)}…` };
+    render();
     let resp;
     try { resp = await chamar("/api/salvar", corpo); } catch { resp = { status: 0 }; }
-    salvar.disabled = false;
+    st.salvando = false;
     if (resp.status === 200) {
-      salvar.textContent = "Salvo";
-      aviso(status, "ok", "Dados salvos. Obrigado!");
-      if (corpo.fotoBase64) { p.temFoto = true; st.foto = null; fotoLegenda.textContent = textoFoto(); }
-      setTimeout(() => { salvar.textContent = "Salvar"; }, 2500);
+      if (corpo.fotoBase64) { p.temFoto = true; st.foto = null; }
+      if (corpo.telefone) { p.temTelefone = true; p.telefoneMascarado = telefoneOculto(corpo.telefone); st.tel = ""; st.editTel = false; }
+      if (corpo.email) { p.temEmail = true; p.emailMascarado = emailOculto(corpo.email); st.mail = ""; st.editMail = false; }
+      const plural = itens.length > 1 ? "salvos" : itens[0] === "foto" ? "salva" : "salvo";
+      st.msg = { tipo: "ok", texto: `${maiuscula(listaNatural(itens))} ${plural}.` };
+      render(`msg-${id}`);
+      aoSalvar();
       return;
     }
-    salvar.textContent = "Tentar de novo";
-    if (resp.status === 410 || resp.status === 404) aviso(status, "erro", "Este link expirou ou não é mais válido. Peça um novo à Betinhos.");
-    else if (resp.status === 429) aviso(status, "erro", "Muitas tentativas, aguarde alguns minutos.");
-    else if (resp.status === 400) aviso(status, "erro", "Algum dado não foi aceito. Confira e tente de novo.");
-    else if (resp.status === 413) aviso(status, "erro", "A foto ficou grande demais. Tente outra.");
-    else aviso(status, "erro", "Não foi possível salvar agora. Toque em Tentar de novo.");
-  });
+    const erros = {
+      410: "Este link expirou e nada foi salvo. Peça um novo à equipe Betinhos.",
+      404: "Este link não vale mais e nada foi salvo. Peça um novo à equipe Betinhos.",
+      429: "Muitas tentativas seguidas. Aguarde alguns minutos e toque em Salvar de novo.",
+      400: "Algum dado não foi aceito. Confira o telefone e o e-mail e tente de novo.",
+      413: "A foto ficou grande demais. Escolha outra.",
+    };
+    st.msg = { tipo: "erro", texto: erros[resp.status] || "Não foi possível salvar agora. O que você preencheu continua aqui; toque em Salvar para tentar de novo." };
+    render(`msg-${id}`);
+  }
 
-  return el("section", { class: "card", "aria-label": `Passageiro ${nome}` },
-    el("p", { class: "nome" }, nome), fotoInput, fotoBtn, fotoMsg,
-    el("label", { class: "campo", for: tel.id }, "Telefone", tel, telMsg),
-    el("label", { class: "campo", for: mail.id }, "E-mail", mail, mailMsg),
-    salvar, status,
-  );
+  render();
+  return card;
 }
 
 async function decodificar(arq) {

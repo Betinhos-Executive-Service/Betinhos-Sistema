@@ -133,3 +133,39 @@ test('toda ação citada em expressões existe e nomes não se repetem', () => {
 test('nenhuma função de expressão é chamada sem argumentos (createArray() quebra o flow)', () => {
   assert.doesNotMatch(raw, /createArray\(\)/)
 })
+
+// Avalia as expressões de máscara do "ler" com um mini-interpretador das funções usadas.
+const avaliar = (expr, registro) => {
+  const js = expr.slice(1)
+    .replace(/body\('Obter_passageiro'\)\?\['(\w+)'\]/g, "R['$1']")
+    .replace(/\bif\(/g, 'iff(')
+  const fns = {
+    iff: (c, a, b) => (c ? a : b), trim: (s) => String(s).trim(), coalesce: (...a) => a.find((x) => x != null),
+    replace: (s, a, b) => s.split(a).join(b), substring: (s, i, n) => s.substr(i, n), sub: (a, b) => a - b,
+    length: (s) => s.length, less: (a, b) => a < b, empty: (s) => !s, and: (a, b) => a && b, not: (a) => !a,
+    startsWith: (s, p) => s.startsWith(p), greaterOrEquals: (a, b) => a >= b, lessOrEquals: (a, b) => a <= b,
+    concat: (...a) => a.join(''), indexOf: (s, p) => s.indexOf(p), min: Math.min,
+  }
+  return new Function('R', ...Object.keys(fns), `return ${js}`)(registro, ...Object.values(fns))
+}
+
+test('ler: telefone e e-mail só mascarados, nunca o valor completo', () => {
+  assert.match(todas.get('Obter_passageiro').inputs.parameters.$select, /cr40f_telefone,cr40f_email/)
+  const v = todas.get('Incluir_passageiro').inputs.value
+  assert.ok(!Object.values(v).some((x) => x === "@body('Obter_passageiro')?['cr40f_telefone']" || x === "@body('Obter_passageiro')?['cr40f_email']"))
+  const tel = (t) => avaliar(v.telefoneMascarado, { cr40f_telefone: t })
+  assert.equal(tel('+5511987654321'), '(11) •••••-4321')
+  assert.equal(tel('(21) 3456-7890'), '(21) •••••-7890')
+  assert.equal(tel('+55 11 98765-4321'), '(11) •••••-4321')
+  assert.equal(tel('+15551234567'), '+••• 4567')
+  assert.equal(tel('123'), '••••')
+  assert.equal(tel(null), '')
+  assert.equal(avaliar(v.temTelefone, { cr40f_telefone: '  ' }), false)
+  assert.equal(avaliar(v.temTelefone, { cr40f_telefone: '+5511987654321' }), true)
+  const mail = (e) => avaliar(v.emailMascarado, { cr40f_email: e })
+  assert.equal(mail('ana.souza@empresa.com.br'), 'an•••@empresa.com.br')
+  assert.equal(mail('a@b.co'), 'a•••@b.co')
+  assert.equal(mail('semarroba'), '•••')
+  assert.equal(mail(null), '')
+  assert.equal(avaliar(v.temEmail, { cr40f_email: 'a@b.co' }), true)
+})

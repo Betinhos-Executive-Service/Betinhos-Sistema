@@ -58,15 +58,39 @@ const FOTO_MOCK = "/9j/4AAQSkZJRgABAQEAbgBuAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEB
 
 function mockResposta(op, corpo) {
   if (op === "ler") {
+    const foto = { mimeType: "image/jpeg", base64: FOTO_MOCK };
     return json(200, {
       dataServico: new Date(Date.now() + 86400000).toISOString(),
       passageiros: [
-        { id: "00000000-0000-0000-0000-000000000001", primeiroNome: "Mariana", temFoto: true, foto: { mimeType: "image/jpeg", base64: FOTO_MOCK } },
-        { id: "00000000-0000-0000-0000-000000000002", primeiroNome: "Carlos", temFoto: false },
+        { id: "00000000-0000-0000-0000-000000000001", primeiroNome: "Mariana", temFoto: true, foto,
+          temTelefone: true, telefoneMascarado: "(11) •••••-4321", temEmail: true, emailMascarado: "ma•••@empresa.com.br" },
+        { id: "00000000-0000-0000-0000-000000000002", primeiroNome: "Carlos", temFoto: true, foto, temTelefone: false, temEmail: false },
+        { id: "00000000-0000-0000-0000-000000000003", primeiroNome: "Beatriz", temFoto: false, temTelefone: false, temEmail: false },
       ],
     });
   }
+  // E-mail começando com "erro" simula falha do flow para testar a mensagem de erro.
+  if (/^erro/i.test(corpo.email || "")) return erro(500, "falha");
   return json(200, { ok: true, passageiroId: corpo.passageiroId });
+}
+
+// Só repassa os campos esperados do "ler"; telefone/e-mail só passam se vierem mascarados (com •).
+const mascarado = (v) => (typeof v === "string" && v.includes("•") ? v : "");
+export function limparLer(dados) {
+  if (!dados || !Array.isArray(dados.passageiros)) return null;
+  return {
+    dataServico: typeof dados.dataServico === "string" ? dados.dataServico : null,
+    passageiros: dados.passageiros.map((p) => ({
+      id: p?.id,
+      primeiroNome: p?.primeiroNome,
+      temFoto: Boolean(p?.temFoto),
+      foto: p?.foto ?? null,
+      temTelefone: Boolean(p?.temTelefone),
+      telefoneMascarado: mascarado(p?.telefoneMascarado),
+      temEmail: Boolean(p?.temEmail),
+      emailMascarado: mascarado(p?.emailMascarado),
+    })),
+  };
 }
 
 // Monta o payload de "salvar" só com campos válidos e preenchidos. Retorna null se inválido.
@@ -126,7 +150,10 @@ export async function tratarApi(request, env, url, fetcher = fetch) {
   // Erros viram código genérico: detalhes internos do flow nunca chegam ao navegador.
   if (resp.status !== 200) return erro(resp.status, CODIGOS[resp.status]);
   try {
-    return json(200, await resp.json());
+    const dados = await resp.json();
+    if (op !== "ler") return json(200, dados);
+    const limpo = limparLer(dados);
+    return limpo ? json(200, limpo) : erro(500, "falha");
   } catch {
     return erro(500, "falha");
   }
