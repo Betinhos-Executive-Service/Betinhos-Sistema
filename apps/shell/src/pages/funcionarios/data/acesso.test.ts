@@ -40,14 +40,21 @@ describe('acesso', () => {
 
   it('mock cadastra, aplica sufixo quando repete e simula erro pelo nome', async () => {
     const src = createAcessoSource({ mode: 'mock' })
-    const a = await src.cadastrar({ nomeCompleto: 'Ana Lima', celular: '12991234567', tipoVinculo: 1 })
+    const a = await src.cadastrar({ nomeCompleto: 'Ana Lima', celular: '11988887777', tipoVinculo: 1 })
     expect(a.emailMicrosoft).toBe('ana.lima@betinhos.onmicrosoft.com')
     expect(a.senhaTemporaria).toHaveLength(14)
     expect(a.etapas.map((e) => e.estado)).toContain('feita')
-    const b = await src.cadastrar({ nomeCompleto: 'Ana Lima', celular: '12991234567', tipoVinculo: 1 })
+    const b = await src.cadastrar({ nomeCompleto: 'Ana Lima', celular: '11988887777', tipoVinculo: 1 })
     expect(b.emailMicrosoft).toBe('ana.lima2@betinhos.onmicrosoft.com')
-    await expect(src.cadastrar({ nomeCompleto: 'Erro Graph', celular: '12991234567', tipoVinculo: 1 })).rejects.toMatchObject({ codigo: 'GRAPH_INDISPONIVEL' })
-    await expect(src.cadastrar({ nomeCompleto: 'Sem Licenca', celular: '12991234567', tipoVinculo: 1 })).rejects.toMatchObject({ codigo: 'SEM_LICENCA_DISPONIVEL' })
+    await expect(src.cadastrar({ nomeCompleto: 'Erro Graph', celular: '11988887777', tipoVinculo: 1 })).rejects.toMatchObject({ codigo: 'GRAPH_INDISPONIVEL' })
+    await expect(src.cadastrar({ nomeCompleto: 'Sem Licenca', celular: '11988887777', tipoVinculo: 1 })).rejects.toMatchObject({ codigo: 'SEM_LICENCA_DISPONIVEL' })
+  })
+
+  it('mock para em HOMONIMO_ENCONTRADO sem ficha nem criarNovo e lista os parecidos', async () => {
+    const src = createAcessoSource({ mode: 'mock' })
+    await expect(src.cadastrar({ nomeCompleto: 'Maria Souza', celular: '(12) 99123-4567', tipoVinculo: 1 })).rejects.toMatchObject({ codigo: 'HOMONIMO_ENCONTRADO' })
+    expect((await src.parecidos({ nome: 'carlos alberto  teste', celular: '' })).map((p) => [p.id, p.temAcesso])).toEqual([['m1', true]])
+    expect((await src.cadastrar({ nomeCompleto: 'Maria Souza', celular: '12991234567', tipoVinculo: 1, criarNovo: true })).emailMicrosoft).toBe('maria.souza@betinhos.onmicrosoft.com')
   })
 
   it('mock encerra só com o primeiro nome certo', async () => {
@@ -79,6 +86,19 @@ describe('acesso', () => {
     expect(calls[1]).toEqual({ path: 'cr40f_EncerrarAcessoMotorista', body: { FuncionarioId: 'F1', Confirmacao: 'Ana' } })
     expect(await src.reativar('F1')).toEqual({ emailMicrosoft: 'a@b', senhaTemporaria: 's', linkApp: 'l', etapas: [] })
     expect(calls[2]).toEqual({ path: 'cr40f_ReativarAcessoMotorista', body: { FuncionarioId: 'F1' } })
+  })
+
+  it('dataverse envia Cpf e CriarNovo e confere parecidos em todos os funcionários', async () => {
+    const calls: { path: string; body?: unknown }[] = []
+    const client = {
+      request: async (path: string, init: { body: string }) => { calls.push({ path, body: JSON.parse(init.body) }); return { EmailMicrosoft: 'a@b', SenhaTemporaria: 's', FuncionarioId: 'f', LinkApp: 'l', Etapas: '[]' } },
+      getAll: async (path: string) => { calls.push({ path }); return path.startsWith('systemusers') ? [{ internalemailaddress: 'Ana@B' }] : [{ cr40f_funcionariosid: 'x', cr40f_nomecompleto: 'Ána  Lima', cr40f_telefonepessoal: null, cr40f_funcao: 202410001, cr40f_status: 1, cr40f_emailmicrosoft: 'ana@b' }] },
+    }
+    const src = createAcessoSource({ mode: 'dataverse', client } as never)
+    await src.cadastrar({ nomeCompleto: 'A B', celular: '12991234567', tipoVinculo: 1, cpf: '52998224725', criarNovo: true })
+    expect(calls[0].body).toEqual({ NomeCompleto: 'A B', Celular: '12991234567', TipoVinculo: 1, Cpf: '52998224725', CriarNovo: true })
+    expect(await src.parecidos({ nome: 'ana lima', celular: '' })).toEqual([expect.objectContaining({ id: 'x', funcao: 'Administrativo', status: 'Desligado', temAcesso: true })])
+    expect(calls[1].path).not.toContain('$filter')   // qualquer função e status
   })
 
   it('parseAcessoError lê só o primeiro array de etapas mesmo com texto e colchetes do Dataverse depois', () => {
