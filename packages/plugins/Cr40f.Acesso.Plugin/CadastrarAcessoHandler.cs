@@ -123,7 +123,8 @@ public sealed class CadastrarAcessoHandler
         {
             var objectId = Guid.Parse(usuarioEntraId);
             if (usuarios.Pronto(objectId)) { etapas.Pulada("systemuser", "já existe no Dataverse"); return true; }
-            pp.SincronizarUsuario(objectId);
+            try { pp.SincronizarUsuario(objectId); }
+            catch (AcessoException e) when (e.Codigo == "USUARIO_DATAVERSE_PENDENTE") { etapas.Trace?.Invoke("systemuser pendente: " + e.Message); etapas.Pendente("systemuser", MsgLiberando); return false; }
             if (!usuarios.AguardarPronto(objectId)) { etapas.Pendente("systemuser", MsgLiberando); return false; }
             etapas.Feita("systemuser", "sincronizado pelo Power Platform");
             return true;
