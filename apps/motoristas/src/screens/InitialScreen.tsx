@@ -473,7 +473,13 @@ export function InitialScreen(props: InitialScreenProps) {
       )}
 
       {servicesModule && (
-        <button className="concept-module-card concept-module-card--primary" type="button" onClick={() => navigateTo("services")}>
+        <button
+          className="concept-module-card concept-module-card--primary"
+          type="button"
+          disabled={servicesModule.disabled}
+          aria-disabled={servicesModule.disabled}
+          onClick={() => navigateTo("services")}
+        >
           <span className="concept-module-meta" aria-hidden="true">
             <ModuleIcon name={servicesModule.icon} />
           </span>
