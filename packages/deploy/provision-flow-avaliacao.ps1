@@ -27,7 +27,8 @@
 param(
   [switch] $SomenteValidar,
   [string] $Restaurar = '',
-  [ValidatePattern('^[^@\s]+@[^@\s]+$')] [string] $EmailOperacao = 'junior@betinhos.com.br',
+  # Caixa que recebe elogios e notas baixas. Não fica no repositório: -EmailOperacao ou a variável BETINHOS_EMAIL_OPERACAO.
+  [string] $EmailOperacao = $env:BETINHOS_EMAIL_OPERACAO,
   [string] $ReferenciaDataverse = 'new_sharedcommondataserviceforapps_5696d',
   [string] $ReferenciaOutlook = 'new_sharedoffice365_f87d5'
 )
@@ -41,6 +42,7 @@ $flowName = 'Link | Registrar avaliação'
 $envVarName = 'new_URLFlowRegistrarAvaliacao'
 $backupDir = Join-Path $PSScriptRoot 'flows/backup'
 if (([Uri]$environmentUrl).Host -ne 'org23b93544.crm2.dynamics.com') { throw 'Somente DEV.' }
+if (-not $Restaurar -and $EmailOperacao -notmatch '^[^@\s]+@[^@\s]+$') { throw 'Informe o e-mail da operação: -EmailOperacao <email> ou a variável BETINHOS_EMAIL_OPERACAO.' }
 function Write-Step([string] $m) { Write-Host "[flow-avaliacao] $m" }
 
 # Autoconferência do arquivo: sem erro de sintaxe e com BOM.
