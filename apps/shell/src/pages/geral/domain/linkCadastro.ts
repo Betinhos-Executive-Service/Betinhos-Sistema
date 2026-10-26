@@ -27,6 +27,15 @@ export function parseLinkCadastroJson(raw: unknown): LinkCadastroResult {
   } catch { return { ok: false, erro: LINK_CADASTRO_FALHA } }
 }
 
+/** Pedido que pré-carrega no Worker a lista e as fotos do link recém-gerado, para a 1ª abertura não esperar o flow.
+ * `null` quando o link não é do Worker de cadastro ou não traz token. */
+export function pedidoAquecer(link: string): { url: string; init: RequestInit } | null {
+  const m = /^(https:\/\/[^/#]+)\/#t=([A-Za-z0-9_-]{43})$/.exec(link)
+  if (!m) return null
+  // no-cors + text/plain: sem preflight; a resposta não importa (o Worker responde 202 e segue em segundo plano).
+  return { url: `${m[1]}/api/aquecer`, init: { method: 'POST', mode: 'no-cors', keepalive: true, headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ token: m[2] }) } }
+}
+
 const fmt = new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
 /** "vale até dd/mm HH:mm" no fuso de São Paulo; `null` sem data válida. */
 export function validadeTexto(iso?: string | null): string | null {

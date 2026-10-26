@@ -129,15 +129,15 @@ export function payloadSalvar(corpo) {
   return Object.keys(p).length > 1 ? p : null;
 }
 
-export async function tratarApi(request, env, url, fetcher = fetch) {
+export async function tratarApi(request, env, url, fetcher = fetch, ctx = null) {
   if (request.method !== "POST") return erro(405, "metodo");
+  const op = { "/api/ler": "ler", "/api/foto": "foto", "/api/salvar": "salvar", "/api/aquecer": "aquecer" }[url.pathname] || null;
+  if (!op) return erro(404, "rota");
+  // "aquecer" vem do Sistema Betinhos (outra origem, fetch no-cors); o token é a autorização.
   const origem = request.headers.get("Origin");
   const local = ehLocal(url, env);
-  if (origem && origem !== url.origin && !local) return erro(403, "origem");
+  if (op !== "aquecer" && origem && origem !== url.origin && !local) return erro(403, "origem");
   if (!(await limiteTaxa(request, env))) return erro(429, "limite");
-
-  const op = { "/api/ler": "ler", "/api/foto": "foto", "/api/salvar": "salvar" }[url.pathname] || null;
-  if (!op) return erro(404, "rota");
 
   const { grande, dados } = await lerCorpo(request);
   if (grande) return erro(413, "grande");
@@ -153,31 +153,106 @@ export async function tratarApi(request, env, url, fetcher = fetch) {
     if (!extra) return erro(400, "invalido");
   }
 
-  if (!env.FLOW_URL) return local ? mockResposta(op, dados) : erro(500, "config");
+  if (!env.FLOW_URL) {
+    if (!local) return erro(500, "config");
+    return op === "aquecer" ? json(202, { ok: true }) : mockResposta(op, dados);
+  }
 
   const hash = await sha256Hex(dados.token);
+  const flow = (corpo) => chamarFlow(env, fetcher, { hash, ...corpo });
+  // Trabalho depois da resposta: no Worker vai para o waitUntil; nos testes (sem ctx) roda antes de responder.
+  const depois = async (tarefa) => { if (ctx?.waitUntil) ctx.waitUntil(tarefa().catch(() => {})); else await tarefa().catch(() => {}); };
+
+  if (op === "aquecer") {
+    await depois(() => aquecer(env, flow, hash));
+    return json(202, { ok: true });
+  }
+
+  if (op === "ler") {
+    if (dados.fresco !== true) {
+      const salvo = await cacheLer(env, chaveLer(hash));
+      if (salvo) return json(200, { ...salvo, cache: true });
+    }
+    const r = await atualizarLer(env, flow, hash);
+    if (r.status !== 200) return erro(r.status, CODIGOS[r.status]);
+    return json(200, r.limpo);
+  }
+
+  if (op === "foto") {
+    const chave = chaveFoto(hash, extra.passageiroId);
+    const salvo = await cacheLer(env, chave);
+    if (salvo) return json(200, salvo);
+    const r = await flow({ op: "foto", ...extra });
+    if (r.status !== 200) return erro(r.status, CODIGOS[r.status]);
+    const limpo = limparFoto(r.dados);
+    if (limpo.foto) await depois(() => cacheGravar(env, chave, limpo));
+    return json(200, limpo);
+  }
+
+  const r = await flow({ op, ...extra });
+  if (r.status !== 200) return erro(r.status, CODIGOS[r.status]);
+  // Salvou: a lista guardada fica velha; a foto nova já vai para o cache sem passar pelo flow.
+  if (env.CACHE) await depois(async () => {
+    if (extra.fotoBase64) await cacheGravar(env, chaveFoto(hash, extra.passageiroId.toLowerCase()), { foto: { mimeType: "image/jpeg", base64: extra.fotoBase64 } });
+    await atualizarLer(env, flow, hash);
+  });
+  return json(200, r.dados);
+}
+
+// Chama o flow e devolve {status, dados}; qualquer falha de rede ou status fora da lista vira 500.
+async function chamarFlow(env, fetcher, corpo) {
   let resp;
   try {
-    resp = await fetcher(env.FLOW_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ op, hash, ...extra }),
-    });
+    resp = await fetcher(env.FLOW_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
   } catch {
-    return erro(500, "falha");
+    return { status: 500 };
   }
-  if (!STATUS_REPASSADOS.has(resp.status)) return erro(500, "falha");
-  // Erros viram código genérico: detalhes internos do flow nunca chegam ao navegador.
-  if (resp.status !== 200) return erro(resp.status, CODIGOS[resp.status]);
-  try {
-    const dados = await resp.json();
-    if (op === "foto") return json(200, limparFoto(dados));
-    if (op !== "ler") return json(200, dados);
-    const limpo = limparLer(dados);
-    return limpo ? json(200, limpo) : erro(500, "falha");
-  } catch {
-    return erro(500, "falha");
+  if (!STATUS_REPASSADOS.has(resp.status)) return { status: 500 };
+  if (resp.status !== 200) return { status: resp.status };
+  try { return { status: 200, dados: await resp.json() }; } catch { return { status: 500 }; }
+}
+
+// Cache no KV (binding CACHE): a primeira abertura do link não espera o flow (2–5 s).
+// Só grava quando o valor muda (o plano grátis tem 1.000 gravações/dia); vale as 36 h do link.
+const CACHE_TTL = 36 * 3600;
+const chaveLer = (hash) => `ler:${hash}`;
+const chaveFoto = (hash, id) => `foto:${hash}:${id}`;
+
+async function cacheLer(env, chave) {
+  if (!env.CACHE) return null;
+  try { return JSON.parse((await env.CACHE.get(chave)) || "null"); } catch { return null; }
+}
+async function cacheGravar(env, chave, valor) {
+  if (!env.CACHE) return;
+  const texto = JSON.stringify(valor);
+  if ((await env.CACHE.get(chave)) === texto) return;
+  await env.CACHE.put(chave, texto, { expirationTtl: CACHE_TTL });
+}
+
+// Lê do flow e atualiza o cache: 200 grava; link inexistente/vencido apaga.
+async function atualizarLer(env, flow, hash) {
+  const r = await flow({ op: "ler" });
+  if (r.status === 200) {
+    const limpo = limparLer(r.dados);
+    if (!limpo) return { status: 500 };
+    await cacheGravar(env, chaveLer(hash), limpo).catch(() => {});
+    return { status: 200, limpo };
   }
+  if ((r.status === 404 || r.status === 410) && env.CACHE) await env.CACHE.delete(chaveLer(hash)).catch(() => {});
+  return { status: r.status };
+}
+
+// Pré-carrega lista e fotos logo depois de o link ser gerado.
+async function aquecer(env, flow, hash) {
+  const r = await atualizarLer(env, flow, hash);
+  if (r.status !== 200) return;
+  await Promise.all(r.limpo.passageiros.filter((p) => p.temFoto && idValido(p.id)).map(async (p) => {
+    const chave = chaveFoto(hash, p.id.toLowerCase());
+    if (await cacheLer(env, chave)) return;
+    const f = await flow({ op: "foto", passageiroId: p.id.toLowerCase() });
+    const limpo = f.status === 200 ? limparFoto(f.dados) : null;
+    if (limpo?.foto) await cacheGravar(env, chave, limpo);
+  }));
 }
 
 const CODIGOS = { 400: "invalido", 404: "nao-encontrado", 410: "expirado", 429: "limite", 500: "falha" };

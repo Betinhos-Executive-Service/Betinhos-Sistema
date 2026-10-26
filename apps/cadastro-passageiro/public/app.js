@@ -94,19 +94,23 @@ function apagarCache(chave) { try { localStorage.removeItem(chave); } catch { /*
 async function carregar() {
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return mostrarErroGeral(410);
   const chave = await chaveCache().catch(() => null);
-  const salvo = chave ? lerCache(chave) : null;
-  if (salvo) renderLista(salvo); else app.replaceChildren(esqueleto());
+  let mostrado = chave ? lerCache(chave) : null;
+  if (mostrado) renderLista(mostrado); else app.replaceChildren(esqueleto());
   mexeu = false;
-  let resp;
-  try { resp = await chamar("/api/ler", {}); } catch { return salvo ? null : mostrarErroGeral(0, carregar); }
-  if (resp.status !== 200 || !Array.isArray(resp.dados?.passageiros)) {
-    if (chave && [400, 404, 410].includes(resp.status)) apagarCache(chave);
-    return salvo && resp.status >= 500 ? null : mostrarErroGeral(resp.status, carregar);
+  // 1ª chamada pode vir do cache do Worker (cache: true, instantânea); aí busca a versão fresca em seguida.
+  for (const fresco of [false, true]) {
+    let resp;
+    try { resp = await chamar("/api/ler", fresco ? { fresco: true } : {}); } catch { return mostrado ? null : mostrarErroGeral(0, carregar); }
+    if (resp.status !== 200 || !Array.isArray(resp.dados?.passageiros)) {
+      if (chave && [400, 404, 410].includes(resp.status)) apagarCache(chave);
+      return mostrado && resp.status >= 500 ? null : mostrarErroGeral(resp.status, carregar);
+    }
+    if (chave) gravarCache(chave, resp.dados);
+    // Não redesenha se nada mudou nem se a pessoa já começou a preencher.
+    if (!mostrado || (!mexeu && JSON.stringify(lerSemFoto(resp.dados)) !== JSON.stringify(lerSemFoto(mostrado)))) renderLista(resp.dados);
+    mostrado = resp.dados;
+    if (!resp.dados.cache) return;
   }
-  if (chave) gravarCache(chave, resp.dados);
-  const novo = JSON.stringify(lerSemFoto(resp.dados));
-  // Não redesenha se nada mudou nem se a pessoa já começou a preencher a versão salva.
-  if (!salvo || (!mexeu && novo !== JSON.stringify(lerSemFoto(salvo)))) renderLista(resp.dados);
 }
 const lerSemFoto = (d) => ({ dataServico: d.dataServico, passageiros: d.passageiros.map(({ foto, ...r }) => r) });
 

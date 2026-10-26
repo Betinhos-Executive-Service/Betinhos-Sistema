@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LINK_CADASTRO_FALHA, linkCadastroBlock, mensagemWhatsapp, parseLinkCadastroJson, temDadosCadastrados, validadeTexto, whatsappCadastroHref } from './linkCadastro'
+import { LINK_CADASTRO_FALHA, linkCadastroBlock, mensagemWhatsapp, parseLinkCadastroJson, pedidoAquecer, temDadosCadastrados, validadeTexto, whatsappCadastroHref } from './linkCadastro'
 
 describe('linkCadastroBlock', () => {
   it('libera um serviço ativo', () => expect(linkCadastroBlock([{ cr40f_status: 202410001 }], 1)).toBeNull())
@@ -35,5 +35,19 @@ describe('validade e mensagem', () => {
   it('monta a mensagem e o link do WhatsApp', () => {
     expect(mensagemWhatsapp('https://c/x', 'vale até 24/10 12:05')).toContain('https://c/x (vale até 24/10 12:05)')
     expect(whatsappCadastroHref('https://c/x', null)).toMatch(/^https:\/\/wa\.me\/\?text=.*https%3A%2F%2Fc%2Fx$/)
+  })
+})
+
+describe('pedidoAquecer', () => {
+  const token = 'A'.repeat(40) + '_-9'
+  it('monta o POST no-cors para /api/aquecer com o token do link', () => {
+    const p = pedidoAquecer(`https://cadastro-passageiro.betinhosexecutiveservice.workers.dev/#t=${token}`)
+    expect(p?.url).toBe('https://cadastro-passageiro.betinhosexecutiveservice.workers.dev/api/aquecer')
+    expect(p?.init).toMatchObject({ method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' } })
+    expect(JSON.parse(String(p?.init.body))).toEqual({ token })
+  })
+  it('ignora link sem token válido ou não https', () => {
+    expect(pedidoAquecer('https://cadastro.mock/c/abc123')).toBeNull()
+    expect(pedidoAquecer(`http://x.dev/#t=${token}`)).toBeNull()
   })
 })

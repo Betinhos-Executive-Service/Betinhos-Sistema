@@ -8,7 +8,7 @@ import { buildCountFetch, buildFetch, quickFindAttributes } from '../domain/fetc
 import { buildSearch, searchKind, type SearchCondition, type SearchField } from '../domain/search'
 import { parseLinkJson, type LinkResult } from '../domain/link'
 import { SNAPSHOT_TENARIS, type Protecao } from '../domain/protecao'
-import { parseLinkCadastroJson, type LinkCadastroResult } from '../domain/linkCadastro'
+import { parseLinkCadastroJson, pedidoAquecer, type LinkCadastroResult } from '../domain/linkCadastro'
 import { formatDateTime, formatMoney } from '../domain/format'
 import { ENTITY, ID_ATTRIBUTE, PAGE_SIZE, type AttributeInfo, type AttributeMap, type LookupBind, type LookupOption, type Page, type Sort, type View } from '../domain/types'
 import { MOCK_ATTRIBUTES, MOCK_BINDS, MOCK_LOOKUPS, applyMockFetch, createMockRows, createMockViews, mockProtecao } from './mock'
@@ -477,7 +477,10 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
       const body: Record<string, string> = { new_ReservaId: cleanId(reservaId) }
       if (passageiroId) body.new_PassageiroId = cleanId(passageiroId)
       const r = await host.client.request<{ new_LinkJson?: string }>('new_GerarLinkCadastro', { method: 'POST', body: JSON.stringify(body) })
-      return parseLinkCadastroJson(r?.new_LinkJson)
+      const result = parseLinkCadastroJson(r?.new_LinkJson)
+      const aquecer = result.ok && result.link ? pedidoAquecer(result.link) : null
+      if (aquecer) void fetch(aquecer.url, aquecer.init).catch(() => {})
+      return result
     },
     escalaFdsUrl: () => `${host.clientUrl}/WebResources/${ESCALA_FDS_WEBRESOURCE}`,
     async flowUrl(schema) {
