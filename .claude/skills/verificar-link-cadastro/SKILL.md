@@ -11,7 +11,7 @@ description: "Verifica o link público de cadastro do passageiro: tabela cr40f_l
 - Link da foto (`new_linkdafoto`): sempre URL com caminho, `https://betinhos.sharepoint.com/:i:/r/sites/BetinhosGestoInterna/Documentos%20Compartilhados/Passageiros/Fotos/<DEV|PROD>/<id>.<ext>`, montada do `Path` devolvido pelo CreateFile (`replace(uriComponent(Path), '%2F', '/')`). Nunca link de compartilhamento (`/:i:/s/<token>`, CreateSharingLink): o Formulário Geral (`passengerPhotoPathUrl`) só exibe `/:x:/r/`. Vale também para o "Flow Salvar Foto BD" (`patch-flow-salvar-foto-sharepoint.ps1`, idempotente) e para os registros antigos (`regravar-links-fotos.ps1 -Ambiente DEV|PROD`, DRY RUN sem `-Apply`; exige login no Graph).
 
 ## Roteiro local
-1. `dotnet test packages/plugins/Cr40f.Cadastro.Plugin.Tests` → "Com falha: 0" (13 testes em 22/10/2026).
+1. `dotnet test packages/plugins/Cr40f.Cadastro.Plugin.Tests` → "Com falha: 0" (34 testes em 24/10/2026: 13 do link + 21 da foto).
 2. `pnpm --filter ./packages/deploy test` (ou `npm test` em `packages/deploy`) → `fail 0` (127 em 23/10/2026); o teste do flow exige zero CreateSharingLink e o link com `/:i:/r`.
 3. Sintaxe dos .ps1: `powershell.exe -NoProfile -Command "$e=$null;[void][System.Management.Automation.Language.Parser]::ParseFile('<arquivo>',[ref]$null,[ref]$e);$e.Count"` → `0`.
 
@@ -19,6 +19,13 @@ description: "Verifica o link público de cadastro do passageiro: tabela cr40f_l
 4. `powershell.exe -File packages/deploy/provision-link-cadastro.ps1` (DRY RUN) e depois com `-Apply` → a conferência final lista colunas, a chave do hash e a tabela na solução.
 5. `packages/plugins/scripts/push-cadastro-plugin.ps1` → Custom API registrada. Para testar: rodar o registrador com `--testar <reservaId>` → `ok:true`, token oculto; isso cria um link real e revoga os anteriores.
 6. `provision-flow-cadastro-passageiro.ps1 -SiteUrl … -BibliotecaId … -Pasta …` (DRY RUN, depois `-Apply`). Chamar o gatilho com `{op:"ler",hash}` → 200; hash inexistente → 404; forçar `cr40f_expiraem` no passado → 410; `salvar` com foto → arquivo `<passageiroId>.jpg` no SharePoint e `new_linkdafoto` preenchido com `/:i:/r/sites/...` (abrir no Formulário Geral e ver a foto).
+
+## Custom API `new_ObterFotoPassageiro` (foto para o App Motoristas)
+- Código: `ObterFotoPassageiroHandler.cs`, `ObterFotoPassageiroPlugin.cs`, `ConsultaArquivoFlow.cs` (HTTP atrás de `IConsultaArquivo`) e `PassageirosDoServico.cs` (rotina de ids compartilhada com o link de cadastro).
+- Regras, a cada chamada (serviço do sistema): reserva `cr40f_status = 202410005` (Programado); `cr40f_funcionarios.cr40f_emailmicrosoft` do `_cr40f_motorista_value` igual (minúsculo) ao `domainname` ou `internalemailaddress` do iniciador; passageiro nos filhos `cr40f_servicosporpassageiro` (fallback `passageiro1..4`); `new_linkdafoto` começa com `https://betinhos.sharepoint.com/:i:/r/sites/BetinhosGestoInterna/Documentos%20Compartilhados/`, sem `..`, `\` ou segmento vazio. Qualquer negação → `{"ok":false,"motivo":"indisponivel"}`; o detalhe só no trace do plugin.
+- Leitura: POST no gatilho do "Flow - Consultar Arquivos Sharepoint" com `{id, fileLocator:"", caminhoSharePoint, nomeArquivo}`; `caminhoSharePoint` = `/Documentos Compartilhados/<resto decodificado>` (o flow usa `GetFileContentByPath` com dataset = site BetinhosGestoInterna). Timeout 20 s, resposta até 5 MB, só `image/*`.
+- Registro: Custom API sem plugintype (`allowedcustomprocessingsteptype = 2`) + step síncrono stage 40 `Cadastro | new_ObterFotoPassageiro | PostOperation`. A URL do flow vai na configuração segura do step: `push-cadastro-plugin.ps1 -FotoFlowUrl '<url>'` ou `$env:CADASTRO_FOTO_FLOW_URL` antes do `pnpm push:plugin:cadastro:dev`. Sem ela, mantém a já gravada (primeira vez: "ATENCAO: step sem configuracao segura"). Nunca versionar nem imprimir a URL.
+- DEV: `dotnet run --project packages/plugins/tools/Cr40f.Cadastro.Registrar -- --environmentUrl https://org23b93544.crm2.dynamics.com --testarFoto <reservaId> --passageiroId <id>` → como usuário que não é o motorista: `ok:false`. Como o motorista (App Motoristas, serviço Programado, passageiro com foto): `ok:true`, `mimeType image/*`. Mudar o status para Em Execução (202410006) → `ok:false` na chamada seguinte. Trace em Plug-in Trace Log mostra o motivo.
 
 ## Não verificável sem DEV
 Dados reais do Dataverse e escrita no SharePoint (a sobrescrita foi confirmada no DEV em 23/10/2026).
