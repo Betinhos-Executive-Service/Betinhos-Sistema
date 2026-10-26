@@ -11,6 +11,7 @@ export function paginaHtml() {
 <meta name="referrer" content="no-referrer">
 <title>Cadastro do passageiro · Betinhos</title>
 <link rel="icon" href="/logo-betinhos.png">
+<link rel="preload" href="/manrope.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/app.css">
 </head>
 <body>
