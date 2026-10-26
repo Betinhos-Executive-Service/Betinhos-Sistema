@@ -34,6 +34,8 @@ export interface DataSource {
   /** Grava só o diff. Retorna o id (novo ou existente). */
   save(original: Funcionario | null, draft: Draft): Promise<string>
   uploadImage(id: string, field: ImageField, file: File): Promise<void>
+  /** Limpa a coluna de imagem (volta às iniciais). */
+  removeImage(id: string, field: ImageField): Promise<void>
   /** Envia o PDF do aditivo de assinatura eletrônica para a coluna de arquivo `new_aditivoassinatura`. */
   uploadAditivo(id: string, file: File): Promise<void>
   /** Grava "Logins e senhas" (HTML rich text ou null). */

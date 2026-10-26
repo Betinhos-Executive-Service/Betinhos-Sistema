@@ -181,6 +181,10 @@ export function createXrmSource(xrm: XrmHost): DataSource {
       await api.updateRecord(TABLE, id, { [field]: await fileToBase64(file) })
     },
 
+    async removeImage(id: string, field: ImageField) {
+      await api.updateRecord(TABLE, id, { [field]: null })
+    },
+
     /** Coluna de arquivo: PATCH com o binário e o nome em `x-ms-file-name` (até 128 MB numa só requisição; o limite do aditivo é 10 MB). */
     async uploadAditivo(id: string, file: File) {
       const response = await fetch(`${apiUrl}/${ENTITY_SET}(${guid(id, 'funcionário')})/new_aditivoassinatura`, {
