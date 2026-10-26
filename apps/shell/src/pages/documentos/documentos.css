@@ -67,3 +67,7 @@
 @media (hover: hover) and (pointer: fine) {
   .doc-table--clicavel .bt-table__row:hover, .doc-item--clicavel:hover { background-color: var(--bt-color-surface-soft); }
 }
+.doc-config__topo { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--bt-space-3); }
+.doc-config__topo > p { flex: 1 1 280px; margin: 0; }
+.doc-tipo__codigo { padding: 0 var(--bt-space-1-5); border-radius: var(--bt-radius-sm); background-color: var(--bt-color-surface-soft); font-size: var(--bt-font-size-11); color: var(--bt-color-text-secondary); }
+.doc-tipo--inativo .doc-item__nome { color: var(--bt-color-text-secondary); }

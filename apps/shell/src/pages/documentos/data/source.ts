@@ -25,6 +25,10 @@ export type DocsSource = {
   enviarArquivo(doc: DocEmitido, file: File): Promise<Arquivo>
   excluirArquivo(doc: DocEmitido, arq: Arquivo): Promise<void>
   salvarTipo(tipo: TipoInput, id?: string): Promise<string>
+  /** Inativo some do checklist, das pendências e do resumo semanal; os documentos já emitidos ficam. */
+  ativarTipo(id: string, ativo: boolean): Promise<void>
+  /** Só para tipo sem documento emitido; com documento, use inativar. */
+  excluirTipo(id: string): Promise<void>
   adicionarDestinatario(categoria: Categoria, funcionarioId: string, nome: string): Promise<string>
   removerDestinatario(id: string): Promise<void>
   /** Descarta a listagem de arquivos guardada (ex.: botão Atualizar). */
@@ -144,6 +148,8 @@ export function createMockDocsSource(hoje = todaySP(), { cacheArquivos = true }:
       if (id) { Object.assign(data.tipos.find((x) => x.id === id) ?? {}, tipo); avisarAlteracao(); return id }
       const novo = novoId(); data.tipos.push({ ...tipo, id: novo, ativo: true }); avisarAlteracao(); return novo
     },
+    async ativarTipo(id, ativo) { await wait(150); const t = data.tipos.find((x) => x.id === id); if (t) t.ativo = ativo; avisarAlteracao() },
+    async excluirTipo(id) { await wait(150); data.tipos = data.tipos.filter((t) => t.id !== id); avisarAlteracao() },
     async adicionarDestinatario(categoria, funcionarioId, nome) { await wait(150); const id = novoId(); data.destinatarios.push({ id, categoria, funcionarioId, nome }); return id },
     async removerDestinatario(id) { await wait(150); data.destinatarios = data.destinatarios.filter((d) => d.id !== id) },
   }
@@ -213,6 +219,14 @@ export function createDocsSource(host: Host): DocsSource {
       const s = await entitySets()
       if (id) { await comAviso(host.client.update(s.tipo, id, tipoPayload(tipo))); return id }
       return cleanId(await comAviso(host.client.create(s.tipo, tipoPayload(tipo))))
+    },
+    async ativarTipo(id, ativo) {
+      const s = await entitySets()
+      await comAviso(host.client.update(s.tipo, id, ativo ? { statecode: 0, statuscode: 1 } : { statecode: 1, statuscode: 2 }))
+    },
+    async excluirTipo(id) {
+      const s = await entitySets()
+      await comAviso(host.client.remove(s.tipo, id))
     },
     async adicionarDestinatario(categoria, funcionarioId, nome) {
       const s = await entitySets()
