@@ -1,4 +1,4 @@
-import { chunk, cleanId, formatted, getHostXrm, type Row } from '@betinhos/dataverse'
+import { chunk, cleanId, DataverseError, formatted, getHostXrm, type Row } from '@betinhos/dataverse'
 import type { Host } from '../../../host'
 import { browserKV } from '../../pagantes/data/source'
 import type { KV } from '../domain/columns'
@@ -7,11 +7,12 @@ import { COPY_SELECT } from '../domain/copy'
 import { buildCountFetch, buildFetch, quickFindAttributes } from '../domain/fetch'
 import { buildSearch, searchKind, type SearchCondition, type SearchField } from '../domain/search'
 import { parseLinkJson, type LinkResult } from '../domain/link'
+import { SNAPSHOT_TENARIS, type Protecao } from '../domain/protecao'
 import { parseLinkCadastroJson, type LinkCadastroResult } from '../domain/linkCadastro'
 import { formatDateTime, formatMoney } from '../domain/format'
 import { ENTITY, ID_ATTRIBUTE, PAGE_SIZE, type AttributeInfo, type AttributeMap, type LookupBind, type LookupOption, type Page, type Sort, type View } from '../domain/types'
-import { MOCK_ATTRIBUTES, MOCK_BINDS, MOCK_LOOKUPS, applyMockFetch, createMockRows, createMockViews } from './mock'
-import { contagemPath, copyPath, envVarDefaultPath, envVarPath, motoristasPath, fetchPath, lookupIdsPath, mapViews, parseCount, parsePage, quickFindPath, relationshipPath, reloadPath, searchPath, viewsPaths, type FetchResponse } from './queries'
+import { MOCK_ATTRIBUTES, MOCK_BINDS, MOCK_LOOKUPS, applyMockFetch, createMockRows, createMockViews, mockProtecao } from './mock'
+import { auditPath, contagemPath, copyPath, envVarDefaultPath, envVarPath, motoristasPath, fetchPath, lookupIdsPath, mapViews, parseCount, parsePage, quickFindPath, relationshipPath, reloadPath, searchPath, viewsPaths, type FetchResponse } from './queries'
 
 export const FORM_WEBRESOURCE = 'new_formulario_geral.html'
 export const VOUCHER_WEBRESOURCE = 'cr40f_VoucherConfirmacao.html'
@@ -69,6 +70,8 @@ export type Source = {
   /** URL do visualizador de auditoria para o fallback fora do model-driven; `null` em mock. */
   auditoriaUrl(ids: string[]): string | null
   openErroOperacional(id: string): Promise<'closed' | 'external' | 'mock'>
+  /** Auditoria e snapshot da Tenaris da OS, para o popover do campo protegido. Sem privilégio de auditoria: `audits = 'sem-permissao'`. */
+  protecao(id: string): Promise<Protecao>
   /** Reservas com motorista no dia (yyyy-mm-dd, São Paulo) e a lista de motoristas ativos. */
   contagem(day: string): Promise<{ reservas: Row[]; motoristas: Motorista[] }>
   kv: KV
@@ -251,6 +254,12 @@ function createMockSource({ latency = 1 }: SourceOptions = {}): Source {
     openAuditoria: async () => 'mock',
     auditoriaUrl: () => null,
     openErroOperacional: async () => 'mock',
+    async protecao(id) {
+      await wait(400)
+      const row = rows.find((r) => r[ID_ATTRIBUTE] === id)
+      if (!row) throw new Error('Serviço não encontrado.')
+      return mockProtecao(row)
+    },
     async contagem(day) {
       await wait(200)
       const { start, end } = dayWindow(day)
@@ -429,6 +438,17 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
     },
     async reload(id, keys) {
       return host.client.request<Row>(reloadPath(await entitySet(), id, keys))
+    },
+    async protecao(id) {
+      const [audits, row] = await Promise.all([
+        host.client.request<{ value: Row[] }>(auditPath(id)).then(
+          (body) => body.value,
+          // 403: o perfil não tem "Exibir auditoria" (prvReadAuditSummary); o popover mostra o resto sem o histórico.
+          (error: unknown) => { if (error instanceof DataverseError && error.status === 403) return 'sem-permissao' as const; throw error },
+        ),
+        host.client.request<Row>(`${await entitySet()}(${cleanId(id)})?$select=${SNAPSHOT_TENARIS}`),
+      ])
+      return { audits, snapshot: row[SNAPSHOT_TENARIS] ?? null }
     },
     async copyRows(ids) {
       const set = await entitySet()

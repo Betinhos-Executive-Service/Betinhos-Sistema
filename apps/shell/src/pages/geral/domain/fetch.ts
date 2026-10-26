@@ -1,5 +1,6 @@
 import type { SearchCondition } from './search'
 import { ID_ATTRIBUTE, type Sort } from './types'
+import { CAMPOS_PROTEGIDOS } from './protecao'
 
 type BuildOptions = { page: number; pageSize: number; cookie: string | null; sort: Sort; search: SearchCondition[] }
 
@@ -54,13 +55,16 @@ export function buildFetch(fetchxml: string, { page, pageSize, cookie, sort, sea
   root.setAttribute('page', String(page))
   if (cookie) root.setAttribute('paging-cookie', cookie)
 
-  // Os comandos Desativar/Ativar dependem do estado da linha: toda visão precisa trazê-lo.
-  // `all-attributes` já inclui o estado; misturar os dois é inválido.
-  const has = Array.from(entity.children).some((c) => c.tagName === 'all-attributes' || (c.tagName === 'attribute' && c.getAttribute('name') === 'statecode'))
-  if (!has) {
-    const attribute = doc.createElement('attribute')
-    attribute.setAttribute('name', 'statecode')
-    entity.insertBefore(attribute, entity.firstChild)
+  // Toda visão traz o estado (comandos Desativar/Ativar) e os campos protegidos da Tenaris (cadeado na célula).
+  // `all-attributes` já inclui tudo; misturar os dois é inválido.
+  const children = Array.from(entity.children)
+  if (!children.some((c) => c.tagName === 'all-attributes')) {
+    for (const name of ['statecode', CAMPOS_PROTEGIDOS]) {
+      if (children.some((c) => c.tagName === 'attribute' && c.getAttribute('name') === name)) continue
+      const attribute = doc.createElement('attribute')
+      attribute.setAttribute('name', name)
+      entity.insertBefore(attribute, entity.firstChild)
+    }
   }
 
   if (sort) applySort(doc, entity, sort)
