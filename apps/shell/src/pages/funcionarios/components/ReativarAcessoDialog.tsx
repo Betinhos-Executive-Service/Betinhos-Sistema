@@ -1,8 +1,9 @@
 import { Alert, Button, buttonClassName, Dialog } from '@betinhos/ui'
 import { MessageCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { type Etapa, type ReativacaoResultado, mensagemWhatsApp, parseAcessoError, whatsappComMensagem } from '../data/acesso'
-import { CredenciaisAcesso, FecharSemEnviarDialog, ListaEtapas } from './CadastroAcessoDrawer'
+import { type Etapa, liberacaoPendente, type ReativacaoResultado, mensagemWhatsApp, parseAcessoError, whatsappComMensagem } from '../data/acesso'
+import { ListaEtapas, ProgressoAcesso } from './AcessoProgresso'
+import { CredenciaisAcesso, FecharSemEnviarDialog } from './CadastroAcessoDrawer'
 
 type Props = { open: boolean; nome: string; celular: string; onCancel: () => void; onReativar: () => Promise<ReativacaoResultado>; onReativado: (r: ReativacaoResultado) => void }
 type Estado = { fase: 'confirmar' } | { fase: 'enviando' } | { fase: 'erro'; codigo: string; mensagem: string; etapas: Etapa[] } | { fase: 'resultado'; r: ReativacaoResultado }
@@ -42,11 +43,13 @@ export function ReativarAcessoDialog({ open, nome, celular, onCancel, onReativar
           : <><Button variant="secondary" onClick={fechar} disabled={enviando}>Cancelar</Button><Button loading={enviando} disabled={enviando} onClick={() => void reativar()}>{estado.fase === 'erro' ? 'Tentar de novo' : 'Reativar acesso'}</Button></>}>
         {estado.fase === 'resultado' ? (
           <div className="acesso-resultado">
-            <Alert tone="success" title="Senha nova">A senha aparece só agora. Envie para o motorista antes de fechar.</Alert>
-            <CredenciaisAcesso r={estado.r} semSenha="(senha não redefinida)" />
-            <ListaEtapas etapas={estado.r.etapas} />
+            {liberacaoPendente(estado.r.etapas)
+              ? <Alert tone="info" title="Acesso reativado, liberando no app">A senha nova já vale. O app libera em instantes — se o motorista não conseguir entrar, use "Concluir liberação" na ficha.</Alert>
+              : <Alert tone="success" title="Senha nova">A senha aparece só agora. Envie para o motorista antes de fechar.</Alert>}
+            <CredenciaisAcesso r={estado.r} semSenha="Senha não redefinida" />
+            <ListaEtapas etapas={estado.r.etapas} fluxo="reativar" />
           </div>
-        ) : (
+        ) : enviando ? <ProgressoAcesso fluxo="reativar" /> : (
           <>
             <ul>
               <li>A conta Microsoft é desbloqueada e recebe uma senha nova.</li>
@@ -55,8 +58,8 @@ export function ReativarAcessoDialog({ open, nome, celular, onCancel, onReativar
             </ul>
             {estado.fase === 'erro' && (
               <Alert {...(estado.codigo === 'SEM_PERMISSAO_SENHA' ? { tone: 'warning', title: 'Conta reativada sem senha nova' } : { tone: 'danger', title: 'Não foi possível reativar' })}>
-                {estado.mensagem}
-                {estado.etapas.length > 0 && <ListaEtapas etapas={estado.etapas} />}
+                {estado.mensagem}{estado.codigo !== 'SEM_PERMISSAO_SENHA' && ' O que já foi feito fica guardado; "Tentar de novo" continua de onde parou.'}
+                <ListaEtapas etapas={estado.etapas} fluxo="reativar" />
               </Alert>
             )}
           </>

@@ -35,6 +35,8 @@ type Props = {
   onToggle: (id: string) => void
   /** Clique na linha (fora de controles): sozinho substitui a seleção; Ctrl/Cmd alterna; Shift marca o intervalo. */
   onSelectRow: (id: string, mode: 'only' | 'toggle' | 'range') => void
+  /** Clique direito na linha: menu de contexto com as ações da seleção (DS §10.9.3). */
+  onRowContextMenu?: (id: string, event: MouseEvent<HTMLElement>) => void
   onToggleAll: () => void
   onOpen: (id: string) => void
   /** Devolve o `gridcell` completo da coluna (a primeira coluna é desenhada aqui, como botão que abre o serviço). */
@@ -49,7 +51,7 @@ type Props = {
 
 const SKELETON_ROWS = 8
 /** Grid editável com rolagem horizontal, seleção por linha e a primeira coluna fixa. As classes visuais são as da tabela do DS. */
-export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, filteredKeys, quick, onClearFilter, onHide, customWidths, onResize, onMove, selected, onToggle, onSelectRow, onToggleAll, onOpen, renderCell, scrollRef, tail, footer, empty }: Props) {
+export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, filteredKeys, quick, onClearFilter, onHide, customWidths, onResize, onMove, selected, onToggle, onSelectRow, onRowContextMenu, onToggleAll, onOpen, renderCell, scrollRef, tail, footer, empty }: Props) {
   // Trilhas crescem na proporção da largura da visão (fr) e nunca ficam abaixo do mínimo; a largura mínima total
   // garante que cabeçalho e linhas compartilhem as mesmas trilhas quando a soma dos mínimos excede o contêiner.
   // Sim/Não ocupa uma trilha fixa estreita: o conteúdo é um switch, não cresce com a tela.
@@ -252,7 +254,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
             const id = String(row[ID_ATTRIBUTE])
             const isSelected = selected.has(id)
             return (
-              <div key={id} className={isSelected ? 'bt-table__row is-selected' : 'bt-table__row'} role="row" aria-selected={isSelected} onClick={rowClick(id)}>
+              <div key={id} className={isSelected ? 'bt-table__row is-selected' : 'bt-table__row'} role="row" aria-selected={isSelected} onClick={rowClick(id)} onContextMenu={onRowContextMenu ? (event) => onRowContextMenu(id, event) : undefined}>
                 <div className="bt-table__cell gr-cell--select" role="gridcell">
                   <Checkbox label={<span className="gr-sr">Selecionar serviço {formatCell('readonly', row, 'cr40f_id')}</span>} checked={isSelected} onChange={() => onToggle(id)} />
                 </div>

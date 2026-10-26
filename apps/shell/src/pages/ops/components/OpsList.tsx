@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { StatusBadge, Table, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
-import { openFromRow } from '../../pagantes/components/PagantesList'
+import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
 import { formatDate, formatMoney } from '../../pagantes/domain/messages'
 import { label } from '../../pagantes/domain/status'
 import { opTone } from '../domain/status'
@@ -47,7 +47,7 @@ export function OpsTable({ list, choices, onOpen, loading, view, quickFilters, f
   ]
   return (
     <div className="pg-table-wrap" onClick={(event) => openFromRow(event, '.bt-table__row', '.pg-open')}>
-      <Table className="pg-table" columns={columns} rows={list} rowKey={(op) => op.id} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <Table className="pg-table" columns={columns} rows={list} rowKey={(op) => op.id} rowActions={openRowActions(onOpen)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }
