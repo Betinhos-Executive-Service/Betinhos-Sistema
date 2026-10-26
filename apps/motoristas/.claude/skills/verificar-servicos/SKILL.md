@@ -99,3 +99,6 @@ Tela "Enviar comprovante" (`src/screens/ReceiveScreen.tsx`, lógica pura em `src
 - A foto só é pedida com o serviço Programado (`cr40f_status` 202410005), pela Custom API `new_ObterFotoPassageiro` (`executeCustomApi`, `{new_ReservaId, new_PassageiroId}` → `new_FotoJson`). Se a API negar, falhar ou devolver JSON inválido, aparece só a inicial, sem mensagem de erro. A imagem fica em memória como blob URL, revogada ao sair da tela; são no máximo 2 chamadas simultâneas.
 - Mock (375 px): o serviço 10241 mostra a foto da Ana e o "R" do Roberto; tocar no avatar amplia a foto, e X, Esc ou toque fora fecham. Se a agenda mock antiga aparecer, apague `app-motoristas-local-v1` do localStorage.
 - DEV: entre como o motorista de um serviço Programado com passageiro com foto e veja a foto. Mude o status para Em Execução e reabra: só a inicial.
+
+## Resumo da Observação final (ícones por tópico)
+- Prévia `/?dev=preview` em 390×844: clique `Finalizar Serviço` (lista), digite no textarea, `Gerar resumo`. No modo mock cada frase vira um tópico; confira que todo `li` em `.observation-review-topics` tem `svg path` (a classe `is-<tipo>` vem de `topicKind`, que nunca devolve nulo; sem palavra-chave = `is-outros`). Teste unitário: `tests/observacaoOrganizada.test.ts`.

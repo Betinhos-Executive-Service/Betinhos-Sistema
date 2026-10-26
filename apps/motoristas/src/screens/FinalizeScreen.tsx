@@ -124,12 +124,29 @@ const TOPIC_ICON_PATHS: Record<TopicKind, string> = {
   combustivel: "M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M4 11h10M14 8l3 3v6a2 2 0 0 0 4 0V9l-3-3",
   passageiro: "M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z",
   ocorrencia: "M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z",
+  local: "M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0ZM12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",
+  rota: "M6 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM18 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM9 16h6a3 3 0 0 0 0-6h-2M6 13V8",
+  cafe: "M17 8h1a4 4 0 0 1 0 8h-1M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8ZM6 2v3M10 2v3M14 2v3",
+  refeicao: "M7 2v9M4 2v5a3 3 0 0 0 6 0V2M7 11v11M17 22V2c-3 2-4 6-4 9h4",
+  pagamento: "M3 6h18v12H3zM3 10h18M7 15h3",
+  veiculo: "M5 17H3v-5l2-5h14l2 5v5h-2M5 17a2 2 0 1 0 4 0M15 17a2 2 0 1 0 4 0M9 17h6M3 12h18",
+  aeroporto: "M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2l-1.4 1.4 6.3 3.4-3.2 3.2-3-.5-1 1 4 2 2 4 1-1-.5-3 3.2-3.2 3.4 6.3Z",
+  bagagem: "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M5 6h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2ZM9 21V6M15 21V6",
+  documento: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8ZM14 2v6h6M8 13h8M8 17h5",
+  contato: "M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z",
+  limpeza: "M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9ZM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9Z",
+  clima: "M17.5 19H9a7 7 0 1 1 6.7-9h1.8a4.5 4.5 0 0 1 0 9ZM8 22l1-2M12 22l1-2M16 22l1-2",
+  elogio: "M7 10v12M15 5.9 14 10h5.8a2 2 0 0 1 2 2.4l-1.4 7a2 2 0 0 1-2 1.6H7V10l4.3-8a2.4 2.4 0 0 1 3.7 2Z",
+  reclamacao: "M17 14V2M9 18.1 10 14H4.2a2 2 0 0 1-2-2.4l1.4-7A2 2 0 0 1 5.6 3H17v12l-4.3 8a2.4 2.4 0 0 1-3.7-2Z",
+  cancelamento: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM15 9l-6 6M9 9l6 6",
+  seguranca: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10ZM9 12l2 2 4-4",
+  hospedagem: "M3 21V8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v13M3 21h18M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01M10 21v-3h4v3",
+  concluido: "M21.8 10A10 10 0 1 1 17 3.3M9 11l3 3L22 4",
   outros: "M5 12h.01M12 12h.01M19 12h.01"
 };
 
 function TopicIcon({ topic }: { topic: string }) {
   const kind = topicKind(topic);
-  if (!kind) return <span className="observation-topic-icon is-empty" aria-hidden="true" />;
   return (
     <span className={`observation-topic-icon is-${kind}`} aria-hidden="true">
       <svg viewBox="0 0 24 24"><path d={TOPIC_ICON_PATHS[kind]} /></svg>
