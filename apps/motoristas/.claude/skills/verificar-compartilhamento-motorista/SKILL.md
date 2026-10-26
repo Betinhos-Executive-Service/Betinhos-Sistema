@@ -16,6 +16,7 @@ description: "Verifica o compartilhamento de registros com o motorista (ServiceD
 - Copie `plugins/DriverRecordSharing/DriverRecordSharing.snk` (gitignored) do checkout principal para o worktree; não gere chave nova (mudaria a identidade do assembly).
 
 ## Regra do passageiro
+- `ServicePassengerViewSynchronizer` é o dono único de `cr40f_passageirosetelefonedecontato` (o flow Tenaris não grava mais o campo) e ordena os vínculos por `cr40f_ordemdeselecao` e depois `createdon`.
 - O flow Tenaris regrava nome e telefone de `cr40f_bancodedados` a cada sincronização com o mesmo valor. `HandlePassenger` compara com a pré-imagem `pre` (nome, telefone) e só chama `SyncServicesForPassenger` se o valor mudou (nulo = vazio). Sem pré-imagem, qualquer atributo presente conta como mudança.
 
 ## Roteiro
