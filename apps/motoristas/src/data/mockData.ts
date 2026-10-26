@@ -275,8 +275,8 @@ export const agendaMock: AgendaItem[] = [
     id: "10241",
     status: 202410005,
     passengers: [
-      { id: "mock-pax-10241-1", name: "Ana Paula Martins" },
-      { id: "mock-pax-10241-2", name: "Roberto Almeida" }
+      { id: "mock-pax-10241-1", name: "Ana Paula Martins", phone: "+55 (11) 90000-0010", language: "Inglês" },
+      { id: "mock-pax-10241-2", name: "Roberto Almeida", phone: "+55 (11) 90000-0011", language: "Português" }
     ],
     time: "HOJE 14:30",
     description: "Hotel Fasano São Paulo -> Aeroporto de Congonhas",

@@ -3092,6 +3092,8 @@ export function getPassengerLanguageCode(passenger: DataverseRecord) {
   return "";
 }
 
+const PASSENGER_LANGUAGE_LABELS: Record<string, string> = { BR: "Português", US: "Inglês", ES: "Espanhol" };
+
 // Marcador lido por parseSafeDetailHtml e renderizado como SVG (emoji de bandeira não aparece no Windows).
 export function buildLanguageFlagHtml(code: string) {
   return code ? `<span data-flag="${code}"></span>` : "";
@@ -3124,16 +3126,28 @@ async function buildPassengersHtml(geralId: string, serviceDate: Date | null, dr
       const phone = normalizeWhatsAppPhone(phoneRaw);
       const message = buildPassengerMessage(name, driverName, serviceDate);
       const phoneText = escapeHtml(phoneRaw || "Sem telefone");
+      const whatsappUrl = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}` : "";
       const phoneHtml = phone
-        ? `<a href="https://wa.me/${phone}?text=${encodeURIComponent(message)}" target="_blank" rel="noopener noreferrer">${phoneText}</a>`
+        ? `<a href="${whatsappUrl}" target="_blank" rel="noopener noreferrer">${phoneText}</a>`
         : `<span style="color:#8a8a8a">${phoneText}</span>`;
-      const flagHtml = buildLanguageFlagHtml(getPassengerLanguageCode(passenger));
-      return { id: passengerId, name, html: `<span>${flagHtml}${escapeHtml(name)}${name ? " - " : ""}${phoneHtml}</span>` };
+      const languageCode = getPassengerLanguageCode(passenger);
+      const flagHtml = buildLanguageFlagHtml(languageCode);
+      const language = PASSENGER_LANGUAGE_LABELS[languageCode] ?? getFormatted(passenger, "cr40f_idioma");
+      return { id: passengerId, name, phone: phoneRaw, whatsappUrl, language, html: `<span>${flagHtml}${escapeHtml(name)}${name ? " - " : ""}${phoneHtml}</span>` };
     })
   );
 
   const valid = passengers.filter((item): item is NonNullable<typeof item> => Boolean(item));
-  return { html: valid.map((item) => item.html).join("<br>"), passengers: valid.map(({ id, name }) => ({ id, name })) };
+  return {
+    html: valid.map((item) => item.html).join("<br>"),
+    passengers: valid.map(({ id, name, phone, whatsappUrl, language }) => ({
+      id,
+      name,
+      ...(phone ? { phone } : {}),
+      ...(whatsappUrl ? { whatsappUrl } : {}),
+      ...(language ? { language } : {})
+    }))
+  };
 }
 
 async function buildSolicitanteHtml(record: DataverseRecord, serviceDate: Date | null, driverName: string, readOne = retrieveOne) {

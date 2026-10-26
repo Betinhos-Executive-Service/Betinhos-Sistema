@@ -64,12 +64,37 @@ export const fetchFotoJsonRemote: PhotoFetcher = async (reservaId, passageiroId)
   return response.new_FotoJson;
 };
 
-// Mock local: PNG 1x1 em base64 para o primeiro passageiro; "indisponivel" para os demais.
+// Mock local: retrato simples desenhado em canvas (PNG 1x1 fora do navegador) para o primeiro
+// passageiro; "indisponivel" para os demais.
 const MOCK_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+function drawMockPortrait() {
+  if (typeof document === "undefined") return MOCK_PNG;
+  const canvas = document.createElement("canvas");
+  canvas.width = 320;
+  canvas.height = 320;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return MOCK_PNG;
+  ctx.fillStyle = "#D9DDE2";
+  ctx.fillRect(0, 0, 320, 320);
+  ctx.fillStyle = "#4A5563";
+  ctx.beginPath();
+  ctx.ellipse(160, 330, 120, 100, 0, Math.PI, 0);
+  ctx.fill();
+  ctx.fillStyle = "#C9A68A";
+  ctx.fillRect(140, 190, 40, 50);
+  ctx.beginPath();
+  ctx.ellipse(160, 145, 58, 70, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#3B2F2A";
+  ctx.beginPath();
+  ctx.ellipse(160, 100, 64, 42, 0, Math.PI, 0);
+  ctx.fill();
+  return canvas.toDataURL("image/png").split(",")[1] || MOCK_PNG;
+}
 export const fetchFotoJsonMock: PhotoFetcher = async (_reservaId, passageiroId) => {
   await new Promise((resolve) => setTimeout(resolve, 300));
   return passageiroId.endsWith("-1")
-    ? JSON.stringify({ ok: true, mimeType: "image/png", conteudoBase64: MOCK_PNG })
+    ? JSON.stringify({ ok: true, mimeType: "image/png", conteudoBase64: drawMockPortrait() })
     : JSON.stringify({ ok: false, motivo: "indisponivel" });
 };
 

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import type { DetailAction, DetailData } from "../types";
 import { DetailActionButton } from "../components/details/DetailActionButton";
 import { DetailsField } from "../components/details/DetailsField";
-import { PassengerAvatars } from "../components/details/PassengerAvatars";
+import { PassengerContacts } from "../components/details/PassengerContacts";
 import { QuestionsBox } from "../components/details/QuestionsBox";
 import { TextAreaField } from "../components/common/FormFields";
 import { PullToRefresh } from "../components/common/PullToRefresh";
@@ -71,6 +71,8 @@ function ObservationStatus({ status }: { status: ObservationSaveStatus }) {
     </span>
   );
 }
+
+const PASSENGERS_FIELD_LABEL = "Passageiros e Telefones de Contato";
 
 export function DetailsScreen({
   detail,
@@ -272,10 +274,13 @@ export function DetailsScreen({
               onScroll={updateScrollHint}
             >
               <div className="details-fields details-fields-v1">
-                <PassengerAvatars detail={detail} />
-                {visibleFields.map((field) => (
-                  <DetailsField key={field.label} field={field} />
-                ))}
+                {visibleFields.map((field) =>
+                  field.label === PASSENGERS_FIELD_LABEL && detail.passengers?.length ? (
+                    <PassengerContacts key={field.label} detail={detail} label={field.label} />
+                  ) : (
+                    <DetailsField key={field.label} field={field} />
+                  )
+                )}
 
                 {shouldShowServiceObservation ? (
                   <TextAreaField

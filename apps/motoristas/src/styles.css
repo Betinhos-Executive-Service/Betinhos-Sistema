@@ -13911,86 +13911,61 @@ select,
   font: 700 13px/1.3 "Manrope", Arial, sans-serif;
 }
 
-/* Foto do passageiro (detalhe do serviço Programado): avatar 72 px e ampliação. */
-.passenger-avatars {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  padding: 4px 2px 10px;
+/* Passageiros no detalhe: linha com avatar (foto só em serviço Programado), ações e ficha. */
+.passenger-list { display: grid; gap: 8px; margin: 4px 0 0; padding: 0; list-style: none; }
+.passenger-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.passenger-row-open {
+  display: flex; flex: 1 1 auto; align-items: center; gap: 10px; min-width: 0; min-height: 52px;
+  padding: 4px; border: 0; border-radius: 12px; background: transparent; color: #001a3d; text-align: left; cursor: pointer;
 }
-.passenger-avatar-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  width: 76px;
+.passenger-row-open:focus-visible,
+.passenger-row-actions button:focus-visible,
+.passenger-sheet button:focus-visible { outline: 2px solid #1f6c9f; outline-offset: 2px; }
+.passenger-row-text { display: grid; min-width: 0; }
+.passenger-row-name { display: flex; align-items: center; min-width: 0; }
+.passenger-name-text, .passenger-row-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.passenger-row-name { font: 700 14px/20px "Manrope", Arial, sans-serif; }
+.passenger-row-meta { color: #536174; font: 500 13px/18px "Manrope", Arial, sans-serif; }
+.passenger-row-actions { display: flex; flex: 0 0 auto; gap: 6px; }
+.passenger-row-actions button {
+  display: grid; place-items: center; width: 44px; height: 44px; padding: 0;
+  border: 1px solid rgba(0, 26, 61, 0.1); border-radius: 999px; background: #FCFCFB; color: #1f6c9f; cursor: pointer;
 }
 .passenger-avatar {
-  display: grid;
-  place-items: center;
-  width: 72px;
-  height: 72px;
-  padding: 0;
-  overflow: hidden;
-  border: 1px solid rgba(0, 14, 35, 0.13);
-  border-radius: 999px;
-  background: #FCFCFB;
-  color: #001a3d;
-  font-size: 28px;
-  font-weight: 600;
-  cursor: pointer;
+  display: grid; flex: 0 0 auto; place-items: center; overflow: hidden;
+  border: 1px solid rgba(0, 14, 35, 0.13); border-radius: 999px; background: #FCFCFB; color: #001a3d; font-weight: 600;
 }
-.passenger-avatar.is-initial { cursor: default; }
-.passenger-avatar:focus-visible { outline: 2px solid #1f6c9f; outline-offset: 2px; }
+.passenger-avatar--sm { width: 44px; height: 44px; font-size: 18px; }
+.passenger-avatar--lg { width: 120px; height: 120px; font-size: 44px; }
 .passenger-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.passenger-avatar-name {
-  max-width: 100%;
-  overflow: hidden;
-  font-size: 12px;
-  color: #001a3d;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.passenger-sheet-overlay {
+  position: fixed; inset: 0; z-index: 9999; display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(0, 14, 35, 0.58); backdrop-filter: blur(10px);
 }
-.passenger-photo-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 18px;
-  background: rgba(0, 14, 35, 0.84);
+.passenger-sheet {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 12px;
+  width: min(100%, 480px); max-height: 92dvh; overflow-y: auto;
+  padding: 24px 18px calc(18px + env(safe-area-inset-bottom)); border-radius: 20px 20px 0 0;
+  background: #ffffff; color: #001a3d; font-family: "Manrope", Arial, sans-serif;
+  animation: passenger-sheet-enter 240ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
-.passenger-photo-figure {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  margin: 0;
-  max-width: 100%;
+@keyframes passenger-sheet-enter { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.passenger-sheet-close {
+  position: absolute; top: 8px; right: 8px; width: 44px; height: 44px; border: 0; border-radius: 999px;
+  background: #FCFCFB; color: #001a3d; font-size: 26px; line-height: 1; cursor: pointer;
 }
-.passenger-photo-figure img {
-  width: min(86vw, 420px);
-  height: min(86vw, 420px);
-  object-fit: cover;
-  border-radius: 16px;
-  background: #FCFCFB;
+.passenger-sheet-photo { width: min(64vw, 240px); height: min(64vw, 240px); object-fit: cover; border-radius: 16px; background: #FCFCFB; }
+.passenger-sheet-name { display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 800; text-align: center; overflow-wrap: anywhere; }
+.passenger-sheet-info { display: grid; gap: 6px; width: 100%; margin: 0; }
+.passenger-sheet-info div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 12px; background: #FCFCFB; }
+.passenger-sheet-info dt { color: #536174; font-size: 13px; font-weight: 600; }
+.passenger-sheet-info dd { margin: 0; font-size: 14px; font-weight: 700; text-align: right; overflow-wrap: anywhere; }
+.passenger-sheet-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; width: 100%; }
+.passenger-sheet-actions button {
+  display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px;
+  border: 0; border-radius: 12px; background: #001a3d; color: #ffffff; font: 800 15px "Manrope", Arial, sans-serif; cursor: pointer;
 }
-.passenger-photo-figure figcaption { color: #ffffff; font-size: 16px; font-weight: 600; }
-.passenger-photo-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 44px;
-  height: 44px;
-  border: 0;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.16);
-  color: #ffffff;
-  font-size: 28px;
-  line-height: 1;
-  cursor: pointer;
-}
+@media (prefers-reduced-motion: reduce) { .passenger-sheet { animation: none; } }
 /* Menu inicial compacto: pendências no topo e grade 3 colunas */
 .concept-shell > .concept-module-card--primary { width: 100%; margin-bottom: 12px; }
 
