@@ -6,7 +6,9 @@
 #   - Compose_Telefone/Email/Departamento pegam o primeiro valor preenchido entre elas (passageiros antes do Responsável);
 #   - Update_BD_Existente mantém o valor do Dataverse quando o lote vem vazio; Add_a_new_row_BD_1 grava null no vazio.
 # Também garante a ordem do union (passageiros antes do Responsável) e o $select do cadastro com telefone, e-mail e
-# departamento. O resto do flow não muda. Já no formato final, não faz nada. Sem -Apply é DRY RUN.
+# departamento, e tira do Upsert_Geral a gravação de cr40f_passageirosetelefonedecontato (dono único: plugin
+# DriverRecordSharing, que monta o campo a partir dos vínculos; antes os dois alternavam o formato a cada sync).
+# O resto do flow não muda. Já no formato final, não faz nada. Sem -Apply é DRY RUN.
 #
 # Antes de alterar, salva o clientdata atual em packages/deploy/flows/backup/. Para reverter:
 #   powershell -File packages/deploy/patch-flow-tenaris-contatos.ps1 -Ambiente DEV -Apply -Restaurar <arquivo>
@@ -100,16 +102,28 @@ $create = $loop.Condition_nome_nao_existe_ainda.actions.Add_a_new_row_BD_1.input
 if (@($loop.PSObject.Properties.Name) -notcontains 'Filter_BDLocal' -or -not $update -or -not $create) {
   throw 'O flow não está no formato esperado: Filter_BDLocal, Update_BD_Existente ou Add_a_new_row_BD_1 ausente no Loop_UpsertBD.'
 }
-if (@($loop.PSObject.Properties.Name) -contains 'Filter_Ocorrencias') {
-  Write-Output "${Ambiente}: '$flowName' já junta as ocorrências e não grava contato vazio; nada a alterar."
+$upsert = $cond.Loop_Servicos.actions.Upsert_Geral.inputs.parameters
+$campoPax = 'item/cr40f_passageirosetelefonedecontato'
+$temOcorrencias = @($loop.PSObject.Properties.Name) -contains 'Filter_Ocorrencias'
+$gravaPax = @($upsert.PSObject.Properties.Name) -contains $campoPax
+if ($temOcorrencias -and -not $gravaPax) {
+  Write-Output "${Ambiente}: '$flowName' já junta as ocorrências, não grava contato vazio nem o campo de passageiros; nada a alterar."
   return
 }
+Write-Output "${Ambiente}: '$flowName' (statecode $($flow.statecode)) - mudanças:"
 
+# cr40f_passageirosetelefonedecontato é derivado de cr40f_servicosporpassageiro + cr40f_bancodedados e tem um dono
+# só: o plugin DriverRecordSharing (ServicePassengerViewSynchronizer). O texto da planilha continua no snapshot.
+if ($gravaPax) {
+  Write-Output "  Upsert_Geral.$campoPax : removido (era $($upsert.$campoPax.Substring(0, 60))...)"
+  $upsert.PSObject.Properties.Remove($campoPax)
+}
+if ($temOcorrencias) { Write-Output '  Loop_UpsertBD: já junta as ocorrências; sem mudança.' }
+else {
 $union = "@union(body('Select_Pax_1'),body('Select_Pax_2'),body('Select_Pax_3'),body('Select_Pax_4'),body('Select_Responsável'))"
 $select = 'cr40f_bancodedadosid,cr40f_nomedopassageiro,cr40f_telefone,cr40f_email,cr40f_departamento'
 $campos = [ordered]@{ Telefone = @('telefone', 'cr40f_telefone'); Email = @('email', 'cr40f_email'); Departamento = @('departamento', 'cr40f_departamento') }
 
-Write-Output "${Ambiente}: '$flowName' (statecode $($flow.statecode)) - mudanças:"
 Write-Output "  Compose_TodasPessoas: $($cond.Compose_TodasPessoas.inputs) -> $union"
 Write-Output "  List_rows_BancodeDados_Completo.`$select: $($cond.List_rows_BancodeDados_Completo.inputs.parameters.'$select') -> $select"
 $cond.Compose_TodasPessoas.inputs = $union
@@ -135,12 +149,16 @@ foreach ($c in $campos.GetEnumerator()) {
 # Filter_BDLocal era a primeira ação do loop; passa a rodar depois dos Composes.
 $loop.Filter_BDLocal | Add-Member -NotePropertyName runAfter -NotePropertyValue (After $anterior) -Force
 Write-Output "  Loop_UpsertBD: + Filter_Ocorrencias, Filter_Ocorr_*/Compose_* (Telefone, Email, Departamento); Filter_BDLocal depois de $anterior"
+}
 
 $novo = $clientData | ConvertTo-Json -Depth 90 -Compress
 if (-not $Apply) { Write-Output 'DRY RUN: nada foi gravado. Rode com -Apply para aplicar.'; return }
 Backup $flow
 Save $flow $novo
 $conf = (Dv GET "workflows($flowId)?`$select=clientdata,statecode")
-$loopSalvo = ($conf.clientdata | ConvertFrom-Json).properties.definition.actions.Scope.actions.Condition_linhas_mais_que_0.actions.Loop_UpsertBD.actions
-if (@($loopSalvo.PSObject.Properties.Name) -notcontains 'Filter_Ocorrencias') { throw 'A gravação não persistiu: Filter_Ocorrencias ausente após o PATCH.' }
+$condSalvo = ($conf.clientdata | ConvertFrom-Json).properties.definition.actions.Scope.actions.Condition_linhas_mais_que_0.actions
+if (@($condSalvo.Loop_UpsertBD.actions.PSObject.Properties.Name) -notcontains 'Filter_Ocorrencias' -or
+  @($condSalvo.Loop_Servicos.actions.Upsert_Geral.inputs.parameters.PSObject.Properties.Name) -contains $campoPax) {
+  throw 'A gravação não persistiu: Filter_Ocorrencias ausente ou Upsert_Geral ainda grava o campo de passageiros.'
+}
 Write-Output "${Ambiente}: '$flowName' atualizado (statecode $($conf.statecode))."
