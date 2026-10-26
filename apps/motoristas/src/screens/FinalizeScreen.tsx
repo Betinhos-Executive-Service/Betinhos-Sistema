@@ -8,7 +8,8 @@ import { AppShell } from "../components/layout/AppShell";
 import { useCameraScroll } from "../app/cameraScroll";
 import { FormMenu } from "../components/navigation/FormMenu";
 import { appendDitado } from "../lib/useDitado";
-import { isExchangeOutsideWindow, type ExchangeWindowCheck } from "../lib/dataverse";
+import { isExchangeOutsideWindow, organizeObservationRemote, type ExchangeWindowCheck } from "../lib/dataverse";
+import { buildOrganizedObservation, NO_OBSERVATION, prepareObservationReview, type OrganizeObservation } from "../lib/observacaoOrganizada";
 import { matchesExpenseCitySearch, type ExpenseReferenceData } from "../lib/expenses";
 import { buildWhatsAppUrl, openExternalUrl } from "../lib/localWorkflow";
 import { validateMaintenanceFinalizeFields, type MaintenanceFinalizeErrors } from "../lib/maintenanceFinalize";
@@ -29,6 +30,7 @@ type FinalizeScreenProps = {
   onClearPhotos?: () => void;
   submitState?: ActionButtonState;
   initialServiceObservation?: string;
+  organizeObservation?: OrganizeObservation;
 };
 
 export type MaintenanceFinalizeDraft = {
@@ -47,7 +49,7 @@ function focusInvalidField(element: HTMLElement | null) {
   }, 40);
 }
 
-function FinalizeActions({ onNone, onConfirm, submitState, noneLabel = "Não tenho" }: { onNone: () => void; onConfirm: () => void; submitState: ActionButtonState; noneLabel?: string }) {
+function FinalizeActions({ onNone, onConfirm, submitState, noneLabel = "Não tenho", confirmLoadingLabel }: { onNone: () => void; onConfirm: () => void; submitState: ActionButtonState; noneLabel?: string; confirmLoadingLabel?: string }) {
   const [activeAction, setActiveAction] = useState<"none" | "confirm" | "">("");
 
   useEffect(() => {
@@ -70,6 +72,7 @@ function FinalizeActions({ onNone, onConfirm, submitState, noneLabel = "Não ten
       <ActionButton
         className="finalize-primary"
         idleLabel="Confirmar"
+        loadingLabel={confirmLoadingLabel}
         state={submitState}
         active={activeAction === "confirm"}
         variant="primary"
@@ -103,35 +106,128 @@ function TextAreaBlock({
   );
 }
 
-function ServiceFinalize({ detail, onDone, submitState, initialObservation = "" }: { detail: DetailData; onDone: (fields: Record<string, string>) => void; submitState: ActionButtonState; initialObservation?: string }) {
+type ObservationTopics = { original: string; topicos: string[] };
+
+function ObservationReview({ review, submitState, onConfirm, onEdit, onUseOriginal }: { review: ObservationTopics; submitState: ActionButtonState; onConfirm: () => void; onEdit: () => void; onUseOriginal: () => void }) {
+  const [activeAction, setActiveAction] = useState<"confirm" | "original" | "">("");
+  useEffect(() => {
+    if (submitState === "idle") setActiveAction("");
+  }, [submitState]);
+
+  return (
+    <article className="finalize-card">
+      <div className="finalize-title">Confira os tópicos</div>
+      <div className="finalize-scroll">
+        <div className="finalize-form">
+          <section className="observation-review shadow" aria-label="Observação organizada">
+            <p className="observation-review-hint">Organizamos sua observação. Está correto?</p>
+            <ul className="observation-review-topics">
+              {review.topicos.map((topic, index) => (
+                <li key={`${index}-${topic}`}>{topic}</li>
+              ))}
+            </ul>
+          </section>
+        </div>
+      </div>
+      <ActionBar className="finalize-actions observation-review-actions">
+        <ActionButton
+          className="finalize-secondary"
+          idleLabel="Usar o texto original"
+          state={submitState}
+          active={activeAction === "original"}
+          variant="secondary"
+          onClick={() => {
+            setActiveAction("original");
+            onUseOriginal();
+          }}
+        />
+        <ActionButton className="finalize-secondary" idleLabel="Editar" state={submitState} active={false} variant="secondary" onClick={onEdit} />
+        <ActionButton
+          className="finalize-primary"
+          idleLabel="Confirmar"
+          state={submitState}
+          active={activeAction === "confirm"}
+          variant="primary"
+          onClick={() => {
+            setActiveAction("confirm");
+            onConfirm();
+          }}
+        />
+      </ActionBar>
+    </article>
+  );
+}
+
+function ServiceFinalize({
+  detail,
+  onDone,
+  submitState,
+  initialObservation = "",
+  organizeObservation
+}: {
+  detail: DetailData;
+  onDone: (fields: Record<string, string>) => void;
+  submitState: ActionButtonState;
+  initialObservation?: string;
+  organizeObservation: OrganizeObservation;
+}) {
   const [obs, setObs] = useState(initialObservation);
+  const [organizing, setOrganizing] = useState(false);
+  const [review, setReview] = useState<ObservationTopics | null>(null);
 
   useEffect(() => {
     setObs(initialObservation);
+    setReview(null);
   }, [detail.id, initialObservation]);
 
   // Se o motorista já escreveu no detalhe, a tela confirma o texto em vez de perguntar de novo.
   const hasObservation = obs.trim() !== "";
+  const finish = (value: string) => onDone({ "Observação Final": value });
+
+  const confirm = async () => {
+    setOrganizing(true);
+    const prepared = await prepareObservationReview(obs, organizeObservation);
+    setOrganizing(false);
+    if (prepared.kind === "review") setReview({ original: prepared.original, topicos: prepared.topicos });
+    else finish(prepared.value);
+  };
+
+  if (review) {
+    return (
+      <ObservationReview
+        review={review}
+        submitState={submitState}
+        onConfirm={() => finish(buildOrganizedObservation(review.topicos, review.original))}
+        onUseOriginal={() => finish(review.original)}
+        onEdit={() => {
+          setObs(review.original);
+          setReview(null);
+        }}
+      />
+    );
+  }
 
   return (
     <article className="finalize-card">
       <div className="finalize-title">{hasObservation ? "Confira sua observação" : "Digite abaixo sua observação"}</div>
       <div className="finalize-scroll">
         <div className="finalize-form">
-          <DitadoField stopWhen={submitState !== "idle"} onFinal={(text) => setObs((current) => appendDitado(current, text))}>
+          <DitadoField stopWhen={submitState !== "idle" || organizing} onFinal={(text) => setObs((current) => appendDitado(current, text))}>
             <TextAreaBlock label="Observação do serviço" value={obs} onChange={setObs} />
           </DitadoField>
         </div>
       </div>
       <FinalizeActions
         noneLabel={hasObservation ? "Enviar sem observação" : "Não tenho"}
-        onNone={() => onDone({ "Observação Final": "Sem observação." })}
-        onConfirm={() => onDone({ "Observação Final": obs.trim() || "Sem observação." })}
-        submitState={submitState}
+        onNone={() => finish(NO_OBSERVATION)}
+        onConfirm={() => void confirm()}
+        submitState={organizing ? "loading" : submitState}
+        confirmLoadingLabel={organizing ? "Organizando…" : undefined}
       />
     </article>
   );
 }
+
 function ExchangeFinalize({ detail, onDone, submitState }: { detail: DetailData; onDone: (fields: Record<string, string>) => void; submitState: ActionButtonState }) {
   const [obs, setObs] = useState("");
   const [reason, setReason] = useState("");
@@ -513,7 +609,8 @@ export function FinalizeScreen({
   onPreviewMaintenancePhoto,
   onClearPhotos,
   submitState = "idle",
-  initialServiceObservation = ""
+  initialServiceObservation = "",
+  organizeObservation = organizeObservationRemote
 }: FinalizeScreenProps) {
   const title = detail.type === "MANUTENCAO" ? "Detalhes da Manutenção" : "Observação final";
   const isSubmitting = submitState !== "idle";
@@ -545,7 +642,7 @@ export function FinalizeScreen({
       ) : null}
       <section className="main-panel finalize-main">
         {detail.type === "TROCA" ? <ExchangeFinalize detail={detail} onDone={onDone} submitState={submitState} /> : null}
-        {detail.type === "SERVICO" ? <ServiceFinalize detail={detail} onDone={onDone} submitState={submitState} initialObservation={initialServiceObservation} /> : null}
+        {detail.type === "SERVICO" ? <ServiceFinalize detail={detail} onDone={onDone} submitState={submitState} initialObservation={initialServiceObservation} organizeObservation={organizeObservation} /> : null}
         {detail.type === "MANUTENCAO" ? (
           <MaintenanceFinalize
             detail={detail}

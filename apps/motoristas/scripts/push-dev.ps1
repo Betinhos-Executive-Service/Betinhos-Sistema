@@ -87,7 +87,7 @@ function Assert-SolutionArchiveExchangeLifecycle([string] $ZipPath) {
     $customApiPath = Join-Path $extractPath "customapis"
     if (-not (Test-Path -LiteralPath $customApiPath)) { throw "ZIP final nao possui a pasta customapis." }
     $xmlText = ((Get-ChildItem -LiteralPath $customApiPath -Recurse -File -Filter "*.xml" | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }) -join "`n")
-    foreach ($required in @("new_ConcluirTrocaDeCarro", "new_CancelarTrocaDeCarro", "new_ReverterTrocaDeCarro", "new_ConfirmarTrocaMotorista", "new_AtualizarTrocaDeCarro", "new_RegistrarTrocaDeCarro", "new_Motivo", "new_DataEfetiva", "new_VersaoEsperada", "new_IdempotencyKey", "new_TrocaId", "new_TrocaCompensatoriaId", "new_DispararComunicadoMotorista", "new_AbrirComunicadoMotorista", "new_RegistrarCienciaComunicado", "new_ReenviarPushComunicado", "new_DestinatarioId", "new_ComunicadoId", "new_AssinaturaJson", "new_ResolverVeiculoDoServico", "new_ReservaId", "new_ResultadoJson", "new_SincronizarVeiculoAtual", "new_GerarLinkAcompanhamento", "new_ResumoJson", "new_LinkJson", "new_SolicitarChecklistVeiculo", "new_ProcessarChecklistsVeiculos", "new_ReatribuirChecklistVeiculo", "new_ConcluirChecklistVeiculo", "new_CancelarChecklistVeiculo", "new_ReenviarPushChecklist", "new_ChecklistId", "new_VeiculoId", "new_RespostasJson")) {
+    foreach ($required in @("new_ConcluirTrocaDeCarro", "new_CancelarTrocaDeCarro", "new_ReverterTrocaDeCarro", "new_ConfirmarTrocaMotorista", "new_AtualizarTrocaDeCarro", "new_RegistrarTrocaDeCarro", "new_Motivo", "new_DataEfetiva", "new_VersaoEsperada", "new_IdempotencyKey", "new_TrocaId", "new_TrocaCompensatoriaId", "new_DispararComunicadoMotorista", "new_AbrirComunicadoMotorista", "new_RegistrarCienciaComunicado", "new_ReenviarPushComunicado", "new_DestinatarioId", "new_ComunicadoId", "new_AssinaturaJson", "new_ResolverVeiculoDoServico", "new_ReservaId", "new_ResultadoJson", "new_SincronizarVeiculoAtual", "new_GerarLinkAcompanhamento", "new_ResumoJson", "new_LinkJson", "new_SolicitarChecklistVeiculo", "new_ProcessarChecklistsVeiculos", "new_ReatribuirChecklistVeiculo", "new_ConcluirChecklistVeiculo", "new_CancelarChecklistVeiculo", "new_ReenviarPushChecklist", "new_ChecklistId", "new_VeiculoId", "new_RespostasJson", "new_OrganizarObservacao", "new_Texto")) {
       if ($xmlText.IndexOf($required, [System.StringComparison]::Ordinal) -lt 0) { throw "ZIP final nao possui o componente esperado: $required" }
     }
     Write-Step "validacao do ZIP final OK: Custom APIs, parametros e retorno presentes"
@@ -194,6 +194,14 @@ Write-Step "provision cobranca por QR (Custom API, chave do Stripe e webhook) in
   -Apply `
   -DeviceCode:$DeviceCode
 if (-not $?) { throw "Provisionamento da cobranca por QR falhou." }
+
+Write-Step "provision observacao organizada (variavel da chave, Custom API e step) in DEV"
+& (Join-Path $PSScriptRoot "provision-observacao-organizada.ps1") `
+  -EnvironmentUrl $environmentUrl `
+  -SolutionUniqueName $solutionUniqueName `
+  -Apply `
+  -DeviceCode:$DeviceCode
+if (-not $?) { throw "Provisionamento da observacao organizada falhou." }
 
 Write-Step "publish push redirect (forms OnLoad -> App Motoristas)"
 & (Join-Path $PSScriptRoot "provision-push-redirect.ps1") `
