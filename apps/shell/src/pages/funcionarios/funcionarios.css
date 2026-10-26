@@ -155,7 +155,7 @@
   .foto-perfil img { width: 100%; height: 100%; object-fit: cover; }
   .foto-perfil:active:not(:disabled) { transform: scale(0.97); }
   .foto-perfil:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bt-color-surface), 0 0 0 4px var(--bt-color-action); }
-  .foto-perfil__veu { position: absolute; inset: 0; display: grid; place-items: center; color: var(--bt-color-white); background-color: color-mix(in srgb, var(--bt-color-brand) calc(var(--bt-opacity-backdrop) * 100%), transparent); opacity: 0; transition: opacity var(--bt-duration-fast) ease; }
+  .foto-perfil__veu { position: absolute; inset: 0; display: grid; place-items: center; color: var(--bt-color-white); background-color: var(--shell-veu); opacity: 0; transition: opacity var(--bt-duration-fast) ease; }
   @media (hover: hover) and (pointer: fine) { .foto-perfil:hover .foto-perfil__veu { opacity: 1; } }
   .foto-perfil:focus-visible .foto-perfil__veu, .foto-perfil--over .foto-perfil__veu, .foto-perfil--busy .foto-perfil__veu { opacity: 1; }
   .foto-perfil--over { transform: scale(1.06); box-shadow: 0 0 0 2px var(--bt-color-surface), 0 0 0 4px var(--bt-color-action); }
@@ -165,7 +165,7 @@
   .foto-recorte__palco:active { cursor: grabbing; }
   .foto-recorte__palco:focus-visible { outline: none; box-shadow: var(--bt-focus-ring); }
   .foto-recorte__palco img { position: absolute; top: 0; left: 0; max-width: none; pointer-events: none; }
-  .foto-recorte__mascara { position: absolute; inset: 0; border-radius: 50%; box-shadow: 0 0 0 999px color-mix(in srgb, var(--bt-color-brand) calc(var(--bt-opacity-backdrop) * 100%), transparent); outline: 2px solid var(--bt-color-white); outline-offset: -2px; pointer-events: none; }
+  .foto-recorte__mascara { position: absolute; inset: 0; border-radius: 50%; box-shadow: 0 0 0 999px var(--shell-veu); outline: 2px solid var(--bt-color-white); outline-offset: -2px; pointer-events: none; }
   .foto-recorte__zoom { display: flex; align-items: center; gap: var(--bt-space-2); width: 240px; color: var(--bt-color-text-secondary); }
   .foto-recorte__zoom input { flex: 1; accent-color: var(--bt-color-action); }
   @media (prefers-reduced-motion: reduce) { .foto-perfil, .foto-perfil--over { transform: none; } }
