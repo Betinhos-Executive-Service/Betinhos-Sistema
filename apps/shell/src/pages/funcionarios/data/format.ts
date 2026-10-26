@@ -22,7 +22,7 @@ export function isValidCpf(value: string) {
   return check(9) === Number(d[9]) && check(10) === Number(d[10])
 }
 
-/** Padrão já usado na base: "+55 12 90000x00". */
+/** Padrão já usado na base: "+55 12 90000-7000". */
 export function formatPhone(value: string) {
   let d = digitsOnly(value)
   if (!d) return ''
@@ -78,7 +78,7 @@ export function richTextToPlain(html: string | null | undefined) {
   return (doc.body.textContent ?? '').replace(/\n{3,}/g, '\n\n').trim()
 }
 
-/** Exibição "(12) 90000i74"; aceita com ou sem +55 e formata enquanto digita. */
+/** Exibição "(12) 90000-5174"; aceita com ou sem +55 e formata enquanto digita. */
 export function formatCelular(value: string) {
   let d = digitsOnly(value)
   if (d.startsWith('55') && d.length >= 12) d = d.slice(2)
