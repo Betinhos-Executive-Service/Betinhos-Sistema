@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import type { Row } from '@betinhos/dataverse'
 import { Button, Dialog, Field, Input, Select, Sheet, Switch, Textarea } from '@betinhos/ui'
 import { cellKind, MOTORISTA_TITLE, readonlyHint } from '../domain/cells'
+import { isProtegido } from '../domain/protecao'
+import { ProtecaoLock } from './ProtecaoLock'
 import type { EditValue } from '../domain/edit'
 import { decideChoice, decideCommit, draftOf, lookupOptions, type PickedOption } from '../domain/editing'
 import { formatCell } from '../domain/format'
 import { columnLabel, rowKey } from '../domain/layout'
-import type { AttributeInfo, AttributeMap, CellStatus, Column, LookupOption } from '../domain/types'
+import { ID_ATTRIBUTE, type AttributeInfo, type AttributeMap, type CellStatus, type Column, type LookupOption } from '../domain/types'
 import { useLookupSearch } from './useLookupSearch'
 
 type Props = {
@@ -127,7 +129,10 @@ function SheetField({ row, column, info, status, onSave, onReset, search, onInva
   // O contêiner de aviso existe desde o início: leitor de tela só anuncia mudanças numa região viva já presente.
   return (
     <div className="gr-sheet__field">
-      <Field label={label} error={message ?? undefined}>{control}</Field>
+      <div className="gr-sheet__field">
+        <Field label={label} error={message ?? undefined}>{control}</Field>
+        {isProtegido(row, column) ? <ProtecaoLock id={String(row[ID_ATTRIBUTE])} attribute={column.attribute} label={label} atual={text} info={info} /> : null}
+      </div>
       <div aria-live="polite">{hint ? <p className="bt-field__hint">{hint}</p> : null}</div>
       {retryButton}
     </div>

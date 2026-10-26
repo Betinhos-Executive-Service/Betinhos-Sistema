@@ -6,6 +6,8 @@ import type { Host } from '../../host'
 import { useMedia } from '../operacional/useMedia'
 import { hrefFor, patchHashQuery, queryFromHash, readHashQuery } from '../../nav/useHashRoute'
 import { createSource } from './data/source'
+import { ProtecaoContext } from './components/ProtecaoLock'
+import type { Protecao } from './domain/protecao'
 import { Cell } from './components/Cell'
 import { GeralCards } from './components/GeralCards'
 import { GeralSheet } from './components/GeralSheet'
@@ -42,6 +44,19 @@ const IDLE: CellStatus = { kind: 'idle' }
 
 function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const source = useMemo(() => createSource(host), [host])
+  // Histórico do campo protegido sob demanda, uma consulta por OS enquanto a tela está aberta; falha não fica no cache.
+  const protecao = useMemo(() => {
+    const cache = new Map<string, Promise<Protecao>>()
+    return (id: string) => {
+      let pending = cache.get(id)
+      if (!pending) {
+        pending = source.protecao(id)
+        cache.set(id, pending)
+        pending.catch(() => cache.delete(id))
+      }
+      return pending
+    }
+  }, [source])
   const toast = useToast()
   const mobile = useMedia('(max-width: 820px)')
   const [mode, setModeState] = useState<ViewMode>(() => loadViewMode(source.kv))
@@ -588,64 +603,66 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const notApplied = geral.filtersIgnored ? [...Object.keys(filters.quick), ...filters.advanced.items.map((i) => i.id)] : undefined
 
   return (
-    <div className="page page--full gr-page">
-      {/* A linha de comando da lista (DS §10.9.1): visão, colunas, filtros, busca e comandos. */}
-      <div role="toolbar" aria-label="Comandos de serviços" className={selecting ? 'gr-commandline is-selecting' : 'gr-commandline'}>
-      <ViewBar
-        view={viewState}
-        columns={columnDefs}
-        filters={{ fields: filterFields, search: searchFilter, notApplied }}
-      >
-        {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-        {selecting ? selectionBar : (
-          <>
-            <SearchBox className="gr-filters__search" size={size} aria-label="Buscar serviços" placeholder="Buscar por ID, trajeto, cliente…" value={searchText} onChange={setSearchText} onSearch={(value) => { if (value.trim() !== query) setQuery(value.trim()) }} debounce={300} loading={loading && query !== ''} />
-            <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title={status ?? 'Atualizar'} loading={loading && rows.length > 0} onClick={reload} />
-          </>
-        )}
-        {shortcuts}
-        {selecting ? null : createButton}
-      </ViewBar>
-      </div>
-      <Stack gap="4" className="gr-body">
-      {body}
-      {mobile && geral.selected.size > 0 ? (
-        <div className="gr-selbar" role="group" aria-label="Ações sobre os selecionados">
-          <span role="status" className="gr-selbar__count">{geral.selected.size === 1 ? '1 selecionado' : `${geral.selected.size} selecionados`}</span>
-          {selectionCommands}
+    <ProtecaoContext.Provider value={protecao}>
+      <div className="page page--full gr-page">
+        {/* A linha de comando da lista (DS §10.9.1): visão, colunas, filtros, busca e comandos. */}
+        <div role="toolbar" aria-label="Comandos de serviços" className={selecting ? 'gr-commandline is-selecting' : 'gr-commandline'}>
+        <ViewBar
+          view={viewState}
+          columns={columnDefs}
+          filters={{ fields: filterFields, search: searchFilter, notApplied }}
+        >
+          {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
+          {selecting ? selectionBar : (
+            <>
+              <SearchBox className="gr-filters__search" size={size} aria-label="Buscar serviços" placeholder="Buscar por ID, trajeto, cliente…" value={searchText} onChange={setSearchText} onSearch={(value) => { if (value.trim() !== query) setQuery(value.trim()) }} debounce={300} loading={loading && query !== ''} />
+              <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title={status ?? 'Atualizar'} loading={loading && rows.length > 0} onClick={reload} />
+            </>
+          )}
+          {shortcuts}
+          {selecting ? null : createButton}
+        </ViewBar>
         </div>
-      ) : null}
-      {cardsLayout && editRow ? (
-        <GeralSheet
-          row={editRow}
-          columns={visibleColumns}
-          attributes={attributes}
-          cellStatus={(attribute) => cells.get(cellKey(String(editRow[ID_ATTRIBUTE]), attribute)) ?? IDLE}
-          open
-          onClose={() => setEditId(null)}
-          onSave={(column, value) => save(String(editRow[ID_ATTRIBUTE]), column, value)}
-          onReset={(column) => resetCell(String(editRow[ID_ATTRIBUTE]), column.attribute)}
-          search={(column, text) => source.search(column.attribute, text)}
-        />
-      ) : null}
-      <CopyDialog open={copy.open} loading={copy.loading} text={copy.text} onClose={closeCopy} onCopied={() => { closeCopy(); toast({ tone: 'success', message: 'Serviços copiados.' }) }} />
-      <LinkDialog request={linkRequest} onClose={() => setLinkRequest(null)}
-        onCopied={(what) => toast({ tone: 'success', message: what === 'link' ? 'Link copiado.' : 'Mensagem copiada.' })}
-        onCopyFailed={(reason) => toast({ tone: 'danger', message: `Não foi possível copiar. ${reason instanceof Error ? reason.message : ''}`.trim() })} />
-      <LinkCadastroDrawer request={cadastroRequest} mobile={mobile} onClose={() => setCadastroRequest(null)}
-        onCopied={() => toast({ tone: 'success', message: 'Link copiado.' })}
-        onCopyFailed={(reason) => toast({ tone: 'danger', message: `Não foi possível copiar. ${reason instanceof Error ? reason.message : ''}`.trim() })} />
-      <StateDialog request={stateRequest} busy={stateBusy} onClose={() => setStateRequest(null)} onConfirm={() => { void confirmState() }} />
-      <MockFormDialog open={mockForm} onClose={() => setMockForm(false)} />
-      <ContagemDrawer open={contagemOpen} onClose={() => setContagemOpen(false)} source={source} initialDay={contagemDay} kv={source.kv} mobile={mobile} />
-      <EscalaFdsDrawer url={source.escalaFdsUrl()} open={escalaOpen} onClose={() => setEscalaOpen(false)} />
-      <GerarOpDialog request={opRequest} busy={opBusy} error={opError} onClose={() => setOpRequest(null)} onConfirm={() => { void confirmOp() }} />
-      <DispararDialog request={dispRequest} busy={dispBusy} onClose={() => setDispRequest(null)} onConfirm={() => { void confirmDisparar() }} />
-      <ContextMenu at={contextAt} actions={contextActions} onClose={closeContext} />
-      {auditoriaUrl ? <AuditoriaOverlay url={auditoriaUrl} onClose={() => setAuditoriaUrl(null)} /> : null}
-      {voucherUrl ? <VoucherOverlay url={voucherUrl} onClose={() => setVoucherUrl(null)} /> : null}
-      {formUrl ? <FormOverlay url={formUrl} onClose={() => { setFormUrl(null); refresh() }} /> : null}
-      </Stack>
-    </div>
+        <Stack gap="4" className="gr-body">
+        {body}
+        {mobile && geral.selected.size > 0 ? (
+          <div className="gr-selbar" role="group" aria-label="Ações sobre os selecionados">
+            <span role="status" className="gr-selbar__count">{geral.selected.size === 1 ? '1 selecionado' : `${geral.selected.size} selecionados`}</span>
+            {selectionCommands}
+          </div>
+        ) : null}
+        {cardsLayout && editRow ? (
+          <GeralSheet
+            row={editRow}
+            columns={visibleColumns}
+            attributes={attributes}
+            cellStatus={(attribute) => cells.get(cellKey(String(editRow[ID_ATTRIBUTE]), attribute)) ?? IDLE}
+            open
+            onClose={() => setEditId(null)}
+            onSave={(column, value) => save(String(editRow[ID_ATTRIBUTE]), column, value)}
+            onReset={(column) => resetCell(String(editRow[ID_ATTRIBUTE]), column.attribute)}
+            search={(column, text) => source.search(column.attribute, text)}
+          />
+        ) : null}
+        <CopyDialog open={copy.open} loading={copy.loading} text={copy.text} onClose={closeCopy} onCopied={() => { closeCopy(); toast({ tone: 'success', message: 'Serviços copiados.' }) }} />
+        <LinkDialog request={linkRequest} onClose={() => setLinkRequest(null)}
+          onCopied={(what) => toast({ tone: 'success', message: what === 'link' ? 'Link copiado.' : 'Mensagem copiada.' })}
+          onCopyFailed={(reason) => toast({ tone: 'danger', message: `Não foi possível copiar. ${reason instanceof Error ? reason.message : ''}`.trim() })} />
+        <LinkCadastroDrawer request={cadastroRequest} mobile={mobile} onClose={() => setCadastroRequest(null)}
+          onCopied={() => toast({ tone: 'success', message: 'Link copiado.' })}
+          onCopyFailed={(reason) => toast({ tone: 'danger', message: `Não foi possível copiar. ${reason instanceof Error ? reason.message : ''}`.trim() })} />
+        <StateDialog request={stateRequest} busy={stateBusy} onClose={() => setStateRequest(null)} onConfirm={() => { void confirmState() }} />
+        <MockFormDialog open={mockForm} onClose={() => setMockForm(false)} />
+        <ContagemDrawer open={contagemOpen} onClose={() => setContagemOpen(false)} source={source} initialDay={contagemDay} kv={source.kv} mobile={mobile} />
+        <EscalaFdsDrawer url={source.escalaFdsUrl()} open={escalaOpen} onClose={() => setEscalaOpen(false)} />
+        <GerarOpDialog request={opRequest} busy={opBusy} error={opError} onClose={() => setOpRequest(null)} onConfirm={() => { void confirmOp() }} />
+        <DispararDialog request={dispRequest} busy={dispBusy} onClose={() => setDispRequest(null)} onConfirm={() => { void confirmDisparar() }} />
+        <ContextMenu at={contextAt} actions={contextActions} onClose={closeContext} />
+        {auditoriaUrl ? <AuditoriaOverlay url={auditoriaUrl} onClose={() => setAuditoriaUrl(null)} /> : null}
+        {voucherUrl ? <VoucherOverlay url={voucherUrl} onClose={() => setVoucherUrl(null)} /> : null}
+        {formUrl ? <FormOverlay url={formUrl} onClose={() => { setFormUrl(null); refresh() }} /> : null}
+        </Stack>
+      </div>
+    </ProtecaoContext.Provider>
   )
 }

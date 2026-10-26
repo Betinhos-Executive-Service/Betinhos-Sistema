@@ -168,6 +168,20 @@
 .gr-sheet__line { display: grid; gap: 2px; margin: 0; font-size: var(--bt-font-size-13); overflow-wrap: anywhere; }
 .gr-sheet__line span { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
 .gr-sheet__line strong { font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-primary); white-space: pre-line; }
+/* Campo protegido da sincronização da Tenaris: cadeado discreto; azul só no foco. */
+.gr-protecao { flex: 0 0 auto; display: inline-flex; }
+.gr-protecao__trigger { display: inline-grid; place-items: center; width: 20px; height: 20px; margin: -4px 0; padding: 0; border: 0; border-radius: var(--bt-radius-sm); background: transparent; color: var(--bt-color-text-secondary); cursor: pointer; }
+.gr-protecao__trigger:hover, .gr-protecao__trigger[aria-expanded="true"] { background-color: var(--bt-color-surface-soft); color: var(--bt-color-text-primary); }
+.gr-protecao__trigger:focus-visible { outline: 0; box-shadow: var(--bt-focus-ring); color: var(--bt-color-action); }
+.gr-protecao__panel { position: fixed; inset: auto; z-index: var(--bt-z-index-popover); width: min(320px, calc(100vw - 16px)); margin: 0; padding: var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); color: var(--bt-color-text-primary); box-shadow: var(--bt-shadow-popover); font-size: var(--bt-font-size-13); white-space: normal; }
+.gr-protecao__title { display: flex; align-items: center; gap: var(--bt-space-1); margin: 0; font-weight: var(--bt-font-weight-semibold); }
+.gr-protecao__note { margin: var(--bt-space-1) 0 var(--bt-space-2); font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.gr-protecao__list { display: grid; gap: var(--bt-space-2); margin: 0; }
+.gr-protecao__list dt { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.gr-protecao__list dd { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
+.gr-protecao__status { display: flex; align-items: center; gap: var(--bt-space-1-5); color: var(--bt-color-text-secondary); }
+.gr-sheet__field { position: relative; }
+.gr-sheet__field > .gr-protecao { position: absolute; top: 0; right: 0; }
 .gr-sheet__hint { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
 @media (max-width: 820px) { .gr-filters__columns { display: none; } }
 

@@ -1,5 +1,6 @@
 import type { ChoiceOption, Row } from '@betinhos/dataverse'
 import { formatDateTime, formatMoney, TZ } from '../domain/format'
+import { CAMPOS_PROTEGIDOS, SNAPSHOT_TENARIS, camposProtegidos, type Protecao } from '../domain/protecao'
 import { searchConditions } from '../domain/search'
 import { ENTITY, ID_ATTRIBUTE, type AttributeInfo, type AttributeMap, type LookupBind, type LookupOption, type Page, type Sort, type View } from '../domain/types'
 
@@ -141,9 +142,27 @@ export function createMockRows(now: Date): Row[] {
     lookup('cr40f_solicitante', i * 3)
     // OS-1004 já tem OP gerada: cobre o caso "com OP" do comando Gerar OP.
     if (i === 4) row._cr40f_financeiro_value = 'cccccccc-0001-4000-8000-000000000004'
+    // A cada 6 serviços, um veio da Tenaris e teve trajeto e status editados (passageiros também consta, como no PROD, e fica de fora da trava).
+    if (i % 6 === 1) {
+      row[CAMPOS_PROTEGIDOS] = 'cr40f_trajeto, cr40f_status,cr40f_passageirosetelefonedecontato,cr40f_inexistente'
+      row[SNAPSHOT_TENARIS] = JSON.stringify({ cr40f_trajeto: 'São Paulo / Pindamonhangaba / São Paulo / Taubaté - Sem Espera', cr40f_status: '202410001' })
+    }
     rows.push(row)
   }
   return rows
+}
+
+/**
+ * Histórico do popover de campo protegido: OS-1007 simula perfil sem acesso à auditoria, OS-1013 auditoria sem a troca;
+ * as demais trazem a troca do valor da Tenaris para o atual, por Keila em 23/10 16:27 (São Paulo).
+ */
+export function mockProtecao(row: Row): Protecao {
+  const snapshot = row[SNAPSHOT_TENARIS] ?? null
+  if (row.cr40f_id === 'OS-1007') return { audits: 'sem-permissao', snapshot }
+  if (row.cr40f_id === 'OS-1013') return { audits: [], snapshot }
+  const fonte = typeof snapshot === 'string' ? (JSON.parse(snapshot) as Record<string, string>) : {}
+  const changedAttributes = [...camposProtegidos(row[CAMPOS_PROTEGIDOS])].map((logicalName) => ({ logicalName, oldValue: fonte[logicalName] ?? '', newValue: String(row[logicalName] ?? '') }))
+  return { audits: [{ changedata: JSON.stringify({ changedAttributes }), createdon: '2026-10-23T19:27:00Z', _userid_value: 'u-keila', [`_userid_value${F}`]: 'Keila, Deborah' }], snapshot }
 }
 
 export type MockFetchOptions = { page: number; pageSize: number; sort: Sort; query: string; quickFind: string[]; now: Date }
