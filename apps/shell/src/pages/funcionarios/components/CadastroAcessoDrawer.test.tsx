@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { ToastProvider } from '@betinhos/ui'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AcessoError, type AcessoSource } from '../data/acesso'
@@ -97,6 +97,47 @@ describe('CadastroAcessoDrawer', () => {
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
     expect(onClose).not.toHaveBeenCalled()
     await act(async () => { resolver(ok) })
+  })
+
+  it('nome da ficha aparece como informação; celular formatado na tela e original para a API', async () => {
+    const cadastrar = vi.fn<AcessoSource['cadastrar']>(async () => ok)
+    renderDrawer(src(cadastrar), { inicial: { funcionarioId: 'f1', nomeCompleto: 'Ana Lima', celular: '+5512997135174' } })
+    expect(screen.queryByLabelText(/Nome completo/)).toBeNull()
+    expect(screen.getByText('Ana Lima')).toBeTruthy()
+    expect(screen.getByText(/da ficha do funcionário/)).toBeTruthy()
+    expect((screen.getByLabelText(/Celular/) as HTMLInputElement).value).toBe('(12) 99713-5174')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Criar acesso/ })) })
+    expect(cadastrar.mock.calls[0][0]).toMatchObject({ celular: '+5512997135174' })
+  })
+
+  it('nome de uma palavra pede sobrenome antes de enviar (o plugin recusa); prévia aparece uma vez', () => {
+    renderDrawer(src(async () => ok))
+    fireEvent.change(screen.getByLabelText(/Nome completo/), { target: { value: 'Betinho' } })
+    fireEvent.change(screen.getByLabelText(/Celular/), { target: { value: '12991234567' } })
+    expect(screen.getAllByText('betinho@betinhos.onmicrosoft.com')).toHaveLength(1)
+    expect(screen.getByText('Informe nome e sobrenome.')).toBeTruthy()
+    expect((screen.getByRole('button', { name: /Criar acesso/ }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText(/Nome completo/), { target: { value: 'Betinho Souza' } })
+    expect(screen.queryByText('Informe nome e sobrenome.')).toBeNull()
+    expect((screen.getByRole('button', { name: /Criar acesso/ }) as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('nome da ficha sem sobrenome orienta corrigir na ficha', () => {
+    renderDrawer(src(async () => ok), { inicial: { funcionarioId: 'f1', nomeCompleto: 'Betinho', celular: '12991234567' } })
+    expect(screen.getByText(/Inclua o sobrenome na ficha/)).toBeTruthy()
+    expect((screen.getByRole('button', { name: /Criar acesso/ }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('vínculo é um seletor segmentado e o rodapé tem Cancelar e o resumo do efeito', () => {
+    const cadastrar = vi.fn<AcessoSource['cadastrar']>(async () => ok)
+    const { onClose } = renderDrawer(src(cadastrar))
+    fireEvent.click(screen.getByRole('radio', { name: 'Colaborador' }))
+    expect(screen.getByRole('radio', { name: 'Colaborador' }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByText(/libera a licença/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(screen.getByText('Descartar alterações?')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Descartar' }))
+    expect(onClose).toHaveBeenCalled()
   })
 
   it('com inicial preenche nome e celular e envia funcionarioId', async () => {
@@ -212,7 +253,7 @@ describe('CadastroAcessoDrawer', () => {
       const cadastrar = vi.fn<AcessoSource['cadastrar']>(async () => ok)
       await preencherECriar(cadastrar, async () => [helena])
       await screen.findByText('Já existe um funcionário parecido')
-      fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Já existe um funcionário parecido' })).getByRole('button', { name: 'Cancelar' }))
       expect(screen.queryByRole('button', { name: 'Criar ficha nova' })).toBeNull()
       expect(cadastrar).not.toHaveBeenCalled()
       await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Criar acesso/ })) })
