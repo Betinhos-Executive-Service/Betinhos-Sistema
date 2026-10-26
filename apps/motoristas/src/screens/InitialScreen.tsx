@@ -407,17 +407,16 @@ export function InitialScreen(props: InitialScreenProps) {
 
   const servicesModule = modules.find((module) => module.id === "services");
   const gridModules = modules.filter((module) => module.id !== "services");
-  const pendingCounts: Record<string, number> = {
-    comunicados: props.pendingComunicados ?? 0,
-    multas: props.pendingMultas ?? 0,
-    checklists: props.pendingChecklists ?? 0,
-  };
-  const { checklists, multas, comunicados } = pendingCounts;
-  const pendencias = [
-    checklists > 0 && { id: "checklists", text: `${checklists} checklist${plural(checklists)} pendente${plural(checklists)}` },
-    (props.multasBanner || multas > 0) && { id: "multas", text: props.multasBanner || `${multas} multa${plural(multas)} para assinar` },
-    comunicados > 0 && { id: "comunicados", text: `${comunicados} comunicado${plural(comunicados)} para ler` },
-  ].filter((item): item is { id: string; text: string } => Boolean(item));
+  const multasPrazo = props.multasBanner?.split(" · ")[1];
+  const pendingTypes = [
+    { id: "checklists", count: props.pendingChecklists ?? 0, text: (n: number) => `${n} checklist${plural(n)} pendente${plural(n)}` },
+    { id: "multas", count: props.pendingMultas ?? 0, text: (n: number) => `${n} multa${plural(n)} para assinar${multasPrazo ? ` · ${multasPrazo}` : ""}` },
+    { id: "comunicados", count: props.pendingComunicados ?? 0, text: (n: number) => `${n} comunicado${plural(n)} para ler` },
+  ];
+  const pendingCounts: Record<string, number> = Object.fromEntries(pendingTypes.map((type) => [type.id, type.count]));
+  const pendencias = pendingTypes
+    .filter((type) => type.count > 0)
+    .map((type) => ({ id: type.id, text: type.text(type.count) }));
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
