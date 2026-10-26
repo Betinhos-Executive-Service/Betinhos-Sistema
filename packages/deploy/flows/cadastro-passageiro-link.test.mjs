@@ -99,6 +99,11 @@ test('ler: passageiros em paralelo e sem foto (a foto vem da op foto)', () => {
   assert.equal(incluir.inputs.value.foto, null)
 })
 
+test('entrada válida aceita a op foto com passageiroId de 36 caracteres', () => {
+  const exp = todas.get('Entrada_valida').expression.equals[0]
+  assert.ok(exp.includes("equals(toLower(trim(coalesce(triggerBody()?['op'], ''))), 'foto'), equals(length(toLower(trim(coalesce(triggerBody()?['passageiroId'], '')))), 36)"))
+})
+
 test('foto: só passageiro do escopo, só da pasta Passageiros/Fotos, lida por caminho e sem derrubar a resposta', () => {
   const escopo = todas.get('No_escopo_foto')
   assert.equal(escopo.expression.equals[0], "@contains(outputs('Escopo'), toLower(trim(coalesce(triggerBody()?['passageiroId'], ''))))")
