@@ -15,8 +15,8 @@ export function paginaHtml() {
 </head>
 <body>
 <header class="topo"><img src="/logo-betinhos.png" alt="Betinhos Executive Service" class="logo"></header>
-<main id="app" aria-live="polite">
-  <section class="estado"><div class="spinner" aria-hidden="true"></div><p>Carregando…</p></section>
+<main id="app">
+  <section class="estado" role="status"><div class="spinner" aria-hidden="true"></div><p>Carregando os passageiros…</p></section>
 </main>
 <div class="versao" aria-hidden="true">${VERSAO}</div>
 <script type="module" src="/app.js"></script>
