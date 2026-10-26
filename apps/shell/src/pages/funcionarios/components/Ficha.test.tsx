@@ -278,7 +278,7 @@ describe('Ficha', () => {
 
   const comEmail = { ...record, values: { ...record.values, cr40f_emailmicrosoft: 'ana.souza@betinhos.onmicrosoft.com', cr40f_telefonecorporativo: '+5512991234567' } }
   const naoUsar = async () => { throw new Error('n/a') }
-  const acessoFake = (extra: Partial<AcessoSource> = {}): AcessoSource => ({ cadastrar: naoUsar, encerrar: async () => [], reativar: naoUsar, ...extra })
+  const acessoFake = (extra: Partial<AcessoSource> = {}): AcessoSource => ({ cadastrar: naoUsar, parecidos: async () => [], encerrar: async () => [], reativar: naoUsar, ...extra })
   const comUsuario = (ativo: boolean | null, extra: Partial<DataSource> = {}) => fakeSource(async () => 'f1', { get: async () => structuredClone(comEmail), usuarioDoApp: async () => (ativo === null ? null : { id: 'su1', ativo }), ...extra })
 
   const abrirAcesso = async () => { fireEvent.click(await screen.findByRole('tab', { name: 'Acesso' }, { timeout: 5000 })) }

@@ -1,11 +1,14 @@
+import { odataString } from '@betinhos/dataverse'
 import type { Host } from '../../../host'
 import { whatsappHref } from '../../operacional/domain/phone'
 import { createAcessoMock } from './acessoMock'
+import { type BuscaParecido, encontrarParecidos, type FuncionarioParecido } from './parecidos'
+import { ENTITY_SET } from './schema'
 import { errorMessage } from './xrm'
 
 export type Etapa = { etapa: string; estado: 'feita' | 'pulada' | 'pendente' | 'erro'; detalhe: string }
 export type Fluxo = 'cadastro' | 'reativar' | 'encerrar'
-export type CadastroInput = { nomeCompleto: string; celular: string; emailPessoal?: string; prefixoEmail?: string; tipoVinculo: 0 | 1; funcionarioId?: string }
+export type CadastroInput = { nomeCompleto: string; celular: string; emailPessoal?: string; prefixoEmail?: string; tipoVinculo: 0 | 1; funcionarioId?: string; cpf?: string; criarNovo?: boolean }
 export type AcessoInicial = { funcionarioId: string; nomeCompleto: string; celular: string }
 export type CadastroResultado = { emailMicrosoft: string; senhaTemporaria: string; funcionarioId: string; linkApp: string; etapas: Etapa[] }
 /** Reativação: a senha é sempre nova (a anterior foi descartada ao encerrar). */
@@ -13,6 +16,8 @@ export type ReativacaoResultado = { emailMicrosoft: string; senhaTemporaria: str
 
 export interface AcessoSource {
   cadastrar(input: CadastroInput): Promise<CadastroResultado>
+  /** Todos os funcionários (qualquer função e status) com mesmo nome, celular ou CPF: confirma antes de cadastrar sem ficha. */
+  parecidos(busca: BuscaParecido): Promise<FuncionarioParecido[]>
   encerrar(funcionarioId: string, confirmacao: string): Promise<Etapa[]>
   reativar(funcionarioId: string): Promise<ReativacaoResultado>
 }
@@ -31,6 +36,7 @@ export const MENSAGENS: Record<string, string> = {
   ACESSO_ENCERRADO: 'Acesso encerrado antes. Use "Reativar acesso" na ficha do funcionário.',
   CONTA_NAO_EXISTE: 'A conta Microsoft não existe mais; cadastre o acesso de novo.',
   SEM_PERMISSAO_SENHA: 'Falta a permissão User-PasswordProfile.ReadWrite.All no app do Graph.',
+  HOMONIMO_ENCONTRADO: 'Já existe funcionário parecido; confirme na tela se é a mesma pessoa.',
   USUARIO_DATAVERSE_PENDENTE: 'A conta foi criada, mas o Dataverse ainda não a reconhece. Tente de novo em alguns minutos.',
 }
 
@@ -53,12 +59,12 @@ export const ESTADO_ETAPA: Record<Etapa['estado'], string> = { feita: '', pulada
 /** O systemuser não ficou pronto a tempo: o acesso existe e o Dataverse libera em instantes. */
 export const liberacaoPendente = (etapas: Etapa[]) => etapas.some((e) => e.etapa === 'systemuser' && e.estado === 'pendente')
 
-export const MSG_PENDENTE = "Conta criada. O Dataverse ainda está liberando o acesso; isto conclui sozinho em alguns minutos. Se fechar antes, use 'Concluir liberação' na ficha ou cadastre de novo com os mesmos dados."
+export const MSG_PENDENTE = "Conta criada. O Dataverse ainda está liberando o acesso; isto conclui sozinho em alguns minutos. Se fechar antes, use 'Concluir liberação' na ficha ou cadastre de novo e escolha 'Usar esta ficha'."
 /** As tentativas automáticas acabaram (~3 min) sem o Dataverse liberar. */
 export const MSG_PENDENTE_DEMORADA = "Conta criada. O Dataverse está demorando para liberar o acesso. Abra a ficha e use 'Concluir liberação' em alguns minutos."
 
 /** Erros que nova tentativa não resolve: a retentativa automática para e mostra a mensagem. */
-export const ERROS_PERMANENTES = new Set(['SEM_PERMISSAO', 'SEM_PERMISSAO_SENHA', 'CONFIG_AUSENTE', 'CONTA_NAO_EXISTE', 'ACESSO_ENCERRADO', 'SEM_LICENCA_DISPONIVEL', 'NOME_INVALIDO', 'CELULAR_INVALIDO', 'FUNCIONARIO_NAO_ENCONTRADO', 'EMAIL_EM_USO_POR_OUTRO_FUNCIONARIO'])
+export const ERROS_PERMANENTES = new Set(['SEM_PERMISSAO', 'SEM_PERMISSAO_SENHA', 'CONFIG_AUSENTE', 'CONTA_NAO_EXISTE', 'ACESSO_ENCERRADO', 'SEM_LICENCA_DISPONIVEL', 'NOME_INVALIDO', 'CELULAR_INVALIDO', 'FUNCIONARIO_NAO_ENCONTRADO', 'EMAIL_EM_USO_POR_OUTRO_FUNCIONARIO', 'HOMONIMO_ENCONTRADO'])
 
 export class AcessoError extends Error {
   constructor(public codigo: string, message: string, public etapas: Etapa[]) { super(message); this.name = 'AcessoError' }
@@ -129,8 +135,22 @@ export function createAcessoSource(host: Host): AcessoSource {
       if (input.emailPessoal) body.EmailPessoal = input.emailPessoal
       if (input.prefixoEmail) body.PrefixoEmail = input.prefixoEmail
       if (input.funcionarioId) body.FuncionarioId = input.funcionarioId
+      if (input.cpf) body.Cpf = input.cpf
+      if (input.criarNovo) body.CriarNovo = true
       const r = await chamar<Resposta>('cr40f_CadastrarAcessoMotorista', body)
       return { emailMicrosoft: r.EmailMicrosoft, senhaTemporaria: r.SenhaTemporaria, funcionarioId: r.FuncionarioId, linkApp: r.LinkApp, etapas: parseEtapas(r.Etapas) }
+    },
+    async parecidos(busca) {
+      const rows = await client.getAll(`${ENTITY_SET}?$select=cr40f_funcionariosid,cr40f_nomecompleto,cr40f_telefonecorporativo,cr40f_telefonepessoal,cr40f_numerodocpf,cr40f_funcao,cr40f_status,cr40f_emailmicrosoft`)
+      const texto = (v: unknown) => (typeof v === 'string' ? v : null)
+      const numero = (v: unknown) => (typeof v === 'number' ? v : null)
+      const linhas = rows.map((r) => ({ id: String(r.cr40f_funcionariosid), nome: texto(r.cr40f_nomecompleto) ?? '', telefones: [texto(r.cr40f_telefonecorporativo), texto(r.cr40f_telefonepessoal)], cpf: texto(r.cr40f_numerodocpf), funcao: numero(r.cr40f_funcao), status: numero(r.cr40f_status), emailMicrosoft: texto(r.cr40f_emailmicrosoft) }))
+      const achados = new Set(encontrarParecidos(busca, linhas, new Set()).map((p) => p.id))
+      const candidatas = linhas.filter((l) => achados.has(l.id))
+      // Acesso ativo só dos poucos parecidos com e-mail: evita baixar todos os systemusers.
+      const emails = [...new Set(candidatas.flatMap((l) => (l.emailMicrosoft ? [l.emailMicrosoft.trim().toLowerCase()] : [])))]
+      const ativos = emails.length === 0 ? [] : await client.getAll(`systemusers?$select=internalemailaddress&$filter=isdisabled eq false and (${emails.map((e) => `internalemailaddress eq '${odataString(e)}'`).join(' or ')})`)
+      return encontrarParecidos(busca, candidatas, new Set(ativos.map((u) => String(u.internalemailaddress ?? '').toLowerCase())))
     },
     async encerrar(funcionarioId, confirmacao) {
       const r = await chamar<{ Etapas: string }>('cr40f_EncerrarAcessoMotorista', { FuncionarioId: funcionarioId, Confirmacao: confirmacao })

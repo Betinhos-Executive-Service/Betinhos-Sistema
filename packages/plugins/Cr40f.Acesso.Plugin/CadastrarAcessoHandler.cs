@@ -3,12 +3,13 @@ using System.Linq;
 
 namespace Cr40f.Acesso.Plugin;
 
-public sealed class CadastroEntrada { public string NomeCompleto = ""; public string Celular = ""; public string? EmailPessoal; public string? PrefixoEmail; public int TipoVinculo = 1; public Guid? FuncionarioId; }
+public sealed class CadastroEntrada { public string NomeCompleto = ""; public string Celular = ""; public string? EmailPessoal; public string? PrefixoEmail; public int TipoVinculo = 1; public Guid? FuncionarioId; public string? Cpf; public bool CriarNovo; }
 public sealed class CadastroSaida { public string EmailMicrosoft = ""; public string SenhaTemporaria = ""; public Guid FuncionarioId; public string UsuarioEntraId = ""; public string LinkApp = ""; public Etapas Etapas = new(); }
 
 /// <summary>Cadastro idempotente: cada etapa confere o estado antes de agir. Falha relança com as etapas em Data["Etapas"].</summary>
 public sealed class CadastrarAcessoHandler
 {
+    internal const string MsgHomonimo = "Já existe funcionário parecido; confirme na tela se é a mesma pessoa.";
     internal const string MsgEncerrado = "Acesso encerrado antes. Use \"Reativar acesso\" na ficha do funcionário.";
     private readonly IGraphGateway _graph; private readonly FuncionarioRepository _repo; private readonly UsuarioDataverseRepository _usuarios; private readonly IPowerPlatformGateway _pp; private readonly AcessoConfig _cfg; private readonly Random _rng; private readonly Action<string> _trace;
     public CadastrarAcessoHandler(IGraphGateway graph, FuncionarioRepository repo, UsuarioDataverseRepository usuarios, IPowerPlatformGateway pp, AcessoConfig cfg, Random rng, Action<string> trace)
@@ -27,8 +28,11 @@ public sealed class CadastrarAcessoHandler
 
             var (existente, email, dono) = etapas.Executar("email", () =>
             {
-                // Sem FuncionarioId, reaproveita o funcionário criado sem e-mail numa execução que ficou com a liberação pendente.
-                var ex = entrada.FuncionarioId is Guid fid ? _repo.PorId(fid) ?? throw new AcessoException("FUNCIONARIO_NAO_ENCONTRADO", "Funcionário não encontrado.") : _repo.SemEmailPorNome(entrada.NomeCompleto);
+                // Sem FuncionarioId nunca adivinha a ficha: parecido (nome, celular ou CPF) volta para a tela confirmar,
+                // salvo CriarNovo (o operador disse que é outra pessoa). Retentativas mandam o FuncionarioId da 1ª resposta.
+                var ex = entrada.FuncionarioId is Guid fid ? _repo.PorId(fid) ?? throw new AcessoException("FUNCIONARIO_NAO_ENCONTRADO", "Funcionário não encontrado.") : null;
+                if (ex is null && !entrada.CriarNovo && _repo.TemParecido(entrada.NomeCompleto, celular, entrada.Cpf))
+                    throw new AcessoException("HOMONIMO_ENCONTRADO", MsgHomonimo);
                 string em;
                 if (ex?.EmailMicrosoft is { Length: > 0 } ja)
                 {
@@ -43,8 +47,9 @@ public sealed class CadastrarAcessoHandler
                     if (prefixo.Length == 0) throw new AcessoException("NOME_INVALIDO", "Não foi possível gerar o e-mail a partir do nome.");
                     // Com FuncionarioId a regra é estrita: conta existente é de outra pessoa, salvo a sobra de uma execução
                     // com liberação pendente (ativa, mesmo nome, já com licença e no grupo). Órfã sem licença não é vinculada.
+                    // CriarNovo: e-mail com ficha é de outra pessoa, mesmo homônima.
                     Func<string, bool> ocupado = ex is null
-                        ? upn => EmUsoPorOutraPessoa(upn, entrada.NomeCompleto)
+                        ? upn => EmUsoPorOutraPessoa(upn, entrada.NomeCompleto, entrada.CriarNovo)
                         : upn => _repo.PorEmail(upn) is { } d && d.Id != ex.Id
                             || _graph.UsuarioPorUpn(upn) is { } u && !SobraDeLiberacaoPendente(u, ex.Nome);
                     em = AcessoRules.EmailComSufixo(prefixo, _cfg.Dominio, ocupado);
@@ -67,7 +72,9 @@ public sealed class CadastrarAcessoHandler
                 }
                 if (_graph.LicencasLivres(_cfg.LicenseSkuId) <= 0) throw new AcessoException("SEM_LICENCA_DISPONIVEL", "Não há licença livre no plano configurado.");
                 saida.SenhaTemporaria = AcessoRules.GerarSenha(_rng);
-                u = _graph.CriarUsuario(email, entrada.NomeCompleto.Trim(), saida.SenhaTemporaria, celular, EmailValido(entrada.EmailPessoal));
+                // Conta com o nome da ficha: a retentativa reconhece a sobra pelo nome da ficha (SobraDeLiberacaoPendente).
+                var nomeConta = existente?.Nome is { Length: > 0 } nomeFicha ? nomeFicha : entrada.NomeCompleto;
+                u = _graph.CriarUsuario(email, nomeConta.Trim(), saida.SenhaTemporaria, celular, EmailValido(entrada.EmailPessoal));
                 etapas.Feita("usuario", "criado"); return u;
             });
             saida.UsuarioEntraId = usuario.Id;
@@ -136,13 +143,13 @@ public sealed class CadastrarAcessoHandler
     /// O e-mail só conta como ocupado se pertence a outra pessoa. Reaproveita (idempotência) quando o funcionário dono
     /// tem o mesmo nome, ou quando não há funcionário e o usuário do Entra tem o mesmo nome (sobra de tentativa que falhou).
     /// </summary>
-    private bool EmUsoPorOutraPessoa(string upn, string nome)
+    private bool EmUsoPorOutraPessoa(string upn, string nome, bool criarNovo)
     {
         var alvo = AcessoRules.NomeComparavel(nome);
         var usuario = _graph.UsuarioPorUpn(upn);
         if (usuario is { Ativo: false }) return true;   // R10: conta desativada conta como ocupada, mesmo homônimo exato
         var dono = _repo.PorEmail(upn);
-        if (dono is not null) return AcessoRules.NomeComparavel(dono.Nome) != alvo;
+        if (dono is not null) return criarNovo || AcessoRules.NomeComparavel(dono.Nome) != alvo;
         return usuario is not null && AcessoRules.NomeComparavel(usuario.DisplayName) != alvo;
     }
 

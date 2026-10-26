@@ -45,6 +45,9 @@ public static class AcessoRules
         return "+55" + digitos;
     }
 
+    /// <summary>Só os dígitos (CPF digitado com ou sem máscara).</summary>
+    public static string SoDigitos(string? texto) => new string((texto ?? "").Where(char.IsDigit).ToArray());
+
     public static string GerarSenha(Random rng)
     {
         var tudo = Maiusculas + Minusculas + Digitos + Simbolos;

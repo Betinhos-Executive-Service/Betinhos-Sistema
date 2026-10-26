@@ -370,6 +370,10 @@
   .acesso-etapas li[data-estado='feita'] svg { color: var(--bt-color-success); }
   .acesso-etapas li[data-estado='pendente'] svg { color: var(--bt-color-action); }
   .acesso-etapas__estado { margin-left: auto; color: var(--bt-color-text-secondary); }
+  .acesso-parecidos { display: grid; gap: var(--bt-space-2); list-style: none; padding: 0; margin: var(--bt-space-3) 0 0; }
+  .acesso-parecido { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--bt-space-2); padding: var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background: var(--bt-color-surface-neutral); }
+  .acesso-parecido__dados { display: grid; gap: var(--bt-space-1); flex: 1 1 14rem; min-width: 0; font-size: var(--bt-font-size-13); overflow-wrap: anywhere; }
+  .acesso-parecido__nota { color: var(--bt-color-text-secondary); font-weight: var(--bt-font-weight-semibold); }
   .acesso-progresso { display: grid; gap: var(--bt-space-2); padding: var(--bt-space-3); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background: var(--bt-color-surface-neutral); }
   .acesso-progresso__atual { display: flex; align-items: center; gap: var(--bt-space-2); margin: 0; font-weight: 600; color: var(--bt-color-text-primary); }
   .acesso-progresso__fases { display: grid; gap: var(--bt-space-1); margin: 0; padding-left: var(--bt-space-5); font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }

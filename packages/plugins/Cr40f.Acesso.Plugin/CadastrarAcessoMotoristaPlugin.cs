@@ -30,6 +30,8 @@ public sealed class CadastrarAcessoMotoristaPlugin : IPlugin
                 NomeCompleto = Texto(context, "NomeCompleto"), Celular = Texto(context, "Celular"), EmailPessoal = TextoOuNulo(context, "EmailPessoal"), PrefixoEmail = TextoOuNulo(context, "PrefixoEmail"),
                 TipoVinculo = context.InputParameters.Contains("TipoVinculo") && context.InputParameters["TipoVinculo"] is int tv ? tv : 1,
                 FuncionarioId = context.InputParameters.Contains("FuncionarioId") && context.InputParameters["FuncionarioId"] is Guid g && g != Guid.Empty ? g : null,
+                Cpf = TextoOuNulo(context, "Cpf"),
+                CriarNovo = context.InputParameters.Contains("CriarNovo") && context.InputParameters["CriarNovo"] is true,
             };
             var handler = new CadastrarAcessoHandler(new GraphGateway(cfg, GraphGateway.Compartilhado), new FuncionarioRepository(sistema), new UsuarioDataverseRepository(sistema), new PowerPlatformGateway(cfg, GraphGateway.Compartilhado), cfg, RandomSeguro(), m => tracing.Trace("{0}: {1}", Mensagem, m));
             var saida = handler.Executar(entrada);

@@ -1,10 +1,20 @@
 import type { AcessoSource, CadastroResultado, Etapa, ReativacaoResultado } from './acesso'
 import { AcessoError, MENSAGENS } from './acesso'
 import { normalizeSearch as semAcentos } from './format'
+import { encontrarParecidos, type LinhaFuncionario } from './parecidos'
 
 // 1,2 s: o bastante para ver o progresso no mock.
 const delay = <T,>(value: T, ms = 1200) => new Promise<T>((resolve) => setTimeout(() => resolve(value), ms))
 const MOCK_FUNCIONARIOS: Record<string, { nome: string; email: string | null }> = { m1: { nome: 'Carlos Alberto Teste', email: 'carlos.teste@betinhos.onmicrosoft.com' }, m7: { nome: 'Helena Simulada Costa', email: null }, m9: { nome: 'Joana Encerrada Teste', email: 'joana.teste@betinhos.onmicrosoft.com' } }
+
+/** Espelha linhas do mock de funcionários para exercitar o aviso de parecido: Carlos já tem acesso (CPF 529.982.247-25), Joana tem o celular 12 99123-4567 e acesso encerrado, Gustavo está desligado. */
+const MOCK_LINHAS: LinhaFuncionario[] = [
+  { id: 'm1', nome: 'Carlos Alberto Teste', telefones: ['+55 12 99000-0000'], cpf: '529.982.247-25', funcao: 202410000, status: 0, emailMicrosoft: 'carlos.teste@betinhos.onmicrosoft.com' },
+  { id: 'm6', nome: 'Gustavo Amostra Pires', telefones: ['+55 12 99000-0000'], cpf: null, funcao: 202410000, status: 1, emailMicrosoft: null },
+  { id: 'm7', nome: 'Helena Simulada Costa', telefones: ['+55 12 99000-0000'], cpf: null, funcao: 202410001, status: 0, emailMicrosoft: null },
+  { id: 'm9', nome: 'Joana Encerrada Teste', telefones: ['+5512991234567'], cpf: null, funcao: 202410000, status: 0, emailMicrosoft: 'joana.teste@betinhos.onmicrosoft.com' },
+]
+const MOCK_ATIVOS = new Set(['carlos.teste@betinhos.onmicrosoft.com'])
 
 /** Simulação em memória: nome com "Erro Graph" falha depois de criar o usuário; "Sem Licenca" falha antes; "Liberando" fica com a liberação pendente. */
 export function createAcessoMock(): AcessoSource {
@@ -15,6 +25,7 @@ export function createAcessoMock(): AcessoSource {
       const palavras = semAcentos(input.nomeCompleto.trim()).split(/\s+/).filter(Boolean)
       if (palavras.length < 2) throw new AcessoError('NOME_INVALIDO', MENSAGENS.NOME_INVALIDO, [])
       if (input.celular.replace(/\D/g, '').length !== 11) throw new AcessoError('CELULAR_INVALIDO', MENSAGENS.CELULAR_INVALIDO, [])
+      if (!input.funcionarioId && !input.criarNovo && encontrarParecidos({ nome: input.nomeCompleto, celular: input.celular, cpf: input.cpf }, MOCK_LINHAS, MOCK_ATIVOS).length > 0) throw new AcessoError('HOMONIMO_ENCONTRADO', MENSAGENS.HOMONIMO_ENCONTRADO, [])
       if (/sem licenca/i.test(semAcentos(input.nomeCompleto))) throw new AcessoError('SEM_LICENCA_DISPONIVEL', MENSAGENS.SEM_LICENCA_DISPONIVEL, [{ etapa: 'validacao', estado: 'feita', detalhe: 'ok' }, { etapa: 'usuario', estado: 'erro', detalhe: 'sem licença' }])
       const prefixo = input.prefixoEmail ? semAcentos(input.prefixoEmail).replace(/\s+/g, '.') : `${palavras[0]}.${palavras[palavras.length - 1]}`
       let email = `${prefixo}@betinhos.onmicrosoft.com`
@@ -33,6 +44,7 @@ export function createAcessoMock(): AcessoSource {
       }
       return delay(resultado)
     },
+    parecidos: (busca) => delay(encontrarParecidos(busca, MOCK_LINHAS, MOCK_ATIVOS), 400),
     async encerrar(funcionarioId, confirmacao) {
       const f = MOCK_FUNCIONARIOS[funcionarioId] ?? { nome: 'Funcionário Mock', email: 'x@betinhos.onmicrosoft.com' }
       if (!f.email) throw new AcessoError('FUNCIONARIO_SEM_EMAIL', MENSAGENS.FUNCIONARIO_SEM_EMAIL, [])
