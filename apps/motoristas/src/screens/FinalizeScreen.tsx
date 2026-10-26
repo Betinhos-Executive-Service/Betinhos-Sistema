@@ -4,12 +4,24 @@ import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { FieldError, MoneyInputField, SelectField, TextAreaField } from "../components/common/FormFields";
 import { DitadoField } from "../components/common/DitadoButton";
 import { PhotoAddButton } from "../components/common/PhotoAddButton";
+import { SystemIcon } from "../components/icons/SystemIcon";
 import { AppShell } from "../components/layout/AppShell";
 import { useCameraScroll } from "../app/cameraScroll";
 import { FormMenu } from "../components/navigation/FormMenu";
 import { appendDitado } from "../lib/useDitado";
 import { isExchangeOutsideWindow, organizeObservationRemote, type ExchangeWindowCheck } from "../lib/dataverse";
-import { buildOrganizedObservation, NO_OBSERVATION, prepareObservationReview, type OrganizeObservation } from "../lib/observacaoOrganizada";
+import {
+  canFinalizeReview,
+  isReviewStale,
+  NO_OBSERVATION,
+  prepareObservationReview,
+  refreshReview,
+  reviewFinalValue,
+  topicKind,
+  type OrganizeObservation,
+  type ReviewState,
+  type TopicKind
+} from "../lib/observacaoOrganizada";
 import { matchesExpenseCitySearch, type ExpenseReferenceData } from "../lib/expenses";
 import { buildWhatsAppUrl, openExternalUrl } from "../lib/localWorkflow";
 import { validateMaintenanceFinalizeFields, type MaintenanceFinalizeErrors } from "../lib/maintenanceFinalize";
@@ -106,54 +118,111 @@ function TextAreaBlock({
   );
 }
 
-type ObservationTopics = { original: string; topicos: string[] };
+const TOPIC_ICON_PATHS: Record<TopicKind, string> = {
+  atraso: "M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z",
+  espera: "M6 2h12M6 22h12M7 2v4a5 5 0 0 0 10 0V2M7 22v-4a5 5 0 0 1 10 0v4",
+  pedagio: "M3 20V8l9-5 9 5v12M3 20h18M9 20v-6h6v6",
+  combustivel: "M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M4 11h10M14 8l3 3v6a2 2 0 0 0 4 0V9l-3-3",
+  passageiro: "M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z",
+  ocorrencia: "M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z",
+  outros: "M5 12h.01M12 12h.01M19 12h.01"
+};
 
-function ObservationReview({ review, submitState, onConfirm, onEdit, onUseOriginal }: { review: ObservationTopics; submitState: ActionButtonState; onConfirm: () => void; onEdit: () => void; onUseOriginal: () => void }) {
-  const [activeAction, setActiveAction] = useState<"confirm" | "original" | "">("");
-  useEffect(() => {
-    if (submitState === "idle") setActiveAction("");
-  }, [submitState]);
+function TopicIcon({ topic }: { topic: string }) {
+  const kind = topicKind(topic);
+  if (!kind) return <span className="observation-topic-icon is-empty" aria-hidden="true" />;
+  return (
+    <span className={`observation-topic-icon is-${kind}`} aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d={TOPIC_ICON_PATHS[kind]} /></svg>
+    </span>
+  );
+}
+
+function ObservationReview({
+  review,
+  submitState,
+  onChangeOriginal,
+  onRefresh,
+  onFinalize
+}: {
+  review: ReviewState;
+  submitState: ActionButtonState;
+  onChangeOriginal: (text: string) => void;
+  onRefresh: () => void;
+  onFinalize: () => void;
+}) {
+  const stale = isReviewStale(review);
+  const updating = review.status === "updating";
+  const failed = review.status === "failed";
+  const canFinalize = canFinalizeReview(review);
+  const busy = submitState !== "idle";
+  // Depois de uma falha, o motorista pode tentar de novo se mudar o texto.
+  const showRefresh = (stale || (failed && review.original.trim() !== review.summarizedFrom)) && review.original.trim() !== "";
 
   return (
     <article className="finalize-card">
-      <div className="finalize-title">Confira os tópicos</div>
+      <div className="finalize-title">Confira o resumo do serviço</div>
       <div className="finalize-scroll">
-        <div className="finalize-form">
-          <section className="observation-review shadow" aria-label="Observação organizada">
-            <p className="observation-review-hint">Organizamos sua observação. Está correto?</p>
-            <ul className="observation-review-topics">
-              {review.topicos.map((topic, index) => (
-                <li key={`${index}-${topic}`}>{topic}</li>
-              ))}
-            </ul>
+        <div className="finalize-form observation-review-form">
+          {failed ? (
+            <p className="observation-review-warning" role="alert">
+              <SystemIcon name="warning" />
+              Não foi possível resumir agora. Você pode finalizar com o texto que falou.
+            </p>
+          ) : (
+            <section className={`observation-review shadow${stale || updating ? " is-stale" : ""}`} aria-label="Resumo do serviço">
+              <ul className="observation-review-topics">
+                {review.topicos.map((topic, index) => (
+                  <li key={`${index}-${topic}`}>
+                    <TopicIcon topic={topic} />
+                    <span>{topic}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          <section className="observation-original" aria-label="O que você falou">
+            <div className="observation-original-head">
+              <span className="observation-original-title">O que você falou</span>
+              <span className="observation-original-hint">Toque para corrigir</span>
+            </div>
+            <DitadoField stopWhen={busy || updating} onFinal={(text) => onChangeOriginal(appendDitado(review.original, text))}>
+              <textarea
+                className="observation-original-input"
+                aria-label="O que você falou. Toque para corrigir"
+                rows={4}
+                value={review.original}
+                disabled={busy || updating}
+                onChange={(event) => onChangeOriginal(event.target.value)}
+              />
+            </DitadoField>
+            {showRefresh || updating ? (
+              <ActionButton
+                className="observation-refresh"
+                variant="secondary"
+                idleLabel="Atualizar resumo"
+                loadingLabel="Atualizando resumo…"
+                state={updating ? "loading" : "idle"}
+                disabled={busy}
+                onClick={onRefresh}
+              />
+            ) : null}
           </section>
         </div>
       </div>
-      <ActionBar className="finalize-actions observation-review-actions">
-        <ActionButton
-          className="finalize-secondary"
-          idleLabel="Usar o texto original"
-          state={submitState}
-          active={activeAction === "original"}
-          variant="secondary"
-          onClick={() => {
-            setActiveAction("original");
-            onUseOriginal();
-          }}
-        />
-        <ActionButton className="finalize-secondary" idleLabel="Editar" state={submitState} active={false} variant="secondary" onClick={onEdit} />
-        <ActionButton
-          className="finalize-primary"
-          idleLabel="Confirmar"
-          state={submitState}
-          active={activeAction === "confirm"}
-          variant="primary"
-          onClick={() => {
-            setActiveAction("confirm");
-            onConfirm();
-          }}
-        />
-      </ActionBar>
+      <div className="observation-review-footer">
+        {!canFinalize && !busy ? <p className="observation-review-blocked">Atualize o resumo antes de finalizar</p> : null}
+        <ActionBar className="finalize-actions observation-review-actions">
+          <ActionButton
+            className="finalize-primary"
+            idleLabel="Está certo, finalizar"
+            state={submitState}
+            variant="primary"
+            disabled={!canFinalize}
+            onClick={onFinalize}
+          />
+        </ActionBar>
+      </div>
     </article>
   );
 }
@@ -173,7 +242,7 @@ function ServiceFinalize({
 }) {
   const [obs, setObs] = useState(initialObservation);
   const [organizing, setOrganizing] = useState(false);
-  const [review, setReview] = useState<ObservationTopics | null>(null);
+  const [review, setReview] = useState<ReviewState | null>(null);
 
   useEffect(() => {
     setObs(initialObservation);
@@ -188,8 +257,14 @@ function ServiceFinalize({
     setOrganizing(true);
     const prepared = await prepareObservationReview(obs, organizeObservation);
     setOrganizing(false);
-    if (prepared.kind === "review") setReview({ original: prepared.original, topicos: prepared.topicos });
-    else finish(prepared.value);
+    if (prepared.kind === "direct") finish(prepared.value);
+    else setReview({ original: prepared.original, summarizedFrom: prepared.summarizedFrom, topicos: prepared.topicos, status: prepared.status });
+  };
+
+  const refresh = async (current: ReviewState) => {
+    setReview({ ...current, status: "updating" });
+    const next = await refreshReview(current, organizeObservation);
+    setReview((latest) => (latest && latest.original === current.original ? next : latest));
   };
 
   if (review) {
@@ -197,12 +272,9 @@ function ServiceFinalize({
       <ObservationReview
         review={review}
         submitState={submitState}
-        onConfirm={() => finish(buildOrganizedObservation(review.topicos, review.original))}
-        onUseOriginal={() => finish(review.original)}
-        onEdit={() => {
-          setObs(review.original);
-          setReview(null);
-        }}
+        onChangeOriginal={(text) => setReview((current) => (current ? { ...current, original: text } : current))}
+        onRefresh={() => void refresh(review)}
+        onFinalize={() => finish(reviewFinalValue(review))}
       />
     );
   }

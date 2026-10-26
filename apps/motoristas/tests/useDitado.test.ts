@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { appendDitado, createDitado, getDitadoCtor, DITADO_IDLE, type DitadoRecognition, type DitadoState } from "../src/lib/useDitado.ts";
+import { appendDitado, formatDitadoTimer, createDitado, getDitadoCtor, DITADO_IDLE, type DitadoRecognition, type DitadoState } from "../src/lib/useDitado.ts";
 
 class FakeRecognition implements DitadoRecognition {
   static last: FakeRecognition | null = null;
@@ -165,4 +165,10 @@ test("nova sessão de escuta zera o último final", () => {
   ctrl.start();
   FakeRecognition.last!.emit([["bom dia", true]]);
   assert.deepEqual(finals, ["bom dia", "bom dia"]);
+});
+
+test("contador do ditado em mm:ss", () => {
+  assert.equal(formatDitadoTimer(0), "00:00");
+  assert.equal(formatDitadoTimer(9999), "00:09");
+  assert.equal(formatDitadoTimer(125000), "02:05");
 });
