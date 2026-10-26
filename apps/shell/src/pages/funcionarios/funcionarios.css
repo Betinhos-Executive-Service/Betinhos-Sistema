@@ -352,14 +352,23 @@
   /* Drawer Cadastrar acesso ao App Motoristas */
   .drawer--acesso { width: min(var(--bt-layout-drawer-width), 96vw); }
   .drawer--acesso form { display: grid; gap: var(--bt-space-3); }
-  /* Só cabeçalho, corpo e rodapé: sem isso o rodapé cai na linha elástica e abre um vazio sob o formulário. */
-  .drawer.drawer--acesso { grid-template-rows: auto minmax(0, 1fr) auto; }
-  .drawer--acesso .drawer-foot { justify-content: flex-end; }
-  .acesso-select { position: relative; }
-  .acesso-select select { appearance: none; cursor: pointer; padding-right: var(--bt-space-6); }
-  .acesso-select__caret { position: absolute; right: var(--bt-space-3); pointer-events: none; }
+  .acesso-opcao { display: inline-flex; align-items: center; gap: var(--bt-space-1-5); }
   .acesso-bloco .acesso-estado { clear: both; display: flex; flex-wrap: wrap; gap: var(--bt-space-3); align-items: baseline; margin-bottom: var(--bt-space-2); }
   .acesso-previa { margin: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); }
+  .drawer.drawer--acesso { grid-template-rows: auto minmax(0, 1fr) auto; }
+  .drawer--acesso form { gap: var(--bt-space-5); }
+  .acesso-secao { display: grid; gap: var(--bt-space-3); }
+  .acesso-secao__titulo { margin: 0; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); letter-spacing: .04em; text-transform: uppercase; color: var(--bt-color-text-secondary); }
+  .acesso-campo { display: grid; gap: var(--bt-space-1-5); }
+  .acesso-opcional { font-weight: var(--bt-font-weight-regular); color: var(--bt-color-text-secondary); }
+  .acesso-info { display: grid; gap: var(--bt-space-0-5); padding: var(--bt-space-2-5) var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-control); background-color: var(--bt-color-neutral-050); }
+  .acesso-info__label { font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-secondary); }
+  .acesso-info__valor { font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text); }
+  .acesso-info__nota { margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+  .acesso-previa strong { color: var(--bt-color-text); overflow-wrap: anywhere; }
+  .acesso-info__erro { font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-danger); }
+  .acesso-efeito { margin: 0; padding: var(--bt-space-2-5) var(--bt-space-3); border-radius: var(--bt-radius-control); background-color: var(--bt-color-surface); font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }
+  .drawer--acesso .drawer-foot { justify-content: flex-end; }
   .acesso-resultado { display: grid; gap: var(--bt-space-4); }
   .acesso-credenciais { display: grid; gap: var(--bt-space-3); margin: 0; }
   .acesso-credencial { display: grid; gap: var(--bt-space-1); padding: var(--bt-space-3); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background: var(--bt-color-surface-neutral); }
