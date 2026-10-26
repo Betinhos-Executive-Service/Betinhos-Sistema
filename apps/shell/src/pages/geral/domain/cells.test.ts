@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { READONLY, cellKind, statusTone } from './cells'
+import { READONLY, cellKind, readonlyHint, statusTone } from './cells'
 import { formatCell, formatMoney, fromDateTimeLocal, parseMoney, toDateTimeLocal } from './format'
 import type { AttributeInfo, Column } from './types'
 
@@ -28,6 +28,14 @@ describe('cellKind', () => {
     expect(READONLY.has('cr40f_endereodesada')).toBe(true)
     expect(cellKind(col('cr40f_criadopor'), info('Lookup'))).toBe('readonly')
     expect(cellKind(col('cr40f_modificadopor'), info('Lookup'))).toBe('readonly')
+  })
+})
+
+describe('readonlyHint', () => {
+  it('passageiros aponta para os vínculos; outras e link-entity não têm dica', () => {
+    expect(readonlyHint(col('cr40f_passageirosetelefonedecontato'))).toBe('Edite pelos passageiros da OS.')
+    expect(readonlyHint(col('cr40f_passageirosetelefonedecontato', 'a_1'))).toBeNull()
+    expect(readonlyHint(col('cr40f_id'))).toBeNull()
   })
 })
 

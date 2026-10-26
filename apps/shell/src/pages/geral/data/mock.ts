@@ -49,12 +49,15 @@ export const MOCK_ATTRIBUTES: AttributeMap = new Map([
   info('cr40f_cotao', 'Money', 'Cotação'),
   info('cr40f_receber', 'Boolean', 'Receber', { options: SIM_NAO }),
   info('cr40f_observaointerna', 'Memo', 'Observação interna'),
+  // Atualizável na metadata, como no DEV: a trava vem de READONLY (o plugin DriverRecordSharing monta o texto).
+  info('cr40f_passageirosetelefonedecontato', 'Memo', 'Passageiros e telefone de contato'),
   info('createdon', 'DateTime', 'Criado em', { updatable: false }),
 ])
 
 const AGENDA_COLS = [
   'cr40f_id', 'cr40f_status', 'cr40f_statusdefaturamento', 'cr40f_dataehorriodesada', 'cr40f_motorista', 'cr40f_veiculo',
   'cr40f_tipodeveiculo', 'cr40f_cliente', 'cr40f_trajeto', 'cr40f_cotao', 'cr40f_receber', 'cr40f_observaointerna',
+  'cr40f_passageirosetelefonedecontato',
 ]
 const HOJE_COLS = ['cr40f_id', 'cr40f_dataehorriodesada', 'cr40f_status', 'cr40f_motorista', 'cr40f_veiculo', 'cr40f_cliente', 'cr40f_trajeto', 'cr40f_cotao']
 const SEM_MOTORISTA_COLS = ['cr40f_id', 'cr40f_dataehorriodesada', 'cr40f_status', 'cr40f_cliente', 'cr40f_solicitante', 'cr40f_trajeto', 'cr40f_tipodeveiculo', 'cr40f_cotao']
@@ -71,6 +74,14 @@ export function createMockViews(): View[] {
     { id: 'mock-hoje', nome: 'Hoje', grupo: 'sistema', padrao: false, fetchxml: fetch(HOJE_COLS, '<condition attribute="cr40f_dataehorriodesada" operator="today" />'), layoutxml: layout(HOJE_COLS) },
     { id: 'mock-sem-motorista', nome: 'Sem motorista', grupo: 'sistema', padrao: false, fetchxml: fetch(SEM_MOTORISTA_COLS, '<condition attribute="cr40f_motorista" operator="null" />'), layoutxml: layout(SEM_MOTORISTA_COLS) },
   ]
+}
+
+/** Texto no formato do plugin: vazio (OS sem vínculos), um passageiro ou vários (`;\r\n` entre eles, ` / ` entre telefones). */
+const paxText = (i: number) => {
+  const one = (n: number) => `Passageiro ${n} (11) 9${String(10000000 + n * 137).slice(0, 8)}`
+  if (i % 5 === 0) return null
+  if (i % 5 === 1) return [`${one(i + 1)} / (11) 3456-7890`, one(i + 2), `${one(i + 3)} / (21) 99876-5432`].join(';\r\n')
+  return one(i + 1)
 }
 
 const TRAJETOS = ['GRU → Hotel Unique', 'Hotel Fasano → CGH', 'Escritório Faria Lima → GRU', 'VCP → Alphaville', 'Residência → Evento Jockey', 'GRU → Hotel Tivoli', 'Santos → Aeroporto de Viracopos']
@@ -104,7 +115,7 @@ export function createMockRows(now: Date): Row[] {
       cr40f_receber: i % 3 !== 0,
       [`cr40f_receber${F}`]: i % 3 !== 0 ? 'Sim' : 'Não',
       cr40f_observaointerna: i % 4 === 0 ? 'Confirmar placa do veículo com o motorista.' : null,
-      cr40f_passageirosetelefonedecontato: `Passageiro ${i + 1} (11) 9${String(10000000 + i * 137).slice(0, 8)}`,
+      cr40f_passageirosetelefonedecontato: paxText(i),
       cr40f_endereodesada: 'Av. Brigadeiro Faria Lima, 1000',
       cr40f_destino: 'Aeroporto de Guarulhos',
       cr40f_obsdeoperao: null,
