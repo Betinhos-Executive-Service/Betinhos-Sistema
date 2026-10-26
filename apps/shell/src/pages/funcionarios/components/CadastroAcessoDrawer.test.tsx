@@ -101,13 +101,13 @@ describe('CadastroAcessoDrawer', () => {
 
   it('nome da ficha aparece como informação; celular formatado na tela e original para a API', async () => {
     const cadastrar = vi.fn<AcessoSource['cadastrar']>(async () => ok)
-    renderDrawer(src(cadastrar), { inicial: { funcionarioId: 'f1', nomeCompleto: 'Ana Lima', celular: '+5512997135174' } })
+    renderDrawer(src(cadastrar), { inicial: { funcionarioId: 'f1', nomeCompleto: 'Ana Lima', celular: '+5512900005174' } })
     expect(screen.queryByLabelText(/Nome completo/)).toBeNull()
     expect(screen.getByText('Ana Lima')).toBeTruthy()
     expect(screen.getByText(/da ficha do funcionário/)).toBeTruthy()
-    expect((screen.getByLabelText(/Celular/) as HTMLInputElement).value).toBe('(12) 99713-5174')
+    expect((screen.getByLabelText(/Celular/) as HTMLInputElement).value).toBe('(12) 90000-5174')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Criar acesso/ })) })
-    expect(cadastrar.mock.calls[0][0]).toMatchObject({ celular: '+5512997135174' })
+    expect(cadastrar.mock.calls[0][0]).toMatchObject({ celular: '+5512900005174' })
   })
 
   it('nome de uma palavra pede sobrenome antes de enviar (o plugin recusa); prévia aparece uma vez', () => {
