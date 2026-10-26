@@ -21,6 +21,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Sem dado pessoal real (CPF válido, e-mail de pessoa, backup de flow) no repositório.
+      - run: node --test scripts/dados-pessoais.test.mjs && node scripts/dados-pessoais.mjs
       - run: pnpm typecheck
       - run: pnpm test
       - name: Varredura de segredos na solução

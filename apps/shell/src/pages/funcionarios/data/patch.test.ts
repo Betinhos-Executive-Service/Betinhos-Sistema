@@ -74,7 +74,7 @@ describe('validateDraft', () => {
   })
 
   it('formata telefone e CPF', () => {
-    expect(formatPhone('1290000x00')).toBe('+55 12 90000x00')
+    expect(formatPhone('12900007000')).toBe('+55 12 90000-7000')
     expect(isValidCpf('529.982.247-25')).toBe(true)
   })
 })

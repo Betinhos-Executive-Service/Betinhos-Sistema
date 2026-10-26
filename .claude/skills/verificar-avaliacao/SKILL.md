@@ -30,7 +30,7 @@ POST `application/json` em `$u`:
 1. Elogio: `{ linkId: $L, titulo: "Embarque OS-xxxx", nota: 5, comentario: "Motorista <b>pontual</b> & \"educado\"", classificacao: "elogio", avaliadoEm: <agora ISO> }`.
    - Espera `200 { ok: true, avaliacaoId }`.
    - A avaliação fica com nome `OS-xxxx · nota 5` e reserva, motorista e veículo (se houver) ligados.
-   - Chega e-mail "Elogio de cliente · OS-xxxx" em fulano.real@betinhos.com.br, com o comentário escapado (aparece `<b>` literal, sem negrito).
+   - Chega e-mail "Elogio de cliente · OS-xxxx" na caixa da operação (o `-EmailOperacao` usado no provisionamento), com o comentário escapado (aparece `<b>` literal, sem negrito).
 2. Duplicado: o mesmo POST de novo responde `200 { ok: true, duplicada: true }` e nada novo é criado. Dois POSTs simultâneos (`Start-Job`) do mesmo linkId novo: o resultado é uma avaliação só, e o segundo POST responde duplicada (chave alternativa).
 3. Sugestão (outro linkId): `classificacao: "sugestao"`, com comentário.
    - Cria `cr40f_boasideias` "Sugestão de cliente · …" com status 100000000 Nova e `cr40f_detalhes` contendo comentário e nota.
