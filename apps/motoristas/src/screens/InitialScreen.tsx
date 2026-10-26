@@ -13,72 +13,56 @@ const baseModules = [
     id: "services",
     label: "Serviços",
     detail: "Corridas de hoje",
-    action: "Abrir agora",
     icon: "services",
-    tone: "primary",
     disabled: false,
   },
   {
     id: "history",
     label: "Histórico",
     detail: "Serviços finalizados",
-    action: "Ver histórico",
     icon: "history",
-    tone: "neutral",
     disabled: false,
   },
   {
     id: "comunicados",
     label: "Comunicados",
     detail: "Avisos da operação",
-    action: "Ver comunicados",
     icon: "comunicados",
-    tone: "neutral",
     disabled: false,
   },
   {
     id: "checklists",
     label: "Checklist",
     detail: "Vistoria do veículo",
-    action: "Abrir",
     icon: "checklist",
-    tone: "neutral",
     disabled: false,
   },
   {
     id: "multas",
     label: "Multas",
     detail: "Termos para assinar",
-    action: "Abrir",
     icon: "multas",
-    tone: "neutral",
     disabled: false,
   },
   {
     id: "maintenancePhoto",
     label: "Manutenção",
     detail: "Solicitar reparo",
-    action: "Abrir",
     icon: "maintenance",
-    tone: "neutral",
     disabled: false,
   },
   {
     id: "expenses",
     label: "Gastos",
     detail: "Registrar despesas",
-    action: "Abrir",
     icon: "expenses",
-    tone: "neutral",
     disabled: false,
   },
   {
     id: "collisions",
     label: "Colis\u00f5es",
     detail: "Registro de colis\u00f5es",
-    action: "Abrir",
     icon: "collisions",
-    tone: "neutral",
     disabled: false,
   }
 ];
@@ -88,9 +72,7 @@ const ideasModule = {
   id: "ideas",
   label: "Boas ideias",
   detail: "Sugerir melhorias",
-  action: "Abrir",
   icon: "ideas",
-  tone: "neutral",
   disabled: false,
 };
 
@@ -397,6 +379,8 @@ function ModuleIcon({ name }: { name: string }) {
   );
 }
 
+const plural = (n: number) => (n === 1 ? "" : "s");
+
 export function InitialScreen(props: InitialScreenProps) {
   const shellRef = useRef<HTMLElement | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -412,9 +396,7 @@ export function InitialScreen(props: InitialScreenProps) {
             id: "personalReceipt",
             label: "Recibo personalizado",
             detail: "Gerar recibo sob demanda",
-            action: "Abrir",
             icon: "receipt",
-            tone: "neutral",
             disabled: false
           }
         ]
@@ -422,6 +404,19 @@ export function InitialScreen(props: InitialScreenProps) {
     ).concat([ideasModule]),
     [props.canGeneratePersonalReceipt]
   );
+
+  const servicesModule = modules.find((module) => module.id === "services");
+  const gridModules = modules.filter((module) => module.id !== "services");
+  const multasPrazo = props.multasBanner?.split(" · ")[1];
+  const pendingTypes = [
+    { id: "checklists", count: props.pendingChecklists ?? 0, text: (n: number) => `${n} checklist${plural(n)} pendente${plural(n)}` },
+    { id: "multas", count: props.pendingMultas ?? 0, text: (n: number) => `${n} multa${plural(n)} para assinar${multasPrazo ? ` · ${multasPrazo}` : ""}` },
+    { id: "comunicados", count: props.pendingComunicados ?? 0, text: (n: number) => `${n} comunicado${plural(n)} para ler` },
+  ];
+  const pendingCounts: Record<string, number> = Object.fromEntries(pendingTypes.map((type) => [type.id, type.count]));
+  const pendencias = pendingTypes
+    .filter((type) => type.count > 0)
+    .map((type) => ({ id: type.id, text: type.text(type.count) }));
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
@@ -476,39 +471,60 @@ export function InitialScreen(props: InitialScreenProps) {
         </button>
       )}
 
-      {props.multasBanner ? (
-        <button className="concept-multas-banner" type="button" onClick={() => navigateTo("multas")}>
-          <span>{props.multasBanner}</span>
-          <strong>Ver multas</strong>
+      {servicesModule && (
+        <button
+          className="concept-module-card concept-module-card--primary"
+          type="button"
+          disabled={servicesModule.disabled}
+          aria-disabled={servicesModule.disabled}
+          onClick={() => navigateTo("services")}
+        >
+          <span className="concept-module-meta" aria-hidden="true">
+            <ModuleIcon name={servicesModule.icon} />
+          </span>
+          <span className="concept-module-text">
+            <strong>{servicesModule.label}</strong>
+            <small>
+              {servicesModule.detail}
+              {agendaCount > 0 ? <span className="concept-inline-count"> • {agendaCount}</span> : null}
+            </small>
+          </span>
         </button>
-      ) : null}
+      )}
 
-      <section className="concept-module-grid" aria-label="Módulos do aplicativo">
-        {modules.map((module) => (
-          <button
-            className={`concept-module-card concept-module-card--${module.tone}`}
-            key={module.id}
-            type="button"
-            disabled={module.disabled}
-            aria-disabled={module.disabled}
-            onClick={() => navigateTo(module.id)}
-          >
-            <span className="concept-module-meta" aria-hidden="true">
-              <ModuleIcon name={module.icon} />
-            </span>
-            <span className="concept-module-text">
-              <strong>{module.label}</strong>
-              <small>
-                {module.detail}
-                {module.id === "services" && agendaCount > 0 ? <span className="concept-inline-count"> • {agendaCount}</span> : null}
-                {module.id === "comunicados" && (props.pendingComunicados ?? 0) > 0 ? <span className="concept-inline-count"> • {props.pendingComunicados} pendente{props.pendingComunicados === 1 ? "" : "s"}</span> : null}
-                {module.id === "multas" && (props.pendingMultas ?? 0) > 0 ? <span className="concept-inline-count"> • {props.pendingMultas} pendente{props.pendingMultas === 1 ? "" : "s"}</span> : null}
-                {module.id === "checklists" && (props.pendingChecklists ?? 0) > 0 ? <span className="concept-inline-count"> • {props.pendingChecklists} pendente{props.pendingChecklists === 1 ? "" : "s"}</span> : null}
-              </small>
-            </span>
-            <span className="concept-module-action">{module.action}</span>
-          </button>
-        ))}
+      {pendencias.length > 0 && (
+        <section className="concept-pending" aria-label="Pendências">
+          {pendencias.map((item) => (
+            <button className="concept-pending-row" key={item.id} type="button" onClick={() => navigateTo(item.id)}>
+              <span className="concept-pending-dot" aria-hidden="true" />
+              <span className="concept-pending-text">{item.text}</span>
+              <span className="concept-pending-chevron" aria-hidden="true">›</span>
+            </button>
+          ))}
+        </section>
+      )}
+
+      <section className="concept-tile-grid" aria-label="Módulos do aplicativo">
+        {gridModules.map((module) => {
+          const count = pendingCounts[module.id] ?? 0;
+          return (
+            <button
+              className="concept-tile"
+              key={module.id}
+              type="button"
+              disabled={module.disabled}
+              aria-disabled={module.disabled}
+              aria-label={count > 0 ? `${module.label}, ${count} pendente${plural(count)}` : module.label}
+              onClick={() => navigateTo(module.id)}
+            >
+              <span className="concept-tile-icon" aria-hidden="true">
+                <ModuleIcon name={module.icon} />
+                {count > 0 ? <span className="concept-tile-badge">{count > 9 ? "9+" : count}</span> : null}
+              </span>
+              <span className="concept-tile-label">{module.label}</span>
+            </button>
+          );
+        })}
       </section>
 
       <footer className="concept-footer">
