@@ -508,8 +508,9 @@ export function InitialScreen(props: InitialScreenProps) {
         <section className="concept-pending" aria-label="Pendências">
           {pendencias.map((item) => (
             <button className="concept-pending-row" key={item.id} type="button" onClick={() => navigateTo(item.id)}>
-              <span>{item.text}</span>
-              <strong>Abrir</strong>
+              <span className="concept-pending-dot" aria-hidden="true" />
+              <span className="concept-pending-text">{item.text}</span>
+              <span className="concept-pending-chevron" aria-hidden="true">›</span>
             </button>
           ))}
         </section>
