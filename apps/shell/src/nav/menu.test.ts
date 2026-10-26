@@ -22,7 +22,7 @@ it('Resumo Operacional é rota React do shell', () => {
 
 it('usa rótulo do sitemap, depois metadata, depois nome lógico', () => {
   const labels = new Map([['cr40f_recibos_v2', 'Recibos']])
-  expect(itemLabel(findItem('cr40f_clientes1')!.item, labels)).toBe('Clientes')
+  expect(itemLabel(findItem('clientes')!.item, labels)).toBe('Clientes')
   expect(itemLabel(findItem('cr40f_recibos_v2')!.item, labels)).toBe('Recibos')
   expect(itemLabel(findItem('cr40f_trocasdecarro')!.item, labels)).toBe('cr40f_trocasdecarro')
 })
@@ -41,7 +41,7 @@ it('Equipamentos é rota React em Cadastros', () => {
 
 it('Frota tem um item por visão, sem as tabelas legadas nem Infrações solta', () => {
   const frota = MENU.find((group) => group.id === 'frota')!
-  expect(frota.items.map((item) => item.label)).toEqual(['Pendências', 'Veículos', 'Manutenções', 'Multas', 'Parcelas de multa', 'Colisões', 'Indicadores', 'Plano preventivo', 'Assistente', 'Checklists de Veículos'])
+  expect(frota.items.map((item) => item.label)).toEqual(['Pendências', 'Veículos', 'Manutenções', 'Multas', 'Colisões', 'Indicadores', 'Plano preventivo', 'Assistente', 'Checklists de Veículos'])
   expect(ENTITY_NAMES).not.toContain('cr40f_manutencoes')
   expect(ENTITY_NAMES).not.toContain('cr40f_multas')
   expect(ENTITY_NAMES).not.toContain('cr40f_colisao_v2')
@@ -65,10 +65,10 @@ it('Geral é rota React do shell no lugar da lista nativa de reservas', () => {
   expect(findItem('cr40f_reservadeveculos')).toBeNull()
 })
 
-it('Parcelas de multa é tabela em Frota, logo após Multas, para o DP', () => {
-  const found = findItem('new_parcelamultafolha')
-  expect(found?.group.id).toBe('frota')
-  expect(found?.item).toMatchObject({ kind: 'entity', entity: 'new_parcelamultafolha', label: 'Parcelas de multa' })
-  const ids = found!.group.items.map((item) => item.id)
-  expect(ids.indexOf('new_parcelamultafolha')).toBe(ids.indexOf('frota-multas') + 1)
+it('Parcelas de multa sai do menu; Clientes é rota React em Cadastros', () => {
+  expect(findItem('new_parcelamultafolha')).toBeNull()
+  expect(findItem('clientes')?.group.id).toBe('cadastros')
+  expect(findItem('clientes')?.item).toMatchObject({ kind: 'page', page: 'clientes', label: 'Clientes' })
+  expect(findItem('cr40f_clientes1')).toBeNull()
+  expect(rotaAtualizada('cr40f_clientes1', new URLSearchParams('ver=c1'))).toEqual({ id: 'clientes', query: new URLSearchParams('ver=c1') })
 })
