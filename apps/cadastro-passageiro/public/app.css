@@ -153,6 +153,7 @@ input[aria-invalid=true] { border-color: var(--err); }
 /* Foto sendo preparada */
 .foto-carregando { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(255, 255, 255, .72); border-radius: inherit; z-index: 3; }
 .foto.preparando .foto-input { pointer-events: none; }
+.foto.carregando { border-style: solid; border-color: var(--line); }
 .foto.nova img { animation: entra .22s var(--ease-out); }
 
 /* Campo validado ao sair */

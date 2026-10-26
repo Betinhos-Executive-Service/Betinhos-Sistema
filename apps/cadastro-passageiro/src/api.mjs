@@ -56,15 +56,20 @@ async function limiteTaxa(request, env) {
 // JPEG 96×96 (silhueta) só para o modo local mostrar a foto atual.
 const FOTO_MOCK = "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";
 
-function mockResposta(op, corpo) {
+async function mockResposta(op, corpo) {
+  const foto = { mimeType: "image/jpeg", base64: FOTO_MOCK };
+  if (op === "foto") {
+    // Atraso para ver o spinner da foto no modo local; Beatriz (…003) não tem foto.
+    await new Promise((r) => setTimeout(r, 900));
+    return json(200, { ok: true, foto: corpo.passageiroId.endsWith("3") ? null : foto });
+  }
   if (op === "ler") {
-    const foto = { mimeType: "image/jpeg", base64: FOTO_MOCK };
     return json(200, {
       dataServico: new Date(Date.now() + 86400000).toISOString(),
       passageiros: [
-        { id: "00000000-0000-0000-0000-000000000001", primeiroNome: "Mariana", temFoto: true, foto,
+        { id: "00000000-0000-0000-0000-000000000001", primeiroNome: "Mariana", temFoto: true, foto: null,
           temTelefone: true, telefoneMascarado: "(11) •••••-4321", temEmail: true, emailMascarado: "ma•••@empresa.com.br" },
-        { id: "00000000-0000-0000-0000-000000000002", primeiroNome: "Carlos", temFoto: true, foto, temTelefone: false, temEmail: false },
+        { id: "00000000-0000-0000-0000-000000000002", primeiroNome: "Carlos", temFoto: true, foto: null, temTelefone: false, temEmail: false },
         { id: "00000000-0000-0000-0000-000000000003", primeiroNome: "Beatriz", temFoto: false, temTelefone: false, temEmail: false },
       ],
     });
@@ -75,7 +80,16 @@ function mockResposta(op, corpo) {
 }
 
 // Só repassa os campos esperados do "ler"; telefone/e-mail só passam se vierem mascarados (com •).
+// O flow monta a lista em paralelo, então a ordem vem por nome.
 const mascarado = (v) => (typeof v === "string" && v.includes("•") ? v : "");
+const porNome = (a, b) => String(a.primeiroNome || "").localeCompare(String(b.primeiroNome || ""), "pt-BR");
+
+// Foto do "foto": só imagem em base64; qualquer outra coisa vira null.
+export function limparFoto(dados) {
+  const f = dados?.foto;
+  const ok = f && typeof f.base64 === "string" && /^[A-Za-z0-9+/=]+$/.test(f.base64);
+  return { foto: ok ? { mimeType: typeof f.mimeType === "string" ? f.mimeType : "image/jpeg", base64: f.base64 } : null };
+}
 export function limparLer(dados) {
   if (!dados || !Array.isArray(dados.passageiros)) return null;
   return {
@@ -89,14 +103,16 @@ export function limparLer(dados) {
       telefoneMascarado: mascarado(p?.telefoneMascarado),
       temEmail: Boolean(p?.temEmail),
       emailMascarado: mascarado(p?.emailMascarado),
-    })),
+    })).sort(porNome),
   };
 }
+
+const idValido = (id) => typeof id === "string" && /^[0-9a-fA-F-]{36}$/.test(id);
 
 // Monta o payload de "salvar" só com campos válidos e preenchidos. Retorna null se inválido.
 export function payloadSalvar(corpo) {
   const { passageiroId, fotoBase64, telefone, email } = corpo;
-  if (typeof passageiroId !== "string" || !/^[0-9a-fA-F-]{36}$/.test(passageiroId)) return null;
+  if (!idValido(passageiroId)) return null;
   const p = { passageiroId };
   if (fotoBase64 != null && fotoBase64 !== "") {
     if (typeof fotoBase64 !== "string" || !/^[A-Za-z0-9+/=]+$/.test(fotoBase64)) return null;
@@ -120,7 +136,7 @@ export async function tratarApi(request, env, url, fetcher = fetch) {
   if (origem && origem !== url.origin && !local) return erro(403, "origem");
   if (!(await limiteTaxa(request, env))) return erro(429, "limite");
 
-  const op = url.pathname === "/api/ler" ? "ler" : url.pathname === "/api/salvar" ? "salvar" : null;
+  const op = { "/api/ler": "ler", "/api/foto": "foto", "/api/salvar": "salvar" }[url.pathname] || null;
   if (!op) return erro(404, "rota");
 
   const { grande, dados } = await lerCorpo(request);
@@ -128,6 +144,10 @@ export async function tratarApi(request, env, url, fetcher = fetch) {
   if (!dados || typeof dados !== "object" || !tokenValido(dados.token)) return erro(400, "invalido");
 
   let extra = {};
+  if (op === "foto") {
+    if (!idValido(dados.passageiroId)) return erro(400, "invalido");
+    extra = { passageiroId: dados.passageiroId.toLowerCase() };
+  }
   if (op === "salvar") {
     extra = payloadSalvar(dados);
     if (!extra) return erro(400, "invalido");
@@ -151,6 +171,7 @@ export async function tratarApi(request, env, url, fetcher = fetch) {
   if (resp.status !== 200) return erro(resp.status, CODIGOS[resp.status]);
   try {
     const dados = await resp.json();
+    if (op === "foto") return json(200, limparFoto(dados));
     if (op !== "ler") return json(200, dados);
     const limpo = limparLer(dados);
     return limpo ? json(200, limpo) : erro(500, "falha");

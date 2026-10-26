@@ -155,7 +155,7 @@ test("ler: só campos esperados; telefone/e-mail sem máscara são descartados",
 test("mock: 3 perfis (completo, só foto, nada) e e-mail 'erro…' simula falha", async () => {
   const local = (c, corpo) => new Request("http://localhost:52418/api/" + c, { method: "POST", body: JSON.stringify({ token: TOKEN, ...corpo }) });
   const ps = (await (await tratarApi(local("ler"), {}, new URL(local("ler").url))).json()).passageiros;
-  assert.deepEqual(ps.map((p) => [p.temFoto, p.temTelefone, p.temEmail]), [[true, true, true], [true, false, false], [false, false, false]]);
+  assert.deepEqual(ps.map((p) => [p.primeiroNome, p.temFoto, p.temTelefone, p.temEmail]), [["Mariana", true, true, true], ["Carlos", true, false, false], ["Beatriz", false, false, false]]);
   const r = local("salvar", { passageiroId: PID, email: "erro@teste.com" });
   assert.equal((await tratarApi(r, {}, new URL(r.url))).status, 500);
 });
@@ -170,4 +170,27 @@ test("máscaras: telefone só DDD + 4 últimos; e-mail 2 letras + domínio", () 
   assert.equal(emailOculto("a@b.co"), "a•••@b.co");
   assert.equal(emailOculto(""), "");
   for (const v of [telefoneOculto("+5511987654321"), emailOculto("ana.souza@empresa.com.br")]) assert.doesNotMatch(v, /9876|souza/);
+});
+
+test("foto: manda hash + passageiroId ao flow e devolve só {foto}", async () => {
+  const foto = { mimeType: "image/png", base64: "QUJD" };
+  const f = flowFalso(200, { ok: true, foto, extra: "interno" });
+  const r = await chamar(req("/api/foto", { token: TOKEN, passageiroId: PID.toUpperCase() }), f);
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), { foto });
+  assert.deepEqual(f.chamadas[0].corpo, { op: "foto", hash: await sha256Hex(TOKEN), passageiroId: PID });
+});
+
+test("foto: id inválido é 400 sem chamar o flow; foto malformada vira null; 404 repassado", async () => {
+  const f = flowFalso(200, { foto: { base64: "<script>" } });
+  assert.equal((await chamar(req("/api/foto", { token: TOKEN, passageiroId: "x" }), f)).status, 400);
+  assert.equal(f.chamadas.length, 0);
+  assert.deepEqual(await (await chamar(req("/api/foto", { token: TOKEN, passageiroId: PID }), f)).json(), { foto: null });
+  assert.equal((await chamar(req("/api/foto", { token: TOKEN, passageiroId: PID }), flowFalso(404, {}))).status, 404);
+});
+
+test("ler: lista ordenada por nome (o flow monta em paralelo)", async () => {
+  const f = flowFalso(200, { passageiros: [{ id: PID, primeiroNome: "Zeca" }, { id: PID, primeiroNome: "Ana" }] });
+  const ps = (await (await chamar(req("/api/ler", { token: TOKEN }), f)).json()).passageiros;
+  assert.deepEqual(ps.map((p) => p.primeiroNome), ["Ana", "Zeca"]);
 });
