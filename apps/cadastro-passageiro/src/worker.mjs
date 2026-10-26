@@ -18,9 +18,9 @@ function comSeguranca(resp) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    if (url.pathname.startsWith("/api/")) return comSeguranca(await tratarApi(request, env, url));
+    if (url.pathname.startsWith("/api/")) return comSeguranca(await tratarApi(request, env, url, fetch, ctx));
     if (url.pathname === "/" || url.pathname === "/index.html") {
       if (request.method !== "GET" && request.method !== "HEAD") return comSeguranca(new Response(null, { status: 405 }));
       return comSeguranca(new Response(paginaHtml(), {
