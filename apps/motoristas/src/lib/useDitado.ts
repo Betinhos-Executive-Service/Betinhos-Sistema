@@ -49,6 +49,12 @@ export function ditadoErrorMessage(code?: string): string {
   }
 }
 
+/** Tempo de ditado em mm:ss. */
+export function formatDitadoTimer(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
 /** Acrescenta o trecho ditado ao texto já digitado, separando com espaço e sem apagar nada. */
 export function appendDitado(current: string, fragment: string): string {
   const piece = fragment.trim();

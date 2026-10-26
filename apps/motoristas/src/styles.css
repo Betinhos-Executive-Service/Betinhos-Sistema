@@ -2976,50 +2976,93 @@ svg {
   background: rgb(0, 14, 35);
 }
 
-.observation-review {
-  width: 100%;
-  padding: 14px 16px;
-  border-radius: 12px;
-  background: rgb(252, 252, 251);
-  color: rgb(0, 14, 35);
-  font-family: "Manrope", sans-serif;
+.observation-review-form {
+  gap: 14px;
 }
 
-.observation-review-hint {
-  margin: 0 0 10px;
-  color: rgb(70, 84, 105);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 20px;
+.observation-review {
+  width: 100%;
+  padding: 14px 14px 14px 12px;
+  border-radius: 12px;
+  background: #fcfcfb;
+  color: #001a3d;
+  font-family: "Manrope", sans-serif;
+  transition: opacity 160ms ease;
 }
+
 
 .observation-review-topics {
   margin: 0;
-  padding-left: 20px;
+  padding: 0;
+  list-style: none;
   display: grid;
-  gap: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 22px;
+  gap: 10px;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 24px;
   overflow-wrap: anywhere;
 }
 
-.finalize-actions.observation-review-actions {
-  width: min(100%, 560px);
-  height: auto;
-  flex-wrap: wrap;
+.observation-review-topics li {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.observation-topic-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #edf3ff;
+  color: #2159d2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.observation-topic-icon.is-empty {
+  background: transparent;
+}
+
+.observation-topic-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.observation-review-warning {
+  width: 100%;
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
   gap: 8px;
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fcfcfb;
+  color: #956400;
 }
 
-.observation-review-actions button {
-  flex: 1 1 calc(50% - 4px);
-  min-height: 48px;
+.observation-review-warning svg,
+.ditado-error svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
 }
 
-.observation-review-actions .finalize-primary {
-  flex-basis: 100%;
-  order: -1;
+.observation-review-warning svg {
+  margin-top: 1px;
 }
+
+
 
 .maintenance-actions {
   width: min(50%, 320px);
@@ -13742,38 +13785,86 @@ select,
   .qr-charge-progress-bar li { transition: none; }
 }
 
-/* Ditado por voz no campo de observação do serviço */
+/* Ditado por voz: microfone de 56 px no canto inferior direito do campo. */
 .ditado-field {
   width: 100%;
   display: flex;
   flex-direction: column;
+  gap: 6px;
 }
 
-.ditado-bar {
+.ditado-box {
+  position: relative;
+  width: 100%;
+}
+
+.ditado-box textarea {
+  padding-bottom: 76px;
+}
+
+.ditado-overlay {
+  position: absolute;
+  left: 12px;
+  right: 18px;
+  bottom: 18px;
   display: flex;
-  flex-direction: row-reverse;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.ditado-interim {
+  color: #8a94a3;
+  font: italic 600 15px/20px "Manrope", Arial, sans-serif;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.ditado-control {
+  display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
-  padding: 0 8px;
+}
+
+.ditado-label {
+  min-width: 0;
+  color: rgb(70, 84, 105);
+  font: 700 13px/1.25 "Manrope", Arial, sans-serif;
+  text-align: right;
+}
+
+.ditado-field.is-listening .ditado-label {
+  color: #2159d2;
+}
+
+.ditado-timer {
+  font-variant-numeric: tabular-nums;
 }
 
 .ditado-button {
+  position: relative;
   flex: none;
-  width: 44px;
-  height: 44px;
+  width: 56px;
+  height: 56px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 1px solid rgba(0, 26, 61, 0.14);
-  border-radius: 12px;
+  border-radius: 999px;
   background: #fcfcfb;
   color: #001a3d;
+  box-shadow: 0 2px 6px rgba(0, 14, 35, 0.12);
   cursor: pointer;
+  pointer-events: auto;
 }
 
 .ditado-button svg {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
@@ -13782,27 +13873,42 @@ select,
 }
 
 .ditado-button.is-listening {
-  background: #001a3d;
-  border-color: #001a3d;
+  background: #2159d2;
+  border-color: #2159d2;
   color: #fcfcfb;
 }
 
-.ditado-status {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-family: "Manrope", Arial, sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
+.ditado-button.is-listening::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 999px;
+  border: 3px solid #2159d2;
+  animation: ditado-pulse 1.4s ease-out infinite;
+  pointer-events: none;
 }
 
-.ditado-listening {
-  color: #001a3d;
+@keyframes ditado-pulse {
+  from { transform: scale(1); opacity: 0.55; }
+  to { transform: scale(1.45); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ditado-button.is-listening::after {
+    animation: none;
+    opacity: 0.35;
+    transform: scale(1.15);
+  }
 }
 
 .ditado-error {
+  margin: 0;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: #9f2f2d;
+  font: 700 13px/1.3 "Manrope", Arial, sans-serif;
 }
 
 /* Foto do passageiro (detalhe do serviço Programado): avatar 72 px e ampliação. */

@@ -4,12 +4,22 @@ import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { FieldError, MoneyInputField, SelectField, TextAreaField } from "../components/common/FormFields";
 import { DitadoField } from "../components/common/DitadoButton";
 import { PhotoAddButton } from "../components/common/PhotoAddButton";
+import { SystemIcon } from "../components/icons/SystemIcon";
 import { AppShell } from "../components/layout/AppShell";
 import { useCameraScroll } from "../app/cameraScroll";
 import { FormMenu } from "../components/navigation/FormMenu";
 import { appendDitado } from "../lib/useDitado";
 import { isExchangeOutsideWindow, organizeObservationRemote, type ExchangeWindowCheck } from "../lib/dataverse";
-import { buildOrganizedObservation, NO_OBSERVATION, prepareObservationReview, type OrganizeObservation } from "../lib/observacaoOrganizada";
+import {
+  activeSummary,
+  generateSummary,
+  NO_OBSERVATION,
+  summaryFinalValue,
+  topicKind,
+  type OrganizeObservation,
+  type SummaryState,
+  type TopicKind
+} from "../lib/observacaoOrganizada";
 import { matchesExpenseCitySearch, type ExpenseReferenceData } from "../lib/expenses";
 import { buildWhatsAppUrl, openExternalUrl } from "../lib/localWorkflow";
 import { validateMaintenanceFinalizeFields, type MaintenanceFinalizeErrors } from "../lib/maintenanceFinalize";
@@ -49,7 +59,7 @@ function focusInvalidField(element: HTMLElement | null) {
   }, 40);
 }
 
-function FinalizeActions({ onNone, onConfirm, submitState, noneLabel = "Não tenho", confirmLoadingLabel }: { onNone: () => void; onConfirm: () => void; submitState: ActionButtonState; noneLabel?: string; confirmLoadingLabel?: string }) {
+function FinalizeActions({ onNone, onConfirm, submitState, noneLabel = "Não tenho", confirmLabel = "Confirmar", confirmDisabled = false, confirmLoadingLabel }: { onNone: () => void; onConfirm: () => void; submitState: ActionButtonState; noneLabel?: string; confirmLabel?: string; confirmDisabled?: boolean; confirmLoadingLabel?: string }) {
   const [activeAction, setActiveAction] = useState<"none" | "confirm" | "">("");
 
   useEffect(() => {
@@ -71,8 +81,9 @@ function FinalizeActions({ onNone, onConfirm, submitState, noneLabel = "Não ten
       />
       <ActionButton
         className="finalize-primary"
-        idleLabel="Confirmar"
+        idleLabel={confirmLabel}
         loadingLabel={confirmLoadingLabel}
+        disabled={confirmDisabled}
         state={submitState}
         active={activeAction === "confirm"}
         variant="primary"
@@ -106,55 +117,46 @@ function TextAreaBlock({
   );
 }
 
-type ObservationTopics = { original: string; topicos: string[] };
+const TOPIC_ICON_PATHS: Record<TopicKind, string> = {
+  atraso: "M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z",
+  espera: "M6 2h12M6 22h12M7 2v4a5 5 0 0 0 10 0V2M7 22v-4a5 5 0 0 1 10 0v4",
+  pedagio: "M3 20V8l9-5 9 5v12M3 20h18M9 20v-6h6v6",
+  combustivel: "M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M4 11h10M14 8l3 3v6a2 2 0 0 0 4 0V9l-3-3",
+  passageiro: "M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z",
+  ocorrencia: "M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z",
+  outros: "M5 12h.01M12 12h.01M19 12h.01"
+};
 
-function ObservationReview({ review, submitState, onConfirm, onEdit, onUseOriginal }: { review: ObservationTopics; submitState: ActionButtonState; onConfirm: () => void; onEdit: () => void; onUseOriginal: () => void }) {
-  const [activeAction, setActiveAction] = useState<"confirm" | "original" | "">("");
-  useEffect(() => {
-    if (submitState === "idle") setActiveAction("");
-  }, [submitState]);
-
+function TopicIcon({ topic }: { topic: string }) {
+  const kind = topicKind(topic);
+  if (!kind) return <span className="observation-topic-icon is-empty" aria-hidden="true" />;
   return (
-    <article className="finalize-card">
-      <div className="finalize-title">Confira os tópicos</div>
-      <div className="finalize-scroll">
-        <div className="finalize-form">
-          <section className="observation-review shadow" aria-label="Observação organizada">
-            <p className="observation-review-hint">Organizamos sua observação. Está correto?</p>
-            <ul className="observation-review-topics">
-              {review.topicos.map((topic, index) => (
-                <li key={`${index}-${topic}`}>{topic}</li>
-              ))}
-            </ul>
-          </section>
-        </div>
-      </div>
-      <ActionBar className="finalize-actions observation-review-actions">
-        <ActionButton
-          className="finalize-secondary"
-          idleLabel="Usar o texto original"
-          state={submitState}
-          active={activeAction === "original"}
-          variant="secondary"
-          onClick={() => {
-            setActiveAction("original");
-            onUseOriginal();
-          }}
-        />
-        <ActionButton className="finalize-secondary" idleLabel="Editar" state={submitState} active={false} variant="secondary" onClick={onEdit} />
-        <ActionButton
-          className="finalize-primary"
-          idleLabel="Confirmar"
-          state={submitState}
-          active={activeAction === "confirm"}
-          variant="primary"
-          onClick={() => {
-            setActiveAction("confirm");
-            onConfirm();
-          }}
-        />
-      </ActionBar>
-    </article>
+    <span className={`observation-topic-icon is-${kind}`} aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d={TOPIC_ICON_PATHS[kind]} /></svg>
+    </span>
+  );
+}
+
+function ObservationSummary({ summary }: { summary: SummaryState }) {
+  if (summary.status === "failed") {
+    return (
+      <p className="observation-review-warning" role="alert">
+        <SystemIcon name="warning" />
+        Não foi possível resumir agora
+      </p>
+    );
+  }
+  return (
+    <section className="observation-review shadow" aria-label="Resumo do serviço">
+      <ul className="observation-review-topics">
+        {summary.topicos.map((topic, index) => (
+          <li key={`${index}-${topic}`}>
+            <TopicIcon topic={topic} />
+            <span>{topic}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -172,57 +174,46 @@ function ServiceFinalize({
   organizeObservation: OrganizeObservation;
 }) {
   const [obs, setObs] = useState(initialObservation);
-  const [organizing, setOrganizing] = useState(false);
-  const [review, setReview] = useState<ObservationTopics | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [summaryState, setSummaryState] = useState<SummaryState | null>(null);
 
   useEffect(() => {
     setObs(initialObservation);
-    setReview(null);
+    setSummaryState(null);
   }, [detail.id, initialObservation]);
 
-  // Se o motorista já escreveu no detalhe, a tela confirma o texto em vez de perguntar de novo.
+  // Etapa 1: sem resumo para o texto atual (digitar ou ditar depois do resumo volta para cá).
+  const summary = activeSummary(summaryState, obs);
   const hasObservation = obs.trim() !== "";
   const finish = (value: string) => onDone({ "Observação Final": value });
 
-  const confirm = async () => {
-    setOrganizing(true);
-    const prepared = await prepareObservationReview(obs, organizeObservation);
-    setOrganizing(false);
-    if (prepared.kind === "review") setReview({ original: prepared.original, topicos: prepared.topicos });
-    else finish(prepared.value);
+  const generate = async () => {
+    setGenerating(true);
+    setSummaryState(await generateSummary(obs, organizeObservation));
+    setGenerating(false);
   };
 
-  if (review) {
-    return (
-      <ObservationReview
-        review={review}
-        submitState={submitState}
-        onConfirm={() => finish(buildOrganizedObservation(review.topicos, review.original))}
-        onUseOriginal={() => finish(review.original)}
-        onEdit={() => {
-          setObs(review.original);
-          setReview(null);
-        }}
-      />
-    );
-  }
+  const confirmLabel = !summary ? "Gerar resumo" : summary.status === "ready" ? "Confirmar" : "Enviar";
 
   return (
     <article className="finalize-card">
-      <div className="finalize-title">{hasObservation ? "Confira sua observação" : "Digite abaixo sua observação"}</div>
+      <div className="finalize-title">{summary?.status === "ready" ? "Confira o resumo do serviço" : hasObservation ? "Confira sua observação" : "Digite abaixo sua observação"}</div>
       <div className="finalize-scroll">
-        <div className="finalize-form">
-          <DitadoField stopWhen={submitState !== "idle" || organizing} onFinal={(text) => setObs((current) => appendDitado(current, text))}>
+        <div className="finalize-form observation-review-form">
+          {summary ? <ObservationSummary summary={summary} /> : null}
+          <DitadoField stopWhen={submitState !== "idle" || generating} onFinal={(text) => setObs((current) => appendDitado(current, text))}>
             <TextAreaBlock label="Observação do serviço" value={obs} onChange={setObs} />
           </DitadoField>
         </div>
       </div>
       <FinalizeActions
-        noneLabel={hasObservation ? "Enviar sem observação" : "Não tenho"}
+        noneLabel="Não tenho observação"
+        confirmLabel={confirmLabel}
+        confirmDisabled={!hasObservation || generating}
         onNone={() => finish(NO_OBSERVATION)}
-        onConfirm={() => void confirm()}
-        submitState={organizing ? "loading" : submitState}
-        confirmLoadingLabel={organizing ? "Organizando…" : undefined}
+        onConfirm={() => (summary ? finish(summaryFinalValue(summary)) : void generate())}
+        submitState={generating ? "loading" : submitState}
+        confirmLoadingLabel={generating ? "Gerando resumo…" : undefined}
       />
     </article>
   );
