@@ -94,7 +94,12 @@ public sealed class CadastrarAcessoHandler
                 if (dono is not null) { etapas.Pulada("funcionario", "já cadastrado"); return dono.Id; }
                 if (!liberado)
                 {
-                    if (existente is not null) { etapas.Pendente("funcionario", "e-mail vinculado quando o Dataverse liberar"); return existente.Id; }
+                    if (existente is not null)
+                    {
+                        // A ficha relê o celular para concluir; sem ele, a nova execução pararia em CELULAR_INVALIDO.
+                        if (string.IsNullOrWhiteSpace(existente.Celular)) _repo.CompletarCelular(existente.Id, celular);
+                        etapas.Pendente("funcionario", "e-mail vinculado quando o Dataverse liberar"); return existente.Id;
+                    }
                     var novo = _repo.Criar(entrada.NomeCompleto, null, celular, entrada.TipoVinculo); etapas.Pendente("funcionario", "criado sem e-mail até o Dataverse liberar"); return novo;
                 }
                 if (existente is not null) { _repo.VincularEmail(existente.Id, email, celular); etapas.Feita("funcionario", "e-mail vinculado"); return existente.Id; }

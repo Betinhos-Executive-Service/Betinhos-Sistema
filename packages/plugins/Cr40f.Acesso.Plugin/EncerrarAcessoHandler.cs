@@ -12,7 +12,7 @@ public sealed class EncerrarAcessoHandler
 
     public Etapas Executar(Guid funcionarioId, string confirmacao)
     {
-        var etapas = new Etapas();
+        var etapas = new Etapas { Trace = _trace };
         try
         {
             var f = _repo.PorId(funcionarioId) ?? throw new AcessoException("FUNCIONARIO_NAO_ENCONTRADO", "Funcionário não encontrado.");
@@ -29,22 +29,29 @@ public sealed class EncerrarAcessoHandler
                 // R11: só mexe na conta se ela é do grupo de motoristas; evita bloquear conta de outra pessoa apontada na ficha.
                 var membro = false;
                 etapas.Executar("grupo", () => { membro = _graph.EhMembro(_cfg.GroupId, u.Id); });
-                if (!membro) { foreach (var nome in EtapasDeConta) etapas.Pulada(nome, "conta fora do grupo de motoristas"); }
+                // O Dataverse só desabilita o systemuser ao sincronizar com o Entra (horas); bloqueia já para a ficha refletir o encerramento.
+                void Bloquear() => etapas.Executar("bloqueio", () =>
+                {
+                    var s = _usuarios.PorObjectId(Guid.Parse(u.Id));
+                    if (s is null) etapas.Pulada("bloqueio", "sem usuário no Dataverse");
+                    else if (s.GetAttributeValue<bool>("isdisabled")) etapas.Pulada("bloqueio", "já bloqueado");
+                    else { _usuarios.Bloquear(s.Id); etapas.Feita("bloqueio", "bloqueado no Dataverse"); }
+                });
+                if (!membro)
+                {
+                    foreach (var nome in new[] { "grupo", "licenca", "conta" }) etapas.Pulada(nome, "conta fora do grupo de motoristas");
+                    // Conta já desativada no Entra (ex.: tentativa anterior parou no SetState depois de sair do grupo): conclui o bloqueio.
+                    // Conta ativa fora do grupo continua intocada (R11).
+                    if (u.Ativo) etapas.Pulada("bloqueio", "conta fora do grupo de motoristas"); else Bloquear();
+                }
                 else
                 {
                     // Grupo depois de licença e conta: é o marcador do R11; sair dele antes deixaria licença e conta ativas se uma etapa falhasse e a tela tentasse de novo.
                     etapas.Executar("licenca", () => { if (AcessoRules.TemLicenca(u, _cfg.LicenseSkuId)) { _graph.RemoverLicenca(u.Id, _cfg.LicenseSkuId); etapas.Feita("licenca", "removida"); } else etapas.Pulada("licenca", "não tinha"); });
                     etapas.Executar("conta", () => { if (u.Ativo) { _graph.DefinirAtivo(u.Id, false); etapas.Feita("conta", "desativada"); } else etapas.Pulada("conta", "já desativada"); });
                     etapas.Executar("grupo", () => { _graph.RemoverDoGrupo(_cfg.GroupId, u.Id); etapas.Feita("grupo", "removido"); });
-                    // O Dataverse só desabilita o systemuser ao sincronizar com o Entra (horas); bloqueia já para a ficha refletir o encerramento.
-                    // Depois do grupo: se o SetState falhar, o Entra já ficou encerrado e a nova tentativa não trava aqui (conta fora do grupo pula tudo).
-                    etapas.Executar("bloqueio", () =>
-                    {
-                        var s = _usuarios.PorObjectId(Guid.Parse(u.Id));
-                        if (s is null) etapas.Pulada("bloqueio", "sem usuário no Dataverse");
-                        else if (s.GetAttributeValue<bool>("isdisabled")) etapas.Pulada("bloqueio", "já bloqueado");
-                        else { _usuarios.Bloquear(s.Id); etapas.Feita("bloqueio", "bloqueado no Dataverse"); }
-                    });
+                    // Depois do grupo: se o SetState falhar, a nova tentativa cai no ramo "fora do grupo" acima e conclui o bloqueio.
+                    Bloquear();
                 }
             }
             // Só acesso ao app: status e demissão do funcionário são do RH e não mudam aqui (decisão de 23/10/2026).

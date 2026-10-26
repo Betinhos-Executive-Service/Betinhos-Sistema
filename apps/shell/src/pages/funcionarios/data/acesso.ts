@@ -58,7 +58,7 @@ export const MSG_PENDENTE = "Conta criada. O Dataverse ainda está liberando o a
 export const MSG_PENDENTE_DEMORADA = "Conta criada. O Dataverse está demorando para liberar o acesso. Abra a ficha e use 'Concluir liberação' em alguns minutos."
 
 /** Erros que nova tentativa não resolve: a retentativa automática para e mostra a mensagem. */
-export const ERROS_PERMANENTES = new Set(['SEM_PERMISSAO', 'SEM_PERMISSAO_SENHA', 'CONFIG_AUSENTE', 'CONTA_NAO_EXISTE', 'ACESSO_ENCERRADO', 'SEM_LICENCA_DISPONIVEL'])
+export const ERROS_PERMANENTES = new Set(['SEM_PERMISSAO', 'SEM_PERMISSAO_SENHA', 'CONFIG_AUSENTE', 'CONTA_NAO_EXISTE', 'ACESSO_ENCERRADO', 'SEM_LICENCA_DISPONIVEL', 'NOME_INVALIDO', 'CELULAR_INVALIDO', 'FUNCIONARIO_NAO_ENCONTRADO', 'EMAIL_EM_USO_POR_OUTRO_FUNCIONARIO'])
 
 export class AcessoError extends Error {
   constructor(public codigo: string, message: string, public etapas: Etapa[]) { super(message); this.name = 'AcessoError' }

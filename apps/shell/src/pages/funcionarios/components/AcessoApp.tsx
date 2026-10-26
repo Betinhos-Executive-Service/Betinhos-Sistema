@@ -144,7 +144,7 @@ export function AcessoApp({ funcionario, acesso, estado, setConta, emailPendente
         <dt>E-mail Microsoft</dt>
         <dd>{email ? <code>{email}</code> : <span className="muted">Ainda não criado</span>}</dd>
       </dl>
-      {estado === 'liberando' && !concluindo && <p className="acesso-dica">{esgotou ? `A conta existe. ${textoPendente}` : 'A conta existe; o Dataverse ainda está liberando e isto conclui sozinho em alguns minutos. Para tentar agora, use "Concluir liberação".'}</p>}
+      {estado === 'liberando' && !concluindo && !ultimo && <p className="acesso-dica">{esgotou ? `A conta existe. ${textoPendente}` : 'A conta existe; o Dataverse ainda está liberando e isto conclui sozinho em alguns minutos. Para tentar agora, use "Concluir liberação".'}</p>}
       {concluindo && <ProgressoAcesso fluxo="cadastro" />}
       <div className="cluster">
         {pode && estado === 'sem' && <Button variant="secondary" size="compact" icon={<KeyRound size={16} />} onClick={onCadastrar}>Cadastrar acesso</Button>}

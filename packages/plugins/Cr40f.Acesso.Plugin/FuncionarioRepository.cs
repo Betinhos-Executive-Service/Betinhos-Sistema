@@ -58,6 +58,9 @@ public sealed class FuncionarioRepository
         return _service.Create(e);
     }
 
+    /// <summary>Liberação pendente: grava só o celular (sem e-mail, não dispara o DriverRecordSharing) para "Concluir liberação" na ficha ter um celular válido.</summary>
+    public void CompletarCelular(Guid id, string celular) => _service.Update(new Entity(Tabela, id) { [ColunaCelular] = celular });
+
     public void VincularEmail(Guid id, string email, string? celularSeVazio)
     {
         var atual = PorId(id) ?? throw new AcessoException("FUNCIONARIO_NAO_ENCONTRADO", "Funcionário " + id + " não existe.");
