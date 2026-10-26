@@ -149,11 +149,14 @@ public sealed class EncerrarAcessoHandlerTests
     [Fact]
     public void Bloqueio_recusado_ja_tirou_do_grupo_e_nova_tentativa_conclui()
     {
-        ComFuncionario(); ComUsuarioCompleto(); ComSystemuser(); _svc.FalharExecute = true;
+        ComFuncionario(); ComUsuarioCompleto(); var s = ComSystemuser(); _svc.FalharExecute = true;
         Assert.Equal("GRAPH_INDISPONIVEL", Assert.Throws<AcessoException>(() => Handler().Executar(_id, "Ana")).Codigo);
         Assert.DoesNotContain(("g", "00000000-0000-0000-0000-0000000000a1"), _graph.Membros);
         Assert.False(_graph.Usuarios["ana.lima@betinhos.onmicrosoft.com"].Ativo);
-        Assert.Contains("\"etapa\":\"bloqueio\",\"estado\":\"pulada\"", Handler().Executar(_id, "Ana").ToJson());
+        _svc.FalharExecute = false;
+        // Fora do grupo, mas com a conta do Entra já desativada: a nova tentativa conclui o bloqueio que faltou.
+        Assert.Contains("\"etapa\":\"bloqueio\",\"estado\":\"feita\"", Handler().Executar(_id, "Ana").ToJson());
+        Assert.True(s.GetAttributeValue<bool>("isdisabled"));
     }
 
     [Fact]

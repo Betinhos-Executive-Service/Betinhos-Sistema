@@ -299,6 +299,19 @@ public sealed class CadastrarAcessoHandlerTests
     }
 
     [Fact]
+    public void Pendente_em_ficha_sem_celular_grava_so_o_celular()
+    {
+        _pp.CriarSystemuser = false;
+        var fid = Guid.NewGuid();
+        _svc.Com(new Entity("cr40f_funcionarios", fid) { ["cr40f_nomecompleto"] = "João da Silva Ávila" });
+        var entrada = Entrada(); entrada.FuncionarioId = fid;
+        Handler().Executar(entrada);
+        var atualizado = Assert.Single(_svc.Atualizados);
+        Assert.Equal("+5512991234567", atualizado["cr40f_telefonecorporativo"]);
+        Assert.False(atualizado.Contains("cr40f_emailmicrosoft"));   // e-mail só com o systemuser pronto
+    }
+
+    [Fact]
     public void Reexecucao_sem_funcionarioId_conclui_no_mesmo_funcionario()
     {
         _pp.CriarSystemuser = false;
