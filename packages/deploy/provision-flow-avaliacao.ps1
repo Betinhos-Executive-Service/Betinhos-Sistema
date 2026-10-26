@@ -5,7 +5,7 @@
 # com classificacao "elogio" | "sugestao" | "reclamacao" | "sem_comentario". O flow:
 #   - valida a entrada (linkId com 12 ou 64 caracteres, nota 1-5, classificação conhecida) e responde 400 se inválida;
 #   - idempotência: já existe cr40f_avaliacaoservico com o mesmo cr40f_linkid → 200 { ok, duplicada: true } sem criar nada.
-#     Dois envios simultâneos: a chave alternativa cr40f_linkid_unico recusa o segundo POST e o flow responde duplicada;
+#     Dois envios simultâneos: a chave alternativa cr40f_linkidunico recusa o segundo POST e o flow responde duplicada;
 #   - acha a reserva por new_linkacompanhamento terminando em "/<linkId>" e pega dela cr40f_id (OS), o motorista
 #     (_cr40f_motorista_value) e o veículo (new_veiculoreal, "Veículo utilizado no serviço", senão cr40f_veiculo).
 #     Sem reserva, a avaliação nasce sem lookups e com o título no nome;
