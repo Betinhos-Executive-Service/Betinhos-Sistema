@@ -11,6 +11,7 @@ public sealed class ObterFotoPassageiroHandler
     public const int StatusProgramado = 202410005;
     public const string PrefixoLink = "https://betinhos.sharepoint.com/:i:/r/sites/BetinhosGestoInterna/Documentos%20Compartilhados/";
     public const string Biblioteca = "/Documentos Compartilhados/";
+    public const string PastaFotos = "Passageiros/Fotos/";
     public const string Negado = "{\"ok\":false,\"motivo\":\"indisponivel\"}";
 
     private readonly IOrganizationService _sistema;
@@ -72,6 +73,8 @@ public sealed class ObterFotoPassageiroHandler
         try { decodificado = Uri.UnescapeDataString(resto); } catch (Exception) { return null; }
         if (decodificado.Length == 0 || decodificado.IndexOf('\\') >= 0 || decodificado.Any(char.IsControl)) return null;
         if (decodificado.Split('/').Any(p => p.Length == 0 || p == "." || p == "..")) return null;
+        // Só a pasta de fotos de passageiros: um new_linkdafoto adulterado não abre outros arquivos do site.
+        if (!decodificado.StartsWith(PastaFotos, StringComparison.OrdinalIgnoreCase)) return null;
         return Biblioteca + decodificado;
     }
 
