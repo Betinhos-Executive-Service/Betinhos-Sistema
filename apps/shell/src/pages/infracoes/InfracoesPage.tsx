@@ -29,8 +29,9 @@ export function Infracoes({ host, embutido = false }: { host: Host; embutido?: b
   const data = useInfracoes(source)
 
   // Visões, colunas e filtros (DS §10.9.1/§10.9.2); a Visão padrão mostra só as ativas. Busca em `q`, filtros em `f=`.
-  const { view, filters, quickFilters, clearFilters } = useListView({
+  const { view, filters, quickFilters, clearFilters, fields: allFields, extra } = useListView({
     host,
+    extra: { entity: 'cr40f_infracaodetransito', ids: data.list.map((i) => i.id) },
     defaultName: 'Infrações ativas',
     tela: TELA,
     columns: INFRACAO_COLUMNS,
@@ -46,8 +47,9 @@ export function Infracoes({ host, embutido = false }: { host: Host; embutido?: b
   const uso = useMemo(() => usoIndex(data.multas), [data.multas])
   const visible = useMemo(() => {
     const multas = (id: string) => uso.get(id)?.length ?? 0
-    const list = data.list.filter((i) => matchesFilters(i, filters, INFRACAO_FIELDS, (row, key) => readInfracao(row, key, multas)) && matchesKeyword(i, query))
-    return sortInfracoes(list, view.config.sort, multas)
+    const read = extra.read((row: (typeof data.list)[number], key: string) => readInfracao(row, key, multas), (i) => i.id)
+    const list = data.list.filter((i) => matchesFilters(i, filters, allFields, read) && matchesKeyword(i, query))
+    return extra.sort(sortInfracoes(list, view.config.sort, multas), view.config.sort, (i) => i.id)
   }, [data.list, filters, query, uso, view.config.sort])
   // Lazy loading de renderização: trocar filtro, busca ou ordenação volta ao primeiro lote; recarregar a lista não.
   const lazyKey = useMemo(() => ({ filters, query, sort: view.config.sort }), [filters, query, view.config.sort])
@@ -76,7 +78,7 @@ export function Infracoes({ host, embutido = false }: { host: Host; embutido?: b
       <>
         {mobile
           ? (visible.length ? <InfracoesCards list={slice} uso={uso} onOpen={open} /> : <div className="surface">{empty}</div>)
-          : <InfracoesTable list={slice} uso={uso} onOpen={open} view={{ config: view.config, onChange: view.setConfig }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+          : <InfracoesTable list={slice} uso={uso} onOpen={open} view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )
@@ -86,7 +88,7 @@ export function Infracoes({ host, embutido = false }: { host: Host; embutido?: b
     <div className={embutido ? 'if-page' : 'page page--full if-page'}>
       {embutido ? null : <CabecalhoShell actions={headerActions} />}
       <div role="toolbar" aria-label="Comandos de infrações">
-        <ViewBar view={view} columns={INFRACAO_COLUMNS} filters={{ fields: INFRACAO_FIELDS }}>
+        <ViewBar view={view} columns={INFRACAO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
           {source.mock && !embutido ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="if-filters__search" value={query} onChange={setQuery} placeholder="Buscar por código, descrição ou artigo" aria-label="Buscar infrações" />
           {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />}

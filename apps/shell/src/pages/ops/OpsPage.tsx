@@ -48,8 +48,9 @@ function Ops({ host }: { host: Host }) {
   const choices = ops.choices
   const fields = useMemo(() => (choices ? opFields(choices) : []), [choices])
 
-  const { view, filters, quickFilters, clearFilters } = useListView({
+  const { view, filters, quickFilters, clearFilters, fields: allFields, extra } = useListView({
     host,
+    extra: { entity: 'cr40f_financeiro', ids: ops.list.map((op) => op.id) },
     defaultName: 'Todas as OPs',
     tela: TELA,
     columns: OP_COLUMNS,
@@ -73,8 +74,8 @@ function Ops({ host }: { host: Host }) {
   const found = useServerSearch({ query: q, enabled: Boolean(choices) && !ops.complete, search: searchOps })
   const list = useMergedById(ops.list, found)
   // Ordena e filtra uma vez por lista/visão; a cada busca só confere o texto já normalizado de cada linha.
-  const sorted = useMemo(() => (choices ? sortOps(list, view.config.sort, choices) : list), [list, choices, view.config.sort])
-  const filtered = useMemo(() => filterRows(sorted, filters, fields, readOp), [sorted, filters, fields])
+  const sorted = useMemo(() => extra.sort(choices ? sortOps(list, view.config.sort, choices) : list, view.config.sort, (op) => op.id), [list, choices, view.config.sort, extra])
+  const filtered = useMemo(() => filterRows(sorted, filters, allFields, extra.read(readOp, (op) => op.id)), [sorted, filters, allFields, extra])
   const index = useMemo(() => keywordIndex<Op>(opKeywordText), [])
   const visible = useMemo(() => {
     if (!choices) return []
@@ -157,7 +158,7 @@ function Ops({ host }: { host: Host }) {
       <>
         {mobile
           ? (visible.length ? <OpsCards list={slice} choices={ops.choices} onOpen={setSelectedId} /> : <div className="surface">{empty}</div>)
-          : <OpsTable list={slice} choices={ops.choices} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+          : <OpsTable list={slice} choices={ops.choices} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
         <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} pending={pending} />
       </>
     )
@@ -166,7 +167,7 @@ function Ops({ host }: { host: Host }) {
   return (
     <div className="page page--full op-page">
       <div role="toolbar" aria-label="Comandos de ordens de pagamento">
-        <ViewBar view={view} columns={OP_COLUMNS} filters={choices ? { fields } : undefined}>
+        <ViewBar view={view} columns={OP_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="pg-filters__search" value={query} onChange={setQuery} placeholder="Buscar por OP, cliente, passageiro ou trajeto" aria-label="Buscar ordens de pagamento" />
           <Select className="pg-filters__select" aria-label="Período de criação" searchable={false} clearable={false} options={PERIODOS} value={periodo} onChange={(v) => setPeriodo(v ?? EMPTY_FILTERS.periodo)} />

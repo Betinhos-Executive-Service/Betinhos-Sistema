@@ -17,11 +17,13 @@ import { motoristaAtual, possesAbertas, rotuloMotoristaAtual } from '../domain/m
 import { buildPendencias } from '../domain/pendencias'
 
 const MOCK_HOST: Host = { mode: 'mock' }
+const byVeiculo = (linha: LinhaVeiculo) => linha.veiculo.id
 
 export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo }: { data: FrotaData; source: DataSource; host?: Host; today: string; onOpenVeiculo: (id: string) => void }) {
   // Visões, colunas e filtros (DS §10.9.1/§10.9.2); a Visão padrão mostra só os ativos. Busca em `q`, filtros em `f=`.
-  const { view, filters, quickFilters, clearFilters } = useListView({
+  const { view, filters, quickFilters, clearFilters, fields: allFields, extra } = useListView({
     host,
+    extra: { entity: 'cr40f_veiculos', ids: data.veiculos.map((v) => v.id) },
     tela: TELA_VEICULOS,
     columns: VEICULO_COLUMNS,
     defaultSort: VEICULO_SORT,
@@ -48,7 +50,7 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo 
   }, [data, today])
 
   const visiveis = useMemo(
-    () => sortVeiculos(filterRows(linhas, filters, VEICULO_FIELDS, readVeiculo).filter((linha) => matchesVeiculoKeyword(linha, termo)), view.config.sort),
+    () => extra.sort(sortVeiculos(filterRows(linhas, filters, allFields, extra.read(readVeiculo, byVeiculo)).filter((linha) => matchesVeiculoKeyword(linha, termo)), view.config.sort), view.config.sort, byVeiculo),
     [linhas, filters, termo, view.config.sort],
   )
   // Rolagem infinita (sem paginação visível): trocar filtro, busca ou ordenação volta ao primeiro lote.
@@ -58,7 +60,7 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo 
   return (
     <div className="frota-lista">
       <div role="toolbar" aria-label="Comandos de veículos">
-        <ViewBar view={view} columns={VEICULO_COLUMNS} filters={{ fields: VEICULO_FIELDS }}>
+        <ViewBar view={view} columns={VEICULO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
           <SearchBox className="frota-busca" size="compact" aria-label="Buscar veículo" placeholder="Buscar placa, modelo ou motorista" value={busca} onChange={setBusca} />
         </ViewBar>
       </div>
@@ -66,7 +68,7 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo 
         rows={slice}
         rowKey={(linha) => linha.veiculo.id}
         onRowClick={(linha) => onOpenVeiculo(linha.veiculo.id)}
-        view={{ config: view.config, onChange: view.setConfig }}
+        view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }}
         quickFilters={quickFilters}
         footer={<span className="frota-muted">{visiveis.length} de {linhas.length}</span>}
         empty={<EmptyState compact align="start" title="Nenhum veículo com estes filtros" action={<Button variant="secondary" size="compact" onClick={() => { clearFilters(); setBusca('') }}>Limpar filtros</Button>} />}

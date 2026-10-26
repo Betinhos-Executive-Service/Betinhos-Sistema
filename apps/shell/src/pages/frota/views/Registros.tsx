@@ -11,7 +11,7 @@ import { patchHashQuery, useHashQuery } from '../../../nav/useHashRoute'
 import { useNotify } from '../components/Toasts'
 import { StatusBadge } from '../components/Ui'
 import { formatBR } from '../data/dates'
-import { KIND_LABEL } from '../data/schema'
+import { KIND_LABEL, KIND_TABLE } from '../data/schema'
 import type { DataSource } from '../data/source'
 import type { FrotaData, Kind, Ref } from '../data/types'
 import { errorMessage } from '../data/xrm'
@@ -51,8 +51,9 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload }
   const columns = useMemo(() => registroColumns(kind), [kind])
 
   // Visões, colunas e filtros (DS §10.9.1/§10.9.2) por tipo; busca em `q`, filtros em `f=`.
-  const { view, filters, quickFilters, clearFilters } = useListView({
+  const { view, filters, quickFilters, clearFilters, fields: allFields, extra } = useListView({
     host,
+    extra: { entity: KIND_TABLE[kind], ids: todas.map((linha) => linha.id) },
     tela: telaRegistros(kind),
     columns,
     defaultSort: REGISTRO_SORT,
@@ -63,7 +64,7 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload }
   })
 
   const visiveis = useMemo(
-    () => sortRegistros(filterRows(todas, filters, fields, readRegistro).filter((linha) => matchesRegistroKeyword(linha, termo)), kind, view.config.sort),
+    () => extra.sort(sortRegistros(filterRows(todas, filters, allFields, extra.read(readRegistro, (linha) => linha.id)).filter((linha) => matchesRegistroKeyword(linha, termo)), kind, view.config.sort), view.config.sort, (linha) => linha.id),
     [todas, filters, fields, termo, kind, view.config.sort],
   )
   // Rolagem infinita (sem paginação visível): trocar filtro, busca ou ordenação volta ao primeiro lote.
@@ -87,7 +88,7 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload }
   return (
     <div className="frota-lista">
       <div role="toolbar" aria-label="Comandos de registros">
-        <ViewBar view={view} columns={columns} filters={{ fields }}>
+        <ViewBar view={view} columns={columns} catalog={extra.catalog} filters={{ fields: allFields }}>
           {kinds.length > 1 && <SegmentedControl size="compact" aria-label="Tipo de registro" options={kinds.map((item) => ({ value: item, label: PLURAL[item] }))} value={kind} onChange={trocar} />}
           <SearchBox className="frota-busca" size="compact" aria-label="Buscar registro" placeholder="Buscar descrição, placa ou pessoa" value={busca} onChange={setBusca} />
           <Button size="compact" variant="action" icon={<Plus size={16} />} onClick={() => void novo()}>Novo registro</Button>
@@ -97,7 +98,7 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload }
         rows={slice}
         rowKey={(linha) => linha.id}
         onRowClick={(linha) => onOpen(linha.kind, linha.id)}
-        view={{ config: view.config, onChange: view.setConfig }}
+        view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }}
         quickFilters={quickFilters}
         footer={<span className="frota-muted">{visiveis.length} de {todas.length}{kind === 'multa' && todas.some((linha) => linha.termoIndisponivel) ? ' · Coluna Termo indisponível: não foi possível ler os termos' : ''}</span>}
         empty={<EmptyState compact align="start" title={`Nenhum registro de ${KIND_LABEL[kind].toLowerCase()} com estes filtros`} action={<Button variant="secondary" size="compact" onClick={() => { clearFilters(); setBusca('') }}>Limpar filtros</Button>} />}

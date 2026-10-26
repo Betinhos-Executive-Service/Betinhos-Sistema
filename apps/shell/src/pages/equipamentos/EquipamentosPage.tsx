@@ -34,8 +34,9 @@ function Equipamentos({ host }: { host: Host }) {
   const fields = useMemo(() => equipamentoFields(data.tipos, responsaveis), [data.tipos, responsaveis])
 
   // Visões, colunas e filtros (DS §10.9.1/§10.9.2); a Visão padrão esconde os baixados. Busca em `q`, filtros em `f=`.
-  const { view, filters, quickFilters, clearFilters } = useListView({
+  const { view, filters, quickFilters, clearFilters, fields: allFields, extra } = useListView({
     host,
+    extra: { entity: 'cr40f_equipamento', ids: data.equipamentos.map((e) => e.id) },
     defaultName: 'Equipamentos em uso e disponíveis',
     tela: TELA,
     columns: EQUIPAMENTO_COLUMNS,
@@ -51,8 +52,9 @@ function Equipamentos({ host }: { host: Host }) {
 
   const inativos = useMemo(() => new Set(data.pessoas.filter((p) => !p.ativo).map((p) => p.id)), [data.pessoas])
   const visible = useMemo(() => {
-    const list = data.equipamentos.filter((e) => matchesFilters(e, filters, fields, readEquipamento) && matchesKeyword(e, query))
-    return sortEquipamentos(list, view.config.sort)
+    const read = extra.read(readEquipamento, (e) => e.id)
+    const list = data.equipamentos.filter((e) => matchesFilters(e, filters, allFields, read) && matchesKeyword(e, query))
+    return extra.sort(sortEquipamentos(list, view.config.sort), view.config.sort, (e) => e.id)
   }, [data.equipamentos, filters, fields, query, view.config.sort])
   // Lazy loading de renderização: trocar filtro, busca ou ordenação volta ao primeiro lote; recarregar a lista não.
   // Chave por conteúdo: `fields` depende dos itens (filtro de Responsável), então salvar ou recarregar gera outro
@@ -88,7 +90,7 @@ function Equipamentos({ host }: { host: Host }) {
       <>
         {mobile
           ? (visible.length ? <EquipamentosCards list={slice} inativos={inativos} onOpen={open} /> : <div className="surface">{empty}</div>)
-          : <EquipamentosTable list={slice} inativos={inativos} onOpen={open} view={{ config: view.config, onChange: view.setConfig }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+          : <EquipamentosTable list={slice} inativos={inativos} onOpen={open} view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )
@@ -98,7 +100,7 @@ function Equipamentos({ host }: { host: Host }) {
     <ImagensContext.Provider value={imagens}>
     <div className="page eq-page">
       <div role="toolbar" aria-label="Comandos de equipamentos">
-        <ViewBar view={view} columns={EQUIPAMENTO_COLUMNS} filters={{ fields }}>
+        <ViewBar view={view} columns={EQUIPAMENTO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="eq-search" value={query} onChange={setQuery} placeholder="Buscar por descrição, modelo, série ou responsável" aria-label="Buscar equipamentos" />
           {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />}

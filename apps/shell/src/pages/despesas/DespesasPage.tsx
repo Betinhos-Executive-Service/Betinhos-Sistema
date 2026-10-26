@@ -52,8 +52,9 @@ function Despesas({ host }: { host: Host }) {
   const op = useMemo(() => opcoes(list), [list])
   const fields = useMemo(() => (choices ? despesaFields(choices, op) : []), [choices, op])
 
-  const { view, filters, quickFilters, clearFilters } = useListView({
+  const { view, filters, quickFilters, clearFilters, fields: allFields, extra } = useListView({
     host,
+    extra: { entity: 'cr40f_despesaoperacional', ids: list.map((d) => d.id) },
     defaultName: 'Todas as despesas',
     tela: TELA,
     columns: DESPESA_COLUMNS,
@@ -76,9 +77,9 @@ function Despesas({ host }: { host: Host }) {
   // Ordena e filtra uma vez por lista/visão; a cada busca só confere o texto já normalizado de cada linha.
   const sorted = useMemo(() => {
     const sort = view.config.sort
-    return choices && sort ? sortDespesas(list, sort.key, sort.dir, choices) : list
+    return extra.sort(choices && sort ? sortDespesas(list, sort.key, sort.dir, choices) : list, sort, (d) => d.id)
   }, [list, choices, view.config.sort])
-  const filtered = useMemo(() => filterRows(sorted, filters, fields, readDespesa), [sorted, filters, fields])
+  const filtered = useMemo(() => filterRows(sorted, filters, allFields, extra.read(readDespesa, (d) => d.id)), [sorted, filters, allFields, extra])
   const index = useMemo(() => keywordIndex<Despesa>(despesaKeywordText), [])
   const visible = useMemo(() => {
     if (!choices) return []
@@ -115,7 +116,7 @@ function Despesas({ host }: { host: Host }) {
       <>
         {mobile
           ? (visible.length ? <DespesasCards list={slice} choices={choices} onOpen={setSelectedId} /> : <div className="surface">{empty}</div>)
-          : <DespesasTable list={slice} choices={choices} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig }} quickFilters={quickFilters} footer={footer} empty={empty} loading={despesas.loading && !list.length} />}
+          : <DespesasTable list={slice} choices={choices} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} loading={despesas.loading && !list.length} />}
         <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} pending={pending} />
       </>
     )
@@ -124,7 +125,7 @@ function Despesas({ host }: { host: Host }) {
   return (
     <div className="page dp-page">
       <div role="toolbar" aria-label="Comandos de despesas">
-        <ViewBar view={view} columns={DESPESA_COLUMNS} filters={choices ? { fields } : undefined}>
+        <ViewBar view={view} columns={DESPESA_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="pg-filters__search" value={query} onChange={setQuery} placeholder="Buscar por despesa, local, motorista, reserva ou protocolo" aria-label="Buscar despesas" />
           <Select className="pg-filters__select" aria-label="Período do gasto" searchable={false} clearable={false} options={PERIODOS} value={periodo} onChange={(v) => setPeriodo(v ?? EMPTY_FILTERS.periodo)} />
