@@ -193,7 +193,7 @@ function ServiceFinalize({
     setGenerating(false);
   };
 
-  const confirmLabel = !summary ? "Gerar resumo" : summary.status === "ready" ? "Confirmar" : "Enviar sem resumo";
+  const confirmLabel = !summary ? "Gerar resumo" : summary.status === "ready" ? "Confirmar" : "Enviar";
 
   return (
     <article className="finalize-card">

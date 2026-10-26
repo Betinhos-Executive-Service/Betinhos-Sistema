@@ -37,7 +37,7 @@ test("alterar o texto depois do resumo volta à etapa Gerar resumo", () => {
   assert.equal(activeSummary(null, "x"), null);
 });
 
-test("falha, ok=false ou timeout: Enviar sem resumo grava só o original", async () => {
+test("falha, ok=false ou timeout: Enviar grava só o original", async () => {
   const check = async (summaryPromise: ReturnType<typeof generateSummary>) => {
     const summary = await summaryPromise;
     assert.equal(summary.status, "failed");

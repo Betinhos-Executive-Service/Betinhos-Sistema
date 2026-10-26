@@ -53,7 +53,7 @@ export function activeSummary(summary: SummaryState | null, text: string): Summa
   return summary && summary.from !== "" && summary.from === text.trim() ? summary : null;
 }
 
-/** Com resumo: tópicos + texto original. Falha da IA ("Enviar sem resumo"): só o texto original. */
+/** Com resumo: tópicos + texto original. Falha da IA ("Enviar"): só o texto original. */
 export function summaryFinalValue(summary: SummaryState) {
   return summary.status === "ready" ? buildOrganizedObservation(summary.topicos, summary.from) : summary.from;
 }
