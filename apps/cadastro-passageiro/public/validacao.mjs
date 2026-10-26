@@ -42,3 +42,21 @@ export function telefoneParaEnvio(valor) {
   if (!d) return "";
   return texto.startsWith("+") ? "+" + d : "+55" + d;
 }
+
+// Versões mascaradas (iguais às do flow "ler"): só DDD e 4 últimos dígitos; e-mail com 2 letras + domínio.
+export function telefoneOculto(valor) {
+  const texto = String(valor ?? "").trim();
+  const d = soDigitos(texto);
+  if (d.length < 8) return texto ? "••••" : "";
+  const fim = d.slice(-4);
+  if (d.startsWith("55") && d.length >= 12) return `(${d.slice(2, 4)}) •••••-${fim}`;
+  if (!texto.startsWith("+") && d.length <= 11) return `(${d.slice(0, 2)}) •••••-${fim}`;
+  return `+••• ${fim}`;
+}
+
+export function emailOculto(valor) {
+  const e = String(valor ?? "").trim();
+  const at = e.indexOf("@");
+  if (at < 1) return e ? "•••" : "";
+  return e.slice(0, Math.min(2, at)) + "•••" + e.slice(at);
+}
