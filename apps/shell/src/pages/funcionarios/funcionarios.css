@@ -352,6 +352,12 @@
   /* Drawer Cadastrar acesso ao App Motoristas */
   .drawer--acesso { width: min(var(--bt-layout-drawer-width), 96vw); }
   .drawer--acesso form { display: grid; gap: var(--bt-space-3); }
+  /* Só cabeçalho, corpo e rodapé: sem isso o rodapé cai na linha elástica e abre um vazio sob o formulário. */
+  .drawer.drawer--acesso { grid-template-rows: auto minmax(0, 1fr) auto; }
+  .drawer--acesso .drawer-foot { justify-content: flex-end; }
+  .acesso-select { position: relative; }
+  .acesso-select select { appearance: none; cursor: pointer; padding-right: var(--bt-space-6); }
+  .acesso-select__caret { position: absolute; right: var(--bt-space-3); pointer-events: none; }
   .acesso-bloco .acesso-estado { clear: both; display: flex; flex-wrap: wrap; gap: var(--bt-space-3); align-items: baseline; margin-bottom: var(--bt-space-2); }
   .acesso-previa { margin: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); }
   .acesso-resultado { display: grid; gap: var(--bt-space-4); }
