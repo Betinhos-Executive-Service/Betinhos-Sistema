@@ -49,9 +49,9 @@ describe('rotas sob demanda', () => {
 
 describe('telas legadas (WebResource)', () => {
   it('abre o WebResource com host=shell para a tela recolher a própria barra lateral', () => {
-    const found = findItem('new_telaplanner')!
+    const found = findItem('new_telacomposicaopreco')!
     const host = { mode: 'dataverse', clientUrl: 'https://org.crm2.dynamics.com' } as unknown as Parameters<typeof RouteLayout>[0]['host']
-    const { container } = render(<RouteLayout host={host} group={found.group} item={found.item} label="Planner" />)
-    expect(container.querySelector('iframe')?.getAttribute('src')).toBe('https://org.crm2.dynamics.com/WebResources/new_TelaPlanner.html?host=shell')
+    const { container } = render(<RouteLayout host={host} group={found.group} item={found.item} label="Composição de Preço" />)
+    expect(container.querySelector('iframe')?.getAttribute('src')).toBe('https://org.crm2.dynamics.com/WebResources/new_TelaComposicaoPreco.html?host=shell')
   })
 })

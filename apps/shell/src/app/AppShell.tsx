@@ -61,7 +61,7 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   new_gestaochecklistsveiculos: <ClipboardCheck />,
   'new_gestao_erros_operacionais': <Shield />,
   infleet: <MapPin />,
-  new_telaplanner: <ClipboardList />,
+  planner: <ClipboardList />,
   cr40f_composicaodeprecos: <Calculator />,
   ops: <Coins />,
   pagantes: <Users />,

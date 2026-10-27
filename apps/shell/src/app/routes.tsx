@@ -33,6 +33,7 @@ export const PAGE_LOADERS: Record<PageId, () => Promise<ComponentType<PageProps>
   clientes: () => import('../pages/clientes/ClientesPage').then((m) => m.ClientesPage),
   comunicados: () => import('../pages/comunicados/ComunicadosPage').then((m) => m.ComunicadosPage),
   agentes: () => import('../pages/agentes/AgentesPage').then((m) => m.AgentesPage),
+  planner: () => import('../pages/planner/PlannerPage').then((m) => m.PlannerPage),
 }
 
 const pending = new Map<PageId, Promise<ComponentType<PageProps>>>()
