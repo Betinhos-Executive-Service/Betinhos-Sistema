@@ -12,3 +12,4 @@
 - verificar-avaliacao | packages/deploy/provision-avaliacao-schema.ps1, packages/deploy/provision-flow-avaliacao.ps1 | Avaliação do link de acompanhamento: tabela cr40f_avaliacaoservico, flow HTTP "Link | Registrar avaliação" (4 casos, duplicado, sem reserva) e variável new_URLFlowRegistrarAvaliacao no DEV
 <!-- Sem roteiro ainda: apps/escala-fds/**, packages/despesas-ia/** -->
 - verificar-flow-tenaris | packages/deploy/patch-flow-tenaris-contatos.ps1 | Patch do flow Tenaris: contatos do passageiro sem apagar (dry run, aplicar e validar ativação no DEV)
+- verificar-flow-servico-editado | packages/deploy/patch-flow-servico-editado.ps1 | Patch do flow Notificação Serviço Editado: coluna editada correta, sem disparo fora das colunas de interesse (dry run, aplicar, editar reserva de teste no DEV)
