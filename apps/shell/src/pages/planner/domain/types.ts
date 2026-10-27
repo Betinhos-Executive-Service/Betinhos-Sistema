@@ -192,6 +192,8 @@ export interface Quote {
   acceptedOptionId?: string
   acceptedProposalVersionId?: string
   lossReason?: string
+  /** Funcionário que criou a cotação (V2: recebe preço pronto e lembrete). */
+  creatorEmployeeId?: string
   history?: TaskHistoryItem[]
   [extra: string]: unknown
 }
