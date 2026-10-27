@@ -13,7 +13,7 @@ import TaskHistorySection from '../TaskHistorySection';
 import QuoteDeleteDialog from './QuoteDeleteDialog';
 import QuoteOptionsComparison from './QuoteOptionsComparison';
 import { chosenQuoteOption, formatQuoteOption, newQuoteOption, normalizeQuoteOptions, prepareQuoteResponse, resolveQuoteAcceptance } from '../../domain/quoteScenarios';
-import { LOSS_REASONS } from '../../domain/quoteNotifications';
+import { LOSS_REASONS, isLossReason } from '../../domain/quoteNotifications';
 import { InputSelect } from '../AssignmentFields';
 import { QuoteStatus } from './QuoteFields';
 
@@ -306,7 +306,7 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     if (quoteConflict) { setResultError("Esta cotação mudou em outra edição. Recarregue antes de registrar a decisão."); return; }
     if (!onOutcome) { setResultError("Não foi possível registrar o resultado. Tente novamente."); return; }
     const reason = lossReason.trim();
-    if (resultStatus === "Perdida" && !(LOSS_REASONS as readonly string[]).includes(reason)) { setResultError("Escolha o motivo da perda."); return; }
+    if (resultStatus === "Perdida" && !isLossReason(reason)) { setResultError("Escolha o motivo da perda."); return; }
     if (reason.length > 1000) { setResultError("Motivo da perda excede 1.000 caracteres."); return; }
     if (resultStatus === "Aceita pelo cliente") {
       try { resolveQuoteAcceptance(draft, { acceptedOptionId, acceptedProposalVersionId }); }
