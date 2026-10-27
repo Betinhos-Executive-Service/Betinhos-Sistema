@@ -69,12 +69,12 @@ describe('quoteLiveSync', () => {
     })
   })
 
-  test('adapter live cria nova cotação e acompanhamento sem confirmar envio', async () => {
+  test('adapter live cria nova cotação sem tarefa (V2) e sem confirmar envio', async () => {
     await withDataverse(async (store, writes) => {
       await store.createQuote({ quotes: [], tasks: [], employees: [], teams: [] }, { title: 'Transfer', status: 'Nova', priority: 'medium', route: 'GRU / Hotel' })
       const quoteWrite = findWrite(writes, (item) => item.method === 'POST' && item.url.endsWith('/cr40f_pedidodecotacaos'))
       expect(quoteWrite.body.cr40f_respostaenviadacliente).toBe(false)
-      expect(writes.some((item) => item.method === 'POST' && item.url.endsWith('/cr40f_plannertarefas'))).toBe(true)
+      expect(writes.some((item) => item.method === 'POST' && item.url.endsWith('/cr40f_plannertarefas'))).toBe(false)
       expect(!writes.some((item) => item.method === 'DELETE')).toBe(true)
     })
   })
@@ -103,7 +103,7 @@ describe('quoteLiveSync', () => {
   for (const outcome of ['Aceita pelo cliente', 'Perdida', 'Cancelada']) {
     test(`Registrar resultado salva ${outcome} para cotação respondida`, async () => {
       await withDataverse(async (store, writes) => {
-        const reason = outcome === 'Perdida' ? 'Cliente não aprovou o orçamento' : ''
+        const reason = outcome === 'Perdida' ? 'Preço' : ''
         const accepted = outcome === 'Aceita pelo cliente' ? { acceptedProposalVersionId: '44444444-4444-4444-8444-444444444444', acceptedOptionId: 'option-1' } : {}
         await store.setQuoteOutcome(stateFor(), quoteId, outcome, reason, accepted)
         const quoteWrite = findWrite(writes, (item) => item.url.endsWith(`/cr40f_pedidodecotacaos(${quoteId})`))
@@ -117,7 +117,7 @@ describe('quoteLiveSync', () => {
 
   test('Registrar resultado continua exigindo motivo para perda', async () => {
     await withDataverse(async (store, writes) => {
-      await expect(store.setQuoteOutcome(stateFor(), quoteId, 'Perdida', '')).rejects.toThrow(/Informe o motivo da perda/)
+      await expect(store.setQuoteOutcome(stateFor(), quoteId, 'Perdida', '')).rejects.toThrow(/Escolha o motivo da perda/)
       expect(writes.length).toBe(0)
     })
   })

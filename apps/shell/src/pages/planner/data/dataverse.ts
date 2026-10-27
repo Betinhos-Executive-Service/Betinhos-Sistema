@@ -73,6 +73,7 @@ import { commitQuoteSend } from "../domain/quoteSendBatch";
 import { localDateKey, manualCollectionKey } from "../domain/management";
 import { normalizeContact } from "../domain/contactDomain";
 import { logAppError, sanitizeDataversePath } from "./errorLogger";
+import { followUpNotices, isLossReason, readyNotice, urgentNotices, type QuoteNotice } from "../domain/quoteNotifications";
 import type { Employee, PersonalTag, PlannerNotification, PlannerState, QuoteData, QuoteOptionData, QuoteProposalVersion, Task, TaskAttachment, TaskHistoryItem, Team, WaitingContext, WaitingContextInput } from "../domain/types";
 
 void prepareQuoteProposal;
@@ -419,6 +420,9 @@ const OPTIONAL_QUOTE_FIELDS: Readonly<Record<OptionalQuoteField, string[]>> = Ob
 });
 const quoteFieldAvailable: Record<OptionalQuoteField, boolean> = { route: false, lossReason: false, longRoutes: false, requestFields: false };
 let optionalQuoteFieldsProbe: Promise<unknown> | null = null;
+// Cotações V2 (scripts/ensure-quote-v2-dev.ps1): criador na cotação e cotação na notificação.
+interface QuoteV2Schema { creator: boolean; notificationQuote: boolean }
+let quoteV2SchemaProbe: Promise<QuoteV2Schema> | null = null;
 let quoteScenarioSchemaChecked = false;
 const scenarioEntitySets = new Map<string, string>();
 
@@ -967,6 +971,7 @@ function normalizeQuote(row: Row): LiveQuote {
     deadline: dateOnly(row.cr40f_prazoresponder),
     value: row.cr40f_valorcotado == null ? "" : String(row.cr40f_valorcotado),
     plannerTaskId: s(row.cr40f_plannertaskid),
+    creatorEmployeeId: s(row._cr40f_criador_value),
     plannerLink: s(row.cr40f_linktarefaplanner),
     teamsLink: s(row.cr40f_linkmensagemteams),
   };
@@ -978,13 +983,57 @@ const QUOTE_SELECT = [
 
 // Só 404 significa "coluna não existe"; outro erro (rede, 401) não pode virar
 // ausência cacheada, senão todo salvamento passa a recusar os campos opcionais.
-async function attributeExists(xrm: PlannerXrm, field: string) {
-  try { await request(xrm, `/EntityDefinitions(LogicalName='${QUOTE_TABLE}')/Attributes(LogicalName='${field}')?$select=LogicalName`); return true; }
+async function attributeExists(xrm: PlannerXrm, field: string, table: string = QUOTE_TABLE) {
+  try { await request(xrm, `/EntityDefinitions(LogicalName='${table}')/Attributes(LogicalName='${field}')?$select=LogicalName`); return true; }
   catch (error) {
     if (!errorMessage(error).includes("404")) throw error;
-    console.warn(`[Planner] coluna opcional ${field} não existe neste ambiente (scripts/ensure-quote-*-dev.ps1).`);
+    console.warn(`[Planner] coluna opcional ${table}.${field} não existe neste ambiente (scripts/ensure-quote-*-dev.ps1).`);
     return false;
   }
+}
+
+function probeQuoteV2Schema(xrm: PlannerXrm): Promise<QuoteV2Schema> {
+  quoteV2SchemaProbe ??= Promise.all([attributeExists(xrm, "cr40f_criador"), attributeExists(xrm, "cr40f_cotacao", NOTIFICATION_TABLE)])
+    .then(([creator, notificationQuote]) => {
+      if (!creator || !notificationQuote) void logAppError(new Error("Schema da V2 de cotações ausente: avisos de cotação desligados."), { action: "probeQuoteV2Schema", severity: "warning", source: "planner-quotes-v2", errorCode: "QUOTE_V2_SCHEMA_MISSING", payload: { creator, notificationQuote } });
+      return { creator, notificationQuote };
+    })
+    .catch((error: unknown) => { quoteV2SchemaProbe = null; throw error; });
+  return quoteV2SchemaProbe;
+}
+
+// Avisos de cotação vão direto para cr40f_plannernotificacao (sininho), com dedupe
+// pela chave. Falha aqui nunca derruba a gravação da cotação: só registra no log.
+export async function createQuoteNotifications(xrm: PlannerXrm, notices: QuoteNotice[]): Promise<void> {
+  if (!notices.length) return;
+  try {
+    const schema = await probeQuoteV2Schema(xrm);
+    if (!schema.notificationQuote) return;
+    const keys = [...new Set(notices.map((item) => item.dedupeKey))];
+    const filter = keys.map((key) => `cr40f_chavededupe eq '${key.replace(/'/g, "''")}'`).join(" or ");
+    const existing = new Set((await retrieveMany(xrm, NOTIFICATION_TABLE, `?$select=cr40f_chavededupe&$filter=${filter}`)).map((row) => s(row.cr40f_chavededupe)));
+    const recipientNavigation = await resolveLookupNavigation(xrm, NOTIFICATION_TABLE, "cr40f_destinatario", EMPLOYEE_TABLE);
+    const quoteNavigation = await resolveLookupNavigation(xrm, NOTIFICATION_TABLE, "cr40f_cotacao", QUOTE_TABLE);
+    const occurredAt = new Date().toISOString();
+    for (const item of notices) {
+      if (existing.has(item.dedupeKey)) continue;
+      existing.add(item.dedupeKey);
+      await request(xrm, `/${entitySetName(NOTIFICATION_TABLE)}`, { method: "POST", body: JSON.stringify({
+        cr40f_name: item.title.slice(0, 100), cr40f_titulo: item.title, cr40f_mensagem: item.message, cr40f_tipo: item.type,
+        cr40f_chavededupe: item.dedupeKey, cr40f_datareferencia: item.referenceDate || null, cr40f_ocorridoem: occurredAt,
+        [`${recipientNavigation}@odata.bind`]: `/${entitySetName(EMPLOYEE_TABLE)}(${cleanId(item.recipientEmployeeId)})`,
+        [`${quoteNavigation}@odata.bind`]: `/${entitySetName(QUOTE_TABLE)}(${cleanId(item.quoteId)})`,
+      }) });
+    }
+  } catch (error) {
+    console.warn("[Planner] aviso de cotação não gravado", error);
+    void logAppError(error, { action: "createQuoteNotifications", severity: "warning", source: "planner-quotes-v2", errorCode: "QUOTE_NOTICE_FAILED" });
+  }
+}
+
+function financeMemberIds(state: LiveState): string[] {
+  const team = (state.teams || []).find((item) => String(item.name || "").trim().toLowerCase() === "financeiro");
+  return (team?.memberIds || []).map(String);
 }
 
 function probeOptionalQuoteFields(xrm: PlannerXrm) {
@@ -1013,7 +1062,8 @@ async function quoteSelect(xrm: PlannerXrm) {
       throw new Error(`Schema de opções de cotação indisponível em DEV. Publique as entidades e relacionamentos antes de usar cotações com opções. ${errorMessage(error)}`);
     }
   }
-  return [QUOTE_SELECT, ...(Object.entries(OPTIONAL_QUOTE_FIELDS) as Array<[OptionalQuoteField, string[]]>).flatMap(([key, fields]) => quoteFieldAvailable[key] ? fields : [])].join(",");
+  const v2 = await probeQuoteV2Schema(xrm);
+  return [QUOTE_SELECT, ...(Object.entries(OPTIONAL_QUOTE_FIELDS) as Array<[OptionalQuoteField, string[]]>).flatMap(([key, fields]) => quoteFieldAvailable[key] ? fields : []), ...(v2.creator ? ["_cr40f_criador_value"] : [])].join(",");
 }
 
 function scenarioId() {
@@ -1555,6 +1605,7 @@ export async function loadSupplementalState(xrm: PlannerXrm, state: LiveState) {
     measureStage("ações operacionais", () => retrieveMany(xrm, QUALITY_ACTION_TABLE, "?$select=cr40f_acaooperacionalid,cr40f_titulo,cr40f_descricao,cr40f_status,cr40f_prazo,_cr40f_responsavel_value&$filter=statecode eq 0&$orderby=createdon desc")),
   ]);
   const quoteRecords = await loadQuoteScenarioData(xrm, quotes);
+  await createQuoteNotifications(xrm, followUpNotices(quoteRecords, localDateKey()));
   const quoteById = new Map<unknown, LiveQuote>(quoteRecords.map((quote) => [quote.id, quote]));
   const employees = state.employees || [];
   const employeeById = new Map(employees.map((employee) => [cleanId(employee.id).toLowerCase(), employee]));
@@ -1679,6 +1730,7 @@ function normalizeNotification(row: Row, dispatches: EmailDispatch[] = []): Live
   return {
     id: s(row.cr40f_plannernotificacaoid),
     taskId: s(row._cr40f_tarefa_value),
+    quoteId: s(row._cr40f_cotacao_value),
     recipientEmployeeId: s(row._cr40f_destinatario_value),
     eventOriginId: s(row._cr40f_eventoorigem_value),
     type: s(row.cr40f_tipo) || "update",
@@ -1706,8 +1758,9 @@ async function loadLiveEmailDispatches(xrm: PlannerXrm, employeeId: string) {
 async function loadLiveNotifications(xrm: PlannerXrm, employeeId: string): Promise<LiveNotification[]> {
   if (!employeeId) return [];
   try {
+    const quoteColumn = await probeQuoteV2Schema(xrm).then((schema) => schema.notificationQuote ? ",_cr40f_cotacao_value" : "", () => "");
     const [rows, dispatches] = await Promise.all([
-      retrieveMany(xrm, NOTIFICATION_TABLE, `?$select=cr40f_plannernotificacaoid,cr40f_name,cr40f_titulo,cr40f_mensagem,cr40f_tipo,cr40f_ocorridoem,cr40f_lidoem,cr40f_datareferencia,cr40f_chavededupe,_cr40f_tarefa_value,_cr40f_destinatario_value,_cr40f_eventoorigem_value&$filter=_cr40f_destinatario_value eq ${cleanId(employeeId)} and statecode eq 0&$orderby=cr40f_ocorridoem desc&$top=100`),
+      retrieveMany(xrm, NOTIFICATION_TABLE, `?$select=cr40f_plannernotificacaoid,cr40f_name,cr40f_titulo,cr40f_mensagem,cr40f_tipo,cr40f_ocorridoem,cr40f_lidoem,cr40f_datareferencia,cr40f_chavededupe,_cr40f_tarefa_value,_cr40f_destinatario_value,_cr40f_eventoorigem_value${quoteColumn}&$filter=_cr40f_destinatario_value eq ${cleanId(employeeId)} and statecode eq 0&$orderby=cr40f_ocorridoem desc&$top=100`),
       loadLiveEmailDispatches(xrm, employeeId),
     ]);
     return rows.map((row) => normalizeNotification(row, dispatches));
@@ -2356,6 +2409,8 @@ async function createLiveQuote(xrm: PlannerXrm, state: LiveState, input: QuotePa
     ? await resolveLookupNavigation(xrm, QUOTE_TABLE, "cr40f_cliente", "cr40f_clientes1")
     : "";
   const payload = quotePayload(normalizedInput, true, clientNavigation);
+  const schema = await probeQuoteV2Schema(xrm);
+  if (schema.creator && normalizedInput.actorEmployeeId) await bindLookup(xrm, payload, QUOTE_TABLE, "cr40f_criador", EMPLOYEE_TABLE, normalizedInput.actorEmployeeId);
   const created = asRecord(await request(xrm, `/${entitySetName(QUOTE_TABLE)}`, { method: "POST", body: JSON.stringify(payload) }));
   const quoteId = cleanId(created?.cr40f_pedidodecotacaoid || created?.[`${QUOTE_TABLE}id`]);
   if (!quoteId) throw new Error("Dataverse criou a cotação sem retornar o ID.");
@@ -2366,16 +2421,11 @@ async function createLiveQuote(xrm: PlannerXrm, state: LiveState, input: QuotePa
       throw new Error(`Não foi possível salvar as opções da cotação. ${errorMessage(error)}`);
     }
   }
-  try {
-    const nextState: LiveState = { ...state, quotes: [...(state.quotes || []), { ...normalizedInput, id: quoteId } as LiveQuote] };
-    const taskId = await createLiveTask(xrm, nextState, { title: quoteTaskTitle(normalizedInput), quoteId, quoteCode: s(created.cr40f_numerodacotacao), quoteTitle: s(normalizedInput.title), quoteStatus: s(normalizedInput.status) || "Nova", dueDate: s(normalizedInput.deadline), priority: s(normalizedInput.priority) || "medium", sourceType: "quote", assigneeIds: (normalizedInput.assigneeIds as string[] | undefined) || [], assigneeNames: (normalizedInput.assigneeNames as string[] | undefined) || [], assignmentMode: "people", description: `Acompanhar a cotação ${s(created.cr40f_numerodacotacao) || "selecionada"} até a resposta ao cliente.` }, true);
-    const teamId = await resolveFinanceTeamId(xrm, state);
-    if (teamId) await replaceTaskTeams(xrm, taskId, { assignmentMode: "team", teamIds: [teamId] });
-    return loadLiveState(xrm);
-  } catch (error) {
-    try { await request(xrm, `/${entitySetName(QUOTE_TABLE)}(${quoteId})`, { method: "DELETE" }); } catch (cleanupError) { console.warn("[Planner] falha ao desfazer cotação sem tarefa", cleanupError); }
-    throw new Error(`Cotação criada, mas não foi possível criar o acompanhamento no Planner. ${errorMessage(error) || "Tente novamente."}`);
-  }
+  // V2: a cotação é a própria fila; não cria tarefa. Prazo hoje avisa o Financeiro.
+  const financeIds = Array.isArray(normalizedInput.financeIds) ? (normalizedInput.financeIds as unknown[]).map(String) : financeMemberIds(state);
+  const quote = { id: quoteId, code: s(created.cr40f_numerodacotacao), title: s(normalizedInput.title), client: s(normalizedInput.client), status: "Nova", deadline: s(normalizedInput.deadline) };
+  await createQuoteNotifications(xrm, urgentNotices(quote, financeIds, s(normalizedInput.today) || localDateKey()));
+  return loadLiveState(xrm);
 }
 
 async function updateLiveQuote(xrm: PlannerXrm, state: LiveState, id: string, patch: QuotePatch = {}): Promise<LiveState> {
@@ -2398,7 +2448,6 @@ async function updateLiveQuote(xrm: PlannerXrm, state: LiveState, id: string, pa
   if (patch.status === "Aguardando informação" && existing.status !== patch.status) {
     const validation = validateWaitingContext("waiting", patch.waitingContext);
     if (!validation.allowed) throw new Error(validation.error);
-    if (!linkedTasks.some((task) => !task.parentTaskId)) throw new Error("Tarefa vinculada à cotação não encontrada.");
   }
   await quoteSelect(xrm);
   if (Array.isArray(patch.options) && !existing.etag) throw new Error("O Dataverse não forneceu a versão da cotação. Recarregue antes de substituir as opções para evitar sobrescrever uma edição simultânea.");
@@ -2432,6 +2481,8 @@ async function updateLiveQuote(xrm: PlannerXrm, state: LiveState, id: string, pa
     if (errorMessage(error).includes("412")) throw new Error("A cotação foi alterada por outra pessoa. Recarregue os dados antes de salvar para evitar sobrescrever a edição.");
     throw error;
   }
+  const ready = readyNotice(existing, { ...existing, ...effectivePatch, status: nextStatus });
+  if (ready) await createQuoteNotifications(xrm, [ready]);
   const statusChanged = nextStatus !== existing.status;
   const terminal = isQuoteTerminalStatus(nextStatus);
   try { await Promise.all(linkedTasks.map((task) => {
@@ -2504,12 +2555,20 @@ async function markLiveQuoteSent(xrm: PlannerXrm, state: LiveState, id: string, 
   const version = createQuoteProposalVersion(sentQuote, sentOptions, {
     html: proposal.html || buildQuoteEmailHtml(sentQuote, { baseUrl: xrm.Utility.getGlobalContext().getClientUrl?.() || "" }),
     text: proposal.text || buildQuotePlainText(sentQuote),
-  }, { id: cleanId(user.userId), name: user.userName || user.fullName || "Usuário Dataverse" }, proposal.send as QuoteSend, requestId);
+  }, { id: cleanId(user.userId), name: user.userName || user.fullName || "Usuário Dataverse" }, proposal.send, requestId);
+  if (!savedQuote.etag) throw new Error("Recarregue a cotação antes de registrar o envio.");
+  // V2: cotação nova não tem tarefa; só a legada recebe o contexto de espera e o evento.
   const task = (savedState.tasks || []).find((item) => cleanId(item.quoteId) === cleanId(id) && !item.parentTaskId);
-  if (!task || !savedQuote.etag) throw new Error("Recarregue a cotação e sua tarefa antes de registrar o envio.");
-  const waitingContext = clientDecisionWaitingContext(sentQuote, version.sentAt);
   const versionNavigation = await resolveLookupNavigation(xrm, QUOTE_PROPOSAL_VERSION_TABLE, "cr40f_pedidocotacao", QUOTE_TABLE);
-  const eventNavigation = await resolveLookupNavigation(xrm, EVENT_TABLE, "cr40f_tarefa", TASK_TABLE);
+  const via = version.channel ? ` via ${version.channel} para ${version.recipient}` : "";
+  const taskOperations = task ? [
+    { method: "PATCH", path: `/${entitySetName(TASK_TABLE)}(${cleanId(task.id)})`, body: { cr40f_status: STATUS_VALUES.waiting, ...waitingContextPayload(clientDecisionWaitingContext(sentQuote, version.sentAt)) } },
+    { method: "POST", path: `/${entitySetName(EVENT_TABLE)}`, body: {
+      cr40f_tipo: 100000002, cr40f_descricao: `Proposta enviada por ${version.authorName}${via}. Tarefa aguardando a decisão do cliente.`,
+      cr40f_campo: "quote:sent", cr40f_valoranterior: quote.status, cr40f_valornovo: JSON.stringify({ versionId: version.id, confirmedAt: version.createdAt, actorUserId: version.authorId, channel: version.channel, recipient: version.recipient, sentAt: version.sentAt }), cr40f_ocorridoem: version.createdAt,
+      [`${await resolveLookupNavigation(xrm, EVENT_TABLE, "cr40f_tarefa", TASK_TABLE)}@odata.bind`]: `/${entitySetName(TASK_TABLE)}(${cleanId(task.id)})`,
+    } },
+  ] : [];
   const operations = [
     { method: "POST", path: `/${entitySetName(QUOTE_PROPOSAL_VERSION_TABLE)}`, body: {
       cr40f_cotacaopropostaversaoid: requestId, cr40f_nome: `${savedQuote.code || "Cotação"} · versão ${version.number}`.slice(0, 100),
@@ -2517,12 +2576,7 @@ async function markLiveQuoteSent(xrm: PlannerXrm, state: LiveState, id: string, 
       [`${versionNavigation}@odata.bind`]: `/${entitySetName(QUOTE_TABLE)}(${cleanId(id)})`,
     } },
     { method: "PATCH", path: `/${entitySetName(QUOTE_TABLE)}(${cleanId(id)})`, etag: savedQuote.etag, body: quotePayload({ responseSent: true, status: "Respondida ao cliente", value: sentOptions.length === 1 ? sentOptions[0].value : "", finalizationAt: "" }) },
-    { method: "PATCH", path: `/${entitySetName(TASK_TABLE)}(${cleanId(task.id)})`, body: { cr40f_status: STATUS_VALUES.waiting, ...waitingContextPayload(waitingContext) } },
-    { method: "POST", path: `/${entitySetName(EVENT_TABLE)}`, body: {
-      cr40f_tipo: 100000002, cr40f_descricao: `Proposta enviada por ${version.authorName} via ${version.channel} para ${version.recipient}. Tarefa aguardando a decisão do cliente.`,
-      cr40f_campo: "quote:sent", cr40f_valoranterior: quote.status, cr40f_valornovo: JSON.stringify({ versionId: version.id, confirmedAt: version.createdAt, actorUserId: version.authorId, channel: version.channel, recipient: version.recipient, sentAt: version.sentAt }), cr40f_ocorridoem: version.createdAt,
-      [`${eventNavigation}@odata.bind`]: `/${entitySetName(TASK_TABLE)}(${cleanId(task.id)})`,
-    } },
+    ...taskOperations,
   ];
   try {
     await commitQuoteSend(apiUrl(xrm), operations, requestId);
@@ -2540,8 +2594,7 @@ async function markLiveQuoteSent(xrm: PlannerXrm, state: LiveState, id: string, 
 export interface QuoteAcceptance { acceptedProposalVersionId?: string; acceptedOptionId?: string }
 
 async function setLiveQuoteOutcome(xrm: PlannerXrm, state: LiveState, id: string, outcome: string, reason: unknown = "", accepted: QuoteAcceptance = {}) {
-  if (outcome === "Perdida" && !String(reason).trim()) throw new Error("Informe o motivo da perda.");
-  if (String(reason).trim().length > 1000) throw new Error("Motivo da perda excede 1.000 caracteres.");
+  if (outcome === "Perdida" && !isLossReason(String(reason).trim())) throw new Error("Escolha o motivo da perda.");
   const quote = (state.quotes || []).find((item) => cleanId(item.id) === cleanId(id));
   const patch: QuotePatch = { status: outcome, lossReason: outcome === "Perdida" ? String(reason).trim() : "", finalizationAt: new Date().toISOString() };
   if (outcome === "Aceita pelo cliente") {
