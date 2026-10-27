@@ -574,8 +574,24 @@ function readStoredState(): MockState {
   }
 }
 
+// O hook guarda só os avisos do usuário atual e pode salvar uma cópia antiga.
+// Por isso a gravação junta com o que já está salvo: não perde avisos de outros
+// destinatários e não desfaz uma leitura (no mock, lido nunca volta a não lido).
+function mergeStoredNotifications(notifications: MockNotification[] = []): MockNotification[] {
+  let stored: MockNotification[] = []
+  try { stored = (JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') as MockState).notifications || [] } catch { return notifications }
+  const keyOf = (item: MockNotification) => item.dedupeKey || item.id
+  const storedByKey = new Map(stored.map((item) => [keyOf(item), item]))
+  const merged = notifications.map((item) => {
+    const previous = storedByKey.get(keyOf(item))
+    return previous?.readAt && !item.readAt ? { ...item, readAt: previous.readAt } : item
+  })
+  const kept = new Set(merged.map(keyOf))
+  return [...merged, ...stored.filter((item) => !kept.has(keyOf(item)))]
+}
+
 export function saveState<S extends MockState>(state: S): S {
-  const next = { ...state, lastUpdated: new Date().toISOString() }
+  const next = { ...state, notifications: mergeStoredNotifications(state.notifications), lastUpdated: new Date().toISOString() }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
   return next
 }
