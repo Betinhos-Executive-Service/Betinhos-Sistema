@@ -19,7 +19,7 @@ describe('Registros', () => {
   it('lista e filtra pela busca (depois da pausa na digitação)', async () => {
     render(<Registros kinds={['manutencao']} data={data} source={source} onOpen={() => {}} onReload={() => {}} />)
     expect(rows()).toHaveLength(2)
-    fireEvent.change(screen.getByPlaceholderText(/Buscar/), { target: { value: 'bruno' } })
+    fireEvent.change(screen.getByPlaceholderText(/Buscar descrição/), { target: { value: 'bruno' } })
     await waitFor(() => expect(rows()).toHaveLength(1))
   })
 

@@ -1,5 +1,5 @@
 import { chunk, odataString, type Row } from '@betinhos/dataverse'
-import { EXTRA_COLUMN_PREFIX, isExtraColumn, type ColumnCatalog, type ColumnCatalogEntry, type FilterField, type FilterKind } from '@betinhos/ui'
+import { EXTRA_COLUMN_PREFIX, isExtraColumn, type ColumnCatalog, type ColumnCatalogEntry, type ColumnCatalogType, type FilterField, type FilterKind } from '@betinhos/ui'
 import type { Host } from '../host'
 
 /**
@@ -15,7 +15,8 @@ export type ExtraAttr = { name: string; label: string; kind: FilterKind; money?:
 /** Relação N:1 da tabela: navegação, coluna de lookup (`attribute`) e tabela de destino. */
 export type ExtraRelation = { nav: string; attribute: string; label: string; target: string; targetLabel: string }
 /** O que a metadata diz de uma tabela; `null` no mock (sem tabela real). */
-export type ExtraTable = { entitySet: string; primaryId: string; attrs: ExtraAttr[]; relations: ExtraRelation[] }
+/** `label`: nome da tabela no plural ("Reservas"), para a trilha do catálogo. */
+export type ExtraTable = { entitySet: string; primaryId: string; label?: string; attrs: ExtraAttr[]; relations: ExtraRelation[] }
 
 /** Valor de uma célula: `raw` para ordenar e filtrar, `text` para mostrar. */
 export type ExtraValue = { raw: unknown; text: string }
@@ -41,7 +42,7 @@ export const extraPath = (key: string) => key.slice(EXTRA_COLUMN_PREFIX.length).
 
 type AttrDef = { LogicalName: string; AttributeType: string; DisplayName?: { UserLocalizedLabel?: { Label?: string } | null }; AttributeOf?: string | null }
 type RelDef = { ReferencingAttribute: string; ReferencedEntity: string; ReferencingEntityNavigationPropertyName: string }
-type EntityDef = { EntitySetName: string; PrimaryIdAttribute: string }
+type EntityDef = { EntitySetName: string; PrimaryIdAttribute: string; DisplayCollectionName?: { UserLocalizedLabel?: { Label?: string } | null } }
 
 const labelOf = (d: AttrDef) => d.DisplayName?.UserLocalizedLabel?.Label || ''
 
@@ -52,7 +53,7 @@ export function createDataverseExtraSource(host: Extract<Host, { mode: 'datavers
   async function load(entity: string): Promise<ExtraTable> {
     const base = `EntityDefinitions(LogicalName='${odataString(entity)}')`
     const [def, attrs, rels] = await Promise.all([
-      host.client.request<EntityDef>(`${base}?$select=EntitySetName,PrimaryIdAttribute`),
+      host.client.request<EntityDef>(`${base}?$select=EntitySetName,PrimaryIdAttribute,DisplayCollectionName`),
       host.client.request<{ value: AttrDef[] }>(`${base}/Attributes?$select=LogicalName,AttributeType,DisplayName,AttributeOf&$filter=${encodeURIComponent('IsValidForRead eq true')}`),
       host.client.request<{ value: RelDef[] }>(`${base}/ManyToOneRelationships?$select=ReferencingAttribute,ReferencedEntity,ReferencingEntityNavigationPropertyName`),
     ])
@@ -72,7 +73,7 @@ export function createDataverseExtraSource(host: Extract<Host, { mode: 'datavers
         const attrLabel = labelOf(byName.get(r.ReferencingAttribute)!) || r.ReferencingAttribute
         return { nav: r.ReferencingEntityNavigationPropertyName, attribute: r.ReferencingAttribute, target: r.ReferencedEntity, targetLabel, label: (perAttr.get(r.ReferencingAttribute) ?? 0) > 1 ? `${attrLabel} (${targetLabel})` : attrLabel }
       })
-    return { entitySet: def.EntitySetName, primaryId: def.PrimaryIdAttribute, attrs: fields, relations }
+    return { entitySet: def.EntitySetName, primaryId: def.PrimaryIdAttribute, label: def.DisplayCollectionName?.UserLocalizedLabel?.Label || undefined, attrs: fields, relations }
   }
 
   function table(entity: string) {
@@ -213,10 +214,14 @@ export async function resolveLinkColumns(source: ExtraSource, entity: string, co
   return out
 }
 
-/** Catálogo do painel "Adicionar coluna": campos e relações de cada nível, em ordem alfabética. */
-export function extraCatalog(source: ExtraSource, entity: string): ColumnCatalog {
+/** Tipo do campo para o ícone do catálogo: lookup vira "vínculo"; Sim/Não e choice, "opção". */
+const catalogType = (a: ExtraAttr): ColumnCatalogType => (a.lookup ? 'lookup' : a.kind === 'number' ? 'number' : a.kind === 'date' ? 'date' : a.kind === 'choice' ? 'choice' : 'text')
+
+/** Catálogo do painel "Adicionar coluna": campos (com tipo) e relações de cada nível, em ordem alfabética. `label`: nome da tabela da lista. */
+export function extraCatalog(source: ExtraSource, entity: string, label?: string): ColumnCatalog {
   return {
     maxDepth: MAX_DEPTH,
+    label,
     async load(path) {
       let table = await source.table(entity)
       for (const nav of path) {
@@ -226,7 +231,7 @@ export function extraCatalog(source: ExtraSource, entity: string): ColumnCatalog
       }
       const byLabel = (a: ColumnCatalogEntry, b: ColumnCatalogEntry) => a.label.localeCompare(b.label, 'pt-BR')
       return [
-        ...table.attrs.map((a): ColumnCatalogEntry => ({ id: a.name, label: a.label })).sort(byLabel),
+        ...table.attrs.map((a): ColumnCatalogEntry => ({ id: a.name, label: a.label, type: catalogType(a) })).sort(byLabel),
         ...table.relations.map((r): ColumnCatalogEntry => ({ id: r.nav, label: r.label, relation: true, description: r.targetLabel })).sort(byLabel),
       ]
     },
@@ -260,7 +265,7 @@ export function sortByExtra<T>(list: T[], key: string, dir: 'asc' | 'desc', valu
 // Mock (pnpm dev e VM): uma tabela de exemplo com relações em três níveis e valores estáveis por id.
 const MOCK_TABLES: Record<string, ExtraTable> = {
   lista: {
-    entitySet: 'lista', primaryId: 'id',
+    entitySet: 'lista', primaryId: 'id', label: 'Registros',
     attrs: [
       { name: 'createdon', label: 'Criado em', kind: 'date' },
       { name: 'modifiedon', label: 'Modificado em', kind: 'date' },
@@ -273,18 +278,18 @@ const MOCK_TABLES: Record<string, ExtraTable> = {
       { nav: 'cr40f_cliente', attribute: 'cr40f_cliente', label: 'Cliente', target: 'cr40f_clientes1', targetLabel: 'Clientes' },
     ],
   },
-  systemuser: { entitySet: 'systemusers', primaryId: 'systemuserid', attrs: [{ name: 'fullname', label: 'Nome completo', kind: 'text' }, { name: 'internalemailaddress', label: 'E-mail principal', kind: 'text' }], relations: [] },
+  systemuser: { entitySet: 'systemusers', primaryId: 'systemuserid', label: 'Usuários', attrs: [{ name: 'fullname', label: 'Nome completo', kind: 'text' }, { name: 'internalemailaddress', label: 'E-mail principal', kind: 'text' }], relations: [] },
   cr40f_clientes1: {
-    entitySet: 'cr40f_clientes1s', primaryId: 'cr40f_clientes1id',
+    entitySet: 'cr40f_clientes1s', primaryId: 'cr40f_clientes1id', label: 'Clientes',
     attrs: [{ name: 'cr40f_nomedocliente', label: 'Nome do cliente', kind: 'text' }, { name: 'cr40f_registro', label: 'Registro', kind: 'choice' }],
     relations: [{ nav: 'cr40f_gestor', attribute: 'cr40f_gestor', label: 'Gestor da conta', target: 'cr40f_funcionarios', targetLabel: 'Funcionários' }],
   },
   cr40f_funcionarios: {
-    entitySet: 'cr40f_funcionarioses', primaryId: 'cr40f_funcionariosid',
+    entitySet: 'cr40f_funcionarioses', primaryId: 'cr40f_funcionariosid', label: 'Funcionários',
     attrs: [{ name: 'cr40f_nome', label: 'Nome', kind: 'text' }, { name: 'cr40f_telefone', label: 'Telefone', kind: 'text' }],
     relations: [{ nav: 'cr40f_cargo', attribute: 'cr40f_cargo', label: 'Cargo', target: 'cr40f_cargo', targetLabel: 'Cargos' }],
   },
-  cr40f_cargo: { entitySet: 'cr40f_cargos', primaryId: 'cr40f_cargoid', attrs: [{ name: 'cr40f_name', label: 'Nome', kind: 'text' }], relations: [] },
+  cr40f_cargo: { entitySet: 'cr40f_cargos', primaryId: 'cr40f_cargoid', label: 'Cargos', attrs: [{ name: 'cr40f_name', label: 'Nome', kind: 'text' }], relations: [] },
 }
 const MOCK_TEXT: Record<string, string[]> = {
   fullname: ['Renan Mendonça', 'Paula Andrade', 'Equipe Operação'],

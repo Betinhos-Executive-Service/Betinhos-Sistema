@@ -6,6 +6,7 @@ import type { Host } from '../../host'
 import { useMedia } from '../operacional/useMedia'
 import { hrefFor, patchHashQuery, queryFromHash, readHashQuery } from '../../nav/useHashRoute'
 import { createDataverseExtraSource, createMockExtraSource, extraCatalog, resolveLinkColumns } from '../../app/extraColumns'
+import { useTableLabel } from '../../app/useListView'
 import { createSource } from './data/source'
 import { ProtecaoContext } from './components/ProtecaoLock'
 import type { Protecao } from './domain/protecao'
@@ -96,7 +97,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
 
   // "Adicionar coluna" (DS §10.9.1): campos da reserva e das relações N:1; as escolhidas viram link-entity na consulta.
   const extraSource = useMemo(() => (host.mode === 'dataverse' ? createDataverseExtraSource(host) : createMockExtraSource()), [host])
-  const catalog = useMemo(() => extraCatalog(extraSource, ENTITY), [extraSource])
+  const tableLabel = useTableLabel(extraSource, ENTITY)
+  const catalog = useMemo(() => extraCatalog(extraSource, ENTITY, tableLabel), [extraSource, tableLabel])
   const extraPrefs = JSON.stringify(prefs?.extra ?? [])
   const { setExtras } = geral
   useEffect(() => {
