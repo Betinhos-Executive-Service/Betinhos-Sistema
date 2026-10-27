@@ -14,22 +14,6 @@ param([string] $Restaurar = '', [switch] $SomenteValidar)
 . (Join-Path $PSScriptRoot '../flows/atualizar-status-pagamento.ps1')
 
 function Prefixo([string] $name) { return ($name -replace '[^A-Za-z0-9]+', '-').Trim('-') }
-function CheckFlowErrors($row, $cd) {
-  $flowToken = & az account get-access-token --resource https://service.flow.microsoft.com/ --query accessToken -o tsv
-  if (-not $flowToken) { throw 'Token do Power Automate indisponível.' }
-  $flowApi = "https://api.flow.microsoft.com/providers/Microsoft.ProcessSimple/environments/$script:ProdEnvironmentId/flows/$($row.workflowid)"
-  $props = (Invoke-RestMethod -Uri "$flowApi`?api-version=2016-11-01&`$expand=properties.definition,properties.connectionreferences" -Headers @{ Authorization = "Bearer $flowToken" }).properties
-  $props.definition = $cd.properties.definition
-  $body = [Text.Encoding]::UTF8.GetBytes((@{ properties = $props } | ConvertTo-Json -Depth 90 -Compress))
-  try { $r = Invoke-WebRequest -Method POST -Uri "$flowApi/checkFlowErrors?api-version=2016-11-01" -Headers @{ Authorization = "Bearer $flowToken" } -ContentType 'application/json; charset=utf-8' -Body $body -UseBasicParsing }
-  catch {
-    $detalhe = if ($_.Exception.Response) { (New-Object IO.StreamReader $_.Exception.Response.GetResponseStream()).ReadToEnd() } else { $_.Exception.Message }
-    throw "checkFlowErrors falhou: $detalhe"
-  }
-  $erros = [Text.Encoding]::UTF8.GetString($r.RawContentStream.ToArray())
-  Write-Output "checkFlowErrors: $erros"
-  if ($erros.Trim() -ne '[]') { throw 'A definição montada tem erros.' }
-}
 
 AssertProd
 
@@ -48,9 +32,9 @@ Corrigir-AtualizarStatus $cd
 $novo = $cd | ConvertTo-Json -Depth 90 -Compress
 # Ida e volta pelo JSON para comparar no mesmo formato.
 $atual = ($row.clientdata | ConvertFrom-Json) | ConvertTo-Json -Depth 90 -Compress
-if ($SomenteValidar) { CheckFlowErrors $row $cd; Conferir-AtualizarStatus $cd; Write-Output "PROD: '$script:StatusFlowName' válido$(if ($atual -eq $novo) { ' (já corrigido)' })."; return }
+if ($SomenteValidar) { CheckFlowErrors $row $cd $script:ProdEnvironmentId; Conferir-AtualizarStatus $cd; Write-Output "PROD: '$script:StatusFlowName' válido$(if ($atual -eq $novo) { ' (já corrigido)' })."; return }
 if ($atual -eq $novo) { Write-Output "PROD: '$script:StatusFlowName' já corrigido."; return }
-CheckFlowErrors $row $cd
+CheckFlowErrors $row $cd $script:ProdEnvironmentId
 BackupFlow $row (Prefixo $script:StatusFlowName) | Out-Null
 ApplyFlow $row $novo
 $lido = GetFlow $script:StatusFlowName

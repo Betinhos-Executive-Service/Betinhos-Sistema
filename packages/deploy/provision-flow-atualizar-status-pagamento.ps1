@@ -46,6 +46,7 @@ function Backup($row) {
   New-Item -ItemType Directory -Force $backupDir | Out-Null
   $stamp = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, 'E. South America Standard Time').ToString('yyyyMMdd-HHmmss')
   $file = Join-Path $backupDir "Flow-Atualizar-Status-de-Pagamento-$stamp.json"
+  if (Test-Path $file) { throw "Backup $file já existe; rode de novo em instantes." }
   [IO.File]::WriteAllText($file, $row.clientdata, (New-Object Text.UTF8Encoding $false))
   Write-Host "[atualizar-status] backup: $file"
 }
@@ -62,23 +63,6 @@ function Apply($row, [string] $clientData) {
     if ($after.statecode -ne 1) { throw "Flow não reativou (statecode $($after.statecode)). Restaure com -Restaurar." }
   }
 }
-function CheckFlowErrors($row, $cd) {
-  $flowToken = & az account get-access-token --resource https://service.flow.microsoft.com/ --query accessToken -o tsv
-  if (-not $flowToken) { throw 'Token do Power Automate indisponível.' }
-  $flowApi = "https://api.flow.microsoft.com/providers/Microsoft.ProcessSimple/environments/$environmentId/flows/$($row.workflowid)"
-  $props = (Invoke-RestMethod -Uri "$flowApi`?api-version=2016-11-01&`$expand=properties.definition,properties.connectionreferences" -Headers @{ Authorization = "Bearer $flowToken" }).properties
-  $props.definition = $cd.properties.definition
-  $body = [Text.Encoding]::UTF8.GetBytes((@{ properties = $props } | ConvertTo-Json -Depth 90 -Compress))
-  try { $r = Invoke-WebRequest -Method POST -Uri "$flowApi/checkFlowErrors?api-version=2016-11-01" -Headers @{ Authorization = "Bearer $flowToken" } -ContentType 'application/json; charset=utf-8' -Body $body -UseBasicParsing }
-  catch {
-    $detalhe = if ($_.Exception.Response) { (New-Object IO.StreamReader $_.Exception.Response.GetResponseStream()).ReadToEnd() } else { $_.Exception.Message }
-    throw "checkFlowErrors falhou: $detalhe"
-  }
-  $erros = [Text.Encoding]::UTF8.GetString($r.RawContentStream.ToArray())
-  Write-Output "checkFlowErrors: $erros"
-  if ($erros.Trim() -ne '[]') { throw 'A definição montada tem erros.' }
-}
-
 if ($Restaurar) {
   $text = [IO.File]::ReadAllText((Resolve-Path $Restaurar), [Text.Encoding]::UTF8).TrimStart([char]0xFEFF)
   $row = GetFlow
@@ -94,9 +78,9 @@ Corrigir-AtualizarStatus $cd
 $novo = $cd | ConvertTo-Json -Depth 90 -Compress
 # Ida e volta pelo JSON para comparar no mesmo formato.
 $atual = ($row.clientdata | ConvertFrom-Json) | ConvertTo-Json -Depth 90 -Compress
-if ($SomenteValidar) { CheckFlowErrors $row $cd; Conferir-AtualizarStatus $cd; Write-Output "DEV: '$script:StatusFlowName' válido$(if ($atual -eq $novo) { ' (já corrigido)' })."; return }
+if ($SomenteValidar) { CheckFlowErrors $row $cd $environmentId; Conferir-AtualizarStatus $cd; Write-Output "DEV: '$script:StatusFlowName' válido$(if ($atual -eq $novo) { ' (já corrigido)' })."; return }
 if ($atual -eq $novo) { Write-Output "DEV: '$script:StatusFlowName' já corrigido."; return }
-CheckFlowErrors $row $cd
+CheckFlowErrors $row $cd $environmentId
 Backup $row
 Apply $row $novo
 $lido = GetFlow

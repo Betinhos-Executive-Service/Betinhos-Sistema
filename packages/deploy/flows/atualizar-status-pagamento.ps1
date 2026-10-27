@@ -1,5 +1,6 @@
 ﻿# Correção do "Flow Atualizar Status de Pagamento" (27/10/2026). Carregado por provision-flow-atualizar-status-pagamento.ps1
-# (DEV); só transforma o clientdata já lido, não fala com o Dataverse.
+# (DEV) e prod/patch-flow-atualizar-status-pagamento-prod.ps1 (PROD); só transforma o clientdata já lido e o valida na
+# API do Power Automate, não grava nada.
 #
 # Problema: o flow localizava o pagante só pelo order_number da Cielo. Até 26/10 o plugin do Gerar Pagantes gravava o mesmo
 # order_number em todos os pagantes de uma OP (rateio); com 2+ registros o flow falha de propósito e a baixa não acontece.
@@ -57,6 +58,24 @@ function Corrigir-AtualizarStatus($cd) {
     'Causas comuns: product_id e order_number não encontrados em Pagantes, ou mais de um pagante com o mesmo valor (nesse caso nenhum registro foi atualizado; confira no painel da Cielo e ajuste manualmente).')
 }
 
+# Valida a definição montada com o checkFlowErrors do Power Automate, sem gravar. $envId = ambiente (DEV ou PROD) do flow.
+function CheckFlowErrors($row, $cd, [string] $envId) {
+  $flowToken = & az account get-access-token --resource https://service.flow.microsoft.com/ --query accessToken -o tsv
+  if (-not $flowToken) { throw 'Token do Power Automate indisponível.' }
+  $flowApi = "https://api.flow.microsoft.com/providers/Microsoft.ProcessSimple/environments/$envId/flows/$($row.workflowid)"
+  $props = (Invoke-RestMethod -Uri "$flowApi`?api-version=2016-11-01&`$expand=properties.definition,properties.connectionreferences" -Headers @{ Authorization = "Bearer $flowToken" }).properties
+  $props.definition = $cd.properties.definition
+  $body = [Text.Encoding]::UTF8.GetBytes((@{ properties = $props } | ConvertTo-Json -Depth 90 -Compress))
+  try { $r = Invoke-WebRequest -Method POST -Uri "$flowApi/checkFlowErrors?api-version=2016-11-01" -Headers @{ Authorization = "Bearer $flowToken" } -ContentType 'application/json; charset=utf-8' -Body $body -UseBasicParsing }
+  catch {
+    $detalhe = if ($_.Exception.Response) { (New-Object IO.StreamReader $_.Exception.Response.GetResponseStream()).ReadToEnd() } else { $_.Exception.Message }
+    throw "checkFlowErrors falhou: $detalhe"
+  }
+  $erros = [Text.Encoding]::UTF8.GetString($r.RawContentStream.ToArray())
+  Write-Output "checkFlowErrors: $erros"
+  if ($erros.Trim() -ne '[]') { throw 'A definição montada tem erros.' }
+}
+
 function Conferir-AtualizarStatus($cd) {
   $a = $cd.properties.definition.actions.Scope.actions
   foreach ($n in 'Compose_ProductId_bruto', 'Compose_ProductId', 'List_rows_by_CieloLinkId') {
@@ -64,4 +83,5 @@ function Conferir-AtualizarStatus($cd) {
   }
   if ($a.Compose_GUID_Format.inputs -notmatch 'List_rows_by_CieloLinkId') { throw 'Compose_GUID_Format não usa o product_id.' }
   if ($a.List_rows_by_CieloOrderNumber.runAfter.PSObject.Properties.Name -notcontains 'List_rows_by_CieloLinkId') { throw 'A busca por order_number não vem depois da busca por product_id.' }
+  if ($cd.properties.definition.actions.Scope_1.actions.'Send_an_email_(V2)_1'.inputs.parameters.'emailMessage/Body' -notmatch 'product_id e order_number') { throw 'O texto do e-mail de erro não foi atualizado; o corpo atual difere do esperado.' }
 }
