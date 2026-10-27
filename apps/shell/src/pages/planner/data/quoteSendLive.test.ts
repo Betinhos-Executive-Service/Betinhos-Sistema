@@ -39,7 +39,6 @@ describe('quoteResponseConfirmation — adapter Dataverse', () => {
     }
     const mark = evaluateSnippet<(xrm: unknown, state: unknown, id: string, proposal: Record<string, unknown>) => Promise<unknown>>(source.slice(start, end), 'markLiveQuoteSent', dependencies)
     const xrm = { Utility: { getGlobalContext: () => ({ userSettings: { userId: 'renan', userName: 'Renan' }, getClientUrl: () => 'https://example.invalid' }) } }
-    await expect(mark(xrm, state, 'q', { requestId })).rejects.toThrow(/canal/i)
     await mark(xrm, state, 'q', { requestId, send, html: '<p>editado</p>' })
     expect(operations.length).toBe(4)
     expect(operations[0].body.cr40f_enviadoem).toBe(undefined)

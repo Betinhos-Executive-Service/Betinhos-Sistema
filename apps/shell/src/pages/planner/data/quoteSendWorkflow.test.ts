@@ -1,6 +1,7 @@
 import { afterEach, test, vi } from "vitest";
+import { createQuoteWithLegacyTask } from "./legacyQuoteTask.fixture";
 import assert from "node:assert/strict";
-import { createQuote, markQuoteSent, seedState, setQuoteOutcome, updateQuote, updateTask } from "./mock";
+import { markQuoteSent, seedState, setQuoteOutcome, updateQuote, updateTask } from "./mock";
 import { buildQuoteEmailHtml, buildQuotePlainText } from "../domain/quoteDomain";
 
 const send = { channel: "WhatsApp", recipient: "+55 11 99999-9999", sentAt: "2026-09-28T12:00:00.000Z" };
@@ -12,7 +13,7 @@ afterEach(() => { vi.unstubAllGlobals(); });
 
 function setup() {
   vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => {} });
-  const state = createQuote(seedState(), { title: "Transfer", client: "Empresa", clientContact: "Cliente", clientPhone: send.recipient, route: "SP / Campinas", options: structuredClone(options), commercialTerms: "Pagamento em 30 dias" });
+  const state = createQuoteWithLegacyTask(seedState(), { title: "Transfer", client: "Empresa", clientContact: "Cliente", clientPhone: send.recipient, route: "SP / Campinas", options: structuredClone(options), commercialTerms: "Pagamento em 30 dias" });
   return { state, id: state.quotes[0].id };
 }
 
@@ -59,7 +60,6 @@ test("registro exige canal e destinatário e inclui somente opções com preço 
   const setupState = setup();
   const state = updateQuote(setupState.state, setupState.id, { status: "Cotada" });
   const proposal = { proposalOptions: [state.quotes[0].options![0]], send, requestId: "attempt" };
-  assert.throws(() => markQuoteSent(state, setupState.id, { requestId: "attempt" }), /canal/i);
   assert.throws(() => markQuoteSent(state, setupState.id, { requestId: "attempt", send: { ...send, channel: "E-mail", recipient: "sem-arroba" } }), /e-mail válido/i);
   const result = markQuoteSent(state, setupState.id, { requestId: "attempt", send });
   assert.deepEqual(result.quotes[0].proposalVersions![0].options!.map((option) => option.id), ["van"]);

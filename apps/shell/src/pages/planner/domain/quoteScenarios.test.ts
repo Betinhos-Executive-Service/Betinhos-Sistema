@@ -74,7 +74,7 @@ test("cotação antiga respondida registra aceite sem inventar versão de envio"
     assert.throws(() => resolveQuoteAcceptance({ ...quote, status: "Cotada" }, accepted));
     assert.throws(() => resolveQuoteAcceptance({ ...quote, proposalVersions: [{ id: "v1", options: [] }] }, accepted));
     assert.throws(() => resolveQuoteAcceptance(quote, { acceptedOptionId: "missing" }));
-    assert.equal(setQuoteOutcome(state, quote.id, "Perdida", "Preço recusado").quotes[0].lossReason, "Preço recusado");
+    assert.equal(setQuoteOutcome(state, quote.id, "Perdida", "Preço").quotes[0].lossReason, "Preço");
     assert.equal(setQuoteOutcome(state, quote.id, "Cancelada").quotes[0].status, "Cancelada");
   } finally { globalThis.localStorage = previousStorage; }
 });

@@ -1,6 +1,7 @@
 import { afterAll, test, vi } from "vitest";
+import { createQuoteWithLegacyTask } from "./legacyQuoteTask.fixture";
 import assert from "node:assert/strict";
-import { addAttachment, addComment, archivePersonalTag, createPersonalTag, createTask, createTeam, createQuote, deleteAttachment, deleteQuote, deleteTask, deleteTeam, ensureQuoteTask, importPlannerTasks, loadPersonalTags, loadState, markQuoteSent, replaceTaskPersonalTags, resolveWaitingReturn, seedState, setQuoteOutcome, STORAGE_KEY, updatePersonalTag, updateTask, updateTeam, updateQuote, type MockTask } from "./mock";
+import { addAttachment, addComment, archivePersonalTag, createPersonalTag, createTask, createTeam, deleteAttachment, deleteQuote, deleteTask, deleteTeam, ensureQuoteTask, importPlannerTasks, loadPersonalTags, loadState, markQuoteSent, replaceTaskPersonalTags, resolveWaitingReturn, seedState, setQuoteOutcome, STORAGE_KEY, updatePersonalTag, updateTask, updateTeam, updateQuote, type MockTask } from "./mock";
 import { localDateKey } from "../domain/management";
 
 function withStorage() {
@@ -174,7 +175,7 @@ test("bloqueia segunda tarefa principal ativa para a mesma cotação no mock", (
 
 test("cria cotação e acompanhamento principal no mesmo estado mock", () => {
   withStorage();
-  const next = createQuote(seedState(), { title: "Transfer novo", client: "Cliente novo", deadline: "2026-09-20", priority: "high" });
+  const next = createQuoteWithLegacyTask(seedState(), { title: "Transfer novo", client: "Cliente novo", deadline: "2026-09-20", priority: "high" });
   const quote = next.quotes[0];
   const task = next.tasks.find((item) => item.quoteId === quote.id && !item.parentTaskId);
   assert.match(quote.code!, /^COT-\d{4}$/);
@@ -185,7 +186,7 @@ test("cria cotação e acompanhamento principal no mesmo estado mock", () => {
 
 test("usa solicitante no título automático da cotação e da tarefa", () => {
   withStorage();
-  const next = createQuote(seedState(), { client: "Cliente novo", clientContact: "Maria Silva", deadline: "2026-09-20" });
+  const next = createQuoteWithLegacyTask(seedState(), { client: "Cliente novo", clientContact: "Maria Silva", deadline: "2026-09-20" });
   const quote = next.quotes[0];
   const task = next.tasks.find((item) => item.quoteId === quote.id && !item.parentTaskId);
   assert.equal(quote.title, "Cotação - Maria Silva");
@@ -194,14 +195,14 @@ test("usa solicitante no título automático da cotação e da tarefa", () => {
 
 test("atualiza títulos automáticos quando solicitante muda e preserva títulos manuais", () => {
   withStorage();
-  const created = createQuote(seedState(), { client: "Cliente", clientContact: "Maria Silva" });
+  const created = createQuoteWithLegacyTask(seedState(), { client: "Cliente", clientContact: "Maria Silva" });
   const quote = created.quotes[0];
   const automatic = updateQuote(created, quote.id, { clientContact: "João Souza" });
   const automaticTask = automatic.tasks.find((item) => item.quoteId === quote.id && !item.parentTaskId);
   assert.equal(automatic.quotes[0].title, "Cotação - João Souza");
   assert.equal(automaticTask!.title, "Cotação - João Souza");
 
-  const custom = createQuote(seedState(), { title: "Transfer executivo", client: "Cliente", clientContact: "Maria Silva" });
+  const custom = createQuoteWithLegacyTask(seedState(), { title: "Transfer executivo", client: "Cliente", clientContact: "Maria Silva" });
   const customQuote = custom.quotes[0];
   const customTaskId = custom.tasks.find((item) => item.quoteId === customQuote.id && !item.parentTaskId)!.id;
   const renamedTaskState = updateTask(custom, customTaskId, { title: "Cobrar retorno do cliente" });
@@ -213,7 +214,7 @@ test("atualiza títulos automáticos quando solicitante muda e preserva títulos
 
 test("coloca nova cotação na fila Financeiro sem lembrete individual", () => {
   withStorage();
-  const created = createQuote(seedState(), { title: "Transfer", client: "Cliente", deadline: "2026-09-19" });
+  const created = createQuoteWithLegacyTask(seedState(), { title: "Transfer", client: "Cliente", deadline: "2026-09-19" });
   const quote = created.quotes[0];
   const task = created.tasks.find((item) => item.quoteId === quote.id && !item.parentTaskId);
   assert.equal(quote.status, "Nova");
@@ -225,7 +226,7 @@ test("coloca nova cotação na fila Financeiro sem lembrete individual", () => {
 
 test("notificações da cotação seguem responsáveis, ação necessária e deduplicação", () => {
   withStorage();
-  const created = createQuote(seedState(), {
+  const created = createQuoteWithLegacyTask(seedState(), {
     title: "Transfer",
     client: "Cliente",
     deadline: "2026-09-19",
@@ -269,20 +270,20 @@ test("atualiza dados comerciais e replica campos operacionais na tarefa", () => 
 
 test("registra envio e resultados da cotação sem criar reserva", () => {
   withStorage();
-  const initial = createQuote(seedState(), { title: "Transfer", client: "Cliente", clientContact: "Contato", channel: "WhatsApp", origin: "A", destination: "B", serviceDate: "2026-09-20T10:00", deadline: "2026-09-19" });
+  const initial = createQuoteWithLegacyTask(seedState(), { title: "Transfer", client: "Cliente", clientContact: "Contato", channel: "WhatsApp", origin: "A", destination: "B", serviceDate: "2026-09-20T10:00", deadline: "2026-09-19" });
   const quote = initial.quotes[0];
   assert.throws(() => markQuoteSent(initial, quote.id), /Finalize/);
   const priced = updateQuote(initial, quote.id, { status: "Cotada", value: "R$ 800,00", commercialTerms: "Pagamento em 30 dias" });
   const sent = markQuoteSent(priced, quote.id, { send: { channel: "WhatsApp", recipient: "Cliente", sentAt: "2026-09-18T12:00:00.000Z" } });
   assert.equal(sent.quotes[0].status, "Respondida ao cliente");
   assert.equal(sent.quotes[0].responseSent, true);
-  const lost = setQuoteOutcome(sent, quote.id, "Perdida", "Preço acima do orçamento");
+  const lost = setQuoteOutcome(sent, quote.id, "Perdida", "Preço");
   assert.equal(lost.quotes[0].status, "Perdida");
-  assert.equal(lost.quotes[0].lossReason, "Preço acima do orçamento");
+  assert.equal(lost.quotes[0].lossReason, "Preço");
   assert.ok(lost.quotes[0].finalizationAt);
   assert.equal(lost.tasks.find((task) => task.quoteId === quote.id && !task.parentTaskId)!.status, "done");
   assert.throws(() => setQuoteOutcome(sent, quote.id, "Perdida"), /motivo/);
-  assert.throws(() => setQuoteOutcome(sent, quote.id, "Perdida", "x".repeat(1001)), /1.000/);
+  assert.throws(() => setQuoteOutcome(sent, quote.id, "Perdida", "x".repeat(1001)), /motivo da perda/);
   const sentVersion = sent.quotes.find((item) => item.id === quote.id)!.proposalVersions!.at(-1);
   assert.throws(() => setQuoteOutcome(sent, quote.id, "Aceita pelo cliente"), /proposta registrada como enviada/);
   const accepted = setQuoteOutcome(sent, quote.id, "Aceita pelo cliente", "", { acceptedProposalVersionId: sentVersion!.id, acceptedOptionId: sentVersion!.options![0].id });
@@ -293,7 +294,7 @@ test("registra envio e resultados da cotação sem criar reserva", () => {
 
 test("sincroniza status comercial da cotação com sua tarefa principal", () => {
   withStorage();
-  const created = createQuote(seedState(), { title: "Transfer", client: "Cliente", deadline: "2026-09-19" });
+  const created = createQuoteWithLegacyTask(seedState(), { title: "Transfer", client: "Cliente", deadline: "2026-09-19" });
   const quote = created.quotes[0];
   const task = created.tasks.find((item) => item.quoteId === quote.id && !item.parentTaskId);
 
@@ -322,7 +323,7 @@ test("sincroniza status comercial da cotação com sua tarefa principal", () => 
 
 test("sincroniza alteração de status da tarefa de cotação de volta para a cotação", () => {
   withStorage();
-  const created = createQuote(seedState(), { title: "Transfer", client: "Cliente", deadline: "2026-09-19" });
+  const created = createQuoteWithLegacyTask(seedState(), { title: "Transfer", client: "Cliente", deadline: "2026-09-19" });
   const quote = created.quotes[0];
   const task = created.tasks.find((item) => item.quoteId === quote.id && !item.parentTaskId);
 
@@ -333,7 +334,7 @@ test("sincroniza alteração de status da tarefa de cotação de volta para a co
 
 test("exclui cotação, tarefa, subtarefas e notificações vinculadas", () => {
   withStorage();
-  const initial = createQuote(seedState(), { title: "Transfer", client: "Cliente" });
+  const initial = createQuoteWithLegacyTask(seedState(), { title: "Transfer", client: "Cliente" });
   const quote = initial.quotes[0];
   const parent = initial.tasks.find((task) => task.quoteId === quote.id && !task.parentTaskId);
   const withChild = createTask(initial, { title: "Conferir rota", parentTaskId: parent!.id });
@@ -349,7 +350,7 @@ test("exclui cotação, tarefa, subtarefas e notificações vinculadas", () => {
 
 test("marcar cotada exige valor e aceita condições vazias sem concluir tarefa", () => {
   withStorage();
-  const created = createQuote(seedState(), { title: "Transfer", client: "Cliente" });
+  const created = createQuoteWithLegacyTask(seedState(), { title: "Transfer", client: "Cliente" });
   const quote = created.quotes[0];
   const task = created.tasks.find((item) => item.quoteId === quote.id && !item.parentTaskId);
   assert.throws(() => updateTask(created, task!.id, { status: "done" }), /decisão do cliente/);
@@ -362,7 +363,7 @@ test("marcar cotada exige valor e aceita condições vazias sem concluir tarefa"
 
 test("conclusão pelo Planner só acontece pela decisão do cliente", () => {
   withStorage();
-  const created = createQuote(seedState(), { title: "Transfer", client: "Cliente" });
+  const created = createQuoteWithLegacyTask(seedState(), { title: "Transfer", client: "Cliente" });
   const quote = created.quotes[0];
   const task = created.tasks.find((item) => item.quoteId === quote.id && !item.parentTaskId);
   for (const patch of [{ status: "done" }, { status: "done", quoteStatus: "Cotada", value: "R$ 800,00" }, { status: "done", quoteStatus: "Respondida ao cliente", responseSent: true, value: "R$ 800,00" }]) {
@@ -377,7 +378,7 @@ test("conclusão pelo Planner só acontece pela decisão do cliente", () => {
 
 test("opção com valor torna a cotação Cotada sem clique e a devolve para análise sem valor", () => {
   withStorage();
-  const created = createQuote(seedState(), { title: "Transfer", client: "Cliente", options: [{ id: "a", name: "Executivo", value: "" }] });
+  const created = createQuoteWithLegacyTask(seedState(), { title: "Transfer", client: "Cliente", options: [{ id: "a", name: "Executivo", value: "" }] });
   const quote = created.quotes[0];
   const analysing = updateQuote(created, quote.id, { status: "Em análise pelo financeiro" });
   const priced = updateQuote(analysing, quote.id, { options: [{ id: "a", name: "Executivo", value: "R$ 900,00" }] });
@@ -390,7 +391,7 @@ test("opção com valor torna a cotação Cotada sem clique e a devolve para an�
 
 test("editar uma cotação pronta mantém tarefa aberta e não presume envio", () => {
   withStorage();
-  const created = createQuote(seedState(), { title: "Transfer", client: "Cliente" });
+  const created = createQuoteWithLegacyTask(seedState(), { title: "Transfer", client: "Cliente" });
   const quote = created.quotes[0];
   const task = created.tasks.find((item) => item.quoteId === quote.id && !item.parentTaskId);
   const priced = updateTask(created, task!.id, { quoteStatus: "Cotada", value: "R$ 800,00", commercialTerms: "Pagamento em 30 dias" });
@@ -402,7 +403,7 @@ test("editar uma cotação pronta mantém tarefa aberta e não presume envio", (
 
 test("falha ao persistir envio preserva a cotação e tarefa originais", () => {
   withStorage();
-  const created = createQuote(seedState(), { title: "Transfer", client: "Cliente" });
+  const created = createQuoteWithLegacyTask(seedState(), { title: "Transfer", client: "Cliente" });
   const quote = created.quotes[0];
   const priced = updateQuote(created, quote.id, { status: "Cotada", value: "R$ 800,00" });
   const task = priced.tasks.find((item) => item.quoteId === quote.id && !item.parentTaskId);
@@ -415,9 +416,9 @@ test("falha ao persistir envio preserva a cotação e tarefa originais", () => {
 
 test("reabrir cotação reativa sua tarefa principal e limpa encerramento", () => {
   withStorage();
-  const created = createQuote(seedState(), { title: "Transfer", client: "Cliente", deadline: "2026-09-19" });
+  const created = createQuoteWithLegacyTask(seedState(), { title: "Transfer", client: "Cliente", deadline: "2026-09-19" });
   const quote = created.quotes[0];
-  const closed = setQuoteOutcome(created, quote.id, "Perdida", "Preço acima do orçamento");
+  const closed = setQuoteOutcome(created, quote.id, "Perdida", "Preço");
   const reopened = updateQuote(closed, quote.id, { status: "Nova", finalizationAt: "", responseSent: false });
   const reopenedTask = reopened.tasks.find((item) => item.quoteId === quote.id && !item.parentTaskId);
 
@@ -430,7 +431,7 @@ test("reabrir cotação reativa sua tarefa principal e limpa encerramento", () =
 
 test("conclui todas as tarefas abertas vinculadas ao resultado da cotação", () => {
   withStorage();
-  const created = createQuote(seedState(), { title: "Transfer", client: "Cliente", deadline: "2026-09-19" });
+  const created = createQuoteWithLegacyTask(seedState(), { title: "Transfer", client: "Cliente", deadline: "2026-09-19" });
   const quote = created.quotes[0];
   const mainTask = created.tasks.find((task) => task.quoteId === quote.id && !task.parentTaskId);
   const withOpenSubtask = createTask(created, { title: "Validar veículo", parentTaskId: mainTask!.id, quoteId: quote.id, quoteCode: quote.code, quoteTitle: quote.title });
@@ -439,7 +440,7 @@ test("conclui todas as tarefas abertas vinculadas ao resultado da cotação", ()
   const withDone = updateTask(withDoneSubtask, doneId, { status: "done" });
   const alreadyDoneTask = withDone.tasks.find((task) => task.id === doneId);
 
-  const lost = setQuoteOutcome(withDone, quote.id, "Perdida", "Preço acima do orçamento");
+  const lost = setQuoteOutcome(withDone, quote.id, "Perdida", "Preço");
   const linkedTasks = lost.tasks.filter((task) => task.quoteId === quote.id);
 
   assert.equal(linkedTasks.length, 3);
@@ -612,7 +613,7 @@ test("lê registros mock antigos como aceite do cliente", () => {
 });
 
 test("registra no histórico da tarefa mudanças feitas pela gestão da cotação", () => {
-  const created = createQuote(seedState(), { title: "Transfer", client: "Cliente", channel: "WhatsApp", clientPhone: "11999999999", origin: "A", destination: "B", serviceDate: "2026-09-20T10:00", deadline: "2026-09-19" });
+  const created = createQuoteWithLegacyTask(seedState(), { title: "Transfer", client: "Cliente", channel: "WhatsApp", clientPhone: "11999999999", origin: "A", destination: "B", serviceDate: "2026-09-20T10:00", deadline: "2026-09-19" });
   const quote = created.quotes[0];
   const changed = updateQuote(created, quote.id, { status: "Em análise pelo financeiro", deadline: "2026-09-18", assigneeIds: ["employee-renan"], assigneeNames: ["Renan Martins"] });
   const task = changed.tasks.find((item) => item.quoteId === quote.id && !item.parentTaskId);

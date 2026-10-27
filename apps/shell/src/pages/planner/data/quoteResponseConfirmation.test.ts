@@ -1,6 +1,7 @@
 import { afterEach, test, vi } from "vitest";
+import { createQuoteWithLegacyTask } from "./legacyQuoteTask.fixture";
 import assert from "node:assert/strict";
-import { createQuote, markQuoteSent, seedState, setQuoteOutcome, updateQuote } from "./mock";
+import { markQuoteSent, seedState, setQuoteOutcome, updateQuote } from "./mock";
 import { createQuoteProposalVersion, normalizeQuoteOptions, prepareQuoteResponse } from "../domain/quoteScenarios";
 import { buildQuoteEmailHtml, buildQuotePlainText } from "../domain/quoteDomain";
 import { clientDecisionWaitingContext } from "../domain/quoteTaskFlow";
@@ -9,7 +10,7 @@ afterEach(() => { vi.unstubAllGlobals(); });
 
 function setup() {
   vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => {} });
-  let state = createQuote(seedState(), { title: "Transfer", client: "Empresa", options: [
+  let state = createQuoteWithLegacyTask(seedState(), { title: "Transfer", client: "Empresa", options: [
     { id: "a", name: "Executivo", value: "1200" },
     { id: "b", name: "Premium", value: "1800" },
     { id: "incomplete", name: "Em composição", value: "" },
@@ -23,7 +24,8 @@ const send = { channel: "E-mail", recipient: "cliente@empresa.com", sentAt: "202
 
 test("registra o envio da cotação inteira com canal e destinatário e preserva todas as opções válidas", () => {
   const { state, id } = setup();
-  assert.throws(() => markQuoteSent(state, id, { requestId: "sem-envio" }), /canal/i);
+  // V2 ("Enviei"): sem canal/destinatário registra só a data do envio.
+  assert.equal(markQuoteSent(state, id, { requestId: "sem-envio" }).quotes[0].proposalVersions!.at(-1)!.channel, "");
   const result = markQuoteSent({ ...state, currentUserId: "renan", currentUserName: "Renan" }, id, {
     requestId: "confirmation-1", proposalOptions: [state.quotes[0].options![0]], send,
     text: "Texto editado na prévia",

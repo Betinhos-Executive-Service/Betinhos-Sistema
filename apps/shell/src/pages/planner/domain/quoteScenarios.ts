@@ -117,8 +117,10 @@ const SNAPSHOT_KEYS = ['title', 'client', 'clientContact', 'clientEmail', 'clien
 
 // O registro do envio exige canal, destinatário e momento: a versão gravada é
 // a prova do que foi enviado ao cliente.
-export function createQuoteProposalVersion(quote: QuoteInput, options: QuoteOptionData[], content: ProposalContent, author: ProposalAuthor, send: QuoteSend, requestId: string = uuid()): QuoteProposalVersion {
-  const error = validateQuoteSend(send)
+// V2 ("Enviei"): sem `send`, registra só o momento do envio, sem canal nem destinatário.
+export function createQuoteProposalVersion(quote: QuoteInput, options: QuoteOptionData[], content: ProposalContent, author: ProposalAuthor, sendInput?: QuoteSend, requestId: string = uuid()): QuoteProposalVersion {
+  const send: QuoteSend = sendInput || { channel: '', recipient: '', sentAt: new Date().toISOString() }
+  const error = sendInput ? validateQuoteSend(send) : ''
   if (error) throw new Error(error)
   return {
     id: requestId,
@@ -127,8 +129,8 @@ export function createQuoteProposalVersion(quote: QuoteInput, options: QuoteOpti
     createdAt: new Date().toISOString(),
     authorId: author.id || '',
     authorName: author.name || '',
-    channel: send.channel,
-    recipient: String(send.recipient).trim(),
+    channel: send.channel || '',
+    recipient: String(send.recipient || '').trim(),
     sentAt: new Date(send.sentAt as string).toISOString(),
     commercialTerms: quote.commercialTerms || '',
     quoteSnapshot: Object.fromEntries(SNAPSHOT_KEYS.map((key) => [key, quote[key] ?? ''])),

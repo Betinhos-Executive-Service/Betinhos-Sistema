@@ -30,9 +30,9 @@ import {
   validateContact,
 } from '../domain/contactDomain'
 import { isQuoteTask, isQuoteTerminalStatus, QUOTE_CLIENT_DECISION_RETURN, QUOTE_TASK_DONE_BLOCKED, quoteStatusForTaskStatus, taskStatusForQuoteStatus, waitingContextForStatusChange } from '../domain/quoteTaskFlow'
+import { followUpNotices, isLossReason, readyNotice, urgentNotices, type QuoteNotice } from '../domain/quoteNotifications'
 import { applyDerivedStatus, buildQuoteEmailHtml, buildQuotePlainText, lastProposalSentAt, normalizeQuoteRoute, QUOTE_COMPLETED_STATUSES, quoteRoutePoints, validateQuoteCommercial } from '../domain/quoteDomain'
 import type { NormalizedContact } from '../domain/contactDomain'
-import type { QuoteSend } from '../domain/quoteScenarios'
 import { createQuoteProposalVersion, normalizeQuoteOptions, prepareQuoteProposal, prepareQuoteResponse, resolveQuoteAcceptance } from '../domain/quoteScenarios'
 import type {
   Employee,
@@ -131,6 +131,7 @@ const asMockContact = (contact: NormalizedContact): MockContact => contact as Om
 
 export interface MockNotification extends PlannerNotification {
   contactId?: string
+  quoteId?: string
   title?: string
   message?: string
   occurredAt?: string
@@ -232,6 +233,10 @@ export type TaskPatch = Partial<MockTask> & {
 
 export interface QuotePatch extends Partial<MockQuote> {
   actorEmployeeId?: string
+  /** V2: destinatários do aviso de cotação urgente; sem isso, membros da equipe Financeiro. */
+  financeIds?: string[]
+  /** Data de hoje (yyyy-mm-dd) para a regra de urgência; padrão: hoje local. */
+  today?: string
   assigneeIds?: string[]
   assigneeNames?: string[]
 }
@@ -532,6 +537,10 @@ function task(id: string, title: string, quoteId: string | null, quoteCode: stri
 // --- Persistência -----------------------------------------------------------
 
 export function loadState(): MockState {
+  return syncQuoteFollowUps(readStoredState(), localDateKey())
+}
+
+function readStoredState(): MockState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return seedState()
@@ -1410,15 +1419,27 @@ export function createQuote(state: MockState, input: QuotePatch = {}): MockState
     vehicleType: input.vehicleType || '', route, origin: routePoints[0] || input.origin || '', destination: lastOf(routePoints) || input.destination || '',
     passengers: input.passengers || '', serviceDate: input.serviceDate || '', returnDate: input.returnDate || '',
     clientContact: input.clientContact || '', clientEmail: input.clientEmail || '', clientPhone: input.clientPhone || '',
-    commercialTerms: input.commercialTerms || '', notes: input.notes || '', passengerProfile: input.passengerProfile || '', internalNotes: input.internalNotes || '', options: input.options || [], proposalVersions: [], acceptedOptionId: '', acceptedProposalVersionId: '', priority: input.priority || 'medium', channel: input.channel || '', hasReturn: Boolean(input.returnDate), lossReason: input.lossReason || '', responseSent: false, finalizationAt: '', plannerTaskId: '', createdAt: now, modifiedAt: now,
+    commercialTerms: input.commercialTerms || '', notes: input.notes || '', passengerProfile: input.passengerProfile || '', internalNotes: input.internalNotes || '', options: input.options || [], proposalVersions: [], acceptedOptionId: '', acceptedProposalVersionId: '', priority: input.priority || 'medium', channel: input.channel || '', hasReturn: Boolean(input.returnDate), lossReason: input.lossReason || '', responseSent: false, finalizationAt: '', plannerTaskId: '', creatorEmployeeId: input.actorEmployeeId || '', createdAt: now, modifiedAt: now,
   }
   if (!quote.title) quote.title = quoteTaskTitle(quote)
+  // V2: a cotação é a própria fila; não cria tarefa.
   const withQuote: MockState = { ...state, quotes: [quote, ...(state.quotes || [])] }
-  const assigneeIds = input.assigneeIds || []
-  const assigneeNames = input.assigneeNames || assigneeIds.map((id) => withQuote.employees?.find((employee) => employee.id === id)?.name).filter((value): value is string => Boolean(value))
-  const withTask = createTask(withQuote, { title: quoteTaskTitle(quote), quoteId: quote.id, quoteCode: quote.code, quoteTitle: quote.title, quoteStatus: quote.status, dueDate: quote.deadline, priority: quote.priority, assigneeIds, assigneeNames, assigneeName: assigneeNames.join(', ') || 'Não atribuído', assignmentMode: 'people', teamName: 'Financeiro', description: `Acompanhar a cotação ${quote.code} até a resposta ao cliente.` })
-  const createdTask = withTask.tasks.find((item) => item.quoteId === quote.id && !item.parentTaskId)
-  return saveState({ ...withTask, quotes: withTask.quotes.map((item) => item.id === quote.id ? { ...item, plannerTaskId: createdTask?.id || '', modifiedAt: now } : item) })
+  return saveState(pushQuoteNotices(withQuote, urgentNotices(quote, input.financeIds ?? financeMemberIds(state), input.today || localDateKey())))
+}
+
+function financeMemberIds(state: MockState): string[] {
+  const team = (state.teams || []).find((item) => item.name === 'Financeiro')
+  return team?.memberIds || []
+}
+
+function pushQuoteNotices(state: MockState, notices: QuoteNotice[], occurredAt: string = new Date().toISOString()): MockState {
+  const existing = new Set((state.notifications || []).map((item) => item.dedupeKey).filter(Boolean))
+  const additions: MockNotification[] = notices.filter((item) => !existing.has(item.dedupeKey)).map((item) => ({ id: uid('notification'), taskId: '', readAt: '', occurredAt, ...item }))
+  return additions.length ? { ...state, notifications: [...additions, ...(state.notifications || [])] } : state
+}
+
+export function syncQuoteFollowUps(state: MockState, today: string = localDateKey()): MockState {
+  return pushQuoteNotices(state, followUpNotices(state.quotes || [], today))
 }
 
 export function updateQuote(state: MockState, id: string, patchInput: QuotePatch = {}): MockState {
@@ -1438,7 +1459,6 @@ export function updateQuote(state: MockState, id: string, patchInput: QuotePatch
   if (patch.status === 'Aguardando informação' && existing.status !== patch.status) {
     const validation = validateWaitingContext('waiting', patch.waitingContext)
     if (!validation.allowed) throw new Error(validation.error)
-    if (!(state.tasks || []).some((taskItem) => taskItem.quoteId === id && !taskItem.parentTaskId)) throw new Error('Tarefa vinculada à cotação não encontrada.')
   }
   const nextQuote: MockQuote = { ...existing, ...patch, id, modifiedAt: new Date().toISOString() }
   if (patch.route !== undefined) {
@@ -1495,6 +1515,8 @@ export function updateQuote(state: MockState, id: string, patchInput: QuotePatch
       }
     }),
   }
+  const ready = readyNotice(existing, nextQuote)
+  if (ready) nextState.notifications = pushQuoteNotices(nextState, [ready], nextQuote.modifiedAt).notifications
   const linkedTask = nextState.tasks.find((taskItem) => taskItem.quoteId === id && !taskItem.parentTaskId)
   if (linkedTask) {
     const previousTask = state.tasks.find((taskItem) => taskItem.id === linkedTask.id)
@@ -1548,15 +1570,14 @@ export function markQuoteSent(state: MockState, id: string, proposal: QuoteSendP
   const sentQuote: MockQuote = { ...quote, ...proposal.draft, options, proposalOptions: prepared.options }
   const version = createQuoteProposalVersion(sentQuote, prepared.options, {
     html: proposal.html || buildQuoteEmailHtml(sentQuote), text: proposal.text || buildQuotePlainText(sentQuote),
-  }, { id: state.currentUserId, name: state.currentUserName || state.employees?.find((employee) => employee.userId === state.currentUserId || employee.id === state.currentUserId)?.name || 'Usuário local' }, proposal.send as QuoteSend, proposal.requestId)
+  }, { id: state.currentUserId, name: state.currentUserName || state.employees?.find((employee) => employee.userId === state.currentUserId || employee.id === state.currentUserId)?.name || 'Usuário local' }, proposal.send, proposal.requestId)
   return updateQuote(state, id, { ...proposal.draft, options, proposalOptions: prepared.options, proposalVersions: [...(quote.proposalVersions || []), version], responseSent: true, status: 'Respondida ao cliente', value: prepared.options.length > 1 ? '' : prepared.options[0].value as string | undefined, commercialTerms: sentQuote.commercialTerms || '', finalizationAt: '' })
 }
 
 export function setQuoteOutcome(state: MockState, id: string, outcome: string, reason: string = '', accepted: Parameters<typeof resolveQuoteAcceptance>[1] = {}): MockState {
   const quote = (state.quotes || []).find((item) => item.id === id)
   if (!quote) throw new Error('Cotação não encontrada.')
-  if (outcome === 'Perdida' && !String(reason).trim()) throw new Error('Informe o motivo da perda.')
-  if (String(reason).trim().length > 1000) throw new Error('Motivo da perda excede 1.000 caracteres.')
+  if (outcome === 'Perdida' && !isLossReason(String(reason).trim())) throw new Error('Escolha o motivo da perda.')
   if (outcome === 'Aceita pelo cliente') {
     const { option, version } = resolveQuoteAcceptance(quote, accepted)
     return updateQuote(state, id, { status: outcome, acceptedOptionId: option.id, acceptedProposalVersionId: version?.id || '', value: option.value as string | undefined, commercialTerms: version?.commercialTerms ?? option.commercialTerms ?? quote.commercialTerms ?? '', finalizationAt: new Date().toISOString() })
