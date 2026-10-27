@@ -1,3 +1,5 @@
+import { createFetchWebApi } from "./fetchWebApi.ts";
+
 // Execução de Custom API (Action não vinculada) pelo Xrm.WebApi.online.execute, compartilhada por comunicados e termos de multa.
 type XrmApi = { WebApi?: { online?: { execute?: (request: Record<string, unknown>) => Promise<Response> } } };
 
@@ -14,10 +16,12 @@ export async function executeCustomApi(operationName: string, parameters: Custom
   let xrm: XrmApi | undefined;
   try { xrm = (window.parent as Window & { Xrm?: XrmApi }).Xrm; } catch { /* Parent may be cross-origin. */ }
   xrm ??= (window as Window & { Xrm?: XrmApi }).Xrm;
-  const online = xrm?.WebApi?.online;
+  let online = xrm?.WebApi?.online;
+  // URL direta do web resource (host do Dataverse, sem Xrm): Action não vinculada por fetch com o cookie da sessão.
+  if (!online && /\.dynamics\.com$/i.test(window.location.hostname)) online = createFetchWebApi(window.location.origin, {}).online;
   // O Xrm depende do `this`; extrair o método solto quebra com "reading '_execute'".
   const execute = online?.execute?.bind(online);
-  if (!execute) throw new Error("Abra o web resource no Power Apps para registrar esta ação.");
+  if (!execute) throw new Error("Abra o app pelo Power Apps ou pelo link do Dataverse para registrar esta ação.");
   const parameterTypes = Object.fromEntries(Object.entries(parameters).map(([key, value]) => [key, {
     // Com "Edm.Guid" o Xrm serializa a string como 'undefined'; o servidor converte o texto para Guid.
     typeName: typeof value === "number" ? "Edm.Decimal" : "Edm.String",
