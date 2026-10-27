@@ -24,13 +24,13 @@ function installFakeBrowser() {
 }
 
 test('monta o registro com usuário, tela, versão e mensagem', () => {
-  setErrorLogContext({ screen: 'kanban', userEmail: 'juliana@betinhos.com.br' });
+  setErrorLogContext({ screen: 'kanban', userEmail: 'usuario.teste@exemplo.com.br' });
   const record = buildErrorLogRecord(new Error('boom'), { action: 'GET /x', source: 'Dataverse', errorCode: '500' }, { userSettings: { userId: '{ABC}', userName: 'Juliana' }, now: '2026-10-19T12:00:00Z' });
   expect(record.new_appname).toBe('Tela Planner');
   expect(record.new_screen).toBe('kanban');
   expect(record.new_userid).toBe('ABC');
   expect(record.new_username).toBe('Juliana');
-  expect(record.new_useremail).toBe('juliana@betinhos.com.br');
+  expect(record.new_useremail).toBe('usuario.teste@exemplo.com.br');
   expect(record.new_builtat).toBe(APP_VERSION);
   expect(record.new_message).toBe('boom');
   expect(record.new_errorcode).toBe('500');
