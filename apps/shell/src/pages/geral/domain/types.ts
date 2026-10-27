@@ -4,7 +4,8 @@ export type ViewGroup = 'sistema' | 'minhas'
 export type View = { id: string; nome: string; grupo: ViewGroup; fetchxml: string; layoutxml: string; padrao: boolean }
 
 /** Coluna do layoutxml. `alias` e `entity` só em colunas de link-entity (`alias.atributo`). */
-export type Column = { key: string; attribute: string; alias: string | null; entity: string | null; width: number }
+/** `label`: título fixo (colunas adicionadas pelo painel, com o caminho "Cliente › Nome"). */
+export type Column = { key: string; attribute: string; alias: string | null; entity: string | null; width: number; label?: string }
 
 export type CellKind = 'choice' | 'lookup' | 'datetime' | 'text' | 'memo' | 'money' | 'boolean' | 'readonly'
 

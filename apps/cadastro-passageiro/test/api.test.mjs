@@ -155,7 +155,7 @@ test("ler: só campos esperados; telefone/e-mail sem máscara são descartados",
 test("mock: 3 perfis (completo, só foto, nada) e e-mail 'erro…' simula falha", async () => {
   const local = (c, corpo) => new Request("http://localhost:52418/api/" + c, { method: "POST", body: JSON.stringify({ token: TOKEN, ...corpo }) });
   const ps = (await (await tratarApi(local("ler"), {}, new URL(local("ler").url))).json()).passageiros;
-  assert.deepEqual(ps.map((p) => [p.temFoto, p.temTelefone, p.temEmail]), [[true, true, true], [true, false, false], [false, false, false]]);
+  assert.deepEqual(ps.map((p) => [p.primeiroNome, p.temFoto, p.temTelefone, p.temEmail]), [["Mariana", true, true, true], ["Carlos", true, false, false], ["Beatriz", false, false, false]]);
   const r = local("salvar", { passageiroId: PID, email: "erro@teste.com" });
   assert.equal((await tratarApi(r, {}, new URL(r.url))).status, 500);
 });
@@ -170,4 +170,81 @@ test("máscaras: telefone só DDD + 4 últimos; e-mail 2 letras + domínio", () 
   assert.equal(emailOculto("a@b.co"), "a•••@b.co");
   assert.equal(emailOculto(""), "");
   for (const v of [telefoneOculto("+5511987654321"), emailOculto("ana.souza@empresa.com.br")]) assert.doesNotMatch(v, /9876|souza/);
+});
+
+test("foto: manda hash + passageiroId ao flow e devolve só {foto}", async () => {
+  const foto = { mimeType: "image/png", base64: "QUJD" };
+  const f = flowFalso(200, { ok: true, foto, extra: "interno" });
+  const r = await chamar(req("/api/foto", { token: TOKEN, passageiroId: PID.toUpperCase() }), f);
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), { foto });
+  assert.deepEqual(f.chamadas[0].corpo, { op: "foto", hash: await sha256Hex(TOKEN), passageiroId: PID });
+});
+
+test("foto: id inválido é 400 sem chamar o flow; foto malformada vira null; 404 repassado", async () => {
+  const f = flowFalso(200, { foto: { base64: "<script>" } });
+  assert.equal((await chamar(req("/api/foto", { token: TOKEN, passageiroId: "x" }), f)).status, 400);
+  assert.equal(f.chamadas.length, 0);
+  assert.deepEqual(await (await chamar(req("/api/foto", { token: TOKEN, passageiroId: PID }), f)).json(), { foto: null });
+  assert.equal((await chamar(req("/api/foto", { token: TOKEN, passageiroId: PID }), flowFalso(404, {}))).status, 404);
+});
+
+test("ler: lista ordenada por nome (o flow monta em paralelo)", async () => {
+  const f = flowFalso(200, { passageiros: [{ id: PID, primeiroNome: "Zeca" }, { id: PID, primeiroNome: "Ana" }] });
+  const ps = (await (await chamar(req("/api/ler", { token: TOKEN }), f)).json()).passageiros;
+  assert.deepEqual(ps.map((p) => p.primeiroNome), ["Ana", "Zeca"]);
+});
+
+// KV falso: conta gravações para garantir que só grava quando muda.
+function kvFalso() {
+  const m = new Map();
+  const kv = { m, puts: 0, get: async (k) => m.get(k) ?? null, put: async (k, v) => { kv.puts++; m.set(k, v); }, delete: async (k) => { m.delete(k); } };
+  return kv;
+}
+const LISTA = { dataServico: "2026-10-27T10:00:00Z", passageiros: [{ id: PID, primeiroNome: "Ana", temFoto: true, temTelefone: false, temEmail: false }] };
+
+test("cache: 1º ler vai ao flow e grava; 2º vem do cache sem chamar o flow; fresco força o flow", async () => {
+  const e = { ...env, CACHE: kvFalso() };
+  const f = flowFalso(200, LISTA);
+  const r1 = await (await chamar(req("/api/ler", { token: TOKEN }), f, e)).json();
+  assert.equal(r1.cache, undefined);
+  const r2 = await (await chamar(req("/api/ler", { token: TOKEN }), f, e)).json();
+  assert.equal(r2.cache, true);
+  assert.equal(r2.passageiros[0].primeiroNome, "Ana");
+  assert.equal(f.chamadas.length, 1);
+  await chamar(req("/api/ler", { token: TOKEN, fresco: true }), f, e);
+  assert.equal(f.chamadas.length, 2);
+  assert.equal(e.CACHE.puts, 1, "mesmo conteúdo não regrava");
+});
+
+test("cache: link vencido (410) apaga a lista guardada", async () => {
+  const e = { ...env, CACHE: kvFalso() };
+  await chamar(req("/api/ler", { token: TOKEN }), flowFalso(200, LISTA), e);
+  await chamar(req("/api/ler", { token: TOKEN, fresco: true }), flowFalso(410, {}), e);
+  assert.equal(e.CACHE.m.size, 0);
+});
+
+test("aquecer: aceita outra origem, responde 202 e guarda lista e fotos", async () => {
+  const e = { ...env, CACHE: kvFalso() };
+  const chamadas = [];
+  const f = async (url, init) => {
+    const c = JSON.parse(init.body); chamadas.push(c.op);
+    const corpo = c.op === "ler" ? LISTA : { foto: { mimeType: "image/jpeg", base64: "QUJD" } };
+    return new Response(JSON.stringify(corpo), { status: 200 });
+  };
+  const r = await chamar(req("/api/aquecer", { token: TOKEN }, { Origin: "https://org23b93544.crm2.dynamics.com", "Content-Type": "text/plain" }), f, e);
+  assert.equal(r.status, 202);
+  assert.deepEqual(chamadas, ["ler", "foto"]);
+  const foto = await (await chamar(req("/api/foto", { token: TOKEN, passageiroId: PID }), f, e)).json();
+  assert.equal(foto.foto.base64, "QUJD");
+  assert.equal(chamadas.length, 2, "foto veio do cache");
+});
+
+test("salvar com foto: grava a foto nova no cache e atualiza a lista", async () => {
+  const e = { ...env, CACHE: kvFalso() };
+  const f = async (url, init) => new Response(JSON.stringify(JSON.parse(init.body).op === "ler" ? LISTA : { ok: true }), { status: 200 });
+  await chamar(req("/api/salvar", { token: TOKEN, passageiroId: PID, fotoBase64: "WFla" }), f, e);
+  const foto = await (await chamar(req("/api/foto", { token: TOKEN, passageiroId: PID }), f, e)).json();
+  assert.equal(foto.foto.base64, "WFla");
+  assert.ok(e.CACHE.m.has("ler:" + await sha256Hex(TOKEN)));
 });

@@ -36,10 +36,10 @@ test('o token puro nunca é usado; o link é buscado por cr40f_tokenhash', () =>
   assert.equal(busca.inputs.parameters.$top, 1)
 })
 
-test('operações ler e salvar no Switch; outra op dá 400', () => {
+test('operações ler, foto e salvar no Switch; outra op dá 400', () => {
   const sw = todas.get('Por_operacao')
   assert.equal(sw.type, 'Switch')
-  assert.deepEqual(Object.values(sw.cases).map((c) => c.case).sort(), ['ler', 'salvar'])
+  assert.deepEqual(Object.values(sw.cases).map((c) => c.case).sort(), ['foto', 'ler', 'salvar'])
 })
 
 test('códigos de resposta previstos e corpo de erro genérico', () => {
@@ -89,9 +89,28 @@ test('foto vira <passageiroId>.jpg no SharePoint com link de caminho (/:i:/r/), 
   assert.equal(guardar.inputs.value, "@{concat('https://', uriHost('__SITE_URL__'), '/:i:/r', uriPath('__SITE_URL__'), replace(uriComponent(body('Criar_arquivo')?['Path']), '%2F', '/'))}")
 })
 
-test('ler: foto atual só da pasta Passageiros/Fotos, lida por caminho e sem derrubar o ler', () => {
+test('ler: passageiros em paralelo e sem foto (a foto vem da op foto)', () => {
+  const loop = todas.get('Por_passageiro')
+  assert.ok(loop.runtimeConfiguration.concurrency.repetitions >= 10, 'loop paralelo')
+  assert.ok(!('Ler_foto' in loop.actions) && !('Tem_foto_lida' in loop.actions), 'o ler não baixa fotos')
+  const incluir = todas.get('Incluir_passageiro')
+  assert.deepEqual(incluir.runAfter, { Obter_passageiro: ['Succeeded'] })
+  assert.match(incluir.inputs.value.temFoto, /new_linkdafoto/)
+  assert.equal(incluir.inputs.value.foto, null)
+})
+
+test('entrada válida aceita a op foto com passageiroId de 36 caracteres', () => {
+  const exp = todas.get('Entrada_valida').expression.equals[0]
+  assert.ok(exp.includes("equals(toLower(trim(coalesce(triggerBody()?['op'], ''))), 'foto'), equals(length(toLower(trim(coalesce(triggerBody()?['passageiroId'], '')))), 36)"))
+})
+
+test('foto: só passageiro do escopo, só da pasta Passageiros/Fotos, lida por caminho e sem derrubar a resposta', () => {
+  const escopo = todas.get('No_escopo_foto')
+  assert.equal(escopo.expression.equals[0], "@contains(outputs('Escopo'), toLower(trim(coalesce(triggerBody()?['passageiroId'], ''))))")
+  assert.equal(escopo.else.actions.Status_erro_404_foto.inputs.value, 404)
+  assert.equal(todas.get('Obter_passageiro_foto').inputs.parameters.$select, 'new_linkdafoto')
   const caminho = todas.get('Caminho_foto').inputs
-  assert.ok(caminho.startsWith("@if(and(startsWith(coalesce(body('Obter_passageiro')?['new_linkdafoto']"))
+  assert.ok(caminho.startsWith("@if(and(startsWith(coalesce(body('Obter_passageiro_foto')?['new_linkdafoto']"))
   assert.ok(caminho.includes("'/Documentos%20Compartilhados/Passageiros/Fotos/'"), 'restrito à pasta de fotos')
   assert.ok(caminho.includes("contains(decodeUriComponent("), 'recusa ..')
   const ler = todas.get('Ler_foto')
@@ -99,11 +118,10 @@ test('ler: foto atual só da pasta Passageiros/Fotos, lida por caminho e sem der
   assert.equal(ler.inputs.parameters.dataset, '__SITE_URL__')
   assert.equal(ler.inputs.parameters.path, "@outputs('Caminho_foto')")
   assert.equal(todas.get('Tem_foto_lida').expression.not.equals[0], "@empty(outputs('Caminho_foto'))")
-  const incluir = todas.get('Incluir_passageiro')
-  assert.deepEqual(incluir.runAfter, { Tem_foto_lida: ['Succeeded', 'Failed', 'Skipped', 'TimedOut'] })
-  assert.match(incluir.inputs.value.temFoto, /new_linkdafoto/)
-  assert.ok(incluir.inputs.value.foto.startsWith("@if(equals(coalesce(actions('Ler_foto')?['status'], ''), 'Succeeded')"))
-  assert.ok(incluir.inputs.value.foto.includes("base64(body('Ler_foto'))"))
+  assert.deepEqual(todas.get('Status_foto').runAfter, { Tem_foto_lida: ['Succeeded', 'Failed', 'Skipped', 'TimedOut'] })
+  const foto = todas.get('Corpo_foto').inputs.value.foto
+  assert.ok(foto.startsWith("@if(equals(coalesce(actions('Ler_foto')?['status'], ''), 'Succeeded')"))
+  assert.ok(foto.includes("base64(body('Ler_foto'))"))
 })
 
 test('PATCH do passageiro só com os campos enviados e registro do envio', () => {

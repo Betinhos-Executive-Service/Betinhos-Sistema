@@ -7,6 +7,8 @@
   // Página e /api passam pelo Worker (cabeçalhos de segurança); o resto vem de ./public
   "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": true },
   // 20 requisições por IP a cada 60 s. Sem o binding (ex.: dev local antigo), o Worker não bloqueia.
-  "ratelimits": [{ "name": "RATE_LIMITER", "namespace_id": "4201", "simple": { "limit": 20, "period": 60 } }]
+  // Cache da 1ª abertura (lista e fotos por hash do token, 36 h). Ver src/api.mjs.
+  "kv_namespaces": [{ "binding": "CACHE", "id": "d26f8512a9a943ab884e3b6340c3af15" }],
+  "ratelimits": [{ "name": "RATE_LIMITER", "namespace_id": "4201", "simple": { "limit": 60, "period": 60 } }]
   // Secret FLOW_URL: `wrangler secret put FLOW_URL` (URL SAS do flow HTTP). Sem ela, localhost responde mock.
 }

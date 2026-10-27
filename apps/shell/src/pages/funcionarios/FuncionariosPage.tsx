@@ -94,6 +94,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   // Busca (`q`) e chips de alerta (`alerta`) ficam fora da visão; os filtros vão em `f=`.
   const lista = useListView({
     host,
+    extra: { entity: 'cr40f_funcionarios', ids: views.map((row) => row.id) },
     defaultName: 'Funcionários',
     tela: TELA,
     columns: FUNCIONARIO_COLUMNS,
@@ -109,11 +110,11 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   const termo = useDebouncedText(busca)
   const [alertaUrl, setAlerta] = useQueryTexto('alerta')
   const alerta = ALERTAS.find((kind) => kind === alertaUrl) ?? null
-  const desktopFiltrados = useMemo(() => filterRows(views, lista.filters, FUNCIONARIO_FIELDS, readFuncionario), [views, lista.filters])
+  const desktopFiltrados = useMemo(() => filterRows(views, lista.filters, lista.fields, lista.extra.read(readFuncionario, (row) => row.id)), [views, lista.filters, lista.fields, lista.extra])
   const desktopBase = useMemo(() => desktopFiltrados.filter((row) => matchesKeyword(row, termo)), [desktopFiltrados, termo])
   const desktopCounts = useMemo(() => countAlertas(desktopBase), [desktopBase])
   const desktopVisible = useMemo<FuncionarioView[]>(
-    () => sortFuncionarios(desktopBase.filter((row) => matchesAlerta(row, alerta)), lista.view.config.sort),
+    () => lista.extra.sort(sortFuncionarios(desktopBase.filter((row) => matchesAlerta(row, alerta)), lista.view.config.sort), lista.view.config.sort, (row) => row.id),
     [desktopBase, alerta, lista.view.config.sort],
   )
   // Rolagem infinita (sem paginação visível): trocar filtro, busca, alerta ou ordenação volta ao primeiro lote.
@@ -188,7 +189,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
     <div className="page func">
     <div className="app">
       <div role="toolbar" aria-label="Comandos de funcionários" className="toolbar">
-        <ViewBar view={view} columns={FUNCIONARIO_COLUMNS} filters={{ fields: FUNCIONARIO_FIELDS }}>
+        <ViewBar view={view} columns={FUNCIONARIO_COLUMNS} catalog={lista.extra.catalog} filters={{ fields: lista.fields }}>
           <EnvBadge env={source.envLabel} />
           <SearchBox aria-label="Buscar colaborador" placeholder="Buscar nome, CPF, telefone ou placa" value={busca} onChange={setBusca} />
           <div className="chips" role="group" aria-label="Alertas de vencimento">
@@ -220,7 +221,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
             rows={desktopSlice.slice}
             loading={loading && !rows.length}
             onOpen={(id) => setSelection({ mode: 'open', id })}
-            view={{ config: view.config, onChange: view.setConfig }}
+            view={{ config: view.config, onChange: view.setConfig, extraCell: lista.extra.cell }}
             quickFilters={quickFilters}
             footer={<span className="toolbar-count">{desktopVisible.length} de {views.length} · {ativos} ativos{pending ? ' · carregando o restante…' : ''}</span>}
             empty={pending

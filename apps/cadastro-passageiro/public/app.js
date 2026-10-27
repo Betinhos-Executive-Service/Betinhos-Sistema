@@ -56,14 +56,63 @@ function mostrarErroGeral(status, tentar) {
   }
 }
 
-async function carregar() {
-  app.replaceChildren(esqueleto());
-  if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return mostrarErroGeral(410);
-  let resp;
-  try { resp = await chamar("/api/ler", {}); } catch { return mostrarErroGeral(0, carregar); }
-  if (resp.status !== 200 || !Array.isArray(resp.dados?.passageiros)) return mostrarErroGeral(resp.status, carregar);
-  renderLista(resp.dados);
+// Fotos vêm de /api/foto, uma busca por passageiro por página (o "ler" volta sem fotos e responde rápido).
+const fotos = new Map();
+function buscarFoto(id) {
+  if (!fotos.has(id)) {
+    fotos.set(id, chamar("/api/foto", { passageiroId: id })
+      .then((r) => (r.status === 200 ? r.dados?.foto ?? null : null), () => null));
+  }
+  return fotos.get(id);
 }
+
+// Reabertura instantânea: a última lista (sem fotos; nomes e contatos já mascarados) fica no aparelho por 36 h,
+// na chave do hash do token. Ao abrir, mostra o que estava salvo e atualiza quando o "ler" responder.
+const VALIDADE_CACHE = 36 * 3600 * 1000;
+let mexeu = false;
+app.addEventListener("input", () => { mexeu = true; });
+app.addEventListener("change", () => { mexeu = true; });
+
+async function chaveCache() {
+  const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  return "cadastro:" + [...new Uint8Array(h)].slice(0, 16).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+function lerCache(chave) {
+  try {
+    const c = JSON.parse(localStorage.getItem(chave) || "null");
+    return c && Date.now() - c.em < VALIDADE_CACHE && Array.isArray(c.dados?.passageiros) ? c.dados : null;
+  } catch { return null; }
+}
+function gravarCache(chave, dados) {
+  try {
+    const passageiros = dados.passageiros.map(({ foto, ...resto }) => resto);
+    localStorage.setItem(chave, JSON.stringify({ em: Date.now(), dados: { dataServico: dados.dataServico, passageiros } }));
+  } catch { /* sem armazenamento: só perde a reabertura instantânea */ }
+}
+function apagarCache(chave) { try { localStorage.removeItem(chave); } catch { /* idem */ } }
+
+async function carregar() {
+  if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return mostrarErroGeral(410);
+  const chave = await chaveCache().catch(() => null);
+  let mostrado = chave ? lerCache(chave) : null;
+  if (mostrado) renderLista(mostrado); else app.replaceChildren(esqueleto());
+  mexeu = false;
+  // 1ª chamada pode vir do cache do Worker (cache: true, instantânea); aí busca a versão fresca em seguida.
+  for (const fresco of [false, true]) {
+    let resp;
+    try { resp = await chamar("/api/ler", fresco ? { fresco: true } : {}); } catch { return mostrado ? null : mostrarErroGeral(0, carregar); }
+    if (resp.status !== 200 || !Array.isArray(resp.dados?.passageiros)) {
+      if (chave && [400, 404, 410].includes(resp.status)) apagarCache(chave);
+      return mostrado && resp.status >= 500 ? null : mostrarErroGeral(resp.status, carregar);
+    }
+    if (chave) gravarCache(chave, resp.dados);
+    // Não redesenha se nada mudou nem se a pessoa já começou a preencher.
+    if (!mostrado || (!mexeu && JSON.stringify(lerSemFoto(resp.dados)) !== JSON.stringify(lerSemFoto(mostrado)))) renderLista(resp.dados);
+    mostrado = resp.dados;
+    if (!resp.dados.cache) return;
+  }
+}
+const lerSemFoto = (d) => ({ dataServico: d.dataServico, passageiros: d.passageiros.map(({ foto, ...r }) => r) });
 
 // Esqueleto com a forma da lista (cabeçalho + 3 cards) enquanto o "ler" responde.
 function esqueleto() {
@@ -135,7 +184,7 @@ function cardPassageiro(p, aoSalvar) {
   const st = {
     foto: null, fotoUrl: fotoAtual(p.foto), tel: "", mail: "",
     editTel: !p.temTelefone, editMail: !p.temEmail, msg: null, salvando: false, erros: {},
-    preparando: false, recem: new Set(),
+    preparando: false, recem: new Set(), carregandoFoto: Boolean(p.temFoto && !p.foto),
   };
   const card = el("section", { class: "card", "aria-labelledby": `nome-${id}` });
   const fotoInput = el("input", { class: "foto-input", type: "file", accept: "image/*", id: `foto-${id}` });
@@ -239,21 +288,37 @@ function cardPassageiro(p, aoSalvar) {
       editando ? campoTexto(tipo) : null);
   }
 
+  // O toque cai direto no <input type=file> transparente sobre a foto: sem <label for> nem pointer-events:none,
+  // que no celular (iOS Safari) não abriam a câmera/galeria. Spinner enquanto a foto atual ou a nova carrega.
+  let fotoEl = null;
+  function montarFoto() {
+    const ocupada = st.preparando || (st.carregandoFoto && !st.fotoUrl);
+    return el("div", { class: `foto${st.fotoUrl ? " com-foto" : ""}${st.foto ? " nova" : ""}${st.preparando ? " preparando" : ocupada ? " carregando" : ""}${st.recem.has("foto") ? " recem" : ""}`, "aria-busy": ocupada ? "true" : null },
+      st.fotoUrl ? el("img", { src: st.fotoUrl, alt: "" }) : ocupada ? null : el("span", { class: "foto-vazia", html: ICONE.camera }),
+      el("span", { class: "foto-acao", "aria-hidden": "true", html: ICONE.camera }),
+      ocupada ? el("span", { class: "foto-carregando", "aria-hidden": "true" }, el("span", { class: "spinner pequeno" })) : null,
+      fotoInput);
+  }
+  if (st.carregandoFoto) {
+    buscarFoto(id).then((f) => {
+      st.carregandoFoto = false;
+      if (f && !st.fotoUrl) st.fotoUrl = fotoAtual(f);
+      // Troca só a foto: não redesenha o card, para não tirar o foco de quem está digitando.
+      if (fotoEl?.isConnected) fotoEl.replaceWith(fotoEl = montarFoto());
+      const legenda = card.querySelector(".foto-legenda");
+      if (legenda && !st.foto && !st.preparando) legenda.textContent = "Toque na foto para trocar";
+    });
+  }
+
   function render(focar) {
     const s = statusDe(p);
     const temFotoAgora = Boolean(st.foto) || p.temFoto;
-    // O toque cai direto no <input type=file> transparente sobre a foto: sem <label for> nem pointer-events:none,
-    // que no celular (iOS Safari) não abriam a câmera/galeria.
-    const fotoBtn = el("div", { class: `foto${st.fotoUrl ? " com-foto" : ""}${st.foto ? " nova" : ""}${st.preparando ? " preparando" : ""}${st.recem.has("foto") ? " recem" : ""}`, "aria-busy": st.preparando ? "true" : null },
-      st.fotoUrl ? el("img", { src: st.fotoUrl, alt: "" }) : el("span", { class: "foto-vazia", html: ICONE.camera }),
-      el("span", { class: "foto-acao", "aria-hidden": "true", html: ICONE.camera }),
-      st.preparando ? el("span", { class: "foto-carregando", "aria-hidden": "true" }, el("span", { class: "spinner pequeno" })) : null,
-      fotoInput);
+    const fotoBtn = fotoEl = montarFoto();
     fotoInput.setAttribute("aria-label", `${temFotoAgora ? "Trocar" : "Adicionar"} foto de ${nome}`);
 
     const valorTel = p.temTelefone ? (p.telefoneMascarado || "Cadastrado") : "Faltando";
     const valorMail = p.temEmail ? (p.emailMascarado || "Cadastrado") : "Faltando";
-    const legendaFoto = st.preparando ? "Preparando a foto…" : st.foto ? "Foto nova, falta salvar" : temFotoAgora ? "Toque na foto para trocar" : "Toque para adicionar a foto";
+    const legendaFoto = st.preparando ? "Preparando a foto…" : st.carregandoFoto && !st.fotoUrl ? "Carregando a foto…" : st.foto ? "Foto nova, falta salvar" : temFotoAgora ? "Toque na foto para trocar" : "Toque para adicionar a foto";
 
     const precisaBotao = st.salvando || pendentes().length > 0 || st.editTel || st.editMail || !p.temFoto || st.msg?.tipo === "erro";
     botao = precisaBotao

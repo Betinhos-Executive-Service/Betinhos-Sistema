@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { readFilters, storedFilters, useTableFilters, useTableView, type FilterField, type StoredView, type TableFilters, type TableViewState, type ViewColumnDef, type ViewSort, type ViewStore } from '@betinhos/ui'
+import { isExtraColumn, readFilters, storedFilters, useTableFilters, useTableView, type ColumnCatalog, type FilterField, type StoredView, type TableFilters, type TableViewState, type ViewColumnDef, type ViewSort, type ViewStore } from '@betinhos/ui'
 import type { Host } from '../host'
+import { createDataverseExtraSource, createMockExtraSource, extraCatalog, extraFields, resolveExtras, sortByExtra, type ExtraSource, type ExtraValues, type ResolvedExtra } from './extraColumns'
 import { patchHashQuery, readHashQuery } from '../nav/useHashRoute'
 import { decodeTableFilters, encodeTableFilters } from './filtersUrl'
 import { viewStoreFor, withBuiltinViews } from './viewStore'
@@ -26,6 +27,67 @@ type Options = {
   legacy?: { keys: readonly string[]; read: (query: URLSearchParams) => TableFilters }
   /** Visões antigas do navegador: vão uma vez para o armazenamento e saem de lá. */
   imports?: { list: () => LegacyView[]; done: () => void; onImported: (count: number) => void }
+  /**
+   * Liga "Adicionar coluna" (DS §10.9.1): campos da tabela `entity` (nome lógico) e das relações N:1, até 3 níveis.
+   * `ids` são as linhas carregadas; os valores das colunas adicionadas vêm numa consulta à parte.
+   */
+  extra?: { entity: string; ids: string[] }
+}
+
+/** Nome da tabela (plural) para a trilha do catálogo; vem da metadata e fica `undefined` até chegar. */
+export function useTableLabel(source: ExtraSource, entity: string | undefined) {
+  const [label, setLabel] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    let live = true
+    if (!entity) return
+    source.table(entity).then((t) => { if (live) setLabel(t.label) }).catch(() => undefined)
+    return () => { live = false }
+  }, [source, entity])
+  return label
+}
+
+const NO_VALUES: ExtraValues = new Map()
+const NO_EXTRAS: ResolvedExtra[] = []
+
+/** Colunas `x:` da visão: catálogo, metadata resolvida e valores das linhas carregadas. */
+function useExtraColumns(host: Host, extra: Options['extra'], columns: { key: string; label?: string }[]) {
+  const entity = extra?.entity
+  const source = useMemo(() => (host.mode === 'dataverse' ? createDataverseExtraSource(host) : createMockExtraSource()), [host])
+  const tableLabel = useTableLabel(source, entity)
+  const catalog = useMemo<ColumnCatalog | undefined>(() => (entity ? extraCatalog(source, entity, tableLabel) : undefined), [source, entity, tableLabel])
+  const wanted = JSON.stringify(columns.filter((c) => isExtraColumn(c.key)).map((c) => [c.key, c.label ?? '']))
+  const [resolved, setResolved] = useState(NO_EXTRAS)
+  useEffect(() => {
+    let live = true
+    const list = (JSON.parse(wanted) as [string, string][]).map(([key, label]) => ({ key, label }))
+    if (!entity || !list.length) { setResolved(NO_EXTRAS); return }
+    void resolveExtras(source, entity, list).then((r) => { if (live) setResolved(r) })
+    return () => { live = false }
+  }, [source, entity, wanted])
+
+  // Ids como texto na dependência: a tela pode montar o array a cada render sem disparar outra consulta.
+  const ids = extra?.ids.join(',') ?? ''
+  const [values, setValues] = useState(NO_VALUES)
+  useEffect(() => {
+    let live = true
+    if (!entity || !resolved.length || !ids) { setValues(NO_VALUES); return }
+    source.values(entity, resolved, ids.split(',')).then((v) => { if (live) setValues(v) }).catch(() => { if (live) setValues(NO_VALUES) })
+    return () => { live = false }
+  }, [source, entity, resolved, ids])
+
+  return useMemo(() => {
+    const get = (id: string, key: string) => values.get(id.toLowerCase())?.[key]
+    return {
+      catalog,
+      fields: extraFields(resolved, values),
+      /** Texto da célula de uma coluna `x:` (`Table.extraCell`). */
+      cell: (id: string, key: string) => get(id, key)?.text ?? '',
+      /** Leitura para os filtros: coluna `x:` aqui, o resto na leitura da tela. */
+      read: <T>(base: (row: T, key: string) => unknown, idOf: (row: T) => string) => (row: T, key: string) => (isExtraColumn(key) ? get(idOf(row), key)?.raw ?? null : base(row, key)),
+      /** Ordena pela coluna `x:` quando ela é a ordenação da visão; senão devolve a lista como veio. */
+      sort: <T>(list: T[], sort: ViewSort | null | undefined, idOf: (row: T) => string) => (sort && isExtraColumn(sort.key) ? sortByExtra(list, sort.key, sort.dir, (row) => get(idOf(row), sort.key)) : list),
+    }
+  }, [catalog, resolved, values])
 }
 
 /**
@@ -51,6 +113,8 @@ export function useListView(o: Options) {
   }, [o.host, gate])
   const defaultFilters = useMemo(() => (o.defaultFilters ? storedFilters(o.defaultFilters) : undefined), [JSON.stringify(o.defaultFilters ?? null)]) // eslint-disable-line react-hooks/exhaustive-deps
   const raw = useTableView({ tela: o.tela, columns: o.columns, store, defaultSort: o.defaultSort, defaultFilters, defaultName: o.defaultName })
+  const extra = useExtraColumns(o.host, o.extra, raw.config.columns)
+  const fields = useMemo(() => (extra.fields.length ? [...o.fields, ...extra.fields] : o.fields), [o.fields, extra.fields])
 
   // O que o usuário muda (visão, colunas, filtros) encerra o filtro vindo do link; até lá ele vale a cada recarga.
   const touched = useRef(false)
@@ -60,7 +124,7 @@ export function useListView(o: Options) {
     select: (id) => { touched.current = true; raw.select(id) },
     restore: () => { touched.current = true; raw.restore() },
   }), [raw])
-  const { filters, quickFilters } = useTableFilters(view, o.fields)
+  const { filters, quickFilters } = useTableFilters(view, fields)
 
   const urlApplied = useRef(false)
   const linked = useRef<TableFilters | null | undefined>(undefined)
@@ -81,7 +145,7 @@ export function useListView(o: Options) {
     urlApplied.current = true
   }, [status, views, o.ready, applyConfig])
 
-  const valid = useMemo(() => readFilters(filters, o.fields), [filters, o.fields])
+  const valid = useMemo(() => readFilters(filters, fields), [filters, fields])
   useEffect(() => {
     if (!urlApplied.current) return
     const f = encodeTableFilters(valid)
@@ -108,5 +172,5 @@ export function useListView(o: Options) {
   }, [status, o.ready, o.tela, store, reload])
 
   const clearFilters = () => view.setConfig((c) => ({ ...c, filters: {} }))
-  return { view, filters: valid, quickFilters, clearFilters }
+  return { view, filters: valid, quickFilters, clearFilters, fields, extra }
 }

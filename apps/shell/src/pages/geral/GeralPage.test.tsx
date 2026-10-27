@@ -202,7 +202,6 @@ describe('Geral', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
     const dialog = await screen.findByRole('dialog', { name: 'Colunas' })
     fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Trajeto' }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Mover Trajeto para cima' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Aplicar' }))
     await waitFor(() => expect(screen.queryByRole('columnheader', { name: /Trajeto/, hidden: true })).toBeNull())
     first.unmount()

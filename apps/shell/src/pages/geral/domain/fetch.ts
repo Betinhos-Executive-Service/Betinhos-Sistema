@@ -55,7 +55,7 @@ export function buildFetch(fetchxml: string, { page, pageSize, cookie, sort, sea
   root.setAttribute('page', String(page))
   if (cookie) root.setAttribute('paging-cookie', cookie)
 
-  // Toda visão traz o estado (comandos Desativar/Ativar) e os campos protegidos da Tenaris (cadeado na célula).
+  // Toda visão traz o estado (comandos Desativar/Ativar) e os campos protegidos da Tenaris (escudo na célula).
   // `all-attributes` já inclui tudo; misturar os dois é inválido.
   const children = Array.from(entity.children)
   if (!children.some((c) => c.tagName === 'all-attributes')) {
