@@ -192,7 +192,7 @@ describe('cotações (quotesUiContract)', () => {
     expect(drawer).not.toMatch(/comparisonOptions\.length > 1 && <QuoteOptionsComparison/)
     expect(drawer).toMatch(/onActivate=\{setActiveOptionId\}/)
     expect(comparison).toMatch(/onDecision\(option.id, "Aceita pelo cliente"\)/)
-    expect(drawer).toMatch(/<TaskHistorySection history=\{task\?\.history\}/)
+    expect(drawer).toMatch(/\{task && <TaskHistorySection history=\{task\.history\}/)
     expect(drawer).toMatch(/onMarkSent, onOutcome/)
     expect(comparison).not.toMatch(/Incluir na proposta|opções selecionadas/)
     expect(comparison).toMatch(/Montar proposta/)

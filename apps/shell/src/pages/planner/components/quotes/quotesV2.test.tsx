@@ -39,6 +39,12 @@ describe('cotações V2 nas telas', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
+  it('cotação sem tarefa não mostra o histórico da tarefa', async () => {
+    render(<QuoteManagementDrawer quote={sentQuote} employees={[]} teams={[]} onClose={() => {}} onUpdate={vi.fn()} onOutcome={vi.fn()} />)
+    await waitFor(() => expect(screen.getByText('Propostas enviadas')).toBeTruthy())
+    expect(screen.queryByText('Histórico da tarefa')).toBeNull()
+  })
+
   it('Perdida exige motivo da lista', async () => {
     const onOutcome = vi.fn(async () => true)
     render(<QuoteManagementDrawer quote={sentQuote} initialAction="outcome" employees={[]} teams={[]} onClose={() => {}} onUpdate={vi.fn()} onOutcome={onOutcome} />)
