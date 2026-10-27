@@ -5,6 +5,7 @@ import { Archive, ArchiveRestore, Bug, CalendarDays, ChevronDown, ClipboardList,
 import type { Host } from '../../host'
 import { useMedia } from '../operacional/useMedia'
 import { hrefFor, patchHashQuery, queryFromHash, readHashQuery } from '../../nav/useHashRoute'
+import { createDataverseExtraSource, createMockExtraSource, extraCatalog, resolveLinkColumns } from '../../app/extraColumns'
 import { createSource } from './data/source'
 import { ProtecaoContext } from './components/ProtecaoLock'
 import type { Protecao } from './domain/protecao'
@@ -28,7 +29,7 @@ import { loadViewMode, saveViewMode, type ViewMode } from './domain/viewMode'
 import { splitOp } from './domain/commands'
 import { applyColumnPrefs, loadColumnPrefs, saveColumnPrefs, type ColumnPrefs } from './domain/columns'
 import { buildLayout, buildViewFetch } from './domain/views'
-import { ID_ATTRIBUTE, type CellStatus, type Column } from './domain/types'
+import { ENTITY, ID_ATTRIBUTE, type CellStatus, type Column } from './domain/types'
 import { readUrlState, writeUrlState, type UrlState } from './domain/urlState'
 import { cellKey, useGeral, type SaveFailure } from './useGeral'
 import { useGeralViewState } from './useGeralViewState'
@@ -92,6 +93,19 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     saveColumnPrefs(source.kv, viewId, next)
     setSaved((s) => ({ ...s, [viewId]: next }))
   }, [source.kv, viewId])
+
+  // "Adicionar coluna" (DS §10.9.1): campos da reserva e das relações N:1; as escolhidas viram link-entity na consulta.
+  const extraSource = useMemo(() => (host.mode === 'dataverse' ? createDataverseExtraSource(host) : createMockExtraSource()), [host])
+  const catalog = useMemo(() => extraCatalog(extraSource, ENTITY), [extraSource])
+  const extraPrefs = JSON.stringify(prefs?.extra ?? [])
+  const { setExtras } = geral
+  useEffect(() => {
+    let alive = true
+    const list = JSON.parse(extraPrefs) as { key: string; label: string }[]
+    if (!list.length) { setExtras([]); return }
+    void resolveLinkColumns(extraSource, ENTITY, list).then((resolved) => { if (alive) setExtras(resolved) })
+    return () => { alive = false }
+  }, [extraSource, extraPrefs, viewId, setExtras])
 
   const { reload, refresh, loadMore, retryLoadMore, setQuery, selectView, clearSelection } = geral
   // Contêiner de rolagem da tabela: raiz do observador que carrega mais linhas (nos cards a raiz é a janela).
@@ -610,6 +624,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         <ViewBar
           view={viewState}
           columns={columnDefs}
+          catalog={catalog}
           filters={{ fields: filterFields, search: searchFilter, notApplied }}
         >
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}

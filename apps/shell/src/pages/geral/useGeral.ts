@@ -3,6 +3,8 @@ import type { Row } from '@betinhos/dataverse'
 import type { Source } from './data/source'
 import { cellKind } from './domain/cells'
 import { buildPatch, reduceCell, validateEdit, SAVED_VISIBLE_MS, type CellEvent, type EditValue } from './domain/edit'
+import type { ResolvedLinkColumn } from '../../app/extraColumns'
+import { addExtraLinks, extraColumn } from './domain/extraLinks'
 import { defaultSort, linkEntities } from './domain/fetch'
 import { emptyFilters, type FilterCondition, type FilterField, type TableFilters } from '@betinhos/ui'
 import { geralFilterFields, hasActiveFilters, injectTableFilters } from './domain/tableFilters'
@@ -93,8 +95,19 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   const [source] = useState(initialSource)
   const [views, setViews] = useState<View[]>([])
   const [viewsError, setViewsError] = useState<string | null>(null)
-  const [view, setView] = useState<View | null>(null)
-  const [columns, setColumns] = useState<Column[]>([])
+  const [baseView, setView] = useState<View | null>(null)
+  const [layoutColumns, setColumns] = useState<Column[]>([])
+  /** Colunas adicionadas pelo painel: viram `link-entity` no FetchXML e colunas no fim do layout. */
+  const [extras, setExtras] = useState<ResolvedLinkColumn[]>([])
+  const view = useMemo(() => {
+    if (!baseView || !extras.length) return baseView
+    try { return { ...baseView, fetchxml: addExtraLinks(baseView.fetchxml, extras) } } catch { return baseView }
+  }, [baseView, extras])
+  const columns = useMemo(() => {
+    if (!extras.length) return layoutColumns
+    const known = new Set(layoutColumns.map((c) => c.key))
+    return [...layoutColumns, ...extras.map(extraColumn).filter((c) => !known.has(c.key))]
+  }, [layoutColumns, extras])
   const [attributes, setAttributes] = useState<AttributeMap | null>(null)
   const [attributesError, setAttributesError] = useState<string | null>(null)
   const [quickFind, setQuickFind] = useState<string[]>([])
@@ -111,8 +124,9 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   const [filters, setFiltersState] = useState<TableFilters>(emptyFilters)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [cells, setCells] = useState<Map<string, CellStatus>>(() => new Map())
+  // A visão como veio do Dataverse (sem as colunas adicionadas): base para comparar ao reler as visões.
   const viewRef = useRef<View | null>(null)
-  viewRef.current = view
+  viewRef.current = baseView
   const hasFilters = useMemo(() => hasActiveFilters(filters), [filters])
   const filterFields = useMemo(() => geralFilterFields(attributes, columns.map((c) => c.key)), [attributes, columns])
   /** Com filtros e a metadata ainda a caminho a consulta espera: pedir antes devolveria a lista sem filtrar. */
@@ -177,6 +191,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   const enterView = useCallback((next: View) => {
     setView(next)
     setColumns(parseLayout(next.layoutxml))
+    setExtras([])
     // Sem ordenação própria, a consulta mantém todos os `<order>` da visão (inclusive os secundários).
     setSortState(null)
     setCells(new Map())
@@ -516,5 +531,5 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   const state: GeralState = { views, viewsError, view, columns, attributes, attributesError, quickFind, rows, total, more, pagesLoaded, loading, loadingMore, pageError, loadError, sort, query, filters, filterFields, selected, cells }
   /** Há filtros, mas a metadata falhou: a consulta segue sem eles. */
   const filtersIgnored = hasFilters && attributes == null && attributesError != null
-  return { ...state, filtersIgnored, defaultOrder, selectView, reloadViews, setSort, setQuery, setFilters, setQuickFilter, clearFilters, loadMore, retryLoadMore, reload, refresh: reload, toggle, selectOnly, selectRange, toggleAll, clearSelection, save, resetCell }
+  return { ...state, filtersIgnored, defaultOrder, setExtras, selectView, reloadViews, setSort, setQuery, setFilters, setQuickFilter, clearFilters, loadMore, retryLoadMore, reload, refresh: reload, toggle, selectOnly, selectRange, toggleAll, clearSelection, save, resetCell }
 }

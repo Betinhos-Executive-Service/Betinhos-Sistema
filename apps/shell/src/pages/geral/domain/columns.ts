@@ -1,7 +1,9 @@
 import type { Column } from './types'
 
 export type KV = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
-export type ColumnPrefs = { hidden: string[]; order: string[]; widths?: Record<string, number> }
+/** `extra`: colunas adicionadas pelo painel (chave `x:` e rótulo), até o usuário salvar a visão. */
+export type ExtraPref = { key: string; label: string }
+export type ColumnPrefs = { hidden: string[]; order: string[]; widths?: Record<string, number>; extra?: ExtraPref[] }
 export const MIN_WIDTH = 90
 export const MAX_WIDTH = 1200
 export const STORAGE_KEY = 'betinhos.geral.colunas.v1'
@@ -25,10 +27,11 @@ function readAll(kv: KV): Record<string, unknown> {
 export function loadColumnPrefs(kv: KV, viewId: string): ColumnPrefs | null {
   const raw = readAll(kv)[viewId]
   if (!raw || typeof raw !== 'object') return null
-  const { hidden, order, widths } = raw as Record<string, unknown>
+  const { hidden, order, widths, extra } = raw as Record<string, unknown>
   if (!strings(hidden) || !strings(order)) return null
   const clean = cleanWidths(widths)
-  return clean ? { hidden, order, widths: clean } : { hidden, order }
+  const extras = Array.isArray(extra) ? extra.filter((e): e is ExtraPref => Boolean(e) && typeof e.key === 'string' && e.key.startsWith('x:') && typeof e.label === 'string') : []
+  return { hidden, order, ...(clean ? { widths: clean } : {}), ...(extras.length ? { extra: extras } : {}) }
 }
 
 export function saveColumnPrefs(kv: KV, viewId: string, prefs: ColumnPrefs | null) {
