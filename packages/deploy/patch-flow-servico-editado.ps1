@@ -12,24 +12,28 @@
 #   - Select_changedata + Compose_campo listam TODAS as colunas de interesse alteradas, com rótulo em português;
 #   - Condition_campo_relevante: sem coluna de interesse alterada, encerra como Succeeded sem notificar;
 #   - Terminate_1 (fora da janela de horário) passa de Cancelled para Succeeded.
-# Sem -Apply é DRY RUN. Só DEV. Antes de gravar, salva o clientdata em packages/deploy/flows/backup/. Reverter:
-#   powershell -File packages/deploy/patch-flow-servico-editado.ps1 -Apply -Restaurar <arquivo>
-# Requer `az login` com acesso ao DEV.
+# Sem -Apply é DRY RUN. PROD exige -Apply e -ConfirmarProd. Antes de gravar, salva o clientdata em packages/deploy/flows/backup/. Reverter:
+#   powershell -File packages/deploy/patch-flow-servico-editado.ps1 -Ambiente DEV -Apply -Restaurar <arquivo>
+# Requer `az login` com acesso ao ambiente.
 param(
+  [Parameter(Mandatory = $true)][ValidateSet('DEV', 'PROD')][string] $Ambiente,
   [switch] $Apply,
+  [switch] $ConfirmarProd,
   [string] $Restaurar = ''
 )
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-$environmentUrl = 'https://org23b93544.crm2.dynamics.com'
+$urls = @{ DEV = 'https://org23b93544.crm2.dynamics.com'; PROD = 'https://orgf261ae8e.crm2.dynamics.com' }
+$environmentUrl = $urls[$Ambiente]
 $flowId = '3a12fce1-ec26-f111-88b4-7ced8da87663'
 $flowName = 'Flow Notificação Serviço Editado | Interno e Motoristas'
 $backupDir = Join-Path $PSScriptRoot 'flows/backup'
+if ($Ambiente -eq 'PROD' -and $Apply -and -not $ConfirmarProd) { throw 'PROD exige -ConfirmarProd junto com -Apply.' }
 if ($Restaurar -and -not $Apply) { throw '-Restaurar grava no flow; use junto com -Apply.' }
 
 $dvToken = & az account get-access-token --resource "$environmentUrl/" --query accessToken -o tsv
-if ($LASTEXITCODE -ne 0 -or -not $dvToken) { throw 'Token do Dataverse DEV indisponível (rode az login).' }
+if ($LASTEXITCODE -ne 0 -or -not $dvToken) { throw 'Token do Dataverse $Ambiente indisponível (rode az login).' }
 $headers = @{ Authorization = "Bearer $dvToken"; Accept = 'application/json'; 'OData-Version' = '4.0'; 'OData-MaxVersion' = '4.0' }
 
 function Dv([string] $Method, [string] $Path, $Body = $null) {
@@ -51,7 +55,7 @@ function Backup($row) {
   if ($row.clientdata -match 'sig=') { throw 'O clientdata contém URL assinada (sig=); revise antes de continuar.' }
   New-Item -ItemType Directory -Force $backupDir | Out-Null
   $stamp = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, 'E. South America Standard Time').ToString('yyyyMMdd-HHmmss')
-  $file = Join-Path $backupDir ("Flow-ServicoEditado-DEV-$stamp.json")
+  $file = Join-Path $backupDir ("Flow-ServicoEditado-$Ambiente-$stamp.json")
   if (Test-Path $file) { throw "Backup $file já existe; rode de novo em instantes." }
   [IO.File]::WriteAllText($file, $row.clientdata, (New-Object Text.UTF8Encoding $false))
   Write-Host "[servico-editado] backup: $file"
@@ -71,16 +75,16 @@ function Save($row, [string] $clientData) {
 }
 
 $who = Dv GET WhoAmI
-if (-not $who.OrganizationId) { throw 'A API não respondeu pela organização DEV.' }
+if (-not $who.OrganizationId) { throw 'A API não respondeu pela organização $Ambiente.' }
 $flow = Dv GET "workflows($flowId)?`$select=workflowid,name,statecode,clientdata"
-if ($flow.name -ne $flowName) { throw "O workflow $flowId não é '$flowName' no DEV." }
+if ($flow.name -ne $flowName) { throw "O workflow $flowId não é '$flowName' no $Ambiente." }
 
 if ($Restaurar) {
   $text = [IO.File]::ReadAllText((Resolve-Path $Restaurar), [Text.Encoding]::UTF8).TrimStart([char]0xFEFF)
   if (-not ($text | ConvertFrom-Json).properties.definition.actions.Scope) { throw 'O arquivo não é um backup deste flow.' }
   Backup $flow
   Save $flow $text
-  Write-Output "DEV: '$flowName' restaurado de $Restaurar (statecode original $($flow.statecode))."
+  Write-Output "${Ambiente}: '$flowName' restaurado de $Restaurar (statecode original $($flow.statecode))."
   return
 }
 
@@ -93,7 +97,7 @@ foreach ($n in 'List_rows_auditoria', 'Compose_campo', 'Compose_valor_antigo') {
   if (@($acts.PSObject.Properties.Name) -notcontains $n) { throw "O flow não está no formato esperado: ação '$n' ausente." }
 }
 if (@($acts.PSObject.Properties.Name) -contains 'Filter_auditoria') {
-  Write-Output "DEV: '$flowName' já está no formato final; nada a alterar."
+  Write-Output "${Ambiente}: '$flowName' já está no formato final; nada a alterar."
   return
 }
 
@@ -157,7 +161,7 @@ $acts.Compose_valor_antigo.runAfter = [pscustomobject]@{ Condition_campo_relevan
 # Fora da janela de horário não é erro nem cancelamento.
 $ifNode.else.actions.Terminate_1.inputs.runStatus = 'Succeeded'
 
-Write-Output "DEV: '$flowName' (statecode $($flow.statecode)) - mudanças:"
+Write-Output "${Ambiente}: '$flowName' (statecode $($flow.statecode)) - mudanças:"
 Write-Output "  gatilho.filteringattributes : $lista"
 Write-Output '  Delay_auditoria + List_rows_auditoria : espera 15 s; createdon de -3 s a +10 s do modifiedon, top 20'
 Write-Output '  Select_changedata/Compose_campo : lista todas as colunas de interesse alteradas, com rótulo'
@@ -167,4 +171,4 @@ $novo = $cd | ConvertTo-Json -Depth 90 -Compress
 if (-not $Apply) { Write-Output 'DRY RUN: nada gravado. Rode com -Apply.'; return }
 Backup $flow
 Save $flow $novo
-Write-Output "DEV: '$flowName' atualizado (statecode $($flow.statecode) mantido)."
+Write-Output "${Ambiente}: '$flowName' atualizado (statecode $($flow.statecode) mantido)."
