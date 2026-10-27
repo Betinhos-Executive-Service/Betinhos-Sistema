@@ -13,9 +13,13 @@
     "sitemap:geral": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ../../packages/deploy/sitemap-dev.ps1 -SiteMapUniqueName cr40f_ModelDrivenBetinhos -AfterSubAreaId subarea_a5c599b3 -SubAreaId subarea_geral_novo -Title \"Geral (novo)\" -Url \"$webresource:cr40f_SistemaBetinhosLoader.html?data=geral\" -DeviceCode"
   },
   "dependencies": {
+    "@azure/msal-browser": "^5.26.0",
     "@betinhos/dataverse": "workspace:*",
     "@betinhos/ui": "npm:@betinhos-executive-service/ui@^1.15.2",
+    "docx": "^9.14.0",
+    "html2canvas": "^1.4.1",
     "lucide-react": "^1.47.0",
+    "pdf-lib": "^1.17.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "recharts": "^3.10.1"

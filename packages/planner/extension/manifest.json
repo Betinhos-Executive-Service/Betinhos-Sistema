@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Betinhos · WhatsApp para Planner",
+  "version": "0.1.0",
+  "description": "Triagem assistida de conversas do WhatsApp Web e envio para o Planner.",
+  "permissions": ["storage", "notifications", "tabs"],
+  "host_permissions": ["https://web.whatsapp.com/*", "https://*.dynamics.com/*", "http://127.0.0.1:8765/*", "http://127.0.0.1:3000/*", "http://localhost:3000/*"],
+  "action": { "default_popup": "popup.html", "default_title": "Betinhos Planner", "default_icon": { "128": "icon.svg" } },
+  "background": { "service_worker": "service-worker.js", "type": "module" },
+  "content_scripts": [
+    { "matches": ["https://web.whatsapp.com/*"], "js": ["whatsapp-content.js"], "css": ["whatsapp-content.css"], "run_at": "document_idle" },
+    { "matches": ["https://*.dynamics.com/*", "http://localhost/*", "http://127.0.0.1/*"], "js": ["planner-content.js"], "run_at": "document_idle" }
+  ]
+}

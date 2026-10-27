@@ -24,3 +24,4 @@ packages/agentes-ia/.local/
 
 # Backups de flows (clientdata com destinatários e sites internos): ficam só na máquina, nunca no Git.
 packages/deploy/flows/backup/
+!packages/planner/.env.waha.example

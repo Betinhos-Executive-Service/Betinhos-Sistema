@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head><meta charset="utf-8"><title>Betinhos Planner</title><link rel="stylesheet" href="popup.css"></head>
+  <body>
+    <main>
+      <h1>Betinhos Planner</h1>
+      <p id="status">Fila de triagem</p>
+      <label>Endpoint IA<input id="endpoint" type="url" placeholder="https://..." /></label>
+      <label>Sessão temporária<input id="sessionToken" type="password" placeholder="Token de pareamento" /></label>
+      <fieldset>
+        <legend>WAHA local · opcional</legend>
+        <label class="check"><input id="wahaEnabled" type="checkbox" /> Usar WAHA para resolver telefone</label>
+        <label>Endpoint WAHA<input id="wahaEndpoint" type="url" placeholder="http://127.0.0.1:3000" /></label>
+        <label>Sessão WAHA<input id="wahaSession" type="text" placeholder="default" /></label>
+        <label>Chave WAHA<input id="wahaApiKey" type="password" placeholder="Chave local" /></label>
+      </fieldset>
+      <button id="save" type="button">Salvar configuração</button>
+      <button id="scan" type="button">Classificar conversa aberta</button>
+      <ul id="queue"></ul>
+      <details>
+        <summary>Diagnóstico</summary>
+        <button id="refreshDebug" type="button">Atualizar diagnóstico</button>
+        <pre id="debugLog">Nenhum evento ainda.</pre>
+      </details>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
