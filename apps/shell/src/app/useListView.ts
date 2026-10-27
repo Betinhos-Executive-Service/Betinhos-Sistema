@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { isExtraColumn, readFilters, storedFilters, useTableFilters, useTableView, type ColumnCatalog, type FilterField, type StoredView, type TableFilters, type TableViewState, type ViewColumnDef, type ViewSort, type ViewStore } from '@betinhos/ui'
 import type { Host } from '../host'
-import { createDataverseExtraSource, createMockExtraSource, extraCatalog, extraFields, resolveExtras, sortByExtra, type ExtraValues, type ResolvedExtra } from './extraColumns'
+import { createDataverseExtraSource, createMockExtraSource, extraCatalog, extraFields, resolveExtras, sortByExtra, type ExtraSource, type ExtraValues, type ResolvedExtra } from './extraColumns'
 import { patchHashQuery, readHashQuery } from '../nav/useHashRoute'
 import { decodeTableFilters, encodeTableFilters } from './filtersUrl'
 import { viewStoreFor, withBuiltinViews } from './viewStore'
@@ -34,6 +34,18 @@ type Options = {
   extra?: { entity: string; ids: string[] }
 }
 
+/** Nome da tabela (plural) para a trilha do catálogo; vem da metadata e fica `undefined` até chegar. */
+export function useTableLabel(source: ExtraSource, entity: string | undefined) {
+  const [label, setLabel] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    let live = true
+    if (!entity) return
+    source.table(entity).then((t) => { if (live) setLabel(t.label) }).catch(() => undefined)
+    return () => { live = false }
+  }, [source, entity])
+  return label
+}
+
 const NO_VALUES: ExtraValues = new Map()
 const NO_EXTRAS: ResolvedExtra[] = []
 
@@ -41,7 +53,8 @@ const NO_EXTRAS: ResolvedExtra[] = []
 function useExtraColumns(host: Host, extra: Options['extra'], columns: { key: string; label?: string }[]) {
   const entity = extra?.entity
   const source = useMemo(() => (host.mode === 'dataverse' ? createDataverseExtraSource(host) : createMockExtraSource()), [host])
-  const catalog = useMemo<ColumnCatalog | undefined>(() => (entity ? extraCatalog(source, entity) : undefined), [source, entity])
+  const tableLabel = useTableLabel(source, entity)
+  const catalog = useMemo<ColumnCatalog | undefined>(() => (entity ? extraCatalog(source, entity, tableLabel) : undefined), [source, entity, tableLabel])
   const wanted = JSON.stringify(columns.filter((c) => isExtraColumn(c.key)).map((c) => [c.key, c.label ?? '']))
   const [resolved, setResolved] = useState(NO_EXTRAS)
   useEffect(() => {
