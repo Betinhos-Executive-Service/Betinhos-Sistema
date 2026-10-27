@@ -1,8 +1,7 @@
 // Porte de Tela Planner/src/completionSound.js (som curto ao concluir tarefa).
-// O caminho /sounds/task-completed.m4a era servido pelo Tela Planner; no shell o asset ainda precisa ser
-// trazido na fase 3 (sem ele o fetch falha e o som é silenciosamente ignorado, como no original).
-
-const AUDIO_SOURCE = '/sounds/task-completed.m4a'
+// No Tela Planner o áudio era servido em /sounds/task-completed.m4a; no shell ele entra pelo Vite
+// (35 kB, abaixo do assetsInlineLimit): vira data URL dentro do chunk do Planner e funciona no WebResource.
+import AUDIO_SOURCE from '../assets/task-completed.m4a?url'
 
 type AudioContextConstructor = new () => AudioContext
 
