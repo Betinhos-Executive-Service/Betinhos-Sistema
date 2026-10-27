@@ -14,6 +14,9 @@ param(
 
   [string] $SolutionUniqueName = "",
 
+  # Tipo do web resource a criar quando o nome ainda nao existe (3 = JS). 0 = nao cria (padrao).
+  [int] $CreateType = 0,
+
   [switch] $SkipBuild,
 
   [switch] $DeviceCode,
@@ -189,6 +192,13 @@ else {
 
   Write-Step "lookup $WebResourceName"
   $lookup = Invoke-DataverseGet -Uri $lookupUrl -RequestHeaders $headers
+
+  if ((-not $lookup.value -or $lookup.value.Count -eq 0) -and $CreateType -gt 0) {
+    Write-Step "criando $WebResourceName (tipo $CreateType)"
+    $createBody = @{ name = $WebResourceName; displayname = $WebResourceName; webresourcetype = $CreateType; content = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("//")) } | ConvertTo-Json
+    Invoke-RestMethod -Method Post -Uri "$apiBaseUrl/webresourceset" -Headers $headers -ContentType "application/json; charset=utf-8" -Body $createBody | Out-Null
+    $lookup = Invoke-DataverseGet -Uri $lookupUrl -RequestHeaders $headers
+  }
 
   if (-not $lookup.value -or $lookup.value.Count -eq 0) {
     throw "WebResource nao encontrado: $WebResourceName"

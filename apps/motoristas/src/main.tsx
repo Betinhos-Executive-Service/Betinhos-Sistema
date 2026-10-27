@@ -3,8 +3,10 @@ import * as ReactDOM from "react-dom";
 import App from "./App";
 import { AppErrorBoundary } from "./components/app/AppErrorBoundary";
 import { installGlobalAppErrorLogger } from "./lib/appErrorLogger";
+import { installPwa } from "./lib/pwa";
 
 installGlobalAppErrorLogger();
+installPwa();
 
 try {
   (ReactDOM as { render: (node: React.ReactNode, container: HTMLElement) => void }).render(

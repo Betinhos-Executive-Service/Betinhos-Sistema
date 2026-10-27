@@ -10,3 +10,9 @@
 - Não verificável na nuvem: dados reais do Dataverse, Flows, plugins (`plugins/`, .NET), câmera/mídia de dispositivo, comportamento dentro do Power Apps/model-driven. A sessão cloud entrega o PR e declara essa parte como "não verificada na nuvem"; a validação com o Dataverse DEV é feita localmente.
 - Sessões cloud nunca executam `npm run push`, `npm run deploy:webresource`, `scripts/deploy-*.ps1`, `scripts/push-dev.ps1`, scripts `*.console.js` de schema/permissões nem nada que escreva no Dataverse (DEV ou PROD). Esses scripts são PowerShell/Windows e exigem autenticação local.
 - Skills de verificação ficam em `.claude/skills/` (versionadas) para valerem também nas VMs.
+
+## PWA (app instalável)
+
+- Só na URL direta do web resource (`*.dynamics.com`, janela de topo). `src/lib/pwa.ts` injeta manifest (data URL, `src/lib/pwaManifest.ts`), metas do iOS e registra o service worker; no Power Apps (iframe) e em localhost não faz nada.
+- Service worker = web resource JS `new_app-motoristas-v2-sw` (fonte `src/pwa/sw.js`, copiado para `dist/sw.js` no build, criado e publicado pelo `push-dev.ps1`). Escopo `/WebResources/`. Cacheia só o HTML do app para abrir sem rede; dados, fotos e login nunca entram no cache. Mudou o SW: suba `CACHE` em `sw.js`.
+- Ícones em `src/assets/pwa/` (fundo navy do DS, logo Betinhos B).
