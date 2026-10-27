@@ -25,6 +25,7 @@ description: "Verificação base do App Motoristas: testes Node, TypeScript estr
 - DEV autenticado (só com a trava `~/.claude/locks/dataverse-dev.lock`): publique só o WebResource (`scripts/deploy-webresource.ps1 -EnvironmentUrl https://org23b93544.crm2.dynamics.com/ -WebResourceName new_app-motoristas-v2 -SolutionUniqueName AppBetinhos`), force um erro no app aberto, confira a linha em `new_appmotoristaslogs` (`new_appname` = App Motoristas, `new_appversion` = versão do build, `new_useremail`) e apague a linha de teste. Sem login no navegador: rode `reportAppError` do `src/lib/appErrorLogger.ts` em Node com um `window` falso cujo `Xrm.WebApi.createRecord` faz POST em `new_appmotoristaslogs` com o token de `az account get-access-token --resource https://org23b93544.crm2.dynamics.com` e `__APP_BUILD_INFO` do `dist/` publicado; leia a linha, apague e confirme 404.
 
 ## Casos de borda
+- PWA (`src/lib/pwa*.ts`, `src/pwa/sw.js`): `tests/pwa.test.ts` cobre o manifest; instalação só se prova no DEV pela URL direta (Chrome: Application > Manifest sem erros e botão Instalar; SW ativo com escopo `/WebResources/`; iPhone: Adicionar à Tela de Início).
 - URL direta do web resource (host `*.dynamics.com`, sem `Xrm`): Custom APIs e dados caem em `fetchWebApi`; `tests/customApi.test.ts` cobre. Qualquer módulo novo que exija `Xrm` direto quebra só nesse modo.
 - Viewport 390×844 e desktop; landscape baixo quando a tela tiver modo compacto.
 

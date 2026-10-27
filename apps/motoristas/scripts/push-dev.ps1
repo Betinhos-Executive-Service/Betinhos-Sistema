@@ -244,6 +244,17 @@ Write-Step "publish webresource in $solutionUniqueName"
   -SolutionUniqueName $solutionUniqueName `
   -DeviceCode:$DeviceCode
 
+# Service worker do PWA (JS, escopo /WebResources/): vai depois do HTML, que ja refez o build e gerou dist/sw.js.
+Write-Step "publish service worker in $solutionUniqueName"
+& (Join-Path $PSScriptRoot "deploy-webresource.ps1") `
+  -EnvironmentUrl $environmentUrl `
+  -WebResourceName "new_app-motoristas-v2-sw" `
+  -FilePath "dist/sw.js" `
+  -CreateType 3 `
+  -SkipBuild `
+  -SolutionUniqueName $solutionUniqueName `
+  -DeviceCode:$DeviceCode
+
 $finalBackupPath = Join-Path $backupDir ("$solutionUniqueName-final-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".zip")
 Export-SolutionBackup $finalBackupPath "export final solution"
 Assert-SolutionArchiveExchangeLifecycle $finalBackupPath

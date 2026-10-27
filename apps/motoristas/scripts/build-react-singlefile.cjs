@@ -116,6 +116,8 @@ async function run() {
 
   fs.writeFileSync(path.join(distDir, "webresource-app-motoristas.html"), html, "utf8");
   fs.writeFileSync(path.join(distDir, "index.html"), html, "utf8");
+  // Service worker do PWA: web resource JS próprio (o navegador não aceita SW embutido no HTML).
+  fs.copyFileSync(path.join(root, "src", "pwa", "sw.js"), path.join(distDir, "sw.js"));
   console.log(`Build concluído: dist/webresource-app-motoristas.html | versão ${buildVersion}`);
 }
 
