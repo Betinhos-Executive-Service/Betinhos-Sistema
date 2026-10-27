@@ -12,8 +12,8 @@ const FORMATTED = '@OData.Community.Display.V1.FormattedValue'
 
 /** Campo de uma tabela que pode virar coluna. */
 export type ExtraAttr = { name: string; label: string; kind: FilterKind; money?: boolean; lookup?: boolean }
-/** Relação N:1 da tabela: navegação e tabela de destino. */
-export type ExtraRelation = { nav: string; label: string; target: string; targetLabel: string }
+/** Relação N:1 da tabela: navegação, coluna de lookup (`attribute`) e tabela de destino. */
+export type ExtraRelation = { nav: string; attribute: string; label: string; target: string; targetLabel: string }
 /** O que a metadata diz de uma tabela; `null` no mock (sem tabela real). */
 export type ExtraTable = { entitySet: string; primaryId: string; attrs: ExtraAttr[]; relations: ExtraRelation[] }
 
@@ -70,7 +70,7 @@ export function createDataverseExtraSource(host: Extract<Host, { mode: 'datavers
       .map((r): ExtraRelation => {
         const targetLabel = info.get(r.ReferencedEntity)?.label ?? r.ReferencedEntity
         const attrLabel = labelOf(byName.get(r.ReferencingAttribute)!) || r.ReferencingAttribute
-        return { nav: r.ReferencingEntityNavigationPropertyName, target: r.ReferencedEntity, targetLabel, label: (perAttr.get(r.ReferencingAttribute) ?? 0) > 1 ? `${attrLabel} (${targetLabel})` : attrLabel }
+        return { nav: r.ReferencingEntityNavigationPropertyName, attribute: r.ReferencingAttribute, target: r.ReferencedEntity, targetLabel, label: (perAttr.get(r.ReferencingAttribute) ?? 0) > 1 ? `${attrLabel} (${targetLabel})` : attrLabel }
       })
     return { entitySet: def.EntitySetName, primaryId: def.PrimaryIdAttribute, attrs: fields, relations }
   }
@@ -182,6 +182,37 @@ export async function resolveExtras(source: ExtraSource, entity: string, columns
   return out
 }
 
+/** Um passo de `link-entity` (FetchXML): lookup na tabela de origem e chave primária da tabela ligada. */
+export type ExtraLink = { nav: string; attribute: string; target: string; targetId: string }
+/** Coluna `x:` resolvida para FetchXML: cadeia de links até a tabela do campo. */
+export type ResolvedLinkColumn = { key: string; label: string; links: ExtraLink[]; attr: ExtraAttr }
+
+/** Como `resolveExtras`, mas com o que o FetchXML precisa (lookup de origem e id da tabela ligada); só colunas com relação. */
+export async function resolveLinkColumns(source: ExtraSource, entity: string, columns: { key: string; label?: string }[]): Promise<ResolvedLinkColumn[]> {
+  const out: ResolvedLinkColumn[] = []
+  for (const col of columns) {
+    if (!isExtraColumn(col.key)) continue
+    const path = extraPath(col.key)
+    const navs = path.slice(0, -1)
+    if (!navs.length || navs.length > MAX_DEPTH) continue
+    try {
+      let table = await source.table(entity)
+      const links: ExtraLink[] = []
+      for (const nav of navs) {
+        const rel = table.relations.find((r) => r.nav === nav)
+        if (!rel) throw new Error('relação removida')
+        table = await source.table(rel.target)
+        links.push({ nav, attribute: rel.attribute, target: rel.target, targetId: table.primaryId })
+      }
+      const attr = table.attrs.find((a) => a.name === path[path.length - 1])
+      if (attr) out.push({ key: col.key, label: col.label ?? col.key, links, attr })
+    } catch {
+      // Campo ou relação que saiu da metadata: a coluna some sem quebrar a lista.
+    }
+  }
+  return out
+}
+
 /** Catálogo do painel "Adicionar coluna": campos e relações de cada nível, em ordem alfabética. */
 export function extraCatalog(source: ExtraSource, entity: string): ColumnCatalog {
   return {
@@ -238,20 +269,20 @@ const MOCK_TABLES: Record<string, ExtraTable> = {
       { name: 'statuscode', label: 'Razão do status', kind: 'choice' },
     ],
     relations: [
-      { nav: 'ownerid', label: 'Proprietário', target: 'systemuser', targetLabel: 'Usuários' },
-      { nav: 'cr40f_cliente', label: 'Cliente', target: 'cr40f_clientes1', targetLabel: 'Clientes' },
+      { nav: 'ownerid', attribute: 'ownerid', label: 'Proprietário', target: 'systemuser', targetLabel: 'Usuários' },
+      { nav: 'cr40f_cliente', attribute: 'cr40f_cliente', label: 'Cliente', target: 'cr40f_clientes1', targetLabel: 'Clientes' },
     ],
   },
   systemuser: { entitySet: 'systemusers', primaryId: 'systemuserid', attrs: [{ name: 'fullname', label: 'Nome completo', kind: 'text' }, { name: 'internalemailaddress', label: 'E-mail principal', kind: 'text' }], relations: [] },
   cr40f_clientes1: {
     entitySet: 'cr40f_clientes1s', primaryId: 'cr40f_clientes1id',
     attrs: [{ name: 'cr40f_nomedocliente', label: 'Nome do cliente', kind: 'text' }, { name: 'cr40f_registro', label: 'Registro', kind: 'choice' }],
-    relations: [{ nav: 'cr40f_gestor', label: 'Gestor da conta', target: 'cr40f_funcionarios', targetLabel: 'Funcionários' }],
+    relations: [{ nav: 'cr40f_gestor', attribute: 'cr40f_gestor', label: 'Gestor da conta', target: 'cr40f_funcionarios', targetLabel: 'Funcionários' }],
   },
   cr40f_funcionarios: {
     entitySet: 'cr40f_funcionarioses', primaryId: 'cr40f_funcionariosid',
     attrs: [{ name: 'cr40f_nome', label: 'Nome', kind: 'text' }, { name: 'cr40f_telefone', label: 'Telefone', kind: 'text' }],
-    relations: [{ nav: 'cr40f_cargo', label: 'Cargo', target: 'cr40f_cargo', targetLabel: 'Cargos' }],
+    relations: [{ nav: 'cr40f_cargo', attribute: 'cr40f_cargo', label: 'Cargo', target: 'cr40f_cargo', targetLabel: 'Cargos' }],
   },
   cr40f_cargo: { entitySet: 'cr40f_cargos', primaryId: 'cr40f_cargoid', attrs: [{ name: 'cr40f_name', label: 'Nome', kind: 'text' }], relations: [] },
 }

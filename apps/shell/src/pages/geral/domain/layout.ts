@@ -25,5 +25,5 @@ export function rowKey(column: Column, info: AttributeInfo | undefined) {
 }
 
 export function columnLabel(column: Column, info: AttributeInfo | undefined) {
-  return info?.label || column.attribute
+  return column.label || info?.label || column.attribute
 }
