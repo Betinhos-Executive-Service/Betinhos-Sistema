@@ -13,7 +13,7 @@ import TaskHistorySection from '../TaskHistorySection';
 import QuoteDeleteDialog from './QuoteDeleteDialog';
 import QuoteOptionsComparison from './QuoteOptionsComparison';
 import { chosenQuoteOption, formatQuoteOption, newQuoteOption, normalizeQuoteOptions, prepareQuoteResponse, resolveQuoteAcceptance } from '../../domain/quoteScenarios';
-import QuoteSendDialog from './QuoteSendDialog';
+import { LOSS_REASONS } from '../../domain/quoteNotifications';
 import { InputSelect } from '../AssignmentFields';
 import { QuoteStatus } from './QuoteFields';
 
@@ -27,7 +27,6 @@ function quoteDraftSnapshot(quote: any) {
 
 export default function QuoteManagementDrawer({ quote, task, employees = [], teams = [], currentEmployee, initialAction = "", onActionConsumed, WaitingContextFieldsComponent, ReturnsSectionComponent, onClose, onOpenTask, onEnsureTaskDetails, onUpdate, onMarkSent, onOutcome, onDeleteQuote, onRequestWaiting, onRegisterWaitingReturn, onAttachment, onDeleteAttachment, loadAttachmentContent, AttachmentSectionComponent }: any) {
   const [draft, setDraft] = useState<any>(() => quoteToDraft(quote));
-  const [sendRequest, setSendRequest] = useState<any>(null);
   const mutationPending = useRef<any>(false);
   const pendingSavePatch = useRef<any>({});
   const [activeOptionId, setActiveOptionId] = useState<any>(() => normalizeQuoteOptions(quote)[0]?.id || "");
@@ -71,7 +70,7 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
   const waitingChanged = JSON.stringify(normalizeWaitingContext(task?.waitingContext)) !== JSON.stringify(waitingContext);
   const update = (key: any, value: any) => { setSaveMessage(""); setDraft((current: any) => ({ ...current, [key]: value })); };
   const requestClose = () => {
-    if (mutationPending.current || saving || sendRequest) return;
+    if (mutationPending.current || saving) return;
     const changed = dirty || waitingChanged || previewEdited;
     if (changed) { setConfirmClose(true); return; }
     onClose?.();
@@ -107,10 +106,10 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
   }, [quote, draft, draftSnapshot, saving]);
   useEffect(() => { setWaitingContext(normalizeWaitingContext(task?.waitingContext)); setWaitingError(""); }, [task?.id, task?.waitingContext]);
   const closeComposer = () => { composerController.current?.abort(); composerController.current = null; setComposerBusy(""); setComposerMessage(""); setComposerOpen(false); };
-  useEffect(() => { const handler = (event: any) => { if (event.key === "Escape" && !confirmClose && !sendRequest && !mutationPending.current) resultOpen ? setResultOpen(false) : deleteOpen ? setDeleteOpen(false) : composerOpen ? closeComposer() : requestClose(); }; window.addEventListener("keydown", handler); return () => window.removeEventListener("keydown", handler); }, [onClose, composerOpen, deleteOpen, sendRequest, resultOpen, confirmClose, draft, waitingContext, task?.waitingContext, previewEdited, saving]);
+  useEffect(() => { const handler = (event: any) => { if (event.key === "Escape" && !confirmClose && !mutationPending.current) resultOpen ? setResultOpen(false) : deleteOpen ? setDeleteOpen(false) : composerOpen ? closeComposer() : requestClose(); }; window.addEventListener("keydown", handler); return () => window.removeEventListener("keydown", handler); }, [onClose, composerOpen, deleteOpen, resultOpen, confirmClose, draft, waitingContext, task?.waitingContext, previewEdited, saving]);
   useEffect(() => {
     const containFocus = (event: any) => {
-      if (event.key !== "Tab" || confirmClose || resultOpen || deleteOpen || sendRequest) return;
+      if (event.key !== "Tab" || confirmClose || resultOpen || deleteOpen) return;
       const scope = composerOpen ? composerRef.current : dialogRef.current;
       const focusable = [...(scope?.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') || [])].filter((item) => item.getClientRects().length);
       if (!focusable.length) { event.preventDefault(); return; }
@@ -122,7 +121,7 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     };
     window.addEventListener("keydown", containFocus);
     return () => window.removeEventListener("keydown", containFocus);
-  }, [composerOpen, resultOpen, deleteOpen, sendRequest, confirmClose]);
+  }, [composerOpen, resultOpen, deleteOpen, confirmClose]);
   useEffect(() => () => composerController.current?.abort(), []);
   useEffect(() => {
     if (!resultOpen) return;
@@ -284,19 +283,20 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
       const failure = await save(true);
       if (failure) { setComposerMessage(failure); return; }
     }
-    setSendRequest({ html: preview.html || "", text: preview.text || "" });
+    await confirmProposalSent({ html: preview.html || "", text: preview.text || "" });
   };
-  const confirmProposalSent = async (registration: any) => {
+  // V2 ("Enviei"): registra só a data do envio, sem canal nem destinatário.
+  const confirmProposalSent = async (content: { html?: string; text?: string } = {}) => {
     if (quoteConflict) return false;
     if (!onMarkSent) return false;
     // Versão e concorrência vêm do registro atual, não do momento em que a prévia abriu.
     const { etag, modifiedAt, syncStatus, ...businessDraft } = draft;
-    const request = { draft: { ...businessDraft, status: deriveQuoteStatus(draft) }, options: draft.options, html: sendRequest.html, text: sendRequest.text, expectedEtag: quote.etag, expectedModifiedAt: quote.modifiedAt };
-    const result = await run(() => onMarkSent(quote.id, { ...request, ...registration }));
+    const request = { draft: { ...businessDraft, status: deriveQuoteStatus(draft) }, options: draft.options, html: content.html || "", text: content.text || "", expectedEtag: quote.etag, expectedModifiedAt: quote.modifiedAt };
+    const result = await run(() => onMarkSent(quote.id, request));
     if (result !== false) {
       const nextDraft = { ...draft, status: "Respondida ao cliente", responseSent: true };
       baselineRef.current = { id: quote.id, snapshot: quoteDraftSnapshot(nextDraft) }; setDraft(nextDraft);
-      setSendRequest(null); closeComposer();
+      closeComposer();
     }
     return result;
   };
@@ -306,7 +306,7 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     if (quoteConflict) { setResultError("Esta cotação mudou em outra edição. Recarregue antes de registrar a decisão."); return; }
     if (!onOutcome) { setResultError("Não foi possível registrar o resultado. Tente novamente."); return; }
     const reason = lossReason.trim();
-    if (resultStatus === "Perdida" && !reason) { setResultError("Informe o motivo da perda."); return; }
+    if (resultStatus === "Perdida" && !(LOSS_REASONS as readonly string[]).includes(reason)) { setResultError("Escolha o motivo da perda."); return; }
     if (reason.length > 1000) { setResultError("Motivo da perda excede 1.000 caracteres."); return; }
     if (resultStatus === "Aceita pelo cliente") {
       try { resolveQuoteAcceptance(draft, { acceptedOptionId, acceptedProposalVersionId }); }
@@ -374,6 +374,11 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
   const actions = {
     start: () => save(false, startQuotePatch(task, currentEmployee)),
     compose: openComposer,
+    send: async () => {
+      if (mutationPending.current) return;
+      if (!QUOTE_COMPLETED_STATUSES.includes(quote.status) || dirty) { const failure = await save(true); if (failure) { setResultError(failure); return; } }
+      await confirmProposalSent();
+    },
     return: () => task && onRegisterWaitingReturn?.(task.id),
     outcome: () => openResult("Aceita pelo cliente"),
     reopen,
@@ -437,7 +442,7 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
       <div id="quote-panel-historico" className="quote-quote-history" aria-label="Histórico da cotação">{(draft.proposalVersions || []).length > 0 ? <section className="quote-proposal-history"><h4>Propostas enviadas</h4>{draft.proposalVersions.map((version: any) => <article key={version.id}><header><strong>Versão {version.number}</strong></header><p>{version.channel ? `Enviada por ${version.channel}` : "Envio registrado"}{version.recipient ? ` para ${version.recipient}` : ""}{version.sentAt ? ` em ${formatDateTime(version.sentAt)}` : ""}</p><p>Registrada por {version.authorName || "Autor não informado"}{version.createdAt ? ` em ${formatDateTime(version.createdAt)}` : ""}</p><ul>{(version.options || []).map((option: any) => <li key={option.id}>{formatQuoteOption(option)}</li>)}</ul>{draft.acceptedProposalVersionId === version.id && <span className="quote-accepted-version">Proposta aceita</span>}</article>)}</section> : <p className="quote-stage-hint">Monte a proposta na etapa Custo e registre o envio pela prévia.</p>}<TaskHistorySection history={task?.history} employees={employees} loading={task?.detailsLoading} error={task?.detailsError} onRetry={task ? () => onEnsureTaskDetails?.(task.id) : undefined} /></div>
       </details>
     </div>
-    <footer className="quote-v3-drawer-footer quote-v3-management-footer"><div className="quote-management-primary-actions">{!terminalQuote && <button className="button button-primary" type="button" disabled={saving || (actionEnabled as any)[nextAction.primary.id] === false} onClick={(actions as any)[nextAction.primary.id]}>{nextAction.primary.id === "compose" && <Send size={15} />}{nextAction.primary.label}</button>}{terminalQuote && <button className="button button-secondary" type="button" disabled={saving} onClick={reopen}>Reabrir cotação</button>}{!terminalQuote && dirty && <button className="button button-secondary" type="button" disabled={saving} onClick={() => save()}><Save size={15} />{saving ? "Salvando…" : "Salvar alterações"}</button>}{!terminalQuote && nextAction.secondary.map((action) => <button key={action.id} className="button button-quiet" type="button" disabled={saving || (actionEnabled as any)[action.id] === false} onClick={(actions as any)[action.id]}>{action.label}</button>)}</div><details className="quote-management-more"><summary aria-label="Mais ações"><MoreHorizontal size={18} /></summary><div>{task && <button type="button" onClick={() => onOpenTask?.(task.id)}><Link2 size={14} />Ver tarefa</button>}{!terminalQuote && draft.status !== "Respondida ao cliente" && <button type="button" disabled={saving} onClick={() => openResult("Cancelada")}>Cancelar cotação</button>}{onDeleteQuote && <button className="is-danger" type="button" disabled={saving} onClick={() => setDeleteOpen(true)}><Trash2 size={14} />Excluir cotação</button>}{resultError && <span role="alert">{resultError}</span>}</div></details></footer>
+    <footer className="quote-v3-drawer-footer quote-v3-management-footer"><div className="quote-management-primary-actions">{!terminalQuote && <button className="button button-primary" type="button" disabled={saving || (actionEnabled as any)[nextAction.primary.id] === false} onClick={(actions as any)[nextAction.primary.id]}>{["compose", "send"].includes(nextAction.primary.id) && <Send size={15} />}{nextAction.primary.label}</button>}{terminalQuote && <button className="button button-secondary" type="button" disabled={saving} onClick={reopen}>Reabrir cotação</button>}{!terminalQuote && dirty && <button className="button button-secondary" type="button" disabled={saving} onClick={() => save()}><Save size={15} />{saving ? "Salvando…" : "Salvar alterações"}</button>}{!terminalQuote && nextAction.secondary.map((action) => <button key={action.id} className="button button-quiet" type="button" disabled={saving || (actionEnabled as any)[action.id] === false} onClick={(actions as any)[action.id]}>{action.label}</button>)}</div><details className="quote-management-more"><summary aria-label="Mais ações"><MoreHorizontal size={18} /></summary><div>{task && <button type="button" onClick={() => onOpenTask?.(task.id)}><Link2 size={14} />Ver tarefa</button>}{!terminalQuote && draft.status !== "Respondida ao cliente" && <button type="button" disabled={saving} onClick={() => openResult("Cancelada")}>Cancelar cotação</button>}{onDeleteQuote && <button className="is-danger" type="button" disabled={saving} onClick={() => setDeleteOpen(true)}><Trash2 size={14} />Excluir cotação</button>}{resultError && <span role="alert">{resultError}</span>}</div></details></footer>
     </aside>
   </div>
   {composerOpen && <div className="quote-v3-composer-layer" onMouseDown={(event) => { if (event.target === event.currentTarget) closeComposer(); }}><section ref={composerRef} className="quote-v3-preview" role="dialog" aria-modal="true" aria-label="Montar email da cotação" tabIndex={-1}>
@@ -447,13 +452,12 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
   {confirmMissingDeadline && <MissingDeadlineDialog onCancel={() => { setConfirmMissingDeadline(false); document.getElementById("quote-deadline")?.focus(); }} onConfirm={() => save(true, pendingSavePatch.current)} />}
   {resultOpen && <div className="quote-v3-confirm-layer" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setResultOpen(false); }}><form ref={resultRef} className="quote-v3-dialog" role="dialog" aria-modal="true" aria-label="Registrar resultado da cotação" onSubmit={registerResult}>
     <h3>{awaitingDecision ? "Registrar decisão do cliente" : "Cancelar cotação"}</h3>
-    {awaitingDecision && decisionOptions.length > 0 && <div className="quote-decision-kind" role="radiogroup" aria-label="Decisão do cliente">{[["Aceita pelo cliente", "Aceitou"], ["Perdida", "Recusou"], ["Cancelada", "Cancelou"]].map(([status, label]: any) => <button key={status} type="button" role="radio" aria-checked={resultStatus === status} className={`quote-chip${resultStatus === status ? " is-selected" : ""}`} disabled={saving} onClick={() => { setResultStatus(status); setResultError(""); }}>{label}</button>)}</div>}
-    {resultStatus === "Aceita pelo cliente" ? <>{decisionOptions.length > 1 && <div className="quote-result-option" id="quote-result-option"><span>Opção escolhida</span><InputSelect value={acceptedOptionId} disabled={saving} onChange={setAcceptedOptionId} options={decisionOptions.map((option: any) => ({ value: option.id, label: formatQuoteOption(option) }))} placeholder="Opção escolhida" /></div>}<p>{decisionOptions.find((option: any) => option.id === acceptedOptionId)?.name} · {formatMoney(decisionOptions.find((option: any) => option.id === acceptedOptionId)?.value)}<br />A cotação será finalizada como aceita pelo cliente e a tarefa concluída.</p></> : <p>Esta ação encerra toda a cotação como {resultStatus === "Perdida" ? "Perdida" : "Cancelada"}, incluindo todas as opções, e conclui a tarefa.</p>}
-    {resultStatus === "Perdida" && <label htmlFor="quote-result-reason">Motivo da perda<textarea id="quote-result-reason" required maxLength={1000} disabled={saving} value={lossReason} onChange={(event) => setLossReason(event.target.value)} /></label>}
+    {awaitingDecision && decisionOptions.length > 0 && <div className="quote-decision-kind" role="radiogroup" aria-label="Decisão do cliente">{[["Aceita pelo cliente", "Aceitou"], ["Perdida", "Perdida"], ["Cancelada", "Cancelou"]].map(([status, label]: any) => <button key={status} type="button" role="radio" aria-checked={resultStatus === status} className={`quote-chip${resultStatus === status ? " is-selected" : ""}`} disabled={saving} onClick={() => { setResultStatus(status); setResultError(""); }}>{label}</button>)}</div>}
+    {resultStatus === "Aceita pelo cliente" ? <>{decisionOptions.length > 1 && <div className="quote-result-option" id="quote-result-option"><span>Opção escolhida</span><InputSelect value={acceptedOptionId} disabled={saving} onChange={setAcceptedOptionId} options={decisionOptions.map((option: any) => ({ value: option.id, label: formatQuoteOption(option) }))} placeholder="Opção escolhida" /></div>}<p>{decisionOptions.find((option: any) => option.id === acceptedOptionId)?.name} · {formatMoney(decisionOptions.find((option: any) => option.id === acceptedOptionId)?.value)}<br />A cotação será finalizada como aceita pelo cliente{task ? " e a tarefa concluída" : ""}.</p></> : <p>Esta ação encerra toda a cotação como {resultStatus === "Perdida" ? "Perdida" : "Cancelada"}, incluindo todas as opções{task ? ", e conclui a tarefa" : ""}.</p>}
+    {resultStatus === "Perdida" && <div className="quote-result-option" id="quote-result-reason"><span>Motivo da perda</span><InputSelect value={lossReason} disabled={saving} onChange={(value: string) => { setLossReason(value); setResultError(""); }} options={LOSS_REASONS.map((reason) => ({ value: reason, label: reason }))} placeholder="Escolha o motivo" /></div>}
     {resultError && <p role="alert">{resultError}</p>}
-    <div><button className="button button-secondary" type="button" disabled={saving} onClick={() => setResultOpen(false)}>Voltar</button><button className="button button-primary" type="submit" disabled={saving || (resultStatus === "Perdida" && !lossReason.trim())}>{saving ? "Salvando…" : "Confirmar"}</button></div>
+    <div><button className="button button-secondary" type="button" disabled={saving} onClick={() => setResultOpen(false)}>Voltar</button><button className="button button-primary" type="submit" disabled={saving}>{saving ? "Salvando…" : "Confirmar"}</button></div>
   </form></div>}
-  {sendRequest && <QuoteSendDialog quote={draft} onCancel={() => setSendRequest(null)} onConfirm={confirmProposalSent} />}
   {deleteOpen && <QuoteDeleteDialog quote={quote} onCancel={() => setDeleteOpen(false)} onDelete={onDeleteQuote} />}
   {confirmClose && <div className="quote-v3-confirm-layer"><div ref={discardRef} className="quote-v3-dialog" role="alertdialog" aria-modal="true" aria-labelledby="quote-discard-title"><h3 id="quote-discard-title">Descartar alterações?</h3><p>As alterações não salvas nos dados e nas opções da cotação serão perdidas.</p><div><button className="button button-secondary" type="button" onClick={() => setConfirmClose(false)}>Continuar editando</button><button className="button button-danger" type="button" onClick={() => onClose?.()}>Descartar</button></div></div></div>}
   </div>;

@@ -70,12 +70,9 @@ describe('cotações (quotesUiContract)', () => {
     expect(app).not.toMatch(/id="quote-completion-terms"[\s\S]{0,180}\brequired/)
     expect(fields).toMatch(/id="quote-value"[^>]*required/)
     expect(app).toMatch(/conclui sozinha quando a decisão do cliente é registrada/)
-    const sendDialog = read(`${Q}QuoteSendDialog.tsx`)
-    expect(sendDialog).toMatch(/Registrar envio da proposta/)
-    expect(sendDialog).toMatch(/quote-send-channel[\s\S]*quote-send-recipient[\s\S]*quote-send-at/)
-    expect(sendDialog).not.toMatch(/<select|SearchableSelect|selectedIds/)
-    expect(sendDialog).toMatch(/Registrar envio/)
-    expect(sendDialog).not.toMatch(/Confirmar resposta/)
+    // V2: "Enviei" registra só a data; não há diálogo de canal/destinatário.
+    expect(walk(DIR).some((file) => file.endsWith('QuoteSendDialog.tsx'))).toBe(false)
+    expect(read(`${Q}QuoteManagementDrawer.tsx`)).toMatch(/LOSS_REASONS[\s\S]*Escolha o motivo da perda/)
   })
 
   it('footer do cadastro não exibe botão cancelar', () => {

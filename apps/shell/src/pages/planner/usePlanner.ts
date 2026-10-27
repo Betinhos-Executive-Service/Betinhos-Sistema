@@ -1495,10 +1495,13 @@ export function usePlanner() {
     if (item.contactId) {
       if (!item.readAt) markNotificationRead(item.id);
       openContact(item.contactId);
+    } else if (item.quoteId) {
+      if (!item.readAt) markNotificationRead(item.id);
+      openQuoteView(item.quoteId);
     } else if (item.taskId) {
       openTask(item.taskId);
     }
-  }, [markNotificationRead, openContact, openTask]);
+  }, [markNotificationRead, openContact, openQuoteView, openTask]);
   const onTaskScopeChange = useCallback(
     (scope: any) => {
       setTaskScope(scope);

@@ -6,6 +6,9 @@ import { useState } from 'react'
 
 
 export const ACTIONABLE_NOTIFICATION_TYPES = new Set([
+  "quote_urgent",
+  "quote_ready",
+  "quote_follow_up",
   "assignment",
   "deadline",
   "due_today",
@@ -32,6 +35,13 @@ export function notificationPresentation(item: any, task: any, contact: any) {
   const context = task ? task.teamName || "Sem equipe" : contact ? `${contactChannelLabelForNotification(contact.channel)} • ${contact.ownerName || "Sem responsável"}` : "Central de avisos";
   const type = item.type || "update";
   const distinctMessage = item.message && String(item.message).trim() !== String(taskTitle).trim() ? item.message : "";
+
+  // Cotações V2: avisos ligados à cotação (sem tarefa).
+  if (item.quoteId) {
+    const quoteLabels: Record<string, [string, string]> = { quote_urgent: ["Cotação para hoje", "danger"], quote_ready: ["Preço pronto", "success"], quote_follow_up: ["Cobrar decisão do cliente", "warning"] };
+    const [label, tone] = quoteLabels[type] || ["Cotação", "info"];
+    return { context: "Cotações", icon: type === "quote_urgent" ? ShieldAlert : FileText, label, message: item.message || "", title: item.title || label, tone };
+  }
 
   if (item.contactId) {
     return {
@@ -257,7 +267,7 @@ export function NotificationsPanel({
                     <Icon size={20} strokeWidth={2.1} />
                   </span>
                   <div className="notification-item-content">
-                    <button className="notification-item-main" type="button" onClick={() => item.contactId ? onOpenContact?.(item) : onOpenTask(item)}>
+                    <button className="notification-item-main" type="button" onClick={() => item.contactId || item.quoteId ? onOpenContact?.(item) : onOpenTask(item)}>
                       <span className="notification-kicker">{presentation.label}</span>
                       <strong>{presentation.title}</strong>
                       {presentation.message && <span className="notification-message">{presentation.message}</span>}

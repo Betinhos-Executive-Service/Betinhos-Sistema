@@ -7,7 +7,6 @@ import QuoteCreateDrawer from './QuoteCreateDrawer';
 import QuoteKanban from './QuoteKanban';
 import QuoteHistory from './QuoteHistory';
 import QuoteManagementDrawer from './QuoteManagementDrawer';
-import QuoteSendDialog from './QuoteSendDialog';
 import { SearchableMultiSelect } from '../SearchableSelect';
 import { FormTextInput, QuoteStatus } from './QuoteFields';
 import { readQuoteViewPreference, saveQuoteViewPreference } from '../../domain/quoteViewPreference';
@@ -44,7 +43,6 @@ export default function HybridQuotesView({ state, currentEmployee, WaitingContex
   const [section, setSection] = useState<any>("pending");
   const [filters, setFilters] = useState<any>({ query: "", responsible: [], priority: [], status: [], deadline: [] });
   const [pendingMove, setPendingMove] = useState<any>(null);
-  const [pendingResponse, setPendingResponse] = useState<any>(null);
   const [moving, setMoving] = useState<any>(false);
   const allQuotes = state.quotes || [];
   const quotes = allQuotes.filter((quote: any) => isQuoteOpen(quote.status));
@@ -56,8 +54,10 @@ export default function HybridQuotesView({ state, currentEmployee, WaitingContex
   const selectedTask = selectedQuote ? tasksByQuote.get(selectedQuote.id) : null;
   const setFilter = (key: any, value: any) => setFilters((current: any) => ({ ...current, [key]: value }));
   const changeView = (next: any) => { setView(next); saveQuoteViewPreference(next); };
+  // V2 ("Enviei"): registra o envio direto, só com a data; sem diálogo de canal.
+  const markSent = useCallback((quote: any) => onMarkQuoteSent?.(quote.id, { expectedEtag: quote.etag, expectedModifiedAt: quote.modifiedAt }), [onMarkQuoteSent]);
   const requestMove = useCallback((quote: any, status: any) => {
-    if (status === "Respondida ao cliente") { setPendingResponse(quote); return true; }
+    if (status === "Respondida ao cliente") { void markSent(quote); return true; }
     if (status === "Aguardando informação") { onRequestWaitingQuote?.(quote.id); return true; }
     // Cotada é derivada: uma cotação com opção precificada não "volta" para análise.
     const target = deriveQuoteStatus({ ...quote, status });
@@ -65,20 +65,15 @@ export default function HybridQuotesView({ state, currentEmployee, WaitingContex
     if (target === "Cotada" || quote.status === "Respondida ao cliente") { setPendingMove({ quote, status: target }); return true; }
     onUpdateQuote?.(quote.id, { status: target });
     return true;
-  }, [onRequestWaitingQuote, onUpdateQuote]);
-  const confirmResponse = async (registration: any) => {
-    if (!onMarkQuoteSent) return false;
-    const result = await onMarkQuoteSent(pendingResponse.id, { ...registration, expectedEtag: pendingResponse.etag, expectedModifiedAt: pendingResponse.modifiedAt });
-    if (result !== false) setPendingResponse(null);
-    return result;
-  };
+  }, [markSent, onRequestWaitingQuote, onUpdateQuote]);
   const confirmMove = async (patch: any) => { setMoving(true); try { const result = await onUpdateQuote?.(pendingMove.quote.id, { status: pendingMove.status, ...patch }); if (result !== false) setPendingMove(null); } finally { setMoving(false); } };
   // Ação primária do card: "Iniciar cotação" grava direto; as demais abrem a cotação já na ação.
   // Toda ação do card abre a cotação já na ação; "Registrar retorno" vai direto ao retorno da tarefa.
   const runCardAction = useCallback((quote: any, action: any) => {
+    if (action.id === "send") { void markSent(quote); return; }
     if (action.id === "return") { const task = tasksByQuote.get(quote.id); if (task) onRegisterWaitingReturn?.((task as any).id); return; }
     openQuote(quote.id, { initialAction: action.id });
-  }, [onRegisterWaitingReturn, openQuote, tasksByQuote]);
+  }, [markSent, onRegisterWaitingReturn, openQuote, tasksByQuote]);
 
   return <div className="page-content quotes-page quote-v3-page" data-view="quotes"><div className="page-header"><div><span className="eyebrow">ACOMPANHAMENTO COMERCIAL</span><h1>Cotações</h1><p>Cadastre, priorize e acompanhe a resposta sem sair da gestão.</p></div><button className="button button-primary" type="button" onClick={() => setCreating(true)}><Plus size={15} />Nova cotação</button></div>
     <div className="quote-v3-view-toggle quote-history-navigation" aria-label="Seção de cotações"><button type="button" className={section === "pending" ? "active" : ""} aria-pressed={section === "pending"} onClick={() => setSection("pending")}>Pendentes <b>{quotes.length}</b></button><button type="button" className={section === "history" ? "active" : ""} aria-pressed={section === "history"} onClick={() => setSection("history")}>Histórico <b>{allQuotes.filter((quote: any) => QUOTE_TERMINAL_STATUSES.includes(quote.status)).length}</b></button></div>
@@ -106,6 +101,5 @@ export default function HybridQuotesView({ state, currentEmployee, WaitingContex
     {creating && <QuoteCreateDrawer employees={state.employees || []} onClose={() => setCreating(false)} onCreate={onCreateQuote} AttachmentSectionComponent={AttachmentSectionComponent} />}
     {selectedQuote && <QuoteManagementDrawer quote={selectedQuote} initialAction={requestedQuoteAction} onActionConsumed={onQuoteActionConsumed} task={selectedTask} employees={state.employees || []} teams={state.teams || []} currentEmployee={currentEmployee} WaitingContextFieldsComponent={WaitingContextFieldsComponent} ReturnsSectionComponent={ReturnsSectionComponent} onClose={closeQuote} onOpenTask={(id: any) => { closeQuote(); onOpenTask?.(id); }} onEnsureTaskDetails={onEnsureTaskDetails} onUpdate={onUpdateQuote} onRequestWaiting={() => onRequestWaitingQuote?.(selectedQuote.id)} onRegisterWaitingReturn={onRegisterWaitingReturn} onMarkSent={onMarkQuoteSent} onOutcome={onSetQuoteOutcome} onDeleteQuote={onDeleteQuote} onAttachment={onAttachment} onDeleteAttachment={onDeleteAttachment} loadAttachmentContent={loadAttachmentContent} AttachmentSectionComponent={AttachmentSectionComponent} />}
     {pendingMove && <MoveDialog move={pendingMove} task={tasksByQuote.get(pendingMove.quote.id)} saving={moving} onCancel={() => setPendingMove(null)} onConfirm={confirmMove} onAttachment={onAttachment} onDeleteAttachment={onDeleteAttachment} loadAttachmentContent={loadAttachmentContent} AttachmentSectionComponent={AttachmentSectionComponent} />}
-    {pendingResponse && <QuoteSendDialog quote={pendingResponse} onCancel={() => setPendingResponse(null)} onConfirm={confirmResponse} onReview={() => { setPendingResponse(null); openQuote(pendingResponse.id); }} />}
   </div>;
 }

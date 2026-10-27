@@ -33,6 +33,7 @@ const base = {
   value: "R$ 1.092,30",
   commercialTerms: "Pagamento <30 dias>",
   deadline: "2026-09-09",
+  notes: "Transfer GRU → Faria Lima",
 };
 
 test("valida campos mínimos e exige motivo somente para Perdida", () => {
@@ -64,16 +65,17 @@ test("seleciona modelo executivo e oferece fallback textual", () => {
   assert.match(buildQuotePlainText(base), /Custo total: R\$ 1\.092,30/);
 });
 
-test("valida cada etapa e exige telefone ou e-mail", () => {
-  assert.deepEqual(Object.keys(validateQuoteStep({}, "request").errors), ["title", "client", "clientContact", "clientPhone"]);
-  assert.equal(validateQuoteStep({ ...base, clientPhone: "", clientEmail: "" }, "request").errors.clientPhone, "Informe pelo menos o telefone ou o e-mail.");
+test("valida cada etapa: obrigatórios só solicitante, pedido e prazo (V2)", () => {
+  assert.deepEqual(Object.keys(validateQuoteStep({}, "request").errors), ["clientContact", "notes", "deadline"]);
+  assert.equal(validateQuoteStep({ clientContact: "Walter", notes: "GRU → Centro", deadline: "2026-10-27" }, "request").valid, true);
+  assert.equal(validateQuoteStep({ ...base, clientPhone: "", clientEmail: "" }, "request").errors.clientPhone, undefined);
   assert.equal(validateQuoteStep({ ...base, clientPhone: "", clientEmail: "invalido" }, "request").errors.clientEmail, "Informe um e-mail válido.");
   assert.equal(validateQuoteStep({ ...base, clientPhone: "", clientEmail: "iara@acme.com" }, "request").valid, true);
   assert.equal(validateQuoteStep({ ...base, clientPhone: "11999999999", clientEmail: "" }, "request").valid, true);
   assert.equal(validateQuoteStep({ ...base, clientPhone: "11999999999", passengerProfile: "x".repeat(301) }, "request").errors.passengerProfile, "O perfil do passageiro excede 300 caracteres.");
   assert.equal(validateQuoteStep({ ...base, deadline: "" }, "commercial").valid, true);
   assert.equal(validateQuoteDraft({ ...base, channel: "Telefone", clientPhone: "11999999999", deadline: "" }).valid, true);
-  assert.equal(validateQuoteStep(base, "review").valid, false);
+  assert.equal(validateQuoteStep({ ...base, notes: "" }, "review").valid, false);
   assert.equal(validateQuoteStep({ ...base, channel: "Telefone", clientPhone: "11999999999" }, "review").valid, true);
 });
 
@@ -147,7 +149,8 @@ test("define uma ação primária por etapa", () => {
   assert.deepEqual(getQuoteNextAction({ status: "Nova" }).primary, { id: "start", label: "Iniciar cotação", status: "Em análise pelo financeiro" });
   assert.equal(getQuoteNextAction({ status: "Em análise pelo financeiro" }).primary.id, "compose");
   assert.equal(getQuoteNextAction({ status: "Aguardando informação" }).primary.id, "return");
-  assert.equal(getQuoteNextAction({ status: "Cotada" }).primary.id, "compose");
+  assert.deepEqual(getQuoteNextAction({ status: "Cotada" }).primary, { id: "send", label: "Enviei" });
+  assert.equal(getQuoteNextAction({ status: "Cotada" }).secondary[0].id, "compose");
   assert.equal(getQuoteNextAction({ status: "Respondida ao cliente" }).primary.id, "outcome");
   assert.equal(getQuoteNextAction({ status: "Perdida" }).primary.status, "Nova");
   assert.equal(quoteStage("Aguardando informação").id, "request");

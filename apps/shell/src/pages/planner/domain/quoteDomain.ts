@@ -132,10 +132,11 @@ export const QUOTE_CREATE_STEPS = [
   { id: 'commercial', label: 'Custo' },
 ]
 
+// V2: obrigatórios só solicitante, texto do pedido e prazo; o resto é opcional.
 const REQUEST_FIELDS: Array<[keyof QuoteInput & string, string]> = [
-  ['title', 'Informe o título interno.'],
-  ['client', 'Informe o cliente ou empresa.'],
   ['clientContact', 'Informe o nome do solicitante.'],
+  ['notes', 'Informe o texto do pedido.'],
+  ['deadline', 'Escolha o prazo para responder.'],
 ]
 
 export function validateQuoteStep(input: QuoteInput = {}, stepId: string = 'review'): ValidationResult {
@@ -146,9 +147,7 @@ export function validateQuoteStep(input: QuoteInput = {}, stepId: string = 'revi
   const errors: ValidationErrors = {}
   if (stepId === 'request') {
     for (const [field, message] of REQUEST_FIELDS) if (!String(input[field] ?? '').trim()) errors[field] = message
-    const phone = String(input.clientPhone || '').trim()
     const email = String(input.clientEmail || '').trim()
-    if (!phone && !email) errors.clientPhone = 'Informe pelo menos o telefone ou o e-mail.'
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.clientEmail = 'Informe um e-mail válido.'
     if (String(input.notes || '').length > 4000) errors.notes = 'O pedido do cliente excede 4.000 caracteres, limite do Dataverse.'
     if (String(input.passengerProfile || '').length > 300) errors.passengerProfile = 'O perfil do passageiro excede 300 caracteres.'
@@ -254,7 +253,7 @@ const QUOTE_NEXT_ACTIONS: Readonly<Record<string, QuoteNextAction>> = Object.fre
   Nova: { primary: { id: 'start', label: 'Iniciar cotação', status: 'Em análise pelo financeiro' }, secondary: [{ id: 'wait', label: 'Aguardar informação', status: 'Aguardando informação' }] },
   'Em análise pelo financeiro': { primary: { id: 'compose', label: 'Montar proposta' }, secondary: [{ id: 'wait', label: 'Aguardar informação', status: 'Aguardando informação' }] },
   'Aguardando informação': { primary: { id: 'return', label: 'Registrar retorno' }, secondary: [{ id: 'resume', label: 'Retomar cotação', status: 'Em análise pelo financeiro' }] },
-  Cotada: { primary: { id: 'compose', label: 'Montar proposta' }, secondary: [] },
+  Cotada: { primary: { id: 'send', label: 'Enviei' }, secondary: [{ id: 'compose', label: 'Montar proposta' }] },
   'Respondida ao cliente': { primary: { id: 'outcome', label: 'Registrar decisão do cliente' }, secondary: [] },
 })
 const QUOTE_REOPEN_ACTION: QuoteNextAction = Object.freeze({ primary: { id: 'reopen', label: 'Reabrir cotação', status: 'Nova' }, secondary: [] })
