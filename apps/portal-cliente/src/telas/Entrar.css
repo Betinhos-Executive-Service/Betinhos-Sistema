@@ -1,0 +1,51 @@
+.pc-entrar {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--bt-space-6) var(--bt-space-4);
+}
+
+.pc-entrar__card {
+  width: 100%;
+  max-width: 400px;
+  padding: var(--bt-space-8) var(--bt-space-6);
+  background-color: var(--bt-color-surface);
+  border: 1px solid var(--bt-color-border);
+  border-radius: var(--bt-radius-lg);
+  box-shadow: var(--bt-shadow-panel);
+}
+
+.pc-entrar__titulo {
+  margin: var(--bt-space-1) 0 var(--bt-space-5);
+  font-family: var(--bt-typography-heading-page-font-family);
+  font-weight: var(--bt-typography-heading-page-font-weight);
+  font-size: 32px;
+  line-height: var(--bt-typography-heading-page-line-height);
+  -webkit-text-stroke: var(--bt-heading-page-stroke-width) currentColor;
+  color: var(--bt-color-brand);
+}
+
+.pc-entrar__texto {
+  margin: 0;
+  font-size: var(--bt-font-size-14);
+  color: var(--bt-color-text-secondary);
+}
+
+.pc-entrar__form { display: flex; flex-direction: column; gap: var(--bt-space-4); }
+
+/* Etapa do código entra deslizando de leve: mostra que o fluxo avançou sem trocar de tela. */
+.pc-entrar__form--entra {
+  animation: pc-entra var(--bt-duration-normal) var(--bt-ease-out);
+}
+
+.pc-entrar__codigo {
+  font-size: var(--bt-font-size-20);
+  font-weight: var(--bt-font-weight-bold);
+  letter-spacing: 0.4em;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes pc-entra {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}

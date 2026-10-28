@@ -1,0 +1,9 @@
+/* Estilos globais do portal. Tokens e componentes vêm do @betinhos/ui. */
+.pc-marca {
+  margin: 0;
+  font-size: var(--bt-font-size-12);
+  font-weight: var(--bt-font-weight-extrabold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bt-color-brand);
+}
