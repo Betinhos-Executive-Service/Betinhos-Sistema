@@ -37,3 +37,14 @@ describe('label.control e labels (test-setup)', () => {
     expect($<HTMLInputElement>('#h').labels).toBeNull()
   })
 })
+
+// O test-setup embrulha o setTimeout para cancelar, no fim do arquivo, o que ainda estiver pendente.
+describe('setTimeout (test-setup)', () => {
+  it('o timer embrulhado dispara com os argumentos e o clearTimeout ainda cancela', async () => {
+    const vistos: string[] = []
+    setTimeout((a: string) => vistos.push(a), 0, 'disparou')
+    clearTimeout(setTimeout(() => vistos.push('cancelado'), 0))
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    expect(vistos).toEqual(['disparou'])
+  })
+})

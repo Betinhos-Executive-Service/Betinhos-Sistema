@@ -1,0 +1,36 @@
+/* Logs dos apps: lista e ficha, só leitura. Só tokens do Design System. */
+.lg-num { font-variant-numeric: tabular-nums; }
+.lg-muted { margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.lg-quebra { overflow-wrap: anywhere; }
+
+.lg-search { flex: 1 1 260px; min-width: 200px; max-width: 360px; }
+.lg-periodo { flex: 0 1 190px; min-width: 160px; }
+
+.lg-open { display: grid; gap: var(--bt-space-0-5); min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
+.lg-open strong { font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); }
+.lg-open span { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); overflow-wrap: anywhere; }
+.lg-open:focus-visible, .lg-card__open:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+
+.lg-table .bt-table__row:not(.bt-table__row--loading), .lg-card { cursor: pointer; }
+@media (hover: hover) and (pointer: fine) {
+  .lg-table .bt-table__row:not(.bt-table__row--loading):hover, .lg-card:hover { background-color: var(--bt-color-surface-soft); }
+  .lg-open:hover strong { color: var(--bt-color-action); }
+}
+
+.lg-cards { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
+.lg-card { border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
+.lg-card__open { display: grid; gap: var(--bt-space-1); width: 100%; min-height: var(--bt-control-height-touch); padding: var(--bt-space-3); border: 0; border-radius: inherit; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform var(--bt-duration-fast) var(--bt-ease-out); }
+.lg-card__open:active { transform: scale(0.97); }
+.lg-card__top { display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-2); }
+.lg-card__msg { font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-primary); overflow-wrap: anywhere; }
+
+.lg-ficha { display: grid; gap: var(--bt-space-4); }
+.lg-ficha__msg { margin: 0; font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-primary); overflow-wrap: anywhere; }
+.lg-ficha__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--bt-space-2) var(--bt-space-4); margin: 0; }
+.lg-ficha__item { display: grid; gap: var(--bt-space-0-5); min-width: 0; }
+.lg-ficha__item dt { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.lg-ficha__item dd { margin: 0; font-size: var(--bt-font-size-13); color: var(--bt-color-text-primary); overflow-wrap: anywhere; }
+.lg-ficha__block { display: grid; gap: var(--bt-space-2); min-width: 0; }
+.lg-ficha__block h3 { margin: 0; font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); letter-spacing: 0.08em; text-transform: uppercase; color: var(--bt-color-text-secondary); }
+.lg-pre { max-height: 320px; margin: 0; padding: var(--bt-space-3); overflow: auto; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-soft); font-family: var(--bt-font-family-mono, monospace); font-size: var(--bt-font-size-12); white-space: pre-wrap; overflow-wrap: anywhere; }
+@container (max-width: 480px) { .lg-ficha__grid { grid-template-columns: minmax(0, 1fr); } }

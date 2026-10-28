@@ -81,7 +81,7 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   cr40f_servicosporpassageiro: <List />,
   new_teladespesasoperacionais: <Coins />,
   new_fotomanutencao: <Camera />,
-  new_appmotoristaslog: <FileText />,
+  'logs-apps': <FileText />,
   cr40f_anexodespesaoperacional: <Paperclip />,
   cr40f_categoriadespesaoperacional: <Tag />,
   'despesas-operacionais': <ReceiptText />,

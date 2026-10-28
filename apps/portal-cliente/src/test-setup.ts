@@ -50,5 +50,7 @@ if (typeof HTMLLabelElement !== 'undefined') {
 }
 // O estado das telas vive na query do hash (#/pagantes?status=1): sem limpar, o filtro de um teste vazaria para o seguinte.
 if (typeof history !== 'undefined') afterEach(() => { history.replaceState(null, '', '#') })
-import { cleanup } from '@testing-library/react'
+import { cleanup, configure } from '@testing-library/react'
 afterEach(cleanup)
+// Consultas por papel na lista de 30 serviços passam de 1 s no jsdom com a máquina carregada.
+configure({ asyncUtilTimeout: 5000 })

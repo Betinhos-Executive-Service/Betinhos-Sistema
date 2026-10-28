@@ -14,7 +14,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test-setup.ts'],
-    testTimeout: 15_000,
+    // O login agora tem duas etapas (e-mail + autenticador) antes da lista: 15 s ficou curto nesta máquina.
+    testTimeout: 30_000,
     // @betinhos/ui é publicado como fonte TS (e importa CSS): o Vitest precisa transformá-lo.
     server: { deps: { inline: [/@betinhos(-executive-service)?\/(ui|tokens)/] } },
   },

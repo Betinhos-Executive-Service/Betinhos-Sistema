@@ -1,17 +1,10 @@
 import type { Motivo, Servico, Sessao } from '../domain/types'
-import { ErroPortal, type CodigoErro } from './PortalApi'
+import { ErroPortal, type CodigoErro, type PortalApi, type ResultadoEntrada } from './PortalApi'
 
 /**
  * PortalApi real: fala com o Worker na mesma origem (`/api/*`), sessão em cookie HttpOnly.
  * Ponto de troca: em `main.tsx`, `createMockApi(...)` → `createWorkerApi()` quando o Worker estiver no ar.
- * Tipado localmente com o contrato das duas etapas; quando `PortalApi.ts` tiver `confirmarAutenticador`,
- * anote o retorno como `PortalApi` (o formato já é o mesmo).
  */
-export type ResultadoEntrada =
-  | { etapa: 'cadastrar_autenticador'; otpauthUrl: string; segredo: string }
-  | { etapa: 'autenticador' }
-  | { etapa: 'ok'; sessao: Sessao }
-
 const CODIGOS: string[] = ['codigo_invalido', 'codigo_expirado', 'totp_invalido', 'bloqueado', 'nao_permitido', 'falha']
 
 /** Corpo `{erro, mensagem?}` do Worker → ErroPortal; sem corpo, pelo status HTTP. */
@@ -27,7 +20,7 @@ export async function erroDaResposta(r: Response): Promise<ErroPortal> {
   return new ErroPortal(codigo, corpo.mensagem ?? codigo)
 }
 
-export function createWorkerApi(base = '/api', f: typeof fetch = (...a) => fetch(...a)) {
+export function createWorkerApi(base = '/api', f: typeof fetch = (...a) => fetch(...a)): PortalApi {
   async function chamar<T>(metodo: 'GET' | 'POST', caminho: string, corpo?: unknown): Promise<T> {
     let r: Response
     try {
