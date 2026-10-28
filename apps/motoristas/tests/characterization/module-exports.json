@@ -741,6 +741,10 @@
   "src/app/overlayLayering.ts": [
     "getVisibleLoadingOverlay"
   ],
+  "src/app/rotaInicial.ts": [
+    "findDetailFromHashRoute",
+    "getInitialScreenFromHashRoute"
+  ],
   "src/data/mockData.ts": [
     "agendaMock",
     "historyMock",

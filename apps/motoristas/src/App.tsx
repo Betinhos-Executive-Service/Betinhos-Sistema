@@ -2,8 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   findFirstPendingServiceDetail,
-  getInitialChecklistId,
-  getInitialComunicadoId,
   getInitialDetail,
   getInitialParams,
   getInitialTermoMultaId,
@@ -26,7 +24,6 @@ import {
   AUTO_REFRESH_INTERVAL_MS,
   buildHashRoute,
   getHashRouteFallbackScreen,
-  getHashRouteRestoreScreen,
   getScreenMotion,
   isHashRoutingEnabled,
   parseHashRoute,
@@ -87,10 +84,11 @@ import { getQuickReadMockMode, readReceiptQuickMock } from "./features/despesas/
 import { IDEA_STATUS, type Idea, type IdeaDraft } from "./features/ideias/ideas";
 import { APP_CONNECTION_LOST_MESSAGE, APP_OPERATION_ERROR_MESSAGE, reportAppError, type AppErrorNotice } from "./lib/appErrorLogger";
 import { useDados } from "./app/DataProvider";
-import { isComunicadoPending, isMockComunicados, type ComunicadoDestinatario } from "./features/comunicados/comunicados";
-import type { ComunicadosLoadStatus } from "./features/comunicados/ComunicadosScreen";
-import { isChecklistPending, isMockChecklists, type ChecklistVeiculo } from "./features/checklist/checklists";
-import type { ChecklistsLoadStatus } from "./features/checklist/ChecklistsScreen";
+import { useComunicados } from "./features/comunicados/useComunicados";
+import { useChecklists } from "./features/checklist/useChecklists";
+import { useTermosMulta } from "./features/termos/useTermosMulta";
+import { isComunicadoPending, isMockComunicados } from "./features/comunicados/comunicados";
+import { isChecklistPending } from "./features/checklist/checklists";
 import { clearMediaDraft, loadMediaDraft, saveMediaDraft, touchMediaDraft } from "./features/fotos/mediaDraftStore";
 import { describeExpenseSubmission, normalizeStoredExpenseSubmissions, type ExpenseSubmission, type ExpenseUploadRow } from "./features/despesas/expenseUploadState";
 import { resumeExpenseSubmission, type ExpenseSubmissionProgress } from "./features/despesas/expenseSubmission";
@@ -98,24 +96,6 @@ import { ExpenseSendOverlay, type ExpenseSendState } from "./features/despesas/E
 import type { ExpenseUploadMode } from "./features/despesas/expenseUploadMode";
 import { resolveExpenseUploadModeRemote, expenseSubmissionStorageKey, ensureExpenseSubmissionRemote, loadExpenseUploadRowsRemote, transitionExpenseUploadRemote, dispatchExpenseUploadRemote, createExpenseUploadItem } from "./lib/dataverse";
 
-const EXCHANGE_ERROR_MESSAGES: Record<string, string> = {
-  EXCHANGE_CONCURRENCY_CONFLICT: "A troca foi alterada por outra pessoa. Atualize a agenda e tente novamente.",
-  EXCHANGE_VERSION_REQUIRED: "Atualize a agenda antes de executar esta ação.",
-  EXCHANGE_INVALID_WINDOW: "O fim da troca deve ser posterior ao início.",
-  EXCHANGE_OVERLAP: "Existe outra troca para este motorista ou veículo no período.",
-  POSSESSION_CHAIN_GAP: "O histórico de posse precisa ser reconciliado pela operação antes desta troca.",
-  POSSESSION_OVERLAP: "Existe sobreposição no histórico de posse. Contate a operação.",
-  POSSESSION_NOT_OPEN: "A posse esperada do veículo não está aberta. Contate a operação.",
-  IDENTITY_NOT_MAPPED: "Seu usuário não está vinculado a um funcionário ativo. Contate a operação.",
-  FORBIDDEN_LIFECYCLE: "Você não tem permissão ou esta troca não aceita essa ação.",
-  EXCHANGE_OUT_OF_WINDOW_REASON_REQUIRED: "A troca está fora do combinado. Conte o motivo antes de confirmar."
-};
-
-function exchangeUserError(error: unknown): string {
-  const message = error instanceof Error ? error.message : String((error as { message?: unknown })?.message ?? error ?? "");
-  const code = Object.keys(EXCHANGE_ERROR_MESSAGES).find((candidate) => message.includes(candidate));
-  return code ? EXCHANGE_ERROR_MESSAGES[code] : APP_OPERATION_ERROR_MESSAGE;
-}
 import {
   cancelDetailLocally,
   clearMaintenancePhotos,
@@ -134,8 +114,8 @@ import { LoadingOverlay, type LoadingOverlayState } from "./components/common/Lo
 import { getVisibleLoadingOverlay } from "./app/overlayLayering";
 import { CollisionScreen } from "./features/colisao/CollisionScreen";
 import { ComunicadosScreen } from "./features/comunicados/ComunicadosScreen";
-import { TermosMultaScreen, type TermosLoadStatus } from "./features/termos/TermosMultaScreen";
-import { isMockTermos, listarTermosMotorista, resumoPendentes, separarTermos, type TermoMulta } from "./features/termos/termosMulta";
+import { TermosMultaScreen } from "./features/termos/TermosMultaScreen";
+import { resumoPendentes, separarTermos } from "./features/termos/termosMulta";
 import { ChecklistsScreen } from "./features/checklist/ChecklistsScreen";
 import { ButtonPreviewScreen } from "./screens/ButtonPreviewScreen";
 import { CollisionStartScreen } from "./features/colisao/CollisionStartScreen";
@@ -189,74 +169,32 @@ import {
 import { DEFAULT_EXPENSE_REFERENCE_DATA, buildExpenseCreatePayload, type ExpenseDraft, type ExpensePhoto, type ExpenseReferenceData } from "./features/despesas/expenses";
 import { hasMediaDraftContent, prepareVideoBlobForUpload, revokePreviewUrl } from "./features/fotos/mediaDrafts";
 import type { CapturedVideoDraft, DetailData, MaintenancePhotoKind, Screen } from "./types";
-
-type RemoteOperation = {
-  title: string;
-  message: string;
-  detailId?: string;
-  phase: "loading" | "success";
-};
+import { exchangeUserError } from "./features/servicos/trocaErros";
+import { FlowProgressOverlay, type RemoteOperation } from "./shared/ui/FlowProgressOverlay";
+import { findDetailFromHashRoute, getInitialScreenFromHashRoute } from "./app/rotaInicial";
+import { inferToastTone } from "./shared/ui/toastTone";
+import {
+  getDetailDraftKey,
+  loadFinalizeDraftAssets,
+  loadServiceObservationDrafts,
+  loadVoucherDrafts,
+  serializeReceiveProofs,
+  FINALIZE_DRAFT_ASSETS_STORAGE_KEY,
+  SERVICE_OBSERVATION_DRAFTS_KEY,
+  VOUCHER_DRAFTS_STORAGE_KEY,
+  type PersistedFinalizeDraftAssets
+} from "./features/finalizar/rascunhos";
+import { isVideoMediaDraft, prepareMediaDraftForUpload, revokePhotoPreviewUrls } from "./features/fotos/envioMidia";
+import { EMPTY_MAINTENANCE_REQUEST_DRAFT } from "./features/manutencao/rascunho";
+import { EMPTY_EXPENSE_DRAFT } from "./features/despesas/rascunho";
+import { EMPTY_MAINTENANCE_FINALIZE_DRAFT } from "./features/finalizar/rascunhoManutencao";
+import { LOCAL_RECEIPT_CLIENT_MOCKS } from "./features/recibo/clientesMock";
 
 type RefreshOptions = {
   silent?: boolean;
 };
 
 type ReceiptEntrySource = "home" | "service";
-
-const LOCAL_RECEIPT_CLIENT_MOCKS = [
-  "Particular",
-  "Tenaris",
-  "Embraer",
-  "Johnson & Johnson",
-  "Bayer",
-  "Volkswagen",
-  "Natura"
-];
-
-const EMPTY_MAINTENANCE_REQUEST_DRAFT: MaintenanceRequestDraft = {
-  descricao: "",
-  kmAtual: "",
-  veiculoId: "",
-  gravidade: ""
-};
-
-const EMPTY_EXPENSE_DRAFT: ExpenseDraft = {
-  categoriaId: "",
-  veiculoId: "",
-  valor: "",
-  dataGasto: new Date().toISOString().slice(0, 10),
-  formaPagamentoId: "",
-  cidadeId: "",
-  estabelecimento: "",
-  descricao: "",
-  kmInformado: "",
-  litros: ""
-};
-
-const EMPTY_MAINTENANCE_FINALIZE_DRAFT: MaintenanceFinalizeDraft = {
-  serviceDone: "",
-  value: "",
-  payment: "",
-  cidadeId: "",
-  establishment: "",
-  notes: ""
-};
-
-function FlowProgressOverlay({ operation }: { operation: RemoteOperation }) {
-  return (
-    <div className="flow-progress-overlay" role="status" aria-live="polite" aria-label={operation.title}>
-      <div className={`flow-progress-card is-${operation.phase}`}>
-        <div className="flow-progress-track" aria-hidden="true">
-          <span />
-        </div>
-        <div className="flow-progress-kicker">{operation.detailId ?? "Processo remoto"}</div>
-        <h2>{operation.title}</h2>
-        <p>{operation.message}</p>
-        <div className="flow-progress-note">Mantenha esta tela aberta.</div>
-      </div>
-    </div>
-  );
-}
 
 function wait(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -266,172 +204,6 @@ const DATA_LOADING_SUCCESS_DURATION_MS = 420;
 
 function isTrueLike(value: unknown) {
   return value === true || value === 1 || value === "true";
-}
-
-function findDetailFromHashRoute(store: LocalStore, route: HashRoute | null) {
-  if (!route?.detailId) return null;
-  return findDetailByParams([...store.agenda, ...store.history], route.detailId, route.detailType ?? "");
-}
-
-function getInitialScreenFromHashRoute(route: HashRoute, detail: DetailData | null): Screen {
-  const restoredScreen = getHashRouteRestoreScreen(route.screen);
-  if (screenNeedsHashDetail(restoredScreen) && !detail) {
-    return getHashRouteFallbackScreen(restoredScreen);
-  }
-  return restoredScreen;
-}
-
-function inferToastTone(message: string): ToastTone {
-  const normalized = message.trim().toLowerCase();
-
-  if (
-    normalized.includes("falha") ||
-    normalized.includes("erro") ||
-    normalized.includes("não foi") ||
-    normalized.includes("nao foi") ||
-    normalized.includes("não encontrado") ||
-    normalized.includes("nao encontrado")
-  ) {
-    return "error";
-  }
-
-  if (
-    normalized.includes("atenção") ||
-    normalized.includes("atencao") ||
-    normalized.includes("aviso") ||
-    normalized.includes("conclua") ||
-    normalized.includes("ainda nao") ||
-    normalized.includes("ainda não")
-  ) {
-    return "warning";
-  }
-
-  if (
-    normalized.includes("salva") ||
-    normalized.includes("salvo") ||
-    normalized.includes("enviado") ||
-    normalized.includes("registrado") ||
-    normalized.includes("atualizado") ||
-    normalized.includes("copiadas") ||
-    normalized.includes("copiado") ||
-    normalized.includes("reiniciados") ||
-    normalized.includes("apagada") ||
-    normalized.includes("apagado")
-  ) {
-    return "success";
-  }
-
-  return "info";
-}
-
-const VOUCHER_DRAFTS_STORAGE_KEY = "app-motoristas-voucher-drafts-v1";
-const FINALIZE_DRAFT_ASSETS_STORAGE_KEY = "app-motoristas-finalize-draft-assets-v1";
-const SERVICE_OBSERVATION_DRAFTS_KEY = "app-motoristas-service-observation-drafts-v1";
-
-type PersistedReceiveProof = Omit<ExpensePhoto, "previewUrl" | "rawBlob">;
-
-type PersistedFinalizeDraftAssets = {
-  signatures: Record<string, string>;
-  photos: LocalStore["photos"];
-  receiveProofs: Record<string, PersistedReceiveProof[]>;
-};
-
-function getDetailDraftKey(detail: DetailData) {
-  return `${detail.type}:${detail.dataverse?.id ?? detail.id}`;
-}
-
-function loadServiceObservationDrafts(storage: Storage = window.localStorage): Record<string, string> {
-  try {
-    const raw = storage.getItem(SERVICE_OBSERVATION_DRAFTS_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-    const entries = Object.entries(parsed as Record<string, unknown>)
-      .filter(([key, value]) => key && typeof value === "string")
-      .map(([key, value]) => [key, value] as const);
-    return Object.fromEntries(entries) as Record<string, string>;
-  } catch (error) {
-    reportAppError(error, { severity: "warning", source: "app", action: "loadServiceObservationDrafts", phase: "localStorage", notifyUser: false });
-    return {};
-  }
-}
-
-function loadVoucherDrafts(storage: Storage = window.localStorage): Record<string, Record<string, string>> {
-  try {
-    const raw = storage.getItem(VOUCHER_DRAFTS_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-    const entries = Object.entries(parsed as Record<string, unknown>)
-      .filter(([key, value]) => key && value && typeof value === "object" && !Array.isArray(value))
-      .map(([key, value]) => {
-        const draftEntries = Object.entries(value as Record<string, unknown>)
-          .filter(([fieldKey, fieldValue]) => fieldKey && typeof fieldValue === "string")
-          .map(([fieldKey, fieldValue]) => [fieldKey, fieldValue] as const);
-        return [key, Object.fromEntries(draftEntries) as Record<string, string>] as const;
-      });
-    return Object.fromEntries(
-      entries
-    ) as Record<string, Record<string, string>>;
-  } catch (error) {
-    reportAppError(error, { severity: "warning", source: "app", action: "loadVoucherDrafts", phase: "localStorage", notifyUser: false });
-    return {};
-  }
-}
-
-function loadFinalizeDraftAssets(storage: Storage = window.localStorage): PersistedFinalizeDraftAssets {
-  try {
-    const raw = storage.getItem(FINALIZE_DRAFT_ASSETS_STORAGE_KEY);
-    if (!raw) return { signatures: {}, photos: {}, receiveProofs: {} };
-    const parsed = JSON.parse(raw) as Partial<PersistedFinalizeDraftAssets>;
-    return {
-      signatures: parsed.signatures && typeof parsed.signatures === "object" ? parsed.signatures : {},
-      photos: parsed.photos && typeof parsed.photos === "object" ? parsed.photos : {},
-      receiveProofs: parsed.receiveProofs && typeof parsed.receiveProofs === "object" ? parsed.receiveProofs : {}
-    };
-  } catch (error) {
-    reportAppError(error, { severity: "warning", source: "app", action: "loadFinalizeDraftAssets", phase: "localStorage", notifyUser: false });
-    return { signatures: {}, photos: {}, receiveProofs: {} };
-  }
-}
-
-function serializeReceiveProofs(receiveProofs: Record<string, ExpensePhoto[]>): Record<string, PersistedReceiveProof[]> {
-  return Object.fromEntries(
-    Object.entries(receiveProofs).map(([detailId, photos]) => [
-      detailId,
-      photos
-        .filter((photo) => Boolean(photo.dataUrl))
-        .map(({ previewUrl: _previewUrl, rawBlob: _rawBlob, ...photo }) => photo)
-    ])
-  );
-}
-
-function isVideoMediaDraft(dataUrl?: string | null, rawBlob?: Blob | null) {
-  return Boolean(rawBlob) || String(dataUrl ?? "").startsWith("data:video/");
-}
-
-type UploadableMediaDraft = {
-  dataUrl: string;
-  rawBlob?: Blob;
-  posterUrl?: string;
-  durationLabel?: string;
-  mediaType?: "foto" | "video";
-};
-
-async function prepareMediaDraftForUpload<T extends UploadableMediaDraft>(photo: T): Promise<T> {
-  if (!photo.rawBlob || photo.dataUrl) return photo;
-  const prepared = await prepareVideoBlobForUpload(photo.rawBlob);
-  return {
-    ...photo,
-    dataUrl: prepared.dataUrl,
-    posterUrl: photo.posterUrl ?? prepared.posterUrl,
-    durationLabel: photo.durationLabel ?? prepared.durationLabel,
-    mediaType: "video"
-  };
-}
-
-function revokePhotoPreviewUrls(photos: Array<{ previewUrl?: string }>) {
-  photos.forEach((photo) => revokePreviewUrl(photo.previewUrl));
 }
 
 function App() {
@@ -488,17 +260,6 @@ function App() {
     resolve: (choice: DriverVehicleChoice | null) => void;
     loadFleet: () => Promise<FleetVehicle[]>;
   } | null>(null);
-  const [comunicados, setComunicados] = useState<ComunicadoDestinatario[]>([]);
-  const [comunicadosStatus, setComunicadosStatus] = useState<ComunicadosLoadStatus>(() => isMockComunicados() || hasDataverseRuntime() ? "loading" : "ready");
-  const [selectedComunicadoId, setSelectedComunicadoId] = useState("");
-  // Tela de origem ao abrir um comunicado direto (ex.: aba Serviços), para o Voltar retornar a ela.
-  const [comunicadoOrigin, setComunicadoOrigin] = useState<"servicos" | "">("");
-  const pendingComunicadoDeepLinkRef = useRef(getInitialComunicadoId());
-  const [checklists, setChecklists] = useState<ChecklistVeiculo[]>([]);
-  const [checklistsStatus, setChecklistsStatus] = useState<ChecklistsLoadStatus>(() => isMockChecklists() || hasDataverseRuntime() ? "loading" : "ready");
-  const [selectedChecklistId, setSelectedChecklistId] = useState("");
-  const [checklistOrigin, setChecklistOrigin] = useState<"servicos" | "">("");
-  const pendingChecklistDeepLinkRef = useRef(getInitialChecklistId());
   const pendingServiceDeepLinkRef = useRef(getInitialParams());
   // true quando o deep link de serviço já abriu a tela; o fluxo pós-carga não deve sobrescrever a navegação.
   const serviceDeepLinkHandledRef = useRef(false);
@@ -884,100 +645,26 @@ function App() {
 
   // Guarda o motorista logado para recarregar comunicados sem depender do estado ainda não aplicado.
   const comunicadosDriverIdRef = useRef("");
-  const reloadComunicados = useCallback(async () => {
-    try {
-      setComunicados(await dados.carregarComunicados(comunicadosDriverIdRef.current));
-      setComunicadosStatus("ready");
-    } catch (error) {
-      // Mantém a lista já carregada; só exibe o estado de erro quando nunca houve carga.
-      setComunicadosStatus((current) => current === "ready" ? current : "error");
-      throw error;
-    }
-  }, []);
-
-  // Termos de multa pendentes: mesmo motorista logado; alimentam a tela Multas e o contador da Home.
-  const [termosMulta, setTermosMulta] = useState<TermoMulta[]>([]);
-  const [termosStatus, setTermosStatus] = useState<TermosLoadStatus>("loading");
-  const reloadTermosMulta = useCallback(async () => {
-    try {
-      setTermosMulta(await listarTermosMotorista(comunicadosDriverIdRef.current));
-      setTermosStatus("ready");
-    } catch (error) {
-      setTermosStatus((current) => current === "ready" ? current : "error");
-      throw error;
-    }
-  }, []);
-  useEffect(() => {
-    if (!isMockTermos() && !driverContext?.id) return;
-    reloadTermosMulta().catch((error) => reportAppError(error, { severity: "warning", source: "app", action: "listarTermosMotorista", notifyUser: false }));
-  }, [driverContext?.id]);
-
-  // Checklists usam o mesmo motorista logado dos comunicados.
-  const reloadChecklists = useCallback(async () => {
-    try {
-      setChecklists(await dados.carregarChecklists(comunicadosDriverIdRef.current));
-      setChecklistsStatus("ready");
-    } catch (error) {
-      setChecklistsStatus((current) => current === "ready" ? current : "error");
-      throw error;
-    }
-  }, []);
-
-  // Deep link do push de checklist: abre o checklist apontado sem esperar a agenda.
-  useEffect(() => {
-    const deepLinkId = pendingChecklistDeepLinkRef.current;
-    if (!deepLinkId || isButtonPreviewMode || isReceiptPreviewMode) return;
-    if (!hasDataverseRuntime() && !isMockChecklists()) return;
-    let alive = true;
-    dados.carregarChecklist(deepLinkId)
-      .then((item) => {
-        if (!alive || pendingChecklistDeepLinkRef.current !== deepLinkId) return;
-        pendingChecklistDeepLinkRef.current = "";
-        setDataLoadingState(null);
-        if (!item) {
-          setScreen("checklists");
-          setToast("Este checklist não está mais com você.", "warning");
-          return;
-        }
-        setChecklists((current) => current.some((row) => row.id === item.id) ? current : [item, ...current]);
-        setSelectedChecklistId(item.id);
-        setScreen("checklists");
-      })
-      .catch((error) => {
-        reportAppError(error, { severity: "warning", source: "app", action: "loadDriverChecklist", phase: "deep-link" });
-      });
-    return () => { alive = false; };
-  }, []);
-
-  useEffect(() => {
-    if (!isMockChecklists()) return;
-    reloadChecklists().catch((error) => {
-      reportAppError(error, { severity: "warning", source: "app", action: "loadMockChecklists" });
-    });
-  }, []);
-
-  // Deep link do push: busca só esse destinatário em paralelo com a agenda e abre o comunicado
-  // assim que ele chega, sem esperar loadRemoteStore nem a lista completa. A lista completa, ao
-  // chegar, substitui o item provisório; se esta busca falhar, o efeito abaixo segue como fallback.
-  useEffect(() => {
-    const deepLinkId = pendingComunicadoDeepLinkRef.current;
-    if (!deepLinkId || isButtonPreviewMode || isReceiptPreviewMode) return;
-    if (!hasDataverseRuntime() && !isMockComunicados()) return;
-    let alive = true;
-    dados.carregarComunicado(deepLinkId)
-      .then((item) => {
-        if (!alive || !item || pendingComunicadoDeepLinkRef.current !== deepLinkId) return;
-        pendingComunicadoDeepLinkRef.current = "";
-        setComunicados((current) => current.some((row) => row.id === item.id) ? current : [item, ...current]);
-        setSelectedComunicadoId(item.id);
-        setScreen("comunicados");
-        setDataLoadingState(null);
-      })
-      .catch((error) => {
-        reportAppError(error, { severity: "warning", source: "app", action: "loadDriverComunicado", phase: "deep-link" });
-      });
-    return () => { alive = false; };
-  }, []);
+  const { termosMulta, termosStatus, reloadTermosMulta } = useTermosMulta(comunicadosDriverIdRef, driverContext?.id);
+  const {
+    checklists,
+    checklistsStatus,
+    selectedChecklistId,
+    setSelectedChecklistId,
+    checklistOrigin,
+    setChecklistOrigin,
+    reloadChecklists
+  } = useChecklists({ dados, driverIdRef: comunicadosDriverIdRef, previewMode: isButtonPreviewMode || isReceiptPreviewMode, setScreen, setToast, setDataLoadingState });
+  const {
+    comunicados,
+    comunicadosStatus,
+    selectedComunicadoId,
+    setSelectedComunicadoId,
+    comunicadoOrigin,
+    setComunicadoOrigin,
+    pendingComunicadoDeepLinkRef,
+    reloadComunicados
+  } = useComunicados({ dados, driverIdRef: comunicadosDriverIdRef, previewMode: isButtonPreviewMode || isReceiptPreviewMode, setScreen, setDataLoadingState });
 
   // Deep link de serviço vindo do push (form OnLoad -> data=servicoId=...&tipo=...): busca o detalhe
   // em paralelo com loadRemoteStore e abre assim que chega. Se o serviço saiu da agenda do motorista
