@@ -19,10 +19,11 @@ Spec: `docs/superpowers/specs/2026-10-28-refatoracao-modulos-design.md`. Um PR p
 - `src/app/features.ts`: registro único de features com `liberadoLink` + `featuresDoModo`/`telasDoModo`. Cada item vira `features/<x>/manifesto.ts` quando a feature ganhar pasta (passos 3–5), em vez de 16 arquivos vazios agora.
 - `src/data/worker/contrato.md`. Nenhuma tela usa `useDados()` ainda.
 
-## Passo 2 — Cliente Dataverse
-- `git mv` do núcleo HTTP para `src/data/dataverse/cliente.ts`: `isDataverseHostRuntime`, `isStandaloneWebResourceRuntime`, `hasDataverseRuntime`, `retrieveMultiple`, `retrieveOne`, `createOne`, `updateOne`, `deleteOne`, `getDriverContext`, `getDriverCurrentVehicleId` (+ `fetchWebApi.ts`, `customApi.ts`, `remoteReadBatch.ts`, `fieldLookup.ts`).
-- `lib/dataverse.ts` passa a importar e reexportar.
-- `mockData.ts` → `src/data/mock/`.
+## Passo 2 — Cliente Dataverse (feito)
+- `src/data/dataverse/cliente.ts`: detecção de runtime (Xrm da janela/parent, fetch na URL direta, mock em localhost), CRUD com log, `getDriverContext`/`getDriverCurrentVehicleId`, helpers de log e GUID, tipos `XrmLike`/`DataverseRecord`/`DriverContext`.
+- `src/data/dataverse/entidades.ts`: `DATAVERSE` e mapas de entity set → nome lógico.
+- `git mv` de `fetchWebApi`, `customApi`, `remoteReadBatch` para `src/data/dataverse/` e de `mockData` para `src/data/mock/`; caminhos antigos com reexport explícito (o snapshot de exports não mudou).
+- `fieldLookup` fica: é regra de detalhe, vai para `shared/` no passo 7.
 
 ## Passo 3 — Features isoladas (aprende o padrão)
 Uma por commit, mesmo PR: comunicados, ideias, termos, meu-carro. Para cada: tela(s) de `screens/` + componentes de `components/<x>/` + `lib/<x>.ts` + funções `*Remote` dela em `dataverse.ts` → `features/<x>/` (funções remotas em `features/<x>/remoto.ts`). Comunicados e ideias passam a usar `useDados()`.
