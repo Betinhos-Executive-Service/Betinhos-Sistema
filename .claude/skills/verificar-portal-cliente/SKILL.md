@@ -18,7 +18,7 @@ description: "Verifica o portal de validação de serviços pelo cliente (apps/p
    - Abrir um serviço (botão RV-…): Drawer largo com composição do preço, observação e voucher. "Tenho uma dúvida" sem motivo mostra o erro; com motivo e texto, a mensagem entra na conversa e o serviço vai para "Em dúvida".
    - Digitar e clicar Cancelar → "Descartar alterações?" → Descartar limpa só o formulário (o painel continua aberto).
    - Excel: no console, `(await import('/src/excel/exportar.ts')).linhasExcel` gera as linhas; o clique em "Exportar Excel" baixa o .xlsx (o `exceljs` só carrega no clique).
-4. Mobile (`resize_window` preset mobile, 375 px): a lista vira card com trajeto dentro do título; "Selecionar todos" aparece na barra; o detalhe abre em Sheet com o rodapé colado embaixo. Confira `document.querySelector('dialog.bt-sheet[open]').scrollTop === 0` (contorno `overflow: clip` em `Detalhe.css` para o bug do Sheet do `@betinhos/ui` 1.15).
+4. Mobile (`resize_window` preset mobile, 375 px): a lista vira card com trajeto dentro do título; "Selecionar todos" aparece na barra; o detalhe abre em Sheet com o rodapé colado embaixo. Confira `document.querySelector('dialog.bt-sheet[open]').scrollTop === 0` (corrigido no `@betinhos/ui` 1.15.4).
 5. Console sem erros nem avisos; `document.documentElement.scrollWidth === innerWidth` (sem rolagem horizontal). Versão `v0.0.x · dd/mm/aaaa HH:mm` visível no canto em todas as telas.
 
 ## Evidência

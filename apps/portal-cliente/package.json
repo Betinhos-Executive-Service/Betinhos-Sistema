@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@betinhos/ui": "npm:@betinhos-executive-service/ui@^1.15.2",
+    "@betinhos/ui": "npm:@betinhos-executive-service/ui@^1.15.4",
     "exceljs": "^4.4.0",
     "lucide-react": "^1.47.0",
     "react": "^19.2.0",

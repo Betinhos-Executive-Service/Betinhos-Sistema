@@ -1,8 +1,3 @@
-/* Contorno do Sheet do @betinhos/ui 1.15: o showModal foca o "Fechar" com o painel ainda fora da tela e o
-   navegador rola o <dialog> (overflow: hidden ainda rola por programa), deixando o rodapé no meio do painel.
-   `clip` não rola. Corrigir no design-system-betinhos e remover daqui. */
-dialog.bt-sheet { overflow: clip; }
-
 .pc-det__prazo { font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-secondary); }
 
 .pc-det__dados {
