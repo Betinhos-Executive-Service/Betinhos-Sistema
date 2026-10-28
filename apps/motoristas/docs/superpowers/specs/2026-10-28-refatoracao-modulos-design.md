@@ -14,7 +14,7 @@ O App Motoristas vai virar a base única para dois públicos: o motorista Betinh
 
 1. **Pastas por funcionalidade, não por tipo de arquivo.** Hoje um ajuste no checklist toca `screens/`, `components/checklists/`, `lib/checklists.ts`, `lib/checklistSend.ts` e `App.tsx`. Depois, quase tudo fica em `features/checklist/`. Ganho: quem mexe numa feature encontra tudo junto, e o manifesto de liberação do terceiro mora ao lado do código que ele libera.
 
-2. **Porta + adaptadores (a "tomada").** `data/porta.ts` define, em TypeScript, a lista de operações que o app pode pedir (`carregarAgenda`, `salvarChecklist`, `enviarFoto`, `finalizar`...). As telas só conhecem a porta. Quem cumpre o contrato é um adaptador: hoje o `dataverse/` (código atual reorganizado); na parte 3, o `worker/`. Analogia: a tela é o aparelho, a porta é a tomada, o adaptador é a fiação. Troca a fiação sem trocar o aparelho. Por que operações nomeadas e não um `retrieveMultiple` genérico: o Worker precisa checar o token **por operação** ("este link pode finalizar o serviço X?"); com consultas OData livres o terceiro conseguiria ler qualquer tabela.
+2. **Porta + adaptadores (a "tomada").** `data/porta.ts` define, em TypeScript, a lista de operações que o app pode pedir (`carregarAgenda`, `salvarChecklist`, `enviarFoto`, `finalizar`...). As telas só conhecem a porta. Quem cumpre o contrato é um adaptador. Os dois vão conviver para sempre, um por porta de entrada: o `dataverse/` (código atual reorganizado) atende o motorista Betinhos e os terceiros fixos, que continuam no web resource dentro do Dynamics; o `worker/` (parte 3) atende só o parceiro esporádico que abre o link sem login. O mesmo código de tela vai nos dois builds; só muda o adaptador injetado na entrada. Analogia: a tela é o aparelho, a porta é a tomada, o adaptador é a fiação. Troca a fiação sem trocar o aparelho. Por que operações nomeadas e não um `retrieveMultiple` genérico: o Worker precisa checar o token **por operação** ("este link pode finalizar o serviço X?"); com consultas OData livres o terceiro conseguiria ler qualquer tabela.
 
 3. **Uma porta com dois adaptadores reais, não uma abstração especulativa.** A porta só existe porque haverá dois consumidores concretos. Por isso, nesta parte, ela cobre apenas as operações que o terceiro usará (liberadas no manifesto) mais as que já estão no caminho de migração; operações só do motorista Betinhos (despesas, colisão, QR, termos) podem continuar chamando o adaptador Dataverse direto até haver motivo para passar pela porta. Evita centenas de linhas de contrato que ninguém mais implementa.
 
@@ -80,8 +80,9 @@ src/
 - **Conflito com outras frentes** abertas na `main`: PRs pequenos, merge de `origin/main` antes de cada um.
 - **Coisa só testável no Dynamics** (Xrm, câmera real, Flows): fica declarado como "não verificado"; validação no DEV feita pelo Renan quando quiser publicar.
 
-## Perguntas em aberto
+## Decisões fechadas (28/10/2026, aprovação do Renan)
 
-1. A porta cobre só operações do terceiro (recomendado) ou já todas as 73?
-2. Os PRs podem ir para a `main` um a um, ou prefere uma branch de integração e um merge só no fim?
-3. Manutenção (solicitação/finalização) e "troca de veículo": bloqueados ao terceiro? (Não estavam na lista.)
+1. Porta cobre só as operações usadas pelo parceiro via link; o resto chama o adaptador Dataverse direto.
+2. PRs pequenos direto na `main`, um por passo.
+3. Manutenção e troca de veículo: bloqueadas no modo link.
+4. "Modo terceiro" = parceiro esporádico via link (Worker). Terceiro fixo é motorista comum no web resource, com as regras de permissão do Dataverse; nada muda para ele nesta refatoração.
