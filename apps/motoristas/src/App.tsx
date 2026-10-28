@@ -33,16 +33,11 @@ import {
 } from "./app/navigation";
 import {
   cancelServiceRemote,
-  assertCollisionSchemaReadyRemote,
-  createMaintenanceRequestRemote,
-  createOne,
-  DATAVERSE,
   finalizeExchangeRemote,
   finalizeMaintenanceRemote,
   getDriverContext,
   getDriverCurrentVehicleId,
   hasDataverseRuntime,
-  loadCollisionLookupNavigationNamesRemote,
   loadExpenseReferenceDataRemote,
   loadMyVehiclesRemote,
   setMyCurrentVehicleRemote,
@@ -51,8 +46,6 @@ import {
   resolveServiceVehicleRemote,
   loadActiveFleetRemote,
   prefetchExpenseReferenceDataRemote,
-  updateOne,
-  uploadCollisionPhotoRemote,
   uploadReceiveProofRemote,
   type DriverContext,
   type MaintenanceRequestVehicleOption
@@ -67,6 +60,8 @@ import { getQuickReadMockMode } from "./features/despesas/receiptQuickReadMock";
 import { IDEA_STATUS, type Idea, type IdeaDraft } from "./features/ideias/ideas";
 import { APP_CONNECTION_LOST_MESSAGE, APP_OPERATION_ERROR_MESSAGE, reportAppError, type AppErrorNotice } from "./lib/appErrorLogger";
 import { useDados } from "./app/DataProvider";
+import { useMaintenanceRequestFlow } from "./features/manutencao/useMaintenanceRequestFlow";
+import { useCollisionFlow } from "./features/colisao/useCollisionFlow";
 import { useComunicados } from "./features/comunicados/useComunicados";
 import { useChecklists } from "./features/checklist/useChecklists";
 import { useTermosMulta } from "./features/termos/useTermosMulta";
@@ -112,12 +107,7 @@ import { ReceiptIllegibleScreen } from "./features/despesas/ReceiptIllegibleScre
 import { MaintenancePhotoPreviewScreen } from "./features/fotos/MaintenancePhotoPreviewScreen";
 import { ReceiveScreen } from "./features/recebimento/ReceiveScreen";
 import { ReceiptPreviewScreen, ReceiptScreen } from "./features/recibo/ReceiptScreen";
-import {
-  MaintenanceRequestScreen,
-  type MaintenanceRequestDraft,
-  type MaintenanceRequestFields,
-  type MaintenanceRequestPhoto
-} from "./features/manutencao/MaintenanceRequestScreen";
+import { MaintenanceRequestScreen } from "./features/manutencao/MaintenanceRequestScreen";
 import { IdeasScreen } from "./features/ideias/IdeasScreen";
 import { MyVehicleScreen } from "./features/meu-carro/MyVehicleScreen";
 import { VehicleChoiceDialog } from "./features/detalhe/VehicleChoiceDialog";
@@ -136,17 +126,8 @@ const loadMockAllFleet = async () => MOCK_FLEET;
 import { ServicesScreen } from "./features/servicos/ServicesScreen";
 import { SignatureScreen } from "./features/voucher/SignatureScreen";
 import { VoucherScreen } from "./features/voucher/VoucherScreen";
-import {
-  COLLISION_ATTACHMENT_STATUS,
-  buildCollisionCreatePayload,
-  createEmptyCollisionDraft,
-  getCollisionPhotoLabel,
-  hasCollisionThirdParty,
-  type CollisionDraft,
-  type CollisionPhoto,
-  type CollisionPhotoKind
-} from "./features/colisao/collisions";
-import { type ExpensePhoto } from "./features/despesas/expenses";
+import { createEmptyCollisionDraft, getCollisionPhotoLabel } from "./features/colisao/collisions";
+import type { ExpensePhoto } from "./features/despesas/expenses";
 import { hasMediaDraftContent, prepareVideoBlobForUpload, revokePreviewUrl } from "./features/fotos/mediaDrafts";
 import type { CapturedVideoDraft, DetailData, MaintenancePhotoKind, Screen } from "./types";
 import { exchangeUserError } from "./features/servicos/trocaErros";
@@ -246,7 +227,40 @@ function App() {
   const [maintenanceVehicles, setMaintenanceVehicles] = useState<MaintenanceRequestVehicleOption[]>([]);
   const [maintenanceCurrentVehicleId, setMaintenanceCurrentVehicleId] = useState("");
   const [maintenanceVehiclesLoading, setMaintenanceVehiclesLoading] = useState(false);
-  const [maintenanceRequestDraft, setMaintenanceRequestDraft] = useState<MaintenanceRequestDraft>({ ...EMPTY_MAINTENANCE_REQUEST_DRAFT });
+  const {
+    clearMaintenanceRequestPhotoDraftState,
+    confirmMaintenanceRequestPhoto,
+    deleteMaintenanceRequestPhoto,
+    maintenanceRequestDraft,
+    maintenanceRequestPhotoDraft,
+    maintenanceRequestPhotoIsVideo,
+    maintenanceRequestPhotoPreviewUrl,
+    maintenanceRequestPhotos,
+    maintenanceRequestPreviewPhotoId,
+    openMaintenanceRequestCamera,
+    openMaintenanceRequestPreview,
+    openMaintenanceRequestVideoPreview,
+    setMaintenanceRequestDraft,
+    setMaintenanceRequestPhotoDraft,
+    setMaintenanceRequestPhotoDurationLabel,
+    setMaintenanceRequestPhotoIsVideo,
+    setMaintenanceRequestPhotoPosterUrl,
+    setMaintenanceRequestPhotoPreviewUrl,
+    setMaintenanceRequestPhotoRawBlob,
+    setMaintenanceRequestPhotos,
+    setMaintenanceRequestPreviewPhotoId,
+    submitMaintenanceRequest
+  } = useMaintenanceRequestFlow({
+    // Funções intermediárias para o que o App declara mais abaixo; só rodam nos handlers.
+    logAppError: (...args) => logAppError(...args),
+    maintenanceCurrentVehicleId,
+    remoteMode,
+    remoteOperation,
+    setCriticalError: (...args) => setCriticalError(...args),
+    setRemoteOperation,
+    setScreen,
+    setToast: (...args) => setToast(...args)
+  });
   const {
     cancelExpenseQuickRead,
     checkReceiveProof,
@@ -323,19 +337,43 @@ function App() {
     clear: clearReceivePhotoDraftState
   } = useMediaDraftState();
   const [receivePreviewPhotoId, setReceivePreviewPhotoId] = useState("");
-  const [collisionDraft, setCollisionDraft] = useState<CollisionDraft>(() => createEmptyCollisionDraft());
-  const [collisionPhotos, setCollisionPhotos] = useState<CollisionPhoto[]>([]);
   const {
-    draft: collisionPhotoDraft, setDraft: setCollisionPhotoDraft,
-    previewUrl: collisionPhotoPreviewUrl, setPreviewUrl: setCollisionPhotoPreviewUrl,
-    posterUrl: collisionPhotoPosterUrl, setPosterUrl: setCollisionPhotoPosterUrl,
-    durationLabel: collisionPhotoDurationLabel, setDurationLabel: setCollisionPhotoDurationLabel,
-    rawBlob: collisionPhotoRawBlob, setRawBlob: setCollisionPhotoRawBlob,
-    isVideo: collisionPhotoIsVideo, setIsVideo: setCollisionPhotoIsVideo,
-    clear: clearCollisionPhotoDraftState
-  } = useMediaDraftState();
-  const [collisionPhotoKind, setCollisionPhotoKind] = useState<CollisionPhotoKind>("cena");
-  const [collisionPreviewPhotoId, setCollisionPreviewPhotoId] = useState("");
+    clearCollisionPhotoDraftState,
+    collisionDraft,
+    collisionPhotoDraft,
+    collisionPhotoIsVideo,
+    collisionPhotoKind,
+    collisionPhotoPreviewUrl,
+    collisionPhotos,
+    collisionPreviewPhotoId,
+    confirmCollisionPhoto,
+    deleteCollisionPhoto,
+    openCollisionCamera,
+    openCollisionPreview,
+    openCollisionVideoPreview,
+    setCollisionDraft,
+    setCollisionPhotoDraft,
+    setCollisionPhotoDurationLabel,
+    setCollisionPhotoIsVideo,
+    setCollisionPhotoPosterUrl,
+    setCollisionPhotoPreviewUrl,
+    setCollisionPhotoRawBlob,
+    setCollisionPhotos,
+    setCollisionPreviewPhotoId,
+    startCollision,
+    submitCollision
+  } = useCollisionFlow({
+    // Funções intermediárias para o que o App declara mais abaixo; só rodam nos handlers.
+    driverContext,
+    logAppError: (...args) => logAppError(...args),
+    maintenanceCurrentVehicleId,
+    remoteMode,
+    remoteOperation,
+    setCriticalError: (...args) => setCriticalError(...args),
+    setRemoteOperation,
+    setScreen,
+    setToast: (...args) => setToast(...args)
+  });
   useEffect(() => {
     if (isButtonPreviewMode || isReceiptPreviewMode) return;
     let active = true;
@@ -351,17 +389,6 @@ function App() {
       .finally(() => { if (active) setMediaDraftLoaded(true); });
     return () => { active = false; };
   }, [isButtonPreviewMode, isReceiptPreviewMode]);
-  const [maintenanceRequestPhotos, setMaintenanceRequestPhotos] = useState<MaintenanceRequestPhoto[]>([]);
-  const {
-    draft: maintenanceRequestPhotoDraft, setDraft: setMaintenanceRequestPhotoDraft,
-    previewUrl: maintenanceRequestPhotoPreviewUrl, setPreviewUrl: setMaintenanceRequestPhotoPreviewUrl,
-    posterUrl: maintenanceRequestPhotoPosterUrl, setPosterUrl: setMaintenanceRequestPhotoPosterUrl,
-    durationLabel: maintenanceRequestPhotoDurationLabel, setDurationLabel: setMaintenanceRequestPhotoDurationLabel,
-    rawBlob: maintenanceRequestPhotoRawBlob, setRawBlob: setMaintenanceRequestPhotoRawBlob,
-    isVideo: maintenanceRequestPhotoIsVideo, setIsVideo: setMaintenanceRequestPhotoIsVideo,
-    clear: clearMaintenanceRequestPhotoDraftState
-  } = useMediaDraftState();
-  const [maintenanceRequestPreviewPhotoId, setMaintenanceRequestPreviewPhotoId] = useState("");
   const [maintenanceExistingPreview, setMaintenanceExistingPreview] = useState(false);
   const [maintenanceFinalizeDraft, setMaintenanceFinalizeDraft] = useState<MaintenanceFinalizeDraft>({ ...EMPTY_MAINTENANCE_FINALIZE_DRAFT });
   const finalizeTimerRef = useRef<number | null>(null);
@@ -1632,266 +1659,6 @@ function App() {
     }
   };
 
-  const submitCollision = async (draft: CollisionDraft) => {
-    if (remoteOperation) return;
-    if (!remoteMode) {
-      setToast("Abra no Power Apps para registrar no Dataverse.");
-      return;
-    }
-
-    let createdCollisionId = "";
-    let uploadedCount = 0;
-    try {
-      setRemoteOperation({
-        title: "Registrando colisão",
-        message: "Identificando motorista.",
-        phase: "loading"
-      });
-      const driver = driverContext ?? await getDriverContext();
-      const veiculoId = draft.veiculoId || getDriverCurrentVehicleId(driver);
-      const collisionHasThirdParty = hasCollisionThirdParty(draft);
-      const photosToSubmit = collisionPhotos.filter((photo) =>
-        hasMediaDraftContent(photo) &&
-        (collisionHasThirdParty || (photo.kind !== "danoTerceiro" && photo.kind !== "documentoTerceiro"))
-      );
-      setRemoteOperation({
-        title: "Registrando colisão",
-        message: "Conferindo schema do Dataverse.",
-        phase: "loading"
-      });
-      await assertCollisionSchemaReadyRemote();
-      setRemoteOperation({
-        title: "Registrando colisão",
-        message: "Preparando evidências.",
-        phase: "loading"
-      });
-      const preparedPhotosToSubmit = await Promise.all(photosToSubmit.map((photo) => prepareMediaDraftForUpload(photo)));
-      const lookupNavigationNames = await loadCollisionLookupNavigationNamesRemote();
-      setRemoteOperation({
-        title: "Registrando colisão",
-        message: "Criando ocorrência.",
-        phase: "loading"
-      });
-      const payload = buildCollisionCreatePayload({
-        draft,
-        photos: preparedPhotosToSubmit,
-        motoristaId: driver.id,
-        veiculoId,
-        motoristaEntitySet: DATAVERSE.funcionarios,
-        veiculoEntitySet: DATAVERSE.veiculos,
-        lookupNavigationNames
-      });
-      const result = await createOne(DATAVERSE.colisoes, payload);
-      createdCollisionId = result.id;
-      const collisionName = String(payload.cr40f_nome ?? "Colisão");
-      if (preparedPhotosToSubmit.length) {
-        setRemoteOperation({
-          title: "Registrando colisão",
-          message: `Enviando ${preparedPhotosToSubmit.length} arquivo(s) em paralelo (0/${preparedPhotosToSubmit.length}).`,
-          detailId: result.id,
-          phase: "loading"
-        });
-        const uploadResults = await Promise.allSettled(preparedPhotosToSubmit.map(async (photo, index) => {
-          const link = await uploadCollisionPhotoRemote({
-            collisionId: result.id,
-            collisionName,
-            motoristaId: driver.id,
-            dataUrl: photo.dataUrl,
-            kind: photo.kind,
-            order: index + 1,
-            onProgress: (message) => setRemoteOperation({
-              title: "Registrando colisão",
-              message: `Uploads paralelos: ${message}`,
-              detailId: result.id,
-              phase: "loading"
-            })
-          });
-          uploadedCount += 1;
-          setRemoteOperation({
-            title: "Registrando colisão",
-            message: `Uploads paralelos concluídos (${uploadedCount}/${preparedPhotosToSubmit.length}).`,
-            detailId: result.id,
-            phase: "loading"
-          });
-          return link;
-        }));
-        const failedUploads = uploadResults.filter((uploadResult) => uploadResult.status === "rejected").length;
-        if (failedUploads) {
-          throw new Error(`Colisão criada, mas ${failedUploads} de ${preparedPhotosToSubmit.length} arquivo(s) falharam no upload.`);
-        }
-      }
-      if (preparedPhotosToSubmit.length) {
-        await updateOne(DATAVERSE.colisoes, result.id, { cr40f_statusanexo: COLLISION_ATTACHMENT_STATUS.completo });
-      }
-      setRemoteOperation({
-        title: "Registrando colisão",
-        message: "Colisão registrada.",
-        detailId: result.id,
-        phase: "success"
-      });
-      await wait(720);
-      setRemoteOperation(null);
-      revokePhotoPreviewUrls(collisionPhotos);
-      setCollisionDraft(createEmptyCollisionDraft());
-      setCollisionPhotos([]);
-      clearCollisionPhotoDraftState();
-      setCollisionPreviewPhotoId("");
-      setScreen("inicio");
-      setToast("Colisão registrada.");
-    } catch (error) {
-      if (createdCollisionId) {
-        try {
-          await updateOne(DATAVERSE.colisoes, createdCollisionId, {
-            cr40f_statusanexo: uploadedCount > 0 ? COLLISION_ATTACHMENT_STATUS.parcial : COLLISION_ATTACHMENT_STATUS.falhou
-          });
-        } catch (statusError) {
-          logAppError(statusError, "submitCollision", "statusanexo");
-        }
-      }
-      logAppError(error, "submitCollision", "create");
-      setRemoteOperation(null);
-      setCriticalError(error instanceof Error ? error.message : "Falha ao registrar colisão.");
-    }
-  };
-
-  const submitMaintenanceRequest = async (fields: MaintenanceRequestFields) => {
-    if (remoteOperation) return;
-    if (!remoteMode) {
-      setToast("Abra no Power Apps para enviar ao Dataverse.");
-      return;
-    }
-
-    try {
-      setRemoteOperation({
-        title: "Solicitando manutenção",
-        message: "Identificando motorista.",
-        phase: "loading"
-      });
-      const driver = await getDriverContext();
-      setRemoteOperation({
-        title: "Solicitando manutenção",
-        message: "Criando ordem de manutenção.",
-        phase: "loading"
-      });
-      const preparedPhotos = await Promise.all(
-        maintenanceRequestPhotos.filter((photo) => hasMediaDraftContent(photo)).map((photo) => prepareMediaDraftForUpload(photo))
-      );
-      const result = await createMaintenanceRequestRemote({
-        descricao: fields.descricao,
-        kmAtual: fields.kmAtual,
-        veiculoId: fields.veiculoId,
-        motoristaId: driver.id,
-        gravidade: fields.gravidade,
-        photos: preparedPhotos.map((photo) => photo.dataUrl),
-        onProgress: (message) => setRemoteOperation({
-          title: "Solicitando manutenção",
-          message,
-          phase: "loading"
-        })
-      });
-      setRemoteOperation({
-        title: "Solicitando manutenção",
-        message: "Solicitação enviada.",
-        detailId: result.id,
-        phase: "success"
-      });
-      await wait(720);
-      setRemoteOperation(null);
-      revokePhotoPreviewUrls(maintenanceRequestPhotos);
-      setMaintenanceRequestDraft({ descricao: "", kmAtual: "", veiculoId: maintenanceCurrentVehicleId, gravidade: "" });
-      setMaintenanceRequestPhotos([]);
-      clearMaintenanceRequestPhotoDraftState();
-      setScreen("inicio");
-      setToast("Solicitação enviada para aprovação.");
-    } catch (error) {
-      logAppError(error, "submitMaintenanceRequest", "create");
-      setRemoteOperation(null);
-      setCriticalError(error instanceof Error ? error.message : "Falha ao solicitar manutenção.");
-    }
-  };
-
-  const openMaintenanceRequestCamera = () => {
-    clearMaintenanceRequestPhotoDraftState();
-    setMaintenanceRequestPreviewPhotoId("");
-    setScreen("fotoSolicitacaoManutencao");
-  };
-
-  const openMaintenanceRequestVideoPreview = (video: CapturedVideoDraft) => {
-    setMaintenanceRequestPhotoDraft("");
-    setMaintenanceRequestPhotoPreviewUrl(video.previewUrl);
-    setMaintenanceRequestPhotoPosterUrl(video.posterUrl ?? "");
-    setMaintenanceRequestPhotoDurationLabel(video.durationLabel ?? "");
-    setMaintenanceRequestPhotoRawBlob(video.rawBlob);
-    setMaintenanceRequestPhotoIsVideo(true);
-    setMaintenanceRequestPreviewPhotoId("");
-    setScreen("previewFotoSolicitacaoManutencao");
-  };
-
-  const openMaintenanceRequestPreview = (photoId: string) => {
-    const photo = maintenanceRequestPhotos.find((item) => item.id === photoId);
-    if (!photo) return;
-    setMaintenanceRequestPhotoDraft(photo.dataUrl);
-    setMaintenanceRequestPhotoPreviewUrl(photo.previewUrl ?? "");
-    setMaintenanceRequestPhotoPosterUrl(photo.posterUrl ?? "");
-    setMaintenanceRequestPhotoDurationLabel(photo.durationLabel ?? "");
-    setMaintenanceRequestPhotoRawBlob(photo.rawBlob ?? null);
-    setMaintenanceRequestPhotoIsVideo(isVideoMediaDraft(photo.dataUrl, photo.rawBlob));
-    setMaintenanceRequestPreviewPhotoId(photoId);
-    setScreen("previewFotoSolicitacaoManutencao");
-  };
-
-  const confirmMaintenanceRequestPhoto = () => {
-    if (!hasMediaDraftContent({ dataUrl: maintenanceRequestPhotoDraft, rawBlob: maintenanceRequestPhotoRawBlob, mediaType: maintenanceRequestPhotoIsVideo ? "video" : "foto" })) {
-      return setScreen("solicitarManutencao");
-    }
-    if (maintenanceRequestPreviewPhotoId) {
-      setMaintenanceRequestPhotos((current) =>
-        current.map((photo) => {
-          if (photo.id !== maintenanceRequestPreviewPhotoId) return photo;
-          if (photo.previewUrl && photo.previewUrl !== (maintenanceRequestPhotoPreviewUrl || undefined)) revokePreviewUrl(photo.previewUrl);
-          return {
-            ...photo,
-            dataUrl: maintenanceRequestPhotoDraft,
-            previewUrl: maintenanceRequestPhotoPreviewUrl || undefined,
-            posterUrl: maintenanceRequestPhotoPosterUrl || undefined,
-            durationLabel: maintenanceRequestPhotoDurationLabel || undefined,
-            mediaType: maintenanceRequestPhotoIsVideo ? "video" : "foto",
-            rawBlob: maintenanceRequestPhotoIsVideo ? maintenanceRequestPhotoRawBlob ?? undefined : undefined
-          };
-        })
-      );
-    } else {
-      setMaintenanceRequestPhotos((current) => [
-        ...current,
-        {
-          id: `request-photo-${Date.now()}-${current.length + 1}`,
-          dataUrl: maintenanceRequestPhotoDraft,
-          previewUrl: maintenanceRequestPhotoPreviewUrl || undefined,
-          posterUrl: maintenanceRequestPhotoPosterUrl || undefined,
-          durationLabel: maintenanceRequestPhotoDurationLabel || undefined,
-          mediaType: maintenanceRequestPhotoIsVideo ? "video" : "foto",
-          rawBlob: maintenanceRequestPhotoIsVideo ? maintenanceRequestPhotoRawBlob ?? undefined : undefined
-        }
-      ]);
-    }
-    clearMaintenanceRequestPhotoDraftState(true);
-    setMaintenanceRequestPreviewPhotoId("");
-    setScreen("solicitarManutencao");
-  };
-
-  const deleteMaintenanceRequestPhoto = () => {
-    if (maintenanceRequestPreviewPhotoId) {
-      setMaintenanceRequestPhotos((current) => {
-        const removed = current.find((photo) => photo.id === maintenanceRequestPreviewPhotoId);
-        revokePreviewUrl(removed?.previewUrl);
-        return current.filter((photo) => photo.id !== maintenanceRequestPreviewPhotoId);
-      });
-    }
-    clearMaintenanceRequestPhotoDraftState();
-    setMaintenanceRequestPreviewPhotoId("");
-    setScreen("solicitarManutencao");
-  };
-
   const openReceiveCamera = () => {
     clearReceivePhotoDraftState();
     setReceivePreviewPhotoId("");
@@ -2119,108 +1886,11 @@ function App() {
     setScreen("reciboPersonalizado");
   };
 
-  const startCollision = (type: CollisionDraft["tipoOcorrencia"]) => {
-    setCollisionDraft((current) => ({
-      ...current,
-      tipoOcorrencia: type,
-      houveTerceiro: type === "bateram_em_mim" ? true : current.houveTerceiro,
-      veiculoId: current.veiculoId || maintenanceCurrentVehicleId
-    }));
-    setScreen("colisoes");
-  };
-
-  const openCollisionCamera = (kind: CollisionPhotoKind) => {
-    setCollisionPhotoKind(kind);
-    clearCollisionPhotoDraftState();
-    setCollisionPreviewPhotoId("");
-    setScreen("fotoColisao");
-  };
-
   const openMaintenanceFinalizeCamera = (kind: MaintenancePhotoKind) => {
     setMaintenancePhotoKind(kind);
     clearMaintenanceFinalizePhotoDraft();
     setMaintenanceExistingPreview(false);
     setScreen("fotoManutencao");
-  };
-
-  const openCollisionVideoPreview = (video: CapturedVideoDraft) => {
-    setCollisionPhotoDraft("");
-    setCollisionPhotoPreviewUrl(video.previewUrl);
-    setCollisionPhotoPosterUrl(video.posterUrl ?? "");
-    setCollisionPhotoDurationLabel(video.durationLabel ?? "");
-    setCollisionPhotoRawBlob(video.rawBlob);
-    setCollisionPhotoIsVideo(true);
-    setCollisionPreviewPhotoId("");
-    setScreen("previewFotoColisao");
-  };
-
-  const openCollisionPreview = (photoId: string) => {
-    const photo = collisionPhotos.find((item) => item.id === photoId);
-    if (!photo) return;
-    setCollisionPhotoKind(photo.kind);
-    setCollisionPhotoDraft(photo.dataUrl);
-    setCollisionPhotoPreviewUrl(photo.previewUrl ?? "");
-    setCollisionPhotoPosterUrl(photo.posterUrl ?? "");
-    setCollisionPhotoDurationLabel(photo.durationLabel ?? "");
-    setCollisionPhotoRawBlob(photo.rawBlob ?? null);
-    setCollisionPhotoIsVideo(isVideoMediaDraft(photo.dataUrl, photo.rawBlob));
-    setCollisionPreviewPhotoId(photoId);
-    setScreen("previewFotoColisao");
-  };
-
-  const confirmCollisionPhoto = () => {
-    if (!hasMediaDraftContent({ dataUrl: collisionPhotoDraft, rawBlob: collisionPhotoRawBlob, mediaType: collisionPhotoIsVideo ? "video" : "foto" })) {
-      return setScreen("colisoes");
-    }
-    if (collisionPreviewPhotoId) {
-      setCollisionPhotos((current) =>
-        current.map((photo) => {
-          if (photo.id !== collisionPreviewPhotoId) return photo;
-          if (photo.previewUrl && photo.previewUrl !== (collisionPhotoPreviewUrl || undefined)) revokePreviewUrl(photo.previewUrl);
-          return {
-            ...photo,
-            dataUrl: collisionPhotoDraft,
-            previewUrl: collisionPhotoPreviewUrl || undefined,
-            posterUrl: collisionPhotoPosterUrl || undefined,
-            durationLabel: collisionPhotoDurationLabel || undefined,
-            mediaType: collisionPhotoIsVideo ? "video" : "foto",
-            rawBlob: collisionPhotoIsVideo ? collisionPhotoRawBlob ?? undefined : undefined
-          };
-        })
-      );
-    } else {
-      setCollisionPhotos((current) => {
-        return [
-          ...current,
-          {
-            id: `collision-photo-${Date.now()}-${current.length + 1}`,
-            kind: collisionPhotoKind,
-            dataUrl: collisionPhotoDraft,
-            previewUrl: collisionPhotoPreviewUrl || undefined,
-            posterUrl: collisionPhotoPosterUrl || undefined,
-            durationLabel: collisionPhotoDurationLabel || undefined,
-            mediaType: collisionPhotoIsVideo ? "video" : "foto",
-            rawBlob: collisionPhotoIsVideo ? collisionPhotoRawBlob ?? undefined : undefined
-          }
-        ];
-      });
-    }
-    clearCollisionPhotoDraftState(true);
-    setCollisionPreviewPhotoId("");
-    setScreen("colisoes");
-  };
-
-  const deleteCollisionPhoto = () => {
-    if (collisionPreviewPhotoId) {
-      setCollisionPhotos((current) => {
-        const removed = current.find((photo) => photo.id === collisionPreviewPhotoId);
-        revokePreviewUrl(removed?.previewUrl);
-        return current.filter((photo) => photo.id !== collisionPreviewPhotoId);
-      });
-    }
-    clearCollisionPhotoDraftState();
-    setCollisionPreviewPhotoId("");
-    setScreen("colisoes");
   };
 
   if (screen === "canceladoLocal" && selectedDetail) {

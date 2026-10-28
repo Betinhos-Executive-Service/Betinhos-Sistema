@@ -5,7 +5,7 @@ description: "Verifica os formulários avulsos do App Motoristas: Gastos, Solici
 # Verificar formulários avulsos
 
 ## Cobre
-- Código: `src/features/despesas/ExpenseScreen.tsx`, `src/features/manutencao/MaintenanceRequestScreen.tsx`, `src/features/colisao/CollisionScreen.tsx`, `src/features/colisao/CollisionStartScreen.tsx`, `src/features/recibo/ReceiptScreen.tsx`, `src/screens/ButtonPreviewScreen.tsx`, `src/features/ideias/IdeasScreen.tsx`, `src/components/common/FormFields.tsx`, `src/components/common/SearchableSelect.tsx`.
+- Código: `src/features/despesas/ExpenseScreen.tsx`, `src/features/manutencao/MaintenanceRequestScreen.tsx` e `useMaintenanceRequestFlow.ts` (rascunho, fotos e envio), `src/features/colisao/CollisionScreen.tsx`, `src/features/colisao/CollisionStartScreen.tsx`, `src/features/colisao/useCollisionFlow.ts` (rascunho, fotos por tipo e envio), `src/features/recibo/ReceiptScreen.tsx`, `src/screens/ButtonPreviewScreen.tsx`, `src/features/ideias/IdeasScreen.tsx`, `src/components/common/FormFields.tsx`, `src/components/common/SearchableSelect.tsx`.
 - Rotas: `#gastos`, `#manutencao`, `#colisoes`, `#registro-colisao`, `#recibo-personalizado`, `#boas-ideias`.
 
 ## Preparar ambiente
