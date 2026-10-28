@@ -47,6 +47,18 @@ export function InputSelect({
   );
 }
 
+const initials = (name: string) =>
+  name.split(" ").filter(Boolean).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+
+function PersonChip({ name, primary = false }: { name: string; primary?: boolean }) {
+  return (
+    <span className={"assignment-person" + (primary ? " is-primary" : "")} title={name}>
+      <span className="avatar avatar-small" aria-hidden="true">{initials(name)}</span>
+      <span className="assignment-person-name">{name}</span>
+    </span>
+  );
+}
+
 export default function AssignmentFields({
   form,
   setForm,
@@ -77,9 +89,13 @@ export default function AssignmentFields({
   const primaryAssigneeId = form.primaryAssigneeId || form.assigneeId || form.assigneeIds?.[0] || "";
   const selectedConsultantIds = (form.consultantIds || (form.assigneeIds || []).filter((id: any) => String(id) !== String(primaryAssigneeId)))
     .filter((id: any) => String(id) !== String(primaryAssigneeId));
-  const primaryName = (employeeById.get(String(primaryAssigneeId)) as any)?.name || "Não definido";
+  const displayName = (id: any) => {
+    const employee = employeeById.get(String(id)) as any;
+    return employee?.apelido || employee?.name;
+  };
+  const primaryName = displayName(primaryAssigneeId) || "Não definido";
   const consultantNames = selectedConsultantIds
-    .map((id: any) => (employeeById.get(String(id)) as any)?.name)
+    .map(displayName)
     .filter(Boolean);
   const selectMode = (mode: any) => {
     setForm((current: any) => ({
@@ -194,24 +210,20 @@ export default function AssignmentFields({
               <span className="assignment-members-label">Composição herdada da equipe</span>
               <div className="assignment-members-list">
                 {primaryName !== "Não definido" && (
-                  <span
-                    className="assignment-member-chip assignment-member-primary"
-                  >
-                    <span className="avatar avatar-small">
-                      {String(primaryName)
-                        .split(" ")
-                        .map((part) => part[0])
-                        .join("")
-                        .slice(0, 2)
-                        .toUpperCase()}
-                    </span>
-                    Principal: {primaryName}
-                  </span>
+                  <div className="assignment-role" role="group" aria-label="Principal">
+                    <span className="assignment-role-label">Principal</span>
+                    <div className="assignment-role-people">
+                      <PersonChip name={primaryName} primary />
+                    </div>
+                  </div>
                 )}
                 {consultantNames.length > 0 && (
-                  <span className="assignment-member-chip">
-                    Consultores: {consultantNames.join(", ")}
-                  </span>
+                  <div className="assignment-role" role="group" aria-label="Consultores">
+                    <span className="assignment-role-label">Consultores</span>
+                    <div className="assignment-role-people">
+                      {consultantNames.map((name: any) => <PersonChip key={name} name={name} />)}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

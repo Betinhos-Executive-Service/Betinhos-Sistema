@@ -2494,7 +2494,7 @@
 }
 
 /* Atribuição única: pessoa e equipe compartilham o mesmo contrato visual. */
-:where(.planner-page, .planner-portal) .assignment-field { min-width: 0; display: grid; gap: 5px; }
+:where(.planner-page, .planner-portal) .assignment-field { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 5px; }
 :where(.planner-page, .planner-portal) .assignment-field-header { min-width: 0; min-height: 28px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 :where(.planner-page, .planner-portal) .assignment-field-header > span { color: var(--muted); font-size: 10px; font-weight: 800; line-height: 14px; }
 :where(.planner-page, .planner-portal) .assignment-field .assignment-mode { grid-template-columns: repeat(2, 28px); gap: 2px; padding: 2px; border-radius: 7px; }
@@ -2511,8 +2511,15 @@
 :where(.planner-page, .planner-portal) .assignment-members { width: calc(160% + 13px); display: grid; gap: 7px; min-height: 25px; }
 :where(.planner-page, .planner-portal) .assignment-members-label { color: var(--muted); font-size: 10px; font-weight: 800; line-height: 14px; }
 :where(.planner-page, .planner-portal) .assignment-members-list { width: 100%; display: flex; flex-wrap: wrap; align-items: stretch; gap: 6px; }
-:where(.planner-page, .planner-portal) .assignment-member-chip { width: auto; max-width: 100%; min-width: 0; flex: 0 1 auto; display: inline-flex; align-items: center; justify-content: flex-start; gap: 5px; min-height: 28px; padding: 0 7px; overflow: hidden; border: 1px solid #c5d7f7; border-radius: 10px; color: var(--blue); background: #f3f7ff; box-shadow: 0 2px 5px rgba(33,89,210,.07); font-size: 10px; font-weight: 700; line-height: 1.2; white-space: nowrap; }
-:where(.planner-page, .planner-portal) .assignment-member-chip .avatar-small { width: 20px; height: 20px; flex-basis: 20px; border: 1px solid rgba(33,89,210,.12); background: rgba(255,255,255,.82); font-size: 8px; }
+:where(.planner-page, .planner-portal) .assignment-members-list { flex-direction: column; gap: 0; padding: 4px 10px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--neutral); }
+:where(.planner-page, .planner-portal) .assignment-role { min-width: 0; display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 8px; padding: 6px 0; }
+:where(.planner-page, .planner-portal) .assignment-role + .assignment-role { border-top: 1px solid var(--line); }
+:where(.planner-page, .planner-portal) .assignment-role-label { color: var(--muted); font-size: 10px; font-weight: 800; line-height: 14px; }
+:where(.planner-page, .planner-portal) .assignment-role-people { min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+:where(.planner-page, .planner-portal) .assignment-person { max-width: 100%; min-width: 0; display: inline-flex; align-items: center; gap: 6px; min-height: 26px; padding: 0 9px 0 3px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); background: #fff; font-size: 11px; font-weight: 700; line-height: 1.2; }
+:where(.planner-page, .planner-portal) .assignment-person-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:where(.planner-page, .planner-portal) .assignment-person .avatar-small { width: 20px; height: 20px; flex: 0 0 20px; font-size: 8px; }
+:where(.planner-page, .planner-portal) .assignment-person.is-primary { border-color: #c5d7f7; color: var(--blue); }
 :where(.planner-page, .planner-portal) .assignment-empty { color: var(--tertiary); font-size: 10px; font-weight: 600; }
 :where(.planner-page, .planner-portal) .teams-settings-panel { margin-top: 18px; overflow: hidden; }
 :where(.planner-page, .planner-portal) .teams-panel-heading { padding: 25px 26px 21px; }
@@ -2612,7 +2619,7 @@
 :where(.planner-page, .planner-portal) .drawer-field-grid { grid-template-columns: minmax(0, 1fr); }
 :where(.planner-page, .planner-portal) .drawer-status-priority-grid, :where(.planner-page, .planner-portal) .drawer-assignment-deadline-grid { min-width: 0; display: grid; gap: 13px; }
 :where(.planner-page, .planner-portal) .drawer-status-priority-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-:where(.planner-page, .planner-portal) .drawer-assignment-deadline-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); align-items: start; }
+:where(.planner-page, .planner-portal) .drawer-assignment-deadline-grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, .75fr); align-items: start; }
 :where(.planner-page, .planner-portal) .drawer-assignment-deadline-grid > .deadline-field { align-self: start; grid-template-rows: 28px auto; align-items: center; }
 :where(.planner-page, .planner-portal) .drawer-assignment-deadline-grid .deadline-field { width: 100%; max-width: 100%; }
 :where(.planner-page, .planner-portal) .drawer-assignment-deadline-grid .deadline-field input { width: 100%; max-width: 100%; }
