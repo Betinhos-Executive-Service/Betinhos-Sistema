@@ -5,7 +5,7 @@ description: "Verifica a tela Registrar gasto: validação, carregamento do envi
 # Verificar gastos
 
 ## Cobre
-- Código: `src/features/despesas/ExpenseScreen.tsx`, `src/features/despesas/ExpenseSendOverlay.tsx` (só monta as etapas do gasto), `src/components/common/SendStepsOverlay.tsx` (carregamento genérico em etapas, também usado pelo checklist), `src/features/despesas/expenseSubmission.ts`, `src/features/despesas/expenseUploadState.ts`, `src/features/despesas/expenses*.ts`, trecho de gastos em `src/App.tsx` (`submitExpenseAsync`, `runExpenseSubmission`, worker de segundo plano, `handleExpenseUploadAction`), estilos `.expense-uploads*` e `.expense-send-*` em `src/styles.css`.
+- Código: `src/features/despesas/useExpenseFlow.ts` (estado, fotos, leitura rápida e envio do gasto), `src/features/despesas/useExpenseUploads.ts` (diário e worker do envio assíncrono), `src/features/despesas/ExpenseScreen.tsx`, `src/features/despesas/ExpenseSendOverlay.tsx` (só monta as etapas do gasto), `src/components/common/SendStepsOverlay.tsx` (carregamento genérico em etapas, também usado pelo checklist), `src/features/despesas/expenseSubmission.ts`, `src/features/despesas/expenseUploadState.ts`, `src/features/despesas/expenses*.ts`, `submitExpenseAsync`, `runExpenseSubmission` e `handleExpenseUploadAction` em `useExpenseFlow.ts`, estilos `.expense-uploads*` e `.expense-send-*` em `src/styles.css`.
 - Testes: `tests/expenseUpload.test.ts`, `tests/expenses.test.ts`.
 - Fluxo esperado no DEV: tocar em REGISTRAR → carregamento bloqueante só até as fotos serem aceitas (HTTP 202 do Flow) → "Gasto enviado" → Início. O processamento no OneDrive segue em segundo plano sem mensagem; só problemas aparecem (toast e "Envios pendentes").
 - PROD usa o envio síncrono antigo (`usesAsyncExpenseUpload()` só é verdadeiro na URL do DEV).
@@ -45,6 +45,10 @@ Depois de uns 5 s: `window.__seen`.
 
 Observação: `scroll_to` dentro da prévia rola o palco na horizontal e corta a borda esquerda do print; é da moldura da prévia, não da tela.
 7. Mudou `SendStepsOverlay` ou `ExpenseSendOverlay`? Prove que o gasto continua idêntico: compare o HTML do overlay antigo (`git show <base>:src/features/despesas/ExpenseSendOverlay.tsx`, salvo em `.verificacao/`) com o novo em todos os estados (`saving`/`uploading`/`done`/`error`, 0, 1 e N fotos) com `react-dom/server` `renderToStaticMarkup`, empacotando com `npx esbuild <entrada>.tsx --bundle --platform=node --jsx=automatic --loader:.svg=dataurl`. Esperado: 0 diferenças. Em 21/10/2026: 9 estados, 0 diferenças; sequência do passo 5 igual antes e depois.
+
+## Leitura rápida no mock
+
+- `node scripts/qa/verify-expense-quickread.cjs <pasta>` com o app servido em `APP_MOTORISTAS_URL` (`dist/` num servidor estático, página `/webresource-app-motoristas.html`). Cobre `?mockLeitura=ok` (preenche o valor), `ilegivel` (tela Tirar outra foto) e `falha` (formulário manual vazio), com console sem erros.
 
 ## Casos de borda
 - O texto da etapa pendente (`.expense-send-step.is-pending`, `#94a3b8` sobre `#fcfcfb`) é apontado pelo axe como `color-contrast` serious enquanto aparece (só na fase `saving` do gasto). É o visual aprovado; mudar exige decisão do Renan porque altera o gasto.
