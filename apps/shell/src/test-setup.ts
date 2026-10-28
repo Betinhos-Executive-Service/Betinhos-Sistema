@@ -1,4 +1,17 @@
-import { afterEach } from 'vitest'
+import { afterAll, afterEach } from 'vitest'
+
+// Timer que vence depois do arquivo dispara já sem jsdom e derruba o run com "window is not defined" (o toast de 4 s do
+// ToastProvider do @betinhos/ui não limpa o timer no unmount, e vários arquivos terminam com toast na tela). O fim do
+// arquivo cancela os pendentes.
+const pendentes = new Set<ReturnType<typeof setTimeout> | undefined>()
+const { setTimeout: agendar, clearTimeout: cancelar } = globalThis
+globalThis.setTimeout = ((fn: (...args: unknown[]) => void, ms?: number, ...args: unknown[]) => {
+  const id = agendar((...a: unknown[]) => { pendentes.delete(id); fn(...a) }, ms, ...args)
+  pendentes.add(id)
+  return id
+}) as typeof setTimeout
+globalThis.clearTimeout = ((id?: ReturnType<typeof setTimeout>) => { pendentes.delete(id); cancelar(id) }) as typeof clearTimeout
+afterAll(() => { for (const id of pendentes) cancelar(id) })
 
 // jsdom ainda não implementa o modal nativo do <dialog> usado por Drawer e Dialog.
 if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.showModal) {

@@ -3,19 +3,22 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Portal de validação de serviços pelo cliente (Tenaris): protótipo React com dados fictícios",
+  "description": "Portal de validação de serviços pelo cliente (Tenaris): React + Worker Cloudflare (/api, Dataverse S2S)",
   "scripts": {
     "dev": "node ../../packages/deploy/dev-restart.mjs 52463 .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p worker",
     "build": "node ../../packages/deploy/bump-version.mjs . && tsc --noEmit && vite build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dev:worker": "vite build && wrangler dev"
   },
   "dependencies": {
     "@betinhos/ui": "npm:@betinhos-executive-service/ui@^1.15.4",
     "exceljs": "^4.4.0",
     "lucide-react": "^1.47.0",
+    "otpauth": "9.5.2",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "uqr": "0.1.3"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.3",
@@ -25,6 +28,7 @@
     "jsdom": "^27.4.0",
     "typescript": "^5.9.0",
     "vite": "^7.1.0",
-    "vitest": "^3.2.0"
+    "vitest": "^3.2.0",
+    "wrangler": "^4.151.3"
   }
 }

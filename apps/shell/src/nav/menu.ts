@@ -10,7 +10,7 @@ export type MenuItem =
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
-  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos' | 'clientes' | 'planner' | 'validacao-cliente'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba }
+  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos' | 'clientes' | 'planner' | 'validacao-cliente' | 'logs'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba }
 
 /** Visões da Frota: cada uma é um item do menu, todas na mesma tela (`page: 'frota'`). */
 export type FrotaAba = 'pendencias' | 'veiculos' | 'manutencoes' | 'multas' | 'colisoes' | 'indicadores' | 'plano'
@@ -96,7 +96,7 @@ export const MENU: MenuGroup[] = [
       wr('Dashboard antigo (TV)', 'new_dashboard'),
       wr('Despesas Operacionais', 'new_teladespesasoperacionais'),
       table('new_fotomanutencao'),
-      table('new_appmotoristaslog'),
+      { kind: 'page', id: 'logs-apps', label: 'Logs dos apps', page: 'logs' },
       table('cr40f_anexodespesaoperacional'),
       table('cr40f_categoriadespesaoperacional'),
       table('cr40f_formapagamentodespesa'),

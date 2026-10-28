@@ -1,5 +1,5 @@
-﻿# Somente DEV. Cria (ou atualiza) o flow "Flow Agentes | Executar" na solução AppBetinhos, inclui a definição da variável
-# de ambiente new_AnthropicKeyAgentes (cria se faltar) e ativa o flow.
+﻿# Somente DEV. Cria (ou atualiza) o flow "Flow Agentes | Executar" na solução AppBetinhos, inclui as definições das variáveis
+# de ambiente da chave de cada agente (new_AnthropicKeyFinanceiro, ...Logistica, ...Pessoas, ...Frota; cria se faltar) e ativa o flow.
 #
 # O flow roda quando uma cr40f_agenteexecucao é criada com status Pendente: marca Processando, confere o limite diário
 # por agente, monta o contexto do departamento (Financeiro, Logística, Pessoas ou Frota) no formato de
@@ -9,7 +9,8 @@
 #
 # Constantes (modelo, max_tokens, effort, prompts, tipos, ações, prefixo e schema) vêm de
 # packages/agentes-ia/dist/constantes.json. Gere antes: pnpm --filter @betinhos/agentes-ia constantes
-# A chave (new_AnthropicKeyAgentes) vai no valor padrão, preenchido pelo Renan no maker portal; este script nunca grava nem lê o valor.
+# Cada chave vai no valor padrão da variável do agente, preenchido pelo Renan no maker portal; este script nunca grava nem lê o valor.
+# A antiga new_AnthropicKeyAgentes deixa de ser usada por este flow (continua na solução até o PROD receber as 4 novas).
 #
 # Antes de alterar o flow existente, salva o clientdata em packages/deploy/flows/backup/. Para reverter:
 #   powershell -File packages/deploy/provision-flow-agentes-executar.ps1 -Restaurar <arquivo de backup>
@@ -28,9 +29,12 @@ $environmentUrl = 'https://org23b93544.crm2.dynamics.com'
 $environmentId = '25a2ab78-cf07-ee41-a124-457aa2c29aea'
 $solutionName = 'AppBetinhos'
 $flowName = 'Flow Agentes | Executar'
-$envVarName = 'new_AnthropicKeyAgentes'
-$envVarDisplay = 'Anthropic Key - Agentes'
-$paramKey = "$envVarDisplay ($envVarName)"
+# Uma chave por agente (custo separado no Console da Anthropic; chave revogada derruba só aquele agente). Valor do choice cr40f_agente -> nome.
+$chaves = foreach ($a in @(@(100000000, 'Financeiro'), @(100000001, 'Logistica'), @(100000002, 'Pessoas'), @(100000003, 'Frota'))) {
+  $schema = "new_AnthropicKey$($a[1])"
+  [pscustomobject]@{ agente = $a[0]; nome = $a[1]; schema = $schema; param = "Anthropic Key - Agente $($a[1]) ($schema)" }
+}
+$envVarNames = ($chaves.schema) -join ', '
 $dataverseFlow = 'Flow Comprovantes Despesas Assincrono | App Motoristas'   # fonte da connection reference do Dataverse
 $constantesPath = Join-Path $PSScriptRoot '../agentes-ia/dist/constantes.json'
 $backupDir = Join-Path $PSScriptRoot 'flows/backup'
@@ -118,20 +122,25 @@ foreach ($ag in 'financeiro', 'logistica', 'pessoas', 'frota') {
 # O prefixo vira literal dentro de concat('...'): aspas simples quebrariam a expressão.
 if ($const.prefixoUsuario.Contains("'")) { throw 'prefixoUsuario contém aspa simples; revise a substituição de __PREFIXO__.' }
 
-# Variável da chave: o script cria só a definição (String). O Renan cola a chave no valor padrão.
-$envDefs = @((Dv GET "environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq '$envVarName'").value)
-if (-not $envDefs.Count) {
-  Dv POST environmentvariabledefinitions @{ schemaname = $envVarName; displayname = $envVarDisplay; type = 100000000; description = 'Chave da API do Claude (workspace Agentes) usada pelo flow Agentes | Executar. Chave no valor padrão.' } | Out-Null
-  $envDefs = @((Dv GET "environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq '$envVarName'").value)
-}
-if ($envDefs.Count -ne 1) { throw "Variável $envVarName ausente ou duplicada no DEV." }
-Include $envDefs[0].environmentvariabledefinitionid 380
+# Variáveis das chaves: o script cria só as definições (String). O Renan cola cada chave no valor padrão.
 # A chave fica no valor padrão (vai com a solução e vale em todos os ambientes); valor atual, se houver, tem precedência.
-# O Power Automate só ativa o flow quando a variável tem valor. Sem nenhum dos dois, o flow fica gravado e desligado.
+# O Power Automate só ativa o flow quando todas as variáveis têm valor. Sem isso, o flow fica gravado e desligado.
 # Confere pelos filtros, sem trazer o valor.
-$envId = $envDefs[0].environmentvariabledefinitionid
-$temPadrao = [bool]@((Dv GET "environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq '$envVarName' and defaultvalue ne null").value).Count
-$temValor = $temPadrao -or [bool]@((Dv GET "environmentvariablevalues?`$select=environmentvariablevalueid&`$filter=_environmentvariabledefinitionid_value eq $envId").value).Count
+$semValor = @()
+foreach ($c in $chaves) {
+  $filtro = "environmentvariabledefinitions?`$select=environmentvariabledefinitionid&`$filter=schemaname eq '$($c.schema)'"
+  $envDefs = @((Dv GET $filtro).value)
+  if (-not $envDefs.Count) {
+    Dv POST environmentvariabledefinitions @{ schemaname = $c.schema; displayname = "Anthropic Key - Agente $($c.nome)"; type = 100000000; description = "Chave da API do Claude do agente $($c.nome), usada pelo flow Agentes | Executar. Chave no valor padrão." } | Out-Null
+    $envDefs = @((Dv GET $filtro).value)
+  }
+  if ($envDefs.Count -ne 1) { throw "Variável $($c.schema) ausente ou duplicada no DEV." }
+  $envId = $envDefs[0].environmentvariabledefinitionid
+  Include $envId 380
+  $temPadrao = [bool]@((Dv GET "$filtro and defaultvalue ne null").value).Count
+  if (-not ($temPadrao -or [bool]@((Dv GET "environmentvariablevalues?`$select=environmentvariablevalueid&`$filter=_environmentvariabledefinitionid_value eq $envId").value).Count)) { $semValor += $c.schema }
+}
+$temValor = -not $semValor.Count
 
 # Connection reference do Dataverse, a mesma do flow de comprovantes. Este flow não usa SharePoint.
 $dvSource = @((Dv GET "workflows?`$select=clientdata&`$filter=name eq '$dataverseFlow' and category eq 5").value)
@@ -149,7 +158,7 @@ $definitionText = @'
   "parameters": {
     "$authentication": { "defaultValue": {}, "type": "SecureObject" },
     "$connections": { "defaultValue": {}, "type": "Object" },
-    "__PARAM_KEY__": { "defaultValue": "", "type": "String", "metadata": { "schemaName": "__ENV_VAR__" } }
+    "__PARAMS_CHAVES__": {}
   },
   "triggers": {
     "Quando_execucao_criada": {
@@ -233,7 +242,7 @@ $definitionText = @'
           "runtimeConfiguration": { "secureData": { "properties": ["inputs", "outputs"] } },
           "inputs": {
             "method": "POST", "uri": "https://api.anthropic.com/v1/messages",
-            "headers": { "x-api-key": "@parameters('__PARAM_KEY__')", "anthropic-version": "2023-06-01", "anthropic-beta": "server-side-fallback-2026-07-01", "content-type": "application/json" },
+            "headers": { "x-api-key": "__EXPR_CHAVE__", "anthropic-version": "2023-06-01", "anthropic-beta": "server-side-fallback-2026-07-01", "content-type": "application/json" },
             "body": { "model": "__MODELO__", "max_tokens": 0, "system": "@variables('System_prompt')", "fallbacks": "default", "output_config": { "effort": "__EFFORT__", "format": { "type": "json_schema", "schema": "__SCHEMA__" } }, "messages": [ { "role": "user", "content": "@outputs('Texto_usuario')" } ] },
             "retryPolicy": { "type": "exponential", "count": 2, "interval": "PT10S" }
           }
@@ -534,8 +543,14 @@ $mapaTipos = [ordered]@{}; $i = 0
 foreach ($t in @($const.agentes.financeiro.tipos) + @($const.agentes.logistica.tipos) + @($const.agentes.pessoas.tipos) + @($const.agentes.frota.tipos)) { $mapaTipos[$t] = 100000000 + $i++ }
 # O prefixo termina em quebra de linha: dentro do concat('...') ela vira decodeUriComponent('%0A').
 $prefixoExpr = $const.prefixoUsuario.Replace("`n", "' , decodeUriComponent('%0A'), '")
-$definitionText = $definitionText.Replace('__PARAM_KEY__', $paramKey).Replace('__ENV_VAR__', $envVarName).Replace('__TRIGGER_FILTER__', $triggerFilter).Replace('__LIMITE_DIARIO__', "$LIMITE_DIARIO").Replace('__PREFIXO__', $prefixoExpr)
+# Chave do agente da execução: if aninhado pelo cr40f_agente; o último (Frota) fica no else, já que o Switch barra agente desconhecido antes.
+$exprChave = "parameters('$($chaves[3].param)')"
+foreach ($c in $chaves[2..0]) { $exprChave = "if(equals(triggerOutputs()?['body/cr40f_agente'], $($c.agente)), parameters('$($c.param)'), $exprChave)" }
+$exprChave = "@$exprChave"
+$definitionText = $definitionText.Replace('__EXPR_CHAVE__', $exprChave).Replace('__TRIGGER_FILTER__', $triggerFilter).Replace('__LIMITE_DIARIO__', "$LIMITE_DIARIO").Replace('__PREFIXO__', $prefixoExpr)
 $definition = $definitionText | ConvertFrom-Json
+$definition.parameters.PSObject.Properties.Remove('__PARAMS_CHAVES__')
+foreach ($c in $chaves) { $definition.parameters | Add-Member -NotePropertyName $c.param -NotePropertyValue ([pscustomobject]@{ defaultValue = ''; type = 'String'; metadata = [pscustomobject]@{ schemaName = $c.schema } }) }
 $escopo = $definition.actions.Escopo_execucao.actions
 $escopo.Por_agente.cases.Financeiro.actions = $ramoFinanceiro
 $escopo.Por_agente.cases.Logistica.actions = $ramoLogistica
@@ -582,7 +597,8 @@ function Conferir($lido) {
     'Chamar_Claude secureData inputs e outputs' = (@($http.runtimeConfiguration.secureData.properties) -join ',') -eq 'inputs,outputs'
     'Chamar_Claude retry exponencial 2x' = $http.inputs.retryPolicy.type -eq 'exponential' -and $http.inputs.retryPolicy.count -eq 2
     'Chamar_Claude timeout PT110S' = $http.limit.timeout -eq 'PT110S'
-    'Chamar_Claude chave pela variável' = $http.inputs.headers.'x-api-key' -eq "@parameters('$paramKey')"
+    'Chamar_Claude chave pela variável do agente' = $http.inputs.headers.'x-api-key' -ceq $exprChave
+    'parâmetros das 4 chaves ligados às variáveis' = @($chaves | Where-Object { $p = $lido.parameters.($_.param); -not $p -or $p.metadata.schemaName -cne $_.schema }).Count -eq 0
     'Chamar_Claude fallbacks e header beta' = $http.inputs.body.fallbacks -ceq 'default' -and $http.inputs.headers.'anthropic-beta' -ceq 'server-side-fallback-2026-07-01'
     'Chamar_Claude constantes (model, max_tokens, effort, schema)' = $http.inputs.body.model -ceq $const.modelo -and $http.inputs.body.max_tokens -eq $const.maxTokens -and $http.inputs.body.output_config.effort -ceq $const.effort -and (($http.inputs.body.output_config.format.schema | ConvertTo-Json -Depth 30 -Compress) -ceq ($const.schema | ConvertTo-Json -Depth 30 -Compress))
     'Chamar_Claude system pela variável' = $http.inputs.body.system -ceq "@variables('System_prompt')"
@@ -631,7 +647,7 @@ if ($flows.Count) {
   AssertSemMojibake $flows[0].clientdata 'clientdata atual'
   $atual = ($flows[0].clientdata | ConvertFrom-Json) | ConvertTo-Json -Depth 90 -Compress
   $novo = ($clientData | ConvertFrom-Json) | ConvertTo-Json -Depth 90 -Compress
-  if ($atual -ne $novo -and -not $temValor) { throw "A definição mudou, mas o Power Automate só aceita gravar este flow quando $envVarName tiver valor. Preencha o valor padrão e rode de novo (use -SomenteValidar para conferir a definição antes)." }
+  if ($atual -ne $novo -and -not $temValor) { throw "A definição mudou, mas o Power Automate só aceita gravar este flow quando todas as chaves tiverem valor (faltam: $($semValor -join ', ')). Preencha o valor padrão e rode de novo (use -SomenteValidar para conferir a definição antes)." }
   if ($atual -ne $novo) {
     Backup $flows[0]
     Apply $flows[0] $clientData
@@ -651,7 +667,7 @@ AssertSemMojibake $row.clientdata 'clientdata gravado'
 Conferir (($row.clientdata | ConvertFrom-Json).properties.definition)
 if (-not @((Dv GET "solutioncomponents?`$select=solutioncomponentid&`$filter=_solutionid_value eq $solutionId and componenttype eq 29 and objectid eq $flowId").value).Count) { throw 'Flow fora da AppBetinhos.' }
 if (-not $temValor) {
-  Write-Output "DEV: '$flowName' gravado e DESLIGADO ($flowId), na $solutionName. Preencha o valor padrão de $envVarName (Soluções > $solutionName > Variáveis de ambiente) e rode este script de novo para ativar."
+  Write-Output "DEV: '$flowName' gravado e DESLIGADO ($flowId), na $solutionName. Preencha o valor padrão de $($semValor -join ', ') (Soluções > $solutionName > Variáveis de ambiente) e rode este script de novo para ativar."
   return
 }
-Write-Output "DEV: '$flowName' ativo ($flowId), na $solutionName; $envVarName na solução."
+Write-Output "DEV: '$flowName' ativo ($flowId), na $solutionName; $envVarNames na solução."

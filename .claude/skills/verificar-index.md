@@ -13,6 +13,7 @@
 - verificar-cotacoes | apps/shell/src/pages/planner/** (cotações: domain/quote*, data/mock.ts, data/dataverse.ts, components/quotes/**, NotificationsPanel.tsx), packages/planner/scripts/ensure-quote-*.ps1 | Cotações V2 do Planner: testes, fluxo em mock (Nova → Histórico, Aceitou e Perdida) e schema/avisos no DEV
 - verificar-portal-cliente | apps/portal-cliente/** | Portal de validação de serviços pelo cliente (protótipo mock): testes e fluxo no navegador (entrar com código, aprovar em lote, dúvida, Excel, mobile com Sheet)
 - verificar-validacao-cliente | apps/shell/src/pages/validacao-cliente/** | Tela do financeiro para a validação do cliente: regras (tácita, fechamento), drawer (responder, retirar, descartar), Excel do mês e validadores em mock (desktop e 375 px)
+- verificar-portal-worker | apps/portal-cliente/worker/**, apps/portal-cliente/wrangler.jsonc, apps/portal-cliente/src/api/workerApi.ts | Worker do portal do cliente: TOTP, cifra, prazo tácito, isolamento por cliente, rotas /api contra Dataverse falso, cron e wrangler dev
 <!-- Sem roteiro ainda: apps/escala-fds/**, packages/despesas-ia/** -->
 - verificar-flow-tenaris | packages/deploy/patch-flow-tenaris-contatos.ps1 | Patch do flow Tenaris: contatos do passageiro sem apagar (dry run, aplicar e validar ativação no DEV)
 - verificar-flow-servico-editado | packages/deploy/patch-flow-servico-editado.ps1 | Patch do flow Notificação Serviço Editado: coluna editada correta, sem disparo fora das colunas de interesse (dry run, aplicar, editar reserva de teste no DEV)

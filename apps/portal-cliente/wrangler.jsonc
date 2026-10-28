@@ -1,0 +1,19 @@
+{
+  "name": "portal-cliente",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  // Mesma conta do cadastro-passageiro.
+  "account_id": "a26e65df1496d9808e12a495bc47cd80",
+  "workers_dev": true,
+  // /api/* passa pelo Worker; o resto é o build do app (pnpm build → ./dist), SPA com fallback para index.html.
+  "assets": { "directory": "./dist", "binding": "ASSETS", "not_found_handling": "single-page-application", "run_worker_first": ["/api/*"] },
+  // Token do Dataverse e contadores de falha/bloqueio do login. Criar com `wrangler kv namespace create portal-cliente` e trocar o id.
+  "kv_namespaces": [{ "binding": "KV", "id": "TROCAR_PELO_ID_DO_KV" }],
+  "ratelimits": [
+    { "name": "RL_IP", "namespace_id": "4202", "simple": { "limit": 60, "period": 60 } },
+    { "name": "RL_EMAIL", "namespace_id": "4203", "simple": { "limit": 10, "period": 60 } }
+  ],
+  // 11:00 UTC = 8h em America/Sao_Paulo, seg–sex: aprovação tácita + resumo diário.
+  "triggers": { "crons": ["0 11 * * 1-5"] }
+  // Secrets (wrangler secret put): DV_TENANT, DV_CLIENT_ID, DV_CLIENT_SECRET, DV_URL, EMAIL_FLOW_URL, CHAVE_TOTP, CHAVE_SESSAO.
+}
