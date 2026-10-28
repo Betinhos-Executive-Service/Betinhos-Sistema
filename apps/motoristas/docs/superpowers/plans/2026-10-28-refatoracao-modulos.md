@@ -47,10 +47,14 @@ Spec: `docs/superpowers/specs/2026-10-28-refatoracao-modulos-design.md`. Um PR p
 - Prova extra: `verify-ux-flows` e `verify-checklist-send` com o mesmo resultado antes/depois.
 - Ficam em `src/lib` até o passo 7 (compartilhados): `serviceVehicleInfleet*`, `useDitado`, `localWorkflow`, `appErrorLogger`, `currencyInput`, `buildStamp`, `pwa*`. Troca de veículo segue dentro do `dataverse.ts`.
 
-## Passo 6 — App.tsx vira AppShell
-- Extrair estado por feature em hooks (`useChecklistFlow`, `useFinalizeFlow`, `useReceiptFlow`, `useMediaCapture`...) dentro de cada `features/<x>/`.
-- `src/app/AppShell.tsx` com roteamento de tela; filtro de telas por `featuresDoModo(modo)`.
-- `App.tsx` < 600 linhas. Teste de caracterização de navegação (passo 0) continua verde.
+## Passo 6 — App.tsx vira AppShell (em fatias)
+Regra das fatias: cada bloco vira hook da feature chamado **na mesma posição** do bloco original (a ordem dos efeitos não muda); funções do `App` declaradas mais abaixo (`setToast`, `setCriticalError`...) entram no hook como funções intermediárias, avaliadas só quando o efeito roda. Prova por fatia: testes, `tsc`, build, 16 telas e `verify-ux-flows`/`verify-checklist-send` iguais ao `dist` da main.
+
+- **6a (feito):** helpers de módulo saem para as features (`trocaErros`, `FlowProgressOverlay`, `toastTone`, `rotaInicial`, `rascunhos`, `envioMidia`, rascunhos vazios); hooks `useTermosMulta`, `useChecklists`, `useComunicados`, `useExpenseUploads` e `useMediaDraftState` (4 rascunhos de foto iguais viraram um hook). 3830 → 3371 linhas.
+- **6b:** fluxo de despesas (rascunho, leitura rápida, envio `submitExpenseAsync`/`runExpenseSubmission`) → `features/despesas/useExpenseFlow`.
+- **6c:** recebimento e QR (comprovantes, resumo de cobrança) e colisão e solicitação de manutenção → hooks das features.
+- **6d:** finalizar/voucher/observação (rascunhos, `finalize*`, fila de conclusão) e carga/atualização da agenda (`loadAll`, refresh, deep links de serviço) → `features/finalizar` e `features/servicos`.
+- **6e:** render: cada `if (screen === ...)` vira um componente de rota da feature; `src/app/AppShell.tsx` decide a tela e filtra por `telasDoModo(modo)`. Meta `App.tsx` < 600 linhas. `tests/mediaLayout.test.ts` conta `<MediaCaptureScreen` no `App.tsx`: ajustar para os novos arquivos.
 
 ## Passo 7 — Limpeza
 - Remover reexports antigos (`lib/dataverse.ts`, `screens/`, `components/<x>/` vazios); atualizar imports.

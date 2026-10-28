@@ -90,11 +90,11 @@ import { useTermosMulta } from "./features/termos/useTermosMulta";
 import { isComunicadoPending, isMockComunicados } from "./features/comunicados/comunicados";
 import { isChecklistPending } from "./features/checklist/checklists";
 import { clearMediaDraft, loadMediaDraft, saveMediaDraft, touchMediaDraft } from "./features/fotos/mediaDraftStore";
-import { describeExpenseSubmission, normalizeStoredExpenseSubmissions, type ExpenseSubmission, type ExpenseUploadRow } from "./features/despesas/expenseUploadState";
+import { describeExpenseSubmission, type ExpenseSubmission, type ExpenseUploadRow } from "./features/despesas/expenseUploadState";
 import { resumeExpenseSubmission, type ExpenseSubmissionProgress } from "./features/despesas/expenseSubmission";
-import { ExpenseSendOverlay, type ExpenseSendState } from "./features/despesas/ExpenseSendOverlay";
-import type { ExpenseUploadMode } from "./features/despesas/expenseUploadMode";
-import { resolveExpenseUploadModeRemote, expenseSubmissionStorageKey, ensureExpenseSubmissionRemote, loadExpenseUploadRowsRemote, transitionExpenseUploadRemote, dispatchExpenseUploadRemote, createExpenseUploadItem } from "./lib/dataverse";
+import { ExpenseSendOverlay } from "./features/despesas/ExpenseSendOverlay";
+import { useExpenseUploads } from "./features/despesas/useExpenseUploads";
+import { ensureExpenseSubmissionRemote, loadExpenseUploadRowsRemote, transitionExpenseUploadRemote, dispatchExpenseUploadRemote, createExpenseUploadItem } from "./lib/dataverse";
 
 import {
   cancelDetailLocally,
@@ -185,6 +185,7 @@ import {
   type PersistedFinalizeDraftAssets
 } from "./features/finalizar/rascunhos";
 import { isVideoMediaDraft, prepareMediaDraftForUpload, revokePhotoPreviewUrls } from "./features/fotos/envioMidia";
+import { useMediaDraftState } from "./features/fotos/useMediaDraftState";
 import { EMPTY_MAINTENANCE_REQUEST_DRAFT } from "./features/manutencao/rascunho";
 import { EMPTY_EXPENSE_DRAFT } from "./features/despesas/rascunho";
 import { EMPTY_MAINTENANCE_FINALIZE_DRAFT } from "./features/finalizar/rascunhoManutencao";
@@ -284,154 +285,38 @@ function App() {
   const [expenseReferenceError, setExpenseReferenceError] = useState("");
   const [receiptClienteOptions, setReceiptClienteOptions] = useState<string[]>([]);
   const [expensePhotos, setExpensePhotos] = useState<ExpensePhoto[]>([]);
-  const [expenseSubmissions, setExpenseSubmissions] = useState<ExpenseSubmission[]>([]);
-  const [expenseUploadRows, setExpenseUploadRows] = useState<Record<string, ExpenseUploadRow[]>>({});
-  const [expenseUploadReady, setExpenseUploadReady] = useState(false);
-  const [expenseUploadMode, setExpenseUploadMode] = useState<ExpenseUploadMode | "pending">("pending");
-  const expenseSubmissionsRef = useRef<ExpenseSubmission[]>([]);
-  const expenseJournalQueueRef = useRef<Promise<void>>(Promise.resolve());
-  const expenseNoticeRef = useRef(new Set<string>());
-  const expenseSubmitBusyRef = useRef(false);
-  const [expenseSend, setExpenseSend] = useState<ExpenseSendState | null>(null);
-  const expenseRunningRef = useRef(new Set<string>());
-  const [expenseRunningIds, setExpenseRunningIds] = useState<string[]>([]);
-  const expenseUploadRowsRef = useRef(expenseUploadRows);
-  expenseUploadRowsRef.current = expenseUploadRows;
-  const expenseAutoResumeAtRef = useRef(new Map<string, number>());
-  const expenseAutoRetryCountRef = useRef(new Map<string, number>());
-  const expenseUnclaimedSinceRef = useRef(new Map<string, number>());
-  const expenseWorkerRef = useRef<{
-    run: (submission: ExpenseSubmission, motoristaId: string, retryFailed: boolean) => Promise<boolean>;
-    verify: (submission: ExpenseSubmission, announceError: boolean) => Promise<void>;
-  } | null>(null);
-  const expenseUploadStatuses = expenseSubmissions
-    .map(submission => ({
-      submission,
-      status: expenseRunningIds.includes(submission.expenseId)
-        ? { state: "processing" as const, text: "Enviando gasto." }
-        : describeExpenseSubmission(submission, expenseUploadRows[submission.expenseId] ?? [])
-    }))
-    // Only expenses that need attention are listed; normal processing stays silent.
-    .filter(entry => entry.status.state !== "complete" && entry.status.state !== "processing");
-
-  // Ref first, then the durable write, serialized so concurrent updates never drop a journal entry.
-  const commitExpenseSubmissions = (motoristaId: string, update: (list: ExpenseSubmission[]) => ExpenseSubmission[]) => {
-    const list = update(expenseSubmissionsRef.current);
-    expenseSubmissionsRef.current = list;
-    setExpenseSubmissions([...list]);
-    const key = expenseSubmissionStorageKey(motoristaId);
-    const write = expenseJournalQueueRef.current.then(() => list.length ? saveMediaDraft({ submissions: list }, key) : clearMediaDraft(key));
-    expenseJournalQueueRef.current = write.catch(() => undefined);
-    return write;
-  };
-  const upsertExpenseSubmission = (motoristaId: string, submission: ExpenseSubmission) => commitExpenseSubmissions(motoristaId, list =>
-    list.some(item => item.expenseId === submission.expenseId) ? list.map(item => item.expenseId === submission.expenseId ? submission : item) : [...list, submission]);
-  const removeExpenseSubmission = (motoristaId: string, expenseId: string) => commitExpenseSubmissions(motoristaId, list => list.filter(item => item.expenseId !== expenseId));
-
-  useEffect(() => {
-    if (!remoteMode) return;
-    let active = true;
-    // Decide pela configuracao do ambiente (Flow assincrono configurado), nao pela URL; nunca rejeita.
-    resolveExpenseUploadModeRemote().then(mode => { if (active) setExpenseUploadMode(mode); });
-    return () => { active = false; };
-  }, [remoteMode]);
-
-  useEffect(() => {
-    if (!remoteMode || !driverContext || expenseUploadMode !== "async") return;
-    let active = true;
-    setExpenseUploadReady(false);
-    loadMediaDraft<unknown>(expenseSubmissionStorageKey(driverContext.id)).then(saved => {
-      if (!active) return;
-      const list = normalizeStoredExpenseSubmissions(saved);
-      expenseSubmissionsRef.current = list;
-      setExpenseSubmissions(list);
-      setExpenseUploadReady(true);
-    }).catch(error => { if (active) setCriticalError(error instanceof Error ? error.message : "Falha ao restaurar envio de despesa."); });
-    return () => { active = false; };
-  }, [remoteMode, driverContext?.id, expenseUploadMode]);
-
-  useEffect(() => {
-    const tracked = expenseSubmissions.filter(submission => submission.expenseConfirmed).map(submission => submission.expenseId);
-    if (!tracked.length || !remoteMode) return;
-    let active = true;
-    let busy = false;
-    let reportedFailure = false;
-    const refresh = async () => {
-      if (busy || document.visibilityState !== "visible") return;
-      busy = true;
-      try {
-        const entries = await Promise.all(tracked.map(async id => [id, await loadExpenseUploadRowsRemote(id)] as const));
-        if (active) setExpenseUploadRows(current => ({ ...current, ...Object.fromEntries(entries) }));
-        reportedFailure = false;
-      } catch (error) {
-        if (active && !reportedFailure) reportAppError(error, { severity: "warning", source: "app", action: "expenseUploadStatus", phase: "poll", screen: "gastos", detailId: tracked[0] });
-        reportedFailure = true;
-      } finally { busy = false; }
-    };
-    void refresh();
-    const timer = window.setInterval(() => { void refresh(); }, 5000);
-    const onVisible = () => { void refresh(); };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => { active = false; window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
-  }, [expenseSubmissions, remoteMode]);
-
-  // Background outcome: finished expenses leave the journal; problems are announced once.
-  useEffect(() => {
-    if (!driverContext) return;
-    for (const submission of expenseSubmissionsRef.current) {
-      if (expenseRunningIds.includes(submission.expenseId)) continue;
-      const status = describeExpenseSubmission(submission, expenseUploadRows[submission.expenseId] ?? []);
-      if (status.state === "complete") {
-        void removeExpenseSubmission(driverContext.id, submission.expenseId);
-      } else if (status.state === "failed" && (expenseAutoRetryCountRef.current.get(submission.expenseId) ?? 0) >= 2 && !expenseNoticeRef.current.has(submission.expenseId)) {
-        expenseNoticeRef.current.add(submission.expenseId);
-        setToast("Um comprovante de gasto não foi anexado. Abra Registrar gasto e toque em Tentar de novo.", "warning");
-      }
-    }
-  }, [expenseUploadRows, expenseSubmissions, expenseRunningIds, driverContext?.id]);
-
-  // Background worker: resumes interrupted sends, retries confirmed failures twice and
-  // closes attempts the server never picked up, without the driver having to wait.
-  useEffect(() => {
-    if (!remoteMode || !driverContext || !expenseUploadReady) return;
-    const motoristaId = driverContext.id;
-    const tick = () => {
-      const worker = expenseWorkerRef.current;
-      if (!worker || !navigator.onLine) return;
-      const now = Date.now();
-      for (const submission of expenseSubmissionsRef.current) {
-        const id = submission.expenseId;
-        if (expenseRunningRef.current.has(id) || now - (expenseAutoResumeAtRef.current.get(id) ?? 0) < 30000) continue;
-        const status = describeExpenseSubmission(submission, expenseUploadRowsRef.current[id] ?? []);
-        if (status.state !== "unclaimed") expenseUnclaimedSinceRef.current.delete(id);
-        if (status.state === "interrupted") {
-          expenseAutoResumeAtRef.current.set(id, now);
-          void worker.run(submission, motoristaId, false);
-        } else if (status.state === "failed" && (expenseAutoRetryCountRef.current.get(id) ?? 0) < 2) {
-          expenseAutoResumeAtRef.current.set(id, now);
-          expenseAutoRetryCountRef.current.set(id, (expenseAutoRetryCountRef.current.get(id) ?? 0) + 1);
-          void worker.run(submission, motoristaId, true);
-        } else if (status.state === "unclaimed") {
-          const since = expenseUnclaimedSinceRef.current.get(id) ?? now;
-          expenseUnclaimedSinceRef.current.set(id, since);
-          if (now - since < 120000) continue;
-          expenseAutoResumeAtRef.current.set(id, now);
-          expenseUnclaimedSinceRef.current.delete(id);
-          void worker.verify(submission, false);
-        }
-      }
-    };
-    tick();
-    const timer = window.setInterval(tick, 10000);
-    window.addEventListener("online", tick);
-    return () => { window.clearInterval(timer); window.removeEventListener("online", tick); };
-  }, [remoteMode, driverContext?.id, expenseUploadReady]);
-  const [expensePhotoDraft, setExpensePhotoDraft] = useState("");
-  const [expensePhotoPreviewUrl, setExpensePhotoPreviewUrl] = useState("");
-  const [expensePhotoPosterUrl, setExpensePhotoPosterUrl] = useState("");
-  const [expensePhotoDurationLabel, setExpensePhotoDurationLabel] = useState("");
-  const [expensePhotoRawBlob, setExpensePhotoRawBlob] = useState<Blob | null>(null);
-  const [expensePhotoIsVideo, setExpensePhotoIsVideo] = useState(false);
+  const {
+    expenseAutoResumeAtRef,
+    expenseNoticeRef,
+    expenseRunningRef,
+    expenseSend,
+    setExpenseSend,
+    expenseSubmissionsRef,
+    expenseSubmitBusyRef,
+    expenseUploadMode,
+    expenseUploadReady,
+    expenseUploadRows,
+    setExpenseUploadRows,
+    expenseUploadStatuses,
+    expenseWorkerRef,
+    setExpenseRunningIds,
+    upsertExpenseSubmission
+  } = useExpenseUploads({
+    remoteMode,
+    driverContext,
+    // Funções intermediárias: setToast e setCriticalError são declarados mais abaixo e só rodam nos efeitos.
+    notify: (message, tone) => setToast(message, tone),
+    onCriticalError: (message) => setCriticalError(message)
+  });
+  const {
+    draft: expensePhotoDraft, setDraft: setExpensePhotoDraft,
+    previewUrl: expensePhotoPreviewUrl, setPreviewUrl: setExpensePhotoPreviewUrl,
+    posterUrl: expensePhotoPosterUrl, setPosterUrl: setExpensePhotoPosterUrl,
+    durationLabel: expensePhotoDurationLabel, setDurationLabel: setExpensePhotoDurationLabel,
+    rawBlob: expensePhotoRawBlob, setRawBlob: setExpensePhotoRawBlob,
+    isVideo: expensePhotoIsVideo, setIsVideo: setExpensePhotoIsVideo,
+    clear: clearExpensePhotoDraftState
+  } = useMediaDraftState();
   const [expensePreviewPhotoId, setExpensePreviewPhotoId] = useState("");
   const [receiveProofs, setReceiveProofs] = useState<Record<string, ExpensePhoto[]>>(() => loadFinalizeDraftAssets().receiveProofs);
   // Cobranças pagas por QR nesta sessão (serviço → sessão do Stripe → centavos). O registro definitivo fica no
@@ -442,21 +327,27 @@ function App() {
   >({});
   const qrChargeSummaryInFlightRef = useRef(new Set<string>());
   const [receiveUploadedCounts, setReceiveUploadedCounts] = useState<Record<string, number>>({});
-  const [receivePhotoDraft, setReceivePhotoDraft] = useState("");
-  const [receivePhotoPreviewUrl, setReceivePhotoPreviewUrl] = useState("");
-  const [receivePhotoPosterUrl, setReceivePhotoPosterUrl] = useState("");
-  const [receivePhotoDurationLabel, setReceivePhotoDurationLabel] = useState("");
-  const [receivePhotoRawBlob, setReceivePhotoRawBlob] = useState<Blob | null>(null);
-  const [receivePhotoIsVideo, setReceivePhotoIsVideo] = useState(false);
+  const {
+    draft: receivePhotoDraft, setDraft: setReceivePhotoDraft,
+    previewUrl: receivePhotoPreviewUrl, setPreviewUrl: setReceivePhotoPreviewUrl,
+    posterUrl: receivePhotoPosterUrl, setPosterUrl: setReceivePhotoPosterUrl,
+    durationLabel: receivePhotoDurationLabel, setDurationLabel: setReceivePhotoDurationLabel,
+    rawBlob: receivePhotoRawBlob, setRawBlob: setReceivePhotoRawBlob,
+    isVideo: receivePhotoIsVideo, setIsVideo: setReceivePhotoIsVideo,
+    clear: clearReceivePhotoDraftState
+  } = useMediaDraftState();
   const [receivePreviewPhotoId, setReceivePreviewPhotoId] = useState("");
   const [collisionDraft, setCollisionDraft] = useState<CollisionDraft>(() => createEmptyCollisionDraft());
   const [collisionPhotos, setCollisionPhotos] = useState<CollisionPhoto[]>([]);
-  const [collisionPhotoDraft, setCollisionPhotoDraft] = useState("");
-  const [collisionPhotoPreviewUrl, setCollisionPhotoPreviewUrl] = useState("");
-  const [collisionPhotoPosterUrl, setCollisionPhotoPosterUrl] = useState("");
-  const [collisionPhotoDurationLabel, setCollisionPhotoDurationLabel] = useState("");
-  const [collisionPhotoRawBlob, setCollisionPhotoRawBlob] = useState<Blob | null>(null);
-  const [collisionPhotoIsVideo, setCollisionPhotoIsVideo] = useState(false);
+  const {
+    draft: collisionPhotoDraft, setDraft: setCollisionPhotoDraft,
+    previewUrl: collisionPhotoPreviewUrl, setPreviewUrl: setCollisionPhotoPreviewUrl,
+    posterUrl: collisionPhotoPosterUrl, setPosterUrl: setCollisionPhotoPosterUrl,
+    durationLabel: collisionPhotoDurationLabel, setDurationLabel: setCollisionPhotoDurationLabel,
+    rawBlob: collisionPhotoRawBlob, setRawBlob: setCollisionPhotoRawBlob,
+    isVideo: collisionPhotoIsVideo, setIsVideo: setCollisionPhotoIsVideo,
+    clear: clearCollisionPhotoDraftState
+  } = useMediaDraftState();
   const [collisionPhotoKind, setCollisionPhotoKind] = useState<CollisionPhotoKind>("cena");
   const [collisionPreviewPhotoId, setCollisionPreviewPhotoId] = useState("");
   useEffect(() => {
@@ -475,12 +366,15 @@ function App() {
     return () => { active = false; };
   }, [isButtonPreviewMode, isReceiptPreviewMode]);
   const [maintenanceRequestPhotos, setMaintenanceRequestPhotos] = useState<MaintenanceRequestPhoto[]>([]);
-  const [maintenanceRequestPhotoDraft, setMaintenanceRequestPhotoDraft] = useState("");
-  const [maintenanceRequestPhotoPreviewUrl, setMaintenanceRequestPhotoPreviewUrl] = useState("");
-  const [maintenanceRequestPhotoPosterUrl, setMaintenanceRequestPhotoPosterUrl] = useState("");
-  const [maintenanceRequestPhotoDurationLabel, setMaintenanceRequestPhotoDurationLabel] = useState("");
-  const [maintenanceRequestPhotoRawBlob, setMaintenanceRequestPhotoRawBlob] = useState<Blob | null>(null);
-  const [maintenanceRequestPhotoIsVideo, setMaintenanceRequestPhotoIsVideo] = useState(false);
+  const {
+    draft: maintenanceRequestPhotoDraft, setDraft: setMaintenanceRequestPhotoDraft,
+    previewUrl: maintenanceRequestPhotoPreviewUrl, setPreviewUrl: setMaintenanceRequestPhotoPreviewUrl,
+    posterUrl: maintenanceRequestPhotoPosterUrl, setPosterUrl: setMaintenanceRequestPhotoPosterUrl,
+    durationLabel: maintenanceRequestPhotoDurationLabel, setDurationLabel: setMaintenanceRequestPhotoDurationLabel,
+    rawBlob: maintenanceRequestPhotoRawBlob, setRawBlob: setMaintenanceRequestPhotoRawBlob,
+    isVideo: maintenanceRequestPhotoIsVideo, setIsVideo: setMaintenanceRequestPhotoIsVideo,
+    clear: clearMaintenanceRequestPhotoDraftState
+  } = useMediaDraftState();
   const [maintenanceRequestPreviewPhotoId, setMaintenanceRequestPreviewPhotoId] = useState("");
   const [maintenanceExistingPreview, setMaintenanceExistingPreview] = useState(false);
   const [maintenanceFinalizeDraft, setMaintenanceFinalizeDraft] = useState<MaintenanceFinalizeDraft>({ ...EMPTY_MAINTENANCE_FINALIZE_DRAFT });
@@ -496,46 +390,6 @@ function App() {
     setPhotoDraftPreviewUrl("");
     setPhotoDraftRawBlob(null);
     setPhotoDraftIsVideo(false);
-  };
-
-  const clearMaintenanceRequestPhotoDraftState = (keepPreviewUrl = false) => {
-    if (!keepPreviewUrl) revokePreviewUrl(maintenanceRequestPhotoPreviewUrl);
-    setMaintenanceRequestPhotoDraft("");
-    setMaintenanceRequestPhotoPreviewUrl("");
-    setMaintenanceRequestPhotoPosterUrl("");
-    setMaintenanceRequestPhotoDurationLabel("");
-    setMaintenanceRequestPhotoRawBlob(null);
-    setMaintenanceRequestPhotoIsVideo(false);
-  };
-
-  const clearExpensePhotoDraftState = (keepPreviewUrl = false) => {
-    if (!keepPreviewUrl) revokePreviewUrl(expensePhotoPreviewUrl);
-    setExpensePhotoDraft("");
-    setExpensePhotoPreviewUrl("");
-    setExpensePhotoPosterUrl("");
-    setExpensePhotoDurationLabel("");
-    setExpensePhotoRawBlob(null);
-    setExpensePhotoIsVideo(false);
-  };
-
-  const clearReceivePhotoDraftState = (keepPreviewUrl = false) => {
-    if (!keepPreviewUrl) revokePreviewUrl(receivePhotoPreviewUrl);
-    setReceivePhotoDraft("");
-    setReceivePhotoPreviewUrl("");
-    setReceivePhotoPosterUrl("");
-    setReceivePhotoDurationLabel("");
-    setReceivePhotoRawBlob(null);
-    setReceivePhotoIsVideo(false);
-  };
-
-  const clearCollisionPhotoDraftState = (keepPreviewUrl = false) => {
-    if (!keepPreviewUrl) revokePreviewUrl(collisionPhotoPreviewUrl);
-    setCollisionPhotoDraft("");
-    setCollisionPhotoPreviewUrl("");
-    setCollisionPhotoPosterUrl("");
-    setCollisionPhotoDurationLabel("");
-    setCollisionPhotoRawBlob(null);
-    setCollisionPhotoIsVideo(false);
   };
 
   const logAppError = (error: unknown, action: string, phase = "") => {
