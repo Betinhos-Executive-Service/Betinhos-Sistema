@@ -1279,7 +1279,7 @@
 :where(.planner-page, .planner-portal) .contact-quick-fields > .drawer-assignment-deadline-grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, .75fr); gap: 11px; }
 :where(.planner-page, .planner-portal) .contact-assignment-grid > .assignment-field { min-width: 0; }
 :where(.planner-page, .planner-portal) .contact-assignment-grid .assignment-control, :where(.planner-page, .planner-portal) .contact-assignment-grid .custom-select { width: 100%; min-width: 0; }
-:where(.planner-page, .planner-portal) .contact-assignment-grid .assignment-members { width: 100%; }
+:where(.planner-page, .planner-portal) .contact-assignment-grid .assignment-summary { width: 100%; }
 :where(.planner-page, .planner-portal) .contact-drawer .contact-core-grid .custom-select-trigger { min-height: 38px; }
 :where(.planner-page, .planner-portal) .contact-status-picker .status-picker-options { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 :where(.planner-page, .planner-portal) .contact-status-picker .status-option-new.is-selected { border-color: #b8cfee; color: var(--blue); background: var(--blue-soft); }
@@ -2508,18 +2508,13 @@
 :where(.planner-page, .planner-portal) .assignment-mode button.is-selected { color: var(--blue); background: var(--surface); box-shadow: 0 1px 4px rgba(0,26,61,.1); }
 :where(.planner-page, .planner-portal) .deadline-field { width: 160px; max-width: 100%; }
 :where(.planner-page, .planner-portal) .drawer-field-grid .deadline-field input { width: 160px; max-width: 100%; }
-:where(.planner-page, .planner-portal) .assignment-members { width: calc(160% + 13px); display: grid; gap: 7px; min-height: 25px; }
-:where(.planner-page, .planner-portal) .assignment-members-label { color: var(--muted); font-size: 10px; font-weight: 800; line-height: 14px; }
-:where(.planner-page, .planner-portal) .assignment-members-list { width: 100%; display: flex; flex-wrap: wrap; align-items: stretch; gap: 6px; }
-:where(.planner-page, .planner-portal) .assignment-members-list { flex-direction: column; gap: 0; padding: 4px 10px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--neutral); }
-:where(.planner-page, .planner-portal) .assignment-role { min-width: 0; display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 8px; padding: 6px 0; }
-:where(.planner-page, .planner-portal) .assignment-role + .assignment-role { border-top: 1px solid var(--line); }
-:where(.planner-page, .planner-portal) .assignment-role-label { color: var(--muted); font-size: 10px; font-weight: 800; line-height: 14px; }
-:where(.planner-page, .planner-portal) .assignment-role-people { min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; }
-:where(.planner-page, .planner-portal) .assignment-person { max-width: 100%; min-width: 0; display: inline-flex; align-items: center; gap: 6px; min-height: 26px; padding: 0 9px 0 3px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); background: #fff; font-size: 11px; font-weight: 700; line-height: 1.2; }
-:where(.planner-page, .planner-portal) .assignment-person-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-:where(.planner-page, .planner-portal) .assignment-person .avatar-small { width: 20px; height: 20px; flex: 0 0 20px; font-size: 8px; }
-:where(.planner-page, .planner-portal) .assignment-person.is-primary { border-color: #c5d7f7; color: var(--blue); }
+:where(.planner-page, .planner-portal) .assignment-summary { width: calc(160% + 13px); min-width: 0; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11px; line-height: 16px; }
+:where(.planner-page, .planner-portal) .assignment-stack { display: inline-flex; flex: 0 0 auto; }
+:where(.planner-page, .planner-portal) .assignment-stack .avatar-small { width: 24px; height: 24px; flex: 0 0 24px; display: inline-grid; place-items: center; margin-left: -7px; border: 2px solid var(--surface); border-radius: 999px; color: var(--muted); background: var(--surface-soft); font-size: 9px; font-weight: 800; }
+:where(.planner-page, .planner-portal) .assignment-stack .avatar-small:first-child { margin-left: 0; }
+:where(.planner-page, .planner-portal) .assignment-stack .avatar-small.is-primary { position: relative; z-index: 1; color: var(--blue); background: var(--blue-soft); box-shadow: 0 0 0 1px #c5d7f7; }
+:where(.planner-page, .planner-portal) .assignment-summary-text { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+:where(.planner-page, .planner-portal) .assignment-summary-text strong { color: var(--ink); font-weight: 700; }
 :where(.planner-page, .planner-portal) .assignment-empty { color: var(--tertiary); font-size: 10px; font-weight: 600; }
 :where(.planner-page, .planner-portal) .teams-settings-panel { margin-top: 18px; overflow: hidden; }
 :where(.planner-page, .planner-portal) .teams-panel-heading { padding: 25px 26px 21px; }
@@ -2623,7 +2618,7 @@
 :where(.planner-page, .planner-portal) .drawer-assignment-deadline-grid > .deadline-field { align-self: start; grid-template-rows: 28px auto; align-items: center; }
 :where(.planner-page, .planner-portal) .drawer-assignment-deadline-grid .deadline-field { width: 100%; max-width: 100%; }
 :where(.planner-page, .planner-portal) .drawer-assignment-deadline-grid .deadline-field input { width: 100%; max-width: 100%; }
-@media (max-width: 820px) { :where(.planner-page, .planner-portal) .drawer-status-priority-grid, :where(.planner-page, .planner-portal) .drawer-assignment-deadline-grid { grid-template-columns: minmax(0, 1fr); gap: 11px; }:where(.planner-page, .planner-portal) .assignment-members { width: 100%; } }
+@media (max-width: 820px) { :where(.planner-page, .planner-portal) .drawer-status-priority-grid, :where(.planner-page, .planner-portal) .drawer-assignment-deadline-grid { grid-template-columns: minmax(0, 1fr); gap: 11px; } :where(.planner-page, .planner-portal) .assignment-summary { width: 100%; } }
 
 :where(.planner-page, .planner-portal) .task-return-action { color: var(--green); border-color: #b8e1c8; background: var(--green-soft); }
 :where(.planner-page, .planner-portal) .task-return-action:hover, :where(.planner-page, .planner-portal) .task-return-action:focus-visible { border-color: #8dccaa; background: #e4f7eb; }
