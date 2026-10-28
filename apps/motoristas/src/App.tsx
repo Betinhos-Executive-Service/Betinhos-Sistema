@@ -13,13 +13,7 @@ import {
 } from "./app/bootstrap";
 import { useHardwareBackGuard } from "./app/backGuard";
 import { BuildStamp } from "./components/layout/BuildStamp";
-import {
-  getScreenAfterQrPayment,
-  getServiceTaskBackScreen,
-  hasUploadedReceiveProofs,
-  isReceiveStepPending,
-  shouldRouteServiceToVoucher
-} from "./app/detailFlow";
+import { getScreenAfterQrPayment, getServiceTaskBackScreen } from "./app/detailFlow";
 import {
   AUTO_REFRESH_INTERVAL_MS,
   buildHashRoute,
@@ -46,20 +40,19 @@ import {
   resolveServiceVehicleRemote,
   loadActiveFleetRemote,
   prefetchExpenseReferenceDataRemote,
-  uploadReceiveProofRemote,
   type DriverContext,
   type MaintenanceRequestVehicleOption
 } from "./lib/dataverse";
 import { isStandaloneWebResourceRuntime } from "./lib/dataverse";
 import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "./data/dataverse/fetchWebApi";
 import { createQrChargeRemote, getQrChargeSummaryRemote, updateQrChargeRemote } from "./lib/dataverse";
-import { getQrChargeReceiveState, getReceivableCents, type QrChargeSummary } from "./features/recebimento/qrCharge";
+import { getReceivableCents } from "./features/recebimento/qrCharge";
 import { QrChargeScreen } from "./features/recebimento/QrChargeScreen";
 import { expenseFlowView } from "./features/despesas/receiptQuickRead";
-import { getQuickReadMockMode } from "./features/despesas/receiptQuickReadMock";
 import { IDEA_STATUS, type Idea, type IdeaDraft } from "./features/ideias/ideas";
 import { APP_CONNECTION_LOST_MESSAGE, APP_OPERATION_ERROR_MESSAGE, reportAppError, type AppErrorNotice } from "./lib/appErrorLogger";
 import { useDados } from "./app/DataProvider";
+import { useReceiveFlow } from "./features/recebimento/useReceiveFlow";
 import { useMaintenanceRequestFlow } from "./features/manutencao/useMaintenanceRequestFlow";
 import { useCollisionFlow } from "./features/colisao/useCollisionFlow";
 import { useComunicados } from "./features/comunicados/useComunicados";
@@ -127,14 +120,14 @@ import { ServicesScreen } from "./features/servicos/ServicesScreen";
 import { SignatureScreen } from "./features/voucher/SignatureScreen";
 import { VoucherScreen } from "./features/voucher/VoucherScreen";
 import { createEmptyCollisionDraft, getCollisionPhotoLabel } from "./features/colisao/collisions";
-import type { ExpensePhoto } from "./features/despesas/expenses";
-import { hasMediaDraftContent, prepareVideoBlobForUpload, revokePreviewUrl } from "./features/fotos/mediaDrafts";
-import type { CapturedVideoDraft, DetailData, MaintenancePhotoKind, Screen } from "./types";
+import { prepareVideoBlobForUpload, revokePreviewUrl } from "./features/fotos/mediaDrafts";
+import type { DetailData, MaintenancePhotoKind, Screen } from "./types";
 import { exchangeUserError } from "./features/servicos/trocaErros";
 import { FlowProgressOverlay, type RemoteOperation } from "./shared/ui/FlowProgressOverlay";
 import { findDetailFromHashRoute, getInitialScreenFromHashRoute } from "./app/rotaInicial";
 import { inferToastTone } from "./shared/ui/toastTone";
 import { wait } from "./shared/wait";
+import { isTrueLike } from "./shared/isTrueLike";
 import {
   getDetailDraftKey,
   loadFinalizeDraftAssets,
@@ -146,8 +139,7 @@ import {
   VOUCHER_DRAFTS_STORAGE_KEY,
   type PersistedFinalizeDraftAssets
 } from "./features/finalizar/rascunhos";
-import { isVideoMediaDraft, prepareMediaDraftForUpload, revokePhotoPreviewUrls } from "./features/fotos/envioMidia";
-import { useMediaDraftState } from "./features/fotos/useMediaDraftState";
+import { revokePhotoPreviewUrls } from "./features/fotos/envioMidia";
 import { EMPTY_MAINTENANCE_REQUEST_DRAFT } from "./features/manutencao/rascunho";
 import { EMPTY_EXPENSE_DRAFT } from "./features/despesas/rascunho";
 import { EMPTY_MAINTENANCE_FINALIZE_DRAFT } from "./features/finalizar/rascunhoManutencao";
@@ -160,10 +152,6 @@ type RefreshOptions = {
 type ReceiptEntrySource = "home" | "service";
 
 const DATA_LOADING_SUCCESS_DURATION_MS = 420;
-
-function isTrueLike(value: unknown) {
-  return value === true || value === 1 || value === "true";
-}
 
 function App() {
   // Dados pela porta (src/data/porta.ts): o adaptador vem da entrada do app (main.tsx) e não muda
@@ -318,25 +306,54 @@ function App() {
     logAppError: (error, action, phase) => logAppError(error, action, phase)
   });
   const [receiptClienteOptions, setReceiptClienteOptions] = useState<string[]>([]);
-  const [receiveProofs, setReceiveProofs] = useState<Record<string, ExpensePhoto[]>>(() => loadFinalizeDraftAssets().receiveProofs);
-  // Cobranças pagas por QR nesta sessão (serviço → sessão do Stripe → centavos). O registro definitivo fica no
-  // Dataverse (cr40f_cobrancastripe) e volta pelo resumo do plugin, que sobrevive a recarregar a página.
-  const [qrChargesPaid, setQrChargesPaid] = useState<Record<string, Record<string, number>>>({});
-  const [qrChargeSummaries, setQrChargeSummaries] = useState<
-    Record<string, { status: "loading" | "ready" | "error"; summary?: QrChargeSummary; stale?: boolean }>
-  >({});
-  const qrChargeSummaryInFlightRef = useRef(new Set<string>());
-  const [receiveUploadedCounts, setReceiveUploadedCounts] = useState<Record<string, number>>({});
   const {
-    draft: receivePhotoDraft, setDraft: setReceivePhotoDraft,
-    previewUrl: receivePhotoPreviewUrl, setPreviewUrl: setReceivePhotoPreviewUrl,
-    posterUrl: receivePhotoPosterUrl, setPosterUrl: setReceivePhotoPosterUrl,
-    durationLabel: receivePhotoDurationLabel, setDurationLabel: setReceivePhotoDurationLabel,
-    rawBlob: receivePhotoRawBlob, setRawBlob: setReceivePhotoRawBlob,
-    isVideo: receivePhotoIsVideo, setIsVideo: setReceivePhotoIsVideo,
-    clear: clearReceivePhotoDraftState
-  } = useMediaDraftState();
-  const [receivePreviewPhotoId, setReceivePreviewPhotoId] = useState("");
+    clearReceivePhotoDraftState,
+    confirmReceivePhoto,
+    continueAfterReceive,
+    deleteReceivePhoto,
+    getQrChargeProps,
+    invalidateQrChargeSummary,
+    openReceiveCamera,
+    openReceiveFlow,
+    openReceivePreview,
+    openReceiveVideoPreview,
+    qrChargeState,
+    qrChargeSummaryInFlightRef,
+    qrChargeSummaryNeeded,
+    qrChargeSummaryRequest,
+    qrChargesPaid,
+    receivePhotoDraft,
+    receivePhotoIsVideo,
+    receivePhotoPreviewUrl,
+    receivePreviewPhotoId,
+    receiveProofs,
+    receiveStepPending,
+    setQrChargeSummaries,
+    setQrChargesPaid,
+    setReceivePhotoDraft,
+    setReceivePhotoDurationLabel,
+    setReceivePhotoIsVideo,
+    setReceivePhotoPosterUrl,
+    setReceivePhotoPreviewUrl,
+    setReceivePhotoRawBlob,
+    setReceivePreviewPhotoId,
+    setReceiveProofs,
+    setReceiveUploadedCounts
+  } = useReceiveFlow({
+    // Funções intermediárias para o que o App declara mais abaixo; só rodam nos handlers.
+    blockIfNotFirstPending: (...args) => blockIfNotFirstPending(...args),
+    checkReceiveProof,
+    driverContext,
+    isLocalhostRuntime,
+    logAppError: (...args) => logAppError(...args),
+    remoteMode,
+    remoteOperation,
+    screen,
+    selectedDetail,
+    setCriticalError: (...args) => setCriticalError(...args),
+    setRemoteOperation,
+    setScreen
+  });
   const {
     clearCollisionPhotoDraftState,
     collisionDraft,
@@ -838,47 +855,6 @@ function App() {
   const canGeneratePersonalReceipt =
     isTrueLike(driverContext?.funcionario?.cr40f_gerarrecibopersonalizado) ||
     isLocalhostRuntime;
-  const canChargeByQr = isTrueLike(driverContext?.funcionario?.cr40f_podecobrarqrcode) || isLocalhostRuntime;
-  const sumQrChargesPaid = (paid: Record<string, number> | undefined) => Object.values(paid ?? {}).reduce((total, cents) => total + cents, 0);
-  const qrChargeState = (detail: DetailData, localPaid = qrChargesPaid[detail.id]) =>
-    getQrChargeReceiveState(getReceivableCents(detail), qrChargeSummaries[detail.id]?.summary, sumQrChargesPaid(localPaid));
-  const qrChargeCovers = (detail: DetailData) => qrChargeState(detail).covers;
-  // Resumo só para quem pode cobrar ou já cobrou nesta sessão: os demais nem chamam a Custom API.
-  const shouldLoadQrChargeSummary = (detail: DetailData) =>
-    detail.type === "SERVICO" && getReceivableCents(detail) > 0 && (canChargeByQr || sumQrChargesPaid(qrChargesPaid[detail.id]) > 0);
-  const receiveStepPending = (detail: DetailData) =>
-    isReceiveStepPending(detail, { receiveProofs, receiveUploadedCounts, remoteMode, proofWaived: qrChargeCovers(detail) });
-  const getQrChargeProps = (detail: DetailData) => {
-    const entry = qrChargeSummaries[detail.id];
-    const state = qrChargeState(detail);
-    const canOpen = state.receivableCents > 0 && ((canChargeByQr && state.balanceCents > 0) || Boolean(state.open));
-    return {
-      qrCharge: {
-        receivableCents: state.receivableCents,
-        paidCents: state.paidCents,
-        paidByName: entry?.summary?.ultimaPaga?.paganteNome.trim() ?? "",
-        balanceCents: state.balanceCents,
-        // Só a primeira carga segura o botão; a revalidação usa o resumo anterior.
-        loading: entry?.status === "loading" && !entry.summary,
-        failed: entry?.status === "error",
-        resumable: Boolean(state.open),
-        onOpen: canOpen ? () => setScreen("cobrancaQr") : undefined
-      },
-      proofWaived: state.covers,
-      checkProof: remoteMode || getQuickReadMockMode() ? checkReceiveProof : undefined
-    };
-  };
-  const invalidateQrChargeSummary = (detailId: string) =>
-    setQrChargeSummaries((current) => (current[detailId] ? { ...current, [detailId]: { ...current[detailId], stale: true } } : current));
-
-  // Recebimento aberto (tela própria ou dentro de finalizar/voucher): consulta o resumo uma vez por serviço.
-  const receiveScreenDetail =
-    selectedDetail && (screen === "receber" || ((screen === "finalizar" || screen === "voucher") && receiveStepPending(selectedDetail)))
-      ? selectedDetail
-      : null;
-  const qrChargeSummaryRequest = receiveScreenDetail && shouldLoadQrChargeSummary(receiveScreenDetail) ? receiveScreenDetail : null;
-  const qrChargeSummaryEntry = qrChargeSummaryRequest ? qrChargeSummaries[qrChargeSummaryRequest.id] : undefined;
-  const qrChargeSummaryNeeded = Boolean(qrChargeSummaryRequest && (!qrChargeSummaryEntry || qrChargeSummaryEntry.stale));
   useEffect(() => {
     const detail = qrChargeSummaryRequest;
     if (!detail || !qrChargeSummaryNeeded) return;
@@ -1659,182 +1635,6 @@ function App() {
     }
   };
 
-  const openReceiveCamera = () => {
-    clearReceivePhotoDraftState();
-    setReceivePreviewPhotoId("");
-    setScreen("fotoReceber");
-  };
-
-  const openReceiveVideoPreview = (video: CapturedVideoDraft) => {
-    setReceivePhotoDraft("");
-    setReceivePhotoPreviewUrl(video.previewUrl);
-    setReceivePhotoPosterUrl(video.posterUrl ?? "");
-    setReceivePhotoDurationLabel(video.durationLabel ?? "");
-    setReceivePhotoRawBlob(video.rawBlob);
-    setReceivePhotoIsVideo(true);
-    setReceivePreviewPhotoId("");
-    setScreen("previewFotoReceber");
-  };
-
-  const openReceivePreview = (photoId: string) => {
-    if (!selectedDetail) return;
-    const photo = receiveProofs[selectedDetail.id]?.find((item) => item.id === photoId);
-    if (!photo) return;
-    setReceivePhotoDraft(photo.dataUrl);
-    setReceivePhotoPreviewUrl(photo.previewUrl ?? "");
-    setReceivePhotoPosterUrl(photo.posterUrl ?? "");
-    setReceivePhotoDurationLabel(photo.durationLabel ?? "");
-    setReceivePhotoRawBlob(photo.rawBlob ?? null);
-    setReceivePhotoIsVideo(isVideoMediaDraft(photo.dataUrl, photo.rawBlob));
-    setReceivePreviewPhotoId(photoId);
-    setScreen("previewFotoReceber");
-  };
-
-  const confirmReceivePhoto = () => {
-    if (!selectedDetail) return setScreen("servicos");
-    if (!hasMediaDraftContent({ dataUrl: receivePhotoDraft, rawBlob: receivePhotoRawBlob, mediaType: receivePhotoIsVideo ? "video" : "foto" })) {
-      return setScreen("receber");
-    }
-
-    setReceiveProofs((current) => {
-      const detailPhotos = current[selectedDetail.id] ?? [];
-      const nextPhoto: ExpensePhoto = {
-        id: receivePreviewPhotoId || `receive-photo-${Date.now()}-${detailPhotos.length + 1}`,
-        dataUrl: receivePhotoDraft,
-        previewUrl: receivePhotoPreviewUrl || undefined,
-        posterUrl: receivePhotoPosterUrl || undefined,
-        durationLabel: receivePhotoDurationLabel || undefined,
-        mediaType: receivePhotoIsVideo ? "video" : "foto",
-        rawBlob: receivePhotoIsVideo ? receivePhotoRawBlob ?? undefined : undefined
-      };
-      const nextPhotos = receivePreviewPhotoId
-        ? detailPhotos.map((photo) => {
-          if (photo.id !== receivePreviewPhotoId) return photo;
-          if (photo.previewUrl && photo.previewUrl !== nextPhoto.previewUrl) revokePreviewUrl(photo.previewUrl);
-          return nextPhoto;
-        })
-        : [...detailPhotos, nextPhoto];
-      return {
-        ...current,
-        [selectedDetail.id]: nextPhotos
-      };
-    });
-    setReceiveUploadedCounts((current) => {
-      if (!current[selectedDetail.id]) return current;
-      const next = { ...current };
-      delete next[selectedDetail.id];
-      return next;
-    });
-
-    clearReceivePhotoDraftState(true);
-    setReceivePreviewPhotoId("");
-    setScreen("receber");
-  };
-
-  const deleteReceivePhoto = () => {
-    if (!selectedDetail) return;
-    if (receivePreviewPhotoId) {
-      setReceiveProofs((current) => {
-        const removed = (current[selectedDetail.id] ?? []).find((photo) => photo.id === receivePreviewPhotoId);
-        revokePreviewUrl(removed?.previewUrl);
-        return {
-          ...current,
-          [selectedDetail.id]: (current[selectedDetail.id] ?? []).filter((photo) => photo.id !== receivePreviewPhotoId)
-        };
-      });
-    }
-    setReceiveUploadedCounts((current) => {
-      if (!current[selectedDetail.id]) return current;
-      const next = { ...current };
-      delete next[selectedDetail.id];
-      return next;
-    });
-    clearReceivePhotoDraftState();
-    setReceivePreviewPhotoId("");
-    setScreen("receber");
-  };
-
-  const continueAfterReceive = async () => {
-    if (!selectedDetail || remoteOperation) return;
-    const detailToContinue = selectedDetail;
-    const photos = receiveProofs[detailToContinue.id] ?? [];
-    if (!photos.length && !qrChargeCovers(detailToContinue)) return;
-    if (blockIfNotFirstPending(detailToContinue)) return;
-
-    const goNext = () => {
-      if (blockIfNotFirstPending(detailToContinue)) return;
-      setScreen(shouldRouteServiceToVoucher(detailToContinue) ? "voucher" : "finalizar");
-    };
-
-    // Sem foto só chega aqui com o QR pago no total: não há o que enviar.
-    if (!photos.length || hasUploadedReceiveProofs(detailToContinue, receiveProofs, receiveUploadedCounts) || !remoteMode) {
-      goNext();
-      return;
-    }
-
-    const dvId = detailToContinue.dataverse?.id;
-    if (!dvId) {
-      goNext();
-      return;
-    }
-
-    try {
-      setRemoteOperation({
-        title: "Enviando comprovantes",
-        message: "Preparando upload dos comprovantes.",
-        detailId: detailToContinue.id,
-        phase: "loading"
-      });
-      const preparedPhotos = await Promise.all(photos.map((photo) => prepareMediaDraftForUpload(photo)));
-      let completedUploads = 0;
-      const uploadResults = await Promise.allSettled(
-        preparedPhotos.map(async (photo, index) => {
-          const link = await uploadReceiveProofRemote({
-            reservaId: dvId,
-            reservaName: detailToContinue.id,
-            motoristaId: driverContext?.id,
-            dataUrl: photo.dataUrl,
-            fileName: photo.id,
-            order: index + 1,
-            onProgress: (message) =>
-              setRemoteOperation({
-                title: "Enviando comprovantes",
-                message,
-                detailId: detailToContinue.id,
-                phase: "loading"
-              })
-          });
-          completedUploads += 1;
-          setRemoteOperation({
-            title: "Enviando comprovantes",
-            message: `Comprovantes enviados (${completedUploads}/${preparedPhotos.length}).`,
-            detailId: detailToContinue.id,
-            phase: "loading"
-          });
-          return link;
-        })
-      );
-      const failedUploads = uploadResults.filter((result) => result.status === "rejected").length;
-      if (failedUploads) {
-        throw new Error(`${failedUploads} de ${preparedPhotos.length} comprovante(s) falharam no upload.`);
-      }
-      setReceiveUploadedCounts((current) => ({ ...current, [detailToContinue.id]: preparedPhotos.length }));
-      setRemoteOperation({
-        title: "Enviando comprovantes",
-        message: "Comprovantes enviados com sucesso.",
-        detailId: detailToContinue.id,
-        phase: "success"
-      });
-      await wait(420);
-      setRemoteOperation(null);
-      goNext();
-    } catch (error) {
-      logAppError(error, "continueAfterReceive", detailToContinue.type);
-      setRemoteOperation(null);
-      setCriticalError(error instanceof Error ? error.message : "Falha ao enviar comprovantes de recebimento.");
-    }
-  };
-
   const openVoucherFlow = () => {
     if (!selectedDetail) return;
     if (blockIfNotFirstPending(selectedDetail)) return;
@@ -1857,12 +1657,6 @@ function App() {
       return;
     }
     setScreen("finalizar");
-  };
-
-  const openReceiveFlow = () => {
-    if (!selectedDetail) return;
-    if (blockIfNotFirstPending(selectedDetail)) return;
-    setScreen("receber");
   };
 
   const openLocalCancelFlow = () => {
