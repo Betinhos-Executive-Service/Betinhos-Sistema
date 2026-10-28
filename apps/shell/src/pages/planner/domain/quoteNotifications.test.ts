@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { followUpNotices, LOSS_REASONS, readyNotice, urgentNotices } from './quoteNotifications'
+import { financeMemberIds, followUpNotices, LOSS_REASONS, readyNotice, urgentNotices } from './quoteNotifications'
 import type { QuoteData } from './types'
 
 const base: QuoteData = { id: 'q1', code: 'COT-0001', title: 'Aeroporto', status: 'Nova', deadline: '2026-10-27', creatorEmployeeId: 'e-criador', options: [], proposalVersions: [] }
@@ -42,6 +42,14 @@ describe('followUpNotices', () => {
     expect(followUpNotices([{ ...sent, status: 'Perdida' }], '2026-10-30')).toEqual([])
     expect(followUpNotices([{ ...sent, status: 'Aceita pelo cliente' }], '2026-10-30')).toEqual([])
   })
+  it('conta os dias úteis a partir da data de São Paulo, não da data UTC', () => {
+    // Enviada qui 22/10 às 22:30 em SP (sex 23/10 01:30 UTC): qui + 2 úteis = seg 26.
+    const lateSend: QuoteData = { ...sent, proposalVersions: [{ id: 'v1', sentAt: '2026-10-23T01:30:00.000Z' }] }
+    expect(followUpNotices([lateSend], '2026-10-26')).toHaveLength(1)
+  })
+  it('data de envio inválida não derruba a geração dos lembretes', () => {
+    expect(followUpNotices([{ ...sent, proposalVersions: [{ id: 'v1', sentAt: 'sem data' }] }], '2026-10-30')).toEqual([])
+  })
   it('dedupe por dia', () => {
     const [a] = followUpNotices([sent], '2026-10-27')
     const [b] = followUpNotices([sent], '2026-10-28')
@@ -51,4 +59,11 @@ describe('followUpNotices', () => {
 
 it('motivos de perda fixos', () => {
   expect(LOSS_REASONS).toEqual(['Preço', 'Fechou com outro', 'Desistiu', 'Sem resposta'])
+})
+
+describe('financeMemberIds', () => {
+  it('acha a equipe Financeiro ignorando caixa e espaços e devolve ids como texto', () => {
+    expect(financeMemberIds({ teams: [{ name: 'Operação', memberIds: ['x'] }, { name: ' financeiro ', memberIds: ['a', 2] }] })).toEqual(['a', '2'])
+    expect(financeMemberIds({})).toEqual([])
+  })
 })

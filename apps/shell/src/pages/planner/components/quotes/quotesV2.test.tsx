@@ -39,6 +39,31 @@ describe('cotações V2 nas telas', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
+  it('Enviei depois de salvar a edição não reaproveita a versão anterior ao salvamento', async () => {
+    const quote = { ...pricedQuote, clientContact: 'Walter', notes: 'GRU → Centro', etag: 'W/"1"' }
+    const onUpdate = vi.fn(async () => true)
+    const onMarkSent = vi.fn(async (_id: string, _request: Record<string, unknown>) => true)
+    const { container } = render(<QuoteManagementDrawer quote={quote} employees={[]} teams={[]} onClose={() => {}} onUpdate={onUpdate} onMarkSent={onMarkSent} onOutcome={vi.fn()} />)
+    fireEvent.change(container.querySelector('#quote-notes')!, { target: { value: 'GRU → Centro, 2 malas' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviei' }))
+    await waitFor(() => expect(onMarkSent).toHaveBeenCalled())
+    expect(onUpdate).toHaveBeenCalled()
+    const request = onMarkSent.mock.calls[0][1]
+    expect(request.expectedEtag).toBeUndefined()
+    expect(request.expectedModifiedAt).toBeUndefined()
+  })
+
+  it('Enviei sem edição mantém a checagem de versão', async () => {
+    const quote = { ...pricedQuote, clientContact: 'Walter', notes: 'GRU → Centro', etag: 'W/"1"' }
+    const onUpdate = vi.fn(async () => true)
+    const onMarkSent = vi.fn(async (_id: string, _request: Record<string, unknown>) => true)
+    render(<QuoteManagementDrawer quote={quote} employees={[]} teams={[]} onClose={() => {}} onUpdate={onUpdate} onMarkSent={onMarkSent} onOutcome={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Enviei' }))
+    await waitFor(() => expect(onMarkSent).toHaveBeenCalled())
+    expect(onUpdate).not.toHaveBeenCalled()
+    expect(onMarkSent.mock.calls[0][1]).toMatchObject({ expectedEtag: 'W/"1"', expectedModifiedAt: 'm1' })
+  })
+
   it('cotação sem tarefa não mostra o histórico da tarefa', async () => {
     render(<QuoteManagementDrawer quote={sentQuote} employees={[]} teams={[]} onClose={() => {}} onUpdate={vi.fn()} onOutcome={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('Propostas enviadas')).toBeTruthy())

@@ -221,7 +221,7 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     const controller = new AbortController();
     const proposal = prepareQuoteResponse(draft);
     if (!proposal.valid) { setPreviewHtml(""); return undefined; }
-    const previewQuote = { ...draft, proposalOptions: proposal.valid ? proposal.options : [] };
+    const previewQuote = { ...draft, proposalOptions: proposal.options };
     setPreviewHtml(buildQuoteEmailHtml(previewQuote, { baseUrl: window.location.origin }));
     loadQuoteImages(previewQuote, { baseUrl: window.location.origin, signal: controller.signal })
       .then((assets) => {
@@ -279,19 +279,25 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     if (quoteConflict) { setComposerMessage("Esta cotação mudou em outra edição. Recarregue antes de registrar o envio."); return; }
     if (!proposalSummary.valid) { setComposerMessage(proposalSummary.error); return; }
     const preview = previewEdited ? getEditedPreview() : {};
-    if (!QUOTE_COMPLETED_STATUSES.includes(quote.status) || dirty) {
+    await saveThenMarkSent({ html: preview.html || "", text: preview.text || "" }, setComposerMessage);
+  };
+  // Cotação ainda não concluída ou editada é salva antes de registrar o envio.
+  const saveThenMarkSent = async (content: { html?: string; text?: string }, onError: (message: string) => void) => {
+    const savedNow = !QUOTE_COMPLETED_STATUSES.includes(quote.status) || dirty;
+    if (savedNow) {
       const failure = await save(true);
-      if (failure) { setComposerMessage(failure); return; }
+      if (failure) { onError(failure); return; }
     }
-    await confirmProposalSent({ html: preview.html || "", text: preview.text || "" });
+    await confirmProposalSent(content, savedNow);
   };
   // V2 ("Enviei"): registra só a data do envio, sem canal nem destinatário.
-  const confirmProposalSent = async (content: { html?: string; text?: string } = {}) => {
-    if (quoteConflict) return false;
-    if (!onMarkSent) return false;
-    // Versão e concorrência vêm do registro atual, não do momento em que a prévia abriu.
+  // savedNow: a cotação acabou de ser salva e a etag/modifiedAt desta renderização
+  // já ficaram para trás; o salvamento já checou a concorrência, então não repete.
+  const confirmProposalSent = async (content: { html?: string; text?: string } = {}, savedNow = false) => {
+    if (quoteConflict || !onMarkSent) return false;
     const { etag, modifiedAt, syncStatus, ...businessDraft } = draft;
-    const request = { draft: { ...businessDraft, status: deriveQuoteStatus(draft) }, options: draft.options, html: content.html || "", text: content.text || "", expectedEtag: quote.etag, expectedModifiedAt: quote.modifiedAt };
+    const version = savedNow ? {} : { expectedEtag: quote.etag, expectedModifiedAt: quote.modifiedAt };
+    const request = { draft: { ...businessDraft, status: deriveQuoteStatus(draft) }, options: draft.options, html: content.html || "", text: content.text || "", ...version };
     const result = await run(() => onMarkSent(quote.id, request));
     if (result !== false) {
       const nextDraft = { ...draft, status: "Respondida ao cliente", responseSent: true };
@@ -311,7 +317,6 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     if (resultStatus === "Aceita pelo cliente") {
       try { resolveQuoteAcceptance(draft, { acceptedOptionId, acceptedProposalVersionId }); }
       catch (error: any) { setResultError(error.message); return; }
-
     }
     setResultError("");
     const success = await run(() => onOutcome?.(quote.id, resultStatus, reason, resultStatus === "Aceita pelo cliente" ? { acceptedOptionId, acceptedProposalVersionId } : {}));
@@ -356,6 +361,7 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
   const hasSentOptions = Boolean(sentProposal?.options?.length);
   const legacyDecision = awaitingDecision && !(draft.proposalVersions || []).length;
   const decisionOptions = hasSentOptions ? sentProposal.options : legacyDecision ? normalizeQuoteOptions(quote) : [];
+  const acceptedChoice = decisionOptions.find((option: any) => option.id === acceptedOptionId);
   const terminalQuote = QUOTE_TERMINAL_STATUSES.includes(draft.status);
   const readOnlyOptions = terminalQuote || (awaitingDecision && decisionOptions.length > 0);
   const comparisonOptions = draft.status === "Aceita pelo cliente" && acceptedOption ? [acceptedOption] : awaitingDecision && decisionOptions.length > 0 ? decisionOptions : draft.options || [];
@@ -376,8 +382,7 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     compose: openComposer,
     send: async () => {
       if (mutationPending.current) return;
-      if (!QUOTE_COMPLETED_STATUSES.includes(quote.status) || dirty) { const failure = await save(true); if (failure) { setResultError(failure); return; } }
-      await confirmProposalSent();
+      await saveThenMarkSent({}, setResultError);
     },
     return: () => task && onRegisterWaitingReturn?.(task.id),
     outcome: () => openResult("Aceita pelo cliente"),
@@ -447,13 +452,13 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
   </div>
   {composerOpen && <div className="quote-v3-composer-layer" onMouseDown={(event) => { if (event.target === event.currentTarget) closeComposer(); }}><section ref={composerRef} className="quote-v3-preview" role="dialog" aria-modal="true" aria-label="Montar email da cotação" tabIndex={-1}>
     <div className="quote-v3-preview-viewport" ref={previewViewportRef}>{editingPreview && inlineToolbarPosition && <div ref={inlineToolbarRef} className="quote-v3-inline-toolbar" role="toolbar" aria-label="Formatação do texto" style={inlineToolbarPosition}>{[["bold", <strong>B</strong>, "Negrito"], ["italic", <em>I</em>, "Itálico"], ["underline", <span style={{ textDecoration: "underline" }}>U</span>, "Sublinhado"], ["insertUnorderedList", "•", "Lista com marcadores"], ["insertOrderedList", "1.", "Lista numerada"]].map(([command, label, title]: any) => <button key={command} className="quote-v3-inline-format-button" type="button" title={title} aria-label={title} onMouseDown={(event) => event.preventDefault()} onClick={() => formatPreview(command)}>{label}</button>)}</div>}<iframe key={previewResetKey} ref={previewFrameRef} title="Proposta para Outlook" onLoad={() => { fitEmailPreview(); const document = previewFrameRef.current?.contentDocument; const syncToolbar = () => requestAnimationFrame(positionInlineToolbar); document?.addEventListener("selectionchange", syncToolbar); document?.body?.addEventListener("focusin", syncToolbar); document?.body?.addEventListener("mouseup", syncToolbar); document?.body?.addEventListener("keyup", syncToolbar); document?.body?.addEventListener("input", () => { setPreviewEdited(true); requestAnimationFrame(() => { fitEmailPreview(); positionInlineToolbar(); }); }); document?.body?.addEventListener("keydown", (event: any) => { if (event.key === "Tab" && event.target.isContentEditable) { event.preventDefault(); document.execCommand(event.shiftKey ? "outdent" : "indent", false); } }); document?.body?.addEventListener("paste", (event: any) => { if (!event.target.isContentEditable) return; event.preventDefault(); document.execCommand("insertText", false, event.clipboardData?.getData("text/plain") || ""); }); if (editingPreview) setPreviewEditing(true); }} srcDoc={previewHtml || buildQuoteEmailHtml(draft, { baseUrl: window.location.origin })} /></div>
-    <footer className="quote-v3-composer-actions"><header className="quote-v3-preview-header"><div><span className="quote-v3-preview-kicker">Pré-visualização</span><strong>{quoteSubject(draft)}</strong></div><button className="icon-button" type="button" onClick={closeComposer} aria-label="Fechar montagem do email"><X size={20} /></button></header><section className="quote-proposal-summary" aria-label="Opções desta proposta"><strong>Opções desta proposta</strong>{proposalSummary.valid ? <ul>{proposalSummary.options.map((option) => <li key={option.id}>{formatQuoteOption(option)}</li>)}</ul> : <p>{proposalSummary.error} <button type="button" onClick={() => { closeComposer(); }}>Voltar às opções</button></p>}</section><span role="status">{composerBusy ? "Preparando arquivos…" : composerMessage || "Copie para o Outlook ou baixe o arquivo, envie ao cliente e registre o envio aqui."}</span><button className="button button-secondary" type="button" aria-pressed={editingPreview} disabled={Boolean(composerBusy) || !previewHtml} onClick={() => setPreviewEditing(!editingPreview)}>{editingPreview ? "Concluir edição" : "Editar texto"}</button>{previewEdited && <button className="button button-quiet" type="button" disabled={Boolean(composerBusy)} onClick={() => { setPreviewEdited(false); setEditingPreview(false); setPreviewResetKey((key: any) => key + 1); setComposerMessage("Edições descartadas."); }}>Reverter edições</button>}<button className="button button-secondary" type="button" disabled={Boolean(composerBusy) || !proposalSummary.valid} onClick={() => composeAction("copy")}><Copy size={15} />Copiar para o Outlook</button><div><button className="button button-secondary" type="button" disabled={Boolean(composerBusy) || !proposalSummary.valid} onClick={() => composeAction("pdf")}><Download size={15} />Baixar PDF</button><button className="button button-secondary" type="button" disabled={Boolean(composerBusy) || !proposalSummary.valid} onClick={() => composeAction("word")}><Download size={15} />Baixar Word</button></div>{!terminalQuote && <button className="button button-primary quote-register-send" type="button" disabled={saving || Boolean(composerBusy) || !proposalSummary.valid} onClick={registerProposalSent}><Send size={15} />{draft.status === "Respondida ao cliente" ? "Registrar novo envio" : "Registrar envio"}</button>}</footer>
+    <footer className="quote-v3-composer-actions"><header className="quote-v3-preview-header"><div><span className="quote-v3-preview-kicker">Pré-visualização</span><strong>{quoteSubject(draft)}</strong></div><button className="icon-button" type="button" onClick={closeComposer} aria-label="Fechar montagem do email"><X size={20} /></button></header><section className="quote-proposal-summary" aria-label="Opções desta proposta"><strong>Opções desta proposta</strong>{proposalSummary.valid ? <ul>{proposalSummary.options.map((option) => <li key={option.id}>{formatQuoteOption(option)}</li>)}</ul> : <p>{proposalSummary.error} <button type="button" onClick={closeComposer}>Voltar às opções</button></p>}</section><span role="status">{composerBusy ? "Preparando arquivos…" : composerMessage || "Copie para o Outlook ou baixe o arquivo, envie ao cliente e registre o envio aqui."}</span><button className="button button-secondary" type="button" aria-pressed={editingPreview} disabled={Boolean(composerBusy) || !previewHtml} onClick={() => setPreviewEditing(!editingPreview)}>{editingPreview ? "Concluir edição" : "Editar texto"}</button>{previewEdited && <button className="button button-quiet" type="button" disabled={Boolean(composerBusy)} onClick={() => { setPreviewEdited(false); setEditingPreview(false); setPreviewResetKey((key: any) => key + 1); setComposerMessage("Edições descartadas."); }}>Reverter edições</button>}<button className="button button-secondary" type="button" disabled={Boolean(composerBusy) || !proposalSummary.valid} onClick={() => composeAction("copy")}><Copy size={15} />Copiar para o Outlook</button><div><button className="button button-secondary" type="button" disabled={Boolean(composerBusy) || !proposalSummary.valid} onClick={() => composeAction("pdf")}><Download size={15} />Baixar PDF</button><button className="button button-secondary" type="button" disabled={Boolean(composerBusy) || !proposalSummary.valid} onClick={() => composeAction("word")}><Download size={15} />Baixar Word</button></div>{!terminalQuote && <button className="button button-primary quote-register-send" type="button" disabled={saving || Boolean(composerBusy) || !proposalSummary.valid} onClick={registerProposalSent}><Send size={15} />{draft.status === "Respondida ao cliente" ? "Registrar novo envio" : "Registrar envio"}</button>}</footer>
   </section></div>}
   {confirmMissingDeadline && <MissingDeadlineDialog onCancel={() => { setConfirmMissingDeadline(false); document.getElementById("quote-deadline")?.focus(); }} onConfirm={() => save(true, pendingSavePatch.current)} />}
   {resultOpen && <div className="quote-v3-confirm-layer" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setResultOpen(false); }}><form ref={resultRef} className="quote-v3-dialog" role="dialog" aria-modal="true" aria-label="Registrar resultado da cotação" onSubmit={registerResult}>
     <h3>{awaitingDecision ? "Registrar decisão do cliente" : "Cancelar cotação"}</h3>
     {awaitingDecision && decisionOptions.length > 0 && <div className="quote-decision-kind" role="radiogroup" aria-label="Decisão do cliente">{[["Aceita pelo cliente", "Aceitou"], ["Perdida", "Perdida"], ["Cancelada", "Cancelou"]].map(([status, label]: any) => <button key={status} type="button" role="radio" aria-checked={resultStatus === status} className={`quote-chip${resultStatus === status ? " is-selected" : ""}`} disabled={saving} onClick={() => { setResultStatus(status); setResultError(""); }}>{label}</button>)}</div>}
-    {resultStatus === "Aceita pelo cliente" ? <>{decisionOptions.length > 1 && <div className="quote-result-option" id="quote-result-option"><span>Opção escolhida</span><InputSelect value={acceptedOptionId} disabled={saving} onChange={setAcceptedOptionId} options={decisionOptions.map((option: any) => ({ value: option.id, label: formatQuoteOption(option) }))} placeholder="Opção escolhida" /></div>}<p>{decisionOptions.find((option: any) => option.id === acceptedOptionId)?.name} · {formatMoney(decisionOptions.find((option: any) => option.id === acceptedOptionId)?.value)}<br />A cotação será finalizada como aceita pelo cliente{task ? " e a tarefa concluída" : ""}.</p></> : <p>Esta ação encerra toda a cotação como {resultStatus === "Perdida" ? "Perdida" : "Cancelada"}, incluindo todas as opções{task ? ", e conclui a tarefa" : ""}.</p>}
+    {resultStatus === "Aceita pelo cliente" ? <>{decisionOptions.length > 1 && <div className="quote-result-option" id="quote-result-option"><span>Opção escolhida</span><InputSelect value={acceptedOptionId} disabled={saving} onChange={setAcceptedOptionId} options={decisionOptions.map((option: any) => ({ value: option.id, label: formatQuoteOption(option) }))} placeholder="Opção escolhida" /></div>}<p>{acceptedChoice?.name} · {formatMoney(acceptedChoice?.value)}<br />A cotação será finalizada como aceita pelo cliente{task ? " e a tarefa concluída" : ""}.</p></> : <p>Esta ação encerra toda a cotação como {resultStatus === "Perdida" ? "Perdida" : "Cancelada"}, incluindo todas as opções{task ? ", e conclui a tarefa" : ""}.</p>}
     {resultStatus === "Perdida" && <div className="quote-result-option" id="quote-result-reason"><span>Motivo da perda</span><InputSelect value={lossReason} disabled={saving} onChange={(value: string) => { setLossReason(value); setResultError(""); }} options={LOSS_REASONS.map((reason) => ({ value: reason, label: reason }))} placeholder="Escolha o motivo" /></div>}
     {resultError && <p role="alert">{resultError}</p>}
     <div><button className="button button-secondary" type="button" disabled={saving} onClick={() => setResultOpen(false)}>Voltar</button><button className="button button-primary" type="submit" disabled={saving}>{saving ? "Salvando…" : "Confirmar"}</button></div>
