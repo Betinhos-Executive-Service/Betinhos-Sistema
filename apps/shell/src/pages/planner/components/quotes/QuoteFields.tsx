@@ -35,7 +35,7 @@ export const FormMoneyInput = forwardRef<any, any>(function FormMoneyInput({ err
   return <FormTextInput ref={ref} {...props} value={editing ? String(value ?? "") : moneyDisplay(value)} onChange={onChange} onFocus={(event: any) => { setEditing(true); props.onFocus?.(event); }} onBlur={(event: any) => { setEditing(false); props.onBlur?.(event); }} error={error} inputMode="decimal" type="text" className={className} />;
 });
 
-const FormDateInput = forwardRef<any, any>(function FormDateInput({ error, className = "", ...props }: any, ref) {
+export const FormDateInput = forwardRef<any, any>(function FormDateInput({ error, className = "", ...props }: any, ref) {
   const errorId = props.id && error ? `${props.id}-error` : undefined;
   const handleKeyDown = (event: any) => {
     props.onKeyDown?.(event);

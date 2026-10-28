@@ -247,7 +247,7 @@ test("notificações da cotação seguem responsáveis, ação necessária e ded
 
   const waiting = updateQuote(assigned, quote.id, {
     status: "Aguardando informação",
-    waitingContext: { subject: "Confirmação do cliente", onType: "external", onName: "Cliente", note: "Aguardando dados" },
+    waitingFor: "Confirmação do cliente", waitingFrom: "Cliente", waitingReturnDate: "2026-09-21",
   });
   const waitingNotifications = waiting.notifications!.filter((item) => item.taskId === task!.id && item.type === "waiting");
   assert.deepEqual(new Set(waitingNotifications.map((item) => item.recipientEmployeeId)), new Set(["employee-marina", "employee-rafael"]));
@@ -298,9 +298,10 @@ test("sincroniza status comercial da cotação com sua tarefa principal", () => 
   const quote = created.quotes[0];
   const task = created.tasks.find((item) => item.quoteId === quote.id && !item.parentTaskId);
 
-  assert.throws(() => updateQuote(created, quote.id, { status: "Aguardando informação" }), /aguardado/);
-  const waitingContext = { subject: "Confirmação do cliente", onType: "external", onName: "Cliente", note: "Aguardando dados" };
-  const waiting = updateQuote(created, quote.id, { status: "Aguardando informação", waitingContext });
+  // V2.1: o que falta/de quem/retorno ficam na cotação e viram o contexto de espera da tarefa legada.
+  assert.throws(() => updateQuote(created, quote.id, { status: "Aguardando informação" }), /o que falta/);
+  const waitingContext = { subject: "Confirmação do cliente" };
+  const waiting = updateQuote(created, quote.id, { status: "Aguardando informação", waitingFor: "Confirmação do cliente", waitingFrom: "Cliente", waitingReturnDate: "2026-09-21" });
   const waitingTask = waiting.tasks.find((item) => item.id === task!.id);
   assert.equal(waitingTask!.quoteStatus, "Aguardando informação");
   assert.equal(waitingTask!.status, "waiting");

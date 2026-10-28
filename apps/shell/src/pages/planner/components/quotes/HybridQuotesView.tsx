@@ -1,5 +1,5 @@
 // Porte de Tela Planner/src/quotes/HybridQuotesView.jsx (sem mudança de comportamento).
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { AlarmClock, CalendarDays, ChevronDown, CircleHelp, FileText, LayoutGrid, List, ListFilter, Plus, Search, UserRound, X } from "lucide-react";
 import { formatDate } from '../../domain/domain';
 import { deriveQuoteStatus, filterQuotes, getQuoteMetrics, isQuoteOpen, QUOTE_OPEN_STATUSES, QUOTE_PRIORITIES, QUOTE_TERMINAL_STATUSES, validateQuoteCommercial } from '../../domain/quoteDomain';
@@ -12,6 +12,8 @@ import { FormTextInput, QuoteStatus } from './QuoteFields';
 import { readQuoteViewPreference, saveQuoteViewPreference } from '../../domain/quoteViewPreference';
 import QuoteOptionsEditor from './QuoteOptionsEditor';
 import { chosenQuoteOption, normalizeQuoteOptions } from '../../domain/quoteScenarios';
+import type { QuoteAttachmentsApi } from './useQuoteAttachments';
+import type { LiveAttachment } from '../../data/dataverse';
 
 function quoteOptionsLabel(quote: any) {
   const options = normalizeQuoteOptions(quote);
@@ -24,16 +26,19 @@ function quoteOptionsLabel(quote: any) {
 
 // Arrastar para Cotada: a coluna exige ao menos uma opção com valor, então o
 // diálogo abre a etapa de custo. Reabrir uma cotação já enviada pede confirmação.
-function MoveDialog({ move, task, saving, onCancel, onConfirm, onAttachment, onDeleteAttachment, loadAttachmentContent, AttachmentSectionComponent }: any) {
+// V2.1: os anexos vão para a pasta da cotação (os da tarefa legada ficam só leitura no drawer).
+function MoveDialog({ move, saving, onCancel, onConfirm, quoteAttachments, loadAttachmentContent, AttachmentSectionComponent }: { quoteAttachments?: QuoteAttachmentsApi } & Record<string, any>) {
   const [options, setOptions] = useState<any>(() => normalizeQuoteOptions(move.quote));
+  const ensureAttachments = quoteAttachments?.ensure;
+  useEffect(() => { void ensureAttachments?.(move.quote.id); }, [ensureAttachments, move.quote.id]);
   // Dois modos: montar o custo (destino Cotada) ou reabrir uma cotação já enviada.
   const reopening = move.quote.status === "Respondida ao cliente";
   const pricing = !reopening;
   const validCommercial = !pricing || validateQuoteCommercial({ status: "Cotada", options }).valid;
-  return <div className={`quote-v3-confirm-layer${pricing ? " quote-commercial-layer" : ""}`} role={pricing ? "dialog" : undefined} aria-modal={pricing ? true : undefined} aria-labelledby={pricing ? "quote-move-title" : undefined}>{pricing && <aside className="quote-commercial-request" aria-label="Pedido do cliente"><h3>Pedido do cliente</h3><p className="quote-commercial-request-text">{move.quote.notes || "Pedido do cliente não informado."}</p></aside>}<form className={`quote-v3-dialog${pricing ? " quote-commercial-dialog" : ""}`} role={pricing ? undefined : "dialog"} aria-modal={pricing ? undefined : true} onSubmit={(event) => { event.preventDefault(); if (validCommercial) onConfirm(pricing ? { options } : {}); }}><header className="quote-dialog-header"><div><span className="quote-dialog-eyebrow">Atualização da cotação</span><h3 id="quote-move-title">{pricing ? "Montar o custo da cotação" : "Reabrir a cotação para edição?"}</h3></div><button className="icon-button" type="button" onClick={onCancel} aria-label="Fechar"><X size={18} /></button></header><p>{pricing ? "Cadastre as opções com título e valor. A cotação fica pronta para enviar." : `${move.quote.code} volta para ${move.status}. O envio já registrado continua no histórico e a tarefa deixa de aguardar o cliente.`}</p>{pricing && <><QuoteOptionsEditor options={options} onChange={setOptions} actionsInHeading addLabel="Adicionar opção" />{task && AttachmentSectionComponent && <div className="quote-dialog-attachments"><div className="quote-dialog-section-title"><span>Anexos da cotação</span><small>Opcional</small></div><AttachmentSectionComponent taskId={task.id} attachments={task.attachments || []} loadAttachmentContent={loadAttachmentContent} onAttachment={onAttachment} onDeleteAttachment={onDeleteAttachment} itemLabel="à cotação" helperText="" showPreview={false} allowOpen={false} compact /></div>}</>}<div className="quote-dialog-actions"><button className="button button-secondary" type="button" onClick={onCancel}>Voltar</button><button className="button button-primary" type="submit" disabled={saving || !validCommercial}>{saving ? "Atualizando…" : pricing ? "Salvar custo" : "Reabrir"}</button></div></form></div>;
+  return <div className={`quote-v3-confirm-layer${pricing ? " quote-commercial-layer" : ""}`} role={pricing ? "dialog" : undefined} aria-modal={pricing ? true : undefined} aria-labelledby={pricing ? "quote-move-title" : undefined}>{pricing && <aside className="quote-commercial-request" aria-label="Pedido do cliente"><h3>Pedido do cliente</h3><p className="quote-commercial-request-text">{move.quote.notes || "Pedido do cliente não informado."}</p></aside>}<form className={`quote-v3-dialog${pricing ? " quote-commercial-dialog" : ""}`} role={pricing ? undefined : "dialog"} aria-modal={pricing ? undefined : true} onSubmit={(event) => { event.preventDefault(); if (validCommercial) onConfirm(pricing ? { options } : {}); }}><header className="quote-dialog-header"><div><span className="quote-dialog-eyebrow">Atualização da cotação</span><h3 id="quote-move-title">{pricing ? "Montar o custo da cotação" : "Reabrir a cotação para edição?"}</h3></div><button className="icon-button" type="button" onClick={onCancel} aria-label="Fechar"><X size={18} /></button></header><p>{pricing ? "Cadastre as opções com título e valor. A cotação fica pronta para enviar." : `${move.quote.code} volta para ${move.status}. O envio já registrado continua no histórico e a tarefa deixa de aguardar o cliente.`}</p>{pricing && <><QuoteOptionsEditor options={options} onChange={setOptions} actionsInHeading addLabel="Adicionar opção" />{quoteAttachments && AttachmentSectionComponent && <div className="quote-dialog-attachments"><div className="quote-dialog-section-title"><span>Anexos da cotação</span><small>Opcional</small></div><AttachmentSectionComponent taskId={move.quote.id} attachments={quoteAttachments.get(move.quote.id).items} loadAttachmentContent={loadAttachmentContent} onAttachment={(id: string, files: File[]) => quoteAttachments.add(id, files)} onDeleteAttachment={(id: string, attachment: LiveAttachment) => quoteAttachments.remove(id, attachment)} sizeHint="Até 10 MB por arquivo" itemLabel="à cotação" helperText="" showPreview={false} allowOpen={false} compact /></div>}</>}<div className="quote-dialog-actions"><button className="button button-secondary" type="button" onClick={onCancel}>Voltar</button><button className="button button-primary" type="submit" disabled={saving || !validCommercial}>{saving ? "Atualizando…" : pricing ? "Salvar custo" : "Reabrir"}</button></div></form></div>;
 }
 
-export default function HybridQuotesView({ state, currentEmployee, WaitingContextFieldsComponent, ReturnsSectionComponent, onOpenTask, onCreateQuote, onUpdateQuote, onDeleteQuote, onRequestWaitingQuote, onRegisterWaitingReturn, onMarkQuoteSent, onSetQuoteOutcome, selectedQuoteId, onSelectQuote, requestedQuoteAction = "", onQuoteActionConsumed, onEnsureTaskDetails, onAttachment, onDeleteAttachment, loadAttachmentContent, AttachmentSectionComponent }: any) {
+export default function HybridQuotesView({ state, currentEmployee, quoteAttachments, ReturnsSectionComponent, onOpenTask, onCreateQuote, onUpdateQuote, onDeleteQuote, onRegisterWaitingReturn, onMarkQuoteSent, onSetQuoteOutcome, selectedQuoteId, onSelectQuote, requestedQuoteAction = "", onQuoteActionConsumed, onEnsureTaskDetails, onDeleteAttachment, loadAttachmentContent, AttachmentSectionComponent }: any) {
   // Estáveis: os cards do Kanban são memoizados e recebem estes handlers.
   const openQuote = useCallback((id: any, { initialAction = "" }: any = {}) => onSelectQuote?.(id, initialAction), [onSelectQuote]);
   const closeQuote = () => onSelectQuote?.("");
@@ -58,20 +63,22 @@ export default function HybridQuotesView({ state, currentEmployee, WaitingContex
   const markSent = useCallback((quote: any) => onMarkQuoteSent?.(quote.id, { expectedEtag: quote.etag, expectedModifiedAt: quote.modifiedAt }), [onMarkQuoteSent]);
   const requestMove = useCallback((quote: any, status: any) => {
     if (status === "Respondida ao cliente") { void markSent(quote); return true; }
-    if (status === "Aguardando informação") { onRequestWaitingQuote?.(quote.id); return true; }
+    // V2.1: Aguardando pede o que falta/de quem/retorno; abre a cotação já no diálogo.
+    if (status === "Aguardando informação") { openQuote(quote.id, { initialAction: "wait" }); return true; }
     // Cotada é derivada: uma cotação com opção precificada não "volta" para análise.
     const target = deriveQuoteStatus({ ...quote, status });
     if (target === quote.status) return false;
     if (target === "Cotada" || quote.status === "Respondida ao cliente") { setPendingMove({ quote, status: target }); return true; }
     onUpdateQuote?.(quote.id, { status: target });
     return true;
-  }, [markSent, onRequestWaitingQuote, onUpdateQuote]);
+  }, [markSent, openQuote, onUpdateQuote]);
   const confirmMove = async (patch: any) => { setMoving(true); try { const result = await onUpdateQuote?.(pendingMove.quote.id, { status: pendingMove.status, ...patch }); if (result !== false) setPendingMove(null); } finally { setMoving(false); } };
   // Ação primária do card: "Iniciar cotação" grava direto; as demais abrem a cotação já na ação.
   // Toda ação do card abre a cotação já na ação; "Registrar retorno" vai direto ao retorno da tarefa.
   const runCardAction = useCallback((quote: any, action: any) => {
     if (action.id === "send") { void markSent(quote); return; }
-    if (action.id === "return") { const task = tasksByQuote.get(quote.id); if (task) onRegisterWaitingReturn?.((task as any).id); return; }
+    // Sem tarefa (V2), o retorno é retomar a cotação: abre já na ação "return" do drawer.
+    if (action.id === "return") { const task = tasksByQuote.get(quote.id); if (task) { onRegisterWaitingReturn?.((task as any).id); return; } }
     openQuote(quote.id, { initialAction: action.id });
   }, [markSent, onRegisterWaitingReturn, openQuote, tasksByQuote]);
 
@@ -99,7 +106,7 @@ export default function HybridQuotesView({ state, currentEmployee, WaitingContex
     </section></>}
     {section === "history" && <QuoteHistory quotes={allQuotes} onOpen={openQuote} />}
     {creating && <QuoteCreateDrawer employees={state.employees || []} onClose={() => setCreating(false)} onCreate={onCreateQuote} AttachmentSectionComponent={AttachmentSectionComponent} />}
-    {selectedQuote && <QuoteManagementDrawer quote={selectedQuote} initialAction={requestedQuoteAction} onActionConsumed={onQuoteActionConsumed} task={selectedTask} employees={state.employees || []} teams={state.teams || []} currentEmployee={currentEmployee} WaitingContextFieldsComponent={WaitingContextFieldsComponent} ReturnsSectionComponent={ReturnsSectionComponent} onClose={closeQuote} onOpenTask={(id: any) => { closeQuote(); onOpenTask?.(id); }} onEnsureTaskDetails={onEnsureTaskDetails} onUpdate={onUpdateQuote} onRequestWaiting={() => onRequestWaitingQuote?.(selectedQuote.id)} onRegisterWaitingReturn={onRegisterWaitingReturn} onMarkSent={onMarkQuoteSent} onOutcome={onSetQuoteOutcome} onDeleteQuote={onDeleteQuote} onAttachment={onAttachment} onDeleteAttachment={onDeleteAttachment} loadAttachmentContent={loadAttachmentContent} AttachmentSectionComponent={AttachmentSectionComponent} />}
-    {pendingMove && <MoveDialog move={pendingMove} task={tasksByQuote.get(pendingMove.quote.id)} saving={moving} onCancel={() => setPendingMove(null)} onConfirm={confirmMove} onAttachment={onAttachment} onDeleteAttachment={onDeleteAttachment} loadAttachmentContent={loadAttachmentContent} AttachmentSectionComponent={AttachmentSectionComponent} />}
+    {selectedQuote && <QuoteManagementDrawer quote={selectedQuote} initialAction={requestedQuoteAction} onActionConsumed={onQuoteActionConsumed} task={selectedTask} employees={state.employees || []} teams={state.teams || []} currentEmployee={currentEmployee} quoteAttachments={quoteAttachments} ReturnsSectionComponent={ReturnsSectionComponent} onClose={closeQuote} onOpenTask={(id: any) => { closeQuote(); onOpenTask?.(id); }} onEnsureTaskDetails={onEnsureTaskDetails} onUpdate={onUpdateQuote} onRegisterWaitingReturn={onRegisterWaitingReturn} onMarkSent={onMarkQuoteSent} onOutcome={onSetQuoteOutcome} onDeleteQuote={onDeleteQuote} onDeleteAttachment={onDeleteAttachment} loadAttachmentContent={loadAttachmentContent} AttachmentSectionComponent={AttachmentSectionComponent} />}
+    {pendingMove && <MoveDialog move={pendingMove} saving={moving} onCancel={() => setPendingMove(null)} onConfirm={confirmMove} quoteAttachments={quoteAttachments} loadAttachmentContent={loadAttachmentContent} AttachmentSectionComponent={AttachmentSectionComponent} />}
   </div>;
 }

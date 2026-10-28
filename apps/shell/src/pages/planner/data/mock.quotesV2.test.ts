@@ -11,6 +11,9 @@ function priced(state: MockState) {
   return { id, state: updateQuote(updateQuote(created, id, { status: 'Em análise pelo financeiro' }), id, { options: priceOption }) }
 }
 
+// Avisos desta cotação (as cotações de exemplo do mock também geram lembretes).
+const ofQuote = (state: MockState, id: string) => (state.notifications || []).filter((n) => n.quoteId === id).length
+
 const values = new Map<string, string>()
 vi.stubGlobal('localStorage', { getItem: (key: string) => values.get(key) || null, setItem: (key: string, value: string) => values.set(key, value) })
 afterAll(() => { vi.unstubAllGlobals() })
@@ -42,17 +45,50 @@ describe('cotações V2 no mock', () => {
     expect(recipients.every((id) => finance?.memberIds?.includes(String(id)))).toBe(true)
   })
 
-  it('Aguardando informação não exige tarefa', () => {
+  const waiting = { status: 'Aguardando informação', waitingFor: 'Horário do voo', waitingFrom: 'Walter', waitingReturnDate: '2026-10-30' }
+
+  it('Aguardando informação grava o que falta, de quem e o retorno, sem tarefa', () => {
     const created = createQuote(state, input)
     const id = created.quotes[0].id
-    const next = updateQuote(created, id, { status: 'Aguardando informação', waitingContext: { subject: 'Horário do voo', onType: 'external', onNames: ['Walter'], expectedDate: '2026-10-28' } })
-    expect(next.quotes[0].status).toBe('Aguardando informação')
+    const next = updateQuote(created, id, waiting)
+    expect(next.quotes[0]).toMatchObject(waiting)
+    expect(() => updateQuote(created, id, { status: 'Aguardando informação' })).toThrow('Informe o que falta.')
+  })
+
+  it('sair de Aguardando limpa os campos', () => {
+    const created = createQuote(state, input)
+    const id = created.quotes[0].id
+    const resumed = updateQuote(updateQuote(created, id, waiting), id, { status: 'Em análise pelo financeiro' })
+    expect(resumed.quotes[0]).toMatchObject({ waitingFor: '', waitingFrom: '', waitingReturnDate: '' })
+  })
+
+  it('na data de retorno lembra criador e Financeiro, uma vez por dia', () => {
+    const created = createQuote(state, input)
+    const id = created.quotes[0].id
+    const next = updateQuote(created, id, waiting)
+    expect(ofQuote(syncQuoteFollowUps(next, '2026-10-29'), id)).toBe(ofQuote(next, id))
+    const due = syncQuoteFollowUps(next, '2026-10-30')
+    const recipients = (due.notifications || []).filter((n) => n.quoteId === id && n.type === 'quote_waiting_return').map((n) => n.recipientEmployeeId)
+    const finance = state.teams?.find((team) => team.name === 'Financeiro')?.memberIds || []
+    expect(recipients).toContain('employee-renan')
+    expect(finance.every((member) => recipients.includes(String(member)))).toBe(true)
+    expect(ofQuote(syncQuoteFollowUps(due, '2026-10-30'), id)).toBe(ofQuote(due, id))
   })
 
   it('Cotada derivada avisa o criador uma vez', () => {
     const { id, state: next } = priced(state)
     expect(next.quotes[0].status).toBe('Cotada')
     expect((next.notifications || []).filter((n) => n.quoteId === id && n.type === 'quote_ready' && n.recipientEmployeeId === 'employee-renan')).toHaveLength(1)
+  })
+
+  it('Preço pronto avisa de novo a cada nova entrada em Cotada', () => {
+    const { id, state: first } = priced(state)
+    const back = updateQuote(first, id, { status: 'Em análise pelo financeiro', options: [] })
+    vi.setSystemTime(Date.now() + 60_000)
+    const again = updateQuote(back, id, { options: priceOption })
+    vi.useRealTimers()
+    expect(again.quotes[0].status).toBe('Cotada')
+    expect((again.notifications || []).filter((n) => n.quoteId === id && n.type === 'quote_ready')).toHaveLength(2)
   })
 
   it('Enviei grava só a data, sem canal, e lembra depois de 2 dias úteis', () => {
@@ -65,10 +101,10 @@ describe('cotações V2 no mock', () => {
     expect(version?.channel || '').toBe('')
     expect(version?.recipient || '').toBe('')
     const sentDay = String(version?.sentAt).slice(0, 10)
-    expect(syncQuoteFollowUps(sent, sentDay).notifications?.length).toBe(sent.notifications?.length)
+    expect(ofQuote(syncQuoteFollowUps(sent, sentDay), id)).toBe(ofQuote(sent, id))
     const later = syncQuoteFollowUps(sent, '2099-01-01')
     expect((later.notifications || []).filter((n) => n.quoteId === id && n.type === 'quote_follow_up')).toHaveLength(1)
-    expect(syncQuoteFollowUps(later, '2099-01-01').notifications?.length).toBe(later.notifications?.length)
+    expect(ofQuote(syncQuoteFollowUps(later, '2099-01-01'), id)).toBe(ofQuote(later, id))
   })
 
   it('lembrete some com a decisão', () => {
@@ -78,7 +114,7 @@ describe('cotações V2 no mock', () => {
     const decided = setQuoteOutcome(sent, id, 'Aceita pelo cliente', '', { acceptedOptionId: 'o1', acceptedProposalVersionId: versionId })
     expect(decided.quotes[0].acceptedOptionId).toBe('o1')
     expect(decided.quotes[0].status).toBe('Aceita pelo cliente')
-    expect(syncQuoteFollowUps(decided, '2099-01-01').notifications?.length).toBe(decided.notifications?.length)
+    expect(ofQuote(syncQuoteFollowUps(decided, '2099-01-01'), id)).toBe(ofQuote(decided, id))
   })
 
   it('carregar o estado gera o lembrete vencido', () => {

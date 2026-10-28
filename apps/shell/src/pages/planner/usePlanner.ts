@@ -3,7 +3,7 @@ import { shellPlannerWindow } from './shellNavigation'
 import { notificationsVisibleToEmployee } from './components/NotificationsPanel'
 import { fileToDataUrl, mergeAttachmentDetailsIntoState, toAttachmentFiles } from './components/attachmentFiles'
 import { CHECKLIST_VISIBILITY_STORAGE_KEY, plannerQuoteSearchRef } from './constants'
-import { createDataStore } from './data/dataverse'
+import { createDataStore, type LiveAttachment } from './data/dataverse'
 import { setErrorLogContext } from './data/errorLogger'
 import { playCompletionSound, prepareCompletionSound } from './domain/completionSound'
 import { buildLinkedTaskInput, createContactEvent, createContactPayload, normalizeContact } from './domain/contactDomain'
@@ -63,7 +63,6 @@ export function usePlanner() {
   const openQuoteView = useCallback((id: any, action = "") => { selectQuote(id, action); setActive("quotes"); setSelectedId(""); }, [selectQuote]);
   const [selectedContactId, setSelectedContactId] = useState<any>(initialUrlStateRef.current.contactId);
   const [waitingTaskId, setWaitingTaskId] = useState<any>("");
-  const [waitingQuoteId, setWaitingQuoteId] = useState<any>("");
   const [waitingReturnTaskId, setWaitingReturnTaskId] = useState<any>("");
   const [creating, setCreating] = useState<any>(false);
   const [creatingStatus, setCreatingStatus] = useState<any>("todo");
@@ -934,28 +933,27 @@ export function usePlanner() {
     if (!store.createQuote) return Promise.resolve(false);
     const { attachments = [], ...quoteInput } = input;
     const previousIds = new Set((confirmedStateRef.current || state).quotes?.map((quote: any) => quote.id) || []);
-    let linkedTaskId = "";
+    let createdQuoteId = "";
     const created = await runOptimisticMutation(
       (current: any) => current,
       async () => {
         const next = await store.createQuote(confirmedStateRef.current || state, { ...quoteInput, actorEmployeeId: currentEmployee?.id || "" });
-        const quote = (next.quotes || []).find((item: any) => !previousIds.has(item.id));
-        linkedTaskId = (next.tasks || []).find((task: any) => task.quoteId === quote?.id && !task.parentTaskId)?.id || "";
+        createdQuoteId = (next.quotes || []).find((item: any) => !previousIds.has(item.id))?.id || "";
         return next;
       },
       store.live ? "Cotação em sincronização…" : "Criando cotação no mock local…",
       store.live ? "Cotação enviada para sincronização." : "Cotação criada no mock local.",
     );
     if (!created || !attachments.length) return created;
-    if (!linkedTaskId) { showNotice("Cotação criada, mas a tarefa para anexos não foi localizada.", 5200); return true; }
+    if (!createdQuoteId) { showNotice("Cotação criada, mas não foi localizada para enviar os anexos.", 5200); return true; }
+    // V2.1: anexos vão para a pasta da cotação no SharePoint (Cotacoes/<id>).
     let failures = 0;
+    const uploaded: LiveAttachment[] = [];
     for (const file of attachments) {
       try {
-        showNotice(`Enviando anexo ${attachments.indexOf(file) + 1} de ${attachments.length}…`);
+        showNotice(`Enviando anexo ${uploaded.length + failures + 1} de ${attachments.length}…`);
         const previewUrl = store.live ? "" : await fileToDataUrl(file);
-        const next = await store.addAttachment(confirmedStateRef.current || state, linkedTaskId, file, previewUrl);
-        confirmedStateRef.current = next;
-        setState(applyPendingMutations(next));
+        uploaded.push(await store.addQuoteAttachment(createdQuoteId, file, uploaded, previewUrl));
       } catch (error: any) {
         failures += 1;
         console.warn("[Planner] anexo da cotação não enviado", error);
@@ -973,13 +971,6 @@ export function usePlanner() {
       store.live ? "Cotação sincronizada." : "Cotação atualizada.",
     );
   }, [currentEmployee, runOptimisticMutation, state, store]);
-  const waitingQuote = state.quotes.find((quote: any) => quote.id === waitingQuoteId);
-  const waitingQuoteTask = waitingQuote && state.tasks.find((task: any) => task.quoteId === waitingQuoteId && !task.parentTaskId);
-  const saveWaitingQuote = useCallback((id: any, waitingContext: any) => {
-    const quote = state.quotes.find((item: any) => item.id === waitingQuoteId);
-    if (!quote || !state.tasks.some((task: any) => task.id === id && task.quoteId === quote.id)) return Promise.resolve(false);
-    return updateQuote(quote.id, { status: "Aguardando informação", waitingContext });
-  }, [state.quotes, state.tasks, updateQuote, waitingQuoteId]);
   const markQuoteSent = useCallback((id: any, proposal: any = {}) => {
     if (!store.markQuoteSent) return Promise.resolve(false);
     return runOptimisticMutation(
@@ -1568,8 +1559,6 @@ export function usePlanner() {
     setSelectedContactId,
     waitingTaskId,
     setWaitingTaskId,
-    waitingQuoteId,
-    setWaitingQuoteId,
     waitingReturnTaskId,
     setWaitingReturnTaskId,
     creating,
@@ -1646,9 +1635,6 @@ export function usePlanner() {
     handleWhatsAppIntake,
     createQuote,
     updateQuote,
-    waitingQuote,
-    waitingQuoteTask,
-    saveWaitingQuote,
     markQuoteSent,
     setQuoteOutcome,
     deleteQuote,

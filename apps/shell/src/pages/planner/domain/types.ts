@@ -293,6 +293,10 @@ export interface QuoteData extends Quote {
   subject?: string
   passengerProfile?: string
   internalNotes?: string
+  /** V2.1: o que falta, de quem e quando deve voltar (só em "Aguardando informação"). */
+  waitingFor?: string
+  waitingFrom?: string
+  waitingReturnDate?: string
 }
 
 /** Entrada solta de cotação (formulário, testes, registros antigos). */

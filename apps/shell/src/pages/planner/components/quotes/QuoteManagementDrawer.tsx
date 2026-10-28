@@ -6,7 +6,11 @@ import { localDateKey } from '../../domain/management';
 import { startQuotePatch } from '../../domain/quoteTaskFlow';
 import { createQuoteWord, downloadQuoteWord } from '../../domain/quoteWord';
 import { createQuotePdf, downloadQuotePdf } from '../../domain/quotePdf';
-import { canRegisterWaitingReturn, formatDate, normalizeWaitingContext, validateWaitingContext } from '../../domain/domain';
+import { canRegisterWaitingReturn, formatDate } from '../../domain/domain';
+import { QUOTE_WAITING_STATUS, type QuoteWaitingFields } from '../../domain/quoteWaiting';
+import QuoteWaitingDialog from './QuoteWaitingDialog';
+import type { QuoteAttachmentsApi } from './useQuoteAttachments';
+import type { LiveAttachment } from '../../data/dataverse';
 import { QuoteClientFields, QuoteDeadlineFields, QuoteRequestFields, QuoteTermsFields } from './QuoteFields';
 import MissingDeadlineDialog from './MissingDeadlineDialog';
 import TaskHistorySection from '../TaskHistorySection';
@@ -25,7 +29,7 @@ function quoteDraftSnapshot(quote: any) {
   return JSON.stringify(businessData, (key, value) => key === "recordId" ? undefined : value);
 }
 
-export default function QuoteManagementDrawer({ quote, task, employees = [], teams = [], currentEmployee, initialAction = "", onActionConsumed, WaitingContextFieldsComponent, ReturnsSectionComponent, onClose, onOpenTask, onEnsureTaskDetails, onUpdate, onMarkSent, onOutcome, onDeleteQuote, onRequestWaiting, onRegisterWaitingReturn, onAttachment, onDeleteAttachment, loadAttachmentContent, AttachmentSectionComponent }: any) {
+export default function QuoteManagementDrawer({ quote, task, employees = [], teams = [], currentEmployee, initialAction = "", onActionConsumed, quoteAttachments, ReturnsSectionComponent, onClose, onOpenTask, onEnsureTaskDetails, onUpdate, onMarkSent, onOutcome, onDeleteQuote, onRegisterWaitingReturn, onDeleteAttachment, loadAttachmentContent, AttachmentSectionComponent }: any) {
   const [draft, setDraft] = useState<any>(() => quoteToDraft(quote));
   const mutationPending = useRef<any>(false);
   const pendingSavePatch = useRef<any>({});
@@ -40,8 +44,7 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
   const [composerBusy, setComposerBusy] = useState<any>("");
   const [composerMessage, setComposerMessage] = useState<any>("");
   const [confirmMissingDeadline, setConfirmMissingDeadline] = useState<any>(false);
-  const [waitingContext, setWaitingContext] = useState<any>(() => normalizeWaitingContext(task?.waitingContext));
-  const [waitingError, setWaitingError] = useState<any>("");
+  const [waitingOpen, setWaitingOpen] = useState(false);
   const [resultOpen, setResultOpen] = useState<any>(false);
   const resultRef = useRef<any>(null);
   const decisionFocusRef = useRef<any>(null);
@@ -67,11 +70,10 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
   const inlineToolbarRef = useRef<any>(null);
   const draftSnapshot = useMemo(() => quoteDraftSnapshot(draft), [draft]);
   const dirty = draftSnapshot !== baselineRef.current.snapshot;
-  const waitingChanged = JSON.stringify(normalizeWaitingContext(task?.waitingContext)) !== JSON.stringify(waitingContext);
   const update = (key: any, value: any) => { setSaveMessage(""); setDraft((current: any) => ({ ...current, [key]: value })); };
   const requestClose = () => {
     if (mutationPending.current || saving) return;
-    const changed = dirty || waitingChanged || previewEdited;
+    const changed = dirty || previewEdited;
     if (changed) { setConfirmClose(true); return; }
     onClose?.();
   };
@@ -104,12 +106,15 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     setDraft(quoteToDraft(quote)); setActiveOptionId(options[0]?.id || "");
     setQuoteConflict(false); setAcceptedOptionId(quote.acceptedOptionId || "");
   }, [quote, draft, draftSnapshot, saving]);
-  useEffect(() => { setWaitingContext(normalizeWaitingContext(task?.waitingContext)); setWaitingError(""); }, [task?.id, task?.waitingContext]);
+  const attachmentsApi = quoteAttachments as QuoteAttachmentsApi | undefined;
+  const ensureQuoteAttachments = attachmentsApi?.ensure;
+  useEffect(() => { void ensureQuoteAttachments?.(quote.id); }, [ensureQuoteAttachments, quote.id]);
+  const attachmentList = attachmentsApi?.get(quote.id);
   const closeComposer = () => { composerController.current?.abort(); composerController.current = null; setComposerBusy(""); setComposerMessage(""); setComposerOpen(false); };
-  useEffect(() => { const handler = (event: any) => { if (event.key === "Escape" && !confirmClose && !mutationPending.current) resultOpen ? setResultOpen(false) : deleteOpen ? setDeleteOpen(false) : composerOpen ? closeComposer() : requestClose(); }; window.addEventListener("keydown", handler); return () => window.removeEventListener("keydown", handler); }, [onClose, composerOpen, deleteOpen, resultOpen, confirmClose, draft, waitingContext, task?.waitingContext, previewEdited, saving]);
+  useEffect(() => { const handler = (event: any) => { if (event.key === "Escape" && !confirmClose && !waitingOpen && !mutationPending.current) resultOpen ? setResultOpen(false) : deleteOpen ? setDeleteOpen(false) : composerOpen ? closeComposer() : requestClose(); }; window.addEventListener("keydown", handler); return () => window.removeEventListener("keydown", handler); }, [onClose, composerOpen, deleteOpen, resultOpen, confirmClose, waitingOpen, draft, previewEdited, saving]);
   useEffect(() => {
     const containFocus = (event: any) => {
-      if (event.key !== "Tab" || confirmClose || resultOpen || deleteOpen) return;
+      if (event.key !== "Tab" || confirmClose || resultOpen || deleteOpen || waitingOpen) return;
       const scope = composerOpen ? composerRef.current : dialogRef.current;
       const focusable = [...(scope?.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') || [])].filter((item) => item.getClientRects().length);
       if (!focusable.length) { event.preventDefault(); return; }
@@ -121,7 +126,7 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     };
     window.addEventListener("keydown", containFocus);
     return () => window.removeEventListener("keydown", containFocus);
-  }, [composerOpen, resultOpen, deleteOpen, confirmClose]);
+  }, [composerOpen, resultOpen, deleteOpen, confirmClose, waitingOpen]);
   useEffect(() => () => composerController.current?.abort(), []);
   useEffect(() => {
     if (!resultOpen) return;
@@ -266,12 +271,11 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     baselineRef.current = { id: quote.id, snapshot: quoteDraftSnapshot(quote) };
     setDraft(quoteToDraft(quote)); setActiveOptionId(options[0]?.id || ""); setAcceptedOptionId(quote.acceptedOptionId || ""); setQuoteConflict(false); setSaveError("");
   };
-  const saveWaitingContext = async () => {
-    const validation = validateWaitingContext("waiting", waitingContext);
-    if (!validation.allowed) { setWaitingError(validation.error); return; }
-    setWaitingError("");
-    const result = await run(() => onUpdate?.(quote.id, { waitingContext }));
-    if (result === false) setWaitingError("Não foi possível salvar o contexto. Tente novamente.");
+  // V2.1: grava o que falta/de quem/retorno (com a mudança para Aguardando, se ainda não estava).
+  const confirmWaiting = async (fields: Required<QuoteWaitingFields>) => {
+    const failure = await save(true, { status: QUOTE_WAITING_STATUS, ...fields });
+    if (!failure) setWaitingOpen(false);
+    return failure;
   };
   // Um passo só: a prévia exibida (inclusive texto editado) vira a versão
   // registrada. Se a cotação ainda não estava Cotada, salva antes.
@@ -384,13 +388,14 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
       if (mutationPending.current) return;
       await saveThenMarkSent({}, setResultError);
     },
-    return: () => task && onRegisterWaitingReturn?.(task.id),
+    // Sem tarefa (V2), registrar o retorno é retomar a cotação; os campos de espera são limpos.
+    return: () => task ? onRegisterWaitingReturn?.(task.id) : save(false, { status: "Em análise pelo financeiro" }),
     outcome: () => openResult("Aceita pelo cliente"),
     reopen,
-    wait: () => onRequestWaiting?.(),
+    wait: () => setWaitingOpen(true),
     resume: () => save(false, { status: "Em análise pelo financeiro" }),
   };
-  const actionEnabled = { return: canRegisterWaitingReturn(task, currentEmployee, teams) && Boolean(onRegisterWaitingReturn), outcome: decisionOptions.length > 0, wait: Boolean(onRequestWaiting) };
+  const actionEnabled = { return: task ? canRegisterWaitingReturn(task, currentEmployee, teams) && Boolean(onRegisterWaitingReturn) : true, outcome: decisionOptions.length > 0, wait: true };
   // Ação pedida pelo card do Kanban ou pelo board de tarefas ao abrir a cotação.
   useEffect(() => {
     if (!initialAction) return;
@@ -412,14 +417,17 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
   };
 
 
-  return <div className="quote-v3-layer" onClick={(event) => { if ((event.target as any).matches(".quote-v3-layer, .quote-v3-workspace, .quote-options-comparison") && !composerOpen && !resultOpen && !deleteOpen && !confirmMissingDeadline) requestClose(); }}><div className="quote-v3-workspace has-comparison" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="quote-management-title">
+  return <div className="quote-v3-layer" onClick={(event) => { if ((event.target as any).matches(".quote-v3-layer, .quote-v3-workspace, .quote-options-comparison") && !composerOpen && !resultOpen && !deleteOpen && !waitingOpen && !confirmMissingDeadline) requestClose(); }}><div className="quote-v3-workspace has-comparison" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="quote-management-title">
     <QuoteOptionsComparison contextContent={<div className="quote-options-context">
       {awaitingDecision && <section aria-label="Decisão do cliente">{hasSentOptions ? <p>Opções da proposta enviada · Versão {sentProposal.number}</p> : legacyDecision && decisionOptions.length > 0 ? <p>Cotação respondida sem versão histórica de envio. Registre a decisão sobre a opção atual.</p> : <><p role="status">Nenhuma proposta enviada foi registrada. Registre o envio antes de registrar a decisão do cliente.</p><button className="button button-primary" type="button" disabled={saving} onClick={registerProposalSent}>Registrar envio</button></>}</section>}
       <section className="quote-request-overview" aria-label="Pedido do cliente completo"><h3>Pedido do cliente</h3><p className="quote-request-full-text">{draft.notes || "Pedido do cliente não informado."}</p></section>
       <section className="quote-attachments-overview" aria-label="Anexos da cotação"><h3>Anexos da cotação</h3>
-        {task?.detailsLoading && <p role="status">Carregando anexos…</p>}
-        {task?.detailsError && <p role="alert">{task.detailsError}<button type="button" className="button button-quiet" onClick={() => onEnsureTaskDetails?.(task.id)}>Tentar novamente</button></p>}
-        {task && AttachmentSectionComponent ? <AttachmentSectionComponent taskId={task.id} attachments={task.attachments || []} loadAttachmentContent={loadAttachmentContent} onAttachment={onAttachment} onDeleteAttachment={onDeleteAttachment} itemLabel="à cotação" compact showPreview={false} /> : <p>Nenhuma tarefa vinculada à cotação.</p>}
+        {attachmentList?.loading && <p role="status">Carregando anexos…</p>}
+        {attachmentList?.error && <p role="alert">{attachmentList.error}<button type="button" className="button button-quiet" onClick={() => void attachmentsApi?.ensure(quote.id, true)}>Tentar novamente</button></p>}
+        {attachmentsApi && AttachmentSectionComponent && <AttachmentSectionComponent taskId={quote.id} attachments={attachmentList?.items || []} loadAttachmentContent={loadAttachmentContent} onAttachment={(id: string, files: File[]) => attachmentsApi.add(id, files)} onDeleteAttachment={(id: string, attachment: LiveAttachment) => attachmentsApi.remove(id, attachment)} itemLabel="à cotação" sizeHint="Até 10 MB por arquivo" compact showPreview={false} />}
+        {task && <>{task.detailsLoading && <p role="status">Carregando anexos da tarefa…</p>}
+          {task.detailsError && <p role="alert">{task.detailsError}<button type="button" className="button button-quiet" onClick={() => onEnsureTaskDetails?.(task.id)}>Tentar novamente</button></p>}
+          {AttachmentSectionComponent && (task.attachments || []).length > 0 && <AttachmentSectionComponent taskId={task.id} attachments={task.attachments} loadAttachmentContent={loadAttachmentContent} title="Anexos da tarefa (anterior)" sizeHint="Somente leitura" compact showPreview={false} />}</>}
       </section>
     </div>} options={comparisonOptions} activeId={currentOption?.id} accepted={draft.status === "Aceita pelo cliente"} readOnly={readOnlyOptions} sent={hasSentOptions} saving={saving} onDecision={awaitingDecision && decisionOptions.length > 0 ? (optionId: any, status: any) => openResult(status, optionId) : undefined} onActivate={setActiveOptionId} onAdd={addOption} onDuplicate={duplicateOption} onRemove={removeOption} onChange={(option: any) => update("options", (draft.options || []).map((item: any) => item.id === option.id ? option : item))} onGenerate={openComposer} />
     <aside className="quote-v3-drawer quote-v3-management">
@@ -432,13 +440,14 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
       <details className="quote-stage-section" open={stage.id === "request"}><summary><span className="quote-stage-number">1</span><h3>Pedido</h3><small>{draft.clientContact || "Solicitante"}{draft.passengers ? ` · ${draft.passengers} pax` : ""}{draft.deadline ? ` · até ${formatDate(draft.deadline)}` : ""}</small></summary><section><h4>Cliente</h4><QuoteClientFields draft={draft} update={update} errors={errors} /></section><section><h4>Pedido</h4><QuoteRequestFields draft={draft} update={update} errors={errors} /></section><section><h4>Prazo</h4><QuoteDeadlineFields draft={draft} update={update} errors={errors} /></section></details>
       <details className="quote-stage-section" open={stage.id === "cost"}><summary><span className="quote-stage-number">2</span><h3>Custo</h3><small>{proposalSummary.valid ? `${proposalSummary.options.length} ${proposalSummary.options.length === 1 ? "opção pronta" : "opções prontas"}` : "Sem opção com valor"}</small></summary><p className="quote-stage-hint">As opções ficam ao lado. Com título e valor, a cotação passa a Cotada sozinha.</p><section><QuoteTermsFields draft={draft} update={update} errors={errors} /></section></details>
 
-      {draft.status === "Aguardando informação" && task && WaitingContextFieldsComponent && <div className="quote-v3-waiting">
-        <WaitingContextFieldsComponent value={waitingContext} onChange={setWaitingContext} employees={employees} teams={teams} error={waitingError} />
+      {draft.status === QUOTE_WAITING_STATUS && <section className="quote-v3-waiting" aria-label="Aguardando informação">
+        <h4>Aguardando informação</h4>
+        {draft.waitingFor ? <dl><dt>O que falta</dt><dd>{draft.waitingFor}</dd><dt>De quem</dt><dd>{draft.waitingFrom || "Não informado"}</dd><dt>Retorno</dt><dd className={draft.waitingReturnDate && draft.waitingReturnDate <= localDateKey() ? "danger-text" : ""}>{formatDate(draft.waitingReturnDate)}</dd></dl> : <p>Sem detalhes registrados.</p>}
         <div className="quote-v3-waiting-actions">
-          {actionEnabled.return && <button className="button button-secondary drawer-return-action" type="button" onClick={actions.return}>Registrar retorno</button>}
-          {waitingChanged && <button className="button button-primary" type="button" disabled={saving} onClick={saveWaitingContext}>{saving ? "Salvando…" : "Salvar contexto"}</button>}
+          <button className="button button-quiet" type="button" disabled={saving} onClick={() => setWaitingOpen(true)}>Editar</button>
+          {actionEnabled.return && <button className="button button-secondary drawer-return-action" type="button" disabled={saving} onClick={actions.return}>Registrar retorno</button>}
         </div>
-      </div>}
+      </section>}
       {task && ReturnsSectionComponent && <ReturnsSectionComponent task={task} currentEmployee={currentEmployee} loadAttachmentContent={loadAttachmentContent} onDeleteAttachment={onDeleteAttachment} />}
       {terminalQuote && <section className="quote-v3-result"><h3>Resultado</h3><strong>{draft.status}</strong><span>Finalizada em {draft.finalizationAt ? formatDateTime(draft.finalizationAt) : "data não informada"}</span>{draft.status === "Aceita pelo cliente" && acceptedOption && <p>{acceptedOption.name} · {formatMoney(acceptedOption.value)}</p>}{draft.status === "Perdida" && <p>Motivo: {draft.lossReason || "Não registrado"}</p>}</section>}</form>
       {(saveError || quoteConflict) && <p className="quote-v3-save-error" role="alert">{quoteConflict ? "Esta cotação mudou em outra edição." : saveError}{quoteConflict && <button type="button" onClick={reloadQuote}>Recarregar cotação</button>}</p>}
@@ -463,6 +472,7 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     {resultError && <p role="alert">{resultError}</p>}
     <div><button className="button button-secondary" type="button" disabled={saving} onClick={() => setResultOpen(false)}>Voltar</button><button className="button button-primary" type="submit" disabled={saving}>{saving ? "Salvando…" : "Confirmar"}</button></div>
   </form></div>}
+  {waitingOpen && <QuoteWaitingDialog initial={draft.status === QUOTE_WAITING_STATUS ? draft : {}} saving={saving} onCancel={() => setWaitingOpen(false)} onConfirm={confirmWaiting} />}
   {deleteOpen && <QuoteDeleteDialog quote={quote} onCancel={() => setDeleteOpen(false)} onDelete={onDeleteQuote} />}
   {confirmClose && <div className="quote-v3-confirm-layer"><div ref={discardRef} className="quote-v3-dialog" role="alertdialog" aria-modal="true" aria-labelledby="quote-discard-title"><h3 id="quote-discard-title">Descartar alterações?</h3><p>As alterações não salvas nos dados e nas opções da cotação serão perdidas.</p><div><button className="button button-secondary" type="button" onClick={() => setConfirmClose(false)}>Continuar editando</button><button className="button button-danger" type="button" onClick={() => onClose?.()}>Descartar</button></div></div></div>}
   </div>;
