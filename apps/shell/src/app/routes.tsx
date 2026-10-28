@@ -34,6 +34,7 @@ export const PAGE_LOADERS: Record<PageId, () => Promise<ComponentType<PageProps>
   comunicados: () => import('../pages/comunicados/ComunicadosPage').then((m) => m.ComunicadosPage),
   agentes: () => import('../pages/agentes/AgentesPage').then((m) => m.AgentesPage),
   planner: () => import('../pages/planner/PlannerPage').then((m) => m.PlannerPage),
+  'validacao-cliente': () => import('../pages/validacao-cliente/ValidacaoClientePage').then((m) => m.ValidacaoClientePage),
   logs: () => import('../pages/logs/LogsPage').then((m) => m.LogsPage),
 }
 
