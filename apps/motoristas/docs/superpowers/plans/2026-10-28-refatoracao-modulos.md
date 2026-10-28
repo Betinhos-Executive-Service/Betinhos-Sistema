@@ -12,15 +12,12 @@ Spec: `docs/superpowers/specs/2026-10-28-refatoracao-modulos-design.md`. Um PR p
 - `scripts/qa/screens-baseline.cjs`: 16 telas do mock por rota hash a partir do `dist/`, relógio congelado, comparação por hash do PNG (rodadas seguidas = idênticas).
 - Store mock: coberto pelas screenshots; `loadRemoteStore` já tem testes com Xrm falso.
 
-## Passo 1 — Esqueleto (sem uso ainda)
-- `src/data/porta.ts`: tipo `PortaDados` com as operações do modo link: `carregarAgenda`, `carregarDetalhe`, `marcarVisto`, `enviarFotoChecklist`, `salvarChecklist`, `salvarObservacao`, `finalizarServico`, `salvarVoucher`, `salvarRascunhoVoucher`, `gerarRecibo` (create + PDF + e-mail), `carregarComunicados`, `carregarIdeias`, `criarIdeia`. Assinaturas copiadas das funções atuais, sem mudar formato.
-- `src/data/dataverse/adaptador.ts`: implementa `PortaDados` delegando 1:1 para `lib/dataverse.ts` etc.
-- `src/app/modo.ts`: `type Modo = "motorista" | "link"`; `detectarModo()` retorna sempre `"motorista"` agora.
-- `src/app/DataProvider.tsx` + `useDados()`; `main.tsx` envolve `<App/>` com o adaptador Dataverse.
-- `src/features/<x>/manifesto.ts` para as 16 features + `src/app/features.ts` (registro) + `featuresDoModo(modo)`.
-- `src/data/worker/contrato.md`: rotas/payloads esperados, só texto.
-- Testes: `featuresDoModo("link")` = lista exata da spec; adaptador expõe todas as chaves de `PortaDados`.
-- Pronto quando: build idêntico em comportamento (nada chama `useDados` ainda).
+## Passo 1 — Esqueleto (feito)
+- `src/data/porta.ts`: `PortaDados` com 20 operações do modo link (agenda, detalhe, visto, checklists, foto do checklist, observação, finalizar, voucher e rascunho, recibo, comunicados, ideias). Tipos via `typeof` das funções atuais, para não divergirem.
+- `src/data/dataverse/adaptador.ts`: implementa a porta delegando 1:1 (teste garante que são as mesmas funções).
+- `src/app/modo.ts` (`motorista | link`, sempre `motorista` por enquanto), `src/app/DataProvider.tsx` + `useDados()`, `main.tsx` injeta o adaptador Dataverse.
+- `src/app/features.ts`: registro único de features com `liberadoLink` + `featuresDoModo`/`telasDoModo`. Cada item vira `features/<x>/manifesto.ts` quando a feature ganhar pasta (passos 3–5), em vez de 16 arquivos vazios agora.
+- `src/data/worker/contrato.md`. Nenhuma tela usa `useDados()` ainda.
 
 ## Passo 2 — Cliente Dataverse
 - `git mv` do núcleo HTTP para `src/data/dataverse/cliente.ts`: `isDataverseHostRuntime`, `isStandaloneWebResourceRuntime`, `hasDataverseRuntime`, `retrieveMultiple`, `retrieveOne`, `createOne`, `updateOne`, `deleteOne`, `getDriverContext`, `getDriverCurrentVehicleId` (+ `fetchWebApi.ts`, `customApi.ts`, `remoteReadBatch.ts`, `fieldLookup.ts`).

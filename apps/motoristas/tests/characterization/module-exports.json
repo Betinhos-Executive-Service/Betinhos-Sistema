@@ -693,6 +693,16 @@
     "shouldRequireReceiveStep",
     "shouldRouteServiceToVoucher"
   ],
+  "src/app/features.ts": [
+    "FEATURES",
+    "Feature",
+    "featuresDoModo",
+    "telasDoModo"
+  ],
+  "src/app/modo.ts": [
+    "Modo",
+    "detectarModo"
+  ],
   "src/app/navigation.ts": [
     "AUTO_REFRESH_INTERVAL_MS",
     "HashRoute",
@@ -712,5 +722,8 @@
     "agendaMock",
     "historyMock",
     "tiles"
+  ],
+  "src/data/porta.ts": [
+    "PortaDados"
   ]
 }

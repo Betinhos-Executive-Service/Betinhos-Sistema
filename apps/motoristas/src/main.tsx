@@ -1,7 +1,9 @@
 import React from "react";
 import * as ReactDOM from "react-dom";
 import App from "./App";
+import { DataProvider } from "./app/DataProvider";
 import { AppErrorBoundary } from "./components/app/AppErrorBoundary";
+import { adaptadorDataverse } from "./data/dataverse/adaptador";
 import { installGlobalAppErrorLogger } from "./lib/appErrorLogger";
 import { installPwa } from "./lib/pwa";
 
@@ -12,7 +14,9 @@ try {
   (ReactDOM as { render: (node: React.ReactNode, container: HTMLElement) => void }).render(
     <React.StrictMode>
       <AppErrorBoundary>
-        <App />
+        <DataProvider adaptador={adaptadorDataverse}>
+          <App />
+        </DataProvider>
       </AppErrorBoundary>
     </React.StrictMode>,
     document.getElementById("root") as HTMLElement
