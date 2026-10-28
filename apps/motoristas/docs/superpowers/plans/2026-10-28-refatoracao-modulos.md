@@ -6,12 +6,11 @@ Spec: `docs/superpowers/specs/2026-10-28-refatoracao-modulos-design.md`. Um PR p
 
 **Regra de movimento:** mover arquivo = `git mv` + deixar no caminho antigo um reexport de 1 linha até o passo 7. Assim cada PR muda poucos imports e o diff mostra "renomeado" em vez de "apagado/criado".
 
-## Passo 0 — Rede de segurança
-- `tests/characterization/exports.test.ts`: snapshot da lista de exports de `lib/dataverse.ts` (falha se algo sumir sem querer).
-- `tests/characterization/hashRoute.test.ts`: `parseHashRoute` + `getInitialScreenFromHashRoute` para cada rota hoje usada (agenda, detalhe, recibo, comunicados, termos, preview).
-- `tests/characterization/remoteStoreMock.test.ts`: `loadRemoteStore` em modo mock devolve a mesma forma (snapshot de chaves/contagens de `mockData`).
-- `scripts/qa/capture-baseline.mjs` (reaproveita `demo:capture`): grava PNGs de todas as telas do mock em `artifacts/baseline/` (fora do git) e compara pixel a pixel com uma rodada nova.
-- Pronto quando: testes novos verdes na `main` atual, baseline gerado.
+## Passo 0 — Rede de segurança (feito)
+- `tests/moduleExports.test.ts` + `tests/characterization/module-exports.json`: exports (inclusive tipos) de todos os `.ts` de `src/lib`, `src/app`, `src/data`. Ao mover, o caminho antigo precisa reexportar.
+- `tests/hashRouteCharacterization.test.ts`: hash, parse, restore e fallback das 31 telas + aliases legados.
+- `scripts/qa/screens-baseline.cjs`: 16 telas do mock por rota hash a partir do `dist/`, relógio congelado, comparação por hash do PNG (rodadas seguidas = idênticas).
+- Store mock: coberto pelas screenshots; `loadRemoteStore` já tem testes com Xrm falso.
 
 ## Passo 1 — Esqueleto (sem uso ainda)
 - `src/data/porta.ts`: tipo `PortaDados` com as operações do modo link: `carregarAgenda`, `carregarDetalhe`, `marcarVisto`, `enviarFotoChecklist`, `salvarChecklist`, `salvarObservacao`, `finalizarServico`, `salvarVoucher`, `salvarRascunhoVoucher`, `gerarRecibo` (create + PDF + e-mail), `carregarComunicados`, `carregarIdeias`, `criarIdeia`. Assinaturas copiadas das funções atuais, sem mudar formato.
