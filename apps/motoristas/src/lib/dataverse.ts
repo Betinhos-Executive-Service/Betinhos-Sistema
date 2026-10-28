@@ -3446,8 +3446,8 @@ export async function loadRemoteStore(): Promise<RemoteStore> {
     batch.once(JSON.stringify(["one", entity, cleanGuid(id), options]), () => retrieveOne(entity, id, options));
   const readAll = (entity: string, options: string) => retrieveMultipleAll(entity, options, batch.run);
 
-  const [servicesResult, maintenanceGeralResult, programmedExchangeGeralResult, exchangeResult,
-    historyServiceResult, historyMaintenanceGeralResult, historyExchangeGeralResult, historyExchangeResult] = await Promise.all([
+  const [servicesResult, maintenanceGeralResult, exchangeResult,
+    historyServiceResult, historyMaintenanceGeralResult, historyExchangeResult] = await Promise.all([
     readAll(DATAVERSE.geral, [
       GERAL_SERVICE_SELECT,
       `$filter=cr40f_dataehorriodesada le ${end} and _cr40f_motorista_value eq ${driver.id} and new_foiprogramado eq true and new_categoriadoitem eq ${CATEGORY.servico} and cr40f_status ne ${OPERATION_STATUS.concluido} and _cr40f_om_value eq null and _cr40f_ot_value eq null`,
@@ -3456,11 +3456,6 @@ export async function loadRemoteStore(): Promise<RemoteStore> {
     readAll(DATAVERSE.geral, [
       geralSelect,
       `$filter=cr40f_dataehorriodesada le ${end} and _cr40f_motorista_value eq ${driver.id} and new_foiprogramado eq true and new_categoriadoitem eq ${CATEGORY.manutencao} and cr40f_status ne ${OPERATION_STATUS.concluido} and _cr40f_om_value ne null and _cr40f_ot_value eq null`,
-      "$orderby=cr40f_dataehorriodesada asc"
-    ].join("&")),
-    readAll(DATAVERSE.geral, [
-      geralSelect,
-      `$filter=new_foiprogramado eq true and new_categoriadoitem eq ${CATEGORY.troca} and _cr40f_ot_value ne null`,
       "$orderby=cr40f_dataehorriodesada asc"
     ].join("&")),
     readAll(DATAVERSE.trocas, [
@@ -3476,11 +3471,6 @@ export async function loadRemoteStore(): Promise<RemoteStore> {
     readAll(DATAVERSE.geral, [
       geralSelect,
       `$filter=cr40f_dataehorriodesada ge ${historyStart} and cr40f_dataehorriodesada lt ${historyEnd} and _cr40f_motorista_value eq ${driver.id} and cr40f_status eq ${OPERATION_STATUS.concluido} and new_categoriadoitem eq ${CATEGORY.manutencao} and _cr40f_om_value ne null and _cr40f_ot_value eq null`,
-      "$orderby=cr40f_dataehorriodesada desc"
-    ].join("&")),
-    readAll(DATAVERSE.geral, [
-      geralSelect,
-      `$filter=new_categoriadoitem eq ${CATEGORY.troca} and _cr40f_ot_value ne null`,
       "$orderby=cr40f_dataehorriodesada desc"
     ].join("&")),
     readAll(DATAVERSE.trocas, [
@@ -3503,6 +3493,21 @@ export async function loadRemoteStore(): Promise<RemoteStore> {
       return mapMaintenance(geral, maintenance);
     })
   );
+
+  // Só os Gerais das trocas do motorista: sem o filtro, a carga trazia as trocas de todos e passava do prazo de 8 s.
+  const readExchangeGerals = (exchanges: DataverseRecord[], extraFilter: string, orderBy: string) => {
+    const ids = exchanges.map((exchange) => getRecordId(exchange, "cr40f_trocasdecarroid")).filter(Boolean);
+    if (!ids.length) return Promise.resolve({ entities: [] as DataverseRecord[] });
+    return readAll(DATAVERSE.geral, [
+      geralSelect,
+      `$filter=${extraFilter}new_categoriadoitem eq ${CATEGORY.troca} and (${ids.map((id) => `_cr40f_ot_value eq ${id}`).join(" or ")})`,
+      `$orderby=cr40f_dataehorriodesada ${orderBy}`
+    ].join("&"));
+  };
+  const [programmedExchangeGeralResult, historyExchangeGeralResult] = await Promise.all([
+    readExchangeGerals(exchangeResult.entities, "new_foiprogramado eq true and ", "asc"),
+    readExchangeGerals(historyExchangeResult.entities, "", "desc")
+  ]);
 
   const exchangeGeralById = new Map(
     programmedExchangeGeralResult.entities.map((geral) => [getExchangeIdFromGeral(geral), geral] as const).filter(([id]) => Boolean(id))
