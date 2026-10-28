@@ -1,12 +1,12 @@
 import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "motion/react";
 import qrcode from "qrcode-generator";
-import { ActionBar, ActionButton } from "../components/common/ActionButton";
-import { MoneyInputField, TextInputField } from "../components/common/FormFields";
-import { SystemIcon } from "../components/icons/SystemIcon";
-import { AppShell } from "../components/layout/AppShell";
-import { FormMenu } from "../components/navigation/FormMenu";
-import { formatCurrencyInputOnBlur } from "../lib/currencyInput";
+import { ActionBar, ActionButton } from "../../components/common/ActionButton";
+import { MoneyInputField, TextInputField } from "../../components/common/FormFields";
+import { SystemIcon } from "../../components/icons/SystemIcon";
+import { AppShell } from "../../components/layout/AppShell";
+import { FormMenu } from "../../components/navigation/FormMenu";
+import { formatCurrencyInputOnBlur } from "../../lib/currencyInput";
 import {
   formatCountdown,
   formatQrChargeAmount,
@@ -26,9 +26,9 @@ import {
   type QrChargeOpen,
   type QrChargePayer,
   type QrChargeStep
-} from "../lib/qrCharge";
-import { RECEIPT_LANGUAGE, type ReceiptLanguage } from "../lib/receiptLanguage";
-import type { DetailData } from "../types";
+} from "./qrCharge";
+import { RECEIPT_LANGUAGE, type ReceiptLanguage } from "../../lib/receiptLanguage";
+import type { DetailData } from "../../types";
 
 const POLL_INTERVAL_MS = 3000;
 // Três consultas seguidas sem resposta (~9 s): o motorista precisa saber que o app não está conferindo.

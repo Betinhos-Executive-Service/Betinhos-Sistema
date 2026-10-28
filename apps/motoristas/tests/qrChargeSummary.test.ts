@@ -12,8 +12,8 @@ import {
   validateQrChargeStep,
   type QrChargeDraft,
   type QrChargeSummary
-} from "../src/lib/qrCharge.ts";
-import { createMockQrCharge, getMockQrChargeSummary, resetMockQrCharges, updateMockQrCharge } from "../src/lib/qrChargeMock.ts";
+} from "../src/features/recebimento/qrCharge.ts";
+import { createMockQrCharge, getMockQrChargeSummary, resetMockQrCharges, updateMockQrCharge } from "../src/features/recebimento/qrChargeMock.ts";
 
 const open = {
   sessionId: "cs_test_aberta",

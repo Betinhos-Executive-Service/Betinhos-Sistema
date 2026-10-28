@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getReceiveSummaryState, proofsCoverBalance, quickReadValueCents } from "../src/lib/receiveProofCheck.ts";
+import { getReceiveSummaryState, proofsCoverBalance, quickReadValueCents } from "../src/features/recebimento/receiveProofCheck.ts";
 
 const lido = (valor: number | null) => ({
   kind: "lido" as const,

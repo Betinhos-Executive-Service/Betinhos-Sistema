@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActionBar, ActionButton, type ActionButtonState } from "../components/common/ActionButton";
-import { FormField, SelectField, TextAreaField, TextInputField } from "../components/common/FormFields";
-import { PhotoAddButton } from "../components/common/PhotoAddButton";
-import { AppShell } from "../components/layout/AppShell";
-import { useCameraScroll } from "../app/cameraScroll";
-import { FormMenu } from "../components/navigation/FormMenu";
-import type { MaintenanceRequestVehicleOption } from "../lib/dataverse";
+import { ActionBar, ActionButton, type ActionButtonState } from "../../components/common/ActionButton";
+import { FormField, SelectField, TextAreaField, TextInputField } from "../../components/common/FormFields";
+import { PhotoAddButton } from "../../components/common/PhotoAddButton";
+import { AppShell } from "../../components/layout/AppShell";
+import { useCameraScroll } from "../../app/cameraScroll";
+import { FormMenu } from "../../components/navigation/FormMenu";
+import type { MaintenanceRequestVehicleOption } from "../../lib/dataverse";
 
 export type MaintenanceRequestFields = {
   descricao: string;

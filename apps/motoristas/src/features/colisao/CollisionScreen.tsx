@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActionBar, ActionButton, type ActionButtonState } from "../components/common/ActionButton";
-import { FieldError, FormField, SelectField, TextAreaField, TextInputControl, TextInputField } from "../components/common/FormFields";
-import { PhotoAddButton } from "../components/common/PhotoAddButton";
-import { AppShell } from "../components/layout/AppShell";
-import { useCameraScroll } from "../app/cameraScroll";
-import { FormMenu } from "../components/navigation/FormMenu";
+import { ActionBar, ActionButton, type ActionButtonState } from "../../components/common/ActionButton";
+import { FieldError, FormField, SelectField, TextAreaField, TextInputControl, TextInputField } from "../../components/common/FormFields";
+import { PhotoAddButton } from "../../components/common/PhotoAddButton";
+import { AppShell } from "../../components/layout/AppShell";
+import { useCameraScroll } from "../../app/cameraScroll";
+import { FormMenu } from "../../components/navigation/FormMenu";
 import {
   buildCollisionWhatsAppMessage,
   buildCollisionWhatsAppUrl,
@@ -17,8 +17,8 @@ import {
   type CollisionPhoto,
   type CollisionPhotoKind,
   type CollisionValidationErrors
-} from "../lib/collisions";
-import type { MaintenanceRequestVehicleOption } from "../lib/dataverse";
+} from "./collisions";
+import type { MaintenanceRequestVehicleOption } from "../../lib/dataverse";
 
 type CollisionScreenProps = {
   draft: CollisionDraft;

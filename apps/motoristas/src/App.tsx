@@ -73,9 +73,9 @@ import {
 import { readReceiptQuick, isStandaloneWebResourceRuntime } from "./lib/dataverse";
 import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "./data/dataverse/fetchWebApi";
 import { createQrChargeRemote, getQrChargeSummaryRemote, updateQrChargeRemote } from "./lib/dataverse";
-import { getQrChargeReceiveState, getReceivableCents, type QrChargeSummary } from "./lib/qrCharge";
-import { quickReadValueCents } from "./lib/receiveProofCheck";
-import { QrChargeScreen } from "./screens/QrChargeScreen";
+import { getQrChargeReceiveState, getReceivableCents, type QrChargeSummary } from "./features/recebimento/qrCharge";
+import { quickReadValueCents } from "./features/recebimento/receiveProofCheck";
+import { QrChargeScreen } from "./features/recebimento/QrChargeScreen";
 import {
   INITIAL_QUICK_READ,
   QUICK_READ_FILL_STEP_MS,
@@ -89,8 +89,8 @@ import {
   startQuickReadState,
   type QuickReadFilledFields,
   type QuickReadState
-} from "./lib/receiptQuickRead";
-import { getQuickReadMockMode, readReceiptQuickMock } from "./lib/receiptQuickReadMock";
+} from "./features/despesas/receiptQuickRead";
+import { getQuickReadMockMode, readReceiptQuickMock } from "./features/despesas/receiptQuickReadMock";
 import { IDEA_STATUS, type Idea, type IdeaDraft } from "./features/ideias/ideas";
 import { APP_CONNECTION_LOST_MESSAGE, APP_OPERATION_ERROR_MESSAGE, reportAppError, type AppErrorNotice } from "./lib/appErrorLogger";
 import { useDados } from "./app/DataProvider";
@@ -99,10 +99,10 @@ import type { ComunicadosLoadStatus } from "./features/comunicados/ComunicadosSc
 import { isChecklistPending, isMockChecklists, loadDriverChecklist, loadDriverChecklists, type ChecklistVeiculo } from "./lib/checklists";
 import type { ChecklistsLoadStatus } from "./screens/ChecklistsScreen";
 import { clearMediaDraft, loadMediaDraft, saveMediaDraft, touchMediaDraft } from "./lib/mediaDraftStore";
-import { describeExpenseSubmission, normalizeStoredExpenseSubmissions, type ExpenseSubmission, type ExpenseUploadRow } from "./lib/expenseUploadState";
-import { resumeExpenseSubmission, type ExpenseSubmissionProgress } from "./lib/expenseSubmission";
-import { ExpenseSendOverlay, type ExpenseSendState } from "./components/common/ExpenseSendOverlay";
-import type { ExpenseUploadMode } from "./lib/expenseUploadMode";
+import { describeExpenseSubmission, normalizeStoredExpenseSubmissions, type ExpenseSubmission, type ExpenseUploadRow } from "./features/despesas/expenseUploadState";
+import { resumeExpenseSubmission, type ExpenseSubmissionProgress } from "./features/despesas/expenseSubmission";
+import { ExpenseSendOverlay, type ExpenseSendState } from "./features/despesas/ExpenseSendOverlay";
+import type { ExpenseUploadMode } from "./features/despesas/expenseUploadMode";
 import { resolveExpenseUploadModeRemote, expenseSubmissionStorageKey, ensureExpenseSubmissionRemote, loadExpenseUploadRowsRemote, transitionExpenseUploadRemote, dispatchExpenseUploadRemote, createExpenseUploadItem } from "./lib/dataverse";
 
 const EXCHANGE_ERROR_MESSAGES: Record<string, string> = {
@@ -139,32 +139,32 @@ import {
 import { LocalToast, type ToastState, type ToastTone } from "./components/common/LocalToast";
 import { LoadingOverlay, type LoadingOverlayState } from "./components/common/LoadingOverlay";
 import { getVisibleLoadingOverlay } from "./app/overlayLayering";
-import { CollisionScreen } from "./screens/CollisionScreen";
+import { CollisionScreen } from "./features/colisao/CollisionScreen";
 import { ComunicadosScreen } from "./features/comunicados/ComunicadosScreen";
 import { TermosMultaScreen, type TermosLoadStatus } from "./features/termos/TermosMultaScreen";
 import { isMockTermos, listarTermosMotorista, resumoPendentes, separarTermos, type TermoMulta } from "./features/termos/termosMulta";
 import { ChecklistsScreen } from "./screens/ChecklistsScreen";
 import { ButtonPreviewScreen } from "./screens/ButtonPreviewScreen";
-import { CollisionStartScreen } from "./screens/CollisionStartScreen";
+import { CollisionStartScreen } from "./features/colisao/CollisionStartScreen";
 import { DetailsScreen } from "./screens/DetailsScreen";
-import { ExpenseScreen } from "./screens/ExpenseScreen";
+import { ExpenseScreen } from "./features/despesas/ExpenseScreen";
 import { FinalizeScreen, type MaintenanceFinalizeDraft } from "./screens/FinalizeScreen";
 import { HistoryDetailsScreen } from "./screens/HistoryDetailsScreen";
 import { HistoryScreen } from "./screens/HistoryScreen";
 import { InitialScreen } from "./screens/InitialScreen";
 import { LocalCancelScreen } from "./screens/LocalCancelScreen";
 import { MediaCaptureScreen } from "./screens/MediaCaptureScreen";
-import { ReceiptReadingScreen } from "./screens/ReceiptReadingScreen";
-import { ReceiptIllegibleScreen } from "./screens/ReceiptIllegibleScreen";
+import { ReceiptReadingScreen } from "./features/despesas/ReceiptReadingScreen";
+import { ReceiptIllegibleScreen } from "./features/despesas/ReceiptIllegibleScreen";
 import { MaintenancePhotoPreviewScreen } from "./screens/MaintenancePhotoPreviewScreen";
-import { ReceiveScreen } from "./screens/ReceiveScreen";
+import { ReceiveScreen } from "./features/recebimento/ReceiveScreen";
 import { ReceiptPreviewScreen, ReceiptScreen } from "./screens/ReceiptScreen";
 import {
   MaintenanceRequestScreen,
   type MaintenanceRequestDraft,
   type MaintenanceRequestFields,
   type MaintenanceRequestPhoto
-} from "./screens/MaintenanceRequestScreen";
+} from "./features/manutencao/MaintenanceRequestScreen";
 import { IdeasScreen } from "./features/ideias/IdeasScreen";
 import { MyVehicleScreen } from "./features/meu-carro/MyVehicleScreen";
 import { VehicleChoiceDialog } from "./components/details/VehicleChoiceDialog";
@@ -192,8 +192,8 @@ import {
   type CollisionDraft,
   type CollisionPhoto,
   type CollisionPhotoKind
-} from "./lib/collisions";
-import { DEFAULT_EXPENSE_REFERENCE_DATA, buildExpenseCreatePayload, type ExpenseDraft, type ExpensePhoto, type ExpenseReferenceData } from "./lib/expenses";
+} from "./features/colisao/collisions";
+import { DEFAULT_EXPENSE_REFERENCE_DATA, buildExpenseCreatePayload, type ExpenseDraft, type ExpensePhoto, type ExpenseReferenceData } from "./features/despesas/expenses";
 import { hasMediaDraftContent, prepareVideoBlobForUpload, revokePreviewUrl } from "./lib/mediaDrafts";
 import type { CapturedVideoDraft, DetailData, MaintenancePhotoKind, Screen } from "./types";
 

@@ -2,19 +2,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import invoiceReceiptIcon from "../assets/icons/invoice-receipt.svg";
 import { ActionBar, ActionButton, type ActionButtonState } from "../components/common/ActionButton";
 import { LocalToast, type ToastState } from "../components/common/LocalToast";
-import { ExpenseSendOverlay, type ExpenseSendState } from "../components/common/ExpenseSendOverlay";
+import { ExpenseSendOverlay, type ExpenseSendState } from "../features/despesas/ExpenseSendOverlay";
 import { SearchableSelect } from "../components/common/SearchableSelect";
 import { SystemIcon } from "../components/icons/SystemIcon";
 import { agendaMock, historyMock } from "../data/mock/mockData";
-import { createEmptyCollisionDraft, type CollisionDraft, type CollisionPhoto, type CollisionPhotoKind } from "../lib/collisions";
+import { createEmptyCollisionDraft, type CollisionDraft, type CollisionPhoto, type CollisionPhotoKind } from "../features/colisao/collisions";
 import type { MaintenanceRequestVehicleOption } from "../lib/dataverse";
-import { DEFAULT_EXPENSE_REFERENCE_DATA } from "../lib/expenses.defaults";
-import type { ExpenseDraft, ExpensePhoto, ExpenseReferenceData } from "../lib/expenses.types";
+import { DEFAULT_EXPENSE_REFERENCE_DATA } from "../features/despesas/expenses.defaults";
+import type { ExpenseDraft, ExpensePhoto, ExpenseReferenceData } from "../features/despesas/expenses.types";
 import type { MaintenancePhotoKind, DetailData } from "../types";
-import { CollisionScreen } from "./CollisionScreen";
-import { CollisionStartScreen } from "./CollisionStartScreen";
+import { CollisionScreen } from "../features/colisao/CollisionScreen";
+import { CollisionStartScreen } from "../features/colisao/CollisionStartScreen";
 import { DetailsScreen } from "./DetailsScreen";
-import { ExpenseScreen, type ExpenseUploadListItem } from "./ExpenseScreen";
+import { ExpenseScreen, type ExpenseUploadListItem } from "../features/despesas/ExpenseScreen";
 import { FinalizeScreen, type MaintenanceFinalizeDraft } from "./FinalizeScreen";
 import { HistoryDetailsScreen } from "./HistoryDetailsScreen";
 import { HistoryScreen } from "./HistoryScreen";
@@ -25,8 +25,8 @@ import {
   MaintenanceRequestScreen,
   type MaintenanceRequestDraft,
   type MaintenanceRequestPhoto
-} from "./MaintenanceRequestScreen";
-import { ReceiveScreen } from "./ReceiveScreen";
+} from "../features/manutencao/MaintenanceRequestScreen";
+import { ReceiveScreen } from "../features/recebimento/ReceiveScreen";
 import { ReceiptPreviewScreen } from "./ReceiptScreen";
 import { ServicesScreen } from "./ServicesScreen";
 import { SignatureScreen } from "./SignatureScreen";

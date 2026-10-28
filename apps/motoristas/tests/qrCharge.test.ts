@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { DetailData } from "../src/types.ts";
-import type { ExpensePhoto } from "../src/lib/expenses.ts";
+import type { ExpensePhoto } from "../src/features/despesas/expenses.ts";
 import { isReceiveStepPending } from "../src/app/detailFlow.ts";
 import {
   formatCountdown,
@@ -16,7 +16,7 @@ import {
   qrChargeCoversReceivable,
   validateQrChargeAmount,
   validateQrChargePayer
-} from "../src/lib/qrCharge.ts";
+} from "../src/features/recebimento/qrCharge.ts";
 import { RECEIPT_LANGUAGE_OPTIONS } from "../src/lib/receiptLanguage.ts";
 
 const detail = (record?: Record<string, unknown>, valorCampo = ""): DetailData => ({

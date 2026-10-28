@@ -32,8 +32,13 @@ Spec: `docs/superpowers/specs/2026-10-28-refatoracao-modulos-design.md`. Um PR p
 - `lib/comunicados|termosMulta|ideas|myVehicle.ts` viram `export *` para o novo caminho; o teste de exports agora segue `export *` até o destino.
 - Ficam para depois: remotos do "Meu carro" (`loadMyVehiclesRemote`, `setMyCurrentVehicleRemote`) dependem da resolução Infleet do serviço, migram junto do núcleo (passo 5). Termos importa `cleanGuid`/`validateSignature` de comunicados; vão para `shared/` no passo 7.
 
-## Passo 4 — Features só do motorista
-despesas (`expenses*`, `expenseUpload*`), colisão, recebimento (Receive, QrCharge, receiveProofCheck, qrCharge*), manutenção (MaintenanceRequest/PhotoPreview, maintenanceFinalize), troca de veículo (`*Exchange*`). Continuam chamando o Dataverse direto (sem porta). Um PR por feature se o diff passar de ~800 linhas.
+## Passo 4 — Features só do motorista (feito)
+- `src/features/despesas/` (tela de gasto, leitura rápida do comprovante e telas de leitura/ilegível, overlay de envio, regras e envio assíncrono), `src/features/colisao/`, `src/features/recebimento/` (recebimento, cobrança por QR, conferência do comprovante), `src/features/manutencao/` (solicitar manutenção). Cada uma com `manifesto.ts`.
+- Caminhos antigos de `src/lib` com `export *`.
+- Leitura rápida do comprovante fica em despesas (dona); recebimento importa de lá.
+- Ficam para o passo 5: `MaintenancePhotoPreviewScreen` (prévia genérica de foto, usada também pelo checklist) vai para "fotos"; troca de veículo não tem arquivo próprio (lógica no `dataverse.ts`) e segue com serviços/detalhe; `maintenanceFinalize` vai com finalizar.
+- Remotos dessas features (`*ExpenseUpload*Remote`, `uploadCollisionPhotoRemote`, `createQrChargeRemote`...) seguem em `lib/dataverse.ts`; saem num passo próprio depois do 5, quando o arquivo for dividido por feature.
+- Atenção: o script de mudança de pasta precisa reescrever imports de asset (svg/png); o `tsc` não pega, só o build.
 
 ## Passo 5 — Núcleo do serviço (passa pela porta)
 Ordem: servicos (ServicesScreen, InitialScreen, agendaVisibility, useAgendaSearch) → detalhe (DetailsScreen, detailHtml, detailMedia, passengerContact) → fotos (MediaCaptureScreen, câmera* → `shared/camera/`, mediaDraft*) → checklist → finalizar (FinalizeScreen, observacaoOrganizada, LocalCancel, Signature) → voucher → recibo (Receipt*, receipt*, personalReceipt). Cada chamada de dados no caminho do modo link troca para `useDados()`. Um PR por feature.

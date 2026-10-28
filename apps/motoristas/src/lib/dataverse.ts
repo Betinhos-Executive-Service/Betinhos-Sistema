@@ -1,7 +1,7 @@
 import type { AgendaItem, DetailAction, DetailData, DetailField, DetailPassenger, MaintenancePhotoKind } from "../types";
-import { ATTACHMENT_STATUS, type ExpenseSubmission, type ExpenseUploadItem, type ExpenseUploadRow } from "./expenseUploadState.ts";
+import { ATTACHMENT_STATUS, type ExpenseSubmission, type ExpenseUploadItem, type ExpenseUploadRow } from "../features/despesas/expenseUploadState.ts";
 
-import type { CollisionLookupNavigationNames, CollisionPhotoKind } from "./collisions";
+import type { CollisionLookupNavigationNames, CollisionPhotoKind } from "../features/colisao/collisions";
 import {
   buildExpenseCreatePayload,
   findMaintenanceExpenseCategory,
@@ -12,7 +12,7 @@ import {
   type ExpenseLookupNavigationNames,
   type ExpensePhoto,
   type ExpenseReferenceData
-} from "./expenses.ts";
+} from "../features/despesas/expenses.ts";
 import type { PersonalReceiptModel } from "./personalReceipt";
 import { normalizeReceiptLanguage, RECEIPT_LANGUAGE, type ReceiptLanguage } from "./receiptLanguage.ts";
 
@@ -29,9 +29,9 @@ import { createRemoteReadBatch } from "../data/dataverse/remoteReadBatch.ts";
 import { buildCurrentVehiclePatch } from "../features/meu-carro/myVehicle.ts";
 // Movidos para src/features/ideias/remoto.ts (passo 3); reexportados para não mudar quem importa daqui.
 export { createIdeaRemote, loadMyIdeasRemote } from "../features/ideias/remoto.ts";
-import { decideExpenseUploadMode, type ExpenseUploadMode } from "./expenseUploadMode.ts";
-import { parseQrChargeResponse, parseQrChargeSummary, type QrChargePayer } from "./qrCharge.ts";
-import { createMockQrCharge, getMockQrChargeSummary, updateMockQrCharge } from "./qrChargeMock.ts";
+import { decideExpenseUploadMode, type ExpenseUploadMode } from "../features/despesas/expenseUploadMode.ts";
+import { parseQrChargeResponse, parseQrChargeSummary, type QrChargePayer } from "../features/recebimento/qrCharge.ts";
+import { createMockQrCharge, getMockQrChargeSummary, updateMockQrCharge } from "../features/recebimento/qrChargeMock.ts";
 import {
   cleanGuid,
   cleanODataGuid,

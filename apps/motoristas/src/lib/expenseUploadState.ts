@@ -1,0 +1,2 @@
+// Movido para src/ (passo 4 da refatoração); reexport até a limpeza do passo 7.
+export * from "../";

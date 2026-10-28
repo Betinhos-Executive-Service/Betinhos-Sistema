@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { SystemIcon } from "../components/icons/SystemIcon";
-import { AppShell } from "../components/layout/AppShell";
-import { FormMenu } from "../components/navigation/FormMenu";
-import { quickReadProgress } from "../lib/receiptQuickRead";
+import { SystemIcon } from "../../components/icons/SystemIcon";
+import { AppShell } from "../../components/layout/AppShell";
+import { FormMenu } from "../../components/navigation/FormMenu";
+import { quickReadProgress } from "./receiptQuickRead";
 
 type ReceiptReadingScreenProps = {
   photoDataUrl: string;

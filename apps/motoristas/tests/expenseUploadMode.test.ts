@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { decideExpenseUploadMode, type ExpenseUploadModeDependencies } from "../src/lib/expenseUploadMode.ts";
+import { decideExpenseUploadMode, type ExpenseUploadModeDependencies } from "../src/features/despesas/expenseUploadMode.ts";
 
 function deps(overrides: Partial<ExpenseUploadModeDependencies> = {}) {
   const calls = { flowUrl: 0, schema: 0, warnings: [] as string[] };

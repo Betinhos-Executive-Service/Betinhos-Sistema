@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import invoiceReceiptIcon from "../assets/icons/invoice-receipt.svg";
-import { ActionBar, ActionButton, type ActionButtonState } from "../components/common/ActionButton";
-import { PhotoAddButton } from "../components/common/PhotoAddButton";
-import { AppShell } from "../components/layout/AppShell";
-import { useCameraScroll } from "../app/cameraScroll";
-import { FormMenu } from "../components/navigation/FormMenu";
-import { SystemIcon } from "../components/icons/SystemIcon";
-import type { DetailData } from "../types";
-import type { ExpensePhoto } from "../lib/expenses";
-import { ConfirmDialog } from "../components/common/ConfirmDialog";
-import { formatQrChargeAmount, getReceivableCents } from "../lib/qrCharge";
-import { getReceiveSummaryState, proofsCoverBalance } from "../lib/receiveProofCheck";
+import invoiceReceiptIcon from "../../assets/icons/invoice-receipt.svg";
+import { ActionBar, ActionButton, type ActionButtonState } from "../../components/common/ActionButton";
+import { PhotoAddButton } from "../../components/common/PhotoAddButton";
+import { AppShell } from "../../components/layout/AppShell";
+import { useCameraScroll } from "../../app/cameraScroll";
+import { FormMenu } from "../../components/navigation/FormMenu";
+import { SystemIcon } from "../../components/icons/SystemIcon";
+import type { DetailData } from "../../types";
+import type { ExpensePhoto } from "../despesas/expenses";
+import { ConfirmDialog } from "../../components/common/ConfirmDialog";
+import { formatQrChargeAmount, getReceivableCents } from "./qrCharge";
+import { getReceiveSummaryState, proofsCoverBalance } from "./receiveProofCheck";
 
 // Estado da cobrança por QR no Recebimento, reidratado pelo resumo do plugin.
 export type ReceiveQrCharge = {

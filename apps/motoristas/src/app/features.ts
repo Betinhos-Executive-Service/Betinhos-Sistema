@@ -1,7 +1,11 @@
 import type { Screen } from "../types.ts";
+import { manifesto as colisao } from "../features/colisao/manifesto.ts";
 import { manifesto as comunicados } from "../features/comunicados/manifesto.ts";
+import { manifesto as despesas } from "../features/despesas/manifesto.ts";
 import { manifesto as ideias } from "../features/ideias/manifesto.ts";
+import { manifesto as manutencao } from "../features/manutencao/manifesto.ts";
 import { manifesto as meuCarro } from "../features/meu-carro/manifesto.ts";
+import { manifesto as recebimento } from "../features/recebimento/manifesto.ts";
 import { manifesto as termos } from "../features/termos/manifesto.ts";
 import type { Modo } from "./modo.ts";
 
@@ -24,10 +28,10 @@ export const FEATURES: Feature[] = [
   { id: "recibo", telas: ["reciboPersonalizado"], liberadoLink: true },
   comunicados,
   ideias,
-  { id: "recebimento", telas: ["receber", "cobrancaQr", "fotoReceber", "previewFotoReceber"], liberadoLink: false },
-  { id: "despesas", telas: ["gastos", "fotoGasto", "previewFotoGasto"], liberadoLink: false },
-  { id: "colisao", telas: ["colisoesInicio", "colisoes", "fotoColisao", "previewFotoColisao"], liberadoLink: false },
-  { id: "manutencao", telas: ["solicitarManutencao", "fotoSolicitacaoManutencao", "previewFotoSolicitacaoManutencao"], liberadoLink: false },
+  recebimento,
+  despesas,
+  colisao,
+  manutencao,
   termos,
   { id: "historico", telas: ["historico", "detalhesHistorico"], liberadoLink: false },
   meuCarro

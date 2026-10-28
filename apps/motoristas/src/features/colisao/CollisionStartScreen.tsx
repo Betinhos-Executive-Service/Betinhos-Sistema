@@ -1,7 +1,7 @@
-import { AppShell } from "../components/layout/AppShell";
-import { FormMenu } from "../components/navigation/FormMenu";
-import type { CollisionType } from "../lib/collisions";
-import { openExternalUrl } from "../lib/localWorkflow";
+import { AppShell } from "../../components/layout/AppShell";
+import { FormMenu } from "../../components/navigation/FormMenu";
+import type { CollisionType } from "./collisions";
+import { openExternalUrl } from "../../lib/localWorkflow";
 
 type CollisionStartScreenProps = {
   onBack: () => void;

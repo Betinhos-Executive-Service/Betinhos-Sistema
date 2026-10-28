@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActionBar, ActionButton, type ActionButtonState } from "../components/common/ActionButton";
-import { FormField, MoneyInputField, SelectField, TextAreaField, TextInputField } from "../components/common/FormFields";
-import { PhotoAddButton } from "../components/common/PhotoAddButton";
-import { AppShell } from "../components/layout/AppShell";
-import { useCameraScroll } from "../app/cameraScroll";
-import { FormMenu } from "../components/navigation/FormMenu";
+import { ActionBar, ActionButton, type ActionButtonState } from "../../components/common/ActionButton";
+import { FormField, MoneyInputField, SelectField, TextAreaField, TextInputField } from "../../components/common/FormFields";
+import { PhotoAddButton } from "../../components/common/PhotoAddButton";
+import { AppShell } from "../../components/layout/AppShell";
+import { useCameraScroll } from "../../app/cameraScroll";
+import { FormMenu } from "../../components/navigation/FormMenu";
 import {
   findExpenseCategory,
   getExpenseCategoryRules,
@@ -15,11 +15,11 @@ import {
   type ExpensePhoto,
   type ExpenseReferenceData,
   type ExpenseValidationErrors
-} from "../lib/expenses";
-import type { MaintenanceRequestVehicleOption } from "../lib/dataverse";
-import { parseCurrencyInput } from "../lib/expenses";
-import type { ExpenseSubmissionStatus } from "../lib/expenseUploadState";
-import { SystemIcon, type SystemIconName } from "../components/icons/SystemIcon";
+} from "./expenses";
+import type { MaintenanceRequestVehicleOption } from "../../lib/dataverse";
+import { parseCurrencyInput } from "./expenses";
+import type { ExpenseSubmissionStatus } from "./expenseUploadState";
+import { SystemIcon, type SystemIconName } from "../../components/icons/SystemIcon";
 
 export type ExpenseUploadListItem = {
   id: string;
@@ -38,7 +38,7 @@ const UPLOAD_ICON: Record<ExpenseSubmissionStatus["state"], SystemIconName> = {
 const UPLOAD_ACTION_LABEL = { continue: "Enviar agora", retry: "Tentar de novo", verify: "Verificar" } as const;
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
-import { QUICK_READ_MAX_TENTATIVAS, isQuickReadFieldHighlighted, type QuickReadFilledFields, type QuickReadState } from "../lib/receiptQuickRead";
+import { QUICK_READ_MAX_TENTATIVAS, isQuickReadFieldHighlighted, type QuickReadFilledFields, type QuickReadState } from "./receiptQuickRead";
 
 type ExpenseScreenProps = {
   uploads?: ExpenseUploadListItem[];

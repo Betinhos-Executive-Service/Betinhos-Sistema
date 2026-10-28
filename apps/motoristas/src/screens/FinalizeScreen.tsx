@@ -20,7 +20,7 @@ import {
   type SummaryState,
   type TopicKind
 } from "../lib/observacaoOrganizada";
-import { matchesExpenseCitySearch, type ExpenseReferenceData } from "../lib/expenses";
+import { matchesExpenseCitySearch, type ExpenseReferenceData } from "../features/despesas/expenses";
 import { buildWhatsAppUrl, openExternalUrl } from "../lib/localWorkflow";
 import { validateMaintenanceFinalizeFields, type MaintenanceFinalizeErrors } from "../lib/maintenanceFinalize";
 import type { DetailData, MaintenancePhotoKind } from "../types";

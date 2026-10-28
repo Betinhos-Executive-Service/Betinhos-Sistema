@@ -13,8 +13,8 @@ import {
   runQuickReadPipeline,
   startQuickReadState,
   type QuickReadLeitura
-} from "../src/lib/receiptQuickRead.ts";
-import { DEFAULT_EXPENSE_REFERENCE_DATA, type ExpenseDraft, type ExpenseReferenceData } from "../src/lib/expenses.ts";
+} from "../src/features/despesas/receiptQuickRead.ts";
+import { DEFAULT_EXPENSE_REFERENCE_DATA, type ExpenseDraft, type ExpenseReferenceData } from "../src/features/despesas/expenses.ts";
 
 const leitura: QuickReadLeitura = { legivel: true, valor: 51.9, data: "2026-10-10", hora: "18:28", estabelecimento: "Burger King", cnpj: null, litros: null, categoria_sugerida: "Almoço", forma_pagamento_sugerida: "Cartão de crédito", motivo_ilegivel: null };
 const vazio: ExpenseDraft = { categoriaId: "", veiculoId: "", valor: "", dataGasto: "", formaPagamentoId: "", cidadeId: "", estabelecimento: "", descricao: "", kmInformado: "", litros: "" };
