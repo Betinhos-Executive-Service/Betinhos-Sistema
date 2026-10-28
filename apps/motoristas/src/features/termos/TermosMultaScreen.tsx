@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { reportAppError } from "../lib/appErrorLogger";
-import { AppShell } from "../components/layout/AppShell";
-import { ServicesMenu } from "../components/navigation/ServicesMenu";
+import { reportAppError } from "../../lib/appErrorLogger";
+import { AppShell } from "../../components/layout/AppShell";
+import { ServicesMenu } from "../../components/navigation/ServicesMenu";
 import { TermoMultaDetalheScreen } from "./TermoMultaDetalheScreen";
-import { formatBrl, formatDataHora, isMockTermos, parseEvidencias, prazoAssinatura, proximaAba, separarTermos, TERMO_STATUS, type AbaTermos, type TermoMulta } from "../lib/termosMulta";
+import { formatBrl, formatDataHora, isMockTermos, parseEvidencias, prazoAssinatura, proximaAba, separarTermos, TERMO_STATUS, type AbaTermos, type TermoMulta } from "./termosMulta";
 
 export type TermosLoadStatus = "loading" | "ready" | "error";
 

@@ -25,8 +25,12 @@ Spec: `docs/superpowers/specs/2026-10-28-refatoracao-modulos-design.md`. Um PR p
 - `git mv` de `fetchWebApi`, `customApi`, `remoteReadBatch` para `src/data/dataverse/` e de `mockData` para `src/data/mock/`; caminhos antigos com reexport explícito (o snapshot de exports não mudou).
 - `fieldLookup` fica: é regra de detalhe, vai para `shared/` no passo 7.
 
-## Passo 3 — Features isoladas (aprende o padrão)
-Uma por commit, mesmo PR: comunicados, ideias, termos, meu-carro. Para cada: tela(s) de `screens/` + componentes de `components/<x>/` + `lib/<x>.ts` + funções `*Remote` dela em `dataverse.ts` → `features/<x>/` (funções remotas em `features/<x>/remoto.ts`). Comunicados e ideias passam a usar `useDados()`.
+## Passo 3 — Features isoladas (feito)
+- `src/features/comunicados/` (tela, card da agenda, regras/remoto, CSS), `src/features/termos/` (telas, selfie, regras/remoto, CSS), `src/features/ideias/` (tela, regras, `remoto.ts` saído do `dataverse.ts`), `src/features/meu-carro/` (tela, regras). Cada uma com `manifesto.ts` lido por `src/app/features.ts`.
+- `SignaturePad` em `src/shared/ui/` (usado por comunicados e termos). `getCurrentUserId` foi para o cliente Dataverse.
+- `App.tsx` carrega comunicados e ideias por `useDados()`.
+- `lib/comunicados|termosMulta|ideas|myVehicle.ts` viram `export *` para o novo caminho; o teste de exports agora segue `export *` até o destino.
+- Ficam para depois: remotos do "Meu carro" (`loadMyVehiclesRemote`, `setMyCurrentVehicleRemote`) dependem da resolução Infleet do serviço, migram junto do núcleo (passo 5). Termos importa `cleanGuid`/`validateSignature` de comunicados; vão para `shared/` no passo 7.
 
 ## Passo 4 — Features só do motorista
 despesas (`expenses*`, `expenseUpload*`), colisão, recebimento (Receive, QrCharge, receiveProofCheck, qrCharge*), manutenção (MaintenanceRequest/PhotoPreview, maintenanceFinalize), troca de veículo (`*Exchange*`). Continuam chamando o Dataverse direto (sem porta). Um PR por feature se o diff passar de ~800 linhas.

@@ -38,7 +38,6 @@ import {
   cancelServiceRemote,
   assertCollisionSchemaReadyRemote,
   assertExpenseSchemaReadyRemote,
-  createIdeaRemote,
   createMaintenanceRequestRemote,
   createOne,
   DATAVERSE,
@@ -50,7 +49,6 @@ import {
   hasDataverseRuntime,
   loadCollisionLookupNavigationNamesRemote,
   loadExpenseReferenceDataRemote,
-  loadMyIdeasRemote,
   loadMyVehiclesRemote,
   setMyCurrentVehicleRemote,
   loadReceiptClienteOptionsRemote,
@@ -73,7 +71,7 @@ import {
   type MaintenanceRequestVehicleOption
 } from "./lib/dataverse";
 import { readReceiptQuick, isStandaloneWebResourceRuntime } from "./lib/dataverse";
-import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "./lib/fetchWebApi";
+import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "./data/dataverse/fetchWebApi";
 import { createQrChargeRemote, getQrChargeSummaryRemote, updateQrChargeRemote } from "./lib/dataverse";
 import { getQrChargeReceiveState, getReceivableCents, type QrChargeSummary } from "./lib/qrCharge";
 import { quickReadValueCents } from "./lib/receiveProofCheck";
@@ -93,10 +91,11 @@ import {
   type QuickReadState
 } from "./lib/receiptQuickRead";
 import { getQuickReadMockMode, readReceiptQuickMock } from "./lib/receiptQuickReadMock";
-import { IDEA_STATUS, type Idea, type IdeaDraft } from "./lib/ideas";
+import { IDEA_STATUS, type Idea, type IdeaDraft } from "./features/ideias/ideas";
 import { APP_CONNECTION_LOST_MESSAGE, APP_OPERATION_ERROR_MESSAGE, reportAppError, type AppErrorNotice } from "./lib/appErrorLogger";
-import { isComunicadoPending, isMockComunicados, loadDriverComunicado, loadDriverComunicados, type ComunicadoDestinatario } from "./lib/comunicados";
-import type { ComunicadosLoadStatus } from "./screens/ComunicadosScreen";
+import { useDados } from "./app/DataProvider";
+import { isComunicadoPending, isMockComunicados, type ComunicadoDestinatario } from "./features/comunicados/comunicados";
+import type { ComunicadosLoadStatus } from "./features/comunicados/ComunicadosScreen";
 import { isChecklistPending, isMockChecklists, loadDriverChecklist, loadDriverChecklists, type ChecklistVeiculo } from "./lib/checklists";
 import type { ChecklistsLoadStatus } from "./screens/ChecklistsScreen";
 import { clearMediaDraft, loadMediaDraft, saveMediaDraft, touchMediaDraft } from "./lib/mediaDraftStore";
@@ -141,9 +140,9 @@ import { LocalToast, type ToastState, type ToastTone } from "./components/common
 import { LoadingOverlay, type LoadingOverlayState } from "./components/common/LoadingOverlay";
 import { getVisibleLoadingOverlay } from "./app/overlayLayering";
 import { CollisionScreen } from "./screens/CollisionScreen";
-import { ComunicadosScreen } from "./screens/ComunicadosScreen";
-import { TermosMultaScreen, type TermosLoadStatus } from "./screens/TermosMultaScreen";
-import { isMockTermos, listarTermosMotorista, resumoPendentes, separarTermos, type TermoMulta } from "./lib/termosMulta";
+import { ComunicadosScreen } from "./features/comunicados/ComunicadosScreen";
+import { TermosMultaScreen, type TermosLoadStatus } from "./features/termos/TermosMultaScreen";
+import { isMockTermos, listarTermosMotorista, resumoPendentes, separarTermos, type TermoMulta } from "./features/termos/termosMulta";
 import { ChecklistsScreen } from "./screens/ChecklistsScreen";
 import { ButtonPreviewScreen } from "./screens/ButtonPreviewScreen";
 import { CollisionStartScreen } from "./screens/CollisionStartScreen";
@@ -166,8 +165,8 @@ import {
   type MaintenanceRequestFields,
   type MaintenanceRequestPhoto
 } from "./screens/MaintenanceRequestScreen";
-import { IdeasScreen } from "./screens/IdeasScreen";
-import { MyVehicleScreen } from "./screens/MyVehicleScreen";
+import { IdeasScreen } from "./features/ideias/IdeasScreen";
+import { MyVehicleScreen } from "./features/meu-carro/MyVehicleScreen";
 import { VehicleChoiceDialog } from "./components/details/VehicleChoiceDialog";
 import {
   buildInfleetServiceVehiclePatch,
@@ -176,7 +175,7 @@ import {
   type FleetVehicle,
   type InfleetVehicleResolution
 } from "./lib/serviceVehicleInfleet";
-import { isThirdPartyDriver } from "./lib/myVehicle";
+import { isThirdPartyDriver } from "./features/meu-carro/myVehicle";
 import { createMockFleetLoader, MOCK_FLEET, pickMockInfleetScenario, resolveMockServiceVehicle } from "./lib/serviceVehicleInfleetMock";
 
 // Referência estável: o diálogo compara com a lista exibida para saber se oferece "Nenhuma das opções".
@@ -443,6 +442,8 @@ function revokePhotoPreviewUrls(photos: Array<{ previewUrl?: string }>) {
 }
 
 function App() {
+  // Dados pela porta (src/data/porta.ts): o adaptador vem da entrada do app (main.tsx).
+  const dados = useDados();
   const devMode = useMemo(() => new URLSearchParams(window.location.search).get("dev") ?? "", []);
   const previewHashActive = useMemo(() => /^#\/?preview(?:[/?]|$)/i.test(window.location.hash), []);
   const isButtonPreviewMode = devMode === "preview" || previewHashActive;
@@ -891,14 +892,14 @@ function App() {
   const comunicadosDriverIdRef = useRef("");
   const reloadComunicados = useCallback(async () => {
     try {
-      setComunicados(await loadDriverComunicados(comunicadosDriverIdRef.current));
+      setComunicados(await dados.carregarComunicados(comunicadosDriverIdRef.current));
       setComunicadosStatus("ready");
     } catch (error) {
       // Mantém a lista já carregada; só exibe o estado de erro quando nunca houve carga.
       setComunicadosStatus((current) => current === "ready" ? current : "error");
       throw error;
     }
-  }, []);
+  }, [dados]);
 
   // Termos de multa pendentes: mesmo motorista logado; alimentam a tela Multas e o contador da Home.
   const [termosMulta, setTermosMulta] = useState<TermoMulta[]>([]);
@@ -969,7 +970,7 @@ function App() {
     if (!deepLinkId || isButtonPreviewMode || isReceiptPreviewMode) return;
     if (!hasDataverseRuntime() && !isMockComunicados()) return;
     let alive = true;
-    loadDriverComunicado(deepLinkId)
+    dados.carregarComunicado(deepLinkId)
       .then((item) => {
         if (!alive || !item || pendingComunicadoDeepLinkRef.current !== deepLinkId) return;
         pendingComunicadoDeepLinkRef.current = "";
@@ -982,7 +983,7 @@ function App() {
         reportAppError(error, { severity: "warning", source: "app", action: "loadDriverComunicado", phase: "deep-link" });
       });
     return () => { alive = false; };
-  }, []);
+  }, [dados]);
 
   // Deep link de serviço vindo do push (form OnLoad -> data=servicoId=...&tipo=...): busca o detalhe
   // em paralelo com loadRemoteStore e abre assim que chega. Se o serviço saiu da agenda do motorista
@@ -1371,7 +1372,7 @@ function App() {
 
   const localIdeasRef = useRef<Idea[]>([]);
   const ideasGateway = useMemo(() => {
-    if (remoteMode) return { load: loadMyIdeasRemote, create: createIdeaRemote };
+    if (remoteMode) return { load: dados.carregarIdeias, create: dados.criarIdeia };
     return {
       load: async () => [...localIdeasRef.current],
       create: async (draft: IdeaDraft) => {
@@ -1380,7 +1381,7 @@ function App() {
         return idea;
       }
     };
-  }, [remoteMode]);
+  }, [dados, remoteMode]);
 
   useEffect(() => {
     if ((screen !== "solicitarManutencao" && screen !== "gastos" && screen !== "colisoes") || !remoteMode) return;

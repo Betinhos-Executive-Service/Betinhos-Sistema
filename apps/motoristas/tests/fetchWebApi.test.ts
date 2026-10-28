@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createFetchWebApi, SESSION_EXPIRED_EVENT } from "../src/lib/fetchWebApi.ts";
+import { createFetchWebApi, SESSION_EXPIRED_EVENT } from "../src/data/dataverse/fetchWebApi.ts";
 
 type Call = { url: string; init?: RequestInit };
 

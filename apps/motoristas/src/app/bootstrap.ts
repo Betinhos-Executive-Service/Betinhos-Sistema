@@ -1,4 +1,4 @@
-import { agendaMock, historyMock } from "../data/mockData.ts";
+import { agendaMock, historyMock } from "../data/mock/mockData.ts";
 import { shouldShowAgendaItemInGallery } from "./agendaVisibility.ts";
 import { findDetailByParams, type LocalStore } from "../lib/localWorkflow.ts";
 import type { DetailData } from "../types.ts";

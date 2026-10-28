@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildCurrentVehiclePatch, CURRENT_VEHICLE_ORIGIN_DRIVER, isThirdPartyDriver } from "../src/lib/myVehicle.ts";
+import { buildCurrentVehiclePatch, CURRENT_VEHICLE_ORIGIN_DRIVER, isThirdPartyDriver } from "../src/features/meu-carro/myVehicle.ts";
 
 test("só terceiro vê Meu carro", () => {
   assert.equal(isThirdPartyDriver({ cr40f_tipodevinculo: 1 }), true);

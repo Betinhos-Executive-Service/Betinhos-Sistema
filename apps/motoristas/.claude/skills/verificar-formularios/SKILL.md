@@ -5,7 +5,7 @@ description: "Verifica os formulários avulsos do App Motoristas: Gastos, Solici
 # Verificar formulários avulsos
 
 ## Cobre
-- Código: `src/screens/ExpenseScreen.tsx`, `MaintenanceRequestScreen.tsx`, `CollisionScreen.tsx`, `CollisionStartScreen.tsx`, `ReceiptScreen.tsx`, `IdeasScreen.tsx`, `ButtonPreviewScreen.tsx`, `src/components/common/FormFields.tsx`, `src/components/common/SearchableSelect.tsx`.
+- Código: `src/screens/ExpenseScreen.tsx`, `MaintenanceRequestScreen.tsx`, `CollisionScreen.tsx`, `CollisionStartScreen.tsx`, `ReceiptScreen.tsx`, `ButtonPreviewScreen.tsx`, `src/features/ideias/IdeasScreen.tsx`, `src/components/common/FormFields.tsx`, `src/components/common/SearchableSelect.tsx`.
 - Rotas: `#gastos`, `#manutencao`, `#colisoes`, `#registro-colisao`, `#recibo-personalizado`, `#boas-ideias`.
 
 ## Preparar ambiente

@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { PointerEvent } from "react";
-import type { SignaturePoint, SignatureStrokes } from "../../lib/comunicados";
+import type { SignaturePoint, SignatureStrokes } from "../../features/comunicados/comunicados";
 
 type Props = { value: SignatureStrokes; onChange: (value: SignatureStrokes) => void };
 

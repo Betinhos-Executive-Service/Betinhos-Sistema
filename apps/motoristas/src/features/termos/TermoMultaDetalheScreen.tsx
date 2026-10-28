@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { reportAppError } from "../lib/appErrorLogger";
-import { customApiErrorMessage } from "../lib/customApi";
-import { SignaturePad } from "../components/comunicados/SignaturePad";
-import { SelfieCapture } from "../components/termos/SelfieCapture";
-import { ServicesMenu } from "../components/navigation/ServicesMenu";
+import { reportAppError } from "../../lib/appErrorLogger";
+import { customApiErrorMessage } from "../../data/dataverse/customApi";
+import { SignaturePad } from "../../shared/ui/SignaturePad";
+import { SelfieCapture } from "./SelfieCapture";
+import { ServicesMenu } from "../../components/navigation/ServicesMenu";
 import {
   abrirPdf,
   assinarTermo,
@@ -27,7 +27,7 @@ import {
   validarMotivo,
   type TermoMulta,
   type TermoStep
-} from "../lib/termosMulta";
+} from "./termosMulta";
 
 type Props = { termo: TermoMulta; onDone: () => void; onRefresh: () => void | Promise<void> };
 

@@ -3,7 +3,7 @@ import test from "node:test";
 import { FEATURES, featuresDoModo, telasDoModo } from "../src/app/features.ts";
 import { detectarModo } from "../src/app/modo.ts";
 import * as checklists from "../src/lib/checklists.ts";
-import * as comunicados from "../src/lib/comunicados.ts";
+import * as comunicados from "../src/features/comunicados/comunicados.ts";
 import * as dataverse from "../src/lib/dataverse.ts";
 import { adaptadorDataverse } from "../src/data/dataverse/adaptador.ts";
 

@@ -1,11 +1,11 @@
 ---
 name: verificar-comunicados
-description: "Verifica o módulo Comunicados do App Motoristas: lista de pendentes e já cientes, comunicado informativo e ciência obrigatória com assinatura. Use após mudar src/screens/ComunicadosScreen.tsx, src/components/comunicados/** ou src/comunicados.css, ou quando pedirem para testar comunicados."
+description: "Verifica o módulo Comunicados do App Motoristas: lista de pendentes e já cientes, comunicado informativo e ciência obrigatória com assinatura. Use após mudar src/features/comunicados/ComunicadosScreen.tsx, src/features/comunicados/**, src/shared/ui/SignaturePad.tsx ou src/features/comunicados/comunicados.css, ou quando pedirem para testar comunicados."
 ---
 # Verificar comunicados
 
 ## Cobre
-- Código: `src/screens/ComunicadosScreen.tsx`, `src/components/comunicados/**`, `src/comunicados.css`, `src/lib/comunicados.ts` (regras, também em `verificar-dominio`).
+- Código: `src/features/comunicados/ComunicadosScreen.tsx`, `src/features/comunicados/**, src/shared/ui/SignaturePad.tsx`, `src/features/comunicados/comunicados.css`, `src/features/comunicados/comunicados.ts` (regras, também em `verificar-dominio`).
 - Rota: `#comunicados`; também aparecem no topo de `#servicos` como "Comunicados pendentes".
 
 ## Preparar ambiente

@@ -20,7 +20,7 @@ function findUnbalancedBrace(css: string) {
   return open.length ? `"{" sem fechamento aberto na linha ${open[open.length - 1]}` : "";
 }
 
-for (const file of ["src/styles.css", "src/comunicados.css"]) {
+for (const file of ["src/styles.css", "src/features/comunicados/comunicados.css"]) {
   test(`${file} tem chaves balanceadas`, () => {
     assert.equal(findUnbalancedBrace(readFileSync(file, "utf8")), "");
   });

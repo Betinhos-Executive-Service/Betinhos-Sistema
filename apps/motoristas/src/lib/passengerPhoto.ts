@@ -1,7 +1,7 @@
 // Foto do passageiro para o motorista: só pela Custom API new_ObterFotoPassageiro, que valida
 // no servidor status Programado, motorista e passageiro. A imagem fica só em memória (blob URL).
 import type { DetailData } from "../types";
-import { executeCustomApi } from "./customApi.ts";
+import { executeCustomApi } from "../data/dataverse/customApi.ts";
 
 /** cr40f_status "Programado" da reserva (cr40f_reservadeveculos). */
 export const PROGRAMADO_STATUS = 202410005;

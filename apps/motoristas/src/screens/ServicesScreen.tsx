@@ -5,10 +5,10 @@ import type { AgendaItem, DetailData } from "../types";
 import { AppShell } from "../components/layout/AppShell";
 import { ServicesMenu } from "../components/navigation/ServicesMenu";
 import { AgendaCard } from "../components/services/AgendaCard";
-import { ComunicadoAgendaCard } from "../components/comunicados/ComunicadoAgendaCard";
+import { ComunicadoAgendaCard } from "../features/comunicados/ComunicadoAgendaCard";
 import { ChecklistAgendaCard } from "../components/checklists/ChecklistAgendaCard";
 import { PullToRefresh } from "../components/common/PullToRefresh";
-import type { ComunicadoDestinatario } from "../lib/comunicados";
+import type { ComunicadoDestinatario } from "../features/comunicados/comunicados";
 import type { ChecklistVeiculo } from "../lib/checklists";
 
 type ServicesScreenProps = {

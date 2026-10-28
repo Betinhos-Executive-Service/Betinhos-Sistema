@@ -1,4 +1,8 @@
 import type { Screen } from "../types.ts";
+import { manifesto as comunicados } from "../features/comunicados/manifesto.ts";
+import { manifesto as ideias } from "../features/ideias/manifesto.ts";
+import { manifesto as meuCarro } from "../features/meu-carro/manifesto.ts";
+import { manifesto as termos } from "../features/termos/manifesto.ts";
 import type { Modo } from "./modo.ts";
 
 // Registro de funcionalidades: quais telas cada uma tem e se o parceiro via link pode usar.
@@ -18,16 +22,15 @@ export const FEATURES: Feature[] = [
   { id: "finalizar", telas: ["finalizar", "canceladoLocal"], liberadoLink: true },
   { id: "voucher", telas: ["voucher", "assinatura"], liberadoLink: true },
   { id: "recibo", telas: ["reciboPersonalizado"], liberadoLink: true },
-  { id: "comunicados", telas: ["comunicados"], liberadoLink: true },
-  { id: "ideias", telas: ["boasIdeias"], liberadoLink: true },
+  comunicados,
+  ideias,
   { id: "recebimento", telas: ["receber", "cobrancaQr", "fotoReceber", "previewFotoReceber"], liberadoLink: false },
   { id: "despesas", telas: ["gastos", "fotoGasto", "previewFotoGasto"], liberadoLink: false },
   { id: "colisao", telas: ["colisoesInicio", "colisoes", "fotoColisao", "previewFotoColisao"], liberadoLink: false },
   { id: "manutencao", telas: ["solicitarManutencao", "fotoSolicitacaoManutencao", "previewFotoSolicitacaoManutencao"], liberadoLink: false },
-  { id: "termos", telas: ["multas"], liberadoLink: false },
+  termos,
   { id: "historico", telas: ["historico", "detalhesHistorico"], liberadoLink: false },
-  // Ainda indefinido para o parceiro; fica desligado no link até decisão.
-  { id: "meu-carro", telas: ["meuCarro"], liberadoLink: false }
+  meuCarro
 ];
 
 export function featuresDoModo(modo: Modo, features: Feature[] = FEATURES) {

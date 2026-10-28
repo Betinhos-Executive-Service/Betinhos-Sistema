@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { reportAppError } from "../lib/appErrorLogger";
-import { AppShell } from "../components/layout/AppShell";
-import { ActionButton } from "../components/common/ActionButton";
-import { TextAreaControl } from "../components/common/FormFields";
-import { ServicesMenu } from "../components/navigation/ServicesMenu";
-import { SignatureDrawing, SignaturePad } from "../components/comunicados/SignaturePad";
-import { ComunicadoAgendaCard } from "../components/comunicados/ComunicadoAgendaCard";
+import { reportAppError } from "../../lib/appErrorLogger";
+import { AppShell } from "../../components/layout/AppShell";
+import { ActionButton } from "../../components/common/ActionButton";
+import { TextAreaControl } from "../../components/common/FormFields";
+import { ServicesMenu } from "../../components/navigation/ServicesMenu";
+import { SignatureDrawing, SignaturePad } from "../../shared/ui/SignaturePad";
+import { ComunicadoAgendaCard } from "./ComunicadoAgendaCard";
 import {
   abrirComunicado,
   assinarComunicado,
@@ -15,7 +15,7 @@ import {
   type ComunicadoDestinatario,
   type SignatureStrokes,
   validateSignature
-} from "../lib/comunicados";
+} from "./comunicados";
 
 export type ComunicadosLoadStatus = "loading" | "ready" | "error";
 

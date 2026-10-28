@@ -1,6 +1,6 @@
-import { AgendaCard } from "../services/AgendaCard";
-import { CompactNoticeCard } from "../common/CompactNoticeCard";
-import { COMUNICADO_TIPO, isComunicadoPending, type ComunicadoDestinatario } from "../../lib/comunicados";
+import { AgendaCard } from "../../components/services/AgendaCard";
+import { CompactNoticeCard } from "../../components/common/CompactNoticeCard";
+import { COMUNICADO_TIPO, isComunicadoPending, type ComunicadoDestinatario } from "./comunicados";
 
 type Props = {
   item: ComunicadoDestinatario;

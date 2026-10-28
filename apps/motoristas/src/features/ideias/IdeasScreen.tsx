@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActionBar, ActionButton, type ActionButtonState } from "../components/common/ActionButton";
-import { TextAreaField, TextInputField } from "../components/common/FormFields";
-import { AppShell } from "../components/layout/AppShell";
-import { FormMenu } from "../components/navigation/FormMenu";
+import { ActionBar, ActionButton, type ActionButtonState } from "../../components/common/ActionButton";
+import { TextAreaField, TextInputField } from "../../components/common/FormFields";
+import { AppShell } from "../../components/layout/AppShell";
+import { FormMenu } from "../../components/navigation/FormMenu";
 import {
   IDEA_DETAILS_MAX_LENGTH,
   IDEA_TITLE_MAX_LENGTH,
@@ -12,7 +12,7 @@ import {
   type Idea,
   type IdeaDraft,
   type IdeaDraftErrors
-} from "../lib/ideas";
+} from "./ideas";
 
 type IdeasScreenProps = {
   onBack: () => void;

@@ -229,6 +229,10 @@ export function describeDataverseError(error: unknown) {
   };
 }
 
+export function getCurrentUserId() {
+  return cleanGuid(getWindowXrm()?.Utility?.getGlobalContext?.().userSettings?.userId ?? "");
+}
+
 export async function retrieveMultiple(entitySetName: string, options = "") {
   const startedAt = performance.now();
   const entityName = getWebApiEntityName(entitySetName);

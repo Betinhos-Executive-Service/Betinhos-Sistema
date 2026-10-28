@@ -1,10 +1,8 @@
 import { concluirChecklist, executeChecklistAction, loadDriverChecklist, loadDriverChecklists } from "../../lib/checklists.ts";
-import { executeComunicadoAction, loadDriverComunicado, loadDriverComunicados } from "../../lib/comunicados.ts";
+import { executeComunicadoAction, loadDriverComunicado, loadDriverComunicados } from "../../features/comunicados/comunicados.ts";
 import {
-  createIdeaRemote,
   createReceiptRecordRemote,
   finalizeServiceRemote,
-  loadMyIdeasRemote,
   loadRemoteDetailByParams,
   loadRemoteStore,
   markDetailViewedRemote,
@@ -15,6 +13,7 @@ import {
   uploadChecklistPhotoRemote,
   uploadReceiptPdfRemote
 } from "../../lib/dataverse.ts";
+import { createIdeaRemote, loadMyIdeasRemote } from "../../features/ideias/remoto.ts";
 import type { PortaDados } from "../porta.ts";
 
 // Adaptador do web resource (Xrm.WebApi, URL direta ou mock em localhost).

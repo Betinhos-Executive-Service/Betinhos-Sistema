@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createRemoteReadBatch } from "../src/lib/remoteReadBatch.ts";
+import { createRemoteReadBatch } from "../src/data/dataverse/remoteReadBatch.ts";
 
 test("limita leituras simultaneas a quatro sem alterar a ordem dos resultados", async () => {
   const batch = createRemoteReadBatch();

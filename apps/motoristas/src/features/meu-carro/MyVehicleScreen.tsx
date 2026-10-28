@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
-import { LocalToast, type ToastState } from "../components/common/LocalToast";
-import { AppShell } from "../components/layout/AppShell";
-import { FormMenu } from "../components/navigation/FormMenu";
-import { describeVehicle, type FleetVehicle } from "../lib/serviceVehicleInfleet";
+import { LocalToast, type ToastState } from "../../components/common/LocalToast";
+import { AppShell } from "../../components/layout/AppShell";
+import { FormMenu } from "../../components/navigation/FormMenu";
+import { describeVehicle, type FleetVehicle } from "../../lib/serviceVehicleInfleet";
 
 type MyVehicleScreenProps = {
   onBack: () => void;

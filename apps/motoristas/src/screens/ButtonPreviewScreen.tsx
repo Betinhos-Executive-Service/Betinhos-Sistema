@@ -5,7 +5,7 @@ import { LocalToast, type ToastState } from "../components/common/LocalToast";
 import { ExpenseSendOverlay, type ExpenseSendState } from "../components/common/ExpenseSendOverlay";
 import { SearchableSelect } from "../components/common/SearchableSelect";
 import { SystemIcon } from "../components/icons/SystemIcon";
-import { agendaMock, historyMock } from "../data/mockData";
+import { agendaMock, historyMock } from "../data/mock/mockData";
 import { createEmptyCollisionDraft, type CollisionDraft, type CollisionPhoto, type CollisionPhotoKind } from "../lib/collisions";
 import type { MaintenanceRequestVehicleOption } from "../lib/dataverse";
 import { DEFAULT_EXPENSE_REFERENCE_DATA } from "../lib/expenses.defaults";

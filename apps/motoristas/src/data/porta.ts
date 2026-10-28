@@ -1,5 +1,5 @@
 import type * as checklists from "../lib/checklists";
-import type * as comunicados from "../lib/comunicados";
+import type * as comunicados from "../features/comunicados/comunicados";
 import type * as dataverse from "../lib/dataverse";
 
 // Contrato de dados do app: as operações que as telas podem pedir, com nome de negócio.
