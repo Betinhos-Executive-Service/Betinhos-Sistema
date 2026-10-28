@@ -1,6 +1,6 @@
 import { cleanId } from '@betinhos/dataverse'
 import type { Host } from '../../../host'
-import { FECHAMENTO_VALOR, LADO_VALOR, STATUS_VALOR, aplicarResposta } from '../domain/regras'
+import { FECHAMENTO_VALOR, LADO_VALOR, STATUS_VALOR, aplicarLiberacao, aplicarResposta } from '../domain/regras'
 import type { Cliente, Fechamento, Linha, Mensagem, NovoValidador, Validador } from '../domain/types'
 import { MOCK_CLIENTES, createMockLinhas, createMockMensagens, createMockValidadores } from './mock'
 import { ENTITIES, loadAll, mapMensagem, mensagensPath, type EntitySets } from './queries'
@@ -8,6 +8,8 @@ import { ENTITIES, loadAll, mapMensagem, mensagensPath, type EntitySets } from '
 export type Carga = { linhas: Linha[]; clientes: Cliente[]; validadores: Validador[] }
 /** Resultado de "Enviar resposta"; `avisoFalhou` = a mensagem foi gravada, mas o e-mail ao cliente não saiu. */
 export type Resposta = { mensagem: Mensagem; prazoTacita: string; avisoFalhou: string | null }
+/** Resultado por linha de uma ação em lote; uma falha não desfaz as outras. */
+export type Lote = { ok: { linhaId: string; validacaoId: string }[]; failed: { linhaId: string; codigo: string; message: string }[] }
 
 /** Tudo que a tela precisa do mundo externo; Dataverse em produção, memória no pnpm dev. */
 export type Source = {
@@ -19,6 +21,9 @@ export type Source = {
   /** Grava a mensagem, põe a validação em Respondido com o prazo reiniciado e avisa o cliente pelo flow. */
   responder: (linha: Linha, texto: string) => Promise<Resposta>
   retirar: (validacaoId: string) => Promise<void>
+  /** Cria a validação (ou reativa a retirada no mesmo registro) como Liberado, com a observação ao cliente. */
+  liberar: (linhas: Linha[], observacao: string) => Promise<Lote>
+  setObservacao: (validacaoId: string, observacao: string) => Promise<void>
   setFechamento: (validacaoIds: string[], valor: Fechamento) => Promise<void>
   criarValidador: (v: NovoValidador) => Promise<string>
   setValidadorAtivo: (id: string, ativo: boolean) => Promise<void>
@@ -31,6 +36,15 @@ export const PAPEIS_FINANCEIRO = /financeiro|system administrator|administrador 
 /** URL do flow HTTP "Portal cliente – e-mails" (variável de ambiente; sessão do flow). */
 export const FLOW_EMAILS_VAR = 'cr40f_URLFlowPortalClienteEmails'
 export const AUTOR_BETINHOS = 'Juliana (Financeiro)'
+
+async function emLote(linhas: Linha[], fn: (l: Linha) => Promise<string>): Promise<Lote> {
+  const out: Lote = { ok: [], failed: [] }
+  const results = await Promise.allSettled(linhas.map(fn))
+  results.forEach((r, i) => (r.status === 'fulfilled'
+    ? out.ok.push({ linhaId: linhas[i].id, validacaoId: r.value })
+    : out.failed.push({ linhaId: linhas[i].id, codigo: linhas[i].codigo, message: message(r.reason) })))
+  return out
+}
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 const message = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
@@ -59,6 +73,11 @@ function createMockSource(): Source {
       return { mensagem, prazoTacita, avisoFalhou: null }
     },
     async retirar() { await wait(300) },
+    async liberar(linhas, observacao) {
+      await wait(400)
+      return emLote(linhas, async (l) => { aplicarLiberacao(l, new Date().toISOString(), observacao); return l.validacaoId ?? nextId('a1000000') })
+    },
+    async setObservacao() { await wait(250) },
     async setFechamento() { await wait(300) },
     async criarValidador() { await wait(300); const id = nextId('e1000000'); validadores.add(id); return id },
     async setValidadorAtivo(id) { await wait(250); if (!validadores.has(id)) throw new Error('Validador não encontrado.') },
@@ -131,6 +150,25 @@ export function createSource(host: Host): Source {
     },
     // A conversa fica: só o status muda (o portal deixa de mostrar o serviço).
     retirar: async (id) => host.client.update((await entitySets()).validacao, id, { cr40f_status: STATUS_VALOR.retirado }),
+    async liberar(linhas, observacao) {
+      const s = await entitySets()
+      const me = await host.client.request<{ UserId: string }>('WhoAmI')
+      const agora = new Date().toISOString()
+      return emLote(linhas, async (l) => {
+        const efeito = aplicarLiberacao(l, agora, observacao)
+        // Mesmo payload de pages/geral/data/portal.ts (liberacaoPatch); retirada volta no mesmo registro (chave cr40f_reservaunica).
+        const data = {
+          cr40f_name: l.codigo, cr40f_status: STATUS_VALOR.liberado, cr40f_liberadoem: agora, cr40f_prazotacita: efeito.prazoTacita,
+          cr40f_observacao: efeito.observacao || null, cr40f_valorliberado: efeito.valorLiberado, cr40f_aprovadoem: null, cr40f_aprovadopor: null,
+          'cr40f_Reserva@odata.bind': `/${s.reserva}(${l.reservaId})`,
+          'cr40f_Cliente@odata.bind': `/${s.cliente}(${l.cliente.id})`,
+          'cr40f_LiberadoPor@odata.bind': `/systemusers(${cleanId(me.UserId)})`,
+        }
+        if (l.validacaoId) { await host.client.update(s.validacao, l.validacaoId, data); return l.validacaoId }
+        return cleanId(await host.client.create(s.validacao, data))
+      })
+    },
+    setObservacao: async (id, observacao) => host.client.update((await entitySets()).validacao, id, { cr40f_observacao: observacao.trim() || null }),
     async setFechamento(ids, valor) {
       const set = (await entitySets()).validacao
       for (const id of ids) await host.client.update(set, id, { cr40f_incluirfechamento: FECHAMENTO_VALOR[valor] })

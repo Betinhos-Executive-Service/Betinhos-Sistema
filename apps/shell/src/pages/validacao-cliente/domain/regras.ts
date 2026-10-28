@@ -38,6 +38,12 @@ export const motivoLabel = (m: Motivo) => MOTIVO_LABEL[m]
 export const podeResponder = (s: Situacao) => s === 'em_duvida' || s === 'respondido'
 /** Retirar só antes da aprovação; aprovado fica para o fechamento decidir. */
 export const podeRetirar = (s: Situacao) => s === 'liberado' || s === 'em_duvida' || s === 'respondido'
+/** Liberar: o que ainda não foi liberado ou foi retirado (volta no mesmo registro). */
+export const podeLiberar = (s: Situacao) => s === 'a_liberar' || s === 'retirado'
+/** A observação ao cliente só muda enquanto o serviço está no portal esperando decisão. */
+export const podeEditarObservacao = podeRetirar
+/** Vai ao fechamento só o que já foi liberado e não retirado. */
+export const podeMarcarFechamento = (s: Situacao) => s !== 'a_liberar' && s !== 'retirado'
 
 // Prazo da aprovação tácita: 5 dias úteis, sem sábado, domingo e feriados nacionais, em America/Sao_Paulo
 // (UTC-3 fixo desde 2019). Mesma regra de pages/geral/domain/portal.ts e apps/portal-cliente/src/domain/regras.ts.
@@ -92,6 +98,12 @@ export const prazoVencido = (l: Pick<Linha, 'situacao' | 'prazoTacita'>, hoje: s
 export function aplicarResposta(l: Linha, agoraIso: string): { situacao: 'respondido'; prazoTacita: string } {
   if (!podeResponder(l.situacao)) throw new Error(`Não há dúvida aberta neste serviço (${situacaoLabel(l.situacao)}).`)
   return { situacao: 'respondido', prazoTacita: prazoTacita(agoraIso) }
+}
+
+/** Efeito de "Liberar para o portal": Liberado, prazo aberto, valor da composição e aprovação anterior limpa. */
+export function aplicarLiberacao(l: Linha, agoraIso: string, observacao: string): Pick<Linha, 'situacao' | 'prazoTacita' | 'liberadoEm' | 'valorLiberado' | 'observacao' | 'aprovadoEm' | 'aprovadoPor'> {
+  if (!podeLiberar(l.situacao)) throw new Error(`O serviço ${l.codigo} já está no portal (${situacaoLabel(l.situacao)}).`)
+  return { situacao: 'liberado', prazoTacita: prazoTacita(agoraIso), liberadoEm: agoraIso, valorLiberado: l.valorComposicao, observacao: observacao.trim(), aprovadoEm: null, aprovadoPor: '' }
 }
 
 /** Aprovado (explícito ou automático) entra no fechamento por padrão enquanto a Juliana não decidiu. */

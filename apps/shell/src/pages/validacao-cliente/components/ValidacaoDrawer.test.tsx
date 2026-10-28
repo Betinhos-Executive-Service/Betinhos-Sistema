@@ -25,6 +25,8 @@ function source(over: Partial<Source> = {}): Source {
       avisoFalhou: null,
     })),
     retirar: vi.fn(async () => undefined),
+    liberar: vi.fn(async (ls: Linha[]) => ({ ok: ls.map((l) => ({ linhaId: l.id, validacaoId: 'v-novo' })), failed: [] })),
+    setObservacao: vi.fn(async () => undefined),
     setFechamento: async () => undefined,
     criarValidador: async () => 'x',
     setValidadorAtivo: async () => undefined,
@@ -34,7 +36,7 @@ function source(over: Partial<Source> = {}): Source {
 }
 
 function abrir(s: Source, linha: Linha = emDuvida) {
-  const props = { onClose: vi.fn(), onRespondida: vi.fn(), onRetirada: vi.fn() }
+  const props = { onClose: vi.fn(), onRespondida: vi.fn(), onRetirada: vi.fn(), onPatch: vi.fn() }
   render(<ToastProvider><ValidacaoDrawer linha={linha} missing={false} source={s} mobile={false} {...props} /></ToastProvider>)
   return props
 }
@@ -86,5 +88,30 @@ describe('ValidacaoDrawer', () => {
     abrir(source(), linhas.find((l) => l.situacao === 'aprovado')!)
     await waitFor(() => expect(within(drawer()).queryByRole('button', { name: 'Enviar resposta' })).toBeNull())
     expect(within(drawer()).queryByRole('button', { name: 'Retirar do portal' })).toBeNull()
+  })
+
+  it('a liberar: libera com a observação e a linha vira Liberado', async () => {
+    const s = source()
+    const linha = linhas.find((l) => l.situacao === 'a_liberar')!
+    const props = abrir(s, linha)
+    fireEvent.change(within(drawer()).getByLabelText('Observação'), { target: { value: 'Espera no embarque.' } })
+    fireEvent.click(within(drawer()).getByRole('button', { name: 'Liberar para o portal' }))
+    await waitFor(() => expect(props.onPatch).toHaveBeenCalledWith(linha, expect.objectContaining({ situacao: 'liberado', observacao: 'Espera no embarque.', validacaoId: 'v-novo', valorLiberado: linha.valorComposicao })))
+    expect(s.liberar).toHaveBeenCalledWith([linha], 'Espera no embarque.')
+  })
+
+  it('retirado oferece Liberar de novo', async () => {
+    abrir(source(), linhas.find((l) => l.situacao === 'retirado')!)
+    expect(within(drawer()).getByRole('button', { name: 'Liberar de novo' })).toBeTruthy()
+  })
+
+  it('liberado salva a observação editada', async () => {
+    const s = source()
+    const linha = linhas.find((l) => l.situacao === 'liberado' && l.observacao)!
+    const props = abrir(s, linha)
+    fireEvent.change(within(drawer()).getByLabelText('Observação'), { target: { value: 'Nova observação' } })
+    fireEvent.click(within(drawer()).getByRole('button', { name: 'Salvar observação' }))
+    await waitFor(() => expect(props.onPatch).toHaveBeenCalledWith(linha, { observacao: 'Nova observação' }))
+    expect(s.setObservacao).toHaveBeenCalledWith(linha.validacaoId, 'Nova observação')
   })
 })

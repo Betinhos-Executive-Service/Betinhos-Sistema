@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createMockLinhas, createMockMensagens, TENARIS } from '../data/mock'
 import { planilhaFechamento, nomeArquivo } from './excel'
 import { builtinViews, fechamentoChave } from './lista'
-import { aplicarResposta, entraNoFechamento, fechamentoSugerido, linhasDoFechamento, podeResponder, podeRetirar, prazoTacita, prazoVencido, validarValidador } from './regras'
+import { aplicarLiberacao, podeLiberar, aplicarResposta, entraNoFechamento, fechamentoSugerido, linhasDoFechamento, podeResponder, podeRetirar, prazoTacita, prazoVencido, validarValidador } from './regras'
 import type { Linha } from './types'
 
 const linhas = createMockLinhas(createMockMensagens())
@@ -40,6 +40,16 @@ describe('transições', () => {
     expect(['liberado', 'em_duvida', 'respondido'].every((s) => podeRetirar(s as Linha['situacao']))).toBe(true)
     expect(podeRetirar('aprovado')).toBe(false)
     expect(podeRetirar('a_liberar')).toBe(false)
+  })
+})
+
+describe('liberação', () => {
+  it('libera a liberar e retirado, com prazo novo e aprovação limpa', () => {
+    expect(podeLiberar('a_liberar') && podeLiberar('retirado')).toBe(true)
+    expect(podeLiberar('liberado')).toBe(false)
+    const r = aplicarLiberacao(com({ situacao: 'retirado', valorComposicao: 500, aprovadoPor: 'x' }), '2026-10-27T13:00:00Z', ' obs ')
+    expect(r).toEqual({ situacao: 'liberado', prazoTacita: '2026-11-04', liberadoEm: '2026-10-27T13:00:00Z', valorLiberado: 500, observacao: 'obs', aprovadoEm: null, aprovadoPor: '' })
+    expect(() => aplicarLiberacao(com({ situacao: 'aprovado' }), '2026-10-27T13:00:00Z', '')).toThrow(/já está no portal/)
   })
 })
 

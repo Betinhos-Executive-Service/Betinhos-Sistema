@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Checkbox, StatusBadge, Table, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
 import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
-import { fechamentoSugerido, prazoVencido, situacaoLabel, situacaoTone } from '../domain/regras'
+import { fechamentoSugerido, podeMarcarFechamento, prazoVencido, situacaoLabel, situacaoTone } from '../domain/regras'
 import type { Linha } from '../domain/types'
 
 type Props = { list: Linha[]; hoje: string; selecionados: Set<string>; onToggle: (id: string) => void; onOpen: (id: string) => void; loading?: boolean }
@@ -10,15 +10,13 @@ type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; 
 export const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 export const fmtData = (iso: string | null) => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '')
 const fmtValor = (v: number | null) => (v == null ? '—' : money.format(v))
-/** Retirado e a liberar não vão ao fechamento: sem seleção. */
-export const selecionavel = (l: Linha) => l.validacaoId != null && l.situacao !== 'retirado'
 
 export function Situacao({ l }: { l: Linha }) {
   return <StatusBadge tone={situacaoTone(l.situacao)}>{situacaoLabel(l.situacao)}</StatusBadge>
 }
 
 export function Fechamento({ l }: { l: Linha }) {
-  if (!selecionavel(l)) return <span className="vc-muted">—</span>
+  if (!podeMarcarFechamento(l.situacao)) return <span className="vc-muted">—</span>
   if (l.fechamento === 'sim') return <StatusBadge tone="success">Entra</StatusBadge>
   if (l.fechamento === 'nao') return <StatusBadge tone="neutral">Próximo mês</StatusBadge>
   return fechamentoSugerido(l) ? <StatusBadge tone="info">Sugerido</StatusBadge> : <span className="vc-muted">A decidir</span>
@@ -38,7 +36,6 @@ function UltimaMensagem({ l }: { l: Linha }) {
 }
 
 function Selecao({ l, selecionados, onToggle }: Pick<Props, 'selecionados' | 'onToggle'> & { l: Linha }) {
-  if (!selecionavel(l)) return <span className="vc-check" aria-hidden="true" />
   return <Checkbox className="vc-check" label={<span className="vc-sr">Selecionar serviço {l.codigo}</span>} checked={selecionados.has(l.id)} onChange={() => onToggle(l.id)} />
 }
 

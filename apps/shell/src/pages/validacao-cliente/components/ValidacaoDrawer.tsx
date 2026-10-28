@@ -1,8 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Alert, Button, Dialog, Drawer, Field, Sheet, Skeleton, StatusBadge, Textarea, useToast } from '@betinhos/ui'
-import { Send, Undo2 } from 'lucide-react'
+import { Save, Send, ShieldCheck, Undo2 } from 'lucide-react'
 import type { Source } from '../data/source'
-import { mesLabel, motivoLabel, podeResponder, podeRetirar } from '../domain/regras'
+import { aplicarLiberacao, mesLabel, motivoLabel, podeEditarObservacao, podeLiberar, podeResponder, podeRetirar } from '../domain/regras'
 import type { Linha, Mensagem } from '../domain/types'
 import { Fechamento, Situacao, fmtData, money } from './ValidacaoList'
 
@@ -15,6 +15,8 @@ type Props = {
   mobile: boolean
   onRespondida: (l: Linha, mensagem: Mensagem, prazoTacita: string) => void
   onRetirada: (l: Linha) => void
+  /** Liberação ou observação salva: campos novos da linha. */
+  onPatch: (l: Linha, patch: Partial<Linha>) => void
 }
 
 const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
@@ -25,7 +27,7 @@ function Dado({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** Detalhe do serviço: dados, composição, conversa com resposta e retirada. Fechar com resposta digitada pede confirmação. */
-export function ValidacaoDrawer({ linha, missing, onClose, source, mobile, onRespondida, onRetirada }: Props) {
+export function ValidacaoDrawer({ linha, missing, onClose, source, mobile, onRespondida, onRetirada, onPatch }: Props) {
   const toast = useToast()
   const [mensagens, setMensagens] = useState<Mensagem[] | null>(null)
   const [erroConversa, setErroConversa] = useState<string | null>(null)
@@ -36,6 +38,10 @@ export function ValidacaoDrawer({ linha, missing, onClose, source, mobile, onRes
   const [confirmarRetirada, setConfirmarRetirada] = useState(false)
   const [confirmarSaida, setConfirmarSaida] = useState(false)
   const validacaoId = linha?.validacaoId ?? null
+  const [obs, setObs] = useState('')
+  const [salvandoObs, setSalvandoObs] = useState(false)
+  useEffect(() => { setObs(linha?.observacao ?? '') }, [linha?.id, linha?.situacao]) // eslint-disable-line react-hooks/exhaustive-deps
+  const obsAlterada = linha != null && (podeLiberar(linha.situacao) ? obs.trim() !== '' : obs.trim() !== linha.observacao.trim())
 
   useEffect(() => {
     setTexto(''); setErroTexto(null); setMensagens(null); setErroConversa(null)
@@ -46,10 +52,10 @@ export function ValidacaoDrawer({ linha, missing, onClose, source, mobile, onRes
   }, [validacaoId, source])
 
   const open = linha != null || missing
-  const ocupado = enviando || retirando
+  const ocupado = enviando || retirando || salvandoObs
   function close() {
     if (ocupado) return
-    if (texto.trim()) { setConfirmarSaida(true); return }
+    if (texto.trim() || obsAlterada) { setConfirmarSaida(true); return }
     onClose()
   }
 
@@ -72,6 +78,36 @@ export function ValidacaoDrawer({ linha, missing, onClose, source, mobile, onRes
     }
   }
 
+  async function liberar() {
+    if (!linha) return
+    setSalvandoObs(true)
+    try {
+      const r = await source.liberar([linha], obs)
+      if (r.failed.length) throw new Error(r.failed[0].message)
+      onPatch(linha, { ...aplicarLiberacao(linha, new Date().toISOString(), obs), id: r.ok[0].validacaoId, validacaoId: r.ok[0].validacaoId })
+      toast({ tone: 'success', message: `Serviço ${linha.codigo} liberado. O cliente já vê no portal.` })
+      onClose()
+    } catch (reason) {
+      toast({ tone: 'danger', message: `Não foi possível liberar. ${reasonText(reason)}` })
+    } finally {
+      setSalvandoObs(false)
+    }
+  }
+
+  async function salvarObservacao() {
+    if (!linha?.validacaoId) return
+    setSalvandoObs(true)
+    try {
+      await source.setObservacao(linha.validacaoId, obs)
+      onPatch(linha, { observacao: obs.trim() })
+      toast({ tone: 'success', message: 'Observação salva. O cliente vê a nova no portal.' })
+    } catch (reason) {
+      toast({ tone: 'danger', message: `Não foi possível salvar a observação. ${reasonText(reason)}` })
+    } finally {
+      setSalvandoObs(false)
+    }
+  }
+
   async function retirar() {
     if (!linha?.validacaoId) return
     setRetirando(true)
@@ -91,6 +127,7 @@ export function ValidacaoDrawer({ linha, missing, onClose, source, mobile, onRes
   const responde = linha != null && podeResponder(linha.situacao)
   const footer = !linha ? <Button variant="secondary" onClick={onClose}>Voltar à lista</Button> : (
     <>
+      {podeLiberar(linha.situacao) ? <Button icon={<ShieldCheck size={16} />} loading={salvandoObs} disabled={enviando || retirando || linha.valorComposicao == null} onClick={() => void liberar()}>{linha.situacao === 'retirado' ? 'Liberar de novo' : 'Liberar para o portal'}</Button> : null}
       {podeRetirar(linha.situacao) ? <Button variant="secondary" icon={<Undo2 size={16} />} disabled={ocupado} onClick={() => setConfirmarRetirada(true)}>Retirar do portal</Button> : null}
       <Button variant="secondary" disabled={ocupado} onClick={close}>Fechar</Button>
     </>
@@ -102,8 +139,8 @@ export function ValidacaoDrawer({ linha, missing, onClose, source, mobile, onRes
     : (
       <div className="vc-detalhe">
         <div className="vc-detalhe__status"><Situacao l={linha} /><Fechamento l={linha} /></div>
-        {linha.situacao === 'a_liberar' ? <Alert tone="info">Este serviço ainda não foi liberado. A liberação é feita na Tabela Geral, pela ação "Liberar para o portal".</Alert> : null}
-        {linha.situacao === 'retirado' ? <Alert tone="info">Retirado do portal: o cliente não vê mais este serviço. A conversa abaixo ficou guardada.</Alert> : null}
+        {linha.situacao === 'a_liberar' ? <Alert tone="info">Composição concluída e ainda não liberada: o cliente não vê este serviço. Revise o valor e libere.</Alert> : null}
+        {linha.situacao === 'retirado' ? <Alert tone="info">Retirado do portal: o cliente não vê mais este serviço. A conversa abaixo ficou guardada; "Liberar de novo" devolve ao portal com o prazo reaberto.</Alert> : null}
         <section className="vc-secao" aria-labelledby="vc-dados">
           <h3 id="vc-dados" className="vc-secao__titulo">Dados do serviço</h3>
           <dl className="vc-dados">
@@ -114,7 +151,7 @@ export function ValidacaoDrawer({ linha, missing, onClose, source, mobile, onRes
             <Dado label="Pedido">{linha.pedido}</Dado>
             <Dado label="Prazo da tácita">{fmtData(linha.prazoTacita)}</Dado>
             {linha.aprovadoEm ? <Dado label="Aprovado em">{fmtHora(linha.aprovadoEm)}{linha.aprovadoPor ? ` por ${linha.aprovadoPor}` : ' (automaticamente)'}</Dado> : null}
-            {linha.observacao ? <Dado label="Observação ao cliente">{linha.observacao}</Dado> : null}
+            {linha.observacao && !podeLiberar(linha.situacao) && !podeEditarObservacao(linha.situacao) ? <Dado label="Observação ao cliente">{linha.observacao}</Dado> : null}
           </dl>
         </section>
         <section className="vc-secao" aria-labelledby="vc-comp">
@@ -132,6 +169,15 @@ export function ValidacaoDrawer({ linha, missing, onClose, source, mobile, onRes
             {linha.valorAnterior != null ? <span>Valor anterior: <s className="vc-num">{money.format(linha.valorAnterior)}</s> <StatusBadge tone="warning">Preço alterado</StatusBadge></span> : null}
           </p>
         </section>
+        {podeLiberar(linha.situacao) || podeEditarObservacao(linha.situacao) ? (
+          <section className="vc-secao" aria-labelledby="vc-obs">
+            <h3 id="vc-obs" className="vc-secao__titulo">Observação ao cliente</h3>
+            <Field label="Observação" hint={podeLiberar(linha.situacao) ? 'Opcional. Aparece no portal junto do serviço (ex.: motivo da espera).' : 'O cliente vê a observação no portal.'}>
+              <Textarea name="observacao" rows={2} maxLength={2000} value={obs} disabled={salvandoObs} onChange={(e) => setObs(e.target.value)} />
+            </Field>
+            {podeEditarObservacao(linha.situacao) ? <div><Button variant="secondary" size="compact" icon={<Save size={14} />} disabled={!obsAlterada} loading={salvandoObs} onClick={() => void salvarObservacao()}>Salvar observação</Button></div> : null}
+          </section>
+        ) : null}
         {linha.validacaoId ? (
           <section className="vc-secao" aria-labelledby="vc-conversa">
             <h3 id="vc-conversa" className="vc-secao__titulo">Conversa</h3>
@@ -176,9 +222,9 @@ export function ValidacaoDrawer({ linha, missing, onClose, source, mobile, onRes
       <Dialog open={confirmarSaida} onClose={() => setConfirmarSaida(false)} title="Descartar alterações?"
         actions={<>
           <Button variant="secondary" onClick={() => setConfirmarSaida(false)}>Continuar editando</Button>
-          <Button variant="danger" onClick={() => { setConfirmarSaida(false); setTexto(''); onClose() }}>Descartar</Button>
+          <Button variant="danger" onClick={() => { setConfirmarSaida(false); setTexto(''); setObs(linha?.observacao ?? ''); onClose() }}>Descartar</Button>
         </>}>
-        A resposta digitada ainda não foi enviada.
+        {texto.trim() ? 'A resposta digitada ainda não foi enviada.' : 'A observação alterada ainda não foi salva.'}
       </Dialog>
     </>
   )
