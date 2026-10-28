@@ -77,9 +77,13 @@ export default function AssignmentFields({
   const primaryAssigneeId = form.primaryAssigneeId || form.assigneeId || form.assigneeIds?.[0] || "";
   const selectedConsultantIds = (form.consultantIds || (form.assigneeIds || []).filter((id: any) => String(id) !== String(primaryAssigneeId)))
     .filter((id: any) => String(id) !== String(primaryAssigneeId));
-  const primaryName = (employeeById.get(String(primaryAssigneeId)) as any)?.name || "Não definido";
+  const displayName = (id: any) => {
+    const employee = employeeById.get(String(id)) as any;
+    return employee?.apelido || employee?.name;
+  };
+  const primaryName = displayName(primaryAssigneeId) || "Não definido";
   const consultantNames = selectedConsultantIds
-    .map((id: any) => (employeeById.get(String(id)) as any)?.name)
+    .map(displayName)
     .filter(Boolean);
   const selectMode = (mode: any) => {
     setForm((current: any) => ({
@@ -184,36 +188,31 @@ export default function AssignmentFields({
               multiple
             />
           </label>
-          {selectedTeams.length > 0 && (
+          {selectedTeams.length > 0 && (primaryName !== "Não definido" || consultantNames.length > 0) && (
             <div
-              className="assignment-members"
-              aria-label={
-                "Membros de " + selectedTeams.map((team: any) => team.name).join(", ")
-              }
+              className="assignment-summary"
+              title={[
+                primaryName !== "Não definido" && "Principal: " + primaryName,
+                consultantNames.length > 0 && "Consultores: " + consultantNames.join(", "),
+              ].filter(Boolean).join(" · ")}
             >
-              <span className="assignment-members-label">Composição herdada da equipe</span>
-              <div className="assignment-members-list">
-                {primaryName !== "Não definido" && (
-                  <span
-                    className="assignment-member-chip assignment-member-primary"
-                  >
-                    <span className="avatar avatar-small">
-                      {String(primaryName)
-                        .split(" ")
-                        .map((part) => part[0])
-                        .join("")
-                        .slice(0, 2)
-                        .toUpperCase()}
+              <span className="assignment-stack" aria-hidden="true">
+                {[primaryName !== "Não definido" ? primaryName : null, ...consultantNames]
+                  .filter(Boolean)
+                  .slice(0, 5)
+                  .map((name: any, index: number) => (
+                    <span key={name} className={"avatar avatar-small" + (index === 0 && primaryName !== "Não definido" ? " is-primary" : "")}>
+                      {String(name).split(" ").filter(Boolean).map((part) => part[0]).join("").slice(0, 2).toUpperCase()}
                     </span>
-                    Principal: {primaryName}
-                  </span>
-                )}
-                {consultantNames.length > 0 && (
-                  <span className="assignment-member-chip">
-                    Consultores: {consultantNames.join(", ")}
-                  </span>
-                )}
-              </div>
+                  ))}
+              </span>
+              <span className="assignment-summary-text">
+                {primaryName !== "Não definido" && <strong>{primaryName}</strong>}
+                {consultantNames.length > 0 &&
+                  (primaryName !== "Não definido" ? " e " : "") +
+                    consultantNames.length +
+                    (consultantNames.length === 1 ? " consultor" : " consultores")}
+              </span>
             </div>
           )}
         </>

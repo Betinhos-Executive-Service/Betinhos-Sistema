@@ -1,7 +1,7 @@
 {
   "name": "@betinhos/shell",
   "private": true,
-  "version": "0.0.96",
+  "version": "0.0.102",
   "type": "module",
   "scripts": {
     "dev": "node ../../packages/deploy/dev-restart.mjs 36472 .",
@@ -15,7 +15,7 @@
   "dependencies": {
     "@azure/msal-browser": "^5.26.0",
     "@betinhos/dataverse": "workspace:*",
-    "@betinhos/ui": "npm:@betinhos-executive-service/ui@^1.15.2",
+    "@betinhos/ui": "npm:@betinhos-executive-service/ui@^1.15.3",
     "docx": "^9.14.0",
     "html2canvas": "^1.4.1",
     "lucide-react": "^1.47.0",
