@@ -12,6 +12,10 @@ description: "Verifica o compartilhamento de registros com o motorista (ServiceD
 ## Regra que não pode quebrar
 - O Dataverse recusa revogar o próprio dono ("Only owner can revoke access to the owner", 0x80040223). Em plugin síncrono, capturar a exceção não salva a operação: a transação já foi marcada para rollback. Por isso o helper lê o `ownerid` do alvo e pula conceder/revogar quando o usuário é o dono. Toda chamada de acesso deve passar pelo `DataverseAccessHelper`.
 
+## Regra da revogação por papel
+- Solicitante e passageiro são o mesmo registro (`cr40f_bancodedados`). Antes de revogar a pessoa de um motorista, `ServicePassengerRepository.IsContactInOtherServiceForEmployee` olha os dois papéis nas outras OS dele (solicitante **ou** passageiro). Checar só o mesmo papel derrubou o acesso no PROD em 27/10/2026 (OS-11115 x OS-10762) e o app passou a dar 403 em `retrieveRecord` de `cr40f_bancodedados`.
+- Teste: `plugins/DriverRecordSharing.Tests/ContactRetentionTests.cs`. Em DEV: pessoa solicitante na OS A e passageiro na OS B, mesmo motorista; tirar o motorista da OS A → ele continua lendo a pessoa (trace `keep requester`).
+
 ## Preparar ambiente
 - Copie `plugins/DriverRecordSharing/DriverRecordSharing.snk` (gitignored) do checkout principal para o worktree; não gere chave nova (mudaria a identidade do assembly).
 
