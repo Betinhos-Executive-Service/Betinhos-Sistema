@@ -325,6 +325,8 @@ export function escapeHtml(value: unknown): string {
     .replace(/'/g, '&#39;')
 }
 
+const SAO_PAULO_DATE_TIME = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo' })
+
 export function formatDateTime(value: unknown): string {
   if (!value) return ''
   // Datetime sem fuso (ex.: "2026-09-10T14:45", vindo do campo de data e hora) é hora de parede
@@ -333,7 +335,7 @@ export function formatDateTime(value: unknown): string {
   if (wallClock) return `${wallClock[3]}/${wallClock[2]}/${wallClock[1]}, ${wallClock[4]}:${wallClock[5]}`
   const date = new Date(value as string)
   if (Number.isNaN(date.getTime())) return String(value)
-  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo' }).format(date)
+  return SAO_PAULO_DATE_TIME.format(date)
 }
 
 // Empty is null; invalid input is NaN. Decimal-dot strings remain compatible

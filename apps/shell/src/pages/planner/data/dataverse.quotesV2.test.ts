@@ -8,7 +8,7 @@ const creatorId = '66666666-6666-4666-8666-666666666666'
 const optionId = '33333333-3333-4333-8333-333333333333'
 
 type Write = { url: string; method: string; body: Record<string, unknown> }
-type Options = { missingAttributes?: string[]; existingDedupeKeys?: string[] }
+type Options = { missingAttributes?: string[]; existingDedupeKeys?: string[]; failNoticeFor?: string }
 const g = globalThis as unknown as Record<string, unknown>
 let previous: Record<string, unknown> = {}
 
@@ -27,6 +27,7 @@ async function setup(options: Options = {}): Promise<{ store: PlannerDataStore; 
     else gets.push(decodeURIComponent(url))
     const missing = (options.missingAttributes || []).find((name) => url.includes(`Attributes(LogicalName='${name}')`))
     if (missing) return new Response(JSON.stringify({ error: { message: 'not found' } }), { status: 404 })
+    if (options.failNoticeFor && method === 'POST' && url.includes('/cr40f_plannernotificacaos') && String(init.body).includes(options.failNoticeFor)) return new Response(JSON.stringify({ error: { message: 'falha' } }), { status: 500 })
     const body = url.includes('ManyToOneRelationships') ? { value: [
           { ReferencingAttribute: 'cr40f_criador', ReferencedEntity: 'cr40f_funcionarios', ReferencingEntityNavigationPropertyName: 'cr40f_Criador' },
           { ReferencingAttribute: 'cr40f_destinatario', ReferencedEntity: 'cr40f_funcionarios', ReferencingEntityNavigationPropertyName: 'cr40f_Destinatario' },
@@ -67,6 +68,14 @@ describe('cotações V2 no Dataverse', () => {
     expect(notice.body.cr40f_tipo).toBe('quote_urgent')
     expect(notice.body['cr40f_Cotacao@odata.bind']).toBe(`/cr40f_pedidodecotacaos(${quoteId})`)
     expect(notice.body['cr40f_Destinatario@odata.bind']).toBe(`/cr40f_funcionarioses(${financeId})`)
+  })
+
+  test('falha ao gravar o aviso de um financeiro não impede o aviso dos outros', async () => {
+    const otherFinanceId = '77777777-7777-4777-8777-777777777777'
+    const { store, writes } = await setup({ failNoticeFor: financeId })
+    const state = { ...emptyState(), teams: [{ id: 'team-fin', name: 'Financeiro', memberIds: [financeId, otherFinanceId] }] } as unknown as LiveState
+    await store.createQuote(state, { title: 'GRU', client: 'Tenaris', priority: 'medium', status: 'Nova', clientContact: 'Walter', notes: 'GRU → Centro', deadline: today(), actorEmployeeId: creatorId })
+    expect(notificationPosts(writes).map((item) => item.body['cr40f_Destinatario@odata.bind'])).toContain(`/cr40f_funcionarioses(${otherFinanceId})`)
   })
 
   test('aviso com chave já gravada não é recriado', async () => {

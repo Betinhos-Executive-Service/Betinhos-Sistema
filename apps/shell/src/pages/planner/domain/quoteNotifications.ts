@@ -1,8 +1,15 @@
 // Cotações V2: quem avisar, quando e com qual chave de dedupe. Regras puras.
+import { localDateKey } from './management'
 import { notificationDedupeKey } from './notifications'
 import { lastProposalSentAt } from './quoteDomain'
 import { addBusinessDays } from './quoteTaskFlow'
 import type { QuoteInput } from './types'
+
+// Equipe "Financeiro" recebe o aviso de urgência; nome comparado sem caixa e sem espaços.
+export function financeMemberIds(state: { teams?: Array<{ name?: string; memberIds?: unknown[] }> }): string[] {
+  const team = (state.teams || []).find((item) => String(item.name || '').trim().toLowerCase() === 'financeiro')
+  return (team?.memberIds || []).map(String)
+}
 
 export type QuoteNoticeType = 'quote_urgent' | 'quote_ready' | 'quote_follow_up'
 export interface QuoteNotice {
@@ -44,9 +51,10 @@ export function readyNotice(previous: QuoteInput, next: QuoteInput): QuoteNotice
 
 export function followUpNotices(quotes: QuoteInput[], today: string): QuoteNotice[] {
   return quotes.flatMap((quote) => {
-    const sentAt = lastProposalSentAt(quote)
-    if (quote.status !== 'Respondida ao cliente' || !sentAt || !quote.creatorEmployeeId) return []
-    if (addBusinessDays(sentAt.slice(0, 10), QUOTE_FOLLOW_UP_BUSINESS_DAYS) > today) return []
+    const sentMs = Date.parse(lastProposalSentAt(quote))
+    if (quote.status !== 'Respondida ao cliente' || Number.isNaN(sentMs) || !quote.creatorEmployeeId) return []
+    // O envio é gravado em UTC; o dia que conta é o de São Paulo (como em daysSince).
+    if (addBusinessDays(localDateKey(sentMs), QUOTE_FOLLOW_UP_BUSINESS_DAYS) > today) return []
     return [notice(quote, quote.creatorEmployeeId, 'quote_follow_up', 'Cobrar decisão do cliente', today)]
   })
 }

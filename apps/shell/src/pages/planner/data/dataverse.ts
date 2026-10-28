@@ -73,7 +73,7 @@ import { commitQuoteSend } from "../domain/quoteSendBatch";
 import { localDateKey, manualCollectionKey } from "../domain/management";
 import { normalizeContact } from "../domain/contactDomain";
 import { logAppError, sanitizeDataversePath } from "./errorLogger";
-import { followUpNotices, isLossReason, readyNotice, urgentNotices, type QuoteNotice } from "../domain/quoteNotifications";
+import { financeMemberIds, followUpNotices, isLossReason, readyNotice, urgentNotices, type QuoteNotice } from "../domain/quoteNotifications";
 import type { Employee, PersonalTag, PlannerNotification, PlannerState, QuoteData, QuoteOptionData, QuoteProposalVersion, Task, TaskAttachment, TaskHistoryItem, Team, WaitingContext, WaitingContextInput } from "../domain/types";
 
 void prepareQuoteProposal;
@@ -915,14 +915,6 @@ async function reconcileEmployeeUserLinks(xrm: PlannerXrm, employees: Row[] = []
   return employees;
 }
 
-async function resolveIdByName(xrm: PlannerXrm, table: string, field: string, value: unknown) {
-  if (!value || value === "Não atribuído" || value === "Sem equipe") return "";
-  const escaped = String(value).replace(/'/g, "''");
-  const rows = await retrieveMany(xrm, table, `?$select=${table === "systemuser" ? "systemuserid" : "teamid"}&$filter=${field} eq '${escaped}'${table === "systemuser" ? " and isdisabled eq false" : ""}&$top=2`);
-  if (rows.length > 1) throw new Error(`Mais de um registro encontrado para ${String(value)}. Selecione um responsável/equipe único.`);
-  return s(rows[0]?.[table === "systemuser" ? "systemuserid" : "teamid"]);
-}
-
 async function markQuoteOrigin(xrm: PlannerXrm, quoteId: unknown, taskId: unknown = "") {
   if (!quoteId) return;
   const clientUrl = xrm.Utility?.getGlobalContext?.().getClientUrl?.() || window.location.origin;
@@ -1012,28 +1004,25 @@ export async function createQuoteNotifications(xrm: PlannerXrm, notices: QuoteNo
     const keys = [...new Set(notices.map((item) => item.dedupeKey))];
     const filter = keys.map((key) => `cr40f_chavededupe eq '${key.replace(/'/g, "''")}'`).join(" or ");
     const existing = new Set((await retrieveMany(xrm, NOTIFICATION_TABLE, `?$select=cr40f_chavededupe&$filter=${filter}`)).map((row) => s(row.cr40f_chavededupe)));
-    const recipientNavigation = await resolveLookupNavigation(xrm, NOTIFICATION_TABLE, "cr40f_destinatario", EMPLOYEE_TABLE);
-    const quoteNavigation = await resolveLookupNavigation(xrm, NOTIFICATION_TABLE, "cr40f_cotacao", QUOTE_TABLE);
+    const [recipientNavigation, quoteNavigation] = await Promise.all([
+      resolveLookupNavigation(xrm, NOTIFICATION_TABLE, "cr40f_destinatario", EMPLOYEE_TABLE),
+      resolveLookupNavigation(xrm, NOTIFICATION_TABLE, "cr40f_cotacao", QUOTE_TABLE),
+    ]);
     const occurredAt = new Date().toISOString();
-    for (const item of notices) {
-      if (existing.has(item.dedupeKey)) continue;
-      existing.add(item.dedupeKey);
-      await request(xrm, `/${entitySetName(NOTIFICATION_TABLE)}`, { method: "POST", body: JSON.stringify({
-        cr40f_name: item.title.slice(0, 100), cr40f_titulo: item.title, cr40f_mensagem: item.message, cr40f_tipo: item.type,
-        cr40f_chavededupe: item.dedupeKey, cr40f_datareferencia: item.referenceDate || null, cr40f_ocorridoem: occurredAt,
-        [`${recipientNavigation}@odata.bind`]: `/${entitySetName(EMPLOYEE_TABLE)}(${cleanId(item.recipientEmployeeId)})`,
-        [`${quoteNavigation}@odata.bind`]: `/${entitySetName(QUOTE_TABLE)}(${cleanId(item.quoteId)})`,
-      }) });
-    }
+    const pending = [...new Map(notices.filter((item) => !existing.has(item.dedupeKey)).map((item) => [item.dedupeKey, item])).values()];
+    // Um aviso que falha (destinatário inativo, permissão) não impede os demais.
+    const results = await Promise.allSettled(pending.map((item) => request(xrm, `/${entitySetName(NOTIFICATION_TABLE)}`, { method: "POST", body: JSON.stringify({
+      cr40f_name: item.title.slice(0, 100), cr40f_titulo: item.title, cr40f_mensagem: item.message, cr40f_tipo: item.type,
+      cr40f_chavededupe: item.dedupeKey, cr40f_datareferencia: item.referenceDate || null, cr40f_ocorridoem: occurredAt,
+      [`${recipientNavigation}@odata.bind`]: `/${entitySetName(EMPLOYEE_TABLE)}(${cleanId(item.recipientEmployeeId)})`,
+      [`${quoteNavigation}@odata.bind`]: `/${entitySetName(QUOTE_TABLE)}(${cleanId(item.quoteId)})`,
+    }) })));
+    const failed = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
+    if (failed) throw failed.reason;
   } catch (error) {
     console.warn("[Planner] aviso de cotação não gravado", error);
     void logAppError(error, { action: "createQuoteNotifications", severity: "warning", source: "planner-quotes-v2", errorCode: "QUOTE_NOTICE_FAILED" });
   }
-}
-
-function financeMemberIds(state: LiveState): string[] {
-  const team = (state.teams || []).find((item) => String(item.name || "").trim().toLowerCase() === "financeiro");
-  return (team?.memberIds || []).map(String);
 }
 
 function probeOptionalQuoteFields(xrm: PlannerXrm) {
@@ -2392,13 +2381,6 @@ function quotePayload(input: QuotePatch = {}, includeUnset = false, clientNaviga
     if (quoteFieldAvailable.lossReason) payload.cr40f_motivoperda = reason;
   }
   return payload;
-}
-
-async function resolveFinanceTeamId(xrm: PlannerXrm, state: LiveState) {
-  const existing = (state.teams || []).find((team) => String(team.name || "").trim().toLowerCase() === "financeiro");
-  if (existing?.id) return existing.id;
-  const primaryName = await primaryNameAttribute(xrm, TEAM_TABLE);
-  return resolveIdByName(xrm, TEAM_TABLE, primaryName, "Financeiro");
 }
 
 async function createLiveQuote(xrm: PlannerXrm, state: LiveState, input: QuotePatch = {}) {

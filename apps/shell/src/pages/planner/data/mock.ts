@@ -30,7 +30,7 @@ import {
   validateContact,
 } from '../domain/contactDomain'
 import { isQuoteTask, isQuoteTerminalStatus, QUOTE_CLIENT_DECISION_RETURN, QUOTE_TASK_DONE_BLOCKED, quoteStatusForTaskStatus, taskStatusForQuoteStatus, waitingContextForStatusChange } from '../domain/quoteTaskFlow'
-import { followUpNotices, isLossReason, readyNotice, urgentNotices, type QuoteNotice } from '../domain/quoteNotifications'
+import { financeMemberIds, followUpNotices, isLossReason, readyNotice, urgentNotices, type QuoteNotice } from '../domain/quoteNotifications'
 import { applyDerivedStatus, buildQuoteEmailHtml, buildQuotePlainText, lastProposalSentAt, normalizeQuoteRoute, QUOTE_COMPLETED_STATUSES, quoteRoutePoints, validateQuoteCommercial } from '../domain/quoteDomain'
 import type { NormalizedContact } from '../domain/contactDomain'
 import { createQuoteProposalVersion, normalizeQuoteOptions, prepareQuoteProposal, prepareQuoteResponse, resolveQuoteAcceptance } from '../domain/quoteScenarios'
@@ -1441,11 +1441,6 @@ export function createQuote(state: MockState, input: QuotePatch = {}): MockState
   // V2: a cotação é a própria fila; não cria tarefa.
   const withQuote: MockState = { ...state, quotes: [quote, ...(state.quotes || [])] }
   return saveState(pushQuoteNotices(withQuote, urgentNotices(quote, input.financeIds ?? financeMemberIds(state), input.today || localDateKey())))
-}
-
-function financeMemberIds(state: MockState): string[] {
-  const team = (state.teams || []).find((item) => item.name === 'Financeiro')
-  return team?.memberIds || []
 }
 
 function pushQuoteNotices(state: MockState, notices: QuoteNotice[], occurredAt: string = new Date().toISOString()): MockState {
