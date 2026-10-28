@@ -218,8 +218,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/dataverse
       '@betinhos/ui':
-        specifier: npm:@betinhos-executive-service/ui@^1.15.2
-        version: '@betinhos-executive-service/ui@1.15.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0)'
+        specifier: npm:@betinhos-executive-service/ui@^1.15.3
+        version: '@betinhos-executive-service/ui@1.15.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0)'
       docx:
         specifier: ^9.14.0
         version: 9.14.0
@@ -429,8 +429,17 @@ packages:
   '@betinhos-executive-service/tokens@1.15.2':
     resolution: {integrity: sha512-BwqEbMCAkLDuh5Q6o8EWXXTkXuj5GAf3vaqjAvgjy6PZ6PyIKMMVPTIBo3hU6DTg/LZPJDYZlctKVkrHrpfrwA==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/tokens/1.15.2/13077f513ab1a6e1357990185e054740aba4b3f3}
 
+  '@betinhos-executive-service/tokens@1.15.3':
+    resolution: {integrity: sha512-1xr7r9+eI6klcVHkskkP7sblxhsEytGYvGb3nyusCQtYBodAIMlwFgSpyPFWaDQLYj7fail5nmeyL7Ocf1kAHA==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/tokens/1.15.3/59ecbe5235f518d3eab5d58258069c4eed8a5c9a}
+
   '@betinhos-executive-service/ui@1.15.2':
     resolution: {integrity: sha512-NI6IX+qh+625fcomAaMi1sPWzsKH6cc8FIc6rpJ5keb3NuQfdJcChYVyoZdBoZk3Ibp2NRvNjWmjwYwIotPRBQ==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/ui/1.15.2/585595a05d4bae5adf80785c4acc832b7b5da7b5}
+    peerDependencies:
+      react: ^19.2.0
+      react-dom: ^19.2.0
+
+  '@betinhos-executive-service/ui@1.15.3':
+    resolution: {integrity: sha512-cB5Ja0QamHpBGi+MretSLsDUHAThrTQqFnA0VxaRsjiYbQGqBznzLavxd1b7aYaRTI3z3j/smsYqhqj4G1BHQg==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/ui/1.15.3/8ae7a1b92454486a5fa57bff2d7299b4f37ec131}
     peerDependencies:
       react: ^19.2.0
       react-dom: ^19.2.0
@@ -2081,9 +2090,17 @@ snapshots:
 
   '@betinhos-executive-service/tokens@1.15.2': {}
 
+  '@betinhos-executive-service/tokens@1.15.3': {}
+
   '@betinhos-executive-service/ui@1.15.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
       '@betinhos-executive-service/tokens': 1.15.2
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
+
+  '@betinhos-executive-service/ui@1.15.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+    dependencies:
+      '@betinhos-executive-service/tokens': 1.15.3
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
 
