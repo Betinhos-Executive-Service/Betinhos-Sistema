@@ -17,18 +17,15 @@ import { getScreenAfterQrPayment, getServiceTaskBackScreen } from "./app/detailF
 import {
   AUTO_REFRESH_INTERVAL_MS,
   buildHashRoute,
-  getHashRouteFallbackScreen,
   getScreenMotion,
   isHashRoutingEnabled,
   parseHashRoute,
-  screenNeedsHashDetail,
   shouldAutoRefreshScreen,
   type HashRoute
 } from "./app/navigation";
 import {
   getDriverContext,
   getDriverCurrentVehicleId,
-  hasDataverseRuntime,
   loadExpenseReferenceDataRemote,
   loadMyVehiclesRemote,
   setMyCurrentVehicleRemote,
@@ -48,6 +45,8 @@ import { expenseFlowView } from "./features/despesas/receiptQuickRead";
 import { IDEA_STATUS, type Idea, type IdeaDraft } from "./features/ideias/ideas";
 import { APP_CONNECTION_LOST_MESSAGE, APP_OPERATION_ERROR_MESSAGE, reportAppError, type AppErrorNotice } from "./lib/appErrorLogger";
 import { useDados } from "./app/DataProvider";
+import { useServiceDeepLink } from "./features/servicos/useServiceDeepLink";
+import { useAgendaLoad } from "./features/servicos/useAgendaLoad";
 import { useFinalizeFlow } from "./features/finalizar/useFinalizeFlow";
 import { useReceiveFlow } from "./features/recebimento/useReceiveFlow";
 import { useMaintenanceRequestFlow } from "./features/manutencao/useMaintenanceRequestFlow";
@@ -65,7 +64,6 @@ import {
   clearMaintenancePhotos,
   deleteMaintenancePhoto as deleteFinalizationMaintenancePhoto,
   detailsToClipboardText,
-  findDetailByParams,
   saveMaintenancePhoto,
   saveSignatureLocally,
   type LocalStore
@@ -127,10 +125,6 @@ import { EMPTY_MAINTENANCE_REQUEST_DRAFT } from "./features/manutencao/rascunho"
 import { EMPTY_EXPENSE_DRAFT } from "./features/despesas/rascunho";
 import { EMPTY_MAINTENANCE_FINALIZE_DRAFT } from "./features/finalizar/rascunhoManutencao";
 import { LOCAL_RECEIPT_CLIENT_MOCKS } from "./features/recibo/clientesMock";
-
-type RefreshOptions = {
-  silent?: boolean;
-};
 
 type ReceiptEntrySource = "home" | "service";
 
@@ -565,38 +559,18 @@ function App() {
     reloadComunicados
   } = useComunicados({ dados, driverIdRef: comunicadosDriverIdRef, previewMode: isButtonPreviewMode || isReceiptPreviewMode, setScreen, setDataLoadingState });
 
-  // Deep link de serviço vindo do push (form OnLoad -> data=servicoId=...&tipo=...): busca o detalhe
-  // em paralelo com loadRemoteStore e abre assim que chega. Se o serviço saiu da agenda do motorista
-  // (ex.: "Serviço retirado da agenda"), cai em Serviços em vez de mostrar erro.
-  useEffect(() => {
-    const { serviceId, type } = pendingServiceDeepLinkRef.current;
-    if (!serviceId || isButtonPreviewMode || isReceiptPreviewMode || !hasDataverseRuntime()) return;
-    // Detalhe já presente no cache local: a tela inicial já é "detalhes"; o fluxo pós-carga atualiza.
-    if (initialDetailRef.current) return;
-    let alive = true;
-    dados.carregarDetalhe(serviceId, type)
-      .then((detail) => {
-        if (!alive || serviceDeepLinkHandledRef.current) return;
-        serviceDeepLinkHandledRef.current = true;
-        setDataLoadingState(null);
-        if (!detail) {
-          setSelectedDetail(null);
-          setScreen("servicos");
-          setToast("Este serviço não está mais na sua agenda.", "warning");
-          return;
-        }
-        dados.marcarVisto(detail).catch((error) => {
-          reportAppError(error, { severity: "error", source: "app", action: "markDetailViewedRemote", phase: "push-deep-link", screen: "detalhes", detailId: detail.id, detailType: detail.type });
-        });
-        setSelectedDetail(detail);
-        setScreen("detalhes");
-      })
-      .catch((error) => {
-        // Sem acesso ao registro (ex.: serviço retirado do motorista) ou falha de rede: o fluxo pós-carga decide.
-        reportAppError(error, { severity: "warning", source: "app", action: "loadRemoteDetailByParams", phase: "push-deep-link-fast" });
-      });
-    return () => { alive = false; };
-  }, []);
+  useServiceDeepLink({
+    dados,
+    initialDetailRef,
+    isButtonPreviewMode,
+    isReceiptPreviewMode,
+    pendingServiceDeepLinkRef,
+    serviceDeepLinkHandledRef,
+    setDataLoadingState,
+    setScreen,
+    setSelectedDetail,
+    setToast
+  });
 
   useEffect(() => {
     const deepLinkId = pendingComunicadoDeepLinkRef.current;
@@ -615,192 +589,31 @@ function App() {
     });
   }, []);
 
-  useEffect(() => {
-    if (isButtonPreviewMode || isReceiptPreviewMode) return;
-    if (!hasDataverseRuntime()) return;
-    let alive = true;
-    setRemoteMode(true);
-    setDataLoadingState({
-      phase: "loading",
-      title: "Carregando dados",
-      message: "Sincronizando agenda no Dataverse."
-    });
-    dados.carregarAgenda()
-      .then((remote) => {
-        if (!alive) return;
-        setDataLoadingState(null);
-        const remoteStore = { ...store, agenda: remote.agenda, history: remote.history };
-        const hashRoute = initialHashRouteRef.current;
-        const remoteInitialDetail = hashRoute ? findDetailFromHashRoute(remoteStore, hashRoute) : getInitialDetail(remoteStore);
-        setDriverContext(remote.driver);
-        comunicadosDriverIdRef.current = remote.driver?.id ?? "";
-        reloadComunicados().catch((error) => {
-          reportAppError(error, { severity: "warning", source: "app", action: "loadDriverComunicados", phase: "initial" });
-          setToast("Não foi possível carregar comunicados. Atualize o aplicativo.", "warning");
-        });
-        reloadChecklists().catch((error) => {
-          reportAppError(error, { severity: "warning", source: "app", action: "loadDriverChecklists", phase: "initial" });
-        });
-        setStore((current) => ({
-          ...current,
-          agenda: remote.agenda,
-          history: remote.history
-        }));
-        if (hashRoute) {
-          const routedScreen = getInitialScreenFromHashRoute(hashRoute, remoteInitialDetail);
-          if (screenNeedsHashDetail(routedScreen)) {
-            if (remoteInitialDetail) {
-              dados.marcarVisto(remoteInitialDetail).catch((error) => {
-                reportAppError(error, {
-                  severity: "error",
-                  source: "app",
-                  action: "markDetailViewedRemote",
-                  phase: "hash-route",
-                  screen: routedScreen,
-                  detailId: remoteInitialDetail.id,
-                  detailType: remoteInitialDetail.type
-                });
-                setToast(error instanceof Error ? error.message : "Falha ao marcar visualização.");
-              });
-              setSelectedDetail(remoteInitialDetail);
-              setScreen(routedScreen);
-              setToast("");
-              return;
-            }
-            if (hashRoute.detailId && hashRoute.detailType) {
-              dados.carregarDetalhe(hashRoute.detailId, hashRoute.detailType)
-                .then((detail) => {
-                  if (!alive) return;
-                  if (!detail) {
-                    setSelectedDetail(null);
-                    setScreen(getHashRouteFallbackScreen(routedScreen));
-                    setToast("Serviço do link não encontrado.");
-                    return;
-                  }
-                  dados.marcarVisto(detail).catch((error) => {
-                    reportAppError(error, {
-                      severity: "error",
-                      source: "app",
-                      action: "markDetailViewedRemote",
-                      phase: "hash-route-remote-detail",
-                      screen: routedScreen,
-                      detailId: detail.id,
-                      detailType: detail.type
-                    });
-                    setToast(error instanceof Error ? error.message : "Falha ao marcar visualização.");
-                  });
-                  setSelectedDetail(detail);
-                  setScreen(routedScreen);
-                  setToast("");
-                })
-                .catch((error) => {
-                  if (!alive) return;
-                  reportAppError(error, {
-                    severity: "error",
-                    source: "app",
-                    action: "loadRemoteDetailByParams",
-                    phase: "hash-route",
-                    screen: routedScreen
-                  });
-                  setSelectedDetail(null);
-                  setScreen(getHashRouteFallbackScreen(routedScreen));
-                  setToast(error instanceof Error ? error.message : "Serviço do link não encontrado.");
-                });
-              return;
-            }
-            setSelectedDetail(null);
-            setScreen(getHashRouteFallbackScreen(routedScreen));
-            setToast("");
-            return;
-          }
-          setSelectedDetail(remoteInitialDetail);
-          setScreen(routedScreen);
-          setToast("");
-          return;
-        }
-        if (serviceDeepLinkHandledRef.current) {
-          // O caminho rápido do push já abriu o serviço (ou Serviços); não sobrescreve a navegação do motorista.
-          setToast("");
-          return;
-        }
-        if (remoteInitialDetail) {
-          serviceDeepLinkHandledRef.current = true;
-          dados.marcarVisto(remoteInitialDetail).catch((error) => {
-            reportAppError(error, {
-              severity: "error",
-              source: "app",
-              action: "markDetailViewedRemote",
-              phase: "initial-detail",
-              screen: "detalhes",
-              detailId: remoteInitialDetail.id,
-              detailType: remoteInitialDetail.type
-            });
-            setToast(error instanceof Error ? error.message : "Falha ao marcar visualização.");
-          });
-          setSelectedDetail(remoteInitialDetail);
-          setScreen("detalhes");
-          return;
-        }
-        const initialParams = getInitialParams();
-        if (initialParams.serviceId) {
-          serviceDeepLinkHandledRef.current = true;
-          dados.carregarDetalhe(initialParams.serviceId, initialParams.type)
-            .then((detail) => {
-              if (!alive) return;
-              if (!detail) {
-                setScreen("servicos");
-                setToast("Este serviço não está mais na sua agenda.", "warning");
-                return;
-              }
-              dados.marcarVisto(detail).catch((error) => {
-                reportAppError(error, {
-                  severity: "error",
-                  source: "app",
-                  action: "markDetailViewedRemote",
-                  phase: "deep-link",
-                  screen: "detalhes",
-                  detailId: detail.id,
-                  detailType: detail.type
-                });
-                setToast(error instanceof Error ? error.message : "Falha ao marcar visualização.");
-              });
-              setSelectedDetail(detail);
-              setScreen("detalhes");
-              setToast("");
-            })
-            .catch((error) => {
-              if (!alive) return;
-              reportAppError(error, {
-                severity: "error",
-                source: "app",
-                action: "loadRemoteDetailByParams",
-                phase: "initial-deep-link",
-                screen
-              });
-              setToast(error instanceof Error ? error.message : "Serviço remoto não encontrado.");
-            });
-          return;
-        }
-        setToast("");
-      })
-      .catch((error) => {
-        if (!alive) return;
-        setDataLoadingState(null);
-        reportAppError(error, {
-          severity: "critical",
-          source: "app",
-          action: "loadRemoteStore",
-          phase: "bootstrap",
-          screen
-        });
-        setRemoteMode(false);
-        setToast(error instanceof Error ? error.message : "Falha ao carregar Dataverse.");
-      });
-    return () => {
-      alive = false;
-    };
-  }, [isButtonPreviewMode, isReceiptPreviewMode]);
-
+  const {
+    refreshLocal
+  } = useAgendaLoad({
+    completeDataLoadingState,
+    comunicadosDriverIdRef,
+    dados,
+    initialHashRouteRef,
+    isButtonPreviewMode,
+    isReceiptPreviewMode,
+    logAppError,
+    reloadChecklists,
+    reloadComunicados,
+    remoteMode,
+    screen,
+    selectedChecklistId,
+    serviceDeepLinkHandledRef,
+    setDataLoadingState,
+    setDriverContext,
+    setRemoteMode,
+    setScreen,
+    setSelectedDetail,
+    setStore,
+    setToast,
+    store
+  });
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToastState(null), toast.tone === "error" ? 3600 : 3000);
@@ -1158,55 +971,6 @@ function App() {
     setCompletingDetailKey("");
     setQueueHighlightDetailKey("");
     setToast("Dados locais resetados.");
-  };
-
-  const refreshLocal = async (detailToRefresh?: DetailData, options?: RefreshOptions) => {
-    const silent = options?.silent === true;
-
-    if (remoteMode) {
-      if (!silent) {
-        setDataLoadingState({
-          phase: "loading",
-          title: "Carregando dados",
-          message: "Atualizando dados do Dataverse."
-        });
-      }
-      try {
-        const remote = await dados.carregarAgenda();
-        setDriverContext(remote.driver);
-        comunicadosDriverIdRef.current = remote.driver?.id ?? "";
-        setStore((current) => ({ ...current, agenda: remote.agenda, history: remote.history }));
-        try {
-          await reloadComunicados();
-        } catch (error) {
-          reportAppError(error, { severity: "warning", source: "app", action: "loadDriverComunicados", phase: "refresh" });
-          if (!silent) setToast("Não foi possível atualizar comunicados. Tente novamente.", "warning");
-        }
-        // Não recarrega com o formulário do checklist aberto: o motorista pode estar enviando fotos.
-        if (screen !== "checklists" || !selectedChecklistId) {
-          try {
-            await reloadChecklists();
-          } catch (error) {
-            reportAppError(error, { severity: "warning", source: "app", action: "loadDriverChecklists", phase: "refresh" });
-          }
-        }
-        if (detailToRefresh) {
-          const refreshedDetail =
-            findDetailByParams([...remote.agenda, ...remote.history], detailToRefresh.id, detailToRefresh.type) ??
-            await dados.carregarDetalhe(detailToRefresh.dataverse?.id ?? detailToRefresh.id, detailToRefresh.type);
-          if (refreshedDetail) setSelectedDetail(refreshedDetail);
-        }
-        if (!silent) await completeDataLoadingState("Dados atualizados", "Dataverse sincronizado.");
-      } catch (error) {
-        if (!silent) setDataLoadingState(null);
-        logAppError(error, "loadRemoteStore", "refresh");
-        if (!silent || error instanceof Error) {
-          setToast(error instanceof Error ? error.message : "Falha ao atualizar Dataverse.");
-        }
-      }
-      return;
-    }
-    setStore((current) => ({ ...current }));
   };
 
   useEffect(() => {
