@@ -184,6 +184,8 @@ export function AttachmentSection({
   showPreview = true,
   allowOpen = true,
   compact = false,
+  title = "Anexos",
+  sizeHint = "Até 5 MB por arquivo",
 }: any) {
   const inputId = useId();
   const [isDragging, setIsDragging] = useState<any>(false);
@@ -258,13 +260,13 @@ export function AttachmentSection({
     <section className={`drawer-section attachment-section${compact ? " is-compact" : ""}`}>
       <div className="drawer-section-heading">
         <div className="attachment-heading-copy">
-          <h3>Anexos</h3>
+          <h3>{title}</h3>
           <span className="section-count">{attachments.length}</span>
         </div>
-        <span className="section-hint">Até 5 MB por arquivo</span>
+        <span className="section-hint">{sizeHint}</span>
       </div>
       {helperText && <p className="attachment-helper">{helperText}</p>}
-      <label
+      {onAttachment && <label
         className={`attachment-dropzone ${isDragging ? "is-dragging" : ""}`}
         htmlFor={inputId}
         onDragEnter={(event) => {
@@ -301,7 +303,7 @@ export function AttachmentSection({
             event.target.value = "";
           }}
         />
-      </label>
+      </label>}
       {openError && (
         <div
           className="attachment-feedback attachment-feedback-error"

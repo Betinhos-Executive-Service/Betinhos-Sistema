@@ -73,7 +73,10 @@ import { commitQuoteSend } from "../domain/quoteSendBatch";
 import { localDateKey, manualCollectionKey } from "../domain/management";
 import { normalizeContact } from "../domain/contactDomain";
 import { logAppError, sanitizeDataversePath } from "./errorLogger";
-import { financeMemberIds, followUpNotices, isLossReason, readyNotice, urgentNotices, type QuoteNotice } from "../domain/quoteNotifications";
+import { financeMemberIds, followUpNotices, isLossReason, readyNotice, urgentNotices, waitingReturnNotices, type QuoteNotice } from "../domain/quoteNotifications";
+import { applyQuoteWaiting, QUOTE_WAITING_CLEARED, QUOTE_WAITING_STATUS } from "../domain/quoteWaiting";
+import { createSharePointDocs, DOC_MAX_BYTES, sanitizeFileName, uniqueName } from "../../funcionarios/data/sharepoint";
+import type { Documento } from "../../funcionarios/data/types";
 import type { Employee, PersonalTag, PlannerNotification, PlannerState, QuoteData, QuoteOptionData, QuoteProposalVersion, Task, TaskAttachment, TaskHistoryItem, Team, WaitingContext, WaitingContextInput } from "../domain/types";
 
 void prepareQuoteProposal;
@@ -411,14 +414,17 @@ let quoteClientEntitySet = "";
 // Campos do pedido (V1.1): perfil do passageiro e observações internas.
 const QUOTE_REQUEST_FIELDS = Object.freeze({ passengerProfile: "cr40f_perfilpassageiro", internalNotes: "cr40f_observacoesinternas" });
 // Colunas opcionais da cotação (criadas por scripts/ensure-quote-*.ps1), sondadas uma vez e em paralelo.
-type OptionalQuoteField = "route" | "lossReason" | "longRoutes" | "requestFields";
+// V2.1: o que falta, de quem e data de retorno de "Aguardando informação".
+const QUOTE_WAITING_FIELDS = Object.freeze({ waitingFor: "cr40f_aguardandooque", waitingFrom: "cr40f_aguardandodequem", waitingReturnDate: "cr40f_aguardandoretorno" });
+type OptionalQuoteField = "route" | "lossReason" | "longRoutes" | "requestFields" | "waiting";
 const OPTIONAL_QUOTE_FIELDS: Readonly<Record<OptionalQuoteField, string[]>> = Object.freeze({
   route: ["cr40f_trajeto"],
   lossReason: ["cr40f_motivoperda"],
   longRoutes: ["cr40f_origemcompleta", "cr40f_destinocompleto"],
   requestFields: Object.values(QUOTE_REQUEST_FIELDS),
+  waiting: Object.values(QUOTE_WAITING_FIELDS),
 });
-const quoteFieldAvailable: Record<OptionalQuoteField, boolean> = { route: false, lossReason: false, longRoutes: false, requestFields: false };
+const quoteFieldAvailable: Record<OptionalQuoteField, boolean> = { route: false, lossReason: false, longRoutes: false, requestFields: false, waiting: false };
 let optionalQuoteFieldsProbe: Promise<unknown> | null = null;
 // Cotações V2 (scripts/ensure-quote-v2-dev.ps1): criador na cotação e cotação na notificação.
 interface QuoteV2Schema { creator: boolean; notificationQuote: boolean }
@@ -955,6 +961,9 @@ function normalizeQuote(row: Row): LiveQuote {
     responseSent: Boolean(row.cr40f_respostaenviadacliente),
     finalizationAt: s(row.cr40f_datahorafinalizacao),
     lossReason: s(row.cr40f_motivoperda),
+    waitingFor: s(row[QUOTE_WAITING_FIELDS.waitingFor]),
+    waitingFrom: s(row[QUOTE_WAITING_FIELDS.waitingFrom]),
+    waitingReturnDate: dateOnly(row[QUOTE_WAITING_FIELDS.waitingReturnDate]),
     optionsVersion: s(row.cr40f_opcoesversao),
     acceptedOptionId: s(row.cr40f_opcaoaceitaid),
     acceptedOptionRecordId: s(row._cr40f_opcaoaceita_value),
@@ -1594,7 +1603,8 @@ export async function loadSupplementalState(xrm: PlannerXrm, state: LiveState) {
     measureStage("ações operacionais", () => retrieveMany(xrm, QUALITY_ACTION_TABLE, "?$select=cr40f_acaooperacionalid,cr40f_titulo,cr40f_descricao,cr40f_status,cr40f_prazo,_cr40f_responsavel_value&$filter=statecode eq 0&$orderby=createdon desc")),
   ]);
   const quoteRecords = await loadQuoteScenarioData(xrm, quotes);
-  await createQuoteNotifications(xrm, followUpNotices(quoteRecords, localDateKey()));
+  const today = localDateKey();
+  await createQuoteNotifications(xrm, [...followUpNotices(quoteRecords, today), ...waitingReturnNotices(quoteRecords, financeMemberIds(state), today)]);
   const quoteById = new Map<unknown, LiveQuote>(quoteRecords.map((quote) => [quote.id, quote]));
   const employees = state.employees || [];
   const employeeById = new Map(employees.map((employee) => [cleanId(employee.id).toLowerCase(), employee]));
@@ -1995,7 +2005,7 @@ async function updateLiveTask(xrm: PlannerXrm, state: LiveState, id: string, pat
   }
   await Promise.all(relationUpdates);
   const quoteSyncPayload = quoteTask && !patch.suppressQuoteSync && (nextQuoteStatus !== currentQuoteStatus || quoteResponseSentChanged || patch.value !== undefined || patch.commercialTerms !== undefined)
-    ? quotePayload({ status: nextQuoteStatus, responseSent: nextResponseSent, value: patch.value ?? quote.value, commercialTerms: patch.commercialTerms ?? quote.commercialTerms, finalizationAt: isQuoteTerminalStatus(nextQuoteStatus) ? (quote.finalizationAt || new Date().toISOString()) : "", ...(isQuoteTerminalStatus(linkedQuote?.status) && !isQuoteTerminalStatus(nextQuoteStatus) ? { lossReason: "" } : {}) })
+    ? quotePayload({ status: nextQuoteStatus, responseSent: nextResponseSent, value: patch.value ?? quote.value, commercialTerms: patch.commercialTerms ?? quote.commercialTerms, finalizationAt: isQuoteTerminalStatus(nextQuoteStatus) ? (quote.finalizationAt || new Date().toISOString()) : "", ...(isQuoteTerminalStatus(linkedQuote?.status) && !isQuoteTerminalStatus(nextQuoteStatus) ? { lossReason: "" } : {}), ...(currentQuoteStatus === QUOTE_WAITING_STATUS && nextQuoteStatus !== QUOTE_WAITING_STATUS ? QUOTE_WAITING_CLEARED : {}) })
     : null;
   const taskPath = `/${entitySetName(TASK_TABLE)}(${cleanId(id)})`;
   const quotePath = quoteTask ? `/${entitySetName(QUOTE_TABLE)}(${cleanId(existing?.quoteId)})` : "";
@@ -2190,6 +2200,37 @@ async function loadLiveAttachmentContent(xrm: PlannerXrm, attachment: LiveAttach
   return { ...attachment, mimeType: mimeType as string, dataUrl: `data:${mimeType};base64,${String(result.conteudoBase64)}` };
 }
 
+// --- Anexos da cotação (V2.1) ----------------------------------------------
+// Pasta Cotacoes/<id> (DEV em Cotacoes/DEV/<id>) pelos mesmos flows HTTP de Funcionários.
+export const QUOTE_ATTACHMENT_ROOT = "Cotacoes";
+export const QUOTE_ATTACHMENT_MAX_BYTES = DOC_MAX_BYTES;
+
+export function quoteAttachmentFromDoc(doc: Documento): LiveAttachment {
+  return { id: doc.id || doc.caminho, name: doc.nome, sharePointId: doc.id, path: doc.caminho, mimeType: doc.mimeType || "", size: doc.tamanho ?? 0, createdAt: doc.modificadoEm || "" };
+}
+
+/** Nome seguro e único na pasta; recusa arquivo acima de 10 MB. */
+export function quoteAttachmentName(file: { name?: string; size?: number }, existing: Array<{ name?: string }>): string {
+  if ((file.size || 0) > QUOTE_ATTACHMENT_MAX_BYTES) throw new Error(`${file.name || "Arquivo"}: máximo 10 MB por arquivo.`);
+  return uniqueName(sanitizeFileName(file.name || "arquivo"), existing.map((item) => item.name || ""));
+}
+
+function createQuoteAttachmentStore(xrm: PlannerXrm) {
+  const envLabel = String(apiUrl(xrm)).toLowerCase().includes(DEV_DATAVERSE_URL) ? "DEV" : "PROD";
+  const docs = createSharePointDocs({ retrieveMultipleRecords: async (entity, options = "") => ({ entities: await retrieveMany(xrm, entity, options) }) }, envLabel, QUOTE_ATTACHMENT_ROOT, "PLANNER_COTACAO");
+  const doc = (quoteId: string, attachment: LiveAttachment): Documento => ({ id: attachment.sharePointId || "", caminho: attachment.path || `${docs.pasta(quoteId)}/${attachment.name || ""}`, nome: attachment.name || "", tamanho: attachment.size ?? null, modificadoEm: attachment.createdAt || null, mimeType: attachment.mimeType || null });
+  return {
+    load: async (quoteId: string) => (await docs.listar(cleanId(quoteId))).map(quoteAttachmentFromDoc),
+    add: async (quoteId: string, file: UploadFile, existing: LiveAttachment[]) => {
+      const id = cleanId(quoteId);
+      const saved = await docs.enviar(id, file, quoteAttachmentName(file, existing));
+      // Sem caminho na resposta do flow, o id/abrir/excluir usam o caminho previsível na pasta da cotação.
+      return quoteAttachmentFromDoc({ ...saved, caminho: saved.caminho || `${docs.pasta(id)}/${saved.nome}` });
+    },
+    remove: (quoteId: string, attachment: LiveAttachment) => docs.excluir(cleanId(quoteId), doc(cleanId(quoteId), attachment)),
+  };
+}
+
 async function deleteLiveAttachment(xrm: PlannerXrm, state: LiveState, taskId: string, attachment: LiveAttachment) {
   const flowUrl = await resolveSharePointDeleteFlowUrl(xrm);
   if (!flowUrl) throw new Error(`URL do Flow de exclusão não configurada: ${DELETE_FLOW_URL_SCHEMA}.`);
@@ -2365,6 +2406,12 @@ function quotePayload(input: QuotePatch = {}, includeUnset = false, clientNaviga
     if (value.trim() && !quoteFieldAvailable.requestFields) throw new Error("Campos de perfil do passageiro e observações internas ainda não existem neste ambiente. Rode scripts/ensure-quote-pedido-dev.ps1 e tente novamente.");
     if (quoteFieldAvailable.requestFields) payload[field] = value;
   }
+  // Campos de espera só são gravados se as colunas existirem (scripts/ensure-quote-v2-dev.ps1).
+  if (quoteFieldAvailable.waiting) {
+    set("waitingFor", QUOTE_WAITING_FIELDS.waitingFor, s(input.waitingFor));
+    set("waitingFrom", QUOTE_WAITING_FIELDS.waitingFrom, s(input.waitingFrom));
+    set("waitingReturnDate", QUOTE_WAITING_FIELDS.waitingReturnDate, s(input.waitingReturnDate).slice(0, 10) || null);
+  }
   if (has("priority")) payload.cr40f_prioridade = quoteChoice(input.priority, QUOTE_PRIORITY_VALUES, "Prioridade");
   if (has("status")) payload.cr40f_statuscotacao = quoteChoice(input.status, QUOTE_STATUS_VALUES, "Status");
   if (has("deadline")) payload.cr40f_prazoresponder = input.deadline ? `${String(input.deadline)}T12:00:00Z` : null;
@@ -2415,7 +2462,8 @@ async function updateLiveQuote(xrm: PlannerXrm, state: LiveState, id: string, pa
   const existing = (state.quotes || []).find((quote) => cleanId(quote.id) === quoteId);
   if (!existing) throw new Error("Cotação não encontrada.");
   if (patch.etag && patch.etag !== existing.etag) throw new Error("A cotação foi alterada por outra pessoa. Recarregue antes de salvar.");
-  patch = applyDerivedStatus(existing, patch);
+  // V2.1: entrar em Aguardando exige o que falta/de quem/retorno; sair limpa os campos.
+  patch = applyQuoteWaiting(existing.status, applyDerivedStatus(existing, patch));
   const nextStatus = s(patch.status ?? existing.status);
   if (patch.responseSent === true && nextStatus !== "Respondida ao cliente") throw new Error("Envio só pode ser confirmado na cotação respondida.");
   if (patch.responseSent === true && !((patch.proposalVersions as unknown[] | undefined) || existing.proposalVersions || []).length) throw new Error("Registre uma versão da proposta antes de confirmar o envio.");
@@ -2427,10 +2475,6 @@ async function updateLiveQuote(xrm: PlannerXrm, state: LiveState, id: string, pa
   }
   const linkedTasks = (state.tasks || []).filter((item) => cleanId(item.quoteId) === quoteId);
   if (patch.status && !isQuoteTerminalStatus(patch.status) && isQuoteTerminalStatus(existing.status)) patch = { ...patch, finalizationAt: "", lossReason: "", responseSent: false };
-  if (patch.status === "Aguardando informação" && existing.status !== patch.status) {
-    const validation = validateWaitingContext("waiting", patch.waitingContext);
-    if (!validation.allowed) throw new Error(validation.error);
-  }
   await quoteSelect(xrm);
   if (Array.isArray(patch.options) && !existing.etag) throw new Error("O Dataverse não forneceu a versão da cotação. Recarregue antes de substituir as opções para evitar sobrescrever uma edição simultânea.");
   const effectivePatch: QuotePatch = { ...patch };
@@ -2463,7 +2507,7 @@ async function updateLiveQuote(xrm: PlannerXrm, state: LiveState, id: string, pa
     if (errorMessage(error).includes("412")) throw new Error("A cotação foi alterada por outra pessoa. Recarregue os dados antes de salvar para evitar sobrescrever a edição.");
     throw error;
   }
-  const ready = readyNotice(existing, { ...existing, ...effectivePatch, status: nextStatus });
+  const ready = readyNotice(existing, { ...existing, ...effectivePatch, status: nextStatus }, new Date().toISOString());
   if (ready) await createQuoteNotifications(xrm, [ready]);
   const statusChanged = nextStatus !== existing.status;
   const terminal = isQuoteTerminalStatus(nextStatus);
@@ -2866,6 +2910,10 @@ export interface PlannerDataStore {
   addComment: (state: LiveState, id: string, text: string, context?: CommentContext) => Promise<LiveState>;
   addAttachment: (state: LiveState, id: string, file: UploadFile | null | undefined, previewUrl?: string) => Promise<LiveState>;
   deleteAttachment: (state: LiveState, taskId: string, attachment: LiveAttachment) => Promise<LiveState>;
+  /** V2.1: anexos da própria cotação no SharePoint (fora do estado global). */
+  loadQuoteAttachments: (quoteId: string) => Promise<LiveAttachment[]>;
+  addQuoteAttachment: (quoteId: string, file: UploadFile, existing: LiveAttachment[], previewUrl?: string) => Promise<LiveAttachment>;
+  deleteQuoteAttachment: (quoteId: string, attachment: LiveAttachment) => Promise<void>;
   ensureQuoteTask: (state: LiveState, quote: LiveQuote) => Promise<LiveState>;
   createQuote: (state: LiveState, input: QuotePatch) => Promise<LiveState>;
   updateQuote: (state: LiveState, id: string, patch: QuotePatch) => Promise<LiveState>;
@@ -2887,6 +2935,7 @@ function createMockDataStore(): PlannerDataStore {
   const withoutMode = ({ live: _live, ...state }: LiveState): MockState => asMock(asMock(state) as LiveState);
   const persist = (state: LiveState) => withMode(saveMockState(withoutMode(state)));
   const mockIdeas: LiveIdea[] = [];
+  const mockQuoteAttachments = new Map<string, LiveAttachment[]>();
 
   return {
     live: false,
@@ -2957,6 +3006,13 @@ function createMockDataStore(): PlannerDataStore {
     addComment: async (state, id, text, context) => withMode(addMockComment(asMock(state), id, text, context)),
     addAttachment: async (state, id, file, previewUrl = "") => withMode(addMockAttachment(asMock(state), id, { name: file?.name || "Arquivo", mimeType: file?.type || "", size: file?.size || 0, previewUrl })),
     deleteAttachment: async (state, taskId, attachment) => withMode(deleteMockAttachment(asMock(state), taskId, bridge(attachment?.id))),
+    loadQuoteAttachments: async (quoteId) => [...(mockQuoteAttachments.get(quoteId) || [])],
+    addQuoteAttachment: async (quoteId, file, existing, previewUrl = "") => {
+      const attachment: LiveAttachment = { id: `mock-quote-file-${Date.now()}-${existing.length}`, name: quoteAttachmentName(file, existing), mimeType: file.type || "", size: file.size || 0, previewUrl, createdAt: new Date().toISOString() };
+      mockQuoteAttachments.set(quoteId, [...(mockQuoteAttachments.get(quoteId) || []), attachment]);
+      return attachment;
+    },
+    deleteQuoteAttachment: async (quoteId, attachment) => { mockQuoteAttachments.set(quoteId, (mockQuoteAttachments.get(quoteId) || []).filter((item) => item.id !== attachment.id)); },
     ensureQuoteTask: async (state, quote) => withMode(ensureMockQuoteTask(asMock(state), quote)),
     createQuote: async (state, input) => withMode(createMockQuote(asMock(state), input)),
     updateQuote: async (state, id, patch) => withMode(updateMockQuote(asMock(state), id, patch)),
@@ -2981,6 +3037,7 @@ function registerAttachmentLoader(store: PlannerDataStore) {
 export function createDataStore(): PlannerDataStore {
   const xrm = getXrm();
   if (!xrm) return registerAttachmentLoader(createMockDataStore());
+  const quoteAttachments = createQuoteAttachmentStore(xrm);
   return registerAttachmentLoader({
     live: true,
     load: () => loadLiveState(xrm),
@@ -3036,6 +3093,9 @@ export function createDataStore(): PlannerDataStore {
     deleteQuote: (state, id) => deleteLiveQuote(xrm, state, id),
     addComment: (_state, id, text, context) => addLiveComment(xrm, id, text, context),
     addAttachment: (state, id, file) => addLiveAttachment(xrm, state, id, file),
+    loadQuoteAttachments: (quoteId) => quoteAttachments.load(quoteId),
+    addQuoteAttachment: (quoteId, file, existing) => quoteAttachments.add(quoteId, file, existing),
+    deleteQuoteAttachment: (quoteId, attachment) => quoteAttachments.remove(quoteId, attachment),
     deleteAttachment: (state, taskId, attachment) => deleteLiveAttachment(xrm, state, taskId, attachment),
     ensureQuoteTask: (state, quote) => ensureLiveQuoteTask(xrm, state, quote),
     createQuote: (state, input) => createLiveQuote(xrm, state, input),

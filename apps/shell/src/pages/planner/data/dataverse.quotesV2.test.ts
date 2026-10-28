@@ -116,6 +116,55 @@ describe('cotações V2 no Dataverse', () => {
     expect(raw.includes('cr40f_plannertarefas')).toBe(false)
   })
 
+  const waitingQuote = () => ({ ...emptyState(), quotes: [{ id: quoteId, code: 'COT-0100', title: 'GRU', status: 'Em análise pelo financeiro', etag: 'W/"1"', creatorEmployeeId: creatorId, options: [] }] } as unknown as LiveState)
+  const waiting = { status: 'Aguardando informação', waitingFor: 'Horário do voo', waitingFrom: 'Walter', waitingReturnDate: '2026-10-30' }
+  const quotePatch = (writes: Write[]) => writes.find((item) => item.method === 'PATCH' && item.url.includes(`/cr40f_pedidodecotacaos(${quoteId})`))
+
+  test('Aguardar informação grava as três colunas quando existem', async () => {
+    const { store, writes } = await setup()
+    await store.updateQuote(waitingQuote(), quoteId, waiting).catch(() => undefined)
+    expect(quotePatch(writes)?.body).toMatchObject({ cr40f_aguardandooque: 'Horário do voo', cr40f_aguardandodequem: 'Walter', cr40f_aguardandoretorno: '2026-10-30' })
+  })
+
+  test('sem as colunas de espera, muda o status sem gravá-las', async () => {
+    const { store, writes } = await setup({ missingAttributes: ['cr40f_aguardandooque'] })
+    await store.updateQuote(waitingQuote(), quoteId, waiting).catch(() => undefined)
+    const body = quotePatch(writes)?.body || {}
+    expect(body.cr40f_statuscotacao).toBe(100004002)
+    expect('cr40f_aguardandooque' in body).toBe(false)
+  })
+
+  test('Aguardar sem o que falta é recusado antes de gravar', async () => {
+    const { store, writes } = await setup()
+    await expect(store.updateQuote(waitingQuote(), quoteId, { status: 'Aguardando informação' })).rejects.toThrow('Informe o que falta.')
+    expect(quotePatch(writes)).toBeUndefined()
+  })
+
+  test('nome do anexo é saneado, único e limitado a 10 MB', async () => {
+    const { quoteAttachmentName } = await import('./dataverse')
+    expect(quoteAttachmentName({ name: 'a/b:c.pdf', size: 10 }, [])).toBe('a_b_c.pdf')
+    expect(quoteAttachmentName({ name: 'voo.pdf', size: 10 }, [{ name: 'voo.pdf' }])).toBe('voo (2).pdf')
+    expect(() => quoteAttachmentName({ name: 'grande.zip', size: 10 * 1024 * 1024 + 1 }, [])).toThrow('10 MB')
+  })
+
+  test('anexo da cotação vai para Cotacoes/<id> pelo flow Salvar', async () => {
+    const flowCalls: Array<{ url: string; body: Record<string, unknown> }> = []
+    const { store } = await setup()
+    const dataverseFetch = g.fetch as (url: string, init?: { method?: string; body?: string }) => Promise<Response>
+    g.fetch = async (url: string, init: { method?: string; body?: string } = {}) => {
+      if (url.includes('environmentvariabledefinitions')) return new Response(JSON.stringify({ value: [{ environmentvariabledefinitionid: 'def', defaultvalue: 'https://flow.test/salvar' }] }), { status: 200 })
+      if (url.includes('environmentvariablevalues')) return new Response(JSON.stringify({ value: [] }), { status: 200 })
+      if (url.startsWith('https://flow.test')) { flowCalls.push({ url, body: JSON.parse(init.body || '{}') }); return new Response(JSON.stringify({ sucesso: true, id: 'sp-1', caminhoSharePoint: 'x', tamanho: 3 }), { status: 200 }) }
+      return dataverseFetch(url, init)
+    }
+    vi.stubGlobal('FileReader', class { result = ''; onload: () => void = () => {}; onerror: () => void = () => {}; readAsDataURL() { this.result = 'data:application/pdf;base64,YWJj'; this.onload() } })
+    const file = new File(['abc'], 'voo.pdf', { type: 'application/pdf' })
+    const attachment = await store.addQuoteAttachment(quoteId, file, [])
+    expect(flowCalls[0].body).toMatchObject({ caminhoCompleto: `Cotacoes/${quoteId}`, nomeArquivo: 'voo.pdf', mimeType: 'application/pdf' })
+    expect(attachment).toMatchObject({ name: 'voo.pdf', sharePointId: 'sp-1' })
+    vi.unstubAllGlobals()
+  })
+
   test('Perdida exige motivo da lista', async () => {
     const { store } = await setup()
     const state = { ...emptyState(), quotes: [{ id: quoteId, status: 'Respondida ao cliente' }] } as unknown as LiveState

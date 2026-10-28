@@ -7,7 +7,6 @@ import { NewTaskDrawer } from './components/NewTaskDrawer'
 import { AppShell } from './components/PlannerAppShell'
 import { TaskDrawer } from './components/TaskDrawer'
 import { DataLoadingView } from './components/TaskSelectors'
-import { WaitingContextFields } from './components/WaitingContextFields'
 import { WaitingReturnModal } from './components/WaitingReturnModal'
 import { WaitingStatusModal } from './components/WaitingStatusModal'
 import { QUOTE_HYBRID_V3_ENABLED, QUOTE_WORKSPACE_V2_ENABLED } from './constants'
@@ -31,6 +30,7 @@ import { SettingsView } from './views/SettingsView'
 import { CheckCircle2, LoaderCircle, X } from 'lucide-react'
 import { Suspense, lazy } from 'react'
 import { usePlanner } from './usePlanner'
+import { useQuoteAttachments } from './components/quotes/useQuoteAttachments'
 
 
 
@@ -55,7 +55,6 @@ export function PlannerApp() {
     openQuoteView,
     selectedContactId,
     setWaitingTaskId,
-    setWaitingQuoteId,
     setWaitingReturnTaskId,
     creating,
     setCreating,
@@ -100,9 +99,6 @@ export function PlannerApp() {
     saveContact,
     createQuote,
     updateQuote,
-    waitingQuote,
-    waitingQuoteTask,
-    saveWaitingQuote,
     markQuoteSent,
     setQuoteOutcome,
     deleteQuote,
@@ -135,6 +131,7 @@ export function PlannerApp() {
     visibleTasks,
     visibleNotifications,
   } = usePlanner()
+  const quoteAttachments = useQuoteAttachments(store)
 
   if (error)
     return (
@@ -251,7 +248,7 @@ export function PlannerApp() {
         />
       );
     if (active === "quotes")
-      return state.loading?.quotes ? <LoadingFallback label="Carregando cotações" view="quotes" quoteView={readQuoteViewPreference()} /> : <QuotesView state={viewState} currentEmployee={currentEmployee} WaitingContextFieldsComponent={WaitingContextFields} ReturnsSectionComponent={TaskReturnsSection} onOpenTask={openTask} onCreateQuote={createQuote} onUpdateQuote={updateQuote} onDeleteQuote={deleteQuote} onRequestWaitingQuote={setWaitingQuoteId} onRegisterWaitingReturn={openWaitingReturn} onMarkQuoteSent={markQuoteSent} onSetQuoteOutcome={setQuoteOutcome} onEnsureTaskDetails={ensureTaskDetails} onAttachment={addAttachment} onDeleteAttachment={removeAttachment} loadAttachmentContent={store.loadAttachmentContent} AttachmentSectionComponent={AttachmentSection} selectedQuoteId={quoteToOpenId} onSelectQuote={selectQuote} requestedQuoteAction={quoteActionRequest} onQuoteActionConsumed={consumeQuoteAction} workspaceEnabled={QUOTE_WORKSPACE_V2_ENABLED} hybridEnabled={QUOTE_HYBRID_V3_ENABLED} />;
+      return state.loading?.quotes ? <LoadingFallback label="Carregando cotações" view="quotes" quoteView={readQuoteViewPreference()} /> : <QuotesView state={viewState} currentEmployee={currentEmployee} ReturnsSectionComponent={TaskReturnsSection} onOpenTask={openTask} onCreateQuote={createQuote} onUpdateQuote={updateQuote} onDeleteQuote={deleteQuote} quoteAttachments={quoteAttachments} onRegisterWaitingReturn={openWaitingReturn} onMarkQuoteSent={markQuoteSent} onSetQuoteOutcome={setQuoteOutcome} onEnsureTaskDetails={ensureTaskDetails} onAttachment={addAttachment} onDeleteAttachment={removeAttachment} loadAttachmentContent={store.loadAttachmentContent} AttachmentSectionComponent={AttachmentSection} selectedQuoteId={quoteToOpenId} onSelectQuote={selectQuote} requestedQuoteAction={quoteActionRequest} onQuoteActionConsumed={consumeQuoteAction} workspaceEnabled={QUOTE_WORKSPACE_V2_ENABLED} hybridEnabled={QUOTE_HYBRID_V3_ENABLED} />;
     if (active === "board")
       return (
         <BoardView
@@ -427,15 +424,6 @@ export function PlannerApp() {
           teams={state.teams}
           onClose={() => setWaitingTaskId("")}
           onSave={saveWaitingStatus}
-        />
-      )}
-      {waitingQuoteTask && (
-        <WaitingStatusModal
-          task={{ ...waitingQuoteTask, title: waitingQuote.code || waitingQuote.title || waitingQuoteTask.title }}
-          employees={state.employees}
-          teams={state.teams}
-          onClose={() => setWaitingQuoteId("")}
-          onSave={saveWaitingQuote}
         />
       )}
       {waitingReturnTask && (

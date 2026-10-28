@@ -91,3 +91,38 @@ describe('cotações V2 nas telas', () => {
     expect(onOpenTask).not.toHaveBeenCalled()
   })
 })
+
+describe('cotações V2.1 nas telas', () => {
+  const analysis = { ...pricedQuote, status: 'Em análise pelo financeiro', options: [], notes: 'GRU', clientContact: 'Walter' }
+  const attachments = { get: () => ({ items: [], loading: false, error: '' }), ensure: vi.fn(async () => {}), add: vi.fn(async () => 0), remove: vi.fn(async () => {}) }
+
+  it('criação não oferece "Aguardar informação"', () => {
+    render(<QuoteCreateDrawer employees={[]} onClose={() => {}} onCreate={vi.fn()} />)
+    expect(screen.queryByText(/Aguardar informação/)).toBeNull()
+  })
+
+  it('edição pede o que falta, de quem e retorno (padrão +2 dias úteis) e grava junto com o status', async () => {
+    const onUpdate = vi.fn(async () => true)
+    render(<QuoteManagementDrawer quote={analysis} onUpdate={onUpdate} onClose={() => {}} quoteAttachments={attachments} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Aguardar informação' }))
+    const date = screen.getByLabelText(/Data de retorno/) as HTMLInputElement
+    expect(date.value).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    fireEvent.click(screen.getByRole('button', { name: 'Aguardar' }))
+    expect(await screen.findByText('Informe o que falta.')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText(/O que falta/), { target: { value: 'Horário do voo' } })
+    fireEvent.change(screen.getByLabelText(/De quem/), { target: { value: 'Walter' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Aguardar' }))
+    await waitFor(() => expect(onUpdate).toHaveBeenCalledWith('q1', expect.objectContaining({ status: 'Aguardando informação', waitingFor: 'Horário do voo', waitingFrom: 'Walter', waitingReturnDate: date.value })))
+  })
+
+  it('carrega os anexos da cotação ao abrir', () => {
+    render(<QuoteManagementDrawer quote={analysis} onUpdate={vi.fn()} onClose={() => {}} quoteAttachments={attachments} />)
+    expect(attachments.ensure).toHaveBeenCalledWith('q1')
+  })
+
+  it('sininho rotula o lembrete de retorno', () => {
+    const notification = { id: 'n1', quoteId: 'q1', type: 'quote_waiting_return', title: 'Retorno de informação', message: 'COT-0001 · GRU', occurredAt: new Date().toISOString(), readAt: '', recipientEmployeeId: 'e1' }
+    render(<NotificationsPanel notifications={[notification]} tasks={[]} contacts={[]} employees={[]} teams={[]} currentEmployee={{ id: 'e1' }} onClose={() => {}} onOpenTask={() => {}} onOpenQuote={() => {}} onMarkRead={() => {}} onMarkAllRead={() => {}} />)
+    expect(screen.getAllByText('Retorno de informação').length).toBeGreaterThan(0)
+  })
+})

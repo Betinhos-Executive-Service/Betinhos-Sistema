@@ -37,3 +37,18 @@ Na migração `#/planner` (branch `claude/planner-react`), já em TS. O Tela Pla
 - Testes: criação sem tarefa; Cotada derivada notifica o criador; prazo hoje notifica o financeiro; Enviei grava só a data; lembrete aparece após 2 dias úteis e some com a decisão; Perdida sem motivo é bloqueada.
 - Mock no navegador: fluxo completo Nova → Histórico, nos dois desfechos.
 - DEV autenticado depois do merge; PROD congelado até o Renan liberar.
+
+## V2.1 — lacunas da cotação sem tarefa
+
+Decisões do Renan em 28/10/2026.
+
+1. **Aguardar informação** só na edição da cotação (nunca na criação). Move para "Aguardando informação" e grava três colunas novas em `cr40f_pedidodecotacao`:
+   - `cr40f_aguardandooque` (texto 500) — o que falta;
+   - `cr40f_aguardandodequem` (texto 200) — de quem;
+   - `cr40f_aguardandoretorno` (DateOnly) — data de retorno; padrão = hoje + 2 dias úteis (`addBusinessDays`).
+   Os três são obrigatórios ao entrar em Aguardando. Na data de retorno (ou depois, enquanto continuar aguardando) sai o aviso `quote_waiting_return` no sininho para o criador e para os membros da equipe Financeiro, pelo mesmo mecanismo do lembrete de follow-up (dedupe por destinatário + dia). Ao sair de Aguardando, os três campos são limpos. Arrastar o card para Aguardando abre a cotação já no diálogo; "Registrar retorno" em cotação sem tarefa retoma para Em análise.
+2. **Anexos da cotação** no SharePoint pelos flows HTTP já usados (`FLOW_VARS` de `funcionarios/data/sharepoint.ts`: salvar, listar, consultar, excluir), pasta `Cotacoes/<id da cotação>` (DEV em `Cotacoes/DEV/<id>`), até 10 MB (`DOC_MAX_BYTES`), qualquer tipo, nome por `sanitizeFileName`. Incluídos na criação e na edição; listados no drawer.
+3. **Cotações antigas com tarefa**: os anexos da tarefa continuam no drawer, só leitura, sem migração.
+4. **Preço pronto** avisa o criador a cada nova entrada em Cotada: a chave de dedupe inclui o instante da transição.
+
+Colunas criadas por `packages/planner/scripts/ensure-quote-v2-dev.ps1` (idempotente; primeiro as colunas da cotação, por último a lookup da notificação; erro isolado por item). O app só grava os campos de espera se as colunas existirem (sonda 404).

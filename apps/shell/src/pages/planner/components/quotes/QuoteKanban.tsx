@@ -22,10 +22,11 @@ const QuoteCard = memo(function QuoteCard({ quote, task, today, currentEmployee,
   const sent = quote.status === "Respondida ao cliente";
   // Depois do envio o prazo interno já foi cumprido: o card passa a contar os dias sem retorno.
   const overdue = !sent && Boolean(quote.deadline && quote.deadline < today);
-  const waitingSummary = quote.status === "Aguardando informação" ? waitingContextSummary(task?.waitingContext) : "";
+  // V2.1: sem tarefa, o resumo e o "Registrar retorno" vêm da própria cotação.
+  const waitingSummary = quote.status !== "Aguardando informação" ? "" : task ? waitingContextSummary(task.waitingContext) : waitingContextSummary({ subject: quote.waitingFor, onNames: quote.waitingFrom ? [quote.waitingFrom] : [], expectedDate: quote.waitingReturnDate });
   const optionCount = normalizeQuoteOptions(quote).length;
   const action = getQuoteNextAction(quote).primary;
-  const showAction = action.id === "return" ? canRegisterWaitingReturn(task, currentEmployee, teams) : Boolean(onAction);
+  const showAction = action.id === "return" && task ? canRegisterWaitingReturn(task, currentEmployee, teams) : Boolean(onAction);
   return <article
     className={`task-card quote-kanban-card${overdue ? " task-overdue" : ""}${isDragging ? " task-card-dragging" : ""}`}
     draggable={draggable}

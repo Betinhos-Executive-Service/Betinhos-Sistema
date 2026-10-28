@@ -9,6 +9,7 @@ export const ACTIONABLE_NOTIFICATION_TYPES = new Set([
   "quote_urgent",
   "quote_ready",
   "quote_follow_up",
+  "quote_waiting_return",
   "assignment",
   "deadline",
   "due_today",
@@ -38,7 +39,7 @@ export function notificationPresentation(item: any, task: any, contact: any) {
 
   // Cotações V2: avisos ligados à cotação (sem tarefa).
   if (item.quoteId) {
-    const quoteLabels: Record<string, [string, string]> = { quote_urgent: ["Cotação para hoje", "danger"], quote_ready: ["Preço pronto", "success"], quote_follow_up: ["Cobrar decisão do cliente", "warning"] };
+    const quoteLabels: Record<string, [string, string]> = { quote_urgent: ["Cotação para hoje", "danger"], quote_ready: ["Preço pronto", "success"], quote_follow_up: ["Cobrar decisão do cliente", "warning"], quote_waiting_return: ["Retorno de informação", "warning"] };
     const [label, tone] = quoteLabels[type] || ["Cotação", "info"];
     return { context: "Cotações", icon: type === "quote_urgent" ? ShieldAlert : FileText, label, message: item.message || "", title: item.title || label, tone };
   }

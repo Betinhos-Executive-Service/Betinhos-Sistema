@@ -30,7 +30,8 @@ import {
   validateContact,
 } from '../domain/contactDomain'
 import { isQuoteTask, isQuoteTerminalStatus, QUOTE_CLIENT_DECISION_RETURN, QUOTE_TASK_DONE_BLOCKED, quoteStatusForTaskStatus, taskStatusForQuoteStatus, waitingContextForStatusChange } from '../domain/quoteTaskFlow'
-import { financeMemberIds, followUpNotices, isLossReason, readyNotice, urgentNotices, type QuoteNotice } from '../domain/quoteNotifications'
+import { financeMemberIds, followUpNotices, isLossReason, readyNotice, urgentNotices, waitingReturnNotices, type QuoteNotice } from '../domain/quoteNotifications'
+import { applyQuoteWaiting, QUOTE_WAITING_CLEARED, QUOTE_WAITING_STATUS } from '../domain/quoteWaiting'
 import { applyDerivedStatus, buildQuoteEmailHtml, buildQuotePlainText, lastProposalSentAt, normalizeQuoteRoute, QUOTE_COMPLETED_STATUSES, quoteRoutePoints, validateQuoteCommercial } from '../domain/quoteDomain'
 import type { NormalizedContact } from '../domain/contactDomain'
 import { createQuoteProposalVersion, normalizeQuoteOptions, prepareQuoteProposal, prepareQuoteResponse, resolveQuoteAcceptance } from '../domain/quoteScenarios'
@@ -302,7 +303,7 @@ interface SeedContext {
 export function seedState(): MockState {
   const quotes: MockQuote[] = [
     { id: 'quote-1008', code: 'COT-1008', title: 'Transfer executivo · Aeroporto GRU', client: 'Grupo Horizonte', clientId: 'mock-client-Grupo Horizonte', clientContact: 'Marina Alves', clientEmail: 'marina@grupohorizonte.example', clientPhone: '(11) 99999-1008', status: 'Em análise pelo financeiro', deadline: dateFromToday(0), value: 'R$ 1.280,00' },
-    { id: 'quote-1007', code: 'COT-1007', title: 'Van executiva · Evento corporativo', client: 'Norte & Sul Eventos', clientId: 'mock-client-Norte & Sul Eventos', clientContact: 'Rafael Lima', clientEmail: 'rafael@nortesul.example', clientPhone: '(11) 99999-1007', status: 'Aguardando informação', deadline: dateFromToday(2), value: 'R$ 4.950,00' },
+    { id: 'quote-1007', code: 'COT-1007', title: 'Van executiva · Evento corporativo', client: 'Norte & Sul Eventos', clientId: 'mock-client-Norte & Sul Eventos', clientContact: 'Rafael Lima', clientEmail: 'rafael@nortesul.example', clientPhone: '(11) 99999-1007', status: 'Aguardando informação', deadline: dateFromToday(2), value: 'R$ 4.950,00', waitingFor: 'Lista de passageiros e horário do evento', waitingFrom: 'Rafael Lima (cliente)', waitingReturnDate: dateFromToday(0) },
     { id: 'quote-1006', code: 'COT-1006', title: 'Carro blindado · Diretoria', client: 'Alvorada Capital', clientId: 'mock-client-Alvorada Capital', clientContact: 'Camila Torres', clientEmail: 'camila@alvoradacapital.example', clientPhone: '(11) 99999-1006', status: 'Em análise pelo financeiro', deadline: dateFromToday(1), value: 'R$ 2.400,00' },
     { id: 'quote-1005', code: 'COT-1005', title: 'Recepção de convidados · Congonhas', client: 'Casa 9 Produções', status: 'Respondida ao cliente', deadline: dateFromToday(-1), value: 'R$ 860,00' },
     { id: 'quote-1004', code: 'COT-1004', title: 'Roadshow executivo · São Paulo e Campinas', client: 'Vértice Tecnologia', status: 'Nova', deadline: dateFromToday(3), value: 'R$ 8.740,00' },
@@ -727,6 +728,7 @@ export function updateTask(state: MockState, id: string, patch: TaskPatch): Mock
       commercialTerms: patch.commercialTerms ?? quoteItem.commercialTerms,
       responseSent: nextResponseSent,
       finalizationAt: quoteStatusIsTerminal ? (quoteItem.finalizationAt || new Date().toISOString()) : '',
+      ...(currentQuoteStatus === QUOTE_WAITING_STATUS && nextQuoteStatus !== QUOTE_WAITING_STATUS ? QUOTE_WAITING_CLEARED : {}),
       modifiedAt: new Date().toISOString(),
     } : quoteItem)
     : state.quotes
@@ -1450,14 +1452,16 @@ function pushQuoteNotices(state: MockState, notices: QuoteNotice[], occurredAt: 
 }
 
 export function syncQuoteFollowUps(state: MockState, today: string = localDateKey()): MockState {
-  return pushQuoteNotices(state, followUpNotices(state.quotes || [], today))
+  const quotes = state.quotes || []
+  return pushQuoteNotices(state, [...followUpNotices(quotes, today), ...waitingReturnNotices(quotes, financeMemberIds(state), today)])
 }
 
 export function updateQuote(state: MockState, id: string, patchInput: QuotePatch = {}): MockState {
   const existing = (state.quotes || []).find((quote) => quote.id === id)
   if (!existing) throw new Error('Cotação não encontrada.')
   if (patchInput.modifiedAt && patchInput.modifiedAt !== existing.modifiedAt) throw new Error('A cotação foi alterada por outra pessoa. Recarregue antes de salvar.')
-  const patch: QuotePatch = applyDerivedStatus(existing, patchInput)
+  // V2.1: entrar em Aguardando exige o que falta/de quem/retorno; sair limpa os campos.
+  const patch: QuotePatch = applyQuoteWaiting(existing.status, applyDerivedStatus(existing, patchInput))
   const nextStatus = patch.status ?? existing.status
   if (patch.responseSent === true && nextStatus !== 'Respondida ao cliente') throw new Error('Envio só pode ser confirmado na cotação respondida.')
   if (patch.responseSent === true && !(patch.proposalVersions || existing.proposalVersions || []).length) throw new Error('Registre uma versão da proposta antes de confirmar o envio.')
@@ -1466,10 +1470,6 @@ export function updateQuote(state: MockState, id: string, patchInput: QuotePatch
     const validation = validateQuoteCommercial({ ...existing, ...patch })
     if (!validation.valid) throw new Error(Object.values(validation.errors).join(' '))
     if (nextStatus === 'Respondida ao cliente' && (patch.responseSent === false || (patch.responseSent !== true && !existing.responseSent))) throw new Error('Confirme o envio da proposta ao cliente.')
-  }
-  if (patch.status === 'Aguardando informação' && existing.status !== patch.status) {
-    const validation = validateWaitingContext('waiting', patch.waitingContext)
-    if (!validation.allowed) throw new Error(validation.error)
   }
   const nextQuote: MockQuote = { ...existing, ...patch, id, modifiedAt: new Date().toISOString() }
   if (patch.route !== undefined) {
@@ -1526,7 +1526,7 @@ export function updateQuote(state: MockState, id: string, patchInput: QuotePatch
       }
     }),
   }
-  const ready = readyNotice(existing, nextQuote)
+  const ready = readyNotice(existing, nextQuote, nextQuote.modifiedAt || '')
   if (ready) nextState.notifications = pushQuoteNotices(nextState, [ready], nextQuote.modifiedAt).notifications
   const linkedTask = nextState.tasks.find((taskItem) => taskItem.quoteId === id && !taskItem.parentTaskId)
   if (linkedTask) {

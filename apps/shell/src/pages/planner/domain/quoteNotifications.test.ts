@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { financeMemberIds, followUpNotices, LOSS_REASONS, readyNotice, urgentNotices } from './quoteNotifications'
+import { financeMemberIds, followUpNotices, LOSS_REASONS, readyNotice, urgentNotices, waitingReturnNotices } from './quoteNotifications'
 import type { QuoteData } from './types'
 
 const base: QuoteData = { id: 'q1', code: 'COT-0001', title: 'Aeroporto', status: 'Nova', deadline: '2026-10-27', creatorEmployeeId: 'e-criador', options: [], proposalVersions: [] }
@@ -19,13 +19,18 @@ describe('urgentNotices', () => {
 
 describe('readyNotice', () => {
   it('avisa o criador ao entrar em Cotada', () => {
-    const n = readyNotice({ ...base, status: 'Em análise pelo financeiro' }, { ...base, status: 'Cotada' })
+    const n = readyNotice({ ...base, status: 'Em análise pelo financeiro' }, { ...base, status: 'Cotada' }, '2026-10-28T10:00:00.000Z')
     expect(n?.recipientEmployeeId).toBe('e-criador')
     expect(n?.type).toBe('quote_ready')
   })
   it('não avisa se já estava Cotada ou sem criador', () => {
-    expect(readyNotice({ ...base, status: 'Cotada' }, { ...base, status: 'Cotada' })).toBeNull()
-    expect(readyNotice({ ...base, status: 'Em análise pelo financeiro', creatorEmployeeId: '' }, { ...base, status: 'Cotada', creatorEmployeeId: '' })).toBeNull()
+    expect(readyNotice({ ...base, status: 'Cotada' }, { ...base, status: 'Cotada' }, 't')).toBeNull()
+    expect(readyNotice({ ...base, status: 'Em análise pelo financeiro', creatorEmployeeId: '' }, { ...base, status: 'Cotada', creatorEmployeeId: '' }, 't')).toBeNull()
+  })
+  it('cada nova entrada em Cotada gera chave própria (avisa de novo após reabrir)', () => {
+    const first = readyNotice({ ...base, status: 'Nova' }, { ...base, status: 'Cotada' }, '2026-10-28T10:00:00.000Z')
+    const second = readyNotice({ ...base, status: 'Em análise pelo financeiro' }, { ...base, status: 'Cotada' }, '2026-10-28T11:30:00.000Z')
+    expect(first?.dedupeKey).not.toBe(second?.dedupeKey)
   })
 })
 
@@ -65,5 +70,25 @@ describe('financeMemberIds', () => {
   it('acha a equipe Financeiro ignorando caixa e espaços e devolve ids como texto', () => {
     expect(financeMemberIds({ teams: [{ name: 'Operação', memberIds: ['x'] }, { name: ' financeiro ', memberIds: ['a', 2] }] })).toEqual(['a', '2'])
     expect(financeMemberIds({})).toEqual([])
+  })
+})
+
+describe('waitingReturnNotices', () => {
+  const waiting: QuoteData = { ...base, status: 'Aguardando informação', waitingFor: 'Voo', waitingFrom: 'Cliente', waitingReturnDate: '2026-10-30' }
+  it('na data de retorno avisa criador e Financeiro, sem repetir', () => {
+    const out = waitingReturnNotices([waiting], ['f1', 'e-criador'], '2026-10-30')
+    expect(out.map((n) => n.recipientEmployeeId)).toEqual(['e-criador', 'f1'])
+    expect(out[0].type).toBe('quote_waiting_return')
+    expect(out[0].message).toContain('Voo')
+  })
+  it('antes da data, fora de Aguardando ou sem data não avisa', () => {
+    expect(waitingReturnNotices([waiting], ['f1'], '2026-10-29')).toEqual([])
+    expect(waitingReturnNotices([{ ...waiting, status: 'Em análise pelo financeiro' }], ['f1'], '2026-10-30')).toEqual([])
+    expect(waitingReturnNotices([{ ...waiting, waitingReturnDate: '' }], ['f1'], '2026-10-30')).toEqual([])
+  })
+  it('atrasado continua lembrando, um por dia', () => {
+    const [a] = waitingReturnNotices([waiting], [], '2026-10-30')
+    const [b] = waitingReturnNotices([waiting], [], '2026-10-31')
+    expect(a.dedupeKey).not.toBe(b.dedupeKey)
   })
 })
