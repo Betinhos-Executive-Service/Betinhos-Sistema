@@ -13,24 +13,24 @@ import type { ExpenseDraft, ExpensePhoto, ExpenseReferenceData } from "../featur
 import type { MaintenancePhotoKind, DetailData } from "../types";
 import { CollisionScreen } from "../features/colisao/CollisionScreen";
 import { CollisionStartScreen } from "../features/colisao/CollisionStartScreen";
-import { DetailsScreen } from "./DetailsScreen";
+import { DetailsScreen } from "../features/detalhe/DetailsScreen";
 import { ExpenseScreen, type ExpenseUploadListItem } from "../features/despesas/ExpenseScreen";
-import { FinalizeScreen, type MaintenanceFinalizeDraft } from "./FinalizeScreen";
-import { HistoryDetailsScreen } from "./HistoryDetailsScreen";
-import { HistoryScreen } from "./HistoryScreen";
-import { InitialScreen } from "./InitialScreen";
-import { LocalCancelScreen } from "./LocalCancelScreen";
-import { MaintenancePhotoPreviewScreen } from "./MaintenancePhotoPreviewScreen";
+import { FinalizeScreen, type MaintenanceFinalizeDraft } from "../features/finalizar/FinalizeScreen";
+import { HistoryDetailsScreen } from "../features/historico/HistoryDetailsScreen";
+import { HistoryScreen } from "../features/historico/HistoryScreen";
+import { InitialScreen } from "../features/servicos/InitialScreen";
+import { LocalCancelScreen } from "../features/finalizar/LocalCancelScreen";
+import { MaintenancePhotoPreviewScreen } from "../features/fotos/MaintenancePhotoPreviewScreen";
 import {
   MaintenanceRequestScreen,
   type MaintenanceRequestDraft,
   type MaintenanceRequestPhoto
 } from "../features/manutencao/MaintenanceRequestScreen";
 import { ReceiveScreen } from "../features/recebimento/ReceiveScreen";
-import { ReceiptPreviewScreen } from "./ReceiptScreen";
-import { ServicesScreen } from "./ServicesScreen";
-import { SignatureScreen } from "./SignatureScreen";
-import { VoucherScreen } from "./VoucherScreen";
+import { ReceiptPreviewScreen } from "../features/recibo/ReceiptScreen";
+import { ServicesScreen } from "../features/servicos/ServicesScreen";
+import { SignatureScreen } from "../features/voucher/SignatureScreen";
+import { VoucherScreen } from "../features/voucher/VoucherScreen";
 
 type PreviewButtonId =
   | "variants-primary"

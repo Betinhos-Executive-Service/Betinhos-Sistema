@@ -1,0 +1,48 @@
+import { useRef } from "react";
+import { useAgendaSearch } from "../servicos/useAgendaSearch";
+import type { AgendaItem, DetailData } from "../../types";
+import { AgendaCard } from "../../shared/ui/AgendaCard";
+import { AppShell } from "../../components/layout/AppShell";
+import { PullToRefresh } from "../../components/common/PullToRefresh";
+import { ServicesMenu } from "../../components/navigation/ServicesMenu";
+import { SearchBar } from "../servicos/SearchBar";
+
+type HistoryScreenProps = {
+  items: AgendaItem[];
+  onHome: () => void;
+  onRefresh: () => void | Promise<void>;
+  onOpenDetails: (detail: DetailData) => void;
+};
+
+export function HistoryScreen({ items, onHome, onRefresh, onOpenDetails }: HistoryScreenProps) {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const { query, setQuery, filteredAgenda } = useAgendaSearch(items);
+
+  return (
+    <AppShell screenLabel="TelaHistórico">
+      <ServicesMenu title="HISTÓRICO de Serviços" onHome={onHome} onRefresh={() => { setQuery(""); return onRefresh(); }} />
+      <section className="main-panel services-main history-main">
+        <SearchBar query={query} onQueryChange={setQuery} />
+        <PullToRefresh scrollRef={listRef} onRefresh={() => { setQuery(""); return onRefresh(); }}>
+        <div ref={listRef} className="agenda-list">
+          {filteredAgenda.length > 0 ? (
+            filteredAgenda.map((item: AgendaItem, index) => (
+              <div key={item.id} className="agenda-layout-item">
+                <AgendaCard
+                  item={item}
+                  index={index}
+                  onOpen={(agendaItem) => agendaItem.detail && onOpenDetails(agendaItem.detail)}
+                />
+              </div>
+            ))
+          ) : (
+            <div className="history-empty">
+              {query.trim() ? `Nenhum serviço encontrado para "${query.trim()}".` : "Nenhum serviço disponível no seu histórico."}
+            </div>
+          )}
+        </div>
+        </PullToRefresh>
+      </section>
+    </AppShell>
+  );
+}

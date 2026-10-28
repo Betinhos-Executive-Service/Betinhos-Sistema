@@ -1,5 +1,5 @@
 import type { QrCharge, QrChargePayer, QrChargeSummary } from "./qrCharge.ts";
-import type { ReceiptLanguage } from "../../lib/receiptLanguage.ts";
+import type { ReceiptLanguage } from "../recibo/receiptLanguage.ts";
 
 /**
  * Cobrança por QR simulada para a visualização local (fora do Dynamics): vira "pago" 5 s depois de criada

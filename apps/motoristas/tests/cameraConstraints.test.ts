@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DOCUMENT_PHOTO_ASPECT, getDocumentStreamConstraints, getDocumentTrackConstraints, describeStreamSize } from "../src/lib/cameraConstraints.ts";
+import { DOCUMENT_PHOTO_ASPECT, getDocumentStreamConstraints, getDocumentTrackConstraints, describeStreamSize } from "../src/shared/camera/cameraConstraints.ts";
 
 test("comprovante pede stream 4:3 em alta resolução com a câmera traseira", () => {
   assert.equal(DOCUMENT_PHOTO_ASPECT, 4 / 3);

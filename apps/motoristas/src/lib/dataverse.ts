@@ -13,10 +13,10 @@ import {
   type ExpensePhoto,
   type ExpenseReferenceData
 } from "../features/despesas/expenses.ts";
-import type { PersonalReceiptModel } from "./personalReceipt";
-import { normalizeReceiptLanguage, RECEIPT_LANGUAGE, type ReceiptLanguage } from "./receiptLanguage.ts";
+import type { PersonalReceiptModel } from "../features/recibo/personalReceipt";
+import { normalizeReceiptLanguage, RECEIPT_LANGUAGE, type ReceiptLanguage } from "../features/recibo/receiptLanguage.ts";
 
-import { getFieldValue } from "./fieldLookup.ts";
+import { getFieldValue } from "../features/detalhe/fieldLookup.ts";
 import {
   buildInfleetServiceVehiclePatch,
   parseInfleetVehicleResolution,
@@ -62,7 +62,7 @@ import {
   type WindowWithFlowEnv
 } from "../data/dataverse/cliente.ts";
 import { DATAVERSE } from "../data/dataverse/entidades.ts";
-import { mockOrganizeObservation } from "./observacaoOrganizada.ts";
+import { mockOrganizeObservation } from "../features/finalizar/observacaoOrganizada.ts";
 
 
 // Movidos para src/data/dataverse/ (passo 2 da refatoração); reexportados para não mudar quem importa daqui.

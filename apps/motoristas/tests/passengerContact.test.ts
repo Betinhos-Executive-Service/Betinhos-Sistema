@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizePhoneDigits, passengerContactLinks } from "../src/lib/passengerContact.ts";
+import { normalizePhoneDigits, passengerContactLinks } from "../src/features/detalhe/passengerContact.ts";
 
 test("monta tel: e WhatsApp a partir do telefone", () => {
   assert.deepEqual(passengerContactLinks("+55 (11) 90000-0010"), { tel: "tel:5511900000010", whatsapp: "https://wa.me/5511900000010" });

@@ -1,4 +1,4 @@
-import type * as checklists from "../lib/checklists";
+import type * as checklists from "../features/checklist/checklists";
 import type * as comunicados from "../features/comunicados/comunicados";
 import type * as dataverse from "../lib/dataverse";
 

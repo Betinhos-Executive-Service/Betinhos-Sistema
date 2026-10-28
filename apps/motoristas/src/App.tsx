@@ -43,7 +43,6 @@ import {
   DATAVERSE,
   finalizeExchangeRemote,
   finalizeMaintenanceRemote,
-  finalizeServiceRemote,
   getDriverContext,
   getDriverCurrentVehicleId,
   hasDataverseRuntime,
@@ -54,15 +53,9 @@ import {
   loadReceiptClienteOptionsRemote,
   loadExpenseLookupNavigationNamesRemote,
   loadMaintenanceRequestVehiclesRemote,
-  loadRemoteDetailByParams,
-  loadRemoteStore,
-  markDetailViewedRemote,
   resolveServiceVehicleRemote,
   loadActiveFleetRemote,
   prefetchExpenseReferenceDataRemote,
-  saveServiceObservationRemote,
-  saveVoucherDraftRemote,
-  saveVoucherRemote,
   updateOne,
   uploadCollisionPhotoRemote,
   uploadExpenseInvoiceRemote,
@@ -96,9 +89,9 @@ import { APP_CONNECTION_LOST_MESSAGE, APP_OPERATION_ERROR_MESSAGE, reportAppErro
 import { useDados } from "./app/DataProvider";
 import { isComunicadoPending, isMockComunicados, type ComunicadoDestinatario } from "./features/comunicados/comunicados";
 import type { ComunicadosLoadStatus } from "./features/comunicados/ComunicadosScreen";
-import { isChecklistPending, isMockChecklists, loadDriverChecklist, loadDriverChecklists, type ChecklistVeiculo } from "./lib/checklists";
-import type { ChecklistsLoadStatus } from "./screens/ChecklistsScreen";
-import { clearMediaDraft, loadMediaDraft, saveMediaDraft, touchMediaDraft } from "./lib/mediaDraftStore";
+import { isChecklistPending, isMockChecklists, type ChecklistVeiculo } from "./features/checklist/checklists";
+import type { ChecklistsLoadStatus } from "./features/checklist/ChecklistsScreen";
+import { clearMediaDraft, loadMediaDraft, saveMediaDraft, touchMediaDraft } from "./features/fotos/mediaDraftStore";
 import { describeExpenseSubmission, normalizeStoredExpenseSubmissions, type ExpenseSubmission, type ExpenseUploadRow } from "./features/despesas/expenseUploadState";
 import { resumeExpenseSubmission, type ExpenseSubmissionProgress } from "./features/despesas/expenseSubmission";
 import { ExpenseSendOverlay, type ExpenseSendState } from "./features/despesas/ExpenseSendOverlay";
@@ -143,22 +136,22 @@ import { CollisionScreen } from "./features/colisao/CollisionScreen";
 import { ComunicadosScreen } from "./features/comunicados/ComunicadosScreen";
 import { TermosMultaScreen, type TermosLoadStatus } from "./features/termos/TermosMultaScreen";
 import { isMockTermos, listarTermosMotorista, resumoPendentes, separarTermos, type TermoMulta } from "./features/termos/termosMulta";
-import { ChecklistsScreen } from "./screens/ChecklistsScreen";
+import { ChecklistsScreen } from "./features/checklist/ChecklistsScreen";
 import { ButtonPreviewScreen } from "./screens/ButtonPreviewScreen";
 import { CollisionStartScreen } from "./features/colisao/CollisionStartScreen";
-import { DetailsScreen } from "./screens/DetailsScreen";
+import { DetailsScreen } from "./features/detalhe/DetailsScreen";
 import { ExpenseScreen } from "./features/despesas/ExpenseScreen";
-import { FinalizeScreen, type MaintenanceFinalizeDraft } from "./screens/FinalizeScreen";
-import { HistoryDetailsScreen } from "./screens/HistoryDetailsScreen";
-import { HistoryScreen } from "./screens/HistoryScreen";
-import { InitialScreen } from "./screens/InitialScreen";
-import { LocalCancelScreen } from "./screens/LocalCancelScreen";
-import { MediaCaptureScreen } from "./screens/MediaCaptureScreen";
+import { FinalizeScreen, type MaintenanceFinalizeDraft } from "./features/finalizar/FinalizeScreen";
+import { HistoryDetailsScreen } from "./features/historico/HistoryDetailsScreen";
+import { HistoryScreen } from "./features/historico/HistoryScreen";
+import { InitialScreen } from "./features/servicos/InitialScreen";
+import { LocalCancelScreen } from "./features/finalizar/LocalCancelScreen";
+import { MediaCaptureScreen } from "./features/fotos/MediaCaptureScreen";
 import { ReceiptReadingScreen } from "./features/despesas/ReceiptReadingScreen";
 import { ReceiptIllegibleScreen } from "./features/despesas/ReceiptIllegibleScreen";
-import { MaintenancePhotoPreviewScreen } from "./screens/MaintenancePhotoPreviewScreen";
+import { MaintenancePhotoPreviewScreen } from "./features/fotos/MaintenancePhotoPreviewScreen";
 import { ReceiveScreen } from "./features/recebimento/ReceiveScreen";
-import { ReceiptPreviewScreen, ReceiptScreen } from "./screens/ReceiptScreen";
+import { ReceiptPreviewScreen, ReceiptScreen } from "./features/recibo/ReceiptScreen";
 import {
   MaintenanceRequestScreen,
   type MaintenanceRequestDraft,
@@ -167,7 +160,7 @@ import {
 } from "./features/manutencao/MaintenanceRequestScreen";
 import { IdeasScreen } from "./features/ideias/IdeasScreen";
 import { MyVehicleScreen } from "./features/meu-carro/MyVehicleScreen";
-import { VehicleChoiceDialog } from "./components/details/VehicleChoiceDialog";
+import { VehicleChoiceDialog } from "./features/detalhe/VehicleChoiceDialog";
 import {
   buildInfleetServiceVehiclePatch,
   needsDriverChoice,
@@ -180,9 +173,9 @@ import { createMockFleetLoader, MOCK_FLEET, pickMockInfleetScenario, resolveMock
 
 // Referência estável: o diálogo compara com a lista exibida para saber se oferece "Nenhuma das opções".
 const loadMockAllFleet = async () => MOCK_FLEET;
-import { ServicesScreen } from "./screens/ServicesScreen";
-import { SignatureScreen } from "./screens/SignatureScreen";
-import { VoucherScreen } from "./screens/VoucherScreen";
+import { ServicesScreen } from "./features/servicos/ServicesScreen";
+import { SignatureScreen } from "./features/voucher/SignatureScreen";
+import { VoucherScreen } from "./features/voucher/VoucherScreen";
 import {
   COLLISION_ATTACHMENT_STATUS,
   buildCollisionCreatePayload,
@@ -194,7 +187,7 @@ import {
   type CollisionPhotoKind
 } from "./features/colisao/collisions";
 import { DEFAULT_EXPENSE_REFERENCE_DATA, buildExpenseCreatePayload, type ExpenseDraft, type ExpensePhoto, type ExpenseReferenceData } from "./features/despesas/expenses";
-import { hasMediaDraftContent, prepareVideoBlobForUpload, revokePreviewUrl } from "./lib/mediaDrafts";
+import { hasMediaDraftContent, prepareVideoBlobForUpload, revokePreviewUrl } from "./features/fotos/mediaDrafts";
 import type { CapturedVideoDraft, DetailData, MaintenancePhotoKind, Screen } from "./types";
 
 type RemoteOperation = {
@@ -442,7 +435,8 @@ function revokePhotoPreviewUrls(photos: Array<{ previewUrl?: string }>) {
 }
 
 function App() {
-  // Dados pela porta (src/data/porta.ts): o adaptador vem da entrada do app (main.tsx).
+  // Dados pela porta (src/data/porta.ts): o adaptador vem da entrada do app (main.tsx) e não muda
+  // durante a sessão, por isso não entra nas dependências dos hooks.
   const dados = useDados();
   const devMode = useMemo(() => new URLSearchParams(window.location.search).get("dev") ?? "", []);
   const previewHashActive = useMemo(() => /^#\/?preview(?:[/?]|$)/i.test(window.location.hash), []);
@@ -899,7 +893,7 @@ function App() {
       setComunicadosStatus((current) => current === "ready" ? current : "error");
       throw error;
     }
-  }, [dados]);
+  }, []);
 
   // Termos de multa pendentes: mesmo motorista logado; alimentam a tela Multas e o contador da Home.
   const [termosMulta, setTermosMulta] = useState<TermoMulta[]>([]);
@@ -921,7 +915,7 @@ function App() {
   // Checklists usam o mesmo motorista logado dos comunicados.
   const reloadChecklists = useCallback(async () => {
     try {
-      setChecklists(await loadDriverChecklists(comunicadosDriverIdRef.current));
+      setChecklists(await dados.carregarChecklists(comunicadosDriverIdRef.current));
       setChecklistsStatus("ready");
     } catch (error) {
       setChecklistsStatus((current) => current === "ready" ? current : "error");
@@ -935,7 +929,7 @@ function App() {
     if (!deepLinkId || isButtonPreviewMode || isReceiptPreviewMode) return;
     if (!hasDataverseRuntime() && !isMockChecklists()) return;
     let alive = true;
-    loadDriverChecklist(deepLinkId)
+    dados.carregarChecklist(deepLinkId)
       .then((item) => {
         if (!alive || pendingChecklistDeepLinkRef.current !== deepLinkId) return;
         pendingChecklistDeepLinkRef.current = "";
@@ -983,7 +977,7 @@ function App() {
         reportAppError(error, { severity: "warning", source: "app", action: "loadDriverComunicado", phase: "deep-link" });
       });
     return () => { alive = false; };
-  }, [dados]);
+  }, []);
 
   // Deep link de serviço vindo do push (form OnLoad -> data=servicoId=...&tipo=...): busca o detalhe
   // em paralelo com loadRemoteStore e abre assim que chega. Se o serviço saiu da agenda do motorista
@@ -994,7 +988,7 @@ function App() {
     // Detalhe já presente no cache local: a tela inicial já é "detalhes"; o fluxo pós-carga atualiza.
     if (initialDetailRef.current) return;
     let alive = true;
-    loadRemoteDetailByParams(serviceId, type)
+    dados.carregarDetalhe(serviceId, type)
       .then((detail) => {
         if (!alive || serviceDeepLinkHandledRef.current) return;
         serviceDeepLinkHandledRef.current = true;
@@ -1005,7 +999,7 @@ function App() {
           setToast("Este serviço não está mais na sua agenda.", "warning");
           return;
         }
-        markDetailViewedRemote(detail).catch((error) => {
+        dados.marcarVisto(detail).catch((error) => {
           reportAppError(error, { severity: "error", source: "app", action: "markDetailViewedRemote", phase: "push-deep-link", screen: "detalhes", detailId: detail.id, detailType: detail.type });
         });
         setSelectedDetail(detail);
@@ -1045,7 +1039,7 @@ function App() {
       title: "Carregando dados",
       message: "Sincronizando agenda no Dataverse."
     });
-    loadRemoteStore()
+    dados.carregarAgenda()
       .then((remote) => {
         if (!alive) return;
         setDataLoadingState(null);
@@ -1070,7 +1064,7 @@ function App() {
           const routedScreen = getInitialScreenFromHashRoute(hashRoute, remoteInitialDetail);
           if (screenNeedsHashDetail(routedScreen)) {
             if (remoteInitialDetail) {
-              markDetailViewedRemote(remoteInitialDetail).catch((error) => {
+              dados.marcarVisto(remoteInitialDetail).catch((error) => {
                 reportAppError(error, {
                   severity: "error",
                   source: "app",
@@ -1088,7 +1082,7 @@ function App() {
               return;
             }
             if (hashRoute.detailId && hashRoute.detailType) {
-              loadRemoteDetailByParams(hashRoute.detailId, hashRoute.detailType)
+              dados.carregarDetalhe(hashRoute.detailId, hashRoute.detailType)
                 .then((detail) => {
                   if (!alive) return;
                   if (!detail) {
@@ -1097,7 +1091,7 @@ function App() {
                     setToast("Serviço do link não encontrado.");
                     return;
                   }
-                  markDetailViewedRemote(detail).catch((error) => {
+                  dados.marcarVisto(detail).catch((error) => {
                     reportAppError(error, {
                       severity: "error",
                       source: "app",
@@ -1145,7 +1139,7 @@ function App() {
         }
         if (remoteInitialDetail) {
           serviceDeepLinkHandledRef.current = true;
-          markDetailViewedRemote(remoteInitialDetail).catch((error) => {
+          dados.marcarVisto(remoteInitialDetail).catch((error) => {
             reportAppError(error, {
               severity: "error",
               source: "app",
@@ -1164,7 +1158,7 @@ function App() {
         const initialParams = getInitialParams();
         if (initialParams.serviceId) {
           serviceDeepLinkHandledRef.current = true;
-          loadRemoteDetailByParams(initialParams.serviceId, initialParams.type)
+          dados.carregarDetalhe(initialParams.serviceId, initialParams.type)
             .then((detail) => {
               if (!alive) return;
               if (!detail) {
@@ -1172,7 +1166,7 @@ function App() {
                 setToast("Este serviço não está mais na sua agenda.", "warning");
                 return;
               }
-              markDetailViewedRemote(detail).catch((error) => {
+              dados.marcarVisto(detail).catch((error) => {
                 reportAppError(error, {
                   severity: "error",
                   source: "app",
@@ -1381,7 +1375,7 @@ function App() {
         return idea;
       }
     };
-  }, [dados, remoteMode]);
+  }, [remoteMode]);
 
   useEffect(() => {
     if ((screen !== "solicitarManutencao" && screen !== "gastos" && screen !== "colisoes") || !remoteMode) return;
@@ -1633,7 +1627,7 @@ function App() {
         });
       }
       try {
-        const remote = await loadRemoteStore();
+        const remote = await dados.carregarAgenda();
         setDriverContext(remote.driver);
         comunicadosDriverIdRef.current = remote.driver?.id ?? "";
         setStore((current) => ({ ...current, agenda: remote.agenda, history: remote.history }));
@@ -1654,7 +1648,7 @@ function App() {
         if (detailToRefresh) {
           const refreshedDetail =
             findDetailByParams([...remote.agenda, ...remote.history], detailToRefresh.id, detailToRefresh.type) ??
-            await loadRemoteDetailByParams(detailToRefresh.dataverse?.id ?? detailToRefresh.id, detailToRefresh.type);
+            await dados.carregarDetalhe(detailToRefresh.dataverse?.id ?? detailToRefresh.id, detailToRefresh.type);
           if (refreshedDetail) setSelectedDetail(refreshedDetail);
         }
         if (!silent) await completeDataLoadingState("Dados atualizados", "Dataverse sincronizado.");
@@ -1715,7 +1709,7 @@ function App() {
     if (!selectedDetail || selectedDetail.type !== "SERVICO") return;
     const draftKey = getDetailDraftKey(selectedDetail);
     setServiceObservationDrafts((current) => ({ ...current, [draftKey]: observation }));
-    if (remoteMode) await saveServiceObservationRemote(selectedDetail, observation);
+    if (remoteMode) await dados.salvarObservacao(selectedDetail, observation);
   };
 
   // Abre a escolha do carro e espera a resposta do motorista (null = voltou sem escolher).
@@ -1774,7 +1768,7 @@ function App() {
       };
       try {
         setProgress("Conferindo fila no Dataverse.");
-        const remoteBeforeFinalize = await loadRemoteStore();
+        const remoteBeforeFinalize = await dados.carregarAgenda();
         const remoteFirstPendingDetail = detailToFinalize.type === "SERVICO"
           ? findFirstPendingServiceDetail(remoteBeforeFinalize.agenda)
           : undefined;
@@ -1812,9 +1806,9 @@ function App() {
         const signatureDataUrl = store.signatures[detailToFinalize.id];
         const photos = store.photos[detailToFinalize.id];
         if (detailToFinalize.type === "SERVICO" && isVoucher) {
-          await saveVoucherRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress, vehicleResolution, vehicleChoice, skipVehicle });
+          await dados.salvarVoucher({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress, vehicleResolution, vehicleChoice, skipVehicle });
         } else if (detailToFinalize.type === "SERVICO") {
-          await finalizeServiceRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress, vehicleResolution, vehicleChoice, skipVehicle });
+          await dados.finalizarServico({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress, vehicleResolution, vehicleChoice, skipVehicle });
         } else if (detailToFinalize.type === "MANUTENCAO") {
           await finalizeMaintenanceRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress });
         } else if (detailToFinalize.type === "TROCA") {
@@ -1915,7 +1909,7 @@ function App() {
       if (!remoteMode) return;
 
       void Promise.race([
-        loadRemoteStore(),
+        dados.carregarAgenda(),
         wait(8000).then(() => {
           throw new Error("Falha ao confirmar a atualização da agenda no Dataverse.");
         })
@@ -2009,7 +2003,7 @@ function App() {
           delete next[detailToCancel.id];
           return next;
         });
-        loadRemoteStore()
+        dados.carregarAgenda()
           .then((remote) => setStore((current) => ({ ...current, agenda: remote.agenda, history: remote.history })))
           .catch((error) => {
             reportAppError(error, {
@@ -2073,7 +2067,7 @@ function App() {
     if (!remoteMode) return;
     if (voucherDraftTimerRef.current) window.clearTimeout(voucherDraftTimerRef.current);
     voucherDraftTimerRef.current = window.setTimeout(() => {
-      saveVoucherDraftRemote(detail, fields).catch((error) => {
+      dados.salvarRascunhoVoucher(detail, fields).catch((error) => {
         reportAppError(error, {
           severity: "error",
           source: "app",
@@ -3752,7 +3746,7 @@ function App() {
         queueHighlightDetailKey={queueHighlightDetailKey}
         onOpenDetails={(detail) => {
           if (remoteMode) {
-            markDetailViewedRemote(detail).catch((error) => {
+            dados.marcarVisto(detail).catch((error) => {
               reportAppError(error, {
                 severity: "error",
                 source: "app",

@@ -35,10 +35,10 @@ Usa Chrome headless com user agent Android (ativa a câmera ao vivo) e câmera s
 12. Topo de Serviços (mock): "Comunicados pendentes" (2) e "Checklist do veículo" (1) como avisos compactos `button.notice-compact`, 56 px cada, superfície #fcfcfb sem sombra (não parecem card de serviço); o primeiro card de serviço começa perto de y=322 (antes y=647). Medir: `[...document.querySelectorAll('.notice-compact')].map(e=>e.getBoundingClientRect().height)`. Os avisos não têm `.agenda-card`/`.agenda-hit`: `document.querySelector(".agenda-card .agenda-hit")` em Serviços já cai no primeiro serviço. Detalhes do aviso em `verificar-comunicados` e `verificar-checklists-app`.
 
 ## Passageiros no detalhe (lista com foto e ficha, 26/10/2026)
-`src/components/details/PassengerContacts.tsx` substitui a antiga faixa de avatares do topo (`PassengerAvatars`). Só aparece quando `detail.passengers` vem preenchido; senão a seção "Passageiros e Telefones de Contato" continua no HTML antigo (`DetailsField`).
-- `#detalhes?serviceId=10241&type=SERVICO` (Programado no mock; apague `app-motoristas-local-v1` do localStorage se o mock salvo atrapalhar), 375×812: nenhum `.passenger-avatars`; seção com 2 `.passenger-row`: Ana Paula (foto de retrato em canvas, `naturalWidth` 320) e Roberto (inicial "R"); cada linha com bandeira SVG do idioma ao lado do nome (`aria-label` "Idioma: …"; `languageFlagCode` em `src/lib/passengerContact.ts`, SVGs em `LanguageFlag.tsx`; DEV só tem Português/Inglês/Espanhol), telefone e botões 44×44 Ligar/WhatsApp; `document.documentElement.scrollWidth - innerWidth` = 0.
+`src/features/detalhe/PassengerContacts.tsx` substitui a antiga faixa de avatares do topo (`PassengerAvatars`). Só aparece quando `detail.passengers` vem preenchido; senão a seção "Passageiros e Telefones de Contato" continua no HTML antigo (`DetailsField`).
+- `#detalhes?serviceId=10241&type=SERVICO` (Programado no mock; apague `app-motoristas-local-v1` do localStorage se o mock salvo atrapalhar), 375×812: nenhum `.passenger-avatars`; seção com 2 `.passenger-row`: Ana Paula (foto de retrato em canvas, `naturalWidth` 320) e Roberto (inicial "R"); cada linha com bandeira SVG do idioma ao lado do nome (`aria-label` "Idioma: …"; `languageFlagCode` em `src/features/detalhe/passengerContact.ts`, SVGs em `LanguageFlag.tsx`; DEV só tem Português/Inglês/Espanhol), telefone e botões 44×44 Ligar/WhatsApp; `document.documentElement.scrollWidth - innerWidth` = 0.
 - Tocar na linha abre `.passenger-sheet` (sheet de baixo): foto grande ou inicial 120 px, bandeira + nome, Telefone, botões "Ligar" e "WhatsApp". Fecha com X, Esc e toque fora.
-- Regra da foto e privacidade em `src/lib/passengerPhoto.ts` (só Programado, `new_ObterFotoPassageiro`, 2 chamadas simultâneas, blob URL revogado no `dispose`). Links em `src/lib/passengerContact.ts` (WhatsApp com mensagem vindo do Dataverse tem prioridade). Testes: `tests/passengerContact.test.ts`, `tests/passengerPhoto.test.ts`.
+- Regra da foto e privacidade em `src/features/detalhe/passengerPhoto.ts` (só Programado, `new_ObterFotoPassageiro`, 2 chamadas simultâneas, blob URL revogado no `dispose`). Links em `src/features/detalhe/passengerContact.ts` (WhatsApp com mensagem vindo do Dataverse tem prioridade). Testes: `tests/passengerContact.test.ts`, `tests/passengerPhoto.test.ts`.
 - `cr40f_bancodedados` não tem campo de nacionalidade (metadata DEV 26/10/2026: só `cr40f_idioma`); a ficha mostra o Idioma. Foto real só no DEV com serviço Programado.
 
 ## Cobrança por QR code (Stripe, modo mock)
@@ -82,7 +82,7 @@ Tela "Enviar comprovante" (`src/features/recebimento/ReceiveScreen.tsx`, lógica
 
 ## Casos de borda
 - Fila: finalizar fora de ordem mostra "Conclua os itens anteriores da fila antes de prosseguir." (modo remoto).
-- Câmera negada, ocupada (NotReadableError) e ausente têm mensagens próprias (`src/lib/cameraErrors.ts`, coberto por `tests/cameraErrors.test.ts`).
+- Câmera negada, ocupada (NotReadableError) e ausente têm mensagens próprias (`src/shared/camera/cameraErrors.ts`, coberto por `tests/cameraErrors.test.ts`).
 - Durante envio (`submitState` ≠ idle) os botões Voltar e Limpar ficam desabilitados e o Voltar do celular não navega.
 
 ## Evidência obrigatória
@@ -95,7 +95,7 @@ Tela "Enviar comprovante" (`src/features/recebimento/ReceiveScreen.tsx`, lógica
 - Abrir discador/WhatsApp (`tel:`/`wa.me`) não é exercitado; o roteiro para no diálogo de escolha.
 
 ## Foto do passageiro no detalhe (26/10/2026)
-- Código: `src/lib/passengerPhoto.ts`, `src/components/details/PassengerAvatars.tsx`; teste `tests/passengerPhoto.test.ts`.
+- Código: `src/features/detalhe/passengerPhoto.ts`, `src/components/details/PassengerAvatars.tsx`; teste `tests/passengerPhoto.test.ts`.
 - A foto só é pedida com o serviço Programado (`cr40f_status` 202410005), pela Custom API `new_ObterFotoPassageiro` (`executeCustomApi`, `{new_ReservaId, new_PassageiroId}` → `new_FotoJson`). Se a API negar, falhar ou devolver JSON inválido, aparece só a inicial, sem mensagem de erro. A imagem fica em memória como blob URL, revogada ao sair da tela; são no máximo 2 chamadas simultâneas.
 - Mock (375 px): o serviço 10241 mostra a foto da Ana e o "R" do Roberto; tocar no avatar amplia a foto, e X, Esc ou toque fora fecham. Se a agenda mock antiga aparecer, apague `app-motoristas-local-v1` do localStorage.
 - DEV: entre como o motorista de um serviço Programado com passageiro com foto e veja a foto. Mude o status para Em Execução e reabra: só a inicial.

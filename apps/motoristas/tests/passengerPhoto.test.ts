@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canRequestPassengerPhoto, createPassengerPhotoStore, parseFotoJson, passengerInitial, PROGRAMADO_STATUS } from "../src/lib/passengerPhoto.ts";
+import { canRequestPassengerPhoto, createPassengerPhotoStore, parseFotoJson, passengerInitial, PROGRAMADO_STATUS } from "../src/features/detalhe/passengerPhoto.ts";
 
 test("parseFotoJson aceita ok com imagem", () => {
   assert.deepEqual(parseFotoJson(JSON.stringify({ ok: true, mimeType: "image/jpeg", conteudoBase64: "AAAA" })), { mimeType: "image/jpeg", base64: "AAAA" });

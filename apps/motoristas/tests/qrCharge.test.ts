@@ -17,7 +17,7 @@ import {
   validateQrChargeAmount,
   validateQrChargePayer
 } from "../src/features/recebimento/qrCharge.ts";
-import { RECEIPT_LANGUAGE_OPTIONS } from "../src/lib/receiptLanguage.ts";
+import { RECEIPT_LANGUAGE_OPTIONS } from "../src/features/recibo/receiptLanguage.ts";
 
 const detail = (record?: Record<string, unknown>, valorCampo = ""): DetailData => ({
   type: "SERVICO",

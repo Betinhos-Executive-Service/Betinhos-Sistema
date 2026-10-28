@@ -27,7 +27,7 @@ import {
   type QrChargePayer,
   type QrChargeStep
 } from "./qrCharge";
-import { RECEIPT_LANGUAGE, type ReceiptLanguage } from "../../lib/receiptLanguage";
+import { RECEIPT_LANGUAGE, type ReceiptLanguage } from "../recibo/receiptLanguage";
 import type { DetailData } from "../../types";
 
 const POLL_INTERVAL_MS = 3000;

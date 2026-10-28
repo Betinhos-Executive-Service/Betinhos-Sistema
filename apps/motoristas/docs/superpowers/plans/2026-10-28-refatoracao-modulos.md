@@ -40,8 +40,12 @@ Spec: `docs/superpowers/specs/2026-10-28-refatoracao-modulos-design.md`. Um PR p
 - Remotos dessas features (`*ExpenseUpload*Remote`, `uploadCollisionPhotoRemote`, `createQrChargeRemote`...) seguem em `lib/dataverse.ts`; saem num passo próprio depois do 5, quando o arquivo for dividido por feature.
 - Atenção: o script de mudança de pasta precisa reescrever imports de asset (svg/png); o `tsc` não pega, só o build.
 
-## Passo 5 — Núcleo do serviço (passa pela porta)
-Ordem: servicos (ServicesScreen, InitialScreen, agendaVisibility, useAgendaSearch) → detalhe (DetailsScreen, detailHtml, detailMedia, passengerContact) → fotos (MediaCaptureScreen, câmera* → `shared/camera/`, mediaDraft*) → checklist → finalizar (FinalizeScreen, observacaoOrganizada, LocalCancel, Signature) → voucher → recibo (Receipt*, receipt*, personalReceipt). Cada chamada de dados no caminho do modo link troca para `useDados()`. Um PR por feature.
+## Passo 5 — Núcleo do serviço (feito)
+- `src/features/servicos` (início, agenda, busca, cartões), `historico`, `detalhe` (tela, campos, passageiros, escolha do carro, HTML/mídia/mapas do detalhe), `fotos` (captura, prévia, rascunhos de mídia), `checklist` (tela, cartões, regras, envio, CSS), `finalizar` (finalizar, cancelado no local, finalização de manutenção, observação organizada), `voucher` (voucher, assinatura) e `recibo` (tela, PDF, SVG, idioma). Todas com `manifesto.ts`; `src/app/features.ts` virou só a lista.
+- `src/shared/ui/AgendaCard.tsx` e `src/shared/camera/` (restrições, erros, lanterna, orientação da foto).
+- Pela porta (`useDados()`): no `App.tsx`, agenda, detalhe, visto, checklists, observação, finalizar, voucher e rascunho; no checklist, foto e conclusão; no recibo, registro, PDF e e-mail. O adaptador é estável, não entra em dependências de hooks.
+- Prova extra: `verify-ux-flows` e `verify-checklist-send` com o mesmo resultado antes/depois.
+- Ficam em `src/lib` até o passo 7 (compartilhados): `serviceVehicleInfleet*`, `useDitado`, `localWorkflow`, `appErrorLogger`, `currencyInput`, `buildStamp`, `pwa*`. Troca de veículo segue dentro do `dataverse.ts`.
 
 ## Passo 6 — App.tsx vira AppShell
 - Extrair estado por feature em hooks (`useChecklistFlow`, `useFinalizeFlow`, `useReceiptFlow`, `useMediaCapture`...) dentro de cada `features/<x>/`.

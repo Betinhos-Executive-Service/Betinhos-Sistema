@@ -29,6 +29,7 @@ description: "Verificação base do App Motoristas: testes Node, TypeScript estr
 - Antes de mexer: `npm run build -- --no-version` e `node scripts/qa/screens-baseline.cjs capture <tmp>/antes` (16 telas do mock por rota hash, relógio congelado em 28/10/2026 12:00Z, animações e selo de build desligados).
 - Depois: mesmo build, `capture <tmp>/depois` e `compare <tmp>/antes <tmp>/depois`. Esperado `OK: 16 telas idênticas.`; qualquer `DIFERE` = abrir os dois PNGs.
 - Volte o `dist/` (`git checkout -- dist`) se o PR não for de publicação. `--no-version` evita mexer na versão do `package.json`.
+- Fluxos (finalizar, voucher, comunicados, detalhe, checklist): sirva `dist/` antigo e novo em portas diferentes (servidor estático simples, a página é `/webresource-app-motoristas.html`) e rode `scripts/qa/verify-ux-flows.cjs` e `scripts/qa/verify-checklist-send.cjs <pasta> sucesso|foto|registro` com `APP_MOTORISTAS_URL` em cada um; os resultados têm de bater. Em 28/10/2026 a `main` já falhava em "Finalizar: confirma a observação já escrita".
 - Contratos também cobertos por `tests/moduleExports.test.ts` (exports de `src/lib`, `src/app`, `src/data`; atualize com `UPDATE_SNAPSHOT=1` só quando a mudança for intencional) e `tests/hashRouteCharacterization.test.ts`.
 
 ## Casos de borda

@@ -1,4 +1,4 @@
-import { AgendaCard } from "../../components/services/AgendaCard";
+import { AgendaCard } from "../../shared/ui/AgendaCard";
 import { CompactNoticeCard } from "../../components/common/CompactNoticeCard";
 import { COMUNICADO_TIPO, isComunicadoPending, type ComunicadoDestinatario } from "./comunicados";
 

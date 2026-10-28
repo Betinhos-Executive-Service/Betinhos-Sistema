@@ -1,4 +1,4 @@
-import { concluirChecklist, executeChecklistAction, loadDriverChecklist, loadDriverChecklists } from "../../lib/checklists.ts";
+import { concluirChecklist, executeChecklistAction, loadDriverChecklist, loadDriverChecklists } from "../../features/checklist/checklists.ts";
 import { executeComunicadoAction, loadDriverComunicado, loadDriverComunicados } from "../../features/comunicados/comunicados.ts";
 import {
   createReceiptRecordRemote,

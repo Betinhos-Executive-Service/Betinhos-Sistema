@@ -1,7 +1,7 @@
 import type { DetailData } from "../../types.ts";
 import { sanitizeCurrencyInput } from "../../lib/currencyInput.ts";
-import { parseSafeDetailHtml } from "../../lib/detailHtml.ts";
-import { RECEIPT_LANGUAGE, type ReceiptLanguage } from "../../lib/receiptLanguage.ts";
+import { parseSafeDetailHtml } from "../detalhe/detailHtml.ts";
+import { RECEIPT_LANGUAGE, type ReceiptLanguage } from "../recibo/receiptLanguage.ts";
 
 // Quem paga: o nome e o e-mail vão para a sessão do Stripe (recibo por e-mail) e para o registro da cobrança.
 export type QrChargePayer = { nome: string; email: string };

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { getDocumentStreamConstraints } from "../../lib/cameraConstraints";
-import { describeCameraError } from "../../lib/cameraErrors";
+import { getDocumentStreamConstraints } from "../../shared/camera/cameraConstraints";
+import { describeCameraError } from "../../shared/camera/cameraErrors";
 import { capturarSelfieJpeg } from "./termosMulta";
 
 type Props = { value: string; onChange: (base64: string) => void };

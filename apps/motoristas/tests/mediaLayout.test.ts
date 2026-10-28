@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const styles = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
-const mediaCaptureScreen = readFileSync(new URL("../src/screens/MediaCaptureScreen.tsx", import.meta.url), "utf8");
+const mediaCaptureScreen = readFileSync(new URL("../src/features/fotos/MediaCaptureScreen.tsx", import.meta.url), "utf8");
 
 function getBlocksContaining(selectorFragment: string) {
   return styles
@@ -101,7 +101,7 @@ test("lanterna: botao so com suporte, rotulo e aria-pressed, desligada ao parar 
 test("camera usa foco continuo somente quando o aparelho declara suporte", () => {
   assert.match(mediaCaptureScreen, /focusMode\?\: string\[\]/);
   assert.match(mediaCaptureScreen, /focusMode\?\.includes\("continuous"\)/);
-  assert.match(readFileSync(new URL("../src/lib/cameraConstraints.ts", import.meta.url), "utf8"), /constraints\.focusMode = \{ ideal: "continuous" \}/);
+  assert.match(readFileSync(new URL("../src/shared/camera/cameraConstraints.ts", import.meta.url), "utf8"), /constraints\.focusMode = \{ ideal: "continuous" \}/);
   assert.match(mediaCaptureScreen, /applyProfile\(preferredProfile, false\)/);
 });
 
@@ -124,7 +124,7 @@ test("iphone usa captura nativa limpa para evitar fullscreen ao gravar video", (
 });
 
 test("foto android prioriza ImageCapture e jpeg com baixa compressao", () => {
-  const photoOrientation = readFileSync(new URL("../src/lib/photoOrientation.ts", import.meta.url), "utf8");
+  const photoOrientation = readFileSync(new URL("../src/shared/camera/photoOrientation.ts", import.meta.url), "utf8");
 
   assert.match(mediaCaptureScreen, /ImageCapture\?: BrowserImageCaptureConstructor/);
   assert.match(mediaCaptureScreen, /captureTrackPhotoDataUrl\(stream\)/);
