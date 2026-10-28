@@ -2612,7 +2612,7 @@
 :where(.planner-page, .planner-portal) .drawer-field-grid { grid-template-columns: minmax(0, 1fr); }
 :where(.planner-page, .planner-portal) .drawer-status-priority-grid, :where(.planner-page, .planner-portal) .drawer-assignment-deadline-grid { min-width: 0; display: grid; gap: 13px; }
 :where(.planner-page, .planner-portal) .drawer-status-priority-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-:where(.planner-page, .planner-portal) .drawer-assignment-deadline-grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, .75fr); align-items: start; }
+:where(.planner-page, .planner-portal) .drawer-assignment-deadline-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); align-items: start; }
 :where(.planner-page, .planner-portal) .drawer-assignment-deadline-grid > .deadline-field { align-self: start; grid-template-rows: 28px auto; align-items: center; }
 :where(.planner-page, .planner-portal) .drawer-assignment-deadline-grid .deadline-field { width: 100%; max-width: 100%; }
 :where(.planner-page, .planner-portal) .drawer-assignment-deadline-grid .deadline-field input { width: 100%; max-width: 100%; }

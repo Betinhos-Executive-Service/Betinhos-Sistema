@@ -370,6 +370,9 @@ describe('quadro de tarefas (boardSortUiContract, assigneeDisplay)', () => {
 })
 
 describe('CSS do Planner no shell', () => {
+  it('empilha Equipe e Prazo quando o drawer é estreito, sem sobrepor', () => {
+    expect(styles).toMatch(/\.drawer-assignment-deadline-grid \{ grid-template-columns: repeat\(auto-fit, minmax\(min\(100%, 280px\), 1fr\)\);/)
+  })
   it('não usa gradiente e fica escopado em .planner-page/.planner-portal', () => {
     expect(styles).not.toMatch(/gradient\(/)
     const selectors = styles.replace(/\/\*[\s\S]*?\*\//g, '').match(/(^|\})\s*([^{}@]+)\{/g) || []
