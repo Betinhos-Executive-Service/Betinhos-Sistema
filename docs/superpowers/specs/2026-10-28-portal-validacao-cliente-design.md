@@ -20,7 +20,8 @@ Reduzir o atraso de 15 a 20 dias no faturamento da Tenaris. Hoje a Juliana (fina
 | Tema | Decisão |
 |---|---|
 | Quem valida na Tenaris | Poucos validadores centrais, que veem todos os serviços liberados do cliente |
-| Acesso | E-mail + código de 6 dígitos, sem senha, só para e-mails cadastrados pela Betinhos |
+| Acesso | Duas etapas: código de 6 dígitos no e-mail + código do app autenticador (TOTP, Microsoft/Google Authenticator), só para e-mails cadastrados pela Betinhos. No 1º acesso, o validador lê um QR code. O computador fica lembrado por 30 dias (pede só o e-mail). Sem senha (decisão de 28/10/2026) |
+| Hospedagem | Cloudflare Workers na conta que já roda o link de cadastro; dados no Dataverse, sem Supabase; endereço `*.workers.dev` no piloto, domínio próprio decidido depois (o DNS de betinhos.com.br está na Locaweb). Custo estimado: R$ 0 (plano grátis, 100 mil requisições/dia); plano pago de US$ 5/mês só se passar disso |
 | Liberação | A Juliana libera por serviço ou em lote, só serviços com composição realizada |
 | O que o validador vê | Dados do serviço, preço detalhado pela composição, observação da Juliana e PDF do voucher (trajeto Infleet fica para depois) |
 | Aprovação | Explícita, por serviço ou em lote |
@@ -58,7 +59,7 @@ Os dias úteis são de segunda a sexta, sem feriados nacionais, e contam a parti
 ## Componentes
 
 1. **Tabelas novas** (solução BetinhosCore):
-   - `cr40f_validadorcliente`: nome, e-mail (único), cliente, ativo, último acesso.
+   - `cr40f_validadorcliente`: nome, e-mail (único), cliente, ativo, último acesso e segredo TOTP (cifrado pelo Worker; o Dataverse nunca guarda o segredo em claro). "Refazer autenticador" pela Juliana zera o segredo e força novo QR code.
    - `cr40f_validacaoservico`: reserva (única), cliente, status, liberado em/por, observação da Juliana, valor liberado, valor anterior, prazo da tácita, aprovado em/por, incluir no fechamento (Sim/Não/Pendente).
    - `cr40f_mensagemvalidacao`: validação, autor (validador ou usuário interno), lado (Cliente/Betinhos), motivo (só na primeira mensagem da dúvida), texto, criada em.
    - `cr40f_codigoacesso`: validador, hash do código, expira em, tentativas, usado. As sessões ficam em cookie assinado, sem tabela.
@@ -87,6 +88,7 @@ Os dias úteis são de segunda a sexta, sem feriados nacionais, e contam a parti
 
 ## Verificação
 
+- Duas etapas: código do e-mail certo + TOTP errado → não entra; 1º acesso mostra o QR code uma vez só; computador lembrado por 30 dias pede só o e-mail; "Refazer autenticador" invalida o segredo antigo.
 - Login: e-mail não cadastrado → mensagem genérica, sem revelar se existe. Código errado 5 vezes → bloqueio de 15 minutos. Código expirado → pede um novo.
 - Isolamento: um validador de outro cliente nunca vê serviço da Tenaris, nem pela API direta com o id.
 - Liberar em lote 20 serviços → todos aparecem no portal. Um serviço sem composição realizada não pode ser liberado.
