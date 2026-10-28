@@ -370,6 +370,10 @@ describe('quadro de tarefas (boardSortUiContract, assigneeDisplay)', () => {
 })
 
 describe('CSS do Planner no shell', () => {
+  it('Equipe cabe na própria coluna, ao lado do Prazo, sem sobrepor', () => {
+    expect(styles).toMatch(/\.drawer-assignment-deadline-grid \{ grid-template-columns: minmax\(0, 1\.25fr\) minmax\(0, \.75fr\);/)
+    expect(styles).toMatch(/\.assignment-field \{ min-width: 0; display: grid; grid-template-columns: minmax\(0, 1fr\);/)
+  })
   it('não usa gradiente e fica escopado em .planner-page/.planner-portal', () => {
     expect(styles).not.toMatch(/gradient\(/)
     const selectors = styles.replace(/\/\*[\s\S]*?\*\//g, '').match(/(^|\})\s*([^{}@]+)\{/g) || []
