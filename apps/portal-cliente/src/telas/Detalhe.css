@@ -1,0 +1,78 @@
+.pc-det__prazo { font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-secondary); }
+
+.pc-det__dados {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--bt-space-3) var(--bt-space-4);
+  margin: 0;
+  padding: var(--bt-space-4);
+  background-color: var(--bt-color-surface);
+  border: 1px solid var(--bt-color-border);
+  border-radius: var(--bt-radius-lg);
+}
+.pc-det__item { min-width: 0; }
+.pc-det__item--largo { grid-column: 1 / -1; }
+.pc-det__item dt {
+  font-size: var(--bt-font-size-11);
+  font-weight: var(--bt-font-weight-extrabold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bt-color-text-secondary);
+}
+.pc-det__item dd { margin: var(--bt-space-0-5) 0 0; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-semibold); overflow-wrap: anywhere; }
+
+.pc-det__bloco {
+  padding: var(--bt-space-4);
+  background-color: var(--bt-color-surface);
+  border: 1px solid var(--bt-color-border);
+  border-radius: var(--bt-radius-lg);
+}
+.pc-det__subtitulo {
+  margin: 0 0 var(--bt-space-3);
+  font-size: var(--bt-typography-heading-card-font-size);
+  font-weight: var(--bt-typography-heading-card-font-weight);
+  line-height: var(--bt-typography-heading-card-line-height);
+  color: var(--bt-color-brand);
+}
+
+.pc-preco { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.pc-preco th, .pc-preco td { padding: var(--bt-space-2) 0; border-top: 1px solid var(--bt-color-border); font-size: var(--bt-font-size-13); }
+.pc-preco tbody tr:first-child th, .pc-preco tbody tr:first-child td { border-top: 0; }
+.pc-preco th { text-align: left; font-weight: var(--bt-font-weight-medium); color: var(--bt-color-text-secondary); }
+.pc-preco td { text-align: right; font-weight: var(--bt-font-weight-semibold); }
+.pc-preco tfoot th, .pc-preco tfoot td { font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); }
+
+.pc-det__anterior { margin: var(--bt-space-2) 0 0; font-size: var(--bt-font-size-12); color: var(--bt-color-warning); font-weight: var(--bt-font-weight-semibold); }
+.pc-det__voucher { align-self: flex-start; text-decoration: none; }
+.pc-det__nota { margin: var(--bt-space-3) 0 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.pc-det__form { display: flex; flex-direction: column; gap: var(--bt-space-3); margin-top: var(--bt-space-3); }
+
+.pc-det__acoes { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--bt-space-2); width: 100%; }
+.pc-det__aprovado { display: flex; align-items: center; gap: var(--bt-space-2); margin: 0; font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-success); }
+
+.pc-conversa { --bt-gap: var(--bt-space-2); list-style: none; margin: 0; padding: 0; }
+.pc-msg {
+  max-width: 88%;
+  padding: var(--bt-space-2-5) var(--bt-space-3);
+  border-radius: var(--bt-radius-md);
+  background-color: var(--bt-color-surface-neutral);
+  border: 1px solid var(--bt-color-border);
+}
+/* Lado da Betinhos à esquerda em azul suave; o cliente à direita em neutro: posição + rótulo, não só cor. */
+.pc-msg--betinhos { align-self: flex-start; background-color: var(--bt-color-action-soft); border-color: transparent; }
+.pc-msg--cliente { align-self: flex-end; }
+.pc-msg--nova { animation: pc-msg-entra var(--bt-duration-normal) var(--bt-ease-out); }
+.pc-msg__autor { display: flex; flex-wrap: wrap; gap: var(--bt-space-2); margin: 0; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); }
+.pc-msg__quando { font-weight: var(--bt-font-weight-medium); color: var(--bt-color-text-secondary); }
+.pc-msg__motivo { margin: var(--bt-space-0-5) 0 0; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-secondary); }
+.pc-msg__texto { margin: var(--bt-space-1) 0 0; font-size: var(--bt-font-size-13); white-space: pre-wrap; }
+
+@keyframes pc-msg-entra {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 560px) {
+  .pc-det__dados { grid-template-columns: minmax(0, 1fr); }
+  .pc-det__acoes > * { flex: 1 1 auto; }
+}
