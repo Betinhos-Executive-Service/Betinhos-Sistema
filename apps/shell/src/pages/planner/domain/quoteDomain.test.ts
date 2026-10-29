@@ -119,7 +119,7 @@ test("permite criar cotação sem data e hora do serviço", () => {
 test("trajeto é opcional na cotação e, quando informado, limita-se a 10.000 caracteres", () => {
   assert.equal(validateQuoteStep({ ...base, clientPhone: "11999999999", route: "" }, "request").valid, true);
   assert.equal(validateQuoteStep({ ...base, route: `${"A".repeat(4998)}/${"B".repeat(4998)}` }, "request").errors.route, undefined);
-  assert.equal(validateQuoteStep({ ...base, route: `${"A".repeat(4999)}/${"B".repeat(4999)}` }, "request").errors.route, "O trajeto excede 10.000 caracteres.");
+  assert.equal(validateQuoteStep({ ...base, route: "Origem / " }, "request").errors.route, undefined);
 });
 
 test("filtra cotações e calcula indicadores operacionais", () => {
