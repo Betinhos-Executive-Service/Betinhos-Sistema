@@ -255,4 +255,20 @@ $msg = Falha-Com { Assert-CoberturaDaFoto $fotoOk @{ f1 = $true; f2 = $true } @{
 Confere ($msg -like '*fluxos*(1): f2*' -and $msg -like '*steps*(1): s9*') 'foto: fluxo e step sem estado falham com os ids'
 Confere ((Falha-Com { Assert-CoberturaDaFoto @{ componentes = @{}; fluxos = @{}; steps = @{} } @{} @{} }) -like '*0 componentes*') 'foto: 0 componentes falha'
 
+# Publicacao no TEST: versao seguinte, solucoes escolhidas na ordem de import e import so no TEST
+Confere ((Get-VersaoSeguinte '1.0.0.4') -eq '1.0.0.5' -and (Get-VersaoSeguinte '2.1.0.99') -eq '2.1.0.100') 'versao seguinte sobe a revisao'
+Confere ((Falha-Com { Get-VersaoSeguinte '1.0' }) -like '*fora do formato*') 'versao fora do formato falha'
+Confere ((@(Get-SolucoesEscolhidas '') -join ',') -eq 'BetinhosCore,BetinhosAutomacao,BetinhosInterface,BetinhosMotoristas') 'lista vazia = as 4 na ordem'
+Confere ((@(Get-SolucoesEscolhidas ' BetinhosMotoristas, BetinhosCore ') -join ',') -eq 'BetinhosCore,BetinhosMotoristas') 'lista escolhida volta na ordem de import'
+Confere ((Falha-Com { Get-SolucoesEscolhidas 'AppBetinhos' }) -like '*fora das 4*AppBetinhos*') 'solucao fora das 4 falha'
+Confere ($null -eq (Falha-Com { Assert-HostTest $dvTest })) 'import: host do TEST passa'
+Confere ((Falha-Com { Assert-HostTest @{ Host = 'orgf261ae8e.crm2.dynamics.com' } }) -like '*so e permitido no TEST*') 'import: PROD recusado'
+Confere ((Falha-Com { Assert-HostTest $dv }) -like '*so e permitido no TEST*') 'import: DEV recusado'
+$script:respostas = @([pscustomobject]@{ value = @([pscustomobject]@{ version = '1.0.0.4' }) }, [pscustomobject]@{ value = @([pscustomobject]@{ version = '1.0.0.5' }) })
+Confere (Wait-VersaoInstalada $dvTest 'BetinhosCore' '1.0.0.5' 1 0) 'espera a versao chegar depois de o pac perder a conexao'
+$script:respostas = @([pscustomobject]@{ value = @([pscustomobject]@{ version = '1.0.0.4' }) })
+Confere (-not (Wait-VersaoInstalada $dvTest 'BetinhosCore' '1.0.0.5' 0 0)) 'versao que nao chega devolve falso'
+$script:respostas = @([pscustomobject]@{ value = @() })
+Confere ($null -eq (Get-VersaoInstalada $dvTest 'BetinhosCore')) 'solucao ausente: versao nula'
+
 if ($falhas) { throw "$falhas teste(s) falharam" }
