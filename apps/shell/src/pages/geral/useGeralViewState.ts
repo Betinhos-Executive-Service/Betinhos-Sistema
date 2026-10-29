@@ -30,6 +30,8 @@ type Options = {
   renameView: (name: string) => Promise<void>
   deleteView: () => Promise<void>
   kv: KV
+  /** Colunas virtuais que o painel oferece, mas que só aparecem quando o usuário liga (ex.: Portal). */
+  hiddenByDefault?: string[]
 }
 
 const sortKey = (column: { attribute: string; alias: string | null }) => (column.alias ? `${column.alias}.${column.attribute}` : column.attribute)
@@ -49,15 +51,15 @@ function fromViewSort(sort: ViewSort, columns: Column[]): Sort {
 }
 
 /** Configuração da visão como ela veio do Dataverse: colunas do layout, ordem da própria visão, sem filtros avulsos. */
-function baselineOf(columns: Column[]): ViewConfig {
-  return { v: 1, columns: columns.map((c) => ({ key: c.key, visible: true })), sort: null, filters: {} }
+function baselineOf(columns: Column[], hidden: Set<string>): ViewConfig {
+  return { v: 1, columns: columns.map((c) => ({ key: c.key, visible: !hidden.has(c.key) })), sort: null, filters: {} }
 }
 
 /**
  * Ordem e visibilidade a partir das preferências locais; largura só quando o usuário mudou. Colunas adicionadas
  * (`x__…`) aparecem com a chave `x:` e o rótulo guardado, para o painel tratá-las como adicionadas (✕ para remover).
  */
-function configOf(columns: Column[], prefs: ColumnPrefs | null, sort: Sort, filters: TableFilters): ViewConfig {
+function configOf(columns: Column[], prefs: ColumnPrefs | null, sort: Sort, filters: TableFilters, hidden: Set<string>): ViewConfig {
   const ordered = prefs ? applyColumnPrefs(columns, { order: prefs.order, hidden: [] }) : columns
   const extras = extraKeysOf(prefs)
   const labels = new Map((prefs?.extra ?? []).map((e) => [e.key, e.label]))
@@ -67,7 +69,7 @@ function configOf(columns: Column[], prefs: ColumnPrefs | null, sort: Sort, filt
       const width = prefs?.widths?.[c.key]
       const key = configKey(c.key, extras)
       const label = key !== c.key ? labels.get(key) : undefined
-      return { key, visible: !prefs?.hidden.includes(c.key), ...(width ? { width } : {}), ...(label ? { label } : {}) }
+      return { key, visible: prefs ? !prefs.hidden.includes(c.key) : !hidden.has(c.key), ...(width ? { width } : {}), ...(label ? { label } : {}) }
     }),
     sort: toViewSort(sort, extras),
     filters: storedFilters(filters),
@@ -82,8 +84,10 @@ function configOf(columns: Column[], prefs: ColumnPrefs | null, sort: Sort, filt
 export function useGeralViewState(o: Options): { state: TableViewState; columnDefs: ViewColumnDef[] } {
   // Base da visão sem as colunas adicionadas: é o que "Restaurar colunas" devolve.
   const extraKeys = useMemo(() => extraKeysOf(o.prefs), [o.prefs])
-  const baseline = useMemo(() => baselineOf(o.columns.filter((c) => !extraKeys.has(c.key))), [o.columns, extraKeys])
-  const config = useMemo(() => configOf(o.columns, o.prefs, o.sort, o.filters), [o.columns, o.prefs, o.sort, o.filters])
+  const hiddenKey = (o.hiddenByDefault ?? []).join(',')
+  const hidden = useMemo(() => new Set(hiddenKey ? hiddenKey.split(',') : []), [hiddenKey])
+  const baseline = useMemo(() => baselineOf(o.columns.filter((c) => !extraKeys.has(c.key)), hidden), [o.columns, extraKeys, hidden])
+  const config = useMemo(() => configOf(o.columns, o.prefs, o.sort, o.filters, hidden), [o.columns, o.prefs, o.sort, o.filters, hidden])
   // Colunas adicionadas ficam fora das definições: o painel usa o rótulo guardado na visão e oferece ✕.
   const columnDefs = useMemo<ViewColumnDef[]>(() => o.columns.filter((c) => !extraKeys.has(c.key)).map((c) => ({ key: c.key, label: columnLabel(c, o.attributes?.get(c.key)) })), [o.columns, o.attributes, extraKeys])
 
@@ -100,14 +104,14 @@ export function useGeralViewState(o: Options): { state: TableViewState; columnDe
 
   const { setPrefs, setSort, setFilters, columns, prefs, sort, filters } = o
   const setConfig = useCallback((update: (c: ViewConfig) => ViewConfig) => {
-    const current = configOf(columns, prefs, sort, filters)
+    const current = configOf(columns, prefs, sort, filters, hidden)
     const next = update(current)
     if (JSON.stringify(next.columns) !== JSON.stringify(current.columns)) {
       // Colunas `x:` que o layout da visão ainda não tem vão para `extra` (a tela as liga no FetchXML).
       const layout = new Set(baseline.columns.map((c) => c.key))
       const extra = next.columns.filter((c) => c.key.startsWith('x:') && !layout.has(fromConfigKey(c.key))).map((c) => ({ key: c.key, label: c.label ?? c.key }))
       const keys = next.columns.map((c) => ({ ...c, key: fromConfigKey(c.key) }))
-      const untouched = !extra.length && keys.length === baseline.columns.length && keys.every((c, i) => c.key === baseline.columns[i]?.key && c.visible && !c.width)
+      const untouched = !extra.length && keys.length === baseline.columns.length && keys.every((c, i) => c.key === baseline.columns[i]?.key && c.visible === baseline.columns[i]?.visible && !c.width)
       if (untouched) setPrefs(null)
       else {
         const widths = Object.fromEntries(keys.flatMap((c) => (c.width ? [[c.key, c.width]] : [])))
@@ -119,7 +123,7 @@ export function useGeralViewState(o: Options): { state: TableViewState; columnDe
       const raw = next.filters as Partial<TableFilters>
       setFilters(raw && raw.quick && raw.advanced ? (raw as TableFilters) : emptyFilters())
     }
-  }, [columns, prefs, sort, filters, baseline, setPrefs, setSort, setFilters])
+  }, [columns, prefs, sort, filters, hidden, baseline, setPrefs, setSort, setFilters])
 
 
   const { selectView, reloadViews, createView, updateView, renameView, deleteView } = o
