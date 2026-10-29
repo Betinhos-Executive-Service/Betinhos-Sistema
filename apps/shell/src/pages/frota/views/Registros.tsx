@@ -1,8 +1,9 @@
 import { Plus } from 'lucide-react'
 import { useMemo } from 'react'
-import { Button, EmptyState, SearchBox, SegmentedControl, StatusBadge as Badge, Table, TableTitle, ViewBar } from '@betinhos/ui'
+import { Button, EmptyState, SearchBox, SegmentedControl, StatusBadge as Badge, TableTitle, ViewBar } from '@betinhos/ui'
 import type { Host } from '../../../host'
 import { LazyFooter, useLazySlice } from '../../../app/LazyList'
+import { VirtualTable } from '../../../app/VirtualTable'
 import { useDebouncedText } from '../../../app/search'
 import { filterRows } from '../../../app/filterRows'
 import { useListView } from '../../../app/useListView'
@@ -94,7 +95,7 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload }
           <Button size="compact" variant="action" icon={<Plus size={16} />} onClick={() => void novo()}>Novo registro</Button>
         </ViewBar>
       </div>
-      <Table<Linha>
+      <VirtualTable<Linha>
         rows={slice}
         rowKey={(linha) => linha.id}
         onRowClick={(linha) => onOpen(linha.kind, linha.id)}

@@ -1,5 +1,6 @@
 import type { MouseEvent, ReactNode } from 'react'
-import { Table, type MenuAction, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
+import { type MenuAction, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
+import { VirtualTable } from '../../../app/VirtualTable'
 import { ExternalLink } from 'lucide-react'
 import { formatDate, formatMoney } from '../domain/messages'
 import { hasFalha, label, statusTone } from '../domain/status'
@@ -55,7 +56,7 @@ export function PagantesTable({ list, choices, contatos, onOpen, loading, view, 
   ]
   return (
     <div className="pg-table-wrap" onClick={(event) => openFromRow(event, '.bt-table__row', '.pg-open')}>
-      <Table className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} rowActions={openRowActions(onOpen)} severity={severity} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <VirtualTable className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} rowActions={openRowActions(onOpen)} severity={severity} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }
