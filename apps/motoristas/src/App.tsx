@@ -1,45 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
-import {
-  findFirstPendingServiceDetail,
-  getInitialDetail,
-  getInitialParams,
-  getInitialTermoMultaId,
-  initialStore,
-  isSameDetail,
-  loadStore,
-  STORAGE_KEY
-} from "./app/bootstrap";
-import { useHardwareBackGuard } from "./app/backGuard";
-import { BuildStamp } from "./components/layout/BuildStamp";
-import {
-  AUTO_REFRESH_INTERVAL_MS,
-  buildHashRoute,
-  getScreenMotion,
-  isHashRoutingEnabled,
-  parseHashRoute,
-  shouldAutoRefreshScreen,
-  type HashRoute
-} from "./app/navigation";
-import {
-  getDriverContext,
-  getDriverCurrentVehicleId,
-  loadExpenseReferenceDataRemote,
-  loadReceiptClienteOptionsRemote,
-  loadMaintenanceRequestVehiclesRemote,
-  loadActiveFleetRemote,
-  prefetchExpenseReferenceDataRemote,
-  type DriverContext,
-  type MaintenanceRequestVehicleOption
-} from "./lib/dataverse";
-import { isStandaloneWebResourceRuntime } from "./lib/dataverse";
-import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "./data/dataverse/fetchWebApi";
-import { getQrChargeSummaryRemote } from "./lib/dataverse";
-import { getReceivableCents } from "./features/recebimento/qrCharge";
-import { IDEA_STATUS, type Idea, type IdeaDraft } from "./features/ideias/ideas";
-import { APP_CONNECTION_LOST_MESSAGE, APP_OPERATION_ERROR_MESSAGE, reportAppError, type AppErrorNotice } from "./lib/appErrorLogger";
+import { useMemo, useRef, useState } from "react";
+import { getInitialParams } from "./app/bootstrap";
+import { isHashRoutingEnabled } from "./app/navigation";
+import type { DriverContext, MaintenanceRequestVehicleOption } from "./lib/dataverse";
 import { useDados } from "./app/DataProvider";
-import type { ReceiptEntrySource } from "./features/recibo/origem";
+import { AppShell } from "./app/AppShell";
+import { resetDadosLocais } from "./app/resetDadosLocais";
+import { useEstadoInicial } from "./app/useEstadoInicial";
+import { useCarregarRascunhoMidia } from "./app/useCarregarRascunhoMidia";
+import { useAvisosGlobais } from "./app/useAvisosGlobais";
+import { useNavegacao } from "./app/useNavegacao";
+import { useDadosFormularios } from "./app/useDadosFormularios";
+import { useAutoRefreshAgenda } from "./features/servicos/useAutoRefreshAgenda";
+import { usePersistenciaRascunhos } from "./app/usePersistenciaRascunhos";
+import { useAvisos } from "./app/useAvisos";
 import { rotasMeuCarro } from "./features/meu-carro/rotas";
 import { rotasIdeias } from "./features/ideias/rotas";
 import { rotasChecklist } from "./features/checklist/rotas";
@@ -57,57 +30,29 @@ import { rotasColisao } from "./features/colisao/rotas";
 import { rotasDespesas } from "./features/despesas/rotas";
 import { useServiceDeepLink } from "./features/servicos/useServiceDeepLink";
 import { useAgendaLoad } from "./features/servicos/useAgendaLoad";
+import { useFilaServicos } from "./features/servicos/useFilaServicos";
 import { useFinalizeFlow } from "./features/finalizar/useFinalizeFlow";
+import { useMaintenanceFinalizePhoto } from "./features/finalizar/useMaintenanceFinalizePhoto";
 import { useReceiveFlow } from "./features/recebimento/useReceiveFlow";
+import { useQrChargeSummary } from "./features/recebimento/useQrChargeSummary";
+import { useReciboPersonalizado } from "./features/recibo/useReciboPersonalizado";
 import { useMaintenanceRequestFlow } from "./features/manutencao/useMaintenanceRequestFlow";
 import { useCollisionFlow } from "./features/colisao/useCollisionFlow";
 import { useComunicados } from "./features/comunicados/useComunicados";
+import { useComunicadoDeepLink } from "./features/comunicados/useComunicadoDeepLink";
 import { useChecklists } from "./features/checklist/useChecklists";
 import { useTermosMulta } from "./features/termos/useTermosMulta";
-import { isComunicadoPending, isMockComunicados } from "./features/comunicados/comunicados";
+import { useIdeasGateway } from "./features/ideias/useIdeasGateway";
+import { isComunicadoPending } from "./features/comunicados/comunicados";
 import { isChecklistPending } from "./features/checklist/checklists";
-import { clearMediaDraft, loadMediaDraft, saveMediaDraft, touchMediaDraft } from "./features/fotos/mediaDraftStore";
-import { ExpenseSendOverlay } from "./features/despesas/ExpenseSendOverlay";
 import { useExpenseFlow } from "./features/despesas/useExpenseFlow";
-
-import type { LocalStore } from "./lib/localWorkflow";
-import { LocalToast, type ToastState, type ToastTone } from "./components/common/LocalToast";
-import { LoadingOverlay, type LoadingOverlayState } from "./components/common/LoadingOverlay";
-import { getVisibleLoadingOverlay } from "./app/overlayLayering";
 import { resumoPendentes, separarTermos } from "./features/termos/termosMulta";
 import { ButtonPreviewScreen } from "./screens/ButtonPreviewScreen";
 import { InitialScreen } from "./features/servicos/InitialScreen";
 import { ReceiptPreviewScreen } from "./features/recibo/ReceiptScreen";
-import { VehicleChoiceDialog } from "./features/detalhe/VehicleChoiceDialog";
 import { isThirdPartyDriver } from "./features/meu-carro/myVehicle";
-import { MOCK_FLEET } from "./lib/serviceVehicleInfleetMock";
-
-// Referência estável: o diálogo compara com a lista exibida para saber se oferece "Nenhuma das opções".
-const loadMockAllFleet = async () => MOCK_FLEET;
-import { createEmptyCollisionDraft } from "./features/colisao/collisions";
-import { revokePreviewUrl } from "./features/fotos/mediaDrafts";
 import type { DetailData, MaintenancePhotoKind, Screen } from "./types";
-import { exchangeUserError } from "./features/servicos/trocaErros";
-import { FlowProgressOverlay, type RemoteOperation } from "./shared/ui/FlowProgressOverlay";
-import { findDetailFromHashRoute, getInitialScreenFromHashRoute } from "./app/rotaInicial";
-import { inferToastTone } from "./shared/ui/toastTone";
-import { wait } from "./shared/wait";
-import { isTrueLike } from "./shared/isTrueLike";
-import {
-  loadFinalizeDraftAssets,
-  serializeReceiveProofs,
-  FINALIZE_DRAFT_ASSETS_STORAGE_KEY,
-  SERVICE_OBSERVATION_DRAFTS_KEY,
-  VOUCHER_DRAFTS_STORAGE_KEY,
-  type PersistedFinalizeDraftAssets
-} from "./features/finalizar/rascunhos";
-import { revokePhotoPreviewUrls } from "./features/fotos/envioMidia";
-import { EMPTY_MAINTENANCE_REQUEST_DRAFT } from "./features/manutencao/rascunho";
-import { EMPTY_EXPENSE_DRAFT } from "./features/despesas/rascunho";
-import { EMPTY_MAINTENANCE_FINALIZE_DRAFT } from "./features/finalizar/rascunhoManutencao";
-import { LOCAL_RECEIPT_CLIENT_MOCKS } from "./features/recibo/clientesMock";
-
-const DATA_LOADING_SUCCESS_DURATION_MS = 420;
+import type { RemoteOperation } from "./shared/ui/FlowProgressOverlay";
 
 function App() {
   // Dados pela porta (src/data/porta.ts): o adaptador vem da entrada do app (main.tsx) e não muda
@@ -122,343 +67,137 @@ function App() {
     () => isHashRoutingEnabled() && !isButtonPreviewMode && !isReceiptPreviewMode,
     [isButtonPreviewMode, isReceiptPreviewMode]
   );
-  const [store, setStore] = useState<LocalStore>(() => {
-    const localStore = loadStore();
-    const savedAssets = loadFinalizeDraftAssets();
-    return {
-      ...localStore,
-      signatures: { ...localStore.signatures, ...savedAssets.signatures },
-      photos: { ...localStore.photos, ...savedAssets.photos }
-    };
-  });
-  const initialHashRouteRef = useRef<HashRoute | null>(hashRoutingActive ? parseHashRoute(window.location.hash) : null);
-  const initialHashDetail = initialHashRouteRef.current ? findDetailFromHashRoute(store, initialHashRouteRef.current) : null;
-  const initialDetailRef = useRef<DetailData | null>(initialHashRouteRef.current ? initialHashDetail : getInitialDetail(store));
-  const initialScreen = initialHashRouteRef.current
-    ? getInitialScreenFromHashRoute(initialHashRouteRef.current, initialHashDetail)
-    : (initialDetailRef.current ? "detalhes" : getInitialTermoMultaId() ? "multas" : "inicio");
+  const { initialDetailRef, initialHashDetail, initialHashRouteRef, initialScreen, setStore, store } = useEstadoInicial(hashRoutingActive);
   const [screen, setScreen] = useState<Screen>(initialScreen);
   const previousScreenRef = useRef<Screen>(initialScreen);
   const lastMediaScreenRef = useRef<Screen>(initialScreen);
-  const [mediaDraftLoaded, setMediaDraftLoaded] = useState(false);
   const [selectedDetail, setSelectedDetail] = useState<DetailData | null>(() => initialDetailRef.current);
-  const [receiptEntrySource, setReceiptEntrySource] = useState<ReceiptEntrySource>(
-    () => initialScreen === "reciboPersonalizado" && initialHashDetail ? "service" : "home"
-  );
-  const [maintenancePhotoKind, setMaintenancePhotoKind] = useState<MaintenancePhotoKind>("NOTAFISCAL");
-  const [photoDraft, setPhotoDraft] = useState<string | null>(null);
-  const [photoDraftPreviewUrl, setPhotoDraftPreviewUrl] = useState("");
-  const [photoDraftRawBlob, setPhotoDraftRawBlob] = useState<Blob | null>(null);
-  const [photoDraftIsVideo, setPhotoDraftIsVideo] = useState(false);
-  const [toast, setToastState] = useState<ToastState | null>(null);
-  const [dataLoading, setDataLoading] = useState<LoadingOverlayState | null>(null);
-  const [criticalError, setCriticalErrorState] = useState("");
+  const fotoManutencao = useMaintenanceFinalizePhoto({ setScreen });
+  const avisos = useAvisos({ screen, selectedDetail });
+  const { logAppError, setCriticalError, setDataLoadingState, setToast } = avisos;
   const [completingDetailKey, setCompletingDetailKey] = useState("");
-  const [queueHighlightDetailKey, setQueueHighlightDetailKey] = useState("");
+  const fila = useFilaServicos({ selectedDetail, setScreen, setToast, store });
+  const { blockIfNotFirstPending } = fila;
   const [remoteOperation, setRemoteOperation] = useState<RemoteOperation | null>(null);
   const [remoteMode, setRemoteMode] = useState(false);
   const [driverContext, setDriverContext] = useState<DriverContext | null>(null);
+  const recibo = useReciboPersonalizado({
+    driverContext,
+    inicial: initialScreen === "reciboPersonalizado" && initialHashDetail ? "service" : "home",
+    isLocalhostRuntime,
+    selectedDetail,
+    setScreen,
+    setToast
+  });
+  const { canGeneratePersonalReceipt, openPersonalReceipt, openPersonalReceiptFromHome } = recibo;
   const pendingServiceDeepLinkRef = useRef(getInitialParams());
   // true quando o deep link de serviço já abriu a tela; o fluxo pós-carga não deve sobrescrever a navegação.
   const serviceDeepLinkHandledRef = useRef(false);
   const [maintenanceVehicles, setMaintenanceVehicles] = useState<MaintenanceRequestVehicleOption[]>([]);
   const [maintenanceCurrentVehicleId, setMaintenanceCurrentVehicleId] = useState("");
   const [maintenanceVehiclesLoading, setMaintenanceVehiclesLoading] = useState(false);
+  const veiculos = { maintenanceCurrentVehicleId, maintenanceVehicles, maintenanceVehiclesLoading };
   const manutencao = useMaintenanceRequestFlow({
-    // Funções intermediárias para o que o App declara mais abaixo; só rodam nos handlers.
-    logAppError: (...args) => logAppError(...args),
+    logAppError,
     maintenanceCurrentVehicleId,
     remoteMode,
     remoteOperation,
-    setCriticalError: (...args) => setCriticalError(...args),
+    setCriticalError,
     setRemoteOperation,
     setScreen,
-    setToast: (...args) => setToast(...args)
+    setToast
   });
-  const {
-    clearMaintenanceRequestPhotoDraftState,
-    maintenanceRequestPhotos,
-    setMaintenanceRequestDraft,
-    setMaintenanceRequestPhotos,
-    setMaintenanceRequestPreviewPhotoId
-  } = manutencao;
   const despesas = useExpenseFlow({
     remoteMode,
     driverContext,
     remoteOperation,
     setRemoteOperation,
     setScreen,
-    // Funções intermediárias: declaradas mais abaixo no App, só rodam nos handlers e efeitos.
-    setToast: (message, tone) => setToast(message, tone),
-    setCriticalError: (message) => setCriticalError(message),
-    logAppError: (error, action, phase) => logAppError(error, action, phase)
+    setToast,
+    setCriticalError,
+    logAppError
   });
-  const {
-    checkReceiveProof,
-    clearExpensePhotoDraftState,
-    closeExpenseSendError,
-    expenseDraft,
-    expensePhotos,
-    expenseReferenceData,
-    expenseReferenceError,
-    expenseReferenceLoading,
-    expenseSend,
-    expenseUploadStatuses,
-    isExpenseDraftBlank,
-    openExpenseCamera,
-    resetExpenseQuickRead,
-    setExpenseDraft,
-    setExpensePhotos,
-    setExpensePreviewPhotoId,
-    setExpenseReferenceData,
-    setExpenseReferenceError,
-    setExpenseReferenceLoading
-  } = despesas;
+  const { expenseReferenceData, expenseReferenceError, expenseReferenceLoading } = despesas;
   const [receiptClienteOptions, setReceiptClienteOptions] = useState<string[]>([]);
   const recebimento = useReceiveFlow({
-    // Funções intermediárias para o que o App declara mais abaixo; só rodam nos handlers.
-    blockIfNotFirstPending: (...args) => blockIfNotFirstPending(...args),
-    checkReceiveProof,
+    blockIfNotFirstPending,
+    checkReceiveProof: despesas.checkReceiveProof,
     driverContext,
     isLocalhostRuntime,
-    logAppError: (...args) => logAppError(...args),
+    logAppError,
     remoteMode,
     remoteOperation,
     screen,
     selectedDetail,
-    setCriticalError: (...args) => setCriticalError(...args),
+    setCriticalError,
     setRemoteOperation,
     setScreen
   });
-  const {
-    clearReceivePhotoDraftState,
-    continueAfterReceive,
-    getQrChargeProps,
-    openReceiveCamera,
-    openReceiveFlow,
-    openReceivePreview,
-    qrChargeSummaryInFlightRef,
-    qrChargeSummaryNeeded,
-    qrChargeSummaryRequest,
-    receiveProofs,
-    receiveStepPending,
-    setQrChargeSummaries,
-    setReceiveProofs,
-    setReceiveUploadedCounts
-  } = recebimento;
+  const { continueAfterReceive, getQrChargeProps, openReceiveCamera, openReceivePreview, receiveProofs, receiveStepPending } = recebimento;
   const colisao = useCollisionFlow({
-    // Funções intermediárias para o que o App declara mais abaixo; só rodam nos handlers.
     driverContext,
-    logAppError: (...args) => logAppError(...args),
+    logAppError,
     maintenanceCurrentVehicleId,
     remoteMode,
     remoteOperation,
-    setCriticalError: (...args) => setCriticalError(...args),
+    setCriticalError,
     setRemoteOperation,
     setScreen,
-    setToast: (...args) => setToast(...args)
+    setToast
   });
-  const {
-    clearCollisionPhotoDraftState,
-    collisionPhotos,
-    setCollisionDraft,
-    setCollisionPhotos,
-    setCollisionPreviewPhotoId
-  } = colisao;
-  useEffect(() => {
-    if (isButtonPreviewMode || isReceiptPreviewMode) return;
-    let active = true;
-    void loadMediaDraft<PersistedFinalizeDraftAssets>().then((saved) => {
-      if (!active || !saved) return;
-      setStore((current) => ({
-        ...current,
-        signatures: { ...current.signatures, ...saved.signatures },
-        photos: { ...current.photos, ...saved.photos }
-      }));
-      setReceiveProofs((current) => ({ ...current, ...saved.receiveProofs }));
-    }).catch((error) => reportAppError(error, { severity: "warning", source: "app", action: "loadFinalizeDraftAssets", phase: "indexedDB", screen }))
-      .finally(() => { if (active) setMediaDraftLoaded(true); });
-    return () => { active = false; };
-  }, [isButtonPreviewMode, isReceiptPreviewMode]);
-  const [maintenanceExistingPreview, setMaintenanceExistingPreview] = useState(false);
+  const mediaDraftLoaded = useCarregarRascunhoMidia({
+    isButtonPreviewMode,
+    isReceiptPreviewMode,
+    screen,
+    setReceiveProofs: recebimento.setReceiveProofs,
+    setStore
+  });
   const completingClearTimerRef = useRef<number | null>(null);
-  const queueHighlightTimerRef = useRef<number | null>(null);
   const finalizar = useFinalizeFlow({
-    // Funções intermediárias para o que o App declara mais abaixo; só rodam nos handlers.
-    blockIfNotFirstPending: (...args) => blockIfNotFirstPending(...args),
+    blockIfNotFirstPending,
     completingClearTimerRef,
     dados,
     driverContext,
-    logAppError: (...args) => logAppError(...args),
+    logAppError,
     receiveProofs,
     receiveStepPending,
     remoteMode,
     remoteOperation,
     selectedDetail,
     setCompletingDetailKey,
-    setCriticalError: (...args) => setCriticalError(...args),
-    setReceiveProofs,
-    setReceiveUploadedCounts,
+    setCriticalError,
+    setReceiveProofs: recebimento.setReceiveProofs,
+    setReceiveUploadedCounts: recebimento.setReceiveUploadedCounts,
     setRemoteOperation,
     setScreen,
     setSelectedDetail,
     setStore,
-    setToast: (...args) => setToast(...args),
+    setToast,
     store
   });
-  const {
-    cancelVehicleChoice,
-    closeVehicleChoice,
-    finalizeSelected,
-    finalizeTimerRef,
-    getServiceObservationDraft,
-    openFinalizeFlow,
-    openLocalCancelFlow,
-    openVoucherFlow,
-    saveSelectedServiceObservation,
-    saveVoucherDraft,
-    setMaintenanceFinalizeDraft,
-    setServiceObservationDrafts,
-    setVoucherDrafts,
-    vehicleChoiceRequest,
-    voucherDraftTimerRef,
-    voucherDrafts
-  } = finalizar;
+  const { finalizeSelected, getServiceObservationDraft, openFinalizeFlow, openLocalCancelFlow, openVoucherFlow, saveSelectedServiceObservation, saveVoucherDraft, voucherDrafts } = finalizar;
   const lastGlobalErrorRef = useRef<{ id: string; at: number }>({ id: "", at: 0 });
 
-  const clearMaintenanceFinalizePhotoDraft = (keepPreviewUrl = false) => {
-    if (!keepPreviewUrl) revokePreviewUrl(photoDraftPreviewUrl);
-    setPhotoDraft(null);
-    setPhotoDraftPreviewUrl("");
-    setPhotoDraftRawBlob(null);
-    setPhotoDraftIsVideo(false);
-  };
-
-  const logAppError = (error: unknown, action: string, phase = "") => {
-    reportAppError(error, {
-      severity: "error",
-      source: "app",
-      action,
-      phase,
-      screen,
-      detailId: selectedDetail?.id,
-      detailType: selectedDetail?.type
-    });
-  };
-
-  const setToast = (message: string, tone?: ToastTone) => {
-    const trimmed = /failed to fetch|não foi possível conectar ao servidor|nao foi possivel conectar ao servidor|offline/i.test(message)
-      ? APP_OPERATION_ERROR_MESSAGE
-      : message.trim();
-    if (!trimmed) {
-      setToastState(null);
-      return;
-    }
-
-    setToastState({
-      id: Date.now() + Math.floor(Math.random() * 1000),
-      message: trimmed,
-      tone: tone ?? inferToastTone(trimmed)
-    });
-  };
-
-  const setCriticalError = (message: string) => setCriticalErrorState(message ? APP_OPERATION_ERROR_MESSAGE : "");
-
-  const setDataLoadingState = (loading: LoadingOverlayState | null) => {
-    if (loading) setToastState(null);
-    setDataLoading(loading);
-  };
-
-  const completeDataLoadingState = async (title: string, message?: string) => {
-    setDataLoadingState({
-      phase: "success",
-      title,
-      message
-    });
-    await wait(DATA_LOADING_SUCCESS_DURATION_MS);
-    setDataLoadingState(null);
-  };
-
-  useEffect(() => {
-    if (isButtonPreviewMode || isReceiptPreviewMode) return;
-    if (remoteMode) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...store, photos: {}, signatures: {} }));
-    } catch (error) {
-      reportAppError(error, {
-        severity: "warning",
-        source: "app",
-        action: "persistLocalStore",
-        phase: "localStorage",
-        screen
-      });
-    }
-  }, [isButtonPreviewMode, isReceiptPreviewMode, remoteMode, screen, store]);
-
-  useEffect(() => {
-    if (isButtonPreviewMode || isReceiptPreviewMode) return;
-    try {
-      localStorage.setItem(VOUCHER_DRAFTS_STORAGE_KEY, JSON.stringify(voucherDrafts));
-    } catch (error) {
-      reportAppError(error, {
-        severity: "warning",
-        source: "app",
-        action: "persistVoucherDrafts",
-        phase: "localStorage",
-        screen
-      });
-    }
-  }, [isButtonPreviewMode, isReceiptPreviewMode, screen, voucherDrafts]);
-
-  useEffect(() => {
-    if (isButtonPreviewMode || isReceiptPreviewMode || !mediaDraftLoaded) return;
-    const payload = {
-        signatures: store.signatures,
-        photos: store.photos,
-        receiveProofs: serializeReceiveProofs(receiveProofs)
-      } satisfies PersistedFinalizeDraftAssets;
-    void saveMediaDraft(payload).then(() => localStorage.removeItem(FINALIZE_DRAFT_ASSETS_STORAGE_KEY)).catch((error) => {
-      reportAppError(error, {
-        severity: "warning",
-        source: "app",
-        action: "persistFinalizeDraftAssets",
-        phase: "indexedDB",
-        screen
-      });
-      setToast(exchangeUserError(error), "warning");
-    });
-  }, [isButtonPreviewMode, isReceiptPreviewMode, mediaDraftLoaded, store.photos, store.signatures, receiveProofs]);
-
-  useEffect(() => {
-    if (lastMediaScreenRef.current === screen) return;
-    lastMediaScreenRef.current = screen;
-    if (isButtonPreviewMode || isReceiptPreviewMode || !mediaDraftLoaded) return;
-    void touchMediaDraft().catch((error) => {
-      reportAppError(error, { severity: "warning", source: "app", action: "touchFinalizeDraftAssets", phase: "indexedDB", screen });
-      setToast(exchangeUserError(error), "warning");
-    });
-  }, [isButtonPreviewMode, isReceiptPreviewMode, mediaDraftLoaded, screen]);
+  usePersistenciaRascunhos({
+    isButtonPreviewMode,
+    isReceiptPreviewMode,
+    lastMediaScreenRef,
+    mediaDraftLoaded,
+    receiveProofs,
+    remoteMode,
+    screen,
+    setToast,
+    store,
+    voucherDrafts
+  });
 
   // Guarda o motorista logado para recarregar comunicados sem depender do estado ainda não aplicado.
   const comunicadosDriverIdRef = useRef("");
   const { termosMulta, termosStatus, reloadTermosMulta } = useTermosMulta(comunicadosDriverIdRef, driverContext?.id);
   const checklistsLista = useChecklists({ dados, driverIdRef: comunicadosDriverIdRef, previewMode: isButtonPreviewMode || isReceiptPreviewMode, setScreen, setToast, setDataLoadingState });
-  const {
-    checklists,
-    selectedChecklistId,
-    setSelectedChecklistId,
-    setChecklistOrigin,
-    reloadChecklists
-  } = checklistsLista;
+  const { checklists, setChecklistOrigin, setSelectedChecklistId } = checklistsLista;
   const comunicadosLista = useComunicados({ dados, driverIdRef: comunicadosDriverIdRef, previewMode: isButtonPreviewMode || isReceiptPreviewMode, setScreen, setDataLoadingState });
-  const {
-    comunicados,
-    comunicadosStatus,
-    setSelectedComunicadoId,
-    setComunicadoOrigin,
-    pendingComunicadoDeepLinkRef,
-    reloadComunicados
-  } = comunicadosLista;
+  const { comunicados, setComunicadoOrigin } = comunicadosLista;
 
   useServiceDeepLink({
     dados,
@@ -473,38 +212,21 @@ function App() {
     setToast
   });
 
-  useEffect(() => {
-    const deepLinkId = pendingComunicadoDeepLinkRef.current;
-    if (!deepLinkId || comunicadosStatus !== "ready") return;
-    pendingComunicadoDeepLinkRef.current = "";
-    if (!comunicados.some((item) => item.id.toLowerCase() === deepLinkId)) return;
-    setSelectedComunicadoId(comunicados.find((item) => item.id.toLowerCase() === deepLinkId)?.id ?? "");
-    setScreen("comunicados");
-  }, [comunicados, comunicadosStatus]);
+  useComunicadoDeepLink({ comunicadosLista, setScreen, setToast });
 
-  useEffect(() => {
-    if (!isMockComunicados()) return;
-    reloadComunicados().catch((error) => {
-      reportAppError(error, { severity: "warning", source: "app", action: "loadMockComunicados" });
-      setToast("Não foi possível carregar os comunicados de teste. Confira o painel de comunicados indicado em ?mockApiPort=.", "warning");
-    });
-  }, []);
-
-  const {
-    refreshLocal
-  } = useAgendaLoad({
-    completeDataLoadingState,
+  const { refreshLocal } = useAgendaLoad({
+    completeDataLoadingState: avisos.completeDataLoadingState,
     comunicadosDriverIdRef,
     dados,
     initialHashRouteRef,
     isButtonPreviewMode,
     isReceiptPreviewMode,
     logAppError,
-    reloadChecklists,
-    reloadComunicados,
+    reloadChecklists: checklistsLista.reloadChecklists,
+    reloadComunicados: comunicadosLista.reloadComunicados,
     remoteMode,
     screen,
-    selectedChecklistId,
+    selectedChecklistId: checklistsLista.selectedChecklistId,
     serviceDeepLinkHandledRef,
     setDataLoadingState,
     setDriverContext,
@@ -515,286 +237,73 @@ function App() {
     setToast,
     store
   });
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToastState(null), toast.tone === "error" ? 3600 : 3000);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
-
-  useEffect(() => {
-    const showConnectionLostPopup = () => setCriticalErrorState(APP_CONNECTION_LOST_MESSAGE);
-
-    const showSessionExpiredPopup = () => setCriticalErrorState(SESSION_EXPIRED_MESSAGE);
-    if (navigator.onLine === false) showConnectionLostPopup();
-    window.addEventListener("offline", showConnectionLostPopup);
-    window.addEventListener(SESSION_EXPIRED_EVENT, showSessionExpiredPopup);
-    return () => {
-      window.removeEventListener("offline", showConnectionLostPopup);
-      window.removeEventListener(SESSION_EXPIRED_EVENT, showSessionExpiredPopup);
-    };
-  }, []);
-
-  useEffect(() => {
-    const onGlobalError = (event: Event) => {
-      const detail = (event as CustomEvent<AppErrorNotice>).detail;
-      if (!detail?.userMessage) return;
-
-      const now = Date.now();
-      if (lastGlobalErrorRef.current.id === detail.id && now - lastGlobalErrorRef.current.at < 4000) return;
-      lastGlobalErrorRef.current = { id: detail.id, at: now };
-
-      if (detail.severity === "critical") {
-        setCriticalError(detail.userMessage);
-        return;
-      }
-
-      const tone: ToastTone =
-        detail.severity === "warning"
-          ? "warning"
-          : detail.severity === "info"
-            ? "info"
-            : "error";
-
-      setToastState({
-        id: now + Math.floor(Math.random() * 1000),
-        message: detail.userMessage,
-        tone
-      });
-    };
-
-    window.addEventListener("appmotoristas:error", onGlobalError as EventListener);
-    return () => window.removeEventListener("appmotoristas:error", onGlobalError as EventListener);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (finalizeTimerRef.current) window.clearTimeout(finalizeTimerRef.current);
-      if (completingClearTimerRef.current) window.clearTimeout(completingClearTimerRef.current);
-      if (voucherDraftTimerRef.current) window.clearTimeout(voucherDraftTimerRef.current);
-    };
-  }, []);
+  useAvisosGlobais({
+    completingClearTimerRef,
+    finalizeTimerRef: finalizar.finalizeTimerRef,
+    lastGlobalErrorRef,
+    setCriticalError,
+    setCriticalErrorState: avisos.setCriticalErrorState,
+    setToastState: avisos.setToastState,
+    toast: avisos.toast,
+    voucherDraftTimerRef: finalizar.voucherDraftTimerRef
+  });
 
   const confirmedMaintenancePhotos = useMemo(() => {
     if (!selectedDetail) return [];
     return Object.keys(store.photos[selectedDetail.id] ?? {}) as MaintenancePhotoKind[];
   }, [selectedDetail, store.photos]);
 
-  const receiptDetail = receiptEntrySource === "service" ? selectedDetail ?? undefined : undefined;
-  const screenMotion = getScreenMotion(screen, previousScreenRef.current);
-  const canGeneratePersonalReceipt =
-    isTrueLike(driverContext?.funcionario?.cr40f_gerarrecibopersonalizado) ||
-    isLocalhostRuntime;
-  useEffect(() => {
-    const detail = qrChargeSummaryRequest;
-    if (!detail || !qrChargeSummaryNeeded) return;
-    const detailId = detail.id;
-    const inFlight = qrChargeSummaryInFlightRef.current;
-    if (inFlight.has(detailId)) return;
-    inFlight.add(detailId);
-    setQrChargeSummaries((current) => ({ ...current, [detailId]: { ...current[detailId], status: "loading", stale: false } }));
-    getQrChargeSummaryRemote(detail.dataverse?.id ?? detail.id, getReceivableCents(detail))
-      .then((summary) => setQrChargeSummaries((current) => ({ ...current, [detailId]: { status: "ready", summary } })))
-      .catch((error) => {
-        // Sem resumo o fluxo segue como antes (foto obrigatória); a tela mostra um aviso discreto.
-        logAppError(error, "qrChargeSummary", detail.type);
-        setQrChargeSummaries((current) => ({ ...current, [detailId]: { ...current[detailId], status: "error" } }));
-      })
-      .finally(() => inFlight.delete(detailId));
-    // A requisição depende só do serviço e de precisar (re)carregar.
-  }, [qrChargeSummaryRequest?.id, qrChargeSummaryNeeded]);
+  useQrChargeSummary({ logAppError, recebimento });
 
-  useEffect(() => {
-    previousScreenRef.current = screen;
-  }, [screen]);
+  useNavegacao({
+    hashRoutingActive,
+    previousScreenRef,
+    receiptDetail: recibo.receiptDetail,
+    screen,
+    selectedDetail
+  });
 
-  // Na URL direta do web resource o gesto Voltar do celular sairia do app.
-  useHardwareBackGuard(screen, hashRoutingActive || isStandaloneWebResourceRuntime());
+  const ideasGateway = useIdeasGateway(dados, remoteMode);
 
-  useEffect(() => {
-    if (!hashRoutingActive) return;
-    const hashDetail = screen ==="reciboPersonalizado" ? receiptDetail : selectedDetail;
-    const nextHash = buildHashRoute(screen, hashDetail ? { id: hashDetail.id, type: hashDetail.type } : null);
-    if (window.location.hash === nextHash) return;
-    window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}${nextHash}`);
-  }, [hashRoutingActive, receiptDetail, screen, selectedDetail]);
-
-  useEffect(() => {
-    if (!remoteMode || !driverContext) return;
-    prefetchExpenseReferenceDataRemote();
-  }, [driverContext, remoteMode]);
-
-  const localIdeasRef = useRef<Idea[]>([]);
-  const ideasGateway = useMemo(() => {
-    if (remoteMode) return { load: dados.carregarIdeias, create: dados.criarIdeia };
-    return {
-      load: async () => [...localIdeasRef.current],
-      create: async (draft: IdeaDraft) => {
-        const idea: Idea = { id: `local-idea-${Date.now()}`, title: draft.title.trim(), details: draft.details.trim(), status: IDEA_STATUS.nova, createdAt: new Date().toISOString() };
-        localIdeasRef.current = [idea, ...localIdeasRef.current];
-        return idea;
-      }
-    };
-  }, [remoteMode]);
-
-  useEffect(() => {
-    if ((screen !== "solicitarManutencao" && screen !== "gastos" && screen !== "colisoes") || !remoteMode) return;
-    let alive = true;
-    setMaintenanceVehiclesLoading(true);
-    getDriverContext()
-      .then(async (driver) => {
-        const vehicles = await loadMaintenanceRequestVehiclesRemote(driver, {
-          onlyOwnCategory: screen === "solicitarManutencao",
-          activeOnly: screen === "colisoes"
-        });
-        if (!alive) return;
-        setDriverContext(driver);
-        const currentVehicleId = getDriverCurrentVehicleId(driver);
-        const availableCurrentVehicleId = vehicles.some((vehicle) => vehicle.id === currentVehicleId) ? currentVehicleId : "";
-        setMaintenanceCurrentVehicleId(availableCurrentVehicleId);
-        setMaintenanceRequestDraft((current) => (
-          current.veiculoId && !vehicles.some((vehicle) => vehicle.id === current.veiculoId)
-            ? { ...current, veiculoId: "" }
-            : current
-        ));
-        setMaintenanceVehicles(vehicles);
-      })
-      .catch((error) => {
-        if (!alive) return;
-        reportAppError(error, {
-          severity: "error",
-          source: "app",
-          action: "loadMaintenanceRequestVehiclesRemote",
-          phase: "maintenance-request",
-          screen
-        });
-        setToast(error instanceof Error ? error.message : "Falha ao carregar veículos.");
-      })
-      .finally(() => {
-        if (alive) setMaintenanceVehiclesLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [screen, remoteMode]);
-
-  useEffect(() => {
-    const shouldLoadExpenseReference = screen === "gastos" || (screen === "finalizar" && selectedDetail?.type === "MANUTENCAO");
-    if (!shouldLoadExpenseReference || !remoteMode) return;
-    let alive = true;
-    const hasReferenceData =
-      expenseReferenceData.categories.length > 0 &&
-      expenseReferenceData.paymentMethods.length > 0 &&
-      expenseReferenceData.cities.length > 0;
-    setExpenseReferenceLoading(!hasReferenceData);
-    setExpenseReferenceError("");
-    loadExpenseReferenceDataRemote()
-      .then((referenceData) => {
-        if (!alive) return;
-        setExpenseReferenceData(referenceData);
-        setExpenseReferenceError("");
-      })
-      .catch((error) => {
-        if (!alive) return;
-        reportAppError(error, {
-          severity: "error",
-          source: "app",
-          action: "loadExpenseReferenceDataRemote",
-          phase: screen === "finalizar" ? "maintenance-finalize" : "expense-form",
-          screen
-        });
-        const message = error instanceof Error ? error.message : "Falha ao carregar categorias de despesas.";
-        setExpenseReferenceError(message);
-        setToast(message);
-      })
-      .finally(() => {
-        if (alive) setExpenseReferenceLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [screen, remoteMode, selectedDetail?.type]);
-
-  useEffect(() => {
-    if (screen !== "reciboPersonalizado") {
-      setReceiptClienteOptions([]);
-      return;
-    }
-
-    if (!remoteMode) {
-      setReceiptClienteOptions(isLocalhostRuntime ? LOCAL_RECEIPT_CLIENT_MOCKS : []);
-      return;
-    }
-
-    let alive = true;
-    loadReceiptClienteOptionsRemote()
-      .then((clientes) => {
-        if (!alive) return;
-        setReceiptClienteOptions(clientes.length ? clientes : (isLocalhostRuntime ? LOCAL_RECEIPT_CLIENT_MOCKS : []));
-      })
-      .catch((error) => {
-        if (!alive) return;
-        setDataLoadingState(null);
-        reportAppError(error, {
-          severity: "error",
-          source: "app",
-          action: "loadReceiptClienteOptionsRemote",
-          phase: "receipt-form",
-          screen
-        });
-        setReceiptClienteOptions(isLocalhostRuntime ? LOCAL_RECEIPT_CLIENT_MOCKS : []);
-      });
-
-    return () => {
-      alive = false;
-    };
-  }, [isLocalhostRuntime, remoteMode, screen]);
+  useDadosFormularios({
+    driverContext,
+    expenseReferenceData,
+    isLocalhostRuntime,
+    remoteMode,
+    screen,
+    selectedDetail,
+    setDataLoadingState,
+    setDriverContext,
+    setExpenseReferenceData: despesas.setExpenseReferenceData,
+    setExpenseReferenceError: despesas.setExpenseReferenceError,
+    setExpenseReferenceLoading: despesas.setExpenseReferenceLoading,
+    setMaintenanceCurrentVehicleId,
+    setMaintenanceRequestDraft: manutencao.setMaintenanceRequestDraft,
+    setMaintenanceVehicles,
+    setMaintenanceVehiclesLoading,
+    setReceiptClienteOptions,
+    setToast
+  });
 
   const show = (node: React.ReactNode) => (
-    <>
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={screen}
-          className={`screen-motion screen-motion--${screenMotion.kind}`}
-          style={{ transformOrigin: screenMotion.origin }}
-          initial={screenMotion.initial}
-          animate={{ opacity: 1, x: 0, y: 0, scale: 1, filter: "blur(0px)" }}
-          exit={screenMotion.exit}
-          transition={screenMotion.transition}
-        >
-          {node}
-        </motion.div>
-      </AnimatePresence>
-      <LocalToast toast={dataLoading ? null : toast} onDismiss={() => setToastState(null)} />
-      <LoadingOverlay loading={getVisibleLoadingOverlay(dataLoading, criticalError)} />
-      {remoteOperation ? <FlowProgressOverlay operation={remoteOperation} /> : null}
-      {expenseSend ? <ExpenseSendOverlay state={expenseSend} onClose={closeExpenseSendError} /> : null}
-      {vehicleChoiceRequest ? (
-        <VehicleChoiceDialog
-          resolution={vehicleChoiceRequest.resolution}
-          loadFleet={vehicleChoiceRequest.loadFleet}
-          loadAllVehicles={remoteMode ? loadActiveFleetRemote : loadMockAllFleet}
-          onChoose={closeVehicleChoice}
-          onCancel={cancelVehicleChoice}
-        />
-      ) : null}
-      {criticalError ? (
-        <div className="critical-error-overlay" role="dialog" aria-modal="true" aria-labelledby="critical-error-title">
-          <div className="critical-error-card">
-            <div className="critical-error-kicker">Atenção</div>
-            <h2 id="critical-error-title">Processo não foi concluído</h2>
-            <p>{criticalError}</p>
-            <div className="critical-error-actions">
-              {criticalError === SESSION_EXPIRED_MESSAGE ? (
-                <button type="button" onClick={() => window.location.reload()}>Entrar de novo</button>
-              ) : (
-                <button type="button" onClick={() => setCriticalError("")}>Entendi</button>
-              )}
-            </div>
-          </div>
-        </div>
-      ) : null}
-      <BuildStamp />
-    </>
+    <AppShell
+      cancelVehicleChoice={finalizar.cancelVehicleChoice}
+      closeExpenseSendError={despesas.closeExpenseSendError}
+      closeVehicleChoice={finalizar.closeVehicleChoice}
+      criticalError={avisos.criticalError}
+      dataLoading={avisos.dataLoading}
+      expenseSend={despesas.expenseSend}
+      previousScreen={previousScreenRef.current}
+      remoteMode={remoteMode}
+      remoteOperation={remoteOperation}
+      screen={screen}
+      setCriticalError={setCriticalError}
+      setToastState={avisos.setToastState}
+      toast={avisos.toast}
+      vehicleChoiceRequest={finalizar.vehicleChoiceRequest}
+    >
+      {node}
+    </AppShell>
   );
 
   if (isButtonPreviewMode) {
@@ -805,119 +314,40 @@ function App() {
     return show(<ReceiptPreviewScreen />);
   }
 
-  const resetLocalData = () => {
-    if (remoteMode || !isLocalhostRuntime) return;
-    const confirmed = window.confirm("Resetar dados locais, rascunhos e anexos salvos neste navegador?");
-    if (!confirmed) return;
+  const resetLocalData = () => resetDadosLocais({
+    colisao,
+    completingClearTimerRef,
+    despesas,
+    fila,
+    finalizar,
+    fotoManutencao,
+    isLocalhostRuntime,
+    manutencao,
+    recebimento,
+    remoteMode,
+    setCompletingDetailKey,
+    setCriticalError,
+    setReceiptEntrySource: recibo.setReceiptEntrySource,
+    setRemoteOperation,
+    setScreen,
+    setSelectedDetail,
+    setStore,
+    setToast
+  });
 
-    if (voucherDraftTimerRef.current) {
-      window.clearTimeout(voucherDraftTimerRef.current);
-      voucherDraftTimerRef.current = null;
-    }
-    if (finalizeTimerRef.current) {
-      window.clearTimeout(finalizeTimerRef.current);
-      finalizeTimerRef.current = null;
-    }
-    if (completingClearTimerRef.current) {
-      window.clearTimeout(completingClearTimerRef.current);
-      completingClearTimerRef.current = null;
-    }
-    if (queueHighlightTimerRef.current) {
-      window.clearTimeout(queueHighlightTimerRef.current);
-      queueHighlightTimerRef.current = null;
-    }
-
-    revokePhotoPreviewUrls(expensePhotos);
-    Object.values(receiveProofs).forEach((photos) => revokePhotoPreviewUrls(photos));
-    revokePhotoPreviewUrls(collisionPhotos);
-    revokePhotoPreviewUrls(maintenanceRequestPhotos);
-    clearMaintenanceFinalizePhotoDraft();
-    clearMaintenanceRequestPhotoDraftState();
-    clearExpensePhotoDraftState();
-    clearReceivePhotoDraftState();
-    clearCollisionPhotoDraftState();
-
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(VOUCHER_DRAFTS_STORAGE_KEY);
-    localStorage.removeItem(FINALIZE_DRAFT_ASSETS_STORAGE_KEY);
-    localStorage.removeItem(SERVICE_OBSERVATION_DRAFTS_KEY);
-    void clearMediaDraft();
-
-    setStore(initialStore());
-    setSelectedDetail(null);
-    setScreen("inicio");
-    setReceiptEntrySource("home");
-    setVoucherDrafts({});
-    setServiceObservationDrafts({});
-    setReceiveProofs({});
-    setReceiveUploadedCounts({});
-    setExpensePhotos([]);
-    setExpensePreviewPhotoId("");
-    setCollisionDraft(createEmptyCollisionDraft());
-    setCollisionPhotos([]);
-    setCollisionPreviewPhotoId("");
-    setMaintenanceRequestPhotos([]);
-    setMaintenanceRequestPreviewPhotoId("");
-    setMaintenanceExistingPreview(false);
-    setMaintenanceRequestDraft({ ...EMPTY_MAINTENANCE_REQUEST_DRAFT });
-    setExpenseDraft({ ...EMPTY_EXPENSE_DRAFT });
-    resetExpenseQuickRead();
-    setMaintenanceFinalizeDraft({ ...EMPTY_MAINTENANCE_FINALIZE_DRAFT });
-    setPhotoDraft(null);
-    setPhotoDraftPreviewUrl("");
-    setPhotoDraftRawBlob(null);
-    setPhotoDraftIsVideo(false);
-    setRemoteOperation(null);
-    setCriticalError("");
-    setCompletingDetailKey("");
-    setQueueHighlightDetailKey("");
-    setToast("Dados locais resetados.");
-  };
-
-  useEffect(() => {
-    if (!remoteMode || remoteOperation || !shouldAutoRefreshScreen(screen)) return;
-
-    let refreshing = false;
-    const autoRefresh = () => {
-      if (document.hidden || refreshing) return;
-      refreshing = true;
-      void refreshLocal(selectedDetail ?? undefined, { silent: true }).finally(() => { refreshing = false; });
-    };
-
-    const timer = window.setInterval(autoRefresh, AUTO_REFRESH_INTERVAL_MS);
-    window.addEventListener("focus", autoRefresh);
-    window.addEventListener("pageshow", autoRefresh);
-    document.addEventListener("visibilitychange", autoRefresh);
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener("focus", autoRefresh);
-      window.removeEventListener("pageshow", autoRefresh);
-      document.removeEventListener("visibilitychange", autoRefresh);
-    };
-  }, [remoteMode, remoteOperation, screen, selectedDetail]);
-
-  const blockIfNotFirstPending = (detail: typeof selectedDetail = selectedDetail) => {
-    if (!detail) return true;
-    if (detail.type !== "SERVICO") return false;
-    const firstPendingDetail = findFirstPendingServiceDetail(store.agenda);
-    if (!firstPendingDetail || isSameDetail(firstPendingDetail, detail)) return false;
-    const firstPendingKey = `${firstPendingDetail.type}:${firstPendingDetail.id}`;
-    if (queueHighlightTimerRef.current) window.clearTimeout(queueHighlightTimerRef.current);
-    setQueueHighlightDetailKey(firstPendingKey);
-    queueHighlightTimerRef.current = window.setTimeout(() => {
-      setQueueHighlightDetailKey("");
-      queueHighlightTimerRef.current = null;
-    }, 3600);
-    setToast("Conclua os itens anteriores da fila antes de prosseguir.");
-    setScreen("servicos");
-    return true;
-  };
+  useAutoRefreshAgenda({
+    refreshLocal,
+    remoteMode,
+    remoteOperation,
+    screen,
+    selectedDetail
+  });
 
   const navigateFromInitial = (screenName: string) => {
     // Pending sends that need the driver go first; otherwise open the camera straight away.
-    if (screenName === "gastos" && !expenseUploadStatuses.length && expensePhotos.length === 0 && isExpenseDraftBlank(expenseDraft)) {
+    if (screenName === "gastos" && !despesas.expenseUploadStatuses.length && despesas.expensePhotos.length === 0 && despesas.isExpenseDraftBlank(despesas.expenseDraft)) {
       setComunicadoOrigin("");
-      openExpenseCamera();
+      despesas.openExpenseCamera();
       return;
     }
     if (screenName === "personalReceipt" || screenName === "reciboPersonalizado" || screenName === "gerarReciboPersonalizado") {
@@ -936,32 +366,10 @@ function App() {
     }
   };
 
-  const openPersonalReceipt = () => {
-    if (!selectedDetail) return;
-    setReceiptEntrySource("service");
-    setScreen("reciboPersonalizado");
-  };
-
-  const openPersonalReceiptFromHome = () => {
-    if (!canGeneratePersonalReceipt) {
-      setToast("Você não tem permissão para gerar recibo personalizado.");
-      return;
-    }
-    setReceiptEntrySource("home");
-    setScreen("reciboPersonalizado");
-  };
-
-  const openMaintenanceFinalizeCamera = (kind: MaintenancePhotoKind) => {
-    setMaintenancePhotoKind(kind);
-    clearMaintenanceFinalizePhotoDraft();
-    setMaintenanceExistingPreview(false);
-    setScreen("fotoManutencao");
-  };
-
   const telaFinalizar = rotasFinalizar(screen, {
     ...finalizar,
+    ...fotoManutencao,
     canGeneratePersonalReceipt,
-    clearMaintenanceFinalizePhotoDraft,
     confirmedMaintenancePhotos,
     continueAfterReceive,
     expenseReferenceData,
@@ -969,27 +377,14 @@ function App() {
     expenseReferenceLoading,
     getQrChargeProps,
     logAppError,
-    maintenanceExistingPreview,
-    maintenancePhotoKind,
-    openMaintenanceFinalizeCamera,
     openPersonalReceipt,
     openReceiveCamera,
     openReceivePreview,
-    photoDraft,
-    photoDraftIsVideo,
-    photoDraftPreviewUrl,
-    photoDraftRawBlob,
     receiveProofs,
     receiveStepPending,
     remoteOperation,
     selectedDetail,
     setCriticalError,
-    setMaintenanceExistingPreview,
-    setMaintenancePhotoKind,
-    setPhotoDraft,
-    setPhotoDraftIsVideo,
-    setPhotoDraftPreviewUrl,
-    setPhotoDraftRawBlob,
     setScreen,
     setStore,
     setToast,
@@ -997,39 +392,13 @@ function App() {
   });
   if (telaFinalizar) return show(telaFinalizar);
 
-  const telaManutencao = rotasManutencao(screen, {
-    ...manutencao,
-    maintenanceCurrentVehicleId,
-    maintenanceVehicles,
-    maintenanceVehiclesLoading,
-    remoteOperation,
-    setScreen,
-    setToast
-  });
+  const telaManutencao = rotasManutencao(screen, { ...manutencao, ...veiculos, remoteOperation, setScreen, setToast });
   if (telaManutencao) return show(telaManutencao);
 
-  const telaColisao = rotasColisao(screen, {
-    ...colisao,
-    driverContext,
-    maintenanceCurrentVehicleId,
-    maintenanceVehicles,
-    maintenanceVehiclesLoading,
-    remoteOperation,
-    setScreen,
-    setToast
-  });
+  const telaColisao = rotasColisao(screen, { ...colisao, ...veiculos, driverContext, remoteOperation, setScreen, setToast });
   if (telaColisao) return show(telaColisao);
 
-  const telaDespesas = rotasDespesas(screen, {
-    ...despesas,
-    maintenanceCurrentVehicleId,
-    maintenanceVehicles,
-    maintenanceVehiclesLoading,
-    remoteMode,
-    remoteOperation,
-    setScreen,
-    setToast
-  });
+  const telaDespesas = rotasDespesas(screen, { ...despesas, ...veiculos, remoteMode, remoteOperation, setScreen, setToast });
   if (telaDespesas) return show(telaDespesas);
 
   const telaIdeias = rotasIdeias(screen, { ideasGateway, remoteMode, setScreen });
@@ -1057,8 +426,8 @@ function App() {
 
   const telaRecibo = rotasRecibo(screen, {
     receiptClienteOptions,
-    receiptDetail,
-    receiptEntrySource,
+    receiptDetail: recibo.receiptDetail,
+    receiptEntrySource: recibo.receiptEntrySource,
     selectedDetail,
     setRemoteOperation,
     setScreen
@@ -1090,7 +459,7 @@ function App() {
     getServiceObservationDraft,
     openFinalizeFlow,
     openLocalCancelFlow,
-    openReceiveFlow,
+    openReceiveFlow: recebimento.openReceiveFlow,
     openVoucherFlow,
     refreshLocal,
     saveSelectedServiceObservation,
@@ -1114,14 +483,14 @@ function App() {
     completingDetailKey,
     comunicados,
     dados,
-    queueHighlightDetailKey,
+    queueHighlightDetailKey: fila.queueHighlightDetailKey,
     refreshLocal,
     remoteMode,
     setChecklistOrigin,
     setComunicadoOrigin,
     setScreen,
     setSelectedChecklistId,
-    setSelectedComunicadoId,
+    setSelectedComunicadoId: comunicadosLista.setSelectedComunicadoId,
     setSelectedDetail,
     setToast,
     store
@@ -1168,8 +537,3 @@ function App() {
 }
 
 export default App;
-
-
-
-
-

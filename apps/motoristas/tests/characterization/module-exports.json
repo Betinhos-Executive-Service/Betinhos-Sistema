@@ -741,9 +741,33 @@
   "src/app/overlayLayering.ts": [
     "getVisibleLoadingOverlay"
   ],
+  "src/app/resetDadosLocais.ts": [
+    "resetDadosLocais"
+  ],
   "src/app/rotaInicial.ts": [
     "findDetailFromHashRoute",
     "getInitialScreenFromHashRoute"
+  ],
+  "src/app/useAvisos.ts": [
+    "useAvisos"
+  ],
+  "src/app/useAvisosGlobais.ts": [
+    "useAvisosGlobais"
+  ],
+  "src/app/useCarregarRascunhoMidia.ts": [
+    "useCarregarRascunhoMidia"
+  ],
+  "src/app/useDadosFormularios.ts": [
+    "useDadosFormularios"
+  ],
+  "src/app/useEstadoInicial.ts": [
+    "useEstadoInicial"
+  ],
+  "src/app/useNavegacao.ts": [
+    "useNavegacao"
+  ],
+  "src/app/usePersistenciaRascunhos.ts": [
+    "usePersistenciaRascunhos"
   ],
   "src/data/mockData.ts": [
     "agendaMock",
