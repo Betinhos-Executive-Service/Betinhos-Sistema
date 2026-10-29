@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
 import { Alert, Button, ContextMenu, EmptyState, Menu, SearchBox, Stack, StatusBadge, ToastProvider, ViewBar, readFilters, useShellHeader, useToast, wantsNativeMenu, type FilterGroup, type FilterOption, type MenuAction } from '@betinhos/ui'
-import { Archive, ArchiveRestore, Bug, CalendarDays, ChevronDown, ClipboardList, Copy, FilePlus2, LayoutGrid, Link2, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Send, ShieldCheck, Table2, Ticket, UserPlus, X } from 'lucide-react'
+import { Archive, ArchiveRestore, Bug, CalendarDays, ChevronDown, ClipboardList, Copy, FilePlus2, LayoutGrid, Link2, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Send, Share2, ShieldCheck, Table2, Ticket, UserPlus, X } from 'lucide-react'
 import type { Host } from '../../host'
 import { useMedia } from '../operacional/useMedia'
 import { hrefFor, patchHashQuery, queryFromHash, readHashQuery } from '../../nav/useHashRoute'
@@ -20,6 +20,9 @@ import { EscalaFdsDrawer } from './components/EscalaFdsDrawer'
 import { LoadMore, LoadSentinel, statusText } from './components/LoadMore'
 import { debounceSearch } from './components/useLookupSearch'
 import { AuditoriaOverlay } from './components/AuditoriaOverlay'
+import { LiberarPortalDrawer } from './components/LiberarPortalDrawer'
+import { createPortalSource, type Liberacao } from './data/portal'
+import { PORTAL_COLUMN, PORTAL_KEY, rotuloStatus, tomStatus, type StatusValidacao } from './domain/portal'
 import { LINK_FALHA, gerarLinkBlock } from './domain/link'
 import { LINK_CADASTRO_FALHA, linkCadastroBlock } from './domain/linkCadastro'
 import { LinkCadastroDrawer, type LinkCadastroRequest } from './components/LinkCadastroDrawer'
@@ -30,7 +33,7 @@ import { loadViewMode, saveViewMode, type ViewMode } from './domain/viewMode'
 import { splitOp } from './domain/commands'
 import { applyColumnPrefs, loadColumnPrefs, saveColumnPrefs, type ColumnPrefs } from './domain/columns'
 import { buildLayout, buildViewFetch } from './domain/views'
-import { ENTITY, ID_ATTRIBUTE, type CellStatus, type Column } from './domain/types'
+import { ENTITY, ID_ATTRIBUTE, type CellStatus, type Column, type Sort } from './domain/types'
 import { readUrlState, writeUrlState, type UrlState } from './domain/urlState'
 import { cellKey, useGeral, type SaveFailure } from './useGeral'
 import { useGeralViewState } from './useGeralViewState'
@@ -43,6 +46,7 @@ export function GeralPage({ host }: { host: Host }) {
 }
 
 const IDLE: CellStatus = { kind: 'idle' }
+const noSelectionTitle = 'Selecione um ou mais serviços.'
 
 function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const source = useMemo(() => createSource(host), [host])
@@ -88,7 +92,11 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const [saved, setSaved] = useState<Record<string, ColumnPrefs | null>>({})
   const viewId = view?.id ?? null
   const prefs = useMemo(() => (viewId == null ? null : viewId in saved ? saved[viewId] : loadColumnPrefs(source.kv, viewId)), [viewId, saved, source.kv])
-  const visibleColumns = useMemo(() => applyColumnPrefs(geral.columns, prefs), [geral.columns, prefs])
+  // Coluna virtual "Portal": oferecida no painel, oculta até o usuário ligar (preferência salva sem ela também a deixa oculta).
+  const allColumns = useMemo(() => [...geral.columns, PORTAL_COLUMN], [geral.columns])
+  const viewPrefs = useMemo(() => (prefs && !prefs.order.includes(PORTAL_KEY) ? { ...prefs, order: [...prefs.order, PORTAL_KEY], hidden: [...prefs.hidden, PORTAL_KEY] } : prefs), [prefs])
+  const visibleColumns = useMemo(() => applyColumnPrefs(allColumns, viewPrefs ?? { hidden: [PORTAL_KEY], order: [] }), [allColumns, viewPrefs])
+  const dataColumns = useMemo(() => visibleColumns.filter((c) => c.key !== PORTAL_KEY), [visibleColumns])
   const setPrefs = useCallback((next: ColumnPrefs | null) => {
     if (viewId == null) return
     saveColumnPrefs(source.kv, viewId, next)
@@ -169,9 +177,9 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     if (!view) throw new Error('Nenhuma visão aberta.')
     if (geral.filtersIgnored) throw new Error('Os filtros não puderam ser aplicados porque os campos não carregaram. Atualize e tente de novo.')
     const fetchxml = buildViewFetch(view.fetchxml, geral.filters, geral.sort, geral.filterFields)
-    const layoutxml = buildLayout(visibleColumns, prefs?.widths, await source.objectTypeCode())
+    const layoutxml = buildLayout(dataColumns, prefs?.widths, await source.objectTypeCode())
     return { fetchxml, layoutxml }
-  }, [view, geral.filtersIgnored, geral.filters, geral.sort, geral.filterFields, visibleColumns, prefs, source])
+  }, [view, geral.filtersIgnored, geral.filters, geral.sort, geral.filterFields, dataColumns, prefs, source])
   const createView = useCallback(async (name: string) => (await source.createView({ name, ...(await viewPayload()) })).id, [source, viewPayload])
   const updateView = useCallback(async () => {
     if (!view) return
@@ -191,9 +199,15 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     saveColumnPrefs(source.kv, view.id, null)
     await reloadViews()
   }, [view, source, reloadViews])
+  const { setSort: setGeralSort } = geral
+  // A coluna Portal não existe no FetchXML: não ordena.
+  const setSort = useCallback((next: Sort) => {
+    if (next?.attribute === PORTAL_KEY) { toast({ tone: 'info', message: 'A coluna Portal não pode ser ordenada.' }); return }
+    setGeralSort(next)
+  }, [setGeralSort, toast])
   const { state: viewState, columnDefs } = useGeralViewState({
-    views: geral.views, view, viewsError: geral.viewsError, columns: geral.columns, attributes, prefs, setPrefs,
-    sort: geral.sort, setSort: geral.setSort, filters, setFilters, selectView, reloadViews,
+    views: geral.views, view, viewsError: geral.viewsError, columns: allColumns, attributes, prefs: viewPrefs, setPrefs, hiddenByDefault: [PORTAL_KEY],
+    sort: geral.sort, setSort, filters, setFilters, selectView, reloadViews,
     createView, updateView, renameView, deleteView, kv: source.kv,
   })
   const shareLink = useCallback(async () => {
@@ -391,6 +405,33 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     }
   }, [source, selectedIds, toast, refresh])
 
+  // Liberar para o portal do cliente: cria/reativa cr40f_validacaoservico; a reserva (e o status de faturamento) não muda.
+  const rowsRef = useRef(rows)
+  rowsRef.current = rows
+  const portal = useMemo(() => createPortalSource(host, () => rowsRef.current), [host])
+  const [liberarIds, setLiberarIds] = useState<string[] | null>(null)
+  const [portalStatus, setPortalStatus] = useState<Map<string, StatusValidacao>>(new Map())
+  const [portalSeq, setPortalSeq] = useState(0)
+  const portalVisible = visibleColumns.some((c) => c.key === PORTAL_KEY)
+  const rowIds = useMemo(() => rows.map((r) => String(r[ID_ATTRIBUTE])).join(','), [rows])
+  useEffect(() => {
+    if (!portalVisible || !rowIds) return
+    let alive = true
+    portal.status(rowIds.split(',')).then((map) => { if (alive) setPortalStatus(map) }, () => { if (alive) setPortalStatus(new Map()) })
+    return () => { alive = false }
+  }, [portal, portalVisible, rowIds, portalSeq])
+  const askLiberar = useCallback(() => { if (selectedIds.length) setLiberarIds(selectedIds) }, [selectedIds])
+  const doneLiberar = useCallback((result: Liberacao, bloqueados: number) => {
+    setLiberarIds(null)
+    const fora = bloqueados + result.failed.length
+    const msg = `${result.ok.length} ${result.ok.length === 1 ? 'serviço liberado' : 'serviços liberados'} para o portal${fora ? `; ${fora} ${fora === 1 ? 'ficou' : 'ficaram'} de fora` : ''}.`
+    toast(result.failed.length
+      ? { tone: 'danger', message: `${msg} Falharam: ${result.failed.map((f) => labelOf(f.id)).join(', ')}. ${result.failed[0].message}` }
+      : { tone: 'success', message: msg })
+    setPortalSeq((n) => n + 1)
+    clearSelection()
+  }, [toast, labelOf, clearSelection])
+
   const mixedTitle = 'Selecione só serviços ativos ou só inativos.'
   const mixedId = useId()
   // Barra de seleção do celular: só aparece com linhas marcadas.
@@ -401,6 +442,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       <Button variant="action" size="touch" icon={<Copy size={16} />} onClick={() => { void copySelected() }}>Copiar Serviços</Button>
       <Button variant="action" size="touch" icon={<FilePlus2 size={16} />} onClick={askOp}>Gerar OP</Button>
       <Button variant="action" size="touch" icon={<Send size={16} />} onClick={() => setDispRequest({ ids: selectedIds })}>Disparar</Button>
+      <Button variant="action" size="touch" icon={<Share2 size={16} />} onClick={askLiberar}>Liberar para o portal</Button>
       {selectedState === 1
         ? <Button variant="action" size="touch" icon={<ArchiveRestore size={16} />} onClick={() => askState(true)}>Ativar</Button>
         : selectedState === 0
@@ -439,6 +481,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     { id: 'link', label: hint('Gerar link', linkBlock), icon: <Link2 size={16} />, disabled: linkBlock != null, onSelect: () => { void gerarLink() } },
     { id: 'cadastro', label: hint('Link de cadastro', cadastroBlock), icon: <UserPlus size={16} />, disabled: cadastroBlock != null, onSelect: () => { void gerarLinkCadastro() } },
     { id: 'disparar', label: 'Disparar', icon: <Send size={16} />, onSelect: () => setDispRequest({ ids: selectedIds }) },
+    { id: 'portal', label: 'Liberar para o portal', icon: <Share2 size={16} />, onSelect: askLiberar },
   ]
   const one = selectedIds.length === 1
   const contextActions: MenuAction[] = [
@@ -485,6 +528,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         { id: 'escala', label: 'Escala FDS', icon: <CalendarDays size={16} />, group: 'Atalhos', onSelect: () => setEscalaOpen(true) },
         { id: 'auditoria', label: 'Auditoria', icon: <ShieldCheck size={16} />, group: 'Atalhos', onSelect: () => { void openAuditoria() } },
         { id: 'erro', label: hint('Registrar Erro', selectedIds.length === 1 ? null : oneTitle), icon: <Bug size={16} />, group: 'Atalhos', disabled: selectedIds.length !== 1, onSelect: () => { void registrarErro() } },
+        { id: 'portal', label: hint('Liberar para o portal', selectedIds.length ? null : noSelectionTitle), icon: <Share2 size={16} />, group: 'Atalhos', disabled: !selectedIds.length, onSelect: askLiberar },
         { id: 'contagem', label: 'Contagem de Serviços', icon: <ListChecks size={16} />, group: 'Atalhos', onSelect: () => setContagemOpen(true) },
       ]}
     />
@@ -522,6 +566,10 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   useEffect(() => setSearchText(query), [query])
   const renderCell = useCallback((row: Row, column: Column): ReactNode => {
     const id = String(row[ID_ATTRIBUTE])
+    if (column.key === PORTAL_KEY) {
+      const st = portalStatus.get(id)
+      return <div role="gridcell" className="bt-table__cell gr-cell gr-cell--readonly">{st ? <StatusBadge tone={tomStatus(st)}>{rotuloStatus(st)}</StatusBadge> : <span className="gr-cell__value">—</span>}</div>
+    }
     return (
       <Cell
         row={row}
@@ -535,7 +583,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         editable={attributes != null}
       />
     )
-  }, [attributes, cells, save, resetCell, searchLookup, selectForEdit])
+  }, [attributes, cells, save, resetCell, searchLookup, selectForEdit, portalStatus])
 
   const editRow = editId == null ? undefined : rowOf(editId)
 
@@ -569,7 +617,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               <GeralCards
                 grid={!mobile}
                 rows={rows}
-                columns={visibleColumns}
+                columns={dataColumns}
                 attributes={attributes}
                 loading={loading}
                 selected={geral.selected}
@@ -594,7 +642,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               loading={loading}
               sort={geral.sort}
               defaultSort={geral.defaultOrder}
-              onSort={geral.setSort}
+              onSort={setSort}
               filteredKeys={filteredKeys}
               quick={{ fields: filterFields, value: valid.quick, onChange: setQuickFilter, search: searchQuickFilter }}
               onClearFilter={(attribute) => setQuickFilter(attribute, null)}
@@ -651,7 +699,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         {cardsLayout && editRow ? (
           <GeralSheet
             row={editRow}
-            columns={visibleColumns}
+            columns={dataColumns}
             attributes={attributes}
             cellStatus={(attribute) => cells.get(cellKey(String(editRow[ID_ATTRIBUTE]), attribute)) ?? IDLE}
             open
@@ -674,6 +722,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         <EscalaFdsDrawer url={source.escalaFdsUrl()} open={escalaOpen} onClose={() => setEscalaOpen(false)} />
         <GerarOpDialog request={opRequest} busy={opBusy} error={opError} onClose={() => setOpRequest(null)} onConfirm={() => { void confirmOp() }} />
         <DispararDialog request={dispRequest} busy={dispBusy} onClose={() => setDispRequest(null)} onConfirm={() => { void confirmDisparar() }} />
+        <LiberarPortalDrawer ids={liberarIds} source={portal} mobile={mobile} onClose={() => setLiberarIds(null)} onDone={doneLiberar} />
         <ContextMenu at={contextAt} actions={contextActions} onClose={closeContext} />
         {auditoriaUrl ? <AuditoriaOverlay url={auditoriaUrl} onClose={() => setAuditoriaUrl(null)} /> : null}
         {voucherUrl ? <VoucherOverlay url={voucherUrl} onClose={() => setVoucherUrl(null)} /> : null}
