@@ -1,7 +1,7 @@
-// Porte de Tela Planner/src/quotes/QuoteManagementDrawer.jsx (sem mudança de comportamento).
+// Drawer da cotação (V2.2): mostra só o passo atual com um botão principal; o resto fica em "Ver detalhes".
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Copy, Download, Link2, MoreHorizontal, Save, Send, Trash2, X } from "lucide-react";
-import { buildQuoteEmailHtml, copyQuoteToClipboard, deriveQuoteStatus, formatDateTime, formatMoney, getQuoteNextAction, loadQuoteImages, normalizeQuoteRoute, QUOTE_COMPLETED_STATUSES, QUOTE_STAGES, QUOTE_TERMINAL_STATUSES, quoteStage, quoteSubject, sentLabel, validateQuoteStep } from '../../domain/quoteDomain';
+import { buildQuoteEmailHtml, copyQuoteToClipboard, deriveQuoteStatus, formatDateTime, formatMoney, loadQuoteImages, normalizeQuoteRoute, QUOTE_COMPLETED_STATUSES, QUOTE_STAGES, QUOTE_TERMINAL_STATUSES, quoteStage, quoteSubject, sentLabel, validateQuoteStep } from '../../domain/quoteDomain';
 import { localDateKey } from '../../domain/management';
 import { startQuotePatch } from '../../domain/quoteTaskFlow';
 import { createQuoteWord, downloadQuoteWord } from '../../domain/quoteWord';
@@ -70,6 +70,8 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
   const inlineToolbarRef = useRef<any>(null);
   const draftSnapshot = useMemo(() => quoteDraftSnapshot(draft), [draft]);
   const dirty = draftSnapshot !== baselineRef.current.snapshot;
+  // Status mudado por qualquer caminho (envio, decisão, recarga) também tira a mensagem do passo anterior.
+  useEffect(() => { setSaveMessage(""); }, [draft.status]);
   const update = (key: any, value: any) => { setSaveMessage(""); setDraft((current: any) => ({ ...current, [key]: value })); };
   const requestClose = () => {
     if (mutationPending.current || saving) return;
@@ -251,6 +253,8 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
   // Salva o rascunho; "Cotada" é derivada das opções, nunca escolhida à mão.
   // Devolve "" quando gravou ou a mensagem do que impediu.
   const save = async (confirmedWithoutDeadline = false, patch: any = {}) => {
+    // Outra gravação em andamento (clique duplo, ação inicial repetida): ignora, não é falha.
+    if (mutationPending.current) return "";
     setSaveMessage("");
     const fail = (message: any) => { setSaveError(message); return message; };
     if (quoteConflict) return fail("Esta cotação mudou em outra edição. Recarregue os dados antes de salvar para evitar sobrescrever alterações.");
@@ -262,7 +266,9 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     setSaveError("");
     const result = await run(() => onUpdate?.(quote.id, nextDraft));
     if (result === false) return fail("Não foi possível salvar. Sua edição continua aberta; confira sua conexão e tente novamente.");
-    baselineRef.current = { id: quote.id, snapshot: quoteDraftSnapshot(nextDraft) }; setDraft(nextDraft); setQuoteConflict(false); setSaveMessage("Cotação salva.");
+    baselineRef.current = { id: quote.id, snapshot: quoteDraftSnapshot(nextDraft) }; setDraft(nextDraft); setQuoteConflict(false);
+    // Mudou de passo: o próprio passo novo é o retorno; "Cotação salva." fica só para edições no mesmo passo.
+    setSaveMessage(nextDraft.status === draft.status ? "Cotação salva." : "");
     return "";
   };
   const openComposer = () => { setComposerMessage(""); setPreviewEdited(false); setEditingPreview(false); setComposerOpen(true); };
@@ -328,6 +334,7 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     else { setResultOpen(false); onClose?.(); }
   };
   const reopen = async () => {
+    if (mutationPending.current) return;
     const success = await run(() => onUpdate?.(quote.id, { status: "Nova", responseSent: false, finalizationAt: "", lossReason: "" }));
     if (success === false) setResultError("Não foi possível reabrir a cotação. Tente novamente.");
   };
@@ -378,8 +385,10 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
   };
   const currentOption = comparisonOptions.find((option: any) => option.id === activeOptionId) || comparisonOptions[0];
   const proposalSummary = prepareQuoteResponse(draft);
-  const nextAction = getQuoteNextAction(draft);
+  // Preços (opções editáveis) só aparecem quando o passo é cotar, enviar ou decidir.
+  const showComparison = !["Nova", QUOTE_WAITING_STATUS, "Perdida", "Cancelada"].includes(draft.status);
   const stage = quoteStage(draft.status);
+  const stepTitle = ({ Nova: "Nova cotação", "Em análise pelo financeiro": "Preencha os preços", Cotada: "Preço pronto", "Respondida ao cliente": "Aguardando o cliente", [QUOTE_WAITING_STATUS]: "Aguardando informação" } as Record<string, string>)[draft.status] || "Resultado";
   const stageIndex = QUOTE_STAGES.indexOf(stage);
   const actions = {
     start: () => save(false, startQuotePatch(task, currentEmployee)),
@@ -397,8 +406,12 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
   };
   const actionEnabled = { return: task ? canRegisterWaitingReturn(task, currentEmployee, teams) && Boolean(onRegisterWaitingReturn) : true, outcome: decisionOptions.length > 0, wait: true };
   // Ação pedida pelo card do Kanban ou pelo board de tarefas ao abrir a cotação.
+  // A chave evita repetir a ação quando o efeito roda de novo (StrictMode em dev).
+  const initialActionKey = useRef("");
   useEffect(() => {
-    if (!initialAction) return;
+    const key = `${quote.id}:${initialAction}`;
+    if (!initialAction || initialActionKey.current === key) return;
+    initialActionKey.current = key;
     onActionConsumed?.();
     (actions as any)[initialAction]?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -417,9 +430,39 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
   };
 
 
-  return <div className="quote-v3-layer" onClick={(event) => { if ((event.target as any).matches(".quote-v3-layer, .quote-v3-workspace, .quote-options-comparison") && !composerOpen && !resultOpen && !deleteOpen && !waitingOpen && !confirmMissingDeadline) requestClose(); }}><div className="quote-v3-workspace has-comparison" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="quote-management-title">
-    <QuoteOptionsComparison contextContent={<div className="quote-options-context">
+  return <div className="quote-v3-layer" onClick={(event) => { if ((event.target as any).matches(".quote-v3-layer, .quote-v3-workspace, .quote-options-comparison") && !composerOpen && !resultOpen && !deleteOpen && !waitingOpen && !confirmMissingDeadline) requestClose(); }}><div className={`quote-v3-workspace${showComparison ? " has-comparison" : ""}`} ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="quote-management-title">
+    {showComparison && <QuoteOptionsComparison contextContent={<div className="quote-options-context">
       {awaitingDecision && <section aria-label="Decisão do cliente">{hasSentOptions ? <p>Opções da proposta enviada · Versão {sentProposal.number}</p> : legacyDecision && decisionOptions.length > 0 ? <p>Cotação respondida sem versão histórica de envio. Registre a decisão sobre a opção atual.</p> : <><p role="status">Nenhuma proposta enviada foi registrada. Registre o envio antes de registrar a decisão do cliente.</p><button className="button button-primary" type="button" disabled={saving} onClick={registerProposalSent}>Registrar envio</button></>}</section>}
+    </div>} options={comparisonOptions} activeId={currentOption?.id} accepted={draft.status === "Aceita pelo cliente"} readOnly={readOnlyOptions} sent={hasSentOptions} saving={saving} onDecision={awaitingDecision && decisionOptions.length > 0 ? (optionId: any, status: any) => openResult(status, optionId) : undefined} onActivate={setActiveOptionId} onAdd={addOption} onDuplicate={duplicateOption} onRemove={removeOption} onChange={(option: any) => update("options", (draft.options || []).map((item: any) => item.id === option.id ? option : item))} onGenerate={openComposer} />}
+    <aside className="quote-v3-drawer quote-v3-management">
+    <header className="quote-v3-drawer-header"><div><span className="quote-code">{draft.code || "Sem número"}</span><h2 id="quote-management-title">{draft.client || draft.title}</h2><div className="quote-v3-header-meta"><QuoteStatus status={draft.status} /><span>{task?.assigneeNames?.join(", ") || "Equipe Financeiro"}</span>{awaitingDecision ? <span>{sentLabel(draft)}</span> : <span className={draft.deadline && draft.deadline < localDateKey() && !terminalQuote ? "danger-text" : ""}>Prazo {formatDate(draft.deadline)}</span>}</div>
+    <ol className="quote-stage-stepper" aria-label="Etapas da cotação">{QUOTE_STAGES.map((item, index) => { const state = index < stageIndex || terminalQuote ? "done" : index === stageIndex ? "active" : ""; return <li key={item.id} className={state} aria-current={state === "active" ? "step" : undefined}><span>{state === "done" ? <Check size={12} aria-hidden="true" /> : index + 1}</span>{item.label}</li>; })}</ol>
+    {quote.status === "Cotada" && task?.status === "done" && !quote.responseSent && <p className="quote-v3-save-error" role="status">Registro anterior: tarefa concluída sem envio confirmado. Confira o envio antes de dar baixa; nenhum envio foi presumido.</p>}
+</div><button ref={closeRef} className="icon-button" type="button" onClick={requestClose} aria-label="Fechar cotação"><X size={20} /></button></header>
+    <div className="quote-v3-drawer-body">
+      <section className="quote-current-step" aria-label="Passo atual">
+        <h3>{stepTitle}</h3>
+        {draft.status === "Nova" && <dl className="quote-current-step-summary"><dt>Quem pediu</dt><dd>{draft.clientContact || "Não informado"}</dd><dt>O que pediu</dt><dd className="quote-request-full-text">{draft.notes || "Não informado"}</dd><dt>Para quando</dt><dd>{formatDate(draft.deadline)}</dd></dl>}
+        {draft.status === "Em análise pelo financeiro" && <p>Preencha o título e o valor de cada opção na tabela. Com valor, a cotação fica pronta para enviar.</p>}
+        {draft.status === "Cotada" && <p>Envie a proposta ao cliente (copie para o Outlook ou baixe o PDF) e registre aqui.</p>}
+        {awaitingDecision && <p>{sentLabel(draft)}. Registre a resposta do cliente.</p>}
+        {draft.status === QUOTE_WAITING_STATUS && (draft.waitingFor ? <dl className="quote-current-step-summary"><dt>O que falta</dt><dd>{draft.waitingFor}</dd><dt>De quem</dt><dd>{draft.waitingFrom || "Não informado"}</dd><dt>Retorno</dt><dd className={draft.waitingReturnDate && draft.waitingReturnDate <= localDateKey() ? "danger-text" : ""}>{formatDate(draft.waitingReturnDate)}</dd></dl> : <p>Sem detalhes registrados.</p>)}
+        {terminalQuote && <><strong>{draft.status}</strong><span>Finalizada em {draft.finalizationAt ? formatDateTime(draft.finalizationAt) : "data não informada"}</span>{draft.status === "Aceita pelo cliente" && acceptedOption && <p>{acceptedOption.name} · {formatMoney(acceptedOption.value)}</p>}{draft.status === "Perdida" && <p>Motivo: {draft.lossReason || "Não registrado"}</p>}</>}
+        <div className="quote-current-step-actions">
+          {draft.status === "Nova" && <button className="button button-primary quote-step-primary" type="button" disabled={saving} onClick={actions.start}>Começar a cotar</button>}
+          {draft.status === "Em análise pelo financeiro" && <button className="button button-primary quote-step-primary" type="button" disabled={saving} onClick={() => save()}><Save size={16} />{saving ? "Salvando…" : "Salvar preços"}</button>}
+          {draft.status === "Cotada" && <><button className="button button-primary quote-step-primary" type="button" disabled={saving} onClick={actions.send}><Send size={16} />Enviei ao cliente</button><button className="button button-quiet" type="button" disabled={saving} onClick={openComposer}>Ver proposta</button></>}
+          {awaitingDecision && <><button className="button button-primary quote-step-primary" type="button" disabled={saving || !decisionOptions.length} onClick={() => openResult("Aceita pelo cliente")}><Check size={16} />Cliente aceitou</button><button className="button button-secondary" type="button" disabled={saving || !decisionOptions.length} onClick={() => openResult("Perdida")}>Perdida</button></>}
+          {draft.status === QUOTE_WAITING_STATUS && <>{actionEnabled.return && <button className="button button-primary quote-step-primary drawer-return-action" type="button" disabled={saving} onClick={actions.return}>Registrar retorno</button>}{task && <button className="button button-quiet" type="button" disabled={saving} onClick={actions.resume}>Retomar cotação</button>}<button className="button button-quiet" type="button" disabled={saving} onClick={() => setWaitingOpen(true)}>Editar</button></>}
+          {terminalQuote && <button className="button button-secondary" type="button" disabled={saving} onClick={reopen}>Reabrir cotação</button>}
+          {["Nova", "Em análise pelo financeiro"].includes(draft.status) && <button className="button button-quiet" type="button" disabled={saving} onClick={actions.wait}>Aguardar informação</button>}
+        </div>
+        {resultError && !resultOpen && <p className="quote-v3-save-error" role="alert">{resultError}</p>}
+      </section>
+      {(saveError || quoteConflict) && <p className="quote-v3-save-error" role="alert">{quoteConflict ? "Esta cotação mudou em outra edição." : saveError}{quoteConflict && <button type="button" onClick={reloadQuote}>Recarregar cotação</button>}</p>}
+      {saveMessage && <p role="status">{saveMessage}</p>}
+      <details className="quote-v3-details"><summary>Ver detalhes</summary>
+      <div className="quote-v3-details-context">
       <section className="quote-request-overview" aria-label="Pedido do cliente completo"><h3>Pedido do cliente</h3><p className="quote-request-full-text">{draft.notes || "Pedido do cliente não informado."}</p></section>
       <section className="quote-attachments-overview" aria-label="Anexos da cotação"><h3>Anexos da cotação</h3>
         {attachmentList?.loading && <p role="status">Carregando anexos…</p>}
@@ -429,34 +472,19 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
           {task.detailsError && <p role="alert">{task.detailsError}<button type="button" className="button button-quiet" onClick={() => onEnsureTaskDetails?.(task.id)}>Tentar novamente</button></p>}
           {AttachmentSectionComponent && (task.attachments || []).length > 0 && <AttachmentSectionComponent taskId={task.id} attachments={task.attachments} loadAttachmentContent={loadAttachmentContent} title="Anexos da tarefa (anterior)" sizeHint="Somente leitura" compact showPreview={false} />}</>}
       </section>
-    </div>} options={comparisonOptions} activeId={currentOption?.id} accepted={draft.status === "Aceita pelo cliente"} readOnly={readOnlyOptions} sent={hasSentOptions} saving={saving} onDecision={awaitingDecision && decisionOptions.length > 0 ? (optionId: any, status: any) => openResult(status, optionId) : undefined} onActivate={setActiveOptionId} onAdd={addOption} onDuplicate={duplicateOption} onRemove={removeOption} onChange={(option: any) => update("options", (draft.options || []).map((item: any) => item.id === option.id ? option : item))} onGenerate={openComposer} />
-    <aside className="quote-v3-drawer quote-v3-management">
-    <header className="quote-v3-drawer-header"><div><span className="quote-code">{draft.code || "Sem número"}</span><h2 id="quote-management-title">{draft.client || draft.title}</h2><div className="quote-v3-header-meta"><QuoteStatus status={draft.status} /><span>{task?.assigneeNames?.join(", ") || "Equipe Financeiro"}</span>{awaitingDecision ? <span>{sentLabel(draft)}</span> : <span className={draft.deadline && draft.deadline < localDateKey() && !terminalQuote ? "danger-text" : ""}>Prazo {formatDate(draft.deadline)}</span>}</div>
-    <ol className="quote-stage-stepper" aria-label="Etapas da cotação">{QUOTE_STAGES.map((item, index) => { const state = index < stageIndex || terminalQuote ? "done" : index === stageIndex ? "active" : ""; return <li key={item.id} className={state} aria-current={state === "active" ? "step" : undefined}><span>{state === "done" ? <Check size={12} aria-hidden="true" /> : index + 1}</span>{item.label}</li>; })}</ol>
-    {quote.status === "Cotada" && task?.status === "done" && !quote.responseSent && <p className="quote-v3-save-error" role="status">Registro anterior: tarefa concluída sem envio confirmado. Confira o envio antes de dar baixa; nenhum envio foi presumido.</p>}
-</div><button ref={closeRef} className="icon-button" type="button" onClick={requestClose} aria-label="Fechar cotação"><X size={20} /></button></header>
-    <div className="quote-v3-drawer-body">
+      </div>
       <form id="quote-panel-dados" className="quote-v3-data" onSubmit={(event) => { event.preventDefault(); save(); }} aria-label="Dados da cotação">
       <details className="quote-stage-section" open={stage.id === "request"}><summary><span className="quote-stage-number">1</span><h3>Pedido</h3><small>{draft.clientContact || "Solicitante"}{draft.passengers ? ` · ${draft.passengers} pax` : ""}{draft.deadline ? ` · até ${formatDate(draft.deadline)}` : ""}</small></summary><section><h4>Cliente</h4><QuoteClientFields draft={draft} update={update} errors={errors} /></section><section><h4>Pedido</h4><QuoteRequestFields draft={draft} update={update} errors={errors} /></section><section><h4>Prazo</h4><QuoteDeadlineFields draft={draft} update={update} errors={errors} /></section></details>
       <details className="quote-stage-section" open={stage.id === "cost"}><summary><span className="quote-stage-number">2</span><h3>Custo</h3><small>{proposalSummary.valid ? `${proposalSummary.options.length} ${proposalSummary.options.length === 1 ? "opção pronta" : "opções prontas"}` : "Sem opção com valor"}</small></summary><p className="quote-stage-hint">As opções ficam ao lado. Com título e valor, a cotação passa a Cotada sozinha.</p><section><QuoteTermsFields draft={draft} update={update} errors={errors} /></section></details>
 
-      {draft.status === QUOTE_WAITING_STATUS && <section className="quote-v3-waiting" aria-label="Aguardando informação">
-        <h4>Aguardando informação</h4>
-        {draft.waitingFor ? <dl><dt>O que falta</dt><dd>{draft.waitingFor}</dd><dt>De quem</dt><dd>{draft.waitingFrom || "Não informado"}</dd><dt>Retorno</dt><dd className={draft.waitingReturnDate && draft.waitingReturnDate <= localDateKey() ? "danger-text" : ""}>{formatDate(draft.waitingReturnDate)}</dd></dl> : <p>Sem detalhes registrados.</p>}
-        <div className="quote-v3-waiting-actions">
-          <button className="button button-quiet" type="button" disabled={saving} onClick={() => setWaitingOpen(true)}>Editar</button>
-          {actionEnabled.return && <button className="button button-secondary drawer-return-action" type="button" disabled={saving} onClick={actions.return}>Registrar retorno</button>}
-        </div>
-      </section>}
       {task && ReturnsSectionComponent && <ReturnsSectionComponent task={task} currentEmployee={currentEmployee} loadAttachmentContent={loadAttachmentContent} onDeleteAttachment={onDeleteAttachment} />}
-      {terminalQuote && <section className="quote-v3-result"><h3>Resultado</h3><strong>{draft.status}</strong><span>Finalizada em {draft.finalizationAt ? formatDateTime(draft.finalizationAt) : "data não informada"}</span>{draft.status === "Aceita pelo cliente" && acceptedOption && <p>{acceptedOption.name} · {formatMoney(acceptedOption.value)}</p>}{draft.status === "Perdida" && <p>Motivo: {draft.lossReason || "Não registrado"}</p>}</section>}</form>
-      {(saveError || quoteConflict) && <p className="quote-v3-save-error" role="alert">{quoteConflict ? "Esta cotação mudou em outra edição." : saveError}{quoteConflict && <button type="button" onClick={reloadQuote}>Recarregar cotação</button>}</p>}
-      {saveMessage && <p role="status">{saveMessage}</p>}
+</form>
       <details className="quote-stage-section" open={stage.id === "response"}><summary><span className="quote-stage-number">3</span><h3>Resposta</h3><small>{terminalQuote ? draft.status : sentProposal ? `Versão ${sentProposal.number} enviada` : "Ainda não enviada"}</small></summary>
       <div id="quote-panel-historico" className="quote-quote-history" aria-label="Histórico da cotação">{(draft.proposalVersions || []).length > 0 ? <section className="quote-proposal-history"><h4>Propostas enviadas</h4>{draft.proposalVersions.map((version: any) => <article key={version.id}><header><strong>Versão {version.number}</strong></header><p>{version.channel ? `Enviada por ${version.channel}` : "Envio registrado"}{version.recipient ? ` para ${version.recipient}` : ""}{version.sentAt ? ` em ${formatDateTime(version.sentAt)}` : ""}</p><p>Registrada por {version.authorName || "Autor não informado"}{version.createdAt ? ` em ${formatDateTime(version.createdAt)}` : ""}</p><ul>{(version.options || []).map((option: any) => <li key={option.id}>{formatQuoteOption(option)}</li>)}</ul>{draft.acceptedProposalVersionId === version.id && <span className="quote-accepted-version">Proposta aceita</span>}</article>)}</section> : <p className="quote-stage-hint">Monte a proposta na etapa Custo e registre o envio pela prévia.</p>}{task && <TaskHistorySection history={task.history} employees={employees} loading={task.detailsLoading} error={task.detailsError} onRetry={() => onEnsureTaskDetails?.(task.id)} />}</div>
       </details>
+      </details>
     </div>
-    <footer className="quote-v3-drawer-footer quote-v3-management-footer"><div className="quote-management-primary-actions">{!terminalQuote && <button className="button button-primary" type="button" disabled={saving || (actionEnabled as any)[nextAction.primary.id] === false} onClick={(actions as any)[nextAction.primary.id]}>{["compose", "send"].includes(nextAction.primary.id) && <Send size={15} />}{nextAction.primary.label}</button>}{terminalQuote && <button className="button button-secondary" type="button" disabled={saving} onClick={reopen}>Reabrir cotação</button>}{!terminalQuote && dirty && <button className="button button-secondary" type="button" disabled={saving} onClick={() => save()}><Save size={15} />{saving ? "Salvando…" : "Salvar alterações"}</button>}{!terminalQuote && nextAction.secondary.map((action) => <button key={action.id} className="button button-quiet" type="button" disabled={saving || (actionEnabled as any)[action.id] === false} onClick={(actions as any)[action.id]}>{action.label}</button>)}</div><details className="quote-management-more"><summary aria-label="Mais ações"><MoreHorizontal size={18} /></summary><div>{task && <button type="button" onClick={() => onOpenTask?.(task.id)}><Link2 size={14} />Ver tarefa</button>}{!terminalQuote && draft.status !== "Respondida ao cliente" && <button type="button" disabled={saving} onClick={() => openResult("Cancelada")}>Cancelar cotação</button>}{onDeleteQuote && <button className="is-danger" type="button" disabled={saving} onClick={() => setDeleteOpen(true)}><Trash2 size={14} />Excluir cotação</button>}{resultError && <span role="alert">{resultError}</span>}</div></details></footer>
+    <footer className="quote-v3-drawer-footer quote-v3-management-footer"><div className="quote-management-primary-actions">{!terminalQuote && dirty && draft.status !== "Em análise pelo financeiro" && <button className="button button-secondary" type="button" disabled={saving} onClick={() => save()}><Save size={15} />{saving ? "Salvando…" : "Salvar alterações"}</button>}</div><details className="quote-management-more"><summary aria-label="Mais ações"><MoreHorizontal size={18} /></summary><div>{task && <button type="button" onClick={() => onOpenTask?.(task.id)}><Link2 size={14} />Ver tarefa</button>}{!terminalQuote && draft.status !== "Respondida ao cliente" && <button type="button" disabled={saving} onClick={() => openResult("Cancelada")}>Cancelar cotação</button>}{onDeleteQuote && <button className="is-danger" type="button" disabled={saving} onClick={() => setDeleteOpen(true)}><Trash2 size={14} />Excluir cotação</button>}</div></details></footer>
     </aside>
   </div>
   {composerOpen && <div className="quote-v3-composer-layer" onMouseDown={(event) => { if (event.target === event.currentTarget) closeComposer(); }}><section ref={composerRef} className="quote-v3-preview" role="dialog" aria-modal="true" aria-label="Montar email da cotação" tabIndex={-1}>

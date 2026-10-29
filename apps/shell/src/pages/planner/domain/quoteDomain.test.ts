@@ -146,7 +146,7 @@ test("cotação respondida ao cliente não entra nas atrasadas", () => {
 });
 
 test("define uma ação primária por etapa", () => {
-  assert.deepEqual(getQuoteNextAction({ status: "Nova" }).primary, { id: "start", label: "Iniciar cotação", status: "Em análise pelo financeiro" });
+  assert.deepEqual(getQuoteNextAction({ status: "Nova" }).primary, { id: "start", label: "Começar a cotar", status: "Em análise pelo financeiro" });
   assert.equal(getQuoteNextAction({ status: "Em análise pelo financeiro" }).primary.id, "compose");
   assert.equal(getQuoteNextAction({ status: "Aguardando informação" }).primary.id, "return");
   assert.deepEqual(getQuoteNextAction({ status: "Cotada" }).primary, { id: "send", label: "Enviei" });

@@ -52,3 +52,21 @@ Decisões do Renan em 28/10/2026.
 4. **Preço pronto** avisa o criador a cada nova entrada em Cotada: a chave de dedupe inclui o instante da transição.
 
 Colunas criadas por `packages/planner/scripts/ensure-quote-v2-dev.ps1` (idempotente; primeiro as colunas da cotação, por último a lookup da notificação; erro isolado por item). O app só grava os campos de espera se as colunas existirem (sonda 404).
+
+## V2.2 — um passo por vez
+
+Decisões do Renan em 28/10/2026. Redesenho de UX; as regras da V2 e da V2.1 (avisos, Cotada derivada, "Enviei" só com data, lembretes, Aguardar informação, anexos no SharePoint) não mudam.
+
+1. **Criar cotação = 3 telas curtas**, com "Passo N de 3" e botões Voltar/Continuar: (1) **Quem pediu?** (solicitante), (2) **O que pediu?** (texto do pedido), (3) **Para quando?** (Hoje / 2 dias / 7 dias / data). Cada passo valida só os seus campos; a cotação só é gravada ao fim do passo 3 ("Criar cotação"). Voltar preserva o que foi digitado.
+2. **Opcionais recolhidos** em "Adicionar detalhes" dentro do passo a que pertencem: cliente/empresa, telefone, e-mail e título interno no passo 1; passageiros, perfil, observações internas e anexos no passo 2; prioridade no passo 3. Se um opcional tem erro (ex.: e-mail inválido), o bloco abre sozinho. Custo e condições gerais saíram da criação: entram ao cotar.
+3. **Abrir uma cotação mostra só o passo atual** com um botão principal grande:
+   - Nova → resumo (quem, o quê, para quando) + **Começar a cotar**;
+   - Em análise → tabela de opções editável (todas visíveis, como hoje) + **Salvar preços** (com valor, vira Cotada);
+   - Cotada → **Enviei ao cliente** (e "Ver proposta" discreto para copiar/baixar);
+   - Respondida → **Cliente aceitou** / **Perdida** (motivo em lista);
+   - Aguardando informação → resumo (o que falta, de quem, retorno) + **Registrar retorno** (e "Editar");
+   - Aceita/Perdida/Cancelada → resultado + "Reabrir cotação".
+   "Aguardar informação" aparece como ação secundária discreta em Nova e Em análise.
+4. **Ver detalhes** (recolhido) reúne pedido completo, anexos, dados editáveis (Pedido, Custo), retornos da tarefa legada e histórico de propostas.
+5. Mantidos: lista editável de opções (decisão 3), os três campos de Aguardar (decisão 4), arrastar no Kanban (decisão 5) e a mesma tela para quem cria e para o Financeiro, mudando só o botão principal (decisão 6).
+6. O botão do card no Kanban segue o mesmo rótulo do drawer ("Começar a cotar", "Cliente aceitou"); em Cotada o card continua "Enviei".
