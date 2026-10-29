@@ -20,7 +20,7 @@ test("no Dynamics grava appName, versão, tela, e-mail e errorCode do status", a
     json: async () =>
       String(url).includes("WhoAmI")
         ? { UserId: "11111111-1111-1111-1111-111111111111" }
-        : { internalemailaddress: "teste@betinhos.com.br", fullname: "Teste", domainname: "teste" },
+        : { internalemailaddress: "usuario@example.com", fullname: "Teste", domainname: "teste" },
   });
   globalThis.window = {
     location: { href: "https://org.crm2.dynamics.com/WebResources/x.html" },
@@ -46,7 +46,7 @@ test("no Dynamics grava appName, versão, tela, e-mail e errorCode do status", a
     assert.equal(record.new_appname, ERROR_LOG_APP_NAME);
     assert.equal(record.new_appversion, APP_VERSION_LABEL.split(" ")[0]);
     assert.equal(record.new_screen, "lots");
-    assert.equal(record.new_useremail, "teste@betinhos.com.br");
+    assert.equal(record.new_useremail, "usuario@example.com");
     assert.equal(record.new_errorcode, "412");
     assert.equal(record.new_component, "DataverseClient");
     uninstall();
