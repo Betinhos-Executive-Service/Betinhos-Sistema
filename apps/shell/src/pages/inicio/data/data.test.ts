@@ -109,4 +109,28 @@ describe('capas do Radar', () => {
     localStorage.setItem('bt-inicio-capas', JSON.stringify({ 'https://v.com': { src: 'https://img', em: Date.now() - 8 * 86400000 } }))
     expect(capasEmCache(['https://v.com'])).toEqual({})
   })
+
+  it('cota esgotada (429) não vira "sem capa" no cache', async () => {
+    const cota = vi.fn(async () => new Response('', { status: 429 })) as unknown as typeof fetch
+    const recebidas: string[] = []
+    await carregarCapas(['https://a.com'], (u) => { recebidas.push(u) }, new AbortController().signal, cota)
+    expect(recebidas).toEqual([])
+    expect(capasEmCache(['https://a.com'])).toEqual({})
+  })
+
+  it('no máximo 4 buscas ao mesmo tempo, na ordem recebida', async () => {
+    let ativas = 0, pico = 0
+    const ordem: string[] = []
+    const lento = vi.fn(async (url: string) => {
+      ordem.push(decodeURIComponent(url.split('url=')[1].split('&')[0]))
+      pico = Math.max(pico, ++ativas)
+      await new Promise((r) => setTimeout(r, 5))
+      ativas--
+      return resposta(null)
+    }) as unknown as typeof fetch
+    const urls = Array.from({ length: 10 }, (_, i) => `https://n${i}.com`)
+    await carregarCapas(urls, () => undefined, new AbortController().signal, lento)
+    expect(pico).toBe(4)
+    expect(ordem).toEqual(urls)
+  })
 })
