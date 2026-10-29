@@ -72,3 +72,10 @@ it('Parcelas de multa sai do menu; Clientes é rota React em Cadastros', () => {
   expect(findItem('cr40f_clientes1')).toBeNull()
   expect(rotaAtualizada('cr40f_clientes1', new URLSearchParams('ver=c1'))).toEqual({ id: 'clientes', query: new URLSearchParams('ver=c1') })
 })
+
+it('Gestão de Qualidade é a tela React; o id do WebResource antigo redireciona', () => {
+  expect(findItem('qualidade')?.group.id).toBe('operacional')
+  expect(findItem('qualidade')?.item).toMatchObject({ kind: 'page', page: 'qualidade', label: 'Gestão de Qualidade' })
+  expect(findItem('new_gestao_erros_operacionais')).toBeNull()
+  expect(rotaAtualizada('new_gestao_erros_operacionais', new URLSearchParams('errorId=e1'))).toEqual({ id: 'qualidade', query: new URLSearchParams('errorId=e1') })
+})
