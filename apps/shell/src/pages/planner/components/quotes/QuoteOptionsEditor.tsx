@@ -10,15 +10,16 @@ const optionCategory = (option: any) => { const type = option.items?.[0]?.vehicl
 
 // Com `options` (lista), desenha a grade de cards e o botão de adicionar; com `option`, um card só.
 export default function QuoteOptionsEditor({ option, options, index = 0, onChange, onDuplicate, onRemove, readOnly = false, addLabel = "Adicionar opção" }: any) {
+  const focusOption = (id: string) => requestAnimationFrame(() => document.getElementById(`quote-option-${id}`)?.querySelector<HTMLInputElement>("input[type='text']")?.focus());
   if (Array.isArray(options)) return <div className="quote-flow__options">
-    {options.map((item: any, position: number) => <QuoteOptionsEditor key={item.id} option={item} index={position} readOnly={readOnly}
+    {options.map((item: any, position: number) => <QuoteOptionsEditor key={item.id} option={item} index={position} readOnly={readOnly} onDuplicate={onDuplicate}
       onChange={(updated: any) => onChange(options.map((current: any) => current.id === updated.id ? updated : current))}
       onRemove={!readOnly && options.length > 1 ? (removed: any) => onChange(options.filter((current: any) => current.id !== removed.id)) : undefined} />)}
-    {!readOnly && <button className="quote-flow__option quote-flow__option--add" type="button" onClick={() => onChange([...options, newQuoteOption(options.length)])}><Plus size={20} aria-hidden="true" />{addLabel}</button>}
+    {!readOnly && <button className="quote-flow__option quote-flow__option--add" type="button" onClick={() => { const created = newQuoteOption(options.length); onChange([...options, created]); focusOption(created.id); }}><Plus size={20} aria-hidden="true" />{addLabel}</button>}
   </div>;
   const update = (patch: any) => onChange?.({ ...option, ...patch, legacy: false });
   const validation = validateQuoteOption(option);
-  const priced = parseQuoteMoney(option.value) > 0;
+  const priced = (parseQuoteMoney(option.value) ?? 0) > 0;
   return <article id={`quote-option-${option.id}`} className="quote-flow__option" aria-label={`Opção ${index + 1}`}>
     <header className="quote-flow__option-head">
       <strong>Opção {index + 1}</strong>
@@ -29,7 +30,7 @@ export default function QuoteOptionsEditor({ option, options, index = 0, onChang
       ]} />}
     </header>
     <Field label="Título da opção"><Input value={option.name || ""} maxLength={100} readOnly={readOnly} onChange={(event: any) => update({ name: event.target.value })} placeholder={`Ex.: Sedan executivo · transfer`} /></Field>
-    <Field label="Veículo"><SegmentedControl aria-label="Veículo" fullWidth value={optionCategory(option)} disabled={readOnly} options={CATEGORIES.map(({ value, label }) => ({ value, label }))} onChange={(value: string) => { const category = CATEGORIES.find((item) => item.value === value)!; update({ items: [{ id: option.items?.[0]?.id || category.value, vehicleType: category.vehicleType, quantity: 1 }] }); }} /></Field>
+    <Field label="Veículo"><SegmentedControl aria-label="Veículo" fullWidth value={optionCategory(option)} options={CATEGORIES.map(({ value, label }) => ({ value, label, disabled: readOnly }))} onChange={(value: string) => { const category = CATEGORIES.find((item) => item.value === value)!; update({ items: [{ id: option.items?.[0]?.id || category.value, vehicleType: category.vehicleType, quantity: 1 }] }); }} /></Field>
     <Field label="Valor total"><Input className="quote-flow__money" prefix="R$" inputMode="decimal" value={String(option.value ?? "").replace(/^R\$\s?/, "")} readOnly={readOnly} onChange={(event: any) => update({ value: event.target.value })} onBlur={() => { if (priced) update({ value: formatMoney(option.value).replace(/^R\$\s?/, "") }); }} placeholder="0,00" /></Field>
     <Field label="Condição comercial desta opção"><Textarea rows={3} maxLength={4000} value={option.commercialTerms || ""} readOnly={readOnly} onChange={(event: any) => update({ commercialTerms: event.target.value })} placeholder="Prazo, pagamento e validade" /></Field>
   </article>;

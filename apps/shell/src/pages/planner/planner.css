@@ -648,26 +648,12 @@
 @media (max-width: 1180px) { :where(.planner-page, .planner-portal) .quote-options-context { grid-template-columns: 1fr; } }
 :where(.planner-page, .planner-portal) .quote-option-include { display: flex !important; align-items: center; gap: 7px !important; color: var(--muted); font-size: 11px !important; }
 :where(.planner-page, .planner-portal) .quote-option-include input { width: 16px; min-height: 16px; accent-color: var(--blue, #2159d2); }
-:where(.planner-page, .planner-portal) .quote-management-more summary::-webkit-details-marker { display: none; }
-:where(.planner-page, .planner-portal) .quote-management-more > div { position: absolute; z-index: 5; right: 0; display: grid; min-width: 176px; padding: 5px; border: 1px solid var(--quote-v3-border); border-radius: 8px; background: #fff; box-shadow: 0 10px 25px rgba(0,24,39,.15); }
-:where(.planner-page, .planner-portal) .quote-management-more > div button { display: flex; align-items: center; gap: 8px; min-height: 34px; border: 0; border-radius: 5px; padding: 6px 8px; background: transparent; color: var(--ink); text-align: left; font: inherit; font-size: 12px; cursor: pointer; }
-:where(.planner-page, .planner-portal) .quote-management-more > div button:hover { background: #f3f6fa; }
-:where(.planner-page, .planner-portal) .quote-management-more > div button.is-danger { color: #a32f2f; }
-:where(.planner-page, .planner-portal) .quote-management-more { position: relative; margin-left: auto; }
-:where(.planner-page, .planner-portal) .quote-management-more > summary { display: grid; width: 40px; min-height: 40px; place-items: center; border: 1px solid var(--quote-v3-border); border-radius: 8px; color: var(--ink); cursor: pointer; list-style: none; }
-:where(.planner-page, .planner-portal) .quote-management-more > div { bottom: calc(100% + 8px); min-width: 210px; }
 :where(.planner-page, .planner-portal) .quote-v3-save-error { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; padding: 10px 12px; border-radius: 7px; background: #fff5f4; font-size: 12px; }
 :where(.planner-page, .planner-portal) .quote-v3-save-error button { border: 0; background: transparent; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; }
-@media (max-width: 760px) {
-  :where(.planner-page, .planner-portal) .quote-management-more { margin-left: 0; }
-}
 @media (max-width: 640px) { :where(.planner-page, .planner-portal) .quote-option-fields { grid-template-columns: 1fr; } :where(.planner-page, .planner-portal) .quote-options-editor > header { align-items: flex-start; flex-direction: column; } }
 @media (prefers-reduced-motion: reduce) { :where(.planner-page, .planner-portal) .quote-comparison-card, :where(.planner-page, .planner-portal) .quote-comparison-edit { transition: none; } :where(.planner-page, .planner-portal) .quote-comparison-card:hover, :where(.planner-page, .planner-portal) .quote-comparison-card.is-active { transform: none; } }
 :where(.planner-page, .planner-portal) .quote-v3-inline-warning { display: grid; gap: 8px; padding: 13px; border-radius: 10px; background: #fff7e6; color: #7a5200; }
 :where(.planner-page, .planner-portal) .quote-v3-feedback { position: sticky; bottom: 0; margin-top: 14px; padding: 10px 12px; border-radius: 9px; background: #eaf5f2; color: #175d4d; }
-:where(.planner-page, .planner-portal) .quote-v3-preview { width: min(1480px, 100%); height: min(920px, calc(100dvh - 48px)); min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; grid-template-areas: "header" "viewport" "actions"; overflow: hidden; border: 1px solid rgba(255,255,255,.45); border-radius: 16px; background: #fff; box-shadow: 0 24px 70px rgba(0,20,30,.35); }
-:where(.planner-page, .planner-portal) .quote-v3-preview-viewport { grid-area: viewport; min-width: 0; min-height: 0; display: grid; place-items: center; overflow: hidden; padding: 16px; background: #e8edf2; }
-:where(.planner-page, .planner-portal) .quote-v3-preview-viewport iframe { width: 100%; height: 100%; border: 0; background: #0a2f41; }
 @keyframes quote-v3-enter { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 @keyframes quote-v3-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes quote-v3-spin { to { transform: rotate(360deg); } }
@@ -714,7 +700,6 @@
   :where(.planner-page, .planner-portal) .quote-v3-drawer-footer { align-items: stretch; flex-direction: column-reverse; }
   :where(.planner-page, .planner-portal) .quote-v3-drawer-footer > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   :where(.planner-page, .planner-portal) .quote-v3-drawer-footer .button { justify-content: center; }
-  :where(.planner-page, .planner-portal) .quote-v3-preview { width: 100%; height: 100dvh; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(220px, 1fr) auto; grid-template-areas: "header" "viewport" "actions"; border: 0; border-radius: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3045,34 +3030,8 @@
 }
 
 /* quotes/QuoteEmailComposer.css */
-:where(.planner-page, .planner-portal) .quote-v3-preview.quote-v3-preview {
-  grid-template-columns: minmax(0, 1fr) 360px;
-  grid-template-rows: minmax(0, 1fr);
-  grid-template-areas: "viewport actions";
-}
 
-:where(.planner-page, .planner-portal) .quote-v3-preview.quote-v3-preview > .quote-v3-preview-viewport { position: relative; grid-area: viewport; }
-:where(.planner-page, .planner-portal) .quote-v3-preview.quote-v3-preview > .quote-v3-composer-actions {
-  grid-area: actions;
-  min-width: 0;
-  max-height: 100%;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: flex-start;
-  gap: 10px;
-  padding: 20px;
-  border-top: 0;
-  border-left: 1px solid #edf0f4;
-}
 
-:where(.planner-page, .planner-portal) .quote-v3-preview.quote-v3-preview > .quote-v3-composer-actions > .quote-v3-preview-header {
-  grid-area: auto;
-  flex: 0 0 auto;
-  padding: 0 0 14px;
-  border-bottom: 1px solid #edf0f4;
-}
 :where(.planner-page, .planner-portal) .quote-v3-inline-toolbar { position: absolute; z-index: 5; display: flex; align-items: center; gap: 2px; max-width: calc(100% - 16px); padding: 3px; border: 1px solid #dfe5ec; border-radius: 8px; background: #fff; box-shadow: 0 4px 12px rgba(16,24,40,.13); }
 :where(.planner-page, .planner-portal) .quote-v3-inline-format-button { position: relative; display: grid; flex: 0 0 28px; place-items: center; width: 28px; min-width: 0; height: 28px; min-height: 0; padding: 0; border: 0; border-radius: 5px; background: transparent; color: #26374b; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 :where(.planner-page, .planner-portal) .quote-v3-inline-format-button:hover { background: #f0f4f8; color: #082d62; }
@@ -3080,19 +3039,6 @@
 :where(.planner-page, .planner-portal) .quote-v3-inline-format-button:nth-child(4) { margin-left: 4px; }
 :where(.planner-page, .planner-portal) .quote-v3-inline-format-button:nth-child(4)::before { position: absolute; top: 5px; left: -4px; width: 1px; height: 18px; background: #e5ebf2; content: ""; }
 
-@media (max-width: 760px) {
-  :where(.planner-page, .planner-portal) .quote-v3-preview.quote-v3-preview {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) auto;
-    grid-template-areas: "viewport" "actions";
-  }
-  :where(.planner-page, .planner-portal) .quote-v3-preview.quote-v3-preview > .quote-v3-composer-actions {
-    max-height: 42dvh;
-    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-    border-top: 1px solid #edf0f4;
-    border-left: 0;
-  }
-}
 
 /* quotes/quoteOptionsLayout.css */
 :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-comparison > header {

@@ -2,7 +2,7 @@
 // Painel de 720px nas etapas de leitura; tela cheia, com o pedido fixo à esquerda, nas etapas de trabalho.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Copy, Download, Link2, MoreHorizontal, Save, Send, Trash2, X } from "lucide-react";
-import { Alert, Button, Field, StatusBadge, Surface, Textarea } from "@betinhos/ui";
+import { Alert, Button, Dialog, Field, Menu, StatusBadge, Surface, Textarea } from "@betinhos/ui";
 import { buildQuoteEmailHtml, copyQuoteToClipboard, deriveQuoteStatus, formatDateTime, formatMoney, loadQuoteImages, normalizeQuoteRoute, QUOTE_COMPLETED_STATUSES, QUOTE_TERMINAL_STATUSES, quoteSubject, sentLabel, validateQuoteStep } from '../../domain/quoteDomain';
 import { localDateKey } from '../../domain/management';
 import { startQuotePatch } from '../../domain/quoteTaskFlow';
@@ -23,7 +23,7 @@ import { LOSS_REASONS, isLossReason } from '../../domain/quoteNotifications';
 import { InputSelect } from '../AssignmentFields';
 
 // As 4 etapas da tela. "Aguardando informação" é a etapa Preço parada.
-const STEPS = [{ id: "request", label: "Pedido" }, { id: "cost", label: "Preço" }, { id: "send", label: "Enviar" }, { id: "response", label: "Resposta" }];
+const STEPS = ["Pedido", "Preço", "Enviar", "Resposta"];
 const STEP_OF_STATUS: Record<string, number> = { Nova: 0, "Em análise pelo financeiro": 1, [QUOTE_WAITING_STATUS]: 1, Cotada: 2, "Respondida ao cliente": 3 };
 const STEP_TITLE: Record<string, string> = { Nova: "Pedido do cliente", "Em análise pelo financeiro": "Opções de preço", Cotada: "Enviar a proposta", "Respondida ao cliente": "O que o cliente respondeu?", [QUOTE_WAITING_STATUS]: "Aguardando informação" };
 const STATUS_TONE: Record<string, "info" | "success" | "warning" | "danger" | "neutral"> = { Nova: "info", "Em análise pelo financeiro": "warning", [QUOTE_WAITING_STATUS]: "warning", Cotada: "success", "Respondida ao cliente": "info", "Aceita pelo cliente": "success", Perdida: "danger", Cancelada: "neutral" };
@@ -46,22 +46,18 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
   const [saveError, setSaveError] = useState<any>("");
   const [saveMessage, setSaveMessage] = useState<any>("");
   const [quoteConflict, setQuoteConflict] = useState<any>(false);
-  // Em Cotada o usuário pode voltar aos preços; em Respondida pode abrir a prévia para reenviar.
-  const [editingPrices, setEditingPrices] = useState(false);
-  const [resendOpen, setResendOpen] = useState(false);
+  // Desvio da tela padrão do status: em Cotada voltar aos preços; em Respondida abrir a prévia para reenviar.
+  const [override, setOverride] = useState<"prices" | "resend" | null>(null);
   const [composerBusy, setComposerBusy] = useState<any>("");
   const [composerMessage, setComposerMessage] = useState<any>("");
   const [confirmMissingDeadline, setConfirmMissingDeadline] = useState<any>(false);
   const [waitingOpen, setWaitingOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState<any>(false);
-  const cancelRef = useRef<any>(null);
-  const cancelFocusRef = useRef<any>(null);
   const [resultStatus, setResultStatus] = useState<any>("Aceita pelo cliente");
   const [lossReason, setLossReason] = useState<any>("");
   const [resultError, setResultError] = useState<any>("");
   const [deleteOpen, setDeleteOpen] = useState<any>(false);
   const [confirmClose, setConfirmClose] = useState<any>(false);
-  const discardRef = useRef<any>(null);
   const [previewHtml, setPreviewHtml] = useState<any>("");
   const [editingPreview, setEditingPreview] = useState<any>(false);
   const [previewEdited, setPreviewEdited] = useState<any>(false);
@@ -78,7 +74,7 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
   const draftSnapshot = useMemo(() => quoteDraftSnapshot(draft), [draft]);
   const dirty = draftSnapshot !== baselineRef.current.snapshot;
   // Status mudado por qualquer caminho (envio, decisão, recarga) também tira a mensagem do passo anterior.
-  useEffect(() => { setSaveMessage(""); setEditingPrices(false); setResendOpen(false); }, [draft.status]);
+  useEffect(() => { setSaveMessage(""); setOverride(null); }, [draft.status]);
   const update = (key: any, value: any) => { setSaveMessage(""); setDraft((current: any) => ({ ...current, [key]: value })); };
   const requestClose = () => {
     if (mutationPending.current || saving) return;
@@ -86,20 +82,6 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     if (changed) { setConfirmClose(true); return; }
     onClose?.();
   };
-  useEffect(() => {
-    if (!confirmClose) return;
-    const previousFocus = document.activeElement;
-    discardRef.current?.querySelector("button")?.focus();
-    const handler = (event: any) => {
-      if (event.key === "Escape") { event.preventDefault(); setConfirmClose(false); }
-      if (event.key !== "Tab") return;
-      const buttons = [...discardRef.current.querySelectorAll("button")];
-      if (event.shiftKey && document.activeElement === buttons[0]) { event.preventDefault(); buttons.at(-1)?.focus(); }
-      else if (!event.shiftKey && document.activeElement === buttons.at(-1)) { event.preventDefault(); buttons[0]?.focus(); }
-    };
-    window.addEventListener("keydown", handler);
-    return () => { window.removeEventListener("keydown", handler); (previousFocus as any)?.focus?.(); };
-  }, [confirmClose]);
 
   useEffect(() => { returnFocusRef.current = document.activeElement; closeRef.current?.focus(); return () => returnFocusRef.current?.focus?.(); }, []);
   useEffect(() => { onEnsureTaskDetails?.(task?.id); }, [onEnsureTaskDetails, task?.id]);
@@ -119,8 +101,8 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
   const ensureQuoteAttachments = attachmentsApi?.ensure;
   useEffect(() => { void ensureQuoteAttachments?.(quote.id); }, [ensureQuoteAttachments, quote.id]);
   const attachmentList = attachmentsApi?.get(quote.id);
-  const resetComposer = () => { composerController.current?.abort(); composerController.current = null; setComposerBusy(""); setComposerMessage(""); setResendOpen(false); };
-  useEffect(() => { const handler = (event: any) => { if (event.key === "Escape" && !confirmClose && !waitingOpen && !mutationPending.current) cancelOpen ? setCancelOpen(false) : deleteOpen ? setDeleteOpen(false) : requestClose(); }; window.addEventListener("keydown", handler); return () => window.removeEventListener("keydown", handler); }, [onClose, deleteOpen, cancelOpen, confirmClose, waitingOpen, draft, previewEdited, saving]);
+  const resetComposer = () => { composerController.current?.abort(); composerController.current = null; setComposerBusy(""); setComposerMessage(""); setOverride(null); };
+  useEffect(() => { const handler = (event: any) => { if (event.key === "Escape" && !confirmClose && !waitingOpen && !mutationPending.current && !event.target?.closest?.(".bt-menu")) cancelOpen ? setCancelOpen(false) : deleteOpen ? setDeleteOpen(false) : requestClose(); }; window.addEventListener("keydown", handler); return () => window.removeEventListener("keydown", handler); }, [onClose, deleteOpen, cancelOpen, confirmClose, waitingOpen, draft, previewEdited, saving]);
   useEffect(() => {
     const containFocus = (event: any) => {
       if (event.key !== "Tab" || confirmClose || cancelOpen || deleteOpen || waitingOpen) return;
@@ -137,19 +119,6 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     return () => window.removeEventListener("keydown", containFocus);
   }, [cancelOpen, deleteOpen, confirmClose, waitingOpen]);
   useEffect(() => () => composerController.current?.abort(), []);
-  useEffect(() => {
-    if (!cancelOpen) return;
-    cancelRef.current?.querySelector("button")?.focus();
-    const handler = (event: any) => {
-      if (event.key !== "Tab") return;
-      const elements = [...(cancelRef.current?.querySelectorAll("button:not([disabled])") || [])];
-      const first = elements[0]; const last = elements.at(-1);
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-    };
-    window.addEventListener("keydown", handler);
-    return () => { window.removeEventListener("keydown", handler); cancelFocusRef.current?.focus?.(); };
-  }, [cancelOpen]);
   const fitEmailPreview = () => {
     const frame = previewFrameRef.current;
     const viewport = previewViewportRef.current;
@@ -233,19 +202,23 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
   const awaitingDecision = draft.status === "Respondida ao cliente";
   const terminalQuote = QUOTE_TERMINAL_STATUSES.includes(draft.status);
   const stepIndex = terminalQuote ? 3 : STEP_OF_STATUS[draft.status] ?? 0;
-  // A prévia do e-mail é a etapa Enviar; em Respondida ela volta só para registrar um novo envio.
-  const previewOpen = (draft.status === "Cotada" && !editingPrices) || (awaitingDecision && resendOpen);
-  const costView = draft.status === "Em análise pelo financeiro" || editingPrices;
+  // Uma tela por status; o desvio só vale no status em que foi pedido.
+  const view = terminalQuote ? "terminal" : draft.status === QUOTE_WAITING_STATUS ? "waiting"
+    : awaitingDecision ? (override === "resend" ? "preview" : "decision")
+    : draft.status === "Cotada" ? (override === "prices" ? "cost" : "preview")
+    : draft.status === "Em análise pelo financeiro" ? "cost" : "request";
+  const previewOpen = view === "preview";
+  const costView = view === "cost";
   // Etapas de trabalho ocupam a tela inteira; leitura e espera ficam no painel estreito.
-  const fullWidth = costView || previewOpen || (awaitingDecision && !resendOpen);
+  const fullWidth = costView || previewOpen || view === "decision";
+  const proposalSummary = useMemo(() => prepareQuoteResponse(draft), [draft]);
+  // Abrir a prévia zera a edição manual; mudar os dados da cotação só regera o HTML.
+  useEffect(() => { if (previewOpen) { setEditingPreview(false); setPreviewEdited(false); } }, [previewOpen]);
   useEffect(() => {
     if (!previewOpen) return undefined;
-    setEditingPreview(false);
-    setPreviewEdited(false);
     const controller = new AbortController();
-    const proposal = prepareQuoteResponse(draft);
-    if (!proposal.valid) { setPreviewHtml(""); return undefined; }
-    const previewQuote = { ...draft, proposalOptions: proposal.options };
+    if (!proposalSummary.valid) { setPreviewHtml(""); return undefined; }
+    const previewQuote = { ...draft, proposalOptions: proposalSummary.options };
     setPreviewHtml(buildQuoteEmailHtml(previewQuote, { baseUrl: window.location.origin }));
     loadQuoteImages(previewQuote, { baseUrl: window.location.origin, signal: controller.signal })
       .then((assets) => {
@@ -257,7 +230,9 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     if (viewport) observer?.observe(viewport);
     requestAnimationFrame(fitEmailPreview);
     return () => { controller.abort(); observer?.disconnect(); };
-  }, [previewOpen, draft]);
+    // draftSnapshot cobre os dados de negócio; etag/modifiedAt não regeram a prévia.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewOpen, draftSnapshot]);
 
   const run = async (operation: any) => {
     if (mutationPending.current) return false;
@@ -283,12 +258,12 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     setSaveError("");
     const result = await run(() => onUpdate?.(quote.id, nextDraft));
     if (result === false) return fail("Não foi possível salvar. Sua edição continua aberta; confira sua conexão e tente novamente.");
-    baselineRef.current = { id: quote.id, snapshot: quoteDraftSnapshot(nextDraft) }; setDraft(nextDraft); setQuoteConflict(false); setEditingPrices(false);
+    baselineRef.current = { id: quote.id, snapshot: quoteDraftSnapshot(nextDraft) }; setDraft(nextDraft); setQuoteConflict(false); setOverride(null);
     // Mudou de passo: o próprio passo novo é o retorno; "Cotação salva." fica só para edições no mesmo passo.
     setSaveMessage(nextDraft.status === draft.status ? "Cotação salva." : "");
     return "";
   };
-  const openComposer = () => { setComposerMessage(""); setPreviewEdited(false); setEditingPreview(false); setEditingPrices(false); if (awaitingDecision) setResendOpen(true); };
+  const openComposer = () => { setComposerMessage(""); setOverride(awaitingDecision ? "resend" : null); };
   const reloadQuote = () => {
     baselineRef.current = { id: quote.id, snapshot: quoteDraftSnapshot(quote) };
     setDraft(quoteToDraft(quote)); setAcceptedOptionId(quote.acceptedOptionId || ""); setQuoteConflict(false); setSaveError("");
@@ -389,13 +364,12 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
   const decisionOptions = hasSentOptions ? sentProposal.options : legacyDecision ? normalizeQuoteOptions(quote) : [];
   const acceptedChoice = decisionOptions.find((option: any) => option.id === acceptedOptionId);
   // Decisão (Respondida): ajusta os rádios; cancelamento fora de Respondida abre o diálogo.
-  const openResult = (status: any, optionId = decisionOptions[0]?.id) => {
+  const openResult = (status: any) => {
     if (mutationPending.current || (status !== "Cancelada" && !decisionOptions.length)) return;
-    setAcceptedOptionId(optionId || "");
+    setAcceptedOptionId(decisionOptions[0]?.id || "");
     setResultStatus(status); setLossReason(""); setResultError("");
-    if (!awaitingDecision) { cancelFocusRef.current = document.activeElement; setCancelOpen(true); }
+    if (!awaitingDecision) setCancelOpen(true);
   };
-  const proposalSummary = prepareQuoteResponse(draft);
   const actions = {
     start: () => save(false, startQuotePatch(task, currentEmployee)),
     compose: openComposer,
@@ -410,7 +384,7 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     wait: () => setWaitingOpen(true),
     resume: () => save(false, { status: "Em análise pelo financeiro" }),
   };
-  const actionEnabled = { return: task ? canRegisterWaitingReturn(task, currentEmployee, teams) && Boolean(onRegisterWaitingReturn) : true, outcome: decisionOptions.length > 0, wait: true };
+  const canReturn = task ? canRegisterWaitingReturn(task, currentEmployee, teams) && Boolean(onRegisterWaitingReturn) : true;
   // Ação pedida pelo card do Kanban ou pelo board de tarefas ao abrir a cotação.
   // A chave evita repetir a ação quando o efeito roda de novo (StrictMode em dev).
   const initialActionKey = useRef("");
@@ -429,7 +403,6 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     options.splice(sourceIndex + 1, 0, copy); update("options", options);
     requestAnimationFrame(() => document.getElementById(`quote-option-${copy.id}`)?.querySelector<any>("input[type='text']")?.focus());
   };
-  const removeOption = (option: any) => update("options", (draft.options || []).filter((item: any) => item.id !== option.id));
 
   const overdue = draft.deadline && draft.deadline < localDateKey() && !terminalQuote && !awaitingDecision;
   const deadlineLabel = !draft.deadline ? "Sem prazo" : draft.deadline === localDateKey() ? "Responder hoje" : `Responder até ${formatDate(draft.deadline)}`;
@@ -469,10 +442,10 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     {task && <TaskHistorySection history={task.history} employees={employees} loading={task.detailsLoading} error={task.detailsError} onRetry={() => onEnsureTaskDetails?.(task.id)} />}
     {task && ReturnsSectionComponent && <ReturnsSectionComponent task={task} currentEmployee={currentEmployee} loadAttachmentContent={loadAttachmentContent} onDeleteAttachment={onDeleteAttachment} />}
   </details>;
-  const requestSurface = <Surface compact aria-label="Pedido do cliente"><span className="bt-eyebrow">Pedido do cliente</span><p className="quote-flow__quote">{draft.notes || "Pedido do cliente não informado."}</p>{requestSummary}{requestEditor}</Surface>;
-  const previewBlock = <div className="quote-flow__preview">
+  const requestSurface = (editable = true) => <Surface compact aria-label="Pedido do cliente"><span className="bt-eyebrow">Pedido do cliente</span><p className="quote-flow__quote">{draft.notes || "Pedido do cliente não informado."}</p>{editable && <>{requestSummary}{requestEditor}</>}</Surface>;
+  const previewBlock = previewOpen && <div className="quote-flow__preview">
     <div className="quote-flow__preview-bar"><span className="bt-eyebrow">Prévia · exatamente o que será copiado</span><span className="quote-flow__grow" />{previewEdited && <Button variant="ghost" size="compact" disabled={Boolean(composerBusy)} onClick={() => { setPreviewEdited(false); setEditingPreview(false); setPreviewResetKey((key: any) => key + 1); setComposerMessage("Edições descartadas."); }}>Reverter edições</Button>}<Button variant="secondary" size="compact" aria-pressed={editingPreview} disabled={Boolean(composerBusy) || !previewHtml} onClick={() => setPreviewEditing(!editingPreview)}>{editingPreview ? "Concluir edição" : "Editar texto"}</Button></div>
-    <div className="quote-v3-preview-viewport" ref={previewViewportRef}>{editingPreview && inlineToolbarPosition && <div ref={inlineToolbarRef} className="quote-v3-inline-toolbar" role="toolbar" aria-label="Formatação do texto" style={inlineToolbarPosition}>{[["bold", <strong>B</strong>, "Negrito"], ["italic", <em>I</em>, "Itálico"], ["underline", <span style={{ textDecoration: "underline" }}>U</span>, "Sublinhado"], ["insertUnorderedList", "•", "Lista com marcadores"], ["insertOrderedList", "1.", "Lista numerada"]].map(([command, label, title]: any) => <button key={command} className="quote-v3-inline-format-button" type="button" title={title} aria-label={title} onMouseDown={(event) => event.preventDefault()} onClick={() => formatPreview(command)}>{label}</button>)}</div>}<iframe key={previewResetKey} ref={previewFrameRef} title="Proposta para Outlook" onLoad={() => { fitEmailPreview(); const document = previewFrameRef.current?.contentDocument; const syncToolbar = () => requestAnimationFrame(positionInlineToolbar); document?.addEventListener("selectionchange", syncToolbar); document?.body?.addEventListener("focusin", syncToolbar); document?.body?.addEventListener("mouseup", syncToolbar); document?.body?.addEventListener("keyup", syncToolbar); document?.body?.addEventListener("input", () => { setPreviewEdited(true); requestAnimationFrame(() => { fitEmailPreview(); positionInlineToolbar(); }); }); document?.body?.addEventListener("keydown", (event: any) => { if (event.key === "Tab" && event.target.isContentEditable) { event.preventDefault(); document.execCommand(event.shiftKey ? "outdent" : "indent", false); } }); document?.body?.addEventListener("paste", (event: any) => { if (!event.target.isContentEditable) return; event.preventDefault(); document.execCommand("insertText", false, event.clipboardData?.getData("text/plain") || ""); }); if (editingPreview) setPreviewEditing(true); }} srcDoc={previewHtml || buildQuoteEmailHtml(draft, { baseUrl: window.location.origin })} /></div>
+    <div className="quote-flow__preview-frame" ref={previewViewportRef}>{editingPreview && inlineToolbarPosition && <div ref={inlineToolbarRef} className="quote-v3-inline-toolbar" role="toolbar" aria-label="Formatação do texto" style={inlineToolbarPosition}>{[["bold", <strong>B</strong>, "Negrito"], ["italic", <em>I</em>, "Itálico"], ["underline", <span style={{ textDecoration: "underline" }}>U</span>, "Sublinhado"], ["insertUnorderedList", "•", "Lista com marcadores"], ["insertOrderedList", "1.", "Lista numerada"]].map(([command, label, title]: any) => <button key={command} className="quote-v3-inline-format-button" type="button" title={title} aria-label={title} onMouseDown={(event) => event.preventDefault()} onClick={() => formatPreview(command)}>{label}</button>)}</div>}<iframe key={previewResetKey} ref={previewFrameRef} title="Proposta para Outlook" onLoad={() => { fitEmailPreview(); const document = previewFrameRef.current?.contentDocument; const syncToolbar = () => requestAnimationFrame(positionInlineToolbar); document?.addEventListener("selectionchange", syncToolbar); document?.body?.addEventListener("focusin", syncToolbar); document?.body?.addEventListener("mouseup", syncToolbar); document?.body?.addEventListener("keyup", syncToolbar); document?.body?.addEventListener("input", () => { setPreviewEdited(true); requestAnimationFrame(() => { fitEmailPreview(); positionInlineToolbar(); }); }); document?.body?.addEventListener("keydown", (event: any) => { if (event.key === "Tab" && event.target.isContentEditable) { event.preventDefault(); document.execCommand(event.shiftKey ? "outdent" : "indent", false); } }); document?.body?.addEventListener("paste", (event: any) => { if (!event.target.isContentEditable) return; event.preventDefault(); document.execCommand("insertText", false, event.clipboardData?.getData("text/plain") || ""); }); if (editingPreview) setPreviewEditing(true); }} srcDoc={previewHtml || buildQuoteEmailHtml(draft, { baseUrl: window.location.origin })} /></div>
   </div>;
   const sendAside = <>
     <div><h3>Como enviar</h3><ol className="quote-flow__howto"><li>Copie a proposta ou baixe o arquivo.</li><li>Envie{draft.clientEmail ? <> para <strong>{draft.clientEmail}</strong></> : " ao cliente"} pelo Outlook.</li><li>Volte aqui e clique em <strong>{awaitingDecision ? "Registrar novo envio" : "Registrar envio"}</strong>.</li></ol></div>
@@ -481,8 +454,8 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
       <div className="quote-flow__grid2"><Button variant="secondary" fullWidth icon={<Download size={16} />} disabled={Boolean(composerBusy) || !proposalSummary.valid} onClick={() => composeAction("pdf")}>Baixar PDF</Button><Button variant="secondary" fullWidth icon={<Download size={16} />} disabled={Boolean(composerBusy) || !proposalSummary.valid} onClick={() => composeAction("word")}>Baixar Word</Button></div>
       <span role="status" className="quote-flow__hint">{composerBusy ? "Preparando arquivos…" : composerMessage}</span>
     </div>
-    <div><h3>Opções nesta proposta</h3>{proposalSummary.valid ? <ul className="quote-flow__lines">{proposalSummary.options.map((option) => <li key={option.id}><span>{option.name}</span><strong>{formatMoney(option.value)}</strong></li>)}</ul> : <p className="quote-flow__hint">{proposalSummary.error}</p>}{!awaitingDecision && <Button variant="ghost" size="compact" onClick={() => setEditingPrices(true)}>Editar preços</Button>}</div>
-    {requestSurface}
+    <div><h3>Opções nesta proposta</h3>{proposalSummary.valid ? <ul className="quote-flow__lines">{proposalSummary.options.map((option) => <li key={option.id}><span>{option.name}</span><strong>{formatMoney(option.value)}</strong></li>)}</ul> : <p className="quote-flow__hint">{proposalSummary.error}</p>}{!awaitingDecision && <Button variant="ghost" size="compact" onClick={() => setOverride("prices")}>Editar preços</Button>}</div>
+    {requestSurface()}
     {historyBlock}
   </>;
   const decisionMain = <>
@@ -501,20 +474,17 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
   const decisionAside = <>
     <div><h3>Proposta enviada</h3>{sentProposal ? <dl className="quote-flow__kv quote-flow__kv--tight"><dt>Versão</dt><dd>{sentProposal.number}</dd><dt>Enviada</dt><dd>{sentProposal.sentAt ? formatDateTime(sentProposal.sentAt) : "data não informada"}{sentProposal.authorName ? ` · ${sentProposal.authorName}` : ""}</dd>{draft.clientEmail && <><dt>Para</dt><dd>{draft.clientEmail}</dd></>}</dl> : <p className="quote-flow__hint">Nenhum envio registrado.</p>}</div>
     <div><h3>Sem resposta ainda?</h3><p className="quote-flow__hint">Feche o painel; a cotação continua aguardando. Se o cliente pediu ajuste, reenvie com uma nova versão.</p><Button variant="ghost" size="compact" disabled={saving} onClick={openComposer}>Reenviar com ajustes</Button></div>
-    <Surface compact aria-label="Pedido do cliente"><span className="bt-eyebrow">Pedido do cliente</span><p className="quote-flow__quote">{draft.notes || "Pedido do cliente não informado."}</p></Surface>
+    {requestSurface(false)}
     {historyBlock}
   </>;
   const costAside = <>
-    {requestSurface}
+    {requestSurface()}
     {attachmentsBlock}
     {historyBlock}
   </>;
   const costMain = <>
     <p className="quote-flow__lead">Monte uma ou mais opções. Com título e valor em pelo menos uma, a cotação fica pronta para enviar.</p>
-    <div className="quote-flow__options">
-      {(draft.options || []).map((option: any, index: number) => <QuoteOptionsEditor key={option.id} option={option} index={index} onChange={(updated: any) => update("options", (draft.options || []).map((item: any) => item.id === updated.id ? updated : item))} onDuplicate={duplicateOption} onRemove={(draft.options || []).length > 1 ? removeOption : undefined} />)}
-      <button className="quote-flow__option quote-flow__option--add" type="button" onClick={() => { const option = newQuoteOption((draft.options || []).length); update("options", [...(draft.options || []), option]); requestAnimationFrame(() => document.getElementById(`quote-option-${option.id}`)?.querySelector<any>("input[type='text']")?.focus()); }}><span aria-hidden="true">+</span>Adicionar opção</button>
-    </div>
+    <QuoteOptionsEditor options={draft.options || []} onChange={(options: any) => update("options", options)} onDuplicate={duplicateOption} />
     {errors.options && <Alert tone="danger">{errors.options}</Alert>}
     <Field label="Condições gerais (valem para todas as opções)" className="quote-flow__terms"><Textarea id="quote-commercial-terms" rows={2} value={draft.commercialTerms || ""} onChange={(event: any) => update("commercialTerms", event.target.value)} placeholder="Pagamento, validade, espera e cancelamento" /></Field>
   </>;
@@ -539,23 +509,28 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     {historyBlock}
   </>;
 
-  const aside = costView ? costAside : previewOpen ? sendAside : awaitingDecision ? decisionAside : null;
-  const main = costView ? costMain : previewOpen ? previewBlock : awaitingDecision ? decisionMain : draft.status === QUOTE_WAITING_STATUS ? waitingMain : terminalQuote ? terminalMain : newMain;
-  const moreMenu = <details className="quote-management-more"><summary aria-label="Mais ações"><MoreHorizontal size={18} /></summary><div>{task && <button type="button" onClick={() => onOpenTask?.(task.id)}><Link2 size={14} />Ver tarefa</button>}{!terminalQuote && !awaitingDecision && <button type="button" disabled={saving} onClick={() => openResult("Cancelada")}>Cancelar cotação</button>}{onDeleteQuote && <button className="is-danger" type="button" disabled={saving} onClick={() => setDeleteOpen(true)}><Trash2 size={14} />Excluir cotação</button>}</div></details>;
+  const screens: Record<string, { aside?: React.ReactNode; main: React.ReactNode }> = { cost: { aside: costAside, main: costMain }, preview: { aside: sendAside, main: previewBlock }, decision: { aside: decisionAside, main: decisionMain }, waiting: { main: waitingMain }, terminal: { main: terminalMain }, request: { main: newMain } };
+  const { aside, main } = screens[view];
+  const moreMenu = <Menu align="start" trigger={(props) => <Button {...props} variant="secondary" icon={<MoreHorizontal size={18} />} aria-label="Mais ações" />} actions={[
+    ...(task ? [{ id: "task", label: "Ver tarefa", icon: <Link2 size={14} />, onSelect: () => onOpenTask?.(task.id) }] : []),
+    ...(!terminalQuote && !awaitingDecision ? [{ id: "cancel", label: "Cancelar cotação", disabled: saving, onSelect: () => openResult("Cancelada") }] : []),
+    ...(onDeleteQuote ? [{ id: "delete", label: "Excluir cotação", icon: <Trash2 size={14} />, tone: "danger" as const, disabled: saving, onSelect: () => setDeleteOpen(true) }] : []),
+  ]} />;
+  const saveButton = <Button variant="secondary" icon={<Save size={15} />} disabled={saving} onClick={() => save()}>{saving ? "Salvando…" : "Salvar alterações"}</Button>;
+  const sendButton = <Button icon={<Send size={16} />} disabled={saving || Boolean(composerBusy) || !proposalSummary.valid} onClick={registerProposalSent}>{awaitingDecision ? "Registrar novo envio" : "Registrar envio"}</Button>;
   const footer = <footer className="bt-drawer__foot quote-flow__foot">
     {moreMenu}
-    {!terminalQuote && costView && <Button variant="secondary" disabled={saving} onClick={actions.wait}>Aguardar informação</Button>}
-    {draft.status === "Nova" && <Button variant="secondary" disabled={saving} onClick={actions.wait}>Aguardar informação</Button>}
-    {draft.status === QUOTE_WAITING_STATUS && task && <Button variant="secondary" disabled={saving} onClick={actions.resume}>Retomar cotação</Button>}
+    {(costView || view === "request") && <Button variant="secondary" disabled={saving} onClick={actions.wait}>Aguardar informação</Button>}
+    {view === "waiting" && task && <Button variant="secondary" disabled={saving} onClick={actions.resume}>Retomar cotação</Button>}
     {previewOpen && awaitingDecision && <Button variant="secondary" disabled={saving} onClick={resetComposer}>Voltar</Button>}
     <span className="quote-flow__grow">{previewOpen && !awaitingDecision && <span className="quote-flow__hint">Ainda não enviada</span>}</span>
-    {!terminalQuote && dirty && !costView && draft.status !== "Nova" && <Button variant="secondary" icon={<Save size={15} />} disabled={saving} onClick={() => save()}>{saving ? "Salvando…" : "Salvar alterações"}</Button>}
-    {draft.status === "Nova" && <>{dirty && <Button variant="secondary" icon={<Save size={15} />} disabled={saving} onClick={() => save()}>Salvar alterações</Button>}<Button disabled={saving} onClick={actions.start}>Começar a cotar</Button></>}
+    {dirty && !costView && !terminalQuote && saveButton}
+    {view === "request" && <Button disabled={saving} onClick={actions.start}>Começar a cotar</Button>}
     {costView && <Button icon={<Save size={16} />} disabled={saving} onClick={() => save()}>{saving ? "Salvando…" : "Salvar preços"}</Button>}
-    {previewOpen && !awaitingDecision && <><Button variant="secondary" disabled={saving} onClick={actions.send}>Enviei ao cliente</Button><Button icon={<Send size={16} />} disabled={saving || Boolean(composerBusy) || !proposalSummary.valid} onClick={registerProposalSent}>Registrar envio</Button></>}
-    {previewOpen && awaitingDecision && <Button icon={<Send size={16} />} disabled={saving || Boolean(composerBusy) || !proposalSummary.valid} onClick={registerProposalSent}>Registrar novo envio</Button>}
-    {awaitingDecision && !previewOpen && <Button icon={<Check size={16} />} disabled={saving || !decisionOptions.length} onClick={() => registerResult()}>Registrar decisão</Button>}
-    {draft.status === QUOTE_WAITING_STATUS && actionEnabled.return && <Button className="drawer-return-action" disabled={saving} onClick={actions.return}>Registrar retorno</Button>}
+    {previewOpen && !awaitingDecision && <Button variant="secondary" disabled={saving} onClick={actions.send}>Enviei ao cliente</Button>}
+    {previewOpen && sendButton}
+    {view === "decision" && <Button icon={<Check size={16} />} disabled={saving || !decisionOptions.length} onClick={() => registerResult()}>Registrar decisão</Button>}
+    {view === "waiting" && canReturn && <Button className="drawer-return-action" disabled={saving} onClick={actions.return}>Registrar retorno</Button>}
     {terminalQuote && <Button variant="secondary" disabled={saving} onClick={reopen}>Reabrir cotação</Button>}
   </footer>;
 
@@ -565,7 +540,7 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
       <div className="bt-drawer__heading"><span className="bt-drawer__eyebrow">{[draft.code || "Sem número", draft.client, draft.title].filter(Boolean).join(" · ")}</span><h2 id="quote-management-title" className="bt-drawer__title">{stepTitle}</h2></div>
       <div className="quote-flow__badges"><StatusBadge tone={STATUS_TONE[draft.status] || "neutral"}>{draft.status || "Sem status"}</StatusBadge>{awaitingDecision ? <StatusBadge tone="info">{sentLabel(draft)}</StatusBadge> : !terminalQuote && <StatusBadge tone={overdue || draft.deadline === localDateKey() ? "danger" : "neutral"}>{deadlineLabel}</StatusBadge>}{task?.assigneeNames?.length > 0 && <span className="quote-flow__assignee">{task.assigneeNames.join(", ")}</span>}</div><button ref={closeRef} className="bt-drawer__close" type="button" onClick={requestClose} aria-label="Fechar cotação"><X size={18} /></button>
     </header>
-    <ol className="quote-flow__steps quote-stage-stepper" aria-label="Etapas da cotação">{STEPS.map((item, index) => { const state = index < stepIndex || terminalQuote ? "done" : index === stepIndex ? "active" : ""; return <li key={item.id} className={state} aria-current={state === "active" ? "step" : undefined}><b>{state === "done" ? <Check size={12} aria-hidden="true" /> : index + 1}</b>{item.label}{index === 1 && draft.status === QUOTE_WAITING_STATUS && " · parado"}</li>; })}</ol>
+    <ol className="quote-flow__steps quote-stage-stepper" aria-label="Etapas da cotação">{STEPS.map((label, index) => { const state = index < stepIndex || terminalQuote ? "done" : index === stepIndex ? "active" : ""; return <li key={label} className={state} aria-current={state === "active" ? "step" : undefined}><b>{state === "done" ? <Check size={12} aria-hidden="true" /> : index + 1}</b>{label}{state === "active" && view === "waiting" && " · parado"}</li>; })}</ol>
     <div className="quote-flow__content">
     {(saveError || quoteConflict) && <div className="quote-flow__notice"><Alert tone="danger" action={quoteConflict ? <Button variant="secondary" size="compact" onClick={reloadQuote}>Recarregar cotação</Button> : undefined}>{quoteConflict ? "Esta cotação mudou em outra edição." : saveError}</Alert></div>}
     {saveMessage && <div className="quote-flow__notice"><Alert tone="success">{saveMessage}</Alert></div>}
@@ -579,14 +554,9 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     {footer}
     </div>
   {confirmMissingDeadline && <MissingDeadlineDialog onCancel={() => { setConfirmMissingDeadline(false); document.getElementById("quote-deadline")?.focus(); }} onConfirm={() => save(true, pendingSavePatch.current)} />}
-  {cancelOpen && <div className="quote-v3-confirm-layer" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setCancelOpen(false); }}><form ref={cancelRef} className="quote-v3-dialog" role="dialog" aria-modal="true" aria-label="Cancelar cotação" onSubmit={registerResult}>
-    <h3>Cancelar cotação</h3>
-    <p>Esta ação encerra toda a cotação como Cancelada, incluindo todas as opções{task ? ", e conclui a tarefa" : ""}.</p>
-    {resultError && <p role="alert">{resultError}</p>}
-    <div><button className="button button-secondary" type="button" disabled={saving} onClick={() => setCancelOpen(false)}>Voltar</button><button className="button button-primary" type="submit" disabled={saving}>{saving ? "Salvando…" : "Confirmar"}</button></div>
-  </form></div>}
+  <Dialog open={cancelOpen} tone="danger" title="Cancelar cotação?" onClose={() => { if (!saving) setCancelOpen(false); }} actions={<><Button variant="secondary" disabled={saving} onClick={() => setCancelOpen(false)}>Voltar</Button><Button variant="danger" disabled={saving} onClick={() => registerResult()}>{saving ? "Salvando…" : "Cancelar cotação"}</Button></>}>Esta ação encerra toda a cotação como Cancelada, incluindo todas as opções{task ? ", e conclui a tarefa" : ""}.{resultError && <p role="alert">{resultError}</p>}</Dialog>
   {waitingOpen && <QuoteWaitingDialog initial={draft.status === QUOTE_WAITING_STATUS ? draft : {}} saving={saving} onCancel={() => setWaitingOpen(false)} onConfirm={confirmWaiting} />}
   {deleteOpen && <QuoteDeleteDialog quote={quote} onCancel={() => setDeleteOpen(false)} onDelete={onDeleteQuote} />}
-  {confirmClose && <div className="quote-v3-confirm-layer"><div ref={discardRef} className="quote-v3-dialog" role="alertdialog" aria-modal="true" aria-labelledby="quote-discard-title"><h3 id="quote-discard-title">Descartar alterações?</h3><p>As alterações não salvas nos dados e nas opções da cotação serão perdidas.</p><div><button className="button button-secondary" type="button" onClick={() => setConfirmClose(false)}>Continuar editando</button><button className="button button-danger" type="button" onClick={() => onClose?.()}>Descartar</button></div></div></div>}
+  <Dialog open={confirmClose} title="Descartar alterações?" onClose={() => setConfirmClose(false)} actions={<><Button variant="secondary" onClick={() => setConfirmClose(false)}>Continuar editando</Button><Button onClick={() => onClose?.()}>Descartar</Button></>}>As alterações não salvas nos dados e nas opções da cotação serão perdidas.</Dialog>
   </div>;
 }
