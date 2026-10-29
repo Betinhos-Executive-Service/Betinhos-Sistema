@@ -76,6 +76,14 @@ Outros:
 - A AppBetinhos do DEV continua sendo a caixa de entrada: componentes novos podem ser criados ou incluídos nela a qualquer momento. Rode a conferência de novo antes de cada exportação das 4 soluções; um resultado antigo não vale.
 - A conferência cobre dono e dependências dos componentes; não prova que as soluções gerenciadas importam em outro ambiente.
 
+## Workflow "Publicar TEST" (`.github/workflows/publicar-test.yml`)
+
+Disparo manual (Actions → Publicar TEST → Run workflow; campo `solucoes` vazio = as 4). Pré-requisitos: usuário de aplicação no TEST e environment `test` no GitHub com revisor obrigatório, `vars.DV_ENVIRONMENT_URL` (`https://appbetinhostest.crm2.dynamics.com`), `vars.DV_TENANT_ID`, `vars.DV_CLIENT_ID` e `secrets.DV_CLIENT_SECRET`.
+1. Job `exportar` (environment `dev`): `exportar-para-test.ps1` roda a conferência (`distribuir-solucoes.ps1 -SomenteConferir`, processo filho) e para se não zerar; sobe a revisão de cada solução no DEV (`pac solution online-version`, `Get-VersaoSeguinte`) e exporta com `Export-SolucaoGerenciada`. Artefato `pacotes`: ZIPs + `manifesto.json` (versão e hash).
+2. Job `importar` (environment `test`, espera a aprovação): foto antes, `importar-no-test.ps1` (`Assert-HostTest` recusa DEV e PROD; ordem Core → Automação → Interface → Motoristas; `--stage-and-upgrade --publish-changes --activate-plugins`; se o pac perder a conexão, `Wait-VersaoInstalada` espera até 60 min a versão chegar), foto depois e `comparar-fotos.mjs --travado`. Artefato `fotos`: antes, depois, comparação e `importados.json` (versão antes/depois e minutos por solução).
+3. Esperado: job verde, `importados.json` com a versão nova das escolhidas e comparação sem perda. Vermelho no comparar com fluxo/step em `ligados` é o `--activate-plugins` religando o que estava desligado no TEST (ensaio de 22/10: 2 fluxos e 14 steps): desligar à mão (passo 4b do ensaio) e decidir se o workflow passa a fazer isso.
+4. Testes locais (Windows): `powershell -File packages/deploy/solucoes/testa-solucoes.ps1` cobre `Get-VersaoSeguinte`, `Get-SolucoesEscolhidas`, `Assert-HostTest` e `Wait-VersaoInstalada`.
+
 ## Camadas Active (TEST)
 
 `packages/deploy/solucoes/remover-camadas-active.ps1 -EnvironmentUrl <url>` lista os componentes da AppBetinhos com camada Active no topo (WebResource, Workflow, PluginAssembly, SdkMessageProcessingStep, SystemForm, AppModule, SiteMap); com `-Aplicar` guarda o JSON de cada camada e chama `RemoveActiveCustomization` (`LogicalName` + `Id`). Recusa o PROD. Prova: rodar de novo sem `-Aplicar` e ver `0 componentes`. Ensaio de 22/10/2026: 76 removidas no TEST, 0 falhas (`docs/auditoria/ensaio-segmentacao-2026-10-22.md`).

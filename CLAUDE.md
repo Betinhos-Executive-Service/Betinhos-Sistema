@@ -8,6 +8,7 @@
 - Nunca dispare dois `pnpm push` em paralelo.
 - No fim de todo `pnpm push` (local ou CI), `packages/deploy/solucoes/distribuir-apos-push.ps1` distribui nas 4 soluções (`BetinhosCore`, `BetinhosAutomacao`, `BetinhosInterface`, `BetinhosMotoristas`) o que entrou na AppBetinhos do DEV e confere. Ele nunca derruba o push; se a conferência não zerar, mostra "ATENCAO" e o export para TEST/PROD fica barrado até corrigir (skill `verificar-solucoes`). Tipo de componente novo pede regra em `packages/deploy/solucoes/regras.json`.
 - Exceção automática (decisão do Renan, 20/10/2026): depois de um merge automático de baixo risco (`.claude/entrega-autonoma.json`), o plantão publica no DEV levando a `main` para a branch `dev` (`git push origin origin/main:refs/heads/dev`, só avanço rápido, nunca force). Isso dispara o workflow "Deploy" (job `dev`, conta de serviço do environment `dev` do GitHub). Nunca `pnpm push` fora do checkout principal. A versão de build parte da maior entre a do repo e a já publicada no DEV (descrição do `cr40f_SistemaBetinhos.html`, lida pelo `push-dev.ps1 -Build`), então CI e `pnpm push` local nunca fazem a versão retroceder.
+- TEST: workflow manual "Publicar TEST" (`.github/workflows/publicar-test.yml`) leva as 4 soluções gerenciadas do DEV para o TEST, com conferência antes, aprovação do Renan no environment `test` e comparação de fotos `--travado` depois (skill `verificar-solucoes`). O import recusa qualquer host que não seja o TEST; PROD não tem workflow.
 
 ## Ambiente cloud (sessões cloud do Claude Code)
 

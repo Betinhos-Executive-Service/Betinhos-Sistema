@@ -316,3 +316,63 @@ function Get-ContagemRegistros($Dv, $Entidade) {
   if ($linhas.Count -ne 1 -or -not $linhas[0].PSObject.Properties['n']) { throw "Contagem de $nome voltou num formato inesperado: $(ConvertTo-Json -InputObject $resposta -Depth 4 -Compress)" }
   return @{ Total = [int] $linhas[0].n; Paginada = $false }
 }
+
+# --- Publicacao no TEST (workflow publicar-test.yml) ---
+
+$script:HostTest = "appbetinhostest.crm2.dynamics.com"
+
+# Import so no TEST: o workflow nunca escreve no PROD nem no DEV por aqui.
+function Assert-HostTest($Dv) {
+  if ([string] $Dv.Host -ne $script:HostTest) { throw "Import so e permitido no TEST ($($script:HostTest)); recebi '$($Dv.Host)'." }
+}
+
+# Proxima revisao (1.0.0.4 -> 1.0.0.5): o import com --stage-and-upgrade exige versao maior que a instalada, e o DEV
+# (origem de tudo que o TEST recebe) sempre esta na versao mais alta.
+function Get-VersaoSeguinte([string] $Versao) {
+  $partes = @($Versao.Split("."))
+  if ($partes.Count -ne 4 -or @($partes | Where-Object { $_ -notmatch '^\d+$' }).Count) { throw "Versao '$Versao' fora do formato a.b.c.d." }
+  $partes[3] = [string] ([int64] $partes[3] + 1)
+  return ($partes -join ".")
+}
+
+# Lista do workflow ("BetinhosCore,BetinhosInterface"; vazia = as 4) na ordem de import (camada mais baixa primeiro).
+function Get-SolucoesEscolhidas([string] $Lista) {
+  $pedidas = @($Lista -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+  if ($pedidas.Count -eq 0) { return $script:Solucoes }
+  $estranhas = @($pedidas | Where-Object { $script:Solucoes -notcontains $_ })
+  if ($estranhas.Count) { throw "Solucao fora das 4: $($estranhas -join ', ') (validas: $($script:Solucoes -join ', '))." }
+  return @($script:Solucoes | Where-Object { $pedidas -contains $_ })
+}
+
+function Get-VersaoInstalada($Dv, [string] $Nome) {
+  $linhas = @(Read-DvAll $Dv "solutions?`$select=version&`$filter=uniquename eq '$Nome'")
+  if ($linhas.Count -eq 0) { return $null }
+  return [string] $linhas[0].version
+}
+
+# O pac perde a conexao em operacoes longas e o import continua no servidor: a prova e a versao instalada.
+# Espera ate $Minutos a solucao chegar na versao; devolve $true se chegou.
+function Wait-VersaoInstalada($Dv, [string] $Nome, [string] $Versao, [int] $Minutos = 60, [int] $IntervaloSegundos = 60) {
+  $limite = (Get-Date).AddMinutes($Minutos)
+  do {
+    if ((Get-VersaoInstalada $Dv $Nome) -eq $Versao) { return $true }
+    if ((Get-Date) -ge $limite) { return $false }
+    Start-Sleep -Seconds $IntervaloSegundos
+  } while ($true)
+}
+
+# Importa o ZIP gerenciado com upgrade e prova pela versao instalada. Pac com erro nao e falha se a versao chegou.
+function Import-SolucaoGerenciada($Dv, [string] $Caminho, [int] $MinutosDeEspera = 60) {
+  Assert-HostTest $Dv
+  $m = Get-ManifestoDoPacote $Caminho
+  if (-not $m.Managed) { throw "$Caminho nao e gerenciada." }
+  if ($script:Solucoes -notcontains $m.UniqueName) { throw "$Caminho e '$($m.UniqueName)', fora das 4." }
+  $erroPac = $null
+  try { Invoke-Pac $Dv.Url @("solution", "import", "--path", $Caminho, "--stage-and-upgrade", "--publish-changes", "--activate-plugins", "--async", "--max-async-wait-time", "180") | Out-Null }
+  catch { $erroPac = "$($_.Exception.Message)"; Write-Step "pac falhou ($erroPac); conferindo a versao instalada de $($m.UniqueName)" }
+  $minutos = if ($erroPac) { $MinutosDeEspera } else { 0 }
+  if (-not (Wait-VersaoInstalada $Dv $m.UniqueName $m.Version $minutos)) {
+    throw "$($m.UniqueName) nao chegou a versao $($m.Version) em $($Dv.Host). $erroPac"
+  }
+  return @{ Nome = $m.UniqueName; Versao = $m.Version; PacPerdeuConexao = [bool] $erroPac }
+}
