@@ -21,7 +21,7 @@ let seq = 0
 const novoId = () => `aaaaaaaa-0000-0000-0000-${String(++seq).padStart(12, '0')}`
 
 export function bancoInicial(): Banco {
-  const reserva = (n: string) => ({ cr40f_id: n, cr40f_idtenaris: `PO-${n}`, cr40f_cr: 'CR1', [`_cr40f_passageiro1_value${FV}`]: 'Ana', new_composicaodepreco: { new_valortotal: 500, new_horamotorista: 500 } })
+  const reserva = (n: string) => ({ cr40f_id: n, cr40f_idtenaris: `PO-${n}`, cr40f_cr: 'CR1', [`_cr40f_passageiro1_value${FV}`]: 'Ana', new_composicaodepreco: { new_valortotal: 500, cr40f_valorhoramotorista: 500 } })
   const validacao = (id: string, cliente: string, status: number, prazo: string, n: string) => ({
     cr40f_validacaoservicoid: id, _cr40f_cliente_value: cliente, cr40f_status: status, cr40f_prazotacita: prazo, cr40f_liberadoem: '2026-10-28T11:00:00Z', cr40f_Reserva: reserva(n),
   })
