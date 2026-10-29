@@ -1,6 +1,7 @@
 import type { Host } from '../../host'
 import { PlannerApp } from './PlannerApp'
 import './planner.css'
+import './quote-flow.css'
 
 /**
  * Rota `#/planner`: o Planner inteiro (porte do Tela Planner) dentro do shell.

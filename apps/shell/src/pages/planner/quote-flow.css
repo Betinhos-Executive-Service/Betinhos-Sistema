@@ -1,0 +1,88 @@
+/* Drawer da cotação V3: passo a passo. Painel de 720px nas etapas de leitura; tela cheia nas de trabalho. */
+:where(.planner-page, .planner-portal) .quote-flow { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; width: min(720px, 100vw); height: 100%; margin-left: auto; background: var(--bt-color-surface-neutral, #fcfcfb); box-shadow: var(--bt-shadow-drawer, -20px 0 50px rgba(0,24,39,.2)); transition: width var(--bt-duration-normal, 220ms) var(--bt-ease-drawer, ease-out); }
+:where(.planner-page, .planner-portal) .quote-flow--full { width: 100vw; }
+:where(.planner-page, .planner-portal) .quote-flow__head { flex-wrap: wrap; min-height: 64px; padding-top: 10px; padding-bottom: 10px; }
+:where(.planner-page, .planner-portal) .quote-flow__head .bt-drawer__heading { flex: 1 1 240px; }
+:where(.planner-page, .planner-portal) .quote-flow__head .bt-drawer__title { white-space: normal; }
+:where(.planner-page, .planner-portal) .quote-flow__badges { display: flex; flex: 0 1 auto; flex-wrap: wrap; align-items: center; gap: 8px; }
+:where(.planner-page, .planner-portal) .quote-flow__head .bt-drawer__close { margin-left: 8px; }
+:where(.planner-page, .planner-portal) .quote-flow__assignee { font-size: 12px; color: var(--bt-color-text-secondary); }
+:where(.planner-page, .planner-portal) .quote-flow__steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; background: var(--bt-color-surface, #fff); border-bottom: 1px solid var(--bt-color-border); }
+:where(.planner-page, .planner-portal) .quote-flow__steps li { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 12px 16px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; border-bottom: 2px solid transparent; color: var(--bt-color-text-secondary); font-size: 12px; font-weight: 700; }
+:where(.planner-page, .planner-portal) .quote-flow__steps li b { flex: 0 0 auto; display: grid; place-items: center; width: 22px; height: 22px; border: 2px solid var(--bt-color-border); border-radius: 999px; font-size: 11px; font-weight: 800; }
+:where(.planner-page, .planner-portal) .quote-flow__steps li.done { color: var(--bt-color-success); }
+:where(.planner-page, .planner-portal) .quote-flow__steps li.done b { border-color: var(--bt-color-success); background: var(--bt-color-success); color: #fff; }
+:where(.planner-page, .planner-portal) .quote-flow__steps li.active { color: var(--bt-color-action); border-bottom-color: var(--bt-color-action); }
+:where(.planner-page, .planner-portal) .quote-flow__steps li.active b { border-color: var(--bt-color-action); color: var(--bt-color-action); }
+:where(.planner-page, .planner-portal) .quote-flow__content { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; }
+:where(.planner-page, .planner-portal) .quote-flow__notice { padding: 12px 24px 0; }
+:where(.planner-page, .planner-portal) .quote-flow__body, :where(.planner-page, .planner-portal) .quote-flow__main, :where(.planner-page, .planner-portal) .quote-flow__aside { min-height: 0; overflow: auto; overscroll-behavior: contain; display: grid; align-content: start; gap: 16px; padding: 20px 24px; }
+:where(.planner-page, .planner-portal) .quote-flow__split { display: grid; grid-template-columns: 360px minmax(0, 1fr); min-height: 0; }
+:where(.planner-page, .planner-portal) .quote-flow__aside { background: var(--bt-color-surface, #fff); border-right: 1px solid var(--bt-color-border); }
+:where(.planner-page, .planner-portal) .quote-flow__aside h3 { margin: 0 0 8px; font-size: 13px; font-weight: 800; color: var(--bt-color-brand); }
+:where(.planner-page, .planner-portal) .quote-flow__main { padding: 20px 28px; }
+:where(.planner-page, .planner-portal) .quote-flow__main--preview { grid-template-rows: minmax(0, 1fr); align-content: stretch; background: var(--bt-color-surface-neutral, #fcfcfb); }
+:where(.planner-page, .planner-portal) .quote-flow__lead, :where(.planner-page, .planner-portal) .quote-flow__hint { margin: 0; font-size: 14px; line-height: 1.5; color: var(--bt-color-text-secondary); }
+:where(.planner-page, .planner-portal) .quote-flow__hint { font-size: 13px; }
+:where(.planner-page, .planner-portal) .quote-flow__grow { flex: 1 1 auto; min-width: 0; }
+:where(.planner-page, .planner-portal) .quote-flow__quote { margin: 0; padding: 12px 14px; border: 1px solid var(--bt-color-border); border-radius: 8px; background: var(--bt-color-surface-neutral, #fcfcfb); font-size: 14px; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; }
+:where(.planner-page, .planner-portal) .quote-flow__kv { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 8px 16px; margin: 14px 0 0; font-size: 14px; }
+:where(.planner-page, .planner-portal) .quote-flow__kv--tight { grid-template-columns: 80px minmax(0, 1fr); margin-top: 0; font-size: 13px; }
+:where(.planner-page, .planner-portal) .quote-flow__kv dt { color: var(--bt-color-text-secondary); }
+:where(.planner-page, .planner-portal) .quote-flow__kv dd { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
+:where(.planner-page, .planner-portal) .quote-flow__kv dd small { display: block; color: var(--bt-color-text-secondary); }
+:where(.planner-page, .planner-portal) .quote-flow__edit { margin-top: 14px; border-top: 1px solid var(--bt-color-border); padding-top: 10px; }
+:where(.planner-page, .planner-portal) .quote-flow__edit > summary, :where(.planner-page, .planner-portal) .quote-flow__history > summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--bt-color-brand); }
+:where(.planner-page, .planner-portal) .quote-flow__form { display: grid; gap: 20px; margin-top: 14px; }
+:where(.planner-page, .planner-portal) .quote-flow__form > section { display: grid; gap: 10px; }
+:where(.planner-page, .planner-portal) .quote-flow__form h4 { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--bt-color-text-secondary); }
+:where(.planner-page, .planner-portal) .quote-flow__history { padding: 12px 16px; border: 1px solid var(--bt-color-border); border-radius: 12px; background: var(--bt-color-surface, #fff); }
+:where(.planner-page, .planner-portal) .quote-flow__history[open] > summary { margin-bottom: 10px; }
+:where(.planner-page, .planner-portal) .quote-flow__proposals { display: grid; gap: 10px; margin-bottom: 12px; }
+:where(.planner-page, .planner-portal) .quote-flow__proposals h4 { margin: 0; font-size: 13px; }
+:where(.planner-page, .planner-portal) .quote-flow__proposals article { display: grid; gap: 4px; font-size: 13px; }
+:where(.planner-page, .planner-portal) .quote-flow__proposals p { margin: 0; color: var(--bt-color-text-secondary); }
+:where(.planner-page, .planner-portal) .quote-flow__proposals ul { margin: 0; padding-left: 18px; }
+:where(.planner-page, .planner-portal) .quote-flow__options { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+:where(.planner-page, .planner-portal) .quote-flow__option { display: grid; gap: 12px; min-width: 0; padding: 16px; border: 1px solid var(--bt-color-border); border-radius: 12px; background: var(--bt-color-surface, #fff); }
+:where(.planner-page, .planner-portal) .quote-flow__option--add { min-height: 200px; align-content: center; justify-items: center; gap: 8px; border-style: dashed; background: transparent; color: var(--bt-color-brand); font: inherit; font-weight: 800; cursor: pointer; }
+:where(.planner-page, .planner-portal) .quote-flow__option--add > span { font-size: 24px; line-height: 1; }
+:where(.planner-page, .planner-portal) .quote-flow__option-head { display: flex; align-items: center; gap: 10px; }
+:where(.planner-page, .planner-portal) .quote-flow__option-head strong { font-size: 14px; color: var(--bt-color-brand); }
+:where(.planner-page, .planner-portal) .quote-flow__option-head > :last-child:not(strong):not(.bt-badge) { margin-left: auto; }
+:where(.planner-page, .planner-portal) .quote-flow__money .bt-control__input { font-size: 16px; font-weight: 800; }
+:where(.planner-page, .planner-portal) .quote-flow__terms { max-width: 640px; }
+:where(.planner-page, .planner-portal) .quote-flow__howto { display: grid; gap: 6px; margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.6; }
+:where(.planner-page, .planner-portal) .quote-flow__send-actions { display: grid; gap: 8px; }
+:where(.planner-page, .planner-portal) .quote-flow__grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+:where(.planner-page, .planner-portal) .quote-flow__lines { display: grid; gap: 6px; margin: 0 0 8px; padding: 0; list-style: none; font-size: 13px; }
+:where(.planner-page, .planner-portal) .quote-flow__lines li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 1px solid var(--bt-color-border); border-radius: 8px; background: var(--bt-color-surface-neutral, #fcfcfb); }
+:where(.planner-page, .planner-portal) .quote-flow__preview { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 12px; min-height: 0; }
+:where(.planner-page, .planner-portal) .quote-flow__preview-bar { display: flex; align-items: center; gap: 8px; }
+:where(.planner-page, .planner-portal) .quote-flow__preview .quote-v3-preview-viewport { grid-area: auto; position: relative; display: grid; place-items: center; width: 100%; min-height: 420px; padding: 16px; overflow: hidden; border: 1px solid var(--bt-color-border); border-radius: 12px; background: var(--bt-color-surface, #fff); }
+:where(.planner-page, .planner-portal) .quote-flow__preview iframe { width: 100%; height: 100%; border: 0; }
+:where(.planner-page, .planner-portal) .quote-flow__decide { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+:where(.planner-page, .planner-portal) .quote-flow__choice { grid-template-columns: auto minmax(0, 1fr); align-items: start; cursor: pointer; }
+:where(.planner-page, .planner-portal) .quote-flow__choice.is-selected { border-color: var(--bt-color-action); box-shadow: 0 0 0 3px var(--bt-color-action-soft); }
+:where(.planner-page, .planner-portal) .quote-flow__choice input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--bt-color-action, #2560d8); }
+:where(.planner-page, .planner-portal) .quote-flow__choice-text { display: grid; gap: 4px; font-size: 14px; }
+:where(.planner-page, .planner-portal) .quote-flow__choice-text small { color: var(--bt-color-text-secondary); }
+:where(.planner-page, .planner-portal) .quote-flow__money-big { font-size: 22px; font-weight: 800; color: var(--bt-color-brand); }
+:where(.planner-page, .planner-portal) .quote-flow__reason { display: grid; gap: 6px; max-width: 420px; }
+:where(.planner-page, .planner-portal) .quote-flow__foot { align-items: center; }
+:where(.planner-page, .planner-portal) .quote-flow__foot .quote-management-more { margin-left: 0; }
+@media (max-width: 900px) {
+  :where(.planner-page, .planner-portal) .quote-flow, :where(.planner-page, .planner-portal) .quote-flow--full { width: 100vw; }
+  :where(.planner-page, .planner-portal) .quote-flow__split { grid-template-columns: minmax(0, 1fr); overflow: auto; }
+  :where(.planner-page, .planner-portal) .quote-flow__aside, :where(.planner-page, .planner-portal) .quote-flow__main { min-height: auto; overflow: visible; }
+  :where(.planner-page, .planner-portal) .quote-flow__head { padding-left: 16px; padding-right: 16px; }
+  :where(.planner-page, .planner-portal) .quote-flow__head .bt-drawer__heading { order: 0; flex-basis: 0; }
+  :where(.planner-page, .planner-portal) .quote-flow__head .bt-drawer__close { order: 1; }
+  :where(.planner-page, .planner-portal) .quote-flow__badges { order: 2; flex: 1 1 100%; }
+  :where(.planner-page, .planner-portal) .quote-flow__assignee { display: none; }
+  :where(.planner-page, .planner-portal) .quote-flow__body, :where(.planner-page, .planner-portal) .quote-flow__main, :where(.planner-page, .planner-portal) .quote-flow__aside, :where(.planner-page, .planner-portal) .quote-flow__notice { padding-left: 16px; padding-right: 16px; }
+  :where(.planner-page, .planner-portal) .quote-flow__kv { grid-template-columns: 96px minmax(0, 1fr); }
+  :where(.planner-page, .planner-portal) .quote-flow__aside { border-right: 0; border-bottom: 1px solid var(--bt-color-border); }
+  :where(.planner-page, .planner-portal) .quote-flow__steps li { padding: 10px 8px; font-size: 11px; }
+  :where(.planner-page, .planner-portal) .quote-flow__foot { flex-wrap: wrap; }
+}
