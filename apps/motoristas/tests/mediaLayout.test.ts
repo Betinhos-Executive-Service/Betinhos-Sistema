@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import test from "node:test";
 
 const styles = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
@@ -78,7 +78,11 @@ test("tela de captura usa titulo no topo e preview em fit com fundo neutro", () 
 });
 
 test("toda camera ao vivo pede stream 4:3 em alta resolucao (quadro inteiro), sem modo especial por tela", () => {
-  const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+  // As telas saem do App.tsx para as rotas de cada feature (src/features/*/rotas.tsx).
+  const app = ["../src/App.tsx", ...readdirSync(new URL("../src/features/", import.meta.url)).map((dir) => `../src/features/${dir}/rotas.tsx`)]
+    .filter((file) => existsSync(new URL(file, import.meta.url)))
+    .map((file) => readFileSync(new URL(file, import.meta.url), "utf8"))
+    .join("\n");
   assert.match(mediaCaptureScreen, /video: getDocumentStreamConstraints\(mode\),/);
   assert.match(mediaCaptureScreen, /buildTrackConstraints[\s\S]*getDocumentTrackConstraints\(mode, profile\.frameRate, continuousFocus\)/);
   assert.doesNotMatch(mediaCaptureScreen, /documentFraming/);

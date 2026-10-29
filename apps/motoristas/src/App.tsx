@@ -5,7 +5,6 @@ import {
   getInitialDetail,
   getInitialParams,
   getInitialTermoMultaId,
-  getVoucherDraftKey,
   initialStore,
   isSameDetail,
   loadStore,
@@ -13,7 +12,6 @@ import {
 } from "./app/bootstrap";
 import { useHardwareBackGuard } from "./app/backGuard";
 import { BuildStamp } from "./components/layout/BuildStamp";
-import { getScreenAfterQrPayment, getServiceTaskBackScreen } from "./app/detailFlow";
 import {
   AUTO_REFRESH_INTERVAL_MS,
   buildHashRoute,
@@ -27,8 +25,6 @@ import {
   getDriverContext,
   getDriverCurrentVehicleId,
   loadExpenseReferenceDataRemote,
-  loadMyVehiclesRemote,
-  setMyCurrentVehicleRemote,
   loadReceiptClienteOptionsRemote,
   loadMaintenanceRequestVehiclesRemote,
   loadActiveFleetRemote,
@@ -38,13 +34,27 @@ import {
 } from "./lib/dataverse";
 import { isStandaloneWebResourceRuntime } from "./lib/dataverse";
 import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "./data/dataverse/fetchWebApi";
-import { createQrChargeRemote, getQrChargeSummaryRemote, updateQrChargeRemote } from "./lib/dataverse";
+import { getQrChargeSummaryRemote } from "./lib/dataverse";
 import { getReceivableCents } from "./features/recebimento/qrCharge";
-import { QrChargeScreen } from "./features/recebimento/QrChargeScreen";
-import { expenseFlowView } from "./features/despesas/receiptQuickRead";
 import { IDEA_STATUS, type Idea, type IdeaDraft } from "./features/ideias/ideas";
 import { APP_CONNECTION_LOST_MESSAGE, APP_OPERATION_ERROR_MESSAGE, reportAppError, type AppErrorNotice } from "./lib/appErrorLogger";
 import { useDados } from "./app/DataProvider";
+import type { ReceiptEntrySource } from "./features/recibo/origem";
+import { rotasMeuCarro } from "./features/meu-carro/rotas";
+import { rotasIdeias } from "./features/ideias/rotas";
+import { rotasChecklist } from "./features/checklist/rotas";
+import { rotasTermos } from "./features/termos/rotas";
+import { rotasComunicados } from "./features/comunicados/rotas";
+import { rotasServicos } from "./features/servicos/rotas";
+import { rotasHistorico } from "./features/historico/rotas";
+import { rotasDetalhe } from "./features/detalhe/rotas";
+import { rotasRecibo } from "./features/recibo/rotas";
+import { rotasVoucher } from "./features/voucher/rotas";
+import { rotasFinalizar } from "./features/finalizar/rotas";
+import { rotasRecebimento } from "./features/recebimento/rotas";
+import { rotasManutencao } from "./features/manutencao/rotas";
+import { rotasColisao } from "./features/colisao/rotas";
+import { rotasDespesas } from "./features/despesas/rotas";
 import { useServiceDeepLink } from "./features/servicos/useServiceDeepLink";
 import { useAgendaLoad } from "./features/servicos/useAgendaLoad";
 import { useFinalizeFlow } from "./features/finalizar/useFinalizeFlow";
@@ -60,51 +70,22 @@ import { clearMediaDraft, loadMediaDraft, saveMediaDraft, touchMediaDraft } from
 import { ExpenseSendOverlay } from "./features/despesas/ExpenseSendOverlay";
 import { useExpenseFlow } from "./features/despesas/useExpenseFlow";
 
-import {
-  clearMaintenancePhotos,
-  deleteMaintenancePhoto as deleteFinalizationMaintenancePhoto,
-  detailsToClipboardText,
-  saveMaintenancePhoto,
-  saveSignatureLocally,
-  type LocalStore
-} from "./lib/localWorkflow";
+import type { LocalStore } from "./lib/localWorkflow";
 import { LocalToast, type ToastState, type ToastTone } from "./components/common/LocalToast";
 import { LoadingOverlay, type LoadingOverlayState } from "./components/common/LoadingOverlay";
 import { getVisibleLoadingOverlay } from "./app/overlayLayering";
-import { CollisionScreen } from "./features/colisao/CollisionScreen";
-import { ComunicadosScreen } from "./features/comunicados/ComunicadosScreen";
-import { TermosMultaScreen } from "./features/termos/TermosMultaScreen";
 import { resumoPendentes, separarTermos } from "./features/termos/termosMulta";
-import { ChecklistsScreen } from "./features/checklist/ChecklistsScreen";
 import { ButtonPreviewScreen } from "./screens/ButtonPreviewScreen";
-import { CollisionStartScreen } from "./features/colisao/CollisionStartScreen";
-import { DetailsScreen } from "./features/detalhe/DetailsScreen";
-import { ExpenseScreen } from "./features/despesas/ExpenseScreen";
-import { FinalizeScreen } from "./features/finalizar/FinalizeScreen";
-import { HistoryDetailsScreen } from "./features/historico/HistoryDetailsScreen";
-import { HistoryScreen } from "./features/historico/HistoryScreen";
 import { InitialScreen } from "./features/servicos/InitialScreen";
-import { LocalCancelScreen } from "./features/finalizar/LocalCancelScreen";
-import { MediaCaptureScreen } from "./features/fotos/MediaCaptureScreen";
-import { ReceiptReadingScreen } from "./features/despesas/ReceiptReadingScreen";
-import { ReceiptIllegibleScreen } from "./features/despesas/ReceiptIllegibleScreen";
-import { MaintenancePhotoPreviewScreen } from "./features/fotos/MaintenancePhotoPreviewScreen";
-import { ReceiveScreen } from "./features/recebimento/ReceiveScreen";
-import { ReceiptPreviewScreen, ReceiptScreen } from "./features/recibo/ReceiptScreen";
-import { MaintenanceRequestScreen } from "./features/manutencao/MaintenanceRequestScreen";
-import { IdeasScreen } from "./features/ideias/IdeasScreen";
-import { MyVehicleScreen } from "./features/meu-carro/MyVehicleScreen";
+import { ReceiptPreviewScreen } from "./features/recibo/ReceiptScreen";
 import { VehicleChoiceDialog } from "./features/detalhe/VehicleChoiceDialog";
 import { isThirdPartyDriver } from "./features/meu-carro/myVehicle";
 import { MOCK_FLEET } from "./lib/serviceVehicleInfleetMock";
 
 // Referência estável: o diálogo compara com a lista exibida para saber se oferece "Nenhuma das opções".
 const loadMockAllFleet = async () => MOCK_FLEET;
-import { ServicesScreen } from "./features/servicos/ServicesScreen";
-import { SignatureScreen } from "./features/voucher/SignatureScreen";
-import { VoucherScreen } from "./features/voucher/VoucherScreen";
-import { createEmptyCollisionDraft, getCollisionPhotoLabel } from "./features/colisao/collisions";
-import { prepareVideoBlobForUpload, revokePreviewUrl } from "./features/fotos/mediaDrafts";
+import { createEmptyCollisionDraft } from "./features/colisao/collisions";
+import { revokePreviewUrl } from "./features/fotos/mediaDrafts";
 import type { DetailData, MaintenancePhotoKind, Screen } from "./types";
 import { exchangeUserError } from "./features/servicos/trocaErros";
 import { FlowProgressOverlay, type RemoteOperation } from "./shared/ui/FlowProgressOverlay";
@@ -125,8 +106,6 @@ import { EMPTY_MAINTENANCE_REQUEST_DRAFT } from "./features/manutencao/rascunho"
 import { EMPTY_EXPENSE_DRAFT } from "./features/despesas/rascunho";
 import { EMPTY_MAINTENANCE_FINALIZE_DRAFT } from "./features/finalizar/rascunhoManutencao";
 import { LOCAL_RECEIPT_CLIENT_MOCKS } from "./features/recibo/clientesMock";
-
-type ReceiptEntrySource = "home" | "service";
 
 const DATA_LOADING_SUCCESS_DURATION_MS = 420;
 
@@ -185,30 +164,7 @@ function App() {
   const [maintenanceVehicles, setMaintenanceVehicles] = useState<MaintenanceRequestVehicleOption[]>([]);
   const [maintenanceCurrentVehicleId, setMaintenanceCurrentVehicleId] = useState("");
   const [maintenanceVehiclesLoading, setMaintenanceVehiclesLoading] = useState(false);
-  const {
-    clearMaintenanceRequestPhotoDraftState,
-    confirmMaintenanceRequestPhoto,
-    deleteMaintenanceRequestPhoto,
-    maintenanceRequestDraft,
-    maintenanceRequestPhotoDraft,
-    maintenanceRequestPhotoIsVideo,
-    maintenanceRequestPhotoPreviewUrl,
-    maintenanceRequestPhotos,
-    maintenanceRequestPreviewPhotoId,
-    openMaintenanceRequestCamera,
-    openMaintenanceRequestPreview,
-    openMaintenanceRequestVideoPreview,
-    setMaintenanceRequestDraft,
-    setMaintenanceRequestPhotoDraft,
-    setMaintenanceRequestPhotoDurationLabel,
-    setMaintenanceRequestPhotoIsVideo,
-    setMaintenanceRequestPhotoPosterUrl,
-    setMaintenanceRequestPhotoPreviewUrl,
-    setMaintenanceRequestPhotoRawBlob,
-    setMaintenanceRequestPhotos,
-    setMaintenanceRequestPreviewPhotoId,
-    submitMaintenanceRequest
-  } = useMaintenanceRequestFlow({
+  const manutencao = useMaintenanceRequestFlow({
     // Funções intermediárias para o que o App declara mais abaixo; só rodam nos handlers.
     logAppError: (...args) => logAppError(...args),
     maintenanceCurrentVehicleId,
@@ -220,51 +176,13 @@ function App() {
     setToast: (...args) => setToast(...args)
   });
   const {
-    cancelExpenseQuickRead,
-    checkReceiveProof,
-    clearExpensePhotoDraftState,
-    closeExpenseSendError,
-    confirmExpensePhoto,
-    deleteExpensePhoto,
-    expenseDateTouchedRef,
-    expenseDraft,
-    expensePhotoDraft,
-    expensePhotoIsVideo,
-    expensePhotoPreviewUrl,
-    expensePhotos,
-    expensePreviewPhotoId,
-    expenseQuickRead,
-    expenseQuickReadFilled,
-    expenseQuickReadFilling,
-    expenseQuickReadPhoto,
-    expenseReferenceData,
-    expenseReferenceError,
-    expenseReferenceLoading,
-    expenseSend,
-    expenseUploadMode,
-    expenseUploadReady,
-    expenseUploadStatuses,
-    handleExpenseUploadAction,
-    isExpenseDraftBlank,
-    openExpenseCamera,
-    openExpensePreview,
-    openExpenseVideoPreview,
-    resetExpenseQuickRead,
-    retakeQuickReadPhoto,
-    setExpenseDraft,
-    setExpensePhotoDraft,
-    setExpensePhotoDurationLabel,
-    setExpensePhotoIsVideo,
-    setExpensePhotoPosterUrl,
-    setExpensePhotoPreviewUrl,
-    setExpensePhotoRawBlob,
-    setExpensePhotos,
-    setExpensePreviewPhotoId,
-    setExpenseReferenceData,
-    setExpenseReferenceError,
-    setExpenseReferenceLoading,
-    submitExpense
-  } = useExpenseFlow({
+    clearMaintenanceRequestPhotoDraftState,
+    maintenanceRequestPhotos,
+    setMaintenanceRequestDraft,
+    setMaintenanceRequestPhotos,
+    setMaintenanceRequestPreviewPhotoId
+  } = manutencao;
+  const despesas = useExpenseFlow({
     remoteMode,
     driverContext,
     remoteOperation,
@@ -275,41 +193,29 @@ function App() {
     setCriticalError: (message) => setCriticalError(message),
     logAppError: (error, action, phase) => logAppError(error, action, phase)
   });
-  const [receiptClienteOptions, setReceiptClienteOptions] = useState<string[]>([]);
   const {
-    clearReceivePhotoDraftState,
-    confirmReceivePhoto,
-    continueAfterReceive,
-    deleteReceivePhoto,
-    getQrChargeProps,
-    invalidateQrChargeSummary,
-    openReceiveCamera,
-    openReceiveFlow,
-    openReceivePreview,
-    openReceiveVideoPreview,
-    qrChargeState,
-    qrChargeSummaryInFlightRef,
-    qrChargeSummaryNeeded,
-    qrChargeSummaryRequest,
-    qrChargesPaid,
-    receivePhotoDraft,
-    receivePhotoIsVideo,
-    receivePhotoPreviewUrl,
-    receivePreviewPhotoId,
-    receiveProofs,
-    receiveStepPending,
-    setQrChargeSummaries,
-    setQrChargesPaid,
-    setReceivePhotoDraft,
-    setReceivePhotoDurationLabel,
-    setReceivePhotoIsVideo,
-    setReceivePhotoPosterUrl,
-    setReceivePhotoPreviewUrl,
-    setReceivePhotoRawBlob,
-    setReceivePreviewPhotoId,
-    setReceiveProofs,
-    setReceiveUploadedCounts
-  } = useReceiveFlow({
+    checkReceiveProof,
+    clearExpensePhotoDraftState,
+    closeExpenseSendError,
+    expenseDraft,
+    expensePhotos,
+    expenseReferenceData,
+    expenseReferenceError,
+    expenseReferenceLoading,
+    expenseSend,
+    expenseUploadStatuses,
+    isExpenseDraftBlank,
+    openExpenseCamera,
+    resetExpenseQuickRead,
+    setExpenseDraft,
+    setExpensePhotos,
+    setExpensePreviewPhotoId,
+    setExpenseReferenceData,
+    setExpenseReferenceError,
+    setExpenseReferenceLoading
+  } = despesas;
+  const [receiptClienteOptions, setReceiptClienteOptions] = useState<string[]>([]);
+  const recebimento = useReceiveFlow({
     // Funções intermediárias para o que o App declara mais abaixo; só rodam nos handlers.
     blockIfNotFirstPending: (...args) => blockIfNotFirstPending(...args),
     checkReceiveProof,
@@ -325,31 +231,22 @@ function App() {
     setScreen
   });
   const {
-    clearCollisionPhotoDraftState,
-    collisionDraft,
-    collisionPhotoDraft,
-    collisionPhotoIsVideo,
-    collisionPhotoKind,
-    collisionPhotoPreviewUrl,
-    collisionPhotos,
-    collisionPreviewPhotoId,
-    confirmCollisionPhoto,
-    deleteCollisionPhoto,
-    openCollisionCamera,
-    openCollisionPreview,
-    openCollisionVideoPreview,
-    setCollisionDraft,
-    setCollisionPhotoDraft,
-    setCollisionPhotoDurationLabel,
-    setCollisionPhotoIsVideo,
-    setCollisionPhotoPosterUrl,
-    setCollisionPhotoPreviewUrl,
-    setCollisionPhotoRawBlob,
-    setCollisionPhotos,
-    setCollisionPreviewPhotoId,
-    startCollision,
-    submitCollision
-  } = useCollisionFlow({
+    clearReceivePhotoDraftState,
+    continueAfterReceive,
+    getQrChargeProps,
+    openReceiveCamera,
+    openReceiveFlow,
+    openReceivePreview,
+    qrChargeSummaryInFlightRef,
+    qrChargeSummaryNeeded,
+    qrChargeSummaryRequest,
+    receiveProofs,
+    receiveStepPending,
+    setQrChargeSummaries,
+    setReceiveProofs,
+    setReceiveUploadedCounts
+  } = recebimento;
+  const colisao = useCollisionFlow({
     // Funções intermediárias para o que o App declara mais abaixo; só rodam nos handlers.
     driverContext,
     logAppError: (...args) => logAppError(...args),
@@ -361,6 +258,13 @@ function App() {
     setScreen,
     setToast: (...args) => setToast(...args)
   });
+  const {
+    clearCollisionPhotoDraftState,
+    collisionPhotos,
+    setCollisionDraft,
+    setCollisionPhotos,
+    setCollisionPreviewPhotoId
+  } = colisao;
   useEffect(() => {
     if (isButtonPreviewMode || isReceiptPreviewMode) return;
     let active = true;
@@ -379,26 +283,7 @@ function App() {
   const [maintenanceExistingPreview, setMaintenanceExistingPreview] = useState(false);
   const completingClearTimerRef = useRef<number | null>(null);
   const queueHighlightTimerRef = useRef<number | null>(null);
-  const {
-    cancelSelected,
-    cancelVehicleChoice,
-    closeVehicleChoice,
-    finalizeSelected,
-    finalizeTimerRef,
-    getServiceObservationDraft,
-    maintenanceFinalizeDraft,
-    openFinalizeFlow,
-    openLocalCancelFlow,
-    openVoucherFlow,
-    saveSelectedServiceObservation,
-    saveVoucherDraft,
-    setMaintenanceFinalizeDraft,
-    setServiceObservationDrafts,
-    setVoucherDrafts,
-    vehicleChoiceRequest,
-    voucherDraftTimerRef,
-    voucherDrafts
-  } = useFinalizeFlow({
+  const finalizar = useFinalizeFlow({
     // Funções intermediárias para o que o App declara mais abaixo; só rodam nos handlers.
     blockIfNotFirstPending: (...args) => blockIfNotFirstPending(...args),
     completingClearTimerRef,
@@ -421,6 +306,24 @@ function App() {
     setToast: (...args) => setToast(...args),
     store
   });
+  const {
+    cancelVehicleChoice,
+    closeVehicleChoice,
+    finalizeSelected,
+    finalizeTimerRef,
+    getServiceObservationDraft,
+    openFinalizeFlow,
+    openLocalCancelFlow,
+    openVoucherFlow,
+    saveSelectedServiceObservation,
+    saveVoucherDraft,
+    setMaintenanceFinalizeDraft,
+    setServiceObservationDrafts,
+    setVoucherDrafts,
+    vehicleChoiceRequest,
+    voucherDraftTimerRef,
+    voucherDrafts
+  } = finalizar;
   const lastGlobalErrorRef = useRef<{ id: string; at: number }>({ id: "", at: 0 });
 
   const clearMaintenanceFinalizePhotoDraft = (keepPreviewUrl = false) => {
@@ -539,25 +442,23 @@ function App() {
   // Guarda o motorista logado para recarregar comunicados sem depender do estado ainda não aplicado.
   const comunicadosDriverIdRef = useRef("");
   const { termosMulta, termosStatus, reloadTermosMulta } = useTermosMulta(comunicadosDriverIdRef, driverContext?.id);
+  const checklistsLista = useChecklists({ dados, driverIdRef: comunicadosDriverIdRef, previewMode: isButtonPreviewMode || isReceiptPreviewMode, setScreen, setToast, setDataLoadingState });
   const {
     checklists,
-    checklistsStatus,
     selectedChecklistId,
     setSelectedChecklistId,
-    checklistOrigin,
     setChecklistOrigin,
     reloadChecklists
-  } = useChecklists({ dados, driverIdRef: comunicadosDriverIdRef, previewMode: isButtonPreviewMode || isReceiptPreviewMode, setScreen, setToast, setDataLoadingState });
+  } = checklistsLista;
+  const comunicadosLista = useComunicados({ dados, driverIdRef: comunicadosDriverIdRef, previewMode: isButtonPreviewMode || isReceiptPreviewMode, setScreen, setDataLoadingState });
   const {
     comunicados,
     comunicadosStatus,
-    selectedComunicadoId,
     setSelectedComunicadoId,
-    comunicadoOrigin,
     setComunicadoOrigin,
     pendingComunicadoDeepLinkRef,
     reloadComunicados
-  } = useComunicados({ dados, driverIdRef: comunicadosDriverIdRef, previewMode: isButtonPreviewMode || isReceiptPreviewMode, setScreen, setDataLoadingState });
+  } = comunicadosLista;
 
   useServiceDeepLink({
     dados,
@@ -1057,657 +958,193 @@ function App() {
     setScreen("fotoManutencao");
   };
 
-  if (screen === "canceladoLocal" && selectedDetail) {
-    return show(
-      <LocalCancelScreen
-        detail={selectedDetail}
-        onBack={() => setScreen("detalhes")}
-        onWrongClick={() => setScreen("detalhes")}
-        onSubmit={cancelSelected}
-        submitState={remoteOperation?.phase ?? "idle"}
-      />
-    );
-  }
+  const telaFinalizar = rotasFinalizar(screen, {
+    ...finalizar,
+    canGeneratePersonalReceipt,
+    clearMaintenanceFinalizePhotoDraft,
+    confirmedMaintenancePhotos,
+    continueAfterReceive,
+    expenseReferenceData,
+    expenseReferenceError,
+    expenseReferenceLoading,
+    getQrChargeProps,
+    logAppError,
+    maintenanceExistingPreview,
+    maintenancePhotoKind,
+    openMaintenanceFinalizeCamera,
+    openPersonalReceipt,
+    openReceiveCamera,
+    openReceivePreview,
+    photoDraft,
+    photoDraftIsVideo,
+    photoDraftPreviewUrl,
+    photoDraftRawBlob,
+    receiveProofs,
+    receiveStepPending,
+    remoteOperation,
+    selectedDetail,
+    setCriticalError,
+    setMaintenanceExistingPreview,
+    setMaintenancePhotoKind,
+    setPhotoDraft,
+    setPhotoDraftIsVideo,
+    setPhotoDraftPreviewUrl,
+    setPhotoDraftRawBlob,
+    setScreen,
+    setStore,
+    setToast,
+    store
+  });
+  if (telaFinalizar) return show(telaFinalizar);
 
-  if (screen === "fotoSolicitacaoManutencao") {
-    return show(
-      <MediaCaptureScreen
-        kind="FOTO1"
-        title="Manutenção"
-        onBack={() => setScreen("solicitarManutencao")}
-        onCapture={(photoDataUrl) => {
-          setMaintenanceRequestPhotoDraft(photoDataUrl);
-          setMaintenanceRequestPhotoPreviewUrl("");
-          setMaintenanceRequestPhotoPosterUrl("");
-          setMaintenanceRequestPhotoDurationLabel("");
-          setMaintenanceRequestPhotoRawBlob(null);
-          setMaintenanceRequestPhotoIsVideo(false);
-          setScreen("previewFotoSolicitacaoManutencao");
-        }}
-        onCaptureVideo={openMaintenanceRequestVideoPreview}
-        onSwitchCamera={() => setToast("Câmera alternada localmente.")}
-      />
-    );
-  }
+  const telaManutencao = rotasManutencao(screen, {
+    ...manutencao,
+    maintenanceCurrentVehicleId,
+    maintenanceVehicles,
+    maintenanceVehiclesLoading,
+    remoteOperation,
+    setScreen,
+    setToast
+  });
+  if (telaManutencao) return show(telaManutencao);
 
-  if (screen === "previewFotoSolicitacaoManutencao") {
-    return show(
-      <MaintenancePhotoPreviewScreen
-        kind="FOTO1"
-        title="Foto da manutenção"
-        prompt={maintenanceRequestPhotoIsVideo ? "O vídeo está correto?" : "A foto está legível?"}
-        photoDataUrl={maintenanceRequestPhotoDraft}
-        isVideo={maintenanceRequestPhotoIsVideo}
-        videoPreviewUrl={maintenanceRequestPhotoPreviewUrl}
-        onBack={() => {
-          clearMaintenanceRequestPhotoDraftState();
-          setMaintenanceRequestPreviewPhotoId("");
-          setScreen("solicitarManutencao");
-        }}
-        onRetake={openMaintenanceRequestCamera}
-        onDelete={maintenanceRequestPreviewPhotoId ? deleteMaintenanceRequestPhoto : undefined}
-        onConfirm={confirmMaintenanceRequestPhoto}
-        confirmLabel={maintenanceRequestPreviewPhotoId ? "Voltar" : "Confirmar"}
-        deleteOnly={Boolean(maintenanceRequestPreviewPhotoId)}
-      />
-    );
-  }
+  const telaColisao = rotasColisao(screen, {
+    ...colisao,
+    driverContext,
+    maintenanceCurrentVehicleId,
+    maintenanceVehicles,
+    maintenanceVehiclesLoading,
+    remoteOperation,
+    setScreen,
+    setToast
+  });
+  if (telaColisao) return show(telaColisao);
 
-  if (screen === "fotoColisao") {
-    return show(
-      <MediaCaptureScreen
-        kind="NOTAFISCAL"
-        title={`Capturar: ${getCollisionPhotoLabel(collisionPhotoKind)}`}
-        onBack={() => setScreen("colisoes")}
-        onCapture={(photoDataUrl) => {
-          setCollisionPhotoDraft(photoDataUrl);
-          setCollisionPhotoPreviewUrl("");
-          setCollisionPhotoPosterUrl("");
-          setCollisionPhotoDurationLabel("");
-          setCollisionPhotoRawBlob(null);
-          setCollisionPhotoIsVideo(false);
-          setCollisionPreviewPhotoId("");
-          setScreen("previewFotoColisao");
-        }}
-        onCaptureVideo={openCollisionVideoPreview}
-        onSwitchCamera={() => setToast("Câmera alternada localmente.")}
-      />
-    );
-  }
+  const telaDespesas = rotasDespesas(screen, {
+    ...despesas,
+    maintenanceCurrentVehicleId,
+    maintenanceVehicles,
+    maintenanceVehiclesLoading,
+    remoteMode,
+    remoteOperation,
+    setScreen,
+    setToast
+  });
+  if (telaDespesas) return show(telaDespesas);
 
-  if (screen === "previewFotoColisao") {
-    return show(
-      <MaintenancePhotoPreviewScreen
-        kind="NOTAFISCAL"
-        title={getCollisionPhotoLabel(collisionPhotoKind)}
-        prompt={collisionPhotoIsVideo ? "O vídeo está correto?" : "A foto está legível?"}
-        photoDataUrl={collisionPhotoDraft}
-        isVideo={collisionPhotoIsVideo}
-        videoPreviewUrl={collisionPhotoPreviewUrl}
-        onBack={() => {
-          clearCollisionPhotoDraftState();
-          setCollisionPreviewPhotoId("");
-          setScreen("colisoes");
-        }}
-        onRetake={() => openCollisionCamera(collisionPhotoKind)}
-        onDelete={collisionPreviewPhotoId ? deleteCollisionPhoto : undefined}
-        onConfirm={confirmCollisionPhoto}
-        confirmLabel={collisionPreviewPhotoId ? "Voltar" : "Confirmar"}
-        deleteOnly={Boolean(collisionPreviewPhotoId)}
-      />
-    );
-  }
+  const telaIdeias = rotasIdeias(screen, { ideasGateway, remoteMode, setScreen });
+  if (telaIdeias) return show(telaIdeias);
 
-  if (screen === "fotoGasto") {
-    return show(
-      <MediaCaptureScreen
-        kind="NOTAFISCAL"
-        title="Comprovante"
-        onBack={() => setScreen("gastos")}
-        onCapture={(photoDataUrl) => {
-          setExpensePhotoDraft(photoDataUrl);
-          setExpensePhotoPreviewUrl("");
-          setExpensePhotoPosterUrl("");
-          setExpensePhotoDurationLabel("");
-          setExpensePhotoRawBlob(null);
-          setExpensePhotoIsVideo(false);
-          setExpensePreviewPhotoId("");
-          setScreen("previewFotoGasto");
-        }}
-        onCaptureVideo={openExpenseVideoPreview}
-        onSwitchCamera={() => setToast("Câmera alternada localmente.")}
-      />
-    );
-  }
+  const telaMeuCarro = rotasMeuCarro(screen, {
+    driverContext,
+    remoteMode,
+    setDriverContext,
+    setScreen
+  });
+  if (telaMeuCarro) return show(telaMeuCarro);
 
-  if (screen === "previewFotoGasto") {
-    return show(
-      <MaintenancePhotoPreviewScreen
-        kind="NOTAFISCAL"
-        title="Comprovante"
-        prompt={expensePhotoIsVideo ? "O vídeo está correto?" : "O comprovante está inteiro e legível?"}
-        photoDataUrl={expensePhotoDraft}
-        isVideo={expensePhotoIsVideo}
-        videoPreviewUrl={expensePhotoPreviewUrl}
-        onBack={() => {
-          clearExpensePhotoDraftState();
-          setExpensePreviewPhotoId("");
-          setScreen("gastos");
-        }}
-        onRetake={openExpenseCamera}
-        onDelete={expensePreviewPhotoId ? deleteExpensePhoto : undefined}
-        onConfirm={confirmExpensePhoto}
-        confirmLabel={expensePreviewPhotoId ? "Voltar" : expensePhotoIsVideo ? "Confirmar" : "Usar esta foto"}
-        retakeLabel={expensePhotoIsVideo ? undefined : "Tirar outra"}
-        deleteOnly={Boolean(expensePreviewPhotoId)}
-      />
-    );
-  }
+  const telaRecebimento = rotasRecebimento(screen, {
+    ...recebimento,
+    blockIfNotFirstPending,
+    canGeneratePersonalReceipt,
+    openPersonalReceipt,
+    remoteOperation,
+    selectedDetail,
+    setScreen,
+    setToast
+  });
+  if (telaRecebimento) return show(telaRecebimento);
 
-  if (screen === "solicitarManutencao") {
-    return show(
-      <MaintenanceRequestScreen
-        draft={maintenanceRequestDraft}
-        photos={maintenanceRequestPhotos}
-        onDraftChange={setMaintenanceRequestDraft}
-        onAddPhoto={openMaintenanceRequestCamera}
-        onPreviewPhoto={openMaintenanceRequestPreview}
-        onBack={() => setScreen("inicio")}
-        onSubmit={submitMaintenanceRequest}
-        submitState={remoteOperation?.phase ?? "idle"}
-        vehicles={maintenanceVehicles}
-        initialVehicleId={maintenanceCurrentVehicleId}
-        vehiclesLoading={maintenanceVehiclesLoading}
-      />
-    );
-  }
+  const telaRecibo = rotasRecibo(screen, {
+    receiptClienteOptions,
+    receiptDetail,
+    receiptEntrySource,
+    selectedDetail,
+    setRemoteOperation,
+    setScreen
+  });
+  if (telaRecibo) return show(telaRecibo);
 
-  if (screen === "gastos" && expenseFlowView(expenseQuickRead) === "leitura") {
-    return show(
-      <ReceiptReadingScreen photoDataUrl={expenseQuickReadPhoto} filling={expenseQuickReadFilling} onCancel={cancelExpenseQuickRead} />
-    );
-  }
+  const telaVoucher = rotasVoucher(screen, {
+    canGeneratePersonalReceipt,
+    continueAfterReceive,
+    finalizeSelected,
+    getQrChargeProps,
+    openPersonalReceipt,
+    openReceiveCamera,
+    openReceivePreview,
+    receiveProofs,
+    receiveStepPending,
+    remoteOperation,
+    saveVoucherDraft,
+    selectedDetail,
+    setScreen,
+    setStore,
+    setToast,
+    store,
+    voucherDrafts
+  });
+  if (telaVoucher) return show(telaVoucher);
 
-  if (screen === "gastos" && expenseFlowView(expenseQuickRead) === "ilegivel") {
-    return show(
-      <ReceiptIllegibleScreen photoDataUrl={expenseQuickReadPhoto} onRetake={retakeQuickReadPhoto} onBack={cancelExpenseQuickRead} />
-    );
-  }
+  const telaDetalhe = rotasDetalhe(screen, {
+    getServiceObservationDraft,
+    openFinalizeFlow,
+    openLocalCancelFlow,
+    openReceiveFlow,
+    openVoucherFlow,
+    refreshLocal,
+    saveSelectedServiceObservation,
+    selectedDetail,
+    setScreen,
+    setToast
+  });
+  if (telaDetalhe) return show(telaDetalhe);
 
-  if (screen === "gastos") {
-    return show(
-      <ExpenseScreen
-        uploads={expenseUploadStatuses.map(({ submission, status }) => ({ id: submission.expenseId, draft: submission.draft, status }))}
-        onUploadAction={handleExpenseUploadAction}
-        submitDisabled={remoteMode && (expenseUploadMode === "pending" || (expenseUploadMode === "async" && !expenseUploadReady))}
-        draft={expenseDraft}
-        photos={expensePhotos}
-        referenceData={expenseReferenceData}
-        referenceLoading={expenseReferenceLoading}
-        referenceError={!remoteMode ? "Visualização local. Para gravar, abra o app publicado no Model-driven." : expenseReferenceError}
-        onDraftChange={(draft) => {
-          if (draft.dataGasto !== expenseDraft.dataGasto) expenseDateTouchedRef.current = true;
-          setExpenseDraft(draft);
-        }}
-        onAddPhoto={openExpenseCamera}
-        onPreviewPhoto={openExpensePreview}
-        onBack={() => setScreen("inicio")}
-        onSubmit={submitExpense}
-        submitState={expenseSend && expenseSend.phase !== "error" ? "loading" : remoteOperation?.phase ?? "idle"}
-        vehicles={maintenanceVehicles}
-        vehiclesLoading={maintenanceVehiclesLoading}
-        currentVehicleId={maintenanceCurrentVehicleId}
-        quickRead={expenseQuickRead}
-        quickReadFilled={expenseQuickReadFilled}
-      />
-    );
-  }
+  const telaHistorico = rotasHistorico(screen, {
+    refreshLocal,
+    selectedDetail,
+    setScreen,
+    setSelectedDetail,
+    store
+  });
+  if (telaHistorico) return show(telaHistorico);
 
-  if (screen === "boasIdeias") {
-    return show(
-      <IdeasScreen
-        onBack={() => setScreen("inicio")}
-        loadIdeas={ideasGateway.load}
-        createIdea={ideasGateway.create}
-        localNotice={remoteMode ? undefined : "Visualização local. Para enviar à equipe, abra o app publicado no Model-driven."}
-      />
-    );
-  }
+  const telaServicos = rotasServicos(screen, {
+    checklists,
+    completingDetailKey,
+    comunicados,
+    dados,
+    queueHighlightDetailKey,
+    refreshLocal,
+    remoteMode,
+    setChecklistOrigin,
+    setComunicadoOrigin,
+    setScreen,
+    setSelectedChecklistId,
+    setSelectedComunicadoId,
+    setSelectedDetail,
+    setToast,
+    store
+  });
+  if (telaServicos) return show(telaServicos);
 
-  if (screen === "meuCarro") {
-    return show(
-      <MyVehicleScreen
-        onBack={() => setScreen("inicio")}
-        currentVehicleId={getDriverCurrentVehicleId(driverContext)}
-        loadVehicles={async () => (remoteMode ? loadMyVehiclesRemote(driverContext ?? await getDriverContext()) : MOCK_FLEET.slice(0, 2))}
-        saveVehicle={async (id) => {
-          const driver = driverContext ?? await getDriverContext();
-          if (remoteMode) await setMyCurrentVehicleRemote(driver, id);
-          setDriverContext({ ...driver, funcionario: { ...(driver.funcionario ?? {}), _cr40f_veiculoatual_value: id } });
-        }}
-      />
-    );
-  }
+  const telaComunicados = rotasComunicados(screen, {
+    ...comunicadosLista,
+    driverContext,
+    setScreen
+  });
+  if (telaComunicados) return show(telaComunicados);
 
-  if (screen === "colisoesInicio") {
-    return show(
-      <CollisionStartScreen
-        onBack={() => setScreen("inicio")}
-        onSelect={startCollision}
-      />
-    );
-  }
+  const telaTermos = rotasTermos(screen, {
+    reloadTermosMulta,
+    setScreen,
+    termosMulta,
+    termosStatus
+  });
+  if (telaTermos) return show(telaTermos);
 
-  if (screen === "colisoes") {
-    return show(
-      <CollisionScreen
-        draft={collisionDraft}
-        photos={collisionPhotos}
-        onDraftChange={setCollisionDraft}
-        onAddPhoto={openCollisionCamera}
-        onPreviewPhoto={openCollisionPreview}
-        onBack={() => setScreen("colisoesInicio")}
-        onSubmit={submitCollision}
-        submitState={remoteOperation?.phase ?? "idle"}
-        vehicles={maintenanceVehicles}
-        vehiclesLoading={maintenanceVehiclesLoading}
-        currentVehicleId={maintenanceCurrentVehicleId}
-        driverName={driverContext?.fullName}
-      />
-    );
-  }
-
-  if (screen === "fotoManutencao" && selectedDetail) {
-    return show(
-      <MediaCaptureScreen
-        kind={maintenancePhotoKind}
-        onBack={() => setScreen("finalizar")}
-        onCapture={(photoDataUrl) => {
-          setPhotoDraft(photoDataUrl);
-          setPhotoDraftPreviewUrl("");
-          setPhotoDraftRawBlob(null);
-          setPhotoDraftIsVideo(false);
-          setMaintenanceExistingPreview(false);
-          setScreen("previewFotoManutencao");
-        }}
-        onCaptureVideo={(video) => {
-          setPhotoDraft("");
-          setPhotoDraftPreviewUrl(video.previewUrl);
-          setPhotoDraftRawBlob(video.rawBlob);
-          setPhotoDraftIsVideo(true);
-          setMaintenanceExistingPreview(false);
-          setScreen("previewFotoManutencao");
-        }}
-        onSwitchCamera={() => setToast("Câmera alternada localmente.")}
-      />
-    );
-  }
-
-  if (screen === "previewFotoManutencao" && selectedDetail) {
-    return show(
-      <MaintenancePhotoPreviewScreen
-        kind={maintenancePhotoKind}
-        photoDataUrl={photoDraft}
-        isVideo={photoDraftIsVideo}
-        videoPreviewUrl={photoDraftPreviewUrl}
-        onBack={() => {
-          clearMaintenanceFinalizePhotoDraft();
-          setMaintenanceExistingPreview(false);
-          setScreen("finalizar");
-        }}
-        onRetake={() => openMaintenanceFinalizeCamera(maintenancePhotoKind)}
-        onConfirm={() => {
-          void (async () => {
-            try {
-              const savedPhotoDataUrl =
-                photoDraftIsVideo && photoDraftRawBlob && !photoDraft
-                  ? (await prepareVideoBlobForUpload(photoDraftRawBlob)).dataUrl
-                  : photoDraft ?? "";
-              setStore((current) => saveMaintenancePhoto(current, selectedDetail.id, maintenancePhotoKind, savedPhotoDataUrl));
-              setToast("Foto salva localmente.");
-              clearMaintenanceFinalizePhotoDraft();
-              setMaintenanceExistingPreview(false);
-              setScreen("finalizar");
-            } catch (error) {
-              logAppError(error, "confirmMaintenancePhoto", "local-save");
-              setCriticalError(error instanceof Error ? error.message : "Falha ao preparar mídia local.");
-            }
-          })();
-        }}
-        onDelete={maintenanceExistingPreview ? () => {
-          setStore((current) => deleteFinalizationMaintenancePhoto(current, selectedDetail.id, maintenancePhotoKind));
-          setToast("Foto apagada.");
-          clearMaintenanceFinalizePhotoDraft();
-          setMaintenanceExistingPreview(false);
-          setScreen("finalizar");
-        } : undefined}
-        deleteOnly={maintenanceExistingPreview}
-      />
-    );
-  }
-
-  if (screen === "receber" && selectedDetail) {
-    return show(
-      <ReceiveScreen
-        detail={selectedDetail}
-        photos={receiveProofs[selectedDetail.id] ?? []}
-        onAddPhoto={openReceiveCamera}
-        onPreviewPhoto={openReceivePreview}
-        onBack={() => setScreen("detalhes")}
-        onContinue={continueAfterReceive}
-        onGeneratePersonalReceipt={openPersonalReceipt}
-        canGeneratePersonalReceipt={canGeneratePersonalReceipt}
-        submitState={remoteOperation?.phase ?? "idle"}
-        {...getQrChargeProps(selectedDetail)}
-      />
-    );
-  }
-
-  if (screen === "cobrancaQr" && selectedDetail) {
-    const qrState = qrChargeState(selectedDetail);
-    return show(
-      <QrChargeScreen
-        key={selectedDetail.id}
-        detail={selectedDetail}
-        maxCents={qrState.balanceCents}
-        resume={qrState.open}
-        onBack={() => {
-          invalidateQrChargeSummary(selectedDetail.id);
-          setScreen("receber");
-        }}
-        onPaid={(charge) =>
-          setQrChargesPaid((current) => ({ ...current, [selectedDetail.id]: { ...current[selectedDetail.id], [charge.sessionId]: charge.valorCentavos } }))
-        }
-        onContinue={(charge) => {
-          // O estado do onPaid pode não ter chegado neste clique: soma a cobrança confirmada aqui.
-          const covers = qrChargeState(selectedDetail, { ...qrChargesPaid[selectedDetail.id], [charge.sessionId]: charge.valorCentavos }).covers;
-          invalidateQrChargeSummary(selectedDetail.id);
-          // Pago no total: segue para a próxima etapa do serviço sem passar de novo pelo comprovante.
-          if (covers && blockIfNotFirstPending(selectedDetail)) return;
-          setScreen(getScreenAfterQrPayment(selectedDetail, covers));
-        }}
-        createCharge={(valorCentavos, pagante, idioma) =>
-          createQrChargeRemote({ reservaId: selectedDetail.dataverse?.id ?? selectedDetail.id, valorCentavos, pagante, idioma })
-        }
-        updateCharge={updateQrChargeRemote}
-      />
-    );
-  }
-
-  if (screen === "reciboPersonalizado") {
-    return show(
-      <ReceiptScreen
-        detail={receiptDetail}
-        onBack={() => setScreen(receiptEntrySource === "service" && selectedDetail ? "receber" : "inicio")}
-        clienteOptions={receiptClienteOptions}
-        onProgress={(progress) => {
-          if (!progress) {
-            setRemoteOperation(null);
-            return;
-          }
-          const flowPhase = progress.phase === "success" ? "success" : "loading";
-          setRemoteOperation({
-            title: "Gerando recibo personalizado",
-            message: progress.message,
-            detailId: receiptDetail?.id,
-            phase: flowPhase
-          });
-        }}
-      />
-    );
-  }
-
-  if (screen === "fotoReceber") {
-    return show(
-      <MediaCaptureScreen
-        kind="NOTAFISCAL"
-        title="Comprovante"
-        onBack={() => setScreen("receber")}
-        onCapture={(photoDataUrl) => {
-          setReceivePhotoDraft(photoDataUrl);
-          setReceivePhotoPreviewUrl("");
-          setReceivePhotoPosterUrl("");
-          setReceivePhotoDurationLabel("");
-          setReceivePhotoRawBlob(null);
-          setReceivePhotoIsVideo(false);
-          setReceivePreviewPhotoId("");
-          setScreen("previewFotoReceber");
-        }}
-        onCaptureVideo={openReceiveVideoPreview}
-        onSwitchCamera={() => setToast("Câmera alternada localmente.")}
-      />
-    );
-  }
-
-  if (screen === "previewFotoReceber") {
-    return show(
-      <MaintenancePhotoPreviewScreen
-        kind="NOTAFISCAL"
-        title="Comprovante"
-        prompt={receivePhotoIsVideo ? "O vídeo está correto?" : "O comprovante está legível?"}
-        photoDataUrl={receivePhotoDraft}
-        isVideo={receivePhotoIsVideo}
-        videoPreviewUrl={receivePhotoPreviewUrl}
-        onBack={() => {
-          clearReceivePhotoDraftState();
-          setReceivePreviewPhotoId("");
-          setScreen("receber");
-        }}
-        onRetake={openReceiveCamera}
-        onDelete={receivePreviewPhotoId ? deleteReceivePhoto : undefined}
-        onConfirm={confirmReceivePhoto}
-        confirmLabel={receivePreviewPhotoId ? "Voltar" : "Confirmar"}
-        deleteOnly={Boolean(receivePreviewPhotoId)}
-      />
-    );
-  }
-
-  if (screen === "finalizar" && selectedDetail) {
-    if (receiveStepPending(selectedDetail)) {
-      return show(
-        <ReceiveScreen
-          detail={selectedDetail}
-          photos={receiveProofs[selectedDetail.id] ?? []}
-          onAddPhoto={openReceiveCamera}
-          onPreviewPhoto={openReceivePreview}
-          onBack={() => setScreen("detalhes")}
-          onContinue={continueAfterReceive}
-          onGeneratePersonalReceipt={openPersonalReceipt}
-          canGeneratePersonalReceipt={canGeneratePersonalReceipt}
-          submitState={remoteOperation?.phase ?? "idle"}
-          {...getQrChargeProps(selectedDetail)}
-        />
-      );
-    }
-    return show(
-      <FinalizeScreen
-        detail={selectedDetail}
-        onBack={() => setScreen(getServiceTaskBackScreen(selectedDetail))}
-        onDone={finalizeSelected}
-        confirmedPhotos={confirmedMaintenancePhotos}
-        maintenancePhotos={store.photos[selectedDetail.id] ?? {}}
-        maintenanceDraft={maintenanceFinalizeDraft}
-        onMaintenanceDraftChange={setMaintenanceFinalizeDraft}
-        expenseReferenceData={expenseReferenceData}
-        expenseReferenceLoading={expenseReferenceLoading}
-        expenseReferenceError={expenseReferenceError}
-        submitState={remoteOperation?.phase ?? "idle"}
-        initialServiceObservation={getServiceObservationDraft(selectedDetail)}
-        onClearPhotos={() => {
-          setStore((current) => clearMaintenancePhotos(current, selectedDetail.id));
-          setToast("Fotos locais limpas.");
-        }}
-        onPreviewMaintenancePhoto={(kind) => {
-          setMaintenancePhotoKind(kind);
-          const existingPhoto = store.photos[selectedDetail.id]?.[kind];
-          if (existingPhoto) {
-            setPhotoDraft(existingPhoto);
-            setPhotoDraftPreviewUrl("");
-            setPhotoDraftRawBlob(null);
-            setPhotoDraftIsVideo(existingPhoto.startsWith("data:video/"));
-            setMaintenanceExistingPreview(true);
-            setScreen("previewFotoManutencao");
-            return;
-          }
-          openMaintenanceFinalizeCamera(kind);
-        }}
-      />
-    );
-  }
-
-  if (screen === "assinatura" && selectedDetail) {
-    return show(
-      <SignatureScreen
-        detail={selectedDetail}
-        onBack={() => setScreen("voucher")}
-        onConfirm={(signatureDataUrl) => {
-          if (signatureDataUrl) {
-            setStore((current) => saveSignatureLocally(current, selectedDetail.id, signatureDataUrl));
-            setToast("Assinatura salva localmente.");
-          }
-          setScreen("voucher");
-        }}
-      />
-    );
-  }
-
-  if (screen === "voucher" && selectedDetail) {
-    if (receiveStepPending(selectedDetail)) {
-      return show(
-        <ReceiveScreen
-          detail={selectedDetail}
-          photos={receiveProofs[selectedDetail.id] ?? []}
-          onAddPhoto={openReceiveCamera}
-          onPreviewPhoto={openReceivePreview}
-          onBack={() => setScreen("detalhes")}
-          onContinue={continueAfterReceive}
-          onGeneratePersonalReceipt={openPersonalReceipt}
-          canGeneratePersonalReceipt={canGeneratePersonalReceipt}
-          submitState={remoteOperation?.phase ?? "idle"}
-          {...getQrChargeProps(selectedDetail)}
-        />
-      );
-    }
-    return show(
-      <VoucherScreen
-        detail={selectedDetail}
-        hasSignature={Boolean(store.signatures[selectedDetail.id])}
-        initialDraft={voucherDrafts[getVoucherDraftKey(selectedDetail)]}
-        onBack={() => setScreen(getServiceTaskBackScreen(selectedDetail))}
-        onOpenSignature={() => setScreen("assinatura")}
-        onFinalize={finalizeSelected}
-        onDraftChange={saveVoucherDraft}
-        submitState={remoteOperation?.phase ?? "idle"}
-      />
-    );
-  }
-
-  if (screen === "detalhes" && selectedDetail) {
-    return show(
-      <DetailsScreen
-        detail={selectedDetail}
-        onBack={() => setScreen("servicos")}
-        onOpenReceive={openReceiveFlow}
-        onOpenVoucher={openVoucherFlow}
-        onOpenFinalize={openFinalizeFlow}
-        onServiceObservationChange={saveSelectedServiceObservation}
-        serviceObservationDraft={getServiceObservationDraft(selectedDetail)}
-        onCancelLocal={openLocalCancelFlow}
-        onRefresh={() => refreshLocal(selectedDetail)}
-        onCopy={() => {
-          void navigator.clipboard?.writeText(detailsToClipboardText(selectedDetail));
-          setToast("Informações copiadas.");
-        }}
-      />
-    );
-  }
-
-  if (screen === "detalhesHistorico" && selectedDetail) {
-    return show(<HistoryDetailsScreen detail={selectedDetail} onBack={() => setScreen("historico")} onRefresh={() => refreshLocal(selectedDetail)} />);
-  }
-
-  if (screen === "historico") {
-    return show(
-      <HistoryScreen
-        items={store.history}
-        onHome={() => setScreen("inicio")}
-        onRefresh={refreshLocal}
-        onOpenDetails={(detail) => {
-          setSelectedDetail(detail);
-          setScreen("detalhesHistorico");
-        }}
-      />
-    );
-  }
-
-  if (screen === "servicos") {
-    return show(
-      <ServicesScreen
-        items={store.agenda}
-        pendingComunicados={comunicados.filter(isComunicadoPending)}
-        onOpenComunicado={(id) => { setSelectedComunicadoId(id); setComunicadoOrigin("servicos"); setScreen("comunicados"); }}
-        pendingChecklists={checklists.filter(isChecklistPending)}
-        onOpenChecklist={(id) => { setSelectedChecklistId(id); setChecklistOrigin("servicos"); setScreen("checklists"); }}
-        onHome={() => setScreen("inicio")}
-        onRefresh={refreshLocal}
-        completingDetailKey={completingDetailKey}
-        queueHighlightDetailKey={queueHighlightDetailKey}
-        onOpenDetails={(detail) => {
-          if (remoteMode) {
-            dados.marcarVisto(detail).catch((error) => {
-              reportAppError(error, {
-                severity: "error",
-                source: "app",
-                action: "markDetailViewedRemote",
-                phase: "open-details",
-                screen: "servicos",
-                detailId: detail.id,
-                detailType: detail.type
-              });
-              setToast(error instanceof Error ? error.message : "Falha ao marcar visualização.");
-            });
-          }
-          setSelectedDetail(detail);
-          setScreen("detalhes");
-        }}
-      />
-    );
-  }
-
-  if (screen === "comunicados") {
-    return show(
-      <ComunicadosScreen
-        items={comunicados}
-        selectedId={selectedComunicadoId}
-        onSelectedIdChange={setSelectedComunicadoId}
-        onBack={() => { setComunicadoOrigin(""); setScreen("inicio"); }}
-        onCloseDetail={comunicadoOrigin === "servicos" ? () => { setSelectedComunicadoId(""); setComunicadoOrigin(""); setScreen("servicos"); } : undefined}
-        onReload={reloadComunicados}
-        loadStatus={comunicadosStatus}
-        driverName={driverContext?.fullName ?? (isMockComunicados() ? "Renan" : "")}
-      />
-    );
-  }
-
-  if (screen === "multas") {
-    return show(
-      <TermosMultaScreen items={termosMulta} loadStatus={termosStatus} onBack={() => setScreen("inicio")} onReload={reloadTermosMulta} />
-    );
-  }
-
-  if (screen === "checklists") {
-    return show(
-      <ChecklistsScreen
-        items={checklists}
-        selectedId={selectedChecklistId}
-        onSelectedIdChange={setSelectedChecklistId}
-        onBack={() => { setChecklistOrigin(""); setScreen("inicio"); }}
-        onCloseDetail={checklistOrigin === "servicos" ? () => { setSelectedChecklistId(""); setChecklistOrigin(""); setScreen("servicos"); } : undefined}
-        onReload={reloadChecklists}
-        loadStatus={checklistsStatus}
-      />
-    );
-  }
+  const telaChecklist = rotasChecklist(screen, { ...checklistsLista, setScreen });
+  if (telaChecklist) return show(telaChecklist);
 
   return show(
     <InitialScreen

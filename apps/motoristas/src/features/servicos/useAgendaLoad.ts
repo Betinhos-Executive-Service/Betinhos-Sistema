@@ -11,7 +11,7 @@ import type { LoadingOverlayState } from "../../components/common/LoadingOverlay
 import type { DetailData, Screen } from "../../types";
 import { findDetailFromHashRoute, getInitialScreenFromHashRoute } from "../../app/rotaInicial";
 
-type RefreshOptions = {
+export type RefreshOptions = {
   silent?: boolean;
 };
 
