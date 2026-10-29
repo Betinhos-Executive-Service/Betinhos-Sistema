@@ -139,7 +139,7 @@ export async function confirmarTotp(req: Request, c: Ctx): Promise<Response> {
   await c.env.KV.put(chaveUso, '1', { expirationTtl: 120 })
   await c.env.KV.delete(await chaveFalhas(etapa.email))
 
-  if (etapa.segredo) await c.dv.patch(`${SET.validador}(${etapa.vid})`, { cr40f_segredototp: await cifrar(etapa.segredo, c.env.CHAVE_TOTP, `totp:${etapa.vid}`) })
+  if (etapa.segredo) await c.dv.patch(`${SET.validador}(${etapa.vid})`, { cr40f_segredototp: await cifrar(etapa.segredo, c.env.CHAVE_TOTP, `totp:${etapa.vid}`), cr40f_totpcadastradoem: new Date(c.agora).toISOString() })
   const extras: string[] = []
   if (corpo?.lembrar === true) {
     const token = novoToken()

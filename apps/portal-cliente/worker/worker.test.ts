@@ -82,6 +82,7 @@ describe('login', () => {
     expect(setCookie).toMatch(/__Host-portal_sessao=[^;]+; Path=\/; Max-Age=43200; HttpOnly; Secure; SameSite=Strict/)
     const gravado = String(banco.validadorclientes[0].cr40f_segredototp)
     expect(gravado).not.toContain(corpo.segredo)
+    expect(banco.validadorclientes[0].cr40f_totpcadastradoem).toBeTruthy()
     expect(banco.dispositivoconfiavels).toHaveLength(1)
 
     // Computador lembrado: próximo login só com o código do e-mail.
