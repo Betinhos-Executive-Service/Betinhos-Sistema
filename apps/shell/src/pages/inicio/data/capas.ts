@@ -1,10 +1,12 @@
 // Capas do Radar: imagem og:image da notícia, lida pelo microlink (o Dataverse não guarda a capa).
-// Para aparecer rápido ao abrir a página: todas em paralelo, timeout curto e cache local de 7 dias por URL,
+// O microlink grátis é lento na primeira chamada (~17 s) e limita a cota: poucas por vez, na ordem da tela
+// (destaque primeiro), timeout folgado e cache local de 7 dias por URL,
 // então da segunda visita em diante a capa sai do cache sem rede.
 
 const CHAVE = 'bt-inicio-capas'
 const VALIDADE = 7 * 86400000
-const TIMEOUT = 5000
+const TIMEOUT = 20000
+const SIMULTANEAS = 4
 
 type Cache = Record<string, { src: string | null; em: number }>
 
@@ -35,7 +37,8 @@ async function buscarCapa(url: string, fetchImpl: typeof fetch, signal: AbortSig
   const timer = setTimeout(abortar, TIMEOUT)
   try {
     const resposta = await fetchImpl(`https://api.microlink.io?url=${encodeURIComponent(url)}&meta=true`, { signal: controller.signal })
-    if (!resposta.ok) return null
+    // 429/5xx não é "sem imagem": lança para não ir ao cache e tentar de novo na próxima visita.
+    if (!resposta.ok) throw new Error(`microlink ${resposta.status}`)
     const corpo = await resposta.json() as { data?: { image?: { url?: string } | string } }
     const image = corpo.data?.image
     return imagemSegura(typeof image === 'string' ? image : image?.url) ?? null
@@ -46,20 +49,23 @@ async function buscarCapa(url: string, fetchImpl: typeof fetch, signal: AbortSig
 }
 
 /**
- * Busca as capas que faltam no cache, todas ao mesmo tempo, e avisa cada uma assim que chega.
- * Falha de rede não entra no cache (tenta de novo na próxima visita); "sem imagem" entra.
+ * Busca as capas que faltam no cache, até SIMULTANEAS por vez na ordem recebida, e avisa cada uma assim que chega.
+ * Falha de rede ou cota não entra no cache (tenta de novo na próxima visita); "sem imagem" entra.
  */
 export async function carregarCapas(urls: string[], onCapa: (url: string, src: string | null) => void, signal: AbortSignal, fetchImpl: typeof fetch = (...a) => fetch(...a)) {
   const conhecidas = capasEmCache(urls)
-  const faltam = [...new Set(urls)].filter((url) => !(url in conhecidas))
-  await Promise.all(faltam.map(async (url) => {
-    try {
-      const src = await buscarCapa(url, fetchImpl, signal)
-      if (signal.aborted) return
-      const cache = lerCache()
-      cache[url] = { src, em: Date.now() }
-      gravarCache(cache, Date.now())
-      onCapa(url, src)
-    } catch { /* timeout ou rede: fica o fallback */ }
-  }))
+  const fila = [...new Set(urls)].filter((url) => !(url in conhecidas))
+  const trabalhar = async () => {
+    for (let url = fila.shift(); url && !signal.aborted; url = fila.shift()) {
+      try {
+        const src = await buscarCapa(url, fetchImpl, signal)
+        if (signal.aborted) return
+        const cache = lerCache()
+        cache[url] = { src, em: Date.now() }
+        gravarCache(cache, Date.now())
+        onCapa(url, src)
+      } catch { /* timeout, rede ou cota: fica o fallback */ }
+    }
+  }
+  await Promise.all(Array.from({ length: SIMULTANEAS }, trabalhar))
 }
