@@ -1,7 +1,8 @@
-import { Fragment, useCallback, useEffect, useRef, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from 'react'
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from 'react'
 import type { Row } from '@betinhos/dataverse'
 import { COLUMN_FILTER_EVENT, Checkbox, ColumnFilter, ColumnMenu, type TableQuickFilters } from '@betinhos/ui'
 import { ArrowDown, ArrowUp } from 'lucide-react'
+import { useVirtualRows } from '../../../app/VirtualTable'
 import { cellKind } from '../domain/cells'
 import { columnLabel, rowKey } from '../domain/layout'
 import { filterKindOf } from '../domain/filterKind'
@@ -50,6 +51,7 @@ type Props = {
 }
 
 const SKELETON_ROWS = 8
+const rowId = (row: Row) => String(row[ID_ATTRIBUTE])
 /** Grid editável com rolagem horizontal, seleção por linha e a primeira coluna fixa. As classes visuais são as da tabela do DS. */
 export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, filteredKeys, quick, onClearFilter, onHide, customWidths, onResize, onMove, selected, onToggle, onSelectRow, onRowContextMenu, onToggleAll, onOpen, renderCell, scrollRef, tail, footer, empty }: Props) {
   // Trilhas crescem na proporção da largura da visão (fr) e nunca ficam abaixo do mínimo; a largura mínima total
@@ -169,11 +171,20 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
   }
   const skeleton = loading && rows.length === 0
   const shown = sort ?? defaultSort
+  // Muitas linhas carregadas: só as perto da tela vão para o DOM; a grade rola em `.gr-grid`, abaixo do cabeçalho fixo.
+  const [scroller, setScroller] = useState<HTMLElement | null>(null)
+  const [headHeight, setHeadHeight] = useState(0)
+  useLayoutEffect(() => {
+    const grid = scrollRef?.current
+    setScroller(grid ?? null)
+    setHeadHeight(grid?.querySelector<HTMLElement>('.bt-table__head')?.offsetHeight ?? 0)
+  }, [scrollRef])
+  const { visible, start, before, after, measure } = useVirtualRows(rows, rowId, skeleton ? null : scroller, headHeight, 44)
 
   return (
     <div ref={root} className={!loading && rows.length === 0 ? 'bt-table gr-table gr-table--empty' : 'bt-table gr-table'}>
       <span className="gr-sr" role="status">{announce}</span>
-      <div ref={scrollRef} className="gr-grid" role="grid" aria-label="Serviços" aria-busy={loading || undefined} aria-colcount={columns.length + 1} style={style}>
+      <div ref={scrollRef} className="gr-grid" role="grid" aria-label="Serviços" aria-busy={loading || undefined} aria-colcount={columns.length + 1} aria-rowcount={measure ? rows.length + 1 : undefined} style={style}>
         <div className="bt-table__head" role="row">
           <div className="bt-table__cell gr-cell--select" role="columnheader">
             <Checkbox
@@ -250,11 +261,11 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
               ))}
             </div>
           ))
-          : rows.map((row) => {
+          : <>{before ? <div aria-hidden="true" style={{ height: before }} /> : null}{visible.map((row, offset) => {
             const id = String(row[ID_ATTRIBUTE])
             const isSelected = selected.has(id)
             return (
-              <div key={id} className={isSelected ? 'bt-table__row is-selected' : 'bt-table__row'} role="row" aria-selected={isSelected} onClick={rowClick(id)} onContextMenu={onRowContextMenu ? (event) => onRowContextMenu(id, event) : undefined}>
+              <div key={id} ref={measure} data-index={start + offset} aria-rowindex={measure ? start + offset + 2 : undefined} className={isSelected ? 'bt-table__row is-selected' : 'bt-table__row'} role="row" aria-selected={isSelected} onClick={rowClick(id)} onContextMenu={onRowContextMenu ? (event) => onRowContextMenu(id, event) : undefined}>
                 <div className="bt-table__cell gr-cell--select" role="gridcell">
                   <Checkbox label={<span className="gr-sr">Selecionar serviço {formatCell('readonly', row, 'cr40f_id')}</span>} checked={isSelected} onChange={() => onToggle(id)} />
                 </div>
@@ -269,7 +280,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
                 })}
               </div>
             )
-          })}
+          })}{after ? <div aria-hidden="true" style={{ height: after }} /> : null}</>}
         {tail}
       </div>
       {!loading && rows.length === 0 && empty != null ? <div className="bt-table__empty gr-empty">{empty}</div> : null}

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { StatusBadge, Table, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
+import { StatusBadge, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
+import { VirtualTable } from '../../../app/VirtualTable'
 import { Copy } from 'lucide-react'
 import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
 import { STATUS, label } from '../domain/choices'
@@ -44,7 +45,7 @@ export function PessoasTable({ list, choices, dups, onOpen, loading, view, quick
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.ps-open')}>
-      <Table className="ps-table" columns={columns} rows={list} rowKey={(p) => p.id} rowActions={openRowActions(onOpen)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty}
+      <VirtualTable className="ps-table" columns={columns} rows={list} rowKey={(p) => p.id} rowActions={openRowActions(onOpen)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty}
         severity={(p) => (dups.has(p.id) ? { tone: 'warning', label: 'Possível duplicado' } : null)} />
     </div>
   )
