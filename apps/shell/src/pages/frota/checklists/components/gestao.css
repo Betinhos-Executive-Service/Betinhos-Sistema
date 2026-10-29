@@ -1,0 +1,738 @@
+/* Copiado de tela-gestao-checklists (src/gestao/gestao.css) com todas as regras sob .gestao-checklists, para não vazar para o shell. */
+/* Tokens Betinhos Design System 1.10.0 (light-only). */
+.gestao-checklists {
+  --navy-900: #001a3d;
+  --navy-800: #0b2d5a;
+  --blue-600: #2159d2;
+  --blue-100: #edf3ff;
+  --ink-950: #0f172a;
+  --ink-900: #172033;
+  --slate-700: #475569;
+  --slate-500: #64748b;
+  --slate-400: #94a3b8;
+  --canvas: #f0f0f0;
+  --surface: #ffffff;
+  --surface-soft: #f7f9fc;
+  --surface-neutral: #fcfcfb;
+  --border: #e2e8f0;
+  --border-hover: #c7d2e2;
+  --focus-border: #6c91e8;
+  --focus-ring: 0 0 0 3px rgba(33, 89, 210, .11);
+  --success: #147a4b;
+  --success-soft: #eaf8f1;
+  --warning: #856000;
+  --warning-soft: #fff7df;
+  --danger: #c12f45;
+  --danger-soft: #fff0f3;
+  --shadow-surface: 0 8px 24px rgba(0, 26, 61, .045);
+  --shadow-panel: 0 10px 28px rgba(0, 26, 61, .045);
+  --shadow-popover: 0 18px 42px rgba(15, 23, 42, .18), 0 2px 7px rgba(15, 23, 42, .08);
+  --shadow-toast: 0 12px 35px rgba(0, 18, 45, .18);
+  --shadow-action: 0 12px 30px rgba(33, 89, 210, .30);
+  --ease-out: cubic-bezier(.23, 1, .32, 1);
+  --ease-drawer: cubic-bezier(.32, .72, 0, 1);
+  font-family: var(--bt-font-family-sans, "Manrope", "Segoe UI", sans-serif);
+  color: var(--ink-950);
+  background: var(--canvas);
+  font-synthesis: none;
+}
+.gestao-checklists *, .gestao-checklists { box-sizing: border-box; }
+ { min-width: 320px; min-height: 100%; margin: 0; }
+.gestao-checklists button, .gestao-checklists input, .gestao-checklists textarea, .gestao-checklists select { font: inherit; }
+.gestao-checklists button { cursor: pointer; }
+.gestao-checklists button:disabled { cursor: not-allowed; }
+
+@keyframes gestao-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes gestao-slide { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+@keyframes gestao-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes gestao-pop { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes gestao-toast { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+@keyframes gestao-grow { from { transform: scaleX(0); } }
+@keyframes gestao-draw { to { stroke-dashoffset: 0; } }
+@keyframes gestao-spin { to { transform: rotate(360deg); } }
+@keyframes gestao-shimmer { 50% { opacity: .55; } }
+@keyframes gestao-sheet { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+
+.gestao-checklists .gestao-icon { flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.gestao-checklists .gestao-icon.is-spinning { animation: gestao-spin 800ms linear infinite; }
+
+/* Shell */
+.gestao-checklists .gestao-shell { display: grid; grid-template-areas: "main"; grid-template-columns: minmax(0, 1fr); }
+
+/* Main + header */
+.gestao-checklists .gestao-main { grid-area: main; width: 100%; min-width: 0; max-width: 1500px; margin: 0 auto; padding: 0 0 32px; }
+.gestao-checklists .gestao-header { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 16px; min-height: 72px; margin-bottom: 16px; animation: gestao-rise 260ms var(--ease-out) both; }
+.gestao-checklists .gestao-header-text { display: grid; gap: 6px; min-width: 0; }
+.gestao-checklists .gestao-eyebrow { color: var(--slate-500); font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.gestao-checklists .gestao-crumbs { display: flex; align-items: center; gap: 6px; margin-left: -8px; color: var(--slate-400); font-size: 13px; font-weight: 700; }
+/* slate-500 sobre o canvas #f0f0f0 mede 4,17:1; slate-700 passa de 4,5:1. */
+.gestao-checklists .gestao-crumbs [aria-current] { color: var(--slate-700); }
+.gestao-checklists .gestao-back { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: var(--blue-600); font-size: 13px; font-weight: 800; transition: background-color 150ms var(--ease-out), transform 140ms var(--ease-out); }
+.gestao-checklists .gestao-back .gestao-icon { transition: transform 150ms var(--ease-out); }
+.gestao-checklists .gestao-back:active:not(:disabled) { transform: scale(.97); }
+.gestao-checklists .gestao-back:disabled { opacity: .55; }
+.gestao-checklists .gestao-eyebrow span { padding: 0 4px; color: var(--slate-400); }
+.gestao-checklists .gestao-header h1 { margin: 0; color: var(--navy-900); font-family: var(--bt-font-family-display, var(--bt-font-family-sans)); font-size: clamp(28px, 3vw, 40px); font-weight: 400; letter-spacing: 0; line-height: 1.08; -webkit-text-stroke: .5px currentColor; overflow-wrap: anywhere; }
+.gestao-checklists .gestao-subtitle { margin: 0; color: var(--slate-500); font-size: 14px; line-height: 22px; }
+.gestao-checklists .gestao-header-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: var(--slate-500); font-size: 13px; }
+.gestao-checklists .gestao-header-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+
+/* Buttons */
+.gestao-checklists .gestao-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 16px; border-radius: 10px; font-size: 13px; font-weight: 800; white-space: nowrap; transition: background-color 150ms var(--ease-out), border-color 150ms var(--ease-out), color 150ms var(--ease-out), transform 140ms var(--ease-out); }
+.gestao-checklists .gestao-button.is-primary { border: 1px solid var(--navy-900); background: var(--navy-900); color: #fff; }
+.gestao-checklists .gestao-button.is-secondary { border: 1px solid var(--border); background: var(--surface); color: var(--navy-800); }
+.gestao-checklists .gestao-button.is-compact { min-height: 32px; padding: 0 10px; border-radius: 8px; font-size: 12px; }
+.gestao-checklists .gestao-button.is-danger { border: 1px solid var(--danger); background: var(--danger); color: #fff; }
+.gestao-checklists .gestao-actions-start { margin-right: auto; }
+.gestao-checklists .gestao-results-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 0 20px 12px; }
+.gestao-checklists .gestao-results-toolbar .gestao-search { flex: 1 1 220px; max-width: 360px; }
+.gestao-checklists .gestao-results-toolbar input { width: 100%; min-height: 40px; padding: 0 12px 0 36px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-neutral); color: var(--ink-900); font: inherit; font-size: 13px; }
+.gestao-checklists .gestao-results-toolbar input:focus-visible { outline: 0; border-color: var(--focus-border); box-shadow: var(--focus-ring); }
+.gestao-checklists .gestao-results-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.gestao-checklists .gestao-button:disabled { opacity: .55; }
+.gestao-checklists .gestao-button:active:not(:disabled), .gestao-checklists .gestao-list-row:active:not(:disabled) { transform: scale(.97); }
+.gestao-checklists .gestao-dispatch { min-width: 196px; }
+.gestao-checklists .gestao-link-button { padding: 4px 2px; border: 0; border-radius: 6px; background: transparent; color: var(--blue-600); font-size: 12px; font-weight: 800; transition: color 150ms var(--ease-out); }
+.gestao-checklists .gestao-link-button:disabled { color: var(--slate-400); }
+
+.gestao-checklists :focus-visible { outline: 0; }
+.gestao-checklists .gestao-main :focus-visible, .gestao-checklists .gestao-modal :focus-visible, .gestao-checklists .gestao-toasts :focus-visible { box-shadow: 0 0 0 3px rgba(33, 89, 210, .28); }
+
+/* Cards */
+.gestao-checklists .gestao-card { min-width: 0; border: 1px solid rgba(0, 26, 61, .08); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-surface); }
+.gestao-checklists .gestao-card-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.gestao-checklists .gestao-card-head > div:first-child { display: grid; gap: 2px; }
+.gestao-checklists .gestao-card-head h2 { margin: 0; color: var(--navy-900); font-size: 17px; font-weight: 800; letter-spacing: -.02em; line-height: 22px; }
+.gestao-checklists .gestao-hint { color: var(--slate-500); font-size: 12px; line-height: 17px; }
+
+.gestao-checklists .gestao-badge { display: inline-flex; align-items: center; gap: 6px; width: fit-content; min-height: 24px; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: .02em; white-space: nowrap; transition: background-color 200ms var(--ease-out), color 200ms var(--ease-out); }
+.gestao-checklists .gestao-badge::before { content: ""; width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+.gestao-checklists .gestao-badge.is-neutral { background: var(--surface-soft); color: var(--slate-700); }
+.gestao-checklists .gestao-badge.is-success { background: #e9f8f0; color: #147a4b; }
+.gestao-checklists .gestao-badge.is-info { background: var(--blue-100); color: #285db5; }
+.gestao-checklists .gestao-badge.is-warning { background: var(--warning-soft); color: var(--warning); }
+.gestao-checklists .gestao-badge.is-danger { background: var(--danger-soft); color: #9f2940; }
+
+/* Editor */
+.gestao-checklists .gestao-columns { display: grid; grid-template-areas: "form preview"; grid-template-columns: minmax(0, 1.45fr) minmax(320px, .9fr); align-items: start; gap: 16px; }
+.gestao-checklists .gestao-form { grid-area: form; animation: gestao-rise 260ms var(--ease-out) 70ms both; }
+.gestao-checklists .gestao-preview { grid-area: preview; position: sticky; top: 22px; animation: gestao-rise 260ms var(--ease-out) 140ms both; }
+.gestao-checklists .gestao-form-body { display: grid; gap: 20px; padding: 20px; }
+.gestao-checklists .gestao-field { display: grid; gap: 6px; min-width: 0; }
+.gestao-checklists .gestao-field-label { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.gestao-checklists .gestao-field-label span { color: var(--slate-500); font-size: 12px; font-variant-numeric: tabular-nums; }
+.gestao-checklists .gestao-field label, .gestao-checklists .gestao-label { color: var(--slate-700); font-size: 12px; font-weight: 800; }
+.gestao-checklists .gestao-form input:not([type=checkbox]), .gestao-checklists .gestao-form textarea, .gestao-checklists .gestao-form select { display: block; width: 100%; min-height: 40px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-neutral); color: var(--ink-950); font-size: 13px; outline: 0; transition: border-color 150ms var(--ease-out), box-shadow 150ms var(--ease-out); }
+.gestao-checklists .gestao-form textarea { min-height: 148px; padding: 10px 12px; line-height: 20px; resize: vertical; }
+.gestao-checklists .gestao-form input::placeholder, .gestao-checklists .gestao-form textarea::placeholder { color: var(--slate-400); }
+.gestao-checklists .gestao-form input:not([type=checkbox]):focus, .gestao-checklists .gestao-form textarea:focus, .gestao-checklists .gestao-form select:focus { border-color: var(--focus-border); box-shadow: var(--focus-ring); }
+.gestao-checklists .gestao-form input:disabled, .gestao-checklists .gestao-form textarea:disabled, .gestao-checklists .gestao-form select:disabled { background: var(--surface-soft); color: var(--slate-700); }
+.gestao-checklists .gestao-two-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.gestao-checklists .gestao-type-hint { margin: -10px 0 0; color: var(--slate-500); font-size: 12px; line-height: 17px; }
+
+.gestao-checklists .gestao-segmented { --count: 2; position: relative; display: grid; grid-template-columns: repeat(var(--count), minmax(0, 1fr)); padding: 4px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface-neutral); }
+.gestao-checklists .gestao-segmented.is-four { --count: 4; }
+.gestao-checklists .gestao-segmented.is-three { --count: 3; }
+.gestao-checklists .gestao-segmented.is-five { --count: 5; }
+.gestao-checklists .gestao-segmented.is-one { --count: 1; }
+.gestao-checklists .gestao-segmented.is-none .gestao-segmented-thumb { opacity: 0; }
+.gestao-checklists .chk-filtros { display: flex; gap: 8px; }
+.gestao-checklists .gestao-segmented-thumb { position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / var(--count)); border-radius: 8px; background: var(--navy-900); box-shadow: 0 2px 7px rgba(15, 23, 42, .08); transform: translateX(calc(var(--pos, 0) * 100%)); transition: transform 240ms var(--ease-drawer); }
+.gestao-checklists .gestao-segmented button { position: relative; z-index: 1; min-height: 36px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--slate-700); font-size: 13px; font-weight: 800; white-space: nowrap; transition: color 200ms var(--ease-out); }
+.gestao-checklists .gestao-segmented.is-four button { min-height: 32px; font-size: 12px; }
+.gestao-checklists .gestao-segmented.is-five button { min-height: 32px; font-size: 12px; }
+.gestao-checklists .gestao-segmented button[aria-pressed="true"] { color: #fff; }
+
+.gestao-checklists .gestao-targets { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-neutral); animation: gestao-rise 260ms var(--ease-out) both; }
+.gestao-checklists .gestao-search { position: relative; color: var(--slate-500); }
+.gestao-checklists .gestao-search .gestao-icon { position: absolute; top: 12px; left: 12px; }
+.gestao-checklists .gestao-form .gestao-search input { padding-left: 36px; }
+.gestao-checklists .gestao-target-list { display: grid; max-height: 272px; overflow: auto; }
+.gestao-checklists .gestao-target-list label { display: grid; grid-template-columns: 18px 32px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 52px; padding: 8px 10px; border-radius: 8px; cursor: pointer; animation: gestao-fade 220ms var(--ease-out) both; animation-delay: calc(var(--i, 0) * 30ms); transition: background-color 150ms var(--ease-out); }
+.gestao-checklists .gestao-target-list label.is-checked { background: var(--blue-100); }
+.gestao-checklists .gestao-target-list label.is-invalid { cursor: not-allowed; }
+.gestao-checklists .gestao-target-list input { width: 18px; height: 18px; margin: 0; accent-color: var(--blue-600); cursor: inherit; }
+.gestao-checklists .gestao-target-text { display: grid; min-width: 0; }
+.gestao-checklists .gestao-target-text strong { color: var(--ink-900); font-size: 13px; font-weight: 700; }
+.gestao-checklists .gestao-target-text small { overflow: hidden; color: var(--slate-500); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.gestao-checklists .gestao-target-list label.is-invalid small { color: #9f2940; font-weight: 600; }
+.gestao-checklists .gestao-target-alert { color: var(--danger); }
+.gestao-checklists .gestao-target-empty { margin: 0; padding: 16px 10px; color: var(--slate-500); font-size: 12px; text-align: center; }
+.gestao-checklists .gestao-targets-foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 0 2px; color: var(--slate-500); font-size: 12px; }
+
+.gestao-checklists .gestao-avatar { display: flex; align-items: center; justify-content: center; flex: none; width: 32px; height: 32px; border-radius: 999px; background: var(--blue-100); color: var(--blue-600); font-size: 11px; font-weight: 800; transition: background-color 200ms var(--ease-out), color 200ms var(--ease-out); }
+.gestao-checklists .gestao-avatar.is-large { width: 40px; height: 40px; background: var(--navy-900); color: #fff; font-size: 13px; }
+.gestao-checklists .gestao-target-list label.is-checked .gestao-avatar { background: var(--blue-600); color: #fff; }
+.gestao-checklists .gestao-target-list label.is-invalid .gestao-avatar { background: var(--surface-soft); color: var(--slate-500); }
+
+.gestao-checklists .gestao-count { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-neutral); }
+.gestao-checklists .gestao-count p { margin: 0; color: var(--slate-700); font-size: 13px; }
+.gestao-checklists .gestao-count strong { color: var(--navy-900); font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.gestao-checklists .gestao-count small { color: var(--slate-500); font-size: 12px; }
+.gestao-checklists .gestao-count small.is-error { color: #9f2940; font-weight: 700; }
+.gestao-checklists .gestao-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding: 16px 20px; border-top: 1px solid var(--border); }
+
+/* Preview */
+.gestao-checklists .gestao-preview-body { padding: 20px; }
+.gestao-checklists .gestao-device { max-width: 340px; margin: 0 auto; padding: 10px; border: 1px solid var(--border); border-radius: 28px; background: var(--surface); box-shadow: var(--shadow-panel); }
+.gestao-checklists .gestao-device-screen { overflow: hidden; border-radius: 20px; background: var(--canvas); }
+.gestao-checklists .gestao-device-bar { display: flex; align-items: center; gap: 10px; padding: 16px; background: var(--navy-900); color: #fff; font-size: 14px; }
+.gestao-checklists .gestao-device-bar span { margin-left: auto; padding: 2px 8px; border-radius: 999px; background: var(--blue-600); font-size: 11px; font-weight: 800; }
+.gestao-checklists .gestao-device-content { display: flex; flex-direction: column; gap: 12px; min-height: 360px; padding: 14px; }
+.gestao-checklists .gestao-preview-card { display: grid; gap: 10px; padding: 16px; border: 1px solid rgba(0, 26, 61, .08); border-radius: 12px; background: var(--surface); }
+.gestao-checklists .gestao-preview-card h3 { margin: 0; color: var(--navy-900); font-size: 17px; font-weight: 800; letter-spacing: -.02em; line-height: 22px; overflow-wrap: anywhere; }
+.gestao-checklists .gestao-preview-card p { margin: 0; color: var(--slate-700); font-size: 14px; line-height: 22px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.gestao-checklists .gestao-preview-card .is-empty { color: var(--slate-400); }
+.gestao-checklists .gestao-device-action { display: grid; gap: 10px; animation: gestao-rise 260ms var(--ease-out) both; }
+.gestao-checklists .gestao-device-action.is-bottom { margin-top: auto; }
+.gestao-checklists .gestao-device-signature { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; height: 104px; border: 1px dashed var(--border-hover); border-radius: 10px; background: var(--surface-neutral); color: var(--slate-500); font-size: 12px; font-weight: 700; }
+.gestao-checklists .gestao-device-button { display: flex; align-items: center; justify-content: center; height: 44px; border-radius: 10px; background: var(--navy-900); color: #fff; font-size: 13px; font-weight: 800; }
+.gestao-checklists .gestao-preview-foot { max-width: 340px; margin: 14px auto 0; text-align: center; }
+
+/* Acompanhamento */
+.gestao-checklists .gestao-report-view { display: grid; gap: 16px; }
+.gestao-checklists .gestao-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.gestao-checklists .gestao-kpi { display: grid; gap: 12px; min-height: 96px; padding: 16px; animation: gestao-rise 260ms var(--ease-out) both; animation-delay: calc(60ms + var(--i, 0) * 40ms); }
+.gestao-checklists .gestao-kpi-top { display: flex; align-items: center; gap: 12px; }
+.gestao-checklists .gestao-kpi-top > div { display: grid; gap: 6px; min-width: 0; }
+.gestao-checklists .gestao-kpi-icon { display: flex; align-items: center; justify-content: center; flex: none; width: 42px; height: 42px; border-radius: 10px; }
+.gestao-checklists .gestao-kpi-icon.is-navy, .gestao-checklists .gestao-kpi-icon.is-blue { background: var(--blue-100); color: var(--blue-600); }
+.gestao-checklists .gestao-kpi-icon.is-green { background: var(--success-soft); color: var(--success); }
+.gestao-checklists .gestao-kpi-icon.is-red { background: var(--danger-soft); color: var(--danger); }
+.gestao-checklists .gestao-kpi-label { color: var(--slate-500); font-size: 12px; font-weight: 700; }
+.gestao-checklists .gestao-kpi-value { color: var(--navy-900); font-size: 26px; font-weight: 800; line-height: 1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.gestao-checklists .gestao-kpi-value small { color: var(--slate-500); font-size: 13px; font-weight: 700; letter-spacing: 0; }
+.gestao-checklists .gestao-kpi-value.is-text { font-size: 20px; overflow-wrap: anywhere; }
+.gestao-checklists .gestao-bar { height: 6px; overflow: hidden; border-radius: 999px; background: var(--surface-soft); }
+.gestao-checklists .gestao-bar span { display: block; height: 100%; border-radius: inherit; transform-origin: left center; animation: gestao-grow 800ms var(--ease-out) both; animation-delay: calc(200ms + var(--i, 0) * 60ms); transition: transform 300ms var(--ease-out); }
+.gestao-checklists .gestao-bar .is-navy { background: var(--navy-900); }
+.gestao-checklists .gestao-bar .is-blue { background: var(--blue-600); }
+.gestao-checklists .gestao-bar .is-green { background: var(--success); }
+.gestao-checklists .gestao-bar .is-red { background: var(--danger); }
+
+.gestao-checklists .gestao-report-columns { display: grid; grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr); align-items: start; gap: 16px; }
+.gestao-checklists .gestao-results { overflow: hidden; animation: gestao-rise 260ms var(--ease-out) 220ms both; }
+.gestao-checklists .gestao-results .gestao-card-head { border-bottom: 0; }
+.gestao-checklists .gestao-segmented-scroll { max-width: 100%; overflow-x: auto; }
+.gestao-checklists .gestao-table-head, .gestao-checklists .gestao-recipient { display: grid; grid-template-columns: minmax(0, 1.6fr) 150px minmax(0, 1fr) 140px; align-items: center; gap: 12px; padding: 0 16px; }
+.gestao-checklists .gestao-table-head { height: 36px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--surface-neutral); color: var(--slate-500); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.gestao-checklists .gestao-recipient { cursor: pointer; min-height: 62px; padding-top: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); animation: gestao-rise 240ms var(--ease-out) both; animation-delay: calc(260ms + var(--i, 0) * 45ms); transition: background-color 150ms var(--ease-out); }
+.gestao-checklists .gestao-recipient.is-selected { background: var(--blue-100); }
+.gestao-checklists .gestao-recipient-main { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 44px; padding: 0; border: 0; border-radius: 8px; background: transparent; text-align: left; }
+.gestao-checklists .gestao-recipient-main > span:last-child { display: grid; min-width: 0; }
+.gestao-checklists .gestao-recipient-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.gestao-checklists .gestao-obs-badge { flex: none; gap: 4px; }
+.gestao-checklists .gestao-obs-badge::before { display: none; }
+.gestao-checklists .gestao-recipient-main strong { overflow: hidden; color: var(--ink-900); font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.gestao-checklists .gestao-recipient-main small { color: var(--slate-500); font-size: 12px; }
+.gestao-checklists .gestao-recipient.is-selected .gestao-avatar { background: var(--blue-600); color: #fff; }
+.gestao-checklists .gestao-push { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--slate-700); font-size: 12px; font-weight: 700; overflow-wrap: anywhere; }
+.gestao-checklists .gestao-push.is-error { color: #9f2940; }
+.gestao-checklists .gestao-recipient-action { display: flex; justify-content: flex-end; }
+/* Home: lista de comunicados */
+.gestao-checklists .gestao-kpis + .gestao-list { margin-top: 16px; }
+.gestao-checklists .gestao-list-head, .gestao-checklists .gestao-list-row { display: grid; grid-template-columns: minmax(0, 1fr) 130px 140px 170px 16px; align-items: center; gap: 16px; padding: 0 20px; }
+.gestao-checklists .gestao-list-head { height: 36px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--surface-neutral); color: var(--slate-500); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.gestao-checklists .gestao-list-row { width: 100%; min-height: 68px; padding-top: 12px; padding-bottom: 12px; border: 0; border-bottom: 1px solid var(--border); background: var(--surface); color: var(--ink-950); text-align: left; animation: gestao-rise 240ms var(--ease-out) both; animation-delay: calc(120ms + var(--i, 0) * 40ms); transition: background-color 150ms var(--ease-out), transform 140ms var(--ease-out); }
+.gestao-checklists .gestao-list-row:disabled { cursor: progress; }
+.gestao-checklists .gestao-list-title { display: grid; gap: 4px; min-width: 0; }
+.gestao-checklists .gestao-list-title strong { overflow: hidden; color: var(--navy-900); font-size: 14px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.gestao-checklists .gestao-list-title small { overflow: hidden; color: var(--slate-500); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.gestao-checklists .gestao-list-meta { color: var(--slate-700); font-size: 13px; font-weight: 600; }
+.gestao-checklists .gestao-list-status { display: grid; justify-items: start; gap: 4px; }
+.gestao-checklists .gestao-list-status small { color: var(--slate-500); font-size: 11px; font-weight: 600; }
+.gestao-checklists .gestao-list-item { position: relative; }
+.gestao-checklists .gestao-list-delete { position: absolute; top: 50%; right: 44px; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 0; border-radius: 8px; background: transparent; color: var(--slate-500); transform: translateY(-50%); transition: background-color 150ms var(--ease-out), color 150ms var(--ease-out); }
+.gestao-checklists .gestao-list-delete:disabled { opacity: .55; }
+.gestao-checklists .gestao-list-chevron { color: var(--slate-400); }
+.gestao-checklists .gestao-row-skeleton { display: block; height: 62px; border-bottom: 1px solid var(--border); background: var(--surface-soft); animation: gestao-shimmer 1.2s ease-in-out infinite; }
+.gestao-checklists .gestao-empty { display: grid; justify-items: center; gap: 8px; padding: 40px 16px; color: var(--slate-400); text-align: center; animation: gestao-rise 260ms var(--ease-out) both; }
+.gestao-checklists .gestao-empty strong { color: var(--ink-900); font-size: 14px; }
+.gestao-checklists .gestao-empty p { margin: 0; color: var(--slate-500); font-size: 12px; }
+
+.gestao-checklists .gestao-side-stack { position: sticky; top: 22px; display: grid; gap: 16px; }
+.gestao-checklists .gestao-detail { animation: gestao-slide 260ms var(--ease-out) both; }
+.gestao-checklists .gestao-detail-head { display: flex; align-items: center; gap: 12px; padding: 16px; border-bottom: 1px solid var(--border); }
+.gestao-checklists .gestao-detail-head > div { display: grid; gap: 4px; min-width: 0; }
+.gestao-checklists .gestao-detail-head h2 { margin: 0; color: var(--navy-900); font-size: 17px; font-weight: 800; letter-spacing: -.02em; line-height: 22px; overflow-wrap: anywhere; }
+.gestao-checklists .gestao-detail-body { display: grid; gap: 16px; padding: 16px; }
+.gestao-checklists .gestao-timeline, .gestao-checklists .gestao-detail-block { display: grid; gap: 10px; }
+.gestao-checklists .gestao-step { display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: start; gap: 10px; animation: gestao-rise 240ms var(--ease-out) both; animation-delay: calc(120ms + var(--i, 0) * 60ms); }
+.gestao-checklists .gestao-step-dot { display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; border: 2px solid var(--border); border-radius: 999px; background: var(--surface); color: #fff; }
+.gestao-checklists .gestao-step.is-done .gestao-step-dot { border-color: var(--success); background: var(--success); }
+.gestao-checklists .gestao-step.is-error .gestao-step-dot { border-color: var(--danger); }
+.gestao-checklists .gestao-step > span:last-child { display: grid; }
+.gestao-checklists .gestao-step strong { color: var(--ink-900); font-size: 13px; font-weight: 700; }
+.gestao-checklists .gestao-step small { color: var(--slate-500); font-size: 12px; overflow-wrap: anywhere; }
+.gestao-checklists .gestao-step.is-error small { color: #9f2940; }
+.gestao-checklists .gestao-signature { height: 120px; padding: 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-neutral); color: var(--navy-900); }
+.gestao-checklists .gestao-signature svg { width: 100%; height: 100%; }
+.gestao-checklists .gestao-signature polyline { stroke-dasharray: 1; stroke-dashoffset: 1; animation: gestao-draw 1000ms var(--ease-out) 180ms forwards; }
+.gestao-checklists .gestao-observation { margin: 0; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-neutral); color: var(--ink-900); font-size: 13px; line-height: 20px; overflow-wrap: anywhere; }
+.gestao-checklists .gestao-pending { display: flex; gap: 8px; margin: 0; padding: 12px; border-radius: 10px; background: var(--warning-soft); color: var(--ink-900); font-size: 13px; line-height: 20px; }
+.gestao-checklists .gestao-pending .gestao-icon { margin-top: 2px; color: var(--warning); }
+.gestao-checklists .gestao-sent-message { animation: gestao-rise 260ms var(--ease-out) 300ms both; }
+.gestao-checklists .gestao-sent-message p { margin: 0; padding: 16px 20px 20px; color: var(--slate-700); font-size: 14px; line-height: 22px; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Modal + toast */
+.gestao-checklists .gestao-modal { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.gestao-checklists .gestao-modal-backdrop { position: absolute; inset: 0; padding: 0; border: 0; background: rgba(0, 26, 61, .48); cursor: default; animation: gestao-fade 180ms var(--ease-out) both; }
+.gestao-checklists .gestao-dialog { position: relative; display: grid; gap: 16px; width: 100%; max-width: 440px; padding: 24px; border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-popover); animation: gestao-pop 200ms var(--ease-out) both; }
+.gestao-checklists .gestao-dialog h2 { margin: 0 0 6px; color: var(--navy-900); font-size: 20px; font-weight: 800; letter-spacing: -.02em; line-height: 25px; }
+.gestao-checklists .gestao-dialog p { margin: 0; color: var(--slate-700); font-size: 14px; line-height: 22px; }
+.gestao-checklists .gestao-dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.gestao-checklists .gestao-modal.is-closing .gestao-modal-backdrop { animation: gestao-fade 150ms var(--ease-out) reverse both; }
+.gestao-checklists .gestao-modal.is-closing .gestao-dialog { animation: gestao-pop 150ms var(--ease-out) reverse both; }
+.gestao-checklists .gestao-toasts { position: fixed; top: 16px; left: 50%; z-index: 60; display: grid; justify-items: center; gap: 8px; width: min(460px, 90vw); transform: translateX(-50%); pointer-events: none; }
+.gestao-checklists .gestao-toast { display: flex; align-items: center; gap: 10px; width: fit-content; max-width: 100%; min-height: 40px; padding: 8px 8px 8px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow-toast); color: var(--ink-900); font-size: 13px; font-weight: 700; line-height: 18px; pointer-events: auto; animation: gestao-toast 180ms var(--ease-out) both; }
+.gestao-checklists .gestao-toast.is-success > .gestao-icon { color: var(--success); }
+.gestao-checklists .gestao-toast.is-error { border-color: #f2c2cc; }
+.gestao-checklists .gestao-toast.is-error > .gestao-icon { color: var(--danger); }
+.gestao-checklists .gestao-toast button { display: flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 28px; border: 0; border-radius: 8px; background: transparent; color: var(--slate-500); }
+.gestao-checklists .gestao-version { position: fixed; right: 12px; bottom: 8px; z-index: 4; color: var(--slate-400); font-size: 11px; pointer-events: none; user-select: none; }
+/* Dentro do Sistema Betinhos o selo do Sistema fica no canto inferior direito. */
+.gestao-checklists .gestao-version.is-host-shell { right: auto; left: 12px; }
+
+@media (hover: hover) and (pointer: fine) {
+  .gestao-checklists .gestao-back:hover:not(:disabled) { background: var(--blue-100); }
+  .gestao-checklists .gestao-back:hover:not(:disabled) .gestao-icon { transform: translateX(-2px); }
+  .gestao-checklists .gestao-list-row:hover:not(:disabled) { background: var(--surface-neutral); }
+  .gestao-checklists .gestao-list-delete:hover:not(:disabled) { background: var(--danger-soft); color: var(--danger); }
+  .gestao-checklists .gestao-button.is-primary:hover:not(:disabled) { border-color: var(--navy-800); background: var(--navy-800); }
+  .gestao-checklists .gestao-button.is-secondary:hover:not(:disabled) { border-color: var(--border-hover); background: var(--surface-soft); }
+  .gestao-checklists .gestao-button.is-danger:hover:not(:disabled) { border-color: #a32840; background: #a32840; }
+  .gestao-checklists .gestao-link-button:hover:not(:disabled) { color: var(--navy-800); }
+  .gestao-checklists .gestao-form input:not([type=checkbox]):hover:not(:disabled):not(:focus), .gestao-checklists .gestao-form textarea:hover:not(:disabled):not(:focus), .gestao-checklists .gestao-form select:hover:not(:disabled):not(:focus) { border-color: var(--border-hover); }
+  .gestao-checklists .gestao-segmented button:hover:not([aria-pressed="true"]):not([aria-selected="true"]):not(:disabled) { color: var(--navy-900); }
+  .gestao-checklists .gestao-target-list label:hover:not(.is-invalid):not(.is-checked) { background: var(--surface-soft); }
+  .gestao-checklists .gestao-recipient:hover:not(.is-selected) { background: var(--surface-soft); }
+  .gestao-checklists .gestao-toast button:hover { background: var(--surface-soft); }
+}
+
+@media (max-width: 1120px) {
+  .gestao-checklists .gestao-columns { grid-template-areas: "form" "preview"; grid-template-columns: minmax(0, 1fr); }
+  .gestao-checklists .gestao-preview, .gestao-checklists .gestao-side-stack { position: static; }
+  .gestao-checklists .gestao-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .gestao-checklists .gestao-report-columns { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 820px) {
+  .gestao-checklists .gestao-main { padding: 0 0 32px; }
+  .gestao-checklists .gestao-table-head, .gestao-checklists .gestao-list-head { display: none; }
+  .gestao-checklists .gestao-list-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-left: 16px; padding-right: 16px; }
+  .gestao-checklists .gestao-list-title { width: 100%; }
+  .gestao-checklists .gestao-list-status { display: flex; align-items: center; gap: 8px; }
+  .gestao-checklists .gestao-list-chevron { display: none; }
+  .gestao-checklists .gestao-list-delete { top: 12px; right: 8px; transform: none; }
+  .gestao-checklists .gestao-list-item:has(.gestao-list-delete) .gestao-list-title { padding-right: 36px; }
+  .gestao-checklists .gestao-segmented-scroll { width: 100%; }
+  .gestao-checklists .gestao-segmented.is-four { min-width: 420px; }
+  .gestao-checklists .gestao-segmented.is-five { min-width: 520px; }
+  .gestao-checklists .chk-filtros .gestao-segmented.is-four { min-width: 380px; }
+  .gestao-checklists .gestao-recipient { grid-template-columns: minmax(0, 1fr) auto; row-gap: 8px; }
+  .gestao-checklists .gestao-recipient-action { grid-column: 1 / -1; justify-content: flex-start; }
+  .gestao-checklists .gestao-recipient-action:empty { display: none; }
+}
+@media (max-width: 560px) {
+  .gestao-checklists .gestao-subtitle { display: none; }
+  .gestao-checklists .gestao-header-actions { width: 100%; }
+  .gestao-checklists .gestao-form-body, .gestao-checklists .gestao-preview-body { padding: 16px; }
+  .gestao-checklists .gestao-card-head, .gestao-checklists .gestao-actions, .gestao-checklists .gestao-results-toolbar { padding-left: 16px; padding-right: 16px; }
+  .gestao-checklists .gestao-two-fields { grid-template-columns: minmax(0, 1fr); }
+  .gestao-checklists .gestao-kpi { padding: 12px; }
+  .gestao-checklists .gestao-kpi-top { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .gestao-checklists .gestao-actions { flex-direction: column-reverse; }
+  .gestao-checklists .gestao-actions .gestao-button, .gestao-checklists .gestao-dialog-actions .gestao-button { width: 100%; min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gestao-checklists *, .gestao-checklists, .gestao-checklists *::before, .gestao-checklists *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+/* ---------- Checklist de veículos ---------- */
+.gestao-checklists .gestao-tabs { margin-bottom: 16px; animation: gestao-rise 260ms var(--ease-out) 40ms both; }
+.gestao-checklists .gestao-tabs .gestao-segmented { width: fit-content; min-width: 420px; }
+.gestao-checklists .gestao-segmented button[aria-selected="true"] { color: #fff; }
+/* Eyebrow sobre o canvas cinza: slate-500 fica abaixo de 4,5:1; usa slate-700. */
+.gestao-checklists .gestao-header .gestao-eyebrow, .gestao-checklists .gestao-header .gestao-eyebrow span { color: var(--slate-700); }
+.gestao-checklists .gestao-header .gestao-subtitle { color: var(--slate-700); }
+.gestao-checklists .chk-row.is-selected small, .gestao-checklists .chk-row.is-selected .frota-cell span { color: var(--slate-700); }
+.gestao-checklists .chk-row.is-selected .frota-cell .is-missing { color: #9f2940; }
+.gestao-checklists .gestao-kpis { margin-bottom: 16px; }
+.gestao-checklists .gestao-kpi-icon.is-amber { background: var(--warning-soft); color: var(--warning); }
+
+.gestao-checklists .frota-head, .gestao-checklists .frota-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 150px minmax(0, 1.1fr) 160px; align-items: center; gap: 16px; padding: 0 20px; }
+.gestao-checklists .frota-head, .gestao-checklists .chk-head { height: 36px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--surface-neutral); color: var(--slate-500); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.gestao-checklists .frota-row { min-height: 68px; padding-top: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border); animation: gestao-rise 240ms var(--ease-out) both; animation-delay: calc(80ms + var(--i, 0) * 35ms); }
+.gestao-checklists .frota-cell { display: grid; gap: 2px; min-width: 0; }
+.gestao-checklists .frota-cell strong { overflow: hidden; color: var(--navy-900); font-size: 14px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.gestao-checklists .frota-cell span, .gestao-checklists .frota-cell small { overflow: hidden; color: var(--slate-500); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.gestao-checklists .frota-cell .is-missing { color: #9f2940; font-weight: 700; }
+.gestao-checklists .frota-status { display: grid; justify-items: start; gap: 4px; min-width: 0; }
+.gestao-checklists .frota-status small { max-width: 100%; color: var(--slate-500); font-size: 12px; line-height: 17px; overflow-wrap: anywhere; }
+.gestao-checklists .frota-status.is-danger small { color: #9f2940; }
+.gestao-checklists .frota-action { display: flex; justify-content: flex-end; }
+
+.gestao-checklists .chk-head, .gestao-checklists .chk-row { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) 140px 150px 16px; align-items: center; gap: 14px; padding: 0 16px; }
+.gestao-checklists .chk-row { width: 100%; min-height: 64px; padding-top: 10px; padding-bottom: 10px; border: 0; border-bottom: 1px solid var(--border); background: var(--surface); color: var(--ink-950); text-align: left; animation: gestao-rise 240ms var(--ease-out) both; animation-delay: calc(80ms + var(--i, 0) * 35ms); transition: background-color 150ms var(--ease-out), transform 140ms var(--ease-out); }
+.gestao-checklists .chk-row.is-selected { background: var(--blue-100); }
+.gestao-checklists .chk-row:active { transform: scale(.99); }
+
+.gestao-checklists .chk-answers { display: grid; gap: 8px; margin: 0; }
+.gestao-checklists .chk-answers > div { min-width: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-neutral); }
+.gestao-checklists .chk-answers dt { color: var(--slate-500); font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.gestao-checklists .chk-answers dd { margin: 2px 0 0; color: var(--ink-950); font-size: 13px; font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* Miniaturas das fotos: 72 px fixos em todos os estados (skeleton, foto, falha) para não mexer no layout. */
+.gestao-checklists .chk-thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; white-space: normal; }
+.gestao-checklists .chk-thumb-slot { display: block; min-width: 72px; height: 72px; }
+.gestao-checklists .chk-thumb { display: block; width: 72px; height: 72px; padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); cursor: zoom-in; transition: border-color 150ms var(--ease-out), transform 140ms var(--ease-out); }
+.gestao-checklists .chk-thumb:active { transform: scale(.97); }
+.gestao-checklists .chk-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.gestao-checklists .chk-thumb.is-loading { cursor: default; animation: gestao-shimmer 1.2s ease-in-out infinite; }
+.gestao-checklists .chk-thumb-falha { display: grid; align-content: center; justify-items: center; gap: 2px; width: 72px; height: 72px; padding: 4px; border: 1px dashed var(--border-hover); border-radius: 8px; background: var(--surface-neutral); text-align: center; }
+.gestao-checklists .chk-thumb-falha a { display: grid; justify-items: center; align-content: center; gap: 2px; min-height: 32px; color: var(--blue-600); font-size: 12px; font-weight: 800; line-height: 15px; text-decoration: none; }
+.gestao-checklists .chk-thumb-falha small, .gestao-checklists .chk-problem .chk-thumb-falha small { color: var(--slate-500); font-size: 11px; font-weight: 600; line-height: 14px; }
+.gestao-checklists .chk-thumb-falha.is-large { width: auto; height: auto; padding: 24px; }
+
+/* Visualizador: mesmo overlay do diálogo; a foto ocupa o espaço que sobra. */
+.gestao-checklists .foto-viewer { position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 12px; width: 100%; max-width: 960px; max-height: calc(100dvh - 32px); padding: 16px; border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-popover); animation: gestao-pop 200ms var(--ease-out) both; }
+.gestao-checklists .foto-viewer-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; min-width: 0; }
+.gestao-checklists .foto-viewer-head h2 { margin: 0; color: var(--navy-900); font-size: 17px; font-weight: 800; letter-spacing: -.02em; line-height: 22px; overflow-wrap: anywhere; }
+.gestao-checklists .foto-viewer-head small { color: var(--slate-500); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.gestao-checklists .foto-viewer-stage { position: relative; display: flex; align-items: center; justify-content: center; min-height: 240px; overflow: hidden; border-radius: 10px; background: var(--surface-neutral); }
+.gestao-checklists .foto-viewer-stage img { display: block; max-width: 100%; max-height: calc(100dvh - 180px); object-fit: contain; }
+.gestao-checklists .foto-viewer-skeleton { display: block; width: min(100%, 640px); aspect-ratio: 4 / 3; max-height: calc(100dvh - 180px); animation: gestao-shimmer 1.2s ease-in-out infinite; background: var(--surface-soft); }
+.gestao-checklists .foto-viewer-nav { position: absolute; top: calc(50% - 18px); width: 36px; height: 36px; }
+.gestao-checklists .foto-viewer-nav.is-prev { left: 8px; }
+.gestao-checklists .foto-viewer-nav.is-next { right: 8px; }
+.gestao-checklists .foto-viewer-actions { display: flex; justify-content: flex-end; }
+.gestao-checklists .foto-viewer-actions a { text-decoration: none; }
+@media (max-width: 560px) {
+  .gestao-checklists .foto-viewer { padding: 12px; }
+  .gestao-checklists .foto-viewer-nav { top: calc(50% - 22px); width: 44px; height: 44px; }
+}
+.gestao-checklists .chk-answers > div.is-problem { border-color: #f2c2cc; }
+.gestao-checklists .chk-problem { display: grid; gap: 6px; }
+.gestao-checklists .chk-problem small { color: var(--slate-700); font-size: 12px; font-weight: 600; line-height: 17px; }
+.gestao-checklists .mod-item .gestao-hint { margin: 0; }
+.gestao-checklists .chk-detail-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.gestao-checklists .chk-detail-actions .gestao-hint { flex-basis: 100%; margin: 0; }
+.gestao-checklists .chk-alert { display: flex; gap: 8px; margin: 0; padding: 12px; border-radius: 10px; background: var(--danger-soft); color: #9f2940; font-size: 13px; font-weight: 600; line-height: 20px; }
+.gestao-checklists .chk-alert .gestao-icon { margin-top: 2px; }
+
+.gestao-checklists .mod-head, .gestao-checklists .mod-row { display: grid; grid-template-columns: minmax(0, 1.4fr) 110px 130px minmax(0, 1fr) 16px; align-items: center; gap: 16px; padding: 0 20px; }
+.gestao-checklists .mod-head { height: 36px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--surface-neutral); color: var(--slate-500); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.gestao-checklists .mod-row { width: 100%; min-height: 68px; padding-top: 12px; padding-bottom: 12px; border: 0; border-bottom: 1px solid var(--border); background: var(--surface); color: var(--ink-950); text-align: left; animation: gestao-rise 240ms var(--ease-out) both; animation-delay: calc(80ms + var(--i, 0) * 40ms); transition: background-color 150ms var(--ease-out), transform 140ms var(--ease-out); }
+.gestao-checklists .mod-row:active { transform: scale(.99); }
+.gestao-checklists .mod-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.gestao-checklists .mod-toggles { display: grid; gap: 10px; }
+.gestao-checklists .mod-check { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-neutral); cursor: pointer; }
+.gestao-checklists .mod-check input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--blue-600); }
+.gestao-checklists .mod-check span { display: grid; gap: 2px; }
+.gestao-checklists .mod-check strong { color: var(--ink-900); font-size: 13px; font-weight: 700; }
+.gestao-checklists .mod-check small { color: var(--slate-500); font-size: 12px; line-height: 17px; }
+.gestao-checklists .mod-check.is-invalid { border-color: #f2c2cc; }
+
+/* Editor de modelo: campos, erros e avisos */
+.gestao-checklists .gestao-sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.gestao-checklists .gestao-field-error { display: flex; align-items: center; gap: 6px; margin: 0; color: #a32840; font-size: 12px; font-weight: 700; line-height: 17px; }
+.gestao-checklists .gestao-form input[aria-invalid="true"], .gestao-checklists .gestao-form textarea[aria-invalid="true"], .gestao-checklists .mod-chips.is-invalid { border-color: #f2c2cc; }
+.gestao-checklists .mod-ajuda { margin: 0; }
+.gestao-checklists .gestao-form textarea.mod-textarea-curta { min-height: 64px; }
+.gestao-checklists .mod-head-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.gestao-checklists .mod-ver-previa { display: none; }
+.gestao-checklists .mod-erros { display: grid; gap: 6px; padding: 12px 16px; border-radius: 10px; background: var(--danger-soft); color: var(--ink-900); font-size: 13px; animation: gestao-rise 200ms var(--ease-out) both; }
+.gestao-checklists .mod-erros p { display: flex; align-items: center; gap: 8px; margin: 0; }
+.gestao-checklists .mod-erros p .gestao-icon { color: var(--danger); }
+.gestao-checklists .mod-erros ul { display: grid; gap: 2px; margin: 0; padding: 0 0 0 24px; }
+.gestao-checklists .mod-erros .gestao-link-button { min-height: 32px; color: var(--navy-800); font-size: 13px; text-align: left; text-decoration: underline; text-underline-offset: 2px; }
+.gestao-checklists .mod-info { display: flex; align-items: center; gap: 8px; margin: 0; padding: 12px 16px; border-radius: 10px; background: var(--blue-100); color: var(--ink-900); font-size: 13px; font-weight: 600; line-height: 20px; }
+.gestao-checklists .mod-info .gestao-icon { color: var(--blue-600); }
+.gestao-checklists .mod-aviso { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--warning); font-size: 12px; font-weight: 700; }
+
+/* Itens */
+.gestao-checklists .mod-items { display: grid; gap: 12px; }
+.gestao-checklists .mod-items-head { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
+.gestao-checklists .mod-items-head > div:first-child { display: grid; gap: 2px; }
+.gestao-checklists .mod-items-title { margin: 0; color: var(--navy-900); font-size: 14px; font-weight: 800; }
+.gestao-checklists .mod-items-head .gestao-hint { margin: 0; }
+.gestao-checklists .mod-add-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.gestao-checklists .mod-painel { display: grid; justify-items: start; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-neutral); animation: gestao-rise 200ms var(--ease-out) both; }
+.gestao-checklists .mod-painel-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; margin: 0; color: var(--ink-900); font-size: 13px; font-weight: 800; }
+.gestao-checklists .mod-tipos-grid, .gestao-checklists .mod-prontos-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: 100%; }
+.gestao-checklists .mod-tipo-opcao, .gestao-checklists .mod-pronto { display: grid; align-items: center; gap: 10px; min-height: 52px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--ink-900); text-align: left; transition: border-color 150ms var(--ease-out), background-color 150ms var(--ease-out), transform 140ms var(--ease-out); }
+.gestao-checklists .mod-tipo-opcao { grid-template-columns: 28px minmax(0, 1fr); }
+.gestao-checklists .mod-tipo-opcao > span:last-child, .gestao-checklists .mod-pronto-text { display: grid; gap: 2px; min-width: 0; }
+.gestao-checklists .mod-tipo-opcao strong, .gestao-checklists .mod-pronto-text strong { font-size: 13px; font-weight: 800; }
+.gestao-checklists .mod-tipo-opcao small, .gestao-checklists .mod-pronto-text small { color: var(--slate-500); font-size: 12px; line-height: 17px; }
+.gestao-checklists .mod-pronto { grid-template-columns: 28px minmax(0, 1fr) auto; }
+.gestao-checklists .mod-pronto-text small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gestao-checklists .mod-pronto-state { display: inline-flex; align-items: center; gap: 4px; color: var(--blue-600); font-size: 12px; font-weight: 800; white-space: nowrap; }
+.gestao-checklists .mod-pronto.is-added { background: var(--surface-soft); cursor: default; }
+.gestao-checklists .mod-pronto-state.is-added { color: var(--success); }
+.gestao-checklists .mod-pronto.is-added .mod-pronto-text small { color: var(--slate-700); }
+.gestao-checklists .mod-tipo-opcao:active, .gestao-checklists .mod-pronto:not(.is-added):active { transform: scale(.97); }
+
+.gestao-checklists .mod-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.gestao-checklists .mod-list.is-reordering { user-select: none; }
+.gestao-checklists .mod-list.is-reordering > .mod-item:not(.is-dragging) { transition: transform 150ms var(--ease-out); }
+.gestao-checklists .mod-item { position: relative; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); scroll-margin: 16px 0 112px; animation: gestao-rise 220ms var(--ease-out) both; transition: border-color 150ms var(--ease-out); }
+.gestao-checklists .mod-item.is-open { border-color: var(--border-hover); }
+.gestao-checklists .mod-item.is-invalid { border-color: #f2c2cc; }
+.gestao-checklists .mod-item.is-dragging { z-index: 2; border-color: var(--focus-border); background: var(--surface-neutral); box-shadow: var(--shadow-surface); }
+.gestao-checklists .mod-item-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 2px; min-height: 60px; padding: 4px 8px 4px 2px; }
+.gestao-checklists .mod-handle { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--slate-500); cursor: grab; touch-action: none; }
+.gestao-checklists .mod-handle:disabled { cursor: default; opacity: .55; }
+.gestao-checklists .mod-item.is-dragging .mod-handle { cursor: grabbing; color: var(--blue-600); }
+.gestao-checklists .mod-item-toggle { display: grid; grid-template-columns: 28px minmax(0, 1fr) 16px; align-items: center; gap: 10px; width: 100%; min-width: 0; min-height: 52px; padding: 6px 8px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-900); text-align: left; }
+.gestao-checklists .mod-item-icon { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; background: var(--blue-100); color: var(--blue-600); }
+.gestao-checklists .mod-item-text { display: grid; gap: 4px; min-width: 0; }
+.gestao-checklists .mod-item-text strong { overflow: hidden; color: var(--ink-900); font-size: 13px; font-weight: 700; line-height: 18px; text-overflow: ellipsis; white-space: nowrap; }
+.gestao-checklists .mod-item-text strong.is-empty { color: var(--slate-500); }
+.gestao-checklists .mod-item-num { color: var(--slate-500); font-variant-numeric: tabular-nums; }
+.gestao-checklists .mod-item-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+.gestao-checklists .mod-item-tipo { color: var(--slate-500); font-size: 12px; font-weight: 600; }
+.gestao-checklists .mod-item-chevron { color: var(--slate-500); transition: transform 150ms var(--ease-out); }
+.gestao-checklists .mod-item.is-open .mod-item-chevron { transform: rotate(180deg); }
+.gestao-checklists .mod-item-arrows { display: flex; gap: 4px; }
+.gestao-checklists .mod-item-arrows.is-body { display: none; }
+.gestao-checklists .mod-icon-button { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--slate-700); transition: background-color 150ms var(--ease-out), color 150ms var(--ease-out), transform 140ms var(--ease-out); }
+.gestao-checklists .mod-icon-button:disabled { opacity: .55; }
+.gestao-checklists .mod-icon-button:active:not(:disabled) { transform: scale(.97); }
+.gestao-checklists .mod-item-body { display: grid; gap: 14px; padding: 14px 16px 16px 54px; border-top: 1px solid var(--border); animation: gestao-fade 150ms var(--ease-out) both; }
+.gestao-checklists .mod-tipo-group { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.gestao-checklists .mod-tipo-group button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-neutral); color: var(--slate-700); font-size: 12px; font-weight: 800; transition: background-color 150ms var(--ease-out), border-color 150ms var(--ease-out), color 150ms var(--ease-out), transform 140ms var(--ease-out); }
+.gestao-checklists .mod-tipo-group button[aria-pressed="true"] { border-color: var(--navy-900); background: var(--navy-900); color: #fff; }
+.gestao-checklists .mod-tipo-group button:active:not(:disabled) { transform: scale(.97); }
+.gestao-checklists .mod-item-fields { display: grid; gap: 12px; }
+.gestao-checklists .mod-item-fields.is-number { grid-template-columns: 180px minmax(0, 1fr); align-items: end; }
+.gestao-checklists .mod-item-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.gestao-checklists .mod-item-actions .mod-remover { margin-left: auto; color: #9f2940; }
+
+/* Problemas como chips */
+.gestao-checklists .mod-chips { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-height: 44px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-neutral); cursor: text; transition: border-color 150ms var(--ease-out), box-shadow 150ms var(--ease-out); }
+.gestao-checklists .mod-chips:focus-within { border-color: var(--focus-border); box-shadow: var(--focus-ring); }
+.gestao-checklists .gestao-form .mod-chips input:not([type=checkbox]) { flex: 1 1 140px; width: auto; min-width: 120px; min-height: 32px; padding: 0 4px; border: 0; background: transparent; box-shadow: none; }
+.gestao-checklists .gestao-form .mod-chips input:not([type=checkbox]):focus { border: 0; box-shadow: none; }
+.gestao-checklists .mod-chip { display: inline-flex; align-items: center; gap: 2px; min-height: 30px; padding: 0 2px 0 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--ink-900); font-size: 12px; font-weight: 700; animation: gestao-pop 150ms var(--ease-out) both; }
+.gestao-checklists .mod-chip.is-invalid { border-color: #f2c2cc; color: #9f2940; }
+.gestao-checklists .mod-chip button { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 999px; background: transparent; color: var(--slate-500); transition: background-color 150ms var(--ease-out), color 150ms var(--ease-out); }
+.gestao-checklists .mod-chip.is-sugestao { gap: 4px; padding: 0 10px 0 8px; border-style: dashed; border-color: var(--border-hover); color: var(--navy-800); animation: none; transition: background-color 150ms var(--ease-out), transform 140ms var(--ease-out); }
+.gestao-checklists .mod-chip.is-sugestao:active:not(:disabled) { transform: scale(.97); }
+.gestao-checklists .mod-sugestoes { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.gestao-checklists .mod-vazio { display: grid; justify-items: center; gap: 8px; padding: 28px 16px; border: 1px dashed var(--border-hover); border-radius: 10px; background: var(--surface-neutral); color: var(--slate-500); text-align: center; }
+.gestao-checklists .mod-vazio strong { color: var(--ink-900); font-size: 14px; }
+.gestao-checklists .mod-vazio p { max-width: 420px; margin: 0; color: var(--slate-500); font-size: 12px; line-height: 17px; }
+
+/* Barra fixa do editor: Salvar e Cancelar sempre à vista; a faixa de baixo é do selo de versão. */
+.gestao-checklists .mod-barra { position: sticky; bottom: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px 26px; border-top: 1px solid var(--border); border-radius: 0 0 12px 12px; background: var(--surface); }
+.gestao-checklists .mod-barra-status { display: flex; align-items: center; gap: 8px; min-width: 0; margin: 0; color: var(--ink-900); font-size: 13px; font-weight: 700; line-height: 18px; }
+.gestao-checklists .mod-barra.is-neutro .mod-barra-status .gestao-icon { color: var(--slate-500); }
+.gestao-checklists .mod-barra.is-aviso .mod-barra-status .gestao-icon { color: var(--warning); }
+.gestao-checklists .mod-barra.is-salvando .mod-barra-status .gestao-icon { color: var(--blue-600); }
+.gestao-checklists .mod-barra.is-sucesso .mod-barra-status .gestao-icon { color: var(--success); }
+.gestao-checklists .mod-barra.is-erro .mod-barra-status { color: #9f2940; }
+.gestao-checklists .mod-barra.is-erro .mod-barra-status .gestao-icon { color: var(--danger); }
+.gestao-checklists .mod-barra-acoes { display: flex; flex: none; gap: 8px; }
+
+/* Duplicar na lista de modelos */
+.gestao-checklists .mod-row-wrap { position: relative; }
+.gestao-checklists .mod-row-wrap .mod-row { padding-right: 76px; }
+.gestao-checklists .mod-duplicar { position: absolute; top: 50%; right: 40px; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--slate-700); transform: translateY(-50%); transition: background-color 150ms var(--ease-out), color 150ms var(--ease-out); }
+.gestao-checklists .mod-duplicar:disabled { opacity: .55; }
+
+/* Ordem de prioridade na lista de modelos: Subir e Descer à esquerda do Duplicar; o padrão fica por último. */
+.gestao-checklists .mod-ordem-ajuda { margin: 0; padding: 0 20px 12px; }
+/* Mesma folga em todas as linhas (e no cabeçalho) para as colunas alinharem com e sem Subir/Descer. */
+.gestao-checklists .mod-row-wrap .mod-row, .gestao-checklists .mod-head { padding-right: 164px; }
+.gestao-checklists .mod-ordem-acoes { position: absolute; top: 50%; right: 84px; display: flex; gap: 4px; transform: translateY(-50%); }
+.gestao-checklists .mod-ordem { color: var(--slate-500); font-variant-numeric: tabular-nums; }
+.gestao-checklists .mod-ordem-rotulo { display: none; }
+.gestao-checklists .gestao-list-title small.mod-recebe { display: flex; align-items: center; gap: 6px; color: var(--slate-700); }
+.gestao-checklists .mod-recebe .gestao-icon { flex: none; color: var(--blue-600); }
+
+/* Filtro de veículos do modelo: condições como frase e prévia de quem recebe */
+.gestao-checklists .mod-filtro { display: grid; gap: 10px; }
+.gestao-checklists .mod-filtro > .mod-items-title { margin: 0; }
+.gestao-checklists .mod-filtro-alerta { display: grid; justify-items: start; gap: 8px; padding: 12px 16px; border-radius: 10px; background: var(--warning-soft); color: var(--ink-900); font-size: 13px; }
+.gestao-checklists .mod-filtro-alerta p { display: flex; align-items: center; gap: 8px; margin: 0; }
+.gestao-checklists .mod-filtro-alerta .gestao-icon { color: var(--warning); }
+.gestao-checklists .mod-conds { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.gestao-checklists .mod-cond { display: grid; grid-template-columns: 24px minmax(0, 1fr) minmax(0, .9fr) minmax(0, 1.3fr) 40px; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-neutral); animation: gestao-rise 200ms var(--ease-out) both; }
+.gestao-checklists .mod-cond.is-larga { grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) 40px; }
+.gestao-checklists .mod-cond.is-larga .mod-cond-valor { grid-column: 2 / 4; grid-row: 2; }
+.gestao-checklists .mod-cond.is-invalid { border-color: #f2c2cc; }
+.gestao-checklists .mod-cond-num { color: var(--slate-500); font-size: 12px; font-weight: 800; }
+.gestao-checklists .mod-cond-op { color: var(--ink-900); font-size: 13px; font-weight: 700; }
+.gestao-checklists .mod-cond-valor { min-width: 0; }
+.gestao-checklists .mod-cond-remover { justify-self: end; width: 40px; height: 40px; }
+.gestao-checklists .mod-cond.is-larga .mod-cond-remover { grid-column: 4; grid-row: 1; }
+.gestao-checklists .mod-cond-erro { grid-column: 2 / -1; }
+.gestao-checklists .gestao-form .mod-cond-select { padding: 0 8px; }
+.gestao-checklists .mod-cond-entre { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; color: var(--slate-700); font-size: 13px; font-weight: 700; }
+.gestao-checklists .mod-tipo-group.is-dois { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.gestao-checklists .mod-opcoes { display: flex; flex-wrap: wrap; gap: 6px; }
+.gestao-checklists .mod-opcao { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--ink-900); font-size: 12px; font-weight: 700; transition: background-color 150ms var(--ease-out), border-color 150ms var(--ease-out), transform 140ms var(--ease-out); }
+.gestao-checklists .mod-opcao[aria-pressed="true"] { border-color: var(--blue-600); background: var(--blue-100); color: var(--navy-900); }
+.gestao-checklists .mod-opcao[aria-pressed="true"] .gestao-icon { color: var(--blue-600); }
+.gestao-checklists .mod-opcao:active:not(:disabled) { transform: scale(.97); }
+.gestao-checklists .mod-opcao:disabled { opacity: .55; }
+.gestao-checklists .mod-cond-naosuportado { display: flex; align-items: flex-start; gap: 8px; grid-column: 1 / 5; margin: 0; color: #9f2940; font-size: 13px; line-height: 20px; }
+.gestao-checklists .mod-cond-naosuportado .gestao-icon { flex: none; margin-top: 2px; }
+.gestao-checklists .mod-previa-filtro { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.gestao-checklists .mod-previa-filtro .gestao-hint, .gestao-checklists .mod-previa-filtro .mod-aviso { margin: 0; }
+.gestao-checklists .mod-previa-filtro .gestao-row-skeleton { height: 40px; border-radius: 8px; border: 0; }
+.gestao-checklists .mod-previa-total { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--navy-900); font-size: 14px; }
+.gestao-checklists .mod-previa-total .gestao-icon { color: var(--blue-600); }
+.gestao-checklists .mod-previa-sub { margin: 4px 0 0; color: var(--slate-700); font-size: 12px; font-weight: 800; }
+.gestao-checklists .mod-veiculos { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-neutral); }
+.gestao-checklists .mod-veiculos li { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 2px 12px; min-height: 44px; padding: 6px 12px; border-top: 1px solid var(--border); }
+.gestao-checklists .mod-veiculos li:first-child { border-top: 0; }
+.gestao-checklists .mod-veiculo { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px; min-width: 0; }
+.gestao-checklists .mod-veiculo strong { color: var(--navy-900); font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.gestao-checklists .mod-veiculo small, .gestao-checklists .mod-veiculo-nota { color: var(--slate-700); font-size: 12px; line-height: 17px; }
+.gestao-checklists .mod-veiculos.is-outro .mod-veiculo-nota { font-weight: 700; }
+
+/* Prévia em painel (até 1120 px) */
+.gestao-checklists .mod-previa-sheet { position: relative; width: 100%; max-width: 420px; max-height: calc(100dvh - 32px); overflow: auto; border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-popover); animation: gestao-pop 200ms var(--ease-out) both; }
+.gestao-checklists .mod-previa-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.gestao-checklists .mod-previa-head h2 { margin: 0; color: var(--navy-900); font-size: 17px; font-weight: 800; letter-spacing: -.02em; line-height: 22px; }
+.gestao-checklists .mod-phone-empty { margin: 0; padding: 24px 8px; color: var(--slate-700); font-size: 12px; text-align: center; }
+
+.gestao-checklists .mod-phone-list { display: grid; gap: 8px; }
+.gestao-checklists .mod-phone-item { display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid rgba(0, 26, 61, .08); border-radius: 12px; background: var(--surface); }
+.gestao-checklists .mod-phone-item .gestao-icon { color: var(--blue-600); }
+.gestao-checklists .mod-phone-item strong { display: block; overflow: hidden; color: var(--ink-950); font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.gestao-checklists .mod-phone-item small { color: var(--slate-500); font-size: 11px; }
+.gestao-checklists .mod-phone-item .is-empty { color: var(--slate-500); }
+
+.gestao-checklists .gestao-dialog .gestao-field { margin-top: 4px; }
+.gestao-checklists .gestao-dialog select, .gestao-checklists .gestao-dialog textarea { width: 100%; min-height: 40px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-neutral); color: var(--ink-950); font: inherit; font-size: 13px; }
+.gestao-checklists .gestao-dialog textarea { min-height: 88px; resize: vertical; }
+.gestao-checklists .gestao-dialog select:focus-visible, .gestao-checklists .gestao-dialog textarea:focus-visible { outline: 0; border-color: var(--focus-border); box-shadow: var(--focus-ring); }
+
+@media (hover: hover) and (pointer: fine) {
+  .gestao-checklists .chk-row:hover:not(.is-selected), .gestao-checklists .mod-row:hover { background: var(--surface-neutral); }
+  .gestao-checklists .chk-thumb:hover { border-color: var(--border-hover); }
+  .gestao-checklists .mod-icon-button:hover:not(:disabled), .gestao-checklists .mod-duplicar:hover:not(:disabled) { background: var(--surface-soft); color: var(--navy-900); }
+  .gestao-checklists .mod-handle:hover:not(:disabled), .gestao-checklists .mod-item-toggle:hover { background: var(--surface-soft); }
+  .gestao-checklists .mod-tipo-opcao:hover, .gestao-checklists .mod-pronto:not(.is-added):hover { border-color: var(--border-hover); }
+  .gestao-checklists .mod-tipo-group button:hover:not([aria-pressed="true"]):not(:disabled) { border-color: var(--border-hover); color: var(--navy-900); }
+  .gestao-checklists .mod-chip button:hover:not(:disabled) { background: var(--danger-soft); color: var(--danger); }
+  .gestao-checklists .mod-chip.is-sugestao:hover:not(:disabled) { background: var(--surface-soft); }
+  .gestao-checklists .mod-opcao:hover:not(:disabled):not([aria-pressed="true"]) { border-color: var(--border-hover); background: var(--surface-soft); }
+}
+@media (max-width: 1120px) {
+  .gestao-checklists .frota-head, .gestao-checklists .frota-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 150px; }
+  .gestao-checklists .frota-head > :nth-child(3), .gestao-checklists .frota-row > .frota-last { display: none; }
+}
+@media (max-width: 820px) {
+  .gestao-checklists .gestao-tabs .gestao-segmented { min-width: 0; width: 100%; }
+  .gestao-checklists .frota-head, .gestao-checklists .chk-head, .gestao-checklists .mod-head { display: none; }
+  .gestao-checklists .frota-row { grid-template-columns: minmax(0, 1fr) auto; row-gap: 8px; padding-left: 16px; padding-right: 16px; }
+  .gestao-checklists .frota-row > .frota-driver, .gestao-checklists .frota-row > .frota-status { grid-column: 1 / -1; }
+  .gestao-checklists .frota-action { grid-column: 2; grid-row: 1; }
+  .gestao-checklists .chk-row, .gestao-checklists .mod-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+  .gestao-checklists .chk-row > :first-child, .gestao-checklists .mod-row > :first-child { width: 100%; }
+  .gestao-checklists .chk-row > .gestao-icon, .gestao-checklists .mod-row > .gestao-icon { display: none; }
+  /* Alvos de toque de 44 px no editor. */
+  .gestao-checklists .mod-icon-button, .gestao-checklists .mod-duplicar { width: 44px; height: 44px; }
+  .gestao-checklists .mod-duplicar { top: 12px; right: 8px; transform: none; }
+  .gestao-checklists .mod-row-wrap .mod-row { padding-right: 60px; }
+  .gestao-checklists .mod-tipo-group button { min-height: 44px; }
+  /* X do chip com alvo de 44 px; o chip cresce junto e a margem negativa esconde a sobra da borda. */
+  .gestao-checklists .mod-chip { min-height: 44px; padding-right: 0; }
+  .gestao-checklists .mod-chip button { width: 44px; height: 44px; margin: -1px 0; }
+  .gestao-checklists .mod-erros .gestao-link-button { min-height: 44px; }
+  .gestao-checklists .mod-ordem-ajuda { padding-left: 16px; padding-right: 16px; }
+  /* Celular: Subir e Descer com texto numa linha própria embaixo; nome e filtro usam a largura toda. */
+  .gestao-checklists .mod-ordem-acoes { top: auto; right: auto; bottom: 12px; left: 16px; gap: 8px; transform: none; }
+  .gestao-checklists .mod-ordem-acoes .mod-icon-button { gap: 6px; width: auto; padding: 0 14px; font-size: 13px; font-weight: 800; }
+  .gestao-checklists .mod-ordem-rotulo { display: inline; }
+  .gestao-checklists .mod-row-wrap.has-ordem .mod-row { padding-bottom: 68px; }
+  .gestao-checklists .mod-row .gestao-list-title strong, .gestao-checklists .gestao-list-title small.mod-recebe { white-space: normal; }
+  .gestao-checklists .mod-recebe .gestao-icon { align-self: flex-start; margin-top: 1px; }
+  .gestao-checklists .mod-opcao, .gestao-checklists .gestao-form .mod-cond-select, .gestao-checklists .mod-cond-remover { min-height: 44px; }
+  .gestao-checklists .mod-cond-remover { width: 44px; height: 44px; }
+}
+@media (max-width: 1120px) {
+  .gestao-checklists .gestao-preview { display: none; }
+  .gestao-checklists .mod-ver-previa { display: inline-flex; }
+}
+@media (max-width: 560px) {
+  .gestao-checklists .mod-item-arrows.is-row { display: none; }
+  .gestao-checklists .mod-item-arrows.is-body { display: flex; }
+  .gestao-checklists .mod-item-row { grid-template-columns: 44px minmax(0, 1fr); padding-right: 4px; }
+  .gestao-checklists .mod-item-body { padding: 12px; }
+  /* Linha fechada em uma linha só no celular: o ícone já diz o tipo e os selos perdem o ponto. */
+  .gestao-checklists .mod-item-meta .mod-item-tipo:first-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .gestao-checklists .mod-item-meta .gestao-badge::before { display: none; }
+  .gestao-checklists .mod-item-row { min-height: 0; padding-top: 2px; padding-bottom: 2px; }
+  .gestao-checklists .mod-item-toggle { gap: 8px; min-height: 48px; padding: 4px; }
+  .gestao-checklists .mod-tipo-group { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .gestao-checklists .mod-item-fields.is-number, .gestao-checklists .mod-tipos-grid, .gestao-checklists .mod-prontos-grid { grid-template-columns: minmax(0, 1fr); }
+  .gestao-checklists .mod-add-actions, .gestao-checklists .mod-add-actions .gestao-button { width: 100%; }
+  .gestao-checklists .mod-add-actions .gestao-button { min-height: 44px; }
+  .gestao-checklists .mod-barra { padding: 10px 16px 26px; }
+  .gestao-checklists .mod-barra-status { font-size: 12px; line-height: 16px; }
+  .gestao-checklists .mod-barra-acoes .gestao-button { min-height: 44px; padding: 0 14px; }
+  .gestao-checklists .mod-hide-small { display: none; }
+  /* Condição no celular: campo e comparação na primeira linha, valor na linha de baixo. */
+  .gestao-checklists .mod-cond, .gestao-checklists .mod-cond.is-larga { grid-template-columns: minmax(0, 1fr) 44px; padding: 8px; }
+  .gestao-checklists .mod-cond-num, .gestao-checklists .mod-cond-op { display: none; }
+  .gestao-checklists .mod-cond > .mod-cond-select:first-of-type { grid-column: 1; grid-row: 1; }
+  .gestao-checklists .mod-cond-remover, .gestao-checklists .mod-cond.is-larga .mod-cond-remover { grid-column: 2; grid-row: 1; }
+  .gestao-checklists .mod-cond > .mod-cond-select + .mod-cond-select { grid-column: 1 / -1; grid-row: 2; }
+  .gestao-checklists .mod-cond-valor, .gestao-checklists .mod-cond.is-larga .mod-cond-valor { grid-column: 1 / -1; grid-row: 3; }
+  .gestao-checklists .mod-cond-erro { grid-column: 1 / -1; }
+  .gestao-checklists .mod-cond-naosuportado { grid-column: 1; }
+  .gestao-checklists .mod-previa-modal { align-items: flex-end; padding: 0; }
+  .gestao-checklists .mod-previa-sheet { max-width: none; max-height: 92dvh; border-radius: 12px 12px 0 0; animation: gestao-sheet 220ms var(--ease-drawer) both; }
+}
+
+/* ---------- Padrões ---------- */
+/* Abas: com Padrões são quatro; mantêm a altura e o texto das três de antes. */
+.gestao-checklists .gestao-tabs .gestao-segmented.is-four button { min-height: 36px; font-size: 13px; }
+.gestao-checklists .padroes-stack { display: grid; gap: 16px; }
+.gestao-checklists .padroes-periodo { min-width: 264px; }
+.gestao-checklists .padroes-resumo { margin: 0; padding: 12px 20px; }
+.gestao-checklists .padroes-destaques { display: grid; gap: 8px; padding: 0 20px 16px; }
+.gestao-checklists .padroes-destaques [role="list"] { display: grid; gap: 8px; }
+.gestao-checklists .padroes-row { display: grid; align-items: center; gap: 16px; width: 100%; min-height: 62px; padding: 10px 20px; border: 0; border-bottom: 1px solid var(--border); background: var(--surface); color: var(--ink-950); font-size: 13px; text-align: left; animation: gestao-rise 240ms var(--ease-out) both; animation-delay: calc(80ms + var(--i, 0) * 35ms); transition: background-color 150ms var(--ease-out), transform 140ms var(--ease-out); }
+.gestao-checklists .padroes-row:active { transform: scale(.99); }
+.gestao-checklists .padroes-row[aria-expanded="true"] { background: var(--blue-100); }
+/* slate-500 sobre blue-100 fica abaixo de 4,5:1; como em .chk-row.is-selected, usa slate-700. */
+.gestao-checklists .padroes-row[aria-expanded="true"] small { color: var(--slate-700); }
+.gestao-checklists .padroes-row .gestao-list-chevron { transition: transform 150ms var(--ease-out); }
+.gestao-checklists .padroes-row[aria-expanded="true"] .gestao-list-chevron { transform: rotate(90deg); }
+.gestao-checklists .padroes-row.is-entregador { grid-template-columns: minmax(0, 1.6fr) 90px 120px 70px 16px; }
+.gestao-checklists .padroes-row.is-veiculo { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) 110px 16px; }
+.gestao-checklists .padroes-row.is-frota { grid-template-columns: 28px minmax(0, 1fr) 120px 16px; }
+.gestao-checklists .padroes-row.is-destaque { grid-template-columns: 16px minmax(0, 1fr) 16px; min-height: 44px; padding: 10px 12px; border-radius: 10px; background: var(--warning-soft); color: var(--ink-900); }
+.gestao-checklists .padroes-row.is-destaque[aria-expanded="true"] { background: var(--warning-soft); }
+.gestao-checklists .padroes-row.is-destaque > .gestao-icon:first-child { color: var(--warning); }
+.gestao-checklists .padroes-num { color: var(--navy-900); font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gestao-checklists .padroes-item { min-width: 0; color: var(--ink-900); font-size: 13px; font-weight: 700; line-height: 20px; overflow-wrap: anywhere; }
+.gestao-checklists .padroes-sep { margin: 0; padding: 10px 20px; border-bottom: 1px solid var(--border); background: var(--surface-neutral); color: var(--slate-700); font-size: 12px; font-weight: 700; }
+.gestao-checklists .padroes-lista { display: grid; gap: 8px; padding: 12px 20px 16px; border-bottom: 1px solid var(--border); background: var(--surface-neutral); animation: gestao-fade 180ms var(--ease-out) both; }
+.gestao-checklists .padroes-destaques .padroes-lista { margin-top: 8px; border: 1px solid var(--border); border-radius: 10px; }
+.gestao-checklists .padroes-chk { display: grid; gap: 6px; min-width: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); font-size: 13px; }
+.gestao-checklists .padroes-chk-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.gestao-checklists .padroes-chk-top strong { color: var(--navy-900); font-size: 13px; font-weight: 800; }
+.gestao-checklists .padroes-chk > small { color: var(--slate-500); font-size: 12px; line-height: 17px; overflow-wrap: anywhere; }
+.gestao-checklists .padroes-problema { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--ink-950); font-size: 13px; font-weight: 600; }
+
+@media (hover: hover) and (pointer: fine) {
+  .gestao-checklists .padroes-row:not(.is-destaque):not([aria-expanded="true"]):hover { background: var(--surface-neutral); }
+}
+@media (max-width: 820px) {
+  /* Quatro abas não cabem em 343 px: o wrapper .gestao-segmented-scroll rola, como o filtro de cinco botões. */
+  .gestao-checklists .gestao-tabs .gestao-segmented.is-four { min-width: 440px; }
+  .gestao-checklists .padroes-periodo { width: 100%; min-width: 0; }
+  .gestao-checklists .padroes-row:not(.is-destaque) { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding-left: 16px; padding-right: 16px; }
+  .gestao-checklists .padroes-row > .frota-cell, .gestao-checklists .padroes-row.is-veiculo > .padroes-item { flex: 1 1 100%; }
+  .gestao-checklists .padroes-row.is-frota > .padroes-item { flex: 1 1 0; }
+  /* O chevron some nas outras listas do mobile; aqui ele indica que a linha abre. */
+  .gestao-checklists .padroes-row > .gestao-list-chevron { display: block; }
+  .gestao-checklists .padroes-row:not(.is-destaque) > .gestao-list-chevron { margin-left: auto; }
+  .gestao-checklists .padroes-resumo, .gestao-checklists .padroes-sep, .gestao-checklists .padroes-lista, .gestao-checklists .padroes-destaques { padding-left: 16px; padding-right: 16px; }
+}

@@ -59,7 +59,7 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   'funcoes-operacionais': <Wrench />,
   cr40f_trocasdecarro: <Shuffle />,
   new_possedeveiculo: <KeyRound />,
-  new_gestaochecklistsveiculos: <ClipboardCheck />,
+  'frota-checklists': <ClipboardCheck />,
   qualidade: <Shield />,
   infleet: <MapPin />,
   planner: <ClipboardList />,

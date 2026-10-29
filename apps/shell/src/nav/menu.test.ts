@@ -46,6 +46,7 @@ it('Frota tem um item por visão, sem as tabelas legadas nem Infrações solta',
   expect(ENTITY_NAMES).not.toContain('cr40f_multas')
   expect(ENTITY_NAMES).not.toContain('cr40f_colisao_v2')
   expect(findItem('infracoes')).toBeNull()
+  expect(findItem('frota-checklists')?.item).toMatchObject({ kind: 'page', page: 'frota', aba: 'checklists' })
 })
 
 it('links antigos da Frota e de Infrações vão para a visão nova', () => {
@@ -55,6 +56,8 @@ it('links antigos da Frota e de Infrações vão para a visão nova', () => {
   expect(ir('frota', 'aba=ocorrencias&tipo=colisao')).toBe('frota-colisoes?')
   expect(ir('frota', 'aba=pendencias&ficha=v1')).toBe('frota?ficha=v1')
   expect(ir('infracoes', 'ver=i1')).toBe('frota-multas?ver=i1&sub=infracoes')
+  expect(ir('frota', 'aba=checklists')).toBe('frota-checklists?')
+  expect(ir('new_gestaochecklistsveiculos', '')).toBe('frota-checklists?')
   expect(ir('frota', 'ficha=v1')).toBeNull()
   expect(ir('geral', 'aba=x')).toBeNull()
 })

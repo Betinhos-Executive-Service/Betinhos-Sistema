@@ -13,7 +13,7 @@ export type MenuItem =
   | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos' | 'clientes' | 'planner' | 'validacao-cliente' | 'logs' | 'qualidade' | 'pagamento-fornecedores' | 'funcoes-operacionais'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba }
 
 /** Visões da Frota: cada uma é um item do menu, todas na mesma tela (`page: 'frota'`). */
-export type FrotaAba = 'pendencias' | 'veiculos' | 'manutencoes' | 'multas' | 'colisoes' | 'indicadores' | 'plano'
+export type FrotaAba = 'pendencias' | 'veiculos' | 'manutencoes' | 'multas' | 'colisoes' | 'indicadores' | 'plano' | 'checklists'
 
 export type MenuGroup = { id: string; label: string; items: MenuItem[] }
 
@@ -71,7 +71,7 @@ export const MENU: MenuGroup[] = [
       { kind: 'page', id: 'frota-indicadores', label: 'Indicadores', page: 'frota', aba: 'indicadores' },
       { kind: 'page', id: 'frota-plano', label: 'Plano preventivo', page: 'frota', aba: 'plano' },
       { kind: 'page', id: 'assistente-frota', label: 'Assistente', page: 'agentes', agente: 'frota' },
-      wr('Checklists de Veículos', 'new_gestaochecklistsveiculos'),
+      { kind: 'page', id: 'frota-checklists', label: 'Checklists de Veículos', page: 'frota', aba: 'checklists' },
     ],
   },
   {
@@ -126,6 +126,8 @@ export function rotaAtualizada(id: string, query: URLSearchParams): { id: string
   if (id === 'new_gestao_erros_operacionais') return { id: 'qualidade', query }
   // O WebResource de Pagamento de Fornecedores virou a tela React; links antigos seguem abrindo.
   if (id === 'cr40f_telapagamentofornecedores') return { id: 'pagamento-fornecedores', query }
+  // O WebResource dos Checklists de Veículos virou a aba Checklists da Frota; links antigos seguem abrindo.
+  if (id === 'new_gestaochecklistsveiculos') return { id: 'frota-checklists', query }
   if (id === 'infracoes') return { id: 'frota-multas', query: new URLSearchParams([...query, ['sub', 'infracoes']]) }
   const aba = id === 'frota' ? query.get('aba') : null
   if (!aba) return null
