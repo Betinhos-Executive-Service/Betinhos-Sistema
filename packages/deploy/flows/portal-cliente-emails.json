@@ -197,10 +197,10 @@
                         "host": {
                           "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
                           "connectionName": "shared_office365",
-                          "operationId": "SharedMailboxSendEmailV2"
+                          "operationId": "SendEmailV2"
                         },
                         "parameters": {
-                          "emailMessage/MailboxAddress": "__CAIXA_COMPARTILHADA__",
+                          "emailMessage/From": "__CAIXA_COMPARTILHADA__",
                           "emailMessage/To": "@join(triggerBody()?['para'],';')",
                           "emailMessage/Subject": "@concat('Seu código de acesso: ',trim(string(triggerBody()?['dados']?['codigo'])))",
                           "emailMessage/Body": "@outputs('Html_codigo')",
@@ -328,10 +328,10 @@
                             "host": {
                               "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
                               "connectionName": "shared_office365",
-                              "operationId": "SharedMailboxSendEmailV2"
+                              "operationId": "SendEmailV2"
                             },
                             "parameters": {
-                              "emailMessage/MailboxAddress": "__CAIXA_COMPARTILHADA__",
+                              "emailMessage/From": "__CAIXA_COMPARTILHADA__",
                               "emailMessage/To": "@join(triggerBody()?['para'],';')",
                               "emailMessage/Subject": "Serviços para validar hoje · Betinhos",
                               "emailMessage/Body": "@outputs('Html_resumo')",
@@ -419,10 +419,10 @@
                         "host": {
                           "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
                           "connectionName": "shared_office365",
-                          "operationId": "SharedMailboxSendEmailV2"
+                          "operationId": "SendEmailV2"
                         },
                         "parameters": {
-                          "emailMessage/MailboxAddress": "__CAIXA_COMPARTILHADA__",
+                          "emailMessage/From": "__CAIXA_COMPARTILHADA__",
                           "emailMessage/To": "@join(triggerBody()?['para'],';')",
                           "emailMessage/Subject": "@concat('A Betinhos respondeu sua dúvida sobre ',trim(string(triggerBody()?['dados']?['numero'])))",
                           "emailMessage/Body": "@outputs('Html_resposta')",
