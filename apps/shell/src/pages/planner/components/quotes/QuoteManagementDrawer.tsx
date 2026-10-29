@@ -70,6 +70,8 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
   const inlineToolbarRef = useRef<any>(null);
   const draftSnapshot = useMemo(() => quoteDraftSnapshot(draft), [draft]);
   const dirty = draftSnapshot !== baselineRef.current.snapshot;
+  // Status mudado por qualquer caminho (envio, decisão, recarga) também tira a mensagem do passo anterior.
+  useEffect(() => { setSaveMessage(""); }, [draft.status]);
   const update = (key: any, value: any) => { setSaveMessage(""); setDraft((current: any) => ({ ...current, [key]: value })); };
   const requestClose = () => {
     if (mutationPending.current || saving) return;
@@ -262,7 +264,9 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     setSaveError("");
     const result = await run(() => onUpdate?.(quote.id, nextDraft));
     if (result === false) return fail("Não foi possível salvar. Sua edição continua aberta; confira sua conexão e tente novamente.");
-    baselineRef.current = { id: quote.id, snapshot: quoteDraftSnapshot(nextDraft) }; setDraft(nextDraft); setQuoteConflict(false); setSaveMessage("Cotação salva.");
+    baselineRef.current = { id: quote.id, snapshot: quoteDraftSnapshot(nextDraft) }; setDraft(nextDraft); setQuoteConflict(false);
+    // Mudou de passo: o próprio passo novo é o retorno; "Cotação salva." fica só para edições no mesmo passo.
+    setSaveMessage(nextDraft.status === draft.status ? "Cotação salva." : "");
     return "";
   };
   const openComposer = () => { setComposerMessage(""); setPreviewEdited(false); setEditingPreview(false); setComposerOpen(true); };
@@ -442,7 +446,7 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
           {draft.status === "Em análise pelo financeiro" && <button className="button button-primary quote-step-primary" type="button" disabled={saving} onClick={() => save()}><Save size={16} />{saving ? "Salvando…" : "Salvar preços"}</button>}
           {draft.status === "Cotada" && <><button className="button button-primary quote-step-primary" type="button" disabled={saving} onClick={actions.send}><Send size={16} />Enviei ao cliente</button><button className="button button-quiet" type="button" disabled={saving} onClick={openComposer}>Ver proposta</button></>}
           {awaitingDecision && <><button className="button button-primary quote-step-primary" type="button" disabled={saving || !decisionOptions.length} onClick={() => openResult("Aceita pelo cliente")}><Check size={16} />Cliente aceitou</button><button className="button button-secondary" type="button" disabled={saving || !decisionOptions.length} onClick={() => openResult("Perdida")}>Perdida</button></>}
-          {draft.status === QUOTE_WAITING_STATUS && <>{actionEnabled.return && <button className="button button-primary quote-step-primary drawer-return-action" type="button" disabled={saving} onClick={actions.return}>Registrar retorno</button>}<button className="button button-quiet" type="button" disabled={saving} onClick={() => setWaitingOpen(true)}>Editar</button></>}
+          {draft.status === QUOTE_WAITING_STATUS && <>{actionEnabled.return && <button className="button button-primary quote-step-primary drawer-return-action" type="button" disabled={saving} onClick={actions.return}>Registrar retorno</button>}{task && <button className="button button-quiet" type="button" disabled={saving} onClick={actions.resume}>Retomar cotação</button>}<button className="button button-quiet" type="button" disabled={saving} onClick={() => setWaitingOpen(true)}>Editar</button></>}
           {terminalQuote && <button className="button button-secondary" type="button" disabled={saving} onClick={reopen}>Reabrir cotação</button>}
           {["Nova", "Em análise pelo financeiro"].includes(draft.status) && <button className="button button-quiet" type="button" disabled={saving} onClick={actions.wait}>Aguardar informação</button>}
         </div>

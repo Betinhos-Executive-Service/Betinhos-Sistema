@@ -125,8 +125,7 @@ function validateScenario(option: Partial<QuoteOptionData>): ValidationResult {
   if (amount === null || !Number.isFinite(amount) || amount <= 0) errors.value = 'Informe um valor maior que zero.'
   return { valid: Object.keys(errors).length === 0, errors }
 }
-// Etapas do rascunho de 23/10: ① Pedido (quem pede, o que pede, prazo) e
-// ② Custo (opções). Trajeto, datas e veículo ficam para o agendamento.
+// Criação em três passos (V2.2) no QuoteCreateDrawer; trajeto, datas e veículo ficam para o agendamento.
 // V2: obrigatórios só solicitante, texto do pedido e prazo; o resto é opcional.
 const REQUEST_FIELDS: Array<[keyof QuoteInput & string, string]> = [
   ['clientContact', 'Informe o nome do solicitante.'],

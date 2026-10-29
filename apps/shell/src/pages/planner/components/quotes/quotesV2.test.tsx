@@ -182,4 +182,11 @@ describe('cotações V2.2 nas telas', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Perdida' }))
     expect(await screen.findByText('Motivo da perda')).toBeTruthy()
   })
+
+  it('mudar de passo não mostra "Cotação salva."', async () => {
+    render(<QuoteManagementDrawer quote={{ ...base, status: 'Nova', options: [] }} employees={[]} teams={[]} onClose={() => {}} onUpdate={vi.fn(async () => true)} onOutcome={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Começar a cotar' }))
+    expect(await screen.findByText('Preencha os preços')).toBeTruthy()
+    expect(screen.queryByText('Cotação salva.')).toBeNull()
+  })
 })
