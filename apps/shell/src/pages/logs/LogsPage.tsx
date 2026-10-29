@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Alert, Button, Drawer, EmptyState, SearchBox, Select, StatusBadge, Table, ViewBar, matchesFilters, useShellHeader, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
+import { Alert, Button, EmptyState, SearchBox, Select, StatusBadge, Table, ToastProvider, ViewBar, matchesFilters, useShellHeader, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
 import { FileText, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
@@ -8,7 +8,8 @@ import { useQueryId, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { openFromRow, openRowActions } from '../pagantes/components/PagantesList'
 import { MAX_LOGS, createSource, type LogApp, type Source } from './data'
-import { LOG_COLUMNS, LOG_SORT, builtinViews, PERIODOS, PERIODO_PADRAO, TELA, formatPayload, logFields, matchesKeyword, periodoStart, periodoValido, quemFoi, readLog, severidadeLabel, severidadeTone, sortLogs } from './lista'
+import { LogDrawer } from './LogDrawer'
+import { LOG_COLUMNS, LOG_SORT, builtinViews, PERIODOS, PERIODO_PADRAO, TELA, logFields, matchesKeyword, periodoStart, periodoValido, quemFoi, readLog, severidadeLabel, severidadeTone, sortLogs } from './lista'
 import './logs.css'
 
 const dateTime = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -36,6 +37,10 @@ function useLogs(source: Source, since: Date) {
 }
 
 export function LogsPage({ host }: { host: Host }) {
+  return <ToastProvider><Logs host={host} /></ToastProvider>
+}
+
+function Logs({ host }: { host: Host }) {
   const source = useMemo(() => createSource(host), [host])
   const mobile = useMedia('(max-width: 820px)')
   const [periodoUrl, setPeriodo] = useQueryTexto('periodo', PERIODO_PADRAO)
@@ -96,9 +101,7 @@ export function LogsPage({ host }: { host: Host }) {
       </div>
       {data.error && data.loaded ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{data.error} A lista mostra os dados da carga anterior.</Alert> : null}
       {body}
-      <Drawer open={selected != null} onClose={() => setSelectedId(null)} size="wide" eyebrow="Log de erro" title={selected ? selected.erro || severidadeLabel(selected.severidade) : ''}>
-        {selected ? <LogFicha log={selected} /> : null}
-      </Drawer>
+      {data.loaded ? <LogDrawer log={selected} list={data.list} periodo={PERIODOS.find((p) => p.value === periodo)?.label ?? ''} onClose={() => setSelectedId(null)} /> : null}
     </div>
   )
 }
@@ -144,43 +147,5 @@ function LogsCards({ list, onOpen }: ListProps) {
         </li>
       ))}
     </ul>
-  )
-}
-
-function Item({ name, children }: { name: string; children: ReactNode }) {
-  return <div className="lg-ficha__item"><dt>{name}</dt><dd>{children || '—'}</dd></div>
-}
-
-function Bloco({ title, text }: { title: string; text: string }) {
-  if (!text) return null
-  return (
-    <section className="lg-ficha__block">
-      <h3>{title}</h3>
-      <pre className="lg-pre">{text}</pre>
-    </section>
-  )
-}
-
-function LogFicha({ log: l }: { log: LogApp }) {
-  return (
-    <div className="lg-ficha">
-      <p className="lg-ficha__msg">{l.mensagem || 'Sem mensagem'}</p>
-      <dl className="lg-ficha__grid">
-        <Item name="Severidade"><Severidade l={l} /></Item>
-        <Item name="Data">{fmtData(l.data)}</Item>
-        <Item name="App">{l.app}</Item>
-        <Item name="Versão">{l.versao}</Item>
-        <Item name="Tela">{l.tela}</Item>
-        <Item name="Usuário">{[l.usuario, l.email].filter(Boolean).join(' · ')}</Item>
-        <Item name="Código">{l.codigo}</Item>
-        <Item name="Origem">{[l.origem, l.componente, l.acao, l.fase].filter(Boolean).join(' · ')}</Item>
-        <Item name="Plataforma">{l.plataforma}</Item>
-        <Item name="Conexão">{l.offline == null ? '' : l.offline ? 'Sem internet' : 'Online'}</Item>
-        <Item name="Sessão">{l.sessao}</Item>
-        <Item name="URL"><span className="lg-quebra">{l.url}</span></Item>
-      </dl>
-      <Bloco title="Stack" text={l.stack} />
-      <Bloco title="Payload" text={formatPayload(l.payload)} />
-    </div>
   )
 }
