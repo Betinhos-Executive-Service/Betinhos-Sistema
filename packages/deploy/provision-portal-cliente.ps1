@@ -230,7 +230,7 @@ Ensure-AttributeOn "cr40f_clientes1" (YesNo "cr40f_PortalHabilitado" "Portal hab
 $val = "cr40f_validacaoservico"
 $relReserva = "cr40f_reservadeveculos_cr40f_validacaoservico_reserva"
 $relCliente = "cr40f_clientes1_cr40f_validacaoservico_cliente"
-$relLiberadoPor = "systemuser_cr40f_validacaoservico_liberadopor"
+$relLiberadoPor = "cr40f_systemuser_validacaoservico_liberadopor"
 $valId = Ensure-Table $val "cr40f_ValidacaoServico" "Validação de serviço" "Validações de serviço" "Serviço liberado para o cliente validar no portal; um registro por reserva, reativado ao liberar de novo." 100 "None" "Código" "Código da reserva liberada"
 if (-not $valId) {
   Write-Step "DRY RUN criaria em ${val}: lookups cr40f_reserva (reserva, chave alternativa unica), cr40f_cliente e cr40f_liberadopor; status (Liberado, Em dúvida, Respondido, Aprovado, Aprovado automaticamente, Retirado); liberado em, observacao, valor liberado, valor anterior, prazo da tacita, aprovado em/por e incluir no fechamento (Sim/Nao/Pendente); depois cr40f_validadorcliente, cr40f_mensagemvalidacao, cr40f_codigoacesso e cr40f_dispositivoconfiavel"

@@ -60,7 +60,7 @@ const notificationPosts = (writes: Write[]) => writes.filter((item) => item.meth
 describe('cotações V2 no Dataverse', () => {
   test('criar não grava tarefa, envia o criador e avisa o Financeiro quando o prazo é hoje', async () => {
     const { store, writes } = await setup()
-    await store.createQuote(emptyState(), { title: 'GRU', client: 'Tenaris', priority: 'medium', status: 'Nova', clientContact: 'Walter', notes: 'GRU → Centro', deadline: today(), actorEmployeeId: creatorId })
+    await store.createQuote(emptyState(), { title: 'GRU', client: 'Tenaris', priority: 'medium', status: 'Nova', clientContact: 'Walter', notes: 'GRU → Centro', deadline: today(), today: today(), actorEmployeeId: creatorId })
     expect(writes.some((item) => item.url.includes('/cr40f_plannertarefas'))).toBe(false)
     const quotePost = writes.find((item) => item.method === 'POST' && item.url.endsWith('/cr40f_pedidodecotacaos'))
     expect(quotePost?.body['cr40f_Criador@odata.bind']).toBe(`/cr40f_funcionarioses(${creatorId})`)
@@ -74,7 +74,7 @@ describe('cotações V2 no Dataverse', () => {
     const otherFinanceId = '77777777-7777-4777-8777-777777777777'
     const { store, writes } = await setup({ failNoticeFor: financeId })
     const state = { ...emptyState(), teams: [{ id: 'team-fin', name: 'Financeiro', memberIds: [financeId, otherFinanceId] }] } as unknown as LiveState
-    await store.createQuote(state, { title: 'GRU', client: 'Tenaris', priority: 'medium', status: 'Nova', clientContact: 'Walter', notes: 'GRU → Centro', deadline: today(), actorEmployeeId: creatorId })
+    await store.createQuote(state, { title: 'GRU', client: 'Tenaris', priority: 'medium', status: 'Nova', clientContact: 'Walter', notes: 'GRU → Centro', deadline: today(), today: today(), actorEmployeeId: creatorId })
     expect(notificationPosts(writes).map((item) => item.body['cr40f_Destinatario@odata.bind'])).toContain(`/cr40f_funcionarioses(${otherFinanceId})`)
   })
 
@@ -82,13 +82,13 @@ describe('cotações V2 no Dataverse', () => {
     const { notificationDedupeKey } = await import('../domain/notifications')
     const key = notificationDedupeKey({ recipientId: financeId, taskId: quoteId, type: 'quote_urgent', referenceDate: '' })
     const { store, writes } = await setup({ existingDedupeKeys: [key] })
-    await store.createQuote(emptyState(), { title: 'GRU', client: 'Tenaris', priority: 'medium', status: 'Nova', deadline: today(), actorEmployeeId: creatorId })
+    await store.createQuote(emptyState(), { title: 'GRU', client: 'Tenaris', priority: 'medium', status: 'Nova', deadline: today(), today: today(), actorEmployeeId: creatorId })
     expect(notificationPosts(writes)).toHaveLength(0)
   })
 
   test('sem as colunas da V2, cria a cotação sem criador e sem aviso', async () => {
     const { store, writes } = await setup({ missingAttributes: ['cr40f_criador', 'cr40f_cotacao'] })
-    await store.createQuote(emptyState(), { title: 'GRU', client: 'Tenaris', priority: 'medium', status: 'Nova', deadline: today(), actorEmployeeId: creatorId })
+    await store.createQuote(emptyState(), { title: 'GRU', client: 'Tenaris', priority: 'medium', status: 'Nova', deadline: today(), today: today(), actorEmployeeId: creatorId })
     const quotePost = writes.find((item) => item.method === 'POST' && item.url.endsWith('/cr40f_pedidodecotacaos'))
     expect(quotePost).toBeTruthy()
     expect(quotePost?.body['cr40f_Criador@odata.bind']).toBeUndefined()
