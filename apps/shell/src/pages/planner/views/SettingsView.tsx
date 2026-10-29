@@ -12,7 +12,10 @@ import { Check, ChevronDown, ChevronRight, LoaderCircle, RotateCcw, Tag, Target,
 import { lazy, Suspense, useMemo, useState } from 'react'
 
 // Traz o login Microsoft (MSAL, ~300 kB): só baixa quando alguém abre as configurações.
-const PlannerImportView = lazy(() => import('./PlannerImportView'))
+// Falha ao baixar (build antigo apagado, rede) afeta só este painel, não a tela de Configurações.
+const PlannerImportView = lazy(() => import('./PlannerImportView').catch(() => ({
+  default: (_props: any) => <p>Não foi possível carregar a importação do Planner. Recarregue a página.</p>,
+})))
 
 
 export function TeamManager({ teams = [], tasks = [], employees = [], onSave, onDelete }: any) {
