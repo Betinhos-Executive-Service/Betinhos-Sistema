@@ -37,6 +37,8 @@ export const PAGE_LOADERS: Record<PageId, () => Promise<ComponentType<PageProps>
   'validacao-cliente': () => import('../pages/validacao-cliente/ValidacaoClientePage').then((m) => m.ValidacaoClientePage),
   logs: () => import('../pages/logs/LogsPage').then((m) => m.LogsPage),
   'funcoes-operacionais': () => import('../pages/funcoes-operacionais/FuncoesOperacionaisPage').then((m) => m.FuncoesOperacionaisPage),
+  'pagamento-fornecedores': () => import('../pages/pagamento-fornecedores/PagamentoFornecedoresPage').then((m) => m.PagamentoFornecedoresPage),
+  qualidade: () => import('../pages/qualidade/QualidadePage').then((m) => m.QualidadePage),
 }
 
 const pending = new Map<PageId, Promise<ComponentType<PageProps>>>()

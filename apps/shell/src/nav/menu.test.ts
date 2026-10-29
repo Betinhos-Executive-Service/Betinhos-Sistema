@@ -83,3 +83,17 @@ it('Funções Operacionais é rota React no Operacional e os links antigos vão 
   expect(r && `${r.id}?${r.query}`).toBe('funcoes-operacionais?aba=carro')
   expect(rotaAtualizada('custom-page-funcoes-operacionais', new URLSearchParams())?.id).toBe('funcoes-operacionais')
 })
+
+it('Gestão de Qualidade é a tela React; o id do WebResource antigo redireciona', () => {
+  expect(findItem('qualidade')?.group.id).toBe('operacional')
+  expect(findItem('qualidade')?.item).toMatchObject({ kind: 'page', page: 'qualidade', label: 'Gestão de Qualidade' })
+  expect(findItem('new_gestao_erros_operacionais')).toBeNull()
+  expect(rotaAtualizada('new_gestao_erros_operacionais', new URLSearchParams('errorId=e1'))).toEqual({ id: 'qualidade', query: new URLSearchParams('errorId=e1') })
+})
+
+it('Pagamento de Fornecedores é rota React do Financeiro; o id do WebResource antigo redireciona', () => {
+  expect(findItem('pagamento-fornecedores')?.group.id).toBe('financeiro')
+  expect(findItem('pagamento-fornecedores')?.item).toMatchObject({ kind: 'page', page: 'pagamento-fornecedores', label: 'Pagamento de Fornecedores' })
+  expect(findItem('cr40f_telapagamentofornecedores')).toBeNull()
+  expect(rotaAtualizada('cr40f_telapagamentofornecedores', new URLSearchParams('tab=lots'))).toEqual({ id: 'pagamento-fornecedores', query: new URLSearchParams('tab=lots') })
+})
