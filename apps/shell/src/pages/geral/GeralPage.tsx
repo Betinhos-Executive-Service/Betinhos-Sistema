@@ -413,13 +413,19 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const [portalStatus, setPortalStatus] = useState<Map<string, StatusValidacao>>(new Map())
   const [portalSeq, setPortalSeq] = useState(0)
   const portalVisible = visibleColumns.some((c) => c.key === PORTAL_KEY)
-  const rowIds = useMemo(() => rows.map((r) => String(r[ID_ATTRIBUTE])).join(','), [rows])
+  // Status já pedidos: cada página nova consulta só as linhas que chegaram; liberar tira do cache os liberados.
+  const portalAsked = useRef(new Set<string>())
   useEffect(() => {
-    if (!portalVisible || !rowIds) return
-    let alive = true
-    portal.status(rowIds.split(',')).then((map) => { if (alive) setPortalStatus(map) }, () => { if (alive) setPortalStatus(new Map()) })
-    return () => { alive = false }
-  }, [portal, portalVisible, rowIds, portalSeq])
+    if (!portalVisible) return
+    const novos = rows.map((r) => String(r[ID_ATTRIBUTE])).filter((id) => !portalAsked.current.has(id))
+    if (!novos.length) return
+    novos.forEach((id) => portalAsked.current.add(id))
+    portal.status(novos).then(
+      (found) => setPortalStatus((cur) => { const next = new Map(cur); for (const id of novos) { const st = found.get(id); if (st) next.set(id, st); else next.delete(id) } return next }),
+      // Falha: some do cache para a próxima mudança de linhas tentar de novo.
+      () => novos.forEach((id) => portalAsked.current.delete(id)),
+    )
+  }, [portal, portalVisible, rows, portalSeq])
   const askLiberar = useCallback(() => { if (selectedIds.length) setLiberarIds(selectedIds) }, [selectedIds])
   const doneLiberar = useCallback((result: Liberacao, bloqueados: number) => {
     setLiberarIds(null)
@@ -428,6 +434,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     toast(result.failed.length
       ? { tone: 'danger', message: `${msg} Falharam: ${result.failed.map((f) => labelOf(f.id)).join(', ')}. ${result.failed[0].message}` }
       : { tone: 'success', message: msg })
+    result.ok.forEach((id) => portalAsked.current.delete(id))
     setPortalSeq((n) => n + 1)
     clearSelection()
   }, [toast, labelOf, clearSelection])
