@@ -80,7 +80,7 @@ it('Gestão de Qualidade é a tela React; o id do WebResource antigo redireciona
   expect(rotaAtualizada('new_gestao_erros_operacionais', new URLSearchParams('errorId=e1'))).toEqual({ id: 'qualidade', query: new URLSearchParams('errorId=e1') })
 })
 
-test('Pagamento de Fornecedores é rota React do Financeiro; o id do WebResource antigo redireciona', () => {
+it('Pagamento de Fornecedores é rota React do Financeiro; o id do WebResource antigo redireciona', () => {
   expect(findItem('pagamento-fornecedores')?.group.id).toBe('financeiro')
   expect(findItem('pagamento-fornecedores')?.item).toMatchObject({ kind: 'page', page: 'pagamento-fornecedores', label: 'Pagamento de Fornecedores' })
   expect(findItem('cr40f_telapagamentofornecedores')).toBeNull()
