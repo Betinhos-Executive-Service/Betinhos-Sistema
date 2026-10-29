@@ -1816,7 +1816,8 @@ class DataverseClient {
         { next: "Rascunho" },
       );
       this.persistMock();
-      return clone(lot);
+      // Como no Dataverse: devolve o detalhe completo (itens e eventos), que o drawer do lote lê logo em seguida.
+      return this.getLotDetail(lot.id);
     }
     const paymentPayload = {
       cr40f_statuslote: 100000000,

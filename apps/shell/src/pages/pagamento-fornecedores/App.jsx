@@ -45,7 +45,7 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
-import { patchHashQuery, readHashQuery } from "../../nav/useHashRoute";
+import { hrefFor, parseHash, patchHashQuery, readHashQuery } from "../../nav/useHashRoute";
 import { CHOICES, dataverse } from "./lib/dataverse";
 import { setErrorLogContext } from "./lib/error-logger";
 import { buildPaymentPdf } from "./lib/document";
@@ -98,11 +98,16 @@ const tabFromLocation = () => {
   const tab = readHashQuery().get("tab");
   return APP_TABS.has(tab) ? tab : "overview";
 };
-// A aba fica na query do hash do shell (#/pagamento-fornecedores?tab=lots): recarregar ou voltar reabre a mesma aba.
+// A aba fica na query do hash do shell (#/pagamento-fornecedores?tab=lots): recarregar reabre a mesma aba e,
+// como no WebResource, trocar de aba cria entrada no histórico (Voltar volta para a aba anterior).
 const syncTabLocation = (tab, method) => {
   if (typeof window === "undefined") return;
   if (readHashQuery().get("tab") === tab) return;
-  patchHashQuery({ tab }, { silent: method === "replaceState" });
+  if (method === "replaceState") return patchHashQuery({ tab }, { silent: true });
+  const { id, query } = parseHash(window.location.hash);
+  query.set("tab", tab);
+  window.history.pushState(window.history.state, "", `${hrefFor(id)}?${query}`);
+  window.dispatchEvent(new HashChangeEvent("hashchange"));
 };
 const toDateInput = (date) => date.toISOString().slice(0, 10);
 const previousRange = (range) => {

@@ -458,6 +458,9 @@ test("fluxo local: repasse, vínculo, rascunho, pagamento, documento e auditoria
     year: 2026,
   });
   assert.equal(lot.paymentStatus, "open");
+  // O drawer do lote abre direto com o retorno da criação: itens e eventos precisam vir junto.
+  assert.equal(lot.items.length, 1);
+  assert.ok(lot.events.some((event) => event.message === "Lote criado e serviços reservados."), JSON.stringify(lot.events));
   assert.equal(
     (await dataverse.listFinanceServices()).find((row) => row.id === target.id)
       .pagamentoId,
