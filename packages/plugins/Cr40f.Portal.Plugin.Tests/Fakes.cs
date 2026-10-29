@@ -33,9 +33,13 @@ public sealed class FakeService : IOrganizationService
         Leituras++;
         var expressao = (QueryExpression)query;
         return new EntityCollection(Linhas(expressao.EntityName)
-            .Where(e => expressao.Criteria.Conditions.All(c => c.Operator != ConditionOperator.Equal || Equals(Valor(e, c.AttributeName), c.Values[0])))
+            .Where(e => Atende(e, expressao.Criteria) && expressao.LinkEntities.All(l => Linhas(l.LinkToEntityName)
+                .Any(alvo => Equals(alvo.Id, Valor(e, l.LinkFromAttributeName)) && Atende(alvo, l.LinkCriteria))))
             .ToList());
     }
+
+    private static bool Atende(Entity e, FilterExpression filtro) =>
+        filtro.Conditions.All(c => c.Operator != ConditionOperator.Equal || Equals(Valor(e, c.AttributeName), c.Values[0]));
 
     private static object? Valor(Entity e, string atributo) => !e.Contains(atributo) ? null : e[atributo] switch { OptionSetValue o => o.Value, EntityReference r => r.Id, var v => v };
 

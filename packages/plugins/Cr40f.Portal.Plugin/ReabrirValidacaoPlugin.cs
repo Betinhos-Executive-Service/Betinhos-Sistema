@@ -59,44 +59,32 @@ public sealed class ReabrirValidacaoPlugin : IPlugin
 
     public static int Reabrir(IOrganizationService service, Guid composicaoId, decimal total, DateTime agoraUtc, ITracingService? tracing = null)
     {
-        var prazo = DiasUteis.Somar(DiasUteis.HojeEmBrasilia(agoraUtc));
+        // Uma consulta só: validações ativas cujas reservas usam esta composição (uma validação por reserva).
+        var consulta = new QueryExpression(Validacao)
+        {
+            ColumnSet = new ColumnSet(ValStatus, ValValorLiberado),
+            Criteria = { Conditions = { new ConditionExpression("statecode", ConditionOperator.Equal, 0) } },
+        };
+        consulta.AddLink(Reserva, ValReserva, Reserva + "id").LinkCriteria.AddCondition(ReservaCpLookup, ConditionOperator.Equal, composicaoId);
+        DateTime? prazo = null;
         var reabertas = 0;
-        var reservas = service.RetrieveMultiple(new QueryExpression(Reserva)
+        foreach (var validacao in service.RetrieveMultiple(consulta).Entities)
         {
-            ColumnSet = new ColumnSet(false),
-            Criteria = { Conditions = { new ConditionExpression(ReservaCpLookup, ConditionOperator.Equal, composicaoId) } },
-        }).Entities;
-        foreach (var reserva in reservas)
-        {
-            var validacoes = service.RetrieveMultiple(new QueryExpression(Validacao)
+            var liberado = validacao.GetAttributeValue<Money>(ValValorLiberado)?.Value;
+            if (validacao.GetAttributeValue<OptionSetValue>(ValStatus)?.Value == StatusRetirado || Centavos(liberado) == Centavos(total)) continue;
+            prazo ??= DiasUteis.Somar(DiasUteis.HojeEmBrasilia(agoraUtc));
+            service.Update(new Entity(Validacao, validacao.Id)
             {
-                ColumnSet = new ColumnSet(ValStatus, ValValorLiberado),
-                Criteria =
-                {
-                    Conditions =
-                    {
-                        new ConditionExpression(ValReserva, ConditionOperator.Equal, reserva.Id),
-                        new ConditionExpression("statecode", ConditionOperator.Equal, 0),
-                    },
-                },
-            }).Entities;
-            foreach (var validacao in validacoes)
-            {
-                var liberado = validacao.GetAttributeValue<Money>(ValValorLiberado)?.Value;
-                if (validacao.GetAttributeValue<OptionSetValue>(ValStatus)?.Value == StatusRetirado || Centavos(liberado) == Centavos(total)) continue;
-                service.Update(new Entity(Validacao, validacao.Id)
-                {
-                    [ValValorAnterior] = liberado is null ? null : new Money(liberado.Value),
-                    [ValValorLiberado] = new Money(total),
-                    [ValStatus] = new OptionSetValue(StatusLiberado),
-                    [ValPrazo] = prazo,
-                    [ValLiberadoEm] = agoraUtc,
-                    [ValAprovadoEm] = null,
-                    [ValAprovadoPor] = null,
-                });
-                tracing?.Trace("Cr40f.Portal: validação {0} reaberta {1} → {2}, prazo {3:yyyy-MM-dd}", validacao.Id, liberado, total, prazo);
-                reabertas++;
-            }
+                [ValValorAnterior] = liberado is null ? null : new Money(liberado.Value),
+                [ValValorLiberado] = new Money(total),
+                [ValStatus] = new OptionSetValue(StatusLiberado),
+                [ValPrazo] = prazo,
+                [ValLiberadoEm] = agoraUtc,
+                [ValAprovadoEm] = null,
+                [ValAprovadoPor] = null,
+            });
+            tracing?.Trace("Cr40f.Portal: validação {0} reaberta {1} → {2}, prazo {3:yyyy-MM-dd}", validacao.Id, liberado, total, prazo);
+            reabertas++;
         }
         return reabertas;
     }
