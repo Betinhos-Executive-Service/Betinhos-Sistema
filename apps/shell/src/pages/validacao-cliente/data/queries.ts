@@ -20,10 +20,13 @@ const MENSAGEM_SELECT = ['cr40f_mensagemvalidacaoid', '_cr40f_validacao_value', 
 const VALIDADOR_SELECT = ['cr40f_validadorclienteid', 'cr40f_name', 'cr40f_email', '_cr40f_cliente_value', 'cr40f_ativo', 'cr40f_ultimoacesso', 'cr40f_totpcadastradoem']
 /** `new_status` da composição de preços: 100000001 Concluído (metadata do DEV, 28/10/2026). */
 const COMPOSICAO_CONCLUIDA = 100000001
-/** Itens da composição exibidos no detalhe, na ordem; os que vierem vazios ou zerados ficam fora. */
+/** Itens de cr40f_composicaodeprecos (metadata do DEV, 28/10/2026) exibidos no detalhe; vazios ou zerados ficam fora. O repasse a terceiro é custo e não aparece. */
 const ITENS_COMPOSICAO: [string, string][] = [
-  ['new_horamotorista', 'Hora motorista'], ['new_diaria', 'Diária'], ['new_espera', 'Espera'], ['new_pedagios', 'Pedágios'],
-  ['new_estacionamento', 'Estacionamento'], ['new_ajuste', 'Ajuste'],
+  ['cr40f_valorhoramotorista', 'Hora motorista'], ['cr40f_valordadiaria', 'Diária'], ['cr40f_valortempodeespera', 'Espera'],
+  ['new_valorpedagios', 'Pedágios'], ['cr40f_valorrodoanel', 'Rodoanel'], ['cr40f_valorayrtonsenna', 'Ayrton Senna'], ['cr40f_valorarcometropolitano', 'Arco Metropolitano'],
+  ['new_valorestacionamento', 'Estacionamento'], ['cr40f_valorcombustivel', 'Combustível'], ['cr40f_valorpassageirosadicionais', 'Passageiros adicionais'],
+  ['cr40f_valoradequacaoderota', 'Adequação de rota'], ['cr40f_valordesviosentrecidades', 'Desvios entre cidades'], ['new_valorlocacao', 'Locação'],
+  ['new_valorpassagens', 'Passagens'], ['new_ajuste', 'Ajuste'],
 ]
 /** "A liberar" olha só os últimos 90 dias (fechamentos ainda abertos). */
 const JANELA_A_LIBERAR_DIAS = 90
@@ -71,8 +74,8 @@ function composicaoDe(row: Row | undefined): ItemComposicao[] {
 
 /** Clientes com "Portal habilitado", validações, reservas, composições e mensagens, montados em linhas. */
 export async function loadAll(client: DataverseClient, s: EntitySets) {
-  const clientesRows = await client.getAll(`${s.cliente}?$select=cr40f_clientes1id,cr40f_name&$filter=cr40f_portalhabilitado eq true`)
-  const clientes: Cliente[] = clientesRows.map((r) => ({ id: cleanId(str(r.cr40f_clientes1id)), nome: str(r.cr40f_name) || 'Cliente' }))
+  const clientesRows = await client.getAll(`${s.cliente}?$select=cr40f_clientes1id,cr40f_nomedocliente&$filter=cr40f_portalhabilitado eq true`)
+  const clientes: Cliente[] = clientesRows.map((r) => ({ id: cleanId(str(r.cr40f_clientes1id)), nome: str(r.cr40f_nomedocliente) || 'Cliente' }))
   const porCliente = new Map(clientes.map((c) => [c.id, c]))
   if (!clientes.length) return { linhas: [] as Linha[], clientes, validadores: [] as Validador[] }
 

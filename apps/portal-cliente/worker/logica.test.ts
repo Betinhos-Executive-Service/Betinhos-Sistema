@@ -84,7 +84,7 @@ describe('mapearServico', () => {
       cr40f_endereodesada: 'GRU', cr40f_destino: 'Centro', new_linkdovoucher: 'https://x/v.pdf',
       [`_cr40f_passageiro1_value${FV}`]: 'Ana', _cr40f_passageiro1_value: 'p1', [`_cr40f_passageiro2_value${FV}`]: 'Bruno',
       [`_cr40f_solicitante_value${FV}`]: 'Carla',
-      new_composicaodepreco: { new_valortotal: 1000, new_horamotorista: 800, new_pedagios: 200, new_ajuste: 0 },
+      new_composicaodepreco: { new_valortotal: 1000, cr40f_valorhoramotorista: 800, new_valorpedagios: 200, new_ajuste: 0 },
     },
   }
   it('monta o Servico com composição sem linhas zeradas e só o nome dos passageiros', () => {
