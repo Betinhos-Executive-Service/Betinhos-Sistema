@@ -1027,10 +1027,11 @@ describe('Geral: redimensionar e reordenar colunas', () => {
     fireEvent.keyDown(handle, { key: 'ArrowRight' })
     fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
     let dialog = await screen.findByRole('dialog', { name: 'Colunas' })
-    const boxes = within(dialog).getAllByRole('checkbox')
-    const hiddenName = (boxes[boxes.length - 1] as HTMLInputElement).labels?.[0]?.textContent ?? ''
+    // A última marcada (a coluna virtual Portal vem desligada no fim do painel).
+    const last = within(dialog).getAllByRole('checkbox').filter((b) => (b as HTMLInputElement).checked).at(-1) as HTMLInputElement
+    const hiddenName = last.labels?.[0]?.textContent ?? ''
     expect(hiddenName).not.toBe('')
-    fireEvent.click(boxes[boxes.length - 1])
+    fireEvent.click(last)
     fireEvent.click(within(dialog).getByRole('button', { name: 'Aplicar' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Colunas' })).toBeNull())
     expect(window.localStorage.getItem(LS)).toContain('widths')
@@ -1044,8 +1045,10 @@ describe('Geral: redimensionar e reordenar colunas', () => {
     await waitFor(() => expect(names().indexOf(second)).toBe(3))
     const saved = JSON.parse(window.localStorage.getItem(LS) ?? '{}') as Record<string, { hidden: string[]; order: string[] }>
     const pref = Object.values(saved)[0]
-    expect(pref.hidden.length).toBe(1)
-    expect(pref.order).toContain(pref.hidden[0])
+    // A coluna virtual Portal continua oculta por padrão; conta só a ocultada aqui.
+    const ocultas = pref.hidden.filter((k) => k !== 'portal')
+    expect(ocultas.length).toBe(1)
+    expect(pref.order).toContain(ocultas[0])
     expect(names()).not.toContain(hiddenName)
     fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
     dialog = await screen.findByRole('dialog', { name: 'Colunas' })
