@@ -10,7 +10,7 @@ export type MenuItem =
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
-  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos' | 'clientes' | 'planner' | 'validacao-cliente' | 'logs' | 'pagamento-fornecedores'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba }
+  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos' | 'clientes' | 'planner' | 'validacao-cliente' | 'logs' | 'qualidade' | 'pagamento-fornecedores'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba }
 
 /** Visões da Frota: cada uma é um item do menu, todas na mesma tela (`page: 'frota'`). */
 export type FrotaAba = 'pendencias' | 'veiculos' | 'manutencoes' | 'multas' | 'colisoes' | 'indicadores' | 'plano'
@@ -38,7 +38,7 @@ export const MENU: MenuGroup[] = [
       table('cr40f_trocasdecarro'),
       table('new_possedeveiculo'),
       { kind: 'page', id: 'comunicados', label: 'Comunicados', page: 'comunicados' },
-      wr('Gestão de Qualidade', 'new_gestao_erros_operacionais.html'),
+      { kind: 'page', id: 'qualidade', label: 'Gestão de Qualidade', page: 'qualidade' },
       { kind: 'external', id: 'infleet', label: 'Infleet', url: 'https://app.infleet.com.br/monitoring' },
       { kind: 'page', id: 'planner', label: 'Planner', page: 'planner' },
     ],
@@ -121,6 +121,10 @@ export const DEFAULT_ITEM = MENU[0].items[0]
 export function rotaAtualizada(id: string, query: URLSearchParams): { id: string; query: URLSearchParams } | null {
   // A tabela nativa de clientes virou a tela React; links antigos seguem abrindo.
   if (id === 'cr40f_clientes1') return { id: 'clientes', query }
+  // O WebResource da Gestão de Qualidade virou a tela React; links antigos seguem abrindo.
+  if (id === 'new_gestao_erros_operacionais') return { id: 'qualidade', query }
+  // O WebResource de Pagamento de Fornecedores virou a tela React; links antigos seguem abrindo.
+  if (id === 'cr40f_telapagamentofornecedores') return { id: 'pagamento-fornecedores', query }
   if (id === 'infracoes') return { id: 'frota-multas', query: new URLSearchParams([...query, ['sub', 'infracoes']]) }
   const aba = id === 'frota' ? query.get('aba') : null
   if (!aba) return null

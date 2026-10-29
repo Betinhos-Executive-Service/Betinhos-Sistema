@@ -60,7 +60,7 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   cr40f_trocasdecarro: <Shuffle />,
   new_possedeveiculo: <KeyRound />,
   new_gestaochecklistsveiculos: <ClipboardCheck />,
-  'new_gestao_erros_operacionais': <Shield />,
+  qualidade: <Shield />,
   infleet: <MapPin />,
   planner: <ClipboardList />,
   cr40f_composicaodeprecos: <Calculator />,
