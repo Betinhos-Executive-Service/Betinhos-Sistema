@@ -253,6 +253,8 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
   // Salva o rascunho; "Cotada" é derivada das opções, nunca escolhida à mão.
   // Devolve "" quando gravou ou a mensagem do que impediu.
   const save = async (confirmedWithoutDeadline = false, patch: any = {}) => {
+    // Outra gravação em andamento (clique duplo, ação inicial repetida): ignora, não é falha.
+    if (mutationPending.current) return "";
     setSaveMessage("");
     const fail = (message: any) => { setSaveError(message); return message; };
     if (quoteConflict) return fail("Esta cotação mudou em outra edição. Recarregue os dados antes de salvar para evitar sobrescrever alterações.");
@@ -332,6 +334,7 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     else { setResultOpen(false); onClose?.(); }
   };
   const reopen = async () => {
+    if (mutationPending.current) return;
     const success = await run(() => onUpdate?.(quote.id, { status: "Nova", responseSent: false, finalizationAt: "", lossReason: "" }));
     if (success === false) setResultError("Não foi possível reabrir a cotação. Tente novamente.");
   };
@@ -403,8 +406,12 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
   };
   const actionEnabled = { return: task ? canRegisterWaitingReturn(task, currentEmployee, teams) && Boolean(onRegisterWaitingReturn) : true, outcome: decisionOptions.length > 0, wait: true };
   // Ação pedida pelo card do Kanban ou pelo board de tarefas ao abrir a cotação.
+  // A chave evita repetir a ação quando o efeito roda de novo (StrictMode em dev).
+  const initialActionKey = useRef("");
   useEffect(() => {
-    if (!initialAction) return;
+    const key = `${quote.id}:${initialAction}`;
+    if (!initialAction || initialActionKey.current === key) return;
+    initialActionKey.current = key;
     onActionConsumed?.();
     (actions as any)[initialAction]?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps

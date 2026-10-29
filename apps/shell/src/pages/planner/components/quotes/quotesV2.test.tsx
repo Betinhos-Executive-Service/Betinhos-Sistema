@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 // Cotações V2 nas telas: obrigatórios do pedido, "Enviei" direto, motivo de perda em lista e aviso que abre a cotação.
+import { StrictMode } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import HybridQuotesView from './HybridQuotesView'
@@ -188,5 +189,13 @@ describe('cotações V2.2 nas telas', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Começar a cotar' }))
     expect(await screen.findByText('Preencha os preços')).toBeTruthy()
     expect(screen.queryByText('Cotação salva.')).toBeNull()
+  })
+
+  it('"Começar a cotar" do card no StrictMode grava uma vez e não mostra erro falso', async () => {
+    const onUpdate = vi.fn(() => new Promise((resolve) => setTimeout(() => resolve(true), 20)))
+    render(<StrictMode><QuoteManagementDrawer quote={{ ...base, status: 'Nova', options: [] }} initialAction="start" employees={[]} teams={[]} onClose={() => {}} onUpdate={onUpdate} onOutcome={vi.fn()} /></StrictMode>)
+    expect(await screen.findByText('Preencha os preços')).toBeTruthy()
+    expect(onUpdate).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText(/Não foi possível salvar/)).toBeNull()
   })
 })

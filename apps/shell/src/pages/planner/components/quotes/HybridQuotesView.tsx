@@ -73,7 +73,6 @@ export default function HybridQuotesView({ state, currentEmployee, quoteAttachme
     return true;
   }, [markSent, openQuote, onUpdateQuote]);
   const confirmMove = async (patch: any) => { setMoving(true); try { const result = await onUpdateQuote?.(pendingMove.quote.id, { status: pendingMove.status, ...patch }); if (result !== false) setPendingMove(null); } finally { setMoving(false); } };
-  // Ação primária do card: "Começar a cotar" grava direto; as demais abrem a cotação já na ação.
   // Toda ação do card abre a cotação já na ação; "Registrar retorno" vai direto ao retorno da tarefa.
   const runCardAction = useCallback((quote: any, action: any) => {
     if (action.id === "send") { void markSent(quote); return; }
