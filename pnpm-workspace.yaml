@@ -2,6 +2,8 @@ packages:
   - apps/*
   - packages/*
 allowBuilds:
+  # core-js (opcional do jspdf) só imprime aviso de patrocínio no postinstall.
+  core-js: false
   esbuild: true
   workerd: true
 # Pacotes do nosso Design System entram assim que publicados (a espera vale só para terceiros).
