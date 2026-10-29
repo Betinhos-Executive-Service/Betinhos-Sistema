@@ -73,9 +73,9 @@ describe('cotações V2 nas telas', () => {
   it('Perdida exige motivo da lista', async () => {
     const onOutcome = vi.fn(async () => true)
     render(<QuoteManagementDrawer quote={sentQuote} initialAction="outcome" employees={[]} teams={[]} onClose={() => {}} onUpdate={vi.fn()} onOutcome={onOutcome} />)
-    await waitFor(() => expect(screen.getByRole('radio', { name: 'Perdida' })).toBeTruthy())
-    fireEvent.click(screen.getByRole('radio', { name: 'Perdida' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
+    await waitFor(() => expect(screen.getByRole('radio', { name: /Recusou/ })).toBeTruthy())
+    fireEvent.click(screen.getByRole('radio', { name: /Recusou/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar decisão' }))
     await waitFor(() => expect(screen.getAllByText('Escolha o motivo da perda.').length).toBeGreaterThan(0))
     expect(onOutcome).not.toHaveBeenCalled()
     expect(screen.getByText('Motivo da perda')).toBeTruthy()
@@ -164,37 +164,55 @@ describe('cotações V2.2 nas telas', () => {
   })
 
   const base = { ...pricedQuote, clientContact: 'Walter', notes: 'GRU' }
-  const primaryButtons = () => [...document.querySelectorAll('.quote-current-step .button-primary')].map((button) => button.textContent)
+  // V3: um botão principal por etapa, no rodapé; etapas de trabalho ocupam a tela inteira.
+  const primaryButtons = () => [...document.querySelectorAll('.quote-flow__foot .bt-button--primary')].map((button) => button.textContent)
   it.each([
-    ['Nova', ['Começar a cotar']],
-    ['Em análise pelo financeiro', ['Salvar preços']],
-    ['Cotada', ['Enviei ao cliente']],
-    ['Respondida ao cliente', ['Cliente aceitou']],
-    ['Aguardando informação', ['Registrar retorno']],
-  ])('drawer em %s mostra um só botão principal', (status, expected) => {
+    ['Nova', ['Começar a cotar'], false],
+    ['Em análise pelo financeiro', ['Salvar preços'], true],
+    ['Cotada', ['Registrar envio'], true],
+    ['Respondida ao cliente', ['Registrar decisão'], true],
+    ['Aguardando informação', ['Registrar retorno'], false],
+  ])('drawer em %s mostra um só botão principal', (status, expected, full) => {
     const quote = status === 'Respondida ao cliente' ? { ...sentQuote, clientContact: 'Walter', notes: 'GRU' } : { ...base, status, waitingFor: 'Voo', waitingFrom: 'Walter', waitingReturnDate: '2026-10-30' }
     render(<QuoteManagementDrawer quote={quote} employees={[]} teams={[]} onClose={() => {}} onUpdate={vi.fn()} onOutcome={vi.fn()} />)
     expect(primaryButtons()).toEqual(expected)
-    expect(screen.getByText('Ver detalhes').closest('details')!.open).toBe(false)
+    expect(document.querySelector('.quote-flow')!.classList.contains('quote-flow--full')).toBe(full)
   })
 
-  it('Respondida oferece "Perdida" que abre o motivo em lista', async () => {
+  it('Respondida: "Recusou" abre o motivo em lista no próprio painel', async () => {
     render(<QuoteManagementDrawer quote={sentQuote} employees={[]} teams={[]} onClose={() => {}} onUpdate={vi.fn()} onOutcome={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Perdida' }))
+    expect(screen.queryByText('Motivo da perda')).toBeNull()
+    fireEvent.click(screen.getByRole('radio', { name: /Recusou/ }))
     expect(await screen.findByText('Motivo da perda')).toBeTruthy()
+  })
+
+  it('Respondida: a opção aceita vai no registro da decisão', async () => {
+    const onOutcome = vi.fn(async () => true)
+    render(<QuoteManagementDrawer quote={sentQuote} employees={[]} teams={[]} onClose={() => {}} onUpdate={vi.fn()} onOutcome={onOutcome} />)
+    fireEvent.click(screen.getByRole('radio', { name: /Aceitou Sedan/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar decisão' }))
+    await waitFor(() => expect(onOutcome).toHaveBeenCalledWith('q1', 'Aceita pelo cliente', '', { acceptedOptionId: 'o1', acceptedProposalVersionId: 'v1' }))
+  })
+
+  it('Cotada: "Editar preços" volta à etapa Preço sem perder a prévia como etapa de envio', () => {
+    render(<QuoteManagementDrawer quote={base} employees={[]} teams={[]} onClose={() => {}} onUpdate={vi.fn()} onOutcome={vi.fn()} />)
+    expect(screen.getByTitle('Proposta para Outlook')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Editar preços' }))
+    expect(screen.queryByTitle('Proposta para Outlook')).toBeNull()
+    expect(primaryButtons()).toEqual(['Salvar preços'])
   })
 
   it('mudar de passo não mostra "Cotação salva."', async () => {
     render(<QuoteManagementDrawer quote={{ ...base, status: 'Nova', options: [] }} employees={[]} teams={[]} onClose={() => {}} onUpdate={vi.fn(async () => true)} onOutcome={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: 'Começar a cotar' }))
-    expect(await screen.findByText('Preencha os preços')).toBeTruthy()
+    expect(await screen.findByText('Opções de preço')).toBeTruthy()
     expect(screen.queryByText('Cotação salva.')).toBeNull()
   })
 
   it('"Começar a cotar" do card no StrictMode grava uma vez e não mostra erro falso', async () => {
     const onUpdate = vi.fn(() => new Promise((resolve) => setTimeout(() => resolve(true), 20)))
     render(<StrictMode><QuoteManagementDrawer quote={{ ...base, status: 'Nova', options: [] }} initialAction="start" employees={[]} teams={[]} onClose={() => {}} onUpdate={onUpdate} onOutcome={vi.fn()} /></StrictMode>)
-    expect(await screen.findByText('Preencha os preços')).toBeTruthy()
+    expect(await screen.findByText('Opções de preço')).toBeTruthy()
     expect(onUpdate).toHaveBeenCalledTimes(1)
     expect(screen.queryByText(/Não foi possível salvar/)).toBeNull()
   })
