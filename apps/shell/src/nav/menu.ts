@@ -10,10 +10,10 @@ export type MenuItem =
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
-  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos' | 'clientes' | 'planner' | 'validacao-cliente' | 'logs' | 'qualidade' | 'pagamento-fornecedores'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba }
+  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos' | 'clientes' | 'planner' | 'validacao-cliente' | 'logs' | 'qualidade' | 'pagamento-fornecedores' | 'funcoes-operacionais' | 'inicio'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba }
 
 /** Visões da Frota: cada uma é um item do menu, todas na mesma tela (`page: 'frota'`). */
-export type FrotaAba = 'pendencias' | 'veiculos' | 'manutencoes' | 'multas' | 'colisoes' | 'indicadores' | 'plano'
+export type FrotaAba = 'pendencias' | 'veiculos' | 'manutencoes' | 'multas' | 'colisoes' | 'indicadores' | 'plano' | 'checklists'
 
 export type MenuGroup = { id: string; label: string; items: MenuItem[] }
 
@@ -24,7 +24,7 @@ export const MENU: MenuGroup[] = [
   {
     id: 'inicio',
     label: 'Início',
-    items: [wr('Página Inicial', 'cr40f_HomeBetinhos.html')],
+    items: [{ kind: 'page', id: 'inicio', label: 'Página Inicial', page: 'inicio' }],
   },
   {
     id: 'operacional',
@@ -34,7 +34,7 @@ export const MENU: MenuGroup[] = [
       { kind: 'page', id: 'dashboard', label: 'Dashboard', page: 'dashboard' },
       { kind: 'page', id: 'operacional', label: 'Resumo Operacional', page: 'operacional' },
       { kind: 'page', id: 'assistente-logistica', label: 'Assistente', page: 'agentes', agente: 'logistica' },
-      wr('Funções Operacionais', 'new_telafuncoesoperacionais'),
+      { kind: 'page', id: 'funcoes-operacionais', label: 'Funções Operacionais', page: 'funcoes-operacionais' },
       table('cr40f_trocasdecarro'),
       table('new_possedeveiculo'),
       { kind: 'page', id: 'comunicados', label: 'Comunicados', page: 'comunicados' },
@@ -71,7 +71,7 @@ export const MENU: MenuGroup[] = [
       { kind: 'page', id: 'frota-indicadores', label: 'Indicadores', page: 'frota', aba: 'indicadores' },
       { kind: 'page', id: 'frota-plano', label: 'Plano preventivo', page: 'frota', aba: 'plano' },
       { kind: 'page', id: 'assistente-frota', label: 'Assistente', page: 'agentes', agente: 'frota' },
-      wr('Checklists de Veículos', 'new_gestaochecklistsveiculos'),
+      { kind: 'page', id: 'frota-checklists', label: 'Checklists de Veículos', page: 'frota', aba: 'checklists' },
     ],
   },
   {
@@ -102,7 +102,6 @@ export const MENU: MenuGroup[] = [
       table('cr40f_formapagamentodespesa'),
       table('cr40f_anexocolisao_v2'),
       table('cr40f_anexorecebimento_v2'),
-      { kind: 'unavailable', id: 'custom-page-funcoes-operacionais', label: 'Funções Operacionais (página personalizada)', reason: 'Esta página personalizada só abre pelo menu do app model-driven.' },
       // Substituído por #/comunicados (Operacional); fica aqui enquanto houver uso.
       wr('Comunicados (antigo)', 'cr40f_GerenciarComunicados.html'),
       table('cr40f_pedidodecotacao'),
@@ -119,12 +118,18 @@ export const DEFAULT_ITEM = MENU[0].items[0]
 
 /** Itens do menu que viraram visão da Frota: `#/frota?aba=x` → `#/frota-x`; `#/infracoes` → aba Infrações de Multas. */
 export function rotaAtualizada(id: string, query: URLSearchParams): { id: string; query: URLSearchParams } | null {
+  // O WebResource da Página Inicial virou a tela React; links antigos seguem abrindo.
+  if (id === 'cr40f_homebetinhos') return { id: 'inicio', query }
   // A tabela nativa de clientes virou a tela React; links antigos seguem abrindo.
   if (id === 'cr40f_clientes1') return { id: 'clientes', query }
+  // O WebResource e a página personalizada de Funções Operacionais viraram a tela React.
+  if (id === 'new_telafuncoesoperacionais' || id === 'custom-page-funcoes-operacionais') return { id: 'funcoes-operacionais', query }
   // O WebResource da Gestão de Qualidade virou a tela React; links antigos seguem abrindo.
   if (id === 'new_gestao_erros_operacionais') return { id: 'qualidade', query }
   // O WebResource de Pagamento de Fornecedores virou a tela React; links antigos seguem abrindo.
   if (id === 'cr40f_telapagamentofornecedores') return { id: 'pagamento-fornecedores', query }
+  // O WebResource dos Checklists de Veículos virou a aba Checklists da Frota; links antigos seguem abrindo.
+  if (id === 'new_gestaochecklistsveiculos') return { id: 'frota-checklists', query }
   if (id === 'infracoes') return { id: 'frota-multas', query: new URLSearchParams([...query, ['sub', 'infracoes']]) }
   const aba = id === 'frota' ? query.get('aba') : null
   if (!aba) return null

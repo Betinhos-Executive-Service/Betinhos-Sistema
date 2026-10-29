@@ -25,6 +25,8 @@ import './frota.css'
 
 const MOCK_HOST: Host = { mode: 'mock' }
 /** Só quem abre a aba Infrações baixa o código dela. */
+/** Os Checklists de Veículos só baixam o código ao abrir a aba. */
+const ChecklistsAba = lazy(() => import('./checklists/ChecklistsAba').then((m) => ({ default: m.ChecklistsAba })))
 const Infracoes = lazy(() => import('../infracoes/InfracoesPage').then((m) => ({ default: m.Infracoes })))
 
 export type Tab = FrotaAba
@@ -38,6 +40,8 @@ const TABS: { id: Tab; label: string; tables: TableKey[] }[] = [
   { id: 'colisoes', label: 'Colisões', tables: ['colisoes'] },
   { id: 'indicadores', label: 'Indicadores', tables: ['manutencoes', 'multas', 'infracoes'] },
   { id: 'plano', label: 'Plano preventivo', tables: ['planoPreventivo'] },
+  // Tela própria (`checklists/`), com dados e mock próprios: não usa as tabelas da Frota.
+  { id: 'checklists', label: 'Checklists de Veículos', tables: [] },
 ]
 type SubMultas = 'multas' | 'infracoes'
 /** Páginas de lista não usam `PageHeader` (DS §11.2): o seletor de visão faz o papel de título. */
@@ -60,6 +64,11 @@ function useFrotaRota(tab: Tab) {
 const abrirSub = (sub: SubMultas) => patchHashQuery({ sub: sub === 'multas' ? null : sub, ficha: null, registro: null, secao: null, ...Object.fromEntries(FILTROS_DAS_VISOES.map((chave) => [chave, null])) })
 
 export function FrotaPage({ host, aba = 'pendencias' }: { host: Host; aba?: Tab }) {
+  if (aba === 'checklists') return <Suspense fallback={<Carregando />}><ChecklistsAba host={host} titulo={TABS.find((item) => item.id === aba)!.label} /></Suspense>
+  return <FrotaComFonte host={host} aba={aba} />
+}
+
+function FrotaComFonte({ host, aba }: { host: Host; aba: Tab }) {
   const [state] = useState(() => {
     try { return { source: createFrotaSource(host), error: null } } catch (reason) { return { source: null, error: errorMessage(reason) } }
   })

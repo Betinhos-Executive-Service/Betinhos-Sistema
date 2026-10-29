@@ -55,12 +55,23 @@ export function reportingFetch(report: (failure: FetchFailure) => void, fetchImp
   }
 }
 
+/**
+ * Só as anotações que as telas leem: texto formatado e a paginação do FetchXML (Geral). Com `*` cada lookup trazia
+ * também `lookuplogicalname` e `associatednavigationproperty`, e a resposta ficava 13–25% maior (medido no DEV).
+ */
+const ANNOTATIONS = [
+  'OData.Community.Display.V1.FormattedValue',
+  'Microsoft.Dynamics.CRM.fetchxmlpagingcookie',
+  'Microsoft.Dynamics.CRM.morerecords',
+  'Microsoft.Dynamics.CRM.totalrecordcount',
+].join(',')
+
 export function createClient(clientUrl: string, fetchImpl: typeof fetch = (...args) => fetch(...args)): DataverseClient {
   const apiUrl = `${clientUrl.replace(/\/+$/, '')}/api/data/v9.2`
 
   async function send(path: string, init: RequestOptions = {}) {
     const { maxPageSize, ...rest } = init
-    const prefer = ['odata.include-annotations="*"']
+    const prefer = [`odata.include-annotations="${ANNOTATIONS}"`]
     if (maxPageSize) prefer.push(`odata.maxpagesize=${maxPageSize}`)
     const response = await fetchImpl(/^https?:\/\//i.test(path) ? path : `${apiUrl}/${path}`, {
       credentials: 'same-origin',

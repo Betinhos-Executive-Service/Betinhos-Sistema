@@ -9,6 +9,14 @@ import PriorityPicker from '../PriorityPicker';
 import { DateInput } from '../DateInput';
 import SearchableSelect from '../SearchableSelect';
 
+// V2.2: campos opcionais ficam recolhidos em "Adicionar detalhes"; abre sozinho
+// quando algum deles tem erro, sem fechar o que o usuário abriu.
+export function MoreDetails({ forceOpen = false, children }: { forceOpen?: boolean; children: React.ReactNode }) {
+  const ref = useRef<HTMLDetailsElement>(null);
+  useEffect(() => { if (forceOpen && ref.current) ref.current.open = true; }, [forceOpen]);
+  return <details ref={ref} className="quote-v3-more"><summary>Adicionar detalhes</summary><div className="quote-v3-form-grid">{children}</div></details>;
+}
+
 export function QuoteStatus({ status }: any) { return <span className="quote-v3-status"><span />{status || "Sem status"}</span>; }
 
 export function QuoteField({ id, label, error, required = false, wide = false, children }: any) {
@@ -57,7 +65,7 @@ export const FormTextArea = forwardRef<any, any>(function FormTextArea({ error, 
   return <textarea ref={ref} {...props} className={`form-general-input form-general-textarea${className ? ` ${className}` : ""}`} aria-invalid={error ? true : undefined} aria-describedby={errorId || props["aria-describedby"]} />;
 });
 
-export function QuoteClientFields({ draft, update, errors = {} }: any) {
+export function QuoteClientFields({ draft, update, errors = {}, collapseExtras = false }: any) {
   const [clients, setClients] = useState<any>([]);
   const [clientError, setClientError] = useState<any>("");
   const [mode, setMode] = useState<any>("registered");
@@ -104,6 +112,25 @@ export function QuoteClientFields({ draft, update, errors = {} }: any) {
     }).catch(() => { if (active) setRequesterError("Não foi possível carregar os solicitantes cadastrados. Use o nome livre."); });
     return () => { active = false; };
   }, []);
+  const extras = <>
+    <QuoteField id="quote-title" label="Título interno" error={errors.title} wide><FormTextInput id="quote-title" error={errors.title} value={draft.title || ""} onChange={(event: any) => update("title", event.target.value)} placeholder="Ex.: Transfer executivo · GRU" /></QuoteField>
+    <div className={`quote-v3-field quote-v3-client-field drawer-title-field${errors.client ? " is-invalid" : ""}`}>
+    <div className="quote-v3-client-heading"><label className="drawer-title-label" htmlFor="quote-client">Cliente / empresa</label><div className="assignment-mode quote-v3-client-mode" role="group" aria-label="Origem do cliente"><button type="button" className={mode === "registered" ? "is-selected" : ""} aria-label="Cliente cadastrado" title="Cliente cadastrado" aria-pressed={mode === "registered"} onClick={() => selectMode("registered")}><ContactRound size={13} aria-hidden="true" /></button><button type="button" className={mode === "custom" ? "is-selected" : ""} aria-label="Digitar nome livre" title="Digitar nome livre" aria-pressed={mode === "custom"} onClick={() => selectMode("custom")}><PencilLine size={13} aria-hidden="true" /></button></div></div>
+      {mode === "registered" ? <InputSelect value={draft.clientId || ""} onChange={(value: any) => { const client = clients.find((item: any) => item.id === value); update("clientId", client?.id || ""); update("client", client?.name || ""); }} options={clients.map((client: any) => ({ value: client.id, label: client.name }))} placeholder="Selecione um cliente" /> : <FormTextInput id="quote-client" error={errors.client} value={draft.client || ""} onChange={(event: any) => { update("client", event.target.value); update("clientId", ""); }} placeholder="Digite o nome do cliente" />}
+      {errors.client && <small id="quote-client-error" className="quote-v3-field-error">{errors.client}</small>}{clientError && <small role="status">{clientError}</small>}
+    </div>
+    <QuoteField id="quote-phone" label="Telefone / WhatsApp" error={errors.clientPhone}><FormTextInput id="quote-phone" type="tel" error={errors.clientPhone} value={draft.clientPhone || ""} onChange={(event: any) => update("clientPhone", event.target.value)} /></QuoteField>
+    <QuoteField id="quote-email" label="E-mail" error={errors.clientEmail}><FormTextInput id="quote-email" type="email" error={errors.clientEmail} value={draft.clientEmail || ""} onChange={(event: any) => update("clientEmail", event.target.value)} /></QuoteField>
+  </>;
+  if (collapseExtras) return <div className="quote-v3-form-grid">
+    <div className={`quote-v3-field quote-v3-client-field drawer-title-field${errors.clientContact ? " is-invalid" : ""}`}>
+    <div className="quote-v3-client-heading"><label className="drawer-title-label" htmlFor="quote-contact">Nome do solicitante<b aria-hidden="true"> *</b></label><div className="assignment-mode quote-v3-client-mode" role="group" aria-label="Origem do solicitante"><button type="button" className={requesterMode === "registered" ? "is-selected" : ""} aria-label="Solicitante cadastrado" title="Solicitante cadastrado" aria-pressed={requesterMode === "registered"} onClick={() => selectRequesterMode("registered")}><ContactRound size={13} aria-hidden="true" /></button><button type="button" className={requesterMode === "custom" ? "is-selected" : ""} aria-label="Digitar solicitante livre" title="Digitar solicitante livre" aria-pressed={requesterMode === "custom"} onClick={() => selectRequesterMode("custom")}><PencilLine size={13} aria-hidden="true" /></button></div></div>
+      {requesterMode === "registered" ? <SearchableSelect variant="person-client" value={requesters.some((item: any) => item.id === selectedRequesterId && item.name === draft.clientContact) ? selectedRequesterId : requesters.find((item: any) => item.name === draft.clientContact)?.id || ""} onChange={chooseRequester} options={requesters.map((item: any) => ({ value: item.id, label: item.name, subtitle: [item.clientName, item.classification].filter(Boolean).join(" · "), search: [item.clientName, item.classification, item.email, item.phone].filter(Boolean).join(" ") }))} placeholder="Buscar por nome, empresa, e-mail ou telefone" aria-label="Nome do solicitante" /> : <FormTextInput id="quote-contact" error={errors.clientContact} value={draft.clientContact || ""} onChange={(event: any) => update("clientContact", event.target.value)} placeholder="Digite o nome do solicitante" />}
+      {errors.clientContact && <small id="quote-contact-error" className="quote-v3-field-error">{errors.clientContact}</small>}{requesterError && <small role="status">{requesterError}</small>}
+      {pendingRequester && <div className="quote-requester-conflict" role="alert"><span>O cadastro possui empresa ou contato diferente.</span><div><button type="button" onClick={() => setPendingRequester(null)}>Manter dados atuais</button><button type="button" onClick={() => applyRequester(pendingRequester, true)}>Usar dados do cadastro</button></div></div>}
+    </div>
+    <MoreDetails forceOpen={Boolean(errors.clientEmail || errors.client || errors.title)}>{extras}</MoreDetails>
+  </div>;
   return <div className="quote-v3-form-grid">
     <QuoteField id="quote-title" label="Título interno" error={errors.title} wide><FormTextInput id="quote-title" error={errors.title} value={draft.title || ""} onChange={(event: any) => update("title", event.target.value)} placeholder="Ex.: Transfer executivo · GRU" /></QuoteField>
     <div className={`quote-v3-field quote-v3-client-field drawer-title-field${errors.client ? " is-invalid" : ""}`}>
@@ -129,19 +156,23 @@ function legacySchedulingSummary(draft: any) {
   return [route && `Trajeto: ${route}`, draft.serviceDate && `Saída: ${formatDateTime(draft.serviceDate)}`, draft.returnDate && `Retorno: ${formatDateTime(draft.returnDate)}`, draft.vehicleType && `Veículo: ${draft.vehicleType}`].filter(Boolean);
 }
 
-export function QuoteRequestFields({ draft, update, errors = {} }: any) {
+export function QuoteRequestFields({ draft, update, errors = {}, collapseExtras = false, extraContent = null }: any) {
   const legacy = legacySchedulingSummary(draft);
-  return <div className="quote-v3-form-grid">
-    <QuoteField id="quote-notes" label="Pedido do cliente" required error={errors.notes} wide><FormTextArea id="quote-notes" error={errors.notes} rows={5} maxLength="4000" value={draft.notes || ""} onChange={(event: any) => update("notes", event.target.value)} placeholder="Cole aqui a mensagem original do cliente, sem alterar o texto." /><small>Este texto vai na proposta enviada ao cliente.</small></QuoteField>
+  const requestExtras = <>
     <QuoteField id="quote-passengers" label="Número de passageiros"><FormTextInput id="quote-passengers" type="number" min="1" value={draft.passengers || ""} onChange={(event: any) => update("passengers", event.target.value)} /></QuoteField>
     <QuoteField id="quote-passenger-profile" label="Perfil do passageiro" error={errors.passengerProfile}><FormTextInput id="quote-passenger-profile" error={errors.passengerProfile} maxLength="300" value={draft.passengerProfile || ""} onChange={(event: any) => update("passengerProfile", event.target.value)} placeholder="Ex.: diretoria, autônomo, comitiva" /></QuoteField>
     <QuoteField id="quote-internal-notes" label="Observações internas" error={errors.internalNotes} wide><FormTextArea id="quote-internal-notes" error={errors.internalNotes} rows={3} maxLength="4000" value={draft.internalNotes || ""} onChange={(event: any) => update("internalNotes", event.target.value)} placeholder="Só a equipe vê. Não entra na proposta." /></QuoteField>
     {legacy.length > 0 && <div className="quote-v3-field quote-v3-field-wide quote-legacy-scheduling" role="note"><span className="drawer-title-label">Agendamento (registro anterior)</span><ul>{legacy.map((line) => <li key={line}>{line}</li>)}</ul></div>}
+  </>;
+  return <div className="quote-v3-form-grid">
+    <QuoteField id="quote-notes" label="Pedido do cliente" required error={errors.notes} wide><FormTextArea id="quote-notes" error={errors.notes} rows={5} maxLength="4000" value={draft.notes || ""} onChange={(event: any) => update("notes", event.target.value)} placeholder="Cole aqui a mensagem original do cliente, sem alterar o texto." /><small>Este texto vai na proposta enviada ao cliente.</small></QuoteField>
+    {collapseExtras ? <MoreDetails forceOpen={Boolean(errors.passengerProfile || errors.internalNotes)}>{requestExtras}{extraContent}</MoreDetails> : requestExtras}
   </div>;
 }
 
-export function QuoteDeadlineFields({ draft, update, errors = {} }: any) {
+export function QuoteDeadlineFields({ draft, update, errors = {}, collapseExtras = false }: any) {
   const today = localDateKey();
+  const priority = <div className="quote-v3-field drawer-title-field quote-v3-priority-field"><span className="drawer-title-label">Prioridade</span><PriorityPicker value={draft.priority || "medium"} onChange={(value: any) => update("priority", value)} includeUrgent /></div>;
   const activePreset = QUOTE_DEADLINE_PRESETS.find((preset) => deadlineFromPreset(preset.id, today) === draft.deadline)?.id || "";
   return <div className="quote-v3-form-grid">
     <div className={`quote-v3-field drawer-title-field quote-v3-field-wide${errors.deadline ? " is-invalid" : ""}`}>
@@ -152,7 +183,7 @@ export function QuoteDeadlineFields({ draft, update, errors = {} }: any) {
       </div>
       {errors.deadline && <small id="quote-deadline-error" className="quote-v3-field-error">{errors.deadline}</small>}
     </div>
-    <div className="quote-v3-field drawer-title-field quote-v3-priority-field"><span className="drawer-title-label">Prioridade</span><PriorityPicker value={draft.priority || "medium"} onChange={(value: any) => update("priority", value)} includeUrgent /></div>
+    {collapseExtras ? <MoreDetails>{priority}</MoreDetails> : priority}
   </div>;
 }
 

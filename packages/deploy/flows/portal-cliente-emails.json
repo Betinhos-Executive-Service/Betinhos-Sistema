@@ -1,0 +1,520 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$authentication": {
+      "defaultValue": {},
+      "type": "SecureObject"
+    },
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    }
+  },
+  "triggers": {
+    "manual": {
+      "type": "Request",
+      "kind": "Http",
+      "inputs": {
+        "method": "POST",
+        "triggerAuthenticationType": "All",
+        "schema": {
+          "type": "object",
+          "required": [
+            "tipo",
+            "para",
+            "dados"
+          ],
+          "properties": {
+            "tipo": {
+              "type": "string",
+              "enum": [
+                "codigo",
+                "resumo_diario",
+                "resposta_betinhos"
+              ]
+            },
+            "para": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 10,
+              "items": {
+                "type": "string"
+              }
+            },
+            "dados": {
+              "type": "object",
+              "properties": {
+                "nome": {
+                  "type": "string"
+                },
+                "codigo": {
+                  "type": "string"
+                },
+                "validadeMinutos": {
+                  "type": "integer"
+                },
+                "cliente": {
+                  "type": "string"
+                },
+                "liberadosHoje": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "numero": {
+                        "type": "string"
+                      },
+                      "data": {
+                        "type": "string"
+                      },
+                      "trajeto": {
+                        "type": "string"
+                      },
+                      "valor": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                },
+                "vencendo": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "numero": {
+                        "type": "string"
+                      },
+                      "prazo": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "numero": {
+                  "type": "string"
+                },
+                "trecho": {
+                  "type": "string"
+                },
+                "linkPortal": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "actions": {
+    "Validar": {
+      "type": "Scope",
+      "runAfter": {},
+      "actions": {
+        "Destinatarios_invalidos": {
+          "type": "Query",
+          "runAfter": {},
+          "inputs": {
+            "from": "@triggerBody()?['para']",
+            "where": "@or(not(contains(string(item()),'@')),contains(string(item()),';'),contains(string(item()),','),contains(string(item()),' '),contains(string(item()),'<'),contains(string(item()),'>'),greater(length(string(item())),254))"
+          }
+        },
+        "Para_ok": {
+          "type": "Compose",
+          "runAfter": {
+            "Destinatarios_invalidos": [
+              "Succeeded"
+            ]
+          },
+          "inputs": "@and(greater(length(triggerBody()?['para']),0),lessOrEquals(length(triggerBody()?['para']),10),empty(body('Destinatarios_invalidos')))"
+        }
+      }
+    },
+    "Responder_400_corpo": {
+      "type": "Response",
+      "kind": "Http",
+      "runAfter": {
+        "Validar": [
+          "Failed",
+          "TimedOut"
+        ]
+      },
+      "inputs": {
+        "statusCode": 400,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "ok": false,
+          "codigo": "entrada_invalida"
+        }
+      }
+    },
+    "Envio": {
+      "type": "Scope",
+      "runAfter": {
+        "Validar": [
+          "Succeeded"
+        ]
+      },
+      "actions": {
+        "Por_tipo": {
+          "type": "Switch",
+          "runAfter": {},
+          "expression": "@coalesce(triggerBody()?['tipo'],'')",
+          "cases": {
+            "Codigo": {
+              "case": "codigo",
+              "actions": {
+                "Codigo_valido": {
+                  "type": "If",
+                  "runAfter": {},
+                  "expression": "@and(outputs('Para_ok'),not(empty(trim(string(coalesce(triggerBody()?['dados']?['nome'],''))))),not(empty(trim(string(coalesce(triggerBody()?['dados']?['codigo'],''))))),not(empty(trim(string(coalesce(triggerBody()?['dados']?['validadeMinutos'],''))))))",
+                  "actions": {
+                    "Modelo_codigo": {
+                      "type": "Compose",
+                      "runAfter": {},
+                      "inputs": "__TPL_CODIGO__"
+                    },
+                    "Html_codigo": {
+                      "type": "Compose",
+                      "runAfter": {
+                        "Modelo_codigo": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": "@replace(replace(replace(outputs('Modelo_codigo'),'{{nome}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['nome'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{codigo}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['codigo'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{validadeMinutos}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['validadeMinutos'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;'))"
+                    },
+                    "Enviar_codigo": {
+                      "type": "OpenApiConnection",
+                      "runAfter": {
+                        "Html_codigo": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "host": {
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                          "connectionName": "shared_office365",
+                          "operationId": "SendEmailV2"
+                        },
+                        "parameters": {
+                          "emailMessage/From": "__CAIXA_COMPARTILHADA__",
+                          "emailMessage/To": "@join(triggerBody()?['para'],';')",
+                          "emailMessage/Subject": "@concat('Seu código de acesso: ',trim(string(triggerBody()?['dados']?['codigo'])))",
+                          "emailMessage/Body": "@outputs('Html_codigo')",
+                          "emailMessage/Importance": "Normal"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    },
+                    "Responder_202_codigo": {
+                      "type": "Response",
+                      "kind": "Http",
+                      "runAfter": {
+                        "Enviar_codigo": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "statusCode": 202,
+                        "headers": {
+                          "Content-Type": "application/json"
+                        },
+                        "body": {
+                          "ok": true
+                        }
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {
+                      "Responder_400_codigo": {
+                        "type": "Response",
+                        "kind": "Http",
+                        "runAfter": {},
+                        "inputs": {
+                          "statusCode": 400,
+                          "headers": {
+                            "Content-Type": "application/json"
+                          },
+                          "body": {
+                            "ok": false,
+                            "codigo": "entrada_invalida"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "Resumo": {
+              "case": "resumo_diario",
+              "actions": {
+                "Resumo_valido": {
+                  "type": "If",
+                  "runAfter": {},
+                  "expression": "@and(outputs('Para_ok'),not(empty(trim(string(coalesce(triggerBody()?['dados']?['nome'],''))))),not(empty(trim(string(coalesce(triggerBody()?['dados']?['cliente'],''))))),startsWith(string(coalesce(triggerBody()?['dados']?['linkPortal'],'')),'https://'))",
+                  "actions": {
+                    "Ha_o_que_avisar": {
+                      "type": "If",
+                      "runAfter": {},
+                      "expression": "@or(greater(length(coalesce(triggerBody()?['dados']?['liberadosHoje'],json('[]'))),0),greater(length(coalesce(triggerBody()?['dados']?['vencendo'],json('[]'))),0))",
+                      "actions": {
+                        "Modelo_linha_liberado": {
+                          "type": "Compose",
+                          "runAfter": {},
+                          "inputs": "__TPL_LINHA_LIBERADO__"
+                        },
+                        "Modelo_linha_vencendo": {
+                          "type": "Compose",
+                          "runAfter": {},
+                          "inputs": "__TPL_LINHA_VENCENDO__"
+                        },
+                        "Modelo_resumo": {
+                          "type": "Compose",
+                          "runAfter": {},
+                          "inputs": "__TPL_RESUMO__"
+                        },
+                        "Linhas_liberados": {
+                          "type": "Select",
+                          "runAfter": {
+                            "Modelo_linha_liberado": [
+                              "Succeeded"
+                            ]
+                          },
+                          "inputs": {
+                            "from": "@coalesce(triggerBody()?['dados']?['liberadosHoje'],json('[]'))",
+                            "select": "@replace(replace(replace(replace(outputs('Modelo_linha_liberado'),'{{numero}}',replace(replace(replace(replace(replace(replace(string(coalesce(item()?['numero'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{data}}',replace(replace(replace(replace(replace(replace(string(coalesce(item()?['data'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{trajeto}}',replace(replace(replace(replace(replace(replace(string(coalesce(item()?['trajeto'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{valor}}',replace(replace(replace(replace(replace(replace(string(coalesce(formatNumber(float(string(coalesce(item()?['valor'],0))),'C2','pt-BR'),'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;'))"
+                          }
+                        },
+                        "Linhas_vencendo": {
+                          "type": "Select",
+                          "runAfter": {
+                            "Modelo_linha_vencendo": [
+                              "Succeeded"
+                            ]
+                          },
+                          "inputs": {
+                            "from": "@coalesce(triggerBody()?['dados']?['vencendo'],json('[]'))",
+                            "select": "@replace(replace(outputs('Modelo_linha_vencendo'),'{{numero}}',replace(replace(replace(replace(replace(replace(string(coalesce(item()?['numero'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{prazo}}',replace(replace(replace(replace(replace(replace(string(coalesce(item()?['prazo'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;'))"
+                          }
+                        },
+                        "Html_resumo": {
+                          "type": "Compose",
+                          "runAfter": {
+                            "Linhas_liberados": [
+                              "Succeeded"
+                            ],
+                            "Linhas_vencendo": [
+                              "Succeeded"
+                            ],
+                            "Modelo_resumo": [
+                              "Succeeded"
+                            ]
+                          },
+                          "inputs": "@replace(replace(replace(replace(replace(outputs('Modelo_resumo'),'{{nome}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['nome'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{cliente}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['cliente'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{linkPortal}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['linkPortal'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{linhasLiberados}}',if(empty(body('Linhas_liberados')),'<tr><td colspan=\"3\" style=\"font-family:Segoe UI,Arial,sans-serif;font-size:14px;line-height:20px;color:#475569;padding:8px 10px;\">Nenhum serviço liberado hoje.</td></tr>',join(body('Linhas_liberados'),''))),'{{linhasVencendo}}',if(empty(body('Linhas_vencendo')),'<tr><td colspan=\"2\" style=\"font-family:Segoe UI,Arial,sans-serif;font-size:14px;line-height:20px;color:#475569;padding:8px 10px;\">Nenhum serviço com prazo perto do fim.</td></tr>',join(body('Linhas_vencendo'),'')))"
+                        },
+                        "Enviar_resumo": {
+                          "type": "OpenApiConnection",
+                          "runAfter": {
+                            "Html_resumo": [
+                              "Succeeded"
+                            ]
+                          },
+                          "inputs": {
+                            "host": {
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                              "connectionName": "shared_office365",
+                              "operationId": "SendEmailV2"
+                            },
+                            "parameters": {
+                              "emailMessage/From": "__CAIXA_COMPARTILHADA__",
+                              "emailMessage/To": "@join(triggerBody()?['para'],';')",
+                              "emailMessage/Subject": "Serviços para validar hoje · Betinhos",
+                              "emailMessage/Body": "@outputs('Html_resumo')",
+                              "emailMessage/Importance": "Normal"
+                            },
+                            "authentication": "@parameters('$authentication')"
+                          }
+                        }
+                      },
+                      "else": {
+                        "actions": {}
+                      }
+                    },
+                    "Responder_202_resumo": {
+                      "type": "Response",
+                      "kind": "Http",
+                      "runAfter": {
+                        "Ha_o_que_avisar": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "statusCode": 202,
+                        "headers": {
+                          "Content-Type": "application/json"
+                        },
+                        "body": {
+                          "ok": true
+                        }
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {
+                      "Responder_400_resumo": {
+                        "type": "Response",
+                        "kind": "Http",
+                        "runAfter": {},
+                        "inputs": {
+                          "statusCode": 400,
+                          "headers": {
+                            "Content-Type": "application/json"
+                          },
+                          "body": {
+                            "ok": false,
+                            "codigo": "entrada_invalida"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "Resposta": {
+              "case": "resposta_betinhos",
+              "actions": {
+                "Resposta_valida": {
+                  "type": "If",
+                  "runAfter": {},
+                  "expression": "@and(outputs('Para_ok'),not(empty(trim(string(coalesce(triggerBody()?['dados']?['nome'],''))))),not(empty(trim(string(coalesce(triggerBody()?['dados']?['numero'],''))))),not(empty(trim(string(coalesce(triggerBody()?['dados']?['trecho'],''))))),startsWith(string(coalesce(triggerBody()?['dados']?['linkPortal'],'')),'https://'))",
+                  "actions": {
+                    "Modelo_resposta": {
+                      "type": "Compose",
+                      "runAfter": {},
+                      "inputs": "__TPL_RESPOSTA__"
+                    },
+                    "Html_resposta": {
+                      "type": "Compose",
+                      "runAfter": {
+                        "Modelo_resposta": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": "@replace(replace(replace(replace(outputs('Modelo_resposta'),'{{nome}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['nome'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{numero}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['numero'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{trecho}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['trecho'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{linkPortal}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['linkPortal'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;'))"
+                    },
+                    "Enviar_resposta": {
+                      "type": "OpenApiConnection",
+                      "runAfter": {
+                        "Html_resposta": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "host": {
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                          "connectionName": "shared_office365",
+                          "operationId": "SendEmailV2"
+                        },
+                        "parameters": {
+                          "emailMessage/From": "__CAIXA_COMPARTILHADA__",
+                          "emailMessage/To": "@join(triggerBody()?['para'],';')",
+                          "emailMessage/Subject": "@concat('A Betinhos respondeu sua dúvida sobre ',trim(string(triggerBody()?['dados']?['numero'])))",
+                          "emailMessage/Body": "@outputs('Html_resposta')",
+                          "emailMessage/Importance": "Normal"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    },
+                    "Responder_202_resposta": {
+                      "type": "Response",
+                      "kind": "Http",
+                      "runAfter": {
+                        "Enviar_resposta": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "statusCode": 202,
+                        "headers": {
+                          "Content-Type": "application/json"
+                        },
+                        "body": {
+                          "ok": true
+                        }
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {
+                      "Responder_400_resposta": {
+                        "type": "Response",
+                        "kind": "Http",
+                        "runAfter": {},
+                        "inputs": {
+                          "statusCode": 400,
+                          "headers": {
+                            "Content-Type": "application/json"
+                          },
+                          "body": {
+                            "ok": false,
+                            "codigo": "entrada_invalida"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "actions": {
+              "Responder_400_tipo": {
+                "type": "Response",
+                "kind": "Http",
+                "runAfter": {},
+                "inputs": {
+                  "statusCode": 400,
+                  "headers": {
+                    "Content-Type": "application/json"
+                  },
+                  "body": {
+                    "ok": false,
+                    "codigo": "tipo_invalido"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Responder_502": {
+      "type": "Response",
+      "kind": "Http",
+      "runAfter": {
+        "Envio": [
+          "Failed",
+          "TimedOut"
+        ]
+      },
+      "inputs": {
+        "statusCode": 502,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "ok": false,
+          "codigo": "falha_envio"
+        }
+      }
+    }
+  },
+  "outputs": {}
+}

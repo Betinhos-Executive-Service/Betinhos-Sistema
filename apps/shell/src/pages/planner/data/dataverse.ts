@@ -2376,13 +2376,13 @@ function quotePayload(input: QuotePatch = {}, includeUnset = false, clientNaviga
     if (quoteFieldAvailable.longRoutes) payload[longField] = value;
   }
   // Trajeto deixou de ser obrigatório na cotação (fica no agendamento).
+  // Trajeto antigo incompleto (ex.: "Origem / ") não é editável na V2: mantém o que está gravado.
+  const routeInvalid = has("route") && !!normalizeQuoteRoute(input.route).trim() && !!validateQuoteRoute(normalizeQuoteRoute(input.route));
   if (has("route") && !normalizeQuoteRoute(input.route).trim()) {
     if (quoteFieldAvailable.route) payload.cr40f_trajeto = null;
-  } else if (has("route")) {
+  } else if (has("route") && !routeInvalid) {
     if (!quoteFieldAvailable.route) throw new Error("Campo Trajeto ainda não disponível no Dataverse. O rascunho foi mantido; publique o schema de cotação em DEV e tente novamente.");
     const route = normalizeQuoteRoute(input.route);
-    const routeError = validateQuoteRoute(route);
-    if (routeError) throw new Error(routeError);
     const points: string[] = quoteRoutePoints({ route });
     payload.cr40f_trajeto = route;
     const routeFields: Array<[string, string, string, string]> = [

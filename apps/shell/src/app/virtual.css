@@ -1,0 +1,4 @@
+/* VirtualTable: o invólucro não cria caixa; as linhas fora da tela viram margem antes da primeira e depois da última desenhada. */
+.vt-host { display: contents; }
+.vt-table .bt-table__row:nth-child(1 of .bt-table__row) { margin-top: var(--vt-before, 0px); }
+.vt-table .bt-table__row:nth-last-child(1 of .bt-table__row) { margin-bottom: var(--vt-after, 0px); }

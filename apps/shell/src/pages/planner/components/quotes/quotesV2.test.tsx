@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 // Cotações V2 nas telas: obrigatórios do pedido, "Enviei" direto, motivo de perda em lista e aviso que abre a cotação.
+import { StrictMode } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import HybridQuotesView from './HybridQuotesView'
@@ -20,12 +21,11 @@ const pricedQuote = { id: 'q1', code: 'COT-0001', title: 'GRU', client: 'Tenaris
 const sentQuote = { ...pricedQuote, status: 'Respondida ao cliente', responseSent: true, proposalVersions: [{ id: 'v1', sentAt: '2026-10-27T12:00:00.000Z', createdAt: '2026-10-27T12:00:00.000Z', options: [option] }] }
 
 describe('cotações V2 nas telas', () => {
-  it('criar exige só solicitante, texto do pedido e prazo', async () => {
+  it('criar exige só solicitante, texto do pedido e prazo, um por passo', async () => {
     render(<QuoteCreateDrawer employees={[]} onClose={() => {}} onCreate={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /Avançar/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Continuar/ }))
     await waitFor(() => expect(screen.getByText('Informe o nome do solicitante.')).toBeTruthy())
-    expect(screen.getByText('Informe o texto do pedido.')).toBeTruthy()
-    expect(screen.getByText('Escolha o prazo para responder.')).toBeTruthy()
+    expect(screen.queryByText('Informe o texto do pedido.')).toBeNull()
     expect(screen.queryByText('Informe o cliente ou empresa.')).toBeNull()
     expect(screen.queryByText('Informe pelo menos o telefone ou o e-mail.')).toBeNull()
   })
@@ -45,7 +45,7 @@ describe('cotações V2 nas telas', () => {
     const onMarkSent = vi.fn(async (_id: string, _request: Record<string, unknown>) => true)
     const { container } = render(<QuoteManagementDrawer quote={quote} employees={[]} teams={[]} onClose={() => {}} onUpdate={onUpdate} onMarkSent={onMarkSent} onOutcome={vi.fn()} />)
     fireEvent.change(container.querySelector('#quote-notes')!, { target: { value: 'GRU → Centro, 2 malas' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Enviei' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Enviei ao cliente' }))
     await waitFor(() => expect(onMarkSent).toHaveBeenCalled())
     expect(onUpdate).toHaveBeenCalled()
     const request = onMarkSent.mock.calls[0][1]
@@ -58,7 +58,7 @@ describe('cotações V2 nas telas', () => {
     const onUpdate = vi.fn(async () => true)
     const onMarkSent = vi.fn(async (_id: string, _request: Record<string, unknown>) => true)
     render(<QuoteManagementDrawer quote={quote} employees={[]} teams={[]} onClose={() => {}} onUpdate={onUpdate} onMarkSent={onMarkSent} onOutcome={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Enviei' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Enviei ao cliente' }))
     await waitFor(() => expect(onMarkSent).toHaveBeenCalled())
     expect(onUpdate).not.toHaveBeenCalled()
     expect(onMarkSent.mock.calls[0][1]).toMatchObject({ expectedEtag: 'W/"1"', expectedModifiedAt: 'm1' })
@@ -73,9 +73,9 @@ describe('cotações V2 nas telas', () => {
   it('Perdida exige motivo da lista', async () => {
     const onOutcome = vi.fn(async () => true)
     render(<QuoteManagementDrawer quote={sentQuote} initialAction="outcome" employees={[]} teams={[]} onClose={() => {}} onUpdate={vi.fn()} onOutcome={onOutcome} />)
-    await waitFor(() => expect(screen.getByRole('radio', { name: 'Perdida' })).toBeTruthy())
-    fireEvent.click(screen.getByRole('radio', { name: 'Perdida' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
+    await waitFor(() => expect(screen.getByRole('radio', { name: /Recusou/ })).toBeTruthy())
+    fireEvent.click(screen.getByRole('radio', { name: /Recusou/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar decisão' }))
     await waitFor(() => expect(screen.getAllByText('Escolha o motivo da perda.').length).toBeGreaterThan(0))
     expect(onOutcome).not.toHaveBeenCalled()
     expect(screen.getByText('Motivo da perda')).toBeTruthy()
@@ -124,5 +124,96 @@ describe('cotações V2.1 nas telas', () => {
     const notification = { id: 'n1', quoteId: 'q1', type: 'quote_waiting_return', title: 'Retorno de informação', message: 'COT-0001 · GRU', occurredAt: new Date().toISOString(), readAt: '', recipientEmployeeId: 'e1' }
     render(<NotificationsPanel notifications={[notification]} tasks={[]} contacts={[]} employees={[]} teams={[]} currentEmployee={{ id: 'e1' }} onClose={() => {}} onOpenTask={() => {}} onOpenQuote={() => {}} onMarkRead={() => {}} onMarkAllRead={() => {}} />)
     expect(screen.getAllByText('Retorno de informação').length).toBeGreaterThan(0)
+  })
+})
+
+describe('cotações V2.2 nas telas', () => {
+  // O passo 1 usa o solicitante livre (o cadastrado vem do Dataverse).
+  const typeRequester = (name: string) => {
+    fireEvent.click(screen.getByRole('button', { name: 'Digitar solicitante livre' }))
+    fireEvent.change(document.querySelector('#quote-contact')!, { target: { value: name } })
+  }
+
+  it('criação em 3 passos não salva antes do terceiro e Voltar preserva os valores', async () => {
+    const onCreate = vi.fn(async () => true)
+    render(<QuoteCreateDrawer employees={[]} onClose={() => {}} onCreate={onCreate} />)
+    expect(screen.getByText('Passo 1 de 3')).toBeTruthy()
+    typeRequester('Walter')
+    fireEvent.click(screen.getByRole('button', { name: /Continuar/ }))
+    expect(await screen.findByText('Passo 2 de 3')).toBeTruthy()
+    fireEvent.change(document.querySelector('#quote-notes')!, { target: { value: 'GRU → Centro' } })
+    fireEvent.click(screen.getByRole('button', { name: /Voltar/ }))
+    expect(await screen.findByText('Passo 1 de 3')).toBeTruthy()
+    expect((document.querySelector('#quote-contact') as HTMLInputElement).value).toBe('Walter')
+    fireEvent.click(screen.getByRole('button', { name: /Continuar/ }))
+    expect((await screen.findByLabelText(/Pedido do cliente/) as HTMLTextAreaElement).value).toBe('GRU → Centro')
+    fireEvent.click(screen.getByRole('button', { name: /Continuar/ }))
+    expect(await screen.findByText('Passo 3 de 3')).toBeTruthy()
+    expect(onCreate).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Hoje' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Criar cotação' }))
+    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
+    expect(onCreate.mock.calls[0]).toEqual([expect.objectContaining({ clientContact: 'Walter', notes: 'GRU → Centro', status: 'Nova' })])
+  })
+
+  it('opcionais ficam recolhidos em "Adicionar detalhes"', () => {
+    render(<QuoteCreateDrawer employees={[]} onClose={() => {}} onCreate={vi.fn()} />)
+    const details = screen.getByText('Adicionar detalhes').closest('details')!
+    expect(details.open).toBe(false)
+    expect(details.querySelector('#quote-email')).toBeTruthy()
+  })
+
+  const base = { ...pricedQuote, clientContact: 'Walter', notes: 'GRU' }
+  // V3: um botão principal por etapa, no rodapé; etapas de trabalho ocupam a tela inteira.
+  const primaryButtons = () => [...document.querySelectorAll('.quote-flow__foot .bt-button--primary')].map((button) => button.textContent)
+  it.each([
+    ['Nova', ['Começar a cotar'], false],
+    ['Em análise pelo financeiro', ['Salvar preços'], true],
+    ['Cotada', ['Registrar envio'], true],
+    ['Respondida ao cliente', ['Registrar decisão'], true],
+    ['Aguardando informação', ['Registrar retorno'], false],
+  ])('drawer em %s mostra um só botão principal', (status, expected, full) => {
+    const quote = status === 'Respondida ao cliente' ? { ...sentQuote, clientContact: 'Walter', notes: 'GRU' } : { ...base, status, waitingFor: 'Voo', waitingFrom: 'Walter', waitingReturnDate: '2026-10-30' }
+    render(<QuoteManagementDrawer quote={quote} employees={[]} teams={[]} onClose={() => {}} onUpdate={vi.fn()} onOutcome={vi.fn()} />)
+    expect(primaryButtons()).toEqual(expected)
+    expect(document.querySelector('.quote-flow')!.classList.contains('quote-flow--full')).toBe(full)
+  })
+
+  it('Respondida: "Recusou" abre o motivo em lista no próprio painel', async () => {
+    render(<QuoteManagementDrawer quote={sentQuote} employees={[]} teams={[]} onClose={() => {}} onUpdate={vi.fn()} onOutcome={vi.fn()} />)
+    expect(screen.queryByText('Motivo da perda')).toBeNull()
+    fireEvent.click(screen.getByRole('radio', { name: /Recusou/ }))
+    expect(await screen.findByText('Motivo da perda')).toBeTruthy()
+  })
+
+  it('Respondida: a opção aceita vai no registro da decisão', async () => {
+    const onOutcome = vi.fn(async () => true)
+    render(<QuoteManagementDrawer quote={sentQuote} employees={[]} teams={[]} onClose={() => {}} onUpdate={vi.fn()} onOutcome={onOutcome} />)
+    fireEvent.click(screen.getByRole('radio', { name: /Aceitou Sedan/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar decisão' }))
+    await waitFor(() => expect(onOutcome).toHaveBeenCalledWith('q1', 'Aceita pelo cliente', '', { acceptedOptionId: 'o1', acceptedProposalVersionId: 'v1' }))
+  })
+
+  it('Cotada: "Editar preços" volta à etapa Preço sem perder a prévia como etapa de envio', () => {
+    render(<QuoteManagementDrawer quote={base} employees={[]} teams={[]} onClose={() => {}} onUpdate={vi.fn()} onOutcome={vi.fn()} />)
+    expect(screen.getByTitle('Proposta para Outlook')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Editar preços' }))
+    expect(screen.queryByTitle('Proposta para Outlook')).toBeNull()
+    expect(primaryButtons()).toEqual(['Salvar preços'])
+  })
+
+  it('mudar de passo não mostra "Cotação salva."', async () => {
+    render(<QuoteManagementDrawer quote={{ ...base, status: 'Nova', options: [] }} employees={[]} teams={[]} onClose={() => {}} onUpdate={vi.fn(async () => true)} onOutcome={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Começar a cotar' }))
+    expect(await screen.findByText('Opções de preço')).toBeTruthy()
+    expect(screen.queryByText('Cotação salva.')).toBeNull()
+  })
+
+  it('"Começar a cotar" do card no StrictMode grava uma vez e não mostra erro falso', async () => {
+    const onUpdate = vi.fn(() => new Promise((resolve) => setTimeout(() => resolve(true), 20)))
+    render(<StrictMode><QuoteManagementDrawer quote={{ ...base, status: 'Nova', options: [] }} initialAction="start" employees={[]} teams={[]} onClose={() => {}} onUpdate={onUpdate} onOutcome={vi.fn()} /></StrictMode>)
+    expect(await screen.findByText('Opções de preço')).toBeTruthy()
+    expect(onUpdate).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText(/Não foi possível salvar/)).toBeNull()
   })
 })

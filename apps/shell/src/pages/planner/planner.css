@@ -390,18 +390,7 @@
 }
 :where(.planner-page, .planner-portal) .quote-commercial-dialog .quote-option-edit-group { display: grid; min-width: 0; gap: 12px; padding: 16px; border: 1px solid #e1e7ee; border-radius: 12px; background: #f8fafc; }
 :where(.planner-page, .planner-portal) .quote-commercial-dialog .quote-option-edit-group:focus-within { border-color: #c5d2e2; }
-:where(.planner-page, .planner-portal) .quote-commercial-dialog .quote-option-edit { grid-template-columns: minmax(0, 1fr) 170px; gap: 14px 16px; }
 :where(.planner-page, .planner-portal) .quote-commercial-dialog .quote-option-edit-heading,
-:where(.planner-page, .planner-portal) .quote-commercial-dialog .quote-option-editor-terms { grid-column: 1 / -1; }
-:where(.planner-page, .planner-portal) .quote-commercial-dialog .quote-option-edit-heading { align-items: center; gap: 12px; }
-:where(.planner-page, .planner-portal) .quote-commercial-dialog .quote-option-edit-heading h3 { margin: 0; padding: 6px 10px; border-radius: 7px; background: #eaf0f7; font-size: 13px; }
-:where(.planner-page, .planner-portal) .quote-commercial-dialog .quote-option-remove { display: inline-flex; min-height: 36px; align-items: center; justify-content: center; gap: 6px; padding: 6px 8px; border: 0; border-radius: 7px; background: transparent; color: #596b80; font: inherit; font-size: 11px; font-weight: 650; }
-:where(.planner-page, .planner-portal) .quote-commercial-dialog .quote-option-remove:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-@media (hover: hover) and (pointer: fine) {
-  :where(.planner-page, .planner-portal) .quote-commercial-dialog .quote-option-remove:hover { background: #fceef0; color: #a43b50; }
-}
-:where(.planner-page, .planner-portal) .quote-commercial-dialog .quote-option-editor-field { min-width: 0; margin: 0; font-size: 12px; }
-:where(.planner-page, .planner-portal) .quote-commercial-dialog .quote-option-editor-field :where(input, textarea) { box-sizing: border-box; }
 :where(.planner-page, .planner-portal) .quote-commercial-dialog .quote-dialog-checkbox { margin: 0 !important; }
 :where(.planner-page, .planner-portal) .quote-commercial-dialog .quote-options-edit-list .button { justify-self: start; min-height: 36px; }
 :where(.planner-page, .planner-portal) .quote-commercial-dialog > .quote-dialog-attachments { display: grid; justify-content: stretch; gap: 12px; }
@@ -419,9 +408,7 @@
 }
 @media (max-width: 560px) {
   :where(.planner-page, .planner-portal) .quote-commercial-dialog.quote-v3-dialog { width: calc(100vw - 20px); padding: 20px; }
-  :where(.planner-page, .planner-portal) .quote-commercial-dialog .quote-option-edit { grid-template-columns: minmax(0, 1fr); }
   :where(.planner-page, .planner-portal) .quote-commercial-dialog .quote-option-edit-group { padding: 12px; }
-  :where(.planner-page, .planner-portal) .quote-commercial-dialog .quote-option-remove { min-height: 44px; }
   :where(.planner-page, .planner-portal) .quote-commercial-dialog > .quote-dialog-actions { bottom: -20px; margin-right: -20px; margin-left: -20px; padding: 14px 20px calc(14px + env(safe-area-inset-bottom)); }
 }
 :where(.planner-page, .planner-portal) .quote-dialog-fields { display: grid; gap: 17px; }
@@ -574,16 +561,9 @@
 :where(.planner-page, .planner-portal) .quote-kanban-value-content strong { overflow: hidden; color: #145743; font-size: 13px; font-weight: 850; line-height: 1.2; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
 :where(.planner-page, .planner-portal) .quote-v3-layer { position: fixed; inset: 0; z-index: 90; display: flex; justify-content: flex-end; background: rgba(2, 23, 34, .42); backdrop-filter: blur(2px); animation: quote-v3-fade 180ms linear; }
 :where(.planner-page, .planner-portal) .quote-v3-drawer { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; width: min(760px, 100vw); height: 100%; background: #fff; box-shadow: -20px 0 50px rgba(0, 24, 39, .2); animation: quote-v3-enter 240ms cubic-bezier(.23,1,.32,1); }
-:where(.planner-page, .planner-portal) .quote-v3-management { grid-template-rows: auto auto minmax(0, 1fr) auto; }
 :where(.planner-page, .planner-portal) .quote-v3-create { width: min(720px, 100vw); }
 :where(.planner-page, .planner-portal) .quote-v3-drawer-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 22px 24px 16px; border-bottom: 1px solid var(--quote-v3-border); }
 :where(.planner-page, .planner-portal) .quote-v3-drawer-header h2 { margin: 4px 0 0; }
-:where(.planner-page, .planner-portal) .quote-v3-header-meta { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 8px; color: var(--muted); font-size: 12px; }
-:where(.planner-page, .planner-portal) .quote-v3-stepper { display: grid; grid-template-columns: repeat(4, 1fr); margin: 0; padding: 12px 20px; border-bottom: 1px solid var(--quote-v3-border); list-style: none; }
-:where(.planner-page, .planner-portal) .quote-v3-stepper button { display: flex; width: 100%; align-items: center; gap: 7px; border: 0; background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; }
-:where(.planner-page, .planner-portal) .quote-v3-stepper button > span { display: grid; width: 24px; height: 24px; place-items: center; border: 1px solid var(--quote-v3-border); border-radius: 50%; background: #fff; }
-:where(.planner-page, .planner-portal) .quote-v3-stepper .active button { color: var(--navy); font-weight: 700; }
-:where(.planner-page, .planner-portal) .quote-v3-stepper .active button > span, :where(.planner-page, .planner-portal) .quote-v3-stepper .done button > span { border-color: var(--navy); background: var(--navy); color: #fff; }
 :where(.planner-page, .planner-portal) .quote-v3-drawer-body { overflow-y: auto; padding: 20px 24px 28px; }
 :where(.planner-page, .planner-portal) .quote-v3-step-progress { height: 3px; margin: -20px -24px 18px; background: #edf1f2; }
 :where(.planner-page, .planner-portal) .quote-v3-step-progress span { display: block; height: 100%; background: #15758e; transition: width 220ms ease-in-out; }
@@ -642,13 +622,6 @@
 :where(.planner-page, .planner-portal) .quote-v3-result p { margin: 4px 0 0; overflow-wrap: anywhere; }
 :where(.planner-page, .planner-portal) .quote-v3-dialog fieldset { display: grid; gap: 8px; border: 0; padding: 0; margin: 0 0 14px; }
 :where(.planner-page, .planner-portal) .quote-v3-dialog fieldset label { display: flex; align-items: center; gap: 8px; }
-:where(.planner-page, .planner-portal) .quote-v3-management .quote-v3-drawer-body { display: flex; flex-direction: column; overscroll-behavior-y: contain; }
-:where(.planner-page, .planner-portal) .quote-v3-management .quote-v3-waiting { margin-top: 22px; }
-:where(.planner-page, .planner-portal) .quote-v3-management .quote-v3-drawer-body > .history-section { order: 99; }
-:where(.planner-page, .planner-portal) .quote-v3-data { display: grid; gap: 24px; }
-:where(.planner-page, .planner-portal) .quote-v3-data > section { display: grid; gap: 12px; }
-:where(.planner-page, .planner-portal) .quote-v3-data h3 { margin: 0; }
-:where(.planner-page, .planner-portal) .quote-v3-data > .button { justify-self: end; }
 :where(.planner-page, .planner-portal) .quote-options-editor { display: grid; gap: 14px; min-width: 0; }
 :where(.planner-page, .planner-portal) .quote-options-editor > header, :where(.planner-page, .planner-portal) .quote-option-title-row, :where(.planner-page, .planner-portal) .quote-option-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 :where(.planner-page, .planner-portal) .quote-options-editor > header h3 { margin: 3px 0; }
@@ -666,162 +639,21 @@
 :where(.planner-page, .planner-portal) .quote-option-actions .button { min-height: 32px; padding: 4px 8px; }
 :where(.planner-page, .planner-portal) .quote-result-choice { display: grid; gap: 9px; margin: 12px 0; }
 :where(.planner-page, .planner-portal) .quote-v3-list-row .quote-option-count { color: var(--ink-muted, #667085); font-size: 12px; }
-:where(.planner-page, .planner-portal) .quote-v3-workspace { position: relative; width: min(760px, 100vw); height: 100%; min-width: 0; margin-left: auto; }
-:where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison { width: min(1680px, calc(100vw - 76px)); }
-:where(.planner-page, .planner-portal) .quote-v3-management { width: 100%; min-width: 0; height: 100%; grid-template-rows: auto auto minmax(0, 1fr) auto; box-shadow: -20px 0 50px rgba(0,24,39,.2); }
-:where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-v3-management { position: absolute; inset: 0 0 0 auto; width: 560px; box-shadow: -12px 0 30px rgba(0,24,39,.18); }
-:where(.planner-page, .planner-portal) .quote-management-tabs { display: flex; gap: 22px; min-height: 48px; padding: 0 24px; border-bottom: 1px solid var(--quote-v3-border); }
-:where(.planner-page, .planner-portal) .quote-workflow-next { margin: 10px 0 0; font-size: 12px; color: var(--muted); }
 :where(.planner-page, .planner-portal) .quote-send-dialog label > input:not([type="checkbox"]) { width: 100%; min-height: 38px; padding: 8px 10px; border: 1px solid var(--quote-v3-border); border-radius: 8px; font: inherit; color: inherit; }
-:where(.planner-page, .planner-portal) .quote-management-tabs [role="tab"] { position: relative; display: inline-flex; align-items: center; gap: 7px; padding: 0 2px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; }
-:where(.planner-page, .planner-portal) .quote-management-tabs [role="tab"]::after { position: absolute; right: 0; bottom: -1px; left: 0; height: 2px; background: transparent; content: ""; }
-:where(.planner-page, .planner-portal) .quote-management-tabs [role="tab"][aria-selected="true"] { color: var(--navy); font-weight: 700; }
-:where(.planner-page, .planner-portal) .quote-management-tabs [role="tab"][aria-selected="true"]::after { background: var(--blue, #2159d2); }
-:where(.planner-page, .planner-portal) .quote-management-tabs [role="tab"]:focus-visible, :where(.planner-page, .planner-portal) .quote-options-comparison button:focus-visible, :where(.planner-page, .planner-portal) .quote-option-disclosure button:focus-visible { outline: 2px solid var(--blue, #2159d2); outline-offset: 2px; }
-:where(.planner-page, .planner-portal) .quote-management-tabs [role="tab"] span { display: grid; min-width: 18px; height: 18px; place-items: center; border-radius: 9px; background: #eef3f9; font-size: 10px; }
-:where(.planner-page, .planner-portal) .quote-v3-management .quote-v3-drawer-body { display: block; min-height: 0; }
-:where(.planner-page, .planner-portal) .quote-v3-data { max-width: 100%; }
-:where(.planner-page, .planner-portal) .quote-v3-data > section { padding: 0; border: 0; }
-:where(.planner-page, .planner-portal) .quote-option-edit-panel { max-width: 640px; margin: 0 auto; }
-:where(.planner-page, .planner-portal) .quote-option-edit { display: grid; gap: 14px; }
-:where(.planner-page, .planner-portal) .quote-option-edit-heading { display: flex; justify-content: space-between; align-items: start; }
-:where(.planner-page, .planner-portal) .quote-option-edit-heading h3 { margin: 0; font-size: 15px; font-weight: 750; line-height: 1.4; overflow-wrap: anywhere; }
-:where(.planner-page, .planner-portal) .quote-option-data-heading:empty { display: none; }
-:where(.planner-page, .planner-portal) .quote-option-data-heading { display: flex; min-height: 0; align-items: center; justify-content: flex-end; gap: 10px; }
-:where(.planner-page, .planner-portal) .quote-option-data-heading > span { color: var(--muted); font-size: 11px; }
-:where(.planner-page, .planner-portal) .quote-option-editor-field { display: grid; gap: 6px; color: var(--ink); font-size: 12px; font-weight: 650; }
-:where(.planner-page, .planner-portal) .quote-option-editor-field :where(input, textarea) { width: 100%; min-width: 0; min-height: 40px; padding: 9px 11px; border: 1px solid var(--line, #d8dee8); border-radius: 7px; background: #fff; color: inherit; font: inherit; }
-:where(.planner-page, .planner-portal) .quote-option-editor-field textarea { min-height: 80px; resize: vertical; line-height: 1.5; font-weight: 400; }
-:where(.planner-page, .planner-portal) .quote-option-category { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; margin: 0; padding: 0; border: 0; }
-:where(.planner-page, .planner-portal) .quote-option-category legend { width: 100%; margin-bottom: 6px; padding: 0; }
-:where(.planner-page, .planner-portal) .quote-option-category label { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border: 1px solid var(--line, #d8dee8); border-radius: 7px; background: #FCFCFB; font-weight: 600; cursor: pointer; }
-:where(.planner-page, .planner-portal) .quote-option-category label:has(input:checked) { border-color: var(--blue); color: var(--blue); }
-:where(.planner-page, .planner-portal) .quote-option-category label:has(input:focus-visible) { outline: 2px solid var(--blue); outline-offset: 2px; }
-:where(.planner-page, .planner-portal) .quote-option-category input { margin: 0; accent-color: var(--blue); }
-:where(.planner-page, .planner-portal) .quote-commercial-dialog .quote-option-category { grid-column: 1 / -1; }
-:where(.planner-page, .planner-portal) .quote-option-editor-value input { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
 :where(.planner-page, .planner-portal) .quote-option-items { display: grid; gap: 10px; }
 :where(.planner-page, .planner-portal) .quote-option-items > strong { font-size: 13px; }
 :where(.planner-page, .planner-portal) .quote-option-item { grid-template-columns: minmax(0, 1fr) 104px auto; align-items: end; }
 :where(.planner-page, .planner-portal) .quote-option-item :where(label) { display: grid; gap: 6px; min-width: 0; color: var(--muted); font-size: 11px; font-weight: 650; }
 :where(.planner-page, .planner-portal) .quote-option-item :where(input, .custom-select-trigger) { min-height: 40px; }
-:where(.planner-page, .planner-portal) .quote-option-add-vehicle { justify-self: start; }
-:where(.planner-page, .planner-portal) .quote-option-disclosure { border-top: 1px solid var(--quote-v3-border); padding-top: 12px; }
-:where(.planner-page, .planner-portal) .quote-option-disclosure > button { display: flex; width: 100%; align-items: center; justify-content: space-between; border: 0; padding: 2px 0; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
-:where(.planner-page, .planner-portal) .quote-option-disclosure > button > span { display: grid; gap: 3px; }
-:where(.planner-page, .planner-portal) .quote-option-disclosure small { color: var(--muted); font-size: 11px; font-weight: 400; }
-:where(.planner-page, .planner-portal) .quote-option-disclosure > textarea { width: 100%; margin-top: 12px; }
-:where(.planner-page, .planner-portal) .quote-options-comparison { position: absolute; inset: 0 578px 0 0; display: flex; min-width: 0; max-height: none; flex-direction: column; align-items: center; justify-content: flex-start; gap: 24px; overflow-y: auto; padding: 28px 32px; background: transparent; }
-:where(.planner-page, .planner-portal) .quote-options-comparison > * { flex-shrink: 0; }
-:where(.planner-page, .planner-portal) .quote-options-comparison > header { display: flex; width: min(100%, 1100px); margin-top: auto; align-items: center; justify-content: space-between; gap: 14px; text-align: left; }
-:where(.planner-page, .planner-portal) .quote-options-context { display: grid; width: min(100%, 1100px); grid-template-columns: minmax(0, 1.5fr) minmax(220px, 1fr); gap: 18px; align-items: start; }
-:where(.planner-page, .planner-portal) .quote-options-context > section { min-width: 0; padding: 18px; border-radius: 12px; background: #fff; color: var(--ink); box-shadow: 0 12px 32px rgba(0,15,30,.2); }
-:where(.planner-page, .planner-portal) .quote-options-context h3 { margin: 0 0 12px; font-size: 15px; }
-:where(.planner-page, .planner-portal) .quote-request-full-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.6; }
-:where(.planner-page, .planner-portal) .quote-attachments-overview .attachment-empty { margin-bottom: 0; }
-:where(.planner-page, .planner-portal) .quote-attachments-overview .attachment-file-main strong { white-space: normal; overflow-wrap: anywhere; }
 @media (max-width: 1180px) { :where(.planner-page, .planner-portal) .quote-options-context { grid-template-columns: 1fr; } }
-:where(.planner-page, .planner-portal) .quote-options-comparison > header > div { display: grid; justify-items: center; }
-:where(.planner-page, .planner-portal) .quote-options-comparison > header .eyebrow { color: rgba(255,255,255,.72); text-shadow: 0 1px 8px rgba(0,0,0,.45); }
-:where(.planner-page, .planner-portal) .quote-options-comparison > header h2 { margin: 3px 0 0; color: #fff; font-size: 23px; text-shadow: 0 2px 14px rgba(0,0,0,.46); }
-:where(.planner-page, .planner-portal) .quote-options-comparison > header p { margin: 5px 0 0; color: rgba(255,255,255,.88); font-size: 13px; text-shadow: 0 1px 9px rgba(0,0,0,.45); }
-:where(.planner-page, .planner-portal) .quote-options-comparison > header .button { min-height: 40px; box-shadow: 0 6px 18px rgba(0,12,26,.22); }
-:where(.planner-page, .planner-portal) .quote-options-cards { display: grid; width: min(100%, 1100px); grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); align-content: start; gap: 18px; }
-:where(.planner-page, .planner-portal) .quote-options-cards:has(> :only-child), :where(.planner-page, .planner-portal) .quote-options-comparison:has(.quote-options-cards > :only-child) > header { width: min(100%, 620px); }
-:where(.planner-page, .planner-portal) .quote-comparison-card { display: grid; min-width: 0; align-content: start; gap: 12px; padding: 18px; border: 1px solid rgba(213,222,233,.96); border-radius: 12px; background: #fff; box-shadow: 0 16px 38px rgba(0,15,30,.28); transition: border-color 140ms ease, background 140ms ease, transform 140ms ease, box-shadow 140ms ease; }
-:where(.planner-page, .planner-portal) .quote-comparison-card:hover { box-shadow: 0 19px 42px rgba(0,15,30,.32); }
-:where(.planner-page, .planner-portal) .quote-option-decisions { display: flex; flex-wrap: wrap; gap: 8px; }
-:where(.planner-page, .planner-portal) .quote-comparison-edit:active { transform: scale(.99); }
-:where(.planner-page, .planner-portal) .quote-comparison-card:focus-within { border-color: #aebfd6; }
-:where(.planner-page, .planner-portal) .quote-comparison-card .quote-option-edit { grid-template-columns: minmax(0, 1fr) minmax(120px, .8fr); gap: 18px 16px; }
-:where(.planner-page, .planner-portal) .quote-comparison-card .quote-option-edit-heading, :where(.planner-page, .planner-portal) .quote-comparison-card .quote-option-include, :where(.planner-page, .planner-portal) .quote-comparison-card .quote-option-editor-terms { grid-column: 1 / -1; }
-:where(.planner-page, .planner-portal) .quote-comparison-card .quote-option-edit-heading h3 { font-size: 18px; }
-:where(.planner-page, .planner-portal) .quote-comparison-card .quote-option-include { font-size: 12px !important; color: var(--ink); }
-:where(.planner-page, .planner-portal) .quote-comparison-card .quote-option-editor-field textarea { min-height: 94px; }
-:where(.planner-page, .planner-portal) .quote-option-generate { justify-self: end; }
-:where(.planner-page, .planner-portal) .quote-options-comparison > .quote-options-empty { padding: 24px; border-radius: 10px; background: #fff; }
-:where(.planner-page, .planner-portal) .quote-comparison-card-top { display: flex; min-height: 28px; align-items: center; justify-content: space-between; gap: 8px; }
 :where(.planner-page, .planner-portal) .quote-option-include { display: flex !important; align-items: center; gap: 7px !important; color: var(--muted); font-size: 11px !important; }
 :where(.planner-page, .planner-portal) .quote-option-include input { width: 16px; min-height: 16px; accent-color: var(--blue, #2159d2); }
-:where(.planner-page, .planner-portal) .quote-option-menu { position: relative; }
-:where(.planner-page, .planner-portal) .quote-option-menu summary { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 6px; color: var(--muted); cursor: pointer; list-style: none; }
-:where(.planner-page, .planner-portal) .quote-option-menu summary::-webkit-details-marker, :where(.planner-page, .planner-portal) .quote-management-more summary::-webkit-details-marker { display: none; }
-:where(.planner-page, .planner-portal) .quote-option-menu > div, :where(.planner-page, .planner-portal) .quote-management-more > div { position: absolute; z-index: 5; right: 0; display: grid; min-width: 176px; padding: 5px; border: 1px solid var(--quote-v3-border); border-radius: 8px; background: #fff; box-shadow: 0 10px 25px rgba(0,24,39,.15); }
-:where(.planner-page, .planner-portal) .quote-option-menu > div button, :where(.planner-page, .planner-portal) .quote-management-more > div button { display: flex; align-items: center; gap: 8px; min-height: 34px; border: 0; border-radius: 5px; padding: 6px 8px; background: transparent; color: var(--ink); text-align: left; font: inherit; font-size: 12px; cursor: pointer; }
-:where(.planner-page, .planner-portal) .quote-option-menu > div button:hover, :where(.planner-page, .planner-portal) .quote-management-more > div button:hover { background: #f3f6fa; }
-:where(.planner-page, .planner-portal) .quote-option-menu > div button:last-child, :where(.planner-page, .planner-portal) .quote-management-more > div button.is-danger { color: #a32f2f; }
-:where(.planner-page, .planner-portal) .quote-comparison-edit { display: grid; min-width: 0; gap: 8px; border: 0; padding: 2px 0 0; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
-:where(.planner-page, .planner-portal) .quote-comparison-edit > strong { overflow-wrap: anywhere; font-size: 15px; }
-:where(.planner-page, .planner-portal) .quote-comparison-composition { min-height: 34px; color: var(--muted); font-size: 12px; line-height: 1.4; }
-:where(.planner-page, .planner-portal) .quote-comparison-price { color: #125c4a; font-size: 18px; font-weight: 750; }
-:where(.planner-page, .planner-portal) .quote-comparison-price.is-empty { color: var(--muted); font-size: 13px; font-weight: 550; }
-:where(.planner-page, .planner-portal) .quote-comparison-state { color: var(--muted); font-size: 11px; }
-:where(.planner-page, .planner-portal) .quote-options-comparison-footnote { width: min(100%, 1100px); margin: 0; color: rgba(255,255,255,.82); font-size: 12px; text-align: left; text-shadow: 0 1px 8px rgba(0,0,0,.5); }
-:where(.planner-page, .planner-portal) .quote-options-comparison:has(.quote-options-cards > :only-child) > .quote-options-comparison-footnote { width: min(100%, 620px); }
-:where(.planner-page, .planner-portal) .quote-management-primary-actions { display: flex; min-width: 0; flex-wrap: wrap; gap: 8px; }
-:where(.planner-page, .planner-portal) .quote-management-more { position: relative; margin-left: auto; }
-:where(.planner-page, .planner-portal) .quote-management-more > summary { display: grid; width: 40px; min-height: 40px; place-items: center; border: 1px solid var(--quote-v3-border); border-radius: 8px; color: var(--ink); cursor: pointer; list-style: none; }
-:where(.planner-page, .planner-portal) .quote-management-more > div { bottom: calc(100% + 8px); min-width: 210px; }
-:where(.planner-page, .planner-portal) .quote-quote-history { display: grid; gap: 20px; }
-:where(.planner-page, .planner-portal) .quote-proposal-history { display: grid; gap: 12px; }
-:where(.planner-page, .planner-portal) .quote-proposal-history h3 { margin: 0; }
-:where(.planner-page, .planner-portal) .quote-proposal-history article { display: grid; gap: 7px; padding: 14px 0; border-bottom: 1px solid var(--quote-v3-border); }
-:where(.planner-page, .planner-portal) .quote-proposal-history article header { display: flex; justify-content: space-between; gap: 12px; }
-:where(.planner-page, .planner-portal) .quote-proposal-history article header span, :where(.planner-page, .planner-portal) .quote-proposal-history article small { color: var(--muted); font-size: 11px; }
-:where(.planner-page, .planner-portal) .quote-proposal-history article ul { display: grid; gap: 5px; margin: 0; padding-left: 18px; font-size: 12px; }
-:where(.planner-page, .planner-portal) .quote-accepted-version { width: fit-content; border-radius: 999px; padding: 4px 8px; background: #e8f5ef; color: #176b4e; font-size: 11px; }
 :where(.planner-page, .planner-portal) .quote-v3-save-error { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; padding: 10px 12px; border-radius: 7px; background: #fff5f4; font-size: 12px; }
-:where(.planner-page, .planner-portal) .quote-v3-save-error button, :where(.planner-page, .planner-portal) .quote-proposal-summary p button { border: 0; background: transparent; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; }
-:where(.planner-page, .planner-portal) .quote-proposal-summary { display: grid; max-width: 260px; gap: 6px; color: var(--ink); font-size: 11px; }
-:where(.planner-page, .planner-portal) .quote-proposal-summary ul { display: grid; gap: 5px; margin: 0; padding-left: 17px; }
-:where(.planner-page, .planner-portal) .quote-proposal-summary p { margin: 0; color: #a32f2f; }
-@media (max-width: 1180px) {
-  :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison { width: min(100%, calc(100vw - 238px)); }
-  :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-v3-management { width: min(560px, calc(100vw - 480px)); }
-  :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-comparison { right: calc(min(560px, 100vw - 480px) + 18px); padding: 18px 10px; }
-  :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-comparison-footnote { display: none; }
-  :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-cards { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
-}
-@media (max-width: 920px) {
-  :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(125px, 25dvh) minmax(0, 1fr); width: 100vw; }
-  :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-comparison { position: relative; top: auto; right: auto; left: auto; height: calc(100% - 16px); min-height: 0; max-height: none; overflow-y: auto; overscroll-behavior-y: contain; transform: none; margin: 8px 10px; padding: 12px 0; }
-  :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-comparison > header h2 { font-size: 16px; }
-  :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-comparison > header p { display: none; }
-  :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-comparison .quote-comparison-card { gap: 5px; padding: 7px; }
-  :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-v3-management { position: relative; inset: auto; width: 100%; min-height: 0; }
-  :where(.planner-page, .planner-portal) .quote-options-cards { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 7px; }
-}
-@media (max-width: 760px) {
-  :where(.planner-page, .planner-portal) .quote-v3-workspace, :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison { width: 100vw; }
-  :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison { grid-template-rows: minmax(150px, 28dvh) minmax(0, 1fr); }
-  :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-cards { grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); }
-  :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-comparison > header .button { min-height: 32px; padding: 5px 8px; font-size: 11px; }
-  :where(.planner-page, .planner-portal) .quote-v3-management .quote-v3-drawer-body { padding: 14px 16px 20px; }
-  :where(.planner-page, .planner-portal) .quote-management-tabs { padding: 0 16px; }
-  :where(.planner-page, .planner-portal) .quote-v3-management-footer { align-items: center; flex-direction: row; }
-  :where(.planner-page, .planner-portal) .quote-management-primary-actions { display: grid; flex: 1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  :where(.planner-page, .planner-portal) .quote-management-primary-actions .button { justify-content: center; padding: 8px; font-size: 12px; }
-  :where(.planner-page, .planner-portal) .quote-management-more { margin-left: 0; }
-  :where(.planner-page, .planner-portal) .quote-v3-composer-actions { display: grid; grid-template-columns: 1fr 1fr; }
-  :where(.planner-page, .planner-portal) .quote-proposal-summary { grid-column: 1 / -1; max-width: none; }
-}
+:where(.planner-page, .planner-portal) .quote-v3-save-error button { border: 0; background: transparent; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; }
 @media (max-width: 640px) { :where(.planner-page, .planner-portal) .quote-option-fields { grid-template-columns: 1fr; } :where(.planner-page, .planner-portal) .quote-options-editor > header { align-items: flex-start; flex-direction: column; } }
 @media (prefers-reduced-motion: reduce) { :where(.planner-page, .planner-portal) .quote-comparison-card, :where(.planner-page, .planner-portal) .quote-comparison-edit { transition: none; } :where(.planner-page, .planner-portal) .quote-comparison-card:hover, :where(.planner-page, .planner-portal) .quote-comparison-card.is-active { transform: none; } }
 :where(.planner-page, .planner-portal) .quote-v3-inline-warning { display: grid; gap: 8px; padding: 13px; border-radius: 10px; background: #fff7e6; color: #7a5200; }
 :where(.planner-page, .planner-portal) .quote-v3-feedback { position: sticky; bottom: 0; margin-top: 14px; padding: 10px 12px; border-radius: 9px; background: #eaf5f2; color: #175d4d; }
-:where(.planner-page, .planner-portal) .quote-v3-composer-layer { position: fixed; inset: 0; z-index: 115; display: grid; place-items: center; padding: 24px; background: rgba(0,20,30,.62); }
-:where(.planner-page, .planner-portal) .quote-v3-preview { width: min(1480px, 100%); height: min(920px, calc(100dvh - 48px)); min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; grid-template-areas: "header" "viewport" "actions"; overflow: hidden; border: 1px solid rgba(255,255,255,.45); border-radius: 16px; background: #fff; box-shadow: 0 24px 70px rgba(0,20,30,.35); }
-:where(.planner-page, .planner-portal) .quote-v3-preview-header { grid-area: header; display: flex; align-items: center; justify-content: space-between; min-width: 0; padding: 12px 18px; border-bottom: 1px solid var(--quote-v3-border); background: #fff; }
-:where(.planner-page, .planner-portal) .quote-v3-preview-header > div { min-width: 0; display: grid; gap: 3px; }
-:where(.planner-page, .planner-portal) .quote-v3-preview-header strong { overflow: hidden; color: var(--navy); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-:where(.planner-page, .planner-portal) .quote-v3-preview-kicker { color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-:where(.planner-page, .planner-portal) .quote-v3-preview-viewport { grid-area: viewport; min-width: 0; min-height: 0; display: grid; place-items: center; overflow: hidden; padding: 16px; background: #e8edf2; }
-:where(.planner-page, .planner-portal) .quote-v3-preview-viewport iframe { width: 100%; height: 100%; border: 0; background: #0a2f41; }
-:where(.planner-page, .planner-portal) .quote-v3-composer-actions { grid-area: actions; display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-top: 1px solid #edf0f4; background: #fbfcfd; }
-:where(.planner-page, .planner-portal) .quote-v3-composer-actions > span { flex: 1; min-width: 0; color: var(--muted); font-size: 10px; line-height: 1.4; }
-:where(.planner-page, .planner-portal) .quote-v3-composer-actions > .button { justify-content: center; min-height: 42px; }
-:where(.planner-page, .planner-portal) .quote-v3-composer-actions > div { display: flex; gap: 8px; }
-:where(.planner-page, .planner-portal) .quote-v3-composer-actions > div .button { justify-content: center; min-height: 38px; }
 @keyframes quote-v3-enter { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 @keyframes quote-v3-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes quote-v3-spin { to { transform: rotate(360deg); } }
@@ -861,21 +693,13 @@
   :where(.planner-page, .planner-portal) .quote-v3-kanban-shell .column-body { min-height: 320px; }
   :where(.planner-page, .planner-portal) .quote-v3-drawer { width: 100%; }
   :where(.planner-page, .planner-portal) .quote-v3-drawer-header { padding: 16px; }
-  :where(.planner-page, .planner-portal) .quote-v3-stepper { padding: 9px 8px; }
-  :where(.planner-page, .planner-portal) .quote-v3-stepper button { justify-content: center; font-size: 0; }
-  :where(.planner-page, .planner-portal) .quote-v3-stepper button > span { font-size: 12px; }
   :where(.planner-page, .planner-portal) .quote-v3-drawer-body { padding: 18px 16px 24px; }
   :where(.planner-page, .planner-portal) .quote-v3-step-progress { margin: -18px -16px 16px; }
   :where(.planner-page, .planner-portal) .quote-v3-form-grid { grid-template-columns: 1fr; }
   :where(.planner-page, .planner-portal) .quote-v3-field-wide { grid-column: auto; }
-  :where(.planner-page, .planner-portal) .quote-v3-drawer-footer, :where(.planner-page, .planner-portal) .quote-v3-management-footer { align-items: stretch; flex-direction: column-reverse; }
+  :where(.planner-page, .planner-portal) .quote-v3-drawer-footer { align-items: stretch; flex-direction: column-reverse; }
   :where(.planner-page, .planner-portal) .quote-v3-drawer-footer > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   :where(.planner-page, .planner-portal) .quote-v3-drawer-footer .button { justify-content: center; }
-  :where(.planner-page, .planner-portal) .quote-v3-composer-layer { padding: 0; }
-  :where(.planner-page, .planner-portal) .quote-v3-preview { width: 100%; height: 100dvh; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(220px, 1fr) auto; grid-template-areas: "header" "viewport" "actions"; border: 0; border-radius: 0; }
-  :where(.planner-page, .planner-portal) .quote-v3-composer-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
-  :where(.planner-page, .planner-portal) .quote-v3-composer-actions > span, :where(.planner-page, .planner-portal) .quote-v3-composer-actions > .button { grid-column: 1 / -1; }
-  :where(.planner-page, .planner-portal) .quote-v3-composer-actions > div > .button { flex: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2661,14 +2485,14 @@
 :where(.planner-page, .planner-portal) .history-toggle h3 { margin: 0; }
 :where(.planner-page, .planner-portal) .history-toggle .section-count { color: var(--muted); }
 :where(.planner-page, .planner-portal) .history-toggle:hover, :where(.planner-page, .planner-portal) .history-toggle:focus-visible { color: var(--blue); outline: 0; }
-:where(.planner-page, .planner-portal) .task-drawer .history-section, :where(.planner-page, .planner-portal) .quote-v3-management .history-section { padding-top: 18px; }
-:where(.planner-page, .planner-portal) .task-drawer .history-section .drawer-section-heading, :where(.planner-page, .planner-portal) .quote-v3-management .history-section .drawer-section-heading { margin-bottom: 0; }
-:where(.planner-page, .planner-portal) .task-drawer .history-toggle, :where(.planner-page, .planner-portal) .quote-v3-management .history-toggle { width: 100%; min-height: 48px; gap: 10px; }
-:where(.planner-page, .planner-portal) .task-drawer .history-toggle:focus-visible, :where(.planner-page, .planner-portal) .quote-v3-management .history-toggle:focus-visible, :where(.planner-page, .planner-portal) .task-history-more:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 6px; }
+:where(.planner-page, .planner-portal) .task-drawer .history-section { padding-top: 18px; }
+:where(.planner-page, .planner-portal) .task-drawer .history-section .drawer-section-heading { margin-bottom: 0; }
+:where(.planner-page, .planner-portal) .task-drawer .history-toggle { width: 100%; min-height: 48px; gap: 10px; }
+:where(.planner-page, .planner-portal) .task-drawer .history-toggle:focus-visible, :where(.planner-page, .planner-portal) .task-history-more:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 6px; }
 :where(.planner-page, .planner-portal) .history-heading { display: grid; flex: 1; gap: 2px; }
 :where(.planner-page, .planner-portal) .history-heading strong { color: var(--navy); font-size: 12px; }
 :where(.planner-page, .planner-portal) .history-heading small { color: var(--muted); font-size: 10px; font-weight: 500; }
-:where(.planner-page, .planner-portal) .task-drawer .history-toggle .section-count, :where(.planner-page, .planner-portal) .quote-v3-management .history-toggle .section-count { min-width: 22px; padding: 3px 6px; border-radius: 999px; background: #eef3f9; color: var(--navy); text-align: center; font-size: 10px; font-weight: 800; }
+:where(.planner-page, .planner-portal) .task-drawer .history-toggle .section-count { min-width: 22px; padding: 3px 6px; border-radius: 999px; background: #eef3f9; color: var(--navy); text-align: center; font-size: 10px; font-weight: 800; }
 :where(.planner-page, .planner-portal) .task-history-list { padding: 7px 0 0; }
 :where(.planner-page, .planner-portal) .task-history-day { margin: 12px 0 7px; color: var(--muted); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
 :where(.planner-page, .planner-portal) .task-history-event { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 8px; min-width: 0; }
@@ -3169,72 +2993,13 @@
 @media (max-width: 780px) { :where(.planner-page, .planner-portal) .ideas-toolbar { align-items: stretch; flex-direction: column-reverse; } :where(.planner-page, .planner-portal) .ideas-search { width: 100%; } }
 @media (max-width: 680px) { :where(.planner-page, .planner-portal) .ideas-page { gap: 17px; } :where(.planner-page, .planner-portal) .ideas-page .page-header { align-items: flex-start; } :where(.planner-page, .planner-portal) .ideas-form-panel { padding: 16px; } :where(.planner-page, .planner-portal) .idea-card { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 16px; } :where(.planner-page, .planner-portal) .idea-card-action { max-width: 240px; } }
 /* Cards flutuantes adaptados ao espaço disponível ao lado do drawer. */
-:where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison { --quote-aside-width: clamp(360px, 32vw, 560px); width: 100%; }
-:where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-v3-management { width: var(--quote-aside-width); }
-:where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-comparison { inset: 0 calc(var(--quote-aside-width) + 16px) 0 0; gap: 18px; padding: clamp(16px, 2vw, 28px); scrollbar-gutter: stable; overscroll-behavior-y: contain; container: quote-options / inline-size; }
-:where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-comparison { direction: rtl; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.42) transparent; }
-:where(.planner-page, .planner-portal) .quote-options-comparison > * { direction: ltr; }
-:where(.planner-page, .planner-portal) .quote-options-comparison::-webkit-scrollbar { width: 6px; background: transparent; }
-:where(.planner-page, .planner-portal) .quote-options-comparison::-webkit-scrollbar-track { background: transparent; }
-:where(.planner-page, .planner-portal) .quote-options-comparison::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(255,255,255,.42); }
-:where(.planner-page, .planner-portal) .quote-options-comparison::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.7); }
-:where(.planner-page, .planner-portal) .quote-options-comparison::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
-:where(.planner-page, .planner-portal) .quote-options-context { width: 100%; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; align-items: start; }
-:where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-comparison > header, :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-cards { width: 100%; }
-:where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-cards:has(> :only-child) { width: min(100%, 620px); align-self: flex-end; }
-:where(.planner-page, .planner-portal) .quote-options-context > section { padding: 16px; }
-:where(.planner-page, .planner-portal) .quote-request-overview { display: flex; flex-direction: column; }
-:where(.planner-page, .planner-portal) .quote-request-full-text { max-height: min(32dvh, 320px); overflow-y: auto; scrollbar-gutter: stable; }
-:where(.planner-page, .planner-portal) .quote-attachments-overview .attachment-section { margin: 0; padding: 0; border: 0; }
-:where(.planner-page, .planner-portal) .quote-attachments-overview .attachment-list { max-height: min(24dvh, 220px); overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; }
-:where(.planner-page, .planner-portal) .quote-attachments-overview .attachment-section.is-compact .attachment-list { grid-template-columns: 1fr; }
-:where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-cards { grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 16px; }
-:where(.planner-page, .planner-portal) .quote-options-comparison > header h2 { font-size: clamp(18px, 1.6vw, 23px); }
-:where(.planner-page, .planner-portal) .quote-comparison-card { container: quote-card / inline-size; }
-:where(.planner-page, .planner-portal) .quote-comparison-card .quote-option-editor-field { min-width: 0; }
 @container quote-options (max-width: 620px) {
-  :where(.planner-page, .planner-portal) .quote-options-context { grid-template-columns: 1fr; }
-  :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-cards { grid-template-columns: 1fr; }
 }
 @container quote-card (max-width: 350px) {
-  :where(.planner-page, .planner-portal) .quote-comparison-card .quote-option-edit { grid-template-columns: minmax(0, 1fr); gap: 14px; }
-}
-@media (max-width: 1000px) {
-  :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison { display: block; width: 100%; overflow-y: auto; }
-  :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-comparison { position: relative; inset: auto; height: auto; min-height: 0; margin: 0; padding: 20px clamp(12px, 3vw, 24px); overflow: visible; }
-  :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-comparison > header { margin-top: 12px; }
-  :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-cards { grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 16px; }
-  :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-comparison .quote-comparison-card { padding: 16px; gap: 12px; }
-  :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-v3-management { position: relative; inset: auto; width: 100%; height: auto; min-height: 70dvh; }
-}
-@media (max-width: 480px) {
-  :where(.planner-page, .planner-portal) .quote-options-comparison > header { gap: 10px; }
-  :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-comparison > header .button { min-height: 40px; padding: 8px 12px; font-size: 12px; }
-  :where(.planner-page, .planner-portal) .quote-options-context { gap: 12px; }
-  :where(.planner-page, .planner-portal) .quote-attachments-overview .attachment-dropzone-copy strong { white-space: normal; }
-  :where(.planner-page, .planner-portal) .quote-attachments-overview .attachment-section.is-compact .attachment-delete-button { width: 36px; height: 36px; }
 }
 
 /* Cotações V1.1: etapas, ação primária e registro de envio */
-:where(.planner-page, .planner-portal) .quote-stage-stepper { display: flex; gap: 14px; margin: 10px 0 0; padding: 0; list-style: none; }
-:where(.planner-page, .planner-portal) .quote-stage-stepper li { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; font-weight: 600; }
-:where(.planner-page, .planner-portal) .quote-stage-stepper li > span { display: grid; width: 20px; height: 20px; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: var(--neutral); font-size: 10px; }
-:where(.planner-page, .planner-portal) .quote-stage-stepper li.active { color: var(--navy); }
-:where(.planner-page, .planner-portal) .quote-stage-stepper li.active > span { border-color: var(--blue); color: var(--blue); background: var(--blue-soft); }
-:where(.planner-page, .planner-portal) .quote-stage-stepper li.done > span { border-color: var(--navy); color: #fff; background: var(--navy); }
-:where(.planner-page, .planner-portal) .quote-stage-section { border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
-:where(.planner-page, .planner-portal) .quote-stage-section + .quote-stage-section { margin-top: 12px; }
-:where(.planner-page, .planner-portal) .quote-stage-section > summary { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--radius-md); background: var(--neutral); cursor: pointer; list-style: none; }
-:where(.planner-page, .planner-portal) .quote-stage-section > summary::-webkit-details-marker { display: none; }
-:where(.planner-page, .planner-portal) .quote-stage-section[open] > summary { border-bottom: 1px solid var(--line); border-radius: var(--radius-md) var(--radius-md) 0 0; }
-:where(.planner-page, .planner-portal) .quote-stage-section > summary h3 { margin: 0; font-size: 13px; }
-:where(.planner-page, .planner-portal) .quote-stage-section > summary small { margin-left: auto; color: var(--muted); font-size: 11px; text-align: right; }
-:where(.planner-page, .planner-portal) .quote-stage-section > section { padding: 12px 14px; }
-:where(.planner-page, .planner-portal) .quote-stage-section > section + section { border-top: 1px solid var(--line); }
-:where(.planner-page, .planner-portal) .quote-stage-section h4 { margin: 0 0 10px; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-:where(.planner-page, .planner-portal) .quote-stage-section .quote-quote-history { padding: 12px 14px; }
-:where(.planner-page, .planner-portal) .quote-stage-number { display: grid; width: 22px; height: 22px; flex: 0 0 auto; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--navy); font-size: 11px; font-weight: 700; }
-:where(.planner-page, .planner-portal) .quote-stage-hint, :where(.planner-page, .planner-portal) .quote-v3-step-hint { margin: 0; padding: 10px 14px 0; color: var(--muted); font-size: 12px; }
+:where(.planner-page, .planner-portal) .quote-v3-step-hint { margin: 0; padding: 10px 14px 0; color: var(--muted); font-size: 12px; }
 :where(.planner-page, .planner-portal) .quote-v3-step-hint { padding: 0 0 12px; }
 :where(.planner-page, .planner-portal) .quote-chip { padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--control); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
 :where(.planner-page, .planner-portal) .quote-chip:hover { border-color: #c8d5e6; }
@@ -3248,18 +3013,8 @@
 :where(.planner-page, .planner-portal) .quote-send-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1.2fr); gap: 10px; margin: 12px 0; }
 @media (max-width: 640px) { :where(.planner-page, .planner-portal) .quote-send-fields { grid-template-columns: 1fr; } }
 
-:where(.planner-page, .planner-portal) .quote-decision-kind { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
-:where(.planner-page, .planner-portal) .quote-result-option { display: grid; gap: 6px; margin-bottom: 10px; font-size: 12px; font-weight: 600; }
 
 :where(.planner-page, .planner-portal) .quote-sent-chip { color: var(--green); font-weight: 700; }
-:where(.planner-page, .planner-portal) .quote-register-send { margin-left: auto; }
-:where(.planner-page, .planner-portal) .quote-commercial-header-actions { display: flex; gap: 8px; }
-@media (max-width: 720px) {
-  :where(.planner-page, .planner-portal) .quote-stage-stepper { gap: 8px; }
-  :where(.planner-page, .planner-portal) .quote-stage-stepper li { font-size: 0; }
-  :where(.planner-page, .planner-portal) .quote-stage-stepper li > span { font-size: 10px; }
-  :where(.planner-page, .planner-portal) .quote-commercial-header-actions { flex-wrap: wrap; }
-}
 
 /* plannerImportAuto.css */
 :where(.planner-page, .planner-portal) .import-assignee-map { display: grid; gap: 9px; }
@@ -3275,38 +3030,8 @@
 }
 
 /* quotes/QuoteEmailComposer.css */
-:where(.planner-page, .planner-portal) .quote-v3-preview.quote-v3-preview {
-  grid-template-columns: minmax(0, 1fr) 360px;
-  grid-template-rows: minmax(0, 1fr);
-  grid-template-areas: "viewport actions";
-}
 
-:where(.planner-page, .planner-portal) .quote-v3-preview.quote-v3-preview > .quote-v3-preview-viewport { position: relative; grid-area: viewport; }
-:where(.planner-page, .planner-portal) .quote-v3-preview.quote-v3-preview > .quote-v3-composer-actions {
-  grid-area: actions;
-  min-width: 0;
-  max-height: 100%;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: flex-start;
-  gap: 10px;
-  padding: 20px;
-  border-top: 0;
-  border-left: 1px solid #edf0f4;
-}
 
-:where(.planner-page, .planner-portal) .quote-v3-preview.quote-v3-preview > .quote-v3-composer-actions > .quote-v3-preview-header {
-  grid-area: auto;
-  flex: 0 0 auto;
-  padding: 0 0 14px;
-  border-bottom: 1px solid #edf0f4;
-}
-:where(.planner-page, .planner-portal) .quote-v3-preview.quote-v3-preview > .quote-v3-composer-actions > span { flex: 0 0 auto; padding: 10px 12px; border-radius: 9px; background: #f4f7fb; color: #53647a; font-size: 11px; }
-:where(.planner-page, .planner-portal) .quote-v3-preview.quote-v3-preview > .quote-v3-composer-actions > .button { width: 100%; }
-:where(.planner-page, .planner-portal) .quote-v3-preview.quote-v3-preview > .quote-v3-composer-actions > div { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-:where(.planner-page, .planner-portal) .quote-v3-preview.quote-v3-preview > .quote-v3-composer-actions > div .button { min-width: 0; padding-inline: 8px; }
 :where(.planner-page, .planner-portal) .quote-v3-inline-toolbar { position: absolute; z-index: 5; display: flex; align-items: center; gap: 2px; max-width: calc(100% - 16px); padding: 3px; border: 1px solid #dfe5ec; border-radius: 8px; background: #fff; box-shadow: 0 4px 12px rgba(16,24,40,.13); }
 :where(.planner-page, .planner-portal) .quote-v3-inline-format-button { position: relative; display: grid; flex: 0 0 28px; place-items: center; width: 28px; min-width: 0; height: 28px; min-height: 0; padding: 0; border: 0; border-radius: 5px; background: transparent; color: #26374b; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 :where(.planner-page, .planner-portal) .quote-v3-inline-format-button:hover { background: #f0f4f8; color: #082d62; }
@@ -3314,19 +3039,6 @@
 :where(.planner-page, .planner-portal) .quote-v3-inline-format-button:nth-child(4) { margin-left: 4px; }
 :where(.planner-page, .planner-portal) .quote-v3-inline-format-button:nth-child(4)::before { position: absolute; top: 5px; left: -4px; width: 1px; height: 18px; background: #e5ebf2; content: ""; }
 
-@media (max-width: 760px) {
-  :where(.planner-page, .planner-portal) .quote-v3-preview.quote-v3-preview {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) auto;
-    grid-template-areas: "viewport" "actions";
-  }
-  :where(.planner-page, .planner-portal) .quote-v3-preview.quote-v3-preview > .quote-v3-composer-actions {
-    max-height: 42dvh;
-    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-    border-top: 1px solid #edf0f4;
-    border-left: 0;
-  }
-}
 
 /* quotes/quoteOptionsLayout.css */
 :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-comparison > header {
@@ -3342,10 +3054,6 @@
   background: #fff;
   box-shadow: 0 8px 24px rgba(0,15,30,.16);
 }
-:where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-comparison > header h2 { margin: 0; color: var(--ink); font-size: 18px; text-shadow: none; }
-:where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-comparison > header .button { box-shadow: none; }
-:where(.planner-page, .planner-portal) .quote-options-comparison .quote-attachments-overview .attachment-empty { padding: 0; border: 0; background: transparent; }
-:where(.planner-page, .planner-portal) .quote-options-comparison .quote-attachments-overview .attachment-empty small { display: none; }
 :where(.planner-page, .planner-portal) .quote-commercial-workspace > .quote-options-workbench {
   display: grid;
   width: 100%;
@@ -3385,33 +3093,8 @@
   text-align: left;
   transition: background-color 140ms ease-out, border-color 140ms ease-out;
 }
-:where(.planner-page, .planner-portal) .quote-option-navigation [role="tab"]:hover { background: #f7faff; border-color: #c3d4ef; }
-:where(.planner-page, .planner-portal) .quote-option-navigation [aria-selected="true"] { background: #edf4ff; border-color: #c9dbff; }
-:where(.planner-page, .planner-portal) .quote-option-navigation [aria-selected="true"]::before { content: ""; position: absolute; inset: 9px auto 9px 0; width: 4px; border-radius: 4px; background: var(--blue, #2159d2); }
-:where(.planner-page, .planner-portal) .quote-option-navigation-icon { display: grid; flex: 0 0 40px; width: 40px; height: 40px; place-items: center; border: 1px solid #e1e8f3; border-radius: 10px; background: #f3f6fa; color: var(--navy); }
-:where(.planner-page, .planner-portal) .quote-option-navigation [aria-selected="true"] .quote-option-navigation-icon { background: #e4eeff; color: var(--blue, #2159d2); }
-:where(.planner-page, .planner-portal) .quote-option-navigation-copy { display: grid; min-width: 0; gap: 5px; }
-:where(.planner-page, .planner-portal) .quote-option-navigation-copy strong { font-size: 14px; line-height: 1.35; overflow-wrap: anywhere; }
-:where(.planner-page, .planner-portal) .quote-option-navigation-copy > span { font-size: 13px; color: #425677; font-variant-numeric: tabular-nums; }
 :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-workbench .quote-options-cards,
-:where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-workbench .quote-options-cards:has(> :only-child) { display: block; width: 100%; min-width: 0; align-self: start; }
-:where(.planner-page, .planner-portal) .quote-options-workbench .quote-comparison-card[hidden] { display: none; }
-:where(.planner-page, .planner-portal) .quote-options-workbench .quote-comparison-card { min-height: 350px; height: 100%; padding: 22px; box-shadow: 0 16px 38px rgba(0,15,30,.2); }
-:where(.planner-page, .planner-portal) .quote-options-workbench .quote-comparison-card .quote-option-edit { gap: 20px 18px; }
-:where(.planner-page, .planner-portal) .quote-options-workbench .quote-comparison-card .quote-option-editor-field textarea { min-height: 116px; }
-:where(.planner-page, .planner-portal) .quote-options-workbench .quote-option-generate { margin-top: 8px; }
 @container quote-options (max-width: 720px) {
-  :where(.planner-page, .planner-portal) .quote-commercial-workspace > .quote-options-workbench { grid-template-columns: minmax(0, 1fr); }
-  :where(.planner-page, .planner-portal) .quote-option-navigation { flex-direction: row; max-height: none; overflow-x: auto; padding: 12px; gap: 8px; }
-  :where(.planner-page, .planner-portal) .quote-option-navigation [role="tab"] { flex: 0 0 200px; min-height: 68px; }
-}
-@media (max-width: 480px) {
-  :where(.planner-page, .planner-portal) .quote-options-workbench .quote-comparison-card { min-height: 0; }
-  :where(.planner-page, .planner-portal) .quote-option-navigation [role="tab"] { flex-basis: 180px; padding: 10px; gap: 8px; }
-  :where(.planner-page, .planner-portal) .quote-option-navigation-icon { flex-basis: 32px; width: 32px; height: 32px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  :where(.planner-page, .planner-portal) .quote-option-navigation [role="tab"] { transition: none; }
 }
 
 /* Contexto e proposta agrupados em duas superfícies, com navegação integrada. */
@@ -3431,11 +3114,6 @@
   background: transparent;
   box-shadow: none;
 }
-:where(.planner-page, .planner-portal) .quote-options-context .quote-request-overview { grid-area: request; }
-:where(.planner-page, .planner-portal) .quote-options-context .quote-attachments-overview { grid-area: attachments; border-left: 1px solid #dde5ef; }
-:where(.planner-page, .planner-portal) .quote-options-context > section[aria-label="Decisão do cliente"] { grid-column: 1 / -1; grid-row: 1; border-bottom: 1px solid #dde5ef; }
-:where(.planner-page, .planner-portal) .quote-options-context:has(> section[aria-label="Decisão do cliente"]) { grid-template-areas: "decision decision" "request attachments"; }
-:where(.planner-page, .planner-portal) .quote-options-context h3 { margin-bottom: 10px; font-size: 13px; color: #425677; }
 :where(.planner-page, .planner-portal) .quote-commercial-workspace {
   width: 100%;
   min-width: 0;
@@ -3444,39 +3122,14 @@
   background: #fff;
   box-shadow: 0 12px 32px rgba(0,15,30,.18);
 }
-:where(.planner-page, .planner-portal) .quote-commercial-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 22px; border-bottom: 1px solid #e2e8f0; }
-:where(.planner-page, .planner-portal) .quote-commercial-header h2 { margin: 0; color: var(--ink); font-size: 18px; }
-:where(.planner-page, .planner-portal) .quote-commercial-header p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
-:where(.planner-page, .planner-portal) .quote-commercial-header .button { box-shadow: none; }
-:where(.planner-page, .planner-portal) .quote-v3-workspace .quote-v3-management:not(:has(.quote-management-tabs)) { grid-template-rows: auto minmax(0, 1fr) auto; }
-:where(.planner-page, .planner-portal) .quote-options-comparison .quote-request-full-text { scrollbar-width: thin; scrollbar-color: #8294ac #e8edf4; }
-:where(.planner-page, .planner-portal) .quote-options-comparison .quote-request-full-text::-webkit-scrollbar { width: 8px; }
-:where(.planner-page, .planner-portal) .quote-options-comparison .quote-request-full-text::-webkit-scrollbar-track { border-radius: 999px; background: #e8edf4; }
-:where(.planner-page, .planner-portal) .quote-options-comparison .quote-request-full-text::-webkit-scrollbar-thumb { border: 1px solid #e8edf4; border-radius: 999px; background: #8294ac; }
-:where(.planner-page, .planner-portal) .quote-options-comparison .quote-request-full-text::-webkit-scrollbar-thumb:hover { background: #5f7492; }
-:where(.planner-page, .planner-portal) .quote-options-comparison .quote-request-full-text::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 @supports selector(::-webkit-scrollbar) {
-  :where(.planner-page, .planner-portal) .quote-options-comparison .quote-request-full-text { scrollbar-width: auto; scrollbar-color: auto; }
 }
-:where(.planner-page, .planner-portal) .quote-commercial-workspace > .quote-options-workbench { grid-template-columns: minmax(180px, .35fr) minmax(0, 1fr); grid-template-areas: "navigation editor"; gap: 0; }
-:where(.planner-page, .planner-portal) .quote-commercial-workspace .quote-option-navigation { grid-area: navigation; align-self: stretch; max-height: none; padding: 14px; border: 0; border-right: 1px solid #e2e8f0; border-radius: 0 0 0 12px; background: #f8fafc; box-shadow: none; }
-:where(.planner-page, .planner-portal) .quote-commercial-workspace .quote-option-navigation [role="tab"] { min-height: 64px; padding: 10px; gap: 10px; }
-:where(.planner-page, .planner-portal) .quote-commercial-workspace .quote-option-navigation-icon { flex-basis: 32px; width: 32px; height: 32px; border-radius: 8px; }
-:where(.planner-page, .planner-portal) .quote-commercial-workspace .quote-options-cards { grid-area: editor; }
 :where(.planner-page, .planner-portal) .quote-commercial-workspace .quote-comparison-card,
-:where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-comparison .quote-commercial-workspace .quote-comparison-card { min-height: 0; padding: 22px; border: 0; border-radius: 0 0 12px 0; box-shadow: none; transform: none; }
-:where(.planner-page, .planner-portal) .quote-commercial-workspace .quote-comparison-card:hover { box-shadow: none; }
-:where(.planner-page, .planner-portal) .quote-commercial-workspace .quote-option-editor-field textarea { min-height: 96px; }
-:where(.planner-page, .planner-portal) .quote-commercial-workspace > .quote-options-empty { padding: 22px; }
 @container quote-options (max-width: 720px) {
-  :where(.planner-page, .planner-portal) .quote-commercial-workspace > .quote-options-workbench { grid-template-columns: minmax(0, 1fr); grid-template-areas: "navigation" "editor"; }
-  :where(.planner-page, .planner-portal) .quote-commercial-workspace .quote-option-navigation { flex-direction: row; max-height: none; border-right: 0; border-bottom: 1px solid #e2e8f0; border-radius: 0; }
-  :where(.planner-page, .planner-portal) .quote-options-comparison .quote-options-context { grid-template-columns: 1fr; grid-template-areas: "request" "attachments"; }
-  :where(.planner-page, .planner-portal) .quote-options-context:has(> section[aria-label="Decisão do cliente"]) { grid-template-areas: "decision" "request" "attachments"; }
-  :where(.planner-page, .planner-portal) .quote-options-context .quote-attachments-overview { border-left: 0; border-top: 1px solid #dde5ef; }
 }
-@media (max-width: 480px) {
-  :where(.planner-page, .planner-portal) .quote-commercial-header { padding: 16px; flex-wrap: wrap; gap: 12px; }
-  :where(.planner-page, .planner-portal) .quote-options-comparison .quote-options-context > section { padding: 16px; }
-  :where(.planner-page, .planner-portal) .quote-v3-workspace.has-comparison .quote-options-comparison .quote-commercial-workspace .quote-comparison-card { padding: 16px; }
-}
+
+/* Cotações V2.2: um passo por vez. Opcionais em "Adicionar detalhes", drawer com o passo atual e "Ver detalhes". */
+:where(.planner-page, .planner-portal) .quote-v3-more { grid-column: 1 / -1; border: 1px solid var(--quote-v3-border); border-radius: 8px; background: #FCFCFB; }
+:where(.planner-page, .planner-portal) .quote-v3-more > summary { min-height: 40px; padding: 10px 14px; color: var(--navy); font-size: 13px; font-weight: 600; cursor: pointer; }
+:where(.planner-page, .planner-portal) .quote-v3-more > .quote-v3-form-grid { padding: 4px 14px 14px; background: #fff; border-radius: 0 0 8px 8px; }
+:where(.planner-page, .planner-portal) .quote-v3-create { grid-template-rows: auto minmax(0, 1fr) auto; width: min(560px, 100vw); }

@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
-import { Button, EmptyState, SearchBox, StatusBadge, Table, TableTitle, ViewBar } from '@betinhos/ui'
+import { Button, EmptyState, SearchBox, StatusBadge, TableTitle, ViewBar } from '@betinhos/ui'
 import type { Host } from '../../../host'
 import { LazyFooter, useLazySlice } from '../../../app/LazyList'
+import { VirtualTable } from '../../../app/VirtualTable'
 import { useDebouncedText } from '../../../app/search'
 import { filterRows } from '../../../app/filterRows'
 import { useListView } from '../../../app/useListView'
@@ -64,7 +65,7 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo 
           <SearchBox className="frota-busca" size="compact" aria-label="Buscar veículo" placeholder="Buscar placa, modelo ou motorista" value={busca} onChange={setBusca} />
         </ViewBar>
       </div>
-      <Table<LinhaVeiculo>
+      <VirtualTable<LinhaVeiculo>
         rows={slice}
         rowKey={(linha) => linha.veiculo.id}
         onRowClick={(linha) => onOpenVeiculo(linha.veiculo.id)}

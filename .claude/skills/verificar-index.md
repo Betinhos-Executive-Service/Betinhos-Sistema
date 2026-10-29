@@ -1,6 +1,6 @@
 # Índice de verificação — Sistema Betinhos
 - verificar-shell | apps/shell/**, packages/dataverse/**, packages/deploy/**, packages/agentes-ia/**, .github/workflows/sync-from-dev.yml, .github/workflows/ci.yml, scripts/dados-pessoais*.mjs | Typecheck, testes e telas do shell no DEV (listas, OPs, Geral, WebResources com host=shell)
-- verificar-plugins | packages/plugins/** | Testes dos plugins C# (Financeiro, Documentos, Frota), paridade da frota com o shell, simulação do valor da OP, publicação no DEV
+- verificar-plugins | packages/plugins/** | Testes dos plugins C# (Financeiro, Documentos, Frota, Portal: reabrir validação quando o preço muda), paridade da frota com o shell, simulação do valor da OP, publicação no DEV
 - verificar-ambiente-cloud | scripts/cloud-setup.sh, scripts/testa-cloud-setup.sh, .claude/hooks/session-start.sh, .claude/settings.json, .gitignore (.claude/), .npmrc | Hook SessionStart que prepara a VM cloud do Claude Code (Node 24, pnpm, deps, Chromium, typecheck)
 - verificar-plantao | scripts/plantao/**, packages/deploy/criar-identidade-plantao.ps1 | Coletor e mascaramento do plantão de erros, identidade só-leitura
 - verificar-deploy-dev | .github/workflows/deploy.yml, packages/deploy/bump-version.mjs, packages/deploy/push-dev.ps1 | Workflow Deploy: push em dev publica a tela no DEV (só DEV, barato)
@@ -15,6 +15,8 @@
 - verificar-portal-cliente | apps/portal-cliente/** | Portal de validação de serviços pelo cliente (protótipo mock): testes e fluxo no navegador (entrar com código, aprovar em lote, dúvida, Excel, mobile com Sheet)
 - verificar-validacao-cliente | apps/shell/src/pages/validacao-cliente/** | Tela do financeiro para a validação do cliente: regras (tácita, fechamento), drawer (responder, retirar, descartar), Excel do mês e validadores em mock (desktop e 375 px)
 - verificar-portal-worker | apps/portal-cliente/worker/**, apps/portal-cliente/wrangler.jsonc, apps/portal-cliente/src/api/workerApi.ts | Worker do portal do cliente: TOTP, cifra, prazo tácito, isolamento por cliente, rotas /api contra Dataverse falso, cron e wrangler dev
+- verificar-funcoes-operacionais | apps/shell/src/pages/funcoes-operacionais/** | Trocar motorista, duplicar pedido e trocas de carro (Nova/Editar via Custom APIs): testes, fluxo em mock e roteiro no DEV
 <!-- Sem roteiro ainda: apps/escala-fds/**, packages/despesas-ia/** -->
 - verificar-flow-tenaris | packages/deploy/patch-flow-tenaris-contatos.ps1 | Patch do flow Tenaris: contatos do passageiro sem apagar (dry run, aplicar e validar ativação no DEV)
 - verificar-flow-servico-editado | packages/deploy/patch-flow-servico-editado.ps1 | Patch do flow Notificação Serviço Editado: coluna editada correta, sem disparo fora das colunas de interesse (dry run, aplicar, editar reserva de teste no DEV)
+- verificar-flow-emails-portal | packages/deploy/flows/portal-cliente-emails*, packages/deploy/flows/portal-cliente-emails/**, packages/deploy/provision-flow-portal-cliente-emails.ps1 | Flow HTTP de e-mails do portal do cliente (código, resumo diário, resposta): teste com mini-interpretador, HTML em 640/375 px e dry run no DEV

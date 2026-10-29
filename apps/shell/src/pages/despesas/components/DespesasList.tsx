@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { StatusBadge, Table, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
+import { StatusBadge, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
+import { VirtualTable } from '../../../app/VirtualTable'
 import { Copy, Paperclip, Sparkles } from 'lucide-react'
 import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
 import { formatDate, formatMoney } from '../../pagantes/domain/messages'
@@ -53,7 +54,7 @@ export function DespesasTable({ list, choices, onOpen, loading, view, quickFilte
   ]
   return (
     <div className="pg-table-wrap" onClick={(event) => openFromRow(event, '.bt-table__row', '.pg-open')}>
-      <Table className="pg-table" columns={columns} rows={list} rowKey={(d) => d.id} rowActions={openRowActions(onOpen)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <VirtualTable className="pg-table" columns={columns} rows={list} rowKey={(d) => d.id} rowActions={openRowActions(onOpen)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

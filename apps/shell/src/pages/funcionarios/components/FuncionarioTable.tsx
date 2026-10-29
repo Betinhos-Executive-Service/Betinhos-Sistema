@@ -1,4 +1,5 @@
-import { Table, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
+import { type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
+import { VirtualTable } from '../../../app/VirtualTable'
 import type { ReactNode } from 'react'
 import { ASO_VALIDADE_MESES, rotuloCurto } from '../data/alerts'
 import { addMonths, formatBR } from '../data/dates'
@@ -56,5 +57,5 @@ export function FuncionarioTable({ rows, onOpen, loading, view, quickFilters, fo
     },
     { key: 'admissao', header: 'Admissão', label: 'Admissão', sortable: true, defaultWidth: 120, cell: (row) => <span className="nowrap">{formatBR(row.values.cr40f_datadeadmissao as string) || muted}</span> },
   ]
-  return <Table className="func-table" columns={columns} rows={rows} rowKey={(row) => row.id} onRowClick={(row) => onOpen(row.id)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+  return <VirtualTable className="func-table" columns={columns} rows={rows} rowKey={(row) => row.id} onRowClick={(row) => onOpen(row.id)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
 }
