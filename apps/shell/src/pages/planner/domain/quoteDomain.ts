@@ -127,11 +127,6 @@ function validateScenario(option: Partial<QuoteOptionData>): ValidationResult {
 }
 // Etapas do rascunho de 23/10: ① Pedido (quem pede, o que pede, prazo) e
 // ② Custo (opções). Trajeto, datas e veículo ficam para o agendamento.
-export const QUOTE_CREATE_STEPS = [
-  { id: 'request', label: 'Pedido' },
-  { id: 'commercial', label: 'Custo' },
-]
-
 // V2: obrigatórios só solicitante, texto do pedido e prazo; o resto é opcional.
 const REQUEST_FIELDS: Array<[keyof QuoteInput & string, string]> = [
   ['clientContact', 'Informe o nome do solicitante.'],
@@ -250,11 +245,11 @@ export interface QuoteNextAction {
 }
 
 const QUOTE_NEXT_ACTIONS: Readonly<Record<string, QuoteNextAction>> = Object.freeze({
-  Nova: { primary: { id: 'start', label: 'Iniciar cotação', status: 'Em análise pelo financeiro' }, secondary: [{ id: 'wait', label: 'Aguardar informação', status: 'Aguardando informação' }] },
+  Nova: { primary: { id: 'start', label: 'Começar a cotar', status: 'Em análise pelo financeiro' }, secondary: [{ id: 'wait', label: 'Aguardar informação', status: 'Aguardando informação' }] },
   'Em análise pelo financeiro': { primary: { id: 'compose', label: 'Montar proposta' }, secondary: [{ id: 'wait', label: 'Aguardar informação', status: 'Aguardando informação' }] },
   'Aguardando informação': { primary: { id: 'return', label: 'Registrar retorno' }, secondary: [{ id: 'resume', label: 'Retomar cotação', status: 'Em análise pelo financeiro' }] },
   Cotada: { primary: { id: 'send', label: 'Enviei' }, secondary: [{ id: 'compose', label: 'Montar proposta' }] },
-  'Respondida ao cliente': { primary: { id: 'outcome', label: 'Registrar decisão do cliente' }, secondary: [] },
+  'Respondida ao cliente': { primary: { id: 'outcome', label: 'Cliente aceitou' }, secondary: [] },
 })
 const QUOTE_REOPEN_ACTION: QuoteNextAction = Object.freeze({ primary: { id: 'reopen', label: 'Reabrir cotação', status: 'Nova' }, secondary: [] })
 
