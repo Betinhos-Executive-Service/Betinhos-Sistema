@@ -38,6 +38,7 @@ export const PAGE_LOADERS: Record<PageId, () => Promise<ComponentType<PageProps>
   logs: () => import('../pages/logs/LogsPage').then((m) => m.LogsPage),
   'funcoes-operacionais': () => import('../pages/funcoes-operacionais/FuncoesOperacionaisPage').then((m) => m.FuncoesOperacionaisPage),
   'pagamento-fornecedores': () => import('../pages/pagamento-fornecedores/PagamentoFornecedoresPage').then((m) => m.PagamentoFornecedoresPage),
+  inicio: () => import('../pages/inicio/InicioPage').then((m) => m.InicioPage),
   qualidade: () => import('../pages/qualidade/QualidadePage').then((m) => m.QualidadePage),
 }
 
@@ -52,6 +53,9 @@ function fetchPage(page: PageId) {
   }
   return promise
 }
+
+/** Só para os testes: esquece os chunks já baixados para cada teste partir do zero. */
+export const limparCacheDeTelas = () => { pending.clear() }
 
 export { isChunkLoadError }
 
@@ -80,21 +84,48 @@ export function prefetchRoute(id: string) {
   fetchPage(found.item.page).catch((error: unknown) => { console.warn(`Prefetch da tela ${id} falhou`, error) })
 }
 
+/** Mouse parado neste tempo sobre o link conta como intenção; passar o cursor por vários itens não baixa todos. */
+export const HOVER_DELAY_MS = 100
+
+/** Economia de dados (Chrome/Android `saveData` ou `prefers-reduced-data`): nada de prefetch. */
+function economizaDados() {
+  const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
+  return connection?.saveData === true || window.matchMedia?.('(prefers-reduced-data: reduce)').matches === true
+}
+
+const linkDoMenu = (target: EventTarget | null) => (target instanceof Element ? target.closest('a[href^="#/"]') : null)
+
 /**
- * Intenção de navegar (mouse em cima, foco ou toque num link `#/…` do menu) já baixa o chunk da tela,
+ * Intenção de navegar (mouse parado, foco ou toque num link `#/…` do menu) já baixa o chunk da tela,
  * então o clique quase sempre encontra o código pronto. Sem prefetch em lote no idle: no 4G dos
  * motoristas isso gastaria dados com telas que eles não abrem.
  */
 export function usePrefetchOnIntent() {
   useEffect(() => {
-    const onIntent = (event: Event) => {
-      const link = event.target instanceof Element ? event.target.closest('a[href^="#/"]') : null
-      const id = link?.getAttribute('href')?.slice(2).split('?')[0]
+    if (economizaDados()) return
+    let hover: { link: Element; timer: number } | null = null
+    const cancelHover = () => { if (hover) window.clearTimeout(hover.timer); hover = null }
+    const prefetchLink = (link: Element) => {
+      const id = link.getAttribute('href')?.slice(2).split('?')[0]
       if (id) prefetchRoute(decodeURIComponent(id))
     }
-    const events = ['pointerover', 'focusin', 'touchstart'] as const
-    events.forEach((name) => document.addEventListener(name, onIntent, { passive: true }))
-    return () => events.forEach((name) => document.removeEventListener(name, onIntent))
+    const onImmediate = (event: Event) => {
+      const link = linkDoMenu(event.target)
+      if (link) prefetchLink(link)
+    }
+    const onOver = (event: Event) => {
+      const link = linkDoMenu(event.target)
+      if (!link || hover?.link === link) return
+      cancelHover()
+      hover = { link, timer: window.setTimeout(() => { hover = null; prefetchLink(link) }, HOVER_DELAY_MS) }
+    }
+    const onOut = (event: Event) => {
+      const next = (event as PointerEvent).relatedTarget
+      if (hover && !(next instanceof Node && hover.link.contains(next))) cancelHover()
+    }
+    const listeners = [['pointerover', onOver], ['pointerout', onOut], ['focusin', onImmediate], ['touchstart', onImmediate]] as const
+    listeners.forEach(([name, fn]) => document.addEventListener(name, fn, { passive: true }))
+    return () => { cancelHover(); listeners.forEach(([name, fn]) => document.removeEventListener(name, fn)) }
   }, [])
 }
 

@@ -146,8 +146,6 @@ export function validateQuoteStep(input: QuoteInput = {}, stepId: string = 'revi
     if (String(input.notes || '').length > 4000) errors.notes = 'O pedido do cliente excede 4.000 caracteres, limite do Dataverse.'
     if (String(input.passengerProfile || '').length > 300) errors.passengerProfile = 'O perfil do passageiro excede 300 caracteres.'
     if (String(input.internalNotes || '').length > 4000) errors.internalNotes = 'As observações internas excedem 4.000 caracteres.'
-    const route = String(input.route ?? '').trim()
-    if (route) { const routeError = validateQuoteRoute(route); if (routeError) errors.route = routeError }
   }
   if (stepId === 'commercial' && QUOTE_COMPLETED_STATUSES.includes(String(input.status))) Object.assign(errors, validateQuoteCommercial(input).errors)
   return { valid: Object.keys(errors).length === 0, errors }

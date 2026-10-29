@@ -1,6 +1,6 @@
 ﻿# Cria (ou atualiza) no DEV o flow "Portal cliente – e-mails" (gatilho HTTP chamado pelo Worker do portal de validação),
 # na solução AppBetinhos e na BetinhosAutomacao. Envia os e-mails de código, resumo diário e resposta da Betinhos
-# pela caixa compartilhada do financeiro (Office 365 Outlook, SharedMailboxSendEmailV2).
+# com remetente fixo (Office 365 Outlook, SendEmailV2 com "De"; a conta da conexão precisa poder enviar como esse endereço).
 # A definição vem de flows/portal-cliente-emails.json; os modelos HTML de flows/portal-cliente-emails/*.html entram
 # no lugar dos tokens __TPL_*__; o endereço da caixa entra por parâmetro (nunca no repo).
 # Pré-requisitos: connection reference do Office 365 Outlook na solução, com conexão de quem tem "Enviar como" na caixa,

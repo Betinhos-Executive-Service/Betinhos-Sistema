@@ -3,7 +3,7 @@ import { cleanup, configure, fireEvent, render, screen } from '@testing-library/
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { findItem } from '../nav/menu'
 import { RouteLayout } from './RouteLayout'
-import { isChunkLoadError, navegador, PAGE_LOADERS, usePrefetchOnIntent } from './routes'
+import { HOVER_DELAY_MS, isChunkLoadError, limparCacheDeTelas, navegador, PAGE_LOADERS, usePrefetchOnIntent } from './routes'
 
 configure({ asyncUtilTimeout: 8000 })
 vi.setConfig({ testTimeout: 30_000 })
@@ -26,6 +26,91 @@ function Menu({ href }: { href: string }) {
   usePrefetchOnIntent()
   return <a href={href}>Link</a>
 }
+
+describe('prefetch por intenção', () => {
+  function Links() {
+    usePrefetchOnIntent()
+    return (
+      <nav>
+        <a href="#/pessoas"><span>Pessoas</span></a>
+        <a href="#/clientes">Clientes</a>
+        <a href="#/new_telacomposicaopreco">Composição</a>
+        <a href="https://app.infleet.com.br/monitoring">Infleet</a>
+        <span>Grupo</span>
+      </nav>
+    )
+  }
+  const stubLoaders = () => {
+    const pessoas = vi.fn(() => Promise.resolve(() => null))
+    const clientes = vi.fn(() => Promise.resolve(() => null))
+    PAGE_LOADERS.pessoas = pessoas
+    PAGE_LOADERS.clientes = clientes
+    return { pessoas, clientes }
+  }
+  beforeEach(() => { limparCacheDeTelas() })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('mouse parado sobre o link baixa a tela uma vez, depois do atraso', () => {
+    vi.useFakeTimers()
+    const { pessoas } = stubLoaders()
+    render(<Links />)
+    fireEvent.pointerOver(screen.getByText('Pessoas'))
+    vi.advanceTimersByTime(HOVER_DELAY_MS - 1)
+    expect(pessoas).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(pessoas).toHaveBeenCalledTimes(1)
+    fireEvent.pointerOver(screen.getByText('Pessoas'))
+    vi.advanceTimersByTime(HOVER_DELAY_MS)
+    expect(pessoas).toHaveBeenCalledTimes(1)
+  })
+
+  it('passar o mouse rápido por vários itens não baixa nenhum', () => {
+    vi.useFakeTimers()
+    const { pessoas, clientes } = stubLoaders()
+    render(<Links />)
+    fireEvent.pointerOver(screen.getByText('Pessoas'))
+    vi.advanceTimersByTime(40)
+    fireEvent.pointerOver(screen.getByText('Clientes'))
+    vi.advanceTimersByTime(40)
+    fireEvent.pointerOut(screen.getByText('Clientes'), { relatedTarget: document.body })
+    vi.advanceTimersByTime(HOVER_DELAY_MS)
+    expect(pessoas).not.toHaveBeenCalled()
+    expect(clientes).not.toHaveBeenCalled()
+  })
+
+  it('foco por teclado e toque baixam na hora; WebResource, link externo e grupo não quebram', () => {
+    vi.useFakeTimers()
+    const { pessoas, clientes } = stubLoaders()
+    render(<Links />)
+    fireEvent.focusIn(screen.getByText('Pessoas'))
+    fireEvent.touchStart(screen.getByText('Clientes'))
+    expect(pessoas).toHaveBeenCalledTimes(1)
+    expect(clientes).toHaveBeenCalledTimes(1)
+    for (const text of ['Composição', 'Infleet', 'Grupo']) {
+      expect(() => { fireEvent.pointerOver(screen.getByText(text)); fireEvent.focusIn(screen.getByText(text)) }).not.toThrow()
+    }
+    vi.advanceTimersByTime(HOVER_DELAY_MS)
+  })
+
+  it('com economia de dados não pré-carrega nada', () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('navigator', Object.assign(Object.create(navigator), { connection: { saveData: true } }))
+    const { pessoas } = stubLoaders()
+    render(<Links />)
+    fireEvent.focusIn(screen.getByText('Pessoas'))
+    fireEvent.pointerOver(screen.getByText('Pessoas'))
+    vi.advanceTimersByTime(HOVER_DELAY_MS)
+    expect(pessoas).not.toHaveBeenCalled()
+  })
+
+  it('com prefers-reduced-data não pré-carrega nada', () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('reduced-data'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
+    const { pessoas } = stubLoaders()
+    render(<Links />)
+    fireEvent.touchStart(screen.getByText('Pessoas'))
+    expect(pessoas).not.toHaveBeenCalled()
+  })
+})
 
 describe('falha ao baixar o chunk da tela', () => {
   it('reconhece só erro de import dinâmico (Chrome, Firefox, Safari)', () => {

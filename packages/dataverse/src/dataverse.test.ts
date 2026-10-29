@@ -30,6 +30,14 @@ describe('client', () => {
     expect(fetchMock.mock.calls[1][0]).toBe('https://org.example/api/data/v9.2/contas?$skiptoken=x')
   })
 
+  it('pede só as anotações lidas pelas telas, com o tamanho de página quando informado', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(json({ value: [] }))
+    const client = createClient('https://org.example', fetchMock)
+    await client.request('contas?$select=id', { maxPageSize: 100 })
+    const prefer = (fetchMock.mock.calls[0][1] as { headers: Record<string, string> }).headers.Prefer
+    expect(prefer).toBe('odata.include-annotations="OData.Community.Display.V1.FormattedValue,Microsoft.Dynamics.CRM.fetchxmlpagingcookie,Microsoft.Dynamics.CRM.morerecords,Microsoft.Dynamics.CRM.totalrecordcount",odata.maxpagesize=100')
+  })
+
   it('update usa PATCH com If-Match * para nunca virar upsert', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
     await createClient('https://org.example', fetchMock).update('contas', '{ABC}', { nome: 'x' })

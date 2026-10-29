@@ -1,7 +1,7 @@
 // Porte de Tela Planner/tests/quoteRoute.test.mjs (trajeto da cotação no domínio e no mock).
 import assert from 'node:assert/strict'
 import { afterAll, test, vi } from 'vitest'
-import { buildQuoteEmailHtml, buildQuotePlainText, normalizeQuoteRoute, quoteRoutePoints, validateQuoteDraft, validateQuoteRoute, validateQuoteStep } from '../domain/quoteDomain'
+import { buildQuoteEmailHtml, buildQuotePlainText, normalizeQuoteRoute, quoteRoutePoints, validateQuoteRoute, validateQuoteStep } from '../domain/quoteDomain'
 import { createQuote, seedState, updateQuote } from './mock'
 
 afterAll(() => { vi.unstubAllGlobals() })
@@ -20,8 +20,7 @@ test('exige dois locais e rejeita trechos vazios', () => {
   }
   assert.equal(validateQuoteStep({ route: 'Guarulhos / Hotel' }, 'request').errors.route, undefined)
   assert.equal(validateQuoteStep({ route: '' }, 'request').errors.route, undefined)
-  assert.match(String(validateQuoteStep({ route: 'Guarulhos' }, 'request').errors.route), /pelo menos dois locais/)
-  assert.equal(validateQuoteDraft({ title: 'Transfer', client: 'Cliente', clientContact: 'Renan', route: 'Guarulhos' }).valid, false)
+  assert.equal(validateQuoteStep({ route: 'Guarulhos' }, 'request').errors.route, undefined)
 })
 
 test('limita o trajeto normalizado a 10.000 caracteres', () => {

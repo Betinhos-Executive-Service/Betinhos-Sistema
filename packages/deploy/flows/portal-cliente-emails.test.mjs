@@ -116,13 +116,13 @@ test('Switch por tipo com os três casos e default 400', () => {
   assert.equal(sw.default.actions.Responder_400_tipo.inputs.statusCode, 400)
 })
 
-test('envio pela caixa compartilhada, um por caso, com os assuntos combinados', () => {
+test('envio com remetente fixo (De), um por caso, com os assuntos combinados', () => {
   const envios = porTipo('OpenApiConnection')
   assert.equal(envios.length, 3)
   for (const e of envios) {
-    assert.equal(e.inputs.host.operationId, 'SharedMailboxSendEmailV2')
+    assert.equal(e.inputs.host.operationId, 'SendEmailV2')
     assert.equal(e.inputs.host.connectionName, 'shared_office365')
-    assert.equal(e.inputs.parameters['emailMessage/MailboxAddress'], 'caixa@exemplo.com')
+    assert.equal(e.inputs.parameters['emailMessage/From'], 'caixa@exemplo.com')
   }
   assert.equal(executar(exemplos.codigo).email.Subject, 'Seu código de acesso: 482913')
   assert.equal(executar(exemplos.resumo_diario).email.Subject, 'Serviços para validar hoje · Betinhos')

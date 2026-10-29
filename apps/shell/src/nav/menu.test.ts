@@ -46,6 +46,7 @@ it('Frota tem um item por visão, sem as tabelas legadas nem Infrações solta',
   expect(ENTITY_NAMES).not.toContain('cr40f_multas')
   expect(ENTITY_NAMES).not.toContain('cr40f_colisao_v2')
   expect(findItem('infracoes')).toBeNull()
+  expect(findItem('frota-checklists')?.item).toMatchObject({ kind: 'page', page: 'frota', aba: 'checklists' })
 })
 
 it('links antigos da Frota e de Infrações vão para a visão nova', () => {
@@ -55,6 +56,8 @@ it('links antigos da Frota e de Infrações vão para a visão nova', () => {
   expect(ir('frota', 'aba=ocorrencias&tipo=colisao')).toBe('frota-colisoes?')
   expect(ir('frota', 'aba=pendencias&ficha=v1')).toBe('frota?ficha=v1')
   expect(ir('infracoes', 'ver=i1')).toBe('frota-multas?ver=i1&sub=infracoes')
+  expect(ir('frota', 'aba=checklists')).toBe('frota-checklists?')
+  expect(ir('new_gestaochecklistsveiculos', '')).toBe('frota-checklists?')
   expect(ir('frota', 'ficha=v1')).toBeNull()
   expect(ir('geral', 'aba=x')).toBeNull()
 })
@@ -96,4 +99,11 @@ it('Pagamento de Fornecedores é rota React do Financeiro; o id do WebResource a
   expect(findItem('pagamento-fornecedores')?.item).toMatchObject({ kind: 'page', page: 'pagamento-fornecedores', label: 'Pagamento de Fornecedores' })
   expect(findItem('cr40f_telapagamentofornecedores')).toBeNull()
   expect(rotaAtualizada('cr40f_telapagamentofornecedores', new URLSearchParams('tab=lots'))).toEqual({ id: 'pagamento-fornecedores', query: new URLSearchParams('tab=lots') })
+})
+
+it('Página Inicial é rota React, a tela padrão do shell, e o link antigo do WebResource vai para ela', async () => {
+  const { DEFAULT_ITEM } = await import('./menu')
+  expect(DEFAULT_ITEM).toMatchObject({ kind: 'page', id: 'inicio', page: 'inicio', label: 'Página Inicial' })
+  expect(findItem('cr40f_homebetinhos')).toBeNull()
+  expect(rotaAtualizada('cr40f_homebetinhos', new URLSearchParams('visao=gestao'))).toEqual({ id: 'inicio', query: new URLSearchParams('visao=gestao') })
 })
