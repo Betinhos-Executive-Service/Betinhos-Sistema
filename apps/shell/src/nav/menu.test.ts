@@ -73,6 +73,17 @@ it('Parcelas de multa sai do menu; Clientes é rota React em Cadastros', () => {
   expect(rotaAtualizada('cr40f_clientes1', new URLSearchParams('ver=c1'))).toEqual({ id: 'clientes', query: new URLSearchParams('ver=c1') })
 })
 
+it('Funções Operacionais é rota React no Operacional e os links antigos vão para ela', () => {
+  expect(findItem('funcoes-operacionais')?.group.id).toBe('operacional')
+  expect(findItem('funcoes-operacionais')?.item).toMatchObject({ kind: 'page', page: 'funcoes-operacionais', label: 'Funções Operacionais' })
+  expect(findItem('new_telafuncoesoperacionais')).toBeNull()
+  expect(findItem('custom-page-funcoes-operacionais')).toBeNull()
+  expect(findItem('cr40f_trocasdecarro')?.item).toMatchObject({ kind: 'entity' })
+  const r = rotaAtualizada('new_telafuncoesoperacionais', new URLSearchParams('aba=carro'))
+  expect(r && `${r.id}?${r.query}`).toBe('funcoes-operacionais?aba=carro')
+  expect(rotaAtualizada('custom-page-funcoes-operacionais', new URLSearchParams())?.id).toBe('funcoes-operacionais')
+})
+
 it('Gestão de Qualidade é a tela React; o id do WebResource antigo redireciona', () => {
   expect(findItem('qualidade')?.group.id).toBe('operacional')
   expect(findItem('qualidade')?.item).toMatchObject({ kind: 'page', page: 'qualidade', label: 'Gestão de Qualidade' })
