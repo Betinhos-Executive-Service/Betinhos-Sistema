@@ -50,7 +50,7 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   'assistente-financeiro': <Sparkles />,
   'assistente-frota': <Sparkles />,
   'assistente-pessoas': <Sparkles />,
-  cr40f_homebetinhos: <Home />,
+  inicio: <Home />,
   geral: <Calendar />,
   cr40f_reservadeveculos: <Calendar />,
   dashboard: <LayoutDashboard />,
