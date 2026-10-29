@@ -270,7 +270,7 @@ importers:
         specifier: workspace:*
         version: link:../../packages/dataverse
       '@betinhos/ui':
-        specifier: npm:@betinhos-executive-service/ui@^1.15.3
+        specifier: npm:@betinhos-executive-service/ui@^1.15.4
         version: '@betinhos-executive-service/ui@1.15.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)'
       '@fontsource/manrope':
         specifier: ^5.2.6

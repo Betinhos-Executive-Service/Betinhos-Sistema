@@ -35,6 +35,7 @@ Reduzir o atraso de 15 a 20 dias no faturamento da Tenaris. Hoje a Juliana (fina
 | Clientes | Modelo multi-cliente, liberado só para a Tenaris |
 | Tela interna | Tela nova no shell, `#/validacao-cliente` |
 | Stack | React + Vite + TypeScript + `@betinhos/ui` + tokens do Design System, igual ao shell |
+| Domínio | `workers.dev` no piloto; domínio próprio (opção com domínio técnico + CNAME `portal` na Locaweb, sem mover o DNS de betinhos.com.br) decidido depois do piloto (29/10/2026) |
 | Antes de construir | Protótipo navegável com dados fictícios, mostrado a quem valida na Tenaris |
 
 **Assumi:** o Worker fala direto com a Web API do Dataverse por um usuário de aplicação (S2S) com papel de segurança mínimo, em vez de um flow por endpoint. Os e-mails (código de acesso, resumo diário e aviso de resposta) saem por um flow HTTP "Portal cliente – e-mails" usando a caixa compartilhada do financeiro no M365.

@@ -26,4 +26,4 @@ Segurança: 5 erros (código ou TOTP) no mesmo e-mail → 15 min de bloqueio; li
 
 - `pnpm test` (lógica pura + rotas contra o Dataverse falso de `worker/fakeDataverse.ts`) e `pnpm typecheck`.
 - `pnpm build && pnpm exec wrangler dev` sobe Worker + assets; sem secrets, as rotas que tocam o Dataverse respondem 500 (`falha`).
-- Troca no app: em `src/main.tsx`, `createMockApi(...)` → `createWorkerApi()` (`src/api/workerApi.ts`).
+- Qual API o app usa (`src/main.tsx`): mock só no dev server local (`pnpm dev`, porta 52463, em `localhost`/`127.0.0.1`) ou com `?mock` na URL; em qualquer outro endereço (workers.dev, `wrangler dev`) usa `createWorkerApi()`. A dica do código e o `?refazer-autenticador` só existem no mock.
