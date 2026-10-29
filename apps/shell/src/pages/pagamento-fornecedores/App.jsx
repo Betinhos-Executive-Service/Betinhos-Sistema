@@ -1,0 +1,4465 @@
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  defaultRangeExtractor,
+  useVirtualizer,
+} from "@tanstack/react-virtual";
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Banknote,
+  Check,
+  CheckCircle2,
+  ChevronRight,
+  CircleDollarSign,
+  ClipboardList,
+  Columns3,
+  ExternalLink,
+  FileDown,
+  FileText,
+  Link2,
+  LayoutDashboard,
+  Minus,
+  Pencil,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Pin,
+  GripVertical,
+  Plus,
+  RefreshCw,
+  Rows3,
+  RotateCcw,
+  Save,
+  Search,
+  Send,
+  TableProperties,
+  Undo2,
+  UsersRound,
+  X,
+} from "lucide-react";
+import { patchHashQuery, readHashQuery } from "../../nav/useHashRoute";
+import { CHOICES, dataverse } from "./lib/dataverse";
+import { setErrorLogContext } from "./lib/error-logger";
+import { buildPaymentPdf } from "./lib/document";
+import { downloadServicesXlsx, downloadConsolidatedXlsx } from "./lib/excel";
+import { ConsolidatedDrawer, RevenueDrawer } from './ConsolidatedDrawer';
+import { activeConsolidated, consolidatedTotals, isConsolidated } from './domain/consolidated';
+const consolidatedPeriod = (lot) => `${lot.from?.split('-').reverse().join('/')} a ${lot.to?.split('-').reverse().join('/')}`;
+import {
+  lotCreationDrawer,
+  lotDetailLoadingDrawer,
+  scheduleAfterPaint,
+} from "./lib/ui";
+import SearchableSelect, { SearchableMultiSelect } from "./SearchableSelect";
+import {
+  DOCUMENT_STATUS,
+  LOT_STATUS,
+  PAYMENT_STATUS,
+  canCancel,
+  canPay,
+  canRevert,
+  eligibleServices,
+  isCpCompleted,
+  isLegacyPaidService,
+  money,
+  moneyInput,
+  marginPercent,
+  parseMoney,
+  paymentTotals,
+  repassePercent,
+  serviceLotWarnings,
+  serviceLotEligibilityReason,
+  validateFavorecido,
+} from "./domain/payment";
+
+// No shell a tela já roda dentro do menu do Sistema Betinhos: o menu lateral próprio começa recolhido.
+const EMBEDDED_IN_SHELL = true;
+
+const monthRange = () => {
+  const date = new Date();
+  const start = new Date(date.getFullYear(), date.getMonth(), 1);
+  const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  return {
+    from: start.toISOString().slice(0, 10),
+    to: end.toISOString().slice(0, 10),
+  };
+};
+const APP_TABS = new Set(["overview", "payments", "lots", "favorecidos"]);
+const tabFromLocation = () => {
+  if (typeof window === "undefined") return "overview";
+  const tab = readHashQuery().get("tab");
+  return APP_TABS.has(tab) ? tab : "overview";
+};
+// A aba fica na query do hash do shell (#/pagamento-fornecedores?tab=lots): recarregar ou voltar reabre a mesma aba.
+const syncTabLocation = (tab, method) => {
+  if (typeof window === "undefined") return;
+  if (readHashQuery().get("tab") === tab) return;
+  patchHashQuery({ tab }, { silent: method === "replaceState" });
+};
+const toDateInput = (date) => date.toISOString().slice(0, 10);
+const previousRange = (range) => {
+  const from = new Date(`${range.from}T12:00:00`);
+  const to = new Date(`${range.to}T12:00:00`);
+  const days = Math.max(
+    1,
+    Math.round((to.getTime() - from.getTime()) / 86400000) + 1,
+  );
+  const previousTo = new Date(from);
+  previousTo.setDate(previousTo.getDate() - 1);
+  const previousFrom = new Date(previousTo);
+  previousFrom.setDate(previousFrom.getDate() - days + 1);
+  return { from: toDateInput(previousFrom), to: toDateInput(previousTo) };
+};
+const percentChange = (current, previous) => {
+  if (!previous) return null;
+  return ((current - previous) / Math.abs(previous)) * 100;
+};
+const dashboardBuckets = (services, range) => {
+  const from = new Date(`${range.from}T12:00:00`);
+  const to = new Date(`${range.to}T12:00:00`);
+  const totalDays = Math.max(
+    1,
+    Math.round((to.getTime() - from.getTime()) / 86400000) + 1,
+  );
+  const bucketCount = Math.min(6, Math.max(1, Math.ceil(totalDays / 7)));
+  const bucketDays = Math.ceil(totalDays / bucketCount);
+  return Array.from({ length: bucketCount }, (_, index) => {
+    const start = new Date(from);
+    start.setDate(start.getDate() + index * bucketDays);
+    const end = new Date(start);
+    end.setDate(end.getDate() + bucketDays - 1);
+    if (end > to) end.setTime(to.getTime());
+    const rows = services.filter((service) => {
+      const date = new Date(service.dataServico);
+      return date >= start && date <= end;
+    });
+    return {
+      label: start.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+      ...paymentTotals(rows),
+    };
+  });
+};
+const dashboardRanking = (services, key, nameFor, limit = 5) => {
+  const grouped = new Map();
+  services.forEach((service) => {
+    const id = service[key] || "sem-vinculo";
+    const current = grouped.get(id) || { id, name: nameFor(service), services: [] };
+    current.services.push(service);
+    grouped.set(id, current);
+  });
+  return [...grouped.values()]
+    .map((row) => ({ ...row, ...paymentTotals(row.services) }))
+    .sort((left, right) => right.margin - left.margin)
+    .slice(0, limit);
+};
+const statusText = (lot) =>
+  lot.lotStatus === LOT_STATUS.CANCELLED
+    ? "Cancelado"
+    : lot.paymentStatus === PAYMENT_STATUS.PAID
+      ? lot.documentStatus === DOCUMENT_STATUS.SENT
+        ? "Pago · documento enviado"
+        : lot.documentStatus === DOCUMENT_STATUS.FAILED
+          ? "Pago · falha documental"
+          : "Pago · documento pendente"
+      : "Rascunho";
+const lotStatusTone = (lot) => {
+  if (lot.lotStatus === LOT_STATUS.CANCELLED) return "red";
+  if (lot.paymentStatus !== PAYMENT_STATUS.PAID) return "neutral";
+  return lot.documentStatus === DOCUMENT_STATUS.SENT ? "green" : "amber";
+};
+const lotActivityText = (lot, busy) => {
+  if (busy(`pay-${lot.id}`)) return "Registrando pagamento";
+  if (busy(`document-${lot.id}`)) return "Gerando documento";
+  if (busy(`revert-${lot.id}`)) return "Revertendo pagamento";
+  if (busy(`cancel-${lot.id}`)) return "Cancelando lote";
+  return "";
+};
+const applyActiveFavorecidoDefaults = (serviceRows, linkRows, favorecidoRows) => {
+  const activeFavorecidoIds = new Set(
+    favorecidoRows
+      .filter((favorecido) => favorecido.status === "ativo")
+      .map((favorecido) => favorecido.id),
+  );
+  const activeByDriver = linkRows.reduce((map, link) => {
+    if (link.status !== "ativo" || !activeFavorecidoIds.has(link.favorecidoId))
+      return map;
+    const current = map.get(link.motoristaId) || [];
+    current.push(link.favorecidoId);
+    map.set(link.motoristaId, current);
+    return map;
+  }, new Map());
+  return serviceRows.map((service) => {
+    const activeFavorecidos = activeByDriver.get(service.motoristaId) || [];
+    if (service.favorecidoId || activeFavorecidos.length !== 1) return service;
+    return {
+      ...service,
+      favorecidoId: activeFavorecidos[0],
+      favorecidoFromActiveLink: true,
+    };
+  });
+};
+const resolveLotFavorecido = (lot, favorecidoById) => {
+  const favorecidoId = lot.favorecidoId || lot.favorecido?.id || "";
+  const currentFavorecido = favorecidoById.get(favorecidoId);
+  if (!currentFavorecido) return lot;
+  return {
+    ...lot,
+    favorecido: { ...lot.favorecido, ...currentFavorecido },
+  };
+};
+const formatServiceDate = (value, fallback = "") => {
+  const date = new Date(value);
+  if (!value || Number.isNaN(date.getTime())) return fallback;
+  const pad = (number) => String(number).padStart(2, "0");
+  return [
+    `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`,
+    `${pad(date.getHours())}:${pad(date.getMinutes())}`,
+  ].join(" ");
+};
+const REPASSE_DEFAULT_STATUS_LABELS = [
+  "concluido",
+  "cancelado com ressalvas",
+];
+const normalizeFilterLabel = (value) =>
+  String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+const maskPix = (value) =>
+  value?.length > 8 ? `${value.slice(0, 3)}••••${value.slice(-3)}` : value;
+const MAX_PAYMENT_PROOF_SIZE = 5 * 1024 * 1024;
+const downloadPaymentPdf = (pdf) => {
+  const link = document.createElement("a");
+  link.href = pdf.dataUri;
+  link.download = pdf.name;
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+};
+const REPASSE_COLUMNS = [
+  { id: "identificador", label: "Serviço", width: 150, locked: true },
+  { id: "statusCp", label: "Status da CP", width: 170, locked: true },
+  { id: "statusReserva", label: "Status da reserva", width: 190, locked: true },
+  { id: "valorCobrado", label: "Total CP", width: 135, locked: true },
+  { id: "valorRepasse", label: "Repasse", width: 140, locked: true },
+  { id: "dataServico", label: "Data e hora", width: 150 },
+  { id: "dataFinalizacao", label: "Finalização", width: 150 },
+  { id: "motorista", label: "Motorista", width: 170 },
+  { id: "trajeto", label: "Trajeto", width: 220 },
+  { id: "tipoVeiculo", label: "Tipo de veículo", width: 155 },
+  { id: "veiculo", label: "Veículo", width: 175 },
+  { id: "cliente", label: "Cliente", width: 180 },
+  { id: "nomePassageiro", label: "Nome do passageiro", width: 190 },
+  { id: "observacaoOperacao", label: "Observação operacional", width: 260 },
+  { id: "observacaoFinal", label: "Observação final", width: 240 },
+  { id: "favorecido", label: "Favorecido", width: 180 },
+];
+const REPASSE_COLUMNS_STORAGE_KEY = "betinhos_repasses_columns_v3";
+const REPASSE_DENSITY_STORAGE_KEY = "betinhos_repasses_density_v1";
+const REPASSE_VIEWS_STORAGE_KEY = "betinhos_repasses_views_v1";
+const REPASSE_ACTIVE_VIEW_STORAGE_KEY = "betinhos_repasses_active_view_v1";
+const ALL_SERVICES_COLUMNS = [
+  { id: "identificador", label: "Serviço", width: 145 },
+  { id: "dataServico", label: "Data", width: 145 },
+  { id: "motorista", label: "Motorista", width: 180 },
+  { id: "clienteTrajeto", label: "Cliente / trajeto", width: 250 },
+  { id: "valorCobrado", label: "Total CP", width: 125 },
+  { id: "valorRepasse", label: "Repasse", width: 125 },
+  { id: "favorecido", label: "Favorecido", width: 190 },
+  { id: "status", label: "Status", width: 170 },
+  { id: "lote", label: "Lote", width: 115 },
+];
+const ALL_SERVICES_COLUMNS_STORAGE_KEY = "betinhos_todos_servicos_columns_v1";
+const ALL_SERVICES_DENSITY_STORAGE_KEY = "betinhos_todos_servicos_density_v1";
+const ALL_SERVICES_VIEWS_STORAGE_KEY = "betinhos_todos_servicos_views_v1";
+const ALL_SERVICES_ACTIVE_VIEW_STORAGE_KEY = "betinhos_todos_servicos_active_view_v1";
+const loadTableColumns = (key, defaults) => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(key));
+    if (Array.isArray(saved) && saved.length) {
+      const definition = new Map(defaults.map((column) => [column.id, column]));
+      const restored = saved.filter((column) => definition.has(column.id)).map((column) => ({
+        ...definition.get(column.id), width: Math.max(110, Number(column.width) || definition.get(column.id).width), visible: column.visible !== false,
+      }));
+      const ids = new Set(restored.map((column) => column.id));
+      return [...restored, ...defaults.filter((column) => !ids.has(column.id)).map((column) => ({ ...column, visible: true }))];
+    }
+  } catch { /* Usa configuração padrão. */ }
+  return defaults.map((column) => ({ ...column, visible: true }));
+};
+const loadTableViews = (key) => {
+  try { const views = JSON.parse(localStorage.getItem(key)); return Array.isArray(views) ? views : []; } catch { return []; }
+};
+const restoreTableColumns = (savedColumns, defaults) => {
+  const definition = new Map(defaults.map((column) => [column.id, column]));
+  const restored = (savedColumns || []).filter((column) => definition.has(column.id)).map((column) => ({
+    ...definition.get(column.id), width: Math.max(110, Number(column.width) || definition.get(column.id).width), visible: column.visible !== false,
+  }));
+  const ids = new Set(restored.map((column) => column.id));
+  return [...restored, ...defaults.filter((column) => !ids.has(column.id)).map((column) => ({ ...column, visible: true }))];
+};
+const loadRepasseColumns = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(REPASSE_COLUMNS_STORAGE_KEY));
+    if (Array.isArray(saved) && saved.length) return viewColumns(saved);
+  } catch {
+    /* Usa a configuração padrão. */
+  }
+  return REPASSE_COLUMNS.map((column) => ({ ...column, visible: true }));
+};
+const loadRepasseDensity = () =>
+  localStorage.getItem(REPASSE_DENSITY_STORAGE_KEY) === "compact"
+    ? "compact"
+    : "comfortable";
+const loadRepasseViews = () => {
+  try {
+    const views = JSON.parse(localStorage.getItem(REPASSE_VIEWS_STORAGE_KEY));
+    return Array.isArray(views) ? views : [];
+  } catch {
+    return [];
+  }
+};
+const loadActiveRepasseView = () =>
+  localStorage.getItem(REPASSE_ACTIVE_VIEW_STORAGE_KEY) || "";
+const orderRepasseColumns = (columns) => [
+  ...columns.filter((column) => column.locked),
+  ...columns.filter((column) => !column.locked),
+];
+const viewColumns = (savedColumns) => {
+  const defaults = new Map(REPASSE_COLUMNS.map((column) => [column.id, column]));
+  const saved = Array.isArray(savedColumns) ? savedColumns : [];
+  const mapped = saved
+    .filter((column) => defaults.has(column.id))
+    .map((column) => {
+      const fallback = defaults.get(column.id);
+      return {
+        ...fallback,
+        width: Math.max(110, Number(column.width) || fallback.width),
+        visible: column.visible !== false,
+        locked:
+          typeof column.locked === "boolean" ? column.locked : fallback.locked,
+      };
+    });
+  const present = new Set(mapped.map((column) => column.id));
+  return orderRepasseColumns([
+    ...mapped,
+    ...REPASSE_COLUMNS.filter((column) => !present.has(column.id)).map(
+      (column) => ({ ...column, visible: true }),
+    ),
+  ]);
+};
+
+function Drawer({ title, subtitle, children, onClose, wide = false, locked = false }) {
+  return (
+    <div className="drawer-layer">
+      <button
+        className="drawer-backdrop"
+        aria-label="Fechar"
+        onClick={onClose}
+        disabled={locked}
+      />
+      <section
+        className={`drawer ${wide ? "wide" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        aria-busy={locked || undefined}
+      >
+        <header>
+          <div>
+            <span>{subtitle}</span>
+            <h2>{title}</h2>
+          </div>
+          <button className="icon-button" onClick={onClose} aria-label="Fechar" disabled={locked}>
+            <X size={20} />
+          </button>
+        </header>
+        <div className="drawer-body">{children}</div>
+      </section>
+    </div>
+  );
+}
+function Badge({ tone = "neutral", children }) {
+  return <span className={`status-badge tone-${tone}`}>{children}</span>;
+}
+function ServiceIdentifierLink({ identifier, reservationId }) {
+  const href = dataverse.reservationWebresourceUrl(reservationId);
+  if (!href) return <span>{identifier}</span>;
+  return (
+    <a
+      className="service-identifier-link"
+      href={href}
+      target="_top"
+      title={`Abrir serviço ${identifier}`}
+      aria-label={`Abrir serviço ${identifier}`}
+      onClick={(event) => event.stopPropagation()}
+    >
+      {identifier}
+    </a>
+  );
+}
+
+function TabPage({ className = "", children }) {
+  return <section className={`page-section tab-page ${className}`.trim()}>{children}</section>;
+}
+
+export default function App() {
+  const [services, setServices] = useState([]);
+  const [previousServices, setPreviousServices] = useState([]);
+  const [favorecidos, setFavorecidos] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+  const [links, setLinks] = useState([]);
+  const [lots, setLots] = useState([]);
+  const [reservationStatusOptions, setReservationStatusOptions] = useState([]);
+  const [tab, setTab] = useState(tabFromLocation);
+  // Dentro do Sistema Betinhos (`?host=shell`) o shell já tem a barra lateral: a desta tela começa recolhida.
+  const [sidebarExpanded, setSidebarExpanded] = useState(() => !EMBEDDED_IN_SHELL);
+  const [range, setRange] = useState(monthRange);
+  const [search, setSearch] = useState("");
+  const [driverIds, setDriverIds] = useState([]);
+  const [favorecidoIds, setFavorecidoIds] = useState([]);
+  const [vehicleTypes, setVehicleTypes] = useState([]);
+  const [saving, setSaving] = useState({});
+  const [autosaveErrors, setAutosaveErrors] = useState({});
+  const [drawer, setDrawer] = useState(null);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const [lotDetail, setLotDetail] = useState(null);
+  const [lastDocumentPdf, setLastDocumentPdf] = useState(null);
+  const [preselected, setPreselected] = useState(new Set());
+  const refreshRequestIdRef = useRef(0);
+  const referenceDataLoadedRef = useRef(false);
+  const previousRangeKeyRef = useRef("");
+  const busy = (key) => Boolean(saving[key]);
+  const setBusy = (key, value) =>
+    setSaving((current) => ({ ...current, [key]: value }));
+  const setAutosaveError = (key, error) =>
+    setAutosaveErrors((current) => {
+      const next = { ...current };
+      if (error) next[key] = error;
+      else delete next[key];
+      return next;
+    });
+  const reportActionError = (action, err) => {
+    const detail = err?.message || "Falha inesperada. Tente novamente.";
+    void dataverse.logError(err, { action, phase: "ui.action" });
+    setError(`${action} nao foi concluido. ${detail}`);
+  };
+  const navigateToTab = useCallback((nextTab) => {
+    const next = APP_TABS.has(nextTab) ? nextTab : "overview";
+    setTab(next);
+    syncTabLocation(next, "pushState");
+  }, []);
+  useEffect(() => {
+    setErrorLogContext({ screen: tab });
+  }, [tab]);
+  useEffect(() => {
+    syncTabLocation(tabFromLocation(), "replaceState");
+    const onPopState = () => setTab(tabFromLocation());
+    window.addEventListener("hashchange", onPopState);
+    return () => window.removeEventListener("hashchange", onPopState);
+  }, []);
+  async function refresh({
+    includeReferences = true,
+    includePrevious = tab === "overview",
+  } = {}) {
+    const refreshRequestId = ++refreshRequestIdRef.current;
+    setBusy("refresh", true);
+    try {
+      const [serviceRows, previousServiceRows, referenceRows] =
+        await Promise.all([
+          dataverse.listFinanceServices(range),
+          includePrevious
+            ? dataverse.listFinanceServices(previousRange(range))
+            : Promise.resolve(null),
+          includeReferences
+            ? Promise.all([
+                dataverse.listFavorecidos(true),
+                dataverse.listDrivers(),
+                dataverse.listLinks(),
+                dataverse.listLots(),
+                dataverse.listReservationStatuses(),
+              ])
+            : Promise.resolve(null),
+        ]);
+      const [favorecidoRows, driverRows, linkRows, lotRows, statusRows] =
+        referenceRows || [favorecidos, drivers, links, lots, reservationStatusOptions];
+      if (refreshRequestId !== refreshRequestIdRef.current) return;
+      setServices(
+        applyActiveFavorecidoDefaults(serviceRows, linkRows, favorecidoRows),
+      );
+      if (previousServiceRows) {
+        setPreviousServices(previousServiceRows);
+        previousRangeKeyRef.current = `${range.from}:${range.to}`;
+      }
+      if (referenceRows) {
+        setFavorecidos(favorecidoRows);
+        setDrivers(driverRows);
+        setLinks(linkRows);
+        setLots(lotRows);
+        setReservationStatusOptions(statusRows);
+        referenceDataLoadedRef.current = true;
+      }
+    } catch (err) {
+      if (refreshRequestId === refreshRequestIdRef.current)
+        reportActionError("Atualizacao dos dados", err);
+    } finally {
+      if (refreshRequestId === refreshRequestIdRef.current) {
+        setBusy("refresh", false);
+      }
+    }
+  }
+  useEffect(() => {
+    refresh({
+      includeReferences: !referenceDataLoadedRef.current,
+      includePrevious: tab === "overview",
+    });
+  }, [range.from, range.to]);
+  useEffect(() => {
+    const rangeKey = `${range.from}:${range.to}`;
+    if (
+      tab !== "overview" ||
+      previousRangeKeyRef.current === rangeKey
+    )
+      return;
+    setBusy("refresh", true);
+    dataverse
+      .listFinanceServices(previousRange(range))
+      .then((rows) => {
+        setPreviousServices(rows);
+        previousRangeKeyRef.current = rangeKey;
+      })
+      .catch((err) => reportActionError("Atualizacao do periodo anterior", err))
+      .finally(() => setBusy("refresh", false));
+  }, [tab, range.from, range.to]);
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = setTimeout(() => setNotice(""), 3200);
+    return () => clearTimeout(timer);
+  }, [notice]);
+  const activeFavorecidos = favorecidos.filter((row) => row.status === "ativo");
+  const favorecidoById = useMemo(
+    () => new Map(favorecidos.map((favorecido) => [favorecido.id, favorecido])),
+    [favorecidos],
+  );
+  const resolvedLots = useMemo(
+    () => lots.map((lot) => resolveLotFavorecido(lot, favorecidoById)),
+    [lots, favorecidoById],
+  );
+  const resolvedLotDetail = useMemo(
+    () => (lotDetail ? resolveLotFavorecido(lotDetail, favorecidoById) : null),
+    [lotDetail, favorecidoById],
+  );
+  const vehicleTypeOptions = useMemo(() => {
+    const options = new Set();
+    services.forEach((service) => {
+      if (service.tipoVeiculo) options.add(service.tipoVeiculo);
+    });
+    return [...options]
+      .sort((left, right) => left.localeCompare(right, "pt-BR"))
+      .map((value) => ({ value, label: value }));
+  }, [services]);
+  const visibleServices = useMemo(
+    () =>
+      services.filter(
+        (service) =>
+          (!range.from || service.dataServico.slice(0, 10) >= range.from) &&
+          (!range.to || service.dataServico.slice(0, 10) <= range.to) &&
+          (!driverIds.length || driverIds.includes(service.motoristaId)) &&
+          (!favorecidoIds.length || favorecidoIds.includes(service.favorecidoId)) &&
+          (!vehicleTypes.length || vehicleTypes.includes(service.tipoVeiculo)) &&
+          (!search ||
+            `${service.identificador} ${service.motorista} ${service.trajeto}`
+              .toLowerCase()
+              .includes(search.toLowerCase())),
+      ).map((service) => {
+        const consolidatedLot = activeConsolidated(resolvedLots).find((lot) => lot.id === service.pagamentoId || lot.serviceIds?.includes(service.id));
+        return consolidatedLot ? { ...service, consolidatedLot } : service;
+      }),
+    [services, resolvedLots, range.from, range.to, driverIds, favorecidoIds, vehicleTypes, search],
+  );
+  const openLot = async (lot) => {
+    setLotDetail(null);
+    setDrawer(lotDetailLoadingDrawer(lot));
+    try {
+      const detail = await dataverse.getLotDetail(lot.id);
+      setLotDetail(detail);
+      setDrawer({ type: "lotDetail" });
+    } catch (err) {
+      setLotDetail(null);
+      setDrawer(null);
+      reportActionError("Abertura do lote", err);
+    }
+  };
+  async function saveRepasse(service, raw) {
+    const value = parseMoney(raw);
+    if (value === service.valorRepasse) return;
+    setBusy(`repasse-${service.id}`, true);
+    try {
+      const saved = await dataverse.saveServiceRepasse(
+        service.id,
+        value,
+        service.etag,
+      );
+      setServices((rows) =>
+        rows.map((row) => (row.id === service.id ? { ...row, ...saved } : row)),
+      );
+      return saved;
+    } catch (err) {
+      const isConcurrencyConflict =
+        err.status === 412 ||
+        /rowversion|version of the existing record/i.test(err.message || "");
+      if (isConcurrencyConflict) {
+        let currentService;
+        try {
+          currentService = (await dataverse.listFinanceServices(range)).find(
+            (row) => row.id === service.id,
+          );
+        } catch {
+          currentService = null;
+        }
+        if (currentService?.valorRepasse === service.valorRepasse) {
+          try {
+            const saved = await dataverse.saveServiceRepasse(
+              service.id,
+              value,
+              currentService.etag,
+            );
+            setServices((rows) =>
+              rows.map((row) =>
+                row.id === service.id ? { ...row, ...saved } : row,
+              ),
+            );
+            return saved;
+          } catch (retryError) {
+            if (retryError.status !== 412) throw retryError;
+          }
+        }
+        if (currentService)
+          setServices((rows) =>
+            rows.map((row) =>
+              row.id === service.id ? { ...row, ...currentService } : row,
+            ),
+          );
+        const conflictError = new Error(
+          currentService
+            ? "Registro alterado por outro processo. Valor atual recarregado; revise antes de salvar novamente."
+            : "Registro alterado ou removido por outro processo. Atualize a tela.",
+        );
+        conflictError.status = 412;
+        throw conflictError;
+      }
+      throw err;
+    } finally {
+      setBusy(`repasse-${service.id}`, false);
+    }
+  }
+  async function linkService(service, favorecidoId) {
+    const saveKey = `link-${service.id}`;
+    const previousFavorecidoId = service.favorecidoId;
+    const emptyDriverServiceIds = services
+      .filter(
+        (row) =>
+          row.motoristaId === service.motoristaId && !row.favorecidoId,
+      )
+      .map((row) => row.id);
+    const affectedServiceIds = [...new Set([service.id, ...emptyDriverServiceIds])];
+    const isSelectedLink = (link) =>
+      link.motoristaId === service.motoristaId &&
+      link.favorecidoId === favorecidoId;
+    const previousLink = links.find(
+      isSelectedLink,
+    );
+    const optimisticLink = previousLink || {
+      id: `pending-link-${service.id}-${favorecidoId}`,
+      motoristaId: service.motoristaId,
+      favorecidoId,
+      status: "ativo",
+    };
+    setAutosaveError(saveKey, null);
+    setBusy(saveKey, true);
+    setServices((rows) =>
+      rows.map((row) =>
+        affectedServiceIds.includes(row.id)
+          ? { ...row, favorecidoId }
+          : row,
+      ),
+    );
+    setLinks((rows) =>
+      previousLink
+        ? rows.map((link) =>
+            link.id === previousLink.id ? { ...link, status: "ativo" } : link,
+          )
+        : [...rows, optimisticLink],
+    );
+    try {
+      const saved = await dataverse.setPreferredFavorecido(
+        service.id,
+        favorecidoId,
+        service.motoristaId,
+      );
+      await dataverse.assignFavorecidoToServices(
+        emptyDriverServiceIds.filter((id) => id !== service.id),
+        favorecidoId,
+      );
+      setServices((rows) =>
+        rows.map((row) =>
+          affectedServiceIds.includes(row.id)
+            ? { ...row, ...saved, favorecidoId }
+            : row,
+        ),
+      );
+      const refreshedLinks = await dataverse.listLinks();
+      setLinks((rows) => {
+        const confirmedLink = refreshedLinks.find(
+          (link) => isSelectedLink(link) && link.status === "ativo",
+        );
+        if (confirmedLink) return refreshedLinks;
+        const currentLink = rows.find(isSelectedLink) || optimisticLink;
+        return [
+          ...refreshedLinks.filter((link) => !isSelectedLink(link)),
+          { ...currentLink, status: "ativo" },
+        ];
+      });
+      setPreselected((current) => new Set(current).add(service.id));
+      setNotice("Vínculo criado e serviço pré-selecionado.");
+    } catch (err) {
+      setServices((rows) =>
+        rows.map((row) =>
+          affectedServiceIds.includes(row.id)
+            ? {
+                ...row,
+                favorecidoId:
+                  row.id === service.id ? previousFavorecidoId : "",
+              }
+            : row,
+        ),
+      );
+      setLinks((rows) =>
+        previousLink
+          ? rows.map((link) =>
+              link.id === previousLink.id ? previousLink : link,
+            )
+          : rows.filter((link) => link.id !== optimisticLink.id),
+      );
+      setAutosaveError(saveKey, { message: err.message, favorecidoId });
+      reportActionError("Vinculo do favorecido", err);
+      await refresh();
+    } finally {
+      setBusy(saveKey, false);
+    }
+  }
+  async function createLot(input) {
+    setBusy("lot", true);
+    setDrawer(lotCreationDrawer(input));
+    try {
+      const created = await dataverse.createDraftLot(input);
+      setPreselected(new Set());
+      setNotice(`${created.identifier} reservado.`);
+      setLotDetail(created);
+      setDrawer({ type: "lotDetail" });
+      void refresh();
+    } catch (err) {
+      setPreselected(new Set(input.services.map((service) => service.id)));
+      setDrawer({
+        type: "lot",
+        favorecidoId: input.favorecido.id,
+      });
+      const retryError = new Error(
+        `${err?.message || "Falha inesperada."} Revise os serviços e tente novamente.`,
+      );
+      retryError.name = err?.name || "Error";
+      retryError.stack = err?.stack || retryError.stack;
+      reportActionError("Criacao do lote", retryError);
+    } finally {
+      setBusy("lot", false);
+    }
+  }
+  async function updateLot(lot, input) {
+    setBusy("lot", true);
+    try {
+      const updated = await dataverse.updateDraftLot(lot.id, {
+        favorecidoId: input.favorecido.id,
+        serviceIds: input.services.map((service) => service.id),
+        year: input.year,
+      });
+      setNotice(`${updated.identifier} atualizado.`);
+      setLotDetail(updated);
+      setDrawer({ type: "lotDetail" });
+      void refresh();
+    } catch (err) {
+      reportActionError("Atualizacao do lote", err);
+    } finally {
+      setBusy("lot", false);
+    }
+  }
+  async function runDocument(lot) {
+    setBusy(`document-${lot.id}`, true);
+    let pdf = null;
+    let upload = null;
+    try {
+      const detail = await dataverse.getLotDetail(lot.id);
+      pdf = buildPaymentPdf(detail, detail.items);
+      upload = await dataverse.saveDocumentToOneDrive(detail, pdf);
+      const email = await dataverse.sendLotDocumentEmail(detail, pdf);
+      const updated = await dataverse.registerDocumentResult(lot.id, {
+        ok: true,
+        url: upload.url || upload.link,
+        name: upload.name || pdf.name,
+        emailId: email.emailId,
+      });
+      setLots((current) =>
+        current.map((row) => (row.id === updated.id ? { ...row, ...updated } : row)),
+      );
+      setLastDocumentPdf({ lotId: updated.id, pdf });
+      setLotDetail(await dataverse.getLotDetail(updated.id));
+      setNotice(`Documento enviado para ${email.recipient || detail.favorecido.email}.`);
+    } catch (err) {
+      await dataverse
+        .registerDocumentResult(lot.id, {
+          ok: false,
+          error: err.message,
+          url: upload?.url || upload?.link || "",
+          name: upload?.name || pdf?.name || "",
+        })
+        .catch(() => undefined);
+      setLotDetail(await dataverse.getLotDetail(lot.id).catch(() => lotDetail));
+      reportActionError("Envio do documento", err);
+    } finally {
+      setBusy(`document-${lot.id}`, false);
+    }
+  }
+  function downloadDocument(lot) {
+    if (lastDocumentPdf?.lotId === lot.id) {
+      downloadPaymentPdf(lastDocumentPdf.pdf);
+      return;
+    }
+    const link = document.createElement("a");
+    link.href = lot.documentUrl;
+    link.download = lot.documentName || `Pagamento_${lot.identifier}.pdf`;
+    link.target = "_blank";
+    link.rel = "noreferrer";
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+  async function markPaid(lot, proofInput = {}) {
+    setBusy(`pay-${lot.id}`, true);
+    try {
+      const proof = proofInput.file
+        ? await dataverse.uploadPaymentProof(lot, proofInput.file)
+        : null;
+      const proofUrl = proof?.url || proofInput.url || "";
+      const paid = await dataverse.markPaid(lot.id, proofUrl);
+      setLots((current) =>
+        current.map((row) => (row.id === paid.id ? { ...row, ...paid } : row)),
+      );
+      setLotDetail(await dataverse.getLotDetail(paid.id));
+      setNotice("Pagamento registrado. Documento pronto para envio.");
+      await refresh();
+    } catch (err) {
+      reportActionError("Registro do pagamento", err);
+    } finally {
+      setBusy(`pay-${lot.id}`, false);
+    }
+  }
+  async function reasonAction(action, reason) {
+    setBusy(`${action.type}-${action.lot.id}`, true);
+    try {
+      if (action.type === "cancel")
+        await dataverse.cancelLot(action.lot.id, reason);
+      else await dataverse.revertPaid(action.lot.id, reason);
+      setDrawer(null);
+      setLotDetail(null);
+      setNotice(
+        action.type === "cancel"
+          ? "Lote cancelado e serviços liberados."
+          : "Pagamento revertido.",
+      );
+      await refresh();
+    } catch (err) {
+      reportActionError(
+        action.type === "cancel" ? "Cancelamento do lote" : "Reversao do pagamento",
+        err,
+      );
+    } finally {
+      setBusy(`${action.type}-${action.lot.id}`, false);
+    }
+  }
+  async function resetMock() {
+    dataverse.resetMock();
+    setNotice("Dados locais resetados.");
+    await refresh();
+  }
+  if (!dataverse.available)
+    return (
+      <main className="connection-error">
+        <AlertTriangle size={38} />
+        <h1>Pagamentos a Terceiros</h1>
+        <p>Abra dentro do model-driven app ou use a prévia local.</p>
+      </main>
+    );
+  const isRefreshing = busy("refresh");
+  return (
+    <div className={`app-shell ${sidebarExpanded ? "" : "sidebar-collapsed"}`}>
+      <aside className="sidebar">
+        <button
+          className="sidebar-toggle"
+          type="button"
+          onClick={() => setSidebarExpanded((expanded) => !expanded)}
+          aria-label={sidebarExpanded ? "Recolher menu lateral" : "Expandir menu lateral"}
+          title={sidebarExpanded ? "Recolher menu lateral" : "Expandir menu lateral"}
+        >
+          {sidebarExpanded ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+        </button>
+        <Brand />
+        <Nav tab={tab} onChange={navigateToTab} />
+        <div className="sidebar-foot">
+          <span
+            className="connection-dot mock"
+            title={dataverse.mockMode ? "Modo local completo" : "Dataverse conectado"}
+          />
+          <div>
+            <strong>{dataverse.environmentLabel}</strong>
+            <span>
+              {dataverse.mockMode
+                ? "modo local completo"
+                : "Dataverse conectado"}
+            </span>
+          </div>
+        </div>
+      </aside>
+      <main className="app-main">
+        <header className="mobile-header">
+          <div className="brand-mark">
+            <Banknote size={18} />
+          </div>
+          <strong>Pagamentos a Terceiros</strong>
+          <button
+            className="icon-button"
+            onClick={refresh}
+            aria-label="Atualizar"
+            title={isRefreshing ? "Atualizando dados" : "Atualizar dados"}
+            disabled={isRefreshing}
+            aria-busy={isRefreshing}
+          >
+            <RefreshCw size={17} className={isRefreshing ? "spin" : ""} />
+          </button>
+        </header>
+        <div className="content-wrap">
+          <div className="desktop-actions" aria-label="Ações do ambiente">
+            {/* Ambiente e reset só servem no modo local; no Dataverse eram ruído para quem usa a tela. */}
+            {dataverse.mockMode && (
+              <>
+                <span className="environment-pill">
+                  {dataverse.environmentLabel}
+                </span>
+                <button className="icon-button" onClick={resetMock}>
+                  Resetar mock
+                </button>
+              </>
+            )}
+            <button
+              className="icon-button"
+              onClick={refresh}
+              disabled={isRefreshing}
+              aria-busy={isRefreshing}
+            >
+              <RefreshCw size={15} className={isRefreshing ? "spin" : ""} />
+              {isRefreshing ? "Atualizando…" : "Atualizar"}
+            </button>
+          </div>
+          {error && (
+            <Alert tone="error" onClose={() => setError("")}>
+              {error}
+            </Alert>
+          )}
+          {notice && <Alert tone="success">{notice}</Alert>}
+          {tab === "overview" && (
+            <OverviewView
+              services={services}
+              previousServices={previousServices}
+              lots={resolvedLots}
+              links={links}
+              favorecidos={favorecidos}
+              drivers={drivers}
+              range={range}
+              setRange={setRange}
+              driverIds={driverIds}
+              setDriverIds={setDriverIds}
+              favorecidoIds={favorecidoIds}
+              setFavorecidoIds={setFavorecidoIds}
+              vehicleTypes={vehicleTypes}
+              setVehicleTypes={setVehicleTypes}
+              vehicleTypeOptions={vehicleTypeOptions}
+              onNavigate={navigateToTab}
+              onNewLot={() => setDrawer({ type: "lotMode" })}
+              onNewFavorecido={() => setDrawer({ type: "favorecido" })}
+            />
+          )}
+          {tab === "payments" && (
+            <PaymentsView
+              services={visibleServices}
+              drivers={drivers}
+              favorecidos={activeFavorecidos}
+              allFavorecidos={favorecidos}
+              links={links}
+              range={range}
+              setRange={setRange}
+              search={search}
+              setSearch={setSearch}
+              driverIds={driverIds}
+              setDriverIds={setDriverIds}
+              favorecidoIds={favorecidoIds}
+              setFavorecidoIds={setFavorecidoIds}
+              vehicleTypes={vehicleTypes}
+              setVehicleTypes={setVehicleTypes}
+              vehicleTypeOptions={vehicleTypeOptions}
+              reservationStatusOptions={reservationStatusOptions}
+              refreshing={isRefreshing}
+              lotDrawerOpen={drawer?.type === "lot" || drawer?.type === "editLot"}
+              busy={busy}
+              autosaveErrors={autosaveErrors}
+              onSaveRepasse={saveRepasse}
+              onLink={linkService}
+              onGenerateLot={(selectedServices) => {
+                if (!selectedServices.length) return;
+                setPreselected(new Set(selectedServices.map((service) => service.id)));
+                setDrawer({
+                  type: "lot",
+                  favorecidoId: selectedServices[0].favorecidoId,
+                });
+              }}
+              onOpenConsolidated={openLot}
+            />
+          )}
+          {tab === "lots" && (
+            <LotsView
+              lots={resolvedLots}
+              busy={busy}
+              onNew={() => setDrawer({ type: "lotMode" })}
+              onOpen={openLot}
+            />
+          )}
+          {tab === "favorecidos" && (
+            <FavorecidosView
+              favorecidos={favorecidos}
+              drivers={drivers}
+              links={links}
+              busy={busy}
+              onNew={() => setDrawer({ type: "favorecido" })}
+              onEdit={(favorecido) =>
+                setDrawer({ type: "favorecido", favorecido })
+              }
+              onLinks={(favorecido) => setDrawer({ type: "links", favorecido })}
+              onStatus={async (row) => {
+                const nextStatus = row.status === "ativo" ? "inativo" : "ativo";
+                const saveKey = `favorecido-status-${row.id}`;
+                setBusy(saveKey, true);
+                setFavorecidos((rows) =>
+                  rows.map((item) =>
+                    item.id === row.id ? { ...item, status: nextStatus } : item,
+                  ),
+                );
+                try {
+                  await dataverse.setFavorecidoStatus(row.id, nextStatus);
+                  setNotice(
+                    nextStatus === "ativo"
+                      ? "Terceiro Favorecido reativado."
+                      : "Terceiro Favorecido inativado. Ele nao aparece em novos pagamentos.",
+                  );
+                  await refresh();
+                } catch (err) {
+                  setFavorecidos((rows) =>
+                    rows.map((item) =>
+                      item.id === row.id ? { ...item, status: row.status } : item,
+                    ),
+                  );
+                  reportActionError(
+                    nextStatus === "ativo"
+                      ? "Reativacao do Terceiro Favorecido"
+                      : "Inativacao do Terceiro Favorecido",
+                    err,
+                  );
+                } finally {
+                  setBusy(saveKey, false);
+                }
+              }}
+            />
+          )}
+        </div>
+      </main>
+      <nav className="bottom-nav" aria-label="Navegação principal">
+        <button
+          className={tab === "overview" ? "active" : ""}
+          onClick={() => navigateToTab("overview")}
+        >
+          <LayoutDashboard size={18} />
+          <span>Visão geral</span>
+        </button>
+        <button
+          className={tab === "payments" ? "active" : ""}
+          onClick={() => navigateToTab("payments")}
+        >
+          <CircleDollarSign size={18} />
+          <span>Repasses</span>
+        </button>
+        <button
+          className={tab === "lots" ? "active" : ""}
+          onClick={() => navigateToTab("lots")}
+        >
+          <ClipboardList size={18} />
+          <span>Lotes</span>
+        </button>
+        <button
+          className={tab === "favorecidos" ? "active" : ""}
+          onClick={() => navigateToTab("favorecidos")}
+        >
+          <UsersRound size={18} />
+          <span>Terceiros</span>
+        </button>
+      </nav>
+      {drawer?.type === "favorecido" && (
+        <FavorecidoDrawer
+          favorecido={drawer.favorecido}
+          saving={busy("favorecido")}
+          onClose={() => setDrawer(null)}
+          onSave={async (form) => {
+            setBusy("favorecido", true);
+            const previousFavorecido = drawer.favorecido;
+            if (previousFavorecido) {
+              setFavorecidos((rows) =>
+                rows.map((row) =>
+                  row.id === previousFavorecido.id ? { ...row, ...form } : row,
+                ),
+              );
+            }
+            try {
+              if (drawer.favorecido) {
+                await dataverse.updateFavorecido(drawer.favorecido.id, form);
+              } else {
+                await dataverse.createFavorecido(form);
+              }
+              setDrawer(null);
+              setNotice(
+                drawer.favorecido
+                  ? "Terceiro Favorecido atualizado."
+                  : "Terceiro Favorecido cadastrado.",
+              );
+              await refresh();
+            } catch (err) {
+              if (previousFavorecido) {
+                setFavorecidos((rows) =>
+                  rows.map((row) =>
+                    row.id === previousFavorecido.id ? previousFavorecido : row,
+                  ),
+                );
+              }
+              reportActionError("Cadastro do Terceiro Favorecido", err);
+            } finally {
+              setBusy("favorecido", false);
+            }
+          }}
+        />
+      )}
+      {drawer?.type === "links" && (
+        <LinksDrawer
+          favorecido={drawer.favorecido}
+          drivers={drivers}
+          links={links}
+          saving={busy("link-drawer")}
+          onClose={() => setDrawer(null)}
+          onSave={async (id) => {
+            setBusy("link-drawer", true);
+            try {
+              const driverServices = await dataverse.listFinanceServices({
+                motoristaId: id,
+              });
+              const serviceIds = driverServices
+                .filter(
+                  (service) =>
+                    service.motoristaId === id && !service.favorecidoId,
+                )
+                .map((service) => service.id);
+              await dataverse.upsertLink(id, drawer.favorecido.id);
+              await dataverse.assignFavorecidoToServices(
+                serviceIds,
+                drawer.favorecido.id,
+              );
+              await refresh();
+              setNotice("Vinculo criado e linhas preenchidas.");
+            } catch (err) {
+              reportActionError("Criacao do vinculo", err);
+            } finally {
+              setBusy("link-drawer", false);
+            }
+          }}
+          onDeactivate={async (id) => {
+            setBusy("link-drawer", true);
+            try {
+              const link = links.find((row) => row.id === id);
+              const driverServices = link
+                ? await dataverse.listFinanceServices({
+                    motoristaId: link.motoristaId,
+                  })
+                : [];
+              const serviceIds = link
+                ? driverServices
+                    .filter(
+                      (service) =>
+                        service.motoristaId === link.motoristaId &&
+                        service.favorecidoId === link.favorecidoId,
+                    )
+                    .map((service) => service.id)
+                : [];
+              await dataverse.clearFavorecidoFromServices(
+                serviceIds,
+                link?.favorecidoId,
+              );
+              await dataverse.setLinkStatus(id, "inativo");
+              await refresh();
+              setNotice("Vinculo inativado e linhas desvinculadas.");
+            } catch (err) {
+              reportActionError("Inativacao do vinculo", err);
+            } finally {
+              setBusy("link-drawer", false);
+            }
+          }}
+        />
+      )}
+      {drawer?.type === 'lotMode' && <Drawer title="Novo lote" subtitle="Como deseja registrar o pagamento?" onClose={() => setDrawer(null)}><div className="detail-actions"><button className="pt-action-button" onClick={() => setDrawer({ type: 'lot' })}><ClipboardList size={18} /><div><strong>Por serviços</strong><span>Somar os repasses já preenchidos nos serviços.</span></div><ChevronRight size={16} /></button><button className="pt-action-button" onClick={() => setDrawer({ type: 'consolidated' })}><Banknote size={18} /><div><strong>Pagamento consolidado</strong><span>Informar um total por fornecedor e período, incluindo histórico fora do sistema.</span></div><ChevronRight size={16} /></button></div></Drawer>}
+      {(drawer?.type === 'consolidated' || (drawer?.type === 'editLot' && isConsolidated(drawer.lot))) && <ConsolidatedDrawer Drawer={Drawer} dataverse={dataverse} favorecidos={activeFavorecidos} lots={resolvedLots} range={range} lot={drawer.lot} onClose={() => setDrawer(null)} onSaved={(saved) => { setLotDetail(saved); setDrawer({ type: 'lotDetail' }); setNotice(`${saved.identifier} salvo em aberto.`); void refresh(); }} />}
+      {drawer?.type === 'revenue' && <RevenueDrawer Drawer={Drawer} dataverse={dataverse} lot={drawer.lot} onClose={() => setDrawer({ type: 'lotDetail' })} onSaved={(saved) => { setLotDetail(saved); setDrawer({ type: 'lotDetail' }); setNotice('Receita confirmada e lucro atualizado.'); void refresh(); }} />}
+      {(drawer?.type === "lot" || (drawer?.type === "editLot" && !isConsolidated(drawer.lot))) && (
+        <LotDrawer
+          favorecidos={activeFavorecidos}
+          services={services}
+          links={links}
+          range={range}
+          preselected={preselected}
+          initialFavorecidoId={drawer.favorecidoId}
+          existingLot={drawer.lot}
+          saving={busy("lot")}
+          onClose={() => setDrawer(null)}
+          onSave={(input) =>
+            drawer.lot ? updateLot(drawer.lot, input) : createLot(input)
+          }
+        />
+      )}
+      {drawer?.type === "lotDetail" && resolvedLotDetail && (
+        <LotDetailDrawer
+          lot={resolvedLotDetail}
+          busy={busy}
+          onClose={() => setDrawer(null)}
+          onPay={markPaid}
+          onSend={runDocument}
+          onDownload={downloadDocument}
+          onCompleteRevenue={() => setDrawer({ type: 'revenue', lot: resolvedLotDetail })}
+          onEdit={() => setDrawer({ type: "editLot", lot: lotDetail })}
+          onCancel={() =>
+            setDrawer({
+              type: "reason",
+              action: { type: "cancel", lot: lotDetail },
+            })
+          }
+          onRevert={() =>
+            setDrawer({
+              type: "reason",
+              action: { type: "revert", lot: lotDetail },
+            })
+          }
+        />
+      )}
+      {drawer?.type === "lotDetailLoading" && (
+        <LotDetailLoadingDrawer lot={drawer.lot} />
+      )}
+      {drawer?.type === "lotCreating" && (
+        <LotCreationDrawer serviceCount={drawer.serviceCount} />
+      )}
+      {drawer?.type === "reason" && (
+        <ReasonDrawer
+          action={drawer.action}
+          saving={busy(`${drawer.action.type}-${drawer.action.lot.id}`)}
+          onClose={() => setDrawer({ type: "lotDetail" })}
+          onSave={reasonAction}
+        />
+      )}
+    </div>
+  );
+}
+
+function Brand() {
+  return (
+    <div className="brand-block">
+      <div className="brand-mark">
+        <Banknote size={21} />
+      </div>
+      <div>
+        <strong>Betinhos</strong>
+        <span>Financeiro operacional</span>
+      </div>
+    </div>
+  );
+}
+function Nav({ tab, onChange }) {
+  return (
+    <nav className="main-nav">
+      <button
+        className={tab === "overview" ? "active" : ""}
+        onClick={() => onChange("overview")}
+        title="Visão geral"
+      >
+        <LayoutDashboard size={17} />
+        <span>Visão geral</span>
+      </button>
+      <button
+        className={tab === "payments" ? "active" : ""}
+        onClick={() => onChange("payments")}
+        title="Lançar repasses"
+      >
+        <CircleDollarSign size={17} />
+        <span>Lançar repasses</span>
+      </button>
+      <button
+        className={tab === "lots" ? "active" : ""}
+        onClick={() => onChange("lots")}
+        title="Lotes de pagamento"
+      >
+        <ClipboardList size={17} />
+        <span>Lotes de pagamento</span>
+      </button>
+      <button
+        className={tab === "favorecidos" ? "active" : ""}
+        onClick={() => onChange("favorecidos")}
+        title="Terceiros favorecidos"
+      >
+        <UsersRound size={17} />
+        <span>Terceiros Favorecidos</span>
+      </button>
+    </nav>
+  );
+}
+function Alert({ tone, children, onClose }) {
+  return (
+    <div className={`global-alert ${tone}`}>
+      <CheckCircle2 size={17} />
+      <span>{children}</span>
+      {onClose && <button onClick={onClose}>×</button>}
+    </div>
+  );
+}
+function OverviewView({
+  services,
+  previousServices,
+  lots,
+  links,
+  favorecidos,
+  drivers,
+  range,
+  setRange,
+  driverIds,
+  setDriverIds,
+  favorecidoIds,
+  setFavorecidoIds,
+  vehicleTypes,
+  setVehicleTypes,
+  vehicleTypeOptions,
+  onNavigate,
+  onNewLot,
+  onNewFavorecido,
+}) {
+  const matchesDashboardFilter = (service) =>
+    (!driverIds.length || driverIds.includes(service.motoristaId)) &&
+    (!favorecidoIds.length || favorecidoIds.includes(service.favorecidoId)) &&
+    (!vehicleTypes.length || vehicleTypes.includes(service.tipoVeiculo));
+  const completedServices = services.filter(
+    (service) => service.status === "concluido" && matchesDashboardFilter(service),
+  );
+  const previousCompletedServices = previousServices.filter(
+    (service) => service.status === "concluido" && matchesDashboardFilter(service),
+  );
+  const totals = consolidatedTotals(completedServices, lots, range, { driverIds, favorecidoIds, vehicleTypes });
+  const previousTotals = consolidatedTotals(previousCompletedServices, lots, previousRange(range), { driverIds, favorecidoIds, vehicleTypes });
+  const pendingRepasse = totals.ordinary.filter(
+    (service) => !isLegacyPaidService(service) && Number(service.valorRepasse || 0) <= 0,
+  );
+  const readyServices = eligibleServices(completedServices, "", links).filter(
+    (service) =>
+      links.some(
+        (link) =>
+          link.status === "ativo" &&
+          link.motoristaId === service.motoristaId &&
+          link.favorecidoId === service.favorecidoId,
+      ),
+  );
+  const openLots = lots.filter(
+    (lot) =>
+      lot.lotStatus === LOT_STATUS.DRAFT &&
+      lot.paymentStatus === PAYMENT_STATUS.OPEN,
+  );
+  const documentAttention = lots.filter(
+    (lot) =>
+      lot.paymentStatus === PAYMENT_STATUS.PAID &&
+      [
+        DOCUMENT_STATUS.NOT_GENERATED,
+        DOCUMENT_STATUS.FAILED,
+        DOCUMENT_STATUS.RESEND_REQUIRED,
+      ].includes(lot.documentStatus),
+  );
+  const negativeMargins = totals.ordinary.filter(
+    (service) => Number(service.valorRepasse || 0) > Number(service.valorCobrado || 0),
+  );
+  const missingLink = completedServices.filter(
+    (service) =>
+      !isLegacyPaidService(service) &&
+      (!service.favorecidoId ||
+        !links.some(
+          (link) =>
+            link.status === "ativo" &&
+            link.motoristaId === service.motoristaId &&
+            link.favorecidoId === service.favorecidoId,
+        )),
+  );
+  const openExposure = openLots.reduce(
+    (total, lot) => total + Number(lot.repasse || 0),
+    0,
+  );
+  const paidLots = lots.filter((lot) => lot.paymentStatus === PAYMENT_STATUS.PAID);
+  const totalMargin = totals.marginPercent.toLocaleString("pt-BR", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
+  const marginChange = totals.pending.length || previousTotals.pending.length || totals.partial.length || previousTotals.partial.length ? null : percentChange(totals.margin, previousTotals.margin);
+  const profitTrend = dashboardBuckets(totals.ordinary, range);
+  const highestProfit = Math.max(...profitTrend.map((item) => item.margin), 0);
+  const driverRanking = dashboardRanking(
+    totals.ordinary,
+    "motoristaId",
+    (service) => service.motorista || "Motorista não identificado",
+  );
+  const favorecidoRanking = dashboardRanking(
+    totals.ordinary,
+    "favorecidoId",
+    (service) =>
+      favorecidos.find((favorecido) => favorecido.id === service.favorecidoId)
+        ?.nome || "Sem terceiro favorecido",
+    Infinity,
+  );
+  for (const lot of totals.included.filter((row) => row.revenueConfirmed)) {
+    let row = favorecidoRanking.find((item) => item.id === lot.favorecidoId);
+    if (!row) { row = { id: lot.favorecidoId, name: favorecidos.find((item) => item.id === lot.favorecidoId)?.nome || 'Fornecedor', margin: 0, revenue: 0, repasse: 0, count: 0 }; favorecidoRanking.push(row); }
+    row.margin += lot.revenue - lot.repasse; row.revenue += lot.revenue; row.repasse += lot.repasse;
+  }
+  favorecidoRanking.sort((a, b) => b.margin - a.margin);
+  const serviceTypeRanking = dashboardRanking(
+    totals.ordinary,
+    "tipoVeiculo",
+    (service) => service.tipoServico || service.tipoVeiculo || "Sem classificação",
+  );
+  const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "short",
+  });
+  const periodLabel = `${dateFormatter.format(new Date(`${range.from}T12:00:00`))} – ${dateFormatter.format(new Date(`${range.to}T12:00:00`))}`;
+
+  return (
+    <TabPage className="overview-page">
+      <div className="page-title">
+        <div>
+          <span>Financeiro operacional</span>
+          <h1>Dashboard financeiro</h1>
+          <p className="dashboard-data-notice">Este sistema e seus dados financeiros iniciam em 01/06/2026.</p>
+          <p>Resultado, exposição e pendências de fornecedores no mesmo recorte.</p>
+        </div>
+        <div className="dashboard-title-actions" role="group" aria-label="Ações do dashboard">
+          <button className="secondary-button" onClick={onNewFavorecido}>
+            <UsersRound size={16} /> Terceiro
+          </button>
+          <button className="primary-button" onClick={onNewLot}>
+            <Plus size={16} /> Novo lote
+          </button>
+        </div>
+      </div>
+
+      <section className="dashboard-filters surface" aria-label="Filtros do dashboard">
+        <label className="field"><span>De</span><input type="date" value={range.from} onChange={(event) => setRange((current) => ({ ...current, from: event.target.value }))} /></label>
+        <label className="field"><span>Até</span><input type="date" value={range.to} onChange={(event) => setRange((current) => ({ ...current, to: event.target.value }))} /></label>
+        <label className="field"><span>Motorista</span>
+          <SearchableMultiSelect
+            value={driverIds}
+            onChange={setDriverIds}
+            aria-label="Filtrar por motorista"
+            options={drivers.map((driver) => ({ value: driver.id, label: driver.nome }))}
+            placeholder="Todos os motoristas"
+          />
+        </label>
+        <label className="field"><span>Terceiro favorecido</span>
+          <SearchableMultiSelect
+            value={favorecidoIds}
+            onChange={setFavorecidoIds}
+            aria-label="Filtrar por terceiro favorecido"
+            options={favorecidos.map((favorecido) => ({
+              value: favorecido.id,
+              label: favorecido.nome,
+            }))}
+            placeholder="Todos os favorecidos"
+          />
+        </label>
+        <label className="field"><span>Tipo de veículo</span>
+          <SearchableMultiSelect
+            value={vehicleTypes}
+            onChange={setVehicleTypes}
+            aria-label="Filtrar por tipo de veículo"
+            options={vehicleTypeOptions}
+            placeholder="Todos os veículos"
+          />
+        </label>
+      </section>
+
+      <section className="dashboard-metrics" aria-label="Resumo financeiro do período">
+        <article className="dashboard-profit-card">
+          <span>{totals.pending.length || totals.partial.length ? 'Lucro financeiro · parcial' : 'Lucro financeiro'}</span>
+          <strong>{money(totals.margin)}</strong>
+          <div><b>{totalMargin}%</b><small>{marginChange === null ? "sem base anterior" : `${marginChange >= 0 ? "+" : ""}${marginChange.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% vs. período anterior`}</small></div>
+        </article>
+        <OverviewMetric icon={<Banknote size={19} />} label="Receita apurada" value={money(totals.revenue)} detail={`${totals.count} serviços + ${totals.included.filter((lot) => lot.revenueConfirmed).length} consolidados completos`} />
+        <OverviewMetric icon={<CircleDollarSign size={19} />} label="Repasse previsto" value={money(totals.repasse)} detail={`${totalMargin}% de margem`} />
+        <OverviewMetric icon={<ClipboardList size={19} />} label="Em aberto" value={money(openExposure)} detail={`${openLots.length} lote(s) aguardando pagamento`} />
+      </section>
+
+      {totals.pending.length > 0 && <div className="inline-alert warning-alert" role="status">{totals.pending.length} consolidado(s) com lucro pendente de receita. Custo registrado: {money(totals.pendingCost)}. Esse custo ainda não participa da apuração do lucro. <button className="text-button" onClick={() => onNavigate('lots')}>Completar receita</button></div>}
+      {totals.partial.length > 0 && <section className="surface consolidated-period-notice" aria-label="Consolidados fora do subtotal"><strong>{totals.dimensionFiltered ? 'Resultado consolidado não distribuído por motorista ou veículo' : 'Abrange outros meses; resultado não incluído neste subtotal'}</strong>{totals.partial.map((lot) => <p key={lot.id}>{lot.identifier} · {consolidatedPeriod(lot)} · Custo {money(lot.repasse)} · {lot.revenueConfirmed ? `Lucro ${money(lot.margin)}` : 'Lucro pendente de receita'}</p>)}</section>}
+      {activeConsolidated(lots).length > 0 && <p className="dashboard-data-notice">Gráfico por intervalo e rankings por motorista ou tipo de veículo mostram somente serviços com valores individuais. Consolidados não recebem rateio.</p>}
+
+      <div className="dashboard-grid dashboard-main-grid">
+        <section className="surface dashboard-flow-panel">
+          <div className="surface-head">
+            <div><span>Resultado no tempo</span><h2>Lucro por intervalo</h2></div>
+            <small className="dashboard-period">{periodLabel}</small>
+          </div>
+          <div className="dashboard-chart" aria-label="Gráfico de lucro do período">
+            {profitTrend.map((item) => (
+              <div className="dashboard-chart-column" key={item.label}>
+                <span>{money(item.margin)}</span>
+                <i style={{ "--bar-size": `${highestProfit ? Math.max(10, (item.margin / highestProfit) * 100) : 10}%` }} />
+                <small>{item.label}</small>
+              </div>
+            ))}
+          </div>
+          <div className="dashboard-flow-foot"><span>Receita <b>{money(totals.revenue)}</b></span><span>Repasse <b>{money(totals.repasse)}</b></span><span>Margem <b>{totalMargin}%</b></span></div>
+        </section>
+
+        <section className="surface dashboard-health-panel">
+          <div className="surface-head"><div><span>Controle da carteira</span><h2>O que exige ação</h2></div></div>
+          <div className="overview-queue">
+            <OverviewQueueRow tone={pendingRepasse.length ? "warning" : "success"} title="Repasses pendentes" description={pendingRepasse.length ? `${pendingRepasse.length} serviço(s) sem valor informado.` : "Todos os serviços possuem repasse."} action="Lançar" onClick={() => onNavigate("payments")} />
+            <OverviewQueueRow tone={negativeMargins.length ? "warning" : "success"} title="Margem negativa" description={negativeMargins.length ? `${negativeMargins.length} serviço(s) com repasse acima do Total CP.` : "Nenhum serviço com margem negativa."} action="Revisar" onClick={() => onNavigate("payments")} />
+            <OverviewQueueRow tone={missingLink.length ? "warning" : "success"} title="Vínculos pendentes" description={missingLink.length ? `${missingLink.length} serviço(s) sem vínculo ativo.` : "Vínculos operacionais em dia."} action="Ver" onClick={() => onNavigate("favorecidos")} />
+            <OverviewQueueRow tone={documentAttention.length ? "warning" : "success"} title="Documentos" description={documentAttention.length ? `${documentAttention.length} lote(s) exigem envio ou reenvio.` : "Documentação de pagamento em dia."} action="Lotes" onClick={() => onNavigate("lots")} />
+          </div>
+        </section>
+      </div>
+
+      <div className="dashboard-grid dashboard-bottom-grid">
+        <DashboardRanking title="Resultado por motorista" subtitle="Somente valores individuais; sem rateio de consolidados" rows={driverRanking} total={paymentTotals(totals.ordinary).margin} />
+        <DashboardRanking title="Resultado por favorecido" subtitle="Concentração financeira da carteira" rows={favorecidoRanking.slice(0, 5)} total={totals.margin} />
+        <DashboardRanking title="Resultado por tipo de serviço" subtitle="Somente valores individuais; sem rateio de consolidados" rows={serviceTypeRanking} total={paymentTotals(totals.ordinary).margin} />
+        <section className="surface dashboard-lots-panel">
+          <div className="surface-head"><div><span>Execução</span><h2>Lotes e pagamentos</h2></div><button className="text-button" onClick={() => onNavigate("lots")}>Ver todos <ChevronRight size={14} /></button></div>
+          <div className="dashboard-lot-summary"><span><b>{openLots.length}</b> em aberto</span><span><b>{paidLots.length}</b> pagos</span><span><b>{readyServices.length}</b> prontos</span></div>
+          <button className="dashboard-lot-action" onClick={onNewLot}><Plus size={16} /><span><strong>Montar lote</strong><small>Reserve serviços elegíveis para pagamento.</small></span><ChevronRight size={16} /></button>
+        </section>
+      </div>
+    </TabPage>
+  );
+}
+
+function OverviewMetric({ icon, label, value, detail }) {
+  return (
+    <article className="dashboard-metric-card">
+      <div className="metric-icon">{icon}</div>
+      <div>
+        <span>{label}</span>
+        <strong>{value}</strong>
+        <small>{detail}</small>
+      </div>
+    </article>
+  );
+}
+
+function DashboardRanking({ title, subtitle, rows, total }) {
+  return (
+    <section className="surface dashboard-ranking-panel">
+      <div className="surface-head"><div><span>{subtitle}</span><h2>{title}</h2></div></div>
+      <div className="dashboard-ranking-list">
+        {rows.length ? rows.map((row, index) => (
+          <div className="dashboard-ranking-row" key={row.id}>
+            <span>{String(index + 1).padStart(2, "0")}</span>
+            <div><strong>{row.name}</strong><small>{row.count} serviço(s)</small></div>
+            <div><b>{money(row.margin)}</b><small>{total ? `${((row.margin / total) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%` : "0%"}</small></div>
+          </div>
+        )) : <p className="dashboard-empty">Sem serviços concluídos no filtro atual.</p>}
+      </div>
+    </section>
+  );
+}
+
+function OverviewQueueRow({ tone, title, description, action, onClick }) {
+  return (
+    <article className={`overview-queue-row is-${tone}`}>
+      <span className="overview-queue-dot" aria-hidden="true" />
+      <div>
+        <strong>{title}</strong>
+        <p>{description}</p>
+      </div>
+      <button className="text-button" onClick={onClick}>
+        {action}
+        <ChevronRight size={14} />
+      </button>
+    </article>
+  );
+}
+function AllServicesView({ services, favorecidos, loading }) {
+  const [query, setQuery] = useState("");
+  const [columns, setColumns] = useState(() => loadTableColumns(ALL_SERVICES_COLUMNS_STORAGE_KEY, ALL_SERVICES_COLUMNS));
+  const [density, setDensity] = useState(() => localStorage.getItem(ALL_SERVICES_DENSITY_STORAGE_KEY) === "compact" ? "compact" : "comfortable");
+  const [views, setViews] = useState(() => loadTableViews(ALL_SERVICES_VIEWS_STORAGE_KEY));
+  const [activeViewId, setActiveViewId] = useState(() => localStorage.getItem(ALL_SERVICES_ACTIVE_VIEW_STORAGE_KEY) || "");
+  const [showColumns, setShowColumns] = useState(false);
+  const [showViews, setShowViews] = useState(false);
+  const [viewName, setViewName] = useState("");
+  const [range, setRange] = useState({ from: "", to: "" });
+  const [driverIds, setDriverIds] = useState([]);
+  const [favorecidoIds, setFavorecidoIds] = useState([]);
+  const [vehicleTypes, setVehicleTypes] = useState([]);
+  const [cpStatuses, setCpStatuses] = useState([]);
+  const [reservationStatuses, setReservationStatuses] = useState([]);
+  const [lotStates, setLotStates] = useState([]);
+  const [repasseStates, setRepasseStates] = useState([]);
+  const scrollRef = useRef(null);
+  const visibleColumns = useMemo(() => columns.filter((column) => column.visible), [columns]);
+  const gridTemplate = useMemo(() => visibleColumns.map((column) => `${column.width}px`).join(" "), [visibleColumns]);
+  const activeView = views.find((view) => view.id === activeViewId);
+  const favorecidoById = useMemo(
+    () => new Map(favorecidos.map((favorecido) => [favorecido.id, favorecido.nome])),
+    [favorecidos],
+  );
+  const serviceOptions = (key, label) =>
+    [...new Map(services.map((service) => [String(service[key] || ""), label(service)])).entries()]
+      .filter(([value]) => value)
+      .map(([value, optionLabel]) => ({ value, label: optionLabel }))
+      .sort((left, right) => left.label.localeCompare(right.label, "pt-BR"));
+  const driverOptions = useMemo(
+    () => serviceOptions("motoristaId", (service) => service.motorista),
+    [services],
+  );
+  const vehicleOptions = useMemo(
+    () => serviceOptions("tipoVeiculo", (service) => service.tipoVeiculo),
+    [services],
+  );
+  const cpStatusOptions = useMemo(
+    () => serviceOptions("status", (service) => service.statusLabel || service.status),
+    [services],
+  );
+  const reservationStatusOptions = useMemo(
+    () =>
+      serviceOptions(
+        "reservationStatus",
+        (service) => service.reservationStatusLabel || service.reservationStatus,
+      ),
+    [services],
+  );
+  const rows = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return [...services]
+      .filter((service) =>
+        (!range.from || service.dataServico.slice(0, 10) >= range.from) &&
+        (!range.to || service.dataServico.slice(0, 10) <= range.to) &&
+        (!driverIds.length || driverIds.includes(service.motoristaId)) &&
+        (!favorecidoIds.length || favorecidoIds.includes(service.favorecidoId)) &&
+        (!vehicleTypes.length || vehicleTypes.includes(service.tipoVeiculo)) &&
+        (!cpStatuses.length || cpStatuses.includes(String(service.status))) &&
+        (!reservationStatuses.length || reservationStatuses.includes(String(service.reservationStatus))) &&
+        (!lotStates.length || lotStates.some((state) => (state === "inLot" ? Boolean(service.pagamentoId) : !service.pagamentoId))) &&
+        (!repasseStates.length || repasseStates.some((state) => (state === "pending" ? Number(service.valorRepasse || 0) <= 0 : Number(service.valorRepasse || 0) > 0))) &&
+        (!normalizedQuery ||
+          `${service.identificador} ${service.motorista} ${service.trajeto} ${service.cliente}`
+            .toLowerCase()
+            .includes(normalizedQuery)),
+      )
+      .sort((left, right) =>
+        new Date(right.dataServico || 0).getTime() - new Date(left.dataServico || 0).getTime(),
+      );
+  }, [services, query, range, driverIds, favorecidoIds, vehicleTypes, cpStatuses, reservationStatuses, lotStates, repasseStates]);
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 58,
+    overscan: 12,
+  });
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  useEffect(() => { localStorage.setItem(ALL_SERVICES_COLUMNS_STORAGE_KEY, JSON.stringify(columns)); }, [columns]);
+  useEffect(() => { localStorage.setItem(ALL_SERVICES_DENSITY_STORAGE_KEY, density); }, [density]);
+  useEffect(() => { localStorage.setItem(ALL_SERVICES_VIEWS_STORAGE_KEY, JSON.stringify(views)); }, [views]);
+  useEffect(() => { localStorage.setItem(ALL_SERVICES_ACTIVE_VIEW_STORAGE_KEY, activeViewId); }, [activeViewId]);
+  const columnValue = (service, column) => {
+    if (column.id === "identificador") return <ServiceIdentifierLink identifier={service.identificador} reservationId={service.reservationId} />;
+    if (column.id === "dataServico") return formatServiceDate(service.dataServico, "Não informado");
+    if (column.id === "clienteTrajeto") return <>{service.cliente || "Não informado"}<small>{service.trajeto || "Sem trajeto"}</small></>;
+    if (column.id === "valorCobrado" || column.id === "valorRepasse") return money(service[column.id]);
+    if (column.id === "favorecido") return favorecidoById.get(service.favorecidoId) || "Não informado";
+    if (column.id === "status") return service.reservationStatusLabel || service.statusLabel || service.status || "Não informado";
+    if (column.id === "lote") return service.pagamentoId ? "Em lote" : "Fora de lote";
+    return service[column.id] || "Não informado";
+  };
+  const currentView = () => ({ columns: columns.map(({ id, width, visible }) => ({ id, width, visible })), density });
+  const applyView = (view) => { setColumns(restoreTableColumns(view.columns, ALL_SERVICES_COLUMNS)); setDensity(view.density === "compact" ? "compact" : "comfortable"); setActiveViewId(view.id); setShowViews(false); };
+  const saveView = () => {
+    const name = viewName.trim();
+    if (!name || views.some((view) => view.name.toLowerCase() === name.toLowerCase())) return;
+    const view = { id: `all-services-view-${Date.now()}`, name, ...currentView() };
+    setViews((current) => [...current, view]); setActiveViewId(view.id); setViewName("");
+  };
+  return (
+    <TabPage className="all-services-page">
+      <div className="page-title">
+        <div>
+          <span>Consulta operacional</span>
+          <h1>Todos os serviços</h1>
+          <p>Histórico completo, com serviços pendentes, pagos e já incluídos em lote.</p>
+        </div>
+      </div>
+      <section className="surface all-services-surface">
+        <div className="all-services-toolbar">
+          <div className="search-box">
+            <Search size={17} />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar serviço, motorista, trajeto ou cliente"
+            />
+          </div>
+          <strong>{loading ? "Carregando..." : `${rows.length} serviço(s)`}</strong>
+          <div className="all-services-layout-actions">
+            <div className="saved-view-wrap">
+              <button className={`secondary-button ${activeView ? "is-active" : ""}`} onClick={() => setShowViews((value) => !value)}><TableProperties size={16} />{activeView ? activeView.name : "Views"}</button>
+              {showViews && <div className="saved-view-menu" role="dialog"><div className="saved-view-list">{views.map((view) => <button className={view.id === activeViewId ? "is-selected" : ""} key={view.id} onClick={() => applyView(view)}><span>{view.name}</span>{view.id === activeViewId && <CheckCircle2 size={14} />}</button>)}</div><div className="saved-view-create"><span>Salvar layout como nova view</span><div><input value={viewName} onChange={(event) => setViewName(event.target.value)} placeholder="Nome da nova view" /><button className="primary-button" onClick={saveView}><Save size={15} />Criar</button></div></div></div>}
+            </div>
+            <button className={`secondary-button density-button ${density === "compact" ? "is-active" : ""}`} onClick={() => setDensity((current) => current === "compact" ? "comfortable" : "compact")}><Rows3 size={16} />{density === "compact" ? "Compacta" : "Compactar"}</button>
+            <div className="column-picker-wrap">
+              <button className="secondary-button" onClick={() => setShowColumns((value) => !value)}><Columns3 size={16} />Colunas</button>
+              {showColumns && <div className="column-picker" role="dialog"><div className="column-picker-head"><strong>Exibir colunas</strong><button className="text-button" onClick={() => setColumns(ALL_SERVICES_COLUMNS.map((column) => ({ ...column, visible: true })))}>Restaurar</button></div>{columns.map((column, index) => <div className="column-picker-row" key={column.id}><label><input type="checkbox" checked={column.visible} onChange={() => setColumns((current) => current.map((item) => item.id === column.id ? { ...item, visible: !item.visible } : item))} /><span>{column.label}</span></label><button className="column-pin" disabled={index === 0} onClick={() => setColumns((current) => { const next = [...current]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; return next; })} title="Mover coluna para a esquerda"><ArrowUp size={14} /></button><button className="column-pin" disabled={index === columns.length - 1} onClick={() => setColumns((current) => { const next = [...current]; [next[index + 1], next[index]] = [next[index], next[index + 1]]; return next; })} title="Mover coluna para a direita"><ArrowDown size={14} /></button></div>)}</div>}
+            </div>
+          </div>
+        </div>
+        <div className="all-services-filter-grid">
+          <label className="field"><span>De</span><input type="date" value={range.from} onChange={(event) => setRange((current) => ({ ...current, from: event.target.value }))} /></label>
+          <label className="field"><span>Até</span><input type="date" value={range.to} onChange={(event) => setRange((current) => ({ ...current, to: event.target.value }))} /></label>
+          <label className="field"><span>Motorista</span><SearchableMultiSelect value={driverIds} onChange={setDriverIds} options={driverOptions} placeholder="Todos" /></label>
+          <label className="field"><span>Favorecido</span><SearchableMultiSelect value={favorecidoIds} onChange={setFavorecidoIds} options={favorecidos.map((row) => ({ value: row.id, label: row.nome }))} placeholder="Todos" /></label>
+          <label className="field"><span>Veículo</span><SearchableMultiSelect value={vehicleTypes} onChange={setVehicleTypes} options={vehicleOptions} placeholder="Todos" /></label>
+          <label className="field"><span>Status CP</span><SearchableMultiSelect value={cpStatuses} onChange={setCpStatuses} options={cpStatusOptions} placeholder="Todos" /></label>
+          <label className="field"><span>Status reserva</span><SearchableMultiSelect value={reservationStatuses} onChange={setReservationStatuses} options={reservationStatusOptions} placeholder="Todos" /></label>
+          <label className="field"><span>Lote</span><SearchableMultiSelect value={lotStates} onChange={setLotStates} options={[{ value: "inLot", label: "Em lote" }, { value: "outsideLot", label: "Fora de lote" }]} placeholder="Todos" /></label>
+          <label className="field"><span>Repasse</span><SearchableMultiSelect value={repasseStates} onChange={setRepasseStates} options={[{ value: "pending", label: "Pendente" }, { value: "informed", label: "Informado" }]} placeholder="Todos" /></label>
+        </div>
+        <div className="all-services-grid-scroll" ref={scrollRef}>
+          <div className={`all-services-grid ${density === "compact" ? "is-compact" : ""}`} role="table" style={{ gridTemplateColumns: gridTemplate }}>
+            <div className="all-services-grid-head" role="row" style={{ gridTemplateColumns: gridTemplate }}>{visibleColumns.map((column) => <button key={column.id} onClick={() => setColumns((current) => current.map((item) => item.id === column.id ? { ...item, width: Math.max(110, item.width - 10) } : item))} title="Reduzir largura da coluna">{column.label}</button>)}</div>
+            <div className="all-services-virtual-body" style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
+              {virtualRows.map((virtualRow) => {
+                const service = rows[virtualRow.index];
+                return <div className="all-services-grid-row" role="row" key={virtualRow.key} style={{ transform: `translateY(${virtualRow.start}px)`, gridTemplateColumns: gridTemplate }}>
+                  {visibleColumns.map((column) => <span key={column.id} className={column.id === "valorCobrado" || column.id === "valorRepasse" ? "is-currency" : ""}>{columnValue(service, column)}</span>)}
+                </div>;
+              })}
+            </div>
+          </div>
+        </div>
+      </section>
+    </TabPage>
+  );
+}
+function PaymentsView({
+  services,
+  drivers,
+  favorecidos,
+  allFavorecidos,
+  links,
+  range,
+  setRange,
+  search,
+  setSearch,
+  driverIds,
+  setDriverIds,
+  favorecidoIds,
+  setFavorecidoIds,
+  vehicleTypes,
+  setVehicleTypes,
+  vehicleTypeOptions,
+  reservationStatusOptions,
+  refreshing,
+  lotDrawerOpen,
+  busy,
+  autosaveErrors,
+  onSaveRepasse,
+  onOpenConsolidated,
+  onLink,
+  onGenerateLot,
+}) {
+  const [statusFilter, setStatusFilter] = useState([]);
+  const [cpStatusFilter, setCpStatusFilter] = useState([]);
+  const [repasseFilter, setRepasseFilter] = useState("pending");
+  const statusDefaultApplied = useRef(false);
+  const cpStatusOptions = useMemo(() => {
+    const options = new Map();
+    services.forEach((service) => {
+      const value = String(service.status || "");
+      if (!value || options.has(value)) return;
+      options.set(value, {
+        value,
+        label: service.statusLabel || service.status || "Sem status",
+      });
+    });
+    return [...options.values()];
+  }, [services]);
+  const thirdPartyDriverIds = useMemo(
+    () =>
+      new Set(
+        drivers
+          .filter(
+            (driver) =>
+              Number(driver.tipoVinculo) === CHOICES.thirdPartyEmployee ||
+              normalizeFilterLabel(driver.tipoVinculo) === "terceiro",
+          )
+          .map((driver) => driver.id),
+      ),
+    [drivers],
+  );
+  useEffect(() => {
+    if (statusDefaultApplied.current || !reservationStatusOptions.length) return;
+    statusDefaultApplied.current = true;
+    setStatusFilter(
+      reservationStatusOptions
+        .filter((option) =>
+          REPASSE_DEFAULT_STATUS_LABELS.includes(
+            normalizeFilterLabel(option.label),
+          ),
+        )
+        .map((option) => option.value),
+    );
+  }, [reservationStatusOptions]);
+  const filteredServices = useMemo(
+    () =>
+      services.filter((row) =>
+        (!row.pagamentoId || (repasseFilter === 'all' && row.consolidatedLot)) &&
+        (repasseFilter === "all" || (!isLegacyPaidService(row) && Number(row.valorRepasse || 0) <= 0)) &&
+        thirdPartyDriverIds.has(row.motoristaId) &&
+        (!cpStatusFilter.length || cpStatusFilter.includes(String(row.status))) &&
+        (!statusFilter.length || statusFilter.includes(row.reservationStatus)),
+      ),
+    [services, thirdPartyDriverIds, cpStatusFilter, statusFilter, repasseFilter],
+  );
+  const servicesWithStatusColor = useMemo(() => {
+    const colors = new Map(
+      reservationStatusOptions.map((option) => [option.value, option.color]),
+    );
+    return filteredServices.map((service) => ({
+      ...service,
+      reservationStatusColor: colors.get(service.reservationStatus) || "",
+    }));
+  }, [filteredServices, reservationStatusOptions]);
+  const driverOptions = useMemo(
+    () => drivers.map((row) => ({ value: row.id, label: row.nome })),
+    [drivers],
+  );
+  const favorecidoOptions = useMemo(
+    () => favorecidos.map((row) => ({ value: row.id, label: row.nome })),
+    [favorecidos],
+  );
+  const setRepasseFilterMode = (value) => {
+    setRepasseFilter(value);
+    if (value === "all") {
+      setCpStatusFilter([]);
+      setStatusFilter([]);
+    }
+  };
+  return (
+    <TabPage className="repasse-page">
+      <div className="page-title">
+        <div>
+          <span>Financeiro / operação</span>
+          <h1>Lançar repasses</h1>
+          <p>Confira o serviço e registre somente o valor a repassar.</p>
+        </div>
+        <div className="repasse-filter-actions" role="group" aria-label="Filtro de repasse">
+          <button type="button" className={repasseFilter === "pending" ? "is-active" : ""} onClick={() => setRepasseFilterMode("pending")} aria-pressed={repasseFilter === "pending"} title="Mostrar somente serviços sem valor de repasse">Valor pendente</button>
+          <button type="button" className={repasseFilter === "all" ? "is-active" : ""} onClick={() => setRepasseFilterMode("all")} aria-pressed={repasseFilter === "all"} title="Mostrar todos os serviços fora de lote">Todos</button>
+        </div>
+      </div>
+      <section className="surface filter-surface">
+        <div className="search-box">
+          <Search size={17} />
+          <input
+            placeholder="Buscar serviço, motorista ou trajeto"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </div>
+        <div className="finance-filter-grid">
+          <label className="field">
+            <span>De</span>
+            <input
+              type="date"
+              value={range.from}
+              onChange={(event) =>
+                setRange((current) => ({
+                  ...current,
+                  from: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label className="field">
+            <span>Até</span>
+            <input
+              type="date"
+              value={range.to}
+              onChange={(event) =>
+                setRange((current) => ({ ...current, to: event.target.value }))
+              }
+            />
+          </label>
+          <label className="field">
+            <span>Motorista</span>
+            <SearchableMultiSelect
+              value={driverIds}
+              onChange={setDriverIds}
+              aria-label="Filtrar lançamentos por motorista"
+              options={driverOptions}
+              placeholder="Todos os motoristas"
+            />
+          </label>
+          <label className="field">
+            <span>Favorecido</span>
+            <SearchableMultiSelect
+              value={favorecidoIds}
+              onChange={setFavorecidoIds}
+              aria-label="Filtrar lançamentos por favorecido"
+              options={favorecidoOptions}
+              placeholder="Todos os favorecidos"
+            />
+          </label>
+          <label className="field">
+            <span>Tipo de veículo</span>
+            <SearchableMultiSelect
+              value={vehicleTypes}
+              onChange={setVehicleTypes}
+              aria-label="Filtrar lançamentos por tipo de veículo"
+              options={vehicleTypeOptions}
+              placeholder="Todos os veículos"
+            />
+          </label>
+          <label className="field">
+            <span>Status da CP</span>
+            <SearchableMultiSelect
+              value={cpStatusFilter}
+              onChange={setCpStatusFilter}
+              aria-label="Filtrar lançamentos por status da CP"
+              options={cpStatusOptions}
+              placeholder="Todos os status da CP"
+            />
+          </label>
+          <label className="field">
+            <span>Status da reserva</span>
+            <SearchableMultiSelect
+              value={statusFilter}
+              onChange={setStatusFilter}
+              aria-label="Filtrar lançamentos por status da reserva"
+              options={reservationStatusOptions}
+              placeholder="Todos os status"
+            />
+          </label>
+        </div>
+      </section>
+      <RepasseGrid
+        services={servicesWithStatusColor}
+        refreshing={refreshing}
+        favorecidos={allFavorecidos}
+        busy={busy}
+        autosaveErrors={autosaveErrors}
+        onSave={onSaveRepasse}
+        onLink={onLink}
+        links={links}
+        lotDrawerOpen={lotDrawerOpen}
+        onGenerateLot={onGenerateLot}
+        onOpenConsolidated={onOpenConsolidated}
+      />
+    </TabPage>
+  );
+}
+function RepasseGrid({
+  services,
+  refreshing,
+  favorecidos,
+  busy,
+  autosaveErrors,
+  onSave,
+  onLink,
+  links,
+  lotDrawerOpen,
+  onGenerateLot,
+  onOpenConsolidated,
+}) {
+  const [columns, setColumns] = useState(loadRepasseColumns);
+  const [density, setDensity] = useState(loadRepasseDensity);
+  const [views, setViews] = useState(loadRepasseViews);
+  const [activeViewId, setActiveViewId] = useState(loadActiveRepasseView);
+  const [showPicker, setShowPicker] = useState(false);
+  const [showViews, setShowViews] = useState(false);
+  const [columnSearch, setColumnSearch] = useState("");
+  const [viewName, setViewName] = useState("");
+  const [viewMessage, setViewMessage] = useState("");
+  const [showSelectAllPicker, setShowSelectAllPicker] = useState(false);
+  const [pendingCpSelection, setPendingCpSelection] = useState(null);
+  const [draggedColumn, setDraggedColumn] = useState("");
+  const [dropTarget, setDropTarget] = useState(null);
+  const [resize, setResize] = useState(null);
+  const [sort, setSort] = useState({ id: "dataServico", direction: "desc" });
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [activeRepasseRowId, setActiveRepasseRowId] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
+  const orderedColumns = useMemo(() => orderRepasseColumns(columns), [columns]);
+  const visibleColumns = useMemo(
+    () => orderedColumns.filter((column) => column.visible),
+    [orderedColumns],
+  );
+  const pinnedColumns = useMemo(
+    () => visibleColumns.filter((column) => column.locked),
+    [visibleColumns],
+  );
+  const lastPinnedColumnId = pinnedColumns[pinnedColumns.length - 1]?.id;
+  const template = useMemo(
+    () => visibleColumns.map((column) => `${column.width}px`).join(" "),
+    [visibleColumns],
+  );
+  const gridTemplate = useMemo(() => `52px ${template}`, [template]);
+  const gridScrollRef = useRef(null);
+  const missingInformationLogRef = useRef(new Set());
+  const columnPickerRef = useRef(null);
+  const columnRowRefs = useRef(new Map());
+  const previousColumnPositionsRef = useRef(new Map());
+  const savedViewRef = useRef(null);
+  const pendingCount = useMemo(
+    () =>
+      services.filter(
+        (service) => !isLegacyPaidService(service) && service.valorRepasse <= 0,
+      ).length,
+    [services],
+  );
+  const pickerColumns = useMemo(() => {
+    const query = columnSearch.toLowerCase();
+    return orderedColumns.filter((column) => column.label.toLowerCase().includes(query));
+  }, [columnSearch, orderedColumns]);
+  const activeView = views.find((view) => view.id === activeViewId);
+  const currentView = () => ({
+    columns: columns.map(({ id, width, visible, locked }) => ({
+      id,
+      width,
+      visible,
+      locked,
+    })),
+    density,
+    sort,
+  });
+  const viewHasChanges =
+    activeView &&
+    JSON.stringify(currentView()) !==
+      JSON.stringify({
+        columns: activeView.columns,
+        density: activeView.density,
+        sort: activeView.sort,
+      });
+  const sortedServices = useMemo(() => {
+    const isDate = ["dataServico", "dataFinalizacao"].includes(sort.id);
+    const isCurrency = ["valorRepasse", "valorCobrado"].includes(sort.id);
+    return [...services].sort((left, right) => {
+      const result = isDate
+        ? new Date(left[sort.id] || 0).getTime() -
+          new Date(right[sort.id] || 0).getTime()
+        : isCurrency
+          ? Number(left[sort.id] || 0) - Number(right[sort.id] || 0)
+          : String(left[sort.id] || "").localeCompare(
+              String(right[sort.id] || ""),
+              "pt-BR",
+            );
+      return sort.direction === "asc" ? result : -result;
+    });
+  }, [services, sort]);
+  const exportCurrentView = async () => {
+    setExporting(true);
+    setExportError("");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    try {
+      downloadServicesXlsx(sortedServices, visibleColumns, favorecidos, activeView?.name);
+    } catch (error) {
+      setExportError(`Falha ao extrair Excel: ${error.message}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+  const serviceIndexById = useMemo(
+    () => new Map(sortedServices.map((service, index) => [service.id, index])),
+    [sortedServices],
+  );
+  const activeRepasseRowIndex = activeRepasseRowId
+    ? serviceIndexById.get(activeRepasseRowId) ?? -1
+    : -1;
+  const virtualRangeExtractor = useCallback(
+    (range) => {
+      const indexes = defaultRangeExtractor(range);
+      if (
+        activeRepasseRowIndex >= 0 &&
+        !indexes.includes(activeRepasseRowIndex)
+      )
+        indexes.push(activeRepasseRowIndex);
+      return indexes.sort((left, right) => left - right);
+    },
+    [activeRepasseRowIndex],
+  );
+  const rowVirtualizer = useVirtualizer({
+    count: sortedServices.length,
+    getScrollElement: () => gridScrollRef.current,
+    estimateSize: () => (density === "compact" ? 44 : 58),
+    getItemKey: (index) => sortedServices[index]?.id || index,
+    overscan: 8,
+    rangeExtractor: virtualRangeExtractor,
+  });
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  useEffect(() => rowVirtualizer.measure(), [density, rowVirtualizer]);
+  const activeFavorecidoIds = useMemo(
+    () =>
+      new Set(
+        favorecidos
+          .filter((favorecido) => favorecido.status === "ativo")
+          .map((favorecido) => favorecido.id),
+      ),
+    [favorecidos],
+  );
+  const activeLinkKeys = useMemo(
+    () =>
+      new Set(
+        links
+          .filter((link) => link.status === "ativo")
+          .map((link) => `${link.motoristaId}:${link.favorecidoId}`),
+      ),
+    [links],
+  );
+  const linkedFavorecidosByMotorista = useMemo(() => {
+    const favorecidoById = new Map(
+      favorecidos.map((favorecido) => [favorecido.id, favorecido]),
+    );
+    const result = new Map();
+    links.forEach((link) => {
+      if (link.status !== "ativo") return;
+      const favorecido = favorecidoById.get(link.favorecidoId);
+      if (!favorecido || favorecido.status !== "ativo") return;
+      const current = result.get(link.motoristaId) || [];
+      current.push(favorecido);
+      result.set(link.motoristaId, current);
+    });
+    return result;
+  }, [favorecidos, links]);
+  const eligibleLotServices = useMemo(
+    () =>
+      services.filter(
+        (service) =>
+          service.favorecidoId &&
+          activeFavorecidoIds.has(service.favorecidoId) &&
+          eligibleServices([service], service.favorecidoId, activeLinkKeys).length,
+      ),
+    [services, activeLinkKeys, activeFavorecidoIds],
+  );
+  const eligibleLotServiceIds = useMemo(
+    () => new Set(eligibleLotServices.map((service) => service.id)),
+    [eligibleLotServices],
+  );
+  const selectedServices = useMemo(
+    () => eligibleLotServices.filter((service) => selectedIds.has(service.id)),
+    [eligibleLotServices, selectedIds],
+  );
+  const selectedTotals = useMemo(
+    () => paymentTotals(selectedServices),
+    [selectedServices],
+  );
+  const selectedWarningServices = useMemo(
+    () => selectedServices.filter((service) => serviceLotWarnings(service).length),
+    [selectedServices],
+  );
+  const selectedFavorecidoId = selectedServices[0]?.favorecidoId || "";
+  const selectableFavorecidoId =
+    selectedFavorecidoId || eligibleLotServices[0]?.favorecidoId || "";
+  const selectableLotServices = useMemo(
+    () =>
+      eligibleLotServices.filter(
+        (service) => service.favorecidoId === selectableFavorecidoId,
+      ),
+    [eligibleLotServices, selectableFavorecidoId],
+  );
+  const allSelectableServicesSelected =
+    selectableLotServices.length > 0 &&
+    selectableLotServices.every((service) => selectedIds.has(service.id));
+  const selectAllRef = useRef(null);
+  const selectAllPickerRef = useRef(null);
+  const pendingCpDialogRef = useRef(null);
+  useEffect(() => {
+    const eligibleIds = new Set(eligibleLotServices.map((service) => service.id));
+    setSelectedIds((current) => {
+      const next = new Set([...current].filter((id) => eligibleIds.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [eligibleLotServices]);
+  useEffect(() => {
+    if (!selectAllRef.current) return;
+    selectAllRef.current.indeterminate =
+      selectedServices.length > 0 && !allSelectableServicesSelected;
+  }, [selectedServices.length, allSelectableServicesSelected]);
+  const selectableFavorecidoGroups = useMemo(() => {
+    const groups = new Map();
+    eligibleLotServices.forEach((service) => {
+      const current = groups.get(service.favorecidoId) || [];
+      current.push(service);
+      groups.set(service.favorecidoId, current);
+    });
+    return [...groups.entries()]
+      .map(([favorecidoId, groupServices]) => ({
+        favorecidoId,
+        nome:
+          favorecidos.find((favorecido) => favorecido.id === favorecidoId)?.nome ||
+          "Favorecido não identificado",
+        services: groupServices,
+        total: groupServices.reduce(
+          (sum, service) => sum + Number(service.valorRepasse || 0),
+          0,
+        ),
+      }))
+      .sort((left, right) => left.nome.localeCompare(right.nome, "pt-BR"));
+  }, [eligibleLotServices, favorecidos]);
+  useEffect(() => {
+    if (!showSelectAllPicker) return undefined;
+    const previousFocus = document.activeElement;
+    selectAllPickerRef.current
+      ?.querySelector(".repasse-favorecido-option")
+      ?.focus();
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setShowSelectAllPicker(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = [
+        ...selectAllPickerRef.current.querySelectorAll(
+          'button:not(:disabled), [href], input:not(:disabled), [tabindex]:not([tabindex="-1"])',
+        ),
+      ];
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      previousFocus?.focus?.();
+    };
+  }, [showSelectAllPicker]);
+  useEffect(() => {
+    if (!pendingCpSelection) return undefined;
+    const previousFocus = document.activeElement;
+    pendingCpDialogRef.current?.querySelector(".primary-button")?.focus();
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setPendingCpSelection(null);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const buttons = [...pendingCpDialogRef.current.querySelectorAll("button")];
+      const first = buttons[0];
+      const last = buttons[buttons.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      previousFocus?.focus?.();
+    };
+  }, [pendingCpSelection]);
+  const pinnedStyles = useMemo(() => {
+    let left = 44;
+    const styles = new Map();
+    visibleColumns.forEach((column) => {
+      if (!column.locked) return;
+      styles.set(column.id, { left: `${left}px` });
+      left += column.width;
+    });
+    return styles;
+  }, [visibleColumns]);
+  const pinnedStyle = (column) =>
+    column.locked ? pinnedStyles.get(column.id) : undefined;
+  useEffect(() => {
+    if (!showPicker && !showViews) return undefined;
+    const closeMenus = (event) => {
+      if (!columnPickerRef.current?.contains(event.target)) setShowPicker(false);
+      if (!savedViewRef.current?.contains(event.target)) setShowViews(false);
+    };
+    document.addEventListener("pointerdown", closeMenus);
+    return () => document.removeEventListener("pointerdown", closeMenus);
+  }, [showPicker, showViews]);
+
+  useLayoutEffect(() => {
+    if (!showPicker) return undefined;
+    const picker = columnPickerRef.current?.querySelector(".column-picker");
+    const updateHeight = () => {
+      if (!picker) return;
+      if (window.matchMedia("(max-width: 820px)").matches) {
+        picker.classList.remove("is-above");
+        picker.style.maxHeight = "";
+        return;
+      }
+      const anchor = columnPickerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - anchor.bottom - 19;
+      const spaceAbove = anchor.top - 19;
+      const showAbove = spaceBelow < 220 && spaceAbove > spaceBelow;
+      picker.classList.toggle("is-above", showAbove);
+      picker.style.maxHeight = `${Math.max(0, showAbove ? spaceAbove : spaceBelow)}px`;
+    };
+    updateHeight();
+    window.addEventListener("resize", updateHeight);
+    window.addEventListener("scroll", updateHeight, true);
+    return () => {
+      window.removeEventListener("resize", updateHeight);
+      window.removeEventListener("scroll", updateHeight, true);
+    };
+  }, [showPicker]);
+
+  useLayoutEffect(() => {
+    const previousPositions = previousColumnPositionsRef.current;
+    if (!previousPositions.size) return;
+    previousColumnPositionsRef.current = new Map();
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    columnRowRefs.current.forEach((element, id) => {
+      const previousTop = previousPositions.get(id);
+      const delta = previousTop - element.getBoundingClientRect().top;
+      if (previousTop === undefined || Math.abs(delta) < 1) return;
+      element.animate(
+        [
+          { transform: `translateY(${delta}px)` },
+          { transform: "translateY(0)" },
+        ],
+        { duration: 190, easing: "cubic-bezier(0.23, 1, 0.32, 1)" },
+      );
+    });
+  }, [columns]);
+
+  useEffect(() => {
+    localStorage.setItem(REPASSE_COLUMNS_STORAGE_KEY, JSON.stringify(columns));
+  }, [columns]);
+  useEffect(() => {
+    localStorage.setItem(REPASSE_DENSITY_STORAGE_KEY, density);
+  }, [density]);
+  useEffect(() => {
+    localStorage.setItem(REPASSE_VIEWS_STORAGE_KEY, JSON.stringify(views));
+  }, [views]);
+  useEffect(() => {
+    localStorage.setItem(REPASSE_ACTIVE_VIEW_STORAGE_KEY, activeViewId);
+  }, [activeViewId]);
+  useEffect(() => {
+    if (!resize) return undefined;
+    const move = (event) => {
+      const width = Math.max(110, resize.width + event.clientX - resize.startX);
+      setColumns((current) =>
+        current.map((column) =>
+          column.id === resize.id ? { ...column, width } : column,
+        ),
+      );
+    };
+    const stop = () => setResize(null);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop, { once: true });
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+    };
+  }, [resize]);
+
+  const reorderColumns = (sourceId, targetId, placement = "before") => {
+    if (!sourceId || sourceId === targetId) return;
+    setColumns((current) => {
+      const next = orderRepasseColumns(current);
+      const source = next.findIndex((column) => column.id === sourceId);
+      const target = next.findIndex((column) => column.id === targetId);
+      if (source < 0 || target < 0) return current;
+      previousColumnPositionsRef.current = new Map(
+        [...columnRowRefs.current].map(([id, element]) => [
+          id,
+          element.getBoundingClientRect().top,
+        ]),
+      );
+      const [column] = next.splice(source, 1);
+      const targetIndex = next.findIndex((item) => item.id === targetId);
+      const targetColumn = next[targetIndex];
+      next.splice(targetIndex + (placement === "after" ? 1 : 0), 0, {
+        ...column,
+        locked: targetColumn.locked,
+      });
+      return next;
+    });
+  };
+  const moveColumn = (targetId, placement) => {
+    reorderColumns(draggedColumn, targetId, placement);
+    setDraggedColumn("");
+    setDropTarget(null);
+  };
+  const moveColumnToEnd = () => {
+    const source = orderedColumns.find((column) => column.id === draggedColumn);
+    const target = [...orderedColumns]
+      .reverse()
+      .find((column) => column.locked === source?.locked);
+    if (target) reorderColumns(draggedColumn, target.id, "after");
+    setDraggedColumn("");
+    setDropTarget(null);
+  };
+  const toggleColumn = (id) =>
+    setColumns((current) =>
+      current.map((column) =>
+        column.id === id ? { ...column, visible: !column.visible } : column,
+      ),
+    );
+  const toggleColumnPin = (id) =>
+    setColumns((current) => {
+      previousColumnPositionsRef.current = new Map(
+        [...columnRowRefs.current].map(([columnId, element]) => [
+          columnId,
+          element.getBoundingClientRect().top,
+        ]),
+      );
+      return orderRepasseColumns(
+        current.map((column) =>
+          column.id === id ? { ...column, locked: !column.locked } : column,
+        ),
+      );
+    });
+  const resetColumns = () =>
+    setColumns(REPASSE_COLUMNS.map((column) => ({ ...column, visible: true })));
+  const adjustColumnWidth = (id, delta) =>
+    setColumns((current) =>
+      current.map((column) =>
+        column.id === id
+          ? { ...column, width: Math.max(110, column.width + delta) }
+          : column,
+      ),
+    );
+  const cycleSort = (id) =>
+    setSort((current) =>
+      current.id === id
+        ? { id, direction: current.direction === "asc" ? "desc" : "asc" }
+        : { id, direction: "asc" },
+    );
+  const moveColumnWithKeyboard = (id, direction) => {
+    const index = orderedColumns.findIndex((column) => column.id === id);
+    const source = orderedColumns[index];
+    const target = orderedColumns[index + direction];
+    if (!source || !target) return;
+    const placement =
+      source.locked === target.locked || direction > 0 ? "before" : "after";
+    reorderColumns(id, target.id, placement);
+  };
+  const applyView = (view) => {
+    setColumns(viewColumns(view.columns));
+    setDensity(view.density === "compact" ? "compact" : "comfortable");
+    setSort(view.sort || { id: "dataServico", direction: "desc" });
+    setActiveViewId(view.id);
+    setViewMessage(`View “${view.name}” aplicada.`);
+    setShowViews(false);
+  };
+  const saveView = () => {
+    const name = viewName.trim();
+    if (!name) {
+      setViewMessage("Informe um nome para salvar a view.");
+      return;
+    }
+    if (views.some((view) => view.name.toLowerCase() === name.toLowerCase())) {
+      setViewMessage("Já existe uma view com este nome.");
+      return;
+    }
+    const view = {
+      id: `view-${Date.now()}`,
+      name,
+      ...currentView(),
+    };
+    setViews((current) => [...current, view]);
+    setActiveViewId(view.id);
+    setViewName("");
+    setViewMessage(`View “${name}” salva.`);
+  };
+  const updateView = () => {
+    if (!activeView) return;
+    setViews((current) =>
+      current.map((view) =>
+        view.id === activeView.id ? { ...view, ...currentView() } : view,
+      ),
+    );
+    setViewMessage(`View “${activeView.name}” atualizada.`);
+  };
+  const deleteView = () => {
+    if (!activeView) return;
+    setViews((current) => current.filter((view) => view.id !== activeView.id));
+    setActiveViewId("");
+    setViewMessage(`View “${activeView.name}” excluída.`);
+  };
+  const serviceHasGridControl = (service, columnId) => {
+    if (columnId !== "favorecido") return true;
+    const linkedFavorecidos =
+      linkedFavorecidosByMotorista.get(service.motoristaId) || [];
+    return !linkedFavorecidos.some(
+      (favorecido) => favorecido.id === service.favorecidoId,
+    );
+  };
+  const focusVirtualGridControl = (index, columnId) => {
+    const service = sortedServices[index];
+    if (!service) return;
+    rowVirtualizer.scrollToIndex(index, { align: "auto" });
+    let attempts = 0;
+    const focus = () => {
+      const target = gridScrollRef.current?.querySelector(
+        `[data-repasse-row-id="${service.id}"][data-repasse-tab-stop="${columnId}"]`,
+      );
+      if (target) {
+        target.focus();
+        return;
+      }
+      attempts += 1;
+      if (attempts < 8) window.requestAnimationFrame(focus);
+    };
+    window.requestAnimationFrame(focus);
+  };
+  const moveGridFocus = (event, trigger, columnId, serviceId) => {
+    if (event.key !== "Tab") return;
+    const currentIndex = serviceIndexById.get(serviceId);
+    const direction = event.shiftKey ? -1 : 1;
+    let nextIndex = Number(currentIndex) + direction;
+    while (
+      nextIndex >= 0 &&
+      nextIndex < sortedServices.length &&
+      !serviceHasGridControl(sortedServices[nextIndex], columnId)
+    )
+      nextIndex += direction;
+    if (nextIndex < 0 || nextIndex >= sortedServices.length) return;
+    event.preventDefault();
+    focusVirtualGridControl(nextIndex, columnId);
+  };
+  const cell = (service, column) => {
+    if (column.id === "identificador")
+      return (
+        <ServiceIdentifierLink
+          identifier={service.identificador}
+          reservationId={service.reservationId}
+        />
+      );
+    if (column.id === "statusCp") {
+      if (!service.statusLabel && !service.status) {
+        const logKey = `${service.id}:new_status`;
+        if (!missingInformationLogRef.current.has(logKey)) {
+          missingInformationLogRef.current.add(logKey);
+          console.warn(
+            "[Tela Pagamento de Fornecedores] Status da CP exibido como Não informado",
+            {
+              servico: service.identificador || service.id,
+              composicaoId: service.compositionId || null,
+              campo: "new_status",
+              valorRecebido: service.status || null,
+              motivo:
+                "A composição não trouxe valor nem rótulo formatado para o status da CP.",
+            },
+          );
+        }
+      }
+      return (
+        <span
+          className={`status-badge status-cp-${normalizeFilterLabel(service.status || "sem-status").replace(/[^a-z0-9]+/g, "-")}`}
+          title={service.statusLabel || "Status da CP não informado"}
+        >
+          {service.statusLabel || "Status da CP não informado"}
+        </span>
+      );
+    }
+    if (column.id === "statusReserva") {
+      if (!service.reservationStatusLabel && !service.reservationStatus) {
+        const logKey = `${service.id}:cr40f_status`;
+        if (!missingInformationLogRef.current.has(logKey)) {
+          missingInformationLogRef.current.add(logKey);
+          console.warn(
+            "[Tela Pagamento de Fornecedores] Informação exibida como Não informado",
+            {
+              servico: service.identificador || service.id,
+              reservaId: service.reservationId || null,
+              campo: "cr40f_status",
+              valorRecebido: service.reservationStatus || null,
+              motivo:
+                "O registro da reserva não trouxe valor nem rótulo formatado para o status.",
+            },
+          );
+        }
+      }
+      return (
+        <span
+          className={`status-badge status-${service.reservationStatus} ${service.reservationStatusColor ? "has-choice-color" : ""}`}
+          style={
+            service.reservationStatusColor
+              ? { "--choice-color": service.reservationStatusColor }
+              : undefined
+          }
+          title={service.reservationStatusLabel || "Status n\u00e3o informado"}
+        >
+          {service.reservationStatusLabel || "N\u00e3o informado"}
+        </span>
+      );
+    }
+    if (column.id === 'valorRepasse' && service.consolidatedLot) return <button className="text-button consolidated-link" onClick={() => onOpenConsolidated(service.consolidatedLot)}>Repasse no consolidado</button>;
+    if (column.id === 'favorecido' && service.consolidatedLot) return <span>{service.consolidatedLot.favorecido?.nome || 'No consolidado'}</span>;
+    if (column.id === "valorRepasse")
+      return (
+        <RepasseInput
+          service={service}
+          saving={busy(`repasse-${service.id}`) || busy(`link-${service.id}`)}
+          onSave={onSave}
+          onTabNavigate={(event, trigger) =>
+            moveGridFocus(event, trigger, "valorRepasse", service.id)
+          }
+          onFocusRow={() => setActiveRepasseRowId(service.id)}
+          onBlurRow={() =>
+            setActiveRepasseRowId((current) =>
+              current === service.id ? "" : current,
+            )
+          }
+        />
+      );
+    if (column.id === "favorecido")
+      return (
+        <FavorecidoCell
+          service={service}
+          linkedFavorecidos={
+            linkedFavorecidosByMotorista.get(service.motoristaId) || []
+          }
+          saving={busy(`link-${service.id}`)}
+          error={autosaveErrors[`link-${service.id}`]}
+          onLink={onLink}
+          onTabNavigate={(event, trigger) =>
+            moveGridFocus(event, trigger, "favorecido", service.id)
+          }
+        />
+      );
+    if (column.id === "valorCobrado")
+      return (
+        <strong className="currency-cell">{money(service.valorCobrado)}</strong>
+      );
+    if (column.id === "dataServico" || column.id === "dataFinalizacao")
+      return (
+        <span>{formatServiceDate(service[column.id], "Não informado")}</span>
+      );
+    return (
+      <span title={service[column.id] || "Não informado"}>
+        {service[column.id] || "Não informado"}
+      </span>
+    );
+  };
+
+  const requestSelection = (ids, replace = false) => {
+    const pending = eligibleLotServices.filter(
+      (service) => ids.includes(service.id) && (replace || !selectedIds.has(service.id)) && !isCpCompleted(service),
+    );
+    if (pending.length) {
+      setPendingCpSelection({ ids, replace, pending });
+      return;
+    }
+    applySelection(ids, replace);
+  };
+  const applySelection = (ids, replace = false) =>
+    setSelectedIds((current) => {
+      if (replace) return new Set(ids);
+      const next = new Set(current);
+      ids.forEach((id) => {
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+      });
+      return next;
+    });
+  const toggleServiceSelection = (serviceId) => requestSelection([serviceId]);
+  const toggleServicesForFavorecido = (favorecidoId) => {
+    const groupIds = new Set(
+      eligibleLotServices
+        .filter((service) => service.favorecidoId === favorecidoId)
+        .map((service) => service.id),
+    );
+    const ids = [...groupIds];
+    const allGroupSelected = ids.length > 0 && ids.every((id) => selectedIds.has(id));
+    requestSelection(allGroupSelected ? [] : ids, true);
+    setShowSelectAllPicker(false);
+  };
+  const requestToggleAllSelectableServices = () => {
+    if (
+      allSelectableServicesSelected ||
+      selectedFavorecidoId ||
+      selectableFavorecidoGroups.length <= 1
+    ) {
+      toggleServicesForFavorecido(selectableFavorecidoId);
+      return;
+    }
+    setShowSelectAllPicker(true);
+  };
+
+  return (
+    <section
+      className={`surface repasse-grid-shell ${density === "compact" ? "is-compact" : ""}`}
+    >
+      <div className="repasse-grid-toolbar">
+        <div className="repasse-grid-summary">
+          <strong>{services.length}</strong>
+          <span>serviços concluídos</span>
+          {pendingCount > 0 && <b>{pendingCount} pendente(s)</b>}
+          {selectedServices.length > 0 ? (
+            <>
+              <span className="repasse-selection-status" role="status">
+                <Check size={13} aria-hidden="true" />
+                {selectedServices.length} selecionado(s)
+              </span>
+              <small className="repasse-selection-total">
+                Repasse: <strong>{money(selectedTotals.repasse)}</strong>
+              </small>
+              {selectedWarningServices.length > 0 && (
+                <small className="repasse-selection-warning">
+                  {selectedWarningServices.length} com aviso financeiro/CP
+                </small>
+              )}
+            </>
+          ) : (
+            <small>Selecione serviços prontos do mesmo favorecido.</small>
+          )}
+        </div>
+        <div className="repasse-grid-actions">
+          {exportError && <span role="alert">{exportError}</span>}
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={!sortedServices.length || exporting || refreshing}
+            onClick={exportCurrentView}
+            title="Extrair todas as linhas dos filtros e colunas da view atual"
+          >
+            <FileDown size={16} />
+            {exporting ? "Preparando Excel…" : "Extrair para Excel"}
+          </button>
+          <GenerateLotButton
+            selectedServices={selectedServices}
+            drawerOpen={lotDrawerOpen}
+            onGenerateLot={onGenerateLot}
+          />
+          <div className="saved-view-wrap" ref={savedViewRef}>
+            <button
+              className={`secondary-button ${activeView ? "is-active" : ""}`}
+              onClick={() => {
+                setShowViews((value) => !value);
+                setShowPicker(false);
+              }}
+              aria-expanded={showViews}
+            >
+              <TableProperties size={16} />
+              {activeView ? activeView.name : "Views"}
+            </button>
+            {showViews && (
+              <div className="saved-view-menu" role="dialog" aria-label="Views salvas">
+                <div className="saved-view-head">
+                  <div>
+                    <strong>Views da tabela</strong>
+                    <span>
+                      {activeView
+                        ? viewHasChanges
+                          ? "Alterações não salvas"
+                          : "View ativa"
+                        : "Layout atual não salvo"}
+                    </span>
+                  </div>
+                </div>
+                <div className="saved-view-list">
+                  {views.map((view) => (
+                    <button
+                      className={view.id === activeViewId ? "is-selected" : ""}
+                      key={view.id}
+                      onClick={() => applyView(view)}
+                    >
+                      <span>{view.name}</span>
+                      {view.id === activeViewId && <CheckCircle2 size={14} />}
+                    </button>
+                  ))}
+                  {!views.length && (
+                    <span className="saved-view-empty">Nenhuma view salva.</span>
+                  )}
+                </div>
+                {activeView && (
+                  <div className="saved-view-active">
+                    <div>
+                      <span>View ativa</span>
+                      <strong>{activeView.name}</strong>
+                    </div>
+                    <button
+                      className="secondary-button"
+                      onClick={updateView}
+                      disabled={!viewHasChanges}
+                    >
+                      <Save size={15} />
+                      Salvar alterações
+                    </button>
+                  </div>
+                )}
+                <div className="saved-view-create">
+                  <span>Salvar layout como nova view</span>
+                  <div>
+                  <input
+                    value={viewName}
+                    onChange={(event) => setViewName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") saveView();
+                    }}
+                    placeholder="Nome da nova view"
+                    aria-label="Nome da nova view"
+                  />
+                  <button className="primary-button" onClick={saveView}>
+                    <Save size={15} />
+                    Criar
+                  </button>
+                  </div>
+                </div>
+                <div className="saved-view-foot">
+                  {viewMessage && <span>{viewMessage}</span>}
+                  {activeView && (
+                    <button className="text-button" onClick={deleteView}>
+                      Excluir view
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          <button
+            className={`secondary-button density-button ${density === "compact" ? "is-active" : ""}`}
+            onClick={() =>
+              setDensity((current) =>
+                current === "compact" ? "comfortable" : "compact",
+              )
+            }
+            aria-pressed={density === "compact"}
+            title="Alternar densidade das linhas"
+          >
+            <Rows3 size={16} />
+            {density === "compact" ? "Compacta" : "Compactar"}
+          </button>
+          <div className="column-picker-wrap" ref={columnPickerRef}>
+            <button
+              className="secondary-button"
+              onClick={() => {
+                setShowPicker((value) => !value);
+                setShowViews(false);
+              }}
+              aria-expanded={showPicker}
+            >
+              <Columns3 size={16} />
+              Colunas
+            </button>
+            {showPicker && (
+              <div
+                className="column-picker"
+                role="dialog"
+                aria-label="Escolher colunas"
+              >
+                <div className="column-picker-head">
+                  <strong>Exibir colunas</strong>
+                  <button className="text-button" onClick={resetColumns}>
+                    Restaurar
+                  </button>
+                </div>
+                <input
+                  className="column-search"
+                  value={columnSearch}
+                  onChange={(event) => setColumnSearch(event.target.value)}
+                  placeholder="Localizar coluna"
+                  aria-label="Localizar coluna"
+                />
+                {pickerColumns.map((column) => (
+                  <div
+                    className={`column-picker-row ${draggedColumn === column.id ? "is-dragging" : ""} ${dropTarget?.id === column.id ? `is-drop-${dropTarget.placement}` : ""}`}
+                    key={column.id}
+                    ref={(element) => {
+                      if (element) columnRowRefs.current.set(column.id, element);
+                      else columnRowRefs.current.delete(column.id);
+                    }}
+                    onDragOver={(event) => {
+                      if (!draggedColumn || draggedColumn === column.id) return;
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = "move";
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      const nextTarget = {
+                        id: column.id,
+                        placement:
+                          event.clientY < rect.top + rect.height / 2
+                            ? "before"
+                            : "after",
+                      };
+                      setDropTarget((current) =>
+                        current?.id === nextTarget.id &&
+                        current.placement === nextTarget.placement
+                          ? current
+                          : nextTarget,
+                      );
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      moveColumn(
+                        column.id,
+                        dropTarget?.id === column.id
+                          ? dropTarget.placement
+                          : "before",
+                      );
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="column-drag-handle"
+                      draggable
+                      aria-label={`Reordenar ${column.label}`}
+                      onDragStart={(event) => {
+                        event.dataTransfer.effectAllowed = "move";
+                        event.dataTransfer.setData("text/plain", column.id);
+                        setDropTarget(null);
+                        setDraggedColumn(column.id);
+                      }}
+                      onDragEnd={() => {
+                        setDraggedColumn("");
+                        setDropTarget(null);
+                      }}
+                    >
+                      <GripVertical size={15} aria-hidden="true" />
+                    </button>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={column.visible}
+                        onChange={() => toggleColumn(column.id)}
+                      />
+                      <span>{column.label}</span>
+                    </label>
+                    <button
+                      type="button"
+                      className={`column-pin ${column.locked ? "is-active" : ""}`}
+                      aria-label={`${column.locked ? "Desafixar" : "Fixar"} ${column.label}`}
+                      aria-pressed={column.locked}
+                      title={column.locked ? "Desafixar coluna" : "Fixar à esquerda"}
+                      onClick={() => toggleColumnPin(column.id)}
+                    >
+                      <Pin size={14} />
+                    </button>
+                  </div>
+                ))}
+                <div
+                  className="column-picker-drop-end"
+                  aria-hidden="true"
+                  onDragOver={(event) => {
+                    const source = orderedColumns.find(
+                      (column) => column.id === draggedColumn,
+                    );
+                    const target = [...orderedColumns]
+                      .reverse()
+                      .find((column) => column.locked === source?.locked);
+                    if (!source || !target || source.id === target.id) return;
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    setDropTarget({ id: target.id, placement: "after" });
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    moveColumnToEnd();
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="repasse-grid-viewport">
+        <div className="repasse-grid-scroll" ref={gridScrollRef}>
+          <div
+          className="repasse-grid"
+          style={{
+            gridTemplateColumns: gridTemplate,
+            minWidth: gridTemplate ? undefined : 0,
+          }}
+        >
+          <div
+            className="repasse-grid-head"
+            style={{ gridTemplateColumns: gridTemplate }}
+          >
+            <div className="repasse-grid-select-cell is-header">
+              <label
+                className="repasse-selection-control is-header-control"
+                title={
+                  allSelectableServicesSelected
+                    ? "Limpar seleção"
+                    : "Selecionar todos elegíveis"
+                }
+              >
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  checked={allSelectableServicesSelected}
+                  disabled={!selectableLotServices.length}
+                  onChange={requestToggleAllSelectableServices}
+                  aria-label={
+                    allSelectableServicesSelected
+                      ? "Limpar seleção de serviços prontos"
+                      : "Selecionar todos os serviços elegíveis do favorecido"
+                  }
+                />
+                <span
+                  className={`repasse-selection-box ${
+                    selectedServices.length > 0 && !allSelectableServicesSelected
+                      ? "is-indeterminate"
+                      : ""
+                  }`}
+                  aria-hidden="true"
+                >
+                  {allSelectableServicesSelected ? (
+                    <Check size={15} strokeWidth={3} />
+                  ) : selectedServices.length > 0 ? (
+                    <Minus size={15} strokeWidth={3} />
+                  ) : null}
+                </span>
+              </label>
+            </div>
+            {visibleColumns.map((column) => (
+              <div
+                className={`repasse-grid-header ${column.locked ? "is-pinned" : ""} ${column.id === lastPinnedColumnId ? "is-pinned-edge" : ""}`}
+                key={column.id}
+                style={pinnedStyle(column)}
+                draggable
+                role="columnheader"
+                tabIndex={0}
+                aria-sort={
+                  sort.id === column.id
+                    ? sort.direction === "asc"
+                      ? "ascending"
+                      : "descending"
+                    : "none"
+                }
+                onDragStart={() => setDraggedColumn(column.id)}
+                onDragEnd={() => setDraggedColumn("")}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={() => moveColumn(column.id)}
+                onClick={() => cycleSort(column.id)}
+                onKeyDown={(event) => {
+                  if (
+                    event.altKey &&
+                    ["ArrowLeft", "ArrowRight"].includes(event.key)
+                  ) {
+                    event.preventDefault();
+                    adjustColumnWidth(
+                      column.id,
+                      event.key === "ArrowRight" ? 16 : -16,
+                    );
+                  } else if (
+                    event.shiftKey &&
+                    ["ArrowLeft", "ArrowRight"].includes(event.key)
+                  ) {
+                    event.preventDefault();
+                    moveColumnWithKeyboard(
+                      column.id,
+                      event.key === "ArrowRight" ? 1 : -1,
+                    );
+                  } else if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    cycleSort(column.id);
+                  }
+                }}
+              >
+                <GripVertical size={14} aria-hidden="true" />
+                <span>{column.label}</span>
+                {sort.id === column.id ? (
+                  sort.direction === "asc" ? (
+                    <ArrowUp size={13} aria-label="Crescente" />
+                  ) : (
+                    <ArrowDown size={13} aria-label="Decrescente" />
+                  )
+                ) : (
+                  <ArrowUpDown size={13} aria-hidden="true" />
+                )}
+                <button
+                  className="column-resizer"
+                  aria-label={`Redimensionar ${column.label}`}
+                  title="Arraste para redimensionar; clique duas vezes para restaurar"
+                  onClick={(event) => event.stopPropagation()}
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setResize({
+                      id: column.id,
+                      startX: event.clientX,
+                      width: column.width,
+                    });
+                  }}
+                  onDoubleClick={(event) => {
+                    event.stopPropagation();
+                    const defaultColumn = REPASSE_COLUMNS.find(
+                      (item) => item.id === column.id,
+                    );
+                    setColumns((current) =>
+                      current.map((item) =>
+                        item.id === column.id
+                          ? { ...item, width: defaultColumn.width }
+                          : item,
+                      ),
+                    );
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+          <div
+            className="repasse-grid-virtual-body"
+            style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+          >
+          {virtualRows.map((virtualRow) => {
+            const service = sortedServices[virtualRow.index];
+            const isEligibleForLot = eligibleLotServiceIds.has(service.id);
+            const isOtherFavorecido =
+              selectedFavorecidoId &&
+              service.favorecidoId !== selectedFavorecidoId;
+            const isSelected = selectedIds.has(service.id);
+            const selectionDisabled = !isEligibleForLot || isOtherFavorecido;
+            const financialWarnings = serviceLotWarnings(service);
+            const eligibilityReason = !service.favorecidoId
+              ? "Nenhum favorecido vinculado ao serviço"
+              : !activeFavorecidoIds.has(service.favorecidoId)
+                ? "Favorecido vinculado está inativo"
+                : serviceLotEligibilityReason(
+                    service,
+                    service.favorecidoId,
+                    activeLinkKeys,
+                  );
+            const selectionLabel = !isEligibleForLot
+              ? `Não pode entrar no lote. Motivo: ${eligibilityReason}.`
+                : isOtherFavorecido
+                  ? "Um lote só pode conter serviços do mesmo favorecido"
+                  : financialWarnings.length
+                  ? `Selecionar ${service.identificador}. Atenção: ${financialWarnings
+                      .map((warning) => warning.message)
+                      .join("; ")}.`
+                  : `Selecionar ${service.identificador} para gerar lote`;
+            return (
+              <div
+                ref={rowVirtualizer.measureElement}
+                data-index={virtualRow.index}
+                className={`repasse-grid-row is-virtual ${!isLegacyPaidService(service) && service.valorRepasse <= 0 ? "is-pending" : ""} ${financialWarnings.length ? "has-financial-warning" : ""} ${isSelected ? "is-selected" : ""}`}
+                key={virtualRow.key}
+                style={{
+                  gridTemplateColumns: gridTemplate,
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+              <div
+                className="repasse-grid-select-cell"
+                title={selectionDisabled ? selectionLabel : undefined}
+              >
+                <label
+                  className="repasse-selection-control"
+                  title={selectionLabel}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    disabled={selectionDisabled}
+                    onChange={() => toggleServiceSelection(service.id)}
+                    aria-label={selectionLabel}
+                  />
+                  <span className="repasse-selection-box" aria-hidden="true">
+                    {isSelected && <Check size={15} strokeWidth={3} />}
+                  </span>
+                </label>
+              </div>
+              {visibleColumns.map((column) => (
+                <div
+                  className={`repasse-grid-cell cell-${column.id} ${column.locked ? "is-pinned" : ""} ${column.id === lastPinnedColumnId ? "is-pinned-edge" : ""}`}
+                  key={column.id}
+                  style={pinnedStyle(column)}
+                >
+                  {cell(service, column)}
+                </div>
+              ))}
+              </div>
+            );
+          })}
+          </div>
+          {!services.length && (
+            <div className="empty-state">
+              <FileText size={28} />
+              <strong>Nenhum serviço no período</strong>
+              <span>Amplie o intervalo ou ajuste os filtros.</span>
+            </div>
+          )}
+          </div>
+        </div>
+      </div>
+      {showSelectAllPicker && (
+        <div className="repasse-favorecido-dialog-layer">
+          <button
+            className="repasse-favorecido-dialog-backdrop"
+            type="button"
+            aria-label="Fechar escolha de favorecido"
+            onClick={() => setShowSelectAllPicker(false)}
+          />
+          <div
+            className="repasse-favorecido-dialog"
+            ref={selectAllPickerRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="repasse-favorecido-dialog-title"
+            aria-describedby="repasse-favorecido-dialog-description"
+          >
+            <header>
+              <div>
+                <span>Selecionar serviços prontos</span>
+                <h2 id="repasse-favorecido-dialog-title">
+                  Qual favorecido entra no lote?
+                </h2>
+                <p id="repasse-favorecido-dialog-description">
+                  Cada lote pode reunir serviços de apenas um favorecido.
+                </p>
+              </div>
+              <button
+                className="repasse-favorecido-dialog-close"
+                type="button"
+                aria-label="Fechar"
+                onClick={() => setShowSelectAllPicker(false)}
+              >
+                <X size={18} />
+              </button>
+            </header>
+            <div className="repasse-favorecido-options">
+              {selectableFavorecidoGroups.map((group) => (
+                <button
+                  className="repasse-favorecido-option"
+                  type="button"
+                  key={group.favorecidoId}
+                  onClick={() => toggleServicesForFavorecido(group.favorecidoId)}
+                >
+                  <span className="repasse-favorecido-option-icon">
+                    <UsersRound size={18} aria-hidden="true" />
+                  </span>
+                  <span className="repasse-favorecido-option-copy">
+                    <strong>{group.nome}</strong>
+                    <small>
+                      {group.services.length} serviço(s) pronto(s) ·{" "}
+                      {money(group.total)}
+                    </small>
+                  </span>
+                  <ChevronRight size={17} aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+            <footer>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => setShowSelectAllPicker(false)}
+              >
+                Cancelar
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
+      {pendingCpSelection && (
+        <div className="repasse-favorecido-dialog-layer">
+          <button className="repasse-favorecido-dialog-backdrop" type="button" aria-label="Cancelar seleção" onClick={() => setPendingCpSelection(null)} />
+          <div className="repasse-favorecido-dialog" ref={pendingCpDialogRef} role="dialog" aria-modal="true" aria-labelledby="pending-cp-title" aria-describedby="pending-cp-description">
+            <header>
+              <div>
+                <span>Atenção ao status da CP</span>
+                <h2 id="pending-cp-title">Confirmar seleção?</h2>
+                <p id="pending-cp-description">{pendingCpSelection.pending.length} serviço(s) têm CP não concluída. É possível incluí-los no lote mesmo assim. Confira os status antes de continuar.</p>
+              </div>
+              <button className="repasse-favorecido-dialog-close" type="button" aria-label="Fechar" onClick={() => setPendingCpSelection(null)}><X size={18} /></button>
+            </header>
+            <ul className="repasse-pending-cp-list">
+              {pendingCpSelection.pending.map((service) => (
+                <li key={service.id}><strong>{service.identificador || service.id}</strong><span>CP: {service.statusLabel || service.status || "Não informado"}</span></li>
+              ))}
+            </ul>
+            <footer>
+              <button className="secondary-button" type="button" onClick={() => setPendingCpSelection(null)}>Cancelar</button>
+              <button className="primary-button" type="button" onClick={() => {
+                applySelection(pendingCpSelection.ids, pendingCpSelection.replace);
+                setPendingCpSelection(null);
+              }}>Confirmar seleção</button>
+            </footer>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+function GenerateLotButton({ selectedServices, drawerOpen, onGenerateLot }) {
+  const [preparing, setPreparing] = useState(false);
+  const cancelPreparationRef = useRef(null);
+
+  useEffect(() => {
+    if (drawerOpen) setPreparing(false);
+  }, [drawerOpen]);
+  useEffect(
+    () => () => {
+      cancelPreparationRef.current?.();
+    },
+    [],
+  );
+
+  const openLotReview = () => {
+    if (preparing || !selectedServices.length) return;
+    setPreparing(true);
+    cancelPreparationRef.current = scheduleAfterPaint(() => {
+      cancelPreparationRef.current = null;
+      try {
+        onGenerateLot(selectedServices);
+      } catch (error) {
+        setPreparing(false);
+        throw error;
+      }
+    });
+  };
+
+  return (
+    <button
+      className={`primary-button repasse-generate-lot ${preparing ? "is-preparing" : ""}`}
+      disabled={preparing || !selectedServices.length}
+      aria-busy={preparing}
+      onClick={openLotReview}
+    >
+      {preparing ? (
+        <RefreshCw size={16} className="spin" aria-hidden="true" />
+      ) : (
+        <ClipboardList size={16} aria-hidden="true" />
+      )}
+      {preparing
+        ? "Preparando lote..."
+        : `Gerar lote${selectedServices.length ? ` (${selectedServices.length})` : ""}`}
+    </button>
+  );
+}
+function RepasseInput({
+  service,
+  saving,
+  onSave,
+  onTabNavigate,
+  onFocusRow,
+  onBlurRow,
+}) {
+  const displayValue = (value) => (value > 0 ? moneyInput(value) : "");
+  const [draft, setDraft] = useState(displayValue(service.valorRepasse));
+  const [feedback, setFeedback] = useState(null);
+  useEffect(
+    () => setDraft(displayValue(service.valorRepasse)),
+    [service.valorRepasse],
+  );
+  useEffect(() => {
+    if (!feedback || feedback.type !== "saved") return undefined;
+    const timeout = window.setTimeout(() => setFeedback(null), 1850);
+    return () => window.clearTimeout(timeout);
+  }, [feedback]);
+  const value = parseMoney(draft);
+  const changed = value !== service.valorRepasse;
+  const currentRepassePercent = repassePercent({ ...service, valorRepasse: value });
+  const marginTone =
+    currentRepassePercent < 0
+      ? "is-negative"
+      : currentRepassePercent === 0
+        ? "is-neutral"
+        : "is-positive";
+  const save = async () => {
+    if (!changed || saving) return;
+    setFeedback({ type: "saving" });
+    try {
+      await onSave(service, draft);
+      setFeedback({ type: "saved" });
+    } catch (err) {
+      void dataverse.logError(err, {
+        action: "Atualizacao do repasse",
+        phase: "ui.action",
+      });
+      setFeedback({
+        type: "error",
+        message: err.message,
+        canRetry: err.status !== 412,
+      });
+    }
+  };
+  const status = saving ? { type: "saving" } : feedback;
+  const pending = !isLegacyPaidService(service) && !status && !changed && value <= 0;
+  return (
+    <div className="grid-money-input">
+      <input
+        className={pending ? "is-pending" : undefined}
+        inputMode="decimal"
+        value={draft}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          setFeedback(null);
+        }}
+        onFocus={onFocusRow}
+        onBlur={() => void save().finally(onBlurRow)}
+        onKeyDown={(event) => onTabNavigate?.(event, event.currentTarget)}
+        data-repasse-tab-stop="valorRepasse"
+        data-repasse-row-id={service.id}
+        aria-label={`Repasse de ${service.identificador}`}
+      />
+      <div className="repasse-meta">
+        {pending && <span className="repasse-pending" role="status" aria-label="Repasse pendente" title="Repasse pendente" />}
+        <small className={`repasse-margin ${marginTone}`}>
+          {currentRepassePercent.toLocaleString("pt-BR", {
+            minimumFractionDigits: 1,
+            maximumFractionDigits: 1,
+          })}
+          %
+        </small>
+      </div>
+      {status?.type === "saving" && (
+        <span
+          className="repasse-save-icon is-saving"
+          role="status"
+          aria-label="Salvando repasse"
+        >
+          <RefreshCw size={12} className="spin" aria-hidden="true" />
+        </span>
+      )}
+      {status?.type === "saved" && !changed && (
+        <span className="repasse-save-icon is-saved" title="Repasse salvo">
+          <CheckCircle2 size={21} strokeWidth={2.6} aria-label="Repasse salvo" />
+        </span>
+      )}
+      {status?.type === "error" && (
+        <AutoSaveErrorIcon
+          message={status.message}
+          label="Repasse não salvo"
+          onRetry={save}
+          canRetry={status.canRetry}
+        />
+      )}
+    </div>
+  );
+}
+function AutoSaveErrorIcon({ message, label, onRetry, canRetry = true }) {
+  if (!canRetry)
+    return (
+      <span className="repasse-save-icon is-error" title={message} aria-label={label}>
+        <AlertTriangle size={13} aria-hidden="true" />
+      </span>
+    );
+  return (
+    <button
+      type="button"
+      className="repasse-save-icon is-error"
+      title={`${message} Clique para tentar novamente.`}
+      aria-label={`${label}. Tentar novamente`}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={onRetry}
+    >
+      <AlertTriangle size={13} aria-hidden="true" />
+    </button>
+  );
+}
+function FavorecidoCell({
+  service,
+  linkedFavorecidos,
+  saving,
+  error,
+  onLink,
+  onTabNavigate,
+}) {
+  const [editing, setEditing] = useState(false);
+  useEffect(() => setEditing(false), [service.favorecidoId]);
+  const selectedFavorecidoId = linkedFavorecidos.some(
+    (favorecido) => favorecido.id === service.favorecidoId,
+  )
+    ? service.favorecidoId
+    : "";
+  const errorIcon = error ? (
+    <AutoSaveErrorIcon
+      message={error.message}
+      label="Favorecido não salvo"
+      onRetry={() => onLink(service, error.favorecidoId)}
+    />
+  ) : null;
+  if (selectedFavorecidoId && !editing) {
+    const favorecido = linkedFavorecidos.find(
+      (row) => row.id === selectedFavorecidoId,
+    );
+    return (
+      <div className="favorecido-linked">
+        <div className="favorecido-linked-name">
+          <span title={favorecido?.nome || "Favorecido"}>
+            {favorecido?.nome || "Favorecido"}
+          </span>
+          {service.favorecidoFromActiveLink && (
+            <small>Vinculo ativo</small>
+          )}
+          <button
+            type="button"
+            className="favorecido-edit"
+            disabled={saving}
+            onClick={() => setEditing(true)}
+            aria-label={`Trocar favorecido de ${service.identificador}`}
+            title="Trocar favorecido"
+          >
+            <Pencil size={13} aria-hidden="true" />
+          </button>
+        </div>
+        {errorIcon}
+      </div>
+    );
+  }
+  return (
+    <div className="favorecido-cell">
+      <SearchableSelect
+        value={selectedFavorecidoId}
+        disabled={saving}
+        clearable={false}
+        placeholder="Vincular favorecido"
+        aria-label={`Trocar favorecido de ${service.identificador}`}
+        className="repasse-favorecido-select"
+        tabStop="favorecido"
+        tabStopRowId={service.id}
+        onTabNavigate={onTabNavigate}
+        options={[
+          { value: "", label: "Vincular favorecido" },
+          ...linkedFavorecidos.map((row) => ({
+            value: row.id,
+            label: row.nome,
+            search: `${row.documento || ""} ${row.email || ""}`,
+          })),
+        ]}
+        onChange={async (value) => {
+          if (!value || value === selectedFavorecidoId) {
+            setEditing(false);
+            return;
+          }
+          await onLink(service, value);
+          setEditing(false);
+        }}
+      />
+      {errorIcon}
+    </div>
+  );
+}
+
+function LotsView({ lots, busy, onNew, onOpen }) {
+  return (
+    <TabPage>
+      <div className="page-title">
+        <div>
+          <span>Rastreabilidade</span>
+          <h1>Lotes de pagamento</h1>
+          <p>Rascunhos, pagamentos e documentos em uma trilha auditável.</p>
+        </div>
+        <button className="primary-button" onClick={onNew}>
+          <Plus size={16} />
+          Novo lote
+        </button>
+      </div>
+      <section className="operations-list operations-list-lots" aria-label="Lotes de pagamento">
+        <div className="operations-list-head">
+          <div>
+            <span>Visao operacional</span>
+            <strong>{lots.length} lote(s) no historico</strong>
+          </div>
+          <small>Abra um lote para consultar pagamentos e documentos.</small>
+        </div>
+        {lots.map((lot) => {
+          const activity = lotActivityText(lot, busy);
+          return (
+          <button
+            className={`payment-lot-card ${activity ? "is-updating" : ""}`}
+            key={lot.id}
+            onClick={() => onOpen(lot)}
+            aria-busy={Boolean(activity)}
+          >
+            <span className="payment-lot-card-icon" aria-hidden="true"><ClipboardList size={18} /></span>
+            <div className="payment-lot-card-copy">
+              <strong>{lot.identifier}</strong>
+              {isConsolidated(lot) && <small>Consolidado · {consolidatedPeriod(lot)} · {lot.revenueConfirmed ? 'Receita confirmada' : 'Lucro pendente de receita'}</small>}
+              <span>{lot.favorecido?.nome || JSON.parse(lot.favorecidoSnapshot || "{}").nome || "Terceiro Favorecido"}</span>
+            </div>
+            <div className="payment-lot-card-value">
+              <small>Valor reservado</small>
+              <strong>{money(lot.repasse)}</strong>
+            </div>
+            {activity ? (
+              <span className="payment-lot-card-progress" role="status">
+                <RefreshCw size={14} className="spin" aria-hidden="true" />
+                {activity}
+              </span>
+            ) : (
+              <Badge tone={lotStatusTone(lot)}>
+                {statusText(lot)}
+              </Badge>
+            )}
+            <ChevronRight className="payment-lot-card-arrow" size={18} aria-hidden="true" />
+          </button>
+          );
+        })}
+        {!lots.length && (
+          <div className="operations-empty">Nenhum lote criado neste ambiente.</div>
+        )}
+      </section>
+    </TabPage>
+  );
+}
+
+function FavorecidosView({
+  favorecidos,
+  drivers,
+  links,
+  busy,
+  onNew,
+  onEdit,
+  onLinks,
+  onStatus,
+}) {
+  return (
+    <TabPage>
+      <div className="page-title">
+        <div>
+          <span>Cadastros financeiros</span>
+          <h1>Terceiros Favorecidos</h1>
+          <p>Gerencie dados PIX, status e vínculos com motoristas.</p>
+        </div>
+        <button className="primary-button" onClick={onNew}>
+          <Plus size={16} />
+          Novo terceiro
+        </button>
+      </div>
+      <section className="operations-list operations-list-beneficiaries" aria-label="Terceiros favorecidos">
+        <div className="operations-list-head">
+          <div>
+            <span>Base de pagamento</span>
+            <strong>{favorecidos.length} favorecido(s) cadastrado(s)</strong>
+          </div>
+          <small>PIX, situacao e vinculos por pessoa ou empresa.</small>
+        </div>
+        {favorecidos.map((row) => {
+          const count = links.filter(
+            (link) => link.favorecidoId === row.id && link.status === "ativo",
+          ).length;
+          const changingStatus = busy(`favorecido-status-${row.id}`);
+          return (
+            <article
+              className={`beneficiary-card ${row.status === "inativo" ? "is-inactive" : ""}`}
+              key={row.id}
+              aria-busy={changingStatus}
+            >
+              <div className="beneficiary-card-profile">
+                <div className="beneficiary-card-avatar" aria-hidden="true">
+                  {row.nome.trim().slice(0, 2).toUpperCase()}
+                </div>
+                <div className="beneficiary-card-copy">
+                  <strong>{row.nome}</strong>
+                  <span>{row.tipoPessoa} · {row.documento}</span>
+                </div>
+              </div>
+              <div className="beneficiary-card-pix">
+                <small>Chave PIX</small>
+                <strong>{maskPix(row.chavePix)}</strong>
+              </div>
+              <div className="beneficiary-card-links">
+                <UsersRound size={15} aria-hidden="true" />
+                <span>
+                  {row.status === "inativo"
+                    ? "Inativo em novos pagamentos"
+                    : `${count} motorista(s) vinculado(s)`}
+                </span>
+              </div>
+              <Badge tone={row.status === "ativo" ? "green" : "neutral"}>
+                {row.status}
+              </Badge>
+              <div className="beneficiary-card-actions">
+                <button className="secondary-button" onClick={() => onLinks(row)}>
+                  <Link2 size={15} />
+                  Vínculos
+                </button>
+                <button className="text-button" onClick={() => onEdit(row)}>
+                  Editar
+                </button>
+                <button
+                  className="text-button beneficiary-status-action"
+                  disabled={changingStatus}
+                  onClick={() => onStatus(row)}
+                >
+                  {changingStatus
+                    ? "Atualizando..."
+                    : row.status === "ativo"
+                      ? "Inativar"
+                      : "Reativar"}
+                </button>
+              </div>
+            </article>
+          );
+        })}
+      </section>
+    </TabPage>
+  );
+}
+
+function FavorecidoDrawer({ favorecido, onClose, onSave, saving }) {
+  const [form, setForm] = useState({
+    nome: favorecido?.nome || "",
+    tipoPessoa: favorecido?.tipoPessoa || "PF",
+    documento: favorecido?.documento || "",
+    tipoChavePix: favorecido?.tipoChavePix || "CPF/CNPJ",
+    chavePix: favorecido?.chavePix || "",
+    email: favorecido?.email || "",
+    telefone: favorecido?.telefone || "",
+  });
+  const [errors, setErrors] = useState({});
+  const set = (key, value) =>
+    setForm((current) => ({ ...current, [key]: value }));
+  return (
+    <Drawer
+      title={
+        favorecido ? "Editar Terceiro Favorecido" : "Novo Terceiro Favorecido"
+      }
+      subtitle="Cadastro financeiro"
+      onClose={onClose}
+    >
+      <form
+        className="form-stack"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const validation = validateFavorecido(form);
+          setErrors(validation);
+          if (!Object.keys(validation).length) onSave(form);
+        }}
+      >
+        <label className="field">
+          <span>Nome ou razão social *</span>
+          <input
+            value={form.nome}
+            onChange={(event) => set("nome", event.target.value)}
+            autoFocus
+          />
+          {errors.nome && <small className="field-error">{errors.nome}</small>}
+        </label>
+        <div className="form-grid">
+          <label className="field">
+            <span>Tipo</span>
+            <SearchableSelect
+              value={form.tipoPessoa}
+              onChange={(value) => set("tipoPessoa", value)}
+              clearable={false}
+              aria-label="Tipo de pessoa"
+              options={[
+                { value: "PF", label: "PF" },
+                { value: "PJ", label: "PJ" },
+              ]}
+            />
+          </label>
+          <label className="field">
+            <span>CPF ou CNPJ *</span>
+            <input
+              value={form.documento}
+              onChange={(event) => set("documento", event.target.value)}
+            />
+            {errors.documento && (
+              <small className="field-error">{errors.documento}</small>
+            )}
+          </label>
+        </div>
+        <div className="form-grid">
+          <label className="field">
+            <span>Tipo da chave PIX</span>
+            <SearchableSelect
+              value={form.tipoChavePix}
+              onChange={(value) => set("tipoChavePix", value)}
+              clearable={false}
+              aria-label="Tipo da chave PIX"
+              options={[
+                { value: "CPF/CNPJ", label: "CPF/CNPJ" },
+                { value: "E-mail", label: "E-mail" },
+                { value: "Telefone", label: "Telefone" },
+                { value: "Aleatória", label: "Aleatória" },
+              ]}
+            />
+          </label>
+          <label className="field">
+            <span>Chave PIX *</span>
+            <input
+              value={form.chavePix}
+              onChange={(event) => set("chavePix", event.target.value)}
+            />
+            {errors.chavePix && (
+              <small className="field-error">{errors.chavePix}</small>
+            )}
+          </label>
+        </div>
+        <label className="field">
+          <span>E-mail *</span>
+          <input
+            type="email"
+            value={form.email}
+            onChange={(event) => set("email", event.target.value)}
+          />
+          {errors.email && (
+            <small className="field-error">{errors.email}</small>
+          )}
+        </label>
+        <label className="field">
+          <span>Telefone</span>
+          <input
+            value={form.telefone}
+            onChange={(event) => set("telefone", event.target.value)}
+          />
+        </label>
+        <div className="drawer-actions">
+          <button type="button" className="secondary-button" onClick={onClose}>
+            Cancelar
+          </button>
+          <button className="primary-button" disabled={saving}>
+            <Save size={16} />
+            {saving
+              ? "Salvando…"
+              : favorecido
+                ? "Salvar alterações"
+                : "Salvar cadastro"}
+          </button>
+        </div>
+      </form>
+    </Drawer>
+  );
+}
+function LinksDrawer({
+  favorecido,
+  drivers,
+  links,
+  saving,
+  onClose,
+  onSave,
+  onDeactivate,
+}) {
+  const [driverId, setDriverId] = useState("");
+  const active = links.filter(
+    (row) => row.favorecidoId === favorecido.id && row.status === "ativo",
+  );
+  return (
+    <Drawer
+      title={`Vínculos · ${favorecido.nome}`}
+      subtitle="Motoristas ativos"
+      onClose={onClose}
+    >
+      <div className="form-stack">
+        <label className="field">
+          <span>Adicionar motorista</span>
+          <SearchableSelect
+            value={driverId}
+            onChange={setDriverId}
+            aria-label="Adicionar motorista"
+            options={[
+              { value: "", label: "Selecione" },
+              ...drivers
+                .filter(
+                  (row) => !active.some((link) => link.motoristaId === row.id),
+                )
+                .map((row) => ({ value: row.id, label: row.nome })),
+            ]}
+          />
+        </label>
+        <button
+          className="primary-button"
+          disabled={!driverId || saving}
+          onClick={async () => {
+            await onSave(driverId);
+            setDriverId("");
+          }}
+        >
+          Vincular motorista
+        </button>
+        <div className="selection-list">
+          {active.map((link) => (
+            <div className="selection-row" key={link.id}>
+              <div>
+                <strong>
+                  {drivers.find((row) => row.id === link.motoristaId)?.nome ||
+                    link.motoristaId}
+                </strong>
+                <span>Vínculo ativo</span>
+              </div>
+              <Badge tone="green">Ativo</Badge>
+              <button
+                className="text-button"
+                disabled={saving}
+                onClick={() => onDeactivate(link.id)}
+              >
+                Inativar
+              </button>
+            </div>
+          ))}
+          {!active.length && (
+            <div className="empty-small">Nenhum motorista vinculado.</div>
+          )}
+        </div>
+      </div>
+    </Drawer>
+  );
+}
+function LotDrawer({
+  favorecidos,
+  services,
+  links,
+  range,
+  preselected,
+  initialFavorecidoId,
+  existingLot,
+  saving,
+  onClose,
+  onSave,
+}) {
+  const isReview = !existingLot && preselected.size > 0;
+  const [favorecidoId, setFavorecidoId] = useState(
+    existingLot?.favorecidoId || initialFavorecidoId || favorecidos[0]?.id || "",
+  );
+  const [from, setFrom] = useState(range.from);
+  const [to, setTo] = useState(range.to);
+  const available = useMemo(() => {
+    const scoped = services.filter(
+      (row) =>
+        row.dataServico.slice(0, 10) >= from &&
+        row.dataServico.slice(0, 10) <= to,
+    );
+    const eligible = eligibleServices(scoped, favorecidoId, links);
+    const reservedHere = scoped.filter(
+      (row) => row.pagamentoId === existingLot?.id,
+    );
+    const selectable = [
+      ...eligible,
+      ...reservedHere.filter(
+        (row) => !eligible.some((candidate) => candidate.id === row.id),
+      ),
+    ];
+    return isReview
+      ? selectable.filter((row) => preselected.has(row.id))
+      : selectable;
+  }, [services, favorecidoId, links, from, to, existingLot?.id, isReview, preselected]);
+  const [selected, setSelected] = useState([]);
+  const [showCpConfirmation, setShowCpConfirmation] = useState(false);
+  useEffect(
+    () =>
+      setSelected(
+        available
+          .filter(
+            (row) =>
+              existingLot?.items?.some((item) => item.serviceId === row.id) ||
+              (!existingLot &&
+                (preselected.size
+                  ? preselected.has(row.id)
+                  : row.favorecidoId === favorecidoId)),
+          )
+          .map((row) => row.id),
+      ),
+    [favorecidoId, available.length, existingLot, preselected],
+  );
+  const chosen = available.filter((row) => selected.includes(row.id));
+  const totals = paymentTotals(chosen);
+  const warningServices = chosen.filter((row) => serviceLotWarnings(row).length);
+  const pendingCpServices = chosen.filter((row) => !isCpCompleted(row));
+  const zeroCpCount = warningServices.filter((row) =>
+    serviceLotWarnings(row).some((warning) => warning.code === "ZERO_CP"),
+  ).length;
+  const negativeMarginCount = warningServices.filter((row) =>
+    serviceLotWarnings(row).some((warning) => warning.code === "NEGATIVE_MARGIN"),
+  ).length;
+  const favorecido = favorecidos.find((row) => row.id === favorecidoId);
+  return (
+    <Drawer
+      title={existingLot ? "Editar rascunho" : isReview ? "Revisar lote" : "Montar lote"}
+      subtitle={
+        isReview
+          ? "Serviços selecionados na tabela de repasses"
+          : "Reserva segura de serviços"
+      }
+      wide
+      onClose={onClose}
+    >
+      <div className="form-stack">
+        {isReview ? (
+          <div className="lot-review-context">
+            <span>Favorecido</span>
+            <strong>{favorecido?.nome || "Não informado"}</strong>
+            <small>
+              Revise os serviços abaixo. Para incluir outros, volte à tabela de repasses.
+            </small>
+          </div>
+        ) : (
+          <>
+            <label className="field">
+              <span>Terceiro Favorecido</span>
+              <SearchableSelect
+                value={favorecidoId}
+                onChange={setFavorecidoId}
+                clearable={false}
+                aria-label="Terceiro favorecido do lote"
+                options={favorecidos.map((row) => ({
+                  value: row.id,
+                  label: row.nome,
+                }))}
+              />
+            </label>
+            <div className="form-grid">
+              <label className="field">
+                <span>De</span>
+                <input
+                  type="date"
+                  value={from}
+                  onChange={(event) => setFrom(event.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span>Até</span>
+                <input
+                  type="date"
+                  value={to}
+                  onChange={(event) => setTo(event.target.value)}
+                />
+              </label>
+            </div>
+          </>
+        )}
+        <div className="lot-summary">
+          <div>
+            <span>Serviços</span>
+            <strong>{totals.count}</strong>
+          </div>
+          <div>
+            <span>Repasse</span>
+            <strong>{money(totals.repasse)}</strong>
+          </div>
+          <div>
+            <span>Lucro</span>
+            <strong>{money(totals.margin)}</strong>
+          </div>
+        </div>
+        {warningServices.length > 0 && (
+          <div className="inline-alert warning-alert">
+            <AlertTriangle size={16} />
+            {pendingCpServices.length > 0 && `${pendingCpServices.length} serviço(s) com CP não concluída. `}
+            {zeroCpCount > 0 && `${zeroCpCount} serviço(s) com Total CP zerado. `}
+            {negativeMarginCount > 0 && `${negativeMarginCount} serviço(s) com prejuízo. `}
+            O repasse será mantido e o lote pode ser criado após esta revisão.
+          </div>
+        )}
+        <div className="selection-list">
+          {available.map((service) => (
+            <label className="selection-row" key={service.id}>
+              <input
+                type="checkbox"
+                checked={selected.includes(service.id)}
+                onChange={() =>
+                  setSelected((current) =>
+                    current.includes(service.id)
+                      ? current.filter((id) => id !== service.id)
+                      : [...current, service.id],
+                  )
+                }
+              />
+              <div>
+                <ServiceIdentifierLink
+                  identifier={service.identificador}
+                  reservationId={service.reservationId}
+                />
+                <span>
+                  {service.motorista} · {service.trajeto}
+                </span>
+              </div>
+              <b>{money(service.valorRepasse)}</b>
+            </label>
+          ))}
+          {!available.length && (
+            <div className="empty-small">
+              Não há serviços elegíveis neste período.
+            </div>
+          )}
+        </div>
+        <div className="drawer-actions">
+          <button className="secondary-button" onClick={onClose}>
+            Cancelar
+          </button>
+          <button
+            className="primary-button"
+            disabled={!favorecido || !chosen.length || saving}
+            onClick={() => {
+              if (!isReview && pendingCpServices.length && !showCpConfirmation) {
+                setShowCpConfirmation(true);
+                return;
+              }
+              onSave({ favorecido, services: chosen, year: Number(from.slice(0, 4)) });
+            }}
+          >
+            <ClipboardList size={16} />
+            {saving
+              ? "Reservando…"
+              : existingLot
+                ? "Salvar rascunho"
+                : isReview
+                  ? "Confirmar lote"
+                  : "Criar lote"}
+          </button>
+        </div>
+        {showCpConfirmation && (
+          <div className="repasse-favorecido-dialog-layer">
+            <button className="repasse-favorecido-dialog-backdrop" type="button" aria-label="Cancelar criação do lote" onClick={() => setShowCpConfirmation(false)} />
+            <div className="repasse-favorecido-dialog" role="dialog" aria-modal="true" aria-labelledby="lot-pending-cp-title">
+              <header><div><span>Atenção ao status da CP</span><h2 id="lot-pending-cp-title">Confirmar lote com CP não concluída?</h2><p>Estes serviços serão incluídos mesmo com CP pendente.</p></div></header>
+              <ul className="repasse-pending-cp-list">{pendingCpServices.map((service) => <li key={service.id}><strong>{service.identificador || service.id}</strong><span>CP: {service.statusLabel || service.status || "Não informado"}</span></li>)}</ul>
+              <footer><button className="secondary-button" type="button" onClick={() => setShowCpConfirmation(false)}>Cancelar</button><button className="primary-button" type="button" disabled={saving} onClick={() => { setShowCpConfirmation(false); onSave({ favorecido, services: chosen, year: Number(from.slice(0, 4)) }); }}>Confirmar lote</button></footer>
+            </div>
+          </div>
+        )}
+      </div>
+    </Drawer>
+  );
+}
+function LotCreationDrawer({ serviceCount }) {
+  return (
+    <Drawer title="Criando lote" subtitle="Reserva em andamento" onClose={() => {}} locked>
+      <div className="lot-drawer-loading" role="status">
+        <RefreshCw size={28} className="spin" aria-hidden="true" />
+        <div>
+          <strong>Reservando {serviceCount} serviço(s)</strong>
+          <p>O lote já está aberto. Aguarde a confirmação dos dados.</p>
+        </div>
+      </div>
+    </Drawer>
+  );
+}
+function LotDetailLoadingDrawer({ lot }) {
+  return (
+    <Drawer
+      title={lot.identifier || "Lote de pagamento"}
+      subtitle="Controle e auditoria"
+      onClose={() => {}}
+      locked
+    >
+      <div className="lot-drawer-loading" role="status">
+        <RefreshCw size={28} className="spin" aria-hidden="true" />
+        <div>
+          <strong>Carregando dados do lote</strong>
+          <p>O detalhe abre assim que os dados forem confirmados.</p>
+        </div>
+      </div>
+    </Drawer>
+  );
+}
+function LotDetailDrawer({
+  lot,
+  busy,
+  onClose,
+  onPay,
+  onSend,
+  onDownload,
+  onEdit,
+  onCancel,
+  onRevert,
+  onCompleteRevenue,
+}) {
+  const [proofFile, setProofFile] = useState(null);
+  const [proofError, setProofError] = useState("");
+  const [isProofDropTarget, setIsProofDropTarget] = useState(false);
+  const isPaid = lot.paymentStatus === PAYMENT_STATUS.PAID;
+  const isPaymentProcessing = busy(`pay-${lot.id}`);
+  const isDocumentProcessing = busy(`document-${lot.id}`);
+  const setProof = (file) => {
+    if (!file) return;
+    if (file.size > MAX_PAYMENT_PROOF_SIZE) {
+      setProofError("O comprovante precisa ter no maximo 5 MB.");
+      return;
+    }
+    setProofFile(file);
+    setProofError("");
+  };
+  const handleProofPaste = (event) => {
+    const files = [
+      ...Array.from(event.clipboardData?.files || []),
+      ...Array.from(event.clipboardData?.items || [])
+        .filter((item) => item.kind === "file")
+        .map((item) => item.getAsFile())
+        .filter(Boolean),
+    ];
+    if (files[0]) {
+      event.preventDefault();
+      setProof(files[0]);
+    }
+  };
+  return (
+    <Drawer
+      title={lot.identifier}
+      subtitle="Controle e auditoria"
+      onClose={onClose}
+    >
+      <div className="detail-stack">
+        <div className="detail-hero">
+          <div>
+            <Badge tone={lotStatusTone(lot)}>{statusText(lot)}</Badge>
+            <span>Versão {lot.version}</span>
+          </div>
+          <h3>
+            {lot.favorecido?.nome ||
+              JSON.parse(lot.favorecidoSnapshot || "{}").nome}
+          </h3>
+          <p>
+            {money(lot.repasse)} · {lot.count} {isConsolidated(lot) ? 'serviço(s) vinculado(s)' : 'serviço(s)'} ·{' '}
+            {isConsolidated(lot) && !lot.revenueConfirmed ? 'Lucro pendente de receita' : isConsolidated(lot) ? `Lucro ${money(lot.margin)}` : `${lot.marginPercent?.toFixed(1) || '0.0'}%`}
+          </p>
+        </div>
+        {isConsolidated(lot) && <div className="detail-card"><h3>Pagamento consolidado</h3><p>{consolidatedPeriod(lot)}</p><p>{lot.description}</p><p>{lot.includesHistory ? 'Inclui serviços fora do sistema.' : 'Cobre os serviços vinculados.'}</p><p>{lot.revenueConfirmed ? `Receita confirmada: ${money(lot.revenue)}` : 'Receita pendente. O custo está registrado; o lucro ainda não foi apurado.'}</p></div>}
+        <div className="detail-card">
+          <h3>{isConsolidated(lot) ? 'Serviços vinculados' : 'Serviços congelados'}</h3>
+          <div className="compact-list">
+            {lot.items.map((item) => (
+              <div key={item.id}>
+                <ServiceIdentifierLink
+                  identifier={item.identificador}
+                  reservationId={item.reservationId}
+                />
+                <span>
+                  {item.motorista} · {isConsolidated(lot) ? 'Repasse no consolidado' : money(item.valorRepasse)}
+                </span>
+              </div>
+          ))}
+        </div>
+      </div>
+        <div className="detail-card">
+          <h3>Ações</h3>
+          <div className="detail-actions">
+            {isConsolidated(lot) && <button className="pt-action-button" onClick={() => downloadConsolidatedXlsx(lot)}><FileDown size={18} /><div><strong>Extrair consolidado para Excel</strong><span>Resumo do período e serviços vinculados, sem rateio.</span></div><ChevronRight size={16} /></button>}
+            {isConsolidated(lot) && !lot.revenueConfirmed && lot.lotStatus !== 'cancelled' && <button className="pt-action-button pt-action-edit" onClick={onCompleteRevenue}><Banknote size={18} /><div><strong>Completar receita</strong><span>Confirmar receita total e apurar o lucro do período.</span></div><ChevronRight size={16} /></button>}
+            {canPay(lot) && (
+              <button className="pt-action-button pt-action-edit" onClick={onEdit}>
+                <ClipboardList size={18} />
+                <div>
+                  <strong>Editar rascunho</strong>
+                  <span>Altera período, favorecido e serviços reservados.</span>
+                </div>
+                <ChevronRight size={16} />
+              </button>
+            )}
+            {canPay(lot) && (
+              <>
+                <label
+                  className={`proof-input field proof-dropzone ${isProofDropTarget ? "is-dropping" : ""} ${proofFile ? "has-proof" : ""}`}
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return;
+                    event.preventDefault();
+                    event.currentTarget
+                      .querySelector('input[type="file"]')
+                      ?.click();
+                  }}
+                  onPaste={handleProofPaste}
+                  onDragEnter={(event) => {
+                    event.preventDefault();
+                    setIsProofDropTarget(true);
+                  }}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDragLeave={(event) => {
+                    if (event.currentTarget === event.target)
+                      setIsProofDropTarget(false);
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    setIsProofDropTarget(false);
+                    setProof(event.dataTransfer.files?.[0]);
+                  }}
+                >
+                  <span>Comprovante opcional</span>
+                  <input
+                    type="file"
+                    onChange={(event) => setProof(event.target.files?.[0])}
+                  />
+                  <span className="proof-status">
+                    {proofFile?.name || "Arraste, solte ou cole com Ctrl+V"}
+                  </span>
+                  {proofError && <small className="proof-error">{proofError}</small>}
+                  <small className="proof-legacy-copy">Anexo opcional.</small>
+                </label>
+                <button
+                  className="pt-action-button pt-action-primary"
+                  disabled={isPaymentProcessing || Boolean(proofError)}
+                  onClick={() => onPay(lot, { file: proofFile })}
+                >
+                  <CheckCircle2 size={18} />
+                  <div>
+                    <strong>{isPaymentProcessing ? "Registrando pagamento..." : "Registrar como pago"}</strong>
+                    <span>{isPaymentProcessing ? "O status do lote sera atualizado em seguida." : "Confirma pagamento integral e gera documento."}</span>
+                  </div>
+                  <ChevronRight size={16} />
+                </button>
+              </>
+            )}
+            {isPaid && (
+              <button
+                className="pt-action-button pt-action-send-document"
+                disabled={isDocumentProcessing}
+                onClick={() => onSend(lot)}
+              >
+                <Send size={18} />
+                <div>
+                  <strong>
+                    {isDocumentProcessing
+                      ? "Enviando documento..."
+                      : lot.documentStatus === DOCUMENT_STATUS.SENT
+                        ? "Reenviar documento do lote"
+                        : lot.documentStatus === DOCUMENT_STATUS.FAILED
+                          ? "Tentar enviar documento novamente"
+                          : "Enviar documento do lote"}
+                  </strong>
+                  <span>
+                    {isDocumentProcessing
+                      ? "Preparando PDF e anexando ao e-mail."
+                      : `Envia o PDF real para ${lot.favorecido?.email || "o e-mail do favorecido"}.`}
+                  </span>
+                </div>
+                <ChevronRight size={16} />
+              </button>
+            )}
+            {canRevert(lot) && (
+              <button onClick={onRevert}>
+                <Undo2 size={18} />
+                <div>
+                  <strong>Desmarcar pago</strong>
+                  <span>Exige motivo e preserva histórico.</span>
+                </div>
+                <ChevronRight size={16} />
+              </button>
+            )}
+            {canCancel(lot) && (
+              <button onClick={onCancel}>
+                <X size={18} />
+                <div>
+                  <strong>Cancelar lote</strong>
+                  <span>Libera serviços para nova seleção.</span>
+                </div>
+                <ChevronRight size={16} />
+              </button>
+            )}
+          </div>
+        </div>
+        {lot.documentUrl && (
+          <div className="document-actions">
+            <button className="document-link" onClick={() => onDownload(lot)}>
+              <FileDown size={16} />
+              Baixar PDF
+            </button>
+            <a
+              className="document-link document-open-link"
+              href={lot.documentUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <ExternalLink size={16} />
+              Abrir no OneDrive
+            </a>
+          </div>
+        )}
+        <div className="detail-card">
+          <h3>Linha do tempo</h3>
+          <div className="timeline">
+            {lot.events.map((event) => (
+              <div key={event.id}>
+                <span />
+                <div>
+                  <strong>{event.message}</strong>
+                  <small>
+                    {new Date(event.createdAt).toLocaleString("pt-BR")} ·{" "}
+                    {event.user}
+                    {event.reason ? ` · Motivo: ${event.reason}` : ""}
+                  </small>
+                  {event.detail && <em>{event.detail}</em>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Drawer>
+  );
+}
+function ReasonDrawer({ action, saving, onClose, onSave }) {
+  const [reason, setReason] = useState("");
+  const label =
+    action.type === "cancel" ? "cancelamento" : "reversão de pagamento";
+  return (
+    <Drawer
+      title={`Motivo do ${label}`}
+      subtitle="Auditoria obrigatória"
+      onClose={onClose}
+    >
+      <div className="form-stack">
+        <label className="field">
+          <span>Motivo *</span>
+          <textarea
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            autoFocus
+          />
+        </label>
+        <div className="drawer-actions">
+          <button className="secondary-button" onClick={onClose}>
+            Voltar
+          </button>
+          <button
+            className="primary-button"
+            disabled={!reason.trim() || saving}
+            onClick={() => onSave(action, reason)}
+          >
+            {saving ? "Salvando…" : "Confirmar"}
+          </button>
+        </div>
+      </div>
+    </Drawer>
+  );
+}

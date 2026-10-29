@@ -1,0 +1,2445 @@
+import {
+  DOCUMENT_STATUS,
+  ITEM_STATUS,
+  LOT_STATUS,
+  PAYMENT_STATUS,
+  createLotSnapshot,
+  isEligibleService,
+  serviceLotEligibilityReason,
+  paymentTotals,
+  validateFavorecido,
+} from "../domain/payment.js";
+import { CONSOLIDATED_FIELD, consolidatedRequestSignature, consolidatedSnapshot, isConsolidated } from '../domain/consolidated.js';
+import {
+  migrateLegacyErrorQueue,
+  logDataverseFailure,
+  logError,
+} from "./error-logger.js";
+
+const API_VERSION = "v9.2";
+const STORE_KEY = "betinhos_pagamentos_terceiros_mock_v5";
+const FLOW_CONTRACT = "new_FlowURLFlowSalvarArquivosOnedrive";
+const FLOW_RUNTIME_KEY = "VITE_FLOW_SALVAR_ARQUIVOS_ONEDRIVE_URL";
+const EMAIL_FLOW_CONTRACT = "new_FlowURLEnviarDocumentoLoteFornecedor";
+const EMAIL_FLOW_RUNTIME_KEY = "VITE_FLOW_ENVIAR_DOCUMENTO_LOTE_URL";
+const EMAIL_FLOW_PAYLOAD_CONTRACT =
+  "new_FlowURLEnviarDocumentoLoteFornecedor.v1";
+const MAX_PAYMENT_PROOF_SIZE = 5 * 1024 * 1024;
+export const TABLES = Object.freeze({
+  employee: "cr40f_funcionarios",
+  composition: "cr40f_composicaodeprecos",
+  reservation: "cr40f_reservadeveculos",
+  servicePassenger: "cr40f_servicosporpassageiro",
+  favorecido: "cr40f_terceirofavorecido",
+  link: "cr40f_vinculomotoristafavorecido",
+  payment: "cr40f_pagamentoaterceiro",
+  item: "cr40f_itempagamentoaterceiro",
+  event: "cr40f_eventopagamentoaterceiro",
+});
+export const CHOICES = Object.freeze({
+  completedComposition: 100000001,
+  serviceItemCategory: 100000000,
+  activeEmployee: 0,
+  thirdPartyEmployee: 1,
+  activeFavorecido: 100000000,
+  inactiveFavorecido: 100000001,
+  activeLink: 100000000,
+  inactiveLink: 100000001,
+  openLot: 100000000,
+  cancelledLot: 100000001,
+  openPayment: 100000000,
+  paidPayment: 100000001,
+  documentNotGenerated: 100000000,
+  documentSending: 100000001,
+  documentSent: 100000002,
+  documentFailed: 100000003,
+  documentResendRequired: 100000004,
+  eventCreated: 100000000,
+  eventEmailSent: 100000001,
+  eventEmailResent: 100000002,
+  eventPaymentRegistered: 100000003,
+  eventProofAttached: 100000004,
+  eventNotificationFailed: 100000005,
+  eventDraftUpdated: 100000006,
+  eventCancelled: 100000007,
+  eventPaymentReverted: 100000008,
+  eventDocumentFailed: 100000009,
+});
+
+const EVENT_OPERATION_CHOICES = Object.freeze({
+  draft_created: CHOICES.eventCreated,
+  draft_updated: CHOICES.eventDraftUpdated,
+  cancelled: CHOICES.eventCancelled,
+  paid: CHOICES.eventPaymentRegistered,
+  paid_reverted: CHOICES.eventPaymentReverted,
+  document_sent: CHOICES.eventEmailSent,
+  document_failed: CHOICES.eventDocumentFailed,
+});
+const EVENT_CHOICE_OPERATIONS = Object.freeze({
+  [CHOICES.eventCreated]: "draft_created",
+  [CHOICES.eventEmailSent]: "document_sent",
+  [CHOICES.eventEmailResent]: "document_sent",
+  [CHOICES.eventPaymentRegistered]: "paid",
+  [CHOICES.eventProofAttached]: "proof_attached",
+  [CHOICES.eventNotificationFailed]: "document_failed",
+  [CHOICES.eventDraftUpdated]: "draft_updated",
+  [CHOICES.eventCancelled]: "cancelled",
+  [CHOICES.eventPaymentReverted]: "paid_reverted",
+  [CHOICES.eventDocumentFailed]: "document_failed",
+});
+const eventOperationChoice = (operation, version = 1) =>
+  operation === "document_sent" && Number(version) > 1
+    ? CHOICES.eventEmailResent
+    : EVENT_OPERATION_CHOICES[operation] || CHOICES.eventCreated;
+
+const cleanGuid = (value) => String(value || "").replace(/[{}]/g, "");
+const clone = (value) => JSON.parse(JSON.stringify(value));
+const now = () => new Date().toISOString();
+const newId = (prefix) => `${prefix}-${crypto.randomUUID()}`;
+const parseSnapshot = (value) => {
+  try {
+    return value ? JSON.parse(value) : {};
+  } catch {
+    return {};
+  }
+};
+const runtimeConfig = () => {
+  const root = typeof window === "undefined" ? {} : window;
+  const config = root.__PAYMENT_RUNTIME_CONFIG || {};
+  return {
+    oneDriveFlowUrl:
+      config.oneDriveFlowUrl ||
+      root.__ONEDRIVE_FLOW_URL ||
+      root.__PAYMENT_FLOW_URL ||
+      "",
+    documentEmailFlowUrl:
+      config.documentEmailFlowUrl || root.__DOCUMENT_EMAIL_FLOW_URL || "",
+  };
+};
+const fileToDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Falha ao preparar comprovante para envio."));
+    reader.readAsDataURL(file);
+  });
+const sanitizePathSegment = (value, fallback = "arquivo") => {
+  const sanitized = String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return sanitized || fallback;
+};
+const localHost = () =>
+  typeof window !== "undefined" &&
+  ["localhost", "127.0.0.1"].includes(window.location.hostname);
+const localPreviewHost = () =>
+  localHost() ||
+  (typeof window !== "undefined" && window.location.port === "5192") ||
+  import.meta.env?.DEV === true;
+const readXrm = (target) => {
+  try {
+    return target?.Xrm || null;
+  } catch {
+    return null;
+  }
+};
+
+const getXrm = () => {
+  if (typeof window === "undefined") return null;
+  return readXrm(window.parent) || readXrm(window);
+};
+
+const directWebResourceClientUrl = () => {
+  if (typeof window === "undefined") return "";
+  const { location } = window;
+  if (!/^\/WebResources\//i.test(location?.pathname || "")) return "";
+  return location.origin || "";
+};
+
+const resolveDataverseContext = () => {
+  const xrm = getXrm();
+  const clientUrl = xrm?.Utility?.getGlobalContext?.().getClientUrl?.() || "";
+  if (clientUrl) return { xrm, clientUrl, source: "xrm" };
+
+  const directClientUrl = directWebResourceClientUrl();
+  return {
+    xrm: null,
+    clientUrl: directClientUrl,
+    source: directClientUrl ? "direct" : "none",
+  };
+};
+const escapeOData = (value) => String(value).replace(/'/g, "''");
+const FINANCE_SERVICE_FILTER_BATCH_SIZE = 60;
+const oDataDateBoundary = (value, nextDay = false) => {
+  if (!value) return "";
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return "";
+  if (nextDay) date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString();
+};
+const chunk = (items, size) =>
+  Array.from({ length: Math.ceil(items.length / size) }, (_, index) =>
+    items.slice(index * size, (index + 1) * size),
+  );
+const normalizeLabel = (value) =>
+  String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+const reservationDetailLabels = Object.freeze({
+  dataServico: [
+    "data e hor\u00e1rio de sa\u00edda",
+    "data/hora de sa\u00edda",
+    "data e hora de sa\u00edda",
+  ],
+  trajeto: ["trajeto", "rota"],
+  cliente: ["cliente"],
+  motorista: ["motorista"],
+  dataFinalizacao: [
+    "horário de finalização",
+    "data/hora de finalização",
+    "data de finalização",
+    "finalização",
+  ],
+  observacaoOperacao: [
+    "obs de operação",
+    "observação de operação",
+    "observações da operação",
+  ],
+  tipoVeiculo: ["tipo de veículo", "tipo veículo"],
+  veiculo: ["veículo"],
+  observacaoFinal: ["observação final", "observações finais"],
+});
+const reservationOperationalMetadataFields = Object.freeze({
+  dataServico: "cr40f_dataehorriodesada",
+  dataFinalizacao: "new_datadefinalizacao",
+  observacaoOperacao: "cr40f_obsdeoperao",
+});
+const fieldValue = (row, logicalName) =>
+  logicalName
+    ? row[`${logicalName}@OData.Community.Display.V1.FormattedValue`] ||
+      row[logicalName] ||
+      ""
+    : "";
+const shortPassengerName = (name) => {
+  const parts = String(name || "").trim().split(/\s+/u).filter(Boolean);
+  return parts.length > 1 ? `${parts[0]} ${parts.at(-1)}` : parts[0] || "";
+};
+const rawFieldValue = (row, logicalName) =>
+  logicalName ? row[logicalName] || "" : "";
+const selectableAttributeName = (attribute) =>
+  attribute?.AttributeType === "Lookup"
+    ? `_${attribute.LogicalName}_value`
+    : attribute?.LogicalName || "";
+const drivers = [
+  "Carlos Henrique",
+  "Marcos Lima",
+  "Fernanda Alves",
+  "Rafael Costa",
+  "Juliana Prado",
+].map((nome, index) => ({
+  id: `mot-${String(index + 1).padStart(3, "0")}`,
+  nome,
+  status: "ativo",
+  tipoVinculo: CHOICES.thirdPartyEmployee,
+}));
+const seedFavorecidos = [
+  {
+    id: "fav-001",
+    nome: "Alfa Transporte Executivo Ltda.",
+    tipoPessoa: "PJ",
+    documento: "12.345.678/0001-90",
+    tipoChavePix: "CPF/CNPJ",
+    chavePix: "12.345.678/0001-90",
+    email: "financeiro@alfatransporte.com.br",
+    telefone: "11999990001",
+    status: "ativo",
+  },
+  {
+    id: "fav-002",
+    nome: "Carlos Henrique Souza",
+    tipoPessoa: "PF",
+    documento: "529.982.247-25",
+    tipoChavePix: "CPF/CNPJ",
+    chavePix: "529.982.247-25",
+    email: "carlos.souza@email.com",
+    telefone: "11999990002",
+    status: "ativo",
+  },
+  {
+    id: "fav-003",
+    nome: "Beta Mobilidade Corporativa",
+    tipoPessoa: "PJ",
+    documento: "45.678.901/0001-22",
+    tipoChavePix: "CPF/CNPJ",
+    chavePix: "45.678.901/0001-22",
+    email: "contas@betamobilidade.com.br",
+    telefone: "11999990003",
+    status: "ativo",
+  },
+  {
+    id: "fav-004",
+    nome: "Fernanda Alves",
+    tipoPessoa: "PF",
+    documento: "111.444.777-35",
+    tipoChavePix: "E-mail",
+    chavePix: "fernanda.alves@email.com",
+    email: "fernanda.alves@email.com",
+    telefone: "11999990004",
+    status: "ativo",
+  },
+  {
+    id: "fav-005",
+    nome: "Gamma Eventos e Logística",
+    tipoPessoa: "PJ",
+    documento: "78.901.234/0001-33",
+    tipoChavePix: "CPF/CNPJ",
+    chavePix: "78.901.234/0001-33",
+    email: "financeiro@gammaeventos.com.br",
+    telefone: "11999990005",
+    status: "inativo",
+  },
+];
+
+function seedLinks() {
+  return drivers.flatMap((driver, index) =>
+    [0, 1].map((offset) => ({
+      id: `link-${index}-${offset}`,
+      motoristaId: driver.id,
+      favorecidoId: seedFavorecidos[(index + offset) % 4].id,
+      status: "ativo",
+      createdAt: now(),
+  })),
+  );
+}
+function seedServices() {
+  const routes = [
+    "GRU → Faria Lima",
+    "Congonhas → Campinas",
+    "Paulista → Guarulhos",
+    "Jundiaí → GRU",
+    "Moema → Santos",
+    "Barra Funda → Sorocaba",
+  ];
+  return Array.from({ length: 96 }, (_, index) => {
+    const driver = drivers[index % drivers.length];
+    const value = 780 + ((index * 137) % 1900);
+    const missing = index > 0 && index % 17 === 0;
+    const noLink = index % 13 === 0;
+    const status = index % 19 === 0 ? "pendente" : "concluido";
+    return {
+      id: `srv-${String(index + 1).padStart(4, "0")}`,
+      compositionId: `cmp-${String(index + 1).padStart(4, "0")}`,
+      reservationId: `res-${String(index + 1).padStart(4, "0")}`,
+      identificador: `SRV-2026-${String(index + 184).padStart(4, "0")}`,
+      dataServico: new Date(
+        Date.UTC(2026, index % 12, 3 + (index % 24), 15),
+      ).toISOString(),
+      dataFinalizacao: new Date(
+        Date.UTC(2026, index % 12, 3 + (index % 24), 15, 45 + (index % 3) * 20),
+      ).toISOString(),
+      cliente: [
+        "Diretoria Acme",
+        "Grupo Horizonte",
+        "Núcleo Financeiro",
+        "Alfa Eventos",
+        "Operação Sul",
+      ][index % 5],
+      nomePassageiro: [
+        "Ana Martins",
+        "Bruno Ferreira - Carla Ribeiro",
+        "Daniel Oliveira",
+        "Elisa Costa - Felipe Almeida",
+        "Gabriela Souza",
+      ][index % 5],
+      trajeto: routes[index % routes.length],
+      observacaoOperacao: [
+        "Aguardar no desembarque",
+        "Bagagem de mão",
+        "Recepção no saguão",
+        "Sem observação operacional",
+      ][index % 4],
+      motorista: driver.nome,
+      motoristaId: driver.id,
+      tipoVeiculo: ["Sedan executivo", "SUV executivo", "Van executiva"][
+        index % 3
+      ],
+      veiculo: [
+        "Toyota Corolla",
+        "Chevrolet Trailblazer",
+        "Mercedes-Benz Sprinter",
+      ][index % 3],
+      observacaoFinal:
+        index % 5 === 0 ? "Serviço concluído sem intercorrências." : "",
+      favorecidoId: noLink
+        ? ""
+        : seedLinks().find((link) => link.motoristaId === driver.id)
+            ?.favorecidoId || "",
+      valorCobrado: value,
+      valorRepasse: missing
+        ? 0
+        : Math.round(
+            value * (index % 11 === 0 ? 1.08 : 0.49 + (index % 8) / 100),
+          ),
+      status,
+      itemCategory:
+        index % 7 === 0
+          ? 100000001
+          : CHOICES.serviceItemCategory,
+      statusLabel: status === "concluido" ? "Concluído" : "Pendente",
+      reservationStatus: status,
+      reservationStatusLabel:
+        status === "concluido" ? "Concluído" : "Pendente",
+      pagamentoId: "",
+      etag: 1,
+    };
+  });
+}
+function buildState() {
+  const services = seedServices();
+  const links = seedLinks();
+  const candidates = services
+    .filter(
+      (service) =>
+        service.status === "concluido" &&
+        service.itemCategory === CHOICES.serviceItemCategory &&
+        service.valorRepasse > 0 &&
+        service.favorecidoId,
+    );
+  const scenarios = [
+    { paymentStatus: PAYMENT_STATUS.PAID, documentStatus: DOCUMENT_STATUS.SENT },
+    { paymentStatus: PAYMENT_STATUS.OPEN, documentStatus: DOCUMENT_STATUS.NOT_GENERATED },
+    { paymentStatus: PAYMENT_STATUS.PAID, documentStatus: DOCUMENT_STATUS.FAILED },
+    { paymentStatus: PAYMENT_STATUS.PAID, documentStatus: DOCUMENT_STATUS.RESEND_REQUIRED },
+    { paymentStatus: PAYMENT_STATUS.OPEN, documentStatus: DOCUMENT_STATUS.NOT_GENERATED, lotStatus: LOT_STATUS.CANCELLED },
+  ];
+  const usedServiceIds = new Set();
+  const lots = scenarios.map((scenario, index) => {
+    const first = candidates.find((service) => !usedServiceIds.has(service.id));
+    const selected = candidates
+      .filter((service) => service.favorecidoId === first.favorecidoId && !usedServiceIds.has(service.id))
+      .slice(0, 2);
+    selected.forEach((service) => usedServiceIds.add(service.id));
+    const favorecido = seedFavorecidos.find((row) => row.id === selected[0].favorecidoId);
+    const identifier = `PT-2026-${String(index + 1).padStart(6, "0")}`;
+    const lot = {
+      ...createLotSnapshot(favorecido, selected, 2026),
+      ...scenario,
+      id: `lot-demo-${String(index + 1).padStart(3, "0")}`,
+      identifier,
+      paidAt: scenario.paymentStatus === PAYMENT_STATUS.PAID ? selected[0].dataServico : "",
+      documentUrl: scenario.documentStatus === DOCUMENT_STATUS.SENT ? `https://onedrive.local/${identifier}-v1.pdf` : "",
+      documentName: scenario.documentStatus === DOCUMENT_STATUS.SENT ? `Pagamento_${identifier}_v1.pdf` : "",
+      documentError: scenario.documentStatus === DOCUMENT_STATUS.FAILED ? "Falha simulada no envio do documento." : "",
+      cancelledAt: scenario.lotStatus === LOT_STATUS.CANCELLED ? selected[0].dataServico : "",
+    };
+    if (scenario.lotStatus !== LOT_STATUS.CANCELLED)
+      selected.forEach((service) => { service.pagamentoId = lot.id; });
+    return lot;
+  });
+  const items = lots.flatMap((lot) => lot.services.map((service) => ({
+    ...clone(service),
+    id: `item-${service.id}`,
+    paymentId: lot.id,
+    serviceId: service.id,
+    itemStatus: lot.lotStatus === LOT_STATUS.CANCELLED
+      ? ITEM_STATUS.CANCELLED
+      : lot.paymentStatus === PAYMENT_STATUS.PAID ? ITEM_STATUS.PAID : ITEM_STATUS.RESERVED,
+  })));
+  const events = lots.flatMap((lot) => [{
+    id: `evt-${lot.id}`,
+    paymentId: lot.id,
+    operation: lot.lotStatus === LOT_STATUS.CANCELLED ? "cancelled" : lot.paymentStatus === PAYMENT_STATUS.PAID ? "paid" : "draft_created",
+    result: "success",
+    message: lot.lotStatus === LOT_STATUS.CANCELLED ? "Lote cancelado no cenário de demonstração." : lot.paymentStatus === PAYMENT_STATUS.PAID ? "Pagamento registrado no cenário de demonstração." : "Rascunho criado no cenário de demonstração.",
+    version: 1,
+    createdAt: lot.paidAt || lot.cancelledAt || lot.services[0].dataServico,
+    user: "Financeiro Betinhos",
+    documentUrl: lot.documentUrl,
+  }, ...([DOCUMENT_STATUS.SENT, DOCUMENT_STATUS.FAILED, DOCUMENT_STATUS.RESEND_REQUIRED].includes(lot.documentStatus)
+    ? [{
+        id: `evt-document-${lot.id}`,
+        paymentId: lot.id,
+        operation: lot.documentStatus === DOCUMENT_STATUS.SENT ? "document_sent" : "document_failed",
+        result: lot.documentStatus === DOCUMENT_STATUS.SENT ? "success" : "failure",
+        message: lot.documentStatus === DOCUMENT_STATUS.SENT ? "Documento enviado ao favorecido." : "Envio do documento requer atenção.",
+        version: 1,
+        createdAt: lot.paidAt,
+        user: "Financeiro Betinhos",
+        documentUrl: lot.documentUrl,
+      }] : [])]);
+  return {
+    drivers,
+    favorecidos: clone(seedFavorecidos),
+    links,
+    services,
+    lots,
+    items,
+    events,
+    failNext: {},
+  };
+}
+
+class DataverseClient {
+  constructor() {
+    const context = resolveDataverseContext();
+    this.xrm = context.xrm;
+    this.clientUrl = context.clientUrl;
+    this.contextSource = context.source;
+    this.apiRoot = this.clientUrl
+      ? `${this.clientUrl}/api/data/${API_VERSION}`
+      : "";
+    this.flowUrlCache = new Map();
+    this.mockMode = !this.clientUrl && localPreviewHost();
+    this.identity = {
+      userId: "",
+      organizationId: "",
+      businessUnitId: "",
+    };
+    this.cache = new Map();
+    this.mock = this.loadMock();
+    // Dentro do shell o logger global já é instalado pelo Sistema Betinhos (app/errorLog.ts); reinstalar trocaria o appName.
+    // A fila antiga desta tela continua sendo migrada para a do pacote.
+    migrateLegacyErrorQueue();
+    if (this.contextSource === "direct") void this.loadDirectIdentity();
+  }
+  get available() {
+    return Boolean(this.clientUrl || this.mockMode);
+  }
+  get environmentLabel() {
+    return this.mockMode
+      ? "Prévia local"
+      : this.clientUrl
+        ? new URL(this.clientUrl).hostname
+        : "Não conectado";
+  }
+  reservationWebresourceUrl(reservationId) {
+    const id = cleanGuid(reservationId);
+    if (!id) return "";
+    const data = encodeURIComponent(
+      JSON.stringify({
+        mode: "edit",
+        entityName: TABLES.reservation,
+        id,
+        recordId: id,
+        entityId: id,
+      }),
+    );
+    return `${this.clientUrl || ""}/main.aspx?pagetype=webresource&webresourceName=new_formulario_geral.html&data=${data}`;
+  }
+
+  async loadDirectIdentity() {
+    const identity = await this.request("GET", "/WhoAmI").catch(() => null);
+    if (!identity) return null;
+
+    this.identity = {
+      userId: cleanGuid(identity.UserId),
+      organizationId: cleanGuid(identity.OrganizationId),
+      businessUnitId: cleanGuid(identity.BusinessUnitId),
+    };
+    return this.identity;
+  }
+  loadMock() {
+    try {
+      const saved =
+        typeof localStorage !== "undefined" && localStorage.getItem(STORE_KEY);
+      return saved ? JSON.parse(saved) : buildState();
+    } catch {
+      return buildState();
+    }
+  }
+  persistMock() {
+    if (typeof localStorage !== "undefined")
+      localStorage.setItem(STORE_KEY, JSON.stringify(this.mock));
+  }
+  resetMock() {
+    this.mock = buildState();
+    this.persistMock();
+    return clone(this.mock);
+  }
+  setMockFailure(key) {
+    this.mock.failNext[key] = true;
+    this.persistMock();
+  }
+  consumeFailure(key) {
+    if (this.mock.failNext[key]) {
+      delete this.mock.failNext[key];
+      this.persistMock();
+      throw new Error(`Falha simulada em ${key}. Tente novamente.`);
+    }
+  }
+  logError(error, context = {}) {
+    return logError(error, context);
+  }
+  async request(method, path, body, headers = {}) {
+    if (!this.clientUrl)
+      throw new Error(
+        "Contexto Dataverse indisponível. Abra o web resource em uma organização autenticada.",
+      );
+    let response;
+    try {
+      response = await fetch(
+        path.startsWith("http") ? path : `${this.apiRoot}${path}`,
+        {
+          method,
+          credentials: "same-origin",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json; charset=utf-8",
+            "OData-Version": "4.0",
+            "OData-MaxVersion": "4.0",
+            Prefer:
+              'return=representation,odata.include-annotations="OData.Community.Display.V1.FormattedValue"',
+            ...headers,
+          },
+          body: body ? JSON.stringify(body) : undefined,
+        },
+      );
+    } catch (error) {
+      void logDataverseFailure({ method, path, error, component: "DataverseClient" });
+      throw error;
+    }
+    if (response.status === 204) return null;
+    const text = await response.text();
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = { raw: text };
+    }
+    if (!response.ok) {
+      const error = new Error(
+        response.status === 412
+          ? "Serviço foi alterado por outro processo durante a reserva. Atualize a lista e tente novamente."
+          : data?.error?.message ||
+              data?.Message ||
+              data?.raw ||
+              `${response.status} ${response.statusText}`,
+      );
+      error.status = response.status;
+      if (response.status === 412) error.code = "DATAVERSE_CONFLICT";
+      void logDataverseFailure({
+        method,
+        path,
+        status: response.status,
+        body: data,
+        component: "DataverseClient",
+      });
+      throw error;
+    }
+    return data;
+  }
+  async getDataverseEnvironmentVariableValue(schemaName) {
+    if (this.flowUrlCache.has(schemaName))
+      return this.flowUrlCache.get(schemaName);
+    const definition = await this.request(
+      "GET",
+      `/environmentvariabledefinitions?$select=environmentvariabledefinitionid,defaultvalue&$filter=schemaname eq '${escapeOData(schemaName)}'&$top=1`,
+    );
+    const definitionRow = definition?.value?.[0];
+    if (!definitionRow?.environmentvariabledefinitionid) return "";
+    const value = await this.request(
+      "GET",
+      `/environmentvariablevalues?$select=value&$filter=_environmentvariabledefinitionid_value eq ${cleanGuid(definitionRow.environmentvariabledefinitionid)}&$top=1`,
+    );
+    const url = String(value?.value?.[0]?.value || definitionRow.defaultvalue || "").trim();
+    this.flowUrlCache.set(schemaName, url);
+    return url;
+  }
+  async resolveOneDriveFlowUrl() {
+    if (this.clientUrl) {
+      try {
+        const url = await this.getDataverseEnvironmentVariableValue(FLOW_CONTRACT);
+        if (url) return url;
+      } catch {
+        // Mantém fallback de runtime para prévia local e indisponibilidade de metadata.
+      }
+    }
+    const root = typeof window === "undefined" ? {} : window;
+    return (
+      root.__APP_FLOW_ENV?.[FLOW_RUNTIME_KEY] ||
+      runtimeConfig().oneDriveFlowUrl ||
+      ""
+    );
+  }
+  async resolveDocumentEmailFlowUrl() {
+    if (this.clientUrl) {
+      try {
+        const url =
+          await this.getDataverseEnvironmentVariableValue(EMAIL_FLOW_CONTRACT);
+        if (url) return url;
+      } catch {
+        // Mantém fallback de runtime somente para prévia local.
+      }
+    }
+    const root = typeof window === "undefined" ? {} : window;
+    return (
+      root.__APP_FLOW_ENV?.[EMAIL_FLOW_RUNTIME_KEY] ||
+      runtimeConfig().documentEmailFlowUrl ||
+      ""
+    );
+  }
+  async entity(logicalName) {
+    if (this.cache.has(logicalName)) return this.cache.get(logicalName);
+    const data = await this.request(
+      "GET",
+      `/EntityDefinitions(LogicalName='${escapeOData(logicalName)}')?$select=LogicalName,EntitySetName,PrimaryIdAttribute,PrimaryNameAttribute`,
+    );
+    const info = {
+      logicalName,
+      entitySet: data.EntitySetName,
+      id: data.PrimaryIdAttribute,
+      primaryName: data.PrimaryNameAttribute,
+    };
+    this.cache.set(logicalName, info);
+    return info;
+  }
+  async lookupSchema(source, logicalName, fallbackLogicalName = "") {
+    const key = `${source}:${logicalName}:${fallbackLogicalName}`;
+    if (this.cache.has(key)) return this.cache.get(key);
+    for (const candidate of [logicalName, fallbackLogicalName].filter(Boolean)) {
+      try {
+        const data = await this.request(
+          "GET",
+          `/EntityDefinitions(LogicalName='${escapeOData(source)}')/Attributes(LogicalName='${escapeOData(candidate)}')?$select=LogicalName,SchemaName,AttributeType`,
+        );
+        if (data?.AttributeType === "Lookup" && data.SchemaName) {
+          this.cache.set(key, data.SchemaName);
+          return data.SchemaName;
+        }
+      } catch (error) {
+        if (error.status !== 404) throw error;
+      }
+    }
+    throw new Error(
+      `Lookup ${source}.${logicalName} nao encontrado na metadata do Dataverse.`,
+    );
+  }
+  async bindLookup(source, logicalName, target, id, fallbackLogicalName = "") {
+    if (!id) return {};
+    const [schemaName, entity] = await Promise.all([
+      this.lookupSchema(source, logicalName, fallbackLogicalName),
+      this.entity(target),
+    ]);
+    return {
+      [`${schemaName}@odata.bind`]: `/${entity.entitySet}(${cleanGuid(id)})`,
+    };
+  }
+  async clearLookup(source, logicalName, fallbackLogicalName = "") {
+    const schemaName = await this.lookupSchema(
+      source,
+      logicalName,
+      fallbackLogicalName,
+    );
+    return { [`${schemaName}@odata.bind`]: null };
+  }
+  async delete(logicalName, id) {
+    const entity = await this.entity(logicalName);
+    return this.request("DELETE", `/${entity.entitySet}(${cleanGuid(id)})`);
+  }
+  normalizePayment(row, entity) {
+    const snapshot = parseSnapshot(row?.cr40f_snapshotfavorecido);
+    const consolidated = parseSnapshot(row?.[CONSOLIDATED_FIELD]);
+    const documentStatus =
+      row?.cr40f_statusdocumento === CHOICES.documentSent
+        ? DOCUMENT_STATUS.SENT
+        : row?.cr40f_statusdocumento === CHOICES.documentFailed
+          ? DOCUMENT_STATUS.FAILED
+          : row?.cr40f_statusdocumento === CHOICES.documentResendRequired
+            ? DOCUMENT_STATUS.RESEND_REQUIRED
+            : row?.cr40f_statusdocumento === CHOICES.documentSending
+              ? DOCUMENT_STATUS.SENDING
+              : DOCUMENT_STATUS.NOT_GENERATED;
+    return {
+      id: cleanGuid(row?.[entity.id] || row?.cr40f_pagamentoaterceiroid),
+      identifier: row?.cr40f_identificadorlote || "Sem identificador",
+      lotStatus:
+        row?.cr40f_statuslote === CHOICES.cancelledLot
+          ? LOT_STATUS.CANCELLED
+          : LOT_STATUS.DRAFT,
+      paymentStatus:
+        row?.cr40f_statuspagamento === CHOICES.paidPayment
+          ? PAYMENT_STATUS.PAID
+          : PAYMENT_STATUS.OPEN,
+      documentStatus,
+      version: Math.max(Number(row?.cr40f_documentoversao || 1), Number(row?.cr40f_versaoenvio || 1)),
+      year: Number(row?.cr40f_anoreferencia || new Date().getFullYear()),
+      favorecidoId: snapshot.id || "",
+      favorecidoSnapshot: row?.cr40f_snapshotfavorecido || "{}",
+      favorecido: snapshot,
+      revenue: Number(row?.cr40f_totalcobradocliente || 0),
+      repasse: Number(row?.cr40f_totalrepasse || 0),
+      margin: Number(row?.cr40f_margemtotal || 0),
+      count: Number(row?.cr40f_quantidadeservicos || 0),
+      paidAt: row?.cr40f_pagoem || "",
+      proofUrl: row?.cr40f_comprovanteurl || "",
+      cancelledAt: row?.cr40f_canceladoem || "",
+      documentUrl: row?.cr40f_documentourl || "",
+      documentName: row?.cr40f_documentonome || "",
+      emailId: row?.cr40f_documentoemailid || "",
+      documentError: row?.cr40f_errodocumento || "",
+      etag: row?.["@odata.etag"] || "*",
+      services: [],
+      ...consolidated,
+    };
+  }
+  normalizeItem(row, entity, lot) {
+    const snapshot = parseSnapshot(row?.cr40f_snapshotfinanceiro);
+    return {
+      id: cleanGuid(row?.[entity.id]),
+      paymentId: cleanGuid(row?._cr40f_pagamentoaterceiro_value),
+      serviceId:
+        cleanGuid(row?._cr40f_composicao_value) ||
+        cleanGuid(row?._cr40f_reserva_value),
+      compositionId: cleanGuid(row?._cr40f_composicao_value),
+      reservationId: cleanGuid(row?._cr40f_reserva_value),
+      motoristaId: cleanGuid(row?._cr40f_motoristareferencia_value),
+      identificador: snapshot.identificador || "",
+      dataServico: row?.cr40f_dataservico || "",
+      trajeto: row?.cr40f_trajeto || "",
+      motorista: snapshot.motorista || "",
+      valorCobrado: isConsolidated(lot) ? null : Number(row?.cr40f_valorcobrado || 0),
+      valorRepasse: isConsolidated(lot) ? null : Number(row?.cr40f_valorrepasse || 0),
+      margem: isConsolidated(lot) ? null : Number(row?.cr40f_margem || 0),
+      itemStatus:
+        lot.paymentStatus === PAYMENT_STATUS.PAID
+          ? ITEM_STATUS.PAID
+          : lot.lotStatus === LOT_STATUS.CANCELLED
+            ? ITEM_STATUS.CANCELLED
+            : ITEM_STATUS.RESERVED,
+      snapshotFinanceiro: row?.cr40f_snapshotfinanceiro || "{}",
+    };
+  }
+  normalizeEvent(row, entity) {
+    return {
+      id: cleanGuid(row?.[entity.id]),
+      paymentId: cleanGuid(row?._cr40f_pagamentoaterceiro_value),
+      operation:
+        row?.cr40f_name ||
+        EVENT_CHOICE_OPERATIONS[row?.cr40f_operacao] ||
+        String(row?.cr40f_operacao || ""),
+      result: row?.cr40f_resultado || "success",
+      previous: row?.cr40f_estadoanterior || "",
+      next: row?.cr40f_estadonovo || "",
+      reason: row?.cr40f_motivo || "",
+      message: row?.cr40f_mensagem || "",
+      detail: row?.cr40f_detalhetecnico || "",
+      version: Number(row?.cr40f_versao || 1),
+      documentUrl: row?.cr40f_url || "",
+      emailId: row?.cr40f_emailid || "",
+      createdAt: row?.cr40f_dataevento || row?.createdon || "",
+    };
+  }
+  async createResolved(logicalName, payload, filter) {
+    const entity = await this.entity(logicalName);
+    const created = await this.create(logicalName, payload);
+    const createdId = cleanGuid(created?.[entity.id] || created?.id);
+    if (createdId) return createdId;
+    const rows = await this.listAll(
+      logicalName,
+      `?$select=${entity.id}&$filter=${filter}&$top=2`,
+    );
+    if (rows.length === 1) return cleanGuid(rows[0][entity.id]);
+    throw new Error(
+      `Dataverse criou ${logicalName}, mas nao retornou o identificador.`,
+    );
+  }
+  async listAll(logicalName, query = "") {
+    if (this.mockMode) {
+      const key =
+        logicalName === TABLES.favorecido
+          ? "favorecidos"
+          : logicalName === TABLES.link
+            ? "links"
+            : logicalName === TABLES.payment
+              ? "lots"
+              : logicalName === TABLES.item
+                ? "items"
+                : logicalName === TABLES.event
+                  ? "events"
+                  : logicalName === TABLES.employee
+                    ? "drivers"
+                    : "services";
+      return clone(this.mock[key]);
+    }
+    const rows = [];
+    let next = query;
+    while (next !== null) {
+      const entity = await this.entity(logicalName);
+      const response = await this.request(
+        "GET",
+        next.startsWith("http") ? next : `/${entity.entitySet}${next}`,
+      );
+      rows.push(...(response?.value || []));
+      next = response?.["@odata.nextLink"] || null;
+    }
+    return rows;
+  }
+  async listLots() {
+    if (this.mockMode) return clone(this.mock.lots);
+    const entity = await this.entity(TABLES.payment);
+    const consolidatedSelect = await this.consolidatedSelect();
+    const rows = await this.listAll(
+      TABLES.payment,
+      `?$select=${entity.id},cr40f_statuslote,cr40f_statuspagamento,cr40f_statusdocumento,cr40f_versaoenvio,cr40f_documentoversao,cr40f_anoreferencia,cr40f_identificadorlote,cr40f_quantidadeservicos,cr40f_totalcobradocliente,cr40f_totalrepasse,cr40f_margemtotal,cr40f_pagoem,cr40f_comprovanteurl,cr40f_canceladoem,cr40f_documentourl,cr40f_documentonome,cr40f_documentoemailid,cr40f_errodocumento,cr40f_snapshotfavorecido${consolidatedSelect}&$orderby=createdon desc&$top=5000`,
+    );
+    return rows.map((row) => this.normalizePayment(row, entity));
+  }
+  async create(logicalName, payload) {
+    const entity = await this.entity(logicalName);
+    return this.request("POST", `/${entity.entitySet}`, payload);
+  }
+  async consolidatedSelect(required = false) {
+    if (this.mockMode) return '';
+    if (this.hasConsolidatedSchema === undefined) {
+      try {
+        const attribute = await this.request('GET', `/EntityDefinitions(LogicalName='${TABLES.payment}')/Attributes(LogicalName='${CONSOLIDATED_FIELD}')?$select=LogicalName,AttributeType`);
+        this.hasConsolidatedSchema = attribute?.AttributeType === 'Memo';
+      } catch (error) {
+        if (error.status !== 404) throw error;
+        this.hasConsolidatedSchema = false;
+      }
+    }
+    if (required && !this.hasConsolidatedSchema) throw new Error('Schema de pagamento consolidado indisponível. Publique a coluna cr40f_consolidado na solução antes de salvar.');
+    return this.hasConsolidatedSchema ? `,${CONSOLIDATED_FIELD}` : '';
+  }
+  async atomicChanges(operations) {
+    if (!operations.length || operations.length > 1000) throw new Error('Quantidade de operações fora do limite da transação Dataverse.');
+    const boundary = `batch_${crypto.randomUUID()}`;
+    const changeset = `changeset_${crypto.randomUUID()}`;
+    const parts = [`--${boundary}`, `Content-Type: multipart/mixed;boundary=${changeset}`, ''];
+    for (const [index, op] of operations.entries()) {
+      if (op.method === 'PATCH' && (!op.etag || op.etag === '*')) throw new Error('Versão do registro indisponível; transação interrompida. Atualize os dados.');
+      const entity = await this.entity(op.table);
+      parts.push(`--${changeset}`, 'Content-Type: application/http', 'Content-Transfer-Encoding: binary', `Content-ID: ${index + 1}`, '',
+        `${op.method} ${this.apiRoot}/${entity.entitySet}${op.id ? `(${cleanGuid(op.id)})` : ''} HTTP/1.1`,
+        'Content-Type: application/json; charset=utf-8', 'Accept: application/json',
+        ...(op.etag ? [`If-Match: ${op.etag}`] : []), '', op.payload ? JSON.stringify(op.payload) : '');
+    }
+    parts.push(`--${changeset}--`, `--${boundary}--`, '');
+    const response = await fetch(`${this.apiRoot}/$batch`, { method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': `multipart/mixed;boundary=${boundary}`, 'OData-Version': '4.0', 'OData-MaxVersion': '4.0', Accept: 'multipart/mixed' }, body: parts.join('\r\n') });
+    const result = await response.text();
+    const codes = [...result.matchAll(/HTTP\/1\.1 (\d{3})/g)].map((match) => Number(match[1]));
+    if (!response.ok || codes.some((code) => code >= 400)) {
+      const conflict = codes.includes(412);
+      const message = result.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+      throw new Error(conflict ? 'Dados alterados por outro usuário. Atualize os serviços e tente novamente; nenhum vínculo foi salvo.' : message ? JSON.parse(`"${message[1]}"`) : `Transação recusada (${response.status}). Nenhum vínculo foi salvo.`);
+    }
+    if (codes.length !== operations.length || codes.some((code) => code < 200 || code >= 300)) throw new Error('Resposta da transação inconclusiva. Confira o lançamento antes de tentar novamente.');
+  }
+  async consolidatedEvent(lotId, message, version, operation = 'draft_updated') {
+    return { table: TABLES.event, method: 'POST', payload: {
+      ...(await this.bindLookup(TABLES.event, 'cr40f_pagamentoaterceiro', TABLES.payment, lotId)),
+      cr40f_name: operation, cr40f_dataevento: now(), cr40f_operacao: eventOperationChoice(operation, version),
+      cr40f_resultado: 'success', cr40f_mensagem: message, cr40f_versao: version,
+    } };
+  }
+  async saveConsolidated(input, lotId = '') {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.requestId || '')) throw new Error('Identificador da solicitação inválido.');
+    await this.consolidatedSelect(true);
+    const id = lotId || input.requestId;
+    let existing = null;
+    try { existing = await this.getLotDetail(id); } catch (error) {
+      if (lotId || !/Lote nao encontrado/.test(error.message)) throw error;
+    }
+    if (existing?.requestId === input.requestId && isConsolidated(existing)) {
+      if (existing.requestSignature !== consolidatedRequestSignature(input)) throw new Error('Esta solicitação já foi salva com outros valores. Abra o lançamento existente para editá-lo.');
+      return existing;
+    }
+    if (existing && (!isConsolidated(existing) || existing.paymentStatus !== 'open' || existing.lotStatus === 'cancelled')) throw new Error('Apenas consolidado aberto pode ser editado.');
+    const requested = input.services || [];
+    const actual = requested.length ? await this.listFinanceServices({ compositionIds: requested.map((row) => row.id) }) : [];
+    if (actual.length !== requested.length) throw new Error('Serviço removido ou indisponível. Atualize a seleção.');
+    for (const service of actual) {
+      const selected = requested.find((row) => row.id === service.id);
+      if (selected?.etag !== service.etag) throw new Error('Serviço alterado. Atualize a seleção antes de salvar.');
+    }
+    const snapshot = consolidatedSnapshot({ ...input, lotId }, actual);
+    const identifier = existing?.identifier || `PC-${snapshot.year}-${id.slice(0, 8).toUpperCase()}`;
+    const version = (existing?.version || 0) + 1;
+    if (this.mockMode) {
+      this.consumeFailure('reserve');
+      const lot = { ...(existing || {}), ...snapshot, id, identifier, version,
+        favorecidoId: input.favorecido.id, favorecido: input.favorecido,
+        favorecidoSnapshot: JSON.stringify(input.favorecido), lotStatus: 'draft', paymentStatus: 'open', documentStatus: existing ? 'resend_required' : 'not_generated' };
+      this.mock.services.forEach((row) => { if (row.pagamentoId === id) row.pagamentoId = ''; });
+      for (const service of actual) this.mock.services.find((row) => row.id === service.id).pagamentoId = id;
+      this.mock.items = this.mock.items.filter((item) => item.paymentId !== id);
+      this.mock.items.push(...actual.map((service) => ({ ...service, id: newId('item'), serviceId: service.id, paymentId: id, valorCobrado: null, valorRepasse: null, margem: null, itemStatus: 'reserved' })));
+      this.mock.lots = this.mock.lots.filter((row) => row.id !== id);
+      this.mock.lots.unshift(lot);
+      this.addEvent(id, existing ? 'draft_updated' : 'draft_created', 'Consolidado salvo sem rateio por serviço.', { version });
+      this.persistMock();
+      return this.getLotDetail(id);
+    }
+    const paymentEntity = await this.entity(TABLES.payment);
+    const payload = { [CONSOLIDATED_FIELD]: JSON.stringify(snapshot), cr40f_totalrepasse: snapshot.repasse,
+      cr40f_totalcobradocliente: snapshot.revenue, cr40f_margemtotal: snapshot.margin, cr40f_quantidadeservicos: snapshot.count,
+      cr40f_anoreferencia: snapshot.year, cr40f_identificadorlote: identifier, cr40f_versaoenvio: version,
+      cr40f_snapshotfavorecido: JSON.stringify(input.favorecido), cr40f_emailfavorecidoenvio: input.favorecido.email,
+      ...(await this.bindLookup(TABLES.payment, 'cr40f_terceirofavorecido', TABLES.favorecido, input.favorecido.id)),
+      ...(existing ? { cr40f_statusdocumento: CHOICES.documentResendRequired } : { [paymentEntity.id]: id, cr40f_statuslote: CHOICES.openLot, cr40f_statuspagamento: CHOICES.openPayment, cr40f_statusdocumento: CHOICES.documentNotGenerated }) };
+    const operations = [{ table: TABLES.payment, method: existing ? 'PATCH' : 'POST', id: existing ? id : '', payload, etag: existing?.etag }];
+    const oldServices = existing?.items.length ? await this.listFinanceServices({ compositionIds: existing.items.map((item) => item.compositionId) }) : [];
+    for (const service of oldServices.filter((row) => !actual.some((selected) => selected.id === row.id))) {
+      if (service.pagamentoId !== id) throw new Error('Vínculo alterado por outro processo. Atualize o lançamento.');
+      operations.push({ table: TABLES.composition, method: 'PATCH', id: service.id, etag: service.etag, payload: await this.clearLookup(TABLES.composition, 'cr40f_pagamentoaterceiro') });
+    }
+    for (const item of existing?.items || []) operations.push({ table: TABLES.item, method: 'DELETE', id: item.id });
+    for (const service of actual) {
+      if (!service.etag || service.etag === '*') throw new Error('Versão do serviço indisponível; reserva interrompida.');
+      operations.push({ table: TABLES.composition, method: 'PATCH', id: service.id, etag: service.etag, payload: await this.bindLookup(TABLES.composition, 'cr40f_pagamentoaterceiro', TABLES.payment, id) });
+      operations.push({ table: TABLES.item, method: 'POST', payload: {
+        cr40f_dataservico: service.dataServico, cr40f_trajeto: service.trajeto || '', cr40f_snapshotfinanceiro: JSON.stringify(service),
+        cr40f_valorcobrado: null, cr40f_valorrepasse: null, cr40f_margem: null,
+        ...(await this.bindLookup(TABLES.item, 'cr40f_composicao', TABLES.composition, service.id)),
+        ...(await this.bindLookup(TABLES.item, 'cr40f_pagamentoaterceiro', TABLES.payment, id)),
+        ...(await this.bindLookup(TABLES.item, 'cr40f_reserva', TABLES.reservation, service.reservationId)),
+        ...(await this.bindLookup(TABLES.item, 'cr40f_motoristareferencia', TABLES.employee, service.motoristaId, 'cr40f_motorista')),
+      } });
+    }
+    operations.push(await this.consolidatedEvent(id, 'Consolidado salvo sem rateio por serviço.', version, existing ? 'draft_updated' : 'draft_created'));
+    try { await this.atomicChanges(operations); } catch (error) {
+      // Recupera confirmação perdida sem repetir uma criação que já foi concluída.
+      try { const recovered = await this.getLotDetail(id); if (recovered.requestId === input.requestId) return recovered; } catch { /* Mantém o erro original e o formulário. */ }
+      throw error;
+    }
+    return this.getLotDetail(id);
+  }
+  async completeConsolidatedRevenue(lotId, revenue) {
+    const lot = await this.getLotDetail(lotId);
+    if (!isConsolidated(lot) || lot.lotStatus === 'cancelled' || lot.revenueConfirmed) throw new Error('Receita indisponível para complementação.');
+    if (!Number.isFinite(revenue) || revenue < 0) throw new Error('Informe uma receita válida.');
+    const snapshot = consolidatedSnapshot({ ...lot, favorecido: lot.favorecido || parseSnapshot(lot.favorecidoSnapshot), revenue, revenueConfirmed: true, lotId, services: lot.items }, lot.items.map((item) => ({ ...item, id: item.serviceId || item.compositionId, favorecidoId: lot.favorecidoId, pagamentoId: lotId, itemStatus: 'reserved' })));
+    const version = lot.version + 1;
+    snapshot.requestSignature = lot.requestSignature;
+    if (this.mockMode) {
+      Object.assign(this.mock.lots.find((row) => row.id === lotId), snapshot, { version, documentStatus: 'resend_required' });
+      this.addEvent(lotId, 'draft_updated', 'Receita total confirmada; lucro atualizado.', { version, detail: JSON.stringify({ previous: null, revenue: snapshot.revenue }) });
+      this.persistMock();
+    } else {
+      await this.atomicChanges([
+        { table: TABLES.payment, method: 'PATCH', id: lotId, etag: lot.etag, payload: { [CONSOLIDATED_FIELD]: JSON.stringify(snapshot), cr40f_totalcobradocliente: snapshot.revenue, cr40f_margemtotal: snapshot.margin, cr40f_versaoenvio: version, cr40f_statusdocumento: CHOICES.documentResendRequired } },
+        await this.consolidatedEvent(lotId, `Receita confirmada: ${snapshot.revenue}; anterior: pendente.`, version),
+      ]);
+    }
+    return this.getLotDetail(lotId);
+  }
+  async cancelConsolidated(lot, reason) {
+    if (lot.paymentStatus !== 'open' || lot.lotStatus === 'cancelled') throw new Error('Apenas consolidado aberto pode ser cancelado.');
+    if (this.mockMode) {
+      this.mock.services.forEach((row) => { if (row.pagamentoId === lot.id) row.pagamentoId = ''; });
+      Object.assign(this.mock.lots.find((row) => row.id === lot.id), { lotStatus: 'cancelled', cancelledAt: now() });
+      this.addEvent(lot.id, 'cancelled', 'Consolidado cancelado; serviços liberados.', { reason });
+      this.persistMock();
+    } else {
+      const services = lot.items.length ? await this.listFinanceServices({ compositionIds: lot.items.map((item) => item.compositionId) }) : [];
+      const operations = [{ table: TABLES.payment, method: 'PATCH', id: lot.id, etag: lot.etag, payload: { cr40f_statuslote: CHOICES.cancelledLot, cr40f_canceladoem: now(), cr40f_motivocancelamento: reason } }];
+      for (const service of services) {
+        if (service.pagamentoId !== lot.id) throw new Error('Vínculo alterado; cancelamento interrompido.');
+        operations.push({ table: TABLES.composition, method: 'PATCH', id: service.id, etag: service.etag, payload: await this.clearLookup(TABLES.composition, 'cr40f_pagamentoaterceiro') });
+      }
+      operations.push(await this.consolidatedEvent(lot.id, `Cancelamento: ${reason}`, lot.version, 'cancelled'));
+      await this.atomicChanges(operations);
+    }
+    return this.getLotDetail(lot.id);
+  }
+  async update(logicalName, id, payload, etag = "*") {
+    const entity = await this.entity(logicalName);
+    return this.request(
+      "PATCH",
+      `/${entity.entitySet}(${cleanGuid(id)})`,
+      payload,
+      { "If-Match": etag },
+    );
+  }
+  async listDrivers() {
+    if (this.mockMode) return clone(this.mock.drivers);
+    const entity = await this.entity(TABLES.employee);
+    const rows = await this.listAll(
+      TABLES.employee,
+      `?$select=${entity.id},${entity.primaryName},cr40f_tipodevinculo,statecode&$filter=statecode eq ${CHOICES.activeEmployee}&$orderby=${entity.primaryName} asc`,
+    );
+    return rows.map((row) => ({
+      id: cleanGuid(row[entity.id]),
+      nome: row[entity.primaryName],
+      status: "ativo",
+      tipoVinculo: row.cr40f_tipodevinculo,
+    }));
+  }
+  async listFavorecidos(includeInactive = false) {
+    if (this.mockMode)
+      return clone(
+        this.mock.favorecidos.filter(
+          (row) => includeInactive || row.status === "ativo",
+        ),
+      );
+    const entity = await this.entity(TABLES.favorecido);
+    const filter = includeInactive
+      ? ""
+      : `&$filter=cr40f_status eq ${CHOICES.activeFavorecido}`;
+    const rows = await this.listAll(
+      TABLES.favorecido,
+      `?$select=${entity.id},${entity.primaryName},cr40f_nomerazaosocial,cr40f_tipopessoa,cr40f_cpfcnpj,cr40f_tipochavepix,cr40f_chavepix,cr40f_email,cr40f_telefone,cr40f_status${filter}&$orderby=${entity.primaryName} asc`,
+    );
+    return rows.map((row) => ({
+      id: cleanGuid(row[entity.id]),
+      nome: row.cr40f_nomerazaosocial || row[entity.primaryName] || "Sem nome",
+      tipoPessoa: row.cr40f_tipopessoa === 100000001 ? "PJ" : "PF",
+      documento: row.cr40f_cpfcnpj || "",
+      tipoChavePix:
+        row.cr40f_tipochavepix === 100000001
+          ? "E-mail"
+          : row.cr40f_tipochavepix === 100000002
+            ? "Telefone"
+            : row.cr40f_tipochavepix === 100000003
+              ? "Aleatória"
+              : "CPF/CNPJ",
+      chavePix: row.cr40f_chavepix || "",
+      email: row.cr40f_email || "",
+      telefone: row.cr40f_telefone || "",
+      status:
+        row.cr40f_status === CHOICES.activeFavorecido ? "ativo" : "inativo",
+    }));
+  }
+  async createFavorecido(form) {
+    const errors = validateFavorecido(form);
+    if (Object.keys(errors).length) throw new Error(Object.values(errors)[0]);
+    const all = await this.listFavorecidos(true);
+    const normalized = String(form.documento).replace(/\D/g, "");
+    if (
+      all.some((row) => String(row.documento).replace(/\D/g, "") === normalized)
+    )
+      throw new Error("Já existe Terceiro Favorecido com este CPF/CNPJ.");
+    if (
+      all.some(
+        (row) =>
+          String(row.chavePix).trim().toLowerCase() ===
+          String(form.chavePix).trim().toLowerCase(),
+      )
+    )
+      throw new Error("Já existe Terceiro Favorecido com esta chave PIX.");
+    if (this.mockMode) {
+      const record = { ...clone(form), id: newId("fav"), status: "ativo" };
+      this.mock.favorecidos.push(record);
+      this.persistMock();
+      return clone(record);
+    }
+    return this.create(TABLES.favorecido, {
+      cr40f_nomerazaosocial: form.nome.trim(),
+      cr40f_tipopessoa: form.tipoPessoa === "PJ" ? 100000001 : 100000000,
+      cr40f_cpfcnpj: form.documento.trim(),
+      cr40f_tipochavepix:
+        form.tipoChavePix === "E-mail"
+          ? 100000001
+          : form.tipoChavePix === "Telefone"
+            ? 100000002
+            : form.tipoChavePix === "Aleatória"
+              ? 100000003
+              : 100000000,
+      cr40f_chavepix: form.chavePix.trim(),
+      cr40f_email: form.email.trim(),
+      cr40f_telefone: form.telefone?.trim() || "",
+      cr40f_status: CHOICES.activeFavorecido,
+    });
+  }
+  async updateFavorecido(id, form) {
+    if (this.mockMode) {
+      const row = this.mock.favorecidos.find((item) => item.id === id);
+      if (!row) throw new Error("Favorecido não encontrado.");
+      Object.assign(row, clone(form));
+      this.persistMock();
+      return clone(row);
+    }
+    return this.update(TABLES.favorecido, id, {
+      cr40f_nomerazaosocial: form.nome,
+      cr40f_cpfcnpj: form.documento,
+      cr40f_chavepix: form.chavePix,
+      cr40f_email: form.email,
+      cr40f_telefone: form.telefone || "",
+    });
+  }
+  async setFavorecidoStatus(id, status) {
+    if (this.mockMode) {
+      const row = this.mock.favorecidos.find((item) => item.id === id);
+      row.status = status;
+      this.persistMock();
+      return clone(row);
+    }
+    return this.update(TABLES.favorecido, id, {
+      cr40f_status:
+        status === "ativo"
+          ? CHOICES.activeFavorecido
+          : CHOICES.inactiveFavorecido,
+    });
+  }
+  async listLinks() {
+    if (this.mockMode) return clone(this.mock.links);
+    const rows = await this.listAll(
+      TABLES.link,
+      "?$select=cr40f_vinculomotoristafavorecidoid,_cr40f_motorista_value,_cr40f_terceirofavorecido_value,cr40f_status&$top=5000",
+    );
+    return rows.map((row) => ({
+      id: cleanGuid(row.cr40f_vinculomotoristafavorecidoid),
+      motoristaId: cleanGuid(row._cr40f_motorista_value),
+      favorecidoId: cleanGuid(row._cr40f_terceirofavorecido_value),
+      status: row.cr40f_status === CHOICES.activeLink ? "ativo" : "inativo",
+    }));
+  }
+  async upsertLink(motoristaId, favorecidoId) {
+    if (this.mockMode) {
+      let row = this.mock.links.find(
+        (item) =>
+          item.motoristaId === motoristaId &&
+          item.favorecidoId === favorecidoId,
+      );
+      if (row) row.status = "ativo";
+      else {
+        row = {
+          id: newId("link"),
+          motoristaId,
+          favorecidoId,
+          status: "ativo",
+          createdAt: now(),
+        };
+        this.mock.links.push(row);
+      }
+      this.persistMock();
+      return clone(row);
+    }
+    const existing = (await this.listLinks()).find(
+      (row) =>
+        row.motoristaId === motoristaId && row.favorecidoId === favorecidoId,
+    );
+    if (existing)
+      return this.update(TABLES.link, existing.id, {
+        cr40f_status: CHOICES.activeLink,
+      });
+    const payload = {
+      cr40f_status: CHOICES.activeLink,
+      ...(await this.bindLookup(
+        TABLES.link,
+        "cr40f_motorista",
+        TABLES.employee,
+        motoristaId,
+      )),
+      ...(await this.bindLookup(
+        TABLES.link,
+        "cr40f_terceirofavorecido",
+        TABLES.favorecido,
+        favorecidoId,
+      )),
+    };
+    return this.create(TABLES.link, payload);
+  }
+  async setLinkStatus(id, status) {
+    if (this.mockMode) {
+      const row = this.mock.links.find((item) => item.id === id);
+      row.status = status;
+      this.persistMock();
+      return clone(row);
+    }
+    return this.update(TABLES.link, id, {
+      cr40f_status:
+        status === "ativo" ? CHOICES.activeLink : CHOICES.inactiveLink,
+    });
+  }
+  async reservationOperationalFields() {
+    const cacheKey = "reservationOperationalFields";
+    if (this.cache.has(cacheKey)) return this.cache.get(cacheKey);
+    const response = await this.request(
+      "GET",
+      `/EntityDefinitions(LogicalName='${escapeOData(TABLES.reservation)}')/Attributes?$select=LogicalName,DisplayName,AttributeType`,
+    ).catch(() => ({ value: [] }));
+    const attributes = response.value || [];
+    const resolved = Object.fromEntries(
+      Object.entries(reservationDetailLabels).map(([key, labels]) => {
+        const metadataAttribute = attributes.find(
+          (row) =>
+            row.LogicalName === reservationOperationalMetadataFields[key],
+        );
+        const displayNameAttribute = attributes.find((row) => {
+          const label = normalizeLabel(
+            row.DisplayName?.UserLocalizedLabel?.Label ||
+              row.DisplayName?.LocalizedLabels?.[0]?.Label,
+          );
+          return labels.some(
+            (candidate) => label === normalizeLabel(candidate),
+          );
+        });
+        const attribute = metadataAttribute || displayNameAttribute;
+        return [
+          key,
+          selectableAttributeName(attribute) ||
+            reservationOperationalMetadataFields[key] ||
+            "",
+        ];
+      }),
+    );
+    this.cache.set(cacheKey, resolved);
+    return resolved;
+  }
+  async listReservationStatuses() {
+    if (this.mockMode) {
+      const options = new Map();
+      this.mock.services.forEach((service) => {
+        const value = service.reservationStatus || service.status;
+        if (value)
+          options.set(value, {
+            value,
+            label: service.reservationStatusLabel || service.statusLabel || value,
+            color: service.reservationStatusColor || "",
+          });
+      });
+      return [...options.values()];
+    }
+    const cacheKey = "reservationStatusOptions";
+    if (this.cache.has(cacheKey)) return this.cache.get(cacheKey);
+    const response = await this.request(
+      "GET",
+      `/EntityDefinitions(LogicalName='${escapeOData(TABLES.reservation)}')/Attributes(LogicalName='cr40f_status')/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?$select=LogicalName&$expand=OptionSet($select=Options)`,
+    ).catch(() => ({}));
+    const options = (response.OptionSet?.Options || [])
+      .filter((option) => option.Value !== null && option.Value !== undefined)
+      .map((option) => ({
+        value: String(option.Value),
+        label:
+          option.Label?.UserLocalizedLabel?.Label ||
+          option.Label?.LocalizedLabels?.[0]?.Label ||
+          String(option.Value),
+        color: option.Color || "",
+      }));
+    this.cache.set(cacheKey, options);
+    return options;
+  }
+  async compositionReservationLookupValueField() {
+    const cacheKey = "compositionReservationLookupValueField";
+    if (this.cache.has(cacheKey)) return this.cache.get(cacheKey);
+    const response = await this.request(
+      "GET",
+      `/EntityDefinitions(LogicalName='${escapeOData(TABLES.composition)}')/Attributes/Microsoft.Dynamics.CRM.LookupAttributeMetadata?$select=LogicalName,Targets`,
+    ).catch(() => ({ value: [] }));
+    const lookup = (response.value || []).find((attribute) =>
+      attribute.Targets?.includes(TABLES.reservation),
+    );
+    const field = lookup
+      ? `_${lookup.LogicalName}_value`
+      : "_cr40f_servicorelacionadogeral_value";
+    this.cache.set(cacheKey, field);
+    return field;
+  }
+  async listFinanceServices(filters = {}) {
+    if (this.mockMode)
+      return clone(
+        this.mock.services.filter(
+          (row) =>
+            row.itemCategory === CHOICES.serviceItemCategory &&
+            (!filters.compositionIds?.length ||
+              filters.compositionIds.map(cleanGuid).includes(cleanGuid(row.id))) &&
+            (!filters.from || row.dataServico >= filters.from) &&
+            (!filters.to || row.dataServico.slice(0, 10) <= filters.to) &&
+            (!filters.motoristaId || row.motoristaId === filters.motoristaId),
+        ),
+      );
+    const [operationalFields, reservationLookupValueField, reservationEntity] = await Promise.all([
+      this.reservationOperationalFields(),
+      this.compositionReservationLookupValueField(),
+      this.entity(TABLES.reservation),
+    ]);
+    const reservationFields = [...new Set(Object.values(operationalFields).filter(Boolean))];
+    const compositionIds = [
+      ...new Set((filters.compositionIds || []).map(cleanGuid).filter(Boolean)),
+    ];
+    const reservationFilters = [
+      `new_categoriadoitem eq ${CHOICES.serviceItemCategory}`,
+    ];
+    const from = oDataDateBoundary(filters.from);
+    const toExclusive = oDataDateBoundary(filters.to, true);
+    if (from && operationalFields.dataServico)
+      reservationFilters.push(`${operationalFields.dataServico} ge ${from}`);
+    if (toExclusive && operationalFields.dataServico)
+      reservationFilters.push(`${operationalFields.dataServico} lt ${toExclusive}`);
+    if (filters.motoristaId && operationalFields.motorista)
+      reservationFilters.push(
+        `${operationalFields.motorista} eq ${cleanGuid(filters.motoristaId)}`,
+      );
+    const compositionSelect =
+      `?$select=cr40f_composicaodeprecosid,cr40f_id,${reservationLookupValueField},new_valortotal,new_status,cr40f_valorrepasseterceiro,_cr40f_terceirofavorecido_value,_cr40f_pagamentoaterceiro_value`;
+    let compositionRows;
+    let reservationRows;
+    if (compositionIds.length) {
+      compositionRows = (
+        await Promise.all(
+          chunk(compositionIds, FINANCE_SERVICE_FILTER_BATCH_SIZE).map(
+            (ids) =>
+              this.listAll(
+                TABLES.composition,
+                `${compositionSelect}&$filter=${ids
+                  .map((id) => `cr40f_composicaodeprecosid eq ${id}`)
+                  .join(" or ")}`,
+              ),
+          ),
+        )
+      ).flat();
+      const reservationIds = [
+        ...new Set(
+          compositionRows
+            .map((row) => cleanGuid(row[reservationLookupValueField]))
+            .filter(Boolean),
+        ),
+      ];
+      reservationRows = (
+        await Promise.all(
+          chunk(reservationIds, FINANCE_SERVICE_FILTER_BATCH_SIZE).map(
+            (ids) =>
+              this.listAll(
+                TABLES.reservation,
+                `?$select=${reservationEntity.id},cr40f_id,cr40f_status,new_categoriadoitem${reservationFields.length ? `,${reservationFields.join(",")}` : ""}&$filter=${[
+                  ...reservationFilters,
+                  `(${ids
+                    .map((id) => `${reservationEntity.id} eq ${id}`)
+                    .join(" or ")})`,
+                ].join(" and ")}`,
+              ),
+          ),
+        )
+      ).flat();
+    } else {
+      reservationRows = await this.listAll(
+        TABLES.reservation,
+        `?$select=${reservationEntity.id},cr40f_id,cr40f_status,new_categoriadoitem${reservationFields.length ? `,${reservationFields.join(",")}` : ""}&$filter=${reservationFilters.join(" and ")}`,
+      );
+      if (!reservationRows.length) return [];
+      const reservationIds = reservationRows.map((row) =>
+        cleanGuid(row[reservationEntity.id]),
+      );
+      const hasScopedFilter = Boolean(from || toExclusive || filters.motoristaId);
+      compositionRows = hasScopedFilter
+        ? (
+            await Promise.all(
+              chunk(reservationIds, FINANCE_SERVICE_FILTER_BATCH_SIZE).map(
+                (ids) =>
+                  this.listAll(
+                    TABLES.composition,
+                    `${compositionSelect}&$filter=${ids
+                      .map((id) => `${reservationLookupValueField} eq ${id}`)
+                      .join(" or ")}`,
+                  ),
+              ),
+            )
+          ).flat()
+        : await this.listAll(
+            TABLES.composition,
+            compositionSelect,
+          );
+    }
+    if (!reservationRows.length) return [];
+    const passengerRows = (
+      await Promise.all(
+        chunk(reservationRows.map((row) => cleanGuid(row[reservationEntity.id])).filter(Boolean), FINANCE_SERVICE_FILTER_BATCH_SIZE).map(
+          (ids) => this.listAll(
+            TABLES.servicePassenger,
+            `?$select=_cr40f_geral_value,_cr40f_bancodedados_value&$filter=${ids.map((id) => `_cr40f_geral_value eq ${id}`).join(" or ")}`,
+          ),
+        ),
+      )
+    ).flat();
+    const passengersByReservation = new Map();
+    passengerRows.forEach((row) => {
+      const reservationId = cleanGuid(row._cr40f_geral_value);
+      const passengerId = cleanGuid(row._cr40f_bancodedados_value);
+      const name = shortPassengerName(
+        row["_cr40f_bancodedados_value@OData.Community.Display.V1.FormattedValue"],
+      );
+      if (!reservationId || !passengerId || !name) return;
+      if (!passengersByReservation.has(reservationId)) passengersByReservation.set(reservationId, new Map());
+      passengersByReservation.get(reservationId).set(passengerId, name);
+    });
+    const reservations = new Map(
+      reservationRows.map((row) => [
+        cleanGuid(row[reservationEntity.id]),
+        row,
+      ]),
+    );
+    return compositionRows.flatMap((composition) => {
+      const reservationId = cleanGuid(composition[reservationLookupValueField]);
+      const reservation = reservations.get(reservationId);
+      if (!reservation) return [];
+      const formattedStatus =
+        composition["new_status@OData.Community.Display.V1.FormattedValue"];
+      const statusLabel =
+        formattedStatus ||
+        (composition.new_status === CHOICES.completedComposition
+          ? "Concluído"
+          : "Sem status");
+      return [{
+        id: cleanGuid(composition.cr40f_composicaodeprecosid),
+        compositionId: cleanGuid(composition.cr40f_composicaodeprecosid),
+        reservationId,
+        identificador: reservation.cr40f_id || composition.cr40f_id || "Sem ID",
+        dataServico: rawFieldValue(reservation, operationalFields.dataServico),
+        dataFinalizacao: rawFieldValue(
+          reservation,
+          operationalFields.dataFinalizacao,
+        ),
+        cliente: fieldValue(reservation, operationalFields.cliente),
+        nomePassageiro: [...(passengersByReservation.get(reservationId)?.values() || [])].join(" - "),
+        trajeto: fieldValue(reservation, operationalFields.trajeto),
+        motorista: fieldValue(reservation, operationalFields.motorista),
+        motoristaId: cleanGuid(
+          operationalFields.motorista
+            ? reservation[operationalFields.motorista]
+            : "",
+        ),
+        tipoVeiculo: fieldValue(reservation, operationalFields.tipoVeiculo),
+        veiculo: fieldValue(reservation, operationalFields.veiculo),
+        observacaoOperacao: fieldValue(
+          reservation,
+          operationalFields.observacaoOperacao,
+        ),
+        observacaoFinal: fieldValue(
+          reservation,
+          operationalFields.observacaoFinal,
+        ),
+        favorecidoId: cleanGuid(composition._cr40f_terceirofavorecido_value),
+        pagamentoId: cleanGuid(composition._cr40f_pagamentoaterceiro_value),
+        valorCobrado: Number(composition.new_valortotal || 0),
+        valorRepasse: Number(composition.cr40f_valorrepasseterceiro || 0),
+        status: normalizeLabel(statusLabel),
+        statusLabel,
+        itemCategory: reservation.new_categoriadoitem,
+        reservationStatus: String(reservation.cr40f_status ?? ""),
+        reservationStatusLabel:
+          reservation["cr40f_status@OData.Community.Display.V1.FormattedValue"] ||
+          String(reservation.cr40f_status ?? ""),
+        etag: composition["@odata.etag"] || "*",
+      }];
+    });
+  }
+  async listServices() {
+    return this.listFinanceServices();
+  }
+  async saveServiceRepasse(serviceId, value, etag = "*") {
+    if (Number(value) < 0) throw new Error("Repasse não pode ser negativo.");
+    if (this.mockMode) {
+      this.consumeFailure("repasse");
+      const service = this.mock.services.find((row) => row.id === serviceId);
+      if (!service) throw new Error("Serviço não encontrado.");
+      if (etag !== "*" && Number(etag) !== Number(service.etag))
+        throw new Error(
+          "Serviço alterado por outro usuário. Atualize a lista.",
+        );
+      service.valorRepasse = Number(value);
+      service.etag += 1;
+      this.persistMock();
+      return clone(service);
+    }
+    await this.update(
+      TABLES.composition,
+      serviceId,
+      { cr40f_valorrepasseterceiro: Number(value) },
+      etag,
+    );
+    return {
+      id: cleanGuid(serviceId),
+      valorRepasse: Number(value),
+      etag: "*",
+    };
+  }
+  async setPreferredFavorecido(serviceId, favorecidoId, motoristaId = "") {
+    if (this.mockMode) {
+      const service = this.mock.services.find((row) => row.id === serviceId);
+      if (!service) throw new Error("Serviço não encontrado.");
+      await this.upsertLink(service.motoristaId, favorecidoId);
+      service.favorecidoId = favorecidoId;
+      this.persistMock();
+      return clone(service);
+    }
+    if (motoristaId) await this.upsertLink(motoristaId, favorecidoId);
+    await this.update(TABLES.composition, serviceId, {
+      ...(await this.bindLookup(
+        TABLES.composition,
+        "cr40f_terceirofavorecido",
+        TABLES.favorecido,
+        favorecidoId,
+      )),
+    });
+    return { favorecidoId };
+  }
+  async assignFavorecidoToServices(serviceIds, favorecidoId) {
+    const ids = [...new Set(serviceIds.map(cleanGuid).filter(Boolean))];
+    if (!ids.length) return [];
+    if (this.mockMode) {
+      const assigned = [];
+      this.mock.services.forEach((service) => {
+        if (!ids.includes(service.id) || service.favorecidoId) return;
+        service.favorecidoId = favorecidoId;
+        assigned.push(clone(service));
+      });
+      this.persistMock();
+      return assigned;
+    }
+    const payload = await this.bindLookup(
+      TABLES.composition,
+      "cr40f_terceirofavorecido",
+      TABLES.favorecido,
+      favorecidoId,
+    );
+    await Promise.all(
+      ids.map((serviceId) =>
+        this.update(TABLES.composition, serviceId, payload),
+      ),
+    );
+    return ids.map((id) => ({ id, favorecidoId }));
+  }
+  async clearFavorecidoFromServices(serviceIds, favorecidoId = "") {
+    const ids = [...new Set(serviceIds.map(cleanGuid).filter(Boolean))];
+    if (!ids.length) return [];
+    if (this.mockMode) {
+      const cleared = [];
+      this.mock.services.forEach((service) => {
+        if (
+          !ids.includes(service.id) ||
+          (favorecidoId && service.favorecidoId !== favorecidoId)
+        )
+          return;
+        service.favorecidoId = "";
+        cleared.push(clone(service));
+      });
+      this.persistMock();
+      return cleared;
+    }
+    const payload = await this.clearLookup(
+      TABLES.composition,
+      "cr40f_terceirofavorecido",
+    );
+    await Promise.all(
+      ids.map((serviceId) =>
+        this.update(TABLES.composition, serviceId, payload),
+      ),
+    );
+    return ids.map((id) => ({ id, favorecidoId: "" }));
+  }
+  addEvent(paymentId, operation, message, extra = {}) {
+    const event = {
+      id: newId("evt"),
+      paymentId,
+      operation,
+      message,
+      result: extra.result || "success",
+      previous: extra.previous || "",
+      next: extra.next || "",
+      reason: extra.reason || "",
+      version: extra.version || 1,
+      user: "Financeiro Betinhos",
+      createdAt: now(),
+      ...extra,
+    };
+    this.mock.events.unshift(event);
+    return event;
+  }
+  async recordRemoteEvent(paymentId, operation, message, extra = {}) {
+    const payload = {
+      ...(await this.bindLookup(
+        TABLES.event,
+        "cr40f_pagamentoaterceiro",
+        TABLES.payment,
+        paymentId,
+      )),
+      cr40f_name: operation,
+      cr40f_dataevento: now(),
+      cr40f_operacao: eventOperationChoice(operation, extra.version),
+      cr40f_resultado: extra.result || "success",
+      cr40f_estadoanterior: extra.previous || "",
+      cr40f_estadonovo: extra.next || "",
+      cr40f_motivo: extra.reason || "",
+      cr40f_mensagem: message,
+      cr40f_detalhetecnico: extra.detail || "",
+      cr40f_versao: extra.version || 1,
+      cr40f_url: extra.documentUrl || "",
+      cr40f_emailid: extra.emailId || "",
+    };
+    return this.create(TABLES.event, payload);
+  }
+  async createRemoteItem(paymentId, service) {
+    const payload = {
+      cr40f_dataservico: service.dataServico || null,
+      cr40f_trajeto: service.trajeto || "",
+      cr40f_valorcobrado: Number(service.valorCobrado || 0),
+      cr40f_valorrepasse: Number(service.valorRepasse || 0),
+      cr40f_margem:
+        Number(service.valorCobrado || 0) - Number(service.valorRepasse || 0),
+      cr40f_snapshotfinanceiro: JSON.stringify(service),
+      ...(await this.bindLookup(
+        TABLES.item,
+        "cr40f_composicao",
+        TABLES.composition,
+        service.compositionId,
+      )),
+      ...(await this.bindLookup(
+        TABLES.item,
+        "cr40f_pagamentoaterceiro",
+        TABLES.payment,
+        paymentId,
+      )),
+      ...(await this.bindLookup(
+        TABLES.item,
+        "cr40f_reserva",
+        TABLES.reservation,
+        service.reservationId,
+      )),
+      ...(await this.bindLookup(
+        TABLES.item,
+        "cr40f_motorista",
+        TABLES.employee,
+        service.motoristaId,
+        "cr40f_motoristareferencia",
+      )),
+    };
+    return this.create(TABLES.item, payload);
+  }
+  async linkCompositionToLot(service, paymentId, favorecidoId) {
+    return this.update(
+      TABLES.composition,
+      service.compositionId,
+      {
+        ...(await this.bindLookup(
+          TABLES.composition,
+          "cr40f_pagamentoaterceiro",
+          TABLES.payment,
+          paymentId,
+        )),
+        ...(await this.bindLookup(
+          TABLES.composition,
+          "cr40f_terceirofavorecido",
+          TABLES.favorecido,
+          favorecidoId,
+        )),
+      },
+      service.etag || "*",
+    );
+  }
+  async createDraftLot(input) {
+    if (input.mode === 'consolidated') return this.saveConsolidated(input);
+    const services = input.services || [];
+    if (!services.length) throw new Error("Selecione pelo menos um serviço.");
+    const links = await this.listLinks();
+    const requestedIds = [
+      ...new Set(services.map((service) => cleanGuid(service.id)).filter(Boolean)),
+    ];
+    const actual = await this.listFinanceServices({ compositionIds: requestedIds });
+    const foundIds = new Set(actual.map((service) => cleanGuid(service.id)));
+    const missingIds = requestedIds.filter((id) => !foundIds.has(id));
+    if (missingIds.length) {
+      const error = new Error(
+        `Serviço(s) não encontrado(s) ou removido(s): ${missingIds.join(", ")}. Atualize a lista e tente novamente.`,
+      );
+      error.code = "LOT_SERVICE_NOT_FOUND";
+      error.requestedServiceIds = requestedIds;
+      error.foundServiceIds = [...foundIds];
+      error.missingServiceIds = missingIds;
+      void this.logError(error, {
+        action: "Criacao do lote",
+        phase: "lot.revalidate",
+        payload: {
+          requestedServiceIds: requestedIds,
+          foundServiceIds: [...foundIds],
+          missingServiceIds: missingIds,
+        },
+      });
+      throw error;
+    }
+    const invalid = actual.filter((service) =>
+      !isEligibleService(service, input.favorecido.id, links),
+    );
+    if (invalid.length) {
+      const reasons = invalid.map((service) => ({
+        id: service.id,
+        identificador: service.identificador || service.id,
+        reason: serviceLotEligibilityReason(
+          service,
+          input.favorecido.id,
+          links,
+        ),
+      }));
+      const error = new Error(
+        `Serviço(s) indisponível(is): ${reasons
+          .map((item) => `${item.identificador} — ${item.reason}`)
+          .join("; ")}.`,
+      );
+      error.code = "LOT_SERVICE_INELIGIBLE";
+      error.invalidServices = reasons;
+      void this.logError(error, {
+        action: "Criacao do lote",
+        phase: "lot.revalidate",
+        payload: {
+          requestedServiceIds: requestedIds,
+          foundServiceIds: actual.map((service) => service.id),
+          invalidServices: reasons,
+        },
+      });
+      throw error;
+    }
+    const snapshot = createLotSnapshot(input.favorecido, actual, input.year);
+    const identifier = `PT-${input.year}-${String(Date.now()).slice(-6)}`;
+    if (this.mockMode) {
+      this.consumeFailure("reserve");
+      const lot = {
+        ...snapshot,
+        id: newId("lot"),
+        identifier,
+        items: actual.map((service) => ({
+          ...service,
+          itemStatus: ITEM_STATUS.RESERVED,
+        })),
+      };
+      this.mock.lots.unshift(lot);
+      actual.forEach((service) => {
+        this.mock.services.find((row) => row.id === service.id).pagamentoId =
+          lot.id;
+        this.mock.items.push({
+          id: newId("item"),
+          paymentId: lot.id,
+          serviceId: service.id,
+          ...service,
+          itemStatus: ITEM_STATUS.RESERVED,
+        });
+      });
+      this.addEvent(
+        lot.id,
+        "draft_created",
+        "Lote criado e serviços reservados.",
+        { next: "Rascunho" },
+      );
+      this.persistMock();
+      return clone(lot);
+    }
+    const paymentPayload = {
+      cr40f_statuslote: 100000000,
+      cr40f_statuspagamento: 100000000,
+      cr40f_statusdocumento: 100000000,
+      cr40f_versaoenvio: 1,
+      cr40f_anoreferencia: input.year,
+      cr40f_identificadorlote: identifier,
+      cr40f_quantidadeservicos: snapshot.count,
+      cr40f_totalcobradocliente: snapshot.revenue,
+      cr40f_totalrepasse: snapshot.repasse,
+      cr40f_margemtotal: snapshot.margin,
+      cr40f_emailfavorecidoenvio: input.favorecido.email,
+      cr40f_snapshotfavorecido: snapshot.favorecidoSnapshot,
+    };
+    const paymentId = await this.createResolved(
+      TABLES.payment,
+      paymentPayload,
+      `cr40f_identificadorlote eq '${escapeOData(identifier)}'`,
+    );
+    const linkedServices = [];
+    const createdItems = [];
+    try {
+      for (const service of actual) {
+        await this.linkCompositionToLot(
+          service,
+          paymentId,
+          input.favorecido.id,
+        );
+        linkedServices.push(service);
+        createdItems.push(await this.createRemoteItem(paymentId, service));
+      }
+      await this.recordRemoteEvent(
+        paymentId,
+        "draft_created",
+        "Lote criado e servicos reservados.",
+        { next: "Rascunho", version: 1 },
+      );
+    } catch (error) {
+      void this.logError(error, {
+        action: "Criacao do lote",
+        phase: "lot.reserve",
+        payload: {
+          paymentId,
+          identifier,
+          serviceIds: actual.map((service) => service.id),
+          totals: paymentTotals(actual),
+        },
+      });
+      await Promise.all(
+        linkedServices.map(async (service) => {
+          try {
+            await this.update(
+              TABLES.composition,
+              service.compositionId,
+              await this.clearLookup(
+                TABLES.composition,
+                "cr40f_pagamentoaterceiro",
+              ),
+            );
+          } catch {
+            // A falha de limpeza nÃ£o deve ocultar o erro original da reserva.
+          }
+        }),
+      );
+      const itemEntity = await this.entity(TABLES.item);
+      await Promise.all(
+        createdItems.map((item) => {
+          const itemId = cleanGuid(item?.[itemEntity.id] || item?.id);
+          return itemId
+            ? this.delete(TABLES.item, itemId).catch(() => undefined)
+            : undefined;
+        }),
+      );
+      await this.update(TABLES.payment, paymentId, {
+        cr40f_statuslote: CHOICES.cancelledLot,
+        cr40f_canceladoem: now(),
+        cr40f_motivocancelamento: `Falha ao reservar servicos: ${error.message}`,
+      }).catch(() => undefined);
+      throw new Error(`Lote ${identifier} criado parcialmente: ${error.message}`);
+    }
+    return this.getLotDetail(paymentId);
+  }
+  async updateDraftLot(lotId, input) {
+    if (!this.mockMode) {
+      const detail = await this.getLotDetail(lotId);
+      if (
+        detail.lotStatus !== LOT_STATUS.DRAFT ||
+        detail.paymentStatus !== PAYMENT_STATUS.OPEN
+      )
+        throw new Error("Apenas lote em aberto pode ser editado.");
+      const favorecido = (await this.listFavorecidos(true)).find(
+        (row) => row.id === input.favorecidoId,
+      );
+      if (!favorecido) throw new Error("Favorecido nao encontrado.");
+      const selected = (await this.listFinanceServices()).filter((row) =>
+        input.serviceIds.includes(row.id),
+      );
+      if (!selected.length) throw new Error("Selecione pelo menos um servico.");
+      const selectedIds = new Set(selected.map((row) => row.compositionId));
+      for (const item of detail.items) {
+        if (!item.compositionId || selectedIds.has(item.compositionId)) continue;
+        await this.update(
+          TABLES.composition,
+          item.compositionId,
+          await this.clearLookup(
+            TABLES.composition,
+            "cr40f_pagamentoaterceiro",
+          ),
+        );
+        await this.delete(TABLES.item, item.id);
+      }
+      for (const service of selected) {
+        if (service.pagamentoId && service.pagamentoId !== lotId)
+          throw new Error(`${service.identificador} ja esta reservado.`);
+        await this.linkCompositionToLot(service, lotId, favorecido.id);
+        if (
+          !detail.items.some(
+            (item) => item.compositionId === service.compositionId,
+          )
+        )
+          await this.createRemoteItem(lotId, service);
+      }
+      const snapshot = createLotSnapshot(favorecido, selected, input.year);
+      await this.update(TABLES.payment, lotId, {
+        cr40f_anoreferencia: input.year,
+        cr40f_quantidadeservicos: snapshot.count,
+        cr40f_totalcobradocliente: snapshot.revenue,
+        cr40f_totalrepasse: snapshot.repasse,
+        cr40f_margemtotal: snapshot.margin,
+        cr40f_emailfavorecidoenvio: favorecido.email,
+        cr40f_snapshotfavorecido: snapshot.favorecidoSnapshot,
+      });
+      await this.recordRemoteEvent(
+        lotId,
+        "draft_updated",
+        "Servicos do rascunho atualizados.",
+        { next: "Rascunho", version: detail.version },
+      );
+      return this.getLotDetail(lotId);
+    }
+    const lot = this.mock.lots.find((row) => row.id === lotId);
+    if (!lot || lot.paymentStatus !== PAYMENT_STATUS.OPEN)
+      throw new Error("Apenas lote em aberto pode ser editado.");
+    const selected = this.mock.services.filter((row) =>
+      input.serviceIds.includes(row.id),
+    );
+    this.mock.services
+      .filter(
+        (row) =>
+          row.pagamentoId === lotId && !input.serviceIds.includes(row.id),
+      )
+      .forEach((row) => {
+        row.pagamentoId = "";
+      });
+    selected.forEach((row) => {
+      if (row.pagamentoId && row.pagamentoId !== lotId)
+        throw new Error(`${row.identificador} já está reservado.`);
+      row.pagamentoId = lotId;
+    });
+    const fav = this.mock.favorecidos.find(
+      (row) => row.id === input.favorecidoId,
+    );
+    Object.assign(lot, createLotSnapshot(fav, selected, input.year), {
+      id: lot.id,
+      identifier: lot.identifier,
+      version: lot.version,
+    });
+    this.mock.items = this.mock.items.filter((row) => row.paymentId !== lotId);
+    selected.forEach((row) =>
+      this.mock.items.push({
+        id: newId("item"),
+        paymentId: lotId,
+        serviceId: row.id,
+        ...row,
+        itemStatus: ITEM_STATUS.RESERVED,
+      }),
+    );
+    this.addEvent(lotId, "draft_updated", "Serviços do rascunho atualizados.", {
+      next: "Rascunho",
+      version: lot.version,
+    });
+    this.persistMock();
+    return clone(lot);
+  }
+  async cancelLot(lotId, reason) {
+    if (!String(reason || "").trim())
+      throw new Error("Informe o motivo do cancelamento.");
+    const consolidatedLot = await this.getLotDetail(lotId);
+    if (isConsolidated(consolidatedLot)) return this.cancelConsolidated(consolidatedLot, reason);
+    if (!this.mockMode) {
+      const detail = await this.getLotDetail(lotId);
+      if (
+        detail.lotStatus !== LOT_STATUS.DRAFT ||
+        detail.paymentStatus !== PAYMENT_STATUS.OPEN
+      )
+        throw new Error("Apenas lote aberto pode ser cancelado.");
+      for (const item of detail.items) {
+        if (!item.compositionId) continue;
+        await this.update(
+          TABLES.composition,
+          item.compositionId,
+          await this.clearLookup(
+            TABLES.composition,
+            "cr40f_pagamentoaterceiro",
+          ),
+        );
+      }
+      await this.update(TABLES.payment, lotId, {
+        cr40f_statuslote: 100000001,
+        cr40f_canceladoem: now(),
+        cr40f_motivocancelamento: reason,
+      });
+      await this.recordRemoteEvent(
+        lotId,
+        "cancelled",
+        "Lote cancelado e servicos liberados.",
+        {
+          previous: "Rascunho",
+          next: "Cancelado",
+          reason,
+          version: detail.version,
+        },
+      );
+      return this.getLotDetail(lotId);
+    }
+    const lot = this.mock.lots.find((row) => row.id === lotId);
+    if (!lot || lot.paymentStatus !== PAYMENT_STATUS.OPEN)
+      throw new Error("Reverta o pagamento antes de cancelar.");
+    lot.lotStatus = LOT_STATUS.CANCELLED;
+    this.mock.services
+      .filter((row) => row.pagamentoId === lotId)
+      .forEach((row) => {
+        row.pagamentoId = "";
+      });
+    this.mock.items
+      .filter((row) => row.paymentId === lotId)
+      .forEach((row) => {
+        row.itemStatus = ITEM_STATUS.CANCELLED;
+      });
+    this.addEvent(lotId, "cancelled", "Lote cancelado e serviços liberados.", {
+      previous: "Rascunho",
+      next: "Cancelado",
+      reason,
+      version: lot.version,
+    });
+    this.persistMock();
+    return clone(lot);
+  }
+  async markPaid(lotId, proofUrl = "") {
+    if (!this.mockMode) {
+      const detail = await this.getLotDetail(lotId);
+      if (
+        detail.lotStatus !== LOT_STATUS.DRAFT ||
+        detail.paymentStatus !== PAYMENT_STATUS.OPEN
+      )
+        throw new Error("Lote indisponivel para pagamento.");
+      if (isConsolidated(detail)) {
+        await this.atomicChanges([
+          { table: TABLES.payment, method: 'PATCH', id: lotId, etag: detail.etag, payload: { cr40f_statuspagamento: CHOICES.paidPayment, cr40f_statusdocumento: CHOICES.documentSending, cr40f_pagoem: now(), ...(proofUrl ? { cr40f_comprovanteurl: proofUrl } : {}) } },
+          await this.consolidatedEvent(lotId, 'Pagamento integral registrado.', detail.version, 'paid'),
+        ]);
+        return this.getLotDetail(lotId);
+      }
+      await this.update(TABLES.payment, lotId, {
+        cr40f_statuspagamento: 100000001,
+        cr40f_statusdocumento: CHOICES.documentSending,
+        cr40f_pagoem: now(),
+        ...(proofUrl ? { cr40f_comprovanteurl: proofUrl } : {}),
+      });
+      await this.recordRemoteEvent(
+        lotId,
+        "paid",
+        "Pagamento integral registrado.",
+        {
+          previous: "Em aberto",
+          next: "Pago",
+          version: detail.version,
+        },
+      );
+      return this.getLotDetail(lotId);
+    }
+    const lot = this.mock.lots.find((row) => row.id === lotId);
+    if (
+      !lot ||
+      lot.lotStatus !== LOT_STATUS.DRAFT ||
+      lot.paymentStatus !== PAYMENT_STATUS.OPEN
+    )
+      throw new Error("Lote indisponível para pagamento.");
+    lot.paymentStatus = PAYMENT_STATUS.PAID;
+    lot.paidAt = now();
+    lot.proofUrl = proofUrl;
+    lot.documentStatus = DOCUMENT_STATUS.SENDING;
+    this.mock.items
+      .filter((row) => row.paymentId === lotId)
+      .forEach((row) => {
+        row.itemStatus = ITEM_STATUS.PAID;
+      });
+    this.addEvent(lotId, "paid", "Pagamento integral registrado.", {
+      previous: "Em aberto",
+      next: "Pago",
+      version: lot.version,
+    });
+    this.persistMock();
+    return clone(lot);
+  }
+  async uploadPaymentProof(lot, file) {
+    if (!file) return null;
+    if (file.size > MAX_PAYMENT_PROOF_SIZE)
+      throw new Error("O comprovante deve ter no máximo 5 MB.");
+    const fileName = sanitizePathSegment(file.name, "comprovante");
+    const path = `Pagamentos a Terceiros/${lot.year}/${sanitizePathSegment(lot.favorecido?.nome, "Favorecido")}/${sanitizePathSegment(lot.identifier)}/Comprovantes`;
+    if (this.mockMode)
+      return {
+        url: `https://onedrive.local/${encodeURIComponent(fileName)}`,
+        name: fileName,
+      };
+    const dataUri = await fileToDataUrl(file);
+    const payload = {
+      caminhoCompleto: path,
+      nomeArquivo: fileName,
+      conteudoBase64: dataUri.split(",")[1] || "",
+      mimeType: file.type || "application/octet-stream",
+      metadados: {
+        loteId: lot.id,
+        identificadorLote: lot.identifier,
+        tipo: "COMPROVANTE_PAGAMENTO",
+        contrato: FLOW_CONTRACT,
+      },
+    };
+    if (!payload.conteudoBase64) throw new Error("Comprovante vazio para envio.");
+    const endpoint = await this.resolveOneDriveFlowUrl();
+    if (!endpoint) throw new Error("URL do Flow de OneDrive não configurada.");
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const text = await response.text();
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = null;
+    }
+    if (!response.ok)
+      throw new Error(data?.message || data?.error || `Flow OneDrive retornou ${response.status}.`);
+    const url = data?.shareLink || data?.webUrl || data?.url || data?.link;
+    if (!url) throw new Error("Flow OneDrive nao retornou URL do comprovante.");
+    return { url, name: fileName };
+  }
+  async revertPaid(lotId, reason) {
+    if (!String(reason || "").trim())
+      throw new Error("Informe o motivo da reversão.");
+    if (!this.mockMode) {
+      const detail = await this.getLotDetail(lotId);
+      if (detail.paymentStatus !== PAYMENT_STATUS.PAID)
+        throw new Error("Lote nao esta pago.");
+      await this.update(TABLES.payment, lotId, {
+        cr40f_statuspagamento: 100000000,
+        cr40f_pagamentorevertidoem: now(),
+        cr40f_motivoreversaopagamento: reason,
+        cr40f_statusdocumento: CHOICES.documentResendRequired,
+        cr40f_versaoenvio: detail.version + 1,
+      });
+      await this.recordRemoteEvent(
+        lotId,
+        "paid_reverted",
+        "Pagamento revertido; novo documento sera obrigatorio.",
+        {
+          previous: "Pago",
+          next: "Em aberto",
+          reason,
+          version: detail.version + 1,
+        },
+      );
+      return this.getLotDetail(lotId);
+    }
+    const lot = this.mock.lots.find((row) => row.id === lotId);
+    if (!lot || lot.paymentStatus !== PAYMENT_STATUS.PAID)
+      throw new Error("Lote não está pago.");
+    lot.paymentStatus = PAYMENT_STATUS.OPEN;
+    lot.documentStatus = DOCUMENT_STATUS.RESEND_REQUIRED;
+    lot.version += 1;
+    this.mock.items
+      .filter((row) => row.paymentId === lotId)
+      .forEach((row) => {
+        row.itemStatus = ITEM_STATUS.RESERVED;
+      });
+    this.addEvent(
+      lotId,
+      "paid_reverted",
+      "Pagamento revertido; novo documento será obrigatório.",
+      { previous: "Pago", next: "Em aberto", reason, version: lot.version },
+    );
+    this.persistMock();
+    return clone(lot);
+  }
+  async saveDocumentToOneDrive(lot, pdf) {
+    this.consumeFailure("onedrive");
+    if (this.mockMode)
+      return {
+        url: `https://onedrive.local/${lot.identifier}-v${lot.version}.pdf`,
+        name: pdf.name,
+      };
+    const endpoint = await this.resolveOneDriveFlowUrl();
+    if (!endpoint) throw new Error("URL do Flow de OneDrive não configurada.");
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        caminhoCompleto: `Pagamentos a Terceiros/${lot.year}/${lot.favorecido?.nome || "Favorecido"}/${lot.identifier}`,
+        nomeArquivo: pdf.name,
+        conteudoBase64: pdf.base64,
+        mimeType: "application/pdf",
+        metadados: {
+          loteId: lot.id,
+          versao: lot.version,
+          contrato: FLOW_CONTRACT,
+        },
+      }),
+    });
+    const text = await response.text();
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = null;
+    }
+    if (!response.ok) {
+      const flowError = data?.error;
+      const detail =
+        data?.message ||
+        (typeof flowError === "string" ? flowError : flowError?.message) ||
+        (typeof flowError === "object" ? flowError?.code : "") ||
+        `Flow OneDrive retornou ${response.status}.`;
+      throw new Error(`Flow OneDrive (HTTP ${response.status}): ${detail}`);
+    }
+    if (!data || (!data.shareLink && !data.webUrl && !data.url && !data.link))
+      throw new Error("Flow OneDrive nao retornou URL do documento.");
+    return { ...data, url: data.shareLink || data.webUrl || data.url || data.link };
+  }
+  async sendLotDocumentEmail(lot, pdf) {
+    this.consumeFailure("email");
+    const favorecidoId = lot.favorecidoId || lot.favorecido?.id || "";
+    const currentFavorecido = favorecidoId
+      ? (await this.listFavorecidos(true)).find((row) => row.id === favorecidoId)
+      : null;
+    const favorecido = currentFavorecido || lot.favorecido || {};
+    const recipient = String(favorecido.email || "").trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient))
+      throw new Error("Favorecido sem e-mail válido para envio.");
+    if (!pdf?.base64) throw new Error("PDF vazio para envio.");
+    if (this.mockMode)
+      return {
+        ok: true,
+        emailId: `email-${crypto.randomUUID()}`,
+        recipient,
+      };
+    const endpoint = await this.resolveDocumentEmailFlowUrl();
+    if (!endpoint)
+      throw new Error(
+        `URL do Flow de e-mail não configurada na variável ${EMAIL_FLOW_CONTRACT}.`,
+      );
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contrato: EMAIL_FLOW_PAYLOAD_CONTRACT,
+        loteId: lot.id,
+        identificadorLote: lot.identifier,
+        versao: Number(lot.version || 1),
+        destinatario: recipient,
+        nomeFavorecido: favorecido.nome || "",
+        assunto: `Betinhos | Documento do lote ${lot.identifier}`,
+        corpoHtml:
+          `<p>Olá, ${favorecido.nome || "fornecedor"}.</p>` +
+          `<p>Segue anexo o documento do lote <strong>${lot.identifier}</strong>.</p>` +
+          "<p>Atenciosamente,<br>Betinhos Executive Service</p>",
+        nomeArquivo: pdf.name,
+        conteudoBase64: pdf.base64,
+        mimeType: "application/pdf",
+      }),
+    });
+    const text = await response.text();
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = null;
+    }
+    if (!response.ok || data?.ok === false) {
+      const flowError = data?.error;
+      const detail =
+        data?.message ||
+        (typeof flowError === "string" ? flowError : flowError?.message) ||
+        (typeof flowError === "object" ? flowError?.code : "") ||
+        `Flow de e-mail retornou ${response.status}.`;
+      const runId = data?.emailId || data?.runId;
+      throw new Error(
+        `Flow de e-mail (HTTP ${response.status}): ${detail}${runId ? ` Execução: ${runId}.` : ""}`,
+      );
+    }
+    const emailId = String(data?.emailId || data?.runId || "").trim();
+    if (!emailId) throw new Error("Flow de e-mail não retornou emailId.");
+    return { ...data, ok: true, emailId, recipient };
+  }
+  async registerDocumentResult(lotId, result) {
+    if (!this.mockMode) {
+      const detail = await this.getLotDetail(lotId);
+      await this.update(TABLES.payment, lotId, {
+        cr40f_statusdocumento: result.ok
+          ? CHOICES.documentSent
+          : CHOICES.documentFailed,
+        cr40f_documentourl: result.url || null,
+        cr40f_documentonome: result.name || null,
+        cr40f_documentoemailid: result.emailId || null,
+        cr40f_errodocumento: result.error || null,
+      });
+      await this.recordRemoteEvent(
+        lotId,
+        result.ok ? "document_sent" : "document_failed",
+        result.ok
+          ? "PDF enviado ao favorecido como anexo."
+          : "Falha ao gerar, salvar ou enviar documento.",
+        {
+          result: result.ok ? "success" : "failure",
+          version: detail.version,
+          documentUrl: result.url || "",
+          emailId: result.emailId || "",
+          detail: result.error || "",
+        },
+      );
+      return this.getLotDetail(lotId);
+    }
+    const lot = this.mock.lots.find((row) => row.id === lotId);
+    lot.documentStatus = result.ok
+      ? DOCUMENT_STATUS.SENT
+      : DOCUMENT_STATUS.FAILED;
+    lot.documentUrl = result.url || lot.documentUrl || "";
+    lot.documentName = result.name || lot.documentName || "";
+    lot.emailId = result.emailId || "";
+    lot.documentError = result.error || "";
+    this.addEvent(
+      lotId,
+      result.ok ? "document_sent" : "document_failed",
+      result.ok
+        ? "PDF enviado ao favorecido como anexo."
+        : "Falha ao gerar, salvar ou enviar documento.",
+      {
+        result: result.ok ? "success" : "failure",
+        version: lot.version,
+        documentUrl: result.url || "",
+        emailId: result.emailId || "",
+        detail: result.error || "",
+      },
+    );
+    this.persistMock();
+    return clone(lot);
+  }
+  async getLotDetail(lotId) {
+    if (this.mockMode) {
+      const lot = this.mock.lots.find((row) => row.id === lotId);
+      if (!lot) throw new Error("Lote nao encontrado.");
+      return {
+        ...clone(lot),
+        items: clone(this.mock.items.filter((row) => row.paymentId === lotId)),
+        events: clone(
+          this.mock.events.filter((row) => row.paymentId === lotId),
+        ),
+      };
+    }
+    const paymentEntity = await this.entity(TABLES.payment);
+    const consolidatedSelect = await this.consolidatedSelect();
+    const paymentRows = await this.listAll(
+      TABLES.payment,
+      `?$select=${paymentEntity.id},cr40f_statuslote,cr40f_statuspagamento,cr40f_statusdocumento,cr40f_versaoenvio,cr40f_documentoversao,cr40f_anoreferencia,cr40f_identificadorlote,cr40f_quantidadeservicos,cr40f_totalcobradocliente,cr40f_totalrepasse,cr40f_margemtotal,cr40f_pagoem,cr40f_comprovanteurl,cr40f_canceladoem,cr40f_documentourl,cr40f_documentonome,cr40f_documentoemailid,cr40f_errodocumento,cr40f_snapshotfavorecido${consolidatedSelect}&$filter=${paymentEntity.id} eq ${cleanGuid(lotId)}&$top=1`,
+    );
+    const paymentRow = paymentRows[0];
+    if (!paymentRow) throw new Error("Lote nao encontrado.");
+    const lot = this.normalizePayment(paymentRow, paymentEntity);
+    const itemEntity = await this.entity(TABLES.item);
+    const eventEntity = await this.entity(TABLES.event);
+    const [itemRows, eventRows] = await Promise.all([
+      this.listAll(
+        TABLES.item,
+        `?$select=${itemEntity.id},_cr40f_composicao_value,_cr40f_pagamentoaterceiro_value,_cr40f_reserva_value,_cr40f_motoristareferencia_value,cr40f_dataservico,cr40f_trajeto,cr40f_valorcobrado,cr40f_valorrepasse,cr40f_margem,cr40f_snapshotfinanceiro&$filter=_cr40f_pagamentoaterceiro_value eq ${cleanGuid(lotId)}&$orderby=cr40f_dataservico asc&$top=5000`,
+      ),
+      this.listAll(
+        TABLES.event,
+        `?$select=${eventEntity.id},_cr40f_pagamentoaterceiro_value,cr40f_name,cr40f_dataevento,cr40f_operacao,cr40f_resultado,cr40f_estadoanterior,cr40f_estadonovo,cr40f_motivo,cr40f_mensagem,cr40f_detalhetecnico,cr40f_versao,cr40f_url,cr40f_emailid&$filter=_cr40f_pagamentoaterceiro_value eq ${cleanGuid(lotId)}&$orderby=cr40f_dataevento desc&$top=5000`,
+      ),
+    ]);
+    const items = itemRows.map((row) =>
+      this.normalizeItem(row, itemEntity, lot),
+    );
+    if (items.some((item) => !item.identificador || !item.motorista)) {
+      const services = await this.listFinanceServices();
+      const serviceBySourceId = new Map(
+        services.flatMap((service) => [
+          [service.compositionId, service],
+          [service.reservationId, service],
+        ]),
+      );
+      items.forEach((item) => {
+        const service =
+          serviceBySourceId.get(item.compositionId) ||
+          serviceBySourceId.get(item.reservationId);
+        if (!service) return;
+        item.identificador ||= service.identificador || "";
+        item.motorista ||= service.motorista || "";
+      });
+    }
+    return {
+      ...lot,
+      items,
+      services: items,
+      events: eventRows.map((row) => this.normalizeEvent(row, eventEntity)),
+    };
+  }
+  async listLotEvents(lotId) {
+    return (await this.getLotDetail(lotId)).events;
+  }
+}
+
+export const dataverse = new DataverseClient();
