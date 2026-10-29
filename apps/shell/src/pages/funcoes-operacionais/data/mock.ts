@@ -37,11 +37,11 @@ function serviceAt(offsetDays: number, hour: number, minute: number): string {
 
 function createDrivers(): Driver[] {
   return [
-    { id: "drv-001", name: "Bruno Costa", nickname: "Bruno", microsoftEmail: "bruno@betinhos.com.br", employmentTypeValue: 0, employmentTypeLabel: "Colaborador" },
-    { id: "drv-002", name: "Carla Freitas", nickname: "Carla", microsoftEmail: "carla@betinhos.com.br", employmentTypeValue: 0, employmentTypeLabel: "Colaborador" },
-    { id: "drv-003", name: "Diego Nunes", nickname: "Diego", microsoftEmail: "diego@betinhos.com.br", employmentTypeValue: 0, employmentTypeLabel: "Colaborador" },
-    { id: "drv-004", name: "Fernando Prado", nickname: "Fernando", microsoftEmail: "fernando@betinhos.com.br", employmentTypeValue: 0, employmentTypeLabel: "Colaborador" },
-    { id: "drv-005", name: "Helena Rocha", nickname: "Helena", microsoftEmail: "helena@betinhos.com.br", employmentTypeValue: 0, employmentTypeLabel: "Colaborador" }
+    { id: "drv-001", name: "Bruno Costa", nickname: "Bruno", microsoftEmail: "bruno@exemplo.test", employmentTypeValue: 0, employmentTypeLabel: "Colaborador" },
+    { id: "drv-002", name: "Carla Freitas", nickname: "Carla", microsoftEmail: "carla@exemplo.test", employmentTypeValue: 0, employmentTypeLabel: "Colaborador" },
+    { id: "drv-003", name: "Diego Nunes", nickname: "Diego", microsoftEmail: "diego@exemplo.test", employmentTypeValue: 0, employmentTypeLabel: "Colaborador" },
+    { id: "drv-004", name: "Fernando Prado", nickname: "Fernando", microsoftEmail: "fernando@exemplo.test", employmentTypeValue: 0, employmentTypeLabel: "Colaborador" },
+    { id: "drv-005", name: "Helena Rocha", nickname: "Helena", microsoftEmail: "helena@exemplo.test", employmentTypeValue: 0, employmentTypeLabel: "Colaborador" }
   ];
 }
 

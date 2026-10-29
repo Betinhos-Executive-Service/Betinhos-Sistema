@@ -77,8 +77,8 @@ function service(overrides: Partial<Service>): Service {
 // Formato antigo (AppState inteiro do WebResource): as regras só leem driver/clone/vehicle/data.
 function baseState(overrides: Record<string, any> = {}): AppState {
   const drivers: Driver[] = [
-    { id: "drv-1", name: "Diego Nunes", nickname: "Diego", microsoftEmail: "diego@betinhos.com.br", employmentTypeValue: 0, employmentTypeLabel: "Colaborador" },
-    { id: "drv-2", name: "Helena Rocha", nickname: "Helena", microsoftEmail: "helena@betinhos.com.br", employmentTypeValue: 0, employmentTypeLabel: "Colaborador" }
+    { id: "drv-1", name: "Diego Nunes", nickname: "Diego", microsoftEmail: "diego@exemplo.test", employmentTypeValue: 0, employmentTypeLabel: "Colaborador" },
+    { id: "drv-2", name: "Helena Rocha", nickname: "Helena", microsoftEmail: "helena@exemplo.test", employmentTypeValue: 0, employmentTypeLabel: "Colaborador" }
   ];
   const vehicles: Vehicle[] = [
     { id: "veh-1", model: "Corolla", color: "Preto", plate: "BET1A23", label: "Corolla - BET1A23" },
@@ -369,7 +369,7 @@ describe("operational logic", () => {
         ...baseState().data,
         drivers: [
           ...baseState().data.drivers,
-          { id: "drv-3", name: "Carlos Silva", nickname: "Carlos", microsoftEmail: "carlos@betinhos.com.br", employmentTypeValue: 0, employmentTypeLabel: "Colaborador" }
+          { id: "drv-3", name: "Carlos Silva", nickname: "Carlos", microsoftEmail: "carlos@exemplo.test", employmentTypeValue: 0, employmentTypeLabel: "Colaborador" }
         ],
         vehicles: [
           ...baseState().data.vehicles,
