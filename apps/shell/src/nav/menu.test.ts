@@ -100,3 +100,10 @@ it('Pagamento de Fornecedores é rota React do Financeiro; o id do WebResource a
   expect(findItem('cr40f_telapagamentofornecedores')).toBeNull()
   expect(rotaAtualizada('cr40f_telapagamentofornecedores', new URLSearchParams('tab=lots'))).toEqual({ id: 'pagamento-fornecedores', query: new URLSearchParams('tab=lots') })
 })
+
+it('Página Inicial é rota React, a tela padrão do shell, e o link antigo do WebResource vai para ela', async () => {
+  const { DEFAULT_ITEM } = await import('./menu')
+  expect(DEFAULT_ITEM).toMatchObject({ kind: 'page', id: 'inicio', page: 'inicio', label: 'Página Inicial' })
+  expect(findItem('cr40f_homebetinhos')).toBeNull()
+  expect(rotaAtualizada('cr40f_homebetinhos', new URLSearchParams('visao=gestao'))).toEqual({ id: 'inicio', query: new URLSearchParams('visao=gestao') })
+})
