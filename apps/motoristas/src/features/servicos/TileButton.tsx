@@ -1,5 +1,5 @@
 import type { Screen, Tile } from "../../types";
-import { PowerIcon } from "../../components/icons/PowerIcon";
+import { PowerIcon } from "../../shared/ui/icons/PowerIcon";
 
 type TileButtonProps = {
   tile: Tile;

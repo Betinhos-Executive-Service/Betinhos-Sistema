@@ -5,7 +5,7 @@ description: "Verifica a tela do checklist de vistoria no App Motoristas: tile d
 # Verificar checklist no App Motoristas
 
 ## Cobre
-- Código: `src/features/checklist/checklists.ts`, `src/features/checklist/checklistSend.ts` (etapas do carregamento), `src/components/common/SendStepsOverlay.tsx`, `src/app/cameraScroll.ts`, `src/features/checklist/ChecklistsScreen.tsx`, `src/features/checklist/ChecklistAgendaCard.tsx`, `src/features/checklist/ChecklistOkNokField.tsx`, `src/features/checklist/checklists.css`, `uploadChecklistPhotoRemote` em `src/lib/dataverse.ts`, ligação em `src/App.tsx`, `src/features/servicos/InitialScreen.tsx`, `src/features/servicos/ServicesScreen.tsx`, `src/app/navigation.ts`, `src/app/bootstrap.ts` (`getInitialChecklistId`).
+- Código: `src/features/checklist/checklists.ts`, `src/features/checklist/checklistSend.ts` (etapas do carregamento), `src/shared/ui/SendStepsOverlay.tsx`, `src/app/cameraScroll.ts`, `src/features/checklist/ChecklistsScreen.tsx`, `src/features/checklist/ChecklistAgendaCard.tsx`, `src/features/checklist/ChecklistOkNokField.tsx`, `src/features/checklist/checklists.css`, `uploadChecklistPhotoRemote` em `src/lib/dataverse.ts`, ligação em `src/App.tsx`, `src/features/servicos/InitialScreen.tsx`, `src/features/servicos/ServicesScreen.tsx`, `src/app/navigation.ts`, `src/app/bootstrap.ts` (`getInitialChecklistId`).
 - Testes: `tests/checklistSend.test.ts`, `tests/cameraScroll.test.ts`, `tests/checklists.test.ts` (inclui `mapChecklist` com `new_entreguepor`/`new_trocadetectadaem` e `checklistCardTexto`).
 - Rotas: `#inicio` (tile Checklist), `#servicos` (seção "Checklist do veículo"), `#checklists`.
 

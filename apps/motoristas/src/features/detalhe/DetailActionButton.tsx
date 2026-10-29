@@ -1,4 +1,4 @@
-import { ActionButton } from "../../components/common/ActionButton";
+import { ActionButton } from "../../shared/ui/ActionButton";
 import type { DetailAction } from "../../types";
 
 type DetailActionButtonProps = {

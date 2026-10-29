@@ -1,8 +1,8 @@
-import type { ToastState } from "../components/common/LocalToast";
+import type { ToastState } from "../shared/ui/LocalToast";
 import { useEffect } from "react";
 import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "../data/dataverse/fetchWebApi";
-import { APP_CONNECTION_LOST_MESSAGE, type AppErrorNotice } from "../lib/appErrorLogger";
-import type { ToastTone } from "../components/common/LocalToast";
+import { APP_CONNECTION_LOST_MESSAGE, type AppErrorNotice } from "../shared/appErrorLogger";
+import type { ToastTone } from "../shared/ui/LocalToast";
 
 type Options = {
   completingClearTimerRef: React.MutableRefObject<number | null>;

@@ -1,5 +1,5 @@
 import type { AgendaItem } from "../../types";
-import { SystemIcon } from "../../components/icons/SystemIcon";
+import { SystemIcon } from "../../shared/ui/icons/SystemIcon";
 
 export function NotificationMarker({ priority = 0 }: { priority?: AgendaItem["priority"] }) {
   if (!priority) return null;

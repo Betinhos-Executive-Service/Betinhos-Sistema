@@ -1,4 +1,4 @@
-import { APP_OPERATION_ERROR_MESSAGE } from "../../lib/appErrorLogger";
+import { APP_OPERATION_ERROR_MESSAGE } from "../../shared/appErrorLogger";
 
 // Mensagens para o motorista a partir dos códigos de erro do plugin de trocas de carro.
 const EXCHANGE_ERROR_MESSAGES: Record<string, string> = {

@@ -1,23 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  buildActiveFleetQuery,
-  buildAutomaticServiceVehiclePatch,
-  buildMaintenanceRequestAssignedVehiclesQuery,
-  buildExchangeDisplay,
-  buildMaintenanceRequestRecord,
-  buildMaintenanceRequestVehiclesQuery,
-  buildReceiptEmailContent,
-  finalizeExchangeRemote,
-  formatReceiveDetailValue,
-  getDriverContext,
-  getExchangeCompletionState,
-  normalizeReceiptIdentifier,
-  SERVICE_VEHICLE_ORIGIN,
-  resolveExpenseUploadModeRemote,
-  shouldShowOpenExchangeForDriver,
-  usesAsyncExpenseUpload
-} from "../src/lib/dataverse.ts";
+import { buildActiveFleetQuery, buildAutomaticServiceVehiclePatch, buildMaintenanceRequestAssignedVehiclesQuery, buildExchangeDisplay, buildMaintenanceRequestRecord, buildMaintenanceRequestVehiclesQuery, buildReceiptEmailContent, finalizeExchangeRemote, formatReceiveDetailValue, getExchangeCompletionState, normalizeReceiptIdentifier, SERVICE_VEHICLE_ORIGIN, resolveExpenseUploadModeRemote, shouldShowOpenExchangeForDriver, usesAsyncExpenseUpload } from "../src/lib/dataverse.ts";
+import { getDriverContext } from "../src/data/dataverse/cliente.ts";
 
 test("receber exibe valor em reais somente quando marcado e positivo", () => {
   assert.equal(

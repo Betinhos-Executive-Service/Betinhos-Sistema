@@ -21,7 +21,7 @@ test("linha sem telefone não tem atalhos", () => {
 });
 
 test("bandeira pelo rótulo do idioma", async () => {
-  const { languageFlagCode } = await import("../src/lib/passengerContact.ts");
+  const { languageFlagCode } = await import("../src/features/detalhe/passengerContact.ts");
   assert.equal(languageFlagCode("Português"), "BR");
   assert.equal(languageFlagCode("Inglês"), "US");
   assert.equal(languageFlagCode("Espanhol"), "ES");

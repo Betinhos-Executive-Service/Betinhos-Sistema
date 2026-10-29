@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { APP_OPERATION_ERROR_MESSAGE, reportAppError } from "../lib/appErrorLogger";
-import type { ToastState, ToastTone } from "../components/common/LocalToast";
-import type { LoadingOverlayState } from "../components/common/LoadingOverlay";
+import { APP_OPERATION_ERROR_MESSAGE, reportAppError } from "../shared/appErrorLogger";
+import type { ToastState, ToastTone } from "../shared/ui/LocalToast";
+import type { LoadingOverlayState } from "../shared/ui/LoadingOverlay";
 import type { DetailData, Screen } from "../types";
 import { inferToastTone } from "../shared/ui/toastTone";
 import { wait } from "../shared/wait";

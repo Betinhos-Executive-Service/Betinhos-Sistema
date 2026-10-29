@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { createMaintenanceRequestRemote, getDriverContext } from "../../lib/dataverse";
-import type { ToastTone } from "../../components/common/LocalToast";
+import { createMaintenanceRequestRemote } from "../../lib/dataverse";
+import { getDriverContext } from "../../data/dataverse/cliente";
+import type { ToastTone } from "../../shared/ui/LocalToast";
 import type { MaintenanceRequestDraft, MaintenanceRequestFields, MaintenanceRequestPhoto } from "./MaintenanceRequestScreen";
 import { hasMediaDraftContent, revokePreviewUrl } from "../fotos/mediaDrafts";
 import type { CapturedVideoDraft, Screen } from "../../types";

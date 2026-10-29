@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import { reportAppError } from "../../lib/appErrorLogger";
+import { reportAppError } from "../../shared/appErrorLogger";
 import { isMockComunicados } from "./comunicados";
-import type { ToastTone } from "../../components/common/LocalToast";
+import type { ToastTone } from "../../shared/ui/LocalToast";
 import type { Screen } from "../../types";
 import type { useComunicados } from "./useComunicados";
 

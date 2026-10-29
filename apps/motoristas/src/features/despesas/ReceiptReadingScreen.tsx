@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { SystemIcon } from "../../components/icons/SystemIcon";
-import { AppShell } from "../../components/layout/AppShell";
-import { FormMenu } from "../../components/navigation/FormMenu";
+import { SystemIcon } from "../../shared/ui/icons/SystemIcon";
+import { AppShell } from "../../shared/ui/layout/AppShell";
+import { FormMenu } from "../../shared/ui/navigation/FormMenu";
 import { quickReadProgress } from "./receiptQuickRead";
 
 type ReceiptReadingScreenProps = {

@@ -58,10 +58,13 @@ Regra das fatias: cada bloco vira hook da feature chamado **na mesma posição**
 - **6e (feito):** cada grupo de telas virou `src/features/<x>/rotas.tsx` (`rotasX(screen, props)`, 15 rotas); o `App` chama as rotas e faz `show(tela)`. Props tipadas como `ReturnType<typeof useX>` + extras tipados pelo type checker; o `App` guarda o objeto de cada hook e repassa com spread. Telas de grupos diferentes são exclusivas, então a ordem entre grupos não muda o resultado. 1740 → 1175 linhas.
 - **6f (feito):** `show`/overlays viram o componente `src/app/AppShell.tsx`; efeitos transversais em `src/app/` (`useAvisos`, `useAvisosGlobais`, `useNavegacao`, `usePersistenciaRascunhos`, `useCarregarRascunhoMidia`, `useDadosFormularios`, `useEstadoInicial`, `resetDadosLocais`) e nas features (`useAutoRefreshAgenda`, `useFilaServicos`, `useMaintenanceFinalizePhoto`, `useReciboPersonalizado`, `useQrChargeSummary`, `useComunicadoDeepLink`, `useIdeasGateway`), cada um chamado na posição do bloco original. 1175 → 539 linhas.
 
-## Passo 7 — Limpeza
-- Remover reexports antigos (`lib/dataverse.ts`, `screens/`, `components/<x>/` vazios); atualizar imports.
-- `shared/`: `components/common`, utilitários (currencyInput, mapLinks, buildStamp, appErrorLogger, photoOrientation), CSS.
-- Atualizar `AGENTS.md`, `system_architecture.md` e caminhos nas skills `verificar-*`; `graphify update .`.
+## Passo 7 — Limpeza (feito)
+- Os 43 reexports de `src/lib` e `src/data/mockData.ts` saíram; importadores (5 testes) apontam para o caminho real. `lib/dataverse.ts` deixou de reexportar o cliente, `DATAVERSE` e as ideias: 21 arquivos importam direto de `data/dataverse/cliente`, `data/dataverse/entidades` e `features/ideias/remoto`. Foram apagados também 13 arquivos-lixo em `src/lib` com nome terminado em U+F00D (CR do Windows), versionados no passo 4.
+- `components/common` → `shared/ui`; `components/{icons,layout,navigation}` → `shared/ui/<sub>`; `AppErrorBoundary` e `ButtonPreviewScreen` → `src/app`; `appErrorLogger`, `buildStamp`, `currencyInput` e `useDitado` → `src/shared`. `photoOrientation` já estava em `shared/camera`; `mapLinks` fica em `features/detalhe` (só o detalhe usa). Sem `src/components/` nem `src/screens/`.
+- `src/styles.css` fica na raiz: é a folha de entrada do build e importa o CSS das features, então em `shared/` inverteria a dependência.
+- `tests/moduleExports.test.ts` passa a cobrir `src/shared`; snapshot atualizado de propósito (removidos os reexports e os módulos movidos).
+- `AGENTS.md`, `system_architecture.md`, `CLAUDE.md` e skills `verificar-*` com os caminhos novos. O `graphify update .` fica para a máquina local (sem CLI na VM).
+- Ainda em `src/lib`: `dataverse.ts` (regras e chamadas Dataverse de várias features), `localWorkflow.ts`, `pwa.ts`/`pwaManifest.ts` e `serviceVehicleInfleet*.ts`. Dividir `dataverse.ts` pelas features é trabalho próprio, fora desta limpeza.
 
 ## Fora deste plano
 Modo parceiro (parte 2), adaptador Worker + segundo build + Custom API com token (parte 3), troca da página do link (parte 4).

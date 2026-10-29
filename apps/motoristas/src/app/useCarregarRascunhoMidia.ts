@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { reportAppError } from "../lib/appErrorLogger";
+import { reportAppError } from "../shared/appErrorLogger";
 import { loadMediaDraft } from "../features/fotos/mediaDraftStore";
 import type { PersistedFinalizeDraftAssets } from "../features/finalizar/rascunhos";
 import type { LocalStore } from "../lib/localWorkflow";

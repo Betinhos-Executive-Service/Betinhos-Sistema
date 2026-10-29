@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
-import type { LoadingOverlayState } from "../../components/common/LoadingOverlay";
-import type { ToastTone } from "../../components/common/LocalToast";
+import type { LoadingOverlayState } from "../../shared/ui/LoadingOverlay";
+import type { ToastTone } from "../../shared/ui/LocalToast";
 import { getInitialChecklistId } from "../../app/bootstrap";
 import type { PortaDados } from "../../data/porta";
-import { hasDataverseRuntime } from "../../lib/dataverse";
-import { reportAppError } from "../../lib/appErrorLogger";
+import { hasDataverseRuntime } from "../../data/dataverse/cliente";
+import { reportAppError } from "../../shared/appErrorLogger";
 import type { Screen } from "../../types";
 import type { ChecklistsLoadStatus } from "./ChecklistsScreen";
 import { isMockChecklists, type ChecklistVeiculo } from "./checklists";

@@ -1,13 +1,13 @@
 import { useMemo, useRef, useState, type Ref } from "react";
-import { AppShell } from "../../components/layout/AppShell";
-import { ActionBar, ActionButton, type ActionButtonState } from "../../components/common/ActionButton";
-import { ConfirmDialog } from "../../components/common/ConfirmDialog";
-import { TextAreaControl, TextInputControl, SelectControl } from "../../components/common/FormFields";
-import { FormMenu } from "../../components/navigation/FormMenu";
+import { AppShell } from "../../shared/ui/layout/AppShell";
+import { ActionBar, ActionButton, type ActionButtonState } from "../../shared/ui/ActionButton";
+import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
+import { TextAreaControl, TextInputControl, SelectControl } from "../../shared/ui/FormFields";
+import { FormMenu } from "../../shared/ui/navigation/FormMenu";
 import { VoucherInputRow } from "./VoucherInputRow";
 import { VoucherSection } from "./VoucherSection";
-import { reportAppError } from "../../lib/appErrorLogger";
-import { formatCurrencyInputOnBlur } from "../../lib/currencyInput";
+import { reportAppError } from "../../shared/appErrorLogger";
+import { formatCurrencyInputOnBlur } from "../../shared/currencyInput";
 import { getVoucherValidationResult, type VoucherValidationField } from "../../lib/localWorkflow";
 import type { DetailData } from "../../types";
 

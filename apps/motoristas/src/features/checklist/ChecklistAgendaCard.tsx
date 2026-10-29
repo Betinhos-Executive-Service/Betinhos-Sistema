@@ -1,5 +1,5 @@
 import { AgendaCard } from "../../shared/ui/AgendaCard";
-import { CompactNoticeCard } from "../../components/common/CompactNoticeCard";
+import { CompactNoticeCard } from "../../shared/ui/CompactNoticeCard";
 import { checklistCardTexto, isChecklistPending, type ChecklistVeiculo } from "./checklists";
 
 type Props = {

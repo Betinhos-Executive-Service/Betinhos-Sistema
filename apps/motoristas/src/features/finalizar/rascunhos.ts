@@ -1,5 +1,5 @@
 import type { ExpensePhoto } from "../despesas/expenses";
-import { reportAppError } from "../../lib/appErrorLogger";
+import { reportAppError } from "../../shared/appErrorLogger";
 import type { LocalStore } from "../../lib/localWorkflow";
 import type { DetailData } from "../../types";
 

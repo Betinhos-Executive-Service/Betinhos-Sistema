@@ -5,7 +5,7 @@ import carIcon from "../../assets/icons/car.svg";
 import historyIcon from "../../assets/icons/clock.svg";
 import invoiceReceiptIcon from "../../assets/icons/invoice-receipt.svg";
 import { filterAgendaGalleryItems, getAgendaItemStartDate } from "../../app/agendaVisibility.ts";
-import { PullToRefresh } from "../../components/common/PullToRefresh";
+import { PullToRefresh } from "../../shared/ui/PullToRefresh";
 import type { AgendaItem } from "../../types";
 
 const baseModules = [

@@ -1,5 +1,5 @@
 import type { MaintenanceRequestVehicleOption } from "../../lib/dataverse";
-import type { ToastTone } from "../../components/common/LocalToast";
+import type { ToastTone } from "../../shared/ui/LocalToast";
 import { MediaCaptureScreen } from "../fotos/MediaCaptureScreen";
 import { MaintenancePhotoPreviewScreen } from "../fotos/MaintenancePhotoPreviewScreen";
 import { MaintenanceRequestScreen } from "./MaintenanceRequestScreen";

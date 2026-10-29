@@ -2,10 +2,10 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { PortaDados } from "../../data/porta";
 import { useEffect } from "react";
 import { getInitialParams } from "../../app/bootstrap";
-import { hasDataverseRuntime } from "../../lib/dataverse";
-import { reportAppError } from "../../lib/appErrorLogger";
-import type { ToastTone } from "../../components/common/LocalToast";
-import type { LoadingOverlayState } from "../../components/common/LoadingOverlay";
+import { hasDataverseRuntime } from "../../data/dataverse/cliente";
+import { reportAppError } from "../../shared/appErrorLogger";
+import type { ToastTone } from "../../shared/ui/LocalToast";
+import type { LoadingOverlayState } from "../../shared/ui/LoadingOverlay";
 import type { DetailData, Screen } from "../../types";
 
 type Options = {

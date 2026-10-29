@@ -1,10 +1,10 @@
 import type { ExpensePhoto } from "../features/despesas/expenses.types";
 import { useEffect } from "react";
 import { STORAGE_KEY } from "./bootstrap";
-import { reportAppError } from "../lib/appErrorLogger";
+import { reportAppError } from "../shared/appErrorLogger";
 import { saveMediaDraft, touchMediaDraft } from "../features/fotos/mediaDraftStore";
 import type { LocalStore } from "../lib/localWorkflow";
-import type { ToastTone } from "../components/common/LocalToast";
+import type { ToastTone } from "../shared/ui/LocalToast";
 import type { Screen } from "../types";
 import { exchangeUserError } from "../features/servicos/trocaErros";
 import {

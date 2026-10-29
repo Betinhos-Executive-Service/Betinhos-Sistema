@@ -155,7 +155,7 @@ test("campos preenchidos pela leitura ficam destacados até o motorista mudar o 
 });
 
 test("o que o motorista digitou nunca é sobrescrito nem destacado", async () => {
-  const { applyQuickReadToDraft } = await import("../src/lib/receiptQuickRead.ts");
+  const { applyQuickReadToDraft } = await import("../src/features/despesas/receiptQuickRead.ts");
   const digitado = { ...vazio, valor: "60,00", estabelecimento: "Outro" };
   const depois = applyQuickReadToDraft(digitado, leitura, remota);
   assert.equal(depois.valor, "60,00");

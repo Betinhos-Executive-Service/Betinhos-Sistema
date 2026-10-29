@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { ActionBar, ActionButton } from "../../components/common/ActionButton";
-import { ConfirmDialog } from "../../components/common/ConfirmDialog";
-import { SystemIcon } from "../../components/icons/SystemIcon";
-import { AppShell } from "../../components/layout/AppShell";
-import { FormMenu } from "../../components/navigation/FormMenu";
-import { reportAppError } from "../../lib/appErrorLogger";
+import { ActionBar, ActionButton } from "../../shared/ui/ActionButton";
+import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
+import { SystemIcon } from "../../shared/ui/icons/SystemIcon";
+import { AppShell } from "../../shared/ui/layout/AppShell";
+import { FormMenu } from "../../shared/ui/navigation/FormMenu";
+import { reportAppError } from "../../shared/appErrorLogger";
 import { dataUrlToObjectUrl } from "../../shared/camera/photoOrientation";
 import type { MaintenancePhotoKind } from "../../types";
 

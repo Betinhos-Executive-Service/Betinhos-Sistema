@@ -1,5 +1,6 @@
-import type { DriverContext, MaintenanceRequestVehicleOption } from "../../lib/dataverse";
-import type { ToastTone } from "../../components/common/LocalToast";
+import type { MaintenanceRequestVehicleOption } from "../../lib/dataverse";
+import type { DriverContext } from "../../data/dataverse/cliente";
+import type { ToastTone } from "../../shared/ui/LocalToast";
 import { CollisionScreen } from "./CollisionScreen";
 import { CollisionStartScreen } from "./CollisionStartScreen";
 import { MediaCaptureScreen } from "../fotos/MediaCaptureScreen";

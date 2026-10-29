@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActionBar, ActionButton, type ActionButtonState } from "../../components/common/ActionButton";
-import { TextAreaField, TextInputField } from "../../components/common/FormFields";
-import { AppShell } from "../../components/layout/AppShell";
-import { FormMenu } from "../../components/navigation/FormMenu";
+import { ActionBar, ActionButton, type ActionButtonState } from "../../shared/ui/ActionButton";
+import { TextAreaField, TextInputField } from "../../shared/ui/FormFields";
+import { AppShell } from "../../shared/ui/layout/AppShell";
+import { FormMenu } from "../../shared/ui/navigation/FormMenu";
 import {
   IDEA_DETAILS_MAX_LENGTH,
   IDEA_TITLE_MAX_LENGTH,

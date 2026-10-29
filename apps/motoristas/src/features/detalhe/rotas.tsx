@@ -1,6 +1,6 @@
 import type { RefreshOptions } from "../servicos/useAgendaLoad";
 import { detailsToClipboardText } from "../../lib/localWorkflow";
-import type { ToastTone } from "../../components/common/LocalToast";
+import type { ToastTone } from "../../shared/ui/LocalToast";
 import { DetailsScreen } from "./DetailsScreen";
 import type { DetailData, Screen } from "../../types";
 import type { ReactNode } from "react";

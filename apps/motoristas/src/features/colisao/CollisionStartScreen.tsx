@@ -1,5 +1,5 @@
-import { AppShell } from "../../components/layout/AppShell";
-import { FormMenu } from "../../components/navigation/FormMenu";
+import { AppShell } from "../../shared/ui/layout/AppShell";
+import { FormMenu } from "../../shared/ui/navigation/FormMenu";
 import type { CollisionType } from "./collisions";
 import { openExternalUrl } from "../../lib/localWorkflow";
 

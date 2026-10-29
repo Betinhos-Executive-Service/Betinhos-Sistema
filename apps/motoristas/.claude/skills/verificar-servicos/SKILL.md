@@ -1,16 +1,16 @@
 ---
 name: verificar-servicos
-description: "Verifica o fluxo principal do motorista no App Motoristas: Início, Serviços, detalhe, Receber (câmera e comprovante), Finalizar, Voucher, Cancelado no local, Histórico e o Voltar do celular. Use após mudar src/App.tsx, src/app/**, src/components/**, src/screens das telas de serviço ou src/styles.css, ou quando pedirem para testar o fluxo de serviço."
+description: "Verifica o fluxo principal do motorista no App Motoristas: Início, Serviços, detalhe, Receber (câmera e comprovante), Finalizar, Voucher, Cancelado no local, Histórico e o Voltar do celular. Use após mudar src/App.tsx, src/app/**, src/shared/**, as telas de serviço em src/features/ ou src/styles.css, ou quando pedirem para testar o fluxo de serviço."
 ---
 # Verificar fluxo de serviços
 
 ## Cobre
-- Código: `src/App.tsx`, `src/app/**` (navegação, `backGuard.ts`, `cameraScroll.ts`), `src/components/**`, `src/data/mockData.ts`, `src/styles.css`, telas `Initial`, `Services`, `Details`, `History*`, `Receive`, `Finalize`, `Voucher`, `Signature`, `LocalCancel`, `MediaCapture`, `MaintenancePhotoPreview`.
+- Código: `src/App.tsx`, `src/app/**` (navegação, `backGuard.ts`, `cameraScroll.ts`), `src/shared/**`, `src/data/mock/mockData.ts`, `src/styles.css`, telas `Initial`, `Services`, `Details`, `History*`, `Receive`, `Finalize`, `Voucher`, `Signature`, `LocalCancel`, `MediaCapture`, `MaintenancePhotoPreview`.
 - Rotas (hash): `#inicio`, `#servicos`, `#detalhes?serviceId=…&type=…`, `#receber`, `#foto-receber`, `#preview-foto-receber`, `#finalizar`, `#voucher`, `#assinatura`, `#cancelado-local`, `#historico`.
 
 ## Preparar ambiente
 - Dev server: `node scripts/dev-server.cjs` com `PORT=31877` (configuração `app-motoristas-ux-audit` em `.claude/launch.json`; no navegador interno use `preview_start`). O servidor recompila `dist/` a cada mudança em `src/` (~15 s).
-- URL: `http://localhost:31877/webresource-app-motoristas.html#inicio`. Sem `Xrm` o app entra em modo mock (`src/data/mockData.ts`); nada é gravado no Dataverse.
+- URL: `http://localhost:31877/webresource-app-motoristas.html#inicio`. Sem `Xrm` o app entra em modo mock (`src/data/mock/mockData.ts`); nada é gravado no Dataverse.
 - Antes de começar: `localStorage.clear()` e recarregar, para não herdar serviços finalizados em testes anteriores.
 - Ao terminar: `git checkout -- dist/` (o dev server reescreve `dist/` sem subir versão; `dist/` só muda no build de publicação).
 
@@ -95,7 +95,7 @@ Tela "Enviar comprovante" (`src/features/recebimento/ReceiveScreen.tsx`, lógica
 - Abrir discador/WhatsApp (`tel:`/`wa.me`) não é exercitado; o roteiro para no diálogo de escolha.
 
 ## Foto do passageiro no detalhe (26/10/2026)
-- Código: `src/features/detalhe/passengerPhoto.ts`, `src/components/details/PassengerAvatars.tsx`; teste `tests/passengerPhoto.test.ts`.
+- Código: `src/features/detalhe/passengerPhoto.ts`, `src/features/detalhe/PassengerContacts.tsx`; teste `tests/passengerPhoto.test.ts`.
 - A foto só é pedida com o serviço Programado (`cr40f_status` 202410005), pela Custom API `new_ObterFotoPassageiro` (`executeCustomApi`, `{new_ReservaId, new_PassageiroId}` → `new_FotoJson`). Se a API negar, falhar ou devolver JSON inválido, aparece só a inicial, sem mensagem de erro. A imagem fica em memória como blob URL, revogada ao sair da tela; são no máximo 2 chamadas simultâneas.
 - Mock (375 px): o serviço 10241 mostra a foto da Ana e o "R" do Roberto; tocar no avatar amplia a foto, e X, Esc ou toque fora fecham. Se a agenda mock antiga aparecer, apague `app-motoristas-local-v1` do localStorage.
 - DEV: entre como o motorista de um serviço Programado com passageiro com foto e veja a foto. Mude o status para Em Execução e reabra: só a inicial.

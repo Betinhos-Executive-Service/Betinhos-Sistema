@@ -1,4 +1,5 @@
-import { DATAVERSE, retrieveMultiple, retrieveOne } from "../../lib/dataverse.ts";
+import { DATAVERSE } from "../../data/dataverse/entidades.ts";
+import { retrieveMultiple, retrieveOne } from "../../data/dataverse/cliente.ts";
 
 // Checklist de vistoria de veículo. Contrato com o plugin ChecklistCommandPlugin
 // (plugins/DriverRecordSharing/ChecklistAnswers.cs): itens copiados do modelo e respostas em JSON.

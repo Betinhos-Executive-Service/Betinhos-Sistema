@@ -1,11 +1,11 @@
 ---
 name: verificar-formularios
-description: "Verifica os formulários avulsos do App Motoristas: Gastos, Solicitar manutenção, Colisões, Recibo personalizado e Boas ideias, incluindo campos de valor, seletores pesquisáveis e acessibilidade (axe). Use após mudar essas telas, src/components/common/FormFields.tsx ou SearchableSelect.tsx, ou quando pedirem para testar esses formulários."
+description: "Verifica os formulários avulsos do App Motoristas: Gastos, Solicitar manutenção, Colisões, Recibo personalizado e Boas ideias, incluindo campos de valor, seletores pesquisáveis e acessibilidade (axe). Use após mudar essas telas, src/shared/ui/FormFields.tsx ou SearchableSelect.tsx, ou quando pedirem para testar esses formulários."
 ---
 # Verificar formulários avulsos
 
 ## Cobre
-- Código: `src/features/despesas/ExpenseScreen.tsx`, `src/features/manutencao/MaintenanceRequestScreen.tsx` e `useMaintenanceRequestFlow.ts` (rascunho, fotos e envio), `src/features/colisao/CollisionScreen.tsx`, `src/features/colisao/CollisionStartScreen.tsx`, `src/features/colisao/useCollisionFlow.ts` (rascunho, fotos por tipo e envio), `src/features/recibo/ReceiptScreen.tsx`, `src/screens/ButtonPreviewScreen.tsx`, `src/features/ideias/IdeasScreen.tsx`, `src/components/common/FormFields.tsx`, `src/components/common/SearchableSelect.tsx`.
+- Código: `src/features/despesas/ExpenseScreen.tsx`, `src/features/manutencao/MaintenanceRequestScreen.tsx` e `useMaintenanceRequestFlow.ts` (rascunho, fotos e envio), `src/features/colisao/CollisionScreen.tsx`, `src/features/colisao/CollisionStartScreen.tsx`, `src/features/colisao/useCollisionFlow.ts` (rascunho, fotos por tipo e envio), `src/features/recibo/ReceiptScreen.tsx`, `src/app/ButtonPreviewScreen.tsx`, `src/features/ideias/IdeasScreen.tsx`, `src/shared/ui/FormFields.tsx`, `src/shared/ui/SearchableSelect.tsx`.
 - Rotas: `#gastos`, `#manutencao`, `#colisoes`, `#registro-colisao`, `#recibo-personalizado`, `#boas-ideias`.
 
 ## Preparar ambiente

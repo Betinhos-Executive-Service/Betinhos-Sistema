@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import checkIcon from "../../assets/icons/check-svgrepo-com.svg";
 import type { AgendaItem } from "../../types";
-import { SystemIcon } from "../../components/icons/SystemIcon";
+import { SystemIcon } from "./icons/SystemIcon";
 import { NotificationMarker } from "../../features/servicos/NotificationMarker";
 
 type AgendaCardProps = {

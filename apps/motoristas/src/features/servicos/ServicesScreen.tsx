@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { filterAgendaGalleryItems } from "../../app/agendaVisibility.ts";
 import type { AgendaItem, DetailData } from "../../types";
-import { AppShell } from "../../components/layout/AppShell";
-import { ServicesMenu } from "../../components/navigation/ServicesMenu";
+import { AppShell } from "../../shared/ui/layout/AppShell";
+import { ServicesMenu } from "../../shared/ui/navigation/ServicesMenu";
 import { AgendaCard } from "../../shared/ui/AgendaCard";
 import { ComunicadoAgendaCard } from "../comunicados/ComunicadoAgendaCard";
 import { ChecklistAgendaCard } from "../checklist/ChecklistAgendaCard";
-import { PullToRefresh } from "../../components/common/PullToRefresh";
+import { PullToRefresh } from "../../shared/ui/PullToRefresh";
 import type { ComunicadoDestinatario } from "../comunicados/comunicados";
 import type { ChecklistVeiculo } from "../checklist/checklists";
 

@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { findFirstPendingServiceDetail, isSameDetail } from "../../app/bootstrap";
 import type { LocalStore } from "../../lib/localWorkflow";
-import type { ToastTone } from "../../components/common/LocalToast";
+import type { ToastTone } from "../../shared/ui/LocalToast";
 import type { DetailData, Screen } from "../../types";
 
 type Options = {

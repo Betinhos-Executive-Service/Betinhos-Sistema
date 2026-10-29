@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { ConfirmDialog } from "../../components/common/ConfirmDialog";
-import { FieldError, TextAreaControl } from "../../components/common/FormFields";
-import { PhotoAddButton } from "../../components/common/PhotoAddButton";
-import { SystemIcon } from "../../components/icons/SystemIcon";
+import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
+import { FieldError, TextAreaControl } from "../../shared/ui/FormFields";
+import { PhotoAddButton } from "../../shared/ui/PhotoAddButton";
+import { SystemIcon } from "../../shared/ui/icons/SystemIcon";
 import { CHECKLIST_MAX_FOTOS_POR_ITEM, CHECKLIST_MAX_OBSERVACAO, type ChecklistDraft, type ChecklistItem } from "./checklists";
 
 type Props = {

@@ -13,7 +13,7 @@ test("código da bandeira do idioma do passageiro", () => {
 });
 
 test("marcador de bandeira vira parte flag no HTML seguro", async () => {
-  const { parseSafeDetailHtml } = await import("../src/lib/detailHtml.ts");
+  const { parseSafeDetailHtml } = await import("../src/features/detalhe/detailHtml.ts");
   const { buildLanguageFlagHtml } = await import("../src/lib/dataverse.ts");
   const parts = parseSafeDetailHtml(`<span>${buildLanguageFlagHtml("US")}Ana - <a href="https://wa.me/1">+1</a></span>`);
   assert.deepEqual(parts[0], { type: "flag", code: "US" });

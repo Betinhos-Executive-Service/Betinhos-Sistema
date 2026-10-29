@@ -2,7 +2,7 @@ import type { ExpensePhoto } from "../despesas/expenses.types";
 import { getVoucherDraftKey } from "../../app/bootstrap";
 import { getServiceTaskBackScreen } from "../../app/detailFlow";
 import { saveSignatureLocally, type LocalStore } from "../../lib/localWorkflow";
-import type { ToastTone } from "../../components/common/LocalToast";
+import type { ToastTone } from "../../shared/ui/LocalToast";
 import { ReceiveScreen } from "../recebimento/ReceiveScreen";
 import { SignatureScreen } from "./SignatureScreen";
 import { VoucherScreen } from "./VoucherScreen";

@@ -7,7 +7,7 @@ import {
   saveMaintenancePhoto,
   type LocalStore
 } from "../../lib/localWorkflow";
-import type { ToastTone } from "../../components/common/LocalToast";
+import type { ToastTone } from "../../shared/ui/LocalToast";
 import { FinalizeScreen } from "./FinalizeScreen";
 import { LocalCancelScreen } from "./LocalCancelScreen";
 import { MediaCaptureScreen } from "../fotos/MediaCaptureScreen";

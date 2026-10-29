@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { reportAppError } from "../../lib/appErrorLogger";
+import { reportAppError } from "../../shared/appErrorLogger";
 import { customApiErrorMessage } from "../../data/dataverse/customApi";
 import { SignaturePad } from "../../shared/ui/SignaturePad";
 import { SelfieCapture } from "./SelfieCapture";
-import { ServicesMenu } from "../../components/navigation/ServicesMenu";
+import { ServicesMenu } from "../../shared/ui/navigation/ServicesMenu";
 import {
   abrirPdf,
   assinarTermo,

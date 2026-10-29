@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type MutableRefObject } from "react";
-import { reportAppError } from "../../lib/appErrorLogger";
+import { reportAppError } from "../../shared/appErrorLogger";
 import type { TermosLoadStatus } from "./TermosMultaScreen";
 import { isMockTermos, listarTermosMotorista, type TermoMulta } from "./termosMulta";
 

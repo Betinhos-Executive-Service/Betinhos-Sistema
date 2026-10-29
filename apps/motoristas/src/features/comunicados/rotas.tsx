@@ -1,4 +1,4 @@
-import type { DriverContext } from "../../lib/dataverse";
+import type { DriverContext } from "../../data/dataverse/cliente";
 import { isMockComunicados } from "./comunicados";
 import { ComunicadosScreen } from "./ComunicadosScreen";
 import type { Screen } from "../../types";

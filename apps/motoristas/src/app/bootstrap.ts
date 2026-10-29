@@ -2,7 +2,7 @@ import { agendaMock, historyMock } from "../data/mock/mockData.ts";
 import { shouldShowAgendaItemInGallery } from "./agendaVisibility.ts";
 import { findDetailByParams, type LocalStore } from "../lib/localWorkflow.ts";
 import type { DetailData } from "../types.ts";
-import { reportAppError } from "../lib/appErrorLogger.ts";
+import { reportAppError } from "../shared/appErrorLogger.ts";
 
 export const STORAGE_KEY = "app-motoristas-local-v1";
 

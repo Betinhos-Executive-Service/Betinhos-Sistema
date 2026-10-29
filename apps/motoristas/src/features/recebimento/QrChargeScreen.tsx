@@ -1,12 +1,12 @@
 import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "motion/react";
 import qrcode from "qrcode-generator";
-import { ActionBar, ActionButton } from "../../components/common/ActionButton";
-import { MoneyInputField, TextInputField } from "../../components/common/FormFields";
-import { SystemIcon } from "../../components/icons/SystemIcon";
-import { AppShell } from "../../components/layout/AppShell";
-import { FormMenu } from "../../components/navigation/FormMenu";
-import { formatCurrencyInputOnBlur } from "../../lib/currencyInput";
+import { ActionBar, ActionButton } from "../../shared/ui/ActionButton";
+import { MoneyInputField, TextInputField } from "../../shared/ui/FormFields";
+import { SystemIcon } from "../../shared/ui/icons/SystemIcon";
+import { AppShell } from "../../shared/ui/layout/AppShell";
+import { FormMenu } from "../../shared/ui/navigation/FormMenu";
+import { formatCurrencyInputOnBlur } from "../../shared/currencyInput";
 import {
   formatCountdown,
   formatQrChargeAmount,

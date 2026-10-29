@@ -2,9 +2,9 @@ import React from "react";
 import * as ReactDOM from "react-dom";
 import App from "./App";
 import { DataProvider } from "./app/DataProvider";
-import { AppErrorBoundary } from "./components/app/AppErrorBoundary";
+import { AppErrorBoundary } from "./app/AppErrorBoundary";
 import { adaptadorDataverse } from "./data/dataverse/adaptador";
-import { installGlobalAppErrorLogger } from "./lib/appErrorLogger";
+import { installGlobalAppErrorLogger } from "./shared/appErrorLogger";
 import { installPwa } from "./lib/pwa";
 
 installGlobalAppErrorLogger();

@@ -1,24 +1,9 @@
 import { useRef, useState } from "react";
-import type { ToastTone } from "../../components/common/LocalToast";
-import {
-  assertExpenseSchemaReadyRemote,
-  createExpenseUploadItem,
-  createOne,
-  DATAVERSE,
-  dispatchExpenseUploadRemote,
-  ensureExpenseSubmissionRemote,
-  getDriverContext,
-  getDriverCurrentVehicleId,
-  loadExpenseLookupNavigationNamesRemote,
-  loadExpenseReferenceDataRemote,
-  loadExpenseUploadRowsRemote,
-  readReceiptQuick,
-  transitionExpenseUploadRemote,
-  updateOne,
-  uploadExpenseInvoiceRemote,
-  type DriverContext
-} from "../../lib/dataverse";
-import { reportAppError } from "../../lib/appErrorLogger";
+import type { ToastTone } from "../../shared/ui/LocalToast";
+import { assertExpenseSchemaReadyRemote, createExpenseUploadItem, dispatchExpenseUploadRemote, ensureExpenseSubmissionRemote, loadExpenseLookupNavigationNamesRemote, loadExpenseReferenceDataRemote, loadExpenseUploadRowsRemote, readReceiptQuick, transitionExpenseUploadRemote, uploadExpenseInvoiceRemote } from "../../lib/dataverse";
+import { createOne, getDriverContext, getDriverCurrentVehicleId, updateOne, type DriverContext } from "../../data/dataverse/cliente";
+import { DATAVERSE } from "../../data/dataverse/entidades";
+import { reportAppError } from "../../shared/appErrorLogger";
 import type { RemoteOperation } from "../../shared/ui/FlowProgressOverlay";
 import { wait } from "../../shared/wait";
 import type { CapturedVideoDraft, Screen } from "../../types";

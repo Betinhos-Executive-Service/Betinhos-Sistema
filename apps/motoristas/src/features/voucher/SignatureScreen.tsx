@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ActionBar, ActionButton } from "../../components/common/ActionButton";
-import { SystemIcon } from "../../components/icons/SystemIcon";
-import { AppShell } from "../../components/layout/AppShell";
-import { FormMenu } from "../../components/navigation/FormMenu";
+import { ActionBar, ActionButton } from "../../shared/ui/ActionButton";
+import { SystemIcon } from "../../shared/ui/icons/SystemIcon";
+import { AppShell } from "../../shared/ui/layout/AppShell";
+import { FormMenu } from "../../shared/ui/navigation/FormMenu";
 import type { DetailData } from "../../types";
 
 type SignatureScreenProps = {

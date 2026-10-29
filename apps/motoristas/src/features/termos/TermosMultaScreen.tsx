@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { reportAppError } from "../../lib/appErrorLogger";
-import { AppShell } from "../../components/layout/AppShell";
-import { ServicesMenu } from "../../components/navigation/ServicesMenu";
+import { reportAppError } from "../../shared/appErrorLogger";
+import { AppShell } from "../../shared/ui/layout/AppShell";
+import { ServicesMenu } from "../../shared/ui/navigation/ServicesMenu";
 import { TermoMultaDetalheScreen } from "./TermoMultaDetalheScreen";
 import { formatBrl, formatDataHora, isMockTermos, parseEvidencias, prazoAssinatura, proximaAba, separarTermos, TERMO_STATUS, type AbaTermos, type TermoMulta } from "./termosMulta";
 

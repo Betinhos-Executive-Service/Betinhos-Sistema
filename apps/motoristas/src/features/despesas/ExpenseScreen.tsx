@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActionBar, ActionButton, type ActionButtonState } from "../../components/common/ActionButton";
-import { FormField, MoneyInputField, SelectField, TextAreaField, TextInputField } from "../../components/common/FormFields";
-import { PhotoAddButton } from "../../components/common/PhotoAddButton";
-import { AppShell } from "../../components/layout/AppShell";
+import { ActionBar, ActionButton, type ActionButtonState } from "../../shared/ui/ActionButton";
+import { FormField, MoneyInputField, SelectField, TextAreaField, TextInputField } from "../../shared/ui/FormFields";
+import { PhotoAddButton } from "../../shared/ui/PhotoAddButton";
+import { AppShell } from "../../shared/ui/layout/AppShell";
 import { useCameraScroll } from "../../app/cameraScroll";
-import { FormMenu } from "../../components/navigation/FormMenu";
+import { FormMenu } from "../../shared/ui/navigation/FormMenu";
 import {
   findExpenseCategory,
   getExpenseCategoryRules,
@@ -19,7 +19,7 @@ import {
 import type { MaintenanceRequestVehicleOption } from "../../lib/dataverse";
 import { parseCurrencyInput } from "./expenses";
 import type { ExpenseSubmissionStatus } from "./expenseUploadState";
-import { SystemIcon, type SystemIconName } from "../../components/icons/SystemIcon";
+import { SystemIcon, type SystemIconName } from "../../shared/ui/icons/SystemIcon";
 
 export type ExpenseUploadListItem = {
   id: string;

@@ -4,11 +4,11 @@ import { DetailActionButton } from "./DetailActionButton";
 import { DetailsField } from "./DetailsField";
 import { PassengerContacts } from "./PassengerContacts";
 import { QuestionsBox } from "./QuestionsBox";
-import { TextAreaField } from "../../components/common/FormFields";
-import { PullToRefresh } from "../../components/common/PullToRefresh";
-import { AppShell } from "../../components/layout/AppShell";
-import { DetailsMenu } from "../../components/navigation/DetailsMenu";
-import { reportAppError } from "../../lib/appErrorLogger";
+import { TextAreaField } from "../../shared/ui/FormFields";
+import { PullToRefresh } from "../../shared/ui/PullToRefresh";
+import { AppShell } from "../../shared/ui/layout/AppShell";
+import { DetailsMenu } from "../../shared/ui/navigation/DetailsMenu";
+import { reportAppError } from "../../shared/appErrorLogger";
 
 type ObservationSaveStatus = "idle" | "saving" | "saved" | "error";
 

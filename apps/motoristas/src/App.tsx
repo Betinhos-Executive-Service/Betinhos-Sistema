@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from "react";
 import { getInitialParams } from "./app/bootstrap";
 import { isHashRoutingEnabled } from "./app/navigation";
-import type { DriverContext, MaintenanceRequestVehicleOption } from "./lib/dataverse";
+import type { MaintenanceRequestVehicleOption } from "./lib/dataverse";
+import type { DriverContext } from "./data/dataverse/cliente";
 import { useDados } from "./app/DataProvider";
 import { AppShell } from "./app/AppShell";
 import { resetDadosLocais } from "./app/resetDadosLocais";
@@ -47,7 +48,7 @@ import { isComunicadoPending } from "./features/comunicados/comunicados";
 import { isChecklistPending } from "./features/checklist/checklists";
 import { useExpenseFlow } from "./features/despesas/useExpenseFlow";
 import { resumoPendentes, separarTermos } from "./features/termos/termosMulta";
-import { ButtonPreviewScreen } from "./screens/ButtonPreviewScreen";
+import { ButtonPreviewScreen } from "./app/ButtonPreviewScreen";
 import { InitialScreen } from "./features/servicos/InitialScreen";
 import { ReceiptPreviewScreen } from "./features/recibo/ReceiptScreen";
 import { isThirdPartyDriver } from "./features/meu-carro/myVehicle";

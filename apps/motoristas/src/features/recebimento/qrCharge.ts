@@ -1,5 +1,5 @@
 import type { DetailData } from "../../types.ts";
-import { sanitizeCurrencyInput } from "../../lib/currencyInput.ts";
+import { sanitizeCurrencyInput } from "../../shared/currencyInput.ts";
 import { parseSafeDetailHtml } from "../detalhe/detailHtml.ts";
 import { RECEIPT_LANGUAGE, type ReceiptLanguage } from "../recibo/receiptLanguage.ts";
 

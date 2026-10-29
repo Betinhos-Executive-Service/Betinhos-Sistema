@@ -1,16 +1,8 @@
 import { useState } from "react";
-import {
-  assertCollisionSchemaReadyRemote,
-  createOne,
-  DATAVERSE,
-  getDriverContext,
-  getDriverCurrentVehicleId,
-  loadCollisionLookupNavigationNamesRemote,
-  updateOne,
-  uploadCollisionPhotoRemote,
-  type DriverContext
-} from "../../lib/dataverse";
-import type { ToastTone } from "../../components/common/LocalToast";
+import { assertCollisionSchemaReadyRemote, loadCollisionLookupNavigationNamesRemote, uploadCollisionPhotoRemote } from "../../lib/dataverse";
+import { createOne, getDriverContext, getDriverCurrentVehicleId, updateOne, type DriverContext } from "../../data/dataverse/cliente";
+import { DATAVERSE } from "../../data/dataverse/entidades";
+import type { ToastTone } from "../../shared/ui/LocalToast";
 import {
   COLLISION_ATTACHMENT_STATUS,
   buildCollisionCreatePayload,

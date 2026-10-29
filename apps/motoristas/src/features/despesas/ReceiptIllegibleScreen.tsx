@@ -1,7 +1,7 @@
-import { ActionButton } from "../../components/common/ActionButton";
-import { SystemIcon } from "../../components/icons/SystemIcon";
-import { AppShell } from "../../components/layout/AppShell";
-import { FormMenu } from "../../components/navigation/FormMenu";
+import { ActionButton } from "../../shared/ui/ActionButton";
+import { SystemIcon } from "../../shared/ui/icons/SystemIcon";
+import { AppShell } from "../../shared/ui/layout/AppShell";
+import { FormMenu } from "../../shared/ui/navigation/FormMenu";
 
 type ReceiptIllegibleScreenProps = {
   photoDataUrl: string;

@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
-import { BuildStamp } from "../components/layout/BuildStamp";
-import { LocalToast, type ToastState } from "../components/common/LocalToast";
-import { LoadingOverlay, type LoadingOverlayState } from "../components/common/LoadingOverlay";
+import { BuildStamp } from "../shared/ui/layout/BuildStamp";
+import { LocalToast, type ToastState } from "../shared/ui/LocalToast";
+import { LoadingOverlay, type LoadingOverlayState } from "../shared/ui/LoadingOverlay";
 import { getVisibleLoadingOverlay } from "./overlayLayering";
 import { getScreenMotion } from "./navigation";
 import { loadActiveFleetRemote } from "../lib/dataverse";

@@ -3,11 +3,12 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import test from "node:test";
 
-// Caracterização da refatoração por funcionalidade: cada módulo hoje existente
-// precisa continuar exportando os mesmos nomes no mesmo caminho (reexport ao mover).
+// Superfície dos módulos compartilhados: cada módulo precisa continuar exportando os mesmos
+// nomes no mesmo caminho. Mover ou remover export é mudança de propósito (a limpeza do passo 7
+// tirou os reexports da refatoração por funcionalidade).
 // Para atualizar de propósito: UPDATE_SNAPSHOT=1 npm test
 const SNAPSHOT = new URL("./characterization/module-exports.json", import.meta.url);
-const DIRS = ["src/lib", "src/app", "src/data"];
+const DIRS = ["src/lib", "src/app", "src/data", "src/shared"];
 
 // Leitura estática (inclui tipos); nem todo módulo é importável no Node.
 // `export * from` é seguido até o arquivo de destino: o caminho antigo de um módulo movido
@@ -38,7 +39,7 @@ function currentExports() {
   return result;
 }
 
-test("modulos de src/lib, src/app e src/data mantem os exports caracterizados", () => {
+test("modulos de src/lib, src/app, src/data e src/shared mantem os exports caracterizados", () => {
   const actual = currentExports();
   if (process.env.UPDATE_SNAPSHOT === "1") writeFileSync(SNAPSHOT, `${JSON.stringify(actual, null, 2)}\n`);
   assert.deepEqual(actual, JSON.parse(readFileSync(SNAPSHOT, "utf8")));

@@ -3,11 +3,11 @@ import type { PortaDados } from "../../data/porta";
 import { useEffect } from "react";
 import { getInitialDetail, getInitialParams } from "../../app/bootstrap";
 import { getHashRouteFallbackScreen, screenNeedsHashDetail, type HashRoute } from "../../app/navigation";
-import { hasDataverseRuntime, type DriverContext } from "../../lib/dataverse";
-import { reportAppError } from "../../lib/appErrorLogger";
+import { hasDataverseRuntime, type DriverContext } from "../../data/dataverse/cliente";
+import { reportAppError } from "../../shared/appErrorLogger";
 import { findDetailByParams, type LocalStore } from "../../lib/localWorkflow";
-import type { ToastTone } from "../../components/common/LocalToast";
-import type { LoadingOverlayState } from "../../components/common/LoadingOverlay";
+import type { ToastTone } from "../../shared/ui/LocalToast";
+import type { LoadingOverlayState } from "../../shared/ui/LoadingOverlay";
 import type { DetailData, Screen } from "../../types";
 import { findDetailFromHashRoute, getInitialScreenFromHashRoute } from "../../app/rotaInicial";
 

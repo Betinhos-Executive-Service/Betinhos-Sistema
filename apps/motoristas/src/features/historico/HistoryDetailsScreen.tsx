@@ -2,9 +2,9 @@ import { useRef } from "react";
 import type { DetailData } from "../../types";
 import { DetailsField } from "../detalhe/DetailsField";
 import { QuestionsBox } from "../detalhe/QuestionsBox";
-import { PullToRefresh } from "../../components/common/PullToRefresh";
-import { AppShell } from "../../components/layout/AppShell";
-import { DetailsMenu } from "../../components/navigation/DetailsMenu";
+import { PullToRefresh } from "../../shared/ui/PullToRefresh";
+import { AppShell } from "../../shared/ui/layout/AppShell";
+import { DetailsMenu } from "../../shared/ui/navigation/DetailsMenu";
 import type { DetailField } from "../../types";
 
 type HistoryDetailsScreenProps = {

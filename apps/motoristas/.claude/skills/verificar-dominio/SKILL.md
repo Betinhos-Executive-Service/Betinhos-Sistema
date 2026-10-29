@@ -21,7 +21,7 @@ description: "Verifica a camada de domínio e integração do App Motoristas: re
 - `describeCameraError`: NotAllowed/NotFound/NotReadable/desconhecido (`tests/cameraErrors.test.ts`).
 - `formatBuildStamp`: com e sem data de build (`tests/buildStamp.test.ts`).
 - Frota da escolha do carro (`buildActiveFleetQuery`): só ativos Próprio (`100000000`) ou Aluguel (`100000002`), nunca Terceiro (`100000001`) (`tests/dataverse.test.ts`). Prova real: rode a query OData gerada em DEV e PROD (somente leitura) e conte por categoria; em 21/10/2026 deu DEV 15 (14 Próprio, 1 Aluguel) e PROD 20 (16 Próprio, 4 Aluguel).
-- Logger de erros (`src/lib/appErrorLogger.ts` sobre `@betinhos-executive-service/ui/error-logger.js`): `tests/appErrorLogger.test.ts` cobre gravação via pacote, carimbo `v…`/`dd/mm/aaaa HH:mm`, redação de e-mail/telefone, aviso `appmotoristas:error`, `console.error`, fila antiga e modo mock. Prova no DEV: ver `verificar-app-geral`.
+- Logger de erros (`src/shared/appErrorLogger.ts` sobre `@betinhos-executive-service/ui/error-logger.js`): `tests/appErrorLogger.test.ts` cobre gravação via pacote, carimbo `v…`/`dd/mm/aaaa HH:mm`, redação de e-mail/telefone, aviso `appmotoristas:error`, `console.error`, fila antiga e modo mock. Prova no DEV: ver `verificar-app-geral`.
 - Conferência do comprovante (`src/features/recebimento/receiveProofCheck.ts`): estado do quadro, valor lido em centavos e soma das leituras contra o que falta (`tests/receiveProofCheck.test.ts`).
 - CSS com chaves balanceadas (`tests/stylesSyntax.test.ts`): o esbuild só avisa e engole as regras seguintes; acontece em resolução de merge de `src/styles.css`.
 

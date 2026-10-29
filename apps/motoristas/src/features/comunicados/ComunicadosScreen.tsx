@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { reportAppError } from "../../lib/appErrorLogger";
-import { AppShell } from "../../components/layout/AppShell";
-import { ActionButton } from "../../components/common/ActionButton";
-import { TextAreaControl } from "../../components/common/FormFields";
-import { ServicesMenu } from "../../components/navigation/ServicesMenu";
+import { reportAppError } from "../../shared/appErrorLogger";
+import { AppShell } from "../../shared/ui/layout/AppShell";
+import { ActionButton } from "../../shared/ui/ActionButton";
+import { TextAreaControl } from "../../shared/ui/FormFields";
+import { ServicesMenu } from "../../shared/ui/navigation/ServicesMenu";
 import { SignatureDrawing, SignaturePad } from "../../shared/ui/SignaturePad";
 import { ComunicadoAgendaCard } from "./ComunicadoAgendaCard";
 import {

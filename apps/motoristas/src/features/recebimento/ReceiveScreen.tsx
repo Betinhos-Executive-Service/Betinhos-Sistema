@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import invoiceReceiptIcon from "../../assets/icons/invoice-receipt.svg";
-import { ActionBar, ActionButton, type ActionButtonState } from "../../components/common/ActionButton";
-import { PhotoAddButton } from "../../components/common/PhotoAddButton";
-import { AppShell } from "../../components/layout/AppShell";
+import { ActionBar, ActionButton, type ActionButtonState } from "../../shared/ui/ActionButton";
+import { PhotoAddButton } from "../../shared/ui/PhotoAddButton";
+import { AppShell } from "../../shared/ui/layout/AppShell";
 import { useCameraScroll } from "../../app/cameraScroll";
-import { FormMenu } from "../../components/navigation/FormMenu";
-import { SystemIcon } from "../../components/icons/SystemIcon";
+import { FormMenu } from "../../shared/ui/navigation/FormMenu";
+import { SystemIcon } from "../../shared/ui/icons/SystemIcon";
 import type { DetailData } from "../../types";
 import type { ExpensePhoto } from "../despesas/expenses";
-import { ConfirmDialog } from "../../components/common/ConfirmDialog";
+import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
 import { formatQrChargeAmount, getReceivableCents } from "./qrCharge";
 import { getReceiveSummaryState, proofsCoverBalance } from "./receiveProofCheck";
 

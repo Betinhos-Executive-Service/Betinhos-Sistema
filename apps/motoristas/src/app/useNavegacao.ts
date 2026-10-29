@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useHardwareBackGuard } from "./backGuard";
 import { buildHashRoute } from "./navigation";
-import { isStandaloneWebResourceRuntime } from "../lib/dataverse";
+import { isStandaloneWebResourceRuntime } from "../data/dataverse/cliente";
 import type { DetailData, Screen } from "../types";
 
 type Options = {

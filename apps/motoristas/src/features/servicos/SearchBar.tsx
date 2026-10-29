@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { TextInputControl } from "../../components/common/FormFields";
-import { SystemIcon } from "../../components/icons/SystemIcon";
+import { TextInputControl } from "../../shared/ui/FormFields";
+import { SystemIcon } from "../../shared/ui/icons/SystemIcon";
 
 type SearchBarProps = {
   query: string;

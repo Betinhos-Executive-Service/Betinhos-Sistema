@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
-import type { LoadingOverlayState } from "../../components/common/LoadingOverlay";
+import type { LoadingOverlayState } from "../../shared/ui/LoadingOverlay";
 import { getInitialComunicadoId } from "../../app/bootstrap";
 import type { PortaDados } from "../../data/porta";
-import { hasDataverseRuntime } from "../../lib/dataverse";
-import { reportAppError } from "../../lib/appErrorLogger";
+import { hasDataverseRuntime } from "../../data/dataverse/cliente";
+import { reportAppError } from "../../shared/appErrorLogger";
 import type { Screen } from "../../types";
 import type { ComunicadosLoadStatus } from "./ComunicadosScreen";
 import { isMockComunicados, type ComunicadoDestinatario } from "./comunicados";

@@ -5,17 +5,18 @@ import logoBetinhosPreta from "../../assets/images/logo-betinhos-preta-1200.png"
 import nlaLogo from "../../../NLA.jpg";
 import qrCodeAvaliacao from "../../../QrCode-Avaliação.png";
 import invoiceReceiptIcon from "../../assets/icons/invoice-receipt.svg";
-import { ActionBar, ActionButton, type ActionButtonState } from "../../components/common/ActionButton";
-import { MoneyInputField, SelectField, TextAreaField, TextInputField } from "../../components/common/FormFields";
-import { LocalToast, type ToastState, type ToastTone } from "../../components/common/LocalToast";
-import { AppShell } from "../../components/layout/AppShell";
-import { FormMenu } from "../../components/navigation/FormMenu";
-import { reportAppError } from "../../lib/appErrorLogger";
-import { hasDataverseRuntime, type PreparedReceiptUpload, type ReceiptPdfUploadResult } from "../../lib/dataverse";
+import { ActionBar, ActionButton, type ActionButtonState } from "../../shared/ui/ActionButton";
+import { MoneyInputField, SelectField, TextAreaField, TextInputField } from "../../shared/ui/FormFields";
+import { LocalToast, type ToastState, type ToastTone } from "../../shared/ui/LocalToast";
+import { AppShell } from "../../shared/ui/layout/AppShell";
+import { FormMenu } from "../../shared/ui/navigation/FormMenu";
+import { reportAppError } from "../../shared/appErrorLogger";
+import { type PreparedReceiptUpload, type ReceiptPdfUploadResult } from "../../lib/dataverse";
+import { hasDataverseRuntime } from "../../data/dataverse/cliente";
 import { buildPersonalReceiptDraft, buildPersonalReceiptModel, type PersonalReceiptEditableDraft, type PersonalReceiptModel } from "./personalReceipt";
 import { getReceiptCopy, getReceiptDisplayClient, normalizeReceiptLanguage, RECEIPT_LANGUAGE, RECEIPT_LANGUAGE_OPTIONS } from "./receiptLanguage";
 import { generateReceiptPdfBlob } from "./receiptPdf";
-import { sanitizeCurrencyInput } from "../../lib/currencyInput";
+import { sanitizeCurrencyInput } from "../../shared/currencyInput";
 import { createReceiptPdfCache } from "./receiptPdfCache.ts";
 import type { DetailData } from "../../types";
 

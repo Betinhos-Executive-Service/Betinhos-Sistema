@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
-import { ActionBar, ActionButton, type ActionButtonState } from "../../components/common/ActionButton";
-import { ConfirmDialog } from "../../components/common/ConfirmDialog";
-import { TextAreaField } from "../../components/common/FormFields";
-import { AppShell } from "../../components/layout/AppShell";
-import { FormMenu } from "../../components/navigation/FormMenu";
+import { ActionBar, ActionButton, type ActionButtonState } from "../../shared/ui/ActionButton";
+import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
+import { TextAreaField } from "../../shared/ui/FormFields";
+import { AppShell } from "../../shared/ui/layout/AppShell";
+import { FormMenu } from "../../shared/ui/navigation/FormMenu";
 import type { DetailData } from "../../types";
 
 type LocalCancelScreenProps = {

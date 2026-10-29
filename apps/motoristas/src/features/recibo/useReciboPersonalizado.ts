@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { isTrueLike } from "../../shared/isTrueLike";
-import type { DriverContext } from "../../lib/dataverse";
-import type { ToastTone } from "../../components/common/LocalToast";
+import type { DriverContext } from "../../data/dataverse/cliente";
+import type { ToastTone } from "../../shared/ui/LocalToast";
 import type { DetailData, Screen } from "../../types";
 import type { ReceiptEntrySource } from "./origem";
 

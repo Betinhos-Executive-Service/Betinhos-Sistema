@@ -1,4 +1,4 @@
-import type { ToastTone } from "../../components/common/LocalToast";
+import type { ToastTone } from "./LocalToast";
 
 // Tom do aviso deduzido do texto, para chamadas que só passam a mensagem.
 export function inferToastTone(message: string): ToastTone {

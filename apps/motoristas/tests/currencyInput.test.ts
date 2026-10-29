@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { formatCurrencyInputOnBlur, sanitizeCurrencyInput } from "../src/lib/currencyInput.ts";
+import { formatCurrencyInputOnBlur, sanitizeCurrencyInput } from "../src/shared/currencyInput.ts";
 
 test("valor monetário descarta letras e símbolos digitados", () => {
   assert.equal(sanitizeCurrencyInput("1250,90sao jose dos"), "1250,90");

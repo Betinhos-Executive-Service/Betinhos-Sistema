@@ -11,7 +11,7 @@ import { EMPTY_MAINTENANCE_REQUEST_DRAFT } from "../features/manutencao/rascunho
 import { EMPTY_EXPENSE_DRAFT } from "../features/despesas/rascunho";
 import { EMPTY_MAINTENANCE_FINALIZE_DRAFT } from "../features/finalizar/rascunhoManutencao";
 import type { LocalStore } from "../lib/localWorkflow";
-import type { ToastTone } from "../components/common/LocalToast";
+import type { ToastTone } from "../shared/ui/LocalToast";
 import type { RemoteOperation } from "../shared/ui/FlowProgressOverlay";
 import type { ReceiptEntrySource } from "../features/recibo/origem";
 import type { DetailData, Screen } from "../types";

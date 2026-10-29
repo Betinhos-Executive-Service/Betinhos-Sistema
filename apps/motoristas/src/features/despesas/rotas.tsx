@@ -1,6 +1,6 @@
 import type { MaintenanceRequestVehicleOption } from "../../lib/dataverse";
 import { expenseFlowView } from "./receiptQuickRead";
-import type { ToastTone } from "../../components/common/LocalToast";
+import type { ToastTone } from "../../shared/ui/LocalToast";
 import { ExpenseScreen } from "./ExpenseScreen";
 import { MediaCaptureScreen } from "../fotos/MediaCaptureScreen";
 import { ReceiptReadingScreen } from "./ReceiptReadingScreen";

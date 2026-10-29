@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActionBar, ActionButton, type ActionButtonState } from "../../components/common/ActionButton";
-import { ConfirmDialog } from "../../components/common/ConfirmDialog";
-import { FieldError, MoneyInputField, SelectField, TextAreaField } from "../../components/common/FormFields";
-import { DitadoField } from "../../components/common/DitadoButton";
-import { PhotoAddButton } from "../../components/common/PhotoAddButton";
-import { SystemIcon } from "../../components/icons/SystemIcon";
-import { AppShell } from "../../components/layout/AppShell";
+import { ActionBar, ActionButton, type ActionButtonState } from "../../shared/ui/ActionButton";
+import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
+import { FieldError, MoneyInputField, SelectField, TextAreaField } from "../../shared/ui/FormFields";
+import { DitadoField } from "../../shared/ui/DitadoButton";
+import { PhotoAddButton } from "../../shared/ui/PhotoAddButton";
+import { SystemIcon } from "../../shared/ui/icons/SystemIcon";
+import { AppShell } from "../../shared/ui/layout/AppShell";
 import { useCameraScroll } from "../../app/cameraScroll";
-import { FormMenu } from "../../components/navigation/FormMenu";
-import { appendDitado } from "../../lib/useDitado";
+import { FormMenu } from "../../shared/ui/navigation/FormMenu";
+import { appendDitado } from "../../shared/useDitado";
 import { isExchangeOutsideWindow, organizeObservationRemote, type ExchangeWindowCheck } from "../../lib/dataverse";
 import {
   activeSummary,

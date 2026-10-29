@@ -1,4 +1,4 @@
-import type { SendStep } from "../../components/common/SendStepsOverlay";
+import type { SendStep } from "../../shared/ui/SendStepsOverlay";
 
 // Estado do envio do checklist mostrado no carregamento em etapas (mesmo padrão do gasto).
 export type ChecklistSendState =

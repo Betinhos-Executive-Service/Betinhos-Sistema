@@ -1,6 +1,7 @@
 import type * as checklists from "../features/checklist/checklists";
 import type * as comunicados from "../features/comunicados/comunicados";
 import type * as dataverse from "../lib/dataverse";
+import type * as ideias from "../features/ideias/remoto";
 
 // Contrato de dados do app: as operações que as telas podem pedir, com nome de negócio.
 // Hoje só o adaptador Dataverse implementa (motoristas e terceiros fixos no web resource).
@@ -27,6 +28,6 @@ export type PortaDados = {
   carregarComunicados: typeof comunicados.loadDriverComunicados;
   carregarComunicado: typeof comunicados.loadDriverComunicado;
   acaoComunicado: typeof comunicados.executeComunicadoAction;
-  carregarIdeias: typeof dataverse.loadMyIdeasRemote;
-  criarIdeia: typeof dataverse.createIdeaRemote;
+  carregarIdeias: typeof ideias.loadMyIdeasRemote;
+  criarIdeia: typeof ideias.createIdeaRemote;
 };

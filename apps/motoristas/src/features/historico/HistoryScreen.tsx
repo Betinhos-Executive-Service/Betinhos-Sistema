@@ -2,9 +2,9 @@ import { useRef } from "react";
 import { useAgendaSearch } from "../servicos/useAgendaSearch";
 import type { AgendaItem, DetailData } from "../../types";
 import { AgendaCard } from "../../shared/ui/AgendaCard";
-import { AppShell } from "../../components/layout/AppShell";
-import { PullToRefresh } from "../../components/common/PullToRefresh";
-import { ServicesMenu } from "../../components/navigation/ServicesMenu";
+import { AppShell } from "../../shared/ui/layout/AppShell";
+import { PullToRefresh } from "../../shared/ui/PullToRefresh";
+import { ServicesMenu } from "../../shared/ui/navigation/ServicesMenu";
 import { SearchBar } from "../servicos/SearchBar";
 
 type HistoryScreenProps = {

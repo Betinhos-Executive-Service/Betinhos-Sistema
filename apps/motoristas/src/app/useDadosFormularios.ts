@@ -1,19 +1,11 @@
 import type { ExpenseReferenceData } from "../features/despesas/expenses.types";
-import type { LoadingOverlayState } from "../components/common/LoadingOverlay";
+import type { LoadingOverlayState } from "../shared/ui/LoadingOverlay";
 import type { MaintenanceRequestDraft } from "../features/manutencao/MaintenanceRequestScreen";
 import { useEffect } from "react";
-import {
-  getDriverContext,
-  getDriverCurrentVehicleId,
-  loadExpenseReferenceDataRemote,
-  loadReceiptClienteOptionsRemote,
-  loadMaintenanceRequestVehiclesRemote,
-  prefetchExpenseReferenceDataRemote,
-  type DriverContext,
-  type MaintenanceRequestVehicleOption
-} from "../lib/dataverse";
-import { reportAppError } from "../lib/appErrorLogger";
-import type { ToastTone } from "../components/common/LocalToast";
+import { loadExpenseReferenceDataRemote, loadReceiptClienteOptionsRemote, loadMaintenanceRequestVehiclesRemote, prefetchExpenseReferenceDataRemote, type MaintenanceRequestVehicleOption } from "../lib/dataverse";
+import { getDriverContext, getDriverCurrentVehicleId, type DriverContext } from "../data/dataverse/cliente";
+import { reportAppError } from "../shared/appErrorLogger";
+import type { ToastTone } from "../shared/ui/LocalToast";
 import type { DetailData, Screen } from "../types";
 import { LOCAL_RECEIPT_CLIENT_MOCKS } from "../features/recibo/clientesMock";
 

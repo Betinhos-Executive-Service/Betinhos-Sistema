@@ -30,6 +30,6 @@ test("descreve o tamanho real do stream e a proporção", () => {
 
 test("toda foto da câmera ao vivo é o quadro do vídeo em JPEG 0,85 (sem takePhoto)", async () => {
   // Celular do Renan (15/10, v2.1.716): takePhoto devolveu outro enquadramento e custava segundos.
-  const { LIVE_PHOTO_JPEG_QUALITY } = await import("../src/lib/cameraConstraints.ts");
+  const { LIVE_PHOTO_JPEG_QUALITY } = await import("../src/shared/camera/cameraConstraints.ts");
   assert.equal(LIVE_PHOTO_JPEG_QUALITY, 0.85);
 });

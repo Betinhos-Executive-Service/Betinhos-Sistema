@@ -3,23 +3,16 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { PortaDados } from "../../data/porta";
 import type { ExpensePhoto } from "../despesas/expenses";
 import { findFirstPendingServiceDetail, getVoucherDraftKey, isSameDetail } from "../../app/bootstrap";
-import {
-  cancelServiceRemote,
-  finalizeExchangeRemote,
-  finalizeMaintenanceRemote,
-  getDriverContext,
-  resolveServiceVehicleRemote,
-  loadActiveFleetRemote,
-  type DriverContext
-} from "../../lib/dataverse";
-import { APP_OPERATION_ERROR_MESSAGE, reportAppError } from "../../lib/appErrorLogger";
+import { cancelServiceRemote, finalizeExchangeRemote, finalizeMaintenanceRemote, resolveServiceVehicleRemote, loadActiveFleetRemote } from "../../lib/dataverse";
+import { getDriverContext, type DriverContext } from "../../data/dataverse/cliente";
+import { APP_OPERATION_ERROR_MESSAGE, reportAppError } from "../../shared/appErrorLogger";
 import {
   cancelDetailLocally,
   finalizeDetailLocally,
   removeAgendaDetail,
   type LocalStore
 } from "../../lib/localWorkflow";
-import type { ToastTone } from "../../components/common/LocalToast";
+import type { ToastTone } from "../../shared/ui/LocalToast";
 import type { MaintenanceFinalizeDraft } from "./FinalizeScreen";
 import {
   buildInfleetServiceVehiclePatch,

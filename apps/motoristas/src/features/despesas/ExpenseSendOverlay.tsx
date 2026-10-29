@@ -1,4 +1,4 @@
-import { SendStepsOverlay, type SendStep } from "../../components/common/SendStepsOverlay";
+import { SendStepsOverlay, type SendStep } from "../../shared/ui/SendStepsOverlay";
 
 export type ExpenseSendState = {
   phase: "saving" | "uploading" | "done" | "error";

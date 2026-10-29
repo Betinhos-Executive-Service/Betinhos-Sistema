@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { DetailData, DetailPassenger } from "../../types";
-import { hasDataverseRuntime } from "../../lib/dataverse";
+import { hasDataverseRuntime } from "../../data/dataverse/cliente";
 import { openExternalUrl } from "../../lib/localWorkflow";
 import { languageFlagCode, passengerContactLinks } from "./passengerContact";
 import { LanguageFlag } from "./LanguageFlag";

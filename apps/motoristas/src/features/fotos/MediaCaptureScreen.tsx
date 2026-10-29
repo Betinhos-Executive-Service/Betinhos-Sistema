@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { TextInputControl } from "../../components/common/FormFields";
-import { SystemIcon } from "../../components/icons/SystemIcon";
-import { AppShell } from "../../components/layout/AppShell";
-import { FormMenu } from "../../components/navigation/FormMenu";
-import { reportAppError } from "../../lib/appErrorLogger";
+import { TextInputControl } from "../../shared/ui/FormFields";
+import { SystemIcon } from "../../shared/ui/icons/SystemIcon";
+import { AppShell } from "../../shared/ui/layout/AppShell";
+import { FormMenu } from "../../shared/ui/navigation/FormMenu";
+import { reportAppError } from "../../shared/appErrorLogger";
 import { describeCameraError } from "../../shared/camera/cameraErrors";
 import { describeStreamSize, getDocumentStreamConstraints, getDocumentTrackConstraints, LIVE_PHOTO_JPEG_QUALITY } from "../../shared/camera/cameraConstraints";
 import { setTorch, stopStreamTracks, supportsTorch } from "../../shared/camera/cameraTorch";
