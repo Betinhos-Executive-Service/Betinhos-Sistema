@@ -5,7 +5,6 @@ import { buildQuoteEmailHtml, copyQuoteToClipboard, deriveQuoteStatus, formatDat
 import { localDateKey } from '../../domain/management';
 import { startQuotePatch } from '../../domain/quoteTaskFlow';
 import { createQuoteWord, downloadQuoteWord } from '../../domain/quoteWord';
-import { createQuotePdf, downloadQuotePdf } from '../../domain/quotePdf';
 import { canRegisterWaitingReturn, formatDate } from '../../domain/domain';
 import { QUOTE_WAITING_STATUS, type QuoteWaitingFields } from '../../domain/quoteWaiting';
 import QuoteWaitingDialog from './QuoteWaitingDialog';
@@ -348,6 +347,8 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
         const word = await createQuoteWord(proposalQuote, { baseUrl: window.location.origin, signal: controller.signal, assets, html: currentPreview.html });
         if (!controller.signal.aborted) { downloadQuoteWord(word); setComposerMessage("Word baixado com o mesmo visual da prévia."); }
       } else if (action === "pdf") {
+        // pdf-lib só baixa quando alguém gera o PDF, e não ao abrir o Planner.
+        const { createQuotePdf, downloadQuotePdf } = await import('../../domain/quotePdf');
         const pdf = await createQuotePdf(proposalQuote, { baseUrl: window.location.origin, signal: controller.signal, assets, html: currentPreview.html });
         if (!controller.signal.aborted) { downloadQuotePdf(pdf); setComposerMessage("PDF baixado com o mesmo visual da prévia."); }
       }

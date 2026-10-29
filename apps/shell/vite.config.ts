@@ -13,7 +13,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    cssCodeSplit: false,
+    // CSS de cada tela no próprio arquivo, carregado com o chunk dela (o planner.css sozinho tem ~490 kB).
     assetsInlineLimit: 200_000,
     rollupOptions: {
       output: {

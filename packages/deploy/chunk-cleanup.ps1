@@ -1,9 +1,9 @@
-# Limpeza dos chunks JS com hash (code splitting) que builds anteriores deixaram no Dataverse.
+# Limpeza dos chunks JS e CSS com hash (code splitting) que builds anteriores deixaram no Dataverse.
 # Usado pelo push-dev.ps1 (dot-source). Mantem o build atual e o build que estava publicado antes
 # do push, para a aba aberta com a versao anterior continuar achando os chunks ate recarregar.
 # Mensagens sem acento: o Windows PowerShell 5.1 le .ps1 sem BOM como ANSI.
 
-$script:ChunkFilePattern = '[A-Za-z0-9_-]+\.[a-z0-9]{8}\.js'
+$script:ChunkFilePattern = '[A-Za-z0-9_-]+\.[a-z0-9]{8}\.(js|css)'
 
 function Get-WebResourceText([string] $ApiBaseUrl, [hashtable] $Headers, [string] $Name) {
   $escaped = $Name.Replace("'", "''")
@@ -23,6 +23,8 @@ function Get-PublishedChunkNames([string] $ApiBaseUrl, [hashtable] $Headers, [st
     $name = $pending.Dequeue()
     if ($seen.ContainsKey($name)) { continue }
     $seen[$name] = $true
+    # CSS de tela nao importa outros chunks: nao precisa baixar.
+    if ($name.EndsWith(".css")) { continue }
     $code = Get-WebResourceText $ApiBaseUrl $Headers $name
     if (-not $code) { continue }
     foreach ($m in [regex]::Matches($code, $script:ChunkFilePattern)) {

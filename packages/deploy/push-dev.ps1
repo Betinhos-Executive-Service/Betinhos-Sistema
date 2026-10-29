@@ -129,11 +129,13 @@ if (Test-Path -LiteralPath $chunkManifestPath) {
   $chunkList = [IO.File]::ReadAllText($chunkManifestPath, [Text.Encoding]::UTF8) | ConvertFrom-Json
   foreach ($chunk in $chunkList) {
     if (-not $chunk.name.StartsWith($chunkPrefix, [StringComparison]::Ordinal)) { throw "Chunk $($chunk.name) fora do prefixo $chunkPrefix. Deploy abortado." }
-    if ($chunk.name -notmatch '^[A-Za-z0-9_]+(/[A-Za-z0-9.]+)+\.js$') { throw "Nome de chunk invalido para WebResource: $($chunk.name)." }
+    if ($chunk.name -notmatch '^[A-Za-z0-9_]+(/[A-Za-z0-9.]+)+\.(js|css)$') { throw "Nome de chunk invalido para WebResource: $($chunk.name)." }
     $chunkPath = Join-Path $appRoot ("dist\" + $chunk.file.Replace("/", "\"))
     if (-not (Test-Path -LiteralPath $chunkPath)) { throw "Chunk ausente no build: $chunkPath. Deploy abortado." }
     $chunkNames += $chunk.name
-    $targets += @{ Name = $chunk.name; Display = "$DisplayName - $($chunk.file)"; Path = $chunkPath; Type = 3 }
+    # 2 = CSS (o estilo de cada tela, que o Vite carrega junto com o chunk dela), 3 = Script.
+    $chunkType = if ($chunk.name.EndsWith(".css")) { 2 } else { 3 }
+    $targets += @{ Name = $chunk.name; Display = "$DisplayName - $($chunk.file)"; Path = $chunkPath; Type = $chunkType }
   }
   if ($chunkNames.Count -eq 0) { throw "webresource-assets.json sem chunks. Rode o build de novo." }
 }

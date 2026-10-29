@@ -8,9 +8,11 @@ import { SearchableMultiSelect } from '../components/SearchableSelect'
 import { TEAM_ICON_OPTIONS, TeamIcon } from '../components/teamIcons'
 import { APP_VERSION } from '../data/version'
 import { teamResponsibilitySummary, validateTeamComposition } from '../domain/domain'
-import PlannerImportView from './PlannerImportView'
 import { Check, ChevronDown, ChevronRight, LoaderCircle, RotateCcw, Tag, Target, Trash2, Users, X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
+
+// Traz o login Microsoft (MSAL, ~300 kB): só baixa quando alguém abre as configurações.
+const PlannerImportView = lazy(() => import('./PlannerImportView'))
 
 
 export function TeamManager({ teams = [], tasks = [], employees = [], onSave, onDelete }: any) {
@@ -237,7 +239,9 @@ export function SettingsView({ onReset, onAdminCleanup, onSendNotificationTest, 
             <span className="version-value">{APP_VERSION}</span>
           </div>
         </div>
-        <PlannerImportView live={live} employees={employees} onImport={onImportPlannerTasks} />
+        <Suspense fallback={null}>
+          <PlannerImportView live={live} employees={employees} onImport={onImportPlannerTasks} />
+        </Suspense>
       </section>
       <NotificationTestPanel live={live} tasks={tasks} onSend={onSendNotificationTest} />
       <AdminCleanupPanel live={live} counts={{ tasks: tasks.length, completedTasks: tasks.filter((task: any) => task.status === "done").length, personalTags: personalTags.length, notifications: notifications.length, teams: teams.length, contacts: contacts.length, taskActivity: tasks.reduce((total: any, task: any) => total + (task.comments?.length || 0) + (task.returns?.length || 0) + (task.history?.length || 0), 0), taskAttachments: tasks.reduce((total: any, task: any) => total + (task.attachments?.length || 0), 0), assignedTasks: tasks.filter((task: any) => task.assigneeIds?.length || task.teamIds?.length || task.teamId).length, datedTasks: tasks.filter((task: any) => task.dueDate).length, plannerRecords: tasks.length + personalTags.length + notifications.length + teams.length + contacts.length }} employees={employees} teams={teams} tasks={tasks} contacts={contacts} onCleanup={onAdminCleanup} />
