@@ -19,3 +19,4 @@
 <!-- Sem roteiro ainda: apps/escala-fds/**, packages/despesas-ia/** -->
 - verificar-flow-tenaris | packages/deploy/patch-flow-tenaris-contatos.ps1 | Patch do flow Tenaris: contatos do passageiro sem apagar (dry run, aplicar e validar ativação no DEV)
 - verificar-flow-servico-editado | packages/deploy/patch-flow-servico-editado.ps1 | Patch do flow Notificação Serviço Editado: coluna editada correta, sem disparo fora das colunas de interesse (dry run, aplicar, editar reserva de teste no DEV)
+- verificar-flow-emails-portal | packages/deploy/flows/portal-cliente-emails*, packages/deploy/flows/portal-cliente-emails/**, packages/deploy/provision-flow-portal-cliente-emails.ps1 | Flow HTTP de e-mails do portal do cliente (código, resumo diário, resposta): teste com mini-interpretador, HTML em 640/375 px e dry run no DEV
