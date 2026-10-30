@@ -6,7 +6,7 @@
 .ini-hero__texto h1 { margin: 0; font-size: 28px; line-height: 1.15; font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-navy-900); }
 .ini-hero__texto p { margin: var(--bt-space-1) 0 0; font-size: var(--bt-font-size-14); color: var(--bt-color-text-secondary); }
 
-.ini-frase { position: relative; margin: 0; padding: var(--bt-space-3) 44px var(--bt-space-3) var(--bt-space-4); border: var(--bt-border-width-default) solid var(--bt-color-border); border-left: 3px solid var(--bt-color-brand); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
+.ini-frase { position: relative; margin: 0; padding: var(--bt-space-3) 44px var(--bt-space-3) var(--bt-space-4); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
 .ini-frase blockquote { margin: 0; font-size: var(--bt-font-size-13); line-height: 1.45; color: var(--bt-color-text-primary); }
 .ini-frase figcaption { margin-top: var(--bt-space-1); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-secondary); }
 .ini-frase .bt-button { position: absolute; top: var(--bt-space-2); right: var(--bt-space-2); }
