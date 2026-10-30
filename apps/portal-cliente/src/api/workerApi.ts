@@ -3,7 +3,7 @@ import { ErroPortal, type CodigoErro, type PortalApi, type ResultadoEntrada } fr
 
 /**
  * PortalApi real: fala com o Worker na mesma origem (`/api/*`), sessão em cookie HttpOnly.
- * Ponto de troca: em `main.tsx`, `createMockApi(...)` → `createWorkerApi()` quando o Worker estiver no ar.
+ * Usada por `main.tsx` fora do dev server local (porta 52463) e sem `?mock`.
  */
 const CODIGOS: string[] = ['codigo_invalido', 'codigo_expirado', 'totp_invalido', 'bloqueado', 'nao_permitido', 'falha']
 

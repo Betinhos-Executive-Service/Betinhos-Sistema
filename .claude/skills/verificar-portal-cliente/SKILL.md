@@ -5,7 +5,7 @@ description: "Verifica o portal de validação de serviços pelo cliente (apps/p
 # Verificar portal do cliente
 
 ## Cobre
-- `apps/portal-cliente/**`: app Vite + React + `@betinhos/ui`, hoje só com o adaptador mock (`src/api/mockApi.ts`). Nada grava no Dataverse.
+- `apps/portal-cliente/**`: app Vite + React + `@betinhos/ui`, com dois adaptadores: mock (`src/api/mockApi.ts`) só no dev server local (porta 52463, `localhost`/`127.0.0.1`) ou com `?mock`; em qualquer outro endereço, `createWorkerApi()` (ver `verificar-portal-worker`). No mock nada grava no Dataverse; a dica do código e o `?refazer-autenticador` só aparecem nele.
 - Regras: aprovação tácita em 5 dias úteis depois da liberação ou da resposta da Betinhos (feriados nacionais, fuso de São Paulo); dúvida parada não conta prazo; só `liberado`, `em_duvida` e `respondido` podem ser aprovados; dúvida exige motivo e texto; cinco códigos errados (e-mail ou autenticador) bloqueiam por 15 minutos.
 - Login em duas etapas: código do e-mail + TOTP do app autenticador (RFC 6238, SHA-1, 30 s, 6 dígitos, janela ±1 via `otpauth`). 1º acesso mostra QR (`uqr`, SVG local) e a chave em texto; depois só o campo. "Lembrar este computador por 30 dias" grava `pc-dispositivo` no `localStorage` e o próximo login pula o TOTP. Segredos do mock em `pc-mock-autenticadores`.
 - Spec: `docs/superpowers/specs/2026-10-28-portal-validacao-cliente-design.md`. Plano: `docs/superpowers/plans/2026-10-28-portal-cliente-prototipo.md`.
