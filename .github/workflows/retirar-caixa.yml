@@ -104,7 +104,7 @@ jobs:
         if: always()
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/foto-ambiente.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Saida fotos/depois.json
       - name: Comparar meio → depois
-        if: always()
+        if: always() && hashFiles('fotos/meio.json') != ''
         shell: bash
         run: |
           set -o pipefail
