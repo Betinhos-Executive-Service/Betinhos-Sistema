@@ -25,9 +25,9 @@ description: "Verifica o compartilhamento de registros com o motorista (ServiceD
 
 ## Regra do carro do serviço (posse)
 - `ServiceVehicleSynchronizer` (chamado pelo `ServiceDriverSharePlugin` no Create/Update da reserva, da posse e da troca) só preenche `cr40f_veiculo` pela posse quando o motorista é **terceiro** (`cr40f_tipodevinculo` = 1). Terceiro não passa pela Infleet na finalização do app (`skipVehicle`), então a posse é a única fonte do carro dele.
-- Colaborador recebe o carro só na finalização (Infleet ou escolha do motorista, origem 100000002/100000003). Se um serviço dele ainda aberto (Confirmado/Programado) tiver carro de origem Automático (sobra de posse), o plugin limpa o carro e mantém a origem Automático. Serviço encerrado não é mexido (histórico).
+- Colaborador recebe o carro só na finalização (Infleet ou escolha do motorista, origem 100000002/100000003). Se um serviço dele ainda aberto (Pré-reserva, Solicitado, Confirmado ou Programado) tiver carro de origem Automático (sobra de posse), o plugin limpa o carro e mantém a origem Automático. Serviço em execução ou encerrado não é mexido (histórico; no PROD há OS paradas em Em Execução).
 - A limpeza manda `new_origemveiculo` junto; sem isso, `MarkManualVehicleOriginIfNeeded` remarca o serviço como Manual.
-- Testes: `ServiceVehicleSynchronizerTests` (`EmployeeDriverNeverGetsVehicleFromPossession`, `EmployeeDriverLosesVehicleLeftByPreviousThirdPartyPossession`, `ClosedEmployeeServiceKeepsHistoricalPossessionVehicle`).
+- Testes: `ServiceVehicleSynchronizerTests` (`EmployeeDriverNeverGetsVehicleFromPossession`, `EmployeeDriverLosesVehicleLeftByPreviousThirdPartyPossession`, `StartedOrClosedEmployeeServiceKeepsHistoricalPossessionVehicle`, `PossessionChangeResyncsServicesThatHaveNotStartedYet`). A lista de status "não começou" é `PluginConfig.ServiceNotStartedStatuses`, usada tanto na limpeza quanto na busca de OS futuras ao mudar posse ou troca.
 - DEV: definir um colaborador com posse aberta como motorista de uma OS futura → `cr40f_veiculo` fica vazio (trace `skip employee driver`). Fazer o mesmo com um terceiro → recebe o carro da posse. Na auditoria, nenhuma alteração de `cr40f_veiculo` pela conta de serviço em OS de colaborador.
 
 ## Roteiro
