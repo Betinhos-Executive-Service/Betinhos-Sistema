@@ -1,7 +1,7 @@
 // Porte de Tela Planner/src/quotes/QuoteFields.jsx (sem mudança de comportamento).
 import React, { forwardRef, useEffect, useRef, useState } from "react";
 import { ContactRound, PencilLine } from "lucide-react";
-import { deadlineFromPreset, formatDateTime, formatMoney, parseQuoteMoney, QUOTE_COMPLETED_STATUSES, QUOTE_DEADLINE_PRESETS, quoteRoutePoints } from '../../domain/quoteDomain';
+import { deadlineFromPreset, formatDateTime, formatMoney, parseQuoteMoney, QUOTE_COMPLETED_STATUSES, QUOTE_DEADLINE_PRESETS } from '../../domain/quoteDomain';
 import { localDateKey } from '../../domain/management';
 import { loadQuoteClients, loadQuoteRequesters } from '../../data/dataverse';
 import { InputSelect } from '../AssignmentFields';
@@ -149,11 +149,10 @@ export function QuoteClientFields({ draft, update, errors = {}, collapseExtras =
   </div>;
 }
 
-// Dados de agendamento (trajeto, datas, veículo) saíram da cotação; registros
-// antigos continuam legíveis para não perder o que já foi preenchido.
+// Datas e veículo saíram da cotação; registros antigos continuam legíveis para não perder o que já foi preenchido.
+// O trajeto voltou a ser editável no campo "Trajeto" de QuoteRequestFields, então não é repetido aqui.
 function legacySchedulingSummary(draft: any) {
-  const route = quoteRoutePoints(draft).join(" / ");
-  return [route && `Trajeto: ${route}`, draft.serviceDate && `Saída: ${formatDateTime(draft.serviceDate)}`, draft.returnDate && `Retorno: ${formatDateTime(draft.returnDate)}`, draft.vehicleType && `Veículo: ${draft.vehicleType}`].filter(Boolean);
+  return [draft.serviceDate && `Saída: ${formatDateTime(draft.serviceDate)}`, draft.returnDate && `Retorno: ${formatDateTime(draft.returnDate)}`, draft.vehicleType && `Veículo: ${draft.vehicleType}`].filter(Boolean);
 }
 
 export function QuoteRequestFields({ draft, update, errors = {}, collapseExtras = false, extraContent = null }: any) {
@@ -165,6 +164,7 @@ export function QuoteRequestFields({ draft, update, errors = {}, collapseExtras 
     {legacy.length > 0 && <div className="quote-v3-field quote-v3-field-wide quote-legacy-scheduling" role="note"><span className="drawer-title-label">Agendamento (registro anterior)</span><ul>{legacy.map((line) => <li key={line}>{line}</li>)}</ul></div>}
   </>;
   return <div className="quote-v3-form-grid">
+    <QuoteField id="quote-route" label="Trajeto" error={errors.route} wide><FormTextInput id="quote-route" error={errors.route} maxLength="10000" value={draft.route || ""} onChange={(event: any) => update("route", event.target.value)} placeholder="Ex.: Guarulhos / Centro" /><small>Separe cada local com /.</small></QuoteField>
     <QuoteField id="quote-notes" label="Pedido do cliente" required error={errors.notes} wide><FormTextArea id="quote-notes" error={errors.notes} rows={5} maxLength="4000" value={draft.notes || ""} onChange={(event: any) => update("notes", event.target.value)} placeholder="Cole aqui a mensagem original do cliente, sem alterar o texto." /><small>Este texto vai na proposta enviada ao cliente.</small></QuoteField>
     {collapseExtras ? <MoreDetails forceOpen={Boolean(errors.passengerProfile || errors.internalNotes)}>{requestExtras}{extraContent}</MoreDetails> : requestExtras}
   </div>;
