@@ -20,6 +20,7 @@ import { linhas, type Linha } from '../domain/linhas'
 import { EXTRA, PESSOA, REGISTRO_SORT, matchesRegistroKeyword, readRegistro, registroBuiltins, registroColumns, registroFields, registroLegacy, sortRegistros, telaRegistros } from '../domain/listas'
 import { CATEGORIAS_MANUT } from '../domain/manutencaoCatalogo'
 import { TERMO_TOM } from '../domain/termoMulta'
+import { useAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 
 const PLURAL: Record<Kind, string> = { manutencao: 'Manutenções', multa: 'Multas', colisao: 'Colisões' }
 const LEGACY_KEYS = ['status', 'veiculo', 'pessoa', 'categoria', 'de', 'ate'] as const
@@ -41,6 +42,7 @@ export function Registros(props: Props) {
 }
 
 function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload }: Props & { kind: Kind }) {
+  const auditoria = useAuditoria()
   const notify = useNotify()
   const [busca, setBusca] = useQueryTexto('q')
   // A lista filtra 200 ms depois da última tecla.
@@ -89,7 +91,7 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload }
   return (
     <div className="frota-lista">
       <div role="toolbar" aria-label="Comandos de registros">
-        <ViewBar view={view} columns={columns} catalog={extra.catalog} filters={{ fields: allFields }}>
+        <ViewBar onAudit={() => auditoria({ entity: KIND_TABLE[kind], onOpenRecord: (id) => onOpen(kind, id) })} view={view} columns={columns} catalog={extra.catalog} filters={{ fields: allFields }}>
           {kinds.length > 1 && <SegmentedControl size="compact" aria-label="Tipo de registro" options={kinds.map((item) => ({ value: item, label: PLURAL[item] }))} value={kind} onChange={trocar} />}
           <SearchBox className="frota-busca" size="compact" aria-label="Buscar registro" placeholder="Buscar descrição, placa ou pessoa" value={busca} onChange={setBusca} />
           <Button size="compact" variant="action" icon={<Plus size={16} />} onClick={() => void novo()}>Novo registro</Button>

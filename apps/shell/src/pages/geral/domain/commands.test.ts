@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { auditoriaData, contar, dayWindow, PROGRAMADO, programarPatch, splitOp } from './commands'
+import { contar, dayWindow, PROGRAMADO, programarPatch, splitOp } from './commands'
 
 const ms = (id: string, nome: string) => ({ id, nome })
 const res = (motorista: string | null) => ({ _cr40f_motorista_value: motorista })
@@ -49,9 +49,5 @@ describe('commands', () => {
     const vazio = contar([], [ms('a', 'Ana')], new Set())
     expect(vazio.media).toBe(0)
     expect(vazio.linhas[0].tone).toBe('neutral')
-  })
-  it('auditoriaData mantém só GUIDs válidos em minúsculas', () => {
-    const d = auditoriaData(['{ABCDEF01-2345-4678-89AB-CDEF01234567}', 'lixo'], 'cr40f_reservadeveculoses', 'https://org')
-    expect(d).toEqual({ version: '7.0.0', orgUrl: 'https://org', entityName: 'cr40f_reservadeveculos', entitySetName: 'cr40f_reservadeveculoses', validIds: ['abcdef01-2345-4678-89ab-cdef01234567'] })
   })
 })

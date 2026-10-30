@@ -11,6 +11,7 @@ import { MAX_LOGS, createSource, type LogApp, type Source } from './data'
 import { LogDrawer } from './LogDrawer'
 import { LOG_COLUMNS, LOG_SORT, builtinViews, PERIODOS, PERIODO_PADRAO, TELA, logFields, matchesKeyword, periodoStart, periodoValido, quemFoi, readLog, severidadeLabel, severidadeTone, sortLogs } from './lista'
 import './logs.css'
+import { useAuditoria } from '../../app/auditoria/AuditoriaProvider'
 
 const dateTime = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
 const fmtData = (d: Date | null) => (d ? dateTime.format(d).replace(',', '') : '—')
@@ -41,6 +42,7 @@ export function LogsPage({ host }: { host: Host }) {
 }
 
 function Logs({ host }: { host: Host }) {
+  const auditoria = useAuditoria()
   const source = useMemo(() => createSource(host), [host])
   const mobile = useMedia('(max-width: 820px)')
   const [periodoUrl, setPeriodo] = useQueryTexto('periodo', PERIODO_PADRAO)
@@ -92,7 +94,7 @@ function Logs({ host }: { host: Host }) {
   return (
     <div className="page page--full lg-page">
       <div role="toolbar" aria-label="Comandos dos logs">
-        <ViewBar view={view} columns={LOG_COLUMNS} filters={{ fields }}>
+        <ViewBar onAudit={() => auditoria({ entity: 'new_appmotoristaslog', onOpenRecord: setSelectedId })} view={view} columns={LOG_COLUMNS} filters={{ fields }}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="lg-search" value={query} onChange={setQuery} placeholder="Buscar por mensagem, código, tela ou usuário" aria-label="Buscar logs" />
           <Select className="lg-periodo" aria-label="Período" searchable={false} clearable={false} options={PERIODOS} value={periodo} onChange={(v) => setPeriodo(v ?? PERIODO_PADRAO)} />

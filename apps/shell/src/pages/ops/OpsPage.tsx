@@ -27,6 +27,7 @@ import type { Pendencia } from '../pendencias/domain/types'
 import '../pagantes/pagantes.css'
 import '../pendencias/pendencias.css'
 import './ops.css'
+import { useAuditoria } from '../../app/auditoria/AuditoriaProvider'
 
 export function OpsPage({ host }: { host: Host }) {
   return <ToastProvider><Ops host={host} /></ToastProvider>
@@ -36,6 +37,7 @@ const isPeriodo = (v: string): v is Periodo => PERIODOS.some((p) => p.value === 
 const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
 function Ops({ host }: { host: Host }) {
+  const auditoria = useAuditoria()
   const source = useMemo(() => createSource(host), [host])
   const toast = useToast()
   const mobile = useMedia('(max-width: 820px)')
@@ -167,7 +169,7 @@ function Ops({ host }: { host: Host }) {
   return (
     <div className="page page--full op-page">
       <div role="toolbar" aria-label="Comandos de ordens de pagamento">
-        <ViewBar view={view} columns={OP_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
+        <ViewBar onAudit={() => auditoria({ entity: 'cr40f_financeiro', onOpenRecord: setSelectedId })} view={view} columns={OP_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="pg-filters__search" value={query} onChange={setQuery} placeholder="Buscar por OP, cliente, passageiro ou trajeto" aria-label="Buscar ordens de pagamento" />
           <Select className="pg-filters__select" aria-label="Período de criação" searchable={false} clearable={false} options={PERIODOS} value={periodo} onChange={(v) => setPeriodo(v ?? EMPTY_FILTERS.periodo)} />

@@ -9,6 +9,7 @@ import { buildTimeline } from '../domain/timeline'
 import type { ChoiceSet, Contato, Pagante, ServicoOp } from '../domain/types'
 import { QuickActions } from './QuickActions'
 import { FalhaBadge, PagamentoBadge, ReciboBadge } from './StatusBadges'
+import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 
 type Props = {
   p: Pagante | null
@@ -100,7 +101,7 @@ export function PaganteDrawer({ p, onClose, onOpen, choices, contatos, source, o
   ) : undefined
 
   return (
-    <Drawer open={p != null} onClose={onClose} size="wide" eyebrow={p?.pessoa ? p.codigo : 'Pagante'} title={p?.pessoa || p?.codigo || 'Pagante'} footer={footer}>
+    <Drawer actions={<BotaoAuditoria entity="cr40f_pagantes" ids={[p?.id]} name={p?.pessoa || p?.codigo} />} open={p != null} onClose={onClose} size="wide" eyebrow={p?.pessoa ? p.codigo : 'Pagante'} title={p?.pessoa || p?.codigo || 'Pagante'} footer={footer}>
       {p ? (
         <div className="pg-ficha">
           <div className="pg-ficha__hero">

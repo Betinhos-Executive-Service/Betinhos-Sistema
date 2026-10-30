@@ -16,12 +16,14 @@ import { EquipamentosCards, EquipamentosTable } from './components/EquipamentosL
 import { EquipamentoDrawer } from './components/EquipamentoDrawer'
 import { TiposDrawer } from './components/TiposDrawer'
 import './equipamentos.css'
+import { useAuditoria } from '../../app/auditoria/AuditoriaProvider'
 
 export function EquipamentosPage({ host }: { host: Host }) {
   return <ToastProvider><Equipamentos host={host} /></ToastProvider>
 }
 
 function Equipamentos({ host }: { host: Host }) {
+  const auditoria = useAuditoria()
   const source = useMemo(() => createSource(host), [host])
   // Fotos do SharePoint baixadas nesta visita (lista e drawer); as blob URLs são revogadas ao sair da página.
   const imagens = useMemo(() => createCacheImagens(source.baixarFoto), [source])
@@ -100,7 +102,7 @@ function Equipamentos({ host }: { host: Host }) {
     <ImagensContext.Provider value={imagens}>
     <div className="page eq-page">
       <div role="toolbar" aria-label="Comandos de equipamentos">
-        <ViewBar view={view} columns={EQUIPAMENTO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
+        <ViewBar onAudit={() => auditoria({ entity: 'cr40f_equipamento', onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={EQUIPAMENTO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="eq-search" value={query} onChange={setQuery} placeholder="Buscar por descrição, modelo, série ou responsável" aria-label="Buscar equipamentos" />
           {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />}

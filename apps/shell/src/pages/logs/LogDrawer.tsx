@@ -5,6 +5,7 @@ import { copiarTexto } from '../dashboard/components/Copiar'
 import type { LogApp } from './data'
 import { formatPayload, severidadeLabel, severidadeTone } from './lista'
 import { promptCorrecao, recorrencia } from './prompt'
+import { BotaoAuditoria } from '../../app/auditoria/AuditoriaProvider'
 
 const dataHora = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
 const fmt = (d: Date | null) => (d ? dataHora.format(d).replace(',', '') : '')
@@ -28,7 +29,7 @@ export function LogDrawer({ log, list, periodo, onClose }: Props) {
   ) : null
 
   return (
-    <Drawer open={log != null} onClose={onClose} size="wide" eyebrow={log ? [log.app, log.versao].filter(Boolean).join(' · ') || 'Log de erro' : ''} title={log ? log.erro || severidadeLabel(log.severidade) : ''} footer={footer}>
+    <Drawer actions={<BotaoAuditoria entity="new_appmotoristaslog" ids={[log?.id]} />} open={log != null} onClose={onClose} size="wide" eyebrow={log ? [log.app, log.versao].filter(Boolean).join(' · ') || 'Log de erro' : ''} title={log ? log.erro || severidadeLabel(log.severidade) : ''} footer={footer}>
       {log && rec ? (
         <div className="lg-ficha">
           <section className="lg-hero" aria-label="Resumo do erro">

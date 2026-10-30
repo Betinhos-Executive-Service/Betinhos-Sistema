@@ -9,6 +9,7 @@ import type { Anexo, Despesa, DespesaChoices } from '../domain/types'
 import { AnaliseIA } from './AnaliseIA'
 import { ComprovantesGaleria } from './Comprovantes'
 import { Alertas, FinanceiroBadge, OperacionalBadge, titulo } from './DespesasList'
+import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 
 type Props = { despesa: Despesa | null; onClose: () => void; choices: DespesaChoices; source: Source; version: number }
 type Anexos = Anexo[] | { error: string } | null
@@ -54,7 +55,7 @@ export function DespesaDrawer({ despesa: d, onClose, choices, source, version }:
   const mapa = d && d.latitude != null && d.longitude != null ? `https://www.google.com/maps?q=${d.latitude},${d.longitude}` : null
 
   return (
-    <Drawer open={d != null} onClose={onClose} size="wide" eyebrow="Despesa operacional" title={d ? titulo(d) : ''}>
+    <Drawer actions={<BotaoAuditoria entity="cr40f_despesaoperacional" ids={[d?.id]} name={d ? titulo(d) : undefined} />} open={d != null} onClose={onClose} size="wide" eyebrow="Despesa operacional" title={d ? titulo(d) : ''}>
       {d ? (
         <div className="pg-ficha">
           <div className="pg-ficha__hero">

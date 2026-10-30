@@ -6,6 +6,7 @@ import type { Source } from '../data/source'
 import { MAX_LENGTH, applyForm, buildPayload, emptyForm, isDirty, toForm, validateForm, type ClienteForm, type FormErrors, type FormKey } from '../domain/form'
 import type { Cliente } from '../domain/types'
 import { fmtDay } from './ClientesList'
+import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 
 type Props = {
   target: AlvoGaveta
@@ -107,7 +108,7 @@ export function ClienteDrawer({ target, onTarget, list, source, onSaved }: Props
 
   return (
     <>
-      <Drawer open={target != null} onClose={() => go(null)} eyebrow={target?.mode === 'create' ? 'Cadastros' : current?.registro || 'Cliente'} title={title} footer={footer}>
+      <Drawer actions={<BotaoAuditoria entity="cr40f_clientes1" ids={[current?.id]} name={title} />} open={target != null} onClose={() => go(null)} eyebrow={target?.mode === 'create' ? 'Cadastros' : current?.registro || 'Cliente'} title={title} footer={footer}>
         {target == null ? null
           : editing ? (ready === editKey ? (
             <form id={formId} className="cl-form" noValidate onSubmit={(e) => { e.preventDefault(); void save() }}>

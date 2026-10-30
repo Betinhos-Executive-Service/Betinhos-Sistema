@@ -1,5 +1,4 @@
 import { cleanId, type Row } from '@betinhos/dataverse'
-import { ENTITY } from './types'
 
 export type OpSplit = { ok: Row[]; comOp: Row[] }
 
@@ -59,13 +58,3 @@ export function contar(reservas: Row[], motoristas: Motorista[], excluidos: Set<
   }
 }
 
-const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
-
-/** Payload do `new_betinhos_AuditoriaViewer` (mesmo contrato do botão da barra de comandos). */
-export const auditoriaData = (ids: string[], entitySetName: string, orgUrl: string) => ({
-  version: '7.0.0',
-  orgUrl,
-  entityName: ENTITY,
-  entitySetName,
-  validIds: ids.map((id) => cleanId(id).toLowerCase()).filter((id) => GUID.test(id)),
-})

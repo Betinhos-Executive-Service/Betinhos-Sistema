@@ -21,6 +21,7 @@ import { DespesaDrawer } from './components/DespesaDrawer'
 import type { Despesa } from './domain/types'
 import '../pagantes/pagantes.css'
 import './despesas.css'
+import { useAuditoria } from '../../app/auditoria/AuditoriaProvider'
 
 export function DespesasPage({ host }: { host: Host }) {
   return <ToastProvider><Despesas host={host} /></ToastProvider>
@@ -32,6 +33,7 @@ const LEGACY_KEYS = ['operacional', 'financeiro', 'categoria', 'motorista', 'ale
 const isPeriodo = (v: string): v is Periodo => PERIODOS.some((p) => p.value === v)
 
 function Despesas({ host }: { host: Host }) {
+  const auditoria = useAuditoria()
   const source = useMemo(() => createSource(host), [host])
   const toast = useToast()
   const mobile = useMedia('(max-width: 820px)')
@@ -125,7 +127,7 @@ function Despesas({ host }: { host: Host }) {
   return (
     <div className="page dp-page">
       <div role="toolbar" aria-label="Comandos de despesas">
-        <ViewBar view={view} columns={DESPESA_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
+        <ViewBar onAudit={() => auditoria({ entity: 'cr40f_despesaoperacional', onOpenRecord: setSelectedId })} view={view} columns={DESPESA_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="pg-filters__search" value={query} onChange={setQuery} placeholder="Buscar por despesa, local, motorista, reserva ou protocolo" aria-label="Buscar despesas" />
           <Select className="pg-filters__select" aria-label="Período do gasto" searchable={false} clearable={false} options={PERIODOS} value={periodo} onChange={(v) => setPeriodo(v ?? EMPTY_FILTERS.periodo)} />

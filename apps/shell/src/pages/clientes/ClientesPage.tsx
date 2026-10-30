@@ -15,6 +15,7 @@ import type { Cliente } from './domain/types'
 import { ClientesCards, ClientesTable } from './components/ClientesList'
 import { ClienteDrawer } from './components/ClienteDrawer'
 import './clientes.css'
+import { useAuditoria } from '../../app/auditoria/AuditoriaProvider'
 
 export function ClientesPage({ host }: { host: Host }) {
   return <ToastProvider><Clientes host={host} /></ToastProvider>
@@ -24,6 +25,7 @@ const EMPTY: Cliente[] = []
 const byId = (c: Cliente) => c.id
 
 function Clientes({ host }: { host: Host }) {
+  const auditoria = useAuditoria()
   const source = useMemo(() => createSource(host), [host])
   const mobile = useMedia('(max-width: 820px)')
   const load = useCallback(async () => source.load(), [source])
@@ -79,7 +81,7 @@ function Clientes({ host }: { host: Host }) {
   return (
     <div className="page page--full cl-page">
       <div role="toolbar" aria-label="Comandos de clientes">
-        <ViewBar view={view} columns={CLIENTE_COLUMNS} catalog={extra.catalog} filters={ready ? { fields: allFields } : undefined}>
+        <ViewBar onAudit={() => auditoria({ entity: ENTITY, onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={CLIENTE_COLUMNS} catalog={extra.catalog} filters={ready ? { fields: allFields } : undefined}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="cl-search" value={query} onChange={setQuery} placeholder="Buscar por nome, registro ou endereço" aria-label="Buscar clientes" />
           {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={cs.loading && ready} onClick={refresh} />}

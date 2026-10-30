@@ -9,6 +9,7 @@ import { resumo } from '../domain/history'
 import type { ChoiceSet, Historico, Pessoa } from '../domain/types'
 import { ContatoActions } from './ContatoActions'
 import { PessoaForm } from './PessoaForm'
+import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 
 export type DrawerTarget = { mode: 'view' | 'edit'; id: string } | { mode: 'create' } | null
 
@@ -213,7 +214,7 @@ export function PessoaDrawer({ target, onTarget, list, dups, choices, source, on
 
   return (
     <>
-      <Drawer open={target != null} onClose={() => go(null)} size="wide" eyebrow={target?.mode === 'create' ? 'Cadastros' : current?.cliente || 'Pessoa'} title={title} footer={footer}>
+      <Drawer actions={<BotaoAuditoria entity="cr40f_bancodedados" ids={[current?.id]} name={title} />} open={target != null} onClose={() => go(null)} size="wide" eyebrow={target?.mode === 'create' ? 'Cadastros' : current?.cliente || 'Pessoa'} title={title} footer={footer}>
         {target == null ? null
           : editing ? (ready === editKey ? <PessoaForm formId={formId} form={form} errors={errors} onChange={setForm} onSubmit={() => void save()} choices={choices} source={source}
               duplicates={formDups} onSeeDuplicate={(id) => go({ mode: 'view', id })} disabled={saving} /> : null)

@@ -16,11 +16,13 @@ import { custoVeiculo, ultimos12Meses } from '../domain/indicadores'
 import { TELA_VEICULOS, VEICULO_COLUMNS, VEICULO_DEFAULT_FILTERS, VEICULO_FIELDS, VEICULO_SORT, matchesVeiculoKeyword, readVeiculo, sortVeiculos, veiculoBuiltins, veiculoLegacy, type LinhaVeiculo } from '../domain/listas'
 import { motoristaAtual, possesAbertas, rotuloMotoristaAtual } from '../domain/motoristaAtual'
 import { buildPendencias } from '../domain/pendencias'
+import { useAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 
 const MOCK_HOST: Host = { mode: 'mock' }
 const byVeiculo = (linha: LinhaVeiculo) => linha.veiculo.id
 
 export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo }: { data: FrotaData; source: DataSource; host?: Host; today: string; onOpenVeiculo: (id: string) => void }) {
+  const auditoria = useAuditoria()
   // Visões, colunas e filtros (DS §10.9.1/§10.9.2); a Visão padrão mostra só os ativos. Busca em `q`, filtros em `f=`.
   const { view, filters, quickFilters, clearFilters, fields: allFields, extra } = useListView({
     host,
@@ -61,7 +63,7 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo 
   return (
     <div className="frota-lista">
       <div role="toolbar" aria-label="Comandos de veículos">
-        <ViewBar view={view} columns={VEICULO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
+        <ViewBar onAudit={() => auditoria({ entity: 'cr40f_veiculos', onOpenRecord: onOpenVeiculo })} view={view} columns={VEICULO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
           <SearchBox className="frota-busca" size="compact" aria-label="Buscar veículo" placeholder="Buscar placa, modelo ou motorista" value={busca} onChange={setBusca} />
         </ViewBar>
       </div>
