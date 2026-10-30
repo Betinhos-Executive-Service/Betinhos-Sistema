@@ -15,7 +15,8 @@ export type MenuItem =
 /** Visões da Frota: cada uma é um item do menu, todas na mesma tela (`page: 'frota'`). */
 export type FrotaAba = 'pendencias' | 'veiculos' | 'manutencoes' | 'multas' | 'colisoes' | 'indicadores' | 'plano' | 'checklists'
 
-export type MenuGroup = { id: string; label: string; items: MenuItem[] }
+/** `link`: grupo de um item só que aparece como link direto no nível dos grupos, sem acordeão (só a Página Inicial). */
+export type MenuGroup = { id: string; label: string; items: MenuItem[]; link?: boolean }
 
 const wr = (label: string, resource: string): MenuItem => ({ kind: 'webresource', id: resource.replace(/\.html$/i, '').toLowerCase(), label, resource })
 const table = (entity: string, label?: string): MenuItem => ({ kind: 'entity', id: entity, entity, label })
@@ -24,6 +25,7 @@ export const MENU: MenuGroup[] = [
   {
     id: 'inicio',
     label: 'Início',
+    link: true,
     items: [{ kind: 'page', id: 'inicio', label: 'Página Inicial', page: 'inicio' }],
   },
   {
