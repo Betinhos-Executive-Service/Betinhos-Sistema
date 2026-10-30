@@ -93,6 +93,8 @@ jobs:
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/foto-ambiente.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Saida fotos/antes.json
       - name: Excluir Custom APIs legado (cr40f_AI*V2 não gerenciadas)
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/excluir-custom-apis-legado.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Backup custom-apis-legado -Aplicar
+      - name: Preservar valores de variáveis que só têm padrão (o pacote do DEV substitui o padrão)
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/preservar-valores-variaveis.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Aplicar
       - name: Importar
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/importar-solucoes.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Pasta pacotes -Alvo $env:ALVO_PS
       - name: Remover camadas Active (hotfixes já na main)

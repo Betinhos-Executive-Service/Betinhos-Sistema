@@ -25,10 +25,11 @@ Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot "solucoes.ps1")
 
 $Saida = Initialize-ArquivoDeSaida $Saida
-$foto = Read-JsonFile $Foto
+# Nome diferente do parametro [string] $Foto: a restricao de tipo transformaria o objeto lido em texto (ensaio de 30/10/2026).
+$fotoAntes = Read-JsonFile $Foto
 $dv = Connect-Dataverse $EnvironmentUrl @($script:HostsAlvo[$Alvo])
-if (([string] $foto.ambiente).TrimEnd("/") -ne $dv.Url) { throw "A foto e de $($foto.ambiente), nao de $($dv.Url)." }
-$r = Restore-Estados $dv $Alvo $foto -DesligarNovos:$DesligarNovos
+if (([string] $fotoAntes.ambiente).TrimEnd("/") -ne $dv.Url) { throw "A foto e de $($fotoAntes.ambiente), nao de $($dv.Url)." }
+$r = Restore-Estados $dv $Alvo $fotoAntes -DesligarNovos:$DesligarNovos
 Write-JsonFile $Saida ([ordered]@{ mudancas = @($r.Mudancas); falhas = @($r.Falhas) })
 Write-Step "estados restaurados em ${Alvo}: $($r.Mudancas.Count) mudanca(s), $($r.Falhas.Count) falha(s); detalhes em $Saida"
 $r.Mudancas | ForEach-Object { Write-Step ("  {0} {1}: {2} -> {3}" -f $_.tipo, $_.nome, $_.de, $_.para) }
