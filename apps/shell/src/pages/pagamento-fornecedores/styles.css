@@ -319,7 +319,7 @@
 .pf-root .dashboard-data-notice {
   margin: 2px 0 0;
   padding: 7px 10px;
-  border-left: 3px solid var(--blue);
+  border: 1px solid var(--line);
   border-radius: 4px;
   background: #fcfcfb;
   color: var(--navy) !important;
