@@ -1,6 +1,8 @@
 param(
   [string] $EnvironmentUrl = "https://org23b93544.crm2.dynamics.com",
-  [string] $Solucoes = "",
+  # Nao se chama $Solucoes: solucoes.ps1 atribui $script:Solucoes (as 4 novas) no mesmo escopo do script e, com a
+  # restricao [string] do parametro, a lista virava "BetinhosCore BetinhosAutomacao ..." (export falhou no CI em 30/10/2026).
+  [Alias("Solucoes")] [string] $Pedido = "",
   [Parameter(Mandatory = $true)] [string] $Pasta,
   [switch] $Caixa
 )
@@ -14,7 +16,7 @@ if ($PSVersionTable.PSEdition -eq "Core") {
   $ps = Join-Path $env:WINDIR "System32\WindowsPowerShell\v1.0\powershell.exe"
   # Switch por splat: com -File, "-Caixa:True" (como o Core serializa) e recusado pelo Windows PowerShell.
   $extra = @(); if ($Caixa) { $extra += "-Caixa" }
-  & $ps -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -EnvironmentUrl $EnvironmentUrl -Solucoes $Solucoes -Pasta $Pasta @extra
+  & $ps -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -EnvironmentUrl $EnvironmentUrl -Solucoes $Pedido -Pasta $Pasta @extra
   exit $LASTEXITCODE
 }
 
@@ -24,7 +26,7 @@ Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot "solucoes.ps1")
 
 $dv = Connect-Dataverse $EnvironmentUrl @($script:HostDev)
-$escolhidas = if ($Caixa) { @("AppBetinhos") } else { @(Get-SolucoesEscolhidas $Solucoes) }
+$escolhidas = if ($Caixa) { @("AppBetinhos") } else { @(Get-SolucoesEscolhidas $Pedido) }
 Write-Step "solucoes: $($escolhidas -join ', ')"
 
 # Barreira: nada sai do DEV com componente sem dono, em duas solucoes ou com dependencia fora das 4.
