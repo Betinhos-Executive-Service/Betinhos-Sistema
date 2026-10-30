@@ -324,6 +324,7 @@ $script:HostProd = "orgf261ae8e.crm2.dynamics.com"
 $script:HostsAlvo = @{ Test = $script:HostTest; Prod = $script:HostProd }
 # Solucoes que a retirada desinstala (caixa de entrada do DEV e a antiga de pagantes), na ordem.
 $script:Caixas = @("AppBetinhos", "gerarpagantes")
+$script:SegundosEntreTentativas = 120
 
 # Toda escrita fora do DEV exige o alvo explicito ('Test' ou 'Prod') e a conexao no host desse alvo: nenhum script chega ao
 # PROD por engano com a URL errada, e o DEV nunca e alvo de import, retirada ou mudanca de estado.
@@ -466,6 +467,12 @@ function Test-PacPerdeuConexao([string] $Erro) {
   return [bool] ($Erro -match 'sending the request|timed out|time out|timeout|connection|Unable to connect|ServiceUnavailable|Gateway')
 }
 
+# Falha transitoria do proprio servidor no meio de uma operacao longa (ensaio de 30/10/2026: "Connection State is closed"
+# aos 31 min do upgrade da AppBetinhos no TEST, sem deixar solucao de retencao). Merece uma nova tentativa, nao espera.
+function Test-FalhaTransitoriaDoServidor([string] $Erro) {
+  return [bool] ($Erro -match 'Connection State is closed|SQL timeout|Generic SQL error|deadlock|try again later')
+}
+
 # Primeira instalacao vai sem --stage-and-upgrade: o Dataverse recusa a solucao de retencao sem base ("Cannot create a
 # holding solution for missing base"). Com versao instalada, upgrade com stage, que e o que apaga o que saiu da solucao.
 function Get-ArgumentosDeImport([string] $Caminho, [string] $VersaoInstalada) {
@@ -491,12 +498,23 @@ function Import-SolucaoGerenciada($Dv, [string] $Caminho, [string] $Alvo = "Test
   if (-not $m.Managed) { throw "$Caminho nao e gerenciada." }
   if ($Permitidas -notcontains $m.UniqueName) { throw "$Caminho e '$($m.UniqueName)', fora de: $($Permitidas -join ', ')." }
   $erroPac = $null
-  try { Invoke-Pac $Dv.Url (Get-ArgumentosDeImport $Caminho (Get-VersaoInstalada $Dv $m.UniqueName)) | Out-Null }
-  catch {
-    $erroPac = "$($_.Exception.Message)"
-    if (-not (Test-PacPerdeuConexao $erroPac)) { throw "Import de $($m.UniqueName) falhou em $($Dv.Host): $erroPac" }
-    Write-Step "pac perdeu a conexao ($erroPac); conferindo a versao instalada de $($m.UniqueName)"
-  }
+  $tentativas = 0
+  do {
+    $tentativas++
+    $erroPac = $null
+    try { Invoke-Pac $Dv.Url (Get-ArgumentosDeImport $Caminho (Get-VersaoInstalada (Update-DvToken $Dv) $m.UniqueName)) | Out-Null }
+    catch {
+      $erroPac = "$($_.Exception.Message)"
+      if ($tentativas -lt 2 -and (Test-FalhaTransitoriaDoServidor $erroPac) -and (Get-VersaoInstalada (Update-DvToken $Dv) $m.UniqueName) -ne $m.Version) {
+        Write-Step "falha transitoria do servidor no import de $($m.UniqueName) (tentativa $tentativas): $erroPac. Tentando de novo em 2 min."
+        Start-Sleep -Seconds $script:SegundosEntreTentativas
+        continue
+      }
+      if (-not (Test-PacPerdeuConexao $erroPac)) { throw "Import de $($m.UniqueName) falhou em $($Dv.Host): $erroPac" }
+      Write-Step "pac perdeu a conexao ($erroPac); conferindo a versao instalada de $($m.UniqueName)"
+    }
+    break
+  } while ($true)
   $minutos = if ($erroPac) { $MinutosDeEspera } else { 0 }
   if (-not (Wait-VersaoInstalada $Dv $m.UniqueName $m.Version $minutos)) {
     throw "$($m.UniqueName) nao chegou a versao $($m.Version) em $($Dv.Host). $erroPac"

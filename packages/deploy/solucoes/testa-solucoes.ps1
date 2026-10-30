@@ -330,6 +330,24 @@ Confere ((Update-DvToken $dvVelho).Headers.Authorization -eq 'novo' -and ((Get-D
 $dvNovo = @{ Headers = @{ Authorization = 'atual' }; ConectadoEm = Get-Date }
 Confere ((Update-DvToken $dvNovo).Headers.Authorization -eq 'atual') 'token: conexao recente fica'
 
+# Import com falha transitoria do servidor: tenta de novo uma vez; falha definitiva nao
+Confere ((Test-FalhaTransitoriaDoServidor 'The reason given was: Connection State is closed. Please open the connection') -and -not (Test-FalhaTransitoriaDoServidor 'Cannot create a holding solution')) 'pac: Connection State is closed e transitoria'
+$script:SegundosEntreTentativas = 0
+$script:pacChamadas = 0
+function Invoke-Pac([string] $Url, [string[]] $Argumentos) { $script:pacChamadas++; if ($script:pacChamadas -eq 1) { throw "pac solution import falhou: Connection State is closed." }; return @() }
+function Get-ManifestoDoPacote([string] $ZipPath) { return @{ UniqueName = 'BetinhosCore'; Version = '1.0.0.9'; Managed = $true } }
+# versao instalada: antes (1.0.0.8) nas consultas da 1a tentativa e da checagem, depois 1.0.0.9 na prova final
+$script:respostas = @(
+  [pscustomobject]@{ value = @([pscustomobject]@{ version = '1.0.0.8' }) }, [pscustomobject]@{ value = @([pscustomobject]@{ version = '1.0.0.8' }) },
+  [pscustomobject]@{ value = @([pscustomobject]@{ version = '1.0.0.8' }) }, [pscustomobject]@{ value = @([pscustomobject]@{ version = '1.0.0.9' }) }
+)
+$r = Import-SolucaoGerenciada $dvTest 'x.zip' 'Test' 0
+Confere ($script:pacChamadas -eq 2 -and $r.Versao -eq '1.0.0.9' -and -not $r.PacPerdeuConexao) 'import: falha transitoria do servidor tenta de novo e conclui'
+$script:pacChamadas = 0
+function Invoke-Pac([string] $Url, [string[]] $Argumentos) { $script:pacChamadas++; throw "Solution manifest import: FAILURE: Cannot create a holding solution" }
+$script:respostas = @([pscustomobject]@{ value = @([pscustomobject]@{ version = '1.0.0.8' }) })
+Confere (((Falha-Com { Import-SolucaoGerenciada $dvTest 'x.zip' 'Test' 0 }) -like '*Import de BetinhosCore falhou*') -and $script:pacChamadas -eq 1) 'import: falha definitiva nao tenta de novo'
+
 # Retirada: so AppBetinhos e gerarpagantes; Wait-SolucaoRemovida espera a ausencia
 Confere ((Falha-Com { Remove-SolucaoGerenciada $dvProd 'Prod' 'BetinhosCore' }) -like '*so desinstala AppBetinhos e gerarpagantes*') 'retirada: as 4 novas nunca sao desinstaladas'
 $script:respostas = @([pscustomobject]@{ value = @([pscustomobject]@{ version = '1.0.0.268' }) }, [pscustomobject]@{ value = @() })
