@@ -487,8 +487,6 @@ describe('comandos (caminhos e fonte)', () => {
     const reloaded = await source.reload(ids[0], ['cr40f_status'])
     expect(reloaded.cr40f_status).toBe(202410005)
     expect(reloaded.new_foiprogramado).toBe(true)
-    expect(await source.openAuditoria(ids)).toBe('mock')
-    expect(source.auditoriaUrl(ids)).toBeNull()
     expect(await source.openErroOperacional(ids[0])).toBe('mock')
     const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
     const dia = await source.contagem(hoje)
@@ -500,7 +498,7 @@ describe('comandos (caminhos e fonte)', () => {
     const row = createMockRows(new Date('2026-10-08T12:00:00Z')).find((r) => r.cr40f_id === 'OS-1004')
     expect(row?._cr40f_financeiro_value).toBeTruthy()
   })
-  it('openAuditoria e openErroOperacional fora do model-driven devolvem external', async () => {
+  it('openErroOperacional fora do model-driven devolve external', async () => {
     const host = {
       mode: 'dataverse', clientUrl: 'https://org.crm.dynamics.com', insideModelDriven: false,
       metadata: { entities: async () => new Map([['cr40f_reservadeveculos', { entitySetName: 'cr40f_reservadeveculoses' }]]) },
@@ -510,10 +508,6 @@ describe('comandos (caminhos e fonte)', () => {
     try {
       const source = createSource(host)
       const id = 'ABCDEF01-2345-4678-89AB-CDEF01234567'
-      expect(await source.openAuditoria([id])).toBe('external')
-      const url = source.auditoriaUrl([id])!
-      expect(url.startsWith('https://org.crm.dynamics.com/WebResources/new_betinhos_AuditoriaViewer?data=')).toBe(true)
-      expect(JSON.parse(decodeURIComponent(url.split('data=')[1]))).toMatchObject({ entitySetName: 'cr40f_reservadeveculoses', validIds: [id.toLowerCase()] })
       expect(await source.openErroOperacional(id)).toBe('external')
       expect(open.mock.calls[0][0]).toBe('https://org.crm.dynamics.com/WebResources/new_gestao_erros_operacionais.html?data=reservaId%3Dabcdef01-2345-4678-89ab-cdef01234567')
     } finally { vi.unstubAllGlobals() }

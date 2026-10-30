@@ -3,6 +3,7 @@ import { Drawer } from '@betinhos/ui'
 import { formatDate, formatMoney } from '../../pagantes/domain/messages'
 import { TIPO_LABEL, type Pendencia } from '../domain/types'
 import { AcaoPendencia, TipoBadge, servicosTexto, type Acoes } from './PendenciasList'
+import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 
 type Props = Acoes & { pendencia: Pendencia | null; onClose: () => void }
 
@@ -13,7 +14,7 @@ function Item({ label, children }: { label: string; children: ReactNode }) {
 /** Ficha da pendência: tipo, motivo, OP, serviços envolvidos e valor. Fecha por X, Esc ou clique fora. */
 export function PendenciaDrawer({ pendencia: p, onClose, ...acoes }: Props) {
   return (
-    <Drawer open={p != null} onClose={onClose} size="wide" eyebrow="Pendência" title={p ? (p.opCodigo || p.reservaCodigos[0] || 'Sem código') : ''}
+    <Drawer actions={<BotaoAuditoria entity={p?.opId ? 'cr40f_financeiro' : 'cr40f_reservadeveculos'} ids={p ? (p.opId ? [p.opId] : p.reservaIds) : []} name={p ? p.opCodigo || p.reservaCodigos[0] : undefined} />} open={p != null} onClose={onClose} size="wide" eyebrow="Pendência" title={p ? (p.opCodigo || p.reservaCodigos[0] || 'Sem código') : ''}
       footer={p ? <AcaoPendencia p={p} {...acoes} /> : undefined}>
       {p ? (
         <div className="pg-ficha">

@@ -20,6 +20,7 @@ import { PessoasCards, PessoasTable } from './components/PessoasList'
 import { PessoaDrawer } from './components/PessoaDrawer'
 import type { Pessoa } from './domain/types'
 import './pessoas.css'
+import { useAuditoria } from '../../app/auditoria/AuditoriaProvider'
 
 export function PessoasPage({ host }: { host: Host }) {
   return <ToastProvider><Pessoas host={host} /></ToastProvider>
@@ -29,6 +30,7 @@ export function PessoasPage({ host }: { host: Host }) {
 const LEGACY_KEYS = ['cliente', 'classificacao', 'idioma', 'status', 'duplicados'] as const
 
 function Pessoas({ host }: { host: Host }) {
+  const auditoria = useAuditoria()
   const source = useMemo(() => createSource(host), [host])
   const toast = useToast()
   const mobile = useMedia('(max-width: 820px)')
@@ -118,7 +120,7 @@ function Pessoas({ host }: { host: Host }) {
   return (
     <div className="page page--full ps-page">
       <div role="toolbar" aria-label="Comandos de pessoas">
-        <ViewBar view={view} columns={PESSOA_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
+        <ViewBar onAudit={() => auditoria({ entity: 'cr40f_bancodedados', onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={PESSOA_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="ps-filters__search" value={query} onChange={setQuery} placeholder="Buscar por nome, cliente, celular ou e-mail" aria-label="Buscar pessoas" />
           {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={ps.loading && Boolean(choices)} onClick={refresh} />}

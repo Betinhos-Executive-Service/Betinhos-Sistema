@@ -8,6 +8,7 @@ import { resumoUso } from '../domain/uso'
 import type { Infracao, MultaUso } from '../domain/types'
 import { InfracaoForm } from './InfracaoForm'
 import { Badges, money } from './InfracoesList'
+import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 
 export type DrawerTarget = { mode: 'view' | 'edit'; id: string } | { mode: 'create' } | null
 
@@ -184,7 +185,7 @@ export function InfracaoDrawer({ target, onTarget, list, uso, usoState, source, 
   const n = multas.length
   return (
     <>
-      <Drawer open={target != null} onClose={() => go(null)} size="wide" eyebrow={target?.mode === 'create' ? 'Cadastros' : 'Infração de trânsito'} title={title} footer={footer}>
+      <Drawer actions={<BotaoAuditoria entity="cr40f_infracaodetransito" ids={[current?.id]} name={title} />} open={target != null} onClose={() => go(null)} size="wide" eyebrow={target?.mode === 'create' ? 'Cadastros' : 'Infração de trânsito'} title={title} footer={footer}>
         {target == null ? null
           : editing ? (ready === editKey ? <InfracaoForm formId={formId} form={form} errors={errors} onChange={setForm} onSubmit={() => void save()} disabled={saving} /> : null)
           : current ? <Ficha i={current} multas={multas} usoState={usoState} />

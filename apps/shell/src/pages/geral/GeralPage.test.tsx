@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Source } from './data/source'
 import { MOCK_ROW_COUNT } from './data/mock'
 import { GeralPage } from './GeralPage'
+import { AuditoriaProvider } from '../../app/auditoria/AuditoriaProvider'
 import { encodeFilters } from './domain/filters'
 
 // Ganchos para simular o que o mock não faz: falha parcial de estado, linha inativa e cópia lenta.
@@ -1219,12 +1220,15 @@ describe('Geral: comandos Auditoria, Gerar OP, Disparar e Registrar Erro', () =>
     expect(await screen.findByText(/1 de 2 programados; falharam: OS-1013\./)).toBeTruthy()
   })
 
-  it('Auditoria e Registrar Erro em mock mostram os avisos', async () => {
-    render(<GeralPage host={{ mode: 'mock' }} />)
+  it('Auditoria abre o painel da seleção; Registrar Erro em mock mostra o aviso', async () => {
+    render(<AuditoriaProvider host={{ mode: 'mock' }}><GeralPage host={{ mode: 'mock' }} /></AuditoriaProvider>)
     await pick('OS-1005')
     fireEvent.click(within(toolbar()).getByRole('button', { name: 'Mais ações' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Auditoria', hidden: true }))
-    expect(await screen.findByText('A auditoria abre dentro do Dataverse.')).toBeTruthy()
+    const painel = await screen.findByRole('dialog', { name: 'Auditoria', hidden: true })
+    expect(within(painel).getByText(/1 registro/)).toBeTruthy()
+    expect(await within(painel).findAllByText('Status', {}, { timeout: 2000 })).not.toHaveLength(0)
+    fireEvent.click(within(painel).getByRole('button', { name: 'Fechar painel', hidden: true }))
     fireEvent.click(within(toolbar()).getByRole('button', { name: 'Mais ações' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Registrar Erro', hidden: true }))
     expect(await screen.findByText('A Gestão de Qualidade abre dentro do Dataverse.')).toBeTruthy()

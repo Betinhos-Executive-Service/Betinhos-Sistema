@@ -30,6 +30,7 @@ import { MobileHome } from './components/MobileHome'
 import { useIsMobile } from './lib/useMediaQuery'
 import { FuncionarioTable } from './components/FuncionarioTable'
 import './funcionarios.css'
+import { useAuditoria } from '../../app/auditoria/AuditoriaProvider'
 
 type Selection = { mode: 'closed' } | { mode: 'new' } | { mode: 'open'; id: string }
 
@@ -62,6 +63,7 @@ export function FuncionariosPage({ host }: { host: Host }) {
 
 /** Página com a fonte já resolvida; exportada para os testes. A rota do shell ocupa o hash, então a ficha aberta fica no estado. */
 export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataSource; docs?: DocsSource | null; host?: Host }) {
+  const auditoria = useAuditoria()
   // Primeira página antes do resto e cache por sessão: voltar à tela dentro do TTL não recarrega.
   const load = useCallback((partial: (rows: Funcionario[]) => void) => source.list(partial), [source])
   const carga = useProgressiveData<Funcionario[]>({ cache: listCache(source), key: 'funcionarios', load })
@@ -189,7 +191,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
     <div className="page func">
     <div className="app">
       <div role="toolbar" aria-label="Comandos de funcionários" className="toolbar">
-        <ViewBar view={view} columns={FUNCIONARIO_COLUMNS} catalog={lista.extra.catalog} filters={{ fields: lista.fields }}>
+        <ViewBar onAudit={() => auditoria({ entity: 'cr40f_funcionarios', onOpenRecord: (id) => setSelection({ mode: 'open', id }) })} view={view} columns={FUNCIONARIO_COLUMNS} catalog={lista.extra.catalog} filters={{ fields: lista.fields }}>
           <EnvBadge env={source.envLabel} />
           <SearchBox aria-label="Buscar colaborador" placeholder="Buscar nome, CPF, telefone ou placa" value={busca} onChange={setBusca} />
           <div className="chips" role="group" aria-label="Alertas de vencimento">

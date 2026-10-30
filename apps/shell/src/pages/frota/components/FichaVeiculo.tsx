@@ -21,6 +21,7 @@ import { Preventivas } from './Preventivas'
 import { useNotify } from './Toasts'
 import { Checklist } from '../../documentos/components/Checklist'
 import type { DocsSource } from '../../documentos/data/source'
+import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 
 const TABELAS_TIMELINE: { key: 'manutencoes' | 'multas' | 'colisoes' | 'posses'; nome: string }[] = [
   { key: 'manutencoes', nome: 'Manutenções' }, { key: 'multas', nome: 'Multas' }, { key: 'colisoes', nome: 'Colisões' }, { key: 'posses', nome: 'Posses' },
@@ -129,7 +130,7 @@ export function FichaVeiculo({ source, docs, id, data, errors, today, secao = nu
   const erro = (nome: string, mensagem: string) => <Alert key={nome} tone="danger">Não foi possível carregar {nome}: {mensagem}</Alert>
 
   return (
-    <Drawer
+    <Drawer actions={<BotaoAuditoria entity="cr40f_veiculos" ids={[veiculo?.id]} name={veiculo?.placa} />}
       open
       size="wide"
       onClose={onClose}

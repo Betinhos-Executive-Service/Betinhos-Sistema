@@ -6,6 +6,7 @@ import { applyForm, diffForm, emptyEquipamento, emptyForm, hasChanges, isDirty, 
 import type { Equipamento, Pessoa, TipoEquipamento } from '../domain/types'
 import { EquipamentoForm } from './EquipamentoForm'
 import { FotosSecao } from './FotosSecao'
+import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 
 export type DrawerTarget = { mode: 'view' | 'edit'; id: string } | { mode: 'create' } | null
 
@@ -120,7 +121,7 @@ export function EquipamentoDrawer({ target, onTarget, list, tipos, pessoas, sour
 
   return (
     <>
-      <Drawer open={target != null} onClose={close} size="wide" eyebrow="Equipamentos" title={title} footer={footer}>
+      <Drawer actions={<BotaoAuditoria entity="cr40f_equipamento" ids={[current?.id]} name={title} />} open={target != null} onClose={close} size="wide" eyebrow="Equipamentos" title={title} footer={footer}>
         {missing
           ? <Alert tone="warning" title="Equipamento não encontrado">O link pode ser de um item de outro ambiente ou já removido. Atualize a lista e procure pela busca.</Alert>
           : open ? (

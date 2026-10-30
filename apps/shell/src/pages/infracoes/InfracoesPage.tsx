@@ -14,6 +14,7 @@ import { useInfracoes } from './useInfracoes'
 import { InfracoesCards, InfracoesTable } from './components/InfracoesList'
 import { InfracaoDrawer } from './components/InfracaoDrawer'
 import './infracoes.css'
+import { useAuditoria } from '../../app/auditoria/AuditoriaProvider'
 
 export function InfracoesPage({ host }: { host: Host }) {
   return <ToastProvider><Infracoes host={host} /></ToastProvider>
@@ -24,6 +25,7 @@ const LEGACY_KEYS = ['gravidade', 'competencia', 'responsabilidade', 'situacao',
 
 /** `embutido`: aba Infrações dentro de Multas na Frota, que já tem página, cabeçalho e toasts próprios. */
 export function Infracoes({ host, embutido = false }: { host: Host; embutido?: boolean }) {
+  const auditoria = useAuditoria()
   const source = useMemo(() => createSource(host), [host])
   const mobile = useMedia('(max-width: 820px)')
   const data = useInfracoes(source)
@@ -88,7 +90,7 @@ export function Infracoes({ host, embutido = false }: { host: Host; embutido?: b
     <div className={embutido ? 'if-page' : 'page page--full if-page'}>
       {embutido ? null : <CabecalhoShell actions={headerActions} />}
       <div role="toolbar" aria-label="Comandos de infrações">
-        <ViewBar view={view} columns={INFRACAO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
+        <ViewBar onAudit={() => auditoria({ entity: 'cr40f_infracaodetransito', onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={INFRACAO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
           {source.mock && !embutido ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="if-filters__search" value={query} onChange={setQuery} placeholder="Buscar por código, descrição ou artigo" aria-label="Buscar infrações" />
           {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />}

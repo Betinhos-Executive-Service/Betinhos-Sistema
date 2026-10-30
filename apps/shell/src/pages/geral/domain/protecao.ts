@@ -1,4 +1,5 @@
 import { formatted, type Row } from '@betinhos/dataverse'
+import { parseChanges } from '../../../app/auditoria/format'
 import { formatDateTime, formatMoney } from './format'
 import type { AttributeInfo, Column } from './types'
 
@@ -32,15 +33,12 @@ export type Alteracao = { antes: string | null; depois: string | null; em: strin
 /** Histórico de uma OS para o popover: auditoria (ou `sem-permissao`) e o snapshot da Tenaris. */
 export type Protecao = { audits: Row[] | 'sem-permissao'; snapshot: unknown }
 
-type Changed = { logicalName?: unknown; oldValue?: unknown; newValue?: unknown }
 const asText = (value: unknown) => (value == null || value === '' ? null : String(value))
 
 /** Alteração mais recente do campo; `audits` vem do mais novo para o mais antigo. `changedata` que não é JSON (compartilhamento) é ignorado. */
 export function ultimaAlteracao(audits: Row[], attribute: string): Alteracao | null {
   for (const audit of audits) {
-    let changed: Changed[] = []
-    try { changed = (JSON.parse(String(audit.changedata ?? '')) as { changedAttributes?: Changed[] }).changedAttributes ?? [] } catch { continue }
-    const hit = changed.find((c) => c.logicalName === attribute)
+    const hit = parseChanges(audit.changedata)?.find((c) => c.logicalName === attribute)
     if (hit) return { antes: asText(hit.oldValue), depois: asText(hit.newValue), em: String(audit.createdon ?? ''), por: formatted(audit, '_userid_value') || '—' }
   }
   return null

@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react'
 import { Button, Drawer, EmptyState } from '@betinhos/ui'
 import { diaSP, formatBR } from '../data/dates'
 import { brl, NAO_INFORMADO } from '../data/format'
-import { GRAU, GRAVIDADE, KIND_LABEL, label, TIPO_COLISAO, TIPO_REPARO } from '../data/schema'
+import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
+import { GRAU, GRAVIDADE, KIND_LABEL, KIND_TABLE, label, TIPO_COLISAO, TIPO_REPARO } from '../data/schema'
 import type { Classificacao, DataSource, FlowResult } from '../data/source'
 import type { FrotaData, Kind, Ref } from '../data/types'
 import { errorMessage } from '../data/xrm'
@@ -75,6 +76,7 @@ export function RegistroDrawer({ source, kind, id, data, onClose, onChanged, onC
       open
       size="wide"
       onClose={onClose}
+      actions={registro ? <BotaoAuditoria entity={KIND_TABLE[kind]} ids={[id]} name={registro.titulo} /> : null}
       eyebrow={KIND_LABEL[kind]}
       title={registro?.titulo || 'Registro não encontrado'}
       footer={<>

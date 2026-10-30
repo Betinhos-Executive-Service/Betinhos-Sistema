@@ -21,6 +21,7 @@ import { PagantesCards, PagantesTable } from './components/PagantesList'
 import { PaganteDrawer } from './components/PaganteDrawer'
 import { GerarPagantesFrame, StatusDialog, type StatusRequest } from './components/Dialogs'
 import './pagantes.css'
+import { useAuditoria } from '../../app/auditoria/AuditoriaProvider'
 
 export function PagantesPage({ host }: { host: Host }) {
   return <ToastProvider><Pagantes host={host} /></ToastProvider>
@@ -32,6 +33,7 @@ const isPeriodo = (v: string): v is Periodo => PERIODOS.some((p) => p.value === 
 const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
 function Pagantes({ host }: { host: Host }) {
+  const auditoria = useAuditoria()
   const source = useMemo(() => createSource(host), [host])
   const toast = useToast()
   const mobile = useMedia('(max-width: 820px)')
@@ -177,7 +179,7 @@ function Pagantes({ host }: { host: Host }) {
   return (
     <div className="page page--full pg-page">
       <div role="toolbar" aria-label="Comandos de pagantes">
-        <ViewBar view={view} columns={PAGANTE_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
+        <ViewBar onAudit={() => auditoria({ entity: 'cr40f_pagantes', onOpenRecord: setSelectedId })} view={view} columns={PAGANTE_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="pg-filters__search" value={query} onChange={setQuery} placeholder="Buscar por pagante, PAG, OP, telefone ou e-mail" aria-label="Buscar pagantes" />
           <Select className="pg-filters__select" aria-label="Período de criação" searchable={false} clearable={false} options={PERIODOS} value={periodo} onChange={(v) => setPeriodo(v ?? EMPTY_FILTERS.periodo)} />

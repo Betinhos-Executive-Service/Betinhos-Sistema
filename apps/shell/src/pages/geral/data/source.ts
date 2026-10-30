@@ -2,7 +2,7 @@ import { chunk, cleanId, DataverseError, formatted, getHostXrm, type Row } from 
 import type { Host } from '../../../host'
 import { browserKV } from '../../pagantes/data/source'
 import type { KV } from '../domain/columns'
-import { auditoriaData, dayWindow, programarPatch, type Motorista } from '../domain/commands'
+import { dayWindow, programarPatch, type Motorista } from '../domain/commands'
 import { COPY_SELECT } from '../domain/copy'
 import { buildCountFetch, buildFetch, quickFindAttributes } from '../domain/fetch'
 import { buildSearch, searchKind, type SearchCondition, type SearchField } from '../domain/search'
@@ -17,7 +17,6 @@ import { auditPath, contagemPath, copyPath, envVarDefaultPath, envVarPath, motor
 export const FORM_WEBRESOURCE = 'new_formulario_geral.html'
 export const VOUCHER_WEBRESOURCE = 'cr40f_VoucherConfirmacao.html'
 export const ESCALA_FDS_WEBRESOURCE = 'cr40f_EscalaFDS.html'
-export const AUDITORIA_WEBRESOURCE = 'new_betinhos_AuditoriaViewer'
 export const ERRO_OPERACIONAL_WEBRESOURCE = 'new_gestao_erros_operacionais.html'
 export const FUNCIONARIOS_ENTITY = 'cr40f_funcionarios'
 
@@ -66,9 +65,6 @@ export type Source = {
   triggerFlow(url: string, body: unknown): Promise<{ status: number }>
   /** Marca como Programado; falhas por serviço, sem abortar os demais. */
   programar(ids: string[]): Promise<{ ok: string[]; failed: { id: string; message: string }[] }>
-  openAuditoria(ids: string[]): Promise<'closed' | 'external' | 'mock'>
-  /** URL do visualizador de auditoria para o fallback fora do model-driven; `null` em mock. */
-  auditoriaUrl(ids: string[]): string | null
   openErroOperacional(id: string): Promise<'closed' | 'external' | 'mock'>
   /** Auditoria e snapshot da Tenaris da OS, para o popover do campo protegido. Sem privilégio de auditoria: `audits = 'sem-permissao'`. */
   protecao(id: string): Promise<Protecao>
@@ -251,8 +247,6 @@ function createMockSource({ latency = 1 }: SourceOptions = {}): Source {
     async programar(ids) {
       return settle(ids, await Promise.allSettled(ids.map((id) => update(id, programarPatch()))))
     },
-    openAuditoria: async () => 'mock',
-    auditoriaUrl: () => null,
     openErroOperacional: async () => 'mock',
     async protecao(id) {
       await wait(400)
@@ -274,11 +268,9 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
   if (host.mode === 'mock') return createMockSource(options)
 
   let setPromise: Promise<string> | null = null
-  let knownSet: string | null = null
   const entitySet = () => (setPromise ??= host.metadata.entities([ENTITY]).then((info) => {
     const value = info.get(ENTITY)?.entitySetName
     if (!value) throw new Error(`Tabela ${ENTITY} não encontrada na metadata.`)
-    knownSet = value
     return value
   }).catch((error) => { setPromise = null; throw error }))
 
@@ -499,19 +491,6 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
       const set = await entitySet()
       return settle(ids, await Promise.allSettled(ids.map((id) => host.client.update(set, id, programarPatch()))))
     },
-    async openAuditoria(ids) {
-      const data = auditoriaData(ids, await entitySet(), host.clientUrl)
-      const navigation = getHostXrm()?.Navigation as { navigateTo?: (page: object, options: object) => Promise<unknown> } | undefined
-      if (host.insideModelDriven && navigation?.navigateTo) {
-        await navigation.navigateTo(
-          { pageType: 'webresource', webresourceName: AUDITORIA_WEBRESOURCE, data: JSON.stringify(data) },
-          { target: 2, width: { value: 92, unit: '%' }, height: { value: 88, unit: '%' }, position: 1 },
-        )
-        return 'closed'
-      }
-      return 'external'
-    },
-    auditoriaUrl: (ids) => `${host.clientUrl}/WebResources/${AUDITORIA_WEBRESOURCE}?data=${encodeURIComponent(JSON.stringify(auditoriaData(ids, knownSet ?? `${ENTITY}s`, host.clientUrl)))}`,
     async openErroOperacional(id) {
       const data = `reservaId=${encodeURIComponent(cleanId(id).toLowerCase())}`
       const navigation = getHostXrm()?.Navigation as { navigateTo?: (page: object, options: object) => Promise<unknown> } | undefined

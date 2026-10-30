@@ -5,6 +5,7 @@ import type { Source } from '../data/source'
 import { aplicarLiberacao, mesLabel, motivoLabel, podeEditarObservacao, podeLiberar, podeResponder, podeRetirar } from '../domain/regras'
 import type { Linha, Mensagem } from '../domain/types'
 import { Fechamento, Situacao, fmtData, money } from './ValidacaoList'
+import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 
 type Props = {
   linha: Linha | null
@@ -208,7 +209,7 @@ export function ValidacaoDrawer({ linha, missing, onClose, source, mobile, onRes
 
   const painel = mobile
     ? <Sheet open={open} onClose={close} eyebrow="Validação do cliente" title={title} footer={footer}>{body}</Sheet>
-    : <Drawer open={open} onClose={close} size="wide" eyebrow="Validação do cliente" title={title} footer={footer}>{body}</Drawer>
+    : <Drawer actions={<BotaoAuditoria entity="cr40f_validacaoservico" ids={[linha?.validacaoId]} name={typeof title === 'string' ? title : undefined} />} open={open} onClose={close} size="wide" eyebrow="Validação do cliente" title={title} footer={footer}>{body}</Drawer>
   return (
     <>
       {painel}

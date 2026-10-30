@@ -19,7 +19,6 @@ import { ContagemDrawer, shiftDay, todayIso } from './components/ContagemDrawer'
 import { EscalaFdsDrawer } from './components/EscalaFdsDrawer'
 import { LoadMore, LoadSentinel, statusText } from './components/LoadMore'
 import { debounceSearch } from './components/useLookupSearch'
-import { AuditoriaOverlay } from './components/AuditoriaOverlay'
 import { LiberarPortalDrawer } from './components/LiberarPortalDrawer'
 import { createPortalSource, type Liberacao } from './data/portal'
 import { PORTAL_COLUMN, PORTAL_KEY, rotuloStatus, tomStatus, type StatusValidacao } from './domain/portal'
@@ -33,6 +32,7 @@ import { loadViewMode, saveViewMode, type ViewMode } from './domain/viewMode'
 import { splitOp } from './domain/commands'
 import { applyColumnPrefs, loadColumnPrefs, saveColumnPrefs, type ColumnPrefs } from './domain/columns'
 import { buildLayout, buildViewFetch } from './domain/views'
+import { useAuditoria } from '../../app/auditoria/AuditoriaProvider'
 import { ENTITY, ID_ATTRIBUTE, type CellStatus, type Column, type Sort } from './domain/types'
 import { readUrlState, writeUrlState, type UrlState } from './domain/urlState'
 import { cellKey, useGeral, type SaveFailure } from './useGeral'
@@ -64,6 +64,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     }
   }, [source])
   const toast = useToast()
+  const auditoria = useAuditoria()
   const mobile = useMedia('(max-width: 820px)')
   const [mode, setModeState] = useState<ViewMode>(() => loadViewMode(source.kv))
   // Celular é sempre cards; no desktop vale a escolha lembrada.
@@ -127,7 +128,6 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const [stateBusy, setStateBusy] = useState(false)
   const [voucherUrl, setVoucherUrl] = useState<string | null>(null)
   const [formUrl, setFormUrl] = useState<string | null>(null)
-  const [auditoriaUrl, setAuditoriaUrl] = useState<string | null>(null)
   const [opRequest, setOpRequest] = useState<OpRequest | null>(null)
   const [opBusy, setOpBusy] = useState(false)
   const [opError, setOpError] = useState<string | null>(null)
@@ -385,15 +385,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     }
   }, [dispRequest, source, toast, refresh, clearSelection, labelOf])
 
-  const openAuditoria = useCallback(async () => {
-    try {
-      const result = await source.openAuditoria(selectedIds)
-      if (result === 'mock') toast({ tone: 'info', message: 'A auditoria abre dentro do Dataverse.' })
-      else if (result === 'external') { const url = source.auditoriaUrl(selectedIds); if (url) setAuditoriaUrl(url) }
-    } catch (reason) {
-      toast({ tone: 'danger', message: reason instanceof Error ? reason.message : String(reason) })
-    }
-  }, [source, selectedIds, toast])
+  // Com seleção, só as OS selecionadas; sem seleção, as alterações recentes da tabela.
+  const openAuditoria = useCallback(() => auditoria({ entity: ENTITY, ids: selectedIds }), [auditoria, selectedIds])
 
   const registrarErro = useCallback(async () => {
     try {
@@ -533,7 +526,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         { id: 'compartilhar', label: 'Compartilhar link', icon: <Link2 size={16} />, group: '', onSelect: () => { void shareLink() } },
         { id: 'funcoes', label: 'Funções Operacionais', icon: <ClipboardList size={16} />, group: 'Atalhos', onSelect: () => { location.hash = hrefFor('funcoes-operacionais') } },
         { id: 'escala', label: 'Escala FDS', icon: <CalendarDays size={16} />, group: 'Atalhos', onSelect: () => setEscalaOpen(true) },
-        { id: 'auditoria', label: 'Auditoria', icon: <ShieldCheck size={16} />, group: 'Atalhos', onSelect: () => { void openAuditoria() } },
+        { id: 'auditoria', label: 'Auditoria', icon: <ShieldCheck size={16} />, group: 'Atalhos', onSelect: openAuditoria },
         { id: 'erro', label: hint('Registrar Erro', selectedIds.length === 1 ? null : oneTitle), icon: <Bug size={16} />, group: 'Atalhos', disabled: selectedIds.length !== 1, onSelect: () => { void registrarErro() } },
         { id: 'portal', label: hint('Liberar para o portal', selectedIds.length ? null : noSelectionTitle), icon: <Share2 size={16} />, group: 'Atalhos', disabled: !selectedIds.length, onSelect: askLiberar },
         { id: 'contagem', label: 'Contagem de Serviços', icon: <ListChecks size={16} />, group: 'Atalhos', onSelect: () => setContagemOpen(true) },
@@ -679,6 +672,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         {/* A linha de comando da lista (DS §10.9.1): visão, colunas, filtros, busca e comandos. */}
         <div role="toolbar" aria-label="Comandos de serviços" className={selecting ? 'gr-commandline is-selecting' : 'gr-commandline'}>
         <ViewBar
+          onAudit={openAuditoria}
           view={viewState}
           columns={columnDefs}
           catalog={catalog}
@@ -731,7 +725,6 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         <DispararDialog request={dispRequest} busy={dispBusy} onClose={() => setDispRequest(null)} onConfirm={() => { void confirmDisparar() }} />
         <LiberarPortalDrawer ids={liberarIds} source={portal} mobile={mobile} onClose={() => setLiberarIds(null)} onDone={doneLiberar} />
         <ContextMenu at={contextAt} actions={contextActions} onClose={closeContext} />
-        {auditoriaUrl ? <AuditoriaOverlay url={auditoriaUrl} onClose={() => setAuditoriaUrl(null)} /> : null}
         {voucherUrl ? <VoucherOverlay url={voucherUrl} onClose={() => setVoucherUrl(null)} /> : null}
         {formUrl ? <FormOverlay url={formUrl} onClose={() => { setFormUrl(null); refresh() }} /> : null}
         </Stack>

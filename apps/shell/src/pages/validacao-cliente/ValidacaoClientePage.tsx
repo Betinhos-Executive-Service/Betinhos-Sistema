@@ -17,6 +17,7 @@ import { ValidacaoCards, ValidacaoTable, money } from './components/ValidacaoLis
 import { ValidacaoDrawer } from './components/ValidacaoDrawer'
 import { ValidadoresDrawer } from './components/ValidadoresDrawer'
 import './validacao-cliente.css'
+import { useAuditoria } from '../../app/auditoria/AuditoriaProvider'
 
 export function ValidacaoClientePage({ host }: { host: Host }) {
   return <ToastProvider><ValidacaoCliente host={host} /></ToastProvider>
@@ -42,6 +43,7 @@ function ValidacaoCliente({ host }: { host: Host }) {
 }
 
 function Conteudo({ host, source }: { host: Host; source: ReturnType<typeof createSource> }) {
+  const auditoria = useAuditoria()
   const toast = useToast()
   const mobile = useMedia('(max-width: 820px)')
   const data = useValidacoes(source)
@@ -172,7 +174,7 @@ function Conteudo({ host, source }: { host: Host; source: ReturnType<typeof crea
   return (
     <div className="page vc-page">
       <div role="toolbar" aria-label="Comandos da validação do cliente">
-        <ViewBar view={view} columns={VALIDACAO_COLUMNS} filters={{ fields: allFields }}>
+        <ViewBar onAudit={() => auditoria({ entity: 'cr40f_validacaoservico', onOpenRecord: setAberto })} view={view} columns={VALIDACAO_COLUMNS} filters={{ fields: allFields }}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="vc-search" value={query} onChange={setQuery} placeholder="Buscar serviço, pedido, trajeto ou mensagem" aria-label="Buscar serviços" />
           <Button variant="secondary" icon={<MessageCircleQuestion size={16} />} disabled={!data.loaded} aria-label={`Dúvidas abertas: ${duvidas}`} onClick={() => view.select('pronta:em-duvida')}>{mobile ? null : `Dúvidas (${duvidas})`}</Button>

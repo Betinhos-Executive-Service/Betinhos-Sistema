@@ -10,6 +10,7 @@ import { OP_STATUS, cancelBlock, resumoRateio } from '../domain/status'
 import { buildTimeline } from '../domain/timeline'
 import { valorOp, type Op, type OpChoices } from '../domain/types'
 import { OpBadge, periodo } from './OpsList'
+import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 
 type Related = { rateio: Pagante[]; servicos: ServicoOp[]; contatos: Map<string, Contato>; pagChoices: ChoiceSet } | { error: string } | null
 const message = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
@@ -73,7 +74,7 @@ export function OpDrawer({ op, onClose, choices, source, version, busy, onCancel
   ) : undefined
 
   return (
-    <Drawer open={op != null} onClose={onClose} size="wide" eyebrow="Ordem de pagamento" title={op?.codigo || 'OP sem código'} footer={footer}>
+    <Drawer actions={<BotaoAuditoria entity="cr40f_financeiro" ids={[op?.id]} name={op?.codigo} />} open={op != null} onClose={onClose} size="wide" eyebrow="Ordem de pagamento" title={op?.codigo || 'OP sem código'} footer={footer}>
       {op ? (
         <div className="pg-ficha">
           <div className="pg-ficha__hero">
