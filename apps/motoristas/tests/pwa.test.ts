@@ -14,3 +14,13 @@ test("manifest é instalável: standalone, start_url dentro do escopo e ícones 
   assert.ok(m.start_url.startsWith(m.scope));
   assert.deepEqual(m.icons.map((i) => `${i.sizes}:${i.purpose}`), ["192x192:any", "512x512:any", "512x512:maskable"]);
 });
+
+test("escopo só do próprio app (não cobre o Sistema Betinhos) e nome com DEV no ambiente DEV", () => {
+  const icons = { icon192: "a", icon512: "b", iconMaskable512: "c" };
+  const dev = buildManifest("https://org23b93544.crm2.dynamics.com", "/WebResources/new_app-motoristas-v2", icons);
+  assert.equal(dev.name, "App Betinhos Motoristas DEV");
+  assert.equal(dev.short_name, "Motoristas DEV");
+  assert.ok(!"https://org23b93544.crm2.dynamics.com/WebResources/cr40f_SistemaBetinhosLoader.html".startsWith(dev.scope));
+  const prod = buildManifest("https://org.crm2.dynamics.com", "/WebResources/new_app-motoristas-v2", icons);
+  assert.equal(prod.name, "App Betinhos Motoristas");
+});

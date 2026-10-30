@@ -25,12 +25,16 @@ export function installPwa() {
   addHead("link", { rel: "apple-touch-icon", href: appleTouch180 });
   addHead("meta", { name: "apple-mobile-web-app-capable", content: "yes" });
   addHead("meta", { name: "mobile-web-app-capable", content: "yes" });
-  addHead("meta", { name: "apple-mobile-web-app-title", content: "Motoristas" });
   addHead("meta", { name: "apple-mobile-web-app-status-bar-style", content: "default" });
 
+  addHead("meta", { name: "apple-mobile-web-app-title", content: manifest.short_name });
   if ("serviceWorker" in navigator) {
+    // Registro antigo com escopo /WebResources/ inteiro controlava também o Sistema Betinhos.
+    navigator.serviceWorker.getRegistrations()
+      .then((regs) => regs.filter((r) => r.scope === `${origin}/WebResources/`).forEach((r) => r.unregister()))
+      .catch(() => {});
     navigator.serviceWorker
-      .register(`${origin}/WebResources/${PWA_SW_NAME}`, { scope: `${origin}/WebResources/` })
+      .register(`${origin}/WebResources/${PWA_SW_NAME}`, { scope: manifest.scope })
       .catch((error) => console.warn("[pwa] service worker não registrado", error));
   }
 }
