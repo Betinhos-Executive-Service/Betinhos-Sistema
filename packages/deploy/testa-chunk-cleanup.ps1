@@ -33,4 +33,10 @@ $script:chamadas = 0
 $n = Remove-ObsoleteChunks 'https://x/api' @{} $prefix @("${prefix}a.aaaaaaaa.js") -DryRun
 if ($n -eq 2 -and $script:chamadas -eq 2) { Write-Host 'ok    duas paginas seguindo nextLink: 2 obsoletos' } else { Write-Host "FALHA duas paginas: n=$n chamadas=$($script:chamadas)"; $falhas++ }
 
+# Caso 3: CSS das telas entra na limpeza; o mantido fica.
+$script:paginas = @([pscustomobject]@{ value = @((Recurso 'p.pppppppp.css'), (Recurso 'q.qqqqqqqq.css'), (Recurso 'outro.css')) })
+$script:chamadas = 0
+$n = Remove-ObsoleteChunks 'https://x/api' @{} $prefix @("${prefix}p.pppppppp.css") -DryRun
+if ($n -eq 1) { Write-Host 'ok    CSS com hash: 1 obsoleto, CSS sem hash ignorado' } else { Write-Host "FALHA CSS: n=$n"; $falhas++ }
+
 if ($falhas) { exit 1 }
