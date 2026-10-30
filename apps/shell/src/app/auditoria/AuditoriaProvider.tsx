@@ -43,6 +43,12 @@ export function AuditoriaProvider({ host, children }: { host: Host; children: Re
     try {
       const page = await source.load(target, next)
       if (id !== run.current) return
+      // Mostra os eventos já; os nomes dos lookups chegam depois e trocam só esses eventos.
+      void page.withNames?.().then((named) => {
+        if (!named || id !== run.current) return
+        const byId = new Map(named.map((event) => [event.id, event]))
+        setState((s) => ({ ...s, events: s.events.map((event) => byId.get(event.id) ?? event) }))
+      }, () => undefined)
       setState((s) => {
         const events = next ? [...s.events, ...page.events] : page.events
         const status: AuditStatus = !events.length && !page.auditEnabled ? 'disabled' : 'ready'

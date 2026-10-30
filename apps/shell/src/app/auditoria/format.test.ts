@@ -5,7 +5,11 @@ import { auditPath, MAX_IDS } from './source'
 const F = '@OData.Community.Display.V1.FormattedValue'
 const status: FieldMeta = { label: 'Status', type: 'Status', options: new Map([[202410005, 'Programado'], [202410008, 'Concluído']]) }
 const saida: FieldMeta = { label: 'Data e horário de saída', type: 'DateTime', noZone: false }
-const names = new Map([['3363c66f-44f5-f011-8406-7ced8da8212d', 'ABC-1D23']])
+const names = new Map<string, string | null>([
+  ['3363c66f-44f5-f011-8406-7ced8da8212d', 'ABC-1D23'],
+  // buscados e não encontrados
+  ['00000000-0000-0000-0000-000000000001', null], ['00000000-0000-0000-0000-00000000000a', null], ['00000000-0000-0000-0000-00000000000b', null],
+])
 
 describe('parseChanges', () => {
   it('lê o JSON do changedata', () => {
@@ -36,6 +40,7 @@ describe('formatAuditValue', () => {
     expect(formatAuditValue('10/27/2026 00:00:00', { label: 'Vencimento', type: 'DateTime', dateOnly: true, noZone: true }, names)).toBe('27/10/2026')
   })
   it('lookup vira nome; sem nome, avisa', () => {
+    expect(formatAuditValue('cr40f_veiculos,00000000-0000-0000-0000-0000000000ff', undefined, names)).toBe('Carregando…')
     expect(formatAuditValue('cr40f_veiculos,3363c66f-44f5-f011-8406-7ced8da8212d', undefined, names)).toBe('ABC-1D23')
     expect(formatAuditValue('cr40f_veiculos,00000000-0000-0000-0000-000000000001', undefined, names)).toBe('Registro removido ou sem acesso')
   })
