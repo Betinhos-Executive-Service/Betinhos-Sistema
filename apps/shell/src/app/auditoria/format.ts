@@ -65,10 +65,11 @@ function auditDate(raw: string, meta: FieldMeta) {
 const number = (raw: string) => (raw.trim() === '' ? NaN : Number(raw))
 
 /** Valor do `changedata` como texto de leitura; `null` = vazio. */
-export function formatAuditValue(raw: string | null | undefined, meta: FieldMeta | undefined, names: Map<string, string>): string | null {
+export function formatAuditValue(raw: string | null | undefined, meta: FieldMeta | undefined, names: Map<string, string | null>): string | null {
   if (raw == null || raw === '') return null
   const ref = lookupRef(raw)
-  if (ref) return names.get(ref.id) ?? 'Registro removido ou sem acesso'
+  // Ainda sem resposta: o painel aparece já e o nome entra quando a busca dos lookups volta.
+  if (ref) return names.has(ref.id) ? names.get(ref.id) ?? 'Registro removido ou sem acesso' : 'Carregando…'
   if (!meta) return raw
   switch (meta.type) {
     case 'Picklist': case 'State': case 'Status': {
@@ -106,7 +107,7 @@ function operationOf(row: Row): { operation: AuditOperation; action?: string } {
 }
 
 /** Linha de `audits` → evento do `AuditPanel`. */
-export function toAuditEvent(row: Row, fields: Map<string, FieldMeta>, names: Map<string, string>): AuditEvent {
+export function toAuditEvent(row: Row, fields: Map<string, FieldMeta>, names: Map<string, string | null>): AuditEvent {
   const objectId = typeof row._objectid_value === 'string' ? cleanId(row._objectid_value) : ''
   const recordName = row[`_objectid_value${FORMATTED}`]
   const changes = (parseChanges(row.changedata) ?? [])

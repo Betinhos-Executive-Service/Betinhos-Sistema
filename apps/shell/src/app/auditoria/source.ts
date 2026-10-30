@@ -14,14 +14,23 @@ export type AuditTarget = {
   onOpenRecord?: (id: string) => void
 }
 
-export type AuditPage = { events: AuditEvent[]; next: string | null; auditEnabled: boolean; tableLabel: string }
+export type AuditPage = {
+  events: AuditEvent[]
+  next: string | null
+  auditEnabled: boolean
+  tableLabel: string
+  /** Busca os nomes dos lookups citados e devolve os mesmos eventos com eles; `null` quando não havia o que buscar. */
+  withNames?: () => Promise<AuditEvent[] | null>
+}
 
 export type AuditSource = { load: (target: AuditTarget, next: string | null) => Promise<AuditPage> }
 
 /** Sem privilégio "Exibir auditoria" o Dataverse responde 403. */
 export const isForbidden = (error: unknown) => error instanceof DataverseError && error.status === 403
 
-const PAGE_SIZE = 50
+// A tabela audits ignora `odata.maxpagesize` (devolve 500 por página, ~750 KB nas reservas):
+// a página é limitada por $top e a seguinte começa depois do último evento (cursor createdon + auditid).
+export const PAGE_SIZE = 25
 /** Limite de ids no filtro (tamanho da URL); seleções maiores mostram os primeiros. */
 export const MAX_IDS = 100
 
@@ -29,17 +38,24 @@ type Options = { Options?: { Value: number; Label?: { UserLocalizedLabel?: { Lab
 type WithOptions = { LogicalName: string; OptionSet?: Options | null; GlobalOptionSet?: Options | null }
 type DateDefinition = { LogicalName: string; Format?: string | null; DateTimeBehavior?: { Value?: string } | null }
 
-export function auditPath(target: AuditTarget) {
+/** Cursor da página seguinte: "createdon|auditid" do último evento recebido. */
+export const cursorOf = (row: Row) => `${String(row.createdon)}|${cleanId(String(row.auditid))}`
+
+export function auditPath(target: AuditTarget, cursor: string | null = null) {
   const ids = (target.ids ?? []).slice(0, MAX_IDS).map(cleanId)
   const scope = ids.length ? ` and (${ids.map((id) => `_objectid_value eq ${id}`).join(' or ')})` : ''
-  const filter = `objecttypecode eq '${odataString(target.entity)}'${scope}`
-  return `audits?$select=auditid,createdon,operation,action,changedata,_userid_value,_objectid_value&$filter=${encodeURIComponent(filter)}&$orderby=createdon desc`
+  const [at, id] = cursor?.split('|') ?? []
+  const after = at && id ? ` and (createdon lt ${at} or (createdon eq ${at} and auditid lt ${id}))` : ''
+  const filter = `objecttypecode eq '${odataString(target.entity)}'${scope}${after}`
+  // Um a mais que a página só para saber se existe a seguinte.
+  return `audits?$select=auditid,createdon,operation,action,changedata,_userid_value,_objectid_value&$filter=${encodeURIComponent(filter)}&$orderby=createdon desc,auditid desc&$top=${PAGE_SIZE + 1}`
 }
 
 export function createAuditSource(host: Extract<Host, { mode: 'dataverse' }>): AuditSource {
   const { client, metadata } = host
   const fieldCache = new Map<string, Promise<{ fields: Map<string, FieldMeta>; auditEnabled: boolean }>>()
-  const names = new Map<string, string>()
+  // null = buscado e não encontrado (excluído ou sem acesso): não busca de novo.
+  const names = new Map<string, string | null>()
 
   const optionsOf = (list: WithOptions[]) => new Map(list.map((a) => [a.LogicalName, new Map(
     (a.OptionSet?.Options ?? a.GlobalOptionSet?.Options ?? []).map((o) => [o.Value, o.Label?.UserLocalizedLabel?.Label ?? String(o.Value)] as const),
@@ -89,7 +105,7 @@ export function createAuditSource(host: Extract<Host, { mode: 'dataverse' }>): A
     for (const ref of pending) byEntity.set(ref.entity, [...(byEntity.get(ref.entity) ?? []), ref])
     await Promise.all([...byEntity].map(async ([entity, refs]) => {
       const info = await metadata.entity(entity).catch(() => null)
-      if (!info?.primaryName) return
+      if (!info?.primaryName) { for (const ref of refs) names.set(ref.id, null); return }
       const idField = `${entity}id`
       await Promise.all(chunk(refs.map((r) => r.id), 25).map(async (ids) => {
         const filter = ids.map((id) => `${idField} eq ${id}`).join(' or ')
@@ -98,21 +114,25 @@ export function createAuditSource(host: Extract<Host, { mode: 'dataverse' }>): A
           const name = row[info.primaryName]
           if (typeof row[idField] === 'string' && typeof name === 'string') names.set(cleanId(row[idField] as string), name)
         }
+        for (const id of ids) if (!names.has(id)) names.set(id, null)
       }))
     }))
   }
 
   return {
     async load(target, next) {
-      const [page, meta, table] = await Promise.all([
-        client.request<{ value: Row[]; '@odata.nextLink'?: string }>(next ?? auditPath(target), { maxPageSize: PAGE_SIZE }),
+      const [result, meta, table] = await Promise.all([
+        client.request<{ value: Row[] }>(auditPath(target, next)),
         fieldsOf(target.entity),
         metadata.entity(target.entity).catch(() => null),
       ])
-      await resolveNames(page.value)
+      const rows = result.value.slice(0, PAGE_SIZE)
+      const page = { value: rows }
+      const pending = lookupRefs(page.value).some((ref) => !names.has(ref.id))
       return {
         events: page.value.map((row) => toAuditEvent(row, meta.fields, names)),
-        next: page['@odata.nextLink'] ?? null,
+        withNames: pending ? () => resolveNames(page.value).then(() => page.value.map((row) => toAuditEvent(row, meta.fields, names))) : undefined,
+        next: result.value.length > PAGE_SIZE ? cursorOf(rows[rows.length - 1]) : null,
         auditEnabled: meta.auditEnabled,
         tableLabel: table?.label ?? target.entity,
       }
