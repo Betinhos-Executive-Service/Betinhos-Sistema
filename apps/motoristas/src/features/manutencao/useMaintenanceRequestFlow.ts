@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createMaintenanceRequestRemote } from "../../lib/dataverse";
+import { createMaintenanceRequestRemote } from "./remoto";
 import { getDriverContext } from "../../data/dataverse/cliente";
 import type { ToastTone } from "../../shared/ui/LocalToast";
 import type { MaintenanceRequestDraft, MaintenanceRequestFields, MaintenanceRequestPhoto } from "./MaintenanceRequestScreen";

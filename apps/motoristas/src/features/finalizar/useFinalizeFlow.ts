@@ -3,7 +3,8 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { PortaDados } from "../../data/porta";
 import type { ExpensePhoto } from "../despesas/expenses";
 import { findFirstPendingServiceDetail, getVoucherDraftKey, isSameDetail } from "../../app/bootstrap";
-import { cancelServiceRemote, finalizeExchangeRemote, finalizeMaintenanceRemote, resolveServiceVehicleRemote, loadActiveFleetRemote } from "../../lib/dataverse";
+import { cancelServiceRemote, finalizeExchangeRemote, finalizeMaintenanceRemote, resolveServiceVehicleRemote } from "./remoto";
+import { loadActiveFleetRemote } from "../meu-carro/remoto";
 import { getDriverContext, type DriverContext } from "../../data/dataverse/cliente";
 import { APP_OPERATION_ERROR_MESSAGE, reportAppError } from "../../shared/appErrorLogger";
 import {

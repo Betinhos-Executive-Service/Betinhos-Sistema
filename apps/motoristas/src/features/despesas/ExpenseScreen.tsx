@@ -16,7 +16,7 @@ import {
   type ExpenseReferenceData,
   type ExpenseValidationErrors
 } from "./expenses";
-import type { MaintenanceRequestVehicleOption } from "../../lib/dataverse";
+import type { MaintenanceRequestVehicleOption } from "../manutencao/remoto";
 import { parseCurrencyInput } from "./expenses";
 import type { ExpenseSubmissionStatus } from "./expenseUploadState";
 import { SystemIcon, type SystemIconName } from "../../shared/ui/icons/SystemIcon";

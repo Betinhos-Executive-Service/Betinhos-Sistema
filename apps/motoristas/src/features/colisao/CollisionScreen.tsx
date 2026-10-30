@@ -18,7 +18,7 @@ import {
   type CollisionPhotoKind,
   type CollisionValidationErrors
 } from "./collisions";
-import type { MaintenanceRequestVehicleOption } from "../../lib/dataverse";
+import type { MaintenanceRequestVehicleOption } from "../manutencao/remoto";
 
 type CollisionScreenProps = {
   draft: CollisionDraft;

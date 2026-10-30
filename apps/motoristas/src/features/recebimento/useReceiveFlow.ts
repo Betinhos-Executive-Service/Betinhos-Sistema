@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { hasUploadedReceiveProofs, isReceiveStepPending, shouldRouteServiceToVoucher } from "../../app/detailFlow";
-import { uploadReceiveProofRemote } from "../../lib/dataverse";
+import { uploadReceiveProofRemote } from "./remoto";
 import { type DriverContext } from "../../data/dataverse/cliente";
 import { getQrChargeReceiveState, getReceivableCents, type QrChargeSummary } from "./qrCharge";
 import { getQuickReadMockMode } from "../despesas/receiptQuickReadMock";

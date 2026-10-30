@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ToastTone } from "../../shared/ui/LocalToast";
-import { expenseSubmissionStorageKey, loadExpenseUploadRowsRemote, resolveExpenseUploadModeRemote } from "../../lib/dataverse";
+import { expenseSubmissionStorageKey, loadExpenseUploadRowsRemote, resolveExpenseUploadModeRemote } from "./remoto";
 import { type DriverContext } from "../../data/dataverse/cliente";
 import { reportAppError } from "../../shared/appErrorLogger";
 import { clearMediaDraft, loadMediaDraft, saveMediaDraft } from "../fotos/mediaDraftStore";

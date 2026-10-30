@@ -11,7 +11,7 @@ import { LocalToast, type ToastState, type ToastTone } from "../../shared/ui/Loc
 import { AppShell } from "../../shared/ui/layout/AppShell";
 import { FormMenu } from "../../shared/ui/navigation/FormMenu";
 import { reportAppError } from "../../shared/appErrorLogger";
-import { type PreparedReceiptUpload, type ReceiptPdfUploadResult } from "../../lib/dataverse";
+import { type PreparedReceiptUpload, type ReceiptPdfUploadResult } from "./remoto";
 import { hasDataverseRuntime } from "../../data/dataverse/cliente";
 import { buildPersonalReceiptDraft, buildPersonalReceiptModel, type PersonalReceiptEditableDraft, type PersonalReceiptModel } from "./personalReceipt";
 import { getReceiptCopy, getReceiptDisplayClient, normalizeReceiptLanguage, RECEIPT_LANGUAGE, RECEIPT_LANGUAGE_OPTIONS } from "./receiptLanguage";

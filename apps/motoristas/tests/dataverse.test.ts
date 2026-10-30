@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildActiveFleetQuery, buildAutomaticServiceVehiclePatch, buildMaintenanceRequestAssignedVehiclesQuery, buildExchangeDisplay, buildMaintenanceRequestRecord, buildMaintenanceRequestVehiclesQuery, buildReceiptEmailContent, finalizeExchangeRemote, formatReceiveDetailValue, getExchangeCompletionState, normalizeReceiptIdentifier, SERVICE_VEHICLE_ORIGIN, resolveExpenseUploadModeRemote, shouldShowOpenExchangeForDriver, usesAsyncExpenseUpload } from "../src/lib/dataverse.ts";
+import { buildActiveFleetQuery } from "../src/features/meu-carro/remoto.ts";
+import { buildAutomaticServiceVehiclePatch, finalizeExchangeRemote, SERVICE_VEHICLE_ORIGIN } from "../src/features/finalizar/remoto.ts";
+import { buildMaintenanceRequestAssignedVehiclesQuery, buildMaintenanceRequestRecord, buildMaintenanceRequestVehiclesQuery } from "../src/features/manutencao/remoto.ts";
+import { buildExchangeDisplay, getExchangeCompletionState, shouldShowOpenExchangeForDriver } from "../src/features/servicos/trocas.ts";
+import { buildReceiptEmailContent, normalizeReceiptIdentifier } from "../src/features/recibo/remoto.ts";
+import { formatReceiveDetailValue } from "../src/features/servicos/agendaRemota.ts";
+import { resolveExpenseUploadModeRemote, usesAsyncExpenseUpload } from "../src/features/despesas/remoto.ts";
 import { getDriverContext } from "../src/data/dataverse/cliente.ts";
 
 test("receber exibe valor em reais somente quando marcado e positivo", () => {

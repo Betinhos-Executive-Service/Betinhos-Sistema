@@ -13,7 +13,7 @@ description: "Verifica a camada de domínio e integração do App Motoristas: re
 ## Roteiro
 1. `npm test` → `ℹ fail 0` (304 testes em 22/10/2026; o número só deve crescer).
 2. `npx tsc --noEmit --noUnusedLocals --noUnusedParameters` → sem saída e exit 0.
-3. Mudou payload do Dataverse (`src/lib/dataverse.ts`)? Confira nomes lógicos na metadata real do DEV (MCP `Dataverse_DEV`, somente leitura) antes de concluir. Ex.: `cr40f_observacoes` do recibo recebe "-" quando vazio.
+3. Mudou payload do Dataverse (`src/features/*/remoto.ts`, `src/features/servicos/agendaRemota.ts`/`trocas.ts` ou `src/data/dataverse/`)? Confira nomes lógicos na metadata real do DEV (MCP `Dataverse_DEV`, somente leitura) antes de concluir. Ex.: `cr40f_observacoes` do recibo recebe "-" quando vazio.
 4. Mudou o build (`scripts/build-react-singlefile.cjs`)? `npm run build` gera `dist/webresource-app-motoristas.html` com `window.__APP_BUILD_INFO` e sobe o PATCH; confira o carimbo `v… · dd/mm/aaaa HH:mm` na Início (ver `verificar-servicos`). Não versione `dist/` de builds de teste.
 
 ## Casos de borda

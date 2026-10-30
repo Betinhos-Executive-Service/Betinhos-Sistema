@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { assertCollisionSchemaReadyRemote, loadCollisionLookupNavigationNamesRemote, uploadCollisionPhotoRemote } from "../../lib/dataverse";
+import { assertCollisionSchemaReadyRemote, loadCollisionLookupNavigationNamesRemote, uploadCollisionPhotoRemote } from "./remoto";
 import { createOne, getDriverContext, getDriverCurrentVehicleId, updateOne, type DriverContext } from "../../data/dataverse/cliente";
 import { DATAVERSE } from "../../data/dataverse/entidades";
 import type { ToastTone } from "../../shared/ui/LocalToast";

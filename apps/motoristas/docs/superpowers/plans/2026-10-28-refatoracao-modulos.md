@@ -64,7 +64,12 @@ Regra das fatias: cada bloco vira hook da feature chamado **na mesma posição**
 - `src/styles.css` fica na raiz: é a folha de entrada do build e importa o CSS das features, então em `shared/` inverteria a dependência.
 - `tests/moduleExports.test.ts` passa a cobrir `src/shared`; snapshot atualizado de propósito (removidos os reexports e os módulos movidos).
 - `AGENTS.md`, `system_architecture.md`, `CLAUDE.md` e skills `verificar-*` com os caminhos novos. O `graphify update .` fica para a máquina local (sem CLI na VM).
-- Ainda em `src/lib`: `dataverse.ts` (regras e chamadas Dataverse de várias features), `localWorkflow.ts`, `pwa.ts`/`pwaManifest.ts` e `serviceVehicleInfleet*.ts`. Dividir `dataverse.ts` pelas features é trabalho próprio, fora desta limpeza.
+- Ainda em `src/lib`: `localWorkflow.ts`, `pwa.ts`/`pwaManifest.ts` e `serviceVehicleInfleet*.ts`.
+
+## Passo 8 — `lib/dataverse.ts` dividido pelas features (feito)
+- O arquivo (3.934 linhas) foi dividido por script (grafo de declarações com o compilador TypeScript): cada export foi para a feature que o usa (`features/<x>/remoto.ts`; agenda e trocas em `features/servicos/agendaRemota.ts` e `trocas.ts`) e os ajudantes usados por mais de uma feature para `data/dataverse/` (`flow.ts`, `arquivos.ts`, `metadados.ts`, `registros.ts`). Privados seguem o único módulo que os usa; o texto das declarações não mudou, só ganhou `export` quando outro módulo precisa.
+- Sem ciclos entre módulos e sem `data/dataverse` importando feature. Os caches (`expenseReferenceData*`, modo de envio, URLs dos Flows, nomes de navegação) continuam com uma cópia só, no módulo das funções que os usam.
+- Os 23 importadores em `src` (inclusive `porta.ts` e o adaptador), 8 testes e `scripts/audit-dataverse-selects.cjs` apontam para os módulos novos.
 
 ## Fora deste plano
 Modo parceiro (parte 2), adaptador Worker + segundo build + Custom API com token (parte 3), troca da página do link (parte 4).

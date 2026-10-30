@@ -9,7 +9,8 @@ import { AppShell } from "../../shared/ui/layout/AppShell";
 import { useCameraScroll } from "../../app/cameraScroll";
 import { FormMenu } from "../../shared/ui/navigation/FormMenu";
 import { appendDitado } from "../../shared/useDitado";
-import { isExchangeOutsideWindow, organizeObservationRemote, type ExchangeWindowCheck } from "../../lib/dataverse";
+import { isExchangeOutsideWindow, type ExchangeWindowCheck } from "../servicos/trocas";
+import { organizeObservationRemote } from "./remoto";
 import {
   activeSummary,
   generateSummary,

@@ -4,7 +4,7 @@
 
 This repository contains the App Motoristas React webresource for Power Platform/Dataverse.
 
-- `src/` holds app source, organized by feature (see `system_architecture.md`). Each feature lives in `src/features/<x>/` (screens, components, rules, flow hooks, `rotas.tsx`, `manifesto.ts`). Cross-feature shell, navigation and effects live in `src/app/`; `src/App.tsx` only composes hooks and routes. Data access goes through `src/data/` (`porta.ts` contract, `dataverse/` adapter, `mock/`); remaining Dataverse rules still live in `src/lib/dataverse.ts`. Shared UI, camera helpers and utilities live in `src/shared/`, and shared types in `src/types.ts`.
+- `src/` holds app source, organized by feature (see `system_architecture.md`). Each feature lives in `src/features/<x>/` (screens, components, rules, flow hooks, `rotas.tsx`, `manifesto.ts`). Cross-feature shell, navigation and effects live in `src/app/`; `src/App.tsx` only composes hooks and routes. Data access goes through `src/data/` (`porta.ts` contract, `dataverse/` client, adapter and shared Flow/file/metadata/record helpers, `mock/`); each feature's Dataverse calls live in `src/features/<x>/remoto.ts` (agenda and exchanges in `src/features/servicos/agendaRemota.ts` and `trocas.ts`). Shared UI, camera helpers and utilities live in `src/shared/`, and shared types in `src/types.ts`.
 - `tests/` contains Node test runner specs named `*.test.ts`.
 - `scripts/` contains build, deploy, QA, Dataverse schema, and maintenance utilities.
 - `public/screens/` stores generated demo screenshots.

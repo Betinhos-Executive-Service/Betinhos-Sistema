@@ -1,5 +1,5 @@
 import { getScreenAfterQrPayment } from "../../app/detailFlow";
-import { createQrChargeRemote, updateQrChargeRemote } from "../../lib/dataverse";
+import { createQrChargeRemote, updateQrChargeRemote } from "./remoto";
 import { QrChargeScreen } from "./QrChargeScreen";
 import type { ToastTone } from "../../shared/ui/LocalToast";
 import { MediaCaptureScreen } from "../fotos/MediaCaptureScreen";

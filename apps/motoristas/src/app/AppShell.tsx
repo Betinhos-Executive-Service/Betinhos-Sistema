@@ -4,7 +4,7 @@ import { LocalToast, type ToastState } from "../shared/ui/LocalToast";
 import { LoadingOverlay, type LoadingOverlayState } from "../shared/ui/LoadingOverlay";
 import { getVisibleLoadingOverlay } from "./overlayLayering";
 import { getScreenMotion } from "./navigation";
-import { loadActiveFleetRemote } from "../lib/dataverse";
+import { loadActiveFleetRemote } from "../features/meu-carro/remoto";
 import { SESSION_EXPIRED_MESSAGE } from "../data/dataverse/fetchWebApi";
 import { MOCK_FLEET } from "../lib/serviceVehicleInfleetMock";
 import { ExpenseSendOverlay, type ExpenseSendState } from "../features/despesas/ExpenseSendOverlay";

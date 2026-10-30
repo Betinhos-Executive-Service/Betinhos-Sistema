@@ -1,4 +1,4 @@
-import type { MaintenanceRequestVehicleOption } from "../../lib/dataverse";
+import type { MaintenanceRequestVehicleOption } from "./remoto";
 import type { ToastTone } from "../../shared/ui/LocalToast";
 import { MediaCaptureScreen } from "../fotos/MediaCaptureScreen";
 import { MaintenancePhotoPreviewScreen } from "../fotos/MaintenancePhotoPreviewScreen";

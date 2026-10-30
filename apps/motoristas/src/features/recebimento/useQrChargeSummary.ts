@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { getQrChargeSummaryRemote } from "../../lib/dataverse";
+import { getQrChargeSummaryRemote } from "./remoto";
 import { getReceivableCents } from "./qrCharge";
 import type { useReceiveFlow } from "./useReceiveFlow";
 

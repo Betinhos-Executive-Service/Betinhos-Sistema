@@ -7,7 +7,7 @@ import { SearchableSelect } from "../shared/ui/SearchableSelect";
 import { SystemIcon } from "../shared/ui/icons/SystemIcon";
 import { agendaMock, historyMock } from "../data/mock/mockData";
 import { createEmptyCollisionDraft, type CollisionDraft, type CollisionPhoto, type CollisionPhotoKind } from "../features/colisao/collisions";
-import type { MaintenanceRequestVehicleOption } from "../lib/dataverse";
+import type { MaintenanceRequestVehicleOption } from "../features/manutencao/remoto";
 import { DEFAULT_EXPENSE_REFERENCE_DATA } from "../features/despesas/expenses.defaults";
 import type { ExpenseDraft, ExpensePhoto, ExpenseReferenceData } from "../features/despesas/expenses.types";
 import type { MaintenancePhotoKind, DetailData } from "../types";

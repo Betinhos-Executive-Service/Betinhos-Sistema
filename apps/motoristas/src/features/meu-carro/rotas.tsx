@@ -1,4 +1,4 @@
-import { loadMyVehiclesRemote, setMyCurrentVehicleRemote } from "../../lib/dataverse";
+import { loadMyVehiclesRemote, setMyCurrentVehicleRemote } from "./remoto";
 import { getDriverContext, getDriverCurrentVehicleId, type DriverContext } from "../../data/dataverse/cliente";
 import { MyVehicleScreen } from "./MyVehicleScreen";
 import { MOCK_FLEET } from "../../lib/serviceVehicleInfleetMock";

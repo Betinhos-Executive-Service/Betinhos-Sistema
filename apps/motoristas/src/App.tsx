@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { getInitialParams } from "./app/bootstrap";
 import { isHashRoutingEnabled } from "./app/navigation";
-import type { MaintenanceRequestVehicleOption } from "./lib/dataverse";
+import type { MaintenanceRequestVehicleOption } from "./features/manutencao/remoto";
 import type { DriverContext } from "./data/dataverse/cliente";
 import { useDados } from "./app/DataProvider";
 import { AppShell } from "./app/AppShell";

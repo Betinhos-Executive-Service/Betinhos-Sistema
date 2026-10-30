@@ -1,18 +1,10 @@
 import { concluirChecklist, executeChecklistAction, loadDriverChecklist, loadDriverChecklists } from "../../features/checklist/checklists.ts";
 import { executeComunicadoAction, loadDriverComunicado, loadDriverComunicados } from "../../features/comunicados/comunicados.ts";
-import {
-  createReceiptRecordRemote,
-  finalizeServiceRemote,
-  loadRemoteDetailByParams,
-  loadRemoteStore,
-  markDetailViewedRemote,
-  saveServiceObservationRemote,
-  saveVoucherDraftRemote,
-  saveVoucherRemote,
-  sendReceiptEmailRemote,
-  uploadChecklistPhotoRemote,
-  uploadReceiptPdfRemote
-} from "../../lib/dataverse.ts";
+import { createReceiptRecordRemote, sendReceiptEmailRemote, uploadReceiptPdfRemote } from "../../features/recibo/remoto.ts";
+import { finalizeServiceRemote, saveServiceObservationRemote } from "../../features/finalizar/remoto.ts";
+import { loadRemoteDetailByParams, loadRemoteStore, markDetailViewedRemote } from "../../features/servicos/agendaRemota.ts";
+import { saveVoucherDraftRemote, saveVoucherRemote } from "../../features/voucher/remoto.ts";
+import { uploadChecklistPhotoRemote } from "../../features/checklist/remoto.ts";
 import { createIdeaRemote, loadMyIdeasRemote } from "../../features/ideias/remoto.ts";
 import type { PortaDados } from "../porta.ts";
 

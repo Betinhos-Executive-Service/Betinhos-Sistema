@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildExchangeWindowInfo, isExchangeOutsideWindow } from "../src/lib/dataverse.ts";
+import { buildExchangeWindowInfo, isExchangeOutsideWindow } from "../src/features/servicos/trocas.ts";
 
 const driver1 = { id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", email: "", fullName: "Carlos", funcionario: {} };
 const driver2 = { id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", email: "", fullName: "Jailton", funcionario: {} };

@@ -1,4 +1,4 @@
-import type { MaintenanceRequestVehicleOption } from "../../lib/dataverse";
+import type { MaintenanceRequestVehicleOption } from "../manutencao/remoto";
 import type { DriverContext } from "../../data/dataverse/cliente";
 import type { ToastTone } from "../../shared/ui/LocalToast";
 import { CollisionScreen } from "./CollisionScreen";
