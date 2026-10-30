@@ -5,7 +5,7 @@
   "description": "Operação, financeiro, frota e cadastros da Betinhos Executive Service.",
   "lang": "pt-BR",
   "start_url": "/WebResources/cr40f_SistemaBetinhosLoader.html",
-  "scope": "/WebResources/",
+  "scope": "/WebResources/cr40f_SistemaBetinhos",
   "display": "standalone",
   "background_color": "#f0f0f0",
   "theme_color": "#001a3d",
