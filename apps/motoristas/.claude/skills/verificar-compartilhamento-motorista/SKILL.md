@@ -1,6 +1,6 @@
 ---
 name: verificar-compartilhamento-motorista
-description: "Verifica o compartilhamento de registros com o motorista (ServiceDriverSharePlugin + DataverseAccessHelper): conceder/revogar acesso na reserva, passageiros, solicitante e trocas, inclusive quando o motorista é dono do registro (gestor que também dirige). Use após mudar plugins/DriverRecordSharing/DataverseAccessHelper.cs, DriverResolver.cs ou ServiceDriverSharePlugin.cs."
+description: "Verifica o compartilhamento de registros com o motorista (ServiceDriverSharePlugin + DataverseAccessHelper): conceder/revogar acesso na reserva, passageiros, solicitante e trocas, inclusive quando o motorista é dono do registro (gestor que também dirige). Use após mudar plugins/DriverRecordSharing/DataverseAccessHelper.cs, DriverResolver.cs, ServiceDriverSharePlugin.cs ou ServiceVehicleSynchronizer.cs (carro do serviço pela posse)."
 ---
 # Verificar compartilhamento com o motorista
 
@@ -22,6 +22,13 @@ description: "Verifica o compartilhamento de registros com o motorista (ServiceD
 ## Regra do passageiro
 - `ServicePassengerViewSynchronizer` é o dono único de `cr40f_passageirosetelefonedecontato` (o flow Tenaris não grava mais o campo) e ordena os vínculos por `cr40f_ordemdeselecao` e depois `createdon`.
 - O flow Tenaris regrava nome e telefone de `cr40f_bancodedados` a cada sincronização com o mesmo valor. `HandlePassenger` compara com a pré-imagem `pre` (nome, telefone) e só chama `SyncServicesForPassenger` se o valor mudou (nulo = vazio). Sem pré-imagem, qualquer atributo presente conta como mudança.
+
+## Regra do carro do serviço (posse)
+- `ServiceVehicleSynchronizer` (chamado pelo `ServiceDriverSharePlugin` no Create/Update da reserva, da posse e da troca) só preenche `cr40f_veiculo` pela posse quando o motorista é **terceiro** (`cr40f_tipodevinculo` = 1). Terceiro não passa pela Infleet na finalização do app (`skipVehicle`), então a posse é a única fonte do carro dele.
+- Colaborador recebe o carro só na finalização (Infleet ou escolha do motorista, origem 100000002/100000003). Se um serviço dele ainda aberto (Confirmado/Programado) tiver carro de origem Automático (sobra de posse), o plugin limpa o carro e mantém a origem Automático. Serviço encerrado não é mexido (histórico).
+- A limpeza manda `new_origemveiculo` junto; sem isso, `MarkManualVehicleOriginIfNeeded` remarca o serviço como Manual.
+- Testes: `ServiceVehicleSynchronizerTests` (`EmployeeDriverNeverGetsVehicleFromPossession`, `EmployeeDriverLosesVehicleLeftByPreviousThirdPartyPossession`, `ClosedEmployeeServiceKeepsHistoricalPossessionVehicle`).
+- DEV: definir um colaborador com posse aberta como motorista de uma OS futura → `cr40f_veiculo` fica vazio (trace `skip employee driver`). Fazer o mesmo com um terceiro → recebe o carro da posse. Na auditoria, nenhuma alteração de `cr40f_veiculo` pela conta de serviço em OS de colaborador.
 
 ## Roteiro
 1. `cd plugins/DriverRecordSharing.Tests && dotnet test -v q --filter "DataverseAccessHelperTests|PassengerChangeTests"` → `Com falha: 0`, 8 testes.
