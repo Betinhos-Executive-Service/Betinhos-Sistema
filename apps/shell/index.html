@@ -13,6 +13,26 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="apple-touch-icon" href="/WebResources/cr40f_SistemaBetinhosAppleIcon.png" />
     <link rel="icon" type="image/png" href="/WebResources/cr40f_SistemaBetinhosIcon192.png" />
+    <script>
+      // No DEV o app instalado leva "DEV" no nome (mesmo id e escopo; só o nome muda).
+      if (location.hostname === 'org23b93544.crm2.dynamics.com') {
+        fetch('/WebResources/cr40f_SistemaBetinhos.webmanifest', { credentials: 'same-origin' })
+          .then(function (r) { return r.json() })
+          .then(function (m) {
+            var abs = function (p) { return location.origin + p }
+            m.name += ' DEV'
+            m.short_name += ' DEV'
+            m.id = abs(m.id)
+            m.start_url = abs(m.start_url)
+            m.scope = abs(m.scope)
+            m.icons.forEach(function (i) { i.src = abs(i.src) })
+            document.querySelector('link[rel=manifest]').href =
+              'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(m))
+            document.querySelector('meta[name=apple-mobile-web-app-title]').content = 'Betinhos DEV'
+          })
+          .catch(function () {})
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
