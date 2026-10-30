@@ -15,7 +15,7 @@
   "dependencies": {
     "@azure/msal-browser": "^5.26.0",
     "@betinhos/dataverse": "workspace:*",
-    "@betinhos/ui": "npm:@betinhos-executive-service/ui@^1.17.0",
+    "@betinhos/ui": "npm:@betinhos-executive-service/ui@^1.18.0",
     "@fontsource/manrope": "^5.2.6",
     "@tanstack/react-virtual": "^3.14.7",
     "docx": "^9.14.0",
