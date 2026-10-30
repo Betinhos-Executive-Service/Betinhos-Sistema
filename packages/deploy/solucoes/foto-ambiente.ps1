@@ -39,7 +39,7 @@ function Get-Sha256($Texto) {
 
 $foto = [ordered]@{
   ambiente = $dv.Url; quando = (Get-Date).ToString("s"); registros = [ordered]@{}; aproximados = @(); fluxos = @{}; steps = @{}
-  variaveis = @{}; componentes = @{}; tipos = @{}; pacotes = @{}; stepsSeguros = $null; versoes = @{}
+  variaveis = @{}; componentes = @{}; tipos = @{}; pacotes = @{}; stepsSeguros = $null; versoes = @{}; nomes = @{}
 }
 
 # Registros: contagem exata por FetchXML; acima do limite de agregacao (50.000) conta paginando os ids (tambem exata).
@@ -88,6 +88,13 @@ foreach ($v in @(Read-DvAll $dv "environmentvariabledefinitions?`$select=scheman
   if ([string] $v.schemaname -notmatch $prefixoProprio) { continue }
   $valores = @($v.environmentvariabledefinition_environmentvariablevalue)
   $foto.variaveis[[string] $v.schemaname] = if ($valores.Count) { Get-Sha256 $valores[0].value } else { $null }
+}
+
+# Nome dos chunks da tela (WebResources cr40f_SistemaBetinhos/assets/*): o comparador trata chunk de build antigo que some
+# no upgrade como informativo, nao perda. So esses nomes entram na foto.
+foreach ($w in @(Read-DvAll $dv "webresourceset?`$select=webresourceid,name&`$filter=startswith(name,'cr40f_SistemaBetinhos/assets/')")) {
+  $oid = ([string] $w.webresourceid).ToLowerInvariant()
+  if ($foto.componentes.ContainsKey($oid)) { $foto.nomes[$oid] = [string] $w.name }
 }
 
 $sb = @(Read-DvAll $dv "webresourceset?`$select=description&`$filter=name eq 'cr40f_SistemaBetinhos.html'")
