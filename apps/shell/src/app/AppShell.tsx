@@ -96,6 +96,10 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
 
 /** Traduz o sitemap do app para a navegação do AppShell do Design System. */
 function toNavGroup(group: MenuGroup, entityLabels: Map<string, string>, badges?: Record<string, ReactNode>): NavGroup {
+  if (group.link) {
+    const [item] = group.items
+    return { id: item.id, label: itemLabel(item, entityLabels), icon: ITEM_ICONS[item.id], href: hrefFor(item.id), items: [] }
+  }
   return {
     id: group.id,
     label: group.label,
