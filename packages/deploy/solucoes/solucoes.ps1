@@ -317,13 +317,104 @@ function Get-ContagemRegistros($Dv, $Entidade) {
   return @{ Total = [int] $linhas[0].n; Paginada = $false }
 }
 
-# --- Publicacao no TEST (workflow publicar-test.yml) ---
+# --- Publicacao no TEST e no PROD (workflows publicar.yml e retirar-caixa.yml) ---
 
 $script:HostTest = "appbetinhostest.crm2.dynamics.com"
+$script:HostProd = "orgf261ae8e.crm2.dynamics.com"
+$script:HostsAlvo = @{ Test = $script:HostTest; Prod = $script:HostProd }
+# Solucoes que a retirada desinstala (caixa de entrada do DEV e a antiga de pagantes), na ordem.
+$script:Caixas = @("AppBetinhos", "gerarpagantes")
 
-# Import so no TEST: o workflow nunca escreve no PROD nem no DEV por aqui.
-function Assert-HostTest($Dv) {
-  if ([string] $Dv.Host -ne $script:HostTest) { throw "Import so e permitido no TEST ($($script:HostTest)); recebi '$($Dv.Host)'." }
+# Toda escrita fora do DEV exige o alvo explicito ('Test' ou 'Prod') e a conexao no host desse alvo: nenhum script chega ao
+# PROD por engano com a URL errada, e o DEV nunca e alvo de import, retirada ou mudanca de estado.
+function Assert-HostAlvo($Dv, [string] $Alvo) {
+  if (-not $script:HostsAlvo.ContainsKey($Alvo)) { throw "Alvo '$Alvo' desconhecido (use Test ou Prod)." }
+  $esperado = $script:HostsAlvo[$Alvo]
+  if ([string] $Dv.Host -ne $esperado) { throw "Operacao com alvo $Alvo so e permitida em $esperado; recebi '$($Dv.Host)'." }
+}
+function Assert-HostTest($Dv) { Assert-HostAlvo $Dv "Test" }
+
+# Estado de fluxo ($Conjunto "workflows": 1 = ativado) ou de step ("sdkmessageprocessingsteps": 0 = habilitado, 1 = desabilitado).
+# Os dois conjuntos usam o mesmo par statecode/statuscode, que o Dataverse exige juntos: 0 -> 0/1, 1 -> 1/2.
+function Set-EstadoDv($Dv, [string] $Alvo, [string] $Conjunto, [string] $Id, [int] $Estado) {
+  Assert-HostAlvo $Dv $Alvo
+  $corpo = if ($Estado -eq 1) { @{ statecode = 1; statuscode = 2 } } else { @{ statecode = 0; statuscode = 1 } }
+  Invoke-RestMethod -Method Patch -Uri "$($Dv.Api)/$($Conjunto)($Id)" -Headers $Dv.Headers -Body (ConvertTo-Json $corpo -Compress) -ContentType "application/json" | Out-Null
+}
+
+# Devolve o estado ligado/desligado de cada fluxo e step de uma foto ao que a foto registrou (o import com --activate-plugins
+# liga o que o ambiente tinha desligado de proposito). So toca em id que existe nos dois lados; o que a foto nao tem fica como esta.
+# -DesligarNovos (TEST travado): fluxo de nuvem e step das solucoes rastreadas (as 4 e as caixas) que nao estao na foto e chegaram
+# ligados sao desligados, para o ensaio nao mandar e-mail, WhatsApp nem cobranca a clientes reais (regra de negocio e BPF,
+# categorias 2 e 4, ficam). O que esta fora dessas solucoes (AutoNumberGuard, acoes do sistema...) nao e "novo" e fica como esta.
+# Devolve a lista das mudancas feitas e das falhas.
+function Restore-Estados($Dv, [string] $Alvo, $Foto, [switch] $DesligarNovos) {
+  Assert-HostAlvo $Dv $Alvo
+  $mudancas = @(); $falhas = @()
+  $fluxosAgora = @{}; $categorias = @{}; $nomes = @{}
+  foreach ($w in @(Read-DvAll $Dv "workflows?`$select=workflowid,name,statecode,category&`$filter=type eq 1")) {
+    $id = ([string] $w.workflowid).ToLowerInvariant()
+    $fluxosAgora[$id] = [int] $w.statecode; $categorias[$id] = [int] $w.category; $nomes[$id] = [string] $w.name
+  }
+  $stepsAgora = @{}
+  foreach ($s in @(Read-DvAll $Dv "sdkmessageprocessingsteps?`$select=sdkmessageprocessingstepid,name,statecode&`$filter=customizationlevel eq 1")) {
+    $id = ([string] $s.sdkmessageprocessingstepid).ToLowerInvariant()
+    $stepsAgora[$id] = [int] $s.statecode; $nomes[$id] = [string] $s.name
+  }
+  $naFoto = @{}
+  foreach ($p in $Foto.fluxos.PSObject.Properties) {
+    $id = $p.Name.ToLowerInvariant(); $antes = [int] $p.Value.estado; $naFoto[$id] = $true
+    if (-not $fluxosAgora.ContainsKey($id) -or $fluxosAgora[$id] -eq $antes) { continue }
+    try { Set-EstadoDv $Dv $Alvo "workflows" $id $antes; $mudancas += [ordered]@{ tipo = "fluxo"; id = $id; nome = [string] $p.Value.nome; de = $fluxosAgora[$id]; para = $antes } }
+    catch { $falhas += "fluxo $($p.Value.nome) ($id): $(Get-ErroDv $_)" }
+  }
+  foreach ($p in $Foto.steps.PSObject.Properties) {
+    $id = $p.Name.ToLowerInvariant(); $antes = [int] $p.Value.estado; $naFoto[$id] = $true
+    if (-not $stepsAgora.ContainsKey($id) -or $stepsAgora[$id] -eq $antes) { continue }
+    try { Set-EstadoDv $Dv $Alvo "sdkmessageprocessingsteps" $id $antes; $mudancas += [ordered]@{ tipo = "step"; id = $id; nome = [string] $p.Value.nome; de = $stepsAgora[$id]; para = $antes } }
+    catch { $falhas += "step $($p.Value.nome) ($id): $(Get-ErroDv $_)" }
+  }
+  if ($DesligarNovos) {
+    # "Novo" = fluxo (29) ou step (92) das solucoes rastreadas que a foto nao tem; a foto so cobre essas solucoes.
+    $rastreados = @{}
+    foreach ($sol in @($script:Solucoes) + $script:Caixas) {
+      $sid = Get-SolucaoId $Dv $sol
+      if (-not $sid) { continue }
+      foreach ($l in @(Get-LinhasDaSolucao $Dv $sid)) { if ($l.tipo -eq 29 -or $l.tipo -eq 92) { $rastreados[$l.id] = $true } }
+    }
+    foreach ($id in @($fluxosAgora.Keys | Where-Object { $rastreados.ContainsKey($_) -and -not $naFoto.ContainsKey($_) -and $fluxosAgora[$_] -eq 1 -and @(2, 4) -notcontains $categorias[$_] })) {
+      try { Set-EstadoDv $Dv $Alvo "workflows" $id 0; $mudancas += [ordered]@{ tipo = "fluxo novo"; id = $id; nome = $nomes[$id]; de = 1; para = 0 } }
+      catch { $falhas += "fluxo novo $($nomes[$id]) ($id): $(Get-ErroDv $_)" }
+    }
+    foreach ($id in @($stepsAgora.Keys | Where-Object { $rastreados.ContainsKey($_) -and -not $naFoto.ContainsKey($_) -and $stepsAgora[$_] -eq 0 })) {
+      try { Set-EstadoDv $Dv $Alvo "sdkmessageprocessingsteps" $id 1; $mudancas += [ordered]@{ tipo = "step novo"; id = $id; nome = $nomes[$id]; de = 0; para = 1 } }
+      catch { $falhas += "step novo $($nomes[$id]) ($id): $(Get-ErroDv $_)" }
+    }
+  }
+  return @{ Mudancas = $mudancas; Falhas = $falhas }
+}
+
+# Espera ate $Minutos a solucao sumir do ambiente (desinstalacao que continua no servidor depois de o pac perder a conexao).
+function Wait-SolucaoRemovida($Dv, [string] $Nome, [int] $Minutos = 60, [int] $IntervaloSegundos = 60) {
+  $limite = (Get-Date).AddMinutes($Minutos)
+  do {
+    if ($null -eq (Get-VersaoInstalada $Dv $Nome)) { return $true }
+    if ((Get-Date) -ge $limite) { return $false }
+    Start-Sleep -Seconds $IntervaloSegundos
+  } while ($true)
+}
+
+# Desinstala uma solucao gerenciada da caixa (AppBetinhos ou gerarpagantes) e prova pela ausencia. Nunca as 4 novas.
+function Remove-SolucaoGerenciada($Dv, [string] $Alvo, [string] $Nome, [int] $MinutosDeEspera = 60) {
+  Assert-HostAlvo $Dv $Alvo
+  if ($script:Caixas -notcontains $Nome) { throw "Remove-SolucaoGerenciada so desinstala $($script:Caixas -join ' e '); recebi '$Nome'." }
+  if ($null -eq (Get-VersaoInstalada $Dv $Nome)) { Write-Step "$Nome ja nao existe em $($Dv.Host)"; return @{ Nome = $Nome; JaAusente = $true; PacPerdeuConexao = $false } }
+  $erroPac = $null
+  try { Invoke-Pac $Dv.Url @("solution", "delete", "--solution-name", $Nome) | Out-Null }
+  catch { $erroPac = "$($_.Exception.Message)"; Write-Step "pac falhou ($erroPac); conferindo se $Nome saiu" }
+  $minutos = if ($erroPac) { $MinutosDeEspera } else { 0 }
+  if (-not (Wait-SolucaoRemovida $Dv $Nome $minutos)) { throw "$Nome continua instalada em $($Dv.Host). $erroPac" }
+  return @{ Nome = $Nome; JaAusente = $false; PacPerdeuConexao = [bool] $erroPac }
 }
 
 # Proxima revisao (1.0.0.4 -> 1.0.0.5): o import com --stage-and-upgrade exige versao maior que a instalada, e o DEV
@@ -362,11 +453,12 @@ function Wait-VersaoInstalada($Dv, [string] $Nome, [string] $Versao, [int] $Minu
 }
 
 # Importa o ZIP gerenciado com upgrade e prova pela versao instalada. Pac com erro nao e falha se a versao chegou.
-function Import-SolucaoGerenciada($Dv, [string] $Caminho, [int] $MinutosDeEspera = 60) {
-  Assert-HostTest $Dv
+# $Alvo: Test ou Prod (explicito). $Permitidas: as 4 por padrao; a retirada passa tambem AppBetinhos (upgrade antes de desinstalar).
+function Import-SolucaoGerenciada($Dv, [string] $Caminho, [string] $Alvo = "Test", [int] $MinutosDeEspera = 60, [string[]] $Permitidas = $script:Solucoes) {
+  Assert-HostAlvo $Dv $Alvo
   $m = Get-ManifestoDoPacote $Caminho
   if (-not $m.Managed) { throw "$Caminho nao e gerenciada." }
-  if ($script:Solucoes -notcontains $m.UniqueName) { throw "$Caminho e '$($m.UniqueName)', fora das 4." }
+  if ($Permitidas -notcontains $m.UniqueName) { throw "$Caminho e '$($m.UniqueName)', fora de: $($Permitidas -join ', ')." }
   $erroPac = $null
   try { Invoke-Pac $Dv.Url @("solution", "import", "--path", $Caminho, "--stage-and-upgrade", "--publish-changes", "--activate-plugins", "--async", "--max-async-wait-time", "180") | Out-Null }
   catch { $erroPac = "$($_.Exception.Message)"; Write-Step "pac falhou ($erroPac); conferindo a versao instalada de $($m.UniqueName)" }

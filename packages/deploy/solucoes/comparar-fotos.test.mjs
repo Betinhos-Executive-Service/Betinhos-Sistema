@@ -25,6 +25,49 @@ test('tabela que sumiu é perda', () => {
   assert.deepEqual(d.tabelasSumiram, ['cr40f_b'])
   assert.equal(temPerda(d), true)
 })
+test('tabela vazia que sumiu não é perda, mas aparece', () => {
+  const d = compararFotos(foto({ registros: { cr40f_a: 10, cr40f_b: 0 } }), foto({ registros: { cr40f_a: 10 } }))
+  assert.deepEqual(d.tabelasVaziasSumiram, ['cr40f_b'])
+  assert.deepEqual(d.tabelasSumiram, [])
+  assert.equal(temPerda(d), false)
+})
+test('tabela aceita que sumiu não é perda e leva a contagem', () => {
+  const d = compararFotos(foto(), foto({ registros: { cr40f_a: 10 } }), { aceitarTabelas: ['cr40f_b'] })
+  assert.deepEqual(d.tabelasAceitasSumiram, [{ tabela: 'cr40f_b', registros: 5 }])
+  assert.equal(temPerda(d), false)
+})
+test('chunk da tela que sumiu é informativo; outro WebResource que sumiu é perda', () => {
+  const antes = foto({ componentes: { c1: ['AppBetinhos'], c2: ['AppBetinhos'] }, tipos: { c1: 61, c2: 61 }, nomes: { c1: 'cr40f_SistemaBetinhos/assets/x-abc.js' } })
+  const d = compararFotos(antes, foto({ componentes: {} }))
+  assert.deepEqual(d.chunksObsoletos, ['cr40f_SistemaBetinhos/assets/x-abc.js'])
+  assert.deepEqual(d.componentesSumiram, ['c2'])
+  assert.equal(temPerda(d), true)
+})
+test('retirada: componente, fluxo e variável só da caixa que somem são informativos; componente de uma das 4 que some é perda', () => {
+  const antes = foto({
+    componentes: { c1: ['AppBetinhos'], c2: ['AppBetinhos', 'gerarpagantes'], c3: ['AppBetinhos', 'BetinhosCore'], f1: ['AppBetinhos'] },
+    fluxos: { f1: { nome: 'Fluxo caixa', estado: 1 } },
+  })
+  const depois = foto({ componentes: {}, fluxos: {}, variaveis: {} })
+  const d = compararFotos(antes, depois, { retirada: true })
+  assert.deepEqual(d.componentesDaCaixaSumiram, ['c1', 'c2', 'f1'])
+  assert.deepEqual(d.componentesSumiram, ['c3'])
+  assert.deepEqual(d.fluxosDaCaixaSumiram, [{ id: 'f1', nome: 'Fluxo caixa' }])
+  assert.deepEqual(d.variaveisDaCaixaSumiram, ['new_X'])
+  assert.equal(temPerda(d), true)
+  const so = compararFotos(foto({ componentes: { c1: ['AppBetinhos'] } }), foto({ componentes: {} }), { retirada: true })
+  assert.equal(temPerda(so), false)
+  assert.equal(temPerda(compararFotos(foto({ componentes: { c1: ['AppBetinhos'] } }), foto({ componentes: {} }))), true)
+})
+test('retirada: queda de registros continua perda', () => {
+  assert.equal(temPerda(compararFotos(foto(), foto({ registros: { cr40f_a: 9, cr40f_b: 5 } }), { retirada: true })), true)
+})
+test('fluxo novo desligado e variável sem valor aparecem no informativo', () => {
+  const d = compararFotos(foto(), foto({ fluxos: { f1: { nome: 'Fluxo 1', estado: 1 }, f2: { nome: 'Novo', estado: 0 } }, variaveis: { new_X: 'h1', new_Y: null } }))
+  assert.deepEqual(d.fluxosNovosDesligados, [{ id: 'f2', nome: 'Novo' }])
+  assert.deepEqual(d.variaveisSemValor, ['new_Y'])
+  assert.equal(temPerda(d), false)
+})
 test('fluxo desligado é perda', () => assert.equal(temPerda(compararFotos(foto(), foto({ fluxos: { f1: { nome: 'Fluxo 1', estado: 0 } } }))), true))
 test('fluxo ligado pelo import não é perda', () => {
   const d = compararFotos(foto({ fluxos: { f1: { nome: 'Fluxo 1', estado: 0 } } }), foto())

@@ -262,13 +262,70 @@ Confere ((@(Get-SolucoesEscolhidas '') -join ',') -eq 'BetinhosCore,BetinhosAuto
 Confere ((@(Get-SolucoesEscolhidas ' BetinhosMotoristas, BetinhosCore ') -join ',') -eq 'BetinhosCore,BetinhosMotoristas') 'lista escolhida volta na ordem de import'
 Confere ((Falha-Com { Get-SolucoesEscolhidas 'AppBetinhos' }) -like '*fora das 4*AppBetinhos*') 'solucao fora das 4 falha'
 Confere ($null -eq (Falha-Com { Assert-HostTest $dvTest })) 'import: host do TEST passa'
-Confere ((Falha-Com { Assert-HostTest @{ Host = 'orgf261ae8e.crm2.dynamics.com' } }) -like '*so e permitido no TEST*') 'import: PROD recusado'
-Confere ((Falha-Com { Assert-HostTest $dv }) -like '*so e permitido no TEST*') 'import: DEV recusado'
+Confere ((Falha-Com { Assert-HostTest @{ Host = 'orgf261ae8e.crm2.dynamics.com' } }) -like '*alvo Test*') 'import: PROD recusado'
+Confere ((Falha-Com { Assert-HostTest $dv }) -like '*alvo Test*') 'import: DEV recusado'
 $script:respostas = @([pscustomobject]@{ value = @([pscustomobject]@{ version = '1.0.0.4' }) }, [pscustomobject]@{ value = @([pscustomobject]@{ version = '1.0.0.5' }) })
 Confere (Wait-VersaoInstalada $dvTest 'BetinhosCore' '1.0.0.5' 1 0) 'espera a versao chegar depois de o pac perder a conexao'
 $script:respostas = @([pscustomobject]@{ value = @([pscustomobject]@{ version = '1.0.0.4' }) })
 Confere (-not (Wait-VersaoInstalada $dvTest 'BetinhosCore' '1.0.0.5' 0 0)) 'versao que nao chega devolve falso'
 $script:respostas = @([pscustomobject]@{ value = @() })
 Confere ($null -eq (Get-VersaoInstalada $dvTest 'BetinhosCore')) 'solucao ausente: versao nula'
+
+# Alvo explicito (TEST ou PROD): o host da conexao tem de ser o do alvo; o DEV nunca e alvo
+$dvProd = @{ Api = 'https://p/api/data/v9.2'; Url = 'https://orgf261ae8e.crm2.dynamics.com'; Host = 'orgf261ae8e.crm2.dynamics.com'; Headers = @{} }
+Confere ($null -eq (Falha-Com { Assert-HostAlvo $dvProd 'Prod' })) 'alvo Prod: host do PROD passa'
+Confere ((Falha-Com { Assert-HostAlvo $dvTest 'Prod' }) -like '*alvo Prod*orgf261ae8e*') 'alvo Prod: host do TEST recusado'
+Confere ((Falha-Com { Assert-HostAlvo $dvProd 'Test' }) -like '*alvo Test*') 'alvo Test: host do PROD recusado'
+Confere ((Falha-Com { Assert-HostAlvo $dv 'Prod' }) -like '*alvo Prod*') 'alvo Prod: DEV recusado'
+Confere ((Falha-Com { Assert-HostAlvo $dv 'Dev' }) -like '*desconhecido*') 'alvo Dev nao existe'
+
+# Restore-Estados: so muda o que existe nos dois lados e difere; fluxo liga com statuscode 2 e step desliga com statuscode 2
+$fotoEstados = [pscustomobject]@{
+  fluxos = [pscustomobject]@{ 'f1' = [pscustomobject]@{ nome = 'F1'; estado = 0 }; 'f2' = [pscustomobject]@{ nome = 'F2'; estado = 1 }; 'f9' = [pscustomobject]@{ nome = 'F9'; estado = 0 } }
+  steps = [pscustomobject]@{ 's1' = [pscustomobject]@{ nome = 'S1'; estado = 1 }; 's2' = [pscustomobject]@{ nome = 'S2'; estado = 0 } }
+}
+$script:respostas = @(
+  [pscustomobject]@{ value = @([pscustomobject]@{ workflowid = 'F1'; name = 'F1'; statecode = 1; category = 5 }, [pscustomobject]@{ workflowid = 'f2'; name = 'F2'; statecode = 1; category = 5 }) },
+  [pscustomobject]@{ value = @([pscustomobject]@{ sdkmessageprocessingstepid = 's1'; name = 'S1'; statecode = 0 }, [pscustomobject]@{ sdkmessageprocessingstepid = 's2'; name = 'S2'; statecode = 0 }) },
+  [pscustomobject]@{}, [pscustomobject]@{}
+)
+$script:chamadas = @()
+$r = Restore-Estados $dvProd 'Prod' $fotoEstados
+$patches = @($script:chamadas | Where-Object { $_.Method -eq 'Patch' })
+Confere ($r.Mudancas.Count -eq 2 -and $r.Falhas.Count -eq 0) 'restaura: 2 mudancas (f1 desliga, s1 desabilita); f2, s2 iguais e f9 ausente ficam'
+Confere ($patches.Count -eq 2 -and $patches[0].Uri -like '*workflows(f1)' -and ($patches[0].Body | ConvertFrom-Json).statecode -eq 0 -and ($patches[0].Body | ConvertFrom-Json).statuscode -eq 1) 'restaura: fluxo desliga com statecode 0/statuscode 1'
+Confere ($patches[1].Uri -like '*sdkmessageprocessingsteps(s1)' -and ($patches[1].Body | ConvertFrom-Json).statecode -eq 1 -and ($patches[1].Body | ConvertFrom-Json).statuscode -eq 2) 'restaura: step desabilita com statecode 1/statuscode 2'
+Confere ((Falha-Com { Restore-Estados $dvTest 'Prod' $fotoEstados }) -like '*alvo Prod*') 'restaura: alvo errado nao chama nada'
+$script:respostas = @(
+  [pscustomobject]@{ value = @([pscustomobject]@{ workflowid = 'f1'; name = 'F1'; statecode = 1; category = 5 }) },
+  [pscustomobject]@{ value = @() },
+  (New-Object Exception 'recusado')
+)
+$r = Restore-Estados $dvProd 'Prod' $fotoEstados
+Confere ($r.Mudancas.Count -eq 0 -and $r.Falhas.Count -eq 1 -and $r.Falhas[0] -like 'fluxo F1*recusado*') 'restaura: falha do Dataverse vira item em Falhas, nao excecao'
+
+# -DesligarNovos le as 6 solucoes rastreadas (so BetinhosCore existe aqui, com n1 e n3); n4 e n5 estao fora delas e ficam como estao
+$script:respostas = @(
+  [pscustomobject]@{ value = @([pscustomobject]@{ workflowid = 'f2'; name = 'F2'; statecode = 1; category = 5 }, [pscustomobject]@{ workflowid = 'n1'; name = 'Novo'; statecode = 1; category = 5 }, [pscustomobject]@{ workflowid = 'n2'; name = 'Regra'; statecode = 1; category = 2 }, [pscustomobject]@{ workflowid = 'n4'; name = 'Fora das solucoes'; statecode = 1; category = 5 }) },
+  [pscustomobject]@{ value = @([pscustomobject]@{ sdkmessageprocessingstepid = 's2'; name = 'S2'; statecode = 0 }, [pscustomobject]@{ sdkmessageprocessingstepid = 'n3'; name = 'Step novo'; statecode = 0 }, [pscustomobject]@{ sdkmessageprocessingstepid = 'n5'; name = 'Step AutoNumberGuard'; statecode = 0 }) },
+  [pscustomobject]@{ value = @([pscustomobject]@{ solutionid = 'sid' }) },
+  [pscustomobject]@{ value = @([pscustomobject]@{ objectid = 'N1'; componenttype = 29; rootcomponentbehavior = 0 }, [pscustomobject]@{ objectid = 'n2'; componenttype = 29; rootcomponentbehavior = 0 }, [pscustomobject]@{ objectid = 'n3'; componenttype = 92; rootcomponentbehavior = 0 }) },
+  [pscustomobject]@{ value = @() }, [pscustomobject]@{ value = @() }, [pscustomobject]@{ value = @() }, [pscustomobject]@{ value = @() }, [pscustomobject]@{ value = @() },
+  [pscustomobject]@{}, [pscustomobject]@{}
+)
+$script:chamadas = @()
+$r = Restore-Estados $dvProd 'Prod' $fotoEstados -DesligarNovos
+$patches = @($script:chamadas | Where-Object { $_.Method -eq 'Patch' })
+Confere ($r.Mudancas.Count -eq 2 -and $r.Falhas.Count -eq 0 -and $patches.Count -eq 2 -and $patches[0].Uri -like '*workflows(n1)' -and $patches[1].Uri -like '*sdkmessageprocessingsteps(n3)') 'desligar novos: fluxo de nuvem novo e step novo desligam; regra de negocio, os da foto e os de fora das solucoes ficam'
+
+# Retirada: so AppBetinhos e gerarpagantes; Wait-SolucaoRemovida espera a ausencia
+Confere ((Falha-Com { Remove-SolucaoGerenciada $dvProd 'Prod' 'BetinhosCore' }) -like '*so desinstala AppBetinhos e gerarpagantes*') 'retirada: as 4 novas nunca sao desinstaladas'
+$script:respostas = @([pscustomobject]@{ value = @([pscustomobject]@{ version = '1.0.0.268' }) }, [pscustomobject]@{ value = @() })
+Confere (Wait-SolucaoRemovida $dvProd 'AppBetinhos' 1 0) 'espera a solucao sumir depois de o pac perder a conexao'
+$script:respostas = @([pscustomobject]@{ value = @([pscustomobject]@{ version = '1.0.0.268' }) })
+Confere (-not (Wait-SolucaoRemovida $dvProd 'AppBetinhos' 0 0)) 'solucao que nao sai devolve falso'
+$script:respostas = @([pscustomobject]@{ value = @() })
+$r = Remove-SolucaoGerenciada $dvProd 'Prod' 'gerarpagantes'
+Confere ($r.JaAusente) 'retirada: solucao ja ausente nao chama o pac'
 
 if ($falhas) { throw "$falhas teste(s) falharam" }

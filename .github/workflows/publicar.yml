@@ -1,0 +1,142 @@
+name: Publicar soluções
+
+# Leva as 4 soluções gerenciadas (BetinhosCore, BetinhosAutomacao, BetinhosInterface, BetinhosMotoristas) do DEV para o
+# TEST ou para o PROD: tabelas, colunas, formulários, visões, flows, plugins, WebResources, app e sitemap. Dados não vão por solução.
+#  - exportar (environment dev): conferência das 4 no DEV (barreira), versão seguinte e export gerenciado conferido;
+#  - importar (environment do alvo; no prod com revisor obrigatório): foto antes, exclusão das Custom APIs cr40f_AI*V2 não
+#    gerenciadas (legado que trava o upgrade), import com upgrade, remoção das camadas Active (hotfixes publicados direto no
+#    ambiente; a main já contém todos), estados ligado/desligado devolvidos ao que a foto registrou, foto depois e comparação.
+#    Qualquer perda (registros, tabelas, componentes, fluxo ou step que mudou de estado, variável, configuração segura) reprova.
+# Ordem pensada para o PROD nunca servir versão antiga: as camadas Active só saem depois de a versão nova estar importada.
+# No TEST (cópia travada do PROD) a comparação usa --travado e os fluxos/steps novos são desligados, para o ensaio não
+# mandar nada a clientes reais.
+on:
+  workflow_dispatch:
+    inputs:
+      alvo:
+        description: 'Ambiente de destino'
+        type: choice
+        required: true
+        default: test
+        options: [test, prod]
+      solucoes:
+        description: 'Soluções separadas por vírgula (vazio = as 4)'
+        required: false
+        default: ''
+      backup:
+        description: 'PROD: rótulo do backup manual do ambiente feito antes (pac admin backup). Obrigatório no prod.'
+        required: false
+        default: ''
+
+concurrency:
+  group: publicar-${{ inputs.alvo }}
+  cancel-in-progress: false
+
+env:
+  ALVO_PS: ${{ inputs.alvo == 'prod' && 'Prod' || 'Test' }}
+  TRAVADO: ${{ inputs.alvo == 'test' && '--travado' || '' }}
+  DESLIGAR_NOVOS: ${{ inputs.alvo == 'test' }}
+
+jobs:
+  exportar:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    environment: dev
+    env:
+      DV_ENVIRONMENT_URL: ${{ vars.DV_ENVIRONMENT_URL }}
+      DV_TENANT_ID: ${{ vars.DV_TENANT_ID }}
+      DV_CLIENT_ID: ${{ vars.DV_CLIENT_ID }}
+      DV_CLIENT_SECRET: ${{ secrets.DV_CLIENT_SECRET }}
+      SOLUCOES: ${{ inputs.solucoes }}
+    steps:
+      - name: PROD exige o rótulo do backup
+        if: inputs.alvo == 'prod' && inputs.backup == ''
+        shell: bash
+        run: echo "::error::Informe o rótulo do backup do PROD (pac admin backup --environment <prod> --label <rótulo>) antes de publicar." && exit 1
+      - uses: actions/checkout@v4
+      - name: Instalar pac
+        run: |
+          dotnet tool install --global Microsoft.PowerApps.CLI.Tool
+          pac auth create --name ci-dev --applicationId $env:DV_CLIENT_ID --clientSecret $env:DV_CLIENT_SECRET --tenant $env:DV_TENANT_ID --environment $env:DV_ENVIRONMENT_URL
+      - name: Conferir, subir versão e exportar
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/exportar-do-dev.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Solucoes "$env:SOLUCOES" -Pasta pacotes
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pacotes
+          path: pacotes/
+          retention-days: 7
+
+  importar:
+    needs: exportar
+    runs-on: windows-latest
+    timeout-minutes: 240
+    environment: ${{ inputs.alvo }}
+    env:
+      DV_ENVIRONMENT_URL: ${{ vars.DV_ENVIRONMENT_URL }}
+      DV_TENANT_ID: ${{ vars.DV_TENANT_ID }}
+      DV_CLIENT_ID: ${{ vars.DV_CLIENT_ID }}
+      DV_CLIENT_SECRET: ${{ secrets.DV_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          name: pacotes
+          path: pacotes
+      - name: Instalar pac
+        run: |
+          dotnet tool install --global Microsoft.PowerApps.CLI.Tool
+          pac auth create --name ci-alvo --applicationId $env:DV_CLIENT_ID --clientSecret $env:DV_CLIENT_SECRET --tenant $env:DV_TENANT_ID --environment $env:DV_ENVIRONMENT_URL
+      - name: Foto antes
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/foto-ambiente.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Saida fotos/antes.json
+      - name: Excluir Custom APIs legado (cr40f_AI*V2 não gerenciadas)
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/excluir-custom-apis-legado.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Backup custom-apis-legado -Aplicar
+      - name: Importar
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/importar-solucoes.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Pasta pacotes -Alvo $env:ALVO_PS
+      - name: Remover camadas Active (hotfixes já na main)
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/remover-camadas-active.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Backup camadas-active -Aplicar -PermitirProd
+      - name: Restaurar estados ligado/desligado
+        # -DesligarNovos é switch: powershell.exe -File recusa "-DesligarNovos:True"; o switch entra por splat só no TEST.
+        run: |
+          $extra = @(); if ($env:DESLIGAR_NOVOS -eq 'true') { $extra += '-DesligarNovos' }
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/restaurar-estados.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Foto fotos/antes.json -Saida fotos/estados.json @extra
+      - name: Foto depois
+        if: always()
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/foto-ambiente.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Saida fotos/depois.json
+      - name: Comparar
+        if: always()
+        shell: bash
+        run: |
+          set -o pipefail
+          node packages/deploy/solucoes/comparar-fotos.mjs $TRAVADO fotos/antes.json fotos/depois.json | tee fotos/comparacao.json
+      - name: Resumo
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Publicar soluções: ${{ inputs.alvo }}"
+            echo '```json'
+            cat pacotes/importados.json 2>/dev/null || echo "import não concluído"
+            echo '```'
+            echo "Estados devolvidos ao de antes:"
+            echo '```json'
+            cat fotos/estados.json 2>/dev/null || echo "não executado"
+            echo '```'
+            echo "Para conferir à mão (informativo): fluxos novos que chegaram desligados, variáveis sem valor, chunks obsoletos e versões."
+            echo '```json'
+            node -e 'const d=require("./fotos/comparacao.json");console.log(JSON.stringify({fluxosNovosDesligados:d.fluxosNovosDesligados,variaveisSemValor:d.variaveisSemValor,chunksObsoletos:d.chunksObsoletos.length,versoes:d.versoes},null,2))' 2>/dev/null || echo "comparação não concluída"
+            echo '```'
+            echo "Comparação completa: artefato \`fotos\` (comparacao.json). Perda reprova a execução."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fotos-${{ inputs.alvo }}
+          path: |
+            fotos/
+            pacotes/importados.json
+            camadas-active/
+            custom-apis-legado/
+          retention-days: 90

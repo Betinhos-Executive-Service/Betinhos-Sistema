@@ -76,6 +76,15 @@ test('comparar-fotos --travado: fluxo ligado pelo import sai com código 1; sem 
   assert.equal(livre.status, 0, livre.stderr)
 })
 
+test('comparar-fotos --aceitar-tabelas: tabela com registros que some sai com 0 só quando aceita', () => {
+  const antes = foto({ cr40f_a: 3, cr40f_b: 1 })
+  const depois = foto({ cr40f_a: 3 })
+  const aceita = rodarCli('comparar-fotos.mjs', ['--aceitar-tabelas', 'cr40f_b', 'a.json', 'b.json'], { 'a.json': antes, 'b.json': depois })
+  assert.equal(aceita.status, 0, aceita.stderr)
+  assert.match(aceita.stdout, /"tabelasAceitasSumiram": \[\s*\{/)
+  const recusa = rodarCli('comparar-fotos.mjs', ['a.json', 'b.json'], { 'a.json': antes, 'b.json': depois })
+  assert.equal(recusa.status, 1, recusa.stderr)
+})
 test('comparar-fotos sem as duas fotos falha', () => {
   const r = rodarCli('comparar-fotos.mjs', ['--travado', 'a.json'], { 'a.json': foto({}) })
   assert.notEqual(r.status, 0)

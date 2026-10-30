@@ -1,16 +1,20 @@
 param(
   [string] $EnvironmentUrl = "https://org23b93544.crm2.dynamics.com",
   [string] $Solucoes = "",
-  [Parameter(Mandatory = $true)] [string] $Pasta
+  [Parameter(Mandatory = $true)] [string] $Pasta,
+  [switch] $Caixa
 )
 
-# Etapa 1 do workflow publicar-test.yml, no DEV: conferencia das 4 solucoes (barreira), versao seguinte de cada
-# solucao escolhida (pac solution online-version) e export gerenciado conferido. Grava os ZIPs e manifesto.json em $Pasta.
+# Etapa 1 dos workflows publicar.yml e retirar-caixa.yml, no DEV: conferencia das 4 solucoes (barreira), versao seguinte de
+# cada solucao escolhida (pac solution online-version) e export gerenciado conferido. Grava os ZIPs e manifesto.json em $Pasta.
+# -Caixa: exporta a AppBetinhos (upgrade que antecede a retirada) em vez das 4; a conferencia e a mesma.
 # Mensagens sem acento: o Windows PowerShell 5.1 le .ps1 sem BOM como ANSI.
 
 if ($PSVersionTable.PSEdition -eq "Core") {
   $ps = Join-Path $env:WINDIR "System32\WindowsPowerShell\v1.0\powershell.exe"
-  & $ps -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -EnvironmentUrl $EnvironmentUrl -Solucoes $Solucoes -Pasta $Pasta
+  # Switch por splat: com -File, "-Caixa:True" (como o Core serializa) e recusado pelo Windows PowerShell.
+  $extra = @(); if ($Caixa) { $extra += "-Caixa" }
+  & $ps -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -EnvironmentUrl $EnvironmentUrl -Solucoes $Solucoes -Pasta $Pasta @extra
   exit $LASTEXITCODE
 }
 
@@ -20,7 +24,7 @@ Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot "solucoes.ps1")
 
 $dv = Connect-Dataverse $EnvironmentUrl @($script:HostDev)
-$escolhidas = @(Get-SolucoesEscolhidas $Solucoes)
+$escolhidas = if ($Caixa) { @("AppBetinhos") } else { @(Get-SolucoesEscolhidas $Solucoes) }
 Write-Step "solucoes: $($escolhidas -join ', ')"
 
 # Barreira: nada sai do DEV com componente sem dono, em duas solucoes ou com dependencia fora das 4.
