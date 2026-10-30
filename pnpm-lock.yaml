@@ -270,8 +270,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/dataverse
       '@betinhos/ui':
-        specifier: npm:@betinhos-executive-service/ui@^1.15.3
-        version: '@betinhos-executive-service/ui@1.15.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)'
+        specifier: npm:@betinhos-executive-service/ui@^1.16.0
+        version: '@betinhos-executive-service/ui@1.16.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)'
       '@fontsource/manrope':
         specifier: ^5.2.6
         version: 5.3.0
@@ -500,8 +500,17 @@ packages:
   '@betinhos-executive-service/tokens@1.15.4':
     resolution: {integrity: sha512-gRlXKjx0p30It1Pdc7uoJ4CS3kMFl66sG9dxHSEoYUtyXCJUypTv+x0P4qPDlqA6WIosfOWV2n4NW0o+TKusAg==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/tokens/1.15.4/d8e92c53c8456e68bac5a482d6e331cf0549bd24}
 
+  '@betinhos-executive-service/tokens@1.16.0':
+    resolution: {integrity: sha512-3BJIGbyYyD9hlDJ2VbABtotxDKfpkyvF6ASXH555xFQAjDLRrwGd67/vpSZ+xEckuvIp/CDkzwWTbZnVGDUo6Q==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/tokens/1.16.0/b70c729ecc3a90107e672054d233ce6842dd0bc5}
+
   '@betinhos-executive-service/ui@1.15.4':
     resolution: {integrity: sha512-Os8LNPaCNC7M31+8dtmja4/8YOSH8aTeT4kx8ILi7NPwNbCzwRJFNPC1bYsVH84QdiLdGDBLuC5m0abonq/H5A==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/ui/1.15.4/9db25c2eed4394fe4b64ed451d1baa93e3a857a7}
+    peerDependencies:
+      react: ^19.2.0
+      react-dom: ^19.2.0
+
+  '@betinhos-executive-service/ui@1.16.0':
+    resolution: {integrity: sha512-2YAk9q8ci5k+E53sfhy0fC2B07g4c9JAqdVhN6OdLTk9cf1MHyOOcRyPWPEd3A+WNlOtl8WyTeXDRNZ22E/YSA==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/ui/1.16.0/883a267ad5feae97a526b3415b830403abb175b9}
     peerDependencies:
       react: ^19.2.0
       react-dom: ^19.2.0
@@ -2839,9 +2848,17 @@ snapshots:
 
   '@betinhos-executive-service/tokens@1.15.4': {}
 
+  '@betinhos-executive-service/tokens@1.16.0': {}
+
   '@betinhos-executive-service/ui@1.15.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
       '@betinhos-executive-service/tokens': 1.15.4
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
+
+  '@betinhos-executive-service/ui@1.16.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+    dependencies:
+      '@betinhos-executive-service/tokens': 1.16.0
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
 
@@ -3269,7 +3286,7 @@ snapshots:
   '@testing-library/dom@10.4.2':
     dependencies:
       '@babel/code-frame': 7.29.7
-      '@babel/runtime': 7.29.7
+      '@babel/runtime': 7.29.10
       '@types/aria-query': 5.0.4
       aria-query: 5.3.0
       dom-accessibility-api: 0.5.16
