@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { formatAuditValue, lookupRef, lookupRefs, parseChanges, toAuditEvent, type FieldMeta } from './format'
-import { auditPath, MAX_IDS } from './source'
+import { auditPath, cursorOf, MAX_IDS, PAGE_SIZE } from './source'
 
 const F = '@OData.Community.Display.V1.FormattedValue'
 const status: FieldMeta = { label: 'Status', type: 'Status', options: new Map([[202410005, 'Programado'], [202410008, 'Concluído']]) }
@@ -94,9 +94,15 @@ describe('toAuditEvent', () => {
 
 describe('auditPath', () => {
   it('filtra pela tabela e, com ids, pelos registros', () => {
-    expect(decodeURIComponent(auditPath({ entity: 'cr40f_despesaoperacional' }))).toContain("$filter=objecttypecode eq 'cr40f_despesaoperacional'&$orderby=createdon desc")
+    expect(decodeURIComponent(auditPath({ entity: 'cr40f_despesaoperacional' }))).toContain(`$filter=objecttypecode eq 'cr40f_despesaoperacional'&$orderby=createdon desc,auditid desc&$top=${PAGE_SIZE + 1}`)
     expect(decodeURIComponent(auditPath({ entity: 'x', ids: ['{AAA00000-0000-0000-0000-000000000001}', 'aaa00000-0000-0000-0000-000000000002'] })))
       .toContain('and (_objectid_value eq aaa00000-0000-0000-0000-000000000001 or _objectid_value eq aaa00000-0000-0000-0000-000000000002)')
+  })
+  it('a página seguinte começa depois do último evento (audits ignora maxpagesize)', () => {
+    const cursor = cursorOf({ createdon: '2026-10-27T13:28:51.51Z', auditid: '{EDFE285B-31D8-4A64-82E5-0D0654855115}' })
+    expect(cursor).toBe('2026-10-27T13:28:51.51Z|edfe285b-31d8-4a64-82e5-0d0654855115')
+    expect(decodeURIComponent(auditPath({ entity: 'x' }, cursor)))
+      .toContain("objecttypecode eq 'x' and (createdon lt 2026-10-27T13:28:51.51Z or (createdon eq 2026-10-27T13:28:51.51Z and auditid lt edfe285b-31d8-4a64-82e5-0d0654855115))")
   })
   it(`corta em ${MAX_IDS} ids para caber na URL`, () => {
     const ids = Array.from({ length: MAX_IDS + 20 }, (_, i) => `aaa00000-0000-0000-0000-${String(i).padStart(12, '0')}`)
