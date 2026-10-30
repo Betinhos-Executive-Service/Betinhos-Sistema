@@ -318,6 +318,18 @@ $r = Restore-Estados $dvProd 'Prod' $fotoEstados -DesligarNovos
 $patches = @($script:chamadas | Where-Object { $_.Method -eq 'Patch' })
 Confere ($r.Mudancas.Count -eq 2 -and $r.Falhas.Count -eq 0 -and $patches.Count -eq 2 -and $patches[0].Uri -like '*workflows(n1)' -and $patches[1].Uri -like '*sdkmessageprocessingsteps(n3)') 'desligar novos: fluxo de nuvem novo e step novo desligam; regra de negocio, os da foto e os de fora das solucoes ficam'
 
+# Import: primeira instalacao sem --stage-and-upgrade; upgrade com; so espera quando o pac perdeu a conexao
+Confere ((Get-ArgumentosDeImport 'x.zip' $null) -notcontains '--stage-and-upgrade' -and (Get-ArgumentosDeImport 'x.zip' '') -notcontains '--stage-and-upgrade') 'import: primeira instalacao sem stage-and-upgrade'
+Confere ((Get-ArgumentosDeImport 'x.zip' '1.0.0.4') -contains '--stage-and-upgrade' -and (Get-ArgumentosDeImport 'x.zip' '1.0.0.4')[0..3] -join ' ' -eq 'solution import --path x.zip') 'import: com versao instalada usa stage-and-upgrade'
+Confere ((Test-PacPerdeuConexao 'An error occurred while sending the request') -and (Test-PacPerdeuConexao 'The operation has timed out')) 'pac: erro de rede e perda de conexao'
+Confere (-not (Test-PacPerdeuConexao 'Error: The async operation completed with a statuscode of Failed.') -and -not (Test-PacPerdeuConexao 'Solution manifest import: FAILURE: Cannot create a holding solution')) 'pac: falha declarada pelo servidor nao espera'
+# Update-DvToken: conexao recente fica; conexao velha renova o cabecalho
+$dvVelho = @{ Api = 'https://p/api/data/v9.2'; Url = 'https://orgf261ae8e.crm2.dynamics.com'; Host = 'orgf261ae8e.crm2.dynamics.com'; Headers = @{ Authorization = 'velho' }; ConectadoEm = (Get-Date).AddMinutes(-55) }
+function Connect-Dataverse([string] $EnvironmentUrl, [string[]] $HostsPermitidos) { return @{ Headers = @{ Authorization = 'novo' } } }
+Confere ((Update-DvToken $dvVelho).Headers.Authorization -eq 'novo' -and ((Get-Date) - $dvVelho.ConectadoEm).TotalMinutes -lt 1) 'token: conexao com 55 min renova'
+$dvNovo = @{ Headers = @{ Authorization = 'atual' }; ConectadoEm = Get-Date }
+Confere ((Update-DvToken $dvNovo).Headers.Authorization -eq 'atual') 'token: conexao recente fica'
+
 # Retirada: so AppBetinhos e gerarpagantes; Wait-SolucaoRemovida espera a ausencia
 Confere ((Falha-Com { Remove-SolucaoGerenciada $dvProd 'Prod' 'BetinhosCore' }) -like '*so desinstala AppBetinhos e gerarpagantes*') 'retirada: as 4 novas nunca sao desinstaladas'
 $script:respostas = @([pscustomobject]@{ value = @([pscustomobject]@{ version = '1.0.0.268' }) }, [pscustomobject]@{ value = @() })

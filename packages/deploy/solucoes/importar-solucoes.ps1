@@ -32,7 +32,7 @@ $ordem = @($permitidas | Where-Object { $nomes -contains $_ })
 $resultado = @()
 foreach ($nome in $ordem) {
   $item = @($manifesto | Where-Object { $_.solucao -eq $nome })[0]
-  $antes = Get-VersaoInstalada $dv $nome
+  $antes = Get-VersaoInstalada (Update-DvToken $dv) $nome
   Write-Step "importando $nome $($item.versao) em $Alvo (instalada: $antes)"
   $inicio = Get-Date
   $r = Import-SolucaoGerenciada $dv (Join-Path $Pasta $item.arquivo) $Alvo 60 $permitidas

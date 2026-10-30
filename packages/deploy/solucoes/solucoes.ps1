@@ -398,7 +398,7 @@ function Restore-Estados($Dv, [string] $Alvo, $Foto, [switch] $DesligarNovos) {
 function Wait-SolucaoRemovida($Dv, [string] $Nome, [int] $Minutos = 60, [int] $IntervaloSegundos = 60) {
   $limite = (Get-Date).AddMinutes($Minutos)
   do {
-    if ($null -eq (Get-VersaoInstalada $Dv $Nome)) { return $true }
+    if ($null -eq (Get-VersaoInstalada (Update-DvToken $Dv) $Nome)) { return $true }
     if ((Get-Date) -ge $limite) { return $false }
     Start-Sleep -Seconds $IntervaloSegundos
   } while ($true)
@@ -411,7 +411,12 @@ function Remove-SolucaoGerenciada($Dv, [string] $Alvo, [string] $Nome, [int] $Mi
   if ($null -eq (Get-VersaoInstalada $Dv $Nome)) { Write-Step "$Nome ja nao existe em $($Dv.Host)"; return @{ Nome = $Nome; JaAusente = $true; PacPerdeuConexao = $false } }
   $erroPac = $null
   try { Invoke-Pac $Dv.Url @("solution", "delete", "--solution-name", $Nome) | Out-Null }
-  catch { $erroPac = "$($_.Exception.Message)"; Write-Step "pac falhou ($erroPac); conferindo se $Nome saiu" }
+  catch {
+    $erroPac = "$($_.Exception.Message)"
+    # "Uninstall ja em andamento" (ensaio de 22/10) tambem e sinal de que a operacao segue no servidor.
+    if (-not (Test-PacPerdeuConexao $erroPac) -and $erroPac -notmatch 'already in progress|em andamento') { throw "Desinstalacao de $Nome falhou em $($Dv.Host): $erroPac" }
+    Write-Step "pac perdeu a conexao ($erroPac); conferindo se $Nome saiu"
+  }
   $minutos = if ($erroPac) { $MinutosDeEspera } else { 0 }
   if (-not (Wait-SolucaoRemovida $Dv $Nome $minutos)) { throw "$Nome continua instalada em $($Dv.Host). $erroPac" }
   return @{ Nome = $Nome; JaAusente = $false; PacPerdeuConexao = [bool] $erroPac }
@@ -443,10 +448,36 @@ function Get-VersaoInstalada($Dv, [string] $Nome) {
 
 # O pac perde a conexao em operacoes longas e o import continua no servidor: a prova e a versao instalada.
 # Espera ate $Minutos a solucao chegar na versao; devolve $true se chegou.
+# Token de uma hora: numa espera longa ele vence (401 depois de 60 min no ensaio de 30/10/2026). Renova o cabecalho da conexao
+# quando faltar menos de 10 min; a hashtable e atualizada no lugar, entao quem chamou continua com a mesma conexao.
+function Update-DvToken($Dv) {
+  if (-not $Dv.ContainsKey("ConectadoEm")) { $Dv.ConectadoEm = Get-Date }
+  if (((Get-Date) - $Dv.ConectadoEm).TotalMinutes -ge 50) {
+    $novo = Connect-Dataverse $Dv.Url @($Dv.Host)
+    $Dv.Headers = $novo.Headers; $Dv.ConectadoEm = Get-Date
+  }
+  return $Dv
+}
+
+# O pac so merece espera quando perdeu a conexao com a operacao (que continua no servidor). Falha declarada pelo servidor
+# ("statuscode of Failed", manifesto, dependencia) e definitiva: esperar so atrasa e vence o token.
+function Test-PacPerdeuConexao([string] $Erro) {
+  if ($Erro -match 'statuscode of Failed|FAILURE|Failed within') { return $false }
+  return [bool] ($Erro -match 'sending the request|timed out|time out|timeout|connection|Unable to connect|ServiceUnavailable|Gateway')
+}
+
+# Primeira instalacao vai sem --stage-and-upgrade: o Dataverse recusa a solucao de retencao sem base ("Cannot create a
+# holding solution for missing base"). Com versao instalada, upgrade com stage, que e o que apaga o que saiu da solucao.
+function Get-ArgumentosDeImport([string] $Caminho, [string] $VersaoInstalada) {
+  $args = @("solution", "import", "--path", $Caminho)
+  if ($VersaoInstalada) { $args += "--stage-and-upgrade" }
+  return $args + @("--publish-changes", "--activate-plugins", "--async", "--max-async-wait-time", "180")
+}
+
 function Wait-VersaoInstalada($Dv, [string] $Nome, [string] $Versao, [int] $Minutos = 60, [int] $IntervaloSegundos = 60) {
   $limite = (Get-Date).AddMinutes($Minutos)
   do {
-    if ((Get-VersaoInstalada $Dv $Nome) -eq $Versao) { return $true }
+    if ((Get-VersaoInstalada (Update-DvToken $Dv) $Nome) -eq $Versao) { return $true }
     if ((Get-Date) -ge $limite) { return $false }
     Start-Sleep -Seconds $IntervaloSegundos
   } while ($true)
@@ -460,8 +491,12 @@ function Import-SolucaoGerenciada($Dv, [string] $Caminho, [string] $Alvo = "Test
   if (-not $m.Managed) { throw "$Caminho nao e gerenciada." }
   if ($Permitidas -notcontains $m.UniqueName) { throw "$Caminho e '$($m.UniqueName)', fora de: $($Permitidas -join ', ')." }
   $erroPac = $null
-  try { Invoke-Pac $Dv.Url @("solution", "import", "--path", $Caminho, "--stage-and-upgrade", "--publish-changes", "--activate-plugins", "--async", "--max-async-wait-time", "180") | Out-Null }
-  catch { $erroPac = "$($_.Exception.Message)"; Write-Step "pac falhou ($erroPac); conferindo a versao instalada de $($m.UniqueName)" }
+  try { Invoke-Pac $Dv.Url (Get-ArgumentosDeImport $Caminho (Get-VersaoInstalada $Dv $m.UniqueName)) | Out-Null }
+  catch {
+    $erroPac = "$($_.Exception.Message)"
+    if (-not (Test-PacPerdeuConexao $erroPac)) { throw "Import de $($m.UniqueName) falhou em $($Dv.Host): $erroPac" }
+    Write-Step "pac perdeu a conexao ($erroPac); conferindo a versao instalada de $($m.UniqueName)"
+  }
   $minutos = if ($erroPac) { $MinutosDeEspera } else { 0 }
   if (-not (Wait-VersaoInstalada $Dv $m.UniqueName $m.Version $minutos)) {
     throw "$($m.UniqueName) nao chegou a versao $($m.Version) em $($Dv.Host). $erroPac"
