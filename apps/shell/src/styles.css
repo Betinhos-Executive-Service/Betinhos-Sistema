@@ -2,6 +2,9 @@
 
 #root { height: 100%; }
 
+/* Toque no celular: sem o retângulo azul padrão do navegador; o feedback vem de :active/:focus-visible do DS. */
+html { -webkit-tap-highlight-color: transparent; }
+
 /* A área de rolagem vira o bloco de contenção: spans absolutos (ex.: .sr-only nas células da tabela)
    não escapam do recorte e não esticam o documento, que rolava por trás da ficha aberta. */
 .bt-shell__main { position: relative; }
