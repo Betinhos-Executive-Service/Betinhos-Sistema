@@ -98,6 +98,16 @@ test('conferir-retirada: componente só na AppBetinhos sai com 1; tudo nas 4 sai
   assert.equal(bom.status, 0, bom.stderr)
 })
 
+test('conferir-retirada --dev: só na caixa e ausente do DEV sai com 0; --aceitar-tabelas libera tabela com registros', () => {
+  const alvo = { componentes: { v: ['AppBetinhos'], tb: ['AppBetinhos'] }, tipos: { v: 381, tb: 1 }, pacotes: {}, nomes: { tb: 'cr40f_x' }, registros: { cr40f_x: 2 } }
+  const dev = { componentes: { outro: ['BetinhosCore'] } }
+  const bloqueia = rodarCli('conferir-retirada.mjs', ['f.json', '--dev', 'd.json'], { 'f.json': alvo, 'd.json': dev })
+  assert.equal(bloqueia.status, 1, bloqueia.stderr)
+  assert.match(bloqueia.stdout, /"tabelasComDadosNaCaixa": \[\s*\{/)
+  const passa = rodarCli('conferir-retirada.mjs', ['f.json', '--dev', 'd.json', '--aceitar-tabelas', 'cr40f_x'], { 'f.json': alvo, 'd.json': dev })
+  assert.equal(passa.status, 0, passa.stderr)
+})
+
 test('conferir-retirada: foto vazia não passa', () => {
   const r = rodarCli('conferir-retirada.mjs', ['f.json'], { 'f.json': { componentes: {}, tipos: {}, pacotes: {} } })
   assert.notEqual(r.status, 0)
