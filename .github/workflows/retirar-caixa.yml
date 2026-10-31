@@ -1,13 +1,14 @@
 name: Retirar AppBetinhos
 
 # Segunda janela da promoção (depois de "Publicar soluções" com as 4 no mesmo alvo): tira do TEST ou do PROD as soluções
-# gerenciadas antigas, AppBetinhos e gerarpagantes, que as 4 substituem. Caminho ensaiado no TEST em 22/10/2026:
-#  1. exportar (environment dev): a AppBetinhos atual do DEV, gerenciada (conferência das 4 antes, como sempre);
-#  2. retirar (environment do alvo; no prod com revisor): foto antes; registros das tabelas aceitas exportados em JSON
-#     (elas só existem na AppBetinhos e somem com ela; decisão registrada no input); upgrade da AppBetinhos, que apaga o que
-#     saiu dela no DEV (limpeza de 21/10/2026); estados devolvidos; foto do meio e comparação (tabela vazia ou aceita que some
-#     é informativo; qualquer outra perda reprova); conferir-retirada (nada pode estar só na caixa); desinstalação das duas;
-#     foto depois e comparação final.
+# gerenciadas antigas, AppBetinhos e gerarpagantes, que as 4 substituem.
+#  1. foto-dev (environment dev, só leitura): foto do DEV da mesma janela, prova do que saiu da AppBetinhos de propósito;
+#  2. retirar (environment do alvo; no prod com revisor): foto antes; registros das tabelas aceitas exportados em JSON (elas só
+#     existem na AppBetinhos e somem com ela; decisão registrada no input); conferir-retirada --dev (o que está só na caixa tem
+#     de estar ausente do DEV; tabela com registros só se aceita); desinstalação das duas; foto depois e comparação --retirada
+#     (o que era só da caixa e sumiu é informativo; queda de registros e qualquer outra perda reprovam).
+# Não faz upgrade da AppBetinhos antes de desinstalar: no TEST (30/10/2026) ele caiu duas vezes com erro de transporte SQL do
+# servidor aos 30-50 min; a desinstalação direta apaga o mesmo conjunto, e a barreira com a foto do DEV prova que é o esperado.
 on:
   workflow_dispatch:
     inputs:
@@ -29,13 +30,12 @@ concurrency:
 env:
   ALVO_PS: ${{ inputs.alvo == 'prod' && 'Prod' || 'Test' }}
   TRAVADO: ${{ inputs.alvo == 'test' && '--travado' || '' }}
-  DESLIGAR_NOVOS: ${{ inputs.alvo == 'test' }}
   ACEITAR: ${{ inputs.aceitarTabelas }}
 
 jobs:
-  exportar:
+  foto-dev:
     runs-on: windows-latest
-    timeout-minutes: 90
+    timeout-minutes: 30
     environment: dev
     env:
       DV_ENVIRONMENT_URL: ${{ vars.DV_ENVIRONMENT_URL }}
@@ -44,22 +44,18 @@ jobs:
       DV_CLIENT_SECRET: ${{ secrets.DV_CLIENT_SECRET }}
     steps:
       - uses: actions/checkout@v4
-      - name: Instalar pac
-        run: |
-          dotnet tool install --global Microsoft.PowerApps.CLI.Tool
-          pac auth create --name ci-dev --applicationId $env:DV_CLIENT_ID --clientSecret $env:DV_CLIENT_SECRET --tenant $env:DV_TENANT_ID --environment $env:DV_ENVIRONMENT_URL
-      - name: Conferir e exportar a AppBetinhos gerenciada
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/exportar-do-dev.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Pasta pacotes -Caixa
+      - name: Foto do DEV (só leitura)
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/foto-ambiente.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Saida foto-dev/dev.json
       - uses: actions/upload-artifact@v4
         with:
-          name: pacotes-caixa
-          path: pacotes/
-          retention-days: 7
+          name: foto-dev
+          path: foto-dev/
+          retention-days: 90
 
   retirar:
-    needs: exportar
+    needs: foto-dev
     runs-on: windows-latest
-    timeout-minutes: 300
+    timeout-minutes: 240
     environment: ${{ inputs.alvo }}
     env:
       DV_ENVIRONMENT_URL: ${{ vars.DV_ENVIRONMENT_URL }}
@@ -73,8 +69,8 @@ jobs:
           node-version: 24
       - uses: actions/download-artifact@v4
         with:
-          name: pacotes-caixa
-          path: pacotes
+          name: foto-dev
+          path: foto-dev
       - name: Instalar pac
         run: |
           dotnet tool install --global Microsoft.PowerApps.CLI.Tool
@@ -84,40 +80,27 @@ jobs:
       - name: Exportar registros das tabelas aceitas
         if: inputs.aceitarTabelas != ''
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/exportar-registros.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Tabelas "$env:ACEITAR" -Pasta registros
-      - name: Upgrade da AppBetinhos (apaga o que saiu dela no DEV)
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/importar-solucoes.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Pasta pacotes -Alvo $env:ALVO_PS
-      - name: Restaurar estados ligado/desligado
-        # -DesligarNovos é switch: powershell.exe -File recusa "-DesligarNovos:True"; o switch entra por splat só no TEST.
+      - name: Conferir retirada (com a foto do DEV) e desinstalar AppBetinhos e gerarpagantes
         run: |
-          $extra = @(); if ($env:DESLIGAR_NOVOS -eq 'true') { $extra += '-DesligarNovos' }
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/restaurar-estados.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Foto fotos/antes.json -Saida fotos/estados.json @extra
-      - name: Foto do meio
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/foto-ambiente.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Saida fotos/meio.json
-      - name: Comparar antes → meio (barreira antes do ponto sem volta)
-        shell: bash
-        run: |
-          set -o pipefail
-          node packages/deploy/solucoes/comparar-fotos.mjs $TRAVADO --retirada --aceitar-tabelas "$ACEITAR" fotos/antes.json fotos/meio.json | tee fotos/comparacao-upgrade.json
-      - name: Conferir retirada e desinstalar AppBetinhos e gerarpagantes
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/retirar-caixa.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Foto fotos/meio.json -Saida fotos/retirada.json
+          $extra = @(); if ($env:ACEITAR) { $extra += @('-AceitarTabelas', $env:ACEITAR) }
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/retirar-caixa.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Foto fotos/antes.json -FotoDev foto-dev/dev.json -Saida fotos/retirada.json @extra
       - name: Foto depois
         if: always()
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/foto-ambiente.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Saida fotos/depois.json
-      - name: Comparar meio → depois
-        if: always() && hashFiles('fotos/meio.json') != ''
+      - name: Comparar antes → depois
+        if: always()
         shell: bash
         run: |
           set -o pipefail
-          node packages/deploy/solucoes/comparar-fotos.mjs $TRAVADO fotos/meio.json fotos/depois.json | tee fotos/comparacao-retirada.json
+          node packages/deploy/solucoes/comparar-fotos.mjs $TRAVADO --retirada --aceitar-tabelas "$ACEITAR" fotos/antes.json fotos/depois.json | tee fotos/comparacao.json
       - name: Resumo
         if: always()
         shell: bash
         run: |
           {
             echo "## Retirar AppBetinhos: ${{ inputs.alvo }}"
-            echo "Upgrade:"; echo '```json'; cat pacotes/importados.json 2>/dev/null || echo "não concluído"; echo '```'
             echo "Retirada:"; echo '```json'; cat fotos/retirada.json 2>/dev/null || echo "não concluída"; echo '```'
-            echo "Comparações no artefato \`fotos\` (comparacao-upgrade.json e comparacao-retirada.json). Perda reprova a execução."
+            echo "Comparação no artefato \`retirada-${{ inputs.alvo }}\` (comparacao.json). Perda reprova a execução."
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
@@ -126,5 +109,5 @@ jobs:
           path: |
             fotos/
             registros/
-            pacotes/importados.json
+            foto-dev/
           retention-days: 90

@@ -45,8 +45,9 @@ $foto = [ordered]@{
 # Registros: contagem exata por FetchXML; acima do limite de agregacao (50.000) conta paginando os ids (tambem exata).
 # Qualquer outro erro de contagem interrompe a foto: nao existe contagem aproximada. `aproximados` fica vazio, so pelo formato da foto
 # (o comparar-fotos nao o le: queda de registros e sempre perda).
-$paginadas = @()
-foreach ($e in @(Read-DvAll $dv "EntityDefinitions?`$select=LogicalName,EntitySetName,PrimaryIdAttribute,IsCustomEntity,IsIntersect" | Where-Object { $_.IsCustomEntity -and -not $_.IsIntersect -and $_.LogicalName -match $prefixoProprio } | Sort-Object LogicalName)) {
+$paginadas = @(); $nomeDaTabela = @{}
+foreach ($e in @(Read-DvAll $dv "EntityDefinitions?`$select=MetadataId,LogicalName,EntitySetName,PrimaryIdAttribute,IsCustomEntity,IsIntersect" | Where-Object { $_.IsCustomEntity -and -not $_.IsIntersect -and $_.LogicalName -match $prefixoProprio } | Sort-Object LogicalName)) {
+  $nomeDaTabela[([string] $e.MetadataId).ToLowerInvariant()] = [string] $e.LogicalName
   $contagem = Get-ContagemRegistros $dv $e
   $foto.registros[$e.LogicalName] = $contagem.Total
   if ($contagem.Paginada) { $paginadas += $e.LogicalName; Write-Step "$($e.LogicalName): acima do limite de agregacao, contado por paginacao ($($contagem.Total))" }
@@ -89,6 +90,9 @@ foreach ($v in @(Read-DvAll $dv "environmentvariabledefinitions?`$select=scheman
   $valores = @($v.environmentvariabledefinition_environmentvariablevalue)
   $foto.variaveis[[string] $v.schemaname] = if ($valores.Count) { Get-Sha256 $valores[0].value } else { $null }
 }
+
+# Nome logico das tabelas (componente tipo 1 = MetadataId): conferir-retirada liga a tabela aos registros contados.
+foreach ($id in @($nomeDaTabela.Keys)) { if ($foto.componentes.ContainsKey($id)) { $foto.nomes[$id] = $nomeDaTabela[$id] } }
 
 # Nome dos chunks da tela (WebResources cr40f_SistemaBetinhos/assets/*): o comparador trata chunk de build antigo que some
 # no upgrade como informativo, nao perda. So esses nomes entram na foto.
