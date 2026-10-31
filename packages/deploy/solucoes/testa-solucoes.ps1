@@ -324,9 +324,9 @@ Confere ((Get-ArgumentosDeImport 'x.zip' '1.0.0.4') -contains '--stage-and-upgra
 Confere ((Test-PacPerdeuConexao 'An error occurred while sending the request') -and (Test-PacPerdeuConexao 'The operation has timed out')) 'pac: erro de rede e perda de conexao'
 Confere (-not (Test-PacPerdeuConexao 'Error: The async operation completed with a statuscode of Failed.') -and -not (Test-PacPerdeuConexao 'Solution manifest import: FAILURE: Cannot create a holding solution')) 'pac: falha declarada pelo servidor nao espera'
 # Update-DvToken: conexao recente fica; conexao velha renova o cabecalho
-$dvVelho = @{ Api = 'https://p/api/data/v9.2'; Url = 'https://orgf261ae8e.crm2.dynamics.com'; Host = 'orgf261ae8e.crm2.dynamics.com'; Headers = @{ Authorization = 'velho' }; ConectadoEm = (Get-Date).AddMinutes(-55) }
+$dvVelho = @{ Api = 'https://p/api/data/v9.2'; Url = 'https://orgf261ae8e.crm2.dynamics.com'; Host = 'orgf261ae8e.crm2.dynamics.com'; Headers = @{ Authorization = 'velho' }; ConectadoEm = (Get-Date).AddMinutes(-45) }
 function Connect-Dataverse([string] $EnvironmentUrl, [string[]] $HostsPermitidos) { return @{ Headers = @{ Authorization = 'novo' } } }
-Confere ((Update-DvToken $dvVelho).Headers.Authorization -eq 'novo' -and ((Get-Date) - $dvVelho.ConectadoEm).TotalMinutes -lt 1) 'token: conexao com 55 min renova'
+Confere ((Update-DvToken $dvVelho).Headers.Authorization -eq 'novo' -and ((Get-Date) - $dvVelho.ConectadoEm).TotalMinutes -lt 1) 'token: conexao com 45 min renova'
 $dvNovo = @{ Headers = @{ Authorization = 'atual' }; ConectadoEm = Get-Date }
 Confere ((Update-DvToken $dvNovo).Headers.Authorization -eq 'atual') 'token: conexao recente fica'
 

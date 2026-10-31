@@ -23,8 +23,9 @@ function Connect-Dataverse([string] $EnvironmentUrl, [string[]] $HostsPermitidos
     $token = try { (Get-MsalToken -PublicClientApplication $client -Scopes $scope -Silent).AccessToken } catch { (Get-MsalToken -PublicClientApplication $client -Scopes $scope).AccessToken }
   }
   if (-not $token) { throw "Falha ao obter token para $hostName." }
+  # ConectadoEm: Update-DvToken (solucoes.ps1) renova o token nas esperas longas contando a partir daqui, nao da primeira espera.
   return @{
-    Api = "$base/api/data/v9.2"; Url = $base; Host = $hostName
+    Api = "$base/api/data/v9.2"; Url = $base; Host = $hostName; ConectadoEm = (Get-Date)
     Headers = @{ Authorization = "Bearer $token"; Accept = "application/json"; "OData-MaxVersion" = "4.0"; "OData-Version" = "4.0"; Prefer = "odata.maxpagesize=5000" }
   }
 }

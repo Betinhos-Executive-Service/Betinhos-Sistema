@@ -396,7 +396,8 @@ function Restore-Estados($Dv, [string] $Alvo, $Foto, [switch] $DesligarNovos) {
 }
 
 # Espera ate $Minutos a solucao sumir do ambiente (desinstalacao que continua no servidor depois de o pac perder a conexao).
-function Wait-SolucaoRemovida($Dv, [string] $Nome, [int] $Minutos = 60, [int] $IntervaloSegundos = 60) {
+# Desinstalacao da AppBetinhos com os 430 componentes legados passou de 75 min no TEST (30/10/2026): espera padrao de 3 h.
+function Wait-SolucaoRemovida($Dv, [string] $Nome, [int] $Minutos = 180, [int] $IntervaloSegundos = 60) {
   $limite = (Get-Date).AddMinutes($Minutos)
   do {
     if ($null -eq (Get-VersaoInstalada (Update-DvToken $Dv) $Nome)) { return $true }
@@ -406,7 +407,7 @@ function Wait-SolucaoRemovida($Dv, [string] $Nome, [int] $Minutos = 60, [int] $I
 }
 
 # Desinstala uma solucao gerenciada da caixa (AppBetinhos ou gerarpagantes) e prova pela ausencia. Nunca as 4 novas.
-function Remove-SolucaoGerenciada($Dv, [string] $Alvo, [string] $Nome, [int] $MinutosDeEspera = 60) {
+function Remove-SolucaoGerenciada($Dv, [string] $Alvo, [string] $Nome, [int] $MinutosDeEspera = 180) {
   Assert-HostAlvo $Dv $Alvo
   if ($script:Caixas -notcontains $Nome) { throw "Remove-SolucaoGerenciada so desinstala $($script:Caixas -join ' e '); recebi '$Nome'." }
   if ($null -eq (Get-VersaoInstalada $Dv $Nome)) { Write-Step "$Nome ja nao existe em $($Dv.Host)"; return @{ Nome = $Nome; JaAusente = $true; PacPerdeuConexao = $false } }
@@ -449,11 +450,12 @@ function Get-VersaoInstalada($Dv, [string] $Nome) {
 
 # O pac perde a conexao em operacoes longas e o import continua no servidor: a prova e a versao instalada.
 # Espera ate $Minutos a solucao chegar na versao; devolve $true se chegou.
-# Token de uma hora: numa espera longa ele vence (401 depois de 60 min no ensaio de 30/10/2026). Renova o cabecalho da conexao
-# quando faltar menos de 10 min; a hashtable e atualizada no lugar, entao quem chamou continua com a mesma conexao.
+# Token de uma hora: numa espera longa ele vence (401 aos 60 min da conexao, duas vezes no ensaio de 30/10/2026). Renova o
+# cabecalho aos 40 min contados de ConectadoEm (carimbado pelo Connect-Dataverse); a hashtable e atualizada no lugar, entao quem
+# chamou continua com a mesma conexao.
 function Update-DvToken($Dv) {
   if (-not $Dv.ContainsKey("ConectadoEm")) { $Dv.ConectadoEm = Get-Date }
-  if (((Get-Date) - $Dv.ConectadoEm).TotalMinutes -ge 50) {
+  if (((Get-Date) - $Dv.ConectadoEm).TotalMinutes -ge 40) {
     $novo = Connect-Dataverse $Dv.Url @($Dv.Host)
     $Dv.Headers = $novo.Headers; $Dv.ConectadoEm = Get-Date
   }
