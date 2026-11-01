@@ -5,7 +5,7 @@ export const TIPOS_POR_AGENTE = {
   financeiro: ['SemRecibo', 'OPPendenteAntiga', 'RepasseAguardando', 'MargemNegativa', 'OSSemCobranca'],
   logistica: ['ServicoSemMotorista', 'ServicoSemVeiculo', 'ConflitoHorario', 'MotoristaSemVeiculoAtual'],
   pessoas: ['CNHVencendo', 'ASOVencendo', 'DocumentoVencido', 'Aniversario', 'MultaSemMotorista', 'ComunicadoSugerido'],
-  frota: ['FrotaPrioridade', 'FrotaReincidencia', 'FrotaPreventiva', 'FrotaAgendadaVencida', 'FrotaCustoAlto', 'FrotaHodometro'],
+  frota: ['FrotaPrioridade', 'FrotaReincidencia', 'FrotaPreventiva', 'FrotaAgendadaVencida', 'FrotaCustoAlto', 'FrotaHodometro', 'FrotaConsumo', 'FrotaDicaCombustivel'],
 } as const
 export type TipoProposta = (typeof TIPOS_POR_AGENTE)[Agente][number]
 

@@ -67,7 +67,7 @@ function Lookup([string] $nomeRelacao, [string] $de, [string] $para, [string] $s
   Dv POST RelationshipDefinitions $body | Out-Null
 }
 
-$TIPOS = @('SemRecibo', 'OPPendenteAntiga', 'RepasseAguardando', 'MargemNegativa', 'OSSemCobranca', 'ServicoSemMotorista', 'ServicoSemVeiculo', 'ConflitoHorario', 'MotoristaSemVeiculoAtual', 'CNHVencendo', 'ASOVencendo', 'DocumentoVencido', 'Aniversario', 'MultaSemMotorista', 'ComunicadoSugerido', 'FrotaPrioridade', 'FrotaReincidencia', 'FrotaPreventiva', 'FrotaAgendadaVencida', 'FrotaCustoAlto', 'FrotaHodometro')
+$TIPOS = @('SemRecibo', 'OPPendenteAntiga', 'RepasseAguardando', 'MargemNegativa', 'OSSemCobranca', 'ServicoSemMotorista', 'ServicoSemVeiculo', 'ConflitoHorario', 'MotoristaSemVeiculoAtual', 'CNHVencendo', 'ASOVencendo', 'DocumentoVencido', 'Aniversario', 'MultaSemMotorista', 'ComunicadoSugerido', 'FrotaPrioridade', 'FrotaReincidencia', 'FrotaPreventiva', 'FrotaAgendadaVencida', 'FrotaCustoAlto', 'FrotaHodometro', 'FrotaConsumo', 'FrotaDicaCombustivel')
 $AGENTES = @('Financeiro', 'Logística', 'Pessoas', 'Frota')
 
 Tabela 'cr40f_agenteexecucao' 'Execução de agente' 'Execuções de agente' 'Uma rodada do assistente de departamento (Claude): contexto, resposta e custo.'

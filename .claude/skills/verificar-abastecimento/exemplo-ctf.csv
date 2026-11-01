@@ -1,0 +1,6 @@
+Data Transação;Hora;Placa;Motorista;Produto;Litros;Valor Unitário;Valor Total;Hodômetro;Estabelecimento
+20/10/2026;08:15;TST-1A11;Carlos Alberto Teste;Gasolina Comum;"41,5";"6,29";"261,04";171400;Posto Shell Faria Lima
+22/10/2026;19:40;TST-2B22;Bruna Lima;Gasolina Comum;"38,0";"6,19";"235,22";85900;Posto BR Anhanguera
+23/10/2026;09:00;ZZZ-0Z00;;Etanol;"30,0";"4,10";"123,00";;Auto Posto Novo
+23/10/2026;09:00;ZZZ-0Z00;;Etanol;"30,0";"4,10";"123,00";;Auto Posto Novo
+;;TST-1A11;;Gasolina Comum;10;6;60;;Posto sem data
