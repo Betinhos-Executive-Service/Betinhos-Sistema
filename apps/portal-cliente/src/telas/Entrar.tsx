@@ -135,10 +135,10 @@ export function Entrar({ onEntrar, dicaCodigo }: { onEntrar: (s: Sessao) => void
     <main className="pc-entrar">
       <section className="pc-entrar__card" aria-labelledby="pc-entrar-titulo">
         <p className="pc-marca">Betinhos Executive Service</p>
-        <h1 id="pc-entrar-titulo" className="pc-entrar__titulo">Validação de serviços</h1>
+        <h1 id="pc-entrar-titulo" className="pc-entrar__titulo">Portal do cliente</h1>
         {etapa === 'email' ? (
           <form className="pc-entrar__form" onSubmit={enviarCodigo} noValidate>
-            <p className="pc-entrar__texto">Entre com o e-mail cadastrado pela Betinhos. Enviaremos um código de acesso, sem senha.</p>
+            <p className="pc-entrar__texto">Entre com o e-mail da sua empresa. Enviaremos um código de acesso, sem senha.</p>
             <Field label="E-mail" error={erroCampo} required>
               <Input type="email" autoComplete="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nome@empresa.com" size="touch" autoFocus />
             </Field>

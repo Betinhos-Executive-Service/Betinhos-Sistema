@@ -21,6 +21,15 @@ export function diaLocal(iso: string): string {
   return new Date(new Date(iso).getTime() - OFFSET_MS).toISOString().slice(0, 10)
 }
 
+/** Valor de um `datetime-local` (sem fuso) lido em São Paulo → ISO; vazio ou inválido → ''. */
+export function deLocalSaoPaulo(local: string): string {
+  const ms = Date.parse(`${local}:00Z`)
+  return Number.isNaN(ms) ? '' : new Date(ms + OFFSET_MS).toISOString()
+}
+
+/** Instante → valor de `datetime-local` em São Paulo (yyyy-mm-ddThh:mm). */
+export const paraLocalSaoPaulo = (ms: number) => new Date(ms - OFFSET_MS).toISOString().slice(0, 16)
+
 /** Dias corridos como timestamps UTC à meia-noite, para somar sem criar strings a cada passo. */
 const paraMs = (dia: string) => Date.parse(`${dia}T00:00:00Z`)
 const paraDia = (ms: number) => new Date(ms).toISOString().slice(0, 10)

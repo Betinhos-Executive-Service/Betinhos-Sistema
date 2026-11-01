@@ -4,7 +4,7 @@ import { ApiProvider } from './api/ApiContext'
 import type { PortalApi } from './api/PortalApi'
 import type { Sessao } from './domain/types'
 import { Entrar } from './telas/Entrar'
-import { Servicos } from './telas/Servicos'
+import { Portal } from './telas/Portal'
 
 export function App({ api, dicaCodigo }: { api: PortalApi; dicaCodigo?: string }) {
   const [sessao, setSessao] = useState<Sessao | null>(null)
@@ -15,7 +15,7 @@ export function App({ api, dicaCodigo }: { api: PortalApi; dicaCodigo?: string }
   return (
     <ApiProvider api={api}>
       <ToastProvider>
-        {sessao ? <Servicos sessao={sessao} onSair={sair} /> : <Entrar onEntrar={setSessao} dicaCodigo={dicaCodigo} />}
+        {sessao ? <Portal sessao={sessao} onSair={sair} /> : <Entrar onEntrar={setSessao} dicaCodigo={dicaCodigo} />}
         <BuildBadge version={__APP_VERSION__} isoDate={__BUILD_DATE__} />
       </ToastProvider>
     </ApiProvider>

@@ -105,3 +105,12 @@ Os dias úteis são de segunda a sexta, sem feriados nacionais, e contam a parti
 - O que acontece do lado da Tenaris depois da validação até o pagamento (Renan levanta na reunião).
 - Excel modelo do mês (Renan pega com a Juliana).
 - Domínio do portal (ex.: `portal.betinhos.com.br`).
+
+
+## Adendo 01/11/2026: portal multi-cliente (Latasa)
+
+- O portal passa a ser **do cliente**, com módulos por cliente em `cr40f_clientes1.cr40f_portalmodulos` (Validar / Pedir / Meus serviços) e domínios autorizados em `cr40f_portaldominios`. Tenaris = Validar (fluxo acima intacto). Latasa = Pedir + Meus serviços.
+- Login: validador cadastrado **ou** e-mail de domínio autorizado de um único cliente com módulo; o cadastro em `cr40f_validadorcliente` nasce no primeiro pedido de código (nome derivado do e-mail). Domínio não autorizado, dois clientes com o mesmo domínio ou cliente sem módulo: resposta igual à de e-mail inexistente.
+- Pedir: passageiros (1–4), saída de, destino, data e hora, observação; sem preço. Cria `cr40f_reservadeveculos` em **Solicitado** (202410004) com `cr40f_Cliente`, o lookup novo `cr40f_PortalUsuario` e o memo novo `cr40f_PortalPedido` (JSON com passageiros e observação do cliente, coluna só do portal). Por cortesia à operação também preenche `cr40f_passageirosetelefonedecontato` e `cr40f_observaointerna` ("Pedido pelo portal por …"), mas nunca lê de volta dessas colunas: o plugin de compartilhamento e o shell as reescrevem. Mesmo pedido em 1 minuto é recusado (409). A operação precifica e programa no shell (Geral, status Solicitado).
+- Meus serviços: reservas do usuário da sessão com status da reserva, veículo e voucher quando programadas.
+- Pendências: e-mail à operação a cada pedido (tipo novo no flow de e-mails) e quem na Latasa vê os pedidos dos colegas (hoje só os próprios).

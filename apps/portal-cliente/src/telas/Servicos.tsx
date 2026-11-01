@@ -2,12 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Alert, Button, Checkbox, EmptyState, PageToolbar, SearchBox, SegmentedControl, Select, StatusBadge, Table, useToast, type TableColumn,
 } from '@betinhos/ui'
-import { CheckCheck, Download, Inbox, ListChecks, LogOut } from 'lucide-react'
+import { CheckCheck, Download, Inbox, ListChecks } from 'lucide-react'
 import { useApi } from '../api/ApiContext'
-import { brl, dataHora } from '../domain/formato'
+import { brl } from '../domain/formato'
 import { podeAprovar, statusInfo } from '../domain/regras'
 import type { Servico, Sessao } from '../domain/types'
 import { exportarExcel } from '../excel/exportar'
+import { colunasTrajeto, ResumoServico } from './colunas'
 import { Detalhe } from './Detalhe'
 import { ABAS, contar, daAba, filtrarBase, mesesDisponiveis, type Aba } from './filtros'
 import { calcularPrazo, type Prazo } from './prazo'
@@ -21,7 +22,7 @@ const VAZIO: Record<Aba, string> = {
   todos: 'Nenhum serviço liberado.',
 }
 
-export function Servicos({ sessao, onSair }: { sessao: Sessao; onSair: () => void }) {
+export function Servicos({ sessao }: { sessao: Sessao }) {
   const api = useApi()
   const toast = useToast()
   const [servicos, setServicos] = useState<Servico[]>([])
@@ -131,16 +132,12 @@ export function Servicos({ sessao, onSair }: { sessao: Sessao; onSair: () => voi
             disabled={!podeAprovar(s)}
           />
           <button type="button" className="pc-servico" onClick={() => setAberto(s.id)}>
-            <span className="pc-servico__numero">{s.numero}</span>
-            <span className="pc-servico__data">{dataHora(s.saida)}</span>
-            {/* No card do mobile a coluna Trajeto some e o trajeto aparece aqui. */}
-            <span className="pc-servico__trajeto">{s.origem} → {s.destino}</span>
+            <ResumoServico numero={s.numero} saida={s.saida} origem={s.origem} destino={s.destino} />
           </button>
         </span>
       ),
     },
-    { key: 'trajeto', header: 'Trajeto', width: 'minmax(220px, 1.6fr)', hideBelow: 'mobile', cell: (s) => <span className="pc-trajeto">{s.origem} → {s.destino}</span> },
-    { key: 'passageiros', header: 'Passageiros', width: 'minmax(140px, 1fr)', hideBelow: 'compact', cell: (s) => s.passageiros.join(', ') },
+    ...colunasTrajeto<Servico>(),
     { key: 'cr', header: 'CR', width: 'minmax(120px, .8fr)', hideBelow: 'compact', cell: (s) => s.cr },
     {
       key: 'valor', header: 'Valor', width: '120px', align: 'end',
@@ -166,15 +163,7 @@ export function Servicos({ sessao, onSair }: { sessao: Sessao; onSair: () => voi
   ]
 
   return (
-    <div className="pc-pagina">
-      <header className="pc-topo">
-        <p className="pc-marca">Betinhos Executive Service</p>
-        <div className="pc-topo__usuario">
-          <span className="pc-topo__nome">{sessao.nome} · {sessao.cliente}</span>
-          <Button variant="ghost" size="compact" onClick={onSair} icon={<LogOut size={16} aria-hidden />}>Sair</Button>
-        </div>
-      </header>
-
+    <>
       <main className="pc-conteudo">
         <div>
           <h1 className="pc-titulo">Serviços de {nomeMes ?? 'todos os meses'}</h1>
@@ -244,6 +233,6 @@ export function Servicos({ sessao, onSair }: { sessao: Sessao; onSair: () => voi
           onAtualizado={(s) => atualizar([s])}
         />
       )}
-    </div>
+    </>
   )
 }

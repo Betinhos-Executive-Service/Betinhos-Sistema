@@ -1,6 +1,6 @@
-import type { Motivo, Servico, Sessao } from '../domain/types'
+import type { Motivo, NovoPedido, Pedido, Servico, Sessao } from '../domain/types'
 
-export type CodigoErro = 'codigo_invalido' | 'codigo_expirado' | 'totp_invalido' | 'bloqueado' | 'nao_permitido' | 'falha'
+export type CodigoErro = 'codigo_invalido' | 'codigo_expirado' | 'totp_invalido' | 'bloqueado' | 'nao_permitido' | 'duplicado' | 'falha'
 
 export class ErroPortal extends Error {
   constructor(public codigo: CodigoErro, message: string = codigo) {
@@ -29,4 +29,8 @@ export interface PortalApi {
   aprovar(ids: string[]): Promise<Servico[]>
   abrirDuvida(id: string, motivo: Motivo, texto: string): Promise<Servico>
   responder(id: string, texto: string): Promise<Servico>
+  /** Módulo Pedir: cria a reserva em Solicitado. `duplicado` = mesmo pedido há menos de 1 minuto. */
+  pedir(novo: NovoPedido): Promise<Pedido>
+  /** Módulo Meus serviços: pedidos feitos pelo e-mail da sessão, do mais recente para o mais antigo. */
+  meusServicos(): Promise<Pedido[]>
 }

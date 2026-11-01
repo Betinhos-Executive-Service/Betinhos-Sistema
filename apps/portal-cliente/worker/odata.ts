@@ -1,6 +1,6 @@
 // Montagem das consultas OData. Toda consulta de serviço leva o cliente da sessão no $filter:
 // o isolamento entre clientes é aqui, não na tela.
-import { COMPOSICAO_LINHAS, NAV, RESERVA_CAMPOS, SET, STATUS_DV, VALIDACAO_CAMPOS } from './schema'
+import { CLIENTE_CAMPOS, COMPOSICAO_LINHAS, NAV, PEDIDO_CAMPOS, RESERVA_CAMPOS, SET, STATUS_DV, VALIDACAO_CAMPOS } from './schema'
 
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -48,10 +48,32 @@ export const resumoDoCliente = (clienteId: string, desdeIso: string, hoje: strin
       `(cr40f_liberadoem ge ${desdeIso} or cr40f_prazotacita eq ${hoje})`,
   )
 
-/** Validador ativo de um cliente com o portal habilitado; `$top=2` para recusar e-mail duplicado. */
-export const validadorPorEmail = (email: string) =>
-  `${SET.validador}?$select=cr40f_validadorclienteid,cr40f_name,cr40f_email,cr40f_segredototp,_cr40f_cliente_value&$top=2` +
-  `&$filter=${encodeURIComponent(`cr40f_email eq ${texto(email)} and cr40f_ativo eq true and ${NAV.cliente}/cr40f_portalhabilitado eq true`)}`
+const VALIDADOR_SELECT = 'cr40f_validadorclienteid,cr40f_name,cr40f_email,cr40f_segredototp,_cr40f_cliente_value,cr40f_ativo'
+/** Os módulos do cliente vão na sessão: cliente sem módulo não entra. */
+const expandCliente = `$expand=${NAV.cliente}($select=cr40f_portalmodulos)`
 
-export const validadorPorId = (id: string) =>
-  `${SET.validador}(${guid(id)})?$select=cr40f_validadorclienteid,cr40f_name,cr40f_email,cr40f_segredototp,_cr40f_cliente_value,cr40f_ativo`
+/** Usuário ativo de um cliente com portal e módulos; `$top=2` para recusar e-mail duplicado. */
+export const validadorPorEmail = (email: string) =>
+  `${SET.validador}?$select=${VALIDADOR_SELECT}&${expandCliente}&$top=2` +
+  `&$filter=${encodeURIComponent(`cr40f_email eq ${texto(email)} and cr40f_ativo eq true and ${NAV.cliente}/cr40f_portalhabilitado eq true and ${NAV.cliente}/cr40f_portalmodulos ne null`)}`
+
+export const validadorPorId = (id: string) => `${SET.validador}(${guid(id)})?$select=${VALIDADOR_SELECT}&${expandCliente}`
+
+/** Qualquer cadastro com o e-mail (inativo ou de cliente sem portal): quem foi desativado não volta pelo domínio. */
+export const validadorQualquerPorEmail = (email: string) =>
+  `${SET.validador}?$select=cr40f_validadorclienteid&$top=1&$filter=${encodeURIComponent(`cr40f_email eq ${texto(email)}`)}`
+
+/** Validadores ativos de clientes com portal, com os módulos do cliente (o resumo diário é só de quem valida). */
+export const validadoresAtivos = () =>
+  `${SET.validador}?$select=cr40f_email,_cr40f_cliente_value&${expandCliente}&$filter=${encodeURIComponent(`cr40f_ativo eq true and ${NAV.cliente}/cr40f_portalhabilitado eq true`)}`
+
+/** Clientes com portal cujo campo de domínios contém o domínio; a igualdade exata é conferida no código. */
+export const clientesPorDominio = (dominio: string) =>
+  `${SET.cliente}?$select=${CLIENTE_CAMPOS.join(',')}&$filter=${encodeURIComponent(`cr40f_portalhabilitado eq true and contains(cr40f_portaldominios,${texto(dominio)})`)}`
+
+/** Reservas pedidas pelo portal por este usuário (e do cliente da sessão, por garantia). */
+export const pedidosDe = (validadorId: string, clienteId: string) =>
+  `${SET.reserva}?$select=${PEDIDO_CAMPOS.join(',')}&$filter=${encodeURIComponent(`_cr40f_portalusuario_value eq ${guid(validadorId)} and ${doCliente(clienteId)}`)}&$orderby=cr40f_dataehorriodesada desc`
+
+/** Caminho do POST da reserva: o `$select` define o que volta no `return=representation`. */
+export const criarPedido = () => `${SET.reserva}?$select=${PEDIDO_CAMPOS.join(',')}`

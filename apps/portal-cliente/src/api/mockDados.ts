@@ -1,5 +1,5 @@
 import { DIA_MS, DIAS_TACITA, somarDiasUteis } from '../domain/regras'
-import type { LinhaPreco, Mensagem, Servico, Status } from '../domain/types'
+import type { LinhaPreco, Mensagem, Pedido, Servico, Status, StatusPedido } from '../domain/types'
 
 // Dados fictícios para o protótipo: nomes, pedidos e valores não vêm do Dataverse.
 const CRS = ['501019604 · Manutenção', '501019611 · Engenharia', '501019720 · Comercial']
@@ -98,5 +98,37 @@ export function gerarServicos(agora: Date): Servico[] {
     }
     if (status === 'aprovado_tacito') s.aprovadoEm = `${s.prazoTacito}T23:59:00-03:00`
     return s
+  })
+}
+
+export const SOLICITANTE_LATASA = 'compras@latasa.com.br'
+const ROTAS_LATASA: [string, string][] = [
+  ['Latasa Reciclagem, Pindamonhangaba', 'Aeroporto de Guarulhos (GRU)'],
+  ['Aeroporto de Guarulhos (GRU)', 'Latasa Reciclagem, Pindamonhangaba'],
+  ['Latasa Reciclagem, Pindamonhangaba', 'Hotel Mercure, São José dos Campos'],
+  ['Av. Faria Lima, 3000, São Paulo', 'Latasa Reciclagem, Pindamonhangaba'],
+]
+/** Do mais recente para o mais antigo: 2 futuros (um já programado) e 4 passados. */
+const PLANO_PEDIDOS: { status: StatusPedido; dias: number }[] = [
+  { status: 'solicitado', dias: 3 }, { status: 'programado', dias: 1 }, { status: 'concluido', dias: -2 },
+  { status: 'cancelado', dias: -5 }, { status: 'concluido', dias: -9 }, { status: 'concluido', dias: -16 },
+]
+
+export type PedidoMock = Pedido & { solicitante: string }
+
+/** Pedidos da Latasa feitos por `SOLICITANTE_LATASA` (outro e-mail do domínio começa sem pedidos). */
+export function gerarPedidos(agora: Date): PedidoMock[] {
+  return PLANO_PEDIDOS.map(({ status, dias }, i) => {
+    const saida = new Date(agora.getTime() + dias * DIA_MS)
+    saida.setUTCHours(9 + i, 0, 0, 0)
+    const numero = `RV-${48300 + i}`
+    const [origem, destino] = ROTAS_LATASA[i % ROTAS_LATASA.length]
+    return {
+      id: `ped-seed-${i}`, numero, origem, destino, saida: saida.toISOString(), status, solicitante: SOLICITANTE_LATASA,
+      passageiros: [PASSAGEIROS[(i + 3) % PASSAGEIROS.length]],
+      criadoEm: new Date(saida.getTime() - 2 * DIA_MS).toISOString(),
+      ...(i === 0 ? { observacao: 'Voo LA3421, chega às 14h10.' } : {}),
+      ...(status === 'programado' || status === 'concluido' ? { veiculo: VEICULOS[i % VEICULOS.length], voucherUrl: `https://exemplo.betinhos.com.br/voucher/${numero}.pdf` } : {}),
+    }
   })
 }

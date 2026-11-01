@@ -1,13 +1,33 @@
 import { Secret, TOTP } from 'otpauth'
+import { chaveDuplicado, dominioDe, JANELA_DUPLICADO_MS, nomeDoEmail, normalizarPedido, primeiroErroPedido } from '../domain/pedidos'
 import { podeAprovar } from '../domain/regras'
-import type { Motivo, Servico, Sessao } from '../domain/types'
-import { gerarServicos } from './mockDados'
+import type { Modulo, Motivo, NovoPedido, Pedido, Servico, Sessao } from '../domain/types'
+import { gerarPedidos, gerarServicos, type PedidoMock } from './mockDados'
 import { ErroPortal, type PortalApi } from './PortalApi'
 
 export const CODIGO_MOCK = '123456'
-const VALIDADORES: Record<string, string> = {
-  'fiscal@tenaris.com': 'Marcos Albuquerque',
-  'financeiro@tenaris.com': 'Renata Siqueira',
+type Usuario = { nome: string; cliente: string; modulos: Modulo[] }
+/** Mesma configuração que `cr40f_clientes1` terá: módulos e domínios por cliente. */
+const CLIENTES: Record<string, { modulos: Modulo[]; dominios: string[] }> = {
+  Tenaris: { modulos: ['validar'], dominios: [] },
+  Latasa: { modulos: ['pedir', 'meus_servicos'], dominios: ['latasa.com.br'] },
+  // Portal habilitado sem módulo nenhum: ninguém entra.
+  'Sem Módulo': { modulos: [], dominios: ['semmodulo.com.br'] },
+}
+/** Validadores cadastrados pela Betinhos (Tenaris). Quem entra pelo domínio não precisa de cadastro. */
+const VALIDADORES: Record<string, Usuario> = {
+  'fiscal@tenaris.com': { nome: 'Marcos Albuquerque', cliente: 'Tenaris', modulos: ['validar'] },
+  'financeiro@tenaris.com': { nome: 'Renata Siqueira', cliente: 'Tenaris', modulos: ['validar'] },
+}
+
+/** Cadastro por e-mail ou, sem cadastro, pelo domínio do cliente; cliente sem módulo não autoriza. */
+export function usuarioMock(email: string): Usuario | null {
+  const direto = VALIDADORES[email]
+  if (direto) return direto
+  const clientes = Object.entries(CLIENTES).filter(([, c]) => c.dominios.includes(dominioDe(email)))
+  if (clientes.length !== 1) return null // dois clientes com o mesmo domínio: ninguém entra
+  const [cliente, { modulos }] = clientes[0]
+  return modulos.length ? { nome: nomeDoEmail(email), cliente, modulos } : null
 }
 const MAX_TENTATIVAS = 5
 const BLOQUEIO_MS = 15 * 60 * 1000
@@ -51,11 +71,12 @@ export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; arm
   const armazenamento = opts.armazenamento ?? armazenamentoPadrao()
   const espera = () => new Promise<void>((r) => setTimeout(r, opts.atrasoMs ?? 0))
   let servicos = gerarServicos(agora())
+  let pedidos = gerarPedidos(agora())
   let sessao: Sessao | null = null
   let tentativasErradas = 0
   let bloqueadoAte = 0
-  /** Validador que passou pelo código do e-mail e falta o TOTP; `segredoNovo` só existe no cadastro. */
-  let pendente: { nome: string; email: string; segredoNovo?: string } | null = null
+  /** Usuário que passou pelo código do e-mail e falta o TOTP; `segredoNovo` só existe no cadastro. */
+  let pendente: { usuario: Usuario; email: string; segredoNovo?: string } | null = null
 
   const lerJson = <T,>(chave: string): T | null => {
     try {
@@ -80,16 +101,17 @@ export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; arm
     bloqueadoAte = agora().getTime() + BLOQUEIO_MS
     throw new ErroPortal('bloqueado')
   }
-  const abrirSessao = (nome: string, email: string): Sessao => {
+  const abrirSessao = (u: Usuario, email: string): Sessao => {
     tentativasErradas = 0
     pendente = null
-    sessao = { nome, email, cliente: 'Tenaris' }
+    sessao = { nome: u.nome, email, cliente: u.cliente, modulos: u.modulos }
     return { ...sessao }
   }
 
   const copia = (s: Servico): Servico => structuredClone(s)
-  const exigirSessao = () => {
-    if (!sessao) throw new ErroPortal('nao_permitido')
+  const semSolicitante = ({ solicitante: _, ...p }: PedidoMock): Pedido => structuredClone(p)
+  const exigirSessao = (modulo: Modulo) => {
+    if (!sessao?.modulos.includes(modulo)) throw new ErroPortal('nao_permitido')
     return sessao
   }
   const atualizar = (id: string, muda: (s: Servico) => Servico) => {
@@ -113,24 +135,24 @@ export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; arm
       // Nova tentativa de e-mail invalida a etapa do autenticador que estava aberta.
       pendente = null
       const emailNorm = email.trim().toLowerCase()
-      const nome = VALIDADORES[emailNorm]
-      if (!nome || codigo.trim() !== CODIGO_MOCK) return errou('codigo_invalido')
+      const usuario = usuarioMock(emailNorm)
+      if (!usuario || codigo.trim() !== CODIGO_MOCK) return errou('codigo_invalido')
       tentativasErradas = 0
-      if (lembrado(emailNorm)) return { etapa: 'ok', sessao: abrirSessao(nome, emailNorm) }
+      if (lembrado(emailNorm)) return { etapa: 'ok', sessao: abrirSessao(usuario, emailNorm) }
       const segredo = segredos()[emailNorm]
       if (segredo) {
-        pendente = { nome, email: emailNorm }
+        pendente = { usuario, email: emailNorm }
         return { etapa: 'autenticador' }
       }
       const segredoNovo = new Secret({ size: 20 }).base32
-      pendente = { nome, email: emailNorm, segredoNovo }
+      pendente = { usuario, email: emailNorm, segredoNovo }
       return { etapa: 'cadastrar_autenticador', otpauthUrl: totpDo(emailNorm, segredoNovo).toString(), segredo: segredoNovo }
     },
     async confirmarAutenticador(codigoTotp, lembrar) {
       await espera()
       verificarBloqueio()
       if (!pendente) throw new ErroPortal('nao_permitido')
-      const { nome, email, segredoNovo } = pendente
+      const { usuario, email, segredoNovo } = pendente
       const segredo = segredoNovo ?? segredos()[email]
       // janela 1: aceita o código do intervalo anterior e do seguinte (relógio do celular adiantado/atrasado).
       if (!segredo || totpDo(email, segredo).validate({ token: codigoTotp.trim(), timestamp: agora().getTime(), window: 1 }) === null) {
@@ -139,19 +161,19 @@ export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; arm
       if (segredoNovo) gravar(CHAVE_SEGREDOS, { ...segredos(), [email]: segredoNovo })
       // No portal real é um token opaco do Worker; aqui basta o e-mail e a validade.
       if (lembrar) gravar(CHAVE_DISPOSITIVO, { email, expiraEm: agora().getTime() + LEMBRAR_MS })
-      return abrirSessao(nome, email)
+      return abrirSessao(usuario, email)
     },
     async sair() {
       sessao = null
     },
     async listar() {
       await espera()
-      exigirSessao()
+      exigirSessao('validar')
       return servicos.map(copia)
     },
     async aprovar(ids) {
       await espera()
-      const { nome } = exigirSessao()
+      const { nome } = exigirSessao('validar')
       const quando = agora().toISOString()
       return ids
         .filter((id) => servicos.some((s) => s.id === id && podeAprovar(s)))
@@ -159,7 +181,7 @@ export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; arm
     },
     async abrirDuvida(id, motivo, texto) {
       await espera()
-      const { nome } = exigirSessao()
+      const { nome } = exigirSessao('validar')
       if (!texto.trim()) throw new ErroPortal('nao_permitido', 'Escreva a dúvida.')
       return atualizar(id, (s) => {
         if (!podeAprovar(s)) throw new ErroPortal('nao_permitido')
@@ -168,9 +190,27 @@ export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; arm
     },
     async responder(id, texto) {
       await espera()
-      const { nome } = exigirSessao()
+      const { nome } = exigirSessao('validar')
       if (!texto.trim()) throw new ErroPortal('nao_permitido', 'Escreva a resposta.')
       return atualizar(id, (s) => ({ ...s, status: 'em_duvida', mensagens: [...s.mensagens, mensagem(s, nome, texto.trim())] }))
+    },
+    async pedir(novo) {
+      await espera()
+      const { email } = exigirSessao('pedir')
+      const pedido = normalizarPedido(novo)
+      const primeiro = primeiroErroPedido(pedido, agora().getTime())
+      if (primeiro) throw new ErroPortal('nao_permitido', primeiro)
+      const chave = chaveDuplicado(email, pedido)
+      const repetido = pedidos.some((p) => chaveDuplicado(p.solicitante, p) === chave && agora().getTime() - Date.parse(p.criadoEm) < JANELA_DUPLICADO_MS)
+      if (repetido) throw new ErroPortal('duplicado', 'Este pedido acabou de ser enviado.')
+      const criado: PedidoMock = { ...pedido, id: `ped-${pedidos.length + 1}`, numero: `RV-${48400 + pedidos.length}`, status: 'solicitado', criadoEm: agora().toISOString(), solicitante: email }
+      pedidos = [criado, ...pedidos]
+      return semSolicitante(criado)
+    },
+    async meusServicos() {
+      await espera()
+      const { email } = exigirSessao('meus_servicos')
+      return pedidos.filter((p) => p.solicitante === email).map(semSolicitante)
     },
   }
 }

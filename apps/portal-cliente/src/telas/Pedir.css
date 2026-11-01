@@ -1,0 +1,9 @@
+.pc-pedir__form { display: flex; flex-direction: column; gap: var(--bt-space-4); max-width: 560px; }
+.pc-pedir__grupo { display: flex; flex-direction: column; gap: var(--bt-space-3); margin: 0; padding: 0; border: 0; min-width: 0; }
+.pc-pedir__passageiro { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--bt-space-2); }
+.pc-pedir__mais, .pc-pedir__enviar { align-self: flex-start; }
+.pc-pedir__quando { font-variant-numeric: tabular-nums; }
+
+@media (max-width: 560px) {
+  .pc-pedir__enviar { align-self: stretch; }
+}

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { App } from './App'
 import { armazenamentoEmMemoria, createMockApi, totpDo, type Armazenamento } from './api/mockApi'
@@ -15,7 +15,7 @@ function segredoNaTela() {
   return document.querySelector('.pc-entrar__segredo')!.textContent!.replace(/\s/g, '')
 }
 
-const totpAgora = (segredo: string) => totpDo('fiscal@tenaris.com', segredo).generate({ timestamp: T0 })
+const totpAgora = (segredo: string, email = 'fiscal@tenaris.com') => totpDo(email, segredo).generate({ timestamp: T0 })
 
 async function confirmarTotp(codigo: string, lembrar = false) {
   const campo = await screen.findByLabelText(/Código do autenticador/)
@@ -25,14 +25,14 @@ async function confirmarTotp(codigo: string, lembrar = false) {
 }
 
 /** Login completo no 1º acesso: código do e-mail, QR e TOTP gerado com a mesma biblioteca. */
-async function entrarCompleto() {
-  await entrar()
+async function entrarCompleto(email = 'fiscal@tenaris.com') {
+  await entrar('123456', email)
   await screen.findByRole('img', { name: /QR code/ })
-  await confirmarTotp(totpAgora(segredoNaTela()))
+  await confirmarTotp(totpAgora(segredoNaTela(), email))
 }
 
-async function entrar(codigo = '123456') {
-  fireEvent.change(screen.getByLabelText(/E-mail/), { target: { value: 'fiscal@tenaris.com' } })
+async function entrar(codigo = '123456', email = 'fiscal@tenaris.com') {
+  fireEvent.change(screen.getByLabelText(/E-mail/), { target: { value: email } })
   fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
   const campo = await screen.findByLabelText(/Código de acesso/)
   fireEvent.change(campo, { target: { value: codigo } })
@@ -42,7 +42,7 @@ async function entrar(codigo = '123456') {
 describe('Portal do cliente', () => {
   it('mostra a versão do build já na tela de entrada', () => {
     abrir()
-    expect(screen.getByRole('heading', { name: 'Validação de serviços' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Portal do cliente' })).toBeTruthy()
     expect(document.querySelector('.bt-build-badge')?.textContent).toMatch(/^v\d+\.\d+\.\d+ · /)
   })
 
@@ -99,6 +99,14 @@ describe('Portal do cliente', () => {
     expect(screen.queryByLabelText(/Código do autenticador/)).toBeNull()
   })
 
+  it('Tenaris vê só a validação, sem troca de módulo', async () => {
+    abrir()
+    await entrarCompleto()
+    await screen.findByText(/Serviços de outubro de 2026/)
+    expect(screen.queryByRole('radiogroup', { name: 'Área do portal' })).toBeNull()
+    expect(screen.getByText('Marcos Albuquerque · Tenaris')).toBeTruthy()
+  })
+
   it('entra, seleciona dois serviços e aprova em lote', async () => {
     abrir()
     await entrarCompleto()
@@ -140,5 +148,85 @@ describe('Portal do cliente', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Descartar' }))
     await waitFor(() => expect(within(painel).queryByLabelText(/Sua dúvida/)).toBeNull())
     expect(within(painel).getByRole('button', { name: 'Tenho uma dúvida' })).toBeTruthy()
+  })
+
+  describe('Latasa (Pedir + Meus serviços)', () => {
+    const LATASA = 'compras@latasa.com.br'
+    // Só o Date: as telas usam o relógio real para "daqui para a frente" e os dados do mock nascem em T0.
+    beforeEach(() => vi.setSystemTime(T0))
+    afterEach(() => vi.useRealTimers())
+    /** `datetime-local` de amanhã às 09:00 (sem fuso). */
+    const amanha = () => `${new Date(T0 + 86400_000).toISOString().slice(0, 10)}T09:00`
+
+    it('entra pelo domínio e vê só Pedir e Meus serviços', async () => {
+      abrir()
+      await entrarCompleto(LATASA)
+      expect(await screen.findByRole('heading', { name: 'Pedir serviço' })).toBeTruthy()
+      const areas = screen.getByRole('radiogroup', { name: 'Área do portal' })
+      expect(within(areas).getAllByRole('radio').map((r) => r.textContent)).toEqual(['Pedir serviço', 'Meus serviços'])
+      expect(screen.queryByText(/A validar/)).toBeNull()
+      expect(screen.getByText('Compras · Latasa')).toBeTruthy()
+    })
+
+    it('trocar de área no meio do pedido não perde o que foi digitado', async () => {
+      abrir()
+      await entrarCompleto(LATASA)
+      await screen.findByRole('heading', { name: 'Pedir serviço' })
+      fireEvent.change(screen.getByLabelText(/^Passageiro/), { target: { value: 'Hiroshi Tanaka' } })
+      fireEvent.click(screen.getByRole('radio', { name: 'Meus serviços' }))
+      await screen.findByRole('heading', { name: 'Meus serviços' })
+      fireEvent.click(screen.getByRole('radio', { name: 'Pedir serviço' }))
+      expect((screen.getByLabelText(/^Passageiro/) as HTMLInputElement).value).toBe('Hiroshi Tanaka')
+    })
+
+    it('e-mail de domínio não autorizado recebe a mesma mensagem de código incorreto', async () => {
+      abrir()
+      await entrar('123456', 'alguem@gmail.com')
+      expect(await screen.findByText(/Código incorreto/)).toBeTruthy()
+    })
+
+    it('erros por campo: sem origem e data no passado', async () => {
+      abrir()
+      await entrarCompleto(LATASA)
+      await screen.findByRole('heading', { name: 'Pedir serviço' })
+      fireEvent.change(screen.getByLabelText(/^Passageiro/), { target: { value: 'Hiroshi Tanaka' } })
+      fireEvent.change(screen.getByLabelText(/Destino/), { target: { value: 'GRU' } })
+      fireEvent.change(screen.getByLabelText(/Data e hora da saída/), { target: { value: '2020-01-01T10:00' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Enviar pedido' }))
+      expect(await screen.findByText('Informe o endereço de saída.')).toBeTruthy()
+      expect(screen.getByText('A saída precisa ser daqui para a frente.')).toBeTruthy()
+      expect(screen.queryByText(/Pedido RV-/)).toBeNull()
+    })
+
+    it('pedido completo aparece em Meus serviços como Solicitado', async () => {
+      abrir()
+      await entrarCompleto(LATASA)
+      await screen.findByRole('heading', { name: 'Pedir serviço' })
+      fireEvent.change(screen.getByLabelText(/^Passageiro/), { target: { value: 'Hiroshi Tanaka' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Adicionar passageiro' }))
+      fireEvent.change(screen.getByLabelText('Passageiro 2'), { target: { value: 'Juliana Prado' } })
+      fireEvent.change(screen.getByLabelText(/Saída de/), { target: { value: 'Latasa, Pindamonhangaba' } })
+      fireEvent.change(screen.getByLabelText(/Destino/), { target: { value: 'Aeroporto de Guarulhos' } })
+      fireEvent.change(screen.getByLabelText(/Data e hora da saída/), { target: { value: amanha() } })
+      fireEvent.change(screen.getByLabelText(/Observação/), { target: { value: 'Voo LA3421' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Enviar pedido' }))
+      expect(await screen.findByText(/Pedido RV-\d+ enviado/)).toBeTruthy()
+      expect(await screen.findByRole('heading', { name: 'Meus serviços' })).toBeTruthy()
+      const linha = (await screen.findByText('Latasa, Pindamonhangaba → Aeroporto de Guarulhos', { selector: '.pc-trajeto' })).closest<HTMLElement>('tr, [role=row]')!
+      expect(within(linha).getByText('Solicitado')).toBeTruthy()
+      expect(within(linha).getByText('Hiroshi Tanaka, Juliana Prado')).toBeTruthy()
+    })
+
+    it('Meus serviços mostra o programado com voucher e separa próximos de todos', async () => {
+      abrir()
+      await entrarCompleto(LATASA)
+      fireEvent.click(await screen.findByRole('radio', { name: 'Meus serviços' }))
+      await screen.findByRole('heading', { name: 'Meus serviços' })
+      expect(await screen.findByText('Programado')).toBeTruthy()
+      expect(screen.getByRole('link', { name: /Voucher/ }).getAttribute('href')).toMatch(/\.pdf$/)
+      expect(screen.queryByText('Concluído')).toBeNull()
+      fireEvent.click(screen.getByRole('radio', { name: /Todos · 6/ }))
+      expect((await screen.findAllByText('Concluído')).length).toBe(3)
+    })
   })
 })

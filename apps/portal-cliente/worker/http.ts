@@ -1,9 +1,10 @@
 // Respostas, cookies e sessão. A sessão é um cookie cifrado (AES-GCM), sem tabela: some ao expirar ou ao sair.
+import type { Modulo } from '../src/domain/types'
 import { cifrar, decifrar } from './cripto'
 import type { Env } from './env'
 
 /** Mesmos códigos do `ErroPortal` do app (contrato das duas etapas). */
-export type CodigoErro = 'codigo_invalido' | 'codigo_expirado' | 'totp_invalido' | 'bloqueado' | 'nao_permitido' | 'falha'
+export type CodigoErro = 'codigo_invalido' | 'codigo_expirado' | 'totp_invalido' | 'bloqueado' | 'nao_permitido' | 'duplicado' | 'falha'
 
 export const json = (corpo: unknown, status = 200, headers: HeadersInit = {}) =>
   new Response(JSON.stringify(corpo), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers } })
@@ -28,7 +29,7 @@ export function lerCookie(req: Request, nome: string): string | null {
   return null
 }
 
-export type Sessao = { vid: string; cid: string; nome: string; email: string; cliente: string; exp: number }
+export type Sessao = { vid: string; cid: string; nome: string; email: string; cliente: string; modulos: Modulo[]; exp: number }
 /** Entre o código do e-mail e o TOTP. `segredo` só no 1º acesso (ainda não gravado no Dataverse). */
 export type Etapa = { vid: string; email: string; exp: number; segredo?: string }
 

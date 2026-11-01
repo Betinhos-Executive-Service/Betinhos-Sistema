@@ -1,6 +1,6 @@
 // Registro do Dataverse (validação + reserva + composição + mensagens) → Servico do portal.
-import type { Mensagem, Motivo, Servico, Status } from '../src/domain/types'
-import { COMPOSICAO_LINHAS, LADO_DV, MOTIVO_DV, NAV, STATUS_DV } from './schema'
+import type { Mensagem, Modulo, Motivo, Pedido, Servico, Status, StatusPedido } from '../src/domain/types'
+import { COMPOSICAO_LINHAS, LADO_DV, MODULO_DV, MOTIVO_DV, NAV, PEDIDO_STATUS, STATUS_DV } from './schema'
 
 export type Registro = Record<string, unknown>
 
@@ -8,6 +8,7 @@ const FV = '@OData.Community.Display.V1.FormattedValue'
 const str = (r: Registro | undefined, campo: string) => (typeof r?.[campo] === 'string' ? (r[campo] as string) : '')
 const num = (r: Registro | undefined, campo: string) => (typeof r?.[campo] === 'number' ? (r[campo] as number) : undefined)
 const rotulo = (r: Registro | undefined, lookup: string) => str(r, `${lookup}${FV}`)
+const veiculoDe = (r: Registro | undefined) => rotulo(r, 'new_categoriadoveiculo') || str(r, 'new_categoriadoveiculo')
 
 const inverter = <K extends string>(mapa: Record<K, number>) =>
   new Map(Object.entries(mapa).map(([k, v]) => [v as number, k as K]))
@@ -44,7 +45,7 @@ export function mapearServico(v: Registro, mensagens: Mensagem[] = []): Servico 
     destino: str(reserva, 'cr40f_destino'),
     passageiros,
     solicitante: rotulo(reserva, '_cr40f_solicitante_value'),
-    veiculo: rotulo(reserva, 'new_categoriadoveiculo') || str(reserva, 'new_categoriadoveiculo'),
+    veiculo: veiculoDe(reserva),
     status: status as Status,
     liberadoEm: str(v, 'cr40f_liberadoem'),
     prazoTacito: str(v, 'cr40f_prazotacita').slice(0, 10),
@@ -59,5 +60,46 @@ export function mapearServico(v: Registro, mensagens: Mensagem[] = []): Servico 
     mensagens,
     ...(str(v, 'cr40f_aprovadopor') ? { aprovadoPor: str(v, 'cr40f_aprovadopor') } : {}),
     ...(str(v, 'cr40f_aprovadoem') ? { aprovadoEm: str(v, 'cr40f_aprovadoem') } : {}),
+  }
+}
+
+const MODULO_POR_VALOR = inverter(MODULO_DV)
+
+/** Choice múltipla vem como "100000000,100000001"; valores desconhecidos são ignorados. */
+export function mapearModulos(valor: unknown): Modulo[] {
+  return String(valor ?? '').split(',').flatMap((v) => {
+    const m = MODULO_POR_VALOR.get(Number(v))
+    return m ? [m] : []
+  })
+}
+
+/** Módulos do cliente de um validador lido com `$expand=cr40f_Cliente($select=cr40f_portalmodulos)`. */
+export const modulosDe = (v: Registro): Modulo[] => mapearModulos((v[NAV.cliente] as Registro | undefined)?.cr40f_portalmodulos)
+
+/** O que o cliente digitou, guardado em `cr40f_portalpedido` como JSON. */
+export type PedidoPortal = { passageiros: string[]; observacao?: string }
+
+const PROGRAMADO = new Set<StatusPedido>(['programado', 'em_execucao', 'concluido'])
+
+/** Reserva → pedido do solicitante. Voucher e veículo só depois de programado. */
+export function mapearPedido(r: Registro): Pedido {
+  const status = PEDIDO_STATUS[num(r, 'cr40f_status') ?? -1] ?? 'em_analise'
+  let portal: PedidoPortal = { passageiros: [] }
+  try {
+    portal = { ...portal, ...(JSON.parse(str(r, 'cr40f_portalpedido') || '{}') as PedidoPortal) }
+  } catch { /* coluna editada à mão: mostra sem passageiros */ }
+  const veiculo = veiculoDe(r)
+  return {
+    id: str(r, 'cr40f_reservadeveculosid'),
+    numero: str(r, 'cr40f_id'),
+    status,
+    saida: str(r, 'cr40f_dataehorriodesada'),
+    origem: str(r, 'cr40f_endereodesada'),
+    destino: str(r, 'cr40f_destino'),
+    passageiros: portal.passageiros,
+    criadoEm: str(r, 'createdon'),
+    ...(portal.observacao ? { observacao: portal.observacao } : {}),
+    ...(PROGRAMADO.has(status) && veiculo ? { veiculo } : {}),
+    ...(PROGRAMADO.has(status) && str(r, 'new_linkdovoucher') ? { voucherUrl: str(r, 'new_linkdovoucher') } : {}),
   }
 }

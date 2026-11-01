@@ -1,0 +1,5 @@
+/* Sem clique: a linha não abre detalhe. */
+.pc-meus__servico { cursor: default; }
+.pc-meus__servico:active { transform: none; }
+.pc-meus__veiculo { display: inline-flex; align-items: center; gap: var(--bt-space-1); font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.pc-meus__voucher { display: inline-flex; align-items: center; gap: var(--bt-space-1); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-action); }

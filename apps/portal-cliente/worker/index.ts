@@ -1,10 +1,13 @@
-// Worker do portal de validação: /api/* (login, serviços) + build do app em ./dist (assets) + cron diário.
+// Worker do portal do cliente: /api/* (login, validação, pedidos) + build do app em ./dist (assets) + cron diário.
+// Cada rota exige o módulo do cliente na sessão (Tenaris valida; Latasa pede e acompanha).
+import type { Modulo } from '../src/domain/types'
 import { confirmarTotp, entrar, normalizarEmail, sair, sessaoAtual, solicitarCodigo, type Ctx } from './auth'
 import { aplicarTacita, enviarResumos } from './cron'
 import { sha256Hex } from './cripto'
 import { criarDv } from './dataverse'
 import type { Env } from './env'
 import { erro } from './http'
+import { criarPedido, listarPedidos } from './pedidos'
 import { abrirDuvida, aprovar, listar, responder } from './servicos'
 
 const SEGURANCA: Record<string, string> = {
@@ -53,10 +56,13 @@ async function api(req: Request, env: Env, url: URL, exec: ExecCtx): Promise<Res
 
   const sessao = await sessaoAtual(req, c)
   if (!sessao) return erro(401, 'nao_permitido')
-  if (rota === 'GET /servicos') return listar(c, sessao)
-  if (rota === 'POST /servicos/aprovar') return aprovar(req, c, sessao)
+  const com = (modulo: Modulo, rodar: () => Promise<Response>) => (sessao.modulos.includes(modulo) ? rodar() : Promise.resolve(erro(403, 'nao_permitido')))
+  if (rota === 'POST /pedidos') return com('pedir', () => criarPedido(req, c, sessao))
+  if (rota === 'GET /pedidos') return com('meus_servicos', () => listarPedidos(c, sessao))
+  if (rota === 'GET /servicos') return com('validar', () => listar(c, sessao))
+  if (rota === 'POST /servicos/aprovar') return com('validar', () => aprovar(req, c, sessao))
   const m = /^POST \/servicos\/([^/]+)\/(duvida|responder)$/.exec(rota)
-  if (m) return m[2] === 'duvida' ? abrirDuvida(req, c, sessao, m[1]) : responder(req, c, sessao, m[1])
+  if (m) return com('validar', () => (m[2] === 'duvida' ? abrirDuvida(req, c, sessao, m[1]) : responder(req, c, sessao, m[1])))
   return erro(404, 'nao_permitido')
 }
 

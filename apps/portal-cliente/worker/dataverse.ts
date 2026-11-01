@@ -7,6 +7,8 @@ export type Dv = {
   lista(caminho: string): Promise<Registro[]>
   patch(caminho: string, corpo: Registro): Promise<void>
   post(caminho: string, corpo: Registro): Promise<void>
+  /** POST que devolve o registro criado (`Prefer: return=representation`), com as colunas do `$select` do caminho. */
+  criar(caminho: string, corpo: Registro): Promise<Registro>
 }
 
 const CHAVE_TOKEN = 'dv:token'
@@ -29,7 +31,7 @@ async function token(env: Env, f: typeof fetch): Promise<string> {
 }
 
 export function criarDv(env: Env, f: typeof fetch = fetch): Dv {
-  async function chamar(metodo: string, caminho: string, corpo?: Registro): Promise<Response> {
+  async function chamar(metodo: string, caminho: string, corpo?: Registro, prefer = ''): Promise<Response> {
     // URL montada só na chamada: rota sem Dataverse (ex.: 401 sem sessão) não depende dos secrets.
     if (!env.DV_URL) throw new Error('secret DV_URL ausente')
     const r = await f(`${env.DV_URL.replace(/\/$/, '')}/api/data/v9.2/${caminho}`, {
@@ -40,7 +42,7 @@ export function criarDv(env: Env, f: typeof fetch = fetch): Dv {
         'Content-Type': 'application/json; charset=utf-8',
         'OData-MaxVersion': '4.0',
         'OData-Version': '4.0',
-        Prefer: 'odata.include-annotations="OData.Community.Display.V1.FormattedValue"',
+        Prefer: `odata.include-annotations="OData.Community.Display.V1.FormattedValue"${prefer}`,
       },
       body: corpo ? JSON.stringify(corpo) : undefined,
     })
@@ -53,6 +55,7 @@ export function criarDv(env: Env, f: typeof fetch = fetch): Dv {
     lista: async (c) => ((await (await chamar('GET', c)).json()) as { value: Registro[] }).value,
     patch: async (c, corpo) => void (await chamar('PATCH', c, corpo)),
     post: async (c, corpo) => void (await chamar('POST', c, corpo)),
+    criar: async (c, corpo) => (await (await chamar('POST', c, corpo, ',return=representation')).json()) as Registro,
   }
 }
 

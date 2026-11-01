@@ -1,11 +1,15 @@
 // Login em duas etapas: código de 6 dígitos por e-mail (10 min) + TOTP do autenticador.
 // 5 erros (código ou TOTP) no mesmo e-mail bloqueiam por 15 min. Dispositivo confiável dispensa o TOTP por 30 dias.
+// Quem entra: validador cadastrado pela Betinhos ou, sem cadastro, e-mail de um domínio autorizado do cliente
+// (cr40f_clientes1.cr40f_portaldominios), que ganha o cadastro no primeiro pedido de código.
+import { dominioDe, nomeDoEmail } from '../src/domain/pedidos'
+import type { Modulo } from '../src/domain/types'
 import { cifrar, decifrar, iguais, novoCodigo, novoSegredoTotp, novoToken, otpauthUrl, sha256Hex, verificarTotp } from './cripto'
 import { enviarEmail, type Dv } from './dataverse'
 import type { Env } from './env'
-import type { Registro } from './mapear'
-import { guid, validadorPorEmail, validadorPorId } from './odata'
-import { SET } from './schema'
+import { mapearModulos, modulosDe, type Registro } from './mapear'
+import { clientesPorDominio, guid, validadorPorEmail, validadorPorId, validadorQualquerPorEmail } from './odata'
+import { NAV, SET } from './schema'
 import {
   abrir, apagarCookie, COOKIE, DISPOSITIVO_S, erro, ETAPA_S, json, lerCookie, lerJson, selar, SESSAO_S, setCookie,
   type Etapa, type Sessao,
@@ -39,6 +43,33 @@ async function buscarValidador(dv: Dv, email: string): Promise<Registro | null> 
   return achados.length === 1 ? achados[0] : null // duplicado no cadastro: ninguém entra
 }
 
+const dominios = (c: Registro) => String(c.cr40f_portaldominios ?? '').toLowerCase().split(/[\s,;]+/).filter(Boolean)
+
+/** Cliente único dono do domínio do e-mail, com portal e algum módulo; dois clientes com o mesmo domínio = nenhum. */
+async function clienteDoDominio(dv: Dv, email: string): Promise<Registro | null> {
+  const dominio = dominioDe(email)
+  if (!dominio) return null
+  const donos = (await dv.lista(clientesPorDominio(dominio))).filter((c) => dominios(c).includes(dominio) && mapearModulos(c.cr40f_portalmodulos).length)
+  return donos.length === 1 ? donos[0] : null
+}
+
+/**
+ * Validador cadastrado ou, pelo domínio, cadastro criado agora (ativo, sem autenticador).
+ * E-mail já cadastrado mas barrado (desativado, cliente sem portal ou sem módulo) não ganha cadastro novo.
+ */
+async function buscarOuCriarUsuario(dv: Dv, email: string): Promise<Registro | null> {
+  const existente = await buscarValidador(dv, email)
+  if (existente) return existente
+  const cliente = await clienteDoDominio(dv, email)
+  if (!cliente || (await dv.lista(validadorQualquerPorEmail(email))).length) return null
+  return dv.criar(`${SET.validador}?$select=cr40f_validadorclienteid,cr40f_name`, {
+    cr40f_name: nomeDoEmail(email).slice(0, 100),
+    cr40f_email: email,
+    cr40f_ativo: true,
+    [`${NAV.cliente}@odata.bind`]: `/${SET.cliente}(${cliente.cr40f_clientes1id})`,
+  })
+}
+
 const hashCodigo = (vid: string, codigo: string) => sha256Hex(`${vid}:${codigo}`)
 
 export async function solicitarCodigo(req: Request, c: Ctx): Promise<Response> {
@@ -47,7 +78,7 @@ export async function solicitarCodigo(req: Request, c: Ctx): Promise<Response> {
   // Busca e envio fora da resposta: o tempo de resposta não revela se o e-mail existe.
   c.waitUntil(
     (async () => {
-      const v = await buscarValidador(c.dv, email)
+      const v = await buscarOuCriarUsuario(c.dv, email)
       if (!v) return
       const vid = String(v.cr40f_validadorclienteid)
       const codigo = novoCodigo()
@@ -65,7 +96,7 @@ export async function solicitarCodigo(req: Request, c: Ctx): Promise<Response> {
   return new Response(null, { status: 204 })
 }
 
-type SessaoPublica = { nome: string; email: string; cliente: string }
+type SessaoPublica = { nome: string; email: string; cliente: string; modulos: Modulo[] }
 
 /** Grava o cookie de sessão (12 h), apaga o da etapa e responde com o corpo montado a partir da sessão pública. */
 async function respostaSessao(c: Ctx, v: Registro, corpo: (s: SessaoPublica) => unknown, extras: string[] = []): Promise<Response> {
@@ -75,6 +106,7 @@ async function respostaSessao(c: Ctx, v: Registro, corpo: (s: SessaoPublica) => 
     nome: String(v.cr40f_name ?? ''),
     email: String(v.cr40f_email ?? ''),
     cliente: String(v['_cr40f_cliente_value@OData.Community.Display.V1.FormattedValue'] ?? ''),
+    modulos: modulosDe(v),
     exp: c.agora + SESSAO_S * 1000,
   }
   c.waitUntil(c.dv.patch(`${SET.validador}(${sessao.vid})`, { cr40f_ultimoacesso: new Date(c.agora).toISOString() }).catch(() => {}))
@@ -82,7 +114,7 @@ async function respostaSessao(c: Ctx, v: Registro, corpo: (s: SessaoPublica) => 
   headers.append('Set-Cookie', setCookie(COOKIE.sessao, await selar(c.env, 'sessao', sessao), SESSAO_S))
   headers.append('Set-Cookie', apagarCookie(COOKIE.etapa))
   for (const h of extras) headers.append('Set-Cookie', h)
-  return new Response(JSON.stringify(corpo({ nome: sessao.nome, email: sessao.email, cliente: sessao.cliente })), { status: 200, headers })
+  return new Response(JSON.stringify(corpo({ nome: sessao.nome, email: sessao.email, cliente: sessao.cliente, modulos: sessao.modulos })), { status: 200, headers })
 }
 
 async function dispositivoValido(req: Request, c: Ctx, vid: string): Promise<boolean> {
@@ -130,7 +162,7 @@ export async function confirmarTotp(req: Request, c: Ctx): Promise<Response> {
   const codigo = String(corpo?.codigo ?? '').trim()
 
   const v = await c.dv.get(validadorPorId(etapa.vid))
-  if (v.cr40f_ativo !== true) return erro(401, 'nao_permitido')
+  if (v.cr40f_ativo !== true || !modulosDe(v).length) return erro(401, 'nao_permitido')
   const segredo = etapa.segredo ?? (v.cr40f_segredototp ? await decifrar(String(v.cr40f_segredototp), c.env.CHAVE_TOTP, `totp:${etapa.vid}`) : null)
   if (!segredo) return erro(401, 'nao_permitido') // segredo zerado ("Refazer autenticador") no meio do login: recomeça
   // Mesmo código não vale duas vezes (replay dentro da janela de ±30 s).

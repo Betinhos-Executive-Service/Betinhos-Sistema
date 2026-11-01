@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import { base32, cifrar, decifrar, deBase32, totp, verificarTotp } from './cripto'
-import { mapearServico } from './mapear'
+import { mapearModulos, mapearPedido, mapearServico } from './mapear'
+import { nomeDoEmail, normalizarPedido, validarPedido } from '../src/domain/pedidos'
 import { listarServicos, servicosPorIds, tacitaVencida } from './odata'
 import { feriados, prazoTacito, venceu } from './prazo'
 
@@ -95,5 +96,39 @@ describe('mapearServico', () => {
   })
   it('Retirado não sai do Worker', () => {
     expect(mapearServico({ ...registro, cr40f_status: 100000005 })).toBeNull()
+  })
+})
+
+describe('pedidos', () => {
+  const T0 = Date.parse('2026-11-01T12:00:00Z')
+  const base = normalizarPedido({ passageiros: [' Ana ', '', 'Bia'], origem: ' Pinda ', destino: 'GRU', saida: '2026-11-03T10:00:00Z', observacao: ' ' })
+  it('normaliza e valida campo a campo', () => {
+    expect(base).toEqual({ passageiros: ['Ana', 'Bia'], origem: 'Pinda', destino: 'GRU', saida: '2026-11-03T10:00:00Z' })
+    expect(validarPedido(base, T0)).toEqual({})
+    expect(validarPedido({ ...base, passageiros: [], origem: '', destino: '' }, T0)).toEqual({
+      passageiros: 'Informe pelo menos um passageiro.', origem: 'Informe o endereço de saída.', destino: 'Informe o destino.',
+    })
+    expect(validarPedido({ ...base, saida: '2026-11-01T11:59:00Z' }, T0).saida).toMatch(/daqui para a frente/)
+    expect(validarPedido({ ...base, saida: 'ontem' }, T0).saida).toMatch(/data e a hora/)
+    expect(validarPedido({ ...base, saida: '2028-01-01T10:00:00Z' }, T0).saida).toMatch(/um ano/)
+    expect(validarPedido({ ...base, passageiros: ['x'.repeat(101)], origem: 'y'.repeat(301) }, T0)).toMatchObject({ passageiros: /100 caracteres/, origem: /300 caracteres/ })
+  })
+  it('nome a partir do e-mail e módulos da choice múltipla', () => {
+    expect(nomeDoEmail('paula.ribeiro@latasa.com.br')).toBe('Paula Ribeiro')
+    expect(nomeDoEmail('compras@latasa.com.br')).toBe('Compras')
+    expect(mapearModulos('100000001,100000002')).toEqual(['pedir', 'meus_servicos'])
+    expect(mapearModulos(null)).toEqual([])
+    expect(mapearModulos('100000000,999')).toEqual(['validar'])
+  })
+  it('mapeia a reserva pela coluna do portal (JSON); voucher só depois de programado', () => {
+    const r = {
+      cr40f_reservadeveculosid: 'id1', cr40f_id: 'RV-1', cr40f_status: 202410004, cr40f_dataehorriodesada: '2026-11-03T10:00:00Z', cr40f_endereodesada: 'A', cr40f_destino: 'B',
+      cr40f_portalpedido: '{"passageiros":["Ana","Bia"],"observacao":"Voo LA1"}', new_linkdovoucher: 'https://v/1.pdf', createdon: '2026-11-01T12:00:00Z',
+    }
+    expect(mapearPedido(r)).toEqual({ id: 'id1', numero: 'RV-1', status: 'solicitado', saida: '2026-11-03T10:00:00Z', origem: 'A', destino: 'B', passageiros: ['Ana', 'Bia'], criadoEm: '2026-11-01T12:00:00Z', observacao: 'Voo LA1' })
+    expect(mapearPedido({ ...r, cr40f_status: 202410005 })).toMatchObject({ status: 'programado', voucherUrl: 'https://v/1.pdf' })
+    expect(mapearPedido({ ...r, cr40f_status: 202410010 }).status).toBe('cancelado')
+    // Coluna editada à mão: não quebra, só fica sem passageiros.
+    expect(mapearPedido({ ...r, cr40f_portalpedido: 'x' }).passageiros).toEqual([])
   })
 })
