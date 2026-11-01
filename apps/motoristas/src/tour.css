@@ -46,6 +46,13 @@
   animation: tour-card-enter 220ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 
+/* Primeira pintura: o cartão é medido invisível para já aparecer na posição certa, sem salto. */
+.tour-card--measuring {
+  visibility: hidden;
+  transition: none;
+  animation: none;
+}
+
 .tour-card-progress {
   margin-bottom: 6px;
   color: #687789;

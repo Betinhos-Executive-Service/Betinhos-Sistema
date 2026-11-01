@@ -52,9 +52,9 @@ export function TourOverlay({ steps, onClose }: TourOverlayProps) {
     if (total === 0) onCloseRef.current("indisponivel");
   }, [total]);
 
-  // Mede o elemento do passo: rola até ele e acompanha a rolagem/animações por um curto período,
-  // depois só em scroll/resize. Elemento sumiu no meio do tour: avança sem erro.
-  useEffect(() => {
+  // Mede o elemento do passo antes da primeira pintura (sem salto do cartão), rola até ele e acompanha
+  // a rolagem/animações por um curto período, depois só em scroll/resize. Elemento sumiu: avança sem erro.
+  useLayoutEffect(() => {
     if (!step) return;
     const element = findAnchor(step.anchor);
     if (!element) {
@@ -90,11 +90,14 @@ export function TourOverlay({ steps, onClose }: TourOverlayProps) {
   }, [index, step, total]);
 
   useLayoutEffect(() => {
-    const card = cardRef.current;
-    if (!card) return;
-    setCardHeight(card.offsetHeight);
-    nextRef.current?.focus({ preventScroll: true });
+    if (cardRef.current) setCardHeight(cardRef.current.offsetHeight);
   }, [index, total]);
+
+  // Foco só depois da medição: enquanto o cartão está invisível (visibility: hidden) o botão não aceita foco.
+  const cardReady = cardHeight > 0;
+  useEffect(() => {
+    if (cardReady) nextRef.current?.focus({ preventScroll: true });
+  }, [index, cardReady]);
 
   // Teclado: Esc pula, setas navegam, Tab fica preso no cartão.
   useEffect(() => {
@@ -155,7 +158,7 @@ export function TourOverlay({ steps, onClose }: TourOverlayProps) {
       </div>
       <section
         ref={cardRef}
-        className={`tour-card tour-card--${placement.side}`}
+        className={`tour-card tour-card--${placement.side} ${cardHeight ? "" : "tour-card--measuring"}`.trim()}
         style={{ top: placement.top }}
         role="dialog"
         aria-modal="true"

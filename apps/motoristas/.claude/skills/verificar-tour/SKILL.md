@@ -13,6 +13,9 @@ description: "Verifica o tour de primeiro acesso do App Motoristas: abertura aut
 - Dev server: `PORT=<porta reservada em ~/.codex/dev-ports.json> npm run dev` e abrir `http://localhost:<porta>/webresource-app-motoristas.html#inicio` (modo mock, motorista `localhost-driver`).
 - Para simular primeiro acesso: `localStorage.removeItem("app-motoristas-tour-v1:localhost-driver")` e recarregar, ou "Resetar dados locais" no rodapé do Início (só em localhost).
 
+## Roteiro automatizado (preferido)
+`APP_MOTORISTAS_URL=http://localhost:<porta> CHROME_PATH=<binário Chromium/Brave> node scripts/qa/verify-tour.cjs .verificacao/<data>-<branch>` (sem `CHROME_PATH` usa o Google Chrome instalado; sem `playwright-core` no projeto, prefixe com `NODE_PATH` do cache do npx ou `npx -y -p playwright-core@1.56.1`). Todas as linhas `OK`; prints `tour-passo-1..7.png`, `tour-reabrir.png`, `tour-360.png` na pasta indicada. Cobre os cenários 1 a 5 abaixo, a borda de passo sem elemento e o console.
+
 ## Roteiro manual (viewport 360×740 e 375×812)
 1. Primeiro acesso → cerca de 0,7 s após o Início carregar, o tour abre em "Passo 1 de 7 · Serviços do dia" com o card "Serviços" recortado (`.tour-spotlight`) e o cartão (`.tour-card`) abaixo dele, sem cobrir o destaque.
 2. "Pular" → fecha; recarregar → não abre de novo (chave `visto` gravada).

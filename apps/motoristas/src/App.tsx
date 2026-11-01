@@ -1359,17 +1359,21 @@ function App() {
   // Na URL direta do web resource o gesto Voltar do celular sairia do app.
   useHardwareBackGuard(screen, hashRoutingActive || isStandaloneWebResourceRuntime());
 
+  // Chave da preferência do tour: id real do motorista; em modo mock (sem Xrm) o contexto não é carregado,
+  // então usa o mesmo id do fallback local de getDriverContext.
+  const tourDriverId = driverContext?.id ?? (hasDataverseRuntime() ? "" : "localhost-driver");
+
   // Primeiro acesso: o tour abre sozinho no Início, depois da carga, uma vez por motorista neste aparelho.
   useEffect(() => {
-    if (tourOpen || screen !== "inicio" || !driverContext?.id || dataLoading || criticalError) return;
-    if (hasSeenTour(localStorage, driverContext.id)) return;
+    if (tourOpen || screen !== "inicio" || !tourDriverId || dataLoading || criticalError) return;
+    if (hasSeenTour(localStorage, tourDriverId)) return;
     const timer = window.setTimeout(() => setTourOpen(true), 700);
     return () => window.clearTimeout(timer);
-  }, [tourOpen, screen, driverContext?.id, dataLoading, criticalError]);
+  }, [tourOpen, screen, tourDriverId, dataLoading, criticalError]);
 
   const closeTour = (reason: TourCloseReason) => {
     setTourOpen(false);
-    if (reason !== "indisponivel" && driverContext?.id) markTourSeen(localStorage, driverContext.id);
+    if (reason !== "indisponivel" && tourDriverId) markTourSeen(localStorage, tourDriverId);
   };
 
   useEffect(() => {
@@ -1604,7 +1608,7 @@ function App() {
     localStorage.removeItem(VOUCHER_DRAFTS_STORAGE_KEY);
     localStorage.removeItem(FINALIZE_DRAFT_ASSETS_STORAGE_KEY);
     localStorage.removeItem(SERVICE_OBSERVATION_DRAFTS_KEY);
-    if (driverContext?.id) clearTourSeen(localStorage, driverContext.id);
+    if (tourDriverId) clearTourSeen(localStorage, tourDriverId);
     void clearMediaDraft();
 
     setStore(initialStore());
