@@ -127,6 +127,7 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
   check("4. seta esquerda volta", (await geometry()).progress === "Passo 1 de 7");
   await page.keyboard.press("Escape"); await page.waitForTimeout(400);
   check("4. Esc fecha o tour", !(await tourOpen()));
+  check("4. foco volta ao botão 'Ver tour de novo'", await page.evaluate(() => document.activeElement?.textContent?.trim() === "Ver tour de novo"));
 
   // 1b. Pular no primeiro acesso: fecha e não volta.
   await open({ firstAccess: true });

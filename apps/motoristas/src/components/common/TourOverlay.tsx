@@ -38,6 +38,12 @@ export function TourOverlay({ steps, onClose }: TourOverlayProps) {
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
+  // Quem abriu o tour (ex.: "Ver tour de novo") recebe o foco de volta ao fechar.
+  const [opener] = useState(() => document.activeElement as HTMLElement | null);
+  useEffect(() => () => {
+    if (opener && opener !== document.body && opener.isConnected) opener.focus({ preventScroll: true });
+  }, [opener]);
+
   const [visibleSteps] = useState(() => resolveTourSteps(steps, (anchor) => Boolean(findAnchor(anchor))));
   const [index, setIndex] = useState(0);
   const [spotlight, setSpotlight] = useState<TourBox | null>(null);
@@ -66,7 +72,11 @@ export function TourOverlay({ steps, onClose }: TourOverlayProps) {
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     element.scrollIntoView({ block: "center", behavior: reduceMotion ? "auto" : "smooth" });
 
-    const update = () => setSpotlight(spotlightBox(measure(element), { width: window.innerWidth, height: window.innerHeight }));
+    const update = () => {
+      setSpotlight(spotlightBox(measure(element), { width: window.innerWidth, height: window.innerHeight }));
+      // Girar a tela ou redimensionar muda a quebra de linha do texto: remede o cartão junto com o destaque.
+      if (cardRef.current) setCardHeight(cardRef.current.offsetHeight);
+    };
     update();
 
     const startedAt = performance.now();

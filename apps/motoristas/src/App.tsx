@@ -1365,15 +1365,24 @@ function App() {
   const tourDriverId = driverContext?.id ?? (hasDataverseRuntime() ? "" : LOCAL_DRIVER_ID);
 
   // Primeiro acesso: o tour abre sozinho no Início, depois da carga, uma vez por motorista neste aparelho.
+  // Fechado por "indisponivel" (sem âncoras) não grava "visto"; o ref evita reabrir em loop até sair do Início.
+  const tourUnavailableRef = useRef(false);
+  const tourBlocked = Boolean(vehicleChoiceRequest || remoteOperation || expenseSend);
   useEffect(() => {
-    if (tourOpen || screen !== "inicio" || !tourDriverId || dataLoading || criticalError) return;
+    if (screen !== "inicio") {
+      tourUnavailableRef.current = false;
+      setTourOpen(false);
+      return;
+    }
+    if (tourOpen || tourUnavailableRef.current || tourBlocked || !tourDriverId || dataLoading || criticalError) return;
     if (hasSeenTour(localStorage, tourDriverId)) return;
     const timer = window.setTimeout(() => setTourOpen(true), 700);
     return () => window.clearTimeout(timer);
-  }, [tourOpen, screen, tourDriverId, dataLoading, criticalError]);
+  }, [tourOpen, tourBlocked, screen, tourDriverId, dataLoading, criticalError]);
 
   const closeTour = (reason: TourCloseReason) => {
     setTourOpen(false);
+    if (reason === "indisponivel") tourUnavailableRef.current = true;
     if (reason !== "indisponivel" && tourDriverId) markTourSeen(localStorage, tourDriverId);
   };
 
