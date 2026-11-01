@@ -12,6 +12,8 @@ description: "Verifica o fluxo principal do motorista no App Motoristas: Início
 - Dev server: `node scripts/dev-server.cjs` com `PORT=31877` (configuração `app-motoristas-ux-audit` em `.claude/launch.json`; no navegador interno use `preview_start`). O servidor recompila `dist/` a cada mudança em `src/` (~15 s).
 - URL: `http://localhost:31877/webresource-app-motoristas.html#inicio`. Sem `Xrm` o app entra em modo mock (`src/data/mockData.ts`); nada é gravado no Dataverse.
 - Antes de começar: `localStorage.clear()` e recarregar, para não herdar serviços finalizados em testes anteriores.
+- Depois de `localStorage.clear()` o tour de primeiro acesso reabre sozinho no Início e bloqueia os toques: marque `localStorage.setItem("app-motoristas-tour-v1:localhost-driver", "visto")` logo em seguida (os roteiros `scripts/qa/verify-*.cjs` já fazem isso; ver `verificar-tour`).
+- Sem Google Chrome instalado, os roteiros aceitam `CHROME_PATH=<binário Chromium/Brave>` (e `NODE_PATH` com `playwright-core`). Exceção: `verify-checklist-send.cjs` ainda exige o `@playwright/cli` global do Windows.
 - Ao terminar: `git checkout -- dist/` (o dev server reescreve `dist/` sem subir versão; `dist/` só muda no build de publicação).
 
 ## Roteiro automatizado (preferido)

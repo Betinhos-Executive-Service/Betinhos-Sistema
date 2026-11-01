@@ -26,7 +26,7 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
 
 (async () => {
   fs.mkdirSync(SHOTS, { recursive: true });
-  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  const browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH, headless: true } : { channel: "chrome", headless: true });
   // UA Android ativa a câmera ao vivo (getUserMedia), que é simulada por um canvas.
   const context = await browser.newContext({ viewport: { width: 375, height: 812 }, userAgent: ANDROID_UA });
   await context.addInitScript(() => {
@@ -88,7 +88,7 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
   };
 
   await open("inicio", 300);
-  await page.evaluate(() => localStorage.clear());
+  await page.evaluate(() => { localStorage.clear(); localStorage.setItem("app-motoristas-tour-v1:localhost-driver", "visto"); });
   await open("inicio");
 
   const stamp = await page.locator(".build-stamp").innerText();
