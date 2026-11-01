@@ -2,7 +2,7 @@
 
 Data: 01/11/2026. Decisão do Renan: migrar segredos para tipo Segredo e planejar a saída das URLs de Flow. Origem: achados S1, S2 e S5 de `2026-11-revisao-app-motoristas.md`.
 
-Estado: **nada executado**. O piloto no DEV está bloqueado nesta máquina: MCP do Dataverse desativado, sem `az`, `pac`, `dotnet` nem `pwsh`, e sem Key Vault conhecido. Cada passo abaixo diz o que precisa existir antes.
+Estado: **fase 1 concluída em 01/11/2026**; fases 2 em diante não executadas. O MCP do DEV foi reativado, mas a máquina que gerou este plano não tem `dotnet` nem `pwsh`, então o piloto (que muda e publica o plugin) precisa rodar no Windows. Cada passo abaixo diz o que precisa existir antes.
 
 ## Regra de ordem
 O app lê as URLs dos Flows com a sessão do motorista (`src/lib/dataverse.ts:3629`) e o `Basic User` é o que permite essa leitura. Por isso a retirada do `Basic User` é o último passo. Antes dela, nenhum Flow pode depender de variável legível pelo motorista.
@@ -10,15 +10,19 @@ O app lê as URLs dos Flows com a sessão do motorista (`src/lib/dataverse.ts:36
 ## Fase 1. Inventário (somente leitura, sem risco)
 1. Listar todas as definições de variável de ambiente sem o limite de 20 linhas do MCP (a consulta do relatório parou em 20). Marcar quais guardam segredo e quais guardam URL.
 2. Para cada segredo, achar os consumidores: plugins (`rg EnvironmentVariables.Read` no repo e no Sistema Betinhos), Flows (ações que usam a variável) e scripts.
-3. Resultado esperado: tabela `variável, tipo de conteúdo, consumidor, caminho alvo`. Conhecido até agora:
+3. Resultado do DEV em 01/11/2026 (somente leitura, valores não lidos): 54 definições, 52 do tipo String e 2 de outros tipos da Microsoft. **Nenhuma é do tipo Segredo.**
 
-| Variável | Consumidor | Caminho alvo |
-|---|---|---|
-| `new_AnthropicKeyObservacaoMotorista` | plugin `OrganizeObservationPlugin.cs:26` | configuração segura do step |
-| `new_AnthropicApiKey`, `new_AnthropicKey*` (8 sem valor no DEV) | a descobrir | a descobrir |
-| `cr40f_GerarPagantesGraphClientSecret`, `cr40f_GerarPagantesCieloClientSecret` | provável Flow de pagantes | variável tipo Segredo (Key Vault) |
-| `new_RDStationClientSecret`, `new_RDStationRefreshToken` | a descobrir | variável tipo Segredo; refresh token exige regravação pelo consumidor |
-| `new_JevApiKey` | a descobrir | a descobrir |
+| Variável | Onde a chave está | Consumidor encontrado | Caminho alvo |
+|---|---|---|---|
+| `new_AnthropicKeyObservacaoMotorista` | valor padrão da definição | plugin `OrganizeObservationPlugin.cs:26`, step "Organizar observacao do motorista" (pós-operação, síncrono, sem configuração segura hoje) | configuração segura do step |
+| `new_AnthropicKeyDespesasAnalise`, `new_AnthropicKeyDespesasLeitura` | valor padrão | Flows "Flow Despesas \| Análise IA" e "Flow Despesas \| Leitura rápida" | variável tipo Segredo |
+| `new_AnthropicKeyAgentes`, `new_AnthropicKeyFinanceiro`, `new_AnthropicKeyLogistica`, `new_AnthropicKeyPessoas`, `new_AnthropicKeyFrota` | valor padrão | "Flow Agentes \| Executar" referencia Agentes e Financeiro; Logistica, Pessoas e Frota sem referência no código | variável tipo Segredo; confirmar se as três últimas estão em uso |
+| `new_AnthropicApiKey` | valor | a confirmar entre os Flows acima | variável tipo Segredo |
+| `new_JevApiKey` | valor | Flows "Tela Frota - Classificar manutenção (JEV)" e "... agora (JEV)" | variável tipo Segredo |
+| `new_RDStationClientSecret`, `new_RDStationRefreshToken` | valor | "Flow API RD Station BD para Leads" | variável tipo Segredo; o refresh token é regravado pelo Flow, então o Flow precisa gravar no cofre |
+| `cr40f_GerarPagantesCieloClientSecret`, `cr40f_GerarPagantesGraphClientSecret` | valor | nenhum Flow do DEV os referencia; consumidor não achado no código | confirmar o consumidor (talvez só PROD) antes de migrar |
+
+Achado novo: as oito chaves `new_AnthropicKey*` estão no **valor padrão da definição**, não em `environmentvariablevalue`. O `Basic User` tem leitura da definição, então o motorista enxerga a chave sem nem consultar o valor.
 
 ## Fase 2. Piloto no DEV com um segredo
 Escolha: `new_AnthropicKeyObservacaoMotorista`, porque o consumidor é um plugin deste repo.
@@ -59,6 +63,6 @@ Só depois das fases 3 e 4. Criar papel mínimo se algo do `Basic User` ainda fo
 - Fase 5: reatribuir o papel na equipe.
 
 ## O que preciso de você
-1. Reativar o MCP do Dataverse apenas para o DEV, ou rodar os passos da fase 2 no Windows.
+1. Rodar a fase 2 no Windows (compilação e publicação do plugin), ou liberar `dotnet` e `pwsh` nesta máquina.
 2. Dizer qual Key Vault usar na fase 3, ou autorizar a criação de um.
 3. Confirmar se o PROD tem os mesmos segredos preenchidos.
