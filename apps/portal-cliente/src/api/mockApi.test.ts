@@ -158,7 +158,7 @@ describe('mockApi multi-cliente', () => {
   it('autoriza por cadastro ou por domínio; recusa domínio estranho e cliente sem módulo', () => {
     expect(usuarioMock('fiscal@tenaris.com')).toMatchObject({ cliente: 'Tenaris', modulos: ['validar'] })
     expect(usuarioMock('paula.ribeiro@latasa.com.br')).toEqual({ nome: 'Paula Ribeiro', cliente: 'Latasa', modulos: ['pedir', 'meus_servicos'] })
-    expect(usuarioMock('alguem@gmail.com')).toBeNull()
+    expect(usuarioMock('alguem@example.com')).toBeNull()
     expect(usuarioMock('x@semmodulo.com.br')).toBeNull()
   })
 

@@ -123,7 +123,7 @@ describe('multi-cliente', () => {
   })
 
   it.each([
-    ['domínio não autorizado', 'alguem@gmail.com'],
+    ['domínio não autorizado', 'alguem@example.com'],
     ['subdomínio parecido', 'x@tasa.com'],
     ['dois clientes com o mesmo domínio', 'x@ambiguo.com'],
     ['cliente sem módulo', 'x@semmodulo.com'],

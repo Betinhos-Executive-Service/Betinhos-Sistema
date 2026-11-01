@@ -181,7 +181,7 @@ describe('Portal do cliente', () => {
 
     it('e-mail de domínio não autorizado recebe a mesma mensagem de código incorreto', async () => {
       abrir()
-      await entrar('123456', 'alguem@gmail.com')
+      await entrar('123456', 'alguem@example.com')
       expect(await screen.findByText(/Código incorreto/)).toBeTruthy()
     })
 
