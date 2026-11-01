@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMockData } from '../pages/documentos/data/mock'
 import { DOCUMENTOS_ALTERADOS } from '../pages/documentos/data/source'
 import { contarUrgentes, useDocumentosBadge } from './useDocumentosBadge'
@@ -11,7 +11,9 @@ vi.mock('../pages/documentos/data/source', async (importOriginal) => ({
   createDocsSource: () => ({ carregar }),
 }))
 
-afterEach(() => { carregar.mockClear() })
+// O hook conta pela data de hoje; os dados de exemplo são de 13/10/2026. Só o relógio (Date) é congelado, os timers seguem reais.
+beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-10-13T15:00:00Z')) })
+afterEach(() => { vi.useRealTimers(); carregar.mockClear() })
 
 describe('contador de documentos', () => {
   it('soma vencidos e até 7 dias das duas categorias', () => {
