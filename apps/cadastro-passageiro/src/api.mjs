@@ -2,6 +2,7 @@
 import { TOKEN_RE, emailValido, telefoneValido } from "../public/validacao.mjs";
 
 export const LIMITE_CORPO = 4 * 1024 * 1024; // 4 MB
+export const LIMITE_MINIATURA = 300000; // caracteres em base64 (o flow aceita até 400000)
 const STATUS_REPASSADOS = new Set([200, 400, 404, 410, 429, 500]);
 
 export function tokenValido(token) {
@@ -111,12 +112,15 @@ const idValido = (id) => typeof id === "string" && /^[0-9a-fA-F-]{36}$/.test(id)
 
 // Monta o payload de "salvar" só com campos válidos e preenchidos. Retorna null se inválido.
 export function payloadSalvar(corpo) {
-  const { passageiroId, fotoBase64, telefone, email } = corpo;
+  const { passageiroId, fotoBase64, miniaturaBase64, telefone, email } = corpo;
   if (!idValido(passageiroId)) return null;
   const p = { passageiroId };
   if (fotoBase64 != null && fotoBase64 !== "") {
     if (typeof fotoBase64 !== "string" || !/^[A-Za-z0-9+/=]+$/.test(fotoBase64)) return null;
     p.fotoBase64 = fotoBase64;
+    // Miniatura (quadrado de 288 px, ~15 KB) para as próximas aberturas; inválida ou grande demais é descartada,
+    // e o flow grava a própria foto no lugar dela (nunca sobra uma miniatura de foto anterior).
+    if (typeof miniaturaBase64 === "string" && miniaturaBase64.length <= LIMITE_MINIATURA && /^[A-Za-z0-9+/=]+$/.test(miniaturaBase64)) p.miniaturaBase64 = miniaturaBase64;
   }
   if (telefone != null && telefone !== "") {
     if (!telefoneValido(telefone)) return null;
@@ -193,7 +197,7 @@ export async function tratarApi(request, env, url, fetcher = fetch, ctx = null) 
   if (r.status !== 200) return erro(r.status, CODIGOS[r.status]);
   // Salvou: a lista guardada fica velha; a foto nova já vai para o cache sem passar pelo flow.
   if (env.CACHE) await depois(async () => {
-    if (extra.fotoBase64) await cacheGravar(env, chaveFoto(hash, extra.passageiroId.toLowerCase()), { foto: { mimeType: "image/jpeg", base64: extra.fotoBase64 } });
+    if (extra.fotoBase64) await cacheGravar(env, chaveFoto(hash, extra.passageiroId.toLowerCase()), { foto: { mimeType: "image/jpeg", base64: extra.miniaturaBase64 || extra.fotoBase64 } });
     await atualizarLer(env, flow, hash);
   });
   return json(200, r.dados);

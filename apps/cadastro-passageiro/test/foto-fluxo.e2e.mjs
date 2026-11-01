@@ -18,6 +18,10 @@ const t1 = Date.now(); await (await fc).setFiles({ name: "IMG_20261026.jpg", mim
 await card.locator(".foto img").waitFor(); const tPrevia = Date.now() - t1;
 await card.locator(".foto.nova").waitFor(); const tPronta = Date.now() - t1;
 const botao = await card.locator(".btn.primario").textContent();
+const enviado = p.waitForRequest((r) => r.url().endsWith("/api/salvar"));
 const t2 = Date.now(); await card.locator(".btn.primario").click(); await card.locator(".aviso.ok").waitFor(); const tSalvar = Date.now() - t2;
-console.log(JSON.stringify({ arquivoKB: Math.round(jpeg.length / 1024), tLista, tPrevia, tPronta, botao, tSalvar, aviso: await card.locator(".aviso").textContent() }));
+const corpoEnviado = JSON.parse((await enviado).postData());
+const miniaturaKB = Math.round((corpoEnviado.miniaturaBase64?.length ?? 0) * 0.75 / 1024), fotoEnviadaKB = Math.round(corpoEnviado.fotoBase64.length * 0.75 / 1024);
+if (!miniaturaKB || miniaturaKB > 60 || miniaturaKB * 3 > fotoEnviadaKB) { console.log(JSON.stringify({ falha: "miniatura ausente ou grande demais", miniaturaKB, fotoEnviadaKB })); process.exit(1); }
+console.log(JSON.stringify({ fotoEnviadaKB, miniaturaKB, arquivoKB: Math.round(jpeg.length / 1024), tLista, tPrevia, tPronta, botao, tSalvar, aviso: await card.locator(".aviso").textContent() }));
 await b.close();

@@ -38,6 +38,9 @@
             },
             "email": {
               "type": "string"
+            },
+            "miniaturaBase64": {
+              "type": "string"
             }
           }
         }
@@ -125,7 +128,7 @@
           "runAfter": {},
           "expression": {
             "equals": [
-              "@and(equals(length(toLower(trim(coalesce(triggerBody()?['hash'], '')))), 64), not(contains(toLower(trim(coalesce(triggerBody()?['hash'], ''))), '''')), or(equals(toLower(trim(coalesce(triggerBody()?['op'], ''))), 'ler'), and(equals(toLower(trim(coalesce(triggerBody()?['op'], ''))), 'foto'), equals(length(toLower(trim(coalesce(triggerBody()?['passageiroId'], '')))), 36), not(contains(toLower(trim(coalesce(triggerBody()?['passageiroId'], ''))), ''''))), and(equals(toLower(trim(coalesce(triggerBody()?['op'], ''))), 'salvar'), equals(length(toLower(trim(coalesce(triggerBody()?['passageiroId'], '')))), 36), not(contains(toLower(trim(coalesce(triggerBody()?['passageiroId'], ''))), '''')), or(not(empty(coalesce(triggerBody()?['fotoBase64'], ''))), not(empty(trim(coalesce(triggerBody()?['telefone'], '')))), not(empty(trim(coalesce(triggerBody()?['email'], ''))))), lessOrEquals(length(coalesce(triggerBody()?['fotoBase64'], '')), 10000000), lessOrEquals(length(trim(coalesce(triggerBody()?['telefone'], ''))), 30), lessOrEquals(length(trim(coalesce(triggerBody()?['email'], ''))), 100), or(empty(trim(coalesce(triggerBody()?['email'], ''))), and(contains(trim(coalesce(triggerBody()?['email'], '')), '@'), not(contains(trim(coalesce(triggerBody()?['email'], '')), ' ')), greater(lastIndexOf(trim(coalesce(triggerBody()?['email'], '')), '.'), add(indexOf(trim(coalesce(triggerBody()?['email'], '')), '@'), 1)))))))",
+              "@and(equals(length(toLower(trim(coalesce(triggerBody()?['hash'], '')))), 64), not(contains(toLower(trim(coalesce(triggerBody()?['hash'], ''))), '''')), or(equals(toLower(trim(coalesce(triggerBody()?['op'], ''))), 'ler'), and(equals(toLower(trim(coalesce(triggerBody()?['op'], ''))), 'foto'), equals(length(toLower(trim(coalesce(triggerBody()?['passageiroId'], '')))), 36), not(contains(toLower(trim(coalesce(triggerBody()?['passageiroId'], ''))), ''''))), and(equals(toLower(trim(coalesce(triggerBody()?['op'], ''))), 'salvar'), equals(length(toLower(trim(coalesce(triggerBody()?['passageiroId'], '')))), 36), not(contains(toLower(trim(coalesce(triggerBody()?['passageiroId'], ''))), '''')), or(not(empty(coalesce(triggerBody()?['fotoBase64'], ''))), not(empty(trim(coalesce(triggerBody()?['telefone'], '')))), not(empty(trim(coalesce(triggerBody()?['email'], ''))))), lessOrEquals(length(coalesce(triggerBody()?['fotoBase64'], '')), 10000000), lessOrEquals(length(coalesce(triggerBody()?['miniaturaBase64'], '')), 400000), lessOrEquals(length(trim(coalesce(triggerBody()?['telefone'], ''))), 30), lessOrEquals(length(trim(coalesce(triggerBody()?['email'], ''))), 100), or(empty(trim(coalesce(triggerBody()?['email'], ''))), and(contains(trim(coalesce(triggerBody()?['email'], '')), '@'), not(contains(trim(coalesce(triggerBody()?['email'], '')), ' ')), greater(lastIndexOf(trim(coalesce(triggerBody()?['email'], '')), '.'), add(indexOf(trim(coalesce(triggerBody()?['email'], '')), '@'), 1)))))))",
               true
             ]
           },
@@ -485,9 +488,31 @@
                                           }
                                         },
                                         "actions": {
-                                          "Criar_arquivo": {
+                                          "Criar_miniatura": {
                                             "type": "OpenApiConnection",
                                             "runAfter": {},
+                                            "inputs": {
+                                              "host": {
+                                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                                                "connectionName": "shared_sharepointonline",
+                                                "operationId": "CreateFile"
+                                              },
+                                              "parameters": {
+                                                "dataset": "__SITE_URL__",
+                                                "folderPath": "__FOLDER_PATH__",
+                                                "name": "@{toLower(trim(coalesce(triggerBody()?['passageiroId'], '')))}.min.jpg",
+                                                "body": "@base64ToBinary(if(empty(coalesce(triggerBody()?['miniaturaBase64'], '')), coalesce(triggerBody()?['fotoBase64'], ''), triggerBody()?['miniaturaBase64']))"
+                                              },
+                                              "authentication": "@parameters('$authentication')"
+                                            }
+                                          },
+                                          "Criar_arquivo": {
+                                            "type": "OpenApiConnection",
+                                            "runAfter": {
+                                              "Criar_miniatura": [
+                                                "Succeeded"
+                                              ]
+                                            },
                                             "inputs": {
                                               "host": {
                                                 "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
@@ -718,10 +743,19 @@
                                     },
                                     "inputs": "@if(and(startsWith(coalesce(body('Obter_passageiro_foto')?['new_linkdafoto'], ''), concat('https://', uriHost('__SITE_URL__'), '/:i:/r', uriPath('__SITE_URL__'), '/Documentos%20Compartilhados/Passageiros/Fotos/')), not(contains(decodeUriComponent(coalesce(body('Obter_passageiro_foto')?['new_linkdafoto'], '')), '..'))), concat('/', decodeUriComponent(substring(coalesce(body('Obter_passageiro_foto')?['new_linkdafoto'], ''), sub(length(concat('https://', uriHost('__SITE_URL__'), '/:i:/r', uriPath('__SITE_URL__'), '/Documentos%20Compartilhados/Passageiros/Fotos/')), length('Documentos%20Compartilhados/Passageiros/Fotos/'))))), '')"
                                   },
+                                  "Caminho_miniatura": {
+                                    "type": "Compose",
+                                    "runAfter": {
+                                      "Caminho_foto": [
+                                        "Succeeded"
+                                      ]
+                                    },
+                                    "inputs": "@if(endsWith(outputs('Caminho_foto'), '.jpg'), concat(substring(outputs('Caminho_foto'), 0, sub(length(outputs('Caminho_foto')), 4)), '.min.jpg'), '')"
+                                  },
                                   "Tem_foto_lida": {
                                     "type": "If",
                                     "runAfter": {
-                                      "Caminho_foto": [
+                                      "Caminho_miniatura": [
                                         "Succeeded"
                                       ]
                                     },
@@ -734,9 +768,37 @@
                                       }
                                     },
                                     "actions": {
-                                      "Ler_foto": {
+                                      "Ler_miniatura": {
                                         "type": "OpenApiConnection",
                                         "runAfter": {},
+                                        "inputs": {
+                                          "host": {
+                                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                                            "connectionName": "shared_sharepointonline",
+                                            "operationId": "GetFileContentByPath"
+                                          },
+                                          "parameters": {
+                                            "dataset": "__SITE_URL__",
+                                            "path": "@outputs('Caminho_miniatura')",
+                                            "inferContentType": true
+                                          },
+                                          "authentication": "@parameters('$authentication')"
+                                        },
+                                        "retryPolicy": {
+                                          "type": "none"
+                                        },
+                                        "limit": {
+                                          "timeout": "PT10S"
+                                        }
+                                      },
+                                      "Ler_foto": {
+                                        "type": "OpenApiConnection",
+                                        "runAfter": {
+                                          "Ler_miniatura": [
+                                            "Failed",
+                                            "TimedOut"
+                                          ]
+                                        },
                                         "inputs": {
                                           "host": {
                                             "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
@@ -788,7 +850,7 @@
                                       "name": "corpo",
                                       "value": {
                                         "ok": true,
-                                        "foto": "@if(equals(coalesce(actions('Ler_foto')?['status'], ''), 'Succeeded'), setProperty(setProperty(json('{}'), 'mimeType', coalesce(outputs('Ler_foto')?['headers']?['Content-Type'], 'image/jpeg')), 'base64', base64(body('Ler_foto'))), null)"
+                                        "foto": "@if(equals(coalesce(actions('Ler_miniatura')?['status'], ''), 'Succeeded'), setProperty(setProperty(json('{}'), 'mimeType', coalesce(outputs('Ler_miniatura')?['headers']?['Content-Type'], 'image/jpeg')), 'base64', base64(body('Ler_miniatura'))), if(equals(coalesce(actions('Ler_foto')?['status'], ''), 'Succeeded'), setProperty(setProperty(json('{}'), 'mimeType', coalesce(outputs('Ler_foto')?['headers']?['Content-Type'], 'image/jpeg')), 'base64', base64(body('Ler_foto'))), null))"
                                       }
                                     }
                                   }

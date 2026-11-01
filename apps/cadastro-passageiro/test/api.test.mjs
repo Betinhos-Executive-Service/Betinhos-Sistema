@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { LIMITE_CORPO, sha256Hex, tokenValido, tratarApi } from "../src/api.mjs";
+import { LIMITE_CORPO, LIMITE_MINIATURA, payloadSalvar, sha256Hex, tokenValido, tratarApi } from "../src/api.mjs";
 import worker from "../src/worker.mjs";
 import { emailOculto, emailValido, mascararTelefone, telefoneOculto, telefoneParaEnvio, telefoneValido } from "../public/validacao.mjs";
 
@@ -247,6 +247,25 @@ test("salvar com foto: grava a foto nova no cache e atualiza a lista", async () 
   const foto = await (await chamar(req("/api/foto", { token: TOKEN, passageiroId: PID }), f, e)).json();
   assert.equal(foto.foto.base64, "WFla");
   assert.ok(e.CACHE.m.has("ler:" + await sha256Hex(TOKEN)));
+});
+
+test("salvar: miniatura válida segue com a foto e vai para o cache no lugar da foto inteira", async () => {
+  const kv = new Map();
+  const cache = { get: async (k) => kv.get(k) ?? null, put: async (k, v) => { kv.set(k, v); }, delete: async (k) => { kv.delete(k); } };
+  const f = flowFalso(200, { ok: true, dados: {} });
+  const r = await chamar(req("/api/salvar", { token: TOKEN, passageiroId: PID, fotoBase64: "AAAA", miniaturaBase64: "BBBB" }), f, { ...env, CACHE: cache });
+  assert.equal(r.status, 200);
+  assert.equal(f.chamadas[0].corpo.miniaturaBase64, "BBBB");
+  const guardada = JSON.parse(kv.get(`foto:${await sha256Hex(TOKEN)}:${PID}`));
+  assert.equal(guardada.foto.base64, "BBBB");
+});
+
+test("salvar: miniatura sem foto, inválida ou grande demais é descartada (o flow grava a própria foto)", () => {
+  const base = { passageiroId: PID, fotoBase64: "AAAA", telefone: "11987654321" };
+  assert.equal(payloadSalvar({ ...base, miniaturaBase64: "BBBB" }).miniaturaBase64, "BBBB");
+  assert.equal("miniaturaBase64" in payloadSalvar({ ...base, miniaturaBase64: "<script>" }), false);
+  assert.equal("miniaturaBase64" in payloadSalvar({ ...base, miniaturaBase64: "B".repeat(LIMITE_MINIATURA + 1) }), false);
+  assert.equal("miniaturaBase64" in payloadSalvar({ passageiroId: PID, telefone: "11987654321", miniaturaBase64: "BBBB" }), false);
 });
 
 test("página: CSS inline e script inicial liberados por hash na CSP; esqueleto e contato no HTML", async () => {

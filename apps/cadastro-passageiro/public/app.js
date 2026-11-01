@@ -230,7 +230,7 @@ function cardPassageiro(p, aoSalvar) {
   const id = p.id;
   const nome = String(p.primeiroNome || "Passageiro");
   const st = {
-    foto: null, fotoUrl: fotoAtual(p.foto), tel: "", mail: "",
+    foto: null, miniatura: null, fotoUrl: fotoAtual(p.foto), tel: "", mail: "",
     editTel: !p.temTelefone, editMail: !p.temEmail, msg: null, salvando: false, erros: {},
     preparando: false, recem: new Set(), carregandoFoto: Boolean(p.temFoto && !p.foto), progresso: null,
   };
@@ -250,7 +250,7 @@ function cardPassageiro(p, aoSalvar) {
     st.fotoUrl = previa;
     render();
     try {
-      st.foto = await comTempoLimite(comprimirFoto(arq), 20000, "A foto demorou demais para abrir. Tente outra ou tire uma nova.");
+      ({ foto: st.foto, miniatura: st.miniatura } = await comTempoLimite(comprimirFoto(arq), 20000, "A foto demorou demais para abrir. Tente outra ou tire uma nova."));
       st.fotoUrl = `data:image/jpeg;base64,${st.foto}`;
     } catch (e) {
       st.fotoUrl = anterior;
@@ -414,7 +414,7 @@ function cardPassageiro(p, aoSalvar) {
       if (emailValido(st.mail)) corpo.email = st.mail.trim();
       else st.erros.mail = "Confira o e-mail, ex.: nome@empresa.com.br.";
     }
-    if (st.foto) corpo.fotoBase64 = st.foto;
+    if (st.foto) { corpo.fotoBase64 = st.foto; corpo.miniaturaBase64 = st.miniatura; }
     if (st.erros.tel || st.erros.mail) {
       st.msg = { tipo: "erro", texto: "Corrija o campo destacado e salve de novo." };
       return render(st.erros.tel ? `tel-${id}` : `mail-${id}`);
@@ -456,7 +456,7 @@ function cardPassageiro(p, aoSalvar) {
     st.progresso = null;
     if (resp.status === 200) {
       st.recem = new Set([corpo.fotoBase64 && "foto", corpo.telefone && "tel", corpo.email && "mail"].filter(Boolean));
-      if (corpo.fotoBase64) { p.temFoto = true; st.foto = null; }
+      if (corpo.fotoBase64) { p.temFoto = true; st.foto = st.miniatura = null; }
       if (corpo.telefone) { p.temTelefone = true; p.telefoneMascarado = telefoneOculto(corpo.telefone); st.tel = ""; st.editTel = false; }
       if (corpo.email) { p.temEmail = true; p.emailMascarado = emailOculto(corpo.email); st.mail = ""; st.editMail = false; }
       const plural = itens.length > 1 ? "salvos" : itens[0] === "foto" ? "salva" : "salvo";
@@ -514,7 +514,19 @@ function jpegBase64(canvas, q) {
   }, "image/jpeg", q));
 }
 
-// Redimensiona para lado maior ≤ 1280 px, JPEG 0,8 e reduz a qualidade até caber em 3 MB. Retorna base64 sem prefixo.
+const LADO_MINIATURA = 288; // quadrado: o card mostra a foto em 88–104 px com object-fit: cover
+
+// Quadrado central de 288 px (o mesmo recorte do card) a partir do canvas já reduzido. ~15 KB, base64 sem prefixo.
+function miniaturaDe(canvas) {
+  const lado = Math.min(canvas.width, canvas.height);
+  const mini = document.createElement("canvas");
+  mini.width = mini.height = Math.min(LADO_MINIATURA, lado);
+  mini.getContext("2d").drawImage(canvas, (canvas.width - lado) / 2, (canvas.height - lado) / 2, lado, lado, 0, 0, mini.width, mini.height);
+  return jpegBase64(mini, 0.8);
+}
+
+// Redimensiona para lado maior ≤ 1280 px, JPEG 0,8 e reduz a qualidade até caber em 3 MB.
+// Retorna { foto, miniatura } em base64 sem prefixo.
 async function comprimirFoto(arq) {
   let fonte;
   try { fonte = await decodificar(arq); } catch {
@@ -535,7 +547,7 @@ async function comprimirFoto(arq) {
   fonte.close?.();
   for (let q = 0.8; q >= 0.3; q -= 0.1) {
     const b64 = await jpegBase64(canvas, q);
-    if (b64.length * 0.75 <= BYTES_MAX) return b64;
+    if (b64.length * 0.75 <= BYTES_MAX) return { foto: b64, miniatura: await miniaturaDe(canvas) };
   }
   throw new Error("A foto ficou grande demais. Tente outra.");
 }
