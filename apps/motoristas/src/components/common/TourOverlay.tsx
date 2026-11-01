@@ -28,7 +28,8 @@ function measure(element: HTMLElement): TourBox {
 }
 
 // Tour guiado com spotlight: escurece a tela, recorta o elemento real do passo e posiciona o
-// cartão abaixo ou acima dele. Modal (role=dialog), fecha com Pular, Esc ou botão Voltar do celular.
+// cartão abaixo ou acima dele. Modal (role=dialog); fecha com Pular/Concluir ou Esc (o Voltar do celular só
+// vira Esc fora do Início, onde o backGuard atua).
 export function TourOverlay({ steps, onClose }: TourOverlayProps) {
   const titleId = useId();
   const textId = useId();
@@ -41,7 +42,6 @@ export function TourOverlay({ steps, onClose }: TourOverlayProps) {
   const [index, setIndex] = useState(0);
   const [spotlight, setSpotlight] = useState<TourBox | null>(null);
   const [cardHeight, setCardHeight] = useState(0);
-  const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
 
   const total = visibleSteps.length;
   const step = visibleSteps[index];
@@ -66,10 +66,7 @@ export function TourOverlay({ steps, onClose }: TourOverlayProps) {
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     element.scrollIntoView({ block: "center", behavior: reduceMotion ? "auto" : "smooth" });
 
-    const update = () => {
-      setViewport({ width: window.innerWidth, height: window.innerHeight });
-      setSpotlight(spotlightBox(measure(element), { width: window.innerWidth, height: window.innerHeight }));
-    };
+    const update = () => setSpotlight(spotlightBox(measure(element), { width: window.innerWidth, height: window.innerHeight }));
     update();
 
     const startedAt = performance.now();
@@ -140,7 +137,8 @@ export function TourOverlay({ steps, onClose }: TourOverlayProps) {
 
   if (!step) return null;
 
-  const placement = placeTourCard(spotlight, cardHeight, viewport.height);
+  // Toda mudança de viewport passa por update() e já re-renderiza; basta ler a altura atual aqui.
+  const placement = placeTourCard(spotlight, cardHeight, window.innerHeight);
   const advance = () => {
     if (isLast) onClose("concluido");
     else setIndex(index + 1);
@@ -169,11 +167,7 @@ export function TourOverlay({ steps, onClose }: TourOverlayProps) {
         <h2 id={titleId} className="tour-card-title">{step.title}</h2>
         <p id={textId} className="tour-card-text">{step.text}</p>
         <div className="tour-card-actions">
-          {isLast ? null : (
-            <button type="button" className="tour-skip" onClick={() => onClose("pulado")}>
-              Pular
-            </button>
-          )}
+          {isLast ? null : <ActionButton className="tour-skip" variant="ghost" label="Pular" onClick={() => onClose("pulado")} />}
           {index > 0 ? <ActionButton className="tour-back" variant="secondary" label="Voltar" onClick={() => setIndex(index - 1)} /> : null}
           <ActionButton buttonRef={nextRef} className="tour-next" variant="primary" label={isLast ? "Concluir" : "Próximo"} onClick={advance} />
         </div>

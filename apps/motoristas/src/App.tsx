@@ -49,6 +49,7 @@ import {
   getDriverContext,
   getDriverCurrentVehicleId,
   hasDataverseRuntime,
+  LOCAL_DRIVER_ID,
   loadCollisionLookupNavigationNamesRemote,
   loadExpenseReferenceDataRemote,
   loadMyIdeasRemote,
@@ -1361,7 +1362,7 @@ function App() {
 
   // Chave da preferência do tour: id real do motorista; em modo mock (sem Xrm) o contexto não é carregado,
   // então usa o mesmo id do fallback local de getDriverContext.
-  const tourDriverId = driverContext?.id ?? (hasDataverseRuntime() ? "" : "localhost-driver");
+  const tourDriverId = driverContext?.id ?? (hasDataverseRuntime() ? "" : LOCAL_DRIVER_ID);
 
   // Primeiro acesso: o tour abre sozinho no Início, depois da carga, uma vez por motorista neste aparelho.
   useEffect(() => {

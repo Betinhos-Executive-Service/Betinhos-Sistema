@@ -93,21 +93,11 @@
   margin-left: auto;
 }
 
-.tour-skip {
-  min-height: 44px;
-  padding: 0 6px;
-  border: 0;
-  background: transparent;
-  color: #536174;
-  font: inherit;
-  font-size: 0.9rem;
-  font-weight: 800;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  cursor: pointer;
+.tour-card-actions .tour-skip {
+  padding: 0 8px !important;
+  color: #536174 !important;
 }
 
-.tour-skip:focus-visible,
 .tour-card-actions .action-button:focus-visible {
   outline: 3px solid rgba(32, 118, 231, 0.55);
   outline-offset: 2px;
