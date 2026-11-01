@@ -26,14 +26,20 @@ Achado novo: as oito chaves `new_AnthropicKey*` estão no **valor padrão da def
 
 ## Fase 2. Piloto no DEV com um segredo
 Escolha: `new_AnthropicKeyObservacaoMotorista`, porque o consumidor é um plugin deste repo.
-1. Registrar a chave na **configuração segura** do step de `new_OrganizarObservacao`, mesmo padrão de `new_CobrancaQR` (Stripe) e do plugin Acesso. Não precisa de Key Vault.
-2. Mudar `OrganizeObservationPlugin` para ler a chave da configuração segura, com teste unitário. Manter a leitura antiga como reserva só até a validação.
-3. Publicar o plugin **a partir de uma `main` atualizada** (o assembly é único e compartilhado entre frentes).
-4. Validar no DEV: organizar uma observação, conferir que o texto volta organizado e que a chamada à Anthropic acontece.
-5. Esvaziar o valor da variável de ambiente antiga e rotacionar a chave.
-6. Verificar como motorista: `GET environmentvariablevalues` não mostra mais a chave.
 
-Precisa existir: MCP DEV reativado ou execução local no Windows; `dotnet` para compilar e rodar os testes do plugin; trava `~/.claude/locks/dataverse-dev.lock` para escrita no DEV.
+**Já feito no PR (Linux, 01/11/2026):**
+- `OrganizeObservationPlugin` recebe a configuração segura do step e a usa primeiro (`ObservationApiKey.Resolve`); sem ela, continua lendo a variável de ambiente. Comportamento do step atual não muda.
+- `scripts/provision-observacao-organizada.ps1 -Apply -ConfigurarChaveSegura` pede a chave com entrada oculta e a grava na configuração segura do step.
+- Plugin compila em net462 sem erros; 5 testes novos passam em net8. A suíte inteira do projeto de testes não compila fora do Windows (há um `string.Contains` com dois argumentos em `ExchangePossessionFinalizerTests`, de outra frente).
+- Script PowerShell **não executado** (sem `pwsh`).
+
+**Falta, no Windows, nesta ordem:**
+1. Atualizar a `main` local e publicar o assembly no DEV pelo fluxo normal (o assembly é único e compartilhado entre frentes). Usar a chave de nome forte real; a que gerei aqui é descartável e nunca vai a lugar nenhum.
+2. Gerar uma **chave nova** no console da Anthropic para a observação do motorista e rodar `scripts/provision-observacao-organizada.ps1 -Apply -ConfigurarChaveSegura`. Valide o primeiro `-Apply`: o `Invoke-Dv` manda o cabeçalho de solução também para a tabela de configuração segura, e não conferi se ela aceita.
+3. Chamar `new_OrganizarObservacao` e conferir os tópicos.
+4. Esvaziar o valor padrão de `new_AnthropicKeyObservacaoMotorista`, repetir a chamada e revogar a chave antiga no console.
+5. Verificar como motorista: a definição não mostra mais a chave.
+6. Só depois, incluir o step "Organizar observacao do motorista" em `$secureSteps` de `scripts/deploy-prod.ps1`. Antes disso o deploy do PROD passaria a falhar.
 
 ## Fase 3. Demais segredos
 - Segredos usados por plugin: mesmo caminho da fase 2.
