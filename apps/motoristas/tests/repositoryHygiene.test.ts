@@ -38,8 +38,8 @@ test("padrão reconhece SAS de Flow e ignora fixture curta", () => {
 });
 
 test("nenhum arquivo versionado contém URL com credencial (sig, code, token, secret, key)", () => {
-  // -I pula binários; -P aceita a mesma sintaxe do regex acima.
-  assert.deepEqual(gitLines(["grep", "-I", "-l", "-i", "-P", CREDENTIAL_GREP, "--", "."]), []);
+  // -I pula binários; -P aceita a mesma sintaxe do regex acima. Este arquivo fica de fora: as fixtures dele são credenciais sintéticas.
+  assert.deepEqual(gitLines(["grep", "-I", "-l", "-i", "-P", CREDENTIAL_GREP, "--", ".", ":(exclude)tests/repositoryHygiene.test.ts"]), []);
 });
 
 test("nenhum artefato local versionado (tmp, bin, obj, zip, estado de ferramentas)", () => {

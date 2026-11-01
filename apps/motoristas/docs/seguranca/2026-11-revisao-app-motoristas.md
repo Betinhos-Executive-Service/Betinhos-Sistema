@@ -30,7 +30,7 @@ Fora do escopo por decisão do Renan: bloqueio de print/screenshot e empacotamen
 - `teamroles`: a equipe `Team-Betinhos-Canvas-DEV` (grupo do Entra dos motoristas, conforme `docs/acesso-motorista-entra.md` do Sistema Betinhos) tem os papéis `Acesso-Motoristas`, `App Opener` e `Basic User`.
 - `roleprivileges`: `Basic User` tem `prvReadEnvironmentVariableDefinition` com profundidade 8 (Global). `environmentvariablevalue` é filha de `environmentvariabledefinition` e herda esse acesso.
 - O próprio app confirma a leitura como motorista: `src/lib/dataverse.ts:3629-3657` (`getDataverseEnvironmentVariableValue`) consulta `environmentvariabledefinitions` e `environmentvariablevalues` com a sessão do motorista para obter as URLs de Flow, e o `dist/index.html` publicado tem `__APP_FLOW_ENV` vazio, ou seja, sem essa leitura o app não funcionaria.
-- `environmentvariabledefinition`: todas as variáveis abaixo são do tipo `String` (100000000), não `Segredo`. `environmentvariablevalue` tem valor preenchido no DEV para: `new_AnthropicApiKey`, `cr40f_GerarPagantesCieloClientSecret`, `cr40f_GerarPagantesGraphClientSecret`, `new_RDStationClientSecret`, `new_RDStationRefreshToken`, `new_JevApiKey` (valores não foram lidos). Há ainda nove definições `new_AnthropicKey*` sem valor no DEV.
+- `environmentvariabledefinition`: todas as variáveis abaixo são do tipo `String` (100000000), não `Segredo`. `environmentvariablevalue` tem valor preenchido no DEV para: `new_AnthropicApiKey`, `cr40f_GerarPagantesCieloClientSecret`, `cr40f_GerarPagantesGraphClientSecret`, `new_RDStationClientSecret`, `new_RDStationRefreshToken`, `new_JevApiKey` (valores não foram lidos). Há ainda oito definições `new_AnthropicKey*` sem valor no DEV. A consulta de definições parou no limite de 20 linhas do MCP, então o inventário completo é o primeiro passo do plano.
 - Plugin `OrganizeObservationPlugin.cs:13-26` lê `new_AnthropicKeyObservacaoMotorista` com serviço de sistema, então o plugin em si não exige leitura pelo motorista; a exposição vem do papel, não do plugin.
 
 **Impacto:** qualquer motorista (ou ex-motorista com token ainda válido, ver S3) lê pelo Web API `GET /api/data/v9.2/environmentvariablevalues?$select=schemaname,value` e obtém chaves da Anthropic (custo e abuso), client secret do Graph (acesso a dados do tenant conforme as permissões do app registration), credenciais Cielo (pagamentos) e RD Station. PROD não foi consultado; se os mesmos valores existirem lá, o impacto é o mesmo.
@@ -64,7 +64,7 @@ Fora do escopo por decisão do Renan: bloqueio de print/screenshot e empacotamen
 
 **Correção proposta (decisão):**
 - No Sistema Betinhos: acrescentar `POST /users/{id}/revokeSignInSessions` ao `EncerrarAcessoHandler` (a permissão `User.ReadWrite.All` já está concedida).
-- No App Motoristas: ao receber 401/403 (`SESSION_EXPIRED_EVENT`), limpar `localStorage` e IndexedDB do app (hoje isso só acontece na limpeza manual). Muda comportamento offline, por isso ficou como decisão.
+- No App Motoristas: ao sessão expirar, limpar só o cache de agenda e histórico (`app-motoristas-local-v1`), que o login recarrega do servidor. **Não** limpar rascunhos de voucher, observação e finalização: uma sessão expirada de motorista legítimo também gera 401, e apagar o rascunho perderia gasto e fotos ainda não enviados. O app hoje trata 401 e 403 igual (`src/lib/fetchWebApi.ts:48`), e 403 pode ser só falta de privilégio, então a limpeza deve valer apenas para 401. Não confirmei qual status o Dataverse devolve para usuário desativado; confirmar no DEV antes de implementar.
 
 ### S4. Médio: Custom APIs sem *Execute Privilege*
 
@@ -99,7 +99,7 @@ Não verificado (fora deste repo ou sem leitura detalhada): `new_ExpenseUploadTr
 
 A foto do passageiro segue o plano de 23/10/2026: nunca há URL, só bytes em memória. O telefone é necessário para o trabalho (botões Ligar e WhatsApp), mas não precisa sobreviver sem prazo no aparelho.
 
-**Correção proposta (decisão):** prazo de validade para o store local (por exemplo 48 h) e limpeza ao receber 401/403 (S3). Ambas mudam o comportamento offline.
+**Correção proposta (decisão):** prazo de validade para o store local de agenda (por exemplo 48 h) e limpeza no 401 (S3), mantendo os rascunhos. Ambas mudam o comportamento offline.
 
 ### S7. Médio: dependências de desenvolvimento
 
@@ -152,14 +152,16 @@ Sem *Execute Privilege* (S4); `OrganizeObservationPlugin.cs:24-29` envia o texto
 | `tests/repositoryHygiene.test.ts`: bloqueio automático de URL com credencial e de artefato local em arquivo versionado | `npm test`; prova negativa: arquivo temporário com `sig=` de 36 caracteres adicionado com `git add -N` fez o teste falhar listando o arquivo |
 | `scripts/check-repository-hygiene.ps1` delega ao teste (sem falso positivo nas fixtures `?sig=abc`) | revisão do diff; execução exige Windows |
 
+Plano das decisões 1, 2 e 5: `2026-11-plano-segredos-e-flows.md`. Em 01/11/2026 o Renan aprovou migrar os segredos para tipo Segredo e planejar a saída das URLs de Flow; a execução depende do que está listado ali em "O que preciso de você".
+
 ## Decisões pendentes (Renan)
 
 1. **S1** Migrar segredos para variável tipo Segredo ou configuração segura de step; rotacionar chaves Anthropic, Graph, Cielo, RD Station e Jev; conferir PROD.
 2. **S2** Tirar as URLs de Flow com SAS do alcance do cliente (Custom API/plugin ou gatilho autenticado) e regenerar `sig` nos desligamentos até lá.
-3. **S3** `revokeSignInSessions` no `EncerrarAcessoHandler` (Sistema Betinhos) e limpeza local no app ao receber 401/403.
+3. **S3** `revokeSignInSessions` no `EncerrarAcessoHandler` (Sistema Betinhos) e limpeza só do cache de agenda no app, nos termos do S3 acima.
 4. **S4** *Execute Privilege* nas doze Custom APIs e revisão das cinco não verificadas.
 5. **S5** Substituir `Basic User` por papel mínimo na equipe dos motoristas (depois de S1/S2).
-6. **S6** Prazo para o store local e limpeza em sessão expirada.
+6. **S6** Prazo para o store local e limpeza do cache em sessão expirada (sem apagar rascunhos).
 7. **S7** PR de dependências: `npm audit fix` e Vite 5 → 8.
 8. **S9** Fontes embutidas e CSP por hash no build.
 9. **S10/S11** Privilégio e limite em `new_OrganizarObservacao`; remover `prvWrite` do log.
