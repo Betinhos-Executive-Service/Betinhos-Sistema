@@ -1,7 +1,6 @@
 // Fluxo real: toque na foto -> seletor -> JPEG 4000x3000 -> prévia imediata -> foto comprimida -> salvar.
-import { createRequire } from "node:module";
-const { chromium, devices } = createRequire(import.meta.url)("C:/Users/mendo/AppData/Roaming/npm/node_modules/@playwright/cli/node_modules/playwright");
-const b = await chromium.launch({ executablePath: process.env.LOCALAPPDATA + "/ms-playwright/chromium-1243/chrome-win64/chrome.exe" });
+import { abrirNavegador, devices } from "./navegador.mjs";
+const b = await abrirNavegador();
 const p = await (await b.newContext({ ...devices["Pixel 7"] })).newPage();
 const t0 = Date.now();
 await p.goto(process.argv[2]); await p.waitForSelector(".card");

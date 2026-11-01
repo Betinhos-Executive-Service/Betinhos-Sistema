@@ -11,4 +11,6 @@
   "kv_namespaces": [{ "binding": "CACHE", "id": "d26f8512a9a943ab884e3b6340c3af15" }],
   "ratelimits": [{ "name": "RATE_LIMITER", "namespace_id": "4201", "simple": { "limit": 60, "period": 60 } }]
   // Secret FLOW_URL: `wrangler secret put FLOW_URL` (URL SAS do flow HTTP). Sem ela, localhost responde mock.
+  // Contato na tela de link vencido (opcional, dado público): "vars": { "CONTATO_WHATSAPP": "5511…", "CONTATO_EMAIL": "…" }.
+  // Sem as vars a tela só orienta a pedir um novo link pelo mesmo canal.
 }

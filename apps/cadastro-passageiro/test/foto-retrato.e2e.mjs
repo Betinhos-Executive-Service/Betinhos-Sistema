@@ -1,7 +1,6 @@
 // Teste: foto em retrato (3:4) não pode vazar da área tocável; tocar no meio da imagem visível abre o seletor.
-import { createRequire } from "node:module";
-const { chromium, devices } = createRequire(import.meta.url)("C:/Users/mendo/AppData/Roaming/npm/node_modules/@playwright/cli/node_modules/playwright");
-const b = await chromium.launch({ executablePath: process.env.LOCALAPPDATA + "/ms-playwright/chromium-1243/chrome-win64/chrome.exe" });
+import { abrirNavegador, devices } from "./navegador.mjs";
+const b = await abrirNavegador();
 const p = await (await b.newContext({ ...devices["Pixel 7"] })).newPage();
 await p.goto(process.argv[2]); await p.waitForSelector(".foto img");
 // Troca a foto do 1º passageiro por um retrato 300x400 gerado no canvas
