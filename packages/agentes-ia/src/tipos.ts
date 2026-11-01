@@ -4,7 +4,7 @@ export type Agente = (typeof AGENTES)[number]
 export const TIPOS_POR_AGENTE = {
   financeiro: ['SemRecibo', 'OPPendenteAntiga', 'RepasseAguardando', 'MargemNegativa', 'OSSemCobranca'],
   logistica: ['ServicoSemMotorista', 'ServicoSemVeiculo', 'ConflitoHorario', 'MotoristaSemVeiculoAtual'],
-  pessoas: ['CNHVencendo', 'ASOVencendo', 'DocumentoVencido', 'Aniversario', 'MultaSemMotorista', 'ComunicadoSugerido'],
+  pessoas: ['CNHVencendo', 'ASOVencendo', 'DocumentoVencido', 'Aniversario', 'MultaSemMotorista', 'ComunicadoSugerido', 'TreinamentoPendente'],
   frota: ['FrotaPrioridade', 'FrotaReincidencia', 'FrotaPreventiva', 'FrotaAgendadaVencida', 'FrotaCustoAlto', 'FrotaHodometro'],
 } as const
 export type TipoProposta = (typeof TIPOS_POR_AGENTE)[Agente][number]
@@ -20,8 +20,17 @@ export type TipoAcao = (typeof ACOES_POR_AGENTE)[Agente][number]
 export const PRIORIDADES = ['alta', 'media', 'baixa'] as const
 export type Prioridade = (typeof PRIORIDADES)[number]
 
-/** Ordem fixa: é a ordem dos valores do choice cr40f_tipo (100000000 + índice). */
-export const TODOS_OS_TIPOS: readonly TipoProposta[] = [...TIPOS_POR_AGENTE.financeiro, ...TIPOS_POR_AGENTE.logistica, ...TIPOS_POR_AGENTE.pessoas, ...TIPOS_POR_AGENTE.frota]
+/**
+ * Ordem dos valores do choice cr40f_tipo (100000000 + índice), a mesma de `$TIPOS` em provision-agentes-schema.ps1.
+ * Só acrescente no fim: reordenar mudaria o significado de valores já gravados.
+ */
+export const TODOS_OS_TIPOS = [
+  'SemRecibo', 'OPPendenteAntiga', 'RepasseAguardando', 'MargemNegativa', 'OSSemCobranca',
+  'ServicoSemMotorista', 'ServicoSemVeiculo', 'ConflitoHorario', 'MotoristaSemVeiculoAtual',
+  'CNHVencendo', 'ASOVencendo', 'DocumentoVencido', 'Aniversario', 'MultaSemMotorista', 'ComunicadoSugerido',
+  'FrotaPrioridade', 'FrotaReincidencia', 'FrotaPreventiva', 'FrotaAgendadaVencida', 'FrotaCustoAlto', 'FrotaHodometro',
+  'TreinamentoPendente',
+] as const satisfies readonly TipoProposta[]
 export const TODAS_AS_ACOES: readonly TipoAcao[] = ['CriarPendencia', 'AtribuirMotorista', 'AtribuirVeiculo', 'CriarComunicadoRascunho']
 
 export type Proposta = {

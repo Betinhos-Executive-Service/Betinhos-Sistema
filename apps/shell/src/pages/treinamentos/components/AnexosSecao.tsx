@@ -1,0 +1,102 @@
+import { useRef, useState } from 'react'
+import { Button, formatFileSize, useToast } from '@betinhos/ui'
+import { Download, FileText, Image as ImageIcon, Paperclip, Trash2 } from 'lucide-react'
+import type { Source } from '../data/source'
+import { ANEXO_TIPOS, erroTexto, isImagem, validarAnexo, type Anexo } from '../domain/treinamentos'
+
+type Props = {
+  /** Rascunho salvo; null = ainda sem id (anexos só depois do primeiro salvamento). */
+  treinamentoId: string | null
+  anexos: Anexo[]
+  source: Source
+  onChange: (anexos: Anexo[]) => void
+  disabled: boolean
+  /** Publicado: só leitura além de abrir. */
+  somenteLeitura?: boolean
+}
+
+function baixar(nome: string, blob: Blob) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = nome
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
+/** Fotos e arquivos do treinamento no SharePoint (`Treinamentos/<id>`); a lista fica no registro e é salva com o rascunho. */
+export function AnexosSecao({ treinamentoId, anexos, source, onChange, disabled, somenteLeitura }: Props) {
+  const toast = useToast()
+  const input = useRef<HTMLInputElement>(null)
+  const [enviando, setEnviando] = useState<string | null>(null)
+  const [ocupado, setOcupado] = useState<string | null>(null)
+
+  const enviar = async (files: FileList | null) => {
+    if (!files || !treinamentoId) return
+    let lista = anexos
+    for (const file of Array.from(files)) {
+      const erro = validarAnexo(file)
+      if (erro) { toast({ tone: 'danger', message: `${file.name}: ${erro}` }); continue }
+      setEnviando(file.name)
+      try {
+        const anexo = await source.enviarAnexo(treinamentoId, file, lista)
+        lista = [...lista, anexo]
+        onChange(lista)
+      } catch (reason) {
+        toast({ tone: 'danger', message: `Não foi possível enviar ${file.name}. ${erroTexto(reason)}` })
+      }
+    }
+    setEnviando(null)
+  }
+
+  const excluir = async (anexo: Anexo) => {
+    if (!treinamentoId) return
+    setOcupado(anexo.caminho)
+    try {
+      await source.excluirAnexo(treinamentoId, anexo)
+      onChange(anexos.filter((a) => a.caminho !== anexo.caminho))
+    } catch (reason) {
+      toast({ tone: 'danger', message: `Não foi possível excluir ${anexo.nome}. ${erroTexto(reason)}` })
+    } finally {
+      setOcupado(null)
+    }
+  }
+
+  const abrir = async (anexo: Anexo) => {
+    setOcupado(anexo.caminho)
+    try {
+      const { nome, blob } = await source.abrirAnexo(anexo)
+      baixar(nome, blob)
+    } catch (reason) {
+      toast({ tone: 'danger', message: `Não foi possível abrir ${anexo.nome}. ${erroTexto(reason)}` })
+    } finally {
+      setOcupado(null)
+    }
+  }
+
+  const bloqueado = disabled || !treinamentoId || Boolean(enviando)
+  return (
+    <div className="tr-anexos">
+      <ul className="tr-anexos__lista" aria-label="Anexos">
+        {anexos.map((a) => (
+          <li key={a.caminho}>
+            <span className="tr-anexos__icone" aria-hidden="true">{isImagem(a) ? <ImageIcon size={16} /> : <FileText size={16} />}</span>
+            <span className="tr-anexos__nome"><strong>{a.nome}</strong><small>{isImagem(a) ? 'Foto' : 'Arquivo'} · {formatFileSize(a.tamanho)}</small></span>
+            <Button variant="ghost" size="compact" icon={<Download size={14} />} aria-label={`Abrir ${a.nome}`} loading={ocupado === a.caminho} disabled={Boolean(ocupado)} onClick={() => void abrir(a)} />
+            {somenteLeitura ? null : <Button variant="ghost" size="compact" icon={<Trash2 size={14} />} aria-label={`Excluir ${a.nome}`} disabled={bloqueado || Boolean(ocupado)} onClick={() => void excluir(a)} />}
+          </li>
+        ))}
+        {!anexos.length ? <li className="tr-anexos__vazio">{somenteLeitura ? 'Sem anexos.' : 'Nenhum anexo ainda.'}</li> : null}
+      </ul>
+      {somenteLeitura ? null : (
+        <div className="tr-anexos__acoes">
+          <input ref={input} type="file" hidden multiple accept={ANEXO_TIPOS.join(',')} aria-label="Arquivos para anexar" onChange={(e) => { void enviar(e.target.files); e.currentTarget.value = '' }} />
+          <Button variant="secondary" size="compact" icon={<Paperclip size={14} />} loading={Boolean(enviando)} disabled={bloqueado} onClick={() => input.current?.click()}>{enviando ? `Enviando ${enviando}` : 'Adicionar foto ou arquivo'}</Button>
+          <small className="tr-hint">{treinamentoId ? 'PDF, imagem, Word ou PowerPoint até 25 MB. Ficam no SharePoint BetinhosGestoInterna.' : 'Salve o rascunho para anexar fotos e arquivos.'}</small>
+        </div>
+      )}
+    </div>
+  )
+}
