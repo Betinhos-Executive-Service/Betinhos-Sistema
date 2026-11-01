@@ -14,6 +14,7 @@ import {
   STORAGE_KEY
 } from "./app/bootstrap";
 import { useHardwareBackGuard } from "./app/backGuard";
+import { clearTourSeen, hasSeenTour, markTourSeen, TOUR_STEPS, type TourCloseReason } from "./app/tour";
 import { BuildStamp } from "./components/layout/BuildStamp";
 import {
   getScreenAfterQrPayment,
@@ -48,6 +49,7 @@ import {
   getDriverContext,
   getDriverCurrentVehicleId,
   hasDataverseRuntime,
+  LOCAL_DRIVER_ID,
   loadCollisionLookupNavigationNamesRemote,
   loadExpenseReferenceDataRemote,
   loadMyIdeasRemote,
@@ -139,6 +141,7 @@ import {
 } from "./lib/localWorkflow";
 import { LocalToast, type ToastState, type ToastTone } from "./components/common/LocalToast";
 import { LoadingOverlay, type LoadingOverlayState } from "./components/common/LoadingOverlay";
+import { TourOverlay } from "./components/common/TourOverlay";
 import { getVisibleLoadingOverlay } from "./app/overlayLayering";
 import { CollisionScreen } from "./screens/CollisionScreen";
 import { ComunicadosScreen } from "./screens/ComunicadosScreen";
@@ -488,6 +491,7 @@ function App() {
   const [remoteOperation, setRemoteOperation] = useState<RemoteOperation | null>(null);
   const [remoteMode, setRemoteMode] = useState(false);
   const [driverContext, setDriverContext] = useState<DriverContext | null>(null);
+  const [tourOpen, setTourOpen] = useState(false);
   const [vehicleChoiceRequest, setVehicleChoiceRequest] = useState<{
     resolution: InfleetVehicleResolution;
     resolve: (choice: DriverVehicleChoice | null) => void;
@@ -1356,6 +1360,32 @@ function App() {
   // Na URL direta do web resource o gesto Voltar do celular sairia do app.
   useHardwareBackGuard(screen, hashRoutingActive || isStandaloneWebResourceRuntime());
 
+  // Chave da preferência do tour: id real do motorista; em modo mock (sem Xrm) o contexto não é carregado,
+  // então usa o mesmo id do fallback local de getDriverContext.
+  const tourDriverId = driverContext?.id ?? (hasDataverseRuntime() ? "" : LOCAL_DRIVER_ID);
+
+  // Primeiro acesso: o tour abre sozinho no Início, depois da carga, uma vez por motorista neste aparelho.
+  // Fechado por "indisponivel" (sem âncoras) não grava "visto"; o ref evita reabrir em loop até sair do Início.
+  const tourUnavailableRef = useRef(false);
+  const tourBlocked = Boolean(vehicleChoiceRequest || remoteOperation || expenseSend);
+  useEffect(() => {
+    if (screen !== "inicio") {
+      tourUnavailableRef.current = false;
+      setTourOpen(false);
+      return;
+    }
+    if (tourOpen || tourUnavailableRef.current || tourBlocked || !tourDriverId || dataLoading || criticalError) return;
+    if (hasSeenTour(localStorage, tourDriverId)) return;
+    const timer = window.setTimeout(() => setTourOpen(true), 700);
+    return () => window.clearTimeout(timer);
+  }, [tourOpen, tourBlocked, screen, tourDriverId, dataLoading, criticalError]);
+
+  const closeTour = (reason: TourCloseReason) => {
+    setTourOpen(false);
+    if (reason === "indisponivel") tourUnavailableRef.current = true;
+    if (reason !== "indisponivel" && tourDriverId) markTourSeen(localStorage, tourDriverId);
+  };
+
   useEffect(() => {
     if (!hashRoutingActive) return;
     const hashDetail = screen ==="reciboPersonalizado" ? receiptDetail : selectedDetail;
@@ -1514,6 +1544,7 @@ function App() {
       <LoadingOverlay loading={getVisibleLoadingOverlay(dataLoading, criticalError)} />
       {remoteOperation ? <FlowProgressOverlay operation={remoteOperation} /> : null}
       {expenseSend ? <ExpenseSendOverlay state={expenseSend} onClose={closeExpenseSendError} /> : null}
+      {tourOpen && screen === "inicio" ? <TourOverlay steps={TOUR_STEPS} onClose={closeTour} /> : null}
       {vehicleChoiceRequest ? (
         <VehicleChoiceDialog
           resolution={vehicleChoiceRequest.resolution}
@@ -1587,6 +1618,7 @@ function App() {
     localStorage.removeItem(VOUCHER_DRAFTS_STORAGE_KEY);
     localStorage.removeItem(FINALIZE_DRAFT_ASSETS_STORAGE_KEY);
     localStorage.removeItem(SERVICE_OBSERVATION_DRAFTS_KEY);
+    if (tourDriverId) clearTourSeen(localStorage, tourDriverId);
     void clearMediaDraft();
 
     setStore(initialStore());
@@ -3819,6 +3851,7 @@ function App() {
       driverName={driverContext?.fullName}
       showLocalReset={isLocalhostRuntime && !remoteMode}
       onResetLocalData={resetLocalData}
+      onShowTour={() => setTourOpen(true)}
     />
   );
 }

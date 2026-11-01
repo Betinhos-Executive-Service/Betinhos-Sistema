@@ -215,6 +215,8 @@ type InitialScreenProps = {
   isThirdParty?: boolean;
   showLocalReset?: boolean;
   onResetLocalData?: () => void;
+  /** Reabre o tour de primeiro acesso ("Ver tour de novo" no rodapé). */
+  onShowTour?: () => void;
   [key: string]: unknown;
 };
 
@@ -475,6 +477,7 @@ export function InitialScreen(props: InitialScreenProps) {
         <button
           className="concept-module-card concept-module-card--primary"
           type="button"
+          data-tour="servicos"
           disabled={servicesModule.disabled}
           aria-disabled={servicesModule.disabled}
           onClick={() => navigateTo("services")}
@@ -512,6 +515,7 @@ export function InitialScreen(props: InitialScreenProps) {
               className="concept-tile"
               key={module.id}
               type="button"
+              data-tour={module.id}
               disabled={module.disabled}
               aria-disabled={module.disabled}
               aria-label={count > 0 ? `${module.label}, ${count} pendente${plural(count)}` : module.label}
@@ -528,6 +532,11 @@ export function InitialScreen(props: InitialScreenProps) {
       </section>
 
       <footer className="concept-footer">
+        {props.onShowTour ? (
+          <button type="button" className="concept-tour-link" onClick={props.onShowTour}>
+            Ver tour de novo
+          </button>
+        ) : null}
         {props.showLocalReset && props.onResetLocalData ? (
           <button type="button" className="local-reset" onClick={props.onResetLocalData}>
             Resetar dados locais
