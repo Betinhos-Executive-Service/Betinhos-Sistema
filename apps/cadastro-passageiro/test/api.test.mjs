@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { LIMITE_CORPO, sha256Hex, tokenValido, tratarApi } from "../src/api.mjs";
+import { LIMITE_CORPO, LIMITE_MINIATURA, payloadSalvar, sha256Hex, tokenValido, tratarApi } from "../src/api.mjs";
 import worker from "../src/worker.mjs";
 import { emailOculto, emailValido, mascararTelefone, telefoneOculto, telefoneParaEnvio, telefoneValido } from "../public/validacao.mjs";
 
@@ -247,4 +247,50 @@ test("salvar com foto: grava a foto nova no cache e atualiza a lista", async () 
   const foto = await (await chamar(req("/api/foto", { token: TOKEN, passageiroId: PID }), f, e)).json();
   assert.equal(foto.foto.base64, "WFla");
   assert.ok(e.CACHE.m.has("ler:" + await sha256Hex(TOKEN)));
+});
+
+test("salvar: miniatura válida segue com a foto e vai para o cache no lugar da foto inteira", async () => {
+  const kv = new Map();
+  const cache = { get: async (k) => kv.get(k) ?? null, put: async (k, v) => { kv.set(k, v); }, delete: async (k) => { kv.delete(k); } };
+  const f = flowFalso(200, { ok: true, dados: {} });
+  const r = await chamar(req("/api/salvar", { token: TOKEN, passageiroId: PID, fotoBase64: "AAAA", miniaturaBase64: "BBBB" }), f, { ...env, CACHE: cache });
+  assert.equal(r.status, 200);
+  assert.equal(f.chamadas[0].corpo.miniaturaBase64, "BBBB");
+  const guardada = JSON.parse(kv.get(`foto:${await sha256Hex(TOKEN)}:${PID}`));
+  assert.equal(guardada.foto.base64, "BBBB");
+});
+
+test("salvar: miniatura sem foto, inválida ou grande demais é descartada (o flow grava a própria foto)", () => {
+  const base = { passageiroId: PID, fotoBase64: "AAAA", telefone: "11987654321" };
+  assert.equal(payloadSalvar({ ...base, miniaturaBase64: "BBBB" }).miniaturaBase64, "BBBB");
+  assert.equal("miniaturaBase64" in payloadSalvar({ ...base, miniaturaBase64: "<script>" }), false);
+  assert.equal("miniaturaBase64" in payloadSalvar({ ...base, miniaturaBase64: "B".repeat(LIMITE_MINIATURA + 1) }), false);
+  assert.equal("miniaturaBase64" in payloadSalvar({ passageiroId: PID, telefone: "11987654321", miniaturaBase64: "BBBB" }), false);
+});
+
+test("página: CSS inline e script inicial liberados por hash na CSP; esqueleto e contato no HTML", async () => {
+  const css = "body{margin:0}";
+  const ASSETS = { fetch: async (u) => new URL(String(u instanceof Request ? u.url : u)).pathname === "/app.css" ? new Response(css) : new Response("", { status: 404 }) };
+  const envPagina = { ASSETS, MODO_LOCAL: "1", CONTATO_WHATSAPP: "+55 (11) 90000-0000", CONTATO_EMAIL: "x@y.z" };
+  const r = await worker.fetch(new Request(ORIGEM + "/"), envPagina, null);
+  const html = await r.text();
+  const csp = r.headers.get("Content-Security-Policy");
+  const hash = (t) => `'sha256-${createHash("sha256").update(t, "utf8").digest("base64")}'`;
+  assert.ok(html.includes(`<style>${css}</style>`), "CSS inline");
+  assert.ok(csp.includes(`style-src 'self' ${hash(css)}`), csp);
+  const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+  assert.ok(csp.includes(`script-src 'self' ${hash(script)}`), "hash do script inicial");
+  assert.ok(script.includes('fetch("/api/ler"'));
+  assert.equal((html.match(/sk-card/g) || []).length, 3, "esqueleto com 3 cards no main");
+  assert.ok(html.includes('data-whatsapp="5511900000000" data-email="x@y.z"'), "contato só com dígitos");
+  // Módulo sem ?v= revalida sempre; com ?v= é imutável.
+  const assets = { fetch: async () => new Response("export {}", { status: 200 }) };
+  const semV = await worker.fetch(new Request(ORIGEM + "/validacao.mjs"), { ASSETS: assets, MODO_LOCAL: "1" }, null);
+  assert.equal(semV.headers.get("Cache-Control"), "no-cache");
+  const comV = await worker.fetch(new Request(ORIGEM + "/app.js?v=1"), { ASSETS: assets, MODO_LOCAL: "1" }, null);
+  assert.equal(comV.headers.get("Cache-Control"), "public, max-age=31536000, immutable");
+  // Sem ASSETS: cai no <link> e a CSP fica só com 'self' no style-src.
+  const r2 = await worker.fetch(new Request(ORIGEM + "/"), { MODO_LOCAL: "1" }, null);
+  assert.ok((await r2.text()).includes('<link rel="stylesheet" href="/app.css?v='));
+  assert.ok(r2.headers.get("Content-Security-Policy").includes("style-src 'self';"));
 });

@@ -25,7 +25,7 @@ test('gatilho HTTP POST com JSON e só o hash do token', () => {
   assert.equal(gatilho.type, 'Request')
   assert.equal(gatilho.kind, 'Http')
   assert.equal(gatilho.inputs.method, 'POST')
-  assert.deepEqual(Object.keys(gatilho.inputs.schema.properties).sort(), ['email', 'fotoBase64', 'hash', 'op', 'passageiroId', 'telefone'])
+  assert.deepEqual(Object.keys(gatilho.inputs.schema.properties).sort(), ['email', 'fotoBase64', 'hash', 'miniaturaBase64', 'op', 'passageiroId', 'telefone'])
 })
 
 test('o token puro nunca é usado; o link é buscado por cr40f_tokenhash', () => {
@@ -119,9 +119,31 @@ test('foto: só passageiro do escopo, só da pasta Passageiros/Fotos, lida por c
   assert.equal(ler.inputs.parameters.path, "@outputs('Caminho_foto')")
   assert.equal(todas.get('Tem_foto_lida').expression.not.equals[0], "@empty(outputs('Caminho_foto'))")
   assert.deepEqual(todas.get('Status_foto').runAfter, { Tem_foto_lida: ['Succeeded', 'Failed', 'Skipped', 'TimedOut'] })
+  // miniatura primeiro; a foto inteira só quando a miniatura falha (foto antiga, sem .min.jpg)
+  assert.equal(todas.get('Caminho_miniatura').inputs, "@if(endsWith(outputs('Caminho_foto'), '.jpg'), concat(substring(outputs('Caminho_foto'), 0, sub(length(outputs('Caminho_foto')), 4)), '.min.jpg'), '')")
+  const lerMin = todas.get('Ler_miniatura')
+  assert.equal(lerMin.inputs.host.operationId, 'GetFileContentByPath')
+  assert.equal(lerMin.inputs.parameters.path, "@outputs('Caminho_miniatura')")
+  assert.deepEqual(todas.get('Ler_foto').runAfter, { Ler_miniatura: ['Failed', 'TimedOut'] })
+  assert.deepEqual(todas.get('Tem_foto_lida').runAfter, { Caminho_miniatura: ['Succeeded'] })
   const foto = todas.get('Corpo_foto').inputs.value.foto
-  assert.ok(foto.startsWith("@if(equals(coalesce(actions('Ler_foto')?['status'], ''), 'Succeeded')"))
-  assert.ok(foto.includes("base64(body('Ler_foto'))"))
+  assert.ok(foto.startsWith("@if(equals(coalesce(actions('Ler_miniatura')?['status'], ''), 'Succeeded')"))
+  assert.ok(foto.includes("base64(body('Ler_miniatura'))") && foto.includes("base64(body('Ler_foto'))"))
+})
+
+test('salvar com foto grava <passageiroId>.min.jpg ANTES da foto inteira (nunca sobra miniatura de foto anterior)', () => {
+  const criar = todas.get('Criar_miniatura')
+  assert.deepEqual(criar.runAfter, {})
+  assert.equal(criar.inputs.host.operationId, 'CreateFile')
+  assert.match(criar.inputs.parameters.name, /passageiroId.*\.min\.jpg$/)
+  assert.equal(criar.inputs.parameters.folderPath, '__FOLDER_PATH__')
+  // sem miniatura enviada (aba antiga), grava a própria foto no lugar
+  assert.match(criar.inputs.parameters.body, /miniaturaBase64.*fotoBase64.*miniaturaBase64/)
+  // a foto inteira só é gravada se a miniatura foi; falha em qualquer uma devolve erro e nada muda no link da foto
+  assert.deepEqual(todas.get('Criar_arquivo').runAfter, { Criar_miniatura: ['Succeeded'] })
+  assert.ok(!todas.has('Tem_miniatura'))
+  assert.deepEqual(todas.get('Status_salvar').runAfter, { Registrar_envio: ['Succeeded'] })
+  assert.match(todas.get('Entrada_valida').expression.equals[0], /length\(coalesce\(triggerBody\(\)\?\['miniaturaBase64'\], ''\)\), 400000/)
 })
 
 test('PATCH do passageiro só com os campos enviados e registro do envio', () => {

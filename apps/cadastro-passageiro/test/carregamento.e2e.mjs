@@ -1,9 +1,8 @@
 // Carregamento: lista antes das fotos (spinner por foto) e reabertura instantânea pelo cache local.
 // Uso: node test/carregamento.e2e.mjs "http://127.0.0.1:52418/#t=<43 caracteres>" [pasta-prints]
-import { createRequire } from "node:module";
-const { chromium, devices } = createRequire(import.meta.url)("C:/Users/mendo/AppData/Roaming/npm/node_modules/@playwright/cli/node_modules/playwright");
+import { abrirNavegador, devices } from "./navegador.mjs";
 const [url, prints] = process.argv.slice(2);
-const b = await chromium.launch({ executablePath: process.env.LOCALAPPDATA + "/ms-playwright/chromium-1243/chrome-win64/chrome.exe" });
+const b = await abrirNavegador();
 const p = await (await b.newContext({ ...devices["Pixel 7"] })).newPage();
 const falhas = [];
 const ok = (cond, msg) => { if (!cond) falhas.push(msg); };

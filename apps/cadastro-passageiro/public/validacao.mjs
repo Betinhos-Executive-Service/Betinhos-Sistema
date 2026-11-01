@@ -1,5 +1,8 @@
 // Validações compartilhadas entre a página (navegador) e o Worker. Sem dependências.
 
+// Token do link: 32 bytes em base64url sem padding.
+export const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
+
 export function soDigitos(valor) {
   return String(valor ?? "").replace(/\D/g, "");
 }

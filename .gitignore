@@ -29,3 +29,4 @@ packages/deploy/flows/backup/
 # Secrets locais do wrangler dev
 .dev.vars
 .wrangler/
+.audit/

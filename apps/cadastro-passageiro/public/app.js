@@ -1,8 +1,11 @@
 // Página do link de cadastro. Vanilla JS; o token vem do fragmento #t= e só vai ao /api no corpo.
-import { emailOculto, emailValido, mascararTelefone, telefoneOculto, telefoneParaEnvio, telefoneValido } from "./validacao.mjs";
+import { TOKEN_RE, emailOculto, emailValido, mascararTelefone, telefoneOculto, telefoneParaEnvio, telefoneValido } from "./validacao.mjs";
 
 const app = document.getElementById("app");
-const token = new URLSearchParams(location.hash.slice(1)).get("t") || "";
+const lerToken = () => new URLSearchParams(location.hash.slice(1)).get("t") || "";
+let token = "";
+// Esqueleto (cabeçalho + 3 cards) que já veio no HTML; a cópia serve para o hashchange.
+const esqueletoInicial = app.firstElementChild.cloneNode(true);
 const LADO_MAX = 1280;
 const BYTES_MAX = 3 * 1024 * 1024;
 
@@ -33,21 +36,71 @@ function estado(icone, titulo, texto, extra) {
     el("h1", {}, titulo), el("p", {}, texto), extra));
 }
 
-async function chamar(caminho, corpo) {
-  const r = await fetch(caminho, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token, ...corpo }),
-  });
+async function lerResposta(r) {
   let dados = null;
   try { dados = await r.json(); } catch { /* sem corpo */ }
   return { status: r.status, dados };
 }
 
+function chamar(caminho, corpo) {
+  return fetch(caminho, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, ...corpo }),
+    priority: "high",
+  }).then(lerResposta);
+}
+
+// Envio com progresso (fetch não informa o upload): a foto comprimida pode ter 3 MB e levar mais de um minuto no 3G.
+// `corpoJson` já serializado (a retentativa reaproveita). Rejeita com "rede" (cai para a retentativa) ou "tempo".
+// O prazo é de inatividade (90 s sem o upload avançar nem resposta), não total: enquanto a foto sobe, o envio continua.
+const SEM_PROGRESSO_MS = 90000;
+function enviar(caminho, corpoJson, aoProgredir) {
+  return new Promise((ok, falha) => {
+    const x = new XMLHttpRequest();
+    let prazo;
+    const renovar = () => { clearTimeout(prazo); prazo = setTimeout(() => x.abort(), SEM_PROGRESSO_MS); };
+    x.open("POST", caminho);
+    x.setRequestHeader("Content-Type", "application/json");
+    x.responseType = "json";
+    x.upload.onprogress = (e) => { renovar(); if (e.lengthComputable) aoProgredir(Math.round((e.loaded / e.total) * 100)); };
+    x.onloadend = () => clearTimeout(prazo);
+    x.onload = () => ok({ status: x.status, dados: x.response });
+    x.onerror = () => falha(new Error("rede"));
+    x.onabort = () => falha(new Error("tempo")); // só este código aborta (prazo de inatividade)
+    renovar();
+    x.send(corpoJson);
+  });
+}
+
+// Aviso de rede: some quando a conexão volta. O que foi digitado fica no estado de cada card.
+const offline = document.getElementById("offline");
+const atualizarRede = () => { offline.hidden = navigator.onLine !== false; };
+addEventListener("online", atualizarRede);
+addEventListener("offline", atualizarRede);
+atualizarRede();
+// Espera a conexão voltar (evento online) ou o prazo, o que vier primeiro; limpa o que não disparou.
+const esperarRede = (ms) => new Promise((r) => {
+  const pronto = () => { clearTimeout(t); removeEventListener("online", pronto); r(); };
+  const t = setTimeout(pronto, ms);
+  addEventListener("online", pronto);
+});
+
+// Tela de link vencido: contato da Betinhos vem das vars do Worker (data-whatsapp/data-email). Sem elas, só o texto.
+function acoesContato() {
+  const zap = app.dataset.whatsapp, mail = app.dataset.email;
+  if (!zap && !mail) return null;
+  const texto = encodeURIComponent("Olá! O link de cadastro do passageiro expirou. Podem gerar um novo?");
+  return el("p", { class: "acoes" },
+    zap ? el("a", { class: "btn primario", href: `https://wa.me/${zap}?text=${texto}`, target: "_blank", rel: "noopener" }, "Chamar no WhatsApp") : null,
+    mail ? el("a", { class: "btn", href: `mailto:${mail}?subject=${encodeURIComponent("Link de cadastro do passageiro")}` }, "Enviar e-mail") : null);
+}
+
 function mostrarErroGeral(status, tentar) {
   if (status === 404 || status === 410 || status === 400) {
     estado("link", "Este link não vale mais",
-      "Por segurança, o link de cadastro expira em 36 horas ou quando um novo é gerado. Peça um novo à equipe Betinhos pelo mesmo canal em que recebeu este.");
+      "Por segurança, o link de cadastro expira em 36 horas ou quando um novo é gerado. Peça um novo à equipe Betinhos pelo mesmo canal em que recebeu este.",
+      acoesContato());
   } else if (status === 429) {
     estado("relogio", "Muitas tentativas seguidas", "Aguarde alguns minutos e abra o link de novo.");
   } else {
@@ -92,15 +145,20 @@ function gravarCache(chave, dados) {
 function apagarCache(chave) { try { localStorage.removeItem(chave); } catch { /* idem */ } }
 
 async function carregar() {
-  if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return mostrarErroGeral(410);
+  token = lerToken();
+  fotos.clear();
+  if (!TOKEN_RE.test(token)) return mostrarErroGeral(410);
   const chave = await chaveCache().catch(() => null);
   let mostrado = chave ? lerCache(chave) : null;
-  if (mostrado) renderLista(mostrado); else app.replaceChildren(esqueleto());
+  if (mostrado) renderLista(mostrado); else if (!app.querySelector(".esqueleto")) app.replaceChildren(esqueletoInicial.cloneNode(true));
   mexeu = false;
   // 1ª chamada pode vir do cache do Worker (cache: true, instantânea); aí busca a versão fresca em seguida.
   for (const fresco of [false, true]) {
     let resp;
-    try { resp = await chamar("/api/ler", fresco ? { fresco: true } : {}); } catch { return mostrado ? null : mostrarErroGeral(0, carregar); }
+    // A 1ª chamada já saiu do script inicial do HTML (window.__ler), antes de este módulo carregar; se falhou (null), chama de novo.
+    const inicial = !fresco && await window.__ler;
+    window.__ler = null;
+    try { resp = await (inicial ? lerResposta(inicial) : chamar("/api/ler", fresco ? { fresco: true } : {})); } catch { return mostrado ? null : mostrarErroGeral(0, carregar); }
     if (resp.status !== 200 || !Array.isArray(resp.dados?.passageiros)) {
       if (chave && [400, 404, 410].includes(resp.status)) apagarCache(chave);
       return mostrado && resp.status >= 500 ? null : mostrarErroGeral(resp.status, carregar);
@@ -114,16 +172,6 @@ async function carregar() {
 }
 const lerSemFoto = (d) => ({ dataServico: d.dataServico, passageiros: d.passageiros.map(({ foto, ...r }) => r) });
 
-// Esqueleto com a forma da lista (cabeçalho + 3 cards) enquanto o "ler" responde.
-function esqueleto() {
-  const bloco = (cls) => el("span", { class: `sk ${cls}` });
-  const card = () => el("div", { class: "card sk-card" },
-    el("div", { class: "card-topo" }, bloco("sk-foto"), el("div", { class: "card-id" }, bloco("sk-nome"), bloco("sk-badge"))),
-    el("div", { class: "sk-dados" }, bloco("sk-linha"), bloco("sk-linha")));
-  return el("div", { class: "esqueleto", role: "status", "aria-label": "Carregando os passageiros" },
-    el("div", { class: "cabecalho" }, el("div", { class: "card-id" }, bloco("sk-titulo"), bloco("sk-data"))),
-    el("div", { class: "lista" }, card(), card(), card()));
-}
 
 function formatarData(iso) {
   const d = iso ? new Date(iso) : null;
@@ -182,9 +230,9 @@ function cardPassageiro(p, aoSalvar) {
   const id = p.id;
   const nome = String(p.primeiroNome || "Passageiro");
   const st = {
-    foto: null, fotoUrl: fotoAtual(p.foto), tel: "", mail: "",
+    foto: null, miniatura: null, fotoUrl: fotoAtual(p.foto), tel: "", mail: "",
     editTel: !p.temTelefone, editMail: !p.temEmail, msg: null, salvando: false, erros: {},
-    preparando: false, recem: new Set(), carregandoFoto: Boolean(p.temFoto && !p.foto),
+    preparando: false, recem: new Set(), carregandoFoto: Boolean(p.temFoto && !p.foto), progresso: null,
   };
   const card = el("section", { class: "card", "aria-labelledby": `nome-${id}` });
   const fotoInput = el("input", { class: "foto-input", type: "file", accept: "image/*", id: `foto-${id}` });
@@ -202,7 +250,7 @@ function cardPassageiro(p, aoSalvar) {
     st.fotoUrl = previa;
     render();
     try {
-      st.foto = await comTempoLimite(comprimirFoto(arq), 20000, "A foto demorou demais para abrir. Tente outra ou tire uma nova.");
+      ({ foto: st.foto, miniatura: st.miniatura } = await comTempoLimite(comprimirFoto(arq), 20000, "A foto demorou demais para abrir. Tente outra ou tire uma nova."));
       st.fotoUrl = `data:image/jpeg;base64,${st.foto}`;
     } catch (e) {
       st.fotoUrl = anterior;
@@ -224,7 +272,7 @@ function cardPassageiro(p, aoSalvar) {
   function atualizarBotao() {
     if (!botao) return;
     const pend = pendentes();
-    if (st.salvando) botao.replaceChildren(el("span", { class: "spinner pequeno", "aria-hidden": "true" }), "Salvando…");
+    if (st.salvando) botao.replaceChildren(el("span", { class: "spinner pequeno", "aria-hidden": "true" }), st.progresso != null && st.progresso < 100 ? `Enviando… ${st.progresso}%` : "Salvando…");
     else botao.textContent = pend.length ? `Salvar ${listaNatural(pend)}` : "Salvar";
     botao.classList.toggle("pronto", pend.length > 0);
   }
@@ -263,7 +311,7 @@ function cardPassageiro(p, aoSalvar) {
         msg.textContent = st.erros[tipo];
       }
     });
-    return el("label", { class: "campo", for: iid }, el("span", { class: "sr-only" }, `${ehTel ? "Telefone" : "E-mail"} de ${nome}`), input, msg);
+    return el("div", { class: "campo" }, el("label", { class: "sr-only", for: iid }, `${ehTel ? "Telefone" : "E-mail"} de ${nome}`), input, msg);
   }
 
   function linha({ rotulo, tem, valor, chave, tipo }) {
@@ -338,11 +386,20 @@ function cardPassageiro(p, aoSalvar) {
         linha({ rotulo: "Telefone", tem: p.temTelefone, valor: valorTel, chave: "editTel", tipo: "tel" }),
         linha({ rotulo: "E-mail", tem: p.temEmail, valor: valorMail, chave: "editMail", tipo: "mail" })),
       botao,
-      el("p", { class: `aviso ${st.msg?.tipo || ""}`, role: st.msg?.tipo === "erro" ? "alert" : "status", tabindex: "-1", id: `msg-${id}`, hidden: !st.msg },
-        st.msg ? el("span", { class: "aviso-icone", html: st.msg.tipo === "ok" ? ICONE.ok : ICONE.falta }) : null,
-        st.msg?.texto || ""),
+      montarAviso(),
     ].filter(Boolean));
     if (focar) card.querySelector(`#${CSS.escape(focar)}`)?.focus();
+  }
+
+  function montarAviso() {
+    return el("p", { class: `aviso ${st.msg?.tipo || ""}`, role: st.msg?.tipo === "erro" ? "alert" : "status", tabindex: "-1", id: `msg-${id}`, hidden: !st.msg },
+      st.msg ? el("span", { class: "aviso-icone", html: st.msg.tipo === "ok" ? ICONE.ok : ICONE.falta }) : null,
+      st.msg?.texto || "");
+  }
+  // Troca só o aviso, sem redesenhar o card (quem digita não perde o foco).
+  function avisar(msg) {
+    st.msg = msg;
+    card.querySelector(".aviso")?.replaceWith(montarAviso());
   }
 
   async function salvar() {
@@ -357,25 +414,49 @@ function cardPassageiro(p, aoSalvar) {
       if (emailValido(st.mail)) corpo.email = st.mail.trim();
       else st.erros.mail = "Confira o e-mail, ex.: nome@empresa.com.br.";
     }
-    if (st.foto) corpo.fotoBase64 = st.foto;
+    if (st.foto) { corpo.fotoBase64 = st.foto; corpo.miniaturaBase64 = st.miniatura; }
     if (st.erros.tel || st.erros.mail) {
       st.msg = { tipo: "erro", texto: "Corrija o campo destacado e salve de novo." };
       return render(st.erros.tel ? `tel-${id}` : `mail-${id}`);
     }
     if (Object.keys(corpo).length === 1) {
-      st.msg = { tipo: "atencao", texto: "Nada novo para salvar." };
-      return render(`msg-${id}`);
+      // Nada preenchido: aponta o primeiro campo vazio (erro ao lado e foco nele) em vez de um aviso genérico.
+      const campo = st.editTel ? "tel" : st.editMail ? "mail" : null;
+      if (campo) {
+        st.erros[campo] = campo === "tel" ? "Informe o telefone com DDD." : "Informe o e-mail.";
+        st.msg = null;
+        return render(`${campo}-${id}`);
+      }
+      st.msg = { tipo: "atencao", texto: "Toque na foto para adicionar." };
+      return render(`foto-${id}`);
     }
     const itens = pendentes();
     st.salvando = true;
     st.msg = null;
     render();
+    // Rede caiu no meio do envio: tenta de novo sozinha (até 3 vezes) antes de avisar. Entre as tentativas espera
+    // 2 s/4 s ou, com o aparelho sabidamente offline, até 30 s pelo evento `online` (senão as 3 tentativas falhariam
+    // na hora, sem dar tempo de a rede voltar). Repetir é seguro porque "salvar" com os mesmos valores é idempotente
+    // (sobrescreve foto/telefone/e-mail). Tempo esgotado (servidor lento) não repete, para não segurar a pessoa por minutos.
+    const corpoJson = JSON.stringify({ token, ...corpo });
     let resp;
-    try { resp = await chamar("/api/salvar", corpo); } catch { resp = { status: 0 }; }
+    for (let tentativa = 1; ; tentativa++) {
+      try {
+        resp = await enviar("/api/salvar", corpoJson, (pct) => { if (pct !== st.progresso) { st.progresso = pct; atualizarBotao(); } });
+        break;
+      } catch (e) {
+        if (tentativa >= 3 || e.message !== "rede") { resp = { status: e.message }; break; }
+        st.progresso = null;
+        atualizarBotao();
+        avisar({ tipo: "info", texto: `Não foi possível enviar. Tentando de novo (${tentativa + 1} de 3)…` });
+        await esperarRede(navigator.onLine === false ? 30000 : tentativa * 2000);
+      }
+    }
     st.salvando = false;
+    st.progresso = null;
     if (resp.status === 200) {
       st.recem = new Set([corpo.fotoBase64 && "foto", corpo.telefone && "tel", corpo.email && "mail"].filter(Boolean));
-      if (corpo.fotoBase64) { p.temFoto = true; st.foto = null; }
+      if (corpo.fotoBase64) { p.temFoto = true; st.foto = st.miniatura = null; }
       if (corpo.telefone) { p.temTelefone = true; p.telefoneMascarado = telefoneOculto(corpo.telefone); st.tel = ""; st.editTel = false; }
       if (corpo.email) { p.temEmail = true; p.emailMascarado = emailOculto(corpo.email); st.mail = ""; st.editMail = false; }
       const plural = itens.length > 1 ? "salvos" : itens[0] === "foto" ? "salva" : "salvo";
@@ -390,6 +471,9 @@ function cardPassageiro(p, aoSalvar) {
       429: "Muitas tentativas seguidas. Aguarde alguns minutos e toque em Salvar de novo.",
       400: "Algum dado não foi aceito. Confira o telefone e o e-mail e tente de novo.",
       413: "A foto ficou grande demais. Escolha outra.",
+      rede: "Não conseguimos enviar. Confira a internet; o que você preencheu continua aqui, toque em Salvar para tentar de novo.",
+      // Prazo de inatividade (não é falta de internet): o servidor pode até ter salvo; salvar de novo é seguro.
+      tempo: "O envio demorou demais. O que você preencheu continua aqui; toque em Salvar para tentar de novo.",
     };
     st.msg = { tipo: "erro", texto: erros[resp.status] || "Não foi possível salvar agora. O que você preencheu continua aqui; toque em Salvar para tentar de novo." };
     render(`msg-${id}`);
@@ -430,7 +514,19 @@ function jpegBase64(canvas, q) {
   }, "image/jpeg", q));
 }
 
-// Redimensiona para lado maior ≤ 1280 px, JPEG 0,8 e reduz a qualidade até caber em 3 MB. Retorna base64 sem prefixo.
+const LADO_MINIATURA = 288; // quadrado: o card mostra a foto em 88–104 px com object-fit: cover
+
+// Quadrado central de 288 px (o mesmo recorte do card) a partir do canvas já reduzido. ~15 KB, base64 sem prefixo.
+function miniaturaDe(canvas) {
+  const lado = Math.min(canvas.width, canvas.height);
+  const mini = document.createElement("canvas");
+  mini.width = mini.height = Math.min(LADO_MINIATURA, lado);
+  mini.getContext("2d").drawImage(canvas, (canvas.width - lado) / 2, (canvas.height - lado) / 2, lado, lado, 0, 0, mini.width, mini.height);
+  return jpegBase64(mini, 0.8);
+}
+
+// Redimensiona para lado maior ≤ 1280 px, JPEG 0,8 e reduz a qualidade até caber em 3 MB.
+// Retorna { foto, miniatura } em base64 sem prefixo.
 async function comprimirFoto(arq) {
   let fonte;
   try { fonte = await decodificar(arq); } catch {
@@ -451,7 +547,7 @@ async function comprimirFoto(arq) {
   fonte.close?.();
   for (let q = 0.8; q >= 0.3; q -= 0.1) {
     const b64 = await jpegBase64(canvas, q);
-    if (b64.length * 0.75 <= BYTES_MAX) return b64;
+    if (b64.length * 0.75 <= BYTES_MAX) return { foto: b64, miniatura: await miniaturaDe(canvas) };
   }
   throw new Error("A foto ficou grande demais. Tente outra.");
 }
