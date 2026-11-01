@@ -2,6 +2,7 @@
 @import "./comunicados.css";
 @import "./checklists.css";
 @import "./termos.css";
+@import "./tour.css";
 @font-face {
   font-family: "Centabel Book Embedded";
   src: url("./assets/fonts/Centabel-Book.ttf") format("truetype");
