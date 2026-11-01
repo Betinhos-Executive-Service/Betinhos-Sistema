@@ -41,7 +41,7 @@ it('Equipamentos é rota React em Cadastros', () => {
 
 it('Frota tem um item por visão, sem as tabelas legadas nem Infrações solta', () => {
   const frota = MENU.find((group) => group.id === 'frota')!
-  expect(frota.items.map((item) => item.label)).toEqual(['Pendências', 'Veículos', 'Manutenções', 'Multas', 'Colisões', 'Indicadores', 'Plano preventivo', 'Assistente', 'Checklists de Veículos'])
+  expect(frota.items.map((item) => item.label)).toEqual(['Pendências', 'Veículos', 'Manutenções', 'Multas', 'Colisões', 'Indicadores', 'Abastecimento', 'Plano preventivo', 'Assistente', 'Checklists de Veículos'])
   expect(ENTITY_NAMES).not.toContain('cr40f_manutencoes')
   expect(ENTITY_NAMES).not.toContain('cr40f_multas')
   expect(ENTITY_NAMES).not.toContain('cr40f_colisao_v2')

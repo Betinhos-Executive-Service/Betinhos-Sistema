@@ -6,4 +6,5 @@ export { SYSTEM_FINANCEIRO, montarContextoFinanceiro, type ContextoFinanceiro, t
 export { SYSTEM_LOGISTICA, montarContextoLogistica, type ContextoLogistica, type DadosLogistica } from './logistica.ts'
 export { SYSTEM_PESSOAS, montarContextoPessoas, type ContextoPessoas, type DadosPessoas } from './pessoas.ts'
 export { SYSTEM_FROTA, OBRIGATORIOS_FROTA, montarContextoFrota, obrigatoriosFrota, type ContextoFrota, type PendenciaFrota } from './frota.ts'
+export { SYSTEM_ABASTECIMENTO, montarContextoAbastecimento, obrigatoriosAbastecimento, type ContextoAbastecimento } from './abastecimento.ts'
 export { constantesDoFlow, EFFORT, MAX_TOKENS, MODELO } from './constantes.ts'

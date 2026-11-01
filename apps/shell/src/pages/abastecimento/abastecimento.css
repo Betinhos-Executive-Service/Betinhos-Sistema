@@ -1,0 +1,51 @@
+/* Abastecimento: painéis, lista, anomalias, propostas e importação. Só tokens do Design System. */
+.ab-num { font-variant-numeric: tabular-nums; }
+.ab-muted { margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.ab-dupla { display: grid; gap: var(--bt-space-0-5); min-width: 0; }
+.ab-dupla strong { font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); }
+.ab-dupla span { font-size: var(--bt-font-size-11); color: var(--bt-color-text-secondary); }
+.ab-link { display: inline-flex; align-items: center; gap: var(--bt-space-1); color: var(--bt-color-action); font-weight: var(--bt-font-weight-bold); text-decoration: none; }
+.ab-link:focus-visible { outline: 0; border-radius: var(--bt-radius-xs); box-shadow: var(--bt-focus-ring); }
+@media (hover: hover) and (pointer: fine) { .ab-link:hover { text-decoration: underline; } }
+
+.ab-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); }
+.ab-toolbar .pg-filters__select { flex: 1 1 180px; min-width: 160px; max-width: 260px; }
+.ab-toolbar__importar { margin-left: auto; }
+.ab-paineis { display: grid; gap: var(--bt-space-5); }
+.ab-h2 { display: flex; align-items: center; gap: var(--bt-space-2); margin: 0 0 var(--bt-space-2); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); letter-spacing: 0.04em; text-transform: uppercase; color: var(--bt-color-text-secondary); }
+.ab-contagem { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 var(--bt-space-1-5); border-radius: var(--bt-radius-pill); background-color: var(--bt-color-surface-neutral); font-size: var(--bt-font-size-11); color: var(--bt-color-text-primary); }
+.ab-nota { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); margin: 0; padding: var(--bt-space-2) var(--bt-space-3); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-soft); font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.ab-table .bt-table__row:not(.bt-table__row--loading) { cursor: default; }
+
+/* Propostas (mesma anatomia dos cards do Assistente). */
+.ab-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--bt-space-3); }
+.ab-proposta { display: grid; gap: var(--bt-space-2); padding: var(--bt-space-4); }
+.ab-proposta__cabecalho { display: flex; justify-content: space-between; align-items: center; gap: var(--bt-space-2); }
+.ab-proposta__titulo { margin: 0; font-size: var(--bt-font-size-15); }
+.ab-proposta__texto { margin: 0; color: var(--bt-color-text-secondary); }
+.ab-proposta__acoes { display: flex; justify-content: flex-end; }
+
+/* Lista em cartões (celular). */
+.ab-cards-lista { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
+.ab-card { display: grid; gap: var(--bt-space-1); padding: var(--bt-space-3); }
+.ab-card__topo { display: flex; justify-content: space-between; align-items: center; gap: var(--bt-space-2); }
+
+/* Pendências: placa sem veículo com o seletor ao lado. */
+.ab-pendencias { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
+.ab-pendencia { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--bt-space-2) var(--bt-space-3); align-items: center; padding: var(--bt-space-3); }
+.ab-pendencia__info { display: grid; gap: var(--bt-space-0-5); min-width: 0; }
+.ab-pendencia__acao { display: flex; align-items: center; gap: var(--bt-space-2); }
+.ab-pendencia__acao > :first-child { width: 220px; }
+@container (max-width: 560px) { .ab-pendencia { grid-template-columns: minmax(0, 1fr); } .ab-pendencia__acao > :first-child { flex: 1; width: auto; } }
+@media (max-width: 560px) { .ab-pendencia { grid-template-columns: minmax(0, 1fr); } .ab-pendencia__acao > :first-child { flex: 1; width: auto; } }
+
+/* Importação. */
+.ab-form { display: grid; gap: var(--bt-space-4); }
+.ab-mapa { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--bt-space-3); margin: 0; padding: 0; border: 0; min-width: 0; }
+.ab-mapa legend { padding: 0; margin-bottom: var(--bt-space-1); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); }
+.ab-previa { overflow-x: auto; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); }
+.ab-previa table { width: 100%; border-collapse: collapse; font-size: var(--bt-font-size-12); }
+.ab-previa th, .ab-previa td { padding: var(--bt-space-1-5) var(--bt-space-2); text-align: left; white-space: nowrap; border-bottom: var(--bt-border-width-default) solid var(--bt-color-border); }
+.ab-previa th { background-color: var(--bt-color-surface-soft); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-secondary); }
+.ab-previa tr:last-child td { border-bottom: 0; }
+.ab-lista-resumo { margin: var(--bt-space-1) 0 0; padding-left: var(--bt-space-4); }

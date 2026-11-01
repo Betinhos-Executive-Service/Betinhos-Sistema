@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   AlertTriangle, Banknote, BookUser, Calculator, Calendar, Camera, Car, CarFront, ClipboardCheck, ClipboardList, Clock, Coins, Contact, Database, Download,
-  FileText, FolderCheck, FolderCog, Gauge, Home, Hourglass, IdCard, KeyRound, Landmark, Laptop, LayoutDashboard, List, Mail, Megaphone, MapPin, Paperclip, Receipt, ReceiptText, Route,
+  FileText, FolderCheck, FolderCog, Fuel, Gauge, Home, Hourglass, IdCard, KeyRound, Landmark, Laptop, LayoutDashboard, List, Mail, Megaphone, MapPin, Paperclip, Receipt, ReceiptText, Route,
   ScrollText, Shield, ShieldCheck, Shuffle, Sparkles, Tag, TrendingUp, Users, Wallet, Wrench,
 } from 'lucide-react'
 import { AppShell as Shell, type NavGroup } from '@betinhos/ui'
@@ -43,6 +43,7 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   'frota-colisoes': <Camera />,
   'frota-indicadores': <Gauge />,
   'frota-plano': <Clock />,
+  abastecimento: <Fuel />,
   pendencias: <Hourglass />,
   'validacao-cliente': <ShieldCheck />,
   funcionarios: <IdCard />,

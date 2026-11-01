@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ACOES_POR_AGENTE, RESPOSTA_SCHEMA, TIPOS_POR_AGENTE, TODOS_OS_TIPOS, analisarMensagem, montarContextoFrota, obrigatoriosFrota } from './index.ts'
+import { ACOES_POR_AGENTE, RESPOSTA_SCHEMA, SYSTEM_ABASTECIMENTO, TIPOS_POR_AGENTE, TODOS_OS_TIPOS, analisarMensagem, montarContextoAbastecimento, montarContextoFrota, obrigatoriosAbastecimento, obrigatoriosFrota } from './index.ts'
 
 const msg = (corpo: unknown, stop = 'end_turn') => ({ stop_reason: stop, model: 'claude-opus-5-5', content: [{ type: 'thinking', thinking: '' }, { type: 'text', text: JSON.stringify(corpo) }] })
 const proposta = { tipo: 'SemRecibo', titulo: 'OS 1234 sem recibo', justificativa: 'Concluída há 12 dias.', prioridade: 'alta', registroAlvo: { entidade: 'cr40f_reservadeveculos', id: '11111111-1111-1111-1111-111111111111' }, acao: { tipo: 'CriarPendencia', campos: { titulo: 'Emitir recibo da OS 1234' } } }
@@ -14,7 +14,7 @@ describe('schema', () => {
   it('lista todos os tipos e ações no enum', () => {
     const tipos = Object.values(TIPOS_POR_AGENTE).flat()
     expect(RESPOSTA_SCHEMA.properties.propostas.items.properties.tipo.enum).toEqual(tipos)
-    expect(tipos).toHaveLength(21)
+    expect(tipos).toHaveLength(23)
     expect([...new Set(Object.values(ACOES_POR_AGENTE).flat())]).toEqual(['CriarPendencia', 'AtribuirMotorista', 'AtribuirVeiculo', 'CriarComunicadoRascunho'])
   })
 })
@@ -162,7 +162,28 @@ describe('Agente Frota', () => {
     expect(analisarMensagem(msg(completa), 'frota', obrigatoriosFrota(ctx)).ok).toBe(true)
   })
   it('tipos da frota entram no fim da ordem do choice cr40f_tipo', () => {
-    expect(TODOS_OS_TIPOS.slice(-6)).toEqual(['FrotaPrioridade', 'FrotaReincidencia', 'FrotaPreventiva', 'FrotaAgendadaVencida', 'FrotaCustoAlto', 'FrotaHodometro'])
+    expect(TODOS_OS_TIPOS.slice(-8)).toEqual(['FrotaPrioridade', 'FrotaReincidencia', 'FrotaPreventiva', 'FrotaAgendadaVencida', 'FrotaCustoAlto', 'FrotaHodometro', 'FrotaConsumo', 'FrotaDicaCombustivel'])
     expect(TODOS_OS_TIPOS.indexOf('FrotaPrioridade')).toBe(15)
+  })
+})
+
+describe('Agente Frota: combustível', () => {
+  const v = '11111111-1111-1111-1111-111111111111'
+  const ctx = montarContextoAbastecimento(JSON.stringify({ hoje: '2026-11-01', veiculos: [{ veiculoId: v, placa: 'ABC1A11', modelo: 'Corolla', abastecimentos: 6, litros: 265, valor: 1440, kmPorLitro: 9.2, precoMedio: 5.43, motoristas: ['Carlos'] }], motoristas: [], anomalias: [
+    { tipo: 'tanque', gravidade: 'alta', data: '2026-10-11T11:00:00.000Z', veiculoId: v, placa: 'ABC1A11', motoristaId: null, motorista: 'Carlos', motivo: '55,0 L em um tanque de 50 L' },
+    { tipo: 'intervalo', gravidade: 'media', data: '2026-10-12T11:30:00.000Z', veiculoId: null, placa: 'XYZ9Z99', motoristaId: null, motorista: '', motivo: '30 min depois do anterior' },
+  ] }))
+  const proposta = (tipo: string, alvo: string) => ({ tipo, titulo: 't', justificativa: 'j', prioridade: 'alta', registroAlvo: { entidade: 'cr40f_veiculos', id: alvo }, acao: null })
+
+  it('contexto vazio não quebra e obrigatórios são só os veículos cadastrados com anomalia alta', () => {
+    expect(montarContextoAbastecimento('{}')).toEqual({ hoje: '', veiculos: [], motoristas: [], anomalias: [] })
+    expect(obrigatoriosAbastecimento(ctx)).toEqual([v])
+  })
+  it('tipos novos valem no agente frota, no schema e no choice; o prompt cita as três regras', () => {
+    expect(TIPOS_POR_AGENTE.frota).toContain('FrotaConsumo')
+    expect(RESPOSTA_SCHEMA.properties.propostas.items.properties.tipo.enum).toContain('FrotaDicaCombustivel')
+    expect(analisarMensagem(msg({ resumo: 'r', propostas: [proposta('FrotaConsumo', v)] }), 'frota', obrigatoriosAbastecimento(ctx)).ok).toBe(true)
+    expect(analisarMensagem(msg({ resumo: 'r', propostas: [] }), 'frota', obrigatoriosAbastecimento(ctx))).toEqual({ ok: false, erro: `Pendências obrigatórias sem proposta: ${v}.` })
+    for (const trecho of ['tanque', '2 desvios', 'menos de 1 h', 'FrotaConsumo', 'FrotaDicaCombustivel', 'CriarPendencia']) expect(SYSTEM_ABASTECIMENTO).toContain(trecho)
   })
 })

@@ -40,6 +40,7 @@ export const PAGE_LOADERS: Record<PageId, () => Promise<ComponentType<PageProps>
   'pagamento-fornecedores': () => import('../pages/pagamento-fornecedores/PagamentoFornecedoresPage').then((m) => m.PagamentoFornecedoresPage),
   inicio: () => import('../pages/inicio/InicioPage').then((m) => m.InicioPage),
   qualidade: () => import('../pages/qualidade/QualidadePage').then((m) => m.QualidadePage),
+  abastecimento: () => import('../pages/abastecimento/AbastecimentoPage').then((m) => m.AbastecimentoPage),
 }
 
 const pending = new Map<PageId, Promise<ComponentType<PageProps>>>()
