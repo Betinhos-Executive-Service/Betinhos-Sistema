@@ -115,8 +115,11 @@ describe('pessoas', () => {
     documentos: [{ cr40f_documentoid: 'D1', cr40f_name: 'Antecedentes', cr40f_validade: '2026-10-01', _cr40f_funcionario_value: 'M1', '_cr40f_tipo_value@OData.Community.Display.V1.FormattedValue': 'Certidão' }],
     multas: [{ cr40f_multasid: 'U1', cr40f_id_multa: 'AIT-9', cr40f_dataehorario: '2026-10-02T15:00:00Z', cr40f_dataparaindicar: '2026-10-20', _cr40f_motorista_value: null, '_cr40f_placa_value@OData.Community.Display.V1.FormattedValue': 'ABC1D23' }],
     comunicados: [{ cr40f_comunicadohomeid: 'C1', cr40f_titulo: 'Troca de uniforme', cr40f_inicio: '2026-10-10T00:00:00Z', cr40f_fim: '2026-10-20T00:00:00Z' }],
-    treinamentos: [{ cr40f_treinamentoid: 'T1', cr40f_name: 'Embarque no GRU', cr40f_validade: '2026-10-12' }, { cr40f_treinamentoid: 'T2', cr40f_name: 'Todos concluíram', cr40f_validade: '2026-10-01' }],
-    participacoes: [{ _cr40f_treinamento_value: 'T1', _cr40f_funcionario_value: 'M1' }],
+    treinamentos: [
+      { cr40f_treinamentoid: 'T1', cr40f_name: 'Embarque no GRU', cr40f_validade: '2026-10-12', cr40f_treinamento_cr40f_treinamentoparticipacao_treinamento: [{ cr40f_treinamentoparticipacaoid: 'P1' }, { cr40f_treinamentoparticipacaoid: 'P2' }] },
+      { cr40f_treinamentoid: 'T2', cr40f_name: 'Todos concluíram', cr40f_validade: '2026-10-01', cr40f_treinamento_cr40f_treinamentoparticipacao_treinamento: [] },
+      { cr40f_treinamentoid: 'T3', cr40f_name: 'Sem expansão', cr40f_validade: '2026-10-02' },
+    ],
   }
   it('monta o contexto sem CPF e telefone', () => {
     const ctx = montarContextoPessoas(dados, '2026-10-14')
@@ -126,10 +129,13 @@ describe('pessoas', () => {
     expect(ctx.comunicados[0]).toEqual({ id: 'c1', titulo: 'Troca de uniforme', inicio: '2026-10-10T00:00:00Z', fim: '2026-10-20T00:00:00Z' })
     expect(JSON.stringify(ctx)).not.toMatch(/123|11999/)
   })
-  it('treinamentos e participações pendentes vão planos, como o flow monta', () => {
+  it('treinamentos vão com a contagem pronta de pendentes, como o flow monta', () => {
     const ctx = montarContextoPessoas(dados, '2026-10-14')
-    expect(ctx.treinamentos).toEqual([{ id: 't1', titulo: 'Embarque no GRU', validade: '2026-10-12' }, { id: 't2', titulo: 'Todos concluíram', validade: '2026-10-01' }])
-    expect(ctx.participacoesPendentes).toEqual([{ treinamentoId: 't1', funcionarioId: 'm1' }])
+    expect(ctx.treinamentos).toEqual([
+      { id: 't1', titulo: 'Embarque no GRU', validade: '2026-10-12', pendentes: 2 },
+      { id: 't2', titulo: 'Todos concluíram', validade: '2026-10-01', pendentes: 0 },
+      { id: 't3', titulo: 'Sem expansão', validade: '2026-10-02', pendentes: 0 },
+    ])
   })
   it('prompt fixa os sete tipos e as duas ações', () => {
     for (const t of ['CNHVencendo', 'ASOVencendo', 'DocumentoVencido', 'Aniversario', 'MultaSemMotorista', 'ComunicadoSugerido', 'TreinamentoPendente', 'CriarPendencia', 'CriarComunicadoRascunho', '30 dias', '12 meses', '7 dias']) expect(SYSTEM_PESSOAS).toContain(t)

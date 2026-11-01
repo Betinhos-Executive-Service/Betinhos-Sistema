@@ -455,9 +455,8 @@ $sel = [ordered]@{
   Multas = 'cr40f_multasid,cr40f_id_multa,cr40f_dataehorario,cr40f_dataparaindicar,_cr40f_motorista_value,_cr40f_placa_value'
   Comunicados = 'cr40f_comunicadohomeid,cr40f_titulo,cr40f_inicio,cr40f_fim'
   Treinamentos = 'cr40f_treinamentoid,cr40f_name,cr40f_validade'
-  Participacoes = '_cr40f_treinamento_value,_cr40f_funcionario_value'
 }
-$ramoPorAcao = @{ OS_concluidas = 'Financeiro'; OPs_pendentes = 'Financeiro'; Pagamentos_terceiro = 'Financeiro'; Servicos = 'Logistica'; Motoristas = 'Logistica'; Trocas = 'Logistica'; Funcionarios = 'Pessoas'; Documentos = 'Pessoas'; Multas = 'Pessoas'; Comunicados = 'Pessoas'; Treinamentos = 'Pessoas'; Participacoes = 'Pessoas' }
+$ramoPorAcao = @{ OS_concluidas = 'Financeiro'; OPs_pendentes = 'Financeiro'; Pagamentos_terceiro = 'Financeiro'; Servicos = 'Logistica'; Motoristas = 'Logistica'; Trocas = 'Logistica'; Funcionarios = 'Pessoas'; Documentos = 'Pessoas'; Multas = 'Pessoas'; Comunicados = 'Pessoas'; Treinamentos = 'Pessoas' }
 
 # Recibos ativos de cada OS, pela relação 1:N reserva -> recibo (cr40f_reserva).
 $navRecibos = 'cr40f_cr40f_reservadeveculos_Reserva_cr40f_recibos'
@@ -502,6 +501,8 @@ $ramoLogistica = Ramo (@(Agente 'logistica' 'log') + @(
   (Passo 'Contexto_log' (DefinirVar 'Contexto' ([ordered]@{ hoje = "@{outputs('Hoje')}"; servicos = "@body('Servicos_contexto')"; motoristas = "@body('Motoristas_contexto')"; trocas = "@body('Trocas_contexto')" })))
 ))
 
+# Participações pendentes (sem conclusão) de funcionários ativos (cr40f_status 0), expandidas no treinamento; só a contagem vai ao agente.
+$expandPendentes = "cr40f_treinamento_cr40f_treinamentoparticipacao_treinamento(`$select=cr40f_treinamentoparticipacaoid;`$filter=statecode eq 0 and cr40f_concluidoem eq null and cr40f_Funcionario/cr40f_status eq 0)"
 $ramoPessoas = Ramo (@(Agente 'pessoas' 'pes') + @(
   (Passo 'Fim_90d' (Compor "@addDays(outputs('Inicio_do_dia_utc'), 90)")),
   (Passo 'Fim_10d' (Compor "@addDays(outputs('Inicio_do_dia_utc'), 10)")),
@@ -509,10 +510,10 @@ $ramoPessoas = Ramo (@(Agente 'pessoas' 'pes') + @(
   (Passo 'Documentos' (Listar 'cr40f_documentos' $sel.Documentos "statecode eq 0 and cr40f_situacao eq 100000000 and _cr40f_funcionario_value ne null and cr40f_validade lt @{outputs('Fim_90d')}" 'cr40f_validade asc')),
   (Passo 'Multas' (Listar 'cr40f_multases' $sel.Multas 'statecode eq 0 and cr40f_status eq 202410000 and _cr40f_motorista_value eq null' 'cr40f_dataparaindicar asc')),
   (Passo 'Comunicados' (Listar 'cr40f_comunicadohomes' $sel.Comunicados 'statecode eq 0 and cr40f_ativo eq true' 'cr40f_inicio desc')),
-  # Treinamentos publicados (cr40f_estado 100000001) com validade vencida ou até 7 dias à frente, e as participações ainda sem conclusão.
+  # Treinamentos publicados (cr40f_estado 100000001) com validade vencida ou até 7 dias à frente; as participações pendentes de funcionários
+  # ativos vêm expandidas (mesmo nome de NAV_PARTICIPACOES em pessoas.ts) e o contexto leva só a contagem.
   (Passo 'Fim_7d' (Compor "@addDays(outputs('Inicio_do_dia_utc'), 7)")),
-  (Passo 'Treinamentos' (Listar 'cr40f_treinamentos' $sel.Treinamentos "statecode eq 0 and cr40f_estado eq 100000001 and cr40f_validade ne null and cr40f_validade lt @{outputs('Fim_7d')}" 'cr40f_validade asc')),
-  (Passo 'Participacoes' (Listar 'cr40f_treinamentoparticipacaos' $sel.Participacoes 'statecode eq 0 and cr40f_concluidoem eq null' 'createdon asc')),
+  (Passo 'Treinamentos' (Listar 'cr40f_treinamentos' $sel.Treinamentos "statecode eq 0 and cr40f_estado eq 100000001 and cr40f_validade ne null and cr40f_validade lt @{outputs('Fim_7d')}" 'cr40f_validade asc' $expandPendentes)),
   (Passo 'Funcionarios_contexto' (Selecionar "@outputs('Funcionarios')?['body/value']" ([ordered]@{
     id = Id 'cr40f_funcionariosid'; apelido = Txt 'new_apelido'; funcao = Num 'cr40f_funcao'; validadeCnh = Dia 'cr40f_validadedacnh'; dataAso = Dia 'cr40f_datadoaso'
     aniversario = Dia 'cr40f_datadeaniversario'; admissao = Dia 'cr40f_datadeadmissao'
@@ -528,12 +529,9 @@ $ramoPessoas = Ramo (@(Agente 'pessoas' 'pes') + @(
     id = Id 'cr40f_comunicadohomeid'; titulo = Txt 'cr40f_titulo'; inicio = Txt 'cr40f_inicio'; fim = Txt 'cr40f_fim'
   }))),
   (Passo 'Treinamentos_contexto' (Selecionar "@outputs('Treinamentos')?['body/value']" ([ordered]@{
-    id = Id 'cr40f_treinamentoid'; titulo = Txt 'cr40f_name'; validade = Dia 'cr40f_validade'
+    id = Id 'cr40f_treinamentoid'; titulo = Txt 'cr40f_name'; validade = Dia 'cr40f_validade'; pendentes = "@length(coalesce(item()?['cr40f_treinamento_cr40f_treinamentoparticipacao_treinamento'], createArray()))"
   }))),
-  (Passo 'Participacoes_contexto' (Selecionar "@outputs('Participacoes')?['body/value']" ([ordered]@{
-    treinamentoId = Id '_cr40f_treinamento_value'; funcionarioId = Id '_cr40f_funcionario_value'
-  }))),
-  (Passo 'Contexto_pes' (DefinirVar 'Contexto' ([ordered]@{ hoje = "@{outputs('Hoje')}"; funcionarios = "@body('Funcionarios_contexto')"; documentos = "@body('Documentos_contexto')"; multas = "@body('Multas_contexto')"; comunicados = "@body('Comunicados_contexto')"; treinamentos = "@body('Treinamentos_contexto')"; participacoesPendentes = "@body('Participacoes_contexto')" })))
+  (Passo 'Contexto_pes' (DefinirVar 'Contexto' ([ordered]@{ hoje = "@{outputs('Hoje')}"; funcionarios = "@body('Funcionarios_contexto')"; documentos = "@body('Documentos_contexto')"; multas = "@body('Multas_contexto')"; comunicados = "@body('Comunicados_contexto')"; treinamentos = "@body('Treinamentos_contexto')" })))
 ))
 
 # Frota: as regras rodam na Custom API cr40f_FrotaPendencias (mesmo cálculo da aba Pendências do shell). Prioridade,

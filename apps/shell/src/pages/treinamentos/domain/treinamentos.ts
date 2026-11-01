@@ -244,6 +244,9 @@ export function publicoLabel(item: Pick<Treinamento, 'publicoTipo' | 'publico'>)
 
 export const isConcluida = (p: Participacao) => Boolean(p.concluidoEm)
 
+/** Participação criada por uma publicação interrompida: o funcionário saiu do público e o motorista ainda não fez nada. */
+export const isOrfa = (p: Participacao, alvoIds: Set<string>) => !alvoIds.has(p.funcionarioId) && !p.abertoEm && !p.confirmadoEm && !p.assinadoEm && p.nota == null && !p.concluidoEm
+
 export type FiltroParticipacao = 'todos' | 'pendentes' | 'concluidos' | 'reprovados'
 export function matchParticipacao(filtro: FiltroParticipacao, p: Participacao) {
   if (filtro === 'pendentes') return !isConcluida(p)

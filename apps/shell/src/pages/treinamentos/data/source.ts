@@ -2,7 +2,7 @@ import { chunk, cleanId, type Row } from '@betinhos/dataverse'
 import type { Host } from '../../../host'
 import { getDataverseEnvironmentLabel } from '../../funcionarios/data/dataverse'
 import { createSharePointDocs, sanitizeFileName, uniqueName, type EnvVarApi } from '../../funcionarios/data/sharepoint'
-import { ESTADO, draftPayload, isPublicado, mapFuncionario, mapParticipacao, mapTreinamento, validarRascunho, type Anexo, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
+import { ESTADO, draftPayload, isOrfa, isPublicado, mapFuncionario, mapParticipacao, mapTreinamento, validarRascunho, type Anexo, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
 import type { Linha } from '../domain/lista'
 import { createMockSource } from './mock'
 
@@ -18,7 +18,7 @@ export type Source = {
   excluir: (id: string) => Promise<void>
   /** Grava só a lista de anexos (o arquivo já está no SharePoint); vale para rascunho e publicado. */
   salvarAnexos: (id: string, anexos: Anexo[]) => Promise<void>
-  /** Cria as participações que faltam para `alvos` e marca como publicado. Repetir não duplica. */
+  /** Cria as participações que faltam para `alvos`, remove as órfãs de uma tentativa anterior e marca como publicado. Repetir não duplica. */
   publicar: (treinamento: Treinamento, alvos: Pick<Funcionario, 'id' | 'nome'>[]) => Promise<void>
   /** Arquivo vai para o SharePoint (`Treinamentos/<id>`); a lista de anexos é gravada pelo `salvar`. */
   enviarAnexo: (treinamentoId: string, file: File, existentes: Anexo[]) => Promise<Anexo>
@@ -105,8 +105,11 @@ export function createSource(host: Host): Source {
     },
     async publicar(treinamento, alvos) {
       const s = await entitySets()
-      const jaTem = new Set((await participacoes(treinamento.id)).map((p) => p.funcionarioId))
+      const existentes = await participacoes(treinamento.id)
+      const jaTem = new Set(existentes.map((p) => p.funcionarioId))
+      const alvoIds = new Set(alvos.map((f) => cleanId(f.id)))
       const novos = alvos.filter((f) => !jaTem.has(cleanId(f.id)))
+      for (const lote of chunk(existentes.filter((p) => isOrfa(p, alvoIds)), 5)) await Promise.all(lote.map((p) => client.remove(s.participacao, p.id)))
       // Em lotes paralelos: dezenas de motoristas sem N round-trips em série.
       for (const lote of chunk(novos, 5)) await Promise.all(lote.map((f) => client.create(s.participacao, participacaoPayload(s, treinamento, f))))
       await client.update(s.treinamento, treinamento.id, { cr40f_estado: ESTADO.publicado, cr40f_publicadoem: new Date().toISOString() })

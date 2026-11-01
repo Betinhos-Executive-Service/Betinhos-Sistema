@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { TELA, builtinViews, matchesKeyword, readTreinamento, sortTreinamentos, type Linha } from './lista'
 import {
-  ESTADO, PUBLICO, blocosDoConteudo, draftPayload, emptyDraft, isVencido, mapParticipacao, mapTreinamento, matchParticipacao, novaPergunta, resolverPublico, statusParticipacao, trechos,
+  ESTADO, PUBLICO, blocosDoConteudo, draftPayload, emptyDraft, isOrfa, isVencido, mapParticipacao, mapTreinamento, matchParticipacao, novaPergunta, resolverPublico, statusParticipacao, trechos,
   validarAnexo, validarPublicacao, validarQuiz, validarRascunho, type Funcionario, type Participacao, type Pergunta, type Treinamento,
 } from './treinamentos'
 
@@ -111,6 +111,16 @@ describe('status da participação', () => {
     expect(isVencido(draft({ estado: ESTADO.publicado, validade: '2026-10-01' }), '2026-10-02')).toBe(true)
     expect(isVencido(draft({ estado: ESTADO.publicado, validade: '2026-10-02' }), '2026-10-02')).toBe(false)
     expect(isVencido(draft({ estado: ESTADO.rascunho, validade: '2026-10-01' }), '2026-10-02')).toBe(false)
+  })
+})
+
+describe('publicação interrompida', () => {
+  it('órfã: fora do público e sem nenhuma atividade; quem já abriu ou está no público fica', () => {
+    const alvos = new Set([G(1)])
+    expect(isOrfa(part({ funcionarioId: G(2) }), alvos)).toBe(true)
+    expect(isOrfa(part({ funcionarioId: G(1) }), alvos)).toBe(false)
+    expect(isOrfa(part({ funcionarioId: G(2), abertoEm: 'x' }), alvos)).toBe(false)
+    expect(isOrfa(part({ funcionarioId: G(2), nota: 0, aprovado: false }), alvos)).toBe(false)
   })
 })
 

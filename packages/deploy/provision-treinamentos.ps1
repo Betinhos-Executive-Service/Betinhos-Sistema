@@ -256,11 +256,12 @@ if ($partId) {
   Ensure-AttributeOn $part (Int "cr40f_Tentativas" "Tentativas" "Quantas vezes respondeu o quiz" 0 1000)
   Ensure-AttributeOn $part (Memo "cr40f_RespostasJson" "Respostas (JSON)" "Alternativas marcadas na última tentativa" 100000)
   Ensure-AttributeOn $part (DateTimeUtc "cr40f_ConcluidoEm" "Concluído em" "Quando cumpriu tudo que o treinamento exige (leitura, assinatura e quiz)")
-  # Excluir o treinamento apaga as participações (Cascade); excluir o funcionário também (a participação não existe sem ele).
+  # Excluir o treinamento apaga as participações (Cascade). Funcionário com participação não pode ser excluído (Restrict):
+  # nota e assinatura são prova de treinamento; o caminho normal é marcar como Desligado.
   Ensure-Lookup $relTrein $trein $part "cr40f_Treinamento" "Treinamento" "Treinamento desta participação" "Cascade" "ApplicationRequired"
-  Ensure-Lookup $relFunc "cr40f_funcionarios" $part "cr40f_Funcionario" "Funcionário" "Funcionário que participa" "Cascade" "ApplicationRequired"
+  Ensure-Lookup $relFunc "cr40f_funcionarios" $part "cr40f_Funcionario" "Funcionário" "Funcionário que participa" "Restrict" "ApplicationRequired"
 }
-else { Write-Step "DRY RUN criaria em $part as colunas de participação e os lookups cr40f_treinamento e cr40f_funcionario (Cascade)" }
+else { Write-Step "DRY RUN criaria em $part as colunas de participação e os lookups cr40f_treinamento (Cascade) e cr40f_funcionario (Restrict)" }
 
 if ($Apply) {
   Invoke-Dataverse "POST" "PublishXml" @{ ParameterXml = "<importexportxml><entities><entity>$trein</entity><entity>$part</entity></entities></importexportxml>" } | Out-Null
@@ -273,11 +274,11 @@ if ($Apply) {
   foreach ($t in @($treinId, $partId)) {
     if (@(Get-Rows "solutioncomponents" "solutioncomponentid" "_solutionid_value eq $solutionId and objectid eq $t and componenttype eq 1").Count -eq 0) { throw "Tabela $t nao esta na solucao $SolutionUniqueName." }
   }
-  foreach ($rel in @($relTrein, $relFunc)) {
-    $relRows = @(Get-Rows $relPath "MetadataId" "SchemaName eq '$rel'")
-    if ($relRows.Count -ne 1) { throw "Relacionamento $rel nao encontrado apos a publicacao." }
+  foreach ($rel in @(@($relTrein, "Cascade"), @($relFunc, "Restrict"))) {
+    $relRows = @(Get-Rows $relPath "MetadataId" "SchemaName eq '$($rel[0])'")
+    if ($relRows.Count -ne 1) { throw "Relacionamento $($rel[0]) nao encontrado apos a publicacao." }
     $exclusao = (Invoke-Dataverse "GET" "RelationshipDefinitions($($relRows[0].MetadataId))/Microsoft.Dynamics.CRM.OneToManyRelationshipMetadata").CascadeConfiguration.Delete
-    if ($exclusao -ne "Cascade") { throw "Relacionamento $rel esta com exclusao $exclusao; a spec exige Cascade." }
+    if ($exclusao -ne $rel[1]) { throw "Relacionamento $($rel[0]) esta com exclusao $exclusao; a spec exige $($rel[1])." }
   }
   # O shell e o flow do agente dependem destes detalhes; coluna criada antes por outro caminho pode ter vindo diferente.
   $comportamento = (Invoke-Dataverse "GET" "EntityDefinitions(LogicalName='$trein')/Attributes(LogicalName='cr40f_validade')/Microsoft.Dynamics.CRM.DateTimeAttributeMetadata?`$select=DateTimeBehavior").DateTimeBehavior.Value

@@ -1,4 +1,4 @@
-import { ESTADO, PUBLICO, isPublicado, validarRascunho, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
+import { ESTADO, PUBLICO, isOrfa, isPublicado, validarRascunho, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
 import type { Linha } from '../domain/lista'
 import type { Source } from './source'
 
@@ -91,6 +91,8 @@ export function createMockSource(): Source {
       await wait(400)
       const item = treinamentos.find((row) => row.id === treinamento.id)
       if (!item) throw new Error('Treinamento não encontrado.')
+      const alvoIds = new Set(alvos.map((f) => f.id))
+      for (let i = participacoes.length - 1; i >= 0; i--) if (participacoes[i].treinamentoId === item.id && isOrfa(participacoes[i], alvoIds)) participacoes.splice(i, 1)
       const jaTem = new Set(participacoes.filter((p) => p.treinamentoId === item.id).map((p) => p.funcionarioId))
       for (const f of alvos) if (!jaTem.has(f.id)) participacoes.push(participacao((seq += 1), item.id, f.id))
       item.estado = ESTADO.publicado
