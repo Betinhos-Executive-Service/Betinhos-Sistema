@@ -1,11 +1,11 @@
-import type { Motivo, Servico, Sessao } from '../domain/types'
+import type { Motivo, NovoPedido, Pedido, Servico, Sessao } from '../domain/types'
 import { ErroPortal, type CodigoErro, type PortalApi, type ResultadoEntrada } from './PortalApi'
 
 /**
  * PortalApi real: fala com o Worker na mesma origem (`/api/*`), sessão em cookie HttpOnly.
  * Usada por `main.tsx` fora do dev server local (porta 52463) e sem `?mock`.
  */
-const CODIGOS: string[] = ['codigo_invalido', 'codigo_expirado', 'totp_invalido', 'bloqueado', 'nao_permitido', 'falha']
+const CODIGOS: string[] = ['codigo_invalido', 'codigo_expirado', 'totp_invalido', 'bloqueado', 'nao_permitido', 'duplicado', 'falha']
 
 /** Corpo `{erro, mensagem?}` do Worker → ErroPortal; sem corpo, pelo status HTTP. */
 export async function erroDaResposta(r: Response): Promise<ErroPortal> {
@@ -45,5 +45,7 @@ export function createWorkerApi(base = '/api', f: typeof fetch = (...a) => fetch
     aprovar: (ids: string[]) => chamar<Servico[]>('POST', '/servicos/aprovar', { ids }),
     abrirDuvida: (id: string, motivo: Motivo, texto: string) => chamar<Servico>('POST', `/servicos/${encodeURIComponent(id)}/duvida`, { motivo, texto }),
     responder: (id: string, texto: string) => chamar<Servico>('POST', `/servicos/${encodeURIComponent(id)}/responder`, { texto }),
+    pedir: (novo: NovoPedido) => chamar<Pedido>('POST', '/pedidos', novo),
+    meusServicos: () => chamar<Pedido[]>('GET', '/pedidos'),
   }
 }

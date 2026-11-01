@@ -2,8 +2,8 @@
 import type { Dv } from './dataverse'
 import { enviarEmail } from './dataverse'
 import type { Env } from './env'
-import { mapearServico, type Registro } from './mapear'
-import { resumoDoCliente, tacitaVencida } from './odata'
+import { mapearServico, modulosDe, type Registro } from './mapear'
+import { resumoDoCliente, tacitaVencida, validadoresAtivos } from './odata'
 import { diaLocal, ehDiaUtil, inicioJanelaResumo } from './prazo'
 import { SET, STATUS_DV } from './schema'
 
@@ -24,9 +24,8 @@ const resumir = (r: Registro) => {
 export async function enviarResumos(env: Env, dv: Dv, agoraMs: number): Promise<number> {
   const hoje = diaLocal(agoraMs)
   if (!ehDiaUtil(hoje)) return 0
-  const validadores = await dv.lista(
-    `${SET.validador}?$select=cr40f_email,_cr40f_cliente_value&$filter=${encodeURIComponent('cr40f_ativo eq true and cr40f_Cliente/cr40f_portalhabilitado eq true')}`,
-  )
+  // Só quem valida: cliente com Pedir/Meus serviços (Latasa) não recebe resumo de validação.
+  const validadores = (await dv.lista(validadoresAtivos())).filter((v) => modulosDe(v).includes('validar'))
   const porCliente = Map.groupBy(validadores, (v) => String(v._cr40f_cliente_value))
   let enviados = 0
   for (const [cid, vs] of porCliente) {

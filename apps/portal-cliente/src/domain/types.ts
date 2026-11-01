@@ -42,4 +42,30 @@ export type Servico = {
   aprovadoEm?: string
 }
 
-export type Sessao = { nome: string; email: string; cliente: string }
+/** Módulos do portal habilitados por cliente (`cr40f_clientes1.cr40f_portalmodulos`). */
+export type Modulo = 'validar' | 'pedir' | 'meus_servicos'
+
+export type Sessao = { nome: string; email: string; cliente: string; modulos: Modulo[] }
+
+/** `cr40f_status` da reserva visto pelo solicitante. */
+export type StatusPedido = 'solicitado' | 'em_analise' | 'confirmado' | 'programado' | 'em_execucao' | 'concluido' | 'cancelado'
+
+export type NovoPedido = {
+  passageiros: string[]
+  origem: string
+  destino: string
+  /** ISO da saída. */
+  saida: string
+  observacao?: string
+}
+
+/** Reserva pedida pelo portal (módulos Pedir e Meus serviços). */
+export type Pedido = NovoPedido & {
+  id: string
+  /** Código da reserva (`cr40f_id`); vazio até o Dataverse numerar. */
+  numero: string
+  status: StatusPedido
+  criadoEm: string
+  veiculo?: string
+  voucherUrl?: string
+}

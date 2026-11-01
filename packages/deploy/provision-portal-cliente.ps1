@@ -3,7 +3,8 @@
   [switch] $DeviceCode
 )
 
-# Provisiona o schema do portal de validacao do cliente: tabelas cr40f_validacaoservico (uma por reserva), cr40f_validadorcliente, cr40f_mensagemvalidacao, cr40f_codigoacesso e cr40f_dispositivoconfiavel, e o campo cr40f_portalhabilitado em cr40f_clientes1; inclui na solucao do .env (BetinhosCore pela regra de tipo 1/2/10 em solucoes/regras.json).
+# Provisiona o schema do portal do cliente: tabelas cr40f_validacaoservico (uma por reserva), cr40f_validadorcliente, cr40f_mensagemvalidacao, cr40f_codigoacesso e cr40f_dispositivoconfiavel; em cr40f_clientes1 os campos cr40f_portalhabilitado, cr40f_portalmodulos (Validar / Pedir / Meus servicos) e cr40f_portaldominios; na reserva o lookup cr40f_portalusuario (quem pediu pelo portal) e o memo cr40f_portalpedido (o que o cliente digitou). Inclui na solucao do .env (BetinhosCore pela regra de tipo 1/2/10 em solucoes/regras.json).
+# Multi-cliente (01/11/2026): Tenaris = Validar; Latasa = Pedir + Meus servicos com dominio autorizado. Clientes ja habilitados sem modulo ganham Validar no -Apply (migracao de dados idempotente).
 # Idempotente: cria so o que falta e semeia os tipos por nome. Sem -Apply roda em DRY RUN. Configuracao vem do .env da raiz do monorepo.
 # Spec: docs/superpowers/specs/2026-10-28-portal-validacao-cliente-design.md. Privilegios do usuario de aplicacao do portal ficam para o plano do Worker.
 # Arquivo salvo com BOM: o Windows PowerShell 5.1 precisa dele para ler os rotulos acentuados.
@@ -123,6 +124,13 @@ function Picklist([string] $Schema, [string] $Display, [string] $Description, [s
   if ($null -ne $Default) { $payload.DefaultFormValue = [int] $Default }
   return $payload
 }
+# Choice de selecao multipla (valor gravado como "100000000,100000001").
+function MultiPicklist([string] $Schema, [string] $Display, [string] $Description, [string[]] $Labels) {
+  $options = @()
+  for ($i = 0; $i -lt $Labels.Count; $i++) { $options += @{ Value = 100000000 + $i; Label = Label $Labels[$i] } }
+  @{ "@odata.type" = "Microsoft.Dynamics.CRM.MultiSelectPicklistAttributeMetadata"; SchemaName = $Schema; DisplayName = Label $Display; Description = Label $Description; RequiredLevel = @{ Value = "None" }
+     OptionSet = @{ "@odata.type" = "Microsoft.Dynamics.CRM.OptionSetMetadata"; IsGlobal = $false; OptionSetType = "Picklist"; Options = $options } }
+}
 function Text([string] $Schema, [string] $Display, [string] $Description, [int] $Max) {
   @{ "@odata.type" = "Microsoft.Dynamics.CRM.StringAttributeMetadata"; SchemaName = $Schema; DisplayName = Label $Display; Description = Label $Description; MaxLength = $Max; FormatName = @{ Value = "Text" } }
 }
@@ -224,8 +232,11 @@ function Memo([string] $Schema, [string] $Display, [string] $Description, [int] 
 
 foreach ($e in @("cr40f_reservadeveculos", "cr40f_clientes1", "systemuser")) { if (-not (Get-EntityId $e)) { throw "Tabela $e nao existe neste ambiente." } }
 
-# Campo do cliente: so clientes com portal habilitado podem ter servicos liberados (hoje so a Tenaris).
-Ensure-AttributeOn "cr40f_clientes1" (YesNo "cr40f_PortalHabilitado" "Portal habilitado" "Cliente valida os serviços no portal de validação")
+# Campos do cliente: portal habilitado (chave geral), modulos do portal e dominios de e-mail que entram sem cadastro previo.
+# Valores de cr40f_portalmodulos espelham apps/portal-cliente/worker/schema.ts (MODULO_DV): Validar 100000000, Pedir 100000001, Meus servicos 100000002.
+Ensure-AttributeOn "cr40f_clientes1" (YesNo "cr40f_PortalHabilitado" "Portal habilitado" "Cliente usa o portal do cliente (validar, pedir ou acompanhar serviços)")
+Ensure-AttributeOn "cr40f_clientes1" (MultiPicklist "cr40f_PortalModulos" "Módulos do portal" "O que o cliente faz no portal; sem módulo ninguém do cliente entra" @("Validar", "Pedir", "Meus serviços"))
+Ensure-AttributeOn "cr40f_clientes1" (Text "cr40f_PortalDominios" "Domínios do portal" "Domínios de e-mail (separados por ; ) que entram no portal sem cadastro prévio; ex.: latasa.com.br" 500)
 
 $val = "cr40f_validacaoservico"
 $relReserva = "cr40f_reservadeveculos_cr40f_validacaoservico_reserva"
@@ -291,6 +302,10 @@ if ($vdrId) {
   Ensure-AttributeOn $vdr (DateTimeUser "cr40f_TotpCadastradoEm" "Autenticador cadastrado em" "Quando o validador leu o QR code")
   Ensure-Lookup "cr40f_clientes1_cr40f_validadorcliente_cliente" "cr40f_clientes1" $vdr "cr40f_Cliente" "Cliente" "Cliente do validador" "RemoveLink" "ApplicationRequired"
   Ensure-Key $vdr "cr40f_EmailUnico" "E-mail único" @("cr40f_email")
+  # Reserva pedida pelo portal: quem pediu (modulo Pedir); o Worker lista por este lookup em Meus servicos. Apagar o usuario so limpa o lookup.
+  Ensure-Lookup "cr40f_validadorcliente_cr40f_reservadeveculos_portalusuario" $vdr "cr40f_reservadeveculos" "cr40f_PortalUsuario" "Usuário do portal" "Usuário do portal do cliente que pediu este serviço" "RemoveLink"
+  # O que o cliente digitou (JSON {passageiros, observacao}), so do portal: as colunas de passageiros e observacao interna sao da operacao e sao reescritas por plugin e shell.
+  Ensure-AttributeOn "cr40f_reservadeveculos" (Memo "cr40f_PortalPedido" "Pedido do portal" "Passageiros e observação informados pelo cliente no portal (JSON); não editar" 4000)
 }
 
 $msg = "cr40f_mensagemvalidacao"
@@ -323,7 +338,12 @@ if ($disId) {
 }
 
 if ($Apply) {
-  Invoke-Dataverse "POST" "PublishXml" @{ ParameterXml = "<importexportxml><entities><entity>$val</entity><entity>cr40f_clientes1</entity><entity>$vdr</entity><entity>$msg</entity><entity>$cod</entity><entity>$dis</entity></entities></importexportxml>" } | Out-Null
+  Invoke-Dataverse "POST" "PublishXml" @{ ParameterXml = "<importexportxml><entities><entity>$val</entity><entity>cr40f_clientes1</entity><entity>cr40f_reservadeveculos</entity><entity>$vdr</entity><entity>$msg</entity><entity>$cod</entity><entity>$dis</entity></entities></importexportxml>" } | Out-Null
+  # Migracao: quem ja tinha o portal (Tenaris) continua validando; sem isso o campo novo vazio barraria o login.
+  foreach ($c in @(Get-Rows "cr40f_clientes1s" "cr40f_clientes1id,cr40f_nomedocliente" "cr40f_portalhabilitado eq true and cr40f_portalmodulos eq null")) {
+    Invoke-Dataverse "PATCH" "cr40f_clientes1s($($c.cr40f_clientes1id))" @{ cr40f_portalmodulos = "100000000" } | Out-Null
+    Write-Step "modulo Validar no cliente $($c.cr40f_nomedocliente)"
+  }
   $esperado = @{
     $val = @("cr40f_name", "cr40f_status", "cr40f_liberadoem", "cr40f_observacao", "cr40f_valorliberado", "cr40f_valoranterior", "cr40f_prazotacita", "cr40f_aprovadoem", "cr40f_aprovadopor", "cr40f_incluirfechamento", "cr40f_reserva", "cr40f_cliente", "cr40f_liberadopor")
     $vdr = @("cr40f_name", "cr40f_email", "cr40f_ativo", "cr40f_ultimoacesso", "cr40f_segredototp", "cr40f_totpcadastradoem", "cr40f_cliente")
@@ -333,11 +353,13 @@ if ($Apply) {
   }
   $missing = @()
   foreach ($e in $esperado.Keys) { $missing += @($esperado[$e] | Where-Object { -not (Get-AttributeId $e $_) } | ForEach-Object { "$e.$_" }) }
-  if (-not (Get-AttributeId "cr40f_clientes1" "cr40f_portalhabilitado")) { $missing += "cr40f_clientes1.cr40f_portalhabilitado" }
+  foreach ($a in @("cr40f_portalhabilitado", "cr40f_portalmodulos", "cr40f_portaldominios")) { if (-not (Get-AttributeId "cr40f_clientes1" $a)) { $missing += "cr40f_clientes1.$a" } }
+  foreach ($a in @("cr40f_portalusuario", "cr40f_portalpedido")) { if (-not (Get-AttributeId "cr40f_reservadeveculos" $a)) { $missing += "cr40f_reservadeveculos.$a" } }
   if ($missing.Count) { throw "Colunas ausentes apos a publicacao: $($missing -join ', ')" }
   foreach ($t in @(@($val, $valId), @($vdr, $vdrId), @($msg, $msgId), @($cod, $codId), @($dis, $disId))) {
     if (@(Get-Rows "solutioncomponents" "solutioncomponentid" "_solutionid_value eq $solutionId and objectid eq $($t[1]) and componenttype eq 1").Count -eq 0) { throw "Tabela $($t[0]) nao esta na solucao $SolutionUniqueName." }
   }
-  Write-Step "SCHEMA OK: $val, $vdr, $msg, $cod, $dis e cr40f_clientes1.cr40f_portalhabilitado publicados na solucao $SolutionUniqueName. Marque Portal habilitado na Tenaris."
+  Write-Step "SCHEMA OK: $val, $vdr, $msg, $cod, $dis, cr40f_clientes1.cr40f_portal{habilitado,modulos,dominios} e cr40f_reservadeveculos.cr40f_portal{usuario,pedido} publicados na solucao $SolutionUniqueName."
+  Write-Step "Configure a Latasa em cr40f_clientes1: Portal habilitado = Sim, Modulos = Pedir + Meus servicos, Dominios = latasa.com.br. O usuario de aplicacao do Worker precisa de Create em cr40f_validadorcliente e Create/Read em cr40f_reservadeveculos."
 }
 else { Write-Step "DRY RUN OK; use -Apply" }

@@ -1,5 +1,6 @@
 // Rotas de serviço. Toda leitura e toda escrita passam por `carregar`, que filtra pelo cliente da sessão:
 // id de outro cliente não volta do Dataverse e a rota responde 404.
+import { MAX_TEXTO } from '../src/domain/pedidos'
 import type { Motivo, Servico } from '../src/domain/types'
 import type { Ctx } from './auth'
 import type { Sessao } from './http'
@@ -10,7 +11,6 @@ import { LADO_DV, MOTIVO_DV, SET, STATUS_DV } from './schema'
 
 const LOTE = 50 // ids por consulta (limite de URL do OData)
 const MAX_APROVAR = 500
-const MAX_TEXTO = 2000
 
 const lotes = <T>(xs: T[]) => Array.from({ length: Math.ceil(xs.length / LOTE) }, (_, i) => xs.slice(i * LOTE, (i + 1) * LOTE))
 
@@ -63,7 +63,7 @@ async function conversa(req: Request, c: Ctx, sessao: Sessao, id: string, permit
   const corpo = await lerJson<{ texto?: unknown; motivo?: unknown }>(req)
   const texto = typeof corpo?.texto === 'string' ? corpo.texto.trim() : ''
   const motivo = corpo?.motivo as Motivo
-  if (!texto || texto.length > MAX_TEXTO) return erro(400, 'nao_permitido', 'Escreva a mensagem (até 2000 caracteres).')
+  if (!texto || texto.length > MAX_TEXTO) return erro(400, 'nao_permitido', `Escreva a mensagem (até ${MAX_TEXTO} caracteres).`)
   if (comMotivo && !(motivo in MOTIVO_DV)) return erro(400, 'nao_permitido', 'Escolha o motivo da dúvida.')
   const [atual] = await carregar(c, sessao, [id])
   if (!atual) return erro(404, 'nao_permitido')

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Portal de validação de serviços pelo cliente (Tenaris): React + Worker Cloudflare (/api, Dataverse S2S)",
+  "description": "Portal do cliente, multi-cliente por módulos (Tenaris valida; Latasa pede e acompanha): React + Worker Cloudflare (/api, Dataverse S2S)",
   "scripts": {
     "dev": "node ../../packages/deploy/dev-restart.mjs 52463 .",
     "typecheck": "tsc --noEmit && tsc --noEmit -p worker",

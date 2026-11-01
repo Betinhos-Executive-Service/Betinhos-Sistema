@@ -7,13 +7,23 @@ export const DV_URL = 'https://fake.crm2.dynamics.com'
 export const FLOW_URL = 'https://flow.fake/emails'
 export const TENARIS = '11111111-1111-1111-1111-111111111111'
 export const OUTRO = '99999999-9999-9999-9999-999999999999'
+export const LATASA = '55555555-5555-5555-5555-555555555555'
+/** Dois clientes com o mesmo domínio (ambiguo.com): ninguém desse domínio entra. */
+export const AMBIGUO_A = '66666666-6666-6666-6666-666666666661'
+export const AMBIGUO_B = '66666666-6666-6666-6666-666666666662'
+/** Portal habilitado, domínio autorizado e nenhum módulo. */
+export const SEM_MODULO = '77777777-7777-7777-7777-777777777777'
 
 export function kvMemoria(): KV & { dados: Map<string, string> } {
   const dados = new Map<string, string>()
   return { dados, get: async (k) => dados.get(k) ?? null, put: async (k, v) => void dados.set(k, v), delete: async (k) => void dados.delete(k) }
 }
 
-export type Banco = Record<'validadorclientes' | 'codigoacessos' | 'dispositivoconfiavels' | 'validacaoservicos' | 'mensagemvalidacaos', Registro[]>
+export type Banco = Record<'validadorclientes' | 'codigoacessos' | 'dispositivoconfiavels' | 'validacaoservicos' | 'mensagemvalidacaos' | 'clientes1s' | 'reservadeveculoses', Registro[]>
+const CHAVE_ID: Record<keyof Banco, string> = {
+  validadorclientes: 'cr40f_validadorclienteid', codigoacessos: 'cr40f_codigoacessoid', dispositivoconfiavels: 'cr40f_dispositivoconfiavelid',
+  validacaoservicos: 'cr40f_validacaoservicoid', mensagemvalidacaos: 'cr40f_mensagemvalidacaoid', clientes1s: 'cr40f_clientes1id', reservadeveculoses: 'cr40f_reservadeveculosid',
+}
 export type Email = { tipo: string; para: string[]; dados: Record<string, unknown> }
 
 const FV = '@OData.Community.Display.V1.FormattedValue'
@@ -39,8 +49,19 @@ export function bancoInicial(): Banco {
       validacao('22222222-2222-2222-2222-222222222224', TENARIS, 100000005, '2026-10-20', '10804'), // retirado
     ],
     mensagemvalidacaos: [],
+    clientes1s: [
+      { cr40f_clientes1id: TENARIS, cr40f_nomedocliente: 'Tenaris', cr40f_portalhabilitado: true, cr40f_portalmodulos: '100000000', cr40f_portaldominios: null },
+      { cr40f_clientes1id: OUTRO, cr40f_nomedocliente: 'Outro', cr40f_portalhabilitado: true, cr40f_portalmodulos: '100000000', cr40f_portaldominios: null },
+      { cr40f_clientes1id: LATASA, cr40f_nomedocliente: 'Latasa', cr40f_portalhabilitado: true, cr40f_portalmodulos: '100000001,100000002', cr40f_portaldominios: 'latasa.com.br; latasa.com' },
+      { cr40f_clientes1id: AMBIGUO_A, cr40f_nomedocliente: 'Ambíguo A', cr40f_portalhabilitado: true, cr40f_portalmodulos: '100000001', cr40f_portaldominios: 'ambiguo.com' },
+      { cr40f_clientes1id: AMBIGUO_B, cr40f_nomedocliente: 'Ambíguo B', cr40f_portalhabilitado: true, cr40f_portalmodulos: '100000001', cr40f_portaldominios: 'ambiguo.com' },
+      { cr40f_clientes1id: SEM_MODULO, cr40f_nomedocliente: 'Sem módulo', cr40f_portalhabilitado: true, cr40f_portalmodulos: null, cr40f_portaldominios: 'semmodulo.com' },
+    ],
+    reservadeveculoses: [],
   }
 }
+
+const clienteDe = (banco: Banco, id: unknown) => banco.clientes1s.find((c) => c.cr40f_clientes1id === id)
 
 const guids = (texto: string) => [...texto.matchAll(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g)].map((m) => m[0])
 
@@ -48,7 +69,21 @@ function consultar(banco: Banco, tabela: keyof Banco, filtro: string): Registro[
   const linhas = banco[tabela]
   if (tabela === 'validadorclientes') {
     const email = /cr40f_email eq '([^']*)'/.exec(filtro)?.[1]
-    return linhas.filter((v) => v.cr40f_ativo && (!email || v.cr40f_email === email))
+    const exigeAtivo = filtro.includes('cr40f_ativo eq true')
+    const exigePortal = filtro.includes('cr40f_portalhabilitado eq true')
+    const exigeModulos = filtro.includes('cr40f_portalmodulos ne null')
+    return linhas
+      .filter((v) => (!exigeAtivo || v.cr40f_ativo) && (!email || v.cr40f_email === email))
+      .filter((v) => !exigePortal || clienteDe(banco, v._cr40f_cliente_value)?.cr40f_portalhabilitado === true)
+      .filter((v) => !exigeModulos || clienteDe(banco, v._cr40f_cliente_value)?.cr40f_portalmodulos)
+  }
+  if (tabela === 'clientes1s') {
+    const dominio = /contains\(cr40f_portaldominios,'([^']*)'\)/.exec(filtro)?.[1] ?? ''
+    return linhas.filter((c) => c.cr40f_portalhabilitado && String(c.cr40f_portaldominios ?? '').includes(dominio))
+  }
+  if (tabela === 'reservadeveculoses') {
+    const [usuario, cliente] = guids(filtro)
+    return linhas.filter((r) => r._cr40f_portalusuario_value === usuario && r._cr40f_cliente_value === cliente)
   }
   if (tabela === 'codigoacessos') return linhas.filter((c) => c._cr40f_validador_value === guids(filtro)[0] && !c.cr40f_usado).slice(-1)
   if (tabela === 'dispositivoconfiavels') {
@@ -75,21 +110,24 @@ export function fetchFalso(banco: Banco, emails: Email[]): typeof fetch {
     const [, tabelaCr, id] = /^cr40f_(\w+?)(?:\((.+?)\))?(?:\?|$)/.exec(caminho) ?? []
     const tabela = tabelaCr as keyof Banco
     if (!banco[tabela]) return new Response('tabela desconhecida', { status: 404 })
-    const chaveId = Object.keys(banco[tabela][0] ?? {}).find((k) => k.endsWith('id')) ?? `cr40f_${tabela.slice(0, -1)}id`
+    const chaveId = CHAVE_ID[tabela]
     if (metodo === 'POST') {
       const novo: Registro = { [chaveId]: novoId(), createdon: new Date().toISOString(), ...corpo }
       for (const k of Object.keys(corpo).filter((k) => k.endsWith('@odata.bind'))) novo[`_${k.split('@')[0].toLowerCase()}_value`] = guids(String(corpo[k]))[0]
+      if (novo._cr40f_cliente_value) novo[`_cr40f_cliente_value${FV}`] = clienteDe(banco, novo._cr40f_cliente_value)?.cr40f_nomedocliente
+      if (tabela === 'reservadeveculoses') novo.cr40f_id = `RV-${48500 + banco.reservadeveculoses.length}` // autonumber
       banco[tabela].push(novo)
-      return new Response(null, { status: 204 })
+      return init?.headers && String((init.headers as Record<string, string>).Prefer).includes('return=representation') ? Response.json(novo, { status: 201 }) : new Response(null, { status: 204 })
     }
+    const expandir = (reg: Registro) => (caminho.includes('$expand=cr40f_Cliente') ? { ...reg, cr40f_Cliente: clienteDe(banco, reg._cr40f_cliente_value) ?? null } : reg)
     if (id) {
       const reg = banco[tabela].find((r) => r[chaveId] === id)
       if (!reg) return new Response('não achou', { status: 404 })
       if (metodo === 'PATCH') return Object.assign(reg, corpo), new Response(null, { status: 204 })
-      return Response.json(reg)
+      return Response.json(expandir(reg))
     }
     const filtro = /\$filter=([^&]*)/.exec(caminho)?.[1] ?? ''
-    return Response.json({ value: consultar(banco, tabela, filtro) })
+    return Response.json({ value: consultar(banco, tabela, filtro).map(expandir) })
   }
 }
 

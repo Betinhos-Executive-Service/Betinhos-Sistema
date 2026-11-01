@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { armazenamentoEmMemoria, createMockApi, CODIGO_MOCK, refazerAutenticadorMock, totpDo } from './mockApi'
+import { armazenamentoEmMemoria, createMockApi, CODIGO_MOCK, refazerAutenticadorMock, totpDo, usuarioMock } from './mockApi'
 import { ErroPortal } from './PortalApi'
 
 const EMAIL = 'fiscal@tenaris.com'
@@ -151,5 +151,47 @@ describe('mockApi', () => {
     const api = createMockApi({ agora, armazenamento: armazenamentoEmMemoria() })
     await api.solicitarCodigo('alguem@outra.com')
     await expect(api.entrar('alguem@outra.com', CODIGO_MOCK)).rejects.toMatchObject({ codigo: 'codigo_invalido' })
+  })
+})
+
+describe('mockApi multi-cliente', () => {
+  it('autoriza por cadastro ou por domínio; recusa domínio estranho e cliente sem módulo', () => {
+    expect(usuarioMock('fiscal@tenaris.com')).toMatchObject({ cliente: 'Tenaris', modulos: ['validar'] })
+    expect(usuarioMock('paula.ribeiro@latasa.com.br')).toEqual({ nome: 'Paula Ribeiro', cliente: 'Latasa', modulos: ['pedir', 'meus_servicos'] })
+    expect(usuarioMock('alguem@example.com')).toBeNull()
+    expect(usuarioMock('x@semmodulo.com.br')).toBeNull()
+  })
+
+  async function latasa(email = 'compras@latasa.com.br') {
+    const m = montar()
+    const r = await m.api.entrar(email, CODIGO_MOCK)
+    if (r.etapa !== 'cadastrar_autenticador') throw new Error(r.etapa)
+    await m.api.confirmarAutenticador(totpDo(email, r.segredo).generate({ timestamp: m.relogio.t }), false)
+    return m
+  }
+
+  it('Latasa não lista validações; Tenaris não pede', async () => {
+    const { api } = await latasa()
+    await expect(api.listar()).rejects.toMatchObject({ codigo: 'nao_permitido' })
+    await expect((await logado()).meusServicos()).rejects.toMatchObject({ codigo: 'nao_permitido' })
+  })
+
+  it('pedido entra como Solicitado em Meus serviços; o mesmo pedido em 1 minuto é duplicado; depois passa', async () => {
+    const { api, relogio } = await latasa()
+    const antes = (await api.meusServicos()).length
+    const novo = { passageiros: ['Hiroshi Tanaka'], origem: 'Latasa', destino: 'GRU', saida: new Date(T0 + 86400_000).toISOString() }
+    const criado = await api.pedir(novo)
+    expect(criado).toMatchObject({ status: 'solicitado', numero: /^RV-/ })
+    expect((await api.meusServicos())[0]).toEqual(criado)
+    expect(await api.meusServicos()).toHaveLength(antes + 1)
+    await expect(api.pedir(novo)).rejects.toMatchObject({ codigo: 'duplicado' })
+    relogio.t += 61_000
+    await expect(api.pedir(novo)).resolves.toMatchObject({ status: 'solicitado' })
+    await expect(api.pedir({ ...novo, origem: '' })).rejects.toMatchObject({ message: 'Informe o endereço de saída.' })
+  })
+
+  it('outro e-mail do mesmo domínio começa sem pedidos', async () => {
+    const { api } = await latasa('paula.ribeiro@latasa.com.br')
+    expect(await api.meusServicos()).toEqual([])
   })
 })
