@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Breadcrumb, Button, Checkbox, Dialog, Field, Input, PageHeader, SearchBox, SegmentedControl, StatusBadge, Surface, Textarea, useToast } from '@betinhos/ui'
 import { AlertTriangle, ArrowLeft, Bell, Copy, PenLine, Save, Send, Trash2, Users } from 'lucide-react'
+import { useEscVoltar } from '../../../app/useEscVoltar'
 import type { Source } from '../data/source'
 import {
   COMUNICADO_ESCOPO, COMUNICADO_TIPO, CORPO_MAX, TITULO_MAX, duplicateComunicado, plural, validateDraft,
@@ -48,15 +49,7 @@ export function ComunicadoEditor({ initial, motoristas, source, onBack, onSaved,
   const voltar = () => { if (busy) return; if (draft.titulo || draft.corpo ? dirty : false) setConfirm('discard'); else onBack() }
 
   // Esc fora de campos volta para a lista (com a mesma proteção de alterações).
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || confirm || event.defaultPrevented) return
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return
-      voltar()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  })
+  useEscVoltar(voltar, confirm !== null)
 
   const salvar = async () => {
     const problema = validateDraft(draft)

@@ -10,7 +10,7 @@ export type MenuItem =
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
-  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos' | 'clientes' | 'planner' | 'validacao-cliente' | 'logs' | 'qualidade' | 'pagamento-fornecedores' | 'funcoes-operacionais' | 'inicio'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba }
+  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos' | 'clientes' | 'planner' | 'validacao-cliente' | 'logs' | 'qualidade' | 'pagamento-fornecedores' | 'funcoes-operacionais' | 'inicio' | 'treinamentos'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba }
 
 /** Visões da Frota: cada uma é um item do menu, todas na mesma tela (`page: 'frota'`). */
 export type FrotaAba = 'pendencias' | 'veiculos' | 'manutencoes' | 'multas' | 'colisoes' | 'indicadores' | 'plano' | 'checklists'
@@ -85,6 +85,7 @@ export const MENU: MenuGroup[] = [
       { kind: 'page', id: 'assistente-pessoas', label: 'Assistente', page: 'agentes', agente: 'pessoas' },
       { kind: 'page', id: 'curriculos', label: 'Currículos', page: 'curriculos' },
       { kind: 'page', id: 'equipamentos', label: 'Equipamentos', page: 'equipamentos' },
+      { kind: 'page', id: 'treinamentos', label: 'Treinamentos', page: 'treinamentos' },
     ],
   },
   {

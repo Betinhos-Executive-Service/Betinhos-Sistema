@@ -115,7 +115,7 @@ $constantesText = [IO.File]::ReadAllText((Resolve-Path $constantesPath), [Text.E
 if ($constantesText.Contains('@')) { throw 'constantes.json contém @; escape antes de embutir no flow.' }
 AssertSemMojibake $constantesText 'constantes.json'
 $const = $constantesText | ConvertFrom-Json
-foreach ($campo in 'modelo', 'maxTokens', 'effort', 'prefixoUsuario', 'schema', 'agentes') { if ($null -eq $const.$campo) { throw "constantes.json sem $campo." } }
+foreach ($campo in 'modelo', 'maxTokens', 'effort', 'prefixoUsuario', 'schema', 'agentes', 'tiposOrdem') { if ($null -eq $const.$campo) { throw "constantes.json sem $campo." } }
 foreach ($ag in 'financeiro', 'logistica', 'pessoas', 'frota') {
   foreach ($campo in 'systemPrompt', 'tipos', 'acoes') { if ($null -eq $const.agentes.$ag.$campo) { throw "constantes.json sem agentes.$ag.$campo." } }
 }
@@ -454,8 +454,9 @@ $sel = [ordered]@{
   Documentos = 'cr40f_documentoid,cr40f_name,cr40f_validade,_cr40f_funcionario_value,_cr40f_tipo_value'
   Multas = 'cr40f_multasid,cr40f_id_multa,cr40f_dataehorario,cr40f_dataparaindicar,_cr40f_motorista_value,_cr40f_placa_value'
   Comunicados = 'cr40f_comunicadohomeid,cr40f_titulo,cr40f_inicio,cr40f_fim'
+  Treinamentos = 'cr40f_treinamentoid,cr40f_name,cr40f_validade'
 }
-$ramoPorAcao = @{ OS_concluidas = 'Financeiro'; OPs_pendentes = 'Financeiro'; Pagamentos_terceiro = 'Financeiro'; Servicos = 'Logistica'; Motoristas = 'Logistica'; Trocas = 'Logistica'; Funcionarios = 'Pessoas'; Documentos = 'Pessoas'; Multas = 'Pessoas'; Comunicados = 'Pessoas' }
+$ramoPorAcao = @{ OS_concluidas = 'Financeiro'; OPs_pendentes = 'Financeiro'; Pagamentos_terceiro = 'Financeiro'; Servicos = 'Logistica'; Motoristas = 'Logistica'; Trocas = 'Logistica'; Funcionarios = 'Pessoas'; Documentos = 'Pessoas'; Multas = 'Pessoas'; Comunicados = 'Pessoas'; Treinamentos = 'Pessoas' }
 
 # Recibos ativos de cada OS, pela relação 1:N reserva -> recibo (cr40f_reserva).
 $navRecibos = 'cr40f_cr40f_reservadeveculos_Reserva_cr40f_recibos'
@@ -500,6 +501,8 @@ $ramoLogistica = Ramo (@(Agente 'logistica' 'log') + @(
   (Passo 'Contexto_log' (DefinirVar 'Contexto' ([ordered]@{ hoje = "@{outputs('Hoje')}"; servicos = "@body('Servicos_contexto')"; motoristas = "@body('Motoristas_contexto')"; trocas = "@body('Trocas_contexto')" })))
 ))
 
+# Participações pendentes (sem conclusão) de funcionários ativos (cr40f_status 0), expandidas no treinamento; só a contagem vai ao agente.
+$expandPendentes = "cr40f_treinamento_cr40f_treinamentoparticipacao_treinamento(`$select=cr40f_treinamentoparticipacaoid;`$filter=statecode eq 0 and cr40f_concluidoem eq null and cr40f_Funcionario/cr40f_status eq 0)"
 $ramoPessoas = Ramo (@(Agente 'pessoas' 'pes') + @(
   (Passo 'Fim_90d' (Compor "@addDays(outputs('Inicio_do_dia_utc'), 90)")),
   (Passo 'Fim_10d' (Compor "@addDays(outputs('Inicio_do_dia_utc'), 10)")),
@@ -507,6 +510,10 @@ $ramoPessoas = Ramo (@(Agente 'pessoas' 'pes') + @(
   (Passo 'Documentos' (Listar 'cr40f_documentos' $sel.Documentos "statecode eq 0 and cr40f_situacao eq 100000000 and _cr40f_funcionario_value ne null and cr40f_validade lt @{outputs('Fim_90d')}" 'cr40f_validade asc')),
   (Passo 'Multas' (Listar 'cr40f_multases' $sel.Multas 'statecode eq 0 and cr40f_status eq 202410000 and _cr40f_motorista_value eq null' 'cr40f_dataparaindicar asc')),
   (Passo 'Comunicados' (Listar 'cr40f_comunicadohomes' $sel.Comunicados 'statecode eq 0 and cr40f_ativo eq true' 'cr40f_inicio desc')),
+  # Treinamentos publicados (cr40f_estado 100000001) com validade vencida ou até 7 dias à frente; as participações pendentes de funcionários
+  # ativos vêm expandidas (mesmo nome de NAV_PARTICIPACOES em pessoas.ts) e o contexto leva só a contagem.
+  (Passo 'Fim_7d' (Compor "@addDays(outputs('Inicio_do_dia_utc'), 7)")),
+  (Passo 'Treinamentos' (Listar 'cr40f_treinamentos' $sel.Treinamentos "statecode eq 0 and cr40f_estado eq 100000001 and cr40f_validade ne null and cr40f_validade lt @{outputs('Fim_7d')}" 'cr40f_validade asc' $expandPendentes)),
   (Passo 'Funcionarios_contexto' (Selecionar "@outputs('Funcionarios')?['body/value']" ([ordered]@{
     id = Id 'cr40f_funcionariosid'; apelido = Txt 'new_apelido'; funcao = Num 'cr40f_funcao'; validadeCnh = Dia 'cr40f_validadedacnh'; dataAso = Dia 'cr40f_datadoaso'
     aniversario = Dia 'cr40f_datadeaniversario'; admissao = Dia 'cr40f_datadeadmissao'
@@ -521,7 +528,10 @@ $ramoPessoas = Ramo (@(Agente 'pessoas' 'pes') + @(
   (Passo 'Comunicados_contexto' (Selecionar "@outputs('Comunicados')?['body/value']" ([ordered]@{
     id = Id 'cr40f_comunicadohomeid'; titulo = Txt 'cr40f_titulo'; inicio = Txt 'cr40f_inicio'; fim = Txt 'cr40f_fim'
   }))),
-  (Passo 'Contexto_pes' (DefinirVar 'Contexto' ([ordered]@{ hoje = "@{outputs('Hoje')}"; funcionarios = "@body('Funcionarios_contexto')"; documentos = "@body('Documentos_contexto')"; multas = "@body('Multas_contexto')"; comunicados = "@body('Comunicados_contexto')" })))
+  (Passo 'Treinamentos_contexto' (Selecionar "@outputs('Treinamentos')?['body/value']" ([ordered]@{
+    id = Id 'cr40f_treinamentoid'; titulo = Txt 'cr40f_name'; validade = Dia 'cr40f_validade'; pendentes = "@length(coalesce(item()?['cr40f_treinamento_cr40f_treinamentoparticipacao_treinamento'], createArray()))"
+  }))),
+  (Passo 'Contexto_pes' (DefinirVar 'Contexto' ([ordered]@{ hoje = "@{outputs('Hoje')}"; funcionarios = "@body('Funcionarios_contexto')"; documentos = "@body('Documentos_contexto')"; multas = "@body('Multas_contexto')"; comunicados = "@body('Comunicados_contexto')"; treinamentos = "@body('Treinamentos_contexto')" })))
 ))
 
 # Frota: as regras rodam na Custom API cr40f_FrotaPendencias (mesmo cálculo da aba Pendências do shell). Prioridade,
@@ -538,9 +548,9 @@ $ramoFrota = Ramo (@(Agente 'frota' 'fro') + @(
   (Passo 'Contexto_fro' (DefinirVar 'Contexto' ([ordered]@{ hoje = "@{outputs('Hoje')}"; pendencias = "@outputs('Dados_frota')?['pendencias']" })))
 ))
 
-# Mapa tipo -> valor do choice cr40f_tipo (100000000 + índice na ordem financeiro, logística, pessoas, frota; igual à Task 6).
+# Mapa tipo -> valor do choice cr40f_tipo (100000000 + índice em tiposOrdem, a ordem de TODOS_OS_TIPOS: tipo novo sempre no fim).
 $mapaTipos = [ordered]@{}; $i = 0
-foreach ($t in @($const.agentes.financeiro.tipos) + @($const.agentes.logistica.tipos) + @($const.agentes.pessoas.tipos) + @($const.agentes.frota.tipos)) { $mapaTipos[$t] = 100000000 + $i++ }
+foreach ($t in @($const.tiposOrdem)) { $mapaTipos[$t] = 100000000 + $i++ }
 # O prefixo termina em quebra de linha: dentro do concat('...') ela vira decodeUriComponent('%0A').
 $prefixoExpr = $const.prefixoUsuario.Replace("`n", "' , decodeUriComponent('%0A'), '")
 # Chave do agente da execução: if aninhado pelo cr40f_agente; o último (Frota) fica no else, já que o Switch barra agente desconhecido antes.
