@@ -150,6 +150,8 @@ import { CollisionScreen } from "./screens/CollisionScreen";
 import { ComunicadosScreen } from "./screens/ComunicadosScreen";
 import { TermosMultaScreen, type TermosLoadStatus } from "./screens/TermosMultaScreen";
 import { isMockTermos, listarTermosMotorista, resumoPendentes, separarTermos, type TermoMulta } from "./lib/termosMulta";
+import { TreinamentosScreen, type TreinamentosLoadStatus } from "./screens/TreinamentosScreen";
+import { isMockTreinamentos, isTreinamentoPendente, listarTreinamentosMotorista, type Participacao, type TreinamentoMotorista } from "./lib/treinamentos";
 import { ChecklistsScreen } from "./screens/ChecklistsScreen";
 import { ButtonPreviewScreen } from "./screens/ButtonPreviewScreen";
 import { CollisionStartScreen } from "./screens/CollisionStartScreen";
@@ -924,6 +926,28 @@ function App() {
     reloadTermosMulta().catch((error) => reportAppError(error, { severity: "warning", source: "app", action: "listarTermosMotorista", notifyUser: false }));
   }, [driverContext?.id]);
 
+  // Treinamentos do RH: mesmo motorista logado; alimentam a tela Treinamentos e o contador da Home.
+  const [treinamentos, setTreinamentos] = useState<TreinamentoMotorista[]>([]);
+  const [treinamentosStatus, setTreinamentosStatus] = useState<TreinamentosLoadStatus>("loading");
+  const [selectedTreinamentoId, setSelectedTreinamentoId] = useState("");
+  const reloadTreinamentos = useCallback(async () => {
+    try {
+      setTreinamentos(await listarTreinamentosMotorista(comunicadosDriverIdRef.current));
+      setTreinamentosStatus("ready");
+    } catch (error) {
+      setTreinamentosStatus((current) => current === "ready" ? current : "error");
+      throw error;
+    }
+  }, []);
+  useEffect(() => {
+    if (!isMockTreinamentos() && !driverContext?.id) return;
+    reloadTreinamentos().catch((error) => reportAppError(error, { severity: "warning", source: "app", action: "listarTreinamentosMotorista", notifyUser: false }));
+  }, [driverContext?.id]);
+  // Participação gravada pela tela: reflete na lista e na Home sem esperar a releitura.
+  const updateTreinamentoParticipacao = useCallback((participacao: Participacao) => {
+    setTreinamentos((current) => current.map((item) => item.participacao.id === participacao.id ? { ...item, participacao } : item));
+  }, []);
+
   // Checklists usam o mesmo motorista logado dos comunicados.
   const reloadChecklists = useCallback(async () => {
     try {
@@ -1378,12 +1402,13 @@ function App() {
   const comunicadoOpen = Boolean(selectedComunicadoId);
   const checklistOpen = Boolean(selectedChecklistId);
   const termoOpen = Boolean(tourTermoId);
+  const treinamentoOpen = Boolean(selectedTreinamentoId);
 
   // Mudou a tela ou o sub-estado (abrir um comunicado, um termo): o capítulo aberto e os descartes valem só para a visão anterior.
   useEffect(() => {
     tourUnavailableRef.current.clear();
     setTourChapter(null);
-  }, [screen, comunicadoOpen, checklistOpen, termoOpen]);
+  }, [screen, comunicadoOpen, checklistOpen, termoOpen, treinamentoOpen]);
 
   useEffect(() => setTourTermoId(""), [screen]);
 
@@ -1406,8 +1431,8 @@ function App() {
     };
     timer = window.setTimeout(tryOpen, 700);
     return () => window.clearTimeout(timer);
-    // screen/comunicadoOpen/checklistOpen/termoOpen não são lidos aqui: reiniciam o atraso quando a visão muda.
-  }, [screen, comunicadoOpen, checklistOpen, termoOpen, tourChapter, tourBlocked, tourDriverId, dataLoading, criticalError, tourCandidates]);
+    // screen/comunicadoOpen/checklistOpen/termoOpen/treinamentoOpen não são lidos aqui: reiniciam o atraso quando a visão muda.
+  }, [screen, comunicadoOpen, checklistOpen, termoOpen, treinamentoOpen, tourChapter, tourBlocked, tourDriverId, dataLoading, criticalError, tourCandidates]);
 
   const closeTour = (reason: TourCloseReason) => {
     const closing = tourChapter;
@@ -2182,7 +2207,8 @@ function App() {
       setScreen("checklists");
       return;
     }
-    if (screenName === "servicos" || screenName === "comunicados" || screenName === "historico" || screenName === "solicitarManutencao" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro" || screenName === "multas") {
+    if (screenName === "treinamentos") setSelectedTreinamentoId("");
+    if (screenName === "servicos" || screenName === "comunicados" || screenName === "historico" || screenName === "solicitarManutencao" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro" || screenName === "multas" || screenName === "treinamentos") {
       setComunicadoOrigin("");
       setScreen(screenName);
     }
@@ -3866,6 +3892,21 @@ function App() {
     );
   }
 
+  if (screen === "treinamentos") {
+    return show(
+      <TreinamentosScreen
+        items={treinamentos}
+        loadStatus={treinamentosStatus}
+        selectedId={selectedTreinamentoId}
+        onSelectedIdChange={setSelectedTreinamentoId}
+        onBack={() => setScreen("inicio")}
+        onReload={reloadTreinamentos}
+        onParticipacaoChange={updateTreinamentoParticipacao}
+        driverName={driverContext?.fullName ?? (isMockTreinamentos() ? "Renan" : "")}
+      />
+    );
+  }
+
   if (screen === "checklists") {
     return show(
       <ChecklistsScreen
@@ -3893,6 +3934,7 @@ function App() {
       pendingComunicados={comunicados.filter(isComunicadoPending).length}
       pendingChecklists={checklists.filter(isChecklistPending).length}
       pendingMultas={separarTermos(termosMulta).pendentes.length}
+      pendingTreinamentos={treinamentos.filter(isTreinamentoPendente).length}
       multasBanner={resumoPendentes(termosMulta)}
       driverName={driverContext?.fullName}
       showLocalReset={isLocalhostRuntime && !remoteMode}

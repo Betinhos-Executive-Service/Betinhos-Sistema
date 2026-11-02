@@ -154,7 +154,7 @@ async function mockRequest<T>(path: string, data?: unknown, method = data === un
   return result as T;
 }
 
-const GUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const GUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function cleanGuid(value: string) {
   return value.replace(/[{}]/g, "").toLowerCase();
@@ -242,6 +242,11 @@ export function buildResultadosCsv(rows: ComunicadoDestinatario[], driverNames: 
     row.pushErro
   ].map((value) => csvCell(String(value ?? ""))).join(";"));
   return `﻿${[header.join(";"), ...lines].join("\r\n")}`;
+}
+
+export function parseStrokes(value: string): SignatureStrokes {
+  if (!value) return [];
+  try { return JSON.parse(value) as SignatureStrokes; } catch { return []; }
 }
 
 export function validateSignature(strokes: SignatureStrokes) {

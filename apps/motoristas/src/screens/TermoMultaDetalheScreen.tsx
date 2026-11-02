@@ -2,6 +2,7 @@ import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { reportAppError } from "../lib/appErrorLogger";
 import { customApiErrorMessage } from "../lib/customApi";
 import { SignaturePad } from "../components/comunicados/SignaturePad";
+import { SuccessCheck } from "../components/termos/SuccessCheck";
 import { SelfieCapture } from "../components/termos/SelfieCapture";
 import { ServicesMenu } from "../components/navigation/ServicesMenu";
 import {
@@ -39,15 +40,6 @@ const STEP_TITLE: Partial<Record<TermoStep, string>> = {
 };
 const SIGN_STEPS: TermoStep[] = ["selfie", "local", "assinatura"];
 const CONTESTADO_TEXTO = "Contestado — o gestor de frota vai falar com você";
-
-function SuccessCheck() {
-  return (
-    <svg className="termo-check" viewBox="0 0 52 52" aria-hidden="true">
-      <circle cx="26" cy="26" r="24" />
-      <path d="M15 27l7 7 15-16" />
-    </svg>
-  );
-}
 
 // Ícone neutro da contestação: não é sucesso nem erro, é um assunto em aberto com o gestor.
 function NeutralMark() {
