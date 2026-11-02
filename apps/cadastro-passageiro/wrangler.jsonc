@@ -9,9 +9,9 @@
   // 20 requisições por IP a cada 60 s. Sem o binding (ex.: dev local antigo), o Worker não bloqueia.
   // Cache da 1ª abertura (lista e fotos por hash do token, 36 h). Ver src/api.mjs.
   "kv_namespaces": [{ "binding": "CACHE", "id": "d26f8512a9a943ab884e3b6340c3af15" }],
-  "ratelimits": [{ "name": "RATE_LIMITER", "namespace_id": "4201", "simple": { "limit": 60, "period": 60 } }],
+  "ratelimits": [{ "name": "RATE_LIMITER", "namespace_id": "4201", "simple": { "limit": 60, "period": 60 } }]
   // Secret FLOW_URL: `wrangler secret put FLOW_URL` (URL SAS do flow HTTP). Sem ela, localhost responde mock.
-  // Contato na tela de link vencido (dado público, não é secret): botões "Chamar no WhatsApp" e "Enviar e-mail".
-  // CONTATO_WHATSAPP só com dígitos, com 55 e DDD (DDD 12, confirmado pelo Renan). Sem as vars, a tela só orienta.
-  "vars": { "CONTATO_WHATSAPP": "5512997236961", "CONTATO_EMAIL": "junior@betinhos.com.br" }
+  // Contato na tela de link vencido (botões "Chamar no WhatsApp" e "Enviar e-mail"): secrets CONTATO_WHATSAPP (só dígitos,
+  // com 55 e DDD) e CONTATO_EMAIL, definidos com `wrangler secret put <nome>`. Dados de pessoa não ficam no repositório
+  // (scripts/dados-pessoais.mjs barra no CI) e os secrets sobrevivem ao deploy. Sem eles, a tela só orienta a pedir um novo link.
 }
