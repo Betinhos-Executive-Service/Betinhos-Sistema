@@ -6,8 +6,9 @@ Set-StrictMode -Version Latest
 $environmentUrl = 'https://org23b93544.crm2.dynamics.com'
 $solutionName = 'AppBetinhos'
 if (([Uri]$environmentUrl).Host -ne 'org23b93544.crm2.dynamics.com') { throw 'Somente DEV.' }
-$token = & az account get-access-token --resource "$environmentUrl/" --query accessToken -o tsv
-if ($LASTEXITCODE -ne 0 -or -not $token) { throw 'Token do Dataverse DEV indisponível (rode az login).' }
+# Linux/macOS: DV_ACCESS_TOKEN (node packages/deploy/dv-token.mjs token <url do ambiente>); no Windows segue o az login.
+$token = if ($env:DV_ACCESS_TOKEN) { $env:DV_ACCESS_TOKEN } else { & az account get-access-token --resource "$environmentUrl/" --query accessToken -o tsv }
+if (-not $token) { throw 'Token do Dataverse DEV indisponível (rode az login ou informe DV_ACCESS_TOKEN).' }
 $headers = @{ Authorization = "Bearer $token"; Accept = 'application/json'; 'OData-Version' = '4.0'; 'OData-MaxVersion' = '4.0'; 'MSCRM.SolutionUniqueName' = $solutionName }
 function Dv([string] $Method, [string] $Path, $Body = $null) {
   Write-Host "[agentes-schema] $Method $($Path.Split('?')[0])"

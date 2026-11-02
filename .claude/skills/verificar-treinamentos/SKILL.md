@@ -33,6 +33,9 @@ description: "Verifica o módulo de Treinamentos do shell (#/treinamentos: lista
 9. 375 px: lista em cards, editor em uma coluna, painel com lista acima do detalhe; sem rolagem horizontal.
 10. Console sem `console.error` nem `pageerror`.
 
+## Rodar no Linux/macOS (sem Windows)
+Pré-requisitos: `pwsh` 7 (PATH ou `~/.local/powershell/pwsh`) e Node. Login uma vez: `node packages/deploy/dv-token.mjs login` (código de dispositivo; o refresh token fica em `~/.cache/betinhos-dv/refresh.json`, modo 600, e se renova a cada uso; `logout` apaga). Depois: `packages/deploy/rodar-linux.sh provision-treinamentos.ps1 [-Apply]` (idem `conceder-privilegios-treinamentos.ps1`, `provision-agentes-schema.ps1`, `provision-flow-agentes-executar.ps1 [-SomenteValidar]`). O wrapper exporta `DV_ENVIRONMENT_URL` do DEV, `DV_SOLUTION=AppBetinhos`, `DV_BLOCKED_HOSTS` do PROD e os tokens; os scripts continuam recusando PROD.
+
 ## Verificação no DEV (só depois do merge, na `main` do checkout principal; nunca em worktree, sessão cloud ou PROD)
 1. `powershell.exe -File packages/deploy/provision-treinamentos.ps1` (dry run) → "DRY RUN criaria a tabela cr40f_treinamento" e "… cr40f_treinamentoparticipacao". Depois `-Apply` → `SCHEMA OK`; conferências: `cr40f_validade` DateOnly, relacionamentos (treinamento → participação Cascade, funcionário → participação Restrict), `cr40f_name` 200/ApplicationRequired, tabelas na solução.
 2. `powershell.exe -File packages/deploy/conceder-privilegios-treinamentos.ps1` (dry run, depois `-Apply`) → `PRIVILEGIOS OK`; `prvRead*` das duas tabelas Global.
@@ -48,3 +51,6 @@ description: "Verifica o módulo de Treinamentos do shell (#/treinamentos: lista
 
 ## Limites
 - Sem Dataverse na VM/worktree: só mock, typecheck e testes. Leitura, assinatura e quiz pelo motorista dependem do App Motoristas (outra sessão); o campo `cr40f_concluidoem` só será gravado por ele.
+
+## Estado no DEV (02/11/2026)
+Schema, privilégios (MDA e DEV - Usuário), opção `TreinamentoPendente` (100000021) e flow `Flow Agentes | Executar` aplicados; `checkFlowErrors` vazio. Teste de dados ponta a ponta (criar, publicar, participação com binds, consulta do agente com `$expand` filtrado por status do funcionário, conclusão tirando da contagem, limpeza em cascata) passou. Falta: execução real do agente Pessoas (chave Anthropic do agente) e o uso pelo App Motoristas.
