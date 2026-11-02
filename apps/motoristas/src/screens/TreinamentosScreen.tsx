@@ -16,6 +16,7 @@ import {
   formatTamanho,
   formatValidade,
   isAnexoImagem,
+  isAnexoVideo,
   isMockTreinamentos,
   proximaEtapa,
   quizCompleto,
@@ -64,9 +65,16 @@ const Conteudo = memo(function Conteudo({ texto }: { texto: string }) {
   );
 });
 
+const ArquivoVideo = memo(function ArquivoVideo({ src, titulo }: { src: string; titulo: string }) {
+  const [falhou, setFalhou] = useState(false);
+  if (falhou) return <a className="trn-link" href={src} target="_blank" rel="noopener noreferrer">O vídeo não carregou aqui. Toque para abrir.</a>;
+  return <video src={src} title={titulo} controls playsInline preload="metadata" data-error-quiet="" onError={() => setFalhou(true)} />;
+});
+
 const Video = memo(function Video({ url }: { url: string }) {
   const video = resolverVideo(url);
   if (!video) return url.trim() ? <p className="termo-alert" data-tone="neutro">O link do vídeo deste treinamento é inválido. Avise o RH.</p> : null;
+  if (video.kind === "arquivo") return <div className="trn-video"><ArquivoVideo src={video.src} titulo="Vídeo do treinamento" /></div>;
   if (video.kind === "link") return <a className="trn-link" href={video.href} target="_blank" rel="noopener noreferrer">Abrir vídeo do treinamento</a>;
   return (
     <div className="trn-video">
@@ -80,6 +88,14 @@ const AnexoItem = memo(function AnexoItem({ anexo }: { anexo: Anexo }) {
   const [falhou, setFalhou] = useState(false);
   const href = anexoUrl(anexo);
   const tamanho = formatTamanho(anexo.tamanho);
+  if (isAnexoVideo(anexo)) {
+    return (
+      <li className="trn-anexo trn-anexo--video">
+        <div className="trn-video"><ArquivoVideo src={href} titulo={anexo.nome} /></div>
+        <span>{anexo.nome}{tamanho ? ` · ${tamanho}` : ""}</span>
+      </li>
+    );
+  }
   if (isAnexoImagem(anexo) && !falhou) {
     return (
       <li className="trn-anexo trn-anexo--foto">

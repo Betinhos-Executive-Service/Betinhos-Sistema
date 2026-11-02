@@ -157,9 +157,11 @@ export function corrigirQuiz(perguntas: Pergunta[], respostas: Record<string, st
 
 export const quizCompleto = (perguntas: Pergunta[], respostas: Record<string, string>) => perguntas.every((p) => Boolean(respostas[p.id]));
 
-type VideoTreinamento = { kind: "embed"; src: string; href: string } | { kind: "link"; href: string };
+type VideoTreinamento = { kind: "embed"; src: string; href: string } | { kind: "arquivo"; src: string } | { kind: "link"; href: string };
 
-/** YouTube e Vimeo viram player embutido; outros links https (Stream, SharePoint) abrem fora. URL inválida: null. */
+const VIDEO_ARQUIVO = /\.(mp4|m4v|webm|mov)$/i;
+
+/** YouTube e Vimeo viram player embutido; arquivo de vídeo (.mp4 etc.) toca no player nativo; outros links https (Stream, SharePoint) abrem fora. URL inválida: null. */
 export function resolverVideo(url: string): VideoTreinamento | null {
   const texto = url.trim();
   if (!texto) return null;
@@ -176,6 +178,7 @@ export function resolverVideo(url: string): VideoTreinamento | null {
   if (/^[\w-]{11}$/.test(youtubeId)) return { kind: "embed", src: `https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0`, href: texto };
   const vimeo = host === "vimeo.com" || host === "player.vimeo.com" ? /^\/(?:video\/)?(\d+)/.exec(parsed.pathname) : null;
   if (vimeo) return { kind: "embed", src: `https://player.vimeo.com/video/${vimeo[1]}`, href: texto };
+  if (VIDEO_ARQUIVO.test(parsed.pathname)) return { kind: "arquivo", src: texto };
   return { kind: "link", href: texto };
 }
 
@@ -192,6 +195,8 @@ export function anexoUrl(anexo: Pick<Anexo, "caminho">) {
 }
 
 export const isAnexoImagem = (anexo: Pick<Anexo, "mime" | "nome">) => anexo.mime.startsWith("image/") || /\.(png|jpe?g|gif|webp)$/i.test(anexo.nome);
+
+export const isAnexoVideo = (anexo: Pick<Anexo, "mime" | "nome">) => anexo.mime.startsWith("video/") || VIDEO_ARQUIVO.test(anexo.nome);
 
 export function formatTamanho(bytes: number) {
   if (!bytes) return "";
@@ -293,7 +298,7 @@ function getMockStore() {
         cr40f_descricao: "Distância segura, chuva e pontos cegos nas vias expressas de São Paulo.",
         cr40f_conteudo: "# Antes de sair\n- Confira pneus, limpadores e faróis.\n- Programe o trajeto e avise a operação sobre desvios.\n\n# Na via\nMantenha **dois segundos** de distância do carro da frente; com chuva, dobre.\nEvite trocar de faixa perto de alças de acesso.\n\n# Com passageiro a bordo\n- Acelere e freie de forma progressiva.\n- Nada de celular na mão: use o suporte e o viva-voz só se for indispensável.",
         cr40f_videourl: `https://betinhos.sharepoint.com${MOCK_PASTA}/a1/stream.aspx?id=direcao-defensiva`,
-        cr40f_anexosjson: JSON.stringify([{ nome: "Guia rápido.pdf", caminho: `${MOCK_PASTA}/a1/Guia rápido.pdf`, tamanho: 245760, mime: "application/pdf" }, { nome: "Ponto cego.jpg", caminho: `${MOCK_PASTA}/a1/Ponto cego.jpg`, tamanho: 180224, mime: "image/jpeg" }]),
+        cr40f_anexosjson: JSON.stringify([{ nome: "Guia rápido.pdf", caminho: `${MOCK_PASTA}/a1/Guia rápido.pdf`, tamanho: 245760, mime: "application/pdf" }, { nome: "Ponto cego.jpg", caminho: `${MOCK_PASTA}/a1/Ponto cego.jpg`, tamanho: 180224, mime: "image/jpeg" }, { nome: "Manobra de ré.mp4", caminho: `${MOCK_PASTA}/a1/Manobra de ré.mp4`, tamanho: 5242880, mime: "video/mp4" }]),
         cr40f_exigeassinatura: false, cr40f_exigequiz: false, cr40f_notaminima: null, cr40f_quizjson: "", cr40f_validade: "2026-12-15",
         cr40f_publicadoem: "2026-10-28T12:00:00Z"
       },

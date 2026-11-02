@@ -14,6 +14,7 @@ import {
   parsePerguntas,
   proximaEtapa,
   resolverVideo,
+  isAnexoVideo,
   separarTreinamentos,
   statusTreinamento,
   trechos,
@@ -141,9 +142,13 @@ test("vídeo: YouTube e Vimeo viram embed, outros https viram link, URL inválid
   assert.equal(resolverVideo("https://www.youtube.com/shorts/dQw4w9WgXcQ")?.kind, "embed");
   assert.deepEqual(resolverVideo("https://vimeo.com/123456"), { kind: "embed", src: "https://player.vimeo.com/video/123456", href: "https://vimeo.com/123456" });
   assert.deepEqual(resolverVideo("https://betinhos.sharepoint.com/sites/x/stream.aspx?id=1"), { kind: "link", href: "https://betinhos.sharepoint.com/sites/x/stream.aspx?id=1" });
+  assert.deepEqual(resolverVideo("https://betinhos.sharepoint.com/sites/x/Treinamentos/Manobra%20de%20r%C3%A9.MP4?download=1"), { kind: "arquivo", src: "https://betinhos.sharepoint.com/sites/x/Treinamentos/Manobra%20de%20r%C3%A9.MP4?download=1" });
   assert.equal(resolverVideo("http://www.youtube.com/watch?v=dQw4w9WgXcQ"), null);
   assert.equal(resolverVideo("isso não é url"), null);
   assert.equal(resolverVideo(""), null);
+  assert.equal(isAnexoVideo({ mime: "video/mp4", nome: "x" }), true);
+  assert.equal(isAnexoVideo({ mime: "", nome: "Manobra.MOV" }), true);
+  assert.equal(isAnexoVideo({ mime: "image/jpeg", nome: "foto.jpg" }), false);
 });
 
 test("anexo vira link do SharePoint com o caminho codificado; links absolutos passam direto", () => {
