@@ -34,7 +34,7 @@ Escolha: `new_AnthropicKeyObservacaoMotorista`, porque o consumidor é um plugin
 - Script PowerShell **não executado** (sem `pwsh`).
 
 **Falta, no Windows, nesta ordem:**
-1. Atualizar a `main` local e publicar o assembly no DEV pelo fluxo normal (o assembly é único e compartilhado entre frentes). Usar a chave de nome forte real; a que gerei aqui é descartável e nunca vai a lugar nenhum.
+1. Publicar o assembly no DEV. No Linux: copiar a `DriverRecordSharing.snk` real do Windows para `plugins/DriverRecordSharing/` e rodar `node scripts/publicar-plugin-dev.mjs --build` (confere sem gravar) e depois `--build --apply`. O script recusa branch sem a `main`, mudança não commitada, token de nome forte diferente do DEV (`9b3305f5ee59a061`) e DLL sem algum tipo que existe no DEV, e guarda uma cópia do assembly atual em `/tmp`. No Windows, o fluxo de sempre. A chave que gerei aqui é descartável e nunca vai a lugar nenhum.
 2. Gerar uma **chave nova** no console da Anthropic para a observação do motorista e rodar `scripts/provision-observacao-organizada.ps1 -Apply -ConfigurarChaveSegura`. Valide o primeiro `-Apply`: o `Invoke-Dv` manda o cabeçalho de solução também para a tabela de configuração segura, e não conferi se ela aceita.
 3. Chamar `new_OrganizarObservacao` e conferir os tópicos.
 4. Esvaziar o valor padrão de `new_AnthropicKeyObservacaoMotorista`, repetir a chamada e revogar a chave antiga no console.
