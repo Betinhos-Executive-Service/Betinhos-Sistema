@@ -81,7 +81,7 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
     const h = helpers(page);
     const queryA = "?mockPagaEm=10";
     await h.open(queryA, "inicio", 400);
-    await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem("app-motoristas-tour-v1:localhost-driver", "visto"); });
+    await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem("app-motoristas-tour-v2:localhost-driver:*", "visto"); });
     await h.open(queryA, "receber?serviceId=10240&type=SERVICO");
     check("Recebimento 10240 mostra 'Cobrar por QR code'", await h.visible("Cobrar por QR code"));
     await h.shot("01-recebimento");
@@ -174,7 +174,7 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
     // Paga 15 s depois de gerar: a recusa (1ª consulta, 3 s), sair e retomar cabem com folga antes do pagamento.
     const query = "?mockPagaEm=15&mockRecusa=1";
     await h.open(query, "inicio", 400);
-    await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem("app-motoristas-tour-v1:localhost-driver", "visto"); });
+    await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem("app-motoristas-tour-v2:localhost-driver:*", "visto"); });
     await h.open(query, "receber?serviceId=10240&type=SERVICO");
     await h.click("Cobrar por QR code");
     await page.locator("#qr-charge-amount").fill("200");

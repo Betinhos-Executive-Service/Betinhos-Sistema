@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { SystemIcon } from "../icons/SystemIcon";
+import { TourHelpButton } from "../common/TourHelp";
 
 type DetailsMenuProps = {
   title: string;
@@ -31,6 +32,7 @@ export function DetailsMenu({ title, onBack, onCopy }: DetailsMenuProps) {
         <span>Detalhes</span>
         <strong>{title}</strong>
       </div>
+      <TourHelpButton className="icon-button details-copy" />
       <motion.button
         className={`icon-button details-copy copy-button ${copied ? "copied" : ""}`}
         aria-label={copied ? "Copiado" : "Copiar"}
