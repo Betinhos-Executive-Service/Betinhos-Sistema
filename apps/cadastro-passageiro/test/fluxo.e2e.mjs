@@ -87,6 +87,21 @@ ok(await ultimo.locator(".badge.pop").count() === 1, "badge Completo faz o pop a
 ok(await p.locator(".final").count() === 1, "mostra Tudo pronto ao completar todos");
 const anim = await p.locator(".final").first().evaluate((e) => e.getAnimations({ subtree: true }).map((a) => a.animationName));
 ok(anim.includes("traco"), `o check deve se desenhar: ${anim}`);
+// 7. Foto automática com a rede fora: a foto fica pendente, o botão "Salvar foto" tenta de novo e funciona
+const pf = await novaPagina();
+await pf.goto(url); await pf.waitForSelector(".card:not(.sk-card)");
+await pf.route("**/api/salvar", (r) => r.abort("internetdisconnected"));
+const cardFoto = pf.locator(".card").nth(2);
+await cardFoto.locator(".foto-input").setInputFiles({ name: "x.jpg", mimeType: "image/jpeg", buffer: Buffer.from(await pf.evaluate(async () => {
+  const c = document.createElement("canvas"); c.width = 600; c.height = 450; c.getContext("2d").fillRect(0, 0, 600, 450);
+  return [...new Uint8Array(await (await new Promise((r) => c.toBlob(r, "image/jpeg"))).arrayBuffer())];
+})) });
+await cardFoto.locator(".aviso.erro").waitFor({ timeout: 20000 });
+ok((await cardFoto.locator(".btn.primario").textContent()) === "Salvar foto", "falhou: o botão Salvar foto deve continuar");
+ok(await cardFoto.locator(".foto.nova").count() === 1, "falhou: a foto fica marcada como nova (pendente)");
+await pf.unroute("**/api/salvar");
+await cardFoto.locator(".btn.primario").click(); await cardFoto.locator(".aviso.ok").waitFor();
+ok((await cardFoto.locator(".aviso").textContent()).trim() === "Foto salva.", "o botão salva a foto pendente");
 console.log(JSON.stringify({ antes, depois, animando, dur, anim, falhas }));
 await b.close();
 process.exit(falhas.length ? 1 : 0);

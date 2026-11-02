@@ -277,9 +277,11 @@ function cardPassageiro(p, aoSalvar) {
     st.preparando = true;
     st.fotoUrl = previa;
     render();
+    let pronta = false;
     try {
       ({ foto: st.foto, miniatura: st.miniatura } = await comTempoLimite(comprimirFoto(arq), 20000, "A foto demorou demais para abrir. Tente outra ou tire uma nova."));
       st.fotoUrl = `data:image/jpeg;base64,${st.foto}`;
+      pronta = true;
     } catch (e) {
       st.fotoUrl = anterior;
       st.msg = { tipo: "erro", texto: e?.message || "Não foi possível abrir a foto. Tente outra." };
@@ -289,6 +291,9 @@ function cardPassageiro(p, aoSalvar) {
       st.preparando = false;
       render(`foto-${id}`);
     }
+    // Foto escolhida e comprimida já segue sozinha (um toque a menos); o que estiver digitado nos campos fica para o "Salvar".
+    // Se falhar, o botão "Salvar foto" continua ali para tentar de novo.
+    if (pronta && !st.salvando) salvar({ soFoto: true });
   });
 
   const pendentes = () => [
@@ -447,15 +452,16 @@ function cardPassageiro(p, aoSalvar) {
     card.querySelector(".aviso")?.replaceWith(montarAviso());
   }
 
-  async function salvar() {
+  // `soFoto`: salvamento automático da foto, sem validar nem enviar o que está digitado. (Quando chamada pelo clique, o argumento é o evento.)
+  async function salvar({ soFoto } = {}) {
     if (st.salvando) return;
     const corpo = { passageiroId: id };
     st.erros = {};
-    if (st.editTel && st.tel.trim()) {
+    if (!soFoto && st.editTel && st.tel.trim()) {
       if (telefoneValido(st.tel)) corpo.telefone = telefoneParaEnvio(st.tel);
       else st.erros.tel = "Confira o telefone: inclua o DDD, ex.: (11) 98765-4321.";
     }
-    if (st.editMail && st.mail.trim()) {
+    if (!soFoto && st.editMail && st.mail.trim()) {
       if (emailValido(st.mail)) corpo.email = st.mail.trim();
       else st.erros.mail = "Confira o e-mail, ex.: nome@empresa.com.br.";
     }
@@ -475,7 +481,7 @@ function cardPassageiro(p, aoSalvar) {
       st.msg = { tipo: "atencao", texto: "Toque na foto para adicionar." };
       return render(`foto-${id}`);
     }
-    const itens = pendentes(), eraCompleto = completo(p);
+    const itens = soFoto ? ["foto"] : pendentes(), eraCompleto = completo(p);
     st.salvando = true;
     st.msg = null;
     render();
