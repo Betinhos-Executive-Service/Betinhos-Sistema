@@ -10,7 +10,7 @@ await p.evaluate(async () => {
   const dt = new DataTransfer(); dt.items.add(new File([blob], "retrato.jpg", { type: "image/jpeg" }));
   const i = document.querySelector(".foto-input"); i.files = dt.files; i.dispatchEvent(new Event("change"));
 });
-await p.waitForSelector(".foto.nova img");
+await p.waitForSelector(".aviso.ok"); // a foto escolhida já segue sozinha; o retrato continua na tela
 const foto = await p.locator(".foto").first().boundingBox(), img = await p.locator(".foto img").first().boundingBox();
 const vaza = img.height - foto.height > 1 || img.width - foto.width > 1;
 const ponto = [img.x + img.width / 2, img.y + img.height * 0.9];

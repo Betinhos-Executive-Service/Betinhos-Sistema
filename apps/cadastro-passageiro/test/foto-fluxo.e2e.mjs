@@ -13,15 +13,22 @@ const jpeg = Buffer.from(await p.evaluate(async () => {
 }));
 const card = p.locator(".card").nth(2); await card.locator(".foto").scrollIntoViewIfNeeded();
 const box = await card.locator(".foto").boundingBox();
+// Dados digitados nos campos NÃO acompanham a foto automática (ficam para o "Salvar")
+await card.locator("input[type=tel]").fill("11987654321");
+const enviado = p.waitForRequest((r) => r.url().endsWith("/api/salvar"));
 const fc = p.waitForEvent("filechooser"); await p.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
 const t1 = Date.now(); await (await fc).setFiles({ name: "IMG_20261026.jpg", mimeType: "image/jpeg", buffer: jpeg });
 await card.locator(".foto img").waitFor(); const tPrevia = Date.now() - t1;
-await card.locator(".foto.nova").waitFor(); const tPronta = Date.now() - t1;
-const botao = await card.locator(".btn.primario").textContent();
-const enviado = p.waitForRequest((r) => r.url().endsWith("/api/salvar"));
-const t2 = Date.now(); await card.locator(".btn.primario").click(); await card.locator(".aviso.ok").waitFor(); const tSalvar = Date.now() - t2;
+await card.locator(".aviso.ok").waitFor(); const tSalva = Date.now() - t1;
 const corpoEnviado = JSON.parse((await enviado).postData());
 const miniaturaKB = Math.round((corpoEnviado.miniaturaBase64?.length ?? 0) * 0.75 / 1024), fotoEnviadaKB = Math.round(corpoEnviado.fotoBase64.length * 0.75 / 1024);
-if (!miniaturaKB || miniaturaKB > 60 || miniaturaKB * 3 > fotoEnviadaKB) { console.log(JSON.stringify({ falha: "miniatura ausente ou grande demais", miniaturaKB, fotoEnviadaKB })); process.exit(1); }
-console.log(JSON.stringify({ fotoEnviadaKB, miniaturaKB, arquivoKB: Math.round(jpeg.length / 1024), tLista, tPrevia, tPronta, botao, tSalvar, aviso: await card.locator(".aviso").textContent() }));
+const falhas = [];
+if (!miniaturaKB || miniaturaKB > 60 || miniaturaKB * 3 > fotoEnviadaKB) falhas.push(`miniatura ausente ou grande demais (${miniaturaKB} KB de ${fotoEnviadaKB} KB)`);
+if ("telefone" in corpoEnviado || "email" in corpoEnviado) falhas.push("o envio automático da foto levou telefone/e-mail junto");
+const aviso = await card.locator(".aviso").textContent();
+if (aviso.trim() !== "Foto salva.") falhas.push(`aviso: ${aviso}`);
+if ((await card.locator("input[type=tel]").inputValue()) !== "(11) 98765-4321") falhas.push("o telefone digitado deveria continuar no campo");
+if ((await card.locator(".btn.primario").textContent()) !== "Salvar telefone") falhas.push(`botão deveria oferecer só o telefone: ${await card.locator(".btn.primario").textContent()}`);
+console.log(JSON.stringify({ fotoEnviadaKB, miniaturaKB, arquivoKB: Math.round(jpeg.length / 1024), tLista, tPrevia, tSalva, aviso, falhas }));
 await b.close();
+process.exit(falhas.length ? 1 : 0);
