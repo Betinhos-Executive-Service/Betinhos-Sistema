@@ -112,15 +112,30 @@ export function TreinamentoEditor({ initial, funcionarios, source, onBack, onSav
     }
   }
 
-  const anexosAlterados = async (anexos: Anexo[]) => {
-    set({ anexos })
+  const anexosAlterados = async (anexos: Anexo[], id: string) => {
+    set({ id, anexos })
     try {
-      await source.salvarAnexos(draft.id, anexos)
-      onAnexos(draft.id, anexos)
+      await source.salvarAnexos(id, anexos)
+      onAnexos(id, anexos)
     } catch (error) {
       toast({ tone: 'danger', message: erroTexto(error, 'O arquivo foi enviado, mas a lista de anexos não foi gravada. Salve o rascunho.') })
     }
   }
+
+  // Anexar antes do primeiro salvamento: salva o rascunho (campos travados até terminar) e segue com o envio.
+  const garantirId = async () => {
+    const problema = validarRascunho(draft)
+    if (problema) { setErro(problema); return null }
+    setBusy('save')
+    try {
+      return await source.salvar(draft)
+    } catch (error) {
+      toast({ tone: 'danger', message: erroTexto(error, 'Não foi possível salvar o rascunho.') })
+      setBusy(null)
+      return null
+    }
+  }
+  const aposCriar = async (id: string) => { setBusy(null); await onSaved(id) }
 
   const lock = busy !== null
   const resumoPublico = draft.publicoTipo === PUBLICO.motoristas ? 'Todos os motoristas ativos recebem o treinamento.'
@@ -156,7 +171,7 @@ export function TreinamentoEditor({ initial, funcionarios, source, onBack, onSav
               </Field>
               <div>
                 <span className="tr-label">Fotos e arquivos</span>
-                <AnexosSecao treinamentoId={draft.id || null} anexos={draft.anexos} source={source} disabled={lock} onChange={(anexos) => void anexosAlterados(anexos)} />
+                <AnexosSecao treinamentoId={draft.id || null} anexos={draft.anexos} source={source} disabled={lock} garantirId={garantirId} aposCriar={aposCriar} onChange={(anexos, id) => void anexosAlterados(anexos, id)} />
               </div>
             </div>
           </Surface>
