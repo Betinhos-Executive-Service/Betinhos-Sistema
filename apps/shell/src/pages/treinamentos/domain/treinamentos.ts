@@ -63,7 +63,10 @@ export const DESCRICAO_MAX = 1000
 export const CONTEUDO_MAX = 20000
 export const VIDEO_MAX = 500
 export const ANEXO_MAX_BYTES = 25 * 1024 * 1024
-export const ANEXO_TIPOS = ['application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation']
+// Vídeo vai pelo Flow de upload em base64 (+33%): 50 MB ficam abaixo do limite de 100 MB do gatilho HTTP.
+export const ANEXO_VIDEO_MAX_BYTES = 50 * 1024 * 1024
+export const ANEXO_VIDEO_TIPOS = ['video/mp4', 'video/quicktime', 'video/webm']
+export const ANEXO_TIPOS = [...ANEXO_VIDEO_TIPOS, 'application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation']
 export const NOTA_PADRAO = 70
 
 let seq = 0
@@ -79,10 +82,12 @@ export const emptyDraft = (): Treinamento => ({
 export const isPublicado = (item: Treinamento) => item.estado === ESTADO.publicado
 export const isVideoValido = (url: string) => { try { return new URL(url).protocol === 'https:' } catch { return false } }
 export const isImagem = (anexo: Anexo) => anexo.mime.startsWith('image/')
+export const isVideo = (anexo: Anexo) => anexo.mime.startsWith('video/')
 
 export function validarAnexo(file: File) {
-  if (!ANEXO_TIPOS.includes(file.type)) return 'Use PDF, imagem (PNG, JPG, GIF, WEBP), Word ou PowerPoint.'
+  if (!ANEXO_TIPOS.includes(file.type)) return 'Use PDF, imagem (PNG, JPG, GIF, WEBP), vídeo (MP4, MOV, WEBM), Word ou PowerPoint.'
   if (file.size === 0) return 'O arquivo está vazio.'
+  if (ANEXO_VIDEO_TIPOS.includes(file.type)) return file.size > ANEXO_VIDEO_MAX_BYTES ? 'O vídeo deve ter até 50 MB.' : null
   if (file.size > ANEXO_MAX_BYTES) return 'O arquivo deve ter até 25 MB.'
   return null
 }

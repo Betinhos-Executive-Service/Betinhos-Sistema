@@ -60,8 +60,13 @@ describe('anexos', () => {
   it('recusa acima de 25 MB, vazio e tipo fora da lista', () => {
     expect(validarAnexo(file(25 * 1024 * 1024 + 1))).toBe('O arquivo deve ter até 25 MB.')
     expect(validarAnexo(file(0))).toBe('O arquivo está vazio.')
-    expect(validarAnexo(file(10, 'video/mp4'))).toMatch(/Use PDF/)
+    expect(validarAnexo(file(10, 'application/zip'))).toMatch(/Use PDF/)
     expect(validarAnexo(file(10, 'image/jpeg'))).toBeNull()
+  })
+  it('aceita vídeo até 50 MB e recusa acima', () => {
+    expect(validarAnexo(file(40 * 1024 * 1024, 'video/mp4'))).toBeNull()
+    expect(validarAnexo(file(10, 'video/quicktime'))).toBeNull()
+    expect(validarAnexo(file(50 * 1024 * 1024 + 1, 'video/webm'))).toBe('O vídeo deve ter até 50 MB.')
   })
 })
 

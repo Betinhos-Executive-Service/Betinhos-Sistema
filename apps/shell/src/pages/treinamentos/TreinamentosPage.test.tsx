@@ -80,4 +80,20 @@ describe('Treinamentos', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('Selecione pelo menos um funcionário.')
     expect(screen.queryByRole('dialog')).toBeNull()
   })
+
+  it('anexa vídeo num treinamento novo: salva o rascunho sozinho e abre com o anexo', async () => {
+    render(<TreinamentosPage host={{ mode: 'mock' }} />)
+    await screen.findByRole('button', { name: /Embarque no GRU/ })
+    fireEvent.click(screen.getByRole('button', { name: 'Novo treinamento' }))
+    const input = (await screen.findByLabelText('Arquivos para anexar')) as HTMLInputElement
+    const video = new File(['x'], 'manobra.mp4', { type: 'video/mp4' })
+    // Rascunho incompleto: avisa o que falta e não envia.
+    fireEvent.change(input, { target: { files: [video] } })
+    expect((await screen.findByRole('alert')).textContent).toMatch(/título/i)
+    fireEvent.change(screen.getByLabelText(/^Título/), { target: { value: 'Manobras' } })
+    fireEvent.change(screen.getByLabelText(/^Texto/), { target: { value: 'Conteúdo' } })
+    fireEvent.change(input, { target: { files: [video] } })
+    expect(await screen.findByText('manobra.mp4')).toBeTruthy()
+    expect(screen.getByText(/Vídeo ·/)).toBeTruthy()
+  })
 })
