@@ -45,6 +45,13 @@ const baseModules = [
     disabled: false,
   },
   {
+    id: "treinamentos",
+    label: "Treinamentos",
+    detail: "Conteúdos do RH",
+    icon: "treinamentos",
+    disabled: false,
+  },
+  {
     id: "maintenancePhoto",
     label: "Manutenção",
     detail: "Solicitar reparo",
@@ -80,6 +87,7 @@ const screenAliases: Record<string, string[]> = {
   comunicados: ["comunicados"],
   checklists: ["checklists"],
   multas: ["multas"],
+  treinamentos: ["treinamentos"],
   services: ["servicos", "services", "Services", "serviços"],
   history: ["historico", "history", "History", "histórico"],
   maintenancePhoto: ["maintenancePhoto", "maintenance", "MaintenancePhoto", "manutencao", "manutenção"],
@@ -94,6 +102,7 @@ const moduleHandlers: Record<string, string[]> = {
   comunicados: [],
   checklists: [],
   multas: [],
+  treinamentos: [],
   services: [
     "onServices",
     "onService",
@@ -209,6 +218,7 @@ type InitialScreenProps = {
   pendingComunicados?: number;
   pendingChecklists?: number;
   pendingMultas?: number;
+  pendingTreinamentos?: number;
   /** "Você tem N multas para assinar · prazo até dd/mm"; null sem pendências. */
   multasBanner?: string | null;
   canGeneratePersonalReceipt?: boolean;
@@ -338,6 +348,11 @@ function ModuleIcon({ name }: { name: string }) {
     return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.5 22H18a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v9.5M14 2v5h5M13.4 12.6a2 2 0 1 1 2.8 2.8L10 21.6 6 22l.4-4 7-5.4Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" /></svg>;
   }
 
+  if (name === "treinamentos") {
+    // Lucide graduation-cap: conteúdo de formação.
+    return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.4 10.9 12.8 6.2a2 2 0 0 0-1.6 0L2.6 10.9a1 1 0 0 0 0 1.8l8.6 4.7a2 2 0 0 0 1.6 0l8.6-4.7a1 1 0 0 0 0-1.8ZM22 10v6M6 12.5V16a6 3 0 0 0 12 0v-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" /></svg>;
+  }
+
   if (name === "checklist") {
     // Lucide clipboard-check.
     return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1" fill="none" stroke="currentColor" strokeWidth="1.8" /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2m1 10 2 2 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" /></svg>;
@@ -414,6 +429,7 @@ export function InitialScreen(props: InitialScreenProps) {
     { id: "checklists", count: props.pendingChecklists ?? 0, text: (n: number) => `${n} checklist${plural(n)} pendente${plural(n)}` },
     { id: "multas", count: props.pendingMultas ?? 0, text: (n: number) => `${n} multa${plural(n)} para assinar${multasPrazo ? ` · ${multasPrazo}` : ""}` },
     { id: "comunicados", count: props.pendingComunicados ?? 0, text: (n: number) => `${n} comunicado${plural(n)} para ler` },
+    { id: "treinamentos", count: props.pendingTreinamentos ?? 0, text: (n: number) => `${n} treinamento${plural(n)} para fazer` },
   ];
   const pendingCounts: Record<string, number> = Object.fromEntries(pendingTypes.map((type) => [type.id, type.count]));
   const pendencias = pendingTypes

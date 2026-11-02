@@ -55,6 +55,8 @@ const ROUTES = {
   "checklist-formulario": { hash: "checklists", before: async (page) => { await page.locator(".agenda-hit").first().click(); await page.waitForTimeout(900); } },
   multas: { hash: "multas" },
   "multa-detalhe": { hash: "multas", before: async (page) => { await page.locator(".termo-row").first().click(); await page.waitForTimeout(1200); } },
+  treinamentos: { hash: "treinamentos" },
+  "treinamento-detalhe": { hash: "treinamentos", before: async (page) => { await page.locator(".trn-row").first().click(); await page.waitForTimeout(1200); } },
   manutencao: { hash: "manutencao" },
   colisoes: { hash: "colisoes" },
   "colisao-registro": { hash: "registro-colisao" },
