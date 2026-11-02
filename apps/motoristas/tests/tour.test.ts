@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   clearAllChaptersSeen,
   fitSpotlight,
+  missingRequiredSteps,
   hasSeenChapter,
   markChapterSeen,
   pickChapter,
@@ -160,6 +161,21 @@ test("destaque alto é recortado acima do cartão do rodapé; nos demais casos f
   assert.equal(fitSpotlight(alto, { side: "below", top: 600 }), alto);
   assert.equal(fitSpotlight(null, rodape), null);
   assert.equal(fitSpotlight({ top: 390, left: 0, width: 360, height: 100 }, rodape)?.height, 48);
+});
+
+test("missingRequiredSteps lista só os passos obrigatórios cujo elemento ainda não apareceu", () => {
+  const steps = TOUR_CHAPTERS.find((chapter) => chapter.id === "servicos")!.steps;
+  const obrigatorios = steps.filter((step) => !step.optional && step.target).map((step) => step.id);
+  assert.ok(obrigatorios.length >= 3);
+  assert.deepEqual(missingRequiredSteps(steps, () => true), []);
+  assert.deepEqual(missingRequiredSteps(steps, () => false), obrigatorios);
+  assert.deepEqual(missingRequiredSteps(steps, (step) => step.id !== "titulo"), ["titulo"]);
+});
+
+test("capítulos de telas mostradas ao passageiro não abrem sozinhos", () => {
+  for (const id of ["assinatura", "cobranca-qr", "camera", "foto-previa"]) {
+    assert.equal(TOUR_CHAPTERS.find((chapter) => chapter.id === id)?.auto, false, id);
+  }
 });
 
 test("sameBox compara por valor", () => {

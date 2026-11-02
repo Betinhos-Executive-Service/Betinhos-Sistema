@@ -12,7 +12,7 @@ type FormMenuProps = {
 export function FormMenu({ title, onBack, rightIcon, rightLabel, onRightClick }: FormMenuProps) {
   const hasHelp = Boolean(useTourHelp());
   return (
-    <header className="menu form-menu">
+    <header className="menu form-menu" data-help={hasHelp || undefined}>
       <button className="icon-button form-menu-button" aria-label="Voltar" disabled={!onBack} onClick={onBack}>
         <SystemIcon name="arrowLeft" />
       </button>

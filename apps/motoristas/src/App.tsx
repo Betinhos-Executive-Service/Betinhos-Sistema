@@ -14,9 +14,9 @@ import {
   STORAGE_KEY
 } from "./app/bootstrap";
 import { useHardwareBackGuard } from "./app/backGuard";
-import { clearAllChaptersSeen, hasSeenChapter, markChapterSeen, pickChapter, type TourChapter, type TourCloseReason } from "./app/tour";
+import { clearAllChaptersSeen, hasSeenChapter, markChapterSeen, missingRequiredSteps, pickChapter, type TourChapter, type TourCloseReason } from "./app/tour";
 import { tourChaptersForScreen } from "./app/tourChapters";
-import { hasTourProbe } from "./app/tourDom";
+import { findTourTarget, hasTourProbe } from "./app/tourDom";
 import { BuildStamp } from "./components/layout/BuildStamp";
 import {
   getScreenAfterQrPayment,
@@ -1389,22 +1389,34 @@ function App() {
 
   useEffect(() => {
     if (tourChapter || tourBlocked || !tourDriverId || dataLoading || criticalError || !tourCandidates.length) return;
-    const timer = window.setTimeout(() => {
+    // Listas e formulários carregam depois da tela: espera os elementos obrigatórios aparecerem (até ~6 s) em vez
+    // de abrir um guia pela metade e marcá-lo como visto.
+    let attempts = 0;
+    let timer = 0;
+    const tryOpen = () => {
       const chapter = pickChapter(tourCandidates, hasTourProbe);
       if (!chapter || chapter.auto === false) return;
       if (tourUnavailableRef.current.has(chapter.id) || hasSeenChapter(localStorage, tourDriverId, chapter.id)) return;
+      if (missingRequiredSteps(chapter.steps, (step) => Boolean(findTourTarget(step))).length) {
+        attempts += 1;
+        if (attempts < 8) timer = window.setTimeout(tryOpen, 700);
+        return;
+      }
       setTourChapter(chapter);
-    }, 700);
+    };
+    timer = window.setTimeout(tryOpen, 700);
     return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // screen/comunicadoOpen/checklistOpen/termoOpen não são lidos aqui: reiniciam o atraso quando a visão muda.
   }, [screen, comunicadoOpen, checklistOpen, termoOpen, tourChapter, tourBlocked, tourDriverId, dataLoading, criticalError, tourCandidates]);
 
   const closeTour = (reason: TourCloseReason) => {
     const closing = tourChapter;
     setTourChapter(null);
     if (!closing) return;
-    if (reason === "indisponivel") tourUnavailableRef.current.add(closing.id);
-    else if (tourDriverId) markChapterSeen(localStorage, tourDriverId, closing.id);
+    if (reason === "indisponivel") {
+      tourUnavailableRef.current.add(closing.id);
+      setToast("Ainda não há o que explicar nesta tela. Tente de novo em instantes.");
+    } else if (tourDriverId) markChapterSeen(localStorage, tourDriverId, closing.id);
   };
 
   const openTourHelp = useCallback(() => {

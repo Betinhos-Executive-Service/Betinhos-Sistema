@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import {
   fitSpotlight,
+  missingRequiredSteps,
   placeTourCard,
   resolveTourSteps,
   sameBox,
@@ -46,9 +47,8 @@ export function TourOverlay({ chapter, onClose }: TourOverlayProps) {
 
   // O overlay nasce com `key={chapter.id}`: o capítulo não muda, então os passos são resolvidos uma vez só.
   const [{ visibleSteps, skippedRequired }] = useState(() => {
-    const visible = resolveTourSteps(chapter.steps, (candidate) => Boolean(findTourTarget(candidate)));
-    const shown = new Set(visible);
-    return { visibleSteps: visible, skippedRequired: chapter.steps.filter((candidate) => !candidate.optional && !shown.has(candidate)).map((candidate) => candidate.id) };
+    const hasTarget = (candidate: TourStep) => Boolean(findTourTarget(candidate));
+    return { visibleSteps: resolveTourSteps(chapter.steps, hasTarget), skippedRequired: missingRequiredSteps(chapter.steps, hasTarget) };
   });
   const [index, setIndex] = useState(0);
   const [spotlight, setSpotlight] = useState<TourBox | null>(null);
@@ -196,7 +196,7 @@ export function TourOverlay({ chapter, onClose }: TourOverlayProps) {
         </div>
         <h2 id={titleId} className="tour-card-title">{step.title}</h2>
         <div id={textId} className="tour-card-text">
-          {step.text.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+          {step.text.map((paragraph, position) => <p key={position}>{paragraph}</p>)}
         </div>
         <div className="tour-card-actions">
           {isLast ? null : <ActionButton className="tour-skip" variant="ghost" label="Pular" onClick={() => onClose("pulado")} />}

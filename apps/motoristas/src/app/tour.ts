@@ -81,6 +81,12 @@ export function resolveTourSteps(steps: readonly TourStep[], hasTarget: (step: T
   });
 }
 
+/** Ids dos passos obrigatórios (não `optional`) cujo elemento ainda não está na tela. Vazio: o capítulo está pronto. */
+export function missingRequiredSteps(steps: readonly TourStep[], hasTarget: (step: TourStep) => boolean): string[] {
+  const present = new Set(resolveTourSteps(steps, hasTarget));
+  return steps.filter((step) => !step.optional && !present.has(step)).map((step) => step.id);
+}
+
 /** Primeiro capítulo candidato cujo `probe` existe; sem probe, o capítulo vale sempre. */
 export function pickChapter(candidates: readonly TourChapter[], hasProbe: (probe: string) => boolean): TourChapter | null {
   for (const chapter of candidates) {

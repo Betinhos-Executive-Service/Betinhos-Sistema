@@ -247,6 +247,8 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
   {
     id: "cobranca-qr",
     title: "Cobrança por QR code",
+    // Tela mostrada ao passageiro: o guia não abre sozinho na frente dele, só pelo botão "?".
+    auto: false,
     steps: [
       backStep("Antes de gerar o QR code ela volta ao passo anterior; depois de gerado, volta para o recebimento."),
       step("titulo", "Recebimento", [
@@ -336,6 +338,8 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
   {
     id: "assinatura",
     title: "Assinatura do passageiro",
+    // O passageiro assina nesta tela: o guia não abre sozinho na frente dele, só pelo botão "?".
+    auto: false,
     steps: [
       backStep("Volta ao formulário de voucher."),
       step("quadro", "Quadro de assinatura", [
