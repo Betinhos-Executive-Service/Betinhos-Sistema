@@ -272,7 +272,8 @@ export function installGlobalAppErrorLogger() {
     }) | null;
     if (resourceTarget && resourceTarget !== runtime) {
       const tagName = String(resourceTarget.tagName ?? "resource").toLowerCase();
-      const resourceUrl = String(resourceTarget.currentSrc ?? resourceTarget.src ?? resourceTarget.href ?? "").trim();
+      // Sem query nem hash: link assinado (sig, token) não pode ir para o log.
+      const resourceUrl = String(resourceTarget.currentSrc ?? resourceTarget.src ?? resourceTarget.href ?? "").trim().split(/[?#]/)[0];
       // data-error-quiet: recurso externo com fallback próprio na tela (ex.: foto de anexo no SharePoint); registra sem alertar.
       const quiet = Boolean(resourceTarget.hasAttribute?.("data-error-quiet"));
       reportAppError(new Error(`Falha ao carregar recurso ${tagName}: ${resourceUrl || "desconhecido"}`), {
