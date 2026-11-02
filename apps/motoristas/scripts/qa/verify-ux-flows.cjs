@@ -88,7 +88,7 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
   };
 
   await open("inicio", 300);
-  await page.evaluate(() => { localStorage.clear(); localStorage.setItem("app-motoristas-tour-v1:localhost-driver", "visto"); });
+  await page.evaluate(() => { localStorage.clear(); localStorage.setItem("app-motoristas-tour-v2:localhost-driver:*", "visto"); });
   await open("inicio");
 
   const stamp = await page.locator(".build-stamp").innerText();

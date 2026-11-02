@@ -129,3 +129,49 @@
     transition: none;
   }
 }
+
+/* Botão "?" dos cabeçalhos: mesmo tamanho dos botões vizinhos, sem peso visual extra. */
+.tour-help-button {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  padding: 0;
+  cursor: pointer;
+  color: #536174;
+}
+
+.tour-help-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.services-menu .services-menu-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.services-menu .services-menu-actions .tour-help-button {
+  width: 40px;
+  padding: 0;
+}
+
+.tour-help-button:focus-visible {
+  outline: 3px solid rgba(32, 118, 231, 0.55);
+  outline-offset: 2px;
+}
+
+/* Cartão com muito texto: nunca passa da tela e rola por dentro. */
+.tour-card {
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.tour-card-text p {
+  margin: 0 0 8px;
+}
+
+.tour-card-text p:last-child {
+  margin-bottom: 0;
+}

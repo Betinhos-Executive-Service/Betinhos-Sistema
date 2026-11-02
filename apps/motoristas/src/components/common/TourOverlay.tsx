@@ -5,32 +5,30 @@ import {
   spotlightBox,
   tourProgressLabel,
   type TourBox,
+  type TourChapter,
   type TourCloseReason,
   type TourStep
 } from "../../app/tour";
+import { findTourTarget } from "../../app/tourDom";
 import { ActionButton } from "./ActionButton";
 
 type TourOverlayProps = {
-  steps: readonly TourStep[];
+  chapter: TourChapter;
   onClose: (reason: TourCloseReason) => void;
 };
 
 const MEASURE_WINDOW_MS = 800;
 const FOCUSABLE = 'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
-function findAnchor(anchor: string) {
-  return document.querySelector<HTMLElement>(`[data-tour="${anchor}"]`);
-}
-
 function measure(element: HTMLElement): TourBox {
   const rect = element.getBoundingClientRect();
   return { top: rect.top, left: rect.left, width: rect.width, height: rect.height };
 }
 
-// Tour guiado com spotlight: escurece a tela, recorta o elemento real do passo e posiciona o
-// cartão abaixo ou acima dele. Modal (role=dialog); fecha com Pular/Concluir ou Esc (o Voltar do celular só
-// vira Esc fora do Início, onde o backGuard atua).
-export function TourOverlay({ steps, onClose }: TourOverlayProps) {
+// Tour guiado com spotlight: escurece a tela, recorta o elemento real do passo e posiciona o cartão
+// abaixo ou acima dele. Passo sem elemento alvo é um cartão centralizado. Modal (role=dialog); fecha com
+// Pular/Concluir ou Esc (o Voltar do celular só vira Esc fora do Início, onde o backGuard atua).
+export function TourOverlay({ chapter, onClose }: TourOverlayProps) {
   const titleId = useId();
   const textId = useId();
   const cardRef = useRef<HTMLElement>(null);
@@ -38,22 +36,23 @@ export function TourOverlay({ steps, onClose }: TourOverlayProps) {
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
-  // Quem abriu o tour (ex.: "Ver tour de novo") recebe o foco de volta ao fechar.
+  // Quem abriu o tour (ex.: o botão "?") recebe o foco de volta ao fechar.
   const [opener] = useState(() => document.activeElement as HTMLElement | null);
   useEffect(() => () => {
     if (opener && opener !== document.body && opener.isConnected) opener.focus({ preventScroll: true });
   }, [opener]);
 
-  const [visibleSteps] = useState(() => resolveTourSteps(steps, (anchor) => Boolean(findAnchor(anchor))));
+  const [visibleSteps] = useState(() => resolveTourSteps(chapter.steps, (candidate) => Boolean(findTourTarget(candidate))));
+  const skippedRequired = chapter.steps.filter((candidate) => !candidate.optional && !visibleSteps.includes(candidate)).map((candidate) => candidate.id);
   const [index, setIndex] = useState(0);
   const [spotlight, setSpotlight] = useState<TourBox | null>(null);
   const [cardHeight, setCardHeight] = useState(0);
 
   const total = visibleSteps.length;
-  const step = visibleSteps[index];
+  const step: TourStep | undefined = visibleSteps[index];
   const isLast = index === total - 1;
 
-  // Sem nenhuma âncora na tela não há o que mostrar: fecha sem marcar como visto.
+  // Sem nenhum passo na tela não há o que mostrar: fecha sem marcar como visto.
   useEffect(() => {
     if (total === 0) onCloseRef.current("indisponivel");
   }, [total]);
@@ -62,7 +61,12 @@ export function TourOverlay({ steps, onClose }: TourOverlayProps) {
   // a rolagem/animações por um curto período, depois só em scroll/resize. Elemento sumiu: avança sem erro.
   useLayoutEffect(() => {
     if (!step) return;
-    const element = findAnchor(step.anchor);
+    if (!step.target) {
+      setSpotlight(null);
+      if (cardRef.current) setCardHeight(cardRef.current.offsetHeight);
+      return;
+    }
+    const element = findTourTarget(step);
     if (!element) {
       if (index + 1 < total) setIndex(index + 1);
       else onCloseRef.current("concluido");
@@ -73,7 +77,8 @@ export function TourOverlay({ steps, onClose }: TourOverlayProps) {
     element.scrollIntoView({ block: "center", behavior: reduceMotion ? "auto" : "smooth" });
 
     const update = () => {
-      setSpotlight(spotlightBox(measure(element), { width: window.innerWidth, height: window.innerHeight }));
+      const current = findTourTarget(step) ?? element;
+      setSpotlight(spotlightBox(measure(current), { width: window.innerWidth, height: window.innerHeight }));
       // Girar a tela ou redimensionar muda a quebra de linha do texto: remede o cartão junto com o destaque.
       if (cardRef.current) setCardHeight(cardRef.current.offsetHeight);
     };
@@ -148,19 +153,29 @@ export function TourOverlay({ steps, onClose }: TourOverlayProps) {
   if (!step) return null;
 
   // Toda mudança de viewport passa por update() e já re-renderiza; basta ler a altura atual aqui.
-  const placement = placeTourCard(spotlight, cardHeight, window.innerHeight);
+  const placement = placeTourCard(step.target ? spotlight : null, cardHeight, window.innerHeight);
+  // Destaque mais alto que o espaço livre: o recorte termina acima do cartão, que nunca cobre a área destacada.
+  const visibleSpotlight = step.target && spotlight && placement.side === "bottom" && spotlight.top + spotlight.height > placement.top - 8
+    ? { ...spotlight, height: Math.max(48, placement.top - 8 - spotlight.top) }
+    : step.target ? spotlight : null;
   const advance = () => {
     if (isLast) onClose("concluido");
     else setIndex(index + 1);
   };
 
   return (
-    <div className="tour-root" data-tour-step={step.id}>
-      <div className={`tour-backdrop ${spotlight ? "" : "tour-backdrop--dim"}`.trim()} aria-hidden="true">
-        {spotlight ? (
+    <div
+      className="tour-root"
+      data-tour-chapter={chapter.id}
+      data-tour-step={step.id}
+      data-tour-total={total}
+      data-tour-skipped={skippedRequired.join(",") || undefined}
+    >
+      <div className={`tour-backdrop ${visibleSpotlight ? "" : "tour-backdrop--dim"}`.trim()} aria-hidden="true">
+        {visibleSpotlight ? (
           <div
             className="tour-spotlight"
-            style={{ top: spotlight.top, left: spotlight.left, width: spotlight.width, height: spotlight.height }}
+            style={{ top: visibleSpotlight.top, left: visibleSpotlight.left, width: visibleSpotlight.width, height: visibleSpotlight.height }}
           />
         ) : null}
       </div>
@@ -173,9 +188,13 @@ export function TourOverlay({ steps, onClose }: TourOverlayProps) {
         aria-labelledby={titleId}
         aria-describedby={textId}
       >
-        <div className="tour-card-progress" aria-live="polite">{tourProgressLabel(index, total)}</div>
+        <div className="tour-card-progress" aria-live="polite">
+          {tourProgressLabel(index, total)} · {chapter.title}
+        </div>
         <h2 id={titleId} className="tour-card-title">{step.title}</h2>
-        <p id={textId} className="tour-card-text">{step.text}</p>
+        <div id={textId} className="tour-card-text">
+          {step.text.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+        </div>
         <div className="tour-card-actions">
           {isLast ? null : <ActionButton className="tour-skip" variant="ghost" label="Pular" onClick={() => onClose("pulado")} />}
           {index > 0 ? <ActionButton className="tour-back" variant="secondary" label="Voltar" onClick={() => setIndex(index - 1)} /> : null}

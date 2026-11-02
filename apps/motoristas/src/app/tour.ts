@@ -1,102 +1,97 @@
-// Tour de primeiro acesso: passos ancorados em elementos reais da tela Início (atributo data-tour).
-// Lógica pura, sem DOM, para ser testável com node --test.
+// Tour guiado por capítulos: cada tela do App tem um capítulo com passos ancorados em elementos reais.
+// Lógica pura, sem DOM, para ser testável com node --test. A busca de elementos fica em tourDom.ts.
 
 export type TourStep = {
   id: string;
-  /** Valor do atributo data-tour do elemento destacado. */
-  anchor: string;
   title: string;
-  text: string;
+  /** Um parágrafo por item; cada um vira uma linha curta no cartão. */
+  text: readonly string[];
+  /** Seletor CSS do elemento destacado. Sem seletor, o passo é um cartão centralizado (introdução, resumo). */
+  target?: string;
+  /** Regex (sem flags, aplicada sem diferenciar maiúsculas) que o texto do elemento precisa casar. */
+  match?: string;
+  /** Amplia o destaque: "parent" usa o pai do elemento; qualquer outro valor é um seletor para closest(). */
+  within?: string;
+  /** Passo que só existe em certas situações (sem dado, outro tipo de serviço). Ausente: pulado sem erro. */
+  optional?: boolean;
+};
+
+export type TourChapter = {
+  id: string;
+  title: string;
+  /** Seletor que precisa existir para o capítulo valer (distingue lista de detalhe dentro da mesma tela). */
+  probe?: string;
+  /** false: só abre pelo botão "?" (ex.: câmera, onde um aviso automático atrapalharia). Padrão: true. */
+  auto?: boolean;
+  steps: readonly TourStep[];
 };
 
 export type TourCloseReason = "concluido" | "pulado" | "indisponivel";
 
-export const TOUR_STEPS: readonly TourStep[] = [
-  {
-    id: "servicos",
-    anchor: "servicos",
-    title: "Serviços do dia",
-    text: "Aqui ficam os serviços de hoje e de amanhã, com horário, passageiro e trajeto. Toque em um serviço para abrir o detalhe."
-  },
-  {
-    id: "etapas",
-    anchor: "servicos",
-    title: "Etapas e voucher",
-    text: "Dentro do serviço você registra cada etapa: Receber o passageiro, Finalizar e emitir o Voucher, que o passageiro assina na sua tela."
-  },
-  {
-    id: "troca-checklist",
-    anchor: "checklists",
-    title: "Troca de carro e checklist",
-    text: "A troca de carro entra na sua agenda como um serviço. Ao assumir um veículo, faça aqui a vistoria com fotos antes de sair."
-  },
-  {
-    id: "gastos",
-    anchor: "expenses",
-    title: "Gastos",
-    text: "Pedágio, combustível, estacionamento: fotografe o comprovante e registre o gasto por aqui, de preferência no mesmo dia."
-  },
-  {
-    id: "comunicados",
-    anchor: "comunicados",
-    title: "Comunicados",
-    text: "Avisos da operação chegam aqui. Alguns pedem ciência com assinatura, e o Início mostra quantos ainda estão pendentes."
-  },
-  {
-    id: "multas",
-    anchor: "multas",
-    title: "Multas",
-    text: "Termos de multa para assinar aparecem aqui, com o prazo. A assinatura é feita no próprio celular."
-  },
-  {
-    id: "manutencao",
-    anchor: "maintenancePhoto",
-    title: "Manutenção",
-    text: "Notou algo no carro? Solicite o reparo com foto e descrição. A equipe acompanha a partir daqui."
-  }
-];
+const TOUR_STORAGE_PREFIX = "app-motoristas-tour-v2";
+/** Capítulo coringa: marcado como visto, dispensa o guia inteiro (usado também pelos roteiros de QA). */
+export const TOUR_ALL_CHAPTERS = "*";
 
-const TOUR_STORAGE_PREFIX = "app-motoristas-tour-v1";
-
-// Preferência local por motorista: trocar de aparelho ou limpar o navegador faz o tour voltar.
-export function tourStorageKey(driverId: string) {
-  return `${TOUR_STORAGE_PREFIX}:${driverId}`;
+// Preferência local por motorista e por capítulo: trocar de aparelho ou limpar o navegador faz o tour voltar.
+export function tourStorageKey(driverId: string, chapterId: string) {
+  return `${TOUR_STORAGE_PREFIX}:${driverId}:${chapterId}`;
 }
 
-export function hasSeenTour(storage: Pick<Storage, "getItem">, driverId: string): boolean {
+export function hasSeenChapter(storage: Pick<Storage, "getItem">, driverId: string, chapterId: string): boolean {
   try {
-    return storage.getItem(tourStorageKey(driverId)) === "visto";
+    return storage.getItem(tourStorageKey(driverId, chapterId)) === "visto" || storage.getItem(tourStorageKey(driverId, TOUR_ALL_CHAPTERS)) === "visto";
   } catch {
     // Sem storage (modo privado restrito): tratar como visto para não insistir a cada abertura.
     return true;
   }
 }
 
-export function markTourSeen(storage: Pick<Storage, "setItem">, driverId: string): void {
+export function markChapterSeen(storage: Pick<Storage, "setItem">, driverId: string, chapterId: string): void {
   try {
-    storage.setItem(tourStorageKey(driverId), "visto");
+    storage.setItem(tourStorageKey(driverId, chapterId), "visto");
   } catch {
     // Sem storage não há o que persistir; o tour não pode bloquear o uso.
   }
 }
 
-export function clearTourSeen(storage: Pick<Storage, "removeItem">, driverId: string): void {
+/** "Ver tour de novo": apaga a marcação de todos os capítulos do motorista para o guia completo voltar. */
+export function clearAllChaptersSeen(storage: Pick<Storage, "length" | "key" | "removeItem">, driverId: string): void {
   try {
-    storage.removeItem(tourStorageKey(driverId));
+    const prefix = `${TOUR_STORAGE_PREFIX}:${driverId}:`;
+    const keys: string[] = [];
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index);
+      if (key?.startsWith(prefix)) keys.push(key);
+    }
+    keys.forEach((key) => storage.removeItem(key));
   } catch {
     // idem
   }
 }
 
-/** Mantém só os passos cujo elemento existe na tela atual; passo sem âncora é pulado sem erro. */
-export function resolveTourSteps(steps: readonly TourStep[], hasAnchor: (anchor: string) => boolean): TourStep[] {
+/** Mantém só os passos cujo elemento existe na tela atual; passo sem seletor sempre fica. */
+export function resolveTourSteps(steps: readonly TourStep[], hasTarget: (step: TourStep) => boolean): TourStep[] {
   return steps.filter((step) => {
+    if (!step.target) return true;
     try {
-      return hasAnchor(step.anchor);
+      return hasTarget(step);
     } catch {
       return false;
     }
   });
+}
+
+/** Primeiro capítulo candidato cujo `probe` existe; sem probe, o capítulo vale sempre. */
+export function pickChapter(candidates: readonly TourChapter[], hasProbe: (probe: string) => boolean): TourChapter | null {
+  for (const chapter of candidates) {
+    if (!chapter.probe) return chapter;
+    try {
+      if (hasProbe(chapter.probe)) return chapter;
+    } catch {
+      // seletor inválido: tenta o próximo
+    }
+  }
+  return null;
 }
 
 export type TourBox = { top: number; left: number; width: number; height: number };
@@ -110,12 +105,12 @@ export function spotlightBox(rect: TourBox, viewport: { width: number; height: n
   return { top, left, width: Math.max(0, right - left), height: Math.max(0, bottom - top) };
 }
 
-export type TourCardPlacement = { side: "below" | "above" | "bottom"; top: number };
+export type TourCardPlacement = { side: "below" | "above" | "bottom" | "center"; top: number };
 
 /**
  * Posição vertical do cartão: abaixo do destaque quando cabe, senão acima; se não couber em nenhum
- * lado, encosta no rodapé da viewport. O cartão nunca fica fora da tela, então o botão de avançar
- * está sempre visível.
+ * lado, encosta no rodapé da viewport. Sem destaque (passo de introdução), centraliza. O cartão nunca
+ * fica fora da tela, então o botão de avançar está sempre visível.
  */
 export function placeTourCard(
   spotlight: TourBox | null,
@@ -125,7 +120,7 @@ export function placeTourCard(
   margin = 12
 ): TourCardPlacement {
   const bottomTop = Math.max(margin, viewportHeight - margin - cardHeight);
-  if (!spotlight) return { side: "bottom", top: bottomTop };
+  if (!spotlight) return { side: "center", top: Math.max(margin, Math.round((viewportHeight - cardHeight) / 2)) };
 
   const belowTop = spotlight.top + spotlight.height + gap;
   if (belowTop + cardHeight + margin <= viewportHeight) return { side: "below", top: belowTop };

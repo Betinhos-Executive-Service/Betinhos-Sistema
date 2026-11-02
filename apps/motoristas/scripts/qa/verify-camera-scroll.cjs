@@ -37,7 +37,7 @@ const FLOWS = [
   const scroller = () => page.evaluate(() => { const s = [...document.querySelectorAll(".finalize-scroll")].pop(); return s ? { top: Math.round(s.scrollTop), max: s.scrollHeight - s.clientHeight } : null; });
   const results = [];
   await page.goto(`${BASE}#inicio`);
-  await page.evaluate(() => { localStorage.clear(); localStorage.setItem("app-motoristas-tour-v1:localhost-driver", "visto"); indexedDB.deleteDatabase("app-motoristas-media-drafts"); });
+  await page.evaluate(() => { localStorage.clear(); localStorage.setItem("app-motoristas-tour-v2:localhost-driver:*", "visto"); indexedDB.deleteDatabase("app-motoristas-media-drafts"); });
   for (const flow of FLOWS) {
     try {
       await page.goto(`${BASE}?t=${Date.now()}#${flow.hash}`);

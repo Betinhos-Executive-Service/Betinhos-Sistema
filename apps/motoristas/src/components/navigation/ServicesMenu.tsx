@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "motion/react";
 import { SystemIcon } from "../icons/SystemIcon";
 import { reportAppError } from "../../lib/appErrorLogger";
+import { TourHelpButton } from "../common/TourHelp";
 
 type ServicesMenuProps = {
   onHome: () => void;
@@ -56,6 +57,8 @@ export function ServicesMenu({ onHome, onRefresh, title = "Seus Serviços", eyeb
             <strong>{title}</strong>
           </motion.div>
 
+          <div className="services-menu-actions">
+          <TourHelpButton className="services-nav-button services-nav-button--refresh" />
           <motion.button
             className="services-nav-button services-nav-button--refresh"
             aria-label="Atualizar"
@@ -71,6 +74,7 @@ export function ServicesMenu({ onHome, onRefresh, title = "Seus Serviços", eyeb
               <SystemIcon name="refresh" />
             </motion.span>
           </motion.button>
+          </div>
         </motion.div>
       </div>
     </header>
