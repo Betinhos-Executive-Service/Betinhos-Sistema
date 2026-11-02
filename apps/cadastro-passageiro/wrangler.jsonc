@@ -12,6 +12,6 @@
   "ratelimits": [{ "name": "RATE_LIMITER", "namespace_id": "4201", "simple": { "limit": 60, "period": 60 } }],
   // Secret FLOW_URL: `wrangler secret put FLOW_URL` (URL SAS do flow HTTP). Sem ela, localhost responde mock.
   // Contato na tela de link vencido (dado público, não é secret): botões "Chamar no WhatsApp" e "Enviar e-mail".
-  // CONTATO_WHATSAPP só com dígitos, com 55 e DDD (11 assumido: o número informado veio sem DDD). Sem as vars, a tela só orienta.
-  "vars": { "CONTATO_WHATSAPP": "5511997236961", "CONTATO_EMAIL": "junior@betinhos.com.br" }
+  // CONTATO_WHATSAPP só com dígitos, com 55 e DDD (DDD 12, confirmado pelo Renan). Sem as vars, a tela só orienta.
+  "vars": { "CONTATO_WHATSAPP": "5512997236961", "CONTATO_EMAIL": "junior@betinhos.com.br" }
 }
