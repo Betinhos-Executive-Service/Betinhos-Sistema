@@ -173,6 +173,14 @@ async function carregar() {
 const lerSemFoto = (d) => ({ dataServico: d.dataServico, passageiros: d.passageiros.map(({ foto, ...r }) => r) });
 
 
+const movimentoReduzido = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// Quem tem algo digitado e não salvo (por passageiro). Avisa antes de fechar ou recarregar a página.
+const pendencias = new Map();
+addEventListener("beforeunload", (e) => {
+  if ([...pendencias.values()].some((tem) => tem())) { e.preventDefault(); e.returnValue = ""; }
+});
+
 function formatarData(iso) {
   const d = iso ? new Date(iso) : null;
   if (!d || isNaN(d)) return "";
@@ -194,25 +202,45 @@ const listaNatural = (itens) => (itens.length > 1 ? `${itens.slice(0, -1).join("
 const maiuscula = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 
 function renderLista({ passageiros, dataServico }) {
+  pendencias.clear();
   if (!passageiros.length) return estado("falta", "Nenhum passageiro neste link", "Fale com a equipe Betinhos para conferir o serviço.");
   const data = formatarData(dataServico);
   const um = passageiros.length === 1;
-  const progresso = el("div", { class: "progresso", role: "status" });
+  // Atualizado no lugar (sem recriar): os segmentos da barra animam a cor e o "Tudo pronto" entra uma vez só.
+  const texto = el("p", { class: "progresso-texto" });
+  const barra = um ? null : el("div", { class: "barra", "aria-hidden": "true" }, ...passageiros.map(() => el("span")));
+  const progresso = el("div", { class: "progresso", role: "status" }, texto, barra);
+  let final = null;
   const atualizarProgresso = () => {
     const feitos = passageiros.filter(completo).length;
-    progresso.replaceChildren(
-      feitos === passageiros.length
-        ? el("p", { class: "final" }, el("span", { class: "final-icone", html: ICONE.ok }), "Tudo pronto. Obrigado!")
-        : el("p", { class: "progresso-texto" }, `${feitos} de ${passageiros.length} completo${um ? "" : "s"}`),
-      um ? null : el("div", { class: "barra", "aria-hidden": "true" }, ...passageiros.map((p) => el("span", { class: completo(p) ? "feito" : "" }))),
-    );
+    if (feitos === passageiros.length) {
+      final ??= el("p", { class: "final" }, el("span", { class: "final-icone", html: ICONE.ok }), "Tudo pronto. Obrigado!");
+      if (!final.isConnected) progresso.replaceChildren(final, barra);
+    } else texto.textContent = `${feitos} de ${passageiros.length} completo${um ? "" : "s"}`;
+    barra?.childNodes.forEach((s, i) => s.classList.toggle("feito", completo(passageiros[i])));
+  };
+  // Depois de completar um passageiro, leva o próximo incompleto para a tela (só se estiver quase fora dela).
+  // Só quando este salvamento completou o passageiro; desiste se a pessoa rolou ou foi para outro campo nesse meio-tempo.
+  let timerProximo;
+  const irParaProximo = (card, completou) => {
+    clearTimeout(timerProximo);
+    if (!completou) return;
+    const y0 = scrollY;
+    timerProximo = setTimeout(() => {
+      const foco = document.activeElement;
+      if (Math.abs(scrollY - y0) > 40 || (foco && foco !== document.body && !card.contains(foco))) return;
+      let prox = card.nextElementSibling;
+      while (prox?.classList.contains("completo")) prox = prox.nextElementSibling;
+      if (!prox || prox.getBoundingClientRect().top < innerHeight * 0.7) return;
+      prox.scrollIntoView({ behavior: movimentoReduzido() ? "auto" : "smooth", block: "start" });
+    }, 900);
   };
   atualizarProgresso();
   app.replaceChildren(
     el("header", { class: "cabecalho" },
       el("div", {}, el("h1", {}, um ? "Passageiro" : "Passageiros"), data ? el("p", { class: "quando" }, data) : null),
       progresso),
-    el("div", { class: "lista" }, ...passageiros.map((p) => cardPassageiro(p, atualizarProgresso))),
+    el("div", { class: "lista" }, ...passageiros.map((p) => cardPassageiro(p, (card, completou) => { atualizarProgresso(); irParaProximo(card, completou); }))),
   );
 }
 
@@ -230,7 +258,7 @@ function cardPassageiro(p, aoSalvar) {
   const id = p.id;
   const nome = String(p.primeiroNome || "Passageiro");
   const st = {
-    foto: null, miniatura: null, fotoUrl: fotoAtual(p.foto), tel: "", mail: "",
+    foto: null, miniatura: null, fotoUrl: fotoAtual(p.foto), tel: "", mail: "", abrir: null, fotoChegou: false,
     editTel: !p.temTelefone, editMail: !p.temEmail, msg: null, salvando: false, erros: {},
     preparando: false, recem: new Set(), carregandoFoto: Boolean(p.temFoto && !p.foto), progresso: null,
   };
@@ -274,7 +302,7 @@ function cardPassageiro(p, aoSalvar) {
     const pend = pendentes();
     if (st.salvando) botao.replaceChildren(el("span", { class: "spinner pequeno", "aria-hidden": "true" }), st.progresso != null && st.progresso < 100 ? `Enviando… ${st.progresso}%` : "Salvando…");
     else botao.textContent = pend.length ? `Salvar ${listaNatural(pend)}` : "Salvar";
-    botao.classList.toggle("pronto", pend.length > 0);
+    botao.classList.toggle("pronto", pend.length > 0 || st.salvando);
   }
 
   function campoTexto(tipo) {
@@ -282,8 +310,8 @@ function cardPassageiro(p, aoSalvar) {
     const iid = `${tipo}-${id}`;
     const msgId = `${iid}-msg`;
     const input = el("input", ehTel
-      ? { type: "tel", inputmode: "tel", autocomplete: "tel", id: iid, placeholder: "(11) 98765-4321", "aria-describedby": msgId }
-      : { type: "email", inputmode: "email", autocomplete: "email", id: iid, placeholder: "nome@empresa.com.br", "aria-describedby": msgId });
+      ? { type: "tel", inputmode: "tel", enterkeyhint: "next", autocomplete: "tel", id: iid, placeholder: "(11) 98765-4321", "aria-describedby": msgId }
+      : { type: "email", inputmode: "email", enterkeyhint: "send", autocomplete: "email", id: iid, placeholder: "nome@empresa.com.br", "aria-describedby": msgId });
     input.value = ehTel ? st.tel : st.mail;
     const erroTxt = st.erros[tipo];
     if (erroTxt) input.setAttribute("aria-invalid", "true");
@@ -298,7 +326,13 @@ function cardPassageiro(p, aoSalvar) {
       }
       atualizarBotao();
     });
-    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); salvar(); } });
+    input.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      // No telefone válido com o e-mail ainda por preencher, Enter segue para o e-mail em vez de salvar pela metade.
+      const mail = ehTel && st.editMail && !st.mail.trim() && telefoneValido(st.tel) ? card.querySelector(`#mail-${id}`) : null;
+      if (mail) mail.focus(); else salvar();
+    });
     // Ao sair do campo: confirma o valor válido (borda verde) ou avisa o erro já, sem esperar o Salvar.
     input.addEventListener("blur", () => {
       const v = input.value.trim();
@@ -314,13 +348,21 @@ function cardPassageiro(p, aoSalvar) {
     return el("div", { class: "campo" }, el("label", { class: "sr-only", for: iid }, `${ehTel ? "Telefone" : "E-mail"} de ${nome}`), input, msg);
   }
 
+  // "abre" só na renderização do "Alterar"; sai no animationend e, por garantia, num timer (overflow cortaria o anel de foco).
+  function caixaDoCampo(tipo) {
+    const abrindo = st.abrir === tipo;
+    const caixa = el("div", { class: `campo-caixa${abrindo ? " abre" : ""}` }, campoTexto(tipo));
+    if (abrindo) setTimeout(() => caixa.classList.remove("abre"), 400);
+    return caixa;
+  }
+
   function linha({ rotulo, tem, valor, chave, tipo }) {
     const editando = chave && st[chave];
     let acao = null;
     if (chave && tem && !editando) {
       acao = el("button", {
         class: "btn-texto", type: "button", "aria-label": `Alterar ${rotulo.toLowerCase()} de ${nome}`,
-        onclick: () => { st[chave] = true; st.msg = null; render(`${tipo}-${id}`); },
+        onclick: () => { st[chave] = true; st.abrir = tipo; st.msg = null; render(`${tipo}-${id}`); },
       }, "Alterar");
     } else if (chave && tem && editando) {
       acao = el("button", {
@@ -333,7 +375,7 @@ function cardPassageiro(p, aoSalvar) {
         el("span", { class: "item-rotulo" }, rotulo),
         editando ? null : el("span", { class: "item-valor" }, valor),
         acao),
-      editando ? campoTexto(tipo) : null);
+      editando ? caixaDoCampo(tipo) : null);
   }
 
   // O toque cai direto no <input type=file> transparente sobre a foto: sem <label for> nem pointer-events:none,
@@ -341,7 +383,7 @@ function cardPassageiro(p, aoSalvar) {
   let fotoEl = null;
   function montarFoto() {
     const ocupada = st.preparando || (st.carregandoFoto && !st.fotoUrl);
-    return el("div", { class: `foto${st.fotoUrl ? " com-foto" : ""}${st.foto ? " nova" : ""}${st.preparando ? " preparando" : ocupada ? " carregando" : ""}${st.recem.has("foto") ? " recem" : ""}`, "aria-busy": ocupada ? "true" : null },
+    return el("div", { class: `foto${st.fotoUrl ? " com-foto" : ""}${st.fotoChegou ? " chegou" : ""}${st.foto ? " nova" : ""}${st.preparando ? " preparando" : ocupada ? " carregando" : ""}${st.recem.has("foto") ? " recem" : ""}`, "aria-busy": ocupada ? "true" : null },
       st.fotoUrl ? el("img", { src: st.fotoUrl, alt: "" }) : ocupada ? null : el("span", { class: "foto-vazia", html: ICONE.camera }),
       el("span", { class: "foto-acao", "aria-hidden": "true", html: ICONE.camera }),
       ocupada ? el("span", { class: "foto-carregando", "aria-hidden": "true" }, el("span", { class: "spinner pequeno" })) : null,
@@ -352,7 +394,9 @@ function cardPassageiro(p, aoSalvar) {
       st.carregandoFoto = false;
       if (f && !st.fotoUrl) st.fotoUrl = fotoAtual(f);
       // Troca só a foto: não redesenha o card, para não tirar o foco de quem está digitando.
+      st.fotoChegou = Boolean(st.fotoUrl);
       if (fotoEl?.isConnected) fotoEl.replaceWith(fotoEl = montarFoto());
+      st.fotoChegou = false;
       const legenda = card.querySelector(".foto-legenda");
       if (legenda && !st.foto && !st.preparando) legenda.textContent = "Toque na foto para trocar";
     });
@@ -380,7 +424,7 @@ function cardPassageiro(p, aoSalvar) {
         fotoBtn,
         el("div", { class: "card-id" },
           el("h2", { class: "nome", id: `nome-${id}` }, nome),
-          el("span", { class: `badge ${s.tipo}` }, s.texto),
+          el("span", { class: `badge ${s.tipo}${s.tipo === "ok" && st.recem.size ? " pop" : ""}` }, s.texto),
           el("p", { class: `foto-legenda${st.foto ? " nova" : ""}` }, legendaFoto))),
       el("ul", { class: "checklist", "aria-label": `Dados de ${nome}` },
         linha({ rotulo: "Telefone", tem: p.temTelefone, valor: valorTel, chave: "editTel", tipo: "tel" }),
@@ -388,6 +432,7 @@ function cardPassageiro(p, aoSalvar) {
       botao,
       montarAviso(),
     ].filter(Boolean));
+    st.abrir = null;
     if (focar) card.querySelector(`#${CSS.escape(focar)}`)?.focus();
   }
 
@@ -430,7 +475,7 @@ function cardPassageiro(p, aoSalvar) {
       st.msg = { tipo: "atencao", texto: "Toque na foto para adicionar." };
       return render(`foto-${id}`);
     }
-    const itens = pendentes();
+    const itens = pendentes(), eraCompleto = completo(p);
     st.salvando = true;
     st.msg = null;
     render();
@@ -462,7 +507,7 @@ function cardPassageiro(p, aoSalvar) {
       const plural = itens.length > 1 ? "salvos" : itens[0] === "foto" ? "salva" : "salvo";
       st.msg = { tipo: "ok", texto: `${maiuscula(listaNatural(itens))} ${plural}.` };
       render(`msg-${id}`);
-      aoSalvar();
+      aoSalvar(card, !eraCompleto && completo(p));
       return;
     }
     const erros = {
@@ -480,7 +525,11 @@ function cardPassageiro(p, aoSalvar) {
   }
 
   // O destaque de "acabou de salvar" vale só para a renderização seguinte ao sucesso.
-  card.addEventListener("animationend", (e) => { if (e.animationName === "destaque") st.recem.clear(); });
+  card.addEventListener("animationend", (e) => {
+    if (e.animationName === "destaque") st.recem.clear();
+    if (e.animationName === "abre-altura") e.target.classList.remove("abre"); // volta ao layout normal (sem overflow cortado)
+  });
+  pendencias.set(id, () => pendentes().length > 0);
   render();
   return card;
 }

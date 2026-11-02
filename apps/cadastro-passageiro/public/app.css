@@ -48,6 +48,9 @@ h1 { font-size: 20px; line-height: 25px; margin: 0; color: var(--navy-900); font
 .final { display: inline-flex; gap: 6px; align-items: center; font-weight: 700; color: var(--ok); animation: entra .22s var(--ease-out); }
 .final-icone { display: flex; }
 .final-icone svg { width: 18px; height: 18px; }
+/* O check se desenha uma vez quando tudo fica pronto */
+.final-icone svg path { stroke-dasharray: 10; stroke-dashoffset: 10; animation: traco .32s .12s var(--ease-out) forwards; }
+@keyframes traco { to { stroke-dashoffset: 0; } }
 
 /* Estados de página: carregando, link inválido, limite, falha */
 .estado { background: var(--white); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-surface); padding: 32px 20px; text-align: center; display: grid; gap: 12px; justify-items: center; }
@@ -124,7 +127,12 @@ input:focus-visible { outline: none; border-color: var(--blue-600); box-shadow: 
 input[aria-invalid=true] { border-color: var(--err); }
 .msg-campo { color: var(--slate-500); font-size: 12px; line-height: 17px; font-weight: 500; }
 .msg-campo:empty { display: none; }
-.msg-campo.erro { color: var(--err); font-weight: 700; }
+.msg-campo.erro { color: var(--err); font-weight: 700; animation: entra .16s var(--ease-out); }
+
+/* Campo que acabou de abrir ("Alterar"): a altura cresce em vez de empurrar a lista de uma vez */
+.campo-caixa.abre { display: grid; grid-template-rows: 1fr; animation: abre-altura .22s var(--ease-out); }
+.campo-caixa.abre > .campo { overflow: hidden; min-height: 0; }
+@keyframes abre-altura { from { grid-template-rows: 0fr; opacity: 0; } to { grid-template-rows: 1fr; opacity: 1; } }
 
 /* Esqueleto do carregamento: blocos neutros pulsando (sem gradiente) */
 .sk { display: block; background: var(--line); border-radius: var(--r-sm); animation: pulsa 1.2s ease-in-out infinite; }
@@ -146,7 +154,7 @@ input[aria-invalid=true] { border-color: var(--err); }
 .lista > .card:nth-child(2) { animation-delay: 50ms; }
 .lista > .card:nth-child(3) { animation-delay: 100ms; }
 .lista > .card:nth-child(n+4) { animation-delay: 150ms; }
-.card { transition: border-color .2s var(--ease-out); }
+.card { transition: border-color .2s var(--ease-out); scroll-margin-top: 12px; }
 .card.completo { border-color: color-mix(in srgb, var(--ok) 35%, var(--line)); }
 
 /* Destaque do que acabou de ser salvo */
@@ -154,12 +162,16 @@ input[aria-invalid=true] { border-color: var(--err); }
 .item.recem .item-valor { border-radius: var(--r-sm); }
 @keyframes destaque { 0%, 30% { background-color: var(--ok-bg); box-shadow: 0 0 0 4px var(--ok-bg); } 100% { background-color: transparent; box-shadow: 0 0 0 4px transparent; } }
 .badge { transition: background-color .2s var(--ease-out), color .2s var(--ease-out); }
+.badge.pop { animation: pop .26s var(--ease-out); }
+@keyframes pop { from { opacity: .4; transform: scale(.88); } to { opacity: 1; transform: none; } }
 
 /* Foto sendo preparada */
 .foto-carregando { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(255, 255, 255, .72); border-radius: inherit; z-index: 3; }
 .foto.preparando .foto-input { pointer-events: none; }
 .foto.carregando { border-style: solid; border-color: var(--line); }
 .foto.nova img { animation: entra .22s var(--ease-out); }
+.foto.chegou img { animation: aparece .28s var(--ease-out); }
+@keyframes aparece { from { opacity: 0; transform: scale(1.03); } to { opacity: 1; transform: none; } }
 
 /* Campo validado ao sair */
 input.valido { border-color: var(--ok); }
@@ -173,7 +185,10 @@ input.valido { border-color: var(--ok); }
 .btn:active:not(:disabled) { transform: scale(.97); }
 .btn:focus-visible { outline: 2px solid var(--blue-600); outline-offset: 2px; }
 .btn.primario { background: var(--navy-900); border-color: var(--navy-900); color: var(--white); }
-@media (hover: hover) and (pointer: fine) { .btn.primario:hover { background: var(--navy-800); } }
+/* Sem nada para salvar o botão fica discreto; ao digitar ou escolher a foto ele ganha o destaque (transição na cor) */
+.card .btn.primario:not(.pronto) { background: var(--white); border-color: var(--line); color: var(--ink-900); }
+.btn.primario { transition: background-color .18s var(--ease-out), border-color .18s var(--ease-out), color .18s var(--ease-out), transform .14s var(--ease-out); }
+@media (hover: hover) and (pointer: fine) { .btn.primario:hover { background: var(--navy-800); } .card .btn.primario:not(.pronto):hover { background: var(--soft); } }
 .btn:disabled { opacity: .7; cursor: progress; }
 .spinner.pequeno { width: 16px; height: 16px; border-width: 2px; border-color: rgba(255, 255, 255, .35); border-top-color: var(--white); animation-duration: .6s; }
 .foto-carregando .spinner.pequeno { border-color: var(--line); border-top-color: var(--blue-600); }
