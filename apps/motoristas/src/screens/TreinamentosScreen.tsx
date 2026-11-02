@@ -66,9 +66,10 @@ const Conteudo = memo(function Conteudo({ texto }: { texto: string }) {
 });
 
 const ArquivoVideo = memo(function ArquivoVideo({ src, titulo }: { src: string; titulo: string }) {
-  const [falhou, setFalhou] = useState(false);
-  if (falhou) return <a className="trn-link" href={src} target="_blank" rel="noopener noreferrer">O vídeo não carregou aqui. Toque para abrir.</a>;
-  return <video src={src} title={titulo} controls playsInline preload="metadata" data-error-quiet="" onError={() => setFalhou(true)} />;
+  const [srcComFalha, setSrcComFalha] = useState<string | null>(null);
+  if (srcComFalha !== null && srcComFalha === src) return <a className="trn-link" href={src} target="_blank" rel="noopener noreferrer">O vídeo não carregou aqui. Toque para abrir.</a>;
+  // Falhou ao carregar (readyState 0) ou o arquivo não decodifica: mostra o link. Só queda de rede no meio da reprodução mantém o player e a posição.
+  return <video src={src} title={titulo} controls playsInline preload="metadata" data-error-quiet="" onError={(e) => { const v = e.currentTarget; if (v.readyState === 0 || v.error?.code !== MediaError.MEDIA_ERR_NETWORK) setSrcComFalha(src); }} />;
 });
 
 const Video = memo(function Video({ url }: { url: string }) {
