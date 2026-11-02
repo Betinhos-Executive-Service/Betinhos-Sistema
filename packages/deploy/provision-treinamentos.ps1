@@ -9,8 +9,7 @@
 # Arquivo salvo com BOM: o Windows PowerShell 5.1 precisa dele para ler os rotulos acentuados.
 
 $ErrorActionPreference = "Stop"
-# Os rotulos acentuados e o BOM dependem do Windows PowerShell 5.1 (pwsh le o arquivo de outro jeito).
-if ($PSVersionTable.PSEdition -ne "Desktop") { throw "Rode com powershell.exe (Windows PowerShell 5.1)." }
+# No Windows use powershell.exe (5.1). No Linux/macOS rode com pwsh 7 e informe DV_ACCESS_TOKEN (ver packages/deploy/dv-token.mjs); o arquivo tem BOM e o pwsh 7 le UTF-8 normalmente.
 Set-StrictMode -Version Latest
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 
@@ -47,9 +46,11 @@ $SolutionUniqueName = Get-Setting "DV_SOLUTION"
 if ([string]::IsNullOrWhiteSpace($SolutionUniqueName)) { throw "DV_SOLUTION ausente no .env." }
 $clientId = Get-Setting "DV_CLIENT_ID"
 $clientGuid = [Guid]::Empty
-if (-not [Guid]::TryParse($clientId, [ref] $clientGuid)) { throw "DV_CLIENT_ID ausente ou invalido no .env." }
+if ([string]::IsNullOrWhiteSpace((Get-Setting "DV_ACCESS_TOKEN")) -and -not [Guid]::TryParse($clientId, [ref] $clientGuid)) { throw "DV_CLIENT_ID ausente ou invalido no .env (ou informe DV_ACCESS_TOKEN)." }
 
 function Get-AccessToken {
+  $pronto = Get-Setting "DV_ACCESS_TOKEN"
+  if (-not [string]::IsNullOrWhiteSpace($pronto)) { return $pronto }
   $secret = Get-Setting "DV_CLIENT_SECRET"
   if (-not [string]::IsNullOrWhiteSpace($secret)) {
     $tenant = Get-Setting "DV_TENANT_ID"

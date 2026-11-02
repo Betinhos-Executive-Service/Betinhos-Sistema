@@ -42,8 +42,9 @@ $triggerFilter = 'cr40f_status eq 100000000'
 $LIMITE_DIARIO = 20
 if (([Uri]$environmentUrl).Host -ne 'org23b93544.crm2.dynamics.com') { throw 'Somente DEV.' }
 
-$dvToken = & az account get-access-token --resource "$environmentUrl/" --query accessToken -o tsv
-if ($LASTEXITCODE -ne 0 -or -not $dvToken) { throw 'Token do Dataverse DEV indisponível (rode az login).' }
+# Linux/macOS: DV_ACCESS_TOKEN (node packages/deploy/dv-token.mjs token <url do ambiente>); no Windows segue o az login.
+$dvToken = if ($env:DV_ACCESS_TOKEN) { $env:DV_ACCESS_TOKEN } else { & az account get-access-token --resource "$environmentUrl/" --query accessToken -o tsv }
+if (-not $dvToken) { throw 'Token do Dataverse DEV indisponível (rode az login ou informe DV_ACCESS_TOKEN).' }
 $headers = @{ Authorization = "Bearer $dvToken"; Accept = 'application/json'; 'OData-Version' = '4.0'; 'OData-MaxVersion' = '4.0'; 'MSCRM.SolutionUniqueName' = $solutionName }
 
 function Dv([string] $Method, [string] $Path, $Body = $null) {
@@ -615,7 +616,7 @@ function Conferir($lido) {
     'Texto_usuario com prefixo e decodeUriComponent' = $a.Texto_usuario.inputs.Contains("concat('$prefixoExpr', string(variables('Contexto')))")
     'Definir_system_* com o texto exato dos prompts' = $promptsOk
     'Definir_tipos_*/Definir_acoes_* iguais às constantes' = $listasAgenteOk
-    'Mapa_tipos com 21 chaves' = @($a.Mapa_tipos.inputs.PSObject.Properties).Count -eq 21
+    'Mapa_tipos com todas as chaves de tiposOrdem' = @($a.Mapa_tipos.inputs.PSObject.Properties).Count -eq @($const.tiposOrdem).Count
     'Limite diário de 20' = $a.Limite_diario.expression.and[0].greaterOrEquals[1] -eq $LIMITE_DIARIO -and $a.Limite_diario.actions.Motivo_limite.inputs.value -ceq "Limite diário de $LIMITE_DIARIO execuções deste agente atingido."
     'Tratar_erro após Failed/TimedOut' = (@($erro.runAfter.Escopo_execucao) -join ',') -eq 'Failed,TimedOut'
     'Tratar_erro grava Erro (100000003)' = $erro.actions.Gravar_erro.inputs.parameters.'item/cr40f_status' -eq 100000003
@@ -639,8 +640,8 @@ if ($flows.Count -gt 1) { throw 'Flow duplicado no DEV.' }
 if ($SomenteValidar) {
   # Validação do Power Automate (checkFlowErrors) sobre a definição montada, sem gravar nada.
   if (-not $flows.Count) { throw 'Flow ainda não existe no DEV; não há o que validar.' }
-  $flowToken = & az account get-access-token --resource https://service.flow.microsoft.com/ --query accessToken -o tsv
-  if (-not $flowToken) { throw 'Token do Power Automate indisponível.' }
+  $flowToken = if ($env:FLOW_ACCESS_TOKEN) { $env:FLOW_ACCESS_TOKEN } else { & az account get-access-token --resource https://service.flow.microsoft.com/ --query accessToken -o tsv }
+  if (-not $flowToken) { throw 'Token do Power Automate indisponível (rode az login ou informe FLOW_ACCESS_TOKEN).' }
   $flowApi = "https://api.flow.microsoft.com/providers/Microsoft.ProcessSimple/environments/$environmentId/flows/$($flows[0].workflowid)"
   $props = (Invoke-RestMethod -Uri "$flowApi`?api-version=2016-11-01&`$expand=properties.definition,properties.connectionreferences" -Headers @{ Authorization = "Bearer $flowToken" }).properties
   $props.definition = $definition
