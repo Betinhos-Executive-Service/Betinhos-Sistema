@@ -112,7 +112,7 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
       step("atualizar", "Atualizar", [
         "Recarrega agora a agenda e os avisos. O ícone gira enquanto busca.",
         "A lista também se atualiza sozinha a cada minuto, e você pode puxá-la para baixo para atualizar."
-      ], { target: ".services-nav-button--refresh:not(.tour-help-button)" }),
+      ], { target: ".services-nav-button--refresh" }),
       step("comunicados", "Comunicados pendentes", [
         "Os avisos que esperam sua ciência aparecem aqui em cima, em linhas compactas, com o tipo: \"assinatura obrigatória\" ou \"informativo\".",
         "Toque para abrir e dar ciência."
@@ -503,7 +503,7 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
       step("cartao", "Serviço finalizado", [
         "Cada cartão mostra horário, tipo (serviço, troca, manutenção) e trajeto. Toque para ver o detalhe, que é só consulta."
       ], { target: ".agenda-card:not(.header)", optional: true }),
-      step("atualizar", "Atualizar", ["Recarrega o histórico agora."], { target: ".services-nav-button--refresh:not(.tour-help-button)" }),
+      step("atualizar", "Atualizar", ["Recarrega o histórico agora."], { target: ".services-nav-button--refresh" }),
       helpStep()
     ]
   },
@@ -524,7 +524,7 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
     title: "Comunicados",
     steps: [
       step("voltar", "Voltar", ["Volta para a tela anterior."], { target: SERVICE_HOME }),
-      step("atualizar", "Atualizar", ["Busca novos comunicados agora."], { target: ".services-nav-button--refresh:not(.tour-help-button)" }),
+      step("atualizar", "Atualizar", ["Busca novos comunicados agora."], { target: ".services-nav-button--refresh" }),
       step("pendentes", "Aguardando sua ciência", [
         "Os comunicados que ainda aguardam a sua ciência. O número ao lado do título é quantos faltam.",
         "Toque em um para ler e dar ciência."
@@ -562,7 +562,7 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
     title: "Checklists",
     steps: [
       step("voltar", "Voltar", ["Volta para a tela anterior."], { target: SERVICE_HOME }),
-      step("atualizar", "Atualizar", ["Busca novos checklists agora."], { target: ".services-nav-button--refresh:not(.tour-help-button)" }),
+      step("atualizar", "Atualizar", ["Busca novos checklists agora."], { target: ".services-nav-button--refresh" }),
       step("pendentes", "Para fazer", [
         "As vistorias que esperam por você, com o veículo e quem entregou o carro. A operação pede uma vistoria do seu carro a cada 15 dias e avisa por notificação."
       ], { target: "h2", match: "para fazer", optional: true }),

@@ -1375,13 +1375,17 @@ function App() {
   const tourBlocked = Boolean(vehicleChoiceRequest || remoteOperation || expenseSend);
   // Sub-estados dentro da mesma tela (ler comunicado, preencher checklist) também disparam o capítulo certo.
   const [tourTermoId, setTourTermoId] = useState("");
-  const tourContextKey = `${screen}|${selectedComunicadoId ? 1 : 0}|${selectedChecklistId ? 1 : 0}|${tourTermoId ? 1 : 0}`;
+  const comunicadoOpen = Boolean(selectedComunicadoId);
+  const checklistOpen = Boolean(selectedChecklistId);
+  const termoOpen = Boolean(tourTermoId);
 
+  // Mudou a tela ou o sub-estado (abrir um comunicado, um termo): o capítulo aberto e os descartes valem só para a visão anterior.
   useEffect(() => {
     tourUnavailableRef.current.clear();
     setTourChapter(null);
-    setTourTermoId("");
-  }, [screen]);
+  }, [screen, comunicadoOpen, checklistOpen, termoOpen]);
+
+  useEffect(() => setTourTermoId(""), [screen]);
 
   useEffect(() => {
     if (tourChapter || tourBlocked || !tourDriverId || dataLoading || criticalError || !tourCandidates.length) return;
@@ -1393,7 +1397,7 @@ function App() {
     }, 700);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tourContextKey, tourChapter, tourBlocked, tourDriverId, dataLoading, criticalError, tourCandidates]);
+  }, [screen, comunicadoOpen, checklistOpen, termoOpen, tourChapter, tourBlocked, tourDriverId, dataLoading, criticalError, tourCandidates]);
 
   const closeTour = (reason: TourCloseReason) => {
     const closing = tourChapter;
@@ -1403,10 +1407,10 @@ function App() {
     else if (tourDriverId) markChapterSeen(localStorage, tourDriverId, closing.id);
   };
 
-  const openTourHelp = () => {
+  const openTourHelp = useCallback(() => {
     const chapter = pickChapter(tourCandidates, hasTourProbe);
     if (chapter) setTourChapter(chapter);
-  };
+  }, [tourCandidates]);
 
   // "Ver tour de novo": o guia completo volta, começando pelo Início, e os capítulos das telas voltam a abrir.
   const restartTour = () => {
@@ -1556,7 +1560,7 @@ function App() {
   }, [isLocalhostRuntime, remoteMode, screen]);
 
   const show = (node: React.ReactNode) => (
-    <TourHelpContext.Provider value={tourCandidates.length ? { open: openTourHelp } : null}>
+    <TourHelpContext.Provider value={tourCandidates.length ? openTourHelp : null}>
       <AnimatePresence mode="wait">
         <motion.div
           key={screen}

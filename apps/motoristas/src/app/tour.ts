@@ -105,6 +105,17 @@ export function spotlightBox(rect: TourBox, viewport: { width: number; height: n
   return { top, left, width: Math.max(0, right - left), height: Math.max(0, bottom - top) };
 }
 
+export function sameBox(a: TourBox | null, b: TourBox | null) {
+  return a === b || (a !== null && b !== null && a.top === b.top && a.left === b.left && a.width === b.width && a.height === b.height);
+}
+
+/** Destaque mais alto que o espaço livre: o recorte termina acima do cartão, que nunca cobre a área destacada. */
+export function fitSpotlight(spotlight: TourBox | null, placement: TourCardPlacement, gap = 8, minHeight = 48): TourBox | null {
+  if (!spotlight || placement.side !== "bottom") return spotlight;
+  if (spotlight.top + spotlight.height <= placement.top - gap) return spotlight;
+  return { ...spotlight, height: Math.max(minHeight, placement.top - gap - spotlight.top) };
+}
+
 export type TourCardPlacement = { side: "below" | "above" | "bottom" | "center"; top: number };
 
 /**
@@ -119,7 +130,6 @@ export function placeTourCard(
   gap = 12,
   margin = 12
 ): TourCardPlacement {
-  const bottomTop = Math.max(margin, viewportHeight - margin - cardHeight);
   if (!spotlight) return { side: "center", top: Math.max(margin, Math.round((viewportHeight - cardHeight) / 2)) };
 
   const belowTop = spotlight.top + spotlight.height + gap;
@@ -128,7 +138,7 @@ export function placeTourCard(
   const aboveTop = spotlight.top - gap - cardHeight;
   if (aboveTop >= margin) return { side: "above", top: aboveTop };
 
-  return { side: "bottom", top: bottomTop };
+  return { side: "bottom", top: Math.max(margin, viewportHeight - margin - cardHeight) };
 }
 
 export function tourProgressLabel(index: number, total: number) {

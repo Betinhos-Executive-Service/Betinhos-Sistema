@@ -3,12 +3,14 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   clearAllChaptersSeen,
+  fitSpotlight,
   hasSeenChapter,
   markChapterSeen,
   pickChapter,
   placeTourCard,
   TOUR_ALL_CHAPTERS,
   resolveTourSteps,
+  sameBox,
   spotlightBox,
   tourProgressLabel,
   tourStorageKey,
@@ -148,6 +150,23 @@ test("cartão fica abaixo quando cabe, acima quando não cabe, no rodapé quando
   const placement = placeTourCard({ top: 60, left: 0, width: 360, height: 500 }, 220, viewportHeight);
   assert.equal(placement.side, "bottom");
   assert.ok(placement.top + 220 <= viewportHeight);
+});
+
+test("destaque alto é recortado acima do cartão do rodapé; nos demais casos fica como está", () => {
+  const alto = { top: 60, left: 0, width: 360, height: 500 };
+  const rodape = { side: "bottom" as const, top: 400 };
+  assert.deepEqual(fitSpotlight(alto, rodape), { top: 60, left: 0, width: 360, height: 332 });
+  assert.deepEqual(fitSpotlight({ top: 60, left: 0, width: 360, height: 100 }, rodape), { top: 60, left: 0, width: 360, height: 100 });
+  assert.equal(fitSpotlight(alto, { side: "below", top: 600 }), alto);
+  assert.equal(fitSpotlight(null, rodape), null);
+  assert.equal(fitSpotlight({ top: 390, left: 0, width: 360, height: 100 }, rodape)?.height, 48);
+});
+
+test("sameBox compara por valor", () => {
+  assert.equal(sameBox({ top: 1, left: 2, width: 3, height: 4 }, { top: 1, left: 2, width: 3, height: 4 }), true);
+  assert.equal(sameBox({ top: 1, left: 2, width: 3, height: 4 }, { top: 1, left: 2, width: 3, height: 5 }), false);
+  assert.equal(sameBox(null, null), true);
+  assert.equal(sameBox(null, { top: 0, left: 0, width: 0, height: 0 }), false);
 });
 
 test("rótulo de progresso em pt-BR", () => {

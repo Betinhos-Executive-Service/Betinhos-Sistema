@@ -44,6 +44,10 @@
   box-shadow: 0 18px 54px rgba(0, 14, 35, 0.26);
   transition: top 240ms cubic-bezier(0.23, 1, 0.32, 1);
   animation: tour-card-enter 220ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  /* Cartão com muito texto: nunca passa da tela e rola por dentro. */
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* Primeira pintura: o cartão é medido invisível para já aparecer na posição certa, sem salto. */
@@ -153,19 +157,11 @@
 
 .services-menu .services-menu-actions .tour-help-button {
   width: 40px;
-  padding: 0;
 }
 
 .tour-help-button:focus-visible {
   outline: 3px solid rgba(32, 118, 231, 0.55);
   outline-offset: 2px;
-}
-
-/* Cartão com muito texto: nunca passa da tela e rola por dentro. */
-.tour-card {
-  max-height: calc(100dvh - 24px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
 }
 
 .tour-card-text p {

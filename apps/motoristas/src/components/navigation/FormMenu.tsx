@@ -1,5 +1,4 @@
-import { useContext } from "react";
-import { TourHelpButton, TourHelpContext } from "../common/TourHelp";
+import { TourHelpButton, useTourHelp } from "../common/TourHelp";
 import { SystemIcon, type SystemIconName } from "../icons/SystemIcon";
 
 type FormMenuProps = {
@@ -11,7 +10,7 @@ type FormMenuProps = {
 };
 
 export function FormMenu({ title, onBack, rightIcon, rightLabel, onRightClick }: FormMenuProps) {
-  const hasHelp = Boolean(useContext(TourHelpContext));
+  const hasHelp = Boolean(useTourHelp());
   return (
     <header className="menu form-menu">
       <button className="icon-button form-menu-button" aria-label="Voltar" disabled={!onBack} onClick={onBack}>

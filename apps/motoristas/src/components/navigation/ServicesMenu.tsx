@@ -58,7 +58,7 @@ export function ServicesMenu({ onHome, onRefresh, title = "Seus Serviços", eyeb
           </motion.div>
 
           <div className="services-menu-actions">
-          <TourHelpButton className="services-nav-button services-nav-button--refresh" />
+          <TourHelpButton className="services-nav-button" />
           <motion.button
             className="services-nav-button services-nav-button--refresh"
             aria-label="Atualizar"

@@ -32,7 +32,7 @@ export function DetailsMenu({ title, onBack, onCopy }: DetailsMenuProps) {
         <span>Detalhes</span>
         <strong>{title}</strong>
       </div>
-      <TourHelpButton className="icon-button details-copy details-help" />
+      <TourHelpButton className="icon-button details-copy" />
       <motion.button
         className={`icon-button details-copy copy-button ${copied ? "copied" : ""}`}
         aria-label={copied ? "Copiado" : "Copiar"}

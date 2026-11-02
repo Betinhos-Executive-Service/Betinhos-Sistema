@@ -1,16 +1,18 @@
 import { createContext, useContext } from "react";
 import { SystemIcon } from "../icons/SystemIcon";
 
-// Contexto do botão "?" dos cabeçalhos: só existe valor quando a tela atual tem um capítulo do tour.
-export type TourHelpValue = { open: () => void } | null;
+// Contexto do botão "?" dos cabeçalhos: o valor é a função que abre o capítulo, e só existe quando a tela atual tem um.
+export const TourHelpContext = createContext<(() => void) | null>(null);
 
-export const TourHelpContext = createContext<TourHelpValue>(null);
+export function useTourHelp() {
+  return useContext(TourHelpContext);
+}
 
 export function TourHelpButton({ className = "" }: { className?: string }) {
-  const help = useContext(TourHelpContext);
-  if (!help) return null;
+  const openHelp = useTourHelp();
+  if (!openHelp) return null;
   return (
-    <button type="button" className={`tour-help-button ${className}`.trim()} aria-label="Ajuda desta tela" onClick={help.open}>
+    <button type="button" className={`tour-help-button ${className}`.trim()} aria-label="Ajuda desta tela" onClick={openHelp}>
       <SystemIcon name="help" />
     </button>
   );

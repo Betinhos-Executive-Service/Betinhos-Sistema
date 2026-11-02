@@ -1,7 +1,9 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import {
+  fitSpotlight,
   placeTourCard,
   resolveTourSteps,
+  sameBox,
   spotlightBox,
   tourProgressLabel,
   type TourBox,
@@ -42,8 +44,12 @@ export function TourOverlay({ chapter, onClose }: TourOverlayProps) {
     if (opener && opener !== document.body && opener.isConnected) opener.focus({ preventScroll: true });
   }, [opener]);
 
-  const [visibleSteps] = useState(() => resolveTourSteps(chapter.steps, (candidate) => Boolean(findTourTarget(candidate))));
-  const skippedRequired = chapter.steps.filter((candidate) => !candidate.optional && !visibleSteps.includes(candidate)).map((candidate) => candidate.id);
+  // O overlay nasce com `key={chapter.id}`: o capítulo não muda, então os passos são resolvidos uma vez só.
+  const [{ visibleSteps, skippedRequired }] = useState(() => {
+    const visible = resolveTourSteps(chapter.steps, (candidate) => Boolean(findTourTarget(candidate)));
+    const shown = new Set(visible);
+    return { visibleSteps: visible, skippedRequired: chapter.steps.filter((candidate) => !candidate.optional && !shown.has(candidate)).map((candidate) => candidate.id) };
+  });
   const [index, setIndex] = useState(0);
   const [spotlight, setSpotlight] = useState<TourBox | null>(null);
   const [cardHeight, setCardHeight] = useState(0);
@@ -61,11 +67,7 @@ export function TourOverlay({ chapter, onClose }: TourOverlayProps) {
   // a rolagem/animações por um curto período, depois só em scroll/resize. Elemento sumiu: avança sem erro.
   useLayoutEffect(() => {
     if (!step) return;
-    if (!step.target) {
-      setSpotlight(null);
-      if (cardRef.current) setCardHeight(cardRef.current.offsetHeight);
-      return;
-    }
+    if (!step.target) return;
     const element = findTourTarget(step);
     if (!element) {
       if (index + 1 < total) setIndex(index + 1);
@@ -76,9 +78,12 @@ export function TourOverlay({ chapter, onClose }: TourOverlayProps) {
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     element.scrollIntoView({ block: "center", behavior: reduceMotion ? "auto" : "smooth" });
 
+    let current = element;
     const update = () => {
-      const current = findTourTarget(step) ?? element;
-      setSpotlight(spotlightBox(measure(current), { width: window.innerWidth, height: window.innerHeight }));
+      // Só procura de novo se o elemento saiu da tela (a lista re-renderizou); senão apenas mede.
+      if (!current.isConnected) current = findTourTarget(step) ?? current;
+      const next = spotlightBox(measure(current), { width: window.innerWidth, height: window.innerHeight });
+      setSpotlight((previous) => (sameBox(previous, next) ? previous : next));
       // Girar a tela ou redimensionar muda a quebra de linha do texto: remede o cartão junto com o destaque.
       if (cardRef.current) setCardHeight(cardRef.current.offsetHeight);
     };
@@ -153,11 +158,9 @@ export function TourOverlay({ chapter, onClose }: TourOverlayProps) {
   if (!step) return null;
 
   // Toda mudança de viewport passa por update() e já re-renderiza; basta ler a altura atual aqui.
-  const placement = placeTourCard(step.target ? spotlight : null, cardHeight, window.innerHeight);
-  // Destaque mais alto que o espaço livre: o recorte termina acima do cartão, que nunca cobre a área destacada.
-  const visibleSpotlight = step.target && spotlight && placement.side === "bottom" && spotlight.top + spotlight.height > placement.top - 8
-    ? { ...spotlight, height: Math.max(48, placement.top - 8 - spotlight.top) }
-    : step.target ? spotlight : null;
+  const activeSpotlight = step.target ? spotlight : null;
+  const placement = placeTourCard(activeSpotlight, cardHeight, window.innerHeight);
+  const visibleSpotlight = fitSpotlight(activeSpotlight, placement);
   const advance = () => {
     if (isLast) onClose("concluido");
     else setIndex(index + 1);
