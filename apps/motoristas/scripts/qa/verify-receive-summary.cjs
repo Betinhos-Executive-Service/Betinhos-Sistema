@@ -52,7 +52,7 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
     await page.goto(`${BASE}?t=${Date.now()}#inicio`);
     await page.evaluate(async (cents) => {
       localStorage.clear();
-      localStorage.setItem("app-motoristas-tour-v1:localhost-driver", "visto");
+      localStorage.setItem("app-motoristas-tour-v2:localhost-driver:*", "visto");
       // Fotos de comprovante ficam no IndexedDB: limpa para cada cenário começar sem foto.
       for (const db of (await indexedDB.databases?.()) ?? []) if (db.name) indexedDB.deleteDatabase(db.name);
       sessionStorage.clear();

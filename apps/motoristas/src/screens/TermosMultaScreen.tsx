@@ -12,6 +12,8 @@ type Props = {
   loadStatus: TermosLoadStatus;
   onBack: () => void;
   onReload: () => Promise<void>;
+  /** Avisa o App quando um termo abre ou fecha (o tour tem um capítulo para cada estado). */
+  onSelectedChange?: (id: string) => void;
 };
 
 
@@ -22,9 +24,10 @@ function situacaoTermo(termo: TermoMulta) {
   return { tone: "sucesso", texto: termo.assinadoEm ? `Assinado em ${formatDataHora(termo.assinadoEm).slice(0, 10)}` : "Assinado" };
 }
 
-export function TermosMultaScreen({ items, loadStatus, onBack, onReload }: Props) {
+export function TermosMultaScreen({ items, loadStatus, onBack, onReload, onSelectedChange }: Props) {
   // Guarda o termo aberto: depois de assinar ele muda de aba, mas a tela de sucesso continua.
   const [selected, setSelected] = useState<TermoMulta | null>(null);
+  useEffect(() => { onSelectedChange?.(selected?.id ?? ""); }, [selected?.id, onSelectedChange]);
   const [aba, setAba] = useState<AbaTermos>("pendentes");
   const tabRefs = useRef<Partial<Record<AbaTermos, HTMLButtonElement | null>>>({});
   const onTabKey = (event: KeyboardEvent) => {

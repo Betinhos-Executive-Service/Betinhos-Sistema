@@ -22,7 +22,7 @@ fs.mkdirSync(OUT, { recursive: true });
   const errors = [];
   page.on("console", (m) => { if (m.type() === "error" && !(m.location().url || "").endsWith("/favicon.ico")) errors.push(m.text().slice(0, 200)); });
   await page.goto(`${BASE}#checklists`);
-  await page.evaluate(() => { localStorage.clear(); localStorage.setItem("app-motoristas-tour-v1:localhost-driver", "visto"); indexedDB.deleteDatabase("app-motoristas-media-drafts"); });
+  await page.evaluate(() => { localStorage.clear(); localStorage.setItem("app-motoristas-tour-v2:localhost-driver:*", "visto"); indexedDB.deleteDatabase("app-motoristas-media-drafts"); });
   await page.goto(`${BASE}${QUERY ? "&" : "?"}t=${Date.now()}#checklists`);
   await page.waitForTimeout(1300);
   await page.locator(".agenda-hit").first().click();

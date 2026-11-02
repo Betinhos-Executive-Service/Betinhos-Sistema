@@ -1,35 +1,74 @@
-// Roteiro headless do tour de primeiro acesso (modo mock local, sem Xrm).
-// Uso: node scripts/qa/verify-tour.cjs <pasta-evidencias>
+// Roteiro headless do tour por capítulos (modo mock local, sem Xrm).
+// Uso: node scripts/qa/verify-tour.cjs <pasta-evidencias> [capitulo1,capitulo2,...] [--largura=375]
 // Requer o dev server em APP_MOTORISTAS_URL (padrão http://localhost:31877) e um Chromium:
 // CHROME_PATH=<binário> (ex.: Brave/Chrome) ou Google Chrome instalado (channel "chrome").
+// Para cada capítulo: abre a tela, confere abertura automática (ou pelo botão "?"), percorre todos os passos
+// conferindo destaque, cartão dentro da tela, passos obrigatórios sem pular, e tira um print por passo.
 const path = require("path");
 const fs = require("fs");
 
 function loadPlaywright() {
-  const candidates = [
-    "playwright-core",
-    "playwright",
-    path.join(process.env.APPDATA || "", "npm/node_modules/@playwright/cli/node_modules/playwright-core")
-  ];
+  const candidates = ["playwright-core", "playwright", path.join(process.env.APPDATA || "", "npm/node_modules/@playwright/cli/node_modules/playwright-core")];
   for (const candidate of candidates) {
     try { return require(candidate); } catch { /* tenta o próximo */ }
   }
-  throw new Error("playwright-core não encontrado. Rode com `npx -y -p playwright-core@1.56.1 node scripts/qa/verify-tour.cjs <pasta>`.");
+  throw new Error("playwright-core não encontrado. Rode com `NODE_PATH=<pasta com playwright-core>` ou `npx -y -p playwright-core@1.56.1`.");
 }
 
 const { chromium } = loadPlaywright();
 const BASE = `${process.env.APP_MOTORISTAS_URL || "http://localhost:31877"}/webresource-app-motoristas.html`;
 const SHOTS = path.resolve(process.argv[2] || ".verificacao/tour");
-const TOUR_KEY = "app-motoristas-tour-v1:localhost-driver";
+const ONLY = process.argv[3] && !process.argv[3].startsWith("--") ? new Set(process.argv[3].split(",")) : null;
+const WIDTH = Number((process.argv.find((arg) => arg.startsWith("--largura=")) || "--largura=375").split("=")[1]);
+const HEIGHT = WIDTH <= 360 ? 740 : 812;
+const DRIVER = "localhost-driver";
 const results = [];
 const consoleIssues = [];
 const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${name}${extra ? " — " + extra : ""}`);
+const note = (name, extra = "") => results.push(`SKIP ${name}${extra ? " — " + extra : ""}`);
+
+const SOURCE = fs.readFileSync(path.join(__dirname, "../../src/app/tourChapters.ts"), "utf8");
+const CHAPTER_IDS = [...SOURCE.matchAll(/^ {4}id: "([a-z-]+)",\s*\n {4}title:/gm)].map((match) => match[1]);
+const D = "serviceId=10241&type=SERVICO";
+// Serviço mock com valor a receber (cobrança por QR code e resumo de pagamento).
+const R = "serviceId=10240&type=SERVICO";
+
+// capítulo -> como chegar nele no modo mock. `auto: false` abre pelo botão "?".
+const ROUTES = {
+  inicio: { hash: "inicio" },
+  servicos: { hash: "servicos" },
+  detalhes: { hash: `detalhes?${D}` },
+  receber: { hash: `receber?${R}` },
+  "cobranca-qr": { hash: `receber?${R}`, before: async (page) => { await page.click("text=Cobrar por QR code"); await page.waitForTimeout(900); }, auto: false, optional: true },
+  recibo: { hash: `recibo-personalizado?${D}` },
+  voucher: { hash: `voucher?${D}` },
+  assinatura: { hash: `assinatura?${D}`, auto: false },
+  finalizar: { hash: `finalizar?${D}` },
+  "cancelado-local": { hash: `cancelado-local?${D}` },
+  gastos: { hash: "gastos" },
+  camera: { hash: "foto-gasto", auto: false },
+  historico: { hash: "historico" },
+  "historico-detalhe": { hash: "detalhes-historico?serviceId=10239&type=SERVICO" },
+  comunicados: { hash: "comunicados" },
+  "comunicado-detalhe": { hash: "comunicados", before: async (page) => { await page.locator(".agenda-hit").first().click(); await page.waitForTimeout(900); } },
+  checklists: { hash: "checklists" },
+  "checklist-formulario": { hash: "checklists", before: async (page) => { await page.locator(".agenda-hit").first().click(); await page.waitForTimeout(900); } },
+  multas: { hash: "multas" },
+  "multa-detalhe": { hash: "multas", before: async (page) => { await page.locator(".termo-row").first().click(); await page.waitForTimeout(1200); } },
+  manutencao: { hash: "manutencao" },
+  colisoes: { hash: "colisoes" },
+  "colisao-registro": { hash: "registro-colisao" },
+  ideias: { hash: "boas-ideias" },
+  "meu-carro": { hash: "meu-carro?mockTerceiro=1" }
+};
+// Só alcançáveis com foto/leitura em andamento: não exercitados no mock.
+const NAO_EXERCITADOS = { comprovante: "exige leitura de comprovante em andamento (serviço remoto)", "foto-previa": "exige uma foto já capturada" };
 
 (async () => {
   fs.mkdirSync(SHOTS, { recursive: true });
   const launch = process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH, headless: true } : { channel: "chrome", headless: true };
   const browser = await chromium.launch(launch);
-  const context = await browser.newContext({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true });
+  const context = await browser.newContext({ viewport: { width: WIDTH, height: HEIGHT }, hasTouch: true, isMobile: true });
   const page = await context.newPage();
   page.on("pageerror", (error) => consoleIssues.push(`pageerror: ${String(error).slice(0, 160)}`));
   page.on("console", (message) => {
@@ -38,128 +77,126 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
     consoleIssues.push(`error: ${message.text().slice(0, 160)}`);
   });
 
-  const shot = (name) => page.screenshot({ path: path.join(SHOTS, `${name}.png`) });
-  const open = async ({ firstAccess }) => {
-    await page.goto(`${BASE}?t=${Date.now()}#inicio`);
-    await page.evaluate(({ key, firstAccess }) => { localStorage.clear(); if (!firstAccess) localStorage.setItem(key, "visto"); }, { key: TOUR_KEY, firstAccess });
+  const key = (id) => `app-motoristas-tour-v2:${DRIVER}:${id}`;
+  const prepare = async (hash, seenExcept) => {
+    await page.goto(`${BASE}?t=${Date.now()}#${hash}`);
+    await page.evaluate(({ ids, except, keys }) => {
+      localStorage.clear();
+      ids.forEach((id) => { if (id !== except) localStorage.setItem(keys[id], "visto"); });
+    }, { ids: CHAPTER_IDS, except: seenExcept, keys: Object.fromEntries(CHAPTER_IDS.map((id) => [id, key(id)])) });
     await page.reload();
-    await page.waitForTimeout(2200);
+    await page.waitForTimeout(2400);
   };
   const tourOpen = () => page.locator(".tour-card").count().then((n) => n > 0);
-  const seen = () => page.evaluate((key) => localStorage.getItem(key), TOUR_KEY);
-  // Geometria do passo atual: destaque cobre o elemento real; cartão e botão Próximo dentro da viewport e fora do destaque.
-  const geometry = () => page.evaluate(() => {
-    const box = (el) => { const r = el.getBoundingClientRect(); return { top: r.top, left: r.left, right: r.right, bottom: r.bottom, width: r.width, height: r.height }; };
+  const state = () => page.evaluate(() => {
+    const box = (el) => { if (!el) return null; const r = el.getBoundingClientRect(); return { top: r.top, left: r.left, right: r.right, bottom: r.bottom }; };
     const root = document.querySelector(".tour-root");
-    const step = root?.dataset.tourStep ?? "";
-    const spot = document.querySelector(".tour-spotlight");
     const card = document.querySelector(".tour-card");
-    const next = document.querySelector(".tour-next");
-    const anchorByStep = { servicos: "servicos", etapas: "servicos", "troca-checklist": "checklists", gastos: "expenses", comunicados: "comunicados", multas: "multas", manutencao: "maintenancePhoto" };
-    const target = document.querySelector(`[data-tour="${anchorByStep[step]}"]`);
     return {
-      step,
+      step: root?.dataset.tourStep ?? "",
+      total: Number(root?.dataset.tourTotal ?? 0),
+      skipped: root?.dataset.tourSkipped ?? "",
       progress: document.querySelector(".tour-card-progress")?.textContent ?? "",
       title: document.querySelector(".tour-card-title")?.textContent ?? "",
-      hasSkip: Boolean(document.querySelector(".tour-skip")),
-      nextLabel: next?.textContent?.trim() ?? "",
-      focused: document.activeElement?.closest(".tour-card") ? document.activeElement.textContent.trim() : "FORA",
-      viewport: { width: innerWidth, height: innerHeight },
-      spot: spot ? box(spot) : null,
-      card: card ? box(card) : null,
-      next: next ? box(next) : null,
-      target: target ? box(target) : null
+      next: document.querySelector(".tour-next")?.textContent?.trim() ?? "",
+      spot: box(document.querySelector(".tour-spotlight")),
+      card: box(card),
+      cardScrolls: card ? card.scrollHeight > card.clientHeight + 1 : false,
+      vw: innerWidth,
+      vh: innerHeight
     };
   });
-  const inside = (b, v) => b && b.top >= 0 && b.left >= 0 && b.bottom <= v.height + 0.5 && b.right <= v.width + 0.5;
-  const overlaps = (a, b) => a && b && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-  const covers = (spot, target) => spot && target && spot.top <= target.top + 1 && spot.left <= target.left + 1 && spot.bottom >= target.bottom - 1 && spot.right >= target.right - 1;
-  const checkStep = async (label, expected) => {
-    const g = await geometry();
-    check(`${label}: passo "${expected.step}" visível`, g.step === expected.step && g.progress === expected.progress, `${g.progress} · ${g.title}`);
-    check(`${label}: destaque cobre o elemento real`, covers(g.spot, g.target) && inside(g.target, g.viewport), JSON.stringify({ spot: g.spot, target: g.target }));
-    check(`${label}: cartão e Próximo dentro da tela, sem cobrir o destaque`, inside(g.card, g.viewport) && inside(g.next, g.viewport) && !overlaps(g.card, g.spot), JSON.stringify({ card: g.card }));
-    return g;
-  };
+  const overlaps = (a, b) => a && b && a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1;
 
-  const steps = [
-    { step: "servicos", progress: "Passo 1 de 7" },
-    { step: "etapas", progress: "Passo 2 de 7" },
-    { step: "troca-checklist", progress: "Passo 3 de 7" },
-    { step: "gastos", progress: "Passo 4 de 7" },
-    { step: "comunicados", progress: "Passo 5 de 7" },
-    { step: "multas", progress: "Passo 6 de 7" },
-    { step: "manutencao", progress: "Passo 7 de 7" }
-  ];
+  const chapters = CHAPTER_IDS.filter((id) => !ONLY || ONLY.has(id));
+  for (const id of chapters) {
+    const route = ROUTES[id];
+    if (!route) { note(`capítulo ${id}`, NAO_EXERCITADOS[id] || "sem rota no mock"); continue; }
+    await prepare(route.hash, id);
+    if (route.before) {
+      try { await route.before(page); } catch (error) { if (route.optional) { note(`capítulo ${id}`, "recurso indisponível no mock"); continue; } throw error; }
+      // O estado interno (detalhe aberto) dispara o capítulo certo sem recarregar.
+      await page.waitForTimeout(1600);
+    }
+    if (route.auto === false) {
+      check(`${id}: não abre sozinho`, !(await tourOpen()));
+      const help = page.locator(".tour-help-button").first();
+      if (!(await help.count())) { check(`${id}: botão ? presente`, false); continue; }
+      await help.click();
+      await page.waitForTimeout(900);
+    } else if (!(await tourOpen())) {
+      const help = page.locator(".tour-help-button").first();
+      if (route.optional && !(await help.count())) { note(`capítulo ${id}`, "recurso indisponível no mock"); continue; }
+      check(`${id}: abre sozinho na primeira visita`, false);
+      continue;
+    } else {
+      check(`${id}: abre sozinho na primeira visita`, true);
+    }
+    const first = await state();
+    check(`${id}: capítulo certo aberto`, await page.evaluate(() => document.querySelector(".tour-root")?.dataset.tourChapter) === id);
+    check(`${id}: nenhum passo obrigatório pulado`, first.skipped === "", first.skipped ? `pulados: ${first.skipped}` : `${first.total} passos`);
+    if (route.auto !== false) check(`${id}: botão ? presente no cabeçalho`, id === "inicio" || (await page.locator(".tour-help-button").count()) > 0);
 
-  // 1. Primeiro acesso: abre sozinho; percorre os 7 passos com prints.
-  await open({ firstAccess: true });
-  check("1. primeiro acesso abre o tour sozinho", await tourOpen());
-  for (let i = 0; i < steps.length; i += 1) {
-    if (i > 0) { await page.click(".tour-next"); await page.waitForTimeout(900); }
-    const g = await checkStep(`1.${i + 1}`, steps[i]);
-    if (i === 0) check("1.1: foco inicial em Próximo", g.focused === "Próximo", g.focused);
-    if (i === steps.length - 1) check("1.7: último passo mostra Concluir e esconde Pular", g.nextLabel === "Concluir" && !g.hasSkip, g.nextLabel);
-    await shot(`tour-passo-${i + 1}`);
+    let guard = 0;
+    for (;;) {
+      const current = await state();
+      const label = `${id}/${current.step}`;
+      const inside = current.card && current.card.top >= 0 && current.card.left >= 0 && current.card.bottom <= current.vh + 0.5 && current.card.right <= current.vw + 0.5;
+      check(`${label}: cartão dentro da tela`, Boolean(inside), JSON.stringify(current.card));
+      if (current.spot && !(current.cardScrolls)) {
+        const clash = overlaps(current.card, current.spot);
+        check(`${label}: cartão não cobre o destaque`, !clash, clash ? `cartão ${JSON.stringify(current.card)} x destaque ${JSON.stringify(current.spot)}` : "");
+      }
+      if (guard === 0 || current.step === "boas-vindas") await page.screenshot({ path: path.join(SHOTS, `${WIDTH}-${id}-${String(guard + 1).padStart(2, "0")}-${current.step}.png`) });
+      else await page.screenshot({ path: path.join(SHOTS, `${WIDTH}-${id}-${String(guard + 1).padStart(2, "0")}-${current.step}.png`) });
+      const last = current.next === "Concluir";
+      await page.click(".tour-next");
+      await page.waitForTimeout(last ? 450 : 750);
+      guard += 1;
+      if (last || guard > 60) break;
+    }
+    check(`${id}: Concluir fecha o capítulo`, !(await tourOpen()));
+    await page.reload();
+    await page.waitForTimeout(2200);
+    if (route.before) { try { await route.before(page); await page.waitForTimeout(1600); } catch { /* sem o estado, só confere abaixo */ } }
+    if (route.auto !== false) check(`${id}: não volta para quem já viu`, !(await tourOpen()));
   }
-  await page.click(".tour-next");
-  await page.waitForTimeout(400);
-  check("1. Concluir fecha e grava visto", !(await tourOpen()) && (await seen()) === "visto");
 
-  // 5. Quem já viu não vê de novo.
-  await page.reload();
-  await page.waitForTimeout(2200);
-  check("5. tour não volta para quem já viu", !(await tourOpen()));
-
-  // 2. Reabrir pelo rodapé do Início.
-  await page.click("text=Ver tour de novo");
-  await page.waitForTimeout(900);
-  check("2. 'Ver tour de novo' reabre no passo 1", (await tourOpen()) && (await geometry()).progress === "Passo 1 de 7");
-  await shot("tour-reabrir");
-
-  // 4. Teclado: Tab preso no cartão, setas navegam, Esc fecha.
-  const focusTrail = [];
-  for (let i = 0; i < 4; i += 1) { await page.keyboard.press("Tab"); focusTrail.push(await page.evaluate(() => (document.activeElement?.closest(".tour-card") ? document.activeElement.textContent.trim() : "FORA"))); }
-  check("4. Tab circula só dentro do cartão", focusTrail.every((item) => item !== "FORA"), focusTrail.join(" > "));
-  await page.keyboard.press("ArrowRight"); await page.waitForTimeout(700);
-  check("4. seta direita avança", (await geometry()).progress === "Passo 2 de 7");
-  await page.keyboard.press("ArrowLeft"); await page.waitForTimeout(700);
-  check("4. seta esquerda volta", (await geometry()).progress === "Passo 1 de 7");
-  await page.keyboard.press("Escape"); await page.waitForTimeout(400);
-  check("4. Esc fecha o tour", !(await tourOpen()));
-  check("4. foco volta ao botão 'Ver tour de novo'", await page.evaluate(() => document.activeElement?.textContent?.trim() === "Ver tour de novo"));
-
-  // 1b. Pular no primeiro acesso: fecha e não volta.
-  await open({ firstAccess: true });
-  check("1b. tour aberto de novo após limpar a preferência", await tourOpen());
-  await page.click(".tour-skip"); await page.waitForTimeout(400);
-  check("1b. Pular fecha e grava visto", !(await tourOpen()) && (await seen()) === "visto");
-  await page.reload(); await page.waitForTimeout(2200);
-  check("1b. após Pular o tour não volta", !(await tourOpen()));
-
-  // Borda: elemento do passo ausente é pulado sem erro.
-  await page.evaluate(() => { document.querySelector('[data-tour="multas"]')?.remove(); document.querySelector('[data-tour="expenses"]')?.remove(); });
-  await page.click("text=Ver tour de novo"); await page.waitForTimeout(900);
-  const semAncora = await geometry();
-  check("borda: passos sem elemento são pulados (5 passos)", semAncora.progress === "Passo 1 de 5", semAncora.progress);
-  await page.keyboard.press("Escape"); await page.waitForTimeout(300);
-
-  // 4b. 360 px de largura.
-  await page.setViewportSize({ width: 360, height: 740 });
-  await open({ firstAccess: true });
-  const g360 = await checkStep("4b. 360px", steps[0]);
-  check("4b. cartão respeita 12 px de margem em 360 px", g360.card && g360.card.left >= 12 && g360.card.right <= 348, JSON.stringify(g360.card));
-  await shot("tour-360");
-  for (let i = 1; i < steps.length; i += 1) { await page.click(".tour-next"); await page.waitForTimeout(800); await checkStep(`4b.${i + 1} 360px`, steps[i]); }
-  await shot("tour-360-ultimo");
+  if (!ONLY || ONLY.has("inicio")) {
+    // Pular, Esc, "Ver tour de novo" e foco devolvido, no Início.
+    await prepare("inicio", "inicio");
+    await page.goto(`${BASE}?t=${Date.now()}#inicio`);
+    await page.evaluate(({ ids, keys }) => { localStorage.clear(); ids.forEach((id) => localStorage.setItem(keys[id], "visto")); }, { ids: CHAPTER_IDS, keys: Object.fromEntries(CHAPTER_IDS.map((id) => [id, key(id)])) });
+    await page.reload();
+    await page.waitForTimeout(2200);
+    await page.click("text=Ver tour de novo");
+    await page.waitForTimeout(900);
+    check("2. 'Ver tour de novo' reabre o guia no passo 1", (await tourOpen()) && (await state()).progress.startsWith("Passo 1 de"));
+    const seenAfterRestart = await page.evaluate(({ ids, keys }) => ids.filter((id) => localStorage.getItem(keys[id]) === "visto").length, { ids: CHAPTER_IDS, keys: Object.fromEntries(CHAPTER_IDS.map((id) => [id, key(id)])) });
+    check("2. 'Ver tour de novo' reabre todos os capítulos das telas", seenAfterRestart === 0, `${seenAfterRestart} ainda marcados`);
+    const trail = [];
+    for (let i = 0; i < 4; i += 1) { await page.keyboard.press("Tab"); trail.push(await page.evaluate(() => (document.activeElement?.closest(".tour-card") ? document.activeElement.textContent.trim() : "FORA"))); }
+    check("4. Tab circula só dentro do cartão", trail.every((item) => item !== "FORA"), trail.join(" > "));
+    await page.keyboard.press("ArrowRight"); await page.waitForTimeout(700);
+    check("4. seta direita avança", (await state()).progress.startsWith("Passo 2 de"));
+    await page.keyboard.press("ArrowLeft"); await page.waitForTimeout(700);
+    check("4. seta esquerda volta", (await state()).progress.startsWith("Passo 1 de"));
+    await page.keyboard.press("Escape"); await page.waitForTimeout(400);
+    check("4. Esc fecha o tour", !(await tourOpen()));
+    check("4. foco volta ao botão 'Ver tour de novo'", await page.evaluate(() => document.activeElement?.textContent?.trim() === "Ver tour de novo"));
+    await page.reload(); await page.waitForTimeout(2200);
+    check("1b. depois de Esc (pular) o tour do Início não volta", !(await tourOpen()));
+  }
 
   check("console sem erros", consoleIssues.length === 0, consoleIssues.slice(0, 3).join(" | "));
   await browser.close();
 
   const report = results.join("\n");
-  fs.writeFileSync(path.join(SHOTS, "resultado.txt"), report + "\n");
+  fs.writeFileSync(path.join(SHOTS, `resultado-${WIDTH}.txt`), report + "\n");
   console.log(report);
-  process.exit(results.some((line) => line.startsWith("FAIL")) ? 1 : 0);
+  const fails = results.filter((line) => line.startsWith("FAIL")).length;
+  console.log(`\n${results.filter((line) => line.startsWith("OK")).length} OK, ${fails} FAIL, ${results.filter((line) => line.startsWith("SKIP")).length} SKIP`);
+  process.exit(fails ? 1 : 0);
 })().catch((error) => {
   console.error("FAIL roteiro interrompido —", error && error.message ? error.message : error);
   process.exit(1);
