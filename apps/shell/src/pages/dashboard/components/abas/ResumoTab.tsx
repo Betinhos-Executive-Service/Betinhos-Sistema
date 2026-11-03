@@ -1,10 +1,10 @@
 import { useMemo } from 'react'
 import { calcularResumo } from '../../domain/resumo'
 import { useDetalhe } from '../DetalheDrawer'
-import { AlertList, AlertasCarregando, FAIXAS_RESUMO } from '../AlertList'
+import { AlertList, FAIXAS_RESUMO } from '../AlertList'
 import { MetaRealizadoCard, TotalProduzidoCard } from '../Analises'
-import { BlocosCarregando } from '../Carregando'
-import { KpiGrid, KpiGridCarregando } from '../KpiGrid'
+import { AbaCarregando } from '../Carregando'
+import { KpiGrid } from '../KpiGrid'
 import type { DadosAba, PropsAba } from './abas'
 
 /**
@@ -40,11 +40,5 @@ function Resumo({ ctx, dados, periodo }: DadosAba) {
   </>
 }
 
-/** Primeira carga: KPIs, alertas e blocos no formato final, ocupados e sem números. */
-export function ResumoCarregando() {
-  return <>
-    <KpiGridCarregando />
-    <AlertasCarregando />
-    <BlocosCarregando titulos={['Total produzido', 'Meta × realizado']} />
-  </>
-}
+/** Primeira carga: spinner e barra de progresso real. */
+export const ResumoCarregando = () => <AbaCarregando />

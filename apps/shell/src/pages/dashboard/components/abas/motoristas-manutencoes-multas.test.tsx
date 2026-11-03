@@ -120,9 +120,9 @@ describe('MotoristasTab', () => {
     expect(within(ana).getByText('out/26: 2 · 66,7% do mês')).toBeTruthy()
   })
 
-  it('na primeira carga mostra os KPIs ocupados, sem números', () => {
+  it('na primeira carga mostra o spinner com a barra de progresso, sem números', () => {
     render(<Motoristas dados={null} />)
-    expect(screen.getByRole('region', { name: 'Indicadores de motoristas' }).getAttribute('aria-busy')).toBe('true')
+    expect(screen.getByRole('progressbar', { name: 'Progresso do carregamento' })).toBeTruthy()
     expect(screen.queryByRole('heading', { level: 2 })).toBeNull()
   })
 })

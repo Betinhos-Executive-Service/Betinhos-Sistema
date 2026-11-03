@@ -84,12 +84,10 @@ describe('aba Serviços', () => {
     expect(within(kpi('Total de serviços')).getByText('3')).toBeTruthy()
   })
 
-  it('primeira carga: quatro KPIs ocupados, sem números', () => {
+  it('primeira carga: spinner com barra de progresso, sem números', () => {
     render(<ServicosCarregando />)
-    const linha = screen.getByRole('region', { name: 'Indicadores de serviços' })
-    expect(linha.getAttribute('aria-busy')).toBe('true')
-    expect(within(linha).getAllByRole('article')).toHaveLength(4)
-    expect(within(linha).getAllByText('Carregando')).toHaveLength(4)
+    expect(screen.getByRole('progressbar', { name: 'Progresso do carregamento' })).toBeTruthy()
+    expect(screen.queryByRole('region', { name: 'Indicadores de serviços' })).toBeNull()
   })
 })
 
@@ -218,10 +216,9 @@ describe('aba Financeiro', () => {
     expect(within(clientes).getByText(/^out\/26: .+ \(−50,0%\)$/)).toBeTruthy()
   })
 
-  it('primeira carga: seis KPIs ocupados, sem números', () => {
+  it('primeira carga: spinner com barra de progresso, sem números', () => {
     render(<FinanceiroCarregando />)
-    const linha = screen.getByRole('region', { name: 'Indicadores financeiros' })
-    expect(within(linha).getAllByRole('article')).toHaveLength(6)
-    expect(within(linha).queryByText('s/dado')).toBeNull()
+    expect(screen.getByRole('progressbar', { name: 'Progresso do carregamento' })).toBeTruthy()
+    expect(screen.queryByRole('region', { name: 'Indicadores financeiros' })).toBeNull()
   })
 })

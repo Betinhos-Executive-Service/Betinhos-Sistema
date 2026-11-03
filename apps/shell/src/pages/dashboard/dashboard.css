@@ -131,8 +131,6 @@
 .dash-card__chips { display: flex; flex-direction: column; align-items: flex-end; gap: var(--bt-space-1); max-width: 100%; }
 .dash-card__corpo { display: flex; flex: 1 1 auto; flex-direction: column; gap: var(--bt-space-3); min-width: 0; min-height: 0; }
 .dash-card__tabela { min-width: 0; }
-/* Miolo do bloco na primeira carga: ocupa a altura de um gráfico. */
-.dash-card__esqueleto { flex: 1 1 auto; min-height: 200px; }
 /* Aviso discreto de filtros de segmento que não valem na aba. */
 .dash-aviso-filtros { display: flex; align-items: flex-start; gap: var(--bt-space-1-5); margin: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); line-height: var(--bt-typography-body-small-line-height); }
 .dash-aviso-filtros > svg { flex: 0 0 auto; margin-top: 2px; }
@@ -223,3 +221,11 @@
   /* Na lista do celular, a 1ª coluna (título da linha) leva a hierarquia. */
   .dash-card .bt-table__row > .bt-table__cell:first-child, .dash-detalhe .bt-table__row > .bt-table__cell:first-child { color: var(--bt-color-text-primary); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); overflow-wrap: anywhere; }
 }
+
+/* Primeira carga: spinner + barra de progresso real. */
+.dash-carga { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--bt-space-3); min-height: 320px; padding: var(--bt-space-6) var(--bt-space-3); font-family: var(--bt-font-family-sans); color: var(--bt-color-text); }
+.dash-carga__texto { display: flex; align-items: baseline; gap: var(--bt-space-2); }
+.dash-carga__texto span { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--bt-color-action); }
+.dash-carga__trilho { width: min(360px, 100%); height: 8px; overflow: hidden; border-radius: 999px; background-color: var(--bt-color-border); }
+.dash-carga__barra { height: 100%; border-radius: inherit; background-color: var(--bt-color-action); transition: width 200ms var(--bt-ease-out); }
+@media (prefers-reduced-motion: reduce) { .dash-carga__barra { transition: none; } }

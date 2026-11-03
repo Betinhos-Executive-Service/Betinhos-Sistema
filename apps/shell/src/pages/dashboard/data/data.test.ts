@@ -30,7 +30,8 @@ async function mockTudo(s: Source, desde: string, ate: string) {
 describe('consultas do Dashboard', () => {
   it('janela de reservas em Brasília com fim inclusivo', () => {
     const p = reservasPath('res', '2024-01-01', '2026-10-15')
-    expect(p).toContain('$expand=cr40f_Motorista($select=cr40f_funcionariosid,cr40f_nomecompleto,new_apelido),cr40f_Cliente($select=cr40f_nomedocliente)')
+    expect(p).not.toContain('$expand')
+    expect(p).toContain('_cr40f_motorista_value,_cr40f_cliente_value')
     expect(decodeURIComponent(p)).toContain('cr40f_dataehorriodesada ge 2024-01-01T03:00:00.000Z and cr40f_dataehorriodesada lt 2026-10-16T03:00:00.000Z')
   })
 
@@ -69,12 +70,13 @@ describe('consultas do Dashboard', () => {
       cr40f_status: 202410008, [`cr40f_status${F}`]: 'Concluído', cr40f_statusdefaturamento: 202410010, [`cr40f_statusdefaturamento${F}`]: 'Pago',
       new_categoriadoitem: 100000000, [`new_categoriadoitem${F}`]: 'Serviço', cr40f_tipodeveiculo: 3, [`cr40f_tipodeveiculo${F}`]: 'Executivo',
       _cr40f_veiculo_value: 'V1', _new_composicaodepreco_value: 'cp1', [`_new_composicaodepreco_value${F}`]: 'CP-0042', _cr40f_financeiro_value: 'OP1', [`_cr40f_financeiro_value${F}`]: 'OP-0042',
-      cr40f_Motorista: { cr40f_funcionariosid: 'M1', cr40f_nomecompleto: 'Carlos Oliveira', new_apelido: 'Oliveira' },
-      cr40f_Cliente: { cr40f_nomedocliente: 'Tenaris' },
-    }, cps)
+      _cr40f_motorista_value: 'M1', [`_cr40f_motorista_value${F}`]: 'Carlos Oliveira', _cr40f_cliente_value: 'C1', [`_cr40f_cliente_value${F}`]: 'Tenaris',
+    }, cps, new Map([['m1', mapFuncionario({ cr40f_funcionariosid: 'M1', cr40f_nomecompleto: 'Carlos Oliveira', new_apelido: 'Oliveira' })]]))
     expect(r).toMatchObject({ id: 'r1', dia: '2026-10-02', mes: '2026-10', statusLabel: 'Concluído', fatStatus: 202410010, tipoVeiculo: 'Executivo', tipoVeiculoRaw: '3', veiculoId: 'v1', motoristaId: 'm1', motoristaKey: 'm1', motorista: 'Oliveira', cliente: 'Tenaris', valor: 850.5, cpConcluida: true, opId: 'op1', cpCodigo: 'CP-0042', opCodigo: 'OP-0042' })
     // Sem id do funcionário, a chave é o nome sem acento e sem caixa (`normL`), como nas despesas e no CSV 2026.
-    expect(mapReserva({ cr40f_reservadeveculosid: 'R3', cr40f_Motorista: { cr40f_nomecompleto: 'João Ávila' } }, cps)).toMatchObject({ motoristaId: '', motoristaKey: 'nome:joao avila' })
+    expect(mapReserva({ cr40f_reservadeveculosid: 'R3', [`_cr40f_motorista_value${F}`]: 'João Ávila' }, cps)).toMatchObject({ motoristaId: '', motoristaKey: 'nome:joao avila' })
+    // Sem os funcionários (consulta falhou), o rótulo do lookup vale como nome.
+    expect(mapReserva({ cr40f_reservadeveculosid: 'R4', _cr40f_motorista_value: 'M9', [`_cr40f_motorista_value${F}`]: 'Ana Souza' }, cps)).toMatchObject({ motoristaId: 'm9', motorista: 'Ana Souza' })
     expect(mapReserva({ cr40f_reservadeveculosid: 'R2' }, cps)).toMatchObject({ motorista: 'Sem motorista', motoristaKey: 'nome:sem motorista', cliente: 'Sem cliente', valor: 0, dia: '', statusLabel: 'Sem status' })
   })
 
@@ -89,19 +91,6 @@ describe('consultas do Dashboard', () => {
     expect(d.reservas.some((r) => r.id === 'r1')).toBe(true)
     expect(d.reservas.some((r) => r.id.startsWith('legacy-2026-'))).toBe(true)
     await expect(carregarDataverse(client(async (p) => { if (p.startsWith('cps?')) throw new Error('falhou'); return [] }), SETS, '2024-01-01', '2026-10-15')).rejects.toThrow('falhou')
-  })
-
-  it('com a navegação da CP, a composição vem no $expand das reservas e a tabela de CPs não é lida', async () => {
-    const lidos: string[] = []
-    const c = client(async (path) => {
-      lidos.push(path)
-      if (path.startsWith('res?')) return [{ cr40f_reservadeveculosid: 'R1', cr40f_dataehorriodesada: '2026-10-02T12:00:00Z', new_categoriadoitem: 100000000, _new_composicaodepreco_value: 'CP1', nav_cp: { cr40f_composicaodeprecosid: 'CP1', new_valortotal: 250, new_status: null } }]
-      return []
-    })
-    const d = await carregarDataverse(c, SETS, '2024-01-01', '2026-10-15', 'nav_cp')
-    expect(lidos.some((p) => p.startsWith('cps?'))).toBe(false)
-    expect(lidos.find((p) => p.startsWith('res?'))).toContain('nav_cp($select=')
-    expect(d.reservas.find((r) => r.id === 'r1')?.valor).toBe(250)
   })
 
   it('carrega as três tabelas do Infleet; uma que falha vira indisponível só para ela', async () => {

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Button, Skeleton } from '@betinhos/ui'
+import { Button } from '@betinhos/ui'
 import { ChevronRight } from 'lucide-react'
 import { Sparkline } from '../charts/Charts'
 import type { CorToken } from '../charts/tokens'
@@ -62,23 +62,6 @@ export function KpiCard({ rotulo, valor, tom, chips = [], apoio = [], serie = []
 }
 
 /** Linha de KPIs da aba: `colunas` é o número de cards na largura cheia (o CSS desce para 3, 2 e 1 conforme a largura). */
-export function KpiLinha({ rotulo, colunas = 6, carregando = false, children }: { rotulo: string; colunas?: ColunasKpi; carregando?: boolean; children: ReactNode }) {
-  return <section className={`dash-kpis dash-kpis--${colunas}`} aria-label={rotulo} aria-busy={carregando || undefined}>{children}</section>
-}
-
-/** Primeira carga: os cards no formato final, ocupados e sem números; `serie` reserva a sparkline (Resumo). */
-export function KpisCarregando({ rotulo, rotulos, colunas = 6, serie = false }: { rotulo: string; rotulos: readonly string[]; colunas?: ColunasKpi; serie?: boolean }) {
-  return (
-    <KpiLinha rotulo={rotulo} colunas={colunas} carregando>
-      {rotulos.map((r) => (
-        <article key={r} className="dash-kpi" aria-label={r}>
-          <span className="dash-kpi__rotulo">{r}</span>
-          <Skeleton height={26} width="62%" />
-          <Skeleton height={22} width="84%" />
-          <span className="dash-sr">Carregando</span>
-          {serie ? <Skeleton className="dash-spark" shape="rect" width="auto" /> : null}
-        </article>
-      ))}
-    </KpiLinha>
-  )
+export function KpiLinha({ rotulo, colunas = 6, children }: { rotulo: string; colunas?: ColunasKpi; children: ReactNode }) {
+  return <section className={`dash-kpis dash-kpis--${colunas}`} aria-label={rotulo}>{children}</section>
 }
