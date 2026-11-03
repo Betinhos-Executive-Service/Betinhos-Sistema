@@ -89,11 +89,12 @@ export function createMockSource(): Source {
       if (index < 0) throw new Error('Somente rascunhos podem ser excluídos.')
       treinamentos.splice(index, 1)
     },
-    async salvarAnexos(treinamentoId, anexos) {
+    async salvarAnexos(treinamentoId, anexos, publicado = false) {
       await wait(200)
       const item = treinamentos.find((row) => row.id === treinamentoId)
       if (!item) throw new Error('Treinamento não encontrado.')
       item.anexos = clone(anexos)
+      if (publicado) item.editadoEm = new Date().toISOString()
     },
     async publicar(treinamento, alvos) {
       await wait(400)

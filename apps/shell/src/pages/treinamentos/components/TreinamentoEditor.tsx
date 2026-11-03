@@ -130,7 +130,7 @@ export function TreinamentoEditor({ initial, funcionarios, source, onBack, onSav
   const anexosAlterados = async (anexos: Anexo[], id: string) => {
     set({ id, anexos })
     try {
-      await source.salvarAnexos(id, anexos)
+      await source.salvarAnexos(id, anexos, isPublicado(initial))
       onAnexos(id, anexos)
     } catch (error) {
       toast({ tone: 'danger', message: erroTexto(error, 'O arquivo foi enviado, mas a lista de anexos não foi gravada. Salve o rascunho.') })

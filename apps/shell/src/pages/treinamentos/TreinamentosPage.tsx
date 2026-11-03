@@ -70,7 +70,7 @@ function Treinamentos({ host }: { host: Host }) {
   const selected = target && target.mode !== 'create' ? data.items.find((item) => item.id === target.id) : undefined
   const erroCarga = <Alert tone="danger" title="Não foi possível carregar os treinamentos" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{data.error}</Alert>
   const editor = (initial: Treinamento, key: string, onDeleted?: () => Promise<void>) =>
-    <TreinamentoEditor key={key} initial={initial} funcionarios={data.funcionarios} source={source} onBack={isPublicado(initial) ? () => open(initial.id) : goHome} onSaved={saved} onAnexos={(id, anexos) => data.patch(id, { anexos })} onDeleted={onDeleted} />
+    <TreinamentoEditor key={key} initial={initial} funcionarios={data.funcionarios} source={source} onBack={isPublicado(initial) ? () => open(initial.id) : goHome} onSaved={saved} onAnexos={(id, anexos) => data.patch(id, isPublicado(initial) ? { anexos, editadoEm: new Date().toISOString() } : { anexos })} onDeleted={onDeleted} />
 
   let body
   if (target?.mode === 'create') {

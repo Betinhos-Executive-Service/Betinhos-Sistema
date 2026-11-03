@@ -18,8 +18,8 @@ export type Source = {
   /** Publicado: grava conteúdo, anexos e validade (+ editadoem). Quiz, assinatura e público não mudam; participações intactas. */
   salvarPublicado: (item: Treinamento) => Promise<void>
   excluir: (id: string) => Promise<void>
-  /** Grava só a lista de anexos (o arquivo já está no SharePoint); vale para rascunho e publicado. */
-  salvarAnexos: (id: string, anexos: Anexo[]) => Promise<void>
+  /** Grava só a lista de anexos (o arquivo já está no SharePoint); vale para rascunho e publicado. No publicado (`publicado = true`) carimba também `editadoem`. */
+  salvarAnexos: (id: string, anexos: Anexo[], publicado?: boolean) => Promise<void>
   /** Cria as participações que faltam para `alvos`, remove as órfãs de uma tentativa anterior e marca como publicado. Repetir não duplica. */
   publicar: (treinamento: Treinamento, alvos: Pick<Funcionario, 'id' | 'nome'>[]) => Promise<void>
   /** Arquivo vai para o SharePoint (`Treinamentos/<id>`); a lista de anexos é gravada pelo `salvar`. */
@@ -110,8 +110,8 @@ export function createSource(host: Host): Source {
     async excluir(id) {
       await client.remove((await entitySets()).treinamento, id)
     },
-    async salvarAnexos(id, anexos) {
-      await client.update((await entitySets()).treinamento, id, { cr40f_anexosjson: JSON.stringify(anexos) })
+    async salvarAnexos(id, anexos, publicado = false) {
+      await client.update((await entitySets()).treinamento, id, { cr40f_anexosjson: JSON.stringify(anexos), ...(publicado ? { cr40f_editadoem: new Date().toISOString() } : {}) })
     },
     async publicar(treinamento, alvos) {
       const s = await entitySets()
