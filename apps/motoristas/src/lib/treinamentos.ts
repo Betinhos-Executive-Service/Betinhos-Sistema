@@ -253,25 +253,28 @@ function fecharSeCompleto(item: Treinamento, p: Participacao, patch: Patch, agor
   return { patch, participacao: p };
 }
 
+/** Erro de regra com texto pensado para o motorista ler; qualquer outro erro vira a mensagem amigável da tela. */
+export class ErroTreinamento extends Error {}
+
 export function mudancaConfirmacao(item: Treinamento, p: Participacao, agora = new Date().toISOString()): Mudanca {
-  if (proximaEtapa(item, p) !== "leitura") throw new Error("A leitura já foi confirmada.");
+  if (proximaEtapa(item, p) !== "leitura") throw new ErroTreinamento("A leitura já foi confirmada.");
   return fecharSeCompleto(item, { ...p, confirmadoEm: agora }, { cr40f_confirmadoem: agora }, agora);
 }
 
 export function mudancaAssinatura(item: Treinamento, p: Participacao, strokes: SignatureStrokes, nome: string, agora = new Date().toISOString()): Mudanca {
-  if (proximaEtapa(item, p) !== "assinatura") throw new Error("Este treinamento não está na etapa de assinatura.");
-  if (!validateSignature(strokes)) throw new Error("Desenhe sua assinatura antes de confirmar.");
+  if (proximaEtapa(item, p) !== "assinatura") throw new ErroTreinamento("Este treinamento não está na etapa de assinatura.");
+  if (!validateSignature(strokes)) throw new ErroTreinamento("Desenhe sua assinatura antes de confirmar.");
   const assinaturaJson = JSON.stringify(strokes);
-  if (assinaturaJson.length > 100000) throw new Error("A assinatura ficou grande demais. Limpe e assine novamente.");
+  if (assinaturaJson.length > 100000) throw new ErroTreinamento("A assinatura ficou grande demais. Limpe e assine novamente.");
   const nomeAssinante = nome.trim().slice(0, 200);
-  if (!nomeAssinante) throw new Error("Não foi possível identificar o seu nome para assinar.");
+  if (!nomeAssinante) throw new ErroTreinamento("Não foi possível identificar o seu nome para assinar.");
   const patch: Patch = { cr40f_assinadoem: agora, cr40f_nomeassinante: nomeAssinante, cr40f_assinaturajson: assinaturaJson };
   return fecharSeCompleto(item, { ...p, assinadoEm: agora, nomeAssinante, assinaturaJson }, patch, agora);
 }
 
 export function mudancaQuiz(item: Treinamento, p: Participacao, respostas: Record<string, string>, agora = new Date().toISOString()): Mudanca & { resultado: ResultadoQuiz } {
-  if (proximaEtapa(item, p) !== "quiz") throw new Error("Este treinamento não está na etapa do quiz.");
-  if (!quizCompleto(item.perguntas, respostas)) throw new Error("Responda todas as perguntas antes de enviar.");
+  if (proximaEtapa(item, p) !== "quiz") throw new ErroTreinamento("Este treinamento não está na etapa do quiz.");
+  if (!quizCompleto(item.perguntas, respostas)) throw new ErroTreinamento("Responda todas as perguntas antes de enviar.");
   const resultado = corrigirQuiz(item.perguntas, respostas, item.notaMinima);
   const tentativas = p.tentativas + 1;
   // respostasjson fica só como trilha para o RH; o App não lê de volta.

@@ -746,7 +746,7 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
     title: "Fazer o treinamento",
     probe: ".trn-detail",
     steps: [
-      step("voltar", "Voltar", ["Volta para a lista. O que você já fez fica salvo."], { target: SERVICE_HOME }),
+      step("voltar", "Voltar", ["Volta para a lista. Leitura, assinatura e quiz já enviados ficam salvos; o que estiver pela metade se perde."], { target: SERVICE_HOME }),
       step("conteudo", "Conteúdo", [
         "Leia o texto, assista ao vídeo e abra as fotos e os arquivos. Os anexos abrem no SharePoint.",
         "Se houver prazo, ele aparece em destaque logo abaixo do título."

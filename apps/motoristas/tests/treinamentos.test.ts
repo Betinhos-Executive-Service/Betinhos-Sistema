@@ -4,6 +4,7 @@ import {
   anexoUrl,
   blocosDoConteudo,
   corrigirQuiz,
+  ErroTreinamento,
   formatValidade,
   mapParticipacao,
   mapTreinamento,
@@ -176,4 +177,10 @@ test("participação duplicada: fica a mais adiantada (concluída > aberta > nov
   // Confirmada sem abertoem empata com a aberta (ambas em andamento): fica a primeira, nunca a nova.
   const confirmada = participacao({ id: "p-confirmada", confirmadoEm: AGORA });
   assert.equal(participacaoPorTreinamento([nova, confirmada]).get(nova.treinamentoId)?.id, "p-confirmada");
+});
+
+test("erros de regra das mudanças são ErroTreinamento (texto liberado ao motorista)", () => {
+  const p = { id: "p1", abertoEm: "", confirmadoEm: "2026-01-01T00:00:00Z", assinadoEm: "", assinaturaJson: "", nomeAssinante: "", nota: null, aprovado: null, tentativas: 0, concluidoEm: "" } as unknown as Participacao;
+  const t = { exigeAssinatura: false, exigeQuiz: false, perguntas: [] } as unknown as Treinamento;
+  assert.throws(() => mudancaConfirmacao(t, p), (e) => e instanceof ErroTreinamento && e.message === "A leitura já foi confirmada.");
 });
