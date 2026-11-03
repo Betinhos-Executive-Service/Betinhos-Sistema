@@ -4,9 +4,6 @@
 import { isPwaContext, PWA_SW_NAME } from "./pwaManifest.ts";
 
 export const WEB_PUSH_PUBLIC_KEY = "";
-// Provisório até a fatia de schema: conferir na metadata antes de ligar a chave. createOne (Xrm.WebApi.createRecord)
-// recebe o nome lógico (singular), não o entity set; sem entrada em ENTITY_SET_TO_ENTITY_NAME o nome passa direto.
-export const PUSH_SUBSCRIPTION_TABLE = "new_inscricaopushmotorista";
 const DRIVER_MARK_KEY = "app-motoristas:web-push-driver";
 
 function readMark() {

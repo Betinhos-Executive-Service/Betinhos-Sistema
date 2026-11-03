@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { createOne, LOCAL_DRIVER_ID } from "../../lib/dataverse";
-import { enableWebPush, getWebPushState, PUSH_SUBSCRIPTION_TABLE, type WebPushState } from "../../lib/webPush";
+import { createOne, DATAVERSE, LOCAL_DRIVER_ID } from "../../lib/dataverse";
+import { enableWebPush, getWebPushState, type WebPushState } from "../../lib/webPush";
 
 const LABELS: Partial<Record<WebPushState, string>> = {
   ready: "Ativar notificações no celular",
@@ -29,7 +29,7 @@ export function WebPushLink({ driverId }: { driverId?: string }) {
     setBusy(true);
     setFailed(false);
     try {
-      if (!(await enableWebPush(driverId, (record) => createOne(PUSH_SUBSCRIPTION_TABLE, record)))) setFailed(true);
+      if (!(await enableWebPush(driverId, (record) => createOne(DATAVERSE.inscricoesPush, record)))) setFailed(true);
     } catch {
       setFailed(true);
     } finally {
