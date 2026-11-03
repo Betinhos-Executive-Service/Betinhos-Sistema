@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { filterAgendaGalleryItems, shouldShowAgendaItemInGallery } from "../src/app/agendaVisibility.ts";
-import { findFirstPendingDetail, findFirstPendingServiceDetail, getInitialComunicadoId, getInitialTermoMultaId } from "../src/app/bootstrap.ts";
+import { findFirstPendingDetail, findFirstPendingServiceDetail, getInitialComunicadoId, getInitialTermoMultaId, getInitialTreinamentoParticipacaoId } from "../src/app/bootstrap.ts";
 import type { AgendaItem } from "../src/types.ts";
 
 const firstDetail = {
@@ -110,4 +110,12 @@ test("deep link do termo de multa aceita termoMultaId direto ou dentro de data",
   assert.equal(getInitialTermoMultaId(`?data=${encodeURIComponent(`termoMultaId=${id}`)}`), id);
   assert.equal(getInitialTermoMultaId("?termoMultaId=abc"), "");
   assert.equal(getInitialTermoMultaId(""), "");
+});
+
+test("deep link do treinamento aceita treinamentoParticipacaoId direto ou dentro de data", () => {
+  const id = "3f2504e0-4f89-11d3-9a0c-0305e82c3301";
+  assert.equal(getInitialTreinamentoParticipacaoId(`?treinamentoParticipacaoId={${id.toUpperCase()}}`), id);
+  assert.equal(getInitialTreinamentoParticipacaoId(`?data=${encodeURIComponent(`treinamentoParticipacaoId=${id}`)}`), id);
+  assert.equal(getInitialTreinamentoParticipacaoId("?treinamentoParticipacaoId=abc"), "");
+  assert.equal(getInitialTreinamentoParticipacaoId(""), "");
 });

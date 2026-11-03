@@ -5,11 +5,11 @@ description: "Verifica o tour guiado por capítulos do App Motoristas: abertura 
 # Verificar tour guiado
 
 ## Cobre
-- Código: `src/app/tour.ts` (tipos, preferência, posicionamento), `src/app/tourChapters.ts` (conteúdo: 1 capítulo por tela, 25 capítulos e ~180 passos), `src/app/tourDom.ts` (busca do elemento), `src/components/common/TourOverlay.tsx`, `TourHelp.tsx` (contexto e botão "?"), `src/tour.css`, botão "?" em `FormMenu`/`ServicesMenu`/`DetailsMenu`, link "Ver tour de novo" em `InitialScreen.tsx`, estado do tour em `src/App.tsx`, `tests/tour.test.ts`.
+- Código: `src/app/tour.ts` (tipos, preferência, posicionamento), `src/app/tourChapters.ts` (conteúdo: 1 capítulo por tela, 29 capítulos e ~220 passos), `src/app/tourDom.ts` (busca do elemento), `src/components/common/TourOverlay.tsx`, `TourHelp.tsx` (contexto e botão "?"), `src/tour.css`, botão "?" em `FormMenu`/`ServicesMenu`/`DetailsMenu`, link "Ver tour de novo" em `InitialScreen.tsx`, estado do tour em `src/App.tsx`, `tests/tour.test.ts`.
 - Persistência: `localStorage["app-motoristas-tour-v2:<id do motorista>:<capítulo>"] = "visto"`; o capítulo coringa `*` marca todos como vistos. Só local: trocar de aparelho ou limpar o navegador faz o tour voltar (não há coluna de preferências do motorista no Dataverse).
 
 ## Como o tour escolhe o capítulo
-`CHAPTER_IDS_BY_SCREEN` (em `tourChapters.ts`) mapeia a tela do app para capítulos candidatos, do mais específico (com `probe`) ao mais geral: por exemplo `comunicados` -> [`comunicado-detalhe`, `comunicados`]. O primeiro cujo `probe` existe na tela vale. Abre sozinho na primeira visita (700 ms depois da carga), exceto capítulos `auto: false` (câmera, prévia da foto), que só abrem pelo "?".
+`CHAPTER_IDS_BY_SCREEN` (em `tourChapters.ts`) mapeia a tela do app para capítulos candidatos, do mais específico (com `probe`) ao mais geral: por exemplo `comunicados` -> [`comunicado-detalhe`, `comunicados`] e `treinamentos` -> [`treinamento-detalhe`, `treinamentos`]. O primeiro cujo `probe` existe na tela vale. Abre sozinho na primeira visita (700 ms depois da carga), exceto capítulos `auto: false` (câmera, prévia da foto), que só abrem pelo "?".
 
 ## Preparar ambiente
 - `node --test --experimental-strip-types tests/tour.test.ts` (não depende de `node_modules`): confere ids únicos, tamanho dos textos, que toda tela do app tem capítulo e que não há capítulo órfão.

@@ -7,6 +7,7 @@ import {
   getInitialDetail,
   getInitialParams,
   getInitialTermoMultaId,
+  getInitialTreinamentoParticipacaoId,
   getVoucherDraftKey,
   initialStore,
   isSameDetail,
@@ -150,6 +151,8 @@ import { CollisionScreen } from "./screens/CollisionScreen";
 import { ComunicadosScreen } from "./screens/ComunicadosScreen";
 import { TermosMultaScreen, type TermosLoadStatus } from "./screens/TermosMultaScreen";
 import { isMockTermos, listarTermosMotorista, resumoPendentes, separarTermos, type TermoMulta } from "./lib/termosMulta";
+import { TreinamentosScreen, type TreinamentosLoadStatus } from "./screens/TreinamentosScreen";
+import { isMockTreinamentos, isTreinamentoPendente, listarTreinamentosMotorista, mensagemNovosTreinamentos, novosTreinamentosPendentes, type Participacao, type TreinamentoMotorista } from "./lib/treinamentos";
 import { ChecklistsScreen } from "./screens/ChecklistsScreen";
 import { ButtonPreviewScreen } from "./screens/ButtonPreviewScreen";
 import { CollisionStartScreen } from "./screens/CollisionStartScreen";
@@ -472,7 +475,7 @@ function App() {
   const initialDetailRef = useRef<DetailData | null>(initialHashRouteRef.current ? initialHashDetail : getInitialDetail(store));
   const initialScreen = initialHashRouteRef.current
     ? getInitialScreenFromHashRoute(initialHashRouteRef.current, initialHashDetail)
-    : (initialDetailRef.current ? "detalhes" : getInitialTermoMultaId() ? "multas" : "inicio");
+    : (initialDetailRef.current ? "detalhes" : getInitialTermoMultaId() ? "multas" : getInitialTreinamentoParticipacaoId() ? "treinamentos" : "inicio");
   const [screen, setScreen] = useState<Screen>(initialScreen);
   const previousScreenRef = useRef<Screen>(initialScreen);
   const lastMediaScreenRef = useRef<Screen>(initialScreen);
@@ -923,6 +926,69 @@ function App() {
     if (!isMockTermos() && !driverContext?.id) return;
     reloadTermosMulta().catch((error) => reportAppError(error, { severity: "warning", source: "app", action: "listarTermosMotorista", notifyUser: false }));
   }, [driverContext?.id]);
+
+  // Treinamentos do RH: mesmo motorista logado; alimentam a tela Treinamentos e o contador da Home.
+  const [treinamentos, setTreinamentos] = useState<TreinamentoMotorista[]>([]);
+  const [treinamentosStatus, setTreinamentosStatus] = useState<TreinamentosLoadStatus>("loading");
+  const [selectedTreinamentoId, setSelectedTreinamentoId] = useState("");
+  const pendingTreinamentoDeepLinkRef = useRef(getInitialTreinamentoParticipacaoId());
+  // Ids já vistos (null até a primeira carga) e aviso de treinamento novo; a primeira carga não avisa.
+  const treinamentosConhecidosRef = useRef<Set<string> | null>(null);
+  const treinamentosEmCargaRef = useRef<Promise<void> | null>(null);
+  const [avisoTreinamentos, setAvisoTreinamentos] = useState<{ message: string; participacaoId: string } | null>(null);
+  const reloadTreinamentos = useCallback(() => {
+    if (treinamentosEmCargaRef.current) return treinamentosEmCargaRef.current;
+    const carga = (async () => {
+      try {
+        const atuais = await listarTreinamentosMotorista(comunicadosDriverIdRef.current);
+        const novos = novosTreinamentosPendentes(treinamentosConhecidosRef.current, atuais);
+        treinamentosConhecidosRef.current = new Set(atuais.map((item) => item.participacao.id));
+        setTreinamentos(atuais);
+        setTreinamentosStatus("ready");
+        if (novos.length) setAvisoTreinamentos({ message: mensagemNovosTreinamentos(novos.length), participacaoId: novos.length === 1 ? novos[0].participacao.id : "" });
+      } catch (error) {
+        setTreinamentosStatus((current) => current === "ready" ? current : "error");
+        throw error;
+      } finally {
+        treinamentosEmCargaRef.current = null;
+      }
+    })();
+    treinamentosEmCargaRef.current = carga;
+    return carga;
+  }, []);
+  useEffect(() => {
+    if (!isMockTreinamentos() && !driverContext?.id) return;
+    const carregar = () => {
+      if (document.hidden) return;
+      reloadTreinamentos().catch((error) => reportAppError(error, { severity: "warning", source: "app", action: "listarTreinamentosMotorista", notifyUser: false }));
+    };
+    carregar();
+    const timer = window.setInterval(carregar, AUTO_REFRESH_INTERVAL_MS);
+    window.addEventListener("focus", carregar);
+    document.addEventListener("visibilitychange", carregar);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", carregar);
+      document.removeEventListener("visibilitychange", carregar);
+    };
+  }, [driverContext?.id]);
+  const abrirAvisoTreinamentos = () => {
+    const participacaoId = avisoTreinamentos?.participacaoId ?? "";
+    setAvisoTreinamentos(null);
+    setSelectedTreinamentoId(participacaoId);
+    setScreen("treinamentos");
+  };
+  // Deep link do push: abre o detalhe da participação quando a lista chega; se não achar (ou a leitura falhar), fica na lista.
+  useEffect(() => {
+    const participacaoId = pendingTreinamentoDeepLinkRef.current;
+    if (!participacaoId || treinamentosStatus === "loading") return;
+    pendingTreinamentoDeepLinkRef.current = "";
+    if (treinamentos.some((item) => item.participacao.id === participacaoId)) setSelectedTreinamentoId(participacaoId);
+  }, [treinamentos, treinamentosStatus]);
+  // Participação gravada pela tela: reflete na lista e na Home sem esperar a releitura.
+  const updateTreinamentoParticipacao = useCallback((participacao: Participacao) => {
+    setTreinamentos((current) => current.map((item) => item.participacao.id === participacao.id ? { ...item, participacao } : item));
+  }, []);
 
   // Checklists usam o mesmo motorista logado dos comunicados.
   const reloadChecklists = useCallback(async () => {
@@ -1378,12 +1444,13 @@ function App() {
   const comunicadoOpen = Boolean(selectedComunicadoId);
   const checklistOpen = Boolean(selectedChecklistId);
   const termoOpen = Boolean(tourTermoId);
+  const treinamentoOpen = Boolean(selectedTreinamentoId);
 
   // Mudou a tela ou o sub-estado (abrir um comunicado, um termo): o capítulo aberto e os descartes valem só para a visão anterior.
   useEffect(() => {
     tourUnavailableRef.current.clear();
     setTourChapter(null);
-  }, [screen, comunicadoOpen, checklistOpen, termoOpen]);
+  }, [screen, comunicadoOpen, checklistOpen, termoOpen, treinamentoOpen]);
 
   useEffect(() => setTourTermoId(""), [screen]);
 
@@ -1406,8 +1473,8 @@ function App() {
     };
     timer = window.setTimeout(tryOpen, 700);
     return () => window.clearTimeout(timer);
-    // screen/comunicadoOpen/checklistOpen/termoOpen não são lidos aqui: reiniciam o atraso quando a visão muda.
-  }, [screen, comunicadoOpen, checklistOpen, termoOpen, tourChapter, tourBlocked, tourDriverId, dataLoading, criticalError, tourCandidates]);
+    // screen/comunicadoOpen/checklistOpen/termoOpen/treinamentoOpen não são lidos aqui: reiniciam o atraso quando a visão muda.
+  }, [screen, comunicadoOpen, checklistOpen, termoOpen, treinamentoOpen, tourChapter, tourBlocked, tourDriverId, dataLoading, criticalError, tourCandidates]);
 
   const closeTour = (reason: TourCloseReason) => {
     const closing = tourChapter;
@@ -1587,6 +1654,20 @@ function App() {
         </motion.div>
       </AnimatePresence>
       <LocalToast toast={dataLoading ? null : toast} onDismiss={() => setToastState(null)} />
+      {avisoTreinamentos && screen !== "treinamentos" && !dataLoading ? (
+        <div className="local-toast-layer">
+          <div className="local-toast local-toast--info trn-aviso" role="status" aria-live="polite" aria-atomic="true">
+            <div className="local-toast-copy">
+              <span className="local-toast-label">Treinamento</span>
+              <span className="local-toast-message">{avisoTreinamentos.message}</span>
+              <div className="trn-aviso-acoes">
+                <button type="button" onClick={abrirAvisoTreinamentos}>Ver treinamento</button>
+                <button type="button" onClick={() => setAvisoTreinamentos(null)}>Dispensar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <LoadingOverlay loading={getVisibleLoadingOverlay(dataLoading, criticalError)} />
       {remoteOperation ? <FlowProgressOverlay operation={remoteOperation} /> : null}
       {expenseSend ? <ExpenseSendOverlay state={expenseSend} onClose={closeExpenseSendError} /> : null}
@@ -2182,7 +2263,8 @@ function App() {
       setScreen("checklists");
       return;
     }
-    if (screenName === "servicos" || screenName === "comunicados" || screenName === "historico" || screenName === "solicitarManutencao" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro" || screenName === "multas") {
+    if (screenName === "treinamentos") setSelectedTreinamentoId("");
+    if (screenName === "servicos" || screenName === "comunicados" || screenName === "historico" || screenName === "solicitarManutencao" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro" || screenName === "multas" || screenName === "treinamentos") {
       setComunicadoOrigin("");
       setScreen(screenName);
     }
@@ -3866,6 +3948,21 @@ function App() {
     );
   }
 
+  if (screen === "treinamentos") {
+    return show(
+      <TreinamentosScreen
+        items={treinamentos}
+        loadStatus={treinamentosStatus}
+        selectedId={selectedTreinamentoId}
+        onSelectedIdChange={setSelectedTreinamentoId}
+        onBack={() => setScreen("inicio")}
+        onReload={reloadTreinamentos}
+        onParticipacaoChange={updateTreinamentoParticipacao}
+        driverName={driverContext?.fullName ?? (isMockTreinamentos() ? "Renan" : "")}
+      />
+    );
+  }
+
   if (screen === "checklists") {
     return show(
       <ChecklistsScreen
@@ -3893,6 +3990,7 @@ function App() {
       pendingComunicados={comunicados.filter(isComunicadoPending).length}
       pendingChecklists={checklists.filter(isChecklistPending).length}
       pendingMultas={separarTermos(termosMulta).pendentes.length}
+      pendingTreinamentos={treinamentos.filter(isTreinamentoPendente).length}
       multasBanner={resumoPendentes(termosMulta)}
       driverName={driverContext?.fullName}
       showLocalReset={isLocalhostRuntime && !remoteMode}

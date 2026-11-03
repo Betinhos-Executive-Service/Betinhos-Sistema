@@ -66,6 +66,10 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
         "Termos de multa para você assinar ou contestar. Cada termo mostra o prazo e o que você estaria aceitando, como o desconto em folha.",
         "A assinatura é feita no celular, com selfie e localização. Se não concordar, você contesta e conversa com o gestor de frota."
       ], { target: dt("multas") }),
+      step("treinamentos", "Treinamentos", [
+        "Conteúdos que o RH publicou para você: texto, vídeo e arquivos. Alguns pedem assinatura ou um quiz curto no fim.",
+        "O que falta fazer aparece nas pendências; o que você concluiu fica guardado para consultar."
+      ], { target: dt("treinamentos") }),
       step("manutencao", "Manutenção", [
         "Notou ruído, luz acesa no painel ou pneu vibrando? Solicite o reparo aqui, com a gravidade, a descrição e fotos.",
         "O pedido é enviado para a equipe da Betinhos."
@@ -721,6 +725,45 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
     ]
   },
   {
+    id: "treinamentos",
+    title: "Treinamentos",
+    steps: [
+      step("voltar", "Voltar", ["Volta para o Início."], { target: SERVICE_HOME }),
+      step("atualizar", "Atualizar", ["Busca novos treinamentos agora."], { target: ".services-nav-button--refresh" }),
+      step("abas", "Pendentes e Concluídos", [
+        "Pendentes mostra os treinamentos que o RH publicou para você e ainda faltam fazer. Concluídos guarda os que você terminou, com a data e a nota do quiz, para consultar quando quiser."
+      ], { target: ".termo-tabs" }),
+      step("cartao", "O treinamento", [
+        "Cada cartão traz o título, um resumo, o que ele exige (Assinatura, Quiz), o prazo e a situação: Novo, Em andamento ou Concluído.",
+        "Toque para abrir."
+      ], { target: ".trn-row", optional: true }),
+      step("vazio", "Nada pendente", ["Sem treinamentos para fazer, a aba Pendentes avisa que, quando o RH publicar um para você, ele aparece aqui."], { target: ".termo-empty", optional: true }),
+      helpStep()
+    ]
+  },
+  {
+    id: "treinamento-detalhe",
+    title: "Fazer o treinamento",
+    probe: ".trn-detail",
+    steps: [
+      step("voltar", "Voltar", ["Volta para a lista. Leitura, assinatura e quiz já enviados ficam salvos; o que estiver pela metade se perde."], { target: SERVICE_HOME }),
+      step("conteudo", "Conteúdo", [
+        "Leia o texto, assista ao vídeo e abra as fotos e os arquivos. Os anexos abrem no SharePoint.",
+        "Se houver prazo, ele aparece em destaque logo abaixo do título."
+      ], { target: ".trn-detail > .termo-card" }),
+      step("confirmar", "Confirmar leitura", [
+        "Role até o fim do conteúdo e toque em \"Confirmar leitura\". Se o treinamento não exigir mais nada, ele já fica concluído.",
+        "Quando exigir, depois vêm a assinatura e o quiz, nesta ordem."
+      ], { target: ".trn-step", optional: true }),
+      step("assinatura", "Assinar", ["Desenhe a sua assinatura no quadro e toque em \"Assinar\". Ela fica registrada em seu nome, com data e hora."], { target: ".termo-signature", optional: true }),
+      step("quiz", "Quiz", [
+        "Marque uma alternativa por pergunta e toque em \"Enviar respostas\". Abaixo da nota mínima, o app mostra quantas você acertou e \"Refazer quiz\" libera uma nova tentativa."
+      ], { target: ".trn-quiz", optional: true }),
+      step("concluido", "Concluído", ["Aqui ficam a data de conclusão, a leitura, a assinatura e a nota. Reabrir um treinamento concluído não muda nada."], { target: ".trn-concluido", optional: true }),
+      helpStep()
+    ]
+  },
+  {
     id: "meu-carro",
     title: "Meu carro",
     steps: [
@@ -751,6 +794,7 @@ const CHAPTER_IDS_BY_SCREEN: Readonly<Record<string, readonly string[]>> = {
   comunicados: ["comunicado-detalhe", "comunicados"],
   checklists: ["checklist-formulario", "checklists"],
   multas: ["multa-detalhe", "multas"],
+  treinamentos: ["treinamento-detalhe", "treinamentos"],
   solicitarManutencao: ["manutencao"],
   colisoesInicio: ["colisoes"],
   colisoes: ["colisao-registro"],
