@@ -57,6 +57,9 @@ export type Participacao = {
   aprovado: boolean | null
   tentativas: number
   concluidoEm: string | null
+  pushStatus: number | null
+  pushErro: string
+  lembradoEm: string | null
 }
 
 export type Funcionario = { id: string; nome: string; apelido: string; funcao: number | null; ativo: boolean }
@@ -256,6 +259,9 @@ export function mapParticipacao(row: Row): Participacao {
     aprovado: typeof row.cr40f_aprovado === 'boolean' ? row.cr40f_aprovado : null,
     tentativas: Number(row.cr40f_tentativas ?? 0),
     concluidoEm: dateOrNull(row.cr40f_concluidoem),
+    pushStatus: typeof row.cr40f_pushstatus === 'number' ? row.cr40f_pushstatus : null,
+    pushErro: String(row.cr40f_pusherro ?? ''),
+    lembradoEm: dateOrNull(row.cr40f_lembradoem),
   }
 }
 
@@ -300,6 +306,22 @@ export function publicoLabel(item: Pick<Treinamento, 'publicoTipo' | 'publico'>,
 }
 
 export const isConcluida = (p: Participacao) => Boolean(p.concluidoEm)
+
+export const PUSH = { pendente: 100000000, enviado: 100000001, falhou: 100000002 } as const
+export const LEMBRETE_INTERVALO_MS = 24 * 60 * 60 * 1000
+
+export function pushLabel(p: Participacao) {
+  if (p.pushStatus === PUSH.enviado) return 'Push enviado'
+  if (p.pushStatus === PUSH.falhou) return `Push falhou · ${p.pushErro || 'erro não informado'}`
+  if (p.pushStatus === PUSH.pendente) return 'Push na fila'
+  return 'Sem push'
+}
+
+/** Espelha a regra da Custom API cr40f_LembrarTreinamento: pendente, sem push na fila e sem lembrete nas últimas 24 h. A regra vale no servidor; aqui é só dica de UI. */
+export function podeLembrar(p: Participacao, agora: number) {
+  if (isConcluida(p) || p.pushStatus === PUSH.pendente) return false
+  return !p.lembradoEm || agora - Date.parse(p.lembradoEm) >= LEMBRETE_INTERVALO_MS
+}
 
 /** Participação criada por uma publicação interrompida: o funcionário saiu do público e o motorista ainda não fez nada. */
 export const isOrfa = (p: Participacao, alvoIds: Set<string>) => !alvoIds.has(p.funcionarioId) && !p.abertoEm && !p.confirmadoEm && !p.assinadoEm && p.nota == null && !p.concluidoEm

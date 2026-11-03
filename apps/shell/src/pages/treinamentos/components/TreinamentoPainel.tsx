@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Avatar, Breadcrumb, Button, EmptyState, Grid, MetricCard, PageHeader, SearchBox, SegmentedControl, Skeleton, StatusBadge, Surface, todaySaoPaulo } from '@betinhos/ui'
-import { ArrowLeft, CalendarClock, Check, CheckCircle2, Eye, Pencil, PenLine, RefreshCw, Repeat, SearchX, Users, XCircle } from 'lucide-react'
+import { Alert, Avatar, Breadcrumb, Button, EmptyState, Grid, MetricCard, PageHeader, SearchBox, SegmentedControl, Skeleton, StatusBadge, Surface, todaySaoPaulo, useToast } from '@betinhos/ui'
+import { ArrowLeft, BellRing, CalendarClock, Check, CheckCircle2, Eye, Pencil, PenLine, RefreshCw, Repeat, SearchX, Users, XCircle } from 'lucide-react'
 import { parseSignature } from '../../comunicados/domain/comunicados'
 import { Assinatura } from '../../comunicados/components/Assinatura'
 import type { Source } from '../data/source'
-import { erroTexto, fmtDia, formatDate, isConcluida, isVencido, matchParticipacao, plural, publicoLabel, statusParticipacao, type FiltroParticipacao, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
+import { erroTexto, fmtDia, formatDate, isConcluida, isVencido, matchParticipacao, plural, podeLembrar, publicoLabel, PUSH, pushLabel, statusParticipacao, type FiltroParticipacao, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
 import { AnexosSecao } from './AnexosSecao'
 import { Conteudo } from './Conteudo'
 
@@ -26,7 +26,9 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack, onEditar
   const [filtro, setFiltro] = useState<FiltroParticipacao>('todos')
   const [busca, setBusca] = useState('')
   const [selectedId, setSelectedId] = useState('')
+  const [lembrando, setLembrando] = useState(false)
   const token = useRef(0)
+  const toast = useToast()
   const detalheRef = useRef<HTMLDivElement | null>(null)
 
   const pessoas = useMemo(() => new Map(funcionarios.map((f) => [f.id, f])), [funcionarios])
@@ -67,6 +69,20 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack, onEditar
 
   const publico = publicoLabel(item, funcionarios)
 
+  const lembrar = async (participacao?: Participacao) => {
+    setLembrando(true)
+    try {
+      const r = await source.lembrar(item.id, participacao?.id)
+      toast({ tone: 'success', message: `Lembrete enviado para ${r.enfileirados} ${plural(r.enfileirados, 'funcionário', 'funcionários')}${r.ignorados ? ` · ${r.ignorados} lembrados nas últimas 24 h` : ''}` })
+      await load()
+    } catch (reason) {
+      toast({ tone: 'danger', message: erroTexto(reason, 'Não foi possível enviar o lembrete.') })
+    } finally {
+      setLembrando(false)
+    }
+  }
+  const algumLembravel = rows.some((p) => podeLembrar(p, Date.now()))
+
   const etapas = (p: Participacao) => [
     { label: 'Abriu no app', time: formatDate(p.abertoEm) || 'Ainda não abriu', done: Boolean(p.abertoEm) },
     { label: 'Confirmou a leitura', time: formatDate(p.confirmadoEm) || 'Pendente', done: Boolean(p.confirmadoEm) },
@@ -91,6 +107,7 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack, onEditar
         actions={(
           <div className="tr-actions">
             <Button variant="secondary" icon={<ArrowLeft size={16} />} onClick={onBack}>Voltar</Button>
+            <Button variant="secondary" icon={<BellRing size={16} />} loading={lembrando} disabled={!algumLembravel} title={algumLembravel ? undefined : 'Ninguém pode ser lembrado agora (concluído, push na fila ou lembrado nas últimas 24 h)'} onClick={() => void lembrar()}>Lembrar pendentes</Button>
             <Button variant="secondary" icon={<RefreshCw size={16} />} loading={loading && loaded} onClick={() => void load()}>Atualizar</Button>
             <Button variant="secondary" icon={<Pencil size={16} />} onClick={onEditar}>Editar conteúdo</Button>
             <Button variant="secondary" icon={<Repeat size={16} />} onClick={onReaplicar}>Reaplicar</Button>
@@ -126,6 +143,7 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack, onEditar
                     <span className="tr-recipient__text">
                       <strong>{nome(p)}{desligado(p) ? <StatusBadge tone="neutral">Desligado</StatusBadge> : null}</strong>
                       <small>{status.quando ? `${status.label} em ${formatDate(status.quando)}` : 'Aguardando abertura'}</small>
+                      <small className={p.pushStatus === PUSH.falhou ? 'tr-push is-falhou' : 'tr-push'}>{pushLabel(p)}</small>
                     </span>
                     <span className="tr-recipient__nota">{item.exigeQuiz ? (p.nota == null ? 'Sem nota' : `Nota ${p.nota}%`) : ''}</span>
                     <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
@@ -152,6 +170,7 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack, onEditar
                 ))}
               </ol>
               {selected.assinaturaJson ? <><span className="tr-label">Assinatura</span><div className="tr-signature"><Assinatura value={parseSignature(selected.assinaturaJson)} /></div></> : null}
+              {selected.pushStatus === PUSH.falhou ? <Button variant="secondary" size="compact" icon={<BellRing size={14} />} loading={lembrando} onClick={() => void lembrar(selected)}>Reenviar push</Button> : null}
               {vencido && !isConcluida(selected) ? <p className="tr-pending"><CalendarClock size={16} aria-hidden="true" />Validade vencida em {fmtDia(item.validade)} sem conclusão.</p> : null}
             </Surface>
             </div>

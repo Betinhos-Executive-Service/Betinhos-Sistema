@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { TELA, builtinViews, matchesKeyword, readTreinamento, sortTreinamentos, type Linha } from './lista'
 import {
-  ESTADO, FUNCAO_MOTORISTA, PUBLICO, anexoDaPasta, blocosDoConteudo, copiaParaReciclagem, edicaoPublicadoPayload, draftPayload, emptyDraft, isOrfa, isVencido, mapParticipacao, mapTreinamento, matchParticipacao, novaPergunta, publicoLabel, resolverPublico, statusParticipacao, trechos,
+  ESTADO, FUNCAO_MOTORISTA, PUBLICO, anexoDaPasta, blocosDoConteudo, copiaParaReciclagem, edicaoPublicadoPayload, draftPayload, emptyDraft, isOrfa, isVencido, mapParticipacao, mapTreinamento, matchParticipacao, podeLembrar, pushLabel, PUSH, novaPergunta, publicoLabel, resolverPublico, statusParticipacao, trechos,
   validarAnexo, validarComConteudo, validarPublicacao, validarQuiz, validarRascunho, type Funcionario, type Participacao, type Pergunta, type Treinamento,
 } from './treinamentos'
 
@@ -13,7 +13,7 @@ const FUNC: Funcionario[] = [
 ]
 const pergunta = (corretaId: string): Pergunta => ({ id: 'q1', texto: 'Qual a porta?', alternativas: [{ id: 'a', texto: 'Porta 2' }, { id: 'b', texto: 'Porta 4' }], corretaId })
 const draft = (patch: Partial<Treinamento> = {}): Treinamento => ({ ...emptyDraft(), titulo: 'Embarque no GRU', conteudo: 'Texto', ...patch })
-const part = (patch: Partial<Participacao> = {}): Participacao => ({ id: 'p', treinamentoId: 't', funcionarioId: G(1), abertoEm: null, confirmadoEm: null, assinadoEm: null, nomeAssinante: '', assinaturaJson: '', nota: null, aprovado: null, tentativas: 0, concluidoEm: null, ...patch })
+const part = (patch: Partial<Participacao> = {}): Participacao => ({ id: 'p', treinamentoId: 't', funcionarioId: G(1), abertoEm: null, confirmadoEm: null, assinadoEm: null, nomeAssinante: '', assinaturaJson: '', nota: null, aprovado: null, tentativas: 0, concluidoEm: null, pushStatus: PUSH.enviado, pushErro: '', lembradoEm: null, ...patch })
 
 describe('validação do rascunho', () => {
   it('exige título e aceita texto, vídeo https e quiz completo', () => {
@@ -221,5 +221,28 @@ describe('publicoLabel', () => {
     expect(publicoLabel({ publicoTipo: PUBLICO.selecionados, publico: ['a', 'b'] }, fs)).toBe('Ana Souza e Bruno Lima')
     expect(publicoLabel({ publicoTipo: PUBLICO.selecionados, publico: ['a', 'b', 'c'] }, fs)).toBe('Ana Souza, Bruno Lima e mais 1')
     expect(publicoLabel({ publicoTipo: PUBLICO.selecionados, publico: ['a', 'b'] })).toBe('2 selecionados')
+  })
+})
+
+describe('push da participação', () => {
+  const base = part()
+  it('mapeia status, erro e lembrete', () => {
+    const p = mapParticipacao({ cr40f_pushstatus: PUSH.falhou, cr40f_pusherro: 'Dispositivo não registrado', cr40f_lembradoem: '2026-11-03T10:00:00Z' })
+    expect(p).toMatchObject({ pushStatus: PUSH.falhou, pushErro: 'Dispositivo não registrado', lembradoEm: '2026-11-03T10:00:00Z' })
+    expect(mapParticipacao({}).pushStatus).toBeNull()
+  })
+  it('rotula o push', () => {
+    expect(pushLabel({ ...base, pushStatus: null })).toBe('Sem push')
+    expect(pushLabel({ ...base, pushStatus: PUSH.pendente })).toBe('Push na fila')
+    expect(pushLabel({ ...base, pushStatus: PUSH.enviado })).toBe('Push enviado')
+    expect(pushLabel({ ...base, pushStatus: PUSH.falhou, pushErro: 'x' })).toBe('Push falhou · x')
+  })
+  it('lembra pendente sem lembrete nas últimas 24 h; nunca concluído ou com push na fila', () => {
+    const agora = Date.parse('2026-11-03T12:00:00Z')
+    expect(podeLembrar({ ...base, pushStatus: PUSH.enviado }, agora)).toBe(true)
+    expect(podeLembrar({ ...base, pushStatus: PUSH.enviado, lembradoEm: '2026-11-03T00:00:00Z' }, agora)).toBe(false)
+    expect(podeLembrar({ ...base, pushStatus: PUSH.enviado, lembradoEm: '2026-11-02T11:59:00Z' }, agora)).toBe(true)
+    expect(podeLembrar({ ...base, pushStatus: PUSH.pendente }, agora)).toBe(false)
+    expect(podeLembrar({ ...base, pushStatus: PUSH.falhou, concluidoEm: '2026-11-03T09:00:00Z' }, agora)).toBe(false)
   })
 })

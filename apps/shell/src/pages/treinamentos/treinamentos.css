@@ -87,6 +87,8 @@
 .tr-recipient__text { display: grid; gap: 2px; min-width: 0; }
 .tr-recipient__text strong { display: flex; align-items: center; gap: var(--bt-space-1-5); font-size: var(--bt-font-size-13); color: var(--bt-color-text-primary); }
 .tr-recipient__text small { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.tr-push { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.tr-push.is-falhou { color: var(--bt-color-danger); }
 .tr-recipient__nota { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); font-variant-numeric: tabular-nums; }
 .tr-side.tr-side--painel { position: sticky; top: var(--bt-space-4); }
 .tr-timeline { display: grid; gap: var(--bt-space-3); margin-bottom: var(--bt-space-4); }

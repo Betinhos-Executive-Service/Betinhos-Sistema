@@ -1,4 +1,4 @@
-import { ESTADO, PUBLICO, isOrfa, isPublicado, validarComConteudo, validarRascunho, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
+import { ESTADO, PUBLICO, PUSH, isOrfa, podeLembrar, isPublicado, validarComConteudo, validarRascunho, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
 import type { Linha } from '../domain/lista'
 import type { Source } from './source'
 
@@ -25,7 +25,7 @@ const QUIZ = [
 ]
 
 function participacao(n: number, treinamentoId: string, funcionarioId: string, extra: Partial<Participacao> = {}): Participacao {
-  return { id: id(100 + n), treinamentoId, funcionarioId, abertoEm: null, confirmadoEm: null, assinadoEm: null, nomeAssinante: '', assinaturaJson: '', nota: null, aprovado: null, tentativas: 0, concluidoEm: null, ...extra }
+  return { id: id(100 + n), treinamentoId, funcionarioId, abertoEm: null, confirmadoEm: null, assinadoEm: null, nomeAssinante: '', assinaturaJson: '', nota: null, aprovado: null, tentativas: 0, concluidoEm: null, pushStatus: PUSH.enviado, pushErro: '', lembradoEm: null, ...extra }
 }
 
 /** Dados de exemplo do `pnpm dev`: um publicado completo (vídeo, anexo, assinatura, quiz), um vencido e um rascunho. */
@@ -52,7 +52,7 @@ export function createMockSource(): Source {
   const participacoes: Participacao[] = [
     participacao(1, id(10), id(1), { abertoEm: hoje, confirmadoEm: hoje, assinadoEm: hoje, nomeAssinante: 'Carlos Alberto Teste', assinaturaJson: ASSINATURA, nota: 100, aprovado: true, tentativas: 1, concluidoEm: hoje }),
     participacao(2, id(10), id(2), { abertoEm: hoje, confirmadoEm: hoje, assinadoEm: hoje, nomeAssinante: 'Márcio Lima', assinaturaJson: ASSINATURA, nota: 33, aprovado: false, tentativas: 1 }),
-    participacao(3, id(10), id(3), { abertoEm: hoje }),
+    participacao(3, id(10), id(3), { abertoEm: hoje, pushStatus: PUSH.falhou, pushErro: 'Dispositivo não registrado' }),
     participacao(4, id(11), id(1), { abertoEm: ontem, confirmadoEm: ontem, concluidoEm: ontem }),
     participacao(5, id(11), id(2)),
     participacao(6, id(11), id(5), { abertoEm: ontem }),
@@ -103,7 +103,7 @@ export function createMockSource(): Source {
       const alvoIds = new Set(alvos.map((f) => f.id))
       for (let i = participacoes.length - 1; i >= 0; i--) if (participacoes[i].treinamentoId === item.id && isOrfa(participacoes[i], alvoIds)) participacoes.splice(i, 1)
       const jaTem = new Set(participacoes.filter((p) => p.treinamentoId === item.id).map((p) => p.funcionarioId))
-      for (const f of alvos) if (!jaTem.has(f.id)) participacoes.push(participacao((seq += 1), item.id, f.id))
+      for (const f of alvos) if (!jaTem.has(f.id)) participacoes.push(participacao((seq += 1), item.id, f.id, { pushStatus: PUSH.pendente }))
       item.estado = ESTADO.publicado
       item.publicadoEm = new Date().toISOString()
     },
@@ -111,6 +111,14 @@ export function createMockSource(): Source {
       await wait(300)
       const nome = existentes.some((a) => a.nome === file.name) ? `${file.name} (2)` : file.name
       return { nome, caminho: `Treinamentos/DEV/${treinamentoId}/${nome}`, tamanho: file.size, mime: file.type || 'application/octet-stream' }
+    },
+    async lembrar(treinamentoId, participacaoId) {
+      await wait(200)
+      const agora = Date.now()
+      const alvo = participacoes.filter((p) => p.treinamentoId === treinamentoId && (!participacaoId || p.id === participacaoId) && !p.concluidoEm)
+      const aptas = alvo.filter((p) => podeLembrar(p, agora))
+      for (const p of aptas) Object.assign(p, { pushStatus: PUSH.enviado, pushErro: '', lembradoEm: new Date(agora).toISOString() })
+      return { enfileirados: aptas.length, ignorados: alvo.length - aptas.length }
     },
     async excluirAnexo() { await wait(200) },
     async abrirAnexo(anexo) { await wait(200); return { nome: anexo.nome, blob: new Blob([`Conteúdo de exemplo de ${anexo.nome}`], { type: 'text/plain' }) } },
