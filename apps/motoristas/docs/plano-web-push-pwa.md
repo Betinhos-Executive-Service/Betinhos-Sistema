@@ -5,9 +5,9 @@ Cada notificação que os Flows já enviam pelo Power Apps Notification V2 passa
 
 ## Decisões (3/11/2026)
 - Escopo: clonar todas as notificações existentes dos Flows (Novo Serviço, Serviço Retirado da Agenda, Serviço Editado, Serviço Não Visualizado, Comunicados, Termo de Multa, Treinamentos, Checklist).
-- Emissor: plugin .NET + Custom API `new_EnviarWebPush` (sem Azure Function). A chave privada VAPID fica em variável de ambiente secreta do Dataverse, nunca no cliente nem no repositório.
+- Emissor (revisado em 3/11/2026): Cloudflare Worker gratuito em `workers/web-push/` (WebCrypto, sem dependências). O plugin .NET foi descartado: o `net462` não tem AES-GCM e a máquina de desenvolvimento não tem `dotnet`. A chave privada VAPID e o segredo compartilhado ficam como segredos do Worker, nunca no cliente nem no repositório.
 - Ativação: botão "Ativar notificações" no app. Públicos Android e iPhone (guia de instalação na tela inicial para iOS 16.4+).
-- Os Flows chamam a Custom API em paralelo à notificação atual; a notificação do Power Apps continua como está.
+- Os Flows consultam as inscrições do motorista e chamam `POST /send` do Worker (Bearer com o segredo compartilhado) em paralelo à notificação atual, apagando as linhas que voltarem com `gone: true`; a notificação do Power Apps continua como está.
 
 ## Contexto
 - `src/pwa/sw.js`: hoje só cacheia o HTML. Receberá `push` e `notificationclick`; subir `CACHE`.
@@ -21,7 +21,7 @@ Cada notificação que os Flows já enviam pelo Power Apps Notification V2 passa
 ## Fatias (cada uma vira PR)
 1. Cliente: handlers no SW, botão de ativação, guia iOS, gravação da inscrição.
 2. Schema: tabela de inscrições, papéis e env var secreta (script de provisionamento, DEV).
-3. Emissor: Custom API + plugin com assinatura VAPID e cifra `aes128gcm`, remoção de inscrição 404/410.
+3. Emissor: Worker com assinatura VAPID e cifra `aes128gcm` (código e testes prontos); falta publicar, papéis da tabela e ligar `WEB_PUSH_PUBLIC_KEY`.
 4. Flows: adicionar a chamada da Custom API em cada Flow clonado.
 
 ## Verificação (pronto quando todos passarem)
