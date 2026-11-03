@@ -17,6 +17,8 @@ import {
   resolverVideo,
   isAnexoVideo,
   separarTreinamentos,
+  sha256Hex,
+  snapshotConteudo,
   statusTreinamento,
   trechos,
   type Participacao,
@@ -33,7 +35,7 @@ const treinamento = (extra: Partial<Treinamento> = {}): Treinamento => ({
   ...mapTreinamento({
     cr40f_treinamentoid: "{A1A1A1A1-0000-4000-8000-000000000001}", cr40f_name: "Atendimento", cr40f_descricao: "d", cr40f_conteudo: "# T\n- i",
     cr40f_videourl: "https://youtu.be/dQw4w9WgXcQ", cr40f_anexosjson: JSON.stringify([{ nome: "g.pdf", caminho: "/sites/x/g.pdf", tamanho: 10, mime: "application/pdf" }, { nome: "sem caminho" }]),
-    cr40f_exigeassinatura: true, cr40f_exigequiz: true, cr40f_notaminima: 70, cr40f_quizjson: JSON.stringify(QUIZ), cr40f_validade: "2026-12-15T00:00:00Z", cr40f_publicadoem: "2026-10-30T09:30:00Z"
+    cr40f_exigeassinatura: true, cr40f_exigequiz: true, cr40f_notaminima: 70, cr40f_quizjson: JSON.stringify(QUIZ), cr40f_validade: "2026-12-15T00:00:00Z", cr40f_publicadoem: "2026-10-30T09:30:00Z", cr40f_editadoem: "2026-11-01T08:00:00Z"
   }),
   ...extra
 });
@@ -183,4 +185,21 @@ test("erros de regra das mudanças são ErroTreinamento (texto liberado ao motor
   const p = { id: "p1", abertoEm: "", confirmadoEm: "2026-01-01T00:00:00Z", assinadoEm: "", assinaturaJson: "", nomeAssinante: "", nota: null, aprovado: null, tentativas: 0, concluidoEm: "" } as unknown as Participacao;
   const t = { exigeAssinatura: false, exigeQuiz: false, perguntas: [] } as unknown as Treinamento;
   assert.throws(() => mudancaConfirmacao(t, p), (e) => e instanceof ErroTreinamento && e.message === "A leitura já foi confirmada.");
+});
+
+test("snapshot do conteúdo é JSON estável, sem espaços, no formato combinado com o shell", () => {
+  assert.equal(
+    snapshotConteudo(treinamento()),
+    '{"v":1,"titulo":"Atendimento","descricao":"d","conteudo":"# T\\n- i","videoUrl":"https://youtu.be/dQw4w9WgXcQ","anexos":[{"nome":"g.pdf","tamanho":10}],"exigeAssinatura":true,"exigeQuiz":true,"notaMinima":70,"publicadoEm":"2026-10-30T09:30:00Z","editadoEm":"2026-11-01T08:00:00Z"}'
+  );
+  assert.equal(snapshotConteudo(treinamento({ editadoEm: null })).endsWith('"editadoEm":null}'), true);
+});
+
+test("sha256Hex calcula o hash em hexadecimal minúsculo", async () => {
+  assert.equal(await sha256Hex("abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+});
+
+test("mapTreinamento lê a data da última edição", () => {
+  assert.equal(treinamento().editadoEm, "2026-11-01T08:00:00Z");
+  assert.equal(mapTreinamento({}).editadoEm, null);
 });

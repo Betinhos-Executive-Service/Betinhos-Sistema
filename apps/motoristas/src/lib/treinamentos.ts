@@ -29,6 +29,7 @@ export type Treinamento = {
   /** Prazo `AAAA-MM-DD` ou vazio. */
   validade: string;
   publicadoEm: string | null;
+  editadoEm: string | null;
 };
 
 export type Participacao = {
@@ -91,7 +92,8 @@ export function mapTreinamento(row: Record<string, unknown>): Treinamento {
     notaMinima: typeof row.cr40f_notaminima === "number" ? row.cr40f_notaminima : NOTA_MINIMA_PADRAO,
     perguntas,
     validade: String(row.cr40f_validade ?? "").slice(0, 10),
-    publicadoEm: dateOrNull(row.cr40f_publicadoem)
+    publicadoEm: dateOrNull(row.cr40f_publicadoem),
+    editadoEm: dateOrNull(row.cr40f_editadoem)
   };
 }
 
@@ -239,6 +241,28 @@ export function trechos(texto: string): { negrito: boolean; texto: string }[] {
   return texto.split(/(\*\*[^*]+\*\*)/).filter(Boolean).map((parte) => (/^\*\*[^*]+\*\*$/.test(parte) ? { negrito: true, texto: parte.slice(2, -2) } : { negrito: false, texto: parte }));
 }
 
+/** Cópia do que o motorista leu, gravada na conclusão. Formato combinado com o shell (v1): não mude as chaves nem a ordem. */
+export function snapshotConteudo(item: Treinamento): string {
+  return JSON.stringify({
+    v: 1,
+    titulo: item.titulo,
+    descricao: item.descricao,
+    conteudo: item.conteudo,
+    videoUrl: item.videoUrl,
+    anexos: item.anexos.map((a) => ({ nome: a.nome, tamanho: a.tamanho })),
+    exigeAssinatura: item.exigeAssinatura,
+    exigeQuiz: item.exigeQuiz,
+    notaMinima: item.notaMinima,
+    publicadoEm: item.publicadoEm,
+    editadoEm: item.editadoEm
+  });
+}
+
+export async function sha256Hex(texto: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(texto));
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 // ---------------- Payloads (puros, testáveis) ----------------
 
 type Patch = Record<string, unknown>;
@@ -285,7 +309,7 @@ export function mudancaQuiz(item: Treinamento, p: Participacao, respostas: Recor
 
 // ---------------- Dados ----------------
 
-const TREINAMENTO_SELECT = "$select=cr40f_treinamentoid,cr40f_name,cr40f_descricao,cr40f_conteudo,cr40f_videourl,cr40f_anexosjson,cr40f_exigeassinatura,cr40f_exigequiz,cr40f_notaminima,cr40f_quizjson,cr40f_validade,cr40f_publicadoem";
+const TREINAMENTO_SELECT = "$select=cr40f_treinamentoid,cr40f_name,cr40f_descricao,cr40f_conteudo,cr40f_videourl,cr40f_anexosjson,cr40f_exigeassinatura,cr40f_exigequiz,cr40f_notaminima,cr40f_quizjson,cr40f_validade,cr40f_publicadoem,cr40f_editadoem";
 const PARTICIPACAO_SELECT = "$select=cr40f_treinamentoparticipacaoid,_cr40f_treinamento_value,cr40f_abertoem,cr40f_confirmadoem,cr40f_assinadoem,cr40f_nomeassinante,cr40f_assinaturajson,cr40f_nota,cr40f_aprovado,cr40f_tentativas,cr40f_concluidoem";
 
 const mockParam = (name: string) => new URLSearchParams(window.location.search).get(name);
@@ -396,7 +420,11 @@ export function abrirTreinamento(p: Participacao): Promise<Participacao> {
   return aplicar({ patch: { cr40f_abertoem: agora }, participacao: { ...p, abertoEm: agora } });
 }
 
-async function aplicar(mudanca: Mudanca) {
+async function aplicar(mudanca: Mudanca, item?: Treinamento) {
+  if (item && mudanca.patch.cr40f_concluidoem) {
+    const snapshot = snapshotConteudo(item);
+    mudanca = { ...mudanca, patch: { ...mudanca.patch, cr40f_conteudosnapshot: snapshot, cr40f_conteudohash: await sha256Hex(snapshot) } };
+  }
   if (isMockTreinamentos()) {
     await mockDelay();
     if (mockParam("mockTreinamentoErro") === "gravar") throw new Error("Falha simulada ao gravar.");
@@ -409,11 +437,11 @@ async function aplicar(mudanca: Mudanca) {
   return mudanca.participacao;
 }
 
-export const confirmarLeitura = (item: TreinamentoMotorista) => aplicar(mudancaConfirmacao(item.treinamento, item.participacao));
-export const assinarTreinamento = (item: TreinamentoMotorista, strokes: SignatureStrokes, nome: string) => aplicar(mudancaAssinatura(item.treinamento, item.participacao, strokes, nome));
+export const confirmarLeitura = (item: TreinamentoMotorista) => aplicar(mudancaConfirmacao(item.treinamento, item.participacao), item.treinamento);
+export const assinarTreinamento = (item: TreinamentoMotorista, strokes: SignatureStrokes, nome: string) => aplicar(mudancaAssinatura(item.treinamento, item.participacao, strokes, nome), item.treinamento);
 
 export async function responderQuiz(item: TreinamentoMotorista, respostas: Record<string, string>) {
   const mudanca = mudancaQuiz(item.treinamento, item.participacao, respostas);
-  const participacao = await aplicar(mudanca);
+  const participacao = await aplicar(mudanca, item.treinamento);
   return { participacao, resultado: mudanca.resultado };
 }
