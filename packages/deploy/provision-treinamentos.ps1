@@ -260,9 +260,9 @@ if ($partId) {
   Ensure-AttributeOn $part (DateTimeUtc "cr40f_ConcluidoEm" "Concluído em" "Quando cumpriu tudo que o treinamento exige (leitura, assinatura e quiz)")
   Ensure-AttributeOn $part (Picklist "cr40f_PushStatus" "Status do push" "Pendente: o flow Push Treinamentos envia e grava Enviado ou Falhou" @("Pendente", "Enviado", "Falhou"))
   Ensure-AttributeOn $part (Text "cr40f_PushErro" "Erro do push" "Mensagem do conector quando o push falha" 1000)
-  Ensure-AttributeOn $part (DateTimeUtc "cr40f_LembradoEm" "Lembrado em" "Ultimo lembrete enfileirado pela Custom API cr40f_LembrarTreinamento (1 a cada 24 h)")
-  Ensure-AttributeOn $part (Memo "cr40f_ConteudoSnapshot" "Conteudo lido" "JSON da versao do treinamento no momento da conclusao, gravado pelo App Motoristas" 120000)
-  Ensure-AttributeOn $part (Text "cr40f_ConteudoHash" "Hash do conteudo lido" "SHA-256 (hex) do cr40f_conteudosnapshot" 64)
+  Ensure-AttributeOn $part (DateTimeUtc "cr40f_LembradoEm" "Lembrado em" "Último lembrete enfileirado pela Custom API cr40f_LembrarTreinamento (1 a cada 24 h)")
+  Ensure-AttributeOn $part (Memo "cr40f_ConteudoSnapshot" "Conteúdo lido" "JSON da versão do treinamento no momento da conclusão, gravado pelo App Motoristas" 120000)
+  Ensure-AttributeOn $part (Text "cr40f_ConteudoHash" "Identificador do conteúdo lido" "SHA-256 (hex) do cr40f_conteudosnapshot; identifica a versão lida, não prova integridade" 64)
   # Excluir o treinamento apaga as participações (Cascade). Funcionário com participação não pode ser excluído (Restrict):
   # nota e assinatura são prova de treinamento; o caminho normal é marcar como Desligado.
   Ensure-Lookup $relTrein $trein $part "cr40f_Treinamento" "Treinamento" "Treinamento desta participação" "Cascade" "ApplicationRequired"
