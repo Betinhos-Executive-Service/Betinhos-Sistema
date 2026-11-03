@@ -237,3 +237,10 @@ test("mensagemNovosTreinamentos: singular e plural", () => {
   assert.equal(mensagemNovosTreinamentos(1), "Você recebeu um novo treinamento.");
   assert.equal(mensagemNovosTreinamentos(2), "Você recebeu 2 novos treinamentos.");
 });
+
+test("blocosDoConteudo: # sem espaço também é título e # sozinho não", () => {
+  assert.deepEqual(blocosDoConteudo("#Como dirigir\nTexto\n#"), [
+    { tipo: "h", texto: "Como dirigir" },
+    { tipo: "p", texto: "Texto\n#" },
+  ]);
+});
