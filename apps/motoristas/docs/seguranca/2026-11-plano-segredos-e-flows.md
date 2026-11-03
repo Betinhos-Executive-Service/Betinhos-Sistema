@@ -33,13 +33,18 @@ Escolha: `new_AnthropicKeyObservacaoMotorista`, porque o consumidor é um plugin
 - Plugin compila em net462 sem erros; 5 testes novos passam em net8. A suíte inteira do projeto de testes não compila fora do Windows (há um `string.Contains` com dois argumentos em `ExchangePossessionFinalizerTests`, de outra frente).
 - Script PowerShell **não executado** (sem `pwsh`).
 
-**Falta, no Windows, nesta ordem:**
-1. Publicar o assembly no DEV. No Linux: copiar a `DriverRecordSharing.snk` real do Windows para `plugins/DriverRecordSharing/` e rodar `node scripts/publicar-plugin-dev.mjs --build` (confere sem gravar) e depois `--build --apply`. O script recusa branch sem a `main`, mudança não commitada, token de nome forte diferente do DEV (`9b3305f5ee59a061`) e DLL sem algum tipo que existe no DEV, e guarda uma cópia do assembly atual em `/tmp`. No Windows, o fluxo de sempre. A chave que gerei aqui é descartável e nunca vai a lugar nenhum.
-2. Gerar uma **chave nova** no console da Anthropic para a observação do motorista e rodar `scripts/provision-observacao-organizada.ps1 -Apply -ConfigurarChaveSegura`. Valide o primeiro `-Apply`: o `Invoke-Dv` manda o cabeçalho de solução também para a tabela de configuração segura, e não conferi se ela aceita.
-3. Chamar `new_OrganizarObservacao` e conferir os tópicos.
-4. Esvaziar o valor padrão de `new_AnthropicKeyObservacaoMotorista`, repetir a chamada e revogar a chave antiga no console.
-5. Verificar como motorista: a definição não mostra mais a chave.
-6. Só depois, incluir o step "Organizar observacao do motorista" em `$secureSteps` de `scripts/deploy-prod.ps1`. Antes disso o deploy do PROD passaria a falhar.
+**Feito no DEV em 03/11/2026:**
+1. Assembly publicado a partir da `main` (`0f8d99b`), 13 tipos preservados.
+2. Chave **existente** copiada da variável para a configuração segura do step com `node scripts/configurar-chave-observacao-dev.mjs --copiar-da-variavel` (Linux; valor nunca impresso). Não foi gerada chave nova.
+3. Valor padrão de `new_AnthropicKeyObservacaoMotorista` esvaziado e `new_OrganizarObservacao` chamada com texto fictício: `ok:true`, 4 tópicos, 1,1 s. Antes da republicação do plugin o mesmo teste dava `sem_chave`.
+
+**Cuidado:** o assembly é único. Nesse dia o DEV foi sobrescrito duas vezes por publicações de um checkout do Windows 11 commits atrás da `main`. Faça `git pull` antes de qualquer `npm run push`.
+
+**Falta:**
+1. Revogar a chave antiga no console da Anthropic (ela ficou legível pelos motoristas até o valor ser esvaziado).
+2. Verificar como motorista que a definição não mostra mais a chave.
+3. PROD: repetir o caminho (publicar o assembly por `scripts/deploy-prod.ps1`, gravar a chave na configuração segura do step, esvaziar a variável) só com pedido explícito.
+4. Só depois, incluir o step "Organizar observacao do motorista" em `$secureSteps` de `scripts/deploy-prod.ps1`. Antes disso o deploy do PROD passaria a falhar.
 
 ## Fase 3. Demais segredos
 - Segredos usados por plugin: mesmo caminho da fase 2.
