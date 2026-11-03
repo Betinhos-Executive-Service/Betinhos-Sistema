@@ -4,7 +4,7 @@ Decidido com Renan em 03/11/2026 (sessão de grilling). Este documento é a font
 
 ## Escopo v1
 
-- Só a categoria **Abastecimento** (`local-abastecimento`, `exigeLitros=true`). Sempre gasolina comum: não há tipo de combustível.
+- Só a categoria **Combustível** (nome no PROD; chave do app `local-abastecimento`, `exigeLitros=true`). Referências do comparativo excluem o mesmo posto e o mesmo motorista. Sempre gasolina comum: não há tipo de combustível.
 - Quem vê: o **próprio motorista**, no módulo Despesas do App Motoristas. Colegas aparecem anônimos; o **nome do posto** aparece.
 - Nota de performance é **orientação**, sem efeito em repasse, bônus ou advertência.
 - Liberado para **todos os motoristas** de uma vez (sem piloto).

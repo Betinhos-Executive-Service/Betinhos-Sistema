@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Categoria alvo: **Abastecimento** (`local-abastecimento`, nome normalizado `abastecimento`). Nunca filtrar por "combust".
+- Categoria alvo: **Combustível** (decisão do Renan em 03/11/2026: é o nome no PROD; chave do app `local-abastecimento`). Filtrar pelo nome normalizado `combustivel` (aceitar também `abastecimento` por compatibilidade). Sem tipo de combustível: preço sempre comparável. Referências excluem o mesmo posto e o mesmo motorista.
 - Raio 3.000 m; janela 7 dias antes até o mesmo dia; mínimo 2 referências; preço por litro válido em [3,00; 12,00].
 - Nota: preço 50 (−2% → 50, +5% → 0), consumo 30 (r ≥ 1,05 → 30, r ≤ 0,85 → 0), registro 20 (CNPJ 8, km 8, lançado ≤ 2 dias 4); só com ≥ 4 abastecimentos no mês; normalizada pelos pesos disponíveis.
 - Modelo de IA: `claude-haiku-5-5`, endpoint `https://api.anthropic.com/v1/messages`, `anthropic-version: 2023-06-01`, timeout 8000 ms, tool use com schema. Nunca logar chave, texto do cupom ou insight; trace só tamanho, ms, tokens e motivo.
