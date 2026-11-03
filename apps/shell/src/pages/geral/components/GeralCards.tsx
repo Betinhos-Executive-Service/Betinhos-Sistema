@@ -1,7 +1,7 @@
 import type { MouseEvent, ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
 import { Button, Checkbox, Skeleton, StatusBadge } from '@betinhos/ui'
-import { statusTone } from '../domain/cells'
+import { ChoiceBadge } from './ChoiceBadge'
 import { formatCell } from '../domain/format'
 import { rowKey } from '../domain/layout'
 import { ID_ATTRIBUTE, type AttributeMap, type Column } from '../domain/types'
@@ -63,7 +63,7 @@ export function GeralCards({ rows, columns, attributes, loading, selected, onTog
                   <Checkbox label={<span className="gr-sr">Selecionar serviço {name}</span>} checked={selected.has(id)} onChange={() => onToggle(id)} />
                 </span>
                 <button type="button" className="gr-open" aria-label={`Abrir serviço ${name} no Formulário Geral`} onClick={() => onOpen(id)}>{name}</button>
-                {typeof statusRaw === 'number' ? <StatusBadge tone={statusTone(STATUS, statusRaw)}>{formatCell('readonly', row, STATUS)}</StatusBadge> : null}
+                {has.status && typeof statusRaw === 'number' ? <ChoiceBadge column={has.status} info={attributes?.get(has.status.key)} raw={statusRaw} text={formatCell('readonly', row, STATUS)} /> : null}
               </div>
               {data != null ? <p className="gr-card__line"><strong>{data}</strong></p> : null}
               {has.cliente ? <p className="gr-card__line">{valueOf(row, has.cliente)}</p> : null}

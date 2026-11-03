@@ -23,7 +23,7 @@
 /* Células editáveis. As regras de posição vêm antes das colunas fixas (.gr-cell--first/select) para elas prevalecerem. */
 .gr-cell { position: relative; display: flex; align-items: center; gap: var(--bt-space-2); min-width: 0; outline: 0; }
 .gr-cell:focus-visible { box-shadow: inset 0 0 0 2px var(--bt-focus-border); }
-.gr-cell__value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto; color: inherit; }
+.gr-cell__value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto; color: var(--bt-color-text-primary); }
 .gr-cell__editor { flex: 1 1 auto; min-width: 0; }
 .gr-cell__editor .bt-control { min-height: 32px; }
 .gr-cell__mark { flex: 0 0 auto; display: inline-flex; align-items: center; }
@@ -295,3 +295,15 @@
 .gr-lp__valor { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .gr-lp__foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); justify-content: flex-end; width: 100%; }
 .gr-lp__total { margin-right: auto; color: var(--bt-color-text-secondary); }
+
+/* Tipo de serviço: cor própria por tipo (o model-driven tinha); texto escuro sobre fundo suave, contraste AA. */
+.gr-tipo, .gr-choice { display: inline-block; max-width: 100%; padding: 2px 10px; border-radius: 999px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); line-height: 18px; }
+.gr-tipo--1 { background: #dbeafe; color: #1e3a8a; }
+.gr-tipo--2 { background: #e5e7eb; color: #1f2937; }
+.gr-tipo--3 { background: #ffedd5; color: #7c2d12; }
+.gr-tipo--4 { background: #ede9fe; color: #4c1d95; }
+.gr-tipo--5 { background: #ccfbf1; color: #134e4a; }
+.gr-tipo--6 { background: #fce7f3; color: #831843; }
+
+/* Cor real da choice (--gr-choice = hex do Dataverse): fundo 18% e texto escurecido 55%. */
+.gr-choice { background: color-mix(in srgb, var(--gr-choice) 18%, white); color: color-mix(in srgb, var(--gr-choice) 55%, black); }

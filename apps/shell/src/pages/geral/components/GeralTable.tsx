@@ -2,8 +2,9 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, ty
 import type { Row } from '@betinhos/dataverse'
 import { COLUMN_FILTER_EVENT, Checkbox, ColumnFilter, ColumnMenu, type TableQuickFilters } from '@betinhos/ui'
 import { ArrowDown, ArrowUp } from 'lucide-react'
+import { ChoiceBadge } from './ChoiceBadge'
 import { useVirtualRows } from '../../../app/VirtualTable'
-import { cellKind } from '../domain/cells'
+import { cellKind, isBadgeValue } from '../domain/cells'
 import { columnLabel, rowKey } from '../domain/layout'
 import { filterKindOf } from '../domain/filterKind'
 import { formatCell } from '../domain/format'
@@ -271,10 +272,12 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
                 </div>
                 {columns.map((column, index) => {
                   if (index > 0) return <Fragment key={column.key}>{renderCell(row, column)}</Fragment>
-                  const value = formatCell('readonly', row, rowKey(column, attributes?.get(column.key)))
+                  const info = attributes?.get(column.key)
+                  const raw = row[rowKey(column, info)]
+                  const value = formatCell('readonly', row, rowKey(column, info))
                   return (
                     <div key={column.key} className="bt-table__cell gr-cell gr-cell--first" role="gridcell">
-                      <button type="button" className="gr-open" aria-label={`Abrir serviço ${value} no Formulário Geral`} onClick={() => onOpen(id)}>{value}</button>
+                      <button type="button" className="gr-open" aria-label={`Abrir serviço ${value} no Formulário Geral`} onClick={() => onOpen(id)}>{isBadgeValue(column, raw) && value !== '' ? <ChoiceBadge column={column} info={info} raw={raw} text={value} /> : value}</button>
                     </div>
                   )
                 })}

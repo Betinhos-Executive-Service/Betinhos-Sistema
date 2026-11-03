@@ -1,9 +1,10 @@
 import { memo, useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react'
 import type { Row } from '@betinhos/dataverse'
-import { Button, Input, Select, Spinner, StatusBadge, Switch, Textarea, Tooltip, type SelectOption } from '@betinhos/ui'
+import { Button, Input, Select, Spinner, Switch, Textarea, Tooltip, type SelectOption } from '@betinhos/ui'
 import { AlertTriangle, Check, Lock } from 'lucide-react'
-import { cellKind, MOTORISTA_TITLE, readonlyHint, statusTone } from '../domain/cells'
+import { cellKind, MOTORISTA_TITLE, readonlyHint, isBadgeValue } from '../domain/cells'
 import { isProtegido } from '../domain/protecao'
+import { ChoiceBadge } from './ChoiceBadge'
 import { ProtecaoLock } from './ProtecaoLock'
 import type { EditValue } from '../domain/edit'
 import { decideChoice, decideCommit, draftOf, lookupOptions, sameId, type PickedOption } from '../domain/editing'
@@ -31,7 +32,6 @@ type Props = {
 
 type Pick = PickedOption
 
-const STATUS_COLUMNS: ReadonlySet<string> = new Set(['cr40f_status', 'cr40f_statusdefaturamento'])
 const MEMO_MAX_LINES = 8
 
 const isSelect = (kind: string) => kind === 'choice' || kind === 'lookup'
@@ -268,8 +268,6 @@ export const Cell = memo(function Cell({ row, column, info, status, onSave, onRe
     control = column.attribute === 'cr40f_motorista' && !column.alias ? <div title={MOTORISTA_TITLE}>{select}</div> : select
   }
 
-  const rawStatus = typeof raw === 'number' ? raw : null
-  const badge = !column.alias && STATUS_COLUMNS.has(column.attribute) && rawStatus != null
   const href = typeof raw === 'string' && /^https?:\/\//i.test(raw) ? raw : null
 
   let value
@@ -283,7 +281,7 @@ export const Cell = memo(function Cell({ row, column, info, status, onSave, onRe
         onChange={(event) => { lastBoolean.current = event.target.checked; submit(event.target.checked) }}
       />
     )
-  } else if (badge) value = <StatusBadge tone={statusTone(column.attribute, rawStatus)}>{text}</StatusBadge>
+  } else if (isBadgeValue(column, raw) && text !== '') value = <ChoiceBadge column={column} info={info} raw={raw} text={text} />
   else if (href && column.attribute === 'new_linkdovoucher') value = <a className="gr-cell__value" href={href} target="_blank" rel="noreferrer" title={text}>{text}</a>
   else value = <span className="gr-cell__value" title={hint ? `${text}\n${hint}` : text}>{text}</span>
 
