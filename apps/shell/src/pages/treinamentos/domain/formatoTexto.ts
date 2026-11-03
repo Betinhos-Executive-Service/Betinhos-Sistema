@@ -9,7 +9,7 @@ export function textoParaHtml(texto: string): string {
   const fechar = () => { if (lista) { out.push('</ul>'); lista = false } }
   for (const linha of texto.replace(/\r\n/g, '\n').split('\n')) {
     const item = /^\s*[-*•]\s+(.*)$/.exec(linha)
-    const titulo = /^\s*#{1,3}\s+(.*)$/.exec(linha)
+    const titulo = /^\s*#{1,3}\s*(\S.*)$/.exec(linha)
     if (item) { if (!lista) { out.push('<ul>'); lista = true } out.push(`<li>${inline(item[1])}</li>`); continue }
     fechar()
     if (titulo) out.push(`<h3>${inline(titulo[1])}</h3>`)
