@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, matchesFilters, useShellHeader } from '@betinhos/ui'
+import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, matchesFilters, todaySaoPaulo, useShellHeader } from '@betinhos/ui'
 import { GraduationCap, Plus, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { useAuditoria } from '../../app/auditoria/AuditoriaProvider'
@@ -9,7 +9,7 @@ import { useQueryAlvo, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
 import { TELA, TREINAMENTO_COLUMNS, TREINAMENTO_FIELDS, TREINAMENTO_SORT, builtinViews, matchesKeyword, readTreinamento, sortTreinamentos } from './domain/lista'
-import { emptyDraft, isPublicado, plural, type Treinamento } from './domain/treinamentos'
+import { copiaParaReciclagem, emptyDraft, isPublicado, plural, type Treinamento } from './domain/treinamentos'
 import { useTreinamentos } from './useTreinamentos'
 import { TreinamentosCards, TreinamentosTable } from './components/TreinamentosLista'
 import { TreinamentoEditor } from './components/TreinamentoEditor'
@@ -33,6 +33,8 @@ function Treinamentos({ host }: { host: Host }) {
   const [query, setQuery] = useQueryTexto('q')
   // Cada "novo" remonta o editor do zero.
   const [createKey, setCreateKey] = useState(0)
+  // Rascunho copiado por "Reaplicar"; nulo em "Novo treinamento".
+  const [modelo, setModelo] = useState<Treinamento | null>(null)
 
   const { view, filters, quickFilters, clearFilters, fields: allFields, extra } = useListView({
     host,
@@ -59,26 +61,28 @@ function Treinamentos({ host }: { host: Host }) {
   useShellHeader({ title: 'Treinamentos', actions: headerActions })
 
   const goHome = useCallback(() => setTarget(null), [setTarget])
-  const startNew = useCallback(() => { setCreateKey((n) => n + 1); setTarget({ mode: 'create' }) }, [setTarget])
+  const startNew = useCallback(() => { setModelo(null); setCreateKey((n) => n + 1); setTarget({ mode: 'create' }) }, [setTarget])
+  const reaplicar = useCallback((item: Treinamento) => { setModelo(copiaParaReciclagem(item, todaySaoPaulo())); setCreateKey((n) => n + 1); setTarget({ mode: 'create' }) }, [setTarget])
   const open = useCallback((id: string) => setTarget({ mode: 'view', id }), [setTarget])
+  const editar = useCallback((id: string) => setTarget({ mode: 'edit', id }), [setTarget])
   const saved = useCallback(async (id: string) => { await data.reload(); open(id) }, [data.reload, open])
 
   const selected = target && target.mode !== 'create' ? data.items.find((item) => item.id === target.id) : undefined
   const erroCarga = <Alert tone="danger" title="Não foi possível carregar os treinamentos" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{data.error}</Alert>
   const editor = (initial: Treinamento, key: string, onDeleted?: () => Promise<void>) =>
-    <TreinamentoEditor key={key} initial={initial} funcionarios={data.funcionarios} source={source} onBack={goHome} onSaved={saved} onAnexos={(id, anexos) => data.patch(id, { anexos })} onDeleted={onDeleted} />
+    <TreinamentoEditor key={key} initial={initial} funcionarios={data.funcionarios} source={source} onBack={isPublicado(initial) ? () => open(initial.id) : goHome} onSaved={saved} onAnexos={(id, anexos) => data.patch(id, { anexos })} onDeleted={onDeleted} />
 
   let body
   if (target?.mode === 'create') {
-    body = editor(emptyDraft(), `novo-${createKey}`)
+    body = editor(modelo ?? emptyDraft(), `novo-${createKey}`)
   } else if (target && !data.loaded) {
     body = data.error ? erroCarga : <div className="surface tr-loading" role="status" aria-label="Carregando treinamento" />
   } else if (target && !selected) {
     body = <Alert tone="warning" title="Treinamento não encontrado" action={<Button variant="secondary" onClick={goHome}>Voltar para a lista</Button>}>Ele pode ter sido excluído. Atualize a lista para conferir.</Alert>
   } else if (selected) {
-    body = isPublicado(selected)
-      ? <TreinamentoPainel key={selected.id} item={selected} funcionarios={data.funcionarios} source={source} onBack={goHome} />
-      : editor(selected, selected.id, async () => { goHome(); await data.reload() })
+    body = isPublicado(selected) && target?.mode !== 'edit'
+      ? <TreinamentoPainel key={selected.id} item={selected} funcionarios={data.funcionarios} source={source} onBack={goHome} onEditar={() => editar(selected.id)} onReaplicar={() => reaplicar(selected)} />
+      : editor(selected, `${selected.id}-${target?.mode}`, isPublicado(selected) ? undefined : async () => { goHome(); await data.reload() })
   }
   if (body) return <div className="page tr-page">{body}</div>
 

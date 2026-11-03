@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Avatar, Breadcrumb, Button, EmptyState, Grid, MetricCard, PageHeader, SearchBox, SegmentedControl, Skeleton, StatusBadge, Surface, todaySaoPaulo } from '@betinhos/ui'
-import { ArrowLeft, CalendarClock, Check, CheckCircle2, Eye, PenLine, RefreshCw, SearchX, Users, XCircle } from 'lucide-react'
+import { ArrowLeft, CalendarClock, Check, CheckCircle2, Eye, Pencil, PenLine, RefreshCw, Repeat, SearchX, Users, XCircle } from 'lucide-react'
 import { parseSignature } from '../../comunicados/domain/comunicados'
 import { Assinatura } from '../../comunicados/components/Assinatura'
 import type { Source } from '../data/source'
@@ -8,7 +8,7 @@ import { erroTexto, fmtDia, formatDate, isConcluida, isVencido, matchParticipaca
 import { AnexosSecao } from './AnexosSecao'
 import { Conteudo } from './Conteudo'
 
-type Props = { item: Treinamento; funcionarios: Funcionario[]; source: Source; onBack: () => void }
+type Props = { item: Treinamento; funcionarios: Funcionario[]; source: Source; onBack: () => void; onEditar: () => void; onReaplicar: () => void }
 
 const FILTROS: { value: FiltroParticipacao; label: string }[] = [
   { value: 'todos', label: 'Todos' },
@@ -18,7 +18,7 @@ const FILTROS: { value: FiltroParticipacao; label: string }[] = [
 ]
 
 /** Painel de participação do treinamento publicado: quem abriu, confirmou, assinou e a nota do quiz. */
-export function TreinamentoPainel({ item, funcionarios, source, onBack }: Props) {
+export function TreinamentoPainel({ item, funcionarios, source, onBack, onEditar, onReaplicar }: Props) {
   const [rows, setRows] = useState<Participacao[]>([])
   const [loaded, setLoaded] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -87,11 +87,13 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack }: Props)
           {item.exigeQuiz ? <StatusBadge tone="info">Quiz</StatusBadge> : null}
           {vencido ? <StatusBadge tone="danger">Vencido</StatusBadge> : null}
         </>}
-        description={`${formatDate(item.publicadoEm)} · ${publico}${item.validade ? ` · validade ${fmtDia(item.validade)}` : ''}`}
+        description={`${formatDate(item.publicadoEm)} · ${publico}${item.validade ? ` · validade ${fmtDia(item.validade)}` : ''}${item.editadoEm ? ` · editado em ${formatDate(item.editadoEm)}` : ''}`}
         actions={(
           <div className="tr-actions">
             <Button variant="secondary" icon={<ArrowLeft size={16} />} onClick={onBack}>Voltar</Button>
             <Button variant="secondary" icon={<RefreshCw size={16} />} loading={loading && loaded} onClick={() => void load()}>Atualizar</Button>
+            <Button variant="secondary" icon={<Pencil size={16} />} onClick={onEditar}>Editar conteúdo</Button>
+            <Button variant="secondary" icon={<Repeat size={16} />} onClick={onReaplicar}>Reaplicar</Button>
           </div>
         )}
       />

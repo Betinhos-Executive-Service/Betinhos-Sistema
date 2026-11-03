@@ -95,6 +95,38 @@ describe('Treinamentos', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
+  it('edita o texto e a validade do publicado sem mexer no quiz nem no público', async () => {
+    render(<TreinamentosPage host={{ mode: 'mock' }} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Embarque no GRU/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Editar conteúdo' }))
+    expect(await screen.findByRole('heading', { name: 'Editar treinamento publicado' })).toBeTruthy()
+    expect((screen.getByLabelText('Exige quiz') as HTMLInputElement).disabled).toBe(true)
+    expect(screen.queryByRole('button', { name: 'Publicar treinamento' })).toBeNull()
+    fireEvent.change(screen.getByLabelText('Texto'), { target: { value: 'Encontro na porta 5.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+    expect(await screen.findByText('Alterações salvas. As participações continuam como estavam.')).toBeTruthy()
+    expect(await screen.findByText('Encontro na porta 5.')).toBeTruthy()
+    expect(await screen.findAllByText('Concluído')).toHaveLength(2)
+  })
+
+  it('Voltar do editor de publicado retorna ao painel', async () => {
+    render(<TreinamentosPage host={{ mode: 'mock' }} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Embarque no GRU/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Editar conteúdo' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Voltar' }))
+    expect(await screen.findByRole('button', { name: 'Reaplicar' })).toBeTruthy()
+  })
+
+  it('Reaplicar abre um rascunho copiado com o sufixo de reciclagem', async () => {
+    render(<TreinamentosPage host={{ mode: 'mock' }} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Direção defensiva/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Reaplicar' }))
+    const titulo = await screen.findByLabelText(/^Título/) as HTMLInputElement
+    expect(titulo.value).toMatch(/^Direção defensiva: revisão anual \(reciclagem \d{2}\/\d{2}\/\d{4}\)$/)
+    expect((screen.getByLabelText('Validade (prazo para concluir)') as HTMLInputElement).value).toBe('')
+    expect(screen.getByRole('button', { name: 'Publicar treinamento' })).toBeTruthy()
+  })
+
   it('anexa vídeo num treinamento novo: salva o rascunho sozinho e abre com o anexo', async () => {
     render(<TreinamentosPage host={{ mode: 'mock' }} />)
     await screen.findByRole('button', { name: /Embarque no GRU/ })
