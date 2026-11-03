@@ -70,10 +70,14 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack, onEditar
   const publico = publicoLabel(item, funcionarios)
 
   const lembrar = async (participacao?: Participacao) => {
+    if (lembrando) return
     setLembrando(true)
     try {
       const r = await source.lembrar(item.id, participacao?.id)
-      toast({ tone: 'success', message: `Lembrete enviado para ${r.enfileirados} ${plural(r.enfileirados, 'funcionário', 'funcionários')}${r.ignorados ? ` · ${r.ignorados} lembrados nas últimas 24 h` : ''}` })
+      const ignorados = r.ignorados ? ` · ${r.ignorados} ignorados (concluídos, na fila ou lembrados nas últimas 24 h)` : ''
+      toast(r.enfileirados
+        ? { tone: 'success', message: `Lembrete enviado para ${r.enfileirados} ${plural(r.enfileirados, 'funcionário', 'funcionários')}${ignorados}` }
+        : { tone: 'info', message: `Nenhum lembrete enviado${ignorados || ': ninguém pendente'}` })
       await load()
     } catch (reason) {
       toast({ tone: 'danger', message: erroTexto(reason, 'Não foi possível enviar o lembrete.') })
@@ -170,7 +174,7 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack, onEditar
                 ))}
               </ol>
               {selected.assinaturaJson ? <><span className="tr-label">Assinatura</span><div className="tr-signature"><Assinatura value={parseSignature(selected.assinaturaJson)} /></div></> : null}
-              {selected.pushStatus === PUSH.falhou ? <Button variant="secondary" size="compact" icon={<BellRing size={14} />} loading={lembrando} onClick={() => void lembrar(selected)}>Reenviar push</Button> : null}
+              {selected.pushStatus === PUSH.falhou && podeLembrar(selected, Date.now()) ? <Button variant="secondary" size="compact" icon={<BellRing size={14} />} loading={lembrando} onClick={() => void lembrar(selected)}>Reenviar push</Button> : null}
               {vencido && !isConcluida(selected) ? <p className="tr-pending"><CalendarClock size={16} aria-hidden="true" />Validade vencida em {fmtDia(item.validade)} sem conclusão.</p> : null}
             </Surface>
             </div>

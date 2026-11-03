@@ -2,7 +2,7 @@ import { chunk, cleanId, type Row } from '@betinhos/dataverse'
 import type { Host } from '../../../host'
 import { getDataverseEnvironmentLabel } from '../../funcionarios/data/dataverse'
 import { createSharePointDocs, sanitizeFileName, uniqueName, type EnvVarApi } from '../../funcionarios/data/sharepoint'
-import { ESTADO, PUSH, anexoDaPasta, draftPayload, edicaoPublicadoPayload, isOrfa, isPublicado, mapFuncionario, mapParticipacao, mapTreinamento, validarComConteudo, validarRascunho, type Anexo, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
+import { ESTADO, PUSH, anexoDaPasta, draftPayload, edicaoPublicadoPayload, isConcluida, isOrfa, isPublicado, mapFuncionario, mapParticipacao, mapTreinamento, validarComConteudo, validarRascunho, type Anexo, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
 import type { Linha } from '../domain/lista'
 import { createMockSource } from './mock'
 
@@ -43,8 +43,6 @@ function participacaoPayload(sets: Pick<Sets, 'treinamento' | 'funcionario'>, tr
     cr40f_name: `${treinamento.titulo} · ${funcionario.nome}`.slice(0, 200),
     'cr40f_Treinamento@odata.bind': `/${sets.treinamento}(${cleanId(treinamento.id)})`,
     'cr40f_Funcionario@odata.bind': `/${sets.funcionario}(${cleanId(funcionario.id)})`,
-    // O flow Push Treinamentos observa Pendente, envia e grava Enviado ou Falhou.
-    cr40f_pushstatus: PUSH.pendente,
   }
 }
 
@@ -125,8 +123,13 @@ export function createSource(host: Host): Source {
       const novos = alvos.filter((f) => !jaTem.has(cleanId(f.id)))
       for (const lote of chunk(existentes.filter((p) => isOrfa(p, alvoIds)), 5)) await Promise.all(lote.map((p) => client.remove(s.participacao, p.id)))
       // Em lotes paralelos: dezenas de motoristas sem N round-trips em série.
-      for (const lote of chunk(novos, 5)) await Promise.all(lote.map((f) => client.create(s.participacao, participacaoPayload(s, treinamento, f))))
+      const criadas: string[] = []
+      for (const lote of chunk(novos, 5)) criadas.push(...await Promise.all(lote.map((f) => client.create(s.participacao, participacaoPayload(s, treinamento, f)))))
       await client.update(s.treinamento, treinamento.id, { cr40f_estado: ESTADO.publicado, cr40f_publicadoem: new Date().toISOString() })
+      // O flow Push Treinamentos observa Pendente. Só depois de publicar: se o PATCH falhar, ninguém recebe push de treinamento em rascunho.
+      // Participação sem status vinda de uma publicação interrompida também entra (a nova tentativa chega aqui).
+      const semPush = existentes.filter((p) => p.pushStatus == null && !isConcluida(p) && alvoIds.has(p.funcionarioId)).map((p) => p.id)
+      for (const lote of chunk([...criadas, ...semPush], 5)) await Promise.all(lote.map((id) => client.update(s.participacao, id, { cr40f_pushstatus: PUSH.pendente })))
     },
     async enviarAnexo(treinamentoId, file, existentes) {
       const nome = uniqueName(sanitizeFileName(file.name), existentes.map((a) => a.nome))
