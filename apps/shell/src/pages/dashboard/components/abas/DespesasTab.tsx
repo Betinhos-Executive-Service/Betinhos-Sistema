@@ -99,7 +99,7 @@ function DespesasAba({ ctx, dados, periodo, proprios, onProprios }: DadosAba & P
   </>
 }
 
-/** Primeira carga da aba: os seis KPIs e os cinco blocos ocupados. */
+/** Primeira carga da aba: spinner e barra de progresso real. */
 export const DespesasCarregando = () => <AbaCarregando />
 
 type Bloco = { periodo: string; mobile: boolean }

@@ -235,7 +235,7 @@ function FinanceiroAba({ ctx, dados, periodo }: DadosAba) {
   </>
 }
 
-/** Primeira carga da aba Financeiro: os seis KPIs e os cinco blocos ocupados. */
+/** Primeira carga da aba Financeiro: spinner e barra de progresso real. */
 export const FinanceiroCarregando = () => (
   <AbaCarregando />
 )

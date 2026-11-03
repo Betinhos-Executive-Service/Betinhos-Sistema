@@ -53,4 +53,3 @@ export function AlertList({ titulo, itens, abrir = {} }: { titulo: string; itens
 
 /** Títulos das duas faixas do Resumo, na ordem da página. */
 export const FAIXAS_RESUMO = ['Alertas de operação', 'Qualidade dos dados'] as const
-

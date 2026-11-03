@@ -31,7 +31,7 @@ describe('useDashboard', () => {
     await waitFor(() => expect(result.current.progresso).toBe(40)) // (2 + 0) / (4 + 1)
     await act(async () => { liberar() })
     await waitFor(() => expect(result.current.dados).not.toBeNull())
-    expect(result.current.progresso).toBe(0) // estágio 1 pronto; pagantes ainda sem consulta respondida
+    expect(result.current.progresso).toBe(40) // estágio 1 pronto; a barra não volta enquanto os pagantes não respondem
   })
 
   it('carrega e refaz a consulta a cada 60 s só com a aba visível', async () => {

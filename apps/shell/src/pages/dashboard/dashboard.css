@@ -131,7 +131,6 @@
 .dash-card__chips { display: flex; flex-direction: column; align-items: flex-end; gap: var(--bt-space-1); max-width: 100%; }
 .dash-card__corpo { display: flex; flex: 1 1 auto; flex-direction: column; gap: var(--bt-space-3); min-width: 0; min-height: 0; }
 .dash-card__tabela { min-width: 0; }
-/* Miolo do bloco na primeira carga: ocupa a altura de um gráfico. */
 /* Aviso discreto de filtros de segmento que não valem na aba. */
 .dash-aviso-filtros { display: flex; align-items: flex-start; gap: var(--bt-space-1-5); margin: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); line-height: var(--bt-typography-body-small-line-height); }
 .dash-aviso-filtros > svg { flex: 0 0 auto; margin-top: 2px; }

@@ -65,4 +65,3 @@ export function KpiCard({ rotulo, valor, tom, chips = [], apoio = [], serie = []
 export function KpiLinha({ rotulo, colunas = 6, children }: { rotulo: string; colunas?: ColunasKpi; children: ReactNode }) {
   return <section className={`dash-kpis dash-kpis--${colunas}`} aria-label={rotulo}>{children}</section>
 }
-

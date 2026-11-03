@@ -19,5 +19,3 @@ export function KpiGrid({ kpis, abrir = {} }: { kpis: Kpi[]; abrir?: Partial<Rec
     </KpiLinha>
   )
 }
-
-/** Primeira carga do Resumo: os seis cards no formato final, com o espaço da sparkline reservado. */

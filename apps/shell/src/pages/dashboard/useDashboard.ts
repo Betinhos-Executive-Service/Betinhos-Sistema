@@ -29,6 +29,7 @@ export function useDashboard(source: Source, desde: string, ate: string, opcoes:
   const [extras, setExtras] = useState<Extras>({ chave: '', partes: {} })
   const [avanco, setAvanco] = useState<Avanco>({ chave: '', itens: {} })
   const token = useRef(0)
+  const maximo = useRef({ marca: '', pct: 0 })
   const ultima = useRef(0)
   /** Há carga em andamento da janela atual: o relógio e a volta da aba esperam; "Atualizar" e a troca de janela substituem. */
   const emVoo = useRef(false)
@@ -121,11 +122,16 @@ export function useDashboard(source: Source, desde: string, ate: string, opcoes:
 
   /** Avanço real (0–100) do que a tela ainda espera: estágio 1 sem dados e conjuntos do estágio 2 da aba ativa que não chegaram. */
   const progresso = useMemo(() => {
+    const ativas = EXTRAS.filter((c) => ativosKey.split(',').includes(c))
+    if (base && ativas.every((c) => partes?.[c])) return 0
+    // Estágio 1 e extras da aba somados (os já concluídos contam cheios) e porcentagem que só avança na janela/aba: a chegada do estágio 2 não faz a barra voltar.
     const itens = avanco.chave === chave ? avanco.itens : {}
-    const esperando = [...(base ? [] : ['base' as const]), ...EXTRAS.filter((c) => ativosKey.split(',').includes(c) && !partes?.[c])]
     let feitas = 0, total = 0
-    for (const e of esperando) { const i = itens[e]; if (i) { feitas += i[0]; total += i[1] } }
-    return total ? Math.min(99, Math.round((feitas / total) * 100)) : 0
+    for (const e of ['base' as const, ...ativas]) { const i = itens[e]; if (i) { feitas += i[0]; total += i[1] } }
+    const pct = total ? Math.min(99, Math.round((feitas / total) * 100)) : 0
+    const marca = `${chave}|${ativosKey}`
+    if (maximo.current.marca !== marca) maximo.current = { marca, pct: 0 }
+    return (maximo.current.pct = Math.max(maximo.current.pct, pct))
   }, [avanco, chave, base, partes, ativosKey])
 
   return { dados, progresso, carregando: estado.carregando, erro: estado.erro, atualizadoEm: estado.atualizadoEm, atualizar }

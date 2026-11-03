@@ -98,7 +98,7 @@ function ServicosAba({ ctx, dados, periodo }: DadosAba) {
   </>
 }
 
-/** Primeira carga da aba Serviços: os quatro KPIs e os seis blocos ocupados. */
+/** Primeira carga da aba Serviços: spinner e barra de progresso real. */
 export const ServicosCarregando = () => (
   <AbaCarregando />
 )
