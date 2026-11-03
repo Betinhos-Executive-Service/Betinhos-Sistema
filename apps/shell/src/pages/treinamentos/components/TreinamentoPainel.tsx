@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Avatar, Breadcrumb, Button, EmptyState, Grid, MetricCard, PageHeader, SearchBox, SegmentedControl, Skeleton, StatusBadge, Surface, todaySaoPaulo, useToast } from '@betinhos/ui'
-import { ArrowLeft, BellRing, CalendarClock, Check, CheckCircle2, Eye, FileDown, Pencil, PenLine, RefreshCw, Repeat, SearchX, Users, XCircle } from 'lucide-react'
+import { Alert, Avatar, Button, EmptyState, Grid, MetricCard, PageHeader, SearchBox, SegmentedControl, Skeleton, StatusBadge, Surface, todaySaoPaulo, useToast } from '@betinhos/ui'
+import { BellRing, CalendarClock, Check, CheckCircle2, Eye, FileDown, Pencil, PenLine, RefreshCw, Repeat, SearchX, Users, XCircle } from 'lucide-react'
 import { parseSignature } from '../../comunicados/domain/comunicados'
 import { Assinatura } from '../../comunicados/components/Assinatura'
 import type { Source } from '../data/source'
 import { erroTexto, fmtDia, formatDate, isConcluida, isVencido, matchParticipacao, plural, podeLembrar, publicoLabel, PUSH, pushLabel, statusParticipacao, type FiltroParticipacao, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
 import { AnexosSecao } from './AnexosSecao'
 import { Conteudo } from './Conteudo'
+import { NavTopo } from './NavTopo'
 
 type Props = { item: Treinamento; funcionarios: Funcionario[]; source: Source; onBack: () => void; onEditar: () => void; onReaplicar: () => void }
 
@@ -121,7 +122,7 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack, onEditar
     <>
       <PageHeader
         className="page__header"
-        breadcrumb={<Breadcrumb items={[{ label: 'Treinamentos', href: '#/treinamentos' }, { label: 'Participação' }]} />}
+        breadcrumb={<NavTopo onBack={onBack} atual="Participação" />}
         title={item.titulo}
         meta={<>
           <StatusBadge tone="success">Publicado</StatusBadge>
@@ -132,7 +133,6 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack, onEditar
         description={`${formatDate(item.publicadoEm)} · ${publico}${item.validade ? ` · validade ${fmtDia(item.validade)}` : ''}${item.editadoEm ? ` · editado em ${formatDate(item.editadoEm)}` : ''}`}
         actions={(
           <div className="tr-actions">
-            <Button variant="secondary" icon={<ArrowLeft size={16} />} onClick={onBack}>Voltar</Button>
             <Button variant="secondary" icon={<BellRing size={16} />} loading={lembrando} disabled={!algumLembravel} title={algumLembravel ? undefined : 'Ninguém pode ser lembrado agora (concluído, push na fila ou lembrado nas últimas 24 h)'} onClick={() => void lembrar()}>Lembrar pendentes</Button>
             <Button variant="secondary" icon={<RefreshCw size={16} />} loading={loading && loaded} onClick={() => void load()}>Atualizar</Button>
             <Button variant="secondary" icon={<Pencil size={16} />} onClick={onEditar}>Editar conteúdo</Button>

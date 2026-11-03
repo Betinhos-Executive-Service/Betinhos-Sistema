@@ -221,6 +221,18 @@ function DateTimeUtc([string] $Schema, [string] $Display, [string] $Description)
   @{ "@odata.type" = "Microsoft.Dynamics.CRM.DateTimeAttributeMetadata"; SchemaName = $Schema; DisplayName = Label $Display; Description = Label $Description; Format = "DateAndTime"; DateTimeBehavior = @{ Value = "UserLocal" } }
 }
 
+# Liga a auditoria da tabela (PUT da metadata completa, como a Web API exige). A auditoria da organizacao nao e tocada.
+function Ensure-TableAudit([string] $Entity) {
+  $meta = Invoke-Dataverse "GET" "EntityDefinitions(LogicalName='$Entity')"
+  if ($meta.IsAuditEnabled.Value) { return }
+  if (-not $Apply) { Write-Step "DRY RUN ligaria a auditoria de $Entity"; return }
+  foreach ($name in @($meta.PSObject.Properties | Where-Object { $_.Name -like "@odata.*" } | ForEach-Object { $_.Name })) { $meta.PSObject.Properties.Remove($name) }
+  $meta | Add-Member -NotePropertyName "@odata.type" -NotePropertyValue "Microsoft.Dynamics.CRM.EntityMetadata" -Force
+  $meta.IsAuditEnabled.Value = $true
+  Invoke-Dataverse "PUT" "EntityDefinitions(LogicalName='$Entity')" $meta -ExtraHeaders @{ "MSCRM.MergeLabels" = "true" } | Out-Null
+  Write-Step "auditoria ligada em $Entity"
+}
+
 if (-not (Get-EntityId "cr40f_funcionarios")) { throw "Tabela cr40f_funcionarios nao existe neste ambiente." }
 
 $trein = "cr40f_treinamento"; $part = "cr40f_treinamentoparticipacao"
@@ -270,6 +282,9 @@ if ($partId) {
 }
 else { Write-Step "DRY RUN criaria em $part as colunas de participação e os lookups cr40f_treinamento (Cascade) e cr40f_funcionario (Restrict)" }
 
+# Historico de alteracoes do treinamento e das participacoes (botao Auditoria da lista). A auditoria da organizacao ja esta ligada e nao e alterada aqui.
+foreach ($e in @($trein, $part)) { Ensure-TableAudit $e }
+
 if ($Apply) {
   Invoke-Dataverse "POST" "PublishXml" @{ ParameterXml = "<importexportxml><entities><entity>$trein</entity><entity>$part</entity></entities></importexportxml>" } | Out-Null
   $esperado = @{
@@ -278,6 +293,9 @@ if ($Apply) {
   }
   $missing = @(); foreach ($e in $esperado.Keys) { $missing += @($esperado[$e] | Where-Object { -not (Get-AttributeId $e $_) } | ForEach-Object { "$e.$_" }) }
   if ($missing.Count) { throw "Colunas ausentes apos a publicacao: $($missing -join ', ')" }
+  foreach ($e in @($trein, $part)) {
+    if (-not (Invoke-Dataverse "GET" "EntityDefinitions(LogicalName='$e')?`$select=IsAuditEnabled").IsAuditEnabled.Value) { throw "Auditoria desligada em $e." }
+  }
   foreach ($t in @($treinId, $partId)) {
     if (@(Get-Rows "solutioncomponents" "solutioncomponentid" "_solutionid_value eq $solutionId and objectid eq $t and componenttype eq 1").Count -eq 0) { throw "Tabela $t nao esta na solucao $SolutionUniqueName." }
   }
@@ -293,6 +311,6 @@ if ($Apply) {
   $sets = @{}
   foreach ($e in $trein, $part) { $sets[$e] = (Invoke-Dataverse "GET" "EntityDefinitions(LogicalName='$e')?`$select=EntitySetName").EntitySetName }
   if ($sets[$trein] -ne "cr40f_treinamentos" -or $sets[$part] -ne "cr40f_treinamentoparticipacaos") { Write-Step "AVISO: EntitySetName $($sets[$trein]) / $($sets[$part]); ajuste provision-flow-agentes-executar.ps1 (o shell resolve pela metadata)." }
-  Write-Step "SCHEMA OK: tabelas publicadas e na solucao $SolutionUniqueName. Rode conceder-privilegios-treinamentos.ps1 e depois provision-flow-agentes-executar.ps1 (tipo TreinamentoPendente)."
+  Write-Step "SCHEMA OK: tabelas publicadas, auditoria ligada e na solucao $SolutionUniqueName. Rode conceder-privilegios-treinamentos.ps1 e depois provision-flow-agentes-executar.ps1 (tipo TreinamentoPendente)."
 }
 else { Write-Step "DRY RUN OK; use -Apply" }

@@ -4,6 +4,7 @@ import { getDataverseEnvironmentLabel } from '../../funcionarios/data/dataverse'
 import { createSharePointDocs, sanitizeFileName, uniqueName, type EnvVarApi } from '../../funcionarios/data/sharepoint'
 import { ESTADO, PUSH, anexoDaPasta, draftPayload, edicaoPublicadoPayload, isConcluida, isOrfa, isPublicado, mapFuncionario, mapParticipacao, mapTreinamento, validarComConteudo, validarRascunho, type Anexo, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
 import type { Linha } from '../domain/lista'
+import { contarProgresso, type ProgressoConta } from '../domain/tabela'
 import { createMockSource } from './mock'
 
 /** Tudo que a tela precisa do mundo externo; Dataverse em produção, memória no pnpm dev. */
@@ -13,6 +14,8 @@ export type Source = {
   /** Funcionários ativos e desligados (o painel mostra quem saiu depois de publicado). */
   funcionarios: () => Promise<Funcionario[]>
   participacoes: (treinamentoId: string) => Promise<Participacao[]>
+  /** Conclusões por treinamento (uma consulta leve, só id do treinamento e `concluidoem`) para o progresso da lista. */
+  progresso: () => Promise<Record<string, ProgressoConta>>
   /** Cria ou atualiza o rascunho; devolve o id. */
   salvar: (draft: Treinamento) => Promise<string>
   /** Publicado: grava conteúdo, anexos e validade (+ editadoem). Quiz, assinatura e público não mudam; participações intactas. */
@@ -85,6 +88,11 @@ export function createSource(host: Host): Source {
     },
     funcionarios,
     participacoes,
+    async progresso() {
+      const s = await entitySets()
+      const rows = await client.getAll(`${s.participacao}?$select=_cr40f_treinamento_value,cr40f_concluidoem`)
+      return contarProgresso(rows.map((r) => ({ treinamentoId: cleanId(String(r._cr40f_treinamento_value ?? '')), concluida: Boolean(r.cr40f_concluidoem) })))
+    },
     async salvar(draft) {
       const error = validarRascunho(draft)
       if (error) throw new Error(error)

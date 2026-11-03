@@ -58,6 +58,11 @@ Pré-requisitos: `pwsh` 7 (PATH ou `~/.local/powershell/pwsh`) e Node. Login uma
 - Funcionário desligado depois de publicado: continua no painel com selo "Desligado"; nunca entra em publicação nova.
 - Tabela ausente (antes do provision): a página mostra "Tabela cr40f_treinamento não encontrada na metadata." sem cair em mock.
 
+## Lista, navegação e auditoria (UI v2)
+- Voltar: componente único `NavTopo` (canto superior esquerdo, antes do título) no painel, no editor e no "Treinamento não encontrado"; editor com alteração abre "Descartar alterações?", Esc continua voltando. Teste: `TreinamentosPage.test.tsx` (Voltar antes do título).
+- Lista: linha inteira clicável (`role="row"`), coluna Conclusão ("3 de 5 concluíram", barra; vem de `source.progresso()`, um GET em `cr40f_treinamentoparticipacaos` com `$select`; falha vira lista sem progresso), validade com texto e cor (vencido/a vencer em 7 dias), datas curtas com data completa no tooltip. Puras em `domain/tabela.ts` (`tabela.test.ts`).
+- Auditoria: `provision-treinamentos.ps1` liga `Ensure-TableAudit` nas duas tabelas e, no `-Apply`, falha se `IsAuditEnabled` ficar falso. Conferir no DRY RUN as linhas "ligaria a auditoria de ..."; no DEV, após `-Apply`, o histórico aparece pelo `useAuditoria` no editor do Treinamento.
+
 ## Limites
 - Sem Dataverse na VM/worktree: só mock, typecheck e testes. Leitura, assinatura e quiz pelo motorista dependem do App Motoristas (outra sessão); o campo `cr40f_concluidoem` só será gravado por ele.
 
