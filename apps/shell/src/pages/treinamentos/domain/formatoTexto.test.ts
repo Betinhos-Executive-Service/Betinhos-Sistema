@@ -1,19 +1,21 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { aplicarFormato } from './formatoTexto'
+import { htmlParaTexto, textoParaHtml } from './formatoTexto'
 
-describe('aplicarFormato', () => {
-  it('negrito envolve a seleção e desfaz ao repetir', () => {
-    const a = aplicarFormato('dirija com calma', 11, 16, 'negrito')
-    expect(a.texto).toBe('dirija com **calma**')
-    expect(aplicarFormato(a.texto, a.inicio, a.fim, 'negrito').texto).toBe('dirija com calma')
+const volta = (texto: string) => { const el = document.createElement('div'); el.innerHTML = textoParaHtml(texto); return htmlParaTexto(el) }
+
+describe('formato do texto', () => {
+  it('título, lista, negrito e linhas em branco fazem a ida e volta sem perda', () => {
+    const t = '# Regras\nAntes de sair\n\n- Camisa **branca**\n- Terno escuro\nFim'
+    expect(volta(t)).toBe(t)
   })
-  it('título entra na linha do cursor e troca lista por título', () => {
-    expect(aplicarFormato('a\nComo dirigir\nb', 5, 5, 'titulo').texto).toBe('a\n# Como dirigir\nb')
-    expect(aplicarFormato('- item', 0, 0, 'titulo').texto).toBe('# item')
+  it('normaliza # sem nível extra e escapa HTML', () => {
+    expect(volta('## Dois')).toBe('# Dois')
+    expect(textoParaHtml('a <b> & c')).toBe('<p>a &lt;b&gt; &amp; c</p>')
   })
-  it('lista cobre várias linhas e alterna', () => {
-    const a = aplicarFormato('um\ndois', 0, 7, 'lista')
-    expect(a.texto).toBe('- um\n- dois')
-    expect(aplicarFormato(a.texto, a.inicio, a.fim, 'lista').texto).toBe('um\ndois')
+  it('lê o HTML que o navegador gera (div, b, nbsp)', () => {
+    const el = document.createElement('div')
+    el.innerHTML = '<h3>Como dirigir</h3><div>Use <b>calma</b>&nbsp;sempre</div><ul><li>um</li><li>dois</li></ul>'
+    expect(htmlParaTexto(el)).toBe('# Como dirigir\nUse **calma** sempre\n- um\n- dois')
   })
 })

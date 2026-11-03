@@ -1,29 +1,49 @@
-export type Formato = 'titulo' | 'negrito' | 'lista'
-export type Edicao = { texto: string; inicio: number; fim: number }
+/** Conversão entre o texto gravado (# título, - item, **negrito**) e o HTML do editor visual. Uma linha do texto = um bloco. */
 
-const PREFIXO: Record<'titulo' | 'lista', string> = { titulo: '# ', lista: '- ' }
-const MARCA = /^(#{1,3}\s+|[-*•]\s+)/
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+const inline = (s: string) => s.split(/(\*\*[^*]+\*\*)/).filter(Boolean).map((p) => (/^\*\*[^*]+\*\*$/.test(p) ? `<strong>${esc(p.slice(2, -2))}</strong>` : esc(p))).join('')
 
-/** Aplica negrito na seleção, ou título/lista nas linhas tocadas pela seleção (repetir o formato desfaz). */
-export function aplicarFormato(texto: string, inicio: number, fim: number, formato: Formato): Edicao {
-  if (formato === 'negrito') {
-    const sel = texto.slice(inicio, fim)
-    const em = inicio >= 2 && texto.slice(inicio - 2, inicio) === '**' && texto.slice(fim, fim + 2) === '**'
-    if (em) return { texto: texto.slice(0, inicio - 2) + sel + texto.slice(fim + 2), inicio: inicio - 2, fim: fim - 2 }
-    if (/^\*\*[^*]+\*\*$/.test(sel)) return { texto: texto.slice(0, inicio) + sel.slice(2, -2) + texto.slice(fim), inicio, fim: fim - 4 }
-    return { texto: `${texto.slice(0, inicio)}**${sel}**${texto.slice(fim)}`, inicio: inicio + 2, fim: fim + 2 }
+export function textoParaHtml(texto: string): string {
+  const out: string[] = []
+  let lista = false
+  const fechar = () => { if (lista) { out.push('</ul>'); lista = false } }
+  for (const linha of texto.replace(/\r\n/g, '\n').split('\n')) {
+    const item = /^\s*[-*•]\s+(.*)$/.exec(linha)
+    const titulo = /^\s*#{1,3}\s+(.*)$/.exec(linha)
+    if (item) { if (!lista) { out.push('<ul>'); lista = true } out.push(`<li>${inline(item[1])}</li>`); continue }
+    fechar()
+    if (titulo) out.push(`<h3>${inline(titulo[1])}</h3>`)
+    else out.push(linha.trim() ? `<p>${inline(linha)}</p>` : '<p><br></p>')
   }
-  const comeco = texto.lastIndexOf('\n', inicio - 1) + 1
-  const proxima = texto.indexOf('\n', fim)
-  const termino = proxima === -1 ? texto.length : proxima
-  const linhas = texto.slice(comeco, termino).split('\n')
-  const prefixo = PREFIXO[formato]
-  const desfazer = linhas.filter((l) => l.trim()).every((l) => l.startsWith(prefixo))
-  const novas = linhas.map((l) => {
-    if (!l.trim()) return l
-    return desfazer ? l.slice(prefixo.length) : prefixo + l.replace(MARCA, '')
+  fechar()
+  return out.join('')
+}
+
+function emTexto(no: Node): string {
+  if (no.nodeType === 3) return (no.textContent ?? '').replace(/ /g, ' ')
+  if (!(no instanceof HTMLElement)) return ''
+  if (no.tagName === 'BR') return ''
+  const dentro = Array.from(no.childNodes).map(emTexto).join('')
+  if (no.tagName === 'STRONG' || no.tagName === 'B') return dentro.trim() ? `**${dentro}**` : dentro
+  return dentro
+}
+
+export function htmlParaTexto(raiz: HTMLElement): string {
+  const linhas: string[] = []
+  const bloco = (el: HTMLElement) => {
+    const tag = el.tagName
+    if (tag === 'UL' || tag === 'OL') { el.querySelectorAll(':scope > li').forEach((li) => linhas.push(`- ${emTexto(li).replace(/\n/g, ' ')}`)); return }
+    if (/^H[1-6]$/.test(tag)) { linhas.push(`# ${emTexto(el).replace(/\n/g, ' ')}`); return }
+    if (tag === 'P' || tag === 'DIV') {
+      const filhosBloco = Array.from(el.children).some((c) => /^(P|DIV|UL|OL|H[1-6])$/.test(c.tagName))
+      if (filhosBloco) { Array.from(el.children).forEach((c) => bloco(c as HTMLElement)); return }
+      linhas.push(emTexto(el).replace(/\n/g, ' '))
+      return
+    }
+    linhas.push(emTexto(el))
+  }
+  raiz.childNodes.forEach((n) => {
+    if (n.nodeType === 3) { if ((n.textContent ?? '').trim()) linhas.push(emTexto(n)) } else if (n instanceof HTMLElement) bloco(n)
   })
-  const bloco = novas.join('\n')
-  const delta = bloco.length - (termino - comeco)
-  return { texto: texto.slice(0, comeco) + bloco + texto.slice(termino), inicio: comeco, fim: termino + delta }
+  return linhas.join('\n')
 }
