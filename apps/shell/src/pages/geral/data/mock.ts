@@ -8,11 +8,11 @@ const F = '@OData.Community.Display.V1.FormattedValue'
 const DAY = 24 * 3_600_000
 
 const STATUS: ChoiceOption[] = [
-  { value: 202410001, label: 'Confirmado' }, { value: 202410002, label: 'Cancelado' }, { value: 100000001, label: 'Requer Análise' },
-  { value: 202410005, label: 'Programado' }, { value: 202410006, label: 'Em Execução' }, { value: 202410008, label: 'Concluído' },
+  { value: 202410001, label: 'Confirmado', color: '#16a34a' }, { value: 202410002, label: 'Cancelado', color: '#dc2626' }, { value: 100000001, label: 'Requer Análise', color: '#d97706' },
+  { value: 202410005, label: 'Programado', color: '#2563eb' }, { value: 202410006, label: 'Em Execução', color: '#9333ea' }, { value: 202410008, label: 'Concluído', color: '#0f766e' },
 ]
 const FATURAMENTO: ChoiceOption[] = [{ value: 202410005, label: 'Pendente' }, { value: 202410010, label: 'Pago' }, { value: 202410011, label: 'Não Faturável' }]
-const TIPO: ChoiceOption[] = [{ value: 202410001, label: 'Executivo' }, { value: 202410000, label: 'Básico' }, { value: 202410002, label: 'Blindado' }]
+const TIPO: ChoiceOption[] = [{ value: 202410001, label: 'Executivo', color: '#1d4ed8' }, { value: 202410000, label: 'Básico', color: '#64748b' }, { value: 202410002, label: 'Blindado', color: '#7c3aed' }]
 const SIM_NAO: ChoiceOption[] = [{ value: 1, label: 'Sim' }, { value: 0, label: 'Não' }]
 
 const lookupId = (group: number, n: number) => `bbbbbbbb-000${group}-4000-8000-${String(n).padStart(12, '0')}`

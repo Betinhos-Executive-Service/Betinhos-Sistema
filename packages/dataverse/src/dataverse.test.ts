@@ -146,6 +146,20 @@ describe('metadata.choices', () => {
   })
 })
 
+describe('metadata.choices: cor cadastrada', () => {
+  it('traz a cor hex da choice e ignora ausente ou inválida', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(json({
+      OptionSet: { Options: [
+        { Value: 1, Color: '#16A34A', Label: { UserLocalizedLabel: { Label: 'A' } } },
+        { Value: 2, Color: null, Label: { UserLocalizedLabel: { Label: 'B' } } },
+        { Value: 3, Color: 'verde', Label: { UserLocalizedLabel: { Label: 'C' } } },
+      ] },
+    }))
+    const options = await createMetadata(createClient('https://org.example', fetchMock)).choices('cr40f_reservadeveculos', 'cr40f_tipodeveiculo')
+    expect(options).toEqual([{ value: 1, label: 'A', color: '#16A34A' }, { value: 2, label: 'B' }, { value: 3, label: 'C' }])
+  })
+})
+
 describe('metadata attributes', () => {
   it('lê tipo, rótulo, updatable e alvos de lookup em duas chamadas', async () => {
     const fetchMock = vi.fn()

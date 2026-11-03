@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { READONLY, cellKind, readonlyHint, statusTone } from './cells'
+import { READONLY, cellKind, readonlyHint, statusTone, tipoVariant, choiceColor, isBadgeValue } from './cells'
 import { formatCell, formatMoney, fromDateTimeLocal, parseMoney, toDateTimeLocal } from './format'
 import type { AttributeInfo, Column } from './types'
 
@@ -85,5 +85,40 @@ describe('format', () => {
     expect(parseMoney('')).toBeNull()
     expect(parseMoney('abc')).toBeNull()
     expect(formatCell('money', { v: 10 }, 'v')).toBe('R$ 10,00')
+  })
+})
+
+describe('tipoVariant', () => {
+  it('dá cor fixa aos tipos conhecidos, sem acento nem caixa', () => {
+    expect(tipoVariant('Executivo')).toBe(1)
+    expect(tipoVariant('Básico')).toBe(2)
+    expect(tipoVariant('VAN')).toBe(3)
+  })
+  it('rótulo novo recebe sempre a mesma cor entre 1 e 6', () => {
+    const v = tipoVariant('Ônibus')
+    expect(v).toBeGreaterThanOrEqual(1)
+    expect(v).toBeLessThanOrEqual(6)
+    expect(tipoVariant('Ônibus')).toBe(v)
+  })
+})
+
+describe('choiceColor', () => {
+  const withOptions = { ...info('Picklist'), options: [{ value: 1, label: 'A', color: '#16a34a' }, { value: 2, label: 'B' }] }
+  it('devolve a cor cadastrada ou null', () => {
+    expect(choiceColor(withOptions, 1)).toBe('#16a34a')
+    expect(choiceColor(withOptions, 2)).toBeNull()
+    expect(choiceColor(withOptions, 9)).toBeNull()
+    expect(choiceColor(undefined, 1)).toBeNull()
+    expect(choiceColor(withOptions, null)).toBeNull()
+  })
+})
+
+describe('isBadgeValue', () => {
+  it('só choices numéricas de status e tipo, sem alias, viram etiqueta', () => {
+    expect(isBadgeValue(col('cr40f_status'), 202410001)).toBe(true)
+    expect(isBadgeValue(col('cr40f_tipodeveiculo'), 202410001)).toBe(true)
+    expect(isBadgeValue(col('cr40f_status', 'a'), 202410001)).toBe(false)
+    expect(isBadgeValue(col('cr40f_status'), null)).toBe(false)
+    expect(isBadgeValue(col('cr40f_trajeto'), 1)).toBe(false)
   })
 })
