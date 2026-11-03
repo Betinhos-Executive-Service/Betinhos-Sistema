@@ -5,7 +5,7 @@ import { createMetadata } from './metadata'
 type RecordRef = { entityType: string; id: string }
 
 export type XrmWebApi = {
-  retrieveMultipleRecords: (entity: string, options?: string, maxPageSize?: number) => Promise<{ entities: Row[]; nextLink?: string }>
+  retrieveMultipleRecords: (entity: string, options?: string, maxPageSize?: number) => Promise<{ entities: Row[]; nextLink?: string; fetchXmlPagingCookie?: string }>
   retrieveRecord: (entity: string, id: string, options?: string) => Promise<Row>
   createRecord: (entity: string, data: Row) => Promise<RecordRef>
   updateRecord: (entity: string, id: string, data: Row) => Promise<RecordRef>
@@ -65,8 +65,9 @@ export function createXrmShim(client: DataverseClient, clientUrl: string): XrmHo
   return {
     WebApi: {
       async retrieveMultipleRecords(entity, options = '', maxPageSize) {
-        const page = await client.request<{ value: Row[]; '@odata.nextLink'?: string }>(`${await set(entity)}${options}`, { maxPageSize })
-        return { entities: page.value, nextLink: page['@odata.nextLink'] }
+        const page = await client.request<{ value: Row[]; '@odata.nextLink'?: string; '@Microsoft.Dynamics.CRM.fetchxmlpagingcookie'?: string }>(`${await set(entity)}${options}`, { maxPageSize })
+        // Como no Xrm real: FetchXML não traz nextLink, a próxima página vem do cookie (sem ele as telas de views paravam na 1ª página).
+        return { entities: page.value, nextLink: page['@odata.nextLink'], fetchXmlPagingCookie: page['@Microsoft.Dynamics.CRM.fetchxmlpagingcookie'] }
       },
       async retrieveRecord(entity, id, options = '') {
         return client.request<Row>(`${await set(entity)}(${cleanId(id)})${options}`)
