@@ -24,6 +24,7 @@ import { FrotaTab } from './components/abas/FrotaTab'
 import { MotoristasTab, type FrotaMotorista } from './components/abas/MotoristasTab'
 import { ManutencoesTab } from './components/abas/ManutencoesTab'
 import { MultasTab } from './components/abas/MultasTab'
+import { ProgressoCarga } from './components/Carregando'
 import { DashboardToolbar } from './components/DashboardToolbar'
 import { DetalheProvider } from './components/DetalheDrawer'
 import './dashboard.css'
@@ -145,7 +146,9 @@ export function DashboardPage({ host }: { host: Host }) {
         {/* Toast do DS ("Tabela copiada"): o shell não tem provider global, então a página monta o seu. */}
         <ToastProvider>
           <DetalheProvider clientUrl={host.mode === 'dataverse' ? host.clientUrl : null} resolver={resolverDetalhe}>
-            {db.dados || carregandoPrimeira ? conteudo[aba]() : null}
+            <ProgressoCarga.Provider value={db.progresso}>
+              {db.dados || carregandoPrimeira ? conteudo[aba]() : null}
+            </ProgressoCarga.Provider>
           </DetalheProvider>
         </ToastProvider>
       </div>

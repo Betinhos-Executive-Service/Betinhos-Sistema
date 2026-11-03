@@ -100,8 +100,5 @@ function ServicosAba({ ctx, dados, periodo }: DadosAba) {
 
 /** Primeira carga da aba Serviços: os quatro KPIs e os seis blocos ocupados. */
 export const ServicosCarregando = () => (
-  <AbaCarregando
-    rotulo={ROTULO_KPIS} kpis={ROTULOS_SERVICOS} colunas={4}
-    blocos={['Serviços por mês', 'Status dos serviços', 'Por tipo de serviço', 'Por tipo de veículo', 'Produção própria × terceirizada', 'Serviços emergenciais']}
-  />
+  <AbaCarregando />
 )

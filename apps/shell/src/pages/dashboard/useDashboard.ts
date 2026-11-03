@@ -9,6 +9,8 @@ const NENHUM: ReadonlySet<ConjuntoExtra> = new Set()
 
 type Estado = { chave: string; dados: Dados | null; carregando: boolean; erro: string | null; atualizadoEm: Date | null }
 type Extras = { chave: string; partes: Partial<Record<ConjuntoExtra, ParteExtra>> }
+/** Consultas respondidas / total, por etapa da carga (`base` = estágio 1), na janela `chave`. */
+type Avanco = { chave: string; itens: Partial<Record<'base' | ConjuntoExtra, readonly [number, number]>> }
 const mensagem = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
 export type OpcoesDashboard = { /** Conjuntos do estágio 2 que a aba ativa usa. */ conjuntosExtras?: ReadonlySet<ConjuntoExtra> }
@@ -25,6 +27,7 @@ export function useDashboard(source: Source, desde: string, ate: string, opcoes:
   const ativosKey = EXTRAS.filter((c) => ativos.has(c)).join(',')
   const [estado, setEstado] = useState<Estado>({ chave: '', dados: null, carregando: true, erro: null, atualizadoEm: null })
   const [extras, setExtras] = useState<Extras>({ chave: '', partes: {} })
+  const [avanco, setAvanco] = useState<Avanco>({ chave: '', itens: {} })
   const token = useRef(0)
   const ultima = useRef(0)
   /** Há carga em andamento da janela atual: o relógio e a volta da aba esperam; "Atualizar" e a troca de janela substituem. */
@@ -36,12 +39,16 @@ export function useDashboard(source: Source, desde: string, ate: string, opcoes:
   const ativosRef = useRef(ativosKey)
   ativosRef.current = ativosKey
 
+  const registrar = useCallback((etapa: 'base' | ConjuntoExtra, feitas: number, total: number) => {
+    setAvanco((a) => ({ chave, itens: { ...(a.chave === chave ? a.itens : {}), [etapa]: [feitas, total] } }))
+  }, [chave])
+
   const carregarExtra = useCallback(async (conjunto: ConjuntoExtra) => {
     const atual = ++tokenExtra.current[conjunto]
     vooExtra.current[conjunto] = chave
     let parte: ParteExtra | null = null
     try {
-      parte = await source.carregarExtra(conjunto, desde, ate)
+      parte = await source.carregarExtra(conjunto, desde, ate, (f, t) => { if (atual === tokenExtra.current[conjunto]) registrar(conjunto, f, t) })
     } catch (reason) {
       console.warn(`Dashboard: ${conjunto} não carregou.`, mensagem(reason))
     }
@@ -54,7 +61,7 @@ export function useDashboard(source: Source, desde: string, ate: string, opcoes:
       const nova = parte ?? anteriores[conjunto] ?? { campos: {}, indisponivel: true }
       return { chave, partes: { ...anteriores, [conjunto]: nova } }
     })
-  }, [source, desde, ate, chave])
+  }, [source, desde, ate, chave, registrar])
 
   /** Estágio 1; com `comExtras`, também o estágio 2 da aba ativa (o que não estiver em voo, salvo `forcar`). */
   const carregar = useCallback(async (comExtras: boolean, forcar: boolean) => {
@@ -65,7 +72,7 @@ export function useDashboard(source: Source, desde: string, ate: string, opcoes:
     emVoo.current = true
     setEstado((s) => ({ ...s, carregando: true, erro: null }))
     try {
-      const dados = await source.carregar(desde, ate)
+      const dados = await source.carregar(desde, ate, (f, t) => { if (atual === token.current) registrar('base', f, t) })
       if (atual !== token.current) return
       ultima.current = Date.now()
       setEstado({ chave, dados, carregando: false, erro: null, atualizadoEm: new Date() })
@@ -75,7 +82,7 @@ export function useDashboard(source: Source, desde: string, ate: string, opcoes:
     } finally {
       if (atual === token.current) emVoo.current = false
     }
-  }, [source, desde, ate, chave, carregarExtra])
+  }, [source, desde, ate, chave, carregarExtra, registrar])
 
   const atualizar = useCallback(() => carregar(true, true), [carregar])
 
@@ -112,5 +119,14 @@ export function useDashboard(source: Source, desde: string, ate: string, opcoes:
     }
   }, [base, partes])
 
-  return { dados, carregando: estado.carregando, erro: estado.erro, atualizadoEm: estado.atualizadoEm, atualizar }
+  /** Avanço real (0–100) do que a tela ainda espera: estágio 1 sem dados e conjuntos do estágio 2 da aba ativa que não chegaram. */
+  const progresso = useMemo(() => {
+    const itens = avanco.chave === chave ? avanco.itens : {}
+    const esperando = [...(base ? [] : ['base' as const]), ...EXTRAS.filter((c) => ativosKey.split(',').includes(c) && !partes?.[c])]
+    let feitas = 0, total = 0
+    for (const e of esperando) { const i = itens[e]; if (i) { feitas += i[0]; total += i[1] } }
+    return total ? Math.min(99, Math.round((feitas / total) * 100)) : 0
+  }, [avanco, chave, base, partes, ativosKey])
+
+  return { dados, progresso, carregando: estado.carregando, erro: estado.erro, atualizadoEm: estado.atualizadoEm, atualizar }
 }

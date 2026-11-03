@@ -46,7 +46,7 @@ const anterior = (v: number | null) => (v == null || v === 0 ? '—' : int(v))
  * Custo por mês | Por tipo de reparo; Categorias com metas na largura total, cada meta com selo em texto.
  */
 export function ManutencoesTab({ ctx, dados, periodo }: PropsAba) {
-  if (!ctx || !dados) return <AbaCarregando rotulo={ROTULO_KPIS} kpis={KPIS} colunas={5} blocos={BLOCOS} />
+  if (!ctx || !dados) return <AbaCarregando />
   return <ManutencoesAba ctx={ctx} dados={dados} periodo={periodo} />
 }
 

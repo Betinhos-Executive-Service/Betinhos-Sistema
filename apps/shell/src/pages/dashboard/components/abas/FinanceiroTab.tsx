@@ -237,5 +237,5 @@ function FinanceiroAba({ ctx, dados, periodo }: DadosAba) {
 
 /** Primeira carga da aba Financeiro: os seis KPIs e os cinco blocos ocupados. */
 export const FinanceiroCarregando = () => (
-  <AbaCarregando rotulo={ROTULO_KPIS} kpis={ROTULOS_FINANCEIRO} colunas={6} blocos={['Ciclo financeiro', 'Status de faturamento', 'Ticket médio — mensal', 'Recebimentos', 'Clientes']} />
+  <AbaCarregando />
 )
