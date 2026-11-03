@@ -3,7 +3,7 @@
 // pública entregue pela fatia do emissor; ver docs/plano-web-push-pwa.md).
 import { isPwaContext, PWA_SW_NAME } from "./pwaManifest.ts";
 
-export const WEB_PUSH_PUBLIC_KEY = "";
+export const WEB_PUSH_PUBLIC_KEY = "BK2LY-2VoaOD-NeaKUWES7tlTkiRp6hi9m0HIXjl9h2esv9Pf3RJw3JptCJ3wrJrt5cLGGQVUcVACN5wvot7jMo";
 const DRIVER_MARK_KEY = "app-motoristas:web-push-driver";
 
 function readMark() {

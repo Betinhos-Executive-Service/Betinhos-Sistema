@@ -14,15 +14,15 @@ Cada notificação que os Flows já enviam pelo Power Apps Notification V2 passa
 - `src/lib/pwa.ts`: registra o SW só na URL direta `*.dynamics.com`; o botão só aparece aí.
 - Flows: `scripts/provision-motorista-push-flows.ps1`, `provision-comunicados-push-flow.ps1`, `provision-termo-multa-push-flow.ps1`, `provision-treinamentos-push.ps1`, `provision-checklist-flows.ps1`.
 - Redirect do toque: `webresources/new_appmotoristas_push_redirect.js` mapeia registro para tela; o clique do push web reaproveita a mesma tabela de destinos.
-- Plugin: `plugins/` (DriverRecordSharing). Regra: publicar só com a branch sincronizada com `origin/main`.
+- Worker publicado em `https://app-motoristas-web-push.betinhosexecutiveservice.workers.dev/send` (conta Cloudflare da Betinhos); segredos no próprio Worker.
 - Dados: nova tabela de inscrições (motorista, endpoint, chaves p256dh/auth, aparelho, criado em). Nomes lógicos a confirmar na metadata antes de criar.
-- Segurança: a revisão de 11/2026 já aponta segredos em env vars String; a chave VAPID usa env var do tipo Secret e a tabela de inscrições só é legível pelo próprio motorista (escrita) e pelo plugin.
+- Segurança: a revisão de 11/2026 já aponta segredos em env vars String; a chave VAPID e o segredo compartilhado ficam só como segredos do Worker e a tabela de inscrições só é acessível pelo próprio motorista (`scripts/grant-web-push-role.ps1`) e pelo Flow emissor.
 
 ## Fatias (cada uma vira PR)
 1. Cliente: handlers no SW, botão de ativação, guia iOS, gravação da inscrição.
 2. Schema: tabela de inscrições, papéis e env var secreta (script de provisionamento, DEV).
-3. Emissor: Worker com assinatura VAPID e cifra `aes128gcm` (código e testes prontos); falta publicar, papéis da tabela e ligar `WEB_PUSH_PUBLIC_KEY`.
-4. Flows: adicionar a chamada da Custom API em cada Flow clonado.
+3. Emissor: Worker com assinatura VAPID e cifra `aes128gcm` (código e testes prontos); Worker publicado e `WEB_PUSH_PUBLIC_KEY` ligada; falta rodar `scripts/grant-web-push-role.ps1 -Apply` no DEV.
+4. Flows: adicionar a chamada ao Worker (`POST /send`) em cada Flow clonado.
 
 ## Verificação (pronto quando todos passarem)
 1. Toque em "Ativar notificações" → permissão concedida → linha na tabela com o motorista correto.
