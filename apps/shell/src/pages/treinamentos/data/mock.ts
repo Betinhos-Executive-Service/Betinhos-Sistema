@@ -18,6 +18,13 @@ const FUNCIONARIOS: Funcionario[] = [
 // Assinatura curta em coordenadas 0–1, só para o painel mostrar o desenho.
 const ASSINATURA = JSON.stringify([[[0.1, 0.6], [0.2, 0.3], [0.3, 0.7], [0.45, 0.35], [0.6, 0.65], [0.75, 0.4], [0.9, 0.55]]])
 
+// Versão lida fictícia (formato v1 gravado pelo App) e hash de mentira: só para o mock mostrar o comprovante.
+const SNAPSHOT_MOCK = JSON.stringify({
+  v: 1, titulo: 'Embarque no GRU: novo procedimento', descricao: 'Ponto de encontro, antecedência e contato com a operação.',
+  conteudo: '# Ponto de encontro\nO encontro é na **porta 2** do Terminal 3.\n\n- Chegue com 20 minutos de antecedência\n- Placa com o nome do passageiro sempre visível',
+  videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', anexos: [{ nome: 'mapa-terminal-3.pdf', tamanho: 348_212 }], exigeAssinatura: true, exigeQuiz: true, notaMinima: 70, publicadoEm: '2026-11-01T13:00:00.000Z', editadoEm: null,
+})
+
 const QUIZ = [
   { id: 'q1', texto: 'Qual a porta de encontro no Terminal 3?', alternativas: [{ id: 'a', texto: 'Porta 2' }, { id: 'b', texto: 'Porta 4' }, { id: 'c', texto: 'Porta 6' }], corretaId: 'b' },
   { id: 'q2', texto: 'Com quanto tempo de antecedência o motorista chega?', alternativas: [{ id: 'a', texto: '10 minutos' }, { id: 'b', texto: '30 minutos' }], corretaId: 'b' },
@@ -25,7 +32,7 @@ const QUIZ = [
 ]
 
 function participacao(n: number, treinamentoId: string, funcionarioId: string, extra: Partial<Participacao> = {}): Participacao {
-  return { id: id(100 + n), treinamentoId, funcionarioId, abertoEm: null, confirmadoEm: null, assinadoEm: null, nomeAssinante: '', assinaturaJson: '', nota: null, aprovado: null, tentativas: 0, concluidoEm: null, pushStatus: PUSH.enviado, pushErro: '', lembradoEm: null, ...extra }
+  return { id: id(100 + n), treinamentoId, funcionarioId, abertoEm: null, confirmadoEm: null, assinadoEm: null, nomeAssinante: '', assinaturaJson: '', nota: null, aprovado: null, tentativas: 0, concluidoEm: null, pushStatus: PUSH.enviado, pushErro: '', lembradoEm: null, conteudoSnapshot: '', conteudoHash: '', ...extra }
 }
 
 /** Dados de exemplo do `pnpm dev`: um publicado completo (vídeo, anexo, assinatura, quiz), um vencido e um rascunho. */
@@ -50,7 +57,7 @@ export function createMockSource(): Source {
     },
   ]
   const participacoes: Participacao[] = [
-    participacao(1, id(10), id(1), { abertoEm: hoje, confirmadoEm: hoje, assinadoEm: hoje, nomeAssinante: 'Carlos Alberto Teste', assinaturaJson: ASSINATURA, nota: 100, aprovado: true, tentativas: 1, concluidoEm: hoje }),
+    participacao(1, id(10), id(1), { abertoEm: hoje, confirmadoEm: hoje, assinadoEm: hoje, nomeAssinante: 'Carlos Alberto Teste', assinaturaJson: ASSINATURA, nota: 100, aprovado: true, tentativas: 1, concluidoEm: hoje, conteudoSnapshot: SNAPSHOT_MOCK, conteudoHash: '0'.repeat(64) }),
     participacao(2, id(10), id(2), { abertoEm: hoje, confirmadoEm: hoje, assinadoEm: hoje, nomeAssinante: 'Márcio Lima', assinaturaJson: ASSINATURA, nota: 33, aprovado: false, tentativas: 1 }),
     participacao(3, id(10), id(3), { abertoEm: hoje, pushStatus: PUSH.falhou, pushErro: 'Dispositivo não registrado' }),
     participacao(4, id(11), id(1), { abertoEm: ontem, confirmadoEm: ontem, concluidoEm: ontem }),
