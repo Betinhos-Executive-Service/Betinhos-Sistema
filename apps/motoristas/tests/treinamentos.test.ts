@@ -203,3 +203,13 @@ test("mapTreinamento lê a data da última edição", () => {
   assert.equal(treinamento().editadoEm, "2026-11-01T08:00:00Z");
   assert.equal(mapTreinamento({}).editadoEm, null);
 });
+
+test("sha256Hex devolve null sem crypto.subtle (a conclusão não pode depender do hash)", async () => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "crypto");
+  Object.defineProperty(globalThis, "crypto", { value: {}, configurable: true });
+  try {
+    assert.equal(await sha256Hex("abc"), null);
+  } finally {
+    if (original) Object.defineProperty(globalThis, "crypto", original);
+  }
+});

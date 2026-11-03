@@ -258,9 +258,14 @@ export function snapshotConteudo(item: Treinamento): string {
   });
 }
 
-export async function sha256Hex(texto: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(texto));
-  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+/** Hash SHA-256 em hexadecimal; `null` se o ambiente não tem `crypto.subtle` (contexto inseguro, WebView antigo): o hash é prova extra e não pode barrar a conclusão. */
+export async function sha256Hex(texto: string): Promise<string | null> {
+  try {
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(texto));
+    return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+  } catch {
+    return null;
+  }
 }
 
 // ---------------- Payloads (puros, testáveis) ----------------
@@ -423,7 +428,8 @@ export function abrirTreinamento(p: Participacao): Promise<Participacao> {
 async function aplicar(mudanca: Mudanca, item?: Treinamento) {
   if (item && mudanca.patch.cr40f_concluidoem) {
     const snapshot = snapshotConteudo(item);
-    mudanca = { ...mudanca, patch: { ...mudanca.patch, cr40f_conteudosnapshot: snapshot, cr40f_conteudohash: await sha256Hex(snapshot) } };
+    const hash = await sha256Hex(snapshot);
+    mudanca = { ...mudanca, patch: { ...mudanca.patch, cr40f_conteudosnapshot: snapshot, ...(hash ? { cr40f_conteudohash: hash } : {}) } };
   }
   if (isMockTreinamentos()) {
     await mockDelay();
