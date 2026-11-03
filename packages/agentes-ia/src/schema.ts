@@ -1,10 +1,10 @@
-import { PRIORIDADES, TODAS_AS_ACOES, TODOS_OS_TIPOS } from './tipos.ts'
+import { PRIORIDADES, TIPOS_APOSENTADOS, TODAS_AS_ACOES, TODOS_OS_TIPOS } from './tipos.ts'
 
 /** Campos das ações: a saída estruturada exige additionalProperties false, então as chaves são fixas e as que não se aplicam vêm null. */
 const textoOuNulo = { anyOf: [{ type: 'string' }, { type: 'null' }] }
 const camposProps = { titulo: textoOuNulo, descricao: textoOuNulo, conteudo: textoOuNulo, motoristaId: textoOuNulo, veiculoId: textoOuNulo }
 const propostaProps = {
-  tipo: { type: 'string', enum: [...TODOS_OS_TIPOS] },
+  tipo: { type: 'string', enum: TODOS_OS_TIPOS.filter((t) => !(TIPOS_APOSENTADOS as readonly string[]).includes(t)) },
   titulo: { type: 'string' },
   justificativa: { type: 'string' },
   prioridade: { type: 'string', enum: [...PRIORIDADES] },
