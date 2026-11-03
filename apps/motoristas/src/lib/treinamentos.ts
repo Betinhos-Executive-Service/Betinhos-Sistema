@@ -138,6 +138,15 @@ const ORDEM_STATUS: Record<StatusTreinamento, number> = { novo: 0, andamento: 1,
 
 export const isTreinamentoPendente = (item: TreinamentoMotorista) => !item.participacao.concluidoEm;
 
+/** Pendentes que o app ainda não conhecia (por participacao.id). `conhecidos` null = primeira carga: não avisa. */
+export function novosTreinamentosPendentes(conhecidos: ReadonlySet<string> | null, atuais: TreinamentoMotorista[]) {
+  if (!conhecidos) return [];
+  return atuais.filter((item) => isTreinamentoPendente(item) && !conhecidos.has(item.participacao.id));
+}
+
+export const mensagemNovosTreinamentos = (quantidade: number) =>
+  quantidade === 1 ? "Você recebeu um novo treinamento." : `Você recebeu ${quantidade} novos treinamentos.`;
+
 /** Pendentes primeiro (publicados mais recentes no topo); concluídos pelo mais recente. */
 export function separarTreinamentos(items: TreinamentoMotorista[]) {
   const porData = (a: TreinamentoMotorista, b: TreinamentoMotorista, campo: (x: TreinamentoMotorista) => string | null) => String(campo(b) ?? "").localeCompare(String(campo(a) ?? ""));

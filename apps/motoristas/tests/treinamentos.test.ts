@@ -11,6 +11,8 @@ import {
   mudancaAssinatura,
   mudancaConfirmacao,
   mudancaQuiz,
+  mensagemNovosTreinamentos,
+  novosTreinamentosPendentes,
   participacaoPorTreinamento,
   parsePerguntas,
   proximaEtapa,
@@ -212,4 +214,26 @@ test("sha256Hex devolve null sem crypto.subtle (a conclusão não pode depender 
   } finally {
     if (original) Object.defineProperty(globalThis, "crypto", original);
   }
+});
+
+const itemPart = (id: string, concluidoEm: string | null = null) => ({ treinamento: treinamento(), participacao: { id, concluidoEm } as Participacao });
+
+test("novosTreinamentosPendentes: primeira carga não avisa", () => {
+  assert.deepEqual(novosTreinamentosPendentes(null, [itemPart("p1")]), []);
+});
+
+test("novosTreinamentosPendentes: id novo avisa e ids já conhecidos não repetem", () => {
+  const conhecidos = new Set(["p1"]);
+  const novos = novosTreinamentosPendentes(conhecidos, [itemPart("p1"), itemPart("p2")]);
+  assert.deepEqual(novos.map((i) => i.participacao.id), ["p2"]);
+  assert.deepEqual(novosTreinamentosPendentes(new Set(["p1", "p2"]), [itemPart("p1"), itemPart("p2")]), []);
+});
+
+test("novosTreinamentosPendentes: concluído não avisa", () => {
+  assert.deepEqual(novosTreinamentosPendentes(new Set(), [itemPart("p3", "2026-11-01T10:00:00Z")]), []);
+});
+
+test("mensagemNovosTreinamentos: singular e plural", () => {
+  assert.equal(mensagemNovosTreinamentos(1), "Você recebeu um novo treinamento.");
+  assert.equal(mensagemNovosTreinamentos(2), "Você recebeu 2 novos treinamentos.");
 });

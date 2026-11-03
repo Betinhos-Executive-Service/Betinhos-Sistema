@@ -152,7 +152,7 @@ import { ComunicadosScreen } from "./screens/ComunicadosScreen";
 import { TermosMultaScreen, type TermosLoadStatus } from "./screens/TermosMultaScreen";
 import { isMockTermos, listarTermosMotorista, resumoPendentes, separarTermos, type TermoMulta } from "./lib/termosMulta";
 import { TreinamentosScreen, type TreinamentosLoadStatus } from "./screens/TreinamentosScreen";
-import { isMockTreinamentos, isTreinamentoPendente, listarTreinamentosMotorista, type Participacao, type TreinamentoMotorista } from "./lib/treinamentos";
+import { isMockTreinamentos, isTreinamentoPendente, listarTreinamentosMotorista, mensagemNovosTreinamentos, novosTreinamentosPendentes, type Participacao, type TreinamentoMotorista } from "./lib/treinamentos";
 import { ChecklistsScreen } from "./screens/ChecklistsScreen";
 import { ButtonPreviewScreen } from "./screens/ButtonPreviewScreen";
 import { CollisionStartScreen } from "./screens/CollisionStartScreen";
@@ -932,19 +932,52 @@ function App() {
   const [treinamentosStatus, setTreinamentosStatus] = useState<TreinamentosLoadStatus>("loading");
   const [selectedTreinamentoId, setSelectedTreinamentoId] = useState("");
   const pendingTreinamentoDeepLinkRef = useRef(getInitialTreinamentoParticipacaoId());
-  const reloadTreinamentos = useCallback(async () => {
-    try {
-      setTreinamentos(await listarTreinamentosMotorista(comunicadosDriverIdRef.current));
-      setTreinamentosStatus("ready");
-    } catch (error) {
-      setTreinamentosStatus((current) => current === "ready" ? current : "error");
-      throw error;
-    }
+  // Ids já vistos (null até a primeira carga) e aviso de treinamento novo; a primeira carga não avisa.
+  const treinamentosConhecidosRef = useRef<Set<string> | null>(null);
+  const treinamentosEmCargaRef = useRef<Promise<void> | null>(null);
+  const [avisoTreinamentos, setAvisoTreinamentos] = useState<{ message: string; participacaoId: string } | null>(null);
+  const reloadTreinamentos = useCallback(() => {
+    if (treinamentosEmCargaRef.current) return treinamentosEmCargaRef.current;
+    const carga = (async () => {
+      try {
+        const atuais = await listarTreinamentosMotorista(comunicadosDriverIdRef.current);
+        const novos = novosTreinamentosPendentes(treinamentosConhecidosRef.current, atuais);
+        treinamentosConhecidosRef.current = new Set(atuais.map((item) => item.participacao.id));
+        setTreinamentos(atuais);
+        setTreinamentosStatus("ready");
+        if (novos.length) setAvisoTreinamentos({ message: mensagemNovosTreinamentos(novos.length), participacaoId: novos.length === 1 ? novos[0].participacao.id : "" });
+      } catch (error) {
+        setTreinamentosStatus((current) => current === "ready" ? current : "error");
+        throw error;
+      } finally {
+        treinamentosEmCargaRef.current = null;
+      }
+    })();
+    treinamentosEmCargaRef.current = carga;
+    return carga;
   }, []);
   useEffect(() => {
     if (!isMockTreinamentos() && !driverContext?.id) return;
-    reloadTreinamentos().catch((error) => reportAppError(error, { severity: "warning", source: "app", action: "listarTreinamentosMotorista", notifyUser: false }));
+    const carregar = () => {
+      if (document.hidden) return;
+      reloadTreinamentos().catch((error) => reportAppError(error, { severity: "warning", source: "app", action: "listarTreinamentosMotorista", notifyUser: false }));
+    };
+    carregar();
+    const timer = window.setInterval(carregar, AUTO_REFRESH_INTERVAL_MS);
+    window.addEventListener("focus", carregar);
+    document.addEventListener("visibilitychange", carregar);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", carregar);
+      document.removeEventListener("visibilitychange", carregar);
+    };
   }, [driverContext?.id]);
+  const abrirAvisoTreinamentos = () => {
+    const participacaoId = avisoTreinamentos?.participacaoId ?? "";
+    setAvisoTreinamentos(null);
+    setSelectedTreinamentoId(participacaoId);
+    setScreen("treinamentos");
+  };
   // Deep link do push: abre o detalhe da participação quando a lista chega; se não achar (ou a leitura falhar), fica na lista.
   useEffect(() => {
     const participacaoId = pendingTreinamentoDeepLinkRef.current;
@@ -1621,6 +1654,20 @@ function App() {
         </motion.div>
       </AnimatePresence>
       <LocalToast toast={dataLoading ? null : toast} onDismiss={() => setToastState(null)} />
+      {avisoTreinamentos && screen !== "treinamentos" && !dataLoading ? (
+        <div className="local-toast-layer">
+          <div className="local-toast local-toast--info trn-aviso" role="status" aria-live="polite" aria-atomic="true">
+            <div className="local-toast-copy">
+              <span className="local-toast-label">Treinamento</span>
+              <span className="local-toast-message">{avisoTreinamentos.message}</span>
+              <div className="trn-aviso-acoes">
+                <button type="button" onClick={abrirAvisoTreinamentos}>Ver treinamento</button>
+                <button type="button" onClick={() => setAvisoTreinamentos(null)}>Dispensar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <LoadingOverlay loading={getVisibleLoadingOverlay(dataLoading, criticalError)} />
       {remoteOperation ? <FlowProgressOverlay operation={remoteOperation} /> : null}
       {expenseSend ? <ExpenseSendOverlay state={expenseSend} onClose={closeExpenseSendError} /> : null}
