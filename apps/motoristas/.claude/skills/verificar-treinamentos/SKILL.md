@@ -11,11 +11,11 @@ description: "Verifica o módulo Treinamentos do App Motoristas: card e pendênc
 
 ## Preparar ambiente
 - `PORT=<porta reservada> node scripts/dev-server.cjs --strictPort` (porta em `~/.codex/dev-ports.json`; nesta worktree 36487). Modo mock em `localhost`: cabeçalho "RH · Mock local"; dois treinamentos para o motorista local ("[Mock] Direção defensiva na Marginal", sem exigências, com link de vídeo e dois anexos; "[Mock] Atendimento premium ao passageiro", assinatura + quiz com 3 perguntas e nota mínima 70, vídeo do YouTube) e um terceiro sem participação, que não deve aparecer. O mock vive na memória da página: recarregar zera.
-- Parâmetros: `?mockTreinamentos=vazio` (sem treinamentos), `?mockTreinamentoErro=gravar` (toda gravação falha, para ver o alerta e o botão continuar disponível).
+- Parâmetros: `?mockTreinamentos=vazio` (sem treinamentos), `?mockTreinamentoErro=gravar` (toda gravação falha). A abertura mostra o erro logo abaixo do título, com "Tentar de novo" (refaz a gravação); as ações mostram só a mensagem amigável, nunca o texto cru do Dataverse (só `ErroTreinamento` chega ao motorista).
 - Tour: `localStorage.setItem("app-motoristas-tour-v2:localhost-driver:*", "visto")` para ele não abrir sobre a tela.
 
 ## Roteiro automatizado (preferido)
-`NODE_PATH=<node_modules com playwright-core> APP_MOTORISTAS_URL=http://127.0.0.1:<porta> CHROME_PATH=<chromium> node scripts/qa/verify-treinamentos.cjs .verificacao/<data>-<branch>` — todas as linhas `OK` em `resultado.txt` (34), prints `01-home` … `14-falha-gravar` (375×812, 2x). Cobre os cenários 1–6 do brief e os casos de borda (vídeo inválido vira link, imagem que não carrega vira link, fora do público não aparece, reabrir não altera, falha ao gravar com `?mockTreinamentoErro=gravar`).
+`NODE_PATH=<node_modules com playwright-core> APP_MOTORISTAS_URL=http://127.0.0.1:<porta> CHROME_PATH=<chromium> node scripts/qa/verify-treinamentos.cjs .verificacao/<data>-<branch>` — todas as linhas `OK` em `resultado.txt` (39), prints `01-home` … `14-falha-gravar` (375×812, 2x). Cobre os cenários 1–6 do brief e os casos de borda (vídeo inválido vira link, imagem que não carrega vira link, fora do público não aparece, reabrir não altera, falha ao gravar com `?mockTreinamentoErro=gravar`).
 Tour: `node scripts/qa/verify-tour.cjs <pasta> treinamentos,treinamento-detalhe [--largura=360]` — `31 OK`.
 
 ## Roteiro manual (375 px)
@@ -32,7 +32,8 @@ Tour: `node scripts/qa/verify-tour.cjs <pasta> treinamentos,treinamento-detalhe 
 - Treinamento sem vídeo/anexos: blocos somem. Vídeo com URL que não é https → "O link do vídeo deste treinamento é inválido. Avise o RH."
 - Quiz com pergunta de uma alternativa só ou JSON inválido: pergunta descartada (`parsePerguntas`).
 - Duas participações do mesmo treinamento (publicação repetida): fica a mais adiantada.
-- Falha ao gravar: alerta vermelho acima da etapa, botão volta ao normal, nada muda localmente.
+- Falha ao gravar: alerta vermelho acima da etapa com mensagem amigável, botão volta ao normal, nada muda localmente. Erro da abertura: topo da tela com "Tentar de novo".
+- Foco por etapa: ao mudar de etapa (leitura → assinatura → quiz → concluído) a seção rola ao topo da tela e recebe o foco (`aria-label` "Assinatura"/"Quiz"); "Refazer quiz" devolve o foco ao quiz; na abertura nada rola (também em StrictMode).
 
 ## Evidência obrigatória
 - `resultado.txt` só com `OK`, prints `04-confirmar-leitura.png`, `08-quiz-reprovado.png`, `09-concluido-quiz.png`, `11-lista-concluidos.png`.

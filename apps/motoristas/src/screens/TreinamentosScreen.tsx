@@ -134,7 +134,7 @@ function TreinamentoDetalhe({ item, driverName, onParticipacaoChange, onClose }:
   const fimRef = useRef<HTMLDivElement | null>(null);
   const resultadoRef = useRef<HTMLElement | null>(null);
   const etapaRef = useRef<HTMLElement | null>(null);
-  const primeiraEtapa = useRef(true);
+  const etapaAnterior = useRef<string | null>(null);
   // Última participação recebida: a resposta da abertura pode chegar depois de outra gravação e não pode apagá-la.
   const participacaoRef = useRef(participacao);
   participacaoRef.current = participacao;
@@ -167,7 +167,8 @@ function TreinamentoDetalhe({ item, driverName, onParticipacaoChange, onClose }:
 
   // Ao mudar de etapa, a nova seção entra na tela e recebe o foco (não roda na abertura).
   useEffect(() => {
-    if (primeiraEtapa.current) { primeiraEtapa.current = false; return; }
+    if (etapaAnterior.current === null || etapaAnterior.current === etapa) { etapaAnterior.current = etapa; return; }
+    etapaAnterior.current = etapa;
     etapaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     etapaRef.current?.focus({ preventScroll: true });
   }, [etapa]);
