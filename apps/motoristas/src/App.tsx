@@ -7,6 +7,7 @@ import {
   getInitialDetail,
   getInitialParams,
   getInitialTermoMultaId,
+  getInitialTreinamentoParticipacaoId,
   getVoucherDraftKey,
   initialStore,
   isSameDetail,
@@ -474,7 +475,7 @@ function App() {
   const initialDetailRef = useRef<DetailData | null>(initialHashRouteRef.current ? initialHashDetail : getInitialDetail(store));
   const initialScreen = initialHashRouteRef.current
     ? getInitialScreenFromHashRoute(initialHashRouteRef.current, initialHashDetail)
-    : (initialDetailRef.current ? "detalhes" : getInitialTermoMultaId() ? "multas" : "inicio");
+    : (initialDetailRef.current ? "detalhes" : getInitialTermoMultaId() ? "multas" : getInitialTreinamentoParticipacaoId() ? "treinamentos" : "inicio");
   const [screen, setScreen] = useState<Screen>(initialScreen);
   const previousScreenRef = useRef<Screen>(initialScreen);
   const lastMediaScreenRef = useRef<Screen>(initialScreen);
@@ -930,6 +931,7 @@ function App() {
   const [treinamentos, setTreinamentos] = useState<TreinamentoMotorista[]>([]);
   const [treinamentosStatus, setTreinamentosStatus] = useState<TreinamentosLoadStatus>("loading");
   const [selectedTreinamentoId, setSelectedTreinamentoId] = useState("");
+  const pendingTreinamentoDeepLinkRef = useRef(getInitialTreinamentoParticipacaoId());
   const reloadTreinamentos = useCallback(async () => {
     try {
       setTreinamentos(await listarTreinamentosMotorista(comunicadosDriverIdRef.current));
@@ -943,6 +945,13 @@ function App() {
     if (!isMockTreinamentos() && !driverContext?.id) return;
     reloadTreinamentos().catch((error) => reportAppError(error, { severity: "warning", source: "app", action: "listarTreinamentosMotorista", notifyUser: false }));
   }, [driverContext?.id]);
+  // Deep link do push: abre o detalhe da participação quando a lista chega; se não achar (ou a leitura falhar), fica na lista.
+  useEffect(() => {
+    const participacaoId = pendingTreinamentoDeepLinkRef.current;
+    if (!participacaoId || treinamentosStatus === "loading") return;
+    pendingTreinamentoDeepLinkRef.current = "";
+    if (treinamentos.some((item) => item.participacao.id === participacaoId)) setSelectedTreinamentoId(participacaoId);
+  }, [treinamentos, treinamentosStatus]);
   // Participação gravada pela tela: reflete na lista e na Home sem esperar a releitura.
   const updateTreinamentoParticipacao = useCallback((participacao: Participacao) => {
     setTreinamentos((current) => current.map((item) => item.participacao.id === participacao.id ? { ...item, participacao } : item));

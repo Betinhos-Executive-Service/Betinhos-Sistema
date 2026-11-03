@@ -35,6 +35,11 @@ Tour: `node scripts/qa/verify-tour.cjs <pasta> treinamentos,treinamento-detalhe 
 - Falha ao gravar: alerta vermelho acima da etapa com mensagem amigável, botão volta ao normal, nada muda localmente. Erro da abertura: topo da tela com "Tentar de novo".
 - Foco por etapa: ao mudar de etapa (leitura → assinatura → quiz → concluído) a seção rola ao topo da tela e recebe o foco (`aria-label` "Assinatura"/"Quiz"); "Refazer quiz" devolve o foco ao quiz; na abertura nada rola (também em StrictMode).
 
+## Push e lembrete (Custom API + flow)
+- Código: `plugins/DriverRecordSharing/TreinamentoCommandPlugin.cs` (`cr40f_LembrarTreinamento`: só treinamento publicado; ignora concluídas, já na fila (Pendente) e lembradas há menos de 24 h; grava `cr40f_pushstatus` = Pendente, `cr40f_pusherro` vazio, `cr40f_lembradoem`), testes em `plugins/DriverRecordSharing.Tests/TreinamentoCommandPluginTests.cs`; `scripts/provision-treinamentos-push.ps1` (Custom API + flow "Push Treinamentos | Motoristas"; chamado pelo `push-dev.ps1`, depois dos comunicados); deep link `treinamentoParticipacaoId` (`getInitialTreinamentoParticipacaoId` em `src/app/bootstrap.ts` e efeito em `src/App.tsx`).
+- Local: `pnpm test` (bootstrap e pushRedirect cobrem o deep link); `dotnet test plugins/DriverRecordSharing.Tests` (net462 pede `mono` no Linux; `ExchangePossessionFinalizerTests.cs` não compila fora do Windows).
+- DEV, depois do schema do Sistema aplicado e do `pnpm push` do App: disparar `cr40f_LembrarTreinamento` num treinamento de teste e conferir na participação `cr40f_pushstatus` 100000001 (Enviado) ou 100000002 com `cr40f_pusherro`; segundo disparo em menos de 24 h devolve `cr40f_Ignorados`. Recebimento no aparelho é verificação separada.
+
 ## Evidência obrigatória
 - `resultado.txt` só com `OK`, prints `04-confirmar-leitura.png`, `08-quiz-reprovado.png`, `09-concluido-quiz.png`, `11-lista-concluidos.png`.
 
