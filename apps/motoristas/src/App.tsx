@@ -3992,6 +3992,7 @@ function App() {
       pendingMultas={separarTermos(termosMulta).pendentes.length}
       pendingTreinamentos={treinamentos.filter(isTreinamentoPendente).length}
       multasBanner={resumoPendentes(termosMulta)}
+      driverId={driverContext?.id}
       driverName={driverContext?.fullName}
       showLocalReset={isLocalhostRuntime && !remoteMode}
       onResetLocalData={resetLocalData}

@@ -6,6 +6,7 @@ import historyIcon from "../assets/icons/clock.svg";
 import invoiceReceiptIcon from "../assets/icons/invoice-receipt.svg";
 import { filterAgendaGalleryItems, getAgendaItemStartDate } from "../app/agendaVisibility.ts";
 import { PullToRefresh } from "../components/common/PullToRefresh";
+import { WebPushLink } from "../components/common/WebPushLink";
 import type { AgendaItem } from "../types";
 
 const baseModules = [
@@ -210,6 +211,7 @@ type InitialScreenProps = {
   openRecibo?: () => void;
   onOpenRecibo?: () => void;
   onRefresh?: () => void | Promise<void>;
+  driverId?: string;
   driverName?: string;
   motoristaNome?: string;
   nextServiceAt?: string | Date | null;
@@ -548,6 +550,7 @@ export function InitialScreen(props: InitialScreenProps) {
       </section>
 
       <footer className="concept-footer">
+        <WebPushLink driverId={props.driverId} />
         {props.onShowTour ? (
           <button type="button" className="concept-tour-link" onClick={props.onShowTour}>
             Ver tour de novo
