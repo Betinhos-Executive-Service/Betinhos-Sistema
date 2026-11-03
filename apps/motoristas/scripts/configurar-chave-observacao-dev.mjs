@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Grava a chave da API Anthropic na configuração segura do step de new_OrganizarObservacao no DEV (Linux/macOS).
 // A chave vem da variável de ambiente que já a guarda no DEV (--copiar-da-variavel) ou de um ARQUIVO (canal seguro), nunca de argumento;
-// o arquivo é apagado ao final. O valor nunca é impresso. Não cria step nem tipo: eles vêm de scripts/provision-observacao-organizada.ps1.
+// Com --prod aponta para o PROD (gravar exige --confirmo-prod; --prod --verificar só lê). O arquivo é apagado ao final. O valor nunca é impresso. Não cria step nem tipo: eles vêm de scripts/provision-observacao-organizada.ps1.
 //
 //   node scripts/configurar-chave-observacao-dev.mjs --verificar             # só confere o step e se há configuração segura
 //   node scripts/configurar-chave-observacao-dev.mjs --copiar-da-variavel   # copia o valor da variável do DEV para o step
@@ -11,12 +11,14 @@ import { existsSync, readFileSync, rmSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 
 dns.setDefaultResultOrder("ipv4first");
-const ENVIRONMENT_URL = "https://org23b93544.crm2.dynamics.com"; // DEV
+const argv = process.argv.slice(2);
+const isProd = argv.includes("--prod"); // PROD: leitura livre; escrita só com --confirmo-prod
+const ENVIRONMENT_NAME = isProd ? "PROD" : "DEV";
+const ENVIRONMENT_URL = isProd ? "https://orgf261ae8e.crm2.dynamics.com" : "https://org23b93544.crm2.dynamics.com";
 const CLIENT_ID = "51f81489-12ee-4a9e-aaae-a2591f45987d";
 const PLUGIN_TYPE = "Betinhos.DriverRecordSharing.OrganizeObservationPlugin";
 const API_NAME = "new_OrganizarObservacao";
 const ENV_VAR = "new_AnthropicKeyObservacaoMotorista";
-const argv = process.argv.slice(2);
 const fileIndex = argv.indexOf("--arquivo");
 const keyFile = fileIndex >= 0 ? argv[fileIndex + 1] : "";
 const fromVariable = argv.includes("--copiar-da-variavel");
@@ -50,6 +52,7 @@ async function deviceCodeToken() {
 
 async function main() {
   if ([verifyOnly, fromVariable, fileIndex >= 0].filter(Boolean).length !== 1) throw new Error("Use exatamente um: --verificar, --copiar-da-variavel ou --arquivo <caminho>.");
+  if (isProd && !verifyOnly && !argv.includes("--confirmo-prod")) throw new Error("Gravar no PROD exige --confirmo-prod (confira antes o ambiente e a chave).");
   let secret = "";
   if (keyFile) {
     if (!existsSync(keyFile)) throw new Error("Arquivo da chave não encontrado.");
@@ -69,7 +72,7 @@ async function main() {
     };
     const one = async (path, what) => {
       const rows = (await api("GET", path)).value;
-      if (rows.length !== 1) throw new Error(`Esperava 1 ${what} no DEV e achei ${rows.length}. Rode scripts/provision-observacao-organizada.ps1 -Apply antes.`);
+      if (rows.length !== 1) throw new Error(`Esperava 1 ${what} no ${ENVIRONMENT_NAME} e achei ${rows.length}. Faça antes o deploy da solução (PROD: scripts/deploy-prod.ps1) ou rode scripts/provision-observacao-organizada.ps1 -Apply (DEV).`);
       return rows[0];
     };
     const type = await one(`plugintypes?$select=plugintypeid&$filter=typename eq '${PLUGIN_TYPE}'`, "PluginType");
@@ -77,7 +80,7 @@ async function main() {
     const step = await one(`sdkmessageprocessingsteps?$select=sdkmessageprocessingstepid,stage,mode,_sdkmessageprocessingstepsecureconfigid_value&$filter=_eventhandler_value eq ${type.plugintypeid} and _sdkmessageid_value eq ${message.sdkmessageid}`, "step");
     if (step.stage !== 40 || step.mode !== 0) throw new Error("Step divergente (esperado PostOperation síncrono).");
     const secureId = step._sdkmessageprocessingstepsecureconfigid_value;
-    console.log(`Step ${step.sdkmessageprocessingstepid}: configuração segura ${secureId ? "presente" : "ausente"}.`);
+    console.log(`[${ENVIRONMENT_NAME}] Step ${step.sdkmessageprocessingstepid}: configuração segura ${secureId ? "presente" : "ausente"}.`);
     if (verifyOnly) return;
     if (fromVariable) {
       // Mesma regra do app: o valor da variável, se houver; senão o padrão da definição.
