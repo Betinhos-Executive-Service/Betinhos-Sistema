@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Avatar, Breadcrumb, Button, EmptyState, Grid, MetricCard, PageHeader, SearchBox, SegmentedControl, Skeleton, StatusBadge, Surface, todaySaoPaulo, useToast } from '@betinhos/ui'
-import { ArrowLeft, BellRing, CalendarClock, Check, CheckCircle2, Eye, Pencil, PenLine, RefreshCw, Repeat, SearchX, Users, XCircle } from 'lucide-react'
+import { ArrowLeft, BellRing, CalendarClock, Check, CheckCircle2, Eye, FileDown, Pencil, PenLine, RefreshCw, Repeat, SearchX, Users, XCircle } from 'lucide-react'
 import { parseSignature } from '../../comunicados/domain/comunicados'
 import { Assinatura } from '../../comunicados/components/Assinatura'
 import type { Source } from '../data/source'
@@ -27,6 +27,7 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack, onEditar
   const [busca, setBusca] = useState('')
   const [selectedId, setSelectedId] = useState('')
   const [lembrando, setLembrando] = useState(false)
+  const [gerando, setGerando] = useState(false)
   const token = useRef(0)
   const toast = useToast()
   const detalheRef = useRef<HTMLDivElement | null>(null)
@@ -83,6 +84,27 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack, onEditar
       toast({ tone: 'danger', message: erroTexto(reason, 'Não foi possível enviar o lembrete.') })
     } finally {
       setLembrando(false)
+    }
+  }
+  const baixarComprovante = async (p: Participacao) => {
+    if (gerando) return
+    setGerando(true)
+    try {
+      // Import dinâmico: o pdf-lib só entra no bundle quando alguém baixa o comprovante.
+      const [{ dadosComprovante }, { gerarComprovantePdf }] = await Promise.all([import('../domain/comprovante'), import('../data/comprovantePdf')])
+      const dados = dadosComprovante(item, p, nome(p))
+      const url = URL.createObjectURL(new Blob([new Uint8Array(await gerarComprovantePdf(dados))], { type: 'application/pdf' }))
+      const link = document.createElement('a')
+      link.href = url
+      link.download = dados.arquivo
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (reason) {
+      toast({ tone: 'danger', message: erroTexto(reason, 'Não foi possível gerar o comprovante.') })
+    } finally {
+      setGerando(false)
     }
   }
   const algumLembravel = rows.some((p) => podeLembrar(p, Date.now()))
@@ -175,6 +197,7 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack, onEditar
               </ol>
               {selected.assinaturaJson ? <><span className="tr-label">Assinatura</span><div className="tr-signature"><Assinatura value={parseSignature(selected.assinaturaJson)} /></div></> : null}
               {selected.pushStatus === PUSH.falhou && podeLembrar(selected, Date.now()) ? <Button variant="secondary" size="compact" icon={<BellRing size={14} />} loading={lembrando} onClick={() => void lembrar(selected)}>Reenviar push</Button> : null}
+              {isConcluida(selected) ? <Button variant="secondary" size="compact" icon={<FileDown size={14} />} loading={gerando} onClick={() => void baixarComprovante(selected)}>Baixar comprovante</Button> : null}
               {vencido && !isConcluida(selected) ? <p className="tr-pending"><CalendarClock size={16} aria-hidden="true" />Validade vencida em {fmtDia(item.validade)} sem conclusão.</p> : null}
             </Surface>
             </div>

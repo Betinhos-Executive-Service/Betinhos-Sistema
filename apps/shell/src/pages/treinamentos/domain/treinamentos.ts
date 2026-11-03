@@ -60,6 +60,8 @@ export type Participacao = {
   pushStatus: number | null
   pushErro: string
   lembradoEm: string | null
+  conteudoSnapshot: string
+  conteudoHash: string
 }
 
 export type Funcionario = { id: string; nome: string; apelido: string; funcao: number | null; ativo: boolean }
@@ -262,6 +264,8 @@ export function mapParticipacao(row: Row): Participacao {
     pushStatus: typeof row.cr40f_pushstatus === 'number' ? row.cr40f_pushstatus : null,
     pushErro: String(row.cr40f_pusherro ?? ''),
     lembradoEm: dateOrNull(row.cr40f_lembradoem),
+    conteudoSnapshot: String(row.cr40f_conteudosnapshot ?? ''),
+    conteudoHash: String(row.cr40f_conteudohash ?? ''),
   }
 }
 

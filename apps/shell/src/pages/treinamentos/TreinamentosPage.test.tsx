@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, configure, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TreinamentosPage } from './TreinamentosPage'
 
@@ -34,6 +34,24 @@ describe('Treinamentos', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Lembrar pendentes' }))
     expect(await screen.findByText(/Lembrete enviado para 2 funcionários/)).toBeTruthy()
     expect(((await screen.findByRole('button', { name: 'Lembrar pendentes' })) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('baixa o comprovante só de quem concluiu', async () => {
+    const createObjectURL = vi.fn(() => 'blob:x')
+    const revokeObjectURL = vi.fn()
+    vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL })
+    const clique = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    render(<TreinamentosPage host={{ mode: 'mock' }} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Embarque no GRU/ }))
+    // Carlos (concluído) é o selecionado inicial.
+    const baixar = await screen.findByRole('button', { name: 'Baixar comprovante' })
+    fireEvent.click(baixar)
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalled())
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalled(), { timeout: 3000 })
+    fireEvent.click(screen.getByRole('button', { name: /Márcio Lima/ }))
+    expect(await screen.findByText(/33% · reprovado/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Baixar comprovante' })).toBeNull()
+    clique.mockRestore()
   })
 
   it('o painel nomeia o público selecionado em vez de contar', async () => {

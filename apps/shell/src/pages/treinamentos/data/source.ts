@@ -35,7 +35,7 @@ const ENTITIES = { treinamento: 'cr40f_treinamento', participacao: 'cr40f_treina
 type Sets = Record<keyof typeof ENTITIES, string>
 
 const TREINAMENTO_SELECT = 'cr40f_treinamentoid,cr40f_name,cr40f_descricao,cr40f_conteudo,cr40f_videourl,cr40f_anexosjson,cr40f_publicotipo,cr40f_publicojson,cr40f_exigeassinatura,cr40f_exigequiz,cr40f_notaminima,cr40f_quizjson,cr40f_validade,cr40f_estado,cr40f_publicadoem,cr40f_editadoem,createdon'
-const PARTICIPACAO_SELECT = 'cr40f_treinamentoparticipacaoid,_cr40f_treinamento_value,_cr40f_funcionario_value,cr40f_abertoem,cr40f_confirmadoem,cr40f_assinadoem,cr40f_nomeassinante,cr40f_assinaturajson,cr40f_nota,cr40f_aprovado,cr40f_tentativas,cr40f_concluidoem,cr40f_pushstatus,cr40f_pusherro,cr40f_lembradoem'
+const PARTICIPACAO_SELECT = 'cr40f_treinamentoparticipacaoid,_cr40f_treinamento_value,_cr40f_funcionario_value,cr40f_abertoem,cr40f_confirmadoem,cr40f_assinadoem,cr40f_nomeassinante,cr40f_assinaturajson,cr40f_nota,cr40f_aprovado,cr40f_tentativas,cr40f_concluidoem,cr40f_pushstatus,cr40f_pusherro,cr40f_lembradoem,cr40f_conteudosnapshot,cr40f_conteudohash'
 const FUNCIONARIO_SELECT = 'cr40f_funcionariosid,cr40f_nomecompleto,new_apelido,cr40f_funcao,cr40f_status'
 
 function participacaoPayload(sets: Pick<Sets, 'treinamento' | 'funcionario'>, treinamento: Treinamento, funcionario: Pick<Funcionario, 'id' | 'nome'>): Row {

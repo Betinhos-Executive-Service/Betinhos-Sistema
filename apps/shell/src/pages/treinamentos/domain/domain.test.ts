@@ -13,7 +13,7 @@ const FUNC: Funcionario[] = [
 ]
 const pergunta = (corretaId: string): Pergunta => ({ id: 'q1', texto: 'Qual a porta?', alternativas: [{ id: 'a', texto: 'Porta 2' }, { id: 'b', texto: 'Porta 4' }], corretaId })
 const draft = (patch: Partial<Treinamento> = {}): Treinamento => ({ ...emptyDraft(), titulo: 'Embarque no GRU', conteudo: 'Texto', ...patch })
-const part = (patch: Partial<Participacao> = {}): Participacao => ({ id: 'p', treinamentoId: 't', funcionarioId: G(1), abertoEm: null, confirmadoEm: null, assinadoEm: null, nomeAssinante: '', assinaturaJson: '', nota: null, aprovado: null, tentativas: 0, concluidoEm: null, pushStatus: PUSH.enviado, pushErro: '', lembradoEm: null, ...patch })
+const part = (patch: Partial<Participacao> = {}): Participacao => ({ id: 'p', treinamentoId: 't', funcionarioId: G(1), abertoEm: null, confirmadoEm: null, assinadoEm: null, nomeAssinante: '', assinaturaJson: '', nota: null, aprovado: null, tentativas: 0, concluidoEm: null, pushStatus: PUSH.enviado, pushErro: '', lembradoEm: null, conteudoSnapshot: '', conteudoHash: '', ...patch })
 
 describe('validação do rascunho', () => {
   it('exige título e aceita texto, vídeo https e quiz completo', () => {
