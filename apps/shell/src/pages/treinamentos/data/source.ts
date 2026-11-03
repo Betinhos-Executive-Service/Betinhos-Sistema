@@ -2,7 +2,7 @@ import { chunk, cleanId, type Row } from '@betinhos/dataverse'
 import type { Host } from '../../../host'
 import { getDataverseEnvironmentLabel } from '../../funcionarios/data/dataverse'
 import { createSharePointDocs, sanitizeFileName, uniqueName, type EnvVarApi } from '../../funcionarios/data/sharepoint'
-import { ESTADO, anexoDaPasta, draftPayload, edicaoPublicadoPayload, isOrfa, isPublicado, mapFuncionario, mapParticipacao, mapTreinamento, validarComConteudo, validarRascunho, type Anexo, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
+import { ESTADO, PUSH, anexoDaPasta, draftPayload, edicaoPublicadoPayload, isConcluida, isOrfa, isPublicado, mapFuncionario, mapParticipacao, mapTreinamento, validarComConteudo, validarRascunho, type Anexo, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
 import type { Linha } from '../domain/lista'
 import { createMockSource } from './mock'
 
@@ -26,6 +26,8 @@ export type Source = {
   enviarAnexo: (treinamentoId: string, file: File, existentes: Anexo[]) => Promise<Anexo>
   excluirAnexo: (treinamentoId: string, anexo: Anexo) => Promise<void>
   abrirAnexo: (anexo: Anexo) => Promise<{ nome: string; blob: Blob }>
+  /** Custom API cr40f_LembrarTreinamento: reenfileira o push dos pendentes (ou de uma participação), no máximo 1 a cada 24 h. */
+  lembrar: (treinamentoId: string, participacaoId?: string) => Promise<{ enfileirados: number; ignorados: number }>
 }
 
 export const ANEXO_ROOT = 'Treinamentos'
@@ -33,7 +35,7 @@ const ENTITIES = { treinamento: 'cr40f_treinamento', participacao: 'cr40f_treina
 type Sets = Record<keyof typeof ENTITIES, string>
 
 const TREINAMENTO_SELECT = 'cr40f_treinamentoid,cr40f_name,cr40f_descricao,cr40f_conteudo,cr40f_videourl,cr40f_anexosjson,cr40f_publicotipo,cr40f_publicojson,cr40f_exigeassinatura,cr40f_exigequiz,cr40f_notaminima,cr40f_quizjson,cr40f_validade,cr40f_estado,cr40f_publicadoem,cr40f_editadoem,createdon'
-const PARTICIPACAO_SELECT = 'cr40f_treinamentoparticipacaoid,_cr40f_treinamento_value,_cr40f_funcionario_value,cr40f_abertoem,cr40f_confirmadoem,cr40f_assinadoem,cr40f_nomeassinante,cr40f_assinaturajson,cr40f_nota,cr40f_aprovado,cr40f_tentativas,cr40f_concluidoem'
+const PARTICIPACAO_SELECT = 'cr40f_treinamentoparticipacaoid,_cr40f_treinamento_value,_cr40f_funcionario_value,cr40f_abertoem,cr40f_confirmadoem,cr40f_assinadoem,cr40f_nomeassinante,cr40f_assinaturajson,cr40f_nota,cr40f_aprovado,cr40f_tentativas,cr40f_concluidoem,cr40f_pushstatus,cr40f_pusherro,cr40f_lembradoem'
 const FUNCIONARIO_SELECT = 'cr40f_funcionariosid,cr40f_nomecompleto,new_apelido,cr40f_funcao,cr40f_status'
 
 function participacaoPayload(sets: Pick<Sets, 'treinamento' | 'funcionario'>, treinamento: Treinamento, funcionario: Pick<Funcionario, 'id' | 'nome'>): Row {
@@ -121,8 +123,13 @@ export function createSource(host: Host): Source {
       const novos = alvos.filter((f) => !jaTem.has(cleanId(f.id)))
       for (const lote of chunk(existentes.filter((p) => isOrfa(p, alvoIds)), 5)) await Promise.all(lote.map((p) => client.remove(s.participacao, p.id)))
       // Em lotes paralelos: dezenas de motoristas sem N round-trips em série.
-      for (const lote of chunk(novos, 5)) await Promise.all(lote.map((f) => client.create(s.participacao, participacaoPayload(s, treinamento, f))))
+      const criadas: string[] = []
+      for (const lote of chunk(novos, 5)) criadas.push(...await Promise.all(lote.map((f) => client.create(s.participacao, participacaoPayload(s, treinamento, f)))))
       await client.update(s.treinamento, treinamento.id, { cr40f_estado: ESTADO.publicado, cr40f_publicadoem: new Date().toISOString() })
+      // O flow Push Treinamentos observa Pendente. Só depois de publicar: se o PATCH falhar, ninguém recebe push de treinamento em rascunho.
+      // Participação sem status vinda de uma publicação interrompida também entra (a nova tentativa chega aqui).
+      const semPush = existentes.filter((p) => p.pushStatus == null && !isConcluida(p) && alvoIds.has(p.funcionarioId)).map((p) => p.id)
+      for (const lote of chunk([...criadas, ...semPush], 5)) await Promise.all(lote.map((id) => client.update(s.participacao, id, { cr40f_pushstatus: PUSH.pendente })))
     },
     async enviarAnexo(treinamentoId, file, existentes) {
       const nome = uniqueName(sanitizeFileName(file.name), existentes.map((a) => a.nome))
@@ -135,5 +142,11 @@ export function createSource(host: Host): Source {
       await sharepoint.excluir(cleanId(treinamentoId), documentoDoAnexo(anexo))
     },
     abrirAnexo: (anexo) => sharepoint.abrir(documentoDoAnexo(anexo)),
+    async lembrar(treinamentoId, participacaoId) {
+      const body: Record<string, string> = { cr40f_TreinamentoId: cleanId(treinamentoId) }
+      if (participacaoId) body.cr40f_ParticipacaoId = cleanId(participacaoId)
+      const out = await client.request<{ cr40f_Enfileirados?: number; cr40f_Ignorados?: number }>('cr40f_LembrarTreinamento', { method: 'POST', body: JSON.stringify(body) })
+      return { enfileirados: Number(out?.cr40f_Enfileirados ?? 0), ignorados: Number(out?.cr40f_Ignorados ?? 0) }
+    },
   }
 }

@@ -27,6 +27,15 @@ describe('Treinamentos', () => {
     expect(await screen.findByText(/33% · reprovado · 1 tentativa/)).toBeTruthy()
   })
 
+  it('mostra o push falho e lembra os pendentes', async () => {
+    render(<TreinamentosPage host={{ mode: 'mock' }} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Embarque no GRU/ }))
+    expect((await screen.findAllByText('Push falhou · Dispositivo não registrado')).length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Lembrar pendentes' }))
+    expect(await screen.findByText(/Lembrete enviado para 2 funcionários/)).toBeTruthy()
+    expect(((await screen.findByRole('button', { name: 'Lembrar pendentes' })) as HTMLButtonElement).disabled).toBe(true)
+  })
+
   it('o painel nomeia o público selecionado em vez de contar', async () => {
     render(<TreinamentosPage host={{ mode: 'mock' }} />)
     fireEvent.click(await screen.findByRole('button', { name: /Direção defensiva/ }))
