@@ -81,6 +81,13 @@ export function getInitialTermoMultaId(search = window.location.search) {
   return COMUNICADO_ID_PATTERN.test(value) ? value.replace(/[{}]/g, "").toLowerCase() : "";
 }
 
+// Deep link do push de treinamento: ?treinamentoParticipacaoId=<id> ou ?data=treinamentoParticipacaoId%3D<id> (push via form OnLoad).
+// O App abre na tela Treinamentos e, depois do carregamento, no detalhe dessa participação.
+export function getInitialTreinamentoParticipacaoId(search = window.location.search) {
+  const value = readLaunchParam(search, "treinamentoParticipacaoId").trim();
+  return COMUNICADO_ID_PATTERN.test(value) ? value.replace(/[{}]/g, "").toLowerCase() : "";
+}
+
 export function getVoucherDraftKey(detail: DetailData) {
   return `${detail.type}:${detail.id}`;
 }

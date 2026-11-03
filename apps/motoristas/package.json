@@ -1,6 +1,6 @@
 {
   "name": "app-motoristas-webresource",
-  "version": "2.1.812",
+  "version": "2.1.820",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,7 @@
     "build": "node scripts/build-react-singlefile.cjs",
     "deploy:webresource": "powershell -ExecutionPolicy Bypass -File scripts/deploy-webresource.ps1",
     "push": "powershell -ExecutionPolicy Bypass -File scripts/push-dev.ps1 && powershell -NoProfile -ExecutionPolicy Bypass -Command \"if (Test-Path 'C:/Users/mendo/Desktop/vscode/Sistema Betinhos/packages/deploy/solucoes/distribuir-apos-push.ps1') { & 'C:/Users/mendo/Desktop/vscode/Sistema Betinhos/packages/deploy/solucoes/distribuir-apos-push.ps1' } else { Write-Warning 'distribuicao automatica: distribuir-apos-push.ps1 ainda nao esta na main do Sistema Betinhos' }\"",
-    "check:hygiene": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-repository-hygiene.ps1",
+    "check:hygiene": "node --test --experimental-strip-types tests/repositoryHygiene.test.ts",
     "test": "node --test --experimental-strip-types tests/*.test.ts",
     "preview": "node scripts/serve-dist.cjs",
     "demo:capture": "node scripts/capture-demo-screens.cjs",

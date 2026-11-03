@@ -12,6 +12,7 @@ import {
   assinarTreinamento,
   blocosDoConteudo,
   confirmarLeitura,
+  ErroTreinamento,
   formatData,
   formatTamanho,
   formatValidade,
@@ -123,6 +124,8 @@ function TreinamentoDetalhe({ item, driverName, onParticipacaoChange, onClose }:
   const assinatura = useMemo(() => parseStrokes(participacao.assinaturaJson), [participacao.assinaturaJson]);
   const [busy, setBusy] = useState(false);
   const [erro, setErro] = useState("");
+  const [erroAbertura, setErroAbertura] = useState("");
+  const [tentativa, setTentativa] = useState(0);
   const [fimVisto, setFimVisto] = useState(false);
   const [strokes, setStrokes] = useState<SignatureStrokes>([]);
   const [respostas, setRespostas] = useState<Record<string, string>>({});
@@ -130,6 +133,8 @@ function TreinamentoDetalhe({ item, driverName, onParticipacaoChange, onClose }:
   const [jaEstavaConcluido] = useState(() => Boolean(participacao.concluidoEm));
   const fimRef = useRef<HTMLDivElement | null>(null);
   const resultadoRef = useRef<HTMLElement | null>(null);
+  const etapaRef = useRef<HTMLElement | null>(null);
+  const etapaAnterior = useRef<string | null>(null);
   // Última participação recebida: a resposta da abertura pode chegar depois de outra gravação e não pode apagá-la.
   const participacaoRef = useRef(participacao);
   participacaoRef.current = participacao;
@@ -143,10 +148,10 @@ function TreinamentoDetalhe({ item, driverName, onParticipacaoChange, onClose }:
       .then((p) => onParticipacaoChange({ ...participacaoRef.current, abertoEm: p.abertoEm }))
       .catch((cause) => {
         reportAppError(cause, { source: "treinamentos", action: "abrirTreinamento", screen: "Treinamentos", detailId: treinamento.id, notifyUser: false });
-        if (ativo) setErro("Não foi possível registrar a abertura. Verifique a internet e tente de novo.");
+        if (ativo) setErroAbertura("Não foi possível registrar a abertura. Verifique a internet e tente de novo.");
       });
     return () => { ativo = false; };
-  }, [participacao.id, participacao.abertoEm]);
+  }, [participacao.id, participacao.abertoEm, tentativa]);
 
   // "Confirmar leitura" só depois de rolar até o fim do conteúdo (ou quando ele cabe inteiro na tela).
   useEffect(() => {
@@ -160,6 +165,14 @@ function TreinamentoDetalhe({ item, driverName, onParticipacaoChange, onClose }:
 
   useEffect(() => { if (resultado) resultadoRef.current?.focus(); }, [resultado]);
 
+  // Ao mudar de etapa, a nova seção entra na tela e recebe o foco (não roda na abertura).
+  useEffect(() => {
+    if (etapaAnterior.current === null || etapaAnterior.current === etapa) { etapaAnterior.current = etapa; return; }
+    etapaAnterior.current = etapa;
+    etapaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    etapaRef.current?.focus({ preventScroll: true });
+  }, [etapa]);
+
   const executar = async (acao: () => Promise<Participacao>, nome: string, fallback: string) => {
     setBusy(true);
     setErro("");
@@ -168,7 +181,7 @@ function TreinamentoDetalhe({ item, driverName, onParticipacaoChange, onClose }:
       onParticipacaoChange(p);
     } catch (cause) {
       reportAppError(cause, { source: "treinamentos", action: nome, screen: "Treinamentos", detailId: treinamento.id, notifyUser: false });
-      setErro(cause instanceof Error && cause.message ? cause.message : fallback);
+      setErro(cause instanceof ErroTreinamento ? cause.message : fallback);
     } finally {
       setBusy(false);
     }
@@ -180,7 +193,10 @@ function TreinamentoDetalhe({ item, driverName, onParticipacaoChange, onClose }:
     return p;
   }, "responderQuiz", "Não foi possível enviar as respostas. Tente de novo.");
 
-  const refazer = () => { setRespostas({}); setResultado(null); setErro(""); };
+  const refazer = () => {
+    setRespostas({}); setResultado(null); setErro("");
+    requestAnimationFrame(() => { etapaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); etapaRef.current?.focus({ preventScroll: true }); });
+  };
   const spinner = busy ? <span className="termo-spinner" aria-hidden="true" /> : null;
   const exigencias = [treinamento.exigeAssinatura ? "Assinatura obrigatória" : "", treinamento.exigeQuiz ? `Quiz · nota mínima ${treinamento.notaMinima}%` : ""].filter(Boolean);
   const validade = formatValidade(treinamento.validade);
@@ -193,6 +209,12 @@ function TreinamentoDetalhe({ item, driverName, onParticipacaoChange, onClose }:
           {treinamento.publicadoEm ? <time dateTime={treinamento.publicadoEm}>{formatData(treinamento.publicadoEm)}</time> : null}
         </div>
         <h2 className="trn-title">{treinamento.titulo}</h2>
+        {erroAbertura ? (
+          <p className="termo-alert" data-tone="erro" role="alert">
+            {erroAbertura}{" "}
+            <button type="button" className="termo-text-button" onClick={() => { setErroAbertura(""); setTentativa((n) => n + 1); }}>Tentar de novo</button>
+          </p>
+        ) : null}
         {treinamento.descricao ? <p className="trn-descricao">{treinamento.descricao}</p> : null}
         {validade && etapa !== "concluido" ? <p className="termo-prazo">Conclua até <strong>{validade}</strong>.</p> : null}
         <Video url={treinamento.videoUrl} />
@@ -209,7 +231,7 @@ function TreinamentoDetalhe({ item, driverName, onParticipacaoChange, onClose }:
       {erro ? <p className="termo-alert" data-tone="erro" role="alert">{erro}</p> : null}
 
       {etapa === "leitura" ? (
-        <section className="trn-step" aria-label="Confirmar leitura">
+        <section ref={etapaRef} tabIndex={-1} className="trn-step" aria-label="Confirmar leitura">
           <p className="termo-help">{fimVisto ? "Leu tudo? Confirme a leitura para seguir." : "Role até o fim do conteúdo para confirmar a leitura."}</p>
           <button type="button" className="termo-primary" disabled={!fimVisto || busy} aria-busy={busy || undefined} onClick={() => void executar(() => confirmarLeitura(item), "confirmarLeitura", "Não foi possível confirmar a leitura. Tente de novo.")}>
             {spinner}{busy ? "Confirmando" : "Confirmar leitura"}
@@ -218,7 +240,7 @@ function TreinamentoDetalhe({ item, driverName, onParticipacaoChange, onClose }:
       ) : null}
 
       {etapa === "assinatura" ? (
-        <section className="trn-step" aria-label="Assinatura">
+        <section ref={etapaRef} tabIndex={-1} className="trn-step" aria-label="Assinatura">
           <h3 className="termo-section-title">Assinatura</h3>
           <p className="termo-help">A assinatura será registrada em seu nome: <strong>{driverName}</strong>.</p>
           <div className="termo-signature" data-empty={strokes.length === 0 || undefined}>
@@ -233,7 +255,7 @@ function TreinamentoDetalhe({ item, driverName, onParticipacaoChange, onClose }:
       ) : null}
 
       {etapa === "quiz" ? (
-        <section className="trn-step trn-quiz" aria-label="Quiz">
+        <section ref={etapaRef} tabIndex={-1} className="trn-step trn-quiz" aria-label="Quiz">
           <h3 className="termo-section-title">Quiz · nota mínima {treinamento.notaMinima}%</h3>
           {resultado && !resultado.aprovado ? (
             <section ref={resultadoRef} tabIndex={-1} className="termo-alert" data-tone="erro" role="status">
@@ -266,7 +288,7 @@ function TreinamentoDetalhe({ item, driverName, onParticipacaoChange, onClose }:
       ) : null}
 
       {etapa === "concluido" ? (
-        <section className={`termo-card trn-concluido${jaEstavaConcluido ? "" : " is-fresh"}`} role="status" aria-label="Treinamento concluído">
+        <section ref={etapaRef} tabIndex={-1} className={`termo-card trn-concluido${jaEstavaConcluido ? "" : " is-fresh"}`} role="status" aria-label="Treinamento concluído">
           <div className="termo-result"><SuccessCheck /><h2>Treinamento concluído</h2><p>Fica guardado aqui para você consultar quando quiser.</p></div>
           <dl className="trn-resumo">
             <div><dt>Concluído em</dt><dd>{formatDataHora(participacao.concluidoEm)}</dd></div>

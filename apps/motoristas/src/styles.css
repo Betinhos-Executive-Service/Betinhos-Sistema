@@ -14076,3 +14076,18 @@ select,
 @media (prefers-reduced-motion: reduce) {
   .concept-tile { transition: none; }
 }
+
+.trn-aviso { cursor: default; }
+.trn-aviso-acoes { display: flex; gap: 8px; margin-top: 4px; }
+.trn-aviso-acoes button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--toast-border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--toast-accent);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+}
+.trn-aviso-acoes button:first-child { background: var(--toast-accent); color: #fff; border-color: var(--toast-accent); }

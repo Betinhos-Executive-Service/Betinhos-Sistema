@@ -47,6 +47,7 @@ $secureSteps = [ordered]@{
   "Gerar link de acompanhamento" = "provision-current-vehicle.ps1 -LinkApiUrl <url do Worker>"
   "Revogar link de acompanhamento ao sair de Programado" = "provision-current-vehicle.ps1 -LinkApiUrl <url do Worker>"
   "Resolver veiculo do servico pela Infleet" = "provision-infleet-vehicle.ps1"
+  "Organizar observacao do motorista" = "node scripts/configurar-chave-observacao-dev.mjs --prod --confirmo-prod --copiar-da-variavel (ou --arquivo <caminho>)"
 }
 # Devolve os steps sem configuracao segura (so leitura; nunca le o conteudo da configuracao).
 function Get-StepsWithoutSecureConfig([string] $Url) {

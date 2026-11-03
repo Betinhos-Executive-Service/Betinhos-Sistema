@@ -8,14 +8,15 @@ description: "Verifica o módulo Treinamentos do App Motoristas: card e pendênc
 - Código: `src/screens/TreinamentosScreen.tsx`, `src/lib/treinamentos.ts` (regras e acesso), `src/treinamentos.css` (reaproveita `termos.css`), card/pendência em `src/screens/InitialScreen.tsx`, estado em `src/App.tsx`, capítulos `treinamentos` e `treinamento-detalhe` em `src/app/tourChapters.ts`, `tests/treinamentos.test.ts`.
 - Rota: `#treinamentos`. Dados: `cr40f_treinamento` (publicados, `cr40f_estado eq 100000001`) e `cr40f_treinamentoparticipacao` filtrada por `_cr40f_funcionario_value` do motorista logado. O App só atualiza a própria participação (`cr40f_abertoem`, `confirmadoem`, `assinadoem` + `nomeassinante` + `assinaturajson`, `nota` + `aprovado` + `tentativas` + `respostasjson`, `concluidoem`); nunca cria nem apaga. Quem não tem participação (fora do público) não vê o treinamento.
 - Regra de conclusão: leitura confirmada → assinatura (se `cr40f_exigeassinatura`) → quiz aprovado pela `cr40f_notaminima` (se `cr40f_exigequiz`) → `concluidoem`. Reprovado pode refazer (tentativas somam). Reabrir concluído não grava nada.
+- Snapshot na conclusão: o mesmo PATCH que grava `concluidoem` leva `cr40f_conteudosnapshot` (JSON estável v1 do que o motorista leu: título, descrição, conteúdo, vídeo, anexos nome/tamanho, exigências, nota mínima, `publicadoEm`, `editadoEm`) e `cr40f_conteudohash` (SHA-256 hex do snapshot). Formato é contrato com o shell. Cobertura em `tests/treinamentos.test.ts`; as colunas só existem no DEV depois do schema do Sistema. No mock o patch também as recebe; a gravação real só se confere no DEV.
 
 ## Preparar ambiente
 - `PORT=<porta reservada> node scripts/dev-server.cjs --strictPort` (porta em `~/.codex/dev-ports.json`; nesta worktree 36487). Modo mock em `localhost`: cabeçalho "RH · Mock local"; dois treinamentos para o motorista local ("[Mock] Direção defensiva na Marginal", sem exigências, com link de vídeo e dois anexos; "[Mock] Atendimento premium ao passageiro", assinatura + quiz com 3 perguntas e nota mínima 70, vídeo do YouTube) e um terceiro sem participação, que não deve aparecer. O mock vive na memória da página: recarregar zera.
-- Parâmetros: `?mockTreinamentos=vazio` (sem treinamentos), `?mockTreinamentoErro=gravar` (toda gravação falha, para ver o alerta e o botão continuar disponível).
+- Parâmetros: `?mockTreinamentos=vazio` (sem treinamentos), `?mockTreinamentoErro=gravar` (toda gravação falha). A abertura mostra o erro logo abaixo do título, com "Tentar de novo" (refaz a gravação); as ações mostram só a mensagem amigável, nunca o texto cru do Dataverse (só `ErroTreinamento` chega ao motorista).
 - Tour: `localStorage.setItem("app-motoristas-tour-v2:localhost-driver:*", "visto")` para ele não abrir sobre a tela.
 
 ## Roteiro automatizado (preferido)
-`NODE_PATH=<node_modules com playwright-core> APP_MOTORISTAS_URL=http://127.0.0.1:<porta> CHROME_PATH=<chromium> node scripts/qa/verify-treinamentos.cjs .verificacao/<data>-<branch>` — todas as linhas `OK` em `resultado.txt` (34), prints `01-home` … `14-falha-gravar` (375×812, 2x). Cobre os cenários 1–6 do brief e os casos de borda (vídeo inválido vira link, imagem que não carrega vira link, fora do público não aparece, reabrir não altera, falha ao gravar com `?mockTreinamentoErro=gravar`).
+`NODE_PATH=<node_modules com playwright-core> APP_MOTORISTAS_URL=http://127.0.0.1:<porta> CHROME_PATH=<chromium> node scripts/qa/verify-treinamentos.cjs .verificacao/<data>-<branch>` — todas as linhas `OK` em `resultado.txt` (39), prints `01-home` … `14-falha-gravar` (375×812, 2x). Cobre os cenários 1–6 do brief e os casos de borda (vídeo inválido vira link, imagem que não carrega vira link, fora do público não aparece, reabrir não altera, falha ao gravar com `?mockTreinamentoErro=gravar`).
 Tour: `node scripts/qa/verify-tour.cjs <pasta> treinamentos,treinamento-detalhe [--largura=360]` — `31 OK`.
 
 ## Roteiro manual (375 px)
@@ -32,7 +33,17 @@ Tour: `node scripts/qa/verify-tour.cjs <pasta> treinamentos,treinamento-detalhe 
 - Treinamento sem vídeo/anexos: blocos somem. Vídeo com URL que não é https → "O link do vídeo deste treinamento é inválido. Avise o RH."
 - Quiz com pergunta de uma alternativa só ou JSON inválido: pergunta descartada (`parsePerguntas`).
 - Duas participações do mesmo treinamento (publicação repetida): fica a mais adiantada.
-- Falha ao gravar: alerta vermelho acima da etapa, botão volta ao normal, nada muda localmente.
+- Falha ao gravar: alerta vermelho acima da etapa com mensagem amigável, botão volta ao normal, nada muda localmente. Erro da abertura: topo da tela com "Tentar de novo".
+- Foco por etapa: ao mudar de etapa (leitura → assinatura → quiz → concluído) a seção rola ao topo da tela e recebe o foco (`aria-label` "Assinatura"/"Quiz"); "Refazer quiz" devolve o foco ao quiz; na abertura nada rola (também em StrictMode).
+
+## Aviso de treinamento novo dentro do app
+- `src/App.tsx` recarrega os treinamentos ao abrir, ao voltar ao primeiro plano (`focus`/`visibilitychange`) e a cada `AUTO_REFRESH_INTERVAL_MS` (60 s) com o app visível; uma carga em andamento não é duplicada. Lógica de "novo" em `novosTreinamentosPendentes` (primeira carga não avisa; só pendentes com `participacao.id` ainda não visto).
+- Aviso `role="status"` "Você recebeu um novo treinamento." (ou "N novos treinamentos") com "Ver treinamento" (abre o item, ou a lista se forem vários) e "Dispensar"; some na tela Treinamentos. Contador da Home atualiza junto. Não coberto pelo mock estático: exige o mock devolver outra lista na segunda leitura; sem verificação em aparelho/Dataverse real.
+
+## Push e lembrete (Custom API + flow)
+- Código: `plugins/DriverRecordSharing/TreinamentoCommandPlugin.cs` (`cr40f_LembrarTreinamento`: só treinamento publicado; ignora concluídas, já na fila (Pendente) e lembradas há menos de 24 h; grava `cr40f_pushstatus` = Pendente, `cr40f_pusherro` vazio, `cr40f_lembradoem`), testes em `plugins/DriverRecordSharing.Tests/TreinamentoCommandPluginTests.cs`; `scripts/provision-treinamentos-push.ps1` (Custom API + flow "Push Treinamentos | Motoristas"; chamado pelo `push-dev.ps1`, depois dos comunicados); deep link `treinamentoParticipacaoId` (`getInitialTreinamentoParticipacaoId` em `src/app/bootstrap.ts` e efeito em `src/App.tsx`).
+- Local: `pnpm test` (bootstrap e pushRedirect cobrem o deep link); `dotnet test plugins/DriverRecordSharing.Tests` (net462 pede `mono` no Linux; `ExchangePossessionFinalizerTests.cs` não compila fora do Windows).
+- DEV, depois do schema do Sistema aplicado e do `pnpm push` do App: disparar `cr40f_LembrarTreinamento` num treinamento de teste e conferir na participação `cr40f_pushstatus` 100000001 (Enviado) ou 100000002 com `cr40f_pusherro`; segundo disparo em menos de 24 h devolve `cr40f_Ignorados`. Recebimento no aparelho é verificação separada.
 
 ## Evidência obrigatória
 - `resultado.txt` só com `OK`, prints `04-confirmar-leitura.png`, `08-quiz-reprovado.png`, `09-concluido-quiz.png`, `11-lista-concluidos.png`.
