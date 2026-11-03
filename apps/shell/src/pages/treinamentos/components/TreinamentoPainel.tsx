@@ -87,6 +87,7 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack, onEditar
     }
   }
   const baixarComprovante = async (p: Participacao) => {
+    if (gerando) return
     setGerando(true)
     try {
       // Import dinâmico: o pdf-lib só entra no bundle quando alguém baixa o comprovante.

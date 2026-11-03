@@ -68,10 +68,11 @@ export async function gerarComprovantePdf(d: DadosComprovante): Promise<Uint8Arr
   if (d.aviso) texto(d.aviso, { cor: SUAVE, depois: 6 })
 
   if (d.assinatura.length) {
+    // Mesma proporção 1000 × 400 da tela; o título não fica sozinho no fim da página.
+    const w = 250
+    const h = 100
+    espaco(h + 24)
     texto(`Assinatura${d.nomeAssinante ? ` de ${d.nomeAssinante}` : ''}`, { negrito: true })
-    const w = 240
-    const h = 90
-    espaco(h + 8)
     const bx = MARGEM
     const by = y - h
     page.drawRectangle({ x: bx, y: by, width: w, height: h, borderColor: SUAVE, borderWidth: 0.5 })

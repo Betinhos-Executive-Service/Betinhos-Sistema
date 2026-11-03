@@ -26,10 +26,17 @@ type Snapshot = { titulo?: string; descricao?: string; conteudo?: string; videoU
 
 const slug = (texto: string) => texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60)
 
+/** Traços gravados pelo App sem confiar no formato: só pontos [x, y] finitos entram, para o PDF não receber NaN. */
+const tracosValidos = (bruto: unknown[]): SignatureStrokes =>
+  bruto
+    .filter(Array.isArray)
+    .map((traco) => (traco as unknown[]).filter((p): p is [number, number] => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1])))
+    .filter((traco) => traco.length > 1)
+
 function lerSnapshot(json: string): Snapshot | null {
   try {
     const v = JSON.parse(json) as Snapshot
-    return v && typeof v === 'object' ? v : null
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : null
   } catch {
     return null
   }
@@ -42,7 +49,7 @@ export function dadosComprovante(item: Treinamento, p: Participacao, nomeFuncion
   const fonte = snap ?? { titulo: item.titulo, descricao: item.descricao, conteudo: item.conteudo, videoUrl: item.videoUrl, anexos: item.anexos }
   const titulo = String(fonte.titulo ?? item.titulo)
   return {
-    arquivo: `comprovante-${slug(titulo)}-${slug(nomeFuncionario)}.pdf`,
+    arquivo: `comprovante-${slug(titulo) || 'treinamento'}-${slug(nomeFuncionario) || 'funcionario'}.pdf`,
     titulo,
     funcionario: nomeFuncionario,
     publicadoEm: formatDate(item.publicadoEm),
@@ -52,13 +59,13 @@ export function dadosComprovante(item: Treinamento, p: Participacao, nomeFuncion
     assinadoEm: formatDate(p.assinadoEm),
     nota: p.nota == null ? '' : `${p.nota}% · ${p.aprovado ? 'aprovado' : 'reprovado'} · ${p.tentativas} ${plural(p.tentativas, 'tentativa', 'tentativas')}`,
     versao: snap ? 'lida' : 'atual',
-    aviso: snap ? '' : 'Concluído antes do registro da versão lida: este comprovante mostra o conteúdo atual do treinamento.',
+    aviso: snap ? '' : 'A versão lida não está registrada (concluído antes do registro ou registro ilegível): este comprovante mostra o conteúdo atual do treinamento.',
     descricao: String(fonte.descricao ?? ''),
     conteudo: String(fonte.conteudo ?? ''),
     videoUrl: String(fonte.videoUrl ?? ''),
-    anexos: (fonte.anexos ?? []).map((a) => String(a?.nome ?? '')).filter(Boolean),
+    anexos: (Array.isArray(fonte.anexos) ? fonte.anexos : []).map((a) => String(a?.nome ?? '')).filter(Boolean),
     hash: snap ? p.conteudoHash : '',
-    assinatura: p.assinaturaJson ? parseSignature(p.assinaturaJson) : [],
+    assinatura: tracosValidos(p.assinaturaJson ? parseSignature(p.assinaturaJson) : []),
     nomeAssinante: p.nomeAssinante,
   }
 }

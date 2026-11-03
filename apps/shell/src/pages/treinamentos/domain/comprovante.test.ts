@@ -18,11 +18,26 @@ describe('dadosComprovante', () => {
     expect(d.versao).toBe('atual')
     expect(d.conteudo).toBe('Texto atual')
     expect(d.hash).toBe('')
-    expect(d.aviso).toBe('Concluído antes do registro da versão lida: este comprovante mostra o conteúdo atual do treinamento.')
+    expect(d.aviso).toContain('A versão lida não está registrada')
   })
 
   it('snapshot ilegível também cai no conteúdo atual com aviso', () => {
     expect(dadosComprovante(item, { ...base, conteudoSnapshot: '{quebrado', conteudoHash: 'x' }, 'Carlos').versao).toBe('atual')
+  })
+
+  it('snapshot com formato inesperado (anexos fora de lista, array no lugar do objeto) não quebra', () => {
+    const p = { ...base, conteudoHash: 'x' }
+    expect(dadosComprovante(item, { ...p, conteudoSnapshot: JSON.stringify({ conteudo: 'Lido', anexos: 'mapa.pdf' }) }, 'Carlos')).toMatchObject({ versao: 'lida', conteudo: 'Lido', anexos: [] })
+    expect(dadosComprovante(item, { ...p, conteudoSnapshot: '[1,2]' }, 'Carlos').versao).toBe('atual')
+  })
+
+  it('assinatura com pontos inválidos é descartada; traços válidos ficam', () => {
+    const assinaturaJson = JSON.stringify([[[0.1, 0.2], [0.3, 0.4]], [[0.1, null], ['x', 0.2]], 'lixo', [[0.5, 0.5]]])
+    expect(dadosComprovante(item, { ...base, assinaturaJson }, 'Carlos').assinatura).toEqual([[[0.1, 0.2], [0.3, 0.4]]])
+  })
+
+  it('nome sem letras ainda gera arquivo com nome', () => {
+    expect(dadosComprovante({ ...item, titulo: '???' }, base, '!!!').arquivo).toBe('comprovante-treinamento-funcionario.pdf')
   })
 
   it('recusa participação não concluída', () => {
