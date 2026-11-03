@@ -2,6 +2,8 @@ param(
   [Parameter(Mandatory)] [string] $EnvironmentUrl,
   [int] $Meses = 6,
   [switch] $DeviceCode,
+  # Pula o download dos cupons (Graph). Use quando o ClientId nao tem consentimento de Files.Read.All (AADSTS65002).
+  [switch] $SemCupons,
   # Nomes lógicos dos lookups da despesa (confirmados em scripts/import-despesas-operacionais-csv.ps1, linha 508).
   [string] $LkMotorista = "cr40f_motorista",
   [string] $LkCategoria = "cr40f_categoria",
@@ -31,8 +33,11 @@ function Get-Token([string] $Scope) {
 $token = Get-Token "$baseUrl/user_impersonation"
 if (-not $token) { throw "Token Dataverse nao obtido." }
 # Token Graph pelo mesmo app. Se o consentimento de Files.Read.All não existir para este ClientId, falha aqui, antes de ler dados.
-$graphToken = Get-Token "https://graph.microsoft.com/Files.Read.All"
-if (-not $graphToken) { throw "Token Graph (Files.Read.All) nao obtido." }
+$graphToken = $null
+if (-not $SemCupons) {
+  $graphToken = Get-Token "https://graph.microsoft.com/Files.Read.All"
+  if (-not $graphToken) { throw "Token Graph (Files.Read.All) nao obtido." }
+}
 $apiBase = "$baseUrl/api/data/v9.2"
 
 function Invoke-Dv([string] $Path) {
@@ -58,7 +63,8 @@ function Get-Rows([string] $Set, [string] $Select, [string] $Filter = "") {
   while ($path) {
     $page = Invoke-Dv $path
     $rows += @($page.value)
-    $path = $page.PSObject.Properties["@odata.nextLink"].Value
+    $next = $page.PSObject.Properties["@odata.nextLink"]
+    $path = if ($next) { $next.Value } else { $null }
   }
   return $rows
 }
@@ -66,7 +72,7 @@ function Get-Rows([string] $Set, [string] $Select, [string] $Filter = "") {
 $desde = (Get-Date).AddMonths(-$Meses).ToString("yyyy-MM-dd")
 
 $cat = Get-Rows "cr40f_categoriadespesaoperacionals" "cr40f_categoriadespesaoperacionalid,cr40f_nome"
-$abast = @($cat | Where-Object { ($_.cr40f_nome -replace '[^\p{L}]', '').ToLowerInvariant() -like "abastecimento*" })
+$abast = @($cat | Where-Object { ($_.cr40f_nome -replace '[^\p{L}]', '').ToLowerInvariant() -match "^(abastecimento|combust)" })
 if ($abast.Count -eq 0) { throw "Categoria Abastecimento não encontrada." }
 $catId = $abast[0].cr40f_categoriadespesaoperacionalid
 
@@ -80,8 +86,9 @@ $despesas = Get-Rows "cr40f_despesaoperacionals" $select $filter
 
 $linhas = foreach ($d in $despesas) {
   $id = $d.cr40f_despesaoperacionalid
-  $anexo = @(Get-Rows "cr40f_anexodespesaoperacionals" "cr40f_sharelink,cr40f_urlsharepoint,cr40f_mimetype" "_cr40f_despesa_value eq $id and cr40f_tipo eq 100000000" | Select-Object -First 1)
   $arquivo = ""
+  $anexo = @()
+  if (-not $SemCupons) { $anexo = @(Get-Rows "cr40f_anexodespesaoperacionals" "cr40f_sharelink,cr40f_urlsharepoint,cr40f_mimetype" "_cr40f_despesa_value eq $id and cr40f_tipo eq 100000000" | Select-Object -First 1) }
   if ($anexo.Count -gt 0 -and $anexo[0].cr40f_sharelink) {
     $share = "u!" + ([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($anexo[0].cr40f_sharelink)).TrimEnd('=').Replace('/', '_').Replace('+', '-'))
     $ext = if ($anexo[0].cr40f_mimetype -like "*png*") { "png" } else { "jpg" }
