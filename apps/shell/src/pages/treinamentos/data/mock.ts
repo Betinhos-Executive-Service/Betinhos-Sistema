@@ -37,16 +37,16 @@ export function createMockSource(): Source {
       id: id(10), titulo: 'Embarque no GRU: novo procedimento', descricao: 'Ponto de encontro, antecedência e contato com a operação.',
       conteudo: '# Ponto de encontro\nA partir de segunda o encontro é na **porta 4** do Terminal 3.\n\n- Chegue com 30 minutos de antecedência\n- Placa com o nome do passageiro sempre visível\n- Voo atrasado: avise a operação e aguarde',
       videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', anexos: [{ nome: 'mapa-terminal-3.pdf', caminho: 'Treinamentos/DEV/mock/mapa-terminal-3.pdf', tamanho: 348_212, mime: 'application/pdf' }, { nome: 'porta-4.jpg', caminho: 'Treinamentos/DEV/mock/porta-4.jpg', tamanho: 88_120, mime: 'image/jpeg' }],
-      publicoTipo: PUBLICO.motoristas, publico: [], exigeAssinatura: true, exigeQuiz: true, notaMinima: 70, perguntas: QUIZ, validade: dia(15), estado: ESTADO.publicado, publicadoEm: hoje, criadoEm: hoje,
+      publicoTipo: PUBLICO.motoristas, publico: [], exigeAssinatura: true, exigeQuiz: true, notaMinima: 70, perguntas: QUIZ, validade: dia(15), estado: ESTADO.publicado, publicadoEm: hoje, editadoEm: null, criadoEm: hoje,
     },
     {
       id: id(11), titulo: 'Direção defensiva: revisão anual', descricao: 'Vídeo obrigatório com confirmação de leitura.',
       conteudo: 'Assista ao vídeo até o fim e confirme a leitura.', videoUrl: 'https://vimeo.com/123456', anexos: [],
-      publicoTipo: PUBLICO.selecionados, publico: [id(1), id(2), id(5)], exigeAssinatura: false, exigeQuiz: false, notaMinima: 70, perguntas: [], validade: dia(-3), estado: ESTADO.publicado, publicadoEm: ontem, criadoEm: ontem,
+      publicoTipo: PUBLICO.selecionados, publico: [id(1), id(2), id(5)], exigeAssinatura: false, exigeQuiz: false, notaMinima: 70, perguntas: [], validade: dia(-3), estado: ESTADO.publicado, publicadoEm: ontem, editadoEm: null, criadoEm: ontem,
     },
     {
       id: id(12), titulo: 'Atendimento a passageiros com mobilidade reduzida', descricao: '', conteudo: 'Rascunho em preparo.', videoUrl: '', anexos: [],
-      publicoTipo: PUBLICO.funcao, publico: [], exigeAssinatura: true, exigeQuiz: false, notaMinima: 70, perguntas: [], validade: '', estado: ESTADO.rascunho, publicadoEm: null, criadoEm: ontem,
+      publicoTipo: PUBLICO.funcao, publico: [], exigeAssinatura: true, exigeQuiz: false, notaMinima: 70, perguntas: [], validade: '', estado: ESTADO.rascunho, publicadoEm: null, editadoEm: null, criadoEm: ontem,
     },
   ]
   const participacoes: Participacao[] = [

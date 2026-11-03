@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { TELA, builtinViews, matchesKeyword, readTreinamento, sortTreinamentos, type Linha } from './lista'
 import {
-  ESTADO, PUBLICO, blocosDoConteudo, draftPayload, emptyDraft, isOrfa, isVencido, mapParticipacao, mapTreinamento, matchParticipacao, novaPergunta, resolverPublico, statusParticipacao, trechos,
+  ESTADO, PUBLICO, anexoDaPasta, blocosDoConteudo, copiaParaReciclagem, edicaoPublicadoPayload, draftPayload, emptyDraft, isOrfa, isVencido, mapParticipacao, mapTreinamento, matchParticipacao, novaPergunta, resolverPublico, statusParticipacao, trechos,
   validarAnexo, validarPublicacao, validarQuiz, validarRascunho, type Funcionario, type Participacao, type Pergunta, type Treinamento,
 } from './treinamentos'
 
@@ -156,5 +156,49 @@ describe('lista', () => {
   it('visões prontas: rascunhos e publicados', () => {
     expect(TELA).toBe('treinamentos')
     expect(builtinViews().map((v) => v.id)).toEqual(['rascunhos', 'publicados'])
+  })
+})
+
+describe('edição do publicado', () => {
+  const publicado = draft({ id: 'abc', titulo: ' Embarque ', descricao: 'd', conteudo: 'c', validade: '2026-12-01', estado: ESTADO.publicado, publicadoEm: '2026-11-01T10:00:00Z', exigeQuiz: true, notaMinima: 80 })
+
+  it('grava só conteúdo, anexos, validade e editadoem', () => {
+    const payload = edicaoPublicadoPayload(publicado, '2026-11-03T12:00:00.000Z')
+    expect(Object.keys(payload).sort()).toEqual(['cr40f_anexosjson', 'cr40f_conteudo', 'cr40f_descricao', 'cr40f_editadoem', 'cr40f_name', 'cr40f_validade', 'cr40f_videourl'])
+    expect(payload.cr40f_name).toBe('Embarque')
+    expect(payload.cr40f_editadoem).toBe('2026-11-03T12:00:00.000Z')
+  })
+
+  it('validade vazia vira null', () => {
+    expect(edicaoPublicadoPayload({ ...publicado, validade: '' }).cr40f_validade).toBeNull()
+  })
+
+  it('mapeia cr40f_editadoem', () => {
+    expect(mapTreinamento({ cr40f_editadoem: '2026-11-03T12:00:00Z' }).editadoEm).toBe('2026-11-03T12:00:00Z')
+    expect(mapTreinamento({}).editadoEm).toBeNull()
+  })
+})
+
+describe('reciclagem', () => {
+  const base = draft({ id: 'abc', titulo: 'Direção defensiva', validade: '2026-01-10', estado: ESTADO.publicado, publicadoEm: '2026-01-01T10:00:00Z', editadoEm: '2026-01-02T10:00:00Z', exigeQuiz: true })
+
+  it('vira rascunho novo, sem id, validade nem datas, com o sufixo de reciclagem', () => {
+    expect(copiaParaReciclagem(base, '2026-11-03')).toMatchObject({ id: '', estado: ESTADO.rascunho, publicadoEm: null, editadoEm: null, validade: '', exigeQuiz: true, titulo: 'Direção defensiva (reciclagem 03/11/2026)' })
+  })
+
+  it('não empilha sufixos de reciclagem', () => {
+    expect(copiaParaReciclagem({ ...base, titulo: 'Direção defensiva (reciclagem 03/11/2025)' }, '2026-11-03').titulo).toBe('Direção defensiva (reciclagem 03/11/2026)')
+  })
+
+  it('respeita o limite de 200 caracteres', () => {
+    expect(copiaParaReciclagem({ ...base, titulo: 'x'.repeat(200) }, '2026-11-03').titulo.length).toBe(200)
+  })
+})
+
+describe('anexoDaPasta', () => {
+  const id = 'AAAA-1'
+  it('só reconhece arquivo na pasta do próprio treinamento', () => {
+    expect(anexoDaPasta({ nome: 'a.pdf', caminho: '/Documentos Compartilhados/Treinamentos/DEV/aaaa-1/a.pdf', tamanho: 1, mime: 'application/pdf' }, id)).toBe(true)
+    expect(anexoDaPasta({ nome: 'a.pdf', caminho: '/Documentos Compartilhados/Treinamentos/bbbb-2/a.pdf', tamanho: 1, mime: 'application/pdf' }, id)).toBe(false)
   })
 })

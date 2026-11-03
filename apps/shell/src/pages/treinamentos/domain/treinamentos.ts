@@ -39,6 +39,8 @@ export type Treinamento = {
   validade: string
   estado: number
   publicadoEm: string | null
+  /** Última edição de conteúdo ou validade depois de publicado. */
+  editadoEm: string | null
 }
 
 export type Participacao = {
@@ -76,7 +78,7 @@ export const novaPergunta = (): Pergunta => ({ id: novoId(), texto: '', alternat
 
 export const emptyDraft = (): Treinamento => ({
   id: '', titulo: '', descricao: '', conteudo: '', videoUrl: '', anexos: [], publicoTipo: PUBLICO.motoristas, publico: [],
-  exigeAssinatura: false, exigeQuiz: false, notaMinima: NOTA_PADRAO, perguntas: [], validade: '', estado: ESTADO.rascunho, publicadoEm: null,
+  exigeAssinatura: false, exigeQuiz: false, notaMinima: NOTA_PADRAO, perguntas: [], validade: '', estado: ESTADO.rascunho, publicadoEm: null, editadoEm: null,
 })
 
 export const isPublicado = (item: Treinamento) => item.estado === ESTADO.publicado
@@ -157,6 +159,36 @@ export function draftPayload(draft: Treinamento): Row {
   }
 }
 
+/** Edição depois de publicado: conteúdo, anexos e validade. Quiz, assinatura e público ficam como foram publicados. */
+export function edicaoPublicadoPayload(item: Treinamento, agora = new Date().toISOString()): Row {
+  return {
+    cr40f_name: item.titulo.trim(),
+    cr40f_descricao: item.descricao.trim(),
+    cr40f_conteudo: item.conteudo.trim(),
+    cr40f_videourl: item.videoUrl.trim(),
+    cr40f_anexosjson: JSON.stringify(item.anexos),
+    cr40f_validade: item.validade || null,
+    cr40f_editadoem: agora,
+  }
+}
+
+const SUFIXO_RECICLAGEM = /\s*\(reciclagem \d{2}\/\d{2}\/\d{4}\)\s*$/
+
+/** Reaplicar: rascunho novo com o mesmo conteúdo, quiz e público; o RH revisa a validade e publica. */
+export function copiaParaReciclagem(item: Treinamento, hoje: string): Treinamento {
+  const [a, m, d] = hoje.split('-')
+  const sufixo = ` (reciclagem ${d}/${m}/${a})`
+  const base = item.titulo.replace(SUFIXO_RECICLAGEM, '').trim().slice(0, TITULO_MAX - sufixo.length)
+  return {
+    ...item, id: '', titulo: `${base}${sufixo}`, validade: '', estado: ESTADO.rascunho, publicadoEm: null, editadoEm: null,
+    anexos: [...item.anexos], perguntas: item.perguntas.map((p) => ({ ...p, alternativas: p.alternativas.map((x) => ({ ...x })) })),
+  }
+}
+
+/** Arquivo gravado na pasta deste treinamento. A cópia de reciclagem aponta para a pasta do original, que não pode ser apagada por ela. */
+export const anexoDaPasta = (anexo: Anexo, treinamentoId: string) =>
+  anexo.caminho.toLowerCase().includes(`/${cleanId(treinamentoId).toLowerCase()}/`)
+
 function parseJson<T>(value: unknown, fallback: T): T {
   try { return JSON.parse(String(value || '')) as T } catch { return fallback }
 }
@@ -198,6 +230,7 @@ export function mapTreinamento(row: Row): Treinamento {
     validade: String(row.cr40f_validade ?? '').slice(0, 10),
     estado: Number(row.cr40f_estado ?? ESTADO.rascunho),
     publicadoEm: dateOrNull(row.cr40f_publicadoem),
+    editadoEm: dateOrNull(row.cr40f_editadoem),
   }
 }
 
