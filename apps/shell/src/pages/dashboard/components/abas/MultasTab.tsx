@@ -25,7 +25,7 @@ const multas = (n: number) => `${int(n)} ${n === 1 ? 'multa' : 'multas'}`
 
 /** Aba Multas: KPIs (total, pendentes, resolvidas); Por mês | Por motorista; Por infração na largura total. */
 export function MultasTab({ ctx, dados, periodo }: PropsAba) {
-  if (!ctx || !dados) return <AbaCarregando rotulo={ROTULO_KPIS} kpis={KPIS} colunas={3} blocos={BLOCOS} />
+  if (!ctx || !dados) return <AbaCarregando />
   return <MultasAba ctx={ctx} dados={dados} periodo={periodo} />
 }
 

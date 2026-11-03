@@ -28,8 +28,8 @@ describe('Dashboard', () => {
     const abas = screen.getByRole('tablist', { name: 'Abas do dashboard' })
     expect(within(abas).getAllByRole('tab').map((t) => t.textContent)).toEqual(ABAS)
     expect(within(abas).getByRole('tab', { name: 'Resumo' }).getAttribute('aria-selected')).toBe('true')
-    // Primeira carga: KPIs ocupados no formato final.
-    expect(screen.getByRole('region', { name: 'Indicadores executivos' }).getAttribute('aria-busy')).toBe('true')
+    // Primeira carga: spinner com a barra de progresso.
+    expect(screen.getByRole('progressbar', { name: 'Progresso do carregamento' })).toBeTruthy()
     expect(await screen.findByText('Dados de exemplo')).toBeTruthy()
     const painel = await screen.findByRole('tabpanel', { name: 'Resumo' })
     await within(painel).findByRole('region', { name: 'Total produzido' })
@@ -77,7 +77,7 @@ describe('Dashboard', () => {
 
     fireEvent.click(within(abas).getByRole('tab', { name: 'Financeiro' }))
     expect(location.hash).toBe('#/dashboard?tab=financeiro')
-    expect(within(screen.getByRole('tabpanel', { name: 'Financeiro' })).getByRole('region', { name: 'Indicadores financeiros' })).toBeTruthy()
+    expect(await within(screen.getByRole('tabpanel', { name: 'Financeiro' })).findByRole('region', { name: 'Indicadores financeiros' })).toBeTruthy()
 
     fireEvent.click(within(abas).getByRole('tab', { name: 'Resumo' }))
     expect(location.hash).toBe('#/dashboard')
@@ -150,13 +150,11 @@ describe('Dashboard', () => {
     expect(screen.getByRole('dialog', { name: /^Serviços de / })).toBeTruthy()
   })
 
-  it('na primeira carga, cada aba mostra KPIs e blocos ocupados no mesmo padrão', () => {
+  it('na primeira carga, cada aba mostra o mesmo spinner com a barra de progresso', () => {
     history.replaceState(null, '', '#/dashboard?tab=frota')
     render(<DashboardPage host={{ mode: 'mock' }} />)
-    const kpis = screen.getByRole('region', { name: 'Indicadores da frota' })
-    expect(kpis.getAttribute('aria-busy')).toBe('true')
-    expect(within(kpis).getAllByText('Carregando')).toHaveLength(6)
-    expect(document.querySelectorAll('.dash-grade[aria-hidden="true"] .dash-card')).toHaveLength(4)
+    expect(screen.getByRole('progressbar', { name: 'Progresso do carregamento' })).toBeTruthy()
+    expect(screen.queryByRole('region', { name: 'Indicadores da frota' })).toBeNull()
   })
 })
 

@@ -32,14 +32,16 @@ const rotulo = (row: Row, field: string) => str(row[`${field}@OData.Community.Di
 const RESERVA_SELECT = [
   'cr40f_reservadeveculosid', 'cr40f_dataehorriodesada', 'createdon', 'cr40f_status', 'cr40f_statusdefaturamento', 'cr40f_tipodoservico',
   'cr40f_tipodeveiculo', '_cr40f_veiculo_value', 'new_categoriadoitem', '_new_composicaodepreco_value', '_cr40f_financeiro_value', 'new_datadefinalizacao',
+  '_cr40f_motorista_value', '_cr40f_cliente_value',
 ]
-const RESERVA_EXPAND = 'cr40f_Motorista($select=cr40f_funcionariosid,cr40f_nomecompleto,new_apelido),cr40f_Cliente($select=cr40f_nomedocliente)'
 
-/** Reservas com saída (com `cpNav`, a composição de preço vem junto pelo `$expand`, sem ler a tabela inteira) de `desde` 00:00 até o fim de `ate` em Brasília, na ordem do legado. */
-export function reservasPath(set: string, desde: string, ate: string, cpNav = '') {
-  const expand = cpNav ? `${RESERVA_EXPAND},${cpNav}($select=cr40f_composicaodeprecosid,new_valortotal,new_status)` : RESERVA_EXPAND
+/**
+ * Reservas com saída de `desde` 00:00 até o fim de `ate` em Brasília, na ordem do legado. Sem `$expand`: motorista, cliente e composição
+ * vêm dos lookups (id + rótulo formatado) e dos cadastros já lidos; o `$expand` levava a consulta de ~2,5 s para ~12 s no PROD.
+ */
+export function reservasPath(set: string, desde: string, ate: string) {
   const filtro = `cr40f_dataehorriodesada ge ${new Date(inicioMs(desde)).toISOString()} and cr40f_dataehorriodesada lt ${new Date(inicioMs(ate) + DIA_MS).toISOString()}`
-  return `${set}?$select=${RESERVA_SELECT.join(',')}&$expand=${expand}&$filter=${encodeURIComponent(filtro)}&$orderby=${encodeURIComponent('cr40f_dataehorriodesada desc')}`
+  return `${set}?$select=${RESERVA_SELECT.join(',')}&$filter=${encodeURIComponent(filtro)}&$orderby=${encodeURIComponent('cr40f_dataehorriodesada desc')}`
 }
 /** Janela [desde, ate] em Brasília, fim inclusivo, para colunas DateTime (mesma das reservas). */
 const janelaDataHora = (campo: string, desde: string, ate: string) =>
@@ -111,13 +113,13 @@ export function mapCps(rows: Row[]) {
 }
 
 /** `enrichReservas` do legado para uma linha do Dataverse. */
-export function mapReserva(row: Row, cps: Map<string, Cp>): Reserva {
+export function mapReserva(row: Row, cps: Map<string, Cp>, funcionarios: ReadonlyMap<string, Funcionario> = new Map()): Reserva {
   const saidaRaw = str(row.cr40f_dataehorriodesada)
   const dia = dayKey(saidaRaw)
-  const mot = asRow(row.cr40f_Motorista)
-  const nome = str(mot?.cr40f_nomecompleto) || SEM_MOTORISTA
-  const motorista = str(mot?.new_apelido) || nome
-  const motoristaId = lower(mot?.cr40f_funcionariosid)
+  const motoristaId = lower(row._cr40f_motorista_value)
+  const func = funcionarios.get(motoristaId)
+  const nome = func?.nome || rotulo(row, '_cr40f_motorista_value') || SEM_MOTORISTA
+  const motorista = func?.apelido || nome
   const cpId = lower(row._new_composicaodepreco_value)
   const cp = cps.get(cpId)
   return {
@@ -131,7 +133,7 @@ export function mapReserva(row: Row, cps: Map<string, Cp>): Reserva {
     veiculoId: lower(row._cr40f_veiculo_value),
     // Sem id, a chave é o nome sem acento e sem caixa (`normL`), a mesma das despesas e do CSV 2026.
     motoristaId, motoristaKey: motoristaId || `nome:${normL(motorista)}`, motorista,
-    cliente: str(asRow(row.cr40f_Cliente)?.cr40f_nomedocliente) || SEM_CLIENTE,
+    cliente: rotulo(row, '_cr40f_cliente_value') || SEM_CLIENTE,
     cpId, cpCodigo: rotulo(row, '_new_composicaodepreco_value'), valor: cp?.valor ?? 0, cpPendente: cp?.pendente ?? false, cpConcluida: cp?.concluida ?? false,
     opId: lower(row._cr40f_financeiro_value), opCodigo: rotulo(row, '_cr40f_financeiro_value'),
     tipoServico: formatted(row, 'cr40f_tipodoservico') || '—', finalizadoRaw: str(row.new_datadefinalizacao),

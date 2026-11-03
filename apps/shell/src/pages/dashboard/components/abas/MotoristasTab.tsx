@@ -41,7 +41,7 @@ type PropsFrota = { frota: FrotaMotorista; onFrota: (f: FrotaMotorista) => void 
  * e os meses de cada motorista sob demanda; CNH vencendo | Nota de condução por mês; Score por motorista e mês | Ranking mensal.
  */
 export function MotoristasTab({ ctx, dados, periodo, frota, onFrota }: PropsAba & PropsFrota) {
-  if (!ctx || !dados) return <AbaCarregando rotulo={ROTULO_KPIS} kpis={KPIS} colunas={3} blocos={BLOCOS} />
+  if (!ctx || !dados) return <AbaCarregando />
   return <MotoristasAba ctx={ctx} dados={dados} periodo={periodo} frota={frota} onFrota={onFrota} />
 }
 

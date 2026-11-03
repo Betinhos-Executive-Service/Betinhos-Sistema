@@ -16,6 +16,24 @@ const visibilidade = (estado: 'visible' | 'hidden') => Object.defineProperty(doc
 afterEach(() => { vi.useRealTimers(); visibilidade('visible') })
 
 describe('useDashboard', () => {
+  it('progresso real: consultas respondidas / total, somando o estágio 2 da aba ativa', async () => {
+    let avancar: (f: number, t: number) => void = () => undefined
+    let liberar: () => void = () => undefined
+    const s = fonte(async (_d, _a, onProgresso) => {
+      avancar = onProgresso ?? avancar
+      onProgresso?.(0, 4)
+      await new Promise<void>((r) => { liberar = r })
+      return dados(1)
+    }, async (_c, _d, _a, onProgresso) => { onProgresso?.(0, 1); return new Promise<ParteExtra>(() => undefined) })
+    const { result } = renderHook(() => useDashboard(s, '2024-01-01', '2026-10-15', { conjuntosExtras: PAG }))
+    await waitFor(() => expect(result.current.progresso).toBe(0))
+    act(() => avancar(2, 4))
+    await waitFor(() => expect(result.current.progresso).toBe(40)) // (2 + 0) / (4 + 1)
+    await act(async () => { liberar() })
+    await waitFor(() => expect(result.current.dados).not.toBeNull())
+    expect(result.current.progresso).toBe(40) // estágio 1 pronto; a barra não volta enquanto os pagantes não respondem
+  })
+
   it('carrega e refaz a consulta a cada 60 s só com a aba visível', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     let n = 0
@@ -95,7 +113,7 @@ describe('useDashboard', () => {
     expect(result.current.dados?.manutencoes).toHaveLength(1)
     expect(s.carregar).toHaveBeenCalledTimes(1)
     expect(s.carregarExtra).toHaveBeenCalledTimes(1)
-    expect(s.carregarExtra).toHaveBeenCalledWith('pagantes', '2024-01-01', '2026-10-15')
+    expect(s.carregarExtra).toHaveBeenCalledWith('pagantes', '2024-01-01', '2026-10-15', expect.any(Function))
   })
 
   it('aba aberta já na carga: os dois estágios saem juntos', async () => {

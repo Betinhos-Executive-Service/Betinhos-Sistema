@@ -8,7 +8,8 @@ import { DashboardToolbar } from './DashboardToolbar'
 import { Emergenciais } from './Emergenciais'
 import { ApoioChip, ApoioTexto, KpiChip } from './KpiChip'
 import { KpiCard } from './KpiCard'
-import { KpiGrid, KpiGridCarregando } from './KpiGrid'
+import { KpiGrid } from './KpiGrid'
+import { AbaCarregando, ProgressoCarga } from './Carregando'
 import { SemDadoBloco } from './Estados'
 import { StatusServicosCard } from './Analises'
 import { ProducaoPropriaTerceira } from './ProducaoPropriaTerceira'
@@ -141,13 +142,13 @@ describe('componentes do Dashboard', () => {
     expect(within(bloco).queryByRole('table')).toBeNull()
   })
 
-  it('KPI na primeira carga: seis cards no formato final, ocupados e sem números', () => {
-    render(<KpiGridCarregando />)
-    const grade = screen.getByRole('region', { name: 'Indicadores executivos' })
-    expect(grade.getAttribute('aria-busy')).toBe('true')
-    expect(within(grade).getAllByRole('article').length).toBe(6)
-    expect(within(grade).getAllByText('Carregando').length).toBe(6)
-    expect(within(grade).queryByText('—')).toBeNull()
+  it('primeira carga: spinner e barra com a porcentagem real, sem esqueleto nem números', () => {
+    render(<ProgressoCarga.Provider value={46}><AbaCarregando /></ProgressoCarga.Provider>)
+    const barra = screen.getByRole('progressbar', { name: 'Progresso do carregamento' })
+    expect(barra.getAttribute('aria-valuenow')).toBe('46')
+    expect(screen.getByText('46%')).toBeTruthy()
+    expect(screen.getByRole('status', { name: 'Carregando dashboard' })).toBeTruthy()
+    expect(document.querySelector('.dash-kpi')).toBeNull()
   })
 
   it('card de análise com gráfico: o gráfico fica sempre à vista e os valores abrem sob demanda', () => {
