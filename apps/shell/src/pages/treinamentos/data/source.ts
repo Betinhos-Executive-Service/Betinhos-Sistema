@@ -2,7 +2,7 @@ import { chunk, cleanId, type Row } from '@betinhos/dataverse'
 import type { Host } from '../../../host'
 import { getDataverseEnvironmentLabel } from '../../funcionarios/data/dataverse'
 import { createSharePointDocs, sanitizeFileName, uniqueName, type EnvVarApi } from '../../funcionarios/data/sharepoint'
-import { ESTADO, draftPayload, isOrfa, isPublicado, mapFuncionario, mapParticipacao, mapTreinamento, validarRascunho, type Anexo, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
+import { ESTADO, anexoDaPasta, draftPayload, edicaoPublicadoPayload, isOrfa, isPublicado, mapFuncionario, mapParticipacao, mapTreinamento, validarRascunho, type Anexo, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
 import type { Linha } from '../domain/lista'
 import { createMockSource } from './mock'
 
@@ -15,6 +15,8 @@ export type Source = {
   participacoes: (treinamentoId: string) => Promise<Participacao[]>
   /** Cria ou atualiza o rascunho; devolve o id. */
   salvar: (draft: Treinamento) => Promise<string>
+  /** Publicado: grava conteúdo, anexos e validade (+ editadoem). Quiz, assinatura e público não mudam; participações intactas. */
+  salvarPublicado: (item: Treinamento) => Promise<void>
   excluir: (id: string) => Promise<void>
   /** Grava só a lista de anexos (o arquivo já está no SharePoint); vale para rascunho e publicado. */
   salvarAnexos: (id: string, anexos: Anexo[]) => Promise<void>
@@ -30,7 +32,7 @@ export const ANEXO_ROOT = 'Treinamentos'
 const ENTITIES = { treinamento: 'cr40f_treinamento', participacao: 'cr40f_treinamentoparticipacao', funcionario: 'cr40f_funcionarios' } as const
 type Sets = Record<keyof typeof ENTITIES, string>
 
-const TREINAMENTO_SELECT = 'cr40f_treinamentoid,cr40f_name,cr40f_descricao,cr40f_conteudo,cr40f_videourl,cr40f_anexosjson,cr40f_publicotipo,cr40f_publicojson,cr40f_exigeassinatura,cr40f_exigequiz,cr40f_notaminima,cr40f_quizjson,cr40f_validade,cr40f_estado,cr40f_publicadoem,createdon'
+const TREINAMENTO_SELECT = 'cr40f_treinamentoid,cr40f_name,cr40f_descricao,cr40f_conteudo,cr40f_videourl,cr40f_anexosjson,cr40f_publicotipo,cr40f_publicojson,cr40f_exigeassinatura,cr40f_exigequiz,cr40f_notaminima,cr40f_quizjson,cr40f_validade,cr40f_estado,cr40f_publicadoem,cr40f_editadoem,createdon'
 const PARTICIPACAO_SELECT = 'cr40f_treinamentoparticipacaoid,_cr40f_treinamento_value,_cr40f_funcionario_value,cr40f_abertoem,cr40f_confirmadoem,cr40f_assinadoem,cr40f_nomeassinante,cr40f_assinaturajson,cr40f_nota,cr40f_aprovado,cr40f_tentativas,cr40f_concluidoem'
 const FUNCIONARIO_SELECT = 'cr40f_funcionariosid,cr40f_nomecompleto,new_apelido,cr40f_funcao,cr40f_status'
 
@@ -97,6 +99,14 @@ export function createSource(host: Host): Source {
       }
       return cleanId(await client.create(s.treinamento, draftPayload(draft)))
     },
+    async salvarPublicado(item) {
+      const error = validarRascunho(item)
+      if (error) throw new Error(error)
+      const s = await entitySets()
+      const [atual] = await client.getAll(`${s.treinamento}?$select=cr40f_estado&$filter=cr40f_treinamentoid eq ${cleanId(item.id)}`)
+      if (!atual || Number(atual.cr40f_estado) !== ESTADO.publicado) throw new Error('Este treinamento não está publicado. Atualize a lista.')
+      await client.update(s.treinamento, item.id, edicaoPublicadoPayload(item))
+    },
     async excluir(id) {
       await client.remove((await entitySets()).treinamento, id)
     },
@@ -119,7 +129,11 @@ export function createSource(host: Host): Source {
       const doc = await sharepoint.enviar(cleanId(treinamentoId), file, nome)
       return { nome, caminho: doc.caminho || doc.id, tamanho: file.size, mime: file.type || 'application/octet-stream' }
     },
-    excluirAnexo: (treinamentoId, anexo) => sharepoint.excluir(cleanId(treinamentoId), documentoDoAnexo(anexo)),
+    async excluirAnexo(treinamentoId, anexo) {
+      // A cópia de reciclagem herda arquivos do original: tira da lista sem apagar o arquivo do outro treinamento.
+      if (!anexoDaPasta(anexo, treinamentoId)) return
+      await sharepoint.excluir(cleanId(treinamentoId), documentoDoAnexo(anexo))
+    },
     abrirAnexo: (anexo) => sharepoint.abrir(documentoDoAnexo(anexo)),
   }
 }

@@ -75,6 +75,14 @@ export function createMockSource(): Source {
       else treinamentos.unshift(item)
       return item.id
     },
+    async salvarPublicado(item) {
+      await wait(150)
+      const error = validarRascunho(item)
+      if (error) throw new Error(error)
+      const atual = treinamentos.find((row) => row.id === item.id)
+      if (!atual || !isPublicado(atual)) throw new Error('Este treinamento não está publicado. Atualize a lista.')
+      Object.assign(atual, { titulo: item.titulo.trim(), descricao: item.descricao.trim(), conteudo: item.conteudo.trim(), videoUrl: item.videoUrl.trim(), anexos: clone(item.anexos), validade: item.validade, editadoEm: new Date().toISOString() })
+    },
     async excluir(treinamentoId) {
       await wait(300)
       const index = treinamentos.findIndex((item) => item.id === treinamentoId && !isPublicado(item))
