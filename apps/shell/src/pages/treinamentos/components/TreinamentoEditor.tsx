@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Breadcrumb, Button, Checkbox, Dialog, Field, Input, PageHeader, SearchBox, SegmentedControl, StatusBadge, Surface, Switch, Textarea, useToast } from '@betinhos/ui'
-import { AlertTriangle, ArrowLeft, Save, Send, Trash2, Users } from 'lucide-react'
+import { Button, Checkbox, Dialog, Field, Input, PageHeader, SearchBox, SegmentedControl, StatusBadge, Surface, Switch, Textarea, useToast } from '@betinhos/ui'
+import { AlertTriangle, Save, Send, Trash2, Users } from 'lucide-react'
 import { useEscVoltar } from '../../../app/useEscVoltar'
 import { FUNCAO } from '../../funcionarios/data/schema'
 import type { Source } from '../data/source'
@@ -10,6 +10,7 @@ import {
 } from '../domain/treinamentos'
 import { AnexosSecao } from './AnexosSecao'
 import { Conteudo } from './Conteudo'
+import { NavTopo } from './NavTopo'
 import { QuizEditor } from './QuizEditor'
 
 type Props = {
@@ -168,11 +169,10 @@ export function TreinamentoEditor({ initial, funcionarios, source, onBack, onSav
     <>
       <PageHeader
         className="page__header"
-        breadcrumb={<Breadcrumb items={[{ label: 'Treinamentos', href: '#/treinamentos' }, { label: publicado ? 'Editar publicado' : draft.id ? 'Editar rascunho' : 'Novo' }]} />}
+        breadcrumb={<NavTopo onBack={voltar} disabled={lock} atual={publicado ? 'Editar publicado' : draft.id ? 'Editar rascunho' : 'Novo'} />}
         title={publicado ? 'Editar treinamento publicado' : draft.id ? 'Editar treinamento' : 'Novo treinamento'}
         meta={<StatusBadge tone={publicado ? 'success' : 'neutral'}>{publicado ? 'Publicado' : 'Rascunho'}</StatusBadge>}
         description={publicado ? 'Corrija texto, vídeo, anexos ou validade. Quiz, assinatura e público ficam como foram publicados, e quem já concluiu continua concluído.' : 'Monte o conteúdo, escolha quem recebe e defina se exige assinatura e quiz. Publicado, quiz, assinatura e público não mudam mais.'}
-        actions={<Button variant="secondary" icon={<ArrowLeft size={16} />} disabled={lock} onClick={voltar}>Voltar</Button>}
       />
 
       <div className="tr-columns">

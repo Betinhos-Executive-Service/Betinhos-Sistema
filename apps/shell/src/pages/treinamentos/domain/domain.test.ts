@@ -246,3 +246,13 @@ describe('push da participação', () => {
     expect(podeLembrar({ ...base, pushStatus: PUSH.falhou, concluidoEm: '2026-11-03T09:00:00Z' }, agora)).toBe(false)
   })
 })
+
+describe('ordenação por conclusão', () => {
+  it('ordena pelo percentual e deixa sem progresso por último', () => {
+    const l = (id: string) => ({ ...draft({ id }), criadoEm: '' }) as Linha
+    const lista = [l('a'), l('b'), l('c')]
+    const prog = { a: { concluidos: 1, total: 4 }, c: { concluidos: 4, total: 4 } }
+    expect(sortTreinamentos(lista, { key: 'progresso', dir: 'desc' }, prog).map((x) => x.id)).toEqual(['c', 'a', 'b'])
+    expect(sortTreinamentos(lista, { key: 'progresso', dir: 'asc' }, prog).map((x) => x.id)).toEqual(['a', 'c', 'b'])
+  })
+})

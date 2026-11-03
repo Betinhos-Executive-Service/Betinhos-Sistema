@@ -12,6 +12,7 @@ import { TELA, TREINAMENTO_COLUMNS, TREINAMENTO_FIELDS, TREINAMENTO_SORT, builti
 import { copiaParaReciclagem, emptyDraft, isPublicado, plural, type Treinamento } from './domain/treinamentos'
 import { useTreinamentos } from './useTreinamentos'
 import { TreinamentosCards, TreinamentosTable } from './components/TreinamentosLista'
+import { NavTopo } from './components/NavTopo'
 import { TreinamentoEditor } from './components/TreinamentoEditor'
 import { TreinamentoPainel } from './components/TreinamentoPainel'
 import './treinamentos.css'
@@ -51,8 +52,8 @@ function Treinamentos({ host }: { host: Host }) {
   const visible = useMemo(() => {
     const read = extra.read(readTreinamento, (t) => t.id)
     const list = data.items.filter((t) => matchesFilters(t, filters, allFields, read) && matchesKeyword(t, query))
-    return extra.sort(sortTreinamentos(list, view.config.sort), view.config.sort, (t) => t.id)
-  }, [data.items, filters, allFields, query, view.config.sort, extra])
+    return extra.sort(sortTreinamentos(list, view.config.sort, data.progresso), view.config.sort, (t) => t.id)
+  }, [data.items, data.progresso, filters, allFields, query, view.config.sort, extra])
   const lazyKey = useMemo(() => JSON.stringify({ filters, query, sort: view.config.sort }), [filters, query, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
 
@@ -78,7 +79,7 @@ function Treinamentos({ host }: { host: Host }) {
   } else if (target && !data.loaded) {
     body = data.error ? erroCarga : <div className="surface tr-loading" role="status" aria-label="Carregando treinamento" />
   } else if (target && !selected) {
-    body = <Alert tone="warning" title="Treinamento não encontrado" action={<Button variant="secondary" onClick={goHome}>Voltar para a lista</Button>}>Ele pode ter sido excluído. Atualize a lista para conferir.</Alert>
+    body = <><NavTopo onBack={goHome} atual="Não encontrado" /><Alert tone="warning" title="Treinamento não encontrado">Ele pode ter sido excluído. Atualize a lista para conferir.</Alert></>
   } else if (selected) {
     body = isPublicado(selected) && target?.mode !== 'edit'
       ? <TreinamentoPainel key={selected.id} item={selected} funcionarios={data.funcionarios} source={source} onBack={goHome} onEditar={() => editar(selected.id)} onReaplicar={() => reaplicar(selected)} />
@@ -95,12 +96,12 @@ function Treinamentos({ host }: { host: Host }) {
   } else {
     const publicados = data.items.filter(isPublicado).length
     const footer = <span className="tr-num">{visible.length} de {data.items.length} · {publicados} {plural(publicados, 'publicado', 'publicados')}</span>
-    const empty = <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum treinamento com estes filtros" action={<Button variant="secondary" onClick={() => { clearFilters(); setQuery('') }}>Limpar filtros</Button>} />
+    const empty = <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum treinamento com estes filtros" action={<Button variant="secondary" onClick={() => { clearFilters(); setQuery('') }}>Limpar filtros</Button>}>Tire um filtro ou mude a busca para ver mais resultados.</EmptyState>
     body = (
       <>
         {mobile
-          ? (visible.length ? <TreinamentosCards list={slice} onOpen={open} /> : <div className="surface">{empty}</div>)
-          : <TreinamentosTable list={slice} onOpen={open} view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+          ? (visible.length ? <TreinamentosCards list={slice} funcionarios={data.funcionarios} progresso={data.progresso} onOpen={open} /> : <div className="surface">{empty}</div>)
+          : <TreinamentosTable list={slice} funcionarios={data.funcionarios} progresso={data.progresso} onOpen={open} view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )

@@ -1,5 +1,6 @@
 import { ESTADO, PUBLICO, PUSH, isOrfa, podeLembrar, isPublicado, validarComConteudo, validarRascunho, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
 import type { Linha } from '../domain/lista'
+import { contarProgresso } from '../domain/tabela'
 import type { Source } from './source'
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -71,6 +72,7 @@ export function createMockSource(): Source {
     async treinamentos() { await wait(300); return clone(treinamentos) },
     async funcionarios() { await wait(200); return clone(FUNCIONARIOS) },
     async participacoes(treinamentoId) { await wait(300); return clone(participacoes.filter((p) => p.treinamentoId === treinamentoId)) },
+    async progresso() { await wait(150); return contarProgresso(participacoes.map((p) => ({ treinamentoId: p.treinamentoId, concluida: Boolean(p.concluidoEm) }))) },
     async salvar(draft) {
       await wait(300)
       const error = validarRascunho(draft)

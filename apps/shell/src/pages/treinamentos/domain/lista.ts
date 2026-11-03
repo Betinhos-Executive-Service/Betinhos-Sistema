@@ -1,6 +1,7 @@
 import { CONFIG_VERSION, emptyFilters, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
 import { sortRows } from '../../../app/listSort'
 import { normalize } from '../../infracoes/domain/filters'
+import { progressoDe, type ProgressoConta } from './tabela'
 import { ESTADO, PUBLICO, type Treinamento } from './treinamentos'
 
 /** Treinamentos no padrão de listas do DS (§10.9.1/§10.9.2). A Visão padrão mostra rascunhos e publicados. */
@@ -11,6 +12,7 @@ export const TREINAMENTO_SORT: ViewSort = { key: 'criado', dir: 'desc' }
 export const TREINAMENTO_COLUMNS: ViewColumnDef[] = [
   { key: 'titulo', label: 'Treinamento' },
   { key: 'estado', label: 'Situação' },
+  { key: 'progresso', label: 'Conclusão' },
   { key: 'publico', label: 'Público-alvo' },
   { key: 'exigencias', label: 'Exige' },
   { key: 'validade', label: 'Validade' },
@@ -55,12 +57,13 @@ export function matchesKeyword(t: Treinamento, query: string) {
   return terms.every((term) => hay.includes(term))
 }
 
-export function sortTreinamentos(list: Linha[], sort: ViewSort | null) {
+export function sortTreinamentos(list: Linha[], sort: ViewSort | null, progresso: Record<string, ProgressoConta> = {}) {
   if (!sort) return list
   return sortRows(list, (t) => {
     switch (sort.key) {
       case 'titulo': return t.titulo || null
       case 'estado': return t.estado
+      case 'progresso': return progressoDe(progresso[t.id])?.pct ?? null
       case 'publico': return t.publicoTipo
       case 'exigencias': return Number(t.exigeAssinatura) + Number(t.exigeQuiz)
       case 'validade': return t.validade || null

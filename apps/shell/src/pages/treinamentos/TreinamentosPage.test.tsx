@@ -16,7 +16,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 describe('Treinamentos', () => {
   it('lista e abre o painel com status por motorista, assinatura e nota', async () => {
     render(<TreinamentosPage host={{ mode: 'mock' }} />)
-    fireEvent.click(await screen.findByRole('button', { name: /Embarque no GRU/ }))
+    fireEvent.click(await screen.findByRole('row', { name: /Embarque no GRU/ }))
     expect(await screen.findByRole('heading', { name: 'Embarque no GRU: novo procedimento' })).toBeTruthy()
     // Carlos é o selecionado inicial: o selo aparece na lista e no detalhe.
     expect(await screen.findAllByText('Concluído')).toHaveLength(2)
@@ -27,9 +27,37 @@ describe('Treinamentos', () => {
     expect(await screen.findByText(/33% · reprovado · 1 tentativa/)).toBeTruthy()
   })
 
+  it('a tabela mostra progresso, exigências e validade com texto', async () => {
+    render(<TreinamentosPage host={{ mode: 'mock' }} />)
+    const gru = await screen.findByRole('row', { name: /Embarque no GRU/ })
+    expect(await within(gru).findByText(/\d de \d (concluiu|concluíram)/)).toBeTruthy()
+    expect(within(gru).getByText('Assinatura')).toBeTruthy()
+    expect(within(gru).getByText('Quiz')).toBeTruthy()
+    expect(within(await screen.findByRole('row', { name: /Direção defensiva/ })).getByText('Venceu há 3 dias')).toBeTruthy()
+  })
+
+  it('Voltar fica no início do cabeçalho, antes do título, no painel e no editor', async () => {
+    render(<TreinamentosPage host={{ mode: 'mock' }} />)
+    fireEvent.click(await screen.findByRole('row', { name: /Embarque no GRU/ }))
+    const titulo = await screen.findByRole('heading', { name: 'Embarque no GRU: novo procedimento' })
+    const antes = (voltar: HTMLElement, alvo: HTMLElement) => Boolean(voltar.compareDocumentPosition(alvo) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(antes(screen.getByRole('button', { name: 'Voltar' }), titulo)).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Editar conteúdo' }))
+    const editor = await screen.findByRole('heading', { name: 'Editar treinamento publicado' })
+    expect(antes(screen.getByRole('button', { name: 'Voltar' }), editor)).toBe(true)
+  })
+
+  it('treinamento não encontrado tem Voltar no topo e leva à lista', async () => {
+    window.location.hash = '#/treinamentos?ver=00000000-0000-4000-8000-000000000999'
+    render(<TreinamentosPage host={{ mode: 'mock' }} />)
+    expect(await screen.findByText('Treinamento não encontrado')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Voltar' }))
+    expect(await screen.findByRole('row', { name: /Embarque no GRU/ })).toBeTruthy()
+  })
+
   it('mostra o push falho e lembra os pendentes', async () => {
     render(<TreinamentosPage host={{ mode: 'mock' }} />)
-    fireEvent.click(await screen.findByRole('button', { name: /Embarque no GRU/ }))
+    fireEvent.click(await screen.findByRole('row', { name: /Embarque no GRU/ }))
     expect((await screen.findAllByText('Push falhou · Dispositivo não registrado')).length).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('button', { name: 'Lembrar pendentes' }))
     expect(await screen.findByText(/Lembrete enviado para 2 funcionários/)).toBeTruthy()
@@ -42,7 +70,7 @@ describe('Treinamentos', () => {
     vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL })
     const clique = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
     render(<TreinamentosPage host={{ mode: 'mock' }} />)
-    fireEvent.click(await screen.findByRole('button', { name: /Embarque no GRU/ }))
+    fireEvent.click(await screen.findByRole('row', { name: /Embarque no GRU/ }))
     // Carlos (concluído) é o selecionado inicial.
     const baixar = await screen.findByRole('button', { name: 'Baixar comprovante' })
     fireEvent.click(baixar)
@@ -56,13 +84,13 @@ describe('Treinamentos', () => {
 
   it('o painel nomeia o público selecionado em vez de contar', async () => {
     render(<TreinamentosPage host={{ mode: 'mock' }} />)
-    fireEvent.click(await screen.findByRole('button', { name: /Direção defensiva/ }))
+    fireEvent.click(await screen.findByRole('row', { name: /Direção defensiva/ }))
     expect(await screen.findByText(/Carlos Alberto Teste, Márcio Lima e mais 1/)).toBeTruthy()
   })
 
   it('anexar sem título avisa por toast', async () => {
     render(<TreinamentosPage host={{ mode: 'mock' }} />)
-    await screen.findByRole('button', { name: /Embarque no GRU/ })
+    await screen.findByRole('row', { name: /Embarque no GRU/ })
     fireEvent.click(screen.getByRole('button', { name: 'Novo treinamento' }))
     fireEvent.change(await screen.findByLabelText('Arquivos para anexar'), { target: { files: [new File(['x'], 'a.pdf', { type: 'application/pdf' })] } })
     expect(await screen.findByText('Preencha o título antes de anexar.')).toBeTruthy()
@@ -70,7 +98,7 @@ describe('Treinamentos', () => {
 
   it('treinamento vencido mostra o selo Vencido e o desligado continua no painel', async () => {
     render(<TreinamentosPage host={{ mode: 'mock' }} />)
-    fireEvent.click(await screen.findByRole('button', { name: /Direção defensiva/ }))
+    fireEvent.click(await screen.findByRole('row', { name: /Direção defensiva/ }))
     expect(await screen.findByText('Vencido')).toBeTruthy()
     expect(await screen.findByText('Desligado')).toBeTruthy()
     expect(screen.getByText('Não aberto')).toBeTruthy()
@@ -78,7 +106,7 @@ describe('Treinamentos', () => {
 
   it('cria um treinamento com texto, vídeo e quiz de 3 perguntas e publica para os motoristas', async () => {
     render(<TreinamentosPage host={{ mode: 'mock' }} />)
-    await screen.findByRole('button', { name: /Embarque no GRU/ })
+    await screen.findByRole('row', { name: /Embarque no GRU/ })
     fireEvent.click(screen.getByRole('button', { name: 'Novo treinamento' }))
     fireEvent.change(await screen.findByLabelText(/^Título/), { target: { value: 'Uniforme e apresentação' } })
     fireEvent.change(screen.getByLabelText(/^Texto/), { target: { value: '# Regras\n- Camisa **branca**\n- Terno escuro' } })
@@ -112,7 +140,7 @@ describe('Treinamentos', () => {
 
   it('público selecionado vazio avisa e não publica', async () => {
     render(<TreinamentosPage host={{ mode: 'mock' }} />)
-    await screen.findByRole('button', { name: /Embarque no GRU/ })
+    await screen.findByRole('row', { name: /Embarque no GRU/ })
     fireEvent.click(screen.getByRole('button', { name: 'Novo treinamento' }))
     fireEvent.change(await screen.findByLabelText(/^Título/), { target: { value: 'Teste' } })
     fireEvent.change(screen.getByLabelText(/^Texto/), { target: { value: 'Conteúdo' } })
@@ -124,7 +152,7 @@ describe('Treinamentos', () => {
 
   it('edita o texto e a validade do publicado sem mexer no quiz nem no público', async () => {
     render(<TreinamentosPage host={{ mode: 'mock' }} />)
-    fireEvent.click(await screen.findByRole('button', { name: /Embarque no GRU/ }))
+    fireEvent.click(await screen.findByRole('row', { name: /Embarque no GRU/ }))
     fireEvent.click(await screen.findByRole('button', { name: 'Editar conteúdo' }))
     expect(await screen.findByRole('heading', { name: 'Editar treinamento publicado' })).toBeTruthy()
     expect((screen.getByLabelText('Exige quiz') as HTMLInputElement).disabled).toBe(true)
@@ -138,7 +166,7 @@ describe('Treinamentos', () => {
 
   it('Voltar do editor de publicado retorna ao painel', async () => {
     render(<TreinamentosPage host={{ mode: 'mock' }} />)
-    fireEvent.click(await screen.findByRole('button', { name: /Embarque no GRU/ }))
+    fireEvent.click(await screen.findByRole('row', { name: /Embarque no GRU/ }))
     fireEvent.click(await screen.findByRole('button', { name: 'Editar conteúdo' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Voltar' }))
     expect(await screen.findByRole('button', { name: 'Reaplicar' })).toBeTruthy()
@@ -146,7 +174,7 @@ describe('Treinamentos', () => {
 
   it('Reaplicar abre um rascunho copiado com o sufixo de reciclagem', async () => {
     render(<TreinamentosPage host={{ mode: 'mock' }} />)
-    fireEvent.click(await screen.findByRole('button', { name: /Direção defensiva/ }))
+    fireEvent.click(await screen.findByRole('row', { name: /Direção defensiva/ }))
     fireEvent.click(await screen.findByRole('button', { name: 'Reaplicar' }))
     const titulo = await screen.findByLabelText(/^Título/) as HTMLInputElement
     expect(titulo.value).toMatch(/^Direção defensiva: revisão anual \(reciclagem \d{2}\/\d{2}\/\d{4}\)$/)
@@ -156,7 +184,7 @@ describe('Treinamentos', () => {
 
   it('anexa vídeo num treinamento novo: salva o rascunho sozinho e abre com o anexo', async () => {
     render(<TreinamentosPage host={{ mode: 'mock' }} />)
-    await screen.findByRole('button', { name: /Embarque no GRU/ })
+    await screen.findByRole('row', { name: /Embarque no GRU/ })
     fireEvent.click(screen.getByRole('button', { name: 'Novo treinamento' }))
     const input = (await screen.findByLabelText('Arquivos para anexar')) as HTMLInputElement
     const video = new File(['x'], 'manobra.mp4', { type: 'video/mp4' })
