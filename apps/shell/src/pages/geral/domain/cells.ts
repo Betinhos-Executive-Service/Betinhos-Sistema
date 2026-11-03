@@ -47,3 +47,28 @@ export function statusTone(attribute: string, value: number | null): StatusTone 
   if (attribute === 'cr40f_statusdefaturamento') return FATURAMENTO[value] ?? 'neutral'
   return 'neutral'
 }
+
+const BADGE_COLUMNS: ReadonlySet<string> = new Set(['cr40f_status', 'cr40f_statusdefaturamento', 'cr40f_tipodeveiculo'])
+
+/** Colunas mostradas como etiqueta colorida (status e tipo de serviço) quando o valor é uma choice preenchida. */
+export function isBadgeValue(column: Column, value: unknown): value is number {
+  return !column.alias && BADGE_COLUMNS.has(column.attribute) && typeof value === 'number'
+}
+
+/** Tipo de serviço (cr40f_tipodeveiculo): cor por rótulo, para bater o olho na operação; rótulo novo cai numa cor estável pelo texto. */
+const TIPO_FIXOS: ReadonlyMap<string, number> = new Map([['executivo', 1], ['basico', 2], ['van', 3], ['blindado', 4], ['somente motorista', 5]])
+
+export function tipoVariant(label: string): number {
+  const key = label.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
+  const fixo = TIPO_FIXOS.get(key)
+  if (fixo) return fixo
+  let hash = 0
+  for (const char of key) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
+  return (hash % 6) + 1
+}
+
+/** Cor (#RRGGBB) cadastrada na choice para o valor; `null` quando não há (a tela cai nas cores padrão). */
+export function choiceColor(info: AttributeInfo | undefined, value: unknown): string | null {
+  if (typeof value !== 'number') return null
+  return info?.options.find((option) => option.value === value)?.color ?? null
+}

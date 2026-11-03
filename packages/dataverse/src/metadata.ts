@@ -11,7 +11,8 @@ type EntityDefinition = {
   DisplayCollectionName?: { UserLocalizedLabel?: { Label?: string } | null }
 }
 
-export type ChoiceOption = { value: number; label: string }
+/** `color` é o hex cadastrado na choice (#RRGGBB), quando existir. */
+export type ChoiceOption = { value: number; label: string; color?: string }
 
 export type AttributeMeta = { logicalName: string; type: string; label: string; updatable: boolean; targets: string[] }
 
@@ -23,7 +24,7 @@ type AttributeDefinition = {
 }
 
 type PicklistDefinition = {
-  OptionSet?: { Options: { Value: number; Label?: { UserLocalizedLabel?: { Label?: string } | null } }[] }
+  OptionSet?: { Options: { Value: number; Color?: string | null; Label?: { UserLocalizedLabel?: { Label?: string } | null } }[] }
 }
 
 const SELECT = '$select=LogicalName,EntitySetName,PrimaryNameAttribute,DisplayCollectionName,ObjectTypeCode'
@@ -79,6 +80,7 @@ export function createMetadata(client: DataverseClient) {
       options = client.request<PicklistDefinition>(path).then((definition) => (definition.OptionSet?.Options ?? []).map((option) => ({
         value: option.Value,
         label: option.Label?.UserLocalizedLabel?.Label || String(option.Value),
+        ...(option.Color && /^#[0-9a-f]{6}$/i.test(option.Color) ? { color: option.Color } : {}),
       })))
       options.catch(() => choiceCache.delete(key))
       choiceCache.set(key, options)
