@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { TELA, builtinViews, matchesKeyword, readTreinamento, sortTreinamentos, type Linha } from './lista'
 import {
-  ESTADO, PUBLICO, anexoDaPasta, blocosDoConteudo, copiaParaReciclagem, edicaoPublicadoPayload, draftPayload, emptyDraft, isOrfa, isVencido, mapParticipacao, mapTreinamento, matchParticipacao, novaPergunta, resolverPublico, statusParticipacao, trechos,
+  ESTADO, FUNCAO_MOTORISTA, PUBLICO, anexoDaPasta, blocosDoConteudo, copiaParaReciclagem, edicaoPublicadoPayload, draftPayload, emptyDraft, isOrfa, isVencido, mapParticipacao, mapTreinamento, matchParticipacao, novaPergunta, publicoLabel, resolverPublico, statusParticipacao, trechos,
   validarAnexo, validarPublicacao, validarQuiz, validarRascunho, type Funcionario, type Participacao, type Pergunta, type Treinamento,
 } from './treinamentos'
 
@@ -200,5 +200,21 @@ describe('anexoDaPasta', () => {
   it('só reconhece arquivo na pasta do próprio treinamento', () => {
     expect(anexoDaPasta({ nome: 'a.pdf', caminho: '/Documentos Compartilhados/Treinamentos/DEV/aaaa-1/a.pdf', tamanho: 1, mime: 'application/pdf' }, id)).toBe(true)
     expect(anexoDaPasta({ nome: 'a.pdf', caminho: '/Documentos Compartilhados/Treinamentos/bbbb-2/a.pdf', tamanho: 1, mime: 'application/pdf' }, id)).toBe(false)
+  })
+})
+
+describe('publicoLabel', () => {
+  it('nomeia as funções', () => {
+    expect(publicoLabel({ publicoTipo: PUBLICO.funcao, publico: [String(FUNCAO_MOTORISTA)] })).toBe('Motorista')
+  })
+  it('nomeia até 2 selecionados e resume o resto', () => {
+    const fs: Funcionario[] = [
+      { id: 'a', nome: 'Ana Souza', apelido: '', funcao: null, ativo: true },
+      { id: 'b', nome: 'Bruno Lima', apelido: '', funcao: null, ativo: true },
+      { id: 'c', nome: 'Caio Reis', apelido: '', funcao: null, ativo: true },
+    ]
+    expect(publicoLabel({ publicoTipo: PUBLICO.selecionados, publico: ['a', 'b'] }, fs)).toBe('Ana Souza e Bruno Lima')
+    expect(publicoLabel({ publicoTipo: PUBLICO.selecionados, publico: ['a', 'b', 'c'] }, fs)).toBe('Ana Souza, Bruno Lima e mais 1')
+    expect(publicoLabel({ publicoTipo: PUBLICO.selecionados, publico: ['a', 'b'] })).toBe('2 selecionados')
   })
 })

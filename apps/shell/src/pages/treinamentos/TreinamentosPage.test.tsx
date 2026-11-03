@@ -27,6 +27,20 @@ describe('Treinamentos', () => {
     expect(await screen.findByText(/33% · reprovado · 1 tentativa/)).toBeTruthy()
   })
 
+  it('o painel nomeia o público selecionado em vez de contar', async () => {
+    render(<TreinamentosPage host={{ mode: 'mock' }} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Direção defensiva/ }))
+    expect(await screen.findByText(/Carlos Alberto Teste, Márcio Lima e mais 1/)).toBeTruthy()
+  })
+
+  it('anexar sem título avisa por toast', async () => {
+    render(<TreinamentosPage host={{ mode: 'mock' }} />)
+    await screen.findByRole('button', { name: /Embarque no GRU/ })
+    fireEvent.click(screen.getByRole('button', { name: 'Novo treinamento' }))
+    fireEvent.change(await screen.findByLabelText('Arquivos para anexar'), { target: { files: [new File(['x'], 'a.pdf', { type: 'application/pdf' })] } })
+    expect(await screen.findByText('Preencha o título antes de anexar.')).toBeTruthy()
+  })
+
   it('treinamento vencido mostra o selo Vencido e o desligado continua no painel', async () => {
     render(<TreinamentosPage host={{ mode: 'mock' }} />)
     fireEvent.click(await screen.findByRole('button', { name: /Direção defensiva/ }))

@@ -125,7 +125,11 @@ export function TreinamentoEditor({ initial, funcionarios, source, onBack, onSav
   // Anexar antes do primeiro salvamento: salva o rascunho (campos travados até terminar) e segue com o envio.
   const garantirId = async () => {
     const problema = validarRascunho(draft)
-    if (problema) { setErro(problema); return null }
+    if (problema) {
+      setErro(problema)
+      toast({ tone: 'warning', message: draft.titulo.trim() ? problema : 'Preencha o título antes de anexar.' })
+      return null
+    }
     setBusy('save')
     try {
       return await source.salvar(draft)
@@ -140,7 +144,7 @@ export function TreinamentoEditor({ initial, funcionarios, source, onBack, onSav
   const lock = busy !== null
   const resumoPublico = draft.publicoTipo === PUBLICO.motoristas ? 'Todos os motoristas ativos recebem o treinamento.'
     : !draft.publico.length ? (draft.publicoTipo === PUBLICO.funcao ? 'Marque pelo menos uma função.' : 'Marque pelo menos um funcionário.')
-      : `${publicoLabel(draft)}: só funcionários ativos.`
+      : `${publicoLabel(draft, funcionarios)}: só funcionários ativos.`
 
   return (
     <>

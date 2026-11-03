@@ -106,7 +106,7 @@ export function AnexosSecao({ treinamentoId, anexos, source, onChange, garantirI
         <div className="tr-anexos__acoes">
           <input ref={input} type="file" hidden multiple accept={ANEXO_TIPOS.join(',')} aria-label="Arquivos para anexar" onChange={(e) => { void enviar(e.target.files); e.currentTarget.value = '' }} />
           <Button variant="secondary" size="compact" icon={<Paperclip size={14} />} loading={Boolean(enviando)} disabled={bloqueado} onClick={() => input.current?.click()}>{enviando ? `Enviando ${enviando}` : 'Adicionar foto ou arquivo'}</Button>
-          <small className="tr-hint">{treinamentoId ? TEXTO_LIMITES : `${TEXTO_LIMITES} O rascunho é salvo ao anexar.`}</small>
+          <small className="tr-hint">{treinamentoId ? TEXTO_LIMITES : `${TEXTO_LIMITES} Preencha o título: o rascunho é salvo ao anexar.`}</small>
         </div>
       )}
     </div>

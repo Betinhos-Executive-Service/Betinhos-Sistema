@@ -1,5 +1,6 @@
 import { cleanId, type Row } from '@betinhos/dataverse'
 import { plural } from '../../comunicados/domain/comunicados'
+import { FUNCAO } from '../../funcionarios/data/schema'
 
 export { formatDate, plural } from '../../comunicados/domain/comunicados'
 /** `AAAA-MM-DD` → `dd/mm/aaaa` sem passar por Date. */
@@ -61,7 +62,7 @@ export type Participacao = {
 export type Funcionario = { id: string; nome: string; apelido: string; funcao: number | null; ativo: boolean }
 
 export const TITULO_MAX = 200
-export const DESCRICAO_MAX = 1000
+export const DESCRICAO_MAX = 300
 export const CONTEUDO_MAX = 20000
 export const VIDEO_MAX = 500
 export const ANEXO_MAX_BYTES = 25 * 1024 * 1024
@@ -274,10 +275,21 @@ export function statusParticipacao(p: Participacao): StatusParticipacao {
   return { label: 'Não aberto', tone: 'neutral', quando: null }
 }
 
-export function publicoLabel(item: Pick<Treinamento, 'publicoTipo' | 'publico'>) {
+const juntar = (nomes: string[], total: number) => {
+  const resto = total - nomes.length
+  if (resto > 0) return `${nomes.join(', ')} e mais ${resto}`
+  return nomes.length > 1 ? `${nomes.slice(0, -1).join(', ')} e ${nomes[nomes.length - 1]}` : nomes[0] ?? ''
+}
+
+/** Público em texto: nomeia funções e até 2 pessoas; sem o cadastro à mão, cai na contagem. */
+export function publicoLabel(item: Pick<Treinamento, 'publicoTipo' | 'publico'>, funcionarios: Funcionario[] = []) {
   if (item.publicoTipo === PUBLICO.motoristas) return 'Todos os motoristas'
-  if (item.publicoTipo === PUBLICO.funcao) return `${item.publico.length} ${plural(item.publico.length, 'função', 'funções')}`
-  return `${item.publico.length} ${plural(item.publico.length, 'selecionado', 'selecionados')}`
+  if (item.publicoTipo === PUBLICO.funcao) {
+    const nomes = item.publico.map((v) => FUNCAO.find((f) => String(f.value) === v)?.label).filter((x): x is string => Boolean(x))
+    return nomes.length === item.publico.length && nomes.length ? juntar(nomes.slice(0, 2), nomes.length) : `${item.publico.length} ${plural(item.publico.length, 'função', 'funções')}`
+  }
+  const nomes = item.publico.map((id) => funcionarios.find((f) => f.id === id)?.nome).filter((x): x is string => Boolean(x))
+  return nomes.length === item.publico.length && nomes.length ? juntar(nomes.slice(0, 2), nomes.length) : `${item.publico.length} ${plural(item.publico.length, 'selecionado', 'selecionados')}`
 }
 
 export const isConcluida = (p: Participacao) => Boolean(p.concluidoEm)

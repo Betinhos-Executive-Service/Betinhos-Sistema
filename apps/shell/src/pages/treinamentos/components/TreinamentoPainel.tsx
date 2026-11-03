@@ -27,6 +27,7 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack }: Props)
   const [busca, setBusca] = useState('')
   const [selectedId, setSelectedId] = useState('')
   const token = useRef(0)
+  const detalheRef = useRef<HTMLDivElement | null>(null)
 
   const pessoas = useMemo(() => new Map(funcionarios.map((f) => [f.id, f])), [funcionarios])
   const nome = useCallback((p: Participacao) => pessoas.get(p.funcionarioId)?.nome || p.nomeAssinante || 'Funcionário sem cadastro', [pessoas])
@@ -47,6 +48,12 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack }: Props)
   }, [source, item.id])
   useEffect(() => { void load() }, [load])
 
+  // Abaixo de 1120 px o detalhe fica empilhado depois da lista: leva a tela até ele.
+  const selecionar = (id: string) => {
+    setSelectedId(id)
+    if (window.matchMedia('(max-width: 1120px)').matches) requestAnimationFrame(() => { detalheRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); detalheRef.current?.focus({ preventScroll: true }) })
+  }
+
   const termo = busca.trim().toLowerCase()
   const buscados = rows.filter((p) => !termo || nome(p).toLowerCase().includes(termo))
   const visiveis = buscados.filter((p) => matchParticipacao(filtro, p))
@@ -58,7 +65,7 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack }: Props)
   const reprovados = rows.filter((p) => matchParticipacao('reprovados', p)).length
   const vencido = isVencido(item, todaySaoPaulo())
 
-  const publico = publicoLabel(item)
+  const publico = publicoLabel(item, funcionarios)
 
   const etapas = (p: Participacao) => [
     { label: 'Abriu no app', time: formatDate(p.abertoEm) || 'Ainda não abriu', done: Boolean(p.abertoEm) },
@@ -112,7 +119,7 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack }: Props)
               const ativo = selected?.id === p.id
               return (
                 <li key={p.id} className={`tr-recipient${ativo ? ' is-selected' : ''}`}>
-                  <button type="button" className="tr-recipient__main" aria-pressed={ativo} onClick={() => setSelectedId(p.id)}>
+                  <button type="button" className="tr-recipient__main" aria-pressed={ativo} onClick={() => selecionar(p.id)}>
                     <Avatar name={nome(p)} size="sm" />
                     <span className="tr-recipient__text">
                       <strong>{nome(p)}{desligado(p) ? <StatusBadge tone="neutral">Desligado</StatusBadge> : null}</strong>
@@ -131,6 +138,7 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack }: Props)
 
         <aside className="tr-side" aria-label="Detalhe e conteúdo publicado">
           {selected ? (
+            <div ref={detalheRef} tabIndex={-1} className="tr-detail-anchor">
             <Surface title={nome(selected)} action={statusSelecionado ? <StatusBadge tone={statusSelecionado.tone}>{statusSelecionado.label}</StatusBadge> : null} className="tr-detail">
               <span className="tr-label">Linha do tempo</span>
               <ol className="tr-timeline">
@@ -144,11 +152,12 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack }: Props)
               {selected.assinaturaJson ? <><span className="tr-label">Assinatura</span><div className="tr-signature"><Assinatura value={parseSignature(selected.assinaturaJson)} /></div></> : null}
               {vencido && !isConcluida(selected) ? <p className="tr-pending"><CalendarClock size={16} aria-hidden="true" />Validade vencida em {fmtDia(item.validade)} sem conclusão.</p> : null}
             </Surface>
+            </div>
           ) : null}
           <Surface eyebrow="Conteúdo" title="O que foi publicado" className="tr-sent">
             {item.descricao ? <p className="tr-device__desc">{item.descricao}</p> : null}
             {item.videoUrl ? <p><a href={item.videoUrl} target="_blank" rel="noreferrer">Abrir vídeo</a></p> : null}
-            <Conteudo texto={item.conteudo} className="tr-conteudo" />
+            <Conteudo texto={item.conteudo} className="tr-conteudo" nivel={3} />
             <AnexosSecao treinamentoId={item.id} anexos={item.anexos} source={source} disabled onChange={() => undefined} somenteLeitura />
             {item.exigeQuiz ? <p className="tr-hint">{item.perguntas.length} {plural(item.perguntas.length, 'pergunta', 'perguntas')} no quiz · nota mínima {item.notaMinima}%</p> : null}
           </Surface>
