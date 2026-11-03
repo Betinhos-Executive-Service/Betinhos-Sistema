@@ -1035,4 +1035,154 @@ export async function gerarComprovantePdf(d: DadosComprovante): Promise<Uint8Arr
 
 ## Achados da Fase 1
 
-_(preenchido na Tarefa 3)_
+Relatórios: `docs/evidencias/treinamentos/ux-fluxo-shell-2026-11-03.md` (commit `f6b124e`) e, no App, `docs/evidencias/treinamentos/ux-fluxo-app-2026-11-03.md` (commit `21c5428`, branch `docs/treinamentos-ux-fluxo`). Triagem decidida pelo Renan em 03/11/2026.
+
+| Achado | Sev. | Destino |
+|---|---|---|
+| UX-S1 filtro do painel estoura em 375 px | alta | (b) Tarefa 7A |
+| UX-S2 detalhe fica fora da tela no celular | média | (b) Tarefa 7A |
+| UX-S3 anexar sem título falha em silêncio | média | (b) Tarefa 7A |
+| UX-S4 público "1 função" sem nome | média | (b) Tarefa 7A |
+| UX-S5 contraste do módulo | média | (c) não escolhido pelo Renan |
+| UX-S6 `<h4>` sob h2/h3 | baixa | (b) Tarefa 7A |
+| UX-S7 toast cobre o título | baixa | (c) DS |
+| UX-S8 descrição curta com 1000 caracteres | baixa | (b) Tarefa 7A |
+| UX-S9 axe do DS/shell (Table, build badge, sidebar, h1) | alta | (c) repo design-system-betinhos, fora deste plano |
+| UX-A1 erro da abertura fora da tela, sem repetir | média | (b) Tarefa 7B |
+| UX-A2 mensagem crua do Dataverse ao motorista | média | (b) Tarefa 7B |
+| UX-A3 foco perdido após ações | baixa | (b) Tarefa 7B |
+| UX-A4 Refazer quiz não volta ao topo do quiz | baixa | (b) Tarefa 7B |
+| UX-A5 assinatura abaixo da dobra | baixa | (b) Tarefa 7B |
+| UX-A6 tour promete salvar o que se perde | baixa | (b) Tarefa 7B |
+| UX-A7 três tours seguidos | baixa | (c) |
+| UX-A8 `.build-stamp` 2,49:1 (app todo) | baixa | (c) |
+| `esbuild` não declarado no App (dev só sobe com NODE_PATH) | — | (c) correção separada no App |
+
+### Tarefa 7A: Correções de UX do shell (entra no PR da Fase 2, antes da Tarefa 7)
+
+**Arquivos:**
+- Modificar: `apps/shell/src/pages/treinamentos/treinamentos.css`, `components/TreinamentoPainel.tsx`, `components/TreinamentoEditor.tsx`, `components/AnexosSecao.tsx`, `components/Conteudo.tsx`, `domain/treinamentos.ts`
+- Teste: `domain/domain.test.ts`, `TreinamentosPage.test.tsx`
+
+**Interfaces (produz):** `publicoLabel(item, funcionarios?: Funcionario[])` passa a nomear funções e pessoas; `DESCRICAO_MAX = 300`.
+
+- [ ] **Passo 1: testes que falham.** Em `domain.test.ts`:
+
+```ts
+describe('publicoLabel', () => {
+  it('nomeia as funções', () => {
+    expect(publicoLabel({ publicoTipo: PUBLICO.funcao, publico: [String(FUNCAO_MOTORISTA)] })).toBe('Motorista')
+  })
+  it('nomeia até 2 selecionados e resume o resto', () => {
+    const fs = [{ id: 'a', nome: 'Ana Souza', apelido: '', funcao: null, ativo: true }, { id: 'b', nome: 'Bruno Lima', apelido: '', funcao: null, ativo: true }, { id: 'c', nome: 'Caio Reis', apelido: '', funcao: null, ativo: true }]
+    expect(publicoLabel({ publicoTipo: PUBLICO.selecionados, publico: ['a', 'b'] }, fs)).toBe('Ana Souza e Bruno Lima')
+    expect(publicoLabel({ publicoTipo: PUBLICO.selecionados, publico: ['a', 'b', 'c'] }, fs)).toBe('Ana Souza, Bruno Lima e mais 1')
+    expect(publicoLabel({ publicoTipo: PUBLICO.selecionados, publico: ['a', 'b'] })).toBe('2 selecionados')
+  })
+})
+```
+
+  Em `TreinamentosPage.test.tsx`: abrir "Embarque no GRU" e esperar `findAllByText(/Motorista/)` na descrição do painel. Num editor novo, sem título, clicar "Adicionar foto ou arquivo" → `findByText('Preencha o título antes de anexar.')` aparece (toast).
+
+- [ ] **Passo 2:** `pnpm exec vitest run src/pages/treinamentos` → FALHA.
+- [ ] **Passo 3: S4 (domínio).** O `FUNCAO` vem de `../../funcionarios/data/schema` (o editor já o importa). Em `treinamentos.ts`:
+
+```ts
+import { FUNCAO } from '../../funcionarios/data/schema'
+
+const juntar = (nomes: string[], total: number) => {
+  const resto = total - nomes.length
+  if (resto > 0) return `${nomes.join(', ')} e mais ${resto}`
+  return nomes.length > 1 ? `${nomes.slice(0, -1).join(', ')} e ${nomes[nomes.length - 1]}` : nomes[0] ?? ''
+}
+
+export function publicoLabel(item: Pick<Treinamento, 'publicoTipo' | 'publico'>, funcionarios: Funcionario[] = []) {
+  if (item.publicoTipo === PUBLICO.motoristas) return 'Todos os motoristas'
+  if (item.publicoTipo === PUBLICO.funcao) {
+    const nomes = item.publico.map((v) => FUNCAO.find((f) => String(f.value) === v)?.label).filter((x): x is string => Boolean(x))
+    return nomes.length === item.publico.length && nomes.length ? juntar(nomes.slice(0, 2), nomes.length) : `${item.publico.length} ${plural(item.publico.length, 'função', 'funções')}`
+  }
+  const nomes = item.publico.map((id) => funcionarios.find((f) => f.id === id)?.nome).filter((x): x is string => Boolean(x))
+  return nomes.length === item.publico.length && nomes.length ? juntar(nomes.slice(0, 2), nomes.length) : `${item.publico.length} ${plural(item.publico.length, 'selecionado', 'selecionados')}`
+}
+```
+
+  Se `funcionarios/data/schema` importar algo de rede no topo, mover `FUNCAO` para um módulo puro antes; conferir o arquivo. No painel: `publicoLabel(item, funcionarios)`. Na lista (`TreinamentosLista.tsx`), manter `publicoLabel(t)`: funções já saem nomeadas.
+
+- [ ] **Passo 4: S8.** `DESCRICAO_MAX = 300` em `treinamentos.ts`. `validarRascunho` (linha 119) usa `DESCRICAO_MAX`: rascunho ou publicado já salvo com mais de 300 passa a mostrar "A descrição tem no máximo 300 caracteres." ao salvar, o que é aceitável. Antes do merge, conferir no DEV se algum treinamento passa de 300 (`$select=cr40f_descricao`); se passar, informar no PR.
+- [ ] **Passo 5: S3.** Em `TreinamentoEditor.tsx`, `garantirId`: quando `validarRascunho` falha, além de `setErro(problema)`, `toast({ tone: 'warning', message: draft.titulo.trim() ? problema : 'Preencha o título antes de anexar.' })` (`validarRascunho` devolve "Informe um título de até 200 caracteres." para título vazio, que não serve como dica de anexo). Em `AnexosSecao.tsx:111`, a dica sem id vira `` `${TEXTO_LIMITES} Preencha o título: o rascunho é salvo ao anexar.` ``.
+- [ ] **Passo 6: S1.** Em `treinamentos.css`, dentro de `@media (max-width: 560px)`:
+
+```css
+  .tr-results > .bt-surface__header { flex-wrap: wrap; }
+  .tr-results .bt-segmented { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .tr-results .bt-segmented button { min-height: 36px; white-space: nowrap; }
+```
+
+  Conferir no DOM (devtools ou o snapshot do relatório) as classes reais do header do `Surface` e do `SegmentedControl` do DS e ajustar os seletores; o objetivo é o filtro quebrar para a linha de baixo do título e rolar na horizontal dentro do card.
+- [ ] **Passo 7: S2.** Em `TreinamentoPainel.tsx`: `const detalheRef = useRef<HTMLDivElement | null>(null)` em volta do `Surface` do detalhe (`<div ref={detalheRef} tabIndex={-1}>`). No clique da pessoa:
+
+```tsx
+onClick={() => {
+  setSelectedId(p.id)
+  if (window.matchMedia('(max-width: 1120px)').matches) requestAnimationFrame(() => { detalheRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); detalheRef.current?.focus({ preventScroll: true }) })
+}}
+```
+
+  (1120 px é o ponto em que `.tr-report` vira uma coluna.)
+- [ ] **Passo 8: S6.** Em `Conteudo.tsx`, aceitar `nivel?: 3 | 4` (padrão 4) e renderizar `const H = nivel === 3 ? 'h3' : 'h4'`. No painel, o conteúdo publicado fica sob o título h2 do `Surface`: passar `nivel={3}`. Conferir no relatório qual uso disparou o axe e ajustar só esse.
+- [ ] **Passo 9:** `vitest run src/pages/treinamentos` → PASSA; `pnpm typecheck`. ux-audit **Rápido** em 375 px confirmando S1, S2 e S3 resolvidos. Commit: `fix(treinamentos): painel no celular, público nomeado e aviso ao anexar sem título`.
+
+### Tarefa 7B: Correções de UX da tela do motorista (repo App Motoristas, PR próprio na Fase 2)
+
+**Arquivos:**
+- Modificar: `src/screens/TreinamentosScreen.tsx`, `src/app/tourChapters.ts:749`
+- Teste: `tests/treinamentos.test.ts` (só o que for puro)
+
+- [ ] **Passo 1: A2 (mensagem amigável).** Em `executar`, o motorista vê sempre o `fallback`; a causa vai só para `reportAppError` (já feito):
+
+```ts
+    } catch (cause) {
+      reportAppError(cause, { source: "treinamentos", action: nome, screen: "Treinamentos", detailId: treinamento.id, notifyUser: false });
+      setErro(fallback);
+    }
+```
+
+  Antes, conferir em `src/lib/treinamentos.ts` se alguma função lança erro de regra para o motorista ler (ex.: quiz incompleto). Se houver, criar `class ErroTreinamento extends Error {}` lá, lançar com ela nesses casos, e aqui usar `cause instanceof ErroTreinamento ? cause.message : fallback`, com teste node do caso.
+
+- [ ] **Passo 2: A1 (erro visível e repetir).** Separar o erro da abertura do erro das ações: `const [erroAbertura, setErroAbertura] = useState("")` e `const [tentativa, setTentativa] = useState(0)`. O `useEffect` da abertura usa `setErroAbertura` e entra `tentativa` nas dependências. Renderizar logo abaixo do `<h2 className="trn-title">`:
+
+```tsx
+        {erroAbertura ? (
+          <p className="termo-alert" data-tone="erro" role="alert">
+            {erroAbertura}{" "}
+            <button type="button" className="termo-link" onClick={() => { setErroAbertura(""); setTentativa((n) => n + 1); }}>Tentar de novo</button>
+          </p>
+        ) : null}
+```
+
+  (Conferir a classe de botão-link já usada no app; `termo-link` é a sugestão se existir.)
+
+- [ ] **Passo 3: A3 + A5 (foco e rolagem por etapa).** `const etapaRef = useRef<HTMLElement | null>(null)` e `const primeiraEtapa = useRef(true)`. Cada `<section className="trn-step">` (leitura, assinatura, quiz e concluído) recebe `ref={etapaRef}` e `tabIndex={-1}`. Efeito:
+
+```ts
+  useEffect(() => {
+    if (primeiraEtapa.current) { primeiraEtapa.current = false; return; }
+    etapaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    etapaRef.current?.focus({ preventScroll: true });
+  }, [etapa]);
+```
+
+  Assim, depois de Confirmar leitura a assinatura entra na tela com o foco, e depois de Assinar vai para o quiz. Não roda na abertura.
+
+- [ ] **Passo 4: A4.** `refazer` também leva ao início do quiz:
+
+```ts
+  const refazer = () => {
+    setRespostas({}); setResultado(null); setErro("");
+    requestAnimationFrame(() => { etapaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); etapaRef.current?.focus({ preventScroll: true }); });
+  };
+```
+
+- [ ] **Passo 5: A6.** `tourChapters.ts:749`: `["Volta para a lista. Leitura, assinatura e quiz já enviados ficam salvos; o que estiver pela metade se perde."]`.
+- [ ] **Passo 6:** `pnpm test` → PASSA; `pnpm typecheck` se existir. ux-audit **Rápido** em 375×812 refazendo o fluxo da Tarefa 2 com `?mockTreinamentoErro=gravar`. Commit no App: `fix(treinamentos): erro visível com repetir, mensagem amigável e foco por etapa`. PR no App; depois do merge, `pnpm push` do App no DEV.
