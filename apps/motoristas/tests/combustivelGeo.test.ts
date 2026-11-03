@@ -59,3 +59,18 @@ test("verdict aprova com 85% abaixo de 300 m", () => {
   const ruim = [...Array(16).fill(120), 450, 900, 2000, 3000];
   assert.deepEqual(verdict(ruim), { ok: false, share: 0.8 });
 });
+
+import { buildCnpjVisionRequest, parseCnpjVisionResponse } from "../scripts/combustivel/geo.ts";
+
+test("buildCnpjVisionRequest força a ferramenta ler_cnpj no Haiku", () => {
+  const body = buildCnpjVisionRequest("QUJD", "image/jpeg") as Record<string, any>;
+  assert.equal(body.model, "claude-haiku-5-5");
+  assert.deepEqual(body.tool_choice, { type: "tool", name: "ler_cnpj" });
+  assert.equal(body.messages[0].content[0].source.data, "QUJD");
+});
+
+test("parseCnpjVisionResponse devolve CNPJ válido do tool_use", () => {
+  assert.equal(parseCnpjVisionResponse({ content: [{ type: "tool_use", name: "ler_cnpj", input: { cnpj: "07.108.241/0001-06" } }] }), "07108241000106");
+  assert.equal(parseCnpjVisionResponse({ content: [{ type: "tool_use", name: "ler_cnpj", input: { cnpj: null } }] }), null);
+  assert.equal(parseCnpjVisionResponse({ content: [] }), null);
+});

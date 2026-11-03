@@ -83,3 +83,29 @@ export function verdict(errorsMeters: number[]): { ok: boolean; share: number } 
   const share = errorsMeters.length ? errorsMeters.filter((m) => m < 300).length / errorsMeters.length : 0;
   return { ok: share >= 0.85, share: Math.round(share * 100) / 100 };
 }
+
+export function buildCnpjVisionRequest(base64: string, mediaType: "image/jpeg" | "image/png") {
+  return {
+    model: "claude-haiku-5-5",
+    max_tokens: 100,
+    tools: [{
+      name: "ler_cnpj",
+      description: "CNPJ do estabelecimento emissor do cupom fiscal de combustível.",
+      input_schema: { type: "object", properties: { cnpj: { type: ["string", "null"] } }, required: ["cnpj"] }
+    }],
+    tool_choice: { type: "tool", name: "ler_cnpj" },
+    messages: [{
+      role: "user",
+      content: [
+        { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
+        { type: "text", text: "Leia o CNPJ do emissor (posto). Se não estiver legível, devolva null. Não invente." }
+      ]
+    }]
+  };
+}
+
+export function parseCnpjVisionResponse(body: unknown): string | null {
+  const content = ((body ?? {}) as { content?: Array<{ type?: string; name?: string; input?: { cnpj?: unknown } }> }).content ?? [];
+  const tool = content.find((c) => c.type === "tool_use" && c.name === "ler_cnpj");
+  return normalizeCnpj(typeof tool?.input?.cnpj === "string" ? tool.input.cnpj : null);
+}
