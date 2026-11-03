@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { ACOES_POR_AGENTE, RESPOSTA_SCHEMA, TIPOS_POR_AGENTE, TODOS_OS_TIPOS, analisarMensagem, montarContextoFrota, obrigatoriosFrota } from './index.ts'
 
 const msg = (corpo: unknown, stop = 'end_turn') => ({ stop_reason: stop, model: 'claude-opus-5-5', content: [{ type: 'thinking', thinking: '' }, { type: 'text', text: JSON.stringify(corpo) }] })
-const proposta = { tipo: 'SemRecibo', titulo: 'OS 1234 sem recibo', justificativa: 'Concluída há 12 dias.', prioridade: 'alta', registroAlvo: { entidade: 'cr40f_reservadeveculos', id: '11111111-1111-1111-1111-111111111111' }, acao: { tipo: 'CriarPendencia', campos: { titulo: 'Emitir recibo da OS 1234' } } }
-const boa = { resumo: 'Uma OS sem recibo.', propostas: [proposta] }
+const proposta = { tipo: 'OSSemCobranca', titulo: 'OS 1234 sem cobrança', justificativa: 'Concluída há 12 dias.', prioridade: 'alta', registroAlvo: { entidade: 'cr40f_reservadeveculos', id: '11111111-1111-1111-1111-111111111111' }, acao: { tipo: 'CriarPendencia', campos: { titulo: 'Emitir recibo da OS 1234' } } }
+const boa = { resumo: 'Uma OS sem cobrança.', propostas: [proposta] }
 
 describe('schema', () => {
   it('exige resumo e propostas, sem campos extras', () => {
@@ -15,7 +15,8 @@ describe('schema', () => {
     const tipos = Object.values(TIPOS_POR_AGENTE).flat()
     // O enum segue a ordem do choice (TODOS_OS_TIPOS), não a ordem por agente.
     expect([...RESPOSTA_SCHEMA.properties.propostas.items.properties.tipo.enum].sort()).toEqual([...tipos].sort())
-    expect(tipos).toHaveLength(22)
+    expect(tipos).toHaveLength(21)
+    expect(tipos).not.toContain('SemRecibo')
     expect([...new Set(Object.values(ACOES_POR_AGENTE).flat())]).toEqual(['CriarPendencia', 'AtribuirMotorista', 'AtribuirVeiculo', 'CriarComunicadoRascunho'])
   })
 })
@@ -33,7 +34,7 @@ describe('analisarMensagem', () => {
     expect(analisarMensagem(msg([1]), 'financeiro')).toEqual({ ok: false, erro: 'Resposta não é um objeto JSON.' })
   })
   it('rejeita tipo de outro agente', () => {
-    expect(analisarMensagem(msg(boa), 'logistica')).toEqual({ ok: false, erro: 'Tipo de proposta fora do agente logistica: SemRecibo.' })
+    expect(analisarMensagem(msg(boa), 'logistica')).toEqual({ ok: false, erro: 'Tipo de proposta fora do agente logistica: OSSemCobranca.' })
   })
   it('rejeita ação fora do agente e aceita acao null', () => {
     const errada = { ...boa, propostas: [{ ...proposta, acao: { tipo: 'AtribuirMotorista', campos: {} } }] }
@@ -68,20 +69,20 @@ describe('regras comuns', () => {
 describe('financeiro', () => {
   const dados = {
     osConcluidas: [{ cr40f_reservadeveculosid: 'R1', cr40f_idnovo: 'OS-10', cr40f_dataehorriodesada: '2026-09-20T13:00:00Z', cr40f_statusdefaturamento: 202410005, cr40f_valor_a_receber: 500, _cr40f_financeiro_value: null, _cr40f_cliente_value: 'C1', '_cr40f_cliente_value@OData.Community.Display.V1.FormattedValue': 'Embraer' }],
-    recibos: [{ cr40f_recibosid: 'X1', _cr40f_reserva_value: 'R1' }],
     ops: [{ cr40f_financeiroid: 'F1', cr40f_idfinanceiro: 'OP-5', cr40f_status: 100000001, cr40f_valor: 900, createdon: '2026-09-01T10:00:00Z', new_clientedaop: 'Embraer' }],
     pagamentosTerceiro: [{ cr40f_pagamentoaterceiroid: 'P1', cr40f_name: 'Lote 3', cr40f_status: 100000002, cr40f_totalrepasse: 300, cr40f_margemtotal: -20, createdon: '2026-10-01T10:00:00Z', '_cr40f_terceirofavorecido_value@OData.Community.Display.V1.FormattedValue': 'Transportes Z' }],
   }
   it('monta o contexto só com os campos permitidos', () => {
     const ctx = montarContextoFinanceiro(dados, '2026-10-14')
     expect(ctx.hoje).toBe('2026-10-14')
-    expect(ctx.osConcluidas[0]).toEqual({ id: 'r1', codigo: 'OS-10', saida: '2026-09-20T13:00:00Z', faturamento: 202410005, valorAReceber: 500, temOP: false, temRecibo: true, cliente: 'Embraer' })
+    expect(ctx.osConcluidas[0]).toEqual({ id: 'r1', codigo: 'OS-10', saida: '2026-09-20T13:00:00Z', faturamento: 202410005, valorAReceber: 500, temOP: false, cliente: 'Embraer' })
     expect(ctx.ops[0]).toEqual({ id: 'f1', codigo: 'OP-5', status: 100000001, valor: 900, criadaEm: '2026-09-01T10:00:00Z', cliente: 'Embraer' })
     expect(ctx.pagamentosTerceiro[0]).toEqual({ id: 'p1', nome: 'Lote 3', status: 100000002, totalRepasse: 300, margem: -20, criadoEm: '2026-10-01T10:00:00Z', favorecido: 'Transportes Z' })
     expect(JSON.stringify(ctx)).not.toMatch(/cpf|telefone|email/i)
   })
-  it('prompt fixa os cinco tipos e a única ação', () => {
-    for (const t of ['SemRecibo', 'OPPendenteAntiga', 'RepasseAguardando', 'MargemNegativa', 'OSSemCobranca', 'CriarPendencia', '15 dias', '7 dias']) expect(SYSTEM_FINANCEIRO).toContain(t)
+  it('prompt fixa os quatro tipos e a única ação, sem recibos', () => {
+    expect(SYSTEM_FINANCEIRO).not.toMatch(/recibo/i)
+    for (const t of ['OPPendenteAntiga', 'RepasseAguardando', 'MargemNegativa', 'OSSemCobranca', 'CriarPendencia', '15 dias', '7 dias']) expect(SYSTEM_FINANCEIRO).toContain(t)
     expect(SYSTEM_FINANCEIRO).toContain(REGRAS_COMUNS)
   })
 })

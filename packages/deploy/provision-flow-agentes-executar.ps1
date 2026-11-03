@@ -18,9 +18,8 @@
 #   powershell -File packages/deploy/provision-flow-agentes-executar.ps1 -SomenteValidar
 # Requer `az login` com acesso ao DEV.
 #
-# Limites das consultas: cada ListRecords dos ramos traz no máximo 150 linhas ($top 150, sem paginação). No Financeiro, os
-# recibos vêm junto de cada OS por $expand de cr40f_cr40f_reservadeveculos_Reserva_cr40f_recibos (só recibos ativos), então
-# temRecibo não depende de uma segunda lista com corte próprio: OS antigas da janela de 60 dias não perdem o recibo.
+# Limites das consultas: cada ListRecords dos ramos traz no máximo 150 linhas ($top 150, sem paginação).
+# O Financeiro não consulta recibos (decisão do Renan, 03/11/2026): cr40f_recibos não existe no PROD.
 param([string] $Restaurar = '', [switch] $SomenteValidar)
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $ErrorActionPreference = 'Stop'
@@ -459,18 +458,14 @@ $sel = [ordered]@{
 }
 $ramoPorAcao = @{ OS_concluidas = 'Financeiro'; OPs_pendentes = 'Financeiro'; Pagamentos_terceiro = 'Financeiro'; Servicos = 'Logistica'; Motoristas = 'Logistica'; Trocas = 'Logistica'; Funcionarios = 'Pessoas'; Documentos = 'Pessoas'; Multas = 'Pessoas'; Comunicados = 'Pessoas'; Treinamentos = 'Pessoas' }
 
-# Recibos ativos de cada OS, pela relação 1:N reserva -> recibo (cr40f_reserva).
-$navRecibos = 'cr40f_cr40f_reservadeveculos_Reserva_cr40f_recibos'
-$expandRecibos = "$navRecibos(`$select=cr40f_recibosid;`$filter=statecode eq 0)"
 $ramoFinanceiro = Ramo (@(Agente 'financeiro' 'fin') + @(
   (Passo 'Janela_60d' (Compor "@addDays(outputs('Inicio_do_dia_utc'), -60)")),
-  (Passo 'OS_concluidas' (Listar 'cr40f_reservadeveculoses' $sel.OS_concluidas "statecode eq 0 and cr40f_status eq 202410008 and cr40f_dataehorriodesada ge @{outputs('Janela_60d')} and cr40f_statusdefaturamento ne 202410011 and cr40f_statusdefaturamento ne 202410003 and cr40f_statusdefaturamento ne 202410004 and cr40f_statusdefaturamento ne 202410000" 'cr40f_dataehorriodesada asc' $expandRecibos)),
+  (Passo 'OS_concluidas' (Listar 'cr40f_reservadeveculoses' $sel.OS_concluidas "statecode eq 0 and cr40f_status eq 202410008 and cr40f_dataehorriodesada ge @{outputs('Janela_60d')} and cr40f_statusdefaturamento ne 202410011 and cr40f_statusdefaturamento ne 202410003 and cr40f_statusdefaturamento ne 202410004 and cr40f_statusdefaturamento ne 202410000" 'cr40f_dataehorriodesada asc')),
   (Passo 'OPs_pendentes' (Listar 'cr40f_financeiros' $sel.OPs_pendentes 'statecode eq 0 and (cr40f_status eq 100000001 or cr40f_status eq 202410006)' 'createdon asc')),
   (Passo 'Pagamentos_terceiro' (Listar 'cr40f_pagamentoaterceiros' $sel.Pagamentos_terceiro 'statecode eq 0 and (cr40f_status eq 100000002 or cr40f_margemtotal lt 0)' 'createdon asc')),
   (Passo 'OS_contexto' (Selecionar "@outputs('OS_concluidas')?['body/value']" ([ordered]@{
     id = Id 'cr40f_reservadeveculosid'; codigo = "@coalesce(item()?['cr40f_idnovo'], item()?['cr40f_id'], '')"; saida = Txt 'cr40f_dataehorriodesada'
-    faturamento = Num 'cr40f_statusdefaturamento'; valorAReceber = Num 'cr40f_valor_a_receber'; temOP = "@not(equals(item()?['_cr40f_financeiro_value'], null))"
-    temRecibo = "@greater(length(coalesce(item()?['$navRecibos'], createArray())), 0)"; cliente = Rot '_cr40f_cliente_value'
+    faturamento = Num 'cr40f_statusdefaturamento'; valorAReceber = Num 'cr40f_valor_a_receber'; temOP = "@not(equals(item()?['_cr40f_financeiro_value'], null))"; cliente = Rot '_cr40f_cliente_value'
   }))),
   (Passo 'OPs_contexto' (Selecionar "@outputs('OPs_pendentes')?['body/value']" ([ordered]@{
     id = Id 'cr40f_financeiroid'; codigo = Txt 'cr40f_idfinanceiro'; status = Num 'cr40f_status'; valor = Num 'cr40f_valor'; criadaEm = Txt 'createdon'; cliente = Txt 'new_clientedaop'
@@ -623,8 +618,7 @@ function Conferir($lido) {
     'Criar_propostas depois de Mapa_prioridade (após todas as travas)' = (@($a.Criar_propostas.runAfter.Mapa_prioridade) -join ',') -eq 'Succeeded' -and (@($a.Mapa_tipos.runAfter.Com_obrigatorio_faltando) -join ',') -eq 'Succeeded' -and (@($a.Alvos_propostos.runAfter.Com_alvo_invalido) -join ',') -eq 'Succeeded'
     'Criar_proposta vincula cr40f_Execucao' = $a.Criar_propostas.actions.Criar_proposta.inputs.parameters.'item/cr40f_Execucao@odata.bind' -ceq "@concat('/cr40f_agenteexecucaos(', triggerOutputs()?['body/cr40f_agenteexecucaoid'], ')')"
     'ListRecords dos ramos com $top 150 e $select exatos' = $selectsOk
-    'OS_concluidas expande os recibos ativos e não há lista Recibos separada' = $cases.Financeiro.actions.OS_concluidas.inputs.parameters.'$expand' -ceq $expandRecibos -and -not ($cases.Financeiro.actions.PSObject.Properties.Name -contains 'Recibos') -and -not ($cases.Financeiro.actions.PSObject.Properties.Name -contains 'Ids_com_recibo')
-    'temRecibo pelo $expand de OS_concluidas' = $cases.Financeiro.actions.OS_contexto.inputs.select.temRecibo -ceq "@greater(length(coalesce(item()?['$navRecibos'], createArray())), 0)"
+    'Financeiro sem recibos (sem $expand nem temRecibo)' = -not ($cases.Financeiro.actions.OS_concluidas.inputs.parameters.PSObject.Properties.Name -contains '$expand') -and -not ($cases.Financeiro.actions.OS_contexto.inputs.select.PSObject.Properties.Name -contains 'temRecibo')
     'nenhum $select com CPF, RG, conta, telefone, e-mail ou endereço' = ($camposSensiveis.Count -eq 0) -and ($todosSelects.Count -eq 0)
     # createArray() sem argumentos derruba a ação no Power Automate (InvalidTemplate); union consigo mesma deduplica.
     'Definir_obrigatorios deduplica sem createArray() vazio' = $cases.Frota.actions.Definir_obrigatorios.inputs.value -ceq "@union(body('Ids_obrigatorios'), body('Ids_obrigatorios'))"
