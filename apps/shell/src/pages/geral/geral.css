@@ -298,12 +298,12 @@
 
 /* Tipo de serviço: cor própria por tipo (o model-driven tinha); texto escuro sobre fundo suave, contraste AA. */
 .gr-tipo, .gr-choice { display: inline-block; max-width: 100%; padding: 2px 10px; border-radius: 999px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); line-height: 18px; }
-.gr-tipo--1 { background: #dbeafe; color: #1e3a8a; }
-.gr-tipo--2 { background: #e5e7eb; color: #1f2937; }
-.gr-tipo--3 { background: #ffedd5; color: #7c2d12; }
-.gr-tipo--4 { background: #ede9fe; color: #4c1d95; }
-.gr-tipo--5 { background: #ccfbf1; color: #134e4a; }
-.gr-tipo--6 { background: #fce7f3; color: #831843; }
+.gr-tipo--1 { background: #bfdbfe; color: #1e3a8a; box-shadow: inset 0 0 0 1px #60a5fa; }
+.gr-tipo--2 { background: #d1d5db; color: #1f2937; box-shadow: inset 0 0 0 1px #9ca3af; }
+.gr-tipo--3 { background: #fed7aa; color: #7c2d12; box-shadow: inset 0 0 0 1px #fb923c; }
+.gr-tipo--4 { background: #ddd6fe; color: #4c1d95; box-shadow: inset 0 0 0 1px #a78bfa; }
+.gr-tipo--5 { background: #99f6e4; color: #134e4a; box-shadow: inset 0 0 0 1px #2dd4bf; }
+.gr-tipo--6 { background: #fbcfe8; color: #831843; box-shadow: inset 0 0 0 1px #f472b6; }
 
-/* Cor real da choice (--gr-choice = hex do Dataverse): fundo 18% e texto escurecido 55%. */
-.gr-choice { background: color-mix(in srgb, var(--gr-choice) 18%, white); color: color-mix(in srgb, var(--gr-choice) 55%, black); }
+/* Cor real da choice (--gr-choice = hex do Dataverse): fundo 35%, contorno 65% e texto escurecido 50% (mais vivo que o fundo suave anterior; contraste do texto segue AA). */
+.gr-choice { background: color-mix(in srgb, var(--gr-choice) 35%, white); color: color-mix(in srgb, var(--gr-choice) 50%, black); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gr-choice) 65%, white); }
