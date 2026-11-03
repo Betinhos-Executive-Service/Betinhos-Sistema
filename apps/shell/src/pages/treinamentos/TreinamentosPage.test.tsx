@@ -2,6 +2,10 @@
 import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TreinamentosPage } from './TreinamentosPage'
+import { textoParaHtml } from './domain/formatoTexto'
+
+/** Escreve no editor visual: o texto vira o HTML do editor e dispara `input`. */
+const escrever = (el: HTMLElement, texto: string) => { el.innerHTML = textoParaHtml(texto); fireEvent.input(el) }
 
 // O mock simula latência; com a suíte inteira em paralelo a máquina fica lenta.
 configure({ asyncUtilTimeout: 8000 })
@@ -109,7 +113,7 @@ describe('Treinamentos', () => {
     await screen.findByRole('row', { name: /Embarque no GRU/ })
     fireEvent.click(screen.getByRole('button', { name: 'Novo treinamento' }))
     fireEvent.change(await screen.findByLabelText(/^Título/), { target: { value: 'Uniforme e apresentação' } })
-    fireEvent.change(screen.getByLabelText(/^Texto/), { target: { value: '# Regras\n- Camisa **branca**\n- Terno escuro' } })
+    escrever(screen.getByLabelText(/^Texto/), '# Regras\n- Camisa **branca**\n- Terno escuro')
     fireEvent.change(screen.getByLabelText(/Vídeo/), { target: { value: 'youtube.com/x' } })
     fireEvent.click(screen.getByRole('button', { name: 'Publicar treinamento' }))
     expect((await screen.findByRole('alert')).textContent).toContain('O vídeo precisa de um link https:// válido.')
@@ -143,7 +147,7 @@ describe('Treinamentos', () => {
     await screen.findByRole('row', { name: /Embarque no GRU/ })
     fireEvent.click(screen.getByRole('button', { name: 'Novo treinamento' }))
     fireEvent.change(await screen.findByLabelText(/^Título/), { target: { value: 'Teste' } })
-    fireEvent.change(screen.getByLabelText(/^Texto/), { target: { value: 'Conteúdo' } })
+    escrever(screen.getByLabelText(/^Texto/), 'Conteúdo')
     fireEvent.click(screen.getByRole('radio', { name: 'Selecionar' }))
     fireEvent.click(screen.getByRole('button', { name: 'Publicar treinamento' }))
     expect((await screen.findByRole('alert')).textContent).toContain('Selecione pelo menos um funcionário.')
@@ -157,7 +161,7 @@ describe('Treinamentos', () => {
     expect(await screen.findByRole('heading', { name: 'Editar treinamento publicado' })).toBeTruthy()
     expect((screen.getByLabelText('Exige quiz') as HTMLInputElement).disabled).toBe(true)
     expect(screen.queryByRole('button', { name: 'Publicar treinamento' })).toBeNull()
-    fireEvent.change(screen.getByLabelText('Texto'), { target: { value: 'Encontro na porta 5.' } })
+    escrever(screen.getByLabelText('Texto'), 'Encontro na porta 5.')
     fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
     expect(await screen.findByText('Alterações salvas. As participações continuam como estavam.')).toBeTruthy()
     expect(await screen.findByText('Encontro na porta 5.')).toBeTruthy()
@@ -192,7 +196,7 @@ describe('Treinamentos', () => {
     fireEvent.change(input, { target: { files: [video] } })
     expect((await screen.findByRole('alert')).textContent).toMatch(/título/i)
     fireEvent.change(screen.getByLabelText(/^Título/), { target: { value: 'Manobras' } })
-    fireEvent.change(screen.getByLabelText(/^Texto/), { target: { value: 'Conteúdo' } })
+    escrever(screen.getByLabelText(/^Texto/), 'Conteúdo')
     fireEvent.change(input, { target: { files: [video] } })
     expect(await screen.findByText('manobra.mp4')).toBeTruthy()
     expect(screen.getByText(/Vídeo ·/)).toBeTruthy()

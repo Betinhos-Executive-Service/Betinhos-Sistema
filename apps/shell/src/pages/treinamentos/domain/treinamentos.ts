@@ -351,7 +351,7 @@ export function blocosDoConteudo(conteudo: string): Bloco[] {
   const fecharParagrafo = () => { if (paragrafo.length) { blocos.push({ tipo: 'p', texto: paragrafo.join('\n') }); paragrafo = [] } }
   for (const linha of conteudo.replace(/\r\n/g, '\n').split('\n')) {
     const item = /^\s*[-*•]\s+(.*)$/.exec(linha)
-    const titulo = /^\s*#{1,3}\s+(.*)$/.exec(linha)
+    const titulo = /^\s*#{1,3}\s*(\S.*)$/.exec(linha)
     if (item) {
       fecharParagrafo()
       const anterior = blocos[blocos.length - 1]

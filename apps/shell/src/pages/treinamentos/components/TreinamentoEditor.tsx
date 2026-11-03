@@ -1,15 +1,16 @@
 import { useMemo, useState } from 'react'
-import { Button, Checkbox, Dialog, Field, Input, PageHeader, SearchBox, SegmentedControl, StatusBadge, Surface, Switch, Textarea, useToast } from '@betinhos/ui'
+import { Button, Checkbox, Dialog, Field, Input, PageHeader, SearchBox, SegmentedControl, StatusBadge, Surface, Switch, useToast } from '@betinhos/ui'
 import { AlertTriangle, Save, Send, Trash2, Users } from 'lucide-react'
 import { useEscVoltar } from '../../../app/useEscVoltar'
 import { FUNCAO } from '../../funcionarios/data/schema'
 import type { Source } from '../data/source'
 import {
-  CONTEUDO_MAX, DESCRICAO_MAX, PUBLICO, TITULO_MAX, VIDEO_MAX, erroTexto, isPublicado, plural, publicoLabel, resolverPublico, validarComConteudo, validarPublicacao, validarRascunho,
+  CONTEUDO_MAX, PUBLICO, TITULO_MAX, VIDEO_MAX, erroTexto, isPublicado, plural, publicoLabel, resolverPublico, validarComConteudo, validarPublicacao, validarRascunho,
   type Anexo, type Funcionario, type PublicoTipo, type Treinamento,
 } from '../domain/treinamentos'
 import { AnexosSecao } from './AnexosSecao'
 import { Conteudo } from './Conteudo'
+import { EditorTexto } from './EditorTexto'
 import { NavTopo } from './NavTopo'
 import { QuizEditor } from './QuizEditor'
 
@@ -182,12 +183,7 @@ export function TreinamentoEditor({ initial, funcionarios, source, onBack, onSav
               <Field label="Título" required hint={`${draft.titulo.length}/${TITULO_MAX}`}>
                 <Input name="titulo" value={draft.titulo} maxLength={TITULO_MAX} disabled={lock} placeholder="Ex.: Embarque no GRU: novo procedimento" onChange={(e) => set({ titulo: e.target.value })} />
               </Field>
-              <Field label="Descrição curta" hint={`Aparece na lista do app. ${draft.descricao.length}/${DESCRICAO_MAX}`}>
-                <Input name="descricao" value={draft.descricao} maxLength={DESCRICAO_MAX} disabled={lock} onChange={(e) => set({ descricao: e.target.value })} />
-              </Field>
-              <Field label="Texto" hint={`Use # para títulos, - para listas e **negrito**. ${draft.conteudo.length.toLocaleString('pt-BR')}/${CONTEUDO_MAX.toLocaleString('pt-BR')}`}>
-                <Textarea name="conteudo" value={draft.conteudo} maxLength={CONTEUDO_MAX} rows={10} disabled={lock} placeholder="Escreva o conteúdo do treinamento." onChange={(e) => set({ conteudo: e.target.value })} />
-              </Field>
+              <EditorTexto value={draft.conteudo} max={CONTEUDO_MAX} disabled={lock} onChange={(conteudo) => set({ conteudo })} />
               <Field label="Vídeo (link)" hint="YouTube, Vimeo ou Stream; o motorista abre no app.">
                 <Input name="videoUrl" type="url" inputMode="url" value={draft.videoUrl} maxLength={VIDEO_MAX} disabled={lock} placeholder="https://" onChange={(e) => set({ videoUrl: e.target.value })} />
               </Field>
@@ -254,7 +250,6 @@ export function TreinamentoEditor({ initial, funcionarios, source, onBack, onSav
           <Surface eyebrow="Prévia" title="Como o motorista lê" className="tr-preview">
             <article className="tr-device">
               <h3 className={draft.titulo.trim() ? undefined : 'is-empty'}>{draft.titulo || 'Título do treinamento'}</h3>
-              {draft.descricao ? <p className="tr-device__desc">{draft.descricao}</p> : null}
               {draft.videoUrl ? <div className="tr-device__video">▶ Vídeo</div> : null}
               {draft.conteudo.trim() ? <Conteudo texto={draft.conteudo} className="tr-conteudo" /> : <p className="is-empty">O texto aparece aqui.</p>}
               {draft.anexos.length ? <small>{draft.anexos.length} {plural(draft.anexos.length, 'anexo', 'anexos')}</small> : null}
