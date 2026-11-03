@@ -5,7 +5,7 @@ import { useEscVoltar } from '../../../app/useEscVoltar'
 import { FUNCAO } from '../../funcionarios/data/schema'
 import type { Source } from '../data/source'
 import {
-  CONTEUDO_MAX, DESCRICAO_MAX, PUBLICO, TITULO_MAX, VIDEO_MAX, erroTexto, plural, publicoLabel, resolverPublico, validarPublicacao, validarRascunho,
+  CONTEUDO_MAX, DESCRICAO_MAX, PUBLICO, TITULO_MAX, VIDEO_MAX, erroTexto, isPublicado, plural, publicoLabel, resolverPublico, validarComConteudo, validarPublicacao, validarRascunho,
   type Anexo, type Funcionario, type PublicoTipo, type Treinamento,
 } from '../domain/treinamentos'
 import { AnexosSecao } from './AnexosSecao'
@@ -70,6 +70,21 @@ export function TreinamentoEditor({ initial, funcionarios, source, onBack, onSav
     }
   }
 
+  const salvarPublicado = async () => {
+    const problema = validarComConteudo(draft)
+    if (problema) { setErro(problema); return }
+    setBusy('save')
+    try {
+      await source.salvarPublicado(draft)
+      toast({ tone: 'success', message: 'Alterações salvas. As participações continuam como estavam.' })
+      await onSaved(draft.id)
+    } catch (error) {
+      toast({ tone: 'danger', message: erroTexto(error, 'Não foi possível salvar as alterações.') })
+    } finally {
+      setBusy(null)
+    }
+  }
+
   const pedirPublicacao = () => {
     const problema = validarPublicacao(draft, funcionarios)
     if (problema) { setErro(problema); return }
@@ -115,7 +130,7 @@ export function TreinamentoEditor({ initial, funcionarios, source, onBack, onSav
   const anexosAlterados = async (anexos: Anexo[], id: string) => {
     set({ id, anexos })
     try {
-      await source.salvarAnexos(id, anexos)
+      await source.salvarAnexos(id, anexos, isPublicado(initial))
       onAnexos(id, anexos)
     } catch (error) {
       toast({ tone: 'danger', message: erroTexto(error, 'O arquivo foi enviado, mas a lista de anexos não foi gravada. Salve o rascunho.') })
@@ -125,7 +140,11 @@ export function TreinamentoEditor({ initial, funcionarios, source, onBack, onSav
   // Anexar antes do primeiro salvamento: salva o rascunho (campos travados até terminar) e segue com o envio.
   const garantirId = async () => {
     const problema = validarRascunho(draft)
-    if (problema) { setErro(problema); return null }
+    if (problema) {
+      setErro(problema)
+      toast({ tone: 'warning', message: draft.titulo.trim() ? problema : 'Preencha o título antes de anexar.' })
+      return null
+    }
     setBusy('save')
     try {
       return await source.salvar(draft)
@@ -138,18 +157,21 @@ export function TreinamentoEditor({ initial, funcionarios, source, onBack, onSav
   const aposCriar = async (id: string) => { setBusy(null); await onSaved(id) }
 
   const lock = busy !== null
+  const publicado = isPublicado(initial)
+  // Publicado: quiz, assinatura e público ficam como foram publicados.
+  const travado = lock || publicado
   const resumoPublico = draft.publicoTipo === PUBLICO.motoristas ? 'Todos os motoristas ativos recebem o treinamento.'
     : !draft.publico.length ? (draft.publicoTipo === PUBLICO.funcao ? 'Marque pelo menos uma função.' : 'Marque pelo menos um funcionário.')
-      : `${publicoLabel(draft)}: só funcionários ativos.`
+      : `${publicoLabel(draft, funcionarios)}: só funcionários ativos.`
 
   return (
     <>
       <PageHeader
         className="page__header"
-        breadcrumb={<Breadcrumb items={[{ label: 'Treinamentos', href: '#/treinamentos' }, { label: draft.id ? 'Editar rascunho' : 'Novo' }]} />}
-        title={draft.id ? 'Editar treinamento' : 'Novo treinamento'}
-        meta={<StatusBadge tone="neutral">Rascunho</StatusBadge>}
-        description="Monte o conteúdo, escolha quem recebe e defina se exige assinatura e quiz. Publicado, o conteúdo não muda mais."
+        breadcrumb={<Breadcrumb items={[{ label: 'Treinamentos', href: '#/treinamentos' }, { label: publicado ? 'Editar publicado' : draft.id ? 'Editar rascunho' : 'Novo' }]} />}
+        title={publicado ? 'Editar treinamento publicado' : draft.id ? 'Editar treinamento' : 'Novo treinamento'}
+        meta={<StatusBadge tone={publicado ? 'success' : 'neutral'}>{publicado ? 'Publicado' : 'Rascunho'}</StatusBadge>}
+        description={publicado ? 'Corrija texto, vídeo, anexos ou validade. Quiz, assinatura e público ficam como foram publicados, e quem já concluiu continua concluído.' : 'Monte o conteúdo, escolha quem recebe e defina se exige assinatura e quiz. Publicado, quiz, assinatura e público não mudam mais.'}
         actions={<Button variant="secondary" icon={<ArrowLeft size={16} />} disabled={lock} onClick={voltar}>Voltar</Button>}
       />
 
@@ -178,15 +200,15 @@ export function TreinamentoEditor({ initial, funcionarios, source, onBack, onSav
 
           <Surface eyebrow="Confirmação" title="O que o motorista precisa fazer">
             <div className="tr-form__body">
-              <Switch label="Exige assinatura" checked={draft.exigeAssinatura} disabled={lock} onChange={(e) => set({ exigeAssinatura: e.target.checked })} />
+              <Switch label="Exige assinatura" checked={draft.exigeAssinatura} disabled={travado} onChange={(e) => set({ exigeAssinatura: e.target.checked })} />
               <p className="tr-hint">{draft.exigeAssinatura ? 'O motorista assina no app, como no termo de multa, para registrar que leu.' : 'O motorista só confirma a leitura no app.'}</p>
-              <Switch label="Exige quiz" checked={draft.exigeQuiz} disabled={lock} onChange={(e) => set({ exigeQuiz: e.target.checked })} />
+              <Switch label="Exige quiz" checked={draft.exigeQuiz} disabled={travado} onChange={(e) => set({ exigeQuiz: e.target.checked })} />
               {draft.exigeQuiz ? (
                 <>
                   <Field label="Nota mínima para aprovar (%)" required className="tr-nota">
-                    <Input name="notaMinima" type="number" inputMode="numeric" min={0} max={100} value={String(draft.notaMinima)} disabled={lock} onChange={(e) => set({ notaMinima: Number(e.target.value) })} />
+                    <Input name="notaMinima" type="number" inputMode="numeric" min={0} max={100} value={String(draft.notaMinima)} disabled={travado} onChange={(e) => set({ notaMinima: Number(e.target.value) })} />
                   </Field>
-                  <QuizEditor perguntas={draft.perguntas} disabled={lock} onChange={(perguntas) => set({ perguntas })} />
+                  <QuizEditor perguntas={draft.perguntas} disabled={travado} onChange={(perguntas) => set({ perguntas })} />
                 </>
               ) : null}
             </div>
@@ -197,22 +219,22 @@ export function TreinamentoEditor({ initial, funcionarios, source, onBack, onSav
           <Surface eyebrow="Público-alvo" title="Quem recebe">
             <div className="tr-form__body">
               <SegmentedControl<string> aria-label="Público-alvo" fullWidth value={String(draft.publicoTipo)} onChange={(v) => trocarPublico(Number(v) as PublicoTipo)}
-                options={[{ value: String(PUBLICO.motoristas), label: 'Motoristas', disabled: lock }, { value: String(PUBLICO.funcao), label: 'Por função', disabled: lock }, { value: String(PUBLICO.selecionados), label: 'Selecionar', disabled: lock }]} />
+                options={[{ value: String(PUBLICO.motoristas), label: 'Motoristas', disabled: travado }, { value: String(PUBLICO.funcao), label: 'Por função', disabled: travado }, { value: String(PUBLICO.selecionados), label: 'Selecionar', disabled: travado }]} />
               {draft.publicoTipo === PUBLICO.funcao ? (
                 <div className="tr-targets">
-                  {FUNCAO.map((f) => <Checkbox key={f.value} label={f.label} checked={draft.publico.includes(String(f.value))} disabled={lock} onChange={(e) => togglePublico(String(f.value), e.target.checked)} />)}
+                  {FUNCAO.map((f) => <Checkbox key={f.value} label={f.label} checked={draft.publico.includes(String(f.value))} disabled={travado} onChange={(e) => togglePublico(String(f.value), e.target.checked)} />)}
                 </div>
               ) : null}
               {selecionados ? (
                 <div className="tr-targets">
-                  <SearchBox value={busca} onChange={setBusca} placeholder="Buscar funcionário" aria-label="Buscar funcionário" />
+                  <SearchBox value={busca} onChange={setBusca} disabled={travado} placeholder="Buscar funcionário" aria-label="Buscar funcionário" />
                   <ul className="tr-targets__list">
-                    {filtrados.map((f) => <li key={f.id}><Checkbox label={f.nome} description={FUNCAO.find((o) => o.value === f.funcao)?.label ?? 'Sem função'} checked={draft.publico.includes(f.id)} disabled={lock} onChange={(e) => togglePublico(f.id, e.target.checked)} /></li>)}
+                    {filtrados.map((f) => <li key={f.id}><Checkbox label={f.nome} description={FUNCAO.find((o) => o.value === f.funcao)?.label ?? 'Sem função'} checked={draft.publico.includes(f.id)} disabled={travado} onChange={(e) => togglePublico(f.id, e.target.checked)} /></li>)}
                     {!filtrados.length ? <li className="tr-targets__empty">{ativos.length ? 'Nenhum funcionário encontrado para esta busca.' : 'Nenhum funcionário ativo carregado.'}</li> : null}
                   </ul>
                   <div className="tr-targets__foot">
                     <span>{draft.publico.length} de {ativos.length} {plural(ativos.length, 'selecionado', 'selecionados')}</span>
-                    <Button variant="ghost" size="compact" disabled={lock || !ativos.length} onClick={() => set({ publico: todosMarcados ? [] : ativos.map((f) => f.id) })}>{todosMarcados ? 'Limpar seleção' : 'Selecionar todos'}</Button>
+                    <Button variant="ghost" size="compact" disabled={travado || !ativos.length} onClick={() => set({ publico: todosMarcados ? [] : ativos.map((f) => f.id) })}>{todosMarcados ? 'Limpar seleção' : 'Selecionar todos'}</Button>
                   </div>
                 </div>
               ) : null}
@@ -244,14 +266,16 @@ export function TreinamentoEditor({ initial, funcionarios, source, onBack, onSav
 
       {erro ? <p className="tr-error" role="alert"><AlertTriangle size={16} aria-hidden="true" />{erro}</p> : null}
       <div className="tr-form__actions">
-        {draft.id ? <Button variant="danger" className="tr-form__start" icon={<Trash2 size={16} />} disabled={lock} loading={busy === 'delete'} onClick={() => setConfirm('delete')}>Excluir rascunho</Button> : null}
-        <Button variant="secondary" icon={<Save size={16} />} disabled={lock} loading={busy === 'save'} onClick={() => void salvar()}>Salvar rascunho</Button>
-        <Button icon={<Send size={16} />} disabled={lock} loading={busy === 'publish'} onClick={pedirPublicacao}>Publicar treinamento</Button>
+        {publicado ? <Button icon={<Save size={16} />} disabled={lock} loading={busy === 'save'} onClick={() => void salvarPublicado()}>Salvar alterações</Button> : <>
+          {draft.id ? <Button variant="danger" className="tr-form__start" icon={<Trash2 size={16} />} disabled={lock} loading={busy === 'delete'} onClick={() => setConfirm('delete')}>Excluir rascunho</Button> : null}
+          <Button variant="secondary" icon={<Save size={16} />} disabled={lock} loading={busy === 'save'} onClick={() => void salvar()}>Salvar rascunho</Button>
+          <Button icon={<Send size={16} />} disabled={lock} loading={busy === 'publish'} onClick={pedirPublicacao}>Publicar treinamento</Button>
+        </>}
       </div>
 
       <Dialog open={confirm === 'publish'} title={`Publicar para ${alvos.length} ${plural(alvos.length, 'funcionário', 'funcionários')}?`} onClose={() => setConfirm(null)}
         actions={<><Button variant="secondary" onClick={() => setConfirm(null)}>Voltar</Button><Button icon={<Send size={16} />} onClick={() => void publicar()}>Publicar agora</Button></>}>
-        O conteúdo não poderá ser alterado depois. Cada funcionário passa a ver o treinamento no App Motoristas e o painel acompanha quem leu, assinou e respondeu o quiz.
+        Depois de publicado, dá para corrigir texto, vídeo, anexos e validade; quiz, assinatura e público ficam travados. Cada funcionário passa a ver o treinamento no App Motoristas e o painel acompanha quem leu, assinou e respondeu o quiz.
       </Dialog>
       <Dialog open={confirm === 'delete'} tone="danger" title="Excluir este rascunho?" onClose={() => setConfirm(null)}
         actions={<><Button variant="secondary" onClick={() => setConfirm(null)}>Voltar</Button><Button variant="danger" icon={<Trash2 size={16} />} onClick={() => void excluir()}>Excluir rascunho</Button></>}>

@@ -245,6 +245,7 @@ Ensure-AttributeOn $trein (Memo "cr40f_QuizJson" "Quiz (JSON)" "{perguntas: [{id
 Ensure-AttributeOn $trein (DateOnly "cr40f_Validade" "Validade" "Prazo para concluir; depois dele quem não concluiu vira pendência do Assistente de Pessoas")
 Ensure-AttributeOn $trein (Picklist "cr40f_Estado" "Situação" "Rascunho editável ou publicado (imutável)" @("Rascunho", "Publicado") "ApplicationRequired" $estadoRascunho)
 Ensure-AttributeOn $trein (DateTimeUtc "cr40f_PublicadoEm" "Publicado em" "Quando o RH publicou")
+Ensure-AttributeOn $trein (DateTimeUtc "cr40f_EditadoEm" "Editado em" "Ultima edicao de conteudo ou validade depois de publicado; as participacoes nao mudam")
 
 if ($partId) {
   Ensure-AttributeOn $part (DateTimeUtc "cr40f_AbertoEm" "Aberto em" "Primeira abertura no App Motoristas")
@@ -267,7 +268,7 @@ else { Write-Step "DRY RUN criaria em $part as colunas de participação e os lo
 if ($Apply) {
   Invoke-Dataverse "POST" "PublishXml" @{ ParameterXml = "<importexportxml><entities><entity>$trein</entity><entity>$part</entity></entities></importexportxml>" } | Out-Null
   $esperado = @{
-    $trein = @("cr40f_name", "cr40f_descricao", "cr40f_conteudo", "cr40f_videourl", "cr40f_anexosjson", "cr40f_publicotipo", "cr40f_publicojson", "cr40f_exigeassinatura", "cr40f_exigequiz", "cr40f_notaminima", "cr40f_quizjson", "cr40f_validade", "cr40f_estado", "cr40f_publicadoem")
+    $trein = @("cr40f_name", "cr40f_descricao", "cr40f_conteudo", "cr40f_videourl", "cr40f_anexosjson", "cr40f_publicotipo", "cr40f_publicojson", "cr40f_exigeassinatura", "cr40f_exigequiz", "cr40f_notaminima", "cr40f_quizjson", "cr40f_validade", "cr40f_estado", "cr40f_publicadoem", "cr40f_editadoem")
     $part = @("cr40f_name", "cr40f_abertoem", "cr40f_confirmadoem", "cr40f_assinadoem", "cr40f_nomeassinante", "cr40f_assinaturajson", "cr40f_nota", "cr40f_aprovado", "cr40f_tentativas", "cr40f_respostasjson", "cr40f_concluidoem", "cr40f_treinamento", "cr40f_funcionario")
   }
   $missing = @(); foreach ($e in $esperado.Keys) { $missing += @($esperado[$e] | Where-Object { -not (Get-AttributeId $e $_) } | ForEach-Object { "$e.$_" }) }

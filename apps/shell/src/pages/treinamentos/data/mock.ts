@@ -1,4 +1,4 @@
-import { ESTADO, PUBLICO, isOrfa, isPublicado, validarRascunho, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
+import { ESTADO, PUBLICO, isOrfa, isPublicado, validarComConteudo, validarRascunho, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
 import type { Linha } from '../domain/lista'
 import type { Source } from './source'
 
@@ -37,16 +37,16 @@ export function createMockSource(): Source {
       id: id(10), titulo: 'Embarque no GRU: novo procedimento', descricao: 'Ponto de encontro, antecedência e contato com a operação.',
       conteudo: '# Ponto de encontro\nA partir de segunda o encontro é na **porta 4** do Terminal 3.\n\n- Chegue com 30 minutos de antecedência\n- Placa com o nome do passageiro sempre visível\n- Voo atrasado: avise a operação e aguarde',
       videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', anexos: [{ nome: 'mapa-terminal-3.pdf', caminho: 'Treinamentos/DEV/mock/mapa-terminal-3.pdf', tamanho: 348_212, mime: 'application/pdf' }, { nome: 'porta-4.jpg', caminho: 'Treinamentos/DEV/mock/porta-4.jpg', tamanho: 88_120, mime: 'image/jpeg' }],
-      publicoTipo: PUBLICO.motoristas, publico: [], exigeAssinatura: true, exigeQuiz: true, notaMinima: 70, perguntas: QUIZ, validade: dia(15), estado: ESTADO.publicado, publicadoEm: hoje, criadoEm: hoje,
+      publicoTipo: PUBLICO.motoristas, publico: [], exigeAssinatura: true, exigeQuiz: true, notaMinima: 70, perguntas: QUIZ, validade: dia(15), estado: ESTADO.publicado, publicadoEm: hoje, editadoEm: null, criadoEm: hoje,
     },
     {
       id: id(11), titulo: 'Direção defensiva: revisão anual', descricao: 'Vídeo obrigatório com confirmação de leitura.',
       conteudo: 'Assista ao vídeo até o fim e confirme a leitura.', videoUrl: 'https://vimeo.com/123456', anexos: [],
-      publicoTipo: PUBLICO.selecionados, publico: [id(1), id(2), id(5)], exigeAssinatura: false, exigeQuiz: false, notaMinima: 70, perguntas: [], validade: dia(-3), estado: ESTADO.publicado, publicadoEm: ontem, criadoEm: ontem,
+      publicoTipo: PUBLICO.selecionados, publico: [id(1), id(2), id(5)], exigeAssinatura: false, exigeQuiz: false, notaMinima: 70, perguntas: [], validade: dia(-3), estado: ESTADO.publicado, publicadoEm: ontem, editadoEm: null, criadoEm: ontem,
     },
     {
       id: id(12), titulo: 'Atendimento a passageiros com mobilidade reduzida', descricao: '', conteudo: 'Rascunho em preparo.', videoUrl: '', anexos: [],
-      publicoTipo: PUBLICO.funcao, publico: [], exigeAssinatura: true, exigeQuiz: false, notaMinima: 70, perguntas: [], validade: '', estado: ESTADO.rascunho, publicadoEm: null, criadoEm: ontem,
+      publicoTipo: PUBLICO.funcao, publico: [], exigeAssinatura: true, exigeQuiz: false, notaMinima: 70, perguntas: [], validade: '', estado: ESTADO.rascunho, publicadoEm: null, editadoEm: null, criadoEm: ontem,
     },
   ]
   const participacoes: Participacao[] = [
@@ -75,17 +75,26 @@ export function createMockSource(): Source {
       else treinamentos.unshift(item)
       return item.id
     },
+    async salvarPublicado(item) {
+      await wait(150)
+      const error = validarComConteudo(item)
+      if (error) throw new Error(error)
+      const atual = treinamentos.find((row) => row.id === item.id)
+      if (!atual || !isPublicado(atual)) throw new Error('Este treinamento não está publicado. Atualize a lista.')
+      Object.assign(atual, { titulo: item.titulo.trim(), descricao: item.descricao.trim(), conteudo: item.conteudo.trim(), videoUrl: item.videoUrl.trim(), anexos: clone(item.anexos), validade: item.validade, editadoEm: new Date().toISOString() })
+    },
     async excluir(treinamentoId) {
       await wait(300)
       const index = treinamentos.findIndex((item) => item.id === treinamentoId && !isPublicado(item))
       if (index < 0) throw new Error('Somente rascunhos podem ser excluídos.')
       treinamentos.splice(index, 1)
     },
-    async salvarAnexos(treinamentoId, anexos) {
+    async salvarAnexos(treinamentoId, anexos, publicado = false) {
       await wait(200)
       const item = treinamentos.find((row) => row.id === treinamentoId)
       if (!item) throw new Error('Treinamento não encontrado.')
       item.anexos = clone(anexos)
+      if (publicado) item.editadoEm = new Date().toISOString()
     },
     async publicar(treinamento, alvos) {
       await wait(400)

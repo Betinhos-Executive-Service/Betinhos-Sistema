@@ -1,5 +1,6 @@
 import { cleanId, type Row } from '@betinhos/dataverse'
 import { plural } from '../../comunicados/domain/comunicados'
+import { FUNCAO } from '../../funcionarios/data/schema'
 
 export { formatDate, plural } from '../../comunicados/domain/comunicados'
 /** `AAAA-MM-DD` → `dd/mm/aaaa` sem passar por Date. */
@@ -39,6 +40,8 @@ export type Treinamento = {
   validade: string
   estado: number
   publicadoEm: string | null
+  /** Última edição de conteúdo ou validade depois de publicado. */
+  editadoEm: string | null
 }
 
 export type Participacao = {
@@ -59,7 +62,7 @@ export type Participacao = {
 export type Funcionario = { id: string; nome: string; apelido: string; funcao: number | null; ativo: boolean }
 
 export const TITULO_MAX = 200
-export const DESCRICAO_MAX = 1000
+export const DESCRICAO_MAX = 300
 export const CONTEUDO_MAX = 20000
 export const VIDEO_MAX = 500
 export const ANEXO_MAX_BYTES = 25 * 1024 * 1024
@@ -76,7 +79,7 @@ export const novaPergunta = (): Pergunta => ({ id: novoId(), texto: '', alternat
 
 export const emptyDraft = (): Treinamento => ({
   id: '', titulo: '', descricao: '', conteudo: '', videoUrl: '', anexos: [], publicoTipo: PUBLICO.motoristas, publico: [],
-  exigeAssinatura: false, exigeQuiz: false, notaMinima: NOTA_PADRAO, perguntas: [], validade: '', estado: ESTADO.rascunho, publicadoEm: null,
+  exigeAssinatura: false, exigeQuiz: false, notaMinima: NOTA_PADRAO, perguntas: [], validade: '', estado: ESTADO.rascunho, publicadoEm: null, editadoEm: null,
 })
 
 export const isPublicado = (item: Treinamento) => item.estado === ESTADO.publicado
@@ -126,11 +129,18 @@ export function validarRascunho(draft: Treinamento) {
   return ''
 }
 
-/** O que falta para publicar, além do rascunho válido. */
-export function validarPublicacao(draft: Treinamento, funcionarios: Funcionario[]) {
+/** Rascunho válido com conteúdo: vale para publicar e para editar o já publicado. */
+export function validarComConteudo(draft: Treinamento) {
   const base = validarRascunho(draft)
   if (base) return base
-  if (!draft.conteudo.trim() && !draft.videoUrl.trim() && !draft.anexos.length) return 'Inclua um texto, um vídeo ou um anexo antes de publicar.'
+  if (!draft.conteudo.trim() && !draft.videoUrl.trim() && !draft.anexos.length) return 'Inclua um texto, um vídeo ou um anexo.'
+  return ''
+}
+
+/** O que falta para publicar, além do rascunho válido. */
+export function validarPublicacao(draft: Treinamento, funcionarios: Funcionario[]) {
+  const base = validarComConteudo(draft)
+  if (base) return base
   if (draft.publicoTipo !== PUBLICO.motoristas && !draft.publico.length) return draft.publicoTipo === PUBLICO.funcao ? 'Escolha pelo menos uma função.' : 'Selecione pelo menos um funcionário.'
   if (!resolverPublico(draft, funcionarios).length) return 'Nenhum funcionário ativo no público-alvo. O treinamento não foi publicado.'
   return ''
@@ -156,6 +166,36 @@ export function draftPayload(draft: Treinamento): Row {
     cr40f_estado: ESTADO.rascunho,
   }
 }
+
+/** Edição depois de publicado: conteúdo, anexos e validade. Quiz, assinatura e público ficam como foram publicados. */
+export function edicaoPublicadoPayload(item: Treinamento, agora = new Date().toISOString()): Row {
+  return {
+    cr40f_name: item.titulo.trim(),
+    cr40f_descricao: item.descricao.trim(),
+    cr40f_conteudo: item.conteudo.trim(),
+    cr40f_videourl: item.videoUrl.trim(),
+    cr40f_anexosjson: JSON.stringify(item.anexos),
+    cr40f_validade: item.validade || null,
+    cr40f_editadoem: agora,
+  }
+}
+
+const SUFIXO_RECICLAGEM = /\s*\(reciclagem \d{2}\/\d{2}\/\d{4}\)\s*$/
+
+/** Reaplicar: rascunho novo com o mesmo conteúdo, quiz e público; o RH revisa a validade e publica. */
+export function copiaParaReciclagem(item: Treinamento, hoje: string): Treinamento {
+  const [a, m, d] = hoje.split('-')
+  const sufixo = ` (reciclagem ${d}/${m}/${a})`
+  const base = item.titulo.replace(SUFIXO_RECICLAGEM, '').trim().slice(0, TITULO_MAX - sufixo.length)
+  return {
+    ...item, id: '', titulo: `${base}${sufixo}`, validade: '', estado: ESTADO.rascunho, publicadoEm: null, editadoEm: null,
+    anexos: [...item.anexos], perguntas: item.perguntas.map((p) => ({ ...p, alternativas: p.alternativas.map((x) => ({ ...x })) })),
+  }
+}
+
+/** Arquivo gravado na pasta deste treinamento. A cópia de reciclagem aponta para a pasta do original, que não pode ser apagada por ela. */
+export const anexoDaPasta = (anexo: Anexo, treinamentoId: string) =>
+  anexo.caminho.toLowerCase().includes(`/${cleanId(treinamentoId).toLowerCase()}/`)
 
 function parseJson<T>(value: unknown, fallback: T): T {
   try { return JSON.parse(String(value || '')) as T } catch { return fallback }
@@ -198,6 +238,7 @@ export function mapTreinamento(row: Row): Treinamento {
     validade: String(row.cr40f_validade ?? '').slice(0, 10),
     estado: Number(row.cr40f_estado ?? ESTADO.rascunho),
     publicadoEm: dateOrNull(row.cr40f_publicadoem),
+    editadoEm: dateOrNull(row.cr40f_editadoem),
   }
 }
 
@@ -241,10 +282,21 @@ export function statusParticipacao(p: Participacao): StatusParticipacao {
   return { label: 'Não aberto', tone: 'neutral', quando: null }
 }
 
-export function publicoLabel(item: Pick<Treinamento, 'publicoTipo' | 'publico'>) {
+const juntar = (nomes: string[], total: number) => {
+  const resto = total - nomes.length
+  if (resto > 0) return `${nomes.join(', ')} e mais ${resto}`
+  return nomes.length > 1 ? `${nomes.slice(0, -1).join(', ')} e ${nomes[nomes.length - 1]}` : nomes[0] ?? ''
+}
+
+/** Público em texto: nomeia funções e até 2 pessoas; sem o cadastro à mão, cai na contagem. */
+export function publicoLabel(item: Pick<Treinamento, 'publicoTipo' | 'publico'>, funcionarios: Funcionario[] = []) {
   if (item.publicoTipo === PUBLICO.motoristas) return 'Todos os motoristas'
-  if (item.publicoTipo === PUBLICO.funcao) return `${item.publico.length} ${plural(item.publico.length, 'função', 'funções')}`
-  return `${item.publico.length} ${plural(item.publico.length, 'selecionado', 'selecionados')}`
+  if (item.publicoTipo === PUBLICO.funcao) {
+    const nomes = item.publico.map((v) => FUNCAO.find((f) => String(f.value) === v)?.label).filter((x): x is string => Boolean(x))
+    return nomes.length === item.publico.length && nomes.length ? juntar(nomes.slice(0, 2), nomes.length) : `${item.publico.length} ${plural(item.publico.length, 'função', 'funções')}`
+  }
+  const nomes = item.publico.map((id) => funcionarios.find((f) => f.id === id)?.nome).filter((x): x is string => Boolean(x))
+  return nomes.length === item.publico.length && nomes.length ? juntar(nomes.slice(0, 2), nomes.length) : `${item.publico.length} ${plural(item.publico.length, 'selecionado', 'selecionados')}`
 }
 
 export const isConcluida = (p: Participacao) => Boolean(p.concluidoEm)

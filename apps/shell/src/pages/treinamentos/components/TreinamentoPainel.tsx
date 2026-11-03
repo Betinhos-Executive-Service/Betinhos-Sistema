@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Avatar, Breadcrumb, Button, EmptyState, Grid, MetricCard, PageHeader, SearchBox, SegmentedControl, Skeleton, StatusBadge, Surface, todaySaoPaulo } from '@betinhos/ui'
-import { ArrowLeft, CalendarClock, Check, CheckCircle2, Eye, PenLine, RefreshCw, SearchX, Users, XCircle } from 'lucide-react'
+import { ArrowLeft, CalendarClock, Check, CheckCircle2, Eye, Pencil, PenLine, RefreshCw, Repeat, SearchX, Users, XCircle } from 'lucide-react'
 import { parseSignature } from '../../comunicados/domain/comunicados'
 import { Assinatura } from '../../comunicados/components/Assinatura'
 import type { Source } from '../data/source'
@@ -8,7 +8,7 @@ import { erroTexto, fmtDia, formatDate, isConcluida, isVencido, matchParticipaca
 import { AnexosSecao } from './AnexosSecao'
 import { Conteudo } from './Conteudo'
 
-type Props = { item: Treinamento; funcionarios: Funcionario[]; source: Source; onBack: () => void }
+type Props = { item: Treinamento; funcionarios: Funcionario[]; source: Source; onBack: () => void; onEditar: () => void; onReaplicar: () => void }
 
 const FILTROS: { value: FiltroParticipacao; label: string }[] = [
   { value: 'todos', label: 'Todos' },
@@ -18,7 +18,7 @@ const FILTROS: { value: FiltroParticipacao; label: string }[] = [
 ]
 
 /** Painel de participação do treinamento publicado: quem abriu, confirmou, assinou e a nota do quiz. */
-export function TreinamentoPainel({ item, funcionarios, source, onBack }: Props) {
+export function TreinamentoPainel({ item, funcionarios, source, onBack, onEditar, onReaplicar }: Props) {
   const [rows, setRows] = useState<Participacao[]>([])
   const [loaded, setLoaded] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -27,6 +27,7 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack }: Props)
   const [busca, setBusca] = useState('')
   const [selectedId, setSelectedId] = useState('')
   const token = useRef(0)
+  const detalheRef = useRef<HTMLDivElement | null>(null)
 
   const pessoas = useMemo(() => new Map(funcionarios.map((f) => [f.id, f])), [funcionarios])
   const nome = useCallback((p: Participacao) => pessoas.get(p.funcionarioId)?.nome || p.nomeAssinante || 'Funcionário sem cadastro', [pessoas])
@@ -47,6 +48,12 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack }: Props)
   }, [source, item.id])
   useEffect(() => { void load() }, [load])
 
+  // Abaixo de 1120 px o detalhe fica empilhado depois da lista: leva a tela até ele.
+  const selecionar = (id: string) => {
+    setSelectedId(id)
+    if (window.matchMedia('(max-width: 1120px)').matches) requestAnimationFrame(() => { detalheRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); detalheRef.current?.focus({ preventScroll: true }) })
+  }
+
   const termo = busca.trim().toLowerCase()
   const buscados = rows.filter((p) => !termo || nome(p).toLowerCase().includes(termo))
   const visiveis = buscados.filter((p) => matchParticipacao(filtro, p))
@@ -58,7 +65,7 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack }: Props)
   const reprovados = rows.filter((p) => matchParticipacao('reprovados', p)).length
   const vencido = isVencido(item, todaySaoPaulo())
 
-  const publico = publicoLabel(item)
+  const publico = publicoLabel(item, funcionarios)
 
   const etapas = (p: Participacao) => [
     { label: 'Abriu no app', time: formatDate(p.abertoEm) || 'Ainda não abriu', done: Boolean(p.abertoEm) },
@@ -80,11 +87,13 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack }: Props)
           {item.exigeQuiz ? <StatusBadge tone="info">Quiz</StatusBadge> : null}
           {vencido ? <StatusBadge tone="danger">Vencido</StatusBadge> : null}
         </>}
-        description={`${formatDate(item.publicadoEm)} · ${publico}${item.validade ? ` · validade ${fmtDia(item.validade)}` : ''}`}
+        description={`${formatDate(item.publicadoEm)} · ${publico}${item.validade ? ` · validade ${fmtDia(item.validade)}` : ''}${item.editadoEm ? ` · editado em ${formatDate(item.editadoEm)}` : ''}`}
         actions={(
           <div className="tr-actions">
             <Button variant="secondary" icon={<ArrowLeft size={16} />} onClick={onBack}>Voltar</Button>
             <Button variant="secondary" icon={<RefreshCw size={16} />} loading={loading && loaded} onClick={() => void load()}>Atualizar</Button>
+            <Button variant="secondary" icon={<Pencil size={16} />} onClick={onEditar}>Editar conteúdo</Button>
+            <Button variant="secondary" icon={<Repeat size={16} />} onClick={onReaplicar}>Reaplicar</Button>
           </div>
         )}
       />
@@ -112,7 +121,7 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack }: Props)
               const ativo = selected?.id === p.id
               return (
                 <li key={p.id} className={`tr-recipient${ativo ? ' is-selected' : ''}`}>
-                  <button type="button" className="tr-recipient__main" aria-pressed={ativo} onClick={() => setSelectedId(p.id)}>
+                  <button type="button" className="tr-recipient__main" aria-pressed={ativo} onClick={() => selecionar(p.id)}>
                     <Avatar name={nome(p)} size="sm" />
                     <span className="tr-recipient__text">
                       <strong>{nome(p)}{desligado(p) ? <StatusBadge tone="neutral">Desligado</StatusBadge> : null}</strong>
@@ -131,6 +140,7 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack }: Props)
 
         <aside className="tr-side" aria-label="Detalhe e conteúdo publicado">
           {selected ? (
+            <div ref={detalheRef} tabIndex={-1} className="tr-detail-anchor">
             <Surface title={nome(selected)} action={statusSelecionado ? <StatusBadge tone={statusSelecionado.tone}>{statusSelecionado.label}</StatusBadge> : null} className="tr-detail">
               <span className="tr-label">Linha do tempo</span>
               <ol className="tr-timeline">
@@ -144,11 +154,12 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack }: Props)
               {selected.assinaturaJson ? <><span className="tr-label">Assinatura</span><div className="tr-signature"><Assinatura value={parseSignature(selected.assinaturaJson)} /></div></> : null}
               {vencido && !isConcluida(selected) ? <p className="tr-pending"><CalendarClock size={16} aria-hidden="true" />Validade vencida em {fmtDia(item.validade)} sem conclusão.</p> : null}
             </Surface>
+            </div>
           ) : null}
           <Surface eyebrow="Conteúdo" title="O que foi publicado" className="tr-sent">
             {item.descricao ? <p className="tr-device__desc">{item.descricao}</p> : null}
             {item.videoUrl ? <p><a href={item.videoUrl} target="_blank" rel="noreferrer">Abrir vídeo</a></p> : null}
-            <Conteudo texto={item.conteudo} className="tr-conteudo" />
+            <Conteudo texto={item.conteudo} className="tr-conteudo" nivel={3} />
             <AnexosSecao treinamentoId={item.id} anexos={item.anexos} source={source} disabled onChange={() => undefined} somenteLeitura />
             {item.exigeQuiz ? <p className="tr-hint">{item.perguntas.length} {plural(item.perguntas.length, 'pergunta', 'perguntas')} no quiz · nota mínima {item.notaMinima}%</p> : null}
           </Surface>
