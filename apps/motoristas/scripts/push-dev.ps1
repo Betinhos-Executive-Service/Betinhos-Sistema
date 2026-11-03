@@ -212,6 +212,14 @@ Write-Step "provision observacao organizada (variavel da chave, Custom API e ste
   -DeviceCode:$DeviceCode
 if (-not $?) { throw "Provisionamento da observacao organizada falhou." }
 
+Write-Step "provision relatorio de combustivel (schema e variavel Secret) in DEV"
+& (Join-Path $PSScriptRoot "provision-relatorio-combustivel.ps1") `
+  -EnvironmentUrl $environmentUrl `
+  -SolutionUniqueName $solutionUniqueName `
+  -Apply `
+  -DeviceCode:$DeviceCode
+if (-not $?) { throw "Provisionamento do relatorio de combustivel falhou." }
+
 Write-Step "publish push redirect (forms OnLoad -> App Motoristas)"
 & (Join-Path $PSScriptRoot "provision-push-redirect.ps1") `
   -EnvironmentUrl $environmentUrl `
