@@ -1,4 +1,4 @@
-import { ESTADO, PUBLICO, isOrfa, isPublicado, validarRascunho, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
+import { ESTADO, PUBLICO, isOrfa, isPublicado, validarComConteudo, validarRascunho, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
 import type { Linha } from '../domain/lista'
 import type { Source } from './source'
 
@@ -77,7 +77,7 @@ export function createMockSource(): Source {
     },
     async salvarPublicado(item) {
       await wait(150)
-      const error = validarRascunho(item)
+      const error = validarComConteudo(item)
       if (error) throw new Error(error)
       const atual = treinamentos.find((row) => row.id === item.id)
       if (!atual || !isPublicado(atual)) throw new Error('Este treinamento não está publicado. Atualize a lista.')

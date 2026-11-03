@@ -129,11 +129,18 @@ export function validarRascunho(draft: Treinamento) {
   return ''
 }
 
-/** O que falta para publicar, além do rascunho válido. */
-export function validarPublicacao(draft: Treinamento, funcionarios: Funcionario[]) {
+/** Rascunho válido com conteúdo: vale para publicar e para editar o já publicado. */
+export function validarComConteudo(draft: Treinamento) {
   const base = validarRascunho(draft)
   if (base) return base
-  if (!draft.conteudo.trim() && !draft.videoUrl.trim() && !draft.anexos.length) return 'Inclua um texto, um vídeo ou um anexo antes de publicar.'
+  if (!draft.conteudo.trim() && !draft.videoUrl.trim() && !draft.anexos.length) return 'Inclua um texto, um vídeo ou um anexo.'
+  return ''
+}
+
+/** O que falta para publicar, além do rascunho válido. */
+export function validarPublicacao(draft: Treinamento, funcionarios: Funcionario[]) {
+  const base = validarComConteudo(draft)
+  if (base) return base
   if (draft.publicoTipo !== PUBLICO.motoristas && !draft.publico.length) return draft.publicoTipo === PUBLICO.funcao ? 'Escolha pelo menos uma função.' : 'Selecione pelo menos um funcionário.'
   if (!resolverPublico(draft, funcionarios).length) return 'Nenhum funcionário ativo no público-alvo. O treinamento não foi publicado.'
   return ''

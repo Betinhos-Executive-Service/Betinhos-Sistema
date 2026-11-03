@@ -5,7 +5,7 @@ import { useEscVoltar } from '../../../app/useEscVoltar'
 import { FUNCAO } from '../../funcionarios/data/schema'
 import type { Source } from '../data/source'
 import {
-  CONTEUDO_MAX, DESCRICAO_MAX, PUBLICO, TITULO_MAX, VIDEO_MAX, erroTexto, isPublicado, plural, publicoLabel, resolverPublico, validarPublicacao, validarRascunho,
+  CONTEUDO_MAX, DESCRICAO_MAX, PUBLICO, TITULO_MAX, VIDEO_MAX, erroTexto, isPublicado, plural, publicoLabel, resolverPublico, validarComConteudo, validarPublicacao, validarRascunho,
   type Anexo, type Funcionario, type PublicoTipo, type Treinamento,
 } from '../domain/treinamentos'
 import { AnexosSecao } from './AnexosSecao'
@@ -71,7 +71,7 @@ export function TreinamentoEditor({ initial, funcionarios, source, onBack, onSav
   }
 
   const salvarPublicado = async () => {
-    const problema = validarRascunho(draft)
+    const problema = validarComConteudo(draft)
     if (problema) { setErro(problema); return }
     setBusy('save')
     try {
@@ -275,7 +275,7 @@ export function TreinamentoEditor({ initial, funcionarios, source, onBack, onSav
 
       <Dialog open={confirm === 'publish'} title={`Publicar para ${alvos.length} ${plural(alvos.length, 'funcionário', 'funcionários')}?`} onClose={() => setConfirm(null)}
         actions={<><Button variant="secondary" onClick={() => setConfirm(null)}>Voltar</Button><Button icon={<Send size={16} />} onClick={() => void publicar()}>Publicar agora</Button></>}>
-        O conteúdo não poderá ser alterado depois. Cada funcionário passa a ver o treinamento no App Motoristas e o painel acompanha quem leu, assinou e respondeu o quiz.
+        Depois de publicado, dá para corrigir texto, vídeo, anexos e validade; quiz, assinatura e público ficam travados. Cada funcionário passa a ver o treinamento no App Motoristas e o painel acompanha quem leu, assinou e respondeu o quiz.
       </Dialog>
       <Dialog open={confirm === 'delete'} tone="danger" title="Excluir este rascunho?" onClose={() => setConfirm(null)}
         actions={<><Button variant="secondary" onClick={() => setConfirm(null)}>Voltar</Button><Button variant="danger" icon={<Trash2 size={16} />} onClick={() => void excluir()}>Excluir rascunho</Button></>}>

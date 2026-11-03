@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { TELA, builtinViews, matchesKeyword, readTreinamento, sortTreinamentos, type Linha } from './lista'
 import {
   ESTADO, FUNCAO_MOTORISTA, PUBLICO, anexoDaPasta, blocosDoConteudo, copiaParaReciclagem, edicaoPublicadoPayload, draftPayload, emptyDraft, isOrfa, isVencido, mapParticipacao, mapTreinamento, matchParticipacao, novaPergunta, publicoLabel, resolverPublico, statusParticipacao, trechos,
-  validarAnexo, validarPublicacao, validarQuiz, validarRascunho, type Funcionario, type Participacao, type Pergunta, type Treinamento,
+  validarAnexo, validarComConteudo, validarPublicacao, validarQuiz, validarRascunho, type Funcionario, type Participacao, type Pergunta, type Treinamento,
 } from './treinamentos'
 
 const G = (n: number) => `eeeeeeee-0000-4000-8000-${String(n).padStart(12, '0')}`
@@ -167,6 +167,11 @@ describe('edição do publicado', () => {
     expect(Object.keys(payload).sort()).toEqual(['cr40f_anexosjson', 'cr40f_conteudo', 'cr40f_descricao', 'cr40f_editadoem', 'cr40f_name', 'cr40f_validade', 'cr40f_videourl'])
     expect(payload.cr40f_name).toBe('Embarque')
     expect(payload.cr40f_editadoem).toBe('2026-11-03T12:00:00.000Z')
+  })
+
+  it('editar o publicado não deixa esvaziar texto, vídeo e anexos', () => {
+    expect(validarComConteudo({ ...publicado, exigeQuiz: false, conteudo: ' ', videoUrl: '', anexos: [] })).toMatch(/Inclua um texto/)
+    expect(validarComConteudo({ ...publicado, exigeQuiz: false })).toBe('')
   })
 
   it('validade vazia vira null', () => {

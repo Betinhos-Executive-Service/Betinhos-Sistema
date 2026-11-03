@@ -2,7 +2,7 @@ import { chunk, cleanId, type Row } from '@betinhos/dataverse'
 import type { Host } from '../../../host'
 import { getDataverseEnvironmentLabel } from '../../funcionarios/data/dataverse'
 import { createSharePointDocs, sanitizeFileName, uniqueName, type EnvVarApi } from '../../funcionarios/data/sharepoint'
-import { ESTADO, anexoDaPasta, draftPayload, edicaoPublicadoPayload, isOrfa, isPublicado, mapFuncionario, mapParticipacao, mapTreinamento, validarRascunho, type Anexo, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
+import { ESTADO, anexoDaPasta, draftPayload, edicaoPublicadoPayload, isOrfa, isPublicado, mapFuncionario, mapParticipacao, mapTreinamento, validarComConteudo, validarRascunho, type Anexo, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
 import type { Linha } from '../domain/lista'
 import { createMockSource } from './mock'
 
@@ -100,7 +100,7 @@ export function createSource(host: Host): Source {
       return cleanId(await client.create(s.treinamento, draftPayload(draft)))
     },
     async salvarPublicado(item) {
-      const error = validarRascunho(item)
+      const error = validarComConteudo(item)
       if (error) throw new Error(error)
       const s = await entitySets()
       const [atual] = await client.getAll(`${s.treinamento}?$select=cr40f_estado&$filter=cr40f_treinamentoid eq ${cleanId(item.id)}`)
