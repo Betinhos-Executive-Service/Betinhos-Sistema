@@ -1,5 +1,5 @@
 import { useId, type ReactNode } from 'react'
-import { Button, Skeleton, StatusBadge, type StatusTone } from '@betinhos/ui'
+import { Button, StatusBadge, type StatusTone } from '@betinhos/ui'
 import { AlertTriangle, ChevronRight, CircleCheck } from 'lucide-react'
 import type { AlertaItem, Tom } from '../domain/types'
 
@@ -53,23 +53,3 @@ export function AlertList({ titulo, itens, abrir = {} }: { titulo: string; itens
 
 /** Títulos das duas faixas do Resumo, na ordem da página. */
 export const FAIXAS_RESUMO = ['Alertas de operação', 'Qualidade dos dados'] as const
-
-/** Primeira carga: as duas faixas no formato final, com quatro cards ocupados cada e sem números. */
-export function AlertasCarregando() {
-  return (
-    <div className="dash-faixas">
-      {FAIXAS_RESUMO.map((titulo) => (
-        <Faixa key={titulo} titulo={titulo} itens={4}>
-          {[0, 1, 2, 3].map((i) => (
-            <li key={i} className="dash-alerta" aria-hidden="true">
-              <span className="dash-alerta__valor"><Skeleton width={28} height={20} /></span>
-              <span className="dash-alerta__rotulo"><Skeleton width="56%" height={11} /></span>
-              <span className="dash-alerta__selo"><Skeleton width="72%" height={22} /></span>
-            </li>
-          ))}
-        </Faixa>
-      ))}
-      <span className="dash-sr">Carregando alertas</span>
-    </div>
-  )
-}

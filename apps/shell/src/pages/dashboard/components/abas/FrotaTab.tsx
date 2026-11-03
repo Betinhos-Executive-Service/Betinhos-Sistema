@@ -64,8 +64,8 @@ function FrotaAba({ ctx, dados, periodo }: DadosAba) {
   </>
 }
 
-/** Primeira carga da aba Frota: os seis KPIs e os quatro blocos ocupados. */
-export const FrotaCarregando = () => <AbaCarregando rotulo={ROTULO_KPIS} kpis={ROTULOS_KPI} colunas={6} blocos={BLOCOS} />
+/** Primeira carga da aba Frota: spinner e barra de progresso real. */
+export const FrotaCarregando = () => <AbaCarregando />
 
 /** % médio de uso dos próprios no mês inteiro (úteis + fim de semana, pesados pelos dias). */
 const usoDoMes = (m: UsoMes) => { const dias = m.uteis.dias + m.fds.dias; return dias ? (m.uteis.pct * m.uteis.dias + m.fds.pct * m.fds.dias) / dias : 0 }

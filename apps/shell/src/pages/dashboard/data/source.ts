@@ -23,9 +23,11 @@ export type ParteExtra = { campos: Partial<Pick<Dados, 'pagantes' | 'despesas' |
  */
 export type Source = {
   mock: boolean
-  carregar: (desde: string, ate: string) => Promise<Dados>
-  carregarExtra: (conjunto: ConjuntoExtra, desde: string, ate: string) => Promise<ParteExtra>
+  carregar: (desde: string, ate: string, onProgresso?: Progresso) => Promise<Dados>
+  carregarExtra: (conjunto: ConjuntoExtra, desde: string, ate: string, onProgresso?: Progresso) => Promise<ParteExtra>
 }
+/** Avanço real da carga: consultas já respondidas (com sucesso ou falha) de um total conhecido antes de começar. */
+export type Progresso = (feitas: number, total: number) => void
 /** Estágio 2 ainda não carregado: os campos vazios que o estágio 1 devolve. */
 const EXTRAS_VAZIOS = { pagantes: [], despesas: [], categoriasDespesa: [], formasPagamento: [], pendentes: ['pagantes', 'despesas'] } satisfies Partial<Dados>
 
@@ -56,13 +58,16 @@ export function comCacheCadastros(client: DataverseClient, paths: (path: string)
 }
 
 /** Roda as tarefas com no máximo `limite` em paralelo e devolve o resultado de cada uma. */
-async function comLimite<T>(tarefas: (() => Promise<T>)[], limite: number) {
+async function comLimite<T>(tarefas: (() => Promise<T>)[], limite: number, onProgresso?: Progresso) {
+  let feitas = 0
+  onProgresso?.(0, tarefas.length)
   const resultados: PromiseSettledResult<T>[] = new Array(tarefas.length)
   let proxima = 0
   const worker = async () => {
     while (proxima < tarefas.length) {
       const i = proxima++
       try { resultados[i] = { status: 'fulfilled', value: await tarefas[i]() } } catch (reason) { resultados[i] = { status: 'rejected', reason } }
+      onProgresso?.(++feitas, tarefas.length)
     }
   }
   await Promise.all(Array.from({ length: Math.min(limite, tarefas.length) }, worker))
@@ -97,7 +102,7 @@ const linhas = (r: PromiseSettledResult<Row[]>) => (r.status === 'fulfilled' ? r
  * marca só `preventivas` e deixa a entrada vazia.
  * Pagantes e despesas ficam vazios e `pendentes`: são o estágio 2 (`carregarExtraDataverse`).
  */
-export async function carregarDataverse(client: DataverseClient, sets: EntitySets, desde: string, ate: string, cpNav = ''): Promise<Dados> {
+export async function carregarDataverse(client: DataverseClient, sets: EntitySets, desde: string, ate: string, onProgresso?: Progresso): Promise<Dados> {
   const ler = leitor(client)
   // Sem as colunas de hodômetro no ambiente, os veículos vêm sem elas; as preventivas ficam indisponíveis (km desconhecido).
   let semHodometro = false
@@ -111,8 +116,8 @@ export async function carregarDataverse(client: DataverseClient, sets: EntitySet
     }
   }
   const [res, cps, man, mul, oco, fun, vei, via, eve, tel, itp, bas, mpr] = await comLimite<Row[]>([
-    () => client.getAll(reservasPath(sets.reserva, desde, ate, cpNav)),
-    () => (cpNav ? Promise.resolve([]) : client.getAll(composicoesPath(sets.composicao))),
+    () => client.getAll(reservasPath(sets.reserva, desde, ate)),
+    () => client.getAll(composicoesPath(sets.composicao)),
     () => ler(sets.manutencao, (s) => manutencoesPath(s, desde, ate)),
     () => (sets.multa ? comAlternativa(() => client.getAll(multasPath(sets.multa, desde, ate)), () => client.getAll(multasPath(sets.multa, desde, ate, false))) : ausente(sets.multa)),
     () => ler(sets.ocorrencia, (s) => ocorrenciasPath(s, desde, ate)),
@@ -124,7 +129,7 @@ export async function carregarDataverse(client: DataverseClient, sets: EntitySet
     () => ler(sets.itemPlano, itensPlanoPath),
     () => ler(sets.baseline, baselinesPath),
     () => ler(sets.manutencao, manutencoesPreventivaPath),
-  ], PARALELO)
+  ], PARALELO, onProgresso)
   if (res.status === 'rejected') throw res.reason
   if (cps.status === 'rejected') throw cps.reason
   const secundarios: [Conjunto, PromiseSettledResult<Row[]>][] = [
@@ -134,11 +139,12 @@ export async function carregarDataverse(client: DataverseClient, sets: EntitySet
   const semPreventivas = semHodometro || [vei, itp, bas, mpr].some((r) => r.status === 'rejected')
   if (semPreventivas) indisponiveis.push('preventivas')
 
-  const cpMap = mapCps(cpNav ? res.value.map((row) => row[cpNav]).filter((cp): cp is Row => !!cp && typeof cp === 'object') : cps.value)
+  const cpMap = mapCps(cps.value)
   const funcionarios = linhas(fun).map((row) => mapFuncionario(row))
+  const porId = new Map(funcionarios.filter((f) => f.id).map((f) => [f.id, f] as const))
   const apelidos = apelidosFuncionarios(funcionarios)
   return {
-    reservas: aplicarCsv2026(res.value.map((row) => mapReserva(row, cpMap)), reservasCsv2026()),
+    reservas: aplicarCsv2026(res.value.map((row) => mapReserva(row, cpMap, porId)), reservasCsv2026()),
     manutencoes: linhas(man).map((row) => mapManutencao(row)),
     multas: linhas(mul).map((row) => mapMulta(row, apelidos)),
     ocorrencias: linhas(oco).map((row) => mapOcorrencia(row)),
@@ -161,14 +167,17 @@ export async function carregarDataverse(client: DataverseClient, sets: EntitySet
  * Despesas dependem de 4 tabelas (despesas, categorias, formas e anexos): se qualquer uma falhar, o conjunto inteiro fica indisponível.
  * Despesas usam os funcionários (nome e empresa), consultados de novo aqui para o estágio 2 não esperar o 1; sem eles caem no rótulo do lookup e "Sem empresa".
  */
-export async function carregarExtraDataverse(client: DataverseClient, sets: EntitySets, conjunto: ConjuntoExtra, desde: string, ate: string): Promise<ParteExtra> {
+export async function carregarExtraDataverse(client: DataverseClient, sets: EntitySets, conjunto: ConjuntoExtra, desde: string, ate: string, onProgresso?: Progresso): Promise<ParteExtra> {
   const ler = leitor(client)
   if (conjunto === 'pagantes') {
+    onProgresso?.(0, 1)
     try {
       const rows = await (sets.pagante ? comAlternativa(() => client.getAll(pagantesPath(sets.pagante)), () => client.getAll(pagantesPath(sets.pagante, false))) : ausente(sets.pagante))
+      onProgresso?.(1, 1)
       return { campos: { pagantes: rows.map((row) => mapPagante(row)) }, indisponivel: false }
     } catch (error) {
       console.warn('Dashboard: pagantes não carregaram; os cards deles ficam s/dado.', String(error))
+      onProgresso?.(1, 1)
       return { campos: {}, indisponivel: true }
     }
   }
@@ -178,7 +187,7 @@ export async function carregarExtraDataverse(client: DataverseClient, sets: Enti
     () => ler(sets.formaPagamentoDespesa, formasPagamentoPath),
     () => ler(sets.anexoDespesa, anexosDespesaPath),
     () => ler(sets.funcionario, funcionariosPath),
-  ], PARALELO)
+  ], PARALELO, onProgresso)
   if (![des, cat, frm, anx].every((r) => r.status === 'fulfilled')) return { campos: {}, indisponivel: true }
   const categoriasDespesa = linhas(cat).map((row) => mapCategoriaDespesa(row))
   const formasPagamento = linhas(frm).map((row) => mapFormaPagamento(row))
@@ -196,8 +205,10 @@ function createMockSource(): Source {
   const base = criarDadosMock(new Date())
   return {
     mock: true,
-    async carregar(desde, ate) {
+    async carregar(desde, ate, onProgresso) {
+      onProgresso?.(0, 1)
       await wait(300)
+      onProgresso?.(1, 1)
       return {
         ...base,
         reservas: aplicarCsv2026(base.reservas.filter((r) => entre(r.dia, desde, ate)), reservasCsv2026()),
@@ -210,8 +221,10 @@ function createMockSource(): Source {
         ...EXTRAS_VAZIOS,
       }
     },
-    async carregarExtra(conjunto, desde, ate) {
+    async carregarExtra(conjunto, desde, ate, onProgresso) {
+      onProgresso?.(0, 1)
       await wait(300)
+      onProgresso?.(1, 1)
       if (conjunto === 'pagantes') return { campos: { pagantes: base.pagantes }, indisponivel: false }
       return {
         campos: { despesas: base.despesas.filter((x) => entre(x.dia, desde, ate)), categoriasDespesa: base.categoriasDespesa, formasPagamento: base.formasPagamento },
@@ -253,11 +266,6 @@ export function createSource(host: Host): Source {
   if (host.mode === 'mock') return createMockSource()
   let sets: Promise<EntitySets> | null = null
   const entitySets = () => (sets ??= host.metadata.entities(Object.values(ENTITIES)).then((info) => resolverEntitySets(info)).catch((error) => { sets = null; throw error }))
-  // Navegação da reserva para a composição de preço: com ela, as CPs vêm no `$expand` das reservas; sem ela, a tabela inteira (cacheada).
-  let nav: Promise<string> | null = null
-  const cpNav = () => (nav ??= host.client.request<{ value: { ReferencingEntityNavigationPropertyName?: string }[] }>(
-    `EntityDefinitions(LogicalName='${ENTITIES.reserva}')/ManyToOneRelationships?$select=ReferencingEntityNavigationPropertyName&$filter=${encodeURIComponent("ReferencingAttribute eq 'new_composicaodepreco'")}`,
-  ).then((r) => r.value[0]?.ReferencingEntityNavigationPropertyName ?? '').catch((error) => { console.warn('Dashboard: navegação da composição não resolvida; lendo a tabela inteira.', String(error)); return '' }))
   let cliente: DataverseClient | null = null
   const clienteCacheado = (s: EntitySets) => (cliente ??= comCacheCadastros(host.client, (path) => [
     s.composicao && composicoesPath(s.composicao), s.funcionario && funcionariosPath(s.funcionario), s.veiculo && veiculosPath(s.veiculo), s.veiculo && veiculosPath(s.veiculo, false),
@@ -266,7 +274,7 @@ export function createSource(host: Host): Source {
   ].includes(path)))
   return {
     mock: false,
-    carregar: async (desde, ate) => { const [s, n] = await Promise.all([entitySets(), cpNav()]); return carregarDataverse(clienteCacheado(s), s, desde, ate, n) },
-    carregarExtra: async (conjunto, desde, ate) => { const s = await entitySets(); return carregarExtraDataverse(clienteCacheado(s), s, conjunto, desde, ate) },
+    carregar: async (desde, ate, onProgresso) => { const s = await entitySets(); return carregarDataverse(clienteCacheado(s), s, desde, ate, onProgresso) },
+    carregarExtra: async (conjunto, desde, ate, onProgresso) => { const s = await entitySets(); return carregarExtraDataverse(clienteCacheado(s), s, conjunto, desde, ate, onProgresso) },
   }
 }
