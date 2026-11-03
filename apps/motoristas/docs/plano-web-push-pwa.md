@@ -31,3 +31,8 @@ Cada notificação que os Flows já enviam pelo Power Apps Notification V2 passa
 4. Inscrição expirada é removida; dois aparelhos do mesmo motorista recebem; motorista sem inscrição não gera erro no Flow.
 - Prova: `npm test` (payload e destinos), `tsc` estrito, `verificar-push-redirect`, plugin compilado, e teste em aparelho real no DEV.
 - Não verificável na nuvem: recebimento real, iOS, Dataverse, Flows e plugin.
+
+## Fatia 4: desenho decidido (3/11/2026)
+- Segredo: o `SHARED_SECRET` não vai escrito nos Flows. Conector personalizado do Worker (auth por chave na conexão, criada uma vez por Renan); os Flows usam só a ação do conector, via referência de conexão na solução AppBetinhos.
+- Um único script `scripts/provision-web-push-flows.ps1` (dry-run por padrão, idempotente) percorre os 8 Flows e, ao lado de cada `SendPushNotificationV2` do App Motoristas, acrescenta em paralelo: listar funcionário por `cr40f_emailmicrosoft` = destinatário, listar inscrições do funcionário, chamar o Worker (`/send`, até 50 por chamada), apagar as linhas com `gone: true`. Título/texto/URL derivam do push existente (mensagem, entidade e `recordId` para o deep link).
+- Pré-requisito: PRs #127–#129 em `main` e app publicado no DEV.
