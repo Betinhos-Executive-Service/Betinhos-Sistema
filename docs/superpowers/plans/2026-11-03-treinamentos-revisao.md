@@ -49,7 +49,7 @@
 **App Motoristas**
 - `plugins/DriverRecordSharing/TreinamentoCommandPlugin.cs` (novo) + `plugins/DriverRecordSharing.Tests/TreinamentoCommandPluginTests.cs` (novo).
 - `scripts/provision-treinamentos-push.ps1` (novo): Custom API + flow "Push Treinamentos | Motoristas". `scripts/push-dev.ps1` passa a chamá-lo.
-- `webresources/new_appmotoristas_push_redirect.js`: rota `cr40f_treinamentoparticipacao` → `treinamentoId=`.
+- `webresources/new_appmotoristas_push_redirect.js`: rota `cr40f_treinamentoparticipacao` → `treinamentoParticipacaoId=`.
 - `src/app/navigation.ts`, `src/screens/TreinamentosScreen.tsx`: abrir pelo `treinamentoId`.
 - `src/lib/treinamentos.ts` + `tests/treinamentos.test.ts`: snapshot e hash na conclusão.
 
@@ -101,8 +101,8 @@
 Ensure-AttributeOn "cr40f_treinamento" (DateTimeUtc "cr40f_EditadoEm" "Editado em" "Ultima edicao de conteudo ou validade depois de publicado; as participacoes nao mudam")
 ```
 
-- [ ] **Passo 2:** Acrescentar `"cr40f_editadoem"` ao array de verificação das colunas do treinamento (o mesmo padrão do array `$part` da linha 271).
-- [ ] **Passo 3:** Rodar em DRY RUN: `packages/deploy/rodar-linux.sh packages/deploy/provision-treinamentos.ps1` → esperado `DRY RUN OK; use -Apply` e "criaria cr40f_editadoem". **Não** rodar `-Apply` da worktree: isso fica para a `main`, depois do merge (Tarefa 8).
+- [ ] **Passo 2:** Acrescentar `"cr40f_editadoem"` à lista `$trein` dentro da hashtable `$esperado` (linhas ~269-272; `$part` é o nome da tabela de participação, não uma lista).
+- [ ] **Passo 3:** Rodar em DRY RUN: `packages/deploy/rodar-linux.sh packages/deploy/provision-treinamentos.ps1` → esperado: a saída lista `cr40f_editadoem` como coluna a criar (o texto `DRY RUN OK; use -Apply` só sai quando as tabelas ainda não existem, não use como critério). **Não** rodar `-Apply` da worktree: isso fica para a `main`, depois do merge (Tarefa 8).
 - [ ] **Passo 4:** Commit: `feat(treinamentos): coluna cr40f_editadoem no provisionamento`.
 
 ### Tarefa 5: Regras de domínio (edição, reciclagem, anexo da pasta)
@@ -233,6 +233,8 @@ Ajustar quem monta `Treinamento` sem `editadoEm` (o `tsc` aponta): `data/mock.ts
     async salvarPublicado(item) {
       const error = validarRascunho(item)
       if (error) throw new Error(error)
+      // A regra de publicação continua valendo na edição: não dá para esvaziar um treinamento que motoristas já recebem.
+      if (!item.conteudo.trim() && !item.videoUrl.trim() && !item.anexos.length) throw new Error('Mantenha um texto, um vídeo ou um anexo no treinamento publicado.')
       const s = await entitySets()
       const [atual] = await client.getAll(`${s.treinamento}?$select=cr40f_estado&$filter=cr40f_treinamentoid eq ${cleanId(item.id)}`)
       if (!atual || Number(atual.cr40f_estado) !== ESTADO.publicado) throw new Error('Este treinamento não está publicado. Atualize a lista.')
@@ -250,7 +252,7 @@ Ajustar quem monta `Treinamento` sem `editadoEm` (o `tsc` aponta): `data/mock.ts
     },
 ```
 
-- [ ] **Passo 3:** No mock (`createMockSource`), implementar `salvarPublicado`: valida com `validarRascunho`; recusa se o item não for publicado (`'Este treinamento não está publicado. Atualize a lista.'`); aplica os campos de `edicaoPublicadoPayload` ao item em memória (`titulo`, `descricao`, `conteudo`, `videoUrl`, `anexos`, `validade`, `editadoEm`), após `await wait(150)`.
+- [ ] **Passo 3:** No mock (`createMockSource`), implementar `salvarPublicado`: valida com `validarRascunho` e com a mesma regra de conteúdo mínimo (texto, vídeo ou anexo); recusa se o item não for publicado (`'Este treinamento não está publicado. Atualize a lista.'`); aplica os campos de `edicaoPublicadoPayload` ao item em memória (`titulo`, `descricao`, `conteudo`, `videoUrl`, `anexos`, `validade`, `editadoEm`), após `await wait(150)`.
 - [ ] **Passo 4:** `pnpm typecheck` → sem erros.
 - [ ] **Passo 5:** Commit: `feat(treinamentos): gravação do publicado e anexo herdado na reciclagem`.
 
@@ -351,7 +353,8 @@ Ajustar quem monta `Treinamento` sem `editadoEm` (o `tsc` aponta): `data/mock.ts
       </div>
 ```
 
-  - `anexosAlterados` continua igual: `salvarAnexos` já vale para o publicado. No publicado, `garantirId` nunca roda porque o id existe.
+  - `anexosAlterados` grava na hora (não espera "Salvar alterações"), então no publicado ele também precisa carimbar a edição: `salvarAnexos(id, anexos)` passa a incluir `cr40f_editadoem` no PATCH quando o treinamento está publicado (parâmetro `marcarEdicao`, `true` vindo do editor em modo publicado; mock: atualiza `editadoEm`). Sem isso, trocar só um anexo não aparece em "editado em" nem no `editadoEm` do snapshot. No publicado, `garantirId` nunca roda porque o id existe.
+  - Textos que hoje dizem que o publicado não muda precisam acompanhar: o `Dialog` de publicação ("O conteúdo não poderá ser alterado depois." → "Depois de publicado, só texto, vídeo, anexos e validade podem ser corrigidos; quiz, assinatura e público não mudam.") e a `description` do rascunho ("Publicado, o conteúdo não muda mais." → mesma ideia).
   - A prévia e o "Descartar alterações?" continuam iguais.
   - `onSaved(id)` da página recarrega e chama `open(id)`, que volta ao painel. Nada muda ali.
 
@@ -378,7 +381,7 @@ Ajustar quem monta `Treinamento` sem `editadoEm` (o `tsc` aponta): `data/mock.ts
 ### Tarefa 9: Colunas de push na participação
 
 **Arquivos:**
-- Modificar: `packages/deploy/provision-treinamentos.ps1` (atributos de `cr40f_treinamentoparticipacao` e array `$part`, linha 271)
+- Modificar: `packages/deploy/provision-treinamentos.ps1` (atributos de `cr40f_treinamentoparticipacao` e a lista dela em `$esperado`, linha ~271)
 
 - [ ] **Passo 1:** Acrescentar ao lado de `cr40f_ConcluidoEm`:
 
@@ -390,7 +393,7 @@ Ensure-AttributeOn "cr40f_treinamentoparticipacao" (DateTimeUtc "cr40f_LembradoE
 
   (Conferir no `Picklist` se os valores são gerados a partir de 100000000 na ordem dos rótulos; se a função exigir valores explícitos, usar 100000000/100000001/100000002.)
 
-- [ ] **Passo 2:** Acrescentar `"cr40f_pushstatus", "cr40f_pusherro", "cr40f_lembradoem"` ao `$part`.
+- [ ] **Passo 2:** Acrescentar `"cr40f_pushstatus", "cr40f_pusherro", "cr40f_lembradoem"` à lista de `cr40f_treinamentoparticipacao` em `$esperado` (linha ~271).
 - [ ] **Passo 3:** DRY RUN → "criaria" as três colunas. Commit: `feat(treinamentos): colunas de push na participação`. PR curto. Depois do merge, `-Apply` na `main`.
 
 ### Tarefa 10: Shell — push na criação, status e lembrete no painel
@@ -462,7 +465,7 @@ export function podeLembrar(p: Participacao, agora: number) {
 
   Ajustar `participacao()` do mock e as fábricas de teste com `pushStatus: PUSH.enviado, pushErro: '', lembradoEm: null`. Deixar a participação 3 do mock com `pushStatus: PUSH.falhou, pushErro: 'Dispositivo não registrado'`.
 
-- [ ] **Passo 4: source.** `PARTICIPACAO_SELECT` + `,cr40f_pushstatus,cr40f_pusherro,cr40f_lembradoem`. `participacaoPayload` + `cr40f_pushstatus: PUSH.pendente` (o flow dispara na criação). Novo método:
+- [ ] **Passo 4: source.** `PARTICIPACAO_SELECT` + `,cr40f_pushstatus,cr40f_pusherro,cr40f_lembradoem`. `participacaoPayload` continua **sem** `cr40f_pushstatus`: hoje `publicar` cria as participações antes de gravar `cr40f_estado = publicado`, então o flow enviaria push de um treinamento ainda em rascunho (ou nunca publicado, se o último PATCH falhar). Em `publicar`, depois do `client.update(s.treinamento, ..., { cr40f_estado: ESTADO.publicado ... })`, marcar as participações novas em lotes de 5: `client.update(s.participacao, id, { cr40f_pushstatus: PUSH.pendente })` (o flow dispara aí). Novo método:
 
 ```ts
   /** Custom API cr40f_LembrarTreinamento: reenfileira o push dos pendentes (ou de uma participação), no máximo 1 a cada 24 h. */
@@ -484,7 +487,7 @@ export function podeLembrar(p: Participacao, agora: number) {
   - No header, `Lembrar pendentes` (`BellRing`), desabilitado quando `!rows.some((p) => podeLembrar(p, Date.now()))`, com `title` "Ninguém pode ser lembrado agora (concluído, push na fila ou lembrado nas últimas 24 h)".
   - Ao clicar: `const r = await source.lembrar(item.id)`; toast de sucesso `Lembrete enviado para ${r.enfileirados} ${plural(...)}`, mais ` · ${r.ignorados} lembrados nas últimas 24 h` quando houver; depois `await load()`. Erro: toast danger com `erroTexto`.
   - Na linha do funcionário, abaixo do status: `<small>{pushLabel(p)}</small>` com a classe `tr-push is-falhou` quando falhou.
-  - No detalhe, com push falhou: `Reenviar push` → `source.lembrar(item.id, selected.id)`.
+  - No detalhe, com push falhou e `podeLembrar(selected, Date.now())`: `Reenviar push` → `source.lembrar(item.id, selected.id)`. Sem isso o botão apareceria para quem a Custom API vai ignorar (lembrete nas últimas 24 h) e o toast diria "0" sem explicar; quando falhou mas ainda não pode, mostrar "Reenvio liberado 24 h depois do último lembrete".
 - [ ] **Passo 6: teste da página** (`TreinamentosPage.test.tsx`):
 
 ```tsx
@@ -658,7 +661,7 @@ namespace Betinhos.DriverRecordSharing
 
 ### Tarefa 13: Verificação e PR do shell da Fase 3
 
-- [ ] **Passo 1:** `verificar-treinamentos`: em Cobre, "push na criação (`cr40f_pushstatus` 100000000), status por funcionário, Lembrar pendentes (1 a cada 24 h, regra no plugin) e Reenviar push". No DEV: o POST de participação leva `cr40f_pushstatus: 100000000`, a chamada `cr40f_LembrarTreinamento` devolve as contagens, e o flow "Push Treinamentos | Motoristas" grava Enviado ou Falhou.
+- [ ] **Passo 1:** `verificar-treinamentos`: em Cobre, "push na criação (`cr40f_pushstatus` 100000000), status por funcionário, Lembrar pendentes (1 a cada 24 h, regra no plugin) e Reenviar push". No DEV: o POST de participação sai sem `cr40f_pushstatus` e o PATCH que o marca Pendente só acontece depois do PATCH que publica o treinamento, a chamada `cr40f_LembrarTreinamento` devolve as contagens, e o flow "Push Treinamentos | Motoristas" grava Enviado ou Falhou.
 - [ ] **Passo 2:** `qualidade-antes-do-pr` + `verificacao-manter` + ux-audit Rápido (painel com push falho e lembrete).
 - [ ] **Passo 3:** PR `feat(treinamentos): push e lembrete no painel`. No corpo, a dependência: "mergear só depois do flow ativo no DEV (PR do App)". Depois do merge: `pnpm push` e commit do bump.
 
@@ -680,7 +683,7 @@ Ensure-AttributeOn "cr40f_treinamentoparticipacao" (Memo "cr40f_ConteudoSnapshot
 Ensure-AttributeOn "cr40f_treinamentoparticipacao" (Text "cr40f_ConteudoHash" "Hash do conteudo lido" "SHA-256 (hex) do cr40f_conteudosnapshot" 64)
 ```
 
-- [ ] **Passo 2:** `$part` + `"cr40f_conteudosnapshot", "cr40f_conteudohash"`. DRY RUN. Commit `feat(treinamentos): colunas do snapshot da versão lida`, PR curto e `-Apply` na `main` depois do merge.
+- [ ] **Passo 2:** Acrescentar `"cr40f_conteudosnapshot", "cr40f_conteudohash"` à lista de `cr40f_treinamentoparticipacao` em `$esperado`. DRY RUN: as duas colunas aparecem como a criar. Commit `feat(treinamentos): colunas do snapshot da versão lida`, PR curto e `-Apply` na `main` depois do merge.
 
 ### Tarefa 15: App grava snapshot e hash na conclusão (repo App Motoristas)
 
@@ -691,6 +694,7 @@ Ensure-AttributeOn "cr40f_treinamentoparticipacao" (Text "cr40f_ConteudoHash" "H
 **Interfaces (produz):**
 - `snapshotConteudo(item: Treinamento): string` (JSON estável, sem espaços)
 - `sha256Hex(texto: string): Promise<string>`
+  - Limite assumido: o hash é do JSON do snapshot gravado e nada no shell o recalcula nem compara depois; ele identifica a versão, não prova que o registro não foi alterado. Por isso o PDF o chama de "identificador", não de prova de integridade.
 - Formato do snapshot: `{"v":1,"titulo","descricao","conteudo","videoUrl","anexos":[{"nome","tamanho"}],"exigeAssinatura","exigeQuiz","notaMinima","publicadoEm","editadoEm"}`. O shell lê esse formato na Tarefa 16.
 
 - [ ] **Passo 1: testes que falham:**
@@ -893,6 +897,7 @@ describe('comprovante PDF', () => {
   })
   it('remove o que a Helvetica não codifica e mantém os acentos', () => {
     expect(paraWinAnsi('Ação 🚗 · “ok”')).toBe('Ação  · “ok”')
+    expect(paraWinAnsi('a\u0085b\u007fc')).toBe('abc') // DEL e controles C1 não existem em WinAnsi
   })
 })
 ```
@@ -912,7 +917,7 @@ const COR = rgb(0.12, 0.12, 0.14)
 const SUAVE = rgb(0.42, 0.42, 0.46)
 // WinAnsi (Helvetica padrão): Latin-1 + aspas e travessões tipográficos. O resto (emoji etc.) sai.
 const EXTRAS = new Set([...'€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ'])
-export const paraWinAnsi = (texto: string) => [...texto].filter((c) => c === '\n' || (c >= ' ' && c.charCodeAt(0) <= 0xff) || EXTRAS.has(c)).join('')
+export const paraWinAnsi = (texto: string) => [...texto].filter((c) => c === '\n' || (c >= ' ' && c !== '\x7f' && !(c >= '\x80' && c <= '\x9f') && c.charCodeAt(0) <= 0xff) || EXTRAS.has(c)).join('')
 
 function quebrar(texto: string, font: PDFFont, size: number, max: number) {
   const linhas: string[] = []
@@ -920,8 +925,16 @@ function quebrar(texto: string, font: PDFFont, size: number, max: number) {
     let atual = ''
     for (const palavra of paragrafo.split(/\s+/).filter(Boolean)) {
       const tentativa = atual ? `${atual} ${palavra}` : palavra
-      if (font.widthOfTextAtSize(tentativa, size) <= max) atual = tentativa
-      else { if (atual) linhas.push(atual); atual = palavra }
+      if (font.widthOfTextAtSize(tentativa, size) <= max) { atual = tentativa; continue }
+      if (atual) linhas.push(atual)
+      atual = palavra
+      // Palavra maior que a linha (URL do vídeo, hash): quebra por caractere para não sair da página.
+      while (font.widthOfTextAtSize(atual, size) > max && atual.length > 1) {
+        let n = atual.length - 1
+        while (n > 1 && font.widthOfTextAtSize(atual.slice(0, n), size) > max) n -= 1
+        linhas.push(atual.slice(0, n))
+        atual = atual.slice(n)
+      }
     }
     linhas.push(atual)
   }
@@ -965,7 +978,7 @@ export async function gerarComprovantePdf(d: DadosComprovante): Promise<Uint8Arr
 
   if (d.assinatura.length) {
     texto(`Assinatura${d.nomeAssinante ? ` de ${d.nomeAssinante}` : ''}`, { negrito: true })
-    const w = 240, h = 90
+    const w = 240, h = 96 // mesma proporção 1000×400 do componente Assinatura
     espaco(h + 8)
     const bx = MARGEM, by = y - h
     page.drawRectangle({ x: bx, y: by, width: w, height: h, borderColor: SUAVE, borderWidth: 0.5 })
@@ -985,7 +998,7 @@ export async function gerarComprovantePdf(d: DadosComprovante): Promise<Uint8Arr
   }
   if (d.videoUrl) campo('Vídeo', d.videoUrl)
   if (d.anexos.length) campo('Anexos', d.anexos.join(', '))
-  if (d.hash) { y -= 6; texto(`SHA-256 do conteúdo lido: ${d.hash}`, { size: 8, cor: SUAVE }) }
+  if (d.hash) { y -= 6; texto(`Identificador (SHA-256) do registro da versão lida: ${d.hash}`, { size: 8, cor: SUAVE }) }
   return pdf.save()
 }
 ```
@@ -1015,7 +1028,7 @@ export async function gerarComprovantePdf(d: DadosComprovante): Promise<Uint8Arr
 ```
 
   `<Button variant="secondary" icon={<FileDown size={16} />} loading={gerando} onClick={() => void baixarComprovante(selected)}>Baixar comprovante</Button>`. O `import()` dinâmico mantém o pdf-lib fora do bundle inicial. `useToast` do `@betinhos/ui`, e `const [gerando, setGerando] = useState(false)`.
-- [ ] **Passo 5: teste da página:** no mock, abrir "Embarque no GRU". Com Carlos selecionado (concluído), o botão "Baixar comprovante" existe. Com Márcio selecionado (reprovado), não existe. Usar `vi.stubGlobal('URL', { ...URL, createObjectURL: vi.fn(() => 'blob:x'), revokeObjectURL: vi.fn() })` e conferir que `createObjectURL` foi chamado depois do clique.
+- [ ] **Passo 5: teste da página:** no mock, abrir "Embarque no GRU". Com Carlos selecionado (concluído), o botão "Baixar comprovante" existe. Com Márcio selecionado (reprovado), não existe. Usar `URL.createObjectURL = vi.fn(() => 'blob:x'); URL.revokeObjectURL = vi.fn()` (restaurar no `afterEach`); não trocar o `URL` global por um objeto, porque `new URL(...)` (usado em `isVideoValido`) deixaria de funcionar no teste. Conferir que `createObjectURL` foi chamado depois do clique.
 - [ ] **Passo 6:** `vitest run src/pages/treinamentos` → PASSA; `pnpm typecheck`; `pnpm --filter @betinhos/shell build` sem aviso novo de chunk. Commit `feat(treinamentos): comprovante individual em PDF da versão lida`.
 
 ### Tarefa 18: Verificação e PR da Fase 4
@@ -1082,7 +1095,7 @@ describe('publicoLabel', () => {
 })
 ```
 
-  Em `TreinamentosPage.test.tsx`: abrir "Embarque no GRU" e esperar `findAllByText(/Motorista/)` na descrição do painel. Num editor novo, sem título, clicar "Adicionar foto ou arquivo" → `findByText('Preencha o título antes de anexar.')` aparece (toast).
+  Em `TreinamentosPage.test.tsx`: abrir "Embarque no GRU" e esperar `findAllByText(/Motorista/)` na descrição do painel. Num editor novo, sem título, disparar `fireEvent.change` no input de arquivo com um `File` válido (clicar no botão só abre o seletor e nunca chega em `garantirId`) → `findByText('Preencha o título antes de anexar.')` aparece (toast).
 
 - [ ] **Passo 2:** `pnpm exec vitest run src/pages/treinamentos` → FALHA.
 - [ ] **Passo 3: S4 (domínio).** O `FUNCAO` vem de `../../funcionarios/data/schema` (o editor já o importa). Em `treinamentos.ts`:
@@ -1102,7 +1115,7 @@ export function publicoLabel(item: Pick<Treinamento, 'publicoTipo' | 'publico'>,
     const nomes = item.publico.map((v) => FUNCAO.find((f) => String(f.value) === v)?.label).filter((x): x is string => Boolean(x))
     return nomes.length === item.publico.length && nomes.length ? juntar(nomes.slice(0, 2), nomes.length) : `${item.publico.length} ${plural(item.publico.length, 'função', 'funções')}`
   }
-  const nomes = item.publico.map((id) => funcionarios.find((f) => f.id === id)?.nome).filter((x): x is string => Boolean(x))
+  const nomes = item.publico.map((id) => funcionarios.find((f) => cleanId(f.id) === cleanId(id))?.nome).filter((x): x is string => Boolean(x))
   return nomes.length === item.publico.length && nomes.length ? juntar(nomes.slice(0, 2), nomes.length) : `${item.publico.length} ${plural(item.publico.length, 'selecionado', 'selecionados')}`
 }
 ```
@@ -1115,11 +1128,11 @@ export function publicoLabel(item: Pick<Treinamento, 'publicoTipo' | 'publico'>,
 
 ```css
   .tr-results > .bt-surface__header { flex-wrap: wrap; }
-  .tr-results .bt-segmented { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
-  .tr-results .bt-segmented button { min-height: 36px; white-space: nowrap; }
+  .tr-results .bt-segmented { width: 100%; }
+  .tr-results .bt-segmented button { flex: 1 1 0; min-height: 40px; padding-inline: var(--bt-space-1); }
 ```
 
-  Conferir no DOM (devtools ou o snapshot do relatório) as classes reais do header do `Surface` e do `SegmentedControl` do DS e ajustar os seletores; o objetivo é o filtro quebrar para a linha de baixo do título e rolar na horizontal dentro do card.
+  Conferir no DOM (devtools ou o snapshot do relatório) as classes reais do header do `Surface` e do `SegmentedControl` do DS e ajustar os seletores; o objetivo é o filtro quebrar para a linha de baixo do título e caber inteiro na largura do card, com os quatro rótulos visíveis (o defeito do UX-S1 é "Reprovados" cortado; rolar na horizontal só esconderia o rótulo). Se não couberem em 343 px, encurtar os rótulos para "Todos", "Pendentes", "Concluídos", "Reprovados" e mover a contagem para o `aria-label`, como propõe o relatório.
 - [ ] **Passo 7: S2.** Em `TreinamentoPainel.tsx`: `const detalheRef = useRef<HTMLDivElement | null>(null)` em volta do `Surface` do detalhe (`<div ref={detalheRef} tabIndex={-1}>`). No clique da pessoa:
 
 ```tsx

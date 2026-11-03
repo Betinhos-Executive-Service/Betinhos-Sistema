@@ -1,6 +1,6 @@
 # Auditoria de UX (modo Fluxo): RH no módulo Treinamentos do shell
 
-Data: 03/11/2026 · Branch `t3/revisar-melhorar-treinamentos` · Shell v0.0.129 em mock local (`vite --port 36495`; a 36490 e a 36491 já estavam ocupadas por outros projetos) · Playwright + axe-core 4.x (headless Chromium) · Viewports 1366×800 e 375×812.
+Data: 03/11/2026 · Branch `t3/revisar-melhorar-treinamentos` · Shell v0.0.129 em mock local (`vite --port 36495` direto, só para esta auditoria; a 36490 e a 36491 estavam ocupadas por outros projetos. A porta do projeto é a 36472 via `pnpm dev`) · Playwright + axe-core 4.x (headless Chromium) · Viewports 1366×800 e 375×812.
 
 **Persona:** RH da Betinhos, conforto técnico médio, publica o treinamento entre outras tarefas; no celular só confere andamento. Lente de primeiro uso aplicada nas duas telas (editor e painel).
 
@@ -24,7 +24,7 @@ A tarefa se completa nos dois viewports sem erro de console nem de rede, mas os 
 - **Observado:** a linha fica destacada, mas a linha do tempo, a assinatura e o motivo da reprovação aparecem cerca de 550 px abaixo da lista, sem rolagem nem aviso. O RH acha que o toque não fez nada.
 - **Evidência:** `img/ux-s2-toque-sem-detalhe-375.png` (depois do toque a tela continua na lista).
 - **Suspeito:** `TreinamentoPainel.tsx:115` (`setSelectedId`) e `:132-146` (`aside.tr-detail`, empilhado por `treinamentos.css:107`).
-- **Correção proposta:** em viewport estreito, ao selecionar, rolar até `.tr-detail` (`scrollIntoView({ block: 'start' })` num `useEffect` sobre `selectedId`, só quando `matchMedia('(max-width: 900px)')`), ou abrir o detalhe num `Dialog` de tela cheia com "Voltar à lista".
+- **Correção proposta:** em viewport estreito, ao selecionar, rolar até `.tr-detail` (`scrollIntoView({ block: 'start' })` num `useEffect` sobre `selectedId`, só quando `matchMedia('(max-width: 1120px)')`, o ponto em que `.tr-report` vira uma coluna (`treinamentos.css:107`)), ou abrir o detalhe num `Dialog` de tela cheia com "Voltar à lista".
 
 ### UX-S3 · média · Anexar sem título falha em silêncio no celular
 - **Reprodução:** 375 px → "Novo treinamento" → sem preencher nada, "Adicionar foto ou arquivo" → escolher o PDF.
