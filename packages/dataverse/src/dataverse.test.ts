@@ -73,6 +73,17 @@ describe('xrm shim', () => {
     expect(xrm.Utility!.getGlobalContext().getClientUrl()).toBe('https://org.example')
   })
 
+  it('repassa o cookie de paginação do FetchXML (telas com views só carregavam a 1ª página)', async () => {
+    const cookie = '<cookie pagenumber="2" pagingcookie="%253ccookie" />'
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('EntityDefinitions')) return json({ LogicalName: 'cr40f_reserva', EntitySetName: 'cr40f_reservas' })
+      return json({ value: [{ a: 1 }], '@Microsoft.Dynamics.CRM.fetchxmlpagingcookie': cookie })
+    })
+    const xrm = createXrmShim(createClient('https://org.example', fetchMock as unknown as typeof fetch), 'https://org.example')
+    const page = await xrm.WebApi!.retrieveMultipleRecords('cr40f_reserva', '?fetchXml=%3Cfetch%2F%3E')
+    expect(page.fetchXmlPagingCookie).toBe(cookie)
+  })
+
   it('executa Custom API sem vínculo por POST e devolve o erro do servidor como Response', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
