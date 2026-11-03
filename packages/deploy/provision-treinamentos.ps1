@@ -258,6 +258,11 @@ if ($partId) {
   Ensure-AttributeOn $part (Int "cr40f_Tentativas" "Tentativas" "Quantas vezes respondeu o quiz" 0 1000)
   Ensure-AttributeOn $part (Memo "cr40f_RespostasJson" "Respostas (JSON)" "Alternativas marcadas na última tentativa" 100000)
   Ensure-AttributeOn $part (DateTimeUtc "cr40f_ConcluidoEm" "Concluído em" "Quando cumpriu tudo que o treinamento exige (leitura, assinatura e quiz)")
+  Ensure-AttributeOn $part (Picklist "cr40f_PushStatus" "Status do push" "Pendente: o flow Push Treinamentos envia e grava Enviado ou Falhou" @("Pendente", "Enviado", "Falhou"))
+  Ensure-AttributeOn $part (Text "cr40f_PushErro" "Erro do push" "Mensagem do conector quando o push falha" 1000)
+  Ensure-AttributeOn $part (DateTimeUtc "cr40f_LembradoEm" "Lembrado em" "Último lembrete enfileirado pela Custom API cr40f_LembrarTreinamento (1 a cada 24 h)")
+  Ensure-AttributeOn $part (Memo "cr40f_ConteudoSnapshot" "Conteúdo lido" "JSON da versão do treinamento no momento da conclusão, gravado pelo App Motoristas" 120000)
+  Ensure-AttributeOn $part (Text "cr40f_ConteudoHash" "Identificador do conteúdo lido" "SHA-256 (hex) do cr40f_conteudosnapshot; identifica a versão lida, não prova integridade" 64)
   # Excluir o treinamento apaga as participações (Cascade). Funcionário com participação não pode ser excluído (Restrict):
   # nota e assinatura são prova de treinamento; o caminho normal é marcar como Desligado.
   Ensure-Lookup $relTrein $trein $part "cr40f_Treinamento" "Treinamento" "Treinamento desta participação" "Cascade" "ApplicationRequired"
@@ -269,7 +274,7 @@ if ($Apply) {
   Invoke-Dataverse "POST" "PublishXml" @{ ParameterXml = "<importexportxml><entities><entity>$trein</entity><entity>$part</entity></entities></importexportxml>" } | Out-Null
   $esperado = @{
     $trein = @("cr40f_name", "cr40f_descricao", "cr40f_conteudo", "cr40f_videourl", "cr40f_anexosjson", "cr40f_publicotipo", "cr40f_publicojson", "cr40f_exigeassinatura", "cr40f_exigequiz", "cr40f_notaminima", "cr40f_quizjson", "cr40f_validade", "cr40f_estado", "cr40f_publicadoem", "cr40f_editadoem")
-    $part = @("cr40f_name", "cr40f_abertoem", "cr40f_confirmadoem", "cr40f_assinadoem", "cr40f_nomeassinante", "cr40f_assinaturajson", "cr40f_nota", "cr40f_aprovado", "cr40f_tentativas", "cr40f_respostasjson", "cr40f_concluidoem", "cr40f_treinamento", "cr40f_funcionario")
+    $part = @("cr40f_name", "cr40f_abertoem", "cr40f_confirmadoem", "cr40f_assinadoem", "cr40f_nomeassinante", "cr40f_assinaturajson", "cr40f_nota", "cr40f_aprovado", "cr40f_tentativas", "cr40f_respostasjson", "cr40f_concluidoem", "cr40f_pushstatus", "cr40f_pusherro", "cr40f_lembradoem", "cr40f_conteudosnapshot", "cr40f_conteudohash", "cr40f_treinamento", "cr40f_funcionario")
   }
   $missing = @(); foreach ($e in $esperado.Keys) { $missing += @($esperado[$e] | Where-Object { -not (Get-AttributeId $e $_) } | ForEach-Object { "$e.$_" }) }
   if ($missing.Count) { throw "Colunas ausentes apos a publicacao: $($missing -join ', ')" }
