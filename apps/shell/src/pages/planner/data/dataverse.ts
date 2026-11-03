@@ -536,10 +536,26 @@ function waitingTargetIds(state: LiveState, context: WaitingContext | null | und
     .flatMap((team) => team.memberIds || []))];
 }
 
+const resolvedUserIds = new WeakMap<object, string>();
+
+/** Usuário atual: `userSettings` do model-driven ou, no Xrm simulado do shell (sem userSettings), o resolvido por `ensureCurrentUserId`. */
+function currentUserIdOf(xrm: PlannerXrm) {
+  return cleanId(xrm.Utility?.getGlobalContext?.().userSettings?.userId) || resolvedUserIds.get(xrm) || "";
+}
+
+async function ensureCurrentUserId(xrm: PlannerXrm) {
+  if (currentUserIdOf(xrm)) return;
+  try {
+    const who = asRecord(await request(xrm, "/WhoAmI"));
+    const userId = cleanId(who.UserId);
+    if (userId) resolvedUserIds.set(xrm, userId);
+  } catch (error) {
+    console.warn("[Planner] WhoAmI indisponível; usuário atual não identificado", error);
+  }
+}
+
 async function loadCurrentUserEmail(xrm: PlannerXrm) {
-  const userId = cleanId(
-    xrm.Utility?.getGlobalContext?.().userSettings?.userId,
-  );
+  const userId = currentUserIdOf(xrm);
   if (!userId) return "";
   try {
     const rows = await retrieveMany(
@@ -861,7 +877,9 @@ async function reorderLivePersonalTags(xrm: PlannerXrm, _state: LiveState, order
   return loadLiveState(xrm);
 }
 
-async function replaceLiveTaskPersonalTags(xrm: PlannerXrm, state: LiveState, taskId: string, tagIds: string[] | { tagIds?: unknown } = {}, ownerUserId: unknown = state.currentUserId) {
+async function replaceLiveTaskPersonalTags(xrm: PlannerXrm, state: LiveState, taskId: string, tagIds: string[] | { tagIds?: unknown } = {}, ownerUserIdInput: unknown = state.currentUserId) {
+  const ownerUserId = cleanId(ownerUserIdInput || state.currentUserId);
+  if (!ownerUserId) throw new Error("Usuário atual não identificado para salvar as tags pessoais.");
   const ids = normalizePersonalTagIds(Array.isArray(tagIds) ? tagIds : tagIds.tagIds);
   const nextIds = resolveOwnedPersonalTagIds(state.personalTags || [], ids, ownerUserId);
   const current = await retrieveMany(xrm, PERSONAL_TAG_TASK_TABLE, `?$select=cr40f_plannertagpessoaltarefaid&$filter=_cr40f_usuario_value eq ${cleanId(ownerUserId)} and _cr40f_tarefa_value eq ${cleanId(taskId)} and statecode eq 0`);
@@ -1573,11 +1591,12 @@ function buildCoreState(xrm: PlannerXrm, rows: Row[], relations: Row[], assignee
     const creator = employeeRecords.find((employee) => cleanId(employee.userId).toLowerCase() === cleanId(task.creatorUserId).toLowerCase());
     return { ...applyDynamicTeamAssignment(task, teams, employeeRecords), creatorEmployeeId: creator?.id || "", parentTaskId: relationByChild.get(s(row.cr40f_plannertarefaid)) || null, detailsLoaded: false };
   }), personalTagData.personalTagAssignments || []);
-  return { quotes: [], employees: employeeRecords, teams, currentUserEmail, currentUserId: cleanId(xrm.Utility?.getGlobalContext?.().userSettings?.userId), personalTags: personalTagData.personalTags || [], personalTagsUnavailable: Boolean(personalTagData.personalTagsUnavailable), quality: [], tasks, notifications: [], lastUpdated: new Date().toISOString(), live: true, loading: { core: false, quotes: true, quality: true, notifications: true } };
+  return { quotes: [], employees: employeeRecords, teams, currentUserEmail, currentUserId: currentUserIdOf(xrm), personalTags: personalTagData.personalTags || [], personalTagsUnavailable: Boolean(personalTagData.personalTagsUnavailable), quality: [], tasks, notifications: [], lastUpdated: new Date().toISOString(), live: true, loading: { core: false, quotes: true, quality: true, notifications: true } };
 }
 
 export async function loadCoreState(xrm: PlannerXrm): Promise<LiveState> {
-  const currentUserId = cleanId(xrm.Utility?.getGlobalContext?.().userSettings?.userId);
+  await ensureCurrentUserId(xrm);
+  const currentUserId = currentUserIdOf(xrm);
   const [rows, relations, assigneeRelations, employees, currentUserEmail, teams, teamRelations, personalTagData] = await Promise.all([
     measureStage("tarefas", () => retrievePlannerTasks(xrm)),
     measureStage("relações", () => retrieveMany(xrm, RELATION_TABLE, "?$select=cr40f_plannertarearelacaoid,_cr40f_tarefapai_value,_cr40f_subtarefa_value&$filter=statecode eq 0")),
@@ -1629,7 +1648,8 @@ export async function searchQuotes(xrm: PlannerXrm, query: unknown) {
 }
 
 async function loadLiveState(xrm: PlannerXrm): Promise<LiveState> {
-  const currentUserId = cleanId(xrm.Utility?.getGlobalContext?.().userSettings?.userId);
+  await ensureCurrentUserId(xrm);
+  const currentUserId = currentUserIdOf(xrm);
   const [quotes, rows, events, relations, assigneeRelations, qualityErrors, qualityActions, employees, currentUserEmail, teams, teamRelations, personalTagData] = await Promise.all([
     quoteSelect(xrm).then((quoteFields) => loadActiveQuotes(xrm, quoteFields)),
     retrievePlannerTasks(xrm),
