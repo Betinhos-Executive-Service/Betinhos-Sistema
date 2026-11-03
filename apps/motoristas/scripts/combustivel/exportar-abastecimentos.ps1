@@ -4,6 +4,10 @@ param(
   [switch] $DeviceCode,
   # Pula o download dos cupons (Graph). Use quando o ClientId nao tem consentimento de Files.Read.All (AADSTS65002).
   [switch] $SemCupons,
+  # ClientId de um app próprio com Files.Read.All delegado, usado só para baixar os cupons no Graph.
+  [string] $GraphClientId = "",
+  # Tenant do app de -GraphClientId (app de um tenant só não aceita "organizations").
+  [string] $GraphTenantId = "bed8b3ad-d487-4193-a748-09e16f0e0327",
   # Nomes lógicos dos lookups da despesa (confirmados em scripts/import-despesas-operacionais-csv.ps1, linha 508).
   [string] $LkMotorista = "cr40f_motorista",
   [string] $LkCategoria = "cr40f_categoria",
@@ -35,7 +39,14 @@ if (-not $token) { throw "Token Dataverse nao obtido." }
 # Token Graph pelo mesmo app. Se o consentimento de Files.Read.All não existir para este ClientId, falha aqui, antes de ler dados.
 $graphToken = $null
 if (-not $SemCupons) {
-  $graphToken = Get-Token "https://graph.microsoft.com/Files.Read.All"
+  if ($GraphClientId) {
+    # App próprio do Betinhos com Files.Read.All delegado (o app do Power Platform não tem pré-autorização para o Graph).
+    $graphClient = New-MsalClientApplication -ClientId $GraphClientId -TenantId $GraphTenantId -RedirectUri ([Uri] "http://localhost")
+    Enable-MsalTokenCacheOnDisk -PublicClientApplication $graphClient
+    $graphToken = (Get-MsalToken -PublicClientApplication $graphClient -Scopes "https://graph.microsoft.com/Files.Read.All" -DeviceCode).AccessToken
+  } else {
+    $graphToken = Get-Token "https://graph.microsoft.com/Files.Read.All"
+  }
   if (-not $graphToken) { throw "Token Graph (Files.Read.All) nao obtido." }
 }
 $apiBase = "$baseUrl/api/data/v9.2"
