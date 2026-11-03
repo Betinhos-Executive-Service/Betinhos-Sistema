@@ -105,8 +105,11 @@ $linhas = foreach ($d in $despesas) {
     $ext = if ($anexo[0].cr40f_mimetype -like "*png*") { "png" } else { "jpg" }
     $arquivo = Join-Path $cupons "$id.$ext"
     if (-not (Test-Path $arquivo)) {
-      Invoke-WebRequest -Method GET -Uri "https://graph.microsoft.com/v1.0/shares/$share/driveItem/content" -Headers @{ Authorization = "Bearer $graphToken" } -OutFile $arquivo
+      # Um cupom apagado ou sem permissão não deve derrubar a exportação inteira: segue sem arquivo.
+      try { Invoke-WebRequest -Method GET -Uri "https://graph.microsoft.com/v1.0/shares/$share/driveItem/content" -Headers @{ Authorization = "Bearer $graphToken" } -OutFile $arquivo -ErrorAction Stop }
+      catch { Write-Warning "Cupom da despesa $id nao baixado: $($_.Exception.Message)"; Remove-Item -LiteralPath $arquivo -Force -ErrorAction SilentlyContinue }
     }
+    if (-not (Test-Path $arquivo)) { $arquivo = "" }
   }
   $veiculoId = $d."_${LkVeiculo}_value"
   [pscustomobject]@{
@@ -115,6 +118,6 @@ $linhas = foreach ($d in $despesas) {
     estabelecimento = $d.cr40f_estabelecimento; cidade = $d."_${LkCidade}_value@OData.Community.Display.V1.FormattedValue"; createdOn = $d.createdon; arquivo = $arquivo
   }
 }
-$linhas = @($linhas)
+$linhas = @($linhas | Where-Object { $_ })
 $linhas | Export-Csv -Path (Join-Path $out "abastecimentos.csv") -NoTypeInformation -Encoding UTF8
 Write-Host "[combustivel] $($linhas.Count) abastecimentos; $(@($linhas | Where-Object { $_.arquivo }).Count) com cupom baixado em $cupons"

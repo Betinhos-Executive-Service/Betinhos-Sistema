@@ -26,14 +26,18 @@ let lidos = 0;
 let nulos = 0;
 for (const row of parseCsv(join(dir, "abastecimentos.csv"))) {
   if (!row.arquivo || done.has(row.despesaId)) continue;
-  const mediaType = extname(row.arquivo) === ".png" ? "image/png" : "image/jpeg";
+  const mediaType = extname(row.arquivo).toLowerCase() === ".png" ? "image/png" : "image/jpeg";
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
     body: JSON.stringify(buildCnpjVisionRequest(readFileSync(row.arquivo).toString("base64"), mediaType))
   });
-  const cnpj = response.ok ? parseCnpjVisionResponse(await response.json()) : null;
-  if (!response.ok) console.error(`[combustivel] HTTP ${response.status} em ${row.despesaId}`);
+  if (!response.ok) {
+    // Falha de API não é "cupom sem CNPJ": não grava, para que a próxima execução tente de novo.
+    console.error(`[combustivel] HTTP ${response.status} em ${row.despesaId}; será retentado na próxima execução`);
+    continue;
+  }
+  const cnpj = parseCnpjVisionResponse(await response.json());
   appendFileSync(out, `${row.despesaId},${cnpj ?? ""}\n`);
   cnpj ? lidos++ : nulos++;
 }
