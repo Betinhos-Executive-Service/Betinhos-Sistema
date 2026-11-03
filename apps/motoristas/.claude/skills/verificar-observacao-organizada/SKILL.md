@@ -15,6 +15,7 @@ description: "Verifica o organizador de observação do motorista: plugin Organi
 5. Depois de validar: esvaziar o valor padrão de `new_AnthropicKeyObservacaoMotorista` e repetir a chamada; tem de continuar organizando.
 
 ## Casos de borda
+- A variável de ambiente é lida por `SecretReader` (tipo Secret do Key Vault; cai para String se não for Secret). `SecretReaderTests.cs` cobre os dois caminhos; no DEV, com a variável como String, a chamada continua organizando.
 - Sem configuração segura (step antigo), a chave vem da variável de ambiente, como antes.
 - Configuração segura só com espaços vale como ausente.
 - `-ConfigurarChaveSegura` sem `-Apply` lança erro.
