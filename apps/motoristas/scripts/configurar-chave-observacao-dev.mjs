@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // Grava a chave da API Anthropic na configuração segura do step de new_OrganizarObservacao no DEV (Linux/macOS).
-// A chave vem de um ARQUIVO (canal seguro, ex.: recurso de segredo do T3), nunca de argumento, e o arquivo é apagado ao final.
-// O valor nunca é impresso. Não cria step nem tipo: eles vêm de scripts/provision-observacao-organizada.ps1.
+// A chave vem da variável de ambiente que já a guarda no DEV (--copiar-da-variavel) ou de um ARQUIVO (canal seguro), nunca de argumento;
+// o arquivo é apagado ao final. O valor nunca é impresso. Não cria step nem tipo: eles vêm de scripts/provision-observacao-organizada.ps1.
 //
 //   node scripts/configurar-chave-observacao-dev.mjs --verificar             # só confere o step e se há configuração segura
-//   node scripts/configurar-chave-observacao-dev.mjs --arquivo <caminho>     # grava (e apaga o arquivo)
+//   node scripts/configurar-chave-observacao-dev.mjs --copiar-da-variavel   # copia o valor da variável do DEV para o step
+//   node scripts/configurar-chave-observacao-dev.mjs --arquivo <caminho>     # grava a chave do arquivo (e apaga o arquivo)
 import dns from "node:dns";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -14,9 +15,12 @@ const ENVIRONMENT_URL = "https://org23b93544.crm2.dynamics.com"; // DEV
 const CLIENT_ID = "51f81489-12ee-4a9e-aaae-a2591f45987d";
 const PLUGIN_TYPE = "Betinhos.DriverRecordSharing.OrganizeObservationPlugin";
 const API_NAME = "new_OrganizarObservacao";
+const ENV_VAR = "new_AnthropicKeyObservacaoMotorista";
 const argv = process.argv.slice(2);
 const fileIndex = argv.indexOf("--arquivo");
 const keyFile = fileIndex >= 0 ? argv[fileIndex + 1] : "";
+const fromVariable = argv.includes("--copiar-da-variavel");
+const verifyOnly = argv.includes("--verificar");
 
 async function fetchRetry(url, init, attempts = 4) {
   for (let attempt = 1; ; attempt += 1) {
@@ -45,12 +49,11 @@ async function deviceCodeToken() {
 }
 
 async function main() {
-  if (fileIndex < 0 === !argv.includes("--verificar")) throw new Error("Use --verificar ou --arquivo <caminho>.");
+  if ([verifyOnly, fromVariable, fileIndex >= 0].filter(Boolean).length !== 1) throw new Error("Use exatamente um: --verificar, --copiar-da-variavel ou --arquivo <caminho>.");
   let secret = "";
   if (keyFile) {
     if (!existsSync(keyFile)) throw new Error("Arquivo da chave não encontrado.");
     secret = readFileSync(keyFile, "utf8").trim();
-    if (!secret) throw new Error("Chave vazia: nada foi gravado.");
   }
   try {
     const token = await deviceCodeToken();
@@ -75,7 +78,14 @@ async function main() {
     if (step.stage !== 40 || step.mode !== 0) throw new Error("Step divergente (esperado PostOperation síncrono).");
     const secureId = step._sdkmessageprocessingstepsecureconfigid_value;
     console.log(`Step ${step.sdkmessageprocessingstepid}: configuração segura ${secureId ? "presente" : "ausente"}.`);
-    if (!keyFile) return;
+    if (verifyOnly) return;
+    if (fromVariable) {
+      // Mesma regra do app: o valor da variável, se houver; senão o padrão da definição.
+      const definition = await one(`environmentvariabledefinitions?$select=environmentvariabledefinitionid,defaultvalue&$filter=schemaname eq '${ENV_VAR}'`, "variável de ambiente");
+      const values = (await api("GET", `environmentvariablevalues?$select=value&$filter=_environmentvariabledefinitionid_value eq ${definition.environmentvariabledefinitionid}`)).value;
+      secret = String(values[0]?.value ?? definition.defaultvalue ?? "").trim();
+    }
+    if (!secret) throw new Error("Chave vazia: nada foi gravado.");
     if (secureId) await api("PATCH", `sdkmessageprocessingstepsecureconfigs(${secureId})`, { secureconfig: secret });
     else {
       const created = await api("POST", "sdkmessageprocessingstepsecureconfigs", { secureconfig: secret });
