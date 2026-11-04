@@ -8,7 +8,7 @@ description: "Verifica a conciliação diária do cartão de crédito (Banco MCP
 - Schema (`provision-conciliacao-cartao.ps1`): `cr40f_cartaocorporativo` (conta, final, vigência DateOnly, motorista), `cr40f_transacaocartao` (chave alternativa em `cr40f_idexterno`, situação, motivo, lookups cartão/despesa/motorista) e `cr40f_despesaoperacional.cr40f_conciliadacartao`.
 - Privilégios das duas tabelas para "Acesso-Betinhos-MDA" e "DEV - Usuário".
 - Conector `new_betinhos-20banco-20mcp` (só leitura: ListarConexoes, ListarContas, ListarTransacoes) e a referência `new_BetinhosBancoMcp`. A API key fica só na conexão do Power Platform.
-- Flow diário 07:00: leitura toda antes de gravar; transação gravada antes de criar/casar despesa; casa por motorista do cartão vigente, forma "Cartão de crédito", valor ±0,05 e compra -1..+2 dias; sem despesa cria uma (origem 100000002, statusoperacional 100000001) para o motorista validar; push `gastos-cartao` por motorista.
+- Flow diário 08:00: leitura toda antes de gravar; transação gravada antes de criar/casar despesa; casa por motorista do cartão vigente, forma "Cartão de crédito", valor ±0,05 e compra -1..+2 dias; sem despesa cria uma (origem 100000002, statusoperacional 100000001) para o motorista validar; push `gastos-cartao` por motorista.
 
 ## Testes locais (sem Dataverse)
 ```

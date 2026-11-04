@@ -12,7 +12,7 @@
     }
   },
   "triggers": {
-    "Todo_dia_7h": {
+    "Todo_dia_8h": {
       "type": "Recurrence",
       "recurrence": {
         "frequency": "Day",
@@ -20,7 +20,7 @@
         "timeZone": "E. South America Standard Time",
         "schedule": {
           "hours": [
-            "7"
+            "8"
           ],
           "minutes": [
             0

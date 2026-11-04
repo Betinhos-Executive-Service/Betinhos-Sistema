@@ -7,7 +7,7 @@
 )
 
 # Cria (ou atualiza) no DEV o flow "Conciliação do cartão | Diário" (flows/conciliacao-cartao-diario.json) e o inclui na solução do .env.
-# Todo dia às 07:00 (São Paulo) lê pelo conector Betinhos Banco MCP as transações dos cartões de crédito (D-10..hoje, nunca antes de -Inicio),
+# Todo dia às 08:00 (São Paulo) lê pelo conector Betinhos Banco MCP as transações dos cartões de crédito (D-10..hoje, nunca antes de -Inicio),
 # grava cr40f_transacaocartao (idempotente pelo id do banco), casa com a despesa lançada pelo motorista ou cria uma para ele validar,
 # e avisa por push cada motorista com gasto do cartão pendente.
 # Ordem: provision-conciliacao-cartao.ps1, conceder-privilegios-conciliacao-cartao.ps1, provision-conector-banco-mcp.ps1, este script.
@@ -148,7 +148,7 @@ if ($faltas.Count) {
 }
 
 $nome = 'Conciliação do cartão | Diário'
-$descricao = "Todo dia às 07:00 lê as transações dos cartões pelo Banco MCP (D-10..hoje, desde $Inicio), grava cr40f_transacaocartao, casa com a despesa do motorista ou cria uma para ele validar e avisa por push."
+$descricao = "Todo dia às 08:00 lê as transações dos cartões pelo Banco MCP (D-10..hoje, desde $Inicio), grava cr40f_transacaocartao, casa com a despesa do motorista ou cria uma para ele validar e avisa por push."
 $raw = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'flows\conciliacao-cartao-diario.json'), [Text.Encoding]::UTF8)
 $trocas = [ordered]@{
   '"__CATEGORIAS__"' = ($categorias | ConvertTo-Json -Compress)

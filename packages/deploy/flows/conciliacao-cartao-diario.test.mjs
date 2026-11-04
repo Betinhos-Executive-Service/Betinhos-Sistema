@@ -21,11 +21,11 @@ const acao = (nome) => {
   return todas.get(nome)
 }
 
-test('roda uma vez por dia às 07:00 de Brasília, sem execuções simultâneas', () => {
-  const gatilho = flow.triggers.Todo_dia_7h
+test('roda uma vez por dia às 08:00 de Brasília, sem execuções simultâneas', () => {
+  const gatilho = flow.triggers.Todo_dia_8h
   assert.equal(gatilho.recurrence.frequency, 'Day')
   assert.equal(gatilho.recurrence.timeZone, 'E. South America Standard Time')
-  assert.deepEqual(gatilho.recurrence.schedule, { hours: ['7'], minutes: [0] })
+  assert.deepEqual(gatilho.recurrence.schedule, { hours: ['8'], minutes: [0] })
   assert.equal(gatilho.runtimeConfiguration.concurrency.runs, 1)
 })
 
