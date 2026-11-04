@@ -1,0 +1,1495 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$authentication": {
+      "defaultValue": {},
+      "type": "SecureObject"
+    },
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    }
+  },
+  "triggers": {
+    "Todo_dia_7h": {
+      "type": "Recurrence",
+      "recurrence": {
+        "frequency": "Day",
+        "interval": 1,
+        "timeZone": "E. South America Standard Time",
+        "schedule": {
+          "hours": [
+            "7"
+          ],
+          "minutes": [
+            0
+          ]
+        }
+      },
+      "runtimeConfiguration": {
+        "concurrency": {
+          "runs": 1
+        }
+      }
+    }
+  },
+  "actions": {
+    "Parametros": {
+      "type": "Compose",
+      "runAfter": {},
+      "inputs": {
+        "inicio": "__INICIO__",
+        "formaCartao": "__FORMA_CARTAO__",
+        "categorias": "__CATEGORIAS__"
+      }
+    },
+    "Hoje": {
+      "type": "Compose",
+      "runAfter": {
+        "Parametros": [
+          "Succeeded"
+        ]
+      },
+      "inputs": "@formatDateTime(convertFromUtc(utcNow(), 'E. South America Standard Time'), 'yyyy-MM-dd')"
+    },
+    "De": {
+      "type": "Compose",
+      "runAfter": {
+        "Hoje": [
+          "Succeeded"
+        ]
+      },
+      "inputs": "@if(less(formatDateTime(addDays(outputs('Hoje'), -10), 'yyyy-MM-dd'), outputs('Parametros')?['inicio']), outputs('Parametros')?['inicio'], formatDateTime(addDays(outputs('Hoje'), -10), 'yyyy-MM-dd'))"
+    },
+    "Var_transacoes": {
+      "type": "InitializeVariable",
+      "runAfter": {
+        "De": [
+          "Succeeded"
+        ]
+      },
+      "inputs": {
+        "variables": [
+          {
+            "name": "Transacoes",
+            "type": "array",
+            "value": []
+          }
+        ]
+      }
+    },
+    "Var_pagina": {
+      "type": "InitializeVariable",
+      "runAfter": {
+        "Var_transacoes": [
+          "Succeeded"
+        ]
+      },
+      "inputs": {
+        "variables": [
+          {
+            "name": "Pagina",
+            "type": "integer",
+            "value": 1
+          }
+        ]
+      }
+    },
+    "Var_total_paginas": {
+      "type": "InitializeVariable",
+      "runAfter": {
+        "Var_pagina": [
+          "Succeeded"
+        ]
+      },
+      "inputs": {
+        "variables": [
+          {
+            "name": "TotalPaginas",
+            "type": "integer",
+            "value": 1
+          }
+        ]
+      }
+    },
+    "Var_situacao": {
+      "type": "InitializeVariable",
+      "runAfter": {
+        "Var_total_paginas": [
+          "Succeeded"
+        ]
+      },
+      "inputs": {
+        "variables": [
+          {
+            "name": "Situacao",
+            "type": "integer",
+            "value": 100000000
+          }
+        ]
+      }
+    },
+    "Var_motivo": {
+      "type": "InitializeVariable",
+      "runAfter": {
+        "Var_situacao": [
+          "Succeeded"
+        ]
+      },
+      "inputs": {
+        "variables": [
+          {
+            "name": "Motivo",
+            "type": "string",
+            "value": ""
+          }
+        ]
+      }
+    },
+    "Var_cartao": {
+      "type": "InitializeVariable",
+      "runAfter": {
+        "Var_motivo": [
+          "Succeeded"
+        ]
+      },
+      "inputs": {
+        "variables": [
+          {
+            "name": "CartaoId",
+            "type": "string",
+            "value": ""
+          }
+        ]
+      }
+    },
+    "Var_motorista": {
+      "type": "InitializeVariable",
+      "runAfter": {
+        "Var_cartao": [
+          "Succeeded"
+        ]
+      },
+      "inputs": {
+        "variables": [
+          {
+            "name": "MotoristaId",
+            "type": "string",
+            "value": ""
+          }
+        ]
+      }
+    },
+    "Var_despesa": {
+      "type": "InitializeVariable",
+      "runAfter": {
+        "Var_motorista": [
+          "Succeeded"
+        ]
+      },
+      "inputs": {
+        "variables": [
+          {
+            "name": "DespesaId",
+            "type": "string",
+            "value": ""
+          }
+        ]
+      }
+    },
+    "Conexoes": {
+      "type": "OpenApiConnection",
+      "runAfter": {
+        "Var_despesa": [
+          "Succeeded"
+        ]
+      },
+      "inputs": {
+        "host": {
+          "apiId": "__BANCO__",
+          "connectionName": "shared_banco_mcp",
+          "operationId": "ListarConexoes"
+        },
+        "parameters": {
+          "body": {}
+        },
+        "authentication": "@parameters('$authentication')"
+      },
+      "runtimeConfiguration": {
+        "secureData": {
+          "properties": [
+            "inputs",
+            "outputs"
+          ]
+        }
+      }
+    },
+    "Cada_conexao": {
+      "type": "Foreach",
+      "foreach": "@coalesce(outputs('Conexoes')?['body/result/connections'], json('[]'))",
+      "runAfter": {
+        "Conexoes": [
+          "Succeeded"
+        ]
+      },
+      "runtimeConfiguration": {
+        "concurrency": {
+          "repetitions": 1
+        }
+      },
+      "actions": {
+        "Contas": {
+          "type": "OpenApiConnection",
+          "runAfter": {},
+          "inputs": {
+            "host": {
+              "apiId": "__BANCO__",
+              "connectionName": "shared_banco_mcp",
+              "operationId": "ListarContas"
+            },
+            "parameters": {
+              "body/item": "@items('Cada_conexao')?['item_id']",
+              "body/type": "CREDIT"
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runtimeConfiguration": {
+            "secureData": {
+              "properties": [
+                "inputs",
+                "outputs"
+              ]
+            }
+          }
+        },
+        "Cada_conta": {
+          "type": "Foreach",
+          "foreach": "@coalesce(outputs('Contas')?['body/result/results'], json('[]'))",
+          "runAfter": {
+            "Contas": [
+              "Succeeded"
+            ]
+          },
+          "runtimeConfiguration": {
+            "concurrency": {
+              "repetitions": 1
+            }
+          },
+          "actions": {
+            "Primeira_pagina": {
+              "type": "SetVariable",
+              "runAfter": {},
+              "inputs": {
+                "name": "Pagina",
+                "value": 1
+              }
+            },
+            "Uma_pagina": {
+              "type": "SetVariable",
+              "runAfter": {
+                "Primeira_pagina": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "name": "TotalPaginas",
+                "value": 1
+              }
+            },
+            "Paginas": {
+              "type": "Until",
+              "runAfter": {
+                "Uma_pagina": [
+                  "Succeeded"
+                ]
+              },
+              "expression": "@greater(variables('Pagina'), variables('TotalPaginas'))",
+              "limit": {
+                "count": 20,
+                "timeout": "PT1H"
+              },
+              "actions": {
+                "Transacoes_pagina": {
+                  "type": "OpenApiConnection",
+                  "runAfter": {},
+                  "inputs": {
+                    "host": {
+                      "apiId": "__BANCO__",
+                      "connectionName": "shared_banco_mcp",
+                      "operationId": "ListarTransacoes"
+                    },
+                    "parameters": {
+                      "body/account_id": "@items('Cada_conta')?['id']",
+                      "body/from": "@outputs('De')",
+                      "body/to": "@outputs('Hoje')",
+                      "body/page": "@variables('Pagina')",
+                      "body/page_size": 500,
+                      "body/detail": "rich"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "runtimeConfiguration": {
+                    "secureData": {
+                      "properties": [
+                        "inputs",
+                        "outputs"
+                      ]
+                    }
+                  }
+                },
+                "Com_conta": {
+                  "type": "Select",
+                  "runAfter": {
+                    "Transacoes_pagina": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": {
+                    "from": "@coalesce(outputs('Transacoes_pagina')?['body/result/results'], json('[]'))",
+                    "select": "@addProperty(addProperty(item(), '_conta', items('Cada_conta')?['id']), '_item', items('Cada_conexao')?['item_id'])"
+                  },
+                  "runtimeConfiguration": {
+                    "secureData": {
+                      "properties": [
+                        "inputs",
+                        "outputs"
+                      ]
+                    }
+                  }
+                },
+                "Acumulado": {
+                  "type": "Compose",
+                  "runAfter": {
+                    "Com_conta": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": "@union(variables('Transacoes'), body('Com_conta'))",
+                  "runtimeConfiguration": {
+                    "secureData": {
+                      "properties": [
+                        "inputs",
+                        "outputs"
+                      ]
+                    }
+                  }
+                },
+                "Guardar": {
+                  "type": "SetVariable",
+                  "runAfter": {
+                    "Acumulado": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": {
+                    "name": "Transacoes",
+                    "value": "@outputs('Acumulado')"
+                  }
+                },
+                "Total_paginas": {
+                  "type": "SetVariable",
+                  "runAfter": {
+                    "Guardar": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": {
+                    "name": "TotalPaginas",
+                    "value": "@coalesce(outputs('Transacoes_pagina')?['body/result/totalPages'], 1)"
+                  }
+                },
+                "Proxima_pagina": {
+                  "type": "IncrementVariable",
+                  "runAfter": {
+                    "Total_paginas": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": {
+                    "name": "Pagina",
+                    "value": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Ids": {
+      "type": "Select",
+      "runAfter": {
+        "Cada_conexao": [
+          "Succeeded"
+        ]
+      },
+      "inputs": {
+        "from": "@variables('Transacoes')",
+        "select": "@item()?['id']"
+      }
+    },
+    "Cada_transacao": {
+      "type": "Foreach",
+      "foreach": "@variables('Transacoes')",
+      "runAfter": {
+        "Ids": [
+          "Succeeded"
+        ]
+      },
+      "runtimeConfiguration": {
+        "concurrency": {
+          "repetitions": 1
+        }
+      },
+      "actions": {
+        "Dados": {
+          "type": "Compose",
+          "runAfter": {},
+          "inputs": {
+            "id": "@items('Cada_transacao')?['id']",
+            "conta": "@items('Cada_transacao')?['_conta']",
+            "item": "@items('Cada_transacao')?['_item']",
+            "valor": "@float(items('Cada_transacao')?['amount'])",
+            "data": "@items('Cada_transacao')?['date']",
+            "compra": "@if(empty(items('Cada_transacao')?['creditCardMetadata']?['purchaseDate']), formatDateTime(convertFromUtc(items('Cada_transacao')?['date'], 'E. South America Standard Time'), 'yyyy-MM-dd'), substring(items('Cada_transacao')?['creditCardMetadata']?['purchaseDate'], 0, 10))",
+            "final": "@if(greater(length(coalesce(items('Cada_transacao')?['creditCardMetadata']?['cardNumber'], '')), 4), substring(items('Cada_transacao')?['creditCardMetadata']?['cardNumber'], sub(length(items('Cada_transacao')?['creditCardMetadata']?['cardNumber']), 4), 4), coalesce(items('Cada_transacao')?['creditCardMetadata']?['cardNumber'], ''))",
+            "mcc": "@items('Cada_transacao')?['creditCardMetadata']?['payeeMCC']",
+            "parcela": "@int(coalesce(items('Cada_transacao')?['creditCardMetadata']?['installmentNumber'], 1))",
+            "total": "@int(coalesce(items('Cada_transacao')?['creditCardMetadata']?['totalInstallments'], 1))",
+            "fatura": "@coalesce(items('Cada_transacao')?['creditCardMetadata']?['billForecastDate'], '')",
+            "status": "@if(equals(items('Cada_transacao')?['status'], 'POSTED'), 100000001, 100000000)",
+            "descricao": "@take(coalesce(items('Cada_transacao')?['description'], '(sem descrição)'), 200)",
+            "estabelecimento": "@take(coalesce(items('Cada_transacao')?['merchantInfo']?['businessName'], items('Cada_transacao')?['merchant']?['businessName'], items('Cada_transacao')?['merchant']?['name'], ''), 200)",
+            "cnpj": "@take(replace(replace(replace(coalesce(items('Cada_transacao')?['merchantInfo']?['cnpj'], items('Cada_transacao')?['merchant']?['cnpj'], ''), '.', ''), '/', ''), '-', ''), 14)",
+            "tipo": "@if(or(equals(items('Cada_transacao')?['operationType'], 'TARIFA'), startsWith(toUpper(coalesce(items('Cada_transacao')?['description'], '')), 'IOF')), 100000003, if(equals(items('Cada_transacao')?['operationType'], 'PAGAMENTO'), 100000002, if(or(less(float(items('Cada_transacao')?['amount']), 0), equals(items('Cada_transacao')?['type'], 'CREDIT')), 100000001, 100000000)))"
+          },
+          "runtimeConfiguration": {
+            "secureData": {
+              "properties": [
+                "inputs",
+                "outputs"
+              ]
+            }
+          }
+        },
+        "Chave": {
+          "type": "Compose",
+          "runAfter": {
+            "Dados": [
+              "Succeeded"
+            ]
+          },
+          "inputs": "@{toLower(concat(outputs('Dados')?['conta'], '|', outputs('Dados')?['final'], '|', string(outputs('Dados')?['valor']), '|', outputs('Dados')?['compra'], '|', string(outputs('Dados')?['parcela'])))}"
+        },
+        "Existente": {
+          "type": "OpenApiConnection",
+          "runAfter": {
+            "Chave": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "host": {
+              "apiId": "__DV__",
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecords"
+            },
+            "parameters": {
+              "entityName": "__SET_TRANS__",
+              "$select": "cr40f_transacaocartaoid",
+              "$top": 1,
+              "$filter": "cr40f_idexterno eq '@{replace(outputs('Dados')?['id'], '''', '''''')}'"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Ja_gravada": {
+          "type": "If",
+          "runAfter": {
+            "Existente": [
+              "Succeeded"
+            ]
+          },
+          "expression": {
+            "greater": [
+              "@length(outputs('Existente')?['body/value'])",
+              0
+            ]
+          },
+          "actions": {
+            "Atualizar_status": {
+              "type": "OpenApiConnection",
+              "runAfter": {},
+              "inputs": {
+                "host": {
+                  "apiId": "__DV__",
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "UpdateRecord"
+                },
+                "parameters": {
+                  "entityName": "__SET_TRANS__",
+                  "recordId": "@first(outputs('Existente')?['body/value'])?['cr40f_transacaocartaoid']",
+                  "item/cr40f_statusapi": "@outputs('Dados')?['status']",
+                  "item/cr40f_datalancamento": "@outputs('Dados')?['data']",
+                  "item/cr40f_valor": "@outputs('Dados')?['valor']",
+                  "item/cr40f_fatura": "@outputs('Dados')?['fatura']"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            }
+          },
+          "else": {
+            "actions": {
+              "Mesma_compra": {
+                "type": "OpenApiConnection",
+                "runAfter": {},
+                "inputs": {
+                  "host": {
+                    "apiId": "__DV__",
+                    "connectionName": "shared_commondataserviceforapps",
+                    "operationId": "ListRecords"
+                  },
+                  "parameters": {
+                    "entityName": "__SET_TRANS__",
+                    "$select": "cr40f_transacaocartaoid,cr40f_idexterno",
+                    "$top": 5,
+                    "$filter": "cr40f_chavecompra eq '@{replace(outputs('Chave'), '''', '''''')}' and cr40f_statusapi eq 100000000"
+                  },
+                  "authentication": "@parameters('$authentication')"
+                }
+              },
+              "Orfas": {
+                "type": "Query",
+                "runAfter": {
+                  "Mesma_compra": [
+                    "Succeeded"
+                  ]
+                },
+                "inputs": {
+                  "from": "@coalesce(outputs('Mesma_compra')?['body/value'], json('[]'))",
+                  "where": "@not(contains(body('Ids'), item()?['cr40f_idexterno']))"
+                }
+              },
+              "Religar": {
+                "type": "If",
+                "runAfter": {
+                  "Orfas": [
+                    "Succeeded"
+                  ]
+                },
+                "expression": {
+                  "greater": [
+                    "@length(body('Orfas'))",
+                    0
+                  ]
+                },
+                "actions": {
+                  "Religar_id": {
+                    "type": "OpenApiConnection",
+                    "runAfter": {},
+                    "inputs": {
+                      "host": {
+                        "apiId": "__DV__",
+                        "connectionName": "shared_commondataserviceforapps",
+                        "operationId": "UpdateRecord"
+                      },
+                      "parameters": {
+                        "entityName": "__SET_TRANS__",
+                        "recordId": "@first(body('Orfas'))?['cr40f_transacaocartaoid']",
+                        "item/cr40f_idexterno": "@outputs('Dados')?['id']",
+                        "item/cr40f_statusapi": "@outputs('Dados')?['status']",
+                        "item/cr40f_datalancamento": "@outputs('Dados')?['data']",
+                        "item/cr40f_valor": "@outputs('Dados')?['valor']",
+                        "item/cr40f_fatura": "@outputs('Dados')?['fatura']"
+                      },
+                      "authentication": "@parameters('$authentication')"
+                    }
+                  }
+                },
+                "else": {
+                  "actions": {
+                    "Limpar_situacao": {
+                      "type": "SetVariable",
+                      "runAfter": {},
+                      "inputs": {
+                        "name": "Situacao",
+                        "value": 100000000
+                      }
+                    },
+                    "Limpar_motivo": {
+                      "type": "SetVariable",
+                      "runAfter": {
+                        "Limpar_situacao": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "name": "Motivo",
+                        "value": ""
+                      }
+                    },
+                    "Limpar_cartao": {
+                      "type": "SetVariable",
+                      "runAfter": {
+                        "Limpar_motivo": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "name": "CartaoId",
+                        "value": ""
+                      }
+                    },
+                    "Limpar_motorista": {
+                      "type": "SetVariable",
+                      "runAfter": {
+                        "Limpar_cartao": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "name": "MotoristaId",
+                        "value": ""
+                      }
+                    },
+                    "Limpar_despesa": {
+                      "type": "SetVariable",
+                      "runAfter": {
+                        "Limpar_motorista": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "name": "DespesaId",
+                        "value": ""
+                      }
+                    },
+                    "Classificar": {
+                      "type": "If",
+                      "runAfter": {
+                        "Criar_transacao": [
+                          "Succeeded"
+                        ]
+                      },
+                      "expression": {
+                        "equals": [
+                          "@outputs('Dados')?['tipo']",
+                          100000000
+                        ]
+                      },
+                      "actions": {
+                        "Parcela_seguinte": {
+                          "type": "If",
+                          "runAfter": {},
+                          "expression": {
+                            "greater": [
+                              "@outputs('Dados')?['parcela']",
+                              1
+                            ]
+                          },
+                          "actions": {
+                            "Parcela_ignorada": {
+                              "type": "SetVariable",
+                              "runAfter": {},
+                              "inputs": {
+                                "name": "Situacao",
+                                "value": 100000006
+                              }
+                            },
+                            "Motivo_parcela": {
+                              "type": "SetVariable",
+                              "runAfter": {
+                                "Parcela_ignorada": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "inputs": {
+                                "name": "Motivo",
+                                "value": "Parcela @{outputs('Dados')?['parcela']}/@{outputs('Dados')?['total']} da compra de @{formatDateTime(outputs('Dados')?['compra'], 'dd/MM/yyyy')}: a despesa fica na parcela 1."
+                              }
+                            }
+                          },
+                          "else": {
+                            "actions": {
+                              "Cartao": {
+                                "type": "OpenApiConnection",
+                                "runAfter": {},
+                                "inputs": {
+                                  "host": {
+                                    "apiId": "__DV__",
+                                    "connectionName": "shared_commondataserviceforapps",
+                                    "operationId": "ListRecords"
+                                  },
+                                  "parameters": {
+                                    "entityName": "__SET_CARTAO__",
+                                    "$select": "cr40f_cartaocorporativoid,_cr40f_motorista_value,cr40f_final",
+                                    "$top": 2,
+                                    "$filter": "statecode eq 0 and _cr40f_motorista_value ne null and cr40f_idconta eq '@{outputs('Dados')?['conta']}' and @{if(empty(outputs('Dados')?['final']), 'cr40f_final eq null', concat('(cr40f_final eq ''', outputs('Dados')?['final'], ''' or cr40f_final eq null)'))} and cr40f_iniciovigencia le @{outputs('Dados')?['compra']} and (cr40f_fimvigencia eq null or cr40f_fimvigencia ge @{outputs('Dados')?['compra']})",
+                                    "$orderby": "cr40f_final desc"
+                                  },
+                                  "authentication": "@parameters('$authentication')"
+                                }
+                              },
+                              "Um_cartao": {
+                                "type": "If",
+                                "runAfter": {
+                                  "Cartao": [
+                                    "Succeeded"
+                                  ]
+                                },
+                                "expression": {
+                                  "or": [
+                                    {
+                                      "equals": [
+                                        "@length(outputs('Cartao')?['body/value'])",
+                                        1
+                                      ]
+                                    },
+                                    {
+                                      "and": [
+                                        {
+                                          "equals": [
+                                            "@length(outputs('Cartao')?['body/value'])",
+                                            2
+                                          ]
+                                        },
+                                        {
+                                          "not": {
+                                            "equals": [
+                                              "@coalesce(first(outputs('Cartao')?['body/value'])?['cr40f_final'], '')",
+                                              "@coalesce(last(outputs('Cartao')?['body/value'])?['cr40f_final'], '')"
+                                            ]
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                "actions": {
+                                  "Motorista": {
+                                    "type": "Compose",
+                                    "runAfter": {},
+                                    "inputs": "@first(outputs('Cartao')?['body/value'])?['_cr40f_motorista_value']"
+                                  },
+                                  "Guardar_cartao": {
+                                    "type": "SetVariable",
+                                    "runAfter": {
+                                      "Motorista": [
+                                        "Succeeded"
+                                      ]
+                                    },
+                                    "inputs": {
+                                      "name": "CartaoId",
+                                      "value": "@first(outputs('Cartao')?['body/value'])?['cr40f_cartaocorporativoid']"
+                                    }
+                                  },
+                                  "Guardar_motorista": {
+                                    "type": "SetVariable",
+                                    "runAfter": {
+                                      "Guardar_cartao": [
+                                        "Succeeded"
+                                      ]
+                                    },
+                                    "inputs": {
+                                      "name": "MotoristaId",
+                                      "value": "@outputs('Motorista')"
+                                    }
+                                  },
+                                  "Valor_despesa": {
+                                    "type": "Compose",
+                                    "runAfter": {
+                                      "Guardar_motorista": [
+                                        "Succeeded"
+                                      ]
+                                    },
+                                    "inputs": "@if(equals(items('Cada_transacao')?['creditCardMetadata']?['totalAmount'], null), mul(outputs('Dados')?['valor'], outputs('Dados')?['total']), float(string(items('Cada_transacao')?['creditCardMetadata']?['totalAmount'])))"
+                                  },
+                                  "Candidatas": {
+                                    "type": "OpenApiConnection",
+                                    "runAfter": {
+                                      "Valor_despesa": [
+                                        "Succeeded"
+                                      ]
+                                    },
+                                    "inputs": {
+                                      "host": {
+                                        "apiId": "__DV__",
+                                        "connectionName": "shared_commondataserviceforapps",
+                                        "operationId": "ListRecords"
+                                      },
+                                      "parameters": {
+                                        "entityName": "__SET_DESPESA__",
+                                        "$select": "cr40f_despesaoperacionalid",
+                                        "$top": 2,
+                                        "$filter": "statecode eq 0 and _cr40f_motorista_value eq @{outputs('Motorista')} and _cr40f_formapagamento_value eq @{outputs('Parametros')?['formaCartao']} and cr40f_valor ge @{sub(outputs('Valor_despesa'), 0.05)} and cr40f_valor le @{add(outputs('Valor_despesa'), 0.05)} and cr40f_datagasto ge @{formatDateTime(addDays(outputs('Dados')?['compra'], -1), 'yyyy-MM-dd')}T03:00:00Z and cr40f_datagasto lt @{formatDateTime(addDays(outputs('Dados')?['compra'], 3), 'yyyy-MM-dd')}T03:00:00Z and cr40f_statusoperacional ne 100000003 and cr40f_statusoperacional ne 100000004 and (cr40f_conciliadacartao eq false or cr40f_conciliadacartao eq null)"
+                                      },
+                                      "authentication": "@parameters('$authentication')"
+                                    }
+                                  },
+                                  "Quantas": {
+                                    "type": "Switch",
+                                    "runAfter": {
+                                      "Candidatas": [
+                                        "Succeeded"
+                                      ]
+                                    },
+                                    "expression": "@if(greater(length(outputs('Candidatas')?['body/value']), 1), 'varias', string(length(outputs('Candidatas')?['body/value'])))",
+                                    "cases": {
+                                      "Uma": {
+                                        "case": "1",
+                                        "actions": {
+                                          "Marcar_despesa": {
+                                            "type": "OpenApiConnection",
+                                            "runAfter": {},
+                                            "inputs": {
+                                              "host": {
+                                                "apiId": "__DV__",
+                                                "connectionName": "shared_commondataserviceforapps",
+                                                "operationId": "UpdateRecord"
+                                              },
+                                              "parameters": {
+                                                "entityName": "__SET_DESPESA__",
+                                                "recordId": "@first(outputs('Candidatas')?['body/value'])?['cr40f_despesaoperacionalid']",
+                                                "item/cr40f_conciliadacartao": true
+                                              },
+                                              "authentication": "@parameters('$authentication')"
+                                            }
+                                          },
+                                          "Despesa_casada": {
+                                            "type": "SetVariable",
+                                            "runAfter": {
+                                              "Marcar_despesa": [
+                                                "Succeeded"
+                                              ]
+                                            },
+                                            "inputs": {
+                                              "name": "DespesaId",
+                                              "value": "@first(outputs('Candidatas')?['body/value'])?['cr40f_despesaoperacionalid']"
+                                            }
+                                          },
+                                          "Conciliada": {
+                                            "type": "SetVariable",
+                                            "runAfter": {
+                                              "Despesa_casada": [
+                                                "Succeeded"
+                                              ]
+                                            },
+                                            "inputs": {
+                                              "name": "Situacao",
+                                              "value": 100000001
+                                            }
+                                          },
+                                          "Motivo_conciliada": {
+                                            "type": "SetVariable",
+                                            "runAfter": {
+                                              "Conciliada": [
+                                                "Succeeded"
+                                              ]
+                                            },
+                                            "inputs": {
+                                              "name": "Motivo",
+                                              "value": "Casada com a despesa lançada pelo motorista (mesmo valor e data próxima)."
+                                            }
+                                          }
+                                        }
+                                      },
+                                      "Varias": {
+                                        "case": "varias",
+                                        "actions": {
+                                          "Divergencia_varias": {
+                                            "type": "SetVariable",
+                                            "runAfter": {},
+                                            "inputs": {
+                                              "name": "Situacao",
+                                              "value": 100000005
+                                            }
+                                          },
+                                          "Motivo_varias": {
+                                            "type": "SetVariable",
+                                            "runAfter": {
+                                              "Divergencia_varias": [
+                                                "Succeeded"
+                                              ]
+                                            },
+                                            "inputs": {
+                                              "name": "Motivo",
+                                              "value": "Mais de uma despesa do motorista com o mesmo valor e data próxima; escolha no Sistema Betinhos."
+                                            }
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "default": {
+                                      "actions": {
+                                        "Funcionario": {
+                                          "type": "OpenApiConnection",
+                                          "runAfter": {},
+                                          "inputs": {
+                                            "host": {
+                                              "apiId": "__DV__",
+                                              "connectionName": "shared_commondataserviceforapps",
+                                              "operationId": "GetItem"
+                                            },
+                                            "parameters": {
+                                              "entityName": "__SET_FUNC__",
+                                              "recordId": "@outputs('Motorista')",
+                                              "$select": "cr40f_emailmicrosoft"
+                                            },
+                                            "authentication": "@parameters('$authentication')"
+                                          }
+                                        },
+                                        "Usuario": {
+                                          "type": "OpenApiConnection",
+                                          "runAfter": {
+                                            "Funcionario": [
+                                              "Succeeded"
+                                            ]
+                                          },
+                                          "inputs": {
+                                            "host": {
+                                              "apiId": "__DV__",
+                                              "connectionName": "shared_commondataserviceforapps",
+                                              "operationId": "ListRecords"
+                                            },
+                                            "parameters": {
+                                              "entityName": "systemusers",
+                                              "$select": "systemuserid",
+                                              "$top": 1,
+                                              "$filter": "internalemailaddress eq '@{replace(coalesce(outputs('Funcionario')?['body/cr40f_emailmicrosoft'], '-'), '''', '''''')}' and isdisabled eq false"
+                                            },
+                                            "authentication": "@parameters('$authentication')"
+                                          }
+                                        },
+                                        "Criar_despesa": {
+                                          "type": "OpenApiConnection",
+                                          "runAfter": {
+                                            "Usuario": [
+                                              "Succeeded"
+                                            ]
+                                          },
+                                          "inputs": {
+                                            "host": {
+                                              "apiId": "__DV__",
+                                              "connectionName": "shared_commondataserviceforapps",
+                                              "operationId": "CreateRecord"
+                                            },
+                                            "parameters": {
+                                              "entityName": "__SET_DESPESA__",
+                                              "item/cr40f_nome": "@{take(concat('Cartão ', if(empty(outputs('Dados')?['final']), 'corporativo', concat('final ', outputs('Dados')?['final'])), ' · ', if(empty(outputs('Dados')?['estabelecimento']), outputs('Dados')?['descricao'], outputs('Dados')?['estabelecimento'])), 100)}",
+                                              "item/cr40f_valor": "@outputs('Valor_despesa')",
+                                              "item/cr40f_datagasto": "@{outputs('Dados')?['compra']}T15:00:00Z",
+                                              "item/cr40f_estabelecimento": "@{if(empty(outputs('Dados')?['estabelecimento']), outputs('Dados')?['descricao'], outputs('Dados')?['estabelecimento'])}",
+                                              "item/cr40f_origem": 100000002,
+                                              "item/cr40f_statusoperacional": 100000001,
+                                              "item/cr40f_statusfinanceiro": 100000000,
+                                              "item/cr40f_statusanexo": 100000000,
+                                              "item/cr40f_conciliadacartao": true,
+                                              "item/cr40f_observacao": "Lançado pelo cartão em @{formatDateTime(outputs('Dados')?['compra'], 'dd/MM')}. Descreva o gasto e anexe o comprovante.",
+                                              "item/cr40f_observacaointerna": "Criado pela conciliação do cartão (Banco MCP) a partir da transação @{outputs('Dados')?['id']}.",
+                                              "item/__NAV_D_MOTORISTA__@odata.bind": "/__SET_FUNC__(@{outputs('Motorista')})",
+                                              "item/__NAV_D_CATEGORIA__@odata.bind": "/__SET_CATEGORIA__(@{coalesce(outputs('Parametros')?['categorias']?[string(coalesce(outputs('Dados')?['mcc'], 0))], outputs('Parametros')?['categorias']?['outros'])})",
+                                              "item/__NAV_D_FORMA__@odata.bind": "/__SET_FORMA__(@{outputs('Parametros')?['formaCartao']})"
+                                            },
+                                            "authentication": "@parameters('$authentication')"
+                                          }
+                                        },
+                                        "Tem_usuario": {
+                                          "type": "If",
+                                          "runAfter": {
+                                            "Criar_despesa": [
+                                              "Succeeded"
+                                            ]
+                                          },
+                                          "expression": {
+                                            "greater": [
+                                              "@length(outputs('Usuario')?['body/value'])",
+                                              0
+                                            ]
+                                          },
+                                          "actions": {
+                                            "Dono_motorista": {
+                                              "type": "OpenApiConnection",
+                                              "runAfter": {},
+                                              "inputs": {
+                                                "host": {
+                                                  "apiId": "__DV__",
+                                                  "connectionName": "shared_commondataserviceforapps",
+                                                  "operationId": "UpdateRecord"
+                                                },
+                                                "parameters": {
+                                                  "entityName": "__SET_DESPESA__",
+                                                  "recordId": "@outputs('Criar_despesa')?['body/cr40f_despesaoperacionalid']",
+                                                  "item/ownerid@odata.bind": "/systemusers(@{first(outputs('Usuario')?['body/value'])?['systemuserid']})"
+                                                },
+                                                "authentication": "@parameters('$authentication')"
+                                              }
+                                            }
+                                          },
+                                          "else": {
+                                            "actions": {}
+                                          }
+                                        },
+                                        "Despesa_criada": {
+                                          "type": "SetVariable",
+                                          "runAfter": {
+                                            "Tem_usuario": [
+                                              "Succeeded"
+                                            ]
+                                          },
+                                          "inputs": {
+                                            "name": "DespesaId",
+                                            "value": "@outputs('Criar_despesa')?['body/cr40f_despesaoperacionalid']"
+                                          }
+                                        },
+                                        "Aguardando": {
+                                          "type": "SetVariable",
+                                          "runAfter": {
+                                            "Despesa_criada": [
+                                              "Succeeded"
+                                            ]
+                                          },
+                                          "inputs": {
+                                            "name": "Situacao",
+                                            "value": 100000003
+                                          }
+                                        },
+                                        "Motivo_aguardando": {
+                                          "type": "SetVariable",
+                                          "runAfter": {
+                                            "Aguardando": [
+                                              "Succeeded"
+                                            ]
+                                          },
+                                          "inputs": {
+                                            "name": "Motivo",
+                                            "value": "Nenhuma despesa lançada pelo motorista; despesa criada para ele validar."
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
+                                "else": {
+                                  "actions": {
+                                    "Sem_cartao": {
+                                      "type": "SetVariable",
+                                      "runAfter": {},
+                                      "inputs": {
+                                        "name": "Situacao",
+                                        "value": "@if(equals(length(outputs('Cartao')?['body/value']), 0), 100000004, 100000005)"
+                                      }
+                                    },
+                                    "Motivo_sem_cartao": {
+                                      "type": "SetVariable",
+                                      "runAfter": {
+                                        "Sem_cartao": [
+                                          "Succeeded"
+                                        ]
+                                      },
+                                      "inputs": {
+                                        "name": "Motivo",
+                                        "value": "@if(equals(length(outputs('Cartao')?['body/value']), 0), 'Cartão sem motorista vigente na data; cadastre o vínculo no Sistema Betinhos.', 'Mais de um cartão vigente para esta conta e final.')"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "else": {
+                        "actions": {
+                          "Nao_compra": {
+                            "type": "SetVariable",
+                            "runAfter": {},
+                            "inputs": {
+                              "name": "Situacao",
+                              "value": "@if(equals(outputs('Dados')?['tipo'], 100000001), 100000005, 100000006)"
+                            }
+                          },
+                          "Motivo_nao_compra": {
+                            "type": "SetVariable",
+                            "runAfter": {
+                              "Nao_compra": [
+                                "Succeeded"
+                              ]
+                            },
+                            "inputs": {
+                              "name": "Motivo",
+                              "value": "@if(equals(outputs('Dados')?['tipo'], 100000001), 'Estorno: confira a despesa da compra original.', if(equals(outputs('Dados')?['tipo'], 100000003), 'Encargo (IOF/tarifa) do cartão: não é despesa do motorista.', 'Pagamento de fatura.'))"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "Criar_transacao": {
+                      "type": "OpenApiConnection",
+                      "runAfter": {
+                        "Limpar_despesa": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "host": {
+                          "apiId": "__DV__",
+                          "connectionName": "shared_commondataserviceforapps",
+                          "operationId": "CreateRecord"
+                        },
+                        "parameters": {
+                          "entityName": "__SET_TRANS__",
+                          "item/cr40f_name": "@outputs('Dados')?['descricao']",
+                          "item/cr40f_idexterno": "@outputs('Dados')?['id']",
+                          "item/cr40f_idconta": "@outputs('Dados')?['conta']",
+                          "item/cr40f_iditem": "@outputs('Dados')?['item']",
+                          "item/cr40f_fatura": "@outputs('Dados')?['fatura']",
+                          "item/cr40f_datalancamento": "@outputs('Dados')?['data']",
+                          "item/cr40f_datacompra": "@outputs('Dados')?['compra']",
+                          "item/cr40f_valor": "@outputs('Dados')?['valor']",
+                          "item/cr40f_estabelecimento": "@outputs('Dados')?['estabelecimento']",
+                          "item/cr40f_cnpj": "@outputs('Dados')?['cnpj']",
+                          "item/cr40f_mcc": "@outputs('Dados')?['mcc']",
+                          "item/cr40f_final": "@outputs('Dados')?['final']",
+                          "item/cr40f_parcela": "@outputs('Dados')?['parcela']",
+                          "item/cr40f_totalparcelas": "@outputs('Dados')?['total']",
+                          "item/cr40f_statusapi": "@outputs('Dados')?['status']",
+                          "item/cr40f_chavecompra": "@outputs('Chave')",
+                          "item/cr40f_tipo": "@outputs('Dados')?['tipo']",
+                          "item/cr40f_situacao": 100000000,
+                          "item/cr40f_motivo": "Em processamento (se ficar assim, a execução falhou nesta transação)."
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      },
+                      "runtimeConfiguration": {
+                        "secureData": {
+                          "properties": [
+                            "inputs",
+                            "outputs"
+                          ]
+                        }
+                      }
+                    },
+                    "Tem_cartao": {
+                      "type": "If",
+                      "runAfter": {
+                        "Gravar_situacao": [
+                          "Succeeded"
+                        ]
+                      },
+                      "expression": {
+                        "not": {
+                          "equals": [
+                            "@empty(variables('CartaoId'))",
+                            true
+                          ]
+                        }
+                      },
+                      "actions": {
+                        "Tem_despesa": {
+                          "type": "If",
+                          "runAfter": {},
+                          "expression": {
+                            "equals": [
+                              "@empty(variables('DespesaId'))",
+                              true
+                            ]
+                          },
+                          "actions": {
+                            "Vincular_cartao": {
+                              "type": "OpenApiConnection",
+                              "runAfter": {},
+                              "inputs": {
+                                "host": {
+                                  "apiId": "__DV__",
+                                  "connectionName": "shared_commondataserviceforapps",
+                                  "operationId": "UpdateRecord"
+                                },
+                                "parameters": {
+                                  "entityName": "__SET_TRANS__",
+                                  "recordId": "@outputs('Criar_transacao')?['body/cr40f_transacaocartaoid']",
+                                  "item/__NAV_T_CARTAO__@odata.bind": "/__SET_CARTAO__(@{variables('CartaoId')})",
+                                  "item/__NAV_T_MOTORISTA__@odata.bind": "/__SET_FUNC__(@{variables('MotoristaId')})"
+                                },
+                                "authentication": "@parameters('$authentication')"
+                              }
+                            }
+                          },
+                          "else": {
+                            "actions": {
+                              "Vincular_tudo": {
+                                "type": "OpenApiConnection",
+                                "runAfter": {},
+                                "inputs": {
+                                  "host": {
+                                    "apiId": "__DV__",
+                                    "connectionName": "shared_commondataserviceforapps",
+                                    "operationId": "UpdateRecord"
+                                  },
+                                  "parameters": {
+                                    "entityName": "__SET_TRANS__",
+                                    "recordId": "@outputs('Criar_transacao')?['body/cr40f_transacaocartaoid']",
+                                    "item/__NAV_T_CARTAO__@odata.bind": "/__SET_CARTAO__(@{variables('CartaoId')})",
+                                    "item/__NAV_T_MOTORISTA__@odata.bind": "/__SET_FUNC__(@{variables('MotoristaId')})",
+                                    "item/__NAV_T_DESPESA__@odata.bind": "/__SET_DESPESA__(@{variables('DespesaId')})"
+                                  },
+                                  "authentication": "@parameters('$authentication')"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "else": {
+                        "actions": {}
+                      }
+                    },
+                    "Gravar_situacao": {
+                      "type": "OpenApiConnection",
+                      "runAfter": {
+                        "Classificar": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "host": {
+                          "apiId": "__DV__",
+                          "connectionName": "shared_commondataserviceforapps",
+                          "operationId": "UpdateRecord"
+                        },
+                        "parameters": {
+                          "entityName": "__SET_TRANS__",
+                          "recordId": "@outputs('Criar_transacao')?['body/cr40f_transacaocartaoid']",
+                          "item/cr40f_situacao": "@variables('Situacao')",
+                          "item/cr40f_motivo": "@variables('Motivo')"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Pendentes": {
+      "type": "OpenApiConnection",
+      "runAfter": {
+        "Cada_transacao": [
+          "Succeeded",
+          "Failed"
+        ]
+      },
+      "inputs": {
+        "host": {
+          "apiId": "__DV__",
+          "connectionName": "shared_commondataserviceforapps",
+          "operationId": "ListRecords"
+        },
+        "parameters": {
+          "entityName": "__SET_DESPESA__",
+          "$select": "cr40f_despesaoperacionalid,_cr40f_motorista_value",
+          "$filter": "cr40f_origem eq 100000002 and cr40f_statusoperacional eq 100000001 and cr40f_conciliadacartao eq true and _cr40f_formapagamento_value eq @{outputs('Parametros')?['formaCartao']} and _cr40f_motorista_value ne null and statecode eq 0"
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    },
+    "Motoristas": {
+      "type": "Select",
+      "runAfter": {
+        "Pendentes": [
+          "Succeeded"
+        ]
+      },
+      "inputs": {
+        "from": "@outputs('Pendentes')?['body/value']",
+        "select": "@item()?['_cr40f_motorista_value']"
+      }
+    },
+    "Cada_motorista": {
+      "type": "Foreach",
+      "foreach": "@union(body('Motoristas'), body('Motoristas'))",
+      "runAfter": {
+        "Motoristas": [
+          "Succeeded"
+        ]
+      },
+      "actions": {
+        "Do_motorista": {
+          "type": "Query",
+          "runAfter": {},
+          "inputs": {
+            "from": "@outputs('Pendentes')?['body/value']",
+            "where": "@equals(item()?['_cr40f_motorista_value'], items('Cada_motorista'))"
+          }
+        },
+        "Inscricoes": {
+          "type": "OpenApiConnection",
+          "runAfter": {
+            "Do_motorista": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "host": {
+              "apiId": "__DV__",
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecords"
+            },
+            "parameters": {
+              "entityName": "__SET_SUBS__",
+              "$select": "new_inscricaopushmotoristaid,new_endpoint,new_chavep256dh,new_chaveauth",
+              "$filter": "_new_funcionario_value eq @{items('Cada_motorista')}"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Tem_inscricao": {
+          "type": "If",
+          "runAfter": {
+            "Inscricoes": [
+              "Succeeded"
+            ]
+          },
+          "expression": {
+            "greater": [
+              "@length(outputs('Inscricoes')?['body/value'])",
+              0
+            ]
+          },
+          "actions": {
+            "Enviar_push": {
+              "type": "OpenApiConnection",
+              "runAfter": {},
+              "inputs": {
+                "host": {
+                  "apiId": "__PUSH__",
+                  "connectionName": "shared_app_motoristas_push",
+                  "operationId": "EnviarPush"
+                },
+                "parameters": {
+                  "body/payload/title": "App Motoristas",
+                  "body/payload/body": "@{if(equals(length(body('Do_motorista')), 1), 'Você tem 1 gasto do cartão para validar.', concat('Você tem ', length(body('Do_motorista')), ' gastos do cartão para validar.'))}\nToque para descrever e anexar o comprovante.",
+                  "body/payload/tag": "gastos-cartao",
+                  "body/payload/url": "/WebResources/new_app-motoristas-v2?@{if(equals(length(body('Do_motorista')), 1), concat('despesaId=', first(body('Do_motorista'))?['cr40f_despesaoperacionalid']), 'gastosCartao=1')}",
+                  "body/subscriptions": "@select(outputs('Inscricoes')?['body/value'], json(concat('{\"endpoint\":\"', item()?['new_endpoint'], '\",\"p256dh\":\"', item()?['new_chavep256dh'], '\",\"auth\":\"', item()?['new_chaveauth'], '\"}')))"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Gone": {
+              "type": "Query",
+              "runAfter": {
+                "Enviar_push": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "from": "@coalesce(outputs('Enviar_push')?['body/results'], json('[]'))",
+                "where": "@equals(item()?['gone'], true)"
+              }
+            },
+            "Endpoints_gone": {
+              "type": "Select",
+              "runAfter": {
+                "Gone": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "from": "@body('Gone')",
+                "select": "@item()?['endpoint']"
+              }
+            },
+            "Inscricoes_gone": {
+              "type": "Query",
+              "runAfter": {
+                "Endpoints_gone": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "from": "@outputs('Inscricoes')?['body/value']",
+                "where": "@contains(body('Endpoints_gone'), item()?['new_endpoint'])"
+              }
+            },
+            "Remover_gone": {
+              "type": "Foreach",
+              "foreach": "@body('Inscricoes_gone')",
+              "runAfter": {
+                "Inscricoes_gone": [
+                  "Succeeded"
+                ]
+              },
+              "actions": {
+                "Remover_inscricao": {
+                  "type": "OpenApiConnection",
+                  "runAfter": {},
+                  "inputs": {
+                    "host": {
+                      "apiId": "__DV__",
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "DeleteRecord"
+                    },
+                    "parameters": {
+                      "entityName": "__SET_SUBS__",
+                      "recordId": "@items('Remover_gone')?['new_inscricaopushmotoristaid']"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "actions": {}
+          }
+        }
+      }
+    },
+    "Houve_erro": {
+      "type": "If",
+      "runAfter": {
+        "Cada_motorista": [
+          "Succeeded",
+          "Failed",
+          "Skipped"
+        ]
+      },
+      "expression": {
+        "or": [
+          {
+            "equals": [
+              "@actions('Cada_transacao')?['status']",
+              "Failed"
+            ]
+          },
+          {
+            "equals": [
+              "@actions('Cada_motorista')?['status']",
+              "Failed"
+            ]
+          }
+        ]
+      },
+      "actions": {
+        "Marcar_falha": {
+          "type": "Terminate",
+          "runAfter": {},
+          "inputs": {
+            "runStatus": "Failed",
+            "runError": {
+              "code": "ConciliacaoComErro",
+              "message": "Alguma transação ou aviso falhou; veja as transações com motivo 'Em processamento' no Sistema Betinhos."
+            }
+          }
+        }
+      },
+      "else": {
+        "actions": {}
+      }
+    }
+  }
+}

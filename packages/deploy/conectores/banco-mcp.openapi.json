@@ -1,0 +1,112 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Betinhos Banco MCP",
+    "description": "Leitura (Open Finance via mcp.ai/Pluggy) das conexões, contas de cartão e transações. Só leitura; a chave fica na conexão do Power Platform.",
+    "version": "1.0.0"
+  },
+  "host": "api.mcp.ai",
+  "basePath": "/api/openfinance",
+  "schemes": ["https"],
+  "consumes": ["application/json"],
+  "produces": ["application/json"],
+  "securityDefinitions": {
+    "api_key": { "type": "apiKey", "name": "Authorization", "in": "header", "description": "Informe Bearer sk_live_...; a conexão é armazenada pelo Power Platform." }
+  },
+  "security": [{ "api_key": [] }],
+  "paths": {
+    "/connections/list": {
+      "post": {
+        "operationId": "ListarConexoes",
+        "summary": "Listar bancos conectados",
+        "parameters": [{ "name": "body", "in": "body", "required": true, "schema": { "type": "object", "properties": {} } }],
+        "responses": {
+          "200": { "description": "Conexões", "schema": { "$ref": "#/definitions/RespostaConexoes" } },
+          "401": { "description": "Chave inválida" },
+          "402": { "description": "Limite de uso ou pagamento pendente" }
+        }
+      }
+    },
+    "/accounts/list": {
+      "post": {
+        "operationId": "ListarContas",
+        "summary": "Listar contas de uma conexão",
+        "parameters": [{
+          "name": "body", "in": "body", "required": true,
+          "schema": {
+            "type": "object",
+            "properties": {
+              "item": { "type": "string", "description": "item_id da conexão" },
+              "type": { "type": "string", "description": "BANK ou CREDIT", "enum": ["BANK", "CREDIT"] }
+            }
+          }
+        }],
+        "responses": {
+          "200": { "description": "Contas", "schema": { "$ref": "#/definitions/RespostaContas" } },
+          "401": { "description": "Chave inválida" },
+          "402": { "description": "Limite de uso ou pagamento pendente" }
+        }
+      }
+    },
+    "/transactions/list": {
+      "post": {
+        "operationId": "ListarTransacoes",
+        "summary": "Listar transações de uma conta",
+        "parameters": [{
+          "name": "body", "in": "body", "required": true,
+          "schema": {
+            "type": "object",
+            "required": ["account_id"],
+            "properties": {
+              "account_id": { "type": "string", "description": "uuid da conta" },
+              "from": { "type": "string", "description": "AAAA-MM-DD" },
+              "to": { "type": "string", "description": "AAAA-MM-DD" },
+              "page": { "type": "integer", "description": "Página (1...)" },
+              "page_size": { "type": "integer", "description": "1-500" },
+              "detail": { "type": "string", "enum": ["compact", "rich", "raw"] }
+            }
+          }
+        }],
+        "responses": {
+          "200": { "description": "Transações", "schema": { "$ref": "#/definitions/RespostaTransacoes" } },
+          "401": { "description": "Chave inválida" },
+          "402": { "description": "Limite de uso ou pagamento pendente" }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "RespostaConexoes": {
+      "type": "object",
+      "properties": {
+        "ok": { "type": "boolean" },
+        "result": { "type": "object", "properties": { "connections": { "type": "array", "items": { "type": "object", "properties": {
+          "item_id": { "type": "string" }, "connector_id": { "type": "integer" }, "connector_name": { "type": "string" },
+          "custom_label": { "type": "string" }, "status": { "type": "string" }
+        } } } } }
+      }
+    },
+    "RespostaContas": {
+      "type": "object",
+      "properties": {
+        "ok": { "type": "boolean" },
+        "result": { "type": "object", "properties": { "results": { "type": "array", "items": { "type": "object", "properties": {
+          "id": { "type": "string" }, "type": { "type": "string" }, "subtype": { "type": "string" }, "name": { "type": "string" }, "number": { "type": "string" }
+        } } } } }
+      }
+    },
+    "RespostaTransacoes": {
+      "type": "object",
+      "properties": {
+        "ok": { "type": "boolean" },
+        "result": { "type": "object", "properties": {
+          "total": { "type": "integer" }, "page": { "type": "integer" }, "totalPages": { "type": "integer" },
+          "results": { "type": "array", "items": { "type": "object", "properties": {
+            "id": { "type": "string" }, "date": { "type": "string" }, "description": { "type": "string" }, "amount": { "type": "string" },
+            "type": { "type": "string" }, "status": { "type": "string" }, "operationType": { "type": "string" }
+          } } }
+        } }
+      }
+    }
+  }
+}
