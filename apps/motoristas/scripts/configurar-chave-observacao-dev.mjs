@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 // Grava a chave da API Anthropic na configuração segura do step de new_OrganizarObservacao no DEV (Linux/macOS).
+// Com --combustivel grava no step de new_GerarInsightsCombustivel (insights do relatório de combustível); --copiar-da-variavel
+// continua copiando da variável da observação, que é a chave Anthropic já guardada no ambiente.
 // A chave vem da variável de ambiente que já a guarda no DEV (--copiar-da-variavel) ou de um ARQUIVO (canal seguro), nunca de argumento;
 // Com --prod aponta para o PROD (gravar exige --confirmo-prod; --prod --verificar só lê). O arquivo é apagado ao final. O valor nunca é impresso. Não cria step nem tipo: eles vêm de scripts/provision-observacao-organizada.ps1.
 //
 //   node scripts/configurar-chave-observacao-dev.mjs --verificar             # só confere o step e se há configuração segura
 //   node scripts/configurar-chave-observacao-dev.mjs --copiar-da-variavel   # copia o valor da variável do DEV para o step
 //   node scripts/configurar-chave-observacao-dev.mjs --arquivo <caminho>     # grava a chave do arquivo (e apaga o arquivo)
+//   node scripts/configurar-chave-observacao-dev.mjs --combustivel --copiar-da-variavel   # mesma chave no step dos insights de combustível
 import dns from "node:dns";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -16,8 +19,9 @@ const isProd = argv.includes("--prod"); // PROD: leitura livre; escrita só com 
 const ENVIRONMENT_NAME = isProd ? "PROD" : "DEV";
 const ENVIRONMENT_URL = isProd ? "https://orgf261ae8e.crm2.dynamics.com" : "https://org23b93544.crm2.dynamics.com";
 const CLIENT_ID = "51f81489-12ee-4a9e-aaae-a2591f45987d";
-const PLUGIN_TYPE = "Betinhos.DriverRecordSharing.OrganizeObservationPlugin";
-const API_NAME = "new_OrganizarObservacao";
+const isFuel = argv.includes("--combustivel");
+const PLUGIN_TYPE = isFuel ? "Betinhos.DriverRecordSharing.FuelInsightsPlugin" : "Betinhos.DriverRecordSharing.OrganizeObservationPlugin";
+const API_NAME = isFuel ? "new_GerarInsightsCombustivel" : "new_OrganizarObservacao";
 const ENV_VAR = "new_AnthropicKeyObservacaoMotorista";
 const fileIndex = argv.indexOf("--arquivo");
 const keyFile = fileIndex >= 0 ? argv[fileIndex + 1] : "";
