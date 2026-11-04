@@ -188,14 +188,14 @@ export type ExtraLink = { nav: string; attribute: string; target: string; target
 /** Coluna `x:` resolvida para FetchXML: cadeia de links até a tabela do campo. */
 export type ResolvedLinkColumn = { key: string; label: string; links: ExtraLink[]; attr: ExtraAttr }
 
-/** Como `resolveExtras`, mas com o que o FetchXML precisa (lookup de origem e id da tabela ligada); só colunas com relação. */
+/** Como `resolveExtras`, mas com o que o FetchXML precisa (lookup de origem e id da tabela ligada); campo da própria tabela vem sem links. */
 export async function resolveLinkColumns(source: ExtraSource, entity: string, columns: { key: string; label?: string }[]): Promise<ResolvedLinkColumn[]> {
   const out: ResolvedLinkColumn[] = []
   for (const col of columns) {
     if (!isExtraColumn(col.key)) continue
     const path = extraPath(col.key)
     const navs = path.slice(0, -1)
-    if (!navs.length || navs.length > MAX_DEPTH) continue
+    if (!path.length || navs.length > MAX_DEPTH) continue
     try {
       let table = await source.table(entity)
       const links: ExtraLink[] = []
