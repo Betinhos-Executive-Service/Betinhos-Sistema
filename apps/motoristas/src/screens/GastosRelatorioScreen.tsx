@@ -1,5 +1,5 @@
 import { ActionBar, ActionButton } from "../components/common/ActionButton";
-import { GraficoCategorias, GraficoEvolucao } from "../components/gastos/GastosCharts";
+import { GraficoEvolucao } from "../components/gastos/GastosCharts";
 import { AppShell } from "../components/layout/AppShell";
 import { ServicesMenu } from "../components/navigation/ServicesMenu";
 import { formatDiaMes, isMockGastosCartao } from "../lib/gastosCartao";
@@ -67,39 +67,55 @@ export function GastosRelatorioScreen({ modelo, periodoId, loadStatus, pendentes
   );
 }
 
+/** Médias de maior peso para o motorista: ficam sempre no topo, mesmo sem dados no período. */
+const DESTAQUES: { id: RelatorioModelo["cartoes"][number]["id"]; titulo: string; vazio: string }[] = [
+  { id: "litro", titulo: "Preço médio por litro", vazio: "Nenhum abastecimento com litros neste período" },
+  { id: "refeicao", titulo: "Refeição média", vazio: "Nenhum almoço ou jantar neste período" }
+];
+
+function CartaoMedia({ cartao }: { cartao: RelatorioModelo["cartoes"][number] }) {
+  return (
+    <li className="gr-media" data-media={cartao.id}>
+      <span className="gr-media-titulo">{cartao.titulo}</span>
+      <strong className="gr-media-valor">{cartao.valorTexto}</strong>
+      <span className="gr-media-detalhe">{cartao.detalhe}</span>
+      {cartao.variacaoTexto ? <span className="gr-media-variacao">{cartao.variacaoTexto}</span> : null}
+    </li>
+  );
+}
+
 function Relatorio({ modelo, pendentesCartao, onCompletar }: { modelo: RelatorioModelo; pendentesCartao: number; onCompletar: () => void }) {
   const { status } = modelo;
+  const outrasMedias = modelo.cartoes.filter((cartao) => !DESTAQUES.some((destaque) => destaque.id === cartao.id));
   const contagens = [
     { rotulo: "Enviado", valor: status.enviado }, { rotulo: "Validado", valor: status.validado },
     { rotulo: "Precisa corrigir", valor: status.precisaCorrigir }, { rotulo: "Recusado", valor: status.recusado }
   ];
   return (
     <div className="gr-conteudo">
-      <section className="gr-bloco" aria-labelledby="gr-categorias">
-        <p className="gr-total">
-          <span>Total no período</span>
-          <strong>{formatBRL(modelo.total)}</strong>
-          <span>{modelo.quantidade} {modelo.quantidade === 1 ? "gasto" : "gastos"}</span>
-        </p>
-        <h2 className="termo-section-title" id="gr-categorias">Por categoria</h2>
-        <GraficoCategorias itens={modelo.categorias} />
-      </section>
-
-      {modelo.cartoes.length ? (
-        <section className="gr-bloco" aria-labelledby="gr-medias">
-          <h2 className="termo-section-title" id="gr-medias">Suas médias</h2>
-          <ul className="gr-medias">
-            {modelo.cartoes.map((cartao) => (
-              <li key={cartao.id} className="gr-media" data-media={cartao.id}>
-                <span className="gr-media-titulo">{cartao.titulo}</span>
-                <strong className="gr-media-valor">{cartao.valorTexto}</strong>
-                <span className="gr-media-detalhe">{cartao.detalhe}</span>
-                {cartao.variacaoTexto ? <span className="gr-media-variacao">{cartao.variacaoTexto}</span> : null}
+      <section className="gr-bloco" aria-labelledby="gr-medias">
+        <h2 className="termo-section-title" id="gr-medias">Suas médias</h2>
+        <ul className="gr-medias gr-destaques">
+          {DESTAQUES.map((destaque) => {
+            const cartao = modelo.cartoes.find((item) => item.id === destaque.id);
+            return cartao ? <CartaoMedia key={cartao.id} cartao={cartao} /> : (
+              <li key={destaque.id} className="gr-media" data-media={destaque.id} data-vazio="true">
+                <span className="gr-media-titulo">{destaque.titulo}</span>
+                <strong className="gr-media-valor">Sem dados</strong>
+                <span className="gr-media-detalhe">{destaque.vazio}</span>
               </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+            );
+          })}
+        </ul>
+        {outrasMedias.length ? (
+          <>
+            <h3 className="gr-subtitulo" id="gr-outras-medias">Outras médias</h3>
+            <ul className="gr-medias gr-secundarias" aria-labelledby="gr-outras-medias">
+              {outrasMedias.map((cartao) => <CartaoMedia key={cartao.id} cartao={cartao} />)}
+            </ul>
+          </>
+        ) : null}
+      </section>
 
       {modelo.insights.length ? (
         <section className="gr-bloco" aria-labelledby="gr-insights">
