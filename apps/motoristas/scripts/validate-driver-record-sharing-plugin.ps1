@@ -103,7 +103,8 @@ var specs = new[]
   new StepSpec("Recibos Create", "cr40f_recibos_v2", "Create", 1, "", Array.Empty<string>()),
   new StepSpec("Recibos Update", "cr40f_recibos_v2", "Update", 1, "cr40f_motorista", new[] { "cr40f_motorista" }),
   new StepSpec("Combustivel Create", "cr40f_despesaoperacional", "Create", 1, "", Array.Empty<string>(), 40, FuelPluginTypeName),
-  new StepSpec("Combustivel Update", "cr40f_despesaoperacional", "Update", 1, "cr40f_valor,cr40f_litros,cr40f_kminformado,cr40f_datagasto,new_cnpjposto,cr40f_categoria,cr40f_veiculo", Array.Empty<string>(), 40, FuelPluginTypeName),
+  new StepSpec("Combustivel Update", "cr40f_despesaoperacional", "Update", 1, "cr40f_valor,cr40f_litros,cr40f_kminformado,cr40f_datagasto,new_cnpjposto,cr40f_categoria,cr40f_veiculo,cr40f_motorista", new[] { "cr40f_motorista", "cr40f_categoria", "cr40f_datagasto", "cr40f_veiculo" }, 40, FuelPluginTypeName),
+  new StepSpec("Combustivel Delete", "cr40f_despesaoperacional", "Delete", 1, "", new[] { "cr40f_motorista", "cr40f_categoria", "cr40f_datagasto", "cr40f_veiculo" }, 40, FuelPluginTypeName),
   new StepSpec("Pedido de cotacao Update", "cr40f_pedidodecotacao", "Update", 0, "cr40f_origemultimasincronizacao,cr40f_statuscotacao,cr40f_prazoresponder,cr40f_valorcotado,cr40f_condicaocomercial,cr40f_respostaenviadacliente,cr40f_clienteempresa,cr40f_contatocliente,cr40f_telefonewhatsapp,cr40f_emailcliente,cr40f_origem,cr40f_destino,cr40f_datahoraservico,cr40f_quantidadepassageiros,cr40f_observacoespedido,cr40f_prioridade", Array.Empty<string>())
 };
 

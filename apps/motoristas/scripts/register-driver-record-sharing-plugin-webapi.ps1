@@ -208,7 +208,8 @@ $specs = @(
   [pscustomobject]@{ Label = "Recibos Update"; Entity = "cr40f_recibos_v2"; Message = "Update"; Mode = 1; Filtering = "cr40f_motorista"; PreImage = @("cr40f_motorista") },
   [pscustomobject]@{ Label = "Pedido de cotacao Update"; Entity = "cr40f_pedidodecotacao"; Message = "Update"; Mode = 0; Filtering = "cr40f_origemultimasincronizacao,cr40f_statuscotacao,cr40f_prazoresponder,cr40f_valorcotado,cr40f_condicaocomercial,cr40f_respostaenviadacliente,cr40f_clienteempresa,cr40f_contatocliente,cr40f_telefonewhatsapp,cr40f_emailcliente,cr40f_origem,cr40f_destino,cr40f_datahoraservico,cr40f_quantidadepassageiros,cr40f_observacoespedido,cr40f_prioridade"; PreImage = @() },
   [pscustomobject]@{ Label = "Combustivel Create"; Entity = "cr40f_despesaoperacional"; Message = "Create"; Mode = 1; Filtering = ""; PreImage = @(); PluginType = "Betinhos.DriverRecordSharing.FuelExpensePlugin" },
-  [pscustomobject]@{ Label = "Combustivel Update"; Entity = "cr40f_despesaoperacional"; Message = "Update"; Mode = 1; Filtering = "cr40f_valor,cr40f_litros,cr40f_kminformado,cr40f_datagasto,new_cnpjposto,cr40f_categoria,cr40f_veiculo"; PreImage = @(); PluginType = "Betinhos.DriverRecordSharing.FuelExpensePlugin" }
+  [pscustomobject]@{ Label = "Combustivel Update"; Entity = "cr40f_despesaoperacional"; Message = "Update"; Mode = 1; Filtering = "cr40f_valor,cr40f_litros,cr40f_kminformado,cr40f_datagasto,new_cnpjposto,cr40f_categoria,cr40f_veiculo,cr40f_motorista"; PreImage = @("cr40f_motorista", "cr40f_categoria", "cr40f_datagasto", "cr40f_veiculo"); PluginType = "Betinhos.DriverRecordSharing.FuelExpensePlugin" },
+  [pscustomobject]@{ Label = "Combustivel Delete"; Entity = "cr40f_despesaoperacional"; Message = "Delete"; Mode = 1; Filtering = ""; PreImage = @("cr40f_motorista", "cr40f_categoria", "cr40f_datagasto", "cr40f_veiculo"); PluginType = "Betinhos.DriverRecordSharing.FuelExpensePlugin" }
 )
 
 Assert-RequiredTable "cr40f_trocasdecarro"
