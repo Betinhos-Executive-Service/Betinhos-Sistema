@@ -15,6 +15,8 @@ export type ExpenseUploadItem = {
 
 export type ExpenseSubmission = {
   expenseId: string;
+  /** Gasto do cartão: a despesa já existe (criada pelo flow) e o envio faz PATCH em vez de criar. */
+  existing?: boolean;
   expenseConfirmed: boolean;
   draft: ExpenseDraft;
   payload: Record<string, unknown>;

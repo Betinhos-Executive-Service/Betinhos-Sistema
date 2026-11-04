@@ -742,6 +742,20 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
     ]
   },
   {
+    id: "gastos-cartao",
+    title: "Gastos do cartão",
+    steps: [
+      step("voltar", "Voltar", ["Volta para o Início."], { target: SERVICE_HOME }),
+      step("atualizar", "Atualizar", ["Busca novos gastos do cartão agora."], { target: ".services-nav-button--refresh" }),
+      step("gasto", "Gasto para completar", [
+        "Cada linha é uma compra no cartão corporativo que o sistema já registrou: estabelecimento, valor, data e final do cartão.",
+        "Toque para informar descrição, categoria, cidade e comprovante."
+      ], { target: ".termo-row", optional: true }),
+      step("vazio", "Nada pendente", ["Sem gastos do cartão para completar, esta tela avisa que eles aparecem aqui quando o cartão for usado."], { target: ".termo-empty", optional: true }),
+      helpStep()
+    ]
+  },
+  {
     id: "treinamento-detalhe",
     title: "Fazer o treinamento",
     probe: ".trn-detail",
@@ -795,6 +809,7 @@ const CHAPTER_IDS_BY_SCREEN: Readonly<Record<string, readonly string[]>> = {
   checklists: ["checklist-formulario", "checklists"],
   multas: ["multa-detalhe", "multas"],
   treinamentos: ["treinamento-detalhe", "treinamentos"],
+  gastosCartao: ["gastos-cartao"],
   solicitarManutencao: ["manutencao"],
   colisoesInicio: ["colisoes"],
   colisoes: ["colisao-registro"],
