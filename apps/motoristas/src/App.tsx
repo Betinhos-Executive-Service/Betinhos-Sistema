@@ -2368,10 +2368,10 @@ function App() {
     !draft.estabelecimento && !draft.descricao && !draft.kmInformado && !draft.litros && !expenseDateTouchedRef.current;
 
   const navigateFromInitial = (screenName: string) => {
-    // Pending sends that need the driver go first; otherwise open the camera straight away.
-    if (screenName === "gastos" && !expenseUploadStatuses.length && expensePhotos.length === 0 && isExpenseDraftBlank(expenseDraft)) {
+    // Gastos abre a lista de pendências do cartão; a câmera fica no CTA "Anexar despesa".
+    if (screenName === "gastos") {
       setComunicadoOrigin("");
-      openExpenseCamera();
+      setScreen("gastosCartao");
       return;
     }
     if (screenName === "personalReceipt" || screenName === "reciboPersonalizado" || screenName === "gerarReciboPersonalizado") {
@@ -3057,6 +3057,13 @@ function App() {
     expenseRetakeTargetIdRef.current = targetId;
   };
 
+  const isExpenseIdle = () => !expenseUploadStatuses.length && expensePhotos.length === 0 && isExpenseDraftBlank(expenseDraft);
+
+  // Envios pendentes ou rascunho em andamento vão para o formulário; senão abre a câmera direto.
+  const anexarDespesa = () => {
+    if (isExpenseIdle()) openExpenseCamera(); else setScreen("gastos");
+  };
+
   const openExpenseCamera = () => {
     expenseRetakeTargetIdRef.current = "";
     clearExpensePhotoDraftState();
@@ -3600,7 +3607,7 @@ function App() {
       <MediaCaptureScreen
         kind="NOTAFISCAL"
         title="Comprovante"
-        onBack={() => setScreen("gastos")}
+        onBack={() => setScreen(!gastoCartaoAtual && isExpenseIdle() ? "gastosCartao" : "gastos")}
         onCapture={(photoDataUrl) => {
           setExpensePhotoDraft(photoDataUrl);
           setExpensePhotoPreviewUrl("");
@@ -3691,7 +3698,7 @@ function App() {
         onPreviewPhoto={openExpensePreview}
         onBack={() => {
           if (gastoCartaoAtual) sairGastoCartao();
-          setScreen(gastoCartaoAtual && gastosCartaoPendentes.length ? "gastosCartao" : "inicio");
+          setScreen("gastosCartao");
         }}
         onSubmit={submitExpenseChecked}
         submitState={expenseSend && expenseSend.phase !== "error" ? "loading" : remoteOperation?.phase ?? "idle"}
@@ -3725,6 +3732,7 @@ function App() {
           const gasto = gastosCartaoPendentes.find((item) => item.id === id);
           if (gasto) abrirGastoCartao(gasto);
         }}
+        onAttach={anexarDespesa}
       />
     );
   }

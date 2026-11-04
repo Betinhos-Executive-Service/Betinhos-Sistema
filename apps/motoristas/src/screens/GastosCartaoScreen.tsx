@@ -1,3 +1,4 @@
+import { ActionBar, ActionButton } from "../components/common/ActionButton";
 import { AppShell } from "../components/layout/AppShell";
 import { ServicesMenu } from "../components/navigation/ServicesMenu";
 import { formatDiaMes, isMockGastosCartao, type GastoCartao, type GastosCartaoLoadStatus } from "../lib/gastosCartao";
@@ -10,13 +11,14 @@ type GastosCartaoScreenProps = {
   onBack: () => void;
   onReload: () => void;
   onOpen: (id: string) => void;
+  onAttach: () => void;
 };
 
-export function GastosCartaoScreen({ items, loadStatus, onBack, onReload, onOpen }: GastosCartaoScreenProps) {
+export function GastosCartaoScreen({ items, loadStatus, onBack, onReload, onOpen, onAttach }: GastosCartaoScreenProps) {
   return (
     <AppShell screenLabel="GastosCartao">
       <ServicesMenu
-        title="Gastos do cartão"
+        title="Gastos"
         eyebrow={isMockGastosCartao() ? "Financeiro · Mock local" : "Financeiro"}
         homeLabel="Voltar"
         homeIcon="arrowLeft"
@@ -32,6 +34,8 @@ export function GastosCartaoScreen({ items, loadStatus, onBack, onReload, onOpen
             <button type="button" className="termo-text-button" onClick={onReload}>Tentar de novo</button>
           </div>
         ) : items.length ? (
+          <>
+          <h2 className="gastos-cartao-heading">Do cartão, para completar</h2>
           <ul className="termo-list">
             {items.map((item) => (
               <li key={item.id}>
@@ -46,10 +50,14 @@ export function GastosCartaoScreen({ items, loadStatus, onBack, onReload, onOpen
               </li>
             ))}
           </ul>
+          </>
         ) : (
-          <p className="termo-empty">Nenhum gasto do cartão para completar. Quando o cartão for usado, ele aparece aqui.</p>
+          <p className="termo-empty">Nenhum gasto do cartão para completar. Para lançar um gasto novo, toque em Anexar despesa.</p>
         )}
       </section>
+      <ActionBar className="finalize-actions maintenance-actions">
+        <ActionButton className="finalize-primary" variant="primary" label="Anexar despesa" onClick={onAttach} />
+      </ActionBar>
     </AppShell>
   );
 }
