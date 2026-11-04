@@ -1,4 +1,7 @@
 using System;
+using System.IO;
+using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using Microsoft.Xrm.Sdk;
 using Xunit;
 
@@ -150,4 +153,18 @@ public class ProtegerCamposPluginTests
         c.InputParameters["Target"] = alvo;
         Assert.Empty(ProtegerCamposPlugin.Processar(c)!.Adicionados);
     }
+}
+
+public class ListaDoRegistradorTests
+{
+    // O registrador (net8) não referencia o plugin (net462): os campos do filtro do step são repetidos lá e não podem divergir.
+    [Fact]
+    public void Campos_do_registrador_sao_os_monitorados_do_plugin()
+    {
+        var programa = File.ReadAllText(Path.Combine(Pasta(), "tools", "Cr40f.Protecao.Registrar", "Program.cs"));
+        var campos = Regex.Match(programa, "const string Campos = \"([^\"]+)\"").Groups[1].Value;
+        Assert.Equal(string.Join(",", ProtecaoCampos.Monitorados), campos);
+    }
+
+    static string Pasta([CallerFilePath] string arquivo = "") => Path.Combine(Path.GetDirectoryName(arquivo)!, "..");
 }

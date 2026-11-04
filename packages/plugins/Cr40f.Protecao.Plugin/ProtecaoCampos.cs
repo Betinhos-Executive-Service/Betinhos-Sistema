@@ -31,6 +31,7 @@ public static class ProtecaoCampos
         "cr40f_status", "cr40f_trajeto", "cr40f_cr", "cr40f_idtenaris", "cr40f_tipodeveiculo",
     };
     static readonly string[] Vazio = new string[0];
+    static readonly DataContractJsonSerializer LeitorSnapshot = new(typeof(Dictionary<string, string>), new DataContractJsonSerializerSettings { UseSimpleDictionaryFormat = true });
 
     public static Resultado Aplicar(Entity alvo, Entity? anterior)
     {
@@ -60,9 +61,8 @@ public static class ProtecaoCampos
     {
         try
         {
-            var leitor = new DataContractJsonSerializer(typeof(Dictionary<string, string>), new DataContractJsonSerializerSettings { UseSimpleDictionaryFormat = true });
             using var fluxo = new MemoryStream(Encoding.UTF8.GetBytes(json));
-            return (Dictionary<string, string>?)leitor.ReadObject(fluxo) ?? new Dictionary<string, string>();
+            return (Dictionary<string, string>?)LeitorSnapshot.ReadObject(fluxo) ?? new Dictionary<string, string>();
         }
         catch (Exception) { return new Dictionary<string, string>(); }
     }
@@ -79,10 +79,10 @@ public static class ProtecaoCampos
 
     static bool Igual(object? valor, string? texto)
     {
-        if (string.IsNullOrEmpty(texto)) return string.IsNullOrEmpty(Texto(valor));
-        if (valor is DateTime data)
+        if (valor is DateTime data && !string.IsNullOrEmpty(texto))
             return DateTime.TryParse(texto, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var outra)
                 && Math.Abs((data.ToUniversalTime() - outra).TotalMinutes) < 1;
-        return string.Equals(Texto(valor), texto, StringComparison.Ordinal);
+        var atual = Texto(valor);
+        return string.IsNullOrEmpty(texto) ? string.IsNullOrEmpty(atual) : string.Equals(atual, texto, StringComparison.Ordinal);
     }
 }
