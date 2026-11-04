@@ -1,8 +1,6 @@
 using System.Reflection;
 using Microsoft.PowerPlatform.Dataverse.Client;
 using Microsoft.Xrm.Sdk;
-using Microsoft.Xrm.Sdk.Messages;
-using Microsoft.Xrm.Sdk.Metadata;
 using Microsoft.Xrm.Sdk.Query;
 
 // Registra o plugin de campos protegidos da Tenaris (ProtegerCamposPlugin) e o step em cr40f_reservadeveculos Update.
@@ -42,9 +40,9 @@ if (publish)
 }
 Log("plugin de campos protegidos registrado");
 
-if (options.Optional("testar") is { } testar)
+if (options.Has("testar"))
 {
-    var id = Guid.Parse(testar);
+    var id = Guid.Parse(options.Require("testar"));
     var colunas = new ColumnSet("cr40f_status", "new_camposprotegidos", "new_snapshotsharepoint");
     var antes = service.Retrieve("cr40f_reservadeveculos", id, colunas);
     var snapshot = antes.GetAttributeValue<string>("new_snapshotsharepoint") ?? throw new InvalidOperationException("Reserva sem snapshot: escolha uma da Tenaris.");
@@ -53,9 +51,11 @@ if (options.Optional("testar") is { } testar)
     // Precondição: status igual ao da planilha e não protegido. Assim a restauração no fim não protege o status de novo.
     if ((listaOriginal ?? "").ToLowerInvariant().Contains("cr40f_status") || !snapshot.Contains($"\"cr40f_status\":\"{original?.Value}\""))
         throw new InvalidOperationException("Escolha uma reserva da Tenaris com status igual ao da planilha e sem cr40f_status protegido.");
+    if (original?.Value == 202410005)
+        throw new InvalidOperationException("Escolha uma reserva que não esteja em Programado: o teste não pode entrar nem sair de Programado.");
     try
     {
-        var outro = original?.Value == 202410005 ? 202410001 : 202410005;
+        var outro = original?.Value == 202410004 ? 202410001 : 202410004; // Solicitado ↔ Confirmado: nunca passa por Programado
         service.Update(new Entity("cr40f_reservadeveculos", id) { ["cr40f_status"] = new OptionSetValue(outro) });
         var depoisEdicao = service.Retrieve("cr40f_reservadeveculos", id, colunas);
         Log($"edicao: status={depoisEdicao.GetAttributeValue<OptionSetValue>("cr40f_status")?.Value} lista={depoisEdicao.GetAttributeValue<string>("new_camposprotegidos")}");

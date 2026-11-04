@@ -98,6 +98,13 @@ public class ProtecaoCamposTests
     }
 
     [Fact]
+    public void Equipe_limpa_campo_que_a_planilha_preenche_protege()
+    {
+        var alvo = Alvo(); alvo["cr40f_cr"] = null;
+        Assert.Equal(new[] { "cr40f_cr" }, ProtecaoCampos.Aplicar(alvo, Anterior()).Adicionados);
+    }
+
+    [Fact]
     public void Lista_vinda_no_proprio_alvo_e_a_base()
     {
         var alvo = Alvo(); alvo[ProtecaoCampos.Lista] = "cr40f_trajeto"; alvo["cr40f_status"] = new OptionSetValue(202410005);
