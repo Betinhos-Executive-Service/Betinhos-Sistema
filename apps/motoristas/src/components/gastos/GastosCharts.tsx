@@ -7,33 +7,6 @@ const TEXTO = "#0f172a";
 const TEXTO_SUAVE = "#64748b";
 const LARGURA = 320;
 
-type LinhaCategoria = { categoria: string; total: number; quantidade: number };
-
-/** Barras horizontais por categoria: nome e quantidade em cima, barra embaixo, valor à direita. */
-export function GraficoCategorias({ itens }: { itens: LinhaCategoria[] }) {
-  const linha = 40;
-  const altura = itens.length * linha + 4;
-  const maximo = Math.max(...itens.map((item) => item.total), 1);
-  const largura = LARGURA - 8;
-  const resumo = itens.map((item) => `${item.categoria}: ${formatBRL(item.total)}, ${item.quantidade} ${item.quantidade === 1 ? "gasto" : "gastos"}`).join("; ");
-  return (
-    <svg className="gr-chart" viewBox={`0 0 ${LARGURA} ${altura}`} role="img" aria-label={`Gastos por categoria. ${resumo}.`}>
-      {itens.map((item, i) => {
-        const y = i * linha;
-        const comprimento = Math.max(4, Math.round((item.total / maximo) * largura));
-        return (
-          <g key={item.categoria} transform={`translate(4 ${y})`}>
-            <text x="0" y="13" fontSize="12.5" fontWeight="700" fill={TEXTO}>{item.categoria}<tspan fill={TEXTO_SUAVE} fontWeight="600"> · {item.quantidade}</tspan></text>
-            <text x={largura} y="13" fontSize="12.5" fontWeight="800" fill={TEXTO} textAnchor="end">{formatBRL(item.total)}</text>
-            <rect x="0" y="20" width={largura} height="10" rx="5" fill={TRILHO} />
-            <rect x="0" y="20" width={comprimento} height="10" rx="5" fill={NAVY} />
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
 /** Colunas da evolução (semana ou mês): valor acima da coluna, rótulo embaixo. */
 export function GraficoEvolucao({ barras, tipo }: { barras: BarraEvolucao[]; tipo: "semana" | "mes" }) {
   const altura = 168;

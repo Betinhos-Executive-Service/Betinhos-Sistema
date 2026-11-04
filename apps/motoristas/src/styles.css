@@ -14141,8 +14141,6 @@ select,
 .gr-chip:focus-visible { outline:0; box-shadow:0 0 0 3px rgba(33,89,210,.18); }
 .gr-conteudo { display:grid; gap:12px; min-width:0; }
 .gr-bloco { display:grid; gap:10px; min-width:0; padding:14px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; }
-.gr-total { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 8px; margin:0; color:#64748b; font-size:.8rem; font-weight:700; }
-.gr-total strong { color:#334155; font-size:.95rem; font-weight:800; font-variant-numeric:tabular-nums; }
 .gr-chart { display:block; width:100%; height:auto; overflow:visible; }
 .gr-medias { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:0; padding:0; list-style:none; }
 .gr-media { display:grid; align-content:start; gap:3px; min-width:0; padding:12px; border:1px solid #e2e8f0; border-radius:12px; background:#fcfcfb; }
@@ -14150,6 +14148,11 @@ select,
 .gr-media-valor { color:#001a3d; font-size:1.35rem; font-weight:800; line-height:1.15; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
 .gr-media-detalhe { color:#64748b; font-size:.75rem; line-height:1.3; }
 .gr-media-variacao { color:#285db5; font-size:.75rem; font-weight:800; line-height:1.3; }
+.gr-destaques .gr-media-valor { font-size:clamp(1.2rem,6.4vw,1.625rem); line-height:1.1; }
+.gr-subtitulo { margin:6px 0 0; color:#475569; font-size:.72rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+.gr-secundarias .gr-media { padding:10px 12px; }
+.gr-secundarias .gr-media-valor { font-size:1.1rem; }
+.gr-media[data-vazio] .gr-media-valor { color:#64748b; font-size:1.05rem; }
 .gr-insights { display:grid; gap:8px; margin:0; padding:0; list-style:none; }
 .gr-insights li { padding:10px 12px; border-radius:10px; background:#edf3ff; color:#1e3a6e; font-size:.9rem; font-weight:700; line-height:1.4; }
 .gr-status { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:0; padding:0; list-style:none; }

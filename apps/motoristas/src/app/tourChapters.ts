@@ -747,13 +747,10 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
     steps: [
       step("voltar", "Voltar", ["Volta para o Início."], { target: SERVICE_HOME }),
       step("periodo", "Período", ["Escolha Mês atual, Mês anterior ou 3 meses. Todos os números da tela são recalculados para o período."], { target: ".gr-periodos" }),
-      step("categorias", "Total e categorias", [
-        "O total fica discreto: o que importa é a média. Abaixo, as barras mostram quanto foi gasto em cada categoria e quantos gastos foram."
-      ], { target: ".gr-total", optional: true }),
       step("medias", "Suas médias", [
-        "Preço médio por litro, consumo, refeição, estacionamento, pedágio e lavagem. Cada cartão compara com o período anterior, quando há base.",
-        "Só aparecem as médias que têm dados."
-      ], { target: ".gr-medias", optional: true }),
+        "No topo, o preço médio por litro e a refeição média (almoço e jantar), cada um comparado com o período anterior, quando há base.",
+        "Logo abaixo ficam consumo, café e lanche, estacionamento, pedágio e lavagem. Só aparecem as que têm dados."
+      ], { target: ".gr-destaques", optional: true }),
       step("insights", "Para você", ["Frases curtas calculadas no app, como gastos que precisam de correção ou sem comprovante."], { target: ".gr-insights", optional: true }),
       step("status", "Status dos envios", ["Quantos gastos estão Enviados, Validados, Precisando corrigir ou Recusados."], { target: ".gr-status", optional: true }),
       step("evolucao", "Evolução e últimas despesas", ["Colunas por semana (por mês, em 3 meses) e as 10 despesas mais recentes com o status de cada uma."], { target: ".gr-lista", optional: true }),
