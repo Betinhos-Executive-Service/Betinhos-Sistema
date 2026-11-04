@@ -105,3 +105,42 @@ public class ProtecaoCamposTests
         Assert.Equal("cr40f_trajeto,cr40f_status", alvo[ProtecaoCampos.Lista]);
     }
 }
+
+public class ProtegerCamposPluginTests
+{
+    static FakeContext Contexto(Entity alvo, Entity anterior)
+    {
+        var c = new FakeContext("Update", "cr40f_reservadeveculos", alvo.Id, 1);
+        c.InputParameters["Target"] = alvo;
+        c.PreEntityImages[ProtegerCamposPlugin.ImagemAnterior] = anterior;
+        return c;
+    }
+
+    [Fact]
+    public void Plugin_protege_no_proprio_target()
+    {
+        var id = Guid.NewGuid();
+        var alvo = new Entity("cr40f_reservadeveculos", id) { ["cr40f_status"] = new OptionSetValue(202410005) };
+        var anterior = new Entity("cr40f_reservadeveculos", id) { [ProtecaoCampos.Snapshot] = "{\"cr40f_status\":\"202410001\"}" };
+        ProtegerCamposPlugin.Processar(Contexto(alvo, anterior));
+        Assert.Equal("cr40f_status", alvo[ProtecaoCampos.Lista]);
+    }
+
+    [Fact]
+    public void Outra_tabela_ou_mensagem_nao_faz_nada()
+    {
+        var alvo = new Entity("cr40f_composicaodeprecos", Guid.NewGuid());
+        var c = new FakeContext("Update", "cr40f_composicaodeprecos", alvo.Id, 1);
+        c.InputParameters["Target"] = alvo;
+        Assert.Null(ProtegerCamposPlugin.Processar(c));
+    }
+
+    [Fact]
+    public void Sem_imagem_pre_nao_quebra()
+    {
+        var alvo = new Entity("cr40f_reservadeveculos", Guid.NewGuid()) { ["cr40f_status"] = new OptionSetValue(202410005) };
+        var c = new FakeContext("Update", "cr40f_reservadeveculos", alvo.Id, 1);
+        c.InputParameters["Target"] = alvo;
+        Assert.Empty(ProtegerCamposPlugin.Processar(c)!.Adicionados);
+    }
+}
