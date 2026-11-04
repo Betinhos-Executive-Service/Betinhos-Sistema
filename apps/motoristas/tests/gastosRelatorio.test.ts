@@ -1,0 +1,178 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+  STATUS_DESPESA,
+  agruparEvolucao,
+  calcularMedias,
+  consumoMedioKmL,
+  contarSemComprovante,
+  despesasDoPeriodo,
+  despesasMock,
+  filtroDespesasRelatorio,
+  hojeSaoPaulo,
+  mapDespesaRelatorio,
+  mediaPorGasto,
+  montarRelatorio,
+  periodoDe,
+  precoMedioLitro,
+  variacaoPercentual,
+  type DespesaRelatorio
+} from "../src/lib/gastosRelatorio.ts";
+
+let seq = 0;
+const d = (parcial: Partial<DespesaRelatorio>): DespesaRelatorio => ({
+  id: `d${++seq}`, valor: 10, data: "2026-11-10", categoria: "Outros", formaPagamentoId: "", status: STATUS_DESPESA.enviado,
+  statusAnexo: 100000002, litros: null, km: null, veiculoId: "", estabelecimento: "", conciliadaCartao: false, ...parcial
+});
+const HOJE = "2026-11-20";
+
+test("preço médio por litro = valor ÷ litros e ignora abastecimento sem litros", () => {
+  const lista = [
+    d({ categoria: "Abastecimento", valor: 300, litros: 50 }),
+    d({ categoria: "Abastecimento", valor: 200, litros: 30 }),
+    d({ categoria: "Abastecimento", valor: 999, litros: null }),
+    d({ categoria: "Abastecimento", valor: 999, litros: 0 }),
+    d({ categoria: "Almoço", valor: 40, litros: 5 })
+  ];
+  const media = precoMedioLitro(lista);
+  assert.equal(media?.quantidade, 2);
+  assert.ok(Math.abs((media?.valor ?? 0) - 500 / 80) < 1e-9);
+  assert.equal(precoMedioLitro([d({ categoria: "Abastecimento", litros: null })]), null);
+});
+
+test("refeição média considera almoço e jantar, sem acento e sem café", () => {
+  const lista = [d({ categoria: "Almoço", valor: 40 }), d({ categoria: "Jantar", valor: 60 }), d({ categoria: "Café", valor: 10 }), d({ categoria: "Lanche", valor: 20 })];
+  assert.deepEqual(mediaPorGasto(lista, "almoco", "jantar"), { valor: 50, quantidade: 2 });
+  assert.deepEqual(mediaPorGasto(lista, "cafe", "lanche"), { valor: 15, quantidade: 2 });
+  assert.equal(mediaPorGasto(lista, "pedagio"), null);
+});
+
+test("variação contra o período anterior: sem base devolve null, com base arredonda", () => {
+  assert.equal(variacaoPercentual(6.24, 6), 4);
+  assert.equal(variacaoPercentual(5.82, 6), -3);
+  assert.equal(variacaoPercentual(6, null), null);
+  assert.equal(variacaoPercentual(6, 0), null);
+  const base = [d({ categoria: "Almoço", valor: 40, data: "2026-11-05" })];
+  const semBase = montarRelatorio(base, "mes", HOJE);
+  assert.equal(semBase.cartoes[0].variacao, null);
+  assert.equal(semBase.cartoes[0].variacaoTexto, null);
+  const comBase = montarRelatorio([...base, d({ categoria: "Almoço", valor: 50, data: "2026-10-05" })], "mes", HOJE);
+  assert.equal(comBase.cartoes[0].variacao, -20);
+  assert.equal(comBase.cartoes[0].variacaoTexto, "−20% vs mês anterior");
+});
+
+test("Cancelado fica fora de total, médias, status e lista", () => {
+  const lista = [
+    d({ categoria: "Almoço", valor: 40, data: "2026-11-05" }),
+    d({ categoria: "Almoço", valor: 400, data: "2026-11-06", status: STATUS_DESPESA.cancelado })
+  ];
+  assert.equal(despesasDoPeriodo(lista, "2026-11-01", "2026-12-01").length, 1);
+  const rel = montarRelatorio(lista, "mes", HOJE);
+  assert.equal(rel.total, 40);
+  assert.equal(rel.quantidade, 1);
+  assert.equal(rel.cartoes[0].valor, 40);
+  assert.equal(rel.ultimas.length, 1);
+});
+
+test("evolução: semanas de segunda a domingo no mês e um grupo por mês em 3 meses", () => {
+  const lista = [
+    d({ valor: 10, data: "2026-11-02" }), d({ valor: 5, data: "2026-11-08" }), d({ valor: 20, data: "2026-11-09" }),
+    d({ valor: 7, data: "2026-10-15" }), d({ valor: 3, data: "2026-09-30" })
+  ];
+  const semanal = agruparEvolucao(despesasDoPeriodo(lista, "2026-11-01", "2026-12-01"), periodoDe("mes", HOJE), HOJE);
+  assert.equal(semanal.tipo, "semana");
+  // 01/11/2026 é domingo: semana do dia 1 (segunda 26/10), depois 02/11, 09/11, 16/11 (hoje = 20/11).
+  assert.deepEqual(semanal.barras.map((b) => [b.rotulo, b.total]), [["01/11", 0], ["02/11", 15], ["09/11", 20], ["16/11", 0]]);
+  const mensal = agruparEvolucao(despesasDoPeriodo(lista, "2026-09-01", "2026-12-01"), periodoDe("3meses", HOJE), HOJE);
+  assert.equal(mensal.tipo, "mes");
+  assert.deepEqual(mensal.barras.map((b) => [b.rotulo, b.total, b.quantidade]), [["set", 3, 1], ["out", 7, 1], ["nov", 35, 3]]);
+  const anterior = agruparEvolucao(despesasDoPeriodo(lista, "2026-10-01", "2026-11-01"), periodoDe("mesAnterior", HOJE), HOJE);
+  assert.equal(anterior.barras.at(-1)?.rotulo, "26/10");
+  assert.equal(anterior.barras.reduce((t, b) => t + b.total, 0), 7);
+});
+
+test("limites do período em America/Sao_Paulo", () => {
+  // 02:59Z de 01/12 ainda é 30/11 em São Paulo (UTC-3); 03:00Z já é dezembro.
+  assert.equal(hojeSaoPaulo(new Date("2026-12-01T02:59:00Z")), "2026-11-30");
+  assert.equal(hojeSaoPaulo(new Date("2026-12-01T03:00:00Z")), "2026-12-01");
+  assert.equal(hojeSaoPaulo(new Date("2026-01-01T01:00:00Z")), "2025-12-31");
+  const mes = periodoDe("mes", "2026-11-30");
+  assert.deepEqual([mes.inicio, mes.fim, mes.anteriorInicio, mes.anteriorFim], ["2026-11-01", "2026-12-01", "2026-10-01", "2026-11-01"]);
+  const anterior = periodoDe("mesAnterior", "2026-01-15");
+  assert.deepEqual([anterior.inicio, anterior.fim, anterior.anteriorInicio], ["2025-12-01", "2026-01-01", "2025-11-01"]);
+  const tres = periodoDe("3meses", "2026-11-20");
+  assert.deepEqual([tres.inicio, tres.fim, tres.anteriorInicio, tres.anteriorFim], ["2026-09-01", "2026-12-01", "2026-06-01", "2026-09-01"]);
+  const lista = [d({ data: "2026-10-31" }), d({ data: "2026-11-01" }), d({ data: "2026-11-30" }), d({ data: "2026-12-01" })];
+  assert.deepEqual(despesasDoPeriodo(lista, mes.inicio, mes.fim).map((x) => x.data), ["2026-11-01", "2026-11-30"]);
+});
+
+test("insights: correção, comprovante, variação do litro e refeição média, no máximo 4", () => {
+  const lista = [
+    d({ categoria: "Abastecimento", valor: 312, litros: 50, data: "2026-11-05" }),
+    d({ categoria: "Abastecimento", valor: 300, litros: 50, data: "2026-10-05" }),
+    d({ categoria: "Almoço", valor: 38.2, data: "2026-11-06" }),
+    d({ categoria: "Lanche", valor: 20, data: "2026-11-07", status: STATUS_DESPESA.precisaCorrigir, statusAnexo: 100000000 }),
+    d({ categoria: "Lanche", valor: 20, data: "2026-11-08", status: STATUS_DESPESA.precisaCorrigir, statusAnexo: 100000000 }),
+    d({ categoria: "Pedágio", valor: 20, data: "2026-11-09", statusAnexo: 100000003 })
+  ];
+  // O Intl usa espaço não separável depois de "R$"; no teste comparamos com espaço comum.
+  const insights = montarRelatorio(lista, "mes", HOJE).insights.map((texto) => texto.replace(/\u00a0/g, " "));
+  assert.deepEqual(insights, [
+    "2 gastos precisam de correção.",
+    "3 gastos estão sem comprovante.",
+    "Preço do litro subiu 4% vs mês anterior.",
+    "Sua refeição média é R$ 38,20."
+  ]);
+  const um = montarRelatorio([d({ valor: 5, data: "2026-11-02", status: STATUS_DESPESA.precisaCorrigir })], "mes", HOJE).insights;
+  assert.deepEqual(um, ["1 gasto precisa de correção."]);
+  assert.deepEqual(montarRelatorio([], "mes", HOJE).insights, []);
+});
+
+test("consumo km/L: trechos consecutivos do mesmo veículo; sem base segura, omite", () => {
+  const abast = (veiculoId: string, data: string, km: number, litros = 50) => d({ categoria: "Abastecimento", veiculoId, data, km, litros });
+  const lista = [abast("v1", "2026-11-01", 1000), abast("v1", "2026-11-08", 1500), abast("v1", "2026-11-15", 2000), abast("v2", "2026-11-03", 90000)];
+  const consumo = consumoMedioKmL(lista, "2026-11-01", "2026-12-01");
+  assert.equal(consumo?.quantidade, 2);
+  assert.ok(Math.abs((consumo?.valor ?? 0) - 10) < 1e-9);
+  // Um trecho só, KM voltando, ou consumo implausível: não calcula.
+  assert.equal(consumoMedioKmL(lista.slice(0, 2), "2026-11-01", "2026-12-01"), null);
+  assert.equal(consumoMedioKmL([abast("v1", "2026-11-01", 2000), abast("v1", "2026-11-08", 1500), abast("v1", "2026-11-15", 1000)], "2026-11-01", "2026-12-01"), null);
+  assert.equal(consumoMedioKmL([abast("v1", "2026-11-01", 1000), abast("v1", "2026-11-08", 1010), abast("v1", "2026-11-15", 1020)], "2026-11-01", "2026-12-01"), null);
+  assert.equal(consumoMedioKmL([abast("", "2026-11-01", 1000), abast("", "2026-11-08", 1500), abast("", "2026-11-15", 2000)], "2026-11-01", "2026-12-01"), null);
+  // O abastecimento âncora do mês anterior vale para o primeiro trecho do período.
+  const cruzado = [abast("v1", "2026-10-28", 1000), abast("v1", "2026-11-05", 1500), abast("v1", "2026-11-12", 2000)];
+  assert.equal(calcularMedias(cruzado, "2026-11-01", "2026-12-01").consumo?.quantidade, 2);
+  assert.equal(calcularMedias(cruzado, "2026-10-01", "2026-11-01").consumo, null);
+});
+
+test("sem comprovante e mapeamento das colunas do Dataverse", () => {
+  assert.equal(contarSemComprovante([d({ statusAnexo: 100000000 }), d({ statusAnexo: 100000003 }), d({ statusAnexo: 100000002 }), d({ statusAnexo: null })]), 2);
+  const mapa = new Map([["aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", "Pedágio"]]);
+  const despesa = mapDespesaRelatorio({
+    cr40f_despesaoperacionalid: "11111111-2222-4333-8444-555555555555", cr40f_valor: 18.9, cr40f_datagasto: "2026-11-03T12:00:00Z",
+    _cr40f_categoria_value: "{AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE}", cr40f_statusoperacional: 100000002, cr40f_litros: null, cr40f_kminformado: 120,
+    cr40f_estabelecimento: "Dutra", cr40f_conciliadacartao: true
+  }, mapa);
+  assert.deepEqual([despesa.categoria, despesa.data, despesa.valor, despesa.status, despesa.litros, despesa.km, despesa.conciliadaCartao], ["Pedágio", "2026-11-03", 18.9, STATUS_DESPESA.validado, null, 120, true]);
+  const filtro = filtroDespesasRelatorio("11111111-2222-4333-8444-555555555555", HOJE);
+  assert.match(filtro, /_cr40f_motorista_value eq 11111111-2222-4333-8444-555555555555 and statecode eq 0 and cr40f_datagasto ge 2026-06-01T00:00:00Z and cr40f_datagasto lt 2026-12-01T00:00:00Z/);
+  assert.throws(() => filtroDespesasRelatorio("nada", HOJE), /Motorista não identificado/);
+});
+
+test("mock: cerca de 25 despesas, nunca no futuro, e o relatório do mês atual tem médias", () => {
+  for (const hoje of ["2026-11-04", "2026-11-30", "2026-03-01"]) {
+    const mock = despesasMock(hoje);
+    assert.ok(mock.length >= 25);
+    assert.ok(mock.every((x) => x.data <= hoje), `futuro em ${hoje}`);
+  }
+  const rel = montarRelatorio(despesasMock("2026-11-20"), "mes", "2026-11-20");
+  assert.deepEqual(rel.cartoes.map((c) => c.id), ["litro", "consumo", "refeicao", "cafeLanche", "estacionamento", "pedagio", "lavagem"]);
+  assert.ok(rel.cartoes.every((c) => c.variacao != null));
+  assert.ok(rel.insights.length >= 2 && rel.insights.length <= 4);
+});
+
+test("despesa com data futura no mês entra numa coluna da evolução (total e gráfico coerentes)", () => {
+  const lista = [d({ data: "2026-11-10", valor: 10 }), d({ data: "2026-11-27", valor: 25 })];
+  const { barras } = agruparEvolucao(despesasDoPeriodo(lista, "2026-11-01", "2026-12-01"), periodoDe("mes", HOJE), HOJE);
+  assert.equal(barras.reduce((total, barra) => total + barra.total, 0), 35);
+});

@@ -13,7 +13,7 @@ description: "Verifica a tela Registrar gasto: validação, carregamento do envi
 ## Preparar ambiente
 - `npm test` e `npx tsc --noEmit --noUnusedLocals --noUnusedParameters`.
 - Dev server: `PORT=<porta livre> node scripts/dev-server.cjs` (ou `npm run dev`). Ele recompila `dist/` a cada mudança em `src/`; restaure `dist/` com `git checkout -- dist` antes do commit se não for publicar.
-- Prévia local sem Dataverse: `http://127.0.0.1:<porta>/?dev=preview`, card "Gastos" na seção OPERACAO.
+- Prévia local sem Dataverse: `http://127.0.0.1:<porta>/?dev=preview` (catálogo), card "Gastos" na seção OPERACAO.
 
 ## Roteiro
 1. `npm test` → `ℹ fail 0`; os testes de `expenseUpload.test.ts` cobrem diário, nova tentativa, status (`describeExpenseSubmission`) e progresso (`{ phase: "creating" }`, `{ phase: "uploading", order, total }`).
@@ -50,7 +50,10 @@ Observação: `scroll_to` dentro da prévia rola o palco na horizontal e corta a
 - Código: `src/lib/gastosCartao.ts` (filtro, mock, payload, duplicidade), `GastosCartaoScreen`, `GastoCartaoDuplicadoDialog` e `ExpenseScreen` com a prop `cartaoGasto`. Testes: `tests/gastosCartao.test.ts`.
 - Pendente = `cr40f_origem` 100000002, `cr40f_statusoperacional` 100000001 (Precisa corrigir), `cr40f_conciliadacartao` true, do motorista logado. Completar é PATCH na despesa existente (nunca cria) e leva o status para 100000000; valor, data, forma e estabelecimento ficam somente leitura. No caminho assíncrono (DEV) o diário leva `existing: true` e `ensureExpenseSubmissionRemote` faz PATCH com `If-Match: *`.
 - Na prévia (localhost) há 3 gastos de exemplo (`?mockGastosCartao=vazio|erro` para os outros estados). Passos: Início mostra a linha "Gastos do cartão · N para completar" (some com 0) → abrir a lista → abrir um item → ENVIAR sem descrição ou comprovante mostra erro. Atalhos: `?despesaId=<guid>` abre o gasto (id que não é pendente cai na lista) e `?gastosCartao=1` abre a lista. Dispense o tour ("Pular") antes de clicar.
-- Entrada: o tile Gastos do Início abre a lista "Gastos" (pendências do cartão) com o CTA navy "Anexar despesa" no rodapé, nunca a câmera direto. O CTA abre a câmera (ou o formulário, se houver envio pendente ou rascunho); voltar da câmera sem nada capturado volta à lista; voltar do formulário volta à lista.
+- Entrada: o tile Gastos do Início abre o Relatório de gastos (`gastosRelatorio`), nunca a câmera nem a lista direto. Rodapé sempre com "Anexar despesa" (primário); com pendentes do cartão aparece "Completar (N)" à esquerda (secundário), que abre a lista `gastosCartao` (sem CTA de anexar). Voltar: lista → relatório; câmera sem captura → relatório; formulário → relatório (ou lista, se for gasto do cartão); relatório → Início. `concluirGastoCartao` sem pendentes leva ao relatório.
+- Relatório: `src/lib/gastosRelatorio.ts`, `src/screens/GastosRelatorioScreen.tsx`, `src/components/gastos/GastosCharts.tsx`, `tests/gastosRelatorio.test.ts`. Lê `cr40f_despesaoperacional` do motorista (statecode 0, sem Cancelado) numa janela de 6 meses; trocar o chip (Mês atual, Mês anterior, 3 meses) recalcula local. Mock em localhost: `?mockGastosRelatorio=vazio|erro` e `?mockGastosCartao=vazio` (rodapé de 1 botão).
+- Verificar: chips recalculam total e cartões; variação só com base anterior; 2 a 4 insights; atalho "Ver pendentes do cartão"; rodapé com 1 e 2 botões; vazio com CTA; erro com "Tentar de novo"; 360px sem rolagem horizontal; console sem erros. A prévia real fica na raiz (`http://127.0.0.1:<porta>/`), não em `?dev=preview` (que é só o catálogo de componentes); dispense o tour ("Pular") a cada capítulo novo.
+- km/L é estimativa (tanque cheio, trechos entre abastecimentos consecutivos por veículo, mínimo 2 trechos, faixa 3 a 30 km/L); sem veículo ou KM crescente, omite.
 - Aviso de duplicidade: novo gasto com a mesma forma de pagamento do pendente (Cartão de crédito), mesmo valor (±R$ 0,05) e data informada de 1 dia antes a 2 dias depois da compra (mesma janela do flow) abre o diálogo "Completar este" / "Lançar mesmo assim"; Esc e toque fora só fecham.
 - Não verificável fora do DEV: PATCH real, anexo e a leitura do motorista no Dataverse.
 
