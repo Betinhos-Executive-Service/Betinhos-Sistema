@@ -17,6 +17,7 @@ description: "Verifica o módulo de Treinamentos do shell (#/treinamentos: lista
 1. `cd apps/shell && pnpm exec vitest run src/pages/treinamentos src/nav src/app/AppShell.icons.test.tsx` → todos passam. `domain/domain.test.ts` cobre validação (vídeo sem https, quiz sem correta, nota fora de 0–100, público vazio, anexo > 25 MB), público-alvo (desligado fora), payload/mapeamento, status por participação, vencido e marcação do conteúdo; `TreinamentosPage.test.tsx` cobre painel, vencido/desligado, criação com quiz de 3 perguntas e publicação, público selecionado vazio.
 2. `cd packages/agentes-ia && pnpm exec vitest run` → contexto com `treinamentos` (validade vencida ou em até 7 dias) e `pendentes` (contagem pronta de participações abertas de funcionários ativos); `TreinamentoPendente` no índice 21.
 3. `pnpm typecheck` na raiz → sem erros.
+4. Virada de dia: as datas do mock (validade, `dia(n)`) contam a partir do dia de São Paulo (`todaySaoPaulo`), o mesmo "hoje" da tela. Rodar o passo 1 entre 21h e 24h de Brasília (já é o dia seguinte em UTC) também tem que passar ("Venceu há 3 dias").
 
 ## Dados do mock (`pnpm dev`; nesta sessão porta 36484)
 - "Embarque no GRU: novo procedimento": publicado hoje, todos os motoristas, assinatura + quiz (3 perguntas, mínimo 70%), vídeo, 2 anexos, validade em 15 dias. Carlos concluído (assinatura desenhada, 100%), Márcio reprovado 33%, Rafael só abriu.

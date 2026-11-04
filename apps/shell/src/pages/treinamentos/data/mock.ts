@@ -1,3 +1,4 @@
+import { todaySaoPaulo } from '@betinhos/ui'
 import { ESTADO, PUBLICO, PUSH, isOrfa, podeLembrar, isPublicado, validarComConteudo, validarRascunho, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
 import type { Linha } from '../domain/lista'
 import { contarProgresso } from '../domain/tabela'
@@ -6,7 +7,8 @@ import type { Source } from './source'
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 const id = (n: number) => `eeeeeeee-0000-4000-8000-${String(n).padStart(12, '0')}`
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
-const dia = (dias: number) => new Date(Date.now() + dias * 86400000).toISOString().slice(0, 10)
+// Conta a partir do dia de São Paulo, o mesmo "hoje" da tela; com o dia UTC, entre 21h e 24h a validade saía um dia errada.
+const dia = (dias: number) => new Date(Date.parse(todaySaoPaulo()) + dias * 86400000).toISOString().slice(0, 10)
 
 const FUNCIONARIOS: Funcionario[] = [
   { id: id(1), nome: 'Carlos Alberto Teste', apelido: 'Carlos', funcao: 202410000, ativo: true },
