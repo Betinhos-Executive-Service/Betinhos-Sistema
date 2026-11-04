@@ -750,7 +750,7 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
       step("medias", "Suas médias", [
         "No topo, o preço médio por litro e a refeição média (almoço e jantar), cada um comparado com o período anterior, quando há base.",
         "Logo abaixo ficam consumo, café e lanche, estacionamento, pedágio e lavagem. Só aparecem as que têm dados."
-      ], { target: ".gr-destaques" }),
+      ], { target: ".gr-destaques", optional: true }),
       step("insights", "Para você", ["Frases curtas calculadas no app, como gastos que precisam de correção ou sem comprovante."], { target: ".gr-insights", optional: true }),
       step("status", "Status dos envios", ["Quantos gastos estão Enviados, Validados, Precisando corrigir ou Recusados."], { target: ".gr-status", optional: true }),
       step("evolucao", "Evolução e últimas despesas", ["Colunas por semana (por mês, em 3 meses) e as 10 despesas mais recentes com o status de cada uma."], { target: ".gr-lista", optional: true }),
