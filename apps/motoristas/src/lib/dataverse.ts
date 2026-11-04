@@ -519,7 +519,7 @@ export async function retrieveMultiple(entitySetName: string, options = "") {
   }
 }
 
-async function retrieveMultipleAll(entitySetName: string, options = "", schedule?: <T>(request: () => Promise<T>) => Promise<T>) {
+export async function retrieveMultipleAll(entitySetName: string, options = "", schedule?: <T>(request: () => Promise<T>) => Promise<T>) {
   const entities: DataverseRecord[] = [];
   let nextOptions = options;
   let page = 0;

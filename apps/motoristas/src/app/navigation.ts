@@ -41,7 +41,8 @@ const SCREEN_HASH_PATHS: Record<Screen, string> = {
   meuCarro: "meu-carro",
   multas: "multas",
   treinamentos: "treinamentos",
-  gastosCartao: "gastos-cartao"
+  gastosCartao: "gastos-cartao",
+  gastosRelatorio: "gastos-relatorio"
 };
 
 const SCREEN_HASH_ALIASES: Record<string, Screen> = {
@@ -114,7 +115,9 @@ const SCREEN_HASH_ALIASES: Record<string, Screen> = {
   treinamentos: "treinamentos",
   trainings: "treinamentos",
   "gastos-cartao": "gastosCartao",
-  gastoscartao: "gastosCartao"
+  gastoscartao: "gastosCartao",
+  "gastos-relatorio": "gastosRelatorio",
+  gastosrelatorio: "gastosRelatorio"
 };
 
 const HASH_ROUTE_DETAIL_SCREENS = new Set<Screen>([
@@ -234,7 +237,8 @@ const SCREEN_DEPTH: Record<Screen, number> = {
   meuCarro: 1,
   multas: 1,
   treinamentos: 1,
-  gastosCartao: 1
+  gastosCartao: 1,
+  gastosRelatorio: 1
 };
 
 const drillSpring = {

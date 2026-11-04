@@ -1,4 +1,3 @@
-import { ActionBar, ActionButton } from "../components/common/ActionButton";
 import { AppShell } from "../components/layout/AppShell";
 import { ServicesMenu } from "../components/navigation/ServicesMenu";
 import { formatDiaMes, isMockGastosCartao, type GastoCartao, type GastosCartaoLoadStatus } from "../lib/gastosCartao";
@@ -11,10 +10,9 @@ type GastosCartaoScreenProps = {
   onBack: () => void;
   onReload: () => void;
   onOpen: (id: string) => void;
-  onAttach: () => void;
 };
 
-export function GastosCartaoScreen({ items, loadStatus, onBack, onReload, onOpen, onAttach }: GastosCartaoScreenProps) {
+export function GastosCartaoScreen({ items, loadStatus, onBack, onReload, onOpen }: GastosCartaoScreenProps) {
   return (
     <AppShell screenLabel="GastosCartao">
       <ServicesMenu
@@ -52,12 +50,9 @@ export function GastosCartaoScreen({ items, loadStatus, onBack, onReload, onOpen
           </ul>
           </>
         ) : (
-          <p className="termo-empty">Nenhum gasto do cartão para completar. Para lançar um gasto novo, toque em Anexar despesa.</p>
+          <p className="termo-empty">Nenhum gasto do cartão para completar.</p>
         )}
       </section>
-      <ActionBar className="finalize-actions maintenance-actions">
-        <ActionButton className="finalize-primary" variant="primary" label="Anexar despesa" onClick={onAttach} />
-      </ActionBar>
     </AppShell>
   );
 }

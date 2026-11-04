@@ -207,6 +207,8 @@ import {
 } from "./lib/collisions";
 import { DEFAULT_EXPENSE_REFERENCE_DATA, buildExpenseCreatePayload, parseCurrencyInput, type ExpenseDraft, type ExpensePhoto, type ExpenseReferenceData } from "./lib/expenses";
 import { GastosCartaoScreen } from "./screens/GastosCartaoScreen";
+import { GastosRelatorioScreen, type GastosRelatorioLoadStatus } from "./screens/GastosRelatorioScreen";
+import { carregarDespesasRelatorio, hojeSaoPaulo, montarRelatorio, type DespesaRelatorio, type PeriodoId } from "./lib/gastosRelatorio";
 import { GastoCartaoDuplicadoDialog } from "./components/common/GastoCartaoDuplicadoDialog";
 import {
   MOCK_CIDADES,
@@ -1052,6 +1054,44 @@ function App() {
   // Já enviado e guardado no diário do aparelho: sai da lista e da contagem mesmo antes da releitura.
   const gastosCartaoPendentes = gastosCartao.filter((gasto) => !expenseSubmissions.some((submission) => submission.expenseId === gasto.id));
 
+  // Relatório de gastos: uma consulta de 6 meses; o recorte por período e as contas são locais (trocar de período não consulta de novo).
+  const [relatorioPeriodo, setRelatorioPeriodo] = useState<PeriodoId>("mes");
+  const [relatorioDespesas, setRelatorioDespesas] = useState<DespesaRelatorio[] | null>(null);
+  const [relatorioStatus, setRelatorioStatus] = useState<GastosRelatorioLoadStatus>("loading");
+  const relatorioEmCargaRef = useRef(false);
+  const relatorioRepetirRef = useRef(false);
+  const reloadRelatorio = useCallback(async () => {
+    if (relatorioEmCargaRef.current) {
+      relatorioRepetirRef.current = true;
+      return;
+    }
+    relatorioEmCargaRef.current = true;
+    setRelatorioStatus((current) => current === "ready" ? current : "loading");
+    try {
+      setRelatorioDespesas(await carregarDespesasRelatorio(comunicadosDriverIdRef.current));
+      setRelatorioStatus("ready");
+    } catch (error) {
+      setRelatorioStatus((current) => current === "ready" ? current : "error");
+      reportAppError(error, { severity: "warning", source: "app", action: "carregarDespesasRelatorio", notifyUser: false });
+    } finally {
+      relatorioEmCargaRef.current = false;
+      if (relatorioRepetirRef.current) {
+        relatorioRepetirRef.current = false;
+        void reloadRelatorio();
+      }
+    }
+  }, []);
+  // Recarrega a cada vez que o relatório abre (voltar de um envio ou de "Completar" mostra os números novos).
+  useEffect(() => {
+    if (screen !== "gastosRelatorio") return;
+    if (!isMockGastosCartao() && !driverContext?.id) return;
+    void reloadRelatorio();
+  }, [screen, driverContext?.id, reloadRelatorio]);
+  const relatorioModelo = useMemo(
+    () => relatorioDespesas ? montarRelatorio(relatorioDespesas, relatorioPeriodo, hojeSaoPaulo()) : null,
+    [relatorioDespesas, relatorioPeriodo]
+  );
+
   // Abre o gasto no formulário de gastos. `manterFormulario`: veio do aviso de duplicidade, mantém fotos e o que foi digitado.
   const abrirGastoCartao = (gasto: GastoCartao, manterFormulario = false) => {
     const base = gastoCartaoParaRascunho(gasto);
@@ -1098,7 +1138,7 @@ function App() {
   const concluirGastoCartao = (id: string): Screen => {
     setGastosCartao((current) => current.filter((gasto) => gasto.id !== id));
     sairGastoCartao();
-    return gastosCartaoPendentes.some((gasto) => gasto.id !== id) ? "gastosCartao" : "inicio";
+    return gastosCartaoPendentes.some((gasto) => gasto.id !== id) ? "gastosCartao" : "gastosRelatorio";
   };
 
   // Deep link do push: ?despesaId abre o gasto direto quando ele está pendente; senão (ou com ?gastosCartao=1) fica na lista.
@@ -2368,10 +2408,10 @@ function App() {
     !draft.estabelecimento && !draft.descricao && !draft.kmInformado && !draft.litros && !expenseDateTouchedRef.current;
 
   const navigateFromInitial = (screenName: string) => {
-    // Gastos abre a lista de pendências do cartão; a câmera fica no CTA "Anexar despesa".
+    // Gastos abre o relatório do motorista; a lista do cartão fica em "Completar" e a câmera no CTA "Anexar despesa".
     if (screenName === "gastos") {
       setComunicadoOrigin("");
-      setScreen("gastosCartao");
+      setScreen("gastosRelatorio");
       return;
     }
     if (screenName === "personalReceipt" || screenName === "reciboPersonalizado" || screenName === "gerarReciboPersonalizado") {
@@ -3607,7 +3647,7 @@ function App() {
       <MediaCaptureScreen
         kind="NOTAFISCAL"
         title="Comprovante"
-        onBack={() => setScreen(!gastoCartaoAtual && isExpenseIdle() ? "gastosCartao" : "gastos")}
+        onBack={() => setScreen(!gastoCartaoAtual && isExpenseIdle() ? "gastosRelatorio" : "gastos")}
         onCapture={(photoDataUrl) => {
           setExpensePhotoDraft(photoDataUrl);
           setExpensePhotoPreviewUrl("");
@@ -3697,8 +3737,9 @@ function App() {
         onAddPhoto={openExpenseCamera}
         onPreviewPhoto={openExpensePreview}
         onBack={() => {
+          // Completando um gasto do cartão volta para a lista dele; gasto novo volta para o relatório.
           if (gastoCartaoAtual) sairGastoCartao();
-          setScreen("gastosCartao");
+          setScreen(gastoCartaoAtual ? "gastosCartao" : "gastosRelatorio");
         }}
         onSubmit={submitExpenseChecked}
         submitState={expenseSend && expenseSend.phase !== "error" ? "loading" : remoteOperation?.phase ?? "idle"}
@@ -3726,12 +3767,27 @@ function App() {
       <GastosCartaoScreen
         items={gastosCartaoPendentes}
         loadStatus={gastosCartaoStatus}
-        onBack={() => setScreen("inicio")}
+        onBack={() => setScreen("gastosRelatorio")}
         onReload={() => { reloadGastosCartao().catch((error) => reportAppError(error, { severity: "warning", source: "app", action: "listarGastosCartao", notifyUser: false })); }}
         onOpen={(id) => {
           const gasto = gastosCartaoPendentes.find((item) => item.id === id);
           if (gasto) abrirGastoCartao(gasto);
         }}
+      />
+    );
+  }
+
+  if (screen === "gastosRelatorio") {
+    return show(
+      <GastosRelatorioScreen
+        modelo={relatorioModelo}
+        periodoId={relatorioPeriodo}
+        loadStatus={relatorioStatus}
+        pendentesCartao={gastosCartaoPendentes.length}
+        onPeriodo={setRelatorioPeriodo}
+        onBack={() => setScreen("inicio")}
+        onReload={() => { void reloadRelatorio(); }}
+        onCompletar={() => setScreen("gastosCartao")}
         onAttach={anexarDespesa}
       />
     );
