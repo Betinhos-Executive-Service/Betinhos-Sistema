@@ -172,6 +172,18 @@ describe('Geral', () => {
     await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
   })
 
+  it('adicionar campo da própria reserva e aplicar mostra a coluna na tabela', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
+    fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Colunas' })
+    fireEvent.click(within(dialog).getByRole('button', { name: /Adicionar coluna de outra tabela/ }))
+    fireEvent.click(await within(dialog).findByRole('button', { name: 'Adicionar a coluna Razão do status' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Voltar às colunas' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Aplicar' }))
+    await screen.findByRole('columnheader', { name: /Razão do status/, hidden: true })
+  })
+
   it('o menu do título ordena crescente e decrescente; Restaurar padrão volta à ordem da visão', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)

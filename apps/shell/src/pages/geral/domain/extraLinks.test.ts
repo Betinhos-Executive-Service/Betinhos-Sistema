@@ -26,4 +26,14 @@ describe('extraLinks', () => {
     expect(toConfigKey('cliente.cr40f_name')).toBe('cliente.cr40f_name')
     expect(fromConfigKey('cr40f_name')).toBe('cr40f_name')
   })
+
+  it('campo da própria reserva: atributo direto na entidade, sem link-entity, chave x:campo ↔ campo', () => {
+    const tenaris: ResolvedLinkColumn = { key: 'x:cr40f_idtenaris', label: 'ID Tenaris', links: [], attr: { name: 'cr40f_idtenaris', label: 'ID Tenaris', kind: 'text' } }
+    const fetch = addExtraLinks(FETCH, [tenaris])
+    expect(linkEntities(fetch)).toEqual([])
+    expect(fetch).toContain('<attribute name="cr40f_idtenaris"/>')
+    expect(extraColumn(tenaris)).toEqual({ key: 'cr40f_idtenaris', attribute: 'cr40f_idtenaris', alias: null, entity: null, width: 160, label: 'ID Tenaris' })
+    expect(fromConfigKey('x:cr40f_idtenaris')).toBe('cr40f_idtenaris')
+    expect(toConfigKey('cr40f_idtenaris')).toBe('x:cr40f_idtenaris')
+  })
 })

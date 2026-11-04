@@ -13,21 +13,27 @@ const SEP = '__'
 
 export const extraAlias = (navs: string[]) => `${ALIAS_PREFIX}${navs.join(SEP)}`
 
-/** Coluna da Geral de uma coluna `x:` resolvida (`x__nav.campo`). */
+/** Coluna da Geral de uma coluna `x:` resolvida (`x__nav.campo`; campo da própria reserva fica com o nome do campo). */
 export function extraColumn(c: ResolvedLinkColumn): Column {
+  if (!c.links.length) return { key: c.attr.name, attribute: c.attr.name, alias: null, entity: null, width: 160, label: c.label }
   const alias = extraAlias(c.links.map((l) => l.nav))
   return { key: `${alias}.${c.attr.name}`, attribute: c.attr.name, alias, entity: null, width: 160, label: c.label }
 }
 
-/** `x__a__b.campo` ↔ `x:a/b/campo`: o painel usa a chave `x:`; a Geral, a do FetchXML. */
+/**
+ * `x__a__b.campo` ↔ `x:a/b/campo`: o painel usa a chave `x:`; a Geral, a do FetchXML. Campo da própria reserva:
+ * `campo` ↔ `x:campo` (só é chamado para colunas adicionadas; chave com ponto que não é `x__` fica como está).
+ */
 export function toConfigKey(columnKey: string): string {
   const dot = columnKey.indexOf('.')
-  if (!columnKey.startsWith(ALIAS_PREFIX) || dot < 0) return columnKey
+  if (dot < 0) return `${EXTRA_COLUMN_PREFIX}${columnKey}`
+  if (!columnKey.startsWith(ALIAS_PREFIX)) return columnKey
   return `${EXTRA_COLUMN_PREFIX}${[...columnKey.slice(ALIAS_PREFIX.length, dot).split(SEP), columnKey.slice(dot + 1)].join('/')}`
 }
 export function fromConfigKey(configKey: string): string {
   if (!configKey.startsWith(EXTRA_COLUMN_PREFIX)) return configKey
   const path = configKey.slice(EXTRA_COLUMN_PREFIX.length).split('/')
+  if (path.length === 1) return path[0]
   return `${extraAlias(path.slice(0, -1))}.${path[path.length - 1]}`
 }
 
