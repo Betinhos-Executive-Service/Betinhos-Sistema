@@ -65,6 +65,7 @@ using Microsoft.Xrm.Sdk.Query;
 
 const string AssemblyName = "Betinhos.DriverRecordSharing";
 const string PluginTypeName = "Betinhos.DriverRecordSharing.ServiceDriverSharePlugin";
+const string FuelPluginTypeName = "Betinhos.DriverRecordSharing.FuelExpensePlugin";
 const string PreImageAlias = "pre";
 
 var environmentUrl = args.ElementAtOrDefault(0) ?? "https://orgf261ae8e.crm2.dynamics.com/";
@@ -101,6 +102,8 @@ var specs = new[]
   new StepSpec("Colisoes Update", "cr40f_colisao_v2", "Update", 1, "cr40f_motorista", new[] { "cr40f_motorista" }),
   new StepSpec("Recibos Create", "cr40f_recibos_v2", "Create", 1, "", Array.Empty<string>()),
   new StepSpec("Recibos Update", "cr40f_recibos_v2", "Update", 1, "cr40f_motorista", new[] { "cr40f_motorista" }),
+  new StepSpec("Combustivel Create", "cr40f_despesaoperacional", "Create", 1, "", Array.Empty<string>(), 40, FuelPluginTypeName),
+  new StepSpec("Combustivel Update", "cr40f_despesaoperacional", "Update", 1, "cr40f_valor,cr40f_litros,cr40f_kminformado,cr40f_datagasto,new_cnpjposto,cr40f_categoria,cr40f_veiculo", Array.Empty<string>(), 40, FuelPluginTypeName),
   new StepSpec("Pedido de cotacao Update", "cr40f_pedidodecotacao", "Update", 0, "cr40f_origemultimasincronizacao,cr40f_statuscotacao,cr40f_prazoresponder,cr40f_valorcotado,cr40f_condicaocomercial,cr40f_respostaenviadacliente,cr40f_clienteempresa,cr40f_contatocliente,cr40f_telefonewhatsapp,cr40f_emailcliente,cr40f_origem,cr40f_destino,cr40f_datahoraservico,cr40f_quantidadepassageiros,cr40f_observacoespedido,cr40f_prioridade", Array.Empty<string>())
 };
 
@@ -267,11 +270,23 @@ foreach (var spec in specs)
     continue;
   }
 
+  var handlerId = pluginType.Id;
+  if (spec.TypeName != null)
+  {
+    var specTypes = FindMany(service, "plugintype", new ColumnSet("plugintypeid", "typename", "pluginassemblyid"), ("typename", spec.TypeName));
+    if (specTypes.Count != 1 || specTypes[0].GetAttributeValue<EntityReference>("pluginassemblyid")?.Id != assembly.Id)
+    {
+      Fail(failures, $"{spec.Label}: PluginType {spec.TypeName} esperado 1 no assembly correto, encontrado {specTypes.Count}.");
+      continue;
+    }
+    handlerId = specTypes[0].Id;
+  }
+
   var stepRows = FindMany(
     service,
     "sdkmessageprocessingstep",
     new ColumnSet("sdkmessageprocessingstepid", "name", "mode", "stage", "asyncautodelete", "filteringattributes", "supporteddeployment", "impersonatinguserid", "statecode", "statuscode"),
-    ("eventhandler", pluginType.Id),
+    ("eventhandler", handlerId),
     ("sdkmessageid", messageId),
     ("sdkmessagefilterid", filterRows[0].Id),
     ("stage", spec.Stage),
@@ -401,7 +416,7 @@ static ServiceClient CreateServiceClient(string environmentUrl)
   return new ServiceClient(connectionString);
 }
 
-internal sealed record StepSpec(string Label, string PrimaryEntity, string Message, int Mode, string FilteringAttributes, string[] PreImageAttributes, int Stage = 40);
+internal sealed record StepSpec(string Label, string PrimaryEntity, string Message, int Mode, string FilteringAttributes, string[] PreImageAttributes, int Stage = 40, string? TypeName = null);
 '@
 
 Set-Content -LiteralPath $projectFile -Value $csproj -Encoding UTF8

@@ -206,7 +206,9 @@ $specs = @(
   [pscustomobject]@{ Label = "Colisoes Update"; Entity = "cr40f_colisao_v2"; Message = "Update"; Mode = 1; Filtering = "cr40f_motorista"; PreImage = @("cr40f_motorista") },
   [pscustomobject]@{ Label = "Recibos Create"; Entity = "cr40f_recibos_v2"; Message = "Create"; Mode = 1; Filtering = ""; PreImage = @() },
   [pscustomobject]@{ Label = "Recibos Update"; Entity = "cr40f_recibos_v2"; Message = "Update"; Mode = 1; Filtering = "cr40f_motorista"; PreImage = @("cr40f_motorista") },
-  [pscustomobject]@{ Label = "Pedido de cotacao Update"; Entity = "cr40f_pedidodecotacao"; Message = "Update"; Mode = 0; Filtering = "cr40f_origemultimasincronizacao,cr40f_statuscotacao,cr40f_prazoresponder,cr40f_valorcotado,cr40f_condicaocomercial,cr40f_respostaenviadacliente,cr40f_clienteempresa,cr40f_contatocliente,cr40f_telefonewhatsapp,cr40f_emailcliente,cr40f_origem,cr40f_destino,cr40f_datahoraservico,cr40f_quantidadepassageiros,cr40f_observacoespedido,cr40f_prioridade"; PreImage = @() }
+  [pscustomobject]@{ Label = "Pedido de cotacao Update"; Entity = "cr40f_pedidodecotacao"; Message = "Update"; Mode = 0; Filtering = "cr40f_origemultimasincronizacao,cr40f_statuscotacao,cr40f_prazoresponder,cr40f_valorcotado,cr40f_condicaocomercial,cr40f_respostaenviadacliente,cr40f_clienteempresa,cr40f_contatocliente,cr40f_telefonewhatsapp,cr40f_emailcliente,cr40f_origem,cr40f_destino,cr40f_datahoraservico,cr40f_quantidadepassageiros,cr40f_observacoespedido,cr40f_prioridade"; PreImage = @() },
+  [pscustomobject]@{ Label = "Combustivel Create"; Entity = "cr40f_despesaoperacional"; Message = "Create"; Mode = 1; Filtering = ""; PreImage = @(); PluginType = "Betinhos.DriverRecordSharing.FuelExpensePlugin" },
+  [pscustomobject]@{ Label = "Combustivel Update"; Entity = "cr40f_despesaoperacional"; Message = "Update"; Mode = 1; Filtering = "cr40f_valor,cr40f_litros,cr40f_kminformado,cr40f_datagasto,new_cnpjposto,cr40f_categoria,cr40f_veiculo"; PreImage = @(); PluginType = "Betinhos.DriverRecordSharing.FuelExpensePlugin" }
 )
 
 Assert-RequiredTable "cr40f_trocasdecarro"
@@ -250,6 +252,18 @@ function Get-PluginType {
 
 function Get-CommandPluginType {
   return @(Get-DataverseRows "plugintypes" "plugintypeid,typename,_pluginassemblyid_value" "typename eq 'Betinhos.DriverRecordSharing.ExchangeLifecycleCommandPlugin'")
+}
+
+# Steps sem PluginType usam ServiceDriverSharePlugin; os demais apontam para o tipo nomeado (ex.: FuelExpensePlugin).
+function Get-PluginTypeByName([string] $TypeName) {
+  return @(Get-DataverseRows "plugintypes" "plugintypeid,typename,_pluginassemblyid_value" "typename eq '$TypeName'")
+}
+
+function Get-SpecPluginTypeId($Spec, $DefaultTypeId) {
+  if (-not $Spec.PSObject.Properties['PluginType']) { return $DefaultTypeId }
+  $rows = @(Get-PluginTypeByName $Spec.PluginType)
+  if ($rows.Count -ne 1) { throw "$($Spec.Label): PluginType $($Spec.PluginType) esperado 1, encontrado $($rows.Count)." }
+  return $rows[0].plugintypeid
 }
 
 function Get-Step($PluginTypeId, $MessageId, $FilterId, [int] $Stage) {
@@ -305,7 +319,7 @@ function Add-PluginToSolution {
   foreach ($spec in $registrationSpecs) {
     $stage = if ($spec.PSObject.Properties['Stage']) { [int]$spec.Stage } else { 40 }
     $filter = Get-MessageFilter $messages[$spec.Message].sdkmessageid $spec.Entity
-    $steps = @(Get-Step $types[0].plugintypeid $messages[$spec.Message].sdkmessageid $filter.sdkmessagefilterid $stage)
+    $steps = @(Get-Step (Get-SpecPluginTypeId $spec $types[0].plugintypeid) $messages[$spec.Message].sdkmessageid $filter.sdkmessagefilterid $stage)
     if ($steps.Count -ne 1) { throw "$($spec.Label): esperado 1 step, encontrado $($steps.Count)." }
     $step = $steps[0]
     Ensure-SolutionComponent $solution.solutionid $step.sdkmessageprocessingstepid 92 "step $($spec.Label)"
@@ -327,7 +341,7 @@ function Assert-PluginComponentInventory {
   foreach ($spec in $registrationSpecs) {
     $stage = if ($spec.PSObject.Properties['Stage']) { [int]$spec.Stage } else { 40 }
     $filter = Get-MessageFilter $messages[$spec.Message].sdkmessageid $spec.Entity
-    $steps = @(Get-Step $types[0].plugintypeid $messages[$spec.Message].sdkmessageid $filter.sdkmessagefilterid $stage)
+    $steps = @(Get-Step (Get-SpecPluginTypeId $spec $types[0].plugintypeid) $messages[$spec.Message].sdkmessageid $filter.sdkmessagefilterid $stage)
     if ($steps.Count -ne 1) { throw "$($spec.Label): esperado 1 step, encontrado $($steps.Count)." }
     if ($spec.PreImage.Count -eq 0) { continue }
     $images = @(Get-PreImage $steps[0].sdkmessageprocessingstepid)
@@ -357,7 +371,7 @@ function Assert-Configuration([switch] $SkipAssemblyHash) {
   foreach ($spec in $registrationSpecs) {
     $stage = if ($spec.PSObject.Properties['Stage']) { [int]$spec.Stage } else { 40 }
     $filter = Get-MessageFilter $messages[$spec.Message].sdkmessageid $spec.Entity
-    $steps = @(Get-Step $types[0].plugintypeid $messages[$spec.Message].sdkmessageid $filter.sdkmessagefilterid $stage)
+    $steps = @(Get-Step (Get-SpecPluginTypeId $spec $types[0].plugintypeid) $messages[$spec.Message].sdkmessageid $filter.sdkmessagefilterid $stage)
     if ($steps.Count -ne 1) { throw "$($spec.Label): esperado 1 step, encontrado $($steps.Count)." }
     $step = $steps[0]
     if ([int]$step.mode -ne $spec.Mode -or [int]$step.stage -ne $stage -or [int]$step.supporteddeployment -ne 0 -or [int]$step.statecode -ne 0 -or [bool]$step.asyncautodelete -ne ($spec.Mode -eq 1)) { throw "$($spec.Label): modo, estagio, deployment, estado ou asyncautodelete divergente." }
@@ -435,14 +449,25 @@ else {
   $commandPluginTypeId = [string]$created.plugintypeid
 }
 
+foreach ($extraTypeName in @($registrationSpecs | Where-Object { $_.PSObject.Properties['PluginType'] } | ForEach-Object { $_.PluginType } | Select-Object -Unique)) {
+  $extraRows = @(Get-PluginTypeByName $extraTypeName)
+  if ($extraRows.Count -gt 1) { throw "PluginType $extraTypeName duplicado." }
+  if ($extraRows.Count -eq 0) {
+    $shortName = $extraTypeName.Split('.')[-1]
+    Write-Step "criando PluginType $shortName"
+    Invoke-DataverseRequest "POST" "plugintypes" @{ name = $shortName; friendlyname = $shortName; typename = $extraTypeName; "pluginassemblyid@odata.bind" = (New-Bind "pluginassemblies" $assemblyId) } | Out-Null
+  }
+}
+
 $runAs = Get-RunAsUser
   foreach ($spec in $registrationSpecs) {
   $stage = if ($spec.PSObject.Properties['Stage']) { [int]$spec.Stage } else { 40 }
   $messageId = [string]$messages[$spec.Message].sdkmessageid
   $filterId = [string](Get-MessageFilter $messageId $spec.Entity).sdkmessagefilterid
-  $stepRows = @(Get-Step $pluginTypeId $messageId $filterId $stage)
+  $stepPluginTypeId = Get-SpecPluginTypeId $spec $pluginTypeId
+  $stepRows = @(Get-Step $stepPluginTypeId $messageId $filterId $stage)
   if ($stepRows.Count -gt 1) { throw "$($spec.Label): steps duplicados." }
-  $payload = @{ name = "DriverRecordSharing - $($spec.Label)"; description = "Criado pelo script register-driver-record-sharing-plugin-webapi.ps1"; "eventhandler_plugintype@odata.bind" = (New-Bind "plugintypes" $pluginTypeId); "sdkmessageid@odata.bind" = (New-Bind "sdkmessages" $messageId); "sdkmessagefilterid@odata.bind" = (New-Bind "sdkmessagefilters" $filterId); stage = $stage; mode = $spec.Mode; asyncautodelete = ($spec.Mode -eq 1); rank = 1; supporteddeployment = 0 }
+  $payload = @{ name = "DriverRecordSharing - $($spec.Label)"; description = "Criado pelo script register-driver-record-sharing-plugin-webapi.ps1"; "eventhandler_plugintype@odata.bind" = (New-Bind "plugintypes" $stepPluginTypeId); "sdkmessageid@odata.bind" = (New-Bind "sdkmessages" $messageId); "sdkmessagefilterid@odata.bind" = (New-Bind "sdkmessagefilters" $filterId); stage = $stage; mode = $spec.Mode; asyncautodelete = ($spec.Mode -eq 1); rank = 1; supporteddeployment = 0 }
   if ($spec.Message -eq "Update") { $payload.filteringattributes = $spec.Filtering }
   if ($runAs) { $payload["impersonatinguserid@odata.bind"] = (New-Bind "systemusers" $runAs.systemuserid) }
   if ($stepRows.Count -eq 1) {
