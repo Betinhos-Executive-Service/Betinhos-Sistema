@@ -5,12 +5,12 @@ namespace Cr40f.Protecao.Plugin.Tests;
 
 sealed class FakeContext : IPluginExecutionContext
 {
-    public FakeContext(string message, string entity, Guid id, int depth) { MessageName = message; PrimaryEntityName = entity; PrimaryEntityId = id; Depth = depth; }
+    public FakeContext(string message, string entity, Guid id) { MessageName = message; PrimaryEntityName = entity; PrimaryEntityId = id; }
     public int Stage => 20;
     public IPluginExecutionContext ParentContext => null!;
     public int Mode => 0;
     public int IsolationMode => 2;
-    public int Depth { get; }
+    public int Depth => 1;
     public string MessageName { get; }
     public string PrimaryEntityName { get; }
     public Guid? RequestId => null;

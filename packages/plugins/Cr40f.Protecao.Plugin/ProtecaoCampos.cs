@@ -30,7 +30,6 @@ public static class ProtecaoCampos
         "cr40f_destino", "cr40f_endereodesada", "cr40f_dataehorriodesada", "cr40f_obsdeoperao", "cr40f_horrioprevistoderetorno",
         "cr40f_status", "cr40f_trajeto", "cr40f_cr", "cr40f_idtenaris", "cr40f_tipodeveiculo",
     };
-    static readonly string[] Vazio = new string[0];
     static readonly DataContractJsonSerializer LeitorSnapshot = new(typeof(Dictionary<string, string>), new DataContractJsonSerializerSettings { UseSimpleDictionaryFormat = true });
 
     public static Resultado Aplicar(Entity alvo, Entity? anterior)
@@ -40,20 +39,20 @@ public static class ProtecaoCampos
         {
             var barrados = protegidos.Where(alvo.Contains).ToList();
             foreach (var campo in barrados) alvo.Attributes.Remove(campo);
-            return new Resultado(Vazio, barrados);
+            return new Resultado(Array.Empty<string>(), barrados);
         }
         var textoSnapshot = anterior?.GetAttributeValue<string>(Snapshot);
-        if (string.IsNullOrWhiteSpace(textoSnapshot)) return new Resultado(Vazio, Vazio);
+        if (string.IsNullOrWhiteSpace(textoSnapshot)) return new Resultado(Array.Empty<string>(), Array.Empty<string>());
         var planilha = LerSnapshot(textoSnapshot!);
         var adicionados = Monitorados
             .Where(campo => alvo.Contains(campo) && !protegidos.Contains(campo))
-            .Where(campo => !Igual(alvo[campo], planilha.TryGetValue(campo, out var texto) ? texto : Texto(anterior!.Contains(campo) ? anterior[campo] : null)))
+            .Where(campo => !Igual(alvo[campo], planilha.TryGetValue(campo, out var texto) ? texto : Texto(anterior!.GetAttributeValue<object>(campo))))
             .ToList();
         if (adicionados.Count > 0) alvo[Lista] = string.Join(",", protegidos.Concat(adicionados));
-        return new Resultado(adicionados, Vazio);
+        return new Resultado(adicionados, Array.Empty<string>());
     }
 
-    public static List<string> LerLista(string? texto) =>
+    static List<string> LerLista(string? texto) =>
         (texto ?? "").Split(',', ';').Select(nome => nome.Trim().ToLowerInvariant()).Where(nome => nome.Length > 0).Distinct().ToList();
 
     /// <summary>JSON plano campo → texto. Inválido vira vazio: cada campo passa a ser comparado com o valor anterior.</summary>

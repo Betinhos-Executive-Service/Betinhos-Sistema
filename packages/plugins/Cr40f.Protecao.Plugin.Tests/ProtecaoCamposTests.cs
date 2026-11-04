@@ -120,7 +120,7 @@ public class ProtegerCamposPluginTests
 {
     static FakeContext Contexto(Entity alvo, Entity anterior)
     {
-        var c = new FakeContext("Update", "cr40f_reservadeveculos", alvo.Id, 1);
+        var c = new FakeContext("Update", "cr40f_reservadeveculos", alvo.Id);
         c.InputParameters["Target"] = alvo;
         c.PreEntityImages[ProtegerCamposPlugin.ImagemAnterior] = anterior;
         return c;
@@ -140,7 +140,7 @@ public class ProtegerCamposPluginTests
     public void Outra_tabela_ou_mensagem_nao_faz_nada()
     {
         var alvo = new Entity("cr40f_composicaodeprecos", Guid.NewGuid());
-        var c = new FakeContext("Update", "cr40f_composicaodeprecos", alvo.Id, 1);
+        var c = new FakeContext("Update", "cr40f_composicaodeprecos", alvo.Id);
         c.InputParameters["Target"] = alvo;
         Assert.Null(ProtegerCamposPlugin.Processar(c));
     }
@@ -149,7 +149,7 @@ public class ProtegerCamposPluginTests
     public void Sem_imagem_pre_nao_quebra()
     {
         var alvo = new Entity("cr40f_reservadeveculos", Guid.NewGuid()) { ["cr40f_status"] = new OptionSetValue(202410005) };
-        var c = new FakeContext("Update", "cr40f_reservadeveculos", alvo.Id, 1);
+        var c = new FakeContext("Update", "cr40f_reservadeveculos", alvo.Id);
         c.InputParameters["Target"] = alvo;
         Assert.Empty(ProtegerCamposPlugin.Processar(c)!.Adicionados);
     }
