@@ -457,7 +457,7 @@
             "mcc": "@items('Cada_transacao')?['creditCardMetadata']?['payeeMCC']",
             "parcela": "@int(coalesce(items('Cada_transacao')?['creditCardMetadata']?['installmentNumber'], 1))",
             "total": "@int(coalesce(items('Cada_transacao')?['creditCardMetadata']?['totalInstallments'], 1))",
-            "fatura": "@coalesce(items('Cada_transacao')?['creditCardMetadata']?['billForecastDate'], '')",
+            "fatura": "@take(string(coalesce(items('Cada_transacao')?['creditCardMetadata']?['billForecastDate'], '')), 7)",
             "status": "@if(equals(items('Cada_transacao')?['status'], 'POSTED'), 100000001, 100000000)",
             "descricao": "@take(coalesce(items('Cada_transacao')?['description'], '(sem descrição)'), 200)",
             "estabelecimento": "@take(coalesce(items('Cada_transacao')?['merchantInfo']?['businessName'], items('Cada_transacao')?['merchant']?['businessName'], items('Cada_transacao')?['merchant']?['name'], ''), 200)",
@@ -1364,11 +1364,11 @@
               "type": "Select",
               "runAfter": {},
               "inputs": {
-                "from": "@outputs(Inscricoes)?[body/value]",
+                "from": "@outputs('Inscricoes')?['body/value']",
                 "select": {
-                  "endpoint": "@item()?[new_endpoint]",
-                  "p256dh": "@item()?[new_chavep256dh]",
-                  "auth": "@item()?[new_chaveauth]"
+                  "endpoint": "@item()?['new_endpoint']",
+                  "p256dh": "@item()?['new_chavep256dh']",
+                  "auth": "@item()?['new_chaveauth']"
                 }
               }
             },
@@ -1390,7 +1390,7 @@
                   "body/payload/body": "@{if(equals(length(body('Do_motorista')), 1), 'Você tem 1 gasto do cartão para validar.', concat('Você tem ', length(body('Do_motorista')), ' gastos do cartão para validar.'))}\nToque para descrever e anexar o comprovante.",
                   "body/payload/tag": "gastos-cartao",
                   "body/payload/url": "/WebResources/new_app-motoristas-v2?@{if(equals(length(body('Do_motorista')), 1), concat('despesaId=', first(body('Do_motorista'))?['cr40f_despesaoperacionalid']), 'gastosCartao=1')}",
-                  "body/subscriptions": "@body(Subscricoes)"
+                  "body/subscriptions": "@body('Subscricoes')"
                 },
                 "authentication": "@parameters('$authentication')"
               }
@@ -1478,7 +1478,25 @@
         "or": [
           {
             "equals": [
+              "@actions('Conexoes')?['status']",
+              "Failed"
+            ]
+          },
+          {
+            "equals": [
+              "@actions('Cada_conexao')?['status']",
+              "Failed"
+            ]
+          },
+          {
+            "equals": [
               "@actions('Cada_transacao')?['status']",
+              "Failed"
+            ]
+          },
+          {
+            "equals": [
+              "@actions('Pendentes')?['status']",
               "Failed"
             ]
           },
@@ -1498,7 +1516,7 @@
             "runStatus": "Failed",
             "runError": {
               "code": "ConciliacaoComErro",
-              "message": "Alguma transação ou aviso falhou; veja as transações com motivo 'Em processamento' no Sistema Betinhos."
+              "message": "Alguma leitura do banco, transação ou aviso falhou; veja as transações com motivo 'Em processamento' no Sistema Betinhos."
             }
           }
         }

@@ -133,6 +133,11 @@ test('toda ação citada em expressões e runAfter existe', () => {
   for (const [nome, a] of todas) for (const dep of Object.keys(a.runAfter ?? {})) assert.ok(todas.has(dep), `${nome} depende de ${dep}`)
 })
 
+test('referências a ações e propriedades sempre entre aspas simples', () => {
+  assert.doesNotMatch(raw, /(?:outputs|body|items|result|actions|variables)\([A-Za-z_]/, 'nome de ação sem aspas')
+  assert.doesNotMatch(raw, /\?\[[A-Za-z_][\w/]*\]/, 'propriedade sem aspas em ?[...]')
+})
+
 test('variáveis usadas foram inicializadas', () => {
   const iniciadas = new Set([...todas.values()].filter((a) => a.type === 'InitializeVariable').map((a) => a.inputs.variables[0].name))
   for (const [, nome] of raw.matchAll(/variables\('([^']+)'\)/g)) assert.ok(iniciadas.has(nome), `variável sem init: ${nome}`)
@@ -147,4 +152,9 @@ test('erro numa transação não bloqueia o push e marca o run como falho', () =
 test('prefere o cartão do final específico ao da conta inteira', () => {
   assert.equal(acao('Cartao').inputs.parameters.$orderby, 'cr40f_final desc')
   assert.ok(acao('Um_cartao').expression.or)
+})
+
+test('falha na leitura do banco ou no push também marca o run como falho', () => {
+  const nomes = acao('Houve_erro').expression.or.map((c) => c.equals[0])
+  for (const n of ['Conexoes', 'Cada_conexao', 'Cada_transacao', 'Pendentes', 'Cada_motorista']) assert.ok(nomes.includes(`@actions('${n}')?['status']`), n)
 })
