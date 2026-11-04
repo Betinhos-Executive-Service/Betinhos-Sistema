@@ -1,6 +1,6 @@
 ---
 name: verificar-plugins
-description: "Verifica os plugins C# do Dataverse (Cr40f.Financeiro.Plugin, incluindo ValorOpPlugin, Cr40f.Documentos.Plugin, Cr40f.Frota.Plugin e Cr40f.Portal.Plugin) e seus registradores. Use após mudar packages/plugins/** ou quando pedirem para testar plugin, valor da OP ou sincronização financeira."
+description: "Verifica os plugins C# do Dataverse (Cr40f.Financeiro.Plugin, incluindo ValorOpPlugin, Cr40f.Documentos.Plugin, Cr40f.Frota.Plugin e Cr40f.Portal.Plugin, Cr40f.Protecao.Plugin) e seus registradores. Use após mudar packages/plugins/** ou quando pedirem para testar plugin, valor da OP ou sincronização financeira."
 ---
 # Verificar plugins do Dataverse
 
@@ -33,6 +33,14 @@ description: "Verifica os plugins C# do Dataverse (Cr40f.Financeiro.Plugin, incl
 4. `dotnet build packages/plugins/Cr40f.Portal.Plugin -c Release` e conferir o public key token da DLL (não vazio).
 5. Publicar no DEV (só da `main`, checkout principal, **depois** de `packages/deploy/provision-portal-cliente.ps1 -Apply`): `pnpm push:plugin:portal:dev`. O registrador falha se `cr40f_validacaoservico` não existir. Step: `Cr40f.Portal: preço alterado reabre validação` (Update de `cr40f_composicaodeprecos`, pós, síncrono, **sem filtro** porque `new_valortotal` é calculada, imagem `pre` com `new_valortotal`).
 6. Comportamento no DEV: numa reserva de teste com validação Aprovada, alterar um campo de origem da composição (ex.: `new_valorpedagios`) → a validação volta para Liberado, `cr40f_valoranterior` = valor antigo, `cr40f_prazotacita` = hoje + 5 úteis; repetir o mesmo valor → nada muda. Desfazer o valor depois.
+
+## Proteção de campos da Tenaris (`ProtegerCamposPlugin`)
+1. `dotnet test packages/plugins/Cr40f.Protecao.Plugin.Tests` → "Com falha: 0" (13 em 03/11/2026). Chave em `%USERPROFILE%\.codex\keys\Cr40f.Protecao.Plugin.snk`.
+2. Regra: Update de `cr40f_reservadeveculos` sem `new_snapshotsharepoint` no Target, em reserva com snapshot → campo monitorado diferente da planilha entra em `new_camposprotegidos` (tipo de veículo, fora do snapshot, compara com o valor anterior). Update com snapshot (sincronização da Tenaris) → campos protegidos saem do Target. Proteção nunca é removida pelo plugin.
+3. Publicar no DEV (só da `main`, checkout principal): `pnpm push:plugin:protecao:dev`. Step `Cr40f.Protecao: protege campos editados da Tenaris` (pré-operação 20, rank 1, filtro nos 10 campos + snapshot, imagem `pre`).
+4. Prova no DEV: `dotnet run --project packages/plugins/tools/Cr40f.Protecao.Registrar -- --environmentUrl https://org23b93544.crm2.dynamics.com/ --dllPath packages/plugins/Cr40f.Protecao.Plugin/bin/Release/net462/Cr40f.Protecao.Plugin.dll --testar <id de reserva da Tenaris com status igual ao da planilha e sem proteção de status>` → `edicao: ... lista=...cr40f_status`, `sincronizacao simulada: ... BARRADA (ok)`, `reserva restaurada`.
+5. Não rode o flow da Tenaris no DEV de ponta a ponta (grava na planilha real).
+6. PROD: só pelo workflow "Publicar soluções". Depois, prova pela auditoria: nenhuma troca de `cr40f_status` pelo noreply em reserva com `cr40f_status` em `new_camposprotegidos`.
 
 ## Casos de borda
 - Reserva sem composição conta 0 (como o `SyncEngine`); OP sem reserva fica sem valor (null).
