@@ -1360,9 +1360,25 @@
             ]
           },
           "actions": {
+            "Subscricoes": {
+              "type": "Select",
+              "runAfter": {},
+              "inputs": {
+                "from": "@outputs(Inscricoes)?[body/value]",
+                "select": {
+                  "endpoint": "@item()?[new_endpoint]",
+                  "p256dh": "@item()?[new_chavep256dh]",
+                  "auth": "@item()?[new_chaveauth]"
+                }
+              }
+            },
             "Enviar_push": {
               "type": "OpenApiConnection",
-              "runAfter": {},
+              "runAfter": {
+                "Subscricoes": [
+                  "Succeeded"
+                ]
+              },
               "inputs": {
                 "host": {
                   "apiId": "__PUSH__",
@@ -1374,7 +1390,7 @@
                   "body/payload/body": "@{if(equals(length(body('Do_motorista')), 1), 'Você tem 1 gasto do cartão para validar.', concat('Você tem ', length(body('Do_motorista')), ' gastos do cartão para validar.'))}\nToque para descrever e anexar o comprovante.",
                   "body/payload/tag": "gastos-cartao",
                   "body/payload/url": "/WebResources/new_app-motoristas-v2?@{if(equals(length(body('Do_motorista')), 1), concat('despesaId=', first(body('Do_motorista'))?['cr40f_despesaoperacionalid']), 'gastosCartao=1')}",
-                  "body/subscriptions": "@select(outputs('Inscricoes')?['body/value'], json(concat('{\"endpoint\":\"', item()?['new_endpoint'], '\",\"p256dh\":\"', item()?['new_chavep256dh'], '\",\"auth\":\"', item()?['new_chaveauth'], '\"}')))"
+                  "body/subscriptions": "@body(Subscricoes)"
                 },
                 "authentication": "@parameters('$authentication')"
               }
