@@ -4,7 +4,10 @@ param(
   # Inclui a Tela Funcoes Operacionais na mesma publicacao (gates + build + deploy).
   # Sem este switch ela nao e testada, compilada nem republicada: publique-a
   # separadamente com `npm run push` no repo dela.
-  [switch] $IncludeOperacionais
+  [switch] $IncludeOperacionais,
+  # Emergencia, so DEV: pula os exports de backup (inicial e final) e a validacao do ZIP final quando a
+  # solucao nao exporta (ex.: conector Web Push recusado pelo ExportSolution). Nunca use como padrao.
+  [switch] $SemBackupSolucao
 )
 
 if ($PSVersionTable.PSEdition -eq "Core" -or $PSHOME -like "*codex-runtimes*") {
@@ -13,6 +16,7 @@ if ($PSVersionTable.PSEdition -eq "Core" -or $PSHOME -like "*codex-runtimes*") {
   if ($DeviceCode) { $arguments += "-DeviceCode" }
   if ($ExpenseUploadOnly) { $arguments += "-ExpenseUploadOnly" }
   if ($IncludeOperacionais) { $arguments += "-IncludeOperacionais" }
+  if ($SemBackupSolucao) { $arguments += "-SemBackupSolucao" }
   & $windowsPowerShell @arguments
   exit $LASTEXITCODE
 }
@@ -101,7 +105,11 @@ New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
 if (-not (Get-Command pac -ErrorAction SilentlyContinue)) {
   throw "Power Platform CLI (pac) nao encontrado; exporte a solucao atual antes do deploy."
 }
-Export-SolutionBackup $backupPath "export solution backup"
+if ($SemBackupSolucao) {
+  Write-Warning "[push-dev] -SemBackupSolucao: publicando SEM backup da solucao $solutionUniqueName. Rollback so pelo ultimo ZIP em $backupDir."
+} else {
+  Export-SolutionBackup $backupPath "export solution backup"
+}
 
 Write-Step "gate App Motoristas: testes, TypeScript e build"
 npm test
@@ -272,8 +280,12 @@ Write-Step "publish service worker in $solutionUniqueName"
   -SolutionUniqueName $solutionUniqueName `
   -DeviceCode:$DeviceCode
 
-$finalBackupPath = Join-Path $backupDir ("$solutionUniqueName-final-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".zip")
-Export-SolutionBackup $finalBackupPath "export final solution"
-Assert-SolutionArchiveExchangeLifecycle $finalBackupPath
+if ($SemBackupSolucao) {
+  Write-Warning "[push-dev] -SemBackupSolucao: export final e validacao do ZIP pulados; valide os componentes pelos scripts validate-*."
+} else {
+  $finalBackupPath = Join-Path $backupDir ("$solutionUniqueName-final-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".zip")
+  Export-SolutionBackup $finalBackupPath "export final solution"
+  Assert-SolutionArchiveExchangeLifecycle $finalBackupPath
+}
 
 Write-Step "DEV publish complete"
