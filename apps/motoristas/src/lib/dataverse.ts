@@ -1429,14 +1429,19 @@ export async function ensureExpenseSubmissionRemote(submission: ExpenseSubmissio
   // Fail before creating any row when the deployment/permissions are incomplete.
   await assertEntityHasAttributes(DATAVERSE.anexosDespesasOperacionais, "Anexos de despesas", ["new_uploadattemptid", "new_uploadrunid", "new_uploaderror", "cr40f_mimetype", "cr40f_driveitemid"]);
   if (!await resolveFlowUrl(FLOW_URLS.expenseAsync)) throw new Error("Flow assíncrono de despesas não configurado.");
-  await ensureExpenseRecord(DATAVERSE.despesasOperacionais, submission.expenseId, {
-    ...submission.payload, new_uploadexpectedcount: submission.items.length
-  });
+  const expensePayload = { ...submission.payload, new_uploadexpectedcount: submission.items.length };
+  if (submission.existing) {
+    // Gasto do cartão: completa a despesa do flow; If-Match impede criar outra se ela sumir.
+    await expenseRequest(`${DATAVERSE.despesasOperacionais}(${cleanGuid(submission.expenseId)})`, "PATCH", expensePayload, { "If-Match": "*" });
+  } else {
+    await ensureExpenseRecord(DATAVERSE.despesasOperacionais, submission.expenseId, expensePayload);
+  }
   if (!submission.items.length) return;
   const names = await loadExpenseAttachmentLookupNavigationNamesRemote();
   for (const item of submission.items) {
     await ensureExpenseRecord(DATAVERSE.anexosDespesasOperacionais, item.id, {
-      cr40f_nome: `Comprovante ${item.order} - ${String(submission.payload.cr40f_nome)}`.slice(0, 120),
+      // Gasto do cartão não reenvia cr40f_nome no PATCH: usa o estabelecimento.
+      cr40f_nome: `Comprovante ${item.order} - ${String(submission.payload.cr40f_nome ?? (submission.draft.estabelecimento || "Despesa"))}`.slice(0, 120),
       cr40f_nomearquivo: item.fileName,
       cr40f_ordem: item.order,
       cr40f_mimetype: item.mimeType,

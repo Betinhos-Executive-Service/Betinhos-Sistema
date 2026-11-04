@@ -46,6 +46,13 @@ Depois de uns 5 s: `window.__seen`.
 Observação: `scroll_to` dentro da prévia rola o palco na horizontal e corta a borda esquerda do print; é da moldura da prévia, não da tela.
 7. Mudou `SendStepsOverlay` ou `ExpenseSendOverlay`? Prove que o gasto continua idêntico: compare o HTML do overlay antigo (`git show <base>:src/components/common/ExpenseSendOverlay.tsx`, salvo em `.verificacao/`) com o novo em todos os estados (`saving`/`uploading`/`done`/`error`, 0, 1 e N fotos) com `react-dom/server` `renderToStaticMarkup`, empacotando com `npx esbuild <entrada>.tsx --bundle --platform=node --jsx=automatic --loader:.svg=dataurl`. Esperado: 0 diferenças. Em 21/10/2026: 9 estados, 0 diferenças; sequência do passo 5 igual antes e depois.
 
+## Gastos do cartão (despesas criadas pelo flow)
+- Código: `src/lib/gastosCartao.ts` (filtro, mock, payload, duplicidade), `GastosCartaoScreen`, `GastoCartaoDuplicadoDialog` e `ExpenseScreen` com a prop `cartaoGasto`. Testes: `tests/gastosCartao.test.ts`.
+- Pendente = `cr40f_origem` 100000002, `cr40f_statusoperacional` 100000001 (Precisa corrigir), `cr40f_conciliadacartao` true, do motorista logado. Completar é PATCH na despesa existente (nunca cria) e leva o status para 100000000; valor, data, forma e estabelecimento ficam somente leitura. No caminho assíncrono (DEV) o diário leva `existing: true` e `ensureExpenseSubmissionRemote` faz PATCH com `If-Match: *`.
+- Na prévia (localhost) há 3 gastos de exemplo (`?mockGastosCartao=vazio|erro` para os outros estados). Passos: Início mostra a linha "Gastos do cartão · N para completar" (some com 0) → abrir a lista → abrir um item → ENVIAR sem descrição ou comprovante mostra erro. Atalhos: `?despesaId=<guid>` abre o gasto (id que não é pendente cai na lista) e `?gastosCartao=1` abre a lista. Dispense o tour ("Pular") antes de clicar.
+- Aviso de duplicidade: novo gasto com a mesma forma de pagamento do pendente (Cartão de crédito), mesmo valor (±R$ 0,05) e data informada de 1 dia antes a 2 dias depois da compra (mesma janela do flow) abre o diálogo "Completar este" / "Lançar mesmo assim"; Esc e toque fora só fecham.
+- Não verificável fora do DEV: PATCH real, anexo e a leitura do motorista no Dataverse.
+
 ## Casos de borda
 - O texto da etapa pendente (`.expense-send-step.is-pending`, `#94a3b8` sobre `#fcfcfb`) é apontado pelo axe como `color-contrast` serious enquanto aparece (só na fase `saving` do gasto). É o visual aprovado; mudar exige decisão do Renan porque altera o gasto.
 - Sem conexão no envio: `runExpenseSubmission` retorna `false` → overlay `is-error` "Sem conexão agora" com botão "Entendi" (volta ao Início); o gasto fica no diário e o worker tenta de novo a cada 30 s e no evento `online`. Coberto por código; na prévia não há simulação de erro.
