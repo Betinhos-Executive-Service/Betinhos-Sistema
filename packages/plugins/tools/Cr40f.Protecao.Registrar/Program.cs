@@ -1,15 +1,19 @@
 using System.Reflection;
+using System.Text.Json;
 using Microsoft.PowerPlatform.Dataverse.Client;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
 // Registra o plugin de campos protegidos da Tenaris (ProtegerCamposPlugin) e o step em cr40f_reservadeveculos Update.
+// Modo de verificação: --testar <reservaId> só prova o plugin já publicado (não envia DLL nem mexe no step).
 var options = Arguments.Parse(args);
 var environmentUrl = options.Require("environmentUrl");
-var dllPath = options.Require("dllPath");
+var testar = options.Has("testar");
+var testeId = testar ? Guid.Parse(options.Require("testar")) : Guid.Empty;
+var dllPath = testar ? "" : options.Require("dllPath");
 var solutionUniqueName = options.Optional("solutionUniqueName") ?? "appbetinhos";
 var publish = options.Has("publish");
-if (!File.Exists(dllPath)) throw new FileNotFoundException("DLL do plugin nao encontrada.", dllPath);
+if (!testar && !File.Exists(dllPath)) throw new FileNotFoundException("DLL do plugin nao encontrada.", dllPath);
 
 const string PluginTypeName = "Cr40f.Protecao.Plugin.ProtegerCamposPlugin";
 const int PluginAssemblyComponentType = 91;
@@ -22,6 +26,12 @@ var tokenCachePath = Path.Combine(tokenCacheDirectory, "protecao.msalcache.bin")
 var connectionString = $"AuthType=OAuth;Url={environmentUrl.TrimEnd('/')};AppId=51f81489-12ee-4a9e-aaae-a2591f45987d;RedirectUri=http://localhost;TokenCacheStorePath={tokenCachePath};LoginPrompt=Auto";
 using var service = new ServiceClient(connectionString);
 if (!service.IsReady) throw new InvalidOperationException($"Falha ao conectar no Dataverse. {service.LastError}");
+
+if (testar)
+{
+    Testar(service, testeId);
+    return;
+}
 
 var assemblyInfo = AssemblyInfo.Read(dllPath);
 if (assemblyInfo.PublicKeyToken.Length == 0) throw new InvalidOperationException("DLL sem assinatura forte.");
@@ -40,22 +50,23 @@ if (publish)
 }
 Log("plugin de campos protegidos registrado");
 
-if (options.Has("testar"))
+static void Testar(ServiceClient service, Guid id)
 {
-    var id = Guid.Parse(options.Require("testar"));
     var colunas = new ColumnSet("cr40f_status", "new_camposprotegidos", "new_snapshotsharepoint");
     var antes = service.Retrieve("cr40f_reservadeveculos", id, colunas);
     var snapshot = antes.GetAttributeValue<string>("new_snapshotsharepoint") ?? throw new InvalidOperationException("Reserva sem snapshot: escolha uma da Tenaris.");
     var original = antes.GetAttributeValue<OptionSetValue>("cr40f_status");
     var listaOriginal = antes.GetAttributeValue<string>("new_camposprotegidos");
     // Precondição: status igual ao da planilha e não protegido. Assim a restauração no fim não protege o status de novo.
-    if ((listaOriginal ?? "").ToLowerInvariant().Contains("cr40f_status") || !snapshot.Contains($"\"cr40f_status\":\"{original?.Value}\""))
+    var protegidos = (listaOriginal ?? "").Split(',', ';').Select(nome => nome.Trim().ToLowerInvariant());
+    if (protegidos.Contains("cr40f_status") || StatusDaPlanilha(snapshot) != original?.Value.ToString())
         throw new InvalidOperationException("Escolha uma reserva da Tenaris com status igual ao da planilha e sem cr40f_status protegido.");
-    if (original?.Value == 202410005)
-        throw new InvalidOperationException("Escolha uma reserva que não esteja em Programado: o teste não pode entrar nem sair de Programado.");
+    // Só Solicitado ↔ Confirmado: outro status (Programado, Cancelado, concluído) dispararia automações de status.
+    if (original?.Value is not (202410001 or 202410004))
+        throw new InvalidOperationException("Escolha uma reserva em Solicitado ou Confirmado: o teste só alterna entre esses dois status.");
     try
     {
-        var outro = original?.Value == 202410004 ? 202410001 : 202410004; // Solicitado ↔ Confirmado: nunca passa por Programado
+        var outro = original.Value == 202410004 ? 202410001 : 202410004;
         service.Update(new Entity("cr40f_reservadeveculos", id) { ["cr40f_status"] = new OptionSetValue(outro) });
         var depoisEdicao = service.Retrieve("cr40f_reservadeveculos", id, colunas);
         Log($"edicao: status={depoisEdicao.GetAttributeValue<OptionSetValue>("cr40f_status")?.Value} lista={depoisEdicao.GetAttributeValue<string>("new_camposprotegidos")}");
@@ -72,6 +83,16 @@ if (options.Has("testar"))
         service.Update(new Entity("cr40f_reservadeveculos", id) { ["cr40f_status"] = original });
         Log("reserva restaurada");
     }
+}
+
+static string? StatusDaPlanilha(string snapshot)
+{
+    try
+    {
+        using var json = JsonDocument.Parse(snapshot);
+        return json.RootElement.TryGetProperty("cr40f_status", out var status) && status.ValueKind == JsonValueKind.String ? status.GetString() : null;
+    }
+    catch (JsonException) { return null; }
 }
 
 static void Log(string message) => Console.WriteLine($"[protecao:plugin] {message}");

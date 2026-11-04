@@ -25,6 +25,7 @@ public sealed class ProtegerCamposPlugin : IPlugin
         if (context.MessageName != "Update" || context.PrimaryEntityName != Reserva) return null;
         if (!(context.InputParameters.Contains("Target") && context.InputParameters["Target"] is Entity alvo)) return null;
         var anterior = context.PreEntityImages.Contains(ImagemAnterior) ? context.PreEntityImages[ImagemAnterior] : null;
+        if (anterior is null) tracing?.Trace("Cr40f.Protecao: step sem imagem \"{0}\"; só a lista do Target vale", ImagemAnterior);
         var resultado = ProtecaoCampos.Aplicar(alvo, anterior);
         if (resultado.Adicionados.Count > 0) tracing?.Trace("Cr40f.Protecao: protegidos {0}", string.Join(",", resultado.Adicionados));
         if (resultado.Barrados.Count > 0) tracing?.Trace("Cr40f.Protecao: sincronização barrada em {0}", string.Join(",", resultado.Barrados));
