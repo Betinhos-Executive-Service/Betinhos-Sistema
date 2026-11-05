@@ -45,6 +45,9 @@ export default defineConfig({
   test: {
     setupFiles: ['./src/test-setup.ts'],
     testTimeout: 15_000,
+    // O Node 24 expõe um localStorage próprio (sem --localstorage-file ele fica undefined) que às vezes vence o do jsdom
+    // e derruba quem chama localStorage.clear(); desligado, os testes usam só o do jsdom.
+    poolOptions: { forks: { execArgv: ['--no-experimental-webstorage'] } },
     // @betinhos/ui é publicado como fonte TS (e importa CSS): o Vitest precisa transformá-lo, não carregar direto no Node.
     server: { deps: { inline: [/@betinhos(-executive-service)?\/(ui|tokens)/] } },
   },

@@ -96,6 +96,8 @@ it('Gestão de Qualidade é a tela React; o id do WebResource antigo redireciona
 
 it('Pagamento de Fornecedores é rota React do Financeiro; o id do WebResource antigo redireciona', () => {
   expect(findItem('pagamento-fornecedores')?.group.id).toBe('financeiro')
+  expect(findItem('conciliacao-cartao')?.group.id).toBe('financeiro')
+  expect(findItem('conciliacao-cartao')?.item).toMatchObject({ kind: 'page', page: 'conciliacao-cartao', label: 'Conciliação do cartão' })
   expect(findItem('pagamento-fornecedores')?.item).toMatchObject({ kind: 'page', page: 'pagamento-fornecedores', label: 'Pagamento de Fornecedores' })
   expect(findItem('cr40f_telapagamentofornecedores')).toBeNull()
   expect(rotaAtualizada('cr40f_telapagamentofornecedores', new URLSearchParams('tab=lots'))).toEqual({ id: 'pagamento-fornecedores', query: new URLSearchParams('tab=lots') })

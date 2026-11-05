@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
-  AlertTriangle, Banknote, BookUser, Calculator, Calendar, Camera, Car, CarFront, ClipboardCheck, ClipboardList, Clock, Coins, Contact, Database, Download,
+  AlertTriangle, Banknote, BookUser, Calculator, Calendar, Camera, Car, CarFront, ClipboardCheck, ClipboardList, Clock, Coins, Contact, CreditCard, Database, Download,
   FileText, FolderCheck, FolderCog, Gauge, GraduationCap, Home, Hourglass, IdCard, KeyRound, Landmark, Laptop, LayoutDashboard, List, Mail, Megaphone, MapPin, Paperclip, Receipt, ReceiptText, Route,
   ScrollText, Shield, ShieldCheck, Shuffle, Sparkles, Tag, TrendingUp, Users, Wallet, Wrench,
 } from 'lucide-react'
@@ -87,6 +87,7 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   cr40f_anexodespesaoperacional: <Paperclip />,
   cr40f_categoriadespesaoperacional: <Tag />,
   'despesas-operacionais': <ReceiptText />,
+  'conciliacao-cartao': <CreditCard />,
   cr40f_formapagamentodespesa: <Wallet />,
   cr40f_anexocolisao_v2: <Paperclip />,
   cr40f_anexorecebimento_v2: <Paperclip />,
