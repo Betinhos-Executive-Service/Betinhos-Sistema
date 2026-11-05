@@ -1031,7 +1031,8 @@
                                           "type": "SetVariable",
                                           "runAfter": {
                                             "Tem_usuario": [
-                                              "Succeeded"
+                                              "Succeeded",
+                                              "Failed"
                                             ]
                                           },
                                           "inputs": {
@@ -1573,7 +1574,8 @@
                 "type": "SetVariable",
                 "runAfter": {
                   "Tem_usuario_R": [
-                    "Succeeded"
+                    "Succeeded",
+                    "Failed"
                   ]
                 },
                 "inputs": {

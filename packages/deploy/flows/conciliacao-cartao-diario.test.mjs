@@ -189,3 +189,7 @@ test('transação reaberta pelo Reprocessar da tela passa pela mesma regra de ca
   assert.ok(acao('Dono_motorista_R'))
   assert.match(JSON.stringify(acao('Houve_erro').expression), /Cada_reaberta/)
 })
+
+test('falha ao passar a despesa para o motorista (dono) não impede vincular a despesa à transação', () => {
+  for (const s of ['', '_R']) assert.deepEqual(acao(`Despesa_criada${s}`).runAfter, { [`Tem_usuario${s}`]: ['Succeeded', 'Failed'] })
+})
