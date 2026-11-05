@@ -81,7 +81,7 @@
       "properties": {
         "ok": { "type": "boolean" },
         "result": { "type": "object", "properties": { "connections": { "type": "array", "items": { "type": "object", "properties": {
-          "item_id": { "type": "string" }, "connector_id": { "type": "integer" }, "connector_name": { "type": "string" },
+          "item_id": { "type": "string" }, "connector_id": { "type": "string" }, "connector_name": { "type": "string" },
           "custom_label": { "type": "string" }, "status": { "type": "string" }
         } } } } }
       }
