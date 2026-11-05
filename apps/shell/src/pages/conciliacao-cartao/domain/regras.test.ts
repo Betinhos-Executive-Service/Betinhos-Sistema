@@ -1,0 +1,128 @@
+import { describe, expect, it } from 'vitest'
+import { CONTA_ITAU, CONTA_NUBANK, createMockCartoes, createMockDespesas, createMockTransacoes } from '../data/mock'
+import { candidatasPath, mapCartao, mapTransacao } from '../data/queries'
+import { abaDe, acoes, cartaoParaForm, cartaoVigente, ehCandidata, filtrar, FILTROS_VAZIOS, janelaCandidatas, SITUACAO, TIPO, validarCartao } from './regras'
+import type { Cartao, Transacao } from './types'
+
+const trans = createMockTransacoes()
+const t = (n: number) => trans[n - 1]
+const cartao = (o: Partial<Cartao>): Cartao => ({ id: 'x', nome: 'X', conta: CONTA_ITAU, final: '', motoristaId: 'm1', motoristaNome: 'M1', inicio: '2026-01-01', fim: null, ...o })
+
+describe('abas', () => {
+  it('cada situação cai na aba certa; sem situação vai para revisar', () => {
+    expect([SITUACAO.pendente, SITUACAO.semMotorista, SITUACAO.divergencia].map(abaDe)).toEqual(['revisar', 'revisar', 'revisar'])
+    expect(abaDe(SITUACAO.aguardando)).toBe('aguardando')
+    expect([SITUACAO.automatica, SITUACAO.manual].map(abaDe)).toEqual(['conciliadas', 'conciliadas'])
+    expect(abaDe(SITUACAO.ignorada)).toBe('ignoradas')
+    expect(abaDe(null)).toBe('revisar')
+  })
+
+  it('o mock cobre todas as situações', () => {
+    expect(new Set(trans.map((x) => x.situacao))).toEqual(new Set(Object.values(SITUACAO)))
+  })
+})
+
+describe('filtrar', () => {
+  it('por cartão, motorista e período (limites inclusivos)', () => {
+    expect(filtrar(trans, FILTROS_VAZIOS)).toHaveLength(trans.length)
+    expect(filtrar(trans, { ...FILTROS_VAZIOS, cartaoId: t(1).cartaoId }).map((x) => x.id)).toEqual([t(1), t(5), t(7)].map((x) => x.id))
+    expect(filtrar(trans, { ...FILTROS_VAZIOS, motoristaId: 'm3' }).map((x) => x.id)).toEqual([t(2).id, t(9).id])
+    expect(filtrar(trans, { ...FILTROS_VAZIOS, de: '2026-10-28', ate: '2026-10-30' }).map((x) => x.id)).toEqual([t(3).id, t(4).id])
+  })
+})
+
+describe('ações', () => {
+  it('reprocessar só sem motorista; casar só com motorista e sem despesa; reabrir só ignorada', () => {
+    expect(acoes(t(3))).toEqual({ reprocessar: true, casar: false, ignorar: true, reabrir: false })
+    expect(acoes(t(1))).toEqual({ reprocessar: false, casar: true, ignorar: true, reabrir: false })
+    expect(acoes(t(7))).toEqual({ reprocessar: false, casar: false, ignorar: false, reabrir: false })
+    expect(acoes(t(5)).casar).toBe(false)
+    expect(acoes(t(8)).reabrir).toBe(true)
+    expect(acoes({ ...t(3), tipo: TIPO.estorno }).reprocessar).toBe(false)
+  })
+})
+
+describe('cartaoVigente', () => {
+  const cartoes = createMockCartoes()
+  it('acha o cartão da conta inteira para transação com final sem cartão próprio', () => {
+    expect(cartaoVigente(cartoes, t(4))).toMatchObject({ cartao: { motoristaId: 'm4', conta: CONTA_NUBANK } })
+  })
+  it('sem cartão do final nem da conta inteira: nenhum', () => {
+    expect(cartaoVigente(cartoes, t(3))).toEqual({ erro: 'nenhum' })
+  })
+  it('prefere o cartão do final ao da conta inteira', () => {
+    const lista = [cartao({ id: 'geral', final: '' }), cartao({ id: 'esp', final: '9012', motoristaId: 'm2' })]
+    expect(cartaoVigente(lista, t(3))).toMatchObject({ cartao: { id: 'esp' } })
+  })
+  it('transação sem final só aceita o cartão da conta inteira', () => {
+    const lista = [cartao({ id: 'esp', final: '9012' })]
+    expect(cartaoVigente(lista, { ...t(3), final: '' })).toEqual({ erro: 'nenhum' })
+    expect(cartaoVigente([...lista, cartao({ id: 'geral' })], { ...t(3), final: '' })).toMatchObject({ cartao: { id: 'geral' } })
+  })
+  it('respeita a vigência: troca de motorista no meio do ano e cartão encerrado ou futuro', () => {
+    expect(cartaoVigente(cartoes, { conta: CONTA_ITAU, final: '5678', dataCompra: '2026-09-30' })).toMatchObject({ cartao: { motoristaId: 'm2' } })
+    expect(cartaoVigente(cartoes, { conta: CONTA_ITAU, final: '5678', dataCompra: '2026-10-01' })).toMatchObject({ cartao: { motoristaId: 'm3' } })
+    expect(cartaoVigente([cartao({ final: '9012', fim: '2026-10-27' })], t(3))).toEqual({ erro: 'nenhum' })
+    expect(cartaoVigente([cartao({ final: '9012', inicio: '2026-10-29' })], t(3))).toEqual({ erro: 'nenhum' })
+    expect(cartaoVigente([cartao({ final: '9012', inicio: null })], t(3))).toEqual({ erro: 'nenhum' })
+  })
+  it('ignora cartão sem motorista e de outra conta; dois do mesmo nível = varios', () => {
+    expect(cartaoVigente([cartao({ final: '9012', motoristaId: '' }), cartao({ final: '9012', conta: 'outra' })], t(3))).toEqual({ erro: 'nenhum' })
+    expect(cartaoVigente([cartao({ id: 'a', final: '9012' }), cartao({ id: 'b', final: '9012' })], t(3))).toEqual({ erro: 'varios' })
+    expect(cartaoVigente([cartao({ id: 'a' }), cartao({ id: 'b' })], t(3))).toEqual({ erro: 'varios' })
+  })
+})
+
+describe('candidatas', () => {
+  const despesas = createMockDespesas()
+  const ids = (x: Transacao) => despesas.filter((d) => ehCandidata(d, x)).map((d) => d.nome)
+  it('mesmo motorista, cartão, valor ±0,05 e data de -1 a +2 dias, não conciliada', () => {
+    expect(ids(t(1))).toEqual(['Combustível Shell'])
+    expect(ids(t(2))).toEqual(['Almoço com passageiro', 'Jantar viagem'])
+    expect(ids(t(7))).toEqual([])
+  })
+  it('depois de reprocessar, a do motorista do cartão aparece', () => {
+    expect(ids(t(4))).toEqual([])
+    expect(ids({ ...t(4), motoristaId: 'm4' })).toEqual(['Lavagem do carro'])
+  })
+  it('compra parcelada usa o valor da compra inteira', () => {
+    expect(janelaCandidatas({ valor: 100, totalParcelas: 3, dataCompra: '2026-10-31' })).toEqual({ alvo: 300, valorMin: 299.95, valorMax: 300.05, diaDe: '2026-10-30', diaAte: '2026-11-02', de: '2026-10-30T03:00:00Z', ate: '2026-11-03T03:00:00Z' })
+  })
+  it('recusada ou cancelada não casa', () => {
+    const d = { ...despesas[0], statusOperacional: 100000004 }
+    expect(ehCandidata(d, t(1))).toBe(false)
+  })
+  it('o $filter do Dataverse repete o critério do flow', () => {
+    const f = decodeURIComponent(candidatasPath('desp', { ...t(1), motoristaId: 'M1' }, '{F1}'))
+    expect(f).toContain('_cr40f_motorista_value eq m1 and _cr40f_formapagamento_value eq f1')
+    expect(f).toContain('cr40f_valor ge 249.95 and cr40f_valor le 250.05 and cr40f_datagasto ge 2026-11-02T03:00:00Z and cr40f_datagasto lt 2026-11-06T03:00:00Z')
+    expect(f).toContain('cr40f_statusoperacional ne 100000003 and cr40f_statusoperacional ne 100000004 and (cr40f_conciliadacartao eq false or cr40f_conciliadacartao eq null)')
+  })
+})
+
+describe('mapas do Dataverse', () => {
+  it('lê DateOnly e lookups', () => {
+    const c = mapCartao({ cr40f_cartaocorporativoid: 'C1', cr40f_name: 'Itaú', cr40f_idconta: 'acc', cr40f_iniciovigencia: '2026-01-01', _cr40f_motorista_value: 'M1', '_cr40f_motorista_value@OData.Community.Display.V1.FormattedValue': 'Carlos' })
+    expect(c).toMatchObject({ id: 'c1', final: '', inicio: '2026-01-01', fim: null, motoristaId: 'm1', motoristaNome: 'Carlos' })
+    const tr = mapTransacao({ cr40f_transacaocartaoid: 'T1', cr40f_datacompra: '2026-10-28', cr40f_valor: 12.5, cr40f_situacao: SITUACAO.semMotorista })
+    expect(tr).toMatchObject({ id: 't1', dataCompra: '2026-10-28', valor: 12.5, motoristaId: '', cartaoId: '' })
+  })
+})
+
+describe('validarCartao', () => {
+  const cartoes = createMockCartoes()
+  const ok = { ...cartaoParaForm(null), nome: 'Novo', conta: CONTA_ITAU, final: '9012', motoristaId: 'm5', inicio: '2026-10-01' }
+  it('aceita cartão novo sem sobreposição', () => { expect(validarCartao(ok, cartoes, null)).toEqual({}) })
+  it('exige campos e final de 4 dígitos', () => {
+    const e = validarCartao({ ...cartaoParaForm(null), final: '12' }, cartoes, null)
+    expect(Object.keys(e).sort()).toEqual(['conta', 'final', 'inicio', 'motoristaId', 'nome'])
+  })
+  it('fim antes do início', () => { expect(validarCartao({ ...ok, fim: '2026-09-01' }, cartoes, null).fim).toBeTruthy() })
+  it('sobreposição com outro cartão da mesma conta e final', () => {
+    expect(validarCartao({ ...ok, final: '5678', inicio: '2026-11-01' }, cartoes, null).inicio).toMatch(/Diego/)
+    // Editar o próprio cartão não conta como sobreposição.
+    expect(validarCartao(cartaoParaForm(cartoes[2]), cartoes, cartoes[2].id)).toEqual({})
+    // Início antes do Diego ainda bate com a vigência da Bruna.
+    expect(validarCartao({ ...ok, final: '5678', inicio: '2026-09-01', fim: '2026-09-30' }, cartoes, null).inicio).toMatch(/Bruna/)
+  })
+})
