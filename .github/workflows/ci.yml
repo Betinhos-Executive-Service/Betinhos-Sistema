@@ -65,6 +65,22 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # Sem dado pessoal real (CPF válido, e-mail de pessoa, backup de flow) no repositório.
       - run: node --test scripts/dados-pessoais.test.mjs && node scripts/dados-pessoais.mjs
+      # Os .ps1 de publicação só rodam no Deploy e no Produção: erro de sintaxe apareceria tarde, no meio de uma publicação.
+      - name: Sintaxe dos scripts PowerShell
+        shell: pwsh
+        run: |
+          $falhas = 0
+          $arquivos = @(git -c core.quotepath=off ls-files '*.ps1')
+          foreach ($f in $arquivos) {
+            $erros = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path -LiteralPath $f).Path, [ref]$null, [ref]$erros)
+            foreach ($e in $erros) {
+              Write-Host "::error file=$f,line=$($e.Extent.StartLineNumber)::$($e.Message)"
+              $falhas++
+            }
+          }
+          Write-Host "$($arquivos.Count) arquivos, $falhas erro(s)"
+          if ($falhas) { exit 1 }
       - name: Varredura de segredos na solução
         run: node packages/deploy/scan-secrets.mjs solution
       # Todo pacote com script typecheck (shell, escala-fds, portal-cliente e worker, agentes-ia, despesas-ia).
