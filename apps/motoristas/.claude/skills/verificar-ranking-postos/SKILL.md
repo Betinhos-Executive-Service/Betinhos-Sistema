@@ -7,7 +7,7 @@ description: "Verifica o ranking de postos por cidade: Custom API new_ObterRanki
 ## Cobre
 - Código: `plugins/DriverRecordSharing/FuelRanking.cs`, `FuelRankingPlugin.cs`, `FuelRepository.LoadFleetFuelings`, `src/lib/rankingPostos.ts`, `src/screens/RankingPostosScreen.tsx`.
 - Testes: `plugins/DriverRecordSharing.Tests/FuelRankingTests.cs`, `tests/rankingPostos.test.ts`.
-- Regra: últimos 30 dias, CNPJ válido de `cr40f_iacnpjlido`, fora os CNPJs da empresa e o R$/litro fora de `FuelMath` (3 a 12), status enviado, a corrigir ou validado. A resposta nunca traz motorista nem CNPJ.
+- Regra: últimos 30 dias, categoria "Abastecimento" (DEV) ou "Combustível" (PROD), CNPJ válido de `cr40f_iacnpjlido`, fora os CNPJs da empresa e o R$/litro fora de `FuelMath` (3 a 12), status enviado, a corrigir ou validado. A resposta nunca traz motorista nem CNPJ.
 
 ## Preparar ambiente
 - `npm test` e `npx tsc --noEmit --noUnusedLocals --noUnusedParameters`.
