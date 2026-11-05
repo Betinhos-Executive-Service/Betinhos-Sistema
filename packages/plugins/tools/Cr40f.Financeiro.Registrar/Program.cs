@@ -34,7 +34,16 @@ Log("autenticando no Dataverse");
 var tokenCacheDirectory = Path.Combine(Path.GetTempPath(), "Betinhos", "Dataverse");
 Directory.CreateDirectory(tokenCacheDirectory);
 var tokenCachePath = Path.Combine(tokenCacheDirectory, "financeiro.msalcache.bin");
-var connectionString = $"AuthType=OAuth;Url={environmentUrl.TrimEnd('/')};AppId=51f81489-12ee-4a9e-aaae-a2591f45987d;RedirectUri=http://localhost;TokenCacheStorePath={tokenCachePath};LoginPrompt=Auto";
+// No CI (workflow Deploy) entra a conta de servico do environment dev; local, o login interativo de sempre.
+var dvClientSecret = Environment.GetEnvironmentVariable("DV_CLIENT_SECRET");
+var connectionString = string.IsNullOrEmpty(dvClientSecret)
+    ? $"AuthType=OAuth;Url={environmentUrl.TrimEnd('/')};AppId=51f81489-12ee-4a9e-aaae-a2591f45987d;RedirectUri=http://localhost;TokenCacheStorePath={tokenCachePath};LoginPrompt=Auto"
+    : $"AuthType=ClientSecret;Url={environmentUrl.TrimEnd('/')};ClientId={Environment.GetEnvironmentVariable("DV_CLIENT_ID")};ClientSecret={dvClientSecret}";
+
+// A descricao do assembly guarda o commit publicado pelo workflow Deploy; o publicar.yml compara com o commit levado ao PROD.
+// Publicacao local grava vazio, e a trava do PROD recusa ate o Deploy da develop publicar de novo.
+static string CommitPublicado() =>
+    Environment.GetEnvironmentVariable("GITHUB_ACTIONS") == "true" ? Environment.GetEnvironmentVariable("GITHUB_SHA") ?? "" : "";
 using var service = new ServiceClient(connectionString);
 if (!service.IsReady)
 {
@@ -232,13 +241,14 @@ static Guid UpsertAssembly(ServiceClient service, AssemblyInfo assemblyInfo, str
     if (existing is not null)
     {
         Log($"atualizando assembly {assemblyInfo.Name}");
-        service.Update(new Entity("pluginassembly", existing.Id) { ["content"] = content });
+        service.Update(new Entity("pluginassembly", existing.Id) { ["description"] = CommitPublicado(), ["content"] = content });
         return existing.Id;
     }
 
     Log($"criando assembly {assemblyInfo.Name}");
     return service.Create(new Entity("pluginassembly")
     {
+        ["description"] = CommitPublicado(),
         ["name"] = assemblyInfo.Name,
         ["content"] = content,
         ["isolationmode"] = new OptionSetValue(2),

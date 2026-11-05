@@ -239,4 +239,7 @@ if ($LoaderName) { $openName = $LoaderName }
 Write-Host "PUSH CONCLUIDO: v$builtVersion - $(($resources | ForEach-Object { $_.Name }) -join ', ') validados em $solutionUniqueName"
 Write-Host "URL: $environmentBaseUrl/WebResources/$openName"
 
-& (Join-Path $PSScriptRoot "solucoes\distribuir-apos-push.ps1") -EnvironmentUrl $environmentBaseUrl -CaixaDeEntrada $solutionUniqueName
+# O workflow Deploy distribui uma vez so no fim, depois da tela e dos plugins (BETINHOS_DISTRIBUIR=0 aqui).
+if ($env:BETINHOS_DISTRIBUIR -ne '0') {
+  & (Join-Path $PSScriptRoot "solucoes\distribuir-apos-push.ps1") -EnvironmentUrl $environmentBaseUrl -CaixaDeEntrada $solutionUniqueName
+}

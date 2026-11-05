@@ -4,7 +4,7 @@ name: Publicar soluções
 # TEST e/ou o PROD: tabelas, colunas, formulários, visões, flows, plugins, WebResources, app e sitemap. Dados não vão por solução.
 # Caminho normal: o workflow Produção (producao.yml) chama este com alvo test-e-prod quando a main recebe mudança fora da tela.
 # À mão (Actions › Run workflow) continua valendo para refazer um ensaio ou repetir um alvo.
-#  - exportar (environment dev): trava do commit (a tela do DEV tem de ser a deste commit), conferência das 4 no DEV
+#  - exportar (environment dev): trava do commit (a tela e os plugins do DEV têm de ser os deste commit), conferência das 4 no DEV
 #    (barreira), versão seguinte e export gerenciado conferido. Um export só serve TEST e PROD: o PROD recebe exatamente os
 #    pacotes que o TEST ensaiou;
 #  - importar-test e depois importar-prod (_importar-solucoes.yml). O PROD só começa com o TEST verde, e o environment prod
@@ -66,27 +66,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Trava do commit (a tela do DEV é a deste commit)
-        # O export sai do DEV, que recebe a develop. Se a develop já tem tela nova que não está neste commit, o PROD a receberia
-        # sem passar pela main. A descrição do cr40f_SistemaBetinhos.html traz o commit publicado no DEV (push-dev.ps1).
+      - name: Trava do commit (tela e plugins do DEV são os deste commit)
+        # O export sai do DEV, que recebe a develop. Se a develop já tem tela ou plugin novo que não está neste commit, o PROD
+        # o receberia sem passar pela main. O DEV registra o commit publicado na descrição da tela (push-dev.ps1) e de cada
+        # assembly Cr40f.*.Plugin (registrador, no workflow Deploy); pendentes-dev.ps1 compara com este commit.
         run: |
-          $base = $env:DV_ENVIRONMENT_URL.TrimEnd('/')
-          $tokenBody = @{ grant_type = 'client_credentials'; client_id = $env:DV_CLIENT_ID; client_secret = $env:DV_CLIENT_SECRET; scope = "$base/.default" }
-          $token = (Invoke-RestMethod -Method Post -Uri "https://login.microsoftonline.com/$env:DV_TENANT_ID/oauth2/v2.0/token" -Body $tokenBody).access_token
-          $rows = @((Invoke-RestMethod -Uri "$base/api/data/v9.2/webresourceset?`$select=description&`$filter=name eq 'cr40f_SistemaBetinhos.html'" -Headers @{ Authorization = "Bearer $token"; Accept = 'application/json' }).value)
-          if ($rows.Count -ne 1) { throw 'cr40f_SistemaBetinhos.html ausente ou duplicado no DEV.' }
-          if ("$($rows[0].description)" -notmatch '^v\d+\.\d+\.\d+ ([0-9a-f]{40})') {
-            throw "A tela do DEV não registra o commit ('$($rows[0].description)'). Rode o workflow Deploy na develop e publique de novo."
+          $r = powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/pendentes-dev.ps1 -Ate $env:GITHUB_SHA | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'pendentes-dev.ps1 falhou.' }
+          if ($r.tela -or @($r.plugins).Count) {
+            $r.motivos | ForEach-Object { Write-Host $_ }
+            throw "O DEV difere deste commit ($($env:GITHUB_SHA.Substring(0,7))). Espere o Deploy da develop terminar (ou rode-o com forcar_plugins), ou leve a develop inteira para a main e publique de novo."
           }
-          $devCommit = $Matches[1]
-          git cat-file -e "$devCommit^{commit}"
-          if ($LASTEXITCODE -ne 0) { throw "O commit da tela do DEV ($devCommit) não está no repositório." }
-          $diferentes = @(git diff --name-only $devCommit $env:GITHUB_SHA | node packages/deploy/caminho-publicacao.mjs --front)
-          if ($diferentes.Count) {
-            Write-Host ($diferentes -join "`n")
-            throw "A tela do DEV ($($devCommit.Substring(0,7))) difere da deste commit ($($env:GITHUB_SHA.Substring(0,7))). Espere o Deploy da develop terminar, ou leve a develop inteira para a main e publique de novo."
-          }
-          Write-Host "DEV com a tela de $devCommit, igual à deste commit."
+          Write-Host "DEV com a tela e os plugins de $($env:GITHUB_SHA.Substring(0,7))."
       - name: Instalar pac
         run: |
           dotnet tool install --global Microsoft.PowerApps.CLI.Tool
