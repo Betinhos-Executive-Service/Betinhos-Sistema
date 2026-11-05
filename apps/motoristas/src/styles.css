@@ -10431,7 +10431,6 @@ button:disabled {
 
 .history-main .agenda-card:not(.header) {
   border: 1px solid rgba(20, 100, 72, 0.12) !important;
-  border-left: 7px solid rgba(38, 132, 95, 0.62) !important;
   border-radius: 9px !important;
   background: #fcfcfb !important;
   box-shadow: 0 3px 10px rgba(0, 14, 35, 0.028) !important;
@@ -10581,7 +10580,7 @@ button:disabled {
 .details-card-v1.is-scrollable .details-scroll-hint{bottom:128px!important;z-index:8!important}
 
 /* Details hierarchy - label vs content */
-.details-card-v1 .detail-field{position:relative!important;padding:6px 8px 6px 13px!important;border-left:3px solid rgba(0,14,35,.24)!important}
+.details-card-v1 .detail-field{position:relative!important;padding:6px 8px!important}
 .details-card-v1 .detail-field-label,
 .details-card-v1.servico .detail-field-label:nth-child(n),
 .details-card-v1.manutencao .detail-field-label,
@@ -13873,14 +13872,14 @@ select,
 }
 
 .ditado-box textarea {
-  padding-bottom: 76px;
+  resize: none;
+  overflow-y: hidden;
 }
 
+/* Linha do microfone abaixo do campo (nunca sobre o texto). */
 .ditado-overlay {
-  position: absolute;
-  left: 12px;
-  right: 18px;
-  bottom: 18px;
+  position: static;
+  margin-top: 8px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -14275,3 +14274,32 @@ select,
 @media (prefers-reduced-motion:no-preference) { .gr-skeleton span { animation:gr-pulse 1.2s ease-in-out infinite alternate; } }
 @keyframes gr-pulse { from { opacity:.55; } to { opacity:1; } }
 .gr-actions { width:min(95%, 520px); }
+
+/* Conferência no envio: popup "Dúvida" (folha de baixo no celular, centralizado em tela larga). */
+.duvida-overlay { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: flex-end; justify-content: center; padding: 12px 0 0; background: rgba(0, 14, 35, .58); backdrop-filter: blur(6px); animation: contact-overlay-enter 180ms cubic-bezier(.23, 1, .32, 1) both; }
+.duvida-dialog { display: flex; flex-direction: column; width: min(100%, 520px); max-height: calc(100dvh - 12px); overflow: hidden; border-radius: 20px 20px 0 0; background: #fff; color: #001a3d; font-family: Manrope, Arial, sans-serif; box-shadow: 0 -12px 40px rgba(0, 14, 35, .18); animation: gr-detalhe-entrada 280ms cubic-bezier(.32, .72, 0, 1) both; }
+.duvida-topo { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: 14px; padding: 22px 20px 16px; border-bottom: 1px solid #eef2f7; }
+.duvida-topo h2 { margin: 0; font-size: 1.2rem; font-weight: 800; line-height: 1.25; }
+.duvida-topo p { margin: 4px 0 0; color: #475569; font-size: .9rem; font-weight: 600; line-height: 1.4; }
+.duvida-icone { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; background: #fff7df; color: #856000; }
+.duvida-icone svg { width: 26px; height: 26px; }
+.duvida-corpo { display: grid; gap: 14px; padding: 18px 20px; overflow-y: auto; overscroll-behavior: contain; }
+.duvida-pergunta { margin: 0; padding: 16px 18px; border: 1px solid #f3dc9a; border-radius: 12px; background: #fff7df; color: #3d2d00; font-size: 1.05rem; font-weight: 700; line-height: 1.5; }
+.duvida-campo { display: grid; gap: 8px; margin: 0; }
+.duvida-campo label, .duvida-campo .form-field-label { color: #475569; font-size: .78rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.duvida-campo textarea { box-sizing: border-box; width: 100%; min-height: 104px; padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: 12px; background: #fcfcfb; color: #001a3d; font: 600 1rem/1.5 Manrope, Arial, sans-serif; outline: 0; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }
+.duvida-campo textarea::placeholder { color: #8a94a3; font-weight: 600; }
+.duvida-campo textarea:focus { border-color: #2159d2; box-shadow: 0 0 0 3px rgba(33, 89, 210, .18); background: #fff; }
+.duvida-dica { margin: -4px 0 0; color: #64748b; font-size: .85rem; font-weight: 700; }
+.duvida-dica.is-erro { color: #9f2940; }
+.duvida-acoes { display: grid; gap: 10px; padding: 14px 20px calc(16px + env(safe-area-inset-bottom)); border-top: 1px solid #eef2f7; background: #fcfcfb; }
+.duvida-enviar, .duvida-voltar { min-height: 52px; border-radius: 14px; font-family: Manrope, Arial, sans-serif; font-size: 1rem; font-weight: 800; cursor: pointer; transition: transform 140ms cubic-bezier(.23, 1, .32, 1); }
+.duvida-enviar { border: 0; background: #001a3d; color: #fff; }
+.duvida-voltar { border: 1px solid #e2e8f0; background: #fff; color: #001a3d; }
+.duvida-enviar:active, .duvida-voltar:active { transform: scale(.97); }
+.duvida-enviar:focus-visible, .duvida-voltar:focus-visible { outline: 0; box-shadow: 0 0 0 3px rgba(33, 89, 210, .25); }
+@media (min-width: 600px) {
+  .duvida-overlay { align-items: center; padding: 24px; }
+  .duvida-dialog { border-radius: 20px; max-height: calc(100dvh - 48px); }
+}
+@media (prefers-reduced-motion: reduce) { .duvida-overlay, .duvida-dialog { animation: none; } }
