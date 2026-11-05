@@ -6,9 +6,18 @@ on:
   # Rodar à mão (Actions › CI › Run workflow) para conferir a main sem abrir PR.
   workflow_dispatch:
 
+# Push novo no mesmo PR cancela o run anterior (repo privado: minuto de CI é cobrado). Fora de PR nada é cancelado.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Os testes do shell são quase todo o tempo do CI (~95%): rodam divididos em fatias paralelas (vitest --shard).
+# O resto (typecheck de todos os pacotes, testes dos outros pacotes, dados pessoais e segredos) roda num job ao lado.
+# O job "CI ok" junta tudo num resultado só.
 jobs:
-  check:
+  checagens:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -25,7 +34,45 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # Sem dado pessoal real (CPF válido, e-mail de pessoa, backup de flow) no repositório.
       - run: node --test scripts/dados-pessoais.test.mjs && node scripts/dados-pessoais.mjs
-      - run: pnpm typecheck
-      - run: pnpm test
       - name: Varredura de segredos na solução
         run: node packages/deploy/scan-secrets.mjs solution
+      # Todo pacote com script typecheck (shell, escala-fds, portal-cliente e worker, agentes-ia, despesas-ia).
+      - name: Typecheck
+        run: pnpm -r --if-present typecheck
+      - name: Sintaxe do cadastro-passageiro
+        run: pnpm --filter @betinhos/cadastro-passageiro check
+      - name: Testes (exceto shell)
+        run: pnpm -r --filter '!@betinhos/shell' test
+
+  shell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        fatia: [1, 2, 3]
+    name: shell (${{ matrix.fatia }}/3)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://npm.pkg.github.com
+          scope: '@betinhos-executive-service'
+      # Só o shell e o que ele usa do workspace (@betinhos/dataverse).
+      - run: pnpm install --frozen-lockfile --filter @betinhos/shell...
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: pnpm --filter @betinhos/shell exec vitest run --shard=${{ matrix.fatia }}/3
+
+  ok:
+    name: CI ok
+    if: always()
+    needs: [checagens, shell]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "checagens: ${{ needs.checagens.result }} | shell: ${{ needs.shell.result }}"
+          test "${{ needs.checagens.result }}" = success && test "${{ needs.shell.result }}" = success
