@@ -68,12 +68,19 @@ type ExpenseScreenProps = {
 
 function CartaoResumo({ gasto, valor, dataGasto }: { gasto: { cartaoFinal: string; estabelecimento: string }; valor: string; dataGasto: string }) {
   return (
-    <dl className="expense-card-summary" aria-label="Dados do cartão">
-      <div><dt>Estabelecimento</dt><dd>{gasto.estabelecimento || "Não informado"}</dd></div>
-      <div><dt>Valor</dt><dd>{BRL.format(parseCurrencyInput(valor) || 0)}</dd></div>
-      <div><dt>Data</dt><dd>{formatDiaMes(dataGasto)}</dd></div>
-      <div><dt>Cartão</dt><dd>{gasto.cartaoFinal ? `final ${gasto.cartaoFinal}` : "Cartão corporativo"}</dd></div>
-    </dl>
+    <section className="expense-card-summary" aria-label="Dados do cartão">
+      <div className="expense-card-summary-row">
+        <span className="expense-card-summary-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5" /><path d="M2.5 10h19" /></svg>
+        </span>
+        <span className="expense-card-summary-text">
+          <strong>{gasto.estabelecimento || "Estabelecimento não informado"}</strong>
+          <span>{formatDiaMes(dataGasto)} · {gasto.cartaoFinal ? `final ${gasto.cartaoFinal}` : "cartão corporativo"}</span>
+        </span>
+        <strong className="expense-card-summary-value">{BRL.format(parseCurrencyInput(valor) || 0)}</strong>
+      </div>
+      <p className="expense-card-summary-note">Dados do banco, não editáveis. Complete os campos abaixo.</p>
+    </section>
   );
 }
 

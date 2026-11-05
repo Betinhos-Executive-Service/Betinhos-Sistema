@@ -8062,38 +8062,80 @@ button:disabled {
   font-family: Manrope, "Segoe UI", sans-serif;
 }
 
-/* Gasto do cartão: dados do banco, somente leitura. */
+/* Gasto do cartão: dados do banco, somente leitura, numa linha (estabelecimento, data e cartão; valor à direita). */
 .expense-card-summary {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px 16px;
   margin: 0 0 12px;
-  padding: 14px 16px;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  background: #f8fafc;
   font-family: Manrope, "Segoe UI", sans-serif;
 }
 
-.expense-card-summary > div:first-child {
-  grid-column: 1 / -1;
+.expense-card-summary-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fcfcfb;
 }
 
-.expense-card-summary dt {
-  margin: 0 0 2px;
-  color: #64748b;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: .08em;
-  text-transform: uppercase;
+.expense-card-summary-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #eef3fb;
+  color: #001a3d;
 }
 
-.expense-card-summary dd {
-  margin: 0;
-  color: #0f172a;
+.expense-card-summary-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.expense-card-summary-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.expense-card-summary-text strong {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #001a3d;
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 800;
+  line-height: 1.3;
   overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.expense-card-summary-text span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.expense-card-summary-value {
+  color: #001a3d;
+  font-size: 18px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.expense-card-summary-note {
+  margin: 8px 2px 0;
+  color: #64748b;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 .expense-uploads-title {
