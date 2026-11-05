@@ -1,7 +1,7 @@
 import { cleanGuid, GUID_PATTERN } from "./comunicados.ts";
 import { DATAVERSE, loadExpenseReferenceDataRemote, retrieveMultipleAll } from "./dataverse.ts";
 import { DEFAULT_EXPENSE_REFERENCE_DATA } from "./expenses.defaults.ts";
-import { formatDiaMes, isMockGastosCartao } from "./gastosCartao.ts";
+import { isMockGastosCartao } from "./gastosCartao.ts";
 
 // Relatório de gastos do motorista: números, médias e insights calculados no app (sem IA).
 // Colunas de cr40f_despesaoperacional conferidas em expenses.payload.ts, dataverse.ts e gastosCartao.ts.
@@ -84,16 +84,11 @@ function janelaDeBusca(hoje: string) {
   return { inicio: inicioDoMes(hoje, -5), fim: inicioDoMes(hoje, 1) };
 }
 
-const diaDaSemana = (data: string) => {
-  const [ano, mes, dia] = data.split("-").map(Number);
-  return new Date(Date.UTC(ano, mes - 1, dia)).getUTCDay();
-};
 const somarDias = (data: string, dias: number) => {
   const [ano, mes, dia] = data.split("-").map(Number);
   const d = new Date(Date.UTC(ano, mes - 1, dia + dias));
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
 };
-const segundaDaSemana = (data: string) => somarDias(data, -((diaDaSemana(data) + 6) % 7));
 const MESES_CURTOS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
 // ---------------- Formatação ----------------
@@ -144,17 +139,6 @@ const soma = (lista: number[]) => lista.reduce((total, valor) => total + valor, 
 /** Despesas válidas do intervalo `[inicio, fim)`: Cancelado fica de fora de todas as contas. */
 export function despesasDoPeriodo(despesas: DespesaRelatorio[], inicio: string, fim: string) {
   return despesas.filter((d) => d.status !== STATUS_DESPESA.cancelado && d.data >= inicio && d.data < fim);
-}
-
-function totalPorCategoria(despesas: DespesaRelatorio[]) {
-  const mapa = new Map<string, { categoria: string; total: number; quantidade: number }>();
-  for (const d of despesas) {
-    const atual = mapa.get(d.categoria) ?? { categoria: d.categoria, total: 0, quantidade: 0 };
-    atual.total += d.valor;
-    atual.quantidade += 1;
-    mapa.set(d.categoria, atual);
-  }
-  return [...mapa.values()].sort((a, b) => b.total - a.total || a.categoria.localeCompare(b.categoria, "pt-BR"));
 }
 
 /** Soma do valor dos abastecimentos ÷ soma dos litros; ignora abastecimento sem litros. */
@@ -228,12 +212,6 @@ export function variacaoPercentual(atual: number | null | undefined, anterior: n
   return Math.round(((atual - anterior) / anterior) * 100);
 }
 
-function textoVariacao(variacao: number | null, rotuloAnterior: string) {
-  if (variacao == null) return null;
-  if (variacao === 0) return `igual ao ${rotuloAnterior}`;
-  return `${variacao > 0 ? "+" : "−"}${Math.abs(variacao)}% vs ${rotuloAnterior}`;
-}
-
 type CartaoMedia = {
   id: "litro" | "consumo" | "refeicao" | "cafeLanche" | "estacionamento" | "pedagio" | "lavagem";
   titulo: string;
@@ -241,12 +219,11 @@ type CartaoMedia = {
   valorTexto: string;
   detalhe: string;
   variacao: number | null;
-  variacaoTexto: string | null;
 };
 
-const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
+export const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
-function montarCartoes(atual: MediasBrutas, anterior: MediasBrutas, rotuloAnterior: string): CartaoMedia[] {
+function montarCartoes(atual: MediasBrutas, anterior: MediasBrutas): CartaoMedia[] {
   const defs: { id: CartaoMedia["id"]; titulo: string; texto: (v: number) => string; detalhe: (n: number) => string }[] = [
     { id: "litro", titulo: "Preço médio por litro", texto: (v) => `${formatBRL(v)}/L`, detalhe: (n) => plural(n, "abastecimento", "abastecimentos") },
     { id: "consumo", titulo: "Consumo médio", texto: (v) => `${DECIMAL.format(v)} km/L`, detalhe: (n) => `estimado em ${plural(n, "trecho", "trechos")}` },
@@ -260,7 +237,7 @@ function montarCartoes(atual: MediasBrutas, anterior: MediasBrutas, rotuloAnteri
     const media = atual[def.id];
     if (!media) return [];
     const variacao = variacaoPercentual(media.valor, anterior[def.id]?.valor);
-    return [{ id: def.id, titulo: def.titulo, valor: media.valor, valorTexto: def.texto(media.valor), detalhe: def.detalhe(media.quantidade), variacao, variacaoTexto: textoVariacao(variacao, rotuloAnterior) }];
+    return [{ id: def.id, titulo: def.titulo, valor: media.valor, valorTexto: def.texto(media.valor), detalhe: def.detalhe(media.quantidade), variacao }];
   });
 }
 
@@ -275,39 +252,33 @@ export function contarSemComprovante(despesas: DespesaRelatorio[]) {
   return despesas.filter((d) => d.statusAnexo != null && ANEXO_SEM_COMPROVANTE.includes(d.statusAnexo)).length;
 }
 
-export type BarraEvolucao = { chave: string; rotulo: string; total: number; quantidade: number };
+export type PontoTendencia = { chave: string; rotulo: string; valor: number | null; noPeriodo: boolean };
+const MESES_TENDENCIA = 6;
 
-/** Colunas da evolução: semanas (segunda a domingo) em um mês, meses em "3 meses". Não cria colunas vazias depois de `hoje` (só até a última despesa, se for futura). */
-export function agruparEvolucao(despesas: DespesaRelatorio[], periodo: Pick<Periodo, "id" | "inicio" | "fim">, hoje: string): { tipo: "semana" | "mes"; barras: BarraEvolucao[] } {
-  const porMes = periodo.id === "3meses";
-  const chaveDe = (data: string) => (porMes ? `${data.slice(0, 7)}-01` : segundaDaSemana(data));
-  const barras = new Map<string, BarraEvolucao>();
-  const ultimo = despesas.reduce((maior, d) => (d.data > maior ? d.data : maior), hoje);
-  const limite = ultimo < periodo.fim ? somarDias(ultimo, 1) : periodo.fim;
-  let cursor = periodo.inicio;
-  while (cursor < limite) {
-    const chave = chaveDe(cursor);
-    if (!barras.has(chave)) {
-      const rotulo = porMes ? MESES_CURTOS[Number(cursor.slice(5, 7)) - 1] : formatDiaMes(cursor);
-      barras.set(chave, { chave, rotulo, total: 0, quantidade: 0 });
-    }
-    cursor = porMes ? inicioDoMes(cursor, 1) : somarDias(segundaDaSemana(cursor), 7);
+/**
+ * R$/L e refeição média mês a mês nos 6 meses da janela de busca (até o mês atual), sem os meses iniciais vazios nas
+ * duas séries. `noPeriodo` marca os meses do período escolhido.
+ */
+export function tendenciaMensal(despesas: DespesaRelatorio[], periodo: Pick<Periodo, "inicio" | "fim">, hoje: string) {
+  const litro: PontoTendencia[] = [];
+  const refeicao: PontoTendencia[] = [];
+  for (let i = MESES_TENDENCIA - 1; i >= 0; i -= 1) {
+    const inicio = inicioDoMes(hoje, -i);
+    const lista = despesasDoPeriodo(despesas, inicio, inicioDoMes(hoje, 1 - i));
+    const base = { chave: inicio, rotulo: MESES_CURTOS[Number(inicio.slice(5, 7)) - 1], noPeriodo: inicio >= periodo.inicio && inicio < periodo.fim };
+    litro.push({ ...base, valor: precoMedioLitro(lista)?.valor ?? null });
+    refeicao.push({ ...base, valor: mediaPorGasto(lista, "almoco", "jantar")?.valor ?? null });
   }
-  for (const d of despesas) {
-    const barra = barras.get(chaveDe(d.data));
-    if (!barra || d.data < periodo.inicio || d.data >= periodo.fim) continue;
-    barra.total += d.valor;
-    barra.quantidade += 1;
-  }
-  return { tipo: porMes ? "mes" : "semana", barras: [...barras.values()] };
+  const primeiro = litro.findIndex((ponto, i) => ponto.valor != null || refeicao[i].valor != null);
+  const corte = primeiro < 0 ? litro.length : primeiro;
+  return { litro: litro.slice(corte), refeicao: refeicao.slice(corte) };
 }
 
 // ---------------- Insights ----------------
 
-/** 2 a 4 frases curtas e acionáveis, sem percentual do total do mês. */
-function gerarInsights({ cartoes, status, semComprovante, rotuloAnterior }: { cartoes: CartaoMedia[]; status: ContagemStatus; semComprovante: number; rotuloAnterior: string }) {
+/** Até 4 frases curtas, sem percentual do total do mês. Correção e recusa ficam no alerta do topo da tela. */
+function gerarInsights({ cartoes, semComprovante, rotuloAnterior }: { cartoes: CartaoMedia[]; semComprovante: number; rotuloAnterior: string }) {
   const insights: string[] = [];
-  if (status.precisaCorrigir > 0) insights.push(`${plural(status.precisaCorrigir, "gasto precisa", "gastos precisam")} de correção.`);
   if (semComprovante > 0) insights.push(`${plural(semComprovante, "gasto está", "gastos estão")} sem comprovante.`);
   const litro = cartoes.find((c) => c.id === "litro");
   if (litro?.variacao != null && litro.variacao !== 0) insights.push(`Preço do litro ${litro.variacao > 0 ? "subiu" : "caiu"} ${Math.abs(litro.variacao)}% vs ${rotuloAnterior}.`);
@@ -325,31 +296,29 @@ export type RelatorioModelo = {
   periodo: Periodo;
   total: number;
   quantidade: number;
-  categorias: ReturnType<typeof totalPorCategoria>;
   cartoes: CartaoMedia[];
   insights: string[];
   status: ContagemStatus;
   semComprovante: number;
-  evolucao: ReturnType<typeof agruparEvolucao>;
+  tendencia: ReturnType<typeof tendenciaMensal>;
   ultimas: DespesaRelatorio[];
 };
 
 export function montarRelatorio(despesas: DespesaRelatorio[], periodoId: PeriodoId, hoje: string): RelatorioModelo {
   const periodo = periodoDe(periodoId, hoje);
   const doPeriodo = despesasDoPeriodo(despesas, periodo.inicio, periodo.fim);
-  const cartoes = montarCartoes(calcularMedias(despesas, periodo.inicio, periodo.fim), calcularMedias(despesas, periodo.anteriorInicio, periodo.anteriorFim), periodo.rotuloAnterior);
+  const cartoes = montarCartoes(calcularMedias(despesas, periodo.inicio, periodo.fim), calcularMedias(despesas, periodo.anteriorInicio, periodo.anteriorFim));
   const status = contarStatus(doPeriodo);
   const semComprovante = contarSemComprovante(doPeriodo);
   return {
     periodo,
     total: soma(doPeriodo.map((d) => d.valor)),
     quantidade: doPeriodo.length,
-    categorias: totalPorCategoria(doPeriodo),
     cartoes,
-    insights: gerarInsights({ cartoes, status, semComprovante, rotuloAnterior: periodo.rotuloAnterior }),
+    insights: gerarInsights({ cartoes, semComprovante, rotuloAnterior: periodo.rotuloAnterior }),
     status,
     semComprovante,
-    evolucao: agruparEvolucao(doPeriodo, periodo, hoje),
+    tendencia: tendenciaMensal(despesas, periodo, hoje),
     ultimas: [...doPeriodo].sort((a, b) => b.data.localeCompare(a.data)).slice(0, 10)
   };
 }

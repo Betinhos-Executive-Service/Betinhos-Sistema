@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   STATUS_DESPESA,
-  agruparEvolucao,
   calcularMedias,
   consumoMedioKmL,
   contarSemComprovante,
@@ -15,6 +14,7 @@ import {
   montarRelatorio,
   periodoDe,
   precoMedioLitro,
+  tendenciaMensal,
   variacaoPercentual,
   type DespesaRelatorio
 } from "../src/lib/gastosRelatorio.ts";
@@ -55,10 +55,8 @@ test("variação contra o período anterior: sem base devolve null, com base arr
   const base = [d({ categoria: "Almoço", valor: 40, data: "2026-11-05" })];
   const semBase = montarRelatorio(base, "mes", HOJE);
   assert.equal(semBase.cartoes[0].variacao, null);
-  assert.equal(semBase.cartoes[0].variacaoTexto, null);
   const comBase = montarRelatorio([...base, d({ categoria: "Almoço", valor: 50, data: "2026-10-05" })], "mes", HOJE);
   assert.equal(comBase.cartoes[0].variacao, -20);
-  assert.equal(comBase.cartoes[0].variacaoTexto, "−20% vs mês anterior");
 });
 
 test("Cancelado fica fora de total, médias, status e lista", () => {
@@ -74,21 +72,22 @@ test("Cancelado fica fora de total, médias, status e lista", () => {
   assert.equal(rel.ultimas.length, 1);
 });
 
-test("evolução: semanas de segunda a domingo no mês e um grupo por mês em 3 meses", () => {
+test("tendência mensal: R$/L e refeição por mês até o atual, sem meses vazios no início e com o período marcado", () => {
   const lista = [
-    d({ valor: 10, data: "2026-11-02" }), d({ valor: 5, data: "2026-11-08" }), d({ valor: 20, data: "2026-11-09" }),
-    d({ valor: 7, data: "2026-10-15" }), d({ valor: 3, data: "2026-09-30" })
+    d({ categoria: "Abastecimento", valor: 300, litros: 50, data: "2026-09-10" }),
+    d({ categoria: "Abastecimento", valor: 310, litros: 50, data: "2026-11-03" }),
+    d({ categoria: "Abastecimento", valor: 999, litros: null, data: "2026-11-04" }),
+    d({ categoria: "Almoço", valor: 40, data: "2026-10-02" }),
+    d({ categoria: "Jantar", valor: 60, data: "2026-10-03" }),
+    d({ categoria: "Almoço", valor: 90, data: "2026-11-05", status: STATUS_DESPESA.cancelado })
   ];
-  const semanal = agruparEvolucao(despesasDoPeriodo(lista, "2026-11-01", "2026-12-01"), periodoDe("mes", HOJE), HOJE);
-  assert.equal(semanal.tipo, "semana");
-  // 01/11/2026 é domingo: semana do dia 1 (segunda 26/10), depois 02/11, 09/11, 16/11 (hoje = 20/11).
-  assert.deepEqual(semanal.barras.map((b) => [b.rotulo, b.total]), [["01/11", 0], ["02/11", 15], ["09/11", 20], ["16/11", 0]]);
-  const mensal = agruparEvolucao(despesasDoPeriodo(lista, "2026-09-01", "2026-12-01"), periodoDe("3meses", HOJE), HOJE);
-  assert.equal(mensal.tipo, "mes");
-  assert.deepEqual(mensal.barras.map((b) => [b.rotulo, b.total, b.quantidade]), [["set", 3, 1], ["out", 7, 1], ["nov", 35, 3]]);
-  const anterior = agruparEvolucao(despesasDoPeriodo(lista, "2026-10-01", "2026-11-01"), periodoDe("mesAnterior", HOJE), HOJE);
-  assert.equal(anterior.barras.at(-1)?.rotulo, "26/10");
-  assert.equal(anterior.barras.reduce((t, b) => t + b.total, 0), 7);
+  const { litro, refeicao } = tendenciaMensal(lista, periodoDe("mes", HOJE), HOJE);
+  assert.deepEqual(litro.map((p) => [p.rotulo, p.valor, p.noPeriodo]), [["set", 6, false], ["out", null, false], ["nov", 6.2, true]]);
+  assert.deepEqual(refeicao.map((p) => [p.rotulo, p.valor]), [["set", null], ["out", 50], ["nov", null]]);
+  const tres = tendenciaMensal(lista, periodoDe("3meses", HOJE), HOJE);
+  assert.deepEqual(tres.litro.map((p) => p.noPeriodo), [true, true, true]);
+  assert.deepEqual(tendenciaMensal([], periodoDe("mes", HOJE), HOJE), { litro: [], refeicao: [] });
+  assert.equal(montarRelatorio(lista, "mesAnterior", HOJE).tendencia.litro.find((p) => p.noPeriodo)?.rotulo, "out");
 });
 
 test("limites do período em America/Sao_Paulo", () => {
@@ -106,7 +105,7 @@ test("limites do período em America/Sao_Paulo", () => {
   assert.deepEqual(despesasDoPeriodo(lista, mes.inicio, mes.fim).map((x) => x.data), ["2026-11-01", "2026-11-30"]);
 });
 
-test("insights: correção, comprovante, variação do litro e refeição média, no máximo 4", () => {
+test("insights: comprovante, variação do litro e refeição média (correção fica no alerta), no máximo 4", () => {
   const lista = [
     d({ categoria: "Abastecimento", valor: 312, litros: 50, data: "2026-11-05" }),
     d({ categoria: "Abastecimento", valor: 300, litros: 50, data: "2026-10-05" }),
@@ -118,13 +117,12 @@ test("insights: correção, comprovante, variação do litro e refeição média
   // O Intl usa espaço não separável depois de "R$"; no teste comparamos com espaço comum.
   const insights = montarRelatorio(lista, "mes", HOJE).insights.map((texto) => texto.replace(/\u00a0/g, " "));
   assert.deepEqual(insights, [
-    "2 gastos precisam de correção.",
     "3 gastos estão sem comprovante.",
     "Preço do litro subiu 4% vs mês anterior.",
     "Sua refeição média é R$ 38,20."
   ]);
   const um = montarRelatorio([d({ valor: 5, data: "2026-11-02", status: STATUS_DESPESA.precisaCorrigir })], "mes", HOJE).insights;
-  assert.deepEqual(um, ["1 gasto precisa de correção."]);
+  assert.deepEqual(um, []);
   assert.deepEqual(montarRelatorio([], "mes", HOJE).insights, []);
 });
 
@@ -169,10 +167,4 @@ test("mock: cerca de 25 despesas, nunca no futuro, e o relatório do mês atual 
   assert.deepEqual(rel.cartoes.map((c) => c.id), ["litro", "consumo", "refeicao", "cafeLanche", "estacionamento", "pedagio", "lavagem"]);
   assert.ok(rel.cartoes.every((c) => c.variacao != null));
   assert.ok(rel.insights.length >= 2 && rel.insights.length <= 4);
-});
-
-test("despesa com data futura no mês entra numa coluna da evolução (total e gráfico coerentes)", () => {
-  const lista = [d({ data: "2026-11-10", valor: 10 }), d({ data: "2026-11-27", valor: 25 })];
-  const { barras } = agruparEvolucao(despesasDoPeriodo(lista, "2026-11-01", "2026-12-01"), periodoDe("mes", HOJE), HOJE);
-  assert.equal(barras.reduce((total, barra) => total + barra.total, 0), 35);
 });
