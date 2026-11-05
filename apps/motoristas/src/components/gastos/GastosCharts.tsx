@@ -1,63 +1,142 @@
-import type { CSSProperties } from "react";
+import { useEffect, useRef } from "react";
+import {
+  ArcElement,
+  CategoryScale,
+  Chart,
+  DoughnutController,
+  Filler,
+  LinearScale,
+  LineController,
+  LineElement,
+  PointElement,
+  Tooltip,
+  type ChartConfiguration
+} from "chart.js";
+import ChartDataLabels from "chartjs-plugin-datalabels";
 import type { PontoTendencia } from "../../lib/gastosRelatorio";
 
-// Gráficos em SVG próprio (o build é single-file, sem biblioteca). Cores do DS: navy-900 (período) e slate-400 (fora dele) sobre trilho slate-200.
-const NAVY = "#001a3d";
-const FORA_DO_PERIODO = "#94a3b8";
-const TRILHO = "#e2e8f0";
-const TEXTO = "#0f172a";
-const TEXTO_SUAVE = "#64748b";
+// Mesmo Chart.js 4.4.1 + datalabels 2.2.0 do Dashboard Betinhos, com as opções visuais dele (opts0): tooltip escuro,
+// grade #f0f0f0, eixos #94a3b8, entrada easeOutQuart com atraso por ponto. Cores do DS, sem gradiente.
+Chart.register(LineController, LineElement, PointElement, CategoryScale, LinearScale, Filler, Tooltip, DoughnutController, ArcElement, ChartDataLabels);
+Chart.defaults.font.family = "Manrope, system-ui, sans-serif";
+Chart.defaults.plugins.datalabels = { display: false };
 
-/** Mini-gráfico de linha da tendência mensal; decorativo (o valor e a variação estão em texto no cartão). */
-export function Sparkline({ pontos }: { pontos: PontoTendencia[] }) {
-  const largura = 120;
-  const altura = 32;
-  const margem = 4;
-  const comValor = pontos.flatMap((ponto, i) => (ponto.valor == null ? [] : [{ i, valor: ponto.valor }]));
-  if (comValor.length < 2) return null;
-  const valores = comValor.map((ponto) => ponto.valor);
-  const minimo = Math.min(...valores);
-  const faixa = Math.max(...valores) - minimo;
-  const passo = (largura - margem * 2) / Math.max(pontos.length - 1, 1);
-  // Série constante fica no meio, não colada na base.
-  const xy = comValor.map((ponto) => [margem + ponto.i * passo, faixa ? altura - margem - ((ponto.valor - minimo) / faixa) * (altura - margem * 2) : altura / 2] as const);
-  // O ponto marcado é o último mês do período escolhido (em "Mês anterior", não o mês atual).
-  const marcaveis = xy.filter((_, k) => pontos[comValor[k].i].noPeriodo);
-  const [ultimoX, ultimoY] = marcaveis.length ? marcaveis[marcaveis.length - 1] : xy[xy.length - 1];
+const NAVY = "#001a3d";
+const NAVY_AREA = "rgba(0,26,61,0.08)";
+const FORA_DO_PERIODO = "#94a3b8";
+const GRADE = "#f0f0f0";
+const EIXO = "#94a3b8";
+const ROTULO = "#475569";
+
+const semMovimento = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+const animacao = () => (semMovimento() ? false : {
+  duration: 850,
+  easing: "easeOutQuart" as const,
+  delay: (ctx: { type: string; dataIndex: number }) => (ctx.type === "data" ? Math.min(ctx.dataIndex * 35, 280) : 0)
+});
+const TOOLTIP = {
+  backgroundColor: "#0f172a", titleColor: "#ffffff", bodyColor: "#94a3b8", borderColor: "#172033", borderWidth: 1,
+  padding: 12, cornerRadius: 8, displayColors: false, titleFont: { weight: 700, size: 12 }, bodyFont: { size: 11 }
+};
+
+/** Canvas do Chart.js com ciclo de vida do React: cria no mount e recria só quando os dados mudam (`chave`), sem reanimar a cada render. */
+function ChartCanvas({ config, chave, altura, className, rotulo }: { config: ChartConfiguration<"line"> | ChartConfiguration<"doughnut">; chave: string; altura: number; className: string; rotulo?: string }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    if (!ref.current) return;
+    const chart = new Chart(ref.current, config);
+    return () => chart.destroy();
+    // A config tem funções (formatadores); os dados entram pela chave.
+  }, [chave]);
   return (
-    <svg className="gr-sparkline" viewBox={`0 0 ${largura} ${altura}`} aria-hidden="true" focusable="false">
-      <polyline points={xy.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ")} fill="none" stroke={NAVY} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={ultimoX} cy={ultimoY} r="3" fill={NAVY} />
-    </svg>
+    <div className={className} style={{ height: altura }}>
+      <canvas ref={ref} role={rotulo ? "img" : undefined} aria-label={rotulo} aria-hidden={rotulo ? undefined : true} />
+    </div>
   );
 }
 
-/** Colunas da média mês a mês: valor acima, mês embaixo; meses fora do período escolhido ficam em cinza. */
+const pontosComValor = (pontos: PontoTendencia[]) => pontos.map((ponto) => ponto.valor);
+
+/** Mini-gráfico de área da tendência mensal; decorativo (o valor e a variação estão em texto no cartão). */
+export function Sparkline({ pontos }: { pontos: PontoTendencia[] }) {
+  if (pontos.filter((ponto) => ponto.valor != null).length < 2) return null;
+  const ultimoDoPeriodo = pontos.reduce((achado, ponto, i) => (ponto.noPeriodo && ponto.valor != null ? i : achado), -1);
+  const config: ChartConfiguration<"line"> = {
+    type: "line",
+    data: {
+      labels: pontos.map((ponto) => ponto.rotulo),
+      datasets: [{
+        data: pontosComValor(pontos), borderColor: NAVY, backgroundColor: NAVY_AREA, fill: true, tension: 0.4, borderWidth: 2, spanGaps: true,
+        pointRadius: pontos.map((_, i) => (i === ultimoDoPeriodo ? 3 : 0)), pointBackgroundColor: NAVY
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: animacao(), events: [],
+      layout: { padding: 4 },
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: { x: { display: false }, y: { display: false, grace: "15%" } }
+    }
+  };
+  return <ChartCanvas className="gr-sparkline" altura={40} config={config} chave={JSON.stringify(pontos)} />;
+}
+
+/** Média mês a mês em linha com área (estilo do dashboard): valor sobre cada ponto; meses fora do período em cinza. */
 export function GraficoMedias({ pontos, curto, longo, rotulo }: { pontos: PontoTendencia[]; curto: (valor: number) => string; longo: (valor: number) => string; rotulo: string }) {
-  const largura = 320;
-  const altura = 168;
-  const base = 138;
-  const topo = 24;
-  const maximo = Math.max(...pontos.map((ponto) => ponto.valor ?? 0), 1);
-  const passo = largura / Math.max(pontos.length, 1);
-  const larguraColuna = Math.min(36, passo * 0.56);
+  const cores = pontos.map((ponto) => (ponto.noPeriodo ? NAVY : FORA_DO_PERIODO));
   const resumo = pontos.map((ponto) => `${ponto.rotulo}: ${ponto.valor == null ? "sem dados" : longo(ponto.valor)}`).join("; ");
+  const config: ChartConfiguration<"line"> = {
+    type: "line",
+    data: {
+      labels: pontos.map((ponto) => ponto.rotulo),
+      datasets: [{
+        label: rotulo, data: pontosComValor(pontos), borderColor: NAVY, backgroundColor: NAVY_AREA, fill: true, tension: 0.4, borderWidth: 2.5, spanGaps: true,
+        pointRadius: pontos.map((ponto) => (ponto.noPeriodo ? 5 : 4)), pointHoverRadius: 6,
+        pointBackgroundColor: cores, pointBorderColor: "#ffffff", pointBorderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: animacao(),
+      layout: { padding: { top: 22, left: 4, right: 12 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: { ...TOOLTIP, callbacks: { label: (item) => longo(Number(item.raw)) } },
+        datalabels: {
+          display: (ctx) => ctx.dataset.data[ctx.dataIndex] != null,
+          anchor: "end", align: "top", offset: 4,
+          color: (ctx) => (pontos[ctx.dataIndex]?.noPeriodo ? NAVY : ROTULO),
+          font: (ctx) => ({ size: 11, weight: pontos[ctx.dataIndex]?.noPeriodo ? 800 : 600 }),
+          formatter: (valor: number) => curto(valor)
+        }
+      },
+      scales: {
+        x: { ticks: { color: EIXO, font: { size: 11 } }, grid: { display: false }, border: { display: false } },
+        y: { ticks: { color: EIXO, font: { size: 10 }, maxTicksLimit: 4, callback: (valor) => curto(Number(valor)) }, grid: { color: GRADE }, border: { display: false }, grace: "12%" }
+      }
+    }
+  };
+  return <ChartCanvas className="gr-chart" altura={200} config={config} chave={rotulo + JSON.stringify(pontos)} rotulo={`${rotulo} por mês. ${resumo}.`} />;
+}
+
+export type FatiaStatus = { rotulo: string; valor: number; cor: string };
+
+/** Rosca dos status dos envios com o total no centro (o detalhe por status fica na legenda em texto ao lado). */
+export function GraficoStatus({ fatias, total }: { fatias: FatiaStatus[]; total: number }) {
+  const visiveis = fatias.filter((fatia) => fatia.valor > 0);
+  const config: ChartConfiguration<"doughnut"> = {
+    type: "doughnut",
+    data: {
+      labels: visiveis.map((fatia) => fatia.rotulo),
+      datasets: [{ data: visiveis.map((fatia) => fatia.valor), backgroundColor: visiveis.map((fatia) => fatia.cor), borderColor: "#ffffff", borderWidth: 2, hoverOffset: 4 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: "68%", animation: semMovimento() ? false : { duration: 850, easing: "easeOutQuart" },
+      plugins: { legend: { display: false }, tooltip: { ...TOOLTIP, callbacks: { label: (item) => `${item.label}: ${item.raw}` } } }
+    }
+  };
   return (
-    <svg className="gr-chart" viewBox={`0 0 ${largura} ${altura}`} role="img" aria-label={`${rotulo} por mês. ${resumo}.`}>
-      <line x1="0" y1={base} x2={largura} y2={base} stroke={TRILHO} strokeWidth="1" />
-      {pontos.map((ponto, i) => {
-        const centro = passo * i + passo / 2;
-        const alturaColuna = ponto.valor ? Math.max(3, Math.round(((base - topo) * ponto.valor) / maximo)) : 0;
-        return (
-          <g key={ponto.chave}>
-            {alturaColuna ? (
-              <rect className="gr-barra" style={{ "--i": i } as CSSProperties} x={centro - larguraColuna / 2} y={base - alturaColuna} width={larguraColuna} height={alturaColuna} rx="4" fill={ponto.noPeriodo ? NAVY : FORA_DO_PERIODO} />
-            ) : null}
-            <text x={centro} y={base - alturaColuna - 6} fontSize="11" fontWeight="800" fill={ponto.valor == null ? TEXTO_SUAVE : TEXTO} textAnchor="middle">{ponto.valor == null ? "–" : curto(ponto.valor)}</text>
-            <text x={centro} y={base + 17} fontSize="11.5" fontWeight={ponto.noPeriodo ? 800 : 600} fill={ponto.noPeriodo ? TEXTO : TEXTO_SUAVE} textAnchor="middle">{ponto.rotulo}</text>
-          </g>
-        );
-      })}
-    </svg>
+    <div className="gr-rosca">
+      <ChartCanvas className="gr-rosca-canvas" altura={120} config={config} chave={JSON.stringify(visiveis)} />
+      <span className="gr-rosca-centro" aria-hidden="true"><strong>{total}</strong><small>{total === 1 ? "gasto" : "gastos"}</small></span>
+    </div>
   );
 }

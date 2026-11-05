@@ -1,6 +1,6 @@
 import { useState, type CSSProperties } from "react";
 import { ActionBar, ActionButton } from "../components/common/ActionButton";
-import { GraficoMedias, Sparkline } from "../components/gastos/GastosCharts";
+import { GraficoMedias, GraficoStatus, Sparkline } from "../components/gastos/GastosCharts";
 import { AppShell } from "../components/layout/AppShell";
 import { ServicesMenu } from "../components/navigation/ServicesMenu";
 import { formatDiaMes, isMockGastosCartao } from "../lib/gastosCartao";
@@ -86,8 +86,8 @@ const GRAFICOS: Record<"litro" | "refeicao", { aba: string; rotulo: string; vazi
 type Grafico = keyof typeof GRAFICOS;
 const ABAS = Object.keys(GRAFICOS) as Grafico[];
 
-/** Ordem da barra de status e cor de cada trecho (DS: green-600, slate-400, amber-700, red-700). */
-const STATUS_BARRA = [
+/** Ordem dos status (rosca e legenda) e cor de cada um (DS: green-600, slate-400, amber-700, red-700). */
+const STATUS_CORES = [
   { chave: "validado", rotulo: "Validado", cor: "#168f57" },
   { chave: "enviado", rotulo: "Enviado", cor: "#94a3b8" },
   { chave: "precisaCorrigir", rotulo: "Precisa corrigir", cor: "#b17a00" },
@@ -196,7 +196,7 @@ function Relatorio({ modelo, grafico, onGrafico, pendentesCartao, onCompletar }:
         {tendencia[grafico].some((ponto) => ponto.valor != null) ? (
           <>
             <GraficoMedias key={grafico} pontos={tendencia[grafico]} curto={config.curto} longo={config.longo} rotulo={config.rotulo} />
-            <p className="gr-legenda">Em azul-escuro, os meses do período escolhido.</p>
+            <p className="gr-legenda">Pontos em azul-escuro: meses do período escolhido. Toque num ponto para ver o valor.</p>
           </>
         ) : (
           <p className="gr-legenda">{config.vazio}</p>
@@ -204,22 +204,19 @@ function Relatorio({ modelo, grafico, onGrafico, pendentesCartao, onCompletar }:
       </section>
 
       <section className="gr-bloco" aria-labelledby="gr-status" style={ordem(4)}>
-        <div className="gr-bloco-cabecalho">
-          <h2 className="termo-section-title" id="gr-status">Status dos envios</h2>
-          <span className="gr-legenda">{plural(totalStatus, "gasto", "gastos")}</span>
+        <h2 className="termo-section-title" id="gr-status">Status dos envios</h2>
+        <div className="gr-status-painel">
+          <GraficoStatus total={totalStatus} fatias={STATUS_CORES.map((item) => ({ rotulo: item.rotulo, valor: status[item.chave], cor: item.cor }))} />
+          <ul className="gr-status">
+            {STATUS_CORES.map((item) => (
+              <li key={item.chave} data-zero={status[item.chave] ? undefined : "true"}>
+                <i style={{ background: item.cor }} aria-hidden="true" />
+                <span>{item.rotulo}</span>
+                <strong>{status[item.chave]}</strong>
+              </li>
+            ))}
+          </ul>
         </div>
-        <div className="gr-status-barra" aria-hidden="true">
-          {STATUS_BARRA.map((item) => (status[item.chave] ? <span key={item.chave} style={{ flexGrow: status[item.chave], background: item.cor }} /> : null))}
-        </div>
-        <ul className="gr-status">
-          {STATUS_BARRA.map((item) => (
-            <li key={item.chave} data-zero={status[item.chave] ? undefined : "true"}>
-              <i style={{ background: item.cor }} aria-hidden="true" />
-              <span>{item.rotulo}</span>
-              <strong>{status[item.chave]}</strong>
-            </li>
-          ))}
-        </ul>
       </section>
 
       <section className="gr-bloco" aria-labelledby="gr-ultimas" style={ordem(5)}>
