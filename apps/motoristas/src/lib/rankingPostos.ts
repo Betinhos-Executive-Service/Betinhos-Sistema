@@ -1,7 +1,7 @@
 import { executeCustomApi } from "./customApi.ts";
 import { isMockGastosCartao } from "./gastosCartao.ts";
 
-export type PostoRanking = { nome: string; precoLitro: number; abastecimentos: number; ultimoAbastecimento: string };
+type PostoRanking = { nome: string; precoLitro: number; abastecimentos: number; ultimoAbastecimento: string };
 export type CidadeRanking = { cidade: string; postos: PostoRanking[] };
 export type RankingPostos = { dias: number; cidades: CidadeRanking[] };
 
