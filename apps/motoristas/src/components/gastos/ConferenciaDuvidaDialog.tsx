@@ -7,7 +7,7 @@ import { JUSTIFICATIVA_MINIMA } from "../../lib/conferenciaEnvio";
 
 /**
  * Popup "Dúvida" da conferência no envio: mostra a pergunta e pede a explicação (texto ou ditado).
- * "Responder e enviar" exige o mínimo de caracteres; "Voltar e corrigir", o Esc e o toque fora voltam ao formulário.
+ * "Enviar com a explicação" exige o mínimo de caracteres; "Voltar e ajustar", o Esc e o toque fora voltam ao formulário.
  */
 export function ConferenciaDuvidaDialog({ pergunta, onResponder, onVoltar }: { pergunta: string; onResponder: (justificativa: string) => void; onVoltar: () => void }) {
   const [texto, setTexto] = useState("");
@@ -42,8 +42,8 @@ export function ConferenciaDuvidaDialog({ pergunta, onResponder, onVoltar }: { p
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9.5" /><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.3-2.4 3.8" /><path d="M12 17.2h.01" /></svg>
           </span>
           <div>
-            <h2 id="duvida-titulo">Antes de enviar, uma dúvida</h2>
-            <p>Responda para o gasto seguir para o financeiro.</p>
+            <h2 id="duvida-titulo">Só uma conferência rápida</h2>
+            <p>Conta pra gente o que aconteceu. Assim o financeiro aprova sem precisar te chamar.</p>
           </div>
         </header>
 
@@ -53,20 +53,20 @@ export function ConferenciaDuvidaDialog({ pergunta, onResponder, onVoltar }: { p
             <TextAreaField
               fieldClassName="duvida-campo"
               label="Sua explicação"
-              placeholder="Conte o que aconteceu. Ex.: almoço do passageiro, pago a pedido do cliente."
+              placeholder="Ex.: almoço do passageiro, pago a pedido do cliente."
               rows={3}
               value={texto}
               onChange={(event) => setTexto(event.target.value)}
             />
           </DitadoField>
           <p className={`duvida-dica${tentou && faltam ? " is-erro" : ""}`} role={tentou && faltam ? "alert" : undefined}>
-            {faltam ? `Escreva ou fale pelo menos ${JUSTIFICATIVA_MINIMA} letras (faltam ${faltam}).` : "Pronto para enviar."}
+            {faltam ? `Escreva ou fale umas ${JUSTIFICATIVA_MINIMA} letras, pelo menos (faltam ${faltam}).` : "Obrigado! Já pode enviar."}
           </p>
         </div>
 
         <div className="duvida-acoes">
-          <button type="button" className="duvida-enviar" onClick={responder}>Responder e enviar</button>
-          <button type="button" className="duvida-voltar" onClick={onVoltar}>Voltar e corrigir o gasto</button>
+          <button type="button" className="duvida-enviar" onClick={responder}>Enviar com a explicação</button>
+          <button type="button" className="duvida-voltar" onClick={onVoltar}>Voltar e ajustar o gasto</button>
         </div>
       </div>
     </div>,

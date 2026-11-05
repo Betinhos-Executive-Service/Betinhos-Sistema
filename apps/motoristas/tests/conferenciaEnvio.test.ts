@@ -21,13 +21,17 @@ test("acima da política só na faixa vermelha: refeição > R$ 44,10 e litro > 
   assert.deepEqual(tipos({ ...base, gasto: gasto({ categoria: "Café", valor: 90 }) }), []);
 });
 
-test("refeição próxima: com hora < 3 h; sem hora, mesma refeição no mesmo dia", () => {
+test("refeição próxima só quando a refeição atual passou da referência; com hora < 3 h, sem hora mesma refeição no dia", () => {
   const almoco = recente({ categoria: "Almoço", valor: 30, hora: "12:00" });
-  assert.deepEqual(tipos({ ...base, recentes: [almoco], gasto: gasto({ categoria: "Jantar", valor: 35, hora: "14:59" }) }), ["refeicao_proxima"]);
-  assert.deepEqual(tipos({ ...base, recentes: [almoco], gasto: gasto({ categoria: "Jantar", valor: 35, hora: "15:00" }) }), []);
-  const semHora = recente({ categoria: "Almoço", valor: 30 });
-  assert.deepEqual(tipos({ ...base, recentes: [semHora], gasto: gasto({ categoria: "Almoço", valor: 35 }) }), ["refeicao_proxima"]);
-  assert.deepEqual(tipos({ ...base, recentes: [semHora], gasto: gasto({ categoria: "Jantar", valor: 35 }) }), []);
+  assert.deepEqual(tipos({ ...base, recentes: [almoco], gasto: gasto({ categoria: "Jantar", valor: 50, hora: "14:59" }) }), ["acima_politica", "refeicao_proxima"]);
+  assert.deepEqual(tipos({ ...base, recentes: [almoco], gasto: gasto({ categoria: "Jantar", valor: 50, hora: "15:00" }) }), ["acima_politica"]);
+  const semHora = recente({ categoria: "Almoço", valor: 38.5 });
+  assert.deepEqual(tipos({ ...base, recentes: [semHora], gasto: gasto({ categoria: "Almoço", valor: 50 }) }), ["acima_politica", "refeicao_proxima"]);
+  // Dentro da referência (até R$ 44,10) não pergunta, nem com outra refeição perto.
+  assert.deepEqual(tipos({ ...base, recentes: [semHora], gasto: gasto({ categoria: "Almoço", valor: 38 }) }), []);
+  assert.deepEqual(tipos({ ...base, recentes: [semHora], gasto: gasto({ categoria: "Almoço", valor: 44.1 }) }), []);
+  const { sinais } = calcularSinais({ ...base, recentes: [semHora], gasto: gasto({ categoria: "Almoço", valor: 50 }) });
+  assert.equal(sinais[1].detalhe, "Já há outro almoço registrado em 05/11");
 });
 
 test("abastecimento próximo: < 4 h ou < 150 km do anterior do mesmo veículo", () => {
@@ -70,7 +74,7 @@ test("data diferente da lida no cupom", () => {
 
 test("detalhe cita valores e datas", () => {
   const { sinais } = calcularSinais({ ...base, gasto: gasto({ categoria: "Almoço", valor: 58 }) });
-  assert.equal(sinais[0].detalhe, "Almoço de R$ 58,00 contra a política de R$ 42,00");
+  assert.equal(sinais[0].detalhe, "Almoço de R$ 58,00; o valor de referência da empresa é R$ 42,00");
 });
 
 test("serviços para a conferência: janela de véspera a dia seguinte em SP, horário convertido e cancelado marcado", async () => {
