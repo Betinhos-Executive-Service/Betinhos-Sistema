@@ -72,3 +72,15 @@ test("detalhe cita valores e datas", () => {
   const { sinais } = calcularSinais({ ...base, gasto: gasto({ categoria: "Almoço", valor: 58 }) });
   assert.equal(sinais[0].detalhe, "Almoço de R$ 58,00 contra a política de R$ 42,00");
 });
+
+test("serviços para a conferência: janela de véspera a dia seguinte em SP, horário convertido e cancelado marcado", async () => {
+  const { filtroServicosConferencia, mapServicoConferencia, paraHorarioSaoPaulo, STATUS_SERVICO_CANCELADO } = await import("../src/lib/conferenciaEnvio.ts");
+  const filtro = filtroServicosConferencia("{B4F87F6C-A6EC-F011-8406-7CED8DA7F336}", "2026-11-05");
+  assert.match(filtro, /_cr40f_motorista_value eq b4f87f6c-a6ec-f011-8406-7ced8da7f336/i);
+  assert.match(filtro, /cr40f_dataehorriodesada ge 2026-11-04T03:00:00Z and cr40f_dataehorriodesada lt 2026-11-07T03:00:00Z/);
+  assert.throws(() => filtroServicosConferencia("x", "2026-11-05"));
+  assert.equal(paraHorarioSaoPaulo("2026-11-05T02:30:00Z"), "2026-11-04T23:30");
+  assert.equal(paraHorarioSaoPaulo(null), null);
+  assert.deepEqual(mapServicoConferencia({ cr40f_dataehorriodesada: "2026-11-05T11:00:00Z", cr40f_horrioprevistoderetorno: null, cr40f_status: STATUS_SERVICO_CANCELADO }), { saida: "2026-11-05T08:00", retorno: null, cancelado: true });
+  assert.equal(mapServicoConferencia({ cr40f_dataehorriodesada: null }), null);
+});

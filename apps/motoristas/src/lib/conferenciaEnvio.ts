@@ -1,3 +1,6 @@
+import { cleanGuid, GUID_PATTERN } from "./comunicados.ts";
+import { DATAVERSE, retrieveMultipleAll } from "./dataverse.ts";
+import { isMockGastosCartao } from "./gastosCartao.ts";
 import { METAS_GASTOS, STATUS_DESPESA, norm, semaforo, somarDias, type DespesaRelatorio } from "./gastosRelatorio.ts";
 
 // Conferência da despesa no envio: o app calcula os fatos ("sinais") e só chama a IA quando há algum.
@@ -133,4 +136,41 @@ export function calcularSinais({ gasto, leituraData, recentes, servicos }: {
   }
 
   return { sinais, servicoDiaVizinho };
+}
+
+// ---------------- Serviços do motorista para a conferência ----------------
+
+/** cr40f_status "Cancelado" (202410002). "Cancelado com Ressalvas" conta como serviço: o motorista pode ter ido. */
+export const STATUS_SERVICO_CANCELADO = 202410002;
+const CATEGORIA_SERVICO = 100000000;
+const SP = new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+
+/** ISO do Dataverse (UTC) para `AAAA-MM-DDTHH:mm` em São Paulo; vazio vira null. */
+export function paraHorarioSaoPaulo(iso: unknown) {
+  const texto = iso == null ? "" : String(iso);
+  const data = new Date(texto);
+  return texto && !Number.isNaN(data.getTime()) ? SP.format(data).replace(" ", "T") : null;
+}
+
+/** Serviços do motorista com saída de [véspera, dia seguinte] (00:00 de São Paulo = 03:00 UTC). */
+export function filtroServicosConferencia(motoristaId: string, data: string) {
+  const id = cleanGuid(motoristaId);
+  if (!GUID_PATTERN.test(id)) throw new Error("Motorista não identificado para conferir o gasto.");
+  return `_cr40f_motorista_value eq ${id} and new_categoriadoitem eq ${CATEGORIA_SERVICO} and _cr40f_om_value eq null and _cr40f_ot_value eq null`
+    + ` and cr40f_dataehorriodesada ge ${somarDias(data, -1)}T03:00:00Z and cr40f_dataehorriodesada lt ${somarDias(data, 2)}T03:00:00Z`;
+}
+
+export function mapServicoConferencia(row: Record<string, unknown>): ServicoConferido | null {
+  const saida = paraHorarioSaoPaulo(row.cr40f_dataehorriodesada);
+  return saida ? { saida, retorno: paraHorarioSaoPaulo(row.cr40f_horrioprevistoderetorno), cancelado: Number(row.cr40f_status) === STATUS_SERVICO_CANCELADO } : null;
+}
+
+export async function carregarServicosConferencia(motoristaId: string, data: string): Promise<ServicoConferido[]> {
+  if (isMockGastosCartao()) {
+    // Mock local: serviço só na véspera, para a refeição de hoje cair em "sem serviço" com sugestão do dia anterior.
+    if (new URLSearchParams(window.location.search).get("mockConferencia") === "sem-servico") return [{ saida: `${somarDias(data, -1)}T09:00`, retorno: `${somarDias(data, -1)}T17:00`, cancelado: false }];
+    return [{ saida: `${data}T08:00`, retorno: `${data}T18:00`, cancelado: false }];
+  }
+  const { entities } = await retrieveMultipleAll(DATAVERSE.geral, `$select=cr40f_dataehorriodesada,cr40f_horrioprevistoderetorno,cr40f_status&$filter=${filtroServicosConferencia(motoristaId, data)}`);
+  return entities.map((row) => mapServicoConferencia(row as Record<string, unknown>)).filter((s): s is ServicoConferido => s != null);
 }
