@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react'
 import { readFileSync } from 'node:fs'
 
 const packageJson = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
+// Só no Vitest (o build e o pnpm dev não carregam nada de vitest/node).
+const sequenciador = process.env.VITEST ? (await import('./vitest.sequenciador')).SequenciadorPorTempo : undefined
 
 export default defineConfig({
   plugins: [react()],
@@ -50,5 +52,7 @@ export default defineConfig({
     poolOptions: { forks: { execArgv: ['--no-experimental-webstorage'] } },
     // @betinhos/ui é publicado como fonte TS (e importa CSS): o Vitest precisa transformá-lo, não carregar direto no Node.
     server: { deps: { inline: [/@betinhos(-executive-service)?\/(ui|tokens)/] } },
+    // No CI (--shard) as fatias são divididas pelo tempo de cada arquivo (tempos-testes.json), não pela quantidade.
+    ...(sequenciador ? { sequence: { sequencer: sequenciador } } : {}),
   },
 })

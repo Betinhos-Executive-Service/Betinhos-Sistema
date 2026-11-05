@@ -11,10 +11,36 @@ concurrency:
   group: ci-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# Os testes do shell são quase todo o tempo do CI (~95%): rodam divididos em fatias paralelas (vitest --shard).
+# Os testes do shell são quase todo o tempo do CI (~95%): rodam divididos em fatias paralelas (vitest --shard),
+# equilibradas pelo tempo de cada arquivo (apps/shell/tempos-testes.json), e só quando o PR mexe em algo que o shell usa.
 # O resto (typecheck de todos os pacotes, testes dos outros pacotes, dados pessoais e segredos) roda num job ao lado.
 # O job "CI ok" junta tudo num resultado só.
 jobs:
+  # PR que não toca o shell nem o que os testes dele leem (dataverse, fixtures dos plugins, dependências) pula as fatias.
+  # Fora de PR (manual ou workflow_call) roda tudo.
+  mudancas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    outputs:
+      shell: ${{ steps.filtro.outputs.shell }}
+    steps:
+      - id: filtro
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$PR" ]; then echo "shell=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          arquivos=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)')
+          if echo "$arquivos" | grep -qE '^(apps/shell/|packages/dataverse/|packages/plugins/[^/]+/Fixtures/|\.github/workflows/ci\.yml$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig\.base\.json$|\.npmrc$)'; then
+            echo "shell=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "shell=false" >> "$GITHUB_OUTPUT"
+            echo "PR sem mudança que afete o shell: fatias do shell puladas." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   checagens:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -45,6 +71,8 @@ jobs:
         run: pnpm -r --filter '!@betinhos/shell' test
 
   shell:
+    needs: mudancas
+    if: needs.mudancas.outputs.shell == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -70,9 +98,12 @@ jobs:
   ok:
     name: CI ok
     if: always()
-    needs: [checagens, shell]
+    needs: [mudancas, checagens, shell]
     runs-on: ubuntu-latest
     steps:
+      # shell "skipped" só vale quando o filtro decidiu pular; se o filtro falhou, o CI falha.
       - run: |
-          echo "checagens: ${{ needs.checagens.result }} | shell: ${{ needs.shell.result }}"
-          test "${{ needs.checagens.result }}" = success && test "${{ needs.shell.result }}" = success
+          echo "mudancas: ${{ needs.mudancas.result }} (shell=${{ needs.mudancas.outputs.shell }}) | checagens: ${{ needs.checagens.result }} | shell: ${{ needs.shell.result }}"
+          test "${{ needs.mudancas.result }}" = success
+          test "${{ needs.checagens.result }}" = success
+          if [ "${{ needs.mudancas.outputs.shell }}" = true ]; then test "${{ needs.shell.result }}" = success; fi
