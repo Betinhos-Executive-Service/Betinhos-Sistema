@@ -42,7 +42,8 @@ describe('SYSTEM_PROMPT_CONFERENCIA', () => {
     expect(SYSTEM_PROMPT_CONFERENCIA).not.toContain('@')
   })
   it('tom gentil: proíbe cobrança e palavras como política e contra; não cita valor de outros gastos', () => {
-    expect(SYSTEM_PROMPT_CONFERENCIA).toMatch(/parceiro, gentil e leve/)
+    expect(SYSTEM_PROMPT_CONFERENCIA).toMatch(/cordial, direto e respeitoso/)
+    expect(SYSTEM_PROMPT_CONFERENCIA).toMatch(/Sem diminutivos/)
     expect(SYSTEM_PROMPT_CONFERENCIA).toMatch(/Nunca cobre, acuse/)
     expect(SYSTEM_PROMPT_CONFERENCIA).toMatch(/não cite valores de outros gastos/)
   })
