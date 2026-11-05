@@ -8,7 +8,7 @@ import { isMockGastosCartao } from "./gastosCartao.ts";
 
 export const STATUS_DESPESA = { enviado: 100000000, precisaCorrigir: 100000001, validado: 100000002, recusado: 100000003, cancelado: 100000004 } as const;
 /** cr40f_statusanexo: 100000000 Sem anexo, 100000003 Falhou (sem comprovante utilizável). */
-const ANEXO_SEM_COMPROVANTE = [100000000, 100000003];
+export const ANEXO_SEM_COMPROVANTE = [100000000, 100000003];
 const TIME_ZONE = "America/Sao_Paulo";
 
 export type PeriodoId = "mes" | "mesAnterior" | "3meses";
@@ -94,7 +94,6 @@ const MESES_CURTOS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "s
 // ---------------- Formatação ----------------
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
-const DECIMAL = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 export const formatBRL = (valor: number) => BRL.format(valor);
 
 // ---------------- Mapeamento ----------------
@@ -148,40 +147,6 @@ export function precoMedioLitro(despesas: DespesaRelatorio[]) {
   return litros > 0 ? { valor: soma(abastecimentos.map((d) => d.valor)) / litros, quantidade: abastecimentos.length } : null;
 }
 
-const CONSUMO_MIN_KM_L = 3;
-const CONSUMO_MAX_KM_L = 30;
-const CONSUMO_MIN_TRECHOS = 2;
-
-/**
- * Consumo médio em km/L (estimativa, tanque cheio): para cada veículo, abastecimentos em ordem de data; cada trecho
- * é (KM do abastecimento − KM do anterior) ÷ litros do abastecimento. Só entra trecho cujo abastecimento final cai em
- * `[inicio, fim)`, com KM crescente e consumo plausível (3 a 30 km/L). Com menos de 2 trechos válidos, devolve null.
- */
-export function consumoMedioKmL(despesas: DespesaRelatorio[], inicio: string, fim: string) {
-  const porVeiculo = new Map<string, DespesaRelatorio[]>();
-  for (const d of despesas) {
-    if (d.status === STATUS_DESPESA.cancelado || !ehCategoria(d, "abastecimento") || !d.veiculoId || (d.litros ?? 0) <= 0 || (d.km ?? 0) <= 0) continue;
-    porVeiculo.set(d.veiculoId, [...(porVeiculo.get(d.veiculoId) ?? []), d]);
-  }
-  let distancia = 0;
-  let litros = 0;
-  let trechos = 0;
-  for (const lista of porVeiculo.values()) {
-    lista.sort((a, b) => a.data.localeCompare(b.data) || (a.km ?? 0) - (b.km ?? 0));
-    for (let i = 1; i < lista.length; i += 1) {
-      const atual = lista[i];
-      const delta = (atual.km ?? 0) - (lista[i - 1].km ?? 0);
-      if (atual.data < inicio || atual.data >= fim || delta <= 0) continue;
-      const kmPorLitro = delta / (atual.litros ?? 1);
-      if (kmPorLitro < CONSUMO_MIN_KM_L || kmPorLitro > CONSUMO_MAX_KM_L) continue;
-      distancia += delta;
-      litros += atual.litros ?? 0;
-      trechos += 1;
-    }
-  }
-  return trechos >= CONSUMO_MIN_TRECHOS ? { valor: distancia / litros, quantidade: trechos } : null;
-}
-
 /** Valor médio por gasto nas categorias informadas. */
 export function mediaPorGasto(despesas: DespesaRelatorio[], ...categorias: string[]) {
   const lista = despesas.filter((d) => ehCategoria(d, ...categorias));
@@ -190,19 +155,15 @@ export function mediaPorGasto(despesas: DespesaRelatorio[], ...categorias: strin
 
 type Media = { valor: number; quantidade: number } | null;
 type MediasBrutas = {
-  litro: Media; consumo: Media; refeicao: Media; cafeLanche: Media; estacionamento: Media; pedagio: Media; lavagem: Media;
+  litro: Media; refeicao: Media; cafeLanche: Media;
 };
 
 export function calcularMedias(todas: DespesaRelatorio[], inicio: string, fim: string): MediasBrutas {
   const lista = despesasDoPeriodo(todas, inicio, fim);
   return {
     litro: precoMedioLitro(lista),
-    consumo: consumoMedioKmL(todas, inicio, fim),
     refeicao: mediaPorGasto(lista, "almoco", "jantar"),
     cafeLanche: mediaPorGasto(lista, "cafe", "lanche"),
-    estacionamento: mediaPorGasto(lista, "estacionamento"),
-    pedagio: mediaPorGasto(lista, "pedagio"),
-    lavagem: mediaPorGasto(lista, "lavagem")
   };
 }
 
@@ -213,7 +174,7 @@ export function variacaoPercentual(atual: number | null | undefined, anterior: n
 }
 
 type CartaoMedia = {
-  id: "litro" | "consumo" | "refeicao" | "cafeLanche" | "estacionamento" | "pedagio" | "lavagem";
+  id: "litro" | "refeicao" | "cafeLanche";
   titulo: string;
   valor: number;
   valorTexto: string;
@@ -226,12 +187,8 @@ export const plural = (n: number, um: string, varios: string) => `${n} ${n === 1
 function montarCartoes(atual: MediasBrutas, anterior: MediasBrutas): CartaoMedia[] {
   const defs: { id: CartaoMedia["id"]; titulo: string; texto: (v: number) => string; detalhe: (n: number) => string }[] = [
     { id: "litro", titulo: "Preço médio por litro", texto: (v) => `${formatBRL(v)}/L`, detalhe: (n) => plural(n, "abastecimento", "abastecimentos") },
-    { id: "consumo", titulo: "Consumo médio", texto: (v) => `${DECIMAL.format(v)} km/L`, detalhe: (n) => `estimado em ${plural(n, "trecho", "trechos")}` },
     { id: "refeicao", titulo: "Refeição média", texto: formatBRL, detalhe: (n) => `almoço e jantar · ${plural(n, "gasto", "gastos")}` },
-    { id: "cafeLanche", titulo: "Café e lanche médio", texto: formatBRL, detalhe: (n) => plural(n, "gasto", "gastos") },
-    { id: "estacionamento", titulo: "Estacionamento médio", texto: formatBRL, detalhe: (n) => plural(n, "gasto", "gastos") },
-    { id: "pedagio", titulo: "Pedágio médio", texto: formatBRL, detalhe: (n) => plural(n, "gasto", "gastos") },
-    { id: "lavagem", titulo: "Lavagem média", texto: formatBRL, detalhe: (n) => plural(n, "gasto", "gastos") }
+    { id: "cafeLanche", titulo: "Café e lanche médio", texto: formatBRL, detalhe: (n) => plural(n, "gasto", "gastos") }
   ];
   return defs.flatMap((def) => {
     const media = atual[def.id];
@@ -240,6 +197,30 @@ function montarCartoes(atual: MediasBrutas, anterior: MediasBrutas): CartaoMedia
     return [{ id: def.id, titulo: def.titulo, valor: media.valor, valorTexto: def.texto(media.valor), detalhe: def.detalhe(media.quantidade), variacao }];
   });
 }
+
+// ---------------- Política de gastos (semáforo) ----------------
+
+/**
+ * Política da empresa: R$ 6,10 por litro e R$ 42 por refeição. A tolerância é a faixa amarela acima da meta, menor no
+ * combustível (pouca diferença no litro pesa muito no mês). Fixa aqui até a tela do gestor no Sistema Betinhos gravar
+ * esses valores no Dataverse; quando existir, só este ponto passa a ler de lá.
+ */
+export const METAS_GASTOS = {
+  litro: { meta: 6.1, tolerancia: 0.02 },
+  refeicao: { meta: 42, tolerancia: 0.05 }
+} as const;
+
+export type Semaforo = "verde" | "amarelo" | "vermelho";
+
+/** Verde na meta ou abaixo; amarelo até `tolerancia` acima; vermelho além disso. Compara em milésimos para evitar ruído de ponto flutuante. */
+export function semaforo(valor: number, { meta, tolerancia }: { meta: number; tolerancia: number }): Semaforo {
+  const milesimos = (n: number) => Math.round(n * 1000);
+  if (milesimos(valor) <= milesimos(meta)) return "verde";
+  return milesimos(valor) <= milesimos(meta * (1 + tolerancia)) ? "amarelo" : "vermelho";
+}
+
+/** O que exige ação do motorista: precisa corrigir ou recusado. */
+export const ehPendente = (d: Pick<DespesaRelatorio, "status">) => d.status === STATUS_DESPESA.precisaCorrigir || d.status === STATUS_DESPESA.recusado;
 
 type ContagemStatus = { enviado: number; validado: number; precisaCorrigir: number; recusado: number };
 
@@ -282,8 +263,6 @@ function gerarInsights({ cartoes, semComprovante, rotuloAnterior }: { cartoes: C
   if (semComprovante > 0) insights.push(`${plural(semComprovante, "gasto está", "gastos estão")} sem comprovante.`);
   const litro = cartoes.find((c) => c.id === "litro");
   if (litro?.variacao != null && litro.variacao !== 0) insights.push(`Preço do litro ${litro.variacao > 0 ? "subiu" : "caiu"} ${Math.abs(litro.variacao)}% vs ${rotuloAnterior}.`);
-  const consumo = cartoes.find((c) => c.id === "consumo");
-  if (consumo?.variacao != null && Math.abs(consumo.variacao) >= 3) insights.push(`Seu consumo ${consumo.variacao > 0 ? "melhorou" : "piorou"} ${Math.abs(consumo.variacao)}% vs ${rotuloAnterior}.`);
   const refeicao = cartoes.find((c) => c.id === "refeicao");
   if (refeicao) insights.push(`Sua refeição média é ${refeicao.valorTexto}.`);
   if (litro && (litro.variacao == null || litro.variacao === 0)) insights.push(`O litro saiu em média ${litro.valorTexto.replace("/L", "")}.`);
@@ -301,7 +280,8 @@ export type RelatorioModelo = {
   status: ContagemStatus;
   semComprovante: number;
   tendencia: ReturnType<typeof tendenciaMensal>;
-  ultimas: DespesaRelatorio[];
+  /** Todas as despesas do período, da mais recente para a mais antiga. */
+  despesas: DespesaRelatorio[];
 };
 
 export function montarRelatorio(despesas: DespesaRelatorio[], periodoId: PeriodoId, hoje: string): RelatorioModelo {
@@ -319,7 +299,7 @@ export function montarRelatorio(despesas: DespesaRelatorio[], periodoId: Periodo
     status,
     semComprovante,
     tendencia: tendenciaMensal(despesas, periodo, hoje),
-    ultimas: [...doPeriodo].sort((a, b) => b.data.localeCompare(a.data)).slice(0, 10)
+    despesas: [...doPeriodo].sort((a, b) => b.data.localeCompare(a.data))
   };
 }
 

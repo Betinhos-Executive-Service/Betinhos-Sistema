@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  METAS_GASTOS,
   STATUS_DESPESA,
   calcularMedias,
-  consumoMedioKmL,
   contarSemComprovante,
   despesasDoPeriodo,
   despesasMock,
+  ehPendente,
   filtroDespesasRelatorio,
   hojeSaoPaulo,
   mapDespesaRelatorio,
@@ -14,6 +15,7 @@ import {
   montarRelatorio,
   periodoDe,
   precoMedioLitro,
+  semaforo,
   tendenciaMensal,
   variacaoPercentual,
   type DespesaRelatorio
@@ -69,7 +71,31 @@ test("Cancelado fica fora de total, médias, status e lista", () => {
   assert.equal(rel.total, 40);
   assert.equal(rel.quantidade, 1);
   assert.equal(rel.cartoes[0].valor, 40);
-  assert.equal(rel.ultimas.length, 1);
+  assert.equal(rel.despesas.length, 1);
+});
+
+test("semáforo contra a política: litro com faixa amarela de 2% e refeição de 5%", () => {
+  const { litro, refeicao } = METAS_GASTOS;
+  assert.equal(semaforo(6.1, litro), "verde");
+  assert.equal(semaforo(5.89, litro), "verde");
+  assert.equal(semaforo(6.11, litro), "amarelo");
+  assert.equal(semaforo(6.222, litro), "amarelo");
+  assert.equal(semaforo(6.23, litro), "vermelho");
+  assert.equal(semaforo(42, refeicao), "verde");
+  assert.equal(semaforo(44.1, refeicao), "amarelo");
+  assert.equal(semaforo(44.11, refeicao), "vermelho");
+});
+
+test("lista do período: todas da mais recente para a mais antiga; pendente é só precisa corrigir e recusado", () => {
+  const lista = [
+    d({ id: "a", categoria: "Almoço", data: "2026-11-02", status: STATUS_DESPESA.validado }),
+    d({ id: "b", categoria: "Almoço", data: "2026-11-05", status: STATUS_DESPESA.precisaCorrigir }),
+    d({ id: "c", categoria: "Almoço", data: "2026-11-03", status: STATUS_DESPESA.enviado }),
+    d({ id: "e", categoria: "Almoço", data: "2026-11-01", status: STATUS_DESPESA.recusado })
+  ];
+  const rel = montarRelatorio(lista, "mes", HOJE);
+  assert.deepEqual(rel.despesas.map((x) => x.id), ["b", "c", "a", "e"]);
+  assert.deepEqual(rel.despesas.filter(ehPendente).map((x) => x.id), ["b", "e"]);
 });
 
 test("tendência mensal: R$/L e refeição por mês até o atual, sem meses vazios no início e com o período marcado", () => {
@@ -126,23 +152,6 @@ test("insights: comprovante, variação do litro e refeição média (correção
   assert.deepEqual(montarRelatorio([], "mes", HOJE).insights, []);
 });
 
-test("consumo km/L: trechos consecutivos do mesmo veículo; sem base segura, omite", () => {
-  const abast = (veiculoId: string, data: string, km: number, litros = 50) => d({ categoria: "Abastecimento", veiculoId, data, km, litros });
-  const lista = [abast("v1", "2026-11-01", 1000), abast("v1", "2026-11-08", 1500), abast("v1", "2026-11-15", 2000), abast("v2", "2026-11-03", 90000)];
-  const consumo = consumoMedioKmL(lista, "2026-11-01", "2026-12-01");
-  assert.equal(consumo?.quantidade, 2);
-  assert.ok(Math.abs((consumo?.valor ?? 0) - 10) < 1e-9);
-  // Um trecho só, KM voltando, ou consumo implausível: não calcula.
-  assert.equal(consumoMedioKmL(lista.slice(0, 2), "2026-11-01", "2026-12-01"), null);
-  assert.equal(consumoMedioKmL([abast("v1", "2026-11-01", 2000), abast("v1", "2026-11-08", 1500), abast("v1", "2026-11-15", 1000)], "2026-11-01", "2026-12-01"), null);
-  assert.equal(consumoMedioKmL([abast("v1", "2026-11-01", 1000), abast("v1", "2026-11-08", 1010), abast("v1", "2026-11-15", 1020)], "2026-11-01", "2026-12-01"), null);
-  assert.equal(consumoMedioKmL([abast("", "2026-11-01", 1000), abast("", "2026-11-08", 1500), abast("", "2026-11-15", 2000)], "2026-11-01", "2026-12-01"), null);
-  // O abastecimento âncora do mês anterior vale para o primeiro trecho do período.
-  const cruzado = [abast("v1", "2026-10-28", 1000), abast("v1", "2026-11-05", 1500), abast("v1", "2026-11-12", 2000)];
-  assert.equal(calcularMedias(cruzado, "2026-11-01", "2026-12-01").consumo?.quantidade, 2);
-  assert.equal(calcularMedias(cruzado, "2026-10-01", "2026-11-01").consumo, null);
-});
-
 test("sem comprovante e mapeamento das colunas do Dataverse", () => {
   assert.equal(contarSemComprovante([d({ statusAnexo: 100000000 }), d({ statusAnexo: 100000003 }), d({ statusAnexo: 100000002 }), d({ statusAnexo: null })]), 2);
   const mapa = new Map([["aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", "Pedágio"]]);
@@ -164,7 +173,7 @@ test("mock: cerca de 25 despesas, nunca no futuro, e o relatório do mês atual 
     assert.ok(mock.every((x) => x.data <= hoje), `futuro em ${hoje}`);
   }
   const rel = montarRelatorio(despesasMock("2026-11-20"), "mes", "2026-11-20");
-  assert.deepEqual(rel.cartoes.map((c) => c.id), ["litro", "consumo", "refeicao", "cafeLanche", "estacionamento", "pedagio", "lavagem"]);
+  assert.deepEqual(rel.cartoes.map((c) => c.id), ["litro", "refeicao", "cafeLanche"]);
   assert.ok(rel.cartoes.every((c) => c.variacao != null));
   assert.ok(rel.insights.length >= 2 && rel.insights.length <= 4);
 });

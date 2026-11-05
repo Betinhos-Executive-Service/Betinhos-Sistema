@@ -1,9 +1,7 @@
 import { useEffect, useRef } from "react";
 import {
-  ArcElement,
   CategoryScale,
   Chart,
-  DoughnutController,
   Filler,
   LinearScale,
   LineController,
@@ -17,7 +15,7 @@ import type { PontoTendencia } from "../../lib/gastosRelatorio";
 
 // Mesmo Chart.js 4.4.1 + datalabels 2.2.0 do Dashboard Betinhos, com as opções visuais dele (opts0): tooltip escuro,
 // grade #f0f0f0, eixos #94a3b8, entrada easeOutQuart com atraso por ponto. Cores do DS, sem gradiente.
-Chart.register(LineController, LineElement, PointElement, CategoryScale, LinearScale, Filler, Tooltip, DoughnutController, ArcElement, ChartDataLabels);
+Chart.register(LineController, LineElement, PointElement, CategoryScale, LinearScale, Filler, Tooltip, ChartDataLabels);
 Chart.defaults.font.family = "Manrope, system-ui, sans-serif";
 Chart.defaults.plugins.datalabels = { display: false };
 
@@ -40,7 +38,7 @@ const TOOLTIP = {
 };
 
 /** Canvas do Chart.js com ciclo de vida do React: cria no mount e recria só quando os dados mudam (`chave`), sem reanimar a cada render. */
-function ChartCanvas({ config, chave, altura, className, rotulo }: { config: ChartConfiguration<"line"> | ChartConfiguration<"doughnut">; chave: string; altura: number; className: string; rotulo?: string }) {
+function ChartCanvas({ config, chave, altura, className, rotulo }: { config: ChartConfiguration<"line">; chave: string; altura: number; className: string; rotulo?: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     if (!ref.current) return;
@@ -56,29 +54,6 @@ function ChartCanvas({ config, chave, altura, className, rotulo }: { config: Cha
 }
 
 const pontosComValor = (pontos: PontoTendencia[]) => pontos.map((ponto) => ponto.valor);
-
-/** Mini-gráfico de área da tendência mensal; decorativo (o valor e a variação estão em texto no cartão). */
-export function Sparkline({ pontos }: { pontos: PontoTendencia[] }) {
-  if (pontos.filter((ponto) => ponto.valor != null).length < 2) return null;
-  const ultimoDoPeriodo = pontos.reduce((achado, ponto, i) => (ponto.noPeriodo && ponto.valor != null ? i : achado), -1);
-  const config: ChartConfiguration<"line"> = {
-    type: "line",
-    data: {
-      labels: pontos.map((ponto) => ponto.rotulo),
-      datasets: [{
-        data: pontosComValor(pontos), borderColor: NAVY, backgroundColor: NAVY_AREA, fill: true, tension: 0.4, borderWidth: 2, spanGaps: true,
-        pointRadius: pontos.map((_, i) => (i === ultimoDoPeriodo ? 3 : 0)), pointBackgroundColor: NAVY
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false, animation: animacao(), events: [],
-      layout: { padding: 4 },
-      plugins: { legend: { display: false }, tooltip: { enabled: false } },
-      scales: { x: { display: false }, y: { display: false, grace: "15%" } }
-    }
-  };
-  return <ChartCanvas className="gr-sparkline" altura={40} config={config} chave={JSON.stringify(pontos)} />;
-}
 
 /** Média mês a mês em linha com área (estilo do dashboard): valor sobre cada ponto; meses fora do período em cinza. */
 export function GraficoMedias({ pontos, curto, longo, rotulo }: { pontos: PontoTendencia[]; curto: (valor: number) => string; longo: (valor: number) => string; rotulo: string }) {
@@ -115,28 +90,4 @@ export function GraficoMedias({ pontos, curto, longo, rotulo }: { pontos: PontoT
     }
   };
   return <ChartCanvas className="gr-chart" altura={200} config={config} chave={rotulo + JSON.stringify(pontos)} rotulo={`${rotulo} por mês. ${resumo}.`} />;
-}
-
-export type FatiaStatus = { rotulo: string; valor: number; cor: string };
-
-/** Rosca dos status dos envios com o total no centro (o detalhe por status fica na legenda em texto ao lado). */
-export function GraficoStatus({ fatias, total }: { fatias: FatiaStatus[]; total: number }) {
-  const visiveis = fatias.filter((fatia) => fatia.valor > 0);
-  const config: ChartConfiguration<"doughnut"> = {
-    type: "doughnut",
-    data: {
-      labels: visiveis.map((fatia) => fatia.rotulo),
-      datasets: [{ data: visiveis.map((fatia) => fatia.valor), backgroundColor: visiveis.map((fatia) => fatia.cor), borderColor: "#ffffff", borderWidth: 2, hoverOffset: 4 }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false, cutout: "68%", animation: semMovimento() ? false : { duration: 850, easing: "easeOutQuart" },
-      plugins: { legend: { display: false }, tooltip: { ...TOOLTIP, callbacks: { label: (item) => `${item.label}: ${item.raw}` } } }
-    }
-  };
-  return (
-    <div className="gr-rosca">
-      <ChartCanvas className="gr-rosca-canvas" altura={120} config={config} chave={JSON.stringify(visiveis)} />
-      <span className="gr-rosca-centro" aria-hidden="true"><strong>{total}</strong><small>{total === 1 ? "gasto" : "gastos"}</small></span>
-    </div>
-  );
 }
