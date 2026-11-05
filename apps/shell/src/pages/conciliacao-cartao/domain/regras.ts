@@ -34,7 +34,7 @@ export const abaDe = (s: number | null): Aba => (s == null ? undefined : SITUACA
 /** Motivos gravados pela tela (a lista local mostra o mesmo texto sem recarregar). */
 export const MOTIVO_CASADA = 'Casada manualmente no Sistema Betinhos.'
 export const MOTIVO_REABERTA = 'Reaberta no Sistema Betinhos.'
-export const motivoReprocessar = (c: Cartao) => `Cartão ${c.nome} vinculado no Sistema Betinhos; a conciliação das 08:00 casa com a despesa do motorista ou cria uma para ele validar.`
+export const motivoReprocessar = (c: Cartao) => `Cartão ${c.nome} vinculado no Sistema Betinhos; a conciliação casa na hora com a despesa do motorista ou cria uma para ele validar.`
 
 export type Filtros = { cartaoId: string | null; motoristaId: string | null; de: string; ate: string }
 export const FILTROS_VAZIOS: Filtros = { cartaoId: null, motoristaId: null, de: '', ate: '' }
