@@ -1677,10 +1677,63 @@
         }
       }
     },
-    "Pendentes": {
+    "Paradas": {
       "type": "OpenApiConnection",
       "runAfter": {
         "Cada_reaberta": [
+          "Succeeded",
+          "Failed",
+          "Skipped"
+        ]
+      },
+      "inputs": {
+        "host": {
+          "apiId": "__DV__",
+          "connectionName": "shared_commondataserviceforapps",
+          "operationId": "ListRecords"
+        },
+        "parameters": {
+          "entityName": "__SET_TRANS__",
+          "$select": "cr40f_transacaocartaoid",
+          "$expand": "__NAV_T_DESPESA__($select=cr40f_statusoperacional)",
+          "$filter": "statecode eq 0 and cr40f_situacao eq 100000003 and _cr40f_despesa_value ne null and __NAV_T_DESPESA__/cr40f_statusoperacional ne 100000001"
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    },
+    "Cada_parada": {
+      "type": "Foreach",
+      "runAfter": {
+        "Paradas": [
+          "Succeeded"
+        ]
+      },
+      "foreach": "@coalesce(outputs('Paradas')?['body/value'], json('[]'))",
+      "actions": {
+        "Concluir_parada": {
+          "type": "OpenApiConnection",
+          "runAfter": {},
+          "inputs": {
+            "host": {
+              "apiId": "__DV__",
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "UpdateRecord"
+            },
+            "parameters": {
+              "entityName": "__SET_TRANS__",
+              "recordId": "@items('Cada_parada')?['cr40f_transacaocartaoid']",
+              "item/cr40f_situacao": "@if(or(equals(items('Cada_parada')?['__NAV_T_DESPESA__']?['cr40f_statusoperacional'], 100000003), equals(items('Cada_parada')?['__NAV_T_DESPESA__']?['cr40f_statusoperacional'], 100000004)), 100000005, 100000001)",
+              "item/cr40f_motivo": "@if(or(equals(items('Cada_parada')?['__NAV_T_DESPESA__']?['cr40f_statusoperacional'], 100000003), equals(items('Cada_parada')?['__NAV_T_DESPESA__']?['cr40f_statusoperacional'], 100000004)), 'A despesa criada pelo cartão foi recusada ou cancelada; confira a cobrança.', 'O motorista completou a despesa criada pelo cartão.')"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        }
+      }
+    },
+    "Pendentes": {
+      "type": "OpenApiConnection",
+      "runAfter": {
+        "Cada_parada": [
           "Succeeded",
           "Failed",
           "Skipped"
@@ -1919,6 +1972,18 @@
           {
             "equals": [
               "@actions('Cada_reaberta')?['status']",
+              "Failed"
+            ]
+          },
+          {
+            "equals": [
+              "@actions('Paradas')?['status']",
+              "Failed"
+            ]
+          },
+          {
+            "equals": [
+              "@actions('Cada_parada')?['status']",
               "Failed"
             ]
           }
