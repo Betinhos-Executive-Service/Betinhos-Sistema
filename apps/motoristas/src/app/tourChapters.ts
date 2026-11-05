@@ -751,7 +751,7 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
         "No topo, o preço por litro e a refeição média (almoço e jantar) lado a lado. A cor compara com a meta da empresa: verde dentro, amarelo pouco acima e vermelho acima. Embaixo, a variação contra o período anterior.",
         "Logo abaixo ficam consumo, café e lanche e lavagem. Só aparecem as que têm dados."
       ], { target: ".gr-destaques", optional: true }),
-      step("alerta", "Pendências", ["Quando algum gasto precisa de correção ou foi recusado, o aviso aparece aqui no topo."], { target: ".gr-alerta", optional: true }),
+      step("alerta", "Pendências", ["Quando algum gasto precisa de correção ou foi recusado, o aviso aparece aqui no topo. Toque nele para ir direto à lista de pendentes."], { target: ".gr-alerta", optional: true }),
       step("insights", "Para você", ["Frases curtas calculadas no app, como gastos sem comprovante ou a variação do litro."], { target: ".gr-insights", optional: true }),
       step("evolucao", "Médias por mês", ["Escolha R$/L ou Refeição para ver a média de cada mês. Os meses do período escolhido ficam em azul-escuro."], { target: ".gr-evolucao", optional: true }),
       step("despesas", "Despesas", ["Pendentes mostra o que precisa de correção ou foi recusado. Todas mostra as despesas do período. Toque numa despesa para ver o detalhe."], { target: ".gr-despesas", optional: true }),

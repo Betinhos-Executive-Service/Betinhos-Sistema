@@ -1,7 +1,8 @@
-import { useCallback, useState, type CSSProperties } from "react";
+import { useCallback, useRef, useState, type CSSProperties } from "react";
 import { ActionBar, ActionButton } from "../components/common/ActionButton";
 import { DespesaDetalheDialog, STATUS_BADGE } from "../components/gastos/DespesaDetalheDialog";
 import { GraficoMedias } from "../components/gastos/GastosCharts";
+import { SystemIcon } from "../components/icons/SystemIcon";
 import { AppShell } from "../components/layout/AppShell";
 import { ServicesMenu } from "../components/navigation/ServicesMenu";
 import { formatDiaMes, isMockGastosCartao } from "../lib/gastosCartao";
@@ -54,7 +55,7 @@ export function GastosRelatorioScreen({ modelo, periodoId, loadStatus, pendentes
         ) : modelo && modelo.quantidade === 0 ? (
           <p className="termo-empty">Nenhum gasto neste período. Para lançar um gasto, toque em Anexar despesa.</p>
         ) : modelo ? (
-          <Relatorio key={periodoId} modelo={modelo} grafico={grafico} onGrafico={setGrafico} filtro={filtro} onFiltro={setFiltro} pendentesCartao={pendentesCartao} onCompletar={onCompletar} />
+          <Relatorio key={periodoId} modelo={modelo} grafico={grafico} onGrafico={setGrafico} filtro={filtro} onFiltro={setFiltro} />
         ) : null}
       </section>
       <ActionBar className="finalize-actions gr-actions">
@@ -136,29 +137,37 @@ function CartaoMedia({ cartao, rotuloAnterior, i }: { cartao: Cartao; rotuloAnte
   );
 }
 
-type RelatorioProps = { modelo: RelatorioModelo; grafico: Grafico; onGrafico: (id: Grafico) => void; filtro: Filtro; onFiltro: (id: Filtro) => void; pendentesCartao: number; onCompletar: () => void };
+type RelatorioProps = { modelo: RelatorioModelo; grafico: Grafico; onGrafico: (id: Grafico) => void; filtro: Filtro; onFiltro: (id: Filtro) => void };
 
-function Relatorio({ modelo, grafico, onGrafico, filtro, onFiltro, pendentesCartao, onCompletar }: RelatorioProps) {
+function Relatorio({ modelo, grafico, onGrafico, filtro, onFiltro }: RelatorioProps) {
   const { status, tendencia, periodo } = modelo;
   const [aberta, setAberta] = useState<DespesaRelatorio | null>(null);
   const fecharDetalhe = useCallback(() => setAberta(null), []);
+  const despesasRef = useRef<HTMLElement>(null);
   const outrasMedias = modelo.cartoes.filter((cartao) => !DESTAQUES.some((destaque) => destaque.id === cartao.id));
   const pendentes = modelo.despesas.filter(ehPendente);
   const lista = filtro === "pendentes" ? pendentes : modelo.despesas;
-  const pendencias = [
-    status.precisaCorrigir ? plural(status.precisaCorrigir, "gasto precisa de correção", "gastos precisam de correção") : "",
-    status.recusado ? plural(status.recusado, "gasto recusado", "gastos recusados") : ""
-  ].filter(Boolean);
+  const detalhePendencias = [
+    status.precisaCorrigir ? `${status.precisaCorrigir} para corrigir` : "",
+    status.recusado ? plural(status.recusado, "recusado", "recusados") : ""
+  ].filter(Boolean).join(" · ");
+  const verPendentes = () => {
+    onFiltro("pendentes");
+    const suave = !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    despesasRef.current?.scrollIntoView({ behavior: suave ? "smooth" : "auto", block: "start" });
+  };
   const config = GRAFICOS[grafico];
   return (
     <div className="gr-conteudo">
-      {pendencias.length ? (
-        <div className="termo-alert gr-alerta" data-tone="atencao" role="status" style={ordem(0)}>
-          <p>{pendencias.join(" · ")}</p>
-          {status.precisaCorrigir > 0 && pendentesCartao > 0 ? (
-            <button type="button" className="termo-text-button gr-atalho" onClick={onCompletar}>Ver pendentes do cartão</button>
-          ) : null}
-        </div>
+      {pendentes.length ? (
+        <button type="button" className="gr-alerta" onClick={verPendentes} style={ordem(0)}>
+          <span className="gr-alerta-icone" aria-hidden="true"><SystemIcon name="warning" /></span>
+          <span className="gr-alerta-texto">
+            <strong>{plural(pendentes.length, "gasto precisa", "gastos precisam")} da sua atenção</strong>
+            <small>{detalhePendencias}</small>
+          </span>
+          <span className="gr-alerta-acao">Ver<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        </button>
       ) : null}
 
       <section className="gr-bloco" aria-labelledby="gr-medias" style={ordem(1)}>
@@ -206,7 +215,7 @@ function Relatorio({ modelo, grafico, onGrafico, filtro, onFiltro, pendentesCart
         )}
       </section>
 
-      <section className="gr-bloco gr-despesas" aria-labelledby="gr-despesas" style={ordem(4)}>
+      <section ref={despesasRef} className="gr-bloco gr-despesas" aria-labelledby="gr-despesas" style={ordem(4)}>
         <div className="gr-bloco-cabecalho">
           <h2 className="termo-section-title" id="gr-despesas">Despesas</h2>
           <div className="gr-abas" role="group" aria-label="Despesas exibidas">

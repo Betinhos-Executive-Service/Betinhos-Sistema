@@ -14170,7 +14170,18 @@ select,
 .gr-chip:active,.gr-aba:active { transform:scale(.97); }
 .gr-insights { display:grid; gap:8px; margin:0; padding:0; list-style:none; }
 .gr-insights li { padding:10px 12px; border-radius:10px; background:#edf3ff; color:#1e3a6e; font-size:.9rem; font-weight:700; line-height:1.4; }
-.gr-alerta { display:grid; gap:2px; }
+.gr-alerta { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:12px; width:100%; min-height:64px; padding:12px 14px; border:1px solid #f3dc9a; border-radius:12px; background:#fff7df; color:#5c4300; font:inherit; text-align:left; cursor:pointer; transition:background-color 160ms ease-out, transform 120ms ease-out; }
+.gr-alerta:active { transform:scale(.98); background:#fdf0c8; }
+.gr-alerta:focus-visible { outline:0; box-shadow:0 0 0 3px rgba(33,89,210,.18); }
+.gr-alerta-icone { display:grid; place-items:center; width:36px; height:36px; border-radius:10px; background:#fdecb5; color:#856000; }
+.gr-alerta-icone svg { width:20px; height:20px; }
+.gr-alerta-texto { display:grid; gap:2px; min-width:0; }
+.gr-alerta-texto strong { color:#5c4300; font-size:.92rem; font-weight:800; line-height:1.3; }
+.gr-alerta-texto small { color:#856000; font-size:.8rem; font-weight:700; }
+.gr-alerta-acao { display:inline-flex; align-items:center; gap:2px; color:#856000; font-size:.82rem; font-weight:800; }
+.gr-alerta-acao svg { width:16px; height:16px; }
+@media (hover:hover) and (pointer:fine) { .gr-alerta:hover { background:#fdf0c8; } }
+.gr-despesas { scroll-margin-top:12px; }
 @media (min-width:560px) {
   .gr-secundarias { grid-template-columns:repeat(3,minmax(0,1fr)); }
 }
@@ -14178,7 +14189,6 @@ select,
   .gr-conteudo > *,.gr-kpi,.gr-secundarias .gr-media { animation:gr-entrada 240ms cubic-bezier(.23,1,.32,1) both; animation-delay:min(calc(var(--i,0) * 35ms), 210ms); }
 }
 @keyframes gr-entrada { from { opacity:0; transform:translateY(6px); } }
-.gr-atalho { justify-self:start; }
 .gr-vazio { display:grid; justify-items:start; gap:4px; }
 .gr-detalhe { display:grid; gap:10px; }
 .gr-detalhe-topo { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; }
