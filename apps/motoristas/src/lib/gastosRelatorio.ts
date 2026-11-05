@@ -3,7 +3,7 @@ import { DATAVERSE, loadExpenseReferenceDataRemote, retrieveMultipleAll } from "
 import { DEFAULT_EXPENSE_REFERENCE_DATA } from "./expenses.defaults.ts";
 import { isMockGastosCartao } from "./gastosCartao.ts";
 
-// Relatório de gastos do motorista: números, médias e insights calculados no app (sem IA).
+// Relatório de gastos do motorista: números e médias calculados no app (sem IA).
 // Colunas de cr40f_despesaoperacional conferidas em expenses.payload.ts, dataverse.ts e gastosCartao.ts.
 
 export const STATUS_DESPESA = { enviado: 100000000, precisaCorrigir: 100000001, validado: 100000002, recusado: 100000003, cancelado: 100000004 } as const;
@@ -42,7 +42,7 @@ type Periodo = {
   fim: string;
   anteriorInicio: string;
   anteriorFim: string;
-  /** Texto de "vs ..." usado nas variações e insights. */
+  /** Texto de "vs ..." usado nas variações. */
   rotuloAnterior: string;
 };
 
@@ -255,20 +255,6 @@ export function tendenciaMensal(despesas: DespesaRelatorio[], periodo: Pick<Peri
   return { litro: litro.slice(corte), refeicao: refeicao.slice(corte) };
 }
 
-// ---------------- Insights ----------------
-
-/** Até 4 frases curtas, sem percentual do total do mês. Correção e recusa ficam no alerta do topo da tela. */
-function gerarInsights({ cartoes, semComprovante, rotuloAnterior }: { cartoes: CartaoMedia[]; semComprovante: number; rotuloAnterior: string }) {
-  const insights: string[] = [];
-  if (semComprovante > 0) insights.push(`${plural(semComprovante, "gasto está", "gastos estão")} sem comprovante.`);
-  const litro = cartoes.find((c) => c.id === "litro");
-  if (litro?.variacao != null && litro.variacao !== 0) insights.push(`Preço do litro ${litro.variacao > 0 ? "subiu" : "caiu"} ${Math.abs(litro.variacao)}% vs ${rotuloAnterior}.`);
-  const refeicao = cartoes.find((c) => c.id === "refeicao");
-  if (refeicao) insights.push(`Sua refeição média é ${refeicao.valorTexto}.`);
-  if (litro && (litro.variacao == null || litro.variacao === 0)) insights.push(`O litro saiu em média ${litro.valorTexto.replace("/L", "")}.`);
-  return insights.slice(0, 4);
-}
-
 // ---------------- Modelo da tela ----------------
 
 export type RelatorioModelo = {
@@ -276,7 +262,6 @@ export type RelatorioModelo = {
   total: number;
   quantidade: number;
   cartoes: CartaoMedia[];
-  insights: string[];
   status: ContagemStatus;
   semComprovante: number;
   tendencia: ReturnType<typeof tendenciaMensal>;
@@ -295,7 +280,6 @@ export function montarRelatorio(despesas: DespesaRelatorio[], periodoId: Periodo
     total: soma(doPeriodo.map((d) => d.valor)),
     quantidade: doPeriodo.length,
     cartoes,
-    insights: gerarInsights({ cartoes, semComprovante, rotuloAnterior: periodo.rotuloAnterior }),
     status,
     semComprovante,
     tendencia: tendenciaMensal(despesas, periodo, hoje),

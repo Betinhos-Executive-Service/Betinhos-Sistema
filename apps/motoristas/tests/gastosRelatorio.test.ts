@@ -131,27 +131,6 @@ test("limites do período em America/Sao_Paulo", () => {
   assert.deepEqual(despesasDoPeriodo(lista, mes.inicio, mes.fim).map((x) => x.data), ["2026-11-01", "2026-11-30"]);
 });
 
-test("insights: comprovante, variação do litro e refeição média (correção fica no alerta), no máximo 4", () => {
-  const lista = [
-    d({ categoria: "Abastecimento", valor: 312, litros: 50, data: "2026-11-05" }),
-    d({ categoria: "Abastecimento", valor: 300, litros: 50, data: "2026-10-05" }),
-    d({ categoria: "Almoço", valor: 38.2, data: "2026-11-06" }),
-    d({ categoria: "Lanche", valor: 20, data: "2026-11-07", status: STATUS_DESPESA.precisaCorrigir, statusAnexo: 100000000 }),
-    d({ categoria: "Lanche", valor: 20, data: "2026-11-08", status: STATUS_DESPESA.precisaCorrigir, statusAnexo: 100000000 }),
-    d({ categoria: "Pedágio", valor: 20, data: "2026-11-09", statusAnexo: 100000003 })
-  ];
-  // O Intl usa espaço não separável depois de "R$"; no teste comparamos com espaço comum.
-  const insights = montarRelatorio(lista, "mes", HOJE).insights.map((texto) => texto.replace(/\u00a0/g, " "));
-  assert.deepEqual(insights, [
-    "3 gastos estão sem comprovante.",
-    "Preço do litro subiu 4% vs mês anterior.",
-    "Sua refeição média é R$ 38,20."
-  ]);
-  const um = montarRelatorio([d({ valor: 5, data: "2026-11-02", status: STATUS_DESPESA.precisaCorrigir })], "mes", HOJE).insights;
-  assert.deepEqual(um, []);
-  assert.deepEqual(montarRelatorio([], "mes", HOJE).insights, []);
-});
-
 test("sem comprovante e mapeamento das colunas do Dataverse", () => {
   assert.equal(contarSemComprovante([d({ statusAnexo: 100000000 }), d({ statusAnexo: 100000003 }), d({ statusAnexo: 100000002 }), d({ statusAnexo: null })]), 2);
   const mapa = new Map([["aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", "Pedágio"]]);
@@ -175,5 +154,4 @@ test("mock: cerca de 25 despesas, nunca no futuro, e o relatório do mês atual 
   const rel = montarRelatorio(despesasMock("2026-11-20"), "mes", "2026-11-20");
   assert.deepEqual(rel.cartoes.map((c) => c.id), ["litro", "refeicao", "cafeLanche"]);
   assert.ok(rel.cartoes.every((c) => c.variacao != null));
-  assert.ok(rel.insights.length >= 2 && rel.insights.length <= 4);
 });
