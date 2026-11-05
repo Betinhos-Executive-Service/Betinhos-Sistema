@@ -61,7 +61,7 @@ export function GastosRelatorioScreen({ modelo, periodoId, loadStatus, pendentes
         ) : modelo ? (
           <Relatorio key={periodoId} modelo={modelo} grafico={grafico} onGrafico={setGrafico} filtro={filtro} onFiltro={setFiltro} idsCompletar={idsCompletar} onCompletarGasto={onCompletarGasto} />
         ) : null}
-        <button type="button" className="termo-text-button gr-preco-postos" onClick={onPrecoPostos}>Ver preço dos postos por cidade</button>
+        <button type="button" className="termo-text-button gr-preco-postos" onClick={onPrecoPostos}>Ver postos perto de mim</button>
       </section>
       <ActionBar className="finalize-actions gr-actions">
         {pendentesCartao > 0 ? <ActionButton variant="secondary" label={`Completar (${pendentesCartao})`} onClick={onCompletar} /> : null}

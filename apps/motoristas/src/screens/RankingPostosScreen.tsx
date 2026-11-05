@@ -3,67 +3,85 @@ import { AppShell } from "../components/layout/AppShell";
 import { ServicesMenu } from "../components/navigation/ServicesMenu";
 import { reportAppError } from "../lib/appErrorLogger";
 import { formatDiaMes, isMockGastosCartao } from "../lib/gastosCartao";
-import { formatBRL } from "../lib/gastosRelatorio";
-import { carregarRankingPostos, ehMenorPreco, rotuloAbastecimentos, type RankingPostos } from "../lib/rankingPostos";
+import { formatBRL, type Semaforo } from "../lib/gastosRelatorio";
+import { RAIO_KM, carregarRankingPostos, obterPosicao, postosProximos, rotuloAbastecimentos, rotuloDistancia, type Posicao, type RankingPostos } from "../lib/rankingPostos";
+import { descreverGpsErro } from "../lib/termosMulta";
 
-type Carga = { status: "loading" } | { status: "error" } | { status: "ready"; ranking: RankingPostos };
+type Carga =
+  | { status: "loading" }
+  | { status: "error" }
+  | { status: "semGps"; mensagem: string }
+  | { status: "ready"; ranking: RankingPostos; origem: Posicao };
+
+const RECOMENDACAO: Record<Semaforo, { rotulo: string; tom: string }> = {
+  verde: { rotulo: "Recomendado", tom: "sucesso" },
+  amarelo: { rotulo: "Atenção", tom: "atencao" },
+  vermelho: { rotulo: "Evitar", tom: "erro" }
+};
 
 export function RankingPostosScreen({ onBack }: { onBack: () => void }) {
   const [carga, setCarga] = useState<Carga>({ status: "loading" });
-  const carregar = useCallback(() => {
+  const carregar = useCallback(async () => {
     setCarga({ status: "loading" });
-    return carregarRankingPostos().then(
-      (ranking) => setCarga({ status: "ready", ranking }),
-      (error) => {
-        setCarga({ status: "error" });
-        reportAppError(error, { severity: "warning", source: "app", action: "carregarRankingPostos", screen: "RankingPostos", notifyUser: false });
-      }
-    );
+    const [posicao, dados] = await Promise.allSettled([obterPosicao(), carregarRankingPostos()]);
+    if (dados.status === "rejected") reportAppError(dados.reason, { severity: "warning", source: "app", action: "carregarRankingPostos", screen: "RankingPostos", notifyUser: false });
+    if (posicao.status === "rejected") {
+      setCarga({ status: "semGps", mensagem: descreverGpsErro(posicao.reason as { code?: number } | null) });
+    } else if (dados.status === "rejected") {
+      setCarga({ status: "error" });
+    } else {
+      setCarga({ status: "ready", ranking: dados.value, origem: posicao.value });
+    }
   }, []);
   useEffect(() => { void carregar(); }, [carregar]);
+
+  const proximos = carga.status === "ready" ? postosProximos(carga.ranking.postos, carga.origem) : [];
 
   return (
     <AppShell screenLabel="RankingPostos">
       <ServicesMenu
-        title="Preço dos postos"
+        title="Postos perto de você"
         eyebrow={isMockGastosCartao() ? "Financeiro · Mock local" : "Financeiro"}
         homeLabel="Voltar"
         homeIcon="arrowLeft"
         onHome={onBack}
         onRefresh={carregar}
       />
-      <section className="termo-screen gr-screen" aria-label="Preço dos postos por cidade">
+      <section className="termo-screen gr-screen" aria-label="Postos perto de você">
         {carga.status === "loading" ? (
-          <div className="gr-skeleton" role="status" aria-busy="true" aria-label="Carregando preço dos postos"><span /><span /><span /></div>
-        ) : carga.status === "error" ? (
-          <div className="termo-alert" data-tone="erro" role="alert">
-            <p>Não foi possível carregar o preço dos postos.</p>
+          <div className="gr-skeleton" role="status" aria-busy="true" aria-label="Procurando postos perto de você"><span /><span /><span /></div>
+        ) : carga.status === "semGps" ? (
+          <div className="termo-alert" data-tone="atencao" role="alert">
+            <p>{carga.mensagem}</p>
             <button type="button" className="termo-text-button" onClick={carregar}>Tentar de novo</button>
           </div>
-        ) : carga.ranking.cidades.length === 0 ? (
-          <p className="termo-empty">Ainda não há preços de postos nos últimos {carga.ranking.dias} dias.</p>
+        ) : carga.status === "error" ? (
+          <div className="termo-alert" data-tone="erro" role="alert">
+            <p>Não foi possível carregar os postos.</p>
+            <button type="button" className="termo-text-button" onClick={carregar}>Tentar de novo</button>
+          </div>
+        ) : proximos.length === 0 ? (
+          <p className="termo-empty">Nenhum posto usado pela frota a até {RAIO_KM} km de você nos últimos {carga.ranking.dias} dias.</p>
         ) : (
           <>
-            <p className="gr-legenda">Média do que a frota pagou por litro nos últimos {carga.ranking.dias} dias. É um preço pago, não o preço de hoje.</p>
-            {carga.ranking.cidades.map((cidade) => (
-              <section key={cidade.cidade} className="gr-bloco" aria-label={cidade.cidade}>
-                <h2 className="rp-cidade">{cidade.cidade}</h2>
-                <ol className="gr-lista rp-lista">
-                  {cidade.postos.map((posto, indice) => (
-                    <li key={`${posto.nome}-${indice}`} className="rp-posto">
-                      <div className="gr-linha-main">
-                        <strong>{posto.nome}</strong>
-                        <span>{rotuloAbastecimentos(posto.abastecimentos)} · último em {formatDiaMes(posto.ultimoAbastecimento)}</span>
-                      </div>
-                      <div className="gr-linha-side">
-                        <strong>{formatBRL(posto.precoLitro)}</strong>
-                        {ehMenorPreco(cidade, posto) ? <span className="termo-badge" data-tone="sucesso">Menor preço</span> : null}
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              </section>
-            ))}
+            <p className="gr-legenda">Média paga pela frota nos últimos {carga.ranking.dias} dias, a até {RAIO_KM} km de você. É um preço pago, não o preço de hoje.</p>
+            <section className="gr-bloco">
+              <ol className="gr-lista rp-lista">
+                {proximos.map((posto, indice) => (
+                  <li key={`${posto.nome}-${indice}`} className="rp-posto">
+                    <div className="gr-linha-main">
+                      <strong>{posto.nome}</strong>
+                      <span>{rotuloDistancia(posto)}</span>
+                      <small>{rotuloAbastecimentos(posto.abastecimentos)} · último em {formatDiaMes(posto.ultimoAbastecimento)}</small>
+                    </div>
+                    <div className="gr-linha-side">
+                      <strong>{formatBRL(posto.precoLitro)}</strong>
+                      <span className="termo-badge" data-tone={RECOMENDACAO[posto.cor].tom}>{RECOMENDACAO[posto.cor].rotulo}</span>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </section>
           </>
         )}
       </section>

@@ -14256,7 +14256,6 @@ select,
 @media (prefers-reduced-motion:no-preference) { .gr-comprovante--carregando { animation:gr-pulse 1.2s ease-in-out infinite alternate; } }
 @media (prefers-reduced-motion:reduce) { .gr-detalhe,.gr-detalhe-overlay { animation:none; } }
 @keyframes gr-detalhe-entrada { from { transform:translateY(100%); } }
-.rp-cidade { margin:0; color:#001a3d; font-size:.95rem; font-weight:700; }
 .rp-posto { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; padding:10px 14px; border-top:1px solid #eef2f7; }
 .rp-posto:first-child { border-top:0; }
 .gr-lista { display:grid; margin:0 -14px; padding:0; list-style:none; }

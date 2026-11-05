@@ -755,17 +755,17 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
       step("evolucao", "Médias por mês", ["Escolha R$/L ou Refeição para ver a média de cada mês. Os meses do período escolhido ficam em azul-escuro."], { target: ".gr-evolucao", optional: true }),
       step("despesas", "Despesas", ["Pendentes mostra o que precisa de correção, completar ou foi recusado. Todas mostra as despesas do período. Toque num gasto do cartão marcado Completar para preenchê-lo; nos outros, abre o detalhe com o comprovante."], { target: ".gr-despesas", optional: true }),
       step("completar", "Completar", ["Quando há gastos do cartão para completar, o botão da esquerda abre a lista deles."], { target: ".gr-actions .action-button--secondary", optional: true }),
-      step("precos", "Preço dos postos", ["Mostra quanto a frota pagou por litro nos postos de cada cidade."], { target: ".gr-preco-postos" }),
+      step("precos", "Postos perto de mim", ["Mostra os postos perto de você, com o que a frota pagou por litro e uma recomendação."], { target: ".gr-preco-postos" }),
       step("anexar", "Anexar despesa", ["Abre a câmera para fotografar o comprovante e lançar um gasto novo."], { target: ".gr-actions .action-button--primary" }),
       helpStep()
     ]
   },
   {
     id: "ranking-postos",
-    title: "Preço dos postos",
+    title: "Postos perto de você",
     steps: [
       step("voltar", "Voltar", ["Volta para o Relatório de gastos."], { target: SERVICE_HOME }),
-      step("cidades", "Postos por cidade", ["Cada cidade lista os postos do menor para o maior R$/litro pago pela frota no período recente. A linha também mostra em quantos abastecimentos a média se baseia."], { target: ".rp-lista", optional: true }),
+      step("postos", "Postos perto de você", ["Lista os postos até 10 km, do mais perto para o mais longe, com a média paga pela frota no período recente. A cor compara o preço com a meta da empresa: Recomendado, Atenção ou Evitar."], { target: ".rp-lista", optional: true }),
       helpStep()
     ]
   },
