@@ -78,8 +78,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        fatia: [1, 2, 3, 4]
-    name: shell (${{ matrix.fatia }}/4)
+        fatia: [1, 2, 3]
+    name: shell (${{ matrix.fatia }}/3)
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -93,7 +93,7 @@ jobs:
       - run: pnpm install --frozen-lockfile --filter @betinhos/shell...
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: pnpm --filter @betinhos/shell exec vitest run --shard=${{ matrix.fatia }}/4
+      - run: pnpm --filter @betinhos/shell exec vitest run --shard=${{ matrix.fatia }}/3
 
   ok:
     name: CI ok
