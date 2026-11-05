@@ -5,7 +5,7 @@ const ordenado = (lista) => [...lista].sort()
 // Listas que reprovam (temPerda) e listas só informativas. Toda lista de compararFotos está em exatamente uma das duas.
 export const PERDA = [
   'registrosCairam', 'tabelasSumiram', 'fluxosSumiram', 'fluxosDesligados', 'stepsSumiram', 'stepsDesativados',
-  'stepsPerderamSeguro', 'variaveisSumiram', 'variaveisMudaram', 'componentesSumiram', 'fluxosLigadosNoTravado', 'stepsHabilitadosNoTravado',
+  'stepsPerderamSeguro', 'stepsSensiveisSemSeguro', 'variaveisSumiram', 'variaveisMudaram', 'componentesSumiram', 'fluxosLigadosNoTravado', 'stepsHabilitadosNoTravado',
 ]
 export const INFORMATIVO = [
   'registrosMudaram', 'fluxosMudaramEstado', 'stepsMudaramEstado', 'donosMudaram', 'versoes',
@@ -67,6 +67,11 @@ export function compararFotos(antes, depois, { travado = false, aceitarTabelas =
       if (s.estado === 0) d.stepsDesativados.push(item)
     }
     if (s.seguro && !t.seguro) d.stepsPerderamSeguro.push({ id, nome: s.nome })
+  }
+  // Step sensível (regras.json) que existe depois sem configuração segura: o segredo não viaja na solução, então step
+  // novo chega sem ele (plugin de acesso no PROD, 03/11/2026). Só a foto de depois importa: estava faltando antes também é erro.
+  for (const [nome, s] of Object.entries(depois.stepsSeguros ?? {})) {
+    if (s.existe && !s.seguro) d.stepsSensiveisSemSeguro.push({ nome, steps: s.steps })
   }
   if (travado) {
     for (const [id, g] of Object.entries(depois.fluxos)) {
