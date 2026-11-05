@@ -174,3 +174,29 @@ export async function carregarServicosConferencia(motoristaId: string, data: str
   const { entities } = await retrieveMultipleAll(DATAVERSE.geral, `$select=cr40f_dataehorriodesada,cr40f_horrioprevistoderetorno,cr40f_status&$filter=${filtroServicosConferencia(motoristaId, data)}`);
   return entities.map((row) => mapServicoConferencia(row as Record<string, unknown>)).filter((s): s is ServicoConferido => s != null);
 }
+
+// ---------------- Gravação na despesa ----------------
+
+/** Choice new_conferenciaenvio (scripts/provision-conferencia-envio-schema.ps1). */
+export const CONFERENCIA_OPCAO = { sem_duvida: 100000000, duvida_respondida: 100000001, indisponivel: 100000002, sem_sinal: 100000003 } as const;
+
+export type ConferenciaEnvio = {
+  resultado: keyof typeof CONFERENCIA_OPCAO;
+  motivos: TipoSinal[];
+  pergunta?: string;
+  justificativa?: string;
+  /** Hora do cupom (HH:mm) lida pela leitura rápida. */
+  hora: string | null;
+};
+
+/** Campos a juntar no payload de criação da despesa ou no PATCH de completar gasto do cartão. */
+export function camposConferencia(conferencia: ConferenciaEnvio) {
+  const campos: Record<string, unknown> = {
+    new_conferenciaenvio: CONFERENCIA_OPCAO[conferencia.resultado],
+    new_conferenciamotivos: conferencia.motivos.join(",").slice(0, 400)
+  };
+  if (conferencia.pergunta?.trim()) campos.new_conferenciapergunta = conferencia.pergunta.trim().slice(0, 2000);
+  if (conferencia.justificativa?.trim()) campos.new_conferenciajustificativa = conferencia.justificativa.trim().slice(0, 4000);
+  if (conferencia.hora && /^([01]\d|2[0-3]):[0-5]\d$/.test(conferencia.hora)) campos.new_horagasto = conferencia.hora;
+  return campos;
+}

@@ -39,7 +39,7 @@ A IA decide se pergunta e redige a pergunta (modelo `claude-haiku-5-5`). Para se
 
 ### Hora do gasto
 
-A despesa hoje grava só a data. A leitura rápida passa a extrair também a **hora impressa no cupom** (`hora_compra`, `HH:mm` ou null). O app grava data + hora em `cr40f_datagasto` quando houver hora legível; sem hora, usa a hora do envio para a conferência e mantém a gravação atual da data.
+A despesa hoje grava só a data. A leitura rápida passa a extrair também a **hora impressa no cupom** (`hora_compra`, `HH:mm` ou null). A leitura rápida já devolve `hora` (HH:MM); o app grava em `new_horagasto` (coluna própria, para não mudar `cr40f_datagasto`, que vários leitores tratam como data). Sem hora legível, a conferência usa a hora do envio.
 
 ## Contexto enviado ao flow
 
@@ -66,12 +66,14 @@ Colunas novas em `cr40f_despesaoperacional`:
 
 | Coluna | Tipo | Conteúdo |
 |---|---|---|
-| `cr40f_conferenciaenvio` | Choice | Sem dúvida · Dúvida respondida · Indisponível · Não conferido (sem sinal) |
-| `cr40f_conferenciapergunta` | Memo 2000 | Pergunta exibida ao motorista |
-| `cr40f_conferenciajustificativa` | Memo 4000 | Resposta do motorista |
-| `cr40f_conferenciamotivos` | Texto 400 | Motivos separados por vírgula (`acima_politica,refeicao_proxima`) |
+| `new_conferenciaenvio` | Choice | Sem dúvida · Dúvida respondida · Indisponível · Não conferido (sem sinal) |
+| `new_conferenciapergunta` | Memo 2000 | Pergunta exibida ao motorista |
+| `new_conferenciajustificativa` | Memo 4000 | Resposta do motorista |
+| `new_conferenciamotivos` | Texto 400 | Motivos separados por vírgula (`acima_politica,refeicao_proxima`) |
 
-Gravadas no mesmo payload do envio (`expenses.payload.ts`) e no PATCH de completar gasto do cartão. A hora vai em `cr40f_datagasto` (DateTime já existente).
+| `new_horagasto` | Texto 5 | Hora do cupom `HH:mm` (leitura rápida), quando legível |
+
+Prefixo `new_` (publicador da AppBetinhos). A tabela está na solução com todos os subcomponentes, então as colunas entram no export sem passo extra. Gravadas no mesmo payload do envio (`expenses.payload.ts`) e no PATCH de completar gasto do cartão. Script: `scripts/provision-conferencia-envio-schema.ps1` (aplicado no DEV em 05/11/2026).
 
 ## Flow "Flow Despesas | Conferência no envio"
 

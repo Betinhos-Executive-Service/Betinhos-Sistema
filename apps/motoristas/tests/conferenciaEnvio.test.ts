@@ -84,3 +84,12 @@ test("serviços para a conferência: janela de véspera a dia seguinte em SP, ho
   assert.deepEqual(mapServicoConferencia({ cr40f_dataehorriodesada: "2026-11-05T11:00:00Z", cr40f_horrioprevistoderetorno: null, cr40f_status: STATUS_SERVICO_CANCELADO }), { saida: "2026-11-05T08:00", retorno: null, cancelado: true });
   assert.equal(mapServicoConferencia({ cr40f_dataehorriodesada: null }), null);
 });
+
+test("campos da conferência para o payload: choice, motivos, textos aparados e hora só HH:mm válida", async () => {
+  const { camposConferencia, CONFERENCIA_OPCAO } = await import("../src/lib/conferenciaEnvio.ts");
+  assert.deepEqual(camposConferencia({ resultado: "duvida_respondida", motivos: ["acima_politica", "refeicao_proxima"], pergunta: " Por quê? ", justificativa: " almoço com o cliente ", hora: "12:40" }), {
+    new_conferenciaenvio: CONFERENCIA_OPCAO.duvida_respondida, new_conferenciamotivos: "acima_politica,refeicao_proxima",
+    new_conferenciapergunta: "Por quê?", new_conferenciajustificativa: "almoço com o cliente", new_horagasto: "12:40"
+  });
+  assert.deepEqual(camposConferencia({ resultado: "sem_sinal", motivos: [], hora: "25:00" }), { new_conferenciaenvio: CONFERENCIA_OPCAO.sem_sinal, new_conferenciamotivos: "" });
+});
