@@ -18,6 +18,11 @@ html { -webkit-tap-highlight-color: transparent; }
 /* Rodapé da sidebar: a coluna implícita do grid é `auto` e cresce até o texto do status, que vazava para fora da
    sidebar em vez de cortar com reticências. (Regra a levar para o @betinhos/ui; aqui até o pacote publicar.) */
 .bt-shell__foot { grid-template-columns: minmax(0, 1fr); }
+/* Grupo-link (Página Inicial): centrado na largura da sidebar e com o mesmo espaço abaixo dos grupos-acordeão,
+   cuja lista fechada ainda soma a margem de .bt-shell__items (2px + space-1-5). (Regra a levar para o @betinhos/ui.) */
+.bt-shell__group:has(> a.bt-shell__group-toggle) { margin-bottom: calc(4px + var(--bt-space-1-5)); }
+a.bt-shell__group-toggle { justify-content: center; }
+a.bt-shell__group-toggle > .bt-shell__group-label { flex: 0 1 auto; }
 
 /* Página do shell */
 .page { max-width: var(--bt-layout-content-max); margin: 0 auto; padding: 22px 26px var(--bt-space-8); }
