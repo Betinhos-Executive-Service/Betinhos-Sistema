@@ -10431,7 +10431,6 @@ button:disabled {
 
 .history-main .agenda-card:not(.header) {
   border: 1px solid rgba(20, 100, 72, 0.12) !important;
-  border-left: 7px solid rgba(38, 132, 95, 0.62) !important;
   border-radius: 9px !important;
   background: #fcfcfb !important;
   box-shadow: 0 3px 10px rgba(0, 14, 35, 0.028) !important;
@@ -10581,7 +10580,7 @@ button:disabled {
 .details-card-v1.is-scrollable .details-scroll-hint{bottom:128px!important;z-index:8!important}
 
 /* Details hierarchy - label vs content */
-.details-card-v1 .detail-field{position:relative!important;padding:6px 8px 6px 13px!important;border-left:3px solid rgba(0,14,35,.24)!important}
+.details-card-v1 .detail-field{position:relative!important;padding:6px 8px!important}
 .details-card-v1 .detail-field-label,
 .details-card-v1.servico .detail-field-label:nth-child(n),
 .details-card-v1.manutencao .detail-field-label,
@@ -14285,7 +14284,7 @@ select,
 .duvida-icone { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; background: #fff7df; color: #856000; }
 .duvida-icone svg { width: 26px; height: 26px; }
 .duvida-corpo { display: grid; gap: 14px; padding: 18px 20px; overflow-y: auto; overscroll-behavior: contain; }
-.duvida-pergunta { margin: 0; padding: 16px 18px; border-left: 4px solid #d9a521; border-radius: 12px; background: #fff7df; color: #3d2d00; font-size: 1.05rem; font-weight: 700; line-height: 1.5; }
+.duvida-pergunta { margin: 0; padding: 16px 18px; border: 1px solid #f3dc9a; border-radius: 12px; background: #fff7df; color: #3d2d00; font-size: 1.05rem; font-weight: 700; line-height: 1.5; }
 .duvida-campo { display: grid; gap: 8px; margin: 0; }
 .duvida-campo label, .duvida-campo .form-field-label { color: #475569; font-size: .78rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
 .duvida-campo textarea { box-sizing: border-box; width: 100%; min-height: 104px; padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: 12px; background: #fcfcfb; color: #001a3d; font: 600 1rem/1.5 Manrope, Arial, sans-serif; outline: 0; transition: border-color 160ms ease-out, box-shadow 160ms ease-out; }
