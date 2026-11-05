@@ -32,6 +32,7 @@ Nunca rode com `-Apply` fora da `main` no checkout principal. PROD é bloqueado 
 3. Cadastre um cartão de teste (conta = id da conta CREDIT, final, início da vigência, motorista) e rode o flow manualmente ("Executar") no Power Automate.
 4. Confira: transações em `cr40f_transacaocartao` sem duplicar ao rodar duas vezes; nenhuma com motivo "Em processamento"; compra do motorista lançada vira "Conciliada automática" e a despesa fica com `cr40f_conciliadacartao = true`; compra sem lançamento cria a despesa do motorista e a transação fica "Aguardando motorista"; IOF/tarifa "Ignorada"; parcela >1 "Ignorada".
 - O histórico do run esconde entradas e saídas (secureData): o id da conta (`cr40f_idconta`) para cadastrar cartão sai das transações já gravadas. Conta da Betinhos (a0c4fcc8…) não traz final; a da DePaula (dea94c56…) traz. Falha de uma transação aparece só em `actions/<nome>/repetitions` (paginado por `nextLink`); o banco já mandou `merchant` como texto, e `Dados` precisa aguentar isso.
+- Tipo: no Open Finance `operationType = PAGAMENTO` é compra com o cartão (o Itaú da DePaula manda assim em todas). Pagamento de fatura é crédito (valor < 0 ou type CREDIT) com PAGAMENTO/PAGTO na descrição. Conferir depois de cada run: nenhuma transação de valor positivo com tipo Pagamento de fatura (100000002).
 5. Para testar com a API fora do flow use `request_secret` (nunca a key no chat) e só leitura.
 
 ## Tela `#/conciliacao-cartao` (shell React)

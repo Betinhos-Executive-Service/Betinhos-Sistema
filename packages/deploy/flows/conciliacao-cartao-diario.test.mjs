@@ -167,3 +167,9 @@ test('merchant e merchantInfo em texto não derrubam a transação (o banco às 
   }
   assert.match(dados.estabelecimento, /'', string\(coalesce\(items\('Cada_transacao'\)\?\['merchant'\], ''\)\)\)\), 200\)$/)
 })
+
+test('operationType PAGAMENTO é compra; pagamento de fatura só como crédito com PAGAMENTO/PAGTO na descrição', () => {
+  const tipo = acao('Dados').inputs.tipo
+  assert.doesNotMatch(tipo, /if\(equals\(items\('Cada_transacao'\)\?\['operationType'\], 'PAGAMENTO'\)/)
+  assert.match(tipo, /if\(and\(or\(less\(float\(items\('Cada_transacao'\)\?\['amount'\]\), 0\), equals\(items\('Cada_transacao'\)\?\['type'\], 'CREDIT'\)\), not\(equals\(items\('Cada_transacao'\)\?\['operationType'\], 'ESTORNO'\)\), or\(contains\(.*'PAGAMENTO'\), contains\(.*'PAGTO'\)\)\), 100000002/)
+})
