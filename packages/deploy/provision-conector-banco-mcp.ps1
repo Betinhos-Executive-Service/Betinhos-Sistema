@@ -101,13 +101,21 @@ if ($conector.Count -ne 1 -or -not $conector[0].connectorinternalid) { throw "Co
 Include $conector[0].connectorid 372 "conector $exibicao"
 $apiId = "/providers/Microsoft.PowerApps/apis/$($conector[0].connectorinternalid)"
 
-$ref = @((Dv GET "connectionreferences?`$select=connectionreferenceid,connectorid,connectionid&`$filter=connectionreferencelogicalname eq '$refNome'").value)
+$ref = @((Dv GET "connectionreferences?`$select=connectionreferenceid,connectorid,connectionid,_customconnectorid_value&`$filter=connectionreferencelogicalname eq '$refNome'").value)
 if (-not $ref.Count) {
-  Dv POST connectionreferences @{ connectionreferencelogicalname = $refNome; connectionreferencedisplayname = $exibicao; connectorid = $apiId; description = 'Conexão do flow da conciliação do cartão com a API Banco MCP (a key fica só na conexão).' } | Out-Null
-  $ref = @((Dv GET "connectionreferences?`$select=connectionreferenceid,connectorid,connectionid&`$filter=connectionreferencelogicalname eq '$refNome'").value)
+  Dv POST connectionreferences @{ connectionreferencelogicalname = $refNome; connectionreferencedisplayname = $exibicao; connectorid = $apiId; 'CustomConnectorId@odata.bind' = "/connectors($($conector[0].connectorid))"; description = 'Conexão do flow da conciliação do cartão com a API Banco MCP (a key fica só na conexão).' } | Out-Null
+  $ref = @((Dv GET "connectionreferences?`$select=connectionreferenceid,connectorid,connectionid,_customconnectorid_value&`$filter=connectionreferencelogicalname eq '$refNome'").value)
   Write-Step "connection reference $refNome criada"
 }
 if ($ref[0].connectorid -ne $apiId) { throw "Connection reference $refNome aponta para $($ref[0].connectorid), esperado $apiId." }
+# Sem o lookup CustomConnectorId o export da solução falha ("Exporting connection reference ... requires the custom connector
+# to be added to a dataverse solution"), mesmo com o conector na solução. Visto no DEV em 05/11/2026.
+if ([string]$ref[0]._customconnectorid_value -ne [string]$conector[0].connectorid) {
+  if ($Apply) {
+    Dv PATCH "connectionreferences($($ref[0].connectionreferenceid))" @{ 'CustomConnectorId@odata.bind' = "/connectors($($conector[0].connectorid))" } | Out-Null
+    Write-Step "connection reference $refNome vinculada ao conector (CustomConnectorId)"
+  } else { Write-Step "DRY RUN: connection reference $refNome seria vinculada ao conector (CustomConnectorId)" }
+}
 $tipoRef = @((Dv GET "solutioncomponentdefinitions?`$select=solutioncomponenttype&`$filter=primaryentityname eq 'connectionreference'").value)
 if ($tipoRef.Count -eq 1) { Include $ref[0].connectionreferenceid $tipoRef[0].solutioncomponenttype "connection reference $refNome" }
 if ($ref[0].connectionid) { Write-Step "OK: $refNome já tem conexão; rode provision-flow-conciliacao-cartao.ps1 -Apply para ligar o flow." }
