@@ -16,6 +16,9 @@ type GastosRelatorioScreenProps = {
   loadStatus: GastosRelatorioLoadStatus;
   /** Gastos do cartão que o motorista ainda precisa completar. */
   pendentesCartao: number;
+  /** Ids dos gastos do cartão que ainda faltam completar: tocar neles abre o formulário de completar. */
+  idsCompletar: ReadonlySet<string>;
+  onCompletarGasto: (id: string) => void;
   onPeriodo: (id: PeriodoId) => void;
   onBack: () => void;
   onReload: () => void;
@@ -23,7 +26,7 @@ type GastosRelatorioScreenProps = {
   onAttach: () => void;
 };
 
-export function GastosRelatorioScreen({ modelo, periodoId, loadStatus, pendentesCartao, onPeriodo, onBack, onReload, onCompletar, onAttach }: GastosRelatorioScreenProps) {
+export function GastosRelatorioScreen({ modelo, periodoId, loadStatus, pendentesCartao, idsCompletar, onCompletarGasto, onPeriodo, onBack, onReload, onCompletar, onAttach }: GastosRelatorioScreenProps) {
   const carregando = loadStatus === "loading" && !modelo;
   const erro = loadStatus === "error" && !modelo;
   // Ficam aqui (fora do Relatorio, que remonta a cada período) para a aba do gráfico e o filtro sobreviverem à troca de período.
@@ -55,7 +58,7 @@ export function GastosRelatorioScreen({ modelo, periodoId, loadStatus, pendentes
         ) : modelo && modelo.quantidade === 0 ? (
           <p className="termo-empty">Nenhum gasto neste período. Para lançar um gasto, toque em Anexar despesa.</p>
         ) : modelo ? (
-          <Relatorio key={periodoId} modelo={modelo} grafico={grafico} onGrafico={setGrafico} filtro={filtro} onFiltro={setFiltro} />
+          <Relatorio key={periodoId} modelo={modelo} grafico={grafico} onGrafico={setGrafico} filtro={filtro} onFiltro={setFiltro} idsCompletar={idsCompletar} onCompletarGasto={onCompletarGasto} />
         ) : null}
       </section>
       <ActionBar className="finalize-actions gr-actions">
@@ -137,9 +140,9 @@ function CartaoMedia({ cartao, rotuloAnterior, i }: { cartao: Cartao; rotuloAnte
   );
 }
 
-type RelatorioProps = { modelo: RelatorioModelo; grafico: Grafico; onGrafico: (id: Grafico) => void; filtro: Filtro; onFiltro: (id: Filtro) => void };
+type RelatorioProps = { modelo: RelatorioModelo; grafico: Grafico; onGrafico: (id: Grafico) => void; filtro: Filtro; onFiltro: (id: Filtro) => void; idsCompletar: ReadonlySet<string>; onCompletarGasto: (id: string) => void };
 
-function Relatorio({ modelo, grafico, onGrafico, filtro, onFiltro }: RelatorioProps) {
+function Relatorio({ modelo, grafico, onGrafico, filtro, onFiltro, idsCompletar, onCompletarGasto }: RelatorioProps) {
   const { status, tendencia, periodo } = modelo;
   const [aberta, setAberta] = useState<DespesaRelatorio | null>(null);
   const fecharDetalhe = useCallback(() => setAberta(null), []);
@@ -187,15 +190,6 @@ function Relatorio({ modelo, grafico, onGrafico, filtro, onFiltro }: RelatorioPr
         ) : null}
       </section>
 
-      {modelo.insights.length ? (
-        <section className="gr-bloco" aria-labelledby="gr-insights" style={ordem(2)}>
-          <h2 className="termo-section-title" id="gr-insights">Para você</h2>
-          <ul className="gr-insights">
-            {modelo.insights.map((texto) => <li key={texto}>{texto}</li>)}
-          </ul>
-        </section>
-      ) : null}
-
       <section className="gr-bloco gr-evolucao" aria-labelledby="gr-evolucao" style={ordem(3)}>
         <div className="gr-bloco-cabecalho">
           <h2 className="termo-section-title" id="gr-evolucao">Médias por mês</h2>
@@ -226,10 +220,11 @@ function Relatorio({ modelo, grafico, onGrafico, filtro, onFiltro }: RelatorioPr
         {lista.length ? (
           <ul className="gr-lista">
             {lista.map((item) => {
-              const badge = STATUS_BADGE[item.status];
+              const completar = idsCompletar.has(item.id);
+              const badge = completar ? { rotulo: "Completar", tom: "atencao" } : STATUS_BADGE[item.status];
               return (
                 <li key={item.id}>
-                  <button type="button" className="gr-linha" onClick={() => setAberta(item)}>
+                  <button type="button" className="gr-linha" onClick={() => (completar ? onCompletarGasto(item.id) : setAberta(item))}>
                     <span className="gr-linha-main">
                       <strong>{item.categoria}</strong>
                       <span>{item.estabelecimento || "Sem estabelecimento"}</span>

@@ -271,7 +271,8 @@ const FLOW_URLS = {
   gerarVoucher: "VITE_FLOW_GERAR_VOUCHER_URL",
   salvarFotosManutencao: "VITE_FLOW_SALVAR_FOTOS_MANUTENCAO_URL",
   enviarReciboCliente: "VITE_FLOW_ENVIAR_RECIBO_CLIENTE_URL",
-  quickRead: "VITE_FLOW_LEITURA_RAPIDA_URL"
+  quickRead: "VITE_FLOW_LEITURA_RAPIDA_URL",
+  consultarArquivo: "VITE_FLOW_CONSULTAR_ARQUIVO_URL"
 } as const;
 
 const DEV_DATAVERSE_URL = "https://org23b93544.crm2.dynamics.com/";
@@ -281,7 +282,9 @@ const FLOW_DATAVERSE_ENVIRONMENT_VARIABLES: Record<string, string | undefined> =
   [FLOW_URLS.gerarVoucher]: "new_FlowURLFlowGerarVoucherAppMotoristasv2",
   [FLOW_URLS.salvarFotosManutencao]: "new_FlowURLFlowSalvarArquivosOnedrive",
   [FLOW_URLS.enviarReciboCliente]: "new_FlowURLFlowEnviarReciboCliente",
-  [FLOW_URLS.quickRead]: "new_FlowURLDespesaLeituraRapida"
+  [FLOW_URLS.quickRead]: "new_FlowURLDespesaLeituraRapida",
+  // "Flow - Consultar Arquivo OneDrive" (Sistema Betinhos, provision-flow-consultar-onedrive.ps1): devolve o comprovante em base64.
+  [FLOW_URLS.consultarArquivo]: "new_URLFlowConsultarArquivoOneDrive"
 };
 
 const GERAL_SELECT =
@@ -3773,6 +3776,13 @@ class HttpFlowError extends Error {
     super(message);
     this.status = status;
   }
+}
+
+export type ArquivoFlowResposta = { sucesso?: boolean; erro?: string; nomeArquivo?: string; mimeType?: string; conteudoBase64?: string };
+
+/** Lê um comprovante pelo flow de consulta: por id do item (driveitemid) ou, nos antigos, pelo link de compartilhamento. */
+export async function consultarArquivoComprovante(corpo: { id?: string; link?: string; nomeArquivo: string; origem?: string }) {
+  return (await runHttpFlow(FLOW_URLS.consultarArquivo, corpo)) as ArquivoFlowResposta;
 }
 
 async function runHttpFlow(envKey: string, payload: Record<string, unknown>) {

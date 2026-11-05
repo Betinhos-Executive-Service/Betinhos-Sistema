@@ -3784,6 +3784,8 @@ function App() {
         periodoId={relatorioPeriodo}
         loadStatus={relatorioStatus}
         pendentesCartao={gastosCartaoPendentes.length}
+        idsCompletar={new Set(gastosCartaoPendentes.map((gasto) => gasto.id))}
+        onCompletarGasto={(id) => { const gasto = gastosCartaoPendentes.find((item) => item.id === id); if (gasto) abrirGastoCartao(gasto); }}
         onPeriodo={setRelatorioPeriodo}
         onBack={() => setScreen("inicio")}
         onReload={() => { void reloadRelatorio(); }}
