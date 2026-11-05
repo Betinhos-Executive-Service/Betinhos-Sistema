@@ -2,6 +2,7 @@ import { cleanId, type Row } from '@betinhos/dataverse'
 import type { Host } from '../../../host'
 import { mockFalhaCarga } from '../../../app/mockVolume'
 import type { Cliente } from '../domain/types'
+import { latenciaMock } from '../../../app/latenciaMock'
 
 export const ENTITY = 'cr40f_clientes1'
 const SELECT = ['cr40f_clientes1id', 'cr40f_nomedocliente', 'cr40f_registro', 'cr40f_endereco', 'createdon']
@@ -25,7 +26,7 @@ export function mapCliente(row: Row): Cliente {
 export const clientesPath = (set: string) =>
   `${set}?$select=${SELECT.join(',')}&$filter=${encodeURIComponent('statecode eq 0')}&$orderby=${encodeURIComponent('cr40f_nomedocliente asc')}`
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenciaMock(ms)))
 
 export const MOCK_CLIENTES: Cliente[] = [
   { id: '11111111-1111-4111-8111-111111111111', nome: 'Grupo Atlântico', registro: 'SJCampos', endereco: 'Av. Cassiano Ricardo, 601 - Jardim Aquarius, São José dos Campos - SP', criadoEm: new Date('2025-03-12T12:00:00Z') },

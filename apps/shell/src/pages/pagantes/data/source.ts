@@ -8,6 +8,7 @@ import { withFallback } from '../domain/choices'
 import { MOCK_CHOICES, MOCK_CONTATOS, createMockPagantes, mockServicos } from './mock'
 import { ENTITIES, loadContatos, loadPagantes, loadServicos, opFilter, periodFilter, searchPagantes, type EntitySets } from './queries'
 import { abrirGeradorDeRecibo } from './recibo'
+import { latenciaMock } from '../../../app/latenciaMock'
 
 /** Tudo que a tela precisa do mundo externo; Dataverse em produção, memória no pnpm dev. */
 export type Source = {
@@ -29,7 +30,7 @@ export type Source = {
   kv: KV
 }
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenciaMock(ms)))
 
 function memoryKV(): KV {
   const data = new Map<string, string>()

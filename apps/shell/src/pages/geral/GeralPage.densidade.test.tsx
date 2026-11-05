@@ -4,10 +4,13 @@ import { describe, expect, it, vi } from 'vitest'
 import { MOCK_ROW_COUNT } from './data/mock'
 import { encodeFilters } from './domain/filters'
 import { GeralPage } from './GeralPage'
-import { colFilter, columnMenu, dataRows, FakeObserver, hooks, openColumnFilter, PAGE1, usarAmbienteGeral, viewTrigger } from './testUtils'
+import { colFilter, columnMenu, dataRows, FakeObserver, hooks, openColumnFilter, usarAmbienteGeral, viewTrigger } from './testUtils'
 
-vi.mock('./data/source', async (importOriginal) => (await import('./testUtils')).mockSource(await importOriginal<typeof import('./data/source')>()))
+// Este arquivo testa a página cheia e a rolagem (100, 200, 220): usa o tamanho real da página.
+vi.mock('./data/source', async (importOriginal) => (await import('./testUtils')).mockSource(await importOriginal<typeof import('./data/source')>(), { pageSize: 100 }))
 usarAmbienteGeral()
+
+const PAGE1 = new RegExp(`^100 de ${MOCK_ROW_COUNT} serviços$`)
 
 describe('Geral: espaço e densidade', () => {
   it('sem seleção a linha de comando tem só busca, Atualizar, Mais ações e Criar serviço (a primária, por último)', async () => {

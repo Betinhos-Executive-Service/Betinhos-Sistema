@@ -1,5 +1,6 @@
 import { cleanId, type DataverseClient, type Row } from '@betinhos/dataverse'
 import type { Host } from '../../host'
+import { latenciaMock } from '../../app/latenciaMock'
 
 /** Uma linha de new_appmotoristaslog, gravada pelo logger compartilhado do Design System (todos os apps). */
 export type LogApp = {
@@ -62,7 +63,7 @@ export type Source = { mock: boolean; load: (since: Date) => Promise<LogApp[]> }
 
 export function createSource(host: Host): Source {
   if (host.mode === 'mock') {
-    return { mock: true, load: async (since) => { await new Promise((r) => setTimeout(r, 300)); return createMockLogs(new Date()).filter((l) => !l.data || l.data >= since) } }
+    return { mock: true, load: async (since) => { await new Promise((r) => setTimeout(r, latenciaMock(300))); return createMockLogs(new Date()).filter((l) => !l.data || l.data >= since) } }
   }
   let set: Promise<string> | null = null
   const entitySet = () => (set ??= host.metadata.entities([ENTITY]).then((info) => {

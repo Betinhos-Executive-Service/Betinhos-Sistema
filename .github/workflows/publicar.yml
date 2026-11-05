@@ -1,47 +1,54 @@
 name: Publicar soluções
 
 # Leva as 4 soluções gerenciadas (BetinhosCore, BetinhosAutomacao, BetinhosInterface, BetinhosMotoristas) do DEV para o
-# TEST ou para o PROD: tabelas, colunas, formulários, visões, flows, plugins, WebResources, app e sitemap. Dados não vão por solução.
-#  - exportar (environment dev): conferência das 4 no DEV (barreira), versão seguinte e export gerenciado conferido;
-#  - importar (environment do alvo; no prod com revisor obrigatório): foto antes, exclusão das Custom APIs cr40f_AI*V2 não
-#    gerenciadas (legado que trava o upgrade), import com upgrade, remoção das camadas Active (hotfixes publicados direto no
-#    ambiente; a main já contém todos), estados ligado/desligado devolvidos ao que a foto registrou, foto depois e comparação.
-#    Qualquer perda (registros, tabelas, componentes, fluxo ou step que mudou de estado, variável, configuração segura) reprova.
-# Ordem pensada para o PROD nunca servir versão antiga: as camadas Active só saem depois de a versão nova estar importada.
-# No TEST (cópia travada do PROD) a comparação usa --travado e os fluxos/steps novos são desligados, para o ensaio não
-# mandar nada a clientes reais.
+# TEST e/ou o PROD: tabelas, colunas, formulários, visões, flows, plugins, WebResources, app e sitemap. Dados não vão por solução.
+# Caminho normal: o workflow Produção (producao.yml) chama este com alvo test-e-prod quando a main recebe mudança fora da tela.
+# À mão (Actions › Run workflow) continua valendo para refazer um ensaio ou repetir um alvo.
+#  - exportar (environment dev): trava do commit (a tela e os plugins do DEV têm de ser os deste commit), conferência das 4 no DEV
+#    (barreira), versão seguinte e export gerenciado conferido. Um export só serve TEST e PROD: o PROD recebe exatamente os
+#    pacotes que o TEST ensaiou;
+#  - importar-test e depois importar-prod (_importar-solucoes.yml). O PROD só começa com o TEST verde, e o environment prod
+#    tem revisor obrigatório (Renan). Backup do PROD feito pelo próprio job, ou rótulo informado à mão.
 on:
   workflow_dispatch:
     inputs:
       alvo:
-        description: 'Ambiente de destino'
+        description: 'Ambiente de destino (test-e-prod = ensaio no TEST e, se passar, o PROD com os mesmos pacotes)'
         type: choice
         required: true
         default: test
-        options: [test, prod]
+        options: [test, test-e-prod, prod]
       solucoes:
         description: 'Soluções separadas por vírgula (vazio = as 4)'
         required: false
         default: ''
       backup:
-        description: 'PROD: rótulo do backup manual do ambiente feito antes (pac admin backup). Obrigatório no prod.'
+        description: 'PROD: rótulo de um backup manual já feito (pac admin backup). Vazio = o job faz o backup.'
         required: false
         default: ''
-
-concurrency:
-  group: publicar-${{ inputs.alvo }}
-  cancel-in-progress: false
-
-env:
-  ALVO_PS: ${{ inputs.alvo == 'prod' && 'Prod' || 'Test' }}
-  TRAVADO: ${{ inputs.alvo == 'test' && '--travado' || '' }}
-  DESLIGAR_NOVOS: ${{ inputs.alvo == 'test' }}
+  workflow_call:
+    inputs:
+      alvo:
+        type: string
+        required: true
+      solucoes:
+        type: string
+        required: false
+        default: ''
+      backup:
+        type: string
+        required: false
+        default: ''
 
 jobs:
   exportar:
     runs-on: windows-latest
     timeout-minutes: 60
     environment: dev
+    # O mesmo grupo do deploy.yml: o DEV não muda no meio do export.
+    concurrency:
+      group: dataverse-dev
+      cancel-in-progress: false
     env:
       DV_ENVIRONMENT_URL: ${{ vars.DV_ENVIRONMENT_URL }}
       DV_TENANT_ID: ${{ vars.DV_TENANT_ID }}
@@ -49,11 +56,28 @@ jobs:
       DV_CLIENT_SECRET: ${{ secrets.DV_CLIENT_SECRET }}
       SOLUCOES: ${{ inputs.solucoes }}
     steps:
-      - name: PROD exige o rótulo do backup
-        if: inputs.alvo == 'prod' && inputs.backup == ''
+      - name: Alvo válido
         shell: bash
-        run: echo "::error::Informe o rótulo do backup do PROD (pac admin backup --environment <prod> --label <rótulo>) antes de publicar." && exit 1
+        run: |
+          case "${{ inputs.alvo }}" in test|prod|test-e-prod) ;; *) echo "::error::alvo inválido: ${{ inputs.alvo }}"; exit 1 ;; esac
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Trava do commit (tela e plugins do DEV são os deste commit)
+        # O export sai do DEV, que recebe a develop. Se a develop já tem tela ou plugin novo que não está neste commit, o PROD
+        # o receberia sem passar pela main. O DEV registra o commit publicado na descrição da tela (push-dev.ps1) e de cada
+        # assembly Cr40f.*.Plugin (registrador, no workflow Deploy); pendentes-dev.ps1 compara com este commit.
+        run: |
+          $r = powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/pendentes-dev.ps1 -Ate $env:GITHUB_SHA | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'pendentes-dev.ps1 falhou.' }
+          if ($r.tela -or @($r.plugins).Count) {
+            $r.motivos | ForEach-Object { Write-Host $_ }
+            throw "O DEV difere deste commit ($($env:GITHUB_SHA.Substring(0,7))). Espere o Deploy da develop terminar (ou rode-o com forcar_plugins), ou leve a develop inteira para a main e publique de novo."
+          }
+          Write-Host "DEV com a tela e os plugins de $($env:GITHUB_SHA.Substring(0,7))."
       - name: Instalar pac
         run: |
           dotnet tool install --global Microsoft.PowerApps.CLI.Tool
@@ -66,83 +90,23 @@ jobs:
           path: pacotes/
           retention-days: 7
 
-  importar:
+  importar-test:
     needs: exportar
-    runs-on: windows-latest
-    timeout-minutes: 240
-    environment: ${{ inputs.alvo }}
-    env:
-      DV_ENVIRONMENT_URL: ${{ vars.DV_ENVIRONMENT_URL }}
-      DV_TENANT_ID: ${{ vars.DV_TENANT_ID }}
-      DV_CLIENT_ID: ${{ vars.DV_CLIENT_ID }}
-      DV_CLIENT_SECRET: ${{ secrets.DV_CLIENT_SECRET }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - uses: actions/download-artifact@v4
-        with:
-          name: pacotes
-          path: pacotes
-      - name: Instalar pac
-        run: |
-          dotnet tool install --global Microsoft.PowerApps.CLI.Tool
-          pac auth create --name ci-alvo --applicationId $env:DV_CLIENT_ID --clientSecret $env:DV_CLIENT_SECRET --tenant $env:DV_TENANT_ID --environment $env:DV_ENVIRONMENT_URL
-      - name: Foto antes
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/foto-ambiente.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Saida fotos/antes.json
-      - name: Excluir Custom APIs legado (cr40f_AI*V2 não gerenciadas)
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/excluir-custom-apis-legado.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Backup custom-apis-legado -Aplicar
-      - name: Preservar valores de variáveis que só têm padrão (o pacote do DEV substitui o padrão)
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/preservar-valores-variaveis.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Aplicar
-      - name: Guardar configuração dos steps (o pacote traz a do DEV)
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/preservar-config-steps.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Arquivo config-steps/antes.json
-      - name: Importar
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/importar-solucoes.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Pasta pacotes -Alvo $env:ALVO_PS
-      - name: Remover camadas Active (hotfixes já na main)
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/remover-camadas-active.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Backup camadas-active -Aplicar -PermitirProd
-      - name: Restaurar configuração dos steps (depois das camadas Active, que a apagariam)
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/preservar-config-steps.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Arquivo config-steps/antes.json -Restaurar
-      - name: Restaurar estados ligado/desligado
-        # -DesligarNovos é switch: powershell.exe -File recusa "-DesligarNovos:True"; o switch entra por splat só no TEST.
-        run: |
-          $extra = @(); if ($env:DESLIGAR_NOVOS -eq 'true') { $extra += '-DesligarNovos' }
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/restaurar-estados.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Foto fotos/antes.json -Saida fotos/estados.json @extra
-      - name: Foto depois
-        if: always()
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/foto-ambiente.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Saida fotos/depois.json
-      - name: Comparar
-        if: always()
-        shell: bash
-        run: |
-          set -o pipefail
-          node packages/deploy/solucoes/comparar-fotos.mjs $TRAVADO fotos/antes.json fotos/depois.json | tee fotos/comparacao.json
-      - name: Resumo
-        if: always()
-        shell: bash
-        run: |
-          {
-            echo "## Publicar soluções: ${{ inputs.alvo }}"
-            echo '```json'
-            cat pacotes/importados.json 2>/dev/null || echo "import não concluído"
-            echo '```'
-            echo "Estados devolvidos ao de antes:"
-            echo '```json'
-            cat fotos/estados.json 2>/dev/null || echo "não executado"
-            echo '```'
-            echo "Para conferir à mão (informativo): fluxos novos que chegaram desligados, variáveis sem valor, chunks obsoletos e versões."
-            echo '```json'
-            node -e 'const d=require("./fotos/comparacao.json");console.log(JSON.stringify({fluxosNovosDesligados:d.fluxosNovosDesligados,variaveisSemValor:d.variaveisSemValor,chunksObsoletos:d.chunksObsoletos.length,versoes:d.versoes},null,2))' 2>/dev/null || echo "comparação não concluída"
-            echo '```'
-            echo "Comparação completa: artefato \`fotos\` (comparacao.json). Perda reprova a execução."
-          } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: fotos-${{ inputs.alvo }}
-          path: |
-            fotos/
-            pacotes/importados.json
-            camadas-active/
-            custom-apis-legado/
-          retention-days: 90
+    if: inputs.alvo == 'test' || inputs.alvo == 'test-e-prod'
+    uses: ./.github/workflows/_importar-solucoes.yml
+    with:
+      alvo: test
+    secrets: inherit
+
+  importar-prod:
+    needs: [exportar, importar-test]
+    # Com test-e-prod o PROD só vem depois do TEST verde; com prod (à mão) o TEST foi pulado de propósito.
+    if: >-
+      !cancelled() && needs.exportar.result == 'success' &&
+      ((inputs.alvo == 'test-e-prod' && needs.importar-test.result == 'success') ||
+       (inputs.alvo == 'prod' && needs.importar-test.result == 'skipped'))
+    uses: ./.github/workflows/_importar-solucoes.yml
+    with:
+      alvo: prod
+      backup: ${{ inputs.backup }}
+    secrets: inherit

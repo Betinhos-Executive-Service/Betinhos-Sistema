@@ -1,34 +1,56 @@
 name: Deploy
 
-# Só DEV (decisão do Renan, 20/10/2026): push na branch dev publica a tela do Sistema Betinhos no DEV.
-# TEST e PROD não são publicados por aqui; o job managed antigo está no histórico do git (antes do PR "deploy só DEV").
+# Só DEV: push na branch develop publica no DEV a tela do Sistema Betinhos e os plugins que mudaram, e distribui nas 4
+# soluções (decisão do Renan, 05/11/2026: develop → DEV, main → PROD). TEST e PROD são do workflow Produção (producao.yml).
+# O que publicar sai de pendentes-dev.ps1: compara o commit que o DEV registra em cada peça (descrição da tela e de cada
+# assembly Cr40f.*.Plugin) com o HEAD. Assim um deploy cancelado na fila ou uma publicação local nunca deixa peça para trás,
+# e o publicar.yml usa os mesmos registros para nunca levar ao PROD tela ou plugin que ainda não entrou na main.
+# Flows e schema (packages/deploy/provision-*) continuam à mão: usam az login e conexões do usuário.
 # Feito para gastar poucos minutos de CI (repo privado, runner Windows conta em dobro):
-#  - só roda quando muda código do app; documentação, skills e scripts do plantão não disparam;
-#  - não repete o CI (typecheck e testes já passaram no PR que entrou na main);
-#  - instala só o pacote do shell e suas dependências;
-#  - um push novo cancela o deploy anterior; limite de 15 min.
+#  - só roda quando muda a tela, um plugin ou os scripts deste deploy; documentação e skills não disparam;
+#  - um job só (um setup de runner); cada passo pesado roda só se a sua peça está pendente;
+#  - não repete o CI (typecheck e testes do shell e dos plugins já passaram no PR que entrou na develop);
+#  - instala só o pacote do shell e suas dependências; cache do pnpm e do NuGet;
+#  - distribui uma vez só, no fim;
+#  - um push novo espera o deploy em andamento (grupo dataverse-dev, o mesmo do export do publicar.yml, para o DEV nunca
+#    mudar no meio de um export). Só um fica na fila: o mais novo, e ele publica tudo o que o DEV ainda não tem.
 on:
   push:
-    branches: [dev]
+    branches: [develop]
     paths:
       - 'apps/shell/**'
       - 'packages/dataverse/**'
+      - 'pnpm-lock.yaml'
       - 'packages/deploy/push-dev.ps1'
+      - 'packages/deploy/push-plugins-dev.ps1'
+      - 'packages/deploy/pendentes-dev.ps1'
+      - 'packages/deploy/mudancas-dev.mjs'
+      - 'packages/deploy/caminho-publicacao.mjs'
       - 'packages/deploy/bump-version.mjs'
       - 'packages/deploy/inline-webresource.mjs'
       - 'packages/deploy/loader.template.html'
-      - 'pnpm-lock.yaml'
+      - 'packages/plugins/Cr40f.*.Plugin/**'
+      - 'packages/plugins/tools/**'
+      - 'packages/plugins/scripts/**'
   workflow_dispatch:
+    inputs:
+      forcar_tela:
+        description: 'Publicar a tela mesmo sem mudança'
+        type: boolean
+        default: false
+      forcar_plugins:
+        description: 'Plugins a publicar mesmo sem mudança (frota,acesso ou todos); vazio = só os pendentes'
+        type: string
+        default: ''
 
 concurrency:
-  group: deploy-dev
-  cancel-in-progress: true
+  group: dataverse-dev
+  cancel-in-progress: false
 
 jobs:
-  # DEV é não gerenciado e é onde schema e flows são editados; aqui só a tela é publicada.
   dev:
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     environment: dev
     env:
       DV_ENVIRONMENT_URL: ${{ vars.DV_ENVIRONMENT_URL }}
@@ -37,10 +59,33 @@ jobs:
       DV_CLIENT_ID: ${{ vars.DV_CLIENT_ID }}
       DV_CLIENT_SECRET: ${{ secrets.DV_CLIENT_SECRET }}
       DV_SOLUTION: AppBetinhos
+      DOTNET_NOLOGO: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+
+      - name: O que o DEV ainda não tem
+        id: pendentes
+        env:
+          FORCAR_TELA: ${{ inputs.forcar_tela }}
+          FORCAR_PLUGINS: ${{ inputs.forcar_plugins }}
+        run: |
+          $saida = @(powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/pendentes-dev.ps1 -GitHub)
+          if ($LASTEXITCODE -ne 0) { throw 'pendentes-dev.ps1 falhou.' }
+          $tela = ($saida -contains 'tela=true') -or ($env:FORCAR_TELA -eq 'true')
+          $plugins = (($saida | Where-Object { $_ -like 'plugins=*' }) -replace '^plugins=', '')
+          if ($env:FORCAR_PLUGINS) { $plugins = (@($plugins.Split(',') + $env:FORCAR_PLUGINS.Split(',')) | ForEach-Object { $_.Trim().ToLowerInvariant() } | Where-Object { $_ } | Sort-Object -Unique) -join ',' }
+          if (($env:FORCAR_PLUGINS -split ',' | ForEach-Object { $_.Trim() }) -contains 'todos') { $plugins = 'todos' }
+          "tela=$($tela.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "plugins=$plugins" >> $env:GITHUB_OUTPUT
+          Write-Host "tela: $tela; plugins: $(if ($plugins) { $plugins } else { 'nenhum' })"
+
+      # Tela
+      - if: steps.pendentes.outputs.tela == 'true'
+        uses: pnpm/action-setup@v4
+      - if: steps.pendentes.outputs.tela == 'true'
+        uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: pnpm
@@ -48,10 +93,63 @@ jobs:
           # (ui e tokens) lista este repo em Package settings → Manage Actions access (Read).
           registry-url: https://npm.pkg.github.com
           scope: '@betinhos-executive-service'
-      - run: pnpm install --frozen-lockfile --filter @betinhos/shell...
+      - if: steps.pendentes.outputs.tela == 'true'
+        run: pnpm install --frozen-lockfile --filter @betinhos/shell...
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: pnpm push
-      - name: Versão publicada
+      - name: Publicar a tela
+        if: steps.pendentes.outputs.tela == 'true'
+        run: pnpm push
+        env:
+          BETINHOS_DISTRIBUIR: '0'
+
+      # Plugins
+      - if: steps.pendentes.outputs.plugins != ''
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('packages/plugins/**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - name: Publicar os plugins
+        if: steps.pendentes.outputs.plugins != ''
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/push-plugins-dev.ps1 -Plugins "${{ steps.pendentes.outputs.plugins }}"
+        env:
+          # Chaves de assinatura (base64 do .snk). Uma chave nova mudaria o public key token do assembly.
+          PLUGIN_SNK_ACESSO: ${{ secrets.PLUGIN_SNK_ACESSO }}
+          PLUGIN_SNK_CADASTRO: ${{ secrets.PLUGIN_SNK_CADASTRO }}
+          PLUGIN_SNK_DOCUMENTOS: ${{ secrets.PLUGIN_SNK_DOCUMENTOS }}
+          PLUGIN_SNK_FINANCEIRO: ${{ secrets.PLUGIN_SNK_FINANCEIRO }}
+          PLUGIN_SNK_FROTA: ${{ secrets.PLUGIN_SNK_FROTA }}
+          PLUGIN_SNK_PORTAL: ${{ secrets.PLUGIN_SNK_PORTAL }}
+          PLUGIN_SNK_PRONTUARIO: ${{ secrets.PLUGIN_SNK_PRONTUARIO }}
+          PLUGIN_SNK_PROTECAO: ${{ secrets.PLUGIN_SNK_PROTECAO }}
+          # Configuração não segura do step do plugin de acesso (no local vem do .env).
+          ACESSO_TENANT_ID: ${{ vars.ACESSO_TENANT_ID }}
+          ACESSO_CLIENT_ID: ${{ vars.ACESSO_CLIENT_ID }}
+          ACESSO_LICENSE_SKU_ID: ${{ vars.ACESSO_LICENSE_SKU_ID }}
+          ACESSO_GROUP_ID: ${{ vars.ACESSO_GROUP_ID }}
+          ACESSO_APP_URL: ${{ vars.ACESSO_APP_URL }}
+          ACESSO_ENVIRONMENT_ID: ${{ vars.ACESSO_ENVIRONMENT_ID }}
+          ACESSO_DOMINIO: ${{ vars.ACESSO_DOMINIO }}
+
+      # Uma distribuição só, depois de tudo. Nunca derruba o deploy (a publicação já valeu); se não zerar, avisa e o
+      # export para TEST/PROD fica barrado até corrigir (skill verificar-solucoes).
+      - name: Distribuir nas 4 soluções
+        id: distribuir
+        if: steps.pendentes.outputs.tela == 'true' || steps.pendentes.outputs.plugins != ''
+        run: |
+          $saida = @(powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/distribuir-apos-push.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -CaixaDeEntrada AppBetinhos 2>&1 | ForEach-Object { "$_" })
+          $saida | ForEach-Object { Write-Host $_ }
+          if ($saida -match 'ATENCAO') { Write-Host '::warning title=Distribuição nas 4 soluções::Não zerou. O export para TEST/PROD fica barrado; veja a skill verificar-solucoes.'; 'zerou=false' >> $env:GITHUB_OUTPUT }
+          else { 'zerou=true' >> $env:GITHUB_OUTPUT }
+
+      - name: Resumo
+        if: always()
         shell: bash
-        run: echo "Publicado no DEV - v$(node -p "require('./apps/shell/package.json').version")" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          {
+            if [ "${{ steps.pendentes.outputs.tela }}" = "true" ]; then echo "Tela publicada no DEV - v$(node -p "require('./apps/shell/package.json').version")"; fi
+            if [ -n "${{ steps.pendentes.outputs.plugins }}" ]; then echo; echo "Plugins publicados no DEV: ${{ steps.pendentes.outputs.plugins }}"; fi
+            if [ "${{ steps.pendentes.outputs.tela }}" != "true" ] && [ -z "${{ steps.pendentes.outputs.plugins }}" ]; then echo "Nada pendente: o DEV já tem a tela e os plugins deste commit."; fi
+            if [ "${{ steps.distribuir.outputs.zerou }}" = "false" ]; then echo; echo "**ATENÇÃO:** a distribuição nas 4 soluções não zerou."; fi
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,4 +1,5 @@
 import { FIRST_PAGE } from './pagedLoad'
+import { latenciaMock } from './latenciaMock'
 
 /**
  * Modo mock com listas grandes, para testar desempenho no `pnpm dev`: `?volume=5000` antes do `#` multiplica os
@@ -20,7 +21,7 @@ export function mockVolume() {
 
 export const mockFalhaCarga = () => param('falha') === 'carga'
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenciaMock(ms)))
 
 /**
  * Simula a carga do Dataverse: listas pequenas chegam de uma vez (como antes); grandes mostram a primeira página

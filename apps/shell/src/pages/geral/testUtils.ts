@@ -5,6 +5,7 @@
 // Este módulo não importa './data/source' em tempo de execução (só tipos): importá-lo de dentro do mock fecharia um ciclo.
 import { cleanup, configure, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, vi } from 'vitest'
+import { MOCK_ROW_COUNT } from './data/mock'
 import type { Source } from './data/source'
 
 type SourceModule = typeof import('./data/source')
@@ -20,13 +21,20 @@ export const hooks = {
   gerarLink: null as null | Source['gerarLink'],
 }
 
-/** Fábrica do vi.mock de './data/source': a fonte do mock sem latência, com os ganchos acima. */
-export function mockSource(actual: SourceModule): SourceModule {
+/**
+ * Linhas por página nos testes de tela. A tela real pede 100; aqui bastam 20, porque renderizar e consultar por papel
+ * 100 linhas no jsdom era a maior parte do custo destes arquivos. Quem testa a página cheia ou a rolagem
+ * (GeralPage.densidade) passa `{ pageSize: 100 }` ao `mockSource`.
+ */
+export const TEST_PAGE_SIZE = 20
+
+/** Fábrica do vi.mock de './data/source': a fonte do mock sem latência e com páginas menores, com os ganchos acima. */
+export function mockSource(actual: SourceModule, { pageSize = TEST_PAGE_SIZE }: { pageSize?: number } = {}): SourceModule {
   return {
     ...actual,
     createSource: (host: Parameters<SourceModule['createSource']>[0]): Source => {
       // Sem a latência simulada do pnpm dev: os testes não esperam timers artificiais.
-      const source = actual.createSource(host, { latency: 0 })
+      const source = actual.createSource(host, { latency: 0, pageSize })
       return {
         ...source,
         setState: (ids, active) => (hooks.setState ? hooks.setState(ids, active) : source.setState(ids, active)),
@@ -81,8 +89,11 @@ export class FakeObserver {
   takeRecords() { return [] }
 }
 
-/** Status da primeira página (cabeçalho e rodapé mostram o mesmo texto). */
-export const PAGE1 = /^100 de \d+ serviços$/
+/**
+ * Status da primeira página da Agenda sem filtro (cabeçalho e rodapé mostram o mesmo texto). O total entra no padrão
+ * porque uma visão filtrada com mais de uma página (ex.: Sem motorista, 44) também mostra "20 de N serviços".
+ */
+export const PAGE1 = new RegExp(`^${TEST_PAGE_SIZE} de ${MOCK_ROW_COUNT} serviços$`)
 
 export const dataRows = () => screen.getAllByRole('row', { hidden: true })
 export const colFilter = () => document.querySelector<HTMLElement>('.bt-colfilter')
@@ -94,7 +105,9 @@ export async function openColumnFilter(name: RegExp, label: string) {
 }
 /** O título da coluna abre o menu (como no model-driven): escolhe um item dele. */
 export const columnMenu = async (name: RegExp, item: string) => {
-  fireEvent.click(screen.getByRole('button', { name, hidden: true }))
+  // Procura só na linha de títulos: pela tela inteira, o getByRole calcula o nome de todos os botões das linhas de dados.
+  const header = document.querySelector<HTMLElement>('[role="columnheader"]')?.closest<HTMLElement>('[role="row"]')
+  fireEvent.click((header ? within(header) : screen).getByRole('button', { name, hidden: true }))
   fireEvent.click(await screen.findByRole('menuitem', { name: item, hidden: true }))
 }
 export const findDataRows = async () => { await screen.findAllByRole('row', { hidden: true }); return dataRows() }
@@ -108,7 +121,8 @@ export const cellOf = (row: HTMLElement, kind: string) =>
   })
 
 /** O seletor de visão é o título da lista (DS §10.9.1): um botão "Visão: <nome>" que abre o menu das visões. */
-export const viewTrigger = () => screen.getByRole('button', { name: /^Visão: / })
+// `hidden: true` pula a checagem de acessibilidade, que pede o estilo computado de cada ancestral e é cara no jsdom.
+export const viewTrigger = () => screen.getByRole('button', { name: /^Visão: /, hidden: true })
 export async function pickView(name: string) {
   fireEvent.click(viewTrigger())
   // O painel do Menu usa `popover`, que o jsdom não exibe: os itens existem, mas ficam fora da árvore acessível.

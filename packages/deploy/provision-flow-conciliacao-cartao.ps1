@@ -147,9 +147,6 @@ if ($faltas.Count) {
   return
 }
 
-$nome = 'Conciliação do cartão | Diário'
-$descricao = "Todo dia às 08:00 lê as transações dos cartões pelo Banco MCP (D-10..hoje, desde $Inicio), grava cr40f_transacaocartao, casa com a despesa do motorista ou cria uma para ele validar e avisa por push."
-$raw = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'flows\conciliacao-cartao-diario.json'), [Text.Encoding]::UTF8)
 $trocas = [ordered]@{
   '"__CATEGORIAS__"' = ($categorias | ConvertTo-Json -Compress)
   '__DV__' = '/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps'; '__BANCO__' = $apiBanco; '__PUSH__' = $apiPush
@@ -159,45 +156,69 @@ $trocas = [ordered]@{
   '__NAV_T_CARTAO__' = $nav.tCartao; '__NAV_T_MOTORISTA__' = $nav.tMotorista; '__NAV_T_DESPESA__' = $nav.tDespesa
   '__NAV_D_MOTORISTA__' = $nav.dMotorista; '__NAV_D_CATEGORIA__' = $nav.dCategoria; '__NAV_D_FORMA__' = $nav.dForma
 }
-foreach ($k in $trocas.Keys) { $raw = $raw.Replace($k, [string] $trocas[$k]) }
-if ($raw -match '__[A-Z_]+__') { throw "Token não substituído: $($Matches[0])" }
-$definicao = $raw | ConvertFrom-Json
 $apiNome = { param($id) $id.Split('/')[-1] }
-$connectionReferences = @{
-  shared_commondataserviceforapps = @{ runtimeSource = 'embedded'; connection = @{ connectionReferenceLogicalName = $ReferenciaDataverse }; api = @{ name = 'shared_commondataserviceforapps' } }
+$refDataverse = @{ shared_commondataserviceforapps = @{ runtimeSource = 'embedded'; connection = @{ connectionReferenceLogicalName = $ReferenciaDataverse }; api = @{ name = 'shared_commondataserviceforapps' } } }
+$refDiario = $refDataverse + @{
   shared_banco_mcp = @{ runtimeSource = 'embedded'; connection = @{ connectionReferenceLogicalName = $ReferenciaBanco }; api = @{ name = (& $apiNome $apiBanco) } }
   shared_app_motoristas_push = @{ runtimeSource = 'embedded'; connection = @{ connectionReferenceLogicalName = $ReferenciaPush }; api = @{ name = (& $apiNome $apiPush) } }
 }
-$clientData = @{ properties = @{ definition = $definicao; connectionReferences = $connectionReferences }; schemaVersion = '1.0.0.0' } | ConvertTo-Json -Depth 90 -Compress
-
-$flows = Rows "workflows?`$select=workflowid,statecode,clientdata&`$filter=name eq '$nome' and category eq 5"
-if ($flows.Count -gt 1) { throw "Flow '$nome' duplicado no DEV." }
-$alvo = if ($bancoConectado) { 1 } else { 0 }
+$diarioJson = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'flows\conciliacao-cartao-diario.json'), [Text.Encoding]::UTF8)
+function TempoReal([string] $qual) {
+  $out = & node (Join-Path $PSScriptRoot 'flows\conciliacao-cartao-tempo-real.mjs') $qual
+  if ($LASTEXITCODE -ne 0 -or -not $out) { throw "Falha ao gerar o flow em tempo real '$qual'." }
+  return ($out -join "`n")
+}
+# O diário só liga com a conexão do Banco MCP; os de tempo real só usam o Dataverse e ficam sempre ligados.
+$alvoDiario = if ($bancoConectado) { 1 } else { 0 }
+$publicar = @(
+  @{ nome = 'Conciliação do cartão | Diário'; raw = $diarioJson; refs = $refDiario; alvo = $alvoDiario
+     descricao = "Todo dia às 08:00 lê as transações dos cartões pelo Banco MCP (D-10..hoje, desde $Inicio), grava cr40f_transacaocartao, casa com a despesa do motorista ou cria uma para ele validar e avisa por push." }
+  @{ nome = 'Conciliação do cartão | Reprocessada'; raw = (TempoReal 'reprocessada'); refs = $refDataverse; alvo = 1
+     descricao = 'Na hora em que uma compra volta a Pendente com cartão e motorista e sem despesa (Reprocessar/Reabrir no Sistema Betinhos), casa com a despesa do motorista, marca divergência ou cria a despesa para ele validar.' }
+  @{ nome = 'Conciliação do cartão | Despesa atualizada'; raw = (TempoReal 'despesa'); refs = $refDataverse; alvo = 1
+     descricao = 'Na hora em que a despesa criada pelo cartão sai de Precisa corrigir: completada concilia a transação; recusada ou cancelada marca divergência.' }
+)
+$definicoes = foreach ($f in $publicar) {
+  $raw = $f.raw
+  foreach ($k in $trocas.Keys) { $raw = $raw.Replace($k, [string] $trocas[$k]) }
+  if ($raw -match '__[A-Z_]+__') { throw "$($f.nome): token não substituído: $($Matches[0])" }
+  $f.clientData = @{ properties = @{ definition = ($raw | ConvertFrom-Json); connectionReferences = $f.refs }; schemaVersion = '1.0.0.0' } | ConvertTo-Json -Depth 90 -Compress
+  $f
+}
 if (-not $Apply) {
-  Write-Output "DRY RUN: '$nome' seria $(if ($flows.Count) { 'atualizado' } else { 'criado' }) $(if ($alvo -eq 1) { 'LIGADO' } else { 'DESLIGADO (a referência do Banco MCP ainda não tem conexão)' }); início $Inicio, $($categorias.Count) MCCs mapeados."
+  foreach ($f in $definicoes) {
+    $existe = (Rows "workflows?`$select=workflowid&`$filter=name eq '$($f.nome)' and category eq 5").Count
+    Write-Output "DRY RUN: '$($f.nome)' seria $(if ($existe) { 'atualizado' } else { 'criado' }) $(if ($f.alvo -eq 1) { 'LIGADO' } else { 'DESLIGADO (a referência do Banco MCP ainda não tem conexão)' })."
+  }
+  Write-Output "DRY RUN: início $Inicio, $($categorias.Count) MCCs mapeados."
   return
 }
-if ($flows.Count) {
-  $flowId = $flows[0].workflowid
-  $norm = { param($o) ($o | ConvertTo-Json -Depth 90 -Compress | ConvertFrom-Json | ConvertTo-Json -Depth 90 -Compress) }
-  $g = $flows[0].clientdata | ConvertFrom-Json; $n = $clientData | ConvertFrom-Json
-  $mudou = (& $norm $g.properties.definition) -ne (& $norm $n.properties.definition) -or (& $norm $g.properties.connectionReferences) -ne (& $norm $n.properties.connectionReferences)
-  if ($mudou) {
-    if ($flows[0].statecode -eq 1) { Dv PATCH "workflows($flowId)" @{ statecode = 0 } | Out-Null }
-    Dv PATCH "workflows($flowId)" @{ clientdata = $clientData; description = $descricao } | Out-Null
+$norm = { param($o) ($o | ConvertTo-Json -Depth 90 -Compress | ConvertFrom-Json | ConvertTo-Json -Depth 90 -Compress) }
+foreach ($f in $definicoes) {
+  $nome = $f.nome
+  $flows = Rows "workflows?`$select=workflowid,statecode,clientdata&`$filter=name eq '$nome' and category eq 5"
+  if ($flows.Count -gt 1) { throw "Flow '$nome' duplicado no DEV." }
+  if ($flows.Count) {
+    $flowId = $flows[0].workflowid
+    $g = $flows[0].clientdata | ConvertFrom-Json; $n = $f.clientData | ConvertFrom-Json
+    $mudou = (& $norm $g.properties.definition) -ne (& $norm $n.properties.definition) -or (& $norm $g.properties.connectionReferences) -ne (& $norm $n.properties.connectionReferences)
+    if ($mudou) {
+      if ($flows[0].statecode -eq 1) { Dv PATCH "workflows($flowId)" @{ statecode = 0 } | Out-Null }
+      Dv PATCH "workflows($flowId)" @{ clientdata = $f.clientData; description = $f.descricao } | Out-Null
+    }
+    Write-Output "'$nome': definição $(if ($mudou) { 'atualizada' } else { 'já igual' })."
+  } else {
+    Dv POST workflows @{ name = $nome; category = 5; type = 1; primaryentity = 'none'; clientdata = $f.clientData; description = $f.descricao } | Out-Null
+    $flowId = (Rows "workflows?`$select=workflowid&`$filter=name eq '$nome' and category eq 5")[0].workflowid
+    Write-Output "'$nome': criado."
   }
-  Write-Output "'$nome': definição $(if ($mudou) { 'atualizada' } else { 'já igual' })."
-} else {
-  Dv POST workflows @{ name = $nome; category = 5; type = 1; primaryentity = 'none'; clientdata = $clientData; description = $descricao } | Out-Null
-  $flowId = (Rows "workflows?`$select=workflowid&`$filter=name eq '$nome' and category eq 5")[0].workflowid
-  Write-Output "'$nome': criado."
+  $filtro = "solutioncomponents?`$select=solutioncomponentid&`$filter=_solutionid_value eq $solutionId and componenttype eq 29 and objectid eq $flowId"
+  if (-not (Rows $filtro).Count) {
+    Dv POST AddSolutionComponent @{ ComponentId = $flowId; ComponentType = 29; SolutionUniqueName = $solutionName; AddRequiredComponents = $false } | Out-Null
+    if (-not (Rows $filtro).Count) { throw "Flow '$nome' não entrou na $solutionName." }
+  }
+  $atual = (Dv GET "workflows($flowId)?`$select=statecode").statecode
+  if ($atual -ne $f.alvo) { Dv PATCH "workflows($flowId)" @{ statecode = $f.alvo } | Out-Null; $atual = (Dv GET "workflows($flowId)?`$select=statecode").statecode }
+  if ($atual -ne $f.alvo) { throw "'$nome' não ficou com statecode $($f.alvo). Confira as conexões no Power Automate." }
+  Write-Output "DEV: '$nome' $(if ($f.alvo -eq 1) { 'LIGADO' } else { 'DESLIGADO: ligue a conexão do Banco MCP e rode de novo' }) na $solutionName."
 }
-$filtro = "solutioncomponents?`$select=solutioncomponentid&`$filter=_solutionid_value eq $solutionId and componenttype eq 29 and objectid eq $flowId"
-if (-not (Rows $filtro).Count) {
-  Dv POST AddSolutionComponent @{ ComponentId = $flowId; ComponentType = 29; SolutionUniqueName = $solutionName; AddRequiredComponents = $false } | Out-Null
-  if (-not (Rows $filtro).Count) { throw "Flow '$nome' não entrou na $solutionName." }
-}
-$atual = (Dv GET "workflows($flowId)?`$select=statecode").statecode
-if ($atual -ne $alvo) { Dv PATCH "workflows($flowId)" @{ statecode = $alvo } | Out-Null; $atual = (Dv GET "workflows($flowId)?`$select=statecode").statecode }
-if ($atual -ne $alvo) { throw "'$nome' não ficou com statecode $alvo. Confira as conexões no Power Automate." }
-Write-Output "DEV: '$nome' $(if ($alvo -eq 1) { 'LIGADO' } else { 'DESLIGADO: ligue a conexão do Banco MCP e rode de novo' }) na $solutionName."

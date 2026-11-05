@@ -143,8 +143,19 @@ foreach ($reference in [regex]::Matches($resourceHtml, '<script[^>]+src="/WebRes
   if ($chunkNames -notcontains $referenced) { throw "webresource.html referencia /WebResources/$referenced, que nao esta em webresource-assets.json. Rode o build de novo." }
 }
 # A descricao do HTML guarda a versao publicada: o proximo push -Build parte dela.
+# Depois da versao vai o commit publicado (CI: GITHUB_SHA; local: HEAD, so com a arvore limpa). O publicar.yml compara esse
+# commit com o que vai ao PROD para nunca exportar do DEV uma tela que ainda nao entrou na main.
 $builtVersion = (Get-Content -Raw (Join-Path $appRoot "package.json") | ConvertFrom-Json).version
-$targets += @{ Name = $ResourceName; Display = $DisplayName; Path = $resourcePath; Type = 1; Description = "v$builtVersion" }
+$publishedCommit = $env:GITHUB_SHA
+if (-not $publishedCommit) {
+  try {
+    $dirty = & git -C $root status --porcelain --untracked-files=no -- $AppDir packages/dataverse pnpm-lock.yaml 2>$null
+    if ($LASTEXITCODE -eq 0 -and -not $dirty) { $publishedCommit = (& git -C $root rev-parse HEAD 2>$null) }
+  }
+  catch { $publishedCommit = $null }
+}
+$resourceDescription = if ($publishedCommit -match '^[0-9a-f]{40}$') { "v$builtVersion $publishedCommit" } else { "v$builtVersion" }
+$targets += @{ Name = $ResourceName; Display = $DisplayName; Path = $resourcePath; Type = 1; Description = $resourceDescription }
 if ($LoaderName) {
   $template = [IO.File]::ReadAllText((Join-Path $PSScriptRoot "loader.template.html"), [Text.Encoding]::UTF8)
   $loaderPath = Join-Path $appRoot "dist\loader.html"
@@ -228,4 +239,7 @@ if ($LoaderName) { $openName = $LoaderName }
 Write-Host "PUSH CONCLUIDO: v$builtVersion - $(($resources | ForEach-Object { $_.Name }) -join ', ') validados em $solutionUniqueName"
 Write-Host "URL: $environmentBaseUrl/WebResources/$openName"
 
-& (Join-Path $PSScriptRoot "solucoes\distribuir-apos-push.ps1") -EnvironmentUrl $environmentBaseUrl -CaixaDeEntrada $solutionUniqueName
+# O workflow Deploy distribui uma vez so no fim, depois da tela e dos plugins (BETINHOS_DISTRIBUIR=0 aqui).
+if ($env:BETINHOS_DISTRIBUIR -ne '0') {
+  & (Join-Path $PSScriptRoot "solucoes\distribuir-apos-push.ps1") -EnvironmentUrl $environmentBaseUrl -CaixaDeEntrada $solutionUniqueName
+}

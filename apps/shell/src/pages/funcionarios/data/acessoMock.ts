@@ -2,9 +2,10 @@ import type { AcessoSource, CadastroResultado, Etapa, ReativacaoResultado } from
 import { AcessoError, MENSAGENS } from './acesso'
 import { normalizeSearch as semAcentos } from './format'
 import { encontrarParecidos, type LinhaFuncionario } from './parecidos'
+import { latenciaMock } from '../../../app/latenciaMock'
 
 // 1,2 s: o bastante para ver o progresso no mock.
-const delay = <T,>(value: T, ms = 1200) => new Promise<T>((resolve) => setTimeout(() => resolve(value), ms))
+const delay = <T,>(value: T, ms = 1200) => new Promise<T>((resolve) => setTimeout(() => resolve(value), latenciaMock(ms)))
 const MOCK_FUNCIONARIOS: Record<string, { nome: string; email: string | null }> = { m1: { nome: 'Carlos Alberto Teste', email: 'carlos.teste@betinhos.onmicrosoft.com' }, m7: { nome: 'Helena Simulada Costa', email: null }, m9: { nome: 'Joana Encerrada Teste', email: 'joana.teste@betinhos.onmicrosoft.com' } }
 
 /** Espelha linhas do mock de funcionários para exercitar o aviso de parecido: Carlos já tem acesso (CPF 529.982.247-25), Joana tem o celular 12 99123-4567 e acesso encerrado, Gustavo está desligado. */

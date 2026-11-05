@@ -1,0 +1,110 @@
+name: Produção
+
+# main → PROD (decisão do Renan, 05/11/2026). A main só recebe a develop inteira (PR develop → main, merge do Renan); o merge
+# automático do plantão vai até a develop. Cada push na main escolhe o caminho pelos arquivos que mudaram desde a última
+# publicação (tag prod-publicado), com packages/deploy/caminho-publicacao.mjs:
+#  - front: só a tela do Sistema Betinhos → direto ao PROD (push-front-prod.ps1, environment prod-front). Se der errado,
+#    publicar a versão anterior resolve em minutos e nenhum dado se perde;
+#  - solucoes: qualquer coisa fora da tela (schema, flows, plugins, outros WebResources, arquivo desconhecido) → publicar.yml
+#    com test-e-prod: export do DEV, ensaio no TEST e PROD com os mesmos pacotes, backup e aprovação do Renan;
+#  - nada: só documentação, CI, skills → só move a tag.
+# A tag só anda quando a publicação passa: o que falhou ou foi recusado volta a contar no próximo push.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      caminho:
+        description: 'auto = pelos arquivos; front ou solucoes força o caminho'
+        type: choice
+        default: auto
+        options: [auto, front, solucoes]
+
+# Uma publicação de cada vez, na ordem dos merges. Só uma fica na fila (a mais nova); como o caminho é calculado desde a
+# última publicação que passou, a mais nova já inclui o que a cancelada levaria.
+concurrency:
+  group: producao
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  caminho:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      caminho: ${{ steps.decidir.outputs.caminho }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: decidir
+        env:
+          FORCADO: ${{ inputs.caminho }}
+        run: |
+          if [ -n "$FORCADO" ] && [ "$FORCADO" != "auto" ]; then
+            resultado="{\"caminho\":\"$FORCADO\",\"motivo\":\"forçado à mão\"}"
+          elif base=$(git rev-parse -q --verify 'refs/tags/prod-publicado^{commit}') && git merge-base --is-ancestor "$base" HEAD; then
+            resultado=$(git diff --name-only "$base" HEAD | node packages/deploy/caminho-publicacao.mjs)
+          else
+            resultado=$(node packages/deploy/caminho-publicacao.mjs --sem-base)
+          fi
+          caminho=$(node -p "JSON.parse(process.argv[1]).caminho" "$resultado")
+          echo "caminho=$caminho" >> "$GITHUB_OUTPUT"
+          echo "## Caminho: $caminho" >> "$GITHUB_STEP_SUMMARY"
+          node -p "JSON.parse(process.argv[1]).motivo" "$resultado" >> "$GITHUB_STEP_SUMMARY"
+
+  front:
+    needs: caminho
+    if: needs.caminho.outputs.caminho == 'front'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    # Environment sem revisor (a aprovação é o merge na main), com regra de branch: só a main.
+    environment: prod-front
+    concurrency:
+      group: publicar-prod
+      cancel-in-progress: false
+    env:
+      DV_ENVIRONMENT_URL: ${{ vars.DV_ENVIRONMENT_URL }}
+      DV_TENANT_ID: ${{ vars.DV_TENANT_ID }}
+      DV_CLIENT_ID: ${{ vars.DV_CLIENT_ID }}
+      DV_CLIENT_SECRET: ${{ secrets.DV_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://npm.pkg.github.com
+          scope: '@betinhos-executive-service'
+      - run: pnpm install --frozen-lockfile --filter @betinhos/shell...
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/push-front-prod.ps1
+      - name: Versão publicada
+        shell: bash
+        run: echo "Publicado no PROD (só a tela) - v$(node -p "require('./apps/shell/package.json').version")" >> "$GITHUB_STEP_SUMMARY"
+
+  solucoes:
+    needs: caminho
+    if: needs.caminho.outputs.caminho == 'solucoes'
+    uses: ./.github/workflows/publicar.yml
+    with:
+      alvo: test-e-prod
+    secrets: inherit
+
+  marcar:
+    needs: [caminho, front, solucoes]
+    if: >-
+      !cancelled() && needs.caminho.result == 'success' &&
+      (needs.caminho.outputs.caminho == 'nada' || needs.front.result == 'success' || needs.solucoes.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Mover a tag prod-publicado
+        run: |
+          git tag -f prod-publicado "$GITHUB_SHA"
+          git push -f origin refs/tags/prod-publicado

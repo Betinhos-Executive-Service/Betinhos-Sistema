@@ -1,6 +1,7 @@
 // Cópia de src/lib/checklists.ts do App Motoristas (fonte canônica), trazida via tela-gestao-checklists.
 // Mudanças de regra vão primeiro no App Motoristas; aqui só o caminho do import do Dataverse foi trocado.
 import { DATAVERSE, retrieveMultiple, retrieveOne } from "../data/dataverse";
+import { latenciaMock } from "../../../../app/latenciaMock";
 
 // Checklist de vistoria de veículo. Contrato com o plugin ChecklistCommandPlugin
 // (plugins/DriverRecordSharing/ChecklistAnswers.cs): itens copiados do modelo e respostas em JSON.
@@ -330,7 +331,7 @@ function getLocalMock() {
   return localMock;
 }
 
-const delay = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+const delay = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, latenciaMock(ms)));
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 // ---------- Leitura ----------

@@ -128,12 +128,12 @@ Referenciados pelos workflows: `vars.DV_ENVIRONMENT_URL`, `vars.DV_TENANT_ID`, `
 
 ## 5. Publicação (regras do CLAUDE.md)
 
-1. `pnpm push` (e qualquer publicação equivalente no Dataverse) só roda na branch `main`, no checkout principal `Sistema Betinhos`, com `git pull` antes. Nunca de branch de feature ou worktree (inclui `.worktrees/*` e `.claude/worktrees/*`). Nunca dois pushes em paralelo.
-2. Depois do push, commitar o bump como `build: Sistema Betinhos vX.Y.Z publicado no DEV a partir da main` direto na `main`.
-3. Exceção automática (decisão de 20/10/2026): após merge automático de baixo risco, o plantão leva a `main` à branch `dev` (`git push origin origin/main:refs/heads/dev`, só avanço rápido) e o workflow "Deploy" publica no DEV.
-4. TEST e PROD só pelos workflows manuais "Publicar soluções" e "Retirar AppBetinhos". Ensaio no TEST antes do PROD; nenhum outro caminho para o PROD.
+1. Decisão de 05/11/2026: `develop` → DEV, `main` → PROD, só pelo GitHub. PRs entram na `develop`; a `main` só recebe a `develop` inteira (merge do Renan).
+2. DEV: push na `develop` dispara o workflow "Deploy". Scripts manuais que alteram o DEV (`pnpm push` local, `provision-*`, `push:plugin:*`, `sitemap:*`) só do checkout principal na `develop` atualizada; nunca de feature ou worktree; nunca dois em paralelo.
+3. PROD: push na `main` dispara o workflow "Produção" (`producao.yml`), que escolhe o caminho com `caminho-publicacao.mjs` desde a tag `prod-publicado`: só a tela vai direto (`push-front-prod.ps1`); o resto passa por "Publicar soluções" com ensaio no TEST e aprovação no PROD.
+4. "Publicar soluções" à mão continua para refazer ensaios; "Retirar AppBetinhos" é manual. Nenhum outro caminho para o PROD.
 5. Sessões cloud nunca executam `pnpm push`, `pnpm wr` de publicação, `sitemap:*`, `push:plugin:*` nem `packages/deploy/provision-*`.
-6. Merge automático (`.claude/entrega-autonoma.json`, `autoMerge: true`): PR de baixo risco = no máximo 3 arquivos e 80 linhas, sem tocar em `packages/deploy/**`, `packages/plugins/**`, `packages/dataverse/**`, `**/package.json`, `pnpm-lock.yaml`, `.github/**`, `.claude/**`, `scripts/**`, `**/financeiro/**`, `**/pagantes/**`, `**/ops/**`; exige três aprovações no mesmo SHA, verificação registrada e CI verde. Merge na main não publica.
+6. Merge automático (`.claude/entrega-autonoma.json`, `autoMerge: true`): PR de baixo risco = no máximo 3 arquivos e 80 linhas, sem tocar em `packages/deploy/**`, `packages/plugins/**`, `packages/dataverse/**`, `**/package.json`, `pnpm-lock.yaml`, `.github/**`, `.claude/**`, `scripts/**`, `**/financeiro/**`, `**/pagantes/**`, `**/ops/**`; exige três aprovações no mesmo SHA, verificação registrada e CI verde. Só na `develop` (`base`); nunca na `main`, que publica no PROD.
 
 ### O que `push-dev.ps1` faz (`packages/deploy/push-dev.ps1`)
 
@@ -142,7 +142,7 @@ Referenciados pelos workflows: `vars.DV_ENVIRONMENT_URL`, `vars.DV_TENANT_ID`, `
 3. Autentica (client secret no CI; senão MSAL/device code).
 4. Exige que `DV_SOLUTION` exista, seja única e não gerenciada.
 5. Com `-Build`: lê a versão publicada na descrição do WebResource, exporta `PUBLISHED_VERSION` e roda `pnpm build`.
-6. Cria ou atualiza o WebResource, o loader (gerado de `loader.template.html`) e os chunks; inclui cada um na solução (tipo 61); guarda a versão na descrição do HTML.
+6. Cria ou atualiza o WebResource, o loader (gerado de `loader.template.html`) e os chunks; inclui cada um na solução (tipo 61); guarda versão e commit na descrição do HTML (`vX.Y.Z <sha>`; o commit só entra no CI ou com a árvore limpa).
 7. Publica os WebResources, valida pertencimento à solução e remove chunks de builds antigos (`chunk-cleanup.ps1`; mantém o atual e o publicado antes do push).
 8. Chama `solucoes/distribuir-apos-push.ps1` (nunca derruba o push; mostra "ATENCAO" se a conferência não zerar).
 
@@ -155,8 +155,9 @@ O loader (`cr40f_SistemaBetinhosLoader.html`) existe porque o model-driven serve
 | Workflow | Gatilho | Runner | Environment | O que faz |
 |---|---|---|---|---|
 | `ci.yml` (CI) | `pull_request`, `workflow_call`, `workflow_dispatch` | ubuntu | nenhum | install congelado; `scripts/dados-pessoais.test.mjs` + `scripts/dados-pessoais.mjs` (trava de dado pessoal); `pnpm typecheck`; `pnpm test`; `scan-secrets.mjs solution` |
-| `deploy.yml` (Deploy) | push em `dev` (só se mudar `apps/shell/**`, `packages/dataverse/**`, `push-dev.ps1`, `bump-version.mjs`, `inline-webresource.mjs`, `loader.template.html`, `pnpm-lock.yaml`) ou manual | windows | `dev` | instala só `@betinhos/shell...`; `pnpm push`; resumo com a versão. Concorrência `deploy-dev` cancela o anterior; 15 min; não repete typecheck/testes |
-| `publicar.yml` (Publicar soluções) | manual (`alvo` test/prod, `solucoes`, `backup`) | windows | `dev` (exportar), `test` ou `prod` (importar) | ver 6.3 |
+| `deploy.yml` (Deploy) | push em `develop` (só se mudar `apps/shell/**`, `packages/dataverse/**`, `push-dev.ps1`, `bump-version.mjs`, `inline-webresource.mjs`, `loader.template.html`, `pnpm-lock.yaml`) ou manual | windows | `dev` | instala só `@betinhos/shell...`; `pnpm push`; resumo com a versão. Concorrência `dataverse-dev` (a mesma do export), sem cancelar; 15 min; não repete typecheck/testes |
+| `producao.yml` (Produção) | push na `main` ou manual (`caminho`) | ubuntu + windows | `prod-front` (tela) ou via `publicar.yml` | caminho por `caminho-publicacao.mjs`; tela direto ao PROD; resto por `publicar.yml test-e-prod`; move a tag `prod-publicado` |
+| `publicar.yml` (Publicar soluções) | `producao.yml` ou manual (`alvo` test/test-e-prod/prod, `solucoes`, `backup`) | windows | `dev` (exportar), `test` e/ou `prod` (`_importar-solucoes.yml`) | ver 6.3 |
 | `retirar-caixa.yml` (Retirar AppBetinhos) | manual (`alvo`, `aceitarTabelas`) | windows | `dev` (foto), `test`/`prod` (retirar) | ver 6.4 |
 | `sync-from-dev.yml` | manual | ubuntu | `dev` | ver 6.5 |
 
@@ -164,8 +165,8 @@ O loader (`cr40f_SistemaBetinhosLoader.html`) existe porque o model-driven serve
 
 ```mermaid
 flowchart LR
-  PR[PR aprovado e CI verde] --> M[merge na main]
-  M -->|plantao: avanco rapido| D[branch dev]
+  PR[PR aprovado e CI verde] --> M[merge na develop]
+  M --> D[branch develop]
   M -->|manual: pnpm push no checkout principal| P
   D --> W[workflow Deploy - job dev]
   W --> P[push-dev.ps1 -Build]
@@ -178,13 +179,13 @@ flowchart LR
 
 ### 6.3 TEST e PROD (`publicar.yml`)
 
-Dois jobs. `ALVO_PS` = `Prod` ou `Test`; no TEST, `--travado` na comparação e `DESLIGAR_NOVOS=true`. Concorrência por alvo (`publicar-<alvo>`, sem cancelar; `retirar-caixa.yml` usa o mesmo grupo).
+Job `exportar` (com a trava do commit: a tela do DEV tem de ser a do commit publicado) e um import por alvo (`_importar-solucoes.yml`): `test-e-prod` importa no TEST e, se passar, no PROD com os mesmos pacotes. No PROD o job faz o backup (`pac admin backup`) se o rótulo não vier no input. `ALVO_PS` = `Prod` ou `Test`; no TEST, `--travado` na comparação e `DESLIGAR_NOVOS=true`. Concorrência por alvo (`publicar-<alvo>`, sem cancelar; `retirar-caixa.yml` e o caminho da tela usam o mesmo grupo). O diagrama abaixo é o de um alvo.
 
 ```mermaid
 flowchart TD
-  S([Disparo manual]) --> CK{alvo = prod e backup vazio?}
-  CK -->|sim| F1[falha: informar rotulo do backup]
-  CK -->|nao| E1
+  S([producao.yml ou disparo manual]) --> TR{tela do DEV = tela do commit?}
+  TR -->|nao| F1[falha: esperar o Deploy da develop]
+  TR -->|sim| E1
   subgraph exportar [job exportar - environment dev]
     E1[pac auth + exportar-do-dev.ps1: conferencia das 4 como barreira, versao seguinte, export gerenciado] --> E2[artefato pacotes]
   end
@@ -230,12 +231,12 @@ flowchart TD
 
 ### 6.5 Sincronização do DEV (`sync-from-dev.yml`)
 
-Manual, só leitura no DEV, checkout da branch `dev`:
+Manual, só leitura no DEV, checkout da branch `develop`:
 
 1. `pac solution export` da `AppBetinhos` (não gerenciada e gerenciada) e `pac solution unpack` em `solution/AppBetinhos`.
 2. Remove `environmentvariablevalues.json` (valor atual é de cada ambiente) e o `defaultvalue` das variáveis com "anthropic" no nome.
 3. `scan-secrets.mjs solution` (bloqueia client_secret com valor, Bearer, `sk-`, `sk-ant-`; URL `sig=` e chave Google só avisam; nunca imprime o valor).
-4. Se houver diferença, abre branch `sync/dev-<n>` e PR para `dev`.
+4. Se houver diferença, abre branch `sync/dev-<n>` e PR para `develop`.
 
 Nota: o próprio CLAUDE.md informa que o export para TEST/PROD sai direto do DEV (`solucoes.ps1`), então a pasta `solution/` serve como cópia versionada para revisão. O diretório `solution/` não existe nesta worktree (não confirmado se está na `main`).
 

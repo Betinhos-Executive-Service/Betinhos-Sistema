@@ -7,7 +7,10 @@ param(
   [ValidateSet('dev', 'prod')]
   [string] $EnvironmentName,
 
-  [string] $SolutionUniqueName = 'appbetinhos'
+  [string] $SolutionUniqueName = 'appbetinhos',
+
+  # CI (workflow Deploy): os testes ja rodaram no PR (job plugins do ci.yml).
+  [switch] $SemTestes
 )
 
 $ErrorActionPreference = 'Stop'
@@ -28,6 +31,9 @@ $dllPath = Join-Path $root 'packages\plugins\Cr40f.Financeiro.Plugin\bin\Release
 $signingKeyPath = Join-Path $env:USERPROFILE '.codex\keys\Cr40f.Financeiro.Plugin.snk'
 
 if (-not (Test-Path -LiteralPath $pluginProject)) { throw "Projeto do plugin nao encontrado: $pluginProject" }
+# No CI a chave vem do secret do environment dev. Gerar outra mudaria o public key token, e o Dataverse trataria
+# o plugin como outro assembly.
+if ($env:GITHUB_ACTIONS -eq 'true' -and -not (Test-Path -LiteralPath $signingKeyPath -PathType Leaf)) { throw "Chave de assinatura ausente no CI: $signingKeyPath" }
 if (-not (Test-Path -LiteralPath $signingKeyPath -PathType Leaf)) {
   Write-Step "criando chave persistente de assinatura em $signingKeyPath"
   $keyDirectory = Split-Path -Parent $signingKeyPath

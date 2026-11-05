@@ -81,7 +81,7 @@ export const casarPayload = (s: EntitySets, despesaId: string): Row => ({
   cr40f_situacao: SITUACAO.manual, cr40f_motivo: MOTIVO_CASADA, [`${NAV.despesa}@odata.bind`]: bind(s.despesa, despesaId),
 })
 
-/** Reprocessar: cartão e motorista do cartão vigente; volta a Pendente; o passo Reabertas do flow casa ou cria a despesa na próxima execução. */
+/** Reprocessar: cartão e motorista do cartão vigente; volta a Pendente; o flow 'Reprocessada' casa ou cria a despesa na hora (o passo Reabertas do diário é a rede de segurança). */
 export const reprocessarPayload = (s: EntitySets, c: Cartao): Row => ({
   cr40f_situacao: SITUACAO.pendente, cr40f_motivo: motivoReprocessar(c),
   [`${NAV.cartao}@odata.bind`]: bind(s.cartao, c.id), [`${NAV.motorista}@odata.bind`]: bind(s.funcionario, c.motoristaId),

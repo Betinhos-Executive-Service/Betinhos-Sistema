@@ -11,7 +11,10 @@ param(
 
   # URL do gatilho HTTP do "Flow - Consultar Arquivos Sharepoint" (configuracao segura do step de new_ObterFotoPassageiro).
   # Opcional: sem ela (e sem $env:CADASTRO_FOTO_FLOW_URL), a configuracao segura ja gravada no step e mantida. Nunca versionar.
-  [string] $FotoFlowUrl = ''
+  [string] $FotoFlowUrl = '',
+
+  # CI (workflow Deploy): os testes ja rodaram no PR (job plugins do ci.yml).
+  [switch] $SemTestes
 )
 
 $ErrorActionPreference = 'Stop'
@@ -31,6 +34,9 @@ $dllPath = Join-Path $root 'packages\plugins\Cr40f.Cadastro.Plugin\bin\Release\n
 $registrar = Join-Path $root 'packages\plugins\tools\Cr40f.Cadastro.Registrar\Cr40f.Cadastro.Registrar.csproj'
 $signingKeyPath = Join-Path $env:USERPROFILE '.codex\keys\Cr40f.Cadastro.Plugin.snk'
 
+# No CI a chave vem do secret do environment dev. Gerar outra mudaria o public key token, e o Dataverse trataria
+# o plugin como outro assembly.
+if ($env:GITHUB_ACTIONS -eq 'true' -and -not (Test-Path -LiteralPath $signingKeyPath -PathType Leaf)) { throw "Chave de assinatura ausente no CI: $signingKeyPath" }
 if (-not (Test-Path -LiteralPath $signingKeyPath -PathType Leaf)) {
   Write-Step "criando chave persistente de assinatura em $signingKeyPath"
   [IO.Directory]::CreateDirectory((Split-Path -Parent $signingKeyPath)) | Out-Null
@@ -38,9 +44,12 @@ if (-not (Test-Path -LiteralPath $signingKeyPath -PathType Leaf)) {
   try { [IO.File]::WriteAllBytes($signingKeyPath, $rsa.ExportCspBlob($true)) } finally { $rsa.Dispose() }
 }
 
-Write-Step 'rodando testes do plugin'
-& $dotnet.Source test $testsProject
-if ($LASTEXITCODE -ne 0) { throw "Testes do plugin falharam. Codigo: $LASTEXITCODE" }
+if ($SemTestes) { Write-Step 'testes pulados (ja rodaram no PR)' }
+else {
+  Write-Step 'rodando testes do plugin'
+  & $dotnet.Source test $testsProject
+  if ($LASTEXITCODE -ne 0) { throw "Testes do plugin falharam. Codigo: $LASTEXITCODE" }
+}
 
 Write-Step 'compilando plugin'
 & $dotnet.Source build $pluginProject --configuration Release
