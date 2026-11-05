@@ -158,3 +158,12 @@ test('falha na leitura do banco ou no push também marca o run como falho', () =
   const nomes = acao('Houve_erro').expression.or.map((c) => c.equals[0])
   for (const n of ['Conexoes', 'Cada_conexao', 'Cada_transacao', 'Pendentes', 'Cada_motorista']) assert.ok(nomes.includes(`@actions('${n}')?['status']`), n)
 })
+
+test('merchant e merchantInfo em texto não derrubam a transação (o banco às vezes manda string)', () => {
+  const dados = acao('Dados').inputs
+  for (const campo of ['estabelecimento', 'cnpj']) {
+    assert.doesNotMatch(dados[campo], /\?\['merchant(Info)?'\]\?\[/, `${campo} seleciona propriedade direto em merchant/merchantInfo`)
+    assert.match(dados[campo], /json\(if\(startsWith\(string\(coalesce\(items\('Cada_transacao'\)\?\['merchant(Info)?'\], ''\)\), '\{'\)/)
+  }
+  assert.match(dados.estabelecimento, /'', string\(coalesce\(items\('Cada_transacao'\)\?\['merchant'\], ''\)\)\)\), 200\)$/)
+})
