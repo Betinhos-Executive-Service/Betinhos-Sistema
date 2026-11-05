@@ -93,3 +93,25 @@ test("campos da conferência para o payload: choice, motivos, textos aparados e 
   });
   assert.deepEqual(camposConferencia({ resultado: "sem_sinal", motivos: [], hora: "25:00" }), { new_conferenciaenvio: CONFERENCIA_OPCAO.sem_sinal, new_conferenciamotivos: "" });
 });
+
+test("resposta do flow: dúvida exige pergunta; fora do contrato vira null (indisponível)", async () => {
+  const { lerRespostaConferencia } = await import("../src/lib/conferenciaEnvio.ts");
+  assert.deepEqual(lerRespostaConferencia({ ok: true, resultado: "duvida", pergunta: " O almoço ficou acima. O que houve? ", motivos: ["acima_politica"] }), { resultado: "duvida", pergunta: "O almoço ficou acima. O que houve?", motivos: ["acima_politica"] });
+  assert.deepEqual(lerRespostaConferencia({ ok: true, resultado: "sem_duvida", pergunta: null }), { resultado: "sem_duvida" });
+  assert.equal(lerRespostaConferencia({ ok: true, resultado: "duvida", pergunta: "curta" }), null);
+  assert.equal(lerRespostaConferencia({ ok: false, erro: "conferencia_indisponivel" }), null);
+  assert.equal(lerRespostaConferencia(null), null);
+});
+
+test("sem a lista de serviços (consulta falhou) não pergunta de refeição sem serviço", () => {
+  assert.deepEqual(tipos({ leituraData: null, recentes: [], servicos: null, gasto: gasto({ categoria: "Almoço", valor: 30 }) }), []);
+});
+
+test("corpo do flow leva só 7 dias de recentes, sem o próprio gasto, e corta a descrição", async () => {
+  const { montarCorpoConferencia } = await import("../src/lib/conferenciaEnvio.ts");
+  const g = gasto({ id: "atual", categoria: "Almoço", valor: 58, data: "2026-11-10" });
+  const corpo = montarCorpoConferencia({ gasto: g, descricao: "x".repeat(1500), leituraData: null, sinais: [], servicoDiaVizinho: null,
+    recentes: [recente({ id: "atual", data: "2026-11-10" }), recente({ data: "2026-11-03" }), recente({ data: "2026-11-02" })] });
+  assert.deepEqual(corpo.recentes.map((r) => r.data), ["2026-11-03"]);
+  assert.equal(corpo.gasto.descricao.length, 1000);
+});

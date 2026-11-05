@@ -75,3 +75,12 @@ Observação: `scroll_to` dentro da prévia rola o palco na horizontal e corta a
 ## Limites
 - O envio real (Dataverse, Custom API `new_ExpenseUploadTransition`, Flow assíncrono com 202) só existe no DEV e exige o app publicado no model-driven com login. PROD é somente leitura e usa o caminho síncrono.
 - Teste autenticado no DEV: registrar um gasto de teste com 1 foto, conferir o carregamento, a volta ao Início e, no Dataverse DEV, a despesa e o anexo com status Enviado; cancelar o registro de QA depois.
+
+## Conferência da despesa no envio (05/11/2026)
+
+- Spec: `docs/superpowers/specs/2026-11-05-conferencia-envio-despesa-design.md`. Regras em `src/lib/conferenciaEnvio.ts` (`calcularSinais`, testes em `tests/conferenciaEnvio.test.ts`); popup em `src/components/gastos/ConferenciaDuvidaDialog.tsx`; ligação em `submitExpenseChecked` (App.tsx).
+- Sem sinal o app não chama o flow e grava `new_conferenciaenvio = Não conferido (sem sinal)`. Com sinal: overlay "Conferindo o gasto..." e o flow "Flow Despesas | Conferência no envio" (URL em `new_FlowURLDespesaConferenciaEnvio`, Haiku, timeout 12 s no app).
+- Localhost (mock): completar o gasto do cartão "Restaurante Fogo de Chão" como Almoço (R$ 132,40) dispara a dúvida. `?mockConferencia=sem` e `?mockConferencia=erro` enviam direto; `?mockConferencia=sem-servico` deixa os serviços só na véspera.
+- O preview interno do T3 trava nas transições de tela com a aba escondida. Use o Playwright headless pelo Edge com câmera falsa: `scratchpad/teste-duvida.cjs` desta sessão é o modelo (args `--use-fake-device-for-media-stream --use-fake-ui-for-media-stream`; a foto entra pelo `filechooser` de "Tirar foto" com `setFiles({ name, mimeType, buffer })`, porque arquivo antigo é recusado).
+- Esperado: dúvida com a pergunta, "Responder e enviar" recusa menos de 10 letras ("Escreva ou fale um pouco mais"), depois envia; "Voltar e corrigir" fecha e mantém o formulário; sem/erro enviam sem popup.
+- DEV: as 5 colunas `new_conferenciaenvio`, `new_conferenciapergunta`, `new_conferenciajustificativa`, `new_conferenciamotivos`, `new_horagasto` existem (script `scripts/provision-conferencia-envio-schema.ps1`). Depois de um envio real, confira os valores na despesa.

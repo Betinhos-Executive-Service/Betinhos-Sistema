@@ -79,7 +79,7 @@ import {
   type DriverContext,
   type MaintenanceRequestVehicleOption
 } from "./lib/dataverse";
-import { readReceiptQuick, isStandaloneWebResourceRuntime } from "./lib/dataverse";
+import { conferirDespesaRemote, readReceiptQuick, isStandaloneWebResourceRuntime } from "./lib/dataverse";
 import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "./lib/fetchWebApi";
 import { createQrChargeRemote, getQrChargeSummaryRemote, updateQrChargeRemote } from "./lib/dataverse";
 import { getQrChargeReceiveState, getReceivableCents, type QrChargeSummary } from "./lib/qrCharge";
@@ -110,6 +110,8 @@ import { clearMediaDraft, loadMediaDraft, saveMediaDraft, touchMediaDraft } from
 import { describeExpenseSubmission, normalizeStoredExpenseSubmissions, type ExpenseSubmission, type ExpenseUploadRow } from "./lib/expenseUploadState";
 import { resumeExpenseSubmission, type ExpenseSubmissionProgress } from "./lib/expenseSubmission";
 import { ExpenseSendOverlay, type ExpenseSendState } from "./components/common/ExpenseSendOverlay";
+import { ConferenciaDuvidaDialog } from "./components/gastos/ConferenciaDuvidaDialog";
+import { TIMEOUT_CONFERENCIA_MS, calcularSinais, camposConferencia, carregarServicosConferencia, lerRespostaConferencia, montarCorpoConferencia, respostaConferenciaMock, type ConferenciaEnvio, type GastoConferido } from "./lib/conferenciaEnvio";
 import type { ExpenseUploadMode } from "./lib/expenseUploadMode";
 import { resolveExpenseUploadModeRemote, expenseSubmissionStorageKey, ensureExpenseSubmissionRemote, loadExpenseUploadRowsRemote, transitionExpenseUploadRemote, dispatchExpenseUploadRemote, createExpenseUploadItem } from "./lib/dataverse";
 
@@ -565,6 +567,10 @@ function App() {
   const expenseJournalQueueRef = useRef<Promise<void>>(Promise.resolve());
   const expenseNoticeRef = useRef(new Set<string>());
   const expenseSubmitBusyRef = useRef(false);
+  // Conferência no envio: data/hora lidas no cupom, resultado da última conferência e o popup "Dúvida" aberto.
+  const expenseQuickReadLeituraRef = useRef<{ data: string | null; hora: string | null } | null>(null);
+  const conferenciaRef = useRef<ConferenciaEnvio | null>(null);
+  const [duvidaConferencia, setDuvidaConferencia] = useState<{ pergunta: string; responder: (justificativa: string | null) => void } | null>(null);
   const [expenseSend, setExpenseSend] = useState<ExpenseSendState | null>(null);
   const expenseRunningRef = useRef(new Set<string>());
   const [expenseRunningIds, setExpenseRunningIds] = useState<string[]>([]);
@@ -1832,6 +1838,7 @@ function App() {
       <LoadingOverlay loading={getVisibleLoadingOverlay(dataLoading, criticalError)} />
       {remoteOperation ? <FlowProgressOverlay operation={remoteOperation} /> : null}
       {expenseSend ? <ExpenseSendOverlay state={expenseSend} onClose={closeExpenseSendError} /> : null}
+      {duvidaConferencia ? <ConferenciaDuvidaDialog pergunta={duvidaConferencia.pergunta} onResponder={(texto) => duvidaConferencia.responder(texto)} onVoltar={() => duvidaConferencia.responder(null)} /> : null}
       {tourChapter ? <TourOverlay key={tourChapter.id} chapter={tourChapter} onClose={closeTour} /> : null}
       {vehicleChoiceRequest ? (
         <VehicleChoiceDialog
@@ -2463,6 +2470,7 @@ function App() {
             cityEntitySet: DATAVERSE.cidades, motoristaEntitySet: DATAVERSE.funcionarios, veiculoEntitySet: DATAVERSE.veiculos,
             reservaEntitySet: DATAVERSE.geral, lookupNavigationNames: names
           });
+        submission.payload = { ...submission.payload, ...(submission.conferencia ?? {}) };
       }
       rows = await resumeExpenseSubmission(submission, {
         save: value => upsertExpenseSubmission(motoristaId, value),
@@ -2500,7 +2508,8 @@ function App() {
       const submission: ExpenseSubmission = {
         expenseId: completing?.id ?? crypto.randomUUID(), existing: Boolean(completing), expenseConfirmed: false, draft: { ...draft }, payload: {}, motoristaId: driverContext.id,
         vehicleId: draft.veiculoId || getDriverCurrentVehicleId(driverContext),
-        items: photos.map((photo, index) => createExpenseUploadItem(photo.dataUrl, index + 1))
+        items: photos.map((photo, index) => createExpenseUploadItem(photo.dataUrl, index + 1)),
+        conferencia: conferenciaRef.current ? camposConferencia(conferenciaRef.current) : undefined
       };
       const total = submission.items.length;
       setExpenseSend({ phase: "saving", current: 0, total });
@@ -2662,6 +2671,7 @@ function App() {
           reservaEntitySet: DATAVERSE.geral,
           lookupNavigationNames
         });
+      if (conferenciaRef.current) Object.assign(payload, camposConferencia(conferenciaRef.current));
       if (completing) await updateOne(DATAVERSE.despesasOperacionais, completing.id, payload);
       const result = completing ? { id: completing.id } : await createOne(DATAVERSE.despesasOperacionais, payload);
       createdExpenseId = result.id;
@@ -2755,7 +2765,51 @@ function App() {
   };
 
   // Gasto novo pago no cartão que já existe pendente (mesmo valor e data próxima): avisa antes de duplicar.
-  const submitExpenseChecked = (draft: ExpenseDraft) => {
+  // Conferência no envio: calcula os sinais no app; só chama a IA quando há algum. Devolve null se o motorista
+  // escolher "Voltar e corrigir". Qualquer falha vira "indisponível" e o envio segue (o motorista nunca fica travado).
+  const conferirAntesDeEnviar = async (draft: ExpenseDraft): Promise<ConferenciaEnvio | null> => {
+    const leitura = expenseQuickReadLeituraRef.current;
+    const hora = leitura?.hora && leitura.data === draft.dataGasto ? leitura.hora : null;
+    const horaAgora = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date());
+    const completing = gastoCartaoAtualRef.current;
+    const numero = (texto: string) => { const n = parseCurrencyInput(texto); return Number.isFinite(n) && n > 0 ? n : null; };
+    const gasto: GastoConferido = {
+      id: completing?.id,
+      categoria: expenseReferenceData.categories.find((c) => c.id === draft.categoriaId)?.name ?? "",
+      valor: parseCurrencyInput(draft.valor) || 0,
+      data: draft.dataGasto,
+      hora: hora ?? horaAgora,
+      litros: numero(draft.litros),
+      km: numero(draft.kmInformado),
+      veiculoId: draft.veiculoId
+    };
+    const motoristaId = driverContext?.id ?? comunicadosDriverIdRef.current;
+    try {
+      const [recentes, servicos] = await Promise.all([
+        relatorioDespesas ? Promise.resolve(relatorioDespesas) : carregarDespesasRelatorio(motoristaId).catch(() => []),
+        carregarServicosConferencia(motoristaId, draft.dataGasto).catch(() => null)
+      ]);
+      const { sinais, servicoDiaVizinho } = calcularSinais({ gasto, leituraData: leitura?.data ?? null, recentes, servicos });
+      const motivos = sinais.map((s) => s.tipo);
+      if (!sinais.length) return { resultado: "sem_sinal", motivos, hora };
+      setRemoteOperation({ title: "Enviando gasto", message: "Conferindo o gasto...", phase: "loading" });
+      const corpo = montarCorpoConferencia({ gasto, descricao: draft.descricao, leituraData: leitura?.data ?? null, sinais, servicoDiaVizinho, recentes });
+      const resposta = lerRespostaConferencia(isMockGastosCartao() ? await respostaConferenciaMock(sinais) : await conferirDespesaRemote(corpo, TIMEOUT_CONFERENCIA_MS));
+      setRemoteOperation(null);
+      if (!resposta) return { resultado: "indisponivel", motivos, hora };
+      if (resposta.resultado === "sem_duvida") return { resultado: "sem_duvida", motivos, hora };
+      const justificativa = await new Promise<string | null>((resolve) => setDuvidaConferencia({ pergunta: resposta.pergunta, responder: resolve }));
+      setDuvidaConferencia(null);
+      if (justificativa == null) return null;
+      return { resultado: "duvida_respondida", motivos: resposta.motivos.length ? resposta.motivos : motivos, pergunta: resposta.pergunta, justificativa, hora };
+    } catch (error) {
+      setRemoteOperation(null);
+      reportAppError(error, { severity: "warning", source: "app", action: "conferenciaEnvio", notifyUser: false });
+      return { resultado: "indisponivel", motivos: [], hora };
+    }
+  };
+
+  const submitExpenseChecked = async (draft: ExpenseDraft) => {
     if (!gastoCartaoAtualRef.current) {
       const duplicado = acharGastoCartaoDuplicado(gastosCartaoPendentes, draft.formaPagamentoId, parseCurrencyInput(draft.valor), draft.dataGasto);
       if (duplicado) {
@@ -2763,7 +2817,15 @@ function App() {
         return;
       }
     }
-    return submitExpense(draft);
+    if (expenseSubmitBusyRef.current || remoteOperation) return;
+    const conferencia = await conferirAntesDeEnviar(draft);
+    if (!conferencia) return;
+    conferenciaRef.current = conferencia;
+    try {
+      return await submitExpense(draft);
+    } finally {
+      conferenciaRef.current = null;
+    }
   };
 
   const submitCollision = async (draft: CollisionDraft) => {
@@ -3028,6 +3090,7 @@ function App() {
 
   function resetExpenseQuickRead() {
     expenseQuickReadSeqRef.current++;
+    expenseQuickReadLeituraRef.current = null;
     expenseRetakeTargetIdRef.current = "";
     expenseDateTouchedRef.current = false;
     setExpenseQuickRead(INITIAL_QUICK_READ);
@@ -3077,6 +3140,7 @@ function App() {
       if (seq !== expenseQuickReadSeqRef.current) return;
       const before = expenseDraftRef.current;
       const { draft: after, filled } = applyQuickRead(before, outcome.leitura, referenceData, { replaceAutoDate: !expenseDateTouchedRef.current });
+      expenseQuickReadLeituraRef.current = { data: outcome.leitura.data ?? null, hora: outcome.leitura.hora ?? null };
       setExpenseDraft(after);
       setExpenseQuickReadFilled(filled);
     }

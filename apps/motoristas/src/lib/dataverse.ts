@@ -272,6 +272,7 @@ const FLOW_URLS = {
   salvarFotosManutencao: "VITE_FLOW_SALVAR_FOTOS_MANUTENCAO_URL",
   enviarReciboCliente: "VITE_FLOW_ENVIAR_RECIBO_CLIENTE_URL",
   quickRead: "VITE_FLOW_LEITURA_RAPIDA_URL",
+  conferenciaEnvio: "VITE_FLOW_CONFERENCIA_ENVIO_URL",
   consultarArquivo: "VITE_FLOW_CONSULTAR_ARQUIVO_URL"
 } as const;
 
@@ -283,6 +284,8 @@ const FLOW_DATAVERSE_ENVIRONMENT_VARIABLES: Record<string, string | undefined> =
   [FLOW_URLS.salvarFotosManutencao]: "new_FlowURLFlowSalvarArquivosOnedrive",
   [FLOW_URLS.enviarReciboCliente]: "new_FlowURLFlowEnviarReciboCliente",
   [FLOW_URLS.quickRead]: "new_FlowURLDespesaLeituraRapida",
+  // "Flow Despesas | Conferência no envio" (Sistema Betinhos, provision-flow-despesas-conferencia-envio.ps1).
+  [FLOW_URLS.conferenciaEnvio]: "new_FlowURLDespesaConferenciaEnvio",
   // "Flow - Consultar Arquivo OneDrive" (Sistema Betinhos, provision-flow-consultar-onedrive.ps1): devolve o comprovante em base64.
   [FLOW_URLS.consultarArquivo]: "new_URLFlowConsultarArquivoOneDrive"
 };
@@ -3718,6 +3721,30 @@ export async function readReceiptQuick(imagemBase64: string, categorias: string[
     return await response.json();
   } catch (error) {
     dataverseWarn("Leitura rapida sem resposta.", { endpoint: describeFlowUrl(url), error: error instanceof Error ? error.name : String(error) });
+    return { ok: false };
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+/**
+ * Conferência da despesa no envio (Flow Despesas | Conferência no envio). Mesmo padrão da leitura rápida: timeout por
+ * AbortSignal, nunca lança (falha vira { ok: false } e o app envia sem perguntar) e não registra o corpo.
+ */
+export async function conferirDespesaRemote(corpo: Record<string, unknown>, timeoutMs: number): Promise<unknown> {
+  const url = await resolveFlowUrl(FLOW_URLS.conferenciaEnvio);
+  if (!url) return { ok: false, erro: "nao_configurado" };
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, signal: controller.signal, body: JSON.stringify(corpo) });
+    if (!response.ok) {
+      dataverseWarn("Conferencia no envio falhou.", { status: response.status, endpoint: describeFlowUrl(url) });
+      return { ok: false };
+    }
+    return await response.json();
+  } catch (error) {
+    dataverseWarn("Conferencia no envio sem resposta.", { endpoint: describeFlowUrl(url), error: error instanceof Error ? error.name : String(error) });
     return { ok: false };
   } finally {
     window.clearTimeout(timer);

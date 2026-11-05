@@ -23,6 +23,8 @@ export type ExpenseSubmission = {
   motoristaId: string;
   vehicleId?: string;
   items: ExpenseUploadItem[];
+  /** Campos da conferência no envio (new_conferencia*, new_horagasto), juntados ao payload quando ele é montado. */
+  conferencia?: Record<string, unknown>;
 };
 
 export type ExpenseUploadRow = {

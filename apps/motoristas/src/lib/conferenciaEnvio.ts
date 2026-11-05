@@ -71,7 +71,8 @@ export function calcularSinais({ gasto, leituraData, recentes, servicos }: {
   /** Data lida no cupom pela leitura rápida (AAAA-MM-DD) ou null. */
   leituraData: string | null;
   recentes: GastoRecente[];
-  servicos: ServicoConferido[];
+  /** null quando a consulta falhou: a regra de refeição sem serviço fica de fora (não pergunta à toa). */
+  servicos: ServicoConferido[] | null;
 }): { sinais: Sinal[]; servicoDiaVizinho: string | null } {
   const sinais: Sinal[] = [];
   const categoria = cat(gasto.categoria);
@@ -125,7 +126,7 @@ export function calcularSinais({ gasto, leituraData, recentes, servicos }: {
 
   // Refeição/café sem serviço no dia; sugere o dia vizinho com serviço.
   let servicoDiaVizinho: string | null = null;
-  if (SEM_SERVICO.includes(categoria) && !servicos.some((s) => servicoTocaODia(s, gasto.data))) {
+  if (servicos && SEM_SERVICO.includes(categoria) && !servicos.some((s) => servicoTocaODia(s, gasto.data))) {
     servicoDiaVizinho = [somarDias(gasto.data, -1), somarDias(gasto.data, 1)].find((dia) => servicos.some((s) => servicoTocaODia(s, dia))) ?? null;
     sinais.push({ tipo: "refeicao_sem_servico", detalhe: `Sem serviço em ${diaMes(gasto.data)}${servicoDiaVizinho ? `; há serviço em ${diaMes(servicoDiaVizinho)}` : ""}` });
   }
@@ -199,4 +200,47 @@ export function camposConferencia(conferencia: ConferenciaEnvio) {
   if (conferencia.justificativa?.trim()) campos.new_conferenciajustificativa = conferencia.justificativa.trim().slice(0, 4000);
   if (conferencia.hora && /^([01]\d|2[0-3]):[0-5]\d$/.test(conferencia.hora)) campos.new_horagasto = conferencia.hora;
   return campos;
+}
+
+// ---------------- Chamada ao flow ----------------
+
+export const JUSTIFICATIVA_MINIMA = 10;
+export const TIMEOUT_CONFERENCIA_MS = 12_000;
+
+export type RespostaConferenciaFlow = { resultado: "sem_duvida" } | { resultado: "duvida"; pergunta: string; motivos: TipoSinal[] } | null;
+
+/** Resposta do flow; qualquer coisa fora do contrato vira null (= indisponível, envia sem perguntar). */
+export function lerRespostaConferencia(body: unknown): RespostaConferenciaFlow {
+  const r = body as { ok?: unknown; resultado?: unknown; pergunta?: unknown; motivos?: unknown } | null;
+  if (!r || r.ok !== true) return null;
+  if (r.resultado === "sem_duvida") return { resultado: "sem_duvida" };
+  if (r.resultado !== "duvida" || typeof r.pergunta !== "string" || r.pergunta.trim().length < 10) return null;
+  const motivos = Array.isArray(r.motivos) ? r.motivos.filter((m): m is TipoSinal => typeof m === "string") : [];
+  return { resultado: "duvida", pergunta: r.pergunta.trim(), motivos };
+}
+
+/** Corpo enviado ao flow: só o necessário (sem nome de passageiro/cliente). */
+export function montarCorpoConferencia({ gasto, descricao, leituraData, sinais, servicoDiaVizinho, recentes }: {
+  gasto: GastoConferido; descricao: string; leituraData: string | null; sinais: Sinal[]; servicoDiaVizinho: string | null; recentes: GastoRecente[];
+}) {
+  return {
+    gasto: { categoria: gasto.categoria, valor: gasto.valor, data: gasto.data, hora: gasto.hora, litros: gasto.litros, km: gasto.km, descricao: descricao.slice(0, 1000) },
+    leitura: leituraData ? { data: leituraData } : null,
+    metas: METAS_GASTOS,
+    sinais,
+    servico_dia_vizinho: servicoDiaVizinho,
+    recentes: recentes
+      .filter((d) => d.id !== gasto.id && d.status !== STATUS_DESPESA.cancelado && d.data >= somarDias(gasto.data, -7) && d.data <= somarDias(gasto.data, 1))
+      .slice(0, 40)
+      .map((d) => ({ categoria: d.categoria, valor: d.valor, data: d.data, hora: d.hora ?? null, litros: d.litros, km: d.km }))
+  };
+}
+
+/** Mock local (`?mockConferencia=sem|erro`; padrão: dúvida com os detalhes dos sinais). */
+export async function respostaConferenciaMock(sinais: Sinal[]) {
+  await new Promise((resolve) => setTimeout(resolve, 900));
+  const modo = new URLSearchParams(window.location.search).get("mockConferencia");
+  if (modo === "erro") return { ok: false, erro: "conferencia_indisponivel" };
+  if (modo === "sem") return { ok: true, resultado: "sem_duvida", pergunta: null, motivos: [] };
+  return { ok: true, resultado: "duvida", pergunta: `${sinais.map((s) => s.detalhe).join(". ")}. O que aconteceu?`, motivos: sinais.map((s) => s.tipo) };
 }

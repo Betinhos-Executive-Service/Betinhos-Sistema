@@ -14275,3 +14275,16 @@ select,
 @media (prefers-reduced-motion:no-preference) { .gr-skeleton span { animation:gr-pulse 1.2s ease-in-out infinite alternate; } }
 @keyframes gr-pulse { from { opacity:.55; } to { opacity:1; } }
 .gr-actions { width:min(95%, 520px); }
+
+/* Conferência no envio: popup "Dúvida" (reaproveita o diálogo de contato). */
+.duvida-dialog { display: grid; gap: 12px; width: min(100%, 380px); }
+.duvida-topo { display: flex; align-items: center; gap: 10px; }
+.duvida-icone { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 10px; background: #fff7df; color: #856000; font-size: 1.1rem; font-weight: 900; }
+.duvida-pergunta { margin: 0; padding: 12px 14px; border: 1px solid #f3dc9a; border-radius: 12px; background: #fff7df; color: #5c4300; font-size: .95rem; font-weight: 700; line-height: 1.45; }
+.duvida-dialog .finalize-input-block { margin: 0; }
+.duvida-erro { margin: -4px 0 0; color: #9f2940; font-size: .82rem; font-weight: 700; }
+.duvida-acoes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.duvida-acoes .contact-choice-cancel { margin-top: 0; }
+.duvida-enviar { min-height: 44px; border: 0; border-radius: 12px; background: #001a3d; color: #fff; font-family: Manrope, Arial, sans-serif; font-size: .9rem; font-weight: 900; cursor: pointer; transition: transform 140ms cubic-bezier(.23, 1, .32, 1); }
+.duvida-enviar:active { transform: scale(.97); }
+.duvida-enviar:focus-visible { outline: 0; box-shadow: 0 0 0 3px rgba(33, 89, 210, .25); }
