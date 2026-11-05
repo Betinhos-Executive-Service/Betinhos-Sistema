@@ -16,8 +16,9 @@ public sealed class FinanceiroStepPlugin : IPlugin
         var tracing = (ITracingService)serviceProvider.GetService(typeof(ITracingService));
         var factory = (IOrganizationServiceFactory)serviceProvider.GetService(typeof(IOrganizationServiceFactory));
 
-        // Anti-loop: updates disparados pelo próprio motor (Depth > 1 com a flag) não reentram.
-        if (context.Depth > 1 && (context.SharedVariables.Contains(SincronizarFinanceiroPlugin.SharedFlag) || context.ParentContext?.SharedVariables.Contains(SincronizarFinanceiroPlugin.SharedFlag) == true)) return;
+        // Anti-loop: updates disparados pelo próprio motor (Depth > 1 com a flag) não reentram. A flag pode estar
+        // vários níveis acima (ex.: baixa manual da OP → update do pagante), então a cadeia inteira é verificada.
+        if (context.Depth > 1 && DentroDaSincronizacao(context)) return;
         if (context.MessageName != "Update") return;
         if (!context.InputParameters.Contains("Target") || context.InputParameters["Target"] is not Entity target) return;
 
@@ -64,6 +65,13 @@ public sealed class FinanceiroStepPlugin : IPlugin
             tracing.Trace("Cr40f.Financeiro step: {0}", error);
             throw error is InvalidPluginExecutionException ? error : new InvalidPluginExecutionException("Não foi possível sincronizar o financeiro. " + error.Message, error);
         }
+    }
+
+    public static bool DentroDaSincronizacao(IPluginExecutionContext? context)
+    {
+        for (var c = context; c is not null; c = c.ParentContext)
+            if (c.SharedVariables.Contains(SincronizarFinanceiroPlugin.SharedFlag)) return true;
+        return false;
     }
 
     /// <summary>Composição concluída/reaberta → status de faturamento das reservas ligadas a ela (ver <see cref="ComposicaoFaturamento"/>).</summary>
