@@ -86,6 +86,17 @@ Novo-Zip "$tmp\h4.zip" @(, @('a', 'bX'))
 Novo-Zip "$tmp\h5.zip" @(, @('ab', 'X'))
 Confere ((Get-HashDoPacote "$tmp\h4.zip") -ne (Get-HashDoPacote "$tmp\h5.zip")) 'hash separa o nome da entrada do conteudo'
 
+# Test-PodePular: so com o mesmo conteudo e o ambiente na versao registrada; na duvida, importa
+$pub = @([pscustomobject]@{ solucao = 'BetinhosCore'; versao = '1.0.0.5'; hash = 'abc' })
+$itemIgual = [pscustomobject]@{ solucao = 'BetinhosCore'; hash = 'abc' }
+Confere (Test-PodePular $itemIgual '1.0.0.5' $pub) 'pula conteudo igual na versao registrada'
+Confere (-not (Test-PodePular ([pscustomobject]@{ solucao = 'BetinhosCore'; hash = 'xyz' }) '1.0.0.5' $pub)) 'importa conteudo diferente'
+Confere (-not (Test-PodePular $itemIgual '1.0.0.4' $pub)) 'importa se o ambiente esta em outra versao (pac admin copy)'
+Confere (-not (Test-PodePular $itemIgual '' $pub)) 'importa se a solucao nao esta instalada'
+Confere (-not (Test-PodePular $itemIgual '1.0.0.5' @())) 'importa sem registro'
+Confere (-not (Test-PodePular $itemIgual '1.0.0.5' $null)) 'importa com registro nulo'
+Confere (-not (Test-PodePular ([pscustomobject]@{ solucao = 'BetinhosAutomacao'; hash = 'abc' }) '1.0.0.5' $pub)) 'registro de outra solucao nao vale'
+
 # Get-ContagemRegistros: FetchXML exato; so o limite de agregacao cai na contagem paginada (exata); o resto falha alto
 function Novo-Erro([string] $Mensagem, [string] $Corpo) {
   $er = New-Object Management.Automation.ErrorRecord (New-Object Exception $Mensagem), 'http', 'NotSpecified', $null

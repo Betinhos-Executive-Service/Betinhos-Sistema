@@ -19,6 +19,11 @@ on:
         type: string
         required: false
         default: ''
+      importar_tudo:
+        description: 'Importa as soluções mesmo com conteúdo igual ao da última publicação neste ambiente.'
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   importar:
@@ -37,6 +42,8 @@ jobs:
       ALVO_PS: ${{ inputs.alvo == 'prod' && 'Prod' || 'Test' }}
       TRAVADO: ${{ inputs.alvo == 'test' && '--travado' || '' }}
       DESLIGAR_NOVOS: ${{ inputs.alvo == 'test' }}
+      IMPORTAR_TUDO: ${{ inputs.importar_tudo }}
+      TAG_PUBLICADAS: solucoes-${{ inputs.alvo }}
     steps:
       - name: Alvo válido
         shell: bash
@@ -78,8 +85,18 @@ jobs:
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/preservar-valores-variaveis.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Aplicar
       - name: Guardar configuração dos steps (o pacote traz a do DEV)
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/preservar-config-steps.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Arquivo config-steps/antes.json
+      - name: Última publicação neste ambiente
+        # A tag solucoes-<alvo> guarda versão e hash de cada solução na última publicação que passou. Sem ela, importa tudo.
+        shell: bash
+        run: |
+          if git fetch --quiet --no-tags origin "+refs/tags/$TAG_PUBLICADAS:refs/tags/$TAG_PUBLICADAS"; then
+            git tag -l --format='%(contents)' "$TAG_PUBLICADAS" > publicadas-antes.json
+          fi
       - name: Importar
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/importar-solucoes.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Pasta pacotes -Alvo $env:ALVO_PS
+        run: |
+          $extra = @(); if ($env:IMPORTAR_TUDO -eq 'true') { $extra += '-ImportarTudo' }
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/importar-solucoes.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Pasta pacotes -Alvo $env:ALVO_PS -Publicadas publicadas-antes.json @extra
+          if ($LASTEXITCODE -ne 0) { throw "importar-solucoes.ps1 falhou ($LASTEXITCODE)." }
       - name: Remover camadas Active (hotfixes já na main)
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/remover-camadas-active.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Backup camadas-active -Aplicar -PermitirProd
       - name: Restaurar configuração dos steps (depois das camadas Active, que a apagariam)
@@ -98,6 +115,14 @@ jobs:
         run: |
           set -o pipefail
           node packages/deploy/solucoes/comparar-fotos.mjs $TRAVADO fotos/antes.json fotos/depois.json | tee fotos/comparacao.json
+      - name: Registrar a publicação neste ambiente
+        # Só com tudo verde: o que falhou volta a ser importado na próxima.
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -f -a --cleanup=verbatim -F pacotes/publicadas.json "$TAG_PUBLICADAS" "$GITHUB_SHA"
+          git push -f origin "refs/tags/$TAG_PUBLICADAS"
       - name: Resumo
         if: always()
         shell: bash

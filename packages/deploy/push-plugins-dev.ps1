@@ -22,8 +22,11 @@ foreach ($d in Get-ChildItem (Join-Path $root 'packages\plugins') -Directory) {
   if ($d.Name -match '^Cr40f\.([A-Za-z]+)\.Plugin$') { $pastas[$Matches[1].ToLowerInvariant()] = $Matches[1] }
 }
 
-$pedidos = if ($Plugins.Trim() -eq 'todos') { @($pastas.Keys | Sort-Object) }
-           else { @($Plugins.Split(',') | ForEach-Object { $_.Trim().ToLowerInvariant() } | Where-Object { $_ }) }
+# @(...) por fora: um if devolvendo um elemento so vira string, e .Count falha com StrictMode.
+$pedidos = @(
+  if ($Plugins.Trim() -eq 'todos') { $pastas.Keys | Sort-Object }
+  else { $Plugins.Split(',') | ForEach-Object { $_.Trim().ToLowerInvariant() } | Where-Object { $_ } }
+)
 if (-not $pedidos.Count) { Write-Host '[plugins] nada a publicar'; exit 0 }
 
 foreach ($nome in $pedidos) {

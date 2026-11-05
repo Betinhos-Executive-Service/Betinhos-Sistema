@@ -24,16 +24,15 @@ public static class SyncEngine
         var total = op.ValorCents ?? op.Reservas.Sum(r => r.CpValorCents);
         var somaPaga = pagos.Sum(p => p.ValorCents);
         var totalConhecido = op.ValorCents.HasValue || op.Reservas.All(r => r.CpId.HasValue);
-        var quitada = totalConhecido && ativos.Count > 0 && pagos.Count == ativos.Count && somaPaga >= total && total > 0;
+        var todosPagos = ativos.Count > 0 && pagos.Count == ativos.Count;
+        // OP marcada como Paga à mão (baixa manual) fica quitada enquanto nenhum pagante ativo voltar a ficar pendente,
+        // mesmo que a soma não cubra o total: a decisão do financeiro prevalece sobre o cálculo.
+        var quitada = todosPagos && ((totalConhecido && somaPaga >= total && total > 0) || op.Status == Codigos.OpPaga);
 
         if (quitada)
         {
             Set(mudancas, Codigos.Op, op.Id, Codigos.OpStatus, op.Status, Codigos.OpPaga, "Todos os pagantes ativos pagos e soma cobre o total da OP.");
-            foreach (var r in op.Reservas)
-            {
-                Set(mudancas, Codigos.Reserva, r.Id, Codigos.ReservaFatStatus, r.FatStatus, Codigos.ReservaFatPago, "OP paga.");
-                if (r.CpId is { } cp) Set(mudancas, Codigos.Composicao, cp, Codigos.CpStatus, r.CpStatus, Codigos.CpConcluida, "OP paga.");
-            }
+            MarcarReservasPagas(mudancas, op, "OP paga.");
         }
         else if (pagos.Count > 0)
         {
@@ -49,6 +48,31 @@ public static class SyncEngine
             Reverter(mudancas, op, Codigos.ReservaFatPagamentoPendente, "OP sem pagamento.");
         }
         return mudancas;
+    }
+
+    /// <summary>
+    /// Baixa manual: alguém marcou a OP como Paga (substitui os flows legados "Dar Baixa Status OP -> Pagantes" e "OP -> Geral").
+    /// Pagantes ativos ainda não pagos viram Pago; reservas viram Pago e composições Concluída. A OP não muda.
+    /// </summary>
+    public static IReadOnlyList<Mudanca> ComputeBaixaManual(OpSnapshot op)
+    {
+        var mudancas = new List<Mudanca>();
+        if (op.Status != Codigos.OpPaga) return mudancas;
+        const string motivo = "OP marcada como paga manualmente.";
+        foreach (var p in op.Pagantes.Where(p => p.Status != Codigos.PagCancelado && p.Status != Codigos.PagPago && p.Status != Codigos.PagAutorizado))
+            Set(mudancas, Codigos.Pagante, p.Id, Codigos.PaganteStatus, p.Status, Codigos.PagPago, motivo);
+        MarcarReservasPagas(mudancas, op, motivo);
+        return mudancas;
+    }
+
+    /// <summary>Reserva vira Pago e a composição Concluída; reservas com status de faturamento protegido (cancelado, cortesia...) ficam como estão.</summary>
+    internal static void MarcarReservasPagas(List<Mudanca> list, OpSnapshot op, string motivo)
+    {
+        foreach (var r in op.Reservas.Where(r => !Codigos.FatProtegido(r.FatStatus)))
+        {
+            Set(list, Codigos.Reserva, r.Id, Codigos.ReservaFatStatus, r.FatStatus, Codigos.ReservaFatPago, motivo);
+            if (r.CpId is { } cp) Set(list, Codigos.Composicao, cp, Codigos.CpStatus, r.CpStatus, Codigos.CpConcluida, motivo);
+        }
     }
 
     /// <summary>Desfaz só o que este motor marcou (PagoPorEstaOp); CP acompanha a reserva. `alvo` = status de faturamento de destino.</summary>

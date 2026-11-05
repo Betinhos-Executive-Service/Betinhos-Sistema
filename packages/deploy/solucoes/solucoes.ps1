@@ -239,6 +239,14 @@ function Invoke-Pac([string] $Url, [string[]] $Argumentos) {
 }
 
 # UniqueName, versao e se e gerenciada, lidos do solution.xml do ZIP.
+# Pode pular o import: o ambiente esta na versao registrada na ultima publicacao que passou e o pacote tem o mesmo conteudo
+# dela. A versao protege de ambiente sobrescrito (pac admin copy) ou mexido fora do fluxo: nesse caso importa.
+function Test-PodePular($Item, [string] $Instalada, $Publicadas) {
+  if (-not $Instalada -or -not $Item.hash) { return $false }
+  $ultimo = @(@($Publicadas) | Where-Object { $_ -and $_.solucao -eq $Item.solucao })
+  return ($ultimo.Count -eq 1 -and [string] $ultimo[0].versao -eq $Instalada -and [string] $ultimo[0].hash -eq [string] $Item.hash)
+}
+
 function Get-ManifestoDoPacote([string] $ZipPath) {
   Add-Type -AssemblyName System.IO.Compression.FileSystem
   $zip = [IO.Compression.ZipFile]::OpenRead($ZipPath)

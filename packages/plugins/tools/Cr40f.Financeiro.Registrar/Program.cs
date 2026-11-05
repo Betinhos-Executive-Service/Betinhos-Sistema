@@ -98,6 +98,7 @@ ConfigureMainOperationStep(service, fecharApiId, fecharTypeId);
 var stepTypeId = UpsertPluginTypeNamed(service, assemblyId, "Cr40f.Financeiro.Plugin.FinanceiroStepPlugin");
 EnsureUpdateStep(service, stepTypeId, "cr40f_pagantes", "cr40f_status", "Cr40f.Financeiro: Pagante → OP", solutionUniqueName);
 EnsureUpdateStep(service, stepTypeId, "cr40f_financeiro", "cr40f_status", "Cr40f.Financeiro: OP → Reservas", solutionUniqueName);
+EnsureUpdateStep(service, stepTypeId, "cr40f_composicaodeprecos", "new_status", "Cr40f.Financeiro: CP → Geral", solutionUniqueName);
 // Valor da OP = soma das composições das reservas (mesma soma do SyncEngine). Ver ValorOpPlugin.
 var valorOpTypeId = UpsertPluginTypeNamed(service, assemblyId, "Cr40f.Financeiro.Plugin.ValorOpPlugin");
 // new_valortotal é coluna calculada (subtotal + pedágios + passagens + estacionamento + combustível): não entra em Update,
