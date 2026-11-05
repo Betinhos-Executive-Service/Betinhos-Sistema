@@ -6,14 +6,14 @@ import { appendDitado } from "../../lib/useDitado";
 import { JUSTIFICATIVA_MINIMA } from "../../lib/conferenciaEnvio";
 
 /**
- * Popup "Dúvida" da conferência no envio: mostra a pergunta da IA e pede a justificativa (texto ou ditado).
- * "Responder e enviar" exige o mínimo de caracteres; "Voltar e corrigir", o X, o Esc e o toque fora voltam ao formulário.
+ * Popup "Dúvida" da conferência no envio: mostra a pergunta e pede a explicação (texto ou ditado).
+ * "Responder e enviar" exige o mínimo de caracteres; "Voltar e corrigir", o Esc e o toque fora voltam ao formulário.
  */
 export function ConferenciaDuvidaDialog({ pergunta, onResponder, onVoltar }: { pergunta: string; onResponder: (justificativa: string) => void; onVoltar: () => void }) {
   const [texto, setTexto] = useState("");
   const [tentou, setTentou] = useState(false);
   const caixaRef = useRef<HTMLDivElement>(null);
-  const valido = texto.trim().length >= JUSTIFICATIVA_MINIMA;
+  const faltam = Math.max(0, JUSTIFICATIVA_MINIMA - texto.trim().length);
 
   useEffect(() => {
     const anterior = document.activeElement as HTMLElement | null;
@@ -31,24 +31,42 @@ export function ConferenciaDuvidaDialog({ pergunta, onResponder, onVoltar }: { p
 
   const responder = () => {
     setTentou(true);
-    if (valido) onResponder(texto.trim());
+    if (!faltam) onResponder(texto.trim());
   };
 
   return createPortal(
-    <div className="contact-choice-overlay" role="dialog" aria-modal="true" aria-labelledby="duvida-titulo" aria-describedby="duvida-pergunta" onClick={onVoltar}>
-      <div className="contact-choice-dialog duvida-dialog" ref={caixaRef} onClick={(event) => event.stopPropagation()}>
-        <div className="duvida-topo">
-          <span className="duvida-icone" aria-hidden="true">?</span>
-          <div className="contact-choice-title" id="duvida-titulo">Dúvida sobre este gasto</div>
+    <div className="duvida-overlay" role="dialog" aria-modal="true" aria-labelledby="duvida-titulo" aria-describedby="duvida-pergunta" onClick={onVoltar}>
+      <div className="duvida-dialog" ref={caixaRef} onClick={(event) => event.stopPropagation()}>
+        <header className="duvida-topo">
+          <span className="duvida-icone" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9.5" /><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.3-2.4 3.8" /><path d="M12 17.2h.01" /></svg>
+          </span>
+          <div>
+            <h2 id="duvida-titulo">Antes de enviar, uma dúvida</h2>
+            <p>Responda para o gasto seguir para o financeiro.</p>
+          </div>
+        </header>
+
+        <div className="duvida-corpo">
+          <p className="duvida-pergunta" id="duvida-pergunta">{pergunta}</p>
+          <DitadoField onFinal={(fala) => setTexto((atual) => appendDitado(atual, fala))}>
+            <TextAreaField
+              fieldClassName="duvida-campo"
+              label="Sua explicação"
+              placeholder="Conte o que aconteceu. Ex.: almoço do passageiro, pago a pedido do cliente."
+              rows={3}
+              value={texto}
+              onChange={(event) => setTexto(event.target.value)}
+            />
+          </DitadoField>
+          <p className={`duvida-dica${tentou && faltam ? " is-erro" : ""}`} role={tentou && faltam ? "alert" : undefined}>
+            {faltam ? `Escreva ou fale pelo menos ${JUSTIFICATIVA_MINIMA} letras (faltam ${faltam}).` : "Pronto para enviar."}
+          </p>
         </div>
-        <p className="duvida-pergunta" id="duvida-pergunta">{pergunta}</p>
-        <DitadoField onFinal={(fala) => setTexto((atual) => appendDitado(atual, fala))}>
-          <TextAreaField fieldClassName="finalize-input-block shadow" label="Sua explicação" placeholder="Explique o que aconteceu" rows={4} value={texto} onChange={(event) => setTexto(event.target.value)} />
-        </DitadoField>
-        {tentou && !valido ? <p className="duvida-erro" role="alert">Escreva ou fale um pouco mais (pelo menos {JUSTIFICATIVA_MINIMA} letras).</p> : null}
+
         <div className="duvida-acoes">
-          <button type="button" className="contact-choice-cancel" onClick={onVoltar}>Voltar e corrigir</button>
           <button type="button" className="duvida-enviar" onClick={responder}>Responder e enviar</button>
+          <button type="button" className="duvida-voltar" onClick={onVoltar}>Voltar e corrigir o gasto</button>
         </div>
       </div>
     </div>,
