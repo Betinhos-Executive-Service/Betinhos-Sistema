@@ -84,7 +84,7 @@ export function TransacaoDrawer({ transacao: t, cartoes, source, onClose, onSave
     if (!t) return
     const salvo = { ...t, cartaoId: c.id, cartaoNome: c.nome, motoristaId: c.motoristaId, motoristaNome: c.motoristaNome, situacao: SITUACAO.pendente, motivo: motivoReprocessar(c) }
     // Fica aberto: o próximo passo é casar com a despesa do motorista.
-    void run(() => source.reprocessar(t, c), salvo, `Cartão vinculado: ${c.motoristaNome}. A conciliação das 08:00 casa ou cria a despesa para ele.`, false)
+    void run(() => source.reprocessar(t, c), salvo, `Cartão vinculado: ${c.motoristaNome}. A conciliação casa ou cria a despesa para ele em instantes.`, false)
   }
 
   const vig = t && pode?.reprocessar ? cartaoVigente(cartoes, t) : null
