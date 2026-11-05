@@ -1,15 +1,18 @@
 name: Deploy
 
-# Só DEV (decisão do Renan, 20/10/2026): push na branch dev publica a tela do Sistema Betinhos no DEV.
-# TEST e PROD não são publicados por aqui; o job managed antigo está no histórico do git (antes do PR "deploy só DEV").
+# Só DEV: push na branch develop publica a tela do Sistema Betinhos no DEV (decisão do Renan, 05/11/2026: develop → DEV,
+# main → PROD). TEST e PROD são do workflow Produção (producao.yml), disparado pela main.
+# A descrição do HTML publicado guarda a versão e o commit (push-dev.ps1); o publicar.yml usa o commit para nunca levar ao
+# PROD uma tela do DEV que ainda não entrou na main.
 # Feito para gastar poucos minutos de CI (repo privado, runner Windows conta em dobro):
 #  - só roda quando muda código do app; documentação, skills e scripts do plantão não disparam;
-#  - não repete o CI (typecheck e testes já passaram no PR que entrou na main);
+#  - não repete o CI (typecheck e testes já passaram no PR que entrou na develop);
 #  - instala só o pacote do shell e suas dependências;
-#  - um push novo cancela o deploy anterior; limite de 15 min.
+#  - limite de 15 min; um push novo espera o deploy em andamento (grupo dataverse-dev, o mesmo do export do publicar.yml,
+#    para o DEV nunca mudar no meio de um export). Só um fica na fila: o mais novo, que já inclui os anteriores.
 on:
   push:
-    branches: [dev]
+    branches: [develop]
     paths:
       - 'apps/shell/**'
       - 'packages/dataverse/**'
@@ -21,8 +24,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy-dev
-  cancel-in-progress: true
+  group: dataverse-dev
+  cancel-in-progress: false
 
 jobs:
   # DEV é não gerenciado e é onde schema e flows são editados; aqui só a tela é publicada.

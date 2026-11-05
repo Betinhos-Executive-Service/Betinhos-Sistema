@@ -22,9 +22,9 @@ Riscos reunidos dos achados em [05](05-ambiente-scripts-deploy.md), [06](06-back
 
 **Como testo e valido tipos?** `pnpm test` e `pnpm typecheck` na raiz. Os testes C# dos plugins ficam em `packages/plugins/*.Tests`; como rodá-los: **não confirmado**.
 
-**Como publico no DEV?** Pela `main` do checkout principal com `pnpm push`, ou levando `origin/main` à branch `dev` (workflow Deploy). Nunca de worktree ou de branch de feature.
+**Como publico no DEV?** Merge na `develop` (workflow Deploy), ou `pnpm push` do checkout principal na `develop`. Nunca de worktree ou de branch de feature.
 
-**E TEST/PROD?** Só pelo workflow manual "Publicar soluções" (ensaio no TEST antes do PROD; PROD exige backup e aprovação).
+**E TEST/PROD?** Merge da `develop` na `main` (workflow Produção): só a tela vai direto ao PROD; o resto passa pelo ensaio no TEST, backup e aprovação do Renan.
 
 **Onde mudo componentes visuais?** No repo `design-system-betinhos`; aqui só se atualiza a versão de `@betinhos/ui`.
 

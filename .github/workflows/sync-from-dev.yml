@@ -1,7 +1,7 @@
 name: Sincronizar solução do DEV
 
 # Traz schema, flows, plugins e WebResources editados no DEV para o repo (pasta solution/),
-# em uma branch sync/* com PR para dev. Só leitura no DEV.
+# em uma branch sync/* com PR para develop. Só leitura no DEV.
 on:
   workflow_dispatch:
 
@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: dev
+          ref: develop
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -49,7 +49,7 @@ jobs:
             -exec sed -i -E 's#<defaultvalue>[^<]*</defaultvalue>##' {} +
       - name: Varredura de segredos
         run: node packages/deploy/scan-secrets.mjs solution
-      - name: Abre PR para dev
+      - name: Abre PR para develop
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -61,4 +61,4 @@ jobs:
           git switch -c "$branch"
           git commit -m "Sincroniza a solução $SOLUTION a partir do DEV"
           git push origin "$branch"
-          gh pr create --base dev --head "$branch" --title "Sincroniza a solução $SOLUTION a partir do DEV" --body "Exportação automática do DEV. Revise o diff de schema e flows antes do merge."
+          gh pr create --base develop --head "$branch" --title "Sincroniza a solução $SOLUTION a partir do DEV" --body "Exportação automática do DEV. Revise o diff de schema e flows antes do merge."

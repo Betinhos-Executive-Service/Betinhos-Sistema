@@ -33,12 +33,15 @@ function Get-PublishedChunkNames([string] $ApiBaseUrl, [hashtable] $Headers, [st
   return @($seen.Keys)
 }
 
-function Remove-ObsoleteChunks([string] $ApiBaseUrl, [hashtable] $Headers, [string] $ChunkPrefix, [string[]] $Keep, [switch] $DryRun) {
+# -SomenteNaoGerenciados (PROD): chunk que veio por solucao gerenciada nao pode ser apagado direto; so o import o retira.
+function Remove-ObsoleteChunks([string] $ApiBaseUrl, [hashtable] $Headers, [string] $ChunkPrefix, [string[]] $Keep, [switch] $DryRun, [switch] $SomenteNaoGerenciados) {
   if (-not $Keep -or $Keep.Count -eq 0) { throw "Lista de chunks a manter vazia. Limpeza abortada." }
   $keepSet = @{}
   foreach ($k in $Keep) { $keepSet[$k] = $true }
   $prefix = $ChunkPrefix.Replace("'", "''")
-  $url = "$ApiBaseUrl/webresourceset?`$select=webresourceid,name&`$filter=startswith(name,'$prefix')"
+  $filter = "startswith(name,'$prefix')"
+  if ($SomenteNaoGerenciados) { $filter += " and ismanaged eq false" }
+  $url = "$ApiBaseUrl/webresourceset?`$select=webresourceid,name&`$filter=$filter"
   $all = @()
   while ($url) {
     $page = Invoke-RestMethod -Method Get -Uri $url -Headers ($Headers + @{ Prefer = "odata.maxpagesize=500" })
