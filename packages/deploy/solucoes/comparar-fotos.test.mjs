@@ -88,6 +88,20 @@ test('step sensível que chega novo sem configuração segura é perda; ausente 
   assert.deepEqual(d.stepsSensiveisSemSeguro, [{ nome: 'Novo sem segredo', steps: 1 }])
   assert.equal(temPerda(d), true)
 })
+test('no TEST travado, step sensível que já estava sem segredo é informativo; novo sem segredo continua perda', () => {
+  const semSeguro = { 'Já sem segredo': { existe: true, steps: 1, seguro: false } }
+  const antes = foto({ stepsSeguros: semSeguro })
+  const depois = foto({ stepsSeguros: { ...semSeguro, 'Novo sem segredo': { existe: true, steps: 1, seguro: false } } })
+  const d = compararFotos(antes, depois, { travado: true })
+  assert.deepEqual(d.stepsSensiveisJaSemSeguro, [{ nome: 'Já sem segredo', steps: 1 }])
+  assert.deepEqual(d.stepsSensiveisSemSeguro, [{ nome: 'Novo sem segredo', steps: 1 }])
+  assert.equal(temPerda(d), true)
+  assert.equal(temPerda(compararFotos(antes, foto({ stepsSeguros: semSeguro }), { travado: true })), false)
+})
+test('fora do TEST travado, step sensível sem segredo é perda mesmo se já estava assim', () => {
+  const fotoSem = () => foto({ stepsSeguros: { 'Já sem segredo': { existe: true, steps: 1, seguro: false } } })
+  assert.deepEqual(compararFotos(fotoSem(), fotoSem()).stepsSensiveisSemSeguro, [{ nome: 'Já sem segredo', steps: 1 }])
+})
 test('step desativado é perda', () => {
   const d = compararFotos(foto(), foto({ steps: { s1: { nome: 'Step 1', estado: 1, seguro: true } } }))
   assert.deepEqual(d.stepsDesativados, [{ id: 's1', nome: 'Step 1', antes: 0, depois: 1 }])
