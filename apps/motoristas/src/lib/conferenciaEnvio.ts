@@ -78,25 +78,27 @@ export function calcularSinais({ gasto, leituraData, recentes, servicos }: {
   const categoria = cat(gasto.categoria);
   const outros = recentes.filter((d) => d.id !== gasto.id && d.status !== STATUS_DESPESA.cancelado);
 
-  // Acima da política, só faixa vermelha.
-  if (REFEICAO.includes(categoria) && semaforo(gasto.valor, METAS_GASTOS.refeicao) === "vermelho") {
-    sinais.push({ tipo: "acima_politica", detalhe: `${gasto.categoria} de ${brl(gasto.valor)} contra a política de ${brl(METAS_GASTOS.refeicao.meta)}` });
+  // Acima da referência, só faixa vermelha (até 5% acima na refeição e 2% no litro não é problema).
+  const refeicaoAcima = REFEICAO.includes(categoria) && semaforo(gasto.valor, METAS_GASTOS.refeicao) === "vermelho";
+  if (refeicaoAcima) {
+    sinais.push({ tipo: "acima_politica", detalhe: `${gasto.categoria} de ${brl(gasto.valor)}; o valor de referência da empresa é ${brl(METAS_GASTOS.refeicao.meta)}` });
   }
   if (categoria === "abastecimento" && gasto.litros && gasto.litros > 0) {
     const porLitro = gasto.valor / gasto.litros;
     if (semaforo(porLitro, METAS_GASTOS.litro) === "vermelho") {
-      sinais.push({ tipo: "acima_politica", detalhe: `${brl(porLitro)} por litro contra a política de ${brl(METAS_GASTOS.litro.meta)}` });
+      sinais.push({ tipo: "acima_politica", detalhe: `${brl(porLitro)} por litro; o valor de referência da empresa é ${brl(METAS_GASTOS.litro.meta)}` });
     }
   }
 
-  // Refeição perto de outra (com hora: < 3 h; sem hora: mesma refeição no mesmo dia).
-  if (REFEICAO.includes(categoria)) {
+  // Refeição perto de outra (com hora: < 3 h; sem hora: mesma refeição no mesmo dia). Só pergunta quando a refeição
+  // atual passou da referência: duas refeições dentro do valor não são problema. Não cita o valor da outra refeição.
+  if (refeicaoAcima) {
     const perto = outros.find((d) => {
       if (!REFEICAO.includes(cat(d.categoria))) return false;
       const horas = horasEntre(gasto, d);
       return horas == null ? d.data === gasto.data && cat(d.categoria) === categoria : horas < LIMITES.refeicaoHoras;
     });
-    if (perto) sinais.push({ tipo: "refeicao_proxima", detalhe: `${perto.categoria} de ${brl(perto.valor)} em ${diaMes(perto.data)}${perto.hora ? ` às ${perto.hora}` : ""}` });
+    if (perto) sinais.push({ tipo: "refeicao_proxima", detalhe: `Já há outro ${perto.categoria.toLowerCase()} registrado em ${diaMes(perto.data)}${perto.hora ? ` às ${perto.hora}` : ""}` });
   }
 
   // Abastecimento perto de outro do mesmo veículo (< 4 h ou < 150 km rodados).
@@ -242,5 +244,5 @@ export async function respostaConferenciaMock(sinais: Sinal[]) {
   const modo = new URLSearchParams(window.location.search).get("mockConferencia");
   if (modo === "erro") return { ok: false, erro: "conferencia_indisponivel" };
   if (modo === "sem") return { ok: true, resultado: "sem_duvida", pergunta: null, motivos: [] };
-  return { ok: true, resultado: "duvida", pergunta: `${sinais.map((s) => s.detalhe).join(". ")}. O que aconteceu?`, motivos: sinais.map((s) => s.tipo) };
+  return { ok: true, resultado: "duvida", pergunta: `Só para registrar certinho: ${sinais.map((s) => s.detalhe).join(". ")}. Pode contar rapidinho o que aconteceu?`, motivos: sinais.map((s) => s.tipo) };
 }
