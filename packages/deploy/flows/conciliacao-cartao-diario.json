@@ -352,8 +352,7 @@
                   "runtimeConfiguration": {
                     "secureData": {
                       "properties": [
-                        "inputs",
-                        "outputs"
+                        "inputs"
                       ]
                     }
                   }
@@ -369,8 +368,7 @@
                   "runtimeConfiguration": {
                     "secureData": {
                       "properties": [
-                        "inputs",
-                        "outputs"
+                        "inputs"
                       ]
                     }
                   }
@@ -467,8 +465,7 @@
           "runtimeConfiguration": {
             "secureData": {
               "properties": [
-                "inputs",
-                "outputs"
+                "inputs"
               ]
             }
           }
