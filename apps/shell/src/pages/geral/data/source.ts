@@ -93,10 +93,14 @@ const BLOCKED_ID = 'OS-1013'
 const BIND_SUFFIX = '@odata.bind'
 const LOOKUP_IDS = 10
 
-/** Opções do mock. `latency` multiplica as esperas simuladas (1 = as de `pnpm dev`; 0 = resposta imediata, para testes). */
-export type SourceOptions = { latency?: number }
+/**
+ * Opções do mock. `latency` multiplica as esperas simuladas (1 = as de `pnpm dev`; 0 = resposta imediata, para testes).
+ * `pageSize` troca o tamanho da página só no mock: os testes de tela usam páginas menores, porque no jsdom renderizar e
+ * consultar por papel 100 linhas custa caro e a maioria dos testes não precisa de tantas.
+ */
+export type SourceOptions = { latency?: number; pageSize?: number }
 
-function createMockSource({ latency = 1 }: SourceOptions = {}): Source {
+function createMockSource({ latency = 1, pageSize = PAGE_SIZE }: SourceOptions = {}): Source {
   const wait = (ms: number) => (latency === 0 ? Promise.resolve() : new Promise((resolve) => setTimeout(resolve, ms * latency)))
   const now = new Date()
   const rows = createMockRows(now)
@@ -171,7 +175,7 @@ function createMockSource({ latency = 1 }: SourceOptions = {}): Source {
     attributes: async (entity) => (entity === ENTITY ? new Map(MOCK_ATTRIBUTES) : new Map<string, AttributeInfo>()),
     async page(req) {
       await wait(300)
-      const page = applyMockFetch(rows, req.fetchxml, { ...req, pageSize: PAGE_SIZE, now: new Date() })
+      const page = applyMockFetch(rows, req.fetchxml, { ...req, pageSize, now: new Date() })
       // Como no Dataverse (sem `returntotalrecordcount`), o total não vem com a página: a tela pede a contagem à parte.
       return { ...page, rows: page.rows.map((r) => ({ ...r })), total: null }
     },
