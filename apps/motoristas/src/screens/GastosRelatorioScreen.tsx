@@ -1,10 +1,11 @@
-import { useState, type CSSProperties } from "react";
+import { useCallback, useState, type CSSProperties } from "react";
 import { ActionBar, ActionButton } from "../components/common/ActionButton";
-import { GraficoMedias, GraficoStatus, Sparkline } from "../components/gastos/GastosCharts";
+import { DespesaDetalheDialog, STATUS_BADGE } from "../components/gastos/DespesaDetalheDialog";
+import { GraficoMedias } from "../components/gastos/GastosCharts";
 import { AppShell } from "../components/layout/AppShell";
 import { ServicesMenu } from "../components/navigation/ServicesMenu";
 import { formatDiaMes, isMockGastosCartao } from "../lib/gastosCartao";
-import { PERIODOS, STATUS_DESPESA, formatBRL, plural, type PeriodoId, type PontoTendencia, type RelatorioModelo } from "../lib/gastosRelatorio";
+import { METAS_GASTOS, PERIODOS, ehPendente, formatBRL, plural, semaforo, type DespesaRelatorio, type PeriodoId, type RelatorioModelo, type Semaforo } from "../lib/gastosRelatorio";
 
 export type GastosRelatorioLoadStatus = "loading" | "ready" | "error";
 
@@ -21,18 +22,12 @@ type GastosRelatorioScreenProps = {
   onAttach: () => void;
 };
 
-const STATUS_BADGE: Record<number, { rotulo: string; tom: string }> = {
-  [STATUS_DESPESA.enviado]: { rotulo: "Enviado", tom: "neutro" },
-  [STATUS_DESPESA.validado]: { rotulo: "Validado", tom: "sucesso" },
-  [STATUS_DESPESA.precisaCorrigir]: { rotulo: "Precisa corrigir", tom: "atencao" },
-  [STATUS_DESPESA.recusado]: { rotulo: "Recusado", tom: "erro" }
-};
-
 export function GastosRelatorioScreen({ modelo, periodoId, loadStatus, pendentesCartao, onPeriodo, onBack, onReload, onCompletar, onAttach }: GastosRelatorioScreenProps) {
   const carregando = loadStatus === "loading" && !modelo;
   const erro = loadStatus === "error" && !modelo;
-  // Fica aqui (fora do Relatorio, que remonta a cada período) para a aba do gráfico sobreviver à troca de período.
+  // Ficam aqui (fora do Relatorio, que remonta a cada período) para a aba do gráfico e o filtro sobreviverem à troca de período.
   const [grafico, setGrafico] = useState<Grafico>("litro");
+  const [filtro, setFiltro] = useState<Filtro>("pendentes");
   return (
     <AppShell screenLabel="GastosRelatorio">
       <ServicesMenu
@@ -59,7 +54,7 @@ export function GastosRelatorioScreen({ modelo, periodoId, loadStatus, pendentes
         ) : modelo && modelo.quantidade === 0 ? (
           <p className="termo-empty">Nenhum gasto neste período. Para lançar um gasto, toque em Anexar despesa.</p>
         ) : modelo ? (
-          <Relatorio key={periodoId} modelo={modelo} grafico={grafico} onGrafico={setGrafico} pendentesCartao={pendentesCartao} onCompletar={onCompletar} />
+          <Relatorio key={periodoId} modelo={modelo} grafico={grafico} onGrafico={setGrafico} filtro={filtro} onFiltro={setFiltro} pendentesCartao={pendentesCartao} onCompletar={onCompletar} />
         ) : null}
       </section>
       <ActionBar className="finalize-actions gr-actions">
@@ -71,28 +66,23 @@ export function GastosRelatorioScreen({ modelo, periodoId, loadStatus, pendentes
 }
 
 type Cartao = RelatorioModelo["cartoes"][number];
+type Destaque = "litro" | "refeicao";
 
-/** Médias de maior peso para o motorista: ficam sempre no topo, mesmo sem dados no período. */
-const DESTAQUES: { id: "litro" | "refeicao"; titulo: string; vazio: string }[] = [
-  { id: "litro", titulo: "Preço médio por litro", vazio: "Nenhum abastecimento com litros neste período" },
-  { id: "refeicao", titulo: "Refeição média", vazio: "Nenhum almoço ou jantar neste período" }
+/** Médias de maior peso: sempre no topo, lado a lado, com o semáforo contra a política da empresa. */
+const DESTAQUES: { id: Destaque; titulo: string; vazio: string; meta: string }[] = [
+  { id: "litro", titulo: "Preço por litro", vazio: "Sem abastecimento com litros", meta: `Meta ${formatBRL(METAS_GASTOS.litro.meta)}/L` },
+  { id: "refeicao", titulo: "Refeição média", vazio: "Sem almoço ou jantar", meta: `Meta ${formatBRL(METAS_GASTOS.refeicao.meta)}` }
 ];
+const SEMAFORO_ROTULO: Record<Semaforo, string> = { verde: "Dentro da meta", amarelo: "Pouco acima", vermelho: "Acima da meta" };
 
 const DECIMAL_2 = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const GRAFICOS: Record<"litro" | "refeicao", { aba: string; rotulo: string; vazio: string; curto: (valor: number) => string; longo: (valor: number) => string }> = {
+const GRAFICOS: Record<Destaque, { aba: string; rotulo: string; vazio: string; curto: (valor: number) => string; longo: (valor: number) => string }> = {
   litro: { aba: "R$/L", rotulo: "Preço médio por litro", vazio: "Nenhum abastecimento com litros nos últimos meses.", curto: (valor) => DECIMAL_2.format(valor), longo: (valor) => `${formatBRL(valor)} por litro` },
   refeicao: { aba: "Refeição", rotulo: "Refeição média", vazio: "Nenhum almoço ou jantar nos últimos meses.", curto: (valor) => String(Math.round(valor)), longo: formatBRL }
 };
-type Grafico = keyof typeof GRAFICOS;
+type Grafico = Destaque;
 const ABAS = Object.keys(GRAFICOS) as Grafico[];
-
-/** Ordem dos status (rosca e legenda) e cor de cada um (DS: green-600, slate-400, amber-700, red-700). */
-const STATUS_CORES = [
-  { chave: "validado", rotulo: "Validado", cor: "#168f57" },
-  { chave: "enviado", rotulo: "Enviado", cor: "#94a3b8" },
-  { chave: "precisaCorrigir", rotulo: "Precisa corrigir", cor: "#b17a00" },
-  { chave: "recusado", rotulo: "Recusado", cor: "#c12f45" }
-] as const;
+type Filtro = "pendentes" | "todas";
 
 /** Posição na cascata de entrada (CSS usa `--i` para o atraso). */
 const ordem = (i: number) => ({ "--i": i }) as CSSProperties;
@@ -111,16 +101,26 @@ function Variacao({ cartao, rotuloAnterior, compacto = false }: { cartao: Cartao
   );
 }
 
-type Destaque = (typeof DESTAQUES)[number];
-
-function CartaoDestaque({ destaque, cartao, tendencia, rotuloAnterior, i }: { destaque: Destaque; cartao?: Cartao; tendencia: PontoTendencia[]; rotuloAnterior: string; i: number }) {
+/** Comparação com o período anterior em texto discreto (a cor do cartão já é o semáforo). */
+function VariacaoTexto({ variacao, rotuloAnterior }: { variacao: number | null; rotuloAnterior: string }) {
+  if (variacao == null) return <span className="gr-kpi-comparacao">Sem base no {rotuloAnterior}</span>;
+  if (variacao === 0) return <span className="gr-kpi-comparacao">Igual ao {rotuloAnterior}</span>;
   return (
-    <li className="gr-kpi" data-media={destaque.id} data-vazio={cartao ? undefined : "true"} style={ordem(i)}>
+    <span className="gr-kpi-comparacao">
+      <span aria-hidden="true">{variacao > 0 ? "▲" : "▼"}</span><span className="gr-sr">{variacao > 0 ? "subiu" : "caiu"}</span> {Math.abs(variacao)}% vs {rotuloAnterior}
+    </span>
+  );
+}
+
+function CartaoDestaque({ destaque, cartao, rotuloAnterior, i }: { destaque: (typeof DESTAQUES)[number]; cartao?: Cartao; rotuloAnterior: string; i: number }) {
+  const cor = cartao ? semaforo(cartao.valor, METAS_GASTOS[destaque.id]) : undefined;
+  return (
+    <li className="gr-kpi" data-media={destaque.id} data-semaforo={cor} data-vazio={cartao ? undefined : "true"} style={ordem(i)}>
       <span className="gr-media-titulo">{destaque.titulo}</span>
       <strong className="gr-kpi-valor">{cartao ? cartao.valorTexto : "Sem dados"}</strong>
-      <span className="gr-media-detalhe">{cartao ? cartao.detalhe : destaque.vazio}</span>
-      {cartao ? <Variacao cartao={cartao} rotuloAnterior={rotuloAnterior} /> : null}
-      <Sparkline pontos={tendencia} />
+      {cor ? <span className="gr-kpi-semaforo"><i aria-hidden="true" />{SEMAFORO_ROTULO[cor]}</span> : <span className="gr-media-detalhe">{destaque.vazio}</span>}
+      <span className="gr-media-detalhe">{destaque.meta}</span>
+      {cartao ? <VariacaoTexto variacao={cartao.variacao} rotuloAnterior={rotuloAnterior} /> : null}
     </li>
   );
 }
@@ -136,12 +136,15 @@ function CartaoMedia({ cartao, rotuloAnterior, i }: { cartao: Cartao; rotuloAnte
   );
 }
 
-type RelatorioProps = { modelo: RelatorioModelo; grafico: Grafico; onGrafico: (id: Grafico) => void; pendentesCartao: number; onCompletar: () => void };
+type RelatorioProps = { modelo: RelatorioModelo; grafico: Grafico; onGrafico: (id: Grafico) => void; filtro: Filtro; onFiltro: (id: Filtro) => void; pendentesCartao: number; onCompletar: () => void };
 
-function Relatorio({ modelo, grafico, onGrafico, pendentesCartao, onCompletar }: RelatorioProps) {
+function Relatorio({ modelo, grafico, onGrafico, filtro, onFiltro, pendentesCartao, onCompletar }: RelatorioProps) {
   const { status, tendencia, periodo } = modelo;
+  const [aberta, setAberta] = useState<DespesaRelatorio | null>(null);
+  const fecharDetalhe = useCallback(() => setAberta(null), []);
   const outrasMedias = modelo.cartoes.filter((cartao) => !DESTAQUES.some((destaque) => destaque.id === cartao.id));
-  const totalStatus = status.enviado + status.validado + status.precisaCorrigir + status.recusado;
+  const pendentes = modelo.despesas.filter(ehPendente);
+  const lista = filtro === "pendentes" ? pendentes : modelo.despesas;
   const pendencias = [
     status.precisaCorrigir ? plural(status.precisaCorrigir, "gasto precisa de correção", "gastos precisam de correção") : "",
     status.recusado ? plural(status.recusado, "gasto recusado", "gastos recusados") : ""
@@ -162,7 +165,7 @@ function Relatorio({ modelo, grafico, onGrafico, pendentesCartao, onCompletar }:
         <h2 className="termo-section-title" id="gr-medias">Suas médias</h2>
         <ul className="gr-kpis gr-destaques">
           {DESTAQUES.map((destaque, i) => (
-            <CartaoDestaque key={destaque.id} destaque={destaque} cartao={modelo.cartoes.find((item) => item.id === destaque.id)} tendencia={tendencia[destaque.id]} rotuloAnterior={periodo.rotuloAnterior} i={i + 1} />
+            <CartaoDestaque key={destaque.id} destaque={destaque} cartao={modelo.cartoes.find((item) => item.id === destaque.id)} rotuloAnterior={periodo.rotuloAnterior} i={i + 1} />
           ))}
         </ul>
         {outrasMedias.length ? (
@@ -203,43 +206,43 @@ function Relatorio({ modelo, grafico, onGrafico, pendentesCartao, onCompletar }:
         )}
       </section>
 
-      <section className="gr-bloco" aria-labelledby="gr-status" style={ordem(4)}>
-        <h2 className="termo-section-title" id="gr-status">Status dos envios</h2>
-        <div className="gr-status-painel">
-          <GraficoStatus total={totalStatus} fatias={STATUS_CORES.map((item) => ({ rotulo: item.rotulo, valor: status[item.chave], cor: item.cor }))} />
-          <ul className="gr-status">
-            {STATUS_CORES.map((item) => (
-              <li key={item.chave} data-zero={status[item.chave] ? undefined : "true"}>
-                <i style={{ background: item.cor }} aria-hidden="true" />
-                <span>{item.rotulo}</span>
-                <strong>{status[item.chave]}</strong>
-              </li>
-            ))}
-          </ul>
+      <section className="gr-bloco gr-despesas" aria-labelledby="gr-despesas" style={ordem(4)}>
+        <div className="gr-bloco-cabecalho">
+          <h2 className="termo-section-title" id="gr-despesas">Despesas</h2>
+          <div className="gr-abas" role="group" aria-label="Despesas exibidas">
+            <button type="button" className="gr-aba" aria-pressed={filtro === "pendentes"} onClick={() => onFiltro("pendentes")}>Pendentes ({pendentes.length})</button>
+            <button type="button" className="gr-aba" aria-pressed={filtro === "todas"} onClick={() => onFiltro("todas")}>Todas ({modelo.despesas.length})</button>
+          </div>
         </div>
+        {lista.length ? (
+          <ul className="gr-lista">
+            {lista.map((item) => {
+              const badge = STATUS_BADGE[item.status];
+              return (
+                <li key={item.id}>
+                  <button type="button" className="gr-linha" onClick={() => setAberta(item)}>
+                    <span className="gr-linha-main">
+                      <strong>{item.categoria}</strong>
+                      <span>{item.estabelecimento || "Sem estabelecimento"}</span>
+                      <small>{formatDiaMes(item.data)}</small>
+                    </span>
+                    <span className="gr-linha-side">
+                      <strong>{formatBRL(item.valor)}</strong>
+                      {badge ? <span className="termo-badge" data-tone={badge.tom}>{badge.rotulo}</span> : null}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <div className="gr-vazio">
+            <p className="gr-legenda">Nenhuma pendência neste período.</p>
+            <button type="button" className="termo-text-button" onClick={() => onFiltro("todas")}>Ver todas</button>
+          </div>
+        )}
       </section>
-
-      <section className="gr-bloco" aria-labelledby="gr-ultimas" style={ordem(5)}>
-        <h2 className="termo-section-title" id="gr-ultimas">Últimas despesas</h2>
-        <ul className="gr-lista">
-          {modelo.ultimas.map((item) => {
-            const badge = STATUS_BADGE[item.status];
-            return (
-              <li key={item.id} className="gr-linha">
-                <span className="gr-linha-main">
-                  <strong>{item.categoria}</strong>
-                  <span>{item.estabelecimento || "Sem estabelecimento"}</span>
-                  <small>{formatDiaMes(item.data)}</small>
-                </span>
-                <span className="gr-linha-side">
-                  <strong>{formatBRL(item.valor)}</strong>
-                  {badge ? <span className="termo-badge" data-tone={badge.tom}>{badge.rotulo}</span> : null}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+      {aberta ? <DespesaDetalheDialog despesa={aberta} onClose={fecharDetalhe} /> : null}
     </div>
   );
 }

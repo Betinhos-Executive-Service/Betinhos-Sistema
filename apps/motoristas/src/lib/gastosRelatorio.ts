@@ -8,7 +8,7 @@ import { isMockGastosCartao } from "./gastosCartao.ts";
 
 export const STATUS_DESPESA = { enviado: 100000000, precisaCorrigir: 100000001, validado: 100000002, recusado: 100000003, cancelado: 100000004 } as const;
 /** cr40f_statusanexo: 100000000 Sem anexo, 100000003 Falhou (sem comprovante utilizável). */
-const ANEXO_SEM_COMPROVANTE = [100000000, 100000003];
+export const ANEXO_SEM_COMPROVANTE = [100000000, 100000003];
 const TIME_ZONE = "America/Sao_Paulo";
 
 export type PeriodoId = "mes" | "mesAnterior" | "3meses";
@@ -190,7 +190,7 @@ export function mediaPorGasto(despesas: DespesaRelatorio[], ...categorias: strin
 
 type Media = { valor: number; quantidade: number } | null;
 type MediasBrutas = {
-  litro: Media; consumo: Media; refeicao: Media; cafeLanche: Media; estacionamento: Media; pedagio: Media; lavagem: Media;
+  litro: Media; consumo: Media; refeicao: Media; cafeLanche: Media; lavagem: Media;
 };
 
 export function calcularMedias(todas: DespesaRelatorio[], inicio: string, fim: string): MediasBrutas {
@@ -200,8 +200,6 @@ export function calcularMedias(todas: DespesaRelatorio[], inicio: string, fim: s
     consumo: consumoMedioKmL(todas, inicio, fim),
     refeicao: mediaPorGasto(lista, "almoco", "jantar"),
     cafeLanche: mediaPorGasto(lista, "cafe", "lanche"),
-    estacionamento: mediaPorGasto(lista, "estacionamento"),
-    pedagio: mediaPorGasto(lista, "pedagio"),
     lavagem: mediaPorGasto(lista, "lavagem")
   };
 }
@@ -213,7 +211,7 @@ export function variacaoPercentual(atual: number | null | undefined, anterior: n
 }
 
 type CartaoMedia = {
-  id: "litro" | "consumo" | "refeicao" | "cafeLanche" | "estacionamento" | "pedagio" | "lavagem";
+  id: "litro" | "consumo" | "refeicao" | "cafeLanche" | "lavagem";
   titulo: string;
   valor: number;
   valorTexto: string;
@@ -229,8 +227,6 @@ function montarCartoes(atual: MediasBrutas, anterior: MediasBrutas): CartaoMedia
     { id: "consumo", titulo: "Consumo médio", texto: (v) => `${DECIMAL.format(v)} km/L`, detalhe: (n) => `estimado em ${plural(n, "trecho", "trechos")}` },
     { id: "refeicao", titulo: "Refeição média", texto: formatBRL, detalhe: (n) => `almoço e jantar · ${plural(n, "gasto", "gastos")}` },
     { id: "cafeLanche", titulo: "Café e lanche médio", texto: formatBRL, detalhe: (n) => plural(n, "gasto", "gastos") },
-    { id: "estacionamento", titulo: "Estacionamento médio", texto: formatBRL, detalhe: (n) => plural(n, "gasto", "gastos") },
-    { id: "pedagio", titulo: "Pedágio médio", texto: formatBRL, detalhe: (n) => plural(n, "gasto", "gastos") },
     { id: "lavagem", titulo: "Lavagem média", texto: formatBRL, detalhe: (n) => plural(n, "gasto", "gastos") }
   ];
   return defs.flatMap((def) => {
@@ -240,6 +236,30 @@ function montarCartoes(atual: MediasBrutas, anterior: MediasBrutas): CartaoMedia
     return [{ id: def.id, titulo: def.titulo, valor: media.valor, valorTexto: def.texto(media.valor), detalhe: def.detalhe(media.quantidade), variacao }];
   });
 }
+
+// ---------------- Política de gastos (semáforo) ----------------
+
+/**
+ * Política da empresa: R$ 6,10 por litro e R$ 42 por refeição. A tolerância é a faixa amarela acima da meta, menor no
+ * combustível (pouca diferença no litro pesa muito no mês). Fixa aqui até a tela do gestor no Sistema Betinhos gravar
+ * esses valores no Dataverse; quando existir, só este ponto passa a ler de lá.
+ */
+export const METAS_GASTOS = {
+  litro: { meta: 6.1, tolerancia: 0.02 },
+  refeicao: { meta: 42, tolerancia: 0.05 }
+} as const;
+
+export type Semaforo = "verde" | "amarelo" | "vermelho";
+
+/** Verde na meta ou abaixo; amarelo até `tolerancia` acima; vermelho além disso. Compara em milésimos para evitar ruído de ponto flutuante. */
+export function semaforo(valor: number, { meta, tolerancia }: { meta: number; tolerancia: number }): Semaforo {
+  const milesimos = (n: number) => Math.round(n * 1000);
+  if (milesimos(valor) <= milesimos(meta)) return "verde";
+  return milesimos(valor) <= milesimos(meta * (1 + tolerancia)) ? "amarelo" : "vermelho";
+}
+
+/** O que exige ação do motorista: precisa corrigir ou recusado. */
+export const ehPendente = (d: Pick<DespesaRelatorio, "status">) => d.status === STATUS_DESPESA.precisaCorrigir || d.status === STATUS_DESPESA.recusado;
 
 type ContagemStatus = { enviado: number; validado: number; precisaCorrigir: number; recusado: number };
 
@@ -301,7 +321,8 @@ export type RelatorioModelo = {
   status: ContagemStatus;
   semComprovante: number;
   tendencia: ReturnType<typeof tendenciaMensal>;
-  ultimas: DespesaRelatorio[];
+  /** Todas as despesas do período, da mais recente para a mais antiga. */
+  despesas: DespesaRelatorio[];
 };
 
 export function montarRelatorio(despesas: DespesaRelatorio[], periodoId: PeriodoId, hoje: string): RelatorioModelo {
@@ -319,7 +340,7 @@ export function montarRelatorio(despesas: DespesaRelatorio[], periodoId: Periodo
     status,
     semComprovante,
     tendencia: tendenciaMensal(despesas, periodo, hoje),
-    ultimas: [...doPeriodo].sort((a, b) => b.data.localeCompare(a.data)).slice(0, 10)
+    despesas: [...doPeriodo].sort((a, b) => b.data.localeCompare(a.data))
   };
 }
 

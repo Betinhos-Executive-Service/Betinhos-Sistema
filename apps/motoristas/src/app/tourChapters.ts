@@ -748,14 +748,13 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
       step("voltar", "Voltar", ["Volta para o Início."], { target: SERVICE_HOME }),
       step("periodo", "Período", ["Escolha Mês atual, Mês anterior ou 3 meses. Todos os números da tela são recalculados para o período."], { target: ".gr-periodos" }),
       step("medias", "Suas médias", [
-        "No topo, o preço médio por litro e a refeição média (almoço e jantar), com a seta de alta ou queda contra o período anterior e a linha dos últimos meses.",
-        "Logo abaixo ficam consumo, café e lanche, estacionamento, pedágio e lavagem. Só aparecem as que têm dados."
+        "No topo, o preço por litro e a refeição média (almoço e jantar) lado a lado. A cor compara com a meta da empresa: verde dentro, amarelo pouco acima e vermelho acima. Embaixo, a variação contra o período anterior.",
+        "Logo abaixo ficam consumo, café e lanche e lavagem. Só aparecem as que têm dados."
       ], { target: ".gr-destaques", optional: true }),
       step("alerta", "Pendências", ["Quando algum gasto precisa de correção ou foi recusado, o aviso aparece aqui no topo."], { target: ".gr-alerta", optional: true }),
       step("insights", "Para você", ["Frases curtas calculadas no app, como gastos sem comprovante ou a variação do litro."], { target: ".gr-insights", optional: true }),
       step("evolucao", "Médias por mês", ["Escolha R$/L ou Refeição para ver a média de cada mês. Os meses do período escolhido ficam em azul-escuro."], { target: ".gr-evolucao", optional: true }),
-      step("status", "Status dos envios", ["A rosca mostra a proporção de gastos Validados, Enviados, Precisando corrigir e Recusados, com o total no centro."], { target: ".gr-status-painel", optional: true }),
-      step("ultimas", "Últimas despesas", ["As 10 despesas mais recentes do período, com o status de cada uma."], { target: ".gr-lista", optional: true }),
+      step("despesas", "Despesas", ["Pendentes mostra o que precisa de correção ou foi recusado. Todas mostra as despesas do período. Toque numa despesa para ver o detalhe."], { target: ".gr-despesas", optional: true }),
       step("completar", "Completar", ["Quando há gastos do cartão para completar, o botão da esquerda abre a lista deles."], { target: ".gr-actions .action-button--secondary", optional: true }),
       step("anexar", "Anexar despesa", ["Abre a câmera para fotografar o comprovante e lançar um gasto novo."], { target: ".gr-actions .action-button--primary" }),
       helpStep()

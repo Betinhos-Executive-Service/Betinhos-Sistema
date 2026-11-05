@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  METAS_GASTOS,
   STATUS_DESPESA,
   calcularMedias,
   consumoMedioKmL,
   contarSemComprovante,
   despesasDoPeriodo,
   despesasMock,
+  ehPendente,
   filtroDespesasRelatorio,
   hojeSaoPaulo,
   mapDespesaRelatorio,
@@ -14,6 +16,7 @@ import {
   montarRelatorio,
   periodoDe,
   precoMedioLitro,
+  semaforo,
   tendenciaMensal,
   variacaoPercentual,
   type DespesaRelatorio
@@ -69,7 +72,31 @@ test("Cancelado fica fora de total, médias, status e lista", () => {
   assert.equal(rel.total, 40);
   assert.equal(rel.quantidade, 1);
   assert.equal(rel.cartoes[0].valor, 40);
-  assert.equal(rel.ultimas.length, 1);
+  assert.equal(rel.despesas.length, 1);
+});
+
+test("semáforo contra a política: litro com faixa amarela de 2% e refeição de 5%", () => {
+  const { litro, refeicao } = METAS_GASTOS;
+  assert.equal(semaforo(6.1, litro), "verde");
+  assert.equal(semaforo(5.89, litro), "verde");
+  assert.equal(semaforo(6.11, litro), "amarelo");
+  assert.equal(semaforo(6.222, litro), "amarelo");
+  assert.equal(semaforo(6.23, litro), "vermelho");
+  assert.equal(semaforo(42, refeicao), "verde");
+  assert.equal(semaforo(44.1, refeicao), "amarelo");
+  assert.equal(semaforo(44.11, refeicao), "vermelho");
+});
+
+test("lista do período: todas da mais recente para a mais antiga; pendente é só precisa corrigir e recusado", () => {
+  const lista = [
+    d({ id: "a", categoria: "Almoço", data: "2026-11-02", status: STATUS_DESPESA.validado }),
+    d({ id: "b", categoria: "Almoço", data: "2026-11-05", status: STATUS_DESPESA.precisaCorrigir }),
+    d({ id: "c", categoria: "Almoço", data: "2026-11-03", status: STATUS_DESPESA.enviado }),
+    d({ id: "e", categoria: "Almoço", data: "2026-11-01", status: STATUS_DESPESA.recusado })
+  ];
+  const rel = montarRelatorio(lista, "mes", HOJE);
+  assert.deepEqual(rel.despesas.map((x) => x.id), ["b", "c", "a", "e"]);
+  assert.deepEqual(rel.despesas.filter(ehPendente).map((x) => x.id), ["b", "e"]);
 });
 
 test("tendência mensal: R$/L e refeição por mês até o atual, sem meses vazios no início e com o período marcado", () => {
@@ -164,7 +191,7 @@ test("mock: cerca de 25 despesas, nunca no futuro, e o relatório do mês atual 
     assert.ok(mock.every((x) => x.data <= hoje), `futuro em ${hoje}`);
   }
   const rel = montarRelatorio(despesasMock("2026-11-20"), "mes", "2026-11-20");
-  assert.deepEqual(rel.cartoes.map((c) => c.id), ["litro", "consumo", "refeicao", "cafeLanche", "estacionamento", "pedagio", "lavagem"]);
+  assert.deepEqual(rel.cartoes.map((c) => c.id), ["litro", "consumo", "refeicao", "cafeLanche", "lavagem"]);
   assert.ok(rel.cartoes.every((c) => c.variacao != null));
   assert.ok(rel.insights.length >= 2 && rel.insights.length <= 4);
 });
