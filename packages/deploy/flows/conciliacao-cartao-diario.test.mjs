@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { despesa } from './conciliacao-cartao-tempo-real.mjs'
 
 const raw = readFileSync(new URL('./conciliacao-cartao-diario.json', import.meta.url), 'utf8')
 const flow = JSON.parse(raw)
@@ -177,7 +178,8 @@ test('operationType PAGAMENTO é compra; pagamento de fatura só como crédito c
 test('transação reaberta pelo Reprocessar da tela passa pela mesma regra de casar ou criar despesa, antes do push', () => {
   const ordem = Object.keys(flow.actions)
   assert.ok(ordem.indexOf('Cada_transacao') < ordem.indexOf('Reabertas') && ordem.indexOf('Cada_reaberta') < ordem.indexOf('Pendentes'))
-  assert.deepEqual(acao('Pendentes').runAfter, { Cada_reaberta: ['Succeeded', 'Failed', 'Skipped'] })
+  assert.deepEqual(acao('Paradas').runAfter, { Cada_reaberta: ['Succeeded', 'Failed', 'Skipped'] })
+  assert.deepEqual(acao('Pendentes').runAfter, { Cada_parada: ['Succeeded', 'Failed', 'Skipped'] })
   const filtro = acao('Reabertas').inputs.parameters.$filter
   for (const parte of ['cr40f_situacao eq 100000000', 'cr40f_tipo eq 100000000', '_cr40f_cartao_value ne null', '_cr40f_motorista_value ne null', '_cr40f_despesa_value eq null']) assert.ok(filtro.includes(parte), parte)
   const loop = acao('Cada_reaberta')
@@ -192,4 +194,18 @@ test('transação reaberta pelo Reprocessar da tela passa pela mesma regra de ca
 
 test('falha ao passar a despesa para o motorista (dono) não impede vincular a despesa à transação', () => {
   for (const s of ['', '_R']) assert.deepEqual(acao(`Despesa_criada${s}`).runAfter, { [`Tem_usuario${s}`]: ['Succeeded', 'Failed'] })
+})
+
+test('varre transação parada em Aguardando quando o gatilho da despesa não pegou', () => {
+  assert.match(acao('Paradas').inputs.parameters.$filter, /cr40f_situacao eq 100000003 .*__NAV_T_DESPESA__\/cr40f_statusoperacional ne 100000001/)
+  assert.equal(acao('Paradas').inputs.parameters.$expand, '__NAV_T_DESPESA__($select=cr40f_statusoperacional)')
+  // Mesma regra do flow Despesa atualizada: só muda de onde vem o status.
+  const gravar = acao('Concluir_parada').inputs.parameters
+  const regra = despesa(flow).actions.Cada_aguardando.actions.Concluir.inputs.parameters
+  for (const campo of ['item/cr40f_situacao', 'item/cr40f_motivo']) {
+    assert.equal(gravar[campo].replaceAll("items('Cada_parada')?['__NAV_T_DESPESA__']?['cr40f_statusoperacional']", "triggerOutputs()?['body/cr40f_statusoperacional']"), regra[campo])
+  }
+  const erro = JSON.stringify(acao('Houve_erro').expression)
+  assert.match(erro, /Paradas/)
+  assert.match(erro, /Cada_parada/)
 })
