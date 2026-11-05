@@ -329,9 +329,20 @@ const MOCK_ITENS: MockItem[] = [
 ];
 
 /** ~29 despesas em 3 meses, ancoradas em `hoje` (nenhuma no futuro). Os nomes de categoria são os reais do app. */
+/** Os 3 gastos do mock de gastos do cartão (mesmos ids), para o relatório local mostrar o selo "Completar". */
+const MOCK_CARTAO: [string, string, number, string, string][] = [
+  ["a1111111-1111-4111-8111-111111111111", "Abastecimento", 245.9, "2026-11-02", "Posto Ipiranga Dutra"],
+  ["a2222222-2222-4222-8222-222222222222", "Estacionamento", 58, "2026-11-03", "Estacionamento Aeroporto GRU"],
+  ["a3333333-3333-4333-8333-333333333333", "Outros", 132.4, "2026-11-03", "Restaurante Fogo de Chão"]
+];
+
 export function despesasMock(hoje: string): DespesaRelatorio[] {
   const nomes = new Map(DEFAULT_EXPENSE_REFERENCE_DATA.categories.map((c) => [norm(c.name), c.name]));
-  return MOCK_ITENS.map(([mes, posicao, categoria, valor, status, anexo, litros, km, estabelecimento, cartao], i) => {
+  const doCartao: DespesaRelatorio[] = MOCK_CARTAO.filter(([, , , data]) => data <= hoje).map(([id, categoria, valor, data, estabelecimento]) => ({
+    id, valor, data, categoria: nomes.get(norm(categoria)) ?? categoria, formaPagamentoId: "local-cartao-credito", status: STATUS_DESPESA.precisaCorrigir,
+    statusAnexo: 100000000, litros: null, km: null, veiculoId: "", estabelecimento, conciliadaCartao: true
+  }));
+  return [...doCartao, ...MOCK_ITENS.map(([mes, posicao, categoria, valor, status, anexo, litros, km, estabelecimento, cartao], i) => {
     const inicio = inicioDoMes(hoje, mes);
     const ultimoDia = mes === 0 ? Number(hoje.slice(8, 10)) : diasDoMes(inicio);
     const dia = Math.max(1, Math.ceil(posicao * ultimoDia));
@@ -340,7 +351,7 @@ export function despesasMock(hoje: string): DespesaRelatorio[] {
       formaPagamentoId: cartao ? "local-cartao-credito" : "local-particular-reembolso", status, statusAnexo: anexo,
       litros: litros ?? null, km: km ?? null, veiculoId: litros ? MOCK_VEICULO : "", estabelecimento: estabelecimento ?? "", conciliadaCartao: Boolean(cartao)
     };
-  });
+  })];
 }
 
 const mockDelay = () => new Promise((resolve) => setTimeout(resolve, 300));

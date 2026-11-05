@@ -150,8 +150,12 @@ function Relatorio({ modelo, grafico, onGrafico, filtro, onFiltro, idsCompletar,
   const outrasMedias = modelo.cartoes.filter((cartao) => !DESTAQUES.some((destaque) => destaque.id === cartao.id));
   const pendentes = modelo.despesas.filter(ehPendente);
   const lista = filtro === "pendentes" ? pendentes : modelo.despesas;
+  // Gasto do cartão a completar também tem status "Precisa corrigir"; no aviso ele é contado à parte.
+  const aCompletar = pendentes.filter((item) => idsCompletar.has(item.id)).length;
+  const aCorrigir = status.precisaCorrigir - aCompletar;
   const detalhePendencias = [
-    status.precisaCorrigir ? `${status.precisaCorrigir} para corrigir` : "",
+    aCompletar ? `${aCompletar} para completar` : "",
+    aCorrigir > 0 ? `${aCorrigir} para corrigir` : "",
     status.recusado ? plural(status.recusado, "recusado", "recusados") : ""
   ].filter(Boolean).join(" · ");
   const verPendentes = () => {
