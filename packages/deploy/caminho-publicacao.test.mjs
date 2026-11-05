@@ -24,6 +24,28 @@ test('plugin, flow, schema ou outro WebResource vai pelas soluções', () => {
   }
 })
 
+test('só código de plugin vai pelo caminho rápido, com a lista dos plugins', () => {
+  const r = caminhoDaPublicacao(['packages/plugins/Cr40f.Frota.Plugin/A.cs', 'packages/plugins/Cr40f.Acesso.Plugin/B.cs', 'docs/x.md'])
+  assert.equal(r.caminho, 'plugin')
+  assert.deepEqual(r.plugins, ['acesso', 'frota'])
+})
+
+test('tela e plugin juntos fazem os dois caminhos rápidos', () => {
+  const r = caminhoDaPublicacao(['apps/shell/src/App.tsx', 'packages/plugins/Cr40f.Portal.Plugin/A.cs'])
+  assert.equal(r.caminho, 'front-plugin')
+  assert.deepEqual(r.plugins, ['portal'])
+})
+
+test('registrador ou script de plugin vai pelas soluções', () => {
+  for (const arquivo of ['packages/plugins/tools/Cr40f.Frota.Registrar/Program.cs', 'packages/plugins/scripts/push-frota-plugin.ps1']) {
+    assert.equal(caminhoDaPublicacao(['packages/plugins/Cr40f.Frota.Plugin/A.cs', arquivo]).caminho, 'solucoes', arquivo)
+  }
+})
+
+test('teste de plugin não muda o PROD', () => {
+  assert.equal(caminhoDaPublicacao(['packages/plugins/Cr40f.Frota.Plugin.Tests/A.cs']).caminho, 'nada')
+})
+
 test('arquivo desconhecido vai pelo caminho seguro', () => {
   assert.equal(caminhoDoArquivo('pasta-nova/qualquer.txt'), 'solucoes')
 })
