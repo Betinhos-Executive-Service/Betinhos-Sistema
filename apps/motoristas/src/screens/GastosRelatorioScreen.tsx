@@ -88,14 +88,14 @@ type Filtro = "pendentes" | "todas";
 /** Posição na cascata de entrada (CSS usa `--i` para o atraso). */
 const ordem = (i: number) => ({ "--i": i }) as CSSProperties;
 
-/** Seta + percentual; subir é ruim em custo e bom em consumo (km/L). `compacto` omite o "vs ..." visível (fica para leitor de tela). */
+/** Seta + percentual; subir é ruim (custo). `compacto` omite o "vs ..." visível (fica para leitor de tela). */
 function Variacao({ cartao, rotuloAnterior, compacto = false }: { cartao: Cartao; rotuloAnterior: string; compacto?: boolean }) {
   const { variacao } = cartao;
   if (variacao == null) return null;
   if (variacao === 0) return <span className="termo-badge gr-variacao" data-tone="neutro">{compacto ? <>= 0%<span className="gr-sr"> igual ao {rotuloAnterior}</span></> : `Igual ao ${rotuloAnterior}`}</span>;
   const subiu = variacao > 0;
   return (
-    <span className="termo-badge gr-variacao" data-tone={subiu === (cartao.id === "consumo") ? "sucesso" : "atencao"}>
+    <span className="termo-badge gr-variacao" data-tone={subiu ? "atencao" : "sucesso"}>
       <span aria-hidden="true">{subiu ? "▲" : "▼"}</span>
       <span className="gr-sr">{subiu ? "subiu" : "caiu"}</span> {Math.abs(variacao)}%{compacto ? <span className="gr-sr"> vs {rotuloAnterior}</span> : ` vs ${rotuloAnterior}`}
     </span>

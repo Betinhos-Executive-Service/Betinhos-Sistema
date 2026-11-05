@@ -749,7 +749,7 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
       step("periodo", "Período", ["Escolha Mês atual, Mês anterior ou 3 meses. Todos os números da tela são recalculados para o período."], { target: ".gr-periodos" }),
       step("medias", "Suas médias", [
         "No topo, o preço por litro e a refeição média (almoço e jantar) lado a lado. A cor compara com a meta da empresa: verde dentro, amarelo pouco acima e vermelho acima. Embaixo, a variação contra o período anterior.",
-        "Logo abaixo ficam consumo, café e lanche e lavagem. Só aparecem as que têm dados."
+        "Logo abaixo fica o café e lanche médio, quando há dados."
       ], { target: ".gr-destaques", optional: true }),
       step("alerta", "Pendências", ["Quando algum gasto precisa de correção ou foi recusado, o aviso aparece aqui no topo. Toque nele para ir direto à lista de pendentes."], { target: ".gr-alerta", optional: true }),
       step("insights", "Para você", ["Frases curtas calculadas no app, como gastos sem comprovante ou a variação do litro."], { target: ".gr-insights", optional: true }),
