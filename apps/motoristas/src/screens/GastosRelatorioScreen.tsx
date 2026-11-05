@@ -24,9 +24,10 @@ type GastosRelatorioScreenProps = {
   onReload: () => void;
   onCompletar: () => void;
   onAttach: () => void;
+  onPrecoPostos: () => void;
 };
 
-export function GastosRelatorioScreen({ modelo, periodoId, loadStatus, pendentesCartao, idsCompletar, onCompletarGasto, onPeriodo, onBack, onReload, onCompletar, onAttach }: GastosRelatorioScreenProps) {
+export function GastosRelatorioScreen({ modelo, periodoId, loadStatus, pendentesCartao, idsCompletar, onCompletarGasto, onPeriodo, onBack, onReload, onCompletar, onAttach, onPrecoPostos }: GastosRelatorioScreenProps) {
   const carregando = loadStatus === "loading" && !modelo;
   const erro = loadStatus === "error" && !modelo;
   // Ficam aqui (fora do Relatorio, que remonta a cada período) para a aba do gráfico e o filtro sobreviverem à troca de período.
@@ -60,6 +61,7 @@ export function GastosRelatorioScreen({ modelo, periodoId, loadStatus, pendentes
         ) : modelo ? (
           <Relatorio key={periodoId} modelo={modelo} grafico={grafico} onGrafico={setGrafico} filtro={filtro} onFiltro={setFiltro} idsCompletar={idsCompletar} onCompletarGasto={onCompletarGasto} />
         ) : null}
+        <button type="button" className="termo-text-button gr-preco-postos" onClick={onPrecoPostos}>Ver preço dos postos por cidade</button>
       </section>
       <ActionBar className="finalize-actions gr-actions">
         {pendentesCartao > 0 ? <ActionButton variant="secondary" label={`Completar (${pendentesCartao})`} onClick={onCompletar} /> : null}

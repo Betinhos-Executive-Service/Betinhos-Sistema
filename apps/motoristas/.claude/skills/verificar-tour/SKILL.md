@@ -5,7 +5,7 @@ description: "Verifica o tour guiado por capítulos do App Motoristas: abertura 
 # Verificar tour guiado
 
 ## Cobre
-- Código: `src/app/tour.ts` (tipos, preferência, posicionamento), `src/app/tourChapters.ts` (conteúdo: 1 capítulo por tela, 29 capítulos e ~220 passos), `src/app/tourDom.ts` (busca do elemento), `src/components/common/TourOverlay.tsx`, `TourHelp.tsx` (contexto e botão "?"), `src/tour.css`, botão "?" em `FormMenu`/`ServicesMenu`/`DetailsMenu`, link "Ver tour de novo" em `InitialScreen.tsx`, estado do tour em `src/App.tsx`, `tests/tour.test.ts`.
+- Código: `src/app/tour.ts` (tipos, preferência, posicionamento), `src/app/tourChapters.ts` (conteúdo: 1 capítulo por tela, 30 capítulos e ~220 passos), `src/app/tourDom.ts` (busca do elemento), `src/components/common/TourOverlay.tsx`, `TourHelp.tsx` (contexto e botão "?"), `src/tour.css`, botão "?" em `FormMenu`/`ServicesMenu`/`DetailsMenu`, link "Ver tour de novo" em `InitialScreen.tsx`, estado do tour em `src/App.tsx`, `tests/tour.test.ts`.
 - Persistência: `localStorage["app-motoristas-tour-v2:<id do motorista>:<capítulo>"] = "visto"`; o capítulo coringa `*` marca todos como vistos. Só local: trocar de aparelho ou limpar o navegador faz o tour voltar (não há coluna de preferências do motorista no Dataverse).
 
 ## Como o tour escolhe o capítulo

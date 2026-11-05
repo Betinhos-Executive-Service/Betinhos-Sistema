@@ -210,6 +210,7 @@ import {
 import { DEFAULT_EXPENSE_REFERENCE_DATA, buildExpenseCreatePayload, parseCurrencyInput, type ExpenseDraft, type ExpensePhoto, type ExpenseReferenceData } from "./lib/expenses";
 import { GastosCartaoScreen } from "./screens/GastosCartaoScreen";
 import { GastosRelatorioScreen, type GastosRelatorioLoadStatus } from "./screens/GastosRelatorioScreen";
+import { RankingPostosScreen } from "./screens/RankingPostosScreen";
 import { carregarDespesasRelatorio, hojeSaoPaulo, montarRelatorio, type DespesaRelatorio, type PeriodoId } from "./lib/gastosRelatorio";
 import { GastoCartaoDuplicadoDialog } from "./components/common/GastoCartaoDuplicadoDialog";
 import {
@@ -3855,8 +3856,13 @@ function App() {
         onReload={() => { void reloadRelatorio(); }}
         onCompletar={() => setScreen("gastosCartao")}
         onAttach={anexarDespesa}
+        onPrecoPostos={() => setScreen("rankingPostos")}
       />
     );
+  }
+
+  if (screen === "rankingPostos") {
+    return show(<RankingPostosScreen onBack={() => setScreen("gastosRelatorio")} />);
   }
 
   if (screen === "boasIdeias") {

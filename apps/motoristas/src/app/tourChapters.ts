@@ -755,7 +755,17 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
       step("evolucao", "Médias por mês", ["Escolha R$/L ou Refeição para ver a média de cada mês. Os meses do período escolhido ficam em azul-escuro."], { target: ".gr-evolucao", optional: true }),
       step("despesas", "Despesas", ["Pendentes mostra o que precisa de correção, completar ou foi recusado. Todas mostra as despesas do período. Toque num gasto do cartão marcado Completar para preenchê-lo; nos outros, abre o detalhe com o comprovante."], { target: ".gr-despesas", optional: true }),
       step("completar", "Completar", ["Quando há gastos do cartão para completar, o botão da esquerda abre a lista deles."], { target: ".gr-actions .action-button--secondary", optional: true }),
+      step("precos", "Preço dos postos", ["Mostra quanto a frota pagou por litro nos postos de cada cidade."], { target: ".gr-preco-postos" }),
       step("anexar", "Anexar despesa", ["Abre a câmera para fotografar o comprovante e lançar um gasto novo."], { target: ".gr-actions .action-button--primary" }),
+      helpStep()
+    ]
+  },
+  {
+    id: "ranking-postos",
+    title: "Preço dos postos",
+    steps: [
+      step("voltar", "Voltar", ["Volta para o Relatório de gastos."], { target: SERVICE_HOME }),
+      step("cidades", "Postos por cidade", ["Cada cidade lista os postos do menor para o maior R$/litro pago pela frota no período recente. A linha também mostra em quantos abastecimentos a média se baseia."], { target: ".rp-lista", optional: true }),
       helpStep()
     ]
   },
@@ -829,6 +839,7 @@ const CHAPTER_IDS_BY_SCREEN: Readonly<Record<string, readonly string[]>> = {
   treinamentos: ["treinamento-detalhe", "treinamentos"],
   gastosCartao: ["gastos-cartao"],
   gastosRelatorio: ["gastos-relatorio"],
+  rankingPostos: ["ranking-postos"],
   solicitarManutencao: ["manutencao"],
   colisoesInicio: ["colisoes"],
   colisoes: ["colisao-registro"],
