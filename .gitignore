@@ -30,3 +30,4 @@ packages/deploy/flows/backup/
 .dev.vars
 .wrangler/
 .audit/
+__pycache__/
