@@ -14,16 +14,18 @@ describe('Geral: correções finais', () => {
   it('trocar de visão e buscar mudam de fato as linhas', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
-    // OS-1217 não tem motorista, mas fica além da primeira página (100 linhas) da Agenda; OS-1000 tem motorista.
-    expect(screen.queryByRole('button', opener('OS-1217'))).toBeNull()
+    // OS-1072 não tem motorista, mas fica além da primeira página (20 linhas) da Agenda; OS-1000 tem motorista.
+    // Na Sem motorista ela é a 15ª, dentro da primeira página.
+    expect(screen.queryByRole('button', opener('OS-1072'))).toBeNull()
     expect(screen.getByRole('button', opener('OS-1000'))).toBeTruthy()
     await pickView('Sem motorista')
-    expect(await screen.findByRole('button', opener('OS-1217'))).toBeTruthy()
+    expect(await screen.findByRole('button', opener('OS-1072'))).toBeTruthy()
     await waitFor(() => expect(screen.queryByRole('button', opener('OS-1000'))).toBeNull())
     expect(screen.getByRole('button', opener('OS-1052'))).toBeTruthy()
     // A busca é no servidor: some o que não bate, fica o que bate.
     fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar serviços' }), { target: { value: 'OS-1217' } })
     await waitFor(() => expect(screen.queryByRole('button', opener('OS-1052'))).toBeNull())
+    // A OS-1217 está além da primeira página da Sem motorista, mas a busca a traz.
     expect(screen.getByRole('button', opener('OS-1217'))).toBeTruthy()
   })
 
