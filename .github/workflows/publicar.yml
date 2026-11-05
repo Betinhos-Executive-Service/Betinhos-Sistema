@@ -95,10 +95,14 @@ jobs:
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/excluir-custom-apis-legado.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Backup custom-apis-legado -Aplicar
       - name: Preservar valores de variáveis que só têm padrão (o pacote do DEV substitui o padrão)
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/preservar-valores-variaveis.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Aplicar
+      - name: Guardar configuração dos steps (o pacote traz a do DEV)
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/preservar-config-steps.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Arquivo config-steps/antes.json
       - name: Importar
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/importar-solucoes.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Pasta pacotes -Alvo $env:ALVO_PS
       - name: Remover camadas Active (hotfixes já na main)
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/remover-camadas-active.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Backup camadas-active -Aplicar -PermitirProd
+      - name: Restaurar configuração dos steps (depois das camadas Active, que a apagariam)
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/preservar-config-steps.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Arquivo config-steps/antes.json -Restaurar
       - name: Restaurar estados ligado/desligado
         # -DesligarNovos é switch: powershell.exe -File recusa "-DesligarNovos:True"; o switch entra por splat só no TEST.
         run: |

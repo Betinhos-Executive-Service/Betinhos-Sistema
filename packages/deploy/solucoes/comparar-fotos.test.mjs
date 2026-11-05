@@ -79,6 +79,15 @@ test('step sem configuração segura é perda', () => {
   assert.deepEqual(d.stepsPerderamSeguro, [{ id: 's1', nome: 'Step 1' }])
   assert.equal(temPerda(d), true)
 })
+test('step sensível que chega novo sem configuração segura é perda; ausente ou seguro não é', () => {
+  const d = compararFotos(foto(), foto({ stepsSeguros: {
+    'Novo sem segredo': { existe: true, steps: 1, seguro: false },
+    'Nao importado': { existe: false, steps: 0, seguro: false },
+    'Com segredo': { existe: true, steps: 1, seguro: true },
+  } }))
+  assert.deepEqual(d.stepsSensiveisSemSeguro, [{ nome: 'Novo sem segredo', steps: 1 }])
+  assert.equal(temPerda(d), true)
+})
 test('step desativado é perda', () => {
   const d = compararFotos(foto(), foto({ steps: { s1: { nome: 'Step 1', estado: 1, seguro: true } } }))
   assert.deepEqual(d.stepsDesativados, [{ id: 's1', nome: 'Step 1', antes: 0, depois: 1 }])
@@ -119,6 +128,7 @@ const cenarios = {
   stepsSumiram: [foto(), foto({ steps: {} })],
   stepsDesativados: [foto(), foto({ steps: { s1: { nome: 'Step 1', estado: 1, seguro: true } } })],
   stepsPerderamSeguro: [foto(), foto({ steps: { s1: { nome: 'Step 1', estado: 0, seguro: false } } })],
+  stepsSensiveisSemSeguro: [foto(), foto({ stepsSeguros: { 'Cr40f.Acesso: encerrar acesso': { existe: true, steps: 1, seguro: false } } })],
   variaveisSumiram: [foto(), foto({ variaveis: {} })],
   variaveisMudaram: [foto(), foto({ variaveis: { new_X: 'h2' } })],
   componentesSumiram: [foto(), foto({ componentes: {} })],

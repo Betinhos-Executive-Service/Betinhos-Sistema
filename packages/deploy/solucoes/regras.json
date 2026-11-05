@@ -64,6 +64,9 @@
     "Sincronizar veiculo atual pela Infleet",
     "Gerar link de acompanhamento",
     "Revogar link de acompanhamento ao sair de Programado",
-    "Resolver veiculo do servico pela Infleet"
+    "Resolver veiculo do servico pela Infleet",
+    "Cr40f.Acesso: cadastrar acesso",
+    "Cr40f.Acesso: encerrar acesso",
+    "Cr40f.Acesso: reativar acesso"
   ]
 }
