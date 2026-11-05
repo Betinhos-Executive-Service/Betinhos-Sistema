@@ -145,7 +145,7 @@ test('variáveis usadas foram inicializadas', () => {
 })
 
 test('erro numa transação não bloqueia o push e marca o run como falho', () => {
-  assert.deepEqual(acao('Pendentes').runAfter, { Cada_transacao: ['Succeeded', 'Failed'] })
+  assert.deepEqual(acao('Reabertas').runAfter, { Cada_transacao: ['Succeeded', 'Failed'] })
   assert.equal(acao('Marcar_falha').inputs.runStatus, 'Failed')
 })
 
@@ -172,4 +172,20 @@ test('operationType PAGAMENTO é compra; pagamento de fatura só como crédito c
   const tipo = acao('Dados').inputs.tipo
   assert.doesNotMatch(tipo, /if\(equals\(items\('Cada_transacao'\)\?\['operationType'\], 'PAGAMENTO'\)/)
   assert.match(tipo, /if\(and\(or\(less\(float\(items\('Cada_transacao'\)\?\['amount'\]\), 0\), equals\(items\('Cada_transacao'\)\?\['type'\], 'CREDIT'\)\), not\(equals\(items\('Cada_transacao'\)\?\['operationType'\], 'ESTORNO'\)\), or\(contains\(.*'PAGAMENTO'\), contains\(.*'PAGTO'\)\)\), 100000002/)
+})
+
+test('transação reaberta pelo Reprocessar da tela passa pela mesma regra de casar ou criar despesa, antes do push', () => {
+  const ordem = Object.keys(flow.actions)
+  assert.ok(ordem.indexOf('Cada_transacao') < ordem.indexOf('Reabertas') && ordem.indexOf('Cada_reaberta') < ordem.indexOf('Pendentes'))
+  assert.deepEqual(acao('Pendentes').runAfter, { Cada_reaberta: ['Succeeded', 'Failed', 'Skipped'] })
+  const filtro = acao('Reabertas').inputs.parameters.$filter
+  for (const parte of ['cr40f_situacao eq 100000000', 'cr40f_tipo eq 100000000', '_cr40f_cartao_value ne null', '_cr40f_motorista_value ne null', '_cr40f_despesa_value eq null']) assert.ok(filtro.includes(parte), parte)
+  const loop = acao('Cada_reaberta')
+  assert.equal(loop.runtimeConfiguration.concurrency.repetitions, 1)
+  const texto = JSON.stringify(loop)
+  assert.doesNotMatch(texto, /items\('Cada_transacao'\)|outputs\('(Dados|Motorista|Candidatas|Criar_despesa|Usuario|Funcionario|Valor_despesa)'\)/)
+  assert.deepEqual(Object.keys(acao('Quantas_R').cases).sort(), Object.keys(acao('Quantas').cases).sort())
+  assert.equal(acao('Criar_despesa_R').inputs.parameters['item/cr40f_origem'], 100000002)
+  assert.ok(acao('Dono_motorista_R'))
+  assert.match(JSON.stringify(acao('Houve_erro').expression), /Cada_reaberta/)
 })
