@@ -1,6 +1,6 @@
 ---
 name: verificar-plugins
-description: "Verifica os plugins C# do Dataverse (Cr40f.Financeiro.Plugin, incluindo ValorOpPlugin, Cr40f.Documentos.Plugin, Cr40f.Frota.Plugin e Cr40f.Portal.Plugin, Cr40f.Protecao.Plugin) e seus registradores. Use após mudar packages/plugins/** ou quando pedirem para testar plugin, valor da OP ou sincronização financeira."
+description: "Verifica os plugins C# do Dataverse (Cr40f.Financeiro.Plugin, incluindo ValorOpPlugin, Cr40f.Documentos.Plugin, Cr40f.Frota.Plugin e Cr40f.Portal.Plugin, Cr40f.Protecao.Plugin, Cr40f.Prontuario.Plugin) e seus registradores. Use após mudar packages/plugins/** ou quando pedirem para testar plugin, valor da OP ou sincronização financeira."
 ---
 # Verificar plugins do Dataverse
 
@@ -53,3 +53,10 @@ description: "Verifica os plugins C# do Dataverse (Cr40f.Financeiro.Plugin, incl
 ## Limites
 - PROD só com aprovação explícita (carga inicial grava em todas as OPs).
 - Fluxos do Power Automate que escutam alteração de OP podem disparar quando `cr40f_valor` muda: conferir no DEV antes do PROD.
+
+## Prontuário (anexo pelo Claude: `cr40f_PrepararAnexoProntuario` e `cr40f_ConsumirAnexoProntuario`)
+1. `dotnet test packages/plugins/Cr40f.Prontuario.Plugin.Tests` → "Com falha: 0" (38 em 05/11/2026). Chave em `%USERPROFILE%\.codex\keys\Cr40f.Prontuario.Plugin.snk`.
+2. Flow e script: `node --test flows/prontuario-anexar-claude.test.mjs` em `packages/deploy` (9) e `python -m unittest test_anexar_prontuario` em `packages/prontuario-anexo` (13).
+3. Regras: preparo só para quem tem `prvCreateNote` + `prvAppendNote` + AppendTo no funcionário; liberação de uso único (10 min, só o hash do token gravado, RowVersion contra corrida); só JPG/PNG/HEIC/PDF, ≤ 10 MB cada, ≤ 10 arquivos, ≤ 50 MB no total.
+4. Publicar no DEV (só da `main`, checkout principal), nesta ordem: `packages/deploy/provision-anexo-prontuario.ps1 -Apply` → `pnpm push:plugin:prontuario:dev` → `packages/deploy/provision-flow-prontuario-anexo.ps1 -SiteUrl https://betinhos.sharepoint.com/sites/BetinhosGestoInterna -Apply` → `packages/deploy/solucoes/distribuir-apos-push.ps1`.
+5. Comportamento no DEV: com um usuário comum (papel por equipe também), chamar o preparo num funcionário de teste e rodar o script com uma foto e um PDF → uma anotação com os 2 links e "Anexado por <nome> via Claude"; repetir com o mesmo token → 403; usuário sem permissão de anotação → erro de permissão.
