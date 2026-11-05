@@ -1,0 +1,25 @@
+name: Origem da main
+
+# A main publica no PROD (producao.yml) e só recebe a develop inteira (decisão do Renan, 05/11/2026).
+# O ruleset "main só da develop" exige este check; PR para a main vindo de outra branch fica vermelho e não entra.
+on:
+  pull_request:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  origem-main:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: PR vem da develop
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          if [ "$HEAD_REF" != "develop" ] || [ "$HEAD_REPO" != "$GITHUB_REPOSITORY" ]; then
+            echo "::error::A main só recebe a develop. Mude a base deste PR para develop (gh pr edit <n> --base develop)."
+            exit 1
+          fi
+          echo "PR da develop para a main."

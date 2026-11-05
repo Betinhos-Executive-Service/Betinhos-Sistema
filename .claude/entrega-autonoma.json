@@ -18,11 +18,13 @@
       "**/ops/**"
     ],
     "exige": [
+      "PR com base develop (nunca main: merge na main publica no PROD)",
       "três aprovações (implementador, Sonnet, Fable) no mesmo SHA",
       "verificação registrada (hook) e CI verde",
       "seção Qualidade no PR (qualidade-antes-do-pr)",
       "nenhum cenário marcado 'não verificado' que dependa de dado real"
     ]
   },
-  "publicacao": "manual: merge na main não publica; pnpm push continua com o Renan"
+  "base": "develop",
+  "publicacao": "merge automático só na develop (publica no DEV pelo workflow Deploy). Nunca merge automático na main: main publica no PROD (decisão do Renan, 05/11/2026)"
 }

@@ -50,7 +50,7 @@ flowchart LR
   I --> P[push-dev.ps1: sobe WebResource e carregador,<br/>inclui na solução, publica, valida]
 ```
 
-`pnpm push` faz o mesmo com `push-dev.ps1 -Build` e login MSAL por código de dispositivo (`apps/shell/package.json`). Regras (só `main` no checkout principal, nunca em paralelo, commit do bump) estão no `CLAUDE.md`. Automático no DEV: push de `origin/main` na branch `dev` dispara `deploy.yml`.
+`pnpm push` faz o mesmo com `push-dev.ps1 -Build` e login MSAL por código de dispositivo (`apps/shell/package.json`). Regras (só `main` no checkout principal, nunca em paralelo, commit do bump) estão no `CLAUDE.md`. Automático: push na `develop` dispara `deploy.yml` (DEV); push na `main` dispara `producao.yml` (PROD).
 
 ## 5. Promoção DEV → TEST → PROD
 
