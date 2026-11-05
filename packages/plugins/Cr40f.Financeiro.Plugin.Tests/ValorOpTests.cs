@@ -141,7 +141,7 @@ sealed class FakeContext : IPluginExecutionContext
     public FakeContext(string message, string entity, Guid id, int stage) { MessageName = message; PrimaryEntityName = entity; PrimaryEntityId = id; Stage = stage; }
     public Entity? Target { set { if (value != null) InputParameters["Target"] = value; } }
     public int Stage { get; }
-    public IPluginExecutionContext ParentContext => null!;
+    public IPluginExecutionContext ParentContext { get; set; } = null!;
     public int Mode => 0;
     public int IsolationMode => 2;
     public int Depth => 1;
