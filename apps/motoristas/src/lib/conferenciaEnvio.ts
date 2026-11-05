@@ -244,5 +244,5 @@ export async function respostaConferenciaMock(sinais: Sinal[]) {
   const modo = new URLSearchParams(window.location.search).get("mockConferencia");
   if (modo === "erro") return { ok: false, erro: "conferencia_indisponivel" };
   if (modo === "sem") return { ok: true, resultado: "sem_duvida", pergunta: null, motivos: [] };
-  return { ok: true, resultado: "duvida", pergunta: `Só para registrar certinho: ${sinais.map((s) => s.detalhe).join(". ")}. Pode contar rapidinho o que aconteceu?`, motivos: sinais.map((s) => s.tipo) };
+  return { ok: true, resultado: "duvida", pergunta: `${sinais.map((s) => s.detalhe).join(". ")}. Pode explicar o que aconteceu?`, motivos: sinais.map((s) => s.tipo) };
 }
