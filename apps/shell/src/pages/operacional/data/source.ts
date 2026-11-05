@@ -4,6 +4,7 @@ import type { OperacionalData } from '../domain/types'
 import { MOCK_STATUS, createMockData } from './mock'
 import { ENTITIES, loadOperacional, type EntitySets } from './queries'
 import { motoristaPatch, motoristaRefPath, statusPatch } from './mutations'
+import { latenciaMock } from '../../../app/latenciaMock'
 
 /** Tudo que a tela precisa do mundo externo; dataverse em produção, memória no pnpm dev. */
 export type Source = {
@@ -16,7 +17,7 @@ export type Source = {
   gerarLink: (reservaId: string) => Promise<{ ok: true; link: string; expiraEm: string } | { ok: false; erro: string }>
 }
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenciaMock(ms)))
 
 function createMockSource(): Source {
   let data: OperacionalData | null = null

@@ -3,6 +3,7 @@ import { gravacaoDaAcao } from '../domain/acoes'
 import type { Agente, Decisao, Execucao, Proposta } from '../domain/types'
 import { createMockData } from './mock'
 import { AGENTE_VALOR, ENTITY_EXECUCAO, ENTITY_PROPOSTA, SUFIXO_AO_ABRIR_TEXTO, execucaoPath, execucoesPath, mapExecucao, mapProposta, propostasPath } from './queries'
+import { latenciaMock } from '../../../app/latenciaMock'
 
 export type Source = {
   mock: boolean
@@ -14,7 +15,7 @@ export type Source = {
   /** Grava o que a proposta propõe, com a sessão do usuário. Lança se o usuário não puder gravar. */
   executarAcao: (proposta: Proposta) => Promise<void>
 }
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
+const wait = (ms: number) => new Promise((r) => setTimeout(r, latenciaMock(ms)))
 const DECISAO_VALOR = { aprovada: 100000001, descartada: 100000002 } as const
 
 function createMockSource(): Source {

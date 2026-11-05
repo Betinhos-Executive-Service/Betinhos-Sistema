@@ -5,6 +5,7 @@ import { COLISAO, MANUT, MULTA, STATUS_FIELD, VEICULO } from './schema'
 import type { Acordo } from '../domain/termoMulta'
 import type { DataSource, FlowId } from './source'
 import type { Colisao, DespesaCombustivel, FrotaData, ItemPlano, Kind, Manutencao, Multa, Ref, TelemetriaKm, TermoMulta } from './types'
+import { latenciaMock } from '../../../app/latenciaMock'
 
 // Dados fictícios só para `pnpm dev` em localhost. Nunca usados dentro do Dataverse.
 function offset(days: number) {
@@ -120,7 +121,7 @@ export function createMockSource(): DataSource {
   const parcelas = new Map([['tu3-1', [0, 1, 2].map((i) => ({ numero: i + 1, competencia: addMonths(`${todaySP().slice(0, 7)}-01`, i - 1), valor: i === 0 ? 97.83 : 97.82, status: i === 0 ? 'Descontada' : 'Prevista' }))]])
   const comTermo = (multas: Multa[]) => multas.map((m) => { const t = termos.get(m.id)?.[0]; return { ...m, termo: t?.status ? { status: t.status, enviadoEm: t.enviadoEm } : null } })
   const find = (kind: Kind, id: string) => (data[COLLECTION[kind]] as { id: string; status: number | null }[]).find((item) => item.id === id)
-  const delay = () => new Promise((resolve) => setTimeout(resolve, 250))
+  const delay = () => new Promise((resolve) => setTimeout(resolve, latenciaMock(250)))
 
   return {
     mode: 'mock',

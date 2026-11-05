@@ -1,7 +1,8 @@
 import { COMUNICADO_ESCOPO, COMUNICADO_ESTADO, COMUNICADO_PUSH, COMUNICADO_TIPO, isDisparado, validateDraft, type Comunicado, type Destinatario, type Motorista } from '../domain/comunicados'
 import type { Source } from './source'
+import { latenciaMock } from '../../../app/latenciaMock'
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenciaMock(ms)))
 const id = (n: number) => `dddddddd-0000-4000-8000-${String(n).padStart(12, '0')}`
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
 

@@ -4,6 +4,7 @@ import { FECHAMENTO_VALOR, LADO_VALOR, STATUS_VALOR, aplicarLiberacao, aplicarRe
 import type { Cliente, Fechamento, Linha, Mensagem, NovoValidador, Validador } from '../domain/types'
 import { MOCK_CLIENTES, createMockLinhas, createMockMensagens, createMockValidadores } from './mock'
 import { ENTITIES, loadAll, mapMensagem, mensagensPath, type EntitySets } from './queries'
+import { latenciaMock } from '../../../app/latenciaMock'
 
 export type Carga = { linhas: Linha[]; clientes: Cliente[]; validadores: Validador[] }
 /** Resultado de "Enviar resposta"; `avisoFalhou` = a mensagem foi gravada, mas o e-mail ao cliente não saiu. */
@@ -46,7 +47,7 @@ async function emLote(linhas: Linha[], fn: (l: Linha) => Promise<string>): Promi
   return out
 }
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenciaMock(ms)))
 const message = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
 function createMockSource(): Source {

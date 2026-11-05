@@ -7,6 +7,7 @@ import { mesSP } from '../domain/detect'
 import type { OpResumo, PaganteResumo, Reserva } from '../domain/types'
 import { createMockPendencias } from './mock'
 import { ENTITY_OP, ENTITY_PAGANTE, ENTITY_RESERVA, loadPendenciasData, resolveCpNav, type EntitySets } from './queries'
+import { latenciaMock } from '../../../app/latenciaMock'
 
 export type Mudanca = { entidade: string; id: string; campo: string; de: number | null; para: number | null; limparLookup: boolean; motivo: string }
 export type Sincronizacao = { opId: string; modo: 'simular' | 'aplicar'; mudancas: Mudanca[]; aplicadas: boolean }
@@ -20,7 +21,7 @@ export type Source = {
   kv: KV
 }
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenciaMock(ms)))
 const ENTITY_CP = 'cr40f_composicaodeprecos'
 
 function createMockSource(): Source {

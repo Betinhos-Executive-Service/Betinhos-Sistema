@@ -15,6 +15,7 @@ import {
   mapFuncionarioDono, mapTipo, mapVeiculoDono, tipoPayload, tiposPath, veiculosPath, type EntitySets, type TipoInput,
 } from './queries'
 import { salvarDocumento, type SalvarDocInput, type SalvarDocResult } from './salvar'
+import { latenciaMock } from '../../../app/latenciaMock'
 
 export type DocsSource = {
   mock: boolean
@@ -75,7 +76,7 @@ export function comCacheDeArquivos(base: FonteSemCache): DocsSource {
   }
 }
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenciaMock(ms)))
 
 /** Evento que o badge de "Documentos" no menu escuta para recarregar depois de um salvamento. */
 export const DOCUMENTOS_ALTERADOS = 'documentos:alterados'

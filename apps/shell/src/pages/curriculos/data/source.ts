@@ -8,6 +8,7 @@ import { getDataverseEnvironmentLabel } from '../../funcionarios/data/dataverse'
 import { createSharePointDocs, nomeComData } from '../../funcionarios/data/sharepoint'
 import type { Documento } from '../../funcionarios/data/types'
 import type { XrmHost } from '../../funcionarios/data/xrm'
+import { latenciaMock } from '../../../app/latenciaMock'
 
 /** Tudo que a tela precisa do mundo externo; Dataverse em produção, memória no pnpm dev. */
 export type Source = {
@@ -27,7 +28,7 @@ export type Source = {
   kv: KV
 }
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenciaMock(ms)))
 
 function memoryKV(): KV {
   const data = new Map<string, string>()

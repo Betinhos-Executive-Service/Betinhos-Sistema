@@ -2,6 +2,7 @@ import type { AuditEvent } from '@betinhos/ui'
 import { chunk, cleanId, DataverseError, odataString, type Row } from '@betinhos/dataverse'
 import type { Host } from '../../host'
 import { lookupRefs, toAuditEvent, type FieldMeta } from './format'
+import { latenciaMock } from '../latenciaMock'
 
 export type AuditTarget = {
   /** Nome lógico da tabela. */
@@ -146,7 +147,7 @@ const MOCK_USERS = ['Marina Lopes', 'João Araújo', 'Betinhos Executive Service
 export function createMockAuditSource(): AuditSource {
   return {
     async load(target, next) {
-      await new Promise((resolve) => setTimeout(resolve, 350))
+      await new Promise((resolve) => setTimeout(resolve, latenciaMock(350)))
       const start = next ? Number(next) : 0
       const ids = target.ids?.length ? target.ids : ['mock-1', 'mock-2', 'mock-3']
       const events = Array.from({ length: 12 }, (_, i): AuditEvent => {

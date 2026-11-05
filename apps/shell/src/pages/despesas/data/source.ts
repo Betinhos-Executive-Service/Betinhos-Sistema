@@ -9,6 +9,7 @@ import type { Anexo, Arquivo, Despesa, DespesaChoices } from '../domain/types'
 import { createArquivos } from './arquivo'
 import { createMockAnexos, createMockArquivo, createMockDespesas } from './mock'
 import { ENTITY_ANEXO, ENTITY_DESPESA, anexosPath, despesasPath, despesasSearchFilter, mapAnexo, mapDespesa } from './queries'
+import { latenciaMock } from '../../../app/latenciaMock'
 
 /** Tudo que a tela precisa do mundo externo. Só leitura: a tela não grava nada. */
 export type Source = {
@@ -26,7 +27,7 @@ export type Source = {
   kv: KV
 }
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenciaMock(ms)))
 
 function createMockSource(): Source {
   const rows = createMockDespesas(new Date())
