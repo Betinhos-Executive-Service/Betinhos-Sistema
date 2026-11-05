@@ -1,0 +1,136 @@
+import { METAS_GASTOS, STATUS_DESPESA, norm, semaforo, somarDias, type DespesaRelatorio } from "./gastosRelatorio.ts";
+
+// Conferência da despesa no envio: o app calcula os fatos ("sinais") e só chama a IA quando há algum.
+// Spec: docs/superpowers/specs/2026-11-05-conferencia-envio-despesa-design.md
+
+export type TipoSinal =
+  | "acima_politica"
+  | "refeicao_proxima"
+  | "abastecimento_proximo"
+  | "muitos_cafes"
+  | "possivel_duplicidade"
+  | "refeicao_sem_servico"
+  | "data_diferente_cupom";
+
+export type Sinal = { tipo: TipoSinal; detalhe: string };
+
+/** Gasto sendo enviado. `data` AAAA-MM-DD; `hora` HH:mm do cupom (ou null). */
+export type GastoConferido = {
+  id?: string;
+  categoria: string;
+  valor: number;
+  data: string;
+  hora: string | null;
+  litros: number | null;
+  km: number | null;
+  veiculoId: string;
+};
+
+/** Gasto já enviado; `hora` só existe quando o cupom tinha hora legível. */
+export type GastoRecente = DespesaRelatorio & { hora?: string | null };
+
+/** Serviço do motorista: saída e retorno previsto em `AAAA-MM-DDTHH:mm` (horário de São Paulo). */
+export type ServicoConferido = { saida: string; retorno: string | null; cancelado: boolean };
+
+export const LIMITES = {
+  refeicaoHoras: 3,
+  abastecimentoHoras: 4,
+  abastecimentoKm: 150,
+  cafesPorDia: 3
+} as const;
+
+const REFEICAO = ["almoco", "jantar"];
+const CAFE = ["cafe", "lanche"];
+const SEM_SERVICO = [...REFEICAO, ...CAFE];
+const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const brl = (valor: number) => BRL.format(valor).replace(/ /g, " ");
+const diaMes = (data: string) => `${data.slice(8, 10)}/${data.slice(5, 7)}`;
+const cat = (nome: string) => norm(nome);
+const minutos = (data: string, hora: string) => Date.UTC(+data.slice(0, 4), +data.slice(5, 7) - 1, +data.slice(8, 10), +hora.slice(0, 2), +hora.slice(3, 5)) / 60000;
+const centavos = (valor: number) => Math.round(valor * 100);
+
+/** Distância em horas entre dois gastos; null quando falta a hora de algum (aí vale só "mesmo dia"). */
+function horasEntre(a: { data: string; hora?: string | null }, b: { data: string; hora?: string | null }) {
+  if (!a.hora || !b.hora) return null;
+  return Math.abs(minutos(a.data, a.hora) - minutos(b.data, b.hora)) / 60;
+}
+
+/** O serviço toca o dia se sai, volta ou atravessa aquela data (cancelado não conta). */
+export function servicoTocaODia(servico: ServicoConferido, data: string) {
+  if (servico.cancelado) return false;
+  const inicio = servico.saida.slice(0, 10);
+  const fim = (servico.retorno || servico.saida).slice(0, 10);
+  return inicio <= data && data <= fim;
+}
+
+export function calcularSinais({ gasto, leituraData, recentes, servicos }: {
+  gasto: GastoConferido;
+  /** Data lida no cupom pela leitura rápida (AAAA-MM-DD) ou null. */
+  leituraData: string | null;
+  recentes: GastoRecente[];
+  servicos: ServicoConferido[];
+}): { sinais: Sinal[]; servicoDiaVizinho: string | null } {
+  const sinais: Sinal[] = [];
+  const categoria = cat(gasto.categoria);
+  const outros = recentes.filter((d) => d.id !== gasto.id && d.status !== STATUS_DESPESA.cancelado);
+
+  // Acima da política, só faixa vermelha.
+  if (REFEICAO.includes(categoria) && semaforo(gasto.valor, METAS_GASTOS.refeicao) === "vermelho") {
+    sinais.push({ tipo: "acima_politica", detalhe: `${gasto.categoria} de ${brl(gasto.valor)} contra a política de ${brl(METAS_GASTOS.refeicao.meta)}` });
+  }
+  if (categoria === "abastecimento" && gasto.litros && gasto.litros > 0) {
+    const porLitro = gasto.valor / gasto.litros;
+    if (semaforo(porLitro, METAS_GASTOS.litro) === "vermelho") {
+      sinais.push({ tipo: "acima_politica", detalhe: `${brl(porLitro)} por litro contra a política de ${brl(METAS_GASTOS.litro.meta)}` });
+    }
+  }
+
+  // Refeição perto de outra (com hora: < 3 h; sem hora: mesma refeição no mesmo dia).
+  if (REFEICAO.includes(categoria)) {
+    const perto = outros.find((d) => {
+      if (!REFEICAO.includes(cat(d.categoria))) return false;
+      const horas = horasEntre(gasto, d);
+      return horas == null ? d.data === gasto.data && cat(d.categoria) === categoria : horas < LIMITES.refeicaoHoras;
+    });
+    if (perto) sinais.push({ tipo: "refeicao_proxima", detalhe: `${perto.categoria} de ${brl(perto.valor)} em ${diaMes(perto.data)}${perto.hora ? ` às ${perto.hora}` : ""}` });
+  }
+
+  // Abastecimento perto de outro do mesmo veículo (< 4 h ou < 150 km rodados).
+  if (categoria === "abastecimento") {
+    const perto = outros.find((d) => {
+      if (cat(d.categoria) !== "abastecimento" || (gasto.veiculoId && d.veiculoId && d.veiculoId !== gasto.veiculoId)) return false;
+      const horas = horasEntre(gasto, d);
+      const poucoTempo = horas == null ? d.data === gasto.data : horas < LIMITES.abastecimentoHoras;
+      const poucoKm = gasto.km != null && d.km != null && gasto.km >= d.km && gasto.km - d.km < LIMITES.abastecimentoKm;
+      return poucoTempo || poucoKm;
+    });
+    if (perto) {
+      const km = gasto.km != null && perto.km != null ? `, ${gasto.km - perto.km} km depois` : "";
+      sinais.push({ tipo: "abastecimento_proximo", detalhe: `Abastecimento de ${brl(perto.valor)} em ${diaMes(perto.data)}${perto.hora ? ` às ${perto.hora}` : ""}${km}` });
+    }
+  }
+
+  // Mais de 3 cafés/lanches no dia, contando este.
+  if (CAFE.includes(categoria)) {
+    const total = outros.filter((d) => d.data === gasto.data && CAFE.includes(cat(d.categoria))).length + 1;
+    if (total > LIMITES.cafesPorDia) sinais.push({ tipo: "muitos_cafes", detalhe: `${total} cafés ou lanches em ${diaMes(gasto.data)}` });
+  }
+
+  // Mesmo valor e mesma data de um gasto já enviado.
+  const igual = outros.find((d) => d.data === gasto.data && centavos(d.valor) === centavos(gasto.valor));
+  if (igual) sinais.push({ tipo: "possivel_duplicidade", detalhe: `${igual.categoria} de ${brl(igual.valor)} já enviado em ${diaMes(igual.data)}` });
+
+  // Refeição/café sem serviço no dia; sugere o dia vizinho com serviço.
+  let servicoDiaVizinho: string | null = null;
+  if (SEM_SERVICO.includes(categoria) && !servicos.some((s) => servicoTocaODia(s, gasto.data))) {
+    servicoDiaVizinho = [somarDias(gasto.data, -1), somarDias(gasto.data, 1)].find((dia) => servicos.some((s) => servicoTocaODia(s, dia))) ?? null;
+    sinais.push({ tipo: "refeicao_sem_servico", detalhe: `Sem serviço em ${diaMes(gasto.data)}${servicoDiaVizinho ? `; há serviço em ${diaMes(servicoDiaVizinho)}` : ""}` });
+  }
+
+  // Data digitada diferente da lida no cupom.
+  if (leituraData && leituraData !== gasto.data) {
+    sinais.push({ tipo: "data_diferente_cupom", detalhe: `Data informada ${diaMes(gasto.data)}, no cupom ${diaMes(leituraData)}` });
+  }
+
+  return { sinais, servicoDiaVizinho };
+}

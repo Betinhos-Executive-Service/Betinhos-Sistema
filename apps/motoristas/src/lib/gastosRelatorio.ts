@@ -84,7 +84,7 @@ function janelaDeBusca(hoje: string) {
   return { inicio: inicioDoMes(hoje, -5), fim: inicioDoMes(hoje, 1) };
 }
 
-const somarDias = (data: string, dias: number) => {
+export const somarDias = (data: string, dias: number) => {
   const [ano, mes, dia] = data.split("-").map(Number);
   const d = new Date(Date.UTC(ano, mes - 1, dia + dias));
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
@@ -131,7 +131,7 @@ export function filtroDespesasRelatorio(motoristaId: string, hoje: string) {
 
 // ---------------- Agregações puras ----------------
 
-const norm = (texto: string) => texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+export const norm = (texto: string) => texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 const ehCategoria = (despesa: DespesaRelatorio, ...nomes: string[]) => nomes.includes(norm(despesa.categoria));
 const soma = (lista: number[]) => lista.reduce((total, valor) => total + valor, 0);
 
