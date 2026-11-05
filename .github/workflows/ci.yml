@@ -25,6 +25,7 @@ jobs:
       pull-requests: read
     outputs:
       shell: ${{ steps.filtro.outputs.shell }}
+      plugins: ${{ steps.filtro.outputs.plugins }}
     steps:
       - id: filtro
         env:
@@ -32,8 +33,12 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
         run: |
-          if [ -z "$PR" ]; then echo "shell=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if [ -z "$PR" ]; then echo "shell=true" >> "$GITHUB_OUTPUT"; echo "plugins=todos" >> "$GITHUB_OUTPUT"; exit 0; fi
           arquivos=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)')
+          # Plugins tocados (código, testes, registrador ou script de publicação), em minúsculas: frota,acesso.
+          plugins=$(echo "$arquivos" | sed -nE 's#^packages/plugins/(Cr40f\.([A-Za-z]+)\.Plugin(\.Tests)?|tools/Cr40f\.([A-Za-z]+)\.Registrar)/.*#\2\4#p; s#^packages/plugins/scripts/push-([a-z]+)-plugin\.ps1$#\1#p' | tr 'A-Z' 'a-z' | sort -u | paste -sd, -)
+          if echo "$arquivos" | grep -qE '^\.github/workflows/ci\.yml$'; then plugins=todos; fi
+          echo "plugins=$plugins" >> "$GITHUB_OUTPUT"
           if echo "$arquivos" | grep -qE '^(apps/shell/|packages/dataverse/|packages/plugins/[^/]+/Fixtures/|\.github/workflows/ci\.yml$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig\.base\.json$|\.npmrc$)'; then
             echo "shell=true" >> "$GITHUB_OUTPUT"
           else
@@ -95,15 +100,51 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: pnpm --filter @betinhos/shell exec vitest run --shard=${{ matrix.fatia }}/3
 
+  # Testes dos plugins (net48, só Windows) e build dos registradores, só dos plugins que o PR toca. O workflow Deploy
+  # publica sem repetir os testes. Sem assinatura aqui: a chave fica só no environment dev.
+  plugins:
+    needs: mudancas
+    if: needs.mudancas.outputs.plugins != ''
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      DOTNET_NOLOGO: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('packages/plugins/**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - name: Testes e registradores
+        env:
+          PLUGINS: ${{ needs.mudancas.outputs.plugins }}
+        run: |
+          $pastas = @{}
+          foreach ($d in Get-ChildItem packages/plugins -Directory) { if ($d.Name -match '^Cr40f\.([A-Za-z]+)\.Plugin$') { $pastas[$Matches[1].ToLowerInvariant()] = $Matches[1] } }
+          $pedidos = if ($env:PLUGINS -eq 'todos') { @($pastas.Keys | Sort-Object) } else { @($env:PLUGINS.Split(',') | Where-Object { $_ -and $pastas.ContainsKey($_) }) }
+          foreach ($nome in $pedidos) {
+            $p = $pastas[$nome]
+            Write-Host "::group::$p"
+            $testes = "packages/plugins/Cr40f.$p.Plugin.Tests"
+            if (Test-Path $testes) { dotnet test $testes -p:SignAssembly=false; if ($LASTEXITCODE) { throw "testes de $p falharam" } }
+            else { dotnet build "packages/plugins/Cr40f.$p.Plugin" -p:SignAssembly=false; if ($LASTEXITCODE) { throw "build de $p falhou" } }
+            dotnet build "packages/plugins/tools/Cr40f.$p.Registrar"; if ($LASTEXITCODE) { throw "registrador de $p não compila" }
+            Write-Host "::endgroup::"
+          }
+
   ok:
     name: CI ok
     if: always()
-    needs: [mudancas, checagens, shell]
+    needs: [mudancas, checagens, shell, plugins]
     runs-on: ubuntu-latest
     steps:
       # shell "skipped" só vale quando o filtro decidiu pular; se o filtro falhou, o CI falha.
       - run: |
-          echo "mudancas: ${{ needs.mudancas.result }} (shell=${{ needs.mudancas.outputs.shell }}) | checagens: ${{ needs.checagens.result }} | shell: ${{ needs.shell.result }}"
+          echo "mudancas: ${{ needs.mudancas.result }} (shell=${{ needs.mudancas.outputs.shell }}, plugins=${{ needs.mudancas.outputs.plugins }}) | checagens: ${{ needs.checagens.result }} | shell: ${{ needs.shell.result }} | plugins: ${{ needs.plugins.result }}"
           test "${{ needs.mudancas.result }}" = success
           test "${{ needs.checagens.result }}" = success
           if [ "${{ needs.mudancas.outputs.shell }}" = true ]; then test "${{ needs.shell.result }}" = success; fi
+          if [ -n "${{ needs.mudancas.outputs.plugins }}" ]; then test "${{ needs.plugins.result }}" = success; fi

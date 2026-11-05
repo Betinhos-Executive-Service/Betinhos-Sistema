@@ -7,7 +7,10 @@ param(
   [ValidateSet('dev', 'prod')]
   [string] $EnvironmentName,
 
-  [string] $SolutionUniqueName = 'appbetinhos'
+  [string] $SolutionUniqueName = 'appbetinhos',
+
+  # CI (workflow Deploy): os testes ja rodaram no PR (job plugins do ci.yml).
+  [switch] $SemTestes
 )
 
 $ErrorActionPreference = 'Stop'
@@ -27,6 +30,9 @@ $dllPath = Join-Path $root 'packages\plugins\Cr40f.Frota.Plugin\bin\Release\net4
 $registrar = Join-Path $root 'packages\plugins\tools\Cr40f.Frota.Registrar\Cr40f.Frota.Registrar.csproj'
 $signingKeyPath = Join-Path $env:USERPROFILE '.codex\keys\Cr40f.Frota.Plugin.snk'
 
+# No CI a chave vem do secret do environment dev. Gerar outra mudaria o public key token, e o Dataverse trataria
+# o plugin como outro assembly.
+if ($env:GITHUB_ACTIONS -eq 'true' -and -not (Test-Path -LiteralPath $signingKeyPath -PathType Leaf)) { throw "Chave de assinatura ausente no CI: $signingKeyPath" }
 if (-not (Test-Path -LiteralPath $signingKeyPath -PathType Leaf)) {
   Write-Step "criando chave persistente de assinatura em $signingKeyPath"
   [IO.Directory]::CreateDirectory((Split-Path -Parent $signingKeyPath)) | Out-Null
@@ -34,9 +40,12 @@ if (-not (Test-Path -LiteralPath $signingKeyPath -PathType Leaf)) {
   try { [IO.File]::WriteAllBytes($signingKeyPath, $rsa.ExportCspBlob($true)) } finally { $rsa.Dispose() }
 }
 
-Write-Step 'rodando testes do plugin'
-& $dotnet.Source test $testsProject
-if ($LASTEXITCODE -ne 0) { throw "Testes do plugin falharam. Codigo: $LASTEXITCODE" }
+if ($SemTestes) { Write-Step 'testes pulados (ja rodaram no PR)' }
+else {
+  Write-Step 'rodando testes do plugin'
+  & $dotnet.Source test $testsProject
+  if ($LASTEXITCODE -ne 0) { throw "Testes do plugin falharam. Codigo: $LASTEXITCODE" }
+}
 
 Write-Step 'compilando plugin'
 & $dotnet.Source build $pluginProject --configuration Release
