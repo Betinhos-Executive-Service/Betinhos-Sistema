@@ -48,7 +48,7 @@ foreach ($nome in $ordem) {
   $item = @($manifesto | Where-Object { $_.solucao -eq $nome })[0]
   $antes = Get-VersaoInstalada (Update-DvToken $dv) $nome
   if (Test-PodePular $item $antes $anteriores) {
-    Write-Step "pulando $nome em $Alvo: conteudo igual ao da versao instalada ($antes)"
+    Write-Step "pulando $nome em ${Alvo}: conteudo igual ao da versao instalada ($antes)"
     $resultado += [ordered]@{ solucao = $nome; antes = $antes; depois = $antes; minutos = 0; pacPerdeuConexao = $false; pulada = $true }
     $registro += [ordered]@{ solucao = $nome; versao = $antes; hash = $item.hash }
     continue
