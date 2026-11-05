@@ -24,6 +24,7 @@ import {
   type ChecklistResposta,
   type ChecklistVeiculo
 } from "./checklists";
+import { latenciaMock } from "../../../../app/latenciaMock";
 
 // Gestão do checklist de vistoria: frota, checklists e modelos. As ações sobre checklists passam pelas
 // Custom APIs do plugin ChecklistCommandPlugin (App Motoristas); modelos são registros comuns.
@@ -424,7 +425,7 @@ type MockStore = { modelos: Modelo[]; frota: VeiculoFrota[]; checklists: Checkli
 let mock: MockStore | null = null;
 const mockId = () => globalThis.crypto?.randomUUID?.() ?? `m-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const iso = (offsetDays: number, now = Date.now()) => new Date(now - offsetDays * DAY).toISOString();
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenciaMock(ms)));
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 function mockItens(): ModeloItem[] {

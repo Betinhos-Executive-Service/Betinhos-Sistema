@@ -9,6 +9,7 @@ import { buildNoteHtml, textToNoteHtml, type SpAnexo } from './notes'
 import { nomeComData, pastaFuncionario } from './sharepoint'
 import { ANEXOS_SUBPASTA, LIMITES_PADRAO, type DocumentStore } from './source'
 import type { Anotacao, Documento, Funcionario, Lookup } from './types'
+import { latenciaMock } from '../../../app/latenciaMock'
 
 // Dados fictícios só para `pnpm dev` em localhost. Nunca usados dentro do Dataverse.
 const context: PatchContext = { veiculoNav: 'cr40f_VeiculoAtual', veiculoSet: 'cr40f_veiculoses', dateBehaviors: {} }
@@ -86,7 +87,7 @@ let docs: Record<string, Documento[]> = {}
 const blobs = new Map<string, Blob>()
 const noteBlobs = new Map<string, Blob>()
 
-const delay = <T,>(value: T) => new Promise<T>((resolve) => setTimeout(() => resolve(structuredClone(value)), 150))
+const delay = <T,>(value: T) => new Promise<T>((resolve) => setTimeout(() => resolve(structuredClone(value)), latenciaMock(150)))
 
 const documentos: DocumentStore = {
   pasta: (id) => pastaFuncionario(id, 'DEV'),
@@ -96,7 +97,7 @@ const documentos: DocumentStore = {
     const doc: Documento = { id: `doc-${Date.now()}`, nome, caminho: `/Documentos Compartilhados/${pastaFuncionario(id, 'DEV')}${subpasta ? `/${subpasta}` : ''}/${nome}`, tamanho: file.size, modificadoEm: new Date().toISOString(), mimeType: file.type || null }
     blobs.set(doc.id, file)
     if (!subpasta) docs[id] = [doc, ...(docs[id] ?? [])]
-    await new Promise((resolve) => setTimeout(resolve, 600))
+    await new Promise((resolve) => setTimeout(resolve, latenciaMock(600)))
     return doc
   },
   async abrir(doc) {

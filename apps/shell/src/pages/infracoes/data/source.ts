@@ -3,6 +3,7 @@ import type { Host } from '../../../host'
 import type { Infracao, MultaUso } from '../domain/types'
 import { createMockInfracoes, createMockMultas } from './mock'
 import { ENTITIES, estadoPayload, loadInfracoes, loadMultasUso, type EntitySets } from './queries'
+import { latenciaMock } from '../../../app/latenciaMock'
 
 /** Tudo que a tela precisa do mundo externo; Dataverse em produção, memória no pnpm dev. */
 export type Source = {
@@ -14,7 +15,7 @@ export type Source = {
   setAtivo: (id: string, ativo: boolean) => Promise<void>
 }
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenciaMock(ms)))
 
 function createMockSource(): Source {
   const rows = createMockInfracoes()

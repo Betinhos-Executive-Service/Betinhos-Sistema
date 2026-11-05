@@ -12,6 +12,7 @@ import {
 import type { BaseLocation, Driver, PassengerLink, Possession, Service, Swap, Vehicle, VehiclePreview } from "../domain/types";
 import { addDays, displayDriverName, startOfDay, uid } from "../domain/utils";
 import type { Source } from "./source";
+import { latenciaMock } from "../../../app/latenciaMock";
 
 /** Troca semeada (GUID, para abrir por `?troca=` como no Dataverse). */
 export const MOCK_SWAP_ID = "5a0c1d2e-0000-4000-8000-000000000001";
@@ -337,7 +338,7 @@ export function applyMockPossessionTransition(store: { possessions: Possession[]
   create(preview.driver2Id, preview.driver2Label, preview.vehicle1Id, preview.vehicle1Label);
 }
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenciaMock(ms)));
 const raw = <T,>(item: T) => item as unknown as RawRecord;
 
 /** Fonte mock: cada instância tem o seu banco (a página cria uma por host). `delay` simula a rede. */

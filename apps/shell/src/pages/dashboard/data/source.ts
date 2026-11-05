@@ -11,6 +11,7 @@ import {
   mapOcorrencia, mapPagante, mapReserva, mapTelemetria, mapVeiculo, mapVeiculoPrev, mapViagem, multasPath, ocorrenciasPath, pagantesPath, reservasPath, telemetriaPath,
   veiculosPath, viagensPath, type EntitySets,
 } from './queries'
+import { latenciaMock } from '../../../app/latenciaMock'
 
 /** Conjuntos do estágio 2 (sob demanda): só as abas Financeiro e Despesas os usam. */
 export type ConjuntoExtra = NonNullable<Dados['pendentes']>[number]
@@ -199,7 +200,7 @@ export async function carregarExtraDataverse(client: DataverseClient, sets: Enti
   return { campos: { despesas: linhas(des).map((row) => mapDespesa(row, ctxDespesa)), categoriasDespesa, formasPagamento }, indisponivel: false }
 }
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenciaMock(ms)))
 
 function createMockSource(): Source {
   const base = criarDadosMock(new Date())

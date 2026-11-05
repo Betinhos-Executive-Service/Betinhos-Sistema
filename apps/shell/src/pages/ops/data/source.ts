@@ -8,6 +8,7 @@ import { OP_STATUS, withOpFallback } from '../domain/status'
 import type { Op, OpChoices } from '../domain/types'
 import { createMockOps } from './mock'
 import { ENTITY_OP, loadValoresServicos, mapOp, opsPath, opsSearchFilter } from './queries'
+import { latenciaMock } from '../../../app/latenciaMock'
 
 const ENTITY_RESERVA = 'cr40f_reservadeveculos'
 const ENTITY_COMPOSICAO = 'cr40f_composicaodeprecos'
@@ -28,7 +29,7 @@ export type Source = {
   kv: KV
 }
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenciaMock(ms)))
 
 function createMockSource(host: Host): Source {
   const rows = createMockOps(new Date())

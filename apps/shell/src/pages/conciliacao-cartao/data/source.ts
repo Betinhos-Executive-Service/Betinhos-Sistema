@@ -9,6 +9,7 @@ import {
   candidatasPath, cartaoPayload, cartoesPath, casarPayload, ENTITIES, formaCartaoPath, mapCartao, mapDespesa, mapTransacao,
   reprocessarPayload, transacoesPath, type EntitySets,
 } from './queries'
+import { latenciaMock } from '../../../app/latenciaMock'
 
 export type Carga = { transacoes: Transacao[]; cartoes: Cartao[]; motoristas: Pessoa[] }
 
@@ -28,7 +29,7 @@ export type Source = {
 }
 
 export const message = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
-const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, latenciaMock(ms)))
 
 function createMockSource(): Source {
   let seq = 100

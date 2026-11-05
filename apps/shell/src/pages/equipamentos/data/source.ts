@@ -8,6 +8,7 @@ import { caminhoDaCapa, type Foto } from '../domain/fotos'
 import type { Equipamento, Pessoa, TipoEquipamento } from '../domain/types'
 import { createMockEquipamentos, createMockFotos, createMockPessoas, createMockTipos, MOCK_ENV } from './mock'
 import { ENTITIES, FOTO_ENTITY, capasPath, estadoPayload, FOTO_MAX_CAMINHO, fotoPayload, fotosPath, loadAll, mapCapas, mapFoto, responsavelRefPath, toPayload, type EntitySets } from './queries'
+import { latenciaMock } from '../../../app/latenciaMock'
 
 export type Carga = { equipamentos: Equipamento[]; tipos: TipoEquipamento[]; pessoas: Pessoa[] }
 
@@ -50,7 +51,7 @@ export function documentoDaFoto(caminho: string, nome = caminho.split('/').pop()
   return { id: ehCaminho ? '' : caminho, caminho: ehCaminho ? caminho : '', nome, tamanho: null, modificadoEm: null, mimeType: tipoImagem(nome) }
 }
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenciaMock(ms)))
 
 function createMockSource(): Source {
   let seq = 100

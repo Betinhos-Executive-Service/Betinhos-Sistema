@@ -3,8 +3,9 @@ import { ESTADO, PUBLICO, PUSH, isOrfa, podeLembrar, isPublicado, validarComCont
 import type { Linha } from '../domain/lista'
 import { contarProgresso } from '../domain/tabela'
 import type { Source } from './source'
+import { latenciaMock } from '../../../app/latenciaMock'
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenciaMock(ms)))
 const id = (n: number) => `eeeeeeee-0000-4000-8000-${String(n).padStart(12, '0')}`
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
 // Conta a partir do dia de São Paulo, o mesmo "hoje" da tela; com o dia UTC, entre 21h e 24h a validade saía um dia errada.

@@ -10,6 +10,7 @@ import { mockProgressive, mockSearch } from '../../../app/mockVolume'
 import { normalizeSearch } from '@betinhos/ui'
 import { MOCK_CLIENTES, createMockPessoas, mockHistorico, nextMockId } from './mock'
 import { ENTITIES, loadPagantesDaPessoa, loadPessoas, loadServicosDaPessoa, searchClientes, searchPessoas, type EntitySets } from './queries'
+import { latenciaMock } from '../../../app/latenciaMock'
 
 /** Tudo que a tela precisa do mundo externo; Dataverse em produção, memória no pnpm dev. */
 export type Source = {
@@ -28,7 +29,7 @@ export type Source = {
   kv: KV
 }
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenciaMock(ms)))
 
 function createMockSource(): Source {
   const rows = createMockPessoas()
