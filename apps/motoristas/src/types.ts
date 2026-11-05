@@ -32,7 +32,8 @@ export type Screen =
   | "multas"
   | "treinamentos"
   | "gastosCartao"
-  | "gastosRelatorio";
+  | "gastosRelatorio"
+  | "rankingPostos";
 
 export type TileIcon = "cars" | "clock" | "money" | "tools";
 
