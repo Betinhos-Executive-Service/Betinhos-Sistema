@@ -196,7 +196,7 @@ foreach ($dep in @("cr40f_funcionarios", "systemuser")) {
 
 $lib = "cr40f_liberacaoanexo"
 $relFuncionario = "cr40f_funcionarios_cr40f_liberacaoanexo_funcionario"
-$relSolicitante = "systemuser_cr40f_liberacaoanexo_solicitante"
+$relSolicitante = "cr40f_systemuser_cr40f_liberacaoanexo_solicitante"
 $libId = Ensure-Table $lib "cr40f_LiberacaoAnexo" "Liberação de anexo" "Liberações de anexo" "Liberação de uso único (10 min) para o Claude anexar arquivos no prontuário do funcionário; guarda só o hash do token." 100 "ApplicationRequired" "Nome" "Identificação da liberação (funcionário)"
 if (-not $libId) {
   Write-Step "DRY RUN criaria em $lib as colunas cr40f_tokenhash (texto 64), cr40f_expiraem e cr40f_usadaem (data e hora UTC), cr40f_arquivos (inteiro) e os lookups cr40f_funcionario e cr40f_solicitante"
