@@ -15,7 +15,7 @@ description: "Verifica os postos perto do motorista: Custom API new_ObterRanking
 - Dev server: `PORT=<porta livre> node scripts/dev-server.cjs`. Ele reescreve `dist/`; restaure com `git checkout -- dist package.json package-lock.json`.
 
 ## Roteiro (mock em localhost, viewport 390×844)
-1. Abra `/?p=1#gastos-relatorio` e toque em "Ver postos perto de mim" → rota `#ranking-postos`, título "Postos perto de você".
+1. Abra `/?p=1#gastos-relatorio` e toque no cartão "Postos perto de mim", em Suas médias (sem gastos no período, o link "Ver postos perto de mim") → rota `#ranking-postos`, título "Postos perto de você".
 2. A lista vem do mais perto para o mais longe; "Posto Exemplo Distante" (mais de 10 km) não aparece.
 3. Semáforo: R$ 6,09 "Recomendado", R$ 6,19 "Atenção" e R$ 6,83 "Evitar".
 4. O posto com ponto do Nominatim mostra "cerca de X km"; o da ANP mostra só a distância.

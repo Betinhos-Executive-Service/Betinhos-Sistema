@@ -752,10 +752,10 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
         "Logo abaixo fica o café e lanche médio, quando há dados."
       ], { target: ".gr-destaques", optional: true }),
       step("alerta", "Pendências", ["Quando algum gasto precisa de correção ou foi recusado, o aviso aparece aqui no topo. Toque nele para ir direto à lista de pendentes."], { target: ".gr-alerta", optional: true }),
+      step("precos", "Postos perto de mim", ["Mostra os postos perto de você, com o que a frota pagou por litro e uma recomendação."], { target: ".gr-preco-postos" }),
       step("evolucao", "Médias por mês", ["Escolha R$/L ou Refeição para ver a média de cada mês. Os meses do período escolhido ficam em azul-escuro."], { target: ".gr-evolucao", optional: true }),
       step("despesas", "Despesas", ["Pendentes mostra o que precisa de correção, completar ou foi recusado. Todas mostra as despesas do período. Toque num gasto do cartão marcado Completar para preenchê-lo; nos outros, abre o detalhe com o comprovante."], { target: ".gr-despesas", optional: true }),
       step("completar", "Completar", ["Quando há gastos do cartão para completar, o botão da esquerda abre a lista deles."], { target: ".gr-actions .action-button--secondary", optional: true }),
-      step("precos", "Postos perto de mim", ["Mostra os postos perto de você, com o que a frota pagou por litro e uma recomendação."], { target: ".gr-preco-postos" }),
       step("anexar", "Anexar despesa", ["Abre a câmera para fotografar o comprovante e lançar um gasto novo."], { target: ".gr-actions .action-button--primary" }),
       helpStep()
     ]
