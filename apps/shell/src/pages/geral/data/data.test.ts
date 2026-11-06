@@ -148,6 +148,7 @@ describe('source Dataverse', () => {
           { logicalName: 'cr40f_motorista', type: 'Lookup', label: 'Motorista', updatable: true, targets: ['cr40f_funcionarios'] },
         ],
         choices: async () => [{ value: 1, label: 'Confirmado' }],
+        picklists: async () => new Map([['cr40f_status', [{ value: 1, label: 'Confirmado' }]]]),
       },
     } as unknown as Host
     return { host, request, update, getAll, create, remove }

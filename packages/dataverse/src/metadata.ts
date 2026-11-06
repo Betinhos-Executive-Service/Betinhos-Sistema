@@ -27,6 +27,23 @@ type PicklistDefinition = {
   OptionSet?: { Options: { Value: number; Color?: string | null; Label?: { UserLocalizedLabel?: { Label?: string } | null } }[] }
 }
 
+type Deferred<T> = { promise: Promise<T>; resolve: (value: T) => void; reject: (reason: unknown) => void }
+
+function deferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void
+  let reject!: (reason: unknown) => void
+  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej })
+  return { promise, resolve, reject }
+}
+
+function toOptions(definition: PicklistDefinition): ChoiceOption[] {
+  return (definition.OptionSet?.Options ?? []).map((option) => ({
+    value: option.Value,
+    label: option.Label?.UserLocalizedLabel?.Label || String(option.Value),
+    ...(option.Color && /^#[0-9a-f]{6}$/i.test(option.Color) ? { color: option.Color } : {}),
+  }))
+}
+
 const SELECT = '$select=LogicalName,EntitySetName,PrimaryNameAttribute,DisplayCollectionName,ObjectTypeCode'
 
 /** Nomes reais (entity set e rótulo plural) lidos da metadata, com cache por cliente. */
@@ -53,22 +70,71 @@ export function createMetadata(client: DataverseClient) {
     return info
   }
 
-  /** Carrega várias tabelas em poucas chamadas; tabelas inexistentes ficam fora do resultado. */
-  async function entities(logicalNames: string[]) {
+  /**
+   * Carrega várias tabelas em poucas chamadas; tabelas inexistentes ficam fora do resultado.
+   * Tabela já lida (ou em leitura por outra chamada) vem do cache: só o que falta vai ao Dataverse, e as promessas do
+   * lote entram no cache antes de qualquer espera, para `entity()` e outro `entities()` simultâneos as compartilharem.
+   */
+  async function entities(logicalNames: string[]): Promise<Map<string, EntityInfo>> {
     const result = new Map<string, EntityInfo>()
-    for (const group of chunk(logicalNames, 15)) {
-      const filter = group.map((name) => `LogicalName eq '${odataString(name)}'`).join(' or ')
-      const page = await client.request<{ value: EntityDefinition[] }>(`EntityDefinitions?${SELECT}&$filter=${encodeURIComponent(filter)}`)
-      for (const definition of page.value) {
-        const info = toInfo(definition)
-        result.set(info.logicalName, info)
-        cache.set(info.logicalName, Promise.resolve(info))
-      }
+    const shared: [string, Promise<EntityInfo>][] = []
+    const pending = new Map<string, Deferred<EntityInfo>>()
+    for (const name of new Set(logicalNames)) {
+      const hit = cache.get(name)
+      if (hit) { shared.push([name, hit]); continue }
+      const slot = deferred<EntityInfo>()
+      slot.promise.catch(() => cache.delete(name))
+      cache.set(name, slot.promise)
+      pending.set(name, slot)
     }
+    // Leituras de outras chamadas: a que falhar saiu do cache e é refeita aqui, sem herdar o erro. Esperam junto com as próprias.
+    const failed: string[] = []
+    const waitShared = Promise.all(shared.map(([name, promise]) => promise.then((info) => { result.set(name, info) }, () => { failed.push(name) })))
+    try {
+      await Promise.all(chunk([...pending.keys()], 15).map(async (group) => {
+        const filter = group.map((name) => `LogicalName eq '${odataString(name)}'`).join(' or ')
+        const page = await client.request<{ value: EntityDefinition[] }>(`EntityDefinitions?${SELECT}&$filter=${encodeURIComponent(filter)}`)
+        for (const definition of page.value) {
+          const info = toInfo(definition)
+          result.set(info.logicalName, info)
+          pending.get(info.logicalName)?.resolve(info)
+        }
+      }))
+    } catch (error) {
+      for (const slot of pending.values()) slot.reject(error)
+      throw error
+    }
+    for (const [name, slot] of pending) if (!result.has(name)) slot.reject(new Error(`Tabela ${name} não encontrada na metadata.`))
+    await waitShared
+    if (failed.length) for (const [name, info] of await entities(failed)) result.set(name, info)
     return result
   }
 
   const choiceCache = new Map<string, Promise<ChoiceOption[]>>()
+  const picklistCache = new Map<string, Promise<Map<string, ChoiceOption[]>>>()
+
+  /**
+   * Opções de todas as colunas Picklist da tabela numa só consulta (em vez de uma por coluna), com cache.
+   * Abastece o cache de `choices()`, que passa a responder sem ir ao Dataverse.
+   */
+  function picklists(entityName: string) {
+    let all = picklistCache.get(entityName)
+    if (!all) {
+      const path = `EntityDefinitions(LogicalName='${odataString(entityName)}')/Attributes/Microsoft.Dynamics.CRM.PicklistAttributeMetadata`
+        + '?$select=LogicalName&$expand=OptionSet($select=Options)'
+      all = client.request<{ value: (PicklistDefinition & { LogicalName: string })[] }>(path).then((body) => {
+        const byAttribute = new Map(body.value.map((definition) => [definition.LogicalName, toOptions(definition)]))
+        for (const [attribute, options] of byAttribute) {
+          const key = `${entityName}.${attribute}`
+          if (!choiceCache.has(key)) choiceCache.set(key, Promise.resolve(options))
+        }
+        return byAttribute
+      })
+      all.catch(() => picklistCache.delete(entityName))
+      picklistCache.set(entityName, all)
+    }
+    return all
+  }
 
   /** Opções reais de uma coluna choice (nunca valores fixos no código), com cache por cliente. `type` (Picklist, State ou Status) define o cast da metadata. */
   function choices(entityName: string, attribute: string, type: 'Picklist' | 'State' | 'Status' = 'Picklist') {
@@ -77,11 +143,7 @@ export function createMetadata(client: DataverseClient) {
     if (!options) {
       const path = `EntityDefinitions(LogicalName='${odataString(entityName)}')/Attributes(LogicalName='${odataString(attribute)}')`
         + `/Microsoft.Dynamics.CRM.${type}AttributeMetadata?$select=LogicalName&$expand=OptionSet($select=Options)`
-      options = client.request<PicklistDefinition>(path).then((definition) => (definition.OptionSet?.Options ?? []).map((option) => ({
-        value: option.Value,
-        label: option.Label?.UserLocalizedLabel?.Label || String(option.Value),
-        ...(option.Color && /^#[0-9a-f]{6}$/i.test(option.Color) ? { color: option.Color } : {}),
-      })))
+      options = client.request<PicklistDefinition>(path).then(toOptions)
       options.catch(() => choiceCache.delete(key))
       choiceCache.set(key, options)
     }
@@ -114,5 +176,5 @@ export function createMetadata(client: DataverseClient) {
     return list
   }
 
-  return { entity, entities, choices, attributes }
+  return { entity, entities, choices, picklists, attributes }
 }
