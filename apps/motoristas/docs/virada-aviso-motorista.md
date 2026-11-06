@@ -89,7 +89,9 @@ Lido em 06/11/2026: no PROD não existem o conector `App Motoristas Web Push`, a
 
 Por isso a conexão não pode ser criada antes de publicar: ela depende do conector, que está na BetinhosCore. E publicar tudo de uma vez leva "Novo Serviço" e "Retirado" ligados a uma referência sem conexão: **eles podem não religar, e o PROD ficaria sem aviso nenhum**. Isso não foi testado; no TEST a referência existe sem conexão e o flow está desligado, o que não prova nem descarta o risco.
 
-Ordem proposta:
+**Decisão do Renan (06/11/2026):** provar no ensaio. Com o TEST recém-copiado do PROD, depois do import tente ligar "Novo Serviço" à mão e depois devolva o estado. Só libere o PROD se ligar. Se não ligar, siga a ordem abaixo.
+
+Ordem se o risco se confirmar:
 
 1. Publicar só a `BetinhosCore` (input `solucoes`): traz conector e tabelas, sem steps nem flows.
 2. Renan cria a conexão no PROD, com o segredo do Worker.
