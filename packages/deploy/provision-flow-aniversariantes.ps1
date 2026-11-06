@@ -50,7 +50,12 @@ if (-not $setFuncionarios) { throw 'Tabela cr40f_funcionarios ausente no DEV.' }
 
 # 3. Connection references (Dataverse e Office 365 Outlook).
 $refs = @((Dv GET "connectionreferences?`$select=connectionreferencelogicalname,connectorid&`$filter=statecode eq 0").value)
+# Flow que já existe mantém a referência que usa: com várias no DEV, só o flow novo pede o parâmetro.
+$flows = @((Dv GET "workflows?`$select=workflowid,statecode,clientdata&`$filter=name eq '$flowName' and category eq 5").value)
+if ($flows.Count -gt 1) { throw 'Flow duplicado no DEV.' }
+$refsAtuais = if ($flows.Count) { ($flows[0].clientdata | ConvertFrom-Json).properties.connectionReferences } else { $null }
 function Referencia([string] $conector, [string] $preferida) {
+  if (-not $preferida -and $refsAtuais -and $refsAtuais.PSObject.Properties[$conector]) { $preferida = $refsAtuais.$conector.connection.connectionReferenceLogicalName }
   $candidatas = @($refs | Where-Object { $_.connectorid -like "*/$conector" })
   if ($preferida) {
     $escolhida = @($candidatas | Where-Object { $_.connectionreferencelogicalname -eq $preferida })
@@ -97,8 +102,6 @@ $connectionReferences = @{
 $clientData = @{ properties = @{ definition = $definition; connectionReferences = $connectionReferences }; schemaVersion = '1.0.0.0' } | ConvertTo-Json -Depth 90 -Compress
 
 # 6. Cria ou atualiza o flow, inclui na solução e ativa.
-$flows = @((Dv GET "workflows?`$select=workflowid,statecode,clientdata&`$filter=name eq '$flowName' and category eq 5").value)
-if ($flows.Count -gt 1) { throw 'Flow duplicado no DEV.' }
 if ($flows.Count) {
   $flowId = $flows[0].workflowid
   # O Dataverse normaliza o clientdata; compara só definição e referências de conexão, ambas normalizadas igual.

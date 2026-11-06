@@ -48,6 +48,15 @@ test('a regra dos args obrigatórios cobre os parâmetros Mandatory dos scripts'
   }
 })
 
+test('script que escolhe connection reference reusa a do flow existente: o Deploy não informa qual usar', () => {
+  for (const e of ENTRADAS) {
+    const fonte = readFileSync(join(aqui, e.script), 'utf8')
+    if (fonte.includes('function Referencia(') || fonte.includes('$outlookRefs')) {
+      assert.match(fonte, /\$refsAtuais\.(\$conector|shared_office365)\.connection\.connectionReferenceLogicalName/, e.script)
+    }
+  }
+})
+
 test('mudança no script ou no JSON publica só aquele flow', () => {
   assert.deepEqual(nomes(['packages/deploy/provision-flow-hodometro.ps1']), ['hodometro'])
   assert.deepEqual(nomes(['packages/deploy/flows/aniversariantes-diario.json']), ['aniversariantes'])

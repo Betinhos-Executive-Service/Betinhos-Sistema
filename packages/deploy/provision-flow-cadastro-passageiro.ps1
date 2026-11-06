@@ -63,7 +63,12 @@ foreach ($campo in 'new_linkdafoto', 'cr40f_telefone', 'cr40f_email', 'cr40f_nom
 
 # 2. Connection references (Dataverse e SharePoint).
 $refs = @((Dv GET "connectionreferences?`$select=connectionreferencelogicalname,connectorid&`$filter=statecode eq 0").value)
+# Flow que já existe mantém a referência que usa: com várias no DEV, só o flow novo pede o parâmetro.
+$flows = @((Dv GET "workflows?`$select=workflowid,statecode,clientdata&`$filter=name eq '$flowName' and category eq 5").value)
+if ($flows.Count -gt 1) { throw 'Flow duplicado no DEV.' }
+$refsAtuais = if ($flows.Count) { ($flows[0].clientdata | ConvertFrom-Json).properties.connectionReferences } else { $null }
 function Referencia([string] $conector, [string] $preferida, [string] $parametro) {
+  if (-not $preferida -and $refsAtuais -and $refsAtuais.PSObject.Properties[$conector]) { $preferida = $refsAtuais.$conector.connection.connectionReferenceLogicalName }
   $candidatas = @($refs | Where-Object { $_.connectorid -like "*/$conector" })
   if ($preferida) {
     if (@($candidatas | Where-Object { $_.connectionreferencelogicalname -eq $preferida }).Count -ne 1) { throw "Connection reference '$preferida' ($conector) não encontrada." }
@@ -90,8 +95,6 @@ $connectionReferences = @{
 $clientData = @{ properties = @{ definition = $definition; connectionReferences = $connectionReferences }; schemaVersion = '1.0.0.0' } | ConvertTo-Json -Depth 90 -Compress
 
 # 4. Cria ou atualiza o flow, inclui na solução e ativa.
-$flows = @((Dv GET "workflows?`$select=workflowid,statecode,clientdata&`$filter=name eq '$flowName' and category eq 5").value)
-if ($flows.Count -gt 1) { throw 'Flow duplicado no DEV.' }
 if ($flows.Count) {
   $flowId = $flows[0].workflowid
   $normalizar = { param($o) if ($null -eq $o) { '' } else { ($o | ConvertTo-Json -Depth 90 -Compress | ConvertFrom-Json | ConvertTo-Json -Depth 90 -Compress) } }
