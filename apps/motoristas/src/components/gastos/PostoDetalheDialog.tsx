@@ -1,4 +1,4 @@
-import { Check, MapPin, Pencil, ThumbsDown, ThumbsUp } from "lucide-react";
+import { Check, ChevronDown, MapPin, Pencil, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { DitadoField } from "../common/DitadoButton";
@@ -6,11 +6,11 @@ import { TextAreaField } from "../common/FormFields";
 import { SystemIcon } from "../icons/SystemIcon";
 import { useDetalheDialog } from "./useDetalheDialog";
 import { reportAppError } from "../../lib/appErrorLogger";
-import { MAX_COMENTARIO, MOTIVOS, enviarAvaliacao, iniciaisAutor, motivoPositivo, percentualRecomenda, rotuloMotivo, type MinhaAvaliacao, type ResumoAvaliacoes } from "../../lib/avaliacaoPostos";
+import { MAX_COMENTARIO, MOTIVOS, enviarAvaliacao, motivoPositivo, nomeCurto, percentualRecomenda, rotuloMotivo, type MinhaAvaliacao, type ResumoAvaliacoes } from "../../lib/avaliacaoPostos";
 import { customApiErrorMessage } from "../../lib/customApi";
 import { formatDiaMes } from "../../lib/gastosCartao";
 import { formatBRL } from "../../lib/gastosRelatorio";
-import { RECOMENDACAO, rotuloDistancia, urlMaps, type PostoProximo } from "../../lib/rankingPostos";
+import { RECOMENDACAO, ROTULO_META, enderecoLegivel, rotuloDistancia, urlMaps, type PostoProximo } from "../../lib/rankingPostos";
 import { appendDitado } from "../../lib/useDitado";
 
 const mesmoRascunho = (a: MinhaAvaliacao, b: MinhaAvaliacao) => JSON.stringify([a.recomenda, a.motivos, a.comentario]) === JSON.stringify([b.recomenda, b.motivos, b.comentario]);
@@ -24,7 +24,6 @@ export function PostoDetalheDialog({ posto, dias, onAvaliado, onClose }: { posto
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const [enviada, setEnviada] = useState(false);
-  const recomendacao = RECOMENDACAO[posto.cor];
   const sujo = rascunho !== null && inicial !== null && !mesmoRascunho(rascunho, inicial);
 
   const fecharPainel = useCallback(() => { setDescartando(false); setRascunho(null); setRecemSalva(false); }, []);
@@ -78,20 +77,33 @@ export function PostoDetalheDialog({ posto, dias, onAvaliado, onClose }: { posto
     <div className="gr-detalhe-overlay" role="dialog" aria-modal="true" aria-labelledby="rp-detalhe-titulo" onClick={pedirFechar}>
       <div className="gr-detalhe rp-ficha" onClick={(event) => event.stopPropagation()}>
         <header className="gr-detalhe-topo">
-          <div className="gr-detalhe-titulos">
-            <h2 id="rp-detalhe-titulo">{posto.nome}</h2>
-            <strong className="gr-detalhe-valor">{formatBRL(posto.precoLitro)}/L</strong>
-          </div>
-          <span className="termo-badge" data-tone={recomendacao.tom}>{recomendacao.rotulo}</span>
+          <div className="gr-detalhe-titulos"><h2 id="rp-detalhe-titulo">{posto.nome}</h2></div>
           <button ref={fecharRef} type="button" className="gr-detalhe-fechar" aria-label="Fechar" disabled={salvando} onClick={pedirFechar}><SystemIcon name="dismiss" /></button>
         </header>
         <div className="gr-detalhe-corpo">
-          <dl className="gr-detalhe-campos">
-            {posto.endereco ? <div><dt>Endereço</dt><dd>{posto.endereco}</dd></div> : null}
-            <div><dt>Distância</dt><dd>{rotuloDistancia(posto)}</dd></div>
-            <div><dt>Média</dt><dd>{posto.abastecimentos === 1 ? "Baseada em 1 abastecimento" : `${posto.abastecimentos} abastecimentos em ${dias} dias`}</dd></div>
-          </dl>
-          <a className="rp-maps" href={urlMaps(posto)} target="_blank" rel="noreferrer"><MapPin aria-hidden="true" />Abrir no Maps</a>
+          <section className="rp-bloco" aria-labelledby="rp-custa">
+            <h3 id="rp-custa">Quanto custa</h3>
+            <div className="rp-bloco-linha">
+              <strong className="rp-bloco-valor">{formatBRL(posto.precoLitro)}<small>/L</small></strong>
+              <span className="termo-badge" data-tone={RECOMENDACAO[posto.cor].tom}>{ROTULO_META[posto.cor]}</span>
+            </div>
+            <p className="rp-bloco-texto">{posto.abastecimentos === 1 ? "Preço de 1 abastecimento" : `Média de ${posto.abastecimentos} abastecimentos em ${dias} dias`}. Última vez em {formatDiaMes(posto.ultimoAbastecimento)}.</p>
+            {posto.historico.length ? (
+              <details className="rp-detalhes">
+                <summary>Ver últimos abastecimentos<ChevronDown aria-hidden="true" /></summary>
+                <ul className="rp-historico">
+                  {posto.historico.map((item, indice) => (
+                    <li key={`${item.data}-${indice}`}><span>{formatDiaMes(item.data)}</span><strong>{formatBRL(item.precoLitro)}/L</strong></li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
+          </section>
+          <section className="rp-bloco" aria-labelledby="rp-onde">
+            <h3 id="rp-onde">Onde fica · {rotuloDistancia(posto)} de você</h3>
+            {posto.endereco ? <p className="rp-bloco-endereco">{enderecoLegivel(posto.endereco)}</p> : null}
+            <a className="rp-ir" href={urlMaps(posto)} target="_blank" rel="noreferrer"><MapPin aria-hidden="true" />Ir para o posto</a>
+          </section>
           {posto.postoId ? (
             <Avaliacoes
               resumo={posto.avaliacoes}
@@ -101,16 +113,6 @@ export function PostoDetalheDialog({ posto, dias, onAvaliado, onClose }: { posto
               onAvaliar={avaliarNoToque}
               onEditar={(minha) => { setEnviada(false); abrirPainel({ recomenda: minha.recomenda, motivos: minha.motivos, comentario: minha.comentario }, false); }}
             />
-          ) : null}
-          {posto.historico.length ? (
-            <section aria-labelledby="rp-historico">
-              <h3 className="termo-section-title" id="rp-historico">Últimos abastecimentos</h3>
-              <ul className="rp-historico">
-                {posto.historico.map((item, indice) => (
-                  <li key={`${item.data}-${indice}`}><span>{formatDiaMes(item.data)}</span><strong>{formatBRL(item.precoLitro)}/L</strong></li>
-                ))}
-              </ul>
-            </section>
           ) : null}
         </div>
         {rascunho ? (
@@ -139,15 +141,11 @@ export function PostoDetalheDialog({ posto, dias, onAvaliado, onClose }: { posto
 function Avaliacoes({ resumo, enviada, salvando, erro, onAvaliar, onEditar }: { resumo: ResumoAvaliacoes; enviada: boolean; salvando: boolean; erro: string; onAvaliar: (recomenda: boolean) => void; onEditar: (minha: MinhaAvaliacao) => void }) {
   const percentual = percentualRecomenda(resumo);
   return (
-    <section aria-labelledby="rp-avaliacoes">
-      <h3 className="termo-section-title" id="rp-avaliacoes">Avaliações dos motoristas</h3>
+    <section className="rp-bloco" aria-labelledby="rp-avaliacoes">
+      <h3 id="rp-avaliacoes">O que dizem</h3>
       {resumo.total ? (
         <>
           <p className="rp-placar" data-bom={percentual >= 50}><strong>{percentual}%</strong><span>recomendam · {resumo.total === 1 ? "1 avaliação" : `${resumo.total} avaliações`}</span></p>
-          <div className="rp-barra" aria-hidden="true">
-            {resumo.recomendam ? <i style={{ flexGrow: resumo.recomendam }} /> : null}
-            {resumo.total > resumo.recomendam ? <u style={{ flexGrow: resumo.total - resumo.recomendam }} /> : null}
-          </div>
           {resumo.motivos.length ? (
             <ul className="rp-motivos">
               {resumo.motivos.map((id) => <li key={id} data-positivo={motivoPositivo(id)}>{rotuloMotivo(id)}{resumo.contagemMotivos[id] ? <b>{resumo.contagemMotivos[id]}</b> : null}</li>)}
@@ -177,11 +175,8 @@ function Avaliacoes({ resumo, enviada, salvando, erro, onAvaliar, onEditar }: { 
         <ul className="rp-comentarios">
           {resumo.comentarios.map((comentario, indice) => (
             <li key={`${comentario.autor}-${indice}`}>
-              <span className="rp-inicial" aria-hidden="true">{iniciaisAutor(comentario.autor)}</span>
-              <div>
-                <small data-positivo={comentario.recomenda}>{comentario.autor} · {formatDiaMes(comentario.data)}{comentario.recomenda ? <ThumbsUp aria-label="Recomenda" /> : <ThumbsDown aria-label="Não recomenda" />}</small>
-                <p>{comentario.texto}</p>
-              </div>
+              <p>{comentario.texto}</p>
+              <small data-positivo={comentario.recomenda}>{comentario.recomenda ? <ThumbsUp aria-label="Recomenda" /> : <ThumbsDown aria-label="Não recomenda" />}{nomeCurto(comentario.autor)} · {formatDiaMes(comentario.data)}</small>
             </li>
           ))}
         </ul>
