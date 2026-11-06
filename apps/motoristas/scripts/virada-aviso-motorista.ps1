@@ -130,15 +130,20 @@ if ($toDisable.Count -gt 0 -or @(Get-ChildItem -LiteralPath $snapshotDir -Filter
 }
 
 # 1. Liga os novos. Antigos intactos: se isto falhar, nada mudou para o motorista.
+#    O corte vem antes: aviso gravado com o Enviar ja ligado esta em entrega e nao pode ser cancelado no passo 2.
 $newFlows = Get-NewFlows
+$activating = @($newFlows | Where-Object { [int]$_.statecode -eq 0 }).Count -gt 0
+$cutoff = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 foreach ($flow in $newFlows) { Set-FlowState $flow 1 }
 
 # 2. Avisos gravados antes de o Enviar ligar nunca dispararam e foram atendidos pelos flows antigos: sem isto a
 #    Vigia acusaria todos como nao entregues. "Sem app" entra junto para nao virar rajada de alertas.
-$cutoff = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-$backlog = @(Get-Rows "new_avisomotoristas" "new_avisomotoristaid" "(new_situacao eq $pendente or new_situacao eq $semApp) and createdon lt $cutoff")
-foreach ($row in $backlog) { Request "PATCH" "new_avisomotoristas($($row.new_avisomotoristaid))" @{ new_situacao = $cancelado } | Out-Null }
-Write-Step "avisos Pendente ou Sem app anteriores a virada cancelados: $($backlog.Count)"
+#    Repetir a virada com os novos ja ligados (ex.: depois de falha no passo 3) nao tem acumulado a cancelar.
+if ($activating) {
+  $backlog = @(Get-Rows "new_avisomotoristas" "new_avisomotoristaid" "(new_situacao eq $pendente or new_situacao eq $semApp) and createdon lt $cutoff")
+  foreach ($row in $backlog) { Request "PATCH" "new_avisomotoristas($($row.new_avisomotoristaid))" @{ new_situacao = $cancelado } | Out-Null }
+  Write-Step "avisos Pendente ou Sem app anteriores a virada cancelados: $($backlog.Count)"
+}
 
 # 3. So agora desliga os antigos. Falhou no meio: religa os que ja desligou.
 $disabled = @()

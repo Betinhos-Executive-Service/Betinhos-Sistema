@@ -13,7 +13,7 @@ Na troca de motorista, "Novo Serviço", "Retirado da Agenda" e "Resetar" liam a 
 | `new_avisomotorista` | `scripts/provision-aviso-motorista.ps1` | Outbox: um aviso por motorista e evento |
 | `DriverNoticePlugin` pré-operação | `plugins/DriverRecordSharing` | Motorista mudou: zera `new_visualizacaodomotorista` e ajusta `new_foiprogramado` na mesma gravação |
 | `DriverNoticePlugin` pós-operação | `plugins/DriverRecordSharing` | Cria o aviso na transação da reserva, com o serviço de sistema |
-| `Flow Aviso Motorista \| Enviar` | `scripts/provision-aviso-motorista-flows.ps1` | Entrega Power Apps e Web Push; grava Enviado, Falhou ou Sem app |
+| `Flow Aviso Motorista \| Enviar` | `scripts/provision-aviso-motorista-flows.ps1` | Entrega Power Apps e Web Push em paralelo; grava Enviado, Falhou ou Sem app. Novo que deixou de valer (saiu de Programado ou trocou o motorista) vira Cancelado sem push |
 | `Flow Aviso Motorista \| Vigia` | idem | A cada 10 min: concilia, alerta a operação, reenvia o vencido |
 
 Regras:
@@ -54,7 +54,7 @@ No DEV, "Novo Serviço" e "Retirado" já estão em rascunho (06/11/2026); só "R
 
 ### Reversão
 
-`scripts/virada-aviso-motorista.ps1 -Reverter -Apply` religa os antigos que estavam ligados e desliga os novos, nessa ordem. Exige o snapshot em `backup/aviso-motorista/` da mesma máquina. Os steps seguem ativos; para tirar o plugin de cena, desative os três steps `DriverRecordSharing - Aviso motorista ...`.
+`scripts/virada-aviso-motorista.ps1 -Reverter -Apply` religa os antigos que estavam ligados e desliga os novos, nessa ordem. Exige o snapshot em `backup/aviso-motorista/` do mesmo checkout em que a virada rodou. Os steps seguem ativos; para tirar o plugin de cena, desative os três steps `DriverRecordSharing - Aviso motorista ...`.
 
 A proteção provisória dos flows antigos (`scripts/patch-flow-troca-motorista.ps1`, em PR próprio) perde o efeito com esta virada; depois dela, o script pode ser removido.
 
