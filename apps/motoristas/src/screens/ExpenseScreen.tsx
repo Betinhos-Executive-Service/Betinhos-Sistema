@@ -19,6 +19,7 @@ import {
 import type { MaintenanceRequestVehicleOption } from "../lib/dataverse";
 import { parseCurrencyInput } from "../lib/expenses";
 import type { ExpenseSubmissionStatus } from "../lib/expenseUploadState";
+import { validarDescricao, formatDiaMes } from "../lib/gastosCartao";
 import { SystemIcon, type SystemIconName } from "../components/icons/SystemIcon";
 
 export type ExpenseUploadListItem = {
@@ -61,7 +62,27 @@ type ExpenseScreenProps = {
   quickRead?: QuickReadState;
   /** Campos preenchidos pela leitura rápida (destacados até o motorista alterar). */
   quickReadFilled?: QuickReadFilledFields;
+  /** Completar gasto do cartão: valor, data, forma e estabelecimento ficam somente leitura. */
+  cartaoGasto?: { cartaoFinal: string; estabelecimento: string };
 };
+
+function CartaoResumo({ gasto, valor, dataGasto }: { gasto: { cartaoFinal: string; estabelecimento: string }; valor: string; dataGasto: string }) {
+  return (
+    <section className="expense-card-summary" aria-label="Dados do cartão">
+      <div className="expense-card-summary-row">
+        <span className="expense-card-summary-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5" /><path d="M2.5 10h19" /></svg>
+        </span>
+        <span className="expense-card-summary-text">
+          <strong>{gasto.estabelecimento || "Estabelecimento não informado"}</strong>
+          <span>{formatDiaMes(dataGasto)} · {gasto.cartaoFinal ? `final ${gasto.cartaoFinal}` : "cartão corporativo"}</span>
+        </span>
+        <strong className="expense-card-summary-value">{BRL.format(parseCurrencyInput(valor) || 0)}</strong>
+      </div>
+      <p className="expense-card-summary-note">Dados do banco, não editáveis. Complete os campos abaixo.</p>
+    </section>
+  );
+}
 
 function focusInvalidField(element: HTMLElement | null) {
   element?.focus({ preventScroll: false });
@@ -87,7 +108,8 @@ export function ExpenseScreen({
   vehiclesLoading,
   currentVehicleId,
   quickRead,
-  quickReadFilled = {}
+  quickReadFilled = {},
+  cartaoGasto
 }: ExpenseScreenProps) {
   const isSubmitting = submitState !== "idle";
   const cameraScroll = useCameraScroll("gastos");
@@ -103,6 +125,8 @@ export function ExpenseScreen({
   const litersRef = useRef<HTMLInputElement | null>(null);
   const photosRef = useRef<HTMLDivElement | null>(null);
   const [errors, setErrors] = useState<ExpenseValidationErrors>({});
+  const [descricaoError, setDescricaoError] = useState("");
+  const descricaoRef = useRef<HTMLTextAreaElement | null>(null);
 
   const category = findExpenseCategory(referenceData, draft.categoriaId);
   const rules = getExpenseCategoryRules(category);
@@ -153,8 +177,12 @@ export function ExpenseScreen({
 
   const submit = () => {
     if (isSubmitting || submitDisabled) return;
-    const nextErrors = validateExpenseDraft(draft, photos, referenceData);
+    const validated = validateExpenseDraft(draft, photos, referenceData);
+    // Valor, data e forma vêm do banco e ficam ocultos no modo cartão: não podem travar o envio.
+    const nextErrors = cartaoGasto ? { ...validated, valor: undefined, dataGasto: undefined, formaPagamentoId: undefined } : validated;
     setErrors(nextErrors);
+    const nextDescricaoError = cartaoGasto ? validarDescricao(draft) : "";
+    setDescricaoError(nextDescricaoError);
     if (nextErrors.categoriaId) return focusInvalidField(categoryRef.current);
     if (nextErrors.veiculoId) return focusInvalidField(vehicleRef.current);
     if (nextErrors.valor) return focusInvalidField(valueRef.current);
@@ -163,6 +191,7 @@ export function ExpenseScreen({
     if (nextErrors.cidadeId) return focusInvalidField(cityRef.current);
     if (nextErrors.kmInformado) return focusInvalidField(kmRef.current);
     if (nextErrors.litros) return focusInvalidField(litersRef.current);
+    if (nextDescricaoError) return focusInvalidField(descricaoRef.current);
     if (nextErrors.photos) return focusInvalidField(photosRef.current);
     normalizeExpenseFields(draft, photos, referenceData);
     onSubmit(draft);
@@ -174,7 +203,8 @@ export function ExpenseScreen({
     onAddPhoto();
   };
 
-  const errorCount = Object.values(errors).filter(Boolean).length;
+  const labels = cartaoGasto ? ["ENVIAR", "ENVIANDO", "ENVIADO"] : ["REGISTRAR", "REGISTRANDO", "REGISTRADO"];
+  const errorCount = Object.values(errors).filter(Boolean).length + (descricaoError ? 1 : 0);
   const isVideo = (photo: ExpensePhoto) => photo.mediaType === "video" || Boolean(photo.rawBlob) || photo.dataUrl.startsWith("data:video/");
   const uploadTitle = (item: ExpenseUploadListItem) => {
     const name = findExpenseCategory(referenceData, item.draft.categoriaId)?.name ?? "Gasto";
@@ -184,7 +214,7 @@ export function ExpenseScreen({
 
   return (
     <AppShell screenLabel="TelaGastos">
-      <FormMenu title="Registrar gasto" onBack={isSubmitting ? undefined : onBack} />
+      <FormMenu title={cartaoGasto ? "Completar gasto do cartão" : "Registrar gasto"} onBack={isSubmitting ? undefined : onBack} />
       <section className="main-panel maintenance-request-main">
         <article className="finalize-card maintenance-request-card">
           <div className="finalize-scroll" ref={cameraScroll.ref}>
@@ -222,6 +252,11 @@ export function ExpenseScreen({
                 <div className="form-error-summary is-info" role="status">Preencha os dados do comprovante.</div>
               ) : null}
 
+              {cartaoGasto ? (
+                <CartaoResumo gasto={cartaoGasto} valor={draft.valor} dataGasto={draft.dataGasto} />
+              ) : null}
+
+              {!cartaoGasto ? (
               <TextInputField
                 ref={dateRef}
                 required
@@ -235,6 +270,7 @@ export function ExpenseScreen({
                   clearError("dataGasto");
                 }}
               />
+              ) : null}
 
               <SelectField
                 ref={categoryRef}
@@ -260,6 +296,8 @@ export function ExpenseScreen({
                 }}
               />
 
+              {!cartaoGasto ? (
+              <>
               <MoneyInputField
                 ref={valueRef}
                 required
@@ -292,6 +330,8 @@ export function ExpenseScreen({
                   clearError("formaPagamentoId");
                 }}
               />
+              </>
+              ) : null}
 
               <SelectField
                 ref={cityRef}
@@ -367,6 +407,7 @@ export function ExpenseScreen({
                 />
               ) : null}
 
+              {!cartaoGasto ? (
               <TextInputField
                 label="Estabelecimento"
                 fieldClassName={quickReadClass("estabelecimento")}
@@ -374,14 +415,21 @@ export function ExpenseScreen({
                 value={draft.estabelecimento}
                 onChange={(event) => updateDraft({ estabelecimento: event.target.value })}
               />
+              ) : null}
 
               <TextAreaField
+                ref={descricaoRef}
                 label="Descrição"
+                required={Boolean(cartaoGasto)}
+                error={descricaoError}
                 fieldClassName={quickReadClass("descricao")}
-                placeholder="Opcional"
+                placeholder={cartaoGasto ? "O que foi este gasto?" : "Opcional"}
                 rows={3}
                 value={draft.descricao}
-                onChange={(event) => updateDraft({ descricao: event.target.value })}
+                onChange={(event) => {
+                  updateDraft({ descricao: event.target.value });
+                  if (descricaoError) setDescricaoError("");
+                }}
               />
 
               <FormField label="Comprovantes" error={errors.photos} required>
@@ -416,10 +464,10 @@ export function ExpenseScreen({
             <ActionButton
               className="finalize-primary"
               variant="primary"
-              idleLabel="REGISTRAR"
+              idleLabel={labels[0]}
               disabled={submitDisabled}
-              loadingLabel="REGISTRANDO"
-              successLabel="REGISTRADO"
+              loadingLabel={labels[1]}
+              successLabel={labels[2]}
               state={submitState}
               onClick={submit}
             />

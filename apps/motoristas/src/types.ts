@@ -30,7 +30,10 @@ export type Screen =
   | "boasIdeias"
   | "meuCarro"
   | "multas"
-  | "treinamentos";
+  | "treinamentos"
+  | "gastosCartao"
+  | "gastosRelatorio"
+  | "rankingPostos";
 
 export type TileIcon = "cars" | "clock" | "money" | "tools";
 

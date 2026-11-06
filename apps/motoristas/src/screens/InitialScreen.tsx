@@ -221,6 +221,7 @@ type InitialScreenProps = {
   pendingChecklists?: number;
   pendingMultas?: number;
   pendingTreinamentos?: number;
+  pendingGastosCartao?: number;
   /** "Você tem N multas para assinar · prazo até dd/mm"; null sem pendências. */
   multasBanner?: string | null;
   canGeneratePersonalReceipt?: boolean;
@@ -432,6 +433,7 @@ export function InitialScreen(props: InitialScreenProps) {
     { id: "multas", count: props.pendingMultas ?? 0, text: (n: number) => `${n} multa${plural(n)} para assinar${multasPrazo ? ` · ${multasPrazo}` : ""}` },
     { id: "comunicados", count: props.pendingComunicados ?? 0, text: (n: number) => `${n} comunicado${plural(n)} para ler` },
     { id: "treinamentos", count: props.pendingTreinamentos ?? 0, text: (n: number) => `${n} treinamento${plural(n)} para fazer` },
+    { id: "gastosCartao", count: props.pendingGastosCartao ?? 0, text: (n: number) => `Gastos do cartão · ${n} para completar` },
   ];
   const pendingCounts: Record<string, number> = Object.fromEntries(pendingTypes.map((type) => [type.id, type.count]));
   const pendencias = pendingTypes

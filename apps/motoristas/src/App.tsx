@@ -4,7 +4,9 @@ import {
   findFirstPendingServiceDetail,
   getInitialChecklistId,
   getInitialComunicadoId,
+  getInitialDespesaId,
   getInitialDetail,
+  getInitialGastosCartaoLink,
   getInitialParams,
   getInitialTermoMultaId,
   getInitialTreinamentoParticipacaoId,
@@ -77,7 +79,7 @@ import {
   type DriverContext,
   type MaintenanceRequestVehicleOption
 } from "./lib/dataverse";
-import { readReceiptQuick, isStandaloneWebResourceRuntime } from "./lib/dataverse";
+import { conferirDespesaRemote, readReceiptQuick, isStandaloneWebResourceRuntime } from "./lib/dataverse";
 import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "./lib/fetchWebApi";
 import { createQrChargeRemote, getQrChargeSummaryRemote, updateQrChargeRemote } from "./lib/dataverse";
 import { getQrChargeReceiveState, getReceivableCents, type QrChargeSummary } from "./lib/qrCharge";
@@ -108,6 +110,8 @@ import { clearMediaDraft, loadMediaDraft, saveMediaDraft, touchMediaDraft } from
 import { describeExpenseSubmission, normalizeStoredExpenseSubmissions, type ExpenseSubmission, type ExpenseUploadRow } from "./lib/expenseUploadState";
 import { resumeExpenseSubmission, type ExpenseSubmissionProgress } from "./lib/expenseSubmission";
 import { ExpenseSendOverlay, type ExpenseSendState } from "./components/common/ExpenseSendOverlay";
+import { ConferenciaDuvidaDialog } from "./components/gastos/ConferenciaDuvidaDialog";
+import { TIMEOUT_CONFERENCIA_MS, calcularSinais, camposConferencia, carregarServicosConferencia, lerRespostaConferencia, montarCorpoConferencia, respostaConferenciaMock, type ConferenciaEnvio, type GastoConferido } from "./lib/conferenciaEnvio";
 import type { ExpenseUploadMode } from "./lib/expenseUploadMode";
 import { resolveExpenseUploadModeRemote, expenseSubmissionStorageKey, ensureExpenseSubmissionRemote, loadExpenseUploadRowsRemote, transitionExpenseUploadRemote, dispatchExpenseUploadRemote, createExpenseUploadItem } from "./lib/dataverse";
 
@@ -203,7 +207,25 @@ import {
   type CollisionPhoto,
   type CollisionPhotoKind
 } from "./lib/collisions";
-import { DEFAULT_EXPENSE_REFERENCE_DATA, buildExpenseCreatePayload, type ExpenseDraft, type ExpensePhoto, type ExpenseReferenceData } from "./lib/expenses";
+import { DEFAULT_EXPENSE_REFERENCE_DATA, buildExpenseCreatePayload, parseCurrencyInput, type ExpenseDraft, type ExpensePhoto, type ExpenseReferenceData } from "./lib/expenses";
+import { GastosCartaoScreen } from "./screens/GastosCartaoScreen";
+import { GastosRelatorioScreen, type GastosRelatorioLoadStatus } from "./screens/GastosRelatorioScreen";
+import { RankingPostosScreen } from "./screens/RankingPostosScreen";
+import { carregarDespesasRelatorio, hojeSaoPaulo, montarRelatorio, type DespesaRelatorio, type PeriodoId } from "./lib/gastosRelatorio";
+import { GastoCartaoDuplicadoDialog } from "./components/common/GastoCartaoDuplicadoDialog";
+import {
+  MOCK_CIDADES,
+  STATUS_OPERACIONAL,
+  acharGastoCartaoDuplicado,
+  buildGastoCartaoCompletarPayload,
+  concluirGastoCartaoMock,
+  gastoCartaoParaRascunho,
+  isMockGastosCartao,
+  listarGastosCartao,
+  mesclarRascunho,
+  type GastoCartao,
+  type GastosCartaoLoadStatus
+} from "./lib/gastosCartao";
 import { hasMediaDraftContent, prepareVideoBlobForUpload, revokePreviewUrl } from "./lib/mediaDrafts";
 import type { CapturedVideoDraft, DetailData, MaintenancePhotoKind, Screen } from "./types";
 
@@ -475,7 +497,7 @@ function App() {
   const initialDetailRef = useRef<DetailData | null>(initialHashRouteRef.current ? initialHashDetail : getInitialDetail(store));
   const initialScreen = initialHashRouteRef.current
     ? getInitialScreenFromHashRoute(initialHashRouteRef.current, initialHashDetail)
-    : (initialDetailRef.current ? "detalhes" : getInitialTermoMultaId() ? "multas" : getInitialTreinamentoParticipacaoId() ? "treinamentos" : "inicio");
+    : (initialDetailRef.current ? "detalhes" : getInitialTermoMultaId() ? "multas" : getInitialTreinamentoParticipacaoId() ? "treinamentos" : (getInitialDespesaId() || getInitialGastosCartaoLink()) ? "gastosCartao" : "inicio");
   const [screen, setScreen] = useState<Screen>(initialScreen);
   const previousScreenRef = useRef<Screen>(initialScreen);
   const lastMediaScreenRef = useRef<Screen>(initialScreen);
@@ -546,6 +568,10 @@ function App() {
   const expenseJournalQueueRef = useRef<Promise<void>>(Promise.resolve());
   const expenseNoticeRef = useRef(new Set<string>());
   const expenseSubmitBusyRef = useRef(false);
+  // Conferência no envio: data/hora lidas no cupom, resultado da última conferência e o popup "Dúvida" aberto.
+  const expenseQuickReadLeituraRef = useRef<{ data: string | null; hora: string | null } | null>(null);
+  const conferenciaRef = useRef<ConferenciaEnvio | null>(null);
+  const [duvidaConferencia, setDuvidaConferencia] = useState<{ pergunta: string; responder: (justificativa: string | null) => void } | null>(null);
   const [expenseSend, setExpenseSend] = useState<ExpenseSendState | null>(null);
   const expenseRunningRef = useRef(new Set<string>());
   const [expenseRunningIds, setExpenseRunningIds] = useState<string[]>([]);
@@ -989,6 +1015,148 @@ function App() {
   const updateTreinamentoParticipacao = useCallback((participacao: Participacao) => {
     setTreinamentos((current) => current.map((item) => item.participacao.id === participacao.id ? { ...item, participacao } : item));
   }, []);
+
+  // Gastos do cartão corporativo criados pelo flow: o motorista completa descrição, categoria, cidade e comprovante.
+  const [gastosCartao, setGastosCartao] = useState<GastoCartao[]>([]);
+  const [gastosCartaoStatus, setGastosCartaoStatus] = useState<GastosCartaoLoadStatus>("loading");
+  const [gastoCartaoAtual, setGastoCartaoAtual] = useState<GastoCartao | null>(null);
+  const gastoCartaoAtualRef = useRef<GastoCartao | null>(null);
+  gastoCartaoAtualRef.current = gastoCartaoAtual;
+  const gastoCartaoBackupRef = useRef<{ draft: ExpenseDraft; photos: ExpensePhoto[] } | null>(null);
+  const pendingGastoCartaoDeepLinkRef = useRef(getInitialDespesaId());
+  const gastosCartaoEmCargaRef = useRef<Promise<void> | null>(null);
+  const [duplicidadeCartao, setDuplicidadeCartao] = useState<GastoCartao | null>(null);
+  const reloadGastosCartao = useCallback(() => {
+    if (gastosCartaoEmCargaRef.current) return gastosCartaoEmCargaRef.current;
+    const carga = (async () => {
+      try {
+        setGastosCartao(await listarGastosCartao(comunicadosDriverIdRef.current));
+        setGastosCartaoStatus("ready");
+      } catch (error) {
+        setGastosCartaoStatus((current) => current === "ready" ? current : "error");
+        throw error;
+      } finally {
+        gastosCartaoEmCargaRef.current = null;
+      }
+    })();
+    gastosCartaoEmCargaRef.current = carga;
+    return carga;
+  }, []);
+  useEffect(() => {
+    if (!isMockGastosCartao() && !driverContext?.id) return;
+    const carregar = () => {
+      if (document.hidden) return;
+      reloadGastosCartao().catch((error) => reportAppError(error, { severity: "warning", source: "app", action: "listarGastosCartao", notifyUser: false }));
+    };
+    carregar();
+    const timer = window.setInterval(carregar, AUTO_REFRESH_INTERVAL_MS);
+    window.addEventListener("focus", carregar);
+    document.addEventListener("visibilitychange", carregar);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", carregar);
+      document.removeEventListener("visibilitychange", carregar);
+    };
+  }, [driverContext?.id]);
+  // Já enviado e guardado no diário do aparelho: sai da lista e da contagem mesmo antes da releitura.
+  const gastosCartaoPendentes = gastosCartao.filter((gasto) => !expenseSubmissions.some((submission) => submission.expenseId === gasto.id));
+
+  // Relatório de gastos: uma consulta de 6 meses; o recorte por período e as contas são locais (trocar de período não consulta de novo).
+  const [relatorioPeriodo, setRelatorioPeriodo] = useState<PeriodoId>("mes");
+  const [relatorioDespesas, setRelatorioDespesas] = useState<DespesaRelatorio[] | null>(null);
+  const [relatorioStatus, setRelatorioStatus] = useState<GastosRelatorioLoadStatus>("loading");
+  const relatorioEmCargaRef = useRef(false);
+  const relatorioRepetirRef = useRef(false);
+  const reloadRelatorio = useCallback(async () => {
+    if (relatorioEmCargaRef.current) {
+      relatorioRepetirRef.current = true;
+      return;
+    }
+    relatorioEmCargaRef.current = true;
+    setRelatorioStatus((current) => current === "ready" ? current : "loading");
+    try {
+      setRelatorioDespesas(await carregarDespesasRelatorio(comunicadosDriverIdRef.current));
+      setRelatorioStatus("ready");
+    } catch (error) {
+      setRelatorioStatus((current) => current === "ready" ? current : "error");
+      reportAppError(error, { severity: "warning", source: "app", action: "carregarDespesasRelatorio", notifyUser: false });
+    } finally {
+      relatorioEmCargaRef.current = false;
+      if (relatorioRepetirRef.current) {
+        relatorioRepetirRef.current = false;
+        void reloadRelatorio();
+      }
+    }
+  }, []);
+  // Recarrega a cada vez que o relatório abre (voltar de um envio ou de "Completar" mostra os números novos).
+  useEffect(() => {
+    if (screen !== "gastosRelatorio") return;
+    if (!isMockGastosCartao() && !driverContext?.id) return;
+    void reloadRelatorio();
+  }, [screen, driverContext?.id, reloadRelatorio]);
+  const relatorioModelo = useMemo(
+    () => relatorioDespesas ? montarRelatorio(relatorioDespesas, relatorioPeriodo, hojeSaoPaulo()) : null,
+    [relatorioDespesas, relatorioPeriodo]
+  );
+
+  // Abre o gasto no formulário de gastos. `manterFormulario`: veio do aviso de duplicidade, mantém fotos e o que foi digitado.
+  const abrirGastoCartao = (gasto: GastoCartao, manterFormulario = false) => {
+    const base = gastoCartaoParaRascunho(gasto);
+    if (!remoteMode && isMockGastosCartao() && !expenseReferenceData.cities.length) setExpenseReferenceData({ ...expenseReferenceData, cities: MOCK_CIDADES });
+    if (manterFormulario) {
+      setExpenseDraft(mesclarRascunho(base, expenseDraftRef.current));
+    } else {
+      if (!gastoCartaoAtualRef.current && (expensePhotos.length || !isExpenseDraftBlank(expenseDraftRef.current))) {
+        gastoCartaoBackupRef.current = { draft: expenseDraftRef.current, photos: expensePhotos };
+      } else if (!gastoCartaoBackupRef.current) {
+        revokePhotoPreviewUrls(expensePhotos);
+      }
+      setExpensePhotos([]);
+      setExpenseDraft(base);
+    }
+    setExpensePreviewPhotoId("");
+    clearExpensePhotoDraftState();
+    resetExpenseQuickRead();
+    setGastoCartaoAtual(gasto);
+    setDuplicidadeCartao(null);
+    setScreen("gastos");
+  };
+
+  // Sai do preenchimento do pendente: devolve o formulário que estava em andamento (se havia) ou limpa tudo.
+  const sairGastoCartao = () => {
+    const backup = gastoCartaoBackupRef.current;
+    gastoCartaoBackupRef.current = null;
+    setGastoCartaoAtual(null);
+    resetExpenseQuickRead();
+    clearExpensePhotoDraftState();
+    setExpensePreviewPhotoId("");
+    // As fotos atuais são do gasto do cartão (as do formulário anterior estão no backup).
+    revokePhotoPreviewUrls(expensePhotos);
+    if (backup) {
+      setExpenseDraft(backup.draft);
+      setExpensePhotos(backup.photos);
+    } else {
+      setExpenseDraft({ ...EMPTY_EXPENSE_DRAFT, dataGasto: new Date().toISOString().slice(0, 10) });
+      setExpensePhotos([]);
+    }
+  };
+
+  // Gasto enviado: sai da lista, devolve o formulário e diz para onde voltar.
+  const concluirGastoCartao = (id: string): Screen => {
+    setGastosCartao((current) => current.filter((gasto) => gasto.id !== id));
+    sairGastoCartao();
+    return gastosCartaoPendentes.some((gasto) => gasto.id !== id) ? "gastosCartao" : "gastosRelatorio";
+  };
+
+  // Deep link do push: ?despesaId abre o gasto direto quando ele está pendente; senão (ou com ?gastosCartao=1) fica na lista.
+  useEffect(() => {
+    const despesaId = pendingGastoCartaoDeepLinkRef.current;
+    if (!despesaId || gastosCartaoStatus === "loading") return;
+    pendingGastoCartaoDeepLinkRef.current = "";
+    const gasto = gastosCartao.find((item) => item.id === despesaId);
+    // O motorista pode ter saído da lista enquanto carregava: não puxa ele de volta.
+    if (gasto && screen === "gastosCartao") abrirGastoCartao(gasto);
+  }, [gastosCartao, gastosCartaoStatus]);
 
   // Checklists usam o mesmo motorista logado dos comunicados.
   const reloadChecklists = useCallback(async () => {
@@ -1671,6 +1839,7 @@ function App() {
       <LoadingOverlay loading={getVisibleLoadingOverlay(dataLoading, criticalError)} />
       {remoteOperation ? <FlowProgressOverlay operation={remoteOperation} /> : null}
       {expenseSend ? <ExpenseSendOverlay state={expenseSend} onClose={closeExpenseSendError} /> : null}
+      {duvidaConferencia ? <ConferenciaDuvidaDialog pergunta={duvidaConferencia.pergunta} onResponder={(texto) => duvidaConferencia.responder(texto)} onVoltar={() => duvidaConferencia.responder(null)} /> : null}
       {tourChapter ? <TourOverlay key={tourChapter.id} chapter={tourChapter} onClose={closeTour} /> : null}
       {vehicleChoiceRequest ? (
         <VehicleChoiceDialog
@@ -2247,10 +2416,10 @@ function App() {
     !draft.estabelecimento && !draft.descricao && !draft.kmInformado && !draft.litros && !expenseDateTouchedRef.current;
 
   const navigateFromInitial = (screenName: string) => {
-    // Pending sends that need the driver go first; otherwise open the camera straight away.
-    if (screenName === "gastos" && !expenseUploadStatuses.length && expensePhotos.length === 0 && isExpenseDraftBlank(expenseDraft)) {
+    // Gastos abre o relatório do motorista; a lista do cartão fica em "Completar" e a câmera no CTA "Anexar despesa".
+    if (screenName === "gastos") {
       setComunicadoOrigin("");
-      openExpenseCamera();
+      setScreen("gastosRelatorio");
       return;
     }
     if (screenName === "personalReceipt" || screenName === "reciboPersonalizado" || screenName === "gerarReciboPersonalizado") {
@@ -2264,6 +2433,11 @@ function App() {
       return;
     }
     if (screenName === "treinamentos") setSelectedTreinamentoId("");
+    if (screenName === "gastosCartao") {
+      setComunicadoOrigin("");
+      setScreen("gastosCartao");
+      return;
+    }
     if (screenName === "servicos" || screenName === "comunicados" || screenName === "historico" || screenName === "solicitarManutencao" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro" || screenName === "multas" || screenName === "treinamentos") {
       setComunicadoOrigin("");
       setScreen(screenName);
@@ -2284,13 +2458,20 @@ function App() {
       if (!Object.keys(submission.payload).length) {
         await assertExpenseSchemaReadyRemote();
         const names = await loadExpenseLookupNavigationNamesRemote({ includeVeiculo: Boolean(submission.vehicleId), includeReserva: false });
-        submission.payload = buildExpenseCreatePayload({
-          draft: submission.draft, referenceData: await loadExpenseReferenceDataRemote(), motoristaId, veiculoId: submission.vehicleId ?? "",
-          photos: submission.items.map(item => ({ id: item.id, dataUrl: item.dataUrl, mediaType: item.mimeType.startsWith("video/") ? "video" : "foto" })),
-          categoryEntitySet: DATAVERSE.categoriasDespesasOperacionais, paymentMethodEntitySet: DATAVERSE.formasPagamentoDespesas,
-          cityEntitySet: DATAVERSE.cidades, motoristaEntitySet: DATAVERSE.funcionarios, veiculoEntitySet: DATAVERSE.veiculos,
-          reservaEntitySet: DATAVERSE.geral, lookupNavigationNames: names
-        });
+        const referenceData = await loadExpenseReferenceDataRemote();
+        const photos = submission.items.map(item => ({ id: item.id, dataUrl: item.dataUrl, mediaType: item.mimeType.startsWith("video/") ? "video" as const : "foto" as const }));
+        submission.payload = submission.existing
+          ? buildGastoCartaoCompletarPayload({
+            draft: submission.draft, photos, referenceData, veiculoId: submission.vehicleId ?? "", categoryEntitySet: DATAVERSE.categoriasDespesasOperacionais,
+            cityEntitySet: DATAVERSE.cidades, veiculoEntitySet: DATAVERSE.veiculos, lookupNavigationNames: names
+          })
+          : buildExpenseCreatePayload({
+            draft: submission.draft, referenceData, motoristaId, veiculoId: submission.vehicleId ?? "", photos,
+            categoryEntitySet: DATAVERSE.categoriasDespesasOperacionais, paymentMethodEntitySet: DATAVERSE.formasPagamentoDespesas,
+            cityEntitySet: DATAVERSE.cidades, motoristaEntitySet: DATAVERSE.funcionarios, veiculoEntitySet: DATAVERSE.veiculos,
+            reservaEntitySet: DATAVERSE.geral, lookupNavigationNames: names
+          });
+        submission.payload = { ...submission.payload, ...(submission.conferencia ?? {}) };
       }
       rows = await resumeExpenseSubmission(submission, {
         save: value => upsertExpenseSubmission(motoristaId, value),
@@ -2324,10 +2505,12 @@ function App() {
     let journaled = false;
     try {
       const photos = await Promise.all(expensePhotos.filter(hasMediaDraftContent).map(prepareMediaDraftForUpload));
+      const completing = gastoCartaoAtualRef.current;
       const submission: ExpenseSubmission = {
-        expenseId: crypto.randomUUID(), expenseConfirmed: false, draft: { ...draft }, payload: {}, motoristaId: driverContext.id,
+        expenseId: completing?.id ?? crypto.randomUUID(), existing: Boolean(completing), expenseConfirmed: false, draft: { ...draft }, payload: {}, motoristaId: driverContext.id,
         vehicleId: draft.veiculoId || getDriverCurrentVehicleId(driverContext),
-        items: photos.map((photo, index) => createExpenseUploadItem(photo.dataUrl, index + 1))
+        items: photos.map((photo, index) => createExpenseUploadItem(photo.dataUrl, index + 1)),
+        conferencia: conferenciaRef.current ? camposConferencia(conferenciaRef.current) : undefined
       };
       const total = submission.items.length;
       setExpenseSend({ phase: "saving", current: 0, total });
@@ -2339,7 +2522,12 @@ function App() {
         if (event.phase === "uploading") setExpenseSend({ phase: "uploading", current: event.order, total });
       });
       // The journal owns the expense from here; an empty form avoids a duplicate.
+      let destino: Screen = "inicio";
       const clearForm = () => {
+        if (completing) {
+          destino = concluirGastoCartao(completing.id);
+          return;
+        }
         revokePhotoPreviewUrls(expensePhotos);
         setExpensePhotos([]);
         setExpensePreviewPhotoId("");
@@ -2355,7 +2543,7 @@ function App() {
       await wait(1100);
       clearForm();
       setExpenseSend(null);
-      setScreen("inicio");
+      setScreen(destino);
     } catch (error) {
       reportAppError(error, { source: "app", action: "expenseUpload", phase: "journal", screen: "gastos" });
       setExpenseSend(null);
@@ -2411,6 +2599,18 @@ function App() {
   const submitExpense = async (draft: ExpenseDraft) => {
     if (remoteMode && expenseUploadMode === "async") return submitExpenseAsync(draft);
     if (remoteOperation || (remoteMode && expenseUploadMode === "pending")) return;
+    const completing = gastoCartaoAtualRef.current;
+    if (!remoteMode && completing && isMockGastosCartao()) {
+      setRemoteOperation({ title: "Enviando gasto", message: "Completando gasto do cartão.", phase: "loading" });
+      await wait(700);
+      concluirGastoCartaoMock(completing.id);
+      setRemoteOperation({ title: "Enviando gasto", message: "Gasto enviado.", detailId: completing.id, phase: "success" });
+      await wait(720);
+      setRemoteOperation(null);
+      setScreen(concluirGastoCartao(completing.id));
+      setToast("Gasto enviado.");
+      return;
+    }
     if (!remoteMode) {
       setToast("Abra no Power Apps para registrar no Dataverse.");
       return;
@@ -2447,21 +2647,34 @@ function App() {
         message: "Criando despesa.",
         phase: "loading"
       });
-      const payload = buildExpenseCreatePayload({
-        draft,
-        photos: preparedPhotosToSubmit,
-        referenceData: expenseReferenceData,
-        motoristaId: driver.id,
-        veiculoId,
-        categoryEntitySet: DATAVERSE.categoriasDespesasOperacionais,
-        paymentMethodEntitySet: DATAVERSE.formasPagamentoDespesas,
-        cityEntitySet: DATAVERSE.cidades,
-        motoristaEntitySet: DATAVERSE.funcionarios,
-        veiculoEntitySet: DATAVERSE.veiculos,
-        reservaEntitySet: DATAVERSE.geral,
-        lookupNavigationNames
-      });
-      const result = await createOne(DATAVERSE.despesasOperacionais, payload);
+      const payload = completing
+        ? buildGastoCartaoCompletarPayload({
+          draft,
+          photos: preparedPhotosToSubmit,
+          referenceData: expenseReferenceData,
+          veiculoId,
+          categoryEntitySet: DATAVERSE.categoriasDespesasOperacionais,
+          cityEntitySet: DATAVERSE.cidades,
+          veiculoEntitySet: DATAVERSE.veiculos,
+          lookupNavigationNames
+        })
+        : buildExpenseCreatePayload({
+          draft,
+          photos: preparedPhotosToSubmit,
+          referenceData: expenseReferenceData,
+          motoristaId: driver.id,
+          veiculoId,
+          categoryEntitySet: DATAVERSE.categoriasDespesasOperacionais,
+          paymentMethodEntitySet: DATAVERSE.formasPagamentoDespesas,
+          cityEntitySet: DATAVERSE.cidades,
+          motoristaEntitySet: DATAVERSE.funcionarios,
+          veiculoEntitySet: DATAVERSE.veiculos,
+          reservaEntitySet: DATAVERSE.geral,
+          lookupNavigationNames
+        });
+      if (conferenciaRef.current) Object.assign(payload, camposConferencia(conferenciaRef.current));
+      if (completing) await updateOne(DATAVERSE.despesasOperacionais, completing.id, payload);
+      const result = completing ? { id: completing.id } : await createOne(DATAVERSE.despesasOperacionais, payload);
       createdExpenseId = result.id;
       if (preparedPhotosToSubmit.length) {
         let completedUploads = 0;
@@ -2474,7 +2687,7 @@ function App() {
         const uploadResults = await Promise.allSettled(preparedPhotosToSubmit.map(async (photo, index) => {
           const link = await uploadExpenseInvoiceRemote({
             expenseId: result.id,
-            expenseName: String(payload.cr40f_nome ?? "Despesa"),
+            expenseName: completing?.nome ?? String(payload.cr40f_nome ?? "Despesa"),
             motoristaId: driver.id,
             dataUrl: photo.dataUrl,
             fileName: photo.mediaType === "video" ? `video-comprovante-${index + 1}` : `comprovante-${index + 1}`,
@@ -2528,12 +2741,20 @@ function App() {
       setExpensePhotos([]);
       clearExpensePhotoDraftState();
       setExpensePreviewPhotoId("");
+      if (completing) {
+        setScreen(concluirGastoCartao(completing.id));
+        setToast("Gasto enviado.");
+        return;
+      }
       setScreen("inicio");
       setToast("Gasto registrado.");
     } catch (error) {
       if (createdExpenseId) {
         try {
-          await updateOne(DATAVERSE.despesasOperacionais, createdExpenseId, { cr40f_statusanexo: 100000003 });
+          // Gasto do cartão volta para "Precisa corrigir" e continua na lista para o motorista tentar de novo.
+          await updateOne(DATAVERSE.despesasOperacionais, createdExpenseId, completing
+            ? { cr40f_statusanexo: 100000003, cr40f_statusoperacional: STATUS_OPERACIONAL.precisaCorrigir }
+            : { cr40f_statusanexo: 100000003 });
         } catch (statusError) {
           logAppError(statusError, "submitExpense", "statusanexo");
         }
@@ -2541,6 +2762,70 @@ function App() {
       logAppError(error, "submitExpense", "create");
       setRemoteOperation(null);
       setCriticalError(error instanceof Error ? error.message : "Falha ao registrar gasto.");
+    }
+  };
+
+  // Gasto novo pago no cartão que já existe pendente (mesmo valor e data próxima): avisa antes de duplicar.
+  // Conferência no envio: calcula os sinais no app; só chama a IA quando há algum. Devolve null se o motorista
+  // escolher "Voltar e corrigir". Qualquer falha vira "indisponível" e o envio segue (o motorista nunca fica travado).
+  const conferirAntesDeEnviar = async (draft: ExpenseDraft): Promise<ConferenciaEnvio | null> => {
+    const leitura = expenseQuickReadLeituraRef.current;
+    const hora = leitura?.hora && leitura.data === draft.dataGasto ? leitura.hora : null;
+    const horaAgora = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date());
+    const completing = gastoCartaoAtualRef.current;
+    const numero = (texto: string) => { const n = parseCurrencyInput(texto); return Number.isFinite(n) && n > 0 ? n : null; };
+    const gasto: GastoConferido = {
+      id: completing?.id,
+      categoria: expenseReferenceData.categories.find((c) => c.id === draft.categoriaId)?.name ?? "",
+      valor: parseCurrencyInput(draft.valor) || 0,
+      data: draft.dataGasto,
+      hora: hora ?? horaAgora,
+      litros: numero(draft.litros),
+      km: numero(draft.kmInformado),
+      veiculoId: draft.veiculoId
+    };
+    const motoristaId = driverContext?.id ?? comunicadosDriverIdRef.current;
+    try {
+      const [recentes, servicos] = await Promise.all([
+        relatorioDespesas ? Promise.resolve(relatorioDespesas) : carregarDespesasRelatorio(motoristaId).catch(() => []),
+        carregarServicosConferencia(motoristaId, draft.dataGasto).catch(() => null)
+      ]);
+      const { sinais, servicoDiaVizinho } = calcularSinais({ gasto, leituraData: leitura?.data ?? null, recentes, servicos });
+      const motivos = sinais.map((s) => s.tipo);
+      if (!sinais.length) return { resultado: "sem_sinal", motivos, hora };
+      setRemoteOperation({ title: "Enviando gasto", message: "Conferindo o gasto...", phase: "loading" });
+      const corpo = montarCorpoConferencia({ gasto, descricao: draft.descricao, leituraData: leitura?.data ?? null, sinais, servicoDiaVizinho, recentes });
+      const resposta = lerRespostaConferencia(isMockGastosCartao() ? await respostaConferenciaMock(sinais) : await conferirDespesaRemote(corpo, TIMEOUT_CONFERENCIA_MS));
+      setRemoteOperation(null);
+      if (!resposta) return { resultado: "indisponivel", motivos, hora };
+      if (resposta.resultado === "sem_duvida") return { resultado: "sem_duvida", motivos, hora };
+      const justificativa = await new Promise<string | null>((resolve) => setDuvidaConferencia({ pergunta: resposta.pergunta, responder: resolve }));
+      setDuvidaConferencia(null);
+      if (justificativa == null) return null;
+      return { resultado: "duvida_respondida", motivos: resposta.motivos.length ? resposta.motivos : motivos, pergunta: resposta.pergunta, justificativa, hora };
+    } catch (error) {
+      setRemoteOperation(null);
+      reportAppError(error, { severity: "warning", source: "app", action: "conferenciaEnvio", notifyUser: false });
+      return { resultado: "indisponivel", motivos: [], hora };
+    }
+  };
+
+  const submitExpenseChecked = async (draft: ExpenseDraft) => {
+    if (!gastoCartaoAtualRef.current) {
+      const duplicado = acharGastoCartaoDuplicado(gastosCartaoPendentes, draft.formaPagamentoId, parseCurrencyInput(draft.valor), draft.dataGasto);
+      if (duplicado) {
+        setDuplicidadeCartao(duplicado);
+        return;
+      }
+    }
+    if (expenseSubmitBusyRef.current || remoteOperation) return;
+    const conferencia = await conferirAntesDeEnviar(draft);
+    if (!conferencia) return;
+    conferenciaRef.current = conferencia;
+    try {
+      return await submitExpense(draft);
+    } finally {
+      conferenciaRef.current = null;
     }
   };
 
@@ -2806,6 +3091,7 @@ function App() {
 
   function resetExpenseQuickRead() {
     expenseQuickReadSeqRef.current++;
+    expenseQuickReadLeituraRef.current = null;
     expenseRetakeTargetIdRef.current = "";
     expenseDateTouchedRef.current = false;
     setExpenseQuickRead(INITIAL_QUICK_READ);
@@ -2829,6 +3115,8 @@ function App() {
   };
 
   const runExpenseQuickRead = async (dataUrl: string) => {
+    // Gasto do cartão: valor, data e forma vêm do banco; a leitura do comprovante não pode sobrescrevê-los.
+    if (gastoCartaoAtualRef.current) return;
     const mockMode = remoteMode ? null : getQuickReadMockMode();
     if ((!remoteMode && !mockMode) || !shouldRunQuickRead(expenseQuickRead)) return;
     const online = typeof navigator === "undefined" || navigator.onLine !== false;
@@ -2853,6 +3141,7 @@ function App() {
       if (seq !== expenseQuickReadSeqRef.current) return;
       const before = expenseDraftRef.current;
       const { draft: after, filled } = applyQuickRead(before, outcome.leitura, referenceData, { replaceAutoDate: !expenseDateTouchedRef.current });
+      expenseQuickReadLeituraRef.current = { data: outcome.leitura.data ?? null, hora: outcome.leitura.hora ?? null };
       setExpenseDraft(after);
       setExpenseQuickReadFilled(filled);
     }
@@ -2871,6 +3160,13 @@ function App() {
     const targetId = expensePhotos[0]?.id ?? "";
     openExpenseCamera();
     expenseRetakeTargetIdRef.current = targetId;
+  };
+
+  const isExpenseIdle = () => !expenseUploadStatuses.length && expensePhotos.length === 0 && isExpenseDraftBlank(expenseDraft);
+
+  // Envios pendentes ou rascunho em andamento vão para o formulário; senão abre a câmera direto.
+  const anexarDespesa = () => {
+    if (isExpenseIdle()) openExpenseCamera(); else setScreen("gastos");
   };
 
   const openExpenseCamera = () => {
@@ -3416,7 +3712,7 @@ function App() {
       <MediaCaptureScreen
         kind="NOTAFISCAL"
         title="Comprovante"
-        onBack={() => setScreen("gastos")}
+        onBack={() => setScreen(!gastoCartaoAtual && isExpenseIdle() ? "gastosRelatorio" : "gastos")}
         onCapture={(photoDataUrl) => {
           setExpensePhotoDraft(photoDataUrl);
           setExpensePhotoPreviewUrl("");
@@ -3489,6 +3785,7 @@ function App() {
 
   if (screen === "gastos") {
     return show(
+      <>
       <ExpenseScreen
         uploads={expenseUploadStatuses.map(({ submission, status }) => ({ id: submission.expenseId, draft: submission.draft, status }))}
         onUploadAction={handleExpenseUploadAction}
@@ -3504,16 +3801,68 @@ function App() {
         }}
         onAddPhoto={openExpenseCamera}
         onPreviewPhoto={openExpensePreview}
-        onBack={() => setScreen("inicio")}
-        onSubmit={submitExpense}
+        onBack={() => {
+          // Completando um gasto do cartão volta para a lista dele; gasto novo volta para o relatório.
+          if (gastoCartaoAtual) sairGastoCartao();
+          setScreen(gastoCartaoAtual ? "gastosCartao" : "gastosRelatorio");
+        }}
+        onSubmit={submitExpenseChecked}
         submitState={expenseSend && expenseSend.phase !== "error" ? "loading" : remoteOperation?.phase ?? "idle"}
         vehicles={maintenanceVehicles}
         vehiclesLoading={maintenanceVehiclesLoading}
         currentVehicleId={maintenanceCurrentVehicleId}
         quickRead={expenseQuickRead}
         quickReadFilled={expenseQuickReadFilled}
+        cartaoGasto={gastoCartaoAtual ? { cartaoFinal: gastoCartaoAtual.cartaoFinal, estabelecimento: gastoCartaoAtual.estabelecimento } : undefined}
+      />
+      {duplicidadeCartao ? (
+        <GastoCartaoDuplicadoDialog
+          gasto={duplicidadeCartao}
+          onComplete={() => abrirGastoCartao(duplicidadeCartao, true)}
+          onLaunchAnyway={() => { setDuplicidadeCartao(null); void submitExpense(expenseDraftRef.current); }}
+          onClose={() => setDuplicidadeCartao(null)}
+        />
+      ) : null}
+      </>
+    );
+  }
+
+  if (screen === "gastosCartao") {
+    return show(
+      <GastosCartaoScreen
+        items={gastosCartaoPendentes}
+        loadStatus={gastosCartaoStatus}
+        onBack={() => setScreen("gastosRelatorio")}
+        onReload={() => { reloadGastosCartao().catch((error) => reportAppError(error, { severity: "warning", source: "app", action: "listarGastosCartao", notifyUser: false })); }}
+        onOpen={(id) => {
+          const gasto = gastosCartaoPendentes.find((item) => item.id === id);
+          if (gasto) abrirGastoCartao(gasto);
+        }}
       />
     );
+  }
+
+  if (screen === "gastosRelatorio") {
+    return show(
+      <GastosRelatorioScreen
+        modelo={relatorioModelo}
+        periodoId={relatorioPeriodo}
+        loadStatus={relatorioStatus}
+        pendentesCartao={gastosCartaoPendentes.length}
+        idsCompletar={new Set(gastosCartaoPendentes.map((gasto) => gasto.id))}
+        onCompletarGasto={(id) => { const gasto = gastosCartaoPendentes.find((item) => item.id === id); if (gasto) abrirGastoCartao(gasto); }}
+        onPeriodo={setRelatorioPeriodo}
+        onBack={() => setScreen("inicio")}
+        onReload={() => { void reloadRelatorio(); }}
+        onCompletar={() => setScreen("gastosCartao")}
+        onAttach={anexarDespesa}
+        onPrecoPostos={() => setScreen("rankingPostos")}
+      />
+    );
+  }
+
+  if (screen === "rankingPostos") {
+    return show(<RankingPostosScreen onBack={() => setScreen("gastosRelatorio")} />);
   }
 
   if (screen === "boasIdeias") {
@@ -3991,6 +4340,7 @@ function App() {
       pendingChecklists={checklists.filter(isChecklistPending).length}
       pendingMultas={separarTermos(termosMulta).pendentes.length}
       pendingTreinamentos={treinamentos.filter(isTreinamentoPendente).length}
+      pendingGastosCartao={gastosCartaoPendentes.length}
       multasBanner={resumoPendentes(termosMulta)}
       driverId={driverContext?.id}
       driverName={driverContext?.fullName}

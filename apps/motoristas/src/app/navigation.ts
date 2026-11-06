@@ -40,7 +40,10 @@ const SCREEN_HASH_PATHS: Record<Screen, string> = {
   boasIdeias: "boas-ideias",
   meuCarro: "meu-carro",
   multas: "multas",
-  treinamentos: "treinamentos"
+  treinamentos: "treinamentos",
+  gastosCartao: "gastos-cartao",
+  gastosRelatorio: "gastos-relatorio",
+  rankingPostos: "ranking-postos"
 };
 
 const SCREEN_HASH_ALIASES: Record<string, Screen> = {
@@ -111,7 +114,13 @@ const SCREEN_HASH_ALIASES: Record<string, Screen> = {
   multas: "multas",
   termos: "multas",
   treinamentos: "treinamentos",
-  trainings: "treinamentos"
+  trainings: "treinamentos",
+  "gastos-cartao": "gastosCartao",
+  gastoscartao: "gastosCartao",
+  "gastos-relatorio": "gastosRelatorio",
+  gastosrelatorio: "gastosRelatorio",
+  "ranking-postos": "rankingPostos",
+  rankingpostos: "rankingPostos"
 };
 
 const HASH_ROUTE_DETAIL_SCREENS = new Set<Screen>([
@@ -230,7 +239,10 @@ const SCREEN_DEPTH: Record<Screen, number> = {
   boasIdeias: 1,
   meuCarro: 1,
   multas: 1,
-  treinamentos: 1
+  treinamentos: 1,
+  gastosCartao: 1,
+  gastosRelatorio: 1,
+  rankingPostos: 2
 };
 
 const drillSpring = {
@@ -266,7 +278,7 @@ const fastFade = {
   ease: "easeOut" as const
 };
 
-const isListScreen = (screenName: Screen) => screenName === "servicos" || screenName === "comunicados" || screenName === "checklists" || screenName === "historico" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro" || screenName === "multas" || screenName === "treinamentos";
+const isListScreen = (screenName: Screen) => screenName === "servicos" || screenName === "comunicados" || screenName === "checklists" || screenName === "historico" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro" || screenName === "multas" || screenName === "treinamentos" || screenName === "gastosCartao";
 const isDetailScreen = (screenName: Screen) => screenName === "detalhes" || screenName === "detalhesHistorico";
 const isTaskScreen = (screenName: Screen) =>
   screenName === "receber" || screenName === "voucher" || screenName === "finalizar" || screenName === "canceladoLocal";

@@ -742,6 +742,48 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
     ]
   },
   {
+    id: "gastos-relatorio",
+    title: "Relatório de gastos",
+    steps: [
+      step("voltar", "Voltar", ["Volta para o Início."], { target: SERVICE_HOME }),
+      step("periodo", "Período", ["Escolha Mês atual, Mês anterior ou 3 meses. Todos os números da tela são recalculados para o período."], { target: ".gr-periodos" }),
+      step("medias", "Suas médias", [
+        "No topo, o preço por litro e a refeição média (almoço e jantar) lado a lado. A cor compara com a meta da empresa: verde dentro, amarelo pouco acima e vermelho acima. Embaixo, a variação contra o período anterior.",
+        "Logo abaixo fica o café e lanche médio, quando há dados."
+      ], { target: ".gr-destaques", optional: true }),
+      step("alerta", "Pendências", ["Quando algum gasto precisa de correção ou foi recusado, o aviso aparece aqui no topo. Toque nele para ir direto à lista de pendentes."], { target: ".gr-alerta", optional: true }),
+      step("precos", "Postos perto de mim", ["Mostra os postos perto de você, com o que a frota pagou por litro e uma recomendação."], { target: ".gr-preco-postos" }),
+      step("evolucao", "Médias por mês", ["Escolha R$/L ou Refeição para ver a média de cada mês. Os meses do período escolhido ficam em azul-escuro."], { target: ".gr-evolucao", optional: true }),
+      step("despesas", "Despesas", ["Pendentes mostra o que precisa de correção, completar ou foi recusado. Todas mostra as despesas do período. Toque num gasto do cartão marcado Completar para preenchê-lo; nos outros, abre o detalhe com o comprovante."], { target: ".gr-despesas", optional: true }),
+      step("completar", "Completar", ["Quando há gastos do cartão para completar, o botão da esquerda abre a lista deles."], { target: ".gr-actions .action-button--secondary", optional: true }),
+      step("anexar", "Anexar despesa", ["Abre a câmera para fotografar o comprovante e lançar um gasto novo."], { target: ".gr-actions .action-button--primary" }),
+      helpStep()
+    ]
+  },
+  {
+    id: "ranking-postos",
+    title: "Postos perto de você",
+    steps: [
+      step("voltar", "Voltar", ["Volta para o Relatório de gastos."], { target: SERVICE_HOME }),
+      step("postos", "Postos perto de você", ["Lista os postos até 10 km, do mais perto para o mais longe, com a média paga pela frota no período recente. A cor compara o preço com a meta da empresa: Recomendado, Atenção ou Evitar."], { target: ".rp-lista", optional: true }),
+      helpStep()
+    ]
+  },
+  {
+    id: "gastos-cartao",
+    title: "Gastos do cartão",
+    steps: [
+      step("voltar", "Voltar", ["Volta para o relatório de gastos."], { target: SERVICE_HOME }),
+      step("atualizar", "Atualizar", ["Busca novos gastos do cartão agora."], { target: ".services-nav-button--refresh" }),
+      step("gasto", "Gasto para completar", [
+        "Cada linha é uma compra no cartão corporativo que o sistema já registrou: estabelecimento, valor, data e final do cartão.",
+        "Toque para informar descrição, categoria, cidade e comprovante."
+      ], { target: ".termo-row", optional: true }),
+      step("vazio", "Nada pendente", ["Sem gastos do cartão para completar, esta tela avisa que eles aparecem aqui quando o cartão for usado. Para lançar um gasto novo, use Anexar despesa no relatório."], { target: ".termo-empty", optional: true }),
+      helpStep()
+    ]
+  },
+  {
     id: "treinamento-detalhe",
     title: "Fazer o treinamento",
     probe: ".trn-detail",
@@ -795,6 +837,9 @@ const CHAPTER_IDS_BY_SCREEN: Readonly<Record<string, readonly string[]>> = {
   checklists: ["checklist-formulario", "checklists"],
   multas: ["multa-detalhe", "multas"],
   treinamentos: ["treinamento-detalhe", "treinamentos"],
+  gastosCartao: ["gastos-cartao"],
+  gastosRelatorio: ["gastos-relatorio"],
+  rankingPostos: ["ranking-postos"],
   solicitarManutencao: ["manutencao"],
   colisoesInicio: ["colisoes"],
   colisoes: ["colisao-registro"],

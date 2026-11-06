@@ -15,12 +15,16 @@ export type ExpenseUploadItem = {
 
 export type ExpenseSubmission = {
   expenseId: string;
+  /** Gasto do cartão: a despesa já existe (criada pelo flow) e o envio faz PATCH em vez de criar. */
+  existing?: boolean;
   expenseConfirmed: boolean;
   draft: ExpenseDraft;
   payload: Record<string, unknown>;
   motoristaId: string;
   vehicleId?: string;
   items: ExpenseUploadItem[];
+  /** Campos da conferência no envio (new_conferencia*, new_horagasto), juntados ao payload quando ele é montado. */
+  conferencia?: Record<string, unknown>;
 };
 
 export type ExpenseUploadRow = {

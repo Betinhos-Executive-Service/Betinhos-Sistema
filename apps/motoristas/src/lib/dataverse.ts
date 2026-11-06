@@ -271,7 +271,9 @@ const FLOW_URLS = {
   gerarVoucher: "VITE_FLOW_GERAR_VOUCHER_URL",
   salvarFotosManutencao: "VITE_FLOW_SALVAR_FOTOS_MANUTENCAO_URL",
   enviarReciboCliente: "VITE_FLOW_ENVIAR_RECIBO_CLIENTE_URL",
-  quickRead: "VITE_FLOW_LEITURA_RAPIDA_URL"
+  quickRead: "VITE_FLOW_LEITURA_RAPIDA_URL",
+  conferenciaEnvio: "VITE_FLOW_CONFERENCIA_ENVIO_URL",
+  consultarArquivo: "VITE_FLOW_CONSULTAR_ARQUIVO_URL"
 } as const;
 
 const DEV_DATAVERSE_URL = "https://org23b93544.crm2.dynamics.com/";
@@ -281,7 +283,11 @@ const FLOW_DATAVERSE_ENVIRONMENT_VARIABLES: Record<string, string | undefined> =
   [FLOW_URLS.gerarVoucher]: "new_FlowURLFlowGerarVoucherAppMotoristasv2",
   [FLOW_URLS.salvarFotosManutencao]: "new_FlowURLFlowSalvarArquivosOnedrive",
   [FLOW_URLS.enviarReciboCliente]: "new_FlowURLFlowEnviarReciboCliente",
-  [FLOW_URLS.quickRead]: "new_FlowURLDespesaLeituraRapida"
+  [FLOW_URLS.quickRead]: "new_FlowURLDespesaLeituraRapida",
+  // "Flow Despesas | Conferência no envio" (Sistema Betinhos, provision-flow-despesas-conferencia-envio.ps1).
+  [FLOW_URLS.conferenciaEnvio]: "new_FlowURLDespesaConferenciaEnvio",
+  // "Flow - Consultar Arquivo OneDrive" (Sistema Betinhos, provision-flow-consultar-onedrive.ps1): devolve o comprovante em base64.
+  [FLOW_URLS.consultarArquivo]: "new_URLFlowConsultarArquivoOneDrive"
 };
 
 const GERAL_SELECT =
@@ -519,7 +525,7 @@ export async function retrieveMultiple(entitySetName: string, options = "") {
   }
 }
 
-async function retrieveMultipleAll(entitySetName: string, options = "", schedule?: <T>(request: () => Promise<T>) => Promise<T>) {
+export async function retrieveMultipleAll(entitySetName: string, options = "", schedule?: <T>(request: () => Promise<T>) => Promise<T>) {
   const entities: DataverseRecord[] = [];
   let nextOptions = options;
   let page = 0;
@@ -1429,14 +1435,19 @@ export async function ensureExpenseSubmissionRemote(submission: ExpenseSubmissio
   // Fail before creating any row when the deployment/permissions are incomplete.
   await assertEntityHasAttributes(DATAVERSE.anexosDespesasOperacionais, "Anexos de despesas", ["new_uploadattemptid", "new_uploadrunid", "new_uploaderror", "cr40f_mimetype", "cr40f_driveitemid"]);
   if (!await resolveFlowUrl(FLOW_URLS.expenseAsync)) throw new Error("Flow assíncrono de despesas não configurado.");
-  await ensureExpenseRecord(DATAVERSE.despesasOperacionais, submission.expenseId, {
-    ...submission.payload, new_uploadexpectedcount: submission.items.length
-  });
+  const expensePayload = { ...submission.payload, new_uploadexpectedcount: submission.items.length };
+  if (submission.existing) {
+    // Gasto do cartão: completa a despesa do flow; If-Match impede criar outra se ela sumir.
+    await expenseRequest(`${DATAVERSE.despesasOperacionais}(${cleanGuid(submission.expenseId)})`, "PATCH", expensePayload, { "If-Match": "*" });
+  } else {
+    await ensureExpenseRecord(DATAVERSE.despesasOperacionais, submission.expenseId, expensePayload);
+  }
   if (!submission.items.length) return;
   const names = await loadExpenseAttachmentLookupNavigationNamesRemote();
   for (const item of submission.items) {
     await ensureExpenseRecord(DATAVERSE.anexosDespesasOperacionais, item.id, {
-      cr40f_nome: `Comprovante ${item.order} - ${String(submission.payload.cr40f_nome)}`.slice(0, 120),
+      // Gasto do cartão não reenvia cr40f_nome no PATCH: usa o estabelecimento.
+      cr40f_nome: `Comprovante ${item.order} - ${String(submission.payload.cr40f_nome ?? (submission.draft.estabelecimento || "Despesa"))}`.slice(0, 120),
       cr40f_nomearquivo: item.fileName,
       cr40f_ordem: item.order,
       cr40f_mimetype: item.mimeType,
@@ -3716,6 +3727,30 @@ export async function readReceiptQuick(imagemBase64: string, categorias: string[
   }
 }
 
+/**
+ * Conferência da despesa no envio (Flow Despesas | Conferência no envio). Mesmo padrão da leitura rápida: timeout por
+ * AbortSignal, nunca lança (falha vira { ok: false } e o app envia sem perguntar) e não registra o corpo.
+ */
+export async function conferirDespesaRemote(corpo: Record<string, unknown>, timeoutMs: number): Promise<unknown> {
+  const url = await resolveFlowUrl(FLOW_URLS.conferenciaEnvio);
+  if (!url) return { ok: false, erro: "nao_configurado" };
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, signal: controller.signal, body: JSON.stringify(corpo) });
+    if (!response.ok) {
+      dataverseWarn("Conferencia no envio falhou.", { status: response.status, endpoint: describeFlowUrl(url) });
+      return { ok: false };
+    }
+    return await response.json();
+  } catch (error) {
+    dataverseWarn("Conferencia no envio sem resposta.", { endpoint: describeFlowUrl(url), error: error instanceof Error ? error.name : String(error) });
+    return { ok: false };
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 // Sem motoristaId: o plugin usa o funcionário do usuário logado, então ninguém cobra em nome de outro.
 export type QrChargeRequest = {
   reservaId: string;
@@ -3768,6 +3803,13 @@ class HttpFlowError extends Error {
     super(message);
     this.status = status;
   }
+}
+
+export type ArquivoFlowResposta = { sucesso?: boolean; erro?: string; nomeArquivo?: string; mimeType?: string; conteudoBase64?: string };
+
+/** Lê um comprovante pelo flow de consulta: por id do item (driveitemid) ou, nos antigos, pelo link de compartilhamento. */
+export async function consultarArquivoComprovante(corpo: { id?: string; link?: string; nomeArquivo: string; origem?: string }) {
+  return (await runHttpFlow(FLOW_URLS.consultarArquivo, corpo)) as ArquivoFlowResposta;
 }
 
 async function runHttpFlow(envKey: string, payload: Record<string, unknown>) {
