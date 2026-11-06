@@ -174,6 +174,39 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.Null(posto["avaliacoes"]);
         }
 
+        private const string CnpjConvite = "11222333000181";
+        private static readonly DateTime Agora = new DateTime(2026, 11, 6, 12, 0, 0, DateTimeKind.Utc);
+        private static readonly Dictionary<string, Guid> PostosConvite = new Dictionary<string, Guid> { [CnpjConvite] = Posto };
+
+        private static FuelRanking.Abastecimento DoMotorista(Guid motorista, int diasAtras) =>
+            new FuelRanking.Abastecimento { Cnpj = CnpjConvite, Valor = 60m, Litros = 10m, Nome = "Posto A", MotoristaId = motorista, DataUtc = Agora.AddDays(-diasAtras) };
+
+        [Fact]
+        public void Convite_TrazOPostoDoAbastecimentoRecente()
+        {
+            var convite = FuelRanking.Convite(new[] { DoMotorista(Eu, 2), DoMotorista(Eu, 5) }, PostosConvite, new Guid[0], Eu, Agora);
+            Assert.Equal(Posto.ToString(), convite["postoId"]);
+            Assert.Equal("Posto A", convite["nome"]);
+            Assert.Equal(FuelRepository.LocalDay(Agora.AddDays(-2)), convite["data"]);
+        }
+
+        [Fact]
+        public void Convite_IgnoraOutroMotoristaAbastecimentoAntigoEPostoJaAvaliado()
+        {
+            Assert.Null(FuelRanking.Convite(new[] { DoMotorista(Guid.NewGuid(), 1) }, PostosConvite, new Guid[0], Eu, Agora));
+            Assert.Null(FuelRanking.Convite(new[] { DoMotorista(Eu, 8) }, PostosConvite, new Guid[0], Eu, Agora));
+            Assert.Null(FuelRanking.Convite(new[] { DoMotorista(Eu, 1) }, PostosConvite, new[] { Posto }, Eu, Agora));
+            Assert.Null(FuelRanking.Convite(new[] { DoMotorista(Eu, 1) }, new Dictionary<string, Guid>(), new Guid[0], Eu, Agora));
+        }
+
+        [Fact]
+        public void BuildJson_SemAvaliacoesNaoConvida()
+        {
+            var entidade = new Entity(FuelSchema.Posto, Posto);
+            var json = Ler(FuelRankingPlugin.BuildJson(new[] { DoMotorista(Eu, 1) }, new Dictionary<string, Entity> { [CnpjConvite] = entidade }, null, Eu, Agora));
+            Assert.Null(json["convite"]);
+        }
+
         [Fact]
         public void BuildJson_LevaIdEAvaliacoesDoPosto()
         {

@@ -10,6 +10,7 @@ namespace Betinhos.DriverRecordSharing
     {
         public const int JanelaDias = 30;
         private const int MaxHistorico = 5;
+        private const int DiasConvite = 7;
 
         // Defesa até o flow de IA parar de gravar o CNPJ do destinatário do cupom: a própria empresa não é posto.
         private static readonly string[] RaizesProprias = { "07108241", "24484228" };
@@ -21,6 +22,7 @@ namespace Betinhos.DriverRecordSharing
             public string Cnpj, Nome;
             public decimal Valor, Litros;
             public DateTime DataUtc;
+            public Guid MotoristaId; // Só para achar o último abastecimento do próprio motorista; nunca vai na resposta.
         }
 
         public sealed class Local
@@ -59,6 +61,26 @@ namespace Betinhos.DriverRecordSharing
                 .GroupBy(x => x.cnpj, x => x.a);
 
         public static IList<string> Cnpjs(IEnumerable<Abastecimento> abastecimentos) => PorPosto(abastecimentos).Select(g => g.Key).ToList();
+
+        // Convida para avaliar o posto do abastecimento mais recente do motorista que ele ainda não avaliou.
+        // O posto pode estar fora da lista por falta de coordenada: para avaliar, basta ele existir.
+        public static Dictionary<string, object> Convite(IEnumerable<Abastecimento> abastecimentos, IDictionary<string, Guid> postos, ICollection<Guid> jaAvaliados, Guid motoristaId, DateTime nowUtc)
+        {
+            var desde = nowUtc.AddDays(-DiasConvite);
+            var candidato = PorPosto(abastecimentos)
+                .Where(g => postos.ContainsKey(g.Key) && !jaAvaliados.Contains(postos[g.Key]))
+                .Select(g => new { g, Ultimo = g.Where(a => a.MotoristaId == motoristaId && a.DataUtc >= desde).Select(a => (DateTime?)a.DataUtc).Max() })
+                .Where(x => x.Ultimo != null)
+                .OrderByDescending(x => x.Ultimo)
+                .FirstOrDefault();
+            if (candidato == null) return null;
+            return new Dictionary<string, object>
+            {
+                ["postoId"] = postos[candidato.g.Key].ToString(),
+                ["nome"] = NomeMaisFrequente(candidato.g.Select(a => a.Nome)),
+                ["data"] = FuelRepository.LocalDay(candidato.Ultimo.Value)
+            };
+        }
 
         // Posto sem local conhecido fica de fora: sem coordenada não há como dizer se está perto.
         public static IList<Dictionary<string, object>> Montar(IEnumerable<Abastecimento> abastecimentos, IDictionary<string, Local> locais, Func<Guid, Dictionary<string, object>> avaliacoesDe = null) =>

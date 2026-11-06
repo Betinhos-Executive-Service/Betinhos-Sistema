@@ -41,7 +41,7 @@ namespace Betinhos.DriverRecordSharing
                 catch (Exception e) { tracing?.Trace("RankingPostos: posto novo não gravado: {0}", e.Message); }
             }
             tracing?.Trace("RankingPostos: abastecimentos={0} postos={1}", abastecimentos.Count, postos.Count);
-            return BuildJson(abastecimentos, postos, CarregarAvaliacoes(repo, postos, nowUtc, tracing), driver.EmployeeReference.Id);
+            return BuildJson(abastecimentos, postos, CarregarAvaliacoes(repo, postos, nowUtc, tracing), driver.EmployeeReference.Id, nowUtc);
         }
 
         // Avaliação é um extra: o assembly é único e pode chegar a um ambiente sem a tabela, e a lista de preços não pode cair por isso.
@@ -65,15 +65,17 @@ namespace Betinhos.DriverRecordSharing
             return faltando.Count == 0 ? null : faltando[(int)(nowUtc.Ticks / TimeSpan.TicksPerSecond % faltando.Count)];
         }
 
-        public static string BuildJson(IEnumerable<FuelRanking.Abastecimento> abastecimentos, IDictionary<string, Entity> postos, IList<PostoAvaliacoes.Avaliacao> avaliacoes = null, Guid motoristaId = default(Guid))
+        public static string BuildJson(IEnumerable<FuelRanking.Abastecimento> abastecimentos, IDictionary<string, Entity> postos, IList<PostoAvaliacoes.Avaliacao> avaliacoes = null, Guid motoristaId = default(Guid), DateTime nowUtc = default(DateTime))
         {
             var porPosto = avaliacoes?.ToLookup(a => a.PostoId);
             var locais = postos.Select(p => new { p.Key, Local = LocalDe(p.Value) }).Where(x => x.Local != null).ToDictionary(x => x.Key, x => x.Local);
+            var lista = abastecimentos.ToList();
             return new JavaScriptSerializer().Serialize(new Dictionary<string, object>
             {
                 ["ok"] = true,
                 ["dias"] = FuelRanking.JanelaDias,
-                ["postos"] = FuelRanking.Montar(abastecimentos, locais, porPosto == null ? (Func<Guid, Dictionary<string, object>>)null : id => PostoAvaliacoes.Resumir(porPosto[id], motoristaId))
+                ["convite"] = avaliacoes == null || nowUtc == default(DateTime) ? null : FuelRanking.Convite(lista, postos.ToDictionary(p => p.Key, p => p.Value.Id), avaliacoes.Where(a => a.MotoristaId == motoristaId).Select(a => a.PostoId).ToList(), motoristaId, nowUtc),
+                ["postos"] = FuelRanking.Montar(lista, locais, porPosto == null ? (Func<Guid, Dictionary<string, object>>)null : id => PostoAvaliacoes.Resumir(porPosto[id], motoristaId))
             });
         }
 
@@ -98,6 +100,7 @@ namespace Betinhos.DriverRecordSharing
         private static FuelRanking.Abastecimento Mapear(Entity d) => new FuelRanking.Abastecimento
         {
             Cnpj = d.GetAttributeValue<string>(FuelSchema.DespesaCnpjLido),
+            MotoristaId = d.GetAttributeValue<EntityReference>(FuelSchema.DespesaMotorista)?.Id ?? Guid.Empty,
             Nome = d.GetAttributeValue<string>("cr40f_estabelecimento"),
             Valor = d.GetAttributeValue<Money>("cr40f_valor")?.Value ?? 0m,
             Litros = d.GetAttributeValue<decimal?>("cr40f_litros") ?? 0m,
