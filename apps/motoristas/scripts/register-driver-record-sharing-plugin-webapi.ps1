@@ -181,6 +181,9 @@ function Get-Sha256Hex([byte[]] $Bytes) {
 $specs = @(
   [pscustomobject]@{ Label = "Servicos Create"; Entity = "cr40f_reservadeveculos"; Message = "Create"; Mode = 0; Filtering = ""; PreImage = @() },
   [pscustomobject]@{ Label = "Servicos Update"; Entity = "cr40f_reservadeveculos"; Message = "Update"; Mode = 0; Filtering = "cr40f_motorista,cr40f_solicitante,cr40f_dataehorriodesada,cr40f_horrioprevistoderetorno,cr40f_veiculo,new_origemveiculo,cr40f_ot,cr40f_status,new_datadefinalizacao"; PreImage = @("cr40f_motorista", "cr40f_solicitante", "cr40f_dataehorriodesada", "cr40f_horrioprevistoderetorno", "cr40f_veiculo", "new_origemveiculo", "cr40f_ot", "cr40f_status", "new_datadefinalizacao") },
+  [pscustomobject]@{ Label = "Aviso motorista Update PreOperation"; Entity = "cr40f_reservadeveculos"; Message = "Update"; Mode = 0; Filtering = "cr40f_motorista"; PreImage = @("cr40f_motorista", "cr40f_status", "cr40f_ot"); Stage = 20; PluginType = "Betinhos.DriverRecordSharing.DriverNoticePlugin" },
+  [pscustomobject]@{ Label = "Aviso motorista Create"; Entity = "cr40f_reservadeveculos"; Message = "Create"; Mode = 0; Filtering = ""; PreImage = @(); Rank = 10; PluginType = "Betinhos.DriverRecordSharing.DriverNoticePlugin" },
+  [pscustomobject]@{ Label = "Aviso motorista Update"; Entity = "cr40f_reservadeveculos"; Message = "Update"; Mode = 0; Filtering = "cr40f_motorista,cr40f_status"; PreImage = @("cr40f_motorista", "cr40f_status", "cr40f_dataehorriodesada", "cr40f_id"); Rank = 10; PluginType = "Betinhos.DriverRecordSharing.DriverNoticePlugin" },
   [pscustomobject]@{ Label = "Funcionarios Create"; Entity = "cr40f_funcionarios"; Message = "Create"; Mode = 0; Filtering = ""; PreImage = @() },
   [pscustomobject]@{ Label = "Funcionarios Update"; Entity = "cr40f_funcionarios"; Message = "Update"; Mode = 0; Filtering = "cr40f_emailmicrosoft"; PreImage = @("cr40f_emailmicrosoft") },
   [pscustomobject]@{ Label = "Servicos por passageiro Create"; Entity = "cr40f_servicosporpassageiro"; Message = "Create"; Mode = 1; Filtering = ""; PreImage = @() },
@@ -214,6 +217,8 @@ $specs = @(
 
 Assert-RequiredTable "cr40f_trocasdecarro"
 Assert-RequiredTable "new_possedeveiculo"
+# O DriverNoticePlugin derruba a gravacao da reserva se nao puder criar o aviso: a tabela vem antes dos steps.
+Assert-RequiredTable "new_avisomotorista"
 $registrationSpecs = @($specs)
 Write-Step "registrando e validando os contratos de plugin, incluindo cr40f_reservadeveculos."
 
@@ -468,7 +473,7 @@ $runAs = Get-RunAsUser
   $stepPluginTypeId = Get-SpecPluginTypeId $spec $pluginTypeId
   $stepRows = @(Get-Step $stepPluginTypeId $messageId $filterId $stage)
   if ($stepRows.Count -gt 1) { throw "$($spec.Label): steps duplicados." }
-  $payload = @{ name = "DriverRecordSharing - $($spec.Label)"; description = "Criado pelo script register-driver-record-sharing-plugin-webapi.ps1"; "eventhandler_plugintype@odata.bind" = (New-Bind "plugintypes" $stepPluginTypeId); "sdkmessageid@odata.bind" = (New-Bind "sdkmessages" $messageId); "sdkmessagefilterid@odata.bind" = (New-Bind "sdkmessagefilters" $filterId); stage = $stage; mode = $spec.Mode; asyncautodelete = ($spec.Mode -eq 1); rank = 1; supporteddeployment = 0 }
+  $payload = @{ name = "DriverRecordSharing - $($spec.Label)"; description = "Criado pelo script register-driver-record-sharing-plugin-webapi.ps1"; "eventhandler_plugintype@odata.bind" = (New-Bind "plugintypes" $stepPluginTypeId); "sdkmessageid@odata.bind" = (New-Bind "sdkmessages" $messageId); "sdkmessagefilterid@odata.bind" = (New-Bind "sdkmessagefilters" $filterId); stage = $stage; mode = $spec.Mode; asyncautodelete = ($spec.Mode -eq 1); rank = $(if ($spec.PSObject.Properties['Rank']) { [int]$spec.Rank } else { 1 }); supporteddeployment = 0 }
   if ($spec.Message -eq "Update") { $payload.filteringattributes = $spec.Filtering }
   if ($runAs) { $payload["impersonatinguserid@odata.bind"] = (New-Bind "systemusers" $runAs.systemuserid) }
   if ($stepRows.Count -eq 1) {
