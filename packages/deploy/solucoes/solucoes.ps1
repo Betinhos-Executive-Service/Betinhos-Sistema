@@ -2,6 +2,8 @@
 # Mensagens sem acento: o Windows PowerShell 5.1 le .ps1 sem BOM como ANSI.
 
 $script:Solucoes = @("BetinhosCore", "BetinhosAutomacao", "BetinhosInterface", "BetinhosMotoristas")
+# BetinhosMotoristas continua nas 4 (distribuicao e conferencia), mas e publicada so pelo repositorio app-motoristas-v2.
+$script:SolucoesPublicadasAqui = @("BetinhosCore", "BetinhosAutomacao", "BetinhosInterface")
 $script:HostDev = "org23b93544.crm2.dynamics.com"
 $script:IdVazio = "00000000-0000-0000-0000-000000000000"
 
@@ -444,10 +446,23 @@ function Get-VersaoSeguinte([string] $Versao) {
 # Lista do workflow ("BetinhosCore,BetinhosInterface"; vazia = as 4) na ordem de import (camada mais baixa primeiro).
 function Get-SolucoesEscolhidas([string] $Lista) {
   $pedidas = @($Lista -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-  if ($pedidas.Count -eq 0) { return $script:Solucoes }
-  $estranhas = @($pedidas | Where-Object { $script:Solucoes -notcontains $_ })
-  if ($estranhas.Count) { throw "Solucao fora das 4: $($estranhas -join ', ') (validas: $($script:Solucoes -join ', '))." }
-  return @($script:Solucoes | Where-Object { $pedidas -contains $_ })
+  if ($pedidas.Count -eq 0) { return $script:SolucoesPublicadasAqui }
+  if ($pedidas -contains "BetinhosMotoristas") { throw "BetinhosMotoristas e publicada pelo repositorio app-motoristas-v2." }
+  $estranhas = @($pedidas | Where-Object { $script:SolucoesPublicadasAqui -notcontains $_ })
+  if ($estranhas.Count) { throw "Solucao fora do Sistema: $($estranhas -join ', ') (validas: $($script:SolucoesPublicadasAqui -join ', '))." }
+  return @($script:SolucoesPublicadasAqui | Where-Object { $pedidas -contains $_ })
+}
+
+# Componentes publicados pelo app-motoristas-v2 (ids em minusculo): os da BetinhosMotoristas e o service worker, que no PROD
+# ainda esta na BetinhosInterface. A camada Active deles e a versao que o app publicou, nao um hotfix a remover.
+function Get-IdsDoApp($Dv) {
+  $ids = @{}
+  $solucaoId = Get-SolucaoId $Dv "BetinhosMotoristas"
+  if ($solucaoId) { foreach ($linha in @(Get-LinhasDaSolucao $Dv $solucaoId)) { $ids[$linha.id] = $true } }
+  foreach ($sw in @(Read-DvAll $Dv "webresourceset?`$select=webresourceid&`$filter=name eq 'new_app-motoristas-v2-sw'")) {
+    $ids[([string] $sw.webresourceid).ToLowerInvariant()] = $true
+  }
+  return $ids
 }
 
 function Get-VersaoInstalada($Dv, [string] $Nome) {

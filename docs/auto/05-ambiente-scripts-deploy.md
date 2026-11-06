@@ -203,11 +203,11 @@ flowchart TD
 
 Detalhes (de `publicar.yml` e dos scripts em `packages/deploy/solucoes/`):
 
-- `exportar-do-dev.ps1`: conferência das 4 soluções no DEV, sobe a versão e exporta gerenciado. `SOLUCOES` vazio = as 4.
+- `exportar-do-dev.ps1`: conferência das 4 soluções no DEV, sobe a versão e exporta gerenciado. `SOLUCOES` vazio = as 3 do Sistema; a `BetinhosMotoristas` é publicada só pelo `app-motoristas-v2`.
 - `excluir-custom-apis-legado.ps1`: guarda JSON de backup e exclui Custom APIs `cr40f_AI*V2` não gerenciadas (travam o upgrade).
 - `preservar-valores-variaveis.ps1`: variável que só tem valor padrão no alvo ganha valor atual igual ao padrão (o pacote do DEV substituiria o padrão).
 - `importar-solucoes.ps1`: import com `--stage-and-upgrade`, alvo explícito, conexão só aceita o host dele; ordem do manifesto da camada mais baixa para a mais alta.
-- `remover-camadas-active.ps1`: tira a camada Active de WebResource, Workflow, step, PluginAssembly, SystemForm, AppModule e SiteMap (hotfixes já estão na main). Roda com `-PermitirProd`.
+- `remover-camadas-active.ps1`: tira a camada Active de WebResource, Workflow, step, PluginAssembly, SystemForm, AppModule e SiteMap (hotfixes já estão na main). Pula a `BetinhosMotoristas` e o service worker do app, publicados pelo `app-motoristas-v2`. Roda com `-PermitirProd`.
 - `restaurar-estados.ps1`: devolve ligado/desligado de fluxos e steps conforme a foto; no TEST, novos ficam desligados (`-DesligarNovos`).
 - Comparação: perda de registros, tabelas, componentes, fluxo ou step que mudou de estado, variável ou configuração segura reprova; informativos: fluxos novos desligados, variáveis sem valor, chunks obsoletos, versões.
 - Artefatos: `pacotes` (7 dias); `fotos-<alvo>` (90 dias) com `fotos/`, `pacotes/importados.json`, `camadas-active/`, `custom-apis-legado/`.
