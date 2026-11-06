@@ -70,6 +70,13 @@ describe('cotações V2 no Dataverse', () => {
     expect(notice.body['cr40f_Destinatario@odata.bind']).toBe(`/cr40f_funcionarioses(${financeId})`)
   })
 
+  test('não grava o canal de entrada, que saiu da tela', async () => {
+    const { store, writes } = await setup()
+    await store.createQuote(emptyState(), { title: 'GRU', client: 'Tenaris', priority: 'medium', status: 'Nova', channel: 'Outro', deadline: today(), today: today(), actorEmployeeId: creatorId })
+    const quotePost = writes.find((item) => item.method === 'POST' && item.url.endsWith('/cr40f_pedidodecotacaos'))
+    expect(quotePost?.body).not.toHaveProperty('cr40f_canalentrada')
+  })
+
   test('falha ao gravar o aviso de um financeiro não impede o aviso dos outros', async () => {
     const otherFinanceId = '77777777-7777-4777-8777-777777777777'
     const { store, writes } = await setup({ failNoticeFor: financeId })
