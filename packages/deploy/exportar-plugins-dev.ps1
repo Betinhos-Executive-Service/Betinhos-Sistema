@@ -31,7 +31,7 @@ $headers = @{ Authorization = "Bearer $token"; Accept = 'application/json' }
 
 $Pasta = (New-Item -ItemType Directory -Force -Path $Pasta).FullName
 $pastas = @{}
-foreach ($d in Get-ChildItem (Join-Path $PSScriptRoot '..\plugins') -Directory) { if ($d.Name -match '^Cr40f\.([A-Za-z]+)\.Plugin$') { $pastas[$Matches[1].ToLowerInvariant()] = $d.Name } }
+foreach ($d in Get-ChildItem (Join-Path $PSScriptRoot '..\plugins') -Directory) { if ($d.Name -match '^(?:Cr40f\.(?<n>[A-Za-z]+)\.Plugin|Betinhos\.(?<n>DriverRecordSharing))$') { $pastas[$Matches['n'].ToLowerInvariant()] = $d.Name } }
 foreach ($nome in $pedidos) {
   if (-not $pastas.ContainsKey($nome)) { throw "Plugin desconhecido: $nome" }
   # O nome vem do csproj: o do Gerar Pagantes tem sufixo V2.

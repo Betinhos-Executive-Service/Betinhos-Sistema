@@ -1,12 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
-import { FRONT } from './caminho-publicacao.mjs'
+import { FRONT, PLUGIN_PASTA, nomePlugin } from './caminho-publicacao.mjs'
 
 // Decide o que o workflow Deploy publica no DEV pelos arquivos que mudaram no push da develop:
 //  - tela: o build do Sistema Betinhos (pnpm push), quando muda algo que entra nele ou o próprio script de publicação;
 //  - webresources: a Tela Gerar Pagantes e o gerador de recibo (apps/gerar-pagantes, push-webresources-dev.ps1);
 //  - plugins: cada plugin cujo código, registrador ou script de publicação mudou (push-<nome>-plugin.ps1).
-// Teste de plugin (Cr40f.<Nome>.Plugin.Tests) não republica: o assembly publicado não muda.
+// Teste de plugin (<pasta>.Tests) e Betinhos.ExpenseUpload (congelado) não republicam: o assembly publicado não muda.
 // Flows têm decisão própria (flows-dev.mjs, pela tag flows-dev-publicado); flow novo, schema e sitemap:* continuam à mão:
 // usam az login e conexões do usuário. Por aqui, arquivo de flow não publica nada.
 
@@ -15,7 +15,7 @@ export const TELA = [...FRONT, /^packages\/deploy\/(push-dev\.ps1|bump-version\.
 export const WEBRESOURCES = [/^apps\/gerar-pagantes\//, /^pnpm-lock\.yaml$/, /^packages\/deploy\/(push-webresources-dev\.ps1|bump-version\.mjs)$/]
 
 const PLUGIN = [
-  /^packages\/plugins\/Cr40f\.([A-Za-z]+)\.Plugin\//,
+  new RegExp(`^packages/plugins/(?:${PLUGIN_PASTA})/`),
   /^packages\/plugins\/tools\/Cr40f\.([A-Za-z]+)\.Registrar\//,
   /^packages\/plugins\/scripts\/push-([a-z]+)-plugin\.ps1$/,
 ]
@@ -23,7 +23,7 @@ const PLUGIN = [
 export function pluginDoArquivo(arquivo) {
   for (const r of PLUGIN) {
     const m = r.exec(arquivo)
-    if (m) return m[1].toLowerCase()
+    if (m) return nomePlugin(m)
   }
   return null
 }

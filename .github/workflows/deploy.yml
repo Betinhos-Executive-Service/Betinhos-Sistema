@@ -3,7 +3,7 @@ name: Deploy
 # Só DEV: push na branch develop publica no DEV a tela do Sistema Betinhos, os plugins e os flows que mudaram, e distribui nas 4
 # soluções (decisão do Renan, 05/11/2026: develop → DEV, main → PROD). TEST e PROD são do workflow Produção (producao.yml).
 # O que publicar sai de pendentes-dev.ps1: compara o commit que o DEV registra em cada peça (descrição da tela e de cada
-# assembly Cr40f.*.Plugin) com o HEAD. Assim um deploy cancelado na fila ou uma publicação local nunca deixa peça para trás,
+# assembly Cr40f.*.Plugin e Betinhos.DriverRecordSharing) com o HEAD. Assim um deploy cancelado na fila ou uma publicação local nunca deixa peça para trás,
 # e o publicar.yml usa os mesmos registros para nunca levar ao PROD tela ou plugin que ainda não entrou na main.
 # Flows: cada packages/deploy/provision-flow-*.ps1 cujos arquivos mudaram desde a tag flows-dev-publicado (flows-dev.mjs) roda
 # na conta de serviço (az login do service principal) e só atualiza flow que já existe no DEV (push-flows-dev.ps1). Flow novo,
@@ -48,6 +48,7 @@ on:
       - 'packages/deploy/inline-webresource.mjs'
       - 'packages/deploy/loader.template.html'
       - 'packages/plugins/Cr40f.*.Plugin/**'
+      - 'packages/plugins/Betinhos.DriverRecordSharing/**'
       - 'packages/plugins/tools/**'
       - 'packages/plugins/scripts/**'
   workflow_dispatch:
@@ -61,7 +62,7 @@ on:
         type: boolean
         default: false
       forcar_plugins:
-        description: 'Plugins a publicar mesmo sem mudança (frota,acesso ou todos); vazio = só os pendentes'
+        description: 'Plugins a publicar mesmo sem mudança (frota,acesso,driverrecordsharing ou todos); vazio = só os pendentes'
         type: string
         default: ''
       forcar_flows:
@@ -197,6 +198,7 @@ jobs:
           PLUGIN_SNK_ACESSO: ${{ secrets.PLUGIN_SNK_ACESSO }}
           PLUGIN_SNK_CADASTRO: ${{ secrets.PLUGIN_SNK_CADASTRO }}
           PLUGIN_SNK_DOCUMENTOS: ${{ secrets.PLUGIN_SNK_DOCUMENTOS }}
+          PLUGIN_SNK_DRIVERRECORDSHARING: ${{ secrets.PLUGIN_SNK_DRIVERRECORDSHARING }}
           PLUGIN_SNK_FINANCEIRO: ${{ secrets.PLUGIN_SNK_FINANCEIRO }}
           PLUGIN_SNK_FROTA: ${{ secrets.PLUGIN_SNK_FROTA }}
           PLUGIN_SNK_GERARPAGANTES: ${{ secrets.PLUGIN_SNK_GERARPAGANTES }}

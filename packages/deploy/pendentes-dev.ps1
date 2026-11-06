@@ -9,7 +9,7 @@ param(
 # Diz o que no DEV nao corresponde ao commit $Ate, pelo commit que o proprio DEV registra:
 #  - tela: descricao do cr40f_SistemaBetinhos.html ("vX.Y.Z <sha>", push-dev.ps1);
 #  - webresources: descricao de Tela_GerarPagantes/index.html ("vX.Y.Z <sha>", push-webresources-dev.ps1);
-#  - plugins: descricao de cada assembly Cr40f.<Nome>.Plugin (<sha>, gravada pelo registrador no CI).
+#  - plugins: descricao de cada assembly Cr40f.<Nome>.Plugin e do Betinhos.DriverRecordSharing (<sha>, gravada no CI).
 # Pendente = sem commit registrado, assembly ausente no DEV, ou git diff <registrado> $Ate tocando a peca
 # (regras em mudancas-dev.mjs). Comparar com o que o DEV tem, e nao com o push anterior, faz um deploy cancelado na fila
 # (concurrency) ou uma publicacao local nunca deixar peca para tras. Somente leitura no Dataverse.
@@ -72,10 +72,10 @@ $webresources = Test-WebResourcePendente 'Tela_GerarPagantes/index.html' 'webres
 
 $plugins = New-Object System.Collections.Generic.List[string]
 $assemblies = @{}
-foreach ($a in Get-Dv "pluginassemblies?`$select=name,description&`$filter=startswith(name,'Cr40f.')") { $assemblies[$a.name] = "$($a.description)" }
+foreach ($a in Get-Dv "pluginassemblies?`$select=name,description&`$filter=startswith(name,'Cr40f.') or name eq 'Betinhos.DriverRecordSharing'") { $assemblies[$a.name] = "$($a.description)" }
 foreach ($d in Get-ChildItem (Join-Path $root 'packages\plugins') -Directory | Sort-Object Name) {
-  if ($d.Name -notmatch '^Cr40f\.([A-Za-z]+)\.Plugin$') { continue }
-  $nome = $Matches[1].ToLowerInvariant()
+  if ($d.Name -notmatch '^(?:Cr40f\.(?<n>[A-Za-z]+)\.Plugin|Betinhos\.(?<n>DriverRecordSharing))$') { continue }
+  $nome = $Matches['n'].ToLowerInvariant()
   # O nome vem do csproj: o do Gerar Pagantes tem sufixo V2, e renomear criaria outro assembly no Dataverse.
   $assembly = ([xml](Get-Content -Raw (Join-Path $d.FullName "$($d.Name).csproj"))).SelectSingleNode('//AssemblyName').InnerText
   if (-not $assemblies.ContainsKey($assembly)) { $plugins.Add($nome); $motivos.Add("${nome}: assembly ausente no DEV"); continue }

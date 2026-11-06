@@ -83,7 +83,7 @@ jobs:
       - name: Trava do commit (tela e plugins do DEV são os deste commit)
         # O export sai do DEV, que recebe a develop. Se a develop já tem tela ou plugin novo que não está neste commit, o PROD
         # o receberia sem passar pela main. O DEV registra o commit publicado na descrição da tela (push-dev.ps1) e de cada
-        # assembly Cr40f.*.Plugin (registrador, no workflow Deploy); pendentes-dev.ps1 compara com este commit.
+        # assembly Cr40f.*.Plugin e Betinhos.DriverRecordSharing (no workflow Deploy); pendentes-dev.ps1 compara com este commit.
         run: |
           $r = powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/pendentes-dev.ps1 -Ate $env:GITHUB_SHA | ConvertFrom-Json
           if ($LASTEXITCODE -ne 0) { throw 'pendentes-dev.ps1 falhou.' }

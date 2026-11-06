@@ -35,8 +35,8 @@ jobs:
         run: |
           if [ -z "$PR" ]; then echo "shell=true" >> "$GITHUB_OUTPUT"; echo "plugins=todos" >> "$GITHUB_OUTPUT"; exit 0; fi
           arquivos=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)')
-          # Plugins tocados (código, testes, registrador ou script de publicação), em minúsculas: frota,acesso.
-          plugins=$(echo "$arquivos" | sed -nE 's#^packages/plugins/(Cr40f\.([A-Za-z]+)\.Plugin(\.Tests)?|tools/Cr40f\.([A-Za-z]+)\.Registrar)/.*#\2\4#p; s#^packages/plugins/scripts/push-([a-z]+)-plugin\.ps1$#\1#p' | tr 'A-Z' 'a-z' | sort -u | paste -sd, -)
+          # Plugins tocados (código, testes, registrador ou script de publicação), em minúsculas: frota,acesso,driverrecordsharing.
+          plugins=$(echo "$arquivos" | sed -nE 's#^packages/plugins/(Cr40f\.([A-Za-z]+)\.Plugin(\.Tests)?|tools/Cr40f\.([A-Za-z]+)\.Registrar|Betinhos\.(DriverRecordSharing|ExpenseUpload)(\.Tests)?)/.*#\2\4\5#p; s#^packages/plugins/scripts/push-([a-z]+)-plugin\.ps1$#\1#p' | tr 'A-Z' 'a-z' | sort -u | paste -sd, -)
           if echo "$arquivos" | grep -qE '^\.github/workflows/ci\.yml$'; then plugins=todos; fi
           echo "plugins=$plugins" >> "$GITHUB_OUTPUT"
           if echo "$arquivos" | grep -qE '^(apps/shell/|packages/dataverse/|packages/plugins/[^/]+/Fixtures/|\.github/workflows/ci\.yml$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig\.base\.json$|\.npmrc$)'; then
@@ -138,16 +138,19 @@ jobs:
         env:
           PLUGINS: ${{ needs.mudancas.outputs.plugins }}
         run: |
+          # nome curto -> pasta do código (Cr40f.<Nome>.Plugin, Betinhos.DriverRecordSharing e Betinhos.ExpenseUpload, este só compila e testa)
           $pastas = @{}
-          foreach ($d in Get-ChildItem packages/plugins -Directory) { if ($d.Name -match '^Cr40f\.([A-Za-z]+)\.Plugin$') { $pastas[$Matches[1].ToLowerInvariant()] = $Matches[1] } }
+          foreach ($d in Get-ChildItem packages/plugins -Directory) { if ($d.Name -match '^(?:Cr40f\.(?<n>[A-Za-z]+)\.Plugin|Betinhos\.(?<n>DriverRecordSharing|ExpenseUpload))$') { $pastas[$Matches['n'].ToLowerInvariant()] = $d.Name } }
           $pedidos = if ($env:PLUGINS -eq 'todos') { @($pastas.Keys | Sort-Object) } else { @($env:PLUGINS.Split(',') | Where-Object { $_ -and $pastas.ContainsKey($_) }) }
           foreach ($nome in $pedidos) {
             $p = $pastas[$nome]
             Write-Host "::group::$p"
-            $testes = "packages/plugins/Cr40f.$p.Plugin.Tests"
+            $testes = "packages/plugins/$p.Tests"
             if (Test-Path $testes) { dotnet test $testes -p:SignAssembly=false; if ($LASTEXITCODE) { throw "testes de $p falharam" } }
-            else { dotnet build "packages/plugins/Cr40f.$p.Plugin" -p:SignAssembly=false; if ($LASTEXITCODE) { throw "build de $p falhou" } }
-            dotnet build "packages/plugins/tools/Cr40f.$p.Registrar"; if ($LASTEXITCODE) { throw "registrador de $p não compila" }
+            else { dotnet build "packages/plugins/$p" -p:SignAssembly=false; if ($LASTEXITCODE) { throw "build de $p falhou" } }
+            # Registrador só existe nos Cr40f.*; Betinhos.* não tem (o DriverRecordSharing atualiza o assembly já registrado).
+            $registrador = "packages/plugins/tools/$($p -replace '\.Plugin$', '.Registrar')"
+            if (Test-Path $registrador) { dotnet build $registrador; if ($LASTEXITCODE) { throw "registrador de $p não compila" } }
             Write-Host "::endgroup::"
           }
 
