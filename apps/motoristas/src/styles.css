@@ -14261,25 +14261,37 @@ select,
 @media (prefers-reduced-motion:no-preference) { .gr-comprovante--carregando { animation:gr-pulse 1.2s ease-in-out infinite alternate; } }
 @media (prefers-reduced-motion:reduce) { .gr-detalhe,.gr-detalhe-overlay { animation:none; } }
 @keyframes gr-detalhe-entrada { from { transform:translateY(100%); } }
-.rp-loader { display:grid; justify-items:center; align-content:center; gap:14px; min-height:min(52dvh,380px); }
-.rp-marcador { width:min(62vw,200px); height:auto; overflow:visible; }
-.rp-marcador path { fill:none; stroke-linecap:round; stroke-width:11; }
-.rp-marcador-trilho { stroke:#e2e8f0; }
-.rp-marcador-nivel { stroke:#147a4b; stroke-dasharray:100; stroke-dashoffset:50; }
-.rp-marcador-ponteiro { transform-origin:80px 92px; transform:rotate(0deg); }
-.rp-marcador-ponteiro line { stroke:#001a3d; stroke-linecap:round; stroke-width:5; }
-.rp-marcador circle { fill:#001a3d; }
-.rp-marcador text { fill:#64748b; font-size:12px; font-weight:800; }
-.rp-loader-texto { margin:0; color:#001a3d; font-size:.92rem; font-weight:700; text-align:center; }
+.rp-loader { display:grid; justify-items:center; align-content:center; gap:14px; min-height:min(56dvh,420px); }
+.rp-painel { width:min(68vw,250px); height:auto; filter:drop-shadow(0 10px 18px rgba(0,26,61,.28)); }
+.rp-painel-trilho,.rp-painel-nivel { fill:none; stroke-linecap:round; stroke-width:9; }
+.rp-painel-trilho { stroke:rgba(255,255,255,.12); }
+.rp-painel-nivel { stroke:url(#rp-faixa); stroke-dasharray:100; stroke-dashoffset:50; }
+.rp-painel-marca { stroke:#8fa6c4; stroke-linecap:round; stroke-width:2; }
+.rp-painel-marca--maior { stroke:#fff; stroke-width:3; }
+.rp-painel text { fill:#dbe5f2; font-size:15px; font-weight:800; text-anchor:middle; }
+.rp-painel-bomba { fill:none; stroke:#8fa6c4; stroke-linecap:round; stroke-linejoin:round; stroke-width:2; }
+.rp-painel-ponteiro { fill:#ff5a3c; transform-origin:110px 118px; }
+.rp-painel-eixo { fill:#0b2d5e; stroke:#cbd5e1; stroke-width:2; }
+.rp-painel-centro { fill:#ff5a3c; }
+.rp-loader-texto { margin:0; color:#001a3d; font-size:.95rem; font-weight:800; text-align:center; }
+.rp-etapas { display:flex; gap:8px; margin:0; padding:0; list-style:none; }
+.rp-etapas li { display:flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; background:#e8edf4; color:#64748b; font-size:.74rem; font-weight:800; transition:background-color 200ms ease,color 200ms ease; }
+.rp-etapas i { width:7px; height:7px; border-radius:50%; background:#94a3b8; }
+.rp-etapas [data-estado="ativa"] { background:#001a3d; color:#fff; }
+.rp-etapas [data-estado="ativa"] i { background:#ffb300; }
+.rp-etapas [data-estado="feita"] { background:#eaf8f1; color:#147a4b; }
+.rp-etapas [data-estado="feita"] i { background:#147a4b; }
 .rp-carregando-texto { margin:0 2px; color:#475569; font-size:.85rem; font-weight:700; }
 @media (prefers-reduced-motion:no-preference) {
-  .rp-marcador-ponteiro { animation:rp-ponteiro 1.5s cubic-bezier(.65,0,.35,1) infinite alternate; }
-  .rp-marcador-nivel { animation:rp-nivel 1.5s cubic-bezier(.65,0,.35,1) infinite alternate; }
+  .rp-painel-ponteiro { animation:rp-ponteiro 2.6s cubic-bezier(.45,.05,.3,1) infinite; }
+  .rp-painel-nivel { animation:rp-nivel 2.6s cubic-bezier(.45,.05,.3,1) infinite; }
+  .rp-painel-bomba { animation:rp-bomba 2.6s ease-in-out infinite; }
   .rp-loader-texto { animation:gr-entrada 240ms cubic-bezier(.23,1,.32,1) both; }
   .rp-entrada { animation:gr-entrada 240ms cubic-bezier(.23,1,.32,1) both; animation-delay:calc(var(--i,0) * 40ms); }
 }
-@keyframes rp-ponteiro { from { transform:rotate(-82deg); } to { transform:rotate(82deg); } }
-@keyframes rp-nivel { from { stroke-dashoffset:96; stroke:#b4263f; } 55% { stroke:#d9a400; } to { stroke-dashoffset:4; stroke:#147a4b; } }
+@keyframes rp-ponteiro { 0%,100% { transform:rotate(-84deg); } 42% { transform:rotate(88deg); } 50% { transform:rotate(80deg); } 56% { transform:rotate(84deg); } 62% { transform:rotate(82deg); } }
+@keyframes rp-nivel { 0%,100% { stroke-dashoffset:96; } 42% { stroke-dashoffset:1; } 50% { stroke-dashoffset:6; } 56% { stroke-dashoffset:4; } 62% { stroke-dashoffset:5; } }
+@keyframes rp-bomba { 0%,100% { stroke:#8fa6c4; } 48% { stroke:#2fbf71; } }
 .rp-hero,.rp-posto { --rp-fundo:#eaf8f1; --rp-borda:#bfe6d2; --rp-cor:#147a4b; }
 .rp-hero { display:grid; gap:12px; padding:14px; border:1px solid var(--rp-borda); border-radius:16px; background:var(--rp-fundo); }
 .rp-hero[data-semaforo="amarelo"],.rp-posto[data-semaforo="amarelo"] { --rp-fundo:#fff7df; --rp-borda:#f3dc9a; --rp-cor:#856000; }
