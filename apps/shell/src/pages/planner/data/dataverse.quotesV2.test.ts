@@ -70,14 +70,11 @@ describe('cotações V2 no Dataverse', () => {
     expect(notice.body['cr40f_Destinatario@odata.bind']).toBe(`/cr40f_funcionarioses(${financeId})`)
   })
 
-  test.each([
-    ['WhatsApp', 100001000], ['Telefone', 100001001], ['E-mail', 100001002], ['Site', 100001003],
-    ['Indicação', 100001004], ['Cliente recorrente', 100001005], ['Instagram', 100001006], ['Outro', 100001007],
-  ])('grava o canal de entrada %s', async (channel, value) => {
+  test('não grava o canal de entrada, que saiu da tela', async () => {
     const { store, writes } = await setup()
-    await store.createQuote(emptyState(), { title: 'GRU', client: 'Tenaris', priority: 'medium', status: 'Nova', channel, deadline: today(), today: today(), actorEmployeeId: creatorId })
+    await store.createQuote(emptyState(), { title: 'GRU', client: 'Tenaris', priority: 'medium', status: 'Nova', channel: 'Outro', deadline: today(), today: today(), actorEmployeeId: creatorId })
     const quotePost = writes.find((item) => item.method === 'POST' && item.url.endsWith('/cr40f_pedidodecotacaos'))
-    expect(quotePost?.body.cr40f_canalentrada).toBe(value)
+    expect(quotePost?.body).not.toHaveProperty('cr40f_canalentrada')
   })
 
   test('falha ao gravar o aviso de um financeiro não impede o aviso dos outros', async () => {

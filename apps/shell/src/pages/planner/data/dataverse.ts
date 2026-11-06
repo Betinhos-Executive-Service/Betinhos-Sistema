@@ -408,7 +408,7 @@ const QUOTE_STATUS_VALUES: Readonly<Record<string, number>> = Object.freeze({
   "Aceita pelo cliente": 100004007,
 });
 const QUOTE_PRIORITY_VALUES: Readonly<Record<string, number>> = Object.freeze({ low: 100003000, medium: 100003001, high: 100003002, urgent: 100003003 });
-const QUOTE_CHANNEL_VALUES: Readonly<Record<string, number>> = Object.freeze({ WhatsApp: 100001000, Telefone: 100001001, "E-mail": 100001002, Site: 100001003, "Indicação": 100001004, "Cliente recorrente": 100001005, Instagram: 100001006, Outro: 100001007 });
+const QUOTE_CHANNEL_VALUES: Readonly<Record<string, number>> = Object.freeze({ WhatsApp: 100001000, Telefone: 100001001, "E-mail": 100001002 });
 const lookupCache = new Map<string, string>();
 let quoteClientEntitySet = "";
 // Campos do pedido (V1.1): perfil do passageiro e observações internas.
@@ -2383,8 +2383,6 @@ function quotePayload(input: QuotePatch = {}, includeUnset = false, clientNaviga
   set("clientContact", "cr40f_contatocliente", input.clientContact == null ? "" : String(input.clientContact).trim());
   set("clientPhone", "cr40f_telefonewhatsapp", input.clientPhone == null ? "" : String(input.clientPhone).trim());
   set("clientEmail", "cr40f_emailcliente", input.clientEmail == null ? "" : String(input.clientEmail).trim());
-  if (input.channel) payload.cr40f_canalentrada = quoteChoice(input.channel, QUOTE_CHANNEL_VALUES, "Canal de entrada");
-  else if (!includeUnset && has("channel")) payload.cr40f_canalentrada = null;
   if (input.vehicleType) payload.cr40f_tipoveiculo = quoteChoice(input.vehicleType === "Basico" ? "Básico" : input.vehicleType, QUOTE_VEHICLE_VALUES, "Tipo de veículo");
   else if (!includeUnset && has("vehicleType")) payload.cr40f_tipoveiculo = null;
   for (const [key, legacyField, longField] of [["origin", "cr40f_origem", "cr40f_origemcompleta"], ["destination", "cr40f_destino", "cr40f_destinocompleto"]]) {
