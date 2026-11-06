@@ -19,7 +19,7 @@ if (([Uri]$EnvironmentUrl).Host -ne 'org23b93544.crm2.dynamics.com') { throw "So
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $pastas = @{}
 foreach ($d in Get-ChildItem (Join-Path $root 'packages\plugins') -Directory) {
-  if ($d.Name -match '^Cr40f\.([A-Za-z]+)\.Plugin$') { $pastas[$Matches[1].ToLowerInvariant()] = $Matches[1] }
+  if ($d.Name -match '^(?:Cr40f\.(?<n>[A-Za-z]+)\.Plugin|Betinhos\.(?<n>DriverRecordSharing))$') { $pastas[$Matches['n'].ToLowerInvariant()] = $d.Name }
 }
 
 # @(...) por fora: um if devolvendo um elemento so vira string, e .Count falha com StrictMode.
@@ -37,7 +37,7 @@ foreach ($nome in $pedidos) {
 $chaves = Join-Path $env:USERPROFILE '.codex\keys'
 [IO.Directory]::CreateDirectory($chaves) | Out-Null
 foreach ($nome in $pedidos) {
-  $snk = Join-Path $chaves "Cr40f.$($pastas[$nome]).Plugin.snk"
+  $snk = Join-Path $chaves "$($pastas[$nome]).snk"
   $b64 = [Environment]::GetEnvironmentVariable("PLUGIN_SNK_$($nome.ToUpperInvariant())")
   if ($b64) { [IO.File]::WriteAllBytes($snk, [Convert]::FromBase64String($b64)) }
   elseif ($env:GITHUB_ACTIONS -eq 'true') { throw "Secret PLUGIN_SNK_$($nome.ToUpperInvariant()) ausente no environment dev." }

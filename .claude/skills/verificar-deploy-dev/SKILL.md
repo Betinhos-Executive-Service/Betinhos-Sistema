@@ -6,7 +6,7 @@ description: "Verifica o workflow Deploy do GitHub Actions que publica no DEV a 
 
 ## Cobre
 - `.github/workflows/deploy.yml` (só DEV; job `dev`, runner Windows, environment `dev` do GitHub).
-- `packages/deploy/pendentes-dev.ps1` (o que o DEV ainda não tem; também é a trava do `publicar.yml`), `packages/deploy/mudancas-dev.mjs` (que arquivo é de qual peça), `packages/deploy/push-plugins-dev.ps1` e os registradores `packages/plugins/tools/Cr40f.*.Registrar` (conta de serviço quando há `DV_CLIENT_SECRET`; commit na descrição do assembly só com `GITHUB_ACTIONS=true`).
+- `packages/deploy/pendentes-dev.ps1` (o que o DEV ainda não tem; também é a trava do `publicar.yml`), `packages/deploy/mudancas-dev.mjs` (que arquivo é de qual peça), `packages/deploy/push-plugins-dev.ps1` `packages/plugins/scripts/push-driverrecordsharing-plugin.ps1` (assembly `Betinhos.DriverRecordSharing`, sem registrador) e os registradores `packages/plugins/tools/Cr40f.*.Registrar` (conta de serviço quando há `DV_CLIENT_SECRET`; commit na descrição do assembly só com `GITHUB_ACTIONS=true`).
 - Flows: `packages/deploy/flows-dev.mjs` (tabela script → arquivos, flows do DEV, args `FLOW_*`, preparo das constantes), `packages/deploy/push-flows-dev.ps1`, os `provision-flow-*.ps1` (no CI, `GITHUB_ACTIONS=true` pula a leitura e a regravação da URL do gatilho e mantém desligado o flow que já estava desligado) e o job `tag-flows` (tag `flows-dev-publicado`).
 
 ## Roteiro

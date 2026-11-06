@@ -21,7 +21,12 @@ export const FRONT = [
   /^packages\/deploy\/loader\.template\.html$/,
 ]
 
-const PLUGIN = /^packages\/plugins\/Cr40f\.([A-Za-z]+)\.Plugin\//
+// Pasta de código de um plugin que o Deploy publica: Cr40f.<Nome>.Plugin, ou o assembly Betinhos.DriverRecordSharing (herdado do
+// app Motoristas; nome curto driverrecordsharing). Betinhos.ExpenseUpload está congelado: compila e testa no CI, mas não é
+// publicado por aqui. Nome curto = o que vira argumento de push-<nome>-plugin.ps1 e a chave PLUGIN_SNK_<NOME>.
+export const PLUGIN_PASTA = String.raw`Cr40f\.([A-Za-z]+)\.Plugin|Betinhos\.(DriverRecordSharing)`
+export const nomePlugin = (m) => (m[1] ?? m[2]).toLowerCase()
+const PLUGIN = new RegExp(`^packages/plugins/(?:${PLUGIN_PASTA})/`)
 
 // Não mudam nada no PROD. Os apps portal-cliente e cadastro-passageiro são Workers da Cloudflare (wrangler), fora do Dataverse.
 export const NEUTRO = [
@@ -34,7 +39,9 @@ export const NEUTRO = [
   /^apps\/cadastro-passageiro\//,
   /^packages\/deploy\/solucoes\//,
   /^packages\/deploy\/(push-dev|push-front-prod|push-plugins-dev|push-plugins-prod|exportar-plugins-dev|pendentes-dev|push-flows-dev|chunk-cleanup)\.ps1$/,
-  /^packages\/plugins\/Cr40f\.[A-Za-z]+\.Plugin\.Tests\//,
+  /^packages\/plugins\/(Cr40f\.[A-Za-z]+\.Plugin|Betinhos\.(DriverRecordSharing|ExpenseUpload))\.Tests\//,
+  // Betinhos.ExpenseUpload: congelado, não é publicado por nenhum caminho.
+  /^packages\/plugins\/Betinhos\.ExpenseUpload\//,
   /^packages\/deploy\/(bump-version|caminho-publicacao|mudancas-dev|flows-dev|scan-secrets|dv-token|dev-restart)(\.test)?\.mjs$/,
   /^packages\/deploy\/flows\/backup\//,
   /^packages\/deploy\/package\.json$/,
@@ -62,7 +69,7 @@ export function caminhoDaPublicacao(arquivos) {
     const lista = porCaminho.solucoes
     return { caminho: 'solucoes', motivo: `fora da tela e do código de plugin: ${lista.slice(0, 10).join(', ')}${lista.length > 10 ? ` (+${lista.length - 10})` : ''}`, plugins: [] }
   }
-  const plugins = [...new Set(porCaminho.plugin.map((a) => PLUGIN.exec(a)[1].toLowerCase()))].sort()
+  const plugins = [...new Set(porCaminho.plugin.map((a) => nomePlugin(PLUGIN.exec(a))))].sort()
   const front = porCaminho.front.length
   if (front && plugins.length) return { caminho: 'front-plugin', motivo: `tela (${front} arquivo(s)) e plugins: ${plugins.join(', ')}`, plugins }
   if (plugins.length) return { caminho: 'plugin', motivo: `só código de plugin: ${plugins.join(', ')}`, plugins }
