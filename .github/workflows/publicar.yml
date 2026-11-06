@@ -8,7 +8,8 @@ name: Publicar soluções
 #    (barreira), versão seguinte e export gerenciado conferido. Um export só serve TEST e PROD: o PROD recebe exatamente os
 #    pacotes que o TEST ensaiou;
 #  - importar-test e depois importar-prod (_importar-solucoes.yml). O PROD só começa com o TEST verde, e o environment prod
-#    tem revisor obrigatório (Renan). Backup do PROD feito pelo próprio job, ou rótulo informado à mão.
+#    tem revisor obrigatório (Renan). Backup do PROD feito pelo próprio job, ou rótulo informado à mão. Solução com o mesmo
+#    conteúdo da última publicação no ambiente (tag solucoes-<alvo>) é pulada; importar_tudo força o import.
 on:
   workflow_dispatch:
     inputs:
@@ -26,6 +27,10 @@ on:
         description: 'PROD: rótulo de um backup manual já feito (pac admin backup). Vazio = o job faz o backup.'
         required: false
         default: ''
+      importar_tudo:
+        description: 'Importar as soluções mesmo com conteúdo igual ao da última publicação no ambiente'
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       alvo:
@@ -39,6 +44,14 @@ on:
         type: string
         required: false
         default: ''
+      importar_tudo:
+        type: boolean
+        required: false
+        default: false
+
+# A tag solucoes-<alvo> registra o que passou em cada ambiente (_importar-solucoes.yml).
+permissions:
+  contents: write
 
 jobs:
   exportar:
@@ -96,6 +109,7 @@ jobs:
     uses: ./.github/workflows/_importar-solucoes.yml
     with:
       alvo: test
+      importar_tudo: ${{ inputs.importar_tudo }}
     secrets: inherit
 
   importar-prod:
@@ -109,4 +123,5 @@ jobs:
     with:
       alvo: prod
       backup: ${{ inputs.backup }}
+      importar_tudo: ${{ inputs.importar_tudo }}
     secrets: inherit

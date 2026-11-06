@@ -101,6 +101,7 @@ describe('cotações V2 no Dataverse', () => {
     await store.updateQuote(state, quoteId, { options: [{ id: 'option-1', name: 'Sedan', value: '350' }] })
     const [notice] = notificationPosts(writes)
     expect(notice?.body.cr40f_tipo).toBe('quote_ready')
+    expect(String(notice?.body.cr40f_chavededupe).length).toBeLessThanOrEqual(100)
     expect(notice?.body['cr40f_Destinatario@odata.bind']).toBe(`/cr40f_funcionarioses(${creatorId})`)
   })
 

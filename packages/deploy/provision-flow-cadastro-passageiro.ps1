@@ -111,6 +111,8 @@ if ($flows.Count) {
 }
 Include $flowId 29
 if (-not $Apply) { Write-Output 'DRY RUN OK; use -Apply'; return }
+# No CI (Deploy), flow existente desligado no DEV continua desligado: quem desliga é decisão de operação.
+if (($env:GITHUB_ACTIONS -eq 'true') -and $flows.Count -and $flows[0].statecode -ne 1) { Write-Output "DEV: '$flowName' mantido desligado (estava desligado)."; return }
 $flow = Dv GET "workflows($flowId)?`$select=statecode"
 if ($flow.statecode -ne 1) { Dv PATCH "workflows($flowId)" @{ statecode = 1 } | Out-Null; $flow = Dv GET "workflows($flowId)?`$select=statecode" }
 if ($flow.statecode -ne 1) { throw 'Flow não ativou. Confira as conexões das connection references no Power Automate.' }

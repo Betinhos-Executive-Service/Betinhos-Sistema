@@ -5,7 +5,10 @@ name: Produção
 # publicação (tag prod-publicado), com packages/deploy/caminho-publicacao.mjs:
 #  - front: só a tela do Sistema Betinhos → direto ao PROD (push-front-prod.ps1, environment prod-front). Se der errado,
 #    publicar a versão anterior resolve em minutos e nenhum dado se perde;
-#  - solucoes: qualquer coisa fora da tela (schema, flows, plugins, outros WebResources, arquivo desconhecido) → publicar.yml
+#  - plugin: só código de plugin que já existe no PROD → copia para o PROD o assembly que o DEV já usa (decisão do Renan,
+#    05/11/2026: exportar-plugins-dev.ps1 com a trava do commit, depois push-plugins-prod.ps1, environment prod-front).
+#    Tela e plugin juntos (front-plugin) fazem os dois;
+#  - solucoes: qualquer outra coisa (schema, flows, registrador, outros WebResources, arquivo desconhecido) → publicar.yml
 #    com test-e-prod: export do DEV, ensaio no TEST e PROD com os mesmos pacotes, backup e aprovação do Renan;
 #  - nada: só documentação, CI, skills → só move a tag.
 # A tag só anda quando a publicação passa: o que falhou ou foi recusado volta a contar no próximo push.
@@ -35,6 +38,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       caminho: ${{ steps.decidir.outputs.caminho }}
+      plugins: ${{ steps.decidir.outputs.plugins }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -52,12 +56,13 @@ jobs:
           fi
           caminho=$(node -p "JSON.parse(process.argv[1]).caminho" "$resultado")
           echo "caminho=$caminho" >> "$GITHUB_OUTPUT"
+          echo "plugins=$(node -p "(JSON.parse(process.argv[1]).plugins ?? []).join(',')" "$resultado")" >> "$GITHUB_OUTPUT"
           echo "## Caminho: $caminho" >> "$GITHUB_STEP_SUMMARY"
           node -p "JSON.parse(process.argv[1]).motivo" "$resultado" >> "$GITHUB_STEP_SUMMARY"
 
   front:
     needs: caminho
-    if: needs.caminho.outputs.caminho == 'front'
+    if: contains(needs.caminho.outputs.caminho, 'front')
     runs-on: windows-latest
     timeout-minutes: 20
     # Environment sem revisor (a aprovação é o merge na main), com regra de branch: só a main.
@@ -87,6 +92,55 @@ jobs:
         shell: bash
         run: echo "Publicado no PROD (só a tela) - v$(node -p "require('./apps/shell/package.json').version")" >> "$GITHUB_STEP_SUMMARY"
 
+  # Exporta do DEV no grupo do deploy.yml: espera o Deploy da develop em andamento, e a trava confere o commit.
+  plugin-dev:
+    needs: caminho
+    if: contains(needs.caminho.outputs.caminho, 'plugin')
+    runs-on: windows-latest
+    timeout-minutes: 30
+    environment: dev
+    concurrency:
+      group: dataverse-dev
+      cancel-in-progress: false
+    env:
+      DV_ENVIRONMENT_URL: ${{ vars.DV_ENVIRONMENT_URL }}
+      DV_TENANT_ID: ${{ vars.DV_TENANT_ID }}
+      DV_CLIENT_ID: ${{ vars.DV_CLIENT_ID }}
+      DV_CLIENT_SECRET: ${{ secrets.DV_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trava do commit e export dos assemblies
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/exportar-plugins-dev.ps1 -Plugins "${{ needs.caminho.outputs.plugins }}" -Pasta plugins-prod
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugins-prod
+          path: plugins-prod/
+          retention-days: 1
+
+  plugin:
+    needs: [caminho, plugin-dev]
+    runs-on: windows-latest
+    timeout-minutes: 10
+    environment: prod-front
+    concurrency:
+      group: publicar-prod
+      cancel-in-progress: false
+    env:
+      DV_ENVIRONMENT_URL: ${{ vars.DV_ENVIRONMENT_URL }}
+      DV_TENANT_ID: ${{ vars.DV_TENANT_ID }}
+      DV_CLIENT_ID: ${{ vars.DV_CLIENT_ID }}
+      DV_CLIENT_SECRET: ${{ secrets.DV_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: plugins-prod
+          path: plugins-prod
+      - run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/push-plugins-prod.ps1 -Pasta plugins-prod
+      - name: Plugins publicados
+        shell: bash
+        run: echo "Publicado no PROD (só código de plugin) - ${{ needs.caminho.outputs.plugins }}. Camada Active até o próximo import das soluções." >> "$GITHUB_STEP_SUMMARY"
+
   solucoes:
     needs: caminho
     if: needs.caminho.outputs.caminho == 'solucoes'
@@ -96,10 +150,14 @@ jobs:
     secrets: inherit
 
   marcar:
-    needs: [caminho, front, solucoes]
+    needs: [caminho, front, plugin, solucoes]
+    # Tela e plugin juntos: a tag só anda com os dois verdes.
     if: >-
       !cancelled() && needs.caminho.result == 'success' &&
-      (needs.caminho.outputs.caminho == 'nada' || needs.front.result == 'success' || needs.solucoes.result == 'success')
+      (needs.caminho.outputs.caminho == 'nada' || needs.solucoes.result == 'success' ||
+       (needs.caminho.outputs.caminho == 'front' && needs.front.result == 'success') ||
+       (needs.caminho.outputs.caminho == 'plugin' && needs.plugin.result == 'success') ||
+       (needs.caminho.outputs.caminho == 'front-plugin' && needs.front.result == 'success' && needs.plugin.result == 'success'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

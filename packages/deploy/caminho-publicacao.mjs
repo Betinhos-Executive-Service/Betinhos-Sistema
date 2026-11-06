@@ -4,7 +4,10 @@ import { pathToFileURL } from 'node:url'
 // Decide o caminho de uma publicação no PROD pelos arquivos que mudaram desde a última publicação:
 //  - "front": só a tela do Sistema Betinhos (WebResource). Vai direto ao PROD (push-front-prod.ps1). Se der errado,
 //    publicar a versão anterior resolve em minutos e nenhum dado se perde.
-//  - "solucoes": schema, flows, plugins, Custom APIs, outros WebResources... Vai pelas soluções: export do DEV, ensaio no
+//  - "plugin": só o código de plugin que já existe no PROD. Copia para o PROD o assembly que o DEV já usa (decisão do Renan,
+//    05/11/2026: sem TEST nem backup, como a tela). Publicar a versão anterior resolve em minutos. Registrador, step e Custom
+//    API novos não entram aqui: mudam mais que o código. Tela e plugin juntos: "front-plugin", os dois caminhos rápidos.
+//  - "solucoes": schema, flows, step, Custom APIs, outros WebResources... Vai pelas soluções: export do DEV, ensaio no
 //    TEST e PROD com aprovação (publicar.yml). Um import que quebra no meio deixa o PROD pela metade e não tem volta.
 //  - "nada": só documentação, CI, skills e scripts de publicação; o PROD não muda.
 // Arquivo que não está em nenhuma lista vai pelas soluções: na dúvida, o caminho mais seguro.
@@ -18,6 +21,8 @@ export const FRONT = [
   /^packages\/deploy\/loader\.template\.html$/,
 ]
 
+const PLUGIN = /^packages\/plugins\/Cr40f\.([A-Za-z]+)\.Plugin\//
+
 // Não mudam nada no PROD. Os apps portal-cliente e cadastro-passageiro são Workers da Cloudflare (wrangler), fora do Dataverse.
 export const NEUTRO = [
   /^docs\//,
@@ -28,8 +33,9 @@ export const NEUTRO = [
   /^apps\/portal-cliente\//,
   /^apps\/cadastro-passageiro\//,
   /^packages\/deploy\/solucoes\//,
-  /^packages\/deploy\/(push-dev|push-front-prod|push-plugins-dev|chunk-cleanup)\.ps1$/,
-  /^packages\/deploy\/(bump-version|caminho-publicacao|mudancas-dev|scan-secrets|dv-token|dev-restart)(\.test)?\.mjs$/,
+  /^packages\/deploy\/(push-dev|push-front-prod|push-plugins-dev|push-plugins-prod|exportar-plugins-dev|pendentes-dev|push-flows-dev|chunk-cleanup)\.ps1$/,
+  /^packages\/plugins\/Cr40f\.[A-Za-z]+\.Plugin\.Tests\//,
+  /^packages\/deploy\/(bump-version|caminho-publicacao|mudancas-dev|flows-dev|scan-secrets|dv-token|dev-restart)(\.test)?\.mjs$/,
   /^packages\/deploy\/flows\/backup\//,
   /^packages\/deploy\/package\.json$/,
   /(^|\/)[^/]+\.md$/,
@@ -39,29 +45,29 @@ export const NEUTRO = [
 
 export function caminhoDoArquivo(arquivo) {
   if (FRONT.some((r) => r.test(arquivo))) return 'front'
+  if (PLUGIN.test(arquivo)) return 'plugin'
   if (NEUTRO.some((r) => r.test(arquivo))) return 'nada'
   return 'solucoes'
 }
 
-const PESO = { nada: 0, front: 1, solucoes: 2 }
-
 // arquivos: lista do git diff --name-only (com os nomes antigos de renomeações). null = sem base conhecida → soluções.
 export function caminhoDaPublicacao(arquivos) {
-  if (arquivos == null) return { caminho: 'solucoes', motivo: 'sem publicação anterior registrada (tag prod-publicado)' }
-  let caminho = 'nada'
-  const porCaminho = { front: [], solucoes: [] }
+  if (arquivos == null) return { caminho: 'solucoes', motivo: 'sem publicação anterior registrada (tag prod-publicado)', plugins: [] }
+  const porCaminho = { front: [], plugin: [], solucoes: [] }
   for (const arquivo of arquivos.map((a) => a.trim()).filter(Boolean)) {
     const c = caminhoDoArquivo(arquivo)
     if (c !== 'nada') porCaminho[c].push(arquivo)
-    if (PESO[c] > PESO[caminho]) caminho = c
   }
-  const motivo =
-    caminho === 'solucoes'
-      ? `fora da tela: ${porCaminho.solucoes.slice(0, 10).join(', ')}${porCaminho.solucoes.length > 10 ? ` (+${porCaminho.solucoes.length - 10})` : ''}`
-      : caminho === 'front'
-        ? `só a tela: ${porCaminho.front.length} arquivo(s)`
-        : 'nenhum arquivo que mude o PROD'
-  return { caminho, motivo }
+  if (porCaminho.solucoes.length) {
+    const lista = porCaminho.solucoes
+    return { caminho: 'solucoes', motivo: `fora da tela e do código de plugin: ${lista.slice(0, 10).join(', ')}${lista.length > 10 ? ` (+${lista.length - 10})` : ''}`, plugins: [] }
+  }
+  const plugins = [...new Set(porCaminho.plugin.map((a) => PLUGIN.exec(a)[1].toLowerCase()))].sort()
+  const front = porCaminho.front.length
+  if (front && plugins.length) return { caminho: 'front-plugin', motivo: `tela (${front} arquivo(s)) e plugins: ${plugins.join(', ')}`, plugins }
+  if (plugins.length) return { caminho: 'plugin', motivo: `só código de plugin: ${plugins.join(', ')}`, plugins }
+  if (front) return { caminho: 'front', motivo: `só a tela: ${front} arquivo(s)`, plugins }
+  return { caminho: 'nada', motivo: 'nenhum arquivo que mude o PROD', plugins }
 }
 
 // Uso: git diff --name-only A B | node caminho-publicacao.mjs          → imprime JSON {caminho, motivo}

@@ -229,3 +229,120 @@ describe('reportingFetch', () => {
     expect(report).toHaveBeenCalledWith({ method: 'GET', path: 'https://org/api/data/v9.2/WhoAmI', error: rede })
   })
 })
+
+/** Dataverse falso de metadata: cada URL pedida fica registrada; tabelas em `ausentes` não vêm no filtro. */
+function metadataFake(options: { ausentes?: string[]; falhas?: number } = {}) {
+  const urls: string[] = []
+  let falhas = options.falhas ?? 0
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = decodeURIComponent(String(input)).replace('https://org.example/api/data/v9.2/', '')
+    urls.push(url)
+    await new Promise((resolve) => setTimeout(resolve, 1))
+    if (falhas > 0) { falhas -= 1; return json({ error: { message: 'indisponível' } }, { status: 500 }) }
+    if (url.startsWith('EntityDefinitions?')) {
+      const names = [...url.matchAll(/LogicalName eq '([^']+)'/g)].map((m) => m[1]).filter((name) => !options.ausentes?.includes(name))
+      return json({ value: names.map((name) => ({ LogicalName: name, EntitySetName: `${name}s`, PrimaryNameAttribute: 'nome' })) })
+    }
+    const single = /^EntityDefinitions\(LogicalName='([^']+)'\)\?/.exec(url)
+    if (single) return json({ LogicalName: single[1], EntitySetName: `${single[1]}s`, PrimaryNameAttribute: 'nome' })
+    if (url.includes('/Attributes/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?')) {
+      return json({ value: ['cr40f_a', 'cr40f_b'].map((name, i) => ({ LogicalName: name, OptionSet: { Options: [{ Value: i + 1, Label: { UserLocalizedLabel: { Label: name } } }] } })) })
+    }
+    return json({ value: [] })
+  })
+  return { urls, fetchMock, metadata: createMetadata(createClient('https://org.example', fetchMock as unknown as typeof fetch)) }
+}
+
+describe('metadata: uma requisição por tabela', () => {
+  it('várias chamadas simultâneas da mesma tabela resultam em 1 requisição', async () => {
+    const { urls, metadata } = metadataFake()
+    const infos = await Promise.all(Array.from({ length: 6 }, () => metadata.entity('cr40f_a')))
+    expect(new Set(infos.map((info) => info.entitySetName))).toEqual(new Set(['cr40f_as']))
+    expect(urls).toHaveLength(1)
+  })
+
+  it('entities() e entity() simultâneos da mesma tabela compartilham a requisição', async () => {
+    const { urls, metadata } = metadataFake()
+    const [lote, unica] = await Promise.all([metadata.entities(['cr40f_a', 'cr40f_b']), metadata.entity('cr40f_a')])
+    expect(lote.get('cr40f_a')?.entitySetName).toBe('cr40f_as')
+    expect(unica.logicalName).toBe('cr40f_a')
+    expect(urls).toHaveLength(1)
+    expect(urls[0]).toContain("LogicalName eq 'cr40f_a'")
+  })
+
+  it('entity() depois de entities() e entities() repetido vêm do cache', async () => {
+    const { urls, metadata } = metadataFake()
+    await metadata.entities(['cr40f_a', 'cr40f_b'])
+    await Promise.all([metadata.entities(['cr40f_a']), metadata.entities(['cr40f_b', 'cr40f_a']), metadata.entity('cr40f_b')])
+    expect(urls).toHaveLength(1)
+  })
+
+  it('entities() só pede as tabelas que ainda faltam', async () => {
+    const { urls, metadata } = metadataFake()
+    await metadata.entity('cr40f_a')
+    const result = await metadata.entities(['cr40f_a', 'cr40f_c'])
+    expect([...result.keys()].sort()).toEqual(['cr40f_a', 'cr40f_c'])
+    expect(urls).toHaveLength(2)
+    expect(urls[1]).toContain("LogicalName eq 'cr40f_c'")
+    expect(urls[1]).not.toContain("'cr40f_a'")
+  })
+
+  it('tabelas diferentes não colidem', async () => {
+    const { metadata } = metadataFake()
+    const [a, b] = await Promise.all([metadata.entity('cr40f_a'), metadata.entity('cr40f_b')])
+    expect([a.entitySetName, b.entitySetName]).toEqual(['cr40f_as', 'cr40f_bs'])
+  })
+
+  it('falha do lote não fica em cache: a próxima chamada tenta de novo', async () => {
+    const { urls, metadata } = metadataFake({ falhas: 1 })
+    await expect(metadata.entities(['cr40f_a'])).rejects.toThrow()
+    expect((await metadata.entity('cr40f_a')).entitySetName).toBe('cr40f_as')
+    expect((await metadata.entities(['cr40f_a'])).get('cr40f_a')?.entitySetName).toBe('cr40f_as')
+    expect(urls).toHaveLength(2)
+  })
+
+  it('quem esperava um lote que falhou refaz a consulta sem herdar o erro', async () => {
+    const { metadata } = metadataFake({ falhas: 1 })
+    const [lote, unica] = await Promise.allSettled([metadata.entities(['cr40f_a']), metadata.entity('cr40f_a')])
+    expect(lote.status).toBe('rejected')
+    expect(unica.status).toBe('rejected')
+    expect((await metadata.entity('cr40f_a')).entitySetName).toBe('cr40f_as')
+  })
+
+  it('tabela inexistente fica fora do resultado e a ausência não é guardada', async () => {
+    const { urls, metadata } = metadataFake({ ausentes: ['cr40f_x'] })
+    expect([...(await metadata.entities(['cr40f_a', 'cr40f_x'])).keys()]).toEqual(['cr40f_a'])
+    expect([...(await metadata.entities(['cr40f_x'])).keys()]).toEqual([])
+    expect(urls).toHaveLength(2)
+  })
+
+  it('cada instância (usuário ou ambiente) tem o próprio cache', async () => {
+    const um = metadataFake()
+    const outro = metadataFake()
+    await um.metadata.entity('cr40f_a')
+    await outro.metadata.entity('cr40f_a')
+    expect(um.urls).toHaveLength(1)
+    expect(outro.urls).toHaveLength(1)
+  })
+})
+
+describe('metadata.picklists: todas as choices da tabela numa consulta', () => {
+  it('lê as opções de todas as colunas em 1 requisição e abastece choices()', async () => {
+    const { urls, metadata } = metadataFake()
+    const [lote] = await Promise.all([metadata.picklists('cr40f_t'), metadata.picklists('cr40f_t')])
+    expect([...lote.keys()]).toEqual(['cr40f_a', 'cr40f_b'])
+    expect(lote.get('cr40f_b')).toEqual([{ value: 2, label: 'cr40f_b' }])
+    expect(await metadata.choices('cr40f_t', 'cr40f_a')).toEqual([{ value: 1, label: 'cr40f_a' }])
+    expect(urls).toHaveLength(1)
+    expect(urls[0]).toContain("EntityDefinitions(LogicalName='cr40f_t')/Attributes/Microsoft.Dynamics.CRM.PicklistAttributeMetadata")
+  })
+
+  it('tabelas diferentes não colidem e a falha não fica em cache', async () => {
+    const { urls, metadata } = metadataFake({ falhas: 1 })
+    await expect(metadata.picklists('cr40f_t')).rejects.toThrow()
+    await metadata.picklists('cr40f_t')
+    await metadata.picklists('cr40f_u')
+    await metadata.picklists('cr40f_t')
+    expect(urls).toHaveLength(3)
+  })
+})

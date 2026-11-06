@@ -1,11 +1,15 @@
 name: Deploy
 
-# Só DEV: push na branch develop publica no DEV a tela do Sistema Betinhos e os plugins que mudaram, e distribui nas 4
+# Só DEV: push na branch develop publica no DEV a tela do Sistema Betinhos, os plugins e os flows que mudaram, e distribui nas 4
 # soluções (decisão do Renan, 05/11/2026: develop → DEV, main → PROD). TEST e PROD são do workflow Produção (producao.yml).
 # O que publicar sai de pendentes-dev.ps1: compara o commit que o DEV registra em cada peça (descrição da tela e de cada
 # assembly Cr40f.*.Plugin) com o HEAD. Assim um deploy cancelado na fila ou uma publicação local nunca deixa peça para trás,
 # e o publicar.yml usa os mesmos registros para nunca levar ao PROD tela ou plugin que ainda não entrou na main.
-# Flows e schema (packages/deploy/provision-*) continuam à mão: usam az login e conexões do usuário.
+# Flows: cada packages/deploy/provision-flow-*.ps1 cujos arquivos mudaram desde a tag flows-dev-publicado (flows-dev.mjs) roda
+# na conta de serviço (az login do service principal) e só atualiza flow que já existe no DEV (push-flows-dev.ps1). Flow novo,
+# schema (provision-* sem flow) e sitemap:* continuam à mão: o flow novo nasce com dono na conta de serviço e não liga, e o
+# resto usa az login e conexões do usuário. Se um flow falha, os outros seguem, a distribuição roda, o Deploy termina
+# vermelho com as causas no resumo e a tag não anda (o próximo Deploy tenta de novo).
 # Feito para gastar poucos minutos de CI (repo privado, runner Windows conta em dobro):
 #  - só roda quando muda a tela, um plugin ou os scripts deste deploy; documentação e skills não disparam;
 #  - um job só (um setup de runner); cada passo pesado roda só se a sua peça está pendente;
@@ -24,6 +28,17 @@ on:
       - 'packages/deploy/push-dev.ps1'
       - 'packages/deploy/push-plugins-dev.ps1'
       - 'packages/deploy/pendentes-dev.ps1'
+      - 'packages/deploy/push-flows-dev.ps1'
+      - 'packages/deploy/flows-dev.mjs'
+      - 'packages/deploy/provision-flow-*.ps1'
+      - 'packages/deploy/flows/**'
+      - '!packages/deploy/flows/**/*.test.mjs'
+      - 'packages/agentes-ia/src/**'
+      - '!packages/agentes-ia/src/**/*.test.ts'
+      - 'packages/agentes-ia/scripts/gerar-constantes.ts'
+      - 'packages/despesas-ia/src/**'
+      - '!packages/despesas-ia/src/**/*.test.ts'
+      - 'packages/despesas-ia/scripts/gerar-constantes.ts'
       - 'packages/deploy/mudancas-dev.mjs'
       - 'packages/deploy/caminho-publicacao.mjs'
       - 'packages/deploy/bump-version.mjs'
@@ -40,6 +55,10 @@ on:
         default: false
       forcar_plugins:
         description: 'Plugins a publicar mesmo sem mudança (frota,acesso ou todos); vazio = só os pendentes'
+        type: string
+        default: ''
+      forcar_flows:
+        description: 'Flows a publicar mesmo sem mudança (nomes de flows-dev.mjs separados por vírgula, ou todos); vazio = só os pendentes'
         type: string
         default: ''
 
@@ -59,6 +78,18 @@ jobs:
       DV_CLIENT_ID: ${{ vars.DV_CLIENT_ID }}
       DV_CLIENT_SECRET: ${{ secrets.DV_CLIENT_SECRET }}
       DV_SOLUTION: AppBetinhos
+      # Argumentos dos provision-flow-*.ps1 (flows-dev.mjs): valores já gravados no DEV, lidos de variáveis do environment dev.
+      FLOW_ANIVERSARIANTES_REMETENTE: ${{ vars.FLOW_ANIVERSARIANTES_REMETENTE }}
+      FLOW_ANIVERSARIANTES_DESTINATARIOS: ${{ vars.FLOW_ANIVERSARIANTES_DESTINATARIOS }}
+      FLOW_EMAIL_ADMIN_AVISOS: ${{ vars.FLOW_EMAIL_ADMIN_AVISOS }}
+      FLOW_AVALIACAO_EMAIL_OPERACAO: ${{ vars.FLOW_AVALIACAO_EMAIL_OPERACAO }}
+      FLOW_SHAREPOINT_SITE_URL: ${{ vars.FLOW_SHAREPOINT_SITE_URL }}
+      FLOW_CADASTRO_BIBLIOTECA_ID: ${{ vars.FLOW_CADASTRO_BIBLIOTECA_ID }}
+      FLOW_CADASTRO_PASTA: ${{ vars.FLOW_CADASTRO_PASTA }}
+      FLOW_DOCUMENTOS_REMETENTE: ${{ vars.FLOW_DOCUMENTOS_REMETENTE }}
+      FLOW_DOCUMENTOS_URL_SISTEMA: ${{ vars.FLOW_DOCUMENTOS_URL_SISTEMA }}
+      FLOW_FROTA_REMETENTE: ${{ vars.FLOW_FROTA_REMETENTE }}
+      FLOW_PORTAL_CAIXA_COMPARTILHADA: ${{ vars.FLOW_PORTAL_CAIXA_COMPARTILHADA }}
       DOTNET_NOLOGO: 'true'
       DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
@@ -80,6 +111,37 @@ jobs:
           "tela=$($tela.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "plugins=$plugins" >> $env:GITHUB_OUTPUT
           Write-Host "tela: $tela; plugins: $(if ($plugins) { $plugins } else { 'nenhum' })"
+
+      # Flows. A base é a tag flows-dev-publicado (mesmo padrão da prod-publicado do producao.yml); sem tag nada fica pendente
+      # e o job final cria a tag no HEAD. O diff compara só as árvores dos dois commits, então basta buscar a tag com depth=1.
+      # Roda antes da tela e dos plugins: uma falha aqui não deixa peça publicada sem distribuir. Flow só sai da develop.
+      - name: Quais flows publicar
+        id: flowspend
+        shell: bash
+        env:
+          FORCAR_FLOWS: ${{ inputs.forcar_flows }}
+        run: |
+          if [ "$GITHUB_REF" != 'refs/heads/develop' ]; then
+            echo "::warning title=Flows no DEV::Fora da develop ($GITHUB_REF): nenhum flow publicado."
+            exit 0
+          fi
+          if [ -n "$FORCAR_FLOWS" ]; then
+            saida=$(node packages/deploy/flows-dev.mjs --forcar "$FORCAR_FLOWS" --github)
+          else
+            # 2 = a tag não existe; outro código é falha de rede e não pode virar "nada pendente".
+            rc=0; git ls-remote --exit-code origin refs/tags/flows-dev-publicado > /dev/null || rc=$?
+            if [ "$rc" -eq 0 ]; then
+              git fetch --quiet --no-tags --depth=1 origin 'refs/tags/flows-dev-publicado:refs/tags/flows-dev-publicado'
+              saida=$(git diff --name-only 'refs/tags/flows-dev-publicado^{commit}' HEAD | node packages/deploy/flows-dev.mjs --github)
+            elif [ "$rc" -eq 2 ]; then
+              echo "Tag flows-dev-publicado ausente: nada pendente; ela é criada no HEAD ao fim."
+              saida=$(node packages/deploy/flows-dev.mjs --sem-base --github)
+            else
+              exit "$rc"
+            fi
+          fi
+          echo "$saida" >> "$GITHUB_OUTPUT"
+          echo "$saida"
 
       # Tela
       - if: steps.pendentes.outputs.tela == 'true'
@@ -132,16 +194,51 @@ jobs:
           ACESSO_ENVIRONMENT_ID: ${{ vars.ACESSO_ENVIRONMENT_ID }}
           ACESSO_DOMINIO: ${{ vars.ACESSO_DOMINIO }}
 
+      - if: steps.flowspend.outputs.preparos != '' && steps.pendentes.outputs.tela != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # Flows. continue-on-error nos três passos: uma falha não pode impedir a distribuição nem o resumo; o passo "Falha nos
+      # flows" deixa o job vermelho.
+      # Constantes dos flows de IA (dist/ não é versionado): só quando algum flow pendente as usa. Sem dependências instaladas.
+      - name: Gerar as constantes dos flows de IA
+        id: constantes
+        if: steps.flowspend.outputs.preparos != ''
+        continue-on-error: true
+        shell: bash
+        env:
+          PREPAROS: ${{ steps.flowspend.outputs.preparos }}
+        run: |
+          case ",$PREPAROS," in *,agentes-ia,*) node packages/agentes-ia/scripts/gerar-constantes.ts ;; esac
+          case ",$PREPAROS," in *,despesas-ia,*) node packages/despesas-ia/scripts/gerar-constantes.ts ;; esac
+      - name: Entrar no DEV como conta de serviço
+        id: azlogin
+        if: steps.flowspend.outputs.flows != ''
+        continue-on-error: true
+        run: az login --service-principal -u $env:DV_CLIENT_ID -p $env:DV_CLIENT_SECRET --tenant $env:DV_TENANT_ID --allow-no-subscriptions --output none
+      - name: Publicar os flows
+        id: flows
+        if: steps.flowspend.outputs.flows != '' && steps.constantes.outcome != 'failure' && steps.azlogin.outcome != 'failure'
+        continue-on-error: true
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/push-flows-dev.ps1 -Flows "${{ steps.flowspend.outputs.flows }}"
+
       # Uma distribuição só, depois de tudo. Nunca derruba o deploy (a publicação já valeu); se não zerar, avisa e o
       # export para TEST/PROD fica barrado até corrigir (skill verificar-solucoes).
       - name: Distribuir nas 4 soluções
         id: distribuir
-        if: steps.pendentes.outputs.tela == 'true' || steps.pendentes.outputs.plugins != ''
+        if: steps.pendentes.outputs.tela == 'true' || steps.pendentes.outputs.plugins != '' || steps.flowspend.outputs.flows != ''
         run: |
           $saida = @(powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/distribuir-apos-push.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -CaixaDeEntrada AppBetinhos 2>&1 | ForEach-Object { "$_" })
           $saida | ForEach-Object { Write-Host $_ }
           if ($saida -match 'ATENCAO') { Write-Host '::warning title=Distribuição nas 4 soluções::Não zerou. O export para TEST/PROD fica barrado; veja a skill verificar-solucoes.'; 'zerou=false' >> $env:GITHUB_OUTPUT }
           else { 'zerou=true' >> $env:GITHUB_OUTPUT }
+
+      - name: Falha nos flows
+        if: steps.flows.outcome == 'failure' || steps.constantes.outcome == 'failure' || steps.azlogin.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "::error title=Flows no DEV::Algum flow falhou (causas no resumo ou nos passos anteriores). A tag flows-dev-publicado não anda."
+          exit 1
 
       - name: Resumo
         if: always()
@@ -150,6 +247,30 @@ jobs:
           {
             if [ "${{ steps.pendentes.outputs.tela }}" = "true" ]; then echo "Tela publicada no DEV - v$(node -p "require('./apps/shell/package.json').version")"; fi
             if [ -n "${{ steps.pendentes.outputs.plugins }}" ]; then echo; echo "Plugins publicados no DEV: ${{ steps.pendentes.outputs.plugins }}"; fi
-            if [ "${{ steps.pendentes.outputs.tela }}" != "true" ] && [ -z "${{ steps.pendentes.outputs.plugins }}" ]; then echo "Nada pendente: o DEV já tem a tela e os plugins deste commit."; fi
+            if [ -n "${{ steps.flowspend.outputs.flows }}" ]; then echo; echo "Flows no DEV (${{ steps.flows.outcome }}): ${{ steps.flowspend.outputs.flows }}"; fi
+            if [ "${{ steps.pendentes.outputs.tela }}" != "true" ] && [ -z "${{ steps.pendentes.outputs.plugins }}" ] && [ -z "${{ steps.flowspend.outputs.flows }}" ]; then echo "Nada pendente: o DEV já tem a tela, os plugins e os flows deste commit."; fi
             if [ "${{ steps.distribuir.outputs.zerou }}" = "false" ]; then echo; echo "**ATENÇÃO:** a distribuição nas 4 soluções não zerou."; fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # A tag só anda quando o Deploy inteiro passou (tela, plugins, flows e Resumo). Job à parte para que `contents: write`
+  # fique só aqui: o job dev, com o segredo do Dataverse, mantém as permissões padrão. Nunca anda para trás. Execução com
+  # forcar_flows não move: ela publica só os pedidos, e andar a tag apagaria os pendentes.
+  tag-flows:
+    needs: dev
+    if: needs.dev.result == 'success' && github.ref == 'refs/heads/develop' && inputs.forcar_flows == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Mover a tag flows-dev-publicado
+        run: |
+          if base=$(git rev-parse -q --verify 'refs/tags/flows-dev-publicado^{commit}') && ! git merge-base --is-ancestor "$base" "$GITHUB_SHA"; then
+            echo "A tag está à frente deste commit; não anda para trás."
+            exit 0
+          fi
+          git tag -f flows-dev-publicado "$GITHUB_SHA"
+          git push -f origin refs/tags/flows-dev-publicado

@@ -9,7 +9,7 @@ export const PERDA = [
 ]
 export const INFORMATIVO = [
   'registrosMudaram', 'fluxosMudaramEstado', 'stepsMudaramEstado', 'donosMudaram', 'versoes',
-  'tabelasVaziasSumiram', 'tabelasAceitasSumiram', 'chunksObsoletos', 'fluxosNovosDesligados', 'variaveisSemValor',
+  'stepsSensiveisJaSemSeguro', 'tabelasVaziasSumiram', 'tabelasAceitasSumiram', 'chunksObsoletos', 'fluxosNovosDesligados', 'variaveisSemValor',
   'componentesDaCaixaSumiram', 'fluxosDaCaixaSumiram', 'variaveisDaCaixaSumiram',
 ]
 
@@ -69,9 +69,14 @@ export function compararFotos(antes, depois, { travado = false, aceitarTabelas =
     if (s.seguro && !t.seguro) d.stepsPerderamSeguro.push({ id, nome: s.nome })
   }
   // Step sensível (regras.json) que existe depois sem configuração segura: o segredo não viaja na solução, então step
-  // novo chega sem ele (plugin de acesso no PROD, 03/11/2026). Só a foto de depois importa: estava faltando antes também é erro.
+  // novo chega sem ele (plugin de acesso no PROD, 03/11/2026). Só a foto de depois importa: estava faltando antes também é erro,
+  // exceto no TEST travado, que não recebe segredo (ensaio de 05/11/2026).
   for (const [nome, s] of Object.entries(depois.stepsSeguros ?? {})) {
-    if (s.existe && !s.seguro) d.stepsSensiveisSemSeguro.push({ nome, steps: s.steps })
+    if (!s.existe || s.seguro) continue
+    // TEST travado: o segredo não é copiado para lá de propósito. Step que já estava sem ele antes do import não é perda.
+    const antesSemSeguro = antes.stepsSeguros?.[nome]?.existe === true && antes.stepsSeguros[nome].seguro === false
+    if (travado && antesSemSeguro) d.stepsSensiveisJaSemSeguro.push({ nome, steps: s.steps })
+    else d.stepsSensiveisSemSeguro.push({ nome, steps: s.steps })
   }
   if (travado) {
     for (const [id, g] of Object.entries(depois.fluxos)) {

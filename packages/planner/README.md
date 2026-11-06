@@ -24,7 +24,7 @@ Todos em PowerShell, a partir de `packages/planner`:
 
 - **WAHA local:** `./scripts/waha-install.ps1` (uma vez; cria `.env.waha.local` com chaves aleatórias, ignorado pelo Git), depois `./scripts/waha-start.ps1` / `./scripts/waha-stop.ps1`. Requer Docker.
 - **Flows do Planner (DEV):** `./scripts/create-planner-immediate-flow.ps1`, `create-planner-daily-flow.ps1`, `create-planner-email-flow.ps1`, `create-planner-automatic-email-flow.ps1`, `disable-planner-legacy-channels.ps1`, `disable-quote-msplanner-flows.ps1` com `-EnvironmentUrl https://org23b93544.crm2.dynamics.com`.
-- **Schema de cotação (DEV):** `ensure-quote-pedido-dev.ps1`, `ensure-quote-result-dev.ps1`, `ensure-quote-long-routes-dev.ps1`, `verify-quote-workflow-dev.ps1`, `grant-ideas-role-dev.ps1`.
+- **Schema de cotação (DEV):** `ensure-quote-pedido-dev.ps1`, `ensure-quote-result-dev.ps1`, `ensure-quote-status-aguardando-dev.ps1` (insere a opção 100004002 "Aguardando informação" em `cr40f_statuscotacao`, só insere; `-WhatIf` lista), `ensure-quote-long-routes-dev.ps1`, `verify-quote-workflow-dev.ps1`, `grant-ideas-role-dev.ps1`.
 - **Plugins:** `dotnet build` na pasta do plugin; depois `register-planner-notification-plugin.ps1` ou `register-quote-autonumber-guard.ps1` (usam o DLL de `power-platform/plugins/.../bin` por padrão). Testes: `dotnet test power-platform/plugins/QuoteAutoNumberGuard.Tests`.
 - **Importação/sitemap:** `import-planner.ps1`, `remove-pedir-cotacao-sitemap.ps1`; `sitemapNavigation.mjs` é módulo auxiliar.
 - **Worker:** `cd serverless; wrangler deploy` (somente quando autorizado).

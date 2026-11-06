@@ -1,4 +1,4 @@
-# Cria (ou atualiza) no DEV o flow "Documentos | Resumo semanal" e as variáveis new_URLSistemaBetinhos e
+﻿# Cria (ou atualiza) no DEV o flow "Documentos | Resumo semanal" e as variáveis new_URLSistemaBetinhos e
 # new_EmailAdminAvisos, na solução AppBetinhos. A definição vem de flows/documentos-resumo-semanal.json;
 # e-mail da noreply, URL do Sistema e e-mail do admin entram por parâmetro (nunca no repo).
 # Pré-requisitos: Custom API cr40f_DocumentosResumoSemanal registrada (pnpm push:plugin:documentos:dev),
@@ -125,6 +125,8 @@ if ($flows.Count) {
   $flowId = @((Dv GET "workflows?`$select=workflowid&`$filter=name eq '$flowName' and category eq 5").value)[0].workflowid
 }
 Include $flowId 29
+# No CI (Deploy), flow existente desligado no DEV continua desligado: quem desliga é decisão de operação.
+if (($env:GITHUB_ACTIONS -eq 'true') -and $flows.Count -and $flows[0].statecode -ne 1) { Write-Output "DEV: '$flowName' mantido desligado (estava desligado)."; return }
 $flow = Dv GET "workflows($flowId)?`$select=statecode"
 if ($flow.statecode -ne 1) { Dv PATCH "workflows($flowId)" @{ statecode = 1 } | Out-Null; $flow = Dv GET "workflows($flowId)?`$select=statecode" }
 if ($flow.statecode -ne 1) { throw 'Flow não ativou. Confira as conexões das connection references no Power Automate.' }

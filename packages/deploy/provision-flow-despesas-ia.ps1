@@ -779,11 +779,13 @@ if ($flows.Count) {
 }
 Include $flowId 29
 $flow = Dv GET "workflows($flowId)?`$select=statecode"
-if ($flow.statecode -ne 1 -and $temValor) { Dv PATCH "workflows($flowId)" @{ statecode = 1 } | Out-Null }
+# No CI (Deploy), flow existente desligado no DEV continua desligado: quem desliga é decisão de operação.
+$manterDesligado = ($env:GITHUB_ACTIONS -eq 'true') -and $flows.Count -and $flows[0].statecode -ne 1
+if ($flow.statecode -ne 1 -and -not $manterDesligado -and $temValor) { Dv PATCH "workflows($flowId)" @{ statecode = 1 } | Out-Null }
 
 # Conferência por leitura de volta (UTF-8): o que está gravado no DEV é o que este script exige.
 $row = Dv GET "workflows($flowId)?`$select=statecode,clientdata"
-if ($temValor -and $row.statecode -ne 1) { throw 'Flow não ativou.' }
+if ($temValor -and $row.statecode -ne 1 -and -not $manterDesligado) { throw 'Flow não ativou.' }
 AssertSemMojibake $row.clientdata 'clientdata gravado'
 Conferir (($row.clientdata | ConvertFrom-Json).properties.definition) $row.clientdata
 if (-not @((Dv GET "solutioncomponents?`$select=solutioncomponentid&`$filter=_solutionid_value eq $solutionId and componenttype eq 29 and objectid eq $flowId").value).Count) { throw 'Flow fora da AppBetinhos.' }
@@ -791,4 +793,4 @@ if (-not $temValor) {
   Write-Output "DEV: '$flowName' gravado e DESLIGADO ($flowId), na $solutionName. Preencha o valor padrão de $envVarName (Soluções > $solutionName > Variáveis de ambiente) e rode este script de novo para ativar."
   return
 }
-Write-Output "DEV: '$flowName' ativo ($flowId), na $solutionName; $envVarName na solução."
+Write-Output "DEV: '$flowName' $(if ($manterDesligado) { 'mantido desligado' } else { 'ativo' }) ($flowId), na $solutionName; $envVarName na solução."

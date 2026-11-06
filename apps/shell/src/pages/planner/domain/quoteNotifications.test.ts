@@ -92,3 +92,42 @@ describe('waitingReturnNotices', () => {
     expect(a.dedupeKey).not.toBe(b.dedupeKey)
   })
 })
+
+// cr40f_ChaveDedupe aceita no máximo 100 caracteres no PROD (a metadata diz 450, mas
+// o INSERT de 101+ falhou com "String or binary data would be truncated").
+describe('chave de dedupe dos avisos de cotação', () => {
+  const MAX_KEY = 100
+  const guid = (n: number) => `${String(n).repeat(8)}-${String(n).repeat(4)}-4${String(n).repeat(3)}-8${String(n).repeat(3)}-${String(n).repeat(12)}`
+  const real: QuoteData = { ...base, id: guid(1), creatorEmployeeId: guid(2) }
+  const waiting: QuoteData = { ...real, status: 'Aguardando informação', waitingFor: 'Voo', waitingReturnDate: '2026-10-30' }
+  const sent: QuoteData = { ...real, status: 'Respondida ao cliente', proposalVersions: [{ id: 'v1', sentAt: '2026-10-23T12:00:00-03:00' }] }
+
+  it('toda chave com GUIDs reais cabe em 100 caracteres', () => {
+    const keys = [
+      ...urgentNotices(real, [guid(3)], '2026-10-27'),
+      ...followUpNotices([sent], '2026-10-27'),
+      ...waitingReturnNotices([waiting], [guid(3)], '2026-10-30'),
+      readyNotice({ ...real, status: 'Nova' }, { ...real, status: 'Cotada' }, '2026-10-28T10:00:00.000Z')!,
+    ]
+    expect(keys.map((n) => n.type).sort()).toEqual(['quote_follow_up', 'quote_ready', 'quote_urgent', 'quote_waiting_return', 'quote_waiting_return'])
+    keys.forEach((n) => expect(n.dedupeKey.length, `${n.type}: ${n.dedupeKey}`).toBeLessThanOrEqual(MAX_KEY))
+  })
+  it('quote_urgent mantém o formato antigo (não reenvia avisos já criados)', () => {
+    const [n] = urgentNotices(real, [guid(3)], '2026-10-27')
+    expect(n.dedupeKey).toBe(`${guid(3)}|${guid(1)}|quote_urgent||`)
+  })
+  it('mesma cotação, tipo, destinatário e dia geram a mesma chave', () => {
+    expect(followUpNotices([sent], '2026-10-27')[0].dedupeKey).toBe(followUpNotices([sent], '2026-10-27')[0].dedupeKey)
+    expect(waitingReturnNotices([waiting], [], '2026-10-30')[0].dedupeKey).toBe(waitingReturnNotices([waiting], [], '2026-10-30')[0].dedupeKey)
+  })
+  it('dia, destinatário, cotação e tipo diferentes geram chaves diferentes', () => {
+    const keys = [
+      followUpNotices([sent], '2026-10-27')[0],
+      followUpNotices([sent], '2026-10-28')[0],
+      followUpNotices([{ ...sent, id: guid(4) }], '2026-10-27')[0],
+      ...waitingReturnNotices([waiting], [guid(3), guid(5)], '2026-10-30'),
+      waitingReturnNotices([waiting], [], '2026-10-31')[0],
+    ].map((n) => n.dedupeKey)
+    expect(new Set(keys).size).toBe(keys.length)
+  })
+})

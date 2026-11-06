@@ -181,4 +181,72 @@ public class SyncEngineTests
         Assert.Equal(Codigos.Op, m[0].Entidade);
         Assert.Equal(Codigos.OpAberta, m[0].Para);
     }
+
+    [Fact]
+    public void OpPagaManual_SomaMenorQueTotal_ContinuaQuitada()
+    {
+        var op = Op(Codigos.OpPaga, 10000, Pag(Codigos.PagPago, 4000));
+        op.Reservas.Add(Res(Codigos.ReservaFatComposicaoRealizada, Codigos.CpConcluida));
+        var m = SyncEngine.Compute(op);
+        Assert.DoesNotContain(m, x => x.Entidade == Codigos.Op);
+        Assert.Contains(m, x => x.Entidade == Codigos.Reserva && x.Para == Codigos.ReservaFatPago);
+    }
+
+    [Fact]
+    public void OpPaga_PaganteVoltaPendente_Rebaixa()
+    {
+        var op = Op(Codigos.OpPaga, 10000, Pag(Codigos.PagPago, 10000), Pag(Codigos.PagPendente, 1));
+        Assert.Contains(SyncEngine.Compute(op), x => x.Entidade == Codigos.Op && x.Para == Codigos.OpParcial);
+    }
+
+    [Fact]
+    public void Quitada_ReservaProtegidaNaoViraPago()
+    {
+        var op = Op(Codigos.OpAberta, 10000, Pag(Codigos.PagPago, 10000));
+        var cancelada = Res(202410000, Codigos.CpPendente);
+        var normal = Res(Codigos.ReservaFatComposicaoRealizada, Codigos.CpConcluida);
+        op.Reservas.Add(cancelada); op.Reservas.Add(normal);
+        var m = SyncEngine.Compute(op);
+        Assert.DoesNotContain(m, x => x.Id == cancelada.Id || x.Id == cancelada.CpId);
+        Assert.Contains(m, x => x.Id == normal.Id && x.Para == Codigos.ReservaFatPago);
+    }
+
+    [Fact]
+    public void BaixaManual_MarcaPagantesReservasECps()
+    {
+        var pendente = Pag(Codigos.PagPendente, 5000);
+        var cancelado = Pag(Codigos.PagCancelado, 5000);
+        var pago = Pag(Codigos.PagPago, 5000);
+        var op = Op(Codigos.OpPaga, 15000, pendente, cancelado, pago);
+        var r = Res(Codigos.ReservaFatPagamentoPendente, Codigos.CpPendente);
+        var mensal = Res(Codigos.ReservaFatMensal, Codigos.CpConcluida);
+        var cortesia = Res(202410003, Codigos.CpConcluida);
+        op.Reservas.Add(r); op.Reservas.Add(mensal); op.Reservas.Add(cortesia);
+        var m = SyncEngine.ComputeBaixaManual(op);
+        Assert.Contains(m, x => x.Id == pendente.Id && x.Entidade == Codigos.Pagante && x.Para == Codigos.PagPago);
+        Assert.DoesNotContain(m, x => x.Id == cancelado.Id || x.Id == pago.Id);
+        Assert.Contains(m, x => x.Id == r.Id && x.Para == Codigos.ReservaFatPago);
+        Assert.Contains(m, x => x.Id == r.CpId && x.Para == Codigos.CpConcluida);
+        Assert.Contains(m, x => x.Id == mensal.Id && x.Para == Codigos.ReservaFatPago);
+        Assert.DoesNotContain(m, x => x.Id == cortesia.Id);
+        Assert.DoesNotContain(m, x => x.Entidade == Codigos.Op);
+    }
+
+    [Fact]
+    public void BaixaManual_SemPagantes_MarcaReservas()
+    {
+        var op = Op(Codigos.OpPaga, null);
+        op.Reservas.Add(Res(Codigos.ReservaFatComposicaoRealizada, Codigos.CpConcluida));
+        var m = SyncEngine.ComputeBaixaManual(op);
+        Assert.Single(m);
+        Assert.Equal(Codigos.ReservaFatPago, m[0].Para);
+    }
+
+    [Fact]
+    public void BaixaManual_OpNaoPaga_NaoFazNada()
+    {
+        var op = Op(Codigos.OpParcial, 10000, Pag(Codigos.PagPendente, 10000));
+        op.Reservas.Add(Res(Codigos.ReservaFatPagamentoPendente, Codigos.CpPendente));
+        Assert.Empty(SyncEngine.ComputeBaixaManual(op));
+    }
 }

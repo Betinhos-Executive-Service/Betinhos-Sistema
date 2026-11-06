@@ -25,5 +25,10 @@ public static class Codigos
     public const int ReservaFatPago = 202410010, ReservaFatPagante = 202410006, ReservaFatMensal = 202410008, ReservaConcluida = 202410008;
     /// <summary>Sem OP (OP cancelada/desvinculada): "Pendente". Com OP ainda viva mas sem pagamento: "Pagamento Pendente" (é o que a Geral grava ao criar OP).</summary>
     public const int ReservaFatPendente = 202410005, ReservaFatPagamentoPendente = 202410007;
+    /// <summary>Composição concluída e serviço ainda sem cobrança (substitui o flow legado "Dar Baixa CP -> Status de Faturamento na Geral").</summary>
+    public const int ReservaFatComposicaoRealizada = 100000001;
+    /// <summary>Não faturável, cancelados (com e sem taxa), cortesia e permuta: decisão humana que pagamento nenhum sobrescreve.</summary>
+    public static bool FatProtegido(int? fat) =>
+        fat is 202410011 or 202410000 or 202410002 or 202410003 or 202410004;
     public const int CpPendente = 100000000, CpConcluida = 100000001;
 }
