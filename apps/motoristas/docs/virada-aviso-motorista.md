@@ -78,10 +78,23 @@ Logo: **depois do import a regra da visualização já vale, os antigos seguem e
 
 ### Antes de aprovar
 
-1. **Web Push:** a referência `new_webpushmotoristas` não existe no PROD. Ela vem com a solução, mas a conexão com o Worker precisa ser criada no PROD pelo Renan, com o segredo do Worker. Sem ela o Enviar não liga.
+1. **Web Push (bloqueante):** ver a seção abaixo.
 2. **Teste no celular** feito no DEV.
 3. **Operadores:** os 3 passam a receber os alertas da Vigia, sem silêncio noturno, além do "Serviço Não Visualizado" que continua ligado.
 4. **Janela:** faça a virada no mesmo dia do import, em horário de pouco movimento.
+
+### Web Push: bloqueia a publicação em uma etapa só
+
+Lido em 06/11/2026: no PROD não existem o conector `App Motoristas Web Push`, a referência `new_webpushmotoristas` nem a tabela `new_inscricaopushmotorista`, e "Novo Serviço" e "Retirado" ainda não têm Web Push. No DEV os dois flows já têm, e isso vale para toda publicação, não só para o aviso.
+
+Por isso a conexão não pode ser criada antes de publicar: ela depende do conector, que está na BetinhosCore. E publicar tudo de uma vez leva "Novo Serviço" e "Retirado" ligados a uma referência sem conexão: **eles podem não religar, e o PROD ficaria sem aviso nenhum**. Isso não foi testado; no TEST a referência existe sem conexão e o flow está desligado, o que não prova nem descarta o risco.
+
+Ordem proposta:
+
+1. Publicar só a `BetinhosCore` (input `solucoes`): traz conector e tabelas, sem steps nem flows.
+2. Renan cria a conexão no PROD, com o segredo do Worker.
+3. Vincular a referência a essa conexão no import da `BetinhosAutomacao`, por `--settings-file`. Exige ajuste em `importar-solucoes.ps1`, no Sistema Betinhos, porque hoje o import não passa essa configuração.
+4. Ensaiar no TEST e publicar o restante.
 
 ### Roteiro
 
