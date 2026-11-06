@@ -279,10 +279,11 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
   }).catch((error) => { setPromise = null; throw error }))
 
   const attributes = async (entity: string): Promise<AttributeMap> => {
-    const list = await host.metadata.attributes(entity)
+    // Choices da tabela numa consulta só; só se ela falhar cada coluna tenta a sua.
+    const [list, picklists] = await Promise.all([host.metadata.attributes(entity), host.metadata.picklists(entity).catch(() => null)])
     const infos = await Promise.all(list.map(async (attribute): Promise<AttributeInfo> => {
       if (attribute.type === 'Boolean') return { ...attribute, options: [{ value: 1, label: 'Sim' }, { value: 0, label: 'Não' }] }
-      if (attribute.type === 'Picklist') return { ...attribute, options: await host.metadata.choices(entity, attribute.logicalName).catch(() => []) }
+      if (attribute.type === 'Picklist') return { ...attribute, options: picklists?.get(attribute.logicalName) ?? await host.metadata.choices(entity, attribute.logicalName).catch(() => []) }
       return { ...attribute, options: [] }
     }))
     return new Map(infos.map((info) => [info.logicalName, info]))
