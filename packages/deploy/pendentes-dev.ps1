@@ -2,12 +2,13 @@ param(
   # Commit de referencia: no Deploy, o HEAD da develop; na trava do publicar.yml, o commit levado ao PROD.
   [string] $Ate = 'HEAD',
   [string] $EnvironmentUrl = $env:DV_ENVIRONMENT_URL,
-  # Linhas tela=... e plugins=a,b para $GITHUB_OUTPUT (sem: JSON).
+  # Linhas tela=..., webresources=... e plugins=a,b para $GITHUB_OUTPUT (sem: JSON).
   [switch] $GitHub
 )
 
 # Diz o que no DEV nao corresponde ao commit $Ate, pelo commit que o proprio DEV registra:
 #  - tela: descricao do cr40f_SistemaBetinhos.html ("vX.Y.Z <sha>", push-dev.ps1);
+#  - webresources: descricao de Tela_GerarPagantes/index.html ("vX.Y.Z <sha>", push-webresources-dev.ps1);
 #  - plugins: descricao de cada assembly Cr40f.<Nome>.Plugin (<sha>, gravada pelo registrador no CI).
 # Pendente = sem commit registrado, assembly ausente no DEV, ou git diff <registrado> $Ate tocando a peca
 # (regras em mudancas-dev.mjs). Comparar com o que o DEV tem, e nao com o push anterior, faz um deploy cancelado na fila
@@ -55,14 +56,19 @@ function Get-Mudancas([string] $Sha) {
 
 $motivos = New-Object System.Collections.Generic.List[string]
 
-$tela = $false
-$html = @(Get-Dv "webresourceset?`$select=description&`$filter=name eq 'cr40f_SistemaBetinhos.html'")
-if ($html.Count -ne 1 -or "$($html[0].description)" -notmatch '^v\d+\.\d+\.\d+ ([0-9a-f]{40})') { $tela = $true; $motivos.Add('tela: sem commit registrado no DEV') }
-else {
-  $m = Get-Mudancas $Matches[1]
-  if ($null -eq $m) { $tela = $true; $motivos.Add("tela: commit $($Matches[1].Substring(0,7)) do DEV fora do repositorio") }
-  elseif ($m.tela) { $tela = $true; $motivos.Add("tela: DEV em $($Matches[1].Substring(0,7))") }
+# $Nome guarda "vX.Y.Z <sha>" na descricao; $Peca e o campo de mudancas-dev.mjs.
+function Test-WebResourcePendente([string] $Nome, [string] $Peca) {
+  $rows = @(Get-Dv "webresourceset?`$select=description&`$filter=name eq '$Nome'")
+  if ($rows.Count -ne 1 -or "$($rows[0].description)" -notmatch '^v\d+\.\d+\.\d+ ([0-9a-f]{40})') { $motivos.Add("${Peca}: sem commit registrado no DEV"); return $true }
+  $sha = $Matches[1]
+  $m = Get-Mudancas $sha
+  if ($null -eq $m) { $motivos.Add("${Peca}: commit $($sha.Substring(0,7)) do DEV fora do repositorio"); return $true }
+  if ($m.$Peca) { $motivos.Add("${Peca}: DEV em $($sha.Substring(0,7))"); return $true }
+  $false
 }
+
+$tela = Test-WebResourcePendente 'cr40f_SistemaBetinhos.html' 'tela'
+$webresources = Test-WebResourcePendente 'Tela_GerarPagantes/index.html' 'webresources'
 
 $plugins = New-Object System.Collections.Generic.List[string]
 $assemblies = @{}
@@ -70,8 +76,10 @@ foreach ($a in Get-Dv "pluginassemblies?`$select=name,description&`$filter=start
 foreach ($d in Get-ChildItem (Join-Path $root 'packages\plugins') -Directory | Sort-Object Name) {
   if ($d.Name -notmatch '^Cr40f\.([A-Za-z]+)\.Plugin$') { continue }
   $nome = $Matches[1].ToLowerInvariant()
-  if (-not $assemblies.ContainsKey($d.Name)) { $plugins.Add($nome); $motivos.Add("${nome}: assembly ausente no DEV"); continue }
-  if ($assemblies[$d.Name] -notmatch '^([0-9a-f]{40})$') { $plugins.Add($nome); $motivos.Add("${nome}: sem commit registrado no DEV (publicado fora do Deploy)"); continue }
+  # O nome vem do csproj: o do Gerar Pagantes tem sufixo V2, e renomear criaria outro assembly no Dataverse.
+  $assembly = ([xml](Get-Content -Raw (Join-Path $d.FullName "$($d.Name).csproj"))).SelectSingleNode('//AssemblyName').InnerText
+  if (-not $assemblies.ContainsKey($assembly)) { $plugins.Add($nome); $motivos.Add("${nome}: assembly ausente no DEV"); continue }
+  if ($assemblies[$assembly] -notmatch '^([0-9a-f]{40})$') { $plugins.Add($nome); $motivos.Add("${nome}: sem commit registrado no DEV (publicado fora do Deploy)"); continue }
   $sha = $Matches[1]
   $m = Get-Mudancas $sha
   if ($null -eq $m) { $plugins.Add($nome); $motivos.Add("${nome}: commit $($sha.Substring(0,7)) do DEV fora do repositorio") }
@@ -79,5 +87,5 @@ foreach ($d in Get-ChildItem (Join-Path $root 'packages\plugins') -Directory | S
 }
 
 foreach ($linha in $motivos) { [Console]::Error.WriteLine("[pendentes] $linha") }
-if ($GitHub) { "tela=$($tela.ToString().ToLowerInvariant())"; "plugins=$($plugins -join ',')" }
-else { [pscustomobject]@{ ate = $ate; tela = $tela; plugins = @($plugins); motivos = @($motivos) } | ConvertTo-Json -Compress }
+if ($GitHub) { "tela=$($tela.ToString().ToLowerInvariant())"; "webresources=$($webresources.ToString().ToLowerInvariant())"; "plugins=$($plugins -join ',')" }
+else { [pscustomobject]@{ ate = $ate; tela = $tela; webresources = $webresources; plugins = @($plugins); motivos = @($motivos) } | ConvertTo-Json -Compress }

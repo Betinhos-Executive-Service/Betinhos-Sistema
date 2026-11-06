@@ -7,6 +7,11 @@ test('só a tela vai direto (front)', () => {
   assert.equal(r.caminho, 'front')
 })
 
+test('teste da Tela Gerar Pagantes não muda o PROD; o código dela vai pelas soluções', () => {
+  assert.equal(caminhoDoArquivo('apps/gerar-pagantes/src/money.test.ts'), 'nada')
+  assert.equal(caminhoDoArquivo('apps/gerar-pagantes/src/money.ts'), 'solucoes')
+})
+
 test('tela com documentação continua front', () => {
   assert.equal(caminhoDaPublicacao(['apps/shell/src/App.tsx', 'docs/auto/01.md', '.claude/skills/x/SKILL.md']).caminho, 'front')
 })

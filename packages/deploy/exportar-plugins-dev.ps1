@@ -34,7 +34,8 @@ $pastas = @{}
 foreach ($d in Get-ChildItem (Join-Path $PSScriptRoot '..\plugins') -Directory) { if ($d.Name -match '^Cr40f\.([A-Za-z]+)\.Plugin$') { $pastas[$Matches[1].ToLowerInvariant()] = $d.Name } }
 foreach ($nome in $pedidos) {
   if (-not $pastas.ContainsKey($nome)) { throw "Plugin desconhecido: $nome" }
-  $assembly = $pastas[$nome]
+  # O nome vem do csproj: o do Gerar Pagantes tem sufixo V2.
+  $assembly = ([xml](Get-Content -Raw (Join-Path $PSScriptRoot "..\plugins\$($pastas[$nome])\$($pastas[$nome]).csproj"))).SelectSingleNode('//AssemblyName').InnerText
   $rows = @((Invoke-RestMethod -Uri "$base/api/data/v9.2/pluginassemblies?`$select=name,version,publickeytoken,content,description&`$filter=name eq '$assembly'" -Headers $headers).value)
   if ($rows.Count -ne 1) { throw "$assembly ausente ou duplicado no DEV." }
   if (-not $rows[0].content) { throw "$assembly sem conteudo no DEV." }
