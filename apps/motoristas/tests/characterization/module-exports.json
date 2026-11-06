@@ -208,6 +208,7 @@
     "AppErrorLogContext",
     "AppErrorNotice",
     "flushAppErrorLogQueue",
+    "flushRepeatedErrorSummaries",
     "installGlobalAppErrorLogger",
     "redactSensitiveLogValue",
     "reportAppError"
@@ -220,6 +221,25 @@
   "src/shared/currencyInput.ts": [
     "formatCurrencyInputOnBlur",
     "sanitizeCurrencyInput"
+  ],
+  "src/shared/errorLogGrouping.ts": [
+    "ErrorCause",
+    "ErrorCauseKind",
+    "ErrorHop",
+    "MAX_LOG_MESSAGE_CHARS",
+    "MAX_LOG_STACK_CHARS",
+    "MAX_PAYLOAD_CHARS",
+    "REPEAT_QUIET_MS",
+    "RepeatGroup",
+    "buildRepeatSignature",
+    "classifyErrorCause",
+    "clip",
+    "compactErrorChain",
+    "createRepeatTracker",
+    "dropRepeatedError",
+    "isNetworkCause",
+    "limitPayload",
+    "withCauseLabel"
   ],
   "src/shared/isTrueLike.ts": [
     "isTrueLike"

@@ -33,3 +33,19 @@ test("reutiliza leitura identica apenas na mesma carga e tenta de novo apos erro
   await assert.rejects(unstable(), /rede/);
   assert.equal(await unstable(), "ok");
 });
+
+test("mapWithLimit respeita o limite e mantém a ordem dos resultados", async () => {
+  const { mapWithLimit } = await import("../src/data/dataverse/remoteReadBatch.ts");
+  let active = 0;
+  let maximum = 0;
+  const results = await mapWithLimit(Array.from({ length: 10 }, (_, index) => index), 3, async (item) => {
+    active += 1;
+    maximum = Math.max(maximum, active);
+    await new Promise((resolve) => setTimeout(resolve, 5 - (item % 3)));
+    active -= 1;
+    return item * 2;
+  });
+  assert.equal(maximum, 3);
+  assert.deepEqual(results, [0, 2, 4, 6, 8, 10, 12, 14, 16, 18]);
+  assert.deepEqual(await mapWithLimit([], 3, async () => 1), []);
+});

@@ -6,6 +6,20 @@ import {
   pendingErrorLogs
 } from "@betinhos-executive-service/ui/error-logger.js";
 import { formatBuildStamp, getBuildInfo } from "./buildStamp.ts";
+import {
+  MAX_LOG_MESSAGE_CHARS,
+  MAX_LOG_STACK_CHARS,
+  buildRepeatSignature,
+  classifyErrorCause,
+  clip,
+  compactErrorChain,
+  createRepeatTracker,
+  dropRepeatedError,
+  isNetworkCause,
+  limitPayload,
+  withCauseLabel,
+  type RepeatGroup
+} from "./errorLogGrouping.ts";
 
 // Wrapper do App Motoristas sobre o logger compartilhado (@betinhos-executive-service/ui/error-logger).
 // O pacote grava em new_appmotoristaslog e cuida de fila, retry, dedupe e usuário. Aqui ficam o que é só
@@ -46,8 +60,12 @@ export const APP_CONNECTION_LOST_MESSAGE = "A conexão com a internet foi perdid
 const LEGACY_QUEUE_KEY = "app-motoristas-error-log-queue-v1";
 const PACKAGE_QUEUE_KEY = `betinhos-error-log-queue-v1:${APP_NAME}`;
 const RETRY_MS = 30000;
+/** Espera antes de gravar o resumo "repetido N vezes" de uma falha que se repetiu na sessão. */
+const REPEAT_SUMMARY_DELAY_MS = 30000;
 let configured = false;
 let originalConsoleError: typeof console.error | null = null;
+const repeatTracker = createRepeatTracker();
+let summaryTimerScheduled = false;
 
 const REDACTED = "[redacted]";
 const REDACTED_EMAIL = "[redacted-email]";
@@ -213,17 +231,72 @@ export function flushAppErrorLogQueue() {
   return flushErrorLogQueue();
 }
 
+function readNavigatorOnLine() {
+  const online = getWindowRuntime()?.navigator?.onLine;
+  return typeof online === "boolean" ? online : null;
+}
+
+function logRepeatSummary(group: RepeatGroup) {
+  const seconds = Math.max(1, Math.round((group.lastAt - group.firstAt) / 1000));
+  const summary = Object.assign(new Error(`${group.message} (repetido ${group.suppressed}x em ${seconds}s)`), { name: "RepeatedError" });
+  void logAppError(summary, {
+    severity: "warning",
+    source: group.source,
+    action: group.action,
+    phase: "resumo-repetidos",
+    errorCode: group.cause.code,
+    payload: {
+      repetidos: group.suppressed,
+      primeiraOcorrencia: new Date(group.firstAt).toISOString(),
+      ultimaOcorrencia: new Date(group.lastAt).toISOString(),
+      causa: group.cause.kind
+    }
+  });
+}
+
+/** Grava o resumo das falhas que se repetiram: uma linha por causa, com a contagem e o intervalo. */
+export function flushRepeatedErrorSummaries() {
+  summaryTimerScheduled = false;
+  repeatTracker.drain().forEach(logRepeatSummary);
+}
+
+function scheduleRepeatSummary() {
+  if (summaryTimerScheduled) return;
+  const runtime = getWindowRuntime();
+  if (typeof runtime?.setTimeout !== "function") return;
+  summaryTimerScheduled = true;
+  runtime.setTimeout(flushRepeatedErrorSummaries, REPEAT_SUMMARY_DELAY_MS);
+}
+
 export function reportAppError(error: unknown, context: AppErrorLogContext = {}) {
   ensureConfigured();
   const raw = normalizeLoggedError(error);
   const normalized = {
     name: String(redactSensitiveLogValue(raw.name)),
-    message: String(redactSensitiveLogValue(raw.message)),
-    stack: String(redactSensitiveLogValue(raw.stack)),
+    message: clip(String(redactSensitiveLogValue(raw.message)), MAX_LOG_MESSAGE_CHARS),
+    stack: clip(String(redactSensitiveLogValue(raw.stack)), MAX_LOG_STACK_CHARS),
     code: String(redactSensitiveLogValue(raw.code))
   };
   if (context.notifyUser !== false) dispatchErrorNotice(normalized, context);
-  const redactedError = Object.assign(new Error(normalized.message), { name: normalized.name, stack: normalized.stack });
+
+  // Mesma falha várias vezes na sessão (ex.: 40 serviços com a rede caída): só a primeira vai completa.
+  const cause = classifyErrorCause(error);
+  const decision = repeatTracker.record({
+    signature: buildRepeatSignature({ source: context.source, action: context.action, phase: context.phase, message: normalized.message, cause }),
+    message: normalized.message,
+    source: context.source ?? "app",
+    action: context.action ?? "",
+    phase: context.phase ?? "",
+    cause
+  });
+  // Falha que voltou após o silêncio: o grupo antigo já foi trocado no tracker, então o resumo dele sai daqui.
+  if (decision.closed) logRepeatSummary(decision.closed);
+  if (!decision.log) {
+    scheduleRepeatSummary();
+    return;
+  }
+
+  const redactedError = Object.assign(new Error(withCauseLabel(normalized.message, cause)), { name: normalized.name, stack: normalized.stack });
   void logAppError(redactedError, {
     severity: context.severity,
     source: context.source,
@@ -234,12 +307,14 @@ export function reportAppError(error: unknown, context: AppErrorLogContext = {})
     detailId: context.detailId,
     detailType: context.detailType,
     errorCode: normalized.code,
-    payload: {
+    payload: limitPayload({
       eventId: createEventId(),
-      payload: redactSensitiveLogValue(context.payload ?? {}),
-      // Erro original (inclusive cause) para não perder o código interno do Dataverse.
-      error: redactSensitiveLogValue(error)
-    }
+      payload: redactSensitiveLogValue(dropRepeatedError(context.payload ?? {}, error)),
+      // Cadeia de causas sem repetição: mantém o código interno do Dataverse sem copiar a mesma mensagem várias vezes.
+      error: redactSensitiveLogValue(compactErrorChain(error)),
+      // O new_isoffline do pacote só olha navigator.onLine; aqui fica o sinal de falha de rede.
+      ...(isNetworkCause(cause) ? { rede: { falhaDeRede: true, causa: cause.kind, navigatorOnLine: readNavigatorOnLine() } } : {})
+    })
   });
 }
 
@@ -327,6 +402,11 @@ export function installGlobalAppErrorLogger() {
 
   runtime.addEventListener("online", () => {
     void flushErrorLogQueue();
+  });
+  // Ao sair do app, grava o que ficou só na contagem (a fila do pacote guarda o que não saiu).
+  runtime.addEventListener("pagehide", flushRepeatedErrorSummaries);
+  runtime.addEventListener("visibilitychange", () => {
+    if (runtime.document?.visibilityState === "hidden") flushRepeatedErrorSummaries();
   });
   runtime.setInterval(() => {
     if (pendingErrorLogs()) void flushErrorLogQueue();

@@ -102,7 +102,9 @@ export function dataverseLog(message: string, data?: unknown) {
 }
 
 export function dataverseWarn(message: string, data?: unknown) {
-  (window as WindowWithFlowEnv).__APP_REPORT_ERROR?.(new Error(message), {
+  // A causa real vai em cause: o logger classifica rede/timeout e agrupa repetições pela causa.
+  const cause = typeof data === "object" && data !== null ? (data as { error?: unknown }).error : undefined;
+  (window as WindowWithFlowEnv).__APP_REPORT_ERROR?.(cause === undefined ? new Error(message) : Object.assign(new Error(message), { cause }), {
     severity: "warning", source: "dataverse", action: message, phase: "fallback", payload: data, notifyUser: false
   });
   if (data === undefined) {
