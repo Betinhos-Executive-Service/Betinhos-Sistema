@@ -69,7 +69,12 @@ $navAnotacao = $navs[0].ReferencingEntityNavigationPropertyName
 
 # 3. Connection references (Dataverse e SharePoint).
 $refs = @(Rows "connectionreferences?`$select=connectionreferencelogicalname,connectorid&`$filter=statecode eq 0")
+# Flow que já existe mantém a referência que usa: com várias no DEV, só o flow novo pede o parâmetro.
+$flows = @(Rows "workflows?`$select=workflowid,statecode,clientdata&`$filter=name eq '$flowName' and category eq 5")
+if ($flows.Count -gt 1) { throw 'Flow duplicado no DEV.' }
+$refsAtuais = if ($flows.Count) { ($flows[0].clientdata | ConvertFrom-Json).properties.connectionReferences } else { $null }
 function Referencia([string] $conector, [string] $preferida, [string] $parametro) {
+  if (-not $preferida -and $refsAtuais -and $refsAtuais.PSObject.Properties[$conector]) { $preferida = $refsAtuais.$conector.connection.connectionReferenceLogicalName }
   $candidatas = @($refs | Where-Object { $_.connectorid -like "*/$conector" })
   if ($preferida) {
     if (@($candidatas | Where-Object { $_.connectionreferencelogicalname -eq $preferida }).Count -ne 1) { throw "Connection reference '$preferida' ($conector) não encontrada." }
@@ -95,8 +100,6 @@ $clientData = @{ properties = @{ definition = $definition; connectionReferences 
 $descricao = 'Recebe do script do Claude (claude.ai) fotos/PDF com uma liberação de uso único, valida pela Custom API cr40f_ConsumirAnexoProntuario, salva no SharePoint (Funcionarios/<id>/Anotacoes) e cria uma anotação no funcionário.'
 
 # 5. Cria ou atualiza o flow, inclui na solução e ativa.
-$flows = @(Rows "workflows?`$select=workflowid,statecode,clientdata&`$filter=name eq '$flowName' and category eq 5")
-if ($flows.Count -gt 1) { throw 'Flow duplicado no DEV.' }
 if ($flows.Count) {
   $flowId = $flows[0].workflowid
   $normalizar = { param($o) if ($null -eq $o) { '' } else { ($o | ConvertTo-Json -Depth 90 -Compress | ConvertFrom-Json | ConvertTo-Json -Depth 90 -Compress) } }
