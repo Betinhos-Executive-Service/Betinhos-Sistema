@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 // Grava a chave da API Anthropic na configuração segura do step de new_OrganizarObservacao no DEV (Linux/macOS).
+// Com --combustivel grava no step de new_GerarInsightsCombustivel (insights do relatório de combustível); --copiar-da-variavel
+// continua copiando da variável da observação, que é a chave Anthropic já guardada no ambiente.
 // A chave vem da variável de ambiente que já a guarda no DEV (--copiar-da-variavel) ou de um ARQUIVO (canal seguro), nunca de argumento;
 // Com --prod aponta para o PROD (gravar exige --confirmo-prod; --prod --verificar só lê). O arquivo é apagado ao final. O valor nunca é impresso. Não cria step nem tipo: eles vêm de scripts/provision-observacao-organizada.ps1.
 //
 //   node scripts/configurar-chave-observacao-dev.mjs --verificar             # só confere o step e se há configuração segura
 //   node scripts/configurar-chave-observacao-dev.mjs --copiar-da-variavel   # copia o valor da variável do DEV para o step
 //   node scripts/configurar-chave-observacao-dev.mjs --arquivo <caminho>     # grava a chave do arquivo (e apaga o arquivo)
+//   node scripts/configurar-chave-observacao-dev.mjs --combustivel --copiar-da-variavel   # mesma chave no step dos insights de combustível
+//   node scripts/configurar-chave-observacao-dev.mjs --combustivel --copiar-da-observacao # copia a configuração segura do step da observação
 import dns from "node:dns";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -16,12 +20,14 @@ const isProd = argv.includes("--prod"); // PROD: leitura livre; escrita só com 
 const ENVIRONMENT_NAME = isProd ? "PROD" : "DEV";
 const ENVIRONMENT_URL = isProd ? "https://orgf261ae8e.crm2.dynamics.com" : "https://org23b93544.crm2.dynamics.com";
 const CLIENT_ID = "51f81489-12ee-4a9e-aaae-a2591f45987d";
-const PLUGIN_TYPE = "Betinhos.DriverRecordSharing.OrganizeObservationPlugin";
-const API_NAME = "new_OrganizarObservacao";
+const isFuel = argv.includes("--combustivel");
+const PLUGIN_TYPE = isFuel ? "Betinhos.DriverRecordSharing.FuelInsightsPlugin" : "Betinhos.DriverRecordSharing.OrganizeObservationPlugin";
+const API_NAME = isFuel ? "new_GerarInsightsCombustivel" : "new_OrganizarObservacao";
 const ENV_VAR = "new_AnthropicKeyObservacaoMotorista";
 const fileIndex = argv.indexOf("--arquivo");
 const keyFile = fileIndex >= 0 ? argv[fileIndex + 1] : "";
 const fromVariable = argv.includes("--copiar-da-variavel");
+const fromObservation = argv.includes("--copiar-da-observacao"); // só com --combustivel: a chave já migrada para o step da observação
 const verifyOnly = argv.includes("--verificar");
 
 async function fetchRetry(url, init, attempts = 4) {
@@ -51,7 +57,8 @@ async function deviceCodeToken() {
 }
 
 async function main() {
-  if ([verifyOnly, fromVariable, fileIndex >= 0].filter(Boolean).length !== 1) throw new Error("Use exatamente um: --verificar, --copiar-da-variavel ou --arquivo <caminho>.");
+  if ([verifyOnly, fromVariable, fromObservation, fileIndex >= 0].filter(Boolean).length !== 1) throw new Error("Use exatamente um: --verificar, --copiar-da-variavel, --copiar-da-observacao ou --arquivo <caminho>.");
+  if (fromObservation && !isFuel) throw new Error("--copiar-da-observacao só vale com --combustivel.");
   if (isProd && !verifyOnly && !argv.includes("--confirmo-prod")) throw new Error("Gravar no PROD exige --confirmo-prod (confira antes o ambiente e a chave).");
   let secret = "";
   if (keyFile) {
@@ -87,6 +94,14 @@ async function main() {
       const definition = await one(`environmentvariabledefinitions?$select=environmentvariabledefinitionid,defaultvalue&$filter=schemaname eq '${ENV_VAR}'`, "variável de ambiente");
       const values = (await api("GET", `environmentvariablevalues?$select=value&$filter=_environmentvariabledefinitionid_value eq ${definition.environmentvariabledefinitionid}`)).value;
       secret = String(values[0]?.value ?? definition.defaultvalue ?? "").trim();
+    }
+    if (fromObservation) {
+      const sourceType = await one(`plugintypes?$select=plugintypeid&$filter=typename eq 'Betinhos.DriverRecordSharing.OrganizeObservationPlugin'`, "PluginType da observação");
+      const sourceMessage = await one(`sdkmessages?$select=sdkmessageid&$filter=name eq 'new_OrganizarObservacao'`, "mensagem da observação");
+      const sourceStep = await one(`sdkmessageprocessingsteps?$select=_sdkmessageprocessingstepsecureconfigid_value&$filter=_eventhandler_value eq ${sourceType.plugintypeid} and _sdkmessageid_value eq ${sourceMessage.sdkmessageid}`, "step da observação");
+      const sourceId = sourceStep._sdkmessageprocessingstepsecureconfigid_value;
+      if (!sourceId) throw new Error("O step da observação está sem configuração segura: nada foi gravado.");
+      secret = String((await api("GET", `sdkmessageprocessingstepsecureconfigs(${sourceId})?$select=secureconfig`)).secureconfig ?? "").trim();
     }
     if (!secret) throw new Error("Chave vazia: nada foi gravado.");
     if (secureId) await api("PATCH", `sdkmessageprocessingstepsecureconfigs(${secureId})`, { secureconfig: secret });

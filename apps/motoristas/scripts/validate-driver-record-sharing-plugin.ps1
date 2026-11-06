@@ -1,5 +1,6 @@
 param(
-  [string] $EnvironmentUrl = "https://orgf261ae8e.crm2.dynamics.com/",
+  # Padrao DEV: validar o PROD exige passar -EnvironmentUrl explicitamente.
+  [string] $EnvironmentUrl = "https://org23b93544.crm2.dynamics.com/",
 
   [string] $TechnicalUserEmail = "",
 
