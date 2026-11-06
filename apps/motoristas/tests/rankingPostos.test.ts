@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { aplicarMinhaAvaliacao, motivoPositivo, rotuloMotivo, rotuloRecomendacoes, SEM_AVALIACOES } from "../src/lib/avaliacaoPostos.ts";
 import { nomePosto, parseRankingPostos, postosProximos, rotuloAbastecimentos, rotuloDistancia, rotuloMelhor, separarMelhor, urlMaps } from "../src/lib/rankingPostos.ts";
 
 const origem = { lat: -23, lon: -45 };
-const posto = (nome: string, precoLitro: number, lat: number, lon = -45, aproximada = false) => ({ nome, precoLitro, abastecimentos: 2, ultimoAbastecimento: "2026-11-03", lat, lon, aproximada, endereco: "RUA A, 10 - TAUBATE/SP", historico: [] });
+const posto = (nome: string, precoLitro: number, lat: number, lon = -45, aproximada = false) => ({ postoId: nome, avaliacoes: SEM_AVALIACOES, nome, precoLitro, abastecimentos: 2, ultimoAbastecimento: "2026-11-03", lat, lon, aproximada, endereco: "RUA A, 10 - TAUBATE/SP", historico: [] });
 
 test("parseRankingPostos lê a resposta da Custom API", () => {
   const ranking = parseRankingPostos(JSON.stringify({ ok: true, dias: 30, postos: [posto("A", 6.19, -23)] }));
@@ -86,4 +87,31 @@ test("parseRankingPostos aceita a resposta do plugin sem endereço e histórico"
   const ranking = parseRankingPostos(JSON.stringify({ ok: true, dias: 30, postos: [antigo] }));
   assert.equal(ranking.postos[0].endereco, "");
   assert.deepEqual(ranking.postos[0].historico, []);
+});
+
+test("parseRankingPostos aceita o plugin anterior, sem id nem avaliações, para a ficha seguir abrindo", () => {
+  const { postoId: _id, avaliacoes: _avaliacoes, ...antigo } = posto("A", 6.19, -23);
+  const [lido] = parseRankingPostos(JSON.stringify({ ok: true, dias: 30, postos: [antigo] })).postos;
+  assert.equal(lido.postoId, "");
+  assert.deepEqual(lido.avaliacoes, SEM_AVALIACOES);
+});
+
+test("rotuloRecomendacoes concorda com o total e some sem avaliações", () => {
+  assert.equal(rotuloRecomendacoes({ total: 0, recomendam: 0 }), "");
+  assert.equal(rotuloRecomendacoes({ total: 1, recomendam: 1 }), "1 de 1 recomenda");
+  assert.equal(rotuloRecomendacoes({ total: 5, recomendam: 4 }), "4 de 5 recomendam");
+});
+
+test("motivos têm rótulo e sentido próprios", () => {
+  assert.equal(rotuloMotivo("fila_grande"), "Fila grande");
+  assert.equal(motivoPositivo("sem_fila"), true);
+  assert.equal(motivoPositivo("fila_grande"), false);
+});
+
+test("avaliar de novo no mock substitui a avaliação em vez de contar em dobro", () => {
+  const primeira = aplicarMinhaAvaliacao({ ...SEM_AVALIACOES, total: 2, recomendam: 1 }, { recomenda: true, motivos: ["sem_fila"], comentario: "Boa" }, "Eu", "2026-11-06");
+  assert.deepEqual([primeira.total, primeira.recomendam, primeira.comentarios.length], [3, 2, 1]);
+  const segunda = aplicarMinhaAvaliacao(primeira, { recomenda: false, motivos: ["fila_grande"], comentario: "" }, "Eu", "2026-11-06");
+  assert.deepEqual([segunda.total, segunda.recomendam, segunda.comentarios.length], [3, 1, 0]);
+  assert.deepEqual(segunda.motivos, ["fila_grande"]);
 });

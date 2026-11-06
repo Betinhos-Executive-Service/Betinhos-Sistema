@@ -4,6 +4,7 @@ import { PostoDetalheDialog } from "../components/gastos/PostoDetalheDialog";
 import { AppShell } from "../components/layout/AppShell";
 import { ServicesMenu } from "../components/navigation/ServicesMenu";
 import { reportAppError } from "../lib/appErrorLogger";
+import { rotuloRecomendacoes, type ResumoAvaliacoes } from "../lib/avaliacaoPostos";
 import { formatDiaMes, isMockGastosCartao } from "../lib/gastosCartao";
 import { formatBRL } from "../lib/gastosRelatorio";
 import { RAIO_KM, RECOMENDACAO, carregarRankingPostos, obterPosicao, postosProximos, rotuloAbastecimentos, rotuloDistancia, rotuloMelhor, separarMelhor, urlMaps, type Posicao, type PostoProximo, type RankingPostos } from "../lib/rankingPostos";
@@ -21,6 +22,10 @@ export function RankingPostosScreen({ onBack }: { onBack: () => void }) {
   const [carga, setCarga] = useState<Carga>({ status: "loading", etapa: "localizacao" });
   const [aberto, setAberto] = useState<PostoProximo | null>(null);
   const fecharPosto = useCallback(() => setAberto(null), []);
+  const aplicarAvaliacao = useCallback((postoId: string, avaliacoes: ResumoAvaliacoes) => {
+    setCarga((anterior) => (anterior.status === "ready" ? { ...anterior, ranking: { ...anterior.ranking, postos: anterior.ranking.postos.map((posto) => (posto.postoId === postoId ? { ...posto, avaliacoes } : posto)) } } : anterior));
+    setAberto((atual) => (atual?.postoId === postoId ? { ...atual, avaliacoes } : atual));
+  }, []);
   const pedido = useRef(0);
   const carregar = useCallback(async () => {
     const atual = ++pedido.current;
@@ -83,7 +88,7 @@ export function RankingPostosScreen({ onBack }: { onBack: () => void }) {
           </>
         )}
       </section>
-      {aberto && carga.status === "ready" ? <PostoDetalheDialog posto={aberto} dias={carga.ranking.dias} onClose={fecharPosto} /> : null}
+      {aberto && carga.status === "ready" ? <PostoDetalheDialog posto={aberto} dias={carga.ranking.dias} onAvaliado={aplicarAvaliacao} onClose={fecharPosto} /> : null}
     </AppShell>
   );
 }
@@ -142,6 +147,7 @@ function ListaPostos({ proximos, dias, onAbrir }: { proximos: PostoProximo[]; di
             <span className="rp-hero-distancia">{rotuloDistancia(melhor)}</span>
           </span>
           <span className="rp-hero-detalhe">{RECOMENDACAO[melhor.cor].rotulo} · {rotuloAbastecimentos(melhor.abastecimentos)} · último em {formatDiaMes(melhor.ultimoAbastecimento)}</span>
+          {melhor.avaliacoes.total ? <span className="rp-hero-avaliacao">{rotuloRecomendacoes(melhor.avaliacoes)}</span> : null}
         </button>
         <a className="rp-maps" href={urlMaps(melhor)} target="_blank" rel="noreferrer"><MapPin aria-hidden="true" />Abrir no Maps</a>
       </section>
@@ -156,6 +162,7 @@ function ListaPostos({ proximos, dias, onAbrir }: { proximos: PostoProximo[]; di
                   <span className="rp-posto-texto">
                     <strong>{posto.nome}</strong>
                     <span>{rotuloDistancia(posto)} · {rotuloAbastecimentos(posto.abastecimentos)}</span>
+                    {posto.avaliacoes.total ? <span className="rp-posto-avaliacao">{rotuloRecomendacoes(posto.avaliacoes)}</span> : null}
                   </span>
                   <span className="rp-posto-preco">
                     <strong>{formatBRL(posto.precoLitro)}</strong>
