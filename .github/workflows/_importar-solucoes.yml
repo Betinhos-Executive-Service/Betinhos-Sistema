@@ -77,12 +77,14 @@ jobs:
           pac admin backup --environment $env:DV_ENVIRONMENT_URL --label $rotulo
           if ($LASTEXITCODE -ne 0) { throw "Backup do PROD falhou. Nada foi importado. Faça o backup à mão e rode 'Publicar soluções' com o rótulo." }
           "## Backup do PROD: $rotulo" | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
+      # Antes da foto: a variável que só tinha padrão ganha valor atual, e a comparação passa a provar que esse valor sobreviveu.
+      # Com a foto antes daqui, a variável aparece sem valor em antes.json e com valor em depois.json, e reprova sem perda nenhuma.
+      - name: Preservar valores de variáveis que só têm padrão (o pacote do DEV substitui o padrão)
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/preservar-valores-variaveis.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Aplicar
       - name: Foto antes
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/foto-ambiente.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Saida fotos/antes.json
       - name: Excluir Custom APIs legado (cr40f_AI*V2 não gerenciadas)
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/excluir-custom-apis-legado.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Backup custom-apis-legado -Aplicar
-      - name: Preservar valores de variáveis que só têm padrão (o pacote do DEV substitui o padrão)
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/preservar-valores-variaveis.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Aplicar
       - name: Guardar configuração dos steps (o pacote traz a do DEV)
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/preservar-config-steps.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Arquivo config-steps/antes.json
       - name: Última publicação neste ambiente
