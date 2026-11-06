@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState, type CSSProperties } from "react";
 import { ActionBar, ActionButton } from "../components/common/ActionButton";
+import postoCombustivel from "../assets/images/posto-combustivel.png";
 import { DespesaDetalheDialog, STATUS_BADGE } from "../components/gastos/DespesaDetalheDialog";
 import { GraficoMedias } from "../components/gastos/GastosCharts";
 import { SystemIcon } from "../components/icons/SystemIcon";
@@ -59,9 +60,9 @@ export function GastosRelatorioScreen({ modelo, periodoId, loadStatus, pendentes
         ) : modelo && modelo.quantidade === 0 ? (
           <p className="termo-empty">Nenhum gasto neste período. Para lançar um gasto, toque em Anexar despesa.</p>
         ) : modelo ? (
-          <Relatorio key={periodoId} modelo={modelo} grafico={grafico} onGrafico={setGrafico} filtro={filtro} onFiltro={setFiltro} idsCompletar={idsCompletar} onCompletarGasto={onCompletarGasto} />
+          <Relatorio key={periodoId} onPrecoPostos={onPrecoPostos} modelo={modelo} grafico={grafico} onGrafico={setGrafico} filtro={filtro} onFiltro={setFiltro} idsCompletar={idsCompletar} onCompletarGasto={onCompletarGasto} />
         ) : null}
-        <button type="button" className="termo-text-button gr-preco-postos" onClick={onPrecoPostos}>Ver preço dos postos por cidade</button>
+        {modelo?.quantidade ? null : <button type="button" className="termo-text-button gr-preco-postos" onClick={onPrecoPostos}>Ver postos perto de mim</button>}
       </section>
       <ActionBar className="finalize-actions gr-actions">
         {pendentesCartao > 0 ? <ActionButton variant="secondary" label={`Completar (${pendentesCartao})`} onClick={onCompletar} /> : null}
@@ -142,9 +143,9 @@ function CartaoMedia({ cartao, rotuloAnterior, i }: { cartao: Cartao; rotuloAnte
   );
 }
 
-type RelatorioProps = { modelo: RelatorioModelo; grafico: Grafico; onGrafico: (id: Grafico) => void; filtro: Filtro; onFiltro: (id: Filtro) => void; idsCompletar: ReadonlySet<string>; onCompletarGasto: (id: string) => void };
+type RelatorioProps = { onPrecoPostos: () => void; modelo: RelatorioModelo; grafico: Grafico; onGrafico: (id: Grafico) => void; filtro: Filtro; onFiltro: (id: Filtro) => void; idsCompletar: ReadonlySet<string>; onCompletarGasto: (id: string) => void };
 
-function Relatorio({ modelo, grafico, onGrafico, filtro, onFiltro, idsCompletar, onCompletarGasto }: RelatorioProps) {
+function Relatorio({ onPrecoPostos, modelo, grafico, onGrafico, filtro, onFiltro, idsCompletar, onCompletarGasto }: RelatorioProps) {
   const { status, tendencia, periodo } = modelo;
   const [aberta, setAberta] = useState<DespesaRelatorio | null>(null);
   const fecharDetalhe = useCallback(() => setAberta(null), []);
@@ -186,14 +187,17 @@ function Relatorio({ modelo, grafico, onGrafico, filtro, onFiltro, idsCompletar,
             <CartaoDestaque key={destaque.id} destaque={destaque} cartao={modelo.cartoes.find((item) => item.id === destaque.id)} rotuloAnterior={periodo.rotuloAnterior} i={i + 1} />
           ))}
         </ul>
-        {outrasMedias.length ? (
-          <>
-            <h3 className="gr-subtitulo" id="gr-outras-medias">Outras médias</h3>
-            <ul className="gr-medias gr-secundarias" aria-labelledby="gr-outras-medias">
-              {outrasMedias.map((cartao, i) => <CartaoMedia key={cartao.id} cartao={cartao} rotuloAnterior={periodo.rotuloAnterior} i={i + 3} />)}
-            </ul>
-          </>
-        ) : null}
+        {outrasMedias.length ? <h3 className="gr-subtitulo" id="gr-outras-medias">Outras médias</h3> : null}
+        <ul className="gr-medias gr-secundarias" aria-labelledby={outrasMedias.length ? "gr-outras-medias" : undefined}>
+          {outrasMedias.map((cartao, i) => <CartaoMedia key={cartao.id} cartao={cartao} rotuloAnterior={periodo.rotuloAnterior} i={i + 3} />)}
+          <li className="gr-postos-item">
+            <button type="button" className="gr-media gr-postos gr-preco-postos" style={ordem(outrasMedias.length + 3)} onClick={onPrecoPostos}>
+              <span className="gr-media-titulo">Postos perto de mim</span>
+              <span className="gr-media-detalhe">Ver preços</span>
+              <img className="gr-postos-img" src={postoCombustivel} alt="" />
+            </button>
+          </li>
+        </ul>
       </section>
 
       <section className="gr-bloco gr-evolucao" aria-labelledby="gr-evolucao" style={ordem(3)}>
