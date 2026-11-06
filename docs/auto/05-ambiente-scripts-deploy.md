@@ -207,6 +207,7 @@ Detalhes (de `publicar.yml` e dos scripts em `packages/deploy/solucoes/`):
 - `excluir-custom-apis-legado.ps1`: guarda JSON de backup e exclui Custom APIs `cr40f_AI*V2` não gerenciadas (travam o upgrade).
 - `preservar-valores-variaveis.ps1`: variável que só tem valor padrão no alvo ganha valor atual igual ao padrão (o pacote do DEV substituiria o padrão).
 - `importar-solucoes.ps1`: import com `--stage-and-upgrade`, alvo explícito, conexão só aceita o host dele; ordem do manifesto da camada mais baixa para a mais alta.
+- `trava.ps1` e `trava-publicacao.ps1`: trava por ambiente entre o Sistema e o `app-motoristas-v2`, em `cr40f_travapublicacao` (`provision-trava-publicacao-schema.ps1`). Ainda não ligada nos workflows: a tabela precisa chegar ao TEST e ao PROD antes.
 - `remover-camadas-active.ps1`: tira a camada Active de WebResource, Workflow, step, PluginAssembly, SystemForm, AppModule e SiteMap (hotfixes já estão na main). Pula a `BetinhosMotoristas` e o service worker do app, publicados pelo `app-motoristas-v2`. Roda com `-PermitirProd`.
 - `restaurar-estados.ps1`: devolve ligado/desligado de fluxos e steps conforme a foto; no TEST, novos ficam desligados (`-DesligarNovos`).
 - Comparação: perda de registros, tabelas, componentes, fluxo ou step que mudou de estado, variável ou configuração segura reprova; informativos: fluxos novos desligados, variáveis sem valor, chunks obsoletos, versões.
