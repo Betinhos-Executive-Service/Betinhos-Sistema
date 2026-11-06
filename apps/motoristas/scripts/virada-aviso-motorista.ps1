@@ -29,6 +29,7 @@ $oldFlowIds = @(
 $noticeType = "Betinhos.DriverRecordSharing.DriverNoticePlugin"
 $expectedSteps = 3
 $pendente = 100000000
+$semApp = 100000003
 $cancelado = 100000005
 $snapshotDir = Join-Path (Resolve-Path (Join-Path $PSScriptRoot "..")) "backup\aviso-motorista"
 
@@ -119,22 +120,25 @@ if (-not $Apply) {
 }
 if ($missing.Count) { throw "Virada bloqueada, faltam: $($missing -join '; ')." }
 
+# Repetir a virada com os antigos ja desligados nao pode sobrescrever o snapshot que a reversao usa.
 New-Item -ItemType Directory -Path $snapshotDir -Force | Out-Null
-$snapshotPath = Join-Path $snapshotDir ("estado-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".json")
-$snapshotJson = @{ flows = @($oldFlows | ForEach-Object { @{ workflowid = [string]$_.workflowid; name = [string]$_.name; statecode = [int]$_.statecode } }) } | ConvertTo-Json -Depth 5
-[IO.File]::WriteAllText($snapshotPath, $snapshotJson, (New-Object Text.UTF8Encoding($false)))
-Write-Step "snapshot em $snapshotPath"
+if ($toDisable.Count -gt 0 -or @(Get-ChildItem -LiteralPath $snapshotDir -Filter "estado-*.json").Count -eq 0) {
+  $snapshotPath = Join-Path $snapshotDir ("estado-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".json")
+  $snapshotJson = @{ flows = @($oldFlows | ForEach-Object { @{ workflowid = [string]$_.workflowid; name = [string]$_.name; statecode = [int]$_.statecode } }) } | ConvertTo-Json -Depth 5
+  [IO.File]::WriteAllText($snapshotPath, $snapshotJson, (New-Object Text.UTF8Encoding($false)))
+  Write-Step "snapshot em $snapshotPath"
+}
 
 # 1. Liga os novos. Antigos intactos: se isto falhar, nada mudou para o motorista.
 $newFlows = Get-NewFlows
 foreach ($flow in $newFlows) { Set-FlowState $flow 1 }
 
 # 2. Avisos gravados antes de o Enviar ligar nunca dispararam e foram atendidos pelos flows antigos: sem isto a
-#    Vigia acusaria todos como nao entregues.
+#    Vigia acusaria todos como nao entregues. "Sem app" entra junto para nao virar rajada de alertas.
 $cutoff = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-$backlog = @(Get-Rows "new_avisomotoristas" "new_avisomotoristaid" "new_situacao eq $pendente and createdon lt $cutoff")
+$backlog = @(Get-Rows "new_avisomotoristas" "new_avisomotoristaid" "(new_situacao eq $pendente or new_situacao eq $semApp) and createdon lt $cutoff")
 foreach ($row in $backlog) { Request "PATCH" "new_avisomotoristas($($row.new_avisomotoristaid))" @{ new_situacao = $cancelado } | Out-Null }
-Write-Step "avisos Pendente anteriores a virada cancelados: $($backlog.Count)"
+Write-Step "avisos Pendente ou Sem app anteriores a virada cancelados: $($backlog.Count)"
 
 # 3. So agora desliga os antigos. Falhou no meio: religa os que ja desligou.
 $disabled = @()

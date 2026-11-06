@@ -17,7 +17,7 @@ description: "Verifica o aviso de troca de motorista: DriverNoticePlugin (zerar 
 - O aviso nasce com o serviço de sistema (`CreateOrganizationService(null)`), nunca com o usuário que salvou.
 - A Vigia reenvia voltando o aviso para Pendente: o texto do push mora só no Enviar.
 - A tabela vem antes dos steps: `push-dev.ps1` provisiona antes de publicar o plugin, e o registro recusa sem ela.
-- Virada: novo liga antes de antigo desligar; reversão no sentido inverso. Flows antigos ficam desligados, nunca excluídos (cinco scripts leem "Novo Serviço" como modelo).
+- Virada: novo liga antes de antigo desligar; reversão no sentido inverso. Flows antigos ficam desligados, nunca excluídos (sete scripts leem "Novo Serviço" como modelo).
 
 ## Preparar ambiente
 - Copie `plugins/DriverRecordSharing/DriverRecordSharing.snk` (gitignored) do checkout principal para o worktree; não gere chave nova.

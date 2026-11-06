@@ -273,7 +273,7 @@ function Get-SpecPluginTypeId($Spec, $DefaultTypeId) {
 }
 
 function Get-Step($PluginTypeId, $MessageId, $FilterId, [int] $Stage) {
-  return @(Get-DataverseRows "sdkmessageprocessingsteps" "sdkmessageprocessingstepid,name,mode,stage,filteringattributes,supporteddeployment,statecode,asyncautodelete,_impersonatinguserid_value" "_eventhandler_value eq $PluginTypeId and _sdkmessageid_value eq $MessageId and _sdkmessagefilterid_value eq $FilterId and stage eq $Stage and statecode eq 0")
+  return @(Get-DataverseRows "sdkmessageprocessingsteps" "sdkmessageprocessingstepid,name,mode,stage,rank,filteringattributes,supporteddeployment,statecode,asyncautodelete,_impersonatinguserid_value" "_eventhandler_value eq $PluginTypeId and _sdkmessageid_value eq $MessageId and _sdkmessagefilterid_value eq $FilterId and stage eq $Stage and statecode eq 0")
 }
 
 function Get-PreImage($StepId) {
@@ -382,6 +382,8 @@ function Assert-Configuration([switch] $SkipAssemblyHash) {
     $step = $steps[0]
     if ([int]$step.mode -ne $spec.Mode -or [int]$step.stage -ne $stage -or [int]$step.supporteddeployment -ne 0 -or [int]$step.statecode -ne 0 -or [bool]$step.asyncautodelete -ne ($spec.Mode -eq 1)) { throw "$($spec.Label): modo, estagio, deployment, estado ou asyncautodelete divergente." }
     Assert-SameCsv $spec.Filtering ([string]$step.filteringattributes) "$($spec.Label): filtro"
+    $expectedRank = if ($spec.PSObject.Properties['Rank']) { [int]$spec.Rank } else { 1 }
+    if ([int]$step.rank -ne $expectedRank) { throw "$($spec.Label): rank $($step.rank), esperado $expectedRank." }
     if ($runAs -and [string]$step._impersonatinguserid_value -ne [string]$runAs.systemuserid) { throw "$($spec.Label): Run As divergente." }
     $images = @(Get-PreImage $step.sdkmessageprocessingstepid)
     if ($spec.PreImage.Count -eq 0) {

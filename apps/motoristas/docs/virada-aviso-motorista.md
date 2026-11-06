@@ -19,7 +19,7 @@ Na troca de motorista, "Novo Serviço", "Retirado da Agenda" e "Resetar" liam a 
 Regras:
 
 - **Visualização:** o motorista mudou, em qualquer status e por qualquer caminho (inclusive limpar o campo): zera na mesma gravação. Regravar o mesmo motorista não zera.
-- **Foi Programado:** vira "status final é Programado", exceto em serviço com `cr40f_ot`, em que quem projeta é o ciclo da troca de carro.
+- **Foi Programado:** na troca de motorista vira "status final é Programado", exceto em serviço com `cr40f_ot`, em que quem projeta é o ciclo da troca de carro. Mudança só de status não passa por esta regra (o step filtra `cr40f_motorista`).
 - **Novo:** status final Programado, com motorista, e (motorista mudou, ou status passou a Programado, ou Create).
 - **Retirado:** motorista mudou, havia motorista antigo e o status anterior era Programado.
 - **Sem app:** motorista sem `cr40f_emailmicrosoft`. Não dispara o Enviar; a Vigia alerta a operação.
@@ -28,7 +28,7 @@ Regras:
 
 Situações do aviso (`new_situacao`): Pendente 100000000, Enviado 100000001, Falhou 100000002, Sem app 100000003, Visto 100000004, Cancelado 100000005. Tipo (`new_tipo`): Novo 100000000, Retirado 100000001.
 
-O reenvio da Vigia volta o aviso para Pendente com `new_alertadoem` preenchido: o Enviar dispara de novo e o texto do push fica num lugar só.
+O reenvio da Vigia volta o aviso para Pendente com `new_alertadoem` preenchido: o Enviar dispara de novo e o texto do push fica num lugar só. Pendente parado há mais de 5 min também é regravado como Pendente ao alertar, o que dá uma nova tentativa de entrega. Se o reenvio virar Falhou, não há segundo alerta: `new_alertadoem` já está preenchido.
 
 ## Diferença de comportamento
 
@@ -56,7 +56,7 @@ No DEV, "Novo Serviço" e "Retirado" já estão em rascunho (06/11/2026); só "R
 
 `scripts/virada-aviso-motorista.ps1 -Reverter -Apply` religa os antigos que estavam ligados e desliga os novos, nessa ordem. Exige o snapshot em `backup/aviso-motorista/` da mesma máquina. Os steps seguem ativos; para tirar o plugin de cena, desative os três steps `DriverRecordSharing - Aviso motorista ...`.
 
-`scripts/patch-flow-troca-motorista.ps1` é a proteção provisória dos flows antigos e sai junto com esta virada.
+A proteção provisória dos flows antigos (`scripts/patch-flow-troca-motorista.ps1`, em PR próprio) perde o efeito com esta virada; depois dela, o script pode ser removido.
 
 ## PROD
 
@@ -68,7 +68,7 @@ O deploy precisa levar a tabela antes de o plugin ficar ativo; na mesma soluçã
 
 ## Modelos de flow
 
-Cinco `provision-*.ps1` leem a definição de "Novo Serviço | Motoristas" para copiar as referências de conexão. Eles leem o `clientdata`, que existe com o flow desligado. **Desligar não quebra; excluir quebra.** Mantenha "Novo Serviço", "Retirado" e "Resetar" desligados, sem excluir.
+Sete `provision-*.ps1` leem a definição de "Novo Serviço | Motoristas" para copiar as referências de conexão. Eles leem o `clientdata`, que existe com o flow desligado. **Desligar não quebra; excluir quebra.** Mantenha "Novo Serviço", "Retirado" e "Resetar" desligados, sem excluir.
 
 ## Como verificar
 
