@@ -3,10 +3,10 @@ import { resolve } from 'node:path'
 
 // Junta o build do Vite em dist/webresource.html para publicar como WebResource.
 // Build com um chunk só: CSS e JS vão inline (um arquivo, como sempre foi).
-// Build com code splitting (`--assets-url /WebResources/<prefixo>/assets/`): o CSS vai inline e os
-// chunks JS ficam como WebResources próprios nessa URL; dist/webresource-assets.json lista o que o
-// push-dev precisa publicar. O chunk de entrada não pode ir inline: os chunks das telas o importam
-// pela URL, e uma cópia inline seria um segundo React na mesma página.
+// Build com code splitting (`--assets-url /WebResources/<prefixo>/assets/`): o CSS da entrada vai inline; os
+// chunks JS e o CSS de cada tela (que o Vite carrega junto com o chunk dela) ficam como WebResources próprios
+// nessa URL; dist/webresource-assets.json lista o que o push-dev precisa publicar. O chunk de entrada não pode
+// ir inline: os chunks das telas o importam pela URL, e uma cópia inline seria um segundo React na mesma página.
 const args = process.argv.slice(2)
 const flag = args.indexOf('--assets-url')
 const assetsUrl = flag >= 0 ? args[flag + 1] : null
@@ -19,6 +19,7 @@ const assetPattern = /(?:src|href)="(\/assets\/[^"]+)"/g
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const assetFiles = await readdir(resolve(dist, 'assets'))
 const jsFiles = assetFiles.filter((name) => name.endsWith('.js'))
+const cssFiles = assetFiles.filter((name) => name.endsWith('.css'))
 const split = jsFiles.length > 1
 
 // Git Bash (MSYS) converte argumentos que começam com "/" em caminho do Windows
@@ -34,14 +35,18 @@ if (split) {
   }
   const others = assetFiles.filter((name) => !name.endsWith('.js') && !name.endsWith('.css'))
   if (others.length) throw new Error(`Arquivos em dist/assets sem publicação definida: ${others.join(', ')}`)
-  const invalid = jsFiles.filter((name) => !/^[A-Za-z0-9.]+\.js$/.test(name))
+  const invalid = [...jsFiles, ...cssFiles].filter((name) => !/^[A-Za-z0-9.]+\.(js|css)$/.test(name))
   if (invalid.length) throw new Error(`Nome de chunk inválido para WebResource (só letras, números e pontos): ${invalid.join(', ')}`)
 }
+
+// O CSS citado no HTML (o da entrada) vai inline; o das telas vira WebResource.
+const inlinedCss = new Set()
 
 for (const [, assetPath] of [...html.matchAll(assetPattern)]) {
   const escapedPath = escapeRegExp(assetPath)
 
   if (assetPath.endsWith('.css')) {
+    inlinedCss.add(assetPath.slice('/assets/'.length))
     const content = await readFile(resolve(dist, assetPath.slice(1)), 'utf8')
     html = html.replace(new RegExp(`<link[^>]+href="${escapedPath}"[^>]*>`), () => `<style>${content}</style>`)
   } else if (split) {
@@ -60,9 +65,10 @@ await writeFile(resolve(dist, 'webresource.html'), html, 'utf8')
 
 if (split) {
   const prefix = assetsUrl.slice('/WebResources/'.length)
-  const chunks = jsFiles.map((file) => ({ name: `${prefix}${file}`, file: `assets/${file}` }))
+  const pageCss = cssFiles.filter((file) => !inlinedCss.has(file))
+  const chunks = [...jsFiles, ...pageCss].map((file) => ({ name: `${prefix}${file}`, file: `assets/${file}` }))
   await writeFile(manifestPath, `${JSON.stringify(chunks, null, 2)}\n`, 'utf8')
-  console.log(`dist/webresource.html gerado com CSS inline e ${chunks.length} chunks JS em ${assetsUrl} (dist/webresource-assets.json)`)
+  console.log(`dist/webresource.html gerado com CSS inline, ${jsFiles.length} chunks JS e ${pageCss.length} CSS de telas em ${assetsUrl} (dist/webresource-assets.json)`)
 } else {
   console.log('dist/webresource.html gerado com CSS e JavaScript inline')
 }
