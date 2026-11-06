@@ -11,7 +11,7 @@ import './inicio.css'
 
 /** Comunicados da Home (cr40f_comunicadohome) ainda são geridos no WebResource antigo. */
 const ROTA_GERENCIAR_COMUNICADOS = 'cr40f_gerenciarcomunicados'
-const QUANTOS: Record<string, number> = { operacao: 4, financeiro: 3, ti_marketing: 4, gestao: 4 }
+const QUANTOS: Record<string, number> = { operacao: 4, financeiro: 3, ti_marketing: 2, gestao: 4 }
 
 const irPara = (rota: string, params?: Record<string, string>) => { location.hash = hrefFor(rota, params) }
 

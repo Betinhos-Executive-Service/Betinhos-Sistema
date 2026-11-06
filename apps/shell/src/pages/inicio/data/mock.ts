@@ -57,7 +57,7 @@ function visao(v: DadosVisao['visao'], now: Date): DadosVisao {
     return { visao: v, ...dadosFinanceiro({ reservas: hoje, aReceber: todas, passageiros, caixa }, now, inicio), erro: null }
   }
   if (v === 'ti_marketing') {
-    return { visao: v, indicadores: indicadoresTi({ async: [{ statuscode: 31 }, { statuscode: 20 }, { statuscode: 20 }, { statuscode: 0 }, { statuscode: 10 }], leads: Array.from({ length: 8 }, () => ({})), campanhas: [{}, {}] }), aReceber: [], erro: null }
+    return { visao: v, indicadores: indicadoresTi({ async: [{ statuscode: 31 }, { statuscode: 20 }, { statuscode: 20 }, { statuscode: 0 }, { statuscode: 10 }], leads: null, campanhas: null }), aReceber: [], erro: null }
   }
   const precos = [{ cr40f_composicaodeprecosid: 'p1', new_valortotal: 46000, new_status: 100000001 }, { cr40f_composicaodeprecosid: 'p2', new_valortotal: 38000, new_status: 100000001 }]
   const reservasDoMes = [
