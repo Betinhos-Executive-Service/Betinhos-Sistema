@@ -388,6 +388,18 @@ Confere ((Update-DvToken $dvNovo).Headers.Authorization -eq 'atual') 'token: con
 Confere ((Test-FalhaTransitoriaDoServidor 'The reason given was: Connection State is closed. Please open the connection') -and -not (Test-FalhaTransitoriaDoServidor 'Cannot create a holding solution')) 'pac: Connection State is closed e transitoria'
 $script:SegundosEntreTentativas = 0
 $script:pacChamadas = 0
+Confere (((Get-ArgumentosDeImport 'x.zip' '1.0.0.4' 'c.json') -join ' ') -like '*--settings-file c.json*') 'import passa o arquivo de configuracao'
+Confere (-not ((Get-ArgumentosDeImport 'x.zip' '1.0.0.4') -contains '--settings-file')) 'import sem configuracao nao passa --settings-file'
+Confere ((Falha-Com { Assert-ConexaoWebPush @('BetinhosCore', 'BetinhosAutomacao') 'Prod' '' }) -like '*CONEXAO_WEBPUSH*') 'PROD com Automacao sem conexao recusa'
+Confere ($null -eq (Falha-Com { Assert-ConexaoWebPush @('BetinhosCore') 'Prod' '' })) 'PROD so com Core passa sem conexao'
+Confere ($null -eq (Falha-Com { Assert-ConexaoWebPush @('BetinhosCore', 'BetinhosAutomacao') 'Prod' 'abc' })) 'PROD com conexao passa'
+Confere ($null -eq (Falha-Com { Assert-ConexaoWebPush @('BetinhosAutomacao') 'Test' '' })) 'TEST sem conexao passa'
+$pastaCfg = Join-Path ([IO.Path]::GetTempPath()) ([Guid]::NewGuid().ToString('N')); [void] [IO.Directory]::CreateDirectory($pastaCfg)
+$cfg = New-ConfiguracaoDeImport $pastaCfg 'BetinhosAutomacao' 'abc'
+$lido = Get-Content -LiteralPath $cfg -Raw | ConvertFrom-Json
+Confere (@($lido.ConnectionReferences).Count -eq 1 -and @($lido.ConnectionReferences)[0].LogicalName -eq 'new_webpushmotoristas' -and @($lido.ConnectionReferences)[0].ConnectionId -eq 'abc') 'configuracao traz a referencia do Web Push'
+Confere (-not (New-ConfiguracaoDeImport $pastaCfg 'BetinhosCore' 'abc') -and -not (New-ConfiguracaoDeImport $pastaCfg 'BetinhosAutomacao' '')) 'sem configuracao fora da Automacao ou sem conexao'
+Remove-Item -LiteralPath $pastaCfg -Recurse -Force
 function Invoke-Pac([string] $Url, [string[]] $Argumentos) { $script:pacChamadas++; if ($script:pacChamadas -eq 1) { throw "pac solution import falhou: Connection State is closed." }; return @() }
 function Get-ManifestoDoPacote([string] $ZipPath) { return @{ UniqueName = 'BetinhosCore'; Version = '1.0.0.9'; Managed = $true } }
 # versao instalada: antes (1.0.0.8) nas consultas da 1a tentativa e da checagem, depois 1.0.0.9 na prova final
