@@ -116,7 +116,7 @@ npm test
 if ($LASTEXITCODE -ne 0) { throw "Testes do App Motoristas falharam." }
 npx tsc --noEmit --noUnusedLocals --noUnusedParameters
 if ($LASTEXITCODE -ne 0) { throw "TypeScript do App Motoristas falhou." }
-npm run build
+node scripts/build-react-singlefile.cjs --no-version
 if ($LASTEXITCODE -ne 0) { throw "Build do App Motoristas falhou." }
 
 if ($IncludeOperacionais) {
@@ -258,27 +258,7 @@ Write-Step "publish exchange lifecycle command resources"
   -Apply `
   -DeviceCode:$DeviceCode
 
-# O webresource do App vai por ultimo: ele pede no $select colunas criadas pelo plugin e pelos
-# provisionamentos acima (ex.: provision-checklists). Publicado antes, a consulta devolveria 400;
-# se algum provisionamento falhar, o script para aqui e o app antigo continua no ar.
-# O deploy refaz o build (com bump de versao), entao a versao exibida e a publicada sao a mesma.
-Write-Step "publish webresource in $solutionUniqueName"
-& (Join-Path $PSScriptRoot "deploy-webresource.ps1") `
-  -EnvironmentUrl $environmentUrl `
-  -WebResourceName "new_app-motoristas-v2" `
-  -SolutionUniqueName $solutionUniqueName `
-  -DeviceCode:$DeviceCode
-
-# Service worker do PWA (JS, escopo /WebResources/): vai depois do HTML, que ja refez o build e gerou dist/sw.js.
-Write-Step "publish service worker in $solutionUniqueName"
-& (Join-Path $PSScriptRoot "deploy-webresource.ps1") `
-  -EnvironmentUrl $environmentUrl `
-  -WebResourceName "new_app-motoristas-v2-sw" `
-  -FilePath "dist/sw.js" `
-  -CreateType 3 `
-  -SkipBuild `
-  -SolutionUniqueName $solutionUniqueName `
-  -DeviceCode:$DeviceCode
+# O app e o service worker saem so pelo workflow Deploy (develop -> DEV, scripts/push-front-dev.ps1).
 
 if ($SemBackupSolucao) {
   Write-Warning "[push-dev] -SemBackupSolucao: export final e validacao do ZIP pulados; valide os componentes pelos scripts validate-*."
