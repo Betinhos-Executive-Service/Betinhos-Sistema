@@ -137,8 +137,14 @@ function toPayer(row: Record<string, unknown>, people: Map<Guid, Person>): Payer
   const person = personId ? people.get(personId) : undefined
   if (!person) return null
   const emailStatusValue = text(row, 'cr40f_statusenvioemail')
+  const receiptPerson = row.cr40f_DestinatarioRecibo as { cr40f_bancodedadosid?: string; cr40f_nomedopassageiro?: string; cr40f_email?: string } | null | undefined
+  const receiptEmail = text(row, 'cr40f_emailrecibo')
+  const recipient: Partial<Payer> = receiptPerson?.cr40f_bancodedadosid
+    ? { recipientId: receiptPerson.cr40f_bancodedadosid, recipientName: receiptPerson.cr40f_nomedopassageiro ?? '', recipientEmail: receiptPerson.cr40f_email ?? '' }
+    : receiptEmail ? { recipientEmail: receiptEmail } : {}
   return {
     ...person,
+    ...recipient,
     existingPayerId: text(row, 'cr40f_pagantesid'),
     paymentStatus: text(row, 'cr40f_status@OData.Community.Display.V1.FormattedValue'),
     amountCents: moneyToCents(row.cr40f_valor),
@@ -154,9 +160,10 @@ function toPayer(row: Record<string, unknown>, people: Map<Guid, Person>): Payer
 }
 
 async function fetchExistingPayers(recordId: Guid): Promise<Array<Record<string, unknown>>> {
-  const baseSelect = 'cr40f_pagantesid,_cr40f_financeiro_value,_cr40f_bancodedados_value,cr40f_valor,cr40f_formadepagamento,cr40f_status,cr40f_statusgeracaolink,cr40f_statusenvioemail,cr40f_errogeracaolink,cr40f_erroenvioemail,cr40f_linkdepagamento,cr40f_cielolinkid,cr40f_cieloordernumber'
+  const baseSelect = 'cr40f_emailrecibo,cr40f_pagantesid,_cr40f_financeiro_value,_cr40f_bancodedados_value,cr40f_valor,cr40f_formadepagamento,cr40f_status,cr40f_statusgeracaolink,cr40f_statusenvioemail,cr40f_errogeracaolink,cr40f_erroenvioemail,cr40f_linkdepagamento,cr40f_cielolinkid,cr40f_cieloordernumber'
   const filter = `$filter=_cr40f_financeiro_value eq ${recordId}`
-  return fetchAll('cr40f_pagantes', `?$select=${baseSelect}&${filter}`)
+  const expand = '$expand=cr40f_DestinatarioRecibo($select=cr40f_nomedopassageiro,cr40f_email)'
+  return fetchAll('cr40f_pagantes', `?$select=${baseSelect}&${expand}&${filter}`)
 }
 
 export async function loadOperation(recordId: Guid): Promise<OperationData> {

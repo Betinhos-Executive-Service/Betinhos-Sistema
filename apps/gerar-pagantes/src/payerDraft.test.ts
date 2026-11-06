@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Payer, Person } from './domain'
-import { changeCount, diffDrafts, draftReducer, initialState, toSubmitPayers, validate, type DraftState } from './payerDraft'
+import { changeCount, diffDrafts, draftFromPayer, draftFromPerson, draftReducer, initialState, toSubmitPayers, validate, type DraftState } from './payerDraft'
 
 const person = (n: number, role: Person['role'] = 'Passageiro', email = `p${n}@x.com`): Person => ({ id: `00000000-0000-0000-0000-00000000000${n}`, name: `Pessoa ${n}`, email, phone: '', role })
 const saved = (n: number, amountCents: number, extra: Partial<Payer> = {}): Payer => ({ ...person(n), existingPayerId: `r${n}`, amountCents, paymentMethod: 202410000, generateLink: true, sendEmail: true, linkStatus: 'Generated', emailStatus: 'Sent', paymentStatus: 'Pendente', ...extra })
@@ -103,5 +103,69 @@ describe('diff e envio', () => {
     const original = [saved(1, 5000), saved(2, 5000)]
     const state = run(initialState(original, [], TOTAL), { type: 'remove', key: 'r2', totalCents: TOTAL }, { type: 'toggleResend', key: 'r1' })
     expect(toSubmitPayers(state.drafts)).toEqual([expect.objectContaining({ paganteId: person(1).id, existingPaganteId: 'r1', resendEmail: true })])
+  })
+})
+
+describe('destinatário do recibo', () => {
+  const pagante: Person = { id: '10000000-0000-4000-8000-000000000001', name: 'Renan', email: 'renan@empresa.com.br', phone: '', role: 'Solicitante' }
+  const julia: Person = { id: '10000000-0000-4000-8000-000000000002', name: 'Júlia', email: 'julia@empresa.com.br', phone: '', role: 'Passageiro' }
+  const inicial = (): DraftState => ({ drafts: [{ ...draftFromPerson(pagante), amountCents: 100 }], pendingEmails: {} })
+  const key = pagante.id
+
+  it('marca o recibo por padrão e envia a pessoa escolhida', () => {
+    const state = draftReducer(inicial(), { type: 'setRecipient', key, person: julia })
+    expect(toSubmitPayers(state.drafts)[0]).toMatchObject({ recipientId: julia.id, recipientName: 'Júlia', recipientEmail: julia.email, receiptToRecipient: true })
+  })
+
+  it('e-mail digitado vai sem pessoa e não cria cadastro', () => {
+    const state = draftReducer(inicial(), { type: 'setRecipientEmail', key, email: ' secretaria@empresa.com.br ' })
+    const [payer] = toSubmitPayers(state.drafts)
+    expect(payer.recipientId).toBeUndefined()
+    expect(payer.recipientEmail).toBe('secretaria@empresa.com.br')
+    expect(state.pendingEmails).toEqual({})
+    expect(validate(state.drafts, 100).rowErrors.size).toBe(0)
+  })
+
+  it('exige e-mail válido do destinatário mesmo sem enviar o e-mail do link', () => {
+    let state = draftReducer(inicial(), { type: 'setEmail', key, sendEmail: false })
+    state = draftReducer(state, { type: 'setRecipient', key, person: { ...julia, email: '' } })
+    expect(validate(state.drafts, 100).rowErrors.get(key)).toEqual(['Informe um e-mail válido para o envio.'])
+  })
+
+  it('reabre o destinatário gravado sem acusar alteração', () => {
+    const saved = { ...draftFromPerson(pagante), existingPayerId: '20000000-0000-4000-8000-000000000001', recipientId: undefined, recipientName: undefined, recipientEmail: 'secretaria@empresa.com.br' }
+    const drafts = [draftFromPayer(saved)]
+    expect(drafts[0].recipientId).toBeUndefined()
+    expect(drafts[0].receiptToRecipient).toBe(true)
+    expect(diffDrafts([saved], drafts).edited).toEqual([])
+  })
+
+  it('voltar ao próprio pagante com o recibo desmarcado não acusa alteração', () => {
+    const saved = { ...draftFromPerson(pagante), existingPayerId: '20000000-0000-4000-8000-000000000001' }
+    let state: DraftState = { drafts: [draftFromPayer(saved)], pendingEmails: {} }
+    state = draftReducer(state, { type: 'setRecipient', key: saved.existingPayerId, person: julia })
+    state = draftReducer(state, { type: 'setReceipt', key: saved.existingPayerId, receiptToRecipient: false })
+    state = draftReducer(state, { type: 'setRecipient', key: saved.existingPayerId, person: pagante })
+    expect(diffDrafts([saved], state.drafts).edited).toEqual([])
+  })
+
+  it('pago com destinatário sem e-mail não bloqueia a OP', () => {
+    const saved = { ...draftFromPerson(pagante), amountCents: 100, existingPayerId: '20000000-0000-4000-8000-000000000001', paymentStatus: 'Pago', recipientId: julia.id, recipientName: 'Júlia', recipientEmail: '' }
+    expect(validate([draftFromPayer(saved)], 100).rowErrors.size).toBe(0)
+  })
+
+  it('trocar destinatário com o e-mail desligado não pede reenvio', () => {
+    const saved = { ...draftFromPerson(pagante), existingPayerId: '20000000-0000-4000-8000-000000000001', emailStatus: 'Sent' as const }
+    let state: DraftState = { drafts: [draftFromPayer(saved)], pendingEmails: {} }
+    state = draftReducer(state, { type: 'setEmail', key: saved.existingPayerId, sendEmail: false })
+    state = draftReducer(state, { type: 'setRecipient', key: saved.existingPayerId, person: julia })
+    expect(toSubmitPayers(state.drafts)[0].resendEmail).toBeUndefined()
+  })
+
+  it('desmarcar o recibo conta como alteração', () => {
+    const saved = { ...draftFromPerson(julia), id: pagante.id, existingPayerId: '20000000-0000-4000-8000-000000000001', recipientId: julia.id, recipientName: 'Júlia' }
+    const state = draftReducer({ drafts: [draftFromPayer(saved)], pendingEmails: {} }, { type: 'setReceipt', key: saved.existingPayerId, receiptToRecipient: false })
+    expect(diffDrafts([saved], state.drafts).edited).toHaveLength(1)
+    expect(toSubmitPayers(state.drafts)[0].receiptToRecipient).toBe(false)
   })
 })

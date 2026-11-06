@@ -60,6 +60,10 @@ export const ENTRADAS = [
     arquivos: [script('lembrete-pagamento'), flowsDir('lembrete-pagamento\\.ps1')],
   },
   {
+    nome: 'recibo-destinatario', script: 'provision-flow-recibo-destinatario.ps1', flows: ['Flow Enviar Recibo Automático', 'Flow Gerar Recibo Manual'],
+    arquivos: [script('recibo-destinatario'), flowsDir('recibo-destinatario\\.mjs')],
+  },
+  {
     nome: 'portal-cliente-emails', script: 'provision-flow-portal-cliente-emails.ps1', flows: ['Portal cliente – e-mails'], apply: true,
     args: [['CaixaCompartilhada', 'FLOW_PORTAL_CAIXA_COMPARTILHADA']],
     arquivos: [script('portal-cliente-emails'), flowsDir('portal-cliente-emails\\.json', 'portal-cliente-emails/[^/]+\\.html')],

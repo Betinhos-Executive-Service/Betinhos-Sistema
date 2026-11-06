@@ -1,9 +1,9 @@
-import { Avatar, Button, Cluster, Field, Input, Select, StatusBadge, Switch, Tooltip } from '@betinhos-executive-service/ui'
+import { Avatar, Button, Checkbox, Cluster, Field, Input, Select, StatusBadge, Switch, Tooltip } from '@betinhos-executive-service/ui'
 import { Check, CircleAlert, Copy, Lock, LockOpen, Mail, RotateCcw, Send, Trash2, Undo2, UserRoundPen } from 'lucide-react'
 import { memo, useEffect, useState, type FormEvent } from 'react'
-import { EMAIL_MAX_LENGTH, emailValid, PAYMENT_METHODS, type Person, type PersonSearch } from '../../domain'
+import { EMAIL_MAX_LENGTH, emailValid, PAYMENT_METHODS, RECEIPT_EMAIL_MAX_LENGTH, type Person, type PersonSearch } from '../../domain'
 import { formatCurrency, hasValidCurrencyPrecision, parseCurrency } from '../../money'
-import { isCard, type DraftAction, type PayerDraft } from '../../payerDraft'
+import { isCard, needsRecipient, recipientIsOther, recipientLabel, type DraftAction, type PayerDraft } from '../../payerDraft'
 import { PersonSelect } from './PersonSelect'
 
 export type RowChange = 'new' | 'edited' | 'unchanged'
@@ -31,6 +31,7 @@ export const PayerEditorRow = memo(function PayerEditorRow({ draft, change, erro
   const key = draft.key
   const readOnly = draft.settled || draft.removed
   const sendsEmail = draft.generateLink && draft.sendEmail
+  const choosesRecipient = draft.generateLink && !draft.settled
   const recipientHasEmail = emailValid(draft.recipientEmail ?? '')
   const saved = Boolean(draft.existingPayerId)
 
@@ -81,18 +82,22 @@ export const PayerEditorRow = memo(function PayerEditorRow({ draft, change, erro
           {isCard(draft.paymentMethod) ? <>
             <Switch label="Link" checked={draft.generateLink} disabled={readOnly} onChange={(event) => dispatch({ type: 'setLink', key, generateLink: event.target.checked })} />
             <Switch label="E-mail" checked={draft.sendEmail} disabled={readOnly || !draft.generateLink} onChange={(event) => dispatch({ type: 'setEmail', key, sendEmail: event.target.checked })} />
-            {sendsEmail && !draft.settled && !pickingRecipient ? <RecipientChip draft={draft} onPick={() => setPickingRecipient(true)} /> : null}
+            {choosesRecipient && !pickingRecipient ? <RecipientChip draft={draft} onPick={() => setPickingRecipient(true)} /> : null}
           </> : <small>Sem link de pagamento</small>}
         </div>
       </div>
 
-      {sendsEmail && !draft.settled && pickingRecipient ? <div className="payer-editor__picker" onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setPickingRecipient(false) } }}>
+      {choosesRecipient && pickingRecipient ? <div className="payer-editor__picker" onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setPickingRecipient(false) } }}>
         <Mail size={15} aria-hidden="true" />
-        <PersonSelect size="compact" ariaLabel={`Destinatário do e-mail de ${draft.name}`} placeholder="Para quem vai o e-mail?" suggestions={people} excludedIds={new Set([draft.recipientId ?? ''])} onSearch={onSearch}
+        <PersonSelect size="compact" ariaLabel={`Destinatário do e-mail de ${draft.name}`} placeholder="Pesquisar pessoa" suggestions={people} excludedIds={new Set([draft.recipientId ?? ''])} onSearch={onSearch}
           onSelect={(person) => { dispatch({ type: 'setRecipient', key, person }); setPickingRecipient(false) }} />
+        <EmailForm label="Ou digite um e-mail" hint="Não cria cadastro." maxLength={RECEIPT_EMAIL_MAX_LENGTH} onSave={(email) => { dispatch({ type: 'setRecipientEmail', key, email }); setPickingRecipient(false) }} />
         <Button variant="ghost" size="compact" onClick={() => setPickingRecipient(false)}>Cancelar</Button>
       </div> : null}
-      {sendsEmail && !draft.settled && !pickingRecipient && !recipientHasEmail ? <div className="payer-editor__missing-wrap"><MissingEmail personId={draft.recipientId ?? draft.id} personName={draft.recipientName ?? draft.name} onSave={(personId, email) => dispatch({ type: 'setPersonEmail', personId, email })} /></div> : null}
+      {choosesRecipient && !pickingRecipient && !recipientHasEmail && needsRecipient(draft) ? <div className="payer-editor__missing-wrap"><EmailForm label={`E-mail de ${draft.recipientName ?? draft.name}`} hint="Será gravado no cadastro ao salvar." onSave={(email) => dispatch({ type: 'setPersonEmail', personId: draft.recipientId ?? draft.id, email })} /></div> : null}
+      {choosesRecipient && recipientIsOther(draft) ? <div className="payer-editor__receipt">
+        <Checkbox label="Enviar também o recibo" description={`Vai para ${recipientLabel(draft)}. Desmarcado, vai para ${draft.name}.`} checked={draft.receiptToRecipient} onChange={(event) => dispatch({ type: 'setReceipt', key, receiptToRecipient: event.currentTarget.checked })} />
+      </div> : null}
 
       {saved ? <div className="payer-editor__status">
         <Cluster>
@@ -115,33 +120,33 @@ export const PayerEditorRow = memo(function PayerEditorRow({ draft, change, erro
  * (o e-mail já está sob o nome); fica em atenção quando falta e-mail.
  */
 function RecipientChip({ draft, onPick }: { draft: PayerDraft; onPick: () => void }) {
-  const self = (draft.recipientId ?? draft.id) === draft.id
+  const self = !recipientIsOther(draft)
   const email = draft.recipientEmail ?? ''
   const hasEmail = emailValid(email)
-  const label = self ? 'Para o próprio pagante' : `Para ${draft.recipientName}`
+  const label = self ? 'Para o próprio pagante' : `Para ${recipientLabel(draft)}`
   const hint = hasEmail ? email : 'Sem e-mail cadastrado'
   const tone = hasEmail ? (self ? 'neutral' : 'info') : 'warning'
   if (self && hasEmail) {
-    return <Tooltip text="Trocar destinatário do e-mail"><Button variant="ghost" size="compact" icon={<UserRoundPen size={15} />} aria-label={`Trocar destinatário do e-mail de ${draft.name}`} onClick={onPick} /></Tooltip>
+    return <Tooltip text="Trocar destinatário"><Button variant="ghost" size="compact" icon={<UserRoundPen size={15} />} aria-label={`Trocar destinatário de ${draft.name}`} onClick={onPick} /></Tooltip>
   }
   return <Tooltip text={`${hint}. Clique para trocar.`}>
     <button type="button" className={`payer-editor__chip payer-editor__chip--${tone}`} onClick={onPick} aria-label={`${label}, ${hint}. Trocar destinatário`}>
-      <Mail size={13} aria-hidden="true" /><span>{self ? 'Sem e-mail' : draft.recipientName}</span>
+      <Mail size={13} aria-hidden="true" /><span>{self ? 'Sem e-mail' : recipientLabel(draft)}</span>
     </button>
   </Tooltip>
 }
 
-function MissingEmail({ personId, personName, onSave }: { personId: string; personName: string; onSave: (personId: string, email: string) => void }) {
+function EmailForm({ label, hint, maxLength = EMAIL_MAX_LENGTH, onSave }: { label: string; hint: string; maxLength?: number; onSave: (email: string) => void }) {
   const [value, setValue] = useState('')
   const [error, setError] = useState('')
   function submit(event: FormEvent) {
     event.preventDefault()
-    if (!emailValid(value) || value.trim().length > EMAIL_MAX_LENGTH) { setError('Informe um e-mail válido, como nome@empresa.com.br.'); return }
-    onSave(personId, value)
+    if (!emailValid(value) || value.trim().length > maxLength) { setError('Informe um e-mail válido, como nome@empresa.com.br.'); return }
+    onSave(value)
   }
   return <form className="payer-editor__missing" onSubmit={submit} noValidate>
-    <Field label={`E-mail de ${personName}`} error={error || undefined} hint={error ? undefined : 'Será gravado no cadastro ao salvar.'}>
-      <Input type="email" inputMode="email" autoComplete="off" size="compact" maxLength={EMAIL_MAX_LENGTH} value={value} placeholder="nome@empresa.com.br" onChange={(event) => { setValue(event.target.value); setError('') }} />
+    <Field label={label} error={error || undefined} hint={error ? undefined : hint}>
+      <Input type="email" inputMode="email" autoComplete="off" size="compact" maxLength={maxLength} value={value} placeholder="nome@empresa.com.br" onChange={(event) => { setValue(event.target.value); setError('') }} />
     </Field>
     <Button type="submit" variant="secondary" size="compact">Usar e-mail</Button>
   </form>

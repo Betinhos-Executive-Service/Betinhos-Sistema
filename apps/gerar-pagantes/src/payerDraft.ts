@@ -15,6 +15,8 @@ export interface PayerDraft extends Payer {
   resendEmail: boolean
   /** Pago ou Autorizado: somente leitura. */
   settled: boolean
+  /** Destinatário diferente do pagante também recebe o recibo. */
+  receiptToRecipient: boolean
 }
 
 export interface DraftState {
@@ -27,12 +29,20 @@ export const isSettledStatus = (status?: string) => /^(pago|autorizado)$/i.test(
 export const isCard = (method: number) => method === CARD
 export const activeDrafts = (drafts: PayerDraft[]) => drafts.filter((draft) => !draft.removed)
 
+/** Sem id e com e-mail: digitado sem cadastro. Sem nada: o próprio pagante. */
+const recipientIdOf = (payer: Payer) => payer.recipientId ?? (payer.recipientEmail ? undefined : payer.id)
+export const recipientIsOther = (draft: PayerDraft) => draft.recipientId !== draft.id
+export const recipientLabel = (draft: PayerDraft) => draft.recipientName ?? draft.recipientEmail ?? ''
+export const needsRecipient = (draft: PayerDraft) => !draft.settled && draft.generateLink && (draft.sendEmail || (recipientIsOther(draft) && draft.receiptToRecipient))
+
 export function draftFromPayer(payer: Payer): PayerDraft {
+  const recipientId = recipientIdOf(payer)
   return {
     ...payer,
-    recipientId: payer.recipientId ?? payer.id,
-    recipientName: payer.recipientName ?? payer.name,
+    recipientId,
+    recipientName: payer.recipientName ?? (recipientId ? payer.name : undefined),
     recipientEmail: payer.recipientEmail ?? payer.email,
+    receiptToRecipient: true,
     key: payer.existingPayerId ?? payer.id,
     amountLocked: true,
     removed: false,
@@ -52,6 +62,7 @@ export function draftFromPerson(person: Person): PayerDraft {
     recipientId: person.id,
     recipientName: person.name,
     recipientEmail: person.email,
+    receiptToRecipient: true,
     linkStatus: 'NotApplicable',
     emailStatus: 'NotApplicable',
     amountLocked: false,
@@ -90,11 +101,19 @@ export type DraftAction =
   | { type: 'setLink'; key: string; generateLink: boolean }
   | { type: 'setEmail'; key: string; sendEmail: boolean }
   | { type: 'setRecipient'; key: string; person: Person }
+  | { type: 'setRecipientEmail'; key: string; email: string }
+  | { type: 'setReceipt'; key: string; receiptToRecipient: boolean }
   | { type: 'setPersonEmail'; personId: Guid; email: string }
   | { type: 'toggleResend'; key: string }
 
 function patch(drafts: PayerDraft[], key: string, change: Partial<PayerDraft>) {
   return drafts.map((draft) => draft.key === key && !draft.settled ? { ...draft, ...change } : draft)
+}
+
+// Trocar destinatário de cobrança já enviada exige reenvio para o novo endereço.
+function resendAfterRecipientChange(drafts: PayerDraft[], key: string) {
+  const target = drafts.find((draft) => draft.key === key)
+  return Boolean(target?.resendEmail) || Boolean(target?.existingPayerId && target.emailStatus === 'Sent')
 }
 
 export function draftReducer(state: DraftState, action: DraftAction): DraftState {
@@ -124,12 +143,11 @@ export function draftReducer(state: DraftState, action: DraftAction): DraftState
     case 'setLink': return { ...state, drafts: drafts.map((draft) => draft.key === action.key && !draft.settled ? { ...draft, generateLink: action.generateLink, sendEmail: action.generateLink && draft.sendEmail } : draft) }
     case 'setEmail': return { ...state, drafts: patch(drafts, action.key, { sendEmail: action.sendEmail }) }
     case 'setRecipient': {
-      // Trocar destinatário de cobrança já enviada exige reenvio para o novo endereço.
-      const target = drafts.find((draft) => draft.key === action.key)
-      const resendEmail = Boolean(target?.existingPayerId && target.emailStatus === 'Sent')
       const email = state.pendingEmails[action.person.id] ?? action.person.email
-      return { ...state, drafts: patch(drafts, action.key, { recipientId: action.person.id, recipientName: action.person.name, recipientEmail: email, resendEmail: resendEmail || Boolean(target?.resendEmail) }) }
+      return { ...state, drafts: patch(drafts, action.key, { recipientId: action.person.id, recipientName: action.person.name, recipientEmail: email, resendEmail: resendAfterRecipientChange(drafts, action.key) }) }
     }
+    case 'setRecipientEmail': return { ...state, drafts: patch(drafts, action.key, { recipientId: undefined, recipientName: undefined, recipientEmail: action.email.trim(), resendEmail: resendAfterRecipientChange(drafts, action.key) }) }
+    case 'setReceipt': return { ...state, drafts: patch(drafts, action.key, { receiptToRecipient: action.receiptToRecipient }) }
     case 'setPersonEmail': {
       const email = action.email.trim()
       return {
@@ -158,7 +176,8 @@ export function validate(drafts: PayerDraft[], totalCents: number): DraftValidat
   for (const draft of active) {
     const errors: string[] = []
     if (draft.amountCents <= 0) errors.push('Informe um valor maior que zero.')
-    if (draft.generateLink && draft.sendEmail && !(guidValid(draft.recipientId) && draft.recipientName?.trim() && emailValid(draft.recipientEmail ?? ''))) errors.push('Informe um e-mail válido para o envio.')
+    const recipientValid = emailValid(draft.recipientEmail ?? '') && (!draft.recipientId || (guidValid(draft.recipientId) && Boolean(draft.recipientName?.trim())))
+    if (needsRecipient(draft) && !recipientValid) errors.push('Informe um e-mail válido para o envio.')
     if (errors.length) rowErrors.set(draft.key, errors)
   }
   const allocatedCents = active.reduce((sum, draft) => sum + draft.amountCents, 0)
@@ -176,7 +195,8 @@ export function diffDrafts(original: Payer[], drafts: PayerDraft[]): DraftChange
   const byRecord = new Map(original.filter((payer) => payer.existingPayerId).map((payer) => [payer.existingPayerId, payer]))
   const changed = (before: Payer, after: PayerDraft) =>
     before.amountCents !== after.amountCents || before.paymentMethod !== after.paymentMethod || before.generateLink !== after.generateLink ||
-    before.sendEmail !== after.sendEmail || (before.recipientId ?? before.id) !== after.recipientId || (before.recipientEmail ?? before.email) !== after.recipientEmail
+    before.sendEmail !== after.sendEmail || recipientIdOf(before) !== after.recipientId || (before.recipientEmail ?? before.email) !== after.recipientEmail ||
+    (recipientIsOther(after) && !after.receiptToRecipient)
   const kept = activeDrafts(drafts).filter((draft) => draft.existingPayerId && byRecord.has(draft.existingPayerId))
   const edited = kept.flatMap((after) => {
     const before = byRecord.get(after.existingPayerId)
@@ -198,13 +218,14 @@ export function toSubmitPayers(drafts: PayerDraft[]): SubmitRequest['pagantes'] 
     existingPaganteId: draft.existingPayerId,
     name: draft.name,
     email: draft.email,
-    recipientId: draft.recipientId ?? draft.id,
-    recipientName: draft.recipientName ?? draft.name,
+    recipientId: draft.recipientId,
+    recipientName: draft.recipientName,
     recipientEmail: draft.recipientEmail ?? draft.email,
     amountCents: draft.amountCents,
     paymentMethod: draft.paymentMethod,
     generateLink: draft.generateLink,
     sendEmail: draft.sendEmail,
-    resendEmail: draft.resendEmail || undefined
+    resendEmail: (draft.sendEmail && draft.resendEmail) || undefined,
+    receiptToRecipient: draft.receiptToRecipient
   }))
 }

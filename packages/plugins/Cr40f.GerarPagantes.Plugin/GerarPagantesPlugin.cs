@@ -53,9 +53,9 @@ public sealed class GerarPagantesPluginV2 : IPlugin
             ValidateOperationAccess(service, context, finance);
             ValidateVersion(finance, request.ExpectedFinanceiroVersion);
             var totalCents = CalculateOperationTotal(service, target.Id);
-            ValidateRequest(service, request, totalCents);
-            response.TotalCents = totalCents;
             var existing = LoadExistingPayers(service, target.Id);
+            ValidateRequest(service, request, totalCents, existing);
+            response.TotalCents = totalCents;
             ValidateExistingPayload(request, existing);
             var needsCielo = request.Pagantes.Any(payer => payer.GenerateLink) ||
                 existing.Values.Any(row => !string.IsNullOrWhiteSpace(row.GetAttributeValue<string>("cr40f_cielolinkid")));
@@ -137,20 +137,23 @@ public sealed class GerarPagantesPluginV2 : IPlugin
             throw new InvalidPluginExecutionException("A OP foi alterada por outro usuário. Atualize os dados antes de salvar.");
     }
 
-    private static void ValidateRequest(IOrganizationService service, GerarPagantesRequest request, int totalCents)
+    private static void ValidateRequest(IOrganizationService service, GerarPagantesRequest request, int totalCents, IReadOnlyDictionary<Guid, Entity> existing)
     {
+        // Pago ou autorizado fica intacto: o destinatário não é usado nem precisa continuar válido.
+        bool ChecksRecipient(PaganteRequest p) => UsesRecipient(p) && !(p.ExistingPaganteId.HasValue && existing.TryGetValue(p.ExistingPaganteId.Value, out var row) && IsLockedPayer(row));
         if (!request.Pagantes.Any()) throw new InvalidPluginExecutionException("Selecione ao menos um pagante.");
         if (request.Pagantes.GroupBy(p => p.PaganteId).Any(group => group.Key == Guid.Empty || group.Count() > 1)) throw new InvalidPluginExecutionException("Existem pagantes inválidos ou duplicados.");
         if (request.Pagantes.Any(p => p.AmountCents <= 0 || !PaymentMethods.Contains(p.PaymentMethod))) throw new InvalidPluginExecutionException("Todos os pagantes devem possuir valor e forma de pagamento válidos.");
-        if (request.Pagantes.Any(p => p.SendEmail && (!p.GenerateLink || p.RecipientId == Guid.Empty || string.IsNullOrWhiteSpace(p.RecipientName) || !System.Text.RegularExpressions.Regex.IsMatch(p.RecipientEmail?.Trim() ?? "", @"^\S+@\S+\.\S+$")))) throw new InvalidPluginExecutionException("Envio de e-mail exige link e destinatário válido.");
+        if (request.Pagantes.Any(p => p.SendEmail && !p.GenerateLink)) throw new InvalidPluginExecutionException("Envio de e-mail exige link.");
+        if (request.Pagantes.Any(p => ChecksRecipient(p) && (p.RecipientId == Guid.Empty || (p.RecipientId.HasValue && string.IsNullOrWhiteSpace(p.RecipientName)) || !System.Text.RegularExpressions.Regex.IsMatch(p.RecipientEmail?.Trim() ?? "", @"^\S+@\S+\.\S+$")))) throw new InvalidPluginExecutionException("Informe um destinatário válido.");
         if (request.Pagantes.Sum(p => p.AmountCents) != totalCents && !request.AllowTotalMismatch) throw new InvalidPluginExecutionException("O total do rateio diverge do valor da OP.");
-        var ids = request.Pagantes.Select(p => p.PaganteId).Concat(request.Pagantes.Where(p => p.SendEmail).Select(p => p.RecipientId)).Distinct().ToArray();
+        var ids = request.Pagantes.Select(p => p.PaganteId).Concat(request.Pagantes.Where(ChecksRecipient).Select(p => p.RecipientId).OfType<Guid>()).Distinct().ToArray();
         var people = service.RetrieveMultiple(new QueryExpression("cr40f_bancodedados") { ColumnSet = new ColumnSet("cr40f_nomedopassageiro", "cr40f_email", "statecode"), Criteria = new FilterExpression(LogicalOperator.And) { Conditions = { new ConditionExpression("cr40f_bancodedadosid", ConditionOperator.In, ids.Cast<object>().ToArray()) } } }).Entities.ToDictionary(p => p.Id);
         foreach (var payer in request.Pagantes)
         {
             if (!people.TryGetValue(payer.PaganteId, out var person) || person.GetAttributeValue<OptionSetValue>("statecode")?.Value == 1) throw new InvalidPluginExecutionException("Um pagante não existe ou está inativo.");
             if (!string.Equals(person.GetAttributeValue<string>("cr40f_nomedopassageiro")?.Trim() ?? string.Empty, payer.Name?.Trim() ?? string.Empty, StringComparison.Ordinal) || !string.Equals(person.GetAttributeValue<string>("cr40f_email")?.Trim() ?? string.Empty, payer.Email?.Trim() ?? string.Empty, StringComparison.OrdinalIgnoreCase)) throw new InvalidPluginExecutionException("Os dados do pagante divergem do Dataverse.");
-            if (payer.SendEmail && (!people.TryGetValue(payer.RecipientId, out var recipient) || !string.Equals(recipient.GetAttributeValue<string>("cr40f_nomedopassageiro")?.Trim() ?? string.Empty, payer.RecipientName?.Trim() ?? string.Empty, StringComparison.Ordinal) || !string.Equals(recipient.GetAttributeValue<string>("cr40f_email")?.Trim() ?? string.Empty, payer.RecipientEmail?.Trim() ?? string.Empty, StringComparison.OrdinalIgnoreCase))) throw new InvalidPluginExecutionException("Os dados do destinatário divergem do Dataverse.");
+            if (ChecksRecipient(payer) && payer.RecipientId.HasValue && (!people.TryGetValue(payer.RecipientId.Value, out var recipient) || !string.Equals(recipient.GetAttributeValue<string>("cr40f_nomedopassageiro")?.Trim() ?? string.Empty, payer.RecipientName?.Trim() ?? string.Empty, StringComparison.Ordinal) || !string.Equals(recipient.GetAttributeValue<string>("cr40f_email")?.Trim() ?? string.Empty, payer.RecipientEmail?.Trim() ?? string.Empty, StringComparison.OrdinalIgnoreCase))) throw new InvalidPluginExecutionException("Os dados do destinatário divergem do Dataverse.");
         }
     }
 
@@ -238,6 +241,9 @@ public sealed class GerarPagantesPluginV2 : IPlugin
         if (!emailAlreadySent) entity["cr40f_statusenvioemail"] = new OptionSetValue(payer.SendEmail ? Pending : NotApplicable);
         entity["cr40f_errogeracaolink"] = null;
         if (!emailAlreadySent) entity["cr40f_erroenvioemail"] = null;
+        var receiptToOther = ReceiptToOther(payer);
+        entity["cr40f_destinatariorecibo"] = receiptToOther && payer.RecipientId.HasValue ? new EntityReference("cr40f_bancodedados", payer.RecipientId.Value) : null;
+        entity["cr40f_emailrecibo"] = receiptToOther && !payer.RecipientId.HasValue ? payer.RecipientEmail.Trim() : null;
         var result = new PaganteResult { PaganteId = payer.PaganteId, LinkStatus = payer.GenerateLink ? "Pending" : "NotApplicable", EmailStatus = emailAlreadySent ? "Sent" : payer.SendEmail ? "Pending" : "NotApplicable" };
         if (!keepsLink)
         {
@@ -365,6 +371,12 @@ public sealed class GerarPagantesPluginV2 : IPlugin
         ColumnSet = new ColumnSet(false), TopCount = 1,
         Criteria = new FilterExpression(LogicalOperator.And) { Conditions = { new ConditionExpression("cr40f_request_id", ConditionOperator.Equal, requestId.ToString("D")) } }
     }).Entities.Any();
+
+    // Recibo para outra pessoa ou e-mail vale mesmo com o link enviado por outro canal.
+    private static bool ReceiptToOther(PaganteRequest payer) =>
+        payer.GenerateLink && payer.ReceiptToRecipient && payer.RecipientId != payer.PaganteId;
+
+    private static bool UsesRecipient(PaganteRequest payer) => payer.SendEmail || ReceiptToOther(payer);
 
     private static bool IsPayerChanged(Entity row, PaganteRequest payer) =>
         row.GetAttributeValue<EntityReference>("cr40f_bancodedados")?.Id != payer.PaganteId ||

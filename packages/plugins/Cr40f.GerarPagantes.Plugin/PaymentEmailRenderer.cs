@@ -27,7 +27,7 @@ public sealed class PaymentEmailRenderer
             ? string.Empty
             : "- " + end;
         var body = _template
-            .Replace("{{PAYER_NAME}}", Encode(payer.Name))
+            .Replace("{{GREETING_NAME}}", Encode(payer.RecipientId.HasValue ? payer.RecipientName : payer.Name))
             .Replace("{{SERVICE_START_DATE}}", Encode(start))
             .Replace("{{SERVICE_END_DATE}}", Encode(endLabel))
             .Replace("{{AMOUNT}}", Encode((payer.AmountCents / 100m).ToString("C", CultureInfo.GetCultureInfo("pt-BR"))))

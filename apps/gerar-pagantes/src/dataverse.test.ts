@@ -22,6 +22,7 @@ const request: SubmitRequest = {
     recipientId: paganteId,
     recipientName: 'Pagante',
     recipientEmail: '',
+    receiptToRecipient: false,
     amountCents: 12500,
     paymentMethod: 202410000,
     generateLink: false,
