@@ -28,13 +28,13 @@ description: "Verifica o aviso de troca de motorista: DriverNoticePlugin (zerar 
 3. Dry-run dos três scripts (DEV, só leitura). Para `-EnvironmentUrl` do PROD, cada um deve recusar com `Publicacao direta bloqueada`.
 
 ## Roteiro no DEV (depois do merge e do `npm run push` da `main`)
-Use uma reserva de teste com saída no futuro. Conclua com a consulta de `new_avisomotoristas` por `_new_reserva_value`.
+Use uma reserva sem cliente, OT ou manutenção, com saída no futuro (OS-1929 serviu em 06/11/2026), e as contas `TESTE` e `teste 2`, que têm usuário ativo. Motorista com e-mail e sem usuário ativo (`Fulaninho do cruze`) é recusado pelo compartilhamento. Programado sem motorista é bloqueado por regra existente. No DEV o único operador é o Renan. Conclua com a consulta de `new_avisomotoristas` por `_new_reserva_value`.
 
 | Ação | Esperado |
 | --- | --- |
 | Trocar motorista em Programado (já visualizado) | Visualização vazia na mesma gravação; Novo do novo e Retirado do antigo; Enviar grava Enviado |
 | Regravar o mesmo motorista | Nada muda; nenhum aviso |
-| Limpar motorista em Programado | Visualização vazia; só Retirado |
+| Limpar motorista saindo de Programado (na mesma gravação) | Visualização vazia; só Retirado; o Novo vira Cancelado na próxima rodada da Vigia |
 | Trocar em Confirmado | Visualização vazia; `new_foiprogramado` false; nenhum aviso |
 | Confirmado → Programado | Só Novo |
 | Motorista sem `cr40f_emailmicrosoft` | Aviso Sem app; a Vigia alerta a operação uma vez |
@@ -44,7 +44,7 @@ Use uma reserva de teste com saída no futuro. Conclua com a consulta de `new_av
 | Serviço sai de Programado | Próxima rodada: Cancelado |
 
 ## Não verificável só com código
-Entrega real do push em celular, autorização das conexões e o `$expand` da Vigia rodando no flow (a consulta equivalente pode ser testada direto na Web API).
+Entrega real do push no celular. Plugin, flows, `$expand`, alertas e reenvio foram provados no DEV em 06/11/2026.
 
 ## Evidência
 Saída do `dotnet test`, dos dry-runs e, no DEV, as linhas de `new_avisomotoristas` e as execuções dos dois flows.
