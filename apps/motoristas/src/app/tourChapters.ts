@@ -752,7 +752,8 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
         "Logo abaixo fica o café e lanche médio, quando há dados."
       ], { target: ".gr-destaques", optional: true }),
       step("alerta", "Pendências", ["Quando algum gasto precisa de correção ou foi recusado, o aviso aparece aqui no topo. Toque nele para ir direto à lista de pendentes."], { target: ".gr-alerta", optional: true }),
-      step("precos", "Postos perto de mim", ["Mostra os postos perto de você, com o que a frota pagou por litro e uma recomendação."], { target: ".gr-preco-postos" }),
+      step("precos", "Postos perto de mim", ["Mostra os postos perto de você, com o que a frota pagou por litro, a comparação com a meta e a opinião dos motoristas."], { target: ".gr-preco-postos" }),
+      step("convite", "Como foi no posto", ["Depois de abastecer, quando a nota é lida e você ainda não avaliou aquele posto, o app pergunta como foi. Um toque em Recomendo ou Não recomendo já salva. O X dispensa a pergunta."], { target: ".gr-convite", optional: true }),
       step("evolucao", "Médias por mês", ["Escolha R$/L ou Refeição para ver a média de cada mês. Os meses do período escolhido ficam em azul-escuro."], { target: ".gr-evolucao", optional: true }),
       step("despesas", "Despesas", ["Pendentes mostra o que precisa de correção, completar ou foi recusado. Todas mostra as despesas do período. Toque num gasto do cartão marcado Completar para preenchê-lo; nos outros, abre o detalhe com o comprovante."], { target: ".gr-despesas", optional: true }),
       step("completar", "Completar", ["Quando há gastos do cartão para completar, o botão da esquerda abre a lista deles."], { target: ".gr-actions .action-button--secondary", optional: true }),
@@ -765,8 +766,8 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
     title: "Postos perto de você",
     steps: [
       step("voltar", "Voltar", ["Volta para o Relatório de gastos."], { target: SERVICE_HOME }),
-      step("melhor", "Melhor opção", ["O destaque é o menor preço até 10 km de você. A cor compara com a meta da empresa: Recomendado, Atenção ou Evitar. Toque nele para ver o endereço e os últimos abastecimentos."], { target: ".rp-hero", optional: true }),
-      step("postos", "Outros postos", ["Toque em um posto para ver o endereço e os últimos abastecimentos. O ícone do mapa abre o posto no Maps."], { target: ".rp-lista", optional: true }),
+      step("melhor", "Melhor opção", ["O destaque é o menor preço até 10 km de você. A cor compara com a meta da empresa: Dentro da meta, Pouco acima da meta ou Acima da meta.", "Se a maioria dos motoristas não recomenda o posto, aparece um alerta. Toque nele para ver o endereço, os últimos abastecimentos e as avaliações."], { target: ".rp-hero", optional: true }),
+      step("postos", "Outros postos", ["Toque em um posto para ver os detalhes e dizer como foi: Recomendo ou Não recomendo. Um toque já salva, e motivos e comentário são opcionais. O ícone do mapa abre o posto no Maps."], { target: ".rp-lista", optional: true }),
       helpStep()
     ]
   },
