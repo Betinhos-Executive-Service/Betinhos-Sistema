@@ -22,8 +22,8 @@ test('Betinhos.DriverRecordSharing publica como driverrecordsharing; ExpenseUplo
   assert.equal(pluginDoArquivo('packages/plugins/scripts/push-driverrecordsharing-plugin.ps1'), 'driverrecordsharing')
   assert.equal(pluginDoArquivo('packages/plugins/Betinhos.DriverRecordSharing.Tests/FuelMathTests.cs'), null)
   assert.equal(pluginDoArquivo('packages/plugins/Betinhos.ExpenseUpload/ExpenseUploadCommand.cs'), null)
-  assert.deepEqual(mudancasDev(['packages/plugins/Betinhos.ExpenseUpload/A.cs', 'packages/plugins/Betinhos.ExpenseUpload.Tests/B.cs']), { tela: false, plugins: [] })
-  assert.deepEqual(mudancasDev(['packages/plugins/Betinhos.DriverRecordSharing/A.cs', 'packages/plugins/Cr40f.Frota.Plugin/B.cs', 'packages/plugins/Betinhos.DriverRecordSharing/C.cs']), { tela: false, plugins: ['driverrecordsharing', 'frota'] })
+  assert.deepEqual(mudancasDev(['packages/plugins/Betinhos.ExpenseUpload/A.cs', 'packages/plugins/Betinhos.ExpenseUpload.Tests/B.cs']), { tela: false, webresources: false, plugins: [] })
+  assert.deepEqual(mudancasDev(['packages/plugins/Betinhos.DriverRecordSharing/A.cs', 'packages/plugins/Cr40f.Frota.Plugin/B.cs', 'packages/plugins/Betinhos.DriverRecordSharing/C.cs']), { tela: false, webresources: false, plugins: ['driverrecordsharing', 'frota'] })
 })
 
 test('teste de plugin não republica', () => {
