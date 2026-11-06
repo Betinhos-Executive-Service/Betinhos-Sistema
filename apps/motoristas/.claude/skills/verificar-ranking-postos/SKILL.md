@@ -28,10 +28,10 @@ description: "Verifica os postos perto do motorista e as avaliações: Custom AP
 7b. `?mockRankingPostos=lento#ranking-postos` → painel de combustível animado no centro, com as etapas Localização e Postos, e "Buscando sua localização…" e depois "Procurando postos perto de você…". Atualizar com a lista aberta mantém a lista, mostra "Atualizando postos…" e, se falhar, avisa sem apagar a lista.
 8. `?mockRankingPostos=vazio#ranking-postos` → "Nenhum posto usado pela frota a até 10 km de você nos últimos 30 dias."
 
-9. Na ficha, "Avaliações dos motoristas" mostra "4 de 5 recomendam", até 3 motivos e comentários com nome e data. "Avaliar este posto" abre o formulário; Enviar fica desabilitado até escolher Recomendo ou Não recomendo, e trocar o sentido limpa os motivos.
-10. Com rascunho alterado, Esc, X, toque fora e Cancelar perguntam "Descartar alterações?"; "Continuar editando" preserva o texto. Sem alteração, fecham direto.
-11. Enviar atualiza a ficha e a lista, mostra "Avaliação enviada" e o botão vira "Editar minha avaliação", com a avaliação anterior preenchida.
-12. `?mockRankingPostos=falhaavaliar#ranking-postos` → erro no formulário, sem perder o rascunho.
+9. Na ficha, "Avaliações dos motoristas" mostra 80%, a barra, até 3 motivos com contagem e comentários com iniciais, nome e data. O cartão "Como foi neste posto?" aparece sem rolar.
+10. Um toque em Recomendo ou Não recomendo já salva: a contagem sobe e o painel sobe com "Avaliação salva. Quer dizer por quê?". "Agora não" fecha sem perguntar; trocar o sentido limpa os motivos.
+11. Com alteração no painel, Esc, toque fora e o botão de sair perguntam "Descartar alterações?"; "Continuar editando" preserva o texto. Concluir grava motivos e comentário, e a ficha mostra "Avaliação enviada" com Editar, que traz a avaliação preenchida.
+12. `?mockRankingPostos=falhaavaliar#ranking-postos` → erro no cartão, sem abrir o painel e sem contar a avaliação.
 
 ## Dataverse (só local, nunca na nuvem)
 - Provisionar com `scripts/provision-relatorio-combustivel.ps1` depois de publicar o assembly a partir da `main` atualizada.

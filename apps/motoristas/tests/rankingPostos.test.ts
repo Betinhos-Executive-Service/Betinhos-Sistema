@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { aplicarMinhaAvaliacao, motivoPositivo, rotuloMotivo, rotuloRecomendacoes, SEM_AVALIACOES } from "../src/lib/avaliacaoPostos.ts";
+import { aplicarMinhaAvaliacao, iniciaisAutor, motivoPositivo, percentualRecomenda, rotuloMotivo, rotuloRecomendacoes, SEM_AVALIACOES } from "../src/lib/avaliacaoPostos.ts";
 import { nomePosto, parseRankingPostos, postosProximos, rotuloAbastecimentos, rotuloDistancia, rotuloMelhor, separarMelhor, urlMaps } from "../src/lib/rankingPostos.ts";
 
 const origem = { lat: -23, lon: -45 };
@@ -100,6 +100,17 @@ test("rotuloRecomendacoes concorda com o total e some sem avaliações", () => {
   assert.equal(rotuloRecomendacoes({ total: 0, recomendam: 0 }), "");
   assert.equal(rotuloRecomendacoes({ total: 1, recomendam: 1 }), "1 de 1 recomenda");
   assert.equal(rotuloRecomendacoes({ total: 5, recomendam: 4 }), "4 de 5 recomendam");
+});
+
+test("percentualRecomenda arredonda e não divide por zero", () => {
+  assert.equal(percentualRecomenda({ total: 0, recomendam: 0 }), 0);
+  assert.equal(percentualRecomenda({ total: 3, recomendam: 2 }), 67);
+});
+
+test("iniciaisAutor usa o primeiro e o último nome e aceita nome vazio", () => {
+  assert.equal(iniciaisAutor("maria da silva"), "MS");
+  assert.equal(iniciaisAutor("Renan"), "R");
+  assert.equal(iniciaisAutor("  "), "?");
 });
 
 test("motivos têm rótulo e sentido próprios", () => {
