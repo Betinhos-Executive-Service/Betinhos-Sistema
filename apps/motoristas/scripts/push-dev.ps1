@@ -154,6 +154,14 @@ if ($IncludeOperacionais) {
     -DeviceCode:$DeviceCode
 }
 
+# Vem antes do plugin: o DriverNoticePlugin nao salva a reserva se nao conseguir gravar o aviso.
+Write-Step "provision tabela de avisos ao motorista in DEV"
+& (Join-Path $PSScriptRoot "provision-aviso-motorista.ps1") `
+  -EnvironmentUrl $environmentUrl `
+  -SolutionUniqueName $solutionUniqueName `
+  -Apply `
+  -DeviceCode:$DeviceCode
+
 Write-Step "publish plugin in $solutionUniqueName"
 & (Join-Path $PSScriptRoot "register-driver-record-sharing-plugin-webapi.ps1") `
   -EnvironmentUrl $environmentUrl `
