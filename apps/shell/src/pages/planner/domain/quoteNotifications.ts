@@ -31,12 +31,22 @@ export function isLossReason(value: unknown): value is LossReason {
   return (LOSS_REASONS as readonly unknown[]).includes(value)
 }
 
+// cr40f_ChaveDedupe aceita no máximo 100 caracteres no PROD (a metadata diz 450, mas 101+
+// falhou com "String or binary data would be truncated"). No formato antigo, com dois GUIDs,
+// follow_up tem 101, waiting_return 106 e ready 111. quote_urgent (88) não muda, para não
+// reenviar avisos já criados; os demais tiram hífens e o "|" vazio do fim (no máximo 98).
+const compact = (value: unknown): string => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+function quoteDedupeKey({ recipientId, quoteId, type, referenceDate = '', eventId = '' }: { recipientId: string; quoteId: string; type: QuoteNoticeType; referenceDate?: string; eventId?: string }): string {
+  if (type === 'quote_urgent') return notificationDedupeKey({ recipientId, taskId: quoteId, type, referenceDate, eventId })
+  return [compact(recipientId), compact(quoteId), type, compact(referenceDate), compact(eventId)].join('|').replace(/\|+$/, '')
+}
+
 function notice(quote: QuoteInput, recipientEmployeeId: string, type: QuoteNoticeType, title: string, referenceDate = '', eventId = '', detail = ''): QuoteNotice {
   const quoteId = String(quote.id || '')
   return {
     quoteId, recipientEmployeeId, type, title, referenceDate,
     message: [quote.code, quote.title || quote.client, detail].filter(Boolean).join(' · '),
-    dedupeKey: notificationDedupeKey({ recipientId: recipientEmployeeId, taskId: quoteId, type, referenceDate, eventId }),
+    dedupeKey: quoteDedupeKey({ recipientId: recipientEmployeeId, quoteId, type, referenceDate, eventId }),
   }
 }
 
