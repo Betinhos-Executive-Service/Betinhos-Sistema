@@ -1,5 +1,5 @@
 import { MapPin } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { PostoDetalheDialog } from "../components/gastos/PostoDetalheDialog";
 import { AppShell } from "../components/layout/AppShell";
 import { ServicesMenu } from "../components/navigation/ServicesMenu";
@@ -9,29 +9,44 @@ import { formatBRL } from "../lib/gastosRelatorio";
 import { RAIO_KM, RECOMENDACAO, carregarRankingPostos, obterPosicao, postosProximos, rotuloAbastecimentos, rotuloDistancia, rotuloMelhor, separarMelhor, urlMaps, type Posicao, type PostoProximo, type RankingPostos } from "../lib/rankingPostos";
 import { descreverGpsErro } from "../lib/termosMulta";
 
+type Etapa = "localizacao" | "postos";
+
 type Carga =
-  | { status: "loading" }
+  | { status: "loading"; etapa: Etapa }
   | { status: "error" }
   | { status: "semGps"; mensagem: string }
-  | { status: "ready"; ranking: RankingPostos; origem: Posicao };
+  | { status: "ready"; ranking: RankingPostos; origem: Posicao; atualizando?: boolean; aviso?: string };
 
 export function RankingPostosScreen({ onBack }: { onBack: () => void }) {
-  const [carga, setCarga] = useState<Carga>({ status: "loading" });
+  const [carga, setCarga] = useState<Carga>({ status: "loading", etapa: "localizacao" });
   const [aberto, setAberto] = useState<PostoProximo | null>(null);
   const fecharPosto = useCallback(() => setAberto(null), []);
+  const pedido = useRef(0);
   const carregar = useCallback(async () => {
-    setCarga({ status: "loading" });
-    const [posicao, dados] = await Promise.allSettled([obterPosicao(), carregarRankingPostos()]);
+    const atual = ++pedido.current;
+    // Atualizar mantém a lista na tela: só a primeira carga mostra o esqueleto.
+    setCarga((anterior) => (anterior.status === "ready" ? { ...anterior, atualizando: true, aviso: "" } : { status: "loading", etapa: "localizacao" }));
+    const localizacao = obterPosicao().then((origem) => {
+      if (atual === pedido.current) setCarga((anterior) => (anterior.status === "loading" ? { status: "loading", etapa: "postos" } : anterior));
+      return origem;
+    });
+    const [posicao, dados] = await Promise.allSettled([localizacao, carregarRankingPostos()]);
     if (dados.status === "rejected") reportAppError(dados.reason, { severity: "warning", source: "app", action: "carregarRankingPostos", screen: "RankingPostos", notifyUser: false });
-    if (posicao.status === "rejected") {
-      setCarga({ status: "semGps", mensagem: descreverGpsErro(posicao.reason as { code?: number } | null) });
-    } else if (dados.status === "rejected") {
-      setCarga({ status: "error" });
-    } else {
+    if (atual !== pedido.current) return;
+    if (posicao.status === "fulfilled" && dados.status === "fulfilled") {
       setCarga({ status: "ready", ranking: dados.value, origem: posicao.value });
+      return;
     }
+    const mensagemGps = posicao.status === "rejected" ? descreverGpsErro(posicao.reason as { code?: number } | null) : "";
+    setCarga((anterior) => {
+      if (anterior.status === "ready") return { ...anterior, atualizando: false, aviso: mensagemGps || "Não foi possível atualizar. Mostrando a última lista carregada." };
+      return mensagemGps ? { status: "semGps", mensagem: mensagemGps } : { status: "error" };
+    });
   }, []);
-  useEffect(() => { void carregar(); }, [carregar]);
+  useEffect(() => {
+    void carregar();
+    return () => { pedido.current += 1; };
+  }, [carregar]);
 
   const proximos = carga.status === "ready" ? postosProximos(carga.ranking.postos, carga.origem) : [];
 
@@ -47,7 +62,7 @@ export function RankingPostosScreen({ onBack }: { onBack: () => void }) {
       />
       <section className="termo-screen gr-screen" aria-label="Postos perto de você">
         {carga.status === "loading" ? (
-          <div className="gr-skeleton" role="status" aria-busy="true" aria-label="Procurando postos perto de você"><span /><span /><span /></div>
+          <ListaCarregando etapa={carga.etapa} />
         ) : carga.status === "semGps" ? (
           <div className="termo-alert" data-tone="atencao" role="alert">
             <p>{carga.mensagem}</p>
@@ -61,7 +76,11 @@ export function RankingPostosScreen({ onBack }: { onBack: () => void }) {
         ) : proximos.length === 0 ? (
           <p className="termo-empty">Nenhum posto usado pela frota a até {RAIO_KM} km de você nos últimos {carga.ranking.dias} dias.</p>
         ) : (
-          <ListaPostos proximos={proximos} dias={carga.ranking.dias} onAbrir={setAberto} />
+          <>
+            {carga.atualizando ? <p className="rp-carregando-texto" role="status">Atualizando postos…</p> : null}
+            {carga.aviso ? <div className="termo-alert" data-tone="atencao" role="alert"><p>{carga.aviso}</p></div> : null}
+            <ListaPostos proximos={proximos} dias={carga.ranking.dias} onAbrir={setAberto} />
+          </>
         )}
       </section>
       {aberto && carga.status === "ready" ? <PostoDetalheDialog posto={aberto} dias={carga.ranking.dias} onClose={fecharPosto} /> : null}
@@ -69,11 +88,33 @@ export function RankingPostosScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
+const TEXTO_ETAPA: Record<Etapa, string> = { localizacao: "Buscando sua localização…", postos: "Procurando postos perto de você…" };
+
+function ListaCarregando({ etapa }: { etapa: Etapa }) {
+  return (
+    <div className="rp-carregando" role="status">
+      <p className="rp-carregando-texto">{TEXTO_ETAPA[etapa]}</p>
+      <div className="rp-esqueleto rp-esqueleto-destaque" aria-hidden="true">
+        <i className="rp-osso-tag" />
+        <i className="rp-osso-nome" />
+        <span className="rp-osso-linha"><i className="rp-osso-preco" /><i className="rp-osso-distancia" /></span>
+        <i className="rp-osso-detalhe" />
+        <i className="rp-osso-botao" />
+      </div>
+      <div className="rp-esqueleto rp-esqueleto-lista" aria-hidden="true">
+        {[0, 1, 2].map((linha) => (
+          <span key={linha} className="rp-osso-posto"><i /><span><i /><i /></span><i /></span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ListaPostos({ proximos, dias, onAbrir }: { proximos: PostoProximo[]; dias: number; onAbrir: (posto: PostoProximo) => void }) {
   const { melhor, outros } = separarMelhor(proximos);
   return (
     <>
-      <section className="rp-hero" data-semaforo={melhor.cor}>
+      <section className="rp-hero rp-entrada" data-semaforo={melhor.cor}>
         <button type="button" className="rp-hero-abrir" onClick={() => onAbrir(melhor)}>
           <span className="rp-hero-tag">{rotuloMelhor(melhor.cor)}</span>
           <strong className="rp-hero-nome">{melhor.nome}</strong>
@@ -86,7 +127,7 @@ function ListaPostos({ proximos, dias, onAbrir }: { proximos: PostoProximo[]; di
         <a className="rp-maps" href={urlMaps(melhor)} target="_blank" rel="noreferrer"><MapPin aria-hidden="true" />Abrir no Maps</a>
       </section>
       {outros.length ? (
-        <section aria-labelledby="rp-outros">
+        <section className="rp-entrada" style={{ "--i": 1 } as CSSProperties} aria-labelledby="rp-outros">
           <h2 className="gr-subtitulo" id="rp-outros">Outros postos</h2>
           <ul className="rp-lista">
             {outros.map((posto, indice) => (
@@ -108,7 +149,7 @@ function ListaPostos({ proximos, dias, onAbrir }: { proximos: PostoProximo[]; di
           </ul>
         </section>
       ) : null}
-      <p className="gr-legenda">Média paga pela frota nos últimos {dias} dias, a até {RAIO_KM} km de você. É um preço pago, não o preço de hoje.</p>
+      <p className="gr-legenda rp-entrada" style={{ "--i": 2 } as CSSProperties}>Média paga pela frota nos últimos {dias} dias, a até {RAIO_KM} km de você. É um preço pago, não o preço de hoje.</p>
     </>
   );
 }
