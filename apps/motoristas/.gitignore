@@ -37,4 +37,7 @@ graphify-out/
 
 # Estado local da skill here.now (contém token de reivindicação)
 .herenow/
+
+# Snapshot local da virada do aviso ao motorista
+backup/aviso-motorista/
 backup/flow-troca-motorista/
