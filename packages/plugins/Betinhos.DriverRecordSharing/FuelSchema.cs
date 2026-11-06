@@ -22,6 +22,7 @@ namespace Betinhos.DriverRecordSharing
 
         public const string Posto = "new_postocombustivel";
         public const string Resumo = "new_resumocombustivelmensal";
+        public const string Avaliacao = "new_avaliacaoposto";
 
         public const int StatusGeoPendente = 100000000, StatusGeoGeocodificado = 100000001, StatusGeoManual = 100000002;
         public const int StatusDespesaEnviado = 100000000, StatusDespesaPrecisaCorrigir = 100000001, StatusDespesaValidado = 100000002;
@@ -31,5 +32,6 @@ namespace Betinhos.DriverRecordSharing
         public const string ApiRelatorio = "new_ObterRelatorioCombustivel";
         public const string ApiRanking = "new_ObterRankingPostos";
         public const string ApiInsights = "new_GerarInsightsCombustivel";
+        public const string ApiAvaliar = "new_AvaliarPosto";
     }
 }

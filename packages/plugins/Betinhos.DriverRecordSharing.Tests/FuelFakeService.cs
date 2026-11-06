@@ -4,6 +4,7 @@ using System.Linq;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Query;
+using Microsoft.Xrm.Sdk.Metadata;
 
 namespace Betinhos.DriverRecordSharing.Tests
 {
@@ -16,6 +17,7 @@ namespace Betinhos.DriverRecordSharing.Tests
         private long clock;
 
         // Tamanho máximo de página devolvido (o Dataverse real devolve 5000); testes baixam o valor para exercitar a paginação.
+        public bool TemTabelaAvaliacoes = true;
         public int PageSize = int.MaxValue;
         public int Pages;
 
@@ -39,7 +41,7 @@ namespace Betinhos.DriverRecordSharing.Tests
 
         public Entity Get(string table, Guid id) => RowList(table).Single(r => r.Id == id);
 
-        public Guid Driver() => Add(new Entity(FuelSchema.Funcionario)).Id;
+        public Guid Driver(string nome = "Motorista") => Add(new Entity(FuelSchema.Funcionario) { ["cr40f_nomecompleto"] = nome }).Id;
 
         public Guid Vehicle(string modelo) => Add(new Entity(FuelSchema.Veiculo) { [FuelSchema.VeiculoModelo] = modelo }).Id;
 
@@ -106,6 +108,14 @@ namespace Betinhos.DriverRecordSharing.Tests
 
         public OrganizationResponse Execute(OrganizationRequest request)
         {
+            if (request is RetrieveMetadataChangesRequest)
+            {
+                var encontradas = new EntityMetadataCollection();
+                if (TemTabelaAvaliacoes) encontradas.Add(new EntityMetadata { LogicalName = FuelSchema.Avaliacao });
+                var resposta = new RetrieveMetadataChangesResponse();
+                resposta.Results["EntityMetadata"] = encontradas;
+                return resposta;
+            }
             if (!(request is UpsertRequest upsert)) throw new NotSupportedException(request.RequestName);
             var key = upsert.Target.KeyAttributes.Single();
             var existing = RowList(upsert.Target.LogicalName).FirstOrDefault(r => Equals(r.GetAttributeValue<object>(key.Key), key.Value));

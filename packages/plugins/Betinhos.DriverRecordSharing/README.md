@@ -240,6 +240,16 @@ Para todos os steps:
 - Execution Mode: `Asynchronous`
 - Image: criar `Pre Image`
 
+### 15. Aviso ao motorista - DriverNoticePlugin
+
+Registrado por `scripts/register-driver-record-sharing-plugin-webapi.ps1`. Contrato e virada em `docs/virada-aviso-motorista.md`.
+
+- `Aviso motorista Update PreOperation`: `Update`, stage 20, sincrono, filtro `cr40f_motorista`, Pre Image `cr40f_motorista,cr40f_status,cr40f_ot`. Motorista mudou: zera `new_visualizacaodomotorista` e ajusta `new_foiprogramado` no proprio Target.
+- `Aviso motorista Create`: `Create`, stage 40, sincrono, rank 10, sem imagem.
+- `Aviso motorista Update`: `Update`, stage 40, sincrono, rank 10, filtro `cr40f_motorista,cr40f_status`, Pre Image `cr40f_motorista,cr40f_status,cr40f_dataehorriodesada,cr40f_id`. O rank 10 faz rodar depois do compartilhamento.
+
+Os steps exigem a tabela `new_avisomotorista` (`scripts/provision-aviso-motorista.ps1`, chamado pelo `push-dev.ps1` antes do plugin). Falha ao criar o aviso derruba a gravacao com `[DRIVER_NOTICE_FAILED]`.
+
 ## Parte 5: como criar a Pre Image
 
 Isto agora e obrigatorio em todo step `Update`.
