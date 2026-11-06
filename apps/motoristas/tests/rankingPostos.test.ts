@@ -70,10 +70,10 @@ test("nomePosto mantém siglas em caixa alta", () => {
   assert.equal(nomePosto("POSTO BR-116 JK"), "Posto BR-116 JK");
 });
 
-test("urlMaps pesquisa pelo nome e pelo endereço", () => {
+test("urlMaps pesquisa como posto de gasolina, com nome e endereço", () => {
   const url = new URL(urlMaps({ nome: "Posto A", endereco: "RUA A, 10 - TAUBATE/SP", lat: -23, lon: -45 }));
   assert.equal(url.searchParams.get("api"), "1");
-  assert.equal(url.searchParams.get("query"), "Posto A RUA A, 10 - TAUBATE/SP");
+  assert.equal(url.searchParams.get("query"), "Posto de gasolina Posto A RUA A, 10 - TAUBATE/SP");
 });
 
 test("urlMaps usa a coordenada quando o posto não tem endereço", () => {

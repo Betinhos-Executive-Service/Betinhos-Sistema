@@ -64,7 +64,7 @@ export function nomePosto(nome: string) {
 const comNomesLimpos = (ranking: RankingPostos): RankingPostos => ({ ...ranking, postos: ranking.postos.map((posto) => ({ ...posto, nome: nomePosto(posto.nome) })) });
 
 // Sem endereço, só o nome levaria a outro posto da mesma rede: vale a coordenada.
-export const urlMaps = ({ nome, endereco, lat, lon }: Pick<PostoRanking, "nome" | "endereco" | "lat" | "lon">) => mapsSearchUrl(endereco ? `${nome} ${endereco}` : `${lat},${lon}`);
+export const urlMaps = ({ nome, endereco, lat, lon }: Pick<PostoRanking, "nome" | "endereco" | "lat" | "lon">) => mapsSearchUrl(endereco ? `Posto de gasolina ${nome} ${endereco}` : `${lat},${lon}`);
 
 export function rotuloDistancia({ distanciaKm: km, aproximada }: Pick<PostoProximo, "distanciaKm" | "aproximada">) {
   const metros = Math.round(km * 1000);
