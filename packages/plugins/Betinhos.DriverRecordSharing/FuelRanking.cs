@@ -5,7 +5,7 @@ using System.Linq;
 namespace Betinhos.DriverRecordSharing
 {
     // Postos com o R$/litro pago pela frota, agrupados pelo CNPJ lido do cupom. Distância e semáforo ficam no app,
-    // que é quem conhece a posição do motorista. Puro e sem dados de motorista: o resultado vai para todos.
+    // que é quem conhece a posição do motorista. Os abastecimentos saem sem dados de motorista; as avaliações, assinadas, vêm de PostoAvaliacoes.
     public static class FuelRanking
     {
         public const int JanelaDias = 30;
@@ -28,6 +28,7 @@ namespace Betinhos.DriverRecordSharing
             public double Lat, Lon;
             public bool Aproximada;
             public string Endereco;
+            public Guid PostoId;
         }
 
         private static string NormalizarCnpj(string bruto)
@@ -60,11 +61,12 @@ namespace Betinhos.DriverRecordSharing
         public static IList<string> Cnpjs(IEnumerable<Abastecimento> abastecimentos) => PorPosto(abastecimentos).Select(g => g.Key).ToList();
 
         // Posto sem local conhecido fica de fora: sem coordenada não há como dizer se está perto.
-        public static IList<Dictionary<string, object>> Montar(IEnumerable<Abastecimento> abastecimentos, IDictionary<string, Local> locais) =>
+        public static IList<Dictionary<string, object>> Montar(IEnumerable<Abastecimento> abastecimentos, IDictionary<string, Local> locais, Func<Guid, Dictionary<string, object>> avaliacoesDe = null) =>
             PorPosto(abastecimentos)
                 .Where(g => locais.ContainsKey(g.Key))
                 .Select(g => new Dictionary<string, object>
                 {
+                    ["postoId"] = avaliacoesDe == null ? null : locais[g.Key].PostoId.ToString(),
                     ["nome"] = NomeMaisFrequente(g.Select(a => a.Nome)),
                     ["precoLitro"] = Math.Round(g.Sum(a => a.Valor) / g.Sum(a => a.Litros), 2, MidpointRounding.AwayFromZero),
                     ["abastecimentos"] = g.Count(),
@@ -73,6 +75,7 @@ namespace Betinhos.DriverRecordSharing
                     ["lon"] = locais[g.Key].Lon,
                     ["aproximada"] = locais[g.Key].Aproximada,
                     ["endereco"] = locais[g.Key].Endereco,
+                    ["avaliacoes"] = avaliacoesDe?.Invoke(locais[g.Key].PostoId),
                     ["historico"] = g.OrderByDescending(a => a.DataUtc).Take(MaxHistorico).Select(a => new Dictionary<string, object>
                     {
                         ["data"] = FuelRepository.LocalDay(a.DataUtc),

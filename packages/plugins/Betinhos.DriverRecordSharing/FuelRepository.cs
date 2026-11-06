@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
+using Microsoft.Xrm.Sdk.Metadata.Query;
 using Microsoft.Xrm.Sdk.Query;
 
 namespace Betinhos.DriverRecordSharing
@@ -278,6 +279,65 @@ namespace Betinhos.DriverRecordSharing
             query.Criteria.AddCondition(FuelSchema.DespesaCnpjLido, ConditionOperator.NotNull);
             query.Criteria.AddCondition("cr40f_datagasto", ConditionOperator.GreaterEqual, fromUtc);
             return RetrieveAll(query);
+        }
+
+        // Pergunta à metadata em vez de capturar o erro da consulta: falha engolida dentro da transação do plugin pode derrubar a resposta inteira.
+        public bool TemTabelaAvaliacoes()
+        {
+            var filtro = new MetadataFilterExpression(LogicalOperator.And);
+            filtro.Conditions.Add(new MetadataConditionExpression("LogicalName", MetadataConditionOperator.Equals, FuelSchema.Avaliacao));
+            var consulta = new EntityQueryExpression { Criteria = filtro, Properties = new MetadataPropertiesExpression("LogicalName") };
+            return ((RetrieveMetadataChangesResponse)service.Execute(new RetrieveMetadataChangesRequest { Query = consulta })).EntityMetadata.Count > 0;
+        }
+
+        public IList<PostoAvaliacoes.Avaliacao> LoadAvaliacoes(IList<Guid> postoIds, DateTime fromUtc)
+        {
+            if (postoIds.Count == 0) return new List<PostoAvaliacoes.Avaliacao>();
+            var query = new QueryExpression(FuelSchema.Avaliacao)
+            {
+                ColumnSet = new ColumnSet("new_posto", "new_motorista", "new_autor", "new_recomenda", "new_motivos", "new_comentario", "new_oculta", "new_avaliadoem")
+            };
+            query.Criteria.AddCondition("new_posto", ConditionOperator.In, postoIds.Cast<object>().ToArray());
+            query.Criteria.AddCondition("new_avaliadoem", ConditionOperator.GreaterEqual, fromUtc);
+            return RetrieveAll(query).Select(a => new PostoAvaliacoes.Avaliacao
+            {
+                PostoId = a.GetAttributeValue<EntityReference>("new_posto").Id,
+                MotoristaId = a.GetAttributeValue<EntityReference>("new_motorista")?.Id ?? Guid.Empty,
+                Autor = a.GetAttributeValue<string>("new_autor"),
+                Recomenda = a.GetAttributeValue<bool>("new_recomenda"),
+                Motivos = (a.GetAttributeValue<string>("new_motivos") ?? "").Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries),
+                Comentario = a.GetAttributeValue<string>("new_comentario"),
+                Oculta = a.GetAttributeValue<bool>("new_oculta"),
+                DataUtc = AsUtc(a.GetAttributeValue<DateTime>("new_avaliadoem"))
+            }).ToList();
+        }
+
+        public string LoadNomeMotorista(Guid motoristaId) =>
+            service.Retrieve(FuelSchema.Funcionario, motoristaId, new ColumnSet(PluginConfig.EmployeeName)).GetAttributeValue<string>(PluginConfig.EmployeeName) ?? "Motorista";
+
+        // new_avaliadoem é a data da avaliação: modifiedon mudaria quando a gestão oculta um comentário.
+        // new_oculta fica de fora: editar a avaliação não desfaz a ocultação feita pela gestão.
+        public void SaveAvaliacao(PostoAvaliacoes.Envio envio, Guid motoristaId, string autor, string posto, DateTime nowUtc)
+        {
+            var query = new QueryExpression(FuelSchema.Avaliacao) { ColumnSet = new ColumnSet(false), TopCount = 1 };
+            query.Criteria.AddCondition("new_posto", ConditionOperator.Equal, envio.PostoId);
+            query.Criteria.AddCondition("new_motorista", ConditionOperator.Equal, motoristaId);
+            var existente = service.RetrieveMultiple(query).Entities.FirstOrDefault();
+
+            var nome = $"{posto} - {autor}"; // A coluna aceita 200 caracteres e a razão social pode ser longa.
+            var avaliacao = new Entity(FuelSchema.Avaliacao)
+            {
+                ["new_name"] = nome.Length > 200 ? nome.Substring(0, 200) : nome,
+                ["new_autor"] = autor,
+                ["new_recomenda"] = envio.Recomenda,
+                ["new_motivos"] = string.Join(",", envio.Motivos),
+                ["new_comentario"] = envio.Comentario,
+                ["new_avaliadoem"] = nowUtc
+            };
+            if (existente != null) { avaliacao.Id = existente.Id; service.Update(avaliacao); return; }
+            avaliacao["new_posto"] = new EntityReference(FuelSchema.Posto, envio.PostoId);
+            avaliacao["new_motorista"] = new EntityReference(FuelSchema.Funcionario, motoristaId);
+            service.Create(avaliacao);
         }
 
         private static QueryExpression CategoriaQuery()

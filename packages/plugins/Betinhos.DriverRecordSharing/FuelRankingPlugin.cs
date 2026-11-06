@@ -7,7 +7,8 @@ using Microsoft.Xrm.Sdk;
 namespace Betinhos.DriverRecordSharing
 {
     // Custom API new_ObterRankingPostos: lê como sistema os abastecimentos da frota e devolve só o agregado por posto
-    // e data e R$/litro dos últimos abastecimentos, porque o motorista não enxerga despesas de colegas. Nada que identifique motorista sai daqui.
+    // e data e R$/litro dos últimos abastecimentos, porque o motorista não enxerga despesas de colegas. Nada dos abastecimentos identifica motorista;
+    // só as avaliações saem assinadas, por decisão do Renan.
     public sealed class FuelRankingPlugin : IPlugin
     {
         public const string ResultParameter = "new_RankingJson";
@@ -40,7 +41,19 @@ namespace Betinhos.DriverRecordSharing
                 catch (Exception e) { tracing?.Trace("RankingPostos: posto novo não gravado: {0}", e.Message); }
             }
             tracing?.Trace("RankingPostos: abastecimentos={0} postos={1}", abastecimentos.Count, postos.Count);
-            return BuildJson(abastecimentos, postos);
+            return BuildJson(abastecimentos, postos, CarregarAvaliacoes(repo, postos, nowUtc, tracing), driver.EmployeeReference.Id);
+        }
+
+        // Avaliação é um extra: o assembly é único e pode chegar a um ambiente sem a tabela, e a lista de preços não pode cair por isso.
+        // Devolve null em vez de lista vazia: "não sei" não pode virar "sem avaliações", ou quem já avaliou abriria o formulário em branco.
+        private static IList<PostoAvaliacoes.Avaliacao> CarregarAvaliacoes(FuelRepository repo, IDictionary<string, Entity> postos, DateTime nowUtc, ITracingService tracing)
+        {
+            try { return repo.TemTabelaAvaliacoes() ? repo.LoadAvaliacoes(postos.Values.Select(p => p.Id).ToList(), nowUtc.AddDays(-PostoAvaliacoes.JanelaDias)) : null; }
+            catch (Exception e)
+            {
+                tracing?.Trace("RankingPostos: avaliações não carregadas: {0}", e.Message);
+                return null;
+            }
         }
 
         // Um posto novo por abertura: a resposta não pode demorar, e ANP e Nominatim limitam as chamadas.
@@ -52,14 +65,15 @@ namespace Betinhos.DriverRecordSharing
             return faltando.Count == 0 ? null : faltando[(int)(nowUtc.Ticks / TimeSpan.TicksPerSecond % faltando.Count)];
         }
 
-        public static string BuildJson(IEnumerable<FuelRanking.Abastecimento> abastecimentos, IDictionary<string, Entity> postos)
+        public static string BuildJson(IEnumerable<FuelRanking.Abastecimento> abastecimentos, IDictionary<string, Entity> postos, IList<PostoAvaliacoes.Avaliacao> avaliacoes = null, Guid motoristaId = default(Guid))
         {
+            var porPosto = avaliacoes?.ToLookup(a => a.PostoId);
             var locais = postos.Select(p => new { p.Key, Local = LocalDe(p.Value) }).Where(x => x.Local != null).ToDictionary(x => x.Key, x => x.Local);
             return new JavaScriptSerializer().Serialize(new Dictionary<string, object>
             {
                 ["ok"] = true,
                 ["dias"] = FuelRanking.JanelaDias,
-                ["postos"] = FuelRanking.Montar(abastecimentos, locais)
+                ["postos"] = FuelRanking.Montar(abastecimentos, locais, porPosto == null ? (Func<Guid, Dictionary<string, object>>)null : id => PostoAvaliacoes.Resumir(porPosto[id], motoristaId))
             });
         }
 
@@ -71,7 +85,7 @@ namespace Betinhos.DriverRecordSharing
             var lon = posto.GetAttributeValue<decimal?>("new_longitude");
             if (status == FuelSchema.StatusGeoPendente || lat == null || lon == null) return null;
             var precisa = status == FuelSchema.StatusGeoManual || posto.GetAttributeValue<string>("new_precisaogeo") == PostoGeocoder.PrecisaoAnp;
-            return new FuelRanking.Local { Lat = (double)lat.Value, Lon = (double)lon.Value, Aproximada = !precisa, Endereco = EnderecoDe(posto) };
+            return new FuelRanking.Local { Lat = (double)lat.Value, Lon = (double)lon.Value, Aproximada = !precisa, Endereco = EnderecoDe(posto), PostoId = posto.Id };
         }
 
         private static string EnderecoDe(Entity posto)

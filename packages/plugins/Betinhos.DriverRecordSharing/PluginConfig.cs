@@ -82,6 +82,7 @@ namespace Betinhos.DriverRecordSharing
         public const string ServiceDestinationAddress = "cr40f_destino";
         public const string ServiceRoute = "cr40f_trajeto";
         public const string ServiceProgrammedFlag = "new_foiprogramado";
+        public const string ServiceDriverViewedAt = "new_visualizacaodomotorista";
         public const string ServiceExchangeLookup = "cr40f_ot";
         public const string ServicePassengerViewField = "cr40f_passageirosetelefonedecontato";
         public const string ServiceAddressViewField = "cr40f_endereodesada";
@@ -121,6 +122,20 @@ namespace Betinhos.DriverRecordSharing
         public const string UserFullName = "fullname";
         public const string UserInternalEmail = "internalemailaddress";
         public const string UserIsDisabled = "isdisabled";
+
+        public const string DriverNoticeTable = "new_avisomotorista";
+        public const string DriverNoticeName = "new_name";
+        public const string DriverNoticeService = "new_reserva";
+        public const string DriverNoticeEmployee = "new_funcionario";
+        public const string DriverNoticeKindColumn = "new_tipo";
+        public const string DriverNoticeSituation = "new_situacao";
+        public const string DriverNoticeDeadline = "new_prazovisualizacao";
+        public const string DriverNoticeKey = "new_chaveidempotencia";
+        public const int DriverNoticePending = 100000000;
+        public const int DriverNoticeSent = 100000001;
+        public const int DriverNoticeFailed = 100000002;
+        public const int DriverNoticeNoApp = 100000003;
+        public const int DriverNoticeCanceled = 100000005;
 
         public const string AppLogTable = "new_appmotoristaslog";
         public const string AppLogName = "new_name";
