@@ -29,7 +29,7 @@ namespace Betinhos.DriverRecordSharing.Tests
         public void CriarParaReservaDeOutroMotoristaDevolveErro()
         {
             var world = new World();
-            var other = world.Service.Driver("Outro", "pessoa.ficticia2@betinhos.com.br", null, null);
+            var other = world.Service.Driver("Outro", "bia@betinhos.com.br", null, null);
             world.Reserva["cr40f_motorista"] = other.ToEntityReference();
 
             Assert.Equal("Este serviço não está com você.", Erro(world.Run(world.CreateCommand(1000))));
@@ -317,7 +317,7 @@ namespace Betinhos.DriverRecordSharing.Tests
         public void ResumoNaoOfereceRetomarCobrancaDeOutroMotoristaNemVencida()
         {
             var world = new World(receivable: 380m);
-            var other = world.Service.Driver("Outro", "pessoa.ficticia2@betinhos.com.br", null, null);
+            var other = world.Service.Driver("Outro", "bia@betinhos.com.br", null, null);
             world.Charge("cs_test_outro", "aguardando", 380m, Now.AddMinutes(20), driver: other);
             world.Stripe.Sessions["cs_test_outro"] = Session("cs_test_outro", "open", "unpaid", 38000);
             world.Charge("cs_test_vencida", "aguardando", 380m, Now.AddMinutes(-1));
@@ -361,7 +361,7 @@ namespace Betinhos.DriverRecordSharing.Tests
         public void ResumoDeReservaDeOutroMotoristaDevolveErro()
         {
             var world = new World();
-            var other = world.Service.Driver("Outro", "pessoa.ficticia2@betinhos.com.br", null, null);
+            var other = world.Service.Driver("Outro", "bia@betinhos.com.br", null, null);
             world.Reserva["cr40f_motorista"] = other.ToEntityReference();
 
             Assert.Equal("Este serviço não está com você.", Erro(world.Run(world.SummaryCommand())));
@@ -434,7 +434,7 @@ namespace Betinhos.DriverRecordSharing.Tests
         public void ConsultarCobrancaDeOutroMotoristaDevolveErro()
         {
             var world = new World();
-            var other = world.Service.Driver("Outro", "pessoa.ficticia2@betinhos.com.br", null, null);
+            var other = world.Service.Driver("Outro", "bia@betinhos.com.br", null, null);
             world.Charge("cs_test_x", "aguardando", 380m, driver: other);
 
             Assert.Equal("Esta cobrança não é sua.", Erro(world.Run(Command("consultar", "cs_test_x"))));
@@ -600,9 +600,9 @@ namespace Betinhos.DriverRecordSharing.Tests
 
             public World(bool canCharge = true, object receivable = null, bool callerIsDriver = true)
             {
-                Driver = Service.Driver("Motorista", "pessoa.ficticia1@betinhos.com.br", null, null);
+                Driver = Service.Driver("Motorista", "ana@betinhos.com.br", null, null);
                 Driver["cr40f_podecobrarqrcode"] = canCharge;
-                User = Service.User(callerIsDriver ? "pessoa.ficticia1@betinhos.com.br" : "pessoa.ficticia3@betinhos.com.br");
+                User = Service.User(callerIsDriver ? "ana@betinhos.com.br" : "maria@betinhos.com.br");
                 Reserva = new Entity("cr40f_reservadeveculos", Guid.NewGuid())
                 {
                     ["cr40f_motorista"] = Driver.ToEntityReference(),
