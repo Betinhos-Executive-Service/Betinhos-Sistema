@@ -6,7 +6,7 @@
 )
 # Conta de serviço do plantão de erros na nuvem (episódio 4). Rode você mesmo, com az login de administrador.
 # - Cria (idempotente) o app registration "Plantao Claude - Leitura" e a entidade de serviço.
-# - PROD: papel "Plantão - Leitura" só com Read (Organização) em flowrun, workflow e cr40f_errodosistema (quando existir).
+# - PROD: papel "Plantão - Leitura" só com Read (Organização) em flowrun, workflow, cr40f_errodosistema (quando existir) e new_appmotoristaslog (logs dos apps).
 # - DEV: o mesmo papel, mais Write em cr40f_errodosistema (para marcar "Em correção").
 # - Cria o usuário de aplicação em cada ambiente e associa o papel.
 # - Gera um segredo novo e o coloca na área de transferência (nunca é impresso). Cole em claude.ai/code →
@@ -18,8 +18,8 @@ Set-StrictMode -Version Latest
 $nomeApp = 'Plantao Claude - Leitura'
 $nomePapel = 'Plantão - Leitura'
 $ambientes = @(
-  @{ Nome = 'PROD'; Url = 'https://orgf261ae8e.crm2.dynamics.com'; Ler = @('prvReadflowrun', 'prvReadWorkflow', 'prvReadcr40f_errodosistema'); Escrever = @() },
-  @{ Nome = 'DEV'; Url = 'https://org23b93544.crm2.dynamics.com'; Ler = @('prvReadflowrun', 'prvReadWorkflow', 'prvReadcr40f_errodosistema'); Escrever = @('prvWritecr40f_errodosistema') }
+  @{ Nome = 'PROD'; Url = 'https://orgf261ae8e.crm2.dynamics.com'; Ler = @('prvReadflowrun', 'prvReadWorkflow', 'prvReadcr40f_errodosistema', 'prvReadnew_appmotoristaslog'); Escrever = @() },
+  @{ Nome = 'DEV'; Url = 'https://org23b93544.crm2.dynamics.com'; Ler = @('prvReadflowrun', 'prvReadWorkflow', 'prvReadcr40f_errodosistema', 'prvReadnew_appmotoristaslog'); Escrever = @('prvWritecr40f_errodosistema') }
 )
 function Passo([string] $m) { Write-Host "[plantao-identidade] $m" }
 function Invoke-Az([string[]] $a) { $r = & az.cmd @a; if ($LASTEXITCODE -ne 0) { throw "az $($a[0..2] -join ' ') falhou" }; $r }

@@ -32,3 +32,7 @@ test('nulo vira vazio', () => {
   assert.equal(mascarar(null), '')
   assert.equal(mascarar(undefined), '')
 })
+
+test('esconde busca digitada em JSON', () => {
+  assert.equal(mascarar('{"search":"maria souza","busca":"joao","limit":5}'), '{"search":"[pessoal]","busca":"[pessoal]","limit":5}')
+})

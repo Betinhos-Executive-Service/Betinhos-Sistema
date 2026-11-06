@@ -19,7 +19,7 @@ const REGRAS = [
 ]
 
 /** Campos JSON cujo valor é sempre pessoal, seja qual for o formato. */
-const CAMPOS_PESSOAIS = /("(?:[\w]*?(?:nome|name|passageiro|cliente|motorista|endereco|address|telefone|phone|email|cpf|rg|cnh)[\w]*)"\s*:\s*)"[^"]*"/gi
+const CAMPOS_PESSOAIS = /("(?:[\w]*?(?:nome|name|passageiro|cliente|motorista|endereco|address|telefone|phone|email|cpf|rg|cnh|busca|search|termo|query)[\w]*)"\s*:\s*)"[^"]*"/gi
 
 export function mascarar(texto) {
   if (texto == null) return ''
