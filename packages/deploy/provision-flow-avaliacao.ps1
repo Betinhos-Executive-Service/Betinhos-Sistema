@@ -651,10 +651,14 @@ if ($flows.Count) {
   Write-Output "'$flowName': criado ($flowId)."
 }
 Include $flowId 29
+# No CI (Deploy), flow existente desligado no DEV continua desligado: quem desliga é decisão de operação.
+if (($env:GITHUB_ACTIONS -eq 'true') -and $flows.Count -and $flows[0].statecode -ne 1) { Write-Output "DEV: '$flowName' mantido desligado (estava desligado)."; return }
 $flow = Dv GET "workflows($flowId)?`$select=resourceid,statecode"
 if ($flow.statecode -ne 1) { Dv PATCH "workflows($flowId)" @{ statecode = 1 } | Out-Null; $flow = Dv GET "workflows($flowId)?`$select=resourceid,statecode" }
 if ($flow.statecode -ne 1) { throw 'Flow não ativou. Confira as conexões das connection references no Power Automate.' }
 
+# No CI a URL do gatilho de um flow existente não muda: não lê nem regrava a variável.
+if ($env:GITHUB_ACTIONS -eq 'true') { Write-Output 'URL do gatilho mantida: flow existente.'; Write-Output "DEV: '$flowName' ativo ($($flow.resourceid)); tudo na $solutionName."; return }
 # URL do gatilho (com sig): só para a variável de ambiente; nunca no console.
 $ft = FlowToken
 $callback = $null

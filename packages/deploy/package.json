@@ -4,6 +4,6 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "test": "node --test caminho-publicacao.test.mjs mudancas-dev.test.mjs flows/conciliacao-cartao-diario.test.mjs flows/documentos-resumo-semanal.test.mjs flows/aniversariantes-diario.test.mjs flows/cadastro-passageiro-link.test.mjs flows/portal-cliente-emails.test.mjs flows/prontuario-anexar-claude.test.mjs solucoes/classificar.test.mjs solucoes/conferir.test.mjs solucoes/comparar-fotos.test.mjs solucoes/conferir-retirada.test.mjs solucoes/cli.test.mjs"
+    "test": "node --test caminho-publicacao.test.mjs mudancas-dev.test.mjs flows-dev.test.mjs flows/conciliacao-cartao-diario.test.mjs flows/documentos-resumo-semanal.test.mjs flows/aniversariantes-diario.test.mjs flows/cadastro-passageiro-link.test.mjs flows/portal-cliente-emails.test.mjs flows/prontuario-anexar-claude.test.mjs solucoes/classificar.test.mjs solucoes/conferir.test.mjs solucoes/comparar-fotos.test.mjs solucoes/conferir-retirada.test.mjs solucoes/cli.test.mjs"
   }
 }

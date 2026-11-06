@@ -95,6 +95,8 @@ if ($flows.Count -eq 1) {
   Dv POST workflows @{ name = $flowName; category = 5; type = 1; primaryentity = 'none'; clientdata = $clientData; description = 'Grava o odômetro Infleet em cr40f_veiculos (cr40f_hodometro/cr40f_hodometroem) para a manutenção preventiva da Frota.' } | Out-Null
   $flowId = @((Dv GET "workflows?`$select=workflowid&`$filter=name eq '$flowName' and category eq 5").value)[0].workflowid
 }
+# No CI (Deploy), flow existente desligado no DEV continua desligado: quem desliga é decisão de operação.
+if (($env:GITHUB_ACTIONS -eq 'true') -and $flows.Count -and $flows[0].statecode -ne 1) { Write-Output "DEV: '$flowName' mantido desligado (estava desligado)."; return }
 $flow = Dv GET "workflows($flowId)?`$select=statecode"
 if ($flow.statecode -ne 1) { Dv PATCH "workflows($flowId)" @{ statecode = 1; statuscode = 2 } | Out-Null; $flow = Dv GET "workflows($flowId)?`$select=statecode" }
 if ($flow.statecode -ne 1) { throw 'Flow não ativou.' }

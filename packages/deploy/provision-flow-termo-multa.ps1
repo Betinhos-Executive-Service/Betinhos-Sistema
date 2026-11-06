@@ -341,6 +341,8 @@ function Ensure-Flow([string] $nome, [string] $descricao, [string] $clientData, 
   if ($flows.Count -gt 1) { throw "Flow '$nome' duplicado no DEV." }
   $anterior = if ($flows.Count) { [int]$flows[0].statecode } else { 0 }
   $alvo = if ($ligado) { 1 } else { $anterior }
+  # No CI (Deploy), flow existente desligado no DEV continua desligado: quem desliga é decisão de operação.
+  if (($env:GITHUB_ACTIONS -eq 'true') -and $flows.Count) { $alvo = $anterior }
   if (-not $Apply) { Write-Output "DRY RUN: '$nome' seria $(if ($flows.Count) { 'atualizado' } else { 'criado' }) $(if ($alvo -eq 1) { 'LIGADO' } else { 'DESLIGADO (rascunho)' })."; return }
   if ($flows.Count) {
     $flowId = $flows[0].workflowid

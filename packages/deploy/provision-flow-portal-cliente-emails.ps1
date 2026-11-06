@@ -108,10 +108,14 @@ if ($flows.Count) {
 Include $flowId 29 $solutionName
 Include $flowId 29 $solucaoDestino
 if (-not $Apply) { Write-Output 'DRY RUN OK; use -Apply'; return }
+# No CI (Deploy), flow existente desligado no DEV continua desligado: quem desliga é decisão de operação.
+if (($env:GITHUB_ACTIONS -eq 'true') -and $flows.Count -and $flows[0].statecode -ne 1) { Write-Output "DEV: '$flowName' mantido desligado (estava desligado)."; return }
 $flow = Dv GET "workflows($flowId)?`$select=statecode"
 if ($flow.statecode -ne 1) { Dv PATCH "workflows($flowId)" @{ statecode = 1 } | Out-Null; $flow = Dv GET "workflows($flowId)?`$select=statecode" }
 if ($flow.statecode -ne 1) { throw 'Flow não ativou. Confira a conexão da connection reference do Outlook no Power Automate.' }
 
+# No CI a URL do gatilho de um flow existente não muda: não lê a URL (ela nunca deve ir ao log do Actions).
+if ($env:GITHUB_ACTIONS -eq 'true') { Write-Output 'URL do gatilho mantida: flow existente.'; Write-Output "DEV: '$flowName' ativo, na $solutionName e na $solucaoDestino."; return }
 # 4. URL do gatilho (com SAS) para o secret do Worker. Nunca é gravada em arquivo; só sai no console.
 $url = $null
 try {
