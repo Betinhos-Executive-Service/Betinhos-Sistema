@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { aplicarMinhaAvaliacao, iniciaisAutor, motivoPositivo, percentualRecomenda, rotuloMotivo, rotuloRecomendacoes, SEM_AVALIACOES } from "../src/lib/avaliacaoPostos.ts";
-import { nomePosto, parseRankingPostos, postosProximos, rotuloAbastecimentos, rotuloDistancia, rotuloMelhor, separarMelhor, urlMaps } from "../src/lib/rankingPostos.ts";
+import { aplicarMinhaAvaliacao, motivoPositivo, nomeCurto, percentualRecomenda, rotuloMotivo, rotuloRecomendacoes, SEM_AVALIACOES } from "../src/lib/avaliacaoPostos.ts";
+import { enderecoLegivel, nomePosto, parseRankingPostos, postosProximos, rotuloAbastecimentos, rotuloDistancia, rotuloMelhor, separarMelhor, urlMaps } from "../src/lib/rankingPostos.ts";
 
 const origem = { lat: -23, lon: -45 };
 const posto = (nome: string, precoLitro: number, lat: number, lon = -45, aproximada = false) => ({ postoId: nome, avaliacoes: SEM_AVALIACOES, nome, precoLitro, abastecimentos: 2, ultimoAbastecimento: "2026-11-03", lat, lon, aproximada, endereco: "RUA A, 10 - TAUBATE/SP", historico: [] });
@@ -107,10 +107,15 @@ test("percentualRecomenda arredonda e não divide por zero", () => {
   assert.equal(percentualRecomenda({ total: 3, recomendam: 2 }), 67);
 });
 
-test("iniciaisAutor usa o primeiro e o último nome e aceita nome vazio", () => {
-  assert.equal(iniciaisAutor("maria da silva"), "MS");
-  assert.equal(iniciaisAutor("Renan"), "R");
-  assert.equal(iniciaisAutor("  "), "?");
+test("nomeCurto fica com o primeiro e o último nome", () => {
+  assert.equal(nomeCurto("Maria Aparecida da Silva"), "Maria Silva");
+  assert.equal(nomeCurto("Maria Silva"), "Maria Silva");
+  assert.equal(nomeCurto("  Renan "), "Renan");
+});
+
+test("enderecoLegivel tira a caixa alta e mantém a UF", () => {
+  assert.equal(enderecoLegivel("AVENIDA BENEDITO DE MATARAZZO, 9183 - SAO JOSE DOS CAMPOS/SP"), "Avenida Benedito de Matarazzo, 9183 - Sao Jose dos Campos/SP");
+  assert.equal(enderecoLegivel("Rua Já Escrita, 10"), "Rua Já Escrita, 10");
 });
 
 test("motivos têm rótulo e sentido próprios", () => {

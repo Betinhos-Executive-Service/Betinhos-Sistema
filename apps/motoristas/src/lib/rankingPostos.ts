@@ -38,6 +38,9 @@ export const RECOMENDACAO: Record<Semaforo, { rotulo: string; tom: string }> = {
   vermelho: { rotulo: "Evitar", tom: "erro" }
 };
 
+// Na ficha o selo fala só de preço: "Recomendado" se confundiria com a recomendação dos motoristas.
+export const ROTULO_META: Record<Semaforo, string> = { verde: "Dentro da meta", amarelo: "Pouco acima da meta", vermelho: "Acima da meta" };
+
 // O destaque é o menor preço do raio; no empate, o mais perto, que já vem primeiro.
 export function separarMelhor(proximos: PostoProximo[]) {
   const melhor = proximos.reduce((atual, posto) => (posto.precoLitro < atual.precoLitro ? posto : atual));
@@ -60,6 +63,12 @@ export function nomePosto(nome: string) {
   const limpo = nome.replace(SUFIXO_SOCIAL, "").trim();
   if (limpo !== limpo.toUpperCase()) return limpo;
   return limpo.toLowerCase().split(/\s+/).map(capitalizar).join(" ");
+}
+
+// O endereço da ANP vem em caixa alta. O original segue na busca do Maps.
+export function enderecoLegivel(endereco: string) {
+  if (endereco !== endereco.toUpperCase()) return endereco;
+  return endereco.toLowerCase().split(/\s+/).map(capitalizar).join(" ").replace(/\/[a-z]{2}$/, (uf) => uf.toUpperCase());
 }
 
 const comNomesLimpos = (ranking: RankingPostos): RankingPostos => ({ ...ranking, postos: ranking.postos.map((posto) => ({ ...posto, nome: nomePosto(posto.nome) })) });

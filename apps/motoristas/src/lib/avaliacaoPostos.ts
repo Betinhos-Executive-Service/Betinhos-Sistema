@@ -36,10 +36,10 @@ export function rotuloRecomendacoes({ total, recomendam }: Pick<ResumoAvaliacoes
 
 export const percentualRecomenda = ({ total, recomendam }: Pick<ResumoAvaliacoes, "total" | "recomendam">) => (total ? Math.round((recomendam / total) * 100) : 0);
 
-export function iniciaisAutor(nome: string) {
-  const partes = nome.trim().split(/\s+/).filter(Boolean);
-  if (!partes.length) return "?";
-  return `${partes[0][0]}${partes.length > 1 ? partes[partes.length - 1][0] : ""}`.toUpperCase();
+// Nome completo não cabe na linha do comentário: primeiro e último bastam entre colegas.
+export function nomeCurto(nome: string) {
+  const partes = nome.trim().split(/\s+/);
+  return partes.length > 2 ? `${partes[0]} ${partes[partes.length - 1]}` : partes.join(" ");
 }
 
 // Só para o mock: no real quem recalcula é o plugin.
