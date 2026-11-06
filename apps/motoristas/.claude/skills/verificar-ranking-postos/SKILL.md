@@ -23,6 +23,7 @@ description: "Verifica os postos perto do motorista: Custom API new_ObterRanking
 5. Sem rolagem horizontal; toque em Voltar → `#gastos-relatorio`.
 6. `?mockRankingPostos=semgps#ranking-postos` → aviso de localização e "Tentar de novo", sem lista.
 7. `?mockRankingPostos=erro#ranking-postos` → "Não foi possível carregar os postos." e "Tentar de novo".
+7b. `?mockRankingPostos=lento#ranking-postos` → esqueleto no formato da lista, com "Buscando sua localização…" e depois "Procurando postos perto de você…". Atualizar com a lista aberta mantém a lista, mostra "Atualizando postos…" e, se falhar, avisa sem apagar a lista.
 8. `?mockRankingPostos=vazio#ranking-postos` → "Nenhum posto usado pela frota a até 10 km de você nos últimos 30 dias."
 
 ## Dataverse (só local, nunca na nuvem)

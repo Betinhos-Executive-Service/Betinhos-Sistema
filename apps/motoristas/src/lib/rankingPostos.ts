@@ -92,8 +92,8 @@ const mockModo = () => new URLSearchParams(window.location.search).get("mockRank
 
 export async function carregarRankingPostos(): Promise<RankingPostos> {
   if (isMockGastosCartao()) {
-    await new Promise((resolve) => setTimeout(resolve, 300));
     const modo = mockModo();
+    await new Promise((resolve) => setTimeout(resolve, modo === "lento" ? 4000 : 300));
     if (modo === "erro") throw new Error("Falha simulada ao carregar os postos.");
     return modo === "vazio" ? { ...MOCK, postos: [] } : comNomesLimpos(MOCK);
   }
@@ -103,7 +103,8 @@ export async function carregarRankingPostos(): Promise<RankingPostos> {
 
 export function obterPosicao(): Promise<Posicao> {
   if (isMockGastosCartao()) {
-    return mockModo() === "semgps" ? Promise.reject({ code: 1 }) : Promise.resolve(MOCK_POSICAO);
+    if (mockModo() === "semgps") return Promise.reject({ code: 1 });
+    return new Promise((resolve) => setTimeout(() => resolve(MOCK_POSICAO), mockModo() === "lento" ? 1500 : 0));
   }
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) { reject(null); return; }
