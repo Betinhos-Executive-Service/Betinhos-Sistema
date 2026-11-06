@@ -25,7 +25,7 @@ import {
   type FleetVehicle,
   type InfleetVehicleResolution
 } from "./serviceVehicleInfleet.ts";
-import { createRemoteReadBatch } from "./remoteReadBatch.ts";
+import { createRemoteReadBatch, mapWithLimit } from "./remoteReadBatch.ts";
 import { buildCurrentVehiclePatch } from "./myVehicle.ts";
 import { buildIdeaRecord, normalizeIdeaRecord, validateIdeaDraft, type Idea, type IdeaDraft } from "./ideas.ts";
 import { decideExpenseUploadMode, type ExpenseUploadMode } from "./expenseUploadMode.ts";
@@ -373,7 +373,9 @@ function dataverseLog(message: string, data?: unknown) {
 }
 
 function dataverseWarn(message: string, data?: unknown) {
-  (window as WindowWithFlowEnv).__APP_REPORT_ERROR?.(new Error(message), {
+  // A causa real vai em cause: o logger classifica rede/timeout e agrupa repetições pela causa.
+  const cause = typeof data === "object" && data !== null ? (data as { error?: unknown }).error : undefined;
+  (window as WindowWithFlowEnv).__APP_REPORT_ERROR?.(cause === undefined ? new Error(message) : Object.assign(new Error(message), { cause }), {
     severity: "warning", source: "dataverse", action: message, phase: "fallback", payload: data, notifyUser: false
   });
   if (data === undefined) {
@@ -3277,6 +3279,9 @@ function mapGeralService(record: DataverseRecord, passengerHtml = "", solicitant
   };
 }
 
+/** Serviços enriquecidos ao mesmo tempo na agenda (passageiros e solicitante); evita rajada de leituras e de logs quando a rede cai. */
+const ENRICH_SERVICES_CONCURRENCY = 3;
+
 async function mapGeralServiceWithPassengers(record: DataverseRecord, driver: DriverContext, readMultiple = retrieveMultiple, readOne = retrieveOne) {
   const serviceId = getGeralId(record);
   let passengerHtml = "";
@@ -3539,7 +3544,7 @@ export async function loadRemoteStore(): Promise<RemoteStore> {
     .filter((exchange) => shouldShowOpenExchangeForDriver(exchange, driver.id))
     .map((exchange) => mapExchange(exchange, exchangeGeralById.get(getRecordId(exchange, "cr40f_trocasdecarroid")), driver));
 
-  const serviceItems = (await Promise.all(servicesResult.entities.map((record) => mapGeralServiceWithPassengers(record, driver, readMultiple, readOne))))
+  const serviceItems = (await mapWithLimit(servicesResult.entities, ENRICH_SERVICES_CONCURRENCY, (record) => mapGeralServiceWithPassengers(record, driver, readMultiple, readOne)))
     .filter((item) => shouldKeepCanceledAgendaItem(item, now.getTime()));
 
   const items = [
@@ -3566,7 +3571,7 @@ export async function loadRemoteStore(): Promise<RemoteStore> {
   const historyExchangeGeralById = new Map(
     historyExchangeGeralResult.entities.map((geral) => [getExchangeIdFromGeral(geral), geral] as const).filter(([id]) => Boolean(id))
   );
-  const historyServiceItems = await Promise.all(historyServiceResult.entities.map((record) => mapGeralServiceWithPassengers(record, driver, readMultiple, readOne)));
+  const historyServiceItems = await mapWithLimit(historyServiceResult.entities, ENRICH_SERVICES_CONCURRENCY, (record) => mapGeralServiceWithPassengers(record, driver, readMultiple, readOne));
 
   const historyItems = [
     ...historyServiceItems,
