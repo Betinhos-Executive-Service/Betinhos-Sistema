@@ -9,7 +9,7 @@ export const COLUNAS_LOGS = ['new_appmotoristaslogid', 'createdon', 'new_appname
 export const LIMITE_LINHAS = 5000
 const JANELA_EVENTO_MS = 60_000
 const GUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi
-const REDE = /falha de rede|failed to fetch|networkerror|network request failed|timeout|timed out|time-out|tempo esgotado|err_(internet|network|connection|timed)|offline|sem conex/i
+const REDE = /falha de rede|falha de conex|failed to fetch|networkerror|network request failed|timeout|timed out|time-out|tempo esgotado|err_(internet|network|connection|timed)|offline|sem conex/i
 const FALLBACK = /\b(usando|fallback|alternativ\w*|tentando de novo|caindo para)\b/i
 
 /** Consulta só por janela: severidade e fonte variam de caixa no dado real ("Dataverse"/"dataverse"), então filtram em código. */

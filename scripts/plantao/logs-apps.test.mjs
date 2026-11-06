@@ -58,11 +58,12 @@ test('rede/timeout vira um grupo de ruído por app, separado do erro de regra', 
     log({ new_source: 'Dataverse', new_errorcode: 'network', new_message: 'Falha de rede em GET /cr40f_documentos: Failed to fetch' }),
     log({ new_source: 'Dataverse', new_errorcode: 'network', new_message: 'Falha de rede em GET /cr40f_veiculoses: Failed to fetch' }),
     log({ new_message: 'Request timed out após 30000 ms' }),
+    log({ new_message: 'Falha de conexão com o servidor' }),
     log({ new_message: 'Checklist inválido' }),
   ])
   const rede = r.grupos.filter((g) => g.classe === 'rede')
   assert.equal(rede.length, 1)
-  assert.equal(rede[0].ocorrencias, 3)
+  assert.equal(rede[0].ocorrencias, 4)
   assert.equal(rede[0].chave, 'log:app-motoristas:rede')
   assert.deepEqual(r.grupos.filter((g) => g.classe === 'regra').map((g) => g.mensagem), ['Checklist inválido'])
 })
