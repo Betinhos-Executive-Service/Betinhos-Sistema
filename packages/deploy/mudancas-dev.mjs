@@ -6,7 +6,8 @@ import { FRONT } from './caminho-publicacao.mjs'
 //  - tela: o build do Sistema Betinhos (pnpm push), quando muda algo que entra nele ou o próprio script de publicação;
 //  - plugins: cada plugin cujo código, registrador ou script de publicação mudou (push-<nome>-plugin.ps1).
 // Teste de plugin (Cr40f.<Nome>.Plugin.Tests) não republica: o assembly publicado não muda.
-// Flows e schema (packages/deploy/provision-*) continuam à mão: usam az login e conexões do usuário.
+// Flows têm decisão própria (flows-dev.mjs, pela tag flows-dev-publicado); flow novo, schema e sitemap:* continuam à mão:
+// usam az login e conexões do usuário. Por aqui, arquivo de flow não publica nada.
 
 export const TELA = [...FRONT, /^packages\/deploy\/(push-dev\.ps1|bump-version\.mjs)$/]
 

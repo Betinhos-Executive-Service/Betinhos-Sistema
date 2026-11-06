@@ -296,14 +296,18 @@ if ($flows.Count) {
 }
 Include $flowId 29
 $flow = Dv GET "workflows($flowId)?`$select=resourceid,statecode"
-if ($flow.statecode -ne 1) { Dv PATCH "workflows($flowId)" @{ statecode = 1 } | Out-Null; $flow = Dv GET "workflows($flowId)?`$select=resourceid,statecode" }
-if ($flow.statecode -ne 1) { throw 'Flow não ativou.' }
+# No CI (Deploy), flow existente desligado no DEV continua desligado: quem desliga é decisão de operação.
+$manterDesligado = ($env:GITHUB_ACTIONS -eq 'true') -and $flows.Count -and $flows[0].statecode -ne 1
+if ($flow.statecode -ne 1 -and -not $manterDesligado) { Dv PATCH "workflows($flowId)" @{ statecode = 1 } | Out-Null; $flow = Dv GET "workflows($flowId)?`$select=resourceid,statecode" }
+if ($flow.statecode -ne 1 -and -not $manterDesligado) { throw 'Flow não ativou.' }
 
 # Conferência por leitura de volta (UTF-8): o que está gravado no DEV é o que este script exige.
 $row = Dv GET "workflows($flowId)?`$select=clientdata"
 AssertSemMojibake $row.clientdata 'clientdata gravado'
 Conferir (($row.clientdata | ConvertFrom-Json).properties.definition)
 
+# No CI a URL do gatilho de um flow existente não muda: não lê nem regrava a variável.
+if ($env:GITHUB_ACTIONS -eq 'true') { Write-Output 'URL do gatilho mantida: flow existente.'; Write-Output "DEV: '$flowName' $(if ($manterDesligado) { 'mantido desligado' } else { 'ativo' }) ($flowId), na $solutionName."; return }
 # URL do gatilho: lida do Power Automate e gravada na variável sem ser impressa.
 $flowToken = & az account get-access-token --resource https://service.flow.microsoft.com/ --query accessToken -o tsv
 if (-not $flowToken) { throw 'Token do Power Automate indisponível.' }

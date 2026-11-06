@@ -57,6 +57,9 @@ test('só documentação, CI e scripts de publicação: nada', () => {
     'CLAUDE.md',
     'packages/deploy/solucoes/conferir.mjs',
     'packages/deploy/push-front-prod.ps1',
+    'packages/deploy/push-flows-dev.ps1',
+    'packages/deploy/flows-dev.mjs',
+    'packages/deploy/flows-dev.test.mjs',
     'apps/portal-cliente/src/x.ts',
     '',
   ])

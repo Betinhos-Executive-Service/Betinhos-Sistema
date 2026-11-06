@@ -1,12 +1,13 @@
 ---
 name: verificar-deploy-dev
-description: "Verifica o workflow Deploy do GitHub Actions que publica no DEV a tela do Sistema Betinhos e os plugins (push na branch develop). Use após mudar .github/workflows/deploy.yml, pendentes-dev.ps1, push-plugins-dev.ps1, mudancas-dev.mjs ou um registrador de plugin, ou quando o deploy automático do plantão falhar."
+description: "Verifica o workflow Deploy do GitHub Actions que publica no DEV a tela do Sistema Betinhos, os plugins e os flows (push na branch develop). Use após mudar .github/workflows/deploy.yml, pendentes-dev.ps1, push-plugins-dev.ps1, push-flows-dev.ps1, flows-dev.mjs, mudancas-dev.mjs, um provision-flow-*.ps1 ou um registrador de plugin, ou quando o deploy automático do plantão falhar."
 ---
 # Verificar deploy automático no DEV
 
 ## Cobre
 - `.github/workflows/deploy.yml` (só DEV; job `dev`, runner Windows, environment `dev` do GitHub).
 - `packages/deploy/pendentes-dev.ps1` (o que o DEV ainda não tem; também é a trava do `publicar.yml`), `packages/deploy/mudancas-dev.mjs` (que arquivo é de qual peça), `packages/deploy/push-plugins-dev.ps1` e os registradores `packages/plugins/tools/Cr40f.*.Registrar` (conta de serviço quando há `DV_CLIENT_SECRET`; commit na descrição do assembly só com `GITHUB_ACTIONS=true`).
+- Flows: `packages/deploy/flows-dev.mjs` (tabela script → arquivos, flows do DEV, args `FLOW_*`, preparo das constantes), `packages/deploy/push-flows-dev.ps1`, os `provision-flow-*.ps1` (no CI, `GITHUB_ACTIONS=true` pula a leitura e a regravação da URL do gatilho e mantém desligado o flow que já estava desligado) e o job `tag-flows` (tag `flows-dev-publicado`).
 
 ## Roteiro
 1. YAML válido: `python -c "import yaml;yaml.safe_load(open('.github/workflows/deploy.yml',encoding='utf-8'))"` sem erro; gatilhos só `push` em `develop` (com `paths`) e `workflow_dispatch`; nenhum job para test/prod.
@@ -19,10 +20,13 @@ description: "Verifica o workflow Deploy do GitHub Actions que publica no DEV a 
 8. Commit nos plugins: `pluginassemblies?$select=name,description&$filter=startswith(name,'Cr40f.')` no DEV → cada descrição = sha de 40 caracteres de um commit da `develop`.
 9. Versão nunca retrocede (`packages/deploy/bump-version.mjs` + `push-dev.ps1 -Build`): `node --test packages/deploy/bump-version.test.mjs` → 5 passam. No log do job: `[push-dev] versao publicada no DEV: vA` seguido de `Build vB` com B > A; no DEV, a descrição de `cr40f_SistemaBetinhos.html` = `vB <sha do commit>` (`webresourceset?$select=description`). Um `pnpm push` local logo depois deve publicar vB+1, não voltar ao número do repo. Primeira execução após esta mudança mostra "desconhecida" (descrição ainda vazia).
 
+10. Flows (somente leitura): `node --test packages/deploy/flows-dev.test.mjs` → passam (todo `provision-flow-*.ps1` e todo arquivo de `packages/deploy/flows/` têm dono na tabela). `git diff --name-only flows-dev-publicado HEAD | node packages/deploy/flows-dev.mjs` → `{flows, preparos}` dos pendentes. Variáveis: `gh variable list --env dev --repo Betinhos-Executive-Service/Betinhos-Sistema` mostra todas as `FLOW_*` que a tabela cita. Execução real (escreve no DEV; só com ok do Renan): `gh workflow run deploy.yml --ref develop -f forcar_flows=<nome>` com um flow inofensivo (ex.: `hodometro`); no log, grupo `flow <nome>` sem URL do gatilho e a linha "URL do gatilho mantida: flow existente" nos que a têm; no resumo, "Flows no DEV" com `ok`. Depois, no DEV, `workflows?$filter=name eq '<flow>'` mantém o `statecode` de antes (o das aniversariantes continua 0 se estava desligado) e a execução seguinte do flow dá `Succeeded`. Falha provocada (variável `FLOW_*` removida, ou flow inexistente): causa clara no resumo, Deploy vermelho, `git ls-remote origin refs/tags/flows-dev-publicado` não muda.
+
 ## Evidência obrigatória
 - Saída do passo 1 e, quando executado, link/id da execução e a versão do rodapé.
 
 ## Limites
-- Push em `develop` que só muda documentação, skills ou scripts do plantão não dispara (filtro `paths`); use `workflow_dispatch` para forçar (`forcar_tela`, `forcar_plugins` = `frota,acesso` ou `todos`).
-- Flows e schema (`provision-*`) não passam pelo Deploy: usam `az login` e conexões do usuário.
+- Push em `develop` que só muda documentação, skills ou scripts do plantão não dispara (filtro `paths`); use `workflow_dispatch` para forçar (`forcar_tela`, `forcar_plugins` = `frota,acesso` ou `todos`, `forcar_flows` = nomes de `flows-dev.mjs` ou `todos`; execução forçada não move a tag `flows-dev-publicado`).
+- Flow novo (a primeira publicação), schema (`provision-*` sem flow) e `sitemap:*` não passam pelo Deploy: usam `az login` e conexões do usuário, e flow criado pela conta de serviço não liga. Flow existente passa pelo Deploy; tipo de flow novo pede entrada em `flows-dev.mjs` (o teste de cobertura falha se faltar).
+- Variáveis `FLOW_*` do environment `dev` guardam os valores de e-mail, site e pasta que os scripts exigem; mudar o valor no DEV pede mudar a variável (os scripts de aniversariantes e documentos reescrevem `new_EmailAdminAvisos` e `new_URLSistemaBetinhos`).
 - Secrets necessários no environment `dev`: `DV_CLIENT_SECRET`, `PLUGIN_SNK_<NOME>` (base64 do `.snk` de `%USERPROFILE%\.codex\keys`; nunca gerar outro, muda o public key token) e variáveis `ACESSO_*` (as do `.env` local).

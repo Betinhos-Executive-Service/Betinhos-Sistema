@@ -217,8 +217,10 @@ foreach ($f in $definicoes) {
     Dv POST AddSolutionComponent @{ ComponentId = $flowId; ComponentType = 29; SolutionUniqueName = $solutionName; AddRequiredComponents = $false } | Out-Null
     if (-not (Rows $filtro).Count) { throw "Flow '$nome' não entrou na $solutionName." }
   }
+  # No CI (Deploy), flow existente fica no estado em que estava: quem liga e desliga é decisão de operação.
+  $alvo = if (($env:GITHUB_ACTIONS -eq 'true') -and $flows.Count) { [int]$flows[0].statecode } else { $f.alvo }
   $atual = (Dv GET "workflows($flowId)?`$select=statecode").statecode
-  if ($atual -ne $f.alvo) { Dv PATCH "workflows($flowId)" @{ statecode = $f.alvo } | Out-Null; $atual = (Dv GET "workflows($flowId)?`$select=statecode").statecode }
-  if ($atual -ne $f.alvo) { throw "'$nome' não ficou com statecode $($f.alvo). Confira as conexões no Power Automate." }
-  Write-Output "DEV: '$nome' $(if ($f.alvo -eq 1) { 'LIGADO' } else { 'DESLIGADO: ligue a conexão do Banco MCP e rode de novo' }) na $solutionName."
+  if ($atual -ne $alvo) { Dv PATCH "workflows($flowId)" @{ statecode = $alvo } | Out-Null; $atual = (Dv GET "workflows($flowId)?`$select=statecode").statecode }
+  if ($atual -ne $alvo) { throw "'$nome' não ficou com statecode $alvo. Confira as conexões no Power Automate." }
+  Write-Output "DEV: '$nome' $(if ($alvo -eq 1) { 'LIGADO' } else { 'DESLIGADO: ligue a conexão do Banco MCP e rode de novo' }) na $solutionName."
 }
