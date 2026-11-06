@@ -16,12 +16,14 @@ description: "Verifica os postos perto do motorista: Custom API new_ObterRanking
 
 ## Roteiro (mock em localhost, viewport 390×844)
 1. Abra `/?p=1#gastos-relatorio` e toque no cartão "Postos perto de mim", em Suas médias (sem gastos no período, o link "Ver postos perto de mim") → rota `#ranking-postos`, título "Postos perto de você".
-2. A lista vem do mais perto para o mais longe; "Posto Exemplo Distante" (mais de 10 km) não aparece.
-3. Semáforo: R$ 6,09 "Recomendado", R$ 6,19 "Atenção" e R$ 6,83 "Evitar".
-4. O posto com ponto do Nominatim mostra "cerca de X km"; o da ANP mostra só a distância.
+2. O destaque mostra o menor preço do raio ("Melhor opção perto de você" se estiver na meta; senão "Menor preço perto de você"); "Posto Exemplo Distante" (mais de 10 km) não aparece.
+3. Em Outros postos, os itens vêm do mais perto para o mais longe, com a recomendação Atenção ou Evitar e nomes em caixa alta já ajustados.
+4. Tocar em um posto abre a ficha com endereço, distância ("cerca de" no ponto aproximado), "Abrir no Maps" e até 5 últimos abastecimentos com data e R$/litro, sem motorista. X, Esc e toque fora fecham; a lista segue na mesma posição.
+4b. O ícone de mapa da linha abre `google.com/maps/search` sem abrir a ficha.
 5. Sem rolagem horizontal; toque em Voltar → `#gastos-relatorio`.
 6. `?mockRankingPostos=semgps#ranking-postos` → aviso de localização e "Tentar de novo", sem lista.
 7. `?mockRankingPostos=erro#ranking-postos` → "Não foi possível carregar os postos." e "Tentar de novo".
+7b. `?mockRankingPostos=lento#ranking-postos` → esqueleto no formato da lista, com "Buscando sua localização…" e depois "Procurando postos perto de você…". Atualizar com a lista aberta mantém a lista, mostra "Atualizando postos…" e, se falhar, avisa sem apagar a lista.
 8. `?mockRankingPostos=vazio#ranking-postos` → "Nenhum posto usado pela frota a até 10 km de você nos últimos 30 dias."
 
 ## Dataverse (só local, nunca na nuvem)

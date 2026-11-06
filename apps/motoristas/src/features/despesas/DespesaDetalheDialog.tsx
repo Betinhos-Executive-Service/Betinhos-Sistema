@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { SystemIcon } from "../../shared/ui/icons/SystemIcon";
+import { useDetalheDialog } from "./useDetalheDialog";
 import { carregarArquivoComprovante, carregarDetalheDespesa, type AnexoDespesa, type ArquivoComprovante, type DespesaDetalhe } from "./despesaDetalhe";
 import { formatDataHora } from "../termos/termosMulta";
 import { ANEXO_SEM_COMPROVANTE, STATUS_DESPESA, ehPendente, formatBRL, type DespesaRelatorio } from "./gastosRelatorio";
@@ -65,23 +66,9 @@ function Comprovante({ anexo, indice }: { anexo: AnexoDespesa; indice: number })
 
 /** Detalhe de leitura de uma despesa, em painel de quase tela cheia. Fecha no X, no Esc e tocando fora. Nada é editável. */
 export function DespesaDetalheDialog({ despesa, onClose }: { despesa: DespesaRelatorio; onClose: () => void }) {
-  const fecharRef = useRef<HTMLButtonElement>(null);
+  const fecharRef = useDetalheDialog(onClose);
   const [carga, setCarga] = useState<Estado<{ detalhe: DespesaDetalhe; anexos: AnexoDespesa[] }>>({ tipo: "carregando" });
   const [tentativa, setTentativa] = useState(0);
-
-  useEffect(() => {
-    const anterior = document.activeElement as HTMLElement | null;
-    const overflow = document.body.style.overflow;
-    const esc = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", esc);
-    fecharRef.current?.focus({ preventScroll: true });
-    return () => {
-      document.body.style.overflow = overflow;
-      window.removeEventListener("keydown", esc);
-      anterior?.focus?.({ preventScroll: true });
-    };
-  }, [onClose]);
 
   useEffect(() => {
     let vivo = true;

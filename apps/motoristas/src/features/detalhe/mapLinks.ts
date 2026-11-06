@@ -41,5 +41,9 @@ export function isConfidentMapAddress(label: string, value: string) {
 
 export function buildGoogleMapsSearchUrl(label: string, value: string) {
   if (!isConfidentMapAddress(label, value)) return "";
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(value.trim())}`;
+  return mapsSearchUrl(value);
+}
+
+export function mapsSearchUrl(busca: string) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(busca.trim())}`;
 }
