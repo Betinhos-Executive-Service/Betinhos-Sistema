@@ -6,11 +6,7 @@ npm test
 if ($LASTEXITCODE -ne 0) { throw 'Testes Node falharam.' }
 npx tsc --noEmit --noUnusedLocals --noUnusedParameters
 if ($LASTEXITCODE -ne 0) { throw 'TypeScript falhou.' }
-if (-not (Test-Path 'plugins/ExpenseUpload/ExpenseUpload.snk')) {
-  $rsa = New-Object System.Security.Cryptography.RSACryptoServiceProvider 2048
-  [IO.File]::WriteAllBytes((Join-Path (Get-Location) 'plugins/ExpenseUpload/ExpenseUpload.snk'), $rsa.ExportCspBlob($true))
-  $rsa.Dispose()
-}
+if (-not (Test-Path 'plugins/ExpenseUpload/ExpenseUpload.snk')) { throw 'plugins/ExpenseUpload/ExpenseUpload.snk ausente. A chave e fixa: uma chave nova muda o public key token e o plugin deixa de atualizar. Nao gere outra.' }
 dotnet test plugins/ExpenseUpload.Tests/ExpenseUpload.Tests.csproj -c Release --nologo
 if ($LASTEXITCODE -ne 0) { throw 'Testes do plugin falharam.' }
 npm run build
