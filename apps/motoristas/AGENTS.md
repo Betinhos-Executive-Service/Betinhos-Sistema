@@ -46,7 +46,7 @@ Pull requests should include the user-facing change, validation commands, Datave
 - PRs go to `develop`. `main` only receives the whole `develop` through a PR merged by Renan (`origem-main` check). Before opening a PR, merge the latest `origin/develop` into the branch.
 - Push to `develop` runs the `Deploy` workflow: it publishes to DEV only `new_app-motoristas-v2` and `new_app-motoristas-v2-sw` when pending (`scripts/pendentes-dev.ps1` compares the commit recorded in each web resource description). Never run a manual publish alongside it.
 - `BetinhosMotoristas` is published only from this repository. `BetinhosCore` and `BetinhosAutomacao` are published only from Betinhos-Sistema: new columns or Custom APIs reach PROD there first, then the app that uses them. The schema only grows.
-- The plugins (`plugins/`) and `provision-*` scripts land in `BetinhosAutomacao` and are moving to Betinhos-Sistema. Until then they stay manual through `npm run push`, which no longer publishes the app. `npm run push` requires `BETINHOS_ALERT_EMAIL`, the failure alert address of the current vehicle flow.
+- The plugins (`plugins/`) and `provision-*` scripts land in `BetinhosAutomacao` and are moving to Betinhos-Sistema. Until then they stay manual through `npm run push`, which no longer publishes the app.
 - The `main` to PROD path is not active yet: it depends on changes in Betinhos-Sistema. PROD stays on `scripts/deploy-prod.ps1` until then.
 
 ## Security & Configuration Tips
