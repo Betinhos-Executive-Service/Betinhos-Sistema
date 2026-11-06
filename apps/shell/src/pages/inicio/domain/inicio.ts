@@ -190,14 +190,17 @@ export function dadosFinanceiro(input: { reservas: Row[]; aReceber: Row[]; passa
   }
 }
 
-/** TI: operações assíncronas (falhas = statuscode 31, 32 ou 40), leads e campanhas ativos. */
-export function indicadoresTi(input: { async: Row[]; leads: Row[]; campanhas: Row[] }): Indicador[] {
+/**
+ * TI: operações assíncronas (falhas = statuscode 31, 32 ou 40), leads e campanhas ativos.
+ * `leads`/`campanhas` = `null` quando a tabela não existe no ambiente (PROD sem o módulo de vendas): o indicador sai da lista, sem zero falso.
+ */
+export function indicadoresTi(input: { async: Row[]; leads: Row[] | null; campanhas: Row[] | null }): Indicador[] {
   const falha = (r: Row) => [31, 32, 40].includes(Number(r.statuscode))
   return [
     contagem('integration_failures', 'Falhas de integração', 'operações com erro', input.async.filter(falha).length, 'danger', { entidade: 'asyncoperation' }),
     contagem('it_tasks', 'Tarefas de TI', 'operações em andamento', input.async.filter((r) => !falha(r)).length, 'info', { entidade: 'asyncoperation' }),
-    contagem('new_leads', 'Leads novos', 'leads ativos', input.leads.length, 'success', { entidade: 'lead' }),
-    contagem('active_campaigns', 'Campanhas ativas', 'campanhas abertas', input.campanhas.length, 'warning', { entidade: 'campaign' }),
+    ...(input.leads ? [contagem('new_leads', 'Leads novos', 'leads ativos', input.leads.length, 'success', { entidade: 'lead' })] : []),
+    ...(input.campanhas ? [contagem('active_campaigns', 'Campanhas ativas', 'campanhas abertas', input.campanhas.length, 'warning', { entidade: 'campaign' })] : []),
   ]
 }
 

@@ -117,6 +117,11 @@ describe('indicadores', () => {
     expect(ind[2]!.destino).toEqual({ entidade: 'lead' })
   })
 
+  it('TI: tabela ausente (null) tira o indicador da lista em vez de mostrar zero', () => {
+    expect(indicadoresTi({ async: [{ statuscode: 31 }], leads: null, campanhas: null }).map((i) => i.id)).toEqual(['integration_failures', 'it_tasks'])
+    expect(indicadoresTi({ async: [], leads: [], campanhas: null }).map((i) => i.id)).toEqual(['integration_failures', 'it_tasks', 'new_leads'])
+  })
+
   it('meta: 50/40/10 dos três anos anteriores +13%; sem histórico, indisponível', () => {
     expect(metaDeReceita(2026, 0)).toBe(Math.round((336469.65 * 0.5 + 213816.57 * 0.4 + 148127.05 * 0.1) * 1.13))
     expect(metaDeReceita(2030, 0)).toBe(0)

@@ -20,6 +20,14 @@ export function createDataverseSource(client: DataverseClient, metadata: ReturnT
   let me: Promise<string> | null = null
   const usuarioId = () => (me ??= client.request<{ UserId: string }>('WhoAmI').then((r) => r.UserId.toLowerCase()).catch((e: unknown) => { me = null; throw e }))
 
+  /** Quais tabelas do módulo de vendas existem no ambiente (`null` se a conferência falhar, e então tenta de novo na próxima carga). */
+  let opcionais: Promise<Awaited<ReturnType<typeof metadata.entities>> | null> | null = null
+  const tabelasOpcionais = () => (opcionais ??= metadata.entities(['lead', 'campaign']).catch((error: unknown) => {
+    opcionais = null
+    void logAppError(error, { action: 'carregar-perfil-ti_marketing', phase: 'load', component: 'tabelas-opcionais' })
+    return null
+  }))
+
   /** Roda as consultas em paralelo; as que falham entram como vazias e somam no erro parcial. */
   async function emParalelo<K extends string>(consultas: Record<K, Promise<Row[]>>, acao: string) {
     const chaves = Object.keys(consultas) as K[]
@@ -94,12 +102,19 @@ export function createDataverseSource(client: DataverseClient, metadata: ReturnT
         return base(dadosFinanceiro(linhas, now, inicio), falhas)
       }
       if (visao === 'ti_marketing') {
-        const { linhas, falhas } = await emParalelo({
-          async: consultar('asyncoperation', '$select=asyncoperationid,name,statuscode,createdon&$filter=statecode eq 0&$orderby=createdon desc&$top=100'),
-          leads: consultar('lead', '$select=leadid,subject,fullname,createdon,statecode&$filter=statecode eq 0&$orderby=createdon desc&$top=100'),
-          campanhas: consultar('campaign', '$select=campaignid,name,statecode&$filter=statecode eq 0&$top=100'),
-        }, acao)
-        return base({ indicadores: indicadoresTi(linhas) }, falhas)
+        // `lead` e `campaign` são do módulo de vendas e não existem no PROD: confere a metadata antes de consultar (uma chamada só, guardada),
+        // para não gerar 404 nem log de erro. Tabela ausente = indicador omitido; a conferência falhar de verdade = "indisponível".
+        const consultaAsync = consultar('asyncoperation', '$select=asyncoperationid,name,statuscode,createdon&$filter=statecode eq 0&$orderby=createdon desc&$top=100')
+        consultaAsync.catch(() => {}) // se rejeitar antes do emParalelo assumir, não vira unhandledrejection (a falha continua contada lá)
+        const existentes = await tabelasOpcionais()
+        const temLeads = existentes?.has('lead') ?? false
+        const temCampanhas = existentes?.has('campaign') ?? false
+        const consultas: Record<string, Promise<Row[]>> = { async: consultaAsync }
+        if (temLeads) consultas.leads = consultar('lead', '$select=leadid,subject,fullname,createdon,statecode&$filter=statecode eq 0&$orderby=createdon desc&$top=100')
+        if (temCampanhas) consultas.campanhas = consultar('campaign', '$select=campaignid,name,statecode&$filter=statecode eq 0&$top=100')
+        const { linhas, falhas } = await emParalelo(consultas, acao)
+        const indisponiveis: string[] = existentes ? falhas : ['leads', 'campanhas', ...falhas]
+        return base({ indicadores: indicadoresTi({ async: linhas.async!, leads: temLeads ? linhas.leads! : null, campanhas: temCampanhas ? linhas.campanhas! : null }) }, indisponiveis)
       }
       const { linhas, falhas } = await emParalelo({
         reservasDoMes: consultarTudo('cr40f_reservadeveculos', `$select=cr40f_reservadeveculosid,cr40f_status,cr40f_statusdefaturamento,cr40f_dataehorriodesada,new_categoriadoitem,_new_composicaodepreco_value&$filter=cr40f_dataehorriodesada ge ${iso(mesIni)} and cr40f_dataehorriodesada lt ${iso(mesFim)} and new_categoriadoitem eq 100000000&$orderby=cr40f_dataehorriodesada asc`),

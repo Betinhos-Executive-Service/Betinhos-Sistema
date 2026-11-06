@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { createMetadata, DataverseClient } from '@betinhos/dataverse'
+import { logAppError } from '@betinhos/ui/error-logger'
 import { createDataverseSource } from './dataverse'
 import { capasEmCache, carregarCapas } from './capas'
 
@@ -9,7 +10,7 @@ vi.mock('@betinhos/ui/error-logger', () => ({ logAppError: vi.fn() }))
 const NOW = new Date('2026-10-29T18:00:00Z')
 
 /** Respostas por prefixo do caminho; `erro` faz aquela consulta falhar. */
-function fakeClient(respostas: Record<string, unknown>) {
+function fakeClient(respostas: Record<string, unknown>, tabelasExistentes: string[] = ['lead', 'campaign']) {
   const calls: string[] = []
   const responder = async (path: string) => {
     calls.push(path)
@@ -24,7 +25,10 @@ function fakeClient(respostas: Record<string, unknown>) {
     getAll: async (path: string) => ((await responder(path)) as { value: unknown[] }).value,
   } as unknown as DataverseClient
   // Entity set = lógico + 's' (o suficiente para o teste).
-  const metadata = { entity: async (logical: string) => ({ entitySetName: `${logical}s` }) } as unknown as ReturnType<typeof createMetadata>
+  const metadata = {
+    entity: async (logical: string) => ({ entitySetName: `${logical}s` }),
+    entities: async (nomes: string[]) => new Map(nomes.filter((n) => tabelasExistentes.includes(n)).map((n) => [n, { entitySetName: `${n}s` }])),
+  } as unknown as ReturnType<typeof createMetadata>
   return { client, metadata, calls }
 }
 
@@ -61,6 +65,22 @@ describe('fonte Dataverse', () => {
     expect(ti.erro).toBe('leads indisponível')
     expect(ti.indicadores[0]!.valor).toBe('01')
     expect(calls.map((c) => c.split('?')[0])).toEqual(['asyncoperations', 'leads', 'campaigns'])
+
+    vi.mocked(logAppError).mockClear()
+    // PROD: sem `lead` e `campaign`, as tabelas nem são consultadas, não há erro e os dois indicadores saem da lista.
+    const semVendas = fakeClient({ 'asyncoperations?': { value: [{ statuscode: 31 }, { statuscode: 20 }] } }, [])
+    const tiProd = await createDataverseSource(semVendas.client, semVendas.metadata).visao('ti_marketing', NOW)
+    expect(tiProd.erro).toBeNull()
+    expect(tiProd.indicadores.map((i) => i.id)).toEqual(['integration_failures', 'it_tasks'])
+    expect(semVendas.calls.map((c) => c.split('?')[0])).toEqual(['asyncoperations'])
+    expect(vi.mocked(logAppError)).not.toHaveBeenCalled()
+
+    // Conferência da metadata falhou de verdade: não afirma ausência, avisa "indisponível" e registra.
+    const quebrada = fakeClient({ 'asyncoperations?': { value: [] } })
+    ;(quebrada.metadata as unknown as { entities: () => Promise<never> }).entities = () => Promise.reject(new Error('metadata fora'))
+    const tiQuebrado = await createDataverseSource(quebrada.client, quebrada.metadata).visao('ti_marketing', NOW)
+    expect(tiQuebrado.erro).toBe('leads indisponível · campanhas indisponível')
+    expect(vi.mocked(logAppError)).toHaveBeenCalledTimes(1)
 
     calls.length = 0
     await source.visao('operacao', NOW)
