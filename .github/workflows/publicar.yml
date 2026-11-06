@@ -87,7 +87,7 @@ jobs:
         run: |
           $r = powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/pendentes-dev.ps1 -Ate $env:GITHUB_SHA | ConvertFrom-Json
           if ($LASTEXITCODE -ne 0) { throw 'pendentes-dev.ps1 falhou.' }
-          if ($r.tela -or @($r.plugins).Count) {
+          if ($r.tela -or $r.webresources -or @($r.plugins).Count) {
             $r.motivos | ForEach-Object { Write-Host $_ }
             throw "O DEV difere deste commit ($($env:GITHUB_SHA.Substring(0,7))). Espere o Deploy da develop terminar (ou rode-o com forcar_plugins), ou leve a develop inteira para a main e publique de novo."
           }
