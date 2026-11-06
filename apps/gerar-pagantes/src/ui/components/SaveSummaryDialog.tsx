@@ -1,7 +1,7 @@
 import { Alert, Button, Dialog, StatusBadge } from '@betinhos-executive-service/ui'
 import { PAYMENT_METHODS, type Payer } from '../../domain'
 import { formatCurrency } from '../../money'
-import type { DraftChanges } from '../../payerDraft'
+import { recipientLabel, type DraftChanges } from '../../payerDraft'
 
 const methodLabel = (payer: Pick<Payer, 'paymentMethod'>) => PAYMENT_METHODS.find((method) => method.value === payer.paymentMethod)?.label ?? ''
 const charge = (payer: Pick<Payer, 'amountCents' | 'paymentMethod'>) => `${formatCurrency(payer.amountCents)} · ${methodLabel(payer)}`
@@ -21,8 +21,8 @@ export function SaveSummaryDialog({ open, changes, emailCount, differenceCents, 
     <p className="save-summary__lead">Confira o que muda nesta OP antes de salvar.</p>
     <ul className="save-summary__list" aria-label="Alterações">
       {changes.added.map((payer) => <li key={`a-${payer.key}`}><StatusBadge tone="info">Novo</StatusBadge><strong>{payer.name}</strong><span>{charge(payer)}</span></li>)}
-      {changes.edited.map(({ before, after }) => <li key={`e-${after.key}`}><StatusBadge tone="warning">Alterado</StatusBadge><strong>{after.name}</strong><span>{charge(before) === charge(after) ? `Envio para ${after.recipientName}` : `${charge(before)} → ${charge(after)}`}</span></li>)}
-      {changes.resent.map((payer) => <li key={`s-${payer.key}`}><StatusBadge tone="info">Reenvio</StatusBadge><strong>{payer.name}</strong><span>E-mail com o link atual para {payer.recipientName}</span></li>)}
+      {changes.edited.map(({ before, after }) => <li key={`e-${after.key}`}><StatusBadge tone="warning">Alterado</StatusBadge><strong>{after.name}</strong><span>{charge(before) === charge(after) ? `Envio para ${recipientLabel(after)}` : `${charge(before)} → ${charge(after)}`}</span></li>)}
+      {changes.resent.map((payer) => <li key={`s-${payer.key}`}><StatusBadge tone="info">Reenvio</StatusBadge><strong>{payer.name}</strong><span>E-mail com o link atual para {recipientLabel(payer)}</span></li>)}
       {changes.removed.map((payer) => <li key={`r-${payer.key}`}><StatusBadge tone="danger">Removido</StatusBadge><strong>{payer.name}</strong><span>{charge(payer)}</span></li>)}
     </ul>
     <div className="save-summary__effects">

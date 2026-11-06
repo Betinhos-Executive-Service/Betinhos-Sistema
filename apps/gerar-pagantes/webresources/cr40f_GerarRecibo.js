@@ -108,7 +108,7 @@ function carregarPagante_GR(reg) {
     return Xrm.WebApi.retrieveRecord(
         reg.entityName,
         reg.id,
-        "?$select=cr40f_id,cr40f_valor,cr40f_formadepagamento,new_observacaodorecibo,_cr40f_bancodedados_value,_cr40f_financeiro_value"
+        "?$select=cr40f_id,cr40f_valor,cr40f_formadepagamento,new_observacaodorecibo,_cr40f_bancodedados_value,_cr40f_financeiro_value,cr40f_emailrecibo&$expand=cr40f_DestinatarioRecibo($select=cr40f_email)"
     )
         .then(function (record) {
             return montarDescricaoPadrao_GR(record._cr40f_financeiro_value)
@@ -169,7 +169,8 @@ function carregarPagante_GR(reg) {
             return Xrm.WebApi.retrieveRecord(paxEntityName, passageiroGuid,
                 "?$select=cr40f_email,cr40f_nomedopassageiro,_cr40f_cliente_value")
                 .then(function (pax) {
-                    pagamento.emailPassageiro = (pax && pax.cr40f_email) || "";
+                    var pessoaRecibo = record.cr40f_DestinatarioRecibo || pax;
+                    pagamento.emailPassageiro = record.cr40f_emailrecibo || (pessoaRecibo && pessoaRecibo.cr40f_email) || "";
                     if (pax && pax.cr40f_nomedopassageiro) pagamento.nomeNoRecibo = pax.cr40f_nomedopassageiro;
                     var cliId = pax && pax._cr40f_cliente_value;
                     var cliEnt = pax && pax["_cr40f_cliente_value@Microsoft.Dynamics.CRM.lookuplogicalname"];
@@ -524,7 +525,8 @@ function garantirEstilos_GR(doc) {
         "white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
         R + ".gr-email{display:flex;align-items:center;gap:6px;margin-top:2px;font:500 12px/17px var(--bt-font);" +
         "color:var(--bt-color-text-secondary);min-width:0}",
-        R + ".gr-email span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+        R + ".gr-email-input{flex:1;min-width:0;border:0;border-bottom:1px solid var(--bt-color-border);background:transparent;font:inherit;color:inherit}",
+        R + ".gr-email-input[aria-invalid=true]{border-bottom-color:var(--bt-color-danger)}",
         R + ".gr-email-sem{color:var(--bt-color-warning);font-weight:600}",
         R + ".gr-valor{margin-top:2px;font:600 12px/17px var(--bt-font);color:var(--bt-color-slate-700);" +
         "font-variant-numeric:tabular-nums}",
@@ -696,7 +698,7 @@ function mostrarModalGaleria_GR(flowUrl, pagantes, primaryControl) {
     var ativos = 0;
     var fechado = false;          // modal fechado: para de acompanhar
     var itens = pagantes.map(function (p) {
-        return { p: p, enviarEmail: true, descricao: p.descricaoPadrao || "", status: null, url: null, els: {} };
+        return { p: p, enviarEmail: true, emailDestino: p.emailPassageiro || "", descricao: p.descricaoPadrao || "", status: null, url: null, els: {} };
     });
 
     function criarEl(tag, cls, txt) {
@@ -751,9 +753,18 @@ function mostrarModalGaleria_GR(flowUrl, pagantes, primaryControl) {
 
         var emailEl = criarEl("div", "gr-email" + (p.emailPassageiro ? "" : " gr-email-sem"));
         emailEl.appendChild(icone_GR(doc, p.emailPassageiro ? "email" : "alerta", 14));
-        emailEl.appendChild(criarEl("span", null,
-            p.emailPassageiro || "Sem e-mail cadastrado (cópia só para o financeiro)"));
-        if (p.emailPassageiro) emailEl.title = p.emailPassageiro;
+        // A troca vale só para este envio e não altera o pagante.
+        var emailInput = criarEl("input", "gr-email-input gr-foco");
+        emailInput.type = "email";
+        emailInput.value = item.emailDestino;
+        emailInput.placeholder = p.emailPassageiro ? "Informe um e-mail ou desligue o envio" : "Sem e-mail cadastrado (cópia só para o financeiro)";
+        emailInput.setAttribute("aria-label", "E-mail que recebe o recibo de " + p.nomePassageiro);
+        emailInput.addEventListener("input", function () {
+            item.emailDestino = emailInput.value.trim();
+            emailInput.removeAttribute("aria-invalid");
+        });
+        item.els.emailInput = emailInput;
+        emailEl.appendChild(emailInput);
         info.appendChild(emailEl);
 
         var valorStr = p.valor != null
@@ -1057,7 +1068,20 @@ function mostrarModalGaleria_GR(flowUrl, pagantes, primaryControl) {
     }
 
     // ── Execução com fila (máx. GR_MAX_PARALELO simultâneos) ────────────────
+    function emailsValidos() {
+        // Campo limpo não cancela o envio: o Flow cairia no destinatário gravado.
+        var invalido = itens.filter(function (i) {
+            if (!i.enviarEmail) return false;
+            return i.emailDestino ? !/^\S+@\S+\.\S+$/.test(i.emailDestino) : Boolean(i.p.emailPassageiro);
+        })[0];
+        if (!invalido) return true;
+        invalido.els.emailInput.setAttribute("aria-invalid", "true");
+        invalido.els.emailInput.focus();
+        return false;
+    }
+
     function iniciarExecucao() {
+        itens.forEach(function (i) { i.els.emailInput.disabled = true; });
         estado = "rodando";
         atualizarRodape();
         processarFila();
@@ -1202,6 +1226,7 @@ function mostrarModalGaleria_GR(flowUrl, pagantes, primaryControl) {
             SEND_EMAIL: item.enviarEmail === true,
             PDF_BASE64: pdfBase64
         };
+        if (item.emailDestino && item.emailDestino !== p.emailPassageiro) payload.EMAIL_DESTINO = item.emailDestino;
         console.log(TAG_GR, "Entrega →", p.id, { ID_PAG: payload.ID_PAG, SEND_EMAIL: payload.SEND_EMAIL });
         item.els.msg.textContent = "PDF pronto. Salvando no OneDrive" + (item.enviarEmail ? " e enviando o e-mail…" : "…");
         item.els.rodapeCard.style.display = "flex";
@@ -1300,6 +1325,7 @@ function mostrarModalGaleria_GR(flowUrl, pagantes, primaryControl) {
         ev.preventDefault();
         if (estado === "fim") { fecharModal(); return; }
         if (estado !== "idle") return;
+        if (!emailsValidos()) return;
 
         var totalEmail = itens.filter(function (i) { return i.enviarEmail; }).length;
         console.log(TAG_GR, "Iniciando geração. Total:", itens.length, "| Com email:", totalEmail);

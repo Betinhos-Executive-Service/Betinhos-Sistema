@@ -21,7 +21,8 @@ public sealed class PaganteRequest
     public Guid? ExistingPaganteId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
-    public Guid RecipientId { get; set; }
+    /// <summary>Pessoa destinatária; nula quando o e-mail foi digitado sem cadastro.</summary>
+    public Guid? RecipientId { get; set; }
     public string RecipientName { get; set; } = string.Empty;
     public string RecipientEmail { get; set; } = string.Empty;
     public int AmountCents { get; set; }
@@ -29,6 +30,7 @@ public sealed class PaganteRequest
     public bool GenerateLink { get; set; }
     public bool SendEmail { get; set; }
     public bool ResendEmail { get; set; }
+    public bool ReceiptToRecipient { get; set; }
 }
 
 public sealed class GerarPagantesResponse

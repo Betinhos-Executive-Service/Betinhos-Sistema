@@ -29,6 +29,7 @@ export type PersonSearch = (query: string, nextLink?: string) => Promise<PersonS
 export type PersonEmailUpdate = (person: Person, email: string) => Promise<void>
 
 export const EMAIL_MAX_LENGTH = 1000
+export const RECEIPT_EMAIL_MAX_LENGTH = 320
 export const emailValid = (email: string) => /^\S+@\S+\.\S+$/.test(email.trim())
 
 export interface Payer extends Person {
@@ -86,6 +87,7 @@ export interface SubmitRequest {
     generateLink: boolean
     sendEmail: boolean
     resendEmail?: boolean
+    receiptToRecipient: boolean
   }>
 }
 
