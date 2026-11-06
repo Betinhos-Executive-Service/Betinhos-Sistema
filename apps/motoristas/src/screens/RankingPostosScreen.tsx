@@ -90,22 +90,22 @@ export function RankingPostosScreen({ onBack }: { onBack: () => void }) {
 
 const TEXTO_ETAPA: Record<Etapa, string> = { localizacao: "Buscando sua localização…", postos: "Procurando postos perto de você…" };
 
+const ARCO_MARCADOR = "M22 92 A58 58 0 0 1 138 92";
+
 function ListaCarregando({ etapa }: { etapa: Etapa }) {
   return (
-    <div className="rp-carregando" role="status">
-      <p className="rp-carregando-texto">{TEXTO_ETAPA[etapa]}</p>
-      <div className="rp-esqueleto rp-esqueleto-destaque" aria-hidden="true">
-        <i className="rp-osso-tag" />
-        <i className="rp-osso-nome" />
-        <span className="rp-osso-linha"><i className="rp-osso-preco" /><i className="rp-osso-distancia" /></span>
-        <i className="rp-osso-detalhe" />
-        <i className="rp-osso-botao" />
-      </div>
-      <div className="rp-esqueleto rp-esqueleto-lista" aria-hidden="true">
-        {[0, 1, 2].map((linha) => (
-          <span key={linha} className="rp-osso-posto"><i /><span><i /><i /></span><i /></span>
-        ))}
-      </div>
+    <div className="rp-loader" role="status">
+      <svg className="rp-marcador" viewBox="0 0 160 108" aria-hidden="true">
+        <path className="rp-marcador-trilho" d={ARCO_MARCADOR} />
+        <path className="rp-marcador-nivel" d={ARCO_MARCADOR} pathLength={100} />
+        <text x="12" y="106">E</text>
+        <text x="140" y="106">F</text>
+        <g className="rp-marcador-ponteiro">
+          <line x1="80" y1="92" x2="80" y2="46" />
+        </g>
+        <circle cx="80" cy="92" r="7" />
+      </svg>
+      <p key={etapa} className="rp-loader-texto">{TEXTO_ETAPA[etapa]}</p>
     </div>
   );
 }
