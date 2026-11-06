@@ -21,7 +21,7 @@ const FLOWS = [
 ];
 
 (async () => {
-  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  const browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH, headless: true } : { channel: "chrome", headless: true });
   const context = await browser.newContext({ viewport: { width: 375, height: 812 } });
   const page = await context.newPage();
   const issues = [];
@@ -37,7 +37,7 @@ const FLOWS = [
   const scroller = () => page.evaluate(() => { const s = [...document.querySelectorAll(".finalize-scroll")].pop(); return s ? { top: Math.round(s.scrollTop), max: s.scrollHeight - s.clientHeight } : null; });
   const results = [];
   await page.goto(`${BASE}#inicio`);
-  await page.evaluate(() => { localStorage.clear(); indexedDB.deleteDatabase("app-motoristas-media-drafts"); });
+  await page.evaluate(() => { localStorage.clear(); localStorage.setItem("app-motoristas-tour-v2:localhost-driver:*", "visto"); indexedDB.deleteDatabase("app-motoristas-media-drafts"); });
   for (const flow of FLOWS) {
     try {
       await page.goto(`${BASE}?t=${Date.now()}#${flow.hash}`);

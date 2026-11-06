@@ -38,6 +38,7 @@ description: "Verificação base do App Motoristas: testes Node, TypeScript estr
 
 ## Casos de borda
 - PWA (`src/lib/pwa*.ts`, `src/pwa/sw.js`): `tests/pwa.test.ts` cobre o manifest; instalação só se prova no DEV pela URL direta (Chrome: Application > Manifest sem erros e botão Instalar; SW ativo com escopo `/WebResources/`; iPhone: Adicionar à Tela de Início).
+- Web Push (`src/lib/webPush.ts`, `WebPushLink`, handlers `push`/`notificationclick` em `src/pwa/sw.js`): `tests/webPush.test.ts` cobre estados e registro. Desligado enquanto `WEB_PUSH_PUBLIC_KEY` estiver vazia (botão some). Com a chave: no DEV pela URL direta, ativar no Android e no iPhone instalado, conferir a linha em `new_inscricaopushmotorista` e o toque abrindo o item (plano em `docs/plano-web-push-pwa.md`).
 - URL direta do web resource (host `*.dynamics.com`, sem `Xrm`): Custom APIs e dados caem em `fetchWebApi`; `tests/customApi.test.ts` cobre. Qualquer módulo novo que exija `Xrm` direto quebra só nesse modo.
 - Viewport 390×844 e desktop; landscape baixo quando a tela tiver modo compacto.
 

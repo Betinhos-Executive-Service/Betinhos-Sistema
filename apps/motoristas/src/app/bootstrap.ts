@@ -81,6 +81,24 @@ export function getInitialTermoMultaId(search = window.location.search) {
   return COMUNICADO_ID_PATTERN.test(value) ? value.replace(/[{}]/g, "").toLowerCase() : "";
 }
 
+// Deep link do push de treinamento: ?treinamentoParticipacaoId=<id> ou ?data=treinamentoParticipacaoId%3D<id> (push via form OnLoad).
+// O App abre na tela Treinamentos e, depois do carregamento, no detalhe dessa participação.
+export function getInitialTreinamentoParticipacaoId(search = window.location.search) {
+  const value = readLaunchParam(search, "treinamentoParticipacaoId").trim();
+  return COMUNICADO_ID_PATTERN.test(value) ? value.replace(/[{}]/g, "").toLowerCase() : "";
+}
+
+// Deep link do push de gastos do cartão: ?despesaId=<id> (1 gasto) ou ?gastosCartao=1 (vários); também dentro de ?data=.
+export function getInitialDespesaId(search = window.location.search) {
+  const value = readLaunchParam(search, "despesaId").trim();
+  return COMUNICADO_ID_PATTERN.test(value) ? value.replace(/[{}]/g, "").toLowerCase() : "";
+}
+
+export function getInitialGastosCartaoLink(search = window.location.search) {
+  const flag = readLaunchParam(search, "gastosCartao").trim().toLowerCase();
+  return flag === "1" || flag === "true";
+}
+
 export function getVoucherDraftKey(detail: DetailData) {
   return `${detail.type}:${detail.id}`;
 }

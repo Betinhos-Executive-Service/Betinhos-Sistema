@@ -12,6 +12,8 @@ description: "Verifica o fluxo principal do motorista no App Motoristas: Início
 - Dev server: `node scripts/dev-server.cjs` com `PORT=31877` (configuração `app-motoristas-ux-audit` em `.claude/launch.json`; no navegador interno use `preview_start`). O servidor recompila `dist/` a cada mudança em `src/` (~15 s).
 - URL: `http://localhost:31877/webresource-app-motoristas.html#inicio`. Sem `Xrm` o app entra em modo mock (`src/data/mock/mockData.ts`); nada é gravado no Dataverse.
 - Antes de começar: `localStorage.clear()` e recarregar, para não herdar serviços finalizados em testes anteriores.
+- Depois de `localStorage.clear()` o tour de primeiro acesso reabre sozinho no Início e bloqueia os toques: marque `localStorage.setItem("app-motoristas-tour-v2:localhost-driver:*", "visto")` logo em seguida (os roteiros `scripts/qa/verify-*.cjs` já fazem isso; ver `verificar-tour`).
+- Sem Google Chrome instalado, os roteiros aceitam `CHROME_PATH=<binário Chromium/Brave>` (e `NODE_PATH` com `playwright-core`). Exceção: `verify-checklist-send.cjs` ainda exige o `@playwright/cli` global do Windows.
 - Ao terminar: `git checkout -- dist/` (o dev server reescreve `dist/` sem subir versão; `dist/` só muda no build de publicação).
 
 ## Roteiro automatizado (preferido)
@@ -33,6 +35,12 @@ Usa Chrome headless com user agent Android (ativa a câmera ao vivo) e câmera s
 10. `#cancelado-local?serviceId=10241&type=SERVICO` → "Limpar texto" desabilitado vazio; com texto pede "Apagar o texto?". "Cliquei errado" volta ao detalhe.
 11. `#historico` → busca "zzz inexistente" mostra `Nenhum serviço encontrado para "zzz inexistente".`
 12. Topo de Serviços (mock): "Comunicados pendentes" (2) e "Checklist do veículo" (1) como avisos compactos `button.notice-compact`, 56 px cada, superfície #fcfcfb sem sombra (não parecem card de serviço); o primeiro card de serviço começa perto de y=322 (antes y=647). Medir: `[...document.querySelectorAll('.notice-compact')].map(e=>e.getBoundingClientRect().height)`. Os avisos não têm `.agenda-card`/`.agenda-hit`: `document.querySelector(".agenda-card .agenda-hit")` em Serviços já cai no primeiro serviço. Detalhes do aviso em `verificar-comunicados` e `verificar-checklists-app`.
+
+## Confirmação depois de finalizar (modo Dataverse, 28/10/2026)
+- Depois de gravar a finalização, `finalizeSelected` recarrega a agenda (`loadRemoteStore`, 8 s por tentativa) e tenta de novo uma vez. A finalização já está salva: tempo esgotado **nunca** devolve o serviço à galeria. Depois de 2 falhas o motorista vê "O serviço foi finalizado, mas a agenda não atualizou. Não finalize de novo: feche e abra o app para conferir." e o log `confirm-agenda-after-finalize` sai com `attempts: 2, restoredToAgenda: false`.
+- Antes disso o app devolvia o serviço e mandava finalizar de novo (64 casos, 18 motoristas, 07–28/10/2026), embora a OS estivesse Concluído.
+- A carga busca o Geral das trocas só pelos ids de troca do motorista (`_cr40f_ot_value eq …`); teste em `tests/loadRemoteStorePerformance.test.ts`. No mock esse caminho não roda (`remoteMode` falso): conferir no DEV, finalizando um serviço e olhando que nenhum log novo `confirm-agenda-after-finalize` aparece com `restoredToAgenda: true`.
+- Falha já existente no roteiro automatizado (na `main` também, 28/10/2026): "Finalizar: confirma a observação já escrita".
 
 ## Passageiros no detalhe (lista com foto e ficha, 26/10/2026)
 `src/features/detalhe/PassengerContacts.tsx` substitui a antiga faixa de avatares do topo (`PassengerAvatars`). Só aparece quando `detail.passengers` vem preenchido; senão a seção "Passageiros e Telefones de Contato" continua no HTML antigo (`DetailsField`).

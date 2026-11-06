@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { ToastTone } from "../../shared/ui/LocalToast";
-import { assertExpenseSchemaReadyRemote, createExpenseUploadItem, dispatchExpenseUploadRemote, ensureExpenseSubmissionRemote, loadExpenseLookupNavigationNamesRemote, loadExpenseReferenceDataRemote, loadExpenseUploadRowsRemote, readReceiptQuick, transitionExpenseUploadRemote, uploadExpenseInvoiceRemote } from "./remoto";
+import { assertExpenseSchemaReadyRemote, conferirDespesaRemote, createExpenseUploadItem, dispatchExpenseUploadRemote, ensureExpenseSubmissionRemote, loadExpenseLookupNavigationNamesRemote, loadExpenseReferenceDataRemote, loadExpenseUploadRowsRemote, readReceiptQuick, transitionExpenseUploadRemote, uploadExpenseInvoiceRemote } from "./remoto";
 import { createOne, getDriverContext, getDriverCurrentVehicleId, updateOne, type DriverContext } from "../../data/dataverse/cliente";
 import { DATAVERSE } from "../../data/dataverse/entidades";
 import { reportAppError } from "../../shared/appErrorLogger";
@@ -13,7 +13,7 @@ import { useMediaDraftState } from "../fotos/useMediaDraftState";
 import { quickReadValueCents } from "../recebimento/receiveProofCheck";
 import { resumeExpenseSubmission, type ExpenseSubmissionProgress } from "./expenseSubmission";
 import { describeExpenseSubmission, type ExpenseSubmission, type ExpenseUploadRow } from "./expenseUploadState";
-import { DEFAULT_EXPENSE_REFERENCE_DATA, buildExpenseCreatePayload, type ExpenseDraft, type ExpensePhoto, type ExpenseReferenceData } from "./expenses";
+import { DEFAULT_EXPENSE_REFERENCE_DATA, buildExpenseCreatePayload, parseCurrencyInput, type ExpenseDraft, type ExpensePhoto, type ExpenseReferenceData } from "./expenses";
 import {
   INITIAL_QUICK_READ,
   QUICK_READ_FILL_STEP_MS,
@@ -30,6 +30,9 @@ import {
 import { getQuickReadMockMode, readReceiptQuickMock } from "./receiptQuickReadMock";
 import { EMPTY_EXPENSE_DRAFT } from "./rascunho";
 import { useExpenseUploads } from "./useExpenseUploads";
+import { TIMEOUT_CONFERENCIA_MS, calcularSinais, camposConferencia, carregarServicosConferencia, lerRespostaConferencia, montarCorpoConferencia, respostaConferenciaMock, type ConferenciaEnvio, type GastoConferido } from "./conferenciaEnvio";
+import { STATUS_OPERACIONAL, acharGastoCartaoDuplicado, buildGastoCartaoCompletarPayload, concluirGastoCartaoMock, isMockGastosCartao, type GastoCartao } from "./gastosCartao";
+import { carregarDespesasRelatorio, type DespesaRelatorio } from "./gastosRelatorio";
 
 type Options = {
   remoteMode: boolean;
@@ -40,11 +43,18 @@ type Options = {
   setToast: (message: string, tone?: ToastTone) => void;
   setCriticalError: (message: string) => void;
   logAppError: (error: unknown, action: string, phase?: string) => void;
+  // Gasto do cartão em preenchimento e o que o hook do cartão (chamado mais abaixo no App) oferece.
+  gastoCartaoAtualRef: React.MutableRefObject<GastoCartao | null>;
+  concluirGastoCartao: (id: string) => Screen;
+  gastosCartaoPendentes: () => GastoCartao[];
+  setDuplicidadeCartao: (gasto: GastoCartao | null) => void;
+  relatorioDespesas: () => DespesaRelatorio[] | null;
+  comunicadosDriverIdRef: React.MutableRefObject<string>;
 };
 
 // Fluxo de "Registrar gasto": rascunho, fotos do comprovante, leitura rápida e envio
 // (assíncrono pelo diário de despesas ou síncrono com o overlay de processo remoto).
-export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, setRemoteOperation, setScreen, setToast, setCriticalError, logAppError }: Options) {
+export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, setRemoteOperation, setScreen, setToast, setCriticalError, logAppError, gastoCartaoAtualRef, concluirGastoCartao, gastosCartaoPendentes, setDuplicidadeCartao, relatorioDespesas, comunicadosDriverIdRef }: Options) {
   const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft>({ ...EMPTY_EXPENSE_DRAFT });
   const [expenseQuickRead, setExpenseQuickRead] = useState<QuickReadState>(INITIAL_QUICK_READ);
   const expenseQuickReadSeqRef = useRef(0);
@@ -59,7 +69,12 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
   const [expenseReferenceLoading, setExpenseReferenceLoading] = useState(false);
   const [expenseReferenceError, setExpenseReferenceError] = useState("");
   const [expensePhotos, setExpensePhotos] = useState<ExpensePhoto[]>([]);
+  // Conferência no envio: data/hora lidas no cupom, resultado da última conferência e o popup "Dúvida" aberto.
+  const expenseQuickReadLeituraRef = useRef<{ data: string | null; hora: string | null } | null>(null);
+  const conferenciaRef = useRef<ConferenciaEnvio | null>(null);
+  const [duvidaConferencia, setDuvidaConferencia] = useState<{ pergunta: string; responder: (justificativa: string | null) => void } | null>(null);
   const {
+    expenseSubmissions,
     expenseAutoResumeAtRef,
     expenseNoticeRef,
     expenseRunningRef,
@@ -111,13 +126,20 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
       if (!Object.keys(submission.payload).length) {
         await assertExpenseSchemaReadyRemote();
         const names = await loadExpenseLookupNavigationNamesRemote({ includeVeiculo: Boolean(submission.vehicleId), includeReserva: false });
-        submission.payload = buildExpenseCreatePayload({
-          draft: submission.draft, referenceData: await loadExpenseReferenceDataRemote(), motoristaId, veiculoId: submission.vehicleId ?? "",
-          photos: submission.items.map(item => ({ id: item.id, dataUrl: item.dataUrl, mediaType: item.mimeType.startsWith("video/") ? "video" : "foto" })),
-          categoryEntitySet: DATAVERSE.categoriasDespesasOperacionais, paymentMethodEntitySet: DATAVERSE.formasPagamentoDespesas,
-          cityEntitySet: DATAVERSE.cidades, motoristaEntitySet: DATAVERSE.funcionarios, veiculoEntitySet: DATAVERSE.veiculos,
-          reservaEntitySet: DATAVERSE.geral, lookupNavigationNames: names
-        });
+        const referenceData = await loadExpenseReferenceDataRemote();
+        const photos = submission.items.map(item => ({ id: item.id, dataUrl: item.dataUrl, mediaType: item.mimeType.startsWith("video/") ? "video" as const : "foto" as const }));
+        submission.payload = submission.existing
+          ? buildGastoCartaoCompletarPayload({
+            draft: submission.draft, photos, referenceData, veiculoId: submission.vehicleId ?? "", categoryEntitySet: DATAVERSE.categoriasDespesasOperacionais,
+            cityEntitySet: DATAVERSE.cidades, veiculoEntitySet: DATAVERSE.veiculos, lookupNavigationNames: names
+          })
+          : buildExpenseCreatePayload({
+            draft: submission.draft, referenceData, motoristaId, veiculoId: submission.vehicleId ?? "", photos,
+            categoryEntitySet: DATAVERSE.categoriasDespesasOperacionais, paymentMethodEntitySet: DATAVERSE.formasPagamentoDespesas,
+            cityEntitySet: DATAVERSE.cidades, motoristaEntitySet: DATAVERSE.funcionarios, veiculoEntitySet: DATAVERSE.veiculos,
+            reservaEntitySet: DATAVERSE.geral, lookupNavigationNames: names
+          });
+        submission.payload = { ...submission.payload, ...(submission.conferencia ?? {}) };
       }
       rows = await resumeExpenseSubmission(submission, {
         save: value => upsertExpenseSubmission(motoristaId, value),
@@ -151,10 +173,12 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
     let journaled = false;
     try {
       const photos = await Promise.all(expensePhotos.filter(hasMediaDraftContent).map(prepareMediaDraftForUpload));
+      const completing = gastoCartaoAtualRef.current;
       const submission: ExpenseSubmission = {
-        expenseId: crypto.randomUUID(), expenseConfirmed: false, draft: { ...draft }, payload: {}, motoristaId: driverContext.id,
+        expenseId: completing?.id ?? crypto.randomUUID(), existing: Boolean(completing), expenseConfirmed: false, draft: { ...draft }, payload: {}, motoristaId: driverContext.id,
         vehicleId: draft.veiculoId || getDriverCurrentVehicleId(driverContext),
-        items: photos.map((photo, index) => createExpenseUploadItem(photo.dataUrl, index + 1))
+        items: photos.map((photo, index) => createExpenseUploadItem(photo.dataUrl, index + 1)),
+        conferencia: conferenciaRef.current ? camposConferencia(conferenciaRef.current) : undefined
       };
       const total = submission.items.length;
       setExpenseSend({ phase: "saving", current: 0, total });
@@ -166,7 +190,12 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
         if (event.phase === "uploading") setExpenseSend({ phase: "uploading", current: event.order, total });
       });
       // The journal owns the expense from here; an empty form avoids a duplicate.
+      let destino: Screen = "inicio";
       const clearForm = () => {
+        if (completing) {
+          destino = concluirGastoCartao(completing.id);
+          return;
+        }
         revokePhotoPreviewUrls(expensePhotos);
         setExpensePhotos([]);
         setExpensePreviewPhotoId("");
@@ -182,7 +211,7 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
       await wait(1100);
       clearForm();
       setExpenseSend(null);
-      setScreen("inicio");
+      setScreen(destino);
     } catch (error) {
       reportAppError(error, { source: "app", action: "expenseUpload", phase: "journal", screen: "gastos" });
       setExpenseSend(null);
@@ -238,6 +267,18 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
   const submitExpense = async (draft: ExpenseDraft) => {
     if (remoteMode && expenseUploadMode === "async") return submitExpenseAsync(draft);
     if (remoteOperation || (remoteMode && expenseUploadMode === "pending")) return;
+    const completing = gastoCartaoAtualRef.current;
+    if (!remoteMode && completing && isMockGastosCartao()) {
+      setRemoteOperation({ title: "Enviando gasto", message: "Completando gasto do cartão.", phase: "loading" });
+      await wait(700);
+      concluirGastoCartaoMock(completing.id);
+      setRemoteOperation({ title: "Enviando gasto", message: "Gasto enviado.", detailId: completing.id, phase: "success" });
+      await wait(720);
+      setRemoteOperation(null);
+      setScreen(concluirGastoCartao(completing.id));
+      setToast("Gasto enviado.");
+      return;
+    }
     if (!remoteMode) {
       setToast("Abra no Power Apps para registrar no Dataverse.");
       return;
@@ -274,21 +315,34 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
         message: "Criando despesa.",
         phase: "loading"
       });
-      const payload = buildExpenseCreatePayload({
-        draft,
-        photos: preparedPhotosToSubmit,
-        referenceData: expenseReferenceData,
-        motoristaId: driver.id,
-        veiculoId,
-        categoryEntitySet: DATAVERSE.categoriasDespesasOperacionais,
-        paymentMethodEntitySet: DATAVERSE.formasPagamentoDespesas,
-        cityEntitySet: DATAVERSE.cidades,
-        motoristaEntitySet: DATAVERSE.funcionarios,
-        veiculoEntitySet: DATAVERSE.veiculos,
-        reservaEntitySet: DATAVERSE.geral,
-        lookupNavigationNames
-      });
-      const result = await createOne(DATAVERSE.despesasOperacionais, payload);
+      const payload = completing
+        ? buildGastoCartaoCompletarPayload({
+          draft,
+          photos: preparedPhotosToSubmit,
+          referenceData: expenseReferenceData,
+          veiculoId,
+          categoryEntitySet: DATAVERSE.categoriasDespesasOperacionais,
+          cityEntitySet: DATAVERSE.cidades,
+          veiculoEntitySet: DATAVERSE.veiculos,
+          lookupNavigationNames
+        })
+        : buildExpenseCreatePayload({
+          draft,
+          photos: preparedPhotosToSubmit,
+          referenceData: expenseReferenceData,
+          motoristaId: driver.id,
+          veiculoId,
+          categoryEntitySet: DATAVERSE.categoriasDespesasOperacionais,
+          paymentMethodEntitySet: DATAVERSE.formasPagamentoDespesas,
+          cityEntitySet: DATAVERSE.cidades,
+          motoristaEntitySet: DATAVERSE.funcionarios,
+          veiculoEntitySet: DATAVERSE.veiculos,
+          reservaEntitySet: DATAVERSE.geral,
+          lookupNavigationNames
+        });
+      if (conferenciaRef.current) Object.assign(payload, camposConferencia(conferenciaRef.current));
+      if (completing) await updateOne(DATAVERSE.despesasOperacionais, completing.id, payload);
+      const result = completing ? { id: completing.id } : await createOne(DATAVERSE.despesasOperacionais, payload);
       createdExpenseId = result.id;
       if (preparedPhotosToSubmit.length) {
         let completedUploads = 0;
@@ -301,7 +355,7 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
         const uploadResults = await Promise.allSettled(preparedPhotosToSubmit.map(async (photo, index) => {
           const link = await uploadExpenseInvoiceRemote({
             expenseId: result.id,
-            expenseName: String(payload.cr40f_nome ?? "Despesa"),
+            expenseName: completing?.nome ?? String(payload.cr40f_nome ?? "Despesa"),
             motoristaId: driver.id,
             dataUrl: photo.dataUrl,
             fileName: photo.mediaType === "video" ? `video-comprovante-${index + 1}` : `comprovante-${index + 1}`,
@@ -355,12 +409,20 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
       setExpensePhotos([]);
       clearExpensePhotoDraftState();
       setExpensePreviewPhotoId("");
+      if (completing) {
+        setScreen(concluirGastoCartao(completing.id));
+        setToast("Gasto enviado.");
+        return;
+      }
       setScreen("inicio");
       setToast("Gasto registrado.");
     } catch (error) {
       if (createdExpenseId) {
         try {
-          await updateOne(DATAVERSE.despesasOperacionais, createdExpenseId, { cr40f_statusanexo: 100000003 });
+          // Gasto do cartão volta para "Precisa corrigir" e continua na lista para o motorista tentar de novo.
+          await updateOne(DATAVERSE.despesasOperacionais, createdExpenseId, completing
+            ? { cr40f_statusanexo: 100000003, cr40f_statusoperacional: STATUS_OPERACIONAL.precisaCorrigir }
+            : { cr40f_statusanexo: 100000003 });
         } catch (statusError) {
           logAppError(statusError, "submitExpense", "statusanexo");
         }
@@ -371,8 +433,75 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
     }
   };
 
+  // Gasto novo pago no cartão que já existe pendente (mesmo valor e data próxima): avisa antes de duplicar.
+  // Conferência no envio: calcula os sinais no app; só chama a IA quando há algum. Devolve null se o motorista
+  // escolher "Voltar e corrigir". Qualquer falha vira "indisponível" e o envio segue (o motorista nunca fica travado).
+  const conferirAntesDeEnviar = async (draft: ExpenseDraft): Promise<ConferenciaEnvio | null> => {
+    const leitura = expenseQuickReadLeituraRef.current;
+    const hora = leitura?.hora && leitura.data === draft.dataGasto ? leitura.hora : null;
+    const horaAgora = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date());
+    const completing = gastoCartaoAtualRef.current;
+    const numero = (texto: string) => { const n = parseCurrencyInput(texto); return Number.isFinite(n) && n > 0 ? n : null; };
+    const gasto: GastoConferido = {
+      id: completing?.id,
+      categoria: expenseReferenceData.categories.find((c) => c.id === draft.categoriaId)?.name ?? "",
+      valor: parseCurrencyInput(draft.valor) || 0,
+      data: draft.dataGasto,
+      hora: hora ?? horaAgora,
+      litros: numero(draft.litros),
+      km: numero(draft.kmInformado),
+      veiculoId: draft.veiculoId
+    };
+    const motoristaId = driverContext?.id ?? comunicadosDriverIdRef.current;
+    try {
+      const relatorio = relatorioDespesas();
+      const [recentes, servicos] = await Promise.all([
+        relatorio ? Promise.resolve(relatorio) : carregarDespesasRelatorio(motoristaId).catch(() => []),
+        carregarServicosConferencia(motoristaId, draft.dataGasto).catch(() => null)
+      ]);
+      const { sinais, servicoDiaVizinho } = calcularSinais({ gasto, leituraData: leitura?.data ?? null, recentes, servicos });
+      const motivos = sinais.map((s) => s.tipo);
+      if (!sinais.length) return { resultado: "sem_sinal", motivos, hora };
+      setRemoteOperation({ title: "Enviando gasto", message: "Conferindo o gasto...", phase: "loading" });
+      const corpo = montarCorpoConferencia({ gasto, descricao: draft.descricao, leituraData: leitura?.data ?? null, sinais, servicoDiaVizinho, recentes });
+      const resposta = lerRespostaConferencia(isMockGastosCartao() ? await respostaConferenciaMock(sinais) : await conferirDespesaRemote(corpo, TIMEOUT_CONFERENCIA_MS));
+      setRemoteOperation(null);
+      if (!resposta) return { resultado: "indisponivel", motivos, hora };
+      if (resposta.resultado === "sem_duvida") return { resultado: "sem_duvida", motivos, hora };
+      const justificativa = await new Promise<string | null>((resolve) => setDuvidaConferencia({ pergunta: resposta.pergunta, responder: resolve }));
+      setDuvidaConferencia(null);
+      if (justificativa == null) return null;
+      return { resultado: "duvida_respondida", motivos: resposta.motivos.length ? resposta.motivos : motivos, pergunta: resposta.pergunta, justificativa, hora };
+    } catch (error) {
+      setRemoteOperation(null);
+      reportAppError(error, { severity: "warning", source: "app", action: "conferenciaEnvio", notifyUser: false });
+      return { resultado: "indisponivel", motivos: [], hora };
+    }
+  };
+
+  const submitExpenseChecked = async (draft: ExpenseDraft) => {
+    if (!gastoCartaoAtualRef.current) {
+      const duplicado = acharGastoCartaoDuplicado(gastosCartaoPendentes(), draft.formaPagamentoId, parseCurrencyInput(draft.valor), draft.dataGasto);
+      if (duplicado) {
+        setDuplicidadeCartao(duplicado);
+        return;
+      }
+    }
+    if (expenseSubmitBusyRef.current || remoteOperation) return;
+    const conferencia = await conferirAntesDeEnviar(draft);
+    if (!conferencia) return;
+    conferenciaRef.current = conferencia;
+    try {
+      return await submitExpense(draft);
+    } finally {
+      conferenciaRef.current = null;
+    }
+  };
+
+
   function resetExpenseQuickRead() {
     expenseQuickReadSeqRef.current++;
+    expenseQuickReadLeituraRef.current = null;
     expenseRetakeTargetIdRef.current = "";
     expenseDateTouchedRef.current = false;
     setExpenseQuickRead(INITIAL_QUICK_READ);
@@ -396,6 +525,8 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
   };
 
   const runExpenseQuickRead = async (dataUrl: string) => {
+    // Gasto do cartão: valor, data e forma vêm do banco; a leitura do comprovante não pode sobrescrevê-los.
+    if (gastoCartaoAtualRef.current) return;
     const mockMode = remoteMode ? null : getQuickReadMockMode();
     if ((!remoteMode && !mockMode) || !shouldRunQuickRead(expenseQuickRead)) return;
     const online = typeof navigator === "undefined" || navigator.onLine !== false;
@@ -420,6 +551,7 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
       if (seq !== expenseQuickReadSeqRef.current) return;
       const before = expenseDraftRef.current;
       const { draft: after, filled } = applyQuickRead(before, outcome.leitura, referenceData, { replaceAutoDate: !expenseDateTouchedRef.current });
+      expenseQuickReadLeituraRef.current = { data: outcome.leitura.data ?? null, hora: outcome.leitura.hora ?? null };
       setExpenseDraft(after);
       setExpenseQuickReadFilled(filled);
     }
@@ -438,6 +570,13 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
     const targetId = expensePhotos[0]?.id ?? "";
     openExpenseCamera();
     expenseRetakeTargetIdRef.current = targetId;
+  };
+
+  const isExpenseIdle = () => !expenseUploadStatuses.length && expensePhotos.length === 0 && isExpenseDraftBlank(expenseDraft);
+
+  // Envios pendentes ou rascunho em andamento vão para o formulário; senão abre a câmera direto.
+  const anexarDespesa = () => {
+    if (isExpenseIdle()) openExpenseCamera(); else setScreen("gastos");
   };
 
   const openExpenseCamera = () => {
@@ -547,14 +686,17 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
   };
 
   return {
+    anexarDespesa,
     cancelExpenseQuickRead,
     checkReceiveProof,
     clearExpensePhotoDraftState,
     closeExpenseSendError,
     confirmExpensePhoto,
     deleteExpensePhoto,
+    duvidaConferencia,
     expenseDateTouchedRef,
     expenseDraft,
+    expenseDraftRef,
     expensePhotoDraft,
     expensePhotoIsVideo,
     expensePhotoPreviewUrl,
@@ -568,11 +710,13 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
     expenseReferenceError,
     expenseReferenceLoading,
     expenseSend,
+    expenseSubmissions,
     expenseUploadMode,
     expenseUploadReady,
     expenseUploadStatuses,
     handleExpenseUploadAction,
     isExpenseDraftBlank,
+    isExpenseIdle,
     openExpenseCamera,
     openExpensePreview,
     openExpenseVideoPreview,
@@ -590,6 +734,7 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
     setExpenseReferenceData,
     setExpenseReferenceError,
     setExpenseReferenceLoading,
-    submitExpense
+    submitExpense,
+    submitExpenseChecked
   };
 }

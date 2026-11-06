@@ -10,8 +10,14 @@ import type { Screen } from "../../types";
 import type { RemoteOperation } from "../../shared/ui/FlowProgressOverlay";
 import type { ReactNode } from "react";
 import type { useExpenseFlow } from "./useExpenseFlow";
+import type { useGastosCartao } from "./useGastosCartao";
+import { GastoCartaoDuplicadoDialog } from "./GastoCartaoDuplicadoDialog";
+import { GastosCartaoScreen } from "./GastosCartaoScreen";
+import { GastosRelatorioScreen } from "./GastosRelatorioScreen";
+import { RankingPostosScreen } from "./RankingPostosScreen";
+import { reportAppError } from "../../shared/appErrorLogger";
 
-type Props = ReturnType<typeof useExpenseFlow> & {
+type Props = ReturnType<typeof useExpenseFlow> & ReturnType<typeof useGastosCartao> & {
   maintenanceCurrentVehicleId: string;
   maintenanceVehicles: MaintenanceRequestVehicleOption[];
   maintenanceVehiclesLoading: boolean;
@@ -21,8 +27,25 @@ type Props = ReturnType<typeof useExpenseFlow> & {
   setToast: (message: string, tone?: ToastTone) => void;
 };
 
-// Telas de "Registrar gasto": câmera e prévia do comprovante, leitura rápida, ilegível e formulário.
+// Telas de gastos: relatório, gastos do cartão a completar, postos perto, e "Registrar gasto" (câmera e prévia do comprovante, leitura rápida, ilegível e formulário).
 export function rotasDespesas(screen: Screen, {
+  abrirGastoCartao,
+  anexarDespesa,
+  duplicidadeCartao,
+  expenseDraftRef,
+  gastoCartaoAtual,
+  gastosCartaoPendentes,
+  gastosCartaoStatus,
+  isExpenseIdle,
+  relatorioModelo,
+  relatorioPeriodo,
+  relatorioStatus,
+  reloadGastosCartao,
+  reloadRelatorio,
+  sairGastoCartao,
+  setDuplicidadeCartao,
+  setRelatorioPeriodo,
+  submitExpenseChecked,
   cancelExpenseQuickRead,
   clearExpensePhotoDraftState,
   confirmExpensePhoto,
@@ -72,7 +95,7 @@ export function rotasDespesas(screen: Screen, {
       <MediaCaptureScreen
         kind="NOTAFISCAL"
         title="Comprovante"
-        onBack={() => setScreen("gastos")}
+        onBack={() => setScreen(!gastoCartaoAtual && isExpenseIdle() ? "gastosRelatorio" : "gastos")}
         onCapture={(photoDataUrl) => {
           setExpensePhotoDraft(photoDataUrl);
           setExpensePhotoPreviewUrl("");
@@ -127,6 +150,7 @@ export function rotasDespesas(screen: Screen, {
 
   if (screen === "gastos") {
     return (
+      <>
       <ExpenseScreen
         uploads={expenseUploadStatuses.map(({ submission, status }) => ({ id: submission.expenseId, draft: submission.draft, status }))}
         onUploadAction={handleExpenseUploadAction}
@@ -142,16 +166,68 @@ export function rotasDespesas(screen: Screen, {
         }}
         onAddPhoto={openExpenseCamera}
         onPreviewPhoto={openExpensePreview}
-        onBack={() => setScreen("inicio")}
-        onSubmit={submitExpense}
+        onBack={() => {
+          // Completando um gasto do cartão volta para a lista dele; gasto novo volta para o relatório.
+          if (gastoCartaoAtual) sairGastoCartao();
+          setScreen(gastoCartaoAtual ? "gastosCartao" : "gastosRelatorio");
+        }}
+        onSubmit={submitExpenseChecked}
         submitState={expenseSend && expenseSend.phase !== "error" ? "loading" : remoteOperation?.phase ?? "idle"}
         vehicles={maintenanceVehicles}
         vehiclesLoading={maintenanceVehiclesLoading}
         currentVehicleId={maintenanceCurrentVehicleId}
         quickRead={expenseQuickRead}
         quickReadFilled={expenseQuickReadFilled}
+        cartaoGasto={gastoCartaoAtual ? { cartaoFinal: gastoCartaoAtual.cartaoFinal, estabelecimento: gastoCartaoAtual.estabelecimento } : undefined}
+      />
+      {duplicidadeCartao ? (
+        <GastoCartaoDuplicadoDialog
+          gasto={duplicidadeCartao}
+          onComplete={() => abrirGastoCartao(duplicidadeCartao, true)}
+          onLaunchAnyway={() => { setDuplicidadeCartao(null); void submitExpense(expenseDraftRef.current); }}
+          onClose={() => setDuplicidadeCartao(null)}
+        />
+      ) : null}
+      </>
+    );
+  }
+
+  if (screen === "gastosCartao") {
+    return (
+      <GastosCartaoScreen
+        items={gastosCartaoPendentes}
+        loadStatus={gastosCartaoStatus}
+        onBack={() => setScreen("gastosRelatorio")}
+        onReload={() => { reloadGastosCartao().catch((error) => reportAppError(error, { severity: "warning", source: "app", action: "listarGastosCartao", notifyUser: false })); }}
+        onOpen={(id) => {
+          const gasto = gastosCartaoPendentes.find((item) => item.id === id);
+          if (gasto) abrirGastoCartao(gasto);
+        }}
       />
     );
+  }
+
+  if (screen === "gastosRelatorio") {
+    return (
+      <GastosRelatorioScreen
+        modelo={relatorioModelo}
+        periodoId={relatorioPeriodo}
+        loadStatus={relatorioStatus}
+        pendentesCartao={gastosCartaoPendentes.length}
+        idsCompletar={new Set(gastosCartaoPendentes.map((gasto) => gasto.id))}
+        onCompletarGasto={(id) => { const gasto = gastosCartaoPendentes.find((item) => item.id === id); if (gasto) abrirGastoCartao(gasto); }}
+        onPeriodo={setRelatorioPeriodo}
+        onBack={() => setScreen("inicio")}
+        onReload={() => { void reloadRelatorio(); }}
+        onCompletar={() => setScreen("gastosCartao")}
+        onAttach={anexarDespesa}
+        onPrecoPostos={() => setScreen("rankingPostos")}
+      />
+    );
+  }
+
+  if (screen === "rankingPostos") {
+    return <RankingPostosScreen onBack={() => setScreen("gastosRelatorio")} />;
   }
   return null;
 }

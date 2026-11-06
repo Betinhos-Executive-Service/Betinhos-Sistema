@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "motion/react";
 import { SystemIcon } from "../icons/SystemIcon";
 import { reportAppError } from "../../appErrorLogger";
+import { TourHelpButton } from "../TourHelp";
 
 type ServicesMenuProps = {
   onHome: () => void;
@@ -56,21 +57,24 @@ export function ServicesMenu({ onHome, onRefresh, title = "Seus Serviços", eyeb
             <strong>{title}</strong>
           </motion.div>
 
-          <motion.button
-            className="services-nav-button services-nav-button--refresh"
-            aria-label="Atualizar"
-            onClick={refresh}
-            disabled={!onRefresh}
-            aria-hidden={onRefresh ? undefined : true}
-            tabIndex={onRefresh ? undefined : -1}
-            style={onRefresh ? undefined : { visibility: "hidden" }}
-            whileTap={{ scale: 0.94 }}
-            transition={{ type: "spring", stiffness: 520, damping: 34 }}
-          >
-            <motion.span animate={{ rotate: isRefreshing ? 360 : 0 }} transition={{ duration: 0.42, ease: "easeOut" }}>
-              <SystemIcon name="refresh" />
-            </motion.span>
-          </motion.button>
+          <div className="services-menu-actions">
+            <TourHelpButton className="services-nav-button" />
+            <motion.button
+              className="services-nav-button services-nav-button--refresh"
+              aria-label="Atualizar"
+              onClick={refresh}
+              disabled={!onRefresh}
+              aria-hidden={onRefresh ? undefined : true}
+              tabIndex={onRefresh ? undefined : -1}
+              style={onRefresh ? undefined : { visibility: "hidden" }}
+              whileTap={{ scale: 0.94 }}
+              transition={{ type: "spring", stiffness: 520, damping: 34 }}
+            >
+              <motion.span animate={{ rotate: isRefreshing ? 360 : 0 }} transition={{ duration: 0.42, ease: "easeOut" }}>
+                <SystemIcon name="refresh" />
+              </motion.span>
+            </motion.button>
+          </div>
         </motion.div>
       </div>
     </header>

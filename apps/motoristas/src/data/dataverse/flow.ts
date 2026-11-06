@@ -7,7 +7,9 @@ export const FLOW_URLS = {
   gerarVoucher: "VITE_FLOW_GERAR_VOUCHER_URL",
   salvarFotosManutencao: "VITE_FLOW_SALVAR_FOTOS_MANUTENCAO_URL",
   enviarReciboCliente: "VITE_FLOW_ENVIAR_RECIBO_CLIENTE_URL",
-  quickRead: "VITE_FLOW_LEITURA_RAPIDA_URL"
+  quickRead: "VITE_FLOW_LEITURA_RAPIDA_URL",
+  conferenciaEnvio: "VITE_FLOW_CONFERENCIA_ENVIO_URL",
+  consultarArquivo: "VITE_FLOW_CONSULTAR_ARQUIVO_URL"
 } as const;
 
 const FLOW_DATAVERSE_ENVIRONMENT_VARIABLES: Record<string, string | undefined> = {
@@ -15,7 +17,11 @@ const FLOW_DATAVERSE_ENVIRONMENT_VARIABLES: Record<string, string | undefined> =
   [FLOW_URLS.gerarVoucher]: "new_FlowURLFlowGerarVoucherAppMotoristasv2",
   [FLOW_URLS.salvarFotosManutencao]: "new_FlowURLFlowSalvarArquivosOnedrive",
   [FLOW_URLS.enviarReciboCliente]: "new_FlowURLFlowEnviarReciboCliente",
-  [FLOW_URLS.quickRead]: "new_FlowURLDespesaLeituraRapida"
+  [FLOW_URLS.quickRead]: "new_FlowURLDespesaLeituraRapida",
+  // "Flow Despesas | Conferência no envio" (Sistema Betinhos, provision-flow-despesas-conferencia-envio.ps1).
+  [FLOW_URLS.conferenciaEnvio]: "new_FlowURLDespesaConferenciaEnvio",
+  // "Flow - Consultar Arquivo OneDrive" (Sistema Betinhos, provision-flow-consultar-onedrive.ps1): devolve o comprovante em base64.
+  [FLOW_URLS.consultarArquivo]: "new_URLFlowConsultarArquivoOneDrive"
 };
 const flowUrlCache = new Map<string, string>();
 

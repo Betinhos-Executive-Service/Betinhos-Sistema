@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 type Props = {
   reloadTermosMulta: () => Promise<void>;
   setScreen: React.Dispatch<React.SetStateAction<Screen>>;
+  setTourTermoId: (id: string) => void;
   termosMulta: TermoMulta[];
   termosStatus: TermosLoadStatus;
 };
@@ -15,12 +16,13 @@ type Props = {
 export function rotasTermos(screen: Screen, {
   reloadTermosMulta,
   setScreen,
+  setTourTermoId,
   termosMulta,
   termosStatus
 }: Props): ReactNode | null {
   if (screen === "multas") {
     return (
-      <TermosMultaScreen items={termosMulta} loadStatus={termosStatus} onBack={() => setScreen("inicio")} onReload={reloadTermosMulta} />
+      <TermosMultaScreen items={termosMulta} loadStatus={termosStatus} onBack={() => setScreen("inicio")} onReload={reloadTermosMulta} onSelectedChange={setTourTermoId} />
     );
   }
   return null;

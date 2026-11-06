@@ -28,6 +28,7 @@
     "PWA_SW_NAME",
     "THEME_COLOR",
     "buildManifest",
+    "isPwaContext",
     "stableAppPath"
   ],
   "src/lib/serviceVehicleInfleet.ts": [
@@ -56,6 +57,16 @@
     "pickMockInfleetScenario",
     "resolveMockServiceVehicle"
   ],
+  "src/lib/webPush.ts": [
+    "WEB_PUSH_PUBLIC_KEY",
+    "WebPushEnv",
+    "WebPushState",
+    "buildSubscriptionRecord",
+    "enableWebPush",
+    "getWebPushState",
+    "resolveWebPushState",
+    "urlBase64ToUint8Array"
+  ],
   "src/app/agendaVisibility.ts": [
     "filterAgendaGalleryItems",
     "getAgendaItemStartDate",
@@ -71,9 +82,12 @@
     "findFirstPendingServiceDetail",
     "getInitialChecklistId",
     "getInitialComunicadoId",
+    "getInitialDespesaId",
     "getInitialDetail",
+    "getInitialGastosCartaoLink",
     "getInitialParams",
     "getInitialTermoMultaId",
+    "getInitialTreinamentoParticipacaoId",
     "getVoucherDraftKey",
     "initialStore",
     "isSameDetail",
@@ -132,6 +146,35 @@
     "findDetailFromHashRoute",
     "getInitialScreenFromHashRoute"
   ],
+  "src/app/tour.ts": [
+    "TOUR_ALL_CHAPTERS",
+    "TourBox",
+    "TourCardPlacement",
+    "TourChapter",
+    "TourCloseReason",
+    "TourStep",
+    "clearAllChaptersSeen",
+    "fitSpotlight",
+    "hasSeenChapter",
+    "markChapterSeen",
+    "missingRequiredSteps",
+    "pickChapter",
+    "placeTourCard",
+    "resolveTourSteps",
+    "sameBox",
+    "spotlightBox",
+    "tourProgressLabel",
+    "tourStorageKey"
+  ],
+  "src/app/tourChapters.ts": [
+    "TOUR_CHAPTERS",
+    "tourChaptersForScreen",
+    "tourScreensWithChapters"
+  ],
+  "src/app/tourDom.ts": [
+    "findTourTarget",
+    "hasTourProbe"
+  ],
   "src/app/useAvisos.ts": [
     "useAvisos"
   ],
@@ -152,6 +195,9 @@
   ],
   "src/app/usePersistenciaRascunhos.ts": [
     "usePersistenciaRascunhos"
+  ],
+  "src/app/useTour.ts": [
+    "useTour"
   ],
   "src/data/porta.ts": [
     "PortaDados"

@@ -387,16 +387,19 @@ async function getCurrentUserEmail() {
 
 let qrPermissionColumnMissing = false;
 
+// Id do motorista no fallback local (sem Xrm); também identifica as preferências locais, como o tour.
+export const LOCAL_DRIVER_ID = "localhost-driver";
+
 export async function getDriverContext(): Promise<DriverContext> {
   const email = await getCurrentUserEmail();
   if (!email && shouldUseLocalFrontendFallback()) {
     dataverseLog("Fallback de motorista local ativado para frontend sem Xrm.");
     return {
-      id: "localhost-driver",
+      id: LOCAL_DRIVER_ID,
       email: "",
       fullName: "Localhost",
       funcionario: {
-        cr40f_funcionariosid: "localhost-driver",
+        cr40f_funcionariosid: LOCAL_DRIVER_ID,
         cr40f_nomecompleto: "Localhost",
         cr40f_emailmicrosoft: "",
         cr40f_gerarrecibopersonalizado: true,

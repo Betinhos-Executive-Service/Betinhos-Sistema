@@ -71,5 +71,12 @@ Regra das fatias: cada bloco vira hook da feature chamado **na mesma posição**
 - Sem ciclos entre módulos e sem `data/dataverse` importando feature. Os caches (`expenseReferenceData*`, modo de envio, URLs dos Flows, nomes de navegação) continuam com uma cópia só, no módulo das funções que os usam.
 - Os 23 importadores em `src` (inclusive `porta.ts` e o adaptador), 8 testes e `scripts/audit-dataverse-selects.cjs` apontam para os módulos novos.
 
+## Passo 9 — refatoração sobre o `main` de 2026-11-06 (feito)
+- A pilha (#87 a #103) ficou parada enquanto o `main` recebeu 180 commits (treinamentos, gastos do cartão, relatório de gastos, combustível, Web Push, tour) escritos no layout antigo. Em vez de 17 merges, o `main` entrou uma vez no fim da pilha (passo 8), com detecção de renomeação: o que o `main` mudou em arquivos movidos caiu no caminho novo.
+- Portado à mão: as mudanças do `main` em `lib/dataverse.ts` (entidades novas, 2 Flows, `LOCAL_DRIVER_ID`, gasto do cartão no envio assíncrono, Gerais das trocas filtrados, `conferirDespesaRemote`, `consultarArquivoComprovante`), conferidas por script (276 declarações iguais ao `main`), e os 39 trechos do `App.tsx`: `features/treinamentos/useTreinamentos.ts` + `rotas.tsx`, `features/despesas/useGastosCartao.ts` (cartão, relatório, deep link), conferência/duplicidade/cartão dentro do `useExpenseFlow`, `src/app/useTour.ts`, aviso de treinamento, dúvida da conferência e tour no `AppShell`, e o #95 no `useFinalizeFlow`.
+- Arquivos novos do `main` nas pastas antigas foram para `features/despesas` (cartão, relatório, postos, conferência, detalhe da despesa), `features/treinamentos`, `features/termos/SuccessCheck`, `shared/ui` (`TourHelp`, `WebPushLink`) e `src/app` (`TourOverlay`, `tour.css`); `lib/webPush.ts` fica ao lado de `pwa.ts`.
+- O `useTour` roda logo depois do `useNavegacao` (no `main` ficava entre o Voltar do celular e o hash da URL); os efeitos são independentes.
+- Prova contra o build do `main`: 526 testes, `tsc` estrito, 20 telas idênticas (as 16 + treinamentos, relatório, cartão e postos) e roteiros com log igual linha a linha. O bundle cresce 1,1% (nomes de propriedades das opções e retornos dos hooks, que o minificador não encurta).
+
 ## Fora deste plano
 Modo parceiro (parte 2), adaptador Worker + segundo build + Custom API com token (parte 3), troca da página do link (parte 4).

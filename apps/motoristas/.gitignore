@@ -34,3 +34,6 @@ graphify-out/
 !.claude/skills/
 !.claude/hooks/
 !.claude/settings.json
+
+# Estado local da skill here.now (contém token de reivindicação)
+.herenow/

@@ -14,7 +14,7 @@ const BASE = `${process.env.APP_MOTORISTAS_URL || "http://127.0.0.1:45127"}/webr
 fs.mkdirSync(OUT, { recursive: true });
 
 (async () => {
-  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  const browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH, headless: true } : { channel: "chrome", headless: true });
   const context = await browser.newContext({ viewport: { width: 375, height: 812 }, reducedMotion: process.env.REDUCED ? "reduce" : "no-preference" });
   const page = await context.newPage();
   await page.goto("about:blank");
@@ -22,7 +22,7 @@ fs.mkdirSync(OUT, { recursive: true });
   const errors = [];
   page.on("console", (m) => { if (m.type() === "error" && !(m.location().url || "").endsWith("/favicon.ico")) errors.push(m.text().slice(0, 200)); });
   await page.goto(`${BASE}#checklists`);
-  await page.evaluate(() => { localStorage.clear(); indexedDB.deleteDatabase("app-motoristas-media-drafts"); });
+  await page.evaluate(() => { localStorage.clear(); localStorage.setItem("app-motoristas-tour-v2:localhost-driver:*", "visto"); indexedDB.deleteDatabase("app-motoristas-media-drafts"); });
   await page.goto(`${BASE}${QUERY ? "&" : "?"}t=${Date.now()}#checklists`);
   await page.waitForTimeout(1300);
   await page.locator(".agenda-hit").first().click();

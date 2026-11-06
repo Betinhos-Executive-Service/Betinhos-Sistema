@@ -29,7 +29,11 @@ export type Screen =
   | "canceladoLocal"
   | "boasIdeias"
   | "meuCarro"
-  | "multas";
+  | "multas"
+  | "treinamentos"
+  | "gastosCartao"
+  | "gastosRelatorio"
+  | "rankingPostos";
 
 export type TileIcon = "cars" | "clock" | "money" | "tools";
 

@@ -57,6 +57,12 @@ test("termo de multa abre o App Motoristas na tela Multas", async () => {
   assert.equal(plain(calls[0].page).data, `termoMultaId=${ID}`);
 });
 
+test("treinamento abre o App Motoristas no treinamento da participação", async () => {
+  const { api, calls } = loadRedirect();
+  await api.onLoad(ctx("cr40f_treinamentoparticipacao", `{${ID.toUpperCase()}}`));
+  assert.equal(plain(calls[0].page).data, `treinamentoParticipacaoId=${ID}`);
+});
+
 test("fora do App Motoristas (ex.: app Interno) não redireciona", async () => {
   const interno = loadRedirect({ appName: "cr40f_ModelDrivenBetinhos" });
   await interno.api.onLoad(ctx("cr40f_reservadeveculos", ID));

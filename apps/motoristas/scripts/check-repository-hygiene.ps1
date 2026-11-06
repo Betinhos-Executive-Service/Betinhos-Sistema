@@ -1,25 +1,11 @@
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-$root = Resolve-Path (Join-Path $PSScriptRoot "..")
-Push-Location $root
+# Regras em tests/repositoryHygiene.test.ts; o comando fica só em package.json (check:hygiene).
+Push-Location (Join-Path $PSScriptRoot "..")
 try {
-  $tracked = @(git ls-files)
-  $forbidden = @($tracked | Where-Object {
-    $_ -match '(^|/)(tmp|\.tmp|\.dev-backups|bin|obj)/' -or
-    $_ -match '(^|/)graphify-out/cache/' -or
-    $_ -match '\.zip$'
-  })
-  if ($forbidden.Count -gt 0) {
-    throw "Repositorio contem artefatos proibidos versionados: $($forbidden.Count)."
-  }
-
-  $credentialFiles = @(git grep -I -l -E 'https://[^[:space:]"'']+(sig|code|token|secret|key)=' -- . 2>$null)
-  if ($LASTEXITCODE -notin @(0, 1)) { throw "Scanner de credenciais falhou." }
-  if ($credentialFiles.Count -gt 0) {
-    throw "Repositorio contem URL com parametro de credencial em arquivo versionado: $($credentialFiles.Count)."
-  }
-
+  npm run check:hygiene
+  if ($LASTEXITCODE -ne 0) { throw "Repositorio reprovado na higiene: veja a saida do teste acima." }
   Write-Host "[hygiene] OK: sem exports, binarios, ZIPs ou URLs credenciadas versionadas."
 }
 finally {

@@ -91,7 +91,6 @@ export function useFinalizeFlow({ blockIfNotFirstPending, completingClearTimerRe
   const finalizeSelected = async (fields: Record<string, string>) => {
     if (!selectedDetail || remoteOperation) return;
     const detailToFinalize = selectedDetail;
-    const agendaBeforeFinalize = store.agenda;
     const receiveProofCount = receiveProofs[detailToFinalize.id]?.length ?? 0;
     const finalFields =
       receiveProofCount > 0
@@ -272,12 +271,15 @@ export function useFinalizeFlow({ blockIfNotFirstPending, completingClearTimerRe
 
       if (!remoteMode) return;
 
-      void Promise.race([
+      // A finalização já foi gravada: a recarga só confirma a agenda e nunca devolve o serviço.
+      const loadAgendaWithTimeout = () => Promise.race([
         dados.carregarAgenda(),
         wait(8000).then(() => {
           throw new Error("Falha ao confirmar a atualização da agenda no Dataverse.");
         })
-      ])
+      ]);
+      void loadAgendaWithTimeout()
+        .catch(loadAgendaWithTimeout)
         .then((remote) => {
           setStore((current) => ({
             ...current,
@@ -301,16 +303,10 @@ export function useFinalizeFlow({ blockIfNotFirstPending, completingClearTimerRe
           reportAppError(error, {
             source: "app", action: "finalizeSelected", phase: "confirm-agenda-after-finalize", screen: "servicos",
             detailId: detailToFinalize.id, detailType: detailToFinalize.type,
-            payload: { dataverseId: detailToFinalize.dataverse?.id, timeoutMs: 8000, restoredToAgenda: true }, notifyUser: false
+            payload: { dataverseId: detailToFinalize.dataverse?.id, timeoutMs: 8000, attempts: 2, restoredToAgenda: false }, notifyUser: false
           });
-          setStore((current) => ({
-            ...current,
-            agenda: current.agenda.some((item) => item.detail?.id === detailToFinalize.id && item.detail?.type === detailToFinalize.type)
-              ? current.agenda
-              : agendaBeforeFinalize
-          }));
           setCriticalError(
-            `${error instanceof Error ? error.message : "Falha ao atualizar a agenda."} O serviço voltou para a galeria. Finalize novamente.`
+            "O serviço foi finalizado, mas a agenda não atualizou. Não finalize de novo: feche e abra o app para conferir."
           );
         });
     }, 1650);

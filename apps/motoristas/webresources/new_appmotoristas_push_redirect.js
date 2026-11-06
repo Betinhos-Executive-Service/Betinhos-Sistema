@@ -13,7 +13,8 @@
     new_comunicadodestinatario: function (id) { return "comunicadoId=" + id; },
     new_checklistveiculo: function (id) { return "checklistId=" + id; },
     cr40f_reservadeveculos: function (id) { return "servicoId=" + id + "&tipo=SERVICO"; },
-    new_termomulta: function (id) { return "termoMultaId=" + id; }
+    new_termomulta: function (id) { return "termoMultaId=" + id; },
+    cr40f_treinamentoparticipacao: function (id) { return "treinamentoParticipacaoId=" + id; }
   };
 
   function getFormContext(executionContext) {

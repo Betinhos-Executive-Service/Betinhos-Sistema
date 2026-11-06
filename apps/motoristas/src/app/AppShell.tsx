@@ -11,52 +11,77 @@ import { ExpenseSendOverlay, type ExpenseSendState } from "../features/despesas/
 import { VehicleChoiceDialog } from "../features/detalhe/VehicleChoiceDialog";
 import { FlowProgressOverlay, type RemoteOperation } from "../shared/ui/FlowProgressOverlay";
 import type { useFinalizeFlow } from "../features/finalizar/useFinalizeFlow";
+import type { useExpenseFlow } from "../features/despesas/useExpenseFlow";
+import type { useTreinamentos } from "../features/treinamentos/useTreinamentos";
+import { ConferenciaDuvidaDialog } from "../features/despesas/ConferenciaDuvidaDialog";
+import { TourHelpContext } from "../shared/ui/TourHelp";
+import { TourOverlay } from "./TourOverlay";
+import type { useTour } from "./useTour";
 import type { Screen } from "../types";
 
 // Referência estável: o diálogo compara com a lista exibida para saber se oferece "Nenhuma das opções".
 const loadMockAllFleet = async () => MOCK_FLEET;
 
 type Finalizar = ReturnType<typeof useFinalizeFlow>;
+type Treinamentos = ReturnType<typeof useTreinamentos>;
+type Tour = ReturnType<typeof useTour>;
 
 type Props = {
+  abrirAvisoTreinamentos: Treinamentos["abrirAvisoTreinamentos"];
+  avisoTreinamentos: Treinamentos["avisoTreinamentos"];
   cancelVehicleChoice: Finalizar["cancelVehicleChoice"];
   children: React.ReactNode;
   closeExpenseSendError: () => void;
   closeVehicleChoice: Finalizar["closeVehicleChoice"];
+  closeTour: Tour["closeTour"];
   criticalError: string;
   dataLoading: LoadingOverlayState | null;
+  duvidaConferencia: ReturnType<typeof useExpenseFlow>["duvidaConferencia"];
   expenseSend: ExpenseSendState | null;
   previousScreen: Screen;
   remoteMode: boolean;
   remoteOperation: RemoteOperation | null;
   screen: Screen;
+  openTourHelp: Tour["openTourHelp"];
+  setAvisoTreinamentos: Treinamentos["setAvisoTreinamentos"];
   setCriticalError: (message: string) => void;
   setToastState: React.Dispatch<React.SetStateAction<ToastState | null>>;
   toast: ToastState | null;
+  tourCandidates: Tour["tourCandidates"];
+  tourChapter: Tour["tourChapter"];
   vehicleChoiceRequest: Finalizar["vehicleChoiceRequest"];
 };
 
-// Moldura de toda tela: animação de troca, toast, carregamento, progresso de envio, escolha do carro, erro crítico e selo de build.
+// Moldura de toda tela: animação de troca, toast, aviso de treinamento novo, carregamento, progresso de envio, dúvida da conferência,
+// tour, escolha do carro, erro crítico e selo de build. O botão "?" dos cabeçalhos abre o tour pelo contexto.
 export function AppShell({
+  abrirAvisoTreinamentos,
+  avisoTreinamentos,
   cancelVehicleChoice,
   children,
   closeExpenseSendError,
+  closeTour,
   closeVehicleChoice,
   criticalError,
   dataLoading,
+  duvidaConferencia,
   expenseSend,
   previousScreen,
   remoteMode,
+  openTourHelp,
   remoteOperation,
   screen,
+  setAvisoTreinamentos,
   setCriticalError,
   setToastState,
   toast,
+  tourCandidates,
+  tourChapter,
   vehicleChoiceRequest
 }: Props) {
   const screenMotion = getScreenMotion(screen, previousScreen);
   return (
-    <>
+    <TourHelpContext.Provider value={tourCandidates.length ? openTourHelp : null}>
       <AnimatePresence mode="wait">
         <motion.div
           key={screen}
@@ -71,9 +96,25 @@ export function AppShell({
         </motion.div>
       </AnimatePresence>
       <LocalToast toast={dataLoading ? null : toast} onDismiss={() => setToastState(null)} />
+      {avisoTreinamentos && screen !== "treinamentos" && !dataLoading ? (
+        <div className="local-toast-layer">
+          <div className="local-toast local-toast--info trn-aviso" role="status" aria-live="polite" aria-atomic="true">
+            <div className="local-toast-copy">
+              <span className="local-toast-label">Treinamento</span>
+              <span className="local-toast-message">{avisoTreinamentos.message}</span>
+              <div className="trn-aviso-acoes">
+                <button type="button" onClick={abrirAvisoTreinamentos}>Ver treinamento</button>
+                <button type="button" onClick={() => setAvisoTreinamentos(null)}>Dispensar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <LoadingOverlay loading={getVisibleLoadingOverlay(dataLoading, criticalError)} />
       {remoteOperation ? <FlowProgressOverlay operation={remoteOperation} /> : null}
       {expenseSend ? <ExpenseSendOverlay state={expenseSend} onClose={closeExpenseSendError} /> : null}
+      {duvidaConferencia ? <ConferenciaDuvidaDialog pergunta={duvidaConferencia.pergunta} onResponder={(texto) => duvidaConferencia.responder(texto)} onVoltar={() => duvidaConferencia.responder(null)} /> : null}
+      {tourChapter ? <TourOverlay key={tourChapter.id} chapter={tourChapter} onClose={closeTour} /> : null}
       {vehicleChoiceRequest ? (
         <VehicleChoiceDialog
           resolution={vehicleChoiceRequest.resolution}
@@ -100,6 +141,6 @@ export function AppShell({
         </div>
       ) : null}
       <BuildStamp />
-    </>
+    </TourHelpContext.Provider>
   );
 }

@@ -13,6 +13,7 @@ description: "Verifica a camada de domínio e integração do App Motoristas: re
 ## Roteiro
 1. `npm test` → `ℹ fail 0` (304 testes em 22/10/2026; o número só deve crescer).
 2. `npx tsc --noEmit --noUnusedLocals --noUnusedParameters` → sem saída e exit 0.
+2b. `npm run check:hygiene` (roda `tests/repositoryHygiene.test.ts`, também incluído no `npm test`): nenhum arquivo versionado com URL/assinatura de credencial (`sig=`, `code=`, `token=`…) nem artefato local (`tmp/`, `bin/`, `obj/`, `.herenow/`, `*.zip`). Prova negativa: crie um arquivo com `sig=` de 20+ caracteres, `git add -N`, o teste tem de listá-lo; depois `git reset` e apague.
 3. Mudou payload do Dataverse (`src/features/*/remoto.ts`, `src/features/servicos/agendaRemota.ts`/`trocas.ts` ou `src/data/dataverse/`)? Confira nomes lógicos na metadata real do DEV (MCP `Dataverse_DEV`, somente leitura) antes de concluir. Ex.: `cr40f_observacoes` do recibo recebe "-" quando vazio.
 4. Mudou o build (`scripts/build-react-singlefile.cjs`)? `npm run build` gera `dist/webresource-app-motoristas.html` com `window.__APP_BUILD_INFO` e sobe o PATCH; confira o carimbo `v… · dd/mm/aaaa HH:mm` na Início (ver `verificar-servicos`). Não versione `dist/` de builds de teste.
 

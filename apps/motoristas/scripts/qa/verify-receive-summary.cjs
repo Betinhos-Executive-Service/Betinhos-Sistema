@@ -23,7 +23,7 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
 
 (async () => {
   fs.mkdirSync(SHOTS, { recursive: true });
-  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  const browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH, headless: true } : { channel: "chrome", headless: true });
   const context = await browser.newContext({ viewport: { width: 375, height: 812 }, userAgent: ANDROID_UA });
   await context.addInitScript(() => {
     if (!navigator.mediaDevices) return;
@@ -52,6 +52,7 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
     await page.goto(`${BASE}?t=${Date.now()}#inicio`);
     await page.evaluate(async (cents) => {
       localStorage.clear();
+      localStorage.setItem("app-motoristas-tour-v2:localhost-driver:*", "visto");
       // Fotos de comprovante ficam no IndexedDB: limpa para cada cenário começar sem foto.
       for (const db of (await indexedDB.databases?.()) ?? []) if (db.name) indexedDB.deleteDatabase(db.name);
       sessionStorage.clear();

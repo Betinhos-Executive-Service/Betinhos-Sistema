@@ -4,7 +4,10 @@ param(
   # Inclui a Tela Funcoes Operacionais na mesma publicacao (gates + build + deploy).
   # Sem este switch ela nao e testada, compilada nem republicada: publique-a
   # separadamente com `npm run push` no repo dela.
-  [switch] $IncludeOperacionais
+  [switch] $IncludeOperacionais,
+  # Emergencia, so DEV: pula os exports de backup (inicial e final) e a validacao do ZIP final quando a
+  # solucao nao exporta (ex.: conector Web Push recusado pelo ExportSolution). Nunca use como padrao.
+  [switch] $SemBackupSolucao
 )
 
 if ($PSVersionTable.PSEdition -eq "Core" -or $PSHOME -like "*codex-runtimes*") {
@@ -13,6 +16,7 @@ if ($PSVersionTable.PSEdition -eq "Core" -or $PSHOME -like "*codex-runtimes*") {
   if ($DeviceCode) { $arguments += "-DeviceCode" }
   if ($ExpenseUploadOnly) { $arguments += "-ExpenseUploadOnly" }
   if ($IncludeOperacionais) { $arguments += "-IncludeOperacionais" }
+  if ($SemBackupSolucao) { $arguments += "-SemBackupSolucao" }
   & $windowsPowerShell @arguments
   exit $LASTEXITCODE
 }
@@ -87,7 +91,7 @@ function Assert-SolutionArchiveExchangeLifecycle([string] $ZipPath) {
     $customApiPath = Join-Path $extractPath "customapis"
     if (-not (Test-Path -LiteralPath $customApiPath)) { throw "ZIP final nao possui a pasta customapis." }
     $xmlText = ((Get-ChildItem -LiteralPath $customApiPath -Recurse -File -Filter "*.xml" | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }) -join "`n")
-    foreach ($required in @("new_ConcluirTrocaDeCarro", "new_CancelarTrocaDeCarro", "new_ReverterTrocaDeCarro", "new_ConfirmarTrocaMotorista", "new_AtualizarTrocaDeCarro", "new_RegistrarTrocaDeCarro", "new_Motivo", "new_DataEfetiva", "new_VersaoEsperada", "new_IdempotencyKey", "new_TrocaId", "new_TrocaCompensatoriaId", "new_DispararComunicadoMotorista", "new_AbrirComunicadoMotorista", "new_RegistrarCienciaComunicado", "new_ReenviarPushComunicado", "new_DestinatarioId", "new_ComunicadoId", "new_AssinaturaJson", "new_ResolverVeiculoDoServico", "new_ReservaId", "new_ResultadoJson", "new_SincronizarVeiculoAtual", "new_GerarLinkAcompanhamento", "new_ResumoJson", "new_LinkJson", "new_SolicitarChecklistVeiculo", "new_ProcessarChecklistsVeiculos", "new_ReatribuirChecklistVeiculo", "new_ConcluirChecklistVeiculo", "new_CancelarChecklistVeiculo", "new_ReenviarPushChecklist", "new_ChecklistId", "new_VeiculoId", "new_RespostasJson", "new_OrganizarObservacao", "new_Texto")) {
+    foreach ($required in @("new_ConcluirTrocaDeCarro", "new_CancelarTrocaDeCarro", "new_ReverterTrocaDeCarro", "new_ConfirmarTrocaMotorista", "new_AtualizarTrocaDeCarro", "new_RegistrarTrocaDeCarro", "new_Motivo", "new_DataEfetiva", "new_VersaoEsperada", "new_IdempotencyKey", "new_TrocaId", "new_TrocaCompensatoriaId", "new_DispararComunicadoMotorista", "new_AbrirComunicadoMotorista", "new_RegistrarCienciaComunicado", "new_ReenviarPushComunicado", "new_DestinatarioId", "new_ComunicadoId", "new_AssinaturaJson", "new_ResolverVeiculoDoServico", "new_ReservaId", "new_ResultadoJson", "new_SincronizarVeiculoAtual", "new_GerarLinkAcompanhamento", "new_ResumoJson", "new_LinkJson", "new_SolicitarChecklistVeiculo", "new_ProcessarChecklistsVeiculos", "new_ReatribuirChecklistVeiculo", "new_ConcluirChecklistVeiculo", "new_CancelarChecklistVeiculo", "new_ReenviarPushChecklist", "new_ChecklistId", "new_VeiculoId", "new_RespostasJson", "new_OrganizarObservacao", "new_Texto", "cr40f_LembrarTreinamento", "cr40f_TreinamentoId", "cr40f_ParticipacaoId", "cr40f_Enfileirados", "cr40f_Ignorados")) {
       if ($xmlText.IndexOf($required, [System.StringComparison]::Ordinal) -lt 0) { throw "ZIP final nao possui o componente esperado: $required" }
     }
     Write-Step "validacao do ZIP final OK: Custom APIs, parametros e retorno presentes"
@@ -101,7 +105,11 @@ New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
 if (-not (Get-Command pac -ErrorAction SilentlyContinue)) {
   throw "Power Platform CLI (pac) nao encontrado; exporte a solucao atual antes do deploy."
 }
-Export-SolutionBackup $backupPath "export solution backup"
+if ($SemBackupSolucao) {
+  Write-Warning "[push-dev] -SemBackupSolucao: publicando SEM backup da solucao $solutionUniqueName. Rollback so pelo ultimo ZIP em $backupDir."
+} else {
+  Export-SolutionBackup $backupPath "export solution backup"
+}
 
 Write-Step "gate App Motoristas: testes, TypeScript e build"
 npm test
@@ -162,6 +170,15 @@ Write-Step "provision comunicados metadata, Custom APIs e travas in DEV"
   -DeviceCode:$DeviceCode
 if (-not $?) { throw "Provisionamento de comunicados falhou." }
 
+# Exige a tabela de participacao e as colunas de push criadas pelo Sistema Betinhos (schema aplicado antes).
+Write-Step "provision treinamentos: Custom API de lembrete e flow de push in DEV"
+& (Join-Path $PSScriptRoot "provision-treinamentos-push.ps1") `
+  -EnvironmentUrl $environmentUrl `
+  -SolutionUniqueName $solutionUniqueName `
+  -Apply `
+  -DeviceCode:$DeviceCode
+if (-not $?) { throw "Provisionamento do push de treinamentos falhou." }
+
 Write-Step "provision decisao do carro pela Infleet in DEV"
 & (Join-Path $PSScriptRoot "provision-infleet-vehicle.ps1") `
   -EnvironmentUrl $environmentUrl `
@@ -202,6 +219,14 @@ Write-Step "provision observacao organizada (variavel da chave, Custom API e ste
   -Apply `
   -DeviceCode:$DeviceCode
 if (-not $?) { throw "Provisionamento da observacao organizada falhou." }
+
+Write-Step "provision relatorio de combustivel (schema e variavel Secret) in DEV"
+& (Join-Path $PSScriptRoot "provision-relatorio-combustivel.ps1") `
+  -EnvironmentUrl $environmentUrl `
+  -SolutionUniqueName $solutionUniqueName `
+  -Apply `
+  -DeviceCode:$DeviceCode
+if (-not $?) { throw "Provisionamento do relatorio de combustivel falhou." }
 
 Write-Step "publish push redirect (forms OnLoad -> App Motoristas)"
 & (Join-Path $PSScriptRoot "provision-push-redirect.ps1") `
@@ -255,8 +280,12 @@ Write-Step "publish service worker in $solutionUniqueName"
   -SolutionUniqueName $solutionUniqueName `
   -DeviceCode:$DeviceCode
 
-$finalBackupPath = Join-Path $backupDir ("$solutionUniqueName-final-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".zip")
-Export-SolutionBackup $finalBackupPath "export final solution"
-Assert-SolutionArchiveExchangeLifecycle $finalBackupPath
+if ($SemBackupSolucao) {
+  Write-Warning "[push-dev] -SemBackupSolucao: export final e validacao do ZIP pulados; valide os componentes pelos scripts validate-*."
+} else {
+  $finalBackupPath = Join-Path $backupDir ("$solutionUniqueName-final-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".zip")
+  Export-SolutionBackup $finalBackupPath "export final solution"
+  Assert-SolutionArchiveExchangeLifecycle $finalBackupPath
+}
 
 Write-Step "DEV publish complete"

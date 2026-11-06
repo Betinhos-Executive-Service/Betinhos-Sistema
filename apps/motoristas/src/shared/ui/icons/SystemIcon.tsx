@@ -15,7 +15,8 @@ export type SystemIconName =
   | "video"
   | "flash"
   | "sync"
-  | "rotate";
+  | "rotate"
+  | "help";
 
 export function SystemIcon({ name }: { name: SystemIconName }) {
   if (name === "arrowLeft") {
@@ -112,6 +113,16 @@ export function SystemIcon({ name }: { name: SystemIconName }) {
     return (
       <svg viewBox="0 0 48 48" aria-hidden="true">
         <path d="M8 23 24 9l16 14v17H29V28H19v12H8V23Z" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  if (name === "help") {
+    return (
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <circle cx="24" cy="24" r="18" fill="none" stroke="currentColor" strokeWidth="3.2" />
+        <path d="M18.5 19a5.8 5.8 0 0 1 11.3 1.6c0 3.9-5.8 4.6-5.8 8.4" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="24" cy="34.5" r="2.2" fill="currentColor" />
       </svg>
     );
   }

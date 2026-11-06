@@ -1,4 +1,5 @@
 import { STORAGE_KEY, initialStore } from "./bootstrap";
+import { clearAllChaptersSeen } from "./tour";
 import { clearMediaDraft } from "../features/fotos/mediaDraftStore";
 import { revokePhotoPreviewUrls } from "../features/fotos/envioMidia";
 import { createEmptyCollisionDraft } from "../features/colisao/collisions";
@@ -42,6 +43,7 @@ type Options = {
   setSelectedDetail: React.Dispatch<React.SetStateAction<DetailData | null>>;
   setStore: React.Dispatch<React.SetStateAction<LocalStore>>;
   setToast: (message: string, tone?: ToastTone) => void;
+  tourDriverId: string;
 };
 
 // Botão "Resetar dados locais" (só localhost no mock): para timers, solta as prévias e apaga agenda, rascunhos e anexos do navegador.
@@ -63,7 +65,8 @@ export function resetDadosLocais({
   setScreen,
   setSelectedDetail,
   setStore,
-  setToast
+  setToast,
+  tourDriverId
 }: Options) {
   if (remoteMode || !isLocalhostRuntime) return;
   const confirmed = window.confirm("Resetar dados locais, rascunhos e anexos salvos neste navegador?");
@@ -100,6 +103,7 @@ export function resetDadosLocais({
   localStorage.removeItem(VOUCHER_DRAFTS_STORAGE_KEY);
   localStorage.removeItem(FINALIZE_DRAFT_ASSETS_STORAGE_KEY);
   localStorage.removeItem(SERVICE_OBSERVATION_DRAFTS_KEY);
+  if (tourDriverId) clearAllChaptersSeen(localStorage, tourDriverId);
   void clearMediaDraft();
 
   setStore(initialStore());

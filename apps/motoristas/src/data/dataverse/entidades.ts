@@ -23,8 +23,11 @@ export const DATAVERSE = {
   boasIdeias: "cr40f_boasideiases",
   comunicados: "new_comunicadomotoristas",
   comunicadoDestinatarios: "new_comunicadodestinatarios",
+  inscricoesPush: "new_inscricaopushmotoristas",
   checklistVeiculos: "new_checklistveiculos",
   termosMulta: "new_termomultas",
+  treinamentos: "cr40f_treinamentos",
+  treinamentoParticipacoes: "cr40f_treinamentoparticipacaos",
   systemusers: "systemusers"
 } as const;
 
@@ -56,8 +59,11 @@ export const ENTITY_SET_TO_ENTITY_NAME: Record<string, string> = {
   [DATAVERSE.boasIdeias]: "cr40f_boasideias",
   [DATAVERSE.comunicados]: "new_comunicadomotorista",
   [DATAVERSE.comunicadoDestinatarios]: "new_comunicadodestinatario",
+  [DATAVERSE.inscricoesPush]: "new_inscricaopushmotorista",
   [DATAVERSE.checklistVeiculos]: "new_checklistveiculo",
   [DATAVERSE.termosMulta]: "new_termomulta",
+  [DATAVERSE.treinamentos]: "cr40f_treinamento",
+  [DATAVERSE.treinamentoParticipacoes]: "cr40f_treinamentoparticipacao",
   [DATAVERSE.systemusers]: "systemuser",
   environmentvariabledefinitions: "environmentvariabledefinition",
   environmentvariablevalues: "environmentvariablevalue"

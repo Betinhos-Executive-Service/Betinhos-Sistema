@@ -43,6 +43,12 @@ import { useComunicados } from "./features/comunicados/useComunicados";
 import { useComunicadoDeepLink } from "./features/comunicados/useComunicadoDeepLink";
 import { useChecklists } from "./features/checklist/useChecklists";
 import { useTermosMulta } from "./features/termos/useTermosMulta";
+import { useTreinamentos } from "./features/treinamentos/useTreinamentos";
+import { isTreinamentoPendente } from "./features/treinamentos/treinamentos";
+import { rotasTreinamentos } from "./features/treinamentos/rotas";
+import { useGastosCartao } from "./features/despesas/useGastosCartao";
+import type { GastoCartao } from "./features/despesas/gastosCartao";
+import { useTour } from "./app/useTour";
 import { useIdeasGateway } from "./features/ideias/useIdeasGateway";
 import { isComunicadoPending } from "./features/comunicados/comunicados";
 import { isChecklistPending } from "./features/checklist/checklists";
@@ -108,6 +114,9 @@ function App() {
     setScreen,
     setToast
   });
+  // Guarda o motorista logado para recarregar comunicados sem depender do estado ainda não aplicado.
+  const comunicadosDriverIdRef = useRef("");
+  const gastoCartaoAtualRef = useRef<GastoCartao | null>(null);
   const despesas = useExpenseFlow({
     remoteMode,
     driverContext,
@@ -116,7 +125,14 @@ function App() {
     setScreen,
     setToast,
     setCriticalError,
-    logAppError
+    logAppError,
+    // Funções intermediárias para o hook do cartão, chamado mais abaixo; só rodam nos handlers.
+    gastoCartaoAtualRef,
+    concluirGastoCartao: (...args) => cartao.concluirGastoCartao(...args),
+    gastosCartaoPendentes: () => cartao.gastosCartaoPendentes,
+    setDuplicidadeCartao: (...args) => cartao.setDuplicidadeCartao(...args),
+    relatorioDespesas: () => cartao.relatorioDespesas,
+    comunicadosDriverIdRef
   });
   const { expenseReferenceData, expenseReferenceError, expenseReferenceLoading } = despesas;
   const [receiptClienteOptions, setReceiptClienteOptions] = useState<string[]>([]);
@@ -192,9 +208,10 @@ function App() {
     voucherDrafts
   });
 
-  // Guarda o motorista logado para recarregar comunicados sem depender do estado ainda não aplicado.
-  const comunicadosDriverIdRef = useRef("");
   const { termosMulta, termosStatus, reloadTermosMulta } = useTermosMulta(comunicadosDriverIdRef, driverContext?.id);
+  const treinamentosLista = useTreinamentos({ comunicadosDriverIdRef, driverContextId: driverContext?.id, setScreen });
+  const { setSelectedTreinamentoId, treinamentos } = treinamentosLista;
+  const cartao = useGastosCartao({ comunicadosDriverIdRef, despesas, driverContextId: driverContext?.id, gastoCartaoAtualRef, remoteMode, screen, setScreen });
   const checklistsLista = useChecklists({ dados, driverIdRef: comunicadosDriverIdRef, previewMode: isButtonPreviewMode || isReceiptPreviewMode, setScreen, setToast, setDataLoadingState });
   const { checklists, setChecklistOrigin, setSelectedChecklistId } = checklistsLista;
   const comunicadosLista = useComunicados({ dados, driverIdRef: comunicadosDriverIdRef, previewMode: isButtonPreviewMode || isReceiptPreviewMode, setScreen, setDataLoadingState });
@@ -264,6 +281,18 @@ function App() {
     selectedDetail
   });
 
+  const tour = useTour({
+    blocked: Boolean(finalizar.vehicleChoiceRequest || remoteOperation || despesas.expenseSend),
+    criticalError: avisos.criticalError,
+    dataLoading: avisos.dataLoading,
+    driverContextId: driverContext?.id,
+    screen,
+    selectedChecklistId: checklistsLista.selectedChecklistId,
+    selectedComunicadoId: comunicadosLista.selectedComunicadoId,
+    selectedTreinamentoId: treinamentosLista.selectedTreinamentoId,
+    setToast
+  });
+
   const ideasGateway = useIdeasGateway(dados, remoteMode);
 
   useDadosFormularios({
@@ -288,19 +317,27 @@ function App() {
 
   const show = (node: React.ReactNode) => (
     <AppShell
+      abrirAvisoTreinamentos={treinamentosLista.abrirAvisoTreinamentos}
+      avisoTreinamentos={treinamentosLista.avisoTreinamentos}
       cancelVehicleChoice={finalizar.cancelVehicleChoice}
       closeExpenseSendError={despesas.closeExpenseSendError}
+      closeTour={tour.closeTour}
       closeVehicleChoice={finalizar.closeVehicleChoice}
       criticalError={avisos.criticalError}
       dataLoading={avisos.dataLoading}
+      duvidaConferencia={despesas.duvidaConferencia}
       expenseSend={despesas.expenseSend}
       previousScreen={previousScreenRef.current}
       remoteMode={remoteMode}
+      openTourHelp={tour.openTourHelp}
       remoteOperation={remoteOperation}
       screen={screen}
+      setAvisoTreinamentos={treinamentosLista.setAvisoTreinamentos}
       setCriticalError={setCriticalError}
       setToastState={avisos.setToastState}
       toast={avisos.toast}
+      tourCandidates={tour.tourCandidates}
+      tourChapter={tour.tourChapter}
       vehicleChoiceRequest={finalizar.vehicleChoiceRequest}
     >
       {node}
@@ -333,7 +370,8 @@ function App() {
     setScreen,
     setSelectedDetail,
     setStore,
-    setToast
+    setToast,
+    tourDriverId: tour.tourDriverId
   });
 
   useAutoRefreshAgenda({
@@ -345,10 +383,10 @@ function App() {
   });
 
   const navigateFromInitial = (screenName: string) => {
-    // Pending sends that need the driver go first; otherwise open the camera straight away.
-    if (screenName === "gastos" && !despesas.expenseUploadStatuses.length && despesas.expensePhotos.length === 0 && despesas.isExpenseDraftBlank(despesas.expenseDraft)) {
+    // Gastos abre o relatório do motorista; a lista do cartão fica em "Completar" e a câmera no CTA "Anexar despesa".
+    if (screenName === "gastos") {
       setComunicadoOrigin("");
-      despesas.openExpenseCamera();
+      setScreen("gastosRelatorio");
       return;
     }
     if (screenName === "personalReceipt" || screenName === "reciboPersonalizado" || screenName === "gerarReciboPersonalizado") {
@@ -361,7 +399,13 @@ function App() {
       setScreen("checklists");
       return;
     }
-    if (screenName === "servicos" || screenName === "comunicados" || screenName === "historico" || screenName === "solicitarManutencao" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro" || screenName === "multas") {
+    if (screenName === "treinamentos") setSelectedTreinamentoId("");
+    if (screenName === "gastosCartao") {
+      setComunicadoOrigin("");
+      setScreen("gastosCartao");
+      return;
+    }
+    if (screenName === "servicos" || screenName === "comunicados" || screenName === "historico" || screenName === "solicitarManutencao" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro" || screenName === "multas" || screenName === "treinamentos") {
       setComunicadoOrigin("");
       setScreen(screenName);
     }
@@ -399,7 +443,7 @@ function App() {
   const telaColisao = rotasColisao(screen, { ...colisao, ...veiculos, driverContext, remoteOperation, setScreen, setToast });
   if (telaColisao) return show(telaColisao);
 
-  const telaDespesas = rotasDespesas(screen, { ...despesas, ...veiculos, remoteMode, remoteOperation, setScreen, setToast });
+  const telaDespesas = rotasDespesas(screen, { ...despesas, ...cartao, ...veiculos, remoteMode, remoteOperation, setScreen, setToast });
   if (telaDespesas) return show(telaDespesas);
 
   const telaIdeias = rotasIdeias(screen, { ideasGateway, remoteMode, setScreen });
@@ -508,10 +552,14 @@ function App() {
   const telaTermos = rotasTermos(screen, {
     reloadTermosMulta,
     setScreen,
+    setTourTermoId: tour.setTourTermoId,
     termosMulta,
     termosStatus
   });
   if (telaTermos) return show(telaTermos);
+
+  const telaTreinamentos = rotasTreinamentos(screen, { ...treinamentosLista, driverContext, setScreen });
+  if (telaTreinamentos) return show(telaTreinamentos);
 
   const telaChecklist = rotasChecklist(screen, { ...checklistsLista, setScreen });
   if (telaChecklist) return show(telaChecklist);
@@ -529,10 +577,14 @@ function App() {
       pendingComunicados={comunicados.filter(isComunicadoPending).length}
       pendingChecklists={checklists.filter(isChecklistPending).length}
       pendingMultas={separarTermos(termosMulta).pendentes.length}
+      pendingTreinamentos={treinamentos.filter(isTreinamentoPendente).length}
+      pendingGastosCartao={cartao.gastosCartaoPendentes.length}
       multasBanner={resumoPendentes(termosMulta)}
+      driverId={driverContext?.id}
       driverName={driverContext?.fullName}
       showLocalReset={isLocalhostRuntime && !remoteMode}
       onResetLocalData={resetLocalData}
+      onShowTour={tour.restartTour}
     />
   );
 }

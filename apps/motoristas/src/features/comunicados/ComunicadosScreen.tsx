@@ -14,6 +14,7 @@ import {
   isMockComunicados,
   type ComunicadoDestinatario,
   type SignatureStrokes,
+  parseStrokes,
   validateSignature
 } from "./comunicados";
 
@@ -30,10 +31,6 @@ type Props = {
   onReload: () => Promise<void>;
   driverName: string;
 };
-
-function parseStrokes(value: string): SignatureStrokes {
-  try { return JSON.parse(value) as SignatureStrokes; } catch { return []; }
-}
 
 function formatDate(value: string | null) {
   if (!value) return "";

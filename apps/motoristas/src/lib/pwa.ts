@@ -5,7 +5,7 @@ import icon512 from "../assets/pwa/icon-512.png";
 import iconMaskable512 from "../assets/pwa/icon-maskable-512.png";
 import appleTouch180 from "../assets/pwa/apple-touch-180.png";
 
-import { buildManifest, PWA_SW_NAME, THEME_COLOR } from "./pwaManifest.ts";
+import { buildManifest, isPwaContext, PWA_SW_NAME, THEME_COLOR } from "./pwaManifest.ts";
 
 function addHead(tag: string, attrs: Record<string, string>) {
   const el = document.createElement(tag);
@@ -14,10 +14,8 @@ function addHead(tag: string, attrs: Record<string, string>) {
 }
 
 export function installPwa() {
-  if (typeof window === "undefined") return;
-  const { origin, hostname, pathname, protocol } = window.location;
-  if (protocol !== "https:" || !/\.dynamics\.com$/i.test(hostname)) return;
-  try { if (window.top !== window.self) return; } catch { return; }
+  if (!isPwaContext()) return;
+  const { origin, pathname } = window.location;
 
   const manifest = buildManifest(origin, pathname, { icon192, icon512, iconMaskable512 });
   addHead("link", { rel: "manifest", href: `data:application/manifest+json,${encodeURIComponent(JSON.stringify(manifest))}` });
@@ -25,12 +23,16 @@ export function installPwa() {
   addHead("link", { rel: "apple-touch-icon", href: appleTouch180 });
   addHead("meta", { name: "apple-mobile-web-app-capable", content: "yes" });
   addHead("meta", { name: "mobile-web-app-capable", content: "yes" });
-  addHead("meta", { name: "apple-mobile-web-app-title", content: "Motoristas" });
   addHead("meta", { name: "apple-mobile-web-app-status-bar-style", content: "default" });
 
+  addHead("meta", { name: "apple-mobile-web-app-title", content: manifest.short_name });
   if ("serviceWorker" in navigator) {
+    // Registro antigo com escopo /WebResources/ inteiro controlava também o Sistema Betinhos.
+    navigator.serviceWorker.getRegistrations()
+      .then((regs) => regs.filter((r) => r.scope === `${origin}/WebResources/`).forEach((r) => r.unregister()))
+      .catch(() => {});
     navigator.serviceWorker
-      .register(`${origin}/WebResources/${PWA_SW_NAME}`, { scope: `${origin}/WebResources/` })
+      .register(`${origin}/WebResources/${PWA_SW_NAME}`, { scope: manifest.scope })
       .catch((error) => console.warn("[pwa] service worker não registrado", error));
   }
 }

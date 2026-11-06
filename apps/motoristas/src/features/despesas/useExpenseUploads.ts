@@ -167,6 +167,7 @@ export function useExpenseUploads({ remoteMode, driverContext, notify, onCritica
     expenseRunningRef,
     expenseSend,
     setExpenseSend,
+    expenseSubmissions,
     expenseSubmissionsRef,
     expenseSubmitBusyRef,
     expenseUploadMode,
