@@ -28,6 +28,8 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
   const browser = await chromium.launch({ channel: "chrome", headless: true });
   for (const mode of ["ok", "ilegivel", "falha"]) {
     const context = await browser.newContext({ viewport: { width: 375, height: 812 }, userAgent: ANDROID_UA });
+    // O tour abriria sozinho na primeira visita de cada tela e cobriria os botões; aqui o alvo é o fluxo do gasto.
+    await context.addInitScript(() => { try { localStorage.setItem("app-motoristas-tour-v2:localhost-driver:*", "visto"); } catch { /* sem storage */ } });
     // Câmera ao vivo simulada por um canvas (o app só usa getUserMedia com UA móvel).
     await context.addInitScript(() => {
       const canvas = document.createElement("canvas");
@@ -56,8 +58,12 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
     try {
       await page.goto(`${BASE}?mockLeitura=${mode}&t=${Date.now()}#inicio`);
       await page.waitForTimeout(1500);
-      // Na Home, "Gastos" com formulário vazio abre a câmera direto.
-      await main().getByRole("button", { name: /Gastos/ }).first().click();
+      // Na Home, "Gastos" abre o relatório; "Anexar despesa" com formulário vazio abre a câmera direto.
+      // O tile (o aviso "Gastos do cartão · N para completar" também casa com /Gastos/ e abre a lista do cartão).
+      await main().locator('[data-tour="expenses"]').click();
+      const attach = main().getByRole("button", { name: "Anexar despesa" });
+      await attach.waitFor({ state: "visible", timeout: 10000 });
+      await attach.click();
       const shutter = main().locator(".photo-capture");
       await shutter.waitFor({ state: "visible", timeout: 10000 });
       const openButton = main().getByRole("button", { name: "Abrir câmera" });
