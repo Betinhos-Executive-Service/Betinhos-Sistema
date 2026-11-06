@@ -44,6 +44,8 @@ jobs:
       DESLIGAR_NOVOS: ${{ inputs.alvo == 'test' }}
       IMPORTAR_TUDO: ${{ inputs.importar_tudo }}
       TAG_PUBLICADAS: solucoes-${{ inputs.alvo }}
+      # Id da conexão do Web Push neste ambiente. Obrigatória no PROD quando a BetinhosAutomacao vai junto (importar-solucoes.ps1).
+      CONEXAO_WEBPUSH: ${{ vars.CONEXAO_WEBPUSH }}
     steps:
       - name: Alvo válido
         shell: bash

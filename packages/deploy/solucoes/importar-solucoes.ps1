@@ -37,6 +37,7 @@ $permitidas = @($script:Solucoes) + @("AppBetinhos")
 $estranhas = @($nomes | Where-Object { $permitidas -notcontains $_ })
 if ($estranhas.Count) { throw "Manifesto com solucao fora do permitido: $($estranhas -join ', ')." }
 $ordem = @($permitidas | Where-Object { $nomes -contains $_ })
+Assert-ConexaoWebPush $nomes $Alvo $env:CONEXAO_WEBPUSH
 $anteriores = @()
 if ($Publicadas -and -not $ImportarTudo -and (Test-Path -LiteralPath $Publicadas -PathType Leaf)) {
   try { $anteriores = @(Read-JsonFile $Publicadas) }
@@ -55,7 +56,7 @@ foreach ($nome in $ordem) {
   }
   Write-Step "importando $nome $($item.versao) em $Alvo (instalada: $antes)"
   $inicio = Get-Date
-  $r = Import-SolucaoGerenciada $dv (Join-Path $Pasta $item.arquivo) $Alvo 60 $permitidas
+  $r = Import-SolucaoGerenciada $dv (Join-Path $Pasta $item.arquivo) $Alvo 60 $permitidas (New-ConfiguracaoDeImport $Pasta $nome $env:CONEXAO_WEBPUSH)
   $resultado += [ordered]@{ solucao = $nome; antes = $antes; depois = $r.Versao; minutos = [math]::Round(((Get-Date) - $inicio).TotalMinutes, 1); pacPerdeuConexao = $r.PacPerdeuConexao; pulada = $false }
   $registro += [ordered]@{ solucao = $nome; versao = $r.Versao; hash = $item.hash }
 }
