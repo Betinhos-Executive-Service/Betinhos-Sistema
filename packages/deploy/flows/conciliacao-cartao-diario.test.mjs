@@ -22,11 +22,11 @@ const acao = (nome) => {
   return todas.get(nome)
 }
 
-test('roda uma vez por dia às 08:00 de Brasília, sem execuções simultâneas', () => {
+test('roda uma vez por dia às 08:07 de Brasília, sem execuções simultâneas', () => {
   const gatilho = flow.triggers.Todo_dia_8h
   assert.equal(gatilho.recurrence.frequency, 'Day')
   assert.equal(gatilho.recurrence.timeZone, 'E. South America Standard Time')
-  assert.deepEqual(gatilho.recurrence.schedule, { hours: ['8'], minutes: [0] })
+  assert.deepEqual(gatilho.recurrence.schedule, { hours: ['8'], minutes: [7] })
   assert.equal(gatilho.runtimeConfiguration.concurrency.runs, 1)
 })
 
@@ -208,4 +208,14 @@ test('varre transação parada em Aguardando quando o gatilho da despesa não pe
   const erro = JSON.stringify(acao('Houve_erro').expression)
   assert.match(erro, /Paradas/)
   assert.match(erro, /Cada_parada/)
+})
+
+test('toda leitura do Banco MCP tenta de novo em espera crescente, por causa do 429 do Pluggy', () => {
+  for (const nome of ['Conexoes', 'Contas', 'Transacoes_pagina']) {
+    assert.deepEqual(acao(nome).inputs.retryPolicy, {
+      type: 'exponential',
+      count: 4,
+      interval: 'PT30S',
+    }, nome)
+  }
 })

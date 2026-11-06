@@ -7,7 +7,7 @@
 )
 
 # Cria (ou atualiza) no DEV o flow "Conciliação do cartão | Diário" (flows/conciliacao-cartao-diario.json) e o inclui na solução do .env.
-# Todo dia às 08:00 (São Paulo) lê pelo conector Betinhos Banco MCP as transações dos cartões de crédito (D-10..hoje, nunca antes de -Inicio),
+# Todo dia às 08:07 (São Paulo) lê pelo conector Betinhos Banco MCP as transações dos cartões de crédito (D-10..hoje, nunca antes de -Inicio),
 # grava cr40f_transacaocartao (idempotente pelo id do banco), casa com a despesa lançada pelo motorista ou cria uma para ele validar,
 # e avisa por push cada motorista com gasto do cartão pendente.
 # Ordem: provision-conciliacao-cartao.ps1, conceder-privilegios-conciliacao-cartao.ps1, provision-conector-banco-mcp.ps1, este script.
@@ -172,7 +172,7 @@ function TempoReal([string] $qual) {
 $alvoDiario = if ($bancoConectado) { 1 } else { 0 }
 $publicar = @(
   @{ nome = 'Conciliação do cartão | Diário'; raw = $diarioJson; refs = $refDiario; alvo = $alvoDiario
-     descricao = "Todo dia às 08:00 lê as transações dos cartões pelo Banco MCP (D-10..hoje, desde $Inicio), grava cr40f_transacaocartao, casa com a despesa do motorista ou cria uma para ele validar e avisa por push." }
+     descricao = "Todo dia às 08:07 lê as transações dos cartões pelo Banco MCP (D-10..hoje, desde $Inicio), grava cr40f_transacaocartao, casa com a despesa do motorista ou cria uma para ele validar e avisa por push." }
   @{ nome = 'Conciliação do cartão | Reprocessada'; raw = (TempoReal 'reprocessada'); refs = $refDataverse; alvo = 1
      descricao = 'Na hora em que uma compra volta a Pendente com cartão e motorista e sem despesa (Reprocessar/Reabrir no Sistema Betinhos), casa com a despesa do motorista, marca divergência ou cria a despesa para ele validar.' }
   @{ nome = 'Conciliação do cartão | Despesa atualizada'; raw = (TempoReal 'despesa'); refs = $refDataverse; alvo = 1
