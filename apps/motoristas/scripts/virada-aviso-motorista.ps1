@@ -129,12 +129,12 @@ if ($toDisable.Count -gt 0 -or @(Get-ChildItem -LiteralPath $snapshotDir -Filter
   Write-Step "snapshot em $snapshotPath"
 }
 
-# 1. Liga os novos. Antigos intactos: se isto falhar, nada mudou para o motorista.
+# 1. Liga o Enviar. Antigos intactos: se isto falhar, nada mudou para o motorista.
 #    O corte vem antes: aviso gravado com o Enviar ja ligado esta em entrega e nao pode ser cancelado no passo 2.
 $newFlows = Get-NewFlows
 $activating = @($newFlows | Where-Object { [int]$_.statecode -eq 0 }).Count -gt 0
 $cutoff = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-foreach ($flow in $newFlows) { Set-FlowState $flow 1 }
+foreach ($flow in @($newFlows | Where-Object { $_.name -like "*Enviar" })) { Set-FlowState $flow 1 }
 
 # 2. Avisos gravados antes de o Enviar ligar nunca dispararam e foram atendidos pelos flows antigos: sem isto a
 #    Vigia acusaria todos como nao entregues. "Sem app" entra junto para nao virar rajada de alertas.
@@ -145,7 +145,10 @@ if ($activating) {
   Write-Step "avisos Pendente ou Sem app anteriores a virada cancelados: $($backlog.Count)"
 }
 
-# 3. So agora desliga os antigos. Falhou no meio: religa os que ja desligou.
+# 3. A Vigia liga depois do passo 2: antes, tomaria o acumulado por nao entregue, alertaria a operacao e reenviaria.
+foreach ($flow in @($newFlows | Where-Object { $_.name -like "*Vigia" })) { Set-FlowState $flow 1 }
+
+# 4. So agora desliga os antigos. Falhou no meio: religa os que ja desligou.
 $disabled = @()
 try {
   foreach ($flow in $toDisable) { Set-FlowState $flow 0; $disabled += $flow }

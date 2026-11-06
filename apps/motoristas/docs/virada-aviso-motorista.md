@@ -46,7 +46,7 @@ Nada disso sai de branch: o assembly é compartilhado e o `npm run push` sai da 
 3. `scripts/provision-aviso-motorista-flows.ps1 -Apply`. Cria os dois flows desligados.
 4. Autorize as conexões dos flows no maker portal se a ativação pedir.
 5. `scripts/virada-aviso-motorista.ps1` (dry-run) e confira `pré-requisitos OK`.
-6. `scripts/virada-aviso-motorista.ps1 -Apply`: liga os novos, cancela o acumulado anterior e só então desliga os antigos.
+6. `scripts/virada-aviso-motorista.ps1 -Apply`: liga o Enviar, cancela o acumulado anterior, liga a Vigia e só então desliga os antigos.
 
 Ordem invertida (flows antigos desligados antes dos novos) deixaria janela sem aviso; o script não faz isso. Durante alguns segundos pode sair push em dobro.
 
@@ -60,11 +60,62 @@ A proteção provisória dos flows antigos (`scripts/patch-flow-troca-motorista.
 
 ## PROD
 
-**Ainda não definido e não executado.** `virada-aviso-motorista.ps1` e os `provision-*` são bloqueados no PROD por `assert-dev-environment.ps1`. O PROD só recebe pela solução AppBetinhos (`scripts/deploy-prod.ps1`).
+**Não executado.** Estado lido em 06/11/2026, só leitura: BetinhosCore, Automacao, Interface e Motoristas instaladas (03/11) sobre a AppBetinhos 1.0.0.268; "Novo Serviço", "Retirado" e "Resetar" ligados; tabela e flows novos ausentes; 3 operadores; 26 serviços Programado futuros.
 
-Risco a resolver antes do primeiro deploy: o estado dos flows pode viajar na solução. Exportar depois da virada no DEV pode levar ao PROD os flows antigos desligados junto com plugin, tabela e flows novos em estados que precisam ser conferidos. Antes do deploy, confirme no zip o estado de cada flow e planeje a ligação dos novos antes do desligamento dos antigos, com as conexões já autorizadas no PROD.
+### Caminho
 
-O deploy precisa levar a tabela antes de o plugin ficar ativo; na mesma solução o import resolve a dependência.
+O PROD recebe pelo workflow **Publicar soluções** do Sistema Betinhos (as 4 soluções, ensaio no TEST, backup e aprovação do Renan). `scripts/deploy-prod.ps1` importa a AppBetinhos inteira e não restaura estados: **não use nesta entrega**.
+
+Toda mudança na `main` do Sistema Betinhos que não seja só tela ou plugin dispara esse workflow. Com a distribuição zerada, **a próxima publicação aprovada leva o aviso ao motorista junto**, mesmo sem ninguém pedir.
+
+### O que a publicação faz sozinha
+
+- `restaurar-estados.ps1` devolve o estado da foto de antes do import: os 3 flows antigos seguem ligados no PROD, embora desligados no DEV.
+- Flows novos chegam desligados e pedem conexão.
+- Os 3 steps novos ficam ativos com o import. Tabela e referências vêm antes, porque Core e Automacao importam nessa ordem.
+
+Logo: **depois do import a regra da visualização já vale, os antigos seguem entregando e os avisos acumulam em Pendente.** Não há janela sem aviso.
+
+### Antes de aprovar
+
+1. **Web Push (bloqueante):** ver a seção abaixo.
+2. **Teste no celular** feito no DEV.
+3. **Operadores:** os 3 passam a receber os alertas da Vigia, sem silêncio noturno, além do "Serviço Não Visualizado" que continua ligado.
+4. **Janela:** faça a virada no mesmo dia do import, em horário de pouco movimento.
+
+### Web Push: bloqueia a publicação em uma etapa só
+
+Lido em 06/11/2026: no PROD não existem o conector `App Motoristas Web Push`, a referência `new_webpushmotoristas` nem a tabela `new_inscricaopushmotorista`, e "Novo Serviço" e "Retirado" ainda não têm Web Push. No DEV os dois flows já têm, e isso vale para toda publicação, não só para o aviso.
+
+Por isso a conexão não pode ser criada antes de publicar: ela depende do conector, que está na BetinhosCore. E publicar tudo de uma vez leva "Novo Serviço" e "Retirado" ligados a uma referência sem conexão: **eles podem não religar, e o PROD ficaria sem aviso nenhum**. Isso não foi testado; no TEST a referência existe sem conexão e o flow está desligado, o que não prova nem descarta o risco.
+
+**Decisão do Renan (06/11/2026):** provar no ensaio. Com o TEST recém-copiado do PROD, depois do import tente ligar "Novo Serviço" à mão e depois devolva o estado. Só libere o PROD se ligar. Se não ligar, siga a ordem abaixo.
+
+Ordem se o risco se confirmar:
+
+1. Publicar só a `BetinhosCore` (input `solucoes`): traz conector e tabelas, sem steps nem flows.
+2. Renan cria a conexão no PROD, com o segredo do Worker.
+3. Vincular a referência a essa conexão no import da `BetinhosAutomacao`, por `--settings-file`. Exige ajuste em `importar-solucoes.ps1`, no Sistema Betinhos, porque hoje o import não passa essa configuração.
+4. Ensaiar no TEST e publicar o restante.
+
+### Roteiro
+
+1. `pac admin backup` do PROD e cópia PROD → TEST, como manda a promoção das soluções.
+2. Publicar `alvo=test`. No TEST, flows e steps novos ficam desligados; confira comparação sem perda.
+3. Publicar `alvo=prod` com o rótulo do backup. Confira no resumo que os 3 flows antigos seguem ligados e que `Flow Aviso Motorista | Enviar` e `| Vigia` aparecem em `fluxosNovosDesligados`.
+4. Vincule as conexões dos dois flows no PROD.
+5. Faça a virada na ordem abaixo. Todo passo é ação no PROD e precisa do OK do Renan.
+   1. Ligar `Enviar`.
+   2. Cancelar os avisos Pendente e Sem app criados antes de ligar.
+   3. Ligar `Vigia`.
+   4. Desligar "Novo Serviço", "Retirado" e "Resetar". Se falhar, religue os que desligou.
+6. Em seguida, uma troca real numa reserva combinada com a operação: Novo e Retirado em Enviado, e uma rodada da Vigia com sucesso.
+
+`virada-aviso-motorista.ps1` faz o passo 5, mas é bloqueado no PROD por `assert-dev-environment.ps1`. Liberar exige `BETINHOS_ALLOW_DIRECT_PROD=1` numa execução decidida pelo Renan; a alternativa é o portal, seguindo a mesma ordem. Depois, rode `audit-prod-layers.ps1` para confirmar que nada ficou em camada Active.
+
+### Reversão
+
+Religue os 3 antigos e depois desligue `Enviar` e `Vigia`, nessa ordem. Com a falha do plugin bloqueando gravações, desative os 3 steps `DriverRecordSharing - Aviso motorista ...`: é o que mais importa, porque esse erro impede salvar reservas.
 
 ## Modelos de flow
 
