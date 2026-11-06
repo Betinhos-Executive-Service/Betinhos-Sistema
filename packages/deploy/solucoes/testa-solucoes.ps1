@@ -3,6 +3,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'dataverse.ps1')
 . (Join-Path $PSScriptRoot 'solucoes.ps1')
+. (Join-Path $PSScriptRoot 'trava.ps1')
 
 $script:respostas = @()
 $script:chamadas = @()
@@ -265,6 +266,33 @@ Confere ($null -eq (Falha-Com { Assert-CoberturaDaFoto $fotoOk @{ f1 = $true } @
 $msg = Falha-Com { Assert-CoberturaDaFoto $fotoOk @{ f1 = $true; f2 = $true } @{ s1 = $true; s9 = $true } }
 Confere ($msg -like '*fluxos*(1): f2*' -and $msg -like '*steps*(1): s9*') 'foto: fluxo e step sem estado falham com os ids'
 Confere ((Falha-Com { Assert-CoberturaDaFoto @{ componentes = @{}; fluxos = @{}; steps = @{} } @{} @{} }) -like '*0 componentes*') 'foto: 0 componentes falha'
+
+# Trava entre repositorios
+function LinhaTrava([string] $Dono, [int] $MinutosAteVencer) {
+  return [pscustomobject]@{ cr40f_travapublicacaoid = 't'; cr40f_name = 'dev'; cr40f_dono = $Dono; cr40f_expiraem = [DateTimeOffset]::UtcNow.AddMinutes($MinutosAteVencer).ToString('o'); '@odata.etag' = 'W/"1"' }
+}
+$vazio = [pscustomobject]@{ value = @() }
+$gravou = [pscustomobject]@{}
+$script:respostas = @($vazio, $gravou); $script:chamadas = @()
+Confere ((Enter-TravaUmaVez $dv 'dev' 'sistema/1' 30) -and $script:chamadas[1].Method -eq 'Post' -and $script:chamadas[1].Body -like '*"cr40f_name":"dev"*') 'trava: sem linha cria'
+$script:respostas = @([pscustomobject]@{ value = @(LinhaTrava 'app/2' 10) }); $script:chamadas = @()
+Confere (-not (Enter-TravaUmaVez $dv 'dev' 'sistema/1' 30) -and $script:chamadas.Count -eq 1) 'trava: ocupada por outro nao grava'
+$script:respostas = @([pscustomobject]@{ value = @(LinhaTrava 'app/2' -5) }, $gravou); $script:chamadas = @()
+Confere ((Enter-TravaUmaVez $dv 'dev' 'sistema/1' 30) -and $script:chamadas[1].Method -eq 'Patch' -and $script:chamadas[1].Body -notlike '*cr40f_name*') 'trava: vencida e tomada'
+$script:respostas = @([pscustomobject]@{ value = @(LinhaTrava 'sistema/1' 10) }, $gravou); $script:chamadas = @()
+Confere (Enter-TravaUmaVez $dv 'dev' 'sistema/1' 30) 'trava: o mesmo dono renova'
+$script:respostas = @($vazio, [Exception]::new('duplicada'), [pscustomobject]@{ value = @(LinhaTrava 'app/2' 10) })
+Confere (-not (Enter-TravaUmaVez $dv 'dev' 'sistema/1' 30)) 'trava: perder a corrida do POST devolve falso'
+$script:respostas = @([pscustomobject]@{ value = @(LinhaTrava 'app/2' -5) }, [Exception]::new('etag'), [pscustomobject]@{ value = @(LinhaTrava 'app/3' 10) })
+Confere (-not (Enter-TravaUmaVez $dv 'dev' 'sistema/1' 30)) 'trava: perder a corrida da vencida devolve falso'
+$script:respostas = @($vazio, [Exception]::new('sem privilegio'), $vazio)
+Confere ((Falha-Com { Enter-TravaUmaVez $dv 'dev' 'sistema/1' 30 }) -like '*sem privilegio*') 'trava: outro erro sobe'
+$script:respostas = @([pscustomobject]@{ value = @(LinhaTrava 'app/2' 10) }, [pscustomobject]@{ value = @(LinhaTrava 'app/2' 10) })
+Confere ((Falha-Com { Enter-Trava $dv 'dev' 'sistema/1' 30 0 }) -like '*ocupada por app/2*') 'trava: espera esgotada falha com o dono'
+$script:respostas = @([pscustomobject]@{ value = @(LinhaTrava 'sistema/1' 10) }, $gravou); $script:chamadas = @()
+Confere ((Exit-Trava $dv 'dev' 'sistema/1') -and $script:chamadas[1].Method -eq 'Patch') 'trava: dono solta'
+$script:respostas = @([pscustomobject]@{ value = @(LinhaTrava 'app/2' 10) }); $script:chamadas = @()
+Confere (-not (Exit-Trava $dv 'dev' 'sistema/1') -and $script:chamadas.Count -eq 1) 'trava: nao solta a de outro'
 
 # Publicacao no TEST: versao seguinte, solucoes escolhidas na ordem de import e import so no TEST
 Confere ((Get-VersaoSeguinte '1.0.0.4') -eq '1.0.0.5' -and (Get-VersaoSeguinte '2.1.0.99') -eq '2.1.0.100') 'versao seguinte sobe a revisao'
