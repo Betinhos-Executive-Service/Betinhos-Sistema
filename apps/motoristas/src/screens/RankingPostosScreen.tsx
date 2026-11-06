@@ -1,10 +1,12 @@
+import { MapPin } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { PostoDetalheDialog } from "../components/gastos/PostoDetalheDialog";
 import { AppShell } from "../components/layout/AppShell";
 import { ServicesMenu } from "../components/navigation/ServicesMenu";
 import { reportAppError } from "../lib/appErrorLogger";
 import { formatDiaMes, isMockGastosCartao } from "../lib/gastosCartao";
-import { formatBRL, type Semaforo } from "../lib/gastosRelatorio";
-import { RAIO_KM, carregarRankingPostos, obterPosicao, postosProximos, rotuloAbastecimentos, rotuloDistancia, type Posicao, type RankingPostos } from "../lib/rankingPostos";
+import { formatBRL } from "../lib/gastosRelatorio";
+import { RAIO_KM, RECOMENDACAO, carregarRankingPostos, obterPosicao, postosProximos, rotuloAbastecimentos, rotuloDistancia, rotuloMelhor, separarMelhor, urlMaps, type Posicao, type PostoProximo, type RankingPostos } from "../lib/rankingPostos";
 import { descreverGpsErro } from "../lib/termosMulta";
 
 type Carga =
@@ -13,14 +15,10 @@ type Carga =
   | { status: "semGps"; mensagem: string }
   | { status: "ready"; ranking: RankingPostos; origem: Posicao };
 
-const RECOMENDACAO: Record<Semaforo, { rotulo: string; tom: string }> = {
-  verde: { rotulo: "Recomendado", tom: "sucesso" },
-  amarelo: { rotulo: "Atenção", tom: "atencao" },
-  vermelho: { rotulo: "Evitar", tom: "erro" }
-};
-
 export function RankingPostosScreen({ onBack }: { onBack: () => void }) {
   const [carga, setCarga] = useState<Carga>({ status: "loading" });
+  const [aberto, setAberto] = useState<PostoProximo | null>(null);
+  const fecharPosto = useCallback(() => setAberto(null), []);
   const carregar = useCallback(async () => {
     setCarga({ status: "loading" });
     const [posicao, dados] = await Promise.allSettled([obterPosicao(), carregarRankingPostos()]);
@@ -63,28 +61,54 @@ export function RankingPostosScreen({ onBack }: { onBack: () => void }) {
         ) : proximos.length === 0 ? (
           <p className="termo-empty">Nenhum posto usado pela frota a até {RAIO_KM} km de você nos últimos {carga.ranking.dias} dias.</p>
         ) : (
-          <>
-            <p className="gr-legenda">Média paga pela frota nos últimos {carga.ranking.dias} dias, a até {RAIO_KM} km de você. É um preço pago, não o preço de hoje.</p>
-            <section className="gr-bloco">
-              <ol className="gr-lista rp-lista">
-                {proximos.map((posto, indice) => (
-                  <li key={`${posto.nome}-${indice}`} className="rp-posto">
-                    <div className="gr-linha-main">
-                      <strong>{posto.nome}</strong>
-                      <span>{rotuloDistancia(posto)}</span>
-                      <small>{rotuloAbastecimentos(posto.abastecimentos)} · último em {formatDiaMes(posto.ultimoAbastecimento)}</small>
-                    </div>
-                    <div className="gr-linha-side">
-                      <strong>{formatBRL(posto.precoLitro)}</strong>
-                      <span className="termo-badge" data-tone={RECOMENDACAO[posto.cor].tom}>{RECOMENDACAO[posto.cor].rotulo}</span>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </section>
-          </>
+          <ListaPostos proximos={proximos} dias={carga.ranking.dias} onAbrir={setAberto} />
         )}
       </section>
+      {aberto && carga.status === "ready" ? <PostoDetalheDialog posto={aberto} dias={carga.ranking.dias} onClose={fecharPosto} /> : null}
     </AppShell>
+  );
+}
+
+function ListaPostos({ proximos, dias, onAbrir }: { proximos: PostoProximo[]; dias: number; onAbrir: (posto: PostoProximo) => void }) {
+  const { melhor, outros } = separarMelhor(proximos);
+  return (
+    <>
+      <section className="rp-hero" data-semaforo={melhor.cor}>
+        <button type="button" className="rp-hero-abrir" onClick={() => onAbrir(melhor)}>
+          <span className="rp-hero-tag">{rotuloMelhor(melhor.cor)}</span>
+          <strong className="rp-hero-nome">{melhor.nome}</strong>
+          <span className="rp-hero-linha">
+            <span className="rp-hero-preco">{formatBRL(melhor.precoLitro)}<small>/L</small></span>
+            <span className="rp-hero-distancia">{rotuloDistancia(melhor)}</span>
+          </span>
+          <span className="rp-hero-detalhe">{RECOMENDACAO[melhor.cor].rotulo} · {rotuloAbastecimentos(melhor.abastecimentos)} · último em {formatDiaMes(melhor.ultimoAbastecimento)}</span>
+        </button>
+        <a className="rp-maps" href={urlMaps(melhor)} target="_blank" rel="noreferrer"><MapPin aria-hidden="true" />Abrir no Maps</a>
+      </section>
+      {outros.length ? (
+        <section aria-labelledby="rp-outros">
+          <h2 className="gr-subtitulo" id="rp-outros">Outros postos</h2>
+          <ul className="rp-lista">
+            {outros.map((posto, indice) => (
+              <li key={`${posto.nome}-${indice}`} className="rp-posto" data-semaforo={posto.cor}>
+                <button type="button" className="rp-posto-abrir" onClick={() => onAbrir(posto)}>
+                  <i aria-hidden="true" />
+                  <span className="rp-posto-texto">
+                    <strong>{posto.nome}</strong>
+                    <span>{rotuloDistancia(posto)} · {rotuloAbastecimentos(posto.abastecimentos)}</span>
+                  </span>
+                  <span className="rp-posto-preco">
+                    <strong>{formatBRL(posto.precoLitro)}</strong>
+                    <span>{RECOMENDACAO[posto.cor].rotulo}</span>
+                  </span>
+                </button>
+                <a className="rp-posto-maps" href={urlMaps(posto)} target="_blank" rel="noreferrer" aria-label={`Abrir ${posto.nome} no Maps`}><MapPin aria-hidden="true" /></a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      <p className="gr-legenda">Média paga pela frota nos últimos {dias} dias, a até {RAIO_KM} km de você. É um preço pago, não o preço de hoje.</p>
+    </>
   );
 }

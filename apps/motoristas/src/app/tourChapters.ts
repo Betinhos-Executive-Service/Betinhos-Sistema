@@ -765,7 +765,8 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
     title: "Postos perto de você",
     steps: [
       step("voltar", "Voltar", ["Volta para o Relatório de gastos."], { target: SERVICE_HOME }),
-      step("postos", "Postos perto de você", ["Lista os postos até 10 km, do mais perto para o mais longe, com a média paga pela frota no período recente. A cor compara o preço com a meta da empresa: Recomendado, Atenção ou Evitar."], { target: ".rp-lista", optional: true }),
+      step("melhor", "Melhor opção", ["O destaque é o menor preço até 10 km de você. A cor compara com a meta da empresa: Recomendado, Atenção ou Evitar. Toque nele para ver o endereço e os últimos abastecimentos."], { target: ".rp-hero", optional: true }),
+      step("postos", "Outros postos", ["Toque em um posto para ver o endereço e os últimos abastecimentos. O ícone do mapa abre o posto no Maps."], { target: ".rp-lista", optional: true }),
       helpStep()
     ]
   },
