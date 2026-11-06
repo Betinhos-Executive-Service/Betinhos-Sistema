@@ -99,7 +99,14 @@ $dataverse = ($dvSource[0].clientdata | ConvertFrom-Json).properties.connectionR
 if (-not $dataverse.connection.connectionReferenceLogicalName) { throw 'Connection reference do Dataverse ausente.' }
 $outlookRefs = @((Dv GET "connectionreferences?`$select=connectionreferencelogicalname&`$filter=connectorid eq '/providers/Microsoft.PowerApps/apis/shared_office365' and statecode eq 0").value)
 if (-not $outlookRefs.Count) { throw 'NEEDS_CONTEXT: Crie uma referência de conexão do Office 365 Outlook na solução AppBetinhos (maker portal) e rode de novo.' }
-$outlook = @{ runtimeSource = 'embedded'; connection = @{ connectionReferenceLogicalName = $outlookRefs[0].connectionreferencelogicalname }; api = @{ name = 'shared_office365' } }
+$flows = @(FlowRows)
+if ($flows.Count -gt 1) { throw 'Flow duplicado no DEV.' }
+# Flow que já existe mantém o Outlook que usa: [0] trocaria a conexão em silêncio com mais de uma referência no DEV.
+$refsAtuais = if ($flows.Count) { ($flows[0].clientdata | ConvertFrom-Json).properties.connectionReferences } else { $null }
+$refOutlook = if ($refsAtuais -and $refsAtuais.PSObject.Properties['shared_office365']) { $refsAtuais.shared_office365.connection.connectionReferenceLogicalName }
+if (-not $refOutlook) { $refOutlook = $outlookRefs[0].connectionreferencelogicalname }
+if (@($outlookRefs | Where-Object { $_.connectionreferencelogicalname -eq $refOutlook }).Count -ne 1) { throw "Connection reference '$refOutlook' (shared_office365) não encontrada." }
+$outlook = @{ runtimeSource = 'embedded'; connection = @{ connectionReferenceLogicalName = $refOutlook }; api = @{ name = 'shared_office365' } }
 
 $definitionText = @'
 {
@@ -292,8 +299,6 @@ function Conferir($lido, [string] $texto) {
   $checks.Keys | ForEach-Object { Write-Host "[resumo-diario] ok: $_" }
 }
 
-$flows = @(FlowRows)
-if ($flows.Count -gt 1) { throw 'Flow duplicado no DEV.' }
 if ($SomenteValidar) {
   if (-not $flows.Count) { throw 'Flow ainda não existe no DEV; não há o que validar. Rode sem -SomenteValidar para criá-lo desligado.' }
   $flowToken = & az account get-access-token --resource https://service.flow.microsoft.com/ --query accessToken -o tsv

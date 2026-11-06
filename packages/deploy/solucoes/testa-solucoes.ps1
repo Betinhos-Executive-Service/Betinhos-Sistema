@@ -3,6 +3,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'dataverse.ps1')
 . (Join-Path $PSScriptRoot 'solucoes.ps1')
+. (Join-Path $PSScriptRoot 'trava.ps1')
 
 $script:respostas = @()
 $script:chamadas = @()
@@ -266,12 +267,54 @@ $msg = Falha-Com { Assert-CoberturaDaFoto $fotoOk @{ f1 = $true; f2 = $true } @{
 Confere ($msg -like '*fluxos*(1): f2*' -and $msg -like '*steps*(1): s9*') 'foto: fluxo e step sem estado falham com os ids'
 Confere ((Falha-Com { Assert-CoberturaDaFoto @{ componentes = @{}; fluxos = @{}; steps = @{} } @{} @{} }) -like '*0 componentes*') 'foto: 0 componentes falha'
 
+# Trava entre repositorios
+function LinhaTrava([string] $Dono, [int] $MinutosAteVencer) {
+  return [pscustomobject]@{ cr40f_travapublicacaoid = 't'; cr40f_name = 'dev'; cr40f_dono = $Dono; cr40f_expiraem = [DateTimeOffset]::UtcNow.AddMinutes($MinutosAteVencer).ToString('o'); '@odata.etag' = 'W/"1"' }
+}
+$vazio = [pscustomobject]@{ value = @() }
+$gravou = [pscustomobject]@{}
+$script:respostas = @($vazio, $gravou); $script:chamadas = @()
+Confere ((Enter-TravaUmaVez $dv 'dev' 'sistema/1' 30) -and $script:chamadas[1].Method -eq 'Post' -and $script:chamadas[1].Body -like '*"cr40f_name":"dev"*') 'trava: sem linha cria'
+$script:respostas = @([pscustomobject]@{ value = @(LinhaTrava 'app/2' 10) }); $script:chamadas = @()
+Confere (-not (Enter-TravaUmaVez $dv 'dev' 'sistema/1' 30) -and $script:chamadas.Count -eq 1) 'trava: ocupada por outro nao grava'
+$script:respostas = @([pscustomobject]@{ value = @(LinhaTrava 'app/2' -5) }, $gravou); $script:chamadas = @()
+Confere ((Enter-TravaUmaVez $dv 'dev' 'sistema/1' 30) -and $script:chamadas[1].Method -eq 'Patch' -and $script:chamadas[1].Body -notlike '*cr40f_name*') 'trava: vencida e tomada'
+$script:respostas = @([pscustomobject]@{ value = @(LinhaTrava 'sistema/1' 10) }, $gravou); $script:chamadas = @()
+Confere (Enter-TravaUmaVez $dv 'dev' 'sistema/1' 30) 'trava: o mesmo dono renova'
+$script:respostas = @($vazio, [Exception]::new('duplicada'), [pscustomobject]@{ value = @(LinhaTrava 'app/2' 10) })
+Confere (-not (Enter-TravaUmaVez $dv 'dev' 'sistema/1' 30)) 'trava: perder a corrida do POST devolve falso'
+$script:respostas = @([pscustomobject]@{ value = @(LinhaTrava 'app/2' -5) }, [Exception]::new('etag'), [pscustomobject]@{ value = @(LinhaTrava 'app/3' 10) })
+Confere (-not (Enter-TravaUmaVez $dv 'dev' 'sistema/1' 30)) 'trava: perder a corrida da vencida devolve falso'
+$script:respostas = @($vazio, [Exception]::new('sem privilegio'), $vazio)
+Confere ((Falha-Com { Enter-TravaUmaVez $dv 'dev' 'sistema/1' 30 }) -like '*sem privilegio*') 'trava: outro erro sobe'
+$script:respostas = @([pscustomobject]@{ value = @(LinhaTrava 'app/2' 10) }, [pscustomobject]@{ value = @(LinhaTrava 'app/2' 10) })
+Confere ((Falha-Com { Enter-Trava $dv 'dev' 'sistema/1' 30 0 }) -like '*ocupada por app/2*') 'trava: espera esgotada falha com o dono'
+$script:respostas = @([pscustomobject]@{ value = @(LinhaTrava 'sistema/1' 10) }, $gravou); $script:chamadas = @()
+Confere ((Exit-Trava $dv 'dev' 'sistema/1') -and $script:chamadas[1].Method -eq 'Patch') 'trava: dono solta'
+$script:respostas = @([pscustomobject]@{ value = @(LinhaTrava 'app/2' 10) }); $script:chamadas = @()
+Confere (-not (Exit-Trava $dv 'dev' 'sistema/1') -and $script:chamadas.Count -eq 1) 'trava: nao solta a de outro'
+
 # Publicacao no TEST: versao seguinte, solucoes escolhidas na ordem de import e import so no TEST
 Confere ((Get-VersaoSeguinte '1.0.0.4') -eq '1.0.0.5' -and (Get-VersaoSeguinte '2.1.0.99') -eq '2.1.0.100') 'versao seguinte sobe a revisao'
 Confere ((Falha-Com { Get-VersaoSeguinte '1.0' }) -like '*fora do formato*') 'versao fora do formato falha'
-Confere ((@(Get-SolucoesEscolhidas '') -join ',') -eq 'BetinhosCore,BetinhosAutomacao,BetinhosInterface,BetinhosMotoristas') 'lista vazia = as 4 na ordem'
-Confere ((@(Get-SolucoesEscolhidas ' BetinhosMotoristas, BetinhosCore ') -join ',') -eq 'BetinhosCore,BetinhosMotoristas') 'lista escolhida volta na ordem de import'
-Confere ((Falha-Com { Get-SolucoesEscolhidas 'AppBetinhos' }) -like '*fora das 4*AppBetinhos*') 'solucao fora das 4 falha'
+Confere ((@(Get-SolucoesEscolhidas '') -join ',') -eq 'BetinhosCore,BetinhosAutomacao,BetinhosInterface') 'lista vazia = as 3 do Sistema na ordem'
+Confere ((@(Get-SolucoesEscolhidas ' BetinhosInterface, BetinhosCore ') -join ',') -eq 'BetinhosCore,BetinhosInterface') 'lista escolhida volta na ordem de import'
+Confere ((Falha-Com { Get-SolucoesEscolhidas 'AppBetinhos' }) -like '*fora do Sistema*AppBetinhos*') 'solucao fora do Sistema falha'
+Confere ((Falha-Com { Get-SolucoesEscolhidas 'BetinhosCore,BetinhosMotoristas' }) -like '*app-motoristas-v2*') 'BetinhosMotoristas nao sai por aqui'
+$script:respostas = @(
+  [pscustomobject]@{ value = @([pscustomobject]@{ solutionid = 'm' }) },
+  [pscustomobject]@{ value = @([pscustomobject]@{ objectid = 'AAA'; componenttype = 61; rootcomponentbehavior = 0 }, [pscustomobject]@{ objectid = 'bbb'; componenttype = 80; rootcomponentbehavior = 0 }) },
+  [pscustomobject]@{ value = @([pscustomobject]@{ webresourceid = 'CCC' }) })
+$doApp = Get-IdsDoApp $dv
+Confere ($doApp.Count -eq 3 -and $doApp.ContainsKey('aaa') -and $doApp.ContainsKey('bbb') -and $doApp.ContainsKey('ccc')) 'app: componentes de uma solucao com varios e o service worker'
+$script:respostas = @(
+  [pscustomobject]@{ value = @([pscustomobject]@{ solutionid = 'm' }) },
+  [pscustomobject]@{ value = @([pscustomobject]@{ objectid = 'AAA'; componenttype = 61; rootcomponentbehavior = 0 }) },
+  [pscustomobject]@{ value = @() })
+$doApp = Get-IdsDoApp $dv
+Confere ($doApp.Count -eq 1 -and $doApp.ContainsKey('aaa')) 'app: um componente so e sem service worker'
+$script:respostas = @([pscustomobject]@{ value = @() }, [pscustomobject]@{ value = @() })
+Confere ((Get-IdsDoApp $dv).Count -eq 0) 'app: solucao ausente nao falha'
 Confere ($null -eq (Falha-Com { Assert-HostTest $dvTest })) 'import: host do TEST passa'
 Confere ((Falha-Com { Assert-HostTest @{ Host = 'orgf261ae8e.crm2.dynamics.com' } }) -like '*alvo Test*') 'import: PROD recusado'
 Confere ((Falha-Com { Assert-HostTest $dv }) -like '*alvo Test*') 'import: DEV recusado'

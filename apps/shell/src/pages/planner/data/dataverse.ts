@@ -2383,8 +2383,6 @@ function quotePayload(input: QuotePatch = {}, includeUnset = false, clientNaviga
   set("clientContact", "cr40f_contatocliente", input.clientContact == null ? "" : String(input.clientContact).trim());
   set("clientPhone", "cr40f_telefonewhatsapp", input.clientPhone == null ? "" : String(input.clientPhone).trim());
   set("clientEmail", "cr40f_emailcliente", input.clientEmail == null ? "" : String(input.clientEmail).trim());
-  if (input.channel) payload.cr40f_canalentrada = quoteChoice(input.channel, QUOTE_CHANNEL_VALUES, "Canal de entrada");
-  else if (!includeUnset && has("channel")) payload.cr40f_canalentrada = null;
   if (input.vehicleType) payload.cr40f_tipoveiculo = quoteChoice(input.vehicleType === "Basico" ? "Básico" : input.vehicleType, QUOTE_VEHICLE_VALUES, "Tipo de veículo");
   else if (!includeUnset && has("vehicleType")) payload.cr40f_tipoveiculo = null;
   for (const [key, legacyField, longField] of [["origin", "cr40f_origem", "cr40f_origemcompleta"], ["destination", "cr40f_destino", "cr40f_destinocompleto"]]) {

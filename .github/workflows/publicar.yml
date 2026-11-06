@@ -1,10 +1,11 @@
 name: Publicar soluções
 
-# Leva as 4 soluções gerenciadas (BetinhosCore, BetinhosAutomacao, BetinhosInterface, BetinhosMotoristas) do DEV para o
+# Leva as 3 soluções gerenciadas do Sistema (BetinhosCore, BetinhosAutomacao, BetinhosInterface) do DEV para o
 # TEST e/ou o PROD: tabelas, colunas, formulários, visões, flows, plugins, WebResources, app e sitemap. Dados não vão por solução.
+# A BetinhosMotoristas é publicada só pelo repositório app-motoristas-v2.
 # Caminho normal: o workflow Produção (producao.yml) chama este com alvo test-e-prod quando a main recebe mudança fora da tela.
 # À mão (Actions › Run workflow) continua valendo para refazer um ensaio ou repetir um alvo.
-#  - exportar (environment dev): trava do commit (a tela e os plugins do DEV têm de ser os deste commit), conferência das 4 no DEV
+#  - exportar (environment dev): trava do commit (a tela e os plugins do DEV têm de ser os deste commit), conferência das 4 soluções no DEV
 #    (barreira), versão seguinte e export gerenciado conferido. Um export só serve TEST e PROD: o PROD recebe exatamente os
 #    pacotes que o TEST ensaiou;
 #  - importar-test e depois importar-prod (_importar-solucoes.yml). O PROD só começa com o TEST verde, e o environment prod
@@ -20,7 +21,7 @@ on:
         default: test
         options: [test, test-e-prod, prod]
       solucoes:
-        description: 'Soluções separadas por vírgula (vazio = as 4)'
+        description: 'Soluções separadas por vírgula (vazio = as 3 do Sistema)'
         required: false
         default: ''
       backup:
