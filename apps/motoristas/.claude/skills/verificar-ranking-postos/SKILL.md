@@ -19,7 +19,7 @@ description: "Verifica os postos perto do motorista e as avaliações: Custom AP
 ## Roteiro (mock em localhost, viewport 390×844)
 1. Abra `/?p=1#gastos-relatorio` e toque no cartão "Postos perto de mim", em Suas médias (sem gastos no período, o link "Ver postos perto de mim") → rota `#ranking-postos`, título "Postos perto de você".
 2. O destaque mostra o menor preço do raio ("Melhor opção perto de você" se estiver na meta; senão "Menor preço perto de você"); "Posto Exemplo Distante" (mais de 10 km) não aparece.
-3. Em Outros postos, os itens vêm do mais perto para o mais longe, com a recomendação Atenção ou Evitar e nomes em caixa alta já ajustados.
+3. Em Outros postos, os itens vêm do mais perto para o mais longe, com o selo de meta ou Evitar e nomes em caixa alta já ajustados.
 4. Tocar em um posto abre a ficha com os blocos Quanto custa (preço, selo da meta e até 5 últimos abastecimentos recolhidos, com data e R$/litro, sem motorista), Onde fica (distância, "cerca de" no ponto aproximado, endereço sem caixa alta e "Ir para o posto") e O que dizem. X, Esc e toque fora fecham; a lista segue na mesma posição.
 4b. O ícone de mapa da linha abre `google.com/maps/search` com a busca "Posto de gasolina <nome> <endereço>" sem abrir a ficha.
 5. Sem rolagem horizontal; toque em Voltar → `#gastos-relatorio`.
@@ -31,6 +31,8 @@ description: "Verifica os postos perto do motorista e as avaliações: Custom AP
 9. Na ficha, "O que dizem" mostra 80%, até 3 motivos com contagem e comentários com primeiro e último nome e data. O cartão "Como foi neste posto?" aparece sem rolar.
 10. Um toque em Recomendo ou Não recomendo já salva: a contagem sobe e o painel sobe com "Avaliação salva. Quer dizer por quê?". "Agora não" fecha sem perguntar; trocar o sentido limpa os motivos.
 11. Com alteração no painel, Esc, toque fora e o botão de sair perguntam "Descartar alterações?"; "Continuar editando" preserva o texto. Concluir grava motivos e comentário, e a ficha mostra "Avaliação enviada" com Editar, que traz a avaliação preenchida.
+12b. `?mockRankingPostos=baratoruim#ranking-postos` → o destaque continua sendo o menor preço, com "Menor preço perto de você" e "Atenção: só 1 de 4 recomendam".
+12c. Em `#gastos-relatorio`, o convite "Como foi no Auto Posto Exemplo Centro?" aparece no topo. Um joinha salva e mostra "Avaliação salva. Obrigado!"; o X dispensa, e o convite daquele posto e data não volta (localStorage). O plugin só convida se o próprio motorista abasteceu lá nos últimos 7 dias, com CNPJ lido, e ainda não avaliou.
 12. `?mockRankingPostos=falhaavaliar#ranking-postos` → erro no cartão, sem abrir o painel e sem contar a avaliação.
 
 ## Dataverse (só local, nunca na nuvem)
