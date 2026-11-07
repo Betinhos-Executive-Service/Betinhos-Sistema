@@ -47,7 +47,7 @@ test('lê o Banco MCP só com operações de leitura e esconde entradas e saída
 })
 
 test('toda a leitura acontece antes de qualquer gravação', () => {
-  assert.deepEqual(acao('Ids').runAfter, { Cada_conexao: ['Succeeded'] })
+  assert.deepEqual(acao('Ids').runAfter, { Cada_conexao: ['Succeeded', 'Failed'] })
   assert.deepEqual(acao('Cada_transacao').runAfter, { Ids: ['Succeeded'] })
   const gravacoes = ['CreateRecord', 'UpdateRecord', 'DeleteRecord']
   for (const nome of ['Cada_conexao']) {
@@ -218,4 +218,17 @@ test('toda leitura do Banco MCP tenta de novo em espera crescente, por causa do 
       interval: 'PT30S',
     }, nome)
   }
+})
+
+test('conexão que falha na leitura não impede gravar as contas lidas por inteiro', () => {
+  assert.deepEqual(acao('Primeira_pagina').runAfter, { Conta_vazia: ['Succeeded'] })
+  assert.equal(acao('Conta_vazia').inputs.name, 'Conta')
+  assert.equal(acao('Guardar').inputs.name, 'Conta')
+  assert.equal(acao('Acumulado').inputs, "@union(variables('Conta'), body('Com_conta'))")
+  assert.deepEqual(acao('Juntar_conta').runAfter, { Paginas: ['Succeeded'] })
+  // Se o Until parar no limite de voltas sem ler todas as páginas, a conta incompleta fica de fora.
+  assert.equal(acao('Juntar_conta').inputs, "@if(greater(variables('Pagina'), variables('TotalPaginas')), union(variables('Transacoes'), variables('Conta')), variables('Transacoes'))")
+  assert.equal(acao('Conta_lida').inputs.name, 'Transacoes')
+  // Conta e Pagina são compartilhadas: os dois laços precisam ser sequenciais.
+  for (const n of ['Cada_conexao', 'Cada_conta']) assert.equal(acao(n).runtimeConfiguration.concurrency.repetitions, 1, n)
 })

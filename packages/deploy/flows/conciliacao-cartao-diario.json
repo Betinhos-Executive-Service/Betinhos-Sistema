@@ -198,10 +198,27 @@
         ]
       }
     },
+    "Var_conta": {
+      "type": "InitializeVariable",
+      "runAfter": {
+        "Var_despesa": [
+          "Succeeded"
+        ]
+      },
+      "inputs": {
+        "variables": [
+          {
+            "name": "Conta",
+            "type": "array",
+            "value": []
+          }
+        ]
+      }
+    },
     "Conexoes": {
       "type": "OpenApiConnection",
       "runAfter": {
-        "Var_despesa": [
+        "Var_conta": [
           "Succeeded"
         ]
       },
@@ -287,9 +304,21 @@
             }
           },
           "actions": {
-            "Primeira_pagina": {
+            "Conta_vazia": {
               "type": "SetVariable",
               "runAfter": {},
+              "inputs": {
+                "name": "Conta",
+                "value": []
+              }
+            },
+            "Primeira_pagina": {
+              "type": "SetVariable",
+              "runAfter": {
+                "Conta_vazia": [
+                  "Succeeded"
+                ]
+              },
               "inputs": {
                 "name": "Pagina",
                 "value": 1
@@ -379,7 +408,7 @@
                       "Succeeded"
                     ]
                   },
-                  "inputs": "@union(variables('Transacoes'), body('Com_conta'))",
+                  "inputs": "@union(variables('Conta'), body('Com_conta'))",
                   "runtimeConfiguration": {
                     "secureData": {
                       "properties": [
@@ -396,7 +425,7 @@
                     ]
                   },
                   "inputs": {
-                    "name": "Transacoes",
+                    "name": "Conta",
                     "value": "@outputs('Acumulado')"
                   }
                 },
@@ -425,6 +454,34 @@
                   }
                 }
               }
+            },
+            "Juntar_conta": {
+              "type": "Compose",
+              "runAfter": {
+                "Paginas": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": "@if(greater(variables('Pagina'), variables('TotalPaginas')), union(variables('Transacoes'), variables('Conta')), variables('Transacoes'))",
+              "runtimeConfiguration": {
+                "secureData": {
+                  "properties": [
+                    "inputs"
+                  ]
+                }
+              }
+            },
+            "Conta_lida": {
+              "type": "SetVariable",
+              "runAfter": {
+                "Juntar_conta": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "name": "Transacoes",
+                "value": "@outputs('Juntar_conta')"
+              }
             }
           }
         }
@@ -434,7 +491,8 @@
       "type": "Select",
       "runAfter": {
         "Cada_conexao": [
-          "Succeeded"
+          "Succeeded",
+          "Failed"
         ]
       },
       "inputs": {
@@ -2012,7 +2070,7 @@
             "runStatus": "Failed",
             "runError": {
               "code": "ConciliacaoComErro",
-              "message": "Alguma leitura do banco, transação ou aviso falhou; veja as transações com motivo 'Em processamento' no Sistema Betinhos."
+              "message": "Alguma leitura do banco, transação ou aviso falhou. A conta não lida volta na próxima execução (janela D-10); transação com erro fica com motivo 'Em processamento' no Sistema Betinhos."
             }
           }
         }
