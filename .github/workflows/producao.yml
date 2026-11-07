@@ -5,7 +5,7 @@ name: Produção
 # publicação (tag prod-publicado), com packages/deploy/caminho-publicacao.mjs:
 #  - front: só a tela do Sistema Betinhos → direto ao PROD (push-front-prod.ps1, environment prod-front). Se der errado,
 #    publicar a versão anterior resolve em minutos e nenhum dado se perde;
-#  - plugin: só código de plugin que já existe no PROD → copia para o PROD o assembly que o DEV já usa (decisão do Renan,
+#  - plugin: só código de plugin (Cr40f.*.Plugin e Betinhos.DriverRecordSharing) que já existe no PROD → copia para o PROD o assembly que o DEV já usa (decisão do Renan,
 #    05/11/2026: exportar-plugins-dev.ps1 com a trava do commit, depois push-plugins-prod.ps1, environment prod-front).
 #    Tela e plugin juntos (front-plugin) fazem os dois;
 #  - solucoes: qualquer outra coisa (schema, flows, registrador, outros WebResources, arquivo desconhecido) → publicar.yml

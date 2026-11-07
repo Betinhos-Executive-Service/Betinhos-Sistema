@@ -1,0 +1,463 @@
+# DriverRecordSharing
+
+## Objetivo
+
+Esta versao esta preparada para:
+
+- conceder acesso quando o motorista entra
+- manter acesso quando o motorista continua igual
+- retirar acesso quando o motorista sai ou e trocado
+- compartilhar a `cr40f_manutencoes` vinculada no `cr40f_om` do servico
+- em troca de carro Programada, compartilhar tambem o registro do outro motorista para liberar o contato enquanto a troca estiver ativa
+- quando `cr40f_emailmicrosoft` for criado ou alterado em `cr40f_funcionarios`, rodar backfill sincronamente para servicos dos ultimos 45 dias e todo futuro
+
+Para isso, agora existe uma exigencia nova:
+
+- todo step `Update` precisa de `Pre Image`
+
+Sem `Pre Image`, o plugin nao consegue saber quem era o motorista antigo e nao consegue revogar acesso com seguranca.
+
+## Como a versao de producao funciona
+
+Regras:
+
+- se nao houver motorista, nao da erro
+- se o funcionario estiver sem `cr40f_emailmicrosoft`, nao da erro e nao compartilha
+- se houver email Microsoft preenchido e nao existir um `systemuser` ativo correspondente, da erro
+- se houver mais de um `systemuser` ativo com o mesmo email, da erro
+- se o motorista mudar, o plugin concede acesso ao novo e revoga do antigo
+- em `cr40f_trocasdecarro`, se `cr40f_statusdatroca` estiver Programada, o motorista 1 recebe leitura do registro do motorista 2 e o motorista 2 recebe leitura do registro do motorista 1
+- quando `cr40f_reservadeveculos.cr40f_ot` estiver preenchido, plugin alinha `cr40f_status` <-> `cr40f_statusdatroca` nos pares com correspondencia direta: Programado/Programada, Confirmado/Confirmada, Concluido/Concluida, Cancelado/Cancelada
+- quando a troca vinculada ficar `Programada`, o plugin tambem garante `new_foiprogramado = true` nos servicos relacionados
+- plugin recalcula `cr40f_passageirosetelefonedecontato` (`Pax - VIEW`) a partir de `cr40f_servicosporpassageiro` + `cr40f_bancodedados` sempre que o vinculo do passageiro mudar ou quando nome/telefone do passageiro forem alterados
+- em `cr40f_trocasdecarro` Programada, se um lado nao tiver app/usuario ativo, o outro lado ainda recebe acesso ao funcionario dele; o salvamento nao falha so por motorista sem app
+- depois de `GrantAccess` ou `ModifyAccess`, o plugin rele `RetrievePrincipalAccess`; se os direitos obrigatorios nao forem confirmados, o salvamento falha
+- falhas do plugin sao gravadas no rastreamento de plug-in (`plugintracelog`, linha `OperationalLog {json}`); o `Ref` da mensagem ao usuario e o `correlationid` desse rastreamento. Nao ha Create em `new_appmotoristaslog` dentro do plugin: na transacao sincrona que falhou ele nunca persiste (transacao abortada ou rollback pelo throw). O registro em `new_appmotoristaslog` e feito pelo App via `reportAppError`
+- quando a troca deixa de estar Programada ou quando um motorista muda, o plugin revoga esse acesso ao funcionario do outro motorista, exceto se outra troca Programada entre o mesmo par ainda precisar dele
+
+## Decisao recomendada de execucao
+
+Use assim:
+
+- `cr40f_reservadeveculos`: `Synchronous`
+- `cr40f_funcionarios`: `Synchronous`
+- `cr40f_servicosporpassageiro`: `Asynchronous`
+- `cr40f_trocasdecarro`: `Synchronous`
+- `new_possedeveiculo`: `Asynchronous`
+- `cr40f_colisao_v2`: `Asynchronous`
+- `cr40f_recibos_v2`: `Asynchronous`
+
+Padrao:
+
+- Stage: `PostOperation`
+- Deployment: `Server`
+- `Create`: sem image
+- `Update`: com `Pre Image`
+
+## Compilar e publicar (neste repositorio)
+
+O codigo vive em `packages/plugins/Betinhos.DriverRecordSharing` (testes em `Betinhos.DriverRecordSharing.Tests`). A publicacao do
+codigo e pelo GitHub: push na `develop` dispara o workflow Deploy, que roda `packages/plugins/scripts/push-driverrecordsharing-plugin.ps1`
+e troca so o conteudo (`content`) e a descricao (commit) do assembly `Betinhos.DriverRecordSharing` que ja existe no DEV. Esse script nao
+cria nem altera steps, tipos de plugin ou Custom APIs; isso continua nas solucoes. Os scripts de registro do app-motoristas-v2
+(`register-driver-record-sharing-plugin*.ps1`) ainda nao foram migrados.
+
+- A assinatura usa a chave fixa `%UserProfile%\.codex\keys\Betinhos.DriverRecordSharing.snk` (no CI vem do secret `PLUGIN_SNK_DRIVERRECORDSHARING`).
+  O public key token publicado e `9b3305f5ee59a061`; o script de publicacao recusa uma DLL com outro token. **Nunca gere outra chave.**
+- Testes: `dotnet test packages/plugins/Betinhos.DriverRecordSharing.Tests -p:SignAssembly=false` (sem a chave).
+
+## Parte 2: atualizar o assembly existente
+
+### Passo 5. Abrir o Plugin Registration Tool
+
+Abra o `Plugin Registration Tool`.
+
+### Passo 6. Conectar no ambiente certo
+
+Antes de mexer:
+
+1. confirme o ambiente
+2. confirme que e exatamente o ambiente onde os servicos estao sendo usados
+
+### Passo 7. Atualizar o assembly
+
+Como o assembly ja existe:
+
+1. localize `Betinhos.DriverRecordSharing`
+2. clique com o botao direito
+3. clique em `Update`
+4. selecione a DLL nova
+5. confirme
+
+Importante:
+
+- nao precisa criar outro assembly
+- isso atualiza o codigo do assembly atual
+
+## Parte 3: ajustar os steps
+
+Se seus steps atuais estiverem errados ou incompletos, o caminho mais limpo e:
+
+1. revisar os steps existentes
+2. apagar os errados
+3. recriar igual a este README
+
+## Configuracao base
+
+Para todos os steps:
+
+- Event Pipeline Stage of Execution: `PostOperation`
+- Deployment: `Server`
+- Run in User's Context: usuario tecnico
+
+## Parte 4: criar ou corrigir os steps
+
+### 1. Servicos - Create
+
+- Message: `Create`
+- Primary Entity: `cr40f_reservadeveculos`
+- Filtering Attributes: deixar vazio
+- Execution Mode: `Synchronous`
+- Image: nao criar
+
+### 2. Servicos - Update
+
+- Message: `Update`
+- Primary Entity: `cr40f_reservadeveculos`
+- Filtering Attributes: `cr40f_motorista,cr40f_solicitante,cr40f_dataehorriodesada,cr40f_veiculo,new_origemveiculo,cr40f_ot,cr40f_status`
+- Execution Mode: `Synchronous`
+- Image: criar `Pre Image`
+
+### 3. Funcionarios - Create
+
+- Message: `Create`
+- Primary Entity: `cr40f_funcionarios`
+- Filtering Attributes: deixar vazio
+- Execution Mode: `Synchronous`
+- Image: nao criar
+
+### 4. Funcionarios - Update
+
+- Message: `Update`
+- Primary Entity: `cr40f_funcionarios`
+- Filtering Attributes: `cr40f_emailmicrosoft`
+- Execution Mode: `Synchronous`
+- Image: criar `Pre Image`
+
+### 5. Servicos por passageiro - Create
+
+- Message: `Create`
+- Primary Entity: `cr40f_servicosporpassageiro`
+- Filtering Attributes: deixar vazio
+- Execution Mode: `Asynchronous`
+- Image: nao criar
+
+### 6. Servicos por passageiro - Update
+
+- Message: `Update`
+- Primary Entity: `cr40f_servicosporpassageiro`
+- Filtering Attributes: `cr40f_geral,cr40f_bancodedados`
+- Execution Mode: `Asynchronous`
+- Image: criar `Pre Image`
+
+### 7. Servicos por passageiro - Delete
+
+- Message: `Delete`
+- Primary Entity: `cr40f_servicosporpassageiro`
+- Filtering Attributes: deixar vazio
+- Execution Mode: `Asynchronous`
+- Image: criar `Pre Image`
+
+### 8. Passageiros - Update
+
+- Message: `Update`
+- Primary Entity: `cr40f_bancodedados`
+- Filtering Attributes: `cr40f_nomedopassageiro,cr40f_telefone`
+- Execution Mode: `Asynchronous`
+- Image: criar `Pre Image`
+
+### 9. Trocas de carro - Create
+
+- Message: `Create`
+- Primary Entity: `cr40f_trocasdecarro`
+- Filtering Attributes: deixar vazio
+- Execution Mode: `Synchronous`
+- Image: nao criar
+
+### 10. Trocas de carro - Update
+
+- Message: `Update`
+- Primary Entity: `cr40f_trocasdecarro`
+- Filtering Attributes: `cr40f_motorista1,cr40f_motorista2,cr40f_statusdatroca,cr40f_veiculo1antesdatroca,cr40f_veiculo2antesdatroca,cr40f_iniciodajaneladetroca,cr40f_fimdajaneladetroca,new_tipodetroca`
+- Execution Mode: `Synchronous`
+- Image: criar `Pre Image`
+
+### 11. Posse de veiculo - Create
+
+- Message: `Create`
+- Primary Entity: `new_possedeveiculo`
+- Filtering Attributes: deixar vazio
+- Execution Mode: `Asynchronous`
+- Image: nao criar
+
+### 12. Posse de veiculo - Update
+
+- Message: `Update`
+- Primary Entity: `new_possedeveiculo`
+- Filtering Attributes: `new_motorista`
+- Execution Mode: `Asynchronous`
+- Image: criar `Pre Image`
+
+### 11. Colisoes - Create
+
+- Message: `Create`
+- Primary Entity: `cr40f_colisao_v2`
+- Filtering Attributes: deixar vazio
+- Execution Mode: `Asynchronous`
+- Image: nao criar
+
+### 12. Colisoes - Update
+
+- Message: `Update`
+- Primary Entity: `cr40f_colisao_v2`
+- Filtering Attributes: `cr40f_motorista`
+- Execution Mode: `Asynchronous`
+- Image: criar `Pre Image`
+
+### 13. Recibos - Create
+
+- Message: `Create`
+- Primary Entity: `cr40f_recibos_v2`
+- Filtering Attributes: deixar vazio
+- Execution Mode: `Asynchronous`
+- Image: nao criar
+
+### 14. Recibos - Update
+
+- Message: `Update`
+- Primary Entity: `cr40f_recibos_v2`
+- Filtering Attributes: `cr40f_motorista`
+- Execution Mode: `Asynchronous`
+- Image: criar `Pre Image`
+
+### 15. Aviso ao motorista - DriverNoticePlugin
+
+Registrado por `scripts/register-driver-record-sharing-plugin-webapi.ps1`. Contrato e virada em `docs/virada-aviso-motorista.md`.
+
+- `Aviso motorista Update PreOperation`: `Update`, stage 20, sincrono, filtro `cr40f_motorista`, Pre Image `cr40f_motorista,cr40f_status,cr40f_ot`. Motorista mudou: zera `new_visualizacaodomotorista` e ajusta `new_foiprogramado` no proprio Target.
+- `Aviso motorista Create`: `Create`, stage 40, sincrono, rank 10, sem imagem.
+- `Aviso motorista Update`: `Update`, stage 40, sincrono, rank 10, filtro `cr40f_motorista,cr40f_status`, Pre Image `cr40f_motorista,cr40f_status,cr40f_dataehorriodesada,cr40f_id`. O rank 10 faz rodar depois do compartilhamento.
+
+Os steps exigem a tabela `new_avisomotorista` (`scripts/provision-aviso-motorista.ps1`, chamado pelo `push-dev.ps1` antes do plugin). Falha ao criar o aviso derruba a gravacao com `[DRIVER_NOTICE_FAILED]`.
+
+## Parte 5: como criar a Pre Image
+
+Isto agora e obrigatorio em todo step `Update`.
+
+### Para adicionar a image:
+
+1. localize o step `Update`
+2. clique com o botao direito nele
+3. clique em `Register New Image`
+
+### Preencha assim:
+
+- Image Type: `Pre Image`
+- Name: `pre`
+- Entity Alias: `pre`
+
+Depois, no campo de atributos, use exatamente os atributos abaixo.
+
+### Update de Servicos
+
+- `cr40f_motorista`
+- `cr40f_solicitante`
+
+### Update de Funcionarios
+
+- `cr40f_emailmicrosoft`
+
+Quando este step roda, o plugin busca servicos com:
+
+- `cr40f_motorista` igual ao funcionario salvo
+- `cr40f_dataehorriodesada` a partir de 45 dias atras
+- sem limite futuro
+- `new_foiprogramado = true`
+- `cr40f_ot` vazio
+- `new_categoriadoitem` em `100000000` ou `100000001`
+
+### Update de Servicos por passageiro
+
+- `cr40f_geral`
+- `cr40f_bancodedados`
+
+### Delete de Servicos por passageiro
+
+- `cr40f_geral`
+- `cr40f_bancodedados`
+
+### Update de Passageiros
+
+- `cr40f_nomedopassageiro`
+- `cr40f_telefone`
+
+### Update de Trocas de carro
+
+- `cr40f_motorista1`
+- `cr40f_motorista2`
+- `cr40f_statusdatroca`
+
+### Update de Posse de veiculo
+
+- `new_motorista`
+
+### Update de Colisoes
+
+- `cr40f_motorista`
+
+### Update de Recibos
+
+- `cr40f_motorista`
+
+Importante:
+
+- o alias tem que ser exatamente `pre`
+- os nomes dos atributos tem que estar exatamente iguais
+
+## Parte 6: o que revisar antes de fechar o PRT
+
+Confira:
+
+1. o assembly foi atualizado
+2. `cr40f_reservadeveculos Create` esta em `Synchronous`
+3. `cr40f_reservadeveculos Update` esta em `Synchronous`
+4. `cr40f_funcionarios Create` e `Update` estao em `Synchronous`
+5. `cr40f_trocasdecarro Create` e `Update` estao em `Synchronous`
+6. os steps de passageiro, posse, colisao e recibo estao em `Asynchronous`
+7. todos estao em `PostOperation`
+8. todos estao com `Deployment = Server`
+9. todos os `Create` estao sem image
+10. todos os `Update` estao com `Pre Image`
+11. toda `Pre Image` usa alias `pre`
+12. os filtros de `Update` estao corretos
+
+## Parte 7: permissoes do usuario tecnico
+
+Esse usuario precisa conseguir:
+
+- ler `cr40f_reservadeveculos`
+- ler `cr40f_manutencoes`
+- ler `cr40f_servicosporpassageiro`
+- ler `cr40f_bancodedados`
+- ler `cr40f_trocasdecarro`
+- ler `new_possedeveiculo`
+- ler `cr40f_colisao_v2`
+- ler `cr40f_recibos_v2`
+- ler `cr40f_funcionarios`
+- compartilhar e revogar `cr40f_funcionarios`
+- ler `systemuser`
+- compartilhar registros
+- revogar compartilhamento
+
+Na pratica, precisa ter capacidade de `GrantAccess`, `ModifyAccess` e `RevokeAccess`.
+
+## Parte 8: como testar agora
+
+### Teste 1. Criar servico ja com motorista
+
+1. crie um `cr40f_reservadeveculos`
+2. preencha `cr40f_motorista`
+3. salve
+
+Esperado:
+
+- se existir problema de email Microsoft ou `systemuser`, o save pode falhar na hora
+- se estiver tudo certo, o motorista recebe acesso
+- se o servico tiver `cr40f_om`, o motorista tambem recebe acesso a `cr40f_manutencoes`
+
+### Teste 2. Pegar servico sem motorista e atribuir
+
+1. abra um servico existente sem motorista
+2. preencha `cr40f_motorista`
+3. salve
+
+Esperado:
+
+- o motorista ganha acesso ao servico
+- se o servico tiver `cr40f_om`, o motorista ganha acesso a essa manutencao
+
+### Teste 3. Trocar motorista do servico
+
+1. abra um servico com motorista
+2. troque `cr40f_motorista`
+3. salve
+
+Esperado:
+
+- o novo motorista ganha acesso
+- o antigo perde acesso
+- se o servico tiver `cr40f_om`, o novo motorista ganha acesso a manutencao e o antigo perde
+
+### Teste 4. Confirmar filhos do servico
+
+No mesmo teste do servico, confirme tambem:
+
+- o novo motorista recebeu acesso aos `cr40f_servicosporpassageiro`
+- o novo motorista recebeu acesso aos passageiros relacionados
+- o novo motorista recebeu acesso ao `cr40f_solicitante`, quando preenchido
+- o antigo perdeu esses acessos quando deixou de ser o motorista
+
+### Teste 5. Funcionario sem email Microsoft
+
+1. escolha um funcionario com `cr40f_emailmicrosoft` vazio
+2. coloque no servico
+3. salve
+
+Esperado:
+
+- salva normal
+- nao compartilha
+- nao bloqueia
+
+### Teste 6. Email Microsoft inconsistente
+
+1. escolha um funcionario com `cr40f_emailmicrosoft` preenchido
+2. garanta que nao exista `systemuser` ativo correspondente
+3. tente salvar o servico
+
+Esperado:
+
+- o plugin falha
+- o servico principal acusa o problema na hora
+
+## Parte 9: como validar o compartilhamento real
+
+Validacao forte:
+
+1. abra o registro
+2. cole `scripts/audit-driver-record-sharing-plugin.console.js` no console do model-driven app
+3. rode `await window.DriverRecordSharingAudit.auditCurrentForm()`
+4. confirme que nao existem shares faltando para servico, manutencao, solicitante, servicos por passageiro e passageiros
+
+No teste de troca:
+
+1. valide que o novo motorista aparece
+2. valide que o antigo deixou de aparecer
+
+## Parte 10: se der erro
+
+Cheque nesta ordem:
+
+1. a DLL certa foi compilada?
+2. o assembly certo foi atualizado?
+3. os steps de `cr40f_reservadeveculos`, `cr40f_funcionarios` e `cr40f_trocasdecarro` estao `Synchronous`?
+4. os steps de passageiro, posse, colisao e recibo estao `Asynchronous`?
+5. todos estao em `PostOperation`?
+6. todos os `Update` receberam `Pre Image`?
+7. o alias da image esta exatamente `pre`?
+8. os atributos da image estao corretos?
+9. os filtros de `Update` estao corretos?
+10. o usuario tecnico tem permissao?
+11. o funcionario tem `cr40f_emailmicrosoft`?
+12. existe um `systemuser` ativo com exatamente esse email?
+13. existe mais de um `systemuser` ativo com esse email?

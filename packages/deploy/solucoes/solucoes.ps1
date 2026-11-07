@@ -500,9 +500,10 @@ function Test-FalhaTransitoriaDoServidor([string] $Erro) {
 
 # Primeira instalacao vai sem --stage-and-upgrade: o Dataverse recusa a solucao de retencao sem base ("Cannot create a
 # holding solution for missing base"). Com versao instalada, upgrade com stage, que e o que apaga o que saiu da solucao.
-function Get-ArgumentosDeImport([string] $Caminho, [string] $VersaoInstalada) {
+function Get-ArgumentosDeImport([string] $Caminho, [string] $VersaoInstalada, [string] $Configuracao = "") {
   $args = @("solution", "import", "--path", $Caminho)
   if ($VersaoInstalada) { $args += "--stage-and-upgrade" }
+  if ($Configuracao) { $args += @("--settings-file", $Configuracao) }
   return $args + @("--publish-changes", "--activate-plugins", "--async", "--max-async-wait-time", "180")
 }
 
@@ -515,9 +516,30 @@ function Wait-VersaoInstalada($Dv, [string] $Nome, [string] $Versao, [int] $Minu
   } while ($true)
 }
 
+# "Novo Servico" e "Retirado" usam a referencia do Web Push (BetinhosAutomacao). Sem conexao, o flow nao religa (0x80060467, ensaio
+# de 06/11/2026) e o PROD ficaria sem aviso ao motorista. A referencia so existe depois do import, entao a conexao entra por ele.
+$script:ReferenciaWebPush = "new_webpushmotoristas"
+$script:ConectorWebPush = "/providers/Microsoft.PowerApps/apis/shared_new-5fapp-20motoristas-20web-20push-5f30e351431b40001e"
+
+# PROD sem a conexao nao comeca: recusa antes do primeiro import, para nao deixar a publicacao pela metade.
+function Assert-ConexaoWebPush([string[]] $Solucoes, [string] $Alvo, [string] $Conexao) {
+  if ($Alvo -eq "Prod" -and $Solucoes -contains "BetinhosAutomacao" -and -not $Conexao) {
+    throw "BetinhosAutomacao no PROD exige a variavel CONEXAO_WEBPUSH do environment prod. Publique so a BetinhosCore, crie a conexao e grave o id dela."
+  }
+}
+
+# Grava o arquivo de --settings-file da BetinhosAutomacao. Sem conexao (TEST sem Web Push), nao ha arquivo.
+function New-ConfiguracaoDeImport([string] $Pasta, [string] $Solucao, [string] $Conexao) {
+  if ($Solucao -ne "BetinhosAutomacao" -or -not $Conexao) { return "" }
+  $caminho = Join-Path $Pasta "configuracao-$Solucao.json"
+  $corpo = [ordered]@{ EnvironmentVariables = @(); ConnectionReferences = @([ordered]@{ LogicalName = $script:ReferenciaWebPush; ConnectionId = $Conexao; ConnectorId = $script:ConectorWebPush }) }
+  [IO.File]::WriteAllText($caminho, (ConvertTo-Json $corpo -Depth 4), (New-Object Text.UTF8Encoding $false))
+  return $caminho
+}
+
 # Importa o ZIP gerenciado com upgrade e prova pela versao instalada. Pac com erro nao e falha se a versao chegou.
 # $Alvo: Test ou Prod (explicito). $Permitidas: as 4 por padrao; a retirada passa tambem AppBetinhos (upgrade antes de desinstalar).
-function Import-SolucaoGerenciada($Dv, [string] $Caminho, [string] $Alvo = "Test", [int] $MinutosDeEspera = 60, [string[]] $Permitidas = $script:Solucoes) {
+function Import-SolucaoGerenciada($Dv, [string] $Caminho, [string] $Alvo = "Test", [int] $MinutosDeEspera = 60, [string[]] $Permitidas = $script:Solucoes, [string] $Configuracao = "") {
   Assert-HostAlvo $Dv $Alvo
   $m = Get-ManifestoDoPacote $Caminho
   if (-not $m.Managed) { throw "$Caminho nao e gerenciada." }
@@ -527,7 +549,7 @@ function Import-SolucaoGerenciada($Dv, [string] $Caminho, [string] $Alvo = "Test
   do {
     $tentativas++
     $erroPac = $null
-    try { Invoke-Pac $Dv.Url (Get-ArgumentosDeImport $Caminho (Get-VersaoInstalada (Update-DvToken $Dv) $m.UniqueName)) | Out-Null }
+    try { Invoke-Pac $Dv.Url (Get-ArgumentosDeImport $Caminho (Get-VersaoInstalada (Update-DvToken $Dv) $m.UniqueName) $Configuracao) | Out-Null }
     catch {
       $erroPac = "$($_.Exception.Message)"
       if ($tentativas -lt 2 -and (Test-FalhaTransitoriaDoServidor $erroPac) -and (Get-VersaoInstalada (Update-DvToken $Dv) $m.UniqueName) -ne $m.Version) {
