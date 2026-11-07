@@ -271,7 +271,7 @@ namespace Betinhos.DriverRecordSharing
 
             var query = new QueryExpression(FuelSchema.Despesa)
             {
-                ColumnSet = new ColumnSet("cr40f_valor", "cr40f_litros", "cr40f_datagasto", "cr40f_estabelecimento", FuelSchema.DespesaCnpjLido)
+                ColumnSet = new ColumnSet("cr40f_valor", "cr40f_litros", "cr40f_datagasto", "cr40f_estabelecimento", FuelSchema.DespesaCnpjLido, FuelSchema.DespesaMotorista)
             };
             query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
             query.Criteria.AddCondition(FuelSchema.DespesaStatus, ConditionOperator.In, FuelSchema.StatusDespesaEnviado, FuelSchema.StatusDespesaPrecisaCorrigir, FuelSchema.StatusDespesaValidado);
