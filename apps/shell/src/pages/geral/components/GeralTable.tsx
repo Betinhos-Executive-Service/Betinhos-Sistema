@@ -59,9 +59,8 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
   // garante que cabeçalho e linhas compartilhem as mesmas trilhas quando a soma dos mínimos excede o contêiner.
   // Sim/Não ocupa uma trilha fixa estreita: o conteúdo é um switch, não cresce com a tela.
   const BOOLEAN_WIDTH = 96
-  // Durante o arraste a largura vem de `live`; ao soltar ela é gravada nas preferências e `live` zera.
-  const [live, setLive] = useState<Record<string, number>>({})
-  const drag = useRef<{ key: string; start: number; width: number } | null>(null)
+  // Durante o arraste a largura vive em `drag` e vai direto para o estilo da grade (um quadro por vez), sem renderizar a tabela; ao soltar é gravada nas preferências.
+  const drag = useRef<{ key: string; start: number; width: number; frame: number } | null>(null)
   const [dropAt, setDropAt] = useState<{ key: string; after: boolean } | null>(null)
   const [announce, setAnnounce] = useState('')
   const root = useRef<HTMLDivElement>(null)
@@ -91,9 +90,9 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
     const buttons = root.current?.querySelectorAll<HTMLElement>('.bt-colhead')
     buttons?.forEach((b) => { if (b.dataset.col === key) b.focus() })
   }, [columns])
-  const widthOf = (c: Column) => live[c.key] ?? c.width
+  const widthOf = (c: Column) => (drag.current?.key === c.key ? drag.current.width : c.width)
   const isBoolean = (c: Column) => cellKind(c, attributes?.get(c.key)) === 'boolean'
-  const isFixed = (c: Column) => live[c.key] != null || customWidths?.[c.key] != null
+  const isFixed = (c: Column) => drag.current?.key === c.key || customWidths?.[c.key] != null
   const track = (c: Column) => (isBoolean(c) ? `${BOOLEAN_WIDTH}px` : isFixed(c) ? `minmax(${widthOf(c)}px, ${widthOf(c)}px)` : `minmax(${Math.max(90, widthOf(c))}px, ${widthOf(c)}fr)`)
   const minOf = (c: Column) => (isBoolean(c) ? BOOLEAN_WIDTH : Math.max(90, widthOf(c)))
   const clampW = (w: number) => Math.min(1200, Math.max(90, Math.round(w)))
@@ -102,7 +101,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
     e.stopPropagation()
     pressing.current = true
     e.currentTarget.setPointerCapture?.(e.pointerId)
-    drag.current = { key: column.key, start: column.width, width: column.width }
+    drag.current = { key: column.key, start: column.width, width: column.width, frame: 0 }
   }
   const resizeMove = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current
@@ -111,16 +110,26 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
     // Mede a borda desenhada: trilhas `fr` ficam mais largas que a largura declarada, e partir dela fazia a coluna encolher e a borda fugir do cursor.
     const rect = cell.getBoundingClientRect()
     d.width = clampW(rect.width + e.clientX - rect.right)
-    setLive((l) => ({ ...l, [d.key]: d.width }))
+    const grid = cell.closest<HTMLElement>('.gr-grid')
+    if (!grid || d.frame) return
+    d.frame = requestAnimationFrame(() => {
+      d.frame = 0
+      const { cols, min } = layout()
+      grid.style.setProperty('--gr-columns', cols)
+      grid.style.setProperty('--gr-min-width', min)
+    })
   }
   const resizeEnd = (e: PointerEvent<HTMLDivElement>) => {
     pressing.current = false
     const d = drag.current
     drag.current = null
     if (!d) return
+    cancelAnimationFrame(d.frame)
+    // Volta o estilo ao que o React conhece; se a largura mudou, a gravação abaixo renderiza com ela.
+    const grid = e.currentTarget.closest<HTMLElement>('.gr-grid')
+    if (grid) { const { cols, min } = layout(); grid.style.setProperty('--gr-columns', cols); grid.style.setProperty('--gr-min-width', min) }
     if (e.currentTarget.hasPointerCapture?.(e.pointerId)) e.currentTarget.releasePointerCapture?.(e.pointerId)
     if (d.width !== d.start) onResize(d.key, d.width)
-    setLive((l) => { const { [d.key]: _gone, ...rest } = l; return rest })
   }
   const resizeKey = (column: Column) => (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
@@ -161,8 +170,9 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
     if (fromIndex < to) to -= 1
     if (fromIndex >= 0 && to !== fromIndex) onMove(from, to)
   }
-  const minTotal = 40 + columns.reduce((sum, c) => sum + minOf(c), 0)
-  const style = { '--gr-columns': `40px ${columns.map(track).join(' ')}`, '--gr-min-width': `${minTotal}px` } as CSSProperties
+  const layout = () => ({ cols: `40px ${columns.map(track).join(' ')}`, min: `${40 + columns.reduce((sum, c) => sum + minOf(c), 0)}px` })
+  const { cols, min } = layout()
+  const style = { '--gr-columns': cols, '--gr-min-width': min } as CSSProperties
   const ids = rows.map((r) => String(r[ID_ATTRIBUTE]))
   const all = ids.length > 0 && ids.every((id) => selected.has(id))
   const some = !all && ids.some((id) => selected.has(id))
