@@ -351,7 +351,7 @@ Todos os de DEV recusam o host de PROD; os `provision-*` sem `-Apply` rodam em d
 | `regravar-links-fotos.ps1` | regrava links `:i:/s/...` como URL com caminho e remove permissões de link `organization` |
 | `inspecionar-despesas-ia.ps1` | somente leitura (GET) sobre despesas IA; `-DumpDir` opcional |
 
-Plugins C# (`packages/plugins/scripts/push-*-plugin.ps1`): publicam os assemblies no DEV (financeiro, documentos, frota, acesso, cadastro, portal) e registram steps/Custom APIs pelos registradores `Cr40f.*.Registrar`/`tools` (detalhe não lido em profundidade; não confirmado). Os scripts acessam o DEV e, pelo `package.json` raiz, chamam `distribuir-apos-push.ps1` no fim.
+Plugins C# (`packages/plugins/scripts/push-*-plugin.ps1`): publicam os assemblies no DEV (financeiro, documentos, frota, acesso, cadastro, portal) e registram steps/Custom APIs pelos registradores `Cr40f.*.Registrar`/`tools` (detalhe não lido em profundidade; não confirmado). Os scripts acessam o DEV e, pelo `package.json` raiz, chamam `distribuir-apos-push.ps1` no fim. `Betinhos.DriverRecordSharing` (herdado do app Motoristas) tem `push-driverrecordsharing-plugin.ps1`, que só atualiza conteúdo e descrição do assembly já registrado, sem registrador; `Betinhos.ExpenseUpload` só compila e testa no CI.
 
 ## 9. `scripts/` e `.claude/`
 

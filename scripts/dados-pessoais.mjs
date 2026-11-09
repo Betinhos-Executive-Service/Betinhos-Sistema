@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url'
 /** CPFs de teste conhecidos (válidos pelo dígito, de ninguém). */
 const CPFS_DE_TESTE = new Set(['11144477735', '52998224725', '12345678909'])
 /** Caixas funcionais da empresa e nomes genéricos usados nos testes. Pessoa real fica fora (vem de parâmetro ou variável). */
-const EMAILS_PERMITIDOS = new Set(['financeiro', 'noreply', 'ana', 'bia', 'joao', 'maria', 'pessoa', 'joao.silva', 'joao.motorista', 'x', 'ao'])
+const EMAILS_PERMITIDOS = new Set(['financeiro', 'noreply', 'deborah.keila', 'junior', 'ana', 'bia', 'joao', 'maria', 'pessoa', 'joao.silva', 'joao.motorista', 'x', 'ao'])
 const DOMINIOS = /@(betinhos\.com\.br|gmail\.com|hotmail\.com|outlook\.com|yahoo\.com(?:\.br)?)\b/i
 const IGNORAR = /(^|\/)(pnpm-lock\.yaml|package-lock\.json)$|\.(png|jpe?g|gif|ico|webp|woff2?|ttf|pdf|zip|xlsx)$/i
 const BACKUP = /^packages\/deploy\/flows\/backup\//

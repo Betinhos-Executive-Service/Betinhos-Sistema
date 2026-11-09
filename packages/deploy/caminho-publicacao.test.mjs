@@ -7,6 +7,11 @@ test('só a tela vai direto (front)', () => {
   assert.equal(r.caminho, 'front')
 })
 
+test('teste da Tela Gerar Pagantes não muda o PROD; o código dela vai pelas soluções', () => {
+  assert.equal(caminhoDoArquivo('apps/gerar-pagantes/src/money.test.ts'), 'nada')
+  assert.equal(caminhoDoArquivo('apps/gerar-pagantes/src/money.ts'), 'solucoes')
+})
+
 test('tela com documentação continua front', () => {
   assert.equal(caminhoDaPublicacao(['apps/shell/src/App.tsx', 'docs/auto/01.md', '.claude/skills/x/SKILL.md']).caminho, 'front')
 })
@@ -42,7 +47,23 @@ test('registrador ou script de plugin vai pelas soluções', () => {
   }
 })
 
+test('Betinhos.DriverRecordSharing entra no caminho de plugin, sozinho ou com outros', () => {
+  const sozinho = caminhoDaPublicacao(['packages/plugins/Betinhos.DriverRecordSharing/FuelMath.cs'])
+  assert.equal(sozinho.caminho, 'plugin')
+  assert.deepEqual(sozinho.plugins, ['driverrecordsharing'])
+  const varios = caminhoDaPublicacao(['packages/plugins/Betinhos.DriverRecordSharing/A.cs', 'packages/plugins/Cr40f.Frota.Plugin/B.cs', 'packages/plugins/Betinhos.DriverRecordSharing/C.cs'])
+  assert.equal(varios.caminho, 'plugin')
+  assert.deepEqual(varios.plugins, ['driverrecordsharing', 'frota'])
+  assert.equal(caminhoDaPublicacao(['apps/shell/src/App.tsx', 'packages/plugins/Betinhos.DriverRecordSharing/A.cs']).caminho, 'front-plugin')
+})
+
+test('Betinhos.ExpenseUpload está congelado e não muda o PROD', () => {
+  assert.equal(caminhoDaPublicacao(['packages/plugins/Betinhos.ExpenseUpload/ExpenseUploadCommand.cs', 'packages/plugins/Betinhos.ExpenseUpload.Tests/ExpenseUploadTests.cs']).caminho, 'nada')
+  assert.deepEqual(caminhoDaPublicacao(['packages/plugins/Betinhos.ExpenseUpload/A.cs', 'packages/plugins/Betinhos.DriverRecordSharing/B.cs']).plugins, ['driverrecordsharing'])
+})
+
 test('teste de plugin não muda o PROD', () => {
+  assert.equal(caminhoDaPublicacao(['packages/plugins/Betinhos.DriverRecordSharing.Tests/A.cs']).caminho, 'nada')
   assert.equal(caminhoDaPublicacao(['packages/plugins/Cr40f.Frota.Plugin.Tests/A.cs']).caminho, 'nada')
 })
 

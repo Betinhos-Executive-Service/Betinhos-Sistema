@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <AssemblyName>Cr40f.GerarPagantes.Plugin.V2</AssemblyName>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>$(UserProfile)\.codex\keys\Cr40f.GerarPagantes.Plugin.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CrmSdk.CoreAssemblies" Version="9.0.2.60" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <Reference Include="System.Net.Http" />
+    <EmbeddedResource Include="assets\payment-email-template.html">
+      <LogicalName>Cr40f.GerarPagantes.Plugin.Assets.payment-email-template.html</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+</Project>
