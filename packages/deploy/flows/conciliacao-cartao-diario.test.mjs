@@ -201,7 +201,7 @@ test('varre transação parada em Aguardando quando o gatilho da despesa não pe
   assert.equal(acao('Paradas').inputs.parameters.$expand, '__NAV_T_DESPESA__($select=cr40f_statusoperacional)')
   // Mesma regra do flow Despesa atualizada: só muda de onde vem o status.
   const gravar = acao('Concluir_parada').inputs.parameters
-  const regra = despesa(flow).actions.Cada_aguardando.actions.Concluir.inputs.parameters
+  const regra = despesa(flow).actions.Se_concluir.actions.Cada_aguardando.actions.Concluir.inputs.parameters
   for (const campo of ['item/cr40f_situacao', 'item/cr40f_motivo']) {
     assert.equal(gravar[campo].replaceAll("items('Cada_parada')?['__NAV_T_DESPESA__']?['cr40f_statusoperacional']", "triggerOutputs()?['body/cr40f_statusoperacional']"), regra[campo])
   }
