@@ -34,7 +34,7 @@ $dataverseFlow = 'Flow Comprovantes Despesas Assincrono | App Motoristas'
 $sharePointFlow = 'Flow - Consultar Arquivos Sharepoint'
 $siteUrl = 'https://betinhos.sharepoint.com/sites/BetinhosGestoInterna'
 $libraryId = '0e524da8-15af-47ff-9b34-7116ac32763f'
-$triggerFilter = 'cr40f_statusanexo eq 100000002 and (cr40f_origem eq 100000000 or (cr40f_origem eq 100000002 and cr40f_conciliadacartao eq true)) and (cr40f_iastatusanalise eq null or cr40f_iastatusanalise eq 100000000)'
+$triggerFilter = 'cr40f_statusanexo eq 100000002 and (cr40f_origem eq 100000000 or (cr40f_origem eq 100000002 and cr40f_conciliadacartao eq true)) and ((cr40f_iastatusanalise eq null or cr40f_iastatusanalise eq 100000000 or (cr40f_iastatusanalise eq 100000002 and cr40f_statusoperacional eq 100000001)))'
 $constantesPath = Join-Path $PSScriptRoot '../despesas-ia/dist/constantes.json'
 $backupDir = Join-Path $PSScriptRoot 'flows/backup'
 if (([Uri]$environmentUrl).Host -ne 'org23b93544.crm2.dynamics.com') { throw 'Somente DEV.' }
