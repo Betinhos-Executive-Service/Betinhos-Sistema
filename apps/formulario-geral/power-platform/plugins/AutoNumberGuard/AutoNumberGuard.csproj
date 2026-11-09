@@ -13,7 +13,7 @@
 
   <Target Name="ValidateStrongNameKey" BeforeTargets="BeforeBuild">
     <Error
-      Condition="!Exists('$(MSBuildProjectDirectory)\AutoNumberGuard.snk')"
+      Condition="'$(SignAssembly)' != 'false' And !Exists('$(MSBuildProjectDirectory)\AutoNumberGuard.snk')"
       Text="Strong-name key not found. Run .\generate-strong-name-key.ps1 inside plugins\AutoNumberGuard before building." />
   </Target>
 
