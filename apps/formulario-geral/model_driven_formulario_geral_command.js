@@ -49,11 +49,21 @@
   }
 
   function getSelectedRecordId(primaryControl, selectedItemReferences) {
-    return firstRecordId(selectedItemReferences)
+    const selected = firstRecordId(selectedItemReferences)
       || firstRecordId(primaryControl?.selectedItemReferences)
-      || firstRecordId(primaryControl?.selectedItems)
-      || firstRecordId(primaryControl)
-      || cleanGuid(primaryControl?.data?.entity?.getId?.());
+      || firstRecordId(primaryControl?.selectedItems);
+    if (selected) return selected;
+    // Seleção de outra tabela (subgrid) não cai no registro do formulário.
+    if (Array.isArray(selectedItemReferences) && selectedItemReferences.length) return "";
+    return formRecordId(primaryControl);
+  }
+
+  // Formulário da reserva aberto no model-driven: só vale o registro da própria tabela.
+  function formRecordId(primaryControl) {
+    const entity = primaryControl?.data?.entity;
+    const entityName = safeCall(() => entity?.getEntityName?.());
+    if (entityName && entityName !== TABLE_NAME) return "";
+    return cleanGuid(safeCall(() => entity?.getId?.()));
   }
 
   function firstRecordId(value, seen = new Set()) {
@@ -62,6 +72,10 @@
     if (typeof value !== "object" && typeof value !== "function") return "";
     if (seen.has(value)) return "";
     seen.add(value);
+
+    // Referência de outra tabela (subgrid, lookup) não é uma reserva.
+    const entityType = value.TypeName || value.entityType || value.LogicalName;
+    if (typeof entityType === "string" && entityType && entityType !== TABLE_NAME) return "";
 
     if (Array.isArray(value)) {
       for (const item of value) {
@@ -84,11 +98,6 @@
         const found = firstRecordId(value[key], seen);
         if (found) return found;
       }
-    }
-
-    for (const item of Object.values(value)) {
-      const found = firstRecordId(item, seen);
-      if (found) return found;
     }
     return "";
   }

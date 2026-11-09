@@ -16749,6 +16749,14 @@
     window.setTimeout(() => item.remove(), timeout);
   }
 
+  // Rodapé: "v1.17.4 · dd/mm/aaaa HH:mm". A data/hora do build (America/Sao_Paulo) vem do bundle; sem ela mostra só a versão.
+  function renderCodeBuiltAt() {
+    const builtAt = String(window.__FORMULARIO_BUILD__?.builtAt || "").trim();
+    const target = document.getElementById("codeBuiltAtText");
+    if (target && builtAt) target.textContent = ` · ${builtAt}`;
+  }
+
+  renderCodeBuiltAt();
   installAppErrorLogging();
 
   init().catch((error) => {

@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 
 const root = path.resolve(__dirname, "..");
 const outputPath = path.join(root, "webresource.html");
@@ -298,6 +299,18 @@ assert.ok(html.includes("var BetinhosErrorLogger = (() => {"), "bundle deve embu
 assert.ok(html.indexOf("var BetinhosErrorLogger") < html.indexOf("function installAppErrorLogging"), "error-logger deve carregar antes do app.js");
 assert.ok(!html.includes('<script src="vendor/betinhos-error-logger.iife.js"'), "bundle nao deve depender do error-logger externo");
 assert.ok(/window\.__FORMULARIO_BUILD__ = \{ builtAt: "\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}" \}/.test(html), "bundle deve gravar data/hora do build");
+// Rodapé "vX.Y.Z · dd/mm/aaaa HH:mm": versão no #codeVersionText (o logger lê só a versão) e data/hora do build no #codeBuiltAtText.
+const footer = html.match(/<footer class="code-version"[^>]*>([\s\S]*?)<\/footer>/u)?.[1] || "";
+assert.ok(/<span>v<\/span><span id="codeVersionText">\d+\.\d+\.\d+<\/span><span id="codeBuiltAtText"><\/span>/.test(footer), "rodape deve ter versao e espaco para a data/hora do build");
+const renderFooter = html.match(/function renderCodeBuiltAt\(\) \{[\s\S]*?\n  \}\n/u)?.[0];
+assert.ok(renderFooter, "bundle deve conter renderCodeBuiltAt");
+for (const [builtAt, esperado] of [["09/11/2026 14:05", " · 09/11/2026 14:05"], ["", ""]]) {
+  const alvo = { textContent: "" };
+  const contexto = { window: { __FORMULARIO_BUILD__: { builtAt } }, document: { getElementById: (id) => (id === "codeBuiltAtText" ? alvo : null) } };
+  vm.runInNewContext(`${renderFooter}\nrenderCodeBuiltAt();`, contexto);
+  assert.equal(alvo.textContent, esperado, `rodape com builtAt "${builtAt}" deve mostrar "${esperado}"`);
+}
+assert.ok(html.indexOf("renderCodeBuiltAt();") < html.indexOf("installAppErrorLogging();"), "rodape deve ser preenchido ao iniciar o app");
 assert.ok(html.includes("console.error = (...args)"), "bundle deve logar erros capturados em catch");
 assert.ok(html.includes("migrateLegacyErrorLogQueue()"), "bundle deve migrar a fila local antiga de logs");
 assert.ok(html.includes(".passenger-edit-field textarea.passenger-edit-control"), "bundle deve conter regra dos textareas de passageiro");
